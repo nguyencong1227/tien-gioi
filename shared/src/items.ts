@@ -107,7 +107,7 @@ export const PICKUP_RANGE = 48;
 /** Trong khoảng này chỉ người được chia đồ nhặt được; sau đó server đặt owner = "" (ai cũng nhặt được) */
 export const LOOT_OWNER_MS = 30_000;
 /** Đồ rơi nằm trên đất bao lâu thì biến mất */
-export const LOOT_DESPAWN_MS = 120_000;
+export const LOOT_DESPAWN_MS = 90_000;
 
 export interface InvSlot { itemId: string; qty: number }
 /** Túi đồ: mảng INVENTORY_SLOTS phần tử, ô trống là null */
