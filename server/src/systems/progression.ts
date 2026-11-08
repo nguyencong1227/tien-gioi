@@ -12,6 +12,7 @@ import {
 } from "@tien-gioi/shared";
 import type { Player } from "../schema";
 import type { World, PlayerCtrl } from "../world";
+import { refreshQuests } from "./quests";
 
 const BREAK_COOLDOWN_MS = 3000;
 
@@ -45,6 +46,7 @@ export function gainExp(w: World, sid: string, p: Player, amount: number) {
     p.tier += 1;
     applyStats(p, true);
     w.events.fx({ kind: "levelup", by: sid, x: p.x, y: p.y, major: false });
+    refreshQuests(w, sid); // bước "reachRealm"
   }
 }
 
@@ -76,6 +78,7 @@ export function breakthrough(w: World, sid: string) {
     p.exp = 0;
     applyStats(p, true);
     w.events.fx({ kind: "levelup", by: sid, x: p.x, y: p.y, major: true });
+    refreshQuests(w, sid);
     w.events.sys(`⚡ ${p.name} đột phá thành công, bước vào ${REALMS[p.realm].name}!`);
   } else {
     p.exp = Math.floor(p.exp * (1 - BREAK_FAIL_EXP_LOSS));

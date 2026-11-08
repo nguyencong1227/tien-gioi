@@ -12,6 +12,7 @@ import { rand, angleDiff, type World, type PlayerCtrl, type MonsterCtrl } from "
 import { applyStats, gainExp } from "./progression";
 import { safeSpot } from "./movement";
 import { dropLoot } from "./loot";
+import { onMonsterKilled } from "./quests";
 
 const CRIT_CHANCE = 0.1;
 const CRIT_MULT = 1.8;
@@ -96,6 +97,7 @@ export function killMonster(w: World, id: string, mc: MonsterCtrl) {
       ),
     );
     gainExp(w, sid, p, share);
+    onMonsterKilled(w, sid, mc.def.id); // ai góp sát thương cũng được tính cho nhiệm vụ
   }
   if (mc.def.boss) w.events.sys(`🐉 ${mc.def.name} đã bị hạ!`);
   const mon = w.state.monsters.get(id);
