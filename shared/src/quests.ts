@@ -59,7 +59,7 @@ export const QUESTS: QuestDef[] = [
     giver: "truong_tran",
     desc: "Tới chào Hà lão ở tiệm thuốc phía tây trấn.",
     steps: [{ kind: "talk", npcId: "duoc_su" }],
-    rewards: { exp: 20, items: [{ itemId: "hoi_huyet_dan", qty: 3 }] },
+    rewards: { exp: 15, items: [{ itemId: "hoi_huyet_dan", qty: 3 }] },
     next: "tru_tho",
     talk: {
       offer: [
@@ -79,7 +79,7 @@ export const QUESTS: QuestDef[] = [
       { kind: "kill", monster: "tho", count: 5 },
       { kind: "collect", itemId: "long_tho", count: 3 },
     ],
-    rewards: { exp: 30, items: [{ itemId: "hoi_huyet_dan", qty: 2 }] },
+    rewards: { exp: 25, items: [{ itemId: "hoi_huyet_dan", qty: 2 }] },
     next: "buoc_vao_tien_do",
     talk: {
       offer: [
@@ -99,7 +99,7 @@ export const QUESTS: QuestDef[] = [
     giver: "truong_tran",
     desc: "Đột phá từ Phàm Nhân lên Luyện Khí.",
     steps: [{ kind: "reachRealm", realm: 1, tier: 0 }],
-    rewards: { exp: 30, items: [{ itemId: "hoi_linh_dan", qty: 2 }] },
+    rewards: { exp: 40, items: [{ itemId: "hoi_linh_dan", qty: 2 }] },
     next: "tinh_toa",
     talk: {
       offer: [
@@ -143,7 +143,7 @@ export const QUESTS: QuestDef[] = [
       { kind: "kill", monster: "lang", count: 8 },
       { kind: "collect", itemId: "nanh_soi", count: 5 },
     ],
-    rewards: { exp: 150, items: [{ itemId: "hoi_linh_dan", qty: 2 }] },
+    rewards: { exp: 80, items: [{ itemId: "hoi_linh_dan", qty: 2 }] },
     next: "thuoc_cho_tran",
     talk: {
       offer: [
@@ -167,7 +167,7 @@ export const QUESTS: QuestDef[] = [
       { kind: "collect", itemId: "nanh_soi", count: 4 },
     ],
     rewards: {
-      exp: 200,
+      exp: 80,
       items: [
         { itemId: "hoi_huyet_dan", qty: 4 },
         { itemId: "hoi_linh_dan", qty: 2 },
@@ -192,18 +192,18 @@ export const QUESTS: QuestDef[] = [
     id: "hac_ho",
     title: "Hắc Hổ xuống núi",
     giver: "truong_tran",
-    desc: "Đạt Luyện Khí tầng 6, rồi hạ 2 Hắc Hổ và mang về 1 tấm da hổ.",
+    desc: "Đạt Luyện Khí tầng 7, rồi hạ 2 Hắc Hổ và mang về 1 tấm da hổ.",
     steps: [
-      { kind: "reachRealm", realm: 1, tier: 5 },
+      { kind: "reachRealm", realm: 1, tier: 6 },
       { kind: "kill", monster: "ho", count: 2 },
       { kind: "collect", itemId: "da_ho", count: 1 },
     ],
-    rewards: { exp: 300, items: [{ itemId: "tu_khi_dan", qty: 1 }] },
+    rewards: { exp: 120, items: [{ itemId: "tu_khi_dan", qty: 1 }] },
     next: "dinh_luyen_khi",
     talk: {
       offer: [
         "Hắc Hổ vốn sống sâu trong rừng phía xa. Nay chúng xuống tới bìa rừng, cắn chết ba con trâu của trấn.",
-        "Chưa tới Luyện Khí tầng sáu thì đừng đi, một cú vồ của nó đủ khiến ngươi trọng thương. Mang đủ đan dược theo người.",
+        "Chưa tới Luyện Khí tầng bảy thì đừng đi, một cú vồ của nó đủ khiến ngươi trọng thương. Mang đủ đan dược theo người.",
       ],
       progress: [
         "Hắc Hổ ở xa trấn hơn Hôi Lang nhiều. Đánh vài đòn rồi lùi, đừng đứng yên chịu đòn.",
@@ -221,7 +221,7 @@ export const QUESTS: QuestDef[] = [
     desc: "Đạt Luyện Khí tầng 9.",
     steps: [{ kind: "reachRealm", realm: 1, tier: 8 }],
     rewards: {
-      exp: 300,
+      exp: 150,
       items: [
         { itemId: "tu_khi_dan", qty: 2 },
         { itemId: "hoi_huyet_dan", qty: 5 },
@@ -247,7 +247,7 @@ export const QUESTS: QuestDef[] = [
     giver: "cao_thi",
     desc: "Hạ 10 Hôi Lang.",
     steps: [{ kind: "kill", monster: "lang", count: 10 }],
-    rewards: { exp: 150, items: [{ itemId: "hoi_linh_dan", qty: 2 }] },
+    rewards: { exp: 60, items: [{ itemId: "hoi_linh_dan", qty: 2 }] },
     minRealm: { realm: 1, tier: 0 },
     daily: true,
     talk: {
@@ -262,7 +262,7 @@ export const QUESTS: QuestDef[] = [
     giver: "cao_thi",
     desc: "Nộp 5 nanh sói.",
     steps: [{ kind: "collect", itemId: "nanh_soi", count: 5 }],
-    rewards: { exp: 120 },
+    rewards: { exp: 50 },
     minRealm: { realm: 1, tier: 0 },
     daily: true,
     talk: {
@@ -277,12 +277,12 @@ export const QUESTS: QuestDef[] = [
     giver: "cao_thi",
     desc: "Hạ 3 Hắc Hổ.",
     steps: [{ kind: "kill", monster: "ho", count: 3 }],
-    rewards: { exp: 400, items: [{ itemId: "tu_khi_dan", qty: 1 }] },
-    minRealm: { realm: 1, tier: 5 },
+    rewards: { exp: 300, items: [{ itemId: "tu_khi_dan", qty: 1 }] },
+    minRealm: { realm: 1, tier: 6 },
     daily: true,
     talk: {
       offer: [
-        "Cáo thị: Hắc Hổ lảng vảng ở bìa rừng. Cần tu sĩ từ Luyện Khí tầng sáu trở lên, hạ ba con.",
+        "Cáo thị: Hắc Hổ lảng vảng ở bìa rừng. Cần tu sĩ từ Luyện Khí tầng bảy trở lên, hạ ba con.",
       ],
       progress: ["Hắc Hổ đánh rất đau. Mang theo Hồi Huyết Đan."],
       complete: ["Ba con Hắc Hổ trong một ngày. Người trong trấn sẽ còn nhắc tên ngươi."],

@@ -1,6 +1,6 @@
 // Test đơn vị cho các system với một World giả (không cần server Colyseus).
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { expToNext, statsFor, TOWN_PX, TICK_MS } from "@tien-gioi/shared";
+import { expToNext, statsFor, killExp, MONSTER_BY_ID, TOWN_PX, TICK_MS } from "@tien-gioi/shared";
 import { makeWorld, addPlayer, addMonster } from "./test-helpers";
 import { gainExp, tickRecovery } from "./progression";
 import { applyInputs, queueInput } from "./movement";
@@ -73,8 +73,8 @@ describe("combat", () => {
     mc.damageBy.set("a", 75).set("b", 25);
     killMonster(w, id, mc);
     expect(w.state.monsters.has(id)).toBe(false);
-    // Hôi Lang: 22 tu vi gốc × 1.35^3 (quái bậc 2), chia 75% / 25%
-    const full = 22 * Math.pow(1.35, 3);
+    // Chia 75% / 25% tu vi của cả con
+    const full = killExp(MONSTER_BY_ID.lang, 0, 0);
     expect(b.exp).toBe(Math.round(full * 0.25));
     expect(a.exp).toBe(Math.min(a.expMax, Math.round(full * 0.75))); // Phàm Nhân: đầy thì dừng chờ đột phá
     expect(a.exp).toBeGreaterThan(b.exp);

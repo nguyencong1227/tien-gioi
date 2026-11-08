@@ -45,7 +45,7 @@ Hai người cùng sở hữu **hợp đồng `shared/`**. Mỗi tính năng đi
 ### Hợp đồng `shared/` (Dev A soạn, Dev B review)
 - `shared/src/items.ts`:
   - `ItemDef { id, name, type: "consumable" | "material" | "equip", stack, rarity: 0..4, desc, effect? }`
-  - Đan dược khởi đầu: **Hồi Huyết Đan** (hồi 40% khí huyết), **Hồi Linh Đan** (hồi 50% linh lực), **Tụ Khí Đan** (+15% thanh tu vi, hồi chiêu 60 giây).
+  - Đan dược khởi đầu: **Hồi Huyết Đan** (hồi 40% khí huyết), **Hồi Linh Đan** (hồi 50% linh lực), **Tụ Khí Đan** (+5% thanh tu vi, hồi chiêu 60 giây; ban đầu 15%, giảm ở #28 vì đan hiếm cũng làm lệch đường cong tu luyện).
   - Nguyên liệu: lông thỏ, nanh sói, da hổ, vảy mãng (dùng cho M3).
 - `DROP_TABLES`: mỗi loại quái có danh sách `{ itemId, chance, min, max }`.
 - Tin nhắn mới: `useItem { slot }`, `pickup { lootId }`, `dropItem { slot, qty }`. Server → client: `inv { slots }` (chỉ gửi cho chủ túi).

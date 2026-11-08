@@ -20,6 +20,7 @@ import {
   type QuestsMsg,
   type DialogMsg,
   NPC_BY_ID,
+  QUEST_BY_ID,
 } from "@tien-gioi/shared";
 import type { WorldRoom } from "./WorldRoom";
 import type { WorldState } from "../schema";
@@ -443,7 +444,7 @@ describe("nhiệm vụ và NPC", () => {
     room.send("questTurnIn", { questId: "nhap_the" });
     await waitFor(() => quests.at(-1)!.done.includes("nhap_the"));
     await sleep(150);
-    expect(me().exp).toBe(20);
+    expect(me().exp).toBe(QUEST_BY_ID.nhap_the.rewards.exp);
     const pills = invs.at(-1)!.slots.filter((s) => s?.itemId === "hoi_huyet_dan");
     expect(pills.reduce((n, s) => n + s!.qty, 0)).toBe(3);
   });

@@ -1,6 +1,7 @@
 // Tu luyện: chỉ số theo cảnh giới, tu vi, đột phá, hồi phục / đả tọa.
 import {
   MEDITATE,
+  meditateExpPerSec,
   BREAK_FAIL_EXP_LOSS,
   REALMS,
   statsFor,
@@ -96,7 +97,7 @@ export function tickRecovery(w: World, sid: string, p: Player, c: PlayerCtrl, dt
   if (p.meditating) {
     p.hp = Math.min(p.maxHp, p.hp + p.maxHp * MEDITATE.hpRegenPct * dt);
     p.mp = Math.min(p.maxMp, p.mp + p.maxMp * MEDITATE.mpRegenPct * dt);
-    gainExp(w, sid, p, p.expMax * MEDITATE.expPctPerSec * dt);
+    gainExp(w, sid, p, meditateExpPerSec(p.realm, p.tier) * dt);
   } else {
     p.mp = Math.min(p.maxMp, p.mp + p.maxMp * 0.01 * dt);
     if (w.now - c.lastHitAt > 5000)
