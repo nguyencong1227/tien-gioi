@@ -3,9 +3,9 @@ import {
   SKILLS,
   RESPAWN_MS,
   DEATH_EXP_LOSS,
-  MONSTERS,
   MONSTER_BY_ID,
   statsFor,
+  killExp,
 } from "@tien-gioi/shared";
 import type { Player, Monster } from "../schema";
 import { rand, angleDiff, type World, type PlayerCtrl, type MonsterCtrl } from "../world";
@@ -90,12 +90,7 @@ export function killMonster(w: World, id: string, mc: MonsterCtrl) {
     const p = w.state.players.get(sid);
     if (!p || p.dead) continue;
     // Quái càng mạnh, tu vi càng tăng theo cấp số nhân
-    const share = Math.max(
-      1,
-      Math.round(
-        mc.def.exp * (dmg / total) * Math.pow(1.35, Math.max(0, MONSTERS.indexOf(mc.def) * 3)),
-      ),
-    );
+    const share = Math.max(1, Math.round(killExp(mc.def, p.realm, p.tier) * (dmg / total)));
     gainExp(w, sid, p, share);
     onMonsterKilled(w, sid, mc.def.id); // ai góp sát thương cũng được tính cho nhiệm vụ
   }
