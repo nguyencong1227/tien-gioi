@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
-  ITEMS, ITEM_BY_ID, DROP_TABLES, MONSTERS, INVENTORY_SLOTS,
-  rollDrops, emptyInventory, addToInventory,
+  ITEMS,
+  ITEM_BY_ID,
+  DROP_TABLES,
+  MONSTERS,
+  INVENTORY_SLOTS,
+  rollDrops,
+  emptyInventory,
+  addToInventory,
 } from "./index";
 
 describe("dữ liệu vật phẩm", () => {
@@ -44,7 +50,9 @@ describe("dữ liệu vật phẩm", () => {
 
 describe("rollDrops", () => {
   it("rng nhỏ: rơi tất cả, số lượng ít nhất; rng sát 1: không rơi gì", () => {
-    expect(rollDrops("lang", () => 0)).toEqual(DROP_TABLES.lang.map((e) => ({ itemId: e.itemId, qty: e.min })));
+    expect(rollDrops("lang", () => 0)).toEqual(
+      DROP_TABLES.lang.map((e) => ({ itemId: e.itemId, qty: e.min })),
+    );
     expect(rollDrops("lang", () => 0.999)).toEqual([]);
   });
 
