@@ -8,7 +8,15 @@ import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { Client, type Room } from "colyseus.js";
 import {
-  ROOM_NAME, MONSTER_CAP, TOWN_PX, SKILLS, expToNext, statsFor, type ChatOut, type ToastMsg, type InvMsg,
+  ROOM_NAME,
+  MONSTER_CAP,
+  TOWN_PX,
+  SKILLS,
+  expToNext,
+  statsFor,
+  type ChatOut,
+  type ToastMsg,
+  type InvMsg,
 } from "@tien-gioi/shared";
 import type { WorldRoom } from "./WorldRoom";
 import type { WorldState } from "../schema";
@@ -65,7 +73,14 @@ async function join(name = `Thu ${++nameSeq}`, secret = secretOf(name)) {
   room.onMessage("dmg", () => {});
   rooms.push(room);
   await waitFor(() => (room.state as any)?.players?.get(room.sessionId));
-  return { room, name, chat, toasts, invs, me: () => (room.state as any).players.get(room.sessionId) };
+  return {
+    room,
+    name,
+    chat,
+    toasts,
+    invs,
+    me: () => (room.state as any).players.get(room.sessionId),
+  };
 }
 
 /** Phòng thật phía server, để dựng tình huống (đặt quái cạnh người chơi…). */
@@ -79,13 +94,19 @@ function serverState(room: Room) {
 describe("vào game", () => {
   it("từ chối tên không hợp lệ", async () => {
     const client = new Client(`ws://localhost:${PORT}`);
-    await expect(client.joinOrCreate(ROOM_NAME, { name: "a", secret: secretOf("a") })).rejects.toThrow(/2–16 ký tự/);
-    await expect(client.joinOrCreate(ROOM_NAME, { name: "<script>", secret: secretOf("x") })).rejects.toThrow();
+    await expect(
+      client.joinOrCreate(ROOM_NAME, { name: "a", secret: secretOf("a") }),
+    ).rejects.toThrow(/2–16 ký tự/);
+    await expect(
+      client.joinOrCreate(ROOM_NAME, { name: "<script>", secret: secretOf("x") }),
+    ).rejects.toThrow();
   });
 
   it("từ chối khi thiếu mã nhân vật", async () => {
     const client = new Client(`ws://localhost:${PORT}`);
-    await expect(client.joinOrCreate(ROOM_NAME, { name: "Khong Ma", secret: "ngan" })).rejects.toThrow(/mã nhân vật/);
+    await expect(
+      client.joinOrCreate(ROOM_NAME, { name: "Khong Ma", secret: "ngan" }),
+    ).rejects.toThrow(/mã nhân vật/);
   });
 
   it("nhân vật mới bắt đầu ở Phàm Nhân, trong trấn, đủ quái trên bản đồ", async () => {
@@ -105,7 +126,9 @@ describe("vào game", () => {
   it("không cho cùng một nhân vật vào hai lần cùng lúc", async () => {
     const a = await join("Song Sinh");
     const client = new Client(`ws://localhost:${PORT}`);
-    await expect(client.joinOrCreate(ROOM_NAME, { name: "song sinh", secret: secretOf("Song Sinh") })).rejects.toThrow(/đang ở trong game/);
+    await expect(
+      client.joinOrCreate(ROOM_NAME, { name: "song sinh", secret: secretOf("Song Sinh") }),
+    ).rejects.toThrow(/đang ở trong game/);
     expect(a.me()).toBeTruthy();
   });
 
@@ -115,7 +138,9 @@ describe("vào game", () => {
     rooms.length = 0;
     await sleep(150);
     const client = new Client(`ws://localhost:${PORT}`);
-    await expect(client.joinOrCreate(ROOM_NAME, { name: "Chu Nhan", secret: secretOf("ke gian") })).rejects.toThrow(/đã có người dùng/);
+    await expect(
+      client.joinOrCreate(ROOM_NAME, { name: "Chu Nhan", secret: secretOf("ke gian") }),
+    ).rejects.toThrow(/đã có người dùng/);
   });
 });
 
@@ -177,7 +202,8 @@ describe("chiến đấu và tu luyện", () => {
     const p = st.players.get(room.sessionId)!;
     for (const [id, m] of st.monsters) {
       if (m.kind !== kind) continue;
-      m.x = p.x + dx; m.y = p.y;
+      m.x = p.x + dx;
+      m.y = p.y;
       return { id, m, p };
     }
     throw new Error(`Không có quái ${kind}`);
@@ -189,13 +215,16 @@ describe("chiến đấu và tu luyện", () => {
     const { id, m } = placeMonster(room, "tho");
     const before = m.hp;
     room.send("attack", { angle: 0 });
-    await waitFor(() => !serverState(room).monsters.has(id) || serverState(room).monsters.get(id)!.hp < before);
+    await waitFor(
+      () => !serverState(room).monsters.has(id) || serverState(room).monsters.get(id)!.hp < before,
+    );
     // Hạ máu còn 1 rồi đánh tiếp để chắc chắn giết được
     const mon = serverState(room).monsters.get(id);
     if (mon) {
       mon.hp = 1;
       const p = serverState(room).players.get(room.sessionId)!;
-      mon.x = p.x + 30; mon.y = p.y;
+      mon.x = p.x + 30;
+      mon.y = p.y;
       await sleep(SKILLS.slash.cooldown + 50);
       room.send("attack", { angle: 0 });
     }
@@ -237,12 +266,14 @@ describe("chiến đấu và tu luyện", () => {
     const st = serverState(room);
     const p = st.players.get(room.sessionId)!;
     // Đưa người chơi ra ngoài trấn, đặt Hôi Lang sát bên
-    p.x = TOWN_PX.x + TOWN_PX.r + 300; p.y = TOWN_PX.y;
+    p.x = TOWN_PX.x + TOWN_PX.r + 300;
+    p.y = TOWN_PX.y;
     p.exp = 30;
     p.hp = 1;
     for (const m of st.monsters.values()) {
       if (m.kind !== "lang") continue;
-      m.x = p.x + 20; m.y = p.y;
+      m.x = p.x + 20;
+      m.y = p.y;
       break;
     }
     await waitFor(() => me().dead, 4000);
@@ -288,7 +319,9 @@ describe("lưu nhân vật", () => {
   it("thoát game thì lưu cảnh giới và tu vi", async () => {
     const { room } = await join("Luu Tru");
     const p = serverState(room).players.get(room.sessionId)!;
-    p.realm = 1; p.tier = 3; p.exp = 12;
+    p.realm = 1;
+    p.tier = 3;
+    p.exp = 12;
     await room.leave(true);
     rooms.length = 0;
     const saved = await waitFor(() => {
@@ -339,14 +372,19 @@ describe("túi đồ và đồ rơi", () => {
     const p = st.players.get(room.sessionId)!;
     // Dời ra khỏi trấn để quái không bị kẹt, đặt một con Linh Thố máu 1 ngay trước mặt
     const [mid, mon] = [...st.monsters.entries()].find(([, m]) => m.kind === "tho")!;
-    mon.x = p.x + 20; mon.y = p.y; mon.hp = 1;
-    sr.world.mctrl.get(mid).homeX = mon.x; sr.world.mctrl.get(mid).homeY = mon.y;
+    mon.x = p.x + 20;
+    mon.y = p.y;
+    mon.hp = 1;
+    sr.world.mctrl.get(mid).homeX = mon.x;
+    sr.world.mctrl.get(mid).homeY = mon.y;
     // Phòng thế giới dùng chung giữa các test: bỏ qua đồ rơi còn sót từ test trước
     const old = new Set(st.loot.keys());
     vi.spyOn(Math, "random").mockReturnValue(0); // không bạo kích, rơi đủ đồ
     room.send("attack", { angle: 0 });
     const loot = await waitFor(() => {
-      const fresh = ([...(room.state as any).loot.entries()] as [string, any][]).filter(([id]) => !old.has(id));
+      const fresh = ([...(room.state as any).loot.entries()] as [string, any][]).filter(
+        ([id]) => !old.has(id),
+      );
       return fresh.length >= 2 && fresh;
     });
     vi.restoreAllMocks();

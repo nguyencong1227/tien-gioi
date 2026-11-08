@@ -1,7 +1,12 @@
 // Test đơn vị: túi đồ, đan dược, rơi đồ / nhặt đồ (World giả).
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  DROP_TABLES, ITEM_BY_ID, LOOT_DESPAWN_MS, LOOT_OWNER_MS, PICKUP_RANGE, expToNext,
+  DROP_TABLES,
+  ITEM_BY_ID,
+  LOOT_DESPAWN_MS,
+  LOOT_OWNER_MS,
+  PICKUP_RANGE,
+  expToNext,
 } from "@tien-gioi/shared";
 import { makeWorld, addPlayer, addMonster } from "./test-helpers";
 import { giveCommand, giveItem, sanitizeInventory, useItem } from "./inventory";
@@ -86,7 +91,8 @@ describe("dùng đan dược", () => {
     const { p } = addPlayer(w, "a");
     giveItem(w, "a", "hoi_huyet_dan", 1);
     giveItem(w, "a", "hoi_linh_dan", 1);
-    p.hp = 1; p.mp = 0;
+    p.hp = 1;
+    p.mp = 0;
     useItem(w, "a", 0);
     useItem(w, "a", 1);
     expect(p.hp).toBeGreaterThan(1);
@@ -110,7 +116,8 @@ describe("dùng đan dược", () => {
     const { w } = makeWorld();
     const { p, c } = addPlayer(w, "a");
     giveItem(w, "a", "hoi_huyet_dan", 1);
-    p.dead = true; p.hp = 0;
+    p.dead = true;
+    p.hp = 0;
     useItem(w, "a", 0);
     expect(p.hp).toBe(0);
     expect(c.inv[0]!.qty).toBe(1);
@@ -156,11 +163,14 @@ describe("rơi đồ", () => {
   it("hết 30 giây thì ai cũng nhặt được, hết 90 giây thì biến mất", () => {
     const { w } = makeWorld();
     const id = spawnLoot(w, "da_ho", 1, 0, 0, "a");
-    w.now += LOOT_OWNER_MS - 1; tickLoot(w);
+    w.now += LOOT_OWNER_MS - 1;
+    tickLoot(w);
     expect(w.state.loot.get(id)!.owner).toBe("a");
-    w.now += 1; tickLoot(w);
+    w.now += 1;
+    tickLoot(w);
     expect(w.state.loot.get(id)!.owner).toBe("");
-    w.now += LOOT_DESPAWN_MS; tickLoot(w);
+    w.now += LOOT_DESPAWN_MS;
+    tickLoot(w);
     expect(w.state.loot.has(id)).toBe(false);
     expect(w.lctrl.has(id)).toBe(false);
   });
@@ -191,7 +201,8 @@ describe("nhặt đồ", () => {
     expect(c.inv.every((s) => s === null)).toBe(true);
     expect(w.state.loot.has(id)).toBe(true);
     expect(toasts.at(-1)).toMatchObject({ sid: "b", msg: { tone: "bad" } });
-    w.now += LOOT_OWNER_MS; tickLoot(w);
+    w.now += LOOT_OWNER_MS;
+    tickLoot(w);
     pickup(w, "b", id);
     expect(c.inv[0]).toEqual({ itemId: "nanh_soi", qty: 1 });
   });

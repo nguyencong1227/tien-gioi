@@ -9,7 +9,11 @@ export function chat(w: World, sid: string, raw: unknown) {
   const p = w.state.players.get(sid);
   const c = w.ctrl.get(sid);
   if (!p || !c || typeof raw !== "string") return;
-  const text = raw.normalize("NFC").replace(/[\u0000-\u001f]/g, "").trim().slice(0, MAX_LEN);
+  const text = raw
+    .normalize("NFC")
+    .replace(/[\u0000-\u001f]/g, "")
+    .trim()
+    .slice(0, MAX_LEN);
   if (!text) return;
   // Lệnh thử nghiệm (không gửi ra kênh chat)
   if (text.startsWith("/give")) return giveCommand(w, sid, text.split(/\s+/).slice(1));

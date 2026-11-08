@@ -1,6 +1,14 @@
 // Trạng thái thế giới dùng chung cho các system. Không phụ thuộc Colyseus Room,
 // nên các system có thể test riêng bằng một World giả.
-import type { InputMsg, FxMsg, DmgMsg, ToastMsg, MonsterKind, Inventory, InvMsg } from "@tien-gioi/shared";
+import type {
+  InputMsg,
+  FxMsg,
+  DmgMsg,
+  ToastMsg,
+  MonsterKind,
+  Inventory,
+  InvMsg,
+} from "@tien-gioi/shared";
 import type { WorldState, Player } from "./schema";
 import type { SavedPlayer } from "./store";
 
@@ -62,7 +70,10 @@ export class World {
   monsterSeq = 0;
   lootSeq = 0;
 
-  constructor(readonly state: WorldState, readonly events: WorldEvents) {}
+  constructor(
+    readonly state: WorldState,
+    readonly events: WorldEvents,
+  ) {}
 
   /** Người chơi còn sống và đang trong phòng; null nếu không. */
   ready(sessionId: string): { p: Player; c: PlayerCtrl } | null {
@@ -74,4 +85,5 @@ export class World {
 }
 
 export const rand = (a: number, b: number) => a + Math.random() * (b - a);
-export const angleDiff = (a: number, b: number) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
+export const angleDiff = (a: number, b: number) =>
+  Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));

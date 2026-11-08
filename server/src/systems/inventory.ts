@@ -1,8 +1,12 @@
 // Túi đồ: nhận đồ, dùng đan dược, đồng bộ túi cho chủ túi.
 // Túi nằm trong PlayerCtrl (dữ liệu riêng), chỉ gửi cho chủ qua tin nhắn `inv`.
 import {
-  INVENTORY_SLOTS, ITEM_BY_ID, addToInventory, emptyInventory,
-  type Inventory, type InvSlot,
+  INVENTORY_SLOTS,
+  ITEM_BY_ID,
+  addToInventory,
+  emptyInventory,
+  type Inventory,
+  type InvSlot,
 } from "@tien-gioi/shared";
 import type { World } from "../world";
 import { gainExp } from "./progression";
@@ -26,7 +30,11 @@ export function sendInv(w: World, sid: string, gained?: InvSlot[]) {
   if (!c) return;
   const cd: Record<string, number> = {};
   for (const [id, until] of c.itemCd) if (until > w.now) cd[id] = until - w.now;
-  w.events.inv(sid, { slots: c.inv.map((s) => (s ? { ...s } : null)), cd, ...(gained?.length ? { gained } : {}) });
+  w.events.inv(sid, {
+    slots: c.inv.map((s) => (s ? { ...s } : null)),
+    cd,
+    ...(gained?.length ? { gained } : {}),
+  });
 }
 
 /** Cho vật phẩm vào túi người chơi. Trả về số còn thừa (túi đầy). */
@@ -41,7 +49,9 @@ export function giveItem(w: World, sid: string, itemId: string, qty: number): nu
 
 /** Số thứ tự ô hợp lệ (0..23) hoặc -1. */
 export function slotIndex(slot: unknown): number {
-  return typeof slot === "number" && Number.isInteger(slot) && slot >= 0 && slot < INVENTORY_SLOTS ? slot : -1;
+  return typeof slot === "number" && Number.isInteger(slot) && slot >= 0 && slot < INVENTORY_SLOTS
+    ? slot
+    : -1;
 }
 
 /** Bớt qty món ở một ô, hết thì ô thành trống. */
@@ -62,13 +72,17 @@ export function useItem(w: World, sid: string, slot: unknown) {
   if (!def?.effect) return;
   const ready = c.itemCd.get(def.id) ?? 0;
   if (w.now < ready) {
-    return w.events.toast(sid, { text: `${def.name} đang hồi, chờ ${Math.ceil((ready - w.now) / 1000)} giây.`, tone: "info" });
+    return w.events.toast(sid, {
+      text: `${def.name} đang hồi, chờ ${Math.ceil((ready - w.now) / 1000)} giây.`,
+      tone: "info",
+    });
   }
 
   const e = def.effect;
   switch (e.kind) {
     case "healHp":
-      if (p.hp >= p.maxHp) return w.events.toast(sid, { text: "Khí huyết đang đầy.", tone: "info" });
+      if (p.hp >= p.maxHp)
+        return w.events.toast(sid, { text: "Khí huyết đang đầy.", tone: "info" });
       p.hp = Math.min(p.maxHp, p.hp + p.maxHp * e.pct);
       break;
     case "healMp":
@@ -76,7 +90,8 @@ export function useItem(w: World, sid: string, slot: unknown) {
       p.mp = Math.min(p.maxMp, p.mp + p.maxMp * e.pct);
       break;
     case "exp":
-      if (p.exp >= p.expMax) return w.events.toast(sid, { text: "Tu vi đã đầy, hãy đột phá trước.", tone: "info" });
+      if (p.exp >= p.expMax)
+        return w.events.toast(sid, { text: "Tu vi đã đầy, hãy đột phá trước.", tone: "info" });
       gainExp(w, sid, p, p.expMax * e.pct);
       break;
   }
@@ -91,7 +106,10 @@ export function giveCommand(w: World, sid: string, args: string[]): void {
   const [itemId, rawQty] = args;
   const def = itemId ? ITEM_BY_ID[itemId] : undefined;
   if (!def) {
-    return w.events.toast(sid, { text: `Không có vật phẩm "${itemId ?? ""}". Có: ${Object.keys(ITEM_BY_ID).join(", ")}`, tone: "bad" });
+    return w.events.toast(sid, {
+      text: `Không có vật phẩm "${itemId ?? ""}". Có: ${Object.keys(ITEM_BY_ID).join(", ")}`,
+      tone: "bad",
+    });
   }
   const qty = Math.min(999, Math.max(1, Math.floor(Number(rawQty ?? 1)) || 1));
   const left = giveItem(w, sid, def.id, qty);

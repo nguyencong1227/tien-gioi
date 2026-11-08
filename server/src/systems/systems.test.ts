@@ -32,7 +32,9 @@ describe("progression", () => {
   it("đả tọa hồi khí huyết, linh lực và tăng tu vi", () => {
     const { w } = makeWorld();
     const { p, c } = addPlayer(w, "a");
-    p.hp = 10; p.mp = 0; p.meditating = true;
+    p.hp = 10;
+    p.mp = 0;
+    p.meditating = true;
     tickRecovery(w, "a", p, c, 1);
     expect(p.hp).toBeGreaterThan(10);
     expect(p.mp).toBeGreaterThan(0);
@@ -54,7 +56,8 @@ describe("movement", () => {
   it("vector hướng dài hơn 1 bị chuẩn hóa", () => {
     const { w } = makeWorld();
     const { p, c } = addPlayer(w, "a");
-    p.x = TOWN_PX.x; p.y = TOWN_PX.y;
+    p.x = TOWN_PX.x;
+    p.y = TOWN_PX.y;
     queueInput(w, "a", { seq: 1, dx: 100, dy: 0 });
     applyInputs(p, c);
     expect(p.x - TOWN_PX.x).toBeCloseTo(statsFor(0, 0).speed * (TICK_MS / 1000));

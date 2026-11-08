@@ -2,7 +2,10 @@
 <html lang="vi">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
     <meta name="theme-color" content="#1d1a16" />
     <title>Tiên Giới</title>
     <link rel="stylesheet" href="/src/style.css" />
@@ -32,19 +35,33 @@
 
       <div id="chat" class="panel">
         <div id="chat-log"></div>
-        <form id="chat-form" autocomplete="off"><input id="chat-input" maxlength="120" placeholder="Truyền âm… (Enter)" /></form>
+        <form id="chat-form" autocomplete="off">
+          <input id="chat-input" maxlength="120" placeholder="Truyền âm… (Enter)" />
+        </form>
       </div>
 
       <div id="skills">
-        <button class="sk" id="sk-break" title="Đột phá (B)"><span>破</span><small>Đột phá</small></button>
-        <button class="sk" id="sk-med" title="Đả tọa (L)"><span>坐</span><small>Đả tọa</small></button>
-        <button class="sk" id="sk-sword" title="Kiếm khí (K)"><span>氣</span><small>Kiếm khí</small><em class="cd"></em></button>
-        <button class="sk big" id="sk-slash" title="Kiếm chém (J / Space)"><span>劍</span><small>Chém</small><em class="cd"></em></button>
+        <button class="sk" id="sk-break" title="Đột phá (B)">
+          <span>破</span><small>Đột phá</small>
+        </button>
+        <button class="sk" id="sk-med" title="Đả tọa (L)">
+          <span>坐</span><small>Đả tọa</small>
+        </button>
+        <button class="sk" id="sk-sword" title="Kiếm khí (K)">
+          <span>氣</span><small>Kiếm khí</small><em class="cd"></em>
+        </button>
+        <button class="sk big" id="sk-slash" title="Kiếm chém (J / Space)">
+          <span>劍</span><small>Chém</small><em class="cd"></em>
+        </button>
       </div>
 
       <div id="toast"></div>
-      <div id="death" hidden><div><b>Trọng thương</b><span id="death-t"></span></div></div>
-      <div id="help">WASD/←↑→↓ di chuyển · J/Space chém · K kiếm khí · L đả tọa · B đột phá · Enter chat</div>
+      <div id="death" hidden>
+        <div><b>Trọng thương</b><span id="death-t"></span></div>
+      </div>
+      <div id="help">
+        WASD/←↑→↓ di chuyển · J/Space chém · K kiếm khí · L đả tọa · B đột phá · Enter chat
+      </div>
     </div>
 
     <script type="module" src="/src/main.ts"></script>
