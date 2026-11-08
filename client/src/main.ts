@@ -12,14 +12,18 @@ function serverUrl() {
   if (env) return env;
   const proto = location.protocol === "https:" ? "wss" : "ws";
   // Dev: client chạy ở Vite, server ở cổng PORT (.env.local, mặc định 2567). Production: cùng một địa chỉ.
-  return import.meta.env.DEV ? `${proto}://${location.hostname}:${__SERVER_PORT__}` : `${proto}://${location.host}`;
+  return import.meta.env.DEV
+    ? `${proto}://${location.hostname}:${__SERVER_PORT__}`
+    : `${proto}://${location.host}`;
 }
 
 /** Mã bí mật giữ tên nhân vật, lưu trong máy (bản thử, chưa có tài khoản thật). */
 function secret() {
   let s = localStorage.getItem(SECRET_KEY);
   if (!s) {
-    s = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
+    s = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) =>
+      b.toString(16).padStart(2, "0"),
+    ).join("");
     localStorage.setItem(SECRET_KEY, s);
   }
   return s;
@@ -38,11 +42,15 @@ form.addEventListener("submit", async (e) => {
   const name = nameInput.value.trim();
   try {
     const client = new Client(serverUrl());
-    const room = await client.joinOrCreate(ROOM_NAME, { name, secret: secret() } satisfies JoinOptions);
+    const room = await client.joinOrCreate(ROOM_NAME, {
+      name,
+      secret: secret(),
+    } satisfies JoinOptions);
     localStorage.setItem(NAME_KEY, name);
     start(room);
   } catch (e: any) {
-    err.textContent = e?.message && !/^\d+$/.test(e.message) ? e.message : "Không kết nối được máy chủ.";
+    err.textContent =
+      e?.message && !/^\d+$/.test(e.message) ? e.message : "Không kết nối được máy chủ.";
     btn.disabled = false;
   }
 });
@@ -58,6 +66,7 @@ function start(room: Room) {
     scene: [new WorldScene(room)],
   });
   room.onLeave((code) => {
-    if (code !== 1000) ui.toast({ text: "Mất kết nối với Tiên Giới. Tải lại trang để vào lại.", tone: "bad" });
+    if (code !== 1000)
+      ui.toast({ text: "Mất kết nối với Tiên Giới. Tải lại trang để vào lại.", tone: "bad" });
   });
 }

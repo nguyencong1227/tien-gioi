@@ -15,14 +15,16 @@ export function setupJoystick() {
   document.getElementById("ui")!.append(zone);
 
   let id: number | null = null;
-  let ox = 0, oy = 0;
+  let ox = 0,
+    oy = 0;
 
   zone.addEventListener("pointerdown", (e) => {
     if (id !== null) return;
     id = e.pointerId;
     zone.setPointerCapture(id);
     const r = zone.getBoundingClientRect();
-    ox = e.clientX; oy = e.clientY;
+    ox = e.clientX;
+    oy = e.clientY;
     base.style.left = `${ox - r.left}px`;
     base.style.top = `${oy - r.top}px`;
     base.classList.add("on");
@@ -31,9 +33,13 @@ export function setupJoystick() {
   });
   const move = (e: PointerEvent) => {
     if (e.pointerId !== id) return;
-    let dx = e.clientX - ox, dy = e.clientY - oy;
+    let dx = e.clientX - ox,
+      dy = e.clientY - oy;
     const len = Math.hypot(dx, dy);
-    if (len > RADIUS) { dx = (dx / len) * RADIUS; dy = (dy / len) * RADIUS; }
+    if (len > RADIUS) {
+      dx = (dx / len) * RADIUS;
+      dy = (dy / len) * RADIUS;
+    }
     knob.style.transform = `translate(${dx}px, ${dy}px)`;
     const dead = len < 8;
     joystick.x = dead ? 0 : dx / RADIUS;

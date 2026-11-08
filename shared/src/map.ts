@@ -42,9 +42,12 @@ function makeNoise(seed: number, cell: number) {
   const g = Array.from({ length: gw * gh }, () => rnd());
   const smooth = (t: number) => t * t * (3 - 2 * t);
   return (x: number, y: number) => {
-    const fx = x / cell, fy = y / cell;
-    const x0 = Math.floor(fx), y0 = Math.floor(fy);
-    const tx = smooth(fx - x0), ty = smooth(fy - y0);
+    const fx = x / cell,
+      fy = y / cell;
+    const x0 = Math.floor(fx),
+      y0 = Math.floor(fy);
+    const tx = smooth(fx - x0),
+      ty = smooth(fy - y0);
     const v = (i: number, j: number) => g[j * gw + i];
     const a = v(x0, y0) + (v(x0 + 1, y0) - v(x0, y0)) * tx;
     const b = v(x0, y0 + 1) + (v(x0 + 1, y0 + 1) - v(x0, y0 + 1)) * tx;
@@ -86,19 +89,28 @@ function generate(): Uint8Array {
     }
   }
   const road = (dx: number, dy: number) => {
-    let x = TOWN.cx, y = TOWN.cy;
+    let x = TOWN.cx,
+      y = TOWN.cy;
     const wob = mulberry32(MAP_SEED + dx * 7 + dy * 13);
     while (x > 1 && y > 1 && x < MAP_W - 2 && y < MAP_H - 2) {
       for (let k = -1; k <= 0; k++) {
-        const px = dx ? x : x + k, py = dy ? y : y + k;
+        const px = dx ? x : x + k,
+          py = dy ? y : y + k;
         const i = py * MAP_W + px;
         if (tiles[i] !== T.Stone) tiles[i] = T.Dirt;
       }
-      x += dx; y += dy;
-      if (wob() < 0.25) { if (dx) y += wob() < 0.5 ? -1 : 1; else x += wob() < 0.5 ? -1 : 1; }
+      x += dx;
+      y += dy;
+      if (wob() < 0.25) {
+        if (dx) y += wob() < 0.5 ? -1 : 1;
+        else x += wob() < 0.5 ? -1 : 1;
+      }
     }
   };
-  road(1, 0); road(-1, 0); road(0, 1); road(0, -1);
+  road(1, 0);
+  road(-1, 0);
+  road(0, 1);
+  road(0, -1);
   return tiles;
 }
 
@@ -116,15 +128,18 @@ export function isBlockedPx(x: number, y: number): boolean {
 /** Kiểm tra hình tròn bán kính r có chạm ô chặn không. */
 export function circleBlocked(x: number, y: number, r: number): boolean {
   return (
-    isBlockedPx(x - r, y - r) || isBlockedPx(x + r, y - r) ||
-    isBlockedPx(x - r, y + r) || isBlockedPx(x + r, y + r) ||
+    isBlockedPx(x - r, y - r) ||
+    isBlockedPx(x + r, y - r) ||
+    isBlockedPx(x - r, y + r) ||
+    isBlockedPx(x + r, y + r) ||
     isBlockedPx(x, y)
   );
 }
 
 /** Di chuyển có trượt theo tường (tách trục X/Y). Dùng chung client và server. */
 export function moveWithCollision(x: number, y: number, dx: number, dy: number, r: number) {
-  let nx = x + dx, ny = y;
+  let nx = x + dx,
+    ny = y;
   if (circleBlocked(nx, ny, r)) nx = x;
   ny = y + dy;
   if (circleBlocked(nx, ny, r)) ny = y;

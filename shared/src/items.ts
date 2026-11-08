@@ -5,15 +5,19 @@ export type ItemType = "consumable" | "material" | "equip";
 /** 0 phàm phẩm, 1 linh phẩm, 2 bảo phẩm, 3 tiên phẩm, 4 thần phẩm */
 export type Rarity = 0 | 1 | 2 | 3 | 4;
 
-export const RARITY_NAMES = ["Phàm phẩm", "Linh phẩm", "Bảo phẩm", "Tiên phẩm", "Thần phẩm"] as const;
+export const RARITY_NAMES = [
+  "Phàm phẩm",
+  "Linh phẩm",
+  "Bảo phẩm",
+  "Tiên phẩm",
+  "Thần phẩm",
+] as const;
 /** Màu gợi ý cho viền ô / hiệu ứng nhấp nháy đồ rơi */
 export const RARITY_COLORS = [0xc9c4b8, 0x6fcf73, 0x4fa3ff, 0xc277ff, 0xffb23f] as const;
 
 /** Hiệu ứng khi dùng. pct tính theo giá trị tối đa (khí huyết, linh lực, thanh tu vi của bậc hiện tại). */
 export type ItemEffect =
-  | { kind: "healHp"; pct: number }
-  | { kind: "healMp"; pct: number }
-  | { kind: "exp"; pct: number };
+  { kind: "healHp"; pct: number } | { kind: "healMp"; pct: number } | { kind: "exp"; pct: number };
 
 export interface ItemDef {
   id: string;
@@ -34,22 +38,75 @@ export interface ItemDef {
 export const ITEMS: ItemDef[] = [
   // ---------- Đan dược ----------
   {
-    id: "hoi_huyet_dan", name: "Hồi Huyết Đan", type: "consumable", stack: 20, rarity: 0,
-    desc: "Hồi 40% khí huyết.", effect: { kind: "healHp", pct: 0.4 }, cooldown: 8_000, color: 0xd9433b,
+    id: "hoi_huyet_dan",
+    name: "Hồi Huyết Đan",
+    type: "consumable",
+    stack: 20,
+    rarity: 0,
+    desc: "Hồi 40% khí huyết.",
+    effect: { kind: "healHp", pct: 0.4 },
+    cooldown: 8_000,
+    color: 0xd9433b,
   },
   {
-    id: "hoi_linh_dan", name: "Hồi Linh Đan", type: "consumable", stack: 20, rarity: 0,
-    desc: "Hồi 50% linh lực.", effect: { kind: "healMp", pct: 0.5 }, cooldown: 8_000, color: 0x3b7bd9,
+    id: "hoi_linh_dan",
+    name: "Hồi Linh Đan",
+    type: "consumable",
+    stack: 20,
+    rarity: 0,
+    desc: "Hồi 50% linh lực.",
+    effect: { kind: "healMp", pct: 0.5 },
+    cooldown: 8_000,
+    color: 0x3b7bd9,
   },
   {
-    id: "tu_khi_dan", name: "Tụ Khí Đan", type: "consumable", stack: 10, rarity: 1,
-    desc: "Tăng 15% thanh tu vi của bậc hiện tại.", effect: { kind: "exp", pct: 0.15 }, cooldown: 60_000, color: 0xe8c547,
+    id: "tu_khi_dan",
+    name: "Tụ Khí Đan",
+    type: "consumable",
+    stack: 10,
+    rarity: 1,
+    desc: "Tăng 15% thanh tu vi của bậc hiện tại.",
+    effect: { kind: "exp", pct: 0.15 },
+    cooldown: 60_000,
+    color: 0xe8c547,
   },
   // ---------- Nguyên liệu ----------
-  { id: "long_tho", name: "Lông thỏ", type: "material", stack: 99, rarity: 0, desc: "Lông mềm của Linh Thố.", color: 0xf4efe2 },
-  { id: "nanh_soi", name: "Nanh sói", type: "material", stack: 99, rarity: 0, desc: "Nanh sắc của Hôi Lang.", color: 0xdcd6c8 },
-  { id: "da_ho", name: "Da hổ", type: "material", stack: 99, rarity: 1, desc: "Tấm da dày của Hắc Hổ.", color: 0x5a4a3a },
-  { id: "vay_mang", name: "Vảy mãng", type: "material", stack: 99, rarity: 2, desc: "Vảy đỏ thẫm của Xích Mãng.", color: 0xb3262a },
+  {
+    id: "long_tho",
+    name: "Lông thỏ",
+    type: "material",
+    stack: 99,
+    rarity: 0,
+    desc: "Lông mềm của Linh Thố.",
+    color: 0xf4efe2,
+  },
+  {
+    id: "nanh_soi",
+    name: "Nanh sói",
+    type: "material",
+    stack: 99,
+    rarity: 0,
+    desc: "Nanh sắc của Hôi Lang.",
+    color: 0xdcd6c8,
+  },
+  {
+    id: "da_ho",
+    name: "Da hổ",
+    type: "material",
+    stack: 99,
+    rarity: 1,
+    desc: "Tấm da dày của Hắc Hổ.",
+    color: 0x5a4a3a,
+  },
+  {
+    id: "vay_mang",
+    name: "Vảy mãng",
+    type: "material",
+    stack: 99,
+    rarity: 2,
+    desc: "Vảy đỏ thẫm của Xích Mãng.",
+    color: 0xb3262a,
+  },
 ];
 
 export const ITEM_BY_ID: Record<string, ItemDef> = Object.fromEntries(ITEMS.map((i) => [i.id, i]));
@@ -89,7 +146,10 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
 };
 
 /** Tung bảng rơi đồ. rng trả về số trong [0, 1) (truyền vào để test được). */
-export function rollDrops(monsterKind: string, rng: () => number = Math.random): { itemId: string; qty: number }[] {
+export function rollDrops(
+  monsterKind: string,
+  rng: () => number = Math.random,
+): { itemId: string; qty: number }[] {
   const out: { itemId: string; qty: number }[] = [];
   for (const e of DROP_TABLES[monsterKind] ?? []) {
     if (rng() >= e.chance) continue;
@@ -109,7 +169,10 @@ export const LOOT_OWNER_MS = 30_000;
 /** Đồ rơi nằm trên đất bao lâu thì biến mất */
 export const LOOT_DESPAWN_MS = 90_000;
 
-export interface InvSlot { itemId: string; qty: number }
+export interface InvSlot {
+  itemId: string;
+  qty: number;
+}
 /** Túi đồ: mảng INVENTORY_SLOTS phần tử, ô trống là null */
 export type Inventory = (InvSlot | null)[];
 
@@ -129,13 +192,15 @@ export function addToInventory(slots: Inventory, itemId: string, qty: number): n
     if (left === 0) break;
     if (s && s.itemId === itemId && s.qty < def.stack) {
       const n = Math.min(left, def.stack - s.qty);
-      s.qty += n; left -= n;
+      s.qty += n;
+      left -= n;
     }
   }
   for (let i = 0; i < slots.length && left > 0; i++) {
     if (slots[i] === null) {
       const n = Math.min(left, def.stack);
-      slots[i] = { itemId, qty: n }; left -= n;
+      slots[i] = { itemId, qty: n };
+      left -= n;
     }
   }
   return left;
@@ -157,10 +222,17 @@ export interface LootView {
 }
 
 // ---------- Tin nhắn client -> server ----------
-export interface UseItemMsg { slot: number }
-export interface PickupMsg { lootId: string }
+export interface UseItemMsg {
+  slot: number;
+}
+export interface PickupMsg {
+  lootId: string;
+}
 /** Vứt qty món ở ô slot xuống đất (qty bỏ trống = cả ô) */
-export interface DropItemMsg { slot: number; qty?: number }
+export interface DropItemMsg {
+  slot: number;
+  qty?: number;
+}
 
 // ---------- Tin nhắn server -> client (chỉ gửi cho chủ túi) ----------
 export interface InvMsg {

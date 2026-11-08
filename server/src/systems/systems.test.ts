@@ -1,6 +1,14 @@
 // Test đơn vị cho các system với một World giả (không cần server Colyseus).
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { MONSTER_BY_ID, expToNext, statsFor, TOWN_PX, TICK_MS, type FxMsg, type ToastMsg } from "@tien-gioi/shared";
+import {
+  MONSTER_BY_ID,
+  expToNext,
+  statsFor,
+  TOWN_PX,
+  TICK_MS,
+  type FxMsg,
+  type ToastMsg,
+} from "@tien-gioi/shared";
 import { WorldState, Player, Monster } from "../schema";
 import { World, type PlayerCtrl } from "../world";
 import { applyStats, gainExp, tickRecovery } from "./progression";
@@ -27,12 +35,22 @@ function makeWorld() {
 
 function addPlayer(w: World, sid: string, realm = 0, tier = 0) {
   const p = new Player();
-  p.name = sid; p.realm = realm; p.tier = tier;
-  p.x = TOWN_PX.x + TOWN_PX.r + 400; p.y = TOWN_PX.y;
+  p.name = sid;
+  p.realm = realm;
+  p.tier = tier;
+  p.x = TOWN_PX.x + TOWN_PX.r + 400;
+  p.y = TOWN_PX.y;
   applyStats(p, true);
   const c: PlayerCtrl = {
     save: { name: sid, secretHash: "", realm, tier, exp: 0, createdAt: "", updatedAt: "" },
-    inputs: [], moveBudget: 4, nextSlash: 0, nextSword: 0, nextBreak: 0, nextChat: 0, lastHitAt: 0, deadAt: 0,
+    inputs: [],
+    moveBudget: 4,
+    nextSlash: 0,
+    nextSword: 0,
+    nextBreak: 0,
+    nextChat: 0,
+    lastHitAt: 0,
+    deadAt: 0,
   };
   w.state.players.set(sid, p);
   w.ctrl.set(sid, c);
@@ -43,9 +61,23 @@ function addMonster(w: World, kind: string, x: number, y: number) {
   const def = MONSTER_BY_ID[kind];
   const id = `m${++w.monsterSeq}`;
   const m = new Monster();
-  m.kind = kind; m.x = x; m.y = y; m.hp = def.hp; m.maxHp = def.hp;
+  m.kind = kind;
+  m.x = x;
+  m.y = y;
+  m.hp = def.hp;
+  m.maxHp = def.hp;
   w.state.monsters.set(id, m);
-  w.mctrl.set(id, { def, homeX: x, homeY: y, target: null, nextAttack: 0, wanderX: x, wanderY: y, nextWander: 0, damageBy: new Map() });
+  w.mctrl.set(id, {
+    def,
+    homeX: x,
+    homeY: y,
+    target: null,
+    nextAttack: 0,
+    wanderX: x,
+    wanderY: y,
+    nextWander: 0,
+    damageBy: new Map(),
+  });
   return { id, m, mc: w.mctrl.get(id)! };
 }
 
@@ -72,7 +104,9 @@ describe("progression", () => {
   it("đả tọa hồi khí huyết, linh lực và tăng tu vi", () => {
     const { w } = makeWorld();
     const { p, c } = addPlayer(w, "a");
-    p.hp = 10; p.mp = 0; p.meditating = true;
+    p.hp = 10;
+    p.mp = 0;
+    p.meditating = true;
     tickRecovery(w, "a", p, c, 1);
     expect(p.hp).toBeGreaterThan(10);
     expect(p.mp).toBeGreaterThan(0);
@@ -94,7 +128,8 @@ describe("movement", () => {
   it("vector hướng dài hơn 1 bị chuẩn hóa", () => {
     const { w } = makeWorld();
     const { p, c } = addPlayer(w, "a");
-    p.x = TOWN_PX.x; p.y = TOWN_PX.y;
+    p.x = TOWN_PX.x;
+    p.y = TOWN_PX.y;
     queueInput(w, "a", { seq: 1, dx: 100, dy: 0 });
     applyInputs(p, c);
     expect(p.x - TOWN_PX.x).toBeCloseTo(statsFor(0, 0).speed * (TICK_MS / 1000));
