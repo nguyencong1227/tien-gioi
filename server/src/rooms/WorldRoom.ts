@@ -18,6 +18,11 @@ import {
   type UseItemMsg,
   type PickupMsg,
   type DropItemMsg,
+  type TalkMsg,
+  type QuestAcceptMsg,
+  type QuestTurnInMsg,
+  type QuestAbandonMsg,
+  type TradeMsg,
 } from "@tien-gioi/shared";
 import { WorldState, Player } from "../schema";
 import { loadPlayer, savePlayer, hashSecret, cleanName, type SavedPlayer } from "../store";
@@ -29,6 +34,8 @@ import { applyStats, breakthrough, setMeditating, tickRecovery } from "../system
 import { chat } from "../systems/chat";
 import { sanitizeInventory, sendInv, useItem } from "../systems/inventory";
 import { dropItem, pickup, releaseLootOwner, tickLoot } from "../systems/loot";
+import { sanitizeQuests, sendQuests } from "../systems/quests";
+import { abandonQuest, acceptQuest, talk, trade, turnInQuest } from "../systems/npc";
 
 const SAVE_EVERY_MS = 30_000;
 
@@ -42,9 +49,16 @@ export class WorldRoom extends Room<WorldState> {
     dmg: (msg) => this.broadcast("dmg", msg),
     sys: (text) => this.broadcast("chat", { from: "Thiên Đạo", text, sys: true } satisfies ChatOut),
     chat: (from, text) => this.broadcast("chat", { from, text } satisfies ChatOut),
-    toast: (sid, msg) => this.clients.find((c) => c.sessionId === sid)?.send("toast", msg),
-    inv: (sid, msg) => this.clients.find((c) => c.sessionId === sid)?.send("inv", msg),
+    toast: (sid, msg) => this.sendTo(sid, "toast", msg),
+    inv: (sid, msg) => this.sendTo(sid, "inv", msg),
+    quests: (sid, msg) => this.sendTo(sid, "quests", msg),
+    dialog: (sid, msg) => this.sendTo(sid, "dialog", msg),
   });
+
+  /** Gửi tin nhắn riêng cho một người chơi */
+  private sendTo(sid: string, type: string, msg: unknown) {
+    this.clients.find((c) => c.sessionId === sid)?.send(type, msg);
+  }
 
   onCreate() {
     this.setPatchRate(TICK_MS);
@@ -65,6 +79,17 @@ export class WorldRoom extends Room<WorldState> {
     this.onMessage("useItem", (c, m: UseItemMsg) => useItem(w, c.sessionId, m?.slot));
     this.onMessage("pickup", (c, m: PickupMsg) => pickup(w, c.sessionId, m?.lootId));
     this.onMessage("dropItem", (c, m: DropItemMsg) => dropItem(w, c.sessionId, m?.slot, m?.qty));
+    this.onMessage("talk", (c, m: TalkMsg) => talk(w, c.sessionId, m?.npcId));
+    this.onMessage("questAccept", (c, m: QuestAcceptMsg) =>
+      acceptQuest(w, c.sessionId, m?.questId),
+    );
+    this.onMessage("questTurnIn", (c, m: QuestTurnInMsg) =>
+      turnInQuest(w, c.sessionId, m?.questId),
+    );
+    this.onMessage("questAbandon", (c, m: QuestAbandonMsg) =>
+      abandonQuest(w, c.sessionId, m?.questId),
+    );
+    this.onMessage("trade", (c, m: TradeMsg) => trade(w, c.sessionId, m?.tradeId));
   }
 
   // ---------------- Vào / ra ----------------
@@ -121,8 +146,10 @@ export class WorldRoom extends Room<WorldState> {
       deadAt: 0,
       inv: sanitizeInventory(save.inventory),
       itemCd: new Map(),
+      quests: sanitizeQuests(save.quests),
     });
     sendInv(this.world, client.sessionId);
+    sendQuests(this.world, client.sessionId);
     this.world.events.sys(`${p.name} (${realmLabel(p.realm, p.tier)}) đã nhập thế.`);
   }
 
@@ -158,6 +185,7 @@ export class WorldRoom extends Room<WorldState> {
       y: undefined,
       ...pos,
       inventory: c.inv,
+      quests: c.quests,
     };
     await savePlayer(c.save);
   }

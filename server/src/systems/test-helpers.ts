@@ -5,6 +5,8 @@ import {
   emptyInventory,
   type FxMsg,
   type InvMsg,
+  type QuestsMsg,
+  type DialogMsg,
   type ToastMsg,
 } from "@tien-gioi/shared";
 import { WorldState, Player, Monster } from "../schema";
@@ -17,6 +19,8 @@ export function makeWorld() {
   const sys: string[] = [];
   const chats: { from: string; text: string }[] = [];
   const invs: { sid: string; msg: InvMsg }[] = [];
+  const quests: { sid: string; msg: QuestsMsg }[] = [];
+  const dialogs: { sid: string; msg: DialogMsg }[] = [];
   const w = new World(new WorldState(), {
     fx: (m) => fx.push(m),
     dmg: () => {},
@@ -24,8 +28,10 @@ export function makeWorld() {
     chat: (from, text) => chats.push({ from, text }),
     toast: (sid, msg) => toasts.push({ sid, msg }),
     inv: (sid, msg) => invs.push({ sid, msg }),
+    quests: (sid, msg) => quests.push({ sid, msg }),
+    dialog: (sid, msg) => dialogs.push({ sid, msg }),
   });
-  return { w, fx, toasts, sys, chats, invs };
+  return { w, fx, toasts, sys, chats, invs, quests, dialogs };
 }
 
 export function addPlayer(w: World, sid: string, realm = 0, tier = 0) {
@@ -48,6 +54,7 @@ export function addPlayer(w: World, sid: string, realm = 0, tier = 0) {
     deadAt: 0,
     inv: emptyInventory(),
     itemCd: new Map(),
+    quests: { active: [], done: [], daily: {} },
   };
   w.state.players.set(sid, p);
   w.ctrl.set(sid, c);

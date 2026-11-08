@@ -17,6 +17,9 @@ import {
   type ChatOut,
   type ToastMsg,
   type InvMsg,
+  type QuestsMsg,
+  type DialogMsg,
+  NPC_BY_ID,
 } from "@tien-gioi/shared";
 import type { WorldRoom } from "./WorldRoom";
 import type { WorldState } from "../schema";
@@ -67,6 +70,10 @@ async function join(name = `Thu ${++nameSeq}`, secret = secretOf(name)) {
   const toasts: ToastMsg[] = [];
   const invs: InvMsg[] = [];
   room.onMessage("inv", (m: InvMsg) => invs.push(m));
+  const quests: QuestsMsg[] = [];
+  const dialogs: DialogMsg[] = [];
+  room.onMessage("quests", (m: QuestsMsg) => quests.push(m));
+  room.onMessage("dialog", (m: DialogMsg) => dialogs.push(m));
   room.onMessage("chat", (m: ChatOut) => chat.push(m));
   room.onMessage("toast", (m: ToastMsg) => toasts.push(m));
   room.onMessage("fx", () => {});
@@ -79,6 +86,8 @@ async function join(name = `Thu ${++nameSeq}`, secret = secretOf(name)) {
     chat,
     toasts,
     invs,
+    quests,
+    dialogs,
     me: () => (room.state as any).players.get(room.sessionId),
   };
 }
@@ -401,5 +410,65 @@ describe("túi đồ và đồ rơi", () => {
     room.send("useItem", { slot });
     await waitFor(() => me().hp > 10);
     await waitFor(() => invs.at(-1)!.cd.hoi_huyet_dan > 0);
+  });
+});
+
+describe("nhiệm vụ và NPC", () => {
+  /** Dịch chuyển người chơi tới cạnh NPC (phía server) */
+  function standAt(room: Room, npcId: string) {
+    const p = serverState(room).players.get(room.sessionId)!;
+    p.x = NPC_BY_ID[npcId].x + 10;
+    p.y = NPC_BY_ID[npcId].y;
+  }
+
+  it("vào game nhận sổ nhiệm vụ; nói chuyện, nhận, làm và trả nhiệm vụ; trả hai lần chỉ thưởng một lần", async () => {
+    const { room, quests, dialogs, invs, me } = await join();
+    await waitFor(() => quests.length);
+    expect(quests[0]).toEqual({ active: [], done: [], dailyDone: [] });
+
+    standAt(room, "truong_tran");
+    room.send("talk", { npcId: "truong_tran" });
+    const d = await waitFor(() => dialogs.at(-1));
+    expect(d.options[0].action).toEqual({ kind: "accept", questId: "nhap_the" });
+
+    room.send("questAccept", { questId: "nhap_the" });
+    await waitFor(() => quests.at(-1)!.active.length === 1);
+
+    standAt(room, "duoc_su");
+    room.send("talk", { npcId: "duoc_su" });
+    await waitFor(() => quests.at(-1)!.active[0]?.step === 1);
+
+    standAt(room, "truong_tran");
+    room.send("questTurnIn", { questId: "nhap_the" });
+    room.send("questTurnIn", { questId: "nhap_the" });
+    await waitFor(() => quests.at(-1)!.done.includes("nhap_the"));
+    await sleep(150);
+    expect(me().exp).toBe(20);
+    const pills = invs.at(-1)!.slots.filter((s) => s?.itemId === "hoi_huyet_dan");
+    expect(pills.reduce((n, s) => n + s!.qty, 0)).toBe(3);
+  });
+
+  it("thoát ra vào lại vẫn giữ tiến độ nhiệm vụ", async () => {
+    const name = "So Nhiem Vu";
+    const a = await join(name);
+    standAt(a.room, "truong_tran");
+    a.room.send("questAccept", { questId: "nhap_the" });
+    await waitFor(() => a.quests.at(-1)?.active.length === 1);
+    await a.room.leave(true);
+    rooms.length = 0;
+    await sleep(200);
+    const again = await join(name);
+    const q = await waitFor(() => again.quests[0]);
+    expect(q.active).toEqual([{ id: "nhap_the", step: 0, count: 0 }]);
+  });
+
+  it("đứng xa NPC thì không nhận hộp thoại", async () => {
+    const { room, dialogs } = await join();
+    const p = serverState(room).players.get(room.sessionId)!;
+    p.x = NPC_BY_ID.tho_ren.x + 200;
+    p.y = NPC_BY_ID.tho_ren.y;
+    room.send("talk", { npcId: "tho_ren" });
+    await sleep(200);
+    expect(dialogs).toHaveLength(0);
   });
 });

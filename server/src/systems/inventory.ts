@@ -10,6 +10,7 @@ import {
 } from "@tien-gioi/shared";
 import type { World } from "../world";
 import { gainExp } from "./progression";
+import { refreshQuests } from "./quests";
 
 /** Đọc túi từ file lưu: bỏ món không còn tồn tại, ép số lượng về [1, stack], đúng 24 ô. */
 export function sanitizeInventory(raw: unknown): Inventory {
@@ -35,6 +36,7 @@ export function sendInv(w: World, sid: string, gained?: InvSlot[]) {
     cd,
     ...(gained?.length ? { gained } : {}),
   });
+  refreshQuests(w, sid); // bước "collect" phụ thuộc túi đồ
 }
 
 /** Cho vật phẩm vào túi người chơi. Trả về số còn thừa (túi đầy). */
@@ -45,6 +47,32 @@ export function giveItem(w: World, sid: string, itemId: string, qty: number): nu
   const got = Math.floor(qty) - left;
   if (got > 0) sendInv(w, sid, [{ itemId, qty: got }]);
   return left;
+}
+
+/**
+ * Đổi đồ nguyên khối: trừ `remove` rồi thêm `add` trên một bản sao của túi.
+ * Thiếu đồ hoặc túi không đủ chỗ thì không đổi gì và trả về false.
+ */
+export function exchangeItems(
+  inv: Inventory,
+  remove: { itemId: string; qty: number }[],
+  add: { itemId: string; qty: number }[],
+): boolean {
+  const next = inv.map((s) => (s ? { ...s } : null));
+  for (const r of remove) {
+    let left = r.qty;
+    for (let i = next.length - 1; i >= 0 && left > 0; i--) {
+      const s = next[i];
+      if (s?.itemId !== r.itemId) continue;
+      const n = Math.min(left, s.qty);
+      takeFromSlot(next, i, n);
+      left -= n;
+    }
+    if (left > 0) return false;
+  }
+  for (const a of add) if (addToInventory(next, a.itemId, a.qty) > 0) return false;
+  next.forEach((s, i) => (inv[i] = s));
+  return true;
 }
 
 /** Số thứ tự ô hợp lệ (0..23) hoặc -1. */

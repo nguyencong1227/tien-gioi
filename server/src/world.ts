@@ -8,9 +8,11 @@ import type {
   MonsterKind,
   Inventory,
   InvMsg,
+  QuestsMsg,
+  DialogMsg,
 } from "@tien-gioi/shared";
 import type { WorldState, Player } from "./schema";
-import type { SavedPlayer } from "./store";
+import type { SavedPlayer, QuestSave } from "./store";
 
 /** Dữ liệu riêng của server cho mỗi người chơi (không gửi xuống client). */
 export interface PlayerCtrl {
@@ -27,6 +29,8 @@ export interface PlayerCtrl {
   inv: Inventory;
   /** Thời điểm hết hồi chiêu theo itemId */
   itemCd: Map<string, number>;
+  /** Sổ nhiệm vụ: chỉ gửi cho chủ qua tin nhắn `quests` */
+  quests: QuestSave;
 }
 
 /** Dữ liệu riêng của server cho mỗi món đồ rơi. */
@@ -59,6 +63,10 @@ export interface WorldEvents {
   toast(sessionId: string, msg: ToastMsg): void;
   /** Gửi túi đồ cho đúng chủ túi. */
   inv(sessionId: string, msg: InvMsg): void;
+  /** Gửi sổ nhiệm vụ cho đúng người. */
+  quests(sessionId: string, msg: QuestsMsg): void;
+  /** Mở hộp thoại NPC cho đúng người. */
+  dialog(sessionId: string, msg: DialogMsg): void;
 }
 
 export class World {

@@ -18,6 +18,8 @@ import {
   questReady,
   canAccept,
   npcMarker,
+  MAIN_QUEST_START,
+  stepOf,
   type QuestsMsg,
   type QuestCtx,
 } from "./index";
@@ -165,5 +167,48 @@ describe("nhận nhiệm vụ và ký hiệu NPC", () => {
     expect(npcMarker("truong_tran", ready, ctx())).toBe("?");
     const doing = log({ active: [{ id: "nhap_the", step: 0, count: 0 }] });
     expect(npcMarker("truong_tran", doing, ctx())).toBe("");
+  });
+});
+
+describe("nội dung nhiệm vụ (#19)", () => {
+  /** Chuỗi chính theo `next`, bắt đầu từ MAIN_QUEST_START */
+  const chain = () => {
+    const out: string[] = [];
+    for (let id: string | undefined = MAIN_QUEST_START; id; id = QUEST_BY_ID[id].next) out.push(id);
+    return out;
+  };
+
+  it("chuỗi chính 6–8 nhiệm vụ, gồm mọi nhiệm vụ không lặp, kết thúc ở Luyện Khí tầng 9", () => {
+    const ids = chain();
+    expect(ids.length).toBeGreaterThanOrEqual(6);
+    expect(ids.length).toBeLessThanOrEqual(8);
+    expect(new Set(ids)).toEqual(new Set(QUESTS.filter((q) => !q.daily).map((q) => q.id)));
+    const last = QUEST_BY_ID[ids.at(-1)!].steps.at(-1)!;
+    expect(last).toEqual({ kind: "reachRealm", realm: 1, tier: 8 });
+  });
+
+  it("mốc cảnh giới trong chuỗi chỉ tăng dần", () => {
+    let prev = -1;
+    for (const id of chain()) {
+      for (const s of QUEST_BY_ID[id].steps) {
+        if (s.kind !== "reachRealm") continue;
+        const st = stepOf(s.realm, s.tier);
+        expect(st, id).toBeGreaterThan(prev);
+        prev = st;
+      }
+    }
+  });
+
+  it("3 nhiệm vụ lặp ở Bảng cáo thị", () => {
+    const daily = QUESTS.filter((q) => q.daily);
+    expect(daily).toHaveLength(3);
+    expect(daily.every((q) => q.giver === "cao_thi")).toBe(true);
+  });
+
+  it("người chơi mới thấy '!' ở Trưởng trấn ngay khi vào game", () => {
+    expect(npcMarker("truong_tran", log(), ctx())).toBe("!");
+    expect(NPCS.filter((n) => npcMarker(n.id, log(), ctx()) === "!").map((n) => n.id)).toEqual([
+      "truong_tran",
+    ]);
   });
 });

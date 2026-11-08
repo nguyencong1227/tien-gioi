@@ -43,11 +43,16 @@ export interface QuestDef {
   };
 }
 
+/** Nhiệm vụ đầu tiên của chuỗi chính (người chơi mới nhận ở Trưởng trấn) */
+export const MAIN_QUEST_START = "nhap_the";
+
 /**
- * Nội dung ban đầu để hai bên có dữ liệu thật mà code. Chuỗi nhiệm vụ chính đầy đủ
- * (Phàm Nhân → Luyện Khí tầng 9) và các nhiệm vụ lặp còn lại thêm ở issue #19.
+ * Chuỗi nhiệm vụ chính: Phàm Nhân → Luyện Khí tầng 9, mỗi nhiệm vụ dạy thêm một thứ
+ * (đánh quái, nhặt đồ, đột phá, đả tọa, đổi đồ, đan dược). Sau đó là nhiệm vụ lặp ở Bảng cáo thị.
+ * Thế giới: Lạc Hà Trấn dưới chân Vân Mộng Sơn; yêu thú càng xa trấn càng mạnh.
  */
 export const QUESTS: QuestDef[] = [
+  // ---------- Chuỗi chính ----------
   {
     id: "nhap_the",
     title: "Nhập thế",
@@ -61,7 +66,7 @@ export const QUESTS: QuestDef[] = [
         "Người lạ mặt, ngươi mới tới Lạc Hà Trấn sao?",
         "Muốn bước lên con đường tu tiên thì trước hết phải biết giữ mạng. Đi gặp Hà lão, ông ấy sẽ chỉ cho ngươi.",
       ],
-      progress: ["Tiệm thuốc của Hà lão ở phía tây trấn, ngay cạnh giếng đá."],
+      progress: ["Tiệm thuốc của Hà lão ở phía tây trấn."],
       complete: ["Hà lão đã gặp ngươi rồi à? Tốt. Cầm lấy mấy viên đan này phòng thân."],
     },
   },
@@ -74,18 +79,168 @@ export const QUESTS: QuestDef[] = [
       { kind: "kill", monster: "tho", count: 5 },
       { kind: "collect", itemId: "long_tho", count: 3 },
     ],
-    rewards: { exp: 60 },
+    rewards: { exp: 30, items: [{ itemId: "hoi_huyet_dan", qty: 2 }] },
+    next: "buoc_vao_tien_do",
     talk: {
       offer: [
         "Đám Linh Thố ăn sạch rau ngoài ruộng. Chúng không hung dữ, rất hợp để ngươi luyện tay.",
-        "Hạ 5 con, mang về ít lông làm bằng chứng.",
+        "Hạ năm con, nhặt ít lông mang về làm bằng chứng. Đồ rơi trên đất, đứng gần mà nhặt.",
       ],
       progress: ["Linh Thố quanh quẩn ngay ngoài cổng trấn. Chém trúng là được, đừng sợ."],
       complete: [
-        "Khá lắm. Kiếm pháp tuy vụng nhưng có khí thế. Ngồi xuống đả tọa, tu vi sẽ tiến nhanh hơn.",
+        "Khá lắm. Kiếm pháp tuy vụng nhưng có khí thế.",
+        "Ta thấy linh khí trong người ngươi đã đầy, sắp chạm tới ngưỡng rồi.",
       ],
     },
   },
+  {
+    id: "buoc_vao_tien_do",
+    title: "Bước vào tiên đồ",
+    giver: "truong_tran",
+    desc: "Đột phá từ Phàm Nhân lên Luyện Khí.",
+    steps: [{ kind: "reachRealm", realm: 1, tier: 0 }],
+    rewards: { exp: 30, items: [{ itemId: "hoi_linh_dan", qty: 2 }] },
+    next: "tinh_toa",
+    talk: {
+      offer: [
+        "Phàm nhân tu luyện đến lúc linh khí tràn đầy thì phải phá vỡ xiềng xích của thân xác.",
+        "Khi thanh tu vi đầy, hãy Đột phá. Có thể thất bại, chân khí nghịch loạn sẽ tổn hao tu vi, nhưng đừng nản.",
+      ],
+      progress: ["Thanh tu vi chưa đầy thì chưa đột phá được. Ra ngoài luyện thêm đi."],
+      complete: [
+        "Ta cảm nhận được linh lực đang lưu chuyển trong kinh mạch ngươi. Chúc mừng, Luyện Khí tầng một!",
+        "Hà lão có chuyện muốn nói với người mới bước vào tiên đồ. Ghé qua đó một chuyến.",
+      ],
+    },
+  },
+  {
+    id: "tinh_toa",
+    title: "Tĩnh tọa dưỡng khí",
+    giver: "duoc_su",
+    desc: "Đạt Luyện Khí tầng 3. Đả tọa để hồi phục và tăng tu vi.",
+    steps: [{ kind: "reachRealm", realm: 1, tier: 2 }],
+    rewards: { exp: 60, items: [{ itemId: "tu_khi_dan", qty: 1 }] },
+    next: "nanh_soi_ren_kiem",
+    talk: {
+      offer: [
+        "Đánh giết chỉ là một nửa con đường. Nửa còn lại là ngồi yên.",
+        "Khi mỏi mệt, hãy Đả tọa: khí huyết, linh lực hồi rất nhanh, tu vi cũng tự tăng. Nhưng động thân là khí tán, phải ngồi lại từ đầu.",
+        "Khi nào tới Luyện Khí tầng ba thì quay lại gặp lão.",
+      ],
+      progress: ["Chưa tới tầng ba à? Ngồi xuống, thở chậm lại."],
+      complete: [
+        "Hơi thở đã đều hơn nhiều. Viên Tụ Khí Đan này giúp ngươi tích tu vi nhanh hơn một chút.",
+        "Thiết Ngưu ở lò rèn phía đông đang cần người giúp, ngươi qua xem.",
+      ],
+    },
+  },
+  {
+    id: "nanh_soi_ren_kiem",
+    title: "Nanh sói cho lò rèn",
+    giver: "tho_ren",
+    desc: "Hạ 8 Hôi Lang ở vùng cỏ cao và mang về 5 nanh sói.",
+    steps: [
+      { kind: "kill", monster: "lang", count: 8 },
+      { kind: "collect", itemId: "nanh_soi", count: 5 },
+    ],
+    rewards: { exp: 150, items: [{ itemId: "hoi_linh_dan", qty: 2 }] },
+    next: "thuoc_cho_tran",
+    talk: {
+      offer: [
+        "Ngươi là tu sĩ mà Hà lão nhắc tới hả? Ta là Thiết Ngưu.",
+        "Chuôi kiếm tốt phải bọc bằng nanh sói mài nhẵn. Hôi Lang ở vùng cỏ cao ngoài kia, chúng đi theo bầy, cẩn thận.",
+      ],
+      progress: ["Hôi Lang thấy người là lao tới. Lùi lại, dùng Kiếm khí đánh từ xa."],
+      complete: [
+        "Nanh tốt! Khi lò rèn đủ lửa, ta sẽ rèn cho ngươi một thanh kiếm ra hồn.",
+        "Hà lão vừa nhắn qua, hình như tiệm thuốc thiếu nguyên liệu.",
+      ],
+    },
+  },
+  {
+    id: "thuoc_cho_tran",
+    title: "Thuốc cho người trong trấn",
+    giver: "duoc_su",
+    desc: "Mang tới cho Hà lão 8 túm lông thỏ và 4 nanh sói.",
+    steps: [
+      { kind: "collect", itemId: "long_tho", count: 8 },
+      { kind: "collect", itemId: "nanh_soi", count: 4 },
+    ],
+    rewards: {
+      exp: 200,
+      items: [
+        { itemId: "hoi_huyet_dan", qty: 4 },
+        { itemId: "hoi_linh_dan", qty: 2 },
+      ],
+    },
+    next: "hac_ho",
+    talk: {
+      offer: [
+        "Mấy hôm nay thợ săn trong trấn bị sói cắn liên tục, thuốc trong tiệm sắp cạn.",
+        "Mang cho lão ít lông thỏ và nanh sói. Sau này dư nguyên liệu, cứ đem tới đổi lấy đan.",
+      ],
+      progress: [
+        "Lông thỏ để làm bông băng, nanh sói tán bột cầm máu. Thiếu thứ nào cũng không được.",
+      ],
+      complete: [
+        "Đủ cả rồi. Mấy viên này lão luyện sẵn, ngươi cầm đi.",
+        "Trưởng trấn đang lo chuyện lớn hơn, nghe nói Hắc Hổ đã xuống núi.",
+      ],
+    },
+  },
+  {
+    id: "hac_ho",
+    title: "Hắc Hổ xuống núi",
+    giver: "truong_tran",
+    desc: "Đạt Luyện Khí tầng 6, rồi hạ 2 Hắc Hổ và mang về 1 tấm da hổ.",
+    steps: [
+      { kind: "reachRealm", realm: 1, tier: 5 },
+      { kind: "kill", monster: "ho", count: 2 },
+      { kind: "collect", itemId: "da_ho", count: 1 },
+    ],
+    rewards: { exp: 300, items: [{ itemId: "tu_khi_dan", qty: 1 }] },
+    next: "dinh_luyen_khi",
+    talk: {
+      offer: [
+        "Hắc Hổ vốn sống sâu trong rừng phía xa. Nay chúng xuống tới bìa rừng, cắn chết ba con trâu của trấn.",
+        "Chưa tới Luyện Khí tầng sáu thì đừng đi, một cú vồ của nó đủ khiến ngươi trọng thương. Mang đủ đan dược theo người.",
+      ],
+      progress: [
+        "Hắc Hổ ở xa trấn hơn Hôi Lang nhiều. Đánh vài đòn rồi lùi, đừng đứng yên chịu đòn.",
+      ],
+      complete: [
+        "Da Hắc Hổ! Từ nay thợ săn trong trấn có thể ngủ yên rồi.",
+        "Ngươi tiến bộ nhanh hơn ta tưởng. Lạc Hà Trấn đã không còn đủ chỗ cho ngươi.",
+      ],
+    },
+  },
+  {
+    id: "dinh_luyen_khi",
+    title: "Đỉnh Luyện Khí",
+    giver: "truong_tran",
+    desc: "Đạt Luyện Khí tầng 9.",
+    steps: [{ kind: "reachRealm", realm: 1, tier: 8 }],
+    rewards: {
+      exp: 300,
+      items: [
+        { itemId: "tu_khi_dan", qty: 2 },
+        { itemId: "hoi_huyet_dan", qty: 5 },
+      ],
+    },
+    talk: {
+      offer: [
+        "Luyện Khí có chín tầng. Đứng ở tầng chín mới có tư cách nhìn lên Trúc Cơ.",
+        "Đi đi, đánh, ngồi, rồi lại đánh. Khi nào tới tầng chín thì quay về đây.",
+      ],
+      progress: ["Chưa tới tầng chín. Bảng cáo thị ngày nào cũng có việc, làm thêm cho quen tay."],
+      complete: [
+        "Luyện Khí tầng chín… Năm xưa ta cũng dừng chân ở đây suốt mười năm.",
+        "Muốn Trúc Cơ phải có cơ duyên. Người ta đồn trong hang sâu nhất của Vân Mộng Sơn có Xích Mãng canh giữ linh mạch. Khi nào đủ sức, ngươi hãy tự mình đi xem.",
+      ],
+    },
+  },
+
+  // ---------- Nhiệm vụ lặp ở Bảng cáo thị ----------
   {
     id: "lang_hai",
     title: "Lang hại",
@@ -97,7 +252,7 @@ export const QUESTS: QuestDef[] = [
     daily: true,
     talk: {
       offer: ["Cáo thị: bầy Hôi Lang quấy nhiễu đường núi. Ai hạ được mười con, trấn sẽ hậu tạ."],
-      progress: ["Hôi Lang sống ở vùng cỏ cao xa trấn hơn."],
+      progress: ["Hôi Lang sống ở vùng cỏ cao, xa trấn hơn đám thỏ."],
       complete: ["Ngươi xé tờ cáo thị đem tới, phần thưởng đã được để sẵn."],
     },
   },
@@ -114,6 +269,23 @@ export const QUESTS: QuestDef[] = [
       offer: ["Cáo thị: tiệm thuốc cần nanh sói, mỗi ngày thu năm chiếc."],
       progress: ["Chưa đủ năm chiếc nanh sói."],
       complete: ["Nanh còn tươi, tốt lắm."],
+    },
+  },
+  {
+    id: "ho_hoan",
+    title: "Hổ hoạn",
+    giver: "cao_thi",
+    desc: "Hạ 3 Hắc Hổ.",
+    steps: [{ kind: "kill", monster: "ho", count: 3 }],
+    rewards: { exp: 400, items: [{ itemId: "tu_khi_dan", qty: 1 }] },
+    minRealm: { realm: 1, tier: 5 },
+    daily: true,
+    talk: {
+      offer: [
+        "Cáo thị: Hắc Hổ lảng vảng ở bìa rừng. Cần tu sĩ từ Luyện Khí tầng sáu trở lên, hạ ba con.",
+      ],
+      progress: ["Hắc Hổ đánh rất đau. Mang theo Hồi Huyết Đan."],
+      complete: ["Ba con Hắc Hổ trong một ngày. Người trong trấn sẽ còn nhắc tên ngươi."],
     },
   },
 ];
