@@ -2,7 +2,7 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { expToNext, statsFor, TOWN_PX, TICK_MS } from "@tien-gioi/shared";
 import { makeWorld, addPlayer, addMonster } from "./test-helpers";
-import { applyStats, gainExp, tickRecovery } from "./progression";
+import { gainExp, tickRecovery } from "./progression";
 import { applyInputs, queueInput } from "./movement";
 import { hitMonster, hurtPlayer, killMonster } from "./combat";
 import { chat } from "./chat";
