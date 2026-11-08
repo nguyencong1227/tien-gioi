@@ -8,6 +8,10 @@ import { WebSocketTransport } from "@colyseus/ws-transport";
 import { ROOM_NAME } from "@tien-gioi/shared";
 import { WorldRoom } from "./rooms/WorldRoom";
 
+// Đọc .env.local ở gốc repo (cổng riêng cho từng dev). Không có file thì dùng mặc định.
+const envFile = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../.env.local");
+if (existsSync(envFile)) process.loadEnvFile(envFile);
+
 const PORT = Number(process.env.PORT ?? 2567);
 const app = express();
 app.get("/health", (_req, res) => res.json({ ok: true }));
