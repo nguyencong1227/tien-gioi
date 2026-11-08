@@ -2,6 +2,7 @@
 import { promises as fs } from "node:fs";
 import { createHash } from "node:crypto";
 import path from "node:path";
+import type { Inventory } from "@tien-gioi/shared";
 
 const DIR = path.resolve(process.env.DATA_DIR ?? "data/players");
 
@@ -13,6 +14,8 @@ export interface SavedPlayer {
   exp: number;
   x?: number;
   y?: number;
+  /** Túi đồ; file cũ không có thì coi như túi trống */
+  inventory?: Inventory;
   createdAt: string;
   updatedAt: string;
 }

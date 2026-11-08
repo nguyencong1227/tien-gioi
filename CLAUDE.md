@@ -29,11 +29,11 @@ npm run build        # build client vào client/dist
   - `game.ts`: hằng số, quái, kiểu tin nhắn.
   - `map.ts`: bản đồ sinh theo seed, va chạm.
 - `server/src/rooms/WorldRoom.ts`: chỉ lo vào/ra phòng, lưu nhân vật, nối tin nhắn với system, vòng lặp 20 tick/giây.
-- `server/src/systems/`: logic game, mỗi file một mảng: `movement`, `combat`, `monsters`, `progression`, `chat`.
+- `server/src/systems/`: logic game, mỗi file một mảng: `movement`, `combat`, `monsters`, `progression`, `chat`, `inventory` (túi đồ, đan dược, lệnh `/give` khi không chạy production), `loot` (rơi đồ, nhặt, vứt đồ).
   - Các system nhận `World` (`server/src/world.ts`: state, dữ liệu riêng của người chơi/quái, `events` để gửi tin), không đụng tới Colyseus `Room`. Tính năng mới thì thêm system mới.
 - `server/src/schema.ts` là state đồng bộ, `store.ts` lưu nhân vật dạng JSON ở `server/data/players/`.
 - Test:
-  - `shared/**/*.test.ts`, `server/src/systems/*.test.ts`: test đơn vị với `World` giả.
+  - `shared/**/*.test.ts`, `server/src/systems/*.test.ts`: test đơn vị với `World` giả (dựng bằng `server/src/systems/test-helpers.ts`).
   - `server/src/rooms/WorldRoom.test.ts`: test tích hợp với server Colyseus thật.
   - Tính năng server mới cần có test.
 - `client/src/scenes/WorldScene.ts`: vẽ, input, đoán trước di chuyển. `ui.ts` là HUD DOM, `textures.ts` là ảnh tạm vẽ bằng code.

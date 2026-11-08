@@ -11,6 +11,7 @@ import type { Player, Monster } from "../schema";
 import { rand, angleDiff, type World, type PlayerCtrl, type MonsterCtrl } from "../world";
 import { applyStats, gainExp } from "./progression";
 import { safeSpot } from "./movement";
+import { dropLoot } from "./loot";
 
 const CRIT_CHANCE = 0.1;
 const CRIT_MULT = 1.8;
@@ -81,7 +82,7 @@ export function hitMonster(
   if (mon.hp <= 0) killMonster(w, id, mc);
 }
 
-/** Chia tu vi theo tỉ lệ sát thương cho những người còn sống, rồi xóa quái. */
+/** Chia tu vi theo tỉ lệ sát thương cho những người còn sống, rơi đồ, rồi xóa quái. */
 export function killMonster(w: World, id: string, mc: MonsterCtrl) {
   const total = [...mc.damageBy.values()].reduce((a, b) => a + b, 0) || 1;
   for (const [sid, dmg] of mc.damageBy) {
@@ -97,6 +98,8 @@ export function killMonster(w: World, id: string, mc: MonsterCtrl) {
     gainExp(w, sid, p, share);
   }
   if (mc.def.boss) w.events.sys(`🐉 ${mc.def.name} đã bị hạ!`);
+  const mon = w.state.monsters.get(id);
+  if (mon) dropLoot(w, mc, mon.x, mon.y);
   w.state.monsters.delete(id);
   w.mctrl.delete(id);
 }

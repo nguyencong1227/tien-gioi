@@ -16,6 +16,7 @@ import {
   statsFor,
   type ChatOut,
   type ToastMsg,
+  type InvMsg,
 } from "@tien-gioi/shared";
 import type { WorldRoom } from "./WorldRoom";
 import type { WorldState } from "../schema";
@@ -64,13 +65,22 @@ async function join(name = `Thu ${++nameSeq}`, secret = secretOf(name)) {
   const room = await client.joinOrCreate(ROOM_NAME, { name, secret });
   const chat: ChatOut[] = [];
   const toasts: ToastMsg[] = [];
+  const invs: InvMsg[] = [];
+  room.onMessage("inv", (m: InvMsg) => invs.push(m));
   room.onMessage("chat", (m: ChatOut) => chat.push(m));
   room.onMessage("toast", (m: ToastMsg) => toasts.push(m));
   room.onMessage("fx", () => {});
   room.onMessage("dmg", () => {});
   rooms.push(room);
   await waitFor(() => (room.state as any)?.players?.get(room.sessionId));
-  return { room, name, chat, toasts, me: () => (room.state as any).players.get(room.sessionId) };
+  return {
+    room,
+    name,
+    chat,
+    toasts,
+    invs,
+    me: () => (room.state as any).players.get(room.sessionId),
+  };
 }
 
 /** Phòng thật phía server, để dựng tình huống (đặt quái cạnh người chơi…). */
@@ -322,5 +332,74 @@ describe("lưu nhân vật", () => {
     });
     expect(saved).toMatchObject({ realm: 1, tier: 3, exp: 12 });
     expect(saved.secretHash).not.toContain("secret"); // không lưu mã gốc
+  });
+});
+
+describe("túi đồ và đồ rơi", () => {
+  it("vào game nhận túi trống 24 ô; /give chỉ gửi túi cho chủ túi", async () => {
+    const a = await join();
+    const b = await join();
+    await waitFor(() => a.invs.length && b.invs.length);
+    expect(a.invs[0].slots).toHaveLength(24);
+    expect(a.invs[0].slots.every((x) => x === null)).toBe(true);
+    const bCount = b.invs.length;
+    a.room.send("chat", { text: "/give hoi_huyet_dan 3" });
+    const got = await waitFor(() => a.invs.find((m) => m.gained));
+    expect(got.gained).toEqual([{ itemId: "hoi_huyet_dan", qty: 3 }]);
+    await sleep(100);
+    expect(b.invs.length).toBe(bCount);
+    expect(b.chat.some((m) => m.text.includes("/give"))).toBe(false);
+  });
+
+  it("thoát ra vào lại vẫn còn đồ", async () => {
+    const name = "Tui Do";
+    const a = await join(name);
+    a.room.send("chat", { text: "/give nanh_soi 7" });
+    await waitFor(() => a.invs.find((m) => m.gained));
+    await a.room.leave(true);
+    rooms.length = 0;
+    await sleep(200);
+    const again = await join(name);
+    const inv = await waitFor(() => again.invs[0]);
+    expect(inv.slots[0]).toEqual({ itemId: "nanh_soi", qty: 7 });
+  });
+
+  it("giết quái thì đồ rơi hiện trong state; nhặt được, dùng được", async () => {
+    const { room, me, invs } = await join();
+    await waitFor(() => invs.length);
+    const st = serverState(room);
+    const sr = serverRoom(room) as any;
+    const p = st.players.get(room.sessionId)!;
+    // Dời ra khỏi trấn để quái không bị kẹt, đặt một con Linh Thố máu 1 ngay trước mặt
+    const [mid, mon] = [...st.monsters.entries()].find(([, m]) => m.kind === "tho")!;
+    mon.x = p.x + 20;
+    mon.y = p.y;
+    mon.hp = 1;
+    sr.world.mctrl.get(mid).homeX = mon.x;
+    sr.world.mctrl.get(mid).homeY = mon.y;
+    // Phòng thế giới dùng chung giữa các test: bỏ qua đồ rơi còn sót từ test trước
+    const old = new Set(st.loot.keys());
+    vi.spyOn(Math, "random").mockReturnValue(0); // không bạo kích, rơi đủ đồ
+    room.send("attack", { angle: 0 });
+    const loot = await waitFor(() => {
+      const fresh = ([...(room.state as any).loot.entries()] as [string, any][]).filter(
+        ([id]) => !old.has(id),
+      );
+      return fresh.length >= 2 && fresh;
+    });
+    vi.restoreAllMocks();
+    expect(loot.every(([, l]) => l.owner === room.sessionId)).toBe(true);
+    for (const [id] of loot) room.send("pickup", { lootId: id });
+    const inv = await waitFor(() => {
+      const last = invs.at(-1)!;
+      return last.slots.filter(Boolean).length >= 2 && last;
+    });
+    expect(inv.slots.map((s) => s?.itemId)).toContain("hoi_huyet_dan");
+    await waitFor(() => loot.every(([id]) => !(room.state as any).loot.has(id)));
+    const slot = inv.slots.findIndex((s) => s?.itemId === "hoi_huyet_dan");
+    p.hp = 10;
+    room.send("useItem", { slot });
+    await waitFor(() => me().hp > 10);
+    await waitFor(() => invs.at(-1)!.cd.hoi_huyet_dan > 0);
   });
 });

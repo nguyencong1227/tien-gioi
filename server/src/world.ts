@@ -1,6 +1,14 @@
 // Trạng thái thế giới dùng chung cho các system. Không phụ thuộc Colyseus Room,
 // nên các system có thể test riêng bằng một World giả.
-import type { InputMsg, FxMsg, DmgMsg, ToastMsg, MonsterKind } from "@tien-gioi/shared";
+import type {
+  InputMsg,
+  FxMsg,
+  DmgMsg,
+  ToastMsg,
+  MonsterKind,
+  Inventory,
+  InvMsg,
+} from "@tien-gioi/shared";
 import type { WorldState, Player } from "./schema";
 import type { SavedPlayer } from "./store";
 
@@ -15,6 +23,17 @@ export interface PlayerCtrl {
   nextChat: number;
   lastHitAt: number;
   deadAt: number;
+  /** Túi đồ: chỉ chủ túi nhận được qua tin nhắn `inv`, không nằm trong state chung */
+  inv: Inventory;
+  /** Thời điểm hết hồi chiêu theo itemId */
+  itemCd: Map<string, number>;
+}
+
+/** Dữ liệu riêng của server cho mỗi món đồ rơi. */
+export interface LootCtrl {
+  /** Lúc hết quyền nhặt trước của owner */
+  ownerUntil: number;
+  expiresAt: number;
 }
 
 /** Dữ liệu riêng của server cho mỗi con quái. */
@@ -38,6 +57,8 @@ export interface WorldEvents {
   sys(text: string): void;
   chat(from: string, text: string): void;
   toast(sessionId: string, msg: ToastMsg): void;
+  /** Gửi túi đồ cho đúng chủ túi. */
+  inv(sessionId: string, msg: InvMsg): void;
 }
 
 export class World {
@@ -45,7 +66,9 @@ export class World {
   now = Date.now();
   readonly ctrl = new Map<string, PlayerCtrl>();
   readonly mctrl = new Map<string, MonsterCtrl>();
+  readonly lctrl = new Map<string, LootCtrl>();
   monsterSeq = 0;
+  lootSeq = 0;
 
   constructor(
     readonly state: WorldState,
