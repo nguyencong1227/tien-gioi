@@ -2,7 +2,7 @@
 import { promises as fs } from "node:fs";
 import { createHash } from "node:crypto";
 import path from "node:path";
-import type { Inventory } from "@tien-gioi/shared";
+import type { Inventory, QuestProgress } from "@tien-gioi/shared";
 
 const DIR = path.resolve(process.env.DATA_DIR ?? "data/players");
 
@@ -16,8 +16,18 @@ export interface SavedPlayer {
   y?: number;
   /** Túi đồ; file cũ không có thì coi như túi trống */
   inventory?: Inventory;
+  /** Sổ nhiệm vụ; file cũ không có thì coi như chưa làm gì */
+  quests?: QuestSave;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface QuestSave {
+  active: QuestProgress[];
+  /** Nhiệm vụ không lặp đã xong */
+  done: string[];
+  /** Nhiệm vụ lặp: questId -> ngày làm xong gần nhất (dayKey) */
+  daily: Record<string, string>;
 }
 
 export const hashSecret = (s: string) => createHash("sha256").update(s).digest("hex");
