@@ -1,0 +1,92 @@
+:root {
+  --ink: #1d1a16;
+  --paper: #f3ecda;
+  --paper-2: #e6dcc3;
+  --red: #a31d1d;
+  --gold: #c9a24a;
+  --hp: #b8433a;
+  --mp: #3f7fa6;
+  --exp: #c9a24a;
+  --panel: rgba(29, 26, 22, 0.72);
+  --line: rgba(243, 220, 160, 0.25);
+  color-scheme: only light;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--ink); font-family: "Noto Serif", Georgia, serif; color: var(--paper); -webkit-user-select: none; user-select: none; touch-action: none; }
+#game { position: fixed; inset: 0; }
+#game canvas { display: block; }
+button { font: inherit; cursor: pointer; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; backdrop-filter: blur(3px); }
+
+/* Đăng nhập */
+#login { position: fixed; z-index: 20; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(92vw, 380px); padding: 28px 24px 20px; text-align: center; background: radial-gradient(ellipse at 50% 30%, #f7f1e1, #e3d6b8); color: var(--ink); border: 1px solid #b9a77e; }
+#login .seal { display: inline-grid; place-items: center; width: 52px; height: 52px; background: var(--red); color: #f6e7c4; font-size: 30px; border-radius: 6px; transform: rotate(-4deg); }
+#login h1 { margin: 10px 0 4px; font-size: 34px; letter-spacing: 0.12em; color: var(--red); }
+#login .sub { margin: 0 0 18px; opacity: 0.75; font-style: italic; }
+#login form { display: flex; gap: 8px; }
+#login input { flex: 1; min-width: 0; padding: 10px 12px; font: inherit; border: 1px solid #b9a77e; border-radius: 6px; background: #fffaf0; color: var(--ink); }
+#login button { padding: 10px 16px; border: 0; border-radius: 6px; background: var(--red); color: #f6e7c4; font-weight: 700; }
+#login button:disabled { opacity: 0.6; }
+.err { min-height: 1.3em; margin: 10px 0 0; color: var(--red); font-size: 14px; }
+
+/* HUD */
+#hud { position: fixed; z-index: 5; top: max(10px, env(safe-area-inset-top)); left: max(10px, env(safe-area-inset-left)); width: 230px; padding: 8px 10px; font-size: 13px; }
+#hud .row { display: flex; justify-content: space-between; gap: 6px; margin-bottom: 6px; }
+#hud-realm { color: var(--gold); }
+.bar { position: relative; height: 14px; margin: 4px 0; background: rgba(0, 0, 0, 0.45); border-radius: 3px; overflow: hidden; }
+.bar i { position: absolute; inset: 0 auto 0 0; width: 0; transition: width 0.15s; }
+.bar.hp i { background: var(--hp); }
+.bar.mp i { background: var(--mp); }
+.bar.exp i { background: var(--exp); }
+.bar span { position: relative; display: block; text-align: center; font-size: 11px; line-height: 14px; text-shadow: 0 1px 2px #000; }
+#hud-online { margin-top: 4px; font-size: 11px; opacity: 0.7; }
+
+/* Chat */
+#chat { position: fixed; z-index: 5; left: max(10px, env(safe-area-inset-left)); bottom: max(10px, env(safe-area-inset-bottom)); width: min(360px, 46vw); padding: 6px; font-size: 13px; }
+#chat-log { height: 130px; overflow-y: auto; padding: 2px 4px; }
+#chat-log p { margin: 1px 0; word-wrap: break-word; }
+#chat-log b { color: #9fd0ea; font-weight: 600; }
+#chat-log p.sys { color: var(--gold); font-style: italic; }
+#chat-input { width: 100%; margin-top: 4px; padding: 6px 8px; font: inherit; color: var(--paper); background: rgba(0, 0, 0, 0.4); border: 1px solid var(--line); border-radius: 5px; -webkit-user-select: text; user-select: text; }
+
+/* Nút kỹ năng */
+#skills { position: fixed; z-index: 5; right: max(14px, env(safe-area-inset-right)); bottom: max(14px, env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(2, auto); gap: 10px; align-items: end; }
+.sk { position: relative; width: 62px; height: 62px; border-radius: 50%; border: 2px solid var(--gold); background: var(--panel); color: var(--paper); display: grid; place-content: center; padding: 0; overflow: hidden; }
+.sk span { font-size: 22px; line-height: 1; }
+.sk small { font-size: 10px; opacity: 0.85; }
+.sk.big { width: 84px; height: 84px; background: rgba(163, 29, 29, 0.85); }
+.sk.big span { font-size: 32px; }
+.sk.on { box-shadow: 0 0 14px var(--gold); background: rgba(201, 162, 74, 0.45); }
+.sk.ready { animation: pulse 1.2s ease-in-out infinite; border-color: #ffe08a; }
+.sk:active { transform: scale(0.94); }
+.sk .cd { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.55); transform-origin: bottom; transform: scaleY(0); pointer-events: none; }
+@keyframes pulse { 50% { box-shadow: 0 0 18px #ffe08a; } }
+
+#toast { position: fixed; z-index: 15; top: 16%; left: 50%; transform: translateX(-50%); pointer-events: none; text-align: center; }
+#toast p { margin: 4px 0; padding: 6px 14px; border-radius: 6px; background: var(--panel); animation: fade 3s forwards; }
+#toast p.good { color: #ffe08a; }
+#toast p.bad { color: #ff9b8e; }
+@keyframes fade { 0%, 80% { opacity: 1; } 100% { opacity: 0; } }
+
+#death { position: fixed; z-index: 10; inset: 0; display: grid; place-items: center; background: rgba(40, 10, 10, 0.45); pointer-events: none; }
+#death div { text-align: center; }
+#death b { display: block; font-size: 36px; color: #ff9b8e; letter-spacing: 0.1em; }
+
+#help { position: fixed; z-index: 4; top: 10px; right: 12px; font-size: 11px; opacity: 0.6; text-shadow: 0 1px 2px #000; }
+/* Joystick: chỉ bật trên màn hình cảm ứng */
+#joyzone { display: none; position: fixed; z-index: 3; left: 0; bottom: 0; width: 55vw; height: 65vh; touch-action: none; }
+.joy-base { position: absolute; width: 112px; height: 112px; margin: -56px 0 0 -56px; border-radius: 50%; border: 2px solid rgba(243, 220, 160, 0.35); background: rgba(29, 26, 22, 0.3); opacity: 0; transition: opacity 0.15s; pointer-events: none; }
+.joy-base.on { opacity: 1; }
+.joy-knob { position: absolute; left: 50%; top: 50%; width: 48px; height: 48px; margin: -24px 0 0 -24px; border-radius: 50%; background: rgba(243, 220, 160, 0.55); }
+
+@media (pointer: coarse) {
+  #joyzone { display: block; }
+  #help { display: none; }
+  #hud { width: 180px; font-size: 11px; padding: 6px 8px; }
+  #chat { left: auto; bottom: auto; right: max(8px, env(safe-area-inset-right)); top: max(8px, env(safe-area-inset-top)); width: min(280px, 42vw); font-size: 12px; }
+  #chat-log { height: 64px; }
+}
+@media (max-width: 760px) and (pointer: fine) {
+  #help { display: none; }
+}

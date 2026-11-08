@@ -1,0 +1,25 @@
+import http from "node:http";
+import path from "node:path";
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import express from "express";
+import { Server } from "colyseus";
+import { WebSocketTransport } from "@colyseus/ws-transport";
+import { ROOM_NAME } from "@tien-gioi/shared";
+import { WorldRoom } from "./rooms/WorldRoom";
+
+const PORT = Number(process.env.PORT ?? 2567);
+const app = express();
+app.get("/health", (_req, res) => res.json({ ok: true }));
+
+// Production: phục vụ luôn bản build của client (client/dist) từ cùng server
+const dist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../client/dist");
+if (existsSync(dist)) {
+  app.use(express.static(dist));
+  app.get("*", (_req, res) => res.sendFile(path.join(dist, "index.html")));
+}
+
+const server = http.createServer(app);
+const gameServer = new Server({ transport: new WebSocketTransport({ server }) });
+gameServer.define(ROOM_NAME, WorldRoom);
+gameServer.listen(PORT).then(() => console.log(`Tiên Giới server: http://localhost:${PORT}`));
