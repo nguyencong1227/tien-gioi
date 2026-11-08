@@ -1,13 +1,25 @@
 import { describe, expect, it } from "vitest";
 import {
-  TILE, MAP_W, MAP_H, MAP_TILES, TOWN, TOWN_PX, BLOCKING, T,
-  tileAt, isBlockedPx, circleBlocked, moveWithCollision, inTown, dangerAt,
+  TILE,
+  MAP_W,
+  MAP_H,
+  MAP_TILES,
+  TOWN,
+  TOWN_PX,
+  BLOCKING,
+  T,
+  tileAt,
+  isBlockedPx,
+  circleBlocked,
+  moveWithCollision,
+  inTown,
+  dangerAt,
 } from "./map";
 import { PLAYER_RADIUS } from "./game";
 
 /** Bộ sinh số ngẫu nhiên cố định để test lặp lại được. */
 function rng(seed: number) {
-  return () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  return () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 }
 
 describe("bản đồ", () => {
@@ -44,10 +56,26 @@ describe("bản đồ", () => {
     while (stack.length) {
       const i = stack.pop()!;
       reached++;
-      const x = i % MAP_W, y = (i / MAP_W) | 0;
-      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        const nx = x + dx, ny = y + dy, j = ny * MAP_W + nx;
-        if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H || seen[j] || BLOCKING.has(MAP_TILES[j] as T)) continue;
+      const x = i % MAP_W,
+        y = (i / MAP_W) | 0;
+      for (const [dx, dy] of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ]) {
+        const nx = x + dx,
+          ny = y + dy,
+          j = ny * MAP_W + nx;
+        if (
+          nx < 0 ||
+          ny < 0 ||
+          nx >= MAP_W ||
+          ny >= MAP_H ||
+          seen[j] ||
+          BLOCKING.has(MAP_TILES[j] as T)
+        )
+          continue;
         seen[j] = 1;
         stack.push(j);
       }
@@ -80,10 +108,13 @@ describe("va chạm", () => {
     for (let ty = 3; ty < MAP_H - 3; ty++) {
       for (let tx = 3; tx < MAP_W - 3; tx++) {
         if (!BLOCKING.has(tileAt(tx, ty))) continue;
-        const free = [-1, 0, 1].every((d) => !BLOCKING.has(tileAt(tx - 1, ty + d)) && !BLOCKING.has(tileAt(tx - 2, ty + d)));
+        const free = [-1, 0, 1].every(
+          (d) => !BLOCKING.has(tileAt(tx - 1, ty + d)) && !BLOCKING.has(tileAt(tx - 2, ty + d)),
+        );
         if (!free) continue;
         // Đứng sát mép trái của ô chặn, ở giữa ô theo chiều dọc
-        const x = tx * TILE - PLAYER_RADIUS - 1, y = ty * TILE + TILE / 2;
+        const x = tx * TILE - PLAYER_RADIUS - 1,
+          y = ty * TILE + TILE / 2;
         if (circleBlocked(x, y, PLAYER_RADIUS)) continue;
         const moved = moveWithCollision(x, y, 6, 6, PLAYER_RADIUS);
         expect(moved.x).toBe(x); // bị tường chặn theo X
@@ -96,7 +127,8 @@ describe("va chạm", () => {
 
   it("isBlockedPx khớp với loại ô", () => {
     for (let i = 0; i < 200; i++) {
-      const tx = (i * 37) % MAP_W, ty = (i * 53) % MAP_H;
+      const tx = (i * 37) % MAP_W,
+        ty = (i * 53) % MAP_H;
       expect(isBlockedPx(tx * TILE + 5, ty * TILE + 5)).toBe(BLOCKING.has(tileAt(tx, ty)));
     }
   });

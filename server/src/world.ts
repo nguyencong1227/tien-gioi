@@ -47,7 +47,10 @@ export class World {
   readonly mctrl = new Map<string, MonsterCtrl>();
   monsterSeq = 0;
 
-  constructor(readonly state: WorldState, readonly events: WorldEvents) {}
+  constructor(
+    readonly state: WorldState,
+    readonly events: WorldEvents,
+  ) {}
 
   /** Người chơi còn sống và đang trong phòng; null nếu không. */
   ready(sessionId: string): { p: Player; c: PlayerCtrl } | null {
@@ -59,4 +62,5 @@ export class World {
 }
 
 export const rand = (a: number, b: number) => a + Math.random() * (b - a);
-export const angleDiff = (a: number, b: number) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
+export const angleDiff = (a: number, b: number) =>
+  Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));

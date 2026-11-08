@@ -2,9 +2,19 @@
 // Logic game nằm trong ../systems/*, trạng thái dùng chung trong ../world.ts.
 import { Room, Client, ServerError } from "colyseus";
 import {
-  TICK_MS, MAX_PLAYERS_PER_ROOM, MONSTER_RESPAWN_MS, REALMS, inTown, realmLabel,
-  type InputMsg, type AttackMsg, type SkillMsg, type MeditateMsg, type ChatMsg,
-  type ChatOut, type JoinOptions,
+  TICK_MS,
+  MAX_PLAYERS_PER_ROOM,
+  MONSTER_RESPAWN_MS,
+  REALMS,
+  inTown,
+  realmLabel,
+  type InputMsg,
+  type AttackMsg,
+  type SkillMsg,
+  type MeditateMsg,
+  type ChatMsg,
+  type ChatOut,
+  type JoinOptions,
 } from "@tien-gioi/shared";
 import { WorldState, Player } from "../schema";
 import { loadPlayer, savePlayer, hashSecret, cleanName, type SavedPlayer } from "../store";
@@ -40,7 +50,9 @@ export class WorldRoom extends Room<WorldState> {
     const w = this.world;
     this.onMessage("input", (c, m: InputMsg) => queueInput(w, c.sessionId, m));
     this.onMessage("attack", (c, m: AttackMsg) => slash(w, c.sessionId, m?.angle));
-    this.onMessage("skill", (c, m: SkillMsg) => { if (m?.id === "sword") swordQi(w, c.sessionId, m.angle); });
+    this.onMessage("skill", (c, m: SkillMsg) => {
+      if (m?.id === "sword") swordQi(w, c.sessionId, m.angle);
+    });
     this.onMessage("meditate", (c, m: MeditateMsg) => setMeditating(w, c.sessionId, !!m?.on));
     this.onMessage("breakthrough", (c) => breakthrough(w, c.sessionId));
     this.onMessage("chat", (c, m: ChatMsg) => chat(w, c.sessionId, m?.text));
@@ -54,15 +66,25 @@ export class WorldRoom extends Room<WorldState> {
     const secret = typeof options?.secret === "string" ? options.secret : "";
     if (secret.length < 16) throw new ServerError(400, "Thiếu mã nhân vật.");
     for (const p of this.state.players.values()) {
-      if (p.name.toLowerCase() === name.toLowerCase()) throw new ServerError(409, "Nhân vật này đang ở trong game.");
+      if (p.name.toLowerCase() === name.toLowerCase())
+        throw new ServerError(409, "Nhân vật này đang ở trong game.");
     }
     const existing = await loadPlayer(name);
     if (existing) {
-      if (existing.secretHash !== hashSecret(secret)) throw new ServerError(403, "Tên này đã có người dùng.");
+      if (existing.secretHash !== hashSecret(secret))
+        throw new ServerError(403, "Tên này đã có người dùng.");
       return existing;
     }
     const now = new Date().toISOString();
-    const fresh: SavedPlayer = { name, secretHash: hashSecret(secret), realm: 0, tier: 0, exp: 0, createdAt: now, updatedAt: now };
+    const fresh: SavedPlayer = {
+      name,
+      secretHash: hashSecret(secret),
+      realm: 0,
+      tier: 0,
+      exp: 0,
+      createdAt: now,
+      updatedAt: now,
+    };
     await savePlayer(fresh);
     return fresh;
   }
@@ -74,11 +96,20 @@ export class WorldRoom extends Room<WorldState> {
     p.tier = Math.min(save.tier, REALMS[p.realm].tiers.length - 1);
     p.exp = save.exp;
     const spot = safeSpot(save.x, save.y);
-    p.x = spot.x; p.y = spot.y;
+    p.x = spot.x;
+    p.y = spot.y;
     applyStats(p, true);
     this.state.players.set(client.sessionId, p);
     this.world.ctrl.set(client.sessionId, {
-      save, inputs: [], moveBudget: 4, nextSlash: 0, nextSword: 0, nextBreak: 0, nextChat: 0, lastHitAt: 0, deadAt: 0,
+      save,
+      inputs: [],
+      moveBudget: 4,
+      nextSlash: 0,
+      nextSword: 0,
+      nextBreak: 0,
+      nextChat: 0,
+      lastHitAt: 0,
+      deadAt: 0,
     });
     this.world.events.sys(`${p.name} (${realmLabel(p.realm, p.tier)}) đã nhập thế.`);
   }
@@ -105,7 +136,15 @@ export class WorldRoom extends Room<WorldState> {
   private async persist(p: Player, c: PlayerCtrl) {
     // Không lưu vị trí trong trấn hoặc lúc trọng thương: lần sau vào thì xuất hiện ở trấn
     const pos = p.dead || inTown(p.x, p.y) ? {} : { x: Math.round(p.x), y: Math.round(p.y) };
-    c.save = { ...c.save, realm: p.realm, tier: p.tier, exp: Math.floor(p.exp), x: undefined, y: undefined, ...pos };
+    c.save = {
+      ...c.save,
+      realm: p.realm,
+      tier: p.tier,
+      exp: Math.floor(p.exp),
+      x: undefined,
+      y: undefined,
+      ...pos,
+    };
     await savePlayer(c.save);
   }
 

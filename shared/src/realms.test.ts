@@ -1,10 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
-  REALMS, realmLabel, stepOf, isLastTier, isPeak, expToNext, statsFor, breakthroughChance,
+  REALMS,
+  realmLabel,
+  stepOf,
+  isLastTier,
+  isPeak,
+  expToNext,
+  statsFor,
+  breakthroughChance,
 } from "./realms";
 
 /** Toàn bộ thang cảnh giới theo thứ tự [realm, tier]. */
-const ladder: [number, number][] = REALMS.flatMap((r, ri) => r.tiers.map((_, ti) => [ri, ti] as [number, number]));
+const ladder: [number, number][] = REALMS.flatMap((r, ri) =>
+  r.tiers.map((_, ti) => [ri, ti] as [number, number]),
+);
 
 describe("thang cảnh giới", () => {
   it("bắt đầu từ Phàm Nhân, kết thúc ở Độ Kiếp", () => {
