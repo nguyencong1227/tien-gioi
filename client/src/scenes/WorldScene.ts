@@ -12,6 +12,9 @@ import {
   PLAYER_RADIUS,
   SKILLS,
   MONSTER_BY_ID,
+  ITEM_BY_ID,
+  RARITY_COLORS,
+  PICKUP_RANGE,
   moveWithCollision,
   statsFor,
   realmLabel,
@@ -20,20 +23,32 @@ import {
   type DmgMsg,
   type ChatOut,
   type ToastMsg,
+  type InvMsg,
+  type LootView,
 } from "@tien-gioi/shared";
-import { makeTextures, TILESET_KEY } from "../textures";
+import { preloadAssets, makeTextures, dirFromAngle, TILESET_KEY, ATLAS_KEY } from "../textures";
 import { ui } from "../ui";
 import { joystick, setupJoystick } from "../joystick";
 
 interface Entity {
   root: Phaser.GameObjects.Container;
-  sprite: Phaser.GameObjects.Image;
+  sprite: Phaser.GameObjects.Sprite;
   bar: Phaser.GameObjects.Graphics;
   label?: Phaser.GameObjects.Text;
   aura?: Phaser.GameObjects.Ellipse;
   tx: number; // vị trí đích (từ server) để nội suy
   ty: number;
   lastLabel?: string;
+  slashUntil?: number;
+}
+
+interface LootEntity {
+  root: Phaser.GameObjects.Container;
+  ring: Phaser.GameObjects.Arc;
+  icon: Phaser.GameObjects.Image;
+  label: Phaser.GameObjects.Text;
+  itemId: string;
+  qty: number;
 }
 
 const LERP_RATE = 14; // nội suy vị trí người khác / quái
@@ -41,6 +56,7 @@ const LERP_RATE = 14; // nội suy vị trí người khác / quái
 export class WorldScene extends Phaser.Scene {
   private players = new Map<string, Entity>();
   private monsters = new Map<string, Entity>();
+  private loots = new Map<string, LootEntity>();
   private keys!: Record<string, Phaser.Input.Keyboard.Key>;
 
   // Đoán trước di chuyển của chính mình
@@ -50,10 +66,12 @@ export class WorldScene extends Phaser.Scene {
   private predY = 0;
   private hasMe = false;
   private acc = 0;
-  private facing = 0;
+  private facing = Math.PI / 2;
+  private moving = false;
 
   private nextSlash = 0;
   private nextSword = 0;
+  private nearestLootId: string | null = null;
 
   constructor(private room: Room) {
     super("world");
@@ -64,6 +82,10 @@ export class WorldScene extends Phaser.Scene {
   }
   private get sid() {
     return this.room.sessionId;
+  }
+
+  preload() {
+    preloadAssets(this);
   }
 
   create() {
@@ -109,6 +131,13 @@ export class WorldScene extends Phaser.Scene {
     fitZoom();
     this.scale.on("resize", fitZoom);
 
+    ui.initInventory({
+      onUse: (slot) => this.room.send("useItem", { slot }),
+      onDrop: (slot, qty) =>
+        this.room.send("dropItem", qty !== undefined ? { slot, qty } : { slot }),
+      onPickup: () => this.pickupNearest(),
+    });
+
     this.setupInput();
     setupJoystick();
     this.setupNetwork();
@@ -119,7 +148,7 @@ export class WorldScene extends Phaser.Scene {
   private setupInput() {
     // enableCapture = false: để còn gõ được chữ vào ô chat
     this.keys = this.input.keyboard!.addKeys(
-      "W,A,S,D,UP,DOWN,LEFT,RIGHT,J,K,L,B,SPACE,ENTER",
+      "W,A,S,D,UP,DOWN,LEFT,RIGHT,J,K,L,B,I,F,ONE,TWO,ESC,SPACE,ENTER",
       false,
     ) as any;
     const typing = () => document.activeElement instanceof HTMLInputElement;
@@ -129,6 +158,11 @@ export class WorldScene extends Phaser.Scene {
     kb.on("keydown-K", () => !typing() && this.sword());
     kb.on("keydown-L", () => !typing() && this.toggleMeditate());
     kb.on("keydown-B", () => !typing() && this.room.send("breakthrough"));
+    kb.on("keydown-I", () => !typing() && ui.toggleInventory());
+    kb.on("keydown-ESC", () => !typing() && ui.isInventoryOpen() && ui.toggleInventory(false));
+    kb.on("keydown-F", () => !typing() && this.pickupNearest());
+    kb.on("keydown-ONE", () => !typing() && ui.useQuick(1));
+    kb.on("keydown-TWO", () => !typing() && ui.useQuick(2));
     kb.on("keydown-ENTER", () => {
       if (!typing())
         setTimeout(() => (document.getElementById("chat-input") as HTMLInputElement).focus(), 0);
@@ -136,7 +170,7 @@ export class WorldScene extends Phaser.Scene {
 
     // Chuột: bấm vào bản đồ để chém về phía con trỏ
     this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
-      if (p.wasTouch || !p.leftButtonDown()) return;
+      if (p.wasTouch || !p.leftButtonDown() || ui.isInventoryOpen()) return;
       this.slash(Math.atan2(p.worldY - this.predY, p.worldX - this.predX));
     });
 
@@ -202,6 +236,8 @@ export class WorldScene extends Phaser.Scene {
     this.nextSlash = this.time.now + SKILLS.slash.cooldown;
     const a = angle ?? this.aim(SKILLS.slash.range + 60);
     this.facing = a;
+    const myEntity = this.players.get(this.sid);
+    if (myEntity) myEntity.slashUntil = this.time.now + 220;
     this.room.send("attack", { angle: a });
     this.fxSlash(this.predX, this.predY, a, 0xffffff);
   }
@@ -213,6 +249,8 @@ export class WorldScene extends Phaser.Scene {
     this.nextSword = this.time.now + SKILLS.sword.cooldown;
     const a = this.aim(SKILLS.sword.range);
     this.facing = a;
+    const myEntity = this.players.get(this.sid);
+    if (myEntity) myEntity.slashUntil = this.time.now + 220;
     this.room.send("skill", { id: "sword", angle: a });
     this.fxSword(this.predX, this.predY, a, SKILLS.sword.range);
   }
@@ -223,6 +261,12 @@ export class WorldScene extends Phaser.Scene {
     this.room.send("meditate", { on: !me.meditating });
   }
 
+  private pickupNearest() {
+    const me = this.me();
+    if (!me || me.dead || !this.nearestLootId) return;
+    this.room.send("pickup", { lootId: this.nearestLootId });
+  }
+
   // ---------------- Mạng ----------------
 
   private setupNetwork() {
@@ -231,9 +275,10 @@ export class WorldScene extends Phaser.Scene {
     this.room.onMessage("dmg", (m: DmgMsg) => this.floatText(m));
     this.room.onMessage("chat", (m: ChatOut) => ui.chat(m));
     this.room.onMessage("toast", (m: ToastMsg) => ui.toast(m));
+    this.room.onMessage("inv", (m: InvMsg) => ui.onInv(m));
     ui.chat({
       from: "",
-      text: "Chào mừng đạo hữu tới Tiên Giới. Ra khỏi trấn để săn yêu thú, hoặc đả tọa để tích tu vi.",
+      text: "Chào mừng đạo hữu tới Tiên Giới. Ra khỏi trấn để săn yêu thú, nhặt linh vật (F) và mở túi đồ (I).",
       sys: true,
     });
   }
@@ -265,9 +310,16 @@ export class WorldScene extends Phaser.Scene {
 
   private fixedStep() {
     const me = this.me();
-    if (!me || me.dead) return;
+    if (!me || me.dead) {
+      this.moving = false;
+      return;
+    }
     const { dx, dy } = this.moveDir();
-    if (Math.hypot(dx, dy) < 0.05) return;
+    if (Math.hypot(dx, dy) < 0.05) {
+      this.moving = false;
+      return;
+    }
+    this.moving = true;
     const msg: InputMsg = { seq: ++this.seq, dx, dy };
     this.room.send("input", msg);
     this.pending.push(msg);
@@ -295,6 +347,7 @@ export class WorldScene extends Phaser.Scene {
     const k = 1 - Math.exp(-LERP_RATE * (deltaMs / 1000));
     this.syncPlayers(k, deltaMs);
     this.syncMonsters(k);
+    this.syncLoot();
 
     const me = this.me();
     if (me) {
@@ -302,6 +355,20 @@ export class WorldScene extends Phaser.Scene {
       const now = this.time.now;
       ui.cooldown("sk-slash", (this.nextSlash - now) / SKILLS.slash.cooldown);
       ui.cooldown("sk-sword", (this.nextSword - now) / SKILLS.sword.cooldown);
+      ui.tickItemCooldowns();
+    }
+  }
+
+  private updatePlayerAnim(e: Entity, who: "me" | "other", angle: number, isMoving: boolean) {
+    const dir = dirFromAngle(angle);
+    const slashing = (e.slashUntil ?? 0) > this.time.now;
+    const mode = slashing ? "slash" : isMoving ? "walk" : "idle";
+    const animKey = `${who}-${mode}-${dir}`;
+    if (this.anims.exists(animKey)) {
+      if (e.sprite.anims.currentAnim?.key !== animKey) e.sprite.play(animKey, true);
+      e.sprite.setFlipX(false);
+    } else {
+      e.sprite.setFlipX(Math.cos(angle) < 0);
     }
   }
 
@@ -310,9 +377,10 @@ export class WorldScene extends Phaser.Scene {
     this.state.players.forEach((p: any, id: string) => {
       seen.add(id);
       const isMe = id === this.sid;
+      const who = isMe ? "me" : "other";
       let e = this.players.get(id);
       if (!e) {
-        e = this.makeEntity(isMe ? "me" : "other", p.x, p.y, true);
+        e = this.makeEntity(who, p.x, p.y, true);
         if (isMe) this.cameras.main.startFollow(e.root, true, 0.2, 0.2);
         this.players.set(id, e);
       }
@@ -321,18 +389,19 @@ export class WorldScene extends Phaser.Scene {
         const kk = 1 - Math.exp(-30 * (deltaMs / 1000));
         e.root.x += (this.predX - e.root.x) * kk;
         e.root.y += (this.predY - e.root.y) * kk;
-        e.sprite.setFlipX(Math.cos(this.facing) < 0);
+        this.updatePlayerAnim(e, who, this.facing, this.moving && !p.dead && !p.meditating);
         ui.death(
           p.dead ? Math.max(0, Math.ceil(5 - (this.time.now - (e as any).deadSince) / 1000)) : null,
         );
         if (p.dead && !(e as any).deadSince) (e as any).deadSince = this.time.now;
         if (!p.dead) (e as any).deadSince = 0;
       } else {
+        const dist = Math.hypot(p.x - e.root.x, p.y - e.root.y);
         e.tx = p.x;
         e.ty = p.y;
         e.root.x += (e.tx - e.root.x) * k;
         e.root.y += (e.ty - e.root.y) * k;
-        e.sprite.setFlipX(Math.cos(p.angle) < 0);
+        this.updatePlayerAnim(e, who, p.angle, dist > 1.5 && !p.dead && !p.meditating);
       }
       e.root.setDepth(e.root.y);
       e.root.setAlpha(p.dead ? 0.35 : 1);
@@ -366,6 +435,8 @@ export class WorldScene extends Phaser.Scene {
       const def = MONSTER_BY_ID[m.kind];
       if (!e) {
         e = this.makeEntity(`mon-${m.kind}`, m.x, m.y, false);
+        const animKey = `mon-${m.kind}-move`;
+        if (this.anims.exists(animKey)) e.sprite.play(animKey);
         if (def.boss) {
           e.label = this.add
             .text(0, -def.radius - 22, def.name, {
@@ -408,9 +479,100 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
+  private syncLoot() {
+    if (!this.state.loot) {
+      ui.pickupPrompt(null);
+      return;
+    }
+    const seen = new Set<string>();
+    let bestId: string | null = null;
+    let bestDist = PICKUP_RANGE;
+    let bestLabel: string | null = null;
+    const me = this.me();
+
+    this.state.loot.forEach((l: LootView, id: string) => {
+      seen.add(id);
+      const def = ITEM_BY_ID[l.itemId];
+      const rarityColor = def ? RARITY_COLORS[def.rarity] : 0xc9c4b8;
+      let le = this.loots.get(id);
+      if (!le) {
+        const root = this.add.container(l.x, l.y).setDepth(l.y - 2);
+        const ring = this.add
+          .circle(0, 2, 11, rarityColor, 0.18)
+          .setStrokeStyle(1.8, rarityColor, 0.9);
+        const texKey = this.textures.exists(`item-${l.itemId}`) ? `item-${l.itemId}` : "dot";
+        const icon = this.add.image(0, -3, texKey);
+        if (texKey === "dot" && def) icon.setTint(def.color);
+        const hex = `#${rarityColor.toString(16).padStart(6, "0")}`;
+        const label = this.add
+          .text(0, -18, "", {
+            fontFamily: "serif",
+            fontSize: "11px",
+            color: hex,
+            stroke: "#1d1a16",
+            strokeThickness: 3,
+          })
+          .setOrigin(0.5);
+        root.add([ring, icon, label]);
+        // Hiệu ứng nhấp nháy theo độ hiếm
+        this.tweens.add({
+          targets: ring,
+          scaleX: 1.3,
+          scaleY: 1.3,
+          alpha: 0.35,
+          yoyo: true,
+          repeat: -1,
+          duration: 650,
+        });
+        this.tweens.add({
+          targets: icon,
+          y: -6,
+          yoyo: true,
+          repeat: -1,
+          duration: 650,
+          ease: "Sine.easeInOut",
+        });
+        le = { root, ring, icon, label, itemId: l.itemId, qty: 0 };
+        this.loots.set(id, le);
+      }
+
+      le.root.setPosition(l.x, l.y);
+      le.root.setDepth(l.y - 2);
+      if (le.qty !== l.qty) {
+        le.qty = l.qty;
+        const name = def?.name ?? l.itemId;
+        le.label.setText(l.qty > 1 ? `${name} ×${l.qty}` : name);
+      }
+      // Đồ của người khác (trong 30 giây đầu) hiện mờ đi
+      const mineOrPublic = !l.owner || l.owner === this.sid;
+      le.root.setAlpha(mineOrPublic ? 1 : 0.35);
+
+      if (me && !me.dead && mineOrPublic) {
+        const d = Math.hypot(l.x - this.predX, l.y - this.predY);
+        if (d <= bestDist) {
+          bestDist = d;
+          bestId = id;
+          bestLabel = def ? `Nhặt ${def.name}` : "Nhặt (F)";
+        }
+      }
+    });
+
+    for (const [id, le] of this.loots) {
+      if (seen.has(id)) continue;
+      le.root.destroy();
+      this.loots.delete(id);
+    }
+
+    this.nearestLootId = bestId;
+    ui.pickupPrompt(bestLabel);
+  }
+
   private makeEntity(texture: string, x: number, y: number, isPlayer: boolean): Entity {
     const root = this.add.container(x, y);
-    const sprite = this.add.image(0, isPlayer ? -12 : 0, texture);
+    const hasAtlas = this.textures.exists(ATLAS_KEY) && this.textures.get(ATLAS_KEY).has(texture);
+    const sprite = hasAtlas
+      ? this.add.sprite(0, isPlayer ? -12 : 0, ATLAS_KEY, texture)
+      : this.add.sprite(0, isPlayer ? -12 : 0, texture);
     const bar = this.add.graphics();
     const e: Entity = { root, sprite, bar, tx: x, ty: y };
     if (isPlayer) {
@@ -464,10 +626,16 @@ export class WorldScene extends Phaser.Scene {
   private onFx(m: FxMsg) {
     if ((m.kind === "slash" || m.kind === "sword") && m.by === this.sid) return; // đã vẽ ngay khi bấm
     switch (m.kind) {
-      case "slash":
+      case "slash": {
+        const other = this.players.get(m.by);
+        if (other) other.slashUntil = this.time.now + 220;
         return this.fxSlash(m.x, m.y, m.angle, 0xdfe8f0);
-      case "sword":
+      }
+      case "sword": {
+        const other = this.players.get(m.by);
+        if (other) other.slashUntil = this.time.now + 220;
         return this.fxSword(m.x, m.y, m.angle, m.range);
+      }
       case "mslash":
         return this.fxSlash(m.x, m.y, m.angle, 0xff6050, 0.6);
       case "levelup":

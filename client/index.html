@@ -30,7 +30,12 @@
         <div class="bar hp"><i id="hp-fill"></i><span id="hp-text"></span></div>
         <div class="bar mp"><i id="mp-fill"></i><span id="mp-text"></span></div>
         <div class="bar exp"><i id="exp-fill"></i><span id="exp-text"></span></div>
-        <div id="hud-online"></div>
+        <div class="hud-foot">
+          <div id="hud-online"></div>
+          <button type="button" id="btn-bag" title="Túi đồ (I)">
+            <span>袋</span><small>Túi đồ</small>
+          </button>
+        </div>
       </div>
 
       <div id="chat" class="panel">
@@ -38,6 +43,29 @@
         <form id="chat-form" autocomplete="off">
           <input id="chat-input" maxlength="120" placeholder="Truyền âm… (Enter)" />
         </form>
+      </div>
+
+      <div id="gain-feed" aria-live="polite"></div>
+
+      <button type="button" id="btn-pickup" class="sk pickup" hidden title="Nhặt vật phẩm (F)">
+        <span>拾</span><small id="pickup-label">Nhặt (F)</small>
+      </button>
+
+      <div id="quickbar">
+        <button type="button" class="qslot" id="quick-1" title="Đan dược 1 (Phím 1)">
+          <i class="qicon" id="quick-1-icon"></i>
+          <span class="qkey">1</span>
+          <b class="qqty" id="quick-1-qty"></b>
+          <small id="quick-1-name">Đan 1</small>
+          <em class="cd"></em>
+        </button>
+        <button type="button" class="qslot" id="quick-2" title="Đan dược 2 (Phím 2)">
+          <i class="qicon" id="quick-2-icon"></i>
+          <span class="qkey">2</span>
+          <b class="qqty" id="quick-2-qty"></b>
+          <small id="quick-2-name">Đan 2</small>
+          <em class="cd"></em>
+        </button>
       </div>
 
       <div id="skills">
@@ -55,12 +83,38 @@
         </button>
       </div>
 
+      <section id="inv-modal" class="panel" hidden aria-label="Túi đồ">
+        <header class="inv-head">
+          <div>
+            <h2>Túi Càn Khôn</h2>
+            <small id="inv-count">0 / 24 ô</small>
+          </div>
+          <button type="button" id="inv-close" title="Đóng (I / Esc)">✕</button>
+        </header>
+        <div id="inv-grid" role="grid"></div>
+        <footer id="inv-detail">
+          <div class="inv-info">
+            <div class="inv-title-row">
+              <b id="inv-item-name">Chưa chọn vật phẩm</b>
+              <span id="inv-item-rarity" class="rarity-tag"></span>
+            </div>
+            <p id="inv-item-desc">Chạm hoặc rê chuột vào một ô để xem chi tiết.</p>
+          </div>
+          <div id="inv-actions" hidden>
+            <button type="button" id="inv-btn-use" class="act-btn use">Dùng</button>
+            <button type="button" id="inv-btn-drop1" class="act-btn drop">Vứt 1</button>
+            <button type="button" id="inv-btn-dropall" class="act-btn drop">Vứt hết</button>
+          </div>
+        </footer>
+      </section>
+
       <div id="toast"></div>
       <div id="death" hidden>
         <div><b>Trọng thương</b><span id="death-t"></span></div>
       </div>
       <div id="help">
-        WASD/←↑→↓ di chuyển · J/Space chém · K kiếm khí · L đả tọa · B đột phá · Enter chat
+        WASD/←↑→↓ đi · J/Space chém · K kiếm khí · 1/2 đan · F nhặt · I túi đồ · L đả tọa · B đột
+        phá · Enter chat
       </div>
     </div>
 

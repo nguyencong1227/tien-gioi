@@ -7,7 +7,7 @@
   --hp: #b8433a;
   --mp: #3f7fa6;
   --exp: #c9a24a;
-  --panel: rgba(29, 26, 22, 0.72);
+  --panel: rgba(29, 26, 22, 0.78);
   --line: rgba(243, 220, 160, 0.25);
   color-scheme: only light;
 }
@@ -121,7 +121,7 @@ button {
   z-index: 5;
   top: max(10px, env(safe-area-inset-top));
   left: max(10px, env(safe-area-inset-left));
-  width: 230px;
+  width: 240px;
   padding: 8px 10px;
   font-size: 13px;
 }
@@ -165,10 +165,41 @@ button {
   line-height: 14px;
   text-shadow: 0 1px 2px #000;
 }
+.hud-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+}
 #hud-online {
-  margin-top: 4px;
   font-size: 11px;
-  opacity: 0.7;
+  opacity: 0.75;
+}
+#btn-bag {
+  position: relative;
+  min-width: 48px;
+  min-height: 44px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--gold);
+  background: rgba(201, 162, 74, 0.2);
+  color: var(--paper);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+#btn-bag span {
+  font-size: 18px;
+  line-height: 1;
+  color: #ffe08a;
+}
+#btn-bag small {
+  font-size: 11px;
+}
+#btn-bag.active {
+  background: rgba(201, 162, 74, 0.48);
+  box-shadow: 0 0 10px rgba(255, 224, 138, 0.5);
 }
 
 /* Chat */
@@ -259,13 +290,17 @@ button {
   animation: pulse 1.2s ease-in-out infinite;
   border-color: #ffe08a;
 }
-.sk:active {
+.sk:active,
+.qslot:active,
+#btn-bag:active {
   transform: scale(0.94);
 }
-.sk .cd {
+.sk .cd,
+.qslot .cd,
+.inv-slot .cd {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(0, 0, 0, 0.6);
   transform-origin: bottom;
   transform: scaleY(0);
   pointer-events: none;
@@ -274,6 +309,293 @@ button {
   50% {
     box-shadow: 0 0 18px #ffe08a;
   }
+}
+
+/* Nút nhặt đồ rơi khi đứng gần */
+#btn-pickup {
+  position: fixed;
+  z-index: 6;
+  right: calc(max(14px, env(safe-area-inset-right)) + 168px);
+  bottom: calc(max(14px, env(safe-area-inset-bottom)) + 68px);
+  width: 66px;
+  height: 66px;
+  border-color: #6fcf73;
+  background: rgba(36, 72, 42, 0.88);
+  box-shadow: 0 0 14px rgba(111, 207, 115, 0.45);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+#btn-pickup small {
+  max-width: 58px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Thanh dùng nhanh 2 ô đan dược cạnh nút kỹ năng */
+#quickbar {
+  position: fixed;
+  z-index: 5;
+  right: calc(max(14px, env(safe-area-inset-right)) + 168px);
+  bottom: max(14px, env(safe-area-inset-bottom));
+  display: flex;
+  gap: 8px;
+}
+.qslot {
+  position: relative;
+  width: 54px;
+  height: 54px;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 10px;
+  border: 2px solid rgba(201, 162, 74, 0.65);
+  background: var(--panel);
+  color: var(--paper);
+  padding: 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.qslot.empty {
+  opacity: 0.45;
+  border-style: dashed;
+}
+.qslot .qicon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  box-shadow: inset 0 -2px 4px rgba(0, 0, 0, 0.45);
+}
+.qslot small {
+  font-size: 9px;
+  line-height: 1.1;
+  max-width: 48px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 2px;
+}
+.qslot .qkey {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-size: 9px;
+  opacity: 0.7;
+}
+.qslot .qqty {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 10px;
+  color: #ffe08a;
+  text-shadow: 0 1px 2px #000;
+}
+
+/* Thông báo nhận đồ góc phải ("+1 Nanh sói") */
+#gain-feed {
+  position: fixed;
+  z-index: 12;
+  right: max(14px, env(safe-area-inset-right));
+  bottom: calc(max(14px, env(safe-area-inset-bottom)) + 168px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  pointer-events: none;
+}
+.gain-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: rgba(29, 26, 22, 0.88);
+  border-left: 3px solid var(--gold);
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  animation: gainSlide 2.8s ease-out forwards;
+}
+.gain-item i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+  background-size: contain;
+}
+@keyframes gainSlide {
+  0% {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+  12%,
+  78% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+/* Bảng túi đồ (6x4 ô) */
+#inv-modal {
+  position: fixed;
+  z-index: 14;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(94vw, 430px);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: rgba(24, 21, 18, 0.94);
+  border: 1px solid var(--gold);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65);
+}
+.inv-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+}
+.inv-head h2 {
+  margin: 0;
+  font-size: 18px;
+  color: #ffe08a;
+  letter-spacing: 0.05em;
+}
+.inv-head small {
+  font-size: 12px;
+  opacity: 0.75;
+}
+#inv-close {
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--paper);
+  font-size: 18px;
+}
+#inv-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 7px;
+}
+.inv-slot {
+  position: relative;
+  aspect-ratio: 1;
+  min-height: 48px;
+  border-radius: 7px;
+  border: 2px solid rgba(243, 220, 160, 0.22);
+  background: rgba(0, 0, 0, 0.45);
+  color: var(--paper);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.inv-slot.selected {
+  box-shadow:
+    0 0 0 2px #ffe08a,
+    0 0 12px rgba(255, 224, 138, 0.55);
+  background: rgba(201, 162, 74, 0.22);
+}
+.inv-slot .slot-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  box-shadow: inset 0 -2px 5px rgba(0, 0, 0, 0.45);
+}
+.inv-slot .slot-name {
+  font-size: 9px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 2px;
+  opacity: 0.9;
+}
+.inv-slot .slot-qty {
+  position: absolute;
+  bottom: 2px;
+  right: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff6dc;
+  text-shadow: 0 1px 2px #000;
+}
+#inv-detail {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 110px;
+  justify-content: space-between;
+}
+.inv-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+#inv-item-name {
+  font-size: 15px;
+}
+.rarity-tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+}
+#inv-item-desc {
+  margin: 4px 0 0;
+  font-size: 13px;
+  opacity: 0.85;
+  line-height: 1.35;
+}
+#inv-actions {
+  display: flex;
+  gap: 8px;
+}
+.act-btn {
+  flex: 1;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--paper);
+  background: rgba(255, 255, 255, 0.08);
+}
+.act-btn.use {
+  background: var(--red);
+  border-color: #d96b5b;
+  color: #f6e7c4;
+}
+.act-btn.use:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.act-btn.drop {
+  background: rgba(90, 70, 50, 0.55);
 }
 
 #toast {
@@ -373,7 +695,7 @@ button {
   background: rgba(243, 220, 160, 0.55);
 }
 
-@media (pointer: coarse) {
+@media (pointer: coarse), (max-width: 640px) {
   #joyzone {
     display: block;
   }
@@ -381,7 +703,7 @@ button {
     display: none;
   }
   #hud {
-    width: 180px;
+    width: 196px;
     font-size: 11px;
     padding: 6px 8px;
   }
@@ -390,11 +712,31 @@ button {
     bottom: auto;
     right: max(8px, env(safe-area-inset-right));
     top: max(8px, env(safe-area-inset-top));
-    width: min(280px, 42vw);
+    width: min(260px, 42vw);
     font-size: 12px;
   }
   #chat-log {
-    height: 64px;
+    height: 60px;
+  }
+  /* Điện thoại: bảng túi đồ mở toàn màn hình, nút tối thiểu 44 px */
+  #inv-modal {
+    inset: 0;
+    top: 0;
+    left: 0;
+    transform: none;
+    width: 100vw;
+    height: 100dvh;
+    border-radius: 0;
+    border: 0;
+    padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right))
+      max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+    justify-content: space-between;
+  }
+  #inv-grid {
+    gap: 8px;
+    max-width: 480px;
+    width: 100%;
+    margin: 0 auto;
   }
 }
 @media (max-width: 760px) and (pointer: fine) {
