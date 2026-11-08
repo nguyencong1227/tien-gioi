@@ -27,7 +27,17 @@ export class Monster extends Schema {
   @type("number") maxHp = 0;
 }
 
+/** Đồ rơi trên đất. Kiểu dùng chung cho client: LootView trong shared/src/items.ts */
+export class Loot extends Schema {
+  @type("string") itemId = "";
+  @type("uint16") qty = 0;
+  @type("float32") x = 0;
+  @type("float32") y = 0;
+  @type("string") owner = ""; // sessionId được nhặt trước; "" = ai cũng nhặt được
+}
+
 export class WorldState extends Schema {
   @type({ map: Player }) players = new MapSchema<Player>();
   @type({ map: Monster }) monsters = new MapSchema<Monster>();
+  @type({ map: Loot }) loot = new MapSchema<Loot>();
 }

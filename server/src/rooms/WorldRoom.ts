@@ -4,7 +4,7 @@ import { Room, Client, ServerError } from "colyseus";
 import {
   TICK_MS, MAX_PLAYERS_PER_ROOM, MONSTER_RESPAWN_MS, REALMS, inTown, realmLabel,
   type InputMsg, type AttackMsg, type SkillMsg, type MeditateMsg, type ChatMsg,
-  type ChatOut, type JoinOptions,
+  type ChatOut, type JoinOptions, type UseItemMsg, type PickupMsg, type DropItemMsg,
 } from "@tien-gioi/shared";
 import { WorldState, Player } from "../schema";
 import { loadPlayer, savePlayer, hashSecret, cleanName, type SavedPlayer } from "../store";
@@ -14,6 +14,8 @@ import { slash, swordQi, tickRespawn } from "../systems/combat";
 import { spawnInitial, topUpMonsters, tickMonsters, forgetTarget } from "../systems/monsters";
 import { applyStats, breakthrough, setMeditating, tickRecovery } from "../systems/progression";
 import { chat } from "../systems/chat";
+import { sanitizeInventory, sendInv, useItem } from "../systems/inventory";
+import { dropItem, pickup, releaseLootOwner, tickLoot } from "../systems/loot";
 
 const SAVE_EVERY_MS = 30_000;
 
@@ -28,6 +30,7 @@ export class WorldRoom extends Room<WorldState> {
     sys: (text) => this.broadcast("chat", { from: "Thiên Đạo", text, sys: true } satisfies ChatOut),
     chat: (from, text) => this.broadcast("chat", { from, text } satisfies ChatOut),
     toast: (sid, msg) => this.clients.find((c) => c.sessionId === sid)?.send("toast", msg),
+    inv: (sid, msg) => this.clients.find((c) => c.sessionId === sid)?.send("inv", msg),
   });
 
   onCreate() {
@@ -44,6 +47,9 @@ export class WorldRoom extends Room<WorldState> {
     this.onMessage("meditate", (c, m: MeditateMsg) => setMeditating(w, c.sessionId, !!m?.on));
     this.onMessage("breakthrough", (c) => breakthrough(w, c.sessionId));
     this.onMessage("chat", (c, m: ChatMsg) => chat(w, c.sessionId, m?.text));
+    this.onMessage("useItem", (c, m: UseItemMsg) => useItem(w, c.sessionId, m?.slot));
+    this.onMessage("pickup", (c, m: PickupMsg) => pickup(w, c.sessionId, m?.lootId));
+    this.onMessage("dropItem", (c, m: DropItemMsg) => dropItem(w, c.sessionId, m?.slot, m?.qty));
   }
 
   // ---------------- Vào / ra ----------------
@@ -79,7 +85,9 @@ export class WorldRoom extends Room<WorldState> {
     this.state.players.set(client.sessionId, p);
     this.world.ctrl.set(client.sessionId, {
       save, inputs: [], moveBudget: 4, nextSlash: 0, nextSword: 0, nextBreak: 0, nextChat: 0, lastHitAt: 0, deadAt: 0,
+      inv: sanitizeInventory(save.inventory), itemCd: new Map(),
     });
+    sendInv(this.world, client.sessionId);
     this.world.events.sys(`${p.name} (${realmLabel(p.realm, p.tier)}) đã nhập thế.`);
   }
 
@@ -94,6 +102,7 @@ export class WorldRoom extends Room<WorldState> {
     this.state.players.delete(sid);
     this.world.ctrl.delete(sid);
     forgetTarget(this.world, sid);
+    releaseLootOwner(this.world, sid);
   }
 
   async onDispose() {
@@ -105,7 +114,7 @@ export class WorldRoom extends Room<WorldState> {
   private async persist(p: Player, c: PlayerCtrl) {
     // Không lưu vị trí trong trấn hoặc lúc trọng thương: lần sau vào thì xuất hiện ở trấn
     const pos = p.dead || inTown(p.x, p.y) ? {} : { x: Math.round(p.x), y: Math.round(p.y) };
-    c.save = { ...c.save, realm: p.realm, tier: p.tier, exp: Math.floor(p.exp), x: undefined, y: undefined, ...pos };
+    c.save = { ...c.save, realm: p.realm, tier: p.tier, exp: Math.floor(p.exp), x: undefined, y: undefined, ...pos, inventory: c.inv };
     await savePlayer(c.save);
   }
 
@@ -134,5 +143,6 @@ export class WorldRoom extends Room<WorldState> {
     });
 
     tickMonsters(w, dt);
+    tickLoot(w);
   }
 }

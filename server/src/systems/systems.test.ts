@@ -1,53 +1,13 @@
 // Test đơn vị cho các system với một World giả (không cần server Colyseus).
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { MONSTER_BY_ID, expToNext, statsFor, TOWN_PX, TICK_MS, type FxMsg, type ToastMsg } from "@tien-gioi/shared";
-import { WorldState, Player, Monster } from "../schema";
-import { World, type PlayerCtrl } from "../world";
+import { expToNext, statsFor, TOWN_PX, TICK_MS } from "@tien-gioi/shared";
+import { makeWorld, addPlayer, addMonster } from "./test-helpers";
 import { applyStats, gainExp, tickRecovery } from "./progression";
 import { applyInputs, queueInput } from "./movement";
 import { hitMonster, hurtPlayer, killMonster } from "./combat";
 import { chat } from "./chat";
 
 afterEach(() => vi.restoreAllMocks());
-
-function makeWorld() {
-  const fx: FxMsg[] = [];
-  const toasts: { sid: string; msg: ToastMsg }[] = [];
-  const sys: string[] = [];
-  const chats: { from: string; text: string }[] = [];
-  const w = new World(new WorldState(), {
-    fx: (m) => fx.push(m),
-    dmg: () => {},
-    sys: (t) => sys.push(t),
-    chat: (from, text) => chats.push({ from, text }),
-    toast: (sid, msg) => toasts.push({ sid, msg }),
-  });
-  return { w, fx, toasts, sys, chats };
-}
-
-function addPlayer(w: World, sid: string, realm = 0, tier = 0) {
-  const p = new Player();
-  p.name = sid; p.realm = realm; p.tier = tier;
-  p.x = TOWN_PX.x + TOWN_PX.r + 400; p.y = TOWN_PX.y;
-  applyStats(p, true);
-  const c: PlayerCtrl = {
-    save: { name: sid, secretHash: "", realm, tier, exp: 0, createdAt: "", updatedAt: "" },
-    inputs: [], moveBudget: 4, nextSlash: 0, nextSword: 0, nextBreak: 0, nextChat: 0, lastHitAt: 0, deadAt: 0,
-  };
-  w.state.players.set(sid, p);
-  w.ctrl.set(sid, c);
-  return { p, c };
-}
-
-function addMonster(w: World, kind: string, x: number, y: number) {
-  const def = MONSTER_BY_ID[kind];
-  const id = `m${++w.monsterSeq}`;
-  const m = new Monster();
-  m.kind = kind; m.x = x; m.y = y; m.hp = def.hp; m.maxHp = def.hp;
-  w.state.monsters.set(id, m);
-  w.mctrl.set(id, { def, homeX: x, homeY: y, target: null, nextAttack: 0, wanderX: x, wanderY: y, nextWander: 0, damageBy: new Map() });
-  return { id, m, mc: w.mctrl.get(id)! };
-}
 
 describe("progression", () => {
   it("tu vi dư thì lên liền nhiều bậc nhỏ, có hiệu ứng mỗi bậc", () => {
