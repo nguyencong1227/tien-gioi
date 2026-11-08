@@ -1,5 +1,6 @@
 // Hệ cảnh giới: thang chuẩn của thể loại tu tiên.
 // "Bậc" (step) = vị trí tuyến tính trên toàn thang, dùng để tính chỉ số.
+import { equipBonus, ITEM_BY_ID, type Equipment } from "./items";
 
 export interface Realm {
   name: string;
@@ -55,16 +56,28 @@ export interface Stats {
   speed: number; // px/giây
 }
 
-export function statsFor(realm: number, tier: number): Stats {
+/**
+ * Chỉ số gốc theo cảnh giới, cộng chỉ số đồ đang mặc (nếu truyền `equipment`).
+ * Client và server dùng chung hàm này nên số hiển thị khớp số server tính.
+ * Client nhớ truyền equipment của chính mình khi đoán trước di chuyển (hộ phù có tốc độ).
+ */
+export function statsFor(realm: number, tier: number, equipment?: Partial<Equipment>): Stats {
   const s = stepOf(realm, tier);
   // Qua cảnh giới lớn có thêm thưởng để đột phá có cảm giác "nhảy vọt"
   const realmBonus = 1 + realm * 0.15;
+  const b = equipBonus(equipment);
   return {
-    maxHp: Math.round(100 * Math.pow(1.18, s) * realmBonus),
-    maxMp: Math.round(50 * Math.pow(1.12, s) * realmBonus),
-    atk: Math.round(10 * Math.pow(1.17, s) * realmBonus),
-    speed: 150 + Math.min(realm, 6) * 8,
+    maxHp: Math.round(100 * Math.pow(1.18, s) * realmBonus) + b.hp,
+    maxMp: Math.round(50 * Math.pow(1.12, s) * realmBonus) + b.mp,
+    atk: Math.round(10 * Math.pow(1.17, s) * realmBonus) + b.atk,
+    speed: 150 + Math.min(realm, 6) * 8 + b.speed,
   };
+}
+
+/** Đủ cảnh giới để mặc món này chưa (false nếu không phải trang bị). */
+export function canEquip(itemId: string, realm: number, tier: number): boolean {
+  const e = ITEM_BY_ID[itemId]?.equip;
+  return !!e && stepOf(realm, tier) >= stepOf(e.reqRealm, e.reqTier);
 }
 
 /** Xác suất đột phá cảnh giới lớn (từ realm → realm+1). */

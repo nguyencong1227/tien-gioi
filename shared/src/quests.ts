@@ -247,11 +247,15 @@ export interface TradeMsg {
 }
 
 // ---------- Tin nhắn server -> client (chỉ gửi cho người đó) ----------
-/** Bấm lựa chọn thì client gửi tin nhắn tương ứng (questAccept / questTurnIn / trade) hoặc đóng hộp thoại */
+/**
+ * Bấm lựa chọn thì client gửi tin nhắn tương ứng (questAccept / questTurnIn / trade) hoặc đóng hộp thoại.
+ * "forge": client đóng hộp thoại và mở bảng rèn đồ của npcId (danh sách RECIPES có npcId đó).
+ */
 export type DialogAction =
   | { kind: "accept"; questId: string }
   | { kind: "turnIn"; questId: string }
   | { kind: "trade"; tradeId: string }
+  | { kind: "forge" }
   | { kind: "close" };
 
 export interface DialogOption {
