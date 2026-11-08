@@ -11,6 +11,7 @@ Cần Node.js 22 (`.nvmrc`).
 npm install
 cp .env.example .env.local   # chỉnh cổng nếu cần
 npm run dev        # server :2567 + client :5173 (Vite, tự reload)
+npm test           # chạy test (Vitest); npm run test:watch để tự chạy lại khi sửa
 ```
 
 Mở http://localhost:5173. Mở thêm tab ẩn danh hoặc điện thoại cùng mạng LAN (`http://<ip-máy>:5173`) để thử nhiều người chơi.
