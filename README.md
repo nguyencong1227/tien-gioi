@@ -9,6 +9,7 @@ Cần Node.js 22 (`.nvmrc`).
 
 ```bash
 npm install
+cp .env.example .env.local   # chỉnh cổng nếu cần
 npm run dev        # server :2567 + client :5173 (Vite, tự reload)
 ```
 
@@ -39,6 +40,7 @@ client/   Phaser 3 + Vite: WorldScene (vẽ, đoán trước di chuyển), ui (H
 ## Chia việc cho 2 dev
 
 Chi tiết từng sprint, tiêu chí "xong", quy trình review: **[docs/PHAN_CONG.md](docs/PHAN_CONG.md)**.
+Hai dev cùng SSH vào một máy: **[docs/LAM_CHUNG_MAY.md](docs/LAM_CHUNG_MAY.md)** (thư mục và cổng riêng cho từng người).
 
 - **Dev A: Server & Gameplay:** `server/`, logic trong `shared/`.
 - **Dev B: Client & Trải nghiệm:** `client/`, asset, âm thanh, UI/UX.
