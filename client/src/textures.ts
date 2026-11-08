@@ -1,7 +1,7 @@
 // Quản lý nạp asset thật (tileset.png + atlas.png/atlas.json) và đăng ký hoạt ảnh 4 hướng.
 // Giữ cơ chế fallback vẽ tạm bằng code cho các quái/vật phẩm mới thêm trong shared/ mà chưa kịp đóng gói vào atlas.
 import Phaser from "phaser";
-import { TILE, T, MONSTERS, ITEMS } from "@tien-gioi/shared";
+import { TILE, T, MONSTERS, ITEMS, NPCS } from "@tien-gioi/shared";
 
 export const TILESET_KEY = "tileset";
 export const ATLAS_KEY = "atlas";
@@ -43,6 +43,7 @@ function registerAnimations(scene: Phaser.Scene) {
   for (const key of ["me", "other", "swordbeam", "dot"]) copyFrameToTexture(key);
   for (const m of MONSTERS) copyFrameToTexture(`mon-${m.id}`);
   for (const it of ITEMS) copyFrameToTexture(`item-${it.id}`);
+  for (const n of NPCS) copyFrameToTexture(`npc-${n.id}`);
 
   // Hoạt ảnh 4 hướng cho người chơi ("me" và "other")
   for (const who of ["me", "other"]) {
@@ -152,11 +153,28 @@ function drawItemFallback(scene: Phaser.Scene, id: string, color: number) {
   g.destroy();
 }
 
+function drawNpcFallback(scene: Phaser.Scene, id: string, color: number) {
+  const key = `npc-${id}`;
+  if (scene.textures.exists(key)) return;
+  const g = scene.make.graphics({}, false);
+  g.fillStyle(0x000000, 0.25);
+  g.fillEllipse(18, 38, 22, 7);
+  g.fillStyle(color, 1);
+  g.fillTriangle(18, 12, 6, 36, 30, 36);
+  g.fillStyle(0xf2d7b6, 1);
+  g.fillCircle(18, 12, 6.5);
+  g.lineStyle(1.5, 0xc9a24a, 0.9);
+  g.strokeRect(11, 22, 14, 3);
+  g.generateTexture(key, 36, 42);
+  g.destroy();
+}
+
 export function makeTextures(scene: Phaser.Scene) {
   registerAnimations(scene);
   makeTileset(scene);
   for (const m of MONSTERS) drawMonsterFallback(scene, m.id, m.color, m.radius);
   for (const it of ITEMS) drawItemFallback(scene, it.id, it.color);
+  for (const n of NPCS) drawNpcFallback(scene, n.id, n.color);
 
   if (!scene.textures.exists("dot")) {
     const g = scene.make.graphics({}, false);

@@ -15,6 +15,12 @@ import {
   ITEM_BY_ID,
   RARITY_COLORS,
   PICKUP_RANGE,
+  NPCS,
+  NPC_BY_ID,
+  NPC_RANGE,
+  QUEST_BY_ID,
+  npcMarker,
+  questReady,
   moveWithCollision,
   statsFor,
   realmLabel,
@@ -25,9 +31,12 @@ import {
   type ToastMsg,
   type InvMsg,
   type LootView,
+  type QuestsMsg,
+  type DialogMsg,
 } from "@tien-gioi/shared";
 import { preloadAssets, makeTextures, dirFromAngle, TILESET_KEY, ATLAS_KEY } from "../textures";
 import { ui } from "../ui";
+import { sound } from "../audio";
 import { joystick, setupJoystick } from "../joystick";
 
 interface Entity {
@@ -51,12 +60,25 @@ interface LootEntity {
   qty: number;
 }
 
+interface NpcEntity {
+  id: string;
+  root: Phaser.GameObjects.Container;
+  sprite: Phaser.GameObjects.Sprite;
+  nameLabel: Phaser.GameObjects.Text;
+  titleLabel: Phaser.GameObjects.Text;
+  markerText: Phaser.GameObjects.Text;
+  markerAura: Phaser.GameObjects.Arc;
+  x: number;
+  y: number;
+}
+
 const LERP_RATE = 14; // nội suy vị trí người khác / quái
 
 export class WorldScene extends Phaser.Scene {
   private players = new Map<string, Entity>();
   private monsters = new Map<string, Entity>();
   private loots = new Map<string, LootEntity>();
+  private npcs = new Map<string, NpcEntity>();
   private keys!: Record<string, Phaser.Input.Keyboard.Key>;
 
   // Đoán trước di chuyển của chính mình
@@ -72,6 +94,11 @@ export class WorldScene extends Phaser.Scene {
   private nextSlash = 0;
   private nextSword = 0;
   private nearestLootId: string | null = null;
+  private closestNpcId: string | null = null;
+
+  // Mũi tên chỉ đường nhiệm vụ
+  private navArrow!: Phaser.GameObjects.Container;
+  private lastMapDraw = 0;
 
   constructor(private room: Room) {
     super("world");
@@ -122,6 +149,12 @@ export class WorldScene extends Phaser.Scene {
       .setStrokeStyle(2, 0xa31d1d, 0.25)
       .setDepth(-5);
 
+    // Tạo các NPC trong Lạc Hà Trấn
+    this.spawnNpcs();
+
+    // Mũi tên chỉ hướng nhiệm vụ xoay quanh người chơi
+    this.createNavArrow();
+
     const cam = this.cameras.main;
     cam.setBounds(0, 0, WORLD_W, WORLD_H);
     const fitZoom = () =>
@@ -131,11 +164,21 @@ export class WorldScene extends Phaser.Scene {
     fitZoom();
     this.scale.on("resize", fitZoom);
 
-    ui.initInventory({
+    ui.init({
       onUse: (slot) => this.room.send("useItem", { slot }),
       onDrop: (slot, qty) =>
         this.room.send("dropItem", qty !== undefined ? { slot, qty } : { slot }),
       onPickup: () => this.pickupNearest(),
+      onTalk: () => this.talkClosestNpc(),
+      onDialogAction: (action) => {
+        if (action.kind === "accept") this.room.send("questAccept", { questId: action.questId });
+        else if (action.kind === "turnIn")
+          this.room.send("questTurnIn", { questId: action.questId });
+        else if (action.kind === "trade") this.room.send("trade", { tradeId: action.tradeId });
+      },
+      onTrackQuest: () => {
+        // Tracker được cập nhật tự động trong update()
+      },
     });
 
     this.setupInput();
@@ -143,24 +186,124 @@ export class WorldScene extends Phaser.Scene {
     this.setupNetwork();
   }
 
+  private spawnNpcs() {
+    for (const npc of NPCS) {
+      const root = this.add.container(npc.x, npc.y).setDepth(npc.y);
+      const texKey = `npc-${npc.id}`;
+      const hasTex = this.textures.exists(texKey);
+      const sprite = hasTex
+        ? this.add.sprite(0, -12, texKey)
+        : this.add.sprite(0, -12, "dot").setTint(npc.color);
+
+      const nameLabel = this.add
+        .text(0, -42, npc.name, {
+          fontFamily: "serif",
+          fontSize: "12px",
+          fontStyle: "bold",
+          color: "#ffe08a",
+          stroke: "#1d1a16",
+          strokeThickness: 3,
+        })
+        .setOrigin(0.5);
+
+      const titleLabel = this.add
+        .text(0, -30, npc.title, {
+          fontFamily: "serif",
+          fontSize: "10px",
+          color: "#f3ecda",
+          stroke: "#1d1a16",
+          strokeThickness: 2,
+        })
+        .setOrigin(0.5);
+
+      const markerAura = this.add
+        .circle(0, -56, 12, 0xffd700, 0.25)
+        .setStrokeStyle(1.6, 0xffd700, 0.9)
+        .setVisible(false);
+
+      const markerText = this.add
+        .text(0, -56, "!", {
+          fontFamily: "serif",
+          fontSize: "17px",
+          fontStyle: "bold",
+          color: "#ffe08a",
+          stroke: "#1d1a16",
+          strokeThickness: 3,
+        })
+        .setOrigin(0.5)
+        .setVisible(false);
+
+      root.add([sprite, nameLabel, titleLabel, markerAura, markerText]);
+
+      this.tweens.add({
+        targets: [markerAura, markerText],
+        y: "-=6",
+        yoyo: true,
+        repeat: -1,
+        duration: 700,
+        ease: "Sine.easeInOut",
+      });
+
+      this.npcs.set(npc.id, {
+        id: npc.id,
+        root,
+        sprite,
+        nameLabel,
+        titleLabel,
+        markerText,
+        markerAura,
+        x: npc.x,
+        y: npc.y,
+      });
+    }
+  }
+
+  private createNavArrow() {
+    this.navArrow = this.add
+      .container(0, 0)
+      .setDepth(WORLD_H + 5)
+      .setVisible(false);
+    const arrowG = this.add.graphics();
+    arrowG.fillStyle(0xffd74a, 0.9);
+    arrowG.fillTriangle(14, 0, -8, -7, -8, 7);
+    arrowG.lineStyle(1.5, 0x1d1a16, 0.9);
+    arrowG.strokeTriangle(14, 0, -8, -7, -8, 7);
+
+    const aura = this.add.circle(0, 0, 16, 0xffd74a, 0.25);
+    this.tweens.add({
+      targets: aura,
+      scale: 1.35,
+      alpha: 0.1,
+      yoyo: true,
+      repeat: -1,
+      duration: 650,
+    });
+
+    this.navArrow.add([aura, arrowG]);
+  }
+
   // ---------------- Input ----------------
 
   private setupInput() {
     // enableCapture = false: để còn gõ được chữ vào ô chat
     this.keys = this.input.keyboard!.addKeys(
-      "W,A,S,D,UP,DOWN,LEFT,RIGHT,J,K,L,B,I,F,ONE,TWO,ESC,SPACE,ENTER",
+      "W,A,S,D,UP,DOWN,LEFT,RIGHT,J,K,L,B,I,Q,M,N,F,ONE,TWO,ESC,SPACE,ENTER",
       false,
     ) as any;
     const typing = () => document.activeElement instanceof HTMLInputElement;
     const kb = this.input.keyboard!;
+
     kb.on("keydown-J", () => !typing() && this.slash());
     kb.on("keydown-SPACE", () => !typing() && this.slash());
     kb.on("keydown-K", () => !typing() && this.sword());
     kb.on("keydown-L", () => !typing() && this.toggleMeditate());
     kb.on("keydown-B", () => !typing() && this.room.send("breakthrough"));
     kb.on("keydown-I", () => !typing() && ui.toggleInventory());
-    kb.on("keydown-ESC", () => !typing() && ui.isInventoryOpen() && ui.toggleInventory(false));
-    kb.on("keydown-F", () => !typing() && this.pickupNearest());
+    kb.on("keydown-Q", () => !typing() && ui.toggleQuestModal());
+    kb.on("keydown-M", () => !typing() && ui.toggleMapModal());
+    kb.on("keydown-N", () => !typing() && sound.toggleMute());
+    kb.on("keydown-ESC", () => !typing() && ui.closeAllModals());
+    kb.on("keydown-F", () => !typing() && this.interactOrPickup());
     kb.on("keydown-ONE", () => !typing() && ui.useQuick(1));
     kb.on("keydown-TWO", () => !typing() && ui.useQuick(2));
     kb.on("keydown-ENTER", () => {
@@ -170,7 +313,15 @@ export class WorldScene extends Phaser.Scene {
 
     // Chuột: bấm vào bản đồ để chém về phía con trỏ
     this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
-      if (p.wasTouch || !p.leftButtonDown() || ui.isInventoryOpen()) return;
+      if (
+        p.wasTouch ||
+        !p.leftButtonDown() ||
+        ui.isInventoryOpen() ||
+        ui.isQuestModalOpen() ||
+        ui.isMapModalOpen() ||
+        ui.isDialogOpen()
+      )
+        return;
       this.slash(Math.atan2(p.worldY - this.predY, p.worldX - this.predX));
     });
 
@@ -239,6 +390,7 @@ export class WorldScene extends Phaser.Scene {
     const myEntity = this.players.get(this.sid);
     if (myEntity) myEntity.slashUntil = this.time.now + 220;
     this.room.send("attack", { angle: a });
+    sound.slash();
     this.fxSlash(this.predX, this.predY, a, 0xffffff);
   }
 
@@ -252,6 +404,7 @@ export class WorldScene extends Phaser.Scene {
     const myEntity = this.players.get(this.sid);
     if (myEntity) myEntity.slashUntil = this.time.now + 220;
     this.room.send("skill", { id: "sword", angle: a });
+    sound.sword();
     this.fxSword(this.predX, this.predY, a, SKILLS.sword.range);
   }
 
@@ -267,18 +420,37 @@ export class WorldScene extends Phaser.Scene {
     this.room.send("pickup", { lootId: this.nearestLootId });
   }
 
+  private talkClosestNpc() {
+    const me = this.me();
+    if (!me || me.dead || !this.closestNpcId) return;
+    this.room.send("talk", { npcId: this.closestNpcId });
+  }
+
+  private interactOrPickup() {
+    if (this.closestNpcId) {
+      this.talkClosestNpc();
+    } else if (this.nearestLootId) {
+      this.pickupNearest();
+    }
+  }
+
   // ---------------- Mạng ----------------
 
   private setupNetwork() {
     this.room.onStateChange(() => this.reconcile());
     this.room.onMessage("fx", (m: FxMsg) => this.onFx(m));
-    this.room.onMessage("dmg", (m: DmgMsg) => this.floatText(m));
+    this.room.onMessage("dmg", (m: DmgMsg) => {
+      this.floatText(m);
+      sound.hit(m.crit);
+    });
     this.room.onMessage("chat", (m: ChatOut) => ui.chat(m));
     this.room.onMessage("toast", (m: ToastMsg) => ui.toast(m));
     this.room.onMessage("inv", (m: InvMsg) => ui.onInv(m));
+    this.room.onMessage("quests", (m: QuestsMsg) => ui.onQuests(m));
+    this.room.onMessage("dialog", (m: DialogMsg) => ui.onDialog(m));
     ui.chat({
       from: "",
-      text: "Chào mừng đạo hữu tới Tiên Giới. Ra khỏi trấn để săn yêu thú, nhặt linh vật (F) và mở túi đồ (I).",
+      text: "Chào mừng đạo hữu tới Tiên Giới. Nhận nhiệm vụ ở Trưởng trấn (F), mở sổ nhiệm vụ (Q) và xem bản đồ (M).",
       sys: true,
     });
   }
@@ -348,6 +520,10 @@ export class WorldScene extends Phaser.Scene {
     this.syncPlayers(k, deltaMs);
     this.syncMonsters(k);
     this.syncLoot();
+    this.syncNpcs();
+    this.syncAudioZone();
+    this.syncQuestNav();
+    this.syncMaps();
 
     const me = this.me();
     if (me) {
@@ -356,6 +532,311 @@ export class WorldScene extends Phaser.Scene {
       ui.cooldown("sk-slash", (this.nextSlash - now) / SKILLS.slash.cooldown);
       ui.cooldown("sk-sword", (this.nextSword - now) / SKILLS.sword.cooldown);
       ui.tickItemCooldowns();
+    }
+  }
+
+  private syncAudioZone() {
+    const distToTown = Math.hypot(this.predX - TOWN_PX.x, this.predY - TOWN_PX.y);
+    const inTown = distToTown <= TOWN_PX.r;
+    sound.setZone(inTown ? "town" : "wild");
+    ui.setZoneName(inTown ? "Lạc Hà Trấn" : "Vân Mộng Sơn");
+  }
+
+  private syncNpcs() {
+    const qLog = ui.getQuestLog();
+    const qCtx = ui.getQuestContext();
+
+    let bestNpc: NpcEntity | null = null;
+    let bestDist = NPC_RANGE;
+
+    for (const [id, ne] of this.npcs) {
+      const marker = npcMarker(id, qLog, qCtx);
+      if (marker === "!" || marker === "?") {
+        ne.markerText.setText(marker).setVisible(true);
+        ne.markerAura.setVisible(true);
+        const col = marker === "?" ? 0x6ad06a : 0xffd700;
+        ne.markerAura.setFillStyle(col, 0.25).setStrokeStyle(1.6, col, 0.9);
+        ne.markerText.setColor(marker === "?" ? "#6ad06a" : "#ffe08a");
+      } else {
+        ne.markerText.setVisible(false);
+        ne.markerAura.setVisible(false);
+      }
+
+      const d = Math.hypot(ne.x - this.predX, ne.y - this.predY);
+      if (d <= bestDist) {
+        bestDist = d;
+        bestNpc = ne;
+      }
+    }
+
+    this.closestNpcId = bestNpc ? bestNpc.id : null;
+    if (bestNpc) {
+      const npcDef = NPC_BY_ID[bestNpc.id];
+      ui.talkPrompt(npcDef ? `Nói chuyện · ${npcDef.name} (F)` : "Nói chuyện (F)");
+    } else {
+      ui.talkPrompt(null);
+    }
+  }
+
+  private resolveQuestTarget(questId: string): { x: number; y: number } | null {
+    const def = QUEST_BY_ID[questId];
+    if (!def) return null;
+    const qLog = ui.getQuestLog();
+    const prog = qLog.active.find((a) => a.id === questId);
+    if (!prog) return null;
+    const ctx = ui.getQuestContext();
+
+    // Nếu đã hoàn thành hoặc sẵn sàng trả thì chỉ tới NPC giao
+    if (questReady(def, prog, ctx)) {
+      const giver = NPC_BY_ID[def.giver];
+      return giver ? { x: giver.x, y: giver.y } : null;
+    }
+
+    const step = def.steps[prog.step];
+    if (!step) return null;
+
+    if (step.kind === "talk") {
+      const npc = NPC_BY_ID[step.npcId];
+      return npc ? { x: npc.x, y: npc.y } : null;
+    }
+
+    if (step.kind === "kill") {
+      // Vùng săn quái theo loại
+      if (step.monster === "tho") return { x: TOWN_PX.x + 230, y: TOWN_PX.y - 120 };
+      if (step.monster === "lang") return { x: TOWN_PX.x - 380, y: TOWN_PX.y - 320 };
+      if (step.monster === "ho") return { x: TOWN_PX.x + 520, y: TOWN_PX.y + 440 };
+      if (step.monster === "mang") return { x: TOWN_PX.x, y: TOWN_PX.y + 740 };
+    }
+
+    if (step.kind === "collect") {
+      // Thu thập nguyên liệu: chỉ tới vùng quái rớt nguyên liệu tương ứng
+      if (step.itemId === "long_tho") return { x: TOWN_PX.x + 230, y: TOWN_PX.y - 120 };
+      if (step.itemId === "nanh_soi") return { x: TOWN_PX.x - 380, y: TOWN_PX.y - 320 };
+      if (step.itemId === "da_ho") return { x: TOWN_PX.x + 520, y: TOWN_PX.y + 440 };
+    }
+
+    // Đột phá cảnh giới: chỉ về trung tâm trấn để an toàn
+    if (step.kind === "reachRealm") {
+      return { x: TOWN_PX.x, y: TOWN_PX.y };
+    }
+
+    return null;
+  }
+
+  private syncQuestNav() {
+    const trackId = ui.getTrackingQuestId();
+    if (!trackId) {
+      this.navArrow.setVisible(false);
+      return;
+    }
+    const target = this.resolveQuestTarget(trackId);
+    if (!target) {
+      this.navArrow.setVisible(false);
+      return;
+    }
+
+    const dx = target.x - this.predX;
+    const dy = target.y - this.predY;
+    const dist = Math.hypot(dx, dy);
+
+    // Khi ở quá gần mục tiêu (dưới 95 px) thì ẩn mũi tên để không rối mắt
+    if (dist <= 95) {
+      this.navArrow.setVisible(false);
+      return;
+    }
+
+    const angle = Math.atan2(dy, dx);
+    this.navArrow.setPosition(
+      this.predX + Math.cos(angle) * 44,
+      this.predY - 8 + Math.sin(angle) * 44,
+    );
+    this.navArrow.setRotation(angle);
+    this.navArrow.setVisible(true);
+  }
+
+  // ---------------- Bản đồ nhỏ & Bản đồ lớn ----------------
+
+  private syncMaps() {
+    const now = performance.now();
+    if (now - this.lastMapDraw < 120) return;
+    this.lastMapDraw = now;
+
+    // 1. Vẽ Minimap (120x120)
+    const mmCanvas = document.getElementById("minimap") as HTMLCanvasElement | null;
+    if (mmCanvas) {
+      const ctx = mmCanvas.getContext("2d");
+      if (ctx) {
+        const w = mmCanvas.width;
+        const h = mmCanvas.height;
+        ctx.clearRect(0, 0, w, h);
+
+        const scale = w / WORLD_W;
+
+        // Nền hoang dã
+        ctx.fillStyle = "#273322";
+        ctx.fillRect(0, 0, w, h);
+
+        // Vòng Lạc Hà Trấn
+        const tx = TOWN_PX.x * scale;
+        const ty = TOWN_PX.y * scale;
+        const tr = TOWN_PX.r * scale;
+        ctx.fillStyle = "rgba(163, 29, 29, 0.18)";
+        ctx.beginPath();
+        ctx.arc(tx, ty, tr, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(163, 29, 29, 0.65)";
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+
+        // Quái vật (chấm đỏ nhỏ)
+        ctx.fillStyle = "#e57373";
+        this.monsters.forEach((m) => {
+          ctx.fillRect(m.tx * scale - 1, m.ty * scale - 1, 2, 2);
+        });
+
+        // Người chơi khác (chấm lam)
+        ctx.fillStyle = "#9fd0ea";
+        this.players.forEach((p, id) => {
+          if (id === this.sid) return;
+          ctx.beginPath();
+          ctx.arc(p.tx * scale, p.ty * scale, 2.2, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        // NPC (chấm hoàng kim)
+        ctx.fillStyle = "#ffd74a";
+        for (const npc of NPCS) {
+          ctx.beginPath();
+          ctx.arc(npc.x * scale, npc.y * scale, 2.8, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Chính mình (chấm lục bảo sáng + vạch hướng nhìn)
+        const mx = this.predX * scale;
+        const my = this.predY * scale;
+        ctx.fillStyle = "#6ad06a";
+        ctx.beginPath();
+        ctx.arc(mx, my, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.strokeStyle = "#6ad06a";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(mx, my);
+        ctx.lineTo(mx + Math.cos(this.facing) * 7, my + Math.sin(this.facing) * 7);
+        ctx.stroke();
+      }
+    }
+
+    // 2. Vẽ Bản đồ lớn (384x384) khi mở modal
+    if (ui.isMapModalOpen()) {
+      const wmCanvas = document.getElementById("worldmap") as HTMLCanvasElement | null;
+      if (wmCanvas) {
+        const ctx = wmCanvas.getContext("2d");
+        if (ctx) {
+          const w = wmCanvas.width;
+          const h = wmCanvas.height;
+          ctx.clearRect(0, 0, w, h);
+          const s = w / WORLD_W;
+
+          // Nền sơn thủy
+          ctx.fillStyle = "#1e291b";
+          ctx.fillRect(0, 0, w, h);
+
+          // Khu an toàn Lạc Hà Trấn
+          const tx = TOWN_PX.x * s;
+          const ty = TOWN_PX.y * s;
+          const tr = TOWN_PX.r * s;
+          ctx.fillStyle = "rgba(163, 29, 29, 0.22)";
+          ctx.beginPath();
+          ctx.arc(tx, ty, tr, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "#a31d1d";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          ctx.fillStyle = "#f3ecda";
+          ctx.font = "bold 12px serif";
+          ctx.textAlign = "center";
+          ctx.fillText("Lạc Hà Trấn", tx, ty - tr - 6);
+
+          // Vùng quái
+          const zones = [
+            { name: "Linh Thố", x: TOWN_PX.x + 230, y: TOWN_PX.y - 120, col: "#9fae7a" },
+            { name: "Hôi Lang", x: TOWN_PX.x - 380, y: TOWN_PX.y - 320, col: "#848994" },
+            { name: "Hắc Hổ", x: TOWN_PX.x + 520, y: TOWN_PX.y + 440, col: "#d8a63a" },
+            { name: "Xích Mãng", x: TOWN_PX.x, y: TOWN_PX.y + 740, col: "#d93848" },
+          ];
+          for (const z of zones) {
+            ctx.fillStyle = z.col;
+            ctx.font = "10px serif";
+            ctx.fillText(z.name, z.x * s, z.y * s);
+          }
+
+          // Quái hiện hành
+          ctx.fillStyle = "#e57373";
+          this.monsters.forEach((m) => {
+            ctx.fillRect(m.tx * s - 1.5, m.ty * s - 1.5, 3, 3);
+          });
+
+          // Người chơi khác
+          ctx.fillStyle = "#9fd0ea";
+          this.players.forEach((p, id) => {
+            if (id === this.sid) return;
+            ctx.beginPath();
+            ctx.arc(p.tx * s, p.ty * s, 3.5, 0, Math.PI * 2);
+            ctx.fill();
+          });
+
+          // NPC trong trấn
+          const qLog = ui.getQuestLog();
+          const qCtx = ui.getQuestContext();
+          for (const npc of NPCS) {
+            const nx = npc.x * s;
+            const ny = npc.y * s;
+            ctx.fillStyle = "#ffd74a";
+            ctx.beginPath();
+            ctx.arc(nx, ny, 4.5, 0, Math.PI * 2);
+            ctx.fill();
+            const marker = npcMarker(npc.id, qLog, qCtx);
+            if (marker) {
+              ctx.fillStyle = marker === "?" ? "#6ad06a" : "#ff4d4d";
+              ctx.font = "bold 11px serif";
+              ctx.fillText(marker, nx, ny - 6);
+            }
+          }
+
+          // Mục tiêu nhiệm vụ
+          const trackId = ui.getTrackingQuestId();
+          if (trackId) {
+            const t = this.resolveQuestTarget(trackId);
+            if (t) {
+              ctx.strokeStyle = "#ffd74a";
+              ctx.lineWidth = 1.5;
+              ctx.setLineDash([3, 3]);
+              ctx.beginPath();
+              ctx.moveTo(this.predX * s, this.predY * s);
+              ctx.lineTo(t.x * s, t.y * s);
+              ctx.stroke();
+              ctx.setLineDash([]);
+            }
+          }
+
+          // Chính mình
+          const px = this.predX * s;
+          const py = this.predY * s;
+          ctx.fillStyle = "#6ad06a";
+          ctx.beginPath();
+          ctx.arc(px, py, 6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "#ffffff";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+      }
     }
   }
 
@@ -684,6 +1165,7 @@ export class WorldScene extends Phaser.Scene {
 
   private fxLevelUp(x: number, y: number, major: boolean, mine: boolean) {
     const color = major ? 0xffd34d : 0xbfe8ff;
+    if (mine) sound.levelup(major);
     for (let i = 0; i < (major ? 3 : 1); i++) {
       const ring = this.add
         .circle(x, y, 16, color, 0)
@@ -710,6 +1192,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private fxBreakFail(x: number, y: number) {
+    sound.breakfail();
     const puff = this.add.circle(x, y - 10, 20, 0x4a2a5a, 0.6).setDepth(WORLD_H);
     this.tweens.add({
       targets: puff,

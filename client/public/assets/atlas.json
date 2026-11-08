@@ -1560,9 +1560,89 @@
         "h": 64
       }
     },
-    "item-hoi_huyet_dan": {
+    "npc-truong_tran": {
       "frame": {
         "x": 300,
+        "y": 220,
+        "w": 36,
+        "h": 42
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 36,
+        "h": 42
+      },
+      "sourceSize": {
+        "w": 36,
+        "h": 42
+      }
+    },
+    "npc-duoc_su": {
+      "frame": {
+        "x": 338,
+        "y": 220,
+        "w": 36,
+        "h": 42
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 36,
+        "h": 42
+      },
+      "sourceSize": {
+        "w": 36,
+        "h": 42
+      }
+    },
+    "npc-tho_ren": {
+      "frame": {
+        "x": 376,
+        "y": 220,
+        "w": 36,
+        "h": 42
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 36,
+        "h": 42
+      },
+      "sourceSize": {
+        "w": 36,
+        "h": 42
+      }
+    },
+    "npc-cao_thi": {
+      "frame": {
+        "x": 414,
+        "y": 220,
+        "w": 36,
+        "h": 42
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 36,
+        "h": 42
+      },
+      "sourceSize": {
+        "w": 36,
+        "h": 42
+      }
+    },
+    "item-hoi_huyet_dan": {
+      "frame": {
+        "x": 452,
         "y": 220,
         "w": 24,
         "h": 24
@@ -1582,7 +1662,7 @@
     },
     "item-hoi_linh_dan": {
       "frame": {
-        "x": 326,
+        "x": 478,
         "y": 220,
         "w": 24,
         "h": 24
@@ -1602,8 +1682,8 @@
     },
     "item-tu_khi_dan": {
       "frame": {
-        "x": 352,
-        "y": 220,
+        "x": 2,
+        "y": 286,
         "w": 24,
         "h": 24
       },
@@ -1622,8 +1702,8 @@
     },
     "item-long_tho": {
       "frame": {
-        "x": 378,
-        "y": 220,
+        "x": 28,
+        "y": 286,
         "w": 24,
         "h": 24
       },
@@ -1642,8 +1722,8 @@
     },
     "item-nanh_soi": {
       "frame": {
-        "x": 404,
-        "y": 220,
+        "x": 54,
+        "y": 286,
         "w": 24,
         "h": 24
       },
@@ -1662,8 +1742,8 @@
     },
     "item-da_ho": {
       "frame": {
-        "x": 430,
-        "y": 220,
+        "x": 80,
+        "y": 286,
         "w": 24,
         "h": 24
       },
@@ -1682,8 +1762,8 @@
     },
     "item-vay_mang": {
       "frame": {
-        "x": 456,
-        "y": 220,
+        "x": 106,
+        "y": 286,
         "w": 24,
         "h": 24
       },
@@ -1702,7 +1782,7 @@
     },
     "swordbeam": {
       "frame": {
-        "x": 2,
+        "x": 132,
         "y": 286,
         "w": 48,
         "h": 16
@@ -1722,7 +1802,7 @@
     },
     "dot": {
       "frame": {
-        "x": 52,
+        "x": 182,
         "y": 286,
         "w": 16,
         "h": 16

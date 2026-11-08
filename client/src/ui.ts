@@ -1,20 +1,31 @@
-// Lớp giao diện DOM (HUD, chat, nút kỹ năng, túi đồ, thanh đan dược, nhặt đồ).
-// Tách khỏi Phaser để dễ làm responsive trên điện thoại và máy tính.
+// Lớp giao diện DOM (HUD, chat, kỹ năng, túi đồ, nhiệm vụ, hộp thoại NPC, minimap, âm thanh).
+// Tuyệt đối không dùng innerHTML để phòng chống XSS theo chuẩn bảo mật SecureCoder.
 import {
   INVENTORY_SLOTS,
   ITEM_BY_ID,
   RARITY_COLORS,
   RARITY_NAMES,
+  QUEST_BY_ID,
+  NPC_BY_ID,
+  MONSTER_BY_ID,
   emptyInventory,
   realmLabel,
   isLastTier,
   isPeak,
+  stepProgress,
+  questReady,
   type ChatOut,
   type ToastMsg,
   type InvMsg,
   type Inventory,
   type ItemDef,
+  type QuestsMsg,
+  type QuestDef,
+  type QuestCtx,
+  type DialogMsg,
+  type DialogAction,
 } from "@tien-gioi/shared";
+import { sound } from "./audio";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -32,10 +43,13 @@ export interface HudPlayer {
   dead: boolean;
 }
 
-export interface InventoryCallbacks {
+export interface UiCallbacks {
   onUse: (slot: number) => void;
   onDrop: (slot: number, qty?: number) => void;
   onPickup: () => void;
+  onTalk: () => void;
+  onDialogAction: (action: DialogAction) => void;
+  onTrackQuest?: (questId: string | null) => void;
 }
 
 const fmt = (n: number) =>
@@ -47,12 +61,26 @@ const fmt = (n: number) =>
 
 const hexColor = (c: number) => `#${c.toString(16).padStart(6, "0")}`;
 
-// Trạng thái túi đồ phía client (chỉ để hiển thị, server quyết định mọi kết quả)
+// ---------- Trạng thái Client ----------
 let invSlots: Inventory = emptyInventory();
 const itemCdUntil = new Map<string, number>();
 let selectedSlot = 0;
 let invOpen = false;
-let callbacks: InventoryCallbacks | null = null;
+let questModalOpen = false;
+let mapModalOpen = false;
+let questTab: "active" | "done" = "active";
+let trackingQuestId: string | null = null;
+let currentRealm = 0;
+let currentTier = 0;
+let questLog: QuestsMsg = { active: [], done: [], dailyDone: [] };
+
+// Hộp thoại NPC
+let currentDialog: DialogMsg | null = null;
+let dlgTypeTimer: number | null = null;
+let dlgFullText = "";
+let dlgTypedLen = 0;
+
+let callbacks: UiCallbacks | null = null;
 const slotEls: HTMLButtonElement[] = [];
 const slotIconEls: HTMLElement[] = [];
 const slotNameEls: HTMLElement[] = [];
@@ -71,7 +99,11 @@ function applyItemVisual(el: HTMLElement, def: ItemDef | undefined) {
   el.style.backgroundImage = `url("/assets/items/${def.id}.png"), radial-gradient(circle at 35% 30%, rgba(255,255,255,0.65), ${color} 70%)`;
 }
 
-/** Chọn 2 loại đan dược cho 2 ô dùng nhanh (ưu tiên Hồi Huyết Đan & Hồi Linh Đan, sau đó tới đan khác có trong túi). */
+function getCtx(): QuestCtx {
+  return { realm: currentRealm, tier: currentTier, inv: invSlots };
+}
+
+/** Chọn 2 loại đan dược cho 2 ô dùng nhanh. */
 function resolveQuickItems(): [string, string] {
   const consumablesInBag: string[] = [];
   for (const s of invSlots) {
@@ -191,13 +223,263 @@ function showGainFeed(itemId: string, qty: number) {
   setTimeout(() => item.remove(), 2800);
 }
 
+// ---------- Theo dõi nhiệm vụ (HUD Quest Tracker) ----------
+
+function describeStep(
+  def: QuestDef,
+  prog: { step: number; count: number },
+): {
+  text: string;
+  ready: boolean;
+} {
+  const ctx = getCtx();
+  if (questReady(def, prog as any, ctx)) {
+    const npc = NPC_BY_ID[def.giver];
+    return { text: `Hoàn thành · Gặp ${npc?.name ?? "NPC"} trả nhiệm vụ`, ready: true };
+  }
+  const s = def.steps[prog.step];
+  if (!s) return { text: "Đã hoàn thành", ready: true };
+  const p = stepProgress(s, prog.count, ctx);
+  switch (s.kind) {
+    case "kill": {
+      const mon = MONSTER_BY_ID[s.monster]?.name ?? s.monster;
+      return { text: `Hạ ${mon}: ${p.have}/${p.need}`, ready: false };
+    }
+    case "collect": {
+      const it = ITEM_BY_ID[s.itemId]?.name ?? s.itemId;
+      return { text: `Thu thập ${it}: ${p.have}/${p.need}`, ready: false };
+    }
+    case "talk": {
+      const npc = NPC_BY_ID[s.npcId]?.name ?? s.npcId;
+      return { text: `Tới nói chuyện với ${npc}`, ready: false };
+    }
+    case "reachRealm": {
+      return { text: `Đạt ${realmLabel(s.realm, s.tier)}`, ready: false };
+    }
+  }
+}
+
+function renderQuestTracker() {
+  const list = $("quest-tracker-list");
+  list.replaceChildren();
+
+  if (!questLog.active.length) {
+    const p = document.createElement("p");
+    p.style.opacity = "0.7";
+    p.style.fontSize = "11px";
+    p.style.margin = "2px 0";
+    p.textContent = "Chưa nhận nhiệm vụ. Gặp Trưởng trấn hoặc Bảng cáo thị để nhận việc.";
+    list.append(p);
+    return;
+  }
+
+  // Tự động gán nhiệm vụ theo dõi mặc định nếu chưa chọn
+  if (!trackingQuestId || !questLog.active.some((a) => a.id === trackingQuestId)) {
+    trackingQuestId = questLog.active[0]?.id ?? null;
+  }
+
+  for (const a of questLog.active) {
+    const def = QUEST_BY_ID[a.id];
+    if (!def) continue;
+    const { text, ready } = describeStep(def, a);
+
+    const div = document.createElement("div");
+    div.className = `qt-item${ready ? " ready" : ""}${trackingQuestId === def.id ? " tracking" : ""}`;
+
+    const titleRow = document.createElement("div");
+    titleRow.className = "qt-title";
+
+    const nameSpan = document.createElement("span");
+    nameSpan.textContent = def.title;
+
+    const badge = document.createElement("span");
+    badge.className = "qt-badge";
+    badge.textContent = def.daily ? "Lặp" : "Chính";
+
+    titleRow.append(nameSpan, badge);
+
+    const stepEl = document.createElement("div");
+    stepEl.className = "qt-step";
+    stepEl.textContent = text;
+
+    div.append(titleRow, stepEl);
+    div.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      trackingQuestId = def.id;
+      renderQuestTracker();
+      callbacks?.onTrackQuest?.(def.id);
+    });
+
+    list.append(div);
+  }
+}
+
+// ---------- Sổ nhiệm vụ (Quest Log Modal - Phím Q) ----------
+
+function renderQuestModal() {
+  $("quest-count").textContent = `${questLog.active.length} / 8 đang làm`;
+  const container = $("quest-list");
+  container.replaceChildren();
+
+  if (questTab === "active") {
+    if (!questLog.active.length) {
+      const p = document.createElement("p");
+      p.style.opacity = "0.7";
+      p.style.padding = "16px";
+      p.style.textAlign = "center";
+      p.textContent = "Hiện không có nhiệm vụ nào đang làm.";
+      container.append(p);
+      return;
+    }
+    for (const a of questLog.active) {
+      const def = QUEST_BY_ID[a.id];
+      if (!def) continue;
+      const { text, ready } = describeStep(def, a);
+
+      const card = document.createElement("div");
+      card.className = `q-card ${def.daily ? "daily" : "main-q"}`;
+
+      const head = document.createElement("div");
+      head.className = "q-card-head";
+
+      const title = document.createElement("b");
+      title.className = "q-card-title";
+      title.textContent = def.title;
+
+      const giver = document.createElement("small");
+      giver.style.opacity = "0.75";
+      const npc = NPC_BY_ID[def.giver];
+      giver.textContent = `${npc?.name ?? def.giver} (${def.daily ? "Hằng ngày" : "Chính tuyến"})`;
+
+      head.append(title, giver);
+
+      const desc = document.createElement("div");
+      desc.className = "q-card-desc";
+      desc.textContent = def.desc;
+
+      const progEl = document.createElement("div");
+      progEl.className = "q-card-progress";
+      progEl.textContent = ready ? `✓ ${text}` : `▸ ${text}`;
+
+      const rew = document.createElement("div");
+      rew.className = "q-card-rewards";
+      const rewParts: string[] = [];
+      if (def.rewards.exp) rewParts.push(`${def.rewards.exp} tu vi`);
+      if (def.rewards.items) {
+        for (const it of def.rewards.items) {
+          const itName = ITEM_BY_ID[it.itemId]?.name ?? it.itemId;
+          rewParts.push(`${itName} ×${it.qty}`);
+        }
+      }
+      rew.textContent = `Thưởng: ${rewParts.join(", ")}`;
+
+      card.append(head, desc, progEl, rew);
+      container.append(card);
+    }
+  } else {
+    // Tab "Đã hoàn thành"
+    const finishedIds = [...questLog.done, ...questLog.dailyDone];
+    if (!finishedIds.length) {
+      const p = document.createElement("p");
+      p.style.opacity = "0.7";
+      p.style.padding = "16px";
+      p.style.textAlign = "center";
+      p.textContent = "Chưa hoàn thành nhiệm vụ nào.";
+      container.append(p);
+      return;
+    }
+    for (const qId of finishedIds) {
+      const def = QUEST_BY_ID[qId];
+      if (!def) continue;
+      const card = document.createElement("div");
+      card.className = "q-card";
+
+      const head = document.createElement("div");
+      head.className = "q-card-head";
+      const title = document.createElement("b");
+      title.className = "q-card-title";
+      title.textContent = def.title;
+      const badge = document.createElement("span");
+      badge.className = "qt-badge";
+      badge.textContent = questLog.dailyDone.includes(qId) ? "Đã xong hôm nay" : "Đã hoàn thành";
+      head.append(title, badge);
+
+      const desc = document.createElement("div");
+      desc.className = "q-card-desc";
+      desc.textContent = def.desc;
+
+      card.append(head, desc);
+      container.append(card);
+    }
+  }
+}
+
+// ---------- Hộp thoại NPC (Typewriter + Options) ----------
+
+function stopTypewriter() {
+  if (dlgTypeTimer !== null) {
+    window.clearInterval(dlgTypeTimer);
+    dlgTypeTimer = null;
+  }
+}
+
+function finishTypewriter() {
+  stopTypewriter();
+  const textEl = $("dlg-text");
+  textEl.textContent = dlgFullText;
+  $("dlg-skip-hint").hidden = true;
+  renderDialogOptions();
+}
+
+function renderDialogOptions() {
+  const optBox = $("dlg-options");
+  optBox.replaceChildren();
+  if (!currentDialog) return;
+
+  for (const opt of currentDialog.options) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "dlg-opt-btn";
+    if (opt.action.kind === "accept" || opt.action.kind === "turnIn") {
+      btn.classList.add("primary");
+    }
+    btn.disabled = !!opt.disabled;
+
+    const labelSpan = document.createElement("span");
+    labelSpan.textContent = opt.label;
+    btn.append(labelSpan);
+
+    if (opt.action.kind === "turnIn") {
+      const tag = document.createElement("small");
+      tag.textContent = "Trả thưởng";
+      tag.style.color = "#ffe08a";
+      btn.append(tag);
+    } else if (opt.action.kind === "accept") {
+      const tag = document.createElement("small");
+      tag.textContent = "Nhận việc";
+      tag.style.color = "#ffe08a";
+      btn.append(tag);
+    }
+
+    btn.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      const action = opt.action;
+      ui.closeDialog();
+      if (action.kind === "turnIn") sound.questDone();
+      callbacks?.onDialogAction(action);
+    });
+
+    optBox.append(btn);
+  }
+}
+
 export const ui = {
   show() {
     $("ui").hidden = false;
     $("login").hidden = true;
   },
 
-  initInventory(cb: InventoryCallbacks) {
+  init(cb: UiCallbacks) {
     callbacks = cb;
     const grid = $("inv-grid");
     grid.replaceChildren();
@@ -253,6 +535,7 @@ export const ui = {
         fn();
       });
 
+    // Túi đồ
     bindTap("btn-bag", () => this.toggleInventory());
     bindTap("inv-close", () => this.toggleInventory(false));
     bindTap("inv-btn-use", () => {
@@ -267,8 +550,50 @@ export const ui = {
     bindTap("quick-1", () => this.useQuick(1));
     bindTap("quick-2", () => this.useQuick(2));
     bindTap("btn-pickup", () => callbacks?.onPickup());
+    bindTap("btn-talk", () => callbacks?.onTalk());
+
+    // Sổ nhiệm vụ
+    bindTap("btn-quest", () => this.toggleQuestModal());
+    bindTap("quest-close", () => this.toggleQuestModal(false));
+    bindTap("tab-q-active", () => {
+      questTab = "active";
+      $("tab-q-active").classList.add("active");
+      $("tab-q-done").classList.remove("active");
+      renderQuestModal();
+    });
+    bindTap("tab-q-done", () => {
+      questTab = "done";
+      $("tab-q-done").classList.add("active");
+      $("tab-q-active").classList.remove("active");
+      renderQuestModal();
+    });
+
+    // Bản đồ
+    bindTap("minimap-wrap", () => this.toggleMapModal());
+    bindTap("map-close", () => this.toggleMapModal(false));
+
+    // Âm thanh
+    bindTap("btn-mute", () => {
+      const isMuted = sound.toggleMute();
+      this.updateMuteIcon(isMuted);
+    });
+    sound.onChange((m) => this.updateMuteIcon(m));
+    this.updateMuteIcon(sound.isMuted());
+
+    // Hộp thoại NPC
+    bindTap("dlg-close", () => this.closeDialog());
+    $("dlg-body").addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      finishTypewriter();
+    });
 
     renderInventory();
+    renderQuestTracker();
+  },
+
+  updateMuteIcon(muted: boolean) {
+    const icon = $("mute-icon");
+    if (icon) icon.textContent = muted ? "🔇" : "🔊";
   },
 
   toggleInventory(force?: boolean) {
@@ -282,6 +607,58 @@ export const ui = {
     return invOpen;
   },
 
+  toggleQuestModal(force?: boolean) {
+    questModalOpen = force ?? !questModalOpen;
+    $("quest-modal").hidden = !questModalOpen;
+    $("btn-quest").classList.toggle("active", questModalOpen);
+    if (questModalOpen) renderQuestModal();
+  },
+
+  isQuestModalOpen() {
+    return questModalOpen;
+  },
+
+  toggleMapModal(force?: boolean) {
+    mapModalOpen = force ?? !mapModalOpen;
+    $("map-modal").hidden = !mapModalOpen;
+  },
+
+  isMapModalOpen() {
+    return mapModalOpen;
+  },
+
+  isDialogOpen() {
+    return !$("dialog-modal").hidden;
+  },
+
+  closeDialog() {
+    stopTypewriter();
+    currentDialog = null;
+    $("dialog-modal").hidden = true;
+    $("dlg-options").replaceChildren();
+  },
+
+  closeAllModals(): boolean {
+    let closedAny = false;
+    if (this.isDialogOpen()) {
+      this.closeDialog();
+      closedAny = true;
+    }
+    if (invOpen) {
+      this.toggleInventory(false);
+      closedAny = true;
+    }
+    if (questModalOpen) {
+      this.toggleQuestModal(false);
+      closedAny = true;
+    }
+    if (mapModalOpen) {
+      this.toggleMapModal(false);
+      closedAny = true;
+    }
+    return closedAny;
+  },
+
   onInv(m: InvMsg) {
     invSlots = m.slots;
     const now = performance.now();
@@ -291,9 +668,72 @@ export const ui = {
     }
     if (m.gained) {
       for (const g of m.gained) showGainFeed(g.itemId, g.qty);
+      sound.pickup();
     }
-    // Nếu ô đang chọn bị trống và trong túi còn đồ thì giữ nguyên chỉ số, cập nhật lại chi tiết
     renderInventory();
+    renderQuestTracker();
+    if (questModalOpen) renderQuestModal();
+  },
+
+  onQuests(m: QuestsMsg) {
+    questLog = m;
+    renderQuestTracker();
+    if (questModalOpen) renderQuestModal();
+  },
+
+  getQuestLog(): QuestsMsg {
+    return questLog;
+  },
+
+  getTrackingQuestId(): string | null {
+    return trackingQuestId;
+  },
+
+  getQuestContext(): QuestCtx {
+    return getCtx();
+  },
+
+  onDialog(m: DialogMsg) {
+    currentDialog = m;
+    const npc = NPC_BY_ID[m.npcId];
+    $("dlg-npc-name").textContent = npc?.name ?? "Kỳ nhân";
+    $("dlg-npc-title").textContent = npc?.title ?? "Lạc Hà Trấn";
+
+    $("dialog-modal").hidden = false;
+    $("dlg-options").replaceChildren();
+    $("dlg-skip-hint").hidden = false;
+
+    dlgFullText = m.lines.join("\n\n");
+    dlgTypedLen = 0;
+    const textEl = $("dlg-text");
+    textEl.textContent = "";
+
+    stopTypewriter();
+    dlgTypeTimer = window.setInterval(() => {
+      dlgTypedLen += 2;
+      if (dlgTypedLen >= dlgFullText.length) {
+        finishTypewriter();
+      } else {
+        textEl.textContent = dlgFullText.slice(0, dlgTypedLen);
+        sound.typeBlip();
+      }
+    }, 28);
+  },
+
+  talkPrompt(label: string | null) {
+    const btn = $("btn-talk");
+    btn.hidden = label === null;
+    if (label !== null) $("talk-label").textContent = label;
+  },
+
+  pickupPrompt(label: string | null) {
+    const btn = $("btn-pickup");
+    btn.hidden = label === null;
+    if (label !== null) $("pickup-label").textContent = label;
+  },
+
+  setZoneName(name: string) {
+    $("minimap-zone").textContent = name;
   },
 
   useQuick(idx: 1 | 2) {
@@ -329,13 +769,9 @@ export const ui = {
     }
   },
 
-  pickupPrompt(label: string | null) {
-    const btn = $("btn-pickup");
-    btn.hidden = label === null;
-    if (label !== null) $("pickup-label").textContent = label;
-  },
-
   hud(p: HudPlayer, online: number) {
+    currentRealm = p.realm;
+    currentTier = p.tier;
     $("hud-name").textContent = p.name;
     $("hud-realm").textContent = realmLabel(p.realm, p.tier);
     const set = (k: string, v: number, max: number, label: string) => {

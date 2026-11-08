@@ -32,9 +32,38 @@
         <div class="bar exp"><i id="exp-fill"></i><span id="exp-text"></span></div>
         <div class="hud-foot">
           <div id="hud-online"></div>
-          <button type="button" id="btn-bag" title="Túi đồ (I)">
-            <span>袋</span><small>Túi đồ</small>
-          </button>
+          <div class="hud-btns">
+            <button type="button" id="btn-bag" class="hud-btn" title="Túi đồ (I)">
+              <span>袋</span><small>Túi</small>
+            </button>
+            <button type="button" id="btn-quest" class="hud-btn" title="Sổ nhiệm vụ (Q)">
+              <span>卷</span><small>Nhiệm vụ</small>
+            </button>
+            <button
+              type="button"
+              id="btn-mute"
+              class="hud-btn icon-only"
+              title="Bật/tắt âm thanh (N)"
+            >
+              <span id="mute-icon">🔊</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <aside id="quest-tracker" class="panel" aria-label="Theo dõi nhiệm vụ">
+        <div class="qt-head">
+          <b>Nhiệm vụ</b>
+          <small>Chạm để chỉ đường</small>
+        </div>
+        <div id="quest-tracker-list"></div>
+      </aside>
+
+      <div id="minimap-wrap" class="panel" title="Bản đồ thế giới (M)">
+        <canvas id="minimap" width="120" height="120"></canvas>
+        <div class="mm-foot">
+          <span id="minimap-zone">Lạc Hà Trấn</span>
+          <small>M</small>
         </div>
       </div>
 
@@ -49,6 +78,10 @@
 
       <button type="button" id="btn-pickup" class="sk pickup" hidden title="Nhặt vật phẩm (F)">
         <span>拾</span><small id="pickup-label">Nhặt (F)</small>
+      </button>
+
+      <button type="button" id="btn-talk" class="sk talk" hidden title="Nói chuyện với NPC (F)">
+        <span>話</span><small id="talk-label">Nói chuyện</small>
       </button>
 
       <div id="quickbar">
@@ -83,13 +116,13 @@
         </button>
       </div>
 
-      <section id="inv-modal" class="panel" hidden aria-label="Túi đồ">
+      <section id="inv-modal" class="panel modal-box" hidden aria-label="Túi đồ">
         <header class="inv-head">
           <div>
             <h2>Túi Càn Khôn</h2>
             <small id="inv-count">0 / 24 ô</small>
           </div>
-          <button type="button" id="inv-close" title="Đóng (I / Esc)">✕</button>
+          <button type="button" id="inv-close" class="modal-close" title="Đóng (I / Esc)">✕</button>
         </header>
         <div id="inv-grid" role="grid"></div>
         <footer id="inv-detail">
@@ -108,13 +141,65 @@
         </footer>
       </section>
 
+      <section id="dialog-modal" class="panel" hidden aria-label="Hộp thoại NPC">
+        <header class="dlg-head">
+          <div>
+            <b id="dlg-npc-name">NPC</b>
+            <span id="dlg-npc-title" class="dlg-badge"></span>
+          </div>
+          <button type="button" id="dlg-close" class="modal-close" title="Đóng (Esc)">✕</button>
+        </header>
+        <div id="dlg-body" title="Chạm để tua nhanh chữ">
+          <p id="dlg-text"></p>
+          <small id="dlg-skip-hint">Chạm để hiện hết chữ ▸</small>
+        </div>
+        <div id="dlg-options"></div>
+      </section>
+
+      <section id="quest-modal" class="panel modal-box" hidden aria-label="Sổ nhiệm vụ">
+        <header class="inv-head">
+          <div>
+            <h2>Sổ Nhiệm Vụ</h2>
+            <small id="quest-count">0 / 8 đang làm</small>
+          </div>
+          <button type="button" id="quest-close" class="modal-close" title="Đóng (Q / Esc)">
+            ✕
+          </button>
+        </header>
+        <div class="q-tabs">
+          <button type="button" id="tab-q-active" class="q-tab active">Đang làm</button>
+          <button type="button" id="tab-q-done" class="q-tab">Đã hoàn thành</button>
+        </div>
+        <div id="quest-list"></div>
+      </section>
+
+      <section id="map-modal" class="panel modal-box" hidden aria-label="Bản đồ thế giới">
+        <header class="inv-head">
+          <div>
+            <h2>Sơn Hà Đồ · Vân Mộng Sơn</h2>
+            <small id="map-coords">Chạm vào bản đồ để đặt hướng chỉ đường</small>
+          </div>
+          <button type="button" id="map-close" class="modal-close" title="Đóng (M / Esc)">✕</button>
+        </header>
+        <div class="map-body">
+          <canvas id="worldmap" width="384" height="384"></canvas>
+          <div class="map-legend">
+            <span><i class="lg me"></i> Đạo hữu</span>
+            <span><i class="lg npc"></i> NPC (!/?)</span>
+            <span><i class="lg other"></i> Đồng đạo</span>
+            <span><i class="lg mon"></i> Yêu thú</span>
+            <span><i class="lg town"></i> Khu an toàn</span>
+          </div>
+        </div>
+      </section>
+
       <div id="toast"></div>
       <div id="death" hidden>
         <div><b>Trọng thương</b><span id="death-t"></span></div>
       </div>
       <div id="help">
-        WASD/←↑→↓ đi · J/Space chém · K kiếm khí · 1/2 đan · F nhặt · I túi đồ · L đả tọa · B đột
-        phá · Enter chat
+        WASD đi · J/Space chém · K kiếm khí · 1/2 đan · F nhặt/nói chuyện · I túi · Q nhiệm vụ · M
+        bản đồ · L đả tọa · B đột phá
       </div>
     </div>
 
