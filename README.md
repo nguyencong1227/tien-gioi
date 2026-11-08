@@ -26,7 +26,8 @@ npm run build && npm start   # http://localhost:2567
 
 ```
 shared/   Hợp đồng chung: cảnh giới, hằng số, quái, sinh bản đồ, va chạm, kiểu tin nhắn
-server/   Colyseus: WorldRoom (logic game, server quyết định), schema (state đồng bộ), store (lưu nhân vật)
+server/   Colyseus: WorldRoom (vào/ra, lưu, nối tin nhắn), systems/ (logic game: movement, combat, monsters,
+          progression, chat), world.ts (trạng thái dùng chung), schema (state đồng bộ), store (lưu nhân vật)
 client/   Phaser 3 + Vite: WorldScene (vẽ, đoán trước di chuyển), ui (HUD DOM), joystick, textures (ảnh tạm)
 ```
 

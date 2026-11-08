@@ -28,7 +28,14 @@ npm run build        # build client vào client/dist
   - `realms.ts`: cảnh giới, chỉ số.
   - `game.ts`: hằng số, quái, kiểu tin nhắn.
   - `map.ts`: bản đồ sinh theo seed, va chạm.
-- `server/src/rooms/WorldRoom.ts`: toàn bộ logic game, 20 tick/giây. `schema.ts` là state đồng bộ, `store.ts` lưu nhân vật dạng JSON ở `server/data/players/`.
+- `server/src/rooms/WorldRoom.ts`: chỉ lo vào/ra phòng, lưu nhân vật, nối tin nhắn với system, vòng lặp 20 tick/giây.
+- `server/src/systems/`: logic game, mỗi file một mảng: `movement`, `combat`, `monsters`, `progression`, `chat`.
+  - Các system nhận `World` (`server/src/world.ts`: state, dữ liệu riêng của người chơi/quái, `events` để gửi tin), không đụng tới Colyseus `Room`. Tính năng mới thì thêm system mới.
+- `server/src/schema.ts` là state đồng bộ, `store.ts` lưu nhân vật dạng JSON ở `server/data/players/`.
+- Test:
+  - `shared/**/*.test.ts`, `server/src/systems/*.test.ts`: test đơn vị với `World` giả.
+  - `server/src/rooms/WorldRoom.test.ts`: test tích hợp với server Colyseus thật.
+  - Tính năng server mới cần có test.
 - `client/src/scenes/WorldScene.ts`: vẽ, input, đoán trước di chuyển. `ui.ts` là HUD DOM, `textures.ts` là ảnh tạm vẽ bằng code.
 - Luồng di chuyển: client gửi `input {seq, dx, dy}` mỗi 50 ms và tự đoán trước vị trí. Server xử lý mỗi input đúng một bước 50 ms bằng `moveWithCollision` dùng chung. Client đối chiếu lại theo `lastSeq`.
   - Đổi tốc độ, va chạm hay bước tick thì phải sửa trong `shared/` để hai bên vẫn khớp.
