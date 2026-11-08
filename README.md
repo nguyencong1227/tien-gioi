@@ -38,16 +38,12 @@ client/   Phaser 3 + Vite: WorldScene (vẽ, đoán trước di chuyển), ui (H
 
 ## Chia việc cho 2 dev
 
-| | Dev A: Server/gameplay | Dev B: Client/UX |
-|---|---|---|
-| Thư mục chính | `server/`, `shared/src/game.ts`, `shared/src/realms.ts` | `client/`, `shared/src/map.ts` (phần hiển thị) |
-| Việc M2 | túi đồ, rơi đồ, đan dược, NPC, nhiệm vụ, lưu DB | asset thật, animation, minimap, túi đồ UI, âm thanh |
+Chi tiết từng sprint, tiêu chí "xong", quy trình review: **[docs/PHAN_CONG.md](docs/PHAN_CONG.md)**.
 
-**Quy ước:**
-- `shared/` là hợp đồng giữa hai bên. Đổi tin nhắn hoặc hằng số ở đó thì làm trong một PR riêng và báo người kia.
-- Mỗi tính năng một nhánh `feat/...` và một PR. Người còn lại review.
-- Trước khi đẩy code: chạy `npm run typecheck`.
-- Logic quyết định kết quả (sát thương, rơi đồ, tu vi) **chỉ nằm ở server**. Client chỉ hiển thị và gửi ý định.
+- **Dev A: Server & Gameplay:** `server/`, logic trong `shared/`.
+- **Dev B: Client & Trải nghiệm:** `client/`, asset, âm thanh, UI/UX.
+- `shared/` là hợp đồng chung: đổi gì ở đó thì làm PR riêng, người kia review trước.
+- Logic quyết định kết quả (sát thương, rơi đồ, tu vi) **chỉ nằm ở server**.
 
 ## Thay ảnh tạm bằng asset thật
 `client/src/textures.ts` vẽ ảnh bằng code với các key: `tileset`, `me`, `other`, `mon-<id>`, `swordbeam`, `dot`.
