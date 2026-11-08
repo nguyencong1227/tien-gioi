@@ -99,15 +99,16 @@ describe("dùng đan dược", () => {
     expect(p.mp).toBeGreaterThan(0);
   });
 
-  it("Tụ Khí Đan cộng 15% thanh tu vi qua gainExp (đủ thì lên bậc)", () => {
+  it("Tụ Khí Đan cộng % thanh tu vi qua gainExp (đủ thì lên bậc)", () => {
     const { w, fx } = makeWorld();
     const { p } = addPlayer(w, "a", 1, 0);
     giveItem(w, "a", "tu_khi_dan", 1);
-    p.exp = p.expMax * 0.9;
+    const e = ITEM_BY_ID.tu_khi_dan.effect!;
+    p.exp = p.expMax * 0.99;
     const before = p.expMax;
     useItem(w, "a", 0);
     expect(p.tier).toBe(1);
-    expect(p.exp).toBeCloseTo(before * 0.05);
+    expect(p.exp).toBeCloseTo(before * (0.99 + e.pct - 1));
     expect(fx.some((f) => f.kind === "levelup")).toBe(true);
     expect(p.expMax).toBe(expToNext(1, 1));
   });

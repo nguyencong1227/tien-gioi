@@ -111,7 +111,7 @@ describe("trọn một nhiệm vụ", () => {
     finishFirst(w, "a", p);
     expect(c.quests.active).toHaveLength(0);
     expect(c.quests.done).toEqual(["nhap_the"]);
-    expect(p.exp).toBe(20);
+    expect(p.exp).toBe(QUEST_BY_ID.nhap_the.rewards.exp);
     expect(countItem(c.inv, "hoi_huyet_dan")).toBe(3);
     expect(toasts.at(-1)!.msg).toMatchObject({ tone: "good" });
     const d = dialogs.at(-1)!.msg;
@@ -129,7 +129,7 @@ describe("trọn một nhiệm vụ", () => {
     finishFirst(w, "a", p);
     turnInQuest(w, "a", "nhap_the");
     turnInQuest(w, "a", "nhap_the");
-    expect(p.exp).toBe(20);
+    expect(p.exp).toBe(QUEST_BY_ID.nhap_the.rewards.exp);
     expect(countItem(c.inv, "hoi_huyet_dan")).toBe(3);
     expect(c.quests.done).toEqual(["nhap_the"]);
   });

@@ -43,9 +43,25 @@ export function isPeak(realm: number, tier: number): boolean {
   return realm >= REALMS.length - 1 && isLastTier(realm, tier);
 }
 
+/**
+ * Thanh tu vi của bậc đầu mỗi cảnh giới. Trong một cảnh giới thanh tăng chậm (REALM_TIER_GROWTH),
+ * qua cảnh giới mới thì nhảy vọt: quái mới mạnh hơn nhưng không bù kịp, nên mỗi cảnh giới lâu hơn hẳn.
+ * Số liệu chọn theo bảng tính docs/CAN_BANG.md (Luyện Khí ~1 giờ, Trúc Cơ ~3 giờ).
+ */
+export const REALM_EXP_BASE = [40, 280, 4400];
+/** Từ Kim Đan trở đi (chưa có nội dung): mỗi cảnh giới gấp ngần này lần cảnh giới trước */
+export const REALM_EXP_MULT_AFTER = 6;
+export const REALM_TIER_GROWTH = [1, 1.1, 1.15];
+
 /** Tu vi cần để lên bậc kế tiếp. */
 export function expToNext(realm: number, tier: number): number {
-  return Math.round(40 * Math.pow(1.35, stepOf(realm, tier)));
+  const last = REALM_EXP_BASE.length - 1;
+  const base =
+    realm <= last
+      ? REALM_EXP_BASE[realm]
+      : REALM_EXP_BASE[last] * Math.pow(REALM_EXP_MULT_AFTER, realm - last);
+  const growth = REALM_TIER_GROWTH[Math.min(realm, REALM_TIER_GROWTH.length - 1)];
+  return Math.round(base * Math.pow(growth, tier));
 }
 
 export interface Stats {

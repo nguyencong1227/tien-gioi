@@ -65,8 +65,9 @@ export const ITEMS: ItemDef[] = [
     type: "consumable",
     stack: 10,
     rarity: 1,
-    desc: "Tăng 15% thanh tu vi của bậc hiện tại.",
-    effect: { kind: "exp", pct: 0.15 },
+    desc: "Tăng 5% thanh tu vi của bậc hiện tại.",
+    // Hiếm: chỉ rơi từ Hắc Hổ / Xích Mãng và thưởng nhiệm vụ (xem docs/CAN_BANG.md)
+    effect: { kind: "exp", pct: 0.05 },
     cooldown: 60_000,
     color: 0xe8c547,
   },
@@ -136,7 +137,7 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: "da_ho", chance: 0.5, min: 1, max: 1 },
     { itemId: "hoi_huyet_dan", chance: 0.2, min: 1, max: 2 },
     { itemId: "hoi_linh_dan", chance: 0.15, min: 1, max: 2 },
-    { itemId: "tu_khi_dan", chance: 0.04, min: 1, max: 1 },
+    { itemId: "tu_khi_dan", chance: 0.01, min: 1, max: 1 },
   ],
   mang: [
     { itemId: "vay_mang", chance: 1, min: 2, max: 4 },

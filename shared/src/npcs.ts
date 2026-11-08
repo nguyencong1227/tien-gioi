@@ -89,15 +89,6 @@ export const TRADES: TradeDef[] = [
     give: [{ itemId: "nanh_soi", qty: 3 }],
     get: { itemId: "hoi_linh_dan", qty: 1 },
   },
-  {
-    id: "doi_tu_khi",
-    npcId: "duoc_su",
-    give: [
-      { itemId: "da_ho", qty: 2 },
-      { itemId: "nanh_soi", qty: 5 },
-    ],
-    get: { itemId: "tu_khi_dan", qty: 1 },
-  },
 ];
 
 export const TRADE_BY_ID: Record<string, TradeDef> = Object.fromEntries(
