@@ -6,13 +6,16 @@ import {
   QUESTS,
   QUEST_BY_ID,
   countItem,
+  MAIN_QUEST_START,
+  ITEM_BY_ID,
+  stepOf,
   type QuestDef,
 } from "@tien-gioi/shared";
 import { makeWorld, addPlayer, addMonster } from "./test-helpers";
 import { giveItem } from "./inventory";
 import { killMonster } from "./combat";
-import { gainExp } from "./progression";
-import { onMonsterKilled, sanitizeQuests } from "./quests";
+import { applyStats, gainExp } from "./progression";
+import { onMonsterKilled, refreshQuests, sanitizeQuests } from "./quests";
 import { abandonQuest, acceptQuest, talk, trade, turnInQuest } from "./npc";
 import type { World } from "../world";
 import type { Player } from "../schema";
@@ -312,5 +315,57 @@ describe("đọc sổ nhiệm vụ từ file lưu", () => {
     expect(q.done).toEqual(["nhap_the"]);
     expect(q.daily).toEqual({ lang_hai: "2026-11-08" });
     expect(sanitizeQuests(undefined)).toEqual({ active: [], done: [], daily: {} });
+  });
+});
+
+describe("chuỗi nhiệm vụ chính (#19)", () => {
+  it("người chơi mới làm được hết chuỗi từ Trưởng trấn tới Luyện Khí tầng 9", () => {
+    const { w, toasts } = makeWorld();
+    const { p, c } = addPlayer(w, "a");
+    const order: string[] = [];
+    for (let id: string | undefined = MAIN_QUEST_START; id; id = QUEST_BY_ID[id].next) {
+      const def = QUEST_BY_ID[id];
+      standAt(p, def.giver);
+      acceptQuest(w, "a", id);
+      expect(
+        c.quests.active.map((a) => a.id),
+        `nhận ${id}`,
+      ).toContain(id);
+      for (const s of def.steps) {
+        switch (s.kind) {
+          case "kill":
+            for (let i = 0; i < s.count; i++) onMonsterKilled(w, "a", s.monster);
+            break;
+          case "collect":
+            giveItem(w, "a", s.itemId, s.count);
+            break;
+          case "talk":
+            standAt(p, s.npcId);
+            talk(w, "a", s.npcId);
+            break;
+          case "reachRealm":
+            // Giả lập tu luyện tới mốc (đột phá / đả tọa nằm ở hệ thống khác)
+            if (stepOf(p.realm, p.tier) < stepOf(s.realm, s.tier)) {
+              p.realm = s.realm;
+              p.tier = s.tier;
+              p.exp = 0;
+              applyStats(p, true);
+              refreshQuests(w, "a");
+            }
+            break;
+        }
+      }
+      standAt(p, def.giver);
+      turnInQuest(w, "a", id);
+      expect(c.quests.done, `${id}: ${toasts.at(-1)?.msg.text}`).toContain(id);
+      order.push(id);
+    }
+    expect(order.length).toBeGreaterThanOrEqual(6);
+    expect(c.quests.active).toHaveLength(0);
+    expect(stepOf(p.realm, p.tier)).toBeGreaterThanOrEqual(stepOf(1, 8));
+    // Nguyên liệu nộp nhiệm vụ đã bị trừ hết, chỉ còn đồ thưởng
+    for (const s of c.inv) {
+      if (s) expect(ITEM_BY_ID[s.itemId].type, s.itemId).toBe("consumable");
+    }
   });
 });
