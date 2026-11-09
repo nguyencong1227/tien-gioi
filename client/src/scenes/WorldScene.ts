@@ -51,10 +51,33 @@ interface Entity {
   weaponVisual?: Phaser.GameObjects.Graphics;
   animPrefix?: string;
   lastEquipKey?: string;
+  lastBarKey?: number;
   tx: number; // vị trí đích (từ server) để nội suy
   ty: number;
   lastLabel?: string;
   slashUntil?: number;
+}
+
+interface SlashFxItem {
+  g: Phaser.GameObjects.Graphics;
+  start: number;
+}
+
+interface SwordFxItem {
+  img: Phaser.GameObjects.Image;
+  x0: number;
+  y0: number;
+  dx: number;
+  dy: number;
+  start: number;
+}
+
+interface FloatTextItem {
+  t: Phaser.GameObjects.Text;
+  y0: number;
+  start: number;
+  lastText: string;
+  lastStyleKey: number;
 }
 
 interface LootEntity {
@@ -105,6 +128,18 @@ export class WorldScene extends Phaser.Scene {
   // Mũi tên chỉ đường nhiệm vụ
   private navArrow!: Phaser.GameObjects.Container;
   private lastMapDraw = 0;
+
+  // Tái sử dụng Set và hồ đối tượng (object pool) để giảm cấp phát mỗi frame (#71)
+  private seenIds = new Set<string>();
+  private auraWave = 0;
+  private talismanWave = 0;
+  private lootWave = 0;
+  private slashPool: Phaser.GameObjects.Graphics[] = [];
+  private activeSlashes: SlashFxItem[] = [];
+  private swordPool: Phaser.GameObjects.Image[] = [];
+  private activeSwords: SwordFxItem[] = [];
+  private floatPool: FloatTextItem[] = [];
+  private activeFloats: FloatTextItem[] = [];
 
   // Bảng đo hiệu năng (?perf=1, #71)
   private perfEnabled = false;
@@ -480,6 +515,7 @@ export class WorldScene extends Phaser.Scene {
     this.room.onStateChange(() => this.reconcile());
     this.room.onMessage("fx", (m: FxMsg) => this.onFx(m));
     this.room.onMessage("dmg", (m: DmgMsg) => {
+      if (!this.inView(m.x, m.y, 96)) return;
       this.floatText(m);
       sound.hit(m.crit);
     });
@@ -548,6 +584,13 @@ export class WorldScene extends Phaser.Scene {
 
   // ---------------- Vòng lặp vẽ ----------------
 
+  /** Kiểm tra toạ độ (x, y) có nằm trong khung nhìn camera (cộng lề pad px) không. */
+  private inView(x: number, y: number, pad = 96): boolean {
+    const wv = this.cameras.main.worldView;
+    if (wv.width <= 0 || wv.height <= 0) return true;
+    return x >= wv.x - pad && x <= wv.right + pad && y >= wv.y - pad && y <= wv.bottom + pad;
+  }
+
   update(_t: number, deltaMs: number) {
     if (!this.state?.players) return;
     const t0 = this.perfEnabled ? performance.now() : 0;
@@ -557,10 +600,16 @@ export class WorldScene extends Phaser.Scene {
       this.fixedStep();
     }
 
+    // Nhịp sóng dùng chung cho hào quang đả tọa, hộ phù và đồ rơi (thay cho hàng trăm tween lặp vô hạn)
+    this.auraWave = 0.5 - 0.5 * Math.cos((_t * Math.PI) / 900);
+    this.talismanWave = 0.5 - 0.5 * Math.cos((_t * Math.PI) / 1100);
+    this.lootWave = 0.5 - 0.5 * Math.cos((_t * Math.PI) / 650);
+
     const k = 1 - Math.exp(-LERP_RATE * (deltaMs / 1000));
     this.syncPlayers(k, deltaMs);
     this.syncMonsters(k);
     this.syncLoot();
+    this.stepTransientFx(this.time.now);
     this.syncNpcs();
     this.syncAudioZone();
     this.syncQuestNav();
@@ -1112,7 +1161,10 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private syncPlayers(k: number, deltaMs: number) {
-    const seen = new Set<string>();
+    const seen = this.seenIds;
+    seen.clear();
+    const lowFx = ui.isLowFx();
+    const hideNames = ui.isHideNames();
     this.state.players.forEach((p: any, id: string) => {
       seen.add(id);
       const isMe = id === this.sid;
@@ -1123,12 +1175,14 @@ export class WorldScene extends Phaser.Scene {
         if (isMe) this.cameras.main.startFollow(e.root, true, 0.2, 0.2);
         this.players.set(id, e);
       }
-      this.applyPlayerEquip(e, p, isMe);
       if (isMe) {
         // Bám sát vị trí đoán trước; làm mượt các lần chỉnh nhỏ từ server
         const kk = 1 - Math.exp(-30 * (deltaMs / 1000));
         e.root.x += (this.predX - e.root.x) * kk;
         e.root.y += (this.predY - e.root.y) * kk;
+        e.root.setVisible(true);
+        if (e.sprite.anims.isPaused) e.sprite.anims.resume();
+        this.applyPlayerEquip(e, p, true);
         this.updatePlayerAnim(e, who, this.facing, this.moving && !p.dead && !p.meditating);
         ui.death(
           p.dead ? Math.max(0, Math.ceil(5 - (this.time.now - (e as any).deadSince) / 1000)) : null,
@@ -1141,29 +1195,42 @@ export class WorldScene extends Phaser.Scene {
         e.ty = p.y;
         e.root.x += (e.tx - e.root.x) * k;
         e.root.y += (e.ty - e.root.y) * k;
+        if (!this.inView(e.root.x, e.root.y, 96)) {
+          if (e.root.visible) e.root.setVisible(false);
+          if (e.sprite.anims.isPlaying) e.sprite.anims.pause();
+          return;
+        }
+        if (!e.root.visible) e.root.setVisible(true);
+        if (e.sprite.anims.isPaused) e.sprite.anims.resume();
+        this.applyPlayerEquip(e, p, false);
         this.updatePlayerAnim(e, who, p.angle, dist > 1.5 && !p.dead && !p.meditating);
       }
       e.root.setDepth(e.root.y);
       e.root.setAlpha(p.dead ? 0.35 : 1);
-      e.aura!.setVisible(p.meditating && !ui.isLowFx());
+      const showAura = Boolean(p.meditating && !lowFx);
+      e.aura!.setVisible(showAura);
+      if (showAura) {
+        const s = 1 + 0.25 * this.auraWave;
+        e.aura!.setScale(s, s).setAlpha(0.25 + 0.25 * this.auraWave);
+      }
       if (e.talismanRing) {
-        const hasTalisman = Boolean(p.talisman && ITEM_BY_ID[p.talisman]);
-        e.talismanRing.setVisible(hasTalisman && !ui.isLowFx());
+        const showTalisman = Boolean(p.talisman && ITEM_BY_ID[p.talisman] && !lowFx);
+        e.talismanRing.setVisible(showTalisman);
+        if (showTalisman) {
+          const s = 1 + 0.15 * this.talismanWave;
+          e.talismanRing.setScale(s, s).setAlpha(0.14 + 0.31 * this.talismanWave);
+        }
       }
-      const label = `${p.name}\n${realmLabel(p.realm, p.tier)}`;
-      if (label !== e.lastLabel) {
-        e.label!.setText(label);
-        e.lastLabel = label;
+      const showLabel = isMe || !hideNames;
+      e.label!.setVisible(showLabel);
+      if (showLabel) {
+        const label = `${p.name}\n${realmLabel(p.realm, p.tier)}`;
+        if (label !== e.lastLabel) {
+          e.label!.setText(label);
+          e.lastLabel = label;
+        }
       }
-      e.label!.setVisible(isMe || !ui.isHideNames());
-      this.drawBar(
-        e.bar,
-        p.hp / p.maxHp,
-        isMe ? 0x6ad06a : 0xd0a040,
-        -30,
-        28,
-        !isMe || p.hp < p.maxHp,
-      );
+      this.drawBar(e, p.hp / p.maxHp, isMe ? 0x6ad06a : 0xd0a040, -30, 28, !isMe || p.hp < p.maxHp);
     });
     for (const [id, e] of this.players)
       if (!seen.has(id)) {
@@ -1173,7 +1240,8 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private syncMonsters(k: number) {
-    const seen = new Set<string>();
+    const seen = this.seenIds;
+    seen.clear();
     this.state.monsters.forEach((m: any, id: string) => {
       seen.add(id);
       let e = this.monsters.get(id);
@@ -1200,10 +1268,17 @@ export class WorldScene extends Phaser.Scene {
       e.ty = m.y;
       e.root.x += (e.tx - e.root.x) * k;
       e.root.y += (e.ty - e.root.y) * k;
+      if (!this.inView(e.root.x, e.root.y, 96)) {
+        if (e.root.visible) e.root.setVisible(false);
+        if (e.sprite.anims.isPlaying) e.sprite.anims.pause();
+        return;
+      }
+      if (!e.root.visible) e.root.setVisible(true);
+      if (e.sprite.anims.isPaused) e.sprite.anims.resume();
       e.root.setDepth(e.root.y);
       e.sprite.setFlipX(Math.cos(m.angle) < 0);
       this.drawBar(
-        e.bar,
+        e,
         m.hp / m.maxHp,
         0xc0392b,
         -def.radius - 10,
@@ -1213,13 +1288,17 @@ export class WorldScene extends Phaser.Scene {
     });
     for (const [id, e] of this.monsters) {
       if (seen.has(id)) continue;
-      this.tweens.add({
-        targets: e.root,
-        alpha: 0,
-        scale: 0.6,
-        duration: 300,
-        onComplete: () => e.root.destroy(),
-      });
+      if (e.root.visible) {
+        this.tweens.add({
+          targets: e.root,
+          alpha: 0,
+          scale: 0.6,
+          duration: 300,
+          onComplete: () => e.root.destroy(),
+        });
+      } else {
+        e.root.destroy();
+      }
       this.monsters.delete(id);
     }
   }
@@ -1229,11 +1308,13 @@ export class WorldScene extends Phaser.Scene {
       ui.pickupPrompt(null);
       return;
     }
-    const seen = new Set<string>();
+    const seen = this.seenIds;
+    seen.clear();
     let bestId: string | null = null;
     let bestDist = PICKUP_RANGE;
     let bestLabel: string | null = null;
     const me = this.me();
+    const lowFx = ui.isLowFx();
 
     this.state.loot.forEach((l: LootView, id: string) => {
       seen.add(id);
@@ -1259,40 +1340,11 @@ export class WorldScene extends Phaser.Scene {
           })
           .setOrigin(0.5);
         root.add([ring, icon, label]);
-        // Hiệu ứng nhấp nháy theo độ hiếm
-        this.tweens.add({
-          targets: ring,
-          scaleX: 1.3,
-          scaleY: 1.3,
-          alpha: 0.35,
-          yoyo: true,
-          repeat: -1,
-          duration: 650,
-        });
-        this.tweens.add({
-          targets: icon,
-          y: -6,
-          yoyo: true,
-          repeat: -1,
-          duration: 650,
-          ease: "Sine.easeInOut",
-        });
         le = { root, ring, icon, label, itemId: l.itemId, qty: 0 };
         this.loots.set(id, le);
       }
 
-      le.root.setPosition(l.x, l.y);
-      le.root.setDepth(l.y - 2);
-      le.ring.setVisible(!ui.isLowFx());
-      if (le.qty !== l.qty) {
-        le.qty = l.qty;
-        const name = def?.name ?? l.itemId;
-        le.label.setText(l.qty > 1 ? `${name} ×${l.qty}` : name);
-      }
-      // Đồ của người khác (trong 30 giây đầu) hiện mờ đi
       const mineOrPublic = !l.owner || l.owner === this.sid;
-      le.root.setAlpha(mineOrPublic ? 1 : 0.35);
-
       if (me && !me.dead && mineOrPublic) {
         const d = Math.hypot(l.x - this.predX, l.y - this.predY);
         if (d <= bestDist) {
@@ -1301,6 +1353,28 @@ export class WorldScene extends Phaser.Scene {
           bestLabel = def ? `Nhặt ${def.name}` : "Nhặt (F)";
         }
       }
+
+      if (!this.inView(l.x, l.y, 80)) {
+        if (le.root.visible) le.root.setVisible(false);
+        return;
+      }
+      if (!le.root.visible) le.root.setVisible(true);
+
+      le.root.setPosition(l.x, l.y);
+      le.root.setDepth(l.y - 2);
+      le.ring.setVisible(!lowFx);
+      if (!lowFx) {
+        const s = 1 + 0.3 * this.lootWave;
+        le.ring.setScale(s, s).setAlpha(0.18 + 0.17 * this.lootWave);
+      }
+      le.icon.y = -3 - 3 * this.lootWave;
+      if (le.qty !== l.qty) {
+        le.qty = l.qty;
+        const name = def?.name ?? l.itemId;
+        le.label.setText(l.qty > 1 ? `${name} ×${l.qty}` : name);
+      }
+      // Đồ của người khác (trong 30 giây đầu) hiện mờ đi
+      le.root.setAlpha(mineOrPublic ? 1 : 0.35);
     });
 
     for (const [id, le] of this.loots) {
@@ -1326,28 +1400,10 @@ export class WorldScene extends Phaser.Scene {
         .ellipse(0, 6, 54, 22, 0xffe08a, 0.25)
         .setStrokeStyle(2, 0xffe08a, 0.7)
         .setVisible(false);
-      this.tweens.add({
-        targets: e.aura,
-        scaleX: 1.25,
-        scaleY: 1.25,
-        alpha: 0.5,
-        yoyo: true,
-        repeat: -1,
-        duration: 900,
-      });
       e.talismanRing = this.add
         .circle(0, 4, 18, 0xffe08a, 0.14)
         .setStrokeStyle(1.6, 0xffe08a, 0.8)
         .setVisible(false);
-      this.tweens.add({
-        targets: e.talismanRing,
-        scaleX: 1.15,
-        scaleY: 1.15,
-        alpha: 0.45,
-        yoyo: true,
-        repeat: -1,
-        duration: 1100,
-      });
       e.weaponVisual = this.add.graphics().setVisible(false);
       e.label = this.add
         .text(0, -54, "", {
@@ -1367,21 +1423,68 @@ export class WorldScene extends Phaser.Scene {
     return e;
   }
 
-  private drawBar(
-    g: Phaser.GameObjects.Graphics,
-    frac: number,
-    color: number,
-    y: number,
-    w: number,
-    visible: boolean,
-  ) {
+  private drawBar(e: Entity, frac: number, color: number, y: number, w: number, visible: boolean) {
+    const fillW = visible ? Math.round(w * Phaser.Math.Clamp(frac, 0, 1)) : -1;
+    const key = visible ? fillW + color * 256 : -1;
+    if (e.lastBarKey === key) return;
+    e.lastBarKey = key;
+    const g = e.bar;
     g.clear();
     if (!visible) return;
     g.fillStyle(0x000000, 0.55).fillRect(-w / 2, y, w, 4);
-    g.fillStyle(color, 1).fillRect(-w / 2, y, w * Phaser.Math.Clamp(frac, 0, 1), 4);
+    g.fillStyle(color, 1).fillRect(-w / 2, y, fillW, 4);
   }
 
   // ---------------- Hiệu ứng ----------------
+
+  private stepTransientFx(now: number) {
+    // 1. Vệt chém (180ms)
+    for (let i = this.activeSlashes.length - 1; i >= 0; i--) {
+      const it = this.activeSlashes[i];
+      const p = (now - it.start) / 180;
+      if (p >= 1) {
+        it.g.setVisible(false);
+        this.slashPool.push(it.g);
+        const last = this.activeSlashes.pop()!;
+        if (i < this.activeSlashes.length) this.activeSlashes[i] = last;
+      } else {
+        it.g.setAlpha(1 - p).setScale(1 + 0.15 * p);
+      }
+    }
+
+    // 2. Kiếm khí (bay 220ms + mờ dần 120ms = 340ms)
+    for (let i = this.activeSwords.length - 1; i >= 0; i--) {
+      const it = this.activeSwords[i];
+      const elapsed = now - it.start;
+      if (elapsed >= 340) {
+        it.img.setVisible(false);
+        this.swordPool.push(it.img);
+        const last = this.activeSwords.pop()!;
+        if (i < this.activeSwords.length) this.activeSwords[i] = last;
+      } else if (elapsed <= 220) {
+        const p = elapsed / 220;
+        it.img.setPosition(it.x0 + it.dx * p, it.y0 + it.dy * p).setAlpha(1);
+      } else {
+        it.img.setPosition(it.x0 + it.dx, it.y0 + it.dy).setAlpha(1 - (elapsed - 220) / 120);
+      }
+    }
+
+    // 3. Chữ sát thương bay lên (800ms, Cubic.easeOut)
+    for (let i = this.activeFloats.length - 1; i >= 0; i--) {
+      const it = this.activeFloats[i];
+      const p = (now - it.start) / 800;
+      if (p >= 1) {
+        it.t.setVisible(false);
+        this.floatPool.push(it.t);
+        const last = this.activeFloats.pop()!;
+        if (i < this.activeFloats.length) this.activeFloats[i] = last;
+      } else {
+        const inv = 1 - p;
+        const ease = 1 - inv * inv * inv;
+        it.t.setY(it.y0 - 36 * ease).setAlpha(1 - ease);
+      }
+    }
+  }
 
   private onFx(m: FxMsg) {
     if ((m.kind === "slash" || m.kind === "sword") && m.by === this.sid) return; // đã vẽ ngay khi bấm
@@ -1389,26 +1492,36 @@ export class WorldScene extends Phaser.Scene {
       case "slash": {
         const other = this.players.get(m.by);
         if (other) other.slashUntil = this.time.now + 220;
+        if (!this.inView(m.x, m.y, 110)) return;
         const attacker = this.state?.players?.get(m.by);
         return this.fxSlash(m.x, m.y, m.angle, this.weaponColorFor(attacker, 0xdfe8f0));
       }
       case "sword": {
         const other = this.players.get(m.by);
         if (other) other.slashUntil = this.time.now + 220;
+        if (!this.inView(m.x, m.y, m.range + 96)) return;
         const attacker = this.state?.players?.get(m.by);
         return this.fxSword(m.x, m.y, m.angle, m.range, this.weaponColorFor(attacker, 0xffffff));
       }
       case "mslash":
+        if (!this.inView(m.x, m.y, 96)) return;
         return this.fxSlash(m.x, m.y, m.angle, 0xff6050, 0.6);
       case "levelup":
         return this.fxLevelUp(m.x, m.y, m.major, m.by === this.sid);
       case "breakfail":
+        if (!this.inView(m.x, m.y, 120)) return;
         return this.fxBreakFail(m.x, m.y);
     }
   }
 
   private fxSlash(x: number, y: number, angle: number, color: number, scale = 1) {
-    const g = this.add.graphics({ x, y: y - 8 }).setDepth(y + 1);
+    const g = this.slashPool.pop() ?? this.add.graphics();
+    g.clear();
+    g.setPosition(x, y - 8)
+      .setDepth(y + 1)
+      .setAlpha(1)
+      .setScale(1)
+      .setVisible(true);
     const r = SKILLS.slash.range * scale,
       half = SKILLS.slash.arc / 2;
     g.lineStyle(6 * scale, color, 0.9);
@@ -1419,49 +1532,49 @@ export class WorldScene extends Phaser.Scene {
     g.beginPath();
     g.arc(0, 0, r, angle - half * 0.8, angle + half * 0.8);
     g.strokePath();
-    this.tweens.add({
-      targets: g,
-      alpha: 0,
-      scale: 1.15,
-      duration: 180,
-      onComplete: () => g.destroy(),
-    });
+    this.activeSlashes.push({ g, start: this.time.now });
   }
 
   private fxSword(x: number, y: number, angle: number, range: number, tint = 0xffffff) {
-    const s = this.add
-      .image(x, y - 10, "swordbeam")
+    const s =
+      this.swordPool.pop() ??
+      this.add.image(x, y - 10, "swordbeam").setBlendMode(Phaser.BlendModes.ADD);
+    s.setPosition(x, y - 10)
       .setRotation(angle)
       .setDepth(WORLD_H)
-      .setBlendMode(Phaser.BlendModes.ADD);
+      .setAlpha(1)
+      .setVisible(true);
     if (tint !== 0xffffff) s.setTint(tint);
-    this.tweens.add({
-      targets: s,
-      x: x + Math.cos(angle) * range,
-      y: y - 10 + Math.sin(angle) * range,
-      duration: 220,
-      onComplete: () =>
-        this.tweens.add({ targets: s, alpha: 0, duration: 120, onComplete: () => s.destroy() }),
+    else s.clearTint();
+    this.activeSwords.push({
+      img: s,
+      x0: x,
+      y0: y - 10,
+      dx: Math.cos(angle) * range,
+      dy: Math.sin(angle) * range,
+      start: this.time.now,
     });
   }
 
   private fxLevelUp(x: number, y: number, major: boolean, mine: boolean) {
     const color = major ? 0xffd34d : 0xbfe8ff;
     if (mine) sound.levelup(major);
-    const rings = ui.isLowFx() ? 1 : major ? 3 : 1;
-    for (let i = 0; i < rings; i++) {
-      const ring = this.add
-        .circle(x, y, 16, color, 0)
-        .setStrokeStyle(3, color, 0.9)
-        .setDepth(WORLD_H);
-      this.tweens.add({
-        targets: ring,
-        scale: major ? 7 : 4,
-        alpha: 0,
-        delay: i * 180,
-        duration: 700,
-        onComplete: () => ring.destroy(),
-      });
+    if (mine || this.inView(x, y, 160)) {
+      const rings = ui.isLowFx() ? 1 : major ? 3 : 1;
+      for (let i = 0; i < rings; i++) {
+        const ring = this.add
+          .circle(x, y, 16, color, 0)
+          .setStrokeStyle(3, color, 0.9)
+          .setDepth(WORLD_H);
+        this.tweens.add({
+          targets: ring,
+          scale: major ? 7 : 4,
+          alpha: 0,
+          delay: i * 180,
+          duration: 700,
+          onComplete: () => ring.destroy(),
+        });
+      }
     }
     if (mine) {
       const me = this.me();
@@ -1487,25 +1600,39 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private floatText(m: DmgMsg) {
-    const color = m.toPlayer ? "#ff6b5e" : m.crit ? "#ffd34d" : "#ffffff";
-    const t = this.add
-      .text(m.x + Phaser.Math.Between(-8, 8), m.y, `${m.crit ? "Bạo! " : ""}${m.amount}`, {
-        fontFamily: '"Noto Serif", Georgia, serif',
-        fontSize: m.crit ? "20px" : "15px",
-        color,
-        stroke: "#1d1a16",
-        strokeThickness: 3,
-        fontStyle: "bold",
-      })
-      .setOrigin(0.5)
-      .setDepth(WORLD_H + 1);
-    this.tweens.add({
-      targets: t,
-      y: m.y - 36,
-      alpha: 0,
-      duration: 800,
-      ease: "Cubic.easeOut",
-      onComplete: () => t.destroy(),
-    });
+    const text = `${m.crit ? "Bạo! " : ""}${m.amount}`;
+    const styleKey = (m.toPlayer ? 2 : 0) | (m.crit ? 1 : 0);
+    const x = m.x + Phaser.Math.Between(-8, 8);
+    const y0 = m.y;
+
+    let item = this.floatPool.pop();
+    if (!item) {
+      const t = this.add
+        .text(x, y0, text, {
+          fontFamily: '"Noto Serif", Georgia, serif',
+          fontSize: m.crit ? "20px" : "15px",
+          color: m.toPlayer ? "#ff6b5e" : m.crit ? "#ffd34d" : "#ffffff",
+          stroke: "#1d1a16",
+          strokeThickness: 3,
+          fontStyle: "bold",
+        })
+        .setOrigin(0.5)
+        .setDepth(WORLD_H + 1);
+      item = { t, y0, start: this.time.now, lastText: text, lastStyleKey: styleKey };
+    } else {
+      if (item.lastStyleKey !== styleKey) {
+        item.t.setFontSize(m.crit ? "20px" : "15px");
+        item.t.setColor(m.toPlayer ? "#ff6b5e" : m.crit ? "#ffd34d" : "#ffffff");
+        item.lastStyleKey = styleKey;
+      }
+      if (item.lastText !== text) {
+        item.t.setText(text);
+        item.lastText = text;
+      }
+      item.t.setPosition(x, y0).setAlpha(1).setVisible(true);
+      item.y0 = y0;
+      item.start = this.time.now;
+    }
+    this.activeFloats.push(item);
   }
 }
