@@ -428,6 +428,8 @@ export type DialogAction =
   | { kind: "turnIn"; questId: string }
   | { kind: "trade"; tradeId: string }
   | { kind: "forge" }
+  /** Mở bảng cửa hàng của NPC này (`SHOP_BY_NPC` trong currency.ts); mua / bán đi qua tin `buy` / `sell` */
+  | { kind: "shop" }
   | { kind: "close" };
 
 export interface DialogOption {

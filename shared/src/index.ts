@@ -6,3 +6,4 @@ export * from "./npcs";
 export * from "./quests";
 export * from "./recipes";
 export * from "./party";
+export * from "./currency";
