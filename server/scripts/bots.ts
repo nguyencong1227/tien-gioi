@@ -3,7 +3,7 @@
 // Cách dùng:
 //   npm run bots -w server -- --bots=50 --duration=15
 //   npm run bots -w server -- --suite --mode=realistic --duration=15 --write-doc
-//   npm run bots -w server -- --clean-only
+//   npm run bots -w server -- --clean-only --yes
 import { execSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -49,6 +49,7 @@ interface CliArgs {
   mode: BotMode;
   bothModes: boolean;
   cleanOnly: boolean;
+  yes: boolean;
   keepSaves: boolean;
   writeDoc: boolean;
   suite: boolean;
@@ -65,6 +66,7 @@ function parseArgs(argv: string[]): CliArgs {
   let mode: BotMode = "realistic";
   let bothModes = false;
   let cleanOnly = false;
+  let yes = false;
   let keepSaves = false;
   let writeDoc = false;
   let suite = false;
@@ -86,6 +88,7 @@ function parseArgs(argv: string[]): CliArgs {
     else if (arg.startsWith("--save-json=")) saveJson = arg.slice(12);
     else if (arg.startsWith("--compare-json=")) compareJson = arg.slice(15);
     else if (arg === "--clean-only") cleanOnly = true;
+    else if (arg === "--yes") yes = true;
     else if (arg === "--keep-saves") keepSaves = true;
     else if (arg === "--write-doc") writeDoc = true;
     else if (arg === "--suite") suite = true;
@@ -104,6 +107,7 @@ function parseArgs(argv: string[]): CliArgs {
     mode,
     bothModes,
     cleanOnly,
+    yes,
     keepSaves,
     writeDoc,
     suite,
@@ -125,19 +129,18 @@ function currentGitCommit(): string {
 }
 
 /**
- * Xoá các file nhân vật bot trong server/data/players/ của Dev C.
- * Lưu ý: store.ts băm tên nhân vật bằng SHA-1 thành `<sha1>.json` và chỉ cho phép chữ/số/khoảng trắng
- * trong tên (`cleanName`), nên bot đặt tên dạng `Bot 001` và ta đọc trường `name` trong JSON để xoá.
+ * Xoá đúng danh sách các file nhân vật bot mà lượt chạy hiện tại đã tạo ra trong `server/data/players/`.
+ * Tránh xoá nhầm người chơi thật có tên bắt đầu bằng "Bot ".
  */
-function cleanBotSaves(): number {
-  if (!existsSync(DATA_PLAYERS_DIR)) return 0;
+function cleanCreatedBotSaves(createdNames: ReadonlySet<string>): number {
+  if (!existsSync(DATA_PLAYERS_DIR) || createdNames.size === 0) return 0;
   let removed = 0;
   for (const entry of readdirSync(DATA_PLAYERS_DIR)) {
     if (!entry.endsWith(".json")) continue;
     const fullPath = path.join(DATA_PLAYERS_DIR, entry);
     try {
       const data = JSON.parse(readFileSync(fullPath, "utf8")) as { name?: string };
-      if (typeof data.name === "string" && /^bot[\s_]/i.test(data.name.trim())) {
+      if (typeof data.name === "string" && createdNames.has(data.name.trim())) {
         rmSync(fullPath, { force: true });
         removed++;
       }
@@ -146,6 +149,51 @@ function cleanBotSaves(): number {
     }
   }
   return removed;
+}
+
+/**
+ * Dọn thủ công bằng `--clean-only`: in danh sách các file sẽ xoá và yêu cầu thêm `--yes` mới thực sự xoá.
+ */
+function cleanBotSavesManual(confirmYes: boolean): void {
+  if (!existsSync(DATA_PLAYERS_DIR)) {
+    console.log(`Thư mục ${DATA_PLAYERS_DIR} chưa tồn tại.`);
+    return;
+  }
+  const matched: { entry: string; fullPath: string; name: string }[] = [];
+  for (const entry of readdirSync(DATA_PLAYERS_DIR)) {
+    if (!entry.endsWith(".json")) continue;
+    const fullPath = path.join(DATA_PLAYERS_DIR, entry);
+    try {
+      const data = JSON.parse(readFileSync(fullPath, "utf8")) as { name?: string };
+      if (typeof data.name === "string" && /^bot[\s_]/i.test(data.name.trim())) {
+        matched.push({ entry, fullPath, name: data.name.trim() });
+      }
+    } catch {
+      // Bỏ qua file lỗi đọc
+    }
+  }
+
+  if (matched.length === 0) {
+    console.log(`Không có file nhân vật bot nào trong ${DATA_PLAYERS_DIR}.`);
+    return;
+  }
+
+  console.log(`Danh sách ${matched.length} file nhân vật khớp mẫu bot trong ${DATA_PLAYERS_DIR}:`);
+  for (const item of matched) {
+    console.log(`  - ${item.entry} (name: "${item.name}")`);
+  }
+
+  if (!confirmYes) {
+    console.log(
+      `\nChế độ xem trước (--clean-only): chưa xoá file nào. Thêm cờ --yes (--clean-only --yes) để xác nhận xoá.`,
+    );
+    return;
+  }
+
+  for (const item of matched) {
+    rmSync(item.fullPath, { force: true });
+  }
+  console.log(`\nĐã xoá ${matched.length} file lưu nhân vật bot trong ${DATA_PLAYERS_DIR}.`);
 }
 
 /** Tìm PID của tiến trình server đang lắng nghe trên cổng đích để đo thời gian CPU mỗi tick từ bên ngoài. */
@@ -305,6 +353,7 @@ async function runLoadTest(
   );
 
   const bots: BotState[] = [];
+  const createdBotNames = new Set<string>();
   const patchIntervals: number[] = [];
   const ackRtts: number[] = [];
   const serverTickCpuSamples: number[] = [];
@@ -317,6 +366,7 @@ async function runLoadTest(
   for (let i = 1; i <= botCount; i++) {
     const numStr = String(i).padStart(3, "0");
     const name = `Bot ${numStr}`;
+    createdBotNames.add(name);
     const secret = `bot_secret_tien_gioi_${numStr}_loadtest`;
     const joinOpts: JoinOptions = { name, secret };
 
@@ -662,8 +712,10 @@ async function runLoadTest(
 
   await sleep(400);
   if (!keepSaves) {
-    const removed = cleanBotSaves();
-    console.log(`Đã dọn ${removed} file lưu của bot trong server/data/players/.`);
+    const removed = cleanCreatedBotSaves(createdBotNames);
+    console.log(
+      `Đã dọn ${removed}/${createdBotNames.size} file lưu của đợt bot vừa chạy trong server/data/players/.`,
+    );
   }
 
   patchIntervals.sort((a, b) => a - b);
@@ -884,8 +936,7 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
 
   if (args.cleanOnly) {
-    const removed = cleanBotSaves();
-    console.log(`Đã xoá ${removed} file lưu nhân vật bot trong ${DATA_PLAYERS_DIR}.`);
+    cleanBotSavesManual(args.yes);
     return;
   }
 
