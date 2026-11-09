@@ -45,7 +45,7 @@ const FORBIDDEN_PORTS = new Set([2567, 2577]); // Cổng của Dev A và Dev B
 const DATA_PLAYERS_DIR = path.resolve(here, "../data/players");
 const DOC_PATH = path.resolve(repoRoot, "docs/LOAD_TEST.md");
 
-export type BotMode = "realistic" | "worst";
+export type BotMode = "realistic" | "worst" | "crowd";
 
 interface CliArgs {
   bots: number;
@@ -91,6 +91,7 @@ function parseArgs(argv: string[]): CliArgs {
       const m = arg.slice(7);
       if (m === "both") bothModes = true;
       else if (m === "worst") mode = "worst";
+      else if (m === "crowd") mode = "crowd";
       else mode = "realistic";
     } else if (arg.startsWith("--commit=")) commitOverride = arg.slice(9);
     else if (arg.startsWith("--note=")) note = arg.slice(7);
@@ -505,7 +506,11 @@ async function runLoadTest(
   mode: BotMode,
 ): Promise<LoadTestMetrics> {
   const modeLabel =
-    mode === "realistic" ? "Thực tế (vào tầm đứng chém)" : "Xấu nhất (100% di chuyển 20 input/s)";
+    mode === "realistic"
+      ? "Thực tế (vào tầm đứng chém)"
+      : mode === "crowd"
+        ? "Đông người trong trấn (30% đứng yên, 70% đi lại)"
+        : "Xấu nhất (100% di chuyển 20 input/s)";
   console.log(
     `\n=== Bắt đầu thử tải [${modeLabel}]: ${botCount} bot, đo trong ${durationSec}s (${url}) ===`,
   );
@@ -537,15 +542,31 @@ async function runLoadTest(
     const tier = Math.floor(rnd() * REALMS[realm].tiers.length);
     let campX: number;
     let campY: number;
-    for (;;) {
-      const a = rnd() * Math.PI * 2;
-      const r = TOWN_PX.r + 80 + rnd() * (WORLD_W * 0.45 - TOWN_PX.r);
-      const x = TOWN_PX.x + Math.cos(a) * r;
-      const y = TOWN_PX.y + Math.sin(a) * r;
-      if (!circleBlocked(x, y, PLAYER_RADIUS) && dangerAt(x, y) < 0.9) {
-        campX = x;
-        campY = y;
-        break;
+    if (mode === "crowd") {
+      // Đông người tụ trong Lạc Hà Trấn (#78): rải bot hoàn toàn bên trong bán kính trấn
+      for (;;) {
+        const a = rnd() * Math.PI * 2;
+        const r = rnd() * (TOWN_PX.r - 28);
+        const x = TOWN_PX.x + Math.cos(a) * r;
+        const y = TOWN_PX.y + Math.sin(a) * r;
+        if (!circleBlocked(x, y, PLAYER_RADIUS)) {
+          campX = x;
+          campY = y;
+          break;
+        }
+      }
+    } else {
+      // Khởi tạo vị trí (campX, campY) rải đều khắp vùng hoang dã giống bench.ts trước khi joinOrCreate
+      for (;;) {
+        const a = rnd() * Math.PI * 2;
+        const r = TOWN_PX.r + 80 + rnd() * (WORLD_W * 0.45 - TOWN_PX.r);
+        const x = TOWN_PX.x + Math.cos(a) * r;
+        const y = TOWN_PX.y + Math.sin(a) * r;
+        if (!circleBlocked(x, y, PLAYER_RADIUS) && dangerAt(x, y) < 0.9) {
+          campX = x;
+          campY = y;
+          break;
+        }
       }
     }
     seedBotSaveFile(name, secret, campX, campY, realm, tier);
@@ -679,7 +700,27 @@ async function runLoadTest(
     let dx: number;
     let dy: number;
 
-    if (now < b.avoidUntil) {
+    if (mode === "crowd") {
+      // Kịch bản đông người tụ trong trấn (#78):
+      // ~30% bot đứng yên (đả tọa, xem túi đồ, nói chuyện NPC), 70% đi lại ngẫu nhiên trong trấn.
+      // Không đánh quái, không nhặt đồ.
+      if (b.index % 3 === 0) {
+        dx = 0;
+        dy = 0;
+      } else {
+        const distFromCenter = Math.hypot(b.predX - TOWN_PX.x, b.predY - TOWN_PX.y);
+        if (distFromCenter > TOWN_PX.r - 28) {
+          b.wanderAngle =
+            Math.atan2(TOWN_PX.y - b.predY, TOWN_PX.x - b.predX) + (Math.random() - 0.5) * 0.4;
+          b.nextTurnAt = now + 1500;
+        } else if (now >= b.nextTurnAt) {
+          b.wanderAngle += (Math.random() - 0.5) * Math.PI;
+          b.nextTurnAt = now + 1500 + Math.random() * 2000;
+        }
+        dx = Math.cos(b.wanderAngle);
+        dy = Math.sin(b.wanderAngle);
+      }
+    } else if (now < b.avoidUntil) {
       // Đang vòng qua vật cản (cây/nước)
       dx = Math.cos(b.wanderAngle);
       dy = Math.sin(b.wanderAngle);
@@ -1091,7 +1132,9 @@ function renderTableRows(
       const modeName =
         (b.mode ?? "realistic") === "realistic"
           ? "Thực tế (vào tầm đứng chém)"
-          : "Xấu nhất (100% đi liên tục)";
+          : (b.mode ?? "realistic") === "crowd"
+            ? "Đông người trong trấn (30% đứng yên, 70% đi lại)"
+            : "Xấu nhất (100% đi liên tục)";
       return `| ${modeName} | **${b.botCount}** | ${fmtCell(
         `${b.connectedBots}/${b.botCount} (4429: ${b.kicked4429})`,
         a ? `${a.connectedBots}/${a.botCount} (4429: ${a.kicked4429})` : undefined,
@@ -1126,7 +1169,9 @@ function renderSideBySideRows(beforeList: LoadTestMetrics[], afterList: LoadTest
     const modeName =
       (b.mode ?? "realistic") === "realistic"
         ? "Thực tế (vào tầm đứng chém)"
-        : "Xấu nhất (100% đi liên tục)";
+        : (b.mode ?? "realistic") === "crowd"
+          ? "Đông người trong trấn (30% đứng yên, 70% đi lại)"
+          : "Xấu nhất (100% đi liên tục)";
     lines.push(
       `| **${modeName}** | **${b.botCount}** | Kết nối giữ vững | ${b.connectedBots}/${b.botCount} (4429: ${b.kicked4429}) | **${a.connectedBots}/${a.botCount} (4429: ${a.kicked4429})** |`,
       `| ${modeName} | **${b.botCount}** | CPU mỗi tick (TB / p95 / cao nhất) | TB **${b.serverCpuMsPerTickAvg} ms** / p95 ${b.serverCpuMsPerTickP95} ms / max ${b.serverCpuMsPerTickMax} ms | TB **${a.serverCpuMsPerTickAvg} ms** / p95 ${a.serverCpuMsPerTickP95} ms / max ${a.serverCpuMsPerTickMax} ms |`,
@@ -1180,7 +1225,9 @@ export function renderMarkdownReport(
             const modeName =
               (b.mode ?? "realistic") === "realistic"
                 ? "Thực tế (vào tầm đứng chém)"
-                : "Xấu nhất (100% đi liên tục)";
+                : (b.mode ?? "realistic") === "crowd"
+                  ? "Đông người trong trấn (30% đứng yên, 70% đi lại)"
+                  : "Xấu nhất (100% đi liên tục)";
             return `| ${modeName} | **${b.botCount}** | ${formatRxCell(b)} (${b.rxMsgsPerSecPerBot} gói/s) | ${formatRxCell(m)} (${m.rxMsgsPerSecPerBot} gói/s) | ${formatRxCell(a)} (${a.rxMsgsPerSecPerBot} gói/s) | ${formatEntitiesCell(a)} |`;
           })
           .filter(Boolean)
