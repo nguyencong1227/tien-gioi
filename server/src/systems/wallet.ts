@@ -26,6 +26,36 @@ export function changeCoin(w: World, sid: string, amount: number): number {
 }
 
 /**
+ * Chia `total` Linh thạch (số nguyên dương) cho những người trong `weights` theo tỉ lệ trọng số, tổng chia ra
+ * đúng bằng `total` (phương pháp phần dư lớn nhất: không làm tròn mất tiền, không sinh thêm). Trọng số không
+ * dương / không hữu hạn bị bỏ qua. Phần dư chia cho người có phần lẻ lớn nhất, bằng nhau thì ngẫu nhiên
+ * (`rng` truyền vào để test), để một người không luôn được phần lẻ. Không có ai đủ điều kiện thì trả Map rỗng.
+ */
+export function splitCoin(
+  total: number,
+  weights: ReadonlyMap<string, number>,
+  rng: () => number = Math.random,
+): Map<string, number> {
+  const out = new Map<string, number>();
+  if (!Number.isInteger(total) || total <= 0) return out;
+  const eligible = [...weights].filter(([, wt]) => Number.isFinite(wt) && wt > 0);
+  const sum = eligible.reduce((s, [, wt]) => s + wt, 0);
+  if (eligible.length === 0 || !(sum > 0)) return out;
+  const parts = eligible.map(([sid, wt]) => {
+    const exact = (total * wt) / sum;
+    return { sid, base: Math.floor(exact), rem: exact - Math.floor(exact), tie: rng() };
+  });
+  let left = total - parts.reduce((s, x) => s + x.base, 0);
+  parts.sort((a, b) => b.rem - a.rem || a.tie - b.tie);
+  for (const x of parts) {
+    const extra = left > 0 ? 1 : 0;
+    left -= extra;
+    if (x.base + extra > 0) out.set(x.sid, x.base + extra);
+  }
+  return out;
+}
+
+/**
  * Trừ đúng `amount` Linh thạch hoặc không trừ gì: trả false nếu số tiền không hợp lệ (không nguyên dương) hoặc
  * không đủ. Dùng cho mua hàng, nơi "trọn vẹn hoặc không gì cả".
  */

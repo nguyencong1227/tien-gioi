@@ -325,12 +325,15 @@ export function tickParty(w: World) {
  * - Đội: `f` = tổng sát thương của các thành viên chia tổng sát thương; mỗi thành viên còn sống và trong
  *   PARTY_SHARE_RANGE quanh chỗ quái chết (kể cả người chưa ra đòn) nhận `f × partyExpShare(n)`,
  *   `n` là số thành viên đủ điều kiện. Thành viên ở xa hoặc đã ngã không được chia và không tính vào `n`.
+ * - `withBonus = false` (chia Linh thạch): bỏ thưởng đội, mỗi thành viên đủ điều kiện nhận `f / n`, nên tổng
+ *   hệ số của một đội đúng bằng `f` và việc lập đội không làm sinh thêm tiền.
  */
 export function killShares(
   w: World,
   damageBy: ReadonlyMap<string, number>,
   x: number,
   y: number,
+  withBonus = true,
 ): Map<string, number> {
   let total = 0;
   for (const dmg of damageBy.values()) total += dmg;
@@ -348,7 +351,7 @@ export function killShares(
       return p !== undefined && !p.dead && Math.hypot(p.x - x, p.y - y) <= PARTY_SHARE_RANGE;
     });
     if (present.length === 0) continue;
-    const frac = (dmg / total) * partyExpShare(present.length);
+    const frac = (dmg / total) * (withBonus ? partyExpShare(present.length) : 1 / present.length);
     for (const sid of present) out.set(sid, frac);
   }
   return out;

@@ -10,6 +10,7 @@ import { Client, getStateCallbacks, type Room } from "colyseus.js";
 import {
   ROOM_NAME,
   COIN_CAP,
+  COIN_DROPS,
   MONSTER_CAP,
   TOWN_PX,
   SKILLS,
@@ -499,6 +500,35 @@ describe("túi đồ và đồ rơi", () => {
     expect((await waitFor(() => again.wallets[0])).coin).toBe(expectedCoin);
     const inv = await waitFor(() => again.invs[0]);
     expect(inv.slots[0]).toEqual({ itemId: "hoi_huyet_dan", qty: 1 });
+  });
+
+  it("giết quái thì nhận Linh thạch qua tin wallet (chỉ người hạ quái), lưu được khi thoát", async () => {
+    const name = "San Tien";
+    const a = await join(name);
+    const other = await join();
+    await waitFor(() => a.wallets[0]);
+    const st = serverState(a.room);
+    const sr = serverRoom(a.room) as any;
+    const p = st.players.get(a.room.sessionId)!;
+    const [mid, mon] = [...st.monsters.entries()].find(([, m]) => m.kind === "tho")!;
+    mon.x = p.x + 20;
+    mon.y = p.y;
+    mon.hp = 1;
+    sr.world.mctrl.get(mid).homeX = mon.x;
+    sr.world.mctrl.get(mid).homeY = mon.y;
+    const before = other.wallets.length;
+    vi.spyOn(Math, "random").mockReturnValue(0); // rơi chắc chắn, mức tối thiểu
+    a.room.send("attack", { angle: 0 });
+    const got = await waitFor(() => a.wallets.find((m) => m.gained));
+    vi.restoreAllMocks();
+    expect(got).toEqual({ coin: COIN_DROPS.tho!.min, gained: COIN_DROPS.tho!.min });
+    await sleep(150);
+    expect(other.wallets.length).toBe(before); // người không góp sát thương không nhận gì
+    await a.room.leave(true);
+    rooms.splice(rooms.indexOf(a.room), 1);
+    await sleep(200);
+    const again = await join(name);
+    expect((await waitFor(() => again.wallets[0])).coin).toBe(COIN_DROPS.tho!.min);
   });
 
   it("giết quái thì đồ rơi hiện trong state; nhặt được, dùng được", async () => {

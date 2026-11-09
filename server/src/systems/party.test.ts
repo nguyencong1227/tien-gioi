@@ -390,6 +390,26 @@ describe("chia tu vi (killShares)", () => {
     expect(total).toBeLessThan(1.5);
   });
 
+  it("withBonus = false (chia Linh thạch): đội chia đều f / n, tổng đội đúng bằng f, không có thưởng", () => {
+    const t = setup(A, B, C, D);
+    for (const n of [A, B, C, D]) at(t.w, n, 1000);
+    join(t.w, A, B);
+    join(t.w, A, C);
+    join(t.w, A, D);
+    const dmg = new Map([
+      [A, 40],
+      [B, 20],
+      [C, 20],
+      [D, 20],
+    ]);
+    const s = killShares(t.w, dmg, 1000, 1000, false);
+    for (const n of [A, B, C, D]) expect(s.get(n)).toBeCloseTo(1 / 4, 9);
+    expect([...s.values()].reduce((a, b) => a + b, 0)).toBeCloseTo(1, 9);
+    // Mặc định vẫn có thưởng (tu vi)
+    const exp = killShares(t.w, dmg, 1000, 1000);
+    expect([...exp.values()].reduce((a, b) => a + b, 0)).toBeGreaterThan(1);
+  });
+
   it("killMonster: mỗi người nhận theo cảnh giới của chính mình, không ai nhận hai lần", () => {
     const t = setup(A, B);
     const a = t.w.state.players.get(A)!;

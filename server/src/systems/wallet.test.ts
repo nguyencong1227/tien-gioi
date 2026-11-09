@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { COIN_CAP } from "@tien-gioi/shared";
 import { addPlayer, makeWorld } from "./test-helpers";
-import { changeCoin, sendWallet, trySpendCoin } from "./wallet";
+import { changeCoin, sendWallet, splitCoin, trySpendCoin } from "./wallet";
 
 describe("ví Linh thạch", () => {
   it("cộng tiền: đổi số dư, gửi wallet cho đúng chủ kèm gained", () => {
@@ -68,5 +68,72 @@ describe("ví Linh thạch", () => {
     c.coin = 42;
     sendWallet(w, "A");
     expect(wallets).toEqual([{ sid: "A", msg: { coin: 42 } }]);
+  });
+});
+
+describe("splitCoin", () => {
+  const sum = (m: Map<string, number>) => [...m.values()].reduce((a, b) => a + b, 0);
+
+  it("tổng chia ra đúng bằng khoản rơi, mọi tỉ lệ và số người", () => {
+    for (const total of [1, 2, 3, 7, 10, 99, 150, 299, 1000]) {
+      for (const ws of [
+        [1],
+        [1, 1],
+        [1, 1, 1],
+        [1, 1, 1, 1],
+        [7, 1],
+        [0.1, 0.2, 0.7],
+        [3, 3, 3, 1],
+      ]) {
+        const w = new Map(ws.map((x, i) => [`p${i}`, x] as [string, number]));
+        expect(sum(splitCoin(total, w)), `${total} / ${ws}`).toBe(total);
+      }
+    }
+  });
+
+  it("chia theo trọng số: phần của mỗi người lệch tối đa 1 so với số lý thuyết", () => {
+    const out = splitCoin(
+      100,
+      new Map([
+        ["a", 3],
+        ["b", 1],
+      ]),
+    );
+    expect(Math.abs(out.get("a")! - 75)).toBeLessThanOrEqual(1);
+    expect(Math.abs(out.get("b")! - 25)).toBeLessThanOrEqual(1);
+  });
+
+  it("khoản nhỏ hơn số người: người được nhận là ngẫu nhiên, không luôn là cùng một người", () => {
+    const w = new Map([
+      ["a", 1],
+      ["b", 1],
+      ["c", 1],
+      ["d", 1],
+    ]);
+    const winners = new Set<string>();
+    for (let i = 0; i < 40; i++) {
+      const out = splitCoin(1, w); // chỉ một người nhận
+      expect(out.size).toBe(1);
+      winners.add([...out.keys()][0]!);
+    }
+    expect(winners.size).toBeGreaterThan(1);
+    // rng cố định thì kết quả xác định
+    const seq = [0.9, 0.1, 0.5, 0.3];
+    let i = 0;
+    expect([...splitCoin(1, w, () => seq[i++ % 4]!).keys()]).toEqual(["b"]);
+  });
+
+  it("bỏ qua trọng số không hợp lệ; khoản rơi không hợp lệ hoặc không ai đủ điều kiện thì rỗng", () => {
+    const w = new Map([
+      ["ok", 1],
+      ["zero", 0],
+      ["neg", -3],
+      ["nan", NaN],
+      ["inf", Infinity],
+    ]);
+    expect(splitCoin(10, w)).toEqual(new Map([["ok", 10]]));
+    for (const bad of [0, -5, 1.5, NaN, Infinity]) expect(splitCoin(bad, w).size).toBe(0);
+    expect(splitCoin(10, new Map()).size).toBe(0);
+    expect(splitCoin(10, new Map([["z", 0]])).size).toBe(0);
   });
 });
