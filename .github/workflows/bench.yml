@@ -1,0 +1,49 @@
+name: Bench hằng đêm
+
+on:
+  schedule:
+    # 21:00 UTC = 04:00 AM giờ Việt Nam
+    - cron: "0 21 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: bench-nightly
+  cancel-in-progress: false
+
+jobs:
+  bench:
+    name: Benchmark hiệu năng server
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout mã nguồn
+        uses: actions/checkout@v4
+
+      - name: Cài đặt Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Cài đặt dependencies
+        run: npm ci
+
+      - name: Chạy Benchmark săn quái (hunt, 20s)
+        run: npm run bench -w server -- --seconds 20 --json=bench-hunt.json
+
+      - name: Chạy Benchmark đám đông trong trấn (crowd, 20s)
+        run: npm run bench -w server -- --crowd --seconds 20 --json=bench-crowd.json
+
+      - name: So sánh với mốc chuẩn (baseline) và xuất báo cáo
+        run: npx tsx server/scripts/bench-compare.ts server/bench-hunt.json server/bench-crowd.json
+
+      - name: Lưu artifact kết quả benchmark
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-results-${{ github.sha }}
+          path: |
+            server/bench-hunt.json
+            server/bench-crowd.json
+          retention-days: 90
