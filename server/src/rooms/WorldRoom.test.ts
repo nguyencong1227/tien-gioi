@@ -494,6 +494,8 @@ describe("bảo mật", () => {
       "trade",
       "khong_co",
       "__proto__",
+      "constructor",
+      "toString",
     ];
     const junk = [
       null,
