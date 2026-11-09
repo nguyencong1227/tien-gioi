@@ -26,6 +26,14 @@ const MAX_SPAWN_PER_TOPUP = 3;
  */
 export const MONSTER_WAKE_DIST = 900;
 
+/**
+ * Quái KHÔNG có mục tiêu (lang thang, về nhà) chỉ áp bước di chuyển mỗi WANDER_STRIDE tick, với bước dài gấp bấy nhiêu lần:
+ * tốc độ trung bình y hệt, nhưng vị trí trong state chỉ đổi 1/WANDER_STRIDE số lần (#80). Quái chạy chậm (~1 px/tick) và client
+ * nội suy vị trí quái nên không nhìn ra; quái có mục tiêu (đang đuổi / đánh) vẫn di chuyển mỗi tick.
+ * Vị trí thật vẫn nằm trong state (không tách vị trí mô phỏng) nên các system khác đọc `m.x`, `m.y` như cũ.
+ */
+export const WANDER_STRIDE = 4;
+
 export function spawnMonster(w: World, def: MonsterKind) {
   for (let i = 0; i < 40; i++) {
     const x = rand(64, WORLD_W - 64),
@@ -52,6 +60,8 @@ export function spawnMonster(w: World, def: MonsterKind) {
       nextWander: 0,
       damageBy: new Map(),
       hpFrac: 0,
+      // Lệch pha theo số thứ tự để quái không cùng nhúc nhích một tick (không dùng random: giữ nguyên chuỗi của bench có seed)
+      strideLeft: w.monsterSeq % WANDER_STRIDE,
     });
     return;
   }
@@ -155,11 +165,23 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
     } else mc.hpFrac = 0;
   }
 
+  // Không có mục tiêu: chỉ áp bước di chuyển mỗi WANDER_STRIDE tick (bước dài gấp WANDER_STRIDE lần)
+  let stride = 1;
+  if (target) {
+    mc.strideLeft = 0;
+  } else if (mc.strideLeft > 0) {
+    mc.strideLeft--;
+    return;
+  } else {
+    mc.strideLeft = WANDER_STRIDE - 1;
+    stride = WANDER_STRIDE;
+  }
+
   const dx = tx - m.x,
     dy = ty - m.y,
     dist = Math.hypot(dx, dy);
   if (speed > 0 && dist > 4) {
-    const step = Math.min(dist, speed * dt);
+    const step = Math.min(dist, speed * dt * stride);
     const next = moveWithCollision(
       m.x,
       m.y,

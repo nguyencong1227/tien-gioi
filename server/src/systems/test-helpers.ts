@@ -92,6 +92,7 @@ export function addMonster(w: World, kind: string, x: number, y: number) {
     nextWander: 0,
     damageBy: new Map(),
     hpFrac: 0,
+    strideLeft: 0,
   });
   return { id, m, mc: w.mctrl.get(id)! };
 }
