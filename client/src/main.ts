@@ -70,3 +70,10 @@ function start(room: Room) {
       ui.toast({ text: "Mất kết nối với Tiên Giới. Tải lại trang để vào lại.", tone: "bad" });
   });
 }
+
+// Chỉ đăng ký Service Worker ở bản build production; không bật khi chạy npm run dev để tránh làm lệch cache Vite HMR.
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+  });
+}
