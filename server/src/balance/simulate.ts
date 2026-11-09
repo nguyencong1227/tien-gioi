@@ -20,6 +20,10 @@ import {
   partyExpShare,
   statsFor,
   type MonsterKind,
+  COIN_DROPS,
+  DROP_TABLES,
+  sellPrice,
+  buyPrice,
 } from "@tien-gioi/shared";
 
 /** Giả định về lối chơi. Đổi ở đây nếu thấy không giống người chơi thật. */
@@ -175,4 +179,70 @@ export function simulate(lastRealm = 2): Row[] {
 /** Phút cộng dồn khi xong bậc cuối của cảnh giới `realm` (sẵn sàng đột phá lên cảnh giới sau) */
 export function minutesToFinish(rows: Row[], realm: number): number {
   return rows.filter((r) => r.realm === realm).at(-1)!.total;
+}
+
+// ---------- Kinh tế Linh thạch (#102) ----------
+
+/** Kỳ vọng Linh thạch rơi trực tiếp từ 1 con quái (COIN_DROPS) */
+export function expectedCoinDrop(monsterKind: string): number {
+  const d = COIN_DROPS[monsterKind];
+  if (!d) return 0;
+  return d.chance * ((d.min + d.max) / 2);
+}
+
+/** Kỳ vọng Linh thạch từ việc bán đồ rơi của 1 con quái (DROP_TABLES × sellPrice) */
+export function expectedLootValue(monsterKind: string): number {
+  const drops = DROP_TABLES[monsterKind] ?? [];
+  let val = 0;
+  for (const e of drops) {
+    const qty = e.chance * ((e.min + e.max) / 2);
+    val += qty * sellPrice(e.itemId);
+  }
+  return val;
+}
+
+/** Tổng kỳ vọng Linh thạch từ 1 con quái (tiền rơi + bán đồ rơi) */
+export function expectedTotalCoin(monsterKind: string): number {
+  return expectedCoinDrop(monsterKind) + expectedLootValue(monsterKind);
+}
+
+export interface MonsterEconomy {
+  monsterId: string;
+  monsterName: string;
+  secPerKill: number;
+  killsPerHour: number;
+  coinDropPerHour: number;
+  lootSellPerHour: number;
+  totalCoinPerHour: number;
+  potionsPerHour: number;
+}
+
+/**
+ * Thu nhập Linh thạch mỗi giờ khi săn một loại quái ở bậc (realm, tier);
+ * null nếu quái quá nguy hiểm không an toàn để săn đơn lẻ.
+ */
+export function monsterEconomy(m: MonsterKind, realm: number, tier: number): MonsterEconomy | null {
+  const h = huntRate(m, realm, tier);
+  if (!h) return null;
+  const killsPerHour = 3600 / h.secPerKill;
+  const coinDropPerKill = expectedCoinDrop(m.id);
+  const lootSellPerKill = expectedLootValue(m.id);
+  const totalCoinPerKill = coinDropPerKill + lootSellPerKill;
+  const potionPrice = buyPrice("hoi_huyet_dan");
+
+  const coinDropPerHour = killsPerHour * coinDropPerKill;
+  const lootSellPerHour = killsPerHour * lootSellPerKill;
+  const totalCoinPerHour = killsPerHour * totalCoinPerKill;
+  const potionsPerHour = potionPrice > 0 ? totalCoinPerHour / potionPrice : 0;
+
+  return {
+    monsterId: m.id,
+    monsterName: m.name,
+    secPerKill: h.secPerKill,
+    killsPerHour,
+    coinDropPerHour,
+    lootSellPerHour,
+    totalCoinPerHour,
+    potionsPerHour,
+  };
 }

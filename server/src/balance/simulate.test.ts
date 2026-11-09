@@ -9,7 +9,17 @@ import {
   killExp,
   meditateExpPerSec,
 } from "@tien-gioi/shared";
-import { bestOption, huntRate, minutesToFinish, partyRatio, simulate } from "./simulate";
+import {
+  bestOption,
+  huntRate,
+  minutesToFinish,
+  partyRatio,
+  simulate,
+  expectedCoinDrop,
+  expectedLootValue,
+  expectedTotalCoin,
+  monsterEconomy,
+} from "./simulate";
 
 describe("đường cong tu luyện", () => {
   const rows = simulate();
@@ -92,5 +102,50 @@ describe("đi theo đội (mô hình, #74)", () => {
       return p.party !== p.solo;
     });
     expect(differ.length).toBeGreaterThan(0);
+  });
+});
+
+describe("kinh tế Linh thạch (mô hình, #102)", () => {
+  const rows = simulate();
+
+  it("mọi quái đều có kỳ vọng rơi tiền và đồ bán được > 0; quái mạnh hơn rơi nhiều hơn", () => {
+    for (const m of MONSTERS) {
+      expect(expectedCoinDrop(m.id), m.id).toBeGreaterThan(0);
+      expect(expectedLootValue(m.id), m.id).toBeGreaterThan(0);
+      expect(expectedTotalCoin(m.id), m.id).toBeGreaterThan(0);
+    }
+    const order = ["tho", "lang", "ho", "mang"];
+    for (let i = 1; i < order.length; i++) {
+      expect(expectedTotalCoin(order[i]!), `${order[i]} vs ${order[i - 1]}`).toBeGreaterThan(
+        expectedTotalCoin(order[i - 1]!),
+      );
+    }
+  });
+
+  it("thu nhập Linh thạch mỗi giờ tăng khi người chơi mạnh lên (giết quái nhanh hơn, ít tốn máu hồi phục hơn)", () => {
+    const thoPham = monsterEconomy(MONSTER_BY_ID.tho, 0, 0)!;
+    const thoLuyenKhi = monsterEconomy(MONSTER_BY_ID.tho, 1, 0)!;
+    const thoTrucCo = monsterEconomy(MONSTER_BY_ID.tho, 2, 0)!;
+    expect(thoLuyenKhi.totalCoinPerHour).toBeGreaterThan(thoPham.totalCoinPerHour);
+    expect(thoTrucCo.totalCoinPerHour).toBeGreaterThan(thoLuyenKhi.totalCoinPerHour);
+  });
+
+  it("hai bãi quái cùng cấp 1 (Thỏ và Sói) không lệch quá 2× thu nhập ở mọi bậc an toàn", () => {
+    for (const r of rows) {
+      const ecoTho = monsterEconomy(MONSTER_BY_ID.tho, r.realm, r.tier);
+      const ecoLang = monsterEconomy(MONSTER_BY_ID.lang, r.realm, r.tier);
+      if (!ecoTho || !ecoLang) continue;
+      const ratio = ecoLang.totalCoinPerHour / ecoTho.totalCoinPerHour;
+      expect(ratio, `${r.label}: lang/tho`).toBeGreaterThan(1);
+      expect(ratio, `${r.label}: lang/tho`).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it("đổi nguyên liệu lấy đan rẻ hơn mua đan bằng tiền (tính theo số quái cần diệt để có 1 đan)", () => {
+    // 5 lông thỏ đổi 1 đan; lông rơi 50% số lượng 1..2 (kỳ vọng 0.75 lông/con) -> ~6.67 thỏ
+    const killsToTrade = 5 / (0.5 * 1.5);
+    // Mua đan: 24 LT; thỏ cho expectedTotalCoin("tho") LT/con -> kills = 24 / total
+    const killsToBuy = 24 / expectedTotalCoin("tho");
+    expect(killsToTrade).toBeLessThan(killsToBuy);
   });
 });
