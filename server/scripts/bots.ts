@@ -532,8 +532,8 @@ async function runLoadTest(
     // Khởi tạo vị trí (campX, campY) rải đều khắp vùng hoang dã giống bench.ts trước khi joinOrCreate
     const realm = rnd() < 0.8 ? 1 : 2;
     const tier = Math.floor(rnd() * REALMS[realm].tiers.length);
-    let campX = TOWN_PX.x;
-    let campY = TOWN_PX.y;
+    let campX: number;
+    let campY: number;
     for (;;) {
       const a = rnd() * Math.PI * 2;
       const r = TOWN_PX.r + 80 + rnd() * (WORLD_W * 0.45 - TOWN_PX.r);
