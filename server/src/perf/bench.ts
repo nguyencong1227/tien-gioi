@@ -57,6 +57,8 @@ export interface BenchResult {
    */
   eventKbBroadcast: number;
   eventKbNear: number;
+  /** Tin nhắn tổ đội (độ dài JSON + 4 byte khung): KB/giây mỗi client nhận (đội 4 người, snapshot mỗi giây) */
+  partyKbPerClient: number;
 }
 
 /**
@@ -81,6 +83,7 @@ export function runBench(
     // Đếm tin nhắn có vị trí: byte nếu broadcast cho cả phòng, và byte thật sự gửi khi cắt theo vùng nhìn
     let evBroadcast = 0;
     let evNear = 0;
+    let partyBytes = 0;
     const emit = (type: string, x: number, y: number, extra: number, msg: object) => {
       const size = JSON.stringify(msg).length + type.length + 4;
       evBroadcast += size * players;
@@ -95,7 +98,9 @@ export function runBench(
       inv: () => {},
       quests: () => {},
       dialog: () => {},
-      party: () => {},
+      party: (_sid, msg) => {
+        partyBytes += JSON.stringify(msg).length + 5 + 4; // "party".length = 5
+      },
       partyInvited: () => {},
       chatTo: () => {},
     });
@@ -139,6 +144,20 @@ export function runBench(
       bots.push({ sid, seq: 0, target: null, walking: false, angle: 0, until: 0 });
     }
     for (const b of bots) syncPublicPos(w.state.players.get(b.sid)!); // như WorldRoom.onJoin
+    // Tổ đội: bot trong bench chia thành các đội 4 người (#76)
+    for (let i = 0; i < players; i += 4) {
+      const leader = `bot${i}`;
+      const members: string[] = [];
+      for (let j = 1; j < 4 && i + j < players; j++) {
+        members.push(`bot${i + j}`);
+      }
+      if (members.length > 0) {
+        const party = w.parties._create(leader, members[0]);
+        for (let k = 1; k < members.length; k++) {
+          w.parties._join(party, members[k]);
+        }
+      }
+    }
     // Vùng nhìn: đăng ký sau khi đã đặt vị trí, như WorldRoom.onJoin
     const views: StateView[] = [];
     for (const b of bots) {
@@ -243,6 +262,7 @@ export function runBench(
       kbPerSecPerClient: (patchBytes * (1000 / TICK_MS)) / 1024,
       eventKbBroadcast: players > 0 ? evBroadcast / players / seconds / 1024 : 0,
       eventKbNear: players > 0 ? evNear / players / seconds / 1024 : 0,
+      partyKbPerClient: players > 0 ? partyBytes / players / seconds / 1024 : 0,
     };
   } finally {
     Math.random = realRandom;
@@ -257,13 +277,13 @@ if (process.argv[1]?.endsWith("bench.ts")) {
     `Mô phỏng ${seconds} giây chơi (${seconds * 20} tick), đo tick + mã hóa patch, ca ${mode === "crowd" ? "đông người tụ trong trấn" : "săn quái ngoài hoang dã"}\n`,
   );
   console.log(
-    "| Người chơi | Quái | Tick TB (ms) | p95 (ms) | Max (ms) | Patch TB (byte) | KB/s mỗi client | fx+dmg cả phòng (KB/s) | fx+dmg vùng nhìn (KB/s) |",
+    "| Người chơi | Quái | Tick TB (ms) | p95 (ms) | Max (ms) | Patch TB (byte) | KB/s mỗi client | fx+dmg cả phòng (KB/s) | fx+dmg vùng nhìn (KB/s) | Party (KB/s) |",
   );
-  console.log("|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
+  console.log("|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
   for (const n of counts) {
     const r = runBench(n, seconds, 1, mode);
     console.log(
-      `| ${n} | ${r.monsters} | ${r.avgMs.toFixed(3)} | ${r.p95Ms.toFixed(3)} | ${r.maxMs.toFixed(2)} | ${Math.round(r.patchBytes)} | ${r.kbPerSecPerClient.toFixed(1)} | ${r.eventKbBroadcast.toFixed(1)} | ${r.eventKbNear.toFixed(1)} |`,
+      `| ${n} | ${r.monsters} | ${r.avgMs.toFixed(3)} | ${r.p95Ms.toFixed(3)} | ${r.maxMs.toFixed(2)} | ${Math.round(r.patchBytes)} | ${r.kbPerSecPerClient.toFixed(1)} | ${r.eventKbBroadcast.toFixed(1)} | ${r.eventKbNear.toFixed(1)} | ${r.partyKbPerClient.toFixed(2)} |`,
     );
   }
 }

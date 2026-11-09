@@ -29,6 +29,8 @@ import {
   type AttackMsg,
   type InputMsg,
   type JoinOptions,
+  type PartyInvitedMsg,
+  type PartyMsg,
   type PickupMsg,
   type SkillMsg,
 } from "@tien-gioi/shared";
@@ -53,6 +55,7 @@ interface CliArgs {
   url: string;
   port: number;
   mode: BotMode;
+  partySize: number;
   bothModes: boolean;
   cleanOnly: boolean;
   yes: boolean;
@@ -71,6 +74,7 @@ function parseArgs(argv: string[]): CliArgs {
   let durationSec = 15;
   let url = "";
   let mode: BotMode = "realistic";
+  let partySize = 0;
   let bothModes = false;
   let cleanOnly = false;
   let yes = false;
@@ -87,7 +91,10 @@ function parseArgs(argv: string[]): CliArgs {
     if (arg.startsWith("--bots=")) bots = Math.max(0, Number(arg.slice(7)));
     else if (arg.startsWith("--duration=")) durationSec = Math.max(2, Number(arg.slice(11)));
     else if (arg.startsWith("--url=")) url = arg.slice(6);
-    else if (arg.startsWith("--mode=")) {
+    else if (arg.startsWith("--party")) {
+      const val = arg.slice(7).replace(/^=/, "");
+      partySize = val ? Math.max(2, Math.min(4, Number(val))) : 4;
+    } else if (arg.startsWith("--mode=")) {
       const m = arg.slice(7);
       if (m === "both") bothModes = true;
       else if (m === "worst") mode = "worst";
@@ -115,6 +122,7 @@ function parseArgs(argv: string[]): CliArgs {
     url,
     port,
     mode,
+    partySize,
     bothModes,
     cleanOnly,
     yes,
@@ -340,6 +348,9 @@ interface BotState {
   txMsgs: number;
   fxCount: number;
   dmgCount: number;
+  partyMsgsCount: number;
+  partyBytes: number;
+  myParty: PartyMsg | null;
   kicked4429: boolean;
   closedCode: number | null;
 }
@@ -348,6 +359,7 @@ export interface LoadTestMetrics {
   commit: string;
   note: string;
   mode?: BotMode;
+  partySize?: number;
   botCount: number;
   connectedBots: number;
   durationSec: number;
@@ -370,8 +382,10 @@ export interface LoadTestMetrics {
   ackRttP95Ms: number;
   rxKBpsPerBot: number;
   rxPatchKBpsPerBot: number;
-  /** Băng thông nhận các gói tin nhắn sự kiện (fx, dmg) mỗi giây trên mỗi bot (KB/s) */
+  /** Băng thông nhận các gói tin nhắn sự kiện (fx, dmg, party) mỗi giây trên mỗi bot (KB/s) */
   rxEventKBpsPerBot?: number;
+  /** Băng thông riêng của tin nhắn tổ đội (party) mỗi giây trên mỗi bot (KB/s) */
+  rxPartyKBpsPerBot?: number;
   txKBpsPerBot: number;
   rxMsgsPerSecPerBot: number;
   txMsgsPerSecPerBot: number;
@@ -394,6 +408,7 @@ export interface LoadTestMetrics {
   inputsSent: number;
   fxEventsReceivedPerBot?: number;
   dmgEventsReceivedPerBot: number;
+  partyEventsReceivedPerBot?: number;
 }
 
 export interface IdleZeroBotMetrics {
@@ -504,13 +519,15 @@ async function runLoadTest(
   commit: string,
   note: string,
   mode: BotMode,
+  partySize = 0,
 ): Promise<LoadTestMetrics> {
+  const partySuffix = partySize > 1 ? `, tổ đội ${partySize} người` : "";
   const modeLabel =
     mode === "realistic"
-      ? "Thực tế (vào tầm đứng chém)"
+      ? `Thực tế (vào tầm đứng chém${partySuffix})`
       : mode === "crowd"
         ? "Đông người trong trấn (30% đứng yên, 70% đi lại)"
-        : "Xấu nhất (100% di chuyển 20 input/s)";
+        : `Xấu nhất (100% di chuyển 20 input/s${partySuffix})`;
   console.log(
     `\n=== Bắt đầu thử tải [${modeLabel}]: ${botCount} bot, đo trong ${durationSec}s (${url}) ===`,
   );
@@ -602,6 +619,9 @@ async function runLoadTest(
       txMsgs: 0,
       fxCount: 0,
       dmgCount: 0,
+      partyMsgsCount: 0,
+      partyBytes: 0,
+      myParty: null,
       kicked4429: false,
       closedCode: null,
     };
@@ -611,6 +631,16 @@ async function runLoadTest(
     });
     room.onMessage("dmg", () => {
       if (measuring) b.dmgCount++;
+    });
+    room.onMessage("partyInvited", (msg: PartyInvitedMsg) => {
+      room.send("partyAccept", { from: msg.from });
+    });
+    room.onMessage("party", (msg: PartyMsg) => {
+      if (measuring) {
+        b.partyMsgsCount++;
+        b.partyBytes += Buffer.byteLength(JSON.stringify(msg)) + 9;
+      }
+      b.myParty = msg;
     });
     room.onMessage("chat", () => {});
     room.onMessage("toast", () => {});
@@ -686,6 +716,27 @@ async function runLoadTest(
     await sleep(20);
   }
 
+  if (partySize > 1 && bots.length >= 2) {
+    console.log(
+      `\n--- Khởi tạo tổ đội (nhóm ${partySize} người, chờ cooldown 3s giữa các lời mời) ---`,
+    );
+    for (let memberOffset = 1; memberOffset < partySize; memberOffset++) {
+      for (let i = 0; i < bots.length; i += partySize) {
+        const leader = bots[i];
+        const target = bots[i + memberOffset];
+        if (leader && target && !leader.closedCode && !target.closedCode) {
+          leader.room.send("partyInvite", { name: target.name });
+        }
+      }
+      if (memberOffset < partySize - 1) {
+        await sleep(3200);
+      } else {
+        await sleep(400);
+      }
+    }
+    console.log(`--- Đã hoàn tất lập đội cho ${bots.length} bot ---`);
+  }
+
   console.log(`Đã kết nối ${bots.length}/${botCount} bot. Chờ ổn định 2 giây để ra bãi quái...`);
 
   const stepBot = (b: BotState, now: number) => {
@@ -727,6 +778,54 @@ async function runLoadTest(
     } else if (inTown(b.predX, b.predY)) {
       dx = Math.cos(b.wanderAngle);
       dy = Math.sin(b.wanderAngle);
+    } else if (partySize > 1 && b.myParty && b.myParty.leader && b.myParty.leader !== b.name) {
+      // Thành viên trong tổ đội: bám theo đội trưởng trong tầm 300 px (#76)
+      const leaderMember = b.myParty.members.find((m) => m.name === b.myParty!.leader);
+      if (leaderMember) {
+        const distToLeader = Math.hypot(leaderMember.x - b.predX, leaderMember.y - b.predY);
+        if (distToLeader > 250) {
+          const a = Math.atan2(leaderMember.y - b.predY, leaderMember.x - b.predX);
+          dx = Math.cos(a);
+          dy = Math.sin(a);
+        } else {
+          // Trong tầm đội trưởng (< 250 px): cùng đánh quái gần nhất quanh đội trưởng
+          let targetMon: any = null;
+          let bestDist = Number.POSITIVE_INFINITY;
+          if (state?.monsters && typeof state.monsters.forEach === "function") {
+            state.monsters.forEach((m: any) => {
+              if (!m || m.hp <= 0) return;
+              const d = Math.hypot(m.x - b.predX, m.y - b.predY);
+              if (d > 300) return;
+              if (d < bestDist) {
+                bestDist = d;
+                targetMon = m;
+              }
+            });
+          }
+          if (targetMon) {
+            const dist = Math.hypot(targetMon.x - b.predX, targetMon.y - b.predY);
+            const angle = Math.atan2(targetMon.y - b.predY, targetMon.x - b.predX);
+            if (dist > SKILLS.slash.range) {
+              dx = Math.cos(angle);
+              dy = Math.sin(angle);
+            } else {
+              dx = 0;
+              dy = 0;
+            }
+            if (dist <= SKILLS.slash.range && now >= b.nextSlashAt) {
+              b.room.send("attack", { angle });
+              b.nextSlashAt = now + SKILLS.slash.cooldown + 60;
+              if (measuring) attacksSent++;
+            }
+          } else {
+            dx = 0;
+            dy = 0;
+          }
+        }
+      } else {
+        dx = 0;
+        dy = 0;
+      }
     } else {
       let targetMon: any = null;
       let bestScore = Number.POSITIVE_INFINITY;
@@ -981,6 +1080,8 @@ async function runLoadTest(
   const totalTxMsgs = bots.reduce((s, b) => s + b.txMsgs, 0);
   const totalFxEvents = bots.reduce((s, b) => s + b.fxCount, 0);
   const totalDmgEvents = bots.reduce((s, b) => s + b.dmgCount, 0);
+  const totalPartyMsgs = bots.reduce((s, b) => s + b.partyMsgsCount, 0);
+  const totalPartyBytes = bots.reduce((s, b) => s + b.partyBytes, 0);
 
   const expectedTicks = actualDurationSec * (1000 / TICK_MS);
   const serverCpuMsPerTickAvg =
@@ -1060,6 +1161,9 @@ async function runLoadTest(
     inputsSent,
     fxEventsReceivedPerBot: Number((totalFxEvents / botCount / actualDurationSec).toFixed(1)),
     dmgEventsReceivedPerBot: Number((totalDmgEvents / botCount / actualDurationSec).toFixed(1)),
+    partySize: partySize > 1 ? partySize : undefined,
+    partyEventsReceivedPerBot: Number((totalPartyMsgs / botCount / actualDurationSec).toFixed(1)),
+    rxPartyKBpsPerBot: Number((totalPartyBytes / botCount / actualDurationSec / 1024).toFixed(2)),
   };
 
   printMetrics(metrics);
@@ -1116,6 +1220,11 @@ function printMetrics(m: LoadTestMetrics) {
   console.log(
     `- Hoạt động chiến đấu: ${m.inputsSent} bước đi, ${m.attacksSent} đòn chém, ${m.skillsSent} kiếm khí (~${m.fxEventsReceivedPerBot ?? "–"} fx/s, ~${m.dmgEventsReceivedPerBot} dmg/s mỗi client)`,
   );
+  if (m.partySize && m.partySize > 1) {
+    console.log(
+      `- Hoạt động tổ đội (${Math.ceil(m.botCount / m.partySize)} đội ${m.partySize} người): nhận ~${m.partyEventsReceivedPerBot ?? 0} tin party/s mỗi bot (~${m.rxPartyKBpsPerBot ?? 0} KB/s)`,
+    );
+  }
 }
 
 function renderTableRows(
@@ -1364,6 +1473,7 @@ async function main() {
           commit,
           args.note,
           m,
+          args.partySize,
         ),
       );
     }
