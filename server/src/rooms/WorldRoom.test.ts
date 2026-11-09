@@ -670,4 +670,26 @@ describe("vùng nhìn (StateView)", () => {
     expect(players(b.room).get(a.room.sessionId).lastSeq).toBeUndefined(); // trường không hề đến client b
     expect(players(b.room).get(a.room.sessionId).x).toBeGreaterThan(0); // vẫn thấy vị trí
   });
+
+  it("fx chỉ gửi cho người ở gần: người ở xa không nhận, người đứng cạnh và chính mình thì có", async () => {
+    const a = await join();
+    const near = await join();
+    const far = await join();
+    teleport(far.room, FAR.x, FAR.y);
+    const got = (room: Room) => {
+      const kinds: { kind: string; by: string }[] = [];
+      room.onMessage("fx", (m: { kind: string; by: string }) => kinds.push(m));
+      return kinds;
+    };
+    const aGot = got(a.room);
+    const nearGot = got(near.room);
+    const farGot = got(far.room);
+    // chờ server xử lý vị trí mới của "far" (đã ra ngoài vùng nhìn) rồi mới chém
+    await waitFor(() => !players(near.room).has(far.room.sessionId));
+    a.room.send("attack", { angle: 0 });
+    await waitFor(() => nearGot.some((m) => m.kind === "slash" && m.by === a.room.sessionId));
+    expect(aGot.some((m) => m.kind === "slash")).toBe(true); // chính mình vẫn nhận
+    await sleep(200);
+    expect(farGot).toEqual([]); // người ở xa không nhận gì
+  });
 });

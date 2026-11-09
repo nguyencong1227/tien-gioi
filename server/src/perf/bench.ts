@@ -22,6 +22,7 @@ import { addPlayer } from "../systems/test-helpers";
 import { slash } from "../systems/combat";
 import { spawnInitial, topUpMonsters } from "../systems/monsters";
 import { tickWorld } from "../systems/tick";
+import { VIEW_ENTER } from "../systems/interest";
 
 function arg(name: string, def: number): number {
   const i = process.argv.indexOf(`--${name}`);
@@ -49,15 +50,29 @@ export interface BenchResult {
   patchBytes: number;
   /** KB/giây mỗi client nhận (patch × 20 tick) */
   kbPerSecPerClient: number;
+  /**
+   * Tin nhắn fx / dmg (ước lượng bằng độ dài JSON + 4 byte khung): KB/giây mỗi client nếu gửi cho cả phòng
+   * (cách cũ, broadcast) và nếu chỉ gửi cho người ở trong vùng nhìn (cách của server hiện tại).
+   */
+  eventKbBroadcast: number;
+  eventKbNear: number;
 }
 
 export function runBench(players: number, seconds: number, seed = 1): BenchResult {
   const realRandom = Math.random;
   Math.random = seeded(seed);
   try {
+    // Đếm tin nhắn có vị trí: byte nếu broadcast cho cả phòng, và byte thật sự gửi khi cắt theo vùng nhìn
+    let evBroadcast = 0;
+    let evNear = 0;
+    const emit = (type: string, x: number, y: number, extra: number, msg: object) => {
+      const size = JSON.stringify(msg).length + type.length + 4;
+      evBroadcast += size * players;
+      w.interest.forEachNear(w, x, y, VIEW_ENTER + extra, () => (evNear += size));
+    };
     const w = new World(new WorldState(), {
-      fx: () => {},
-      dmg: () => {},
+      fx: (m) => emit("fx", m.x, m.y, "range" in m ? m.range : 0, m),
+      dmg: (m) => emit("dmg", m.x, m.y, 0, m),
       sys: () => {},
       chat: () => {},
       toast: () => {},
@@ -175,6 +190,8 @@ export function runBench(players: number, seconds: number, seed = 1): BenchResul
       maxMs: times.at(-1)!,
       patchBytes,
       kbPerSecPerClient: (patchBytes * (1000 / TICK_MS)) / 1024,
+      eventKbBroadcast: players > 0 ? evBroadcast / players / seconds / 1024 : 0,
+      eventKbNear: players > 0 ? evNear / players / seconds / 1024 : 0,
     };
   } finally {
     Math.random = realRandom;
@@ -186,13 +203,13 @@ if (process.argv[1]?.endsWith("bench.ts")) {
   const counts = process.argv.includes("--players") ? [arg("players", 100)] : [0, 10, 50, 100];
   console.log(`Mô phỏng ${seconds} giây chơi (${seconds * 20} tick), đo tick + mã hóa patch\n`);
   console.log(
-    "| Người chơi | Quái | Tick TB (ms) | p95 (ms) | Max (ms) | Patch TB (byte) | KB/s mỗi client |",
+    "| Người chơi | Quái | Tick TB (ms) | p95 (ms) | Max (ms) | Patch TB (byte) | KB/s mỗi client | fx+dmg cả phòng (KB/s) | fx+dmg vùng nhìn (KB/s) |",
   );
-  console.log("|---:|---:|---:|---:|---:|---:|---:|");
+  console.log("|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
   for (const n of counts) {
     const r = runBench(n, seconds);
     console.log(
-      `| ${n} | ${r.monsters} | ${r.avgMs.toFixed(3)} | ${r.p95Ms.toFixed(3)} | ${r.maxMs.toFixed(2)} | ${Math.round(r.patchBytes)} | ${r.kbPerSecPerClient.toFixed(1)} |`,
+      `| ${n} | ${r.monsters} | ${r.avgMs.toFixed(3)} | ${r.p95Ms.toFixed(3)} | ${r.maxMs.toFixed(2)} | ${Math.round(r.patchBytes)} | ${r.kbPerSecPerClient.toFixed(1)} | ${r.eventKbBroadcast.toFixed(1)} | ${r.eventKbNear.toFixed(1)} |`,
     );
   }
 }
