@@ -949,6 +949,16 @@ function renderDialogOptions() {
   }
 }
 
+// Cache trạng thái HUD DOM để tránh reflow / recalculate style không cần thiết mỗi frame (#71)
+let cachedHudName = "";
+let cachedHudRealm = "";
+let cachedHudOnline = -1;
+let cachedMeditating: boolean | null = null;
+let cachedCanBreak: boolean | null = null;
+const cachedBarPct: Record<string, number> = {};
+const cachedBarText: Record<string, string> = {};
+const cachedCooldownFrac: Record<string, number> = {};
+
 export const ui = {
   show() {
     $("ui").hidden = false;
@@ -1141,6 +1151,32 @@ export const ui = {
 
     renderInventory();
     renderQuestTracker();
+
+    // Bảng đo hiệu năng chỉ hiện khi mở bằng ?perf=1 (#71)
+    if (
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("perf") === "1"
+    ) {
+      $("perf-panel").hidden = false;
+    }
+  },
+
+  updatePerf(stats: {
+    fps: number;
+    frameAvgMs: number;
+    frameP95Ms: number;
+    players: number;
+    monsters: number;
+    loots: number;
+    tweens: number;
+  }) {
+    const panel = $("perf-panel");
+    if (panel.hidden) return;
+    $("perf-fps").textContent = `${Math.round(stats.fps)}`;
+    $("perf-frame").textContent =
+      `${stats.frameAvgMs.toFixed(1)} / ${stats.frameP95Ms.toFixed(1)} ms`;
+    $("perf-entities").textContent = `${stats.players} / ${stats.monsters} / ${stats.loots}`;
+    $("perf-tweens").textContent = `${stats.tweens}`;
   },
 
   updateMuteIcon(muted: boolean) {
@@ -1383,8 +1419,12 @@ export const ui = {
       const def = ITEM_BY_ID[itemId];
       const until = itemCdUntil.get(itemId) ?? 0;
       const frac = def?.cooldown && until > now ? (until - now) / def.cooldown : 0;
-      (btn.querySelector(".cd") as HTMLElement).style.transform =
-        `scaleY(${Math.max(0, Math.min(1, frac))})`;
+      const rounded = Math.round(Math.max(0, Math.min(1, frac)) * 100) / 100;
+      const cdKey = `quick-${idx}`;
+      if (cachedCooldownFrac[cdKey] !== rounded) {
+        cachedCooldownFrac[cdKey] = rounded;
+        (btn.querySelector(".cd") as HTMLElement).style.transform = `scaleY(${rounded})`;
+      }
     }
     if (invOpen) {
       for (let i = 0; i < INVENTORY_SLOTS; i++) {
@@ -1392,7 +1432,12 @@ export const ui = {
         const def = s ? ITEM_BY_ID[s.itemId] : undefined;
         const until = s ? (itemCdUntil.get(s.itemId) ?? 0) : 0;
         const frac = def?.cooldown && until > now ? (until - now) / def.cooldown : 0;
-        slotCdEls[i].style.transform = `scaleY(${Math.max(0, Math.min(1, frac))})`;
+        const rounded = Math.round(Math.max(0, Math.min(1, frac)) * 100) / 100;
+        const cdKey = `slot-${i}`;
+        if (cachedCooldownFrac[cdKey] !== rounded) {
+          cachedCooldownFrac[cdKey] = rounded;
+          slotCdEls[i].style.transform = `scaleY(${rounded})`;
+        }
       }
     }
   },
@@ -1419,24 +1464,51 @@ export const ui = {
       if (forgeModalOpen) renderForgeModal();
     }
 
-    $("hud-name").textContent = p.name;
-    $("hud-realm").textContent = realmLabel(p.realm, p.tier);
+    if (p.name !== cachedHudName) {
+      cachedHudName = p.name;
+      $("hud-name").textContent = p.name;
+    }
+    const rLabel = realmLabel(p.realm, p.tier);
+    if (rLabel !== cachedHudRealm) {
+      cachedHudRealm = rLabel;
+      $("hud-realm").textContent = rLabel;
+    }
     const set = (k: string, v: number, max: number, label: string) => {
-      $(`${k}-fill`).style.width = `${Math.max(0, Math.min(1, v / max)) * 100}%`;
-      $(`${k}-text`).textContent = `${label} ${fmt(v)} / ${fmt(max)}`;
+      const pct = Math.round(Math.max(0, Math.min(1, max > 0 ? v / max : 0)) * 1000) / 10;
+      if (pct !== cachedBarPct[k]) {
+        cachedBarPct[k] = pct;
+        $(`${k}-fill`).style.width = `${pct}%`;
+      }
+      const text = `${label} ${fmt(v)} / ${fmt(max)}`;
+      if (text !== cachedBarText[k]) {
+        cachedBarText[k] = text;
+        $(`${k}-text`).textContent = text;
+      }
     };
     set("hp", p.hp, p.maxHp, "Khí huyết");
     set("mp", p.mp, p.maxMp, "Linh lực");
     set("exp", p.exp, p.expMax, "Tu vi");
-    $("hud-online").textContent = `Đạo hữu: ${online}`;
-    $("sk-med").classList.toggle("on", p.meditating);
+    if (online !== cachedHudOnline) {
+      cachedHudOnline = online;
+      $("hud-online").textContent = `Đạo hữu: ${online}`;
+    }
+    if (p.meditating !== cachedMeditating) {
+      cachedMeditating = p.meditating;
+      $("sk-med").classList.toggle("on", p.meditating);
+    }
     const canBreak = isLastTier(p.realm, p.tier) && p.exp >= p.expMax && !isPeak(p.realm, p.tier);
-    $("sk-break").classList.toggle("ready", canBreak);
+    if (canBreak !== cachedCanBreak) {
+      cachedCanBreak = canBreak;
+      $("sk-break").classList.toggle("ready", canBreak);
+    }
   },
 
   cooldown(id: "sk-slash" | "sk-sword", frac: number) {
-    ($(id).querySelector(".cd") as HTMLElement).style.transform =
-      `scaleY(${Math.max(0, Math.min(1, frac))})`;
+    const clamped = Math.max(0, Math.min(1, frac));
+    const rounded = Math.round(clamped * 100) / 100;
+    if (cachedCooldownFrac[id] === rounded) return;
+    cachedCooldownFrac[id] = rounded;
+    ($(id).querySelector(".cd") as HTMLElement).style.transform = `scaleY(${rounded})`;
   },
 
   chat(m: ChatOut) {
