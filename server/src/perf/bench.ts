@@ -3,6 +3,7 @@
 // (mã hóa riêng theo StateView của từng client, như SchemaSerializer.applyPatches, xem #62).
 // Chạy: npm run bench -w server [-- --players 100 --seconds 60] [--crowd: tụ trong trấn, ca xấu nhất của vùng nhìn]
 // Dùng để so trước / sau khi tối ưu; kết quả in ra bảng, không ghi file.
+import { writeFileSync } from "node:fs";
 import { performance } from "node:perf_hooks";
 import { Encoder, StateView } from "@colyseus/schema";
 import {
@@ -269,6 +270,14 @@ export function runBench(
   }
 }
 
+export interface BenchOutput {
+  mode: BenchMode;
+  seconds: number;
+  seed: number;
+  timestamp: string;
+  results: BenchResult[];
+}
+
 if (process.argv[1]?.endsWith("bench.ts")) {
   const seconds = arg("seconds", 60);
   const mode: BenchMode = process.argv.includes("--crowd") ? "crowd" : "hunt";
@@ -280,10 +289,30 @@ if (process.argv[1]?.endsWith("bench.ts")) {
     "| Người chơi | Quái | Tick TB (ms) | p95 (ms) | Max (ms) | Patch TB (byte) | KB/s mỗi client | fx+dmg cả phòng (KB/s) | fx+dmg vùng nhìn (KB/s) | Party (KB/s) |",
   );
   console.log("|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
+  const results: BenchResult[] = [];
   for (const n of counts) {
     const r = runBench(n, seconds, 1, mode);
+    results.push(r);
     console.log(
       `| ${n} | ${r.monsters} | ${r.avgMs.toFixed(3)} | ${r.p95Ms.toFixed(3)} | ${r.maxMs.toFixed(2)} | ${Math.round(r.patchBytes)} | ${r.kbPerSecPerClient.toFixed(1)} | ${r.eventKbBroadcast.toFixed(1)} | ${r.eventKbNear.toFixed(1)} | ${r.partyKbPerClient.toFixed(2)} |`,
     );
+  }
+
+  const jsonArg = process.argv.find((a) => a === "--json" || a.startsWith("--json="));
+  if (jsonArg) {
+    const jsonPath = jsonArg.startsWith("--json=") ? jsonArg.slice(7) : "";
+    const data: BenchOutput = {
+      mode,
+      seconds,
+      seed: 1,
+      timestamp: new Date().toISOString(),
+      results,
+    };
+    if (jsonPath) {
+      writeFileSync(jsonPath, JSON.stringify(data, null, 2), "utf8");
+      console.log(`\nĐã ghi kết quả JSON vào ${jsonPath}`);
+    } else {
+      console.log("\n" + JSON.stringify(data, null, 2));
+    }
   }
 }

@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "description": "M\u1ed1c chu\u1ea9n benchmark hi\u1ec7u n\u0103ng cho CI h\u1eb1ng \u0111\u00eam (20s, seed 1, commit 096fa8a)",
+  "seconds": 20,
+  "seed": 1,
+  "hunt": {
+    "mode": "hunt",
+    "seconds": 20,
+    "seed": 1,
+    "timestamp": "2026-11-09T21:21:00.796Z",
+    "results": [
+      {
+        "players": 0,
+        "monsters": 88,
+        "ticks": 400,
+        "avgMs": 0.012638475000000362,
+        "p95Ms": 0.019370000000009213,
+        "maxMs": 0.3772680000000008,
+        "patchBytes": 0,
+        "kbPerSecPerClient": 0,
+        "eventKbBroadcast": 0,
+        "eventKbNear": 0,
+        "partyKbPerClient": 0
+      },
+      {
+        "players": 10,
+        "monsters": 59,
+        "ticks": 400,
+        "avgMs": 0.15396318999999942,
+        "p95Ms": 0.33112800000000675,
+        "maxMs": 0.9943800000000067,
+        "patchBytes": 78.50000000000003,
+        "kbPerSecPerClient": 1.5332031250000004,
+        "eventKbBroadcast": 2.429736328125,
+        "eventKbNear": 0.9756103515625,
+        "partyKbPerClient": 0.2947265625
+      },
+      {
+        "players": 50,
+        "monsters": 28,
+        "ticks": 400,
+        "avgMs": 0.4112810374999997,
+        "p95Ms": 0.8806350000000123,
+        "maxMs": 1.4000680000000045,
+        "patchBytes": 115.93759999999992,
+        "kbPerSecPerClient": 2.2644062499999986,
+        "eventKbBroadcast": 5.32646484375,
+        "eventKbNear": 1.6919638671875,
+        "partyKbPerClient": 0.321349609375
+      },
+      {
+        "players": 100,
+        "monsters": 20,
+        "ticks": 400,
+        "avgMs": 1.1115019750000028,
+        "p95Ms": 2.068610999999919,
+        "maxMs": 3.2577140000000213,
+        "patchBytes": 213.39239999999995,
+        "kbPerSecPerClient": 4.167820312499999,
+        "eventKbBroadcast": 7.63828125,
+        "eventKbNear": 2.3611005859375,
+        "partyKbPerClient": 0.328150390625
+      }
+    ]
+  },
+  "crowd": {
+    "mode": "crowd",
+    "seconds": 20,
+    "seed": 1,
+    "timestamp": "2026-11-09T21:21:02.076Z",
+    "results": [
+      {
+        "players": 0,
+        "monsters": 88,
+        "ticks": 400,
+        "avgMs": 0.01598583250000047,
+        "p95Ms": 0.024567999999987933,
+        "maxMs": 0.5902389999999968,
+        "patchBytes": 0,
+        "kbPerSecPerClient": 0,
+        "eventKbBroadcast": 0,
+        "eventKbNear": 0,
+        "partyKbPerClient": 0
+      },
+      {
+        "players": 10,
+        "monsters": 88,
+        "ticks": 400,
+        "avgMs": 0.15683575749999953,
+        "p95Ms": 0.37679800000000796,
+        "maxMs": 0.9407119999999907,
+        "patchBytes": 141.1482500000001,
+        "kbPerSecPerClient": 2.756801757812502,
+        "eventKbBroadcast": 0,
+        "eventKbNear": 0,
+        "partyKbPerClient": 0.297265625
+      },
+      {
+        "players": 50,
+        "monsters": 88,
+        "ticks": 400,
+        "avgMs": 0.6358935900000016,
+        "p95Ms": 0.9252549999999928,
+        "maxMs": 1.8046389999999803,
+        "patchBytes": 285.01970000000006,
+        "kbPerSecPerClient": 5.566791015625001,
+        "eventKbBroadcast": 0,
+        "eventKbNear": 0,
+        "partyKbPerClient": 0.3241796875
+      },
+      {
+        "players": 100,
+        "monsters": 88,
+        "ticks": 400,
+        "avgMs": 1.709137984999998,
+        "p95Ms": 2.4366830000000164,
+        "maxMs": 3.7667959999999994,
+        "patchBytes": 483.93467500000014,
+        "kbPerSecPerClient": 9.451849121093753,
+        "eventKbBroadcast": 0,
+        "eventKbNear": 0,
+        "partyKbPerClient": 0.330546875
+      }
+    ]
+  }
+}
