@@ -20,6 +20,8 @@ export interface SavedPlayer {
   quests?: QuestSave;
   /** Đồ đang mặc; file cũ không có thì coi như mặc đồ trống */
   equipment?: Equipment;
+  /** Linh thạch; file cũ không có thì coi như 0. Nạp qua addCoin: không tin giá trị trong file. */
+  coin?: number;
   createdAt: string;
   updatedAt: string;
 }

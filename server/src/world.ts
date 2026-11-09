@@ -9,6 +9,7 @@ import type {
   Inventory,
   InvMsg,
   QuestsMsg,
+  WalletMsg,
   DialogMsg,
   ChatOut,
   PartyMsg,
@@ -38,6 +39,8 @@ export interface PlayerCtrl {
   itemCd: Map<string, number>;
   /** Sổ nhiệm vụ: chỉ gửi cho chủ qua tin nhắn `quests` */
   quests: QuestSave;
+  /** Linh thạch: số nguyên 0..COIN_CAP, chỉ gửi cho chủ qua tin nhắn `wallet`; chỉ đổi bằng systems/wallet.ts */
+  coin: number;
   /**
    * Phần hồi khí huyết / linh lực chưa đủ 1 đơn vị (xem takeWhole), và tu vi đả tọa
    * đang để dành, ghi vào state mỗi EXP_FLUSH_MS (expAt = lần ghi kế tiếp).
@@ -84,6 +87,8 @@ export interface WorldEvents {
   inv(sessionId: string, msg: InvMsg): void;
   /** Gửi sổ nhiệm vụ cho đúng người. */
   quests(sessionId: string, msg: QuestsMsg): void;
+  /** Gửi số Linh thạch cho đúng chủ (không vào state chung). */
+  wallet(sessionId: string, msg: WalletMsg): void;
   /** Mở hộp thoại NPC cho đúng người. */
   dialog(sessionId: string, msg: DialogMsg): void;
   /** Đội hình hiện tại, gửi riêng cho từng thành viên (không broadcast, không vào state chung). */

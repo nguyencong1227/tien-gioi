@@ -7,6 +7,7 @@ import {
   MAX_PLAYERS_PER_ROOM,
   MONSTER_RESPAWN_MS,
   REALMS,
+  addCoin,
   inTown,
   realmLabel,
   type InputMsg,
@@ -42,6 +43,7 @@ import { chat } from "../systems/chat";
 import { sanitizeInventory, sendInv, useItem } from "../systems/inventory";
 import { dropItem, pickup, releaseLootOwner } from "../systems/loot";
 import { sanitizeQuests, sendQuests } from "../systems/quests";
+import { sendWallet } from "../systems/wallet";
 import { abandonQuest, acceptQuest, craft, talk, trade, turnInQuest } from "../systems/npc";
 import { equip, equipmentOf, sanitizeEquipment, setEquipment, unequip } from "../systems/equipment";
 import { tickWorld } from "../systems/tick";
@@ -72,6 +74,7 @@ export class WorldRoom extends Room<WorldState> {
     dialog: (sid, msg) => this.sendTo(sid, "dialog", msg),
     party: (sid, msg) => this.sendTo(sid, "party", msg),
     partyInvited: (sid, msg) => this.sendTo(sid, "partyInvited", msg),
+    wallet: (sid, msg) => this.sendTo(sid, "wallet", msg),
     chatTo: (sid, msg) => this.sendTo(sid, "chat", msg),
   });
 
@@ -222,6 +225,7 @@ export class WorldRoom extends Room<WorldState> {
       inv: sanitizeInventory(save.inventory),
       itemCd: new Map(),
       quests: sanitizeQuests(save.quests),
+      coin: addCoin(0, save.coin ?? 0),
       frac: { hp: 0, mp: 0, exp: 0, expAt: 0 },
     });
     this.limiters.set(client.sessionId, new RateLimiter(Date.now()));
@@ -231,6 +235,7 @@ export class WorldRoom extends Room<WorldState> {
     this.state.online = this.state.players.size;
     sendInv(this.world, client.sessionId);
     sendQuests(this.world, client.sessionId);
+    sendWallet(this.world, client.sessionId);
     this.world.events.sys(`${p.name} (${realmLabel(p.realm, p.tier)}) đã nhập thế.`);
   }
 
@@ -272,6 +277,7 @@ export class WorldRoom extends Room<WorldState> {
       inventory: c.inv,
       quests: c.quests,
       equipment: equipmentOf(p),
+      coin: c.coin,
     };
     await savePlayer(c.save);
   }

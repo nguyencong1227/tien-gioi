@@ -103,6 +103,7 @@ export function runBench(
         partyBytes += JSON.stringify(msg).length + 5 + 4; // "party".length = 5
       },
       partyInvited: () => {},
+      wallet: () => {},
       chatTo: () => {},
     });
     w.now = 0;
