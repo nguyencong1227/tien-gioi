@@ -302,8 +302,8 @@
     },
     "me-slash-up-1": {
       "frame": {
-        "x": 2,
-        "y": 44,
+        "x": 512,
+        "y": 2,
         "w": 32,
         "h": 40
       },
@@ -322,8 +322,8 @@
     },
     "me-slash-up-2": {
       "frame": {
-        "x": 36,
-        "y": 44,
+        "x": 546,
+        "y": 2,
         "w": 32,
         "h": 40
       },
@@ -342,8 +342,8 @@
     },
     "me-idle-left": {
       "frame": {
-        "x": 70,
-        "y": 44,
+        "x": 580,
+        "y": 2,
         "w": 32,
         "h": 40
       },
@@ -362,7 +362,7 @@
     },
     "me-walk-left-0": {
       "frame": {
-        "x": 104,
+        "x": 2,
         "y": 44,
         "w": 32,
         "h": 40
@@ -382,7 +382,7 @@
     },
     "me-walk-left-1": {
       "frame": {
-        "x": 138,
+        "x": 36,
         "y": 44,
         "w": 32,
         "h": 40
@@ -402,7 +402,7 @@
     },
     "me-walk-left-2": {
       "frame": {
-        "x": 172,
+        "x": 70,
         "y": 44,
         "w": 32,
         "h": 40
@@ -422,7 +422,7 @@
     },
     "me-walk-left-3": {
       "frame": {
-        "x": 206,
+        "x": 104,
         "y": 44,
         "w": 32,
         "h": 40
@@ -442,7 +442,7 @@
     },
     "me-slash-left-0": {
       "frame": {
-        "x": 240,
+        "x": 138,
         "y": 44,
         "w": 32,
         "h": 40
@@ -462,7 +462,7 @@
     },
     "me-slash-left-1": {
       "frame": {
-        "x": 274,
+        "x": 172,
         "y": 44,
         "w": 32,
         "h": 40
@@ -482,7 +482,7 @@
     },
     "me-slash-left-2": {
       "frame": {
-        "x": 308,
+        "x": 206,
         "y": 44,
         "w": 32,
         "h": 40
@@ -502,7 +502,7 @@
     },
     "me-idle-right": {
       "frame": {
-        "x": 342,
+        "x": 240,
         "y": 44,
         "w": 32,
         "h": 40
@@ -522,7 +522,7 @@
     },
     "me-walk-right-0": {
       "frame": {
-        "x": 376,
+        "x": 274,
         "y": 44,
         "w": 32,
         "h": 40
@@ -542,7 +542,7 @@
     },
     "me-walk-right-1": {
       "frame": {
-        "x": 410,
+        "x": 308,
         "y": 44,
         "w": 32,
         "h": 40
@@ -562,7 +562,7 @@
     },
     "me-walk-right-2": {
       "frame": {
-        "x": 444,
+        "x": 342,
         "y": 44,
         "w": 32,
         "h": 40
@@ -582,7 +582,7 @@
     },
     "me-walk-right-3": {
       "frame": {
-        "x": 478,
+        "x": 376,
         "y": 44,
         "w": 32,
         "h": 40
@@ -602,8 +602,8 @@
     },
     "me-slash-right-0": {
       "frame": {
-        "x": 2,
-        "y": 86,
+        "x": 410,
+        "y": 44,
         "w": 32,
         "h": 40
       },
@@ -622,8 +622,8 @@
     },
     "me-slash-right-1": {
       "frame": {
-        "x": 36,
-        "y": 86,
+        "x": 444,
+        "y": 44,
         "w": 32,
         "h": 40
       },
@@ -642,8 +642,8 @@
     },
     "me-slash-right-2": {
       "frame": {
-        "x": 70,
-        "y": 86,
+        "x": 478,
+        "y": 44,
         "w": 32,
         "h": 40
       },
@@ -662,8 +662,8 @@
     },
     "other": {
       "frame": {
-        "x": 104,
-        "y": 86,
+        "x": 512,
+        "y": 44,
         "w": 32,
         "h": 40
       },
@@ -682,8 +682,8 @@
     },
     "other-idle-down": {
       "frame": {
-        "x": 138,
-        "y": 86,
+        "x": 546,
+        "y": 44,
         "w": 32,
         "h": 40
       },
@@ -702,8 +702,8 @@
     },
     "other-walk-down-0": {
       "frame": {
-        "x": 172,
-        "y": 86,
+        "x": 580,
+        "y": 44,
         "w": 32,
         "h": 40
       },
@@ -722,7 +722,7 @@
     },
     "other-walk-down-1": {
       "frame": {
-        "x": 206,
+        "x": 2,
         "y": 86,
         "w": 32,
         "h": 40
@@ -742,7 +742,7 @@
     },
     "other-walk-down-2": {
       "frame": {
-        "x": 240,
+        "x": 36,
         "y": 86,
         "w": 32,
         "h": 40
@@ -762,7 +762,7 @@
     },
     "other-walk-down-3": {
       "frame": {
-        "x": 274,
+        "x": 70,
         "y": 86,
         "w": 32,
         "h": 40
@@ -782,7 +782,7 @@
     },
     "other-slash-down-0": {
       "frame": {
-        "x": 308,
+        "x": 104,
         "y": 86,
         "w": 32,
         "h": 40
@@ -802,7 +802,7 @@
     },
     "other-slash-down-1": {
       "frame": {
-        "x": 342,
+        "x": 138,
         "y": 86,
         "w": 32,
         "h": 40
@@ -822,7 +822,7 @@
     },
     "other-slash-down-2": {
       "frame": {
-        "x": 376,
+        "x": 172,
         "y": 86,
         "w": 32,
         "h": 40
@@ -842,7 +842,7 @@
     },
     "other-idle-up": {
       "frame": {
-        "x": 410,
+        "x": 206,
         "y": 86,
         "w": 32,
         "h": 40
@@ -862,7 +862,7 @@
     },
     "other-walk-up-0": {
       "frame": {
-        "x": 444,
+        "x": 240,
         "y": 86,
         "w": 32,
         "h": 40
@@ -882,7 +882,7 @@
     },
     "other-walk-up-1": {
       "frame": {
-        "x": 478,
+        "x": 274,
         "y": 86,
         "w": 32,
         "h": 40
@@ -902,8 +902,8 @@
     },
     "other-walk-up-2": {
       "frame": {
-        "x": 2,
-        "y": 128,
+        "x": 308,
+        "y": 86,
         "w": 32,
         "h": 40
       },
@@ -922,8 +922,8 @@
     },
     "other-walk-up-3": {
       "frame": {
-        "x": 36,
-        "y": 128,
+        "x": 342,
+        "y": 86,
         "w": 32,
         "h": 40
       },
@@ -942,8 +942,8 @@
     },
     "other-slash-up-0": {
       "frame": {
-        "x": 70,
-        "y": 128,
+        "x": 376,
+        "y": 86,
         "w": 32,
         "h": 40
       },
@@ -962,8 +962,8 @@
     },
     "other-slash-up-1": {
       "frame": {
-        "x": 104,
-        "y": 128,
+        "x": 410,
+        "y": 86,
         "w": 32,
         "h": 40
       },
@@ -982,8 +982,8 @@
     },
     "other-slash-up-2": {
       "frame": {
-        "x": 138,
-        "y": 128,
+        "x": 444,
+        "y": 86,
         "w": 32,
         "h": 40
       },
@@ -1002,8 +1002,8 @@
     },
     "other-idle-left": {
       "frame": {
-        "x": 172,
-        "y": 128,
+        "x": 478,
+        "y": 86,
         "w": 32,
         "h": 40
       },
@@ -1022,8 +1022,8 @@
     },
     "other-walk-left-0": {
       "frame": {
-        "x": 206,
-        "y": 128,
+        "x": 512,
+        "y": 86,
         "w": 32,
         "h": 40
       },
@@ -1042,8 +1042,8 @@
     },
     "other-walk-left-1": {
       "frame": {
-        "x": 240,
-        "y": 128,
+        "x": 546,
+        "y": 86,
         "w": 32,
         "h": 40
       },
@@ -1062,8 +1062,8 @@
     },
     "other-walk-left-2": {
       "frame": {
-        "x": 274,
-        "y": 128,
+        "x": 580,
+        "y": 86,
         "w": 32,
         "h": 40
       },
@@ -1082,7 +1082,7 @@
     },
     "other-walk-left-3": {
       "frame": {
-        "x": 308,
+        "x": 2,
         "y": 128,
         "w": 32,
         "h": 40
@@ -1102,7 +1102,7 @@
     },
     "other-slash-left-0": {
       "frame": {
-        "x": 342,
+        "x": 36,
         "y": 128,
         "w": 32,
         "h": 40
@@ -1122,7 +1122,7 @@
     },
     "other-slash-left-1": {
       "frame": {
-        "x": 376,
+        "x": 70,
         "y": 128,
         "w": 32,
         "h": 40
@@ -1142,7 +1142,7 @@
     },
     "other-slash-left-2": {
       "frame": {
-        "x": 410,
+        "x": 104,
         "y": 128,
         "w": 32,
         "h": 40
@@ -1162,7 +1162,7 @@
     },
     "other-idle-right": {
       "frame": {
-        "x": 444,
+        "x": 138,
         "y": 128,
         "w": 32,
         "h": 40
@@ -1182,7 +1182,7 @@
     },
     "other-walk-right-0": {
       "frame": {
-        "x": 478,
+        "x": 172,
         "y": 128,
         "w": 32,
         "h": 40
@@ -1202,6 +1202,246 @@
     },
     "other-walk-right-1": {
       "frame": {
+        "x": 206,
+        "y": 128,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "other-walk-right-2": {
+      "frame": {
+        "x": 240,
+        "y": 128,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "other-walk-right-3": {
+      "frame": {
+        "x": 274,
+        "y": 128,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "other-slash-right-0": {
+      "frame": {
+        "x": 308,
+        "y": 128,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "other-slash-right-1": {
+      "frame": {
+        "x": 342,
+        "y": 128,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "other-slash-right-2": {
+      "frame": {
+        "x": 376,
+        "y": 128,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-tho_nhung_bao": {
+      "frame": {
+        "x": 410,
+        "y": 128,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-tho_nhung_bao-idle-down": {
+      "frame": {
+        "x": 444,
+        "y": 128,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-tho_nhung_bao-walk-down-0": {
+      "frame": {
+        "x": 478,
+        "y": 128,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-tho_nhung_bao-walk-down-1": {
+      "frame": {
+        "x": 512,
+        "y": 128,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-tho_nhung_bao-walk-down-2": {
+      "frame": {
+        "x": 546,
+        "y": 128,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-tho_nhung_bao-walk-down-3": {
+      "frame": {
+        "x": 580,
+        "y": 128,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-tho_nhung_bao-slash-down-0": {
+      "frame": {
         "x": 2,
         "y": 170,
         "w": 32,
@@ -1220,7 +1460,7 @@
         "h": 40
       }
     },
-    "other-walk-right-2": {
+    "robe-tho_nhung_bao-slash-down-1": {
       "frame": {
         "x": 36,
         "y": 170,
@@ -1240,7 +1480,7 @@
         "h": 40
       }
     },
-    "other-walk-right-3": {
+    "robe-tho_nhung_bao-slash-down-2": {
       "frame": {
         "x": 70,
         "y": 170,
@@ -1260,7 +1500,7 @@
         "h": 40
       }
     },
-    "other-slash-right-0": {
+    "robe-tho_nhung_bao-idle-up": {
       "frame": {
         "x": 104,
         "y": 170,
@@ -1280,7 +1520,7 @@
         "h": 40
       }
     },
-    "other-slash-right-1": {
+    "robe-tho_nhung_bao-walk-up-0": {
       "frame": {
         "x": 138,
         "y": 170,
@@ -1300,7 +1540,7 @@
         "h": 40
       }
     },
-    "other-slash-right-2": {
+    "robe-tho_nhung_bao-walk-up-1": {
       "frame": {
         "x": 172,
         "y": 170,
@@ -1320,10 +1560,1750 @@
         "h": 40
       }
     },
-    "mon-tho": {
+    "robe-tho_nhung_bao-walk-up-2": {
       "frame": {
         "x": 206,
         "y": 170,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-tho_nhung_bao-walk-up-3": {
+      "frame": {
+        "x": 240,
+        "y": 170,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-tho_nhung_bao-slash-up-0": {
+      "frame": {
+        "x": 274,
+        "y": 170,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-tho_nhung_bao-slash-up-1": {
+      "frame": {
+        "x": 308,
+        "y": 170,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-tho_nhung_bao-slash-up-2": {
+      "frame": {
+        "x": 342,
+        "y": 170,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-tho_nhung_bao-idle-left": {
+      "frame": {
+        "x": 376,
+        "y": 170,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-tho_nhung_bao-walk-left-0": {
+      "frame": {
+        "x": 410,
+        "y": 170,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-tho_nhung_bao-walk-left-1": {
+      "frame": {
+        "x": 444,
+        "y": 170,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-tho_nhung_bao-walk-left-2": {
+      "frame": {
+        "x": 478,
+        "y": 170,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-tho_nhung_bao-walk-left-3": {
+      "frame": {
+        "x": 512,
+        "y": 170,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-tho_nhung_bao-slash-left-0": {
+      "frame": {
+        "x": 546,
+        "y": 170,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-tho_nhung_bao-slash-left-1": {
+      "frame": {
+        "x": 580,
+        "y": 170,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-tho_nhung_bao-slash-left-2": {
+      "frame": {
+        "x": 2,
+        "y": 212,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-tho_nhung_bao-idle-right": {
+      "frame": {
+        "x": 36,
+        "y": 212,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-tho_nhung_bao-walk-right-0": {
+      "frame": {
+        "x": 70,
+        "y": 212,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-tho_nhung_bao-walk-right-1": {
+      "frame": {
+        "x": 104,
+        "y": 212,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-tho_nhung_bao-walk-right-2": {
+      "frame": {
+        "x": 138,
+        "y": 212,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-tho_nhung_bao-walk-right-3": {
+      "frame": {
+        "x": 172,
+        "y": 212,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-tho_nhung_bao-slash-right-0": {
+      "frame": {
+        "x": 206,
+        "y": 212,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-tho_nhung_bao-slash-right-1": {
+      "frame": {
+        "x": 240,
+        "y": 212,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-tho_nhung_bao-slash-right-2": {
+      "frame": {
+        "x": 274,
+        "y": 212,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao": {
+      "frame": {
+        "x": 308,
+        "y": 212,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-idle-down": {
+      "frame": {
+        "x": 342,
+        "y": 212,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-walk-down-0": {
+      "frame": {
+        "x": 376,
+        "y": 212,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-walk-down-1": {
+      "frame": {
+        "x": 410,
+        "y": 212,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-walk-down-2": {
+      "frame": {
+        "x": 444,
+        "y": 212,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-walk-down-3": {
+      "frame": {
+        "x": 478,
+        "y": 212,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-slash-down-0": {
+      "frame": {
+        "x": 512,
+        "y": 212,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-slash-down-1": {
+      "frame": {
+        "x": 546,
+        "y": 212,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-slash-down-2": {
+      "frame": {
+        "x": 580,
+        "y": 212,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-idle-up": {
+      "frame": {
+        "x": 2,
+        "y": 254,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-walk-up-0": {
+      "frame": {
+        "x": 36,
+        "y": 254,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-walk-up-1": {
+      "frame": {
+        "x": 70,
+        "y": 254,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-walk-up-2": {
+      "frame": {
+        "x": 104,
+        "y": 254,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-walk-up-3": {
+      "frame": {
+        "x": 138,
+        "y": 254,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-slash-up-0": {
+      "frame": {
+        "x": 172,
+        "y": 254,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-slash-up-1": {
+      "frame": {
+        "x": 206,
+        "y": 254,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-slash-up-2": {
+      "frame": {
+        "x": 240,
+        "y": 254,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-idle-left": {
+      "frame": {
+        "x": 274,
+        "y": 254,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-walk-left-0": {
+      "frame": {
+        "x": 308,
+        "y": 254,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-walk-left-1": {
+      "frame": {
+        "x": 342,
+        "y": 254,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-walk-left-2": {
+      "frame": {
+        "x": 376,
+        "y": 254,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-walk-left-3": {
+      "frame": {
+        "x": 410,
+        "y": 254,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-slash-left-0": {
+      "frame": {
+        "x": 444,
+        "y": 254,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-slash-left-1": {
+      "frame": {
+        "x": 478,
+        "y": 254,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-slash-left-2": {
+      "frame": {
+        "x": 512,
+        "y": 254,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-idle-right": {
+      "frame": {
+        "x": 546,
+        "y": 254,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-walk-right-0": {
+      "frame": {
+        "x": 580,
+        "y": 254,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-walk-right-1": {
+      "frame": {
+        "x": 2,
+        "y": 296,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-walk-right-2": {
+      "frame": {
+        "x": 36,
+        "y": 296,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-walk-right-3": {
+      "frame": {
+        "x": 70,
+        "y": 296,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-slash-right-0": {
+      "frame": {
+        "x": 104,
+        "y": 296,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-slash-right-1": {
+      "frame": {
+        "x": 138,
+        "y": 296,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-slash-right-2": {
+      "frame": {
+        "x": 172,
+        "y": 296,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao": {
+      "frame": {
+        "x": 206,
+        "y": 296,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-idle-down": {
+      "frame": {
+        "x": 240,
+        "y": 296,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-walk-down-0": {
+      "frame": {
+        "x": 274,
+        "y": 296,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-walk-down-1": {
+      "frame": {
+        "x": 308,
+        "y": 296,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-walk-down-2": {
+      "frame": {
+        "x": 342,
+        "y": 296,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-walk-down-3": {
+      "frame": {
+        "x": 376,
+        "y": 296,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-slash-down-0": {
+      "frame": {
+        "x": 410,
+        "y": 296,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-slash-down-1": {
+      "frame": {
+        "x": 444,
+        "y": 296,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-slash-down-2": {
+      "frame": {
+        "x": 478,
+        "y": 296,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-idle-up": {
+      "frame": {
+        "x": 512,
+        "y": 296,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-walk-up-0": {
+      "frame": {
+        "x": 546,
+        "y": 296,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-walk-up-1": {
+      "frame": {
+        "x": 580,
+        "y": 296,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-walk-up-2": {
+      "frame": {
+        "x": 2,
+        "y": 338,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-walk-up-3": {
+      "frame": {
+        "x": 36,
+        "y": 338,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-slash-up-0": {
+      "frame": {
+        "x": 70,
+        "y": 338,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-slash-up-1": {
+      "frame": {
+        "x": 104,
+        "y": 338,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-slash-up-2": {
+      "frame": {
+        "x": 138,
+        "y": 338,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-idle-left": {
+      "frame": {
+        "x": 172,
+        "y": 338,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-walk-left-0": {
+      "frame": {
+        "x": 206,
+        "y": 338,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-walk-left-1": {
+      "frame": {
+        "x": 240,
+        "y": 338,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-walk-left-2": {
+      "frame": {
+        "x": 274,
+        "y": 338,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-walk-left-3": {
+      "frame": {
+        "x": 308,
+        "y": 338,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-slash-left-0": {
+      "frame": {
+        "x": 342,
+        "y": 338,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-slash-left-1": {
+      "frame": {
+        "x": 376,
+        "y": 338,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-slash-left-2": {
+      "frame": {
+        "x": 410,
+        "y": 338,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-idle-right": {
+      "frame": {
+        "x": 444,
+        "y": 338,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-walk-right-0": {
+      "frame": {
+        "x": 478,
+        "y": 338,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-walk-right-1": {
+      "frame": {
+        "x": 512,
+        "y": 338,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-walk-right-2": {
+      "frame": {
+        "x": 546,
+        "y": 338,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-walk-right-3": {
+      "frame": {
+        "x": 580,
+        "y": 338,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-slash-right-0": {
+      "frame": {
+        "x": 2,
+        "y": 380,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-slash-right-1": {
+      "frame": {
+        "x": 36,
+        "y": 380,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-slash-right-2": {
+      "frame": {
+        "x": 70,
+        "y": 380,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "mon-tho": {
+      "frame": {
+        "x": 104,
+        "y": 380,
         "w": 32,
         "h": 32
       },
@@ -1342,8 +3322,8 @@
     },
     "mon-tho-0": {
       "frame": {
-        "x": 240,
-        "y": 170,
+        "x": 138,
+        "y": 380,
         "w": 32,
         "h": 32
       },
@@ -1362,8 +3342,8 @@
     },
     "mon-tho-1": {
       "frame": {
-        "x": 274,
-        "y": 170,
+        "x": 172,
+        "y": 380,
         "w": 32,
         "h": 32
       },
@@ -1382,8 +3362,8 @@
     },
     "mon-lang": {
       "frame": {
-        "x": 308,
-        "y": 170,
+        "x": 206,
+        "y": 380,
         "w": 40,
         "h": 40
       },
@@ -1402,8 +3382,8 @@
     },
     "mon-lang-0": {
       "frame": {
-        "x": 350,
-        "y": 170,
+        "x": 248,
+        "y": 380,
         "w": 40,
         "h": 40
       },
@@ -1422,8 +3402,8 @@
     },
     "mon-lang-1": {
       "frame": {
-        "x": 392,
-        "y": 170,
+        "x": 290,
+        "y": 380,
         "w": 40,
         "h": 40
       },
@@ -1442,8 +3422,8 @@
     },
     "mon-ho": {
       "frame": {
-        "x": 434,
-        "y": 170,
+        "x": 332,
+        "y": 380,
         "w": 48,
         "h": 48
       },
@@ -1462,8 +3442,8 @@
     },
     "mon-ho-0": {
       "frame": {
-        "x": 2,
-        "y": 220,
+        "x": 382,
+        "y": 380,
         "w": 48,
         "h": 48
       },
@@ -1482,8 +3462,8 @@
     },
     "mon-ho-1": {
       "frame": {
-        "x": 52,
-        "y": 220,
+        "x": 432,
+        "y": 380,
         "w": 48,
         "h": 48
       },
@@ -1502,8 +3482,8 @@
     },
     "mon-mang": {
       "frame": {
-        "x": 102,
-        "y": 220,
+        "x": 482,
+        "y": 380,
         "w": 64,
         "h": 64
       },
@@ -1522,8 +3502,8 @@
     },
     "mon-mang-0": {
       "frame": {
-        "x": 168,
-        "y": 220,
+        "x": 548,
+        "y": 380,
         "w": 64,
         "h": 64
       },
@@ -1542,8 +3522,8 @@
     },
     "mon-mang-1": {
       "frame": {
-        "x": 234,
-        "y": 220,
+        "x": 2,
+        "y": 446,
         "w": 64,
         "h": 64
       },
@@ -1562,8 +3542,8 @@
     },
     "npc-truong_tran": {
       "frame": {
-        "x": 300,
-        "y": 220,
+        "x": 68,
+        "y": 446,
         "w": 36,
         "h": 42
       },
@@ -1582,8 +3562,8 @@
     },
     "npc-duoc_su": {
       "frame": {
-        "x": 338,
-        "y": 220,
+        "x": 106,
+        "y": 446,
         "w": 36,
         "h": 42
       },
@@ -1602,8 +3582,8 @@
     },
     "npc-tho_ren": {
       "frame": {
-        "x": 376,
-        "y": 220,
+        "x": 144,
+        "y": 446,
         "w": 36,
         "h": 42
       },
@@ -1622,8 +3602,8 @@
     },
     "npc-cao_thi": {
       "frame": {
-        "x": 414,
-        "y": 220,
+        "x": 182,
+        "y": 446,
         "w": 36,
         "h": 42
       },
@@ -1642,8 +3622,8 @@
     },
     "item-hoi_huyet_dan": {
       "frame": {
-        "x": 452,
-        "y": 220,
+        "x": 220,
+        "y": 446,
         "w": 24,
         "h": 24
       },
@@ -1662,8 +3642,8 @@
     },
     "item-hoi_linh_dan": {
       "frame": {
-        "x": 478,
-        "y": 220,
+        "x": 246,
+        "y": 446,
         "w": 24,
         "h": 24
       },
@@ -1682,8 +3662,8 @@
     },
     "item-tu_khi_dan": {
       "frame": {
-        "x": 2,
-        "y": 286,
+        "x": 272,
+        "y": 446,
         "w": 24,
         "h": 24
       },
@@ -1702,8 +3682,8 @@
     },
     "item-long_tho": {
       "frame": {
-        "x": 28,
-        "y": 286,
+        "x": 298,
+        "y": 446,
         "w": 24,
         "h": 24
       },
@@ -1722,8 +3702,8 @@
     },
     "item-nanh_soi": {
       "frame": {
-        "x": 54,
-        "y": 286,
+        "x": 324,
+        "y": 446,
         "w": 24,
         "h": 24
       },
@@ -1742,8 +3722,8 @@
     },
     "item-da_ho": {
       "frame": {
-        "x": 80,
-        "y": 286,
+        "x": 350,
+        "y": 446,
         "w": 24,
         "h": 24
       },
@@ -1762,8 +3742,188 @@
     },
     "item-vay_mang": {
       "frame": {
-        "x": 106,
-        "y": 286,
+        "x": 376,
+        "y": 446,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-lang_nha_kiem": {
+      "frame": {
+        "x": 402,
+        "y": 446,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-tho_nhung_bao": {
+      "frame": {
+        "x": 428,
+        "y": 446,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-lang_nha_phu": {
+      "frame": {
+        "x": 454,
+        "y": 446,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-hac_ho_kiem": {
+      "frame": {
+        "x": 480,
+        "y": 446,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-hac_ho_bao": {
+      "frame": {
+        "x": 506,
+        "y": 446,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-ho_hon_phu": {
+      "frame": {
+        "x": 532,
+        "y": 446,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-xich_mang_kiem": {
+      "frame": {
+        "x": 558,
+        "y": 446,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-xich_lan_bao": {
+      "frame": {
+        "x": 584,
+        "y": 446,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-mang_dam_phu": {
+      "frame": {
+        "x": 610,
+        "y": 446,
         "w": 24,
         "h": 24
       },
@@ -1782,8 +3942,8 @@
     },
     "swordbeam": {
       "frame": {
-        "x": 132,
-        "y": 286,
+        "x": 2,
+        "y": 512,
         "w": 48,
         "h": 16
       },
@@ -1802,8 +3962,8 @@
     },
     "dot": {
       "frame": {
-        "x": 182,
-        "y": 286,
+        "x": 52,
+        "y": 512,
         "w": 16,
         "h": 16
       },
@@ -1827,8 +3987,8 @@
     "image": "atlas.png",
     "format": "RGBA8888",
     "size": {
-      "w": 512,
-      "h": 512
+      "w": 640,
+      "h": 640
     },
     "scale": "1"
   }

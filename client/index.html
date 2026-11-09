@@ -39,6 +39,14 @@
         <div class="hud-foot">
           <div id="hud-online"></div>
           <div class="hud-btns">
+            <button
+              type="button"
+              id="btn-char"
+              class="hud-btn"
+              title="Bảng nhân vật & Trang bị (C)"
+            >
+              <span>身</span><small>Nhân vật</small>
+            </button>
             <button type="button" id="btn-bag" class="hud-btn" title="Túi đồ (I)">
               <span>袋</span><small>Túi</small>
             </button>
@@ -141,13 +149,48 @@
               <span id="inv-item-rarity" class="rarity-tag"></span>
             </div>
             <p id="inv-item-desc">Chạm hoặc rê chuột vào một ô để xem chi tiết.</p>
+            <div id="inv-equip-cmp" class="equip-cmp" hidden></div>
           </div>
           <div id="inv-actions" hidden>
             <button type="button" id="inv-btn-use" class="act-btn use">Dùng</button>
+            <button type="button" id="inv-btn-equip" class="act-btn use" hidden>Mặc</button>
             <button type="button" id="inv-btn-drop1" class="act-btn drop">Vứt 1</button>
             <button type="button" id="inv-btn-dropall" class="act-btn drop">Vứt hết</button>
           </div>
         </footer>
+      </section>
+
+      <section id="char-modal" class="panel modal-box" hidden aria-label="Bảng nhân vật">
+        <header class="inv-head">
+          <div>
+            <h2>Đạo Thể · Trang Bị</h2>
+            <small id="char-subtitle">Chạm trang bị để mặc hoặc tháo</small>
+          </div>
+          <button type="button" id="char-close" class="modal-close" title="Đóng (C / Esc)">
+            ✕
+          </button>
+        </header>
+        <div class="char-body">
+          <div id="char-equip-slots" class="equip-slots-row"></div>
+          <div id="char-stats" class="char-stats-box"></div>
+          <div class="char-bag-section">
+            <div class="char-bag-head">
+              <b>Trang bị trong túi (chạm để so sánh / mặc)</b>
+            </div>
+            <div id="char-bag-equips" class="char-bag-list"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="forge-modal" class="panel modal-box" hidden aria-label="Lò rèn trang bị">
+        <header class="inv-head">
+          <div>
+            <h2 id="forge-title">Lò Rèn Thiết Ngưu</h2>
+            <small>Rèn trước để dành · Đủ cảnh giới mới mặc được</small>
+          </div>
+          <button type="button" id="forge-close" class="modal-close" title="Đóng (Esc)">✕</button>
+        </header>
+        <div id="forge-list" class="forge-list"></div>
       </section>
 
       <section id="settings-modal" class="panel modal-box" hidden aria-label="Màn hình cài đặt">
@@ -247,8 +290,8 @@
         <div><b>Trọng thương</b><span id="death-t"></span></div>
       </div>
       <div id="help">
-        WASD đi · J/Space chém · K kiếm khí · 1/2 đan · F nhặt/nói chuyện · I túi · Q nhiệm vụ · M
-        bản đồ · O cài đặt · L đả tọa · B đột phá
+        WASD đi · J/Space chém · K kiếm khí · 1/2 đan · F nhặt/nói chuyện · C nhân vật · I túi · Q
+        nhiệm vụ · M bản đồ · O cài đặt · L đả tọa · B đột phá
       </div>
     </div>
 

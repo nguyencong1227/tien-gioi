@@ -121,7 +121,7 @@ button {
   z-index: 5;
   top: max(10px, env(safe-area-inset-top));
   left: max(10px, env(safe-area-inset-left));
-  width: 240px;
+  width: 266px;
   padding: 8px 10px;
   font-size: 13px;
 }
@@ -178,13 +178,15 @@ button {
 }
 .hud-btns {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 4px;
 }
 .hud-btn {
   position: relative;
-  min-width: 42px;
-  min-height: 38px;
+  min-width: 40px;
+  min-height: 36px;
   padding: 3px 6px;
   border-radius: 6px;
   border: 1px solid var(--gold);
@@ -193,7 +195,7 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 3px;
 }
 .hud-btn span {
   font-size: 16px;
@@ -1106,6 +1108,339 @@ body.low-fx #btn-talk {
   animation: none !important;
 }
 
+/* So sánh trang bị (trong Túi đồ & Bảng nhân vật) */
+.equip-cmp {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(201, 162, 74, 0.35);
+  font-size: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.cmp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-weight: 600;
+}
+.cmp-up,
+.stat-diff.up {
+  color: #6fcf73;
+  font-weight: 700;
+}
+.cmp-down,
+.stat-diff.down {
+  color: #ff6b5e;
+  font-weight: 700;
+}
+.cmp-eq,
+.stat-diff.eq {
+  color: rgba(243, 236, 218, 0.65);
+}
+.req-warn {
+  color: #ff6b5e;
+  font-weight: 600;
+}
+.req-ok {
+  color: #ffe08a;
+}
+
+/* Bảng nhân vật & Trang bị (Phím C - #31) */
+#char-modal {
+  width: min(95vw, 460px);
+  max-height: 92dvh;
+  overflow-y: auto;
+}
+.char-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+}
+.equip-slots-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.equip-slot-card {
+  min-height: 78px;
+  padding: 8px 6px;
+  border-radius: 7px;
+  border: 2px solid rgba(243, 220, 160, 0.28);
+  background: rgba(0, 0, 0, 0.48);
+  color: var(--paper);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  text-align: center;
+}
+.equip-slot-card.filled {
+  background: rgba(201, 162, 74, 0.14);
+}
+.equip-slot-card .slot-label {
+  font-size: 10px;
+  opacity: 0.72;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.equip-slot-card .slot-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.equip-slot-card .slot-item-name {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.equip-slot-card .slot-hint {
+  font-size: 10px;
+  opacity: 0.7;
+}
+.char-stats-box {
+  padding: 10px 12px;
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.42);
+  border: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px 14px;
+  font-size: 13px;
+}
+.stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.stat-row.full {
+  grid-column: 1 / -1;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 5px;
+  margin-bottom: 2px;
+}
+.stat-label {
+  opacity: 0.82;
+}
+.stat-val {
+  font-weight: 700;
+  color: #fff6dc;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.stat-bonus {
+  font-size: 11px;
+  color: var(--gold);
+  font-weight: 400;
+}
+.char-bag-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.char-bag-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #ffe08a;
+}
+.mini-btn {
+  min-height: 32px;
+  padding: 4px 10px;
+  border-radius: 5px;
+  border: 1px solid var(--gold);
+  background: rgba(201, 162, 74, 0.2);
+  color: #ffe08a;
+  font-size: 11px;
+  font-weight: 600;
+}
+.char-bag-list {
+  max-height: 185px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.char-bag-item {
+  min-height: 48px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+}
+.char-bag-item.previewing {
+  border-color: #ffe08a;
+  background: rgba(201, 162, 74, 0.22);
+}
+.char-bag-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.char-bag-left .slot-icon {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.char-bag-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.char-bag-meta b {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.char-bag-meta small {
+  font-size: 11px;
+  opacity: 0.85;
+}
+.char-equip-btn {
+  min-height: 38px;
+  min-width: 64px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid #d96b5b;
+  background: var(--red);
+  color: #f6e7c4;
+  font-weight: 700;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.char-equip-btn:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  background: rgba(90, 70, 50, 0.4);
+  border-color: var(--line);
+}
+
+/* Giao diện rèn đồ (#forge-modal - #32) */
+#forge-modal {
+  width: min(95vw, 480px);
+  max-height: 92dvh;
+}
+.forge-list {
+  max-height: 410px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 2px;
+}
+.forge-card {
+  padding: 9px 11px;
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition:
+    box-shadow 0.25s,
+    border-color 0.25s;
+}
+.forge-card.forged-flash {
+  border-color: #ffd74a;
+  box-shadow: 0 0 18px rgba(255, 215, 74, 0.75);
+}
+.forge-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.forge-item-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.forge-item-info .slot-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.forge-title-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.forge-title-col b {
+  font-size: 14px;
+}
+.forge-title-col small {
+  font-size: 11px;
+  opacity: 0.85;
+}
+.forge-mats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.forge-mat {
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid transparent;
+}
+.forge-mat.ok {
+  color: #6fcf73;
+  border-color: rgba(111, 207, 115, 0.45);
+}
+.forge-mat.missing {
+  color: #ff6b5e;
+  border-color: rgba(255, 107, 94, 0.45);
+}
+.forge-btn {
+  min-height: 44px;
+  min-width: 78px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid #e8a838;
+  background: linear-gradient(180deg, #b83a28, #8c2318);
+  color: #ffe08a;
+  font-weight: 700;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.forge-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: rgba(80, 70, 60, 0.4);
+  border-color: var(--line);
+  color: var(--paper);
+}
+
 /* Màn hình cài đặt (#settings-modal - #35) */
 #settings-modal {
   width: min(94vw, 410px);
@@ -1290,6 +1625,7 @@ body.low-fx #btn-talk {
     overflow-y: auto;
     justify-content: flex-start;
   }
+  .forge-list,
   #quest-list {
     max-height: calc(100dvh - 96px);
   }
