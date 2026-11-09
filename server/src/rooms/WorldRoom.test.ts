@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
-import { Client, type Room } from "colyseus.js";
+import { Client, getStateCallbacks, type Room } from "colyseus.js";
 import {
   ROOM_NAME,
   MONSTER_CAP,
@@ -127,10 +127,13 @@ describe("vào game", () => {
     expect(p.hp).toBe(statsFor(0, 0).maxHp);
     expect(p.expMax).toBe(expToNext(0, 0));
     expect(Math.hypot(p.x - TOWN_PX.x, p.y - TOWN_PX.y)).toBeLessThan(TOWN_PX.r);
+    // Quái trên bản đồ nằm ở server; client chỉ thấy phần ở gần (xem "vùng nhìn")
     const total = Object.values(MONSTER_CAP).reduce((a, b) => a + b, 0);
+    const monsters = serverState(room).monsters.size;
+    expect(monsters).toBeLessThanOrEqual(total);
+    expect(monsters).toBeGreaterThan(total * 0.8);
     await waitFor(() => (room.state as any).monsters.size > 0);
-    expect((room.state as any).monsters.size).toBeLessThanOrEqual(total);
-    expect((room.state as any).monsters.size).toBeGreaterThan(total * 0.8);
+    expect((room.state as any).monsters.size).toBeLessThanOrEqual(monsters);
   });
 
   it("không cho cùng một nhân vật vào hai lần cùng lúc", async () => {
@@ -588,5 +591,83 @@ describe("trang bị và rèn đồ", () => {
     await sleep(200);
     const again = await join(name);
     expect(again.me().weapon).toBe("lang_nha_kiem");
+  });
+});
+
+describe("vùng nhìn (StateView)", () => {
+  /** Đặt người chơi ở vị trí mới ngay trên server (bỏ qua di chuyển) */
+  function teleport(room: Room, x: number, y: number) {
+    const p = serverState(room).players.get(room.sessionId)!;
+    p.x = x;
+    p.y = y;
+  }
+  const FAR = { x: 220, y: 220 }; // cách trấn ~1900 px, xa hơn VIEW_EXIT
+  const players = (room: Room) => (room.state as any).players as Map<string, any>;
+
+  it("chỉ thấy người ở gần; ra xa thì mất, lại gần thì thấy lại; online luôn là tổng số", async () => {
+    const a = await join();
+    const b = await join();
+    // Cùng ở trong trấn: thấy nhau
+    await waitFor(() => players(a.room).has(b.room.sessionId));
+    await waitFor(() => players(b.room).has(a.room.sessionId));
+
+    // b đi ra xa: a không còn thấy b, nhưng vẫn thấy mình; online vẫn là 2
+    const removed: string[] = [];
+    getStateCallbacks(a.room)(a.room.state as any).players.onRemove((_: unknown, id: string) =>
+      removed.push(id),
+    );
+    teleport(b.room, FAR.x, FAR.y);
+    await waitFor(() => !players(a.room).has(b.room.sessionId));
+    expect(removed).toContain(b.room.sessionId);
+    expect(players(a.room).has(a.room.sessionId)).toBe(true);
+    expect(players(b.room).has(a.room.sessionId)).toBe(false);
+    await waitFor(() => (a.room.state as any).online === 2 && (b.room.state as any).online === 2);
+
+    // b quay lại gần: thấy nhau trở lại, đủ dữ liệu
+    teleport(b.room, TOWN_PX.x + 100, TOWN_PX.y);
+    const seen = await waitFor(() => players(a.room).get(b.room.sessionId));
+    expect(seen.name).toBe(b.name);
+    expect(seen.x).toBeCloseTo(TOWN_PX.x + 100, 0);
+
+    // b thoát: online giảm, a không còn thấy b
+    await b.room.leave(true);
+    rooms.splice(rooms.indexOf(b.room), 1);
+    await waitFor(() => (a.room.state as any).online === 1);
+    expect(players(a.room).has(b.room.sessionId)).toBe(false);
+  });
+
+  it("quái và đồ rơi cũng theo vùng nhìn; quái chết thì biến khỏi màn hình người đang thấy", async () => {
+    const a = await join();
+    const sr = serverRoom(a.room);
+    // Một con quái ở xa, một con ngay cạnh
+    const mons = [...sr.state.monsters.entries()];
+    const [farId, farM] = mons.reduce((best, cur) =>
+      Math.hypot(cur[1].x - TOWN_PX.x, cur[1].y - TOWN_PX.y) >
+      Math.hypot(best[1].x - TOWN_PX.x, best[1].y - TOWN_PX.y)
+        ? cur
+        : best,
+    );
+    expect(Math.hypot(farM.x - TOWN_PX.x, farM.y - TOWN_PX.y)).toBeGreaterThan(1400);
+    const near = mons.find(([, m]) => Math.hypot(m.x - TOWN_PX.x, m.y - TOWN_PX.y) < 900);
+    expect(near).toBeTruthy();
+    const monsters = (a.room.state as any).monsters as Map<string, any>;
+    await waitFor(() => monsters.has(near![0]));
+    expect(monsters.has(farId)).toBe(false);
+    expect(monsters.size).toBeLessThan(sr.state.monsters.size);
+
+    // Quái gần bị xoá khỏi state (như lúc chết): client nhận onRemove
+    sr.state.monsters.delete(near![0]);
+    await waitFor(() => !monsters.has(near![0]));
+  });
+
+  it("lastSeq chỉ gửi cho chủ nhân vật, người khác không nhận", async () => {
+    const a = await join();
+    const b = await join();
+    await waitFor(() => players(b.room).has(a.room.sessionId));
+    a.room.send("input", { seq: 7, dx: 1, dy: 0 });
+    await waitFor(() => a.me().lastSeq === 7);
+    await sleep(150);
+    expect(players(b.room).get(a.room.sessionId).lastSeq).toBeUndefined(); // trường không hề đến client b
+    expect(players(b.room).get(a.room.sessionId).x).toBeGreaterThan(0); // vẫn thấy vị trí
   });
 });

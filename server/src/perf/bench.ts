@@ -1,9 +1,10 @@
 // Benchmark một tick server, không cần mạng: N người chơi giả đi săn quái trong World thật.
-// Đo thời gian mỗi tick (mục tiêu < 10 ms, xem #29) và số byte patch state gửi cho mỗi client.
+// Đo thời gian mỗi tick (mục tiêu < 10 ms, xem #29) và số byte patch state gửi cho mỗi client
+// (mã hóa riêng theo StateView của từng client, như SchemaSerializer.applyPatches, xem #62).
 // Chạy: npm run bench -w server [-- --players 100 --seconds 60]
 // Dùng để so trước / sau khi tối ưu; kết quả in ra bảng, không ghi file.
 import { performance } from "node:perf_hooks";
-import { Encoder } from "@colyseus/schema";
+import { Encoder, StateView } from "@colyseus/schema";
 import {
   MONSTER_BY_ID,
   MONSTER_RESPAWN_MS,
@@ -44,7 +45,7 @@ export interface BenchResult {
   avgMs: number;
   p95Ms: number;
   maxMs: number;
-  /** Byte patch trung bình mỗi tick (một patch gửi chung cho mọi client) */
+  /** Byte patch trung bình mỗi client mỗi tick (gồm phần chung + phần theo vùng nhìn) */
   patchBytes: number;
   /** KB/giây mỗi client nhận (patch × 20 tick) */
   kbPerSecPerClient: number;
@@ -87,9 +88,19 @@ export function runBench(players: number, seconds: number, seed = 1): BenchResul
       }
       bots.push({ sid, seq: 0, target: null });
     }
+    // Vùng nhìn: đăng ký sau khi đã đặt vị trí, như WorldRoom.onJoin
+    const views: StateView[] = [];
+    for (const b of bots) {
+      const v = new StateView();
+      w.interest.join(w, b.sid, v);
+      views.push(v);
+    }
 
     const encoder = new Encoder(w.state);
     encoder.encodeAll();
+    encoder.discardChanges();
+    // Thực tế phần thực thể ban đầu đi trong gói state đầy đủ lúc vào phòng, không tính là patch
+    for (const v of views) encoder.encodeView(v, 1, { offset: 1 });
     encoder.discardChanges();
 
     const ticks = Math.round((seconds * 1000) / TICK_MS);
@@ -134,10 +145,22 @@ export function runBench(players: number, seconds: number, seed = 1): BenchResul
         topUpMonsters(w);
         nextTopUp += MONSTER_RESPAWN_MS;
       }
-      const patch = encoder.encode();
+      // Như SchemaSerializer.applyPatches: một patch chung, rồi mỗi client một bản theo view của nó
+      const it = { offset: 1 };
+      let sharedOffset = 1;
+      const shared = encoder.hasChanges;
+      if (shared) {
+        encoder.encode(it);
+        sharedOffset = it.offset;
+      }
+      let tickBytes = 0;
+      for (const v of views) {
+        if (shared || v.changes.size > 0)
+          tickBytes += encoder.encodeView(v, sharedOffset, it).byteLength;
+      }
       encoder.discardChanges();
       times.push(performance.now() - t0);
-      bytes += patch.byteLength;
+      bytes += players > 0 ? tickBytes / players : 0;
     }
 
     times.sort((a, b) => a - b);

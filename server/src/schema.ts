@@ -1,9 +1,18 @@
-import { Schema, MapSchema, Encoder, type } from "@colyseus/schema";
+import { Schema, MapSchema, Encoder, type, view } from "@colyseus/schema";
 
-// Bộ đệm mã hóa state mặc định 8 KB. Gửi toàn bộ state cho người mới vào khi phòng gần đầy
-// (100 người + quái + đồ rơi ≈ 12 KB) sẽ tràn: schema tự nới rồi mã hóa lại, in cảnh báo mỗi lần.
-// Phải đặt trước khi tạo phòng (Colyseus cấp bộ đệm lúc khởi tạo serializer).
-Encoder.BUFFER_SIZE = 32 * 1024;
+// Bộ đệm mã hóa state mặc định 8 KB. Có hai chỗ cần lớn hơn nhiều:
+// - Gửi toàn bộ state cho người mới vào khi phòng gần đầy (100 người + quái + đồ rơi ≈ 12 KB).
+// - Mỗi tick, patch của MỌI client (theo StateView, #62) được ghi nối tiếp vào cùng một bộ đệm:
+//   100 người cùng tụ trong trấn thì mỗi người nhận patch của ~100 người khác, tổng vài trăm KB.
+// Tràn thì schema tự nới rồi mã hóa lại, in cảnh báo: chậm đúng lúc đông người nhất.
+// Phải đặt trước khi tạo phòng (Colyseus cấp bộ đệm lúc khởi tạo serializer; mỗi phòng 2 bộ đệm).
+Encoder.BUFFER_SIZE = 256 * 1024;
+
+/**
+ * Thẻ `@view` cho trường chỉ chủ nhân vật cần (xem systems/interest.ts: view.add(p, TAG_OWNER)).
+ * Người khác không nhận trường này nên không tốn băng thông mỗi lần nhân vật di chuyển.
+ */
+export const TAG_OWNER = 1;
 
 export class Player extends Schema {
   @type("string") name = "";
@@ -20,7 +29,8 @@ export class Player extends Schema {
   @type("number") expMax = 40;
   @type("boolean") meditating = false;
   @type("boolean") dead = false;
-  @type("uint32") lastSeq = 0; // input cuối server đã xử lý (để client đối chiếu)
+  // input cuối server đã xử lý (để client đối chiếu); chỉ chủ nhân vật nhận
+  @view(TAG_OWNER) @type("uint32") lastSeq = 0;
   // Đồ đang mặc (itemId, "" = trống). Công khai để mọi người thấy ngoại hình; kiểu Equipment trong shared/src/items.ts.
   // Player có đủ 3 trường này nên truyền thẳng vào statsFor(realm, tier, p).
   @type("string") weapon = "";
@@ -46,8 +56,15 @@ export class Loot extends Schema {
   @type("string") owner = ""; // sessionId được nhặt trước; "" = ai cũng nhặt được
 }
 
+/**
+ * Ba bảng thực thể đều `@view()`: mỗi client chỉ nhận phần tử đã thêm vào StateView của mình
+ * (những gì ở gần, xem systems/interest.ts). Thực thể ra khỏi vùng nhìn thì client nhận onRemove,
+ * nên `players.size` ở client chỉ là số người ở gần: dùng `online` cho tổng số người trong phòng.
+ */
 export class WorldState extends Schema {
-  @type({ map: Player }) players = new MapSchema<Player>();
-  @type({ map: Monster }) monsters = new MapSchema<Monster>();
-  @type({ map: Loot }) loot = new MapSchema<Loot>();
+  @view() @type({ map: Player }) players = new MapSchema<Player>();
+  @view() @type({ map: Monster }) monsters = new MapSchema<Monster>();
+  @view() @type({ map: Loot }) loot = new MapSchema<Loot>();
+  /** Tổng số người chơi trong phòng (luôn gửi cho mọi client, không theo vùng nhìn) */
+  @type("uint16") online = 0;
 }
