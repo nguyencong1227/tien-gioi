@@ -12,13 +12,19 @@ import {
   type MonsterKind,
 } from "@tien-gioi/shared";
 import { Monster } from "../schema";
-import { rand, type World, type MonsterCtrl } from "../world";
+import { rand, takeWhole, type World, type MonsterCtrl } from "../world";
 import { hurtPlayer } from "./combat";
 
 const LEASH_DIST = 520; // kéo quá xa nhà thì bỏ mục tiêu
 const WANDER_RADIUS = 90;
 const RETURN_HOME_DIST = 200;
 const MAX_SPAWN_PER_TOPUP = 3;
+/**
+ * Không có người chơi nào trong khoảng này thì quái "ngủ": không lang thang. Lớn hơn nửa màn hình máy tính
+ * (~770 px) nên người chơi không bao giờ thấy quái đứng hình. Quái lang thang chỗ không ai nhìn
+ * vẫn tốn CPU và mỗi tick gửi vị trí mới cho mọi client: 88 con ≈ 900 byte/tick dù không có ai chơi.
+ */
+export const MONSTER_WAKE_DIST = 900;
 
 export function spawnMonster(w: World, def: MonsterKind) {
   for (let i = 0; i < 40; i++) {
@@ -45,6 +51,7 @@ export function spawnMonster(w: World, def: MonsterKind) {
       wanderY: y,
       nextWander: 0,
       damageBy: new Map(),
+      hpFrac: 0,
     });
     return;
   }
@@ -95,12 +102,15 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
     target = undefined;
     mc.damageBy.clear();
   }
-  if (!target && def.aggro > 0) {
-    let best = def.aggro;
+  // Không có mục tiêu: tìm người chơi gần nhất (để gây hấn, và để biết có nên "ngủ" không)
+  let nearest = Infinity;
+  if (!target) {
+    let best = def.aggro; // aggro 0 (quái hiền) thì không bao giờ chọn mục tiêu
     w.state.players.forEach((p, sid) => {
-      if (p.dead || inTown(p.x, p.y, 20)) return;
+      if (p.dead) return;
       const d = Math.hypot(p.x - m.x, p.y - m.y);
-      if (d < best) {
+      if (d < nearest) nearest = d;
+      if (d < best && !inTown(p.x, p.y, 20)) {
         best = d;
         mc.target = sid;
         target = p;
@@ -128,13 +138,20 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
       tx = mc.homeX;
       ty = mc.homeY;
       speed = def.speed * 0.8;
+    } else if (nearest > MONSTER_WAKE_DIST) {
+      // Ngủ: đứng yên tại chỗ, không ghi gì vào state ngoài hồi máu
+      tx = m.x;
+      ty = m.y;
     } else if (w.now >= mc.nextWander) {
       mc.nextWander = w.now + rand(2000, 6000);
       mc.wanderX = mc.homeX + rand(-WANDER_RADIUS, WANDER_RADIUS);
       mc.wanderY = mc.homeY + rand(-WANDER_RADIUS, WANDER_RADIUS);
     }
-    // Hồi máu khi không giao chiến
-    m.hp = Math.min(m.maxHp, m.hp + m.maxHp * 0.05 * dt);
+    // Hồi máu khi không giao chiến (chỉ ghi phần nguyên vào state, xem takeWhole)
+    if (m.hp < m.maxHp) {
+      const add = takeWhole(mc, "hpFrac", m.maxHp * 0.05 * dt);
+      if (add) m.hp = Math.min(m.maxHp, m.hp + add);
+    } else mc.hpFrac = 0;
   }
 
   const dx = tx - m.x,

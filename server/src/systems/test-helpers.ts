@@ -55,6 +55,7 @@ export function addPlayer(w: World, sid: string, realm = 0, tier = 0) {
     inv: emptyInventory(),
     itemCd: new Map(),
     quests: { active: [], done: [], daily: {} },
+    frac: { hp: 0, mp: 0, exp: 0, expAt: 0 },
   };
   w.state.players.set(sid, p);
   w.ctrl.set(sid, c);
@@ -81,6 +82,7 @@ export function addMonster(w: World, kind: string, x: number, y: number) {
     wanderY: y,
     nextWander: 0,
     damageBy: new Map(),
+    hpFrac: 0,
   });
   return { id, m, mc: w.mctrl.get(id)! };
 }

@@ -111,16 +111,16 @@ export function useItem(w: World, sid: string, slot: unknown) {
     case "healHp":
       if (p.hp >= p.maxHp)
         return w.events.toast(sid, { text: "Khí huyết đang đầy.", tone: "info" });
-      p.hp = Math.min(p.maxHp, p.hp + p.maxHp * e.pct);
+      p.hp = Math.min(p.maxHp, p.hp + Math.round(p.maxHp * e.pct));
       break;
     case "healMp":
       if (p.mp >= p.maxMp) return w.events.toast(sid, { text: "Linh lực đang đầy.", tone: "info" });
-      p.mp = Math.min(p.maxMp, p.mp + p.maxMp * e.pct);
+      p.mp = Math.min(p.maxMp, p.mp + Math.round(p.maxMp * e.pct));
       break;
     case "exp":
       if (p.exp >= p.expMax)
         return w.events.toast(sid, { text: "Tu vi đã đầy, hãy đột phá trước.", tone: "info" });
-      gainExp(w, sid, p, p.expMax * e.pct);
+      gainExp(w, sid, p, Math.round(p.expMax * e.pct));
       break;
   }
   takeFromSlot(c.inv, i, 1);
