@@ -47,7 +47,7 @@ form.addEventListener("submit", async (e) => {
       secret: secret(),
     } satisfies JoinOptions);
     localStorage.setItem(NAME_KEY, name);
-    start(room);
+    await start(room);
   } catch (e: any) {
     err.textContent =
       e?.message && !/^\d+$/.test(e.message) ? e.message : "Không kết nối được máy chủ.";
@@ -55,7 +55,12 @@ form.addEventListener("submit", async (e) => {
   }
 });
 
-function start(room: Room) {
+async function start(room: Room) {
+  // Chờ font tiếng Việt tải xong trước khi Phaser vẽ Text lên canvas lần đầu
+  await Promise.race([
+    document.fonts.load('16px "Noto Serif"', "Tiếng Việt"),
+    new Promise((r) => setTimeout(r, 3000)),
+  ]);
   ui.show();
   new Phaser.Game({
     type: Phaser.AUTO,
