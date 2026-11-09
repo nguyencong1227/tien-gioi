@@ -22,6 +22,7 @@ import type { World, PlayerCtrl } from "../world";
 import { exchangeItems, sendInv } from "./inventory";
 import { gainExp } from "./progression";
 import { onTalked, questCtx, questsView, sendQuests } from "./quests";
+import { byId } from "./lookup";
 
 /** Người chơi còn sống và đứng trong tầm của NPC. */
 function nearNpc(
@@ -30,7 +31,7 @@ function nearNpc(
   npcId: unknown,
 ): { p: Player; c: PlayerCtrl; npc: NpcDef } | null {
   const r = w.ready(sid);
-  const npc = typeof npcId === "string" ? NPC_BY_ID[npcId] : undefined;
+  const npc = byId(NPC_BY_ID, npcId);
   if (!r || !npc) return null;
   if (Math.hypot(npc.x - r.p.x, npc.y - r.p.y) > NPC_RANGE) return null;
   return { ...r, npc };
@@ -85,7 +86,7 @@ export function talk(w: World, sid: string, npcId: unknown) {
 }
 
 export function acceptQuest(w: World, sid: string, questId: unknown) {
-  const def = typeof questId === "string" ? QUEST_BY_ID[questId] : undefined;
+  const def = byId(QUEST_BY_ID, questId);
   const r = def && nearNpc(w, sid, def.giver);
   if (!def || !r) return;
   if (!canAccept(def, questsView(w, r.c), questCtx(r.p, r.c))) return;
@@ -101,7 +102,7 @@ export function acceptQuest(w: World, sid: string, questId: unknown) {
  * Nhiệm vụ bị bỏ khỏi `active` ngay trong lần gọi đầu, nên gửi `questTurnIn` lần hai không còn gì để trả.
  */
 export function turnInQuest(w: World, sid: string, questId: unknown) {
-  const def = typeof questId === "string" ? QUEST_BY_ID[questId] : undefined;
+  const def = byId(QUEST_BY_ID, questId);
   const r = def && nearNpc(w, sid, def.giver);
   if (!def || !r) return;
   const { p, c } = r;
@@ -146,7 +147,7 @@ export function abandonQuest(w: World, sid: string, questId: unknown) {
 }
 
 export function trade(w: World, sid: string, tradeId: unknown) {
-  const t = typeof tradeId === "string" ? TRADE_BY_ID[tradeId] : undefined;
+  const t = byId(TRADE_BY_ID, tradeId);
   const r = t && nearNpc(w, sid, t.npcId);
   if (!t || !r) return;
   if (!t.give.every((g) => countItem(r.c.inv, g.itemId) >= g.qty)) {
