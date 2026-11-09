@@ -17,6 +17,7 @@ import {
   expToNext,
   killExp,
   meditateExpPerSec,
+  partyExpShare,
   statsFor,
   type MonsterKind,
 } from "@tien-gioi/shared";
@@ -82,20 +83,27 @@ interface Option {
   secPerKill: number;
 }
 
-/** Tốc độ tu vi khi săn một loại quái ở bậc (realm, tier); null nếu quá nguy hiểm. */
-export function huntRate(m: MonsterKind, realm: number, tier: number): Option | null {
+/**
+ * Tốc độ tu vi (của MỖI người) khi săn một loại quái ở bậc (realm, tier); null nếu quá nguy hiểm.
+ * `party` > 1: đội `party` người cùng cảnh giới đánh chung. Sát thương cộng dồn nên trận ngắn `party` lần; quái chỉ
+ * đánh một mục tiêu một lúc nên mỗi người chịu 1/`party` sát thương (nên đội đánh được quái mà một người không dám);
+ * thời gian tìm quái không đổi; tu vi mỗi con nhân partyExpShare (tu vi đả tọa lúc hồi sức không chia).
+ * `party` = 1 cho đúng kết quả đánh một mình như trước.
+ */
+export function huntRate(m: MonsterKind, realm: number, tier: number, party = 1): Option | null {
   const s = statsFor(realm, tier, bestGear(realm, tier));
   const dps = (s.atk * SKILLS.slash.mult * ASSUME.critAvg) / (SKILLS.slash.cooldown / 1000);
-  const fight = m.hp / dps;
-  const taken = (m.atk / (m.attackCd / 1000)) * fight * ASSUME.hitTaken;
+  const fight = m.hp / (dps * party);
+  const taken = ((m.atk / (m.attackCd / 1000)) * fight * ASSUME.hitTaken) / party;
   if (taken > s.maxHp * ASSUME.maxHpLossPerKill) return null;
   const rest = taken / (s.maxHp * MEDITATE.hpRegenPct); // đả tọa hồi khí huyết
   const sec = fight + rest + (ASSUME.searchSec[m.id] ?? 10);
-  const exp = killExp(m, realm, tier) + meditateExpPerSec(realm, tier) * rest;
+  const exp =
+    killExp(m, realm, tier) * partyExpShare(party) + meditateExpPerSec(realm, tier) * rest;
   return { source: m.id, rate: exp / sec, secPerKill: sec };
 }
 
-export function bestOption(realm: number, tier: number): Option {
+export function bestOption(realm: number, tier: number, party = 1): Option {
   const meditate: Option = {
     source: "đả tọa",
     rate: meditateExpPerSec(realm, tier),
@@ -103,10 +111,17 @@ export function bestOption(realm: number, tier: number): Option {
   };
   let best = meditate;
   for (const m of MONSTERS) {
-    const o = huntRate(m, realm, tier);
+    const o = huntRate(m, realm, tier, party);
     if (o && o.rate > best.rate) best = o;
   }
   return best;
+}
+
+/** Tu vi mỗi giờ của một thành viên đội `party` người so với đánh một mình, mỗi bên chọn quái tốt nhất an toàn. */
+export function partyRatio(realm: number, tier: number, party: number) {
+  const solo = bestOption(realm, tier);
+  const grp = bestOption(realm, tier, party);
+  return { ratio: grp.rate / solo.rate, solo: solo.source, party: grp.source };
 }
 
 /** Tổng tu vi thưởng của chuỗi chính theo cảnh giới lúc nhận thưởng (gần đúng: theo mốc reachRealm cuối cùng của nhiệm vụ) */

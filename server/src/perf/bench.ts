@@ -1,7 +1,7 @@
 // Benchmark một tick server, không cần mạng: N người chơi giả đi săn quái trong World thật.
 // Đo thời gian mỗi tick (mục tiêu < 10 ms, xem #29) và số byte patch state gửi cho mỗi client
 // (mã hóa riêng theo StateView của từng client, như SchemaSerializer.applyPatches, xem #62).
-// Chạy: npm run bench -w server [-- --players 100 --seconds 60]
+// Chạy: npm run bench -w server [-- --players 100 --seconds 60] [--crowd: tụ trong trấn, ca xấu nhất của vùng nhìn]
 // Dùng để so trước / sau khi tối ưu; kết quả in ra bảng, không ghi file.
 import { performance } from "node:perf_hooks";
 import { Encoder, StateView } from "@colyseus/schema";
@@ -58,7 +58,22 @@ export interface BenchResult {
   eventKbNear: number;
 }
 
-export function runBench(players: number, seconds: number, seed = 1): BenchResult {
+/**
+ * "hunt": người chơi rải khắp vùng hoang dã, đi săn quái (mặc định).
+ * "crowd" (#80): cả đám tụ trong Lạc Hà Trấn đi lại ngẫu nhiên, ~30% thời gian đứng yên, không đánh quái.
+ * Ai cũng thấy nhau nên vùng nhìn không cắt được gì: đây là ca xấu nhất của StateView.
+ */
+export type BenchMode = "hunt" | "crowd";
+
+/** Tỉ lệ thời gian một người trong ca "crowd" đứng yên */
+const CROWD_IDLE = 0.3;
+
+export function runBench(
+  players: number,
+  seconds: number,
+  seed = 1,
+  mode: BenchMode = "hunt",
+): BenchResult {
   const realRandom = Math.random;
   Math.random = seeded(seed);
   try {
@@ -79,29 +94,48 @@ export function runBench(players: number, seconds: number, seed = 1): BenchResul
       inv: () => {},
       quests: () => {},
       dialog: () => {},
+      party: () => {},
+      partyInvited: () => {},
+      chatTo: () => {},
     });
     w.now = 0;
     spawnInitial(w);
 
     // Người chơi rải ở vùng hoang dã, cảnh giới ngẫu nhiên Luyện Khí 1–9 / Trúc Cơ
-    const bots: { sid: string; seq: number; target: string | null }[] = [];
+    const bots: {
+      sid: string;
+      seq: number;
+      target: string | null;
+      // ca "crowd": đang đi hay đứng yên, hướng đi, tick đổi trạng thái kế tiếp
+      walking: boolean;
+      angle: number;
+      until: number;
+    }[] = [];
     for (let i = 0; i < players; i++) {
       const sid = `bot${i}`;
       const realm = Math.random() < 0.8 ? 1 : 2;
       const tier = Math.floor(Math.random() * REALMS[realm].tiers.length);
       const { p } = addPlayer(w, sid, realm, tier);
-      for (;;) {
+      if (mode === "crowd") {
+        // Rải đều trong hình tròn của trấn (căn bậc hai để đều theo diện tích)
         const a = Math.random() * Math.PI * 2;
-        const r = TOWN_PX.r + 80 + Math.random() * (WORLD_W * 0.45 - TOWN_PX.r);
-        const x = TOWN_PX.x + Math.cos(a) * r;
-        const y = TOWN_PX.y + Math.sin(a) * r;
-        if (!circleBlocked(x, y, 12) && dangerAt(x, y) < 0.9) {
-          p.x = x;
-          p.y = y;
-          break;
+        const r = Math.sqrt(Math.random()) * TOWN_PX.r * 0.9;
+        p.x = TOWN_PX.x + Math.cos(a) * r;
+        p.y = TOWN_PX.y + Math.sin(a) * r;
+      } else {
+        for (;;) {
+          const a = Math.random() * Math.PI * 2;
+          const r = TOWN_PX.r + 80 + Math.random() * (WORLD_W * 0.45 - TOWN_PX.r);
+          const x = TOWN_PX.x + Math.cos(a) * r;
+          const y = TOWN_PX.y + Math.sin(a) * r;
+          if (!circleBlocked(x, y, 12) && dangerAt(x, y) < 0.9) {
+            p.x = x;
+            p.y = y;
+            break;
+          }
         }
       }
-      bots.push({ sid, seq: 0, target: null });
+      bots.push({ sid, seq: 0, target: null, walking: false, angle: 0, until: 0 });
     }
     // Vùng nhìn: đăng ký sau khi đã đặt vị trí, như WorldRoom.onJoin
     const views: StateView[] = [];
@@ -132,6 +166,21 @@ export function runBench(players: number, seconds: number, seed = 1): BenchResul
         const p = w.state.players.get(b.sid)!;
         const c = w.ctrl.get(b.sid)!;
         if (p.dead) continue;
+        if (mode === "crowd") {
+          // Đi lại ngẫu nhiên trong trấn: mỗi 1–4 giây đổi giữa đi / đứng yên, đi thì chọn hướng mới
+          if (t >= b.until) {
+            b.walking = Math.random() >= CROWD_IDLE;
+            b.angle = Math.random() * Math.PI * 2;
+            b.until = t + 20 + Math.floor(Math.random() * 60);
+          }
+          if (b.walking) {
+            const tx = TOWN_PX.x - p.x;
+            const ty = TOWN_PX.y - p.y;
+            if (Math.hypot(tx, ty) > TOWN_PX.r) b.angle = Math.atan2(ty, tx); // ra khỏi trấn thì quay về
+            c.inputs.push({ seq: ++b.seq, dx: Math.cos(b.angle), dy: Math.sin(b.angle) });
+          }
+          continue;
+        }
         let m = b.target ? w.state.monsters.get(b.target) : undefined;
         if (!m || t % 40 === 0) {
           let best = Infinity;
@@ -200,14 +249,17 @@ export function runBench(players: number, seconds: number, seed = 1): BenchResul
 
 if (process.argv[1]?.endsWith("bench.ts")) {
   const seconds = arg("seconds", 60);
+  const mode: BenchMode = process.argv.includes("--crowd") ? "crowd" : "hunt";
   const counts = process.argv.includes("--players") ? [arg("players", 100)] : [0, 10, 50, 100];
-  console.log(`Mô phỏng ${seconds} giây chơi (${seconds * 20} tick), đo tick + mã hóa patch\n`);
+  console.log(
+    `Mô phỏng ${seconds} giây chơi (${seconds * 20} tick), đo tick + mã hóa patch, ca ${mode === "crowd" ? "đông người tụ trong trấn" : "săn quái ngoài hoang dã"}\n`,
+  );
   console.log(
     "| Người chơi | Quái | Tick TB (ms) | p95 (ms) | Max (ms) | Patch TB (byte) | KB/s mỗi client | fx+dmg cả phòng (KB/s) | fx+dmg vùng nhìn (KB/s) |",
   );
   console.log("|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
   for (const n of counts) {
-    const r = runBench(n, seconds);
+    const r = runBench(n, seconds, 1, mode);
     console.log(
       `| ${n} | ${r.monsters} | ${r.avgMs.toFixed(3)} | ${r.p95Ms.toFixed(3)} | ${r.maxMs.toFixed(2)} | ${Math.round(r.patchBytes)} | ${r.kbPerSecPerClient.toFixed(1)} | ${r.eventKbBroadcast.toFixed(1)} | ${r.eventKbNear.toFixed(1)} |`,
     );
