@@ -40,6 +40,12 @@ import {
   NO_PARTY,
   type PartyMsg,
   type PartyInvitedMsg,
+  CURRENCY_NAME,
+  buyPrice,
+  sellPrice,
+  SHOP_BY_NPC,
+  SHOP_MAX_QTY,
+  type WalletMsg,
 } from "@tien-gioi/shared";
 import { sound } from "./audio";
 
@@ -77,6 +83,8 @@ export interface UiCallbacks {
   onPartyInvite?: (name: string) => void;
   onPartyAccept?: (from: string) => void;
   onPartyDecline?: (from: string) => void;
+  onBuy?: (npcId: string, itemId: string, qty: number) => void;
+  onSell?: (npcId: string, slot: number, qty: number) => void;
 }
 
 const fmt = (n: number) =>
@@ -471,6 +479,28 @@ function showGainFeed(itemId: string, qty: number) {
   applyItemVisual(icon, def);
   const text = document.createElement("span");
   text.textContent = `+${qty} ${def.name}`;
+  item.append(icon, text);
+  feed.append(item);
+  while (feed.children.length > 6) feed.firstChild!.remove();
+  setTimeout(() => item.remove(), 2800);
+}
+
+function showCoinGainFeed(amount: number) {
+  if (amount === 0) return;
+  const feed = $("gain-feed");
+  const item = document.createElement("div");
+  item.className = "gain-item gain-coin";
+  const isGain = amount > 0;
+  item.style.borderLeftColor = isGain ? "#ffe08a" : "#ff7875";
+  item.style.color = isGain ? "#ffe08a" : "#ff7875";
+
+  const icon = document.createElement("i");
+  icon.className = "coin-icon";
+  icon.textContent = "💎";
+  icon.style.fontStyle = "normal";
+
+  const text = document.createElement("span");
+  text.textContent = `${isGain ? "+" : ""}${amount} ${CURRENCY_NAME}`;
   item.append(icon, text);
   feed.append(item);
   while (feed.children.length > 6) feed.firstChild!.remove();
@@ -1008,6 +1038,303 @@ function renderForgeModal() {
   }
 }
 
+// ---------- Giao diện Cửa hàng Lão Dược Sư (#100) ----------
+
+let shopModalOpen = false;
+let shopNpcId = "duoc_su";
+let shopTab: "buy" | "sell" = "buy";
+const shopBuyQuantities: Record<string, number> = {};
+const shopSellQuantities: Record<number, number> = {};
+let currentCoin = 0;
+
+function renderShopModal() {
+  const npc = NPC_BY_ID[shopNpcId];
+  $("shop-title").textContent = npc ? `Cửa Hàng · ${npc.name}` : "Cửa Hàng Lão Dược Sư";
+  $("shop-coin").textContent = currentCoin.toLocaleString("vi-VN");
+
+  const tabBuy = $("tab-shop-buy");
+  const tabSell = $("tab-shop-sell");
+  const listBuy = $("shop-buy-list");
+  const listSell = $("shop-sell-list");
+
+  if (shopTab === "buy") {
+    tabBuy.classList.add("active");
+    tabSell.classList.remove("active");
+    listBuy.hidden = false;
+    listSell.hidden = true;
+    renderShopBuy();
+  } else {
+    tabBuy.classList.remove("active");
+    tabSell.classList.add("active");
+    listBuy.hidden = true;
+    listSell.hidden = false;
+    renderShopSell();
+  }
+}
+
+function renderShopBuy() {
+  const list = $("shop-buy-list");
+  list.replaceChildren();
+
+  const shop = SHOP_BY_NPC[shopNpcId];
+  if (!shop || shop.itemIds.length === 0) {
+    const emptyP = document.createElement("p");
+    emptyP.className = "shop-empty";
+    emptyP.textContent = "Cửa hàng hiện chưa có mặt hàng nào.";
+    list.append(emptyP);
+    return;
+  }
+
+  for (const itemId of shop.itemIds) {
+    const def = ITEM_BY_ID[itemId];
+    if (!def) continue;
+
+    const unitPrice = buyPrice(itemId);
+    const qty = Math.min(SHOP_MAX_QTY, Math.max(1, shopBuyQuantities[itemId] ?? 1));
+    shopBuyQuantities[itemId] = qty;
+    const totalPrice = unitPrice * qty;
+    const canAfford = currentCoin >= totalPrice;
+
+    const card = document.createElement("div");
+    card.className = "shop-card";
+
+    // Cột trái: Icon + Thông tin
+    const left = document.createElement("div");
+    left.className = "shop-card-left";
+
+    const icon = document.createElement("i");
+    icon.className = "slot-icon";
+    applyItemVisual(icon, def);
+
+    const info = document.createElement("div");
+    info.className = "shop-item-info";
+
+    const nameRow = document.createElement("div");
+    nameRow.className = "shop-item-name-row";
+
+    const name = document.createElement("b");
+    name.className = "shop-item-name";
+    name.style.color = hexColor(RARITY_COLORS[def.rarity]);
+    name.textContent = def.name;
+
+    const priceTag = document.createElement("span");
+    priceTag.className = "shop-price-tag";
+    priceTag.textContent = `${unitPrice} 💎 / cái`;
+
+    nameRow.append(name, priceTag);
+
+    const desc = document.createElement("div");
+    desc.className = "shop-item-desc";
+    desc.textContent = def.desc;
+
+    info.append(nameRow, desc);
+    left.append(icon, info);
+
+    // Cột phải: Chọn số lượng + Nút mua
+    const right = document.createElement("div");
+    right.className = "shop-card-right";
+
+    const qtyBox = document.createElement("div");
+    qtyBox.className = "shop-qty-box";
+
+    const btnMinus = document.createElement("button");
+    btnMinus.type = "button";
+    btnMinus.className = "shop-qty-btn";
+    btnMinus.textContent = "−";
+    btnMinus.title = "Giảm số lượng";
+    btnMinus.disabled = qty <= 1;
+    btnMinus.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (qty > 1) {
+        shopBuyQuantities[itemId] = qty - 1;
+        renderShopBuy();
+      }
+    });
+
+    const qtyVal = document.createElement("span");
+    qtyVal.className = "shop-qty-val";
+    qtyVal.textContent = `${qty}`;
+
+    const btnPlus = document.createElement("button");
+    btnPlus.type = "button";
+    btnPlus.className = "shop-qty-btn";
+    btnPlus.textContent = "+";
+    btnPlus.title = "Tăng số lượng";
+    btnPlus.disabled = qty >= SHOP_MAX_QTY;
+    btnPlus.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (qty < SHOP_MAX_QTY) {
+        shopBuyQuantities[itemId] = qty + 1;
+        renderShopBuy();
+      }
+    });
+
+    qtyBox.append(btnMinus, qtyVal, btnPlus);
+
+    const buyBtn = document.createElement("button");
+    buyBtn.type = "button";
+    buyBtn.className = "shop-act-btn buy";
+    buyBtn.disabled = !canAfford;
+
+    const buyBtnText = document.createElement("span");
+    buyBtnText.textContent = canAfford
+      ? `Mua (${totalPrice} 💎)`
+      : `Thiếu ${totalPrice - currentCoin} 💎`;
+    buyBtn.append(buyBtnText);
+
+    buyBtn.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!canAfford) return;
+      sound.pickup();
+      callbacks?.onBuy?.(shopNpcId, itemId, qty);
+    });
+
+    right.append(qtyBox, buyBtn);
+    card.append(left, right);
+    list.append(card);
+  }
+}
+
+function renderShopSell() {
+  const list = $("shop-sell-list");
+  list.replaceChildren();
+
+  let sellableCount = 0;
+
+  for (let i = 0; i < invSlots.length; i++) {
+    const slot = invSlots[i];
+    if (!slot) continue;
+    const def = ITEM_BY_ID[slot.itemId];
+    if (!def) continue;
+
+    const unitPrice = sellPrice(slot.itemId);
+    const canSell = unitPrice > 0;
+    if (canSell) sellableCount++;
+
+    const maxQty = slot.qty;
+    const qty = Math.min(maxQty, Math.max(1, shopSellQuantities[i] ?? 1));
+    shopSellQuantities[i] = qty;
+    const totalPrice = unitPrice * qty;
+
+    const card = document.createElement("div");
+    card.className = `shop-card${canSell ? "" : " unsellable"}`;
+
+    // Cột trái: Icon + Thông tin
+    const left = document.createElement("div");
+    left.className = "shop-card-left";
+
+    const icon = document.createElement("i");
+    icon.className = "slot-icon";
+    applyItemVisual(icon, def);
+
+    const info = document.createElement("div");
+    info.className = "shop-item-info";
+
+    const nameRow = document.createElement("div");
+    nameRow.className = "shop-item-name-row";
+
+    const name = document.createElement("b");
+    name.className = "shop-item-name";
+    name.style.color = hexColor(RARITY_COLORS[def.rarity]);
+    name.textContent = `${def.name} ×${slot.qty}`;
+
+    const priceTag = document.createElement("span");
+    priceTag.className = "shop-price-tag";
+    priceTag.textContent = canSell ? `Thu mua: ${unitPrice} 💎 / cái` : "Không thể bán";
+
+    nameRow.append(name, priceTag);
+
+    const desc = document.createElement("div");
+    desc.className = "shop-item-desc";
+    desc.textContent = canSell
+      ? def.desc
+      : "Vật phẩm đặc biệt hoặc đồ nhiệm vụ không thể bán cho NPC.";
+
+    info.append(nameRow, desc);
+    left.append(icon, info);
+
+    // Cột phải: Chọn số lượng + Nút bán
+    const right = document.createElement("div");
+    right.className = "shop-card-right";
+
+    if (canSell) {
+      const qtyBox = document.createElement("div");
+      qtyBox.className = "shop-qty-box";
+
+      const btnMinus = document.createElement("button");
+      btnMinus.type = "button";
+      btnMinus.className = "shop-qty-btn";
+      btnMinus.textContent = "−";
+      btnMinus.title = "Giảm số lượng";
+      btnMinus.disabled = qty <= 1;
+      btnMinus.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (qty > 1) {
+          shopSellQuantities[i] = qty - 1;
+          renderShopSell();
+        }
+      });
+
+      const qtyVal = document.createElement("span");
+      qtyVal.className = "shop-qty-val";
+      qtyVal.textContent = `${qty}`;
+
+      const btnPlus = document.createElement("button");
+      btnPlus.type = "button";
+      btnPlus.className = "shop-qty-btn";
+      btnPlus.textContent = "+";
+      btnPlus.title = "Tăng số lượng";
+      btnPlus.disabled = qty >= maxQty;
+      btnPlus.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (qty < maxQty) {
+          shopSellQuantities[i] = qty + 1;
+          renderShopSell();
+        }
+      });
+
+      qtyBox.append(btnMinus, qtyVal, btnPlus);
+
+      const sellBtn = document.createElement("button");
+      sellBtn.type = "button";
+      sellBtn.className = "shop-act-btn sell";
+
+      const sellBtnText = document.createElement("span");
+      sellBtnText.textContent = `Bán (+${totalPrice} 💎)`;
+      sellBtn.append(sellBtnText);
+
+      sellBtn.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        sound.pickup();
+        callbacks?.onSell?.(shopNpcId, i, qty);
+      });
+
+      right.append(qtyBox, sellBtn);
+    } else {
+      const lockLabel = document.createElement("span");
+      lockLabel.className = "shop-lock-label";
+      lockLabel.textContent = "Đồ khóa";
+      right.append(lockLabel);
+    }
+
+    card.append(left, right);
+    list.append(card);
+  }
+
+  if (sellableCount === 0) {
+    const emptyP = document.createElement("p");
+    emptyP.className = "shop-empty";
+    emptyP.textContent = "Túi đồ hiện không có vật phẩm nào có thể bán.";
+    list.prepend(emptyP);
+  }
+}
+
 // ---------- Hộp thoại NPC (Typewriter + Options) ----------
 
 function stopTypewriter() {
@@ -1037,7 +1364,8 @@ function renderDialogOptions() {
     if (
       opt.action.kind === "accept" ||
       opt.action.kind === "turnIn" ||
-      opt.action.kind === "forge"
+      opt.action.kind === "forge" ||
+      opt.action.kind === "shop"
     ) {
       btn.classList.add("primary");
     }
@@ -1062,16 +1390,25 @@ function renderDialogOptions() {
       tag.textContent = "Lò rèn";
       tag.style.color = "#ffe08a";
       btn.append(tag);
+    } else if (opt.action.kind === "shop") {
+      const tag = document.createElement("small");
+      tag.textContent = "Cửa hàng";
+      tag.style.color = "#ffe08a";
+      btn.append(tag);
     }
 
     btn.addEventListener("pointerdown", (e) => {
       e.preventDefault();
       const action = opt.action;
-      const npcId = currentDialog?.npcId ?? "tho_ren";
+      const npcId = currentDialog?.npcId ?? "duoc_su";
       ui.closeDialog();
       if (action.kind === "turnIn") sound.questDone();
       if (action.kind === "forge") {
         ui.openForgeModal(npcId);
+        return;
+      }
+      if (action.kind === "shop") {
+        ui.openShopModal(npcId);
         return;
       }
       callbacks?.onDialogAction(action);
@@ -1226,10 +1563,19 @@ export const ui = {
       if (selectedPlayerName) callbacks?.onPartyInvite?.(selectedPlayerName);
     });
 
-    // Bảng nhân vật & Trang bị (#31) + Lò rèn (#32)
+    // Bảng nhân vật & Trang bị (#31) + Lò rèn (#32) + Cửa hàng (#100)
     bindTap("btn-char", () => this.toggleCharModal());
     bindTap("char-close", () => this.toggleCharModal(false));
     bindTap("forge-close", () => this.toggleForgeModal(false));
+    bindTap("shop-close", () => this.toggleShopModal(false));
+    bindTap("tab-shop-buy", () => {
+      shopTab = "buy";
+      renderShopModal();
+    });
+    bindTap("tab-shop-sell", () => {
+      shopTab = "sell";
+      renderShopModal();
+    });
 
     // Sổ nhiệm vụ
     bindTap("btn-quest", () => this.toggleQuestModal());
@@ -1418,6 +1764,21 @@ export const ui = {
     return forgeModalOpen;
   },
 
+  openShopModal(npcId = "duoc_su") {
+    shopNpcId = npcId;
+    this.toggleShopModal(true);
+  },
+
+  toggleShopModal(force?: boolean) {
+    shopModalOpen = force ?? !shopModalOpen;
+    $("shop-modal").hidden = !shopModalOpen;
+    if (shopModalOpen) renderShopModal();
+  },
+
+  isShopModalOpen() {
+    return shopModalOpen;
+  },
+
   toggleQuestModal(force?: boolean) {
     questModalOpen = force ?? !questModalOpen;
     $("quest-modal").hidden = !questModalOpen;
@@ -1465,6 +1826,10 @@ export const ui = {
     }
     if (forgeModalOpen) {
       this.toggleForgeModal(false);
+      closedAny = true;
+    }
+    if (shopModalOpen) {
+      this.toggleShopModal(false);
       closedAny = true;
     }
     if (questModalOpen) {
@@ -1515,6 +1880,30 @@ export const ui = {
     renderInventory();
     renderQuestTracker();
     if (questModalOpen) renderQuestModal();
+    if (shopModalOpen && shopTab === "sell") renderShopSell();
+  },
+
+  onWallet(m: WalletMsg) {
+    currentCoin = m.coin;
+    const coinStr = m.coin.toLocaleString("vi-VN");
+    const hudCoin = $("hud-coin");
+    if (hudCoin) hudCoin.textContent = coinStr;
+    const charCoin = $("char-coin");
+    if (charCoin) charCoin.textContent = coinStr;
+    const shopCoin = $("shop-coin");
+    if (shopCoin) shopCoin.textContent = coinStr;
+
+    if (m.gained !== undefined && m.gained !== 0) {
+      showCoinGainFeed(m.gained);
+    }
+
+    if (shopModalOpen) {
+      renderShopModal();
+    }
+  },
+
+  getCurrentCoin(): number {
+    return currentCoin;
   },
 
   onQuests(m: QuestsMsg) {
