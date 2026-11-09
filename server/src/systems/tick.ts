@@ -17,4 +17,5 @@ export function tickWorld(w: World, dtMs: number) {
   });
   tickMonsters(w, dt);
   tickLoot(w);
+  w.interest.update(w); // sau cùng: dựa trên vị trí mới của tick này
 }

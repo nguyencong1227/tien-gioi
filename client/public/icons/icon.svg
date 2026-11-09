@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#1d1a16" />
+  <circle cx="256" cy="256" r="196" fill="#2b231d" stroke="#c9a24a" stroke-width="10" />
+  <circle cx="256" cy="256" r="168" fill="#a31d1d" stroke="#f3ecda" stroke-width="4" stroke-opacity="0.85" />
+  <circle cx="256" cy="256" r="146" fill="#7d1515" />
+  <circle cx="256" cy="70" r="9" fill="#ffe08a" />
+  <circle cx="442" cy="256" r="9" fill="#ffe08a" />
+  <circle cx="256" cy="442" r="9" fill="#ffe08a" />
+  <circle cx="70" cy="256" r="9" fill="#ffe08a" />
+  <polygon points="256,96 270,132 270,300 242,300 242,132" fill="#f3ecda" />
+  <line x1="256" y1="104" x2="256" y2="296" stroke="#ffffff" stroke-width="6" stroke-linecap="round" />
+  <rect x="198" y="292" width="116" height="16" rx="8" fill="#c9a24a" stroke="#1d1a16" stroke-width="3" />
+  <rect x="248" y="308" width="16" height="68" rx="5" fill="#5a3022" />
+  <circle cx="256" cy="384" r="14" fill="#c9a24a" />
+  <circle cx="256" cy="384" r="7" fill="#3f7fa6" />
+  <text x="256" y="248" text-anchor="middle" font-family="Noto Serif, Georgia, serif" font-size="112" font-weight="bold" fill="#ffe08a" fill-opacity="0.28">仙</text>
+</svg>

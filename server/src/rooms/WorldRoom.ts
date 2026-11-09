@@ -1,5 +1,6 @@
 // Phòng thế giới: vào / ra phòng, lưu nhân vật, nối tin nhắn với các system.
 // Logic game nằm trong ../systems/*, trạng thái dùng chung trong ../world.ts.
+import { StateView } from "@colyseus/schema";
 import { Room, Client, ServerError, type RoomException } from "colyseus";
 import {
   TICK_MS,
@@ -198,6 +199,10 @@ export class WorldRoom extends Room<WorldState> {
       frac: { hp: 0, mp: 0, exp: 0, expAt: 0 },
     });
     this.limiters.set(client.sessionId, new RateLimiter(Date.now()));
+    // Vùng nhìn: phải gán client.view trong onJoin, trước khi Colyseus gửi state đầy đủ
+    client.view = new StateView();
+    this.world.interest.join(this.world, client.sessionId, client.view);
+    this.state.online = this.state.players.size;
     sendInv(this.world, client.sessionId);
     sendQuests(this.world, client.sessionId);
     this.world.events.sys(`${p.name} (${realmLabel(p.realm, p.tier)}) đã nhập thế.`);
@@ -212,6 +217,8 @@ export class WorldRoom extends Room<WorldState> {
       this.world.events.sys(`${p.name} đã rời đi.`);
     }
     this.state.players.delete(sid);
+    this.state.online = this.state.players.size;
+    this.world.interest.leave(sid);
     this.world.ctrl.delete(sid);
     this.limiters.delete(sid);
     forgetTarget(this.world, sid);

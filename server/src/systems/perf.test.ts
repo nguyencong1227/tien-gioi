@@ -95,11 +95,12 @@ describe("ngân sách băng thông và CPU (benchmark có seed, kết quả cố
     expect(runBench(0, 5).patchBytes).toBe(0);
   });
 
-  it("100 người chơi: patch dưới ngân sách, tick dưới 10 ms", () => {
+  it("100 người chơi: patch mỗi client dưới ngân sách, tick dưới 10 ms", () => {
     const r = runBench(100, 10);
-    // Đo lúc viết: ~1670 byte/tick trong 10 giây đầu (≈ 33 KB/s mỗi client; quái còn đông).
-    // Vượt ngân sách nghĩa là có trường state đổi mỗi tick không cần thiết.
-    expect(r.patchBytes).toBeLessThan(2000);
+    // Đo lúc viết (#62, StateView): ~585 byte/tick mỗi client (≈ 11 KB/s) trong 10 giây đầu, quái còn đông.
+    // Trước StateView mỗi client nhận cả thế giới: ~1670 byte/tick. Vượt ngân sách nghĩa là có trường
+    // state đổi mỗi tick không cần thiết, hoặc vùng nhìn (systems/interest.ts) không còn cắt được.
+    expect(r.patchBytes).toBeLessThan(800);
     expect(r.avgMs).toBeLessThan(10);
   });
 });
