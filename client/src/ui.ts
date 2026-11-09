@@ -36,6 +36,10 @@ import {
   type QuestCtx,
   type DialogMsg,
   type DialogAction,
+  PARTY_MAX,
+  NO_PARTY,
+  type PartyMsg,
+  type PartyInvitedMsg,
 } from "@tien-gioi/shared";
 import { sound } from "./audio";
 
@@ -68,6 +72,11 @@ export interface UiCallbacks {
   onTalk: () => void;
   onDialogAction: (action: DialogAction) => void;
   onTrackQuest?: (questId: string | null) => void;
+  onPartyLeave?: () => void;
+  onPartyKick?: (name: string) => void;
+  onPartyInvite?: (name: string) => void;
+  onPartyAccept?: (from: string) => void;
+  onPartyDecline?: (from: string) => void;
 }
 
 const fmt = (n: number) =>
@@ -104,6 +113,130 @@ let currentRealm = 0;
 let currentTier = 0;
 let currentEquip: Equipment = emptyEquipment();
 let questLog: QuestsMsg = { active: [], done: [], dailyDone: [] };
+
+// ---------- Tổ đội (M3, #75) ----------
+let partyData: PartyMsg = NO_PARTY;
+const inviteQueue: PartyInvitedMsg[] = [];
+let inviteInterval: number | null = null;
+let currentInviteFrom = "";
+let selectedPlayerName = "";
+
+function stopInviteTimer() {
+  if (inviteInterval !== null) {
+    window.clearInterval(inviteInterval);
+    inviteInterval = null;
+  }
+}
+
+function processNextInvite() {
+  stopInviteTimer();
+  const next = inviteQueue.shift();
+  if (!next) {
+    currentInviteFrom = "";
+    $("party-invite-box").hidden = true;
+    return;
+  }
+  currentInviteFrom = next.from;
+  const box = $("party-invite-box");
+  box.hidden = false;
+  sound.typeBlip();
+
+  const msgEl = $("pib-msg");
+  msgEl.replaceChildren();
+  const b = document.createElement("b");
+  b.textContent = next.from;
+  msgEl.append(b, document.createTextNode(" mời bạn gia nhập tổ đội "));
+  const timeSpan = document.createElement("span");
+  timeSpan.id = "pib-time-left";
+  msgEl.append(timeSpan);
+
+  const startTime = Date.now();
+  const ttl = next.ttlMs;
+  const bar = $("pib-timer-bar");
+
+  const update = () => {
+    const elapsed = Date.now() - startTime;
+    const rem = Math.max(0, ttl - elapsed);
+    const sec = Math.ceil(rem / 1000);
+    timeSpan.textContent = `(${sec}s)`;
+    bar.style.width = `${(rem / ttl) * 100}%`;
+    if (rem <= 0) {
+      stopInviteTimer();
+      callbacks?.onPartyDecline?.(next.from);
+      processNextInvite();
+    }
+  };
+  update();
+  inviteInterval = window.setInterval(update, 200);
+}
+
+function renderPartyPanel() {
+  const panel = $("party-panel");
+  const membersEl = $("party-members");
+  if (!partyData || !partyData.leader || partyData.members.length === 0) {
+    panel.hidden = true;
+    membersEl.replaceChildren();
+    return;
+  }
+  panel.hidden = false;
+  $("party-title").textContent = `Tổ đội (${partyData.members.length}/${PARTY_MAX})`;
+
+  membersEl.replaceChildren();
+  for (const m of partyData.members) {
+    const row = document.createElement("div");
+    row.className = "pmem-row";
+
+    const info = document.createElement("div");
+    info.className = "pmem-info";
+
+    const nameWrap = document.createElement("div");
+    nameWrap.className = "pmem-name-wrap";
+
+    if (m.name === partyData.leader) {
+      const leaderIcon = document.createElement("span");
+      leaderIcon.className = "pmem-leader-icon";
+      leaderIcon.textContent = "👑";
+      leaderIcon.title = "Đội trưởng";
+      nameWrap.append(leaderIcon);
+    }
+
+    const nameSpan = document.createElement("span");
+    nameSpan.className = `pmem-name${m.name === currentName ? " is-me" : ""}`;
+    nameSpan.textContent = m.name;
+    nameWrap.append(nameSpan);
+
+    const realmSpan = document.createElement("span");
+    realmSpan.className = "pmem-realm";
+    realmSpan.textContent = realmLabel(m.realm, m.tier);
+    nameWrap.append(realmSpan);
+
+    info.append(nameWrap);
+
+    // Đội trưởng có nút trục xuất thành viên khác
+    if (partyData.leader === currentName && m.name !== currentName) {
+      const kickBtn = document.createElement("button");
+      kickBtn.type = "button";
+      kickBtn.className = "pmem-kick-btn";
+      kickBtn.textContent = "✕";
+      kickBtn.title = `Mời ${m.name} ra khỏi đội`;
+      kickBtn.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        callbacks?.onPartyKick?.(m.name);
+      });
+      info.append(kickBtn);
+    }
+
+    const bar = document.createElement("div");
+    bar.className = "pmem-bar";
+    const hpFrac = m.maxHp > 0 ? Math.max(0, Math.min(1, m.hp / m.maxHp)) : 0;
+    const hpFill = document.createElement("i");
+    hpFill.style.width = `${Math.round(hpFrac * 100)}%`;
+    bar.append(hpFill);
+
+    row.append(info, bar);
+    membersEl.append(row);
+  }
+}
 
 function loadSettings() {
   try {
@@ -1052,6 +1185,28 @@ export const ui = {
     bindTap("btn-pickup", () => callbacks?.onPickup());
     bindTap("btn-talk", () => callbacks?.onTalk());
 
+    // Tổ đội (#75)
+    bindTap("party-btn-leave", () => callbacks?.onPartyLeave?.());
+    bindTap("pib-btn-accept", () => {
+      stopInviteTimer();
+      $("party-invite-box").hidden = true;
+      if (currentInviteFrom) callbacks?.onPartyAccept?.(currentInviteFrom);
+      processNextInvite();
+    });
+    bindTap("pib-btn-decline", () => {
+      stopInviteTimer();
+      $("party-invite-box").hidden = true;
+      if (currentInviteFrom) callbacks?.onPartyDecline?.(currentInviteFrom);
+      processNextInvite();
+    });
+    bindTap("pm-close", () => {
+      $("player-menu").hidden = true;
+    });
+    bindTap("pm-invite-btn", () => {
+      $("player-menu").hidden = true;
+      if (selectedPlayerName) callbacks?.onPartyInvite?.(selectedPlayerName);
+    });
+
     // Bảng nhân vật & Trang bị (#31) + Lò rèn (#32)
     bindTap("btn-char", () => this.toggleCharModal());
     bindTap("char-close", () => this.toggleCharModal(false));
@@ -1305,6 +1460,10 @@ export const ui = {
       this.toggleSettingsModal(false);
       closedAny = true;
     }
+    if (this.isPlayerMenuOpen()) {
+      this.closePlayerMenu();
+      closedAny = true;
+    }
     return closedAny;
   },
 
@@ -1517,6 +1676,11 @@ export const ui = {
     if (m.sys) {
       p.className = "sys";
       p.textContent = m.text;
+    } else if (m.channel === "party") {
+      p.className = "party";
+      const b = document.createElement("b");
+      b.textContent = `[Đội] ${m.from}: `;
+      p.append(b, document.createTextNode(m.text));
     } else {
       const b = document.createElement("b");
       b.textContent = `${m.from}: `;
@@ -1526,6 +1690,56 @@ export const ui = {
     log.append(p);
     while (log.children.length > 60) log.firstChild!.remove();
     if (atBottom) log.scrollTop = log.scrollHeight;
+  },
+
+  onParty(m: PartyMsg) {
+    partyData = m;
+    renderPartyPanel();
+  },
+
+  onPartyInvited(m: PartyInvitedMsg) {
+    inviteQueue.push(m);
+    if (!currentInviteFrom) {
+      processNextInvite();
+    }
+  },
+
+  openPlayerMenu(name: string, realm: number, tier: number, x: number, y: number) {
+    if (name === currentName) return;
+    selectedPlayerName = name;
+    $("pm-name").textContent = name;
+    $("pm-realm").textContent = realmLabel(realm, tier);
+
+    const isFull = partyData.members.length >= PARTY_MAX;
+    const btn = $("pm-invite-btn") as HTMLButtonElement;
+    btn.disabled = isFull;
+    btn.textContent = isFull ? "Đội đã đủ (4/4)" : "Mời vào tổ đội";
+
+    const menu = $("player-menu");
+    menu.hidden = false;
+    const pad = 10;
+    const mw = menu.offsetWidth || 200;
+    const mh = menu.offsetHeight || 100;
+    const clampedX = Math.max(pad, Math.min(window.innerWidth - mw - pad, x));
+    const clampedY = Math.max(pad, Math.min(window.innerHeight - mh - pad, y));
+    menu.style.left = `${clampedX}px`;
+    menu.style.top = `${clampedY}px`;
+  },
+
+  closePlayerMenu() {
+    $("player-menu").hidden = true;
+  },
+
+  isPlayerMenuOpen() {
+    return !$("player-menu").hidden;
+  },
+
+  getParty(): PartyMsg {
+    return partyData;
+  },
+
+  isPartyFull(): boolean {
+    return partyData.members.length >= PARTY_MAX;
   },
 
   toast(m: ToastMsg) {

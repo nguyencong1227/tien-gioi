@@ -35,6 +35,8 @@ import {
   type LootView,
   type QuestsMsg,
   type DialogMsg,
+  type PartyMsg,
+  type PartyInvitedMsg,
 } from "@tien-gioi/shared";
 import { preloadAssets, makeTextures, dirFromAngle, TILESET_KEY, ATLAS_KEY } from "../textures";
 import { ui } from "../ui";
@@ -243,6 +245,11 @@ export class WorldScene extends Phaser.Scene {
       onTrackQuest: () => {
         // Tracker được cập nhật tự động trong update()
       },
+      onPartyLeave: () => this.room.send("partyLeave"),
+      onPartyKick: (name) => this.room.send("partyKick", { name }),
+      onPartyInvite: (name) => this.room.send("partyInvite", { name }),
+      onPartyAccept: (from) => this.room.send("partyAccept", { from }),
+      onPartyDecline: (from) => this.room.send("partyDecline", { from }),
     });
 
     this.setupInput();
@@ -381,11 +388,9 @@ export class WorldScene extends Phaser.Scene {
         setTimeout(() => (document.getElementById("chat-input") as HTMLInputElement).focus(), 0);
     });
 
-    // Chuột: bấm vào bản đồ để chém về phía con trỏ
+    // Chuột / chạm: bấm vào người chơi khác để mở menu tổ đội, hoặc chém về phía con trỏ
     this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
       if (
-        p.wasTouch ||
-        !p.leftButtonDown() ||
         ui.isCharModalOpen() ||
         ui.isForgeModalOpen() ||
         ui.isInventoryOpen() ||
@@ -395,6 +400,14 @@ export class WorldScene extends Phaser.Scene {
         ui.isDialogOpen()
       )
         return;
+
+      if (this.tryClickPlayer(p)) return;
+
+      if (ui.isPlayerMenuOpen()) {
+        ui.closePlayerMenu();
+      }
+
+      if (p.wasTouch || !p.leftButtonDown()) return;
       this.slash(Math.atan2(p.worldY - this.predY, p.worldX - this.predX));
     });
 
@@ -448,6 +461,28 @@ export class WorldScene extends Phaser.Scene {
       }
     });
     return angle;
+  }
+
+  /** Bấm/chạm trúng người chơi khác thì mở menu tương tác (mời tổ đội). */
+  private tryClickPlayer(pointer: Phaser.Input.Pointer): boolean {
+    let closestId: string | null = null;
+    let closestDist = 36;
+    this.players.forEach((e, id) => {
+      if (id === this.sid) return;
+      const d = Math.hypot(pointer.worldX - e.root.x, pointer.worldY - e.root.y);
+      if (d < closestDist) {
+        closestDist = d;
+        closestId = id;
+      }
+    });
+    if (closestId) {
+      const sp = this.state.players.get(closestId);
+      if (sp) {
+        ui.openPlayerMenu(sp.name, sp.realm, sp.tier, pointer.x, pointer.y);
+        return true;
+      }
+    }
+    return false;
   }
 
   private me() {
@@ -528,6 +563,8 @@ export class WorldScene extends Phaser.Scene {
     this.room.onMessage("inv", (m: InvMsg) => ui.onInv(m));
     this.room.onMessage("quests", (m: QuestsMsg) => ui.onQuests(m));
     this.room.onMessage("dialog", (m: DialogMsg) => ui.onDialog(m));
+    this.room.onMessage("party", (m: PartyMsg) => ui.onParty(m));
+    this.room.onMessage("partyInvited", (m: PartyInvitedMsg) => ui.onPartyInvited(m));
     ui.chat({
       from: "",
       text: "Chào mừng đạo hữu tới Tiên Giới. Nhận nhiệm vụ ở Trưởng trấn (F), mở sổ nhiệm vụ (Q) và xem bản đồ (M).",
@@ -830,11 +867,16 @@ export class WorldScene extends Phaser.Scene {
     }
 
     if (step.kind === "collect") {
-      // Ưu tiên chỉ tới vật phẩm rơi trên mặt đất nếu có
+      // Ưu tiên chỉ tới vật phẩm rơi trên mặt đất nếu có (của mình hoặc đồng đội)
+      const party = ui.getParty();
+      const partyNames = new Set(party.members.map((m) => m.name));
       let nearestLoot: { x: number; y: number } | null = null;
       let nearestLootDist = Infinity;
       this.state.loot?.forEach((l: LootView) => {
-        if (l.itemId !== step.itemId || (l.owner && l.owner !== this.sid)) return;
+        if (l.itemId !== step.itemId) return;
+        const ownerPlayer = l.owner ? this.state.players.get(l.owner) : null;
+        const isPartyOwned = ownerPlayer ? partyNames.has(ownerPlayer.name) : false;
+        if (l.owner && l.owner !== this.sid && !isPartyOwned) return;
         const d = Math.hypot(l.x - this.predX, l.y - this.predY);
         if (d < nearestLootDist) {
           nearestLootDist = d;
@@ -903,6 +945,11 @@ export class WorldScene extends Phaser.Scene {
     if (now - this.lastMapDraw < 250) return;
     this.lastMapDraw = now;
 
+    const myName = this.me()?.name;
+    const party = ui.getParty();
+    const partyMems = party.members.filter((m) => m.name !== myName);
+    const partyNames = new Set(partyMems.map((m) => m.name));
+
     // 1. Vẽ Minimap (120x120)
     const mmCanvas = document.getElementById("minimap") as HTMLCanvasElement | null;
     if (mmCanvas) {
@@ -936,12 +983,27 @@ export class WorldScene extends Phaser.Scene {
           ctx.fillRect(m.tx * scale - 1, m.ty * scale - 1, 2, 2);
         });
 
-        // Người chơi khác (chấm lam)
+        // Người chơi khác (chấm lam, trừ đồng đội)
         ctx.fillStyle = "#9fd0ea";
         this.players.forEach((p, id) => {
           if (id === this.sid) return;
+          const sp = this.state.players.get(id);
+          if (sp && partyNames.has(sp.name)) return;
           ctx.fillRect(p.tx * scale - 1.5, p.ty * scale - 1.5, 3, 3);
         });
+
+        // Đồng đội (chấm xanh lá #52c41a, lấy tọa độ từ party kể cả ngoài vùng nhìn)
+        if (partyMems.length > 0) {
+          ctx.fillStyle = "#52c41a";
+          for (const pm of partyMems) {
+            ctx.beginPath();
+            ctx.arc(pm.x * scale, pm.y * scale, 3.2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = "#ffffff";
+            ctx.lineWidth = 0.8;
+            ctx.stroke();
+          }
+        }
 
         // NPC (chấm hoàng kim)
         ctx.fillStyle = "#ffd74a";
@@ -1033,14 +1095,35 @@ export class WorldScene extends Phaser.Scene {
             ctx.fillRect(m.tx * s - 1.5, m.ty * s - 1.5, 3, 3);
           });
 
-          // Người chơi khác
+          // Người chơi khác (chấm lam, trừ đồng đội)
           ctx.fillStyle = "#9fd0ea";
           this.players.forEach((p, id) => {
             if (id === this.sid) return;
+            const sp = this.state.players.get(id);
+            if (sp && partyNames.has(sp.name)) return;
             ctx.beginPath();
             ctx.arc(p.tx * s, p.ty * s, 3.5, 0, Math.PI * 2);
             ctx.fill();
           });
+
+          // Đồng đội (chấm xanh lá #52c41a + tên, lấy tọa độ từ party)
+          if (partyMems.length > 0) {
+            ctx.fillStyle = "#52c41a";
+            for (const pm of partyMems) {
+              const pmx = pm.x * s;
+              const pmy = pm.y * s;
+              ctx.beginPath();
+              ctx.arc(pmx, pmy, 5, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.strokeStyle = "#ffffff";
+              ctx.lineWidth = 1.2;
+              ctx.stroke();
+
+              ctx.fillStyle = "#52c41a";
+              ctx.font = "bold 10px serif";
+              ctx.fillText(pm.name, pmx, pmy - 7);
+            }
+          }
 
           // NPC trong trấn
           const qLog = ui.getQuestLog();
@@ -1174,9 +1257,13 @@ export class WorldScene extends Phaser.Scene {
       seen.add(id);
       const isMe = id === this.sid;
       const who = isMe ? "me" : "other";
+      // Vị trí để vẽ: chính mình nhận x, y thật từ server; người khác nhận px, py (làm tròn, ~10 Hz, #80).
+      // Server cũ chưa có px thì rơi về x, y: client chạy được với cả hai.
+      const posX: number = isMe ? p.x : (p.px ?? p.x);
+      const posY: number = isMe ? p.y : (p.py ?? p.y);
       let e = this.players.get(id);
       if (!e) {
-        e = this.makeEntity(who, p.x, p.y, true);
+        e = this.makeEntity(who, posX, posY, true);
         if (isMe) this.cameras.main.startFollow(e.root, true, 0.2, 0.2);
         this.players.set(id, e);
       }
@@ -1195,9 +1282,9 @@ export class WorldScene extends Phaser.Scene {
         if (p.dead && !(e as any).deadSince) (e as any).deadSince = this.time.now;
         if (!p.dead) (e as any).deadSince = 0;
       } else {
-        const dist = Math.hypot(p.x - e.root.x, p.y - e.root.y);
-        e.tx = p.x;
-        e.ty = p.y;
+        const dist = Math.hypot(posX - e.root.x, posY - e.root.y);
+        e.tx = posX;
+        e.ty = posY;
         e.root.x += (e.tx - e.root.x) * k;
         e.root.y += (e.ty - e.root.y) * k;
         if (!this.inView(e.root.x, e.root.y, 48)) {
@@ -1321,6 +1408,8 @@ export class WorldScene extends Phaser.Scene {
     let bestLabel: string | null = null;
     const me = this.me();
     const lowFx = ui.isLowFx();
+    const party = ui.getParty();
+    const partyNames = new Set(party.members.map((m) => m.name));
 
     this.state.loot.forEach((l: LootView, id: string) => {
       seen.add(id);
@@ -1350,8 +1439,10 @@ export class WorldScene extends Phaser.Scene {
         this.loots.set(id, le);
       }
 
-      const mineOrPublic = !l.owner || l.owner === this.sid;
-      if (me && !me.dead && mineOrPublic) {
+      const ownerPlayer = l.owner ? this.state.players.get(l.owner) : null;
+      const isPartyOwned = ownerPlayer ? partyNames.has(ownerPlayer.name) : false;
+      const canPickup = !l.owner || l.owner === this.sid || isPartyOwned;
+      if (me && !me.dead && canPickup) {
         const d = Math.hypot(l.x - this.predX, l.y - this.predY);
         if (d <= bestDist) {
           bestDist = d;
@@ -1379,8 +1470,8 @@ export class WorldScene extends Phaser.Scene {
         const name = def?.name ?? l.itemId;
         le.label.setText(l.qty > 1 ? `${name} ×${l.qty}` : name);
       }
-      // Đồ của người khác (trong 30 giây đầu) hiện mờ đi
-      le.root.setAlpha(mineOrPublic ? 1 : 0.35);
+      // Đồ của người khác (trong 30 giây đầu) hiện mờ đi; đồ của mình hoặc đồng đội hiện rõ
+      le.root.setAlpha(canPickup ? 1 : 0.35);
     });
 
     for (const [id, le] of this.loots) {

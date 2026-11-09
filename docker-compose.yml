@@ -1,0 +1,21 @@
+services:
+  game:
+    build: .
+    container_name: tien-gioi
+    restart: unless-stopped
+    init: true # Dùng tini làm PID 1 để chuyển tiếp tín hiệu SIGTERM và dọn tiến trình con
+    stop_grace_period: 30s # Cho server đủ thời gian lưu toàn bộ dữ liệu nhân vật trước khi tắt
+    ports:
+      # Khi dùng reverse proxy (Caddy/Nginx), chỉ mở cổng trên localhost để bắt buộc truy cập qua HTTPS/WSS:
+      - "127.0.0.1:2567:2567"
+      # Nếu muốn mở trực tiếp ra ngoài Internet (không qua proxy), dùng dòng dưới:
+      # - "2567:2567"
+    environment:
+      - NODE_ENV=production # Bắt buộc đặt production để vô hiệu hóa lệnh quản trị /give
+      - PORT=2567
+      - DATA_DIR=/app/data/players
+    volumes:
+      - tien-gioi-data:/app/data/players
+
+volumes:
+  tien-gioi-data:

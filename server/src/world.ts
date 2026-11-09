@@ -65,6 +65,11 @@ export interface MonsterCtrl {
   damageBy: Map<string, number>;
   /** Phần lẻ của hồi khí huyết chưa đủ 1 đơn vị */
   hpFrac: number;
+  /**
+   * Số tick còn phải chờ tới lần áp bước di chuyển kế tiếp khi không có mục tiêu (lang thang, về nhà, ngủ):
+   * quái chỉ dịch chuyển mỗi WANDER_STRIDE tick, xem systems/monsters.ts. Có mục tiêu thì luôn 0.
+   */
+  strideLeft: number;
 }
 
 /** Cách các system gửi tin ra ngoài. WorldRoom nối vào broadcast / client.send. */

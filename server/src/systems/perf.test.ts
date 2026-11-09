@@ -6,7 +6,7 @@ import { addMonster, addPlayer, makeWorld } from "./test-helpers";
 import { POS_SYNC_EVERY_TICKS, applyInputs, syncPublicPos } from "./movement";
 import { tickWorld } from "./tick";
 import { slash, tickRespawn } from "./combat";
-import { MONSTER_WAKE_DIST, tickMonsters } from "./monsters";
+import { MONSTER_WAKE_DIST, WANDER_STRIDE, spawnInitial, tickMonsters } from "./monsters";
 import { EXP_FLUSH_MS, tickRecovery } from "./progression";
 import { runBench } from "../perf/bench";
 
@@ -235,6 +235,81 @@ describe("vị trí công khai px, py của người chơi (#80)", () => {
   });
 });
 
+describe("quái lang thang chỉ đổi vị trí mỗi WANDER_STRIDE tick (#80)", () => {
+  const TICKS = 80;
+  /**
+   * Một con lang có điểm lang thang cách 190 px (trong RETURN_HOME_DIST, không bị kéo về nhà); một người chơi ở phía
+   * quái đang đi tới, đủ gần để quái không ngủ (đi xa dần sẽ vượt MONSTER_WAKE_DIST) nhưng không đủ gần để gây hấn.
+   */
+  function wanderer() {
+    const { w } = makeWorld();
+    const x = TOWN_PX.x + TOWN_PX.r + 600;
+    const { m, mc } = addMonster(w, "lang", x, TOWN_PX.y);
+    mc.wanderX = x + 190;
+    mc.wanderY = TOWN_PX.y;
+    mc.nextWander = Infinity;
+    const { p } = addPlayer(w, "Alpha");
+    p.x = x + 800;
+    p.y = TOWN_PX.y;
+    expect(800).toBeGreaterThan(MONSTER_BY_ID.lang.aggro);
+    expect(800).toBeLessThan(MONSTER_WAKE_DIST);
+    return { w, m, mc, x };
+  }
+  function run(w: ReturnType<typeof makeWorld>["w"], m: { x: number; y: number }, ticks: number) {
+    let writes = 0;
+    let last = `${m.x},${m.y}`;
+    for (let i = 0; i < ticks; i++) {
+      w.now += 50;
+      tickMonsters(w, 0.05);
+      const cur = `${m.x},${m.y}`;
+      if (cur !== last) writes++;
+      last = cur;
+    }
+    return writes;
+  }
+
+  it("vị trí trong state đổi ~1/WANDER_STRIDE số tick, tốc độ trung bình không đổi", () => {
+    const { w, m, x } = wanderer();
+    const writes = run(w, m, TICKS);
+    expect(writes).toBeLessThanOrEqual(Math.ceil(TICKS / WANDER_STRIDE) + 1);
+    expect(writes).toBeGreaterThanOrEqual(Math.floor(TICKS / WANDER_STRIDE) - 2);
+    // Quãng đường sau 4 giây = tốc độ lang thang × 4 (như khi áp bước mỗi tick)
+    const expected = MONSTER_BY_ID.lang.speed * 0.35 * (TICKS * 0.05);
+    expect(m.x - x).toBeGreaterThan(expected * 0.95);
+    expect(m.x - x).toBeLessThan(expected * 1.05);
+  });
+
+  it("quái có mục tiêu (đang đuổi) vẫn di chuyển mỗi tick", () => {
+    const { w, m, x } = wanderer();
+    const p = w.state.players.get("Alpha")!;
+    p.x = x + 150; // trong tầm gây hấn, còn xa tầm đánh
+    expect(150).toBeLessThan(MONSTER_BY_ID.lang.aggro);
+    expect(run(w, m, 10)).toBe(10);
+  });
+
+  it("vừa có mục tiêu là hết chờ: đuổi ngay, không đợi tới nhịp WANDER_STRIDE", () => {
+    const { w, m, mc, x } = wanderer();
+    mc.strideLeft = WANDER_STRIDE - 1; // đang chờ
+    const p = w.state.players.get("Alpha")!;
+    p.x = x + 150;
+    w.now += 50;
+    tickMonsters(w, 0.05);
+    expect(mc.target).toBe("Alpha");
+    expect(m.x).toBeGreaterThan(x); // đuổi về phía người chơi ngay tick này
+    expect(mc.strideLeft).toBe(0);
+  });
+
+  it("quái được sinh lệch pha, không cùng nhúc nhích một tick", () => {
+    const { w } = makeWorld();
+    spawnInitial(w);
+    const phases = new Map<number, number>();
+    for (const mc of w.mctrl.values())
+      phases.set(mc.strideLeft, (phases.get(mc.strideLeft) ?? 0) + 1);
+    expect([...phases.keys()].sort()).toEqual(Array.from({ length: WANDER_STRIDE }, (_, i) => i));
+    for (const n of phases.values()) expect(n).toBeGreaterThan(w.mctrl.size / WANDER_STRIDE / 2);
+  });
+});
+
 describe("ngân sách băng thông và CPU (benchmark có seed, kết quả cố định)", () => {
   it("không ai chơi thì không gửi gì", () => {
     expect(runBench(0, 5).patchBytes).toBe(0);
@@ -250,13 +325,13 @@ describe("ngân sách băng thông và CPU (benchmark có seed, kết quả cố
     expect(r.avgMs).toBeLessThan(10);
   });
 
-  it("ca đông người tụ trong trấn (#80): giữ mức hiện tại (< 1000), chưa đạt mục tiêu < 520 byte/tick", () => {
+  it("ca đông người tụ trong trấn (#80): giữ mức hiện tại (< 600), mục tiêu < 520 byte/tick", () => {
     const r = runBench(100, 10, 1, "crowd");
-    // Đo lúc viết (#80, bước 2): ~788 byte/tick mỗi client (≈ 15.4 KB/s) khi 100 người tụ trong trấn, 70% thời gian đi lại
-    // (trước khi người khác nhận px, py làm tròn 10 Hz: ~1267 byte/tick). Cộng với quái lang thang mỗi WANDER_STRIDE tick
-    // (#87) còn ~484 byte/tick. Vùng nhìn không cắt được gì vì ai cũng thấy nhau. Test này CHỈ giữ không tệ thêm; khi
-    // các bước còn lại của #80 hạ được thì hạ ngưỡng, đích là < 520 như ngân sách chung.
-    expect(r.patchBytes).toBeLessThan(1000);
+    // Đo lúc viết (#80): ~1267 byte/tick mỗi client (≈ 25 KB/s) khi 100 người tụ trong trấn, 70% thời gian đi lại.
+    // Người khác nhận px, py làm tròn 10 Hz (#89): ~788; quái lang thang chỉ đổi vị trí mỗi WANDER_STRIDE tick (#87):
+    // ~974; cả hai: ~484 (≈ 9.5 KB/s). Vùng nhìn không cắt được gì vì ai cũng thấy nhau. Test này CHỈ giữ không
+    // tệ thêm; khi hạ được nữa thì hạ ngưỡng, đích là < 520 như ngân sách chung.
+    expect(r.patchBytes).toBeLessThan(600);
     expect(r.avgMs).toBeLessThan(10);
   });
 
