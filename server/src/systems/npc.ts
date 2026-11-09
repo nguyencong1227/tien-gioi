@@ -10,6 +10,7 @@ import {
   RECIPES,
   RECIPE_BY_ID,
   ITEM_BY_ID,
+  SHOP_BY_NPC,
   canAccept,
   countItem,
   dayKey,
@@ -27,7 +28,7 @@ import { onTalked, questCtx, questsView, sendQuests } from "./quests";
 import { byId } from "./lookup";
 
 /** Người chơi còn sống và đứng trong tầm của NPC. */
-function nearNpc(
+export function nearNpc(
   w: World,
   sid: string,
   npcId: unknown,
@@ -71,6 +72,8 @@ function buildDialog(w: World, p: Player, c: PlayerCtrl, npc: NpcDef): DialogMsg
     ...(RECIPES.some((x) => x.npcId === npc.id)
       ? [{ label: "Rèn đồ", action: { kind: "forge" as const } }]
       : []),
+    // NPC có cửa hàng: một lựa chọn mở bảng mua / bán (hàng bán do client đọc từ SHOP_BY_NPC)
+    ...(SHOP_BY_NPC[npc.id] ? [{ label: "Cửa hàng", action: { kind: "shop" as const } }] : []),
     { label: "Rời đi", action: { kind: "close" } },
   ];
   // Ưu tiên: có nhiệm vụ để trả > có nhiệm vụ mới > đang làm dở > lời chào

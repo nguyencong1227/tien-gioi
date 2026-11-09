@@ -28,6 +28,8 @@ import {
   type EquipMsg,
   type UnequipMsg,
   type CraftMsg,
+  type BuyMsg,
+  type SellMsg,
   type PartyInviteMsg,
   type PartyAnswerMsg,
   type PartyKickMsg,
@@ -44,6 +46,7 @@ import { sanitizeInventory, sendInv, useItem } from "../systems/inventory";
 import { dropItem, pickup, releaseLootOwner } from "../systems/loot";
 import { sanitizeQuests, sendQuests } from "../systems/quests";
 import { sendWallet } from "../systems/wallet";
+import { buy, sell } from "../systems/shop";
 import { abandonQuest, acceptQuest, craft, talk, trade, turnInQuest } from "../systems/npc";
 import { equip, equipmentOf, sanitizeEquipment, setEquipment, unequip } from "../systems/equipment";
 import { tickWorld } from "../systems/tick";
@@ -125,6 +128,8 @@ export class WorldRoom extends Room<WorldState> {
     this.on<EquipMsg>("equip", (sid, m) => equip(w, sid, m?.slot));
     this.on<UnequipMsg>("unequip", (sid, m) => unequip(w, sid, m?.slot));
     this.on<CraftMsg>("craft", (sid, m) => craft(w, sid, m?.recipeId));
+    this.on<BuyMsg>("buy", (sid, m) => buy(w, sid, m?.npcId, m?.itemId, m?.qty));
+    this.on<SellMsg>("sell", (sid, m) => sell(w, sid, m?.npcId, m?.slot, m?.qty));
     this.on<PartyInviteMsg>("partyInvite", (sid, m) => partyInvite(w, sid, m?.name));
     this.on<PartyAnswerMsg>("partyAccept", (sid, m) => partyAnswer(w, sid, m?.from, true));
     this.on<PartyAnswerMsg>("partyDecline", (sid, m) => partyAnswer(w, sid, m?.from, false));
