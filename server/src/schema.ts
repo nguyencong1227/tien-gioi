@@ -21,6 +21,11 @@ export class Player extends Schema {
   @type("boolean") meditating = false;
   @type("boolean") dead = false;
   @type("uint32") lastSeq = 0; // input cuối server đã xử lý (để client đối chiếu)
+  // Đồ đang mặc (itemId, "" = trống). Công khai để mọi người thấy ngoại hình; kiểu Equipment trong shared/src/items.ts.
+  // Player có đủ 3 trường này nên truyền thẳng vào statsFor(realm, tier, p).
+  @type("string") weapon = "";
+  @type("string") robe = "";
+  @type("string") talisman = "";
 }
 
 export class Monster extends Schema {
