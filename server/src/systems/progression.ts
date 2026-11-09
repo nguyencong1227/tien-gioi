@@ -19,7 +19,7 @@ const BREAK_COOLDOWN_MS = 3000;
 
 /** Tính lại chỉ số tối đa theo cảnh giới; `heal` thì hồi đầy. */
 export function applyStats(p: Player, heal: boolean) {
-  const s = statsFor(p.realm, p.tier);
+  const s = statsFor(p.realm, p.tier, p); // gồm trang bị
   p.maxHp = s.maxHp;
   p.maxMp = s.maxMp;
   p.expMax = expToNext(p.realm, p.tier);

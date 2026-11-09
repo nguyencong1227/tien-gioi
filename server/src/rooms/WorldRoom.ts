@@ -23,6 +23,9 @@ import {
   type QuestTurnInMsg,
   type QuestAbandonMsg,
   type TradeMsg,
+  type EquipMsg,
+  type UnequipMsg,
+  type CraftMsg,
 } from "@tien-gioi/shared";
 import { WorldState, Player } from "../schema";
 import { loadPlayer, savePlayer, hashSecret, cleanName, type SavedPlayer } from "../store";
@@ -35,7 +38,8 @@ import { chat } from "../systems/chat";
 import { sanitizeInventory, sendInv, useItem } from "../systems/inventory";
 import { dropItem, pickup, releaseLootOwner } from "../systems/loot";
 import { sanitizeQuests, sendQuests } from "../systems/quests";
-import { abandonQuest, acceptQuest, talk, trade, turnInQuest } from "../systems/npc";
+import { abandonQuest, acceptQuest, craft, talk, trade, turnInQuest } from "../systems/npc";
+import { equip, equipmentOf, sanitizeEquipment, setEquipment, unequip } from "../systems/equipment";
 import { tickWorld } from "../systems/tick";
 import { RateLimiter } from "../rate-limit";
 
@@ -95,6 +99,9 @@ export class WorldRoom extends Room<WorldState> {
     this.on<QuestTurnInMsg>("questTurnIn", (sid, m) => turnInQuest(w, sid, m?.questId));
     this.on<QuestAbandonMsg>("questAbandon", (sid, m) => abandonQuest(w, sid, m?.questId));
     this.on<TradeMsg>("trade", (sid, m) => trade(w, sid, m?.tradeId));
+    this.on<EquipMsg>("equip", (sid, m) => equip(w, sid, m?.slot));
+    this.on<UnequipMsg>("unequip", (sid, m) => unequip(w, sid, m?.slot));
+    this.on<CraftMsg>("craft", (sid, m) => craft(w, sid, m?.recipeId));
     // Loại tin nhắn không đăng ký: bỏ qua, tính là spam
     this.onMessage("*", (c) => this.reject(c));
   }
@@ -172,6 +179,7 @@ export class WorldRoom extends Room<WorldState> {
     const spot = safeSpot(save.x, save.y);
     p.x = spot.x;
     p.y = spot.y;
+    setEquipment(p, sanitizeEquipment(save.equipment)); // trước applyStats: chỉ số gồm trang bị
     applyStats(p, true);
     this.state.players.set(client.sessionId, p);
     this.world.ctrl.set(client.sessionId, {
@@ -229,6 +237,7 @@ export class WorldRoom extends Room<WorldState> {
       ...pos,
       inventory: c.inv,
       quests: c.quests,
+      equipment: equipmentOf(p),
     };
     await savePlayer(c.save);
   }
