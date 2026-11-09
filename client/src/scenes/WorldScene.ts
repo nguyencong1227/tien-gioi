@@ -106,6 +106,21 @@ export class WorldScene extends Phaser.Scene {
   private navArrow!: Phaser.GameObjects.Container;
   private lastMapDraw = 0;
 
+  // Bảng đo hiệu năng (?perf=1, #71)
+  private perfEnabled = false;
+  private perfRing = new Float64Array(360);
+  private perfRingIdx = 0;
+  private perfRingCount = 0;
+  private perfSortBuf: number[] = [];
+  private lastPerfDraw = 0;
+  private perfFrameHistory: number[] = [];
+  private perfUpdateHistory: number[] = [];
+  private perfTweenSum = 0;
+  private perfTweenMax = 0;
+  private perfPlayersSum = 0;
+  private perfMonstersSum = 0;
+  private perfLootsSum = 0;
+
   constructor(private room: Room) {
     super("world");
   }
@@ -197,6 +212,7 @@ export class WorldScene extends Phaser.Scene {
     this.setupInput();
     setupJoystick();
     this.setupNetwork();
+    this.setupPerfProbe();
   }
 
   private spawnNpcs() {
@@ -534,6 +550,7 @@ export class WorldScene extends Phaser.Scene {
 
   update(_t: number, deltaMs: number) {
     if (!this.state?.players) return;
+    const t0 = this.perfEnabled ? performance.now() : 0;
     this.acc = Math.min(this.acc + deltaMs, 250);
     while (this.acc >= TICK_MS) {
       this.acc -= TICK_MS;
@@ -557,6 +574,101 @@ export class WorldScene extends Phaser.Scene {
       ui.cooldown("sk-sword", (this.nextSword - now) / SKILLS.sword.cooldown);
       ui.tickItemCooldowns();
     }
+
+    if (this.perfEnabled) {
+      this.recordPerf(deltaMs, performance.now() - t0);
+    }
+  }
+
+  private setupPerfProbe() {
+    if (typeof window === "undefined") return;
+    this.perfEnabled = new URLSearchParams(window.location.search).get("perf") === "1";
+    if (!this.perfEnabled) return;
+    (window as any).__tgPerf = {
+      reset: () => {
+        this.perfFrameHistory.length = 0;
+        this.perfUpdateHistory.length = 0;
+        this.perfTweenSum = 0;
+        this.perfTweenMax = 0;
+        this.perfPlayersSum = 0;
+        this.perfMonstersSum = 0;
+        this.perfLootsSum = 0;
+      },
+      snapshot: () => {
+        const frames = this.perfFrameHistory.length;
+        if (frames === 0) return null;
+        const sortedF = [...this.perfFrameHistory].sort((a, b) => a - b);
+        const sortedU = [...this.perfUpdateHistory].sort((a, b) => a - b);
+        const sumF = sortedF.reduce((a, b) => a + b, 0);
+        const sumU = sortedU.reduce((a, b) => a + b, 0);
+        const pct = (arr: number[], p: number) =>
+          arr[Math.min(arr.length - 1, Math.floor((p / 100) * arr.length))];
+        const avgF = sumF / frames;
+        return {
+          frames,
+          durationSec: Number((sumF / 1000).toFixed(2)),
+          fpsAvg: Number((1000 / avgF).toFixed(1)),
+          frameAvgMs: Number(avgF.toFixed(2)),
+          frameP50Ms: Number(pct(sortedF, 50).toFixed(2)),
+          frameP95Ms: Number(pct(sortedF, 95).toFixed(2)),
+          frameP99Ms: Number(pct(sortedF, 99).toFixed(2)),
+          frameMaxMs: Number(sortedF[sortedF.length - 1].toFixed(2)),
+          longFramesOver33Ms: sortedF.filter((x) => x > 33.3).length,
+          longFramesOver50Ms: sortedF.filter((x) => x > 50).length,
+          updateAvgMs: Number((sumU / frames).toFixed(3)),
+          updateP95Ms: Number(pct(sortedU, 95).toFixed(3)),
+          updateMaxMs: Number(sortedU[sortedU.length - 1].toFixed(3)),
+          playersAvg: Number((this.perfPlayersSum / frames).toFixed(1)),
+          monstersAvg: Number((this.perfMonstersSum / frames).toFixed(1)),
+          lootsAvg: Number((this.perfLootsSum / frames).toFixed(1)),
+          tweensAvg: Number((this.perfTweenSum / frames).toFixed(1)),
+          tweensMax: this.perfTweenMax,
+        };
+      },
+    };
+  }
+
+  private recordPerf(deltaMs: number, updateMs: number) {
+    // Bỏ qua frame nhảy vọt > 500ms khi chuyển tab
+    const dt = Math.min(deltaMs, 500);
+    this.perfRing[this.perfRingIdx] = dt;
+    this.perfRingIdx = (this.perfRingIdx + 1) % this.perfRing.length;
+    if (this.perfRingCount < this.perfRing.length) this.perfRingCount++;
+
+    const tweensCount = this.tweens.getTweens().length;
+    this.perfFrameHistory.push(dt);
+    this.perfUpdateHistory.push(updateMs);
+    this.perfTweenSum += tweensCount;
+    if (tweensCount > this.perfTweenMax) this.perfTweenMax = tweensCount;
+    this.perfPlayersSum += this.players.size;
+    this.perfMonstersSum += this.monsters.size;
+    this.perfLootsSum += this.loots.size;
+
+    const now = performance.now();
+    if (now - this.lastPerfDraw < 250 || this.perfRingCount === 0) return;
+    this.lastPerfDraw = now;
+
+    this.perfSortBuf.length = this.perfRingCount;
+    let sum = 0;
+    for (let i = 0; i < this.perfRingCount; i++) {
+      const v = this.perfRing[i];
+      this.perfSortBuf[i] = v;
+      sum += v;
+    }
+    this.perfSortBuf.sort((a, b) => a - b);
+    const frameAvgMs = sum / this.perfRingCount;
+    const p95Idx = Math.min(this.perfRingCount - 1, Math.floor(0.95 * this.perfRingCount));
+    const frameP95Ms = this.perfSortBuf[p95Idx];
+
+    ui.updatePerf({
+      fps: frameAvgMs > 0 ? 1000 / frameAvgMs : 0,
+      frameAvgMs,
+      frameP95Ms,
+      players: this.players.size,
+      monsters: this.monsters.size,
+      loots: this.loots.size,
+      tweens: tweensCount,
+    });
   }
 
   private syncAudioZone() {

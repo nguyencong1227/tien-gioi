@@ -1141,6 +1141,32 @@ export const ui = {
 
     renderInventory();
     renderQuestTracker();
+
+    // Bảng đo hiệu năng chỉ hiện khi mở bằng ?perf=1 (#71)
+    if (
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("perf") === "1"
+    ) {
+      $("perf-panel").hidden = false;
+    }
+  },
+
+  updatePerf(stats: {
+    fps: number;
+    frameAvgMs: number;
+    frameP95Ms: number;
+    players: number;
+    monsters: number;
+    loots: number;
+    tweens: number;
+  }) {
+    const panel = $("perf-panel");
+    if (panel.hidden) return;
+    $("perf-fps").textContent = `${Math.round(stats.fps)}`;
+    $("perf-frame").textContent =
+      `${stats.frameAvgMs.toFixed(1)} / ${stats.frameP95Ms.toFixed(1)} ms`;
+    $("perf-entities").textContent = `${stats.players} / ${stats.monsters} / ${stats.loots}`;
+    $("perf-tweens").textContent = `${stats.tweens}`;
   },
 
   updateMuteIcon(muted: boolean) {
