@@ -11,6 +11,7 @@ import {
 import type { World } from "../world";
 import { gainExp } from "./progression";
 import { refreshQuests } from "./quests";
+import { byId } from "./lookup";
 
 /** Đọc túi từ file lưu: bỏ món không còn tồn tại, ép số lượng về [1, stack], đúng 24 ô. */
 export function sanitizeInventory(raw: unknown): Inventory {
@@ -18,7 +19,7 @@ export function sanitizeInventory(raw: unknown): Inventory {
   if (!Array.isArray(raw)) return inv;
   for (let i = 0; i < INVENTORY_SLOTS; i++) {
     const s = raw[i] as Partial<InvSlot> | null | undefined;
-    const def = s && typeof s.itemId === "string" ? ITEM_BY_ID[s.itemId] : undefined;
+    const def = byId(ITEM_BY_ID, s?.itemId);
     const qty = Math.floor(Number(s?.qty));
     if (def && qty >= 1) inv[i] = { itemId: def.id, qty: Math.min(qty, def.stack) };
   }
@@ -42,7 +43,7 @@ export function sendInv(w: World, sid: string, gained?: InvSlot[]) {
 /** Cho vật phẩm vào túi người chơi. Trả về số còn thừa (túi đầy). */
 export function giveItem(w: World, sid: string, itemId: string, qty: number): number {
   const c = w.ctrl.get(sid);
-  if (!c || !ITEM_BY_ID[itemId]) return qty;
+  if (!c || !byId(ITEM_BY_ID, itemId)) return qty;
   const left = addToInventory(c.inv, itemId, qty);
   const got = Math.floor(qty) - left;
   if (got > 0) sendInv(w, sid, [{ itemId, qty: got }]);
@@ -132,7 +133,7 @@ export function useItem(w: World, sid: string, slot: unknown) {
 export function giveCommand(w: World, sid: string, args: string[]): void {
   if (process.env.NODE_ENV === "production") return;
   const [itemId, rawQty] = args;
-  const def = itemId ? ITEM_BY_ID[itemId] : undefined;
+  const def = byId(ITEM_BY_ID, itemId);
   if (!def) {
     return w.events.toast(sid, {
       text: `Không có vật phẩm "${itemId ?? ""}". Có: ${Object.keys(ITEM_BY_ID).join(", ")}`,
