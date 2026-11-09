@@ -48,6 +48,7 @@ ${table}
       .join(", ")}.
 - Thưởng tu vi của chuỗi nhiệm vụ chính chia đều cho các bậc của cảnh giới tương ứng; đi lại + nói chuyện cả chuỗi: ${ASSUME.questOverheadSec / 60} phút.
 - Đột phá thất bại mất 30% thanh tu vi, tính theo số lần thất bại kỳ vọng.
+- Trang bị: ${ASSUME.useGear ? "mặc món tốt nhất đủ cảnh giới ở mỗi ô (giả định đã rèn kịp; nguyên liệu rơi trong lúc săn, không tính thời gian đi rèn)" : "không mặc gì"}. Không mặc gì thì chậm hơn khoảng 10%.
 - Chưa tính: nhiệm vụ lặp, đan dược, đánh theo nhóm, thời gian chết.
 - Tụ Khí Đan (+5% thanh) cố ý hiếm: rơi 1% từ Hắc Hổ, thưởng nhiệm vụ, không đổi được ở Lão dược sư.
   Ước khoảng 11 viên trong 3 giờ đầu, cộng lại chừng nửa thanh Trúc Cơ (rút ngắn khoảng 20 phút).

@@ -560,3 +560,33 @@ describe("bảo mật", () => {
       expect(pub).not.toContain(k);
   });
 });
+
+describe("trang bị và rèn đồ", () => {
+  it("rèn ở Thợ rèn, mặc vào: người khác thấy trong state; thoát ra vào lại vẫn mặc", async () => {
+    const name = "Tho Ren Thu";
+    const a = await join(name);
+    const b = await join();
+    const p = serverState(a.room).players.get(a.room.sessionId)!;
+    p.realm = 1;
+    p.x = NPC_BY_ID.tho_ren.x + 10;
+    p.y = NPC_BY_ID.tho_ren.y;
+    a.room.send("chat", { text: "/give nanh_soi 8" });
+    a.room.send("chat", { text: "/give long_tho 4" });
+    await waitFor(() => a.invs.at(-1)?.slots.some((s) => s?.itemId === "long_tho"));
+    a.room.send("craft", { recipeId: "ren_lang_nha_kiem" });
+    const inv = await waitFor(() =>
+      a.invs.find((m) => m.gained?.some((g) => g.itemId === "lang_nha_kiem")),
+    );
+    const slot = inv.slots.findIndex((s) => s?.itemId === "lang_nha_kiem");
+    a.room.send("equip", { slot });
+    // b nhìn thấy a đang cầm kiếm
+    await waitFor(
+      () => (b.room.state as any).players.get(a.room.sessionId)?.weapon === "lang_nha_kiem",
+    );
+    await a.room.leave(true);
+    rooms.splice(rooms.indexOf(a.room), 1);
+    await sleep(200);
+    const again = await join(name);
+    expect(again.me().weapon).toBe("lang_nha_kiem");
+  });
+});

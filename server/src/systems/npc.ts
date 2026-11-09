@@ -7,6 +7,8 @@ import {
   QUEST_BY_ID,
   TRADES,
   TRADE_BY_ID,
+  RECIPES,
+  RECIPE_BY_ID,
   ITEM_BY_ID,
   canAccept,
   countItem,
@@ -65,6 +67,10 @@ function buildDialog(w: World, p: Player, c: PlayerCtrl, npc: NpcDef): DialogMsg
       action: { kind: "trade" as const, tradeId: t.id },
       ...(t.give.every((g) => countItem(c.inv, g.itemId) >= g.qty) ? {} : { disabled: true }),
     })),
+    // NPC có công thức rèn: một lựa chọn mở bảng rèn (danh sách RECIPES do client tự vẽ)
+    ...(RECIPES.some((x) => x.npcId === npc.id)
+      ? [{ label: "Rèn đồ", action: { kind: "forge" as const } }]
+      : []),
     { label: "Rời đi", action: { kind: "close" } },
   ];
   // Ưu tiên: có nhiệm vụ để trả > có nhiệm vụ mới > đang làm dở > lời chào
@@ -159,4 +165,20 @@ export function trade(w: World, sid: string, tradeId: unknown) {
   sendInv(w, sid, [{ ...t.get }]);
   // Cập nhật lựa chọn (còn đủ nguyên liệu để đổi tiếp không)
   w.events.dialog(sid, buildDialog(w, r.p, r.c, r.npc));
+}
+
+/** Rèn đồ theo công thức: đứng gần NPC rèn, đủ nguyên liệu; trừ nguyên liệu và thêm đồ cùng lúc. */
+export function craft(w: World, sid: string, recipeId: unknown) {
+  const rc = byId(RECIPE_BY_ID, recipeId);
+  const r = rc && nearNpc(w, sid, rc.npcId);
+  if (!rc || !r) return;
+  if (!rc.inputs.every((g) => countItem(r.c.inv, g.itemId) >= g.qty)) {
+    return w.events.toast(sid, { text: "Không đủ nguyên liệu.", tone: "bad" });
+  }
+  // exchangeItems làm trên bản sao: túi đầy thì không trừ gì, không mất nguyên liệu
+  if (!exchangeItems(r.c.inv, rc.inputs, [rc.output])) {
+    return w.events.toast(sid, { text: "Túi đồ đã đầy.", tone: "bad" });
+  }
+  w.events.toast(sid, { text: `Rèn thành công ${itemName(rc.output.itemId)}.`, tone: "good" });
+  sendInv(w, sid, [{ ...rc.output }]);
 }

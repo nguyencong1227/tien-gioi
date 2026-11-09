@@ -28,7 +28,7 @@ export function queueInput(w: World, sid: string, m: InputMsg | undefined) {
 export function applyInputs(p: Player, c: PlayerCtrl) {
   const step = TICK_MS / 1000;
   c.moveBudget = Math.min(MAX_MOVE_BUDGET, c.moveBudget + 1);
-  const speed = statsFor(p.realm, p.tier).speed;
+  const speed = statsFor(p.realm, p.tier, p).speed; // hộ phù có tốc độ
   while (c.inputs.length && c.moveBudget >= 1) {
     const inp = c.inputs.shift()!;
     c.moveBudget -= 1;
