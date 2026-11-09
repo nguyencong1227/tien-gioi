@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { COIN_CAP, INVENTORY_SLOTS, ITEM_BY_ID, REALMS, WORLD_H, WORLD_W } from "@tien-gioi/shared";
-import { auditPlayerSaveData, auditSavesDirectory, MAX_FILE_SIZE } from "./audit-saves.js";
+import { auditPlayerSaveData, auditSavesDirectory, MAX_FILE_SIZE, show } from "./audit-saves.js";
 
 function hashFileSha256(filePath: string): string {
   return createHash("sha256").update(readFileSync(filePath)).digest("hex");
@@ -97,6 +97,21 @@ describe("audit-saves (Issue #112)", () => {
   it("thư mục không tồn tại -> ném lỗi để CLI trả mã 2", () => {
     const nonExistentDir = path.join(tmpDir, "does-not-exist");
     expect(() => auditSavesDirectory(nonExistentDir)).toThrow(/không tồn tại/);
+  });
+
+  it("symlink trỏ tới file hợp lệ -> báo lỗi not_regular_file, không đọc/treo", () => {
+    const realFile = path.join(tmpDir, "real.json");
+    writeFileSync(realFile, JSON.stringify(validPlayer));
+    const symlinkFile = path.join(tmpDir, "link.json");
+    symlinkSync(realFile, symlinkFile);
+
+    const report = auditSavesDirectory(tmpDir);
+    expect(report.totalFiles).toBe(2);
+    expect(report.cleanFiles).toBe(1);
+    expect(report.errorFiles).toBe(1);
+    expect(report.errorsByCode.not_regular_file).toBe(1);
+    const linkFail = report.failedFiles.find((f) => f.file === "link.json");
+    expect(linkFail?.errors.map((e) => e.code)).toContain("not_regular_file");
   });
 
   describe("kiểm tra từng loại lỗi vi phạm dữ liệu", () => {
@@ -204,7 +219,13 @@ describe("audit-saves (Issue #112)", () => {
       expect(auditPlayerSaveData(raw, raw.length).map((e) => e.code)).toContain("invalid_date");
     });
 
-    it("túi đồ vượt quá 20 ô -> inv_too_many_slots", () => {
+    it("túi đồ vượt quá INVENTORY_SLOTS ô -> inv_too_many_slots, không phải mảng -> inv_not_array", () => {
+      const pNotArr = { ...validPlayer, inventory: "khong-phai-mang" };
+      const rawNotArr = JSON.stringify(pNotArr);
+      expect(auditPlayerSaveData(rawNotArr, rawNotArr.length).map((e) => e.code)).toContain(
+        "inv_not_array",
+      );
+
       const p = {
         ...validPlayer,
         inventory: Array(INVENTORY_SLOTS + 5).fill({ itemId: "hoi_huyet_dan", qty: 1 }),
@@ -324,6 +345,47 @@ describe("audit-saves (Issue #112)", () => {
         "invalid_daily_key",
       );
     });
+
+    it("file có itemId = secretHash và quests.done chứa secretHash -> kết quả report và console không chứa hash", () => {
+      const sensitiveHash = "9999999999999999999999999999999999999999999999999999999999999999";
+      const pMalicious = {
+        ...validPlayer,
+        inventory: [{ itemId: sensitiveHash, qty: 1 }],
+        quests: {
+          ...validPlayer.quests,
+          done: [sensitiveHash],
+        },
+      };
+      const raw = JSON.stringify(pMalicious);
+      const errors = auditPlayerSaveData(raw, raw.length);
+      expect(errors.map((e) => e.code)).toContain("unknown_item");
+      expect(errors.map((e) => e.code)).toContain("unknown_quest");
+
+      const serialized = JSON.stringify(errors);
+      expect(serialized).not.toContain(sensitiveHash);
+      expect(serialized).toContain("<chuỗi 64 ký tự>");
+    });
+
+    it("itemId chứa mã ANSI \\x1b hoặc chuỗi 3000 ký tự -> không chứa ký tự điều khiển, mỗi thông báo < 200 ký tự", () => {
+      const ansiItemId = "\x1b[2J\x1b[Hrm_rf";
+      const hugeItemId = "a".repeat(3000);
+      const pAnsi = {
+        ...validPlayer,
+        inventory: [
+          { itemId: ansiItemId, qty: 1 },
+          { itemId: hugeItemId, qty: 1 },
+        ],
+      };
+      const raw = JSON.stringify(pAnsi);
+      const errors = auditPlayerSaveData(raw, raw.length);
+
+      for (const err of errors) {
+        expect(err.message).not.toContain("\x1b");
+        expect(err.message.length).toBeLessThan(200);
+      }
+      const serialized = JSON.stringify(errors);
+      expect(serialized).toContain("<chuỗi 3000 ký tự>");
+    });
   });
 
   describe("đột biến kiểm tra (mutation check: nới lỏng điều kiện kiểm tra -> test bắt buộc đỏ)", () => {
@@ -384,6 +446,19 @@ describe("audit-saves (Issue #112)", () => {
       const pBlocked = JSON.stringify({ ...validPlayer, x: 0, y: 0 });
       const errors = auditPlayerSaveData(pBlocked, pBlocked.length);
       expect(errors.map((e) => e.code)).toContain("pos_blocked");
+    });
+
+    it("đột biến 5: bỏ hàm show() -> in nguyên văn itemId chứa secretHash hoặc mã ANSI ra thông báo", () => {
+      // Giả sử có hàm định dạng lỗi thiếu cẩn trọng, in thẳng id không qua show():
+      const unsafeFormat = (id: string) => `Vật phẩm lạ: "${id}"`;
+      const secretHash = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
+      const unsafeMsg = unsafeFormat(secretHash);
+      expect(unsafeMsg).toContain(secretHash); // Đột biến làm rò rỉ nguyên vẹn secretHash!
+
+      // Hàm show() an toàn THẬT ngăn chặn hoàn toàn việc rò rỉ:
+      const safeMsg = `Vật phẩm lạ: ${show(secretHash)}`;
+      expect(safeMsg).not.toContain(secretHash);
+      expect(safeMsg).toContain("<chuỗi 64 ký tự>");
     });
   });
 });

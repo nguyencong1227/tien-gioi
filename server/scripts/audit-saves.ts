@@ -4,7 +4,7 @@
 //   npm run kiem-save -w server
 //   npm run kiem-save -w server -- --dir=data/players
 //   npm run kiem-save -w server -- --json
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -50,6 +50,35 @@ export interface AuditReport {
 }
 
 const HEX_64_REGEX = /^[0-9a-fA-F]{64}$/;
+const SAFE_ID_REGEX = /^[a-z0-9_]{1,32}$/;
+
+/**
+ * Hiển thị an toàn một giá trị đến từ file không tin cậy trong thông báo lỗi.
+ * - Chuỗi chỉ in nguyên khi khớp /^[a-z0-9_]{1,32}$/ (id hợp lệ của game),
+ *   còn lại thay thế bằng '<chuỗi N ký tự>' để chặn lộ secretHash, mã điều khiển ANSI hay chuỗi khổng lồ.
+ * - Số hữu hạn in dạng chuỗi, còn lại in '<số không hợp lệ>'.
+ * - Các kiểu khác in '<tên_kiểu>'.
+ */
+export function show(v: unknown): string {
+  if (typeof v === "string") {
+    if (SAFE_ID_REGEX.test(v)) {
+      return `"${v}"`;
+    }
+    return `<chuỗi ${v.length} ký tự>`;
+  }
+  if (typeof v === "number") {
+    if (Number.isFinite(v)) {
+      return String(v);
+    }
+    return "<số không hợp lệ>";
+  }
+  if (v === null) return "null";
+  if (v === undefined) return "undefined";
+  if (Array.isArray(v)) return `<mảng ${v.length} phần tử>`;
+  if (typeof v === "object") return "<object>";
+  if (typeof v === "boolean") return String(v);
+  return `<${typeof v}>`;
+}
 
 /**
  * Kiểm tra tính hợp lệ của nội dung một file lưu nhân vật.
@@ -108,7 +137,7 @@ export function auditPlayerSaveData(rawText: string, byteLength: number): AuditE
   if (!isRealmValid) {
     errors.push({
       code: "invalid_realm",
-      message: `realm (${realm}) không nằm trong khoảng cảnh giới hợp lệ [0, ${REALMS.length - 1}]`,
+      message: `realm (${show(realm)}) không nằm trong khoảng cảnh giới hợp lệ [0, ${REALMS.length - 1}]`,
     });
   }
 
@@ -118,13 +147,13 @@ export function auditPlayerSaveData(rawText: string, byteLength: number): AuditE
     if (!Number.isInteger(tier) || typeof tier !== "number" || tier < 0 || tier >= maxTiers) {
       errors.push({
         code: "invalid_tier",
-        message: `tier (${tier}) không hợp lệ với cảnh giới ${REALMS[realm].name} [0, ${maxTiers - 1}]`,
+        message: `tier (${show(tier)}) không hợp lệ với cảnh giới ${REALMS[realm].name} [0, ${maxTiers - 1}]`,
       });
     }
   } else if (!Number.isInteger(tier) || typeof tier !== "number" || tier < 0) {
     errors.push({
       code: "invalid_tier",
-      message: `tier (${tier}) phải là số nguyên không âm`,
+      message: `tier (${show(tier)}) phải là số nguyên không âm`,
     });
   }
 
@@ -132,7 +161,7 @@ export function auditPlayerSaveData(rawText: string, byteLength: number): AuditE
   if (typeof data.exp !== "number" || !Number.isFinite(data.exp) || data.exp < 0) {
     errors.push({
       code: "invalid_exp",
-      message: `exp (${data.exp}) phải là số hữu hạn không âm`,
+      message: `exp (${show(data.exp)}) phải là số hữu hạn không âm`,
     });
   }
 
@@ -146,7 +175,7 @@ export function auditPlayerSaveData(rawText: string, byteLength: number): AuditE
     ) {
       errors.push({
         code: "coin_out_of_range",
-        message: `coin (${data.coin}) phải là số nguyên trong khoảng [0, ${COIN_CAP}]`,
+        message: `coin (${show(data.coin)}) phải là số nguyên trong khoảng [0, ${COIN_CAP}]`,
       });
     }
   }
@@ -168,12 +197,12 @@ export function auditPlayerSaveData(rawText: string, byteLength: number): AuditE
     if (!isFinitePos) {
       errors.push({
         code: "pos_out_of_bounds",
-        message: `Toạ độ (x: ${x}, y: ${y}) nằm ngoài kích thước bản đồ (${WORLD_W}x${WORLD_H})`,
+        message: `Toạ độ (x: ${show(x)}, y: ${show(y)}) nằm ngoài kích thước bản đồ (${WORLD_W}x${WORLD_H})`,
       });
     } else if (circleBlocked(x, y, PLAYER_RADIUS)) {
       errors.push({
         code: "pos_blocked",
-        message: `Toạ độ (x: ${x}, y: ${y}) nằm đè lên vật cản không thể di chuyển`,
+        message: `Toạ độ (x: ${show(x)}, y: ${show(y)}) nằm đè lên vật cản không thể di chuyển`,
       });
     }
   }
@@ -200,13 +229,13 @@ export function auditPlayerSaveData(rawText: string, byteLength: number): AuditE
   if (data.inventory !== undefined) {
     if (!Array.isArray(data.inventory)) {
       errors.push({
-        code: "inv_too_many_slots",
+        code: "inv_not_array",
         message: "inventory phải là một mảng ô đồ",
       });
     } else if (data.inventory.length > INVENTORY_SLOTS) {
       errors.push({
         code: "inv_too_many_slots",
-        message: `Túi đồ có ${data.inventory.length} ô, vượt quá giới hạn tối đa ${INVENTORY_SLOTS} ô`,
+        message: `Túi đồ có ${data.inventory.length} ô, vượt quá giới hạn tối đa INVENTORY_SLOTS (${INVENTORY_SLOTS} ô)`,
       });
     } else {
       for (let i = 0; i < data.inventory.length; i++) {
@@ -224,7 +253,7 @@ export function auditPlayerSaveData(rawText: string, byteLength: number): AuditE
         if (!itemDef) {
           errors.push({
             code: "unknown_item",
-            message: `Ô đồ thứ ${i} chứa vật phẩm không tồn tại: "${slot.itemId}"`,
+            message: `Ô đồ thứ ${i} chứa vật phẩm không tồn tại: ${show(slot.itemId)}`,
           });
           continue;
         }
@@ -233,7 +262,7 @@ export function auditPlayerSaveData(rawText: string, byteLength: number): AuditE
         if (!Number.isInteger(qty) || typeof qty !== "number" || qty < 1 || qty > itemDef.stack) {
           errors.push({
             code: "qty_out_of_range",
-            message: `Ô đồ thứ ${i} ("${slot.itemId}") có số lượng ${qty} không nằm trong [1, ${itemDef.stack}]`,
+            message: `Ô đồ thứ ${i} (${show(slot.itemId)}) có số lượng ${show(qty)} không nằm trong [1, ${itemDef.stack}]`,
           });
         }
       }
@@ -257,7 +286,7 @@ export function auditPlayerSaveData(rawText: string, byteLength: number): AuditE
         if (!allowedSlots.has(slotKey)) {
           errors.push({
             code: "unknown_equip_slot",
-            message: `Ô trang bị lạ không tồn tại trong game: "${slotKey}"`,
+            message: `Ô trang bị lạ không tồn tại trong game: ${show(slotKey)}`,
           });
           continue;
         }
@@ -265,7 +294,7 @@ export function auditPlayerSaveData(rawText: string, byteLength: number): AuditE
         if (typeof rawItemId !== "string") {
           errors.push({
             code: "unknown_equip_item",
-            message: `Trang bị tại ô "${slotKey}" phải là chuỗi itemId`,
+            message: `Trang bị tại ô ${show(slotKey)} phải là chuỗi itemId`,
           });
           continue;
         }
@@ -276,7 +305,7 @@ export function auditPlayerSaveData(rawText: string, byteLength: number): AuditE
         if (!itemDef) {
           errors.push({
             code: "unknown_equip_item",
-            message: `Trang bị tại ô "${slotKey}" chứa vật phẩm không tồn tại: "${rawItemId}"`,
+            message: `Trang bị tại ô ${show(slotKey)} chứa vật phẩm không tồn tại: ${show(rawItemId)}`,
           });
           continue;
         }
@@ -284,7 +313,7 @@ export function auditPlayerSaveData(rawText: string, byteLength: number): AuditE
         if (itemDef.type !== "equip" || !itemDef.equip || itemDef.equip.slot !== slotKey) {
           errors.push({
             code: "invalid_equip_slot",
-            message: `Vật phẩm "${rawItemId}" không phải trang bị cho ô "${slotKey}"`,
+            message: `Vật phẩm ${show(rawItemId)} không phải trang bị cho ô ${show(slotKey)}`,
           });
         }
       }
@@ -312,12 +341,12 @@ export function auditPlayerSaveData(rawText: string, byteLength: number): AuditE
             if (typeof qId !== "string" || !byId(QUEST_BY_ID, qId)) {
               errors.push({
                 code: "unknown_quest",
-                message: `Nhiệm vụ đã hoàn thành không tồn tại: "${qId}"`,
+                message: `Nhiệm vụ đã hoàn thành không tồn tại: ${show(qId)}`,
               });
             } else if (seen.has(qId)) {
               errors.push({
                 code: "duplicate_quest_done",
-                message: `Nhiệm vụ bị trùng lặp trong quests.done: "${qId}"`,
+                message: `Nhiệm vụ bị trùng lặp trong quests.done: ${show(qId)}`,
               });
             } else {
               seen.add(qId);
@@ -339,7 +368,7 @@ export function auditPlayerSaveData(rawText: string, byteLength: number): AuditE
             if (typeof qId !== "string" || !byId(QUEST_BY_ID, qId)) {
               errors.push({
                 code: "unknown_quest",
-                message: `Nhiệm vụ đang làm không tồn tại: "${qId}"`,
+                message: `Nhiệm vụ đang làm không tồn tại: ${show(qId)}`,
               });
             }
           }
@@ -363,13 +392,13 @@ export function auditPlayerSaveData(rawText: string, byteLength: number): AuditE
             if (!questDef || !questDef.daily) {
               errors.push({
                 code: "invalid_daily_key",
-                message: `Nhiệm vụ "${qId}" trong daily không phải là nhiệm vụ lặp hàng ngày`,
+                message: `Nhiệm vụ ${show(qId)} trong daily không phải là nhiệm vụ lặp hàng ngày`,
               });
             }
             if (typeof dayVal !== "string" || isNaN(Date.parse(dayVal))) {
               errors.push({
                 code: "invalid_daily_key",
-                message: `Giá trị ngày của nhiệm vụ lặp "${qId}" không hợp lệ: "${dayVal}"`,
+                message: `Giá trị ngày của nhiệm vụ lặp ${show(qId)} không hợp lệ: ${show(dayVal)}`,
               });
             }
           }
@@ -417,7 +446,21 @@ export function auditSavesDirectory(dirPath: string): AuditReport {
     let byteLength: number;
 
     try {
-      const fileStat = statSync(fullPath);
+      const fileStat = lstatSync(fullPath);
+      if (!fileStat.isFile()) {
+        const errList = [
+          {
+            code: "not_regular_file",
+            message: "Không phải file thông thường (symlink, FIFO, socket, thư mục)",
+          },
+        ];
+        errorFiles++;
+        errorsByCode.not_regular_file = (errorsByCode.not_regular_file ?? 0) + 1;
+        if (failedFiles.length < 10) {
+          failedFiles.push({ file: filename, errors: errList });
+        }
+        continue;
+      }
       byteLength = fileStat.size;
       if (byteLength <= MAX_FILE_SIZE) {
         rawContent = readFileSync(fullPath, "utf8");

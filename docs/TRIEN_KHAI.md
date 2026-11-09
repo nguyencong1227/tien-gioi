@@ -240,16 +240,27 @@ npm run kiem-save -w server -- --json
 
 | Mã lỗi | Nguyên nhân & Hành động xử lý |
 |---|---|
+| `read_error` | Không thể đọc file do lỗi phân quyền I/O hoặc đĩa cứng. |
+| `not_regular_file` | File không phải file thông thường (symlink, FIFO, socket, thư mục) có nguy cơ gây treo tiến trình. |
+| `file_too_large` | Kích thước file vượt ngưỡng an toàn 1 MB (bảo vệ chống cạn kiệt bộ nhớ). |
 | `invalid_json` | File bị cắt cụt hoặc hỏng cú pháp JSON. Thường do quá trình sao chép đĩa bị gián đoạn. |
+| `not_an_object` | Dữ liệu gốc trong JSON không phải Object (ví dụ: mảng, null, số, chuỗi). |
 | `invalid_name` | Tên nhân vật không khớp quy chuẩn (`cleanName`, độ dài 2–16 ký tự hợp lệ). |
 | `invalid_secret_hash` | Chuỗi mã băm bí mật không phải SHA-256 (64 ký tự hex). |
 | `invalid_realm` / `invalid_tier` | Cảnh giới hoặc tầng bậc vượt ngoài khoảng định nghĩa trong game. |
 | `invalid_exp` | Điểm tu vi bị âm, NaN hoặc Infinity. |
 | `coin_out_of_range` | Số lượng Linh thạch bị âm, chứa số lẻ (float) hoặc vượt trần `COIN_CAP` (999.999.999). |
 | `pos_out_of_bounds` / `pos_blocked` | Toạ độ nhân vật nằm ngoài bản đồ hoặc rơi vào ô vật cản không thể di chuyển (núi đá, nước sâu). |
-| `inv_too_many_slots` | Túi đồ có số ô vượt quá giới hạn tối đa `INVENTORY_SLOTS` (20 ô). |
+| `inv_not_array` | Trường `inventory` không phải là một mảng. |
+| `inv_too_many_slots` | Túi đồ có số ô vượt quá giới hạn tối đa `INVENTORY_SLOTS` ô (hiện tại là 24 ô). |
+| `inv_slot_invalid` | Ô đồ trong túi không phải đối tượng hợp lệ. |
 | `unknown_item` | Ô đồ chứa `itemId` lạ không tồn tại trong bảng `ITEM_BY_ID`, hoặc dính khoá prototype (`constructor`). |
 | `qty_out_of_range` | Số lượng vật phẩm trong ô <= 0, số lẻ hoặc vượt quá giới hạn cộng dồn `stack`. |
-| `unknown_equip_slot` / `invalid_equip_slot` | Ô trang bị không tồn tại, hoặc vật phẩm đeo vào không phải trang bị phù hợp với ô đó. |
-| `unknown_quest` / `duplicate_quest_done` / `invalid_daily_key` | Sổ nhiệm vụ chứa `questId` lạ, nhiệm vụ trùng lặp trong danh sách đã xong, hoặc nhiệm vụ lặp hàng ngày không hợp lệ. |
-| `file_too_large` | Kích thước file vượt ngưỡng an toàn 1 MB (bảo vệ chống cạn kiệt bộ nhớ). |
+| `equip_not_object` | Trường `equipment` không phải là một Object. |
+| `unknown_equip_slot` | Ô trang bị lạ không tồn tại trong game. |
+| `unknown_equip_item` | Ô trang bị chứa giá trị không phải chuỗi hoặc chứa `itemId` không tồn tại. |
+| `invalid_equip_slot` | Vật phẩm đeo vào không phải là trang bị phù hợp với ô đó. |
+| `quests_not_object` | Trường `quests` không phải là một Object. |
+| `unknown_quest` | Sổ nhiệm vụ chứa `questId` lạ không tồn tại trong game. |
+| `duplicate_quest_done` | Danh sách nhiệm vụ đã xong (`done`) chứa `questId` bị trùng lặp. |
+| `invalid_daily_key` | Nhiệm vụ hàng ngày không hợp lệ hoặc giá trị ngày không đúng chuẩn ISO. |
