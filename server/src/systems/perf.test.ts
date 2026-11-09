@@ -342,4 +342,12 @@ describe("ngân sách băng thông và CPU (benchmark có seed, kết quả cố
     expect(r.eventKbNear).toBeLessThan(r.eventKbBroadcast / 2);
     expect(r.eventKbNear).toBeLessThan(4);
   });
+
+  it("tin tổ đội (PartyMsg) cho một client dưới ngân sách < 1 KB/s (#76)", () => {
+    const r = runBench(100, 10);
+    // 100 người chia 25 đội 4 người, snapshot gửi mỗi 1 giây (PARTY_SNAPSHOT_MS = 1000).
+    // Mỗi client nhận 1 tin nhắn/s kích thước ~300 byte JSON + khung.
+    expect(r.partyKbPerClient).toBeGreaterThan(0.1);
+    expect(r.partyKbPerClient).toBeLessThan(1.0);
+  });
 });
