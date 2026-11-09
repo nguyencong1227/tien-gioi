@@ -1,7 +1,7 @@
 // Test tích hợp: chạy server Colyseus thật trong tiến trình, kết nối bằng colyseus.js như client thật.
 // Dùng để đảm bảo hành vi không đổi khi tách / sửa logic server.
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { Server, matchMaker } from "colyseus";
@@ -9,6 +9,7 @@ import { WebSocketTransport } from "@colyseus/ws-transport";
 import { Client, getStateCallbacks, type Room } from "colyseus.js";
 import {
   ROOM_NAME,
+  COIN_CAP,
   MONSTER_CAP,
   TOWN_PX,
   SKILLS,
@@ -17,6 +18,7 @@ import {
   type ChatOut,
   type ToastMsg,
   type InvMsg,
+  type WalletMsg,
   type QuestsMsg,
   type DialogMsg,
   type PartyMsg,
@@ -26,6 +28,7 @@ import {
   NPC_BY_ID,
   QUEST_BY_ID,
 } from "@tien-gioi/shared";
+import { changeCoin } from "../systems/wallet";
 import type { WorldRoom } from "./WorldRoom";
 import type { WorldState } from "../schema";
 
@@ -75,6 +78,8 @@ async function join(name = `Thu ${++nameSeq}`, secret = secretOf(name)) {
   const toasts: ToastMsg[] = [];
   const invs: InvMsg[] = [];
   room.onMessage("inv", (m: InvMsg) => invs.push(m));
+  const wallets: WalletMsg[] = [];
+  room.onMessage("wallet", (m: WalletMsg) => wallets.push(m));
   const quests: QuestsMsg[] = [];
   const dialogs: DialogMsg[] = [];
   room.onMessage("quests", (m: QuestsMsg) => quests.push(m));
@@ -91,6 +96,7 @@ async function join(name = `Thu ${++nameSeq}`, secret = secretOf(name)) {
     chat,
     toasts,
     invs,
+    wallets,
     quests,
     dialogs,
     me: () => (room.state as any).players.get(room.sessionId),
@@ -379,6 +385,59 @@ describe("túi đồ và đồ rơi", () => {
     const again = await join(name);
     const inv = await waitFor(() => again.invs[0]);
     expect(inv.slots[0]).toEqual({ itemId: "nanh_soi", qty: 7 });
+  });
+
+  it("Linh thạch: vào phòng nhận wallet (mới = 0); chỉ chủ nhận; thoát ra vào lại vẫn còn", async () => {
+    const name = "Co Tien";
+    const a = await join(name);
+    const other = await join();
+    const first = await waitFor(() => a.wallets[0]);
+    expect(first).toEqual({ coin: 0 });
+    await sleep(150);
+    expect(other.wallets.every((m) => m.coin === 0)).toBe(true); // mỗi người chỉ nhận ví của mình
+    // Server cộng tiền (như khi hạ quái): chủ nhận wallet kèm gained, người khác không nhận gì thêm
+    const before = other.wallets.length;
+    changeCoin((serverRoom(a.room) as any).world, a.room.sessionId, 123);
+    expect(await waitFor(() => a.wallets.find((m) => m.gained))).toEqual({
+      coin: 123,
+      gained: 123,
+    });
+    await sleep(150);
+    expect(other.wallets.length).toBe(before);
+    await a.room.leave(true);
+    rooms.splice(rooms.indexOf(a.room), 1);
+    await sleep(200);
+    const again = await join(name);
+    const w = await waitFor(() => again.wallets[0]);
+    expect(w).toEqual({ coin: 123 });
+  });
+
+  it("Linh thạch trong file lưu bị hỏng (âm, chuỗi, quá lớn) được nạp an toàn, không làm sập phòng", async () => {
+    const cases: [unknown, number][] = [
+      [-5, 0],
+      ["abc", 0],
+      [null, 0],
+      [1e15, COIN_CAP],
+      [12.9, 12],
+    ];
+    for (const [i, [bad, expected]] of cases.entries()) {
+      const name = `Tien Hong ${i}`;
+      const a = await join(name);
+      await a.room.leave(true);
+      rooms.splice(rooms.indexOf(a.room), 1);
+      await sleep(200);
+      const file = readdirSync(dataDir).find(
+        (f) => JSON.parse(readFileSync(path.join(dataDir, f), "utf8")).name === name,
+      )!;
+      const full = path.join(dataDir, file);
+      const j = JSON.parse(readFileSync(full, "utf8"));
+      j.coin = bad;
+      writeFileSync(full, JSON.stringify(j));
+      const again = await join(name);
+      const w = await waitFor(() => again.wallets[0]);
+      expect(w.coin, `coin=${JSON.stringify(bad)}`).toBe(expected);
+      expect(again.me()).toBeDefined();
+    }
   });
 
   it("giết quái thì đồ rơi hiện trong state; nhặt được, dùng được", async () => {

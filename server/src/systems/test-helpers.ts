@@ -6,6 +6,7 @@ import {
   type FxMsg,
   type InvMsg,
   type QuestsMsg,
+  type WalletMsg,
   type DialogMsg,
   type ToastMsg,
   type ChatOut,
@@ -24,6 +25,7 @@ export function makeWorld() {
   const chats: { from: string; text: string }[] = [];
   const invs: { sid: string; msg: InvMsg }[] = [];
   const quests: { sid: string; msg: QuestsMsg }[] = [];
+  const wallets: { sid: string; msg: WalletMsg }[] = [];
   const dialogs: { sid: string; msg: DialogMsg }[] = [];
   const parties: { sid: string; msg: PartyMsg }[] = [];
   const invited: { sid: string; msg: PartyInvitedMsg }[] = [];
@@ -36,12 +38,13 @@ export function makeWorld() {
     toast: (sid, msg) => toasts.push({ sid, msg }),
     inv: (sid, msg) => invs.push({ sid, msg }),
     quests: (sid, msg) => quests.push({ sid, msg }),
+    wallet: (sid, msg) => wallets.push({ sid, msg }),
     dialog: (sid, msg) => dialogs.push({ sid, msg }),
     party: (sid, msg) => parties.push({ sid, msg }),
     partyInvited: (sid, msg) => invited.push({ sid, msg }),
     chatTo: (sid, msg) => chatsTo.push({ sid, msg }),
   });
-  return { w, fx, toasts, sys, chats, invs, quests, dialogs, parties, invited, chatsTo };
+  return { w, fx, toasts, sys, chats, invs, quests, wallets, dialogs, parties, invited, chatsTo };
 }
 
 export function addPlayer(w: World, sid: string, realm = 0, tier = 0) {
@@ -67,6 +70,7 @@ export function addPlayer(w: World, sid: string, realm = 0, tier = 0) {
     inv: emptyInventory(),
     itemCd: new Map(),
     quests: { active: [], done: [], daily: {} },
+    coin: 0,
     frac: { hp: 0, mp: 0, exp: 0, expAt: 0 },
   };
   w.state.players.set(sid, p);
