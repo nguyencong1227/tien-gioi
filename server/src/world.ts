@@ -118,6 +118,20 @@ export function takeWhole<K extends string>(
   return n;
 }
 
+/**
+ * Bước lượng tử hóa góc nhìn ghi vào state (π/16 = 11,25°, 32 hướng). Chọn bước chia hết π/4 để các ranh giới
+ * hướng của client (±45°, ±135° trong dirFromAngle, ±90° khi lật sprite) trùng mép ô: hướng hiển thị không đổi.
+ */
+export const ANGLE_STEP = Math.PI / 16;
+
+/**
+ * Góc nhìn để ghi vào state (`angle` của người / quái): làm tròn về giữa ô ANGLE_STEP.
+ * Góc này chỉ để client vẽ hướng; server tính trúng đòn bằng góc chính xác (tin nhắn / vị trí), không đọc lại.
+ * Vì sao: nhắm liên tục (bot, cần joystick) đổi góc gần như mỗi tick, mỗi lần gửi 5 byte cho mọi client đang thấy.
+ * Cắt về 32 hướng thì chỉ đổi khi sang ô khác, schema bỏ qua việc gán lại giá trị y hệt.
+ */
+export const quantAngle = (a: number) => (Math.floor(a / ANGLE_STEP) + 0.5) * ANGLE_STEP;
+
 export const rand = (a: number, b: number) => a + Math.random() * (b - a);
 export const angleDiff = (a: number, b: number) =>
   Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));

@@ -12,7 +12,7 @@ import {
   type MonsterKind,
 } from "@tien-gioi/shared";
 import { Monster } from "../schema";
-import { rand, takeWhole, type World, type MonsterCtrl } from "../world";
+import { rand, quantAngle, takeWhole, type World, type MonsterCtrl } from "../world";
 import { hurtPlayer } from "./combat";
 
 const LEASH_DIST = 520; // kéo quá xa nhà thì bỏ mục tiêu
@@ -125,10 +125,11 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
     speed = def.speed;
     if (d <= def.attackRange + PLAYER_RADIUS) {
       speed = 0;
-      m.angle = Math.atan2(target.y - m.y, target.x - m.x);
+      const aim = Math.atan2(target.y - m.y, target.x - m.x);
+      m.angle = quantAngle(aim);
       if (w.now >= mc.nextAttack) {
         mc.nextAttack = w.now + def.attackCd;
-        w.events.fx({ kind: "mslash", by: id, x: m.x, y: m.y, angle: m.angle });
+        w.events.fx({ kind: "mslash", by: id, x: m.x, y: m.y, angle: aim });
         hurtPlayer(w, mc.target!, target, Math.round(def.atk * rand(0.85, 1.15)), m);
       }
     }
@@ -170,6 +171,6 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
       m.x = next.x;
       m.y = next.y;
     }
-    m.angle = Math.atan2(dy, dx);
+    m.angle = quantAngle(Math.atan2(dy, dx));
   }
 }
