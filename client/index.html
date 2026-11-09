@@ -75,6 +75,16 @@
         </div>
       </div>
 
+      <aside id="party-panel" class="panel" hidden aria-label="Tổ đội">
+        <div class="party-head">
+          <b id="party-title">Tổ đội (0/4)</b>
+          <button type="button" id="party-btn-leave" class="party-btn-leave" title="Rời tổ đội">
+            Rời
+          </button>
+        </div>
+        <div id="party-members" class="party-members"></div>
+      </aside>
+
       <aside id="quest-tracker" class="panel" aria-label="Theo dõi nhiệm vụ">
         <div class="qt-head">
           <b>Nhiệm vụ</b>
@@ -291,6 +301,7 @@
           <canvas id="worldmap" width="384" height="384"></canvas>
           <div class="map-legend">
             <span><i class="lg me"></i> Đạo hữu</span>
+            <span><i class="lg party"></i> Đồng đội</span>
             <span><i class="lg npc"></i> NPC (!/?)</span>
             <span><i class="lg other"></i> Đồng đạo</span>
             <span><i class="lg mon"></i> Yêu thú</span>
@@ -298,6 +309,30 @@
           </div>
         </div>
       </section>
+
+      <!-- Lời mời tổ đội -->
+      <div id="party-invite-box" class="party-invite-box" hidden>
+        <div class="pib-content">
+          <p id="pib-msg"><b>Đạo hữu</b> mời bạn gia nhập tổ đội</p>
+          <div class="pib-timer"><i id="pib-timer-bar"></i></div>
+          <div class="pib-actions">
+            <button type="button" id="pib-btn-accept" class="pib-btn accept">Nhận</button>
+            <button type="button" id="pib-btn-decline" class="pib-btn decline">Từ chối</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Menu khi chạm người chơi khác -->
+      <div id="player-menu" class="panel player-menu" hidden>
+        <div class="pm-head">
+          <b id="pm-name">Đồng đạo</b>
+          <button type="button" id="pm-close" class="pm-close" title="Đóng">✕</button>
+        </div>
+        <div class="pm-body">
+          <div id="pm-realm" class="pm-realm"></div>
+          <button type="button" id="pm-invite-btn" class="pm-btn">Mời vào đội</button>
+        </div>
+      </div>
 
       <div id="toast"></div>
       <div id="death" hidden>
