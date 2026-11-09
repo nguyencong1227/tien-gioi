@@ -53,7 +53,55 @@ npm start
 
 ---
 
-## 3. Reverse Proxy & HTTPS (Khuyến nghị Caddy)
+## 3. Triển khai bằng Docker & Docker Compose (Khuyến nghị cho Production)
+
+Dự án cung cấp sẵn `Dockerfile` đa tầng (multi-stage build) và `docker-compose.yml` tối ưu hoá cho môi trường production:
+- Chạy với tài khoản non-root `node` (bảo mật).
+- Tích hợp sẵn `HEALTHCHECK` kiểm tra `/health` định kỳ 30 giây.
+- Dùng `init: true` (tini) và `stop_grace_period: 30s` để đảm bảo tín hiệu tắt máy `SIGTERM` được chuyển tiếp đầy đủ và server có đủ thời gian lưu toàn bộ dữ liệu nhân vật xuống đĩa.
+
+### Bước 1: Khởi động container
+```bash
+# Xây dựng image và chạy container ở chế độ nền:
+docker compose up -d --build
+```
+
+### Bước 2: Kiểm tra trạng thái
+```bash
+docker compose ps
+# Kiểm tra log nếu cần:
+docker compose logs -f
+```
+
+### Bước 3: Sao lưu và khôi phục dữ liệu từ Docker Volume
+Dữ liệu nhân vật được lưu tại Docker named volume `tien-gioi-data` (gắn vào `/app/data/players`).
+
+**Tạo bản sao lưu từ volume:**
+```bash
+docker run --rm -v tien-gioi-data:/data -v "$PWD":/out busybox tar czf /out/players-$(date +%Y%m%d-%H%M%S).tar.gz -C /data .
+```
+
+**Khôi phục dữ liệu vào volume:**
+```bash
+# 1. Dừng container game trước khi khôi phục:
+docker compose stop
+
+# 2. Giải nén bản sao lưu vào volume:
+docker run --rm -v tien-gioi-data:/data -v "$PWD":/backup busybox sh -c "tar xzf /backup/players-*.tar.gz -C /data"
+
+# 3. Khởi động lại container game:
+docker compose start
+```
+
+> [!NOTE]
+> Nếu chạy trực tiếp bằng lệnh `docker run`, hãy luôn kèm cờ `--init` và `--stop-timeout 30`:
+> ```bash
+> docker run -d --name tien-gioi --init --stop-timeout 30 -p 127.0.0.1:2567:2567 -v tien-gioi-data:/app/data/players tien-gioi
+> ```
+
+---
+
+## 4. Reverse Proxy & HTTPS (Khuyến nghị Caddy)
 
 ### Vì sao bắt buộc cần HTTPS?
 1. **PWA (Progressive Web App):** Service Worker ([client/public/sw.js](../client/public/sw.js)) và Web App Manifest chỉ hoạt động trên kết nối an toàn `https://` (hoặc `localhost`).
@@ -75,7 +123,7 @@ caddy run --config Caddyfile
 
 ---
 
-## 4. Kiểm tra sức khoẻ (Health Check) & Giám sát
+## 5. Kiểm tra sức khoẻ (Health Check) & Giám sát
 
 Server cung cấp endpoint kiểm tra tình trạng hoạt động tại `/health`:
 ```bash
@@ -86,7 +134,7 @@ Có thể dùng endpoint này cho Uptime Kuma, AWS Target Group Health Check, ho
 
 ---
 
-## 5. Tắt máy an toàn (Graceful Shutdown)
+## 6. Tắt máy an toàn (Graceful Shutdown)
 
 Khi cập nhật phiên bản hoặc khởi động lại máy chủ, gửi tín hiệu `SIGTERM` hoặc `SIGINT` đến tiến trình Node.js:
 ```bash
@@ -96,7 +144,7 @@ Tiến trình sẽ đóng nhận kết nối mới, lưu toàn bộ trạng thá
 
 ---
 
-## 6. Sao lưu & Khôi phục dữ liệu nhân vật
+## 7. Sao lưu & Khôi phục dữ liệu nhân vật
 
 ### 6.1. Dữ liệu cần bảo vệ (`DATA_DIR`)
 Thư mục `DATA_DIR` (mặc định `server/data/players`) lưu trữ toàn bộ hồ sơ nhân vật dạng JSON (`<sha1_hash>.json`), bao gồm:
