@@ -27,7 +27,6 @@ Khi bổ sung thêm sprite, biểu tượng hoặc hiệu ứng từ thư viện
 |---|---|---|---|
 | Địa hình & kiến trúc bổ sung | **Roguelike/RPG Pack**, **Tiny Town**, **Tiny Dungeon** | **Kenney Vleugels** ([kenney.nl/assets](https://kenney.nl/assets)) | **CC0 1.0** |
 | Nhân vật & quái cổ trang Á Đông | **Ninja Adventure Asset Pack** | **Pixel-boy & AAA** ([pixel-boy.itch.io/ninja-adventure-asset-pack](https://pixel-boy.itch.io/ninja-adventure-asset-pack)) | **CC0 1.0** |
-| Lớp trang phục / quái LPC | **Liberated Pixel Cup (LPC) Base Assets** | **Stephen Challener (Redshrike), Johannes Sjölund (wulax), Matthew Krohn (makrohn)** ([opengameart.org](https://opengameart.org/content/liberated-pixel-cup-lpc-base-assets-sprites-map-tiles)) | **CC-BY 3.0** |
 | Biểu tượng RPG cổ điển | **496 Pixel Art Icons for Medieval/Fantasy RPG** | **Henrique Lazarini (7Soul1)** ([opengameart.org/content/496-pixel-art-icons-for-medievalfantasy-rpg](https://opengameart.org/content/496-pixel-art-icons-for-medievalfantasy-rpg)) | **CC0 1.0** |
 
 ---

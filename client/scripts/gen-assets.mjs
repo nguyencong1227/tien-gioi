@@ -666,7 +666,7 @@ function buildAtlas() {
       },
       null,
       2,
-    ),
+    ) + "\n",
   );
 }
 
