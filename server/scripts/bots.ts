@@ -5,7 +5,8 @@
 //   npm run bots -w server -- --suite --mode=realistic --duration=15 --write-doc
 //   npm run bots -w server -- --clean-only --yes
 import { execSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
@@ -13,12 +14,15 @@ import { Client, Protocol, type Room } from "colyseus.js";
 import {
   PICKUP_RANGE,
   PLAYER_RADIUS,
+  REALMS,
   ROOM_NAME,
   SKILLS,
   TICK_MS,
   TOWN_PX,
   WORLD_H,
   WORLD_W,
+  circleBlocked,
+  dangerAt,
   inTown,
   moveWithCollision,
   statsFor,
@@ -29,6 +33,7 @@ import {
   type SkillMsg,
 } from "@tien-gioi/shared";
 import { runBench } from "../src/perf/bench";
+import { hashSecret, type SavedPlayer } from "../src/store";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
@@ -124,6 +129,50 @@ function parseArgs(argv: string[]): CliArgs {
 }
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/** PRNG có seed cố định (giống bench.ts) để vị trí khởi đầu của các bot lặp lại y hệt giữa các lần đo. */
+function seededPrng(seed: number) {
+  return () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Ghi sẵn file lưu nhân vật cho bot với vị trí (x, y) rải đều ngoài vùng hoang dã trước khi gọi joinOrCreate,
+ * để ngay lúc WorldRoom.onJoin khởi tạo StateView (#62), các bot đã đứng ở bãi săn khắp bản đồ (khớp với bench.ts)
+ * thay vì tụ hết trong Lạc Hà Trấn.
+ */
+function seedBotSaveFile(
+  name: string,
+  secret: string,
+  x: number,
+  y: number,
+  realm: number,
+  tier: number,
+): void {
+  mkdirSync(DATA_PLAYERS_DIR, { recursive: true });
+  // Tên file PHẢI khớp với fileFor() trong server/src/store.ts (sha1 của tên NFC viết thường).
+  // store.ts đổi cách đặt tên file thì bot sẽ ghi nhầm chỗ mà không báo lỗi: sửa cả hai nơi.
+  // Server phải chạy với thư mục làm việc server/ (npm run dev / start -w server) để DATA_DIR mặc định trỏ đúng server/data/players.
+  const key = createHash("sha1").update(name.normalize("NFC").toLowerCase()).digest("hex");
+  const file = path.join(DATA_PLAYERS_DIR, `${key}.json`);
+  const now = new Date().toISOString();
+  const saved: SavedPlayer = {
+    name,
+    secretHash: hashSecret(secret),
+    realm,
+    tier,
+    exp: 0,
+    x: Math.round(x),
+    y: Math.round(y),
+    createdAt: now,
+    updatedAt: now,
+  };
+  writeFileSync(file, JSON.stringify(saved, null, 1));
+}
 
 function currentGitCommit(): string {
   try {
@@ -320,6 +369,8 @@ export interface LoadTestMetrics {
   ackRttP95Ms: number;
   rxKBpsPerBot: number;
   rxPatchKBpsPerBot: number;
+  /** Băng thông nhận các gói tin nhắn sự kiện (fx, dmg) mỗi giây trên mỗi bot (KB/s) */
+  rxEventKBpsPerBot?: number;
   txKBpsPerBot: number;
   rxMsgsPerSecPerBot: number;
   txMsgsPerSecPerBot: number;
@@ -329,9 +380,18 @@ export interface LoadTestMetrics {
   monstersAvg: number;
   monstersMin: number;
   monstersEnd: number;
+  /** Số quái trung bình trong tầm nhìn (StateView) của mỗi bot (#62) */
+  visibleMonstersAvg?: number;
+  /** Số người chơi trung bình trong tầm nhìn (StateView) của mỗi bot (#62) */
+  visiblePlayersAvg?: number;
+  /** Tổng số quái trên toàn server lấy từ benchmark nội bộ (bench.ts) */
+  serverMonstersTotal?: number;
+  /** Tổng số quái còn sống hợp nhất từ tầm nhìn của toàn bộ bot lúc đo */
+  unionMonstersAvg?: number;
   attacksSent: number;
   skillsSent: number;
   inputsSent: number;
+  fxEventsReceivedPerBot?: number;
   dmgEventsReceivedPerBot: number;
 }
 
@@ -416,7 +476,7 @@ async function runIdleZeroBotTest(
   const bench0 = runBench(0, durationSec);
   const idle: IdleZeroBotMetrics = {
     durationSec: Number(actualSec.toFixed(2)),
-    monsters: monstersCount || bench0.monsters,
+    monsters: bench0.monsters || monstersCount,
     serverPid,
     serverCpuMsPerTickAvg: cpuAvg !== null ? Number(cpuAvg.toFixed(3)) : null,
     serverCpuMsPerTickP95:
@@ -456,10 +516,14 @@ async function runLoadTest(
   const ackRtts: number[] = [];
   const serverTickCpuSamples: number[] = [];
   const monsterCounts: number[] = [];
+  const visibleMonstersSamples: number[] = [];
+  const visiblePlayersSamples: number[] = [];
+  const unionMonstersSamples: number[] = [];
   let measuring = false;
   let attacksSent = 0;
   let skillsSent = 0;
   let inputsSent = 0;
+  const rnd = seededPrng(1);
 
   for (let i = 1; i <= botCount; i++) {
     const numStr = String(i).padStart(3, "0");
@@ -468,11 +532,28 @@ async function runLoadTest(
     const secret = `bot_secret_tien_gioi_${numStr}_loadtest`;
     const joinOpts: JoinOptions = { name, secret };
 
+    // Khởi tạo vị trí (campX, campY) rải đều khắp vùng hoang dã giống bench.ts trước khi joinOrCreate
+    const realm = rnd() < 0.8 ? 1 : 2;
+    const tier = Math.floor(rnd() * REALMS[realm].tiers.length);
+    let campX: number;
+    let campY: number;
+    for (;;) {
+      const a = rnd() * Math.PI * 2;
+      const r = TOWN_PX.r + 80 + rnd() * (WORLD_W * 0.45 - TOWN_PX.r);
+      const x = TOWN_PX.x + Math.cos(a) * r;
+      const y = TOWN_PX.y + Math.sin(a) * r;
+      if (!circleBlocked(x, y, PLAYER_RADIUS) && dangerAt(x, y) < 0.9) {
+        campX = x;
+        campY = y;
+        break;
+      }
+    }
+    seedBotSaveFile(name, secret, campX, campY, realm, tier);
+
     const client = new Client(url);
     const room = await client.joinOrCreate(ROOM_NAME, joinOpts);
 
     const radialAngle = ((i - 1) / botCount) * Math.PI * 2;
-    const campR = TOWN_PX.r + 70 + ((i * 67) % 340);
     const now = performance.now();
 
     const b: BotState = {
@@ -480,12 +561,12 @@ async function runLoadTest(
       name,
       room,
       seq: 0,
-      predX: TOWN_PX.x,
-      predY: TOWN_PX.y,
+      predX: campX,
+      predY: campY,
       hasPos: false,
       wanderAngle: radialAngle,
-      campX: TOWN_PX.x + Math.cos(radialAngle) * campR,
-      campY: TOWN_PX.y + Math.sin(radialAngle) * campR,
+      campX,
+      campY,
       avoidUntil: 0,
       nextTurnAt: now + 3000 + Math.random() * 2000,
       nextSlashAt: now + Math.random() * SKILLS.slash.cooldown,
@@ -667,16 +748,19 @@ async function runLoadTest(
           dy = 0;
         }
       } else {
+        // Kịch bản xấu nhất: bot tuần tra liên tục quanh khu bãi săn (campX, campY) của mình (20 input/s),
+        // giữ phân bố rải đều khắp vùng hoang dã thay vì dồn hết về quanh trấn.
+        const distToCamp = Math.hypot(b.predX - b.campX, b.predY - b.campY);
         const distFromTown = Math.hypot(b.predX - TOWN_PX.x, b.predY - TOWN_PX.y);
-        if (distFromTown > TOWN_PX.r + 750) {
-          b.wanderAngle = Math.atan2(TOWN_PX.y - b.predY, TOWN_PX.x - b.predX);
-          b.nextTurnAt = now + 2500;
-        } else if (distFromTown < TOWN_PX.r + 50) {
+        if (distFromTown < TOWN_PX.r + 60) {
           b.wanderAngle = Math.atan2(b.predY - TOWN_PX.y, b.predX - TOWN_PX.x);
-          b.nextTurnAt = now + 2500;
+          b.nextTurnAt = now + 2000;
+        } else if (distToCamp > 260) {
+          b.wanderAngle = Math.atan2(b.campY - b.predY, b.campX - b.predX);
+          b.nextTurnAt = now + 2000;
         } else if (now >= b.nextTurnAt) {
           b.wanderAngle += (Math.random() - 0.5) * Math.PI;
-          b.nextTurnAt = now + 2500 + Math.random() * 2500;
+          b.nextTurnAt = now + 2000 + Math.random() * 2000;
         }
         dx = Math.cos(b.wanderAngle);
         dy = Math.sin(b.wanderAngle);
@@ -745,6 +829,31 @@ async function runLoadTest(
     if (measuring) {
       const mSize = (bots[0]?.room.state as any)?.monsters?.size;
       if (typeof mSize === "number") monsterCounts.push(mSize);
+
+      let sumMon = 0;
+      let sumPlr = 0;
+      let validBots = 0;
+      const unionIds = new Set<string>();
+      for (const b of bots) {
+        const st = b.room.state as any;
+        const mMap = st?.monsters;
+        const pMap = st?.players;
+        if (typeof mMap?.size === "number") {
+          sumMon += mMap.size;
+          validBots++;
+          if (typeof mMap.forEach === "function") {
+            mMap.forEach((_: unknown, id: string) => unionIds.add(id));
+          }
+        }
+        if (typeof pMap?.size === "number") {
+          sumPlr += pMap.size;
+        }
+      }
+      if (validBots > 0) {
+        visibleMonstersSamples.push(sumMon / validBots);
+        visiblePlayersSamples.push(sumPlr / validBots);
+        unionMonstersSamples.push(unionIds.size);
+      }
     }
 
     if (measuring && serverPid) {
@@ -775,6 +884,9 @@ async function runLoadTest(
   ackRtts.length = 0;
   serverTickCpuSamples.length = 0;
   monsterCounts.length = 0;
+  visibleMonstersSamples.length = 0;
+  visiblePlayersSamples.length = 0;
+  unionMonstersSamples.length = 0;
   attacksSent = 0;
   skillsSent = 0;
   inputsSent = 0;
@@ -822,9 +934,11 @@ async function runLoadTest(
 
   const totalRxBytes = bots.reduce((s, b) => s + b.rxBytes, 0);
   const totalRxPatchBytes = bots.reduce((s, b) => s + b.rxPatchBytes, 0);
+  const totalRxEventBytes = Math.max(0, totalRxBytes - totalRxPatchBytes);
   const totalTxBytes = bots.reduce((s, b) => s + b.txBytes, 0);
   const totalRxMsgs = bots.reduce((s, b) => s + b.rxMsgs, 0);
   const totalTxMsgs = bots.reduce((s, b) => s + b.txMsgs, 0);
+  const totalFxEvents = bots.reduce((s, b) => s + b.fxCount, 0);
   const totalDmgEvents = bots.reduce((s, b) => s + b.dmgCount, 0);
 
   const expectedTicks = actualDurationSec * (1000 / TICK_MS);
@@ -839,6 +953,15 @@ async function runLoadTest(
   const monstersEnd = monsterCounts.at(-1) ?? 0;
   const monstersAvg = Math.round(avg(monsterCounts));
   const monstersMin = monsterCounts.length > 0 ? Math.min(...monsterCounts) : 0;
+  const visibleMonstersAvg =
+    visibleMonstersSamples.length > 0
+      ? Number(avg(visibleMonstersSamples).toFixed(1))
+      : monstersAvg;
+  const visiblePlayersAvg =
+    visiblePlayersSamples.length > 0 ? Number(avg(visiblePlayersSamples).toFixed(1)) : botCount;
+  const unionMonstersAvg =
+    unionMonstersSamples.length > 0 ? Math.round(avg(unionMonstersSamples)) : monstersAvg;
+  const serverMonstersTotal = runBench(botCount, 1).monsters;
 
   const metrics: LoadTestMetrics = {
     commit,
@@ -877,6 +1000,7 @@ async function runLoadTest(
     ackRttP95Ms: Number(percentile(ackRtts, 95).toFixed(2)),
     rxKBpsPerBot: Number((totalRxBytes / botCount / actualDurationSec / 1024).toFixed(2)),
     rxPatchKBpsPerBot: Number((totalRxPatchBytes / botCount / actualDurationSec / 1024).toFixed(2)),
+    rxEventKBpsPerBot: Number((totalRxEventBytes / botCount / actualDurationSec / 1024).toFixed(2)),
     txKBpsPerBot: Number((totalTxBytes / botCount / actualDurationSec / 1024).toFixed(2)),
     rxMsgsPerSecPerBot: Number((totalRxMsgs / botCount / actualDurationSec).toFixed(1)),
     txMsgsPerSecPerBot: Number((totalTxMsgs / botCount / actualDurationSec).toFixed(1)),
@@ -886,14 +1010,36 @@ async function runLoadTest(
     monstersAvg,
     monstersMin,
     monstersEnd,
+    visibleMonstersAvg,
+    visiblePlayersAvg,
+    serverMonstersTotal,
+    unionMonstersAvg,
     attacksSent,
     skillsSent,
     inputsSent,
+    fxEventsReceivedPerBot: Number((totalFxEvents / botCount / actualDurationSec).toFixed(1)),
     dmgEventsReceivedPerBot: Number((totalDmgEvents / botCount / actualDurationSec).toFixed(1)),
   };
 
   printMetrics(metrics);
   return metrics;
+}
+
+function eventKBpsOf(m: LoadTestMetrics): number {
+  return (
+    m.rxEventKBpsPerBot ?? Number(Math.max(0, m.rxKBpsPerBot - m.rxPatchKBpsPerBot).toFixed(2))
+  );
+}
+
+function formatRxCell(m: LoadTestMetrics): string {
+  return `Tổng **${m.rxKBpsPerBot} KB/s** (patch: ${m.rxPatchKBpsPerBot} KB/s, fx+dmg: ${eventKBpsOf(m)} KB/s)`;
+}
+
+function formatEntitiesCell(m: LoadTestMetrics): string {
+  if (m.visibleMonstersAvg !== undefined) {
+    return `Tầm nhìn TB **${m.visibleMonstersAvg} quái**, **${m.visiblePlayersAvg ?? m.botCount} người** (server bench: ${m.serverMonstersTotal ?? 88} quái; hợp nhất các bot thấy: TB ${m.unionMonstersAvg ?? m.monstersAvg} quái sống)`;
+  }
+  return `Toàn phòng TB ${m.monstersAvg} quái (đầu ${m.monstersStart} → cuối ${m.monstersEnd}, thấp nhất ${m.monstersMin}), ${m.botCount} người`;
 }
 
 function printMetrics(m: LoadTestMetrics) {
@@ -912,7 +1058,7 @@ function printMetrics(m: LoadTestMetrics) {
     console.log(`- Bộ nhớ RSS của server: ${m.serverRssMb} MB`);
   }
   console.log(
-    `- Số quái còn sống lúc đo: TB ${m.monstersAvg} con (đầu: ${m.monstersStart}, thấp nhất: ${m.monstersMin}, cuối: ${m.monstersEnd})`,
+    `- Thực thể trong tầm nhìn (StateView) mỗi bot: TB ${m.visibleMonstersAvg ?? m.monstersAvg} quái, ${m.visiblePlayersAvg ?? m.botCount} người (toàn server bench: ${m.serverMonstersTotal ?? 88} quái, hợp nhất các bot thấy: TB ${m.unionMonstersAvg ?? m.monstersAvg} quái sống)`,
   );
   console.log(
     `- Nhịp nhận patch tại client (Δt): TB ${m.patchIntervalAvgMs} ms | p50 ${m.patchIntervalP50Ms} ms | p95 ${m.patchIntervalP95Ms} ms | p99 ${m.patchIntervalP99Ms} ms`,
@@ -921,13 +1067,13 @@ function printMetrics(m: LoadTestMetrics) {
     `- Độ trễ vòng lặp input -> lastSeq: TB ${m.ackRttAvgMs} ms | min ${m.ackRttMinMs} ms | p50 ${m.ackRttP50Ms} ms | p95 ${m.ackRttP95Ms} ms`,
   );
   console.log(
-    `- Băng thông mỗi bot: nhận tổng (RX) ${m.rxKBpsPerBot} KB/s (riêng state patch: ${m.rxPatchKBpsPerBot} KB/s, ${m.rxMsgsPerSecPerBot} gói/s) | gửi (TX) ${m.txKBpsPerBot} KB/s (${m.txMsgsPerSecPerBot} gói/s)`,
+    `- Băng thông mỗi bot: nhận tổng (RX) ${m.rxKBpsPerBot} KB/s (state patch: ${m.rxPatchKBpsPerBot} KB/s, fx+dmg: ${eventKBpsOf(m)} KB/s, ${m.rxMsgsPerSecPerBot} gói/s) | gửi (TX) ${m.txKBpsPerBot} KB/s (${m.txMsgsPerSecPerBot} gói/s)`,
   );
   console.log(
     `- Tổng băng thông cả phòng (${m.botCount} bot): server phát ra ${m.totalRxKBps} KB/s, nhận vào ${m.totalTxKBps} KB/s`,
   );
   console.log(
-    `- Hoạt động chiến đấu: ${m.inputsSent} bước đi, ${m.attacksSent} đòn chém, ${m.skillsSent} kiếm khí (~${m.dmgEventsReceivedPerBot} sự kiện sát thương/s mỗi client)`,
+    `- Hoạt động chiến đấu: ${m.inputsSent} bước đi, ${m.attacksSent} đòn chém, ${m.skillsSent} kiếm khí (~${m.fxEventsReceivedPerBot ?? "–"} fx/s, ~${m.dmgEventsReceivedPerBot} dmg/s mỗi client)`,
   );
 }
 
@@ -954,10 +1100,7 @@ function renderTableRows(
         a
           ? `TB **${a.serverCpuMsPerTickAvg ?? "–"} ms** / p95 ${a.serverCpuMsPerTickP95 ?? "–"} ms / max ${a.serverCpuMsPerTickMax ?? "–"} ms`
           : undefined,
-      )} | ${fmtCell(
-        `Tổng **${b.rxKBpsPerBot} KB/s** (patch: ${b.rxPatchKBpsPerBot} KB/s)`,
-        a ? `Tổng **${a.rxKBpsPerBot} KB/s** (patch: ${a.rxPatchKBpsPerBot} KB/s)` : undefined,
-      )} | ${fmtCell(
+      )} | ${fmtCell(formatRxCell(b), a ? formatRxCell(a) : undefined)} | ${fmtCell(
         `**${b.txKBpsPerBot} KB/s** (${b.txMsgsPerSecPerBot} gói/s)`,
         a ? `**${a.txKBpsPerBot} KB/s** (${a.txMsgsPerSecPerBot} gói/s)` : undefined,
       )} | ${fmtCell(
@@ -968,12 +1111,7 @@ function renderTableRows(
         a
           ? `TB ${a.ackRttAvgMs} ms (min: ${a.ackRttMinMs} ms, p95: ${a.ackRttP95Ms} ms)`
           : undefined,
-      )} | ${fmtCell(
-        `TB ${b.monstersAvg} (đầu ${b.monstersStart} → cuối ${b.monstersEnd}, thấp nhất ${b.monstersMin})`,
-        a
-          ? `TB ${a.monstersAvg} (đầu ${a.monstersStart} → cuối ${a.monstersEnd}, thấp nhất ${a.monstersMin})`
-          : undefined,
-      )} |`;
+      )} | ${fmtCell(formatEntitiesCell(b), a ? formatEntitiesCell(a) : undefined)} |`;
     })
     .join("\n");
 }
@@ -992,11 +1130,11 @@ function renderSideBySideRows(beforeList: LoadTestMetrics[], afterList: LoadTest
     lines.push(
       `| **${modeName}** | **${b.botCount}** | Kết nối giữ vững | ${b.connectedBots}/${b.botCount} (4429: ${b.kicked4429}) | **${a.connectedBots}/${a.botCount} (4429: ${a.kicked4429})** |`,
       `| ${modeName} | **${b.botCount}** | CPU mỗi tick (TB / p95 / cao nhất) | TB **${b.serverCpuMsPerTickAvg} ms** / p95 ${b.serverCpuMsPerTickP95} ms / max ${b.serverCpuMsPerTickMax} ms | TB **${a.serverCpuMsPerTickAvg} ms** / p95 ${a.serverCpuMsPerTickP95} ms / max ${a.serverCpuMsPerTickMax} ms |`,
-      `| ${modeName} | **${b.botCount}** | Băng thông nhận vào (RX / bot) | Tổng **${b.rxKBpsPerBot} KB/s** (patch: ${b.rxPatchKBpsPerBot} KB/s) | Tổng **${a.rxKBpsPerBot} KB/s** (patch: ${a.rxPatchKBpsPerBot} KB/s) |`,
+      `| ${modeName} | **${b.botCount}** | Băng thông nhận vào (RX / bot) | ${formatRxCell(b)} | ${formatRxCell(a)} |`,
       `| ${modeName} | **${b.botCount}** | Băng thông gửi đi (TX / bot) | **${b.txKBpsPerBot} KB/s** (${b.txMsgsPerSecPerBot} gói/s) | **${a.txKBpsPerBot} KB/s** (${a.txMsgsPerSecPerBot} gói/s) |`,
       `| ${modeName} | **${b.botCount}** | Nhịp nhận patch \`Δt\` | TB ${b.patchIntervalAvgMs} ms (p95: ${b.patchIntervalP95Ms} ms) | TB **${a.patchIntervalAvgMs} ms** (p95: ${a.patchIntervalP95Ms} ms) |`,
       `| ${modeName} | **${b.botCount}** | Độ trễ \`input → lastSeq\` | TB ${b.ackRttAvgMs} ms (min: ${b.ackRttMinMs} ms, p95: ${b.ackRttP95Ms} ms) | TB **${a.ackRttAvgMs} ms** (min: ${a.ackRttMinMs} ms, p95: ${a.ackRttP95Ms} ms) |`,
-      `| ${modeName} | **${b.botCount}** | Số quái còn sống lúc đo | TB ${b.monstersAvg} (đầu ${b.monstersStart} → cuối ${b.monstersEnd}, thấp nhất ${b.monstersMin}) | TB **${a.monstersAvg}** (đầu ${a.monstersStart} → cuối ${a.monstersEnd}, thấp nhất ${a.monstersMin}) |`,
+      `| ${modeName} | **${b.botCount}** | Quái & người trong tầm nhìn (\`StateView\`) | ${formatEntitiesCell(b)} | ${formatEntitiesCell(a)} |`,
     );
   }
   return lines.join("\n");
@@ -1005,6 +1143,7 @@ function renderSideBySideRows(beforeList: LoadTestMetrics[], afterList: LoadTest
 export function renderMarkdownReport(
   current: LoadTestSnapshot,
   baseline?: LoadTestSnapshot | null,
+  midline?: LoadTestSnapshot | null,
 ): string {
   const before = baseline ?? current;
   const after = baseline ? current : null;
@@ -1014,15 +1153,50 @@ export function renderMarkdownReport(
   const sample = (after ?? before).results[0];
 
   const commitHeader = after
-    ? `- **Mốc trước tối ưu:** commit \`${before.commit}\` (${before.note})\n- **Mốc sau tối ưu:** commit \`${after.commit}\` (${after.note})`
+    ? [
+        `- **Mốc trước #62 (đã có #57, #59):** commit \`${before.commit}\` (${before.note})`,
+        ...(midline
+          ? [
+              `- **Mốc trung gian (chỉ có #66 StateView):** commit \`${midline.commit}\` (${midline.note})`,
+            ]
+          : []),
+        `- **Mốc sau #62 hoàn chỉnh (#66 + #69 + #70):** commit \`${after.commit}\` (${after.note})`,
+      ].join("\n")
     : `- **Commit đã đo:** \`${before.commit}\` (${before.note})`;
 
+  const threeWayRows =
+    after && midline
+      ? before.results
+          .map((b) => {
+            const m = midline.results.find(
+              (x) =>
+                x.botCount === b.botCount && (x.mode ?? "realistic") === (b.mode ?? "realistic"),
+            );
+            const a = after.results.find(
+              (x) =>
+                x.botCount === b.botCount && (x.mode ?? "realistic") === (b.mode ?? "realistic"),
+            );
+            if (!m || !a) return "";
+            const modeName =
+              (b.mode ?? "realistic") === "realistic"
+                ? "Thực tế (vào tầm đứng chém)"
+                : "Xấu nhất (100% đi liên tục)";
+            return `| ${modeName} | **${b.botCount}** | ${formatRxCell(b)} (${b.rxMsgsPerSecPerBot} gói/s) | ${formatRxCell(m)} (${m.rxMsgsPerSecPerBot} gói/s) | ${formatRxCell(a)} (${a.rxMsgsPerSecPerBot} gói/s) | ${formatEntitiesCell(a)} |`;
+          })
+          .filter(Boolean)
+          .join("\n")
+      : "";
+
+  const threeWaySection = threeWayRows
+    ? `\n### 2.1. Bảng tiến trình giảm băng thông qua 3 mốc của #62 (\`${before.commit}\` → \`${midline!.commit}\` → \`${after!.commit}\`)\n\n> **Lưu ý về số lượng thực thể:** Từ PR #66 (\`StateView\`), \`room.state.monsters.size\` và \`room.state.players.size\` trên mỗi client chỉ đếm các thực thể **trong tầm nhìn** (\`VIEW_ENTER = 1100 px\`, rời ở \`VIEW_EXIT = 1300 px\` trong \`server/src/systems/interest.ts\`), không phải toàn bộ phòng. Tổng số quái trên toàn server được lấy từ \`bench.ts\` (cùng seed) và đối chiếu thêm bằng hợp nhất (union) ID quái từ tất cả bot đang kết nối.\n\n| Kịch bản | Số bot | Trước #62 (\`${before.commit}\` — ${before.note}) | Sau #66 (\`${midline!.commit}\` — ${midline!.note}) | Sau #66 + #69 + #70 (\`${after!.commit}\` — ${after!.note}) | Thực thể trong tầm nhìn (\`StateView\`) & toàn server |\n|---|---:|---|---|---|---|\n${threeWayRows}\n`
+    : "";
+
   const sideBySideSection = after
-    ? `\n### 2.1. Bảng so sánh cột Trước (\`${before.commit}\` — ${before.note}) và Sau (\`${after.commit}\` — ${after.note})\n\n| Kịch bản | Số bot | Chỉ số | Trước (${before.note}) | Sau (${after.note}) |\n|---|---:|---|---|---|\n${sideBySide}\n`
+    ? `\n### 2.2. Bảng chi tiết từng chỉ số: Trước #62 (\`${before.commit}\`) và Sau #62 (\`${after.commit}\`)\n\n| Kịch bản | Số bot | Chỉ số | Trước #62 (${before.note}) | Sau #62 (${after.note}) |\n|---|---:|---|---|---|\n${sideBySide}\n`
     : "";
 
   const idleSection = idle
-    ? `\n### 2.3. Mức 0 bot (chỉ server chạy, không ai vào phòng trong ${idle.durationSec} giây)\n\n| Số bot | Quái trong phòng | CPU tiến trình server mỗi tick (TB / p95 / cao nhất) | Tick thuần logic (\`bench.ts\`) | State patch mã hoá mỗi tick (Trước #59 → Sau #59) | Băng thông state patch |\n|---:|---:|---|---|---|---|\n| **0** | ${idle.monsters} con (đều ngủ do \`MONSTER_WAKE_DIST = 900\`) | TB **${idle.serverCpuMsPerTickAvg} ms** / p95 ${idle.serverCpuMsPerTickP95} ms / max ${idle.serverCpuMsPerTickMax} ms | TB ${idle.benchTickAvgMs} ms / p95 ${idle.benchTickP95Ms} ms | ~893 byte/tick → **${idle.benchPatchBytesPerTick} byte/tick** | ~17.4 KB/s → **${idle.benchKBpsPerClient} KB/s** |\n`
+    ? `\n### 2.4. Mức 0 bot (chỉ server chạy, không ai vào phòng trong ${idle.durationSec} giây)\n\n| Số bot | Quái toàn server (\`bench.ts\`) | CPU tiến trình server mỗi tick (TB / p95 / cao nhất) | Tick thuần logic (\`bench.ts\`) | State patch mã hoá mỗi tick (Trước #59 → Sau #59 & #62) | Băng thông state patch |\n|---:|---:|---|---|---|---|\n| **0** | ${idle.monsters} con (đều ngủ do \`MONSTER_WAKE_DIST = 900\`) | TB **${idle.serverCpuMsPerTickAvg} ms** / p95 ${idle.serverCpuMsPerTickP95} ms / max ${idle.serverCpuMsPerTickMax} ms | TB ${idle.benchTickAvgMs} ms / p95 ${idle.benchTickP95Ms} ms | ~893 byte/tick → **${idle.benchPatchBytesPerTick} byte/tick** | ~17.4 KB/s → **${idle.benchKBpsPerClient} KB/s** |\n`
     : "";
 
   return `# Báo cáo thử tải bằng Bot (Load Test)
@@ -1033,39 +1207,49 @@ export function renderMarkdownReport(
 ## 1. Thông tin bản đo & Phương pháp
 
 ${commitHeader}
-- **Thời lượng đo mỗi mức:** ${sample?.durationSec ?? 15} giây ổn định (sau 2 giây khởi động để toàn bộ bot đi ra khỏi khu an toàn Lạc Hà Trấn).
+- **Thời lượng đo mỗi mức:** ${sample?.durationSec ?? 15} giây ổn định (sau 3.5 giây khởi động; vị trí khởi đầu của các bot được ghi sẵn vào \`server/data/players/\` bằng \`seededPrng(1)\` rải đều khắp vùng hoang dã ngoài Lạc Hà Trấn giống \`bench.ts\`, để ngay lúc \`WorldRoom.onJoin\` gắn \`StateView\` các bot đã phân bố tự nhiên trên bản đồ).
 - **Hai kịch bản hành vi bot (đều chạy ở nhịp \`TICK_MS = 50\` ms = 20 lần/giây):**
   1. **Thực tế (\`--mode=realistic\`):** giống hệt \`WorldScene.fixedStep()\` của client thật và \`bench.ts\` của Dev A — bot chỉ gửi \`input { seq, dx, dy }\` khi đang chạy tới quái; khi đã vào tầm chém thì **đứng lại đánh, không gửi \`input\`**.
-  2. **Trường hợp xấu nhất (\`--mode=worst\`):** cả 100% bot di chuyển liên tục mỗi tick (20 \`input\`/giây/bot, kể cả khi đã áp sát quái vẫn lượn vòng quanh), làm \`x, y, lastSeq\` của mọi người chơi đổi ở tất cả các tick và phải phát cho mọi client.
+  2. **Trường hợp xấu nhất (\`--mode=worst\`):** cả 100% bot di chuyển liên tục mỗi tick (20 \`input\`/giây/bot quanh bãi săn của mình, kể cả khi đã áp sát quái vẫn lượn vòng quanh), làm \`x, y, lastSeq\` của mọi người chơi đổi ở tất cả các tick.
 - **Cách lấy số đo (từ bên ngoài qua WebSocket thật & \`/proc\`):**
-  - **CPU mỗi tick (mục tiêu < 10 ms):** đọc \`se.sum_exec_runtime\` từ \`/proc/<server_pid>/sched\` (độ chính xác nano-giây trên Linux) ở mỗi chu kỳ 50 ms. Con số này bao gồm **toàn bộ** công việc của tiến trình server trong một tick: xử lý tin nhắn nhận vào + \`WorldRoom.update()\` + mã hoá bản vá \`@colyseus/schema\` + gửi khung WebSocket qua mạng cho 50–100 kết nối.
-  - **Băng thông mỗi bot nhận vào (RX) & gửi đi (TX):** đo trực tiếp số byte qua socket của từng bot; tách riêng **Tổng RX** (gồm cả tin nhắn broadcast \`fx\`, \`dmg\`, \`chat\`) và **Riêng state patch RX** (mã gói \`Protocol.ROOM_STATE_PATCH = 15\`).
+  - **CPU mỗi tick (mục tiêu < 10 ms):** đọc \`se.sum_exec_runtime\` từ \`/proc/<server_pid>/sched\` (độ chính xác nano-giây trên Linux) ở mỗi chu kỳ 50 ms. Con số này bao gồm **toàn bộ** công việc của tiến trình server trong một tick: xử lý tin nhắn nhận vào + \`WorldRoom.update()\` + mã hoá bản vá \`@colyseus/schema\` theo từng \`StateView\` + gửi khung WebSocket qua mạng cho 50–100 kết nối.
+  - **Băng thông mỗi bot nhận vào (RX) & gửi đi (TX):** đo trực tiếp số byte qua socket của từng bot; tách riêng:
+    - **Tổng RX:** toàn bộ byte nhận qua WebSocket mỗi giây trên mỗi bot.
+    - **State patch RX:** byte của các gói cập nhật trạng thái (\`Protocol.ROOM_STATE_PATCH = 15\`).
+    - **Tin nhắn sự kiện \`fx+dmg\` RX:** byte của các gói tin nhắn hiệu ứng đòn đánh và số sát thương (\`Protocol.ROOM_DATA = 13\`, tức \`Tổng RX - State patch RX\`), kèm tần suất gói \`fx/s\` và \`dmg/s\` mỗi client nhận.
   - **Nhịp nhận patch (\`Δt\`) & Độ trễ \`input → lastSeq\`:** đo trên từng client \`colyseus.js\` bằng \`performance.now()\`.
-  - **Số quái còn sống lúc đo:** lấy mẫu \`room.state.monsters.size\` mỗi tick trong suốt kỳ đo (bot giết quái nhanh hơn chu kỳ hồi 10 giây, ảnh hưởng trực tiếp tới kích thước patch và số gói \`fx\`/\`dmg\`).
+  - **Số thực thể trong tầm nhìn (\`StateView\`) & toàn server:** lấy mẫu \`room.state.monsters.size\` và \`room.state.players.size\` trên toàn bộ bot mỗi tick (sau #66 đây là số quái/người **trong tầm nhìn** của từng bot), đồng thời lấy tổng số quái toàn server từ \`bench.ts\` và hợp nhất (union) các ID quái mà các bot nhìn thấy.
 
-## 2. Bảng kết quả${after ? " (Trước → Sau #57, #59)" : " (Trước tối ưu — chưa có #57, #59)"}
-${sideBySideSection}
-### ${after ? "2.2. Bảng tổng hợp ngang (Trước → Sau)" : "2.1. Bảng kết quả"}
+## 2. Bảng kết quả${after ? " (Trước → Sau #62: StateView #66 + Lượng tử hoá góc #69 + Gửi gần fx/dmg #70)" : ""}
+${threeWaySection}${sideBySideSection}
+### ${after ? "2.3. Bảng tổng hợp ngang (Trước #62 → Sau #62)" : "2.1. Bảng kết quả"}
 
-| Kịch bản | Số bot | Kết nối giữ vững | CPU mỗi tick: TB / p95 / cao nhất (mục tiêu < 10 ms) | Băng thông nhận vào (RX / bot) | Băng thông gửi đi (TX / bot) | Nhịp nhận patch \`Δt\` (mục tiêu ~50 ms) | Độ trễ \`input → lastSeq\` | Số quái còn sống lúc đo |
+| Kịch bản | Số bot | Kết nối giữ vững | CPU mỗi tick: TB / p95 / cao nhất (mục tiêu < 10 ms) | Băng thông nhận vào (RX / bot) | Băng thông gửi đi (TX / bot) | Nhịp nhận patch \`Δt\` (mục tiêu ~50 ms) | Độ trễ \`input → lastSeq\` | Thực thể trong tầm nhìn (\`StateView\`) & toàn server |
 |---|---:|---|---|---|---|---|---|---|
 ${rows}
 ${idleSection}
 ## 3. Đối chiếu với Benchmark nội bộ (\`npm run bench -w server\`) & Nhận xét
 
-1. **Hiệu quả ở mức 0 bot (quái ngủ — \`MONSTER_WAKE_DIST = 900\` từ #59):**
-   - Trước #59, 88 con quái lang thang liên tục dù phòng không có ai, tạo ra **~893 byte/tick (~17.4 KB/s)** bản vá state.
-   - Sau #59, khi không có người chơi trong bán kính \`900 px\`, toàn bộ 88 con quái đứng yên ngủ và ở đầy máu không ghi vào state: **state patch giảm về đúng \`0 byte/tick\` (\`0 KB/s\`)**, CPU tiến trình server khi nhàn rỗi chỉ tốn **~0.03–0.05 ms/tick**.
-2. **Nguyên nhân chênh lệch băng thông giữa kịch bản Xấu nhất (~42 KB/s) và Benchmark nội bộ (~25–26.6 KB/s):**
-   - Benchmark không qua mạng của Dev A (\`npm run bench -w server\`) đo trên code \`main\` (trước #59) cho kết quả **~26.6 KB/s mỗi client** ở 100 người, và sau #59 giảm ~5% về **~25 KB/s**.
-   - Sự khác biệt giữa con số **~42 KB/s** (kịch bản Xấu nhất của \`bots.ts\`) và **~25–26.6 KB/s** của \`bench.ts\` **không phải** do \`takeWhole\`, mà do **kịch bản di chuyển**:
-     - Ở kịch bản **Xấu nhất (\`--mode=worst\`)**, cả 100 bot đều gửi 20 \`input\`/giây liên tục không nghỉ, khiến \`x, y, lastSeq\` của cả 100 nhân vật thay đổi ở mọi tick và được phát cho toàn bộ 100 client. Sau #59, kịch bản xấu nhất này chỉ giảm nhẹ vài KB/s như dự kiến.
-     - Ở kịch bản **Thực tế (\`--mode=realistic\`)**, khi bot vào tầm đánh quái thì đứng lại chém và không gửi \`input\` (giống \`WorldScene.fixedStep\` và \`bench.ts\`), băng thông gửi đi (TX) và băng thông state patch nhận về (RX) thấp hơn rõ rệt và sát với \`bench.ts\` (cộng thêm chi phí gói tin broadcast \`fx\`/\`dmg\` và khung WebSocket).
-3. **CPU mỗi tick (< 10 ms) và giới hạn tần suất (#57):**
-   - Trong \`bench.ts\` (chỉ chạy logic \`tickWorld\` + \`encoder.encode()\` một lần trong bộ nhớ), thời gian thuần logic là **~0.2 ms/tick**.
-   - Khi chạy server thật với **50–100 kết nối WebSocket**, tiến trình Node.js gánh thêm chi phí đọc/giải mã các gói \`input\`+\`attack\`/giây từ socket và đẩy hàng nghìn gói \`patch\`+\`fx\`+\`dmg\`/giây qua tầng TCP/WebSocket của hệ điều hành, nhưng tổng CPU tiến trình vẫn chỉ **~1.4–2.9 ms/tick trung bình (p95 < 5 ms, cao nhất < 10 ms)** — đạt mục tiêu **< 10 ms/tick**.
-   - Với bộ giới hạn tần suất của **#57**, bot gửi đúng nhịp 50 ms giữ nguyên **100% kết nối (\`4429: 0\`)**.
-   - Với \`Encoder.BUFFER_SIZE = 32 * 1024\` của **#59**, cảnh báo \`@colyseus/schema buffer overflow\` khi nối 85–100 người đã biến mất hoàn toàn.
+1. **Kết quả giảm băng thông của chuỗi PR #62 (#66 \`StateView\` + #69 lượng tử hoá góc + #70 \`fx/dmg\` gửi theo vùng nhìn):**
+   - **Kịch bản Thực tế (\`--mode=realistic\`, sát với người chơi thật và \`bench.ts\`):**
+     - Ở **50 bot**: tổng băng thông nhận mỗi client giảm **~77%**, từ **16.71 KB/s** (patch: 14.83 KB/s, \`fx+dmg\`: 1.88 KB/s) xuống **3.86 KB/s** (patch: **3.18 KB/s**, \`fx+dmg\`: **0.68 KB/s**).
+     - Ở **100 bot**: tổng băng thông nhận mỗi client giảm **~71%**, từ **12.11 KB/s** (patch: 11.68 KB/s, \`fx+dmg\`: 0.43 KB/s) xuống **3.55 KB/s** (patch: **3.18 KB/s**, \`fx+dmg\`: **0.37 KB/s**) — đạt sâu dưới mục tiêu **< 10 KB/s mỗi client** của issue #62.
+     - Đối chiếu \`bench.ts\` ở 100 người: \`npm run bench -w server -- --players 100 --seconds 20\` cho **6.8 KB/s** patch + **2.3 KB/s** \`fx+dmg\` vùng nhìn (≈ 9.1 KB/s); chạy mặc định \`--seconds 60\` cho 5.6 + 1.3 KB/s vì càng về sau quái chết càng nhiều. Bot qua mạng ra thấp hơn bench vì bot chỉ tìm quái trong 280 px và đứng canh bãi khi hết quái, nên ít đánh nhau hơn người chơi mô phỏng trong bench.
+   - **Kịch bản Trường hợp xấu nhất (\`--mode=worst\`, 100% bot gửi 20 \`input\`/s liên tục không nghỉ — mốc ~42–46 KB/s trong issue #62):**
+     - Ở **50 bot**: tổng RX mỗi bot giảm **~69%**, từ **26.76 KB/s** (patch: 24.82 KB/s, \`fx+dmg\`: 1.94 KB/s) xuống **8.29 KB/s** (patch: **7.60 KB/s**, \`fx+dmg\`: **0.69 KB/s**).
+     - Ở **100 bot**: tổng RX mỗi bot giảm **~68.5% (hơn 3.1 lần)**, từ **46.10 KB/s** (patch: **43.21 KB/s**, \`fx+dmg\`: **2.89 KB/s**, 65.6 gói/s) xuống **17.20 KB/s** sau #66 và còn **14.54 KB/s** sau #69 + #70 (patch: **13.78 KB/s**, \`fx+dmg\`: **0.75 KB/s**, chỉ còn **31.5 gói/s**).
+     - Lý do kịch bản \`worst\` 100 bot cao hơn kịch bản \`realistic\` (13.78 KB/s so với 3.18 KB/s state patch): bản đồ chỉ \`3072 × 3072 px\` (\`WORLD_W = MAP_W × TILE = 96 × 32\`) và bot được rải trong bán kính \`0.45 × WORLD_W ≈ 1380 px\` quanh trấn, nên vòng nhìn bán kính \`VIEW_ENTER = 1100 px\` của mỗi bot phủ phần lớn vùng có người, trung bình **~53.1 người chơi** trong tầm nhìn; ở chế độ \`worst\`, cả 53 người chơi trong tầm nhìn đều đổi \`x, y, lastSeq\` ở **mọi tick (100% thời gian)** thay vì chỉ ~15–20% thời gian như khi đứng đánh quái ở chế độ \`realistic\` và \`bench.ts\`.
+2. **Hiệu quả của PR #70 (\`WorldRoom.sendNear\` cho \`fx\` và \`dmg\`):**
+   - Trước #70 (sau #66), dù state patch đã lọc theo \`StateView\`, các gói \`fx\` và \`dmg\` vẫn \`broadcast\` toàn phòng, chiếm tới **1.56 KB/s** (ở \`realistic\` 100 bot, 45.1 gói/s) và **2.93 KB/s** (ở \`worst\` 100 bot, 66.7 gói/s).
+   - Sau #70, khi chỉ gửi \`fx\` và \`dmg\` cho người chơi trong bán kính \`VIEW_ENTER = 1100 px\`, băng thông \`fx+dmg\` mỗi bot ở 100 bot giảm xuống còn **0.37 KB/s** (\`realistic\`, giảm **76%**) và **0.75 KB/s** (\`worst\`, giảm **74%**), kéo tổng số khung WebSocket nhận mỗi giây giảm hơn một nửa (từ ~66.7 gói/s xuống **31.5 gói/s**).
+3. **CPU mỗi tick (< 10 ms), mức 0 bot (quái ngủ #59) và giới hạn tần suất (#57):**
+   - Ở mức **0 bot**, toàn bộ 88 con quái ngủ (\`MONSTER_WAKE_DIST = 900\`), state patch giữ nguyên **0 byte/tick (0 KB/s)**, CPU tiến trình server chỉ **~0.27 ms/tick**.
+   - Ở mức **50–100 bot**, tổng thời gian CPU của tiến trình server (gồm cả giải mã tin nhắn, chạy vòng lặp \`World\`, mã hoá \`StateView\` riêng cho từng client và gửi qua mạng) đạt trung bình **1.39–2.36 ms/tick** ở 50 bot và **2.15–4.05 ms/tick** (p95 **3.75–6.05 ms/tick**) ở 100 bot — nằm gọn trong ngân sách **< 10 ms/tick**.
+   - Toàn bộ các đợt chạy 50 và 100 bot đều giữ **100% kết nối (\`4429: 0\`)**, nhịp nhận patch ổn định **~50.2 ms**.
+4. **Chưa đo: đông người tụ trong trấn (ca xấu nhất thật sự của vùng nhìn).**
+   - Mọi kịch bản ở trên rải bot khắp vùng hoang dã nên \`StateView\` cắt được nhiều. Khi 100 người cùng đứng ở Lạc Hà Trấn (nhận nhiệm vụ, rèn đồ, giờ cao điểm) thì ai cũng thấy gần như tất cả mọi người, vùng nhìn không còn cắt được gì.
+   - Ước tính thô của Dev A bằng bench tạm: 100 người tụ trong trấn và **100% đi lại liên tục** ≈ **19 KB/s mỗi client** state patch (mỗi người thấy ~90 người khác); 50 người ≈ 9 KB/s; đứng yên ≈ 0 KB/s.
+   - Sẽ đo bằng bot thật (\`--mode=crowd\`) trong issue #78.
 `;
 }
 
@@ -1088,13 +1272,17 @@ async function main() {
     path.isAbsolute(p) ? p : existsSync(p) ? p : path.resolve(repoRoot, p);
 
   if (process.argv.includes("--render-only")) {
-    const curPath = resolveRepoPath(args.saveJson || "server/scripts/load-test-after.json");
-    const cmpPath = resolveRepoPath(args.compareJson || "server/scripts/load-test-before.json");
+    const curPath = resolveRepoPath(args.saveJson || "server/scripts/load-test-after-62.json");
+    const cmpPath = resolveRepoPath(args.compareJson || "server/scripts/load-test-after.json");
+    const midPath = resolveRepoPath("server/scripts/load-test-after-66.json");
     const cur = JSON.parse(readFileSync(curPath, "utf8")) as LoadTestSnapshot;
     const base = existsSync(cmpPath)
       ? (JSON.parse(readFileSync(cmpPath, "utf8")) as LoadTestSnapshot)
       : null;
-    const md = renderMarkdownReport(cur, base);
+    const mid = existsSync(midPath)
+      ? (JSON.parse(readFileSync(midPath, "utf8")) as LoadTestSnapshot)
+      : null;
+    const md = renderMarkdownReport(cur, base, mid);
     writeFileSync(DOC_PATH, md);
     console.log(`Đã kết xuất báo cáo từ ${curPath} và ${cmpPath} vào ${DOC_PATH}`);
     return;
@@ -1151,7 +1339,12 @@ async function main() {
   }
 
   if (args.writeDoc) {
-    const md = renderMarkdownReport(snapshot, baseline);
+    const midPath = resolveRepoPath("server/scripts/load-test-after-66.json");
+    const mid =
+      existsSync(midPath) && snapshot.commit !== "9be02c9"
+        ? (JSON.parse(readFileSync(midPath, "utf8")) as LoadTestSnapshot)
+        : null;
+    const md = renderMarkdownReport(snapshot, baseline, mid);
     writeFileSync(DOC_PATH, md);
     console.log(`\nĐã ghi báo cáo thử tải vào ${DOC_PATH}`);
   }
