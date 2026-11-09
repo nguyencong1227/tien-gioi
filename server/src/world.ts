@@ -31,6 +31,11 @@ export interface PlayerCtrl {
   itemCd: Map<string, number>;
   /** Sổ nhiệm vụ: chỉ gửi cho chủ qua tin nhắn `quests` */
   quests: QuestSave;
+  /**
+   * Phần hồi khí huyết / linh lực chưa đủ 1 đơn vị (xem takeWhole), và tu vi đả tọa
+   * đang để dành, ghi vào state mỗi EXP_FLUSH_MS (expAt = lần ghi kế tiếp).
+   */
+  frac: { hp: number; mp: number; exp: number; expAt: number };
 }
 
 /** Dữ liệu riêng của server cho mỗi món đồ rơi. */
@@ -51,6 +56,8 @@ export interface MonsterCtrl {
   wanderY: number;
   nextWander: number;
   damageBy: Map<string, number>;
+  /** Phần lẻ của hồi khí huyết chưa đủ 1 đơn vị */
+  hpFrac: number;
 }
 
 /** Cách các system gửi tin ra ngoài. WorldRoom nối vào broadcast / client.send. */
@@ -90,6 +97,22 @@ export class World {
     if (!p || !c || p.dead) return null;
     return { p, c };
   }
+}
+
+/**
+ * Cộng dồn `amount` vào acc[key], trả về phần nguyên để ghi vào state, giữ lại phần lẻ.
+ * Hồi máu / tu vi mỗi tick chỉ là số lẻ nhỏ: ghi thẳng vào state thì trường đó đổi 20 lần/giây
+ * và mỗi lần gửi một số thực 8 byte cho mọi client. Ghi phần nguyên thì chỉ đổi khi đủ 1 đơn vị.
+ */
+export function takeWhole<K extends string>(
+  acc: Record<K, number>,
+  key: K,
+  amount: number,
+): number {
+  const v = acc[key] + amount;
+  const n = Math.floor(v);
+  acc[key] = v - n;
+  return n;
 }
 
 export const rand = (a: number, b: number) => a + Math.random() * (b - a);
