@@ -19,6 +19,45 @@ export const RARITY_COLORS = [0xc9c4b8, 0x6fcf73, 0x4fa3ff, 0xc277ff, 0xffb23f] 
 export type ItemEffect =
   { kind: "healHp"; pct: number } | { kind: "healMp"; pct: number } | { kind: "exp"; pct: number };
 
+// ---------- Trang bị (Sprint 3) ----------
+
+export type EquipSlot = "weapon" | "robe" | "talisman";
+/** Thứ tự hiển thị trong bảng nhân vật */
+export const EQUIP_SLOTS: EquipSlot[] = ["weapon", "robe", "talisman"];
+export const EQUIP_SLOT_NAMES: Record<EquipSlot, string> = {
+  weapon: "Vũ khí",
+  robe: "Pháp bào",
+  talisman: "Hộ phù",
+};
+
+/** Chỉ số cộng thêm (cộng thẳng vào chỉ số gốc, không nhân) */
+export interface EquipStats {
+  atk?: number;
+  hp?: number;
+  mp?: number;
+  /** px/giây */
+  speed?: number;
+}
+
+export interface EquipDef {
+  slot: EquipSlot;
+  stats: EquipStats;
+  /** Cảnh giới tối thiểu để mặc: realm + tier (so theo stepOf) */
+  reqRealm: number;
+  reqTier: number;
+}
+
+/**
+ * Đồ đang mặc: itemId theo từng ô, "" = trống.
+ * Công khai (ai cũng thấy để vẽ ngoại hình): server đặt ba trường `weapon`, `robe`, `talisman`
+ * thẳng trên Player trong state, nên client đọc được Equipment từ chính player trong state.
+ */
+export type Equipment = Record<EquipSlot, string>;
+
+export function emptyEquipment(): Equipment {
+  return { weapon: "", robe: "", talisman: "" };
+}
+
 export interface ItemDef {
   id: string;
   name: string;
@@ -31,6 +70,8 @@ export interface ItemDef {
   effect?: ItemEffect;
   /** Hồi chiêu sau khi dùng (ms), tính riêng cho từng loại vật phẩm */
   cooldown?: number;
+  /** Chỉ có ở trang bị (type "equip", stack 1) */
+  equip?: EquipDef;
   /** Màu ảnh tạm (trước khi có asset thật) */
   color: number;
 }
@@ -108,9 +149,115 @@ export const ITEMS: ItemDef[] = [
     desc: "Vảy đỏ thẫm của Xích Mãng.",
     color: 0xb3262a,
   },
+  // ---------- Trang bị (rèn ở Thợ rèn, xem recipes.ts) ----------
+  {
+    id: "lang_nha_kiem",
+    name: "Lang Nha Kiếm",
+    type: "equip",
+    stack: 1,
+    rarity: 0,
+    desc: "Kiếm gỗ cứng khảm nanh sói, nhẹ tay mà sắc.",
+    equip: { slot: "weapon", stats: { atk: 4 }, reqRealm: 1, reqTier: 0 },
+    color: 0xb8b2a2,
+  },
+  {
+    id: "tho_nhung_bao",
+    name: "Thố Nhung Bào",
+    type: "equip",
+    stack: 1,
+    rarity: 0,
+    desc: "Áo dệt lông Linh Thố, mềm và ấm.",
+    equip: { slot: "robe", stats: { hp: 40 }, reqRealm: 1, reqTier: 0 },
+    color: 0xe9e1cf,
+  },
+  {
+    id: "lang_nha_phu",
+    name: "Lang Nha Phù",
+    type: "equip",
+    stack: 1,
+    rarity: 0,
+    desc: "Bùa xâu nanh sói, mang chút khí nhanh nhẹn của bầy sói.",
+    equip: { slot: "talisman", stats: { mp: 20, speed: 6 }, reqRealm: 1, reqTier: 0 },
+    color: 0x9c9585,
+  },
+  {
+    id: "hac_ho_kiem",
+    name: "Hắc Hổ Kiếm",
+    type: "equip",
+    stack: 1,
+    rarity: 1,
+    desc: "Chuôi bọc da Hắc Hổ, mỗi nhát chém mang theo sát khí.",
+    equip: { slot: "weapon", stats: { atk: 10 }, reqRealm: 1, reqTier: 6 },
+    color: 0x4a3d30,
+  },
+  {
+    id: "hac_ho_bao",
+    name: "Hắc Hổ Bào",
+    type: "equip",
+    stack: 1,
+    rarity: 1,
+    desc: "Áo da hổ dày, đỡ được móng vuốt yêu thú.",
+    equip: { slot: "robe", stats: { hp: 110 }, reqRealm: 1, reqTier: 6 },
+    color: 0x3e3328,
+  },
+  {
+    id: "ho_hon_phu",
+    name: "Hổ Hồn Phù",
+    type: "equip",
+    stack: 1,
+    rarity: 1,
+    desc: "Bùa phong ấn một tia hổ hồn.",
+    equip: { slot: "talisman", stats: { mp: 40, speed: 10 }, reqRealm: 1, reqTier: 6 },
+    color: 0x6b5a44,
+  },
+  {
+    id: "xich_mang_kiem",
+    name: "Xích Mãng Kiếm",
+    type: "equip",
+    stack: 1,
+    rarity: 2,
+    desc: "Lưỡi kiếm tôi bằng vảy Xích Mãng, đỏ như than hồng.",
+    equip: { slot: "weapon", stats: { atk: 18 }, reqRealm: 2, reqTier: 0 },
+    color: 0xc0392b,
+  },
+  {
+    id: "xich_lan_bao",
+    name: "Xích Lân Bào",
+    type: "equip",
+    stack: 1,
+    rarity: 2,
+    desc: "Áo kết vảy mãng, lửa thường khó xuyên.",
+    equip: { slot: "robe", stats: { hp: 200 }, reqRealm: 2, reqTier: 0 },
+    color: 0xa32a22,
+  },
+  {
+    id: "mang_dam_phu",
+    name: "Mãng Đảm Phù",
+    type: "equip",
+    stack: 1,
+    rarity: 2,
+    desc: "Bùa luyện từ vảy mãng, linh lực cuộn chảy không ngừng.",
+    equip: { slot: "talisman", stats: { mp: 70, speed: 14 }, reqRealm: 2, reqTier: 0 },
+    color: 0xd2553f,
+  },
 ];
 
 export const ITEM_BY_ID: Record<string, ItemDef> = Object.fromEntries(ITEMS.map((i) => [i.id, i]));
+
+/** Tổng chỉ số cộng thêm từ đồ đang mặc. Bỏ qua id lạ hoặc món mặc sai ô. */
+export function equipBonus(eq: Partial<Equipment> | undefined): Required<EquipStats> {
+  const out = { atk: 0, hp: 0, mp: 0, speed: 0 };
+  if (!eq) return out;
+  for (const slot of EQUIP_SLOTS) {
+    const e = ITEM_BY_ID[eq[slot] ?? ""]?.equip;
+    if (!e || e.slot !== slot) continue;
+    out.atk += e.stats.atk ?? 0;
+    out.hp += e.stats.hp ?? 0;
+    out.mp += e.stats.mp ?? 0;
+    out.speed += e.stats.speed ?? 0;
+  }
+  return out;
+}
 
 // ---------- Rơi đồ ----------
 

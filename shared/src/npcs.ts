@@ -46,7 +46,10 @@ export const NPCS: NpcDef[] = [
     title: "Thợ rèn",
     x: TOWN_PX.x + 130,
     y: TOWN_PX.y + 30,
-    dialog: ["Lò rèn còn đang nhóm lửa. Đợi ta tìm đủ quặng, sẽ rèn cho ngươi thanh kiếm ra hồn."],
+    dialog: [
+      "Lò đã đỏ lửa. Mang nanh, da, vảy yêu thú tới đây, ta rèn cho ngươi món ra hồn.",
+      "Đồ tốt kén người: cảnh giới chưa tới thì mặc vào cũng chẳng chịu nổi.",
+    ],
     color: 0x8c3b2a,
   },
   {
