@@ -5,11 +5,13 @@
 
 ## Vai trò
 
-| | **Dev A: Server & Gameplay** | **Dev B: Client & Trải nghiệm** |
-|---|---|---|
-| Sở hữu | `server/`, logic trong `shared/` (vật phẩm, nhiệm vụ, công thức chỉ số) | `client/`, asset, âm thanh, UI/UX, build app |
-| Quyết định | Luật chơi, cân bằng số liệu, bảo mật, lưu trữ | Cách hiển thị, thao tác, bố cục điện thoại/máy tính |
-| Chịu trách nhiệm | Server không bao giờ tin client; dữ liệu nhân vật không mất | Chạy mượt 60 FPS trên điện thoại tầm trung; dễ dùng bằng một tay |
+| | **Dev A: Server & Gameplay** | **Dev B: Client & Trải nghiệm** | **Dev C: Công cụ, Thử tải & Phát hành** |
+|---|---|---|---|
+| Sở hữu | `server/`, logic trong `shared/` (vật phẩm, nhiệm vụ, công thức chỉ số) | `client/`, asset, âm thanh, UI/UX | `.github/`, `server/scripts/` (bot thử tải), PWA (manifest, icon, service worker), `docs/LOAD_TEST.md` |
+| Quyết định | Luật chơi, cân bằng số liệu, bảo mật, lưu trữ; giao việc | Cách hiển thị, thao tác, bố cục điện thoại/máy tính | Cách đo, công cụ CI, cách đóng gói |
+| Chịu trách nhiệm | Server không bao giờ tin client; dữ liệu nhân vật không mất | Chạy mượt 60 FPS trên điện thoại tầm trung; dễ dùng bằng một tay | CI bắt lỗi trước khi merge; biết server chịu được bao nhiêu người |
+
+Dev C vào từ Sprint 3, dùng Antigravity CLI. Việc của Dev C ít đụng `server/src/` và `client/src/` để không giẫm lên Dev A / Dev B: cần sửa ở đó thì làm PR nhỏ và nhờ chủ thư mục review.
 
 Hai người cùng sở hữu **hợp đồng `shared/`**. Mỗi tính năng đi theo thứ tự:
 
@@ -123,7 +125,7 @@ Hai người cùng sở hữu **hợp đồng `shared/`**. Mỗi tính năng đi
   - Bảng tính (Google Sheets) mô phỏng thời gian lên từng cảnh giới.
   - Mục tiêu: Luyện Khí ~1 giờ, Trúc Cơ ~3 giờ chơi.
   - Chỉnh `expToNext`, sát thương quái, tỉ lệ rơi đồ theo bảng tính.
-- [ ] **Thử tải:**
+- [ ] **Thử tải** (chuyển cho Dev C):
   - Script `server/scripts/bots.ts` dùng `colyseus.js` tạo 50–100 bot đi lại và đánh quái.
   - Đo thời gian mỗi tick (mục tiêu < 10 ms) và băng thông mỗi người chơi.
   - Ghi kết quả vào `docs/LOAD_TEST.md`.
@@ -139,7 +141,12 @@ Hai người cùng sở hữu **hợp đồng `shared/`**. Mỗi tính năng đi
   - Đảm bảo nút không bị tai thỏ / thanh điều hướng che (safe area).
   - Kiểm tra pin/nhiệt sau 20 phút chơi.
 - [ ] **Màn hình cài đặt:** âm lượng, ẩn tên người khác, chất lượng hình ảnh (tắt hiệu ứng trên máy yếu).
-- [ ] **PWA:** manifest + icon để "Thêm vào màn hình chính". Bước đệm trước khi làm app Capacitor ở M4.
+- [ ] **PWA** (chuyển cho Dev C): manifest + icon để "Thêm vào màn hình chính". Bước đệm trước khi làm app Capacitor ở M4.
+
+### Dev C: công cụ, thử tải, phát hành
+- [ ] **CI kiểm định dạng** (#55): thêm `npx prettier --check .` vào `.github/workflows/ci.yml` (việc khởi động, làm quen quy trình PR).
+- [ ] **Thử tải bằng bot** (#29, nhận lại từ Dev A): script, số đo, `docs/LOAD_TEST.md` như mô tả ở mục Dev A phía trên. Chạy trên server của Dev C (cổng 2587), báo trước khi chạy vì dùng chung CPU.
+- [ ] **PWA** (#36, nhận lại từ Dev B): manifest + icon để "Thêm vào màn hình chính".
 
 **Xong khi:** 50 bot + 2 người thật chơi cùng lúc vẫn mượt; người chơi có mục tiêu rõ ràng cho 3 giờ đầu.
 
@@ -175,6 +182,7 @@ Hai người cùng sở hữu **hợp đồng `shared/`**. Mỗi tính năng đi
 
 ### Khi bị chặn
 - Dev B cần dữ liệu mà server chưa xong: tạm giả lập trong client (dữ liệu mẫu theo đúng kiểu trong `shared/`), không chờ.
+- Dev C cần server / client đổi để đo được (vd thêm số đo thời gian tick): mở issue gắn nhãn của chủ thư mục, trong lúc chờ thì đo từ ngoài (log, `process.hrtime`) trong script của mình.
 - Dev A cần xem kết quả mà UI chưa có: dùng log server hoặc lệnh chat debug (vd `/give hoi_huyet_dan 5`, chỉ bật khi `NODE_ENV !== "production"`).
 
 ## Ước lượng khối lượng
@@ -184,7 +192,9 @@ Hai người cùng sở hữu **hợp đồng `shared/`**. Mỗi tính năng đi
 | 0 | CI, test, tách `WorldRoom` (2–3 ngày) | Lint, chọn asset, quy ước asset (2–3 ngày) |
 | 1 | Túi đồ, rơi đồ, đan dược (≈ 8 ngày) | Asset thật + hoạt ảnh, UI túi đồ, nhặt đồ (≈ 9 ngày) |
 | 2 | Nhiệm vụ, NPC, nội dung (≈ 9 ngày) | NPC, hộp thoại, theo dõi nhiệm vụ, minimap, âm thanh (≈ 9 ngày) |
-| 3 | Trang bị, rèn đồ, cân bằng, thử tải, bảo mật (≈ 9 ngày) | Bảng nhân vật, rèn đồ UI, thử thiết bị thật, cài đặt, PWA (≈ 9 ngày) |
+| 3 | Trang bị, rèn đồ, cân bằng, bảo mật (≈ 7 ngày) | Bảng nhân vật, rèn đồ UI, thử thiết bị thật, cài đặt (≈ 8 ngày) |
+
+Từ Sprint 3, **Dev C** nhận: CI kiểm định dạng (≈ 0.5 ngày), thử tải bằng bot #29 (≈ 3 ngày, từ Dev A), PWA #36 (≈ 1 ngày, từ Dev B).
 
 Khối lượng của Dev B ở Sprint 1 nhiều hơn một chút vì phải thay toàn bộ asset. Nếu trễ, Dev A nhận phần "thông báo nhận đồ" và "thanh dùng nhanh".
 
