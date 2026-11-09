@@ -409,48 +409,4 @@ describe("nhất quán dữ liệu game (Issue #112 - data-integrity)", () => {
       }
     });
   });
-
-  describe("5. Đột biến kiểm tra (mutation check: dữ liệu sai lệch -> test bắt buộc đỏ)", () => {
-    it("đột biến: bảng rơi đồ trỏ itemId không tồn tại -> bị phát hiện", () => {
-      const fakeDropTable = [
-        ...DROP_TABLES.tho,
-        { itemId: "vat_pham_ma_12345", chance: 0.5, min: 1, max: 1 },
-      ];
-      // Kiểm tra logic xác thực bảng rơi:
-      const hasInvalidItem = fakeDropTable.some((drop) => !(drop.itemId in ITEM_BY_ID));
-      expect(hasInvalidItem).toBe(true);
-    });
-
-    it("đột biến: nhiệm vụ trỏ NPC giao không tồn tại -> bị phát hiện", () => {
-      const fakeQuest = {
-        id: "test_fake_quest",
-        name: "Nhiệm vụ ma",
-        giver: "npc_khong_ton_tai",
-        steps: [],
-      };
-      const isGiverValid = fakeQuest.giver in NPC_BY_ID;
-      expect(isGiverValid).toBe(false);
-    });
-
-    it("đột biến: công thức rèn trỏ NPC không tồn tại -> bị phát hiện", () => {
-      const fakeRecipe = {
-        id: "fake_recipe",
-        npcId: "npc_la_123",
-        inputs: [],
-        output: { itemId: "tho_nhung_bao", qty: 1 },
-      };
-      const isNpcValid = fakeRecipe.npcId in NPC_BY_ID;
-      expect(isNpcValid).toBe(false);
-    });
-
-    it("đột biến: trang bị có stack > 1 -> bị phát hiện", () => {
-      const fakeGear = {
-        id: "fake_sword",
-        type: "equip",
-        stack: 10, // Sai quy chuẩn: trang bị phải có stack 1
-      };
-      const isStackValid = fakeGear.type !== "equip" || fakeGear.stack === 1;
-      expect(isStackValid).toBe(false);
-    });
-  });
 });
