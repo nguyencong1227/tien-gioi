@@ -1822,7 +1822,7 @@
     }
   },
   "meta": {
-    "app": "tien-gioi-atlas-packer",
+    "app": "client/scripts/gen-assets.mjs",
     "version": "1.0",
     "image": "atlas.png",
     "format": "RGBA8888",

@@ -11,8 +11,10 @@ import {
   TICK_MS,
   PLAYER_RADIUS,
   SKILLS,
+  MONSTERS,
   MONSTER_BY_ID,
   ITEM_BY_ID,
+  DROP_TABLES,
   RARITY_COLORS,
   PICKUP_RANGE,
   NPCS,
@@ -578,6 +580,38 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
+  /** Bán kính tính từ tâm trấn ứng với ngưỡng dangerAt(x, y) = minDanger */
+  private dangerRadiusPx(minDanger: number): number {
+    return TOWN_PX.r + minDanger * (WORLD_W * 0.5 - TOWN_PX.r);
+  }
+
+  /** Tìm con quái gần nhất cùng loại trong state.monsters; nếu chưa có thì chỉ ra vòng minDanger theo hướng đang đứng. */
+  private monsterTargetPos(monsterKind: string): { x: number; y: number } | null {
+    let bestPos: { x: number; y: number } | null = null;
+    let bestDist = Infinity;
+    this.state.monsters?.forEach((m: any) => {
+      if (m.kind !== monsterKind || m.hp <= 0) return;
+      const d = Math.hypot(m.x - this.predX, m.y - this.predY);
+      if (d < bestDist) {
+        bestDist = d;
+        bestPos = { x: m.x, y: m.y };
+      }
+    });
+    if (bestPos) return bestPos;
+
+    const def = MONSTER_BY_ID[monsterKind];
+    if (!def) return null;
+    const ringR = Math.max(TOWN_PX.r + 48, this.dangerRadiusPx(def.minDanger) + 32);
+    const fromTownDist = Math.hypot(this.predX - TOWN_PX.x, this.predY - TOWN_PX.y);
+    const dirAngle =
+      fromTownDist > 16 ? Math.atan2(this.predY - TOWN_PX.y, this.predX - TOWN_PX.x) : this.facing;
+    const pad = TILE * 2;
+    return {
+      x: Phaser.Math.Clamp(TOWN_PX.x + Math.cos(dirAngle) * ringR, pad, WORLD_W - pad),
+      y: Phaser.Math.Clamp(TOWN_PX.y + Math.sin(dirAngle) * ringR, pad, WORLD_H - pad),
+    };
+  }
+
   private resolveQuestTarget(questId: string): { x: number; y: number } | null {
     const def = QUEST_BY_ID[questId];
     if (!def) return null;
@@ -601,18 +635,35 @@ export class WorldScene extends Phaser.Scene {
     }
 
     if (step.kind === "kill") {
-      // Vùng săn quái theo loại
-      if (step.monster === "tho") return { x: TOWN_PX.x + 230, y: TOWN_PX.y - 120 };
-      if (step.monster === "lang") return { x: TOWN_PX.x - 380, y: TOWN_PX.y - 320 };
-      if (step.monster === "ho") return { x: TOWN_PX.x + 520, y: TOWN_PX.y + 440 };
-      if (step.monster === "mang") return { x: TOWN_PX.x, y: TOWN_PX.y + 740 };
+      return this.monsterTargetPos(step.monster);
     }
 
     if (step.kind === "collect") {
-      // Thu thập nguyên liệu: chỉ tới vùng quái rớt nguyên liệu tương ứng
-      if (step.itemId === "long_tho") return { x: TOWN_PX.x + 230, y: TOWN_PX.y - 120 };
-      if (step.itemId === "nanh_soi") return { x: TOWN_PX.x - 380, y: TOWN_PX.y - 320 };
-      if (step.itemId === "da_ho") return { x: TOWN_PX.x + 520, y: TOWN_PX.y + 440 };
+      // Ưu tiên chỉ tới vật phẩm rơi trên mặt đất nếu có
+      let nearestLoot: { x: number; y: number } | null = null;
+      let nearestLootDist = Infinity;
+      this.state.loot?.forEach((l: LootView) => {
+        if (l.itemId !== step.itemId || (l.owner && l.owner !== this.sid)) return;
+        const d = Math.hypot(l.x - this.predX, l.y - this.predY);
+        if (d < nearestLootDist) {
+          nearestLootDist = d;
+          nearestLoot = { x: l.x, y: l.y };
+        }
+      });
+      if (nearestLoot) return nearestLoot;
+
+      // Tra từ DROP_TABLES xem loại quái nào rơi nguyên liệu này
+      let bestMon: string | null = null;
+      let bestChance = 0;
+      for (const [monId, entries] of Object.entries(DROP_TABLES)) {
+        for (const e of entries) {
+          if (e.itemId === step.itemId && e.chance > bestChance) {
+            bestChance = e.chance;
+            bestMon = monId;
+          }
+        }
+      }
+      if (bestMon) return this.monsterTargetPos(bestMon);
     }
 
     // Đột phá cảnh giới: chỉ về trung tâm trấn để an toàn
@@ -763,17 +814,28 @@ export class WorldScene extends Phaser.Scene {
           ctx.textAlign = "center";
           ctx.fillText("Lạc Hà Trấn", tx, ty - tr - 6);
 
-          // Vùng quái
-          const zones = [
-            { name: "Linh Thố", x: TOWN_PX.x + 230, y: TOWN_PX.y - 120, col: "#9fae7a" },
-            { name: "Hôi Lang", x: TOWN_PX.x - 380, y: TOWN_PX.y - 320, col: "#848994" },
-            { name: "Hắc Hổ", x: TOWN_PX.x + 520, y: TOWN_PX.y + 440, col: "#d8a63a" },
-            { name: "Xích Mãng", x: TOWN_PX.x, y: TOWN_PX.y + 740, col: "#d93848" },
-          ];
-          for (const z of zones) {
-            ctx.fillStyle = z.col;
+          // Vòng nguy hiểm (minDanger) tính ngược từ dangerAt(x, y)
+          for (const m of MONSTERS) {
+            const rPx = m.minDanger > 0 ? this.dangerRadiusPx(m.minDanger) : TOWN_PX.r + 40;
+            const rCanvas = Math.min(w * 0.49, rPx * s);
+            const col = `#${m.color.toString(16).padStart(6, "0")}`;
+            ctx.strokeStyle = col;
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.arc(tx, ty, rCanvas, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.fillStyle = col;
             ctx.font = "10px serif";
-            ctx.fillText(z.name, z.x * s, z.y * s);
+            const labelY = Math.max(11, ty - rCanvas - 3);
+            ctx.fillText(
+              m.minDanger > 0
+                ? `${m.name} (≥${Math.round(m.minDanger * 100)}%)`
+                : `${m.name} (ngoài trấn)`,
+              tx,
+              labelY,
+            );
           }
 
           // Quái hiện hành

@@ -20,6 +20,7 @@ import {
   type Inventory,
   type ItemDef,
   type QuestsMsg,
+  type QuestProgress,
   type QuestDef,
   type QuestCtx,
   type DialogMsg,
@@ -227,13 +228,13 @@ function showGainFeed(itemId: string, qty: number) {
 
 function describeStep(
   def: QuestDef,
-  prog: { step: number; count: number },
+  prog: QuestProgress,
 ): {
   text: string;
   ready: boolean;
 } {
   const ctx = getCtx();
-  if (questReady(def, prog as any, ctx)) {
+  if (questReady(def, prog, ctx)) {
     const npc = NPC_BY_ID[def.giver];
     return { text: `Hoàn thành · Gặp ${npc?.name ?? "NPC"} trả nhiệm vụ`, ready: true };
   }
