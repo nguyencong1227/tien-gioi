@@ -17,7 +17,7 @@ import {
   type MonsterCtrl,
 } from "../world";
 import { applyStats, gainExp } from "./progression";
-import { safeSpot } from "./movement";
+import { safeSpot, syncPublicPos } from "./movement";
 import { dropLoot } from "./loot";
 import { onMonsterKilled } from "./quests";
 import { killShares } from "./party";
@@ -136,6 +136,7 @@ export function tickRespawn(w: World, p: Player, c: PlayerCtrl) {
   const s = safeSpot();
   p.x = s.x;
   p.y = s.y;
+  syncPublicPos(p); // dịch chuyển tức thời: người khác thấy ngay
   p.dead = false;
   p.meditating = false;
   applyStats(p, true);

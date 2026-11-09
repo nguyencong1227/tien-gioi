@@ -28,6 +28,8 @@ export interface PlayerCtrl {
   nextSword: number;
   nextBreak: number;
   nextChat: number;
+  /** Lệch pha ghi px, py giữa các người chơi (0..POS_SYNC_EVERY_TICKS-1) để không cùng ghi một tick */
+  posPhase: number;
   lastHitAt: number;
   deadAt: number;
   /** Túi đồ: chỉ chủ túi nhận được qua tin nhắn `inv`, không nằm trong state chung */
@@ -104,6 +106,8 @@ export class World {
   readonly parties = new Parties();
   monsterSeq = 0;
   lootSeq = 0;
+  /** Số tick đã chạy (dùng chia nhịp ghi px, py) */
+  tick = 0;
 
   constructor(
     readonly state: WorldState,

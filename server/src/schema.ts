@@ -16,8 +16,15 @@ export const TAG_OWNER = 1;
 
 export class Player extends Schema {
   @type("string") name = "";
-  @type("float32") x = 0;
-  @type("float32") y = 0;
+  /**
+   * Vị trí THẬT (float, mô phỏng và đối chiếu dự đoán của client): chỉ gửi cho chủ nhân vật (#80).
+   * Người khác nhận px, py bên dưới: làm tròn và thưa hơn nên tốn ít băng thông hơn nhiều khi đông người.
+   */
+  @view(TAG_OWNER) @type("float32") x = 0;
+  @view(TAG_OWNER) @type("float32") y = 0;
+  /** Vị trí công khai cho người khác: số nguyên px (thế giới 3072 px), cập nhật mỗi POS_SYNC_EVERY_TICKS tick */
+  @type("int16") px = 0;
+  @type("int16") py = 0;
   @type("float32") angle = 0;
   @type("number") hp = 100;
   @type("number") maxHp = 100;

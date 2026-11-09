@@ -3,8 +3,9 @@ import { describe, expect, it } from "vitest";
 import { MONSTER_BY_ID, TOWN_PX } from "@tien-gioi/shared";
 import { ANGLE_STEP, quantAngle, takeWhole } from "../world";
 import { addMonster, addPlayer, makeWorld } from "./test-helpers";
-import { applyInputs } from "./movement";
-import { slash } from "./combat";
+import { POS_SYNC_EVERY_TICKS, applyInputs, syncPublicPos } from "./movement";
+import { tickWorld } from "./tick";
+import { slash, tickRespawn } from "./combat";
 import { MONSTER_WAKE_DIST, WANDER_STRIDE, spawnInitial, tickMonsters } from "./monsters";
 import { EXP_FLUSH_MS, tickRecovery } from "./progression";
 import { runBench } from "../perf/bench";
@@ -145,6 +146,95 @@ describe("quái ngủ khi không có ai ở gần", () => {
   });
 });
 
+describe("vị trí công khai px, py của người chơi (#80)", () => {
+  it("syncPublicPos làm tròn về số nguyên, kẹp trong int16, bỏ qua giá trị không hữu hạn", () => {
+    const { w } = makeWorld();
+    const { p } = addPlayer(w, "Alpha");
+    p.x = 1234.6;
+    p.y = 99.4;
+    syncPublicPos(p);
+    expect([p.px, p.py]).toEqual([1235, 99]);
+    p.x = 1e9;
+    p.y = -1e9;
+    syncPublicPos(p);
+    expect([p.px, p.py]).toEqual([32767, -32767]);
+    p.x = NaN;
+    p.y = Infinity;
+    syncPublicPos(p);
+    expect([p.px, p.py]).toEqual([32767, -32767]); // giữ giá trị cũ
+  });
+
+  it("vào phòng / hồi sinh: px, py khớp ngay, không đợi nhịp", () => {
+    const { w } = makeWorld();
+    const { p, c } = addPlayer(w, "Alpha");
+    expect([p.px, p.py]).toEqual([Math.round(p.x), Math.round(p.y)]); // addPlayer làm như onJoin
+    p.dead = true;
+    c.deadAt = 0;
+    p.px = 0;
+    p.py = 0;
+    w.now = 1e9; // đủ lâu để hồi sinh
+    tickRespawn(w, p, c);
+    expect(p.dead).toBe(false);
+    expect([p.px, p.py]).toEqual([Math.round(p.x), Math.round(p.y)]);
+  });
+
+  it("đi liên tục: px, py chỉ đổi mỗi POS_SYNC_EVERY_TICKS tick, vẫn bám sát vị trí thật", () => {
+    const { w } = makeWorld();
+    const { p, c } = addPlayer(w, "Alpha");
+    let writes = 0;
+    let last = `${p.px},${p.py}`;
+    const ticks = 40;
+    for (let i = 1; i <= ticks; i++) {
+      c.inputs.push({ seq: i, dx: 1, dy: 0 });
+      w.now += 50;
+      tickWorld(w, 50);
+      const cur = `${p.px},${p.py}`;
+      if (cur !== last) writes++;
+      last = cur;
+      expect(Math.abs(p.px - p.x)).toBeLessThanOrEqual(POS_SYNC_EVERY_TICKS * 10); // lệch tối đa ~2 bước
+    }
+    expect(writes).toBeLessThanOrEqual(Math.ceil(ticks / POS_SYNC_EVERY_TICKS));
+    expect(writes).toBeGreaterThanOrEqual(ticks / POS_SYNC_EVERY_TICKS - 2);
+  });
+
+  it("đứng yên không ghi gì; gán thẳng p.x (dịch chuyển) thì tự chữa trong POS_SYNC_EVERY_TICKS tick", () => {
+    const { w } = makeWorld();
+    const { p } = addPlayer(w, "Alpha");
+    let writes = 0;
+    let last = `${p.px},${p.py}`;
+    const step = () => {
+      w.now += 50;
+      tickWorld(w, 50);
+      const cur = `${p.px},${p.py}`;
+      if (cur !== last) writes++;
+      last = cur;
+    };
+    for (let i = 0; i < 20; i++) step();
+    expect(writes).toBe(0);
+    p.x += 500;
+    for (let i = 0; i < POS_SYNC_EVERY_TICKS; i++) step();
+    expect(p.px).toBe(Math.round(p.x));
+  });
+
+  it("hai người lệch pha không ghi cùng một tick", () => {
+    const { w } = makeWorld();
+    const a = addPlayer(w, "Alpha");
+    const b = addPlayer(w, "Bravo");
+    b.c.posPhase = 1;
+    const wrote: string[] = [];
+    for (let i = 1; i <= 8; i++) {
+      for (const x of [a, b]) x.c.inputs.push({ seq: i, dx: 1, dy: 0 });
+      const before = [a.p.px, b.p.px];
+      w.now += 50;
+      tickWorld(w, 50);
+      wrote.push(`${a.p.px !== before[0] ? "A" : "-"}${b.p.px !== before[1] ? "B" : "-"}`);
+    }
+    expect(wrote.some((x) => x === "AB")).toBe(false);
+    expect(wrote.some((x) => x.includes("A"))).toBe(true);
+    expect(wrote.some((x) => x.includes("B"))).toBe(true);
+  });
+});
+
 describe("quái lang thang chỉ đổi vị trí mỗi WANDER_STRIDE tick (#80)", () => {
   const TICKS = 80;
   /**
@@ -235,13 +325,13 @@ describe("ngân sách băng thông và CPU (benchmark có seed, kết quả cố
     expect(r.avgMs).toBeLessThan(10);
   });
 
-  it("ca đông người tụ trong trấn (#80): giữ mức hiện tại (< 1250), chưa đạt mục tiêu < 520 byte/tick", () => {
+  it("ca đông người tụ trong trấn (#80): giữ mức hiện tại (< 600), mục tiêu < 520 byte/tick", () => {
     const r = runBench(100, 10, 1, "crowd");
-    // Đo lúc viết (#80): ~974 byte/tick mỗi client (≈ 19 KB/s) khi 100 người tụ trong trấn, 70% thời gian đi lại
-    // (trước khi quái lang thang chỉ đổi vị trí mỗi WANDER_STRIDE tick: ~1267 byte/tick). Vùng nhìn không cắt được
-    // gì vì ai cũng thấy nhau; phần lớn còn lại là x, y của người. Test này CHỈ giữ không tệ thêm; khi #80 hạ tiếp
-    // thì hạ ngưỡng xuống, đích là < 520 như ngân sách chung.
-    expect(r.patchBytes).toBeLessThan(1250);
+    // Đo lúc viết (#80): ~1267 byte/tick mỗi client (≈ 25 KB/s) khi 100 người tụ trong trấn, 70% thời gian đi lại.
+    // Người khác nhận px, py làm tròn 10 Hz (#89): ~788; quái lang thang chỉ đổi vị trí mỗi WANDER_STRIDE tick (#87):
+    // ~974; cả hai: ~484 (≈ 9.5 KB/s). Vùng nhìn không cắt được gì vì ai cũng thấy nhau. Test này CHỈ giữ không
+    // tệ thêm; khi hạ được nữa thì hạ ngưỡng, đích là < 520 như ngân sách chung.
+    expect(r.patchBytes).toBeLessThan(600);
     expect(r.avgMs).toBeLessThan(10);
   });
 
