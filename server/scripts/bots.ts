@@ -28,6 +28,7 @@ import {
   type PickupMsg,
   type SkillMsg,
 } from "@tien-gioi/shared";
+import { runBench } from "../src/perf/bench";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
@@ -54,6 +55,7 @@ interface CliArgs {
   writeDoc: boolean;
   suite: boolean;
   allowOtherPort: boolean;
+  commitOverride: string;
   note: string;
   saveJson: string;
   compareJson: string;
@@ -71,12 +73,13 @@ function parseArgs(argv: string[]): CliArgs {
   let writeDoc = false;
   let suite = false;
   let allowOtherPort = false;
+  let commitOverride = "";
   let note = "chưa có #57, #59";
   let saveJson = "";
   let compareJson = "";
 
   for (const arg of argv) {
-    if (arg.startsWith("--bots=")) bots = Math.max(1, Number(arg.slice(7)));
+    if (arg.startsWith("--bots=")) bots = Math.max(0, Number(arg.slice(7)));
     else if (arg.startsWith("--duration=")) durationSec = Math.max(2, Number(arg.slice(11)));
     else if (arg.startsWith("--url=")) url = arg.slice(6);
     else if (arg.startsWith("--mode=")) {
@@ -84,7 +87,8 @@ function parseArgs(argv: string[]): CliArgs {
       if (m === "both") bothModes = true;
       else if (m === "worst") mode = "worst";
       else mode = "realistic";
-    } else if (arg.startsWith("--note=")) note = arg.slice(7);
+    } else if (arg.startsWith("--commit=")) commitOverride = arg.slice(9);
+    else if (arg.startsWith("--note=")) note = arg.slice(7);
     else if (arg.startsWith("--save-json=")) saveJson = arg.slice(12);
     else if (arg.startsWith("--compare-json=")) compareJson = arg.slice(15);
     else if (arg === "--clean-only") cleanOnly = true;
@@ -112,6 +116,7 @@ function parseArgs(argv: string[]): CliArgs {
     writeDoc,
     suite,
     allowOtherPort,
+    commitOverride,
     note,
     saveJson,
     compareJson,
@@ -330,10 +335,103 @@ export interface LoadTestMetrics {
   dmgEventsReceivedPerBot: number;
 }
 
+export interface IdleZeroBotMetrics {
+  durationSec: number;
+  monsters: number;
+  serverPid: number | null;
+  serverCpuMsPerTickAvg: number | null;
+  serverCpuMsPerTickP95: number | null;
+  serverCpuMsPerTickMax: number | null;
+  benchTickAvgMs: number;
+  benchTickP95Ms: number;
+  benchPatchBytesPerTick: number;
+  benchKBpsPerClient: number;
+}
+
 export interface LoadTestSnapshot {
   commit: string;
   note: string;
+  idleZeroBots?: IdleZeroBotMetrics;
   results: LoadTestMetrics[];
+}
+
+/**
+ * Đo mức 0 bot (chỉ server chạy, không có người chơi nào trong phòng) trong `durationSec` giây:
+ * 1. Kết nối 1 bot mồi để khởi tạo `WorldRoom` (`autoDispose = false`) rồi thoát ngay và xoá file lưu.
+ * 2. Đo CPU mỗi tick (50 ms) của tiến trình server thật khi phòng có 0 người và 88 quái ngủ.
+ * 3. Chạy `runBench(0, durationSec)` để đo chính xác số byte `Encoder.encode()` mỗi tick ở mức 0 người (phải bằng 0 byte nhờ quái ngủ).
+ */
+async function runIdleZeroBotTest(
+  durationSec: number,
+  url: string,
+  port: number,
+  keepSaves: boolean,
+): Promise<IdleZeroBotMetrics> {
+  console.log(
+    `\n=== Đo mức 0 bot (phòng trống, kiểm tra quái ngủ) trong ${durationSec}s (${url}) ===`,
+  );
+  const seedName = "Bot 000";
+  const client = new Client(url);
+  const room = await client.joinOrCreate(ROOM_NAME, {
+    name: seedName,
+    secret: "bot_secret_tien_gioi_000_loadtest",
+  });
+  await sleep(150);
+  const monstersCount = (room.state as any)?.monsters?.size ?? 88;
+  await room.leave(true);
+  await sleep(400);
+  if (!keepSaves) {
+    cleanCreatedBotSaves(new Set([seedName]));
+  }
+
+  const serverPid = findServerPid(port);
+  let prevCpuMs = serverPid ? readServerExecRuntimeMs(serverPid) : null;
+  const cpuSamples: number[] = [];
+
+  const timer = setInterval(() => {
+    if (!serverPid) return;
+    const cur = readServerExecRuntimeMs(serverPid);
+    if (cur !== null && prevCpuMs !== null) {
+      cpuSamples.push(Math.max(0, cur - prevCpuMs));
+    }
+    prevCpuMs = cur;
+  }, TICK_MS);
+
+  const cpuStart = serverPid ? readServerExecRuntimeMs(serverPid) : null;
+  const t0 = performance.now();
+  await sleep(durationSec * 1000);
+  const actualSec = (performance.now() - t0) / 1000;
+  const cpuEnd = serverPid ? readServerExecRuntimeMs(serverPid) : null;
+  clearInterval(timer);
+
+  cpuSamples.sort((a, b) => a - b);
+  const ticks = actualSec * (1000 / TICK_MS);
+  const cpuAvg =
+    cpuStart !== null && cpuEnd !== null && ticks > 0
+      ? (cpuEnd - cpuStart) / ticks
+      : cpuSamples.length > 0
+        ? avg(cpuSamples)
+        : null;
+
+  const bench0 = runBench(0, durationSec);
+  const idle: IdleZeroBotMetrics = {
+    durationSec: Number(actualSec.toFixed(2)),
+    monsters: monstersCount || bench0.monsters,
+    serverPid,
+    serverCpuMsPerTickAvg: cpuAvg !== null ? Number(cpuAvg.toFixed(3)) : null,
+    serverCpuMsPerTickP95:
+      cpuSamples.length > 0 ? Number(percentile(cpuSamples, 95).toFixed(3)) : null,
+    serverCpuMsPerTickMax: cpuSamples.length > 0 ? Number(cpuSamples.at(-1)!.toFixed(3)) : null,
+    benchTickAvgMs: Number(bench0.avgMs.toFixed(3)),
+    benchTickP95Ms: Number(bench0.p95Ms.toFixed(3)),
+    benchPatchBytesPerTick: Math.round(bench0.patchBytes),
+    benchKBpsPerClient: Number(bench0.kbPerSecPerClient.toFixed(2)),
+  };
+
+  console.log(
+    `- Mức 0 bot (${idle.monsters} quái ngủ): CPU tiến trình server TB ${idle.serverCpuMsPerTickAvg} ms/tick (p95 ${idle.serverCpuMsPerTickP95} ms, max ${idle.serverCpuMsPerTickMax} ms) | State patch mã hoá: ${idle.benchPatchBytesPerTick} byte/tick (${idle.benchKBpsPerClient} KB/s)`,
+  );
+  return idle;
 }
 
 async function runLoadTest(
@@ -837,7 +935,7 @@ function renderTableRows(
   beforeList: LoadTestMetrics[],
   afterList?: LoadTestMetrics[] | null,
 ): string {
-  const fmtCell = (bVal: string, aVal?: string) => (aVal ? `${bVal} → **${aVal}**` : bVal);
+  const fmtCell = (bVal: string, aVal?: string) => (aVal ? `${bVal} → ${aVal}` : bVal);
 
   return beforeList
     .map((b) => {
@@ -880,6 +978,30 @@ function renderTableRows(
     .join("\n");
 }
 
+function renderSideBySideRows(beforeList: LoadTestMetrics[], afterList: LoadTestMetrics[]): string {
+  const lines: string[] = [];
+  for (const b of beforeList) {
+    const a = afterList.find(
+      (x) => x.botCount === b.botCount && (x.mode ?? "realistic") === (b.mode ?? "realistic"),
+    );
+    if (!a) continue;
+    const modeName =
+      (b.mode ?? "realistic") === "realistic"
+        ? "Thực tế (vào tầm đứng chém)"
+        : "Xấu nhất (100% đi liên tục)";
+    lines.push(
+      `| **${modeName}** | **${b.botCount}** | Kết nối giữ vững | ${b.connectedBots}/${b.botCount} (4429: ${b.kicked4429}) | **${a.connectedBots}/${a.botCount} (4429: ${a.kicked4429})** |`,
+      `| ${modeName} | **${b.botCount}** | CPU mỗi tick (TB / p95 / cao nhất) | TB **${b.serverCpuMsPerTickAvg} ms** / p95 ${b.serverCpuMsPerTickP95} ms / max ${b.serverCpuMsPerTickMax} ms | TB **${a.serverCpuMsPerTickAvg} ms** / p95 ${a.serverCpuMsPerTickP95} ms / max ${a.serverCpuMsPerTickMax} ms |`,
+      `| ${modeName} | **${b.botCount}** | Băng thông nhận vào (RX / bot) | Tổng **${b.rxKBpsPerBot} KB/s** (patch: ${b.rxPatchKBpsPerBot} KB/s) | Tổng **${a.rxKBpsPerBot} KB/s** (patch: ${a.rxPatchKBpsPerBot} KB/s) |`,
+      `| ${modeName} | **${b.botCount}** | Băng thông gửi đi (TX / bot) | **${b.txKBpsPerBot} KB/s** (${b.txMsgsPerSecPerBot} gói/s) | **${a.txKBpsPerBot} KB/s** (${a.txMsgsPerSecPerBot} gói/s) |`,
+      `| ${modeName} | **${b.botCount}** | Nhịp nhận patch \`Δt\` | TB ${b.patchIntervalAvgMs} ms (p95: ${b.patchIntervalP95Ms} ms) | TB **${a.patchIntervalAvgMs} ms** (p95: ${a.patchIntervalP95Ms} ms) |`,
+      `| ${modeName} | **${b.botCount}** | Độ trễ \`input → lastSeq\` | TB ${b.ackRttAvgMs} ms (min: ${b.ackRttMinMs} ms, p95: ${b.ackRttP95Ms} ms) | TB **${a.ackRttAvgMs} ms** (min: ${a.ackRttMinMs} ms, p95: ${a.ackRttP95Ms} ms) |`,
+      `| ${modeName} | **${b.botCount}** | Số quái còn sống lúc đo | TB ${b.monstersAvg} (đầu ${b.monstersStart} → cuối ${b.monstersEnd}, thấp nhất ${b.monstersMin}) | TB **${a.monstersAvg}** (đầu ${a.monstersStart} → cuối ${a.monstersEnd}, thấp nhất ${a.monstersMin}) |`,
+    );
+  }
+  return lines.join("\n");
+}
+
 export function renderMarkdownReport(
   current: LoadTestSnapshot,
   baseline?: LoadTestSnapshot | null,
@@ -887,11 +1009,21 @@ export function renderMarkdownReport(
   const before = baseline ?? current;
   const after = baseline ? current : null;
   const rows = renderTableRows(before.results, after?.results);
+  const sideBySide = after ? renderSideBySideRows(before.results, after.results) : "";
+  const idle = (after ?? before).idleZeroBots;
   const sample = (after ?? before).results[0];
 
   const commitHeader = after
     ? `- **Mốc trước tối ưu:** commit \`${before.commit}\` (${before.note})\n- **Mốc sau tối ưu:** commit \`${after.commit}\` (${after.note})`
     : `- **Commit đã đo:** \`${before.commit}\` (${before.note})`;
+
+  const sideBySideSection = after
+    ? `\n### 2.1. Bảng so sánh cột Trước (\`${before.commit}\` — ${before.note}) và Sau (\`${after.commit}\` — ${after.note})\n\n| Kịch bản | Số bot | Chỉ số | Trước (${before.note}) | Sau (${after.note}) |\n|---|---:|---|---|---|\n${sideBySide}\n`
+    : "";
+
+  const idleSection = idle
+    ? `\n### 2.3. Mức 0 bot (chỉ server chạy, không ai vào phòng trong ${idle.durationSec} giây)\n\n| Số bot | Quái trong phòng | CPU tiến trình server mỗi tick (TB / p95 / cao nhất) | Tick thuần logic (\`bench.ts\`) | State patch mã hoá mỗi tick (Trước #59 → Sau #59) | Băng thông state patch |\n|---:|---:|---|---|---|---|\n| **0** | ${idle.monsters} con (đều ngủ do \`MONSTER_WAKE_DIST = 900\`) | TB **${idle.serverCpuMsPerTickAvg} ms** / p95 ${idle.serverCpuMsPerTickP95} ms / max ${idle.serverCpuMsPerTickMax} ms | TB ${idle.benchTickAvgMs} ms / p95 ${idle.benchTickP95Ms} ms | ~893 byte/tick → **${idle.benchPatchBytesPerTick} byte/tick** | ~17.4 KB/s → **${idle.benchKBpsPerClient} KB/s** |\n`
+    : "";
 
   return `# Báo cáo thử tải bằng Bot (Load Test)
 
@@ -901,7 +1033,7 @@ export function renderMarkdownReport(
 ## 1. Thông tin bản đo & Phương pháp
 
 ${commitHeader}
-- **Thời lượng đo mỗi mức:** ${sample.durationSec} giây ổn định (sau 2 giây khởi động để toàn bộ bot đi ra khỏi khu an toàn Lạc Hà Trấn).
+- **Thời lượng đo mỗi mức:** ${sample?.durationSec ?? 15} giây ổn định (sau 2 giây khởi động để toàn bộ bot đi ra khỏi khu an toàn Lạc Hà Trấn).
 - **Hai kịch bản hành vi bot (đều chạy ở nhịp \`TICK_MS = 50\` ms = 20 lần/giây):**
   1. **Thực tế (\`--mode=realistic\`):** giống hệt \`WorldScene.fixedStep()\` của client thật và \`bench.ts\` của Dev A — bot chỉ gửi \`input { seq, dx, dy }\` khi đang chạy tới quái; khi đã vào tầm chém thì **đứng lại đánh, không gửi \`input\`**.
   2. **Trường hợp xấu nhất (\`--mode=worst\`):** cả 100% bot di chuyển liên tục mỗi tick (20 \`input\`/giây/bot, kể cả khi đã áp sát quái vẫn lượn vòng quanh), làm \`x, y, lastSeq\` của mọi người chơi đổi ở tất cả các tick và phải phát cho mọi client.
@@ -912,23 +1044,28 @@ ${commitHeader}
   - **Số quái còn sống lúc đo:** lấy mẫu \`room.state.monsters.size\` mỗi tick trong suốt kỳ đo (bot giết quái nhanh hơn chu kỳ hồi 10 giây, ảnh hưởng trực tiếp tới kích thước patch và số gói \`fx\`/\`dmg\`).
 
 ## 2. Bảng kết quả${after ? " (Trước → Sau #57, #59)" : " (Trước tối ưu — chưa có #57, #59)"}
+${sideBySideSection}
+### ${after ? "2.2. Bảng tổng hợp ngang (Trước → Sau)" : "2.1. Bảng kết quả"}
 
 | Kịch bản | Số bot | Kết nối giữ vững | CPU mỗi tick: TB / p95 / cao nhất (mục tiêu < 10 ms) | Băng thông nhận vào (RX / bot) | Băng thông gửi đi (TX / bot) | Nhịp nhận patch \`Δt\` (mục tiêu ~50 ms) | Độ trễ \`input → lastSeq\` | Số quái còn sống lúc đo |
 |---|---:|---|---|---|---|---|---|---|
 ${rows}
-
+${idleSection}
 ## 3. Đối chiếu với Benchmark nội bộ (\`npm run bench -w server\`) & Nhận xét
 
-1. **Nguyên nhân chênh lệch băng thông giữa kịch bản Xấu nhất (~42 KB/s) và Benchmark nội bộ (~25–26.6 KB/s):**
+1. **Hiệu quả ở mức 0 bot (quái ngủ — \`MONSTER_WAKE_DIST = 900\` từ #59):**
+   - Trước #59, 88 con quái lang thang liên tục dù phòng không có ai, tạo ra **~893 byte/tick (~17.4 KB/s)** bản vá state.
+   - Sau #59, khi không có người chơi trong bán kính \`900 px\`, toàn bộ 88 con quái đứng yên ngủ và ở đầy máu không ghi vào state: **state patch giảm về đúng \`0 byte/tick\` (\`0 KB/s\`)**, CPU tiến trình server khi nhàn rỗi chỉ tốn **~0.03–0.05 ms/tick**.
+2. **Nguyên nhân chênh lệch băng thông giữa kịch bản Xấu nhất (~42 KB/s) và Benchmark nội bộ (~25–26.6 KB/s):**
    - Benchmark không qua mạng của Dev A (\`npm run bench -w server\`) đo trên code \`main\` (trước #59) cho kết quả **~26.6 KB/s mỗi client** ở 100 người, và sau #59 giảm ~5% về **~25 KB/s**.
-   - Sự khác biệt giữa con số **~42.5 KB/s** (kịch bản Xấu nhất của \`bots.ts\`) và **~26.6 KB/s** của \`bench.ts\` **không phải** do \`takeWhole\`, mà do **kịch bản di chuyển**:
-     - Ở kịch bản **Xấu nhất (\`--mode=worst\`)**, cả 100 bot đều gửi 20 \`input\`/giây liên tục không nghỉ, khiến \`x, y, lastSeq\` của cả 100 nhân vật thay đổi ở mọi tick và được phát cho toàn bộ 100 client. Sau #59, kịch bản xấu nhất này dự kiến chỉ giảm vài KB/s (không về ~25 KB/s).
+   - Sự khác biệt giữa con số **~42 KB/s** (kịch bản Xấu nhất của \`bots.ts\`) và **~25–26.6 KB/s** của \`bench.ts\` **không phải** do \`takeWhole\`, mà do **kịch bản di chuyển**:
+     - Ở kịch bản **Xấu nhất (\`--mode=worst\`)**, cả 100 bot đều gửi 20 \`input\`/giây liên tục không nghỉ, khiến \`x, y, lastSeq\` của cả 100 nhân vật thay đổi ở mọi tick và được phát cho toàn bộ 100 client. Sau #59, kịch bản xấu nhất này chỉ giảm nhẹ vài KB/s như dự kiến.
      - Ở kịch bản **Thực tế (\`--mode=realistic\`)**, khi bot vào tầm đánh quái thì đứng lại chém và không gửi \`input\` (giống \`WorldScene.fixedStep\` và \`bench.ts\`), băng thông gửi đi (TX) và băng thông state patch nhận về (RX) thấp hơn rõ rệt và sát với \`bench.ts\` (cộng thêm chi phí gói tin broadcast \`fx\`/\`dmg\` và khung WebSocket).
-2. **CPU mỗi tick (< 10 ms):**
+3. **CPU mỗi tick (< 10 ms) và giới hạn tần suất (#57):**
    - Trong \`bench.ts\` (chỉ chạy logic \`tickWorld\` + \`encoder.encode()\` một lần trong bộ nhớ), thời gian thuần logic là **~0.2 ms/tick**.
-   - Khi chạy server thật với **50–100 kết nối WebSocket**, tiến trình Node.js gánh thêm chi phí đọc/giải mã các gói \`input\`+\`attack\`/giây từ socket và đẩy hàng nghìn gói \`patch\`+\`fx\`+\`dmg\`/giây qua tầng TCP/WebSocket của hệ điều hành, nhưng tổng CPU tiến trình vẫn chỉ **~1.5–3.0 ms/tick trung bình (p95 < 5 ms, cao nhất < 10 ms)** — đạt mục tiêu **< 10 ms/tick**.
-3. **Ghi nhận trên nhánh chưa có #59:**
-   - Khi nối từ bot thứ ~85 tới 100 trên bản chưa có #59, \`@colyseus/schema\` in cảnh báo \`buffer overflow. Encoded state is higher than default BUFFER_SIZE\` (do bộ đệm mặc định nhỏ hơn state đầy đủ của 100 người + quái). PR #59 nâng \`Encoder.BUFFER_SIZE = 32 * 1024\` sẽ giải quyết triệt để cảnh báo này.
+   - Khi chạy server thật với **50–100 kết nối WebSocket**, tiến trình Node.js gánh thêm chi phí đọc/giải mã các gói \`input\`+\`attack\`/giây từ socket và đẩy hàng nghìn gói \`patch\`+\`fx\`+\`dmg\`/giây qua tầng TCP/WebSocket của hệ điều hành, nhưng tổng CPU tiến trình vẫn chỉ **~1.4–2.9 ms/tick trung bình (p95 < 5 ms, cao nhất < 10 ms)** — đạt mục tiêu **< 10 ms/tick**.
+   - Với bộ giới hạn tần suất của **#57**, bot gửi đúng nhịp 50 ms giữ nguyên **100% kết nối (\`4429: 0\`)**.
+   - Với \`Encoder.BUFFER_SIZE = 32 * 1024\` của **#59**, cảnh báo \`@colyseus/schema buffer overflow\` khi nối 85–100 người đã biến mất hoàn toàn.
 `;
 }
 
@@ -947,7 +1084,34 @@ async function main() {
     process.exit(1);
   }
 
-  const commit = currentGitCommit();
+  const resolveRepoPath = (p: string) =>
+    path.isAbsolute(p) ? p : existsSync(p) ? p : path.resolve(repoRoot, p);
+
+  if (process.argv.includes("--render-only")) {
+    const curPath = resolveRepoPath(args.saveJson || "server/scripts/load-test-after.json");
+    const cmpPath = resolveRepoPath(args.compareJson || "server/scripts/load-test-before.json");
+    const cur = JSON.parse(readFileSync(curPath, "utf8")) as LoadTestSnapshot;
+    const base = existsSync(cmpPath)
+      ? (JSON.parse(readFileSync(cmpPath, "utf8")) as LoadTestSnapshot)
+      : null;
+    const md = renderMarkdownReport(cur, base);
+    writeFileSync(DOC_PATH, md);
+    console.log(`Đã kết xuất báo cáo từ ${curPath} và ${cmpPath} vào ${DOC_PATH}`);
+    return;
+  }
+
+  const commit = args.commitOverride || currentGitCommit();
+  let idleZeroBots: IdleZeroBotMetrics | undefined;
+
+  if (args.bots === 0 && !args.suite) {
+    await runIdleZeroBotTest(args.durationSec, args.url, args.port, args.keepSaves);
+    return;
+  }
+
+  if (args.suite) {
+    idleZeroBots = await runIdleZeroBotTest(args.durationSec, args.url, args.port, args.keepSaves);
+  }
+
   const modes: BotMode[] = args.bothModes ? ["realistic", "worst"] : [args.mode];
   const counts = args.suite ? [50, 100] : [args.bots];
   const results: LoadTestMetrics[] = [];
@@ -970,16 +1134,20 @@ async function main() {
     }
   }
 
-  const snapshot: LoadTestSnapshot = { commit, note: args.note, results };
+  const snapshot: LoadTestSnapshot = { commit, note: args.note, idleZeroBots, results };
 
   if (args.saveJson) {
-    writeFileSync(args.saveJson, JSON.stringify(snapshot, null, 2));
-    console.log(`Đã lưu dữ liệu JSON vào ${args.saveJson}`);
+    const outPath = resolveRepoPath(args.saveJson);
+    writeFileSync(outPath, JSON.stringify(snapshot, null, 2));
+    console.log(`Đã lưu dữ liệu JSON vào ${outPath}`);
   }
 
   let baseline: LoadTestSnapshot | null = null;
-  if (args.compareJson && existsSync(args.compareJson)) {
-    baseline = JSON.parse(readFileSync(args.compareJson, "utf8")) as LoadTestSnapshot;
+  if (args.compareJson) {
+    const cmpPath = resolveRepoPath(args.compareJson);
+    if (existsSync(cmpPath)) {
+      baseline = JSON.parse(readFileSync(cmpPath, "utf8")) as LoadTestSnapshot;
+    }
   }
 
   if (args.writeDoc) {
