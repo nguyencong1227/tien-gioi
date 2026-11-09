@@ -134,6 +134,7 @@ export class WorldScene extends Phaser.Scene {
   private auraWave = 0;
   private talismanWave = 0;
   private lootWave = 0;
+  private lastAuxSync = 0;
   private slashPool: Phaser.GameObjects.Graphics[] = [];
   private activeSlashes: SlashFxItem[] = [];
   private swordPool: Phaser.GameObjects.Image[] = [];
@@ -248,6 +249,9 @@ export class WorldScene extends Phaser.Scene {
     setupJoystick();
     this.setupNetwork();
     this.setupPerfProbe();
+    if (typeof window !== "undefined") {
+      (window as any).__game = this.game;
+    }
   }
 
   private spawnNpcs() {
@@ -610,9 +614,12 @@ export class WorldScene extends Phaser.Scene {
     this.syncMonsters(k);
     this.syncLoot();
     this.stepTransientFx(this.time.now);
-    this.syncNpcs();
-    this.syncAudioZone();
-    this.syncQuestNav();
+    if (this.time.now - this.lastAuxSync >= 150) {
+      this.lastAuxSync = this.time.now;
+      this.syncNpcs();
+      this.syncAudioZone();
+      this.syncQuestNav();
+    }
     this.syncMaps();
 
     const me = this.me();
@@ -684,7 +691,7 @@ export class WorldScene extends Phaser.Scene {
     this.perfRingIdx = (this.perfRingIdx + 1) % this.perfRing.length;
     if (this.perfRingCount < this.perfRing.length) this.perfRingCount++;
 
-    const tweensCount = this.tweens.getTweens().length;
+    const tweensCount = (this.tweens as any).tweens?.length ?? this.tweens.getTweens().length;
     this.perfFrameHistory.push(dt);
     this.perfUpdateHistory.push(updateMs);
     this.perfTweenSum += tweensCount;
@@ -893,7 +900,7 @@ export class WorldScene extends Phaser.Scene {
 
   private syncMaps() {
     const now = performance.now();
-    if (now - this.lastMapDraw < 120) return;
+    if (now - this.lastMapDraw < 250) return;
     this.lastMapDraw = now;
 
     // 1. Vẽ Minimap (120x120)
@@ -933,9 +940,7 @@ export class WorldScene extends Phaser.Scene {
         ctx.fillStyle = "#9fd0ea";
         this.players.forEach((p, id) => {
           if (id === this.sid) return;
-          ctx.beginPath();
-          ctx.arc(p.tx * scale, p.ty * scale, 2.2, 0, Math.PI * 2);
-          ctx.fill();
+          ctx.fillRect(p.tx * scale - 1.5, p.ty * scale - 1.5, 3, 3);
         });
 
         // NPC (chấm hoàng kim)
@@ -1195,7 +1200,7 @@ export class WorldScene extends Phaser.Scene {
         e.ty = p.y;
         e.root.x += (e.tx - e.root.x) * k;
         e.root.y += (e.ty - e.root.y) * k;
-        if (!this.inView(e.root.x, e.root.y, 96)) {
+        if (!this.inView(e.root.x, e.root.y, 48)) {
           if (e.root.visible) e.root.setVisible(false);
           if (e.sprite.anims.isPlaying) e.sprite.anims.pause();
           return;
@@ -1221,7 +1226,8 @@ export class WorldScene extends Phaser.Scene {
           e.talismanRing.setScale(s, s).setAlpha(0.14 + 0.31 * this.talismanWave);
         }
       }
-      const showLabel = isMe || !hideNames;
+      const distToMe = isMe ? 0 : Math.hypot(e.root.x - this.predX, e.root.y - this.predY);
+      const showLabel = isMe || (!hideNames && distToMe <= 450);
       e.label!.setVisible(showLabel);
       if (showLabel) {
         const label = `${p.name}\n${realmLabel(p.realm, p.tier)}`;
@@ -1230,7 +1236,7 @@ export class WorldScene extends Phaser.Scene {
           e.lastLabel = label;
         }
       }
-      this.drawBar(e, p.hp / p.maxHp, isMe ? 0x6ad06a : 0xd0a040, -30, 28, !isMe || p.hp < p.maxHp);
+      this.drawBar(e, p.hp / p.maxHp, isMe ? 0x6ad06a : 0xd0a040, -30, 28, p.hp < p.maxHp);
     });
     for (const [id, e] of this.players)
       if (!seen.has(id)) {
@@ -1268,7 +1274,7 @@ export class WorldScene extends Phaser.Scene {
       e.ty = m.y;
       e.root.x += (e.tx - e.root.x) * k;
       e.root.y += (e.ty - e.root.y) * k;
-      if (!this.inView(e.root.x, e.root.y, 96)) {
+      if (!this.inView(e.root.x, e.root.y, 48)) {
         if (e.root.visible) e.root.setVisible(false);
         if (e.sprite.anims.isPlaying) e.sprite.anims.pause();
         return;
@@ -1354,7 +1360,7 @@ export class WorldScene extends Phaser.Scene {
         }
       }
 
-      if (!this.inView(l.x, l.y, 80)) {
+      if (!this.inView(l.x, l.y, 48)) {
         if (le.root.visible) le.root.setVisible(false);
         return;
       }
@@ -1475,7 +1481,7 @@ export class WorldScene extends Phaser.Scene {
       const p = (now - it.start) / 800;
       if (p >= 1) {
         it.t.setVisible(false);
-        this.floatPool.push(it.t);
+        this.floatPool.push(it);
         const last = this.activeFloats.pop()!;
         if (i < this.activeFloats.length) this.activeFloats[i] = last;
       } else {
