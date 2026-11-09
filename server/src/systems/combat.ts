@@ -8,7 +8,14 @@ import {
   killExp,
 } from "@tien-gioi/shared";
 import type { Player, Monster } from "../schema";
-import { rand, angleDiff, type World, type PlayerCtrl, type MonsterCtrl } from "../world";
+import {
+  rand,
+  angleDiff,
+  quantAngle,
+  type World,
+  type PlayerCtrl,
+  type MonsterCtrl,
+} from "../world";
 import { applyStats, gainExp } from "./progression";
 import { safeSpot } from "./movement";
 import { dropLoot } from "./loot";
@@ -25,7 +32,7 @@ export function slash(w: World, sid: string, angle: unknown) {
   const s = SKILLS.slash;
   c.nextSlash = w.now + s.cooldown;
   p.meditating = false;
-  p.angle = angle;
+  p.angle = quantAngle(angle);
   w.events.fx({ kind: "slash", by: sid, x: p.x, y: p.y, angle });
   w.state.monsters.forEach((mon, id) => {
     const d = Math.hypot(mon.x - p.x, mon.y - p.y);
@@ -48,7 +55,7 @@ export function swordQi(w: World, sid: string, angle: unknown) {
   c.nextSword = w.now + s.cooldown;
   p.mp -= s.mp;
   p.meditating = false;
-  p.angle = angle;
+  p.angle = quantAngle(angle);
   w.events.fx({ kind: "sword", by: sid, x: p.x, y: p.y, angle, range: s.range });
   const ux = Math.cos(angle),
     uy = Math.sin(angle);

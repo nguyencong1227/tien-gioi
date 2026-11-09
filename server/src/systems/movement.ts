@@ -9,7 +9,7 @@ import {
   type InputMsg,
 } from "@tien-gioi/shared";
 import type { Player } from "../schema";
-import { rand, type World, type PlayerCtrl } from "../world";
+import { rand, quantAngle, type World, type PlayerCtrl } from "../world";
 
 const MAX_QUEUED_INPUTS = 20;
 const MAX_MOVE_BUDGET = 4;
@@ -43,7 +43,7 @@ export function applyInputs(p: Player, c: PlayerCtrl) {
       const next = moveWithCollision(p.x, p.y, dx * speed * step, dy * speed * step, PLAYER_RADIUS);
       p.x = next.x;
       p.y = next.y;
-      p.angle = Math.atan2(dy, dx);
+      p.angle = quantAngle(Math.atan2(dy, dx));
     }
     p.lastSeq = inp.seq;
   }
