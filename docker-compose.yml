@@ -1,0 +1,16 @@
+services:
+  game:
+    build: .
+    container_name: tien-gioi
+    restart: unless-stopped
+    ports:
+      - "2567:2567"
+    environment:
+      - NODE_ENV=production
+      - PORT=2567
+      - DATA_DIR=/app/data/players
+    volumes:
+      - tien-gioi-data:/app/data/players
+
+volumes:
+  tien-gioi-data:
