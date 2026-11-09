@@ -14,6 +14,7 @@ Toàn bộ các file hình ảnh pixel-art và âm thanh hiện tại trong repo
 | **Texture Atlas nhân vật, NPC, yêu thú & hiệu ứng** (`me`, `other` 4 hướng `idle`/`walk`/`slash`; 4 yêu thú `mon-tho`, `mon-lang`, `mon-ho`, `mon-mang`; 4 NPC `npc-truong_tran`, `npc-duoc_su`, `npc-tho_ren`, `npc-cao_thi`; `swordbeam`, `dot`, `item-*`) | `client/public/assets/atlas.png`, `client/public/assets/atlas.json` | **Nhóm Tiên Giới (Dev B)** — vẽ pixel-art và đóng gói Phaser 3 JSON Atlas bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** |
 | **Ảnh biểu tượng vật phẩm DOM** (`hoi_huyet_dan`, `hoi_linh_dan`, `tu_khi_dan`, `long_tho`, `nanh_soi`, `da_ho`, `vay_mang`) | `client/public/assets/items/*.png` | **Nhóm Tiên Giới (Dev B)** — sinh từ `client/scripts/gen-assets.mjs` | **CC0 1.0** |
 | **Nhạc nền ngũ cung & hiệu ứng âm thanh (SFX)** (nhạc Lạc Hà Trấn, nhạc hoang dã, tiếng kiếm chém, kiếm khí, trúng đòn, nhặt đồ, lên cấp, đột phá) | `client/src/audio.ts` | **Nhóm Tiên Giới (Dev B)** — tổng hợp thời gian thực bằng Web Audio API | **CC0 1.0** |
+| **Phông chữ tiếng Việt cổ phong** (`Noto Serif` hỗ trợ đầy đủ dấu tiếng Việt) | Nạp từ Google Fonts trong `client/index.html` | **Google Fonts / Noto Project** ([fonts.google.com/noto/specimen/Noto+Serif](https://fonts.google.com/noto/specimen/Noto+Serif)) | **SIL OFL 1.1** |
 
 > **Cách đóng gói lại atlas khi thêm sprite mới:** sửa hoặc bổ sung hàm vẽ trong `client/scripts/gen-assets.mjs`, sau đó chạy `npm run assets -w client`.
 

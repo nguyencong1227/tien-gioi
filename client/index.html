@@ -8,6 +8,12 @@
     />
     <meta name="theme-color" content="#1d1a16" />
     <title>Tiên Giới</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,400;0,600;0,700;1,400&subset=vietnamese&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
@@ -46,6 +52,9 @@
               title="Bật/tắt âm thanh (N)"
             >
               <span id="mute-icon">🔊</span>
+            </button>
+            <button type="button" id="btn-settings" class="hud-btn icon-only" title="Cài đặt (O)">
+              <span>⚙</span>
             </button>
           </div>
         </div>
@@ -141,6 +150,46 @@
         </footer>
       </section>
 
+      <section id="settings-modal" class="panel modal-box" hidden aria-label="Màn hình cài đặt">
+        <header class="inv-head">
+          <div>
+            <h2>Cài Đặt Hệ Thống</h2>
+            <small>Tự động lưu trên thiết bị này</small>
+          </div>
+          <button type="button" id="settings-close" class="modal-close" title="Đóng (O / Esc)">
+            ✕
+          </button>
+        </header>
+        <div class="settings-body">
+          <label class="set-row">
+            <span>Âm lượng nhạc nền</span>
+            <div class="set-ctrl">
+              <input type="range" id="set-bgm-vol" min="0" max="100" step="1" />
+              <b id="set-bgm-val">70%</b>
+            </div>
+          </label>
+          <label class="set-row">
+            <span>Âm lượng hiệu ứng</span>
+            <div class="set-ctrl">
+              <input type="range" id="set-sfx-vol" min="0" max="100" step="1" />
+              <b id="set-sfx-val">80%</b>
+            </div>
+          </label>
+          <label class="set-row toggle">
+            <span>Tắt toàn bộ âm thanh (Phím N)</span>
+            <input type="checkbox" id="set-mute" />
+          </label>
+          <label class="set-row toggle">
+            <span>Ẩn tên đồng đạo (đỡ rối khi đông người)</span>
+            <input type="checkbox" id="set-hide-names" />
+          </label>
+          <label class="set-row toggle">
+            <span>Chất lượng thấp (tắt hiệu ứng phụ cho máy yếu / tiết kiệm pin)</span>
+            <input type="checkbox" id="set-low-fx" />
+          </label>
+        </div>
+      </section>
+
       <section id="dialog-modal" class="panel" hidden aria-label="Hộp thoại NPC">
         <header class="dlg-head">
           <div>
@@ -199,7 +248,7 @@
       </div>
       <div id="help">
         WASD đi · J/Space chém · K kiếm khí · 1/2 đan · F nhặt/nói chuyện · I túi · Q nhiệm vụ · M
-        bản đồ · L đả tọa · B đột phá
+        bản đồ · O cài đặt · L đả tọa · B đột phá
       </div>
     </div>
 
