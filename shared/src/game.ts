@@ -180,6 +180,8 @@ export interface ChatOut {
   from: string;
   text: string;
   sys?: boolean;
+  /** Kênh chat đội (lệnh `/p <nội dung>`, chỉ gửi cho thành viên); bỏ trống là chat chung cả phòng */
+  channel?: "party";
 }
 export interface ToastMsg {
   text: string;
