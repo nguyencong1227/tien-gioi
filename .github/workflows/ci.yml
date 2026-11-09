@@ -30,6 +30,9 @@ jobs:
       - name: Lint
         run: npm run lint --if-present
 
+      - name: Kiểm tra định dạng
+        run: npx prettier --check .
+
       - name: Test
         run: npm run test --if-present
 
