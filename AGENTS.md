@@ -65,6 +65,7 @@ Vẫn dùng TypeScript; tối ưu thuật toán và dữ liệu gửi đi ngay k
 - **Băng thông quan trọng hơn CPU:** mỗi trường state đổi là một patch gửi cho *mọi client đang thấy thực thể đó* (xem `interest`), 20 lần/giây.
   - Không ghi vào state mỗi tick những giá trị chỉ nhích số lẻ: cộng dồn trong dữ liệu riêng của server (`PlayerCtrl` / `MonsterCtrl`) rồi ghi phần nguyên (`takeWhole`) hoặc ghi định kỳ.
   - Thứ không ai nhìn thấy thì không cập nhật (quái "ngủ" khi không có người chơi trong `MONSTER_WAKE_DIST`).
+  - Tin nhắn có vị trí (`fx`, `dmg`, hiệu ứng mới) gửi bằng `WorldRoom.sendNear` (chỉ người trong vùng nhìn), không `broadcast` cả phòng. Chỉ chat và thông báo hệ thống mới là của cả phòng.
   - Gán lại giá trị y hệt thì schema bỏ qua; gán số thực khác đi một chút là gửi 8 byte.
 - **CPU:** tránh vòng lặp lồng nhau người chơi × thực thể mỗi tick khi số lượng có thể lớn; nếu cần thì chia lưới không gian. Không tạo object / mảng mới trong vòng lặp nóng nếu tránh được.
 - Hot path nào đo rồi vẫn quá chậm mới tính tới chuyển riêng phần đó sang Rust (napi-rs / WebAssembly).

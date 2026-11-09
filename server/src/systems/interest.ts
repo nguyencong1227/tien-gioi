@@ -118,6 +118,22 @@ export class Interest {
     this.clients.delete(sessionId);
   }
 
+  /**
+   * Gọi fn(sessionId) cho mọi người chơi đã đăng ký đang ở trong r px quanh (x, y), theo vị trí hiện tại.
+   * Dùng để gửi tin nhắn có vị trí (hiệu ứng chém, số sát thương) chỉ cho người nhìn thấy được.
+   * Duyệt thẳng danh sách người chơi (tối đa ~100): rẻ hơn dựng lưới cho vài trăm tin mỗi giây.
+   */
+  forEachNear(w: World, x: number, y: number, r: number, fn: (sessionId: string) => void) {
+    const r2 = r * r;
+    for (const sid of this.clients.keys()) {
+      const p = w.state.players.get(sid);
+      if (!p) continue;
+      const dx = p.x - x;
+      const dy = p.y - y;
+      if (dx * dx + dy * dy <= r2) fn(sid);
+    }
+  }
+
   /** StateView của một người chơi, nếu đã đăng ký (dùng cho test / bench). */
   viewOf(sessionId: string): StateView | undefined {
     return this.clients.get(sessionId)?.view;

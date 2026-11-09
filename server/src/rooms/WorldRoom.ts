@@ -42,6 +42,7 @@ import { sanitizeQuests, sendQuests } from "../systems/quests";
 import { abandonQuest, acceptQuest, craft, talk, trade, turnInQuest } from "../systems/npc";
 import { equip, equipmentOf, sanitizeEquipment, setEquipment, unequip } from "../systems/equipment";
 import { tickWorld } from "../systems/tick";
+import { VIEW_ENTER } from "../systems/interest";
 import { RateLimiter } from "../rate-limit";
 
 const SAVE_EVERY_MS = 30_000;
@@ -56,8 +57,9 @@ export class WorldRoom extends Room<WorldState> {
   state = new WorldState();
 
   private world = new World(this.state, {
-    fx: (msg) => this.broadcast("fx", msg),
-    dmg: (msg) => this.broadcast("dmg", msg),
+    // Hiệu ứng và số sát thương có vị trí: chỉ gửi cho người ở trong vùng nhìn (#62), không broadcast cả phòng
+    fx: (msg) => this.sendNear(msg.x, msg.y, "range" in msg ? msg.range : 0, "fx", msg),
+    dmg: (msg) => this.sendNear(msg.x, msg.y, 0, "dmg", msg),
     sys: (text) => this.broadcast("chat", { from: "Thiên Đạo", text, sys: true } satisfies ChatOut),
     chat: (from, text) => this.broadcast("chat", { from, text } satisfies ChatOut),
     toast: (sid, msg) => this.sendTo(sid, "toast", msg),
@@ -68,6 +70,16 @@ export class WorldRoom extends Room<WorldState> {
 
   /** Giới hạn tần suất tin nhắn, theo sessionId */
   private limiters = new Map<string, RateLimiter>();
+
+  /**
+   * Gửi tin nhắn có vị trí cho những người chơi trong vùng nhìn quanh (x, y). `reach` là đoạn hiệu ứng còn
+   * vươn xa hơn điểm xuất phát (kiếm khí bay `range` px): người ở xa điểm xuất phát vẫn có thể thấy đoạn cuối.
+   */
+  private sendNear(x: number, y: number, reach: number, type: string, msg: unknown) {
+    this.world.interest.forEachNear(this.world, x, y, VIEW_ENTER + reach, (sid) =>
+      this.sendTo(sid, type, msg),
+    );
+  }
 
   /** Gửi tin nhắn riêng cho một người chơi */
   private sendTo(sid: string, type: string, msg: unknown) {
