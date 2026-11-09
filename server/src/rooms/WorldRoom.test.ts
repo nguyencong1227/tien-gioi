@@ -27,6 +27,8 @@ import {
   PARTY_SNAPSHOT_MS,
   NPC_BY_ID,
   QUEST_BY_ID,
+  buyPrice,
+  sellPrice,
 } from "@tien-gioi/shared";
 import { changeCoin } from "../systems/wallet";
 import type { WorldRoom } from "./WorldRoom";
@@ -438,6 +440,65 @@ describe("túi đồ và đồ rơi", () => {
       expect(w.coin, `coin=${JSON.stringify(bad)}`).toBe(expected);
       expect(again.me()).toBeDefined();
     }
+  });
+
+  it("cửa hàng: Lão dược sư có nút Cửa hàng; mua đan trừ tiền, bán đồ lấy tiền; tin rác không sập phòng; vào lại còn đồ và tiền", async () => {
+    const name = "Mua Ban";
+    const a = await join(name);
+    const duoc = NPC_BY_ID.duoc_su!;
+    const sp = serverState(a.room).players.get(a.room.sessionId)!;
+    sp.x = duoc.x;
+    sp.y = duoc.y + 20;
+    const w = (serverRoom(a.room) as any).world;
+    changeCoin(w, a.room.sessionId, 100);
+    await waitFor(() => a.wallets.find((m) => m.coin === 100));
+
+    a.room.send("talk", { npcId: "duoc_su" });
+    const dlg = await waitFor(() => a.dialogs.find((d) => d.npcId === "duoc_su"));
+    expect(dlg.options.some((o) => o.action.kind === "shop")).toBe(true);
+
+    // Mua 2 hồi huyết đan
+    const price = buyPrice("hoi_huyet_dan");
+    a.room.send("buy", { npcId: "duoc_su", itemId: "hoi_huyet_dan", qty: 2 });
+    const bought = await waitFor(() =>
+      a.invs.find((m) => m.gained?.[0]?.itemId === "hoi_huyet_dan"),
+    );
+    expect(bought.gained).toEqual([{ itemId: "hoi_huyet_dan", qty: 2 }]);
+    const afterBuy = await waitFor(() => a.wallets.find((m) => m.coin === 100 - 2 * price));
+    expect(afterBuy.gained).toBe(-2 * price);
+
+    // Tin rác: không làm sập phòng, không đổi gì
+    const junk: unknown[] = [
+      { npcId: "duoc_su", itemId: "tu_khi_dan", qty: 1 },
+      { npcId: "duoc_su", itemId: "hoi_huyet_dan", qty: -5 },
+      { npcId: "duoc_su", itemId: "hoi_huyet_dan", qty: "9" },
+      { npcId: "constructor", itemId: "hoi_huyet_dan", qty: 1 },
+      { npcId: 5, itemId: {}, qty: [] },
+      "mua",
+      null,
+    ];
+    for (const m of junk) a.room.send("buy", m);
+    for (const m of junk) a.room.send("sell", m);
+    await sleep(300);
+    expect(a.me()).toBeDefined();
+    expect((serverRoom(a.room) as any).world.ctrl.get(a.room.sessionId)!.coin).toBe(
+      100 - 2 * price,
+    );
+
+    // Bán 1 hồi huyết đan (ô đầu tiên của túi)
+    a.room.send("sell", { npcId: "duoc_su", slot: 0, qty: 1 });
+    await waitFor(() => a.wallets.find((m) => m.gained === sellPrice("hoi_huyet_dan")));
+    const expectedCoin = 100 - 2 * price + sellPrice("hoi_huyet_dan");
+    expect((serverRoom(a.room) as any).world.ctrl.get(a.room.sessionId)!.coin).toBe(expectedCoin);
+
+    // Thoát ra vào lại: còn 1 đan và đúng số tiền
+    await a.room.leave(true);
+    rooms.splice(rooms.indexOf(a.room), 1);
+    await sleep(200);
+    const again = await join(name);
+    expect((await waitFor(() => again.wallets[0])).coin).toBe(expectedCoin);
+    const inv = await waitFor(() => again.invs[0]);
+    expect(inv.slots[0]).toEqual({ itemId: "hoi_huyet_dan", qty: 1 });
   });
 
   it("giết quái thì đồ rơi hiện trong state; nhặt được, dùng được", async () => {
