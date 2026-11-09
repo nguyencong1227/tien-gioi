@@ -1,28 +1,10 @@
 /* global self, caches, fetch, URL */
 // Service Worker cho Tiên Giới (chỉ đăng ký ở bản build production).
-// Cache asset tĩnh (ảnh, icon, bundle JS/CSS, HTML gốc); tuyệt đối không can thiệp kết nối WebSocket hay API phòng chơi.
+// Khi chạy `npm run build`, `client/scripts/stamp-sw.mjs` sẽ tự động đóng dấu mã băm phiên bản
+// vào `CACHE_NAME` và quét thư mục `dist/` để điền danh sách `PRECACHE_URLS`.
 const CACHE_NAME = "tien-gioi-static-v1";
 
-const PRECACHE_URLS = [
-  "/",
-  "/index.html",
-  "/manifest.webmanifest",
-  "/icons/icon.svg",
-  "/icons/icon-192.png",
-  "/icons/icon-512.png",
-  "/icons/icon-maskable-512.png",
-  "/icons/apple-touch-icon.png",
-  "/assets/tileset.png",
-  "/assets/atlas.png",
-  "/assets/atlas.json",
-  "/assets/items/hoi_huyet_dan.png",
-  "/assets/items/hoi_linh_dan.png",
-  "/assets/items/tu_khi_dan.png",
-  "/assets/items/long_tho.png",
-  "/assets/items/nanh_soi.png",
-  "/assets/items/da_ho.png",
-  "/assets/items/vay_mang.png",
-];
+const PRECACHE_URLS = ["/", "/index.html", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -48,6 +30,15 @@ self.addEventListener("activate", (event) => {
 function isStaticAsset(pathname) {
   if (pathname.startsWith("/assets/") || pathname.startsWith("/icons/")) return true;
   return /\.(?:js|css|png|svg|webp|json|webmanifest|woff2?)$/i.test(pathname);
+}
+
+/**
+ * Kiểm tra xem đường dẫn có phải bundle JS/CSS đã gắn hash nội dung của Vite hay không.
+ * Các file không có hash (như `/assets/atlas.png`, `/assets/atlas.json`, `/assets/tileset.png`)
+ * cần ưu tiên lấy từ mạng trước để không bị lệch sprite khi cập nhật bản build mới.
+ */
+function isHashedImmutableAsset(pathname) {
+  return /^\/assets\/.+-[A-Za-z0-9_-]{8,}\.(?:js|css|woff2?)$/i.test(pathname);
 }
 
 self.addEventListener("fetch", (event) => {
@@ -79,20 +70,37 @@ self.addEventListener("fetch", (event) => {
 
   if (!isStaticAsset(url.pathname)) return;
 
-  // Tài nguyên tĩnh: trả ngay từ cache nếu có, đồng thời làm mới ngầm từ mạng (stale-while-revalidate)
-  event.respondWith(
-    caches.open(CACHE_NAME).then((cache) =>
-      cache.match(req).then((cached) => {
-        const networkFetch = fetch(req)
-          .then((res) => {
+  // Bundle có gắn hash của Vite: ưu tiên cache (cache-first) vì đổi nội dung là đổi tên file
+  if (isHashedImmutableAsset(url.pathname)) {
+    event.respondWith(
+      caches.open(CACHE_NAME).then((cache) =>
+        cache.match(req).then((cached) => {
+          if (cached) return cached;
+          return fetch(req).then((res) => {
             if (res && res.status === 200 && res.type === "basic") {
               cache.put(req, res.clone());
             }
             return res;
-          })
-          .catch(() => cached);
-        return cached || networkFetch;
-      }),
+          });
+        }),
+      ),
+    );
+    return;
+  }
+
+  // Tài nguyên tĩnh không gắn hash (atlas.png, atlas.json, tileset.png, icon...):
+  // ưu tiên mạng (network-first) để luôn đồng bộ với JS mới ngay lần mở đầu tiên sau deploy,
+  // chỉ dùng cache khi ngoại tuyến hoặc lỗi mạng.
+  event.respondWith(
+    caches.open(CACHE_NAME).then((cache) =>
+      fetch(req)
+        .then((res) => {
+          if (res && res.status === 200 && res.type === "basic") {
+            cache.put(req, res.clone());
+          }
+          return res;
+        })
+        .catch(() => cache.match(req)),
     ),
   );
 });
