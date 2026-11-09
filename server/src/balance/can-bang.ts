@@ -2,7 +2,15 @@
 import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { MONSTERS, MONSTER_BY_ID, REALMS } from "@tien-gioi/shared";
+import {
+  MONSTERS,
+  MONSTER_BY_ID,
+  REALMS,
+  TRADE_BY_ID,
+  DROP_TABLES,
+  buyPrice,
+  sellPrice,
+} from "@tien-gioi/shared";
 import {
   ASSUME,
   expectedCoinDrop,
@@ -103,9 +111,25 @@ const langThoRatios = rows
 const minLangTho = langThoRatios.reduce((a, b) => (b.ratio < a.ratio ? b : a));
 const maxLangTho = langThoRatios.reduce((a, b) => (b.ratio > a.ratio ? b : a));
 
+const tradeHoiHuyet = TRADE_BY_ID["doi_hoi_huyet"]!;
+const tradeItem = tradeHoiHuyet.give[0]!;
+const thoDropEntry = DROP_TABLES.tho!.find((d) => d.itemId === tradeItem.itemId)!;
+const avgLongThoPerKill = thoDropEntry.chance * ((thoDropEntry.min + thoDropEntry.max) / 2);
+const killsToTradeDan = tradeItem.qty / avgLongThoPerKill;
+const potionBuyPrice = buyPrice("hoi_huyet_dan");
+const thoTotalCoin = expectedTotalCoin("tho");
+const thoCoinOnlyAndMat = expectedCoinDrop("tho") + avgLongThoPerKill * sellPrice(tradeItem.itemId);
+const killsToBuyDanAll = potionBuyPrice / thoTotalCoin;
+const killsToBuyDanNoPotionSell = potionBuyPrice / thoCoinOnlyAndMat;
+const tradeRatioMin = killsToBuyDanAll / killsToTradeDan;
+const tradeRatioMax = killsToBuyDanNoPotionSell / killsToTradeDan;
+const thoExpectedCoin = expectedTotalCoin("tho");
+const langExpectedCoin = expectedTotalCoin("lang");
+const langThoExpectedRatio = langExpectedCoin / thoExpectedCoin;
+
 const economySection = `## Kinh tế Linh thạch (Sprint 5, #102)
 
-Mô hình kinh tế dựa trên hợp đồng \`shared/src/currency.ts\`: tiền rơi trực tiếp (\`COIN_DROPS\`), tiền bán đồ rơi (\`DROP_TABLES\` × \`sellPrice\`), và giá mua đan hồi phục tại cửa hàng Lão dược sư (\`buyPrice("hoi_huyet_dan") = 24\` Linh thạch).
+Mô hình kinh tế dựa trên hợp đồng \`shared/src/currency.ts\`: tiền rơi trực tiếp (\`COIN_DROPS\`), tiền bán đồ rơi (\`DROP_TABLES\` × \`sellPrice\`), và giá mua đan hồi phục tại cửa hàng Lão dược sư (\`buyPrice("hoi_huyet_dan") = ${potionBuyPrice}\` Linh thạch).
 
 ### 1. Kỳ vọng Linh thạch từ mỗi con quái
 
@@ -113,23 +137,24 @@ ${monsterTable}
 
 ### 2. Thu nhập Linh thạch mỗi giờ khi săn một loại quái
 
-Giả định người chơi đánh đơn lẻ (solo), dùng Kiếm chém, đả tọa hồi phục khí huyết sau trận, mặc trang bị tốt nhất theo bậc (\`bestGear\`). Chỉ hiển thị những loại quái đủ an toàn để săn đơn (mất ≤ 50% HP mỗi trận). Cột "Hồi huyết đan / giờ" tính theo giá mua ở Dược sư (24 LT/viên).
+Giả định người chơi đánh đơn lẻ (solo), dùng Kiếm chém, đả tọa hồi phục khí huyết sau trận, mặc trang bị tốt nhất theo bậc (\`bestGear\`). Chỉ hiển thị những loại quái đủ an toàn để săn đơn (mất ≤ 50% HP mỗi trận). Cột "Hồi huyết đan / giờ" tính theo giá mua ở Dược sư (${potionBuyPrice} LT/viên).
 
 ${economyTable}
 
 ### 3. Nhận xét & phân tích cân bằng kinh tế
 
 - **So sánh các bãi quái cùng cấp (Linh Thố vs Hôi Lang - khu vực khởi đầu ngoài trấn):**
-  - Cả Thỏ (level 0) và Sói (level 1) đều là quái săn ở giai đoạn đầu game. Hôi Lang cho **5.35 LT/con** (gấp ~2.2× so với Thỏ 2.43 LT/con), nhưng đánh lâu hơn và mất máu nhiều hơn.
+  - Cả Thỏ (level 0) và Sói (level 1) đều là quái săn ở giai đoạn đầu game. Hôi Lang cho **${langExpectedCoin.toFixed(2)} LT/con** (gấp ~${langThoExpectedRatio.toFixed(1)}× so với Thỏ ${thoExpectedCoin.toFixed(2)} LT/con), nhưng đánh lâu hơn và mất máu nhiều hơn.
   - Tỷ lệ thu nhập Linh thạch mỗi giờ giữa Sói và Thỏ dao động từ **${minLangTho.ratio.toFixed(2)}×** (${minLangTho.label}: Sói ${Math.round(minLangTho.langCoin).toLocaleString("en-US")} vs Thỏ ${Math.round(minLangTho.thoCoin).toLocaleString("en-US")} LT/h) đến **${maxLangTho.ratio.toFixed(2)}×** (${maxLangTho.label}: Sói ${Math.round(maxLangTho.langCoin).toLocaleString("en-US")} vs Thỏ ${Math.round(maxLangTho.thoCoin).toLocaleString("en-US")} LT/h).
-  - **Đánh giá:** Không có bãi nào lệch quá 2× (> ~2×) so với bãi cùng cấp. Mức chênh 1.12× – 1.58× là hợp lý: vừa đủ để khuyến khích người chơi tiến sang bãi Sói khi đủ mạnh, vừa không làm bãi Thỏ bị phế bỏ.
+  - **Đánh giá:** Không có bãi nào lệch quá 2× (> ~2×) so với bãi cùng cấp. Mức chênh ${minLangTho.ratio.toFixed(2)}× – ${maxLangTho.ratio.toFixed(2)}× là hợp lý: vừa đủ để khuyến khích người chơi tiến sang bãi Sói khi đủ mạnh, vừa không làm bãi Thỏ bị phế bỏ.
 - **Đường mua đan bằng tiền vs Đổi nguyên liệu (\`TRADES\`):**
-  - Đổi nguyên liệu tại Lão dược sư: 5 Lông thỏ (\`long_tho\`) lấy 1 Hồi Huyết Đan. Lông thỏ rơi 50% số lượng 1–2 (kỳ vọng 0.75 lông/con), cần hạ trung bình **~6.7 con thỏ** để đổi được 1 viên đan.
-  - Mua đan bằng tiền: Giá mua là **24 Linh thạch**. Mỗi con thỏ cho trung bình **2.43 LT** (gồm 1.20 LT tiền rơi + 1.23 LT bán đồ). Cần hạ trung bình **~9.9 con thỏ** (hoặc ~12.3 con nếu không bán viên đan nhặt được) để đủ tiền mua 1 viên đan.
-  - **Đánh giá:** Đường đổi nguyên liệu (6.7 con thỏ) **rẻ hơn đáng kể** (~1.5× – 1.8×) so với mua thẳng bằng tiền (10–12 con thỏ). Đây là thiết kế cố ý: đổi đồ là đường rẻ nhất cho người mới bắt đầu và người chịu khó gom nguyên liệu; cửa hàng tiền tệ đóng vai trò tiện lợi, xả tiền tích lũy khi không muốn gom nguyên liệu.
-- **Quái cấp cao (Hắc Hổ, Xích Mãng):**
+  - Đổi nguyên liệu tại Lão dược sư: ${tradeItem.qty} Lông thỏ (\`${tradeItem.itemId}\`) lấy 1 Hồi Huyết Đan. Lông thỏ rơi ${thoDropEntry.chance * 100}% số lượng ${thoDropEntry.min}–${thoDropEntry.max} (kỳ vọng ${avgLongThoPerKill.toFixed(2)} lông/con), cần hạ trung bình **~${killsToTradeDan.toFixed(1)} con thỏ** để đổi được 1 viên đan.
+  - Mua đan bằng tiền: Giá mua là **${potionBuyPrice} Linh thạch**. Mỗi con thỏ cho trung bình **${thoTotalCoin.toFixed(2)} LT** (gồm ${expectedCoinDrop("tho").toFixed(2)} LT tiền rơi + ${expectedLootValue("tho").toFixed(2)} LT bán đồ). Cần hạ trung bình **~${killsToBuyDanAll.toFixed(1)} con thỏ** (hoặc ~${killsToBuyDanNoPotionSell.toFixed(1)} con nếu không bán viên đan nhặt được) để đủ tiền mua 1 viên đan.
+  - **Đánh giá:** Đường đổi nguyên liệu (${killsToTradeDan.toFixed(1)} con thỏ) **rẻ hơn đáng kể** (~${tradeRatioMin.toFixed(1)}× – ${tradeRatioMax.toFixed(1)}×) so với mua thẳng bằng tiền (${Math.round(killsToBuyDanAll)}–${Math.round(killsToBuyDanNoPotionSell)} con thỏ). Đây là thiết kế cố ý: đổi đồ là đường rẻ nhất cho người mới bắt đầu và người chịu khó gom nguyên liệu; cửa hàng tiền tệ đóng vai trò tiện lợi, xả tiền tích lũy khi không muốn gom nguyên liệu.
+- **Quái cấp cao & Thiếu hụt chỗ tiêu tiền (Linh thạch sink):**
   - Hắc Hổ (cấp 2, an toàn từ Luyện Khí Tầng 6): thu nhập tăng mạnh từ ~2,570 LT/h lên ~4,650 LT/h ở Trúc Cơ.
-  - Xích Mãng (trùm cấp 3): cho kỳ vọng tới 460.5 LT/con nhưng không an toàn khi solo trước Kim Đan; thích hợp đi săn theo tổ đội (xem mục "Đi theo đội" ở trên).
+  - Xích Mãng (trùm cấp 3): cho kỳ vọng tới ${expectedTotalCoin("mang").toFixed(1)} LT/con nhưng không an toàn khi solo trước Kim Đan; thích hợp đi săn theo tổ đội (xem mục "Đi theo đội" ở trên).
+  - **Lưu ý cân bằng:** Hiện tại cửa hàng Lão dược sư chỉ bán 2 loại đan hồi phục cơ bản (${potionBuyPrice} LT/viên), trang bị chỉ rèn qua nguyên liệu rơi mà không tốn tiền. Người chơi từ Luyện Khí hậu kỳ đến Trúc Cơ sẽ nhanh chóng tích lũy hàng ngàn đến hàng vạn Linh thạch mà **gần như không có chỗ tiêu** từ giữa game. Cần bổ sung các chỗ xả tiền lớn (mua bí kíp, phí nâng cấp/rèn trang bị cao cấp, phí dịch chuyển, vào bí cảnh hoặc đấu giá) trong các sprint tiếp theo của M3.
 `;
 
 if (process.argv.includes("--stdout")) {
