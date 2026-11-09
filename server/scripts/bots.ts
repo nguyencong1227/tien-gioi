@@ -813,11 +813,13 @@ async function runLoadTest(
           for (let slot = 0; slot < b.invSlots.length; slot++) {
             const it = b.invSlots[slot];
             if (it && sellPrice(it.itemId) > 0) {
-              b.room.send("sell", { npcId: "duoc_su", slot, qty: it.qty });
+              const msg: SellMsg = { npcId: "duoc_su", slot, qty: it.qty };
+              b.room.send("sell", msg);
             }
           }
           if (b.coin >= buyPrice("hoi_huyet_dan")) {
-            b.room.send("buy", { npcId: "duoc_su", itemId: "hoi_huyet_dan", qty: 1 });
+            const msg: BuyMsg = { npcId: "duoc_su", itemId: "hoi_huyet_dan", qty: 1 };
+            b.room.send("buy", msg);
           }
           b.nextShopCheckAt = now + 6000 + Math.random() * 4000;
         }
@@ -855,11 +857,13 @@ async function runLoadTest(
         for (let slot = 0; slot < b.invSlots.length; slot++) {
           const it = b.invSlots[slot];
           if (it && sellPrice(it.itemId) > 0) {
-            b.room.send("sell", { npcId: "duoc_su", slot, qty: it.qty });
+            const msg: SellMsg = { npcId: "duoc_su", slot, qty: it.qty };
+            b.room.send("sell", msg);
           }
         }
         if (b.coin >= buyPrice("hoi_huyet_dan")) {
-          b.room.send("buy", { npcId: "duoc_su", itemId: "hoi_huyet_dan", qty: 1 });
+          const msg: BuyMsg = { npcId: "duoc_su", itemId: "hoi_huyet_dan", qty: 1 };
+          b.room.send("buy", msg);
         }
         b.shopping = false;
         b.nextShopCheckAt = now + 12000 + Math.random() * 8000;
