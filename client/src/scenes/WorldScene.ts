@@ -1174,9 +1174,13 @@ export class WorldScene extends Phaser.Scene {
       seen.add(id);
       const isMe = id === this.sid;
       const who = isMe ? "me" : "other";
+      // Vị trí để vẽ: chính mình nhận x, y thật từ server; người khác nhận px, py (làm tròn, ~10 Hz, #80).
+      // Server cũ chưa có px thì rơi về x, y: client chạy được với cả hai.
+      const posX: number = isMe ? p.x : (p.px ?? p.x);
+      const posY: number = isMe ? p.y : (p.py ?? p.y);
       let e = this.players.get(id);
       if (!e) {
-        e = this.makeEntity(who, p.x, p.y, true);
+        e = this.makeEntity(who, posX, posY, true);
         if (isMe) this.cameras.main.startFollow(e.root, true, 0.2, 0.2);
         this.players.set(id, e);
       }
@@ -1195,9 +1199,9 @@ export class WorldScene extends Phaser.Scene {
         if (p.dead && !(e as any).deadSince) (e as any).deadSince = this.time.now;
         if (!p.dead) (e as any).deadSince = 0;
       } else {
-        const dist = Math.hypot(p.x - e.root.x, p.y - e.root.y);
-        e.tx = p.x;
-        e.ty = p.y;
+        const dist = Math.hypot(posX - e.root.x, posY - e.root.y);
+        e.tx = posX;
+        e.ty = posY;
         e.root.x += (e.tx - e.root.x) * k;
         e.root.y += (e.ty - e.root.y) * k;
         if (!this.inView(e.root.x, e.root.y, 48)) {
