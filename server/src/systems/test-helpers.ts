@@ -15,6 +15,7 @@ import {
 import { WorldState, Player, Monster } from "../schema";
 import { World, type PlayerCtrl } from "../world";
 import { applyStats } from "./progression";
+import { syncPublicPos } from "./movement";
 
 export function makeWorld() {
   const fx: FxMsg[] = [];
@@ -51,10 +52,12 @@ export function addPlayer(w: World, sid: string, realm = 0, tier = 0) {
   p.x = TOWN_PX.x + TOWN_PX.r + 400;
   p.y = TOWN_PX.y;
   applyStats(p, true);
+  syncPublicPos(p);
   const c: PlayerCtrl = {
     save: { name: sid, secretHash: "", realm, tier, exp: 0, createdAt: "", updatedAt: "" },
     inputs: [],
     moveBudget: 4,
+    posPhase: 0,
     nextSlash: 0,
     nextSword: 0,
     nextBreak: 0,

@@ -631,7 +631,9 @@ describe("vùng nhìn (StateView)", () => {
     teleport(b.room, TOWN_PX.x + 100, TOWN_PX.y);
     const seen = await waitFor(() => players(a.room).get(b.room.sessionId));
     expect(seen.name).toBe(b.name);
-    expect(seen.x).toBeCloseTo(TOWN_PX.x + 100, 0);
+    // px, py được ghi theo nhịp (≤ POS_SYNC_EVERY_TICKS tick): chờ hội tụ về vị trí mới
+    await waitFor(() => seen.px === Math.round(TOWN_PX.x + 100));
+    expect(seen.py).toBe(Math.round(TOWN_PX.y));
 
     // b thoát: online giảm, a không còn thấy b
     await b.room.leave(true);
@@ -672,7 +674,7 @@ describe("vùng nhìn (StateView)", () => {
     await waitFor(() => a.me().lastSeq === 7);
     await sleep(150);
     expect(players(b.room).get(a.room.sessionId).lastSeq).toBeUndefined(); // trường không hề đến client b
-    expect(players(b.room).get(a.room.sessionId).x).toBeGreaterThan(0); // vẫn thấy vị trí
+    expect(players(b.room).get(a.room.sessionId).px).toBeGreaterThan(0); // vẫn thấy vị trí (px, py công khai)
   });
 
   it("fx chỉ gửi cho người ở gần: người ở xa không nhận, người đứng cạnh và chính mình thì có", async () => {
@@ -700,6 +702,33 @@ describe("vùng nhìn (StateView)", () => {
     // Các test dùng chung một phòng thế giới: quái có thể đánh người đứng ở góc bản đồ và gửi fx của chính nó,
     // nên chỉ kiểm tin do `a` gây ra (không dùng toEqual([]) trên mọi tin)
     expect(farGot.filter((m) => m.by === a.room.sessionId)).toEqual([]);
+  });
+
+  it("người khác nhận px, py làm tròn; x, y thật chỉ đến chủ và không bị gửi tiếp khi đổi (#80)", async () => {
+    const a = await join();
+    const b = await join();
+    await waitFor(() => players(b.room).has(a.room.sessionId));
+    // Lần vào tầm đầu: người khác không có x, y thật
+    expect(players(b.room).get(a.room.sessionId).x).toBeUndefined();
+    expect(players(b.room).get(a.room.sessionId).y).toBeUndefined();
+    // Đặt vị trí thật có phần lẻ: chủ thấy đúng số thực, người khác thấy số nguyên làm tròn
+    const sp = serverState(a.room).players.get(a.room.sessionId)!;
+    sp.x = TOWN_PX.x + 60.6;
+    sp.y = TOWN_PX.y + 20.4;
+    await waitFor(() => players(b.room).get(a.room.sessionId).px === Math.round(TOWN_PX.x + 60.6));
+    expect(players(b.room).get(a.room.sessionId).py).toBe(Math.round(TOWN_PX.y + 20.4));
+    expect(a.me().x).toBeCloseTo(TOWN_PX.x + 60.6, 1);
+    expect(a.me().y).toBeCloseTo(TOWN_PX.y + 20.4, 1);
+    // Đi xa rồi lại gần: schema gửi kèm trường có thẻ MỘT lần khi thêm lại vào view, nhưng các lần đổi sau vẫn bị lọc.
+    // Điều ta cần giữ: x, y của người khác không chạy theo (chỉ px, py chạy theo).
+    teleport(a.room, FAR.x, FAR.y);
+    await waitFor(() => !players(b.room).has(a.room.sessionId));
+    teleport(a.room, TOWN_PX.x + 100, TOWN_PX.y);
+    const again = await waitFor(() => players(b.room).get(a.room.sessionId));
+    sp.x = TOWN_PX.x + 150;
+    await waitFor(() => again.px === Math.round(TOWN_PX.x + 150));
+    await sleep(120);
+    if (again.x !== undefined) expect(again.x).not.toBeCloseTo(TOWN_PX.x + 150, 0);
   });
 });
 

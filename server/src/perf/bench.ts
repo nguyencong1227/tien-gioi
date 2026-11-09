@@ -22,6 +22,7 @@ import { addPlayer } from "../systems/test-helpers";
 import { slash } from "../systems/combat";
 import { spawnInitial, topUpMonsters } from "../systems/monsters";
 import { tickWorld } from "../systems/tick";
+import { syncPublicPos } from "../systems/movement";
 import { VIEW_ENTER } from "../systems/interest";
 
 function arg(name: string, def: number): number {
@@ -137,6 +138,7 @@ export function runBench(
       }
       bots.push({ sid, seq: 0, target: null, walking: false, angle: 0, until: 0 });
     }
+    for (const b of bots) syncPublicPos(w.state.players.get(b.sid)!); // như WorldRoom.onJoin
     // Vùng nhìn: đăng ký sau khi đã đặt vị trí, như WorldRoom.onJoin
     const views: StateView[] = [];
     for (const b of bots) {

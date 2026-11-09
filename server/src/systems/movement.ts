@@ -25,6 +25,25 @@ export function queueInput(w: World, sid: string, m: InputMsg | undefined) {
  * Áp các input đang chờ. Mỗi input = đúng một bước TICK_MS (client đoán trước y hệt).
  * Token bucket: mỗi tick +1, tối đa 4, nên gửi dồn dập cũng không đi nhanh hơn được.
  */
+/**
+ * Người khác nhận vị trí công khai px, py (số nguyên, 10 Hz) thay vì x, y thật 20 Hz (#80): ở 100 người tụ trong trấn
+ * việc đó cắt gần một nửa byte. Client nội suy vị trí người khác nên không nhìn ra. Đổi hằng số này để chỉnh nhịp.
+ */
+export const POS_SYNC_EVERY_TICKS = 2;
+
+const INT16_MAX = 32767;
+
+/**
+ * Ghi vị trí công khai (px, py) từ vị trí thật. Gán lại giá trị y hệt thì schema bỏ qua nên đứng yên không tốn byte.
+ * Gọi ngay khi dịch chuyển tức thời (vào phòng, hồi sinh) để người khác không thấy nhân vật ở chỗ cũ / (0, 0);
+ * còn lại do tickWorld gọi theo nhịp POS_SYNC_EVERY_TICKS (cũng tự chữa nếu chỗ nào đó gán `p.x` trực tiếp).
+ */
+export function syncPublicPos(p: Player) {
+  if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
+  p.px = Math.max(-INT16_MAX, Math.min(INT16_MAX, Math.round(p.x)));
+  p.py = Math.max(-INT16_MAX, Math.min(INT16_MAX, Math.round(p.y)));
+}
+
 export function applyInputs(p: Player, c: PlayerCtrl) {
   const step = TICK_MS / 1000;
   c.moveBudget = Math.min(MAX_MOVE_BUDGET, c.moveBudget + 1);
