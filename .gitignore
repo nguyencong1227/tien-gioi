@@ -2,6 +2,7 @@ node_modules/
 dist/
 server/data/
 backups/
+server/bench-*.json
 *.log
 .DS_Store
 .env.local
