@@ -1185,12 +1185,22 @@ export const ui = {
     bindTap("btn-talk", () => callbacks?.onTalk());
 
     // Tổ đội (#75, #91)
+    try {
+      if (localStorage.getItem("tg_party_collapsed") === "1") {
+        $("party-panel").classList.add("collapsed");
+        $("party-btn-toggle").textContent = "▸";
+      }
+    } catch {}
     bindTap("party-btn-leave", () => callbacks?.onPartyLeave?.());
     bindTap("party-btn-toggle", () => {
       const panel = $("party-panel");
       panel.classList.toggle("collapsed");
+      const isCollapsed = panel.classList.contains("collapsed");
       const btn = $("party-btn-toggle");
-      btn.textContent = panel.classList.contains("collapsed") ? "▸" : "▾";
+      btn.textContent = isCollapsed ? "▸" : "▾";
+      try {
+        localStorage.setItem("tg_party_collapsed", isCollapsed ? "1" : "0");
+      } catch {}
     });
     bindTap("pib-btn-accept", () => {
       stopInviteTimer();

@@ -256,7 +256,10 @@ export class WorldScene extends Phaser.Scene {
     setupJoystick();
     this.setupNetwork();
     this.setupPerfProbe();
-    if (typeof window !== "undefined") {
+    if (
+      typeof window !== "undefined" &&
+      (import.meta.env.DEV || new URLSearchParams(location.search).has("debug"))
+    ) {
       (window as any).__game = this.game;
       (window as any).__scene = this;
     }
