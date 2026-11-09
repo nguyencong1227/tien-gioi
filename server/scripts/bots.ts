@@ -55,6 +55,11 @@ const FORBIDDEN_PORTS = new Set([2567, 2577]); // Cổng của Dev A và Dev B
 const DATA_PLAYERS_DIR = path.resolve(here, "../data/players");
 const DOC_PATH = path.resolve(repoRoot, "docs/LOAD_TEST.md");
 
+/** 4 byte overhead khung WebSocket Colyseus (RFC 6455 header + masking). */
+const FRAME_OVERHEAD_BYTES = 4;
+/** Overhead khung cho tin nhắn ví Linh thạch: "wallet".length (6) + FRAME_OVERHEAD_BYTES (4) = 10 byte (#102). */
+const WALLET_MSG_OVERHEAD = "wallet".length + FRAME_OVERHEAD_BYTES;
+
 export type BotMode = "realistic" | "worst" | "crowd";
 
 interface CliArgs {
@@ -64,6 +69,7 @@ interface CliArgs {
   port: number;
   mode: BotMode;
   partySize: number;
+  shop: boolean;
   bothModes: boolean;
   cleanOnly: boolean;
   yes: boolean;
@@ -83,6 +89,7 @@ function parseArgs(argv: string[]): CliArgs {
   let url = "";
   let mode: BotMode = "realistic";
   let partySize = 0;
+  let shop = false;
   let bothModes = false;
   let cleanOnly = false;
   let yes = false;
@@ -102,6 +109,8 @@ function parseArgs(argv: string[]): CliArgs {
     else if (arg.startsWith("--party")) {
       const val = arg.slice(7).replace(/^=/, "");
       partySize = val ? Math.max(2, Math.min(4, Number(val))) : 4;
+    } else if (arg === "--shop") {
+      shop = true;
     } else if (arg.startsWith("--mode=")) {
       const m = arg.slice(7);
       if (m === "both") bothModes = true;
@@ -131,6 +140,7 @@ function parseArgs(argv: string[]): CliArgs {
     port,
     mode,
     partySize,
+    shop,
     bothModes,
     cleanOnly,
     yes,
@@ -375,6 +385,7 @@ export interface LoadTestMetrics {
   note: string;
   mode?: BotMode;
   partySize?: number;
+  shop?: boolean;
   botCount: number;
   connectedBots: number;
   durationSec: number;
@@ -538,13 +549,15 @@ async function runLoadTest(
   note: string,
   mode: BotMode,
   partySize = 0,
+  shop = false,
 ): Promise<LoadTestMetrics> {
   const partySuffix = partySize > 1 ? `, tổ đội ${partySize} người` : "";
+  const shopSuffix = shop ? ", mua bán shop" : "";
   const modeLabel =
     mode === "realistic"
-      ? `Thực tế (vào tầm đứng chém${partySuffix})`
+      ? `Thực tế (vào tầm đứng chém${partySuffix}${shopSuffix})`
       : mode === "crowd"
-        ? "Đông người trong trấn (30% đứng yên, 70% đi lại)"
+        ? `Đông người trong trấn (${shop ? "25% ghé Dược Sư, 25% đứng, 50% đi" : "30% đứng yên, 70% đi lại"})`
         : `Xấu nhất (100% di chuyển 20 input/s${partySuffix})`;
   console.log(
     `\n=== Bắt đầu thử tải [${modeLabel}]: ${botCount} bot, đo trong ${durationSec}s (${url}) ===`,
@@ -669,7 +682,7 @@ async function runLoadTest(
     room.onMessage("wallet", (msg: WalletMsg) => {
       if (measuring) {
         b.walletMsgsCount++;
-        b.walletBytes += Buffer.byteLength(JSON.stringify(msg)) + 10;
+        b.walletBytes += Buffer.byteLength(JSON.stringify(msg)) + WALLET_MSG_OVERHEAD;
       }
       b.coin = msg.coin;
     });
@@ -785,7 +798,8 @@ async function runLoadTest(
     let dy: number;
 
     if (
-      mode !== "crowd" &&
+      shop &&
+      mode === "realistic" &&
       !b.shopping &&
       now >= b.nextShopCheckAt &&
       b.index % 5 === 0 &&
@@ -798,11 +812,12 @@ async function runLoadTest(
     }
 
     if (mode === "crowd") {
-      // Kịch bản đông người tụ trong trấn (#78 & #102):
-      // ~25% bot định kỳ ghé Lão Dược Sư mua/bán (phát sinh tin wallet), ~25% đứng yên, 50% đi lại.
+      // Kịch bản đông người tụ trong trấn (#78 & #80):
+      // Khi có cờ --shop (#102): ~25% bot định kỳ ghé Lão Dược Sư mua/bán (phát sinh tin wallet), ~25% đứng yên, 50% đi lại.
+      // Khi không có --shop (mặc định): 30% đứng yên (b.index % 3 === 0), 70% đi lại ngẫu nhiên trong trấn.
       const duoc = NPC_BY_ID.duoc_su;
       const distToDuoc = Math.hypot(duoc.x - b.predX, duoc.y - b.predY);
-      if (b.index % 4 === 0 && now >= b.nextShopCheckAt) {
+      if (shop && b.index % 4 === 0 && now >= b.nextShopCheckAt) {
         if (distToDuoc > NPC_RANGE - 20) {
           const a = Math.atan2(duoc.y - b.predY, duoc.x - b.predX);
           dx = Math.cos(a);
@@ -843,8 +858,8 @@ async function runLoadTest(
       // Đang vòng qua vật cản (cây/nước)
       dx = Math.cos(b.wanderAngle);
       dy = Math.sin(b.wanderAngle);
-    } else if (b.shopping) {
-      // Đang trên đường về Lão Dược Sư trong trấn để mua/bán (#102)
+    } else if (shop && b.shopping) {
+      // Đang trên đường về Lão Dược Sư trong trấn để mua/bán (chỉ khi có cờ --shop) (#102)
       const duoc = NPC_BY_ID.duoc_su;
       const distToDuoc = Math.hypot(duoc.x - b.predX, duoc.y - b.predY);
       if (distToDuoc > NPC_RANGE - 20) {
@@ -1261,6 +1276,7 @@ async function runLoadTest(
     fxEventsReceivedPerBot: Number((totalFxEvents / botCount / actualDurationSec).toFixed(1)),
     dmgEventsReceivedPerBot: Number((totalDmgEvents / botCount / actualDurationSec).toFixed(1)),
     partySize: partySize > 1 ? partySize : undefined,
+    shop: shop ? true : undefined,
     partyEventsReceivedPerBot: Number((totalPartyMsgs / botCount / actualDurationSec).toFixed(1)),
     rxPartyKBpsPerBot: Number((totalPartyBytes / botCount / actualDurationSec / 1024).toFixed(2)),
     walletEventsReceivedPerBot: Number((totalWalletMsgs / botCount / actualDurationSec).toFixed(2)),
@@ -1580,6 +1596,7 @@ async function main() {
           args.note,
           m,
           args.partySize,
+          args.shop,
         ),
       );
     }

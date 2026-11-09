@@ -9,6 +9,7 @@ import {
   TRADE_BY_ID,
   DROP_TABLES,
   buyPrice,
+  sellPrice,
 } from "@tien-gioi/shared";
 import {
   ASSUME,
@@ -117,7 +118,7 @@ const avgLongThoPerKill = thoDropEntry.chance * ((thoDropEntry.min + thoDropEntr
 const killsToTradeDan = tradeItem.qty / avgLongThoPerKill;
 const potionBuyPrice = buyPrice("hoi_huyet_dan");
 const thoTotalCoin = expectedTotalCoin("tho");
-const thoCoinOnlyAndMat = expectedCoinDrop("tho") + avgLongThoPerKill * 1;
+const thoCoinOnlyAndMat = expectedCoinDrop("tho") + avgLongThoPerKill * sellPrice(tradeItem.itemId);
 const killsToBuyDanAll = potionBuyPrice / thoTotalCoin;
 const killsToBuyDanNoPotionSell = potionBuyPrice / thoCoinOnlyAndMat;
 const tradeRatioMin = killsToBuyDanAll / killsToTradeDan;
