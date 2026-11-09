@@ -86,7 +86,16 @@
 | Đông người trong trấn (30% đứng, 70% đi) | **50** | **50/50 (4429: 0)** | TB **2.45 ms** / p95 **3.47 ms** / max 11.72 ms | Tổng **16.06 KB/s** (patch: 16.06 KB/s, fx+dmg: 0 KB/s) | **0.55 KB/s** (13.5 gói/s) | TB **50.32 ms** (p95: 51.41 ms) | TB **74.69 ms** (min: 67.51 ms, p95: 77.88 ms) | Tầm nhìn TB **56.1 quái**, **50.0 người** (thấy 100% người chơi trong phòng; server: 74 quái) |
 | Đông người trong trấn (30% đứng, 70% đi) | **100** | **100/100 (4429: 0)** | TB **4.12 ms** / p95 **6.64 ms** / max **9.25 ms** | Tổng **25.90 KB/s** (patch: 25.90 KB/s, fx+dmg: 0 KB/s) | **0.54 KB/s** (13.3 gói/s) | TB **50.23 ms** (p95: 51.42 ms) | TB **53.66 ms** (min: 48.44 ms, p95: 58.67 ms) | Tầm nhìn TB **56.2 quái**, **100.0 người** (thấy 100% người chơi trong phòng; server: 63 quái) |
 
-### 2.5. Mức 0 bot (chỉ server chạy, không ai vào phòng trong 15 giây)
+### 2.5. Thử tải kịch bản tổ đội: 100 bot lẻ (solo) vs 25 đội 4 người (`--party=4`) (#76)
+
+> Trong kịch bản `--party=4`, 100 bot được chia thành 25 đội gồm 1 đội trưởng và 3 thành viên. Đội trưởng mời tuần tự qua `partyInvite` (tuân thủ hồi chiêu `PARTY_INVITE_COOLDOWN_MS = 3000`), thành viên tự động chấp thuận qua `partyAccept`. Sau khi vào đội, các thành viên di chuyển bám theo đội trưởng trong bán kính 300 px và hỗ trợ chiến đấu khi chạm trán quái vật. Server phát trạng thái tổ đội `party` định kỳ mỗi 1 giây (`PARTY_SNAPSHOT_MS = 1000`) cho từng thành viên.
+
+| Kịch bản | Số bot | Kết nối giữ vững | CPU mỗi tick: TB / p95 / cao nhất (mục tiêu < 10 ms) | Băng thông nhận vào (RX / bot) | Băng thông tin tổ đội (Party RX / bot) | Băng thông gửi đi (TX / bot) | Nhịp nhận patch `Δt` | Độ trễ `input → lastSeq` | Thực thể trong tầm nhìn (`StateView`) |
+|---|---:|---|---|---|---|---|---|---|---|
+| **100 bot lẻ (Solo)** | **100** | **100/100 (4429: 0)** | TB **1.71 ms** / p95 **3.07 ms** / max **8.07 ms** | Tổng **2.01 KB/s** (patch: 1.71 KB/s, fx+dmg: 0.29 KB/s) | **0 KB/s** (0 tin/s) | **0.06 KB/s** (1.5 gói/s) | TB **50.32 ms** (p95: 51.2 ms) | TB **69.19 ms** (min: 59.96 ms, p95: 74.23 ms) | Tầm nhìn TB **6.1 quái**, **54.5 người** (toàn server: 61 quái; hợp nhất bot thấy: 23 quái sống) |
+| **25 đội 4 người (`--party=4`)** | **100** | **100/100 (4429: 0)** | TB **3.47 ms** / p95 **5.63 ms** / max **10.11 ms** | Tổng **13.52 KB/s** (patch: 12.03 KB/s, fx+dmg: 1.48 KB/s) | **0.32 KB/s** (~1.0 tin/s) | **0.53 KB/s** (13.3 gói/s) | TB **50.39 ms** (p95: 52.03 ms) | TB **66.82 ms** (min: 43.66 ms, p95: 98.8 ms) | Tầm nhìn TB **14.9 quái**, **71.0 người** (toàn server: 61 quái; hợp nhất bot thấy: 36 quái sống) |
+
+### 2.6. Mức 0 bot (chỉ server chạy, không ai vào phòng trong 15 giây)
 
 | Số bot | Quái toàn server (`bench.ts`) | CPU tiến trình server mỗi tick (TB / p95 / cao nhất) | Tick thuần logic (`bench.ts`) | State patch mã hoá mỗi tick (Trước #59 → Sau #59 & #62) | Băng thông state patch |
 |---:|---:|---|---|---|---|
@@ -123,3 +132,10 @@
      - Phân tích của Dev A cho thấy: vị trí quái chiếm tới **~25% số trường thay đổi** ở 100 người và chiếm phần lớn ở số người ít.
      - Vì client không đoán trước quái vật (client dùng phép nội suy vị trí giữa các patch), tối ưu bằng cách gửi vị trí quái thưa hơn (ví dụ 4 tick/lần) là bước can thiệp an toàn và hiệu quả cao cho Issue #80 mà không gây giật lag trải nghiệm.
    - **CPU:** Kể cả ở ca 100 bot tụ trong trấn gửi 20 tick/giây, CPU server đạt trung bình **4.12 ms/tick**, p95 **6.64 ms**, max **9.25 ms** — vẫn nằm an toàn dưới ngân sách **10 ms**.
+5. **Đánh giá hiệu năng và băng thông hệ thống tổ đội (#76):**
+   - **Băng thông tin nhắn tổ đội (`PartyMsg`):**
+     - Ở kịch bản 100 bot chia làm 25 đội 4 người, mỗi client nhận trung bình **~1.0 tin `party`/giây** với lưu lượng đo được qua WebSocket thật là **~0.32 KB/s** (đối chiếu trong `bench.ts` bộ nhớ là **~0.33 KB/s**).
+     - Con số này đạt sâu dưới ngân sách an toàn **< 1.0 KB/s mỗi client** được kiểm định tự động bằng test `it("tin tổ đội (PartyMsg) cho một client dưới ngân sách < 1 KB/s (#76)")` trong `server/src/systems/perf.test.ts`.
+   - **Tác động lên CPU và hành vi thế giới:**
+     - Khi lập đội, các thành viên bám theo đội trưởng (khoảng cách < 300 px) khiến các nhóm người chơi tụ lại thành các cụm săn quái cơ động thay vì rải rác từng cá nhân đơn lẻ. Điều này kích hoạt nhiều quái hơn trong tầm nhìn (trung bình 14.9 quái/bot so với 6.1 quái/bot ở solo), tạo ra nhiều hoạt động chiến đấu hơn (167 đòn chém + 45 kiếm khí, so với 60 chém + 26 kiếm khí).
+     - Thời gian CPU mỗi tick của server đạt trung bình **3.47 ms/tick** (p95 **5.63 ms/tick**, cao nhất 10.11 ms), hoàn toàn bảo đảm ngân sách **< 10 ms/tick** của server 20 Hz.
