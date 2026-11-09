@@ -6,6 +6,7 @@ import {
   MONSTER_BY_ID,
   statsFor,
   killExp,
+  rollCoin,
 } from "@tien-gioi/shared";
 import type { Player, Monster } from "../schema";
 import {
@@ -21,6 +22,7 @@ import { safeSpot, syncPublicPos } from "./movement";
 import { dropLoot } from "./loot";
 import { onMonsterKilled } from "./quests";
 import { killShares } from "./party";
+import { changeCoin, splitCoin } from "./wallet";
 
 const CRIT_CHANCE = 0.1;
 const CRIT_MULT = 1.8;
@@ -104,10 +106,27 @@ export function killMonster(w: World, id: string, mc: MonsterCtrl) {
     gainExp(w, sid, p, share);
     onMonsterKilled(w, sid, mc.def.id); // ai góp sát thương (hoặc cùng đội) cũng được tính cho nhiệm vụ
   }
+  if (mon) dropCoin(w, mc, mon.x, mon.y);
   if (mc.def.boss) w.events.sys(`🐉 ${mc.def.name} đã bị hạ!`);
   if (mon) dropLoot(w, mc, mon.x, mon.y);
   w.state.monsters.delete(id);
   w.mctrl.delete(id);
+}
+
+/**
+ * Linh thạch quái rơi (tung một lần cho cả con quái), cộng thẳng cho người hạ nó, không nằm trên đất.
+ * Người nhận như chia tu vi (người lẻ theo sát thương; đội chia đều cho thành viên còn sống đứng trong
+ * PARTY_SHARE_RANGE) nhưng KHÔNG có thưởng đội, và tổng chia ra đúng bằng số đã tung (xem `splitCoin`).
+ */
+function dropCoin(w: World, mc: MonsterCtrl, x: number, y: number) {
+  const coin = rollCoin(mc.def.id);
+  if (coin <= 0) return;
+  const weights = new Map<string, number>();
+  for (const [sid, wt] of killShares(w, mc.damageBy, x, y, false)) {
+    const p = w.state.players.get(sid);
+    if (p && !p.dead) weights.set(sid, wt);
+  }
+  for (const [sid, n] of splitCoin(coin, weights)) changeCoin(w, sid, n);
 }
 
 export function hurtPlayer(w: World, sid: string, p: Player, dmg: number, from: Monster) {
