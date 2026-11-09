@@ -8,10 +8,11 @@ Trả lời người dùng bằng tiếng Việt. Comment trong code viết ti�
 ## Nhóm và nơi làm việc
 - 3 dev cùng SSH vào một máy, cùng user Linux `nguyencong`, cùng tài khoản GitHub `nguyencong1227`.
 - **Dev A (Server & Gameplay, giao việc):** `~/TT/tien-gioi-a`, cổng 2567/5173, nhánh `a/...`. Dùng Claude Code.
-- **Dev B (Client & Trải nghiệm):** `~/TT/tien-gioi-b`, cổng 2577/5183, nhánh `b/...`.
+- **Dev B (Client & Trải nghiệm):** `~/TT/tien-gioi-b`, cổng 2577/5183, nhánh `b/...`. Dùng Antigravity CLI (`agy`).
 - **Dev C (Công cụ, Thử tải & Phát hành):** `~/TT/tien-gioi-c`, cổng 2587/5193, nhánh `c/...`. Dùng Antigravity CLI (`agy`).
 - Thư mục mở lúc khởi động là thư mục của dev đang làm việc với bạn: chỉ làm trong đó. Không sửa, không `git switch`, không chạy server trong thư mục của người khác.
 - Không sửa `~/.bashrc`, `~/.gitconfig`, `~/.gemini/`, `~/.claude/` hay cấu hình global: ba người dùng chung.
+- **Việc được giao nằm trong GitHub issue** (nhãn `dev-a` / `dev-b` / `dev-c`). Trước khi làm, đọc issue bằng `gh issue view <số>`: issue ghi hợp đồng `shared/` cần dùng, tin nhắn, phụ thuộc và tiêu chí xong. Trợ lý AI không nhớ cuộc trò chuyện của dev khác; issue và comment trên PR là nơi duy nhất truyền thông tin giữa các dev.
 - Chi tiết: `docs/LAM_CHUNG_MAY.md`. Phân công M2: `docs/PHAN_CONG.md` và GitHub issues (nhãn `dev-a` / `dev-b` / `dev-c` / `shared`, milestone Sprint 0–3).
 
 ## Lệnh
