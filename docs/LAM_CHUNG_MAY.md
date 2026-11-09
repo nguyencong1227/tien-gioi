@@ -86,15 +86,17 @@ Rồi mở `http://localhost:5173` (Dev A) / `http://localhost:5183` (Dev B) / `
 
 ## Soạn code
 
-### Dev C: Antigravity CLI
+### Dev B, Dev C: Antigravity CLI
 Antigravity CLI (`agy`) đã cài ở `~/.local/bin/agy`. Luôn mở nó **từ thư mục của mình**, để nó chỉ sửa code trong đó:
 
 ```bash
-cd ~/TT/tien-gioi-c && agy
+cd ~/TT/tien-gioi-b && agy     # Dev B
+cd ~/TT/tien-gioi-c && agy     # Dev C
 ```
 
 Antigravity đọc quy ước dự án từ `AGENTS.md` ở gốc repo (cùng nội dung Claude Code đọc qua `CLAUDE.md`).
-Đừng đặt quy ước riêng của dự án vào `~/.gemini/`: thư mục đó dùng chung cho cả máy.
+Đừng đặt quy ước riêng của dự án vào `~/.gemini/`: thư mục đó dùng chung cho cả máy (Dev B và Dev C cùng dùng).
+Mở phiên mới cho mỗi issue và bảo nó đọc issue trước: `Làm #31, đọc issue bằng gh issue view 31`.
 
 ### Trình soạn thảo
 

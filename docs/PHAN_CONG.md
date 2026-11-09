@@ -11,7 +11,7 @@
 | Quyết định | Luật chơi, cân bằng số liệu, bảo mật, lưu trữ; giao việc | Cách hiển thị, thao tác, bố cục điện thoại/máy tính | Cách đo, công cụ CI, cách đóng gói |
 | Chịu trách nhiệm | Server không bao giờ tin client; dữ liệu nhân vật không mất | Chạy mượt 60 FPS trên điện thoại tầm trung; dễ dùng bằng một tay | CI bắt lỗi trước khi merge; biết server chịu được bao nhiêu người |
 
-Dev C vào từ Sprint 3, dùng Antigravity CLI. Việc của Dev C ít đụng `server/src/` và `client/src/` để không giẫm lên Dev A / Dev B: cần sửa ở đó thì làm PR nhỏ và nhờ chủ thư mục review.
+Dev C vào từ Sprint 3. Dev B và Dev C dùng Antigravity CLI, Dev A dùng Claude Code; cả hai đọc chung `AGENTS.md`. Việc của Dev C ít đụng `server/src/` và `client/src/` để không giẫm lên Dev A / Dev B: cần sửa ở đó thì làm PR nhỏ và nhờ chủ thư mục review.
 
 Hai người cùng sở hữu **hợp đồng `shared/`**. Mỗi tính năng đi theo thứ tự:
 
