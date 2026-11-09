@@ -62,6 +62,9 @@ async function start(room: Room) {
     new Promise((r) => setTimeout(r, 3000)),
   ]);
   ui.show();
+  if (typeof window !== "undefined") {
+    (window as any).__ui = ui;
+  }
   new Phaser.Game({
     type: Phaser.AUTO,
     parent: "game",

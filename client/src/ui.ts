@@ -162,7 +162,6 @@ function processNextInvite() {
     bar.style.width = `${(rem / ttl) * 100}%`;
     if (rem <= 0) {
       stopInviteTimer();
-      callbacks?.onPartyDecline?.(next.from);
       processNextInvite();
     }
   };
@@ -1185,8 +1184,14 @@ export const ui = {
     bindTap("btn-pickup", () => callbacks?.onPickup());
     bindTap("btn-talk", () => callbacks?.onTalk());
 
-    // Tổ đội (#75)
+    // Tổ đội (#75, #91)
     bindTap("party-btn-leave", () => callbacks?.onPartyLeave?.());
+    bindTap("party-btn-toggle", () => {
+      const panel = $("party-panel");
+      panel.classList.toggle("collapsed");
+      const btn = $("party-btn-toggle");
+      btn.textContent = panel.classList.contains("collapsed") ? "▸" : "▾";
+    });
     bindTap("pib-btn-accept", () => {
       stopInviteTimer();
       $("party-invite-box").hidden = true;
