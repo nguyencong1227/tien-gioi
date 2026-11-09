@@ -20,6 +20,7 @@ import { applyStats, gainExp } from "./progression";
 import { safeSpot } from "./movement";
 import { dropLoot } from "./loot";
 import { onMonsterKilled } from "./quests";
+import { killShares } from "./party";
 
 const CRIT_CHANCE = 0.1;
 const CRIT_MULT = 1.8;
@@ -92,17 +93,18 @@ export function hitMonster(
 
 /** Chia tu vi theo tỉ lệ sát thương cho những người còn sống, rơi đồ, rồi xóa quái. */
 export function killMonster(w: World, id: string, mc: MonsterCtrl) {
-  const total = [...mc.damageBy.values()].reduce((a, b) => a + b, 0) || 1;
-  for (const [sid, dmg] of mc.damageBy) {
+  const mon = w.state.monsters.get(id);
+  // Hệ số tu vi của từng người (đội chia đều có thưởng, người lẻ theo sát thương: xem killShares)
+  const shares = killShares(w, mc.damageBy, mon?.x ?? 0, mon?.y ?? 0);
+  for (const [sid, frac] of shares) {
     const p = w.state.players.get(sid);
     if (!p || p.dead) continue;
     // Quái càng mạnh, tu vi càng tăng theo cấp số nhân
-    const share = Math.max(1, Math.round(killExp(mc.def, p.realm, p.tier) * (dmg / total)));
+    const share = Math.max(1, Math.round(killExp(mc.def, p.realm, p.tier) * frac));
     gainExp(w, sid, p, share);
-    onMonsterKilled(w, sid, mc.def.id); // ai góp sát thương cũng được tính cho nhiệm vụ
+    onMonsterKilled(w, sid, mc.def.id); // ai góp sát thương (hoặc cùng đội) cũng được tính cho nhiệm vụ
   }
   if (mc.def.boss) w.events.sys(`🐉 ${mc.def.name} đã bị hạ!`);
-  const mon = w.state.monsters.get(id);
   if (mon) dropLoot(w, mc, mon.x, mon.y);
   w.state.monsters.delete(id);
   w.mctrl.delete(id);

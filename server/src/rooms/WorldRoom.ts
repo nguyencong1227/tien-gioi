@@ -27,6 +27,9 @@ import {
   type EquipMsg,
   type UnequipMsg,
   type CraftMsg,
+  type PartyInviteMsg,
+  type PartyAnswerMsg,
+  type PartyKickMsg,
 } from "@tien-gioi/shared";
 import { WorldState, Player } from "../schema";
 import { loadPlayer, savePlayer, hashSecret, cleanName, type SavedPlayer } from "../store";
@@ -43,6 +46,7 @@ import { abandonQuest, acceptQuest, craft, talk, trade, turnInQuest } from "../s
 import { equip, equipmentOf, sanitizeEquipment, setEquipment, unequip } from "../systems/equipment";
 import { tickWorld } from "../systems/tick";
 import { VIEW_ENTER } from "../systems/interest";
+import { partyAnswer, partyDrop, partyInvite, partyKick, partyLeave } from "../systems/party";
 import { RateLimiter } from "../rate-limit";
 
 const SAVE_EVERY_MS = 30_000;
@@ -66,6 +70,9 @@ export class WorldRoom extends Room<WorldState> {
     inv: (sid, msg) => this.sendTo(sid, "inv", msg),
     quests: (sid, msg) => this.sendTo(sid, "quests", msg),
     dialog: (sid, msg) => this.sendTo(sid, "dialog", msg),
+    party: (sid, msg) => this.sendTo(sid, "party", msg),
+    partyInvited: (sid, msg) => this.sendTo(sid, "partyInvited", msg),
+    chatTo: (sid, msg) => this.sendTo(sid, "chat", msg),
   });
 
   /** Giới hạn tần suất tin nhắn, theo sessionId */
@@ -115,6 +122,11 @@ export class WorldRoom extends Room<WorldState> {
     this.on<EquipMsg>("equip", (sid, m) => equip(w, sid, m?.slot));
     this.on<UnequipMsg>("unequip", (sid, m) => unequip(w, sid, m?.slot));
     this.on<CraftMsg>("craft", (sid, m) => craft(w, sid, m?.recipeId));
+    this.on<PartyInviteMsg>("partyInvite", (sid, m) => partyInvite(w, sid, m?.name));
+    this.on<PartyAnswerMsg>("partyAccept", (sid, m) => partyAnswer(w, sid, m?.from, true));
+    this.on<PartyAnswerMsg>("partyDecline", (sid, m) => partyAnswer(w, sid, m?.from, false));
+    this.on("partyLeave", (sid) => partyLeave(w, sid));
+    this.on<PartyKickMsg>("partyKick", (sid, m) => partyKick(w, sid, m?.name));
     // Loại tin nhắn không đăng ký: bỏ qua, tính là spam
     this.onMessage("*", (c) => this.reject(c));
   }
@@ -228,6 +240,7 @@ export class WorldRoom extends Room<WorldState> {
       await this.persist(p, c).catch((e) => console.error("save failed", e));
       this.world.events.sys(`${p.name} đã rời đi.`);
     }
+    partyDrop(this.world, sid); // trước khi xoá khỏi state: báo cho đội, dọn lời mời
     this.state.players.delete(sid);
     this.state.online = this.state.players.size;
     this.world.interest.leave(sid);
