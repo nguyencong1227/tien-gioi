@@ -37,6 +37,7 @@ import {
   type DialogMsg,
   type PartyMsg,
   type PartyInvitedMsg,
+  type WalletMsg,
 } from "@tien-gioi/shared";
 import { preloadAssets, makeTextures, dirFromAngle, TILESET_KEY, ATLAS_KEY } from "../textures";
 import { ui } from "../ui";
@@ -250,6 +251,8 @@ export class WorldScene extends Phaser.Scene {
       onPartyInvite: (name) => this.room.send("partyInvite", { name }),
       onPartyAccept: (from) => this.room.send("partyAccept", { from }),
       onPartyDecline: (from) => this.room.send("partyDecline", { from }),
+      onBuy: (npcId, itemId, qty) => this.room.send("buy", { npcId, itemId, qty }),
+      onSell: (npcId, slot, qty) => this.room.send("sell", { npcId, slot, qty }),
     });
 
     this.setupInput();
@@ -397,6 +400,7 @@ export class WorldScene extends Phaser.Scene {
       if (
         ui.isCharModalOpen() ||
         ui.isForgeModalOpen() ||
+        ui.isShopModalOpen() ||
         ui.isInventoryOpen() ||
         ui.isQuestModalOpen() ||
         ui.isMapModalOpen() ||
@@ -579,6 +583,7 @@ export class WorldScene extends Phaser.Scene {
     this.room.onMessage("dialog", (m: DialogMsg) => ui.onDialog(m));
     this.room.onMessage("party", (m: PartyMsg) => ui.onParty(m));
     this.room.onMessage("partyInvited", (m: PartyInvitedMsg) => ui.onPartyInvited(m));
+    this.room.onMessage("wallet", (m: WalletMsg) => ui.onWallet(m));
     ui.chat({
       from: "",
       text: "Chào mừng đạo hữu tới Tiên Giới. Nhận nhiệm vụ ở Trưởng trấn (F), mở sổ nhiệm vụ (Q) và xem bản đồ (M).",
@@ -599,6 +604,7 @@ export class WorldScene extends Phaser.Scene {
       this.pending.length = 0;
       this.predX = me.x;
       this.predY = me.y;
+      ui.closeAllModals();
       return;
     }
     this.pending = this.pending.filter((i) => i.seq > me.lastSeq);
@@ -819,6 +825,7 @@ export class WorldScene extends Phaser.Scene {
     } else {
       ui.talkPrompt(null);
       if (ui.isForgeModalOpen()) ui.toggleForgeModal(false);
+      if (ui.isShopModalOpen()) ui.toggleShopModal(false);
     }
   }
 

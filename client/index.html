@@ -46,6 +46,9 @@
           <div class="bar exp"><i id="exp-fill"></i><span id="exp-text"></span></div>
           <div class="hud-foot">
             <div id="hud-online"></div>
+            <div id="hud-coin-badge" title="Linh thạch">
+              <span class="coin-gem">💎</span><b id="hud-coin">0</b>
+            </div>
             <div class="hud-btns">
               <button
                 type="button"
@@ -200,7 +203,10 @@
         <header class="inv-head">
           <div>
             <h2>Đạo Thể · Trang Bị</h2>
-            <small id="char-subtitle">Chạm trang bị để mặc hoặc tháo</small>
+            <small id="char-subtitle"
+              >Chạm trang bị để mặc hoặc tháo · Linh thạch:
+              <b id="char-coin" class="coin-val">0</b> 💎</small
+            >
           </div>
           <button type="button" id="char-close" class="modal-close" title="Đóng (C / Esc)">
             ✕
@@ -227,6 +233,24 @@
           <button type="button" id="forge-close" class="modal-close" title="Đóng (Esc)">✕</button>
         </header>
         <div id="forge-list" class="forge-list"></div>
+      </section>
+
+      <section id="shop-modal" class="panel modal-box" hidden aria-label="Cửa hàng">
+        <header class="inv-head">
+          <div>
+            <h2 id="shop-title">Cửa Hàng Lão Dược Sư</h2>
+            <small id="shop-wallet-badge"
+              >Linh thạch hiện có: <b id="shop-coin" class="coin-val">0</b> 💎</small
+            >
+          </div>
+          <button type="button" id="shop-close" class="modal-close" title="Đóng (Esc)">✕</button>
+        </header>
+        <div class="shop-tabs">
+          <button type="button" class="q-tab active" id="tab-shop-buy">Mua Đan Dược</button>
+          <button type="button" class="q-tab" id="tab-shop-sell">Thu Mua Vật Phẩm</button>
+        </div>
+        <div id="shop-buy-list" class="shop-list"></div>
+        <div id="shop-sell-list" class="shop-list" hidden></div>
       </section>
 
       <section id="settings-modal" class="panel modal-box" hidden aria-label="Màn hình cài đặt">
