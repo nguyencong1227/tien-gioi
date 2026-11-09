@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { MONSTER_BY_ID } from "./game";
 import { ITEMS, ITEM_BY_ID } from "./items";
-import { NPC_BY_ID } from "./npcs";
+import { NPC_BY_ID, TRADES } from "./npcs";
+import { RECIPES } from "./recipes";
 import {
   BUY_MARKUP,
   COIN_CAP,
@@ -129,5 +130,53 @@ describe("addCoin", () => {
     expect(addCoin(-Infinity, 5)).toBe(5);
     expect(addCoin(10.9, 1.9)).toBe(11);
     expect(Number.isInteger(addCoin(1e308, 1e308))).toBe(true);
+  });
+});
+
+describe("rèn và đổi đồ không thành vòng sinh tiền (docs/CAN_BANG.md)", () => {
+  // Giá bán cho NPC của cả một bộ (id + số lượng); đồ không bán được tính 0.
+  const sellTotal = (xs: { itemId: string; qty: number }[]) =>
+    xs.reduce((s, x) => s + sellPrice(x.itemId) * x.qty, 0);
+  const buyTotal = (xs: { itemId: string; qty: number }[]) =>
+    xs.reduce((s, x) => s + buyPrice(x.itemId) * x.qty, 0);
+  const shopItems = new Set(SHOPS.flatMap((s) => s.itemIds));
+
+  /** Rèn rồi bán lời tối đa bấy nhiêu lần so với bán thẳng nguyên liệu (hiện cao nhất ~1.6). */
+  const RECIPE_MAX_GAIN = 2;
+  /** Đổi đồ ở Lão dược sư (hiện cao nhất ~1.2). */
+  const TRADE_MAX_GAIN = 1.5;
+
+  it("rèn: bán thành phẩm không lời quá RECIPE_MAX_GAIN lần so với bán nguyên liệu", () => {
+    for (const r of RECIPES) {
+      const inSell = sellTotal(r.inputs);
+      const outSell = sellTotal([r.output]);
+      expect(inSell, `${r.id}: nguyên liệu phải bán được`).toBeGreaterThan(0);
+      expect(outSell, `${r.id}: ${outSell} / ${inSell}`).toBeLessThanOrEqual(
+        inSell * RECIPE_MAX_GAIN,
+      );
+    }
+  });
+
+  it("đổi đồ: nhận về không lời quá TRADE_MAX_GAIN lần so với bán thứ nộp", () => {
+    for (const t of TRADES) {
+      const inSell = sellTotal(t.give);
+      const outSell = sellTotal([t.get]);
+      expect(inSell, `${t.id}: đồ nộp phải bán được`).toBeGreaterThan(0);
+      expect(outSell, `${t.id}: ${outSell} / ${inSell}`).toBeLessThanOrEqual(
+        inSell * TRADE_MAX_GAIN,
+      );
+    }
+  });
+
+  it("không có vòng mua nguyên liệu ở cửa hàng -> rèn / đổi -> bán lại có lời", () => {
+    // Chỉ cần xét khi cửa hàng bán một thứ làm nguyên liệu (hiện chưa có): mua rồi biến đổi rồi bán phải lỗ.
+    for (const r of RECIPES)
+      for (const i of r.inputs)
+        if (shopItems.has(i.itemId))
+          expect(buyTotal(r.inputs), r.id).toBeGreaterThan(sellTotal([r.output]));
+    for (const t of TRADES)
+      for (const g of t.give)
+        if (shopItems.has(g.itemId))
+          expect(buyTotal(t.give), t.id).toBeGreaterThan(sellTotal([t.get]));
   });
 });
