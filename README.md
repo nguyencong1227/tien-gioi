@@ -39,14 +39,15 @@ client/   Phaser 3 + Vite: WorldScene (vẽ, đoán trước di chuyển), ui (H
 - Đánh: client gửi `attack` / `skill` kèm góc. Server kiểm tra hồi chiêu, tầm đánh, tính sát thương rồi phát `fx` / `dmg`.
 - Server 20 tick/giây, gửi patch 20 lần/giây.
 
-## Chia việc cho 2 dev
+## Chia việc cho 3 dev
 
 Chi tiết từng sprint, tiêu chí "xong", quy trình review: **[docs/PHAN_CONG.md](docs/PHAN_CONG.md)**.
-Hai dev cùng SSH vào một máy: **[docs/LAM_CHUNG_MAY.md](docs/LAM_CHUNG_MAY.md)** (thư mục và cổng riêng cho từng người).
+Ba dev cùng SSH vào một máy: **[docs/LAM_CHUNG_MAY.md](docs/LAM_CHUNG_MAY.md)** (thư mục và cổng riêng cho từng người).
 
 - **Dev A: Server & Gameplay:** `server/`, logic trong `shared/`.
 - **Dev B: Client & Trải nghiệm:** `client/`, asset, âm thanh, UI/UX.
-- `shared/` là hợp đồng chung: đổi gì ở đó thì làm PR riêng, người kia review trước.
+- **Dev C: Công cụ, Thử tải & Phát hành:** CI, script thử tải (`server/scripts/`), PWA và đóng gói.
+- `shared/` là hợp đồng chung: đổi gì ở đó thì làm PR riêng, một dev khác review trước.
 - Logic quyết định kết quả (sát thương, rơi đồ, tu vi) **chỉ nằm ở server**.
 
 ## Thay ảnh tạm bằng asset thật
