@@ -63,17 +63,36 @@ const fmt = (n: number) =>
 const hexColor = (c: number) => `#${c.toString(16).padStart(6, "0")}`;
 
 // ---------- Trạng thái Client ----------
+const HIDE_NAMES_KEY = "tg_hide_names";
+const LOW_FX_KEY = "tg_low_fx";
+
 let invSlots: Inventory = emptyInventory();
 const itemCdUntil = new Map<string, number>();
 let selectedSlot = 0;
 let invOpen = false;
 let questModalOpen = false;
 let mapModalOpen = false;
+let settingsModalOpen = false;
+let hideOtherNames = false;
+let lowFx = false;
 let questTab: "active" | "done" = "active";
 let trackingQuestId: string | null = null;
 let currentRealm = 0;
 let currentTier = 0;
 let questLog: QuestsMsg = { active: [], done: [], dailyDone: [] };
+
+function loadSettings() {
+  try {
+    hideOtherNames = localStorage.getItem(HIDE_NAMES_KEY) === "1";
+    lowFx = localStorage.getItem(LOW_FX_KEY) === "1";
+  } catch {
+    hideOtherNames = false;
+    lowFx = false;
+  }
+  if (typeof document !== "undefined") {
+    document.body.classList.toggle("low-fx", lowFx);
+  }
+}
 
 // Hộp thoại NPC
 let currentDialog: DialogMsg | null = null;
@@ -573,6 +592,63 @@ export const ui = {
     bindTap("minimap-wrap", () => this.toggleMapModal());
     bindTap("map-close", () => this.toggleMapModal(false));
 
+    // Cài đặt (#35)
+    loadSettings();
+    bindTap("btn-settings", () => this.toggleSettingsModal());
+    bindTap("settings-close", () => this.toggleSettingsModal(false));
+
+    const bgmInput = $("set-bgm-vol") as HTMLInputElement;
+    const bgmVal = $("set-bgm-val");
+    const sfxInput = $("set-sfx-vol") as HTMLInputElement;
+    const sfxVal = $("set-sfx-val");
+    const muteChk = $("set-mute") as HTMLInputElement;
+    const hideNamesChk = $("set-hide-names") as HTMLInputElement;
+    const lowFxChk = $("set-low-fx") as HTMLInputElement;
+
+    const syncSettingsDom = () => {
+      const bPct = Math.round(sound.getBgmVolume() * 100);
+      const sPct = Math.round(sound.getSfxVolume() * 100);
+      bgmInput.value = `${bPct}`;
+      bgmVal.textContent = `${bPct}%`;
+      sfxInput.value = `${sPct}`;
+      sfxVal.textContent = `${sPct}%`;
+      muteChk.checked = sound.isMuted();
+      hideNamesChk.checked = hideOtherNames;
+      lowFxChk.checked = lowFx;
+    };
+    syncSettingsDom();
+
+    bgmInput.addEventListener("input", () => {
+      const v = Number(bgmInput.value);
+      bgmVal.textContent = `${v}%`;
+      sound.setBgmVolume(v / 100);
+    });
+    sfxInput.addEventListener("input", () => {
+      const v = Number(sfxInput.value);
+      sfxVal.textContent = `${v}%`;
+      sound.setSfxVolume(v / 100);
+    });
+    muteChk.addEventListener("change", () => {
+      sound.setMuted(muteChk.checked);
+    });
+    hideNamesChk.addEventListener("change", () => {
+      hideOtherNames = hideNamesChk.checked;
+      try {
+        localStorage.setItem(HIDE_NAMES_KEY, hideOtherNames ? "1" : "0");
+      } catch {
+        // Bỏ qua nếu trình duyệt chặn localStorage
+      }
+    });
+    lowFxChk.addEventListener("change", () => {
+      lowFx = lowFxChk.checked;
+      document.body.classList.toggle("low-fx", lowFx);
+      try {
+        localStorage.setItem(LOW_FX_KEY, lowFx ? "1" : "0");
+      } catch {
+        // Bỏ qua nếu trình duyệt chặn localStorage
+      }
+    });
+
     // Âm thanh
     bindTap("btn-mute", () => {
       const isMuted = sound.toggleMute();
@@ -595,6 +671,26 @@ export const ui = {
   updateMuteIcon(muted: boolean) {
     const icon = $("mute-icon");
     if (icon) icon.textContent = muted ? "🔇" : "🔊";
+    const muteChk = document.getElementById("set-mute") as HTMLInputElement | null;
+    if (muteChk) muteChk.checked = muted;
+  },
+
+  toggleSettingsModal(force?: boolean) {
+    settingsModalOpen = force ?? !settingsModalOpen;
+    $("settings-modal").hidden = !settingsModalOpen;
+    $("btn-settings").classList.toggle("active", settingsModalOpen);
+  },
+
+  isSettingsModalOpen() {
+    return settingsModalOpen;
+  },
+
+  isHideNames() {
+    return hideOtherNames;
+  },
+
+  isLowFx() {
+    return lowFx;
   },
 
   toggleInventory(force?: boolean) {
@@ -655,6 +751,10 @@ export const ui = {
     }
     if (mapModalOpen) {
       this.toggleMapModal(false);
+      closedAny = true;
+    }
+    if (settingsModalOpen) {
+      this.toggleSettingsModal(false);
       closedAny = true;
     }
     return closedAny;
