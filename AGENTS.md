@@ -20,6 +20,7 @@ Node 22 ở `~/.local/node/bin`. Nếu `npm` không có trong PATH thì thêm `e
 ```bash
 npm run dev          # server + client, cổng lấy từ .env.local
 npm run typecheck    # bắt buộc qua trước khi commit
+npm run format       # định dạng code bằng Prettier (CI kiểm bằng npx prettier --check .)
 npm run build        # build client vào client/dist
 ```
 
