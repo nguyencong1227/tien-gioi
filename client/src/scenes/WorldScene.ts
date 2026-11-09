@@ -163,10 +163,14 @@ export class WorldScene extends Phaser.Scene {
 
     const cam = this.cameras.main;
     cam.setBounds(0, 0, WORLD_W, WORLD_H);
-    const fitZoom = () =>
-      cam.setZoom(
-        Phaser.Math.Clamp(Math.min(this.scale.width, this.scale.height) / 640, 0.75, 1.3),
-      );
+    const fitZoom = () => {
+      const w = this.scale.width;
+      const h = this.scale.height;
+      // Chặn zoom thấp nhất để vùng nhìn (w / zoom <= 1900, h / zoom <= 1100) nằm gọn trong bán kính StateView (1100 px)
+      const minZoom = Math.max(0.75, w / 1900, h / 1100);
+      const baseZoom = Phaser.Math.Clamp(Math.min(w, h) / 640, 0.75, 1.3);
+      cam.setZoom(Math.max(baseZoom, minZoom));
+    };
     fitZoom();
     this.scale.on("resize", fitZoom);
 
@@ -547,7 +551,7 @@ export class WorldScene extends Phaser.Scene {
 
     const me = this.me();
     if (me) {
-      ui.hud(me, this.state.players.size);
+      ui.hud(me, this.state.online ?? this.state.players.size);
       const now = this.time.now;
       ui.cooldown("sk-slash", (this.nextSlash - now) / SKILLS.slash.cooldown);
       ui.cooldown("sk-sword", (this.nextSword - now) / SKILLS.sword.cooldown);
