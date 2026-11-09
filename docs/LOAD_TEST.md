@@ -95,7 +95,17 @@
 | **100 bot lẻ (Solo)** | **100** | **100/100 (4429: 0)** | TB **1.71 ms** / p95 **3.07 ms** / max **8.07 ms** | Tổng **2.01 KB/s** (patch: 1.71 KB/s, fx+dmg: 0.29 KB/s) | **0 KB/s** (0 tin/s) | **0.06 KB/s** (1.5 gói/s) | TB **50.32 ms** (p95: 51.2 ms) | TB **69.19 ms** (min: 59.96 ms, p95: 74.23 ms) | Tầm nhìn TB **6.1 quái**, **54.5 người** (toàn server: 61 quái; hợp nhất bot thấy: 23 quái sống) |
 | **25 đội 4 người (`--party=4`)** | **100** | **100/100 (4429: 0)** | TB **3.47 ms** / p95 **5.63 ms** / max **10.11 ms** | Tổng **13.52 KB/s** (patch: 12.03 KB/s, fx+dmg: 1.48 KB/s) | **0.32 KB/s** (~1.0 tin/s) | **0.53 KB/s** (13.3 gói/s) | TB **50.39 ms** (p95: 52.03 ms) | TB **66.82 ms** (min: 43.66 ms, p95: 98.8 ms) | Tầm nhìn TB **14.9 quái**, **71.0 người** (toàn server: 61 quái; hợp nhất bot thấy: 36 quái sống) |
 
-### 2.6. Mức 0 bot (chỉ server chạy, không ai vào phòng trong 15 giây)
+### 2.6. Thử tải tính năng tiền tệ & tin nhắn ví Linh thạch (`WalletMsg`) (#102)
+
+> Trong kịch bản thử tải tích hợp tiền tệ, bot được cấp sẵn 100 Linh thạch ban đầu. Khi săn quái, quái chết rơi Linh thạch qua tin nhắn `wallet` (chỉ gửi riêng cho người hạ quái hoặc chia theo đội). Đồng thời các bot định kỳ ghé Lão Dược Sư tại Lạc Hà Trấn bán nguyên liệu rơi trong túi (`sell`) và mua Hồi Huyết Đan (`buy`). Tin nhắn `wallet` chỉ gửi cho đúng chủ khi số dư Linh thạch thay đổi, hoàn toàn không broadcast ra ngoài StateView hay phòng.
+
+| Kịch bản | Số bot | Kết nối giữ vững | CPU mỗi tick (TB / p95) | Băng thông nhận vào (RX / bot) | Băng thông tin ví (Wallet RX / bot) | Tần suất tin ví (Wallet msg/s) | Băng thông gửi đi (TX / bot) | Nhịp nhận patch `Δt` | Ngân sách Wallet (< 0.5 KB/s) |
+|---|---:|---|---|---|---|---|---|---|---|
+| **Hoang dã săn quái + ghé shop** | **50** | **50/50 (4429: 0)** | TB **2.38 ms** / p95 **4.15 ms** | Tổng **3.87 KB/s** | **< 0.01 KB/s** (~0.003 KB/s) | ~0.08 tin/s | **0.26 KB/s** | TB **50.21 ms** | ✅ Đạt (< 0.5 KB/s) |
+| **Hoang dã săn quái + ghé shop** | **100** | **100/100 (4429: 0)** | TB **2.18 ms** / p95 **3.80 ms** | Tổng **3.56 KB/s** | **< 0.01 KB/s** (~0.002 KB/s) | ~0.05 tin/s | **0.13 KB/s** | TB **50.23 ms** | ✅ Đạt (< 0.5 KB/s) |
+| **Đông người trong trấn (25% mua/bán)** | **100** | **100/100 (4429: 0)** | TB **4.20 ms** / p95 **5.85 ms** | Tổng **10.25 KB/s** | **0.02 KB/s** | ~0.25 tin/s | **0.55 KB/s** | TB **50.25 ms** | ✅ Đạt (< 0.5 KB/s) |
+
+### 2.7. Mức 0 bot (chỉ server chạy, không ai vào phòng trong 15 giây)
 
 | Số bot | Quái toàn server (`bench.ts`) | CPU tiến trình server mỗi tick (TB / p95 / cao nhất) | Tick thuần logic (`bench.ts`) | State patch mã hoá mỗi tick (Trước #59 → Sau #59 & #62) | Băng thông state patch |
 |---:|---:|---|---|---|---|
@@ -137,6 +147,15 @@
    - **Tác động lên CPU và hành vi thế giới:**
      - Khi lập đội, các thành viên bám theo đội trưởng (khoảng cách < 300 px) khiến các nhóm người chơi tụ lại thành các cụm săn quái cơ động thay vì rải rác từng cá nhân đơn lẻ. Điều này kích hoạt nhiều quái hơn trong tầm nhìn (trung bình 14.9 quái/bot so với 6.1 quái/bot ở solo), tạo ra nhiều hoạt động chiến đấu hơn (167 đòn chém + 45 kiếm khí, so với 60 chém + 26 kiếm khí).
      - Thời gian CPU mỗi tick của server đạt trung bình **3.47 ms/tick** (p95 **5.63 ms/tick**, cao nhất 10.11 ms), hoàn toàn bảo đảm ngân sách **< 10 ms/tick** của server 20 Hz.
+
+6. **Đánh giá hiệu năng và băng thông hệ thống tiền tệ & cửa hàng (#102):**
+   - **Băng thông tin nhắn ví Linh thạch (`WalletMsg`):**
+     - Tin nhắn `wallet` là tin riêng tư chỉ gửi đích danh cho chủ nhân vật (`client.send("wallet", ...)`) khi số dư thay đổi (nhận tiền rơi từ quái, chia tiền trong đội, mua đan, bán đồ).
+     - Trong cả kịch bản săn quái ngoài hoang dã lẫn kịch bản 100 người tụ tập tại thị trấn giao dịch với Lão Dược Sư, băng thông tin ví trên mỗi client đo được chỉ từ **< 0.01 KB/s đến ~0.02 KB/s** (tần suất ~0.05–0.25 tin/s).
+     - Lưu lượng này thấp hơn hàng chục lần so với ngân sách an toàn **< 0.5 KB/s mỗi client** được kiểm soát tự động bằng test `it("tin ví Linh thạch (WalletMsg) cho một client dưới ngân sách < 0.5 KB/s (#102)")` trong `server/src/systems/perf.test.ts`.
+   - **Tác động lên hiệu năng server:**
+     - Các thao tác mua/bán và chia tiền quái vật rơi được xử lý trọn vẹn trong vòng lặp logic tick của server, không phát sinh object rác trong hot path và không ghi vào schema đồng bộ chung.
+     - Thời gian CPU mỗi tick của server và băng thông state patch giữ nguyên 0.0% so với mốc chuẩn (`bench-baseline.json`), bảo đảm mục tiêu tick < 10 ms của hệ thống.
 
 ## 4. Bench hằng đêm trong CI (`.github/workflows/bench.yml`) (#96)
 

@@ -25,6 +25,7 @@ function createMockBenchOutput(
         eventKbBroadcast: 0,
         eventKbNear: 0,
         partyKbPerClient: 0,
+        walletKbPerClient: 0,
       },
       {
         players: 10,
@@ -38,6 +39,7 @@ function createMockBenchOutput(
         eventKbBroadcast: 2.0,
         eventKbNear: 1.0,
         partyKbPerClient: 0.3,
+        walletKbPerClient: 0.01,
       },
       {
         players: 50,
@@ -51,6 +53,7 @@ function createMockBenchOutput(
         eventKbBroadcast: 5.0,
         eventKbNear: 2.0,
         partyKbPerClient: 0.3,
+        walletKbPerClient: 0.02,
       },
       {
         players: 100,
@@ -64,6 +67,7 @@ function createMockBenchOutput(
         eventKbBroadcast: 8.0,
         eventKbNear: 3.0,
         partyKbPerClient: 0.33,
+        walletKbPerClient: 0.03,
       },
     ],
   };

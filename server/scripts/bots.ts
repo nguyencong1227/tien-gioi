@@ -12,6 +12,8 @@ import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
 import { Client, Protocol, type Room } from "colyseus.js";
 import {
+  NPC_BY_ID,
+  NPC_RANGE,
   PICKUP_RANGE,
   PLAYER_RADIUS,
   REALMS,
@@ -21,18 +23,24 @@ import {
   TOWN_PX,
   WORLD_H,
   WORLD_W,
+  buyPrice,
   circleBlocked,
   dangerAt,
   inTown,
   moveWithCollision,
+  sellPrice,
   statsFor,
   type AttackMsg,
+  type BuyMsg,
   type InputMsg,
+  type InvMsg,
   type JoinOptions,
   type PartyInvitedMsg,
   type PartyMsg,
   type PickupMsg,
+  type SellMsg,
   type SkillMsg,
+  type WalletMsg,
 } from "@tien-gioi/shared";
 import { runBench } from "../src/perf/bench";
 import { hashSecret, type SavedPlayer } from "../src/store";
@@ -175,6 +183,7 @@ function seedBotSaveFile(
     realm,
     tier,
     exp: 0,
+    coin: 100,
     x: Math.round(x),
     y: Math.round(y),
     createdAt: now,
@@ -351,6 +360,12 @@ interface BotState {
   partyMsgsCount: number;
   partyBytes: number;
   myParty: PartyMsg | null;
+  walletMsgsCount: number;
+  walletBytes: number;
+  coin: number;
+  invSlots: ({ itemId: string; qty: number } | null)[];
+  nextShopCheckAt: number;
+  shopping: boolean;
   kicked4429: boolean;
   closedCode: number | null;
 }
@@ -386,6 +401,8 @@ export interface LoadTestMetrics {
   rxEventKBpsPerBot?: number;
   /** Băng thông riêng của tin nhắn tổ đội (party) mỗi giây trên mỗi bot (KB/s) */
   rxPartyKBpsPerBot?: number;
+  /** Băng thông riêng của tin nhắn ví Linh thạch (wallet) mỗi giây trên mỗi bot (KB/s) (#102) */
+  rxWalletKBpsPerBot?: number;
   txKBpsPerBot: number;
   rxMsgsPerSecPerBot: number;
   txMsgsPerSecPerBot: number;
@@ -409,6 +426,7 @@ export interface LoadTestMetrics {
   fxEventsReceivedPerBot?: number;
   dmgEventsReceivedPerBot: number;
   partyEventsReceivedPerBot?: number;
+  walletEventsReceivedPerBot?: number;
 }
 
 export interface IdleZeroBotMetrics {
@@ -622,6 +640,12 @@ async function runLoadTest(
       partyMsgsCount: 0,
       partyBytes: 0,
       myParty: null,
+      walletMsgsCount: 0,
+      walletBytes: 0,
+      coin: 100,
+      invSlots: [],
+      nextShopCheckAt: now + 3000 + Math.random() * 4000,
+      shopping: false,
       kicked4429: false,
       closedCode: null,
     };
@@ -642,9 +666,18 @@ async function runLoadTest(
       }
       b.myParty = msg;
     });
+    room.onMessage("wallet", (msg: WalletMsg) => {
+      if (measuring) {
+        b.walletMsgsCount++;
+        b.walletBytes += Buffer.byteLength(JSON.stringify(msg)) + 10;
+      }
+      b.coin = msg.coin;
+    });
     room.onMessage("chat", () => {});
     room.onMessage("toast", () => {});
-    room.onMessage("inv", () => {});
+    room.onMessage("inv", (msg: InvMsg) => {
+      b.invSlots = msg.slots ?? [];
+    });
     room.onMessage("quests", () => {});
     room.onMessage("dialog", () => {});
 
@@ -751,11 +784,44 @@ async function runLoadTest(
     let dx: number;
     let dy: number;
 
+    if (
+      mode !== "crowd" &&
+      !b.shopping &&
+      now >= b.nextShopCheckAt &&
+      b.index % 5 === 0 &&
+      (b.invSlots.some((s) => s && sellPrice(s.itemId) > 0) || b.coin >= buyPrice("hoi_huyet_dan"))
+    ) {
+      b.shopping = true;
+    }
+    if (!b.shopping && now >= b.nextShopCheckAt) {
+      b.nextShopCheckAt = now + 6000 + Math.random() * 4000;
+    }
+
     if (mode === "crowd") {
-      // Kịch bản đông người tụ trong trấn (#78):
-      // ~30% bot đứng yên (đả tọa, xem túi đồ, nói chuyện NPC), 70% đi lại ngẫu nhiên trong trấn.
-      // Không đánh quái, không nhặt đồ.
-      if (b.index % 3 === 0) {
+      // Kịch bản đông người tụ trong trấn (#78 & #102):
+      // ~25% bot định kỳ ghé Lão Dược Sư mua/bán (phát sinh tin wallet), ~25% đứng yên, 50% đi lại.
+      const duoc = NPC_BY_ID.duoc_su;
+      const distToDuoc = Math.hypot(duoc.x - b.predX, duoc.y - b.predY);
+      if (b.index % 4 === 0 && now >= b.nextShopCheckAt) {
+        if (distToDuoc > NPC_RANGE - 20) {
+          const a = Math.atan2(duoc.y - b.predY, duoc.x - b.predX);
+          dx = Math.cos(a);
+          dy = Math.sin(a);
+        } else {
+          dx = 0;
+          dy = 0;
+          for (let slot = 0; slot < b.invSlots.length; slot++) {
+            const it = b.invSlots[slot];
+            if (it && sellPrice(it.itemId) > 0) {
+              b.room.send("sell", { npcId: "duoc_su", slot, qty: it.qty });
+            }
+          }
+          if (b.coin >= buyPrice("hoi_huyet_dan")) {
+            b.room.send("buy", { npcId: "duoc_su", itemId: "hoi_huyet_dan", qty: 1 });
+          }
+          b.nextShopCheckAt = now + 6000 + Math.random() * 4000;
+        }
+      } else if (b.index % 3 === 0) {
         dx = 0;
         dy = 0;
       } else {
@@ -775,6 +841,29 @@ async function runLoadTest(
       // Đang vòng qua vật cản (cây/nước)
       dx = Math.cos(b.wanderAngle);
       dy = Math.sin(b.wanderAngle);
+    } else if (b.shopping) {
+      // Đang trên đường về Lão Dược Sư trong trấn để mua/bán (#102)
+      const duoc = NPC_BY_ID.duoc_su;
+      const distToDuoc = Math.hypot(duoc.x - b.predX, duoc.y - b.predY);
+      if (distToDuoc > NPC_RANGE - 20) {
+        const a = Math.atan2(duoc.y - b.predY, duoc.x - b.predX);
+        dx = Math.cos(a);
+        dy = Math.sin(a);
+      } else {
+        dx = 0;
+        dy = 0;
+        for (let slot = 0; slot < b.invSlots.length; slot++) {
+          const it = b.invSlots[slot];
+          if (it && sellPrice(it.itemId) > 0) {
+            b.room.send("sell", { npcId: "duoc_su", slot, qty: it.qty });
+          }
+        }
+        if (b.coin >= buyPrice("hoi_huyet_dan")) {
+          b.room.send("buy", { npcId: "duoc_su", itemId: "hoi_huyet_dan", qty: 1 });
+        }
+        b.shopping = false;
+        b.nextShopCheckAt = now + 12000 + Math.random() * 8000;
+      }
     } else if (inTown(b.predX, b.predY)) {
       dx = Math.cos(b.wanderAngle);
       dy = Math.sin(b.wanderAngle);
@@ -1018,6 +1107,10 @@ async function runLoadTest(
     b.txMsgs = 0;
     b.fxCount = 0;
     b.dmgCount = 0;
+    b.partyMsgsCount = 0;
+    b.partyBytes = 0;
+    b.walletMsgsCount = 0;
+    b.walletBytes = 0;
     b.lastPatchAt = performance.now();
   }
   patchIntervals.length = 0;
@@ -1082,6 +1175,8 @@ async function runLoadTest(
   const totalDmgEvents = bots.reduce((s, b) => s + b.dmgCount, 0);
   const totalPartyMsgs = bots.reduce((s, b) => s + b.partyMsgsCount, 0);
   const totalPartyBytes = bots.reduce((s, b) => s + b.partyBytes, 0);
+  const totalWalletMsgs = bots.reduce((s, b) => s + b.walletMsgsCount, 0);
+  const totalWalletBytes = bots.reduce((s, b) => s + b.walletBytes, 0);
 
   const expectedTicks = actualDurationSec * (1000 / TICK_MS);
   const serverCpuMsPerTickAvg =
@@ -1164,6 +1259,8 @@ async function runLoadTest(
     partySize: partySize > 1 ? partySize : undefined,
     partyEventsReceivedPerBot: Number((totalPartyMsgs / botCount / actualDurationSec).toFixed(1)),
     rxPartyKBpsPerBot: Number((totalPartyBytes / botCount / actualDurationSec / 1024).toFixed(2)),
+    walletEventsReceivedPerBot: Number((totalWalletMsgs / botCount / actualDurationSec).toFixed(2)),
+    rxWalletKBpsPerBot: Number((totalWalletBytes / botCount / actualDurationSec / 1024).toFixed(3)),
   };
 
   printMetrics(metrics);
@@ -1223,6 +1320,11 @@ function printMetrics(m: LoadTestMetrics) {
   if (m.partySize && m.partySize > 1) {
     console.log(
       `- Hoạt động tổ đội (${Math.ceil(m.botCount / m.partySize)} đội ${m.partySize} người): nhận ~${m.partyEventsReceivedPerBot ?? 0} tin party/s mỗi bot (~${m.rxPartyKBpsPerBot ?? 0} KB/s)`,
+    );
+  }
+  if (m.walletEventsReceivedPerBot !== undefined && m.walletEventsReceivedPerBot > 0) {
+    console.log(
+      `- Giao dịch ví Linh thạch: nhận ~${m.walletEventsReceivedPerBot} tin wallet/s mỗi bot (~${m.rxWalletKBpsPerBot ?? 0} KB/s)`,
     );
   }
 }

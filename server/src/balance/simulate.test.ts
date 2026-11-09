@@ -5,6 +5,9 @@ import {
   MONSTERS,
   MONSTER_BY_ID,
   PARTY_MAX,
+  TRADE_BY_ID,
+  DROP_TABLES,
+  buyPrice,
   expToNext,
   killExp,
   meditateExpPerSec,
@@ -142,10 +145,14 @@ describe("kinh tế Linh thạch (mô hình, #102)", () => {
   });
 
   it("đổi nguyên liệu lấy đan rẻ hơn mua đan bằng tiền (tính theo số quái cần diệt để có 1 đan)", () => {
-    // 5 lông thỏ đổi 1 đan; lông rơi 50% số lượng 1..2 (kỳ vọng 0.75 lông/con) -> ~6.67 thỏ
-    const killsToTrade = 5 / (0.5 * 1.5);
-    // Mua đan: 24 LT; thỏ cho expectedTotalCoin("tho") LT/con -> kills = 24 / total
-    const killsToBuy = 24 / expectedTotalCoin("tho");
+    const trade = TRADE_BY_ID["doi_hoi_huyet"]!;
+    const tradeItem = trade.give[0]!;
+    const drop = DROP_TABLES.tho!.find((d) => d.itemId === tradeItem.itemId)!;
+    const avgMaterial = drop.chance * ((drop.min + drop.max) / 2);
+    const killsToTrade = tradeItem.qty / avgMaterial;
+
+    const potionPrice = buyPrice(trade.get.itemId);
+    const killsToBuy = potionPrice / expectedTotalCoin("tho");
     expect(killsToTrade).toBeLessThan(killsToBuy);
   });
 });

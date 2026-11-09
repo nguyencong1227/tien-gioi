@@ -60,6 +60,8 @@ export interface BenchResult {
   eventKbNear: number;
   /** Tin nhắn tổ đội (độ dài JSON + 4 byte khung): KB/giây mỗi client nhận (đội 4 người, snapshot mỗi giây) */
   partyKbPerClient: number;
+  /** Tin nhắn ví Linh thạch (độ dài JSON + 4 byte khung): KB/giây mỗi client nhận (chỉ gửi khi số dư đổi) (#102) */
+  walletKbPerClient: number;
 }
 
 /**
@@ -85,6 +87,7 @@ export function runBench(
     let evBroadcast = 0;
     let evNear = 0;
     let partyBytes = 0;
+    let walletBytes = 0;
     const emit = (type: string, x: number, y: number, extra: number, msg: object) => {
       const size = JSON.stringify(msg).length + type.length + 4;
       evBroadcast += size * players;
@@ -103,7 +106,9 @@ export function runBench(
         partyBytes += JSON.stringify(msg).length + 5 + 4; // "party".length = 5
       },
       partyInvited: () => {},
-      wallet: () => {},
+      wallet: (_sid, msg) => {
+        walletBytes += JSON.stringify(msg).length + 6 + 4; // "wallet".length = 6
+      },
       chatTo: () => {},
     });
     w.now = 0;
@@ -265,6 +270,7 @@ export function runBench(
       eventKbBroadcast: players > 0 ? evBroadcast / players / seconds / 1024 : 0,
       eventKbNear: players > 0 ? evNear / players / seconds / 1024 : 0,
       partyKbPerClient: players > 0 ? partyBytes / players / seconds / 1024 : 0,
+      walletKbPerClient: players > 0 ? walletBytes / players / seconds / 1024 : 0,
     };
   } finally {
     Math.random = realRandom;
@@ -287,15 +293,15 @@ if (process.argv[1]?.endsWith("bench.ts")) {
     `Mô phỏng ${seconds} giây chơi (${seconds * 20} tick), đo tick + mã hóa patch, ca ${mode === "crowd" ? "đông người tụ trong trấn" : "săn quái ngoài hoang dã"}\n`,
   );
   console.log(
-    "| Người chơi | Quái | Tick TB (ms) | p95 (ms) | Max (ms) | Patch TB (byte) | KB/s mỗi client | fx+dmg cả phòng (KB/s) | fx+dmg vùng nhìn (KB/s) | Party (KB/s) |",
+    "| Người chơi | Quái | Tick TB (ms) | p95 (ms) | Max (ms) | Patch TB (byte) | KB/s mỗi client | fx+dmg cả phòng (KB/s) | fx+dmg vùng nhìn (KB/s) | Party (KB/s) | Wallet (KB/s) |",
   );
-  console.log("|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
+  console.log("|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
   const results: BenchResult[] = [];
   for (const n of counts) {
     const r = runBench(n, seconds, 1, mode);
     results.push(r);
     console.log(
-      `| ${n} | ${r.monsters} | ${r.avgMs.toFixed(3)} | ${r.p95Ms.toFixed(3)} | ${r.maxMs.toFixed(2)} | ${Math.round(r.patchBytes)} | ${r.kbPerSecPerClient.toFixed(1)} | ${r.eventKbBroadcast.toFixed(1)} | ${r.eventKbNear.toFixed(1)} | ${r.partyKbPerClient.toFixed(2)} |`,
+      `| ${n} | ${r.monsters} | ${r.avgMs.toFixed(3)} | ${r.p95Ms.toFixed(3)} | ${r.maxMs.toFixed(2)} | ${Math.round(r.patchBytes)} | ${r.kbPerSecPerClient.toFixed(1)} | ${r.eventKbBroadcast.toFixed(1)} | ${r.eventKbNear.toFixed(1)} | ${r.partyKbPerClient.toFixed(2)} | ${r.walletKbPerClient.toFixed(2)} |`,
     );
   }
 

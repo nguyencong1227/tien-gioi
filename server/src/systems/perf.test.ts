@@ -350,4 +350,12 @@ describe("ngân sách băng thông và CPU (benchmark có seed, kết quả cố
     expect(r.partyKbPerClient).toBeGreaterThan(0.1);
     expect(r.partyKbPerClient).toBeLessThan(1.0);
   });
+
+  it("tin ví Linh thạch (WalletMsg) cho một client dưới ngân sách < 0.5 KB/s (#102)", () => {
+    const r = runBench(100, 10);
+    // Tin wallet chỉ gửi cho đúng chủ khi hạ quái rơi tiền hoặc mua bán tại NPC.
+    // Băng thông rất nhỏ, giữ ngân sách < 0.5 KB/s mỗi client.
+    expect(r.walletKbPerClient).toBeDefined();
+    expect(r.walletKbPerClient).toBeLessThan(0.5);
+  });
 });
