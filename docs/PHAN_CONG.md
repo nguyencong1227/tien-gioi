@@ -199,5 +199,5 @@ Từ Sprint 3, **Dev C** nhận: CI kiểm định dạng (≈ 0.5 ngày), thử
 Khối lượng của Dev B ở Sprint 1 nhiều hơn một chút vì phải thay toàn bộ asset. Nếu trễ, Dev A nhận phần "thông báo nhận đồ" và "thanh dùng nhanh".
 
 ## Sau M2
-- **M3:** tổ đội, tông môn, tiền tệ và cửa hàng, PK có điều kiện, nhiều bản đồ, bí cảnh.
+- **M3:** tổ đội, tông môn, tiền tệ và cửa hàng, PK có điều kiện, nhiều bản đồ, bí cảnh. Bản đề xuất phân công: [`PHAN_CONG_M3.md`](PHAN_CONG_M3.md).
 - **M4:** tài khoản thật, PostgreSQL, deploy, đóng gói app Android/iOS bằng Capacitor.
