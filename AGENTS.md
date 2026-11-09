@@ -63,6 +63,7 @@ Vẫn dùng TypeScript; tối ưu thuật toán và dữ liệu gửi đi ngay k
 - **Đo trước và sau:** `npm run bench -w server` mô phỏng 0 / 10 / 50 / 100 người chơi trong `World` thật (có seed, kết quả cố định), in thời gian tick và byte patch mỗi client. Dán bảng trước / sau vào PR khi đụng vòng lặp tick hoặc state.
 - **Ngân sách** (test trong `server/src/systems/perf.test.ts` giữ, CI đỏ nếu vượt): tick < 10 ms; không ai chơi thì patch = 0 byte; 100 người < 520 byte/tick **mỗi client** (đo theo StateView của từng client).
 - Ca xấu nhất của vùng nhìn là đông người tụ trong trấn (ai cũng thấy nhau): `npm run bench -w server -- --crowd`. Hiện ~25 KB/s mỗi client ở 100 người (issue #80 đang hạ); đừng chỉ đo ca săn quái rải khắp bản đồ.
+- **Vị trí người chơi:** `Player.x`, `Player.y` là vị trí thật (float, mô phỏng và đối chiếu dự đoán) và **chỉ gửi cho chủ** (`@view(TAG_OWNER)`). Người khác nhận `px`, `py` (số nguyên, ~10 Hz, `syncPublicPos`); client vẽ người khác theo `px`, `py`. Dịch chuyển tức thời (vào phòng, hồi sinh) phải gọi `syncPublicPos(p)`. Đừng đọc `x`, `y` của người khác ở client.
 - **Băng thông quan trọng hơn CPU:** mỗi trường state đổi là một patch gửi cho *mọi client đang thấy thực thể đó* (xem `interest`), 20 lần/giây.
   - Không ghi vào state mỗi tick những giá trị chỉ nhích số lẻ: cộng dồn trong dữ liệu riêng của server (`PlayerCtrl` / `MonsterCtrl`) rồi ghi phần nguyên (`takeWhole`) hoặc ghi định kỳ.
   - Thứ không ai nhìn thấy thì không cập nhật (quái "ngủ" khi không có người chơi trong `MONSTER_WAKE_DIST`).

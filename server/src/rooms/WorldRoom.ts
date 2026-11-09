@@ -34,7 +34,7 @@ import {
 import { WorldState, Player } from "../schema";
 import { loadPlayer, savePlayer, hashSecret, cleanName, type SavedPlayer } from "../store";
 import { World, type PlayerCtrl } from "../world";
-import { queueInput, safeSpot } from "../systems/movement";
+import { POS_SYNC_EVERY_TICKS, queueInput, safeSpot, syncPublicPos } from "../systems/movement";
 import { slash, swordQi } from "../systems/combat";
 import { spawnInitial, topUpMonsters, forgetTarget } from "../systems/monsters";
 import { applyStats, breakthrough, setMeditating } from "../systems/progression";
@@ -204,6 +204,7 @@ export class WorldRoom extends Room<WorldState> {
     const spot = safeSpot(save.x, save.y);
     p.x = spot.x;
     p.y = spot.y;
+    syncPublicPos(p); // người khác thấy ngay chỗ vào, không phải (0, 0)
     setEquipment(p, sanitizeEquipment(save.equipment)); // trước applyStats: chỉ số gồm trang bị
     applyStats(p, true);
     this.state.players.set(client.sessionId, p);
@@ -211,6 +212,7 @@ export class WorldRoom extends Room<WorldState> {
       save,
       inputs: [],
       moveBudget: 4,
+      posPhase: this.world.ctrl.size % POS_SYNC_EVERY_TICKS,
       nextSlash: 0,
       nextSword: 0,
       nextBreak: 0,
