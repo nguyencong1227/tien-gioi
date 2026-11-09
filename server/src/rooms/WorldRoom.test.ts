@@ -691,10 +691,15 @@ describe("vùng nhìn (StateView)", () => {
     // chờ server xử lý vị trí mới của "far" (đã ra ngoài vùng nhìn) rồi mới chém
     await waitFor(() => !players(near.room).has(far.room.sessionId));
     a.room.send("attack", { angle: 0 });
-    await waitFor(() => nearGot.some((m) => m.kind === "slash" && m.by === a.room.sessionId));
-    expect(aGot.some((m) => m.kind === "slash")).toBe(true); // chính mình vẫn nhận
+    // Hai gói đi hai socket khác nhau nên có thể về lệch thứ tự: chờ cả hai thay vì kiểm ngay
+    const slashOfA = (m: { kind: string; by: string }) =>
+      m.kind === "slash" && m.by === a.room.sessionId;
+    await waitFor(() => nearGot.some(slashOfA));
+    await waitFor(() => aGot.some(slashOfA)); // chính mình vẫn nhận
     await sleep(200);
-    expect(farGot).toEqual([]); // người ở xa không nhận gì
+    // Các test dùng chung một phòng thế giới: quái có thể đánh người đứng ở góc bản đồ và gửi fx của chính nó,
+    // nên chỉ kiểm tin do `a` gây ra (không dùng toEqual([]) trên mọi tin)
+    expect(farGot.filter((m) => m.by === a.room.sessionId)).toEqual([]);
   });
 });
 
