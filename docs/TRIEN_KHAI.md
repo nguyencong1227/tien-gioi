@@ -7,7 +7,7 @@ Tài liệu này hướng dẫn cài đặt và vận hành máy chủ Tiên Gi�
 ## 1. Yêu cầu hệ thống
 
 - **Hệ điều hành:** Linux (Ubuntu 22.04 LTS / Debian 12 khuyến nghị) hoặc macOS.
-- **Node.js:** Phiên bản 22.x LTS (xem file [.nvmrc](file:///.nvmrc)).
+- **Node.js:** Phiên bản 22.x LTS (xem file [.nvmrc](../.nvmrc)).
 - **Công cụ:** `tar` (sao lưu dữ liệu), `npm`.
 - **Cổng mạng:** Cổng HTTP/WebSocket của game server (mặc định production: `2567`).
 
@@ -31,11 +31,15 @@ npm run build
 ### Bước 3: Chạy server production
 > **Lưu ý về cấu hình:** File `.env.local` chỉ dùng khi phát triển trên máy dev (để chia cổng riêng cho Dev A, B, C) và **không** được commit. Trên production, cấu hình hoàn toàn qua **biến môi trường**:
 
-| Biến môi trường | Ý nghĩa | Mặc định |
+| Biến môi trường | Ý nghĩa | Bắt buộc / Mặc định |
 |---|---|---|
-| `NODE_ENV` | Môi trường chạy | `production` |
-| `PORT` | Cổng HTTP / WebSocket mà server lắng nghe | `2567` |
-| `DATA_DIR` | Thư mục lưu trữ dữ liệu nhân vật (`*.json`) | `server/data/players` |
+| `NODE_ENV` | Môi trường chạy | **Bắt buộc: `production`** |
+| `PORT` | Cổng HTTP / WebSocket mà server lắng nghe | Mặc định: `2567` |
+| `DATA_DIR` | Thư mục lưu trữ dữ liệu nhân vật (`*.json`) | Mặc định: `server/data/players` |
+
+> [!CAUTION]
+> **Bắt buộc phải đặt `NODE_ENV=production` khi mở cho người chơi thật:**
+> Lệnh chat quản trị `/give` (tự cấp mọi loại đan dược, vũ khí, pháp bảo thử nghiệm) chỉ bị vô hiệu hoá khi `NODE_ENV === "production"` đúng chữ (`server/src/systems/inventory.ts`). Nếu quên đặt biến này, bất kỳ người chơi nào cũng có thể gõ `/give` để tự nhận vật phẩm cấp cao.
 
 Chạy ứng dụng:
 ```bash
@@ -52,7 +56,7 @@ npm start
 ## 3. Reverse Proxy & HTTPS (Khuyến nghị Caddy)
 
 ### Vì sao bắt buộc cần HTTPS?
-1. **PWA (Progressive Web App):** Service Worker ([client/public/sw.js](file:///client/public/sw.js)) và Web App Manifest chỉ hoạt động trên kết nối an toàn `https://` (hoặc `localhost`).
+1. **PWA (Progressive Web App):** Service Worker ([client/public/sw.js](../client/public/sw.js)) và Web App Manifest chỉ hoạt động trên kết nối an toàn `https://` (hoặc `localhost`).
 2. **WebSocket bảo mật (`wss://`):** Tránh bị nhà mạng hoặc firewall chặn kết nối WebSocket không mã hoá (`ws://`).
 
 ### Cấu hình bằng Caddy (Tự động cấp chứng chỉ SSL Let's Encrypt)
@@ -101,7 +105,7 @@ Thư mục `DATA_DIR` (mặc định `server/data/players`) lưu trữ toàn b�
 - Tiến độ nhiệm vụ (sổ nhiệm vụ, nhiệm vụ hàng ngày).
 
 ### 6.2. Tạo bản sao lưu (`npm run backup`)
-Tiên Giới có sẵn kịch bản sao lưu nén bằng `tar` và tự động dọn dẹp các bản cũ:
+Tiên Giới có sẵn kịch bản sao lưu nén bằng `tar` và tự động dọn dẹp các bản cũ theo chính sách giữ lại `keep` bản mới nhất:
 ```bash
 # Nén dữ liệu vào thư mục backups/ (mặc định giữ 14 bản mới nhất)
 npm run backup -w server
@@ -112,9 +116,22 @@ npm run backup -w server -- --keep=30 --dir=/var/lib/tien-gioi/players --out=/mn
 
 File nén được tạo theo định dạng: `backups/players-YYYYMMDD-HHMMSS.tar.gz`.
 
+> [!NOTE]
+> **Sao lưu an toàn khi server đang chạy:**
+> Tiến trình server ghi dữ liệu nhân vật theo cơ chế **nguyên tử** (`writeFile` vào file tạm `.json.tmp` rồi mới đổi tên `rename` đè lên file `.json` trong `server/src/store.ts`). Vì vậy lệnh `tar` không bao giờ gặp tình trạng file bị cắt ngang hay đọc dở dang, có thể sao lưu định kỳ mà không cần dừng máy chủ. Nếu file `.json.tmp` có bị nén vào bản sao lưu thì cũng hoàn toàn vô hại vì server chỉ nạp các file kết thúc bằng `.json`.
+
 **Thiết lập Cron tự động sao lưu hàng ngày (03:00 sáng):**
+> [!IMPORTANT]
+> Luôn truyền biến môi trường `DATA_DIR` hoặc cờ `--dir=` chỉ đúng vào thư mục dữ liệu thật của server production. Nếu thư mục không tồn tại, script sẽ lập tức báo lỗi và dừng (không tạo file rỗng).
+
 ```cron
-0 3 * * * cd /opt/tien-gioi && npm run backup -w server >> /var/log/tien-gioi-backup.log 2>&1
+# Chú ý: trỏ đúng DATA_DIR nơi server đang lưu dữ liệu
+0 3 * * * cd /opt/tien-gioi && DATA_DIR=/var/lib/tien-gioi/players npm run backup -w server -- --out=/mnt/backups >> /var/log/tien-gioi-backup.log 2>&1
+```
+
+*Sau khi thiết lập cron hoặc chạy lần đầu, hãy kiểm tra danh sách file bên trong bản nén bằng lệnh:*
+```bash
+tar -tzf /mnt/backups/players-*.tar.gz | head -n 10
 ```
 
 ### 6.3. Khôi phục dữ liệu từ bản sao lưu
@@ -123,12 +140,21 @@ Khi cần khôi phục lại dữ liệu nhân vật:
    ```bash
    kill -TERM <server_pid>
    ```
-2. Giải nén bản sao lưu vào thư mục `DATA_DIR`:
+2. Đổi tên thư mục dữ liệu hiện tại để dự phòng (tránh giải nén chồng đè khiến file rác cũ vẫn sót lại):
    ```bash
-   # Giả sử DATA_DIR là server/data/players
-   tar -xzf backups/players-20261110-020000.tar.gz -C server/data/
+   mv /var/lib/tien-gioi/players /var/lib/tien-gioi/players.cu
    ```
-3. Khởi động lại server:
+3. Giải nén bản sao lưu vào thư mục cha:
+   ```bash
+   # Bản sao lưu chứa thư mục 'players/', nên giải nén vào thư mục cha /var/lib/tien-gioi/
+   tar -xzf /mnt/backups/players-20261110-020000.tar.gz -C /var/lib/tien-gioi/
+   ```
+4. Kiểm tra danh sách file sau khi giải nén:
+   ```bash
+   ls -la /var/lib/tien-gioi/players/
+   ```
+5. Khởi động lại server:
    ```bash
    npm start
    ```
+6. Sau khi xác nhận mọi nhân vật đăng nhập bình thường, có thể xoá thư mục dự phòng `players.cu`.
