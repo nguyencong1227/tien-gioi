@@ -160,6 +160,16 @@ describe("ngân sách băng thông và CPU (benchmark có seed, kết quả cố
     expect(r.avgMs).toBeLessThan(10);
   });
 
+  it("ca đông người tụ trong trấn (#80): giữ mức hiện tại, chưa đạt mục tiêu < 520 byte/tick", () => {
+    const r = runBench(100, 10, 1, "crowd");
+    // Đo lúc viết (#80): ~1267 byte/tick mỗi client (≈ 24.7 KB/s) khi 100 người tụ trong trấn, 70% thời gian đi lại.
+    // Vùng nhìn không cắt được gì vì ai cũng thấy nhau. Gần nửa số byte là quái quanh trấn thức dậy đi lang thang
+    // (~30 quái đổi x, y mỗi tick); phần còn lại là x, y của người. Test này CHỈ giữ không tệ thêm; khi #80 hạ được
+    // thì hạ ngưỡng xuống, đích là < 520 như ngân sách chung.
+    expect(r.patchBytes).toBeLessThan(1600);
+    expect(r.avgMs).toBeLessThan(10);
+  });
+
   it("fx / dmg chỉ gửi cho người trong vùng nhìn: ít hơn một nửa so với broadcast cả phòng", () => {
     const r = runBench(100, 10);
     // Đo lúc viết: ~7.7 KB/s mỗi client nếu broadcast, ~2.3 KB/s khi cắt theo vùng nhìn (ước lượng bằng JSON).
