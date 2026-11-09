@@ -34,7 +34,7 @@ npm run build        # build client vào client/dist
   - `game.ts`: hằng số, quái, kiểu tin nhắn.
   - `map.ts`: bản đồ sinh theo seed, va chạm.
 - `server/src/rooms/WorldRoom.ts`: chỉ lo vào/ra phòng, lưu nhân vật, nối tin nhắn với system, vòng lặp 20 tick/giây.
-- `server/src/systems/`: logic game, mỗi file một mảng: `movement`, `combat`, `monsters`, `progression`, `chat`, `inventory` (túi đồ, đan dược, lệnh `/give` khi không chạy production), `loot` (rơi đồ, nhặt, vứt đồ), `quests` (tiến độ nhiệm vụ cập nhật từ sự kiện), `npc` (nói chuyện, nhận / trả nhiệm vụ, đổi đồ), `interest` (vùng nhìn: mỗi client chỉ nhận state của thực thể ở gần, bằng `StateView`).
+- `server/src/systems/`: logic game, mỗi file một mảng: `movement`, `combat`, `monsters`, `progression`, `chat`, `inventory` (túi đồ, đan dược, lệnh `/give` khi không chạy production), `loot` (rơi đồ, nhặt, vứt đồ), `quests` (tiến độ nhiệm vụ cập nhật từ sự kiện), `npc` (nói chuyện, nhận / trả nhiệm vụ, đổi đồ), `wallet` (ví Linh thạch: mọi thay đổi số dư đi qua `changeCoin` / `trySpendCoin` / `splitCoin`), `shop` (mua / bán với NPC bán hàng, trọn vẹn hoặc không gì cả), `interest` (vùng nhìn: mỗi client chỉ nhận state của thực thể ở gần, bằng `StateView`).
   - Các system nhận `World` (`server/src/world.ts`: state, dữ liệu riêng của người chơi/quái, `events` để gửi tin), không đụng tới Colyseus `Room`. Tính năng mới thì thêm system mới.
 - `server/src/schema.ts` là state đồng bộ, `store.ts` lưu nhân vật dạng JSON ở `server/data/players/`.
 - Test:
@@ -51,7 +51,8 @@ npm run build        # build client vào client/dist
   - Kiểm tra kiểu, giá trị hữu hạn, khoảng cách, hồi chiêu cho mọi tin nhắn.
   - Đăng ký tin nhắn mới bằng `this.on(...)` trong `WorldRoom` (có giới hạn tần suất, `server/src/rate-limit.ts`), không gọi thẳng `onMessage`.
   - Tra bảng `*_BY_ID` bằng id đến từ client / file lưu thì dùng `byId(TABLE, id)` (`server/src/systems/lookup.ts`): `TABLE["constructor"]` không phải `undefined`.
-  - Dữ liệu riêng (túi đồ, nhiệm vụ) không đưa vào state chung, chỉ gửi cho chủ.
+  - Dữ liệu riêng (túi đồ, nhiệm vụ, Linh thạch) không đưa vào state chung, chỉ gửi cho chủ.
+  - Số liệu từ file lưu cũng không tin: nạp qua hàm kẹp / làm sạch (`addCoin`, `sanitizeInventory`...), không gán thẳng.
 - **Đổi `shared/`:** làm PR riêng, chỉ sửa `shared/`, một dev khác review trước khi các bên code tiếp.
 - **Phiên bản đã ghim:** Colyseus 0.16, `@colyseus/schema` 3, `colyseus.js` 0.16, Phaser 3.90, TypeScript 5.9.
   - Không tự nâng major. Các bản mới (Colyseus 0.18, Phaser 4, TS 7) đổi API.
@@ -61,6 +62,7 @@ npm run build        # build client vào client/dist
 ## Hiệu năng (làm tới đâu tối ưu tới đó)
 Vẫn dùng TypeScript; tối ưu thuật toán và dữ liệu gửi đi ngay khi viết, đo bằng số chứ không đoán.
 - **Đo trước và sau:** `npm run bench -w server` mô phỏng 0 / 10 / 50 / 100 người chơi trong `World` thật (có seed, kết quả cố định), in thời gian tick và byte patch mỗi client. Dán bảng trước / sau vào PR khi đụng vòng lặp tick hoặc state.
+  - Bench hằng đêm (`.github/workflows/bench.yml`, #97) so với mốc `server/src/perf/bench-baseline.json` và đỏ nếu byte/tick ở 100 người tăng quá 15%. PR nào đổi byte/tick có chủ ý thì cập nhật mốc cùng PR. Bench có seed nên **nhạy với số lần gọi `Math.random` trong mô phỏng**: thêm tính năng gọi `Math.random` trong luồng tick (vd rơi tiền, #99) làm quỹ đạo đổi và số byte nhích dù không đổi gì về state; ghi rõ trong PR và cập nhật mốc.
 - **Ngân sách** (test trong `server/src/systems/perf.test.ts` giữ, CI đỏ nếu vượt): tick < 10 ms; không ai chơi thì patch = 0 byte; 100 người < 520 byte/tick **mỗi client** (đo theo StateView của từng client).
 - Ca xấu nhất của vùng nhìn là đông người tụ trong trấn (ai cũng thấy nhau): `npm run bench -w server -- --crowd`. Hiện ~9.5 KB/s mỗi client ở 100 người (484 byte/tick; trước #80 là ~25 KB/s), `perf.test.ts` giữ ngưỡng < 600; đừng chỉ đo ca săn quái rải khắp bản đồ.
 - **Vị trí người chơi:** `Player.x`, `Player.y` là vị trí thật (float, mô phỏng và đối chiếu dự đoán) và **chỉ gửi cho chủ** (`@view(TAG_OWNER)`). Người khác nhận `px`, `py` (số nguyên, ~10 Hz, `syncPublicPos`); client vẽ người khác theo `px`, `py`. Dịch chuyển tức thời (vào phòng, hồi sinh) phải gọi `syncPublicPos(p)`. Đừng đọc `x`, `y` của người khác ở client.
