@@ -38,70 +38,72 @@
     </section>
 
     <div id="ui" hidden>
-      <div id="hud" class="panel">
-        <div class="row"><b id="hud-name"></b><span id="hud-realm"></span></div>
-        <div class="bar hp"><i id="hp-fill"></i><span id="hp-text"></span></div>
-        <div class="bar mp"><i id="mp-fill"></i><span id="mp-text"></span></div>
-        <div class="bar exp"><i id="exp-fill"></i><span id="exp-text"></span></div>
-        <div class="hud-foot">
-          <div id="hud-online"></div>
-          <div class="hud-btns">
-            <button
-              type="button"
-              id="btn-char"
-              class="hud-btn"
-              title="Bảng nhân vật & Trang bị (C)"
-            >
-              <span>身</span><small>Nhân vật</small>
-            </button>
-            <button type="button" id="btn-bag" class="hud-btn" title="Túi đồ (I)">
-              <span>袋</span><small>Túi</small>
-            </button>
-            <button type="button" id="btn-quest" class="hud-btn" title="Sổ nhiệm vụ (Q)">
-              <span>卷</span><small>Nhiệm vụ</small>
-            </button>
-            <button
-              type="button"
-              id="btn-mute"
-              class="hud-btn icon-only"
-              title="Bật/tắt âm thanh (N)"
-            >
-              <span id="mute-icon">🔊</span>
-            </button>
-            <button type="button" id="btn-settings" class="hud-btn icon-only" title="Cài đặt (O)">
-              <span>⚙</span>
-            </button>
+      <div id="hud-col-left">
+        <div id="hud" class="panel">
+          <div class="row"><b id="hud-name"></b><span id="hud-realm"></span></div>
+          <div class="bar hp"><i id="hp-fill"></i><span id="hp-text"></span></div>
+          <div class="bar mp"><i id="mp-fill"></i><span id="mp-text"></span></div>
+          <div class="bar exp"><i id="exp-fill"></i><span id="exp-text"></span></div>
+          <div class="hud-foot">
+            <div id="hud-online"></div>
+            <div class="hud-btns">
+              <button
+                type="button"
+                id="btn-char"
+                class="hud-btn"
+                title="Bảng nhân vật & Trang bị (C)"
+              >
+                <span>身</span><small>Nhân vật</small>
+              </button>
+              <button type="button" id="btn-bag" class="hud-btn" title="Túi đồ (I)">
+                <span>袋</span><small>Túi</small>
+              </button>
+              <button type="button" id="btn-quest" class="hud-btn" title="Sổ nhiệm vụ (Q)">
+                <span>卷</span><small>Nhiệm vụ</small>
+              </button>
+              <button
+                type="button"
+                id="btn-mute"
+                class="hud-btn icon-only"
+                title="Bật/tắt âm thanh (N)"
+              >
+                <span id="mute-icon">🔊</span>
+              </button>
+              <button type="button" id="btn-settings" class="hud-btn icon-only" title="Cài đặt (O)">
+                <span>⚙</span>
+              </button>
+            </div>
           </div>
         </div>
+
+        <aside id="party-panel" class="panel" hidden aria-label="Tổ đội">
+          <div class="party-head">
+            <div class="party-head-left">
+              <button
+                type="button"
+                id="party-btn-toggle"
+                class="party-btn-toggle"
+                title="Thu gọn / Mở rộng"
+              >
+                ▾
+              </button>
+              <b id="party-title">Tổ đội (0/4)</b>
+            </div>
+            <button type="button" id="party-btn-leave" class="party-btn-leave" title="Rời tổ đội">
+              Rời
+            </button>
+          </div>
+          <div id="party-members" class="party-members"></div>
+        </aside>
+
+        <aside id="quest-tracker" class="panel" aria-label="Theo dõi nhiệm vụ">
+          <div class="qt-head">
+            <b>Nhiệm vụ</b>
+            <small>Chạm để chỉ đường</small>
+          </div>
+          <div id="quest-tracker-list"></div>
+        </aside>
       </div>
-
-      <aside id="party-panel" class="panel" hidden aria-label="Tổ đội">
-        <div class="party-head">
-          <div class="party-head-left">
-            <button
-              type="button"
-              id="party-btn-toggle"
-              class="party-btn-toggle"
-              title="Thu gọn / Mở rộng"
-            >
-              ▾
-            </button>
-            <b id="party-title">Tổ đội (0/4)</b>
-          </div>
-          <button type="button" id="party-btn-leave" class="party-btn-leave" title="Rời tổ đội">
-            Rời
-          </button>
-        </div>
-        <div id="party-members" class="party-members"></div>
-      </aside>
-
-      <aside id="quest-tracker" class="panel" aria-label="Theo dõi nhiệm vụ">
-        <div class="qt-head">
-          <b>Nhiệm vụ</b>
-          <small>Chạm để chỉ đường</small>
-        </div>
-        <div id="quest-tracker-list"></div>
-      </aside>
 
       <div id="minimap-wrap" class="panel" title="Bản đồ thế giới (M)">
         <canvas id="minimap" width="120" height="120"></canvas>

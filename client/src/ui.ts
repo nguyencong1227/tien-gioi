@@ -1190,7 +1190,9 @@ export const ui = {
         $("party-panel").classList.add("collapsed");
         $("party-btn-toggle").textContent = "▸";
       }
-    } catch {}
+    } catch {
+      /* localStorage bị chặn (chế độ riêng tư): bỏ qua */
+    }
     bindTap("party-btn-leave", () => callbacks?.onPartyLeave?.());
     bindTap("party-btn-toggle", () => {
       const panel = $("party-panel");
@@ -1200,7 +1202,9 @@ export const ui = {
       btn.textContent = isCollapsed ? "▸" : "▾";
       try {
         localStorage.setItem("tg_party_collapsed", isCollapsed ? "1" : "0");
-      } catch {}
+      } catch {
+        /* localStorage bị chặn (chế độ riêng tư): bỏ qua */
+      }
     });
     bindTap("pib-btn-accept", () => {
       stopInviteTimer();
