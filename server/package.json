@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
-    "can-bang": "tsx src/balance/can-bang.ts"
+    "can-bang": "tsx src/balance/can-bang.ts",
+    "bots": "tsx scripts/bots.ts"
   },
   "dependencies": {
     "@colyseus/schema": "3.0.76",
