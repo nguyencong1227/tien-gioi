@@ -255,6 +255,23 @@ class SoundEngine {
 
   // ---------------- Hiệu ứng âm thanh (SFX) ----------------
 
+  /** Tiếng búa nện đe sắt khi rèn trang bị */
+  forge() {
+    if (!this.ready() || !this.ctx || !this.sfxGain) return;
+    const now = this.ctx.currentTime;
+    this.playPluck(320, now, 0.12, "triangle", this.sfxGain, 0.35);
+    this.playPluck(640, now + 0.04, 0.28, "sine", this.sfxGain, 0.32);
+    this.playPluck(960, now + 0.1, 0.42, "sine", this.sfxGain, 0.38);
+  }
+
+  /** Tiếng mặc / tháo trang bị */
+  equip() {
+    if (!this.ready() || !this.ctx || !this.sfxGain) return;
+    const now = this.ctx.currentTime;
+    this.playPluck(440, now, 0.14, "triangle", this.sfxGain, 0.28);
+    this.playPluck(659.25, now + 0.05, 0.22, "sine", this.sfxGain, 0.3);
+  }
+
   /** Tiếng vung kiếm chém */
   slash() {
     if (!this.ready() || !this.ctx || !this.sfxGain) return;

@@ -464,6 +464,48 @@ function drawItemIcon(id) {
     s.tri(12, 5, 6, 11, 18, 11, 0xb3262a);
     s.tri(12, 18, 6, 11, 18, 11, 0x8f1d21);
     s.circle(12, 11, 2, 0xffd966);
+  } else if (id === "lang_nha_kiem" || id === "hac_ho_kiem" || id === "xich_mang_kiem") {
+    // Vũ khí: Bảo kiếm 3 bậc
+    const blade = id === "lang_nha_kiem" ? 0xdce6ef : id === "hac_ho_kiem" ? 0x564b40 : 0xe04838;
+    const edge = id === "lang_nha_kiem" ? 0xffffff : id === "hac_ho_kiem" ? 0xe8a838 : 0xffd34d;
+    const hilt = id === "lang_nha_kiem" ? 0x7a6548 : id === "hac_ho_kiem" ? 0x2b221b : 0x781818;
+    // Lưỡi kiếm chéo từ góc dưới-trái lên trên-phải
+    s.line(7, 17, 19, 5, blade, 3.2);
+    s.line(8, 16, 19, 5, edge, 1.3);
+    // Chắn kiếm (kiếm cách)
+    s.line(6, 12, 12, 18, edge, 2.2);
+    // Chuôi kiếm + quả cầu đầu chuôi
+    s.line(4, 20, 8, 16, hilt, 2.4);
+    s.circle(4, 20, 1.8, edge);
+  } else if (id === "tho_nhung_bao" || id === "hac_ho_bao" || id === "xich_lan_bao") {
+    // Pháp bào 3 bậc
+    const robe = id === "tho_nhung_bao" ? 0xe9e1cf : id === "hac_ho_bao" ? 0x3a3028 : 0xa32a22;
+    const trim = id === "tho_nhung_bao" ? 0x4ba368 : id === "hac_ho_bao" ? 0xe8a838 : 0xffd34d;
+    // Tay áo xòe
+    s.tri(12, 5, 3, 14, 9, 17, robe);
+    s.tri(12, 5, 21, 14, 15, 17, robe);
+    // Thân áo
+    s.tri(12, 4, 6, 20, 18, 20, robe);
+    // Cổ áo chữ Y + đai lưng
+    s.line(9, 5, 12, 12, trim, 1.8);
+    s.line(15, 5, 12, 12, trim, 1.8);
+    s.rect(8, 12, 8, 2, trim);
+    s.rect(11, 13, 2, 7, trim);
+  } else if (id === "lang_nha_phu" || id === "ho_hon_phu" || id === "mang_dam_phu") {
+    // Hộ phù / Linh phù 3 bậc
+    const body = id === "lang_nha_phu" ? 0x9c9585 : id === "ho_hon_phu" ? 0x6b5a44 : 0xc0392b;
+    const rune = id === "lang_nha_phu" ? 0x9fd0ea : id === "ho_hon_phu" ? 0xffd34d : 0xffb23f;
+    // Dây treo đỏ
+    s.line(12, 2, 12, 6, 0xa31d1d, 1.5);
+    // Thân ngọc phù bát giác / chữ nhật
+    s.rect(7, 5, 10, 13, rune);
+    s.rect(8, 6, 8, 11, body);
+    // Linh văn ở giữa
+    s.line(12, 8, 12, 15, rune, 1.5);
+    s.circle(12, 11, 2, rune);
+    // Tua rua bên dưới
+    s.line(10, 18, 9, 21, 0xa31d1d, 1.2);
+    s.line(14, 18, 15, 21, 0xa31d1d, 1.2);
   }
   return s;
 }
@@ -571,6 +613,9 @@ function buildAtlas() {
   const personas = [
     { key: "me", robe: 0xf0ece1, trim: 0x2b6e8f, hair: 0x1f1a17 },
     { key: "other", robe: 0x566c85, trim: 0xc9a24a, hair: 0x1f1a17 },
+    { key: "robe-tho_nhung_bao", robe: 0xf4efe2, trim: 0x4ba368, hair: 0x1f1a17 },
+    { key: "robe-hac_ho_bao", robe: 0x352c24, trim: 0xe8a838, hair: 0x1f1a17 },
+    { key: "robe-xich_lan_bao", robe: 0x9e2420, trim: 0xffd34d, hair: 0x1f1a17 },
   ];
   const dirs = ["down", "up", "left", "right"];
 
@@ -611,6 +656,15 @@ function buildAtlas() {
     "nanh_soi",
     "da_ho",
     "vay_mang",
+    "lang_nha_kiem",
+    "tho_nhung_bao",
+    "lang_nha_phu",
+    "hac_ho_kiem",
+    "hac_ho_bao",
+    "ho_hon_phu",
+    "xich_mang_kiem",
+    "xich_lan_bao",
+    "mang_dam_phu",
   ];
   for (const id of itemIds) {
     const icon = drawItemIcon(id);
@@ -621,9 +675,9 @@ function buildAtlas() {
   push("swordbeam", drawSwordBeam());
   push("dot", drawDot());
 
-  // Sắp xếp shelf packing gọn vào atlas 512x512
-  const W = 512;
-  const H = 512;
+  // Sắp xếp shelf packing gọn vào atlas 640x640
+  const W = 640;
+  const H = 640;
   const atlas = new Surface(W, H);
   const frames = {};
   let cx = 2;

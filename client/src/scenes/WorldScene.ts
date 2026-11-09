@@ -47,6 +47,10 @@ interface Entity {
   bar: Phaser.GameObjects.Graphics;
   label?: Phaser.GameObjects.Text;
   aura?: Phaser.GameObjects.Ellipse;
+  talismanRing?: Phaser.GameObjects.Arc;
+  weaponVisual?: Phaser.GameObjects.Graphics;
+  animPrefix?: string;
+  lastEquipKey?: string;
   tx: number; // vị trí đích (từ server) để nội suy
   ty: number;
   lastLabel?: string;
@@ -159,15 +163,22 @@ export class WorldScene extends Phaser.Scene {
 
     const cam = this.cameras.main;
     cam.setBounds(0, 0, WORLD_W, WORLD_H);
-    const fitZoom = () =>
-      cam.setZoom(
-        Phaser.Math.Clamp(Math.min(this.scale.width, this.scale.height) / 640, 0.75, 1.3),
-      );
+    const fitZoom = () => {
+      const w = this.scale.width;
+      const h = this.scale.height;
+      // Chặn zoom thấp nhất để vùng nhìn (w / zoom <= 1900, h / zoom <= 1100) nằm gọn trong bán kính StateView (1100 px)
+      const minZoom = Math.max(0.75, w / 1900, h / 1100);
+      const baseZoom = Phaser.Math.Clamp(Math.min(w, h) / 640, 0.75, 1.3);
+      cam.setZoom(Math.max(baseZoom, minZoom));
+    };
     fitZoom();
     this.scale.on("resize", fitZoom);
 
     ui.init({
       onUse: (slot) => this.room.send("useItem", { slot }),
+      onEquip: (slot) => this.room.send("equip", { slot }),
+      onUnequip: (slot) => this.room.send("unequip", { slot }),
+      onCraft: (recipeId) => this.room.send("craft", { recipeId }),
       onDrop: (slot, qty) =>
         this.room.send("dropItem", qty !== undefined ? { slot, qty } : { slot }),
       onPickup: () => this.pickupNearest(),
@@ -289,7 +300,7 @@ export class WorldScene extends Phaser.Scene {
   private setupInput() {
     // enableCapture = false: để còn gõ được chữ vào ô chat
     this.keys = this.input.keyboard!.addKeys(
-      "W,A,S,D,UP,DOWN,LEFT,RIGHT,J,K,L,B,I,Q,M,N,O,F,ONE,TWO,ESC,SPACE,ENTER",
+      "W,A,S,D,UP,DOWN,LEFT,RIGHT,J,K,L,B,C,I,Q,M,N,O,F,ONE,TWO,ESC,SPACE,ENTER",
       false,
     ) as any;
     const typing = () => document.activeElement instanceof HTMLInputElement;
@@ -300,6 +311,7 @@ export class WorldScene extends Phaser.Scene {
     kb.on("keydown-K", () => !typing() && this.sword());
     kb.on("keydown-L", () => !typing() && this.toggleMeditate());
     kb.on("keydown-B", () => !typing() && this.room.send("breakthrough"));
+    kb.on("keydown-C", () => !typing() && ui.toggleCharModal());
     kb.on("keydown-I", () => !typing() && ui.toggleInventory());
     kb.on("keydown-Q", () => !typing() && ui.toggleQuestModal());
     kb.on("keydown-M", () => !typing() && ui.toggleMapModal());
@@ -319,6 +331,8 @@ export class WorldScene extends Phaser.Scene {
       if (
         p.wasTouch ||
         !p.leftButtonDown() ||
+        ui.isCharModalOpen() ||
+        ui.isForgeModalOpen() ||
         ui.isInventoryOpen() ||
         ui.isQuestModalOpen() ||
         ui.isMapModalOpen() ||
@@ -385,6 +399,12 @@ export class WorldScene extends Phaser.Scene {
     return this.state?.players?.get(this.sid);
   }
 
+  private weaponColorFor(p: any, fallback: number): number {
+    const wId = p?.weapon ?? "";
+    if (!wId) return fallback;
+    return ITEM_BY_ID[wId]?.color ?? fallback;
+  }
+
   private slash(angle?: number) {
     const me = this.me();
     if (!me || me.dead || this.time.now < this.nextSlash) return;
@@ -395,7 +415,7 @@ export class WorldScene extends Phaser.Scene {
     if (myEntity) myEntity.slashUntil = this.time.now + 220;
     this.room.send("attack", { angle: a });
     sound.slash();
-    this.fxSlash(this.predX, this.predY, a, 0xffffff);
+    this.fxSlash(this.predX, this.predY, a, this.weaponColorFor(me, 0xffffff));
   }
 
   private sword() {
@@ -409,7 +429,7 @@ export class WorldScene extends Phaser.Scene {
     if (myEntity) myEntity.slashUntil = this.time.now + 220;
     this.room.send("skill", { id: "sword", angle: a });
     sound.sword();
-    this.fxSword(this.predX, this.predY, a, SKILLS.sword.range);
+    this.fxSword(this.predX, this.predY, a, SKILLS.sword.range, this.weaponColorFor(me, 0xffffff));
   }
 
   private toggleMeditate() {
@@ -475,7 +495,7 @@ export class WorldScene extends Phaser.Scene {
       return;
     }
     this.pending = this.pending.filter((i) => i.seq > me.lastSeq);
-    const speed = statsFor(me.realm, me.tier).speed * (TICK_MS / 1000);
+    const speed = statsFor(me.realm, me.tier, me).speed * (TICK_MS / 1000);
     let x = me.x,
       y = me.y;
     for (const i of this.pending)
@@ -499,7 +519,7 @@ export class WorldScene extends Phaser.Scene {
     const msg: InputMsg = { seq: ++this.seq, dx, dy };
     this.room.send("input", msg);
     this.pending.push(msg);
-    const speed = statsFor(me.realm, me.tier).speed * (TICK_MS / 1000);
+    const speed = statsFor(me.realm, me.tier, me).speed * (TICK_MS / 1000);
     ({ x: this.predX, y: this.predY } = moveWithCollision(
       this.predX,
       this.predY,
@@ -531,7 +551,7 @@ export class WorldScene extends Phaser.Scene {
 
     const me = this.me();
     if (me) {
-      ui.hud(me, this.state.players.size);
+      ui.hud(me, this.state.online ?? this.state.players.size);
       const now = this.time.now;
       ui.cooldown("sk-slash", (this.nextSlash - now) / SKILLS.slash.cooldown);
       ui.cooldown("sk-sword", (this.nextSword - now) / SKILLS.sword.cooldown);
@@ -579,6 +599,7 @@ export class WorldScene extends Phaser.Scene {
       ui.talkPrompt(npcDef ? `Nói chuyện · ${npcDef.name} (F)` : "Nói chuyện (F)");
     } else {
       ui.talkPrompt(null);
+      if (ui.isForgeModalOpen()) ui.toggleForgeModal(false);
     }
   }
 
@@ -908,12 +929,73 @@ export class WorldScene extends Phaser.Scene {
     const dir = dirFromAngle(angle);
     const slashing = (e.slashUntil ?? 0) > this.time.now;
     const mode = slashing ? "slash" : isMoving ? "walk" : "idle";
-    const animKey = `${who}-${mode}-${dir}`;
+    const prefix = e.animPrefix ?? who;
+    const animKey = `${prefix}-${mode}-${dir}`;
     if (this.anims.exists(animKey)) {
       if (e.sprite.anims.currentAnim?.key !== animKey) e.sprite.play(animKey, true);
       e.sprite.setFlipX(false);
     } else {
       e.sprite.setFlipX(Math.cos(angle) < 0);
+    }
+  }
+
+  /**
+   * Cập nhật ngoại hình nhân vật theo trang bị (weapon / robe / talisman).
+   * Chỉ chạy khi khóa trang bị đổi để tránh vẽ lại mỗi frame.
+   */
+  private applyPlayerEquip(e: Entity, p: any, isMe: boolean) {
+    const who = isMe ? "me" : "other";
+    const weapon = p.weapon ?? "";
+    const robe = p.robe ?? "";
+    const talisman = p.talisman ?? "";
+    const equipKey = `${weapon}|${robe}|${talisman}`;
+    if (e.lastEquipKey === equipKey) return;
+    e.lastEquipKey = equipKey;
+
+    // 1. Pháp bào: ưu tiên bộ frame vẽ sẵn trong atlas (robe-<id>), không có thì nhuộm màu
+    const robePrefix = robe ? `robe-${robe}` : "";
+    if (robePrefix && this.anims.exists(`${robePrefix}-idle-down`)) {
+      e.animPrefix = robePrefix;
+      e.sprite.clearTint();
+    } else {
+      e.animPrefix = who;
+      const robeDef = robe ? ITEM_BY_ID[robe] : undefined;
+      if (robeDef) e.sprite.setTint(robeDef.color);
+      else e.sprite.clearTint();
+    }
+
+    // 2. Vũ khí: vẽ thanh kiếm đeo sau lưng theo màu kiếm đang trang bị
+    if (e.weaponVisual) {
+      e.weaponVisual.clear();
+      const wDef = weapon ? ITEM_BY_ID[weapon] : undefined;
+      if (wDef) {
+        const bladeCol = wDef.color;
+        const hiltCol = RARITY_COLORS[wDef.rarity] ?? 0xd8b868;
+        e.weaponVisual.lineStyle(3, 0x1d1a16, 0.95);
+        e.weaponVisual.strokeLineShape(new Phaser.Geom.Line(-11, -26, 9, -2));
+        e.weaponVisual.lineStyle(2, bladeCol, 1);
+        e.weaponVisual.strokeLineShape(new Phaser.Geom.Line(-10, -25, 8, -3));
+        e.weaponVisual.lineStyle(2, hiltCol, 1);
+        e.weaponVisual.strokeLineShape(new Phaser.Geom.Line(-13, -21, -6, -27));
+        e.weaponVisual.fillStyle(hiltCol, 1);
+        e.weaponVisual.fillCircle(-12, -27, 2);
+        e.weaponVisual.setVisible(true);
+      } else {
+        e.weaponVisual.setVisible(false);
+      }
+    }
+
+    // 3. Hộ phù: vòng hào quang nhỏ mang màu của hộ phù
+    if (e.talismanRing) {
+      const tDef = talisman ? ITEM_BY_ID[talisman] : undefined;
+      if (tDef) {
+        e.talismanRing
+          .setFillStyle(tDef.color, 0.14)
+          .setStrokeStyle(1.6, tDef.color, 0.8)
+          .setVisible(!ui.isLowFx());
+      } else {
+        e.talismanRing.setVisible(false);
+      }
     }
   }
 
@@ -929,6 +1011,7 @@ export class WorldScene extends Phaser.Scene {
         if (isMe) this.cameras.main.startFollow(e.root, true, 0.2, 0.2);
         this.players.set(id, e);
       }
+      this.applyPlayerEquip(e, p, isMe);
       if (isMe) {
         // Bám sát vị trí đoán trước; làm mượt các lần chỉnh nhỏ từ server
         const kk = 1 - Math.exp(-30 * (deltaMs / 1000));
@@ -951,6 +1034,10 @@ export class WorldScene extends Phaser.Scene {
       e.root.setDepth(e.root.y);
       e.root.setAlpha(p.dead ? 0.35 : 1);
       e.aura!.setVisible(p.meditating && !ui.isLowFx());
+      if (e.talismanRing) {
+        const hasTalisman = Boolean(p.talisman && ITEM_BY_ID[p.talisman]);
+        e.talismanRing.setVisible(hasTalisman && !ui.isLowFx());
+      }
       const label = `${p.name}\n${realmLabel(p.realm, p.tier)}`;
       if (label !== e.lastLabel) {
         e.label!.setText(label);
@@ -1136,6 +1223,20 @@ export class WorldScene extends Phaser.Scene {
         repeat: -1,
         duration: 900,
       });
+      e.talismanRing = this.add
+        .circle(0, 4, 18, 0xffe08a, 0.14)
+        .setStrokeStyle(1.6, 0xffe08a, 0.8)
+        .setVisible(false);
+      this.tweens.add({
+        targets: e.talismanRing,
+        scaleX: 1.15,
+        scaleY: 1.15,
+        alpha: 0.45,
+        yoyo: true,
+        repeat: -1,
+        duration: 1100,
+      });
+      e.weaponVisual = this.add.graphics().setVisible(false);
       e.label = this.add
         .text(0, -54, "", {
           fontFamily: '"Noto Serif", Georgia, serif',
@@ -1147,7 +1248,7 @@ export class WorldScene extends Phaser.Scene {
           lineSpacing: -2,
         })
         .setOrigin(0.5, 1);
-      root.add([e.aura, sprite, bar, e.label]);
+      root.add([e.aura, e.talismanRing, e.weaponVisual, sprite, bar, e.label]);
     } else {
       root.add([sprite, bar]);
     }
@@ -1176,12 +1277,14 @@ export class WorldScene extends Phaser.Scene {
       case "slash": {
         const other = this.players.get(m.by);
         if (other) other.slashUntil = this.time.now + 220;
-        return this.fxSlash(m.x, m.y, m.angle, 0xdfe8f0);
+        const attacker = this.state?.players?.get(m.by);
+        return this.fxSlash(m.x, m.y, m.angle, this.weaponColorFor(attacker, 0xdfe8f0));
       }
       case "sword": {
         const other = this.players.get(m.by);
         if (other) other.slashUntil = this.time.now + 220;
-        return this.fxSword(m.x, m.y, m.angle, m.range);
+        const attacker = this.state?.players?.get(m.by);
+        return this.fxSword(m.x, m.y, m.angle, m.range, this.weaponColorFor(attacker, 0xffffff));
       }
       case "mslash":
         return this.fxSlash(m.x, m.y, m.angle, 0xff6050, 0.6);
@@ -1213,12 +1316,13 @@ export class WorldScene extends Phaser.Scene {
     });
   }
 
-  private fxSword(x: number, y: number, angle: number, range: number) {
+  private fxSword(x: number, y: number, angle: number, range: number, tint = 0xffffff) {
     const s = this.add
       .image(x, y - 10, "swordbeam")
       .setRotation(angle)
       .setDepth(WORLD_H)
       .setBlendMode(Phaser.BlendModes.ADD);
+    if (tint !== 0xffffff) s.setTint(tint);
     this.tweens.add({
       targets: s,
       x: x + Math.cos(angle) * range,

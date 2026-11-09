@@ -5,10 +5,18 @@ import {
   ITEM_BY_ID,
   RARITY_COLORS,
   RARITY_NAMES,
+  EQUIP_SLOTS,
+  EQUIP_SLOT_NAMES,
+  emptyEquipment,
+  equipBonus,
+  RECIPES,
   QUEST_BY_ID,
   NPC_BY_ID,
   MONSTER_BY_ID,
   emptyInventory,
+  countItem,
+  statsFor,
+  canEquip,
   realmLabel,
   isLastTier,
   isPeak,
@@ -19,6 +27,9 @@ import {
   type InvMsg,
   type Inventory,
   type ItemDef,
+  type Equipment,
+  type EquipSlot,
+  type EquipStats,
   type QuestsMsg,
   type QuestProgress,
   type QuestDef,
@@ -42,10 +53,16 @@ export interface HudPlayer {
   expMax: number;
   meditating: boolean;
   dead: boolean;
+  weapon?: string;
+  robe?: string;
+  talisman?: string;
 }
 
 export interface UiCallbacks {
   onUse: (slot: number) => void;
+  onEquip: (slot: number) => void;
+  onUnequip: (slot: EquipSlot) => void;
+  onCraft: (recipeId: string) => void;
   onDrop: (slot: number, qty?: number) => void;
   onPickup: () => void;
   onTalk: () => void;
@@ -70,6 +87,11 @@ let invSlots: Inventory = emptyInventory();
 const itemCdUntil = new Map<string, number>();
 let selectedSlot = 0;
 let invOpen = false;
+let charModalOpen = false;
+let forgeModalOpen = false;
+let forgeNpcId = "tho_ren";
+let lastForgedItemId: string | null = null;
+let previewEquipItemId: string | null = null;
 let questModalOpen = false;
 let mapModalOpen = false;
 let settingsModalOpen = false;
@@ -77,8 +99,10 @@ let hideOtherNames = false;
 let lowFx = false;
 let questTab: "active" | "done" = "active";
 let trackingQuestId: string | null = null;
+let currentName = "";
 let currentRealm = 0;
 let currentTier = 0;
+let currentEquip: Equipment = emptyEquipment();
 let questLog: QuestsMsg = { active: [], done: [], dailyDone: [] };
 
 function loadSettings() {
@@ -143,14 +167,76 @@ function resolveQuickItems(): [string, string] {
   return [q1, q2];
 }
 
+/** Chuỗi tóm tắt chỉ số cộng thêm của một món trang bị. */
+function describeEquipStats(stats: EquipStats): string {
+  const parts: string[] = [];
+  if (stats.atk) parts.push(`+${stats.atk} Công`);
+  if (stats.hp) parts.push(`+${stats.hp} Khí huyết`);
+  if (stats.mp) parts.push(`+${stats.mp} Linh lực`);
+  if (stats.speed) parts.push(`+${stats.speed} Tốc độ`);
+  return parts.join(" · ") || "Không cộng chỉ số";
+}
+
+/** Điền so sánh statsFor khi mặc thử món `candidate` so với trang bị hiện tại vào phần tử DOM. */
+function fillEquipComparison(box: HTMLElement, candidate: ItemDef) {
+  box.replaceChildren();
+  const eq = candidate.equip;
+  if (!eq) {
+    box.hidden = true;
+    return;
+  }
+  box.hidden = false;
+
+  const nowStats = statsFor(currentRealm, currentTier, currentEquip);
+  const nextEquip: Equipment = { ...currentEquip, [eq.slot]: candidate.id };
+  const nextStats = statsFor(currentRealm, currentTier, nextEquip);
+
+  const diffs: Array<{ label: string; d: number }> = [
+    { label: "Công", d: nextStats.atk - nowStats.atk },
+    { label: "Khí huyết", d: nextStats.maxHp - nowStats.maxHp },
+    { label: "Linh lực", d: nextStats.maxMp - nowStats.maxMp },
+    { label: "Tốc độ", d: nextStats.speed - nowStats.speed },
+  ];
+
+  const slotTag = document.createElement("span");
+  slotTag.textContent = `[${EQUIP_SLOT_NAMES[eq.slot]}]`;
+  slotTag.style.opacity = "0.8";
+  box.append(slotTag);
+
+  let anyDiff = false;
+  for (const { label, d } of diffs) {
+    if (d === 0) continue;
+    anyDiff = true;
+    const chip = document.createElement("span");
+    chip.className = `cmp-chip ${d > 0 ? "cmp-up" : "cmp-down"}`;
+    chip.textContent = `${label} ${d > 0 ? `+${d}` : `${d}`}`;
+    box.append(chip);
+  }
+  if (!anyDiff) {
+    const same = document.createElement("span");
+    same.className = "cmp-eq";
+    same.textContent = "Chỉ số ngang bằng món đang mặc";
+    box.append(same);
+  }
+
+  const reqSpan = document.createElement("span");
+  const reqText = realmLabel(eq.reqRealm, eq.reqTier);
+  const ok = canEquip(candidate.id, currentRealm, currentTier);
+  reqSpan.className = ok ? "req-ok" : "req-warn";
+  reqSpan.textContent = ok ? `Đủ cảnh giới (${reqText})` : `Cần ${reqText}`;
+  box.append(reqSpan);
+}
+
 function renderSlotDetail() {
   const s = invSlots[selectedSlot];
   const def = s ? ITEM_BY_ID[s.itemId] : undefined;
   const nameEl = $("inv-item-name");
   const rarityEl = $("inv-item-rarity");
   const descEl = $("inv-item-desc");
+  const cmpEl = $("inv-equip-cmp");
   const actionsEl = $("inv-actions");
   const useBtn = $("inv-btn-use") as HTMLButtonElement;
+  const equipBtn = $("inv-btn-equip") as HTMLButtonElement;
   const drop1Btn = $("inv-btn-drop1") as HTMLButtonElement;
 
   if (!s || !def) {
@@ -159,17 +245,31 @@ function renderSlotDetail() {
     rarityEl.textContent = "";
     rarityEl.style.color = "";
     descEl.textContent = "Chạm hoặc rê chuột vào một ô có vật phẩm để xem mô tả, dùng hoặc vứt.";
+    cmpEl.hidden = true;
     actionsEl.hidden = true;
     return;
   }
 
   const rColor = hexColor(RARITY_COLORS[def.rarity]);
-  nameEl.textContent = `${def.name} (×${s.qty})`;
+  nameEl.textContent = s.qty > 1 ? `${def.name} (×${s.qty})` : def.name;
   nameEl.style.color = rColor;
   rarityEl.textContent = RARITY_NAMES[def.rarity];
   rarityEl.style.color = rColor;
   const cdSec = def.cooldown ? ` · Hồi chiêu ${Math.round(def.cooldown / 1000)}s` : "";
-  descEl.textContent = `${def.desc}${cdSec}`;
+  const eqStatsText = def.equip ? ` · ${describeEquipStats(def.equip.stats)}` : "";
+  descEl.textContent = `${def.desc}${eqStatsText}${cdSec}`;
+
+  if (def.type === "equip" && def.equip) {
+    fillEquipComparison(cmpEl, def);
+    equipBtn.hidden = false;
+    const ok = canEquip(def.id, currentRealm, currentTier);
+    equipBtn.disabled = !ok;
+    equipBtn.textContent = ok ? "Mặc" : `Cần ${realmLabel(def.equip.reqRealm, def.equip.reqTier)}`;
+  } else {
+    cmpEl.hidden = true;
+    equipBtn.hidden = true;
+  }
+
   actionsEl.hidden = false;
   useBtn.hidden = !def.effect;
   drop1Btn.hidden = s.qty <= 1;
@@ -200,6 +300,8 @@ function renderInventory() {
   $("inv-count").textContent = `${used} / ${INVENTORY_SLOTS} ô`;
   renderSlotDetail();
   renderQuickbar();
+  if (charModalOpen) renderCharModal();
+  if (forgeModalOpen) renderForgeModal();
 }
 
 function renderQuickbar() {
@@ -434,6 +536,346 @@ function renderQuestModal() {
   }
 }
 
+// ---------- Bảng nhân vật & Trang bị (Phím C - #31) ----------
+
+function renderCharModal() {
+  const slotsBox = $("char-equip-slots");
+  slotsBox.replaceChildren();
+
+  for (const slot of EQUIP_SLOTS) {
+    const itemId = currentEquip[slot] || "";
+    const def = itemId ? ITEM_BY_ID[itemId] : undefined;
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `equip-slot-card${def ? " filled" : ""}`;
+    if (def) {
+      btn.style.borderColor = hexColor(RARITY_COLORS[def.rarity]);
+    }
+
+    const slotLabel = document.createElement("span");
+    slotLabel.className = "slot-label";
+    slotLabel.textContent = EQUIP_SLOT_NAMES[slot];
+
+    const icon = document.createElement("i");
+    icon.className = "slot-icon";
+    applyItemVisual(icon, def);
+
+    const itemName = document.createElement("span");
+    itemName.className = "slot-item-name";
+    if (def) {
+      itemName.textContent = def.name;
+      itemName.style.color = hexColor(RARITY_COLORS[def.rarity]);
+    } else {
+      itemName.textContent = "Trống";
+      itemName.style.opacity = "0.5";
+    }
+
+    const hint = document.createElement("span");
+    hint.className = "slot-hint";
+    hint.textContent = def?.equip
+      ? `${describeEquipStats(def.equip.stats)} · Chạm tháo`
+      : "Chưa trang bị";
+
+    btn.append(slotLabel, icon, itemName, hint);
+    if (def) {
+      btn.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        sound.equip();
+        callbacks?.onUnequip(slot);
+      });
+    }
+    slotsBox.append(btn);
+  }
+
+  // Bảng chỉ số tổng hợp tính từ statsFor(realm, tier, equipment)
+  const statsBox = $("char-stats");
+  statsBox.replaceChildren();
+
+  const curStats = statsFor(currentRealm, currentTier, currentEquip);
+  const bonus = equipBonus(currentEquip);
+
+  const previewDef = previewEquipItemId ? ITEM_BY_ID[previewEquipItemId] : undefined;
+  const previewStats = previewDef?.equip
+    ? statsFor(currentRealm, currentTier, {
+        ...currentEquip,
+        [previewDef.equip.slot]: previewDef.id,
+      })
+    : null;
+
+  const headerRow = document.createElement("div");
+  headerRow.className = "stat-row full";
+  const hLeft = document.createElement("b");
+  hLeft.textContent = currentName || "Đạo hữu";
+  hLeft.style.color = "#ffe08a";
+  const hRight = document.createElement("span");
+  hRight.textContent = realmLabel(currentRealm, currentTier);
+  headerRow.append(hLeft, hRight);
+  statsBox.append(headerRow);
+
+  const statItems: Array<{
+    label: string;
+    val: number;
+    add: number;
+    nextVal: number | null;
+    unit?: string;
+  }> = [
+    {
+      label: "Khí huyết tối đa",
+      val: curStats.maxHp,
+      add: bonus.hp,
+      nextVal: previewStats ? previewStats.maxHp : null,
+    },
+    {
+      label: "Linh lực tối đa",
+      val: curStats.maxMp,
+      add: bonus.mp,
+      nextVal: previewStats ? previewStats.maxMp : null,
+    },
+    {
+      label: "Công kích",
+      val: curStats.atk,
+      add: bonus.atk,
+      nextVal: previewStats ? previewStats.atk : null,
+    },
+    {
+      label: "Tốc độ di chuyển",
+      val: curStats.speed,
+      add: bonus.speed,
+      nextVal: previewStats ? previewStats.speed : null,
+      unit: " px/s",
+    },
+  ];
+
+  for (const st of statItems) {
+    const row = document.createElement("div");
+    row.className = "stat-row";
+
+    const lbl = document.createElement("span");
+    lbl.className = "stat-label";
+    lbl.textContent = st.label;
+
+    const valWrap = document.createElement("span");
+    valWrap.className = "stat-val";
+    valWrap.textContent = `${st.val}${st.unit ?? ""}`;
+
+    if (st.add > 0) {
+      const bSpan = document.createElement("small");
+      bSpan.className = "stat-bonus";
+      bSpan.textContent = `(+${st.add})`;
+      valWrap.append(bSpan);
+    }
+
+    if (st.nextVal !== null) {
+      const diff = st.nextVal - st.val;
+      if (diff !== 0) {
+        const dSpan = document.createElement("span");
+        dSpan.className = `stat-diff ${diff > 0 ? "up" : "down"}`;
+        dSpan.textContent = diff > 0 ? `▲+${diff}` : `▼${diff}`;
+        valWrap.append(dSpan);
+      }
+    }
+
+    row.append(lbl, valWrap);
+    statsBox.append(row);
+  }
+
+  // Danh sách trang bị trong túi để so sánh & mặc một chạm
+  const bagList = $("char-bag-equips");
+  bagList.replaceChildren();
+
+  let countEquips = 0;
+  for (let i = 0; i < INVENTORY_SLOTS; i++) {
+    const s = invSlots[i];
+    if (!s) continue;
+    const def = ITEM_BY_ID[s.itemId];
+    if (!def || def.type !== "equip" || !def.equip) continue;
+    countEquips++;
+
+    const eq = def.equip;
+    const row = document.createElement("div");
+    row.className = `char-bag-item${previewEquipItemId === def.id ? " previewing" : ""}`;
+
+    const left = document.createElement("div");
+    left.className = "char-bag-left";
+
+    const icon = document.createElement("i");
+    icon.className = "slot-icon";
+    applyItemVisual(icon, def);
+
+    const meta = document.createElement("div");
+    meta.className = "char-bag-meta";
+
+    const nameEl = document.createElement("b");
+    nameEl.textContent = `${def.name} · ${EQUIP_SLOT_NAMES[eq.slot]}`;
+    nameEl.style.color = hexColor(RARITY_COLORS[def.rarity]);
+
+    const cmpLine = document.createElement("small");
+    const nextStats = statsFor(currentRealm, currentTier, {
+      ...currentEquip,
+      [eq.slot]: def.id,
+    });
+    const deltas: Array<{ k: string; d: number }> = [
+      { k: "Công", d: nextStats.atk - curStats.atk },
+      { k: "Khí huyết", d: nextStats.maxHp - curStats.maxHp },
+      { k: "Linh lực", d: nextStats.maxMp - curStats.maxMp },
+      { k: "Tốc độ", d: nextStats.speed - curStats.speed },
+    ];
+    let hasDelta = false;
+    for (const { k, d } of deltas) {
+      if (d === 0) continue;
+      if (hasDelta) cmpLine.append(document.createTextNode(" · "));
+      hasDelta = true;
+      const sp = document.createElement("span");
+      sp.className = d > 0 ? "cmp-up" : "cmp-down";
+      sp.textContent = `${k} ${d > 0 ? `+${d}` : `${d}`}`;
+      cmpLine.append(sp);
+    }
+    if (!hasDelta) {
+      const sp = document.createElement("span");
+      sp.className = "cmp-eq";
+      sp.textContent = "Ngang bằng món đang mặc";
+      cmpLine.append(sp);
+    }
+
+    const ok = canEquip(def.id, currentRealm, currentTier);
+    const reqText = realmLabel(eq.reqRealm, eq.reqTier);
+    if (!ok) {
+      cmpLine.append(document.createTextNode(" · "));
+      const reqWarn = document.createElement("span");
+      reqWarn.className = "req-warn";
+      reqWarn.textContent = `Cần ${reqText}`;
+      cmpLine.append(reqWarn);
+    }
+
+    meta.append(nameEl, cmpLine);
+    left.append(icon, meta);
+
+    const equipBtn = document.createElement("button");
+    equipBtn.type = "button";
+    equipBtn.className = "char-equip-btn";
+    equipBtn.disabled = !ok;
+    equipBtn.textContent = ok ? "Mặc" : `Cần ${reqText}`;
+    equipBtn.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!ok) return;
+      sound.equip();
+      callbacks?.onEquip(i);
+    });
+
+    row.addEventListener("pointerenter", (e) => {
+      if (e.pointerType === "mouse" && previewEquipItemId !== def.id) {
+        previewEquipItemId = def.id;
+        renderCharModal();
+      }
+    });
+    row.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      previewEquipItemId = previewEquipItemId === def.id ? null : def.id;
+      renderCharModal();
+    });
+
+    row.append(left, equipBtn);
+    bagList.append(row);
+  }
+
+  if (countEquips === 0) {
+    const p = document.createElement("p");
+    p.style.opacity = "0.72";
+    p.style.fontSize = "12px";
+    p.style.margin = "6px 0";
+    p.style.textAlign = "center";
+    p.textContent =
+      "Trong túi chưa có trang bị nào. Hãy gặp Thợ rèn Thiết Ngưu ở phía đông Lạc Hà Trấn để rèn bảo khí.";
+    bagList.append(p);
+  }
+}
+
+// ---------- Giao diện rèn đồ ở Thợ rèn (#32) ----------
+
+function renderForgeModal() {
+  const npc = NPC_BY_ID[forgeNpcId];
+  $("forge-title").textContent = npc ? `Lò Rèn · ${npc.name}` : "Lò Rèn Thiết Ngưu";
+  const list = $("forge-list");
+  list.replaceChildren();
+
+  const recipes = RECIPES.filter((r) => r.npcId === forgeNpcId);
+  for (const rec of recipes) {
+    const outDef = ITEM_BY_ID[rec.output.itemId];
+    if (!outDef) continue;
+
+    const card = document.createElement("div");
+    card.className = `forge-card${lastForgedItemId === outDef.id ? " forged-flash" : ""}`;
+
+    const top = document.createElement("div");
+    top.className = "forge-top";
+
+    const info = document.createElement("div");
+    info.className = "forge-item-info";
+
+    const icon = document.createElement("i");
+    icon.className = "slot-icon";
+    applyItemVisual(icon, outDef);
+
+    const titleCol = document.createElement("div");
+    titleCol.className = "forge-title-col";
+
+    const nameEl = document.createElement("b");
+    nameEl.textContent = outDef.name;
+    nameEl.style.color = hexColor(RARITY_COLORS[outDef.rarity]);
+
+    const statLine = document.createElement("small");
+    if (outDef.equip) {
+      const slotName = EQUIP_SLOT_NAMES[outDef.equip.slot];
+      const statsStr = describeEquipStats(outDef.equip.stats);
+      const reqStr = realmLabel(outDef.equip.reqRealm, outDef.equip.reqTier);
+      const okRealm = canEquip(outDef.id, currentRealm, currentTier);
+      statLine.textContent = `${slotName} · ${statsStr} · `;
+      const reqSpan = document.createElement("span");
+      reqSpan.className = okRealm ? "req-ok" : "req-warn";
+      reqSpan.textContent = okRealm ? `Đủ cảnh giới (${reqStr})` : `Cần ${reqStr} mới mặc được`;
+      statLine.append(reqSpan);
+    } else {
+      statLine.textContent = outDef.desc;
+    }
+
+    titleCol.append(nameEl, statLine);
+    info.append(icon, titleCol);
+
+    let canCraft = true;
+    const matsRow = document.createElement("div");
+    matsRow.className = "forge-mats";
+
+    for (const inp of rec.inputs) {
+      const matDef = ITEM_BY_ID[inp.itemId];
+      const have = countItem(invSlots, inp.itemId);
+      const enough = have >= inp.qty;
+      if (!enough) canCraft = false;
+
+      const chip = document.createElement("span");
+      chip.className = `forge-mat ${enough ? "ok" : "missing"}`;
+      chip.textContent = `${matDef?.name ?? inp.itemId} ${have}/${inp.qty}`;
+      matsRow.append(chip);
+    }
+
+    const forgeBtn = document.createElement("button");
+    forgeBtn.type = "button";
+    forgeBtn.className = "forge-btn";
+    forgeBtn.disabled = !canCraft;
+    forgeBtn.textContent = "Rèn";
+    forgeBtn.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      if (!canCraft) return;
+      callbacks?.onCraft(rec.id);
+    });
+
+    top.append(info, forgeBtn);
+    card.append(top, matsRow);
+    list.append(card);
+  }
+}
+
 // ---------- Hộp thoại NPC (Typewriter + Options) ----------
 
 function stopTypewriter() {
@@ -460,7 +902,11 @@ function renderDialogOptions() {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "dlg-opt-btn";
-    if (opt.action.kind === "accept" || opt.action.kind === "turnIn") {
+    if (
+      opt.action.kind === "accept" ||
+      opt.action.kind === "turnIn" ||
+      opt.action.kind === "forge"
+    ) {
       btn.classList.add("primary");
     }
     btn.disabled = !!opt.disabled;
@@ -479,13 +925,23 @@ function renderDialogOptions() {
       tag.textContent = "Nhận việc";
       tag.style.color = "#ffe08a";
       btn.append(tag);
+    } else if (opt.action.kind === "forge") {
+      const tag = document.createElement("small");
+      tag.textContent = "Lò rèn";
+      tag.style.color = "#ffe08a";
+      btn.append(tag);
     }
 
     btn.addEventListener("pointerdown", (e) => {
       e.preventDefault();
       const action = opt.action;
+      const npcId = currentDialog?.npcId ?? "tho_ren";
       ui.closeDialog();
       if (action.kind === "turnIn") sound.questDone();
+      if (action.kind === "forge") {
+        ui.openForgeModal(npcId);
+        return;
+      }
       callbacks?.onDialogAction(action);
     });
 
@@ -538,7 +994,14 @@ export const ui = {
       });
       btn.addEventListener("dblclick", () => {
         const s = invSlots[i];
-        if (s && ITEM_BY_ID[s.itemId]?.effect) callbacks?.onUse(i);
+        if (!s) return;
+        const def = ITEM_BY_ID[s.itemId];
+        if (def?.effect) {
+          callbacks?.onUse(i);
+        } else if (def?.type === "equip" && canEquip(def.id, currentRealm, currentTier)) {
+          sound.equip();
+          callbacks?.onEquip(i);
+        }
       });
 
       slotEls.push(btn);
@@ -561,6 +1024,13 @@ export const ui = {
     bindTap("inv-btn-use", () => {
       if (invSlots[selectedSlot]) callbacks?.onUse(selectedSlot);
     });
+    bindTap("inv-btn-equip", () => {
+      const s = invSlots[selectedSlot];
+      if (s && canEquip(s.itemId, currentRealm, currentTier)) {
+        sound.equip();
+        callbacks?.onEquip(selectedSlot);
+      }
+    });
     bindTap("inv-btn-drop1", () => {
       if (invSlots[selectedSlot]) callbacks?.onDrop(selectedSlot, 1);
     });
@@ -571,6 +1041,11 @@ export const ui = {
     bindTap("quick-2", () => this.useQuick(2));
     bindTap("btn-pickup", () => callbacks?.onPickup());
     bindTap("btn-talk", () => callbacks?.onTalk());
+
+    // Bảng nhân vật & Trang bị (#31) + Lò rèn (#32)
+    bindTap("btn-char", () => this.toggleCharModal());
+    bindTap("char-close", () => this.toggleCharModal(false));
+    bindTap("forge-close", () => this.toggleForgeModal(false));
 
     // Sổ nhiệm vụ
     bindTap("btn-quest", () => this.toggleQuestModal());
@@ -704,6 +1179,35 @@ export const ui = {
     return invOpen;
   },
 
+  toggleCharModal(force?: boolean) {
+    charModalOpen = force ?? !charModalOpen;
+    $("char-modal").hidden = !charModalOpen;
+    $("btn-char").classList.toggle("active", charModalOpen);
+    if (charModalOpen) {
+      previewEquipItemId = null;
+      renderCharModal();
+    }
+  },
+
+  isCharModalOpen() {
+    return charModalOpen;
+  },
+
+  openForgeModal(npcId = "tho_ren") {
+    forgeNpcId = npcId;
+    this.toggleForgeModal(true);
+  },
+
+  toggleForgeModal(force?: boolean) {
+    forgeModalOpen = force ?? !forgeModalOpen;
+    $("forge-modal").hidden = !forgeModalOpen;
+    if (forgeModalOpen) renderForgeModal();
+  },
+
+  isForgeModalOpen() {
+    return forgeModalOpen;
+  },
+
   toggleQuestModal(force?: boolean) {
     questModalOpen = force ?? !questModalOpen;
     $("quest-modal").hidden = !questModalOpen;
@@ -745,6 +1249,14 @@ export const ui = {
       this.toggleInventory(false);
       closedAny = true;
     }
+    if (charModalOpen) {
+      this.toggleCharModal(false);
+      closedAny = true;
+    }
+    if (forgeModalOpen) {
+      this.toggleForgeModal(false);
+      closedAny = true;
+    }
     if (questModalOpen) {
       this.toggleQuestModal(false);
       closedAny = true;
@@ -768,8 +1280,23 @@ export const ui = {
       if (remMs > 0) itemCdUntil.set(itemId, now + remMs);
     }
     if (m.gained) {
-      for (const g of m.gained) showGainFeed(g.itemId, g.qty);
-      sound.pickup();
+      let forgedEquip = false;
+      for (const g of m.gained) {
+        showGainFeed(g.itemId, g.qty);
+        const gDef = ITEM_BY_ID[g.itemId];
+        if (gDef?.type === "equip" && forgeModalOpen) {
+          forgedEquip = true;
+          lastForgedItemId = g.itemId;
+          setTimeout(() => {
+            if (lastForgedItemId === g.itemId) {
+              lastForgedItemId = null;
+              if (forgeModalOpen) renderForgeModal();
+            }
+          }, 900);
+        }
+      }
+      if (forgedEquip) sound.forge();
+      else sound.pickup();
     }
     renderInventory();
     renderQuestTracker();
@@ -871,8 +1398,27 @@ export const ui = {
   },
 
   hud(p: HudPlayer, online: number) {
+    const nextW = p.weapon ?? "";
+    const nextR = p.robe ?? "";
+    const nextT = p.talisman ?? "";
+    const equipOrRealmChanged =
+      p.realm !== currentRealm ||
+      p.tier !== currentTier ||
+      nextW !== currentEquip.weapon ||
+      nextR !== currentEquip.robe ||
+      nextT !== currentEquip.talisman;
+
+    currentName = p.name;
     currentRealm = p.realm;
     currentTier = p.tier;
+    currentEquip = { weapon: nextW, robe: nextR, talisman: nextT };
+
+    if (equipOrRealmChanged) {
+      if (charModalOpen) renderCharModal();
+      if (invOpen) renderSlotDetail();
+      if (forgeModalOpen) renderForgeModal();
+    }
+
     $("hud-name").textContent = p.name;
     $("hud-realm").textContent = realmLabel(p.realm, p.tier);
     const set = (k: string, v: number, max: number, label: string) => {

@@ -40,13 +40,14 @@ function registerAnimations(scene: Phaser.Scene) {
     canvasTex.refresh();
   };
 
-  for (const key of ["me", "other", "swordbeam", "dot"]) copyFrameToTexture(key);
+  const robeKeys = ["robe-tho_nhung_bao", "robe-hac_ho_bao", "robe-xich_lan_bao"];
+  for (const key of ["me", "other", "swordbeam", "dot", ...robeKeys]) copyFrameToTexture(key);
   for (const m of MONSTERS) copyFrameToTexture(`mon-${m.id}`);
   for (const it of ITEMS) copyFrameToTexture(`item-${it.id}`);
   for (const n of NPCS) copyFrameToTexture(`npc-${n.id}`);
 
-  // Hoạt ảnh 4 hướng cho người chơi ("me" và "other")
-  for (const who of ["me", "other"]) {
+  // Hoạt ảnh 4 hướng cho người chơi ("me", "other" và các bộ pháp bào)
+  for (const who of ["me", "other", ...robeKeys]) {
     for (const d of DIRS) {
       const idleKey = `${who}-idle-${d}`;
       if (!scene.anims.exists(idleKey) && atlasTex.has(idleKey)) {
