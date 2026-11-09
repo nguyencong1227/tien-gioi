@@ -13,6 +13,7 @@ import type {
 } from "@tien-gioi/shared";
 import type { WorldState, Player } from "./schema";
 import type { SavedPlayer, QuestSave } from "./store";
+import { Interest } from "./systems/interest";
 
 /** Dữ liệu riêng của server cho mỗi người chơi (không gửi xuống client). */
 export interface PlayerCtrl {
@@ -82,6 +83,8 @@ export class World {
   readonly ctrl = new Map<string, PlayerCtrl>();
   readonly mctrl = new Map<string, MonsterCtrl>();
   readonly lctrl = new Map<string, LootCtrl>();
+  /** Vùng nhìn của từng client: ai nhận state của thực thể nào (#62) */
+  readonly interest = new Interest();
   monsterSeq = 0;
   lootSeq = 0;
 

@@ -33,7 +33,7 @@ npm run build        # build client vào client/dist
   - `game.ts`: hằng số, quái, kiểu tin nhắn.
   - `map.ts`: bản đồ sinh theo seed, va chạm.
 - `server/src/rooms/WorldRoom.ts`: chỉ lo vào/ra phòng, lưu nhân vật, nối tin nhắn với system, vòng lặp 20 tick/giây.
-- `server/src/systems/`: logic game, mỗi file một mảng: `movement`, `combat`, `monsters`, `progression`, `chat`, `inventory` (túi đồ, đan dược, lệnh `/give` khi không chạy production), `loot` (rơi đồ, nhặt, vứt đồ), `quests` (tiến độ nhiệm vụ cập nhật từ sự kiện), `npc` (nói chuyện, nhận / trả nhiệm vụ, đổi đồ).
+- `server/src/systems/`: logic game, mỗi file một mảng: `movement`, `combat`, `monsters`, `progression`, `chat`, `inventory` (túi đồ, đan dược, lệnh `/give` khi không chạy production), `loot` (rơi đồ, nhặt, vứt đồ), `quests` (tiến độ nhiệm vụ cập nhật từ sự kiện), `npc` (nói chuyện, nhận / trả nhiệm vụ, đổi đồ), `interest` (vùng nhìn: mỗi client chỉ nhận state của thực thể ở gần, bằng `StateView`).
   - Các system nhận `World` (`server/src/world.ts`: state, dữ liệu riêng của người chơi/quái, `events` để gửi tin), không đụng tới Colyseus `Room`. Tính năng mới thì thêm system mới.
 - `server/src/schema.ts` là state đồng bộ, `store.ts` lưu nhân vật dạng JSON ở `server/data/players/`.
 - Test:
@@ -60,8 +60,8 @@ npm run build        # build client vào client/dist
 ## Hiệu năng (làm tới đâu tối ưu tới đó)
 Vẫn dùng TypeScript; tối ưu thuật toán và dữ liệu gửi đi ngay khi viết, đo bằng số chứ không đoán.
 - **Đo trước và sau:** `npm run bench -w server` mô phỏng 0 / 10 / 50 / 100 người chơi trong `World` thật (có seed, kết quả cố định), in thời gian tick và byte patch mỗi client. Dán bảng trước / sau vào PR khi đụng vòng lặp tick hoặc state.
-- **Ngân sách** (test trong `server/src/systems/perf.test.ts` giữ, CI đỏ nếu vượt): tick < 10 ms; không ai chơi thì patch = 0 byte; 100 người < 2000 byte/tick.
-- **Băng thông quan trọng hơn CPU:** mỗi trường state đổi là một patch gửi cho *mọi* client, 20 lần/giây.
+- **Ngân sách** (test trong `server/src/systems/perf.test.ts` giữ, CI đỏ nếu vượt): tick < 10 ms; không ai chơi thì patch = 0 byte; 100 người < 800 byte/tick **mỗi client** (đo theo StateView của từng client).
+- **Băng thông quan trọng hơn CPU:** mỗi trường state đổi là một patch gửi cho *mọi client đang thấy thực thể đó* (xem `interest`), 20 lần/giây.
   - Không ghi vào state mỗi tick những giá trị chỉ nhích số lẻ: cộng dồn trong dữ liệu riêng của server (`PlayerCtrl` / `MonsterCtrl`) rồi ghi phần nguyên (`takeWhole`) hoặc ghi định kỳ.
   - Thứ không ai nhìn thấy thì không cập nhật (quái "ngủ" khi không có người chơi trong `MONSTER_WAKE_DIST`).
   - Gán lại giá trị y hệt thì schema bỏ qua; gán số thực khác đi một chút là gửi 8 byte.
