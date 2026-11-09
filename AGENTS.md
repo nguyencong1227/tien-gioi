@@ -48,12 +48,25 @@ npm run build        # build client vào client/dist
 - **Server quyết định mọi kết quả** (sát thương, rơi đồ, tu vi, nhiệm vụ). Client chỉ gửi ý định và hiển thị.
 - **Server không tin client:**
   - Kiểm tra kiểu, giá trị hữu hạn, khoảng cách, hồi chiêu cho mọi tin nhắn.
+  - Đăng ký tin nhắn mới bằng `this.on(...)` trong `WorldRoom` (có giới hạn tần suất, `server/src/rate-limit.ts`), không gọi thẳng `onMessage`.
+  - Tra bảng `*_BY_ID` bằng id đến từ client / file lưu thì dùng `byId(TABLE, id)` (`server/src/systems/lookup.ts`): `TABLE["constructor"]` không phải `undefined`.
   - Dữ liệu riêng (túi đồ, nhiệm vụ) không đưa vào state chung, chỉ gửi cho chủ.
 - **Đổi `shared/`:** làm PR riêng, chỉ sửa `shared/`, một dev khác review trước khi các bên code tiếp.
 - **Phiên bản đã ghim:** Colyseus 0.16, `@colyseus/schema` 3, `colyseus.js` 0.16, Phaser 3.90, TypeScript 5.9.
   - Không tự nâng major. Các bản mới (Colyseus 0.18, Phaser 4, TS 7) đổi API.
   - Schema dùng decorator `@type`, cần `experimentalDecorators` + `useDefineForClassFields: false` (đã cấu hình trong `server/tsconfig.json`).
 - **Asset:** chỉ dùng CC0 / CC-BY (ghi nguồn trong `CREDITS.md`). Không dùng chữ, tên, hình hay âm thanh của game khác. Thế giới, địa danh, nhân vật phải là của Tiên Giới.
+
+## Hiệu năng (làm tới đâu tối ưu tới đó)
+Vẫn dùng TypeScript; tối ưu thuật toán và dữ liệu gửi đi ngay khi viết, đo bằng số chứ không đoán.
+- **Đo trước và sau:** `npm run bench -w server` mô phỏng 0 / 10 / 50 / 100 người chơi trong `World` thật (có seed, kết quả cố định), in thời gian tick và byte patch mỗi client. Dán bảng trước / sau vào PR khi đụng vòng lặp tick hoặc state.
+- **Ngân sách** (test trong `server/src/systems/perf.test.ts` giữ, CI đỏ nếu vượt): tick < 10 ms; không ai chơi thì patch = 0 byte; 100 người < 2000 byte/tick.
+- **Băng thông quan trọng hơn CPU:** mỗi trường state đổi là một patch gửi cho *mọi* client, 20 lần/giây.
+  - Không ghi vào state mỗi tick những giá trị chỉ nhích số lẻ: cộng dồn trong dữ liệu riêng của server (`PlayerCtrl` / `MonsterCtrl`) rồi ghi phần nguyên (`takeWhole`) hoặc ghi định kỳ.
+  - Thứ không ai nhìn thấy thì không cập nhật (quái "ngủ" khi không có người chơi trong `MONSTER_WAKE_DIST`).
+  - Gán lại giá trị y hệt thì schema bỏ qua; gán số thực khác đi một chút là gửi 8 byte.
+- **CPU:** tránh vòng lặp lồng nhau người chơi × thực thể mỗi tick khi số lượng có thể lớn; nếu cần thì chia lưới không gian. Không tạo object / mảng mới trong vòng lặp nóng nếu tránh được.
+- Hot path nào đo rồi vẫn quá chậm mới tính tới chuyển riêng phần đó sang Rust (napi-rs / WebAssembly).
 
 ## Git
 - Không commit hay push thẳng lên `main`. Mỗi việc một nhánh (`a/...`, `b/...` hoặc `c/...`) và một PR, ghi `Closes #<số issue>`.

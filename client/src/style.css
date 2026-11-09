@@ -1095,6 +1095,66 @@ button {
   background: rgba(243, 220, 160, 0.55);
 }
 
+/* Chế độ máy yếu: tắt hiệu ứng làm mờ nền & xung sáng tốn GPU */
+body.low-fx .panel,
+body.low-fx #dialog-modal {
+  backdrop-filter: none !important;
+}
+body.low-fx .sk.ready,
+body.low-fx #btn-pickup,
+body.low-fx #btn-talk {
+  animation: none !important;
+}
+
+/* Màn hình cài đặt (#settings-modal - #35) */
+#settings-modal {
+  width: min(94vw, 410px);
+}
+.settings-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.set-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.38);
+  border: 1px solid var(--line);
+  font-size: 13px;
+}
+.set-row.toggle {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 46px;
+  cursor: pointer;
+}
+.set-row.toggle input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  accent-color: var(--gold);
+  flex-shrink: 0;
+}
+.set-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.set-ctrl input[type="range"] {
+  flex: 1;
+  min-height: 32px;
+  accent-color: var(--gold);
+}
+.set-ctrl b {
+  min-width: 42px;
+  text-align: right;
+  color: #ffe08a;
+  font-size: 12px;
+}
+
 @media (pointer: coarse), (max-width: 640px) {
   #joyzone {
     display: block;
@@ -1185,6 +1245,56 @@ button {
     padding: 10px 12px;
   }
 }
+
+/* Hỗ trợ màn hình ngang trên điện thoại (Landscape Safe Area - #34) */
+@media (orientation: landscape) and (max-height: 540px) {
+  #hud {
+    width: 210px;
+    padding: 5px 8px;
+    font-size: 11px;
+  }
+  .bar {
+    height: 12px;
+    margin: 2px 0;
+  }
+  .bar span {
+    font-size: 10px;
+    line-height: 12px;
+  }
+  .hud-btn {
+    min-width: 34px;
+    min-height: 32px;
+    padding: 2px 5px;
+  }
+  .hud-btn small {
+    display: none;
+  }
+  #quest-tracker {
+    top: calc(max(6px, env(safe-area-inset-top)) + 106px);
+    max-height: calc(100dvh - 120px);
+    width: 185px;
+    padding: 5px 7px;
+  }
+  #chat {
+    display: none;
+  }
+  #minimap-wrap {
+    width: 82px;
+    padding: 2px;
+  }
+  #minimap {
+    width: 76px;
+    height: 76px;
+  }
+  .modal-box {
+    overflow-y: auto;
+    justify-content: flex-start;
+  }
+  #quest-list {
+    max-height: calc(100dvh - 96px);
+  }
+}
+
 @media (max-width: 760px) and (pointer: fine) {
   #help {
     display: none;

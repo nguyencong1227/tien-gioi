@@ -3,6 +3,11 @@
 // cộng vài giả định về cách người chơi săn quái (ghi rõ trong ASSUME).
 // Chạy `npm run can-bang -w server` để in bảng ra docs/CAN_BANG.md.
 import {
+  ITEMS,
+  EQUIP_SLOTS,
+  emptyEquipment,
+  stepOf,
+  type Equipment,
   MONSTERS,
   MEDITATE,
   REALMS,
@@ -28,7 +33,32 @@ export const ASSUME = {
   critAvg: 1 + 0.1 * 0.8,
   /** Thời gian đi lại, nói chuyện với NPC trong cả chuỗi nhiệm vụ chính (giây) */
   questOverheadSec: 8 * 60,
+  /**
+   * Người chơi mặc món tốt nhất đủ cảnh giới ở mỗi ô (giả định đã rèn kịp; nguyên liệu rơi trong lúc săn).
+   * Tắt để xem đường cong khi không có trang bị.
+   */
+  useGear: true,
 };
+
+/** Món tốt nhất mỗi ô mà bậc (realm, tier) mặc được: món có yêu cầu cảnh giới cao nhất. */
+export function bestGear(realm: number, tier: number): Equipment {
+  const eq = emptyEquipment();
+  if (!ASSUME.useGear) return eq;
+  const step = stepOf(realm, tier);
+  for (const slot of EQUIP_SLOTS) {
+    let best = -1;
+    for (const it of ITEMS) {
+      const e = it.equip;
+      if (!e || e.slot !== slot) continue;
+      const need = stepOf(e.reqRealm, e.reqTier);
+      if (need <= step && need > best) {
+        best = need;
+        eq[slot] = it.id;
+      }
+    }
+  }
+  return eq;
+}
 
 export interface Row {
   realm: number;
@@ -54,7 +84,7 @@ interface Option {
 
 /** Tốc độ tu vi khi săn một loại quái ở bậc (realm, tier); null nếu quá nguy hiểm. */
 export function huntRate(m: MonsterKind, realm: number, tier: number): Option | null {
-  const s = statsFor(realm, tier);
+  const s = statsFor(realm, tier, bestGear(realm, tier));
   const dps = (s.atk * SKILLS.slash.mult * ASSUME.critAvg) / (SKILLS.slash.cooldown / 1000);
   const fight = m.hp / dps;
   const taken = (m.atk / (m.attackCd / 1000)) * fight * ASSUME.hitTaken;

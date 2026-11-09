@@ -473,3 +473,120 @@ describe("nhiệm vụ và NPC", () => {
     expect(dialogs).toHaveLength(0);
   });
 });
+
+describe("bảo mật", () => {
+  it("dữ liệu rác và loại tin nhắn lạ không làm sập phòng, không sinh đồ", async () => {
+    const a = await join();
+    const b = await join();
+    const types = [
+      "input",
+      "attack",
+      "skill",
+      "meditate",
+      "chat",
+      "useItem",
+      "pickup",
+      "dropItem",
+      "talk",
+      "questAccept",
+      "questTurnIn",
+      "questAbandon",
+      "trade",
+      "khong_co",
+      "__proto__",
+      "constructor",
+      "toString",
+    ];
+    const junk = [
+      null,
+      0,
+      "x",
+      [],
+      { slot: -1 },
+      { npcId: "constructor" },
+      { questId: "__proto__" },
+    ];
+    for (const t of types) for (const j of junk) a.room.send(t, j);
+    await sleep(300);
+    expect(a.room.connection.isOpen).toBe(true);
+    expect(a.invs.at(-1)!.slots.every((s) => s === null)).toBe(true);
+    expect(a.dialogs).toHaveLength(0);
+    // Phòng vẫn chạy: người khác vẫn chat được
+    b.room.send("chat", { text: "còn sống" });
+    await waitFor(() => a.chat.find((m) => m.text === "còn sống"));
+  });
+
+  it("spam tin nhắn liên tục thì bị ngắt kết nối", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const a = await join();
+    let code = 0;
+    a.room.onLeave((c) => (code = c));
+    for (let i = 0; i < 400; i++) a.room.send("talk", { npcId: "truong_tran" });
+    await waitFor(() => code);
+    expect(code).toBe(4429);
+    expect(warn).toHaveBeenCalled();
+  });
+
+  it("lỗi trong một tin nhắn được ghi log, phòng vẫn chạy", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const a = await join();
+    const b = await join();
+    // Làm hỏng dữ liệu riêng của a để useItem ném lỗi
+    (serverRoom(a.room) as any).world.ctrl.get(a.room.sessionId).inv = null;
+    a.room.send("useItem", { slot: 0 });
+    await waitFor(() => error.mock.calls.length > 0);
+    b.room.send("chat", { text: "vẫn chạy" });
+    await waitFor(() => b.chat.find((m) => m.text === "vẫn chạy"));
+    expect(String(error.mock.calls[0][0])).toContain("onMessage");
+  });
+
+  it("không gửi túi đồ / nhiệm vụ / hộp thoại của người này cho người khác", async () => {
+    const a = await join();
+    const b = await join();
+    const before = { invs: b.invs.length, quests: b.quests.length, dialogs: b.dialogs.length };
+    a.room.send("chat", { text: "/give nanh_soi 3" });
+    const p = serverState(a.room).players.get(a.room.sessionId)!;
+    p.x = NPC_BY_ID.truong_tran.x + 10;
+    p.y = NPC_BY_ID.truong_tran.y;
+    a.room.send("talk", { npcId: "truong_tran" });
+    await waitFor(() => a.dialogs.length > 0);
+    await sleep(100);
+    expect({ invs: b.invs.length, quests: b.quests.length, dialogs: b.dialogs.length }).toEqual(
+      before,
+    );
+    // State chung không có trường riêng tư
+    const pub = Object.keys(serverState(a.room).players.get(a.room.sessionId)!.toJSON());
+    for (const k of ["inv", "inventory", "quests", "secret", "secretHash"])
+      expect(pub).not.toContain(k);
+  });
+});
+
+describe("trang bị và rèn đồ", () => {
+  it("rèn ở Thợ rèn, mặc vào: người khác thấy trong state; thoát ra vào lại vẫn mặc", async () => {
+    const name = "Tho Ren Thu";
+    const a = await join(name);
+    const b = await join();
+    const p = serverState(a.room).players.get(a.room.sessionId)!;
+    p.realm = 1;
+    p.x = NPC_BY_ID.tho_ren.x + 10;
+    p.y = NPC_BY_ID.tho_ren.y;
+    a.room.send("chat", { text: "/give nanh_soi 8" });
+    a.room.send("chat", { text: "/give long_tho 4" });
+    await waitFor(() => a.invs.at(-1)?.slots.some((s) => s?.itemId === "long_tho"));
+    a.room.send("craft", { recipeId: "ren_lang_nha_kiem" });
+    const inv = await waitFor(() =>
+      a.invs.find((m) => m.gained?.some((g) => g.itemId === "lang_nha_kiem")),
+    );
+    const slot = inv.slots.findIndex((s) => s?.itemId === "lang_nha_kiem");
+    a.room.send("equip", { slot });
+    // b nhìn thấy a đang cầm kiếm
+    await waitFor(
+      () => (b.room.state as any).players.get(a.room.sessionId)?.weapon === "lang_nha_kiem",
+    );
+    await a.room.leave(true);
+    rooms.splice(rooms.indexOf(a.room), 1);
+    await sleep(200);
+    const again = await join(name);
+    expect(again.me().weapon).toBe("lang_nha_kiem");
+  });
+});

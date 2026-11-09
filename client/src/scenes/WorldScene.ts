@@ -130,7 +130,7 @@ export class WorldScene extends Phaser.Scene {
 
     this.add
       .text(TOWN_PX.x, TOWN_PX.y - 40, "落霞鎮", {
-        fontFamily: "serif",
+        fontFamily: '"Noto Serif", Georgia, serif',
         fontSize: "56px",
         color: "#7a3b2e",
       })
@@ -139,7 +139,7 @@ export class WorldScene extends Phaser.Scene {
       .setDepth(-5);
     this.add
       .text(TOWN_PX.x, TOWN_PX.y + 14, "Lạc Hà Trấn · Khu an toàn", {
-        fontFamily: "serif",
+        fontFamily: '"Noto Serif", Georgia, serif',
         fontSize: "16px",
         color: "#5a4030",
       })
@@ -199,7 +199,7 @@ export class WorldScene extends Phaser.Scene {
 
       const nameLabel = this.add
         .text(0, -42, npc.name, {
-          fontFamily: "serif",
+          fontFamily: '"Noto Serif", Georgia, serif',
           fontSize: "12px",
           fontStyle: "bold",
           color: "#ffe08a",
@@ -210,7 +210,7 @@ export class WorldScene extends Phaser.Scene {
 
       const titleLabel = this.add
         .text(0, -30, npc.title, {
-          fontFamily: "serif",
+          fontFamily: '"Noto Serif", Georgia, serif',
           fontSize: "10px",
           color: "#f3ecda",
           stroke: "#1d1a16",
@@ -225,7 +225,7 @@ export class WorldScene extends Phaser.Scene {
 
       const markerText = this.add
         .text(0, -56, "!", {
-          fontFamily: "serif",
+          fontFamily: '"Noto Serif", Georgia, serif',
           fontSize: "17px",
           fontStyle: "bold",
           color: "#ffe08a",
@@ -289,7 +289,7 @@ export class WorldScene extends Phaser.Scene {
   private setupInput() {
     // enableCapture = false: để còn gõ được chữ vào ô chat
     this.keys = this.input.keyboard!.addKeys(
-      "W,A,S,D,UP,DOWN,LEFT,RIGHT,J,K,L,B,I,Q,M,N,F,ONE,TWO,ESC,SPACE,ENTER",
+      "W,A,S,D,UP,DOWN,LEFT,RIGHT,J,K,L,B,I,Q,M,N,O,F,ONE,TWO,ESC,SPACE,ENTER",
       false,
     ) as any;
     const typing = () => document.activeElement instanceof HTMLInputElement;
@@ -304,6 +304,7 @@ export class WorldScene extends Phaser.Scene {
     kb.on("keydown-Q", () => !typing() && ui.toggleQuestModal());
     kb.on("keydown-M", () => !typing() && ui.toggleMapModal());
     kb.on("keydown-N", () => !typing() && sound.toggleMute());
+    kb.on("keydown-O", () => !typing() && ui.toggleSettingsModal());
     kb.on("keydown-ESC", () => !typing() && ui.closeAllModals());
     kb.on("keydown-F", () => !typing() && this.interactOrPickup());
     kb.on("keydown-ONE", () => !typing() && ui.useQuick(1));
@@ -321,6 +322,7 @@ export class WorldScene extends Phaser.Scene {
         ui.isInventoryOpen() ||
         ui.isQuestModalOpen() ||
         ui.isMapModalOpen() ||
+        ui.isSettingsModalOpen() ||
         ui.isDialogOpen()
       )
         return;
@@ -948,12 +950,13 @@ export class WorldScene extends Phaser.Scene {
       }
       e.root.setDepth(e.root.y);
       e.root.setAlpha(p.dead ? 0.35 : 1);
-      e.aura!.setVisible(p.meditating);
+      e.aura!.setVisible(p.meditating && !ui.isLowFx());
       const label = `${p.name}\n${realmLabel(p.realm, p.tier)}`;
       if (label !== e.lastLabel) {
         e.label!.setText(label);
         e.lastLabel = label;
       }
+      e.label!.setVisible(isMe || !ui.isHideNames());
       this.drawBar(
         e.bar,
         p.hp / p.maxHp,
@@ -983,7 +986,7 @@ export class WorldScene extends Phaser.Scene {
         if (def.boss) {
           e.label = this.add
             .text(0, -def.radius - 22, def.name, {
-              fontFamily: "serif",
+              fontFamily: '"Noto Serif", Georgia, serif',
               fontSize: "13px",
               color: "#ffb0a0",
               stroke: "#000",
@@ -1049,7 +1052,7 @@ export class WorldScene extends Phaser.Scene {
         const hex = `#${rarityColor.toString(16).padStart(6, "0")}`;
         const label = this.add
           .text(0, -18, "", {
-            fontFamily: "serif",
+            fontFamily: '"Noto Serif", Georgia, serif',
             fontSize: "11px",
             color: hex,
             stroke: "#1d1a16",
@@ -1081,6 +1084,7 @@ export class WorldScene extends Phaser.Scene {
 
       le.root.setPosition(l.x, l.y);
       le.root.setDepth(l.y - 2);
+      le.ring.setVisible(!ui.isLowFx());
       if (le.qty !== l.qty) {
         le.qty = l.qty;
         const name = def?.name ?? l.itemId;
@@ -1134,7 +1138,7 @@ export class WorldScene extends Phaser.Scene {
       });
       e.label = this.add
         .text(0, -54, "", {
-          fontFamily: "serif",
+          fontFamily: '"Noto Serif", Georgia, serif',
           fontSize: "12px",
           color: "#fff6dc",
           align: "center",
@@ -1228,7 +1232,8 @@ export class WorldScene extends Phaser.Scene {
   private fxLevelUp(x: number, y: number, major: boolean, mine: boolean) {
     const color = major ? 0xffd34d : 0xbfe8ff;
     if (mine) sound.levelup(major);
-    for (let i = 0; i < (major ? 3 : 1); i++) {
+    const rings = ui.isLowFx() ? 1 : major ? 3 : 1;
+    for (let i = 0; i < rings; i++) {
       const ring = this.add
         .circle(x, y, 16, color, 0)
         .setStrokeStyle(3, color, 0.9)
@@ -1269,7 +1274,7 @@ export class WorldScene extends Phaser.Scene {
     const color = m.toPlayer ? "#ff6b5e" : m.crit ? "#ffd34d" : "#ffffff";
     const t = this.add
       .text(m.x + Phaser.Math.Between(-8, 8), m.y, `${m.crit ? "Bạo! " : ""}${m.amount}`, {
-        fontFamily: "serif",
+        fontFamily: '"Noto Serif", Georgia, serif',
         fontSize: m.crit ? "20px" : "15px",
         color,
         stroke: "#1d1a16",

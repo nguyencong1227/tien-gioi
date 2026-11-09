@@ -4,6 +4,8 @@
 export type BgmZone = "town" | "wild";
 
 const MUTE_KEY = "tg_muted";
+const BGM_VOL_KEY = "tg_bgm_vol";
+const SFX_VOL_KEY = "tg_sfx_vol";
 
 // Ngũ cung cổ phong (C4 D4 E4 G4 A4 C5 D5 E5 G5 A5)
 const TOWN_NOTES = [261.63, 293.66, 329.63, 392.0, 440.0, 523.25, 587.33, 659.25];
@@ -16,11 +18,14 @@ const WILD_MELODY = [0, 3, 2, 4, 1, 3, 0, -1, 2, 5, 4, 3, 1, 2, 0, -1];
 class SoundEngine {
   private ctx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
+  private bgmBus: GainNode | null = null;
   private townGain: GainNode | null = null;
   private wildGain: GainNode | null = null;
   private sfxGain: GainNode | null = null;
   private unlocked = false;
   private muted = false;
+  private bgmVolume = 0.7;
+  private sfxVolume = 0.8;
   private zone: BgmZone = "town";
   private stepIdx = 0;
   private bgmTimer: number | null = null;
@@ -30,6 +35,14 @@ class SoundEngine {
   constructor() {
     try {
       this.muted = localStorage.getItem(MUTE_KEY) === "1";
+      const bv = Number(localStorage.getItem(BGM_VOL_KEY));
+      if (Number.isFinite(bv) && localStorage.getItem(BGM_VOL_KEY) !== null) {
+        this.bgmVolume = Math.max(0, Math.min(1, bv));
+      }
+      const sv = Number(localStorage.getItem(SFX_VOL_KEY));
+      if (Number.isFinite(sv) && localStorage.getItem(SFX_VOL_KEY) !== null) {
+        this.sfxVolume = Math.max(0, Math.min(1, sv));
+      }
     } catch {
       this.muted = false;
     }
@@ -69,16 +82,20 @@ class SoundEngine {
       this.masterGain.gain.value = this.muted ? 0 : 0.75;
       this.masterGain.connect(ctx.destination);
 
+      this.bgmBus = ctx.createGain();
+      this.bgmBus.gain.value = this.bgmVolume;
+      this.bgmBus.connect(this.masterGain);
+
       this.townGain = ctx.createGain();
       this.townGain.gain.value = this.zone === "town" ? 0.22 : 0;
-      this.townGain.connect(this.masterGain);
+      this.townGain.connect(this.bgmBus);
 
       this.wildGain = ctx.createGain();
       this.wildGain.gain.value = this.zone === "wild" ? 0.22 : 0;
-      this.wildGain.connect(this.masterGain);
+      this.wildGain.connect(this.bgmBus);
 
       this.sfxGain = ctx.createGain();
-      this.sfxGain.gain.value = 0.55;
+      this.sfxGain.gain.value = 0.55 * this.sfxVolume;
       this.sfxGain.connect(this.masterGain);
 
       this.startBgmLoop();
@@ -202,6 +219,38 @@ class SoundEngine {
 
   onChange(fn: (muted: boolean) => void) {
     this.listeners.push(fn);
+  }
+
+  getBgmVolume(): number {
+    return this.bgmVolume;
+  }
+
+  setBgmVolume(v: number) {
+    this.bgmVolume = Math.max(0, Math.min(1, v));
+    try {
+      localStorage.setItem(BGM_VOL_KEY, this.bgmVolume.toFixed(2));
+    } catch {
+      // Bỏ qua nếu trình duyệt chặn localStorage
+    }
+    if (this.ctx && this.bgmBus) {
+      this.bgmBus.gain.setValueAtTime(this.bgmVolume, this.ctx.currentTime);
+    }
+  }
+
+  getSfxVolume(): number {
+    return this.sfxVolume;
+  }
+
+  setSfxVolume(v: number) {
+    this.sfxVolume = Math.max(0, Math.min(1, v));
+    try {
+      localStorage.setItem(SFX_VOL_KEY, this.sfxVolume.toFixed(2));
+    } catch {
+      // Bỏ qua nếu trình duyệt chặn localStorage
+    }
+    if (this.ctx && this.sfxGain) {
+      this.sfxGain.gain.setValueAtTime(0.55 * this.sfxVolume, this.ctx.currentTime);
+    }
   }
 
   // ---------------- Hiệu ứng âm thanh (SFX) ----------------

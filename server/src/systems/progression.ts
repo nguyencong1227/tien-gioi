@@ -12,14 +12,14 @@ import {
   inTown,
 } from "@tien-gioi/shared";
 import type { Player } from "../schema";
-import type { World, PlayerCtrl } from "../world";
+import { takeWhole, type World, type PlayerCtrl } from "../world";
 import { refreshQuests } from "./quests";
 
 const BREAK_COOLDOWN_MS = 3000;
 
 /** Tính lại chỉ số tối đa theo cảnh giới; `heal` thì hồi đầy. */
 export function applyStats(p: Player, heal: boolean) {
-  const s = statsFor(p.realm, p.tier);
+  const s = statsFor(p.realm, p.tier, p); // gồm trang bị
   p.maxHp = s.maxHp;
   p.maxMp = s.maxMp;
   p.expMax = expToNext(p.realm, p.tier);
@@ -93,14 +93,46 @@ export function breakthrough(w: World, sid: string) {
 }
 
 /** Hồi phục mỗi tick: đả tọa hồi nhanh + tăng tu vi; bình thường hồi chậm (nhanh hơn trong trấn). */
+/** Tu vi đả tọa ghi vào state mỗi chừng này ms (thanh tu vi vẫn nhích đều từng giây) */
+export const EXP_FLUSH_MS = 1000;
+
+/**
+ * Hồi khí huyết / linh lực, tu vi khi đả tọa. Mỗi tick chỉ là số lẻ nhỏ; ghi thẳng vào state thì
+ * trường đó đổi 20 lần/giây, mỗi lần một số thực 8 byte gửi cho mọi client.
+ * - Khí huyết / linh lực: state chỉ nhận số nguyên (takeWhole).
+ * - Tu vi: để dành, ghi mỗi EXP_FLUSH_MS (số lẻ thì vẫn hiện tiến độ ở cảnh giới thấp).
+ */
 export function tickRecovery(w: World, sid: string, p: Player, c: PlayerCtrl, dt: number) {
+  let hpRate = 0;
+  let mpRate = 0.01;
   if (p.meditating) {
-    p.hp = Math.min(p.maxHp, p.hp + p.maxHp * MEDITATE.hpRegenPct * dt);
-    p.mp = Math.min(p.maxMp, p.mp + p.maxMp * MEDITATE.mpRegenPct * dt);
-    gainExp(w, sid, p, meditateExpPerSec(p.realm, p.tier) * dt);
-  } else {
-    p.mp = Math.min(p.maxMp, p.mp + p.maxMp * 0.01 * dt);
-    if (w.now - c.lastHitAt > 5000)
-      p.hp = Math.min(p.maxHp, p.hp + p.maxHp * (inTown(p.x, p.y) ? 0.08 : 0.01) * dt);
+    hpRate = MEDITATE.hpRegenPct;
+    mpRate = MEDITATE.mpRegenPct;
+    c.frac.exp += meditateExpPerSec(p.realm, p.tier) * dt;
+    if (w.now >= c.frac.expAt) {
+      gainExp(w, sid, p, c.frac.exp);
+      c.frac.exp = 0;
+      c.frac.expAt = w.now + EXP_FLUSH_MS;
+    }
+  } else if (w.now - c.lastHitAt > 5000) {
+    hpRate = inTown(p.x, p.y) ? 0.08 : 0.01;
   }
+  regen(c, "hp", p.hp, p.maxHp, p.maxHp * hpRate * dt, (v) => (p.hp = v));
+  regen(c, "mp", p.mp, p.maxMp, p.maxMp * mpRate * dt, (v) => (p.mp = v));
+}
+
+function regen(
+  c: PlayerCtrl,
+  key: "hp" | "mp",
+  cur: number,
+  max: number,
+  amount: number,
+  set: (v: number) => void,
+) {
+  if (cur >= max || amount <= 0) {
+    c.frac[key] = 0; // đầy rồi thì không để dành phần lẻ
+    return;
+  }
+  const add = takeWhole(c.frac, key, amount);
+  if (add) set(Math.min(max, cur + add));
 }

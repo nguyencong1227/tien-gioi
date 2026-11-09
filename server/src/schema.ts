@@ -1,4 +1,9 @@
-import { Schema, MapSchema, type } from "@colyseus/schema";
+import { Schema, MapSchema, Encoder, type } from "@colyseus/schema";
+
+// Bộ đệm mã hóa state mặc định 8 KB. Gửi toàn bộ state cho người mới vào khi phòng gần đầy
+// (100 người + quái + đồ rơi ≈ 12 KB) sẽ tràn: schema tự nới rồi mã hóa lại, in cảnh báo mỗi lần.
+// Phải đặt trước khi tạo phòng (Colyseus cấp bộ đệm lúc khởi tạo serializer).
+Encoder.BUFFER_SIZE = 32 * 1024;
 
 export class Player extends Schema {
   @type("string") name = "";
@@ -16,6 +21,11 @@ export class Player extends Schema {
   @type("boolean") meditating = false;
   @type("boolean") dead = false;
   @type("uint32") lastSeq = 0; // input cuối server đã xử lý (để client đối chiếu)
+  // Đồ đang mặc (itemId, "" = trống). Công khai để mọi người thấy ngoại hình; kiểu Equipment trong shared/src/items.ts.
+  // Player có đủ 3 trường này nên truyền thẳng vào statsFor(realm, tier, p).
+  @type("string") weapon = "";
+  @type("string") robe = "";
+  @type("string") talisman = "";
 }
 
 export class Monster extends Schema {

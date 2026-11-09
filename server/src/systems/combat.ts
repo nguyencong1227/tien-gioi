@@ -72,7 +72,7 @@ export function hitMonster(
   p: Player,
   mult: number,
 ) {
-  const atk = statsFor(p.realm, p.tier).atk;
+  const atk = statsFor(p.realm, p.tier, p).atk; // gồm vũ khí
   const crit = Math.random() < CRIT_CHANCE;
   const dmg = Math.max(1, Math.round(atk * mult * rand(0.9, 1.1) * (crit ? CRIT_MULT : 1)));
   mon.hp = Math.max(0, mon.hp - dmg);

@@ -7,6 +7,8 @@ import {
   QUEST_BY_ID,
   TRADES,
   TRADE_BY_ID,
+  RECIPES,
+  RECIPE_BY_ID,
   ITEM_BY_ID,
   canAccept,
   countItem,
@@ -22,6 +24,7 @@ import type { World, PlayerCtrl } from "../world";
 import { exchangeItems, sendInv } from "./inventory";
 import { gainExp } from "./progression";
 import { onTalked, questCtx, questsView, sendQuests } from "./quests";
+import { byId } from "./lookup";
 
 /** Người chơi còn sống và đứng trong tầm của NPC. */
 function nearNpc(
@@ -30,7 +33,7 @@ function nearNpc(
   npcId: unknown,
 ): { p: Player; c: PlayerCtrl; npc: NpcDef } | null {
   const r = w.ready(sid);
-  const npc = typeof npcId === "string" ? NPC_BY_ID[npcId] : undefined;
+  const npc = byId(NPC_BY_ID, npcId);
   if (!r || !npc) return null;
   if (Math.hypot(npc.x - r.p.x, npc.y - r.p.y) > NPC_RANGE) return null;
   return { ...r, npc };
@@ -64,6 +67,10 @@ function buildDialog(w: World, p: Player, c: PlayerCtrl, npc: NpcDef): DialogMsg
       action: { kind: "trade" as const, tradeId: t.id },
       ...(t.give.every((g) => countItem(c.inv, g.itemId) >= g.qty) ? {} : { disabled: true }),
     })),
+    // NPC có công thức rèn: một lựa chọn mở bảng rèn (danh sách RECIPES do client tự vẽ)
+    ...(RECIPES.some((x) => x.npcId === npc.id)
+      ? [{ label: "Rèn đồ", action: { kind: "forge" as const } }]
+      : []),
     { label: "Rời đi", action: { kind: "close" } },
   ];
   // Ưu tiên: có nhiệm vụ để trả > có nhiệm vụ mới > đang làm dở > lời chào
@@ -85,7 +92,7 @@ export function talk(w: World, sid: string, npcId: unknown) {
 }
 
 export function acceptQuest(w: World, sid: string, questId: unknown) {
-  const def = typeof questId === "string" ? QUEST_BY_ID[questId] : undefined;
+  const def = byId(QUEST_BY_ID, questId);
   const r = def && nearNpc(w, sid, def.giver);
   if (!def || !r) return;
   if (!canAccept(def, questsView(w, r.c), questCtx(r.p, r.c))) return;
@@ -101,7 +108,7 @@ export function acceptQuest(w: World, sid: string, questId: unknown) {
  * Nhiệm vụ bị bỏ khỏi `active` ngay trong lần gọi đầu, nên gửi `questTurnIn` lần hai không còn gì để trả.
  */
 export function turnInQuest(w: World, sid: string, questId: unknown) {
-  const def = typeof questId === "string" ? QUEST_BY_ID[questId] : undefined;
+  const def = byId(QUEST_BY_ID, questId);
   const r = def && nearNpc(w, sid, def.giver);
   if (!def || !r) return;
   const { p, c } = r;
@@ -146,7 +153,7 @@ export function abandonQuest(w: World, sid: string, questId: unknown) {
 }
 
 export function trade(w: World, sid: string, tradeId: unknown) {
-  const t = typeof tradeId === "string" ? TRADE_BY_ID[tradeId] : undefined;
+  const t = byId(TRADE_BY_ID, tradeId);
   const r = t && nearNpc(w, sid, t.npcId);
   if (!t || !r) return;
   if (!t.give.every((g) => countItem(r.c.inv, g.itemId) >= g.qty)) {
@@ -158,4 +165,20 @@ export function trade(w: World, sid: string, tradeId: unknown) {
   sendInv(w, sid, [{ ...t.get }]);
   // Cập nhật lựa chọn (còn đủ nguyên liệu để đổi tiếp không)
   w.events.dialog(sid, buildDialog(w, r.p, r.c, r.npc));
+}
+
+/** Rèn đồ theo công thức: đứng gần NPC rèn, đủ nguyên liệu; trừ nguyên liệu và thêm đồ cùng lúc. */
+export function craft(w: World, sid: string, recipeId: unknown) {
+  const rc = byId(RECIPE_BY_ID, recipeId);
+  const r = rc && nearNpc(w, sid, rc.npcId);
+  if (!rc || !r) return;
+  if (!rc.inputs.every((g) => countItem(r.c.inv, g.itemId) >= g.qty)) {
+    return w.events.toast(sid, { text: "Không đủ nguyên liệu.", tone: "bad" });
+  }
+  // exchangeItems làm trên bản sao: túi đầy thì không trừ gì, không mất nguyên liệu
+  if (!exchangeItems(r.c.inv, rc.inputs, [rc.output])) {
+    return w.events.toast(sid, { text: "Túi đồ đã đầy.", tone: "bad" });
+  }
+  w.events.toast(sid, { text: `Rèn thành công ${itemName(rc.output.itemId)}.`, tone: "good" });
+  sendInv(w, sid, [{ ...rc.output }]);
 }

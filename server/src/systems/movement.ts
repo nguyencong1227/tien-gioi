@@ -15,7 +15,7 @@ const MAX_QUEUED_INPUTS = 20;
 const MAX_MOVE_BUDGET = 4;
 
 /** Nhận input từ client; bỏ qua dữ liệu sai kiểu. */
-export function queueInput(w: World, sid: string, m: InputMsg) {
+export function queueInput(w: World, sid: string, m: InputMsg | undefined) {
   const c = w.ctrl.get(sid);
   if (!c || typeof m?.seq !== "number" || !Number.isFinite(m.dx) || !Number.isFinite(m.dy)) return;
   if (c.inputs.length < MAX_QUEUED_INPUTS) c.inputs.push({ seq: m.seq >>> 0, dx: m.dx, dy: m.dy });
@@ -28,7 +28,7 @@ export function queueInput(w: World, sid: string, m: InputMsg) {
 export function applyInputs(p: Player, c: PlayerCtrl) {
   const step = TICK_MS / 1000;
   c.moveBudget = Math.min(MAX_MOVE_BUDGET, c.moveBudget + 1);
-  const speed = statsFor(p.realm, p.tier).speed;
+  const speed = statsFor(p.realm, p.tier, p).speed; // hộ phù có tốc độ
   while (c.inputs.length && c.moveBudget >= 1) {
     const inp = c.inputs.shift()!;
     c.moveBudget -= 1;
