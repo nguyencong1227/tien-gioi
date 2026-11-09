@@ -162,7 +162,6 @@ function processNextInvite() {
     bar.style.width = `${(rem / ttl) * 100}%`;
     if (rem <= 0) {
       stopInviteTimer();
-      callbacks?.onPartyDecline?.(next.from);
       processNextInvite();
     }
   };
@@ -1185,8 +1184,28 @@ export const ui = {
     bindTap("btn-pickup", () => callbacks?.onPickup());
     bindTap("btn-talk", () => callbacks?.onTalk());
 
-    // Tổ đội (#75)
+    // Tổ đội (#75, #91)
+    try {
+      if (localStorage.getItem("tg_party_collapsed") === "1") {
+        $("party-panel").classList.add("collapsed");
+        $("party-btn-toggle").textContent = "▸";
+      }
+    } catch {
+      /* localStorage bị chặn (chế độ riêng tư): bỏ qua */
+    }
     bindTap("party-btn-leave", () => callbacks?.onPartyLeave?.());
+    bindTap("party-btn-toggle", () => {
+      const panel = $("party-panel");
+      panel.classList.toggle("collapsed");
+      const isCollapsed = panel.classList.contains("collapsed");
+      const btn = $("party-btn-toggle");
+      btn.textContent = isCollapsed ? "▸" : "▾";
+      try {
+        localStorage.setItem("tg_party_collapsed", isCollapsed ? "1" : "0");
+      } catch {
+        /* localStorage bị chặn (chế độ riêng tư): bỏ qua */
+      }
+    });
     bindTap("pib-btn-accept", () => {
       stopInviteTimer();
       $("party-invite-box").hidden = true;

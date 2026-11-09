@@ -256,8 +256,12 @@ export class WorldScene extends Phaser.Scene {
     setupJoystick();
     this.setupNetwork();
     this.setupPerfProbe();
-    if (typeof window !== "undefined") {
+    if (
+      typeof window !== "undefined" &&
+      (import.meta.env.DEV || new URLSearchParams(location.search).has("debug"))
+    ) {
       (window as any).__game = this.game;
+      (window as any).__scene = this;
     }
   }
 
@@ -465,8 +469,18 @@ export class WorldScene extends Phaser.Scene {
 
   /** Bấm/chạm trúng người chơi khác thì mở menu tương tác (mời tổ đội). */
   private tryClickPlayer(pointer: Phaser.Input.Pointer): boolean {
+    // Nếu con trỏ ở gần quái vật sống thì ưu tiên đánh quái, không mở menu
+    let nearMonster = false;
+    this.monsters.forEach((m) => {
+      if (nearMonster) return;
+      if (Math.hypot(pointer.worldX - m.root.x, pointer.worldY - m.root.y) <= 48) {
+        nearMonster = true;
+      }
+    });
+    if (nearMonster) return false;
+
     let closestId: string | null = null;
-    let closestDist = 36;
+    let closestDist = 28;
     this.players.forEach((e, id) => {
       if (id === this.sid) return;
       const d = Math.hypot(pointer.worldX - e.root.x, pointer.worldY - e.root.y);
