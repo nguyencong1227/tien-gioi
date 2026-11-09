@@ -66,6 +66,8 @@ async function start(room: Room) {
     type: Phaser.AUTO,
     parent: "game",
     backgroundColor: "#2b2620",
+    roundPixels: true,
+    render: { batchSize: 8192 },
     scale: { mode: Phaser.Scale.RESIZE, width: window.innerWidth, height: window.innerHeight },
     input: { activePointers: 3 },
     scene: [new WorldScene(room)],

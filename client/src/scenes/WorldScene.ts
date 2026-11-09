@@ -51,10 +51,33 @@ interface Entity {
   weaponVisual?: Phaser.GameObjects.Graphics;
   animPrefix?: string;
   lastEquipKey?: string;
+  lastBarKey?: number;
   tx: number; // vị trí đích (từ server) để nội suy
   ty: number;
   lastLabel?: string;
   slashUntil?: number;
+}
+
+interface SlashFxItem {
+  g: Phaser.GameObjects.Graphics;
+  start: number;
+}
+
+interface SwordFxItem {
+  img: Phaser.GameObjects.Image;
+  x0: number;
+  y0: number;
+  dx: number;
+  dy: number;
+  start: number;
+}
+
+interface FloatTextItem {
+  t: Phaser.GameObjects.Text;
+  y0: number;
+  start: number;
+  lastText: string;
+  lastStyleKey: number;
 }
 
 interface LootEntity {
@@ -105,6 +128,34 @@ export class WorldScene extends Phaser.Scene {
   // Mũi tên chỉ đường nhiệm vụ
   private navArrow!: Phaser.GameObjects.Container;
   private lastMapDraw = 0;
+
+  // Tái sử dụng Set và hồ đối tượng (object pool) để giảm cấp phát mỗi frame (#71)
+  private seenIds = new Set<string>();
+  private auraWave = 0;
+  private talismanWave = 0;
+  private lootWave = 0;
+  private lastAuxSync = 0;
+  private slashPool: Phaser.GameObjects.Graphics[] = [];
+  private activeSlashes: SlashFxItem[] = [];
+  private swordPool: Phaser.GameObjects.Image[] = [];
+  private activeSwords: SwordFxItem[] = [];
+  private floatPool: FloatTextItem[] = [];
+  private activeFloats: FloatTextItem[] = [];
+
+  // Bảng đo hiệu năng (?perf=1, #71)
+  private perfEnabled = false;
+  private perfRing = new Float64Array(360);
+  private perfRingIdx = 0;
+  private perfRingCount = 0;
+  private perfSortBuf: number[] = [];
+  private lastPerfDraw = 0;
+  private perfFrameHistory: number[] = [];
+  private perfUpdateHistory: number[] = [];
+  private perfTweenSum = 0;
+  private perfTweenMax = 0;
+  private perfPlayersSum = 0;
+  private perfMonstersSum = 0;
+  private perfLootsSum = 0;
 
   constructor(private room: Room) {
     super("world");
@@ -197,6 +248,10 @@ export class WorldScene extends Phaser.Scene {
     this.setupInput();
     setupJoystick();
     this.setupNetwork();
+    this.setupPerfProbe();
+    if (typeof window !== "undefined") {
+      (window as any).__game = this.game;
+    }
   }
 
   private spawnNpcs() {
@@ -464,6 +519,7 @@ export class WorldScene extends Phaser.Scene {
     this.room.onStateChange(() => this.reconcile());
     this.room.onMessage("fx", (m: FxMsg) => this.onFx(m));
     this.room.onMessage("dmg", (m: DmgMsg) => {
+      if (!this.inView(m.x, m.y, 96)) return;
       this.floatText(m);
       sound.hit(m.crit);
     });
@@ -532,21 +588,38 @@ export class WorldScene extends Phaser.Scene {
 
   // ---------------- Vòng lặp vẽ ----------------
 
+  /** Kiểm tra toạ độ (x, y) có nằm trong khung nhìn camera (cộng lề pad px) không. */
+  private inView(x: number, y: number, pad = 96): boolean {
+    const wv = this.cameras.main.worldView;
+    if (wv.width <= 0 || wv.height <= 0) return true;
+    return x >= wv.x - pad && x <= wv.right + pad && y >= wv.y - pad && y <= wv.bottom + pad;
+  }
+
   update(_t: number, deltaMs: number) {
     if (!this.state?.players) return;
+    const t0 = this.perfEnabled ? performance.now() : 0;
     this.acc = Math.min(this.acc + deltaMs, 250);
     while (this.acc >= TICK_MS) {
       this.acc -= TICK_MS;
       this.fixedStep();
     }
 
+    // Nhịp sóng dùng chung cho hào quang đả tọa, hộ phù và đồ rơi (thay cho hàng trăm tween lặp vô hạn)
+    this.auraWave = 0.5 - 0.5 * Math.cos((_t * Math.PI) / 900);
+    this.talismanWave = 0.5 - 0.5 * Math.cos((_t * Math.PI) / 1100);
+    this.lootWave = 0.5 - 0.5 * Math.cos((_t * Math.PI) / 650);
+
     const k = 1 - Math.exp(-LERP_RATE * (deltaMs / 1000));
     this.syncPlayers(k, deltaMs);
     this.syncMonsters(k);
     this.syncLoot();
-    this.syncNpcs();
-    this.syncAudioZone();
-    this.syncQuestNav();
+    this.stepTransientFx(this.time.now);
+    if (this.time.now - this.lastAuxSync >= 150) {
+      this.lastAuxSync = this.time.now;
+      this.syncNpcs();
+      this.syncAudioZone();
+      this.syncQuestNav();
+    }
     this.syncMaps();
 
     const me = this.me();
@@ -557,6 +630,101 @@ export class WorldScene extends Phaser.Scene {
       ui.cooldown("sk-sword", (this.nextSword - now) / SKILLS.sword.cooldown);
       ui.tickItemCooldowns();
     }
+
+    if (this.perfEnabled) {
+      this.recordPerf(deltaMs, performance.now() - t0);
+    }
+  }
+
+  private setupPerfProbe() {
+    if (typeof window === "undefined") return;
+    this.perfEnabled = new URLSearchParams(window.location.search).get("perf") === "1";
+    if (!this.perfEnabled) return;
+    (window as any).__tgPerf = {
+      reset: () => {
+        this.perfFrameHistory.length = 0;
+        this.perfUpdateHistory.length = 0;
+        this.perfTweenSum = 0;
+        this.perfTweenMax = 0;
+        this.perfPlayersSum = 0;
+        this.perfMonstersSum = 0;
+        this.perfLootsSum = 0;
+      },
+      snapshot: () => {
+        const frames = this.perfFrameHistory.length;
+        if (frames === 0) return null;
+        const sortedF = [...this.perfFrameHistory].sort((a, b) => a - b);
+        const sortedU = [...this.perfUpdateHistory].sort((a, b) => a - b);
+        const sumF = sortedF.reduce((a, b) => a + b, 0);
+        const sumU = sortedU.reduce((a, b) => a + b, 0);
+        const pct = (arr: number[], p: number) =>
+          arr[Math.min(arr.length - 1, Math.floor((p / 100) * arr.length))];
+        const avgF = sumF / frames;
+        return {
+          frames,
+          durationSec: Number((sumF / 1000).toFixed(2)),
+          fpsAvg: Number((1000 / avgF).toFixed(1)),
+          frameAvgMs: Number(avgF.toFixed(2)),
+          frameP50Ms: Number(pct(sortedF, 50).toFixed(2)),
+          frameP95Ms: Number(pct(sortedF, 95).toFixed(2)),
+          frameP99Ms: Number(pct(sortedF, 99).toFixed(2)),
+          frameMaxMs: Number(sortedF[sortedF.length - 1].toFixed(2)),
+          longFramesOver33Ms: sortedF.filter((x) => x > 33.3).length,
+          longFramesOver50Ms: sortedF.filter((x) => x > 50).length,
+          updateAvgMs: Number((sumU / frames).toFixed(3)),
+          updateP95Ms: Number(pct(sortedU, 95).toFixed(3)),
+          updateMaxMs: Number(sortedU[sortedU.length - 1].toFixed(3)),
+          playersAvg: Number((this.perfPlayersSum / frames).toFixed(1)),
+          monstersAvg: Number((this.perfMonstersSum / frames).toFixed(1)),
+          lootsAvg: Number((this.perfLootsSum / frames).toFixed(1)),
+          tweensAvg: Number((this.perfTweenSum / frames).toFixed(1)),
+          tweensMax: this.perfTweenMax,
+        };
+      },
+    };
+  }
+
+  private recordPerf(deltaMs: number, updateMs: number) {
+    // Bỏ qua frame nhảy vọt > 500ms khi chuyển tab
+    const dt = Math.min(deltaMs, 500);
+    this.perfRing[this.perfRingIdx] = dt;
+    this.perfRingIdx = (this.perfRingIdx + 1) % this.perfRing.length;
+    if (this.perfRingCount < this.perfRing.length) this.perfRingCount++;
+
+    const tweensCount = (this.tweens as any).tweens?.length ?? this.tweens.getTweens().length;
+    this.perfFrameHistory.push(dt);
+    this.perfUpdateHistory.push(updateMs);
+    this.perfTweenSum += tweensCount;
+    if (tweensCount > this.perfTweenMax) this.perfTweenMax = tweensCount;
+    this.perfPlayersSum += this.players.size;
+    this.perfMonstersSum += this.monsters.size;
+    this.perfLootsSum += this.loots.size;
+
+    const now = performance.now();
+    if (now - this.lastPerfDraw < 250 || this.perfRingCount === 0) return;
+    this.lastPerfDraw = now;
+
+    this.perfSortBuf.length = this.perfRingCount;
+    let sum = 0;
+    for (let i = 0; i < this.perfRingCount; i++) {
+      const v = this.perfRing[i];
+      this.perfSortBuf[i] = v;
+      sum += v;
+    }
+    this.perfSortBuf.sort((a, b) => a - b);
+    const frameAvgMs = sum / this.perfRingCount;
+    const p95Idx = Math.min(this.perfRingCount - 1, Math.floor(0.95 * this.perfRingCount));
+    const frameP95Ms = this.perfSortBuf[p95Idx];
+
+    ui.updatePerf({
+      fps: frameAvgMs > 0 ? 1000 / frameAvgMs : 0,
+      frameAvgMs,
+      frameP95Ms,
+      players: this.players.size,
+      monsters: this.monsters.size,
+      loots: this.loots.size,
+      tweens: tweensCount,
+    });
   }
 
   private syncAudioZone() {
@@ -732,7 +900,7 @@ export class WorldScene extends Phaser.Scene {
 
   private syncMaps() {
     const now = performance.now();
-    if (now - this.lastMapDraw < 120) return;
+    if (now - this.lastMapDraw < 250) return;
     this.lastMapDraw = now;
 
     // 1. Vẽ Minimap (120x120)
@@ -772,9 +940,7 @@ export class WorldScene extends Phaser.Scene {
         ctx.fillStyle = "#9fd0ea";
         this.players.forEach((p, id) => {
           if (id === this.sid) return;
-          ctx.beginPath();
-          ctx.arc(p.tx * scale, p.ty * scale, 2.2, 0, Math.PI * 2);
-          ctx.fill();
+          ctx.fillRect(p.tx * scale - 1.5, p.ty * scale - 1.5, 3, 3);
         });
 
         // NPC (chấm hoàng kim)
@@ -1000,7 +1166,10 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private syncPlayers(k: number, deltaMs: number) {
-    const seen = new Set<string>();
+    const seen = this.seenIds;
+    seen.clear();
+    const lowFx = ui.isLowFx();
+    const hideNames = ui.isHideNames();
     this.state.players.forEach((p: any, id: string) => {
       seen.add(id);
       const isMe = id === this.sid;
@@ -1011,12 +1180,14 @@ export class WorldScene extends Phaser.Scene {
         if (isMe) this.cameras.main.startFollow(e.root, true, 0.2, 0.2);
         this.players.set(id, e);
       }
-      this.applyPlayerEquip(e, p, isMe);
       if (isMe) {
         // Bám sát vị trí đoán trước; làm mượt các lần chỉnh nhỏ từ server
         const kk = 1 - Math.exp(-30 * (deltaMs / 1000));
         e.root.x += (this.predX - e.root.x) * kk;
         e.root.y += (this.predY - e.root.y) * kk;
+        e.root.setVisible(true);
+        if (e.sprite.anims.isPaused) e.sprite.anims.resume();
+        this.applyPlayerEquip(e, p, true);
         this.updatePlayerAnim(e, who, this.facing, this.moving && !p.dead && !p.meditating);
         ui.death(
           p.dead ? Math.max(0, Math.ceil(5 - (this.time.now - (e as any).deadSince) / 1000)) : null,
@@ -1029,29 +1200,43 @@ export class WorldScene extends Phaser.Scene {
         e.ty = p.y;
         e.root.x += (e.tx - e.root.x) * k;
         e.root.y += (e.ty - e.root.y) * k;
+        if (!this.inView(e.root.x, e.root.y, 48)) {
+          if (e.root.visible) e.root.setVisible(false);
+          if (e.sprite.anims.isPlaying) e.sprite.anims.pause();
+          return;
+        }
+        if (!e.root.visible) e.root.setVisible(true);
+        if (e.sprite.anims.isPaused) e.sprite.anims.resume();
+        this.applyPlayerEquip(e, p, false);
         this.updatePlayerAnim(e, who, p.angle, dist > 1.5 && !p.dead && !p.meditating);
       }
       e.root.setDepth(e.root.y);
       e.root.setAlpha(p.dead ? 0.35 : 1);
-      e.aura!.setVisible(p.meditating && !ui.isLowFx());
+      const showAura = Boolean(p.meditating && !lowFx);
+      e.aura!.setVisible(showAura);
+      if (showAura) {
+        const s = 1 + 0.25 * this.auraWave;
+        e.aura!.setScale(s, s).setAlpha(0.25 + 0.25 * this.auraWave);
+      }
       if (e.talismanRing) {
-        const hasTalisman = Boolean(p.talisman && ITEM_BY_ID[p.talisman]);
-        e.talismanRing.setVisible(hasTalisman && !ui.isLowFx());
+        const showTalisman = Boolean(p.talisman && ITEM_BY_ID[p.talisman] && !lowFx);
+        e.talismanRing.setVisible(showTalisman);
+        if (showTalisman) {
+          const s = 1 + 0.15 * this.talismanWave;
+          e.talismanRing.setScale(s, s).setAlpha(0.14 + 0.31 * this.talismanWave);
+        }
       }
-      const label = `${p.name}\n${realmLabel(p.realm, p.tier)}`;
-      if (label !== e.lastLabel) {
-        e.label!.setText(label);
-        e.lastLabel = label;
+      const distToMe = isMe ? 0 : Math.hypot(e.root.x - this.predX, e.root.y - this.predY);
+      const showLabel = isMe || (!hideNames && distToMe <= 450);
+      e.label!.setVisible(showLabel);
+      if (showLabel) {
+        const label = `${p.name}\n${realmLabel(p.realm, p.tier)}`;
+        if (label !== e.lastLabel) {
+          e.label!.setText(label);
+          e.lastLabel = label;
+        }
       }
-      e.label!.setVisible(isMe || !ui.isHideNames());
-      this.drawBar(
-        e.bar,
-        p.hp / p.maxHp,
-        isMe ? 0x6ad06a : 0xd0a040,
-        -30,
-        28,
-        !isMe || p.hp < p.maxHp,
-      );
+      this.drawBar(e, p.hp / p.maxHp, isMe ? 0x6ad06a : 0xd0a040, -30, 28, p.hp < p.maxHp);
     });
     for (const [id, e] of this.players)
       if (!seen.has(id)) {
@@ -1061,7 +1246,8 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private syncMonsters(k: number) {
-    const seen = new Set<string>();
+    const seen = this.seenIds;
+    seen.clear();
     this.state.monsters.forEach((m: any, id: string) => {
       seen.add(id);
       let e = this.monsters.get(id);
@@ -1088,10 +1274,17 @@ export class WorldScene extends Phaser.Scene {
       e.ty = m.y;
       e.root.x += (e.tx - e.root.x) * k;
       e.root.y += (e.ty - e.root.y) * k;
+      if (!this.inView(e.root.x, e.root.y, 48)) {
+        if (e.root.visible) e.root.setVisible(false);
+        if (e.sprite.anims.isPlaying) e.sprite.anims.pause();
+        return;
+      }
+      if (!e.root.visible) e.root.setVisible(true);
+      if (e.sprite.anims.isPaused) e.sprite.anims.resume();
       e.root.setDepth(e.root.y);
       e.sprite.setFlipX(Math.cos(m.angle) < 0);
       this.drawBar(
-        e.bar,
+        e,
         m.hp / m.maxHp,
         0xc0392b,
         -def.radius - 10,
@@ -1101,13 +1294,17 @@ export class WorldScene extends Phaser.Scene {
     });
     for (const [id, e] of this.monsters) {
       if (seen.has(id)) continue;
-      this.tweens.add({
-        targets: e.root,
-        alpha: 0,
-        scale: 0.6,
-        duration: 300,
-        onComplete: () => e.root.destroy(),
-      });
+      if (e.root.visible) {
+        this.tweens.add({
+          targets: e.root,
+          alpha: 0,
+          scale: 0.6,
+          duration: 300,
+          onComplete: () => e.root.destroy(),
+        });
+      } else {
+        e.root.destroy();
+      }
       this.monsters.delete(id);
     }
   }
@@ -1117,11 +1314,13 @@ export class WorldScene extends Phaser.Scene {
       ui.pickupPrompt(null);
       return;
     }
-    const seen = new Set<string>();
+    const seen = this.seenIds;
+    seen.clear();
     let bestId: string | null = null;
     let bestDist = PICKUP_RANGE;
     let bestLabel: string | null = null;
     const me = this.me();
+    const lowFx = ui.isLowFx();
 
     this.state.loot.forEach((l: LootView, id: string) => {
       seen.add(id);
@@ -1147,40 +1346,11 @@ export class WorldScene extends Phaser.Scene {
           })
           .setOrigin(0.5);
         root.add([ring, icon, label]);
-        // Hiệu ứng nhấp nháy theo độ hiếm
-        this.tweens.add({
-          targets: ring,
-          scaleX: 1.3,
-          scaleY: 1.3,
-          alpha: 0.35,
-          yoyo: true,
-          repeat: -1,
-          duration: 650,
-        });
-        this.tweens.add({
-          targets: icon,
-          y: -6,
-          yoyo: true,
-          repeat: -1,
-          duration: 650,
-          ease: "Sine.easeInOut",
-        });
         le = { root, ring, icon, label, itemId: l.itemId, qty: 0 };
         this.loots.set(id, le);
       }
 
-      le.root.setPosition(l.x, l.y);
-      le.root.setDepth(l.y - 2);
-      le.ring.setVisible(!ui.isLowFx());
-      if (le.qty !== l.qty) {
-        le.qty = l.qty;
-        const name = def?.name ?? l.itemId;
-        le.label.setText(l.qty > 1 ? `${name} ×${l.qty}` : name);
-      }
-      // Đồ của người khác (trong 30 giây đầu) hiện mờ đi
       const mineOrPublic = !l.owner || l.owner === this.sid;
-      le.root.setAlpha(mineOrPublic ? 1 : 0.35);
-
       if (me && !me.dead && mineOrPublic) {
         const d = Math.hypot(l.x - this.predX, l.y - this.predY);
         if (d <= bestDist) {
@@ -1189,6 +1359,28 @@ export class WorldScene extends Phaser.Scene {
           bestLabel = def ? `Nhặt ${def.name}` : "Nhặt (F)";
         }
       }
+
+      if (!this.inView(l.x, l.y, 48)) {
+        if (le.root.visible) le.root.setVisible(false);
+        return;
+      }
+      if (!le.root.visible) le.root.setVisible(true);
+
+      le.root.setPosition(l.x, l.y);
+      le.root.setDepth(l.y - 2);
+      le.ring.setVisible(!lowFx);
+      if (!lowFx) {
+        const s = 1 + 0.3 * this.lootWave;
+        le.ring.setScale(s, s).setAlpha(0.18 + 0.17 * this.lootWave);
+      }
+      le.icon.y = -3 - 3 * this.lootWave;
+      if (le.qty !== l.qty) {
+        le.qty = l.qty;
+        const name = def?.name ?? l.itemId;
+        le.label.setText(l.qty > 1 ? `${name} ×${l.qty}` : name);
+      }
+      // Đồ của người khác (trong 30 giây đầu) hiện mờ đi
+      le.root.setAlpha(mineOrPublic ? 1 : 0.35);
     });
 
     for (const [id, le] of this.loots) {
@@ -1214,28 +1406,10 @@ export class WorldScene extends Phaser.Scene {
         .ellipse(0, 6, 54, 22, 0xffe08a, 0.25)
         .setStrokeStyle(2, 0xffe08a, 0.7)
         .setVisible(false);
-      this.tweens.add({
-        targets: e.aura,
-        scaleX: 1.25,
-        scaleY: 1.25,
-        alpha: 0.5,
-        yoyo: true,
-        repeat: -1,
-        duration: 900,
-      });
       e.talismanRing = this.add
         .circle(0, 4, 18, 0xffe08a, 0.14)
         .setStrokeStyle(1.6, 0xffe08a, 0.8)
         .setVisible(false);
-      this.tweens.add({
-        targets: e.talismanRing,
-        scaleX: 1.15,
-        scaleY: 1.15,
-        alpha: 0.45,
-        yoyo: true,
-        repeat: -1,
-        duration: 1100,
-      });
       e.weaponVisual = this.add.graphics().setVisible(false);
       e.label = this.add
         .text(0, -54, "", {
@@ -1255,21 +1429,68 @@ export class WorldScene extends Phaser.Scene {
     return e;
   }
 
-  private drawBar(
-    g: Phaser.GameObjects.Graphics,
-    frac: number,
-    color: number,
-    y: number,
-    w: number,
-    visible: boolean,
-  ) {
+  private drawBar(e: Entity, frac: number, color: number, y: number, w: number, visible: boolean) {
+    const fillW = visible ? Math.round(w * Phaser.Math.Clamp(frac, 0, 1)) : -1;
+    const key = visible ? fillW + color * 256 : -1;
+    if (e.lastBarKey === key) return;
+    e.lastBarKey = key;
+    const g = e.bar;
     g.clear();
     if (!visible) return;
     g.fillStyle(0x000000, 0.55).fillRect(-w / 2, y, w, 4);
-    g.fillStyle(color, 1).fillRect(-w / 2, y, w * Phaser.Math.Clamp(frac, 0, 1), 4);
+    g.fillStyle(color, 1).fillRect(-w / 2, y, fillW, 4);
   }
 
   // ---------------- Hiệu ứng ----------------
+
+  private stepTransientFx(now: number) {
+    // 1. Vệt chém (180ms)
+    for (let i = this.activeSlashes.length - 1; i >= 0; i--) {
+      const it = this.activeSlashes[i];
+      const p = (now - it.start) / 180;
+      if (p >= 1) {
+        it.g.setVisible(false);
+        this.slashPool.push(it.g);
+        const last = this.activeSlashes.pop()!;
+        if (i < this.activeSlashes.length) this.activeSlashes[i] = last;
+      } else {
+        it.g.setAlpha(1 - p).setScale(1 + 0.15 * p);
+      }
+    }
+
+    // 2. Kiếm khí (bay 220ms + mờ dần 120ms = 340ms)
+    for (let i = this.activeSwords.length - 1; i >= 0; i--) {
+      const it = this.activeSwords[i];
+      const elapsed = now - it.start;
+      if (elapsed >= 340) {
+        it.img.setVisible(false);
+        this.swordPool.push(it.img);
+        const last = this.activeSwords.pop()!;
+        if (i < this.activeSwords.length) this.activeSwords[i] = last;
+      } else if (elapsed <= 220) {
+        const p = elapsed / 220;
+        it.img.setPosition(it.x0 + it.dx * p, it.y0 + it.dy * p).setAlpha(1);
+      } else {
+        it.img.setPosition(it.x0 + it.dx, it.y0 + it.dy).setAlpha(1 - (elapsed - 220) / 120);
+      }
+    }
+
+    // 3. Chữ sát thương bay lên (800ms, Cubic.easeOut)
+    for (let i = this.activeFloats.length - 1; i >= 0; i--) {
+      const it = this.activeFloats[i];
+      const p = (now - it.start) / 800;
+      if (p >= 1) {
+        it.t.setVisible(false);
+        this.floatPool.push(it);
+        const last = this.activeFloats.pop()!;
+        if (i < this.activeFloats.length) this.activeFloats[i] = last;
+      } else {
+        const inv = 1 - p;
+        const ease = 1 - inv * inv * inv;
+        it.t.setY(it.y0 - 36 * ease).setAlpha(1 - ease);
+      }
+    }
+  }
 
   private onFx(m: FxMsg) {
     if ((m.kind === "slash" || m.kind === "sword") && m.by === this.sid) return; // đã vẽ ngay khi bấm
@@ -1277,26 +1498,36 @@ export class WorldScene extends Phaser.Scene {
       case "slash": {
         const other = this.players.get(m.by);
         if (other) other.slashUntil = this.time.now + 220;
+        if (!this.inView(m.x, m.y, 110)) return;
         const attacker = this.state?.players?.get(m.by);
         return this.fxSlash(m.x, m.y, m.angle, this.weaponColorFor(attacker, 0xdfe8f0));
       }
       case "sword": {
         const other = this.players.get(m.by);
         if (other) other.slashUntil = this.time.now + 220;
+        if (!this.inView(m.x, m.y, m.range + 96)) return;
         const attacker = this.state?.players?.get(m.by);
         return this.fxSword(m.x, m.y, m.angle, m.range, this.weaponColorFor(attacker, 0xffffff));
       }
       case "mslash":
+        if (!this.inView(m.x, m.y, 96)) return;
         return this.fxSlash(m.x, m.y, m.angle, 0xff6050, 0.6);
       case "levelup":
         return this.fxLevelUp(m.x, m.y, m.major, m.by === this.sid);
       case "breakfail":
+        if (!this.inView(m.x, m.y, 120)) return;
         return this.fxBreakFail(m.x, m.y);
     }
   }
 
   private fxSlash(x: number, y: number, angle: number, color: number, scale = 1) {
-    const g = this.add.graphics({ x, y: y - 8 }).setDepth(y + 1);
+    const g = this.slashPool.pop() ?? this.add.graphics();
+    g.clear();
+    g.setPosition(x, y - 8)
+      .setDepth(y + 1)
+      .setAlpha(1)
+      .setScale(1)
+      .setVisible(true);
     const r = SKILLS.slash.range * scale,
       half = SKILLS.slash.arc / 2;
     g.lineStyle(6 * scale, color, 0.9);
@@ -1307,49 +1538,49 @@ export class WorldScene extends Phaser.Scene {
     g.beginPath();
     g.arc(0, 0, r, angle - half * 0.8, angle + half * 0.8);
     g.strokePath();
-    this.tweens.add({
-      targets: g,
-      alpha: 0,
-      scale: 1.15,
-      duration: 180,
-      onComplete: () => g.destroy(),
-    });
+    this.activeSlashes.push({ g, start: this.time.now });
   }
 
   private fxSword(x: number, y: number, angle: number, range: number, tint = 0xffffff) {
-    const s = this.add
-      .image(x, y - 10, "swordbeam")
+    const s =
+      this.swordPool.pop() ??
+      this.add.image(x, y - 10, "swordbeam").setBlendMode(Phaser.BlendModes.ADD);
+    s.setPosition(x, y - 10)
       .setRotation(angle)
       .setDepth(WORLD_H)
-      .setBlendMode(Phaser.BlendModes.ADD);
+      .setAlpha(1)
+      .setVisible(true);
     if (tint !== 0xffffff) s.setTint(tint);
-    this.tweens.add({
-      targets: s,
-      x: x + Math.cos(angle) * range,
-      y: y - 10 + Math.sin(angle) * range,
-      duration: 220,
-      onComplete: () =>
-        this.tweens.add({ targets: s, alpha: 0, duration: 120, onComplete: () => s.destroy() }),
+    else s.clearTint();
+    this.activeSwords.push({
+      img: s,
+      x0: x,
+      y0: y - 10,
+      dx: Math.cos(angle) * range,
+      dy: Math.sin(angle) * range,
+      start: this.time.now,
     });
   }
 
   private fxLevelUp(x: number, y: number, major: boolean, mine: boolean) {
     const color = major ? 0xffd34d : 0xbfe8ff;
     if (mine) sound.levelup(major);
-    const rings = ui.isLowFx() ? 1 : major ? 3 : 1;
-    for (let i = 0; i < rings; i++) {
-      const ring = this.add
-        .circle(x, y, 16, color, 0)
-        .setStrokeStyle(3, color, 0.9)
-        .setDepth(WORLD_H);
-      this.tweens.add({
-        targets: ring,
-        scale: major ? 7 : 4,
-        alpha: 0,
-        delay: i * 180,
-        duration: 700,
-        onComplete: () => ring.destroy(),
-      });
+    if (mine || this.inView(x, y, 160)) {
+      const rings = ui.isLowFx() ? 1 : major ? 3 : 1;
+      for (let i = 0; i < rings; i++) {
+        const ring = this.add
+          .circle(x, y, 16, color, 0)
+          .setStrokeStyle(3, color, 0.9)
+          .setDepth(WORLD_H);
+        this.tweens.add({
+          targets: ring,
+          scale: major ? 7 : 4,
+          alpha: 0,
+          delay: i * 180,
+          duration: 700,
+          onComplete: () => ring.destroy(),
+        });
+      }
     }
     if (mine) {
       const me = this.me();
@@ -1375,25 +1606,39 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private floatText(m: DmgMsg) {
-    const color = m.toPlayer ? "#ff6b5e" : m.crit ? "#ffd34d" : "#ffffff";
-    const t = this.add
-      .text(m.x + Phaser.Math.Between(-8, 8), m.y, `${m.crit ? "Bạo! " : ""}${m.amount}`, {
-        fontFamily: '"Noto Serif", Georgia, serif',
-        fontSize: m.crit ? "20px" : "15px",
-        color,
-        stroke: "#1d1a16",
-        strokeThickness: 3,
-        fontStyle: "bold",
-      })
-      .setOrigin(0.5)
-      .setDepth(WORLD_H + 1);
-    this.tweens.add({
-      targets: t,
-      y: m.y - 36,
-      alpha: 0,
-      duration: 800,
-      ease: "Cubic.easeOut",
-      onComplete: () => t.destroy(),
-    });
+    const text = `${m.crit ? "Bạo! " : ""}${m.amount}`;
+    const styleKey = (m.toPlayer ? 2 : 0) | (m.crit ? 1 : 0);
+    const x = m.x + Phaser.Math.Between(-8, 8);
+    const y0 = m.y;
+
+    let item = this.floatPool.pop();
+    if (!item) {
+      const t = this.add
+        .text(x, y0, text, {
+          fontFamily: '"Noto Serif", Georgia, serif',
+          fontSize: m.crit ? "20px" : "15px",
+          color: m.toPlayer ? "#ff6b5e" : m.crit ? "#ffd34d" : "#ffffff",
+          stroke: "#1d1a16",
+          strokeThickness: 3,
+          fontStyle: "bold",
+        })
+        .setOrigin(0.5)
+        .setDepth(WORLD_H + 1);
+      item = { t, y0, start: this.time.now, lastText: text, lastStyleKey: styleKey };
+    } else {
+      if (item.lastStyleKey !== styleKey) {
+        item.t.setFontSize(m.crit ? "20px" : "15px");
+        item.t.setColor(m.toPlayer ? "#ff6b5e" : m.crit ? "#ffd34d" : "#ffffff");
+        item.lastStyleKey = styleKey;
+      }
+      if (item.lastText !== text) {
+        item.t.setText(text);
+        item.lastText = text;
+      }
+      item.t.setPosition(x, y0).setAlpha(1).setVisible(true);
+      item.y0 = y0;
+      item.start = this.time.now;
+    }
+    this.activeFloats.push(item);
   }
 }

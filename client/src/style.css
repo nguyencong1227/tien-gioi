@@ -1636,3 +1636,29 @@ body.low-fx #btn-talk {
     display: none;
   }
 }
+
+/* Bảng đo hiệu năng (?perf=1, #71) */
+#perf-panel {
+  position: fixed;
+  z-index: 12;
+  top: calc(max(14px, env(safe-area-inset-top)) + 162px);
+  right: max(14px, env(safe-area-inset-right));
+  width: 176px;
+  padding: 6px 10px;
+  font-size: 11px;
+  line-height: 1.45;
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+.perf-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+}
+.perf-row span {
+  opacity: 0.78;
+}
+.perf-row b {
+  color: #ffe08a;
+}
