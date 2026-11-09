@@ -27,15 +27,16 @@ import {
 import { WorldState, Player } from "../schema";
 import { loadPlayer, savePlayer, hashSecret, cleanName, type SavedPlayer } from "../store";
 import { World, type PlayerCtrl } from "../world";
-import { queueInput, applyInputs, safeSpot } from "../systems/movement";
-import { slash, swordQi, tickRespawn } from "../systems/combat";
-import { spawnInitial, topUpMonsters, tickMonsters, forgetTarget } from "../systems/monsters";
-import { applyStats, breakthrough, setMeditating, tickRecovery } from "../systems/progression";
+import { queueInput, safeSpot } from "../systems/movement";
+import { slash, swordQi } from "../systems/combat";
+import { spawnInitial, topUpMonsters, forgetTarget } from "../systems/monsters";
+import { applyStats, breakthrough, setMeditating } from "../systems/progression";
 import { chat } from "../systems/chat";
 import { sanitizeInventory, sendInv, useItem } from "../systems/inventory";
-import { dropItem, pickup, releaseLootOwner, tickLoot } from "../systems/loot";
+import { dropItem, pickup, releaseLootOwner } from "../systems/loot";
 import { sanitizeQuests, sendQuests } from "../systems/quests";
 import { abandonQuest, acceptQuest, talk, trade, turnInQuest } from "../systems/npc";
+import { tickWorld } from "../systems/tick";
 import { RateLimiter } from "../rate-limit";
 
 const SAVE_EVERY_MS = 30_000;
@@ -186,6 +187,7 @@ export class WorldRoom extends Room<WorldState> {
       inv: sanitizeInventory(save.inventory),
       itemCd: new Map(),
       quests: sanitizeQuests(save.quests),
+      frac: { hp: 0, mp: 0, exp: 0, expAt: 0 },
     });
     this.limiters.set(client.sessionId, new RateLimiter(Date.now()));
     sendInv(this.world, client.sessionId);
@@ -243,19 +245,7 @@ export class WorldRoom extends Room<WorldState> {
   // ---------------- Vòng lặp chính ----------------
 
   private update(dtMs: number) {
-    const w = this.world;
-    w.now = Date.now();
-    const dt = dtMs / 1000;
-
-    this.state.players.forEach((p, sid) => {
-      const c = w.ctrl.get(sid);
-      if (!c) return;
-      if (p.dead) return tickRespawn(w, p, c);
-      applyInputs(p, c);
-      tickRecovery(w, sid, p, c, dt);
-    });
-
-    tickMonsters(w, dt);
-    tickLoot(w);
+    this.world.now = Date.now();
+    tickWorld(this.world, dtMs);
   }
 }
