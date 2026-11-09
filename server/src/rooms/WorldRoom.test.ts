@@ -673,6 +673,134 @@ describe("bảo mật", () => {
     await waitFor(() => a.chat.find((m) => m.text === "còn sống"));
   });
 
+  it("tin rác bơm vào MỌI loại tin đã đăng ký (lấy từ phòng, không liệt kê tay): không sập, state hợp lệ, không sinh đồ / tiền", async () => {
+    const a = await join();
+    const b = await join();
+    const sr = serverRoom(a.room) as any;
+    // Danh sách loại tin lấy thẳng từ phòng: tin mới thêm sau này tự được kiểm, không phải nhớ sửa test
+    const types = Object.keys(sr.onMessageHandlers).filter((t) => t !== "*" && !t.startsWith("__"));
+    expect(types.length).toBeGreaterThanOrEqual(24); // phòng không đổi cách lưu handler khiến test chạy rỗng
+    for (const t of [
+      "input",
+      "chat",
+      "useItem",
+      "equip",
+      "craft",
+      "buy",
+      "sell",
+      "partyInvite",
+      "breakthrough",
+    ]) {
+      expect(types, t).toContain(t);
+    }
+
+    // Đứng cạnh Lão dược sư với ít tiền và đồ để tin rác chạm tới tận logic mua / bán / đổi, không chỉ bị chặn ở cổng
+    const duoc = NPC_BY_ID.duoc_su!;
+    const sp = serverState(a.room).players.get(a.room.sessionId)!;
+    sp.x = duoc.x;
+    sp.y = duoc.y + 20;
+    const ctrl = sr.world.ctrl.get(a.room.sessionId);
+    ctrl.coin = 1000;
+    ctrl.inv[0] = { itemId: "long_tho", qty: 5 };
+    const lootBefore = serverState(a.room).loot.size;
+
+    // Một đối tượng có MỌI tên trường mà các tin dùng, cùng nhận một giá trị xấu: mỗi handler gặp giá trị xấu ở trường của nó.
+    // (Không dùng 0 và 1: slot / qty hợp lệ sẽ làm dropItem vứt đồ thật.)
+    const FIELDS = [
+      "slot",
+      "qty",
+      "npcId",
+      "itemId",
+      "questId",
+      "tradeId",
+      "recipeId",
+      "lootId",
+      "name",
+      "from",
+      "text",
+      "angle",
+      "dx",
+      "dy",
+      "seq",
+      "x",
+      "y",
+      "on",
+    ];
+    const BAD: unknown[] = [
+      -1,
+      1e308,
+      NaN,
+      Infinity,
+      -Infinity,
+      1.5,
+      1e9,
+      "",
+      "x",
+      "9",
+      "__proto__",
+      "constructor",
+      "x".repeat(120),
+      [],
+      {},
+      null,
+      true,
+      false,
+    ];
+    const uniform = BAD.map((v) => Object.fromEntries(FIELDS.map((f) => [f, v])));
+    // Bộ thứ hai "gần hợp lệ": đúng NPC và vật phẩm của cửa hàng, mọi trường còn lại xấu, để mua / bán / nói chuyện
+    // đi qua cổng kiểm NPC và hàng bán rồi mới gặp số lượng, ô túi xấu (chạm tới tận logic, không chỉ bị chặn ở cổng).
+    const nearValid = uniform.map((u) => ({ ...u, npcId: "duoc_su", itemId: "hoi_huyet_dan" }));
+    let deep: any = { slot: -1 };
+    for (let i = 0; i < 30; i++) deep = { slot: -1, npcId: "duoc_su", next: deep };
+    const proto = JSON.parse(
+      '{"__proto__":{"polluted":1},"constructor":{"prototype":{"polluted":1}}}',
+    );
+    const junk: unknown[] = [
+      null,
+      "x",
+      12,
+      [],
+      [1, 2, 3],
+      {},
+      deep,
+      proto,
+      ...uniform,
+      ...nearValid,
+    ];
+
+    // Chia đợt <= 12 tin mỗi loại, nghỉ giữa các đợt cho giới hạn tần suất của từng loại tin hồi lại (burst 16, 8 tin/giây)
+    for (let i = 0; i < junk.length; i += 12) {
+      const wave = junk.slice(i, i + 12);
+      for (const t of types) for (const j of wave) a.room.send(t, j);
+      await sleep(1500);
+    }
+
+    expect(a.room.connection.isOpen).toBe(true);
+    // Không ai tự nhiên có thêm đồ hay tiền, không ai mất đồ / tiền vì tin rác
+    expect(ctrl.coin).toBe(1000);
+    expect(ctrl.inv[0]).toEqual({ itemId: "long_tho", qty: 5 });
+    expect(ctrl.inv.slice(1).every((x: unknown) => x === null)).toBe(true);
+    expect(serverState(a.room).loot.size).toBe(lootBefore);
+    // Mọi giá trị trong state vẫn là số hữu hạn
+    const st = serverState(a.room);
+    st.players.forEach((p) => {
+      for (const k of ["x", "y", "hp", "maxHp", "mp", "maxMp", "exp", "expMax"] as const) {
+        expect(Number.isFinite((p as any)[k]), `${p.name}.${k}`).toBe(true);
+      }
+      expect(p.hp).toBeGreaterThanOrEqual(0);
+      expect(p.hp).toBeLessThanOrEqual(p.maxHp);
+    });
+    st.monsters.forEach((m) => {
+      expect(Number.isFinite(m.x) && Number.isFinite(m.y) && Number.isFinite(m.hp)).toBe(true);
+    });
+    // Không bị "ô nhiễm prototype"
+    expect(({} as any).polluted).toBeUndefined();
+    expect(Object.keys(Object.prototype)).toEqual([]);
+    // Phòng vẫn phục vụ người khác
+    b.room.send("chat", { text: "còn sống sau tin rác" });
+    await waitFor(() => a.chat.find((m) => m.text === "còn sống sau tin rác"));
+  }, 20_000);
+
   it("spam tin nhắn liên tục thì bị ngắt kết nối", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const a = await join();
