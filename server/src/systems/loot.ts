@@ -9,6 +9,7 @@ import {
 import { Loot } from "../schema";
 import { rand, type World, type MonsterCtrl } from "../world";
 import { giveItem, sendInv, slotIndex, takeFromSlot } from "./inventory";
+import { lootOwner } from "./party";
 
 /** Tạo một món đồ rơi. owner = "" thì ai cũng nhặt được ngay. */
 export function spawnLoot(
@@ -33,18 +34,11 @@ export function spawnLoot(
 
 /**
  * Quái chết: tung bảng rơi đồ, đồ nằm rải quanh xác.
- * Người gây sát thương nhiều nhất (còn trong phòng, chưa trọng thương) được quyền nhặt trước.
+ * Nhóm (đội hoặc người lẻ) gây sát thương nhiều nhất được quyền nhặt trước: chủ đồ là người đánh nhiều nhất
+ * trong nhóm đó, đồng đội của họ nhặt được nhờ cùng đội (xem pickup).
  */
 export function dropLoot(w: World, mc: MonsterCtrl, x: number, y: number) {
-  let owner = "",
-    best = 0;
-  for (const [sid, dmg] of mc.damageBy) {
-    const p = w.state.players.get(sid);
-    if (p && !p.dead && dmg > best) {
-      best = dmg;
-      owner = sid;
-    }
-  }
+  const owner = lootOwner(w, mc.damageBy);
   for (const d of rollDrops(mc.def.id)) {
     const a = rand(0, Math.PI * 2),
       r = rand(0, 16);
@@ -60,7 +54,7 @@ export function pickup(w: World, sid: string, lootId: unknown) {
   if (!l) return;
   const { p } = r;
   if (Math.hypot(l.x - p.x, l.y - p.y) > PICKUP_RANGE) return;
-  if (l.owner && l.owner !== sid)
+  if (l.owner && l.owner !== sid && !w.parties.sameParty(l.owner, sid))
     return w.events.toast(sid, { text: "Vật phẩm này chưa thuộc về ngươi.", tone: "bad" });
   const left = giveItem(w, sid, l.itemId, l.qty);
   if (left === l.qty) return w.events.toast(sid, { text: "Túi đồ đã đầy.", tone: "bad" });

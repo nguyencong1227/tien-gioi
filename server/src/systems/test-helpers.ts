@@ -8,6 +8,9 @@ import {
   type QuestsMsg,
   type DialogMsg,
   type ToastMsg,
+  type ChatOut,
+  type PartyMsg,
+  type PartyInvitedMsg,
 } from "@tien-gioi/shared";
 import { WorldState, Player, Monster } from "../schema";
 import { World, type PlayerCtrl } from "../world";
@@ -21,6 +24,9 @@ export function makeWorld() {
   const invs: { sid: string; msg: InvMsg }[] = [];
   const quests: { sid: string; msg: QuestsMsg }[] = [];
   const dialogs: { sid: string; msg: DialogMsg }[] = [];
+  const parties: { sid: string; msg: PartyMsg }[] = [];
+  const invited: { sid: string; msg: PartyInvitedMsg }[] = [];
+  const chatsTo: { sid: string; msg: ChatOut }[] = [];
   const w = new World(new WorldState(), {
     fx: (m) => fx.push(m),
     dmg: () => {},
@@ -30,8 +36,11 @@ export function makeWorld() {
     inv: (sid, msg) => invs.push({ sid, msg }),
     quests: (sid, msg) => quests.push({ sid, msg }),
     dialog: (sid, msg) => dialogs.push({ sid, msg }),
+    party: (sid, msg) => parties.push({ sid, msg }),
+    partyInvited: (sid, msg) => invited.push({ sid, msg }),
+    chatTo: (sid, msg) => chatsTo.push({ sid, msg }),
   });
-  return { w, fx, toasts, sys, chats, invs, quests, dialogs };
+  return { w, fx, toasts, sys, chats, invs, quests, dialogs, parties, invited, chatsTo };
 }
 
 export function addPlayer(w: World, sid: string, realm = 0, tier = 0) {

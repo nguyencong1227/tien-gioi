@@ -79,6 +79,9 @@ export function runBench(players: number, seconds: number, seed = 1): BenchResul
       inv: () => {},
       quests: () => {},
       dialog: () => {},
+      party: () => {},
+      partyInvited: () => {},
+      chatTo: () => {},
     });
     w.now = 0;
     spawnInitial(w);

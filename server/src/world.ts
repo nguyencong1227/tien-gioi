@@ -10,10 +10,14 @@ import type {
   InvMsg,
   QuestsMsg,
   DialogMsg,
+  ChatOut,
+  PartyMsg,
+  PartyInvitedMsg,
 } from "@tien-gioi/shared";
 import type { WorldState, Player } from "./schema";
 import type { SavedPlayer, QuestSave } from "./store";
 import { Interest } from "./systems/interest";
+import { Parties } from "./systems/party";
 
 /** Dữ liệu riêng của server cho mỗi người chơi (không gửi xuống client). */
 export interface PlayerCtrl {
@@ -75,6 +79,12 @@ export interface WorldEvents {
   quests(sessionId: string, msg: QuestsMsg): void;
   /** Mở hộp thoại NPC cho đúng người. */
   dialog(sessionId: string, msg: DialogMsg): void;
+  /** Đội hình hiện tại, gửi riêng cho từng thành viên (không broadcast, không vào state chung). */
+  party(sessionId: string, msg: PartyMsg): void;
+  /** Có người mời vào đội, gửi riêng cho người được mời. */
+  partyInvited(sessionId: string, msg: PartyInvitedMsg): void;
+  /** Chat gửi cho một người (chat đội). */
+  chatTo(sessionId: string, msg: ChatOut): void;
 }
 
 export class World {
@@ -85,6 +95,8 @@ export class World {
   readonly lctrl = new Map<string, LootCtrl>();
   /** Vùng nhìn của từng client: ai nhận state của thực thể nào (#62) */
   readonly interest = new Interest();
+  /** Đội hình: ai ở đội nào, lời mời đang chờ (#74) */
+  readonly parties = new Parties();
   monsterSeq = 0;
   lootSeq = 0;
 

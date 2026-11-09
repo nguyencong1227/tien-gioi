@@ -19,6 +19,10 @@ import {
   type InvMsg,
   type QuestsMsg,
   type DialogMsg,
+  type PartyMsg,
+  type PartyInvitedMsg,
+  PARTY_INVITE_TTL_MS,
+  PARTY_SNAPSHOT_MS,
   NPC_BY_ID,
   QUEST_BY_ID,
 } from "@tien-gioi/shared";
@@ -691,5 +695,88 @@ describe("vùng nhìn (StateView)", () => {
     expect(aGot.some((m) => m.kind === "slash")).toBe(true); // chính mình vẫn nhận
     await sleep(200);
     expect(farGot).toEqual([]); // người ở xa không nhận gì
+  });
+});
+
+describe("tổ đội", () => {
+  /** Thu thập tin `party` / `partyInvited` mà một client nhận được */
+  function listen(room: Room) {
+    const parties: PartyMsg[] = [];
+    const invited: PartyInvitedMsg[] = [];
+    room.onMessage("party", (m: PartyMsg) => parties.push(m));
+    room.onMessage("partyInvited", (m: PartyInvitedMsg) => invited.push(m));
+    return { parties, invited };
+  }
+
+  it("mời, nhận, nhận đội hình mỗi giây; /p chỉ tới đội; người ngoài không nhận gì; rời phòng thì rời đội", async () => {
+    const a = await join();
+    const b = await join();
+    const outsider = await join();
+    const la = listen(a.room);
+    const lb = listen(b.room);
+    const lo = listen(outsider.room);
+
+    a.room.send("partyInvite", { name: b.name });
+    const inv = await waitFor(() => lb.invited[0]);
+    expect(inv).toEqual({ from: a.name, ttlMs: PARTY_INVITE_TTL_MS });
+    b.room.send("partyAccept", { from: a.name });
+    const first = await waitFor(() => la.parties.find((m) => m.members.length === 2));
+    expect(first.leader).toBe(a.name);
+    expect(first.members.map((m) => m.name)).toEqual([a.name, b.name]);
+    await waitFor(() => lb.parties.some((m) => m.members.length === 2));
+
+    // Đội hình được gửi lại định kỳ (máu, vị trí thay đổi)
+    const n = la.parties.length;
+    await waitFor(() => la.parties.length > n, PARTY_SNAPSHOT_MS * 3);
+
+    // Chat đội: chỉ a và b nhận, có channel; người ngoài không nhận
+    b.room.send("chat", { text: "/p đi săn Hôi Lang" });
+    await waitFor(() => a.chat.some((m) => m.channel === "party"));
+    await waitFor(() => b.chat.some((m) => m.channel === "party"));
+    expect(a.chat.find((m) => m.channel === "party")).toMatchObject({
+      from: b.name,
+      text: "đi săn Hôi Lang",
+    });
+    await sleep(150);
+    expect(outsider.chat.some((m) => m.text.includes("Hôi Lang"))).toBe(false);
+    expect(lo.parties).toEqual([]);
+    expect(lo.invited).toEqual([]);
+
+    // b thoát phòng: a không còn đội (còn một mình thì giải tán)
+    await b.room.leave(true);
+    rooms.splice(rooms.indexOf(b.room), 1);
+    await waitFor(() => la.parties.at(-1)?.members.length === 0);
+    expect(la.parties.at(-1)).toEqual({ leader: "", members: [] });
+  });
+
+  it("tin tổ đội rác (kiểu sai, tên quá dài, spam lời mời) không làm sập phòng, không lập đội", async () => {
+    const a = await join();
+    const b = await join();
+    const lb = listen(b.room);
+    const junk: unknown[] = [
+      null,
+      42,
+      "x",
+      [],
+      { name: 42 },
+      { name: "x".repeat(1000) },
+      { from: {} },
+    ];
+    for (const m of junk) {
+      a.room.send("partyInvite", m);
+      a.room.send("partyAccept", m);
+      a.room.send("partyDecline", m);
+      a.room.send("partyKick", m);
+    }
+    a.room.send("partyLeave");
+    // spam lời mời hợp lệ: hồi chiêu giữ lại đúng một lời mời
+    for (let i = 0; i < 5; i++) a.room.send("partyInvite", { name: b.name });
+    await waitFor(() => lb.invited.length >= 1);
+    await sleep(250);
+    expect(lb.invited).toHaveLength(1);
+    expect(serverRoom(a.room).state.players.size).toBeGreaterThanOrEqual(2);
+    // phòng vẫn chạy: b vẫn nhận / đi lại được
+    b.room.send("input", { seq: 1, dx: 1, dy: 0 });
+    await waitFor(() => b.me().lastSeq === 1);
   });
 });
