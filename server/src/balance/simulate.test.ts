@@ -1,8 +1,15 @@
 // Giữ đường cong tu luyện trong mục tiêu của #28. Sửa số liệu trong shared/ mà test này đỏ
 // thì xem lại docs/CAN_BANG.md (chạy `npm run can-bang -w server`).
 import { describe, expect, it } from "vitest";
-import { MONSTER_BY_ID, expToNext, killExp, meditateExpPerSec } from "@tien-gioi/shared";
-import { bestOption, huntRate, minutesToFinish, simulate } from "./simulate";
+import {
+  MONSTERS,
+  MONSTER_BY_ID,
+  PARTY_MAX,
+  expToNext,
+  killExp,
+  meditateExpPerSec,
+} from "@tien-gioi/shared";
+import { bestOption, huntRate, minutesToFinish, partyRatio, simulate } from "./simulate";
 
 describe("đường cong tu luyện", () => {
   const rows = simulate();
@@ -51,5 +58,39 @@ describe("tu vi khi hạ quái", () => {
     expect(secPerBar(1)).toBeGreaterThan(secPerBar(0));
     expect(secPerBar(2)).toBeGreaterThan(secPerBar(1));
     expect(secPerBar(3)).toBeGreaterThan(secPerBar(2));
+  });
+});
+
+describe("đi theo đội (mô hình, #74)", () => {
+  const rows = simulate();
+
+  it("đội 1 người cho đúng kết quả đánh một mình ở mọi bậc", () => {
+    for (const r of rows) {
+      expect(partyRatio(r.realm, r.tier, 1).ratio, r.label).toBe(1);
+      for (const m of MONSTERS) {
+        expect(huntRate(m, r.realm, r.tier, 1)?.rate, `${r.label} ${m.id}`).toBe(
+          huntRate(m, r.realm, r.tier)?.rate,
+        );
+      }
+    }
+  });
+
+  it("đội đông thì quái nào một người đánh được, cả đội cũng đánh được (mỗi người chịu ít sát thương hơn)", () => {
+    for (const r of rows) {
+      for (const m of MONSTERS) {
+        if (!huntRate(m, r.realm, r.tier)) continue;
+        for (let n = 2; n <= PARTY_MAX; n++) {
+          expect(huntRate(m, r.realm, r.tier, n), `${r.label} ${m.id} đội ${n}`).not.toBeNull();
+        }
+      }
+    }
+  });
+
+  it("đội đánh được quái mà một người chưa dám (có ít nhất một bậc đội chọn quái khác người lẻ)", () => {
+    const differ = rows.filter((r) => {
+      const p = partyRatio(r.realm, r.tier, PARTY_MAX);
+      return p.party !== p.solo;
+    });
+    expect(differ.length).toBeGreaterThan(0);
   });
 });
