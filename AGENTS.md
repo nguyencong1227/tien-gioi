@@ -48,6 +48,8 @@ npm run build        # build client vào client/dist
 - **Server quyết định mọi kết quả** (sát thương, rơi đồ, tu vi, nhiệm vụ). Client chỉ gửi ý định và hiển thị.
 - **Server không tin client:**
   - Kiểm tra kiểu, giá trị hữu hạn, khoảng cách, hồi chiêu cho mọi tin nhắn.
+  - Đăng ký tin nhắn mới bằng `this.on(...)` trong `WorldRoom` (có giới hạn tần suất, `server/src/rate-limit.ts`), không gọi thẳng `onMessage`.
+  - Tra bảng `*_BY_ID` bằng id đến từ client / file lưu thì dùng `byId(TABLE, id)` (`server/src/systems/lookup.ts`): `TABLE["constructor"]` không phải `undefined`.
   - Dữ liệu riêng (túi đồ, nhiệm vụ) không đưa vào state chung, chỉ gửi cho chủ.
 - **Đổi `shared/`:** làm PR riêng, chỉ sửa `shared/`, một dev khác review trước khi các bên code tiếp.
 - **Phiên bản đã ghim:** Colyseus 0.16, `@colyseus/schema` 3, `colyseus.js` 0.16, Phaser 3.90, TypeScript 5.9.

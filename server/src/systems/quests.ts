@@ -11,6 +11,7 @@ import {
 import type { Player } from "../schema";
 import type { QuestSave } from "../store";
 import type { World, PlayerCtrl } from "../world";
+import { byId } from "./lookup";
 
 /** Đọc sổ nhiệm vụ từ file lưu: bỏ nhiệm vụ không còn tồn tại, ép bước / tiến độ về khoảng hợp lệ. */
 export function sanitizeQuests(raw: unknown): QuestSave {
@@ -18,18 +19,20 @@ export function sanitizeQuests(raw: unknown): QuestSave {
   const ids = new Set<string>();
   const active: QuestProgress[] = [];
   for (const a of Array.isArray(r.active) ? r.active : []) {
-    const def = typeof a?.id === "string" ? QUEST_BY_ID[a.id] : undefined;
+    const def = byId(QUEST_BY_ID, a?.id);
     if (!def || ids.has(def.id)) continue;
     ids.add(def.id);
     const step = Math.min(def.steps.length, Math.max(0, Math.floor(Number(a.step)) || 0));
     const count = Math.max(0, Math.floor(Number(a.count)) || 0);
     active.push({ id: def.id, step, count });
   }
-  const done = [...new Set((Array.isArray(r.done) ? r.done : []).filter((id) => QUEST_BY_ID[id]))];
+  const done = [
+    ...new Set((Array.isArray(r.done) ? r.done : []).filter((id) => byId(QUEST_BY_ID, id))),
+  ];
   const daily: Record<string, string> = {};
   if (r.daily && typeof r.daily === "object") {
     for (const [id, day] of Object.entries(r.daily)) {
-      if (QUEST_BY_ID[id]?.daily && typeof day === "string") daily[id] = day;
+      if (byId(QUEST_BY_ID, id)?.daily && typeof day === "string") daily[id] = day;
     }
   }
   return { active, done, daily };
