@@ -123,4 +123,32 @@ describe("vùng nhìn", () => {
     expect(view.has(m.m)).toBe(false);
     expect(w.interest.viewOf("a")).toBeUndefined();
   });
+
+  it("forEachNear: chỉ người đã đăng ký và trong bán kính, theo vị trí hiện tại", () => {
+    const { w, a } = setup();
+    const b = addPlayer(w, "b");
+    b.p.x = 1000 + 500;
+    b.p.y = 1000;
+    w.interest.join(w, "b", new StateView());
+    const c = addPlayer(w, "c");
+    c.p.x = 1000 + 3000;
+    c.p.y = 1000;
+    w.interest.join(w, "c", new StateView());
+    const d = addPlayer(w, "d"); // có trong state nhưng chưa đăng ký vùng nhìn
+    d.p.x = 1000;
+    d.p.y = 1000;
+    const got = (r: number) => {
+      const out: string[] = [];
+      w.interest.forEachNear(w, a.p.x, a.p.y, r, (sid) => out.push(sid));
+      return out.sort();
+    };
+    expect(got(VIEW_ENTER)).toEqual(["a", "b"]);
+    expect(got(100)).toEqual(["a"]);
+    expect(got(4000)).toEqual(["a", "b", "c"]);
+    // người chơi đi xa: không còn nhận
+    b.p.x = 1000 + 2 * VIEW_ENTER;
+    expect(got(VIEW_ENTER)).toEqual(["a"]);
+    w.interest.leave("a");
+    expect(got(VIEW_ENTER)).toEqual([]);
+  });
 });

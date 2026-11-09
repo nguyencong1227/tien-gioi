@@ -159,4 +159,12 @@ describe("ngân sách băng thông và CPU (benchmark có seed, kết quả cố
     expect(r.patchBytes).toBeLessThan(520);
     expect(r.avgMs).toBeLessThan(10);
   });
+
+  it("fx / dmg chỉ gửi cho người trong vùng nhìn: ít hơn một nửa so với broadcast cả phòng", () => {
+    const r = runBench(100, 10);
+    // Đo lúc viết: ~7.7 KB/s mỗi client nếu broadcast, ~2.3 KB/s khi cắt theo vùng nhìn (ước lượng bằng JSON).
+    expect(r.eventKbBroadcast).toBeGreaterThan(1);
+    expect(r.eventKbNear).toBeLessThan(r.eventKbBroadcast / 2);
+    expect(r.eventKbNear).toBeLessThan(4);
+  });
 });
