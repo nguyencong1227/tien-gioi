@@ -1,6 +1,6 @@
 // Phòng thế giới: vào / ra phòng, lưu nhân vật, nối tin nhắn với các system.
 // Logic game nằm trong ../systems/*, trạng thái dùng chung trong ../world.ts.
-import { Room, Client, ServerError } from "colyseus";
+import { Room, Client, ServerError, type RoomException } from "colyseus";
 import {
   TICK_MS,
   MAX_PLAYERS_PER_ROOM,
@@ -27,17 +27,23 @@ import {
 import { WorldState, Player } from "../schema";
 import { loadPlayer, savePlayer, hashSecret, cleanName, type SavedPlayer } from "../store";
 import { World, type PlayerCtrl } from "../world";
-import { queueInput, applyInputs, safeSpot } from "../systems/movement";
-import { slash, swordQi, tickRespawn } from "../systems/combat";
-import { spawnInitial, topUpMonsters, tickMonsters, forgetTarget } from "../systems/monsters";
-import { applyStats, breakthrough, setMeditating, tickRecovery } from "../systems/progression";
+import { queueInput, safeSpot } from "../systems/movement";
+import { slash, swordQi } from "../systems/combat";
+import { spawnInitial, topUpMonsters, forgetTarget } from "../systems/monsters";
+import { applyStats, breakthrough, setMeditating } from "../systems/progression";
 import { chat } from "../systems/chat";
 import { sanitizeInventory, sendInv, useItem } from "../systems/inventory";
-import { dropItem, pickup, releaseLootOwner, tickLoot } from "../systems/loot";
+import { dropItem, pickup, releaseLootOwner } from "../systems/loot";
 import { sanitizeQuests, sendQuests } from "../systems/quests";
 import { abandonQuest, acceptQuest, talk, trade, turnInQuest } from "../systems/npc";
+import { tickWorld } from "../systems/tick";
+import { RateLimiter } from "../rate-limit";
 
 const SAVE_EVERY_MS = 30_000;
+/** Mã đóng kết nối khi spam tin nhắn (client hiện "mất kết nối") */
+export const CLOSE_SPAM = 4429;
+/** Mã nhân vật dài hơn mức này thì từ chối luôn (client tạo mã 32 ký tự) */
+const MAX_SECRET_LEN = 256;
 
 export class WorldRoom extends Room<WorldState> {
   maxClients = MAX_PLAYERS_PER_ROOM;
@@ -55,6 +61,9 @@ export class WorldRoom extends Room<WorldState> {
     dialog: (sid, msg) => this.sendTo(sid, "dialog", msg),
   });
 
+  /** Giới hạn tần suất tin nhắn, theo sessionId */
+  private limiters = new Map<string, RateLimiter>();
+
   /** Gửi tin nhắn riêng cho một người chơi */
   private sendTo(sid: string, type: string, msg: unknown) {
     this.clients.find((c) => c.sessionId === sid)?.send(type, msg);
@@ -67,29 +76,59 @@ export class WorldRoom extends Room<WorldState> {
     this.clock.setInterval(() => topUpMonsters(this.world), MONSTER_RESPAWN_MS);
     this.clock.setInterval(() => this.saveAll(), SAVE_EVERY_MS);
 
+    // Mọi tin nhắn đi qua this.on: giới hạn tần suất trước, rồi mới tới system.
+    // Kiểu dữ liệu (m có thể là bất cứ thứ gì client gửi) do từng system tự kiểm tra.
     const w = this.world;
-    this.onMessage("input", (c, m: InputMsg) => queueInput(w, c.sessionId, m));
-    this.onMessage("attack", (c, m: AttackMsg) => slash(w, c.sessionId, m?.angle));
-    this.onMessage("skill", (c, m: SkillMsg) => {
-      if (m?.id === "sword") swordQi(w, c.sessionId, m.angle);
+    this.on<InputMsg>("input", (sid, m) => queueInput(w, sid, m));
+    this.on<AttackMsg>("attack", (sid, m) => slash(w, sid, m?.angle));
+    this.on<SkillMsg>("skill", (sid, m) => {
+      if (m?.id === "sword") swordQi(w, sid, m.angle);
     });
-    this.onMessage("meditate", (c, m: MeditateMsg) => setMeditating(w, c.sessionId, !!m?.on));
-    this.onMessage("breakthrough", (c) => breakthrough(w, c.sessionId));
-    this.onMessage("chat", (c, m: ChatMsg) => chat(w, c.sessionId, m?.text));
-    this.onMessage("useItem", (c, m: UseItemMsg) => useItem(w, c.sessionId, m?.slot));
-    this.onMessage("pickup", (c, m: PickupMsg) => pickup(w, c.sessionId, m?.lootId));
-    this.onMessage("dropItem", (c, m: DropItemMsg) => dropItem(w, c.sessionId, m?.slot, m?.qty));
-    this.onMessage("talk", (c, m: TalkMsg) => talk(w, c.sessionId, m?.npcId));
-    this.onMessage("questAccept", (c, m: QuestAcceptMsg) =>
-      acceptQuest(w, c.sessionId, m?.questId),
-    );
-    this.onMessage("questTurnIn", (c, m: QuestTurnInMsg) =>
-      turnInQuest(w, c.sessionId, m?.questId),
-    );
-    this.onMessage("questAbandon", (c, m: QuestAbandonMsg) =>
-      abandonQuest(w, c.sessionId, m?.questId),
-    );
-    this.onMessage("trade", (c, m: TradeMsg) => trade(w, c.sessionId, m?.tradeId));
+    this.on<MeditateMsg>("meditate", (sid, m) => setMeditating(w, sid, m?.on === true));
+    this.on("breakthrough", (sid) => breakthrough(w, sid));
+    this.on<ChatMsg>("chat", (sid, m) => chat(w, sid, m?.text));
+    this.on<UseItemMsg>("useItem", (sid, m) => useItem(w, sid, m?.slot));
+    this.on<PickupMsg>("pickup", (sid, m) => pickup(w, sid, m?.lootId));
+    this.on<DropItemMsg>("dropItem", (sid, m) => dropItem(w, sid, m?.slot, m?.qty));
+    this.on<TalkMsg>("talk", (sid, m) => talk(w, sid, m?.npcId));
+    this.on<QuestAcceptMsg>("questAccept", (sid, m) => acceptQuest(w, sid, m?.questId));
+    this.on<QuestTurnInMsg>("questTurnIn", (sid, m) => turnInQuest(w, sid, m?.questId));
+    this.on<QuestAbandonMsg>("questAbandon", (sid, m) => abandonQuest(w, sid, m?.questId));
+    this.on<TradeMsg>("trade", (sid, m) => trade(w, sid, m?.tradeId));
+    // Loại tin nhắn không đăng ký: bỏ qua, tính là spam
+    this.onMessage("*", (c) => this.reject(c));
+  }
+
+  /** Đăng ký tin nhắn có giới hạn tần suất. Lỗi trong fn được onUncaughtException bắt, phòng không sập. */
+  private on<T>(type: string, fn: (sid: string, m: T | undefined) => void) {
+    this.onMessage(type, (c: Client, m: unknown) => {
+      const lim = this.limiters.get(c.sessionId);
+      if (!lim) return;
+      const v = lim.check(type, Date.now());
+      if (v === "kick") return this.kick(c);
+      // Tin nhắn hợp lệ luôn là object (hoặc không có, vd "breakthrough"); m có thể là bất cứ gì
+      if (v === "ok") fn(c.sessionId, m !== null && typeof m === "object" ? (m as T) : undefined);
+    });
+  }
+
+  private reject(c: Client) {
+    if (this.limiters.get(c.sessionId)?.reject(Date.now()) === "kick") this.kick(c);
+  }
+
+  private kick(c: Client) {
+    if (!this.limiters.delete(c.sessionId)) return; // đã ngắt rồi
+    const name = this.state.players.get(c.sessionId)?.name ?? c.sessionId;
+    console.warn(`[spam] ngắt kết nối ${name}: gửi quá nhiều tin nhắn`);
+    c.leave(CLOSE_SPAM, "Gửi quá nhiều thao tác.");
+  }
+
+  /**
+   * Lỗi trong tin nhắn / vòng lặp / hẹn giờ: ghi log và chạy tiếp, không để một tin nhắn lỗi làm sập cả server.
+   * Có hàm này thì Colyseus tự bọc try/catch quanh mọi onMessage, setSimulationInterval, clock.
+   */
+  onUncaughtException(err: RoomException<this>, methodName: string) {
+    if (err.cause instanceof ServerError) return; // từ chối có chủ đích (vd sai tên ở onAuth), không phải lỗi
+    console.error(`[lỗi] ${methodName}:`, err.cause ?? err);
   }
 
   // ---------------- Vào / ra ----------------
@@ -98,7 +137,8 @@ export class WorldRoom extends Room<WorldState> {
     const name = cleanName(options?.name);
     if (!name) throw new ServerError(400, "Tên cần 2–16 ký tự, chỉ gồm chữ, số và khoảng trắng.");
     const secret = typeof options?.secret === "string" ? options.secret : "";
-    if (secret.length < 16) throw new ServerError(400, "Thiếu mã nhân vật.");
+    if (secret.length < 16 || secret.length > MAX_SECRET_LEN)
+      throw new ServerError(400, "Thiếu mã nhân vật.");
     for (const p of this.state.players.values()) {
       if (p.name.toLowerCase() === name.toLowerCase())
         throw new ServerError(409, "Nhân vật này đang ở trong game.");
@@ -147,7 +187,9 @@ export class WorldRoom extends Room<WorldState> {
       inv: sanitizeInventory(save.inventory),
       itemCd: new Map(),
       quests: sanitizeQuests(save.quests),
+      frac: { hp: 0, mp: 0, exp: 0, expAt: 0 },
     });
+    this.limiters.set(client.sessionId, new RateLimiter(Date.now()));
     sendInv(this.world, client.sessionId);
     sendQuests(this.world, client.sessionId);
     this.world.events.sys(`${p.name} (${realmLabel(p.realm, p.tier)}) đã nhập thế.`);
@@ -163,6 +205,7 @@ export class WorldRoom extends Room<WorldState> {
     }
     this.state.players.delete(sid);
     this.world.ctrl.delete(sid);
+    this.limiters.delete(sid);
     forgetTarget(this.world, sid);
     releaseLootOwner(this.world, sid);
   }
@@ -202,19 +245,7 @@ export class WorldRoom extends Room<WorldState> {
   // ---------------- Vòng lặp chính ----------------
 
   private update(dtMs: number) {
-    const w = this.world;
-    w.now = Date.now();
-    const dt = dtMs / 1000;
-
-    this.state.players.forEach((p, sid) => {
-      const c = w.ctrl.get(sid);
-      if (!c) return;
-      if (p.dead) return tickRespawn(w, p, c);
-      applyInputs(p, c);
-      tickRecovery(w, sid, p, c, dt);
-    });
-
-    tickMonsters(w, dt);
-    tickLoot(w);
+    this.world.now = Date.now();
+    tickWorld(this.world, dtMs);
   }
 }
