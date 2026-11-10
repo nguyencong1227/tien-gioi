@@ -11,7 +11,13 @@ import {
   REALMS,
   getMap,
 } from "@tien-gioi/shared";
-import { auditPlayerSaveData, auditSavesDirectory, MAX_FILE_SIZE, show } from "./audit-saves.js";
+import {
+  auditPlayerSaveData,
+  auditSavesDirectory,
+  auditSoulSaveData,
+  MAX_FILE_SIZE,
+  show,
+} from "./audit-saves.js";
 
 function hashFileSha256(filePath: string): string {
   return createHash("sha256").update(readFileSync(filePath)).digest("hex");
@@ -529,6 +535,161 @@ describe("audit-saves (Issue #112)", () => {
       const safeMsg = `Vật phẩm lạ: ${show(secretHash)}`;
       expect(safeMsg).not.toContain(secretHash);
       expect(safeMsg).toContain("<chuỗi 64 ký tự>");
+    });
+  });
+
+  describe("auditSoulSaveData & chân linh (#151)", () => {
+    const validSoul = {
+      v: 1,
+      id: "tiểu đạo sĩ",
+      kiep: 2,
+      duyen: 35,
+      duyenTotal: 50,
+      unlocks: {
+        du_am: 2,
+      },
+      origins: ["kiem_khach"],
+      best: { step: 2, realm: 1, tier: 1 },
+      lastCreditedLife: "life-abc-123456",
+      history: [
+        {
+          kiep: 1,
+          step: 2,
+          minutes: 15,
+          gain: 35,
+          at: "2026-11-10T00:00:00.000Z",
+        },
+      ],
+      createdAt: "2026-11-10T00:00:00.000Z",
+      updatedAt: "2026-11-10T00:00:00.000Z",
+    };
+
+    it("chân linh hợp lệ -> không có lỗi", () => {
+      const raw = JSON.stringify(validSoul);
+      const errors = auditSoulSaveData(raw, raw.length);
+      expect(errors).toEqual([]);
+    });
+
+    it("phát hiện phiên bản không hợp lệ (v !== 1)", () => {
+      const raw = JSON.stringify({ ...validSoul, v: 2 });
+      const errors = auditSoulSaveData(raw, raw.length);
+      expect(errors.map((e) => e.code)).toContain("invalid_soul_version");
+    });
+
+    it("phát hiện kiếp không hợp lệ (kiep < 1 hoặc float)", () => {
+      const raw = JSON.stringify({ ...validSoul, kiep: 0 });
+      const errors = auditSoulSaveData(raw, raw.length);
+      expect(errors.map((e) => e.code)).toContain("invalid_soul_kiep");
+    });
+
+    it("phát hiện Duyên âm hoặc duyenTotal < duyen", () => {
+      const rawNeg = JSON.stringify({ ...validSoul, duyen: -10 });
+      expect(auditSoulSaveData(rawNeg, rawNeg.length).map((e) => e.code)).toContain(
+        "invalid_soul_duyen",
+      );
+
+      const rawLess = JSON.stringify({ ...validSoul, duyen: 50, duyenTotal: 30 });
+      expect(auditSoulSaveData(rawLess, rawLess.length).map((e) => e.code)).toContain(
+        "invalid_soul_duyen_total",
+      );
+    });
+
+    it("phát hiện mục mở khóa lạ hoặc nấc vượt quá giới hạn", () => {
+      const rawUnknown = JSON.stringify({
+        ...validSoul,
+        unlocks: { unknown_perk: 1 },
+      });
+      expect(auditSoulSaveData(rawUnknown, rawUnknown.length).map((e) => e.code)).toContain(
+        "unknown_soul_unlock",
+      );
+
+      const rawOver = JSON.stringify({
+        ...validSoul,
+        unlocks: { du_am: 99 },
+      });
+      expect(auditSoulSaveData(rawOver, rawOver.length).map((e) => e.code)).toContain(
+        "invalid_soul_unlock_level",
+      );
+    });
+
+    it("phát hiện xuất thân lạ, pham_gia trong origins, hoặc trùng lặp", () => {
+      const rawUnknown = JSON.stringify({ ...validSoul, origins: ["than_tien"] });
+      expect(auditSoulSaveData(rawUnknown, rawUnknown.length).map((e) => e.code)).toContain(
+        "unknown_soul_origin",
+      );
+
+      const rawPhamGia = JSON.stringify({ ...validSoul, origins: ["pham_gia"] });
+      expect(auditSoulSaveData(rawPhamGia, rawPhamGia.length).map((e) => e.code)).toContain(
+        "invalid_soul_origin",
+      );
+
+      const rawDup = JSON.stringify({ ...validSoul, origins: ["kiem_khach", "kiem_khach"] });
+      expect(auditSoulSaveData(rawDup, rawDup.length).map((e) => e.code)).toContain(
+        "duplicate_soul_origin",
+      );
+    });
+
+    it("phát hiện best không khớp với stepOf", () => {
+      const rawBadBest = JSON.stringify({
+        ...validSoul,
+        best: { step: 999, realm: 1, tier: 1 },
+      });
+      expect(auditSoulSaveData(rawBadBest, rawBadBest.length).map((e) => e.code)).toContain(
+        "invalid_soul_best",
+      );
+    });
+
+    it("auditSavesDirectory kiểm tra thư mục souls/ và đối chiếu limbo", () => {
+      const soulsSubDir = path.join(tmpDir, "souls");
+      mkdirSync(soulsSubDir, { recursive: true });
+
+      const sid = "tiểu đạo sĩ";
+      const expectedHash = createHash("sha1")
+        .update(sid.normalize("NFC").toLowerCase())
+        .digest("hex");
+      const soulFilePath = path.join(soulsSubDir, `${expectedHash}.json`);
+      writeFileSync(soulFilePath, JSON.stringify(validSoul, null, 2));
+
+      // File nhân vật có limbo khớp với chân linh
+      const playerWithLimbo = {
+        ...validPlayer,
+        lifeId: "life-new-789012",
+        life: { playMs: 60000, kills: 10, bossKills: 1 },
+        limbo: {
+          endedLifeId: "life-abc-123456",
+          summary: {
+            kiep: 1,
+            realm: 1,
+            tier: 1,
+            minutes: 15,
+            kills: 50,
+            bossKills: 2,
+            gain: 35,
+          },
+          keepable: ["lang_nha_kiem"],
+          coinAtDeath: 100,
+          counts: true,
+          credited: true,
+        },
+      };
+      const playerFile = path.join(tmpDir, "tieu_dao_si.json");
+      writeFileSync(playerFile, JSON.stringify(playerWithLimbo, null, 2));
+
+      const report = auditSavesDirectory(tmpDir);
+      expect(report.totalFiles).toBe(1);
+      expect(report.cleanFiles).toBe(1);
+      expect(report.errorFiles).toBe(0);
+      expect(report.totalSouls).toBe(1);
+      expect(report.cleanSouls).toBe(1);
+      expect(report.errorSouls).toBe(0);
+
+      // Trường hợp limbo.credited: true nhưng chân linh khác endedLifeId
+      const badSoul = { ...validSoul, lastCreditedLife: "different-life-id" };
+      writeFileSync(soulFilePath, JSON.stringify(badSoul, null, 2));
+
+      const reportInconsistent = auditSavesDirectory(tmpDir);
+      expect(reportInconsistent.errorFiles).toBe(1);
+      expect(reportInconsistent.errorsByCode.limbo_soul_inconsistent).toBe(1);
     });
   });
 });
