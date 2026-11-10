@@ -170,4 +170,17 @@ describe("client sect pure logic", () => {
     expect(inv.sect).toBe("Tiêu Dao Phái");
     expect(inv.ttlMs).toBe(30_000);
   });
+
+  it("fmt định dạng số HUD an toàn, không bao giờ in NaN khi giá trị không hợp lệ", async () => {
+    const { fmt } = await import("./ui");
+    expect(fmt(0)).toBe("0");
+    expect(fmt(8000)).toBe("8000");
+    expect(fmt(10_000)).toBe("10.0k");
+    expect(fmt(1_500_000)).toBe("1.5M");
+    expect(fmt(NaN)).toBe("0");
+    expect(fmt(undefined as any)).toBe("0");
+    expect(fmt(null as any)).toBe("0");
+    expect(fmt(Infinity)).toBe("0");
+    expect(fmt(-100)).toBe("0");
+  });
 });

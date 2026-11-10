@@ -27,6 +27,7 @@ import { captureEarlyMessages } from "./early-messages";
 import { joinWithRedirect } from "./connection";
 import { clearToken, getToken } from "./auth";
 import { initAuthUi, switchAuthView } from "./auth-ui";
+import { setupPwa, canReloadSafely, type PwaGameState } from "./pwa";
 
 const NAME_KEY = "tien-gioi:name";
 const SECRET_KEY = "tien-gioi:secret";
@@ -54,26 +55,63 @@ function createMockDungeonRoom(dead = false): any {
     },
     leave: () => {},
     state: {
-      players: new Map([
-        [
-          "mock-session-01",
-          {
-            name: "Trương Tiểu Phàm",
-            realm: 1,
-            tier: 8,
-            hp: dead ? 0 : 2500,
-            maxHp: 2500,
-            mp: dead ? 0 : 1200,
-            maxMp: 1200,
-            exp: 8000,
-            x: 512,
-            y: 896,
-            lastSeq: 0,
-            dead,
-            meditating: false,
-          },
-        ],
-      ]),
+      players: (() => {
+        const pMap = new Map<string, any>([
+          [
+            "mock-session-01",
+            {
+              name: "Trương Tiểu Phàm",
+              realm: 1,
+              tier: 8,
+              hp: dead ? 0 : 2500,
+              maxHp: 2500,
+              mp: dead ? 0 : 1200,
+              maxMp: 1200,
+              exp: 8000,
+              expMax: 10000,
+              x: 512,
+              y: 896,
+              lastSeq: 0,
+              dead,
+              meditating: false,
+            },
+          ],
+        ]);
+        if (typeof window !== "undefined" && new URLSearchParams(location.search).has("crowd")) {
+          const rawCount = parseInt(new URLSearchParams(location.search).get("crowd") || "30", 10);
+          const count = Math.max(1, Math.min(100, isNaN(rawCount) ? 30 : rawCount));
+          for (let i = 1; i <= count; i++) {
+            const angle = (i / count) * Math.PI * 2;
+            const r = 30 + (i % 6) * 22;
+            const px = Math.round(512 + Math.cos(angle) * r);
+            const py = Math.round(896 + Math.sin(angle) * r);
+            pMap.set(`mock-bot-${i}`, {
+              name: `Đạo Hữu ${i}`,
+              realm: (i % 4) + 1,
+              tier: i % 9,
+              hp: 2000,
+              maxHp: 2000,
+              mp: 1000,
+              maxMp: 1000,
+              exp: 500,
+              expMax: 1000,
+              x: px,
+              y: py,
+              px,
+              py,
+              angle,
+              sect: i % 2 === 0 ? "Tiên" : undefined,
+              duel: i % 4 === 0,
+              weapon: i % 3 === 0 ? "lang_nha_kiem" : undefined,
+              robe: i % 3 === 1 ? "tho_nhung_bao" : undefined,
+              talisman: i % 3 === 2 ? "long_tho" : undefined,
+              dead: false,
+              meditating: i % 5 === 0,
+            });
+          }
+        }
+        return pMap;
+      })(),
       monsters: new Map(),
       loot: new Map(),
     },
@@ -151,7 +189,11 @@ initAuthUi({
 // Chế độ máy chủ giả lập (?dungeon=mock, ?dungeon=fallen, ?duel=mock hoặc ?sect=mock) để thử nghiệm và chụp ảnh không cần server thật
 if (
   typeof window !== "undefined" &&
-  (isMockDungeonEnabled() || isMockDungeonFallen() || isMockDuelEnabled() || isMockSectEnabled())
+  (isMockDungeonEnabled() ||
+    isMockDungeonFallen() ||
+    isMockDuelEnabled() ||
+    isMockSectEnabled() ||
+    new URLSearchParams(location.search).has("crowd"))
 ) {
   const isFallen = isMockDungeonFallen();
   const mockRoom = createMockDungeonRoom(isFallen);
@@ -488,9 +530,52 @@ async function start(room: Room, mapId: string) {
   setupRoomLifecycle(room);
 }
 
-// Chỉ đăng ký Service Worker ở bản build production; không bật khi chạy npm run dev để tránh làm lệch cache Vite HMR.
-if (import.meta.env.PROD && "serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch(() => {});
+// Quản lý PWA và cập nhật an toàn: chỉ kích hoạt Service Worker ở production (hoặc khi test có ?pwa=1)
+function getPwaGameState(): PwaGameState {
+  const me = activeScene?.me();
+  return {
+    inDuel: ui.isDuelActive(),
+    inDungeon: ui.isDungeonActive() || (activeScene ? isDungeonMap(activeScene.map.def.id) : false),
+    isDungeonMap: activeScene ? isDungeonMap(activeScene.map.def.id) : false,
+    inLimbo: ui.isLimboOpen(),
+    isDead: Boolean(me?.dead),
+    isTravelling: isTraveling,
+    inCombat: me ? me.hp < me.maxHp : false,
+  };
+}
+
+let pendingPwaUpdate: (() => void) | null = null;
+
+if (import.meta.env.PROD || new URLSearchParams(location.search).has("pwa")) {
+  const pwa = setupPwa({
+    getGameState: getPwaGameState,
+    onUpdateReady: (applyUpdate, isSafe) => {
+      pendingPwaUpdate = applyUpdate;
+      if (isSafe) {
+        ui.toast({ text: "Có bản cập nhật mới. Đang làm mới...", tone: "info" });
+        setTimeout(() => {
+          if (canReloadSafely(getPwaGameState())) {
+            applyUpdate();
+          }
+        }, 1500);
+      } else {
+        ui.toast({ text: "Có bản cập nhật mới (sẽ áp dụng khi an toàn).", tone: "info" });
+      }
+    },
+    onOfflineChange: (online) => {
+      if (!online) {
+        ui.toast({ text: "Đã ngắt kết nối mạng (chế độ ngoại tuyến).", tone: "bad" });
+      } else {
+        ui.toast({ text: "Đã có kết nối mạng trở lại.", tone: "good" });
+      }
+    },
   });
+
+  if (typeof window !== "undefined") {
+    (window as any).__pwa = {
+      ...pwa,
+      getGameState: getPwaGameState,
+      getPendingUpdate: () => pendingPwaUpdate,
+    };
+  }
 }

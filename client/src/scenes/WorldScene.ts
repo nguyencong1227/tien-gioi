@@ -731,7 +731,7 @@ export class WorldScene extends Phaser.Scene {
     return false;
   }
 
-  private me() {
+  public me() {
     return this.state?.players?.get(this.sid);
   }
 
