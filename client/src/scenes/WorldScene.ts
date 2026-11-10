@@ -187,9 +187,9 @@ export class WorldScene extends Phaser.Scene {
     const mh = this.map.def.h;
     for (let y = 0; y < mh; y++)
       data.push(Array.from(this.map.tiles.subarray(y * mw, (y + 1) * mw)));
-    const map = this.make.tilemap({ data, tileWidth: TILE, tileHeight: TILE });
-    const ts = map.addTilesetImage("tiles", TILESET_KEY, TILE, TILE, 0, 0)!;
-    map.createLayer(0, ts, 0, 0)!.setDepth(-10);
+    const tilemap = this.make.tilemap({ data, tileWidth: TILE, tileHeight: TILE });
+    const ts = tilemap.addTilesetImage("tiles", TILESET_KEY, TILE, TILE, 0, 0)!;
+    tilemap.createLayer(0, ts, 0, 0)!.setDepth(-10);
 
     this.add
       .text(this.map.townPx.x, this.map.townPx.y - 40, "落霞鎮", {
@@ -914,7 +914,7 @@ export class WorldScene extends Phaser.Scene {
 
   /** Bán kính tính từ tâm trấn ứng với ngưỡng dangerAt(x, y) = minDanger */
   private dangerRadiusPx(minDanger: number): number {
-    return this.map.townPx.r + minDanger * (this.map.worldW * 0.5 - this.map.townPx.r);
+    return this.map.dangerRadius(minDanger);
   }
 
   /** Tìm con quái gần nhất cùng loại trong state.monsters; nếu chưa có thì chỉ ra vòng minDanger theo hướng đang đứng. */
