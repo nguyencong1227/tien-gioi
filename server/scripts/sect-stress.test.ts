@@ -4,8 +4,9 @@
 // 2. Đua lập cùng tên / cùng biệt hiệu: 2 người cùng lập, đúng 1 người thành công, người kia bị từ chối và HOÀN TIỀN VÍ đầy đủ.
 // 3. Đua mời / nhận chéo, nhận 2 lần, nhận khi tông môn vừa giải tán.
 // 4. Rải lời mời quá SECT_INVITES_MAX (3): người được mời bị quá tải (target_overloaded).
-// 5. Kiểm tra dọn dẹp rò rỉ sau N chu kỳ (từ chối, hết hạn, rời, giải tán, disconnect): invitesSize, online.size, cache, cooldown về 0.
-// 6. Kiểm tra toàn vẹn file lưu nhân vật và tông môn (audit-saves) không bị bẩn hay mồ côi.
+// 5. Nhận khi tông môn đã đầy (SECT_MAX_MEMBERS = 30): từ chối an toàn với sect_full.
+// 6. Kiểm tra dọn dẹp rò rỉ sau N chu kỳ (từ chối, hết hạn, rời, giải tán, disconnect): invitesSize, online.size, cache, cooldown về 0.
+// 7. Kiểm tra toàn vẹn file lưu nhân vật và tông môn (audit-saves) không bị bẩn hay mồ côi.
 
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -34,14 +35,17 @@ import type { WorldRoom } from "../src/rooms/WorldRoom";
 import type { WorldState } from "../src/schema";
 import type { Sect } from "../src/sect-store";
 import { auditSavesDirectory } from "./audit-saves";
-import { tickWorld } from "../src/systems/tick";
 
 const PORT = 49100 + Math.floor(Math.random() * 2000);
 let server: Server;
 let WorldRoomClass: typeof WorldRoom;
+let tickWorld: (world: any, dtMs: number) => void;
 const rooms: Room[] = [];
 
 beforeAll(async () => {
+  process.env.DATA_DIR = dataDir;
+  const { tickWorld: tw } = await import("../src/systems/tick");
+  tickWorld = tw;
   const { WorldRoom, defineRooms } = await import("../src/rooms/WorldRoom");
   WorldRoomClass = WorldRoom;
   WorldRoomClass.reconnectGraceS = 5;
@@ -389,7 +393,7 @@ describe("Thử tải & Stress test Tông môn (M3.6, Issue #231)", () => {
     await sleep(150);
   });
 
-  it("4b. Nhận khi tông môn đã đầy thành viên (SECT_MAX_MEMBERS): từ chối sect_full", async () => {
+  it("5. Nhận khi tông môn đã đầy thành viên (SECT_MAX_MEMBERS): từ chối sect_full", async () => {
     const runId = ++seq;
     const leader = await spawnBot(`Bot${runId}Ldr`);
     const recruit = await spawnBot(`Bot${runId}Rec`);
@@ -436,9 +440,8 @@ describe("Thử tải & Stress test Tông môn (M3.6, Issue #231)", () => {
     await waitFor(() => leader.me()?.sect === "", 3000);
   });
 
-  it("5. Kiểm tra dọn dẹp rò rỉ sau N chu kỳ: invites, online, cache đều về 0", async () => {
+  it("6. Kiểm tra dọn dẹp rò rỉ sau N chu kỳ: invites, online, cache đều về 0", async () => {
     const book = WorldRoomClass.hub.sects;
-    book._sweep(Date.now() + 10_000_000);
 
     // Chạy 3 chu kỳ liên tiếp
     for (let cycle = 0; cycle < 3; cycle++) {
@@ -460,20 +463,21 @@ describe("Thử tải & Stress test Tông môn (M3.6, Issue #231)", () => {
       await waitFor(() => hB.invited.length > 0, 3000);
 
       if (cycle === 0) {
-        // Chu kỳ 0: B từ chối lời mời
+        // Chu kỳ 0: B từ chối lời mời -> book tự dọn ngay, invitesSize về 0
         hB.room.send(SECT_MSG.decline, { from: hA.name });
         await waitFor(() => book.invitesSize === 0, 3000);
       } else if (cycle === 1) {
-        // Chu kỳ 1: B nhận lời mời rồi rời phái
+        // Chu kỳ 1: B nhận lời mời rồi rời phái -> book tự dọn ngay khi accept
         hB.room.send(SECT_MSG.accept, { from: hA.name });
         await waitFor(() => hB.me()?.sect === tag, 3000);
+        expect(book.invitesSize).toBe(0);
         hB.room.send(SECT_MSG.leave, {});
         await waitFor(() => hB.me()?.sect === "", 3000);
       } else {
         // Chu kỳ 2: B disconnect khi đang có lời mời treo
         await hB.room.leave(true);
-        // Quét lời mời hết hạn
-        book._sweep(Date.now() + 10_000_000);
+        // Lời mời treo cần quét dọn theo hạn TTL (mô phỏng sau khi hết hạn SECT_INVITE_TTL_MS = 60s)
+        book._sweep(Date.now() + 60_000 + 1000);
       }
 
       // Giải tán
@@ -485,8 +489,8 @@ describe("Thử tải & Stress test Tông môn (M3.6, Issue #231)", () => {
       if (hB.room.connection.isOpen) await hB.room.leave(true);
       await sleep(150);
 
-      // Dọn hồi chiêu
-      w.sectService?._sweep(Date.now() + 10_000_000);
+      // Quét dọn hồi chiêu giải tán (mô phỏng sau khi hết hạn cooldown 5 phút)
+      w.sectService?._sweep(Date.now() + 300_000 + 1000);
     }
 
     // Kiểm tra sạch sẽ bộ nhớ sau tất cả chu kỳ
@@ -495,8 +499,11 @@ describe("Thử tải & Stress test Tông môn (M3.6, Issue #231)", () => {
     expect(book.cache.size).toBe(0);
   });
 
-  it("6. Kiểm tra tính toàn vẹn file lưu (audit-saves) không bị bẩn hay lỗi sau thử tải", () => {
+  it("7. Kiểm tra tính toàn vẹn file lưu (audit-saves) không bị bẩn hay lỗi sau thử tải", () => {
     const report = auditSavesDirectory(dataDir);
+    expect(report.totalFiles, "phải có hồ sơ nhân vật được lưu trong dataDir tạm").toBeGreaterThan(
+      0,
+    );
     expect(report.errorFiles).toBe(0);
     expect(report.errorSects ?? 0).toBe(0);
     expect(report.failedFiles).toHaveLength(0);

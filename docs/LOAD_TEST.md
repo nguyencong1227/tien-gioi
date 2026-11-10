@@ -586,11 +586,11 @@ Kịch bản `server/scripts/bots.ts` được bổ sung cờ `--sect` để mô
 - **Cấp Linh thạch ban đầu:** Bot chạy cờ `--sect` được gieo sẵn 5000 Linh thạch vào hồ sơ nhân vật (đủ 1000 Linh thạch phí `SECT_CREATE_COST` lập phái và số dư góp kho).
 - **Phân nhóm tông môn tự động:** Bot được chia theo các nhóm 3 người (`groupSize = 3`, gồm 1 Tông chủ và 2 Đệ tử).
 - **Quy trình hoạt động tự động:**
-  1. **Lập tông môn:** Bot Tông chủ (bot đầu nhóm) gửi `sectCreate` tạo tông môn mang tên `Phai Dao <N>` và biệt hiệu `PD<N>`.
+  1. **Lập tông môn:** Bot Tông chủ (bot đầu nhóm) gửi `sectCreate` tạo tông môn mang tên `Phai Dao <N>` và biệt hiệu `P<N>` (vd: `P01`, `P02`).
   2. **Mời đệ tử:** Tông chủ gửi lời mời `sectInvite` tới các thành viên trong nhóm.
   3. **Nhận lời mời:** Đệ tử lắng nghe sự kiện `sectInvited` và tự động gửi `sectAccept` để gia nhập.
   4. **Giao lưu & tương tác:** Cả Tông chủ và Đệ tử định kỳ chat kênh nội bộ `/s` (`sectChats`), nạp Linh thạch vào kho tông môn (`sectDeposit`), và Tông chủ rút Linh thạch từ kho (`sectWithdraw`).
-  5. **Dọn dẹp chu kỳ:** Đệ tử gửi `sectLeave` rời phái, Tông chủ rút hết Linh thạch rồi giải tán bằng `sectDisband`.
+  5. **Dọn dẹp cuối đợt chạy:** Khi kết thúc kịch bản, Đệ tử tự động gửi `sectLeave` rời phái, Tông chủ rút hết Linh thạch trong kho rồi giải tán bằng `sectDisband` (đồng thời pha dọn dẹp file lưu của bot tự động quét và dọn sạch file tông môn phát sinh trong `<DATA_DIR>/sects`).
 - **Lưu ý quan trọng khi chạy bot thật:** Server thử tải phải dùng `DATA_DIR` mặc định của server (không đặt `DATA_DIR` khác với server) vì bot ghi hồ sơ vào `server/data/players`.
 
 Cách chạy:

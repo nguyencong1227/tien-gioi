@@ -345,6 +345,11 @@ function soulsDirPath(): string {
   return path.join(DATA_PLAYERS_DIR, "souls");
 }
 
+function sectsDirPath(): string {
+  if (process.env.SECTS_DIR) return path.resolve(process.env.SECTS_DIR);
+  return path.join(DATA_PLAYERS_DIR, "sects");
+}
+
 function soulFileOf(name: string): string {
   const norm = name.normalize("NFC").toLowerCase().trim();
   const hash = createHash("sha1").update(norm).digest("hex");
@@ -526,6 +531,28 @@ function cleanCreatedBotSaves(createdNames: ReadonlySet<string>): number {
     }
   }
 
+  // Xoá thêm các file tông môn mồ côi trong sects/ nếu có thành viên hoặc tông chủ là bot trong lượt chạy
+  const secDir = sectsDirPath();
+  if (existsSync(secDir)) {
+    for (const entry of readdirSync(secDir)) {
+      if (!entry.endsWith(".json")) continue;
+      const fullPath = path.join(secDir, entry);
+      try {
+        const data = JSON.parse(readFileSync(fullPath, "utf8")) as {
+          members?: Array<{ name?: string }>;
+        };
+        if (
+          Array.isArray(data.members) &&
+          data.members.some((m) => m?.name && createdNames.has(m.name.trim()))
+        ) {
+          rmSync(fullPath, { force: true });
+        }
+      } catch {
+        // Bỏ qua lỗi đọc/xoá file
+      }
+    }
+  }
+
   return removed;
 }
 
@@ -579,8 +606,32 @@ function cleanBotSavesManual(confirmYes: boolean): void {
       }
     }
   }
+
+  const secDir = sectsDirPath();
+  let sectsRemoved = 0;
+  if (existsSync(secDir)) {
+    for (const entry of readdirSync(secDir)) {
+      if (!entry.endsWith(".json")) continue;
+      const fullPath = path.join(secDir, entry);
+      try {
+        const data = JSON.parse(readFileSync(fullPath, "utf8")) as {
+          members?: Array<{ name?: string }>;
+        };
+        if (
+          Array.isArray(data.members) &&
+          data.members.some((m) => m?.name && /^bot[\s_]/i.test(m.name.trim()))
+        ) {
+          rmSync(fullPath, { force: true });
+          sectsRemoved++;
+        }
+      } catch {
+        // Bỏ qua lỗi
+      }
+    }
+  }
+
   console.log(
-    `\nĐã xoá ${matched.length} file lưu nhân vật bot (và chân linh tương ứng) trong ${DATA_PLAYERS_DIR}.`,
+    `\nĐã xoá ${matched.length} file lưu nhân vật bot (và chân linh tương ứng, ${sectsRemoved} file tông môn bot) trong ${DATA_PLAYERS_DIR}.`,
   );
 }
 
@@ -740,6 +791,7 @@ interface BotState {
   // Các trường cho thử tải Tông môn (--sect, #231)
   sect?: boolean;
   sectTag?: string;
+  sectBalance: number;
   sectIsLeader?: boolean;
   sectGroupLeaderName?: string;
   nextSectActionAt?: number;
@@ -1080,6 +1132,7 @@ function bindRoomEvents(
       }
     }
   });
+  room.onMessage(SECT_MSG.presence, () => {});
   room.onMessage(SECT_MSG.invited, (msg: SectInvitedMsg) => {
     if (b.sect && !b.sectIsLeader) {
       room.send(SECT_MSG.accept, { from: msg.from });
@@ -1090,7 +1143,15 @@ function bindRoomEvents(
   });
   room.onMessage(SECT_MSG.snapshot, (msg: SectMsg) => {
     if (b.sect && msg.sect) {
+      const prevTag = b.sectTag;
       b.sectTag = msg.sect.tag;
+      b.sectBalance = msg.sect.coin;
+      if (msg.sect.myRank === "chu" && !prevTag) {
+        b.sectsCreatedCount++;
+      }
+    } else if (b.sect && !msg.sect) {
+      b.sectTag = undefined;
+      b.sectBalance = 0;
     }
   });
   room.onMessage("limbo", (msg: LimboMsg) => {
@@ -1558,6 +1619,7 @@ async function runLoadTest(
       nextDuelChallengeAt: now + 1500 + ((i - 1) % 2 === 0 ? 0 : 5000),
       sect,
       sectTag: undefined,
+      sectBalance: 0,
       sectIsLeader: (i - 1) % 3 === 0,
       sectGroupLeaderName: `Bot ${String(Math.floor((i - 1) / 3) * 3 + 1).padStart(3, "0")}`,
       nextSectActionAt: now + 1000 + ((i - 1) % 3) * 500,
@@ -1859,9 +1921,7 @@ async function runLoadTest(
             const sectName = `Phai Dao ${groupIndex + 1}`;
             const sectTag = `P${String(groupIndex + 1).padStart(2, "0")}`;
             b.room.send(SECT_MSG.create, { name: sectName, tag: sectTag });
-            b.sectTag = sectTag;
             b.nextSectActionAt = now + 3000;
-            if (measuring) b.sectsCreatedCount++;
           } else {
             const member1Index = groupIndex * groupSize + 2;
             const member2Index = groupIndex * groupSize + 3;
@@ -2445,6 +2505,47 @@ async function runLoadTest(
   }
 
   clearInterval(loopTimer);
+
+  if (sect) {
+    // Pha dọn dẹp tông môn cuối lượt:
+    // 1. Đệ tử rời tông môn (leave)
+    const members = bots.filter(
+      (b) => b.sect && !b.sectIsLeader && b.sectTag && b.room.connection.isOpen,
+    );
+    for (const m of members) {
+      try {
+        m.room.send(SECT_MSG.leave, {});
+      } catch {
+        // Bỏ qua lỗi
+      }
+    }
+    await sleep(400);
+
+    // 2. Tông chủ rút hết Linh thạch từ kho về ví (nếu kho còn tiền)
+    const leaders = bots.filter(
+      (b) => b.sect && b.sectIsLeader && b.sectTag && b.room.connection.isOpen,
+    );
+    for (const l of leaders) {
+      try {
+        if (l.sectBalance > 0) {
+          l.room.send(SECT_MSG.withdraw, { amount: l.sectBalance });
+        }
+      } catch {
+        // Bỏ qua lỗi
+      }
+    }
+    await sleep(400);
+
+    // 3. Tông chủ giải tán tông môn khi kho đã rỗng
+    for (const l of leaders) {
+      try {
+        l.room.send(SECT_MSG.disband, {});
+      } catch {
+        // Bỏ qua lỗi
+      }
+    }
+    await sleep(400);
+  }
 
   const connectedBots = bots.filter((b) => b.room.connection.isOpen).length;
   const kicked4429 = bots.filter((b) => b.kicked4429).length;
