@@ -1,16 +1,5 @@
 // Quái: sinh, bổ sung, AI (lang thang, phát hiện, đuổi, tấn công, về nhà).
-import {
-  PLAYER_RADIUS,
-  MONSTERS,
-  MONSTER_CAP,
-  WORLD_W,
-  WORLD_H,
-  moveWithCollision,
-  circleBlocked,
-  inTown,
-  dangerAt,
-  type MonsterKind,
-} from "@tien-gioi/shared";
+import { PLAYER_RADIUS, MONSTERS, MONSTER_CAP, type MonsterKind } from "@tien-gioi/shared";
 import { Monster } from "../schema";
 import { rand, quantAngle, takeWhole, type World, type MonsterCtrl } from "../world";
 import { hurtPlayer } from "./combat";
@@ -35,12 +24,13 @@ export const MONSTER_WAKE_DIST = 900;
 export const WANDER_STRIDE = 4;
 
 export function spawnMonster(w: World, def: MonsterKind) {
+  const map = w.map;
   for (let i = 0; i < 40; i++) {
-    const x = rand(64, WORLD_W - 64),
-      y = rand(64, WORLD_H - 64);
-    const d = dangerAt(x, y);
+    const x = rand(64, map.worldW - 64),
+      y = rand(64, map.worldH - 64);
+    const d = map.dangerAt(x, y);
     if (d < def.minDanger || (def.id === "tho" && d > 0.45)) continue;
-    if (inTown(x, y, 160) || circleBlocked(x, y, def.radius)) continue;
+    if (map.inTown(x, y, 160) || map.circleBlocked(x, y, def.radius)) continue;
     const id = `m${++w.monsterSeq}`;
     const m = new Monster();
     m.kind = def.id;
@@ -105,7 +95,7 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
   if (
     target &&
     (target.dead ||
-      inTown(target.x, target.y, 20) ||
+      w.map.inTown(target.x, target.y, 20) ||
       Math.hypot(m.x - mc.homeX, m.y - mc.homeY) > LEASH_DIST)
   ) {
     mc.target = null;
@@ -120,7 +110,7 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
       if (p.dead) return;
       const d = Math.hypot(p.x - m.x, p.y - m.y);
       if (d < nearest) nearest = d;
-      if (d < best && !inTown(p.x, p.y, 20)) {
+      if (d < best && !w.map.inTown(p.x, p.y, 20)) {
         best = d;
         mc.target = sid;
         target = p;
@@ -182,14 +172,14 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
     dist = Math.hypot(dx, dy);
   if (speed > 0 && dist > 4) {
     const step = Math.min(dist, speed * dt * stride);
-    const next = moveWithCollision(
+    const next = w.map.moveWithCollision(
       m.x,
       m.y,
       (dx / dist) * step,
       (dy / dist) * step,
       def.radius * 0.8,
     );
-    if (!inTown(next.x, next.y, def.radius + 8)) {
+    if (!w.map.inTown(next.x, next.y, def.radius + 8)) {
       m.x = next.x;
       m.y = next.y;
     }

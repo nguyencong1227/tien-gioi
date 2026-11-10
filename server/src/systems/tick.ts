@@ -13,7 +13,7 @@ export function tickWorld(w: World, dtMs: number) {
     const c = w.ctrl.get(sid);
     if (!c) return;
     if (p.dead) return tickRespawn(w, p, c);
-    applyInputs(p, c);
+    applyInputs(w.map, p, c);
     if ((w.tick + c.posPhase) % POS_SYNC_EVERY_TICKS === 0) syncPublicPos(p);
     tickRecovery(w, sid, p, c, dt);
   });

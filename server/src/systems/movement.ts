@@ -1,13 +1,5 @@
 // Di chuyển của người chơi: nhận input, áp từng bước TICK_MS, chọn chỗ đứng an toàn.
-import {
-  TICK_MS,
-  PLAYER_RADIUS,
-  TOWN_PX,
-  moveWithCollision,
-  circleBlocked,
-  statsFor,
-  type InputMsg,
-} from "@tien-gioi/shared";
+import { TICK_MS, PLAYER_RADIUS, statsFor, type GameMap, type InputMsg } from "@tien-gioi/shared";
 import type { Player } from "../schema";
 import { rand, quantAngle, type World, type PlayerCtrl } from "../world";
 
@@ -44,7 +36,7 @@ export function syncPublicPos(p: Player) {
   p.py = Math.max(-INT16_MAX, Math.min(INT16_MAX, Math.round(p.y)));
 }
 
-export function applyInputs(p: Player, c: PlayerCtrl) {
+export function applyInputs(map: GameMap, p: Player, c: PlayerCtrl) {
   const step = TICK_MS / 1000;
   c.moveBudget = Math.min(MAX_MOVE_BUDGET, c.moveBudget + 1);
   const speed = statsFor(p.realm, p.tier, p).speed; // hộ phù có tốc độ
@@ -59,7 +51,13 @@ export function applyInputs(p: Player, c: PlayerCtrl) {
     }
     if (len > 0.05) {
       p.meditating = false;
-      const next = moveWithCollision(p.x, p.y, dx * speed * step, dy * speed * step, PLAYER_RADIUS);
+      const next = map.moveWithCollision(
+        p.x,
+        p.y,
+        dx * speed * step,
+        dy * speed * step,
+        PLAYER_RADIUS,
+      );
       p.x = next.x;
       p.y = next.y;
       p.angle = quantAngle(Math.atan2(dy, dx));
@@ -69,15 +67,16 @@ export function applyInputs(p: Player, c: PlayerCtrl) {
 }
 
 /** Vị trí đã lưu nếu còn hợp lệ, không thì một điểm ngẫu nhiên trong Lạc Hà Trấn. */
-export function safeSpot(x?: number, y?: number) {
-  if (typeof x === "number" && typeof y === "number" && !circleBlocked(x, y, PLAYER_RADIUS))
+export function safeSpot(map: GameMap, x?: number, y?: number) {
+  const town = map.townPx;
+  if (typeof x === "number" && typeof y === "number" && !map.circleBlocked(x, y, PLAYER_RADIUS))
     return { x, y };
   for (let i = 0; i < 50; i++) {
     const a = rand(0, Math.PI * 2),
-      r = rand(0, TOWN_PX.r * 0.6);
-    const sx = TOWN_PX.x + Math.cos(a) * r,
-      sy = TOWN_PX.y + Math.sin(a) * r;
-    if (!circleBlocked(sx, sy, PLAYER_RADIUS)) return { x: sx, y: sy };
+      r = rand(0, town.r * 0.6);
+    const sx = town.x + Math.cos(a) * r,
+      sy = town.y + Math.sin(a) * r;
+    if (!map.circleBlocked(sx, sy, PLAYER_RADIUS)) return { x: sx, y: sy };
   }
-  return { x: TOWN_PX.x, y: TOWN_PX.y };
+  return { x: town.x, y: town.y };
 }

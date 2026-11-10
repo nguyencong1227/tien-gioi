@@ -6,9 +6,9 @@ import {
   TICK_MS,
   MAX_PLAYERS_PER_ROOM,
   MONSTER_RESPAWN_MS,
+  DEFAULT_MAP,
   REALMS,
   addCoin,
-  inTown,
   realmLabel,
   type InputMsg,
   type AttackMsg,
@@ -75,21 +75,27 @@ export class WorldRoom extends Room<WorldState> {
   autoDispose = false; // thế giới luôn sống, kể cả khi không có ai
   state = new WorldState();
 
-  private world = new World(this.state, {
-    // Hiệu ứng và số sát thương có vị trí: chỉ gửi cho người ở trong vùng nhìn (#62), không broadcast cả phòng
-    fx: (msg) => this.sendNear(msg.x, msg.y, "range" in msg ? msg.range : 0, "fx", msg),
-    dmg: (msg) => this.sendNear(msg.x, msg.y, 0, "dmg", msg),
-    sys: (text) => this.broadcast("chat", { from: "Thiên Đạo", text, sys: true } satisfies ChatOut),
-    chat: (from, text) => this.broadcast("chat", { from, text } satisfies ChatOut),
-    toast: (sid, msg) => this.sendTo(sid, "toast", msg),
-    inv: (sid, msg) => this.sendTo(sid, "inv", msg),
-    quests: (sid, msg) => this.sendTo(sid, "quests", msg),
-    dialog: (sid, msg) => this.sendTo(sid, "dialog", msg),
-    party: (sid, msg) => this.sendTo(sid, "party", msg),
-    partyInvited: (sid, msg) => this.sendTo(sid, "partyInvited", msg),
-    wallet: (sid, msg) => this.sendTo(sid, "wallet", msg),
-    chatTo: (sid, msg) => this.sendTo(sid, "chat", msg),
-  });
+  private world = new World(
+    this.state,
+    {
+      // Hiệu ứng và số sát thương có vị trí: chỉ gửi cho người ở trong vùng nhìn (#62), không broadcast cả phòng
+      fx: (msg) => this.sendNear(msg.x, msg.y, "range" in msg ? msg.range : 0, "fx", msg),
+      dmg: (msg) => this.sendNear(msg.x, msg.y, 0, "dmg", msg),
+      sys: (text) =>
+        this.broadcast("chat", { from: "Thiên Đạo", text, sys: true } satisfies ChatOut),
+      chat: (from, text) => this.broadcast("chat", { from, text } satisfies ChatOut),
+      toast: (sid, msg) => this.sendTo(sid, "toast", msg),
+      inv: (sid, msg) => this.sendTo(sid, "inv", msg),
+      quests: (sid, msg) => this.sendTo(sid, "quests", msg),
+      dialog: (sid, msg) => this.sendTo(sid, "dialog", msg),
+      party: (sid, msg) => this.sendTo(sid, "party", msg),
+      partyInvited: (sid, msg) => this.sendTo(sid, "partyInvited", msg),
+      wallet: (sid, msg) => this.sendTo(sid, "wallet", msg),
+      chatTo: (sid, msg) => this.sendTo(sid, "chat", msg),
+    },
+    // Hiện chỉ có một bản đồ; nhiều bản đồ thì phòng chọn theo mapId (docs/THIET_KE_NHIEU_BAN_DO.md)
+    DEFAULT_MAP,
+  );
 
   /** Giới hạn tần suất tin nhắn, theo sessionId */
   private limiters = new Map<string, RateLimiter>();
@@ -236,7 +242,7 @@ export class WorldRoom extends Room<WorldState> {
     p.realm = Math.min(save.realm, REALMS.length - 1);
     p.tier = Math.min(save.tier, REALMS[p.realm].tiers.length - 1);
     p.exp = save.exp;
-    const spot = safeSpot(save.x, save.y);
+    const spot = safeSpot(this.world.map, save.x, save.y);
     p.x = spot.x;
     p.y = spot.y;
     syncPublicPos(p); // người khác thấy ngay chỗ vào, không phải (0, 0)
@@ -327,7 +333,8 @@ export class WorldRoom extends Room<WorldState> {
 
   private async persist(p: Player, c: PlayerCtrl) {
     // Không lưu vị trí trong trấn hoặc lúc trọng thương: lần sau vào thì xuất hiện ở trấn
-    const pos = p.dead || inTown(p.x, p.y) ? {} : { x: Math.round(p.x), y: Math.round(p.y) };
+    const pos =
+      p.dead || this.world.map.inTown(p.x, p.y) ? {} : { x: Math.round(p.x), y: Math.round(p.y) };
     c.save = {
       ...c.save,
       realm: p.realm,

@@ -12,10 +12,7 @@ import {
   REALMS,
   SKILLS,
   TICK_MS,
-  TOWN_PX,
-  WORLD_W,
-  circleBlocked,
-  dangerAt,
+  DEFAULT_MAP,
 } from "@tien-gioi/shared";
 import { WorldState } from "../schema";
 import { World } from "../world";
@@ -93,24 +90,28 @@ export function runBench(
       evBroadcast += size * players;
       w.interest.forEachNear(w, x, y, VIEW_ENTER + extra, () => (evNear += size));
     };
-    const w = new World(new WorldState(), {
-      fx: (m) => emit("fx", m.x, m.y, "range" in m ? m.range : 0, m),
-      dmg: (m) => emit("dmg", m.x, m.y, 0, m),
-      sys: () => {},
-      chat: () => {},
-      toast: () => {},
-      inv: () => {},
-      quests: () => {},
-      dialog: () => {},
-      party: (_sid, msg) => {
-        partyBytes += JSON.stringify(msg).length + 5 + 4; // "party".length = 5
+    const w = new World(
+      new WorldState(),
+      {
+        fx: (m) => emit("fx", m.x, m.y, "range" in m ? m.range : 0, m),
+        dmg: (m) => emit("dmg", m.x, m.y, 0, m),
+        sys: () => {},
+        chat: () => {},
+        toast: () => {},
+        inv: () => {},
+        quests: () => {},
+        dialog: () => {},
+        party: (_sid, msg) => {
+          partyBytes += JSON.stringify(msg).length + 5 + 4; // "party".length = 5
+        },
+        partyInvited: () => {},
+        wallet: (_sid, msg) => {
+          walletBytes += JSON.stringify(msg).length + 6 + 4; // "wallet".length = 6
+        },
+        chatTo: () => {},
       },
-      partyInvited: () => {},
-      wallet: (_sid, msg) => {
-        walletBytes += JSON.stringify(msg).length + 6 + 4; // "wallet".length = 6
-      },
-      chatTo: () => {},
-    });
+      DEFAULT_MAP,
+    );
     w.now = 0;
     spawnInitial(w);
 
@@ -132,16 +133,16 @@ export function runBench(
       if (mode === "crowd") {
         // Rải đều trong hình tròn của trấn (căn bậc hai để đều theo diện tích)
         const a = Math.random() * Math.PI * 2;
-        const r = Math.sqrt(Math.random()) * TOWN_PX.r * 0.9;
-        p.x = TOWN_PX.x + Math.cos(a) * r;
-        p.y = TOWN_PX.y + Math.sin(a) * r;
+        const r = Math.sqrt(Math.random()) * w.map.townPx.r * 0.9;
+        p.x = w.map.townPx.x + Math.cos(a) * r;
+        p.y = w.map.townPx.y + Math.sin(a) * r;
       } else {
         for (;;) {
           const a = Math.random() * Math.PI * 2;
-          const r = TOWN_PX.r + 80 + Math.random() * (WORLD_W * 0.45 - TOWN_PX.r);
-          const x = TOWN_PX.x + Math.cos(a) * r;
-          const y = TOWN_PX.y + Math.sin(a) * r;
-          if (!circleBlocked(x, y, 12) && dangerAt(x, y) < 0.9) {
+          const r = w.map.townPx.r + 80 + Math.random() * (w.map.worldW * 0.45 - w.map.townPx.r);
+          const x = w.map.townPx.x + Math.cos(a) * r;
+          const y = w.map.townPx.y + Math.sin(a) * r;
+          if (!w.map.circleBlocked(x, y, 12) && w.map.dangerAt(x, y) < 0.9) {
             p.x = x;
             p.y = y;
             break;
@@ -202,9 +203,9 @@ export function runBench(
             b.until = t + 20 + Math.floor(Math.random() * 60);
           }
           if (b.walking) {
-            const tx = TOWN_PX.x - p.x;
-            const ty = TOWN_PX.y - p.y;
-            if (Math.hypot(tx, ty) > TOWN_PX.r) b.angle = Math.atan2(ty, tx); // ra khỏi trấn thì quay về
+            const tx = w.map.townPx.x - p.x;
+            const ty = w.map.townPx.y - p.y;
+            if (Math.hypot(tx, ty) > w.map.townPx.r) b.angle = Math.atan2(ty, tx); // ra khỏi trấn thì quay về
             c.inputs.push({ seq: ++b.seq, dx: Math.cos(b.angle), dy: Math.sin(b.angle) });
           }
           continue;

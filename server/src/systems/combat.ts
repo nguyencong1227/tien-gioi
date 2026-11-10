@@ -152,7 +152,7 @@ export function hurtPlayer(w: World, sid: string, p: Player, dmg: number, from: 
 /** Trọng thương đủ lâu thì hồi sinh ở Lạc Hà Trấn với đầy khí huyết. */
 export function tickRespawn(w: World, p: Player, c: PlayerCtrl) {
   if (w.now - c.deadAt < RESPAWN_MS) return;
-  const s = safeSpot();
+  const s = safeSpot(w.map);
   p.x = s.x;
   p.y = s.y;
   syncPublicPos(p); // dịch chuyển tức thời: người khác thấy ngay

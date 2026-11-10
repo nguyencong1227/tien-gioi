@@ -1,9 +1,10 @@
 // World giả và các hàm dựng tình huống cho test đơn vị của system (không cần server Colyseus).
 import {
   MONSTER_BY_ID,
-  TOWN_PX,
+  DEFAULT_MAP,
   emptyInventory,
   type FxMsg,
+  type GameMap,
   type InvMsg,
   type QuestsMsg,
   type WalletMsg,
@@ -18,7 +19,7 @@ import { World, type PlayerCtrl } from "../world";
 import { applyStats } from "./progression";
 import { syncPublicPos } from "./movement";
 
-export function makeWorld() {
+export function makeWorld(map: GameMap = DEFAULT_MAP) {
   const fx: FxMsg[] = [];
   const toasts: { sid: string; msg: ToastMsg }[] = [];
   const sys: string[] = [];
@@ -30,20 +31,24 @@ export function makeWorld() {
   const parties: { sid: string; msg: PartyMsg }[] = [];
   const invited: { sid: string; msg: PartyInvitedMsg }[] = [];
   const chatsTo: { sid: string; msg: ChatOut }[] = [];
-  const w = new World(new WorldState(), {
-    fx: (m) => fx.push(m),
-    dmg: () => {},
-    sys: (t) => sys.push(t),
-    chat: (from, text) => chats.push({ from, text }),
-    toast: (sid, msg) => toasts.push({ sid, msg }),
-    inv: (sid, msg) => invs.push({ sid, msg }),
-    quests: (sid, msg) => quests.push({ sid, msg }),
-    wallet: (sid, msg) => wallets.push({ sid, msg }),
-    dialog: (sid, msg) => dialogs.push({ sid, msg }),
-    party: (sid, msg) => parties.push({ sid, msg }),
-    partyInvited: (sid, msg) => invited.push({ sid, msg }),
-    chatTo: (sid, msg) => chatsTo.push({ sid, msg }),
-  });
+  const w = new World(
+    new WorldState(),
+    {
+      fx: (m) => fx.push(m),
+      dmg: () => {},
+      sys: (t) => sys.push(t),
+      chat: (from, text) => chats.push({ from, text }),
+      toast: (sid, msg) => toasts.push({ sid, msg }),
+      inv: (sid, msg) => invs.push({ sid, msg }),
+      quests: (sid, msg) => quests.push({ sid, msg }),
+      wallet: (sid, msg) => wallets.push({ sid, msg }),
+      dialog: (sid, msg) => dialogs.push({ sid, msg }),
+      party: (sid, msg) => parties.push({ sid, msg }),
+      partyInvited: (sid, msg) => invited.push({ sid, msg }),
+      chatTo: (sid, msg) => chatsTo.push({ sid, msg }),
+    },
+    map,
+  );
   return { w, fx, toasts, sys, chats, invs, quests, wallets, dialogs, parties, invited, chatsTo };
 }
 
@@ -52,8 +57,8 @@ export function addPlayer(w: World, sid: string, realm = 0, tier = 0) {
   p.name = sid;
   p.realm = realm;
   p.tier = tier;
-  p.x = TOWN_PX.x + TOWN_PX.r + 400;
-  p.y = TOWN_PX.y;
+  p.x = w.map.townPx.x + w.map.townPx.r + 400;
+  p.y = w.map.townPx.y;
   applyStats(p, true);
   syncPublicPos(p);
   const c: PlayerCtrl = {

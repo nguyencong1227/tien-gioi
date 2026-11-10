@@ -48,7 +48,7 @@ describe("movement", () => {
     const { p, c } = addPlayer(w, "a");
     c.moveBudget = 0;
     for (let seq = 1; seq <= 10; seq++) queueInput(w, "a", { seq, dx: 0, dy: 1 });
-    applyInputs(p, c); // ngân sách 0 + 1
+    applyInputs(w.map, p, c); // ngân sách 0 + 1
     expect(p.lastSeq).toBe(1);
     expect(c.inputs).toHaveLength(9);
   });
@@ -59,7 +59,7 @@ describe("movement", () => {
     p.x = TOWN_PX.x;
     p.y = TOWN_PX.y;
     queueInput(w, "a", { seq: 1, dx: 100, dy: 0 });
-    applyInputs(p, c);
+    applyInputs(w.map, p, c);
     expect(p.x - TOWN_PX.x).toBeCloseTo(statsFor(0, 0).speed * (TICK_MS / 1000));
   });
 });
