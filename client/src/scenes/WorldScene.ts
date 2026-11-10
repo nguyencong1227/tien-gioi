@@ -189,6 +189,7 @@ export class WorldScene extends Phaser.Scene {
     makeTextures(this);
 
     this.buildMapVisuals();
+    ui.setCurrentMapId(this.map.def.id);
 
     // Mũi tên chỉ hướng nhiệm vụ xoay quanh người chơi
     this.createNavArrow();
@@ -678,8 +679,8 @@ export class WorldScene extends Phaser.Scene {
 
   public changeMap(room: Room, newMap: GameMap) {
     this.map = newMap;
-    ui.setCurrentMapId(newMap.def.id);
     this.buildMapVisuals();
+    ui.setCurrentMapId(newMap.def.id);
     this.attachRoom(room);
     this.syncAudioZone();
   }

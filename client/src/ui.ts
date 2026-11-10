@@ -1990,6 +1990,9 @@ export const ui = {
 
   setCurrentMapId(mapId: string) {
     currentMapId = mapId;
+    const mapDef = getMap(mapId);
+    const h2 = $("map-modal")?.querySelector("h2");
+    if (h2 && mapDef) h2.textContent = `Sơn Hà Đồ · ${mapDef.def.name}`;
     renderPartyPanel();
   },
 
