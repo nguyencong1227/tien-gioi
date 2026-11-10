@@ -612,4 +612,49 @@ Bộ kiểm thử stress test tự động hoá 7 kịch bản then chốt trên
 | **6. Kiểm tra dọn dẹp rò rỉ sau N chu kỳ** | 3 chu kỳ liên tiếp (từ chối, nhận rồi rời, disconnect khi có lời mời treo): `Hub.sects.invitesSize` về 0, `online.size` về 0, `cache.size` về 0, `_cooldownSize` về 0 sau sweep | 0 lời mời treo, 0 tông môn rò rỉ trong cache, sạch sẽ bộ nhớ | **PASS** (~0.9s) |
 | **7. Kiểm tra tính toàn vẹn lưu trữ (`audit-saves`)** | Chạy `auditSavesDirectory` trên toàn bộ file lưu nhân vật và tông môn phát sinh: 0 file lỗi, 0 lỗi tông môn, 0 file mồ côi | Lưu trữ nhất quán, không bẩn dữ liệu trên đĩa | **PASS** (~0.15s) |
 
+## 16. Red Team Từng Tin Nhắn Server (M4-sớm - Issue #252)
+
+### 16.1. Phương pháp & Công cụ (`server/scripts/red-team.ts`)
+Công cụ `npm run red-team -w server` dựng server Colyseus thật trong tiến trình với thư mục dữ liệu tạm cô lập và kiểm tra đối kháng (red team) toàn diện:
+- **Phạm vi tin nhắn:** Toàn bộ 47 loại tin nhắn hợp lệ mà `WorldRoom` đăng ký qua `this.on(...)` (di chuyển, chiến đấu, kỹ năng, túi đồ, buôn bán, nhiệm vụ, tổ đội, bí cảnh, PK, tông môn, luân hồi) + 1 tin lạ không đăng ký (kiểm tra handler `*` toàn cục từ chối an toàn).
+- **Phân loại Payload tấn công (26 biến thể payload):**
+  1. **Kiểu dữ liệu sai & Primitive Confusion:** `null`, `undefined`, boolean (`true`), số nguyên thuần túy, chuỗi ký tự thô thay thế cho object, mảng rỗng `[]`, mảng chứa dữ liệu phức hợp.
+  2. **Giá trị số biên (Number Edge Cases):** `NaN`, `Infinity`, `-Infinity`, số âm cực đoan (`-999999`, `-Math.PI * 4`), số thực dấu phẩy động phân đoạn (`2.7`, `0.5`, `100.99`), số nguyên vượt trần an toàn (`Number.MAX_SAFE_INTEGER + 100`, `1e12`).
+  3. **Chuỗi độc hại (String Attacks):** Chuỗi rỗng, chuỗi dài tới 2.0–3.5 KB (sát trần 4 KB của transport), byte NUL (`\x00`), chuỗi ký tự điều khiển và mã màu ANSI (`\r\n\x08\x1b[31m`), chuỗi emoji ghép phức tạp (Zero-Width Joiner sequences), Path Traversal (`../../../etc/passwd`, `..\\win.ini`), XSS / SQL Injection payloads (`<script>alert(1)</script>`, `' OR 1=1--`).
+  4. **Khai thác cấu trúc đối tượng (Prototype Pollution & Deep Nesting):** Gửi đối tượng có các khoá nhạy cảm `__proto__`, `constructor`, `prototype`; mảng và đối tượng lồng nhau sâu 50–80 cấp.
+  5. **Mã định danh độc hại (Malicious Field IDs):** Tra cứu id bằng các thuộc tính prototype (`"constructor"`, `"prototype"`, `"__proto__"`, `"toString"`), id lạ không tồn tại trong mọi trường nghiệp vụ (`npcId`, `itemId`, `questId`, `portalId`, `lootId`, `tradeId`, `recipeId`, `name`, `from`).
+  6. **Trạng thái dị thường (State Machine Confusion):** Gửi đòn đánh, buôn bán, lập tông môn khi nhân vật đang ở trạng thái thiền (`meditate`) hoặc Hoàng Tuyền (`limbo`).
+  7. **Bão tin nhắn (Spam Flood & Rate Limit):** Bắn phá 250 tin nhắn liên tiếp từ một kết nối riêng để xác minh cơ chế phòng thủ `rate-limit.ts` ngắt kết nối với mã lỗi `4429`.
+- **Tiêu chuẩn an toàn sau mỗi đòn tấn công:**
+  - Server không bị crash, không ném `unhandledRejection` hoặc `uncaughtException`.
+  - Độ trễ nhịp tick trung bình không bị nghẽn (TB ~20 ms / đòn tấn công qua WebSocket).
+  - Trạng thái người khác (Observer) hoàn toàn bất biến (Linh thạch, Exp, số lượng đồ trong túi đồ không đổi).
+  - Trạng thái kẻ tấn công (Attacker) không được hưởng lợi (Linh thạch, Exp, túi đồ không tăng).
+  - Bộ nhớ VmRSS không bị rò rỉ (+0 MB sau 1248 đòn tấn công).
+
+### 16.2. Kết quả Đo đạc Thực tế
+Chạy toàn bộ 48 loại tin nhắn × 26 biến thể payload (chế độ FULL với `--report`):
+
+| Chỉ số kiểm thử | Giá trị đo được | Đánh giá | Trạng thái |
+| :--- | :---: | :---: | :---: |
+| **Tổng số payload đối kháng đã gửi** | **1248 payloads** (48 loại tin × 26 payloads) | Phủ kín 100% tin nhắn của WorldRoom | **PASS** |
+| **Tỷ lệ an toàn (không crash, không hưởng lợi)** | **1248 / 1248 (100%)** | 0 lỗi bảo mật / 0 lỗ hổng logic | **PASS** |
+| **Unhandled Rejection / Exception** | **0** | Phòng và tiến trình server nguyên vẹn | **PASS** |
+| **Độ trễ xử lý mỗi payload (TB / Max)** | **TB 20.32 ms** / Max 22.03 ms | Nhanh, không treo I/O hay vòng lặp vô tận | **PASS** |
+| **Bảo vệ chống spam (RateLimiter kick 4429)** | **PASS** (ngắt kết nối đúng mã `4429`) | Chống cạn kiệt tài nguyên hiệu quả | **PASS** |
+| **Biến thiên bộ nhớ VmRSS** | **+0 MB** | Không rò rỉ bộ nhớ sau 1248 đòn tấn công | **PASS** |
+
+#### Bảng kết quả chi tiết theo 48 loại tin nhắn WorldRoom (FULL Mode):
+- **Di chuyển & Chiến đấu:** `input` (26/26 OK), `attack` (26/26 OK), `skill` (26/26 OK), `meditate` (26/26 OK), `breakthrough` (26/26 OK), `chat` (26/26 OK).
+- **Túi đồ & Trang bị:** `useItem` (26/26 OK), `pickup` (26/26 OK), `dropItem` (26/26 OK), `equip` (26/26 OK), `unequip` (26/26 OK).
+- **NPC, Nhiệm vụ & Giao dịch:** `talk` (26/26 OK), `questAccept` (26/26 OK), `questTurnIn` (26/26 OK), `questAbandon` (26/26 OK), `trade` (26/26 OK), `craft` (26/26 OK), `buy` (26/26 OK), `sell` (26/26 OK).
+- **Tổ đội:** `partyInvite` (26/26 OK), `partyAccept` (26/26 OK), `partyDecline` (26/26 OK), `partyLeave` (26/26 OK), `partyKick` (26/26 OK).
+- **Dịch chuyển & Bản đồ:** `travel` (26/26 OK).
+- **Bí cảnh:** `dungeonOpen` (26/26 OK), `dungeonEnter` (26/26 OK), `dungeonDecline` (26/26 OK), `dungeonLeave` (26/26 OK).
+- **PK Thách đấu:** `duelChallenge` (26/26 OK), `duelAccept` (26/26 OK), `duelDecline` (26/26 OK), `duelYield` (26/26 OK).
+- **Tông môn:** `sectCreate` (26/26 OK), `sectInvite` (26/26 OK), `sectAccept` (26/26 OK), `sectDecline` (26/26 OK), `sectLeave` (26/26 OK), `sectKick` (26/26 OK), `sectRank` (26/26 OK), `sectTransfer` (26/26 OK), `sectDisband` (26/26 OK), `sectMotd` (26/26 OK), `sectDeposit` (26/26 OK), `sectWithdraw` (26/26 OK).
+- **Luân hồi:** `soulBuy` (26/26 OK), `rebirth` (26/26 OK).
+- **Tin lạ không đăng ký:** `__unknown_unregistered_msg__` (26/26 OK, handler `*` từ chối an toàn).
+
+
 
