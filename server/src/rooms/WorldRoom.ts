@@ -38,6 +38,8 @@ import {
   type PartyInviteMsg,
   type PartyAnswerMsg,
   type PartyKickMsg,
+  type TravelMsg,
+  type TravelToMsg,
   type GameMap,
 } from "@tien-gioi/shared";
 import { WorldState, Player } from "../schema";
@@ -58,12 +60,15 @@ import { equip, equipmentOf, sanitizeEquipment, setEquipment, unequip } from "..
 import { tickWorld } from "../systems/tick";
 import { VIEW_ENTER } from "../systems/interest";
 import { partyAnswer, partyDrop, partyInvite, partyKick, partyLeave } from "../systems/party";
+import { planTravel } from "../systems/travel";
 import { RateLimiter } from "../rate-limit";
 import { defaultHub, type Hub } from "../hub";
 
 const SAVE_EVERY_MS = 30_000;
 /** Mã đóng kết nối khi spam tin nhắn (client hiện "mất kết nối") */
 export const CLOSE_SPAM = 4429;
+/** Mã đóng kết nối sau khi đã đưa người chơi qua cổng (như thoát chủ động: client không hiện "mất kết nối") */
+export const CLOSE_TRAVEL = 4000;
 /** Mã nhân vật dài hơn mức này thì từ chối luôn (client tạo mã 32 ký tự) */
 const MAX_SECRET_LEN = 256;
 /** Giây giữ nhân vật chờ kết nối lại khi rớt mạng bất thường (#116) */
@@ -188,6 +193,7 @@ export class WorldRoom extends Room<WorldState> {
     this.on<PartyAnswerMsg>("partyDecline", (sid, m) => partyAnswer(w, sid, m?.from, false));
     this.on("partyLeave", (sid) => partyLeave(w, sid));
     this.on<PartyKickMsg>("partyKick", (sid, m) => partyKick(w, sid, m?.name));
+    this.on<TravelMsg>("travel", (sid, m) => void this.travel(sid, m?.portalId));
     // Loại tin nhắn không đăng ký: bỏ qua, tính là spam
     this.onMessage("*", (c) => this.reject(c));
   }
@@ -319,6 +325,8 @@ export class WorldRoom extends Room<WorldState> {
     const sid = client.sessionId;
     const p = this.state.players.get(sid);
     const c = this.world.ctrl.get(sid);
+    // Đã đưa ra khỏi phòng khi đi qua cổng (WorldRoom.travel đã lưu và dọn): không còn gì để giữ chờ hay dọn
+    if (!p && !c) return void this.limiters.delete(sid);
     // Rớt mạng bất thường (không phải chủ động thoát; bị ngắt vì spam thì `limiters` đã xoá): giữ nhân vật chờ
     // kết nối lại. Dữ liệu theo sessionId nên giữ nguyên; Colyseus chuyển StateView sang kết nối mới.
     let resolveDone = () => {};
@@ -353,19 +361,57 @@ export class WorldRoom extends Room<WorldState> {
         await this.persist(p, c).catch((e) => console.error("save failed", e));
         this.world.events.sys(`${p.name} đã rời đi.`);
       }
-      partyDrop(this.world, sid); // trước khi xoá khỏi state: báo cho đội, dọn lời mời
-      this.state.players.delete(sid);
-      this.state.online = this.state.players.size;
-      this.world.interest.leave(sid);
-      this.world.ctrl.delete(sid);
-      this.limiters.delete(sid);
-      forgetTarget(this.world, sid);
-      releaseLootOwner(this.world, sid);
+      this.dropPlayer(sid);
     } finally {
       this.ghosts.delete(sid);
       this.world.ghosts.delete(sid);
       resolveDone();
     }
+  }
+
+  /** Gỡ người chơi khỏi thế giới (không lưu): dùng khi rời phòng và khi đi qua cổng. */
+  private dropPlayer(sid: string) {
+    partyDrop(this.world, sid); // trước khi xoá khỏi state: báo cho đội, dọn lời mời
+    this.state.players.delete(sid);
+    this.state.online = this.state.players.size;
+    this.world.interest.leave(sid);
+    this.world.ctrl.delete(sid);
+    this.limiters.delete(sid);
+    forgetTarget(this.world, sid);
+    releaseLootOwner(this.world, sid);
+  }
+
+  /**
+   * Đi qua cổng (shared/src/travel.ts): kiểm (`planTravel`), LƯU nhân vật với bản đồ đích + chỗ xuất hiện, đưa ra khỏi
+   * phòng (không chờ nối lại), gửi `travelTo`, đóng kết nối. Lưu xong mới gửi: client vào phòng đích sẽ nạp đúng bản ghi đó.
+   * Đội tạm thời tan khi qua cổng (đội và chat dùng chung giữa các phòng là việc kế tiếp của #142).
+   */
+  private async travel(sid: string, portalId: unknown) {
+    const plan = planTravel(this.world, sid, portalId);
+    const p = this.state.players.get(sid);
+    const c = this.world.ctrl.get(sid);
+    if (!plan || !p || !c) return;
+    c.travelling = true;
+    c.inputs.length = 0;
+    try {
+      await this.persist(p, c, { mapId: plan.mapId, x: plan.x, y: plan.y });
+    } catch (e) {
+      console.error("save failed (travel)", e);
+      c.travelling = false;
+      this.world.events.toast(sid, { text: "Cổng chưa mở được, thử lại sau.", tone: "bad" });
+      return;
+    }
+    // Trong lúc lưu có thể chết, rớt mạng hoặc bị ngắt: huỷ, ghi lại bản đồ của phòng này (tự chữa)
+    const client = this.clients.find((x) => x.sessionId === sid);
+    const here = this.state.players.get(sid);
+    if (!client || !here || here.dead || this.ghosts.has(sid)) {
+      c.travelling = false;
+      if (here) await this.persist(here, c).catch((e) => console.error("save failed", e));
+      return;
+    }
+    this.dropPlayer(sid);
+    client.send("travelTo", { mapId: plan.mapId } satisfies TravelToMsg);
+    client.leave(CLOSE_TRAVEL);
   }
 
   async onDispose() {
@@ -376,10 +422,18 @@ export class WorldRoom extends Room<WorldState> {
 
   // ---------------- Lưu nhân vật ----------------
 
-  private async persist(p: Player, c: PlayerCtrl) {
+  /**
+   * Lưu nhân vật. `at` (chỉ khi đi qua cổng): ghi bản đồ đích + chỗ xuất hiện thay cho phòng và vị trí hiện tại, kèm
+   * `travelAt`. Người đang đi qua cổng (`c.travelling`) không bị lưu đè bởi lưu định kỳ / lúc rớt mạng.
+   */
+  private async persist(p: Player, c: PlayerCtrl, at?: { mapId: string; x: number; y: number }) {
+    if (c.travelling && !at) return;
     // Không lưu vị trí trong trấn hoặc lúc trọng thương: lần sau vào thì xuất hiện ở trấn
-    const pos =
-      p.dead || this.world.map.inTown(p.x, p.y) ? {} : { x: Math.round(p.x), y: Math.round(p.y) };
+    const pos = at
+      ? { x: Math.round(at.x), y: Math.round(at.y) }
+      : p.dead || this.world.map.inTown(p.x, p.y)
+        ? {}
+        : { x: Math.round(p.x), y: Math.round(p.y) };
     c.save = {
       ...c.save,
       realm: p.realm,
@@ -392,7 +446,8 @@ export class WorldRoom extends Room<WorldState> {
       quests: c.quests,
       equipment: equipmentOf(p),
       coin: c.coin,
-      mapId: this.mapId,
+      mapId: at?.mapId ?? this.mapId,
+      ...(at ? { travelAt: this.world.now } : {}),
     };
     await savePlayer(c.save);
   }
