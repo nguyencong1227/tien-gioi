@@ -7,6 +7,7 @@ import {
   JOIN_BAD_TOKEN,
   JOIN_NEED_CHARACTER,
   getMap,
+  isDungeonMap,
   type TravelToMsg,
   type LimboMsg,
 } from "@tien-gioi/shared";
@@ -188,6 +189,12 @@ function setupRoomLifecycle(room: Room) {
     // 1000: đóng bình thường; 4000-4999: mã của ứng dụng (4000 chủ động thoát, 4429 bị ngắt vì spam)
     if (code === 1000 || (code >= 4000 && code <= 4999)) {
       if (code !== 1000) showDisconnected();
+      return;
+    }
+
+    // Nếu rớt mạng trong phòng bí cảnh: rời run ngay (không có allowReconnection), không cố nối lại
+    if (activeScene && isDungeonMap(activeScene.map.def.id)) {
+      showDisconnected();
       return;
     }
 

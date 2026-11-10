@@ -2874,6 +2874,9 @@ export const ui = {
 
   /** Xử lý kết thúc Bí cảnh (thắng / thua hoặc huỷ trước khi vào) */
   onDungeonEnd(msg: DungeonEndMsg) {
+    // Người đang ở Hoàng Tuyền (chết) bỏ qua màn kết quả vì đang ở màn hình đầu thai
+    if (this.isLimboOpen()) return;
+
     if (!shouldOpenEndModal(msg.reason)) {
       stopDungeonInviteTimer();
       currentDungeonInvite = null;

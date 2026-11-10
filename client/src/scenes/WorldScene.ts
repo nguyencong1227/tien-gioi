@@ -245,7 +245,7 @@ export class WorldScene extends Phaser.Scene {
           if (isMockDungeonEnabled()) {
             ui.onDungeonInvite(MOCK_DUNGEON_SAMPLES.invite(this.me()?.name || "Trương Tiểu Phàm"));
           } else {
-            this.room.send("dialogAction", action);
+            this.room.send(DUNGEON_MSG.open, { dungeonId: action.dungeonId });
           }
         }
       },
