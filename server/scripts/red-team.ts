@@ -25,14 +25,15 @@ import {
   DEFAULT_MAP_ID,
   DUEL_MSG,
   DUNGEON_MSG,
+  NPCS,
   PROTOCOL_VERSION,
   SECT_MSG,
   roomNameOf,
   type ChatMsg,
 } from "@tien-gioi/shared";
 
-// Danh sách tất cả 47 loại tin nhắn hợp lệ mà WorldRoom đăng ký + 1 tin lạ kiểm tra handler '*'
-export const ALL_MESSAGE_TYPES = [
+// Danh sách 47 loại tin nhắn hợp lệ mà WorldRoom đăng ký (dùng để test so khớp với room.onMessageHandlers)
+export const EXPECTED_MESSAGE_TYPES = [
   // Di chuyển & chiến đấu
   "input",
   "attack",
@@ -89,11 +90,15 @@ export const ALL_MESSAGE_TYPES = [
   // Luân hồi
   "soulBuy",
   "rebirth",
-  // Tin lạ không đăng ký
-  "__unknown_unregistered_msg__",
 ] as const;
 
-export type MessageType = (typeof ALL_MESSAGE_TYPES)[number];
+/** Tự phát hiện các loại tin nhắn đã đăng ký từ Colyseus Room handler */
+export function discoverRegisteredMessageTypes(serverRoom: any): string[] {
+  const handlers = serverRoom?.onMessageHandlers ?? {};
+  return Object.keys(handlers)
+    .filter((k) => k !== "__no_message_handler" && k !== "*")
+    .sort();
+}
 
 export interface AttackPayload {
   name: string;
@@ -285,6 +290,7 @@ export interface RedTeamTestResult {
   messageType: string;
   payloadName: string;
   category: string;
+  senderType: "poor" | "rich";
   ok: boolean;
   error?: string;
 }
@@ -294,10 +300,12 @@ export interface RedTeamSummary {
   passedAttacks: number;
   failedAttacks: number;
   unhandledErrors: string[];
-  serverTickAvgMs: number;
-  serverTickMaxMs: number;
+  handlerExceptions: string[];
+  payloadLatencyAvgMs: number;
+  payloadLatencyMaxMs: number;
   rssDeltaMb: number;
   rateLimitKicked: boolean;
+  discoveredMessageTypes: string[];
   results: RedTeamTestResult[];
 }
 
@@ -325,16 +333,36 @@ export async function runRedTeam(options: {
 
   const initialRss = readVmRssMb();
   const unhandledErrors: string[] = [];
+  const handlerExceptions: string[] = [];
 
-  // Bắt các unhandled error nếu lọt ra tiến trình Node
+  // 1. Bắt các unhandled error nếu lọt ra tiến trình Node
   const onUnhandled = (err: any) => {
     unhandledErrors.push(String(err?.stack ?? err));
   };
   process.on("unhandledRejection", onUnhandled);
   process.on("uncaughtException", onUnhandled);
 
+  // 2. Bắt console.error chứa '[lỗi]' (Colyseus Room.onUncaughtException bắt lỗi handler và in [lỗi])
+  const originalConsoleError = console.error;
+  console.error = (...args: unknown[]) => {
+    const line = args
+      .map((a) =>
+        typeof a === "object"
+          ? a instanceof Error
+            ? (a.stack ?? a.message)
+            : JSON.stringify(a)
+          : String(a),
+      )
+      .join(" ");
+    if (line.includes("[lỗi]")) {
+      handlerExceptions.push(line);
+    }
+    originalConsoleError(...args);
+  };
+
   // Khởi tạo Server Colyseus
   const { WorldRoom, defineRooms } = await import("../src/rooms/WorldRoom");
+  const { matchMaker } = await import("colyseus");
   const port = 49600 + Math.floor(Math.random() * 1500);
   const server = new Server({
     transport: new WebSocketTransport(),
@@ -360,6 +388,10 @@ export async function runRedTeam(options: {
       "limbo",
       "travelTo",
       "sectPresence",
+      "partyInvited",
+      "party",
+      "sectInvited",
+      "sect",
     ]) {
       r.onMessage(t, () => {});
     }
@@ -374,161 +406,300 @@ export async function runRedTeam(options: {
   registerNoop(observerRoom);
   await sleep(150);
 
-  let attackerSeq = 1;
-  let attackerRoom = await client.joinOrCreate(roomName, {
-    name: "Red001",
-    secret: "secret-attacker-123456",
+  // Lấy serverRoom thật để tự phát hiện mọi handler đã đăng ký
+  const serverRoom = matchMaker.getLocalRoomById(observerRoom.roomId);
+  const discoveredMessageTypes = discoverRegisteredMessageTypes(serverRoom);
+
+  // 2. Tạo bot Attacker Nghèo (Poor - hồ sơ mới, 0 tiền, túi rỗng, không đội/tông môn)
+  let poorSeq = 1;
+  let poorRoom = await client.joinOrCreate(roomName, {
+    name: "RedPoor001",
+    secret: "secret-poor-123456",
     v: PROTOCOL_VERSION,
   });
-  registerNoop(attackerRoom);
+  registerNoop(poorRoom);
   await sleep(150);
 
-  const getAttackerRoom = async (): Promise<Room> => {
-    if (attackerRoom && attackerRoom.connection.isOpen) {
-      return attackerRoom;
+  const getPoorRoom = async (): Promise<Room> => {
+    if (poorRoom && poorRoom.connection.isOpen) {
+      return poorRoom;
     }
-    attackerSeq++;
-    attackerRoom = await client.joinOrCreate(roomName, {
-      name: `Red${String(attackerSeq).padStart(3, "0")}`,
-      secret: "secret-attacker-123456",
+    poorSeq++;
+    poorRoom = await client.joinOrCreate(roomName, {
+      name: `RedPoor${String(poorSeq).padStart(3, "0")}`,
+      secret: "secret-poor-123456",
       v: PROTOCOL_VERSION,
     });
-    registerNoop(attackerRoom);
+    registerNoop(poorRoom);
     await sleep(100);
-    return attackerRoom;
+    return poorRoom;
   };
+
+  // 3. Tạo bot Attacker Giàu (Rich - 100k coin sống, đủ loại đồ trong túi, cạnh NPC/cổng, có đội, có tông môn)
+  let richSeq = 1;
+  let richRoom = await client.joinOrCreate(roomName, {
+    name: "RedRich001",
+    secret: "secret-rich-123456",
+    v: PROTOCOL_VERSION,
+  });
+  registerNoop(richRoom);
+  await sleep(150);
 
   const world = [...WorldRoom.hub.worlds].find((w) => w.map.def.id === DEFAULT_MAP_ID)!;
 
-  // Lấy snapshot ban đầu của Observer và Attacker
-  const getObserverState = () => {
-    const p = observerRoom.state?.players?.get(observerRoom.sessionId);
-    const ctrl = world.ctrl.get(observerRoom.sessionId);
-    return {
-      coin: ctrl?.save?.coin ?? 0,
-      exp: p?.exp ?? 0,
-      hp: p?.hp ?? 0,
-      x: p?.x ?? 0,
-      y: p?.y ?? 0,
-      invSize: ctrl?.save?.inventory?.filter(Boolean).length ?? 0,
-    };
+  const setupRichAttacker = (room: Room) => {
+    const ctrl = world.ctrl.get(room.sessionId);
+    const p = world.state.players.get(room.sessionId);
+    if (!ctrl || !p) return;
+
+    // Tiền sống
+    ctrl.coin = 100_000;
+
+    // Túi đồ sống đủ loại: dược phẩm, vũ khí, giáp, nguyên liệu, pháp bảo
+    ctrl.inv = [
+      { itemId: "hoi_huyet_dan", qty: 20 },
+      { itemId: "tu_khi_dan", qty: 20 },
+      { itemId: "lang_nha_kiem", qty: 1 },
+      { itemId: "tho_nhung_bao", qty: 1 },
+      { itemId: "long_tho", qty: 50 },
+      { itemId: "ho_hon_phu", qty: 1 },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+    ];
+
+    // Vị trí cạnh NPC trong trấn (Lão Dược Sư ở trấn Lạc Hà)
+    const npc = NPCS[0] ?? { x: 500, y: 500 };
+    p.x = npc.x + 10;
+    p.y = npc.y + 10;
   };
 
-  const getAttackerState = () => {
-    const p = attackerRoom.state?.players?.get(attackerRoom.sessionId);
-    const ctrl = world.ctrl.get(attackerRoom.sessionId);
+  setupRichAttacker(richRoom);
+
+  // Thiết lập tổ đội giữa Rich và Observer
+  richRoom.send("partyInvite", { name: "RedTeamObserver" });
+  await sleep(60);
+  observerRoom.send("partyAccept", { from: "RedRich001" });
+  await sleep(60);
+
+  // Thiết lập tông môn cho Rich và nạp kho
+  richRoom.send(SECT_MSG.create, { name: "Bang Phai Do", tag: "BPD1" });
+  await sleep(100);
+  richRoom.send(SECT_MSG.deposit, { amount: 5000 });
+  await sleep(100);
+  richRoom.send(SECT_MSG.invite, { name: "RedTeamObserver" });
+  await sleep(60);
+  observerRoom.send(SECT_MSG.accept, { from: "Bang Phai Do" });
+  await sleep(100);
+
+  const getRichRoom = async (): Promise<Room> => {
+    if (richRoom && richRoom.connection.isOpen) {
+      return richRoom;
+    }
+    richSeq++;
+    richRoom = await client.joinOrCreate(roomName, {
+      name: `RedRich${String(richSeq).padStart(3, "0")}`,
+      secret: "secret-rich-123456",
+      v: PROTOCOL_VERSION,
+    });
+    registerNoop(richRoom);
+    await sleep(100);
+    setupRichAttacker(richRoom);
+    return richRoom;
+  };
+
+  // Hàm đọc trạng thái SỐNG (Live State) từ bộ nhớ server (PlayerCtrl & World)
+  interface LiveState {
+    coin: number;
+    exp: number;
+    realm: number;
+    hp: number;
+    invTotal: number;
+    itemCounts: Map<string, number>;
+  }
+
+  const getLiveState = (sid: string): LiveState => {
+    const ctrl = world.ctrl.get(sid);
+    const p = world.state.players.get(sid);
+    const itemCounts = new Map<string, number>();
+    let invTotal = 0;
+    if (ctrl?.inv) {
+      for (const slot of ctrl.inv) {
+        if (slot && slot.qty > 0) {
+          invTotal += slot.qty;
+          itemCounts.set(slot.itemId, (itemCounts.get(slot.itemId) ?? 0) + slot.qty);
+        }
+      }
+    }
     return {
-      coin: ctrl?.save?.coin ?? 0,
+      coin: ctrl?.coin ?? 0,
       exp: p?.exp ?? 0,
       realm: p?.realm ?? 0,
-      invSize: ctrl?.save?.inventory?.filter(Boolean).length ?? 0,
+      hp: p?.hp ?? 0,
+      invTotal,
+      itemCounts,
     };
   };
 
-  const initObs = getObserverState();
-  const initAtk = getAttackerState();
+  const initObs = getLiveState(observerRoom.sessionId);
 
   const payloads = buildBadPayloads(fast);
   const results: RedTeamTestResult[] = [];
-  const tickSamples: number[] = [];
+  const latencySamples: number[] = [];
 
   let totalAttacks = 0;
   let passedAttacks = 0;
   let failedAttacks = 0;
 
-  // Chạy lần lượt từng loại tin nhắn x từng payload xấu
-  for (const msgType of ALL_MESSAGE_TYPES) {
+  // Danh sách các tin nhắn cần kiểm tra: toàn bộ tin nhắn tự phát hiện + 1 tin lạ handler '*'
+  const allMessageTypesToTest = [...discoveredMessageTypes, "__unknown_unregistered_msg__"];
+
+  // Chạy lần lượt từng loại tin nhắn x từng payload xấu trên cả 2 đối tượng người gửi:
+  // 1. Poor Attacker (hồ sơ rỗng)
+  // 2. Rich Attacker (đầy đủ tiền, đồ, cạnh NPC, có đội, có tông môn)
+  const senders = [
+    { type: "poor" as const, getRoom: getPoorRoom },
+    { type: "rich" as const, getRoom: getRichRoom },
+  ];
+
+  for (const msgType of allMessageTypesToTest) {
     for (const payload of payloads) {
-      totalAttacks++;
-      const t0 = performance.now();
+      for (const sender of senders) {
+        totalAttacks++;
+        const t0 = performance.now();
+        const activeRoom = await sender.getRoom();
 
-      const curAttackerRoom = await getAttackerRoom();
+        // Ghi nhận trạng thái sống TRƯỚC đòn tấn công
+        const beforeAtk = getLiveState(activeRoom.sessionId);
+        const errCountBefore = handlerExceptions.length;
 
-      try {
-        // Gửi payload qua kết nối WebSocket thật
-        curAttackerRoom.send(msgType as any, payload.data as any);
-      } catch (_err: unknown) {
-        // Gửi qua WebSocket ném lỗi phía client colyseus.js (vd serialization) là an toàn cho server
-        results.push({
-          messageType: msgType,
-          payloadName: payload.name,
-          category: payload.category,
-          ok: true,
-        });
-        passedAttacks++;
-        continue;
-      }
-
-      // Đợi server xử lý nhịp tick
-      await sleep(20);
-
-      const dt = performance.now() - t0;
-      tickSamples.push(dt);
-
-      // Kiểm tra các bất biến sau đòn tấn công:
-      // 1. Observer: coin không đổi, exp không đổi, invSize không đổi
-      const curObs = getObserverState();
-      const obsOk =
-        curObs.coin === initObs.coin &&
-        curObs.exp === initObs.exp &&
-        curObs.invSize === initObs.invSize;
-
-      // 2. Attacker: coin không tăng, exp không tăng, invSize không tăng
-      const curAtk = getAttackerState();
-      const atkOk =
-        curAtk.coin <= initAtk.coin &&
-        curAtk.exp <= initAtk.exp &&
-        curAtk.invSize <= initAtk.invSize;
-
-      // 3. Observer room vẫn mở và server không sập
-      const serverAlive = observerRoom.connection.isOpen && unhandledErrors.length === 0;
-
-      const ok = obsOk && atkOk && serverAlive;
-
-      if (!ok) {
-        failedAttacks++;
-        const errorMsg = !serverAlive
-          ? `Server bị crash hoặc Observer bị ngắt kết nối: ${unhandledErrors.join("; ")}`
-          : !obsOk
-            ? `Observer bị thay đổi trái phép: coin ${initObs.coin}->${curObs.coin}, exp ${initObs.exp}->${curObs.exp}`
-            : `Attacker hưởng lợi bất hợp pháp: coin ${initAtk.coin}->${curAtk.coin}, exp ${initAtk.exp}->${curAtk.exp}`;
-
-        results.push({
-          messageType: msgType,
-          payloadName: payload.name,
-          category: payload.category,
-          ok: false,
-          error: errorMsg,
-        });
-
-        if (verbose) {
-          console.error(`[FAIL] ${msgType} x ${payload.name}: ${errorMsg}`);
+        try {
+          // Gửi payload qua kết nối WebSocket thật
+          activeRoom.send(msgType as any, payload.data as any);
+        } catch (_err: unknown) {
+          // Gửi qua WebSocket ném lỗi phía client colyseus.js (vd serialization) là an toàn cho server
+          results.push({
+            messageType: msgType,
+            payloadName: payload.name,
+            category: payload.category,
+            senderType: sender.type,
+            ok: true,
+          });
+          passedAttacks++;
+          continue;
         }
-      } else {
-        passedAttacks++;
-        results.push({
-          messageType: msgType,
-          payloadName: payload.name,
-          category: payload.category,
-          ok: true,
-        });
+
+        // Đợi server xử lý nhịp tick
+        await sleep(15);
+
+        const dt = performance.now() - t0;
+        latencySamples.push(dt);
+
+        // 1. Kiểm tra handler có ném ngoại lệ bị Room.onUncaughtException bắt không
+        const errsSince = handlerExceptions.length - errCountBefore;
+        const hasHandlerException = errsSince > 0;
+
+        // 2. Kiểm tra Observer sống: coin không đổi, exp không đổi, invTotal không đổi
+        const curObs = getLiveState(observerRoom.sessionId);
+        const obsOk =
+          curObs.coin === initObs.coin &&
+          curObs.exp === initObs.exp &&
+          curObs.invTotal === initObs.invTotal;
+
+        // 3. Kiểm tra Attacker sống:
+        const curAtk = getLiveState(activeRoom.sessionId);
+        const coinOk = curAtk.coin <= beforeAtk.coin;
+        const expOk = curAtk.exp <= beforeAtk.exp;
+        const realmOk = curAtk.realm <= beforeAtk.realm;
+        const invTotalOk = curAtk.invTotal <= beforeAtk.invTotal;
+        let itemsOk = true;
+        for (const [id, count] of curAtk.itemCounts) {
+          const prevCount = beforeAtk.itemCounts.get(id) ?? 0;
+          if (count > prevCount) {
+            itemsOk = false;
+            break;
+          }
+        }
+
+        // 4. Kiểm tra phòng Observer vẫn mở và server không sập
+        const serverAlive = observerRoom.connection.isOpen && unhandledErrors.length === 0;
+
+        const ok =
+          !hasHandlerException &&
+          obsOk &&
+          coinOk &&
+          expOk &&
+          realmOk &&
+          invTotalOk &&
+          itemsOk &&
+          serverAlive;
+
+        if (!ok) {
+          failedAttacks++;
+          const errorMsg = hasHandlerException
+            ? `Handler ném ngoại lệ ([lỗi]): ${handlerExceptions.slice(errCountBefore).join("; ")}`
+            : !serverAlive
+              ? `Server bị crash hoặc Observer bị ngắt kết nối: ${unhandledErrors.join("; ")}`
+              : !obsOk
+                ? `Observer bị thay đổi trái phép: coin ${initObs.coin}->${curObs.coin}, exp ${initObs.exp}->${curObs.exp}, invTotal ${initObs.invTotal}->${curObs.invTotal}`
+                : !coinOk
+                  ? `Attacker tự sinh Linh thạch bất hợp pháp: ${beforeAtk.coin} -> ${curAtk.coin} (+${curAtk.coin - beforeAtk.coin})`
+                  : !expOk
+                    ? `Attacker tự sinh tu vi bất hợp pháp: exp ${beforeAtk.exp} -> ${curAtk.exp}`
+                    : `Attacker tự sinh vật phẩm trong túi bất hợp pháp: invTotal ${beforeAtk.invTotal} -> ${curAtk.invTotal}`;
+
+          results.push({
+            messageType: msgType,
+            payloadName: payload.name,
+            category: payload.category,
+            senderType: sender.type,
+            ok: false,
+            error: errorMsg,
+          });
+
+          if (verbose) {
+            console.error(`[FAIL] [${sender.type}] ${msgType} x ${payload.name}: ${errorMsg}`);
+          }
+        } else {
+          passedAttacks++;
+          results.push({
+            messageType: msgType,
+            payloadName: payload.name,
+            category: payload.category,
+            senderType: sender.type,
+            ok: true,
+          });
+        }
       }
     }
   }
 
-  // 3. Kiểm tra các trạng thái dị thường (State machine):
-  // Gửi tin nhắn khi nhân vật đang thiền hoặc ở Hoàng Tuyền
-  const curAttackerRoom = await getAttackerRoom();
-  curAttackerRoom.send("meditate", { on: true });
-  await sleep(60);
-  curAttackerRoom.send("attack", { angle: 0 });
-  curAttackerRoom.send("trade", { tradeId: "constructor" });
-  curAttackerRoom.send(SECT_MSG.create, { name: "Bang Phai", tag: "BP01" });
-  curAttackerRoom.send("meditate", { on: false });
-  await sleep(60);
+  // 4. Kiểm tra các trạng thái dị thường (State machine):
+  const richStateRoom = await getRichRoom();
+  richStateRoom.send("meditate", { on: true });
+  await sleep(50);
+  richStateRoom.send("attack", { angle: 0 });
+  richStateRoom.send("trade", { tradeId: "constructor" });
+  richStateRoom.send(SECT_MSG.create, { name: "Bang Phai", tag: "BP02" });
+  richStateRoom.send("meditate", { on: false });
+  await sleep(50);
 
-  // 4. Kiểm tra rate-limit / spam flood:
-  // Gửi 250 tin nhắn liên tiếp thật nhanh từ một kết nối riêng để kiểm tra ngắt 4429
+  // 5. Kiểm tra rate-limit / spam flood:
   let rateLimitKicked = false;
   const spammerRoom = await client.joinOrCreate(roomName, {
     name: "RedTeamSpammer",
@@ -550,7 +721,7 @@ export async function runRedTeam(options: {
   }
   await sleep(300);
 
-  // 5. Kiểm tra onAuth options xấu (trường v & prototype pollution ở bước join)
+  // 6. Kiểm tra onAuth options xấu (trường v & prototype pollution ở bước join)
   const badJoinOpts = [
     { name: "RedVStr", secret: "secret-attacker-123456", v: "not_a_number" },
     { name: "RedVNaN", secret: "secret-attacker-123456", v: NaN },
@@ -575,8 +746,9 @@ export async function runRedTeam(options: {
     }
   }
 
-  // Dọn dẹp kết nối
-  if (attackerRoom.connection.isOpen) await attackerRoom.leave(true);
+  // Dọn dẹp kết nối & Server
+  if (poorRoom.connection.isOpen) await poorRoom.leave(true);
+  if (richRoom.connection.isOpen) await richRoom.leave(true);
   if (observerRoom.connection.isOpen) await observerRoom.leave(true);
   if (spammerRoom.connection.isOpen) await spammerRoom.leave(true);
   await sleep(100);
@@ -585,26 +757,31 @@ export async function runRedTeam(options: {
 
   process.off("unhandledRejection", onUnhandled);
   process.off("uncaughtException", onUnhandled);
+  console.error = originalConsoleError;
 
   rmSync(dataDir, { recursive: true, force: true });
 
   const finalRss = readVmRssMb();
   const rssDeltaMb = Math.max(0, finalRss - initialRss);
 
-  tickSamples.sort((a, b) => a - b);
-  const avgTick =
-    tickSamples.length > 0 ? tickSamples.reduce((a, b) => a + b, 0) / tickSamples.length : 0;
-  const maxTick = tickSamples.length > 0 ? tickSamples.at(-1)! : 0;
+  latencySamples.sort((a, b) => a - b);
+  const avgLatency =
+    latencySamples.length > 0
+      ? latencySamples.reduce((a, b) => a + b, 0) / latencySamples.length
+      : 0;
+  const maxLatency = latencySamples.length > 0 ? latencySamples.at(-1)! : 0;
 
   return {
     totalAttacks,
     passedAttacks,
     failedAttacks,
     unhandledErrors,
-    serverTickAvgMs: Number(avgTick.toFixed(2)),
-    serverTickMaxMs: Number(maxTick.toFixed(2)),
+    handlerExceptions,
+    payloadLatencyAvgMs: Number(avgLatency.toFixed(2)),
+    payloadLatencyMaxMs: Number(maxLatency.toFixed(2)),
     rssDeltaMb,
     rateLimitKicked,
+    discoveredMessageTypes,
     results,
   };
 }
@@ -618,7 +795,7 @@ if (isDirectRun) {
   console.log(
     `=== Bắt đầu chạy Red Team Server Messages (chế độ: ${isFast ? "FAST" : "FULL"}) ===`,
   );
-  console.log(`- Kiểm tra ${ALL_MESSAGE_TYPES.length} loại tin nhắn WorldRoom`);
+  console.log(`- Kiểm tra ${EXPECTED_MESSAGE_TYPES.length + 1} loại tin nhắn WorldRoom`);
 
   runRedTeam({ fast: isFast, verbose: true })
     .then((summary) => {
@@ -630,7 +807,7 @@ if (isDirectRun) {
       console.log(`- Thất bại / Lỗi phát hiện: ${summary.failedAttacks}`);
       console.log(`- Unhandled Rejection / Exception: ${summary.unhandledErrors.length}`);
       console.log(
-        `- Độ trễ xử lý mỗi payload: TB ${summary.serverTickAvgMs} ms | Max ${summary.serverTickMaxMs} ms`,
+        `- Độ trễ xử lý mỗi payload: TB ${summary.payloadLatencyAvgMs} ms | Max ${summary.payloadLatencyMaxMs} ms`,
       );
       console.log(
         `- Cơ chế chống spam (RateLimiter kick 4429): ${summary.rateLimitKicked ? "PASS (ngắt đúng 4429)" : "FAIL"}`,

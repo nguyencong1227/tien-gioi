@@ -616,45 +616,52 @@ Bộ kiểm thử stress test tự động hoá 7 kịch bản then chốt trên
 
 ### 16.1. Phương pháp & Công cụ (`server/scripts/red-team.ts`)
 Công cụ `npm run red-team -w server` dựng server Colyseus thật trong tiến trình với thư mục dữ liệu tạm cô lập và kiểm tra đối kháng (red team) toàn diện:
-- **Phạm vi tin nhắn:** Toàn bộ 47 loại tin nhắn hợp lệ mà `WorldRoom` đăng ký qua `this.on(...)` (di chuyển, chiến đấu, kỹ năng, túi đồ, buôn bán, nhiệm vụ, tổ đội, bí cảnh, PK, tông môn, luân hồi) + 1 tin lạ không đăng ký (kiểm tra handler `*` toàn cục từ chối an toàn).
+- **Tự phát hiện loại tin nhắn:** Tự động đọc danh sách handler đã đăng ký từ `serverRoom.onMessageHandlers` (loại bỏ handler nội bộ `__no_message_handler` và handler toàn cục `*`), so khớp 100% với hợp đồng `shared/` (`EXPECTED_MESSAGE_TYPES` gồm 47 loại tin nghiệp vụ) + 1 tin lạ để kiểm tra handler `*`.
+- **Đa dạng hoá đối tượng tấn công (Poor & Rich Attacker):**
+  1. **Poor Attacker:** Nhân vật mới tạo (0 Linh thạch, túi trống, không có đội, không có tông môn) để kiểm tra các ca biên chia cho 0, số âm, thiếu đồ/tiền.
+  2. **Rich Attacker:** Nhân vật giàu có tài nguyên thực tế trong bộ nhớ sống server: 100,000 Linh thạch sống (`ctrl.coin`), túi đồ sống (`ctrl.inv`) chứa dược phẩm (`hoi_huyet_dan`, `tu_khi_dan`), vũ khí (`lang_nha_kiem`), giáp (`tho_nhung_bao`), pháp bảo (`ho_hon_phu`), nguyên liệu rèn (`long_tho`), đứng cạnh NPC Lão Dược Sư tại Lạc Hà Trấn, có tổ đội với Observer và là Tông chủ của tông môn có kho 5000 Linh thạch (Observer là Đệ tử). Đối tượng này kích hoạt sâu vào logic nghiệp vụ của các handler thay vì thoát sớm ở các dòng kiểm tra ban đầu.
 - **Phân loại Payload tấn công (26 biến thể payload):**
   1. **Kiểu dữ liệu sai & Primitive Confusion:** `null`, `undefined`, boolean (`true`), số nguyên thuần túy, chuỗi ký tự thô thay thế cho object, mảng rỗng `[]`, mảng chứa dữ liệu phức hợp.
   2. **Giá trị số biên (Number Edge Cases):** `NaN`, `Infinity`, `-Infinity`, số âm cực đoan (`-999999`, `-Math.PI * 4`), số thực dấu phẩy động phân đoạn (`2.7`, `0.5`, `100.99`), số nguyên vượt trần an toàn (`Number.MAX_SAFE_INTEGER + 100`, `1e12`).
   3. **Chuỗi độc hại (String Attacks):** Chuỗi rỗng, chuỗi dài tới 2.0–3.5 KB (sát trần 4 KB của transport), byte NUL (`\x00`), chuỗi ký tự điều khiển và mã màu ANSI (`\r\n\x08\x1b[31m`), chuỗi emoji ghép phức tạp (Zero-Width Joiner sequences), Path Traversal (`../../../etc/passwd`, `..\\win.ini`), XSS / SQL Injection payloads (`<script>alert(1)</script>`, `' OR 1=1--`).
   4. **Khai thác cấu trúc đối tượng (Prototype Pollution & Deep Nesting):** Gửi đối tượng có các khoá nhạy cảm `__proto__`, `constructor`, `prototype`; mảng và đối tượng lồng nhau sâu 50–80 cấp.
   5. **Mã định danh độc hại (Malicious Field IDs):** Tra cứu id bằng các thuộc tính prototype (`"constructor"`, `"prototype"`, `"__proto__"`, `"toString"`), id lạ không tồn tại trong mọi trường nghiệp vụ (`npcId`, `itemId`, `questId`, `portalId`, `lootId`, `tradeId`, `recipeId`, `name`, `from`).
-  6. **Trạng thái dị thường (State Machine Confusion):** Gửi đòn đánh, buôn bán, lập tông môn khi nhân vật đang ở trạng thái thiền (`meditate`) hoặc Hoàng Tuyền (`limbo`).
-  7. **Bão tin nhắn (Spam Flood & Rate Limit):** Bắn phá 250 tin nhắn liên tiếp từ một kết nối riêng để xác minh cơ chế phòng thủ `rate-limit.ts` ngắt kết nối với mã lỗi `4429`.
-- **Tiêu chuẩn an toàn sau mỗi đòn tấn công:**
-  - Server không bị crash, không ném `unhandledRejection` hoặc `uncaughtException`.
-  - Độ trễ nhịp tick trung bình không bị nghẽn (TB ~20 ms / đòn tấn công qua WebSocket).
-  - Trạng thái người khác (Observer) hoàn toàn bất biến (Linh thạch, Exp, số lượng đồ trong túi đồ không đổi).
-  - Trạng thái kẻ tấn công (Attacker) không được hưởng lợi (Linh thạch, Exp, túi đồ không tăng).
-  - Bộ nhớ VmRSS không bị rò rỉ (+0 MB sau 1248 đòn tấn công).
+  6. **Trường phiên bản & Log Injection:** Kiểm tra trường `v` (`JoinOptions`) và các chuỗi ngắt dòng giả mạo log (`\u2028`, `\r\nFake: audit_log`).
+  7. **Trạng thái dị thường (State Machine Confusion):** Gửi đòn đánh, buôn bán, lập tông môn khi nhân vật đang ở trạng thái thiền (`meditate`) hoặc Hoàng Tuyền (`limbo`).
+  8. **Bão tin nhắn (Spam Flood & Rate Limit):** Bắn phá 250 tin nhắn liên tiếp từ một kết nối riêng để xác minh cơ chế phòng thủ `rate-limit.ts` ngắt kết nối với mã lỗi `4429`.
+- **Giám sát & Tiêu chuẩn an toàn sau mỗi đòn tấn công:**
+  - **Bắt ngoại lệ handler:** Intercept `console.error` và `onUncaughtException` trong tiến trình server để phát hiện mọi dòng lỗi `[lỗi]`. Bất kỳ lỗi runtime nào trong handler (như TypeError) đều bị bắt và tính là thất bại (FAIL).
+  - **Kiểm tra bất biến SỐNG (Live State Invariants):** Đọc trực tiếp `ctrl.coin`, `ctrl.inv` (tổng số lượng và số lượng từng loại itemId trong túi), `p.exp`, `p.realm`, `p.hp` từ bộ nhớ sống server (không đọc snapshot lưu đĩa `ctrl.save`). Kẻ tấn công không được tự tăng Linh thạch, Exp hay bất kỳ vật phẩm nào trong túi.
+  - **Observer bất biến:** Tiền, exp và túi đồ của Observer hoàn toàn giữ nguyên.
+  - **Server an toàn:** Server không crash, phòng Observer không bị ngắt kết nối.
+  - **Xác thực bằng 2 đột biến thật:**
+    - Đột biến 1 (`useItem` cộng 5000 Linh thạch): Red team phát hiện 44 vi phạm bất biến tiền sống (ĐỎ).
+    - Đột biến 2 (`useItem` ném TypeError khi thiếu kiểm tra null): Red team phát hiện 10 ngoại lệ handler `[lỗi]` (ĐỎ).
 
 ### 16.2. Kết quả Đo đạc Thực tế
-Chạy toàn bộ 48 loại tin nhắn × 26 biến thể payload (chế độ FULL với `--report`):
+Chạy 48 loại tin nhắn × 2 senders (Poor + Rich) × 26 biến thể payload (chế độ FAST):
 
 | Chỉ số kiểm thử | Giá trị đo được | Đánh giá | Trạng thái |
 | :--- | :---: | :---: | :---: |
-| **Tổng số payload đối kháng đã gửi** | **1248 payloads** (48 loại tin × 26 payloads) | Phủ kín 100% tin nhắn của WorldRoom | **PASS** |
-| **Tỷ lệ an toàn (không crash, không hưởng lợi)** | **1248 / 1248 (100%)** | 0 lỗi bảo mật / 0 lỗ hổng logic | **PASS** |
-| **Unhandled Rejection / Exception** | **0** | Phòng và tiến trình server nguyên vẹn | **PASS** |
-| **Độ trễ xử lý mỗi payload (TB / Max)** | **TB 20.32 ms** / Max 22.03 ms | Nhanh, không treo I/O hay vòng lặp vô tận | **PASS** |
+| **Tổng số đòn tấn công đối kháng** | **2496 đòn** (48 tin × 2 senders × 26 payloads) | Phủ kín 100% tin nhắn WorldRoom trên cả 2 đối tượng | **PASS** |
+| **Tỷ lệ an toàn (không crash, không hưởng lợi, không lỗi)** | **2496 / 2496 (100%)** | 0 lỗi bảo mật / 0 lỗ hổng logic / 0 ngoại lệ handler | **PASS** |
+| **Ngoại lệ handler phát hiện (`[lỗi]`)** | **0** | Mọi payload xấu được xử lý an toàn | **PASS** |
+| **Unhandled Rejection / Exception** | **0** | Tiến trình server nguyên vẹn | **PASS** |
+| **Độ trễ xử lý mỗi payload (TB / Max)** | **TB 15.36 ms** / Max 17.99 ms | Nhanh, không nghẽn vòng lặp hay I/O | **PASS** |
 | **Bảo vệ chống spam (RateLimiter kick 4429)** | **PASS** (ngắt kết nối đúng mã `4429`) | Chống cạn kiệt tài nguyên hiệu quả | **PASS** |
-| **Biến thiên bộ nhớ VmRSS** | **+0 MB** | Không rò rỉ bộ nhớ sau 1248 đòn tấn công | **PASS** |
+| **Biến thiên bộ nhớ VmRSS** | **+0 MB** | Không rò rỉ bộ nhớ sau 2496 đòn tấn công | **PASS** |
 
-#### Bảng kết quả chi tiết theo 48 loại tin nhắn WorldRoom (FULL Mode):
-- **Di chuyển & Chiến đấu:** `input` (26/26 OK), `attack` (26/26 OK), `skill` (26/26 OK), `meditate` (26/26 OK), `breakthrough` (26/26 OK), `chat` (26/26 OK).
-- **Túi đồ & Trang bị:** `useItem` (26/26 OK), `pickup` (26/26 OK), `dropItem` (26/26 OK), `equip` (26/26 OK), `unequip` (26/26 OK).
-- **NPC, Nhiệm vụ & Giao dịch:** `talk` (26/26 OK), `questAccept` (26/26 OK), `questTurnIn` (26/26 OK), `questAbandon` (26/26 OK), `trade` (26/26 OK), `craft` (26/26 OK), `buy` (26/26 OK), `sell` (26/26 OK).
-- **Tổ đội:** `partyInvite` (26/26 OK), `partyAccept` (26/26 OK), `partyDecline` (26/26 OK), `partyLeave` (26/26 OK), `partyKick` (26/26 OK).
-- **Dịch chuyển & Bản đồ:** `travel` (26/26 OK).
-- **Bí cảnh:** `dungeonOpen` (26/26 OK), `dungeonEnter` (26/26 OK), `dungeonDecline` (26/26 OK), `dungeonLeave` (26/26 OK).
-- **PK Thách đấu:** `duelChallenge` (26/26 OK), `duelAccept` (26/26 OK), `duelDecline` (26/26 OK), `duelYield` (26/26 OK).
-- **Tông môn:** `sectCreate` (26/26 OK), `sectInvite` (26/26 OK), `sectAccept` (26/26 OK), `sectDecline` (26/26 OK), `sectLeave` (26/26 OK), `sectKick` (26/26 OK), `sectRank` (26/26 OK), `sectTransfer` (26/26 OK), `sectDisband` (26/26 OK), `sectMotd` (26/26 OK), `sectDeposit` (26/26 OK), `sectWithdraw` (26/26 OK).
-- **Luân hồi:** `soulBuy` (26/26 OK), `rebirth` (26/26 OK).
-- **Tin lạ không đăng ký:** `__unknown_unregistered_msg__` (26/26 OK, handler `*` từ chối an toàn).
+#### Bảng kết quả chi tiết theo 48 loại tin nhắn WorldRoom:
+- **Di chuyển & Chiến đấu:** `input` (52/52 OK), `attack` (52/52 OK), `skill` (52/52 OK), `meditate` (52/52 OK), `breakthrough` (52/52 OK), `chat` (52/52 OK).
+- **Túi đồ & Trang bị:** `useItem` (52/52 OK), `pickup` (52/52 OK), `dropItem` (52/52 OK), `equip` (52/52 OK), `unequip` (52/52 OK).
+- **NPC, Nhiệm vụ & Giao dịch:** `talk` (52/52 OK), `questAccept` (52/52 OK), `questTurnIn` (52/52 OK), `questAbandon` (52/52 OK), `trade` (52/52 OK), `craft` (52/52 OK), `buy` (52/52 OK), `sell` (52/52 OK).
+- **Tổ đội:** `partyInvite` (52/52 OK), `partyAccept` (52/52 OK), `partyDecline` (52/52 OK), `partyLeave` (52/52 OK), `partyKick` (52/52 OK).
+- **Dịch chuyển & Bản đồ:** `travel` (52/52 OK).
+- **Bí cảnh:** `dungeonOpen` (52/52 OK), `dungeonEnter` (52/52 OK), `dungeonDecline` (52/52 OK), `dungeonLeave` (52/52 OK).
+- **PK Thách đấu:** `duelChallenge` (52/52 OK), `duelAccept` (52/52 OK), `duelDecline` (52/52 OK), `duelYield` (52/52 OK).
+- **Tông môn:** `sectCreate` (52/52 OK), `sectInvite` (52/52 OK), `sectAccept` (52/52 OK), `sectDecline` (52/52 OK), `sectLeave` (52/52 OK), `sectKick` (52/52 OK), `sectRank` (52/52 OK), `sectTransfer` (52/52 OK), `sectDisband` (52/52 OK), `sectMotd` (52/52 OK), `sectDeposit` (52/52 OK), `sectWithdraw` (52/52 OK).
+- **Luân hồi:** `soulBuy` (52/52 OK), `rebirth` (52/52 OK).
+- **Tin lạ không đăng ký:** `__unknown_unregistered_msg__` (52/52 OK, handler `*` từ chối an toàn).
 
 
 
