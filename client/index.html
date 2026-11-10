@@ -633,6 +633,35 @@
         </div>
       </section>
 
+      <!-- Màn hình Client quá cũ / Có bản cập nhật mới (M4 2.5) -->
+      <section
+        id="outdated-modal"
+        class="panel modal-box outdated-modal"
+        hidden
+        aria-label="Cập nhật phiên bản mới"
+        role="alertdialog"
+        aria-modal="true"
+      >
+        <header class="inv-head">
+          <div>
+            <h2>Phiên Bản Đã Cũ</h2>
+            <small id="outdated-subtitle">Máy chủ yêu cầu phiên bản mới hơn</small>
+          </div>
+        </header>
+        <div class="outdated-body">
+          <div class="outdated-icon">仙</div>
+          <p id="outdated-msg" class="outdated-desc">
+            Máy chủ đã nâng cấp phiên bản giao thức mới. Vui lòng tải lại trang để nạp bản cập nhật
+            mới nhất.
+          </p>
+        </div>
+        <footer class="outdated-footer">
+          <button type="button" id="btn-reload-outdated" class="auth-btn-primary">
+            Tải Lại Trang
+          </button>
+        </footer>
+      </section>
+
       <section id="dialog-modal" class="panel" hidden aria-label="Hộp thoại NPC">
         <header class="dlg-head">
           <div>
