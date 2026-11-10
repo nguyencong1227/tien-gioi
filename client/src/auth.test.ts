@@ -484,4 +484,30 @@ describe("client/src/auth-ui - Quyết định điều hướng sau khi có toke
     expect(getToken()).toBeNull();
     expect(getActiveAuthView()).toBe("login");
   });
+
+  it("enterWithToken chuyển sang view character khi onTokenAuth trả JOIN_NEED_CHARACTER (423)", async () => {
+    const { enterWithToken, getActiveAuthView } = await import("./auth-ui");
+    const fakeClient = {
+      me: async () => ({
+        username: "user_need_char",
+        hasCharacter: true,
+        name: "Lý Tiêu Dao",
+      }),
+    } as any;
+
+    await enterWithToken(
+      "token_no_char",
+      {
+        onTokenAuth: async () => {
+          const err: any = new Error("Tài khoản chưa có đạo hiệu.");
+          err.code = 423; // JOIN_NEED_CHARACTER
+          throw err;
+        },
+        onLegacyAuth: async () => {},
+      },
+      fakeClient,
+    );
+
+    expect(getActiveAuthView()).toBe("character");
+  });
 });

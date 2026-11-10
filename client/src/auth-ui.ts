@@ -1,4 +1,10 @@
-import { cleanName, validatePassword, validateUsername, JOIN_BAD_TOKEN } from "@tien-gioi/shared";
+import {
+  cleanName,
+  validatePassword,
+  validateUsername,
+  JOIN_BAD_TOKEN,
+  JOIN_NEED_CHARACTER,
+} from "@tien-gioi/shared";
 import {
   authClient,
   authErrorMessage,
@@ -161,6 +167,8 @@ export async function enterWithToken(
           clearToken();
           switchAuthView("login");
           setErr("auth-login-err", "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+        } else if (joinErr?.code === JOIN_NEED_CHARACTER) {
+          switchAuthView("character");
         } else {
           // Lỗi join khác (already_online, phòng đầy, mạng...): GIỮ token, hiện thông báo
           switchAuthView("login");
