@@ -7,6 +7,7 @@ import {
   DEFAULT_ORIGIN,
   ITEM_BY_ID,
   getMap,
+  isDungeonMap,
   originOf,
   type Equipment,
   type Inventory,
@@ -146,9 +147,15 @@ export interface QuestSave {
   daily: Record<string, string>;
 }
 
-/** Bản đồ của nhân vật đã lưu: id hợp lệ trong `MAPS`, còn lại (thiếu, lạ, sai kiểu) là bản đồ mặc định. */
+/**
+ * Bản đồ của nhân vật đã lưu: id của một bản đồ THƯỜNG (`MAPS`), còn lại (thiếu, lạ, sai kiểu) là bản đồ mặc định.
+ * Bản đồ bí cảnh cũng là bản đồ `getMap` tra được nhưng là phòng tạm của một run, KHÔNG BAO GIỜ là chỗ ở của nhân vật
+ * (docs/THIET_KE_BI_CANH.md mục 4.3): file lưu mang id đó (sửa tay, lỗi, bản cũ) thì về Lạc Hà thay vì bị đưa tới một
+ * phòng không có (`world_bi_canh_...` không đăng ký thì client không vào được: kẹt).
+ */
 export function mapIdOf(save: Pick<SavedPlayer, "mapId">): string {
-  return getMap(save.mapId)?.def.id ?? DEFAULT_MAP_ID;
+  const m = getMap(save.mapId);
+  return m && !isDungeonMap(m.def.id) ? m.def.id : DEFAULT_MAP_ID;
 }
 
 export const hashSecret = (s: string) => createHash("sha256").update(s).digest("hex");
