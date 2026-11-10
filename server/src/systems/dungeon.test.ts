@@ -233,6 +233,8 @@ describe("mở bí cảnh (dungeonOpen)", () => {
           inviteUntil: Infinity,
           startedAt: null,
           deadline: Infinity,
+          exitAt: null,
+          endReason: null,
         },
         0,
       );

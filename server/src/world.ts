@@ -17,6 +17,7 @@ import type {
   PartyInvitedMsg,
   DungeonInviteMsg,
   DungeonEndMsg,
+  DungeonStateMsg,
 } from "@tien-gioi/shared";
 import type { WorldState, Player } from "./schema";
 import type { SavedPlayer, QuestSave, LifeCounters, LimboRecord } from "./store";
@@ -130,6 +131,8 @@ export interface WorldEvents {
   dungeonInvite(sessionId: string, msg: DungeonInviteMsg): void;
   /** Bí cảnh kết thúc (hoặc bị huỷ trước khi có người vào: chỉ đội trưởng nhận). */
   dungeonEnd(sessionId: string, msg: DungeonEndMsg): void;
+  /** Trạng thái bí cảnh cho HUD (trong phòng bí cảnh): mỗi `DUNGEON_STATE_MS` và khi đổi pha. */
+  dungeonState(sessionId: string, msg: DungeonStateMsg): void;
 }
 
 export class World {
@@ -172,6 +175,10 @@ export class World {
    * rồi gửi `travelTo { mapId, roomId }` và ngắt kết nối. Không có hook thì `enterDungeon` không làm gì.
    */
   onDungeonEnter: ((sid: string, run: Run) => void) | null = null;
+  /** Phòng bí cảnh đăng ký: đưa một người từ phòng này về cổng vào (Lạc Hà): `dungeonLeave`, hết giờ nhặt đồ, run kết thúc. */
+  onDungeonExit: ((sid: string) => void) | null = null;
+  /** Phòng bí cảnh: id của run mà phòng này phục vụ (`Hub.runs`); `null` ở mọi phòng thường. */
+  runId: string | null = null;
 
   constructor(
     readonly state: WorldState,

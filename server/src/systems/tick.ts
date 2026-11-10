@@ -6,7 +6,7 @@ import { tickMonsters } from "./monsters";
 import { tickRecovery } from "./progression";
 import { tickLoot } from "./loot";
 import { tickParty } from "./party";
-import { tickDungeons } from "./dungeon";
+import { tickDungeonRun, tickDungeons } from "./dungeon";
 
 export function tickWorld(w: World, dtMs: number) {
   const dt = dtMs / 1000;
@@ -25,6 +25,7 @@ export function tickWorld(w: World, dtMs: number) {
   tickLoot(w);
   tickParty(w);
   tickDungeons(w);
+  tickDungeonRun(w);
   w.interest.update(w); // sau cùng: dựa trên vị trí mới của tick này
   w.tick++;
 }

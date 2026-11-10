@@ -2,7 +2,7 @@
 // Logic game nằm trong ../systems/*, trạng thái dùng chung trong ../world.ts.
 import { StateView } from "@colyseus/schema";
 import { randomBytes } from "node:crypto";
-import { Room, Client, ServerError, type RoomException, type Server } from "colyseus";
+import { Room, Client, ServerError, matchMaker, type RoomException, type Server } from "colyseus";
 import {
   TICK_MS,
   MAX_PLAYERS_PER_ROOM,
@@ -13,6 +13,11 @@ import {
   JOIN_BAD_TOKEN,
   JOIN_NEED_CHARACTER,
   DUNGEON_MSG,
+  DUNGEON_MAPS,
+  JOIN_NOT_IN_RUN,
+  dungeonOf,
+  dungeonOfMap,
+  isDungeonMap,
   getMap,
   roomNameOf,
   wrongMapMessage,
@@ -101,6 +106,18 @@ import {
   partyResync,
 } from "../systems/party";
 import { planTravel } from "../systems/travel";
+import {
+  declineDungeon,
+  enterDungeon,
+  leaveDungeon,
+  memberJoined,
+  memberLeft,
+  openDungeon,
+  runFailed,
+  runOfWorld,
+  runReady,
+  type Run,
+} from "../systems/dungeon";
 import { applyRebirth, creditSoul } from "../systems/reincarnation";
 import { RateLimiter } from "../rate-limit";
 import { defaultHub, type Hub } from "../hub";
@@ -172,6 +189,7 @@ export class WorldRoom extends Room<WorldState> {
         reborn: (sid, msg) => this.sendTo(sid, "reborn", msg),
         dungeonInvite: (sid, msg) => this.sendTo(sid, DUNGEON_MSG.invite, msg),
         dungeonEnd: (sid, msg) => this.sendTo(sid, DUNGEON_MSG.end, msg),
+        dungeonState: (sid, msg) => this.sendTo(sid, DUNGEON_MSG.state, msg),
       },
       map,
       this.hub,
@@ -179,6 +197,10 @@ export class WorldRoom extends Room<WorldState> {
     // Chết do quái = luân hồi: lưu hồ sơ ở trạng thái Hoàng Tuyền, cộng Duyên, gửi màn hình Hoàng Tuyền
     w.reincarnate = true;
     w.onLimbo = (sid) => void this.enterLimbo(sid);
+    // Bí cảnh (4b): tạo phòng cho run mới, đưa người vào phòng bí cảnh, đưa người về Lạc Hà
+    w.onDungeonOpen = (run) => void this.openDungeonRoom(w, run);
+    w.onDungeonEnter = (sid, run) => void this.enterDungeonRoom(sid, run);
+    w.onDungeonExit = (sid) => void this.exitDungeonRoom(sid);
     return w;
   }
 
@@ -210,18 +232,30 @@ export class WorldRoom extends Room<WorldState> {
    * `options.mapId` do `defineRooms` đặt cho từng tên phòng (tuỳ chọn của handler ghi đè tuỳ chọn client, nên client
    * không đổi được bản đồ của phòng). Bỏ trống là bản đồ mặc định (phòng đăng ký tay không qua `defineRooms`).
    */
-  onCreate(options?: { mapId?: unknown }) {
+  onCreate(options?: { mapId?: unknown; runId?: unknown }) {
     const wanted = options?.mapId === undefined ? DEFAULT_MAP_ID : options.mapId;
     const map = getMap(wanted);
     if (!map) throw new Error(`Phòng thế giới cấu hình bản đồ không tồn tại: ${String(wanted)}`);
     this.mapId = map.def.id;
+    // Phòng bí cảnh chỉ do server mở cho đúng một run còn hiệu lực (docs/THIET_KE_BI_CANH.md mục 4.2). Kiểm TRƯỚC khi dựng
+    // thế giới: ném lỗi ở đây thì không rò một `World` vào `Hub.worlds`. `joinOrCreate` của client (kể cả tên phòng đúng)
+    // không có `runId` hợp lệ nên bị từ chối tại đây.
+    const run = isDungeonMap(this.mapId) ? this.claimRun(options?.runId) : null;
     this.world = this.createWorld(map);
     this.removeChatSink = this.hub.addChatSink((msg) => this.broadcast("chat", msg));
     this.setPatchRate(TICK_MS);
     this.setSimulationInterval((dt) => this.update(dt), TICK_MS);
     spawnInitial(this.world);
-    this.clock.setInterval(() => topUpMonsters(this.world), MONSTER_RESPAWN_MS);
     this.clock.setInterval(() => this.saveAll(), SAVE_EVERY_MS);
+    if (run) {
+      // Quái nhỏ dọn một lần (không hồi sinh); phòng trống thì huỷ (`autoDispose` bật ở lần vào đầu tiên: bật ngay bây giờ
+      // thì Colyseus huỷ phòng chưa có ai sau 1 giây, trước khi thành viên kịp bấm "Vào")
+      this.world.runId = run.id;
+      this.maxClients = dungeonOf(run.dungeonId)?.partyMax ?? this.maxClients;
+      this.clock.setInterval(() => this.watchRun(), 1000);
+    } else {
+      this.clock.setInterval(() => topUpMonsters(this.world), MONSTER_RESPAWN_MS);
+    }
 
     // Mọi tin nhắn đi qua this.on: giới hạn tần suất trước, rồi mới tới system.
     // Kiểu dữ liệu (m có thể là bất cứ thứ gì client gửi) do từng system tự kiểm tra.
@@ -253,6 +287,11 @@ export class WorldRoom extends Room<WorldState> {
     this.on("partyLeave", (sid) => partyLeave(w, sid));
     this.on<PartyKickMsg>("partyKick", (sid, m) => partyKick(w, sid, m?.name));
     this.on<TravelMsg>("travel", (sid, m) => void this.travel(sid, m?.portalId));
+    // Bí cảnh: mở / vào / từ chối đi qua mọi phòng thường (người ở bản đồ nào cũng nhận được lời mời); rời chỉ trong bí cảnh
+    this.on(DUNGEON_MSG.open, (sid, m) => void openDungeon(w, sid, m));
+    this.on(DUNGEON_MSG.enter, (sid, m) => void enterDungeon(w, sid, m));
+    this.on(DUNGEON_MSG.decline, (sid, m) => declineDungeon(w, sid, m));
+    this.on(DUNGEON_MSG.leave, (sid) => leaveDungeon(w, sid));
     this.on<SoulBuyMsg>("soulBuy", (sid, m) => void this.soulBuy(sid, m?.id));
     this.on<RebirthMsg>("rebirth", (sid, m) => void this.rebirth(sid, m));
     // Loại tin nhắn không đăng ký: bỏ qua, tính là spam
@@ -361,6 +400,11 @@ export class WorldRoom extends Room<WorldState> {
 
   /** Nhân vật đã có hồ sơ: chỉ vào đúng phòng của bản đồ nó đang ở. */
   private async resume(existing: SavedPlayer, identity: Identity) {
+    // Phòng bí cảnh: file lưu để ở bản đồ vào (Lạc Hà), không bao giờ ở bí cảnh; chỉ cần có tên trong danh sách thành viên
+    if (this.world.runId !== null) {
+      this.checkRunSeat(identity.name);
+      return { save: existing, identity, soul: await this.soulOf(existing, identity) };
+    }
     // Chỉ sau khi xác thực xong mới tiết lộ nhân vật đang ở bản đồ nào. Server quyết định bản đồ; `options.mapId`
     // chỉ là gợi ý chọn phòng, sai thì báo bản đồ đúng để client vào lại (shared/src/travel.ts).
     const home = mapIdOf(existing);
@@ -370,6 +414,9 @@ export class WorldRoom extends Room<WorldState> {
 
   /** Nhân vật mới luôn bắt đầu ở bản đồ mặc định (không tạo file ở phòng sai). */
   private async createFresh(name: string, secretHash: string, identity: Identity) {
+    // Phòng bí cảnh không tạo nhân vật: người chưa có hồ sơ không thể là thành viên của run nào
+    if (this.world.runId !== null)
+      throw new ServerError(JOIN_NOT_IN_RUN, "Không có lần vào bí cảnh nào cho ngươi.");
     if (this.mapId !== DEFAULT_MAP_ID)
       throw new ServerError(JOIN_WRONG_MAP, wrongMapMessage(DEFAULT_MAP_ID));
     const now = new Date().toISOString();
@@ -411,7 +458,9 @@ export class WorldRoom extends Room<WorldState> {
     p.realm = Math.min(save.realm, REALMS.length - 1);
     p.tier = Math.min(save.tier, REALMS[p.realm].tiers.length - 1);
     p.exp = save.exp;
-    const spot = safeSpot(this.world.map, save.x, save.y);
+    // Phòng bí cảnh: luôn xuất hiện ở cổng vào (toạ độ trong file là của Lạc Hà, vô nghĩa ở đây)
+    const inRun = this.world.runId !== null;
+    const spot = inRun ? safeSpot(this.world.map) : safeSpot(this.world.map, save.x, save.y);
     p.x = spot.x;
     p.y = spot.y;
     syncPublicPos(p); // người khác thấy ngay chỗ vào, không phải (0, 0)
@@ -458,6 +507,11 @@ export class WorldRoom extends Room<WorldState> {
     partyResync(this.world, client.sessionId); // vừa qua cổng từ bản đồ khác: vẫn ở trong đội, nhận đội hình ngay
     this.world.events.sys(`${p.name} (${realmLabel(p.realm, p.tier)}) đã nhập thế.`);
     if (limbo) void this.resumeLimbo(client.sessionId); // vào lại giữa lúc ở Hoàng Tuyền: cộng Duyên nếu còn thiếu, hiện lại màn hình
+    if (inRun) {
+      const run = runOfWorld(this.world);
+      if (run) memberJoined(this.world, run, save.name.toLowerCase());
+      this.autoDispose = true; // có người rồi: trống thì huỷ phòng ngay
+    }
   }
 
   async onLeave(client: Client, consented?: boolean) {
@@ -514,6 +568,9 @@ export class WorldRoom extends Room<WorldState> {
    */
   private dropPlayer(sid: string, keepParty = false) {
     if (!keepParty) partyDrop(this.world, sid); // trước khi xoá khỏi state: báo cho đội, dọn lời mời
+    const leaver = this.state.players.get(sid);
+    const run = leaver ? runOfWorld(this.world) : undefined;
+    if (leaver && run) memberLeft(this.world, run, leaver.name.toLowerCase());
     this.state.players.delete(sid);
     this.state.online = this.state.players.size;
     this.world.interest.leave(sid);
@@ -537,7 +594,11 @@ export class WorldRoom extends Room<WorldState> {
    * Đưa người chơi sang phòng của bản đồ khác: lưu nhân vật với bản đồ đích + chỗ xuất hiện, gỡ khỏi phòng này (không chờ
    * nối lại), gửi `travelTo`, đóng kết nối. Dùng cho `travel` (qua cổng) và `rebirth` (đầu thai luôn về Lạc Hà).
    */
-  private async handOff(sid: string, plan: { mapId: string; x: number; y: number }) {
+  private async handOff(
+    sid: string,
+    plan: { mapId: string; x: number; y: number },
+    dest?: { mapId: string; roomId?: string; valid?: () => boolean },
+  ) {
     const p = this.state.players.get(sid);
     const c = this.world.ctrl.get(sid);
     if (!p || !c) return;
@@ -559,9 +620,103 @@ export class WorldRoom extends Room<WorldState> {
       if (here) await this.persist(here, c).catch((e) => console.error("save failed", e));
       return;
     }
+    // Đích là một phòng tạm (bí cảnh): run có thể đã hết hạn / bị huỷ trong lúc lưu. Huỷ, ghi lại chỗ hiện tại (tự chữa)
+    if (dest?.valid && !dest.valid()) {
+      c.travelling = false;
+      await this.persist(here, c).catch((e) => console.error("save failed", e));
+      this.world.events.toast(sid, { text: "Lời mời đã hết hạn.", tone: "bad" });
+      return;
+    }
     this.dropPlayer(sid, true);
-    client.send("travelTo", { mapId: plan.mapId } satisfies TravelToMsg);
+    client.send("travelTo", {
+      mapId: dest?.mapId ?? plan.mapId,
+      ...(dest?.roomId ? { roomId: dest.roomId } : {}),
+    } satisfies TravelToMsg);
     client.leave(CLOSE_TRAVEL);
+  }
+
+  // ---------------- Bí cảnh (docs/THIET_KE_BI_CANH.md mục 4) ----------------
+
+  /** `onCreate` của phòng bí cảnh: nhận run `runId` (còn `gathering`, chưa có phòng, đúng bí cảnh) hoặc ném lỗi. */
+  private claimRun(runId: unknown): Run {
+    const run = this.hub.runs.get(runId);
+    const def = dungeonOfMap(this.mapId);
+    if (
+      !run ||
+      !def ||
+      run.dungeonId !== def.id ||
+      run.roomId !== null ||
+      run.phase !== "gathering"
+    )
+      throw new Error("Phòng bí cảnh chỉ do server mở cho một run còn hiệu lực");
+    run.roomId = this.roomId;
+    return run;
+  }
+
+  /** `onAuth` của phòng bí cảnh: tên phải có trong danh sách thành viên của run, run còn mở và đúng phòng này. */
+  private checkRunSeat(name: string) {
+    const run = runOfWorld(this.world);
+    const m = run?.members.get(name.toLowerCase());
+    if (
+      !run ||
+      !m ||
+      m.status === "declined" ||
+      run.roomId !== this.roomId ||
+      (run.phase !== "gathering" && run.phase !== "running")
+    )
+      throw new ServerError(JOIN_NOT_IN_RUN, "Không có lần vào bí cảnh nào cho ngươi.");
+  }
+
+  /** Phòng bí cảnh không còn run (hết hạn mời, đã dọn) và chưa có ai: đóng, không để phòng treo. */
+  private watchRun() {
+    if (this.world.runId === null || this.hub.runs.get(this.world.runId)) return;
+    if (this.clients.length === 0) void this.disconnect();
+  }
+
+  /** Hook `World.onDungeonOpen`: tạo phòng bí cảnh cho run (chỉ server tạo), xong thì mời thành viên. */
+  private async openDungeonRoom(w: World, run: Run) {
+    const def = dungeonOf(run.dungeonId);
+    if (!def) return runFailed(w, run);
+    try {
+      const listing = await matchMaker.createRoom(roomNameOf(def.mapId), { runId: run.id });
+      runReady(w, run, listing.roomId);
+    } catch (e) {
+      console.error("[bí cảnh] tạo phòng thất bại", e);
+      runFailed(w, run);
+    }
+  }
+
+  /**
+   * Hook `World.onDungeonEnter`: đưa một thành viên sang phòng bí cảnh. Lưu nhân vật với chỗ vào Ở LẠC HÀ (không bao giờ lưu
+   * vị trí / bản đồ bí cảnh: server sập hay rớt mạng giữa run thì lần sau đăng nhập về Lạc Hà, không kẹt), rồi gửi
+   * `travelTo { mapId bí cảnh, roomId }`: client vào bằng `joinById`.
+   */
+  private async enterDungeonRoom(sid: string, run: Run) {
+    const def = dungeonOf(run.dungeonId);
+    const roomId = run.roomId;
+    if (!def || !roomId) return;
+    const entry = getMap(def.entryMapId) ?? DEFAULT_MAP;
+    const spot = safeSpot(entry);
+    await this.handOff(
+      sid,
+      { mapId: entry.def.id, x: spot.x, y: spot.y },
+      {
+        mapId: def.mapId,
+        roomId,
+        valid: () =>
+          this.hub.runs.get(run.id) === run &&
+          (run.phase === "gathering" || run.phase === "running") &&
+          this.world.now < run.inviteUntil + 5_000,
+      },
+    );
+  }
+
+  /** Hook `World.onDungeonExit`: đưa một người từ phòng bí cảnh về cổng vào (Lạc Hà). */
+  private async exitDungeonRoom(sid: string) {
+    const entryId = dungeonOfMap(this.mapId)?.entryMapId ?? DEFAULT_MAP_ID;
+    const entry = getMap(entryId) ?? DEFAULT_MAP;
+    const spot = safeSpot(entry);
+    await this.handOff(sid, { mapId: entry.def.id, x: spot.x, y: spot.y });
   }
 
   // ---------------- Luân hồi (docs/THIET_KE_LUAN_HOI.md mục 4) ----------------
@@ -673,6 +828,9 @@ export class WorldRoom extends Room<WorldState> {
   }
 
   async onDispose() {
+    // Phòng bí cảnh đóng: run còn sót (mọi người đã rời, sập giữa chừng) thì xoá để giải phóng thành viên và chỗ ở `MAX_DUNGEON_RUNS`
+    const run = this.world ? runOfWorld(this.world) : undefined;
+    if (run && run.roomId === this.roomId) this.hub.runs._remove(run);
     this.removeChatSink?.();
     this.removeChatSink = null;
     this.world?.dispose();
@@ -688,9 +846,11 @@ export class WorldRoom extends Room<WorldState> {
   private async persist(p: Player, c: PlayerCtrl, at?: { mapId: string; x: number; y: number }) {
     if (c.travelling && !at) return;
     // Không lưu vị trí trong trấn hoặc lúc trọng thương: lần sau vào thì xuất hiện ở trấn
+    // Bí cảnh (phòng tạm): không bao giờ ghi bản đồ / vị trí trong đó, chỉ bản đồ vào (Lạc Hà), không toạ độ (xuất hiện ở trấn)
+    const inRun = this.world.runId !== null;
     const pos = at
       ? { x: Math.round(at.x), y: Math.round(at.y) }
-      : p.dead || this.world.map.inTown(p.x, p.y)
+      : p.dead || inRun || this.world.map.inTown(p.x, p.y)
         ? {}
         : { x: Math.round(p.x), y: Math.round(p.y) };
     c.save = {
@@ -709,7 +869,9 @@ export class WorldRoom extends Room<WorldState> {
       life: { ...c.life, playMs: Math.floor(c.life.playMs) },
       limbo: c.limbo,
       origin: c.origin,
-      mapId: at?.mapId ?? this.mapId,
+      mapId:
+        at?.mapId ??
+        (inRun ? (dungeonOfMap(this.mapId)?.entryMapId ?? DEFAULT_MAP_ID) : this.mapId),
       ...(at ? { travelAt: this.world.now } : {}),
     };
     await this.players.save(c.save);
@@ -738,4 +900,6 @@ export class WorldRoom extends Room<WorldState> {
  */
 export function defineRooms(gameServer: Server) {
   for (const m of MAPS) gameServer.define(roomNameOf(m.id), WorldRoom, { mapId: m.id });
+  // Bí cảnh: có tên phòng nhưng client không tạo được (`onCreate` đòi `runId` hợp lệ do server cấp); vào bằng `joinById`
+  for (const m of DUNGEON_MAPS) gameServer.define(roomNameOf(m.id), WorldRoom, { mapId: m.id });
 }

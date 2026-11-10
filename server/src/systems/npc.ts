@@ -1,9 +1,6 @@
 // Tương tác NPC: nói chuyện, nhận / trả / bỏ nhiệm vụ, đổi đồ.
 // Mọi thao tác đều kiểm tra lại ở server: còn sống, đứng gần NPC, đủ điều kiện.
 import {
-  DEFAULT_MAP_ID,
-  NPC_BY_ID,
-  NPC_RANGE,
   QUESTS,
   QUEST_BY_ID,
   TRADES,
@@ -27,21 +24,11 @@ import { exchangeItems, sendInv } from "./inventory";
 import { gainExp } from "./progression";
 import { onTalked, questCtx, questsView, sendQuests } from "./quests";
 import { byId } from "./lookup";
+import { nearNpc } from "./near-npc";
+import { GATEKEEPER_ID, dungeonDialog } from "./dungeon";
 
-/** Người chơi còn sống và đứng trong tầm của NPC. */
-export function nearNpc(
-  w: World,
-  sid: string,
-  npcId: unknown,
-): { p: Player; c: PlayerCtrl; npc: NpcDef } | null {
-  const r = w.ready(sid);
-  const npc = byId(NPC_BY_ID, npcId);
-  if (!r || !npc) return null;
-  // NPC chỉ đứng ở bản đồ của mình: toạ độ của bản đồ khác không có nghĩa ở đây
-  if ((npc.mapId ?? DEFAULT_MAP_ID) !== w.map.def.id) return null;
-  if (Math.hypot(npc.x - r.p.x, npc.y - r.p.y) > NPC_RANGE) return null;
-  return { ...r, npc };
-}
+// nearNpc sống ở near-npc.ts (để dungeon.ts không phải import npc.ts); giữ tên cũ cho các nơi đã import từ đây
+export { nearNpc };
 
 const itemName = (id: string) => ITEM_BY_ID[id]?.name ?? id;
 
@@ -91,6 +78,14 @@ export function talk(w: World, sid: string, npcId: unknown) {
   if (!r) return;
   const met = onTalked(w, sid, r.npc.id);
   const d = buildDialog(w, r.p, r.c, r.npc);
+  // Thủ môn: thêm nút mở bí cảnh (theo điều kiện của đội) và dòng lý do / số lượt thưởng còn lại
+  if (r.npc.id === GATEKEEPER_ID) {
+    const extra = dungeonDialog(w, sid);
+    if (extra) {
+      d.lines = [...d.lines, ...extra.lines];
+      d.options = [...extra.options, ...d.options];
+    }
+  }
   // Vừa xong một bước "tới gặp NPC này": báo cho người chơi biết
   if (met.length)
     d.lines = [`(${met.join(", ")}: đã gặp ${r.npc.title} ${r.npc.name}.)`, ...d.lines];

@@ -2,7 +2,8 @@
 // hợp đồng shared/src/dungeon.ts). Mở -> mời -> vào / từ chối -> hết hạn mời. Không đụng Colyseus `Room`: việc tạo phòng,
 // lưu nhân vật và đưa người sang phòng bí cảnh là I/O nên do WorldRoom làm, nối vào đây bằng hook của `World`
 // (`onDungeonOpen`, `onDungeonEnter`) như `onLimbo`.
-// Phần trong phòng (đồng hồ, `dungeonState`, kết thúc, về Lạc Hà) là 4b-2; thưởng và trùm là 4c.
+// Phần trong phòng bí cảnh (4b-2): `memberJoined` / `memberLeft`, đồng hồ, `dungeonState` mỗi giây, kết thúc (hết giờ, mọi
+// người chết / rời), đưa về Lạc Hà (`onDungeonExit`). Thắng (trùm chết), thưởng và lượt thưởng ngày là 4c (`finishRun` có sẵn).
 //
 // Server quyết định mọi thứ: tin từ client chỉ là ý định, kiểm lại hết (đội trưởng, cỡ đội, cảnh giới, còn sống, đứng gần
 // Thủ môn, hồi chiêu, số run tối đa). Khoá thành viên là ĐẠO HIỆU viết thường (như `Hub.parties`): sessionId đổi mỗi lần
@@ -13,6 +14,8 @@ import {
   DUNGEON_DAILY_REWARDS,
   DUNGEON_INVITE_MS,
   DUNGEON_OPEN_COOLDOWN_MS,
+  DUNGEON_STATE_MS,
+  TICK_MS,
   TRAVEL_COMBAT_LOCK_MS,
   canOpenDungeon,
   dungeonOf,
@@ -23,18 +26,25 @@ import {
   parseDungeonOpen,
   stepOf,
   type DialogOption,
+  type DungeonDef,
   type DungeonEndReason,
   type DungeonMemberCheck,
+  type DungeonMemberView,
   type DungeonPhase,
+  type DungeonStateMsg,
 } from "@tien-gioi/shared";
 import type { PlayerCtrl, World } from "../world";
-import { nearNpc } from "./npc";
+import { nearNpc } from "./near-npc";
 
 /** NPC mở bí cảnh (shared/src/npcs.ts). */
 export const GATEKEEPER_ID = "thu_mon";
 
 /** Nhịp kiểm hết hạn mời (ms): chung cho mọi phòng, không mỗi tick. */
 const RUNS_CHECK_MS = 500;
+/** Gửi `dungeonState` mỗi chừng này tick (`DUNGEON_STATE_MS` / `TICK_MS` = 20). */
+const STATE_EVERY_TICKS = Math.max(1, Math.round(DUNGEON_STATE_MS / TICK_MS));
+/** Sau khi run thua, chờ chừng này (ms) cho client hiện màn kết quả rồi đưa mọi người về Lạc Hà. */
+export const DUNGEON_EXIT_DELAY_MS = 3000;
 
 export type MemberStatus = "invited" | "declined" | "inside" | "left";
 
@@ -64,6 +74,10 @@ export interface Run {
   startedAt: number | null;
   /** Hết hạn của pha hiện tại */
   deadline: number;
+  /** Lúc đưa mọi người còn trong phòng về Lạc Hà và xoá run (sau khi kết thúc); `null` khi còn đang chạy */
+  exitAt: number | null;
+  /** Lý do kết thúc (chỉ có sau khi `finishRun`) */
+  endReason: DungeonEndReason | null;
 }
 
 /** Sổ run của cả tiến trình (`Hub.runs`): chỉ mục theo run và theo khoá đạo hiệu. */
@@ -216,6 +230,8 @@ export function openDungeon(w: World, sid: string, raw: unknown): Run | null {
     inviteUntil: w.now + DUNGEON_INVITE_MS,
     startedAt: null,
     deadline: w.now + DUNGEON_INVITE_MS,
+    exitAt: null,
+    endReason: null,
   };
   w.hub.runs._add(run, w.now);
   if (w.onDungeonOpen) w.onDungeonOpen(run);
@@ -359,6 +375,153 @@ export function tickDungeons(w: World) {
   for (const run of [...runs.all()]) {
     if (run.phase === "gathering" && w.now >= run.inviteUntil) endGathering(w, run, "no_entry");
   }
+}
+
+// ---------- Trong phòng bí cảnh (4b-2) ----------
+
+/** Run mà phòng bí cảnh này phục vụ; `undefined` ở phòng thường hoặc khi run đã bị xoá. */
+export function runOfWorld(w: World): Run | undefined {
+  return w.runId === null ? undefined : w.hub.runs.get(w.runId);
+}
+
+/** Đạo hiệu (viết thường) của những người ĐANG CÓ MẶT và còn sống trong phòng này. */
+function aliveKeys(w: World): Set<string> {
+  const alive = new Set<string>();
+  w.state.players.forEach((p) => {
+    if (!p.dead) alive.add(keyOfName(p.name));
+  });
+  return alive;
+}
+
+/**
+ * Một thành viên đã thật sự vào phòng bí cảnh (`onJoin`): đánh dấu `inside`; người ĐẦU TIÊN vào thì run chuyển `running` và
+ * đồng hồ `timeLimitMs` bắt đầu chạy. Người vào muộn (còn trong hạn mời) không đổi đồng hồ.
+ */
+export function memberJoined(w: World, run: Run, key: string) {
+  const m = run.members.get(key);
+  if (!m) return;
+  m.status = "inside";
+  if (run.phase === "gathering") {
+    const def = dungeonOf(run.dungeonId);
+    run.phase = "running";
+    run.startedAt = w.now;
+    run.deadline = w.now + (def?.timeLimitMs ?? 0);
+  }
+  sendDungeonState(w, run);
+}
+
+/** Một thành viên rời phòng bí cảnh (thoát, rớt mạng quá hạn, được đưa về Lạc Hà): `left`. Không đổi nếu họ không ở trong. */
+export function memberLeft(w: World, run: Run, key: string) {
+  const m = run.members.get(key);
+  if (m && m.status === "inside") m.status = "left";
+  void w;
+}
+
+/** `dungeonLeave`: rời bí cảnh sớm, về cổng vào (Lạc Hà). Chỉ trong phòng bí cảnh, người còn sống và đang ở trong run. */
+export function leaveDungeon(w: World, sid: string) {
+  const run = runOfWorld(w);
+  const r = w.ready(sid);
+  if (!run || !r || run.members.get(keyOfName(r.p.name))?.status !== "inside") return;
+  w.onDungeonExit?.(sid);
+}
+
+/** Thành viên đang ở trong phòng này (`inside`), kèm sessionId. */
+function insideMembers(w: World, run: Run): { sid: string; key: string; dead: boolean }[] {
+  const out: { sid: string; key: string; dead: boolean }[] = [];
+  w.state.players.forEach((p, sid) => {
+    const key = keyOfName(p.name);
+    if (run.members.get(key)?.status === "inside") out.push({ sid, key, dead: p.dead });
+  });
+  return out;
+}
+
+/** Còn bao nhiêu ms tới hạn của pha hiện tại (không âm). */
+function deadlineIn(w: World, run: Run): number {
+  const at = run.exitAt ?? (run.phase === "gathering" ? run.inviteUntil : run.deadline);
+  return Math.max(0, Math.round(at - w.now));
+}
+
+function stateOf(w: World, run: Run, def: DungeonDef): DungeonStateMsg {
+  let mobsLeft = 0;
+  let boss: DungeonStateMsg["boss"] = null;
+  w.state.monsters.forEach((m) => {
+    if (m.kind === def.boss) boss = { hp: Math.ceil(m.hp), maxHp: m.maxHp };
+    else mobsLeft++;
+  });
+  const alive = aliveKeys(w);
+  const members: DungeonMemberView[] = [];
+  for (const m of run.members.values()) {
+    if (m.status !== "inside" && m.status !== "left") continue; // chưa vào / từ chối: chưa phải người của phòng
+    members.push({ name: m.name, alive: m.status === "inside" && alive.has(m.key) });
+  }
+  return { phase: run.phase, deadlineInMs: deadlineIn(w, run), mobsLeft, boss, members };
+}
+
+/** Gửi `dungeonState` cho mọi thành viên đang ở trong phòng (HUD). */
+export function sendDungeonState(w: World, run: Run) {
+  const def = dungeonOf(run.dungeonId);
+  if (!def) return;
+  const msg = stateOf(w, run, def);
+  for (const m of insideMembers(w, run)) w.events.dungeonState(m.sid, msg);
+}
+
+/**
+ * Kết thúc run (hết giờ, mọi người chết / rời; 4c thêm `boss_dead` thắng): đổi pha, gửi `dungeonEnd` cho người còn trong
+ * phòng, hẹn `exitAt` để đưa mọi người về Lạc Hà. Run vẫn nằm trong sổ cho tới `exitRun` (không ai vào thêm được: `onAuth`
+ * chỉ nhận run `gathering` / `running`). Idempotent.
+ */
+export function finishRun(
+  w: World,
+  run: Run,
+  result: "won" | "lost",
+  reason: DungeonEndReason,
+  exitDelayMs: number = DUNGEON_EXIT_DELAY_MS,
+) {
+  if (run.exitAt !== null || w.hub.runs.get(run.id) !== run) return;
+  run.phase = result;
+  run.endReason = reason;
+  run.exitAt = w.now + exitDelayMs;
+  for (const m of insideMembers(w, run)) {
+    const c = w.ctrl.get(m.sid);
+    if (c) w.events.dungeonEnd(m.sid, { result, reason, rewardsLeft: rewardsLeftOf(c, w.now) });
+  }
+  sendDungeonState(w, run);
+}
+
+/**
+ * Đưa mọi người còn sống trong phòng về Lạc Hà rồi xoá run khỏi sổ. Người đang ở Hoàng Tuyền (chết thật) KHÔNG bị đưa đi
+ * ở đây: họ còn phải chọn đầu thai, và `rebirth` tự đưa về Lạc Hà (WorldRoom). Phòng tự đóng khi trống (`autoDispose`).
+ */
+function exitRun(w: World, run: Run) {
+  for (const m of insideMembers(w, run)) if (!m.dead) w.onDungeonExit?.(m.sid);
+  w.hub.runs._remove(run);
+}
+
+/**
+ * Mỗi tick của phòng bí cảnh: đồng hồ và điều kiện kết thúc, `dungeonState` mỗi `DUNGEON_STATE_MS`, đưa người về khi tới
+ * `exitAt`. Phòng thường (`runId === null`) và run đã bị xoá thì thoát ngay.
+ */
+export function tickDungeonRun(w: World) {
+  const run = runOfWorld(w);
+  if (!run) return;
+  if (run.exitAt !== null) {
+    if (w.now >= run.exitAt) exitRun(w, run);
+    else if (w.tick % STATE_EVERY_TICKS === 0) sendDungeonState(w, run);
+    return;
+  }
+  if (run.phase === "running") {
+    if (w.now >= run.deadline) return finishRun(w, run, "lost", "timeout");
+    // Còn ai có thể đánh tiếp: người còn sống trong phòng, hoặc người đã được mời mà chưa tới và còn hạn
+    const alive = aliveKeys(w);
+    const inside = insideMembers(w, run);
+    const standing = inside.some((m) => alive.has(m.key));
+    const pending = [...run.members.values()].some(
+      (m) => m.status === "invited" && w.now < run.inviteUntil,
+    );
+    if (!standing && !pending)
+      return finishRun(w, run, "lost", inside.length > 0 ? "all_dead" : "all_left");
+  }
+  if (w.tick % STATE_EVERY_TICKS === 0) sendDungeonState(w, run);
 }
 
 // ---------- Hộp thoại Thủ môn ----------

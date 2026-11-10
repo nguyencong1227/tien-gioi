@@ -117,6 +117,7 @@ export function runBench(
         reborn: () => {},
         dungeonInvite: () => {},
         dungeonEnd: () => {},
+        dungeonState: () => {},
       },
       map,
     );
@@ -368,6 +369,7 @@ export function runMultiMapBench(
           reborn: () => {},
           dungeonInvite: () => {},
           dungeonEnd: () => {},
+          dungeonState: () => {},
         },
         map,
       );
