@@ -18,6 +18,9 @@ import {
   type LimboMsg,
   type SoulMsg,
   type RebornMsg,
+  type DungeonInviteMsg,
+  type DungeonEndMsg,
+  type DungeonStateMsg,
   originMult,
 } from "@tien-gioi/shared";
 import { WorldState, Player, Monster } from "../schema";
@@ -41,6 +44,9 @@ export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
   const limbos: { sid: string; msg: LimboMsg }[] = [];
   const souls: { sid: string; msg: SoulMsg }[] = [];
   const reborns: { sid: string; msg: RebornMsg }[] = [];
+  const dungeonInvites: { sid: string; msg: DungeonInviteMsg }[] = [];
+  const dungeonEnds: { sid: string; msg: DungeonEndMsg }[] = [];
+  const dungeonStates: { sid: string; msg: DungeonStateMsg }[] = [];
   const w = new World(
     new WorldState(),
     {
@@ -59,6 +65,9 @@ export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
       limbo: (sid, msg) => limbos.push({ sid, msg }),
       soul: (sid, msg) => souls.push({ sid, msg }),
       reborn: (sid, msg) => reborns.push({ sid, msg }),
+      dungeonInvite: (sid, msg) => dungeonInvites.push({ sid, msg }),
+      dungeonEnd: (sid, msg) => dungeonEnds.push({ sid, msg }),
+      dungeonState: (sid, msg) => dungeonStates.push({ sid, msg }),
     },
     map,
     hub,
@@ -79,6 +88,9 @@ export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
     limbos,
     souls,
     reborns,
+    dungeonInvites,
+    dungeonEnds,
+    dungeonStates,
   };
 }
 
