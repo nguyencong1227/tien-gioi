@@ -163,6 +163,43 @@ describe("connection helper (joinWithRedirect)", () => {
     expect(storage.getItem("tien-gioi:map:TieuPham")).toBeNull();
   });
 
+  it("lớp phòng thủ thứ hai: khôi phục về DEFAULT_MAP_ID khi server báo phòng chưa định nghĩa (code 4210)", async () => {
+    const storage = new MemoryStorage();
+    // Giả sử storage có map hợp lệ nhưng vì lý do nào đó server chưa đăng ký phòng này
+    saveMap(storage, "TieuPham", HAC_PHONG_ID);
+
+    const fakeRoom = { sessionId: "s5" };
+    const joinOrCreate = vi
+      .fn()
+      .mockRejectedValueOnce({
+        code: 4210,
+        message: 'provided room name "world_hac_phong" not defined',
+      })
+      .mockResolvedValueOnce(fakeRoom);
+
+    const client: JoinClient<typeof fakeRoom> = { joinOrCreate };
+
+    const res = await joinWithRedirect({
+      client,
+      storage,
+      name: "TieuPham",
+      secret: "sec123",
+    });
+
+    expect(res.room).toBe(fakeRoom);
+    expect(res.mapId).toBe(DEFAULT_MAP_ID);
+    expect(joinOrCreate).toHaveBeenCalledTimes(2);
+    expect(joinOrCreate).toHaveBeenNthCalledWith(1, roomNameOf(HAC_PHONG_ID), {
+      name: "TieuPham",
+      secret: "sec123",
+    });
+    expect(joinOrCreate).toHaveBeenNthCalledWith(2, roomNameOf(DEFAULT_MAP_ID), {
+      name: "TieuPham",
+      secret: "sec123",
+    });
+    expect(getSavedMap(storage, "TieuPham")).toBe(DEFAULT_MAP_ID);
+  });
+
   it("ném lỗi ra ngoài nếu gặp lỗi khác không phải sai map", async () => {
     const storage = new MemoryStorage();
     const joinOrCreate = vi.fn().mockRejectedValue({
