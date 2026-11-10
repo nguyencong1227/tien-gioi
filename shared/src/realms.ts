@@ -1,6 +1,7 @@
 // Hệ cảnh giới: thang chuẩn của thể loại tu tiên.
 // "Bậc" (step) = vị trí tuyến tính trên toàn thang, dùng để tính chỉ số.
 import { equipBonus, ITEM_BY_ID, type Equipment } from "./items";
+import type { StatMult } from "./reincarnation";
 
 export interface Realm {
   name: string;
@@ -76,16 +77,22 @@ export interface Stats {
  * Chỉ số gốc theo cảnh giới, cộng chỉ số đồ đang mặc (nếu truyền `equipment`).
  * Client và server dùng chung hàm này nên số hiển thị khớp số server tính.
  * Client nhớ truyền equipment của chính mình khi đoán trước di chuyển (hộ phù có tốc độ).
+ * `mult`: hệ số nhân chỉ số GỐC của xuất thân (luân hồi, `originMult` ở reincarnation.ts); bỏ trống = không đổi.
  */
-export function statsFor(realm: number, tier: number, equipment?: Partial<Equipment>): Stats {
+export function statsFor(
+  realm: number,
+  tier: number,
+  equipment?: Partial<Equipment>,
+  mult?: StatMult,
+): Stats {
   const s = stepOf(realm, tier);
   // Qua cảnh giới lớn có thêm thưởng để đột phá có cảm giác "nhảy vọt"
   const realmBonus = 1 + realm * 0.15;
   const b = equipBonus(equipment);
   return {
-    maxHp: Math.round(100 * Math.pow(1.18, s) * realmBonus) + b.hp,
-    maxMp: Math.round(50 * Math.pow(1.12, s) * realmBonus) + b.mp,
-    atk: Math.round(10 * Math.pow(1.17, s) * realmBonus) + b.atk,
+    maxHp: Math.round(100 * Math.pow(1.18, s) * realmBonus * (mult?.maxHp ?? 1)) + b.hp,
+    maxMp: Math.round(50 * Math.pow(1.12, s) * realmBonus * (mult?.maxMp ?? 1)) + b.mp,
+    atk: Math.round(10 * Math.pow(1.17, s) * realmBonus * (mult?.atk ?? 1)) + b.atk,
     speed: 150 + Math.min(realm, 6) * 8 + b.speed,
   };
 }
