@@ -514,13 +514,17 @@ Công cụ `npm run kiem-save -w server` đã được cập nhật thêm các l
   - `day` phải đúng định dạng ngày tháng `YYYY-MM-DD`.
   - `rewards` phải là số nguyên nằm trong khoảng `[0, DUNGEON_DAILY_REWARDS]`.
 
-## 11. Thử tải PK Thách Đấu, Bot `--duel` & Kiểm tra Rò rỉ (M3.5 - Issue #219)
+## 11. E2E thật PK thách đấu (M3.5, `npm run e2e:pk`)
+Cùng khung với mục 9 (server Colyseus thật trong tiến trình + hai tab Chrome headless, hai nguồn `127.0.0.1` / `localhost`). Luồng qua giao diện thật: bấm **chuột thật** (CDP `Input.dispatchMouseEvent` vào vị trí VẼ của người kia, đúng thứ `tryClickPlayer` so với con trỏ) -> menu có nút "Thách Đấu" bấm được -> B nhận hộp lời mời nêu đúng tên -> B **từ chối** (A nhận toast, không có trận) -> thách lại -> B **nhận** -> đếm ngược 3-2-1 nêu đối thủ -> HUD quyết đấu (tên đối thủ, thanh máu) + dấu ⚔ trên đầu -> A đánh bằng `WorldScene.slash` của client (máu B đặt về 1 phía server) -> màn kết quả cho CẢ HAI (A thắng, B thua "đánh gục") -> B gục rồi đứng dậy **tại chỗ** với khí huyết hồi lại, KHÔNG màn Hoàng Tuyền, lớp phủ không ghi "Lạc Hà Trấn" -> hồ sơ B không `limbo`, vẫn ở Lạc Hà -> 0 lỗi console. Chạy: `npm run build && npm run e2e:pk`; `E2E_SHOTS=<thư mục>` lưu ảnh từng bước. Hai lỗi đã bắt được ở client trước khi merge #224: màn kết quả của người thua bị `closeAllModals()` (gọi mỗi khung khi `me.dead`) đóng ngay, và lớp phủ "chết" hứa hồi sinh ở trấn.
 
-### 11.1. Kịch bản bot `--duel` trong `server/scripts/bots.ts`
+## 12. Thử tải PK Thách Đấu, Bot `--duel` & Kiểm tra Rò rỉ (M3.5 - Issue #219)
+
+### 12.1. Kịch bản bot `--duel` trong `server/scripts/bots.ts`
 Kịch bản `server/scripts/bots.ts` được bổ sung cờ `--duel` (hoặc `--pk`) để mô phỏng và thử tải tính năng PK Thách đấu:
-- **Xếp cặp tự động ngoài khu an toàn:** Bot được gieo với cảnh giới Luyện Khí Tầng 5 (`realm = 1, tier = 4`) theo từng cặp $2k$ (challenger) và $2k+1$ (challenged) ở ngoài khu an toàn của trấn Lạc Hà (cách tâm trấn `townPx.r + 120 px`, hai bot cách nhau 50 px, nằm trọn trong `DUEL_RANGE = 400 px`).
+- **Xếp cặp tự động & di chuyển ra ngoài khu an toàn:** Bot được gieo với cảnh giới Luyện Khí Tầng 5 (`realm = 1, tier = 4`) theo từng cặp (bot lẻ $2k+1$ thách bot chẵn $2k+2$, 1-based index). Vì server luôn cho nhân vật vào từ trấn (khu an toàn), bot sẽ tự động di chuyển tới điểm cắm trại của cặp ở ngoài khu an toàn trấn Lạc Hà (`campX, campY` cách tâm trấn `townPx.r + 120 px`, hai bot cách nhau 50 px, nằm trọn trong `DUEL_RANGE = 400 px`).
+- **Đọc toạ độ công khai:** Khi tính toán khoảng cách và góc đánh, bot đọc `oppPlayer.px`, `oppPlayer.py` (vị trí công khai của người chơi khác, do `x/y` thực chỉ gửi riêng cho chủ sở hữu theo quy chuẩn tối ưu băng thông).
 - **Quy trình thách đấu và giao tranh tự động:**
-  1. **Thách đấu:** Bot chẵn gửi tin `duelChallenge { name: "Bot <lẻ>" }` khi hết hồi chiêu `DUEL_COOLDOWN_MS = 10_000 ms`.
+  1. **Thách đấu:** Bên thách đấu (bot lẻ: 1, 3, 5...) kiểm tra cả hai đã ra ngoài khu an toàn (`!inSafe`) và trong tầm `DUEL_RANGE`, sau đó gửi tin `duelChallenge { name: oppName }` khi hết hồi chiêu `DUEL_COOLDOWN_MS = 10_000 ms`.
   2. **Chấp nhận lời mời:** Bot đối diện nhận tin `duelInvited` và tự động gửi `duelAccept { from: msg.from }`.
   3. **Pha đếm ngược (`countdown`):** Cả hai nhận `duelState` pha countdown và đứng yên đối mặt nhau trong 3 giây.
   4. **Pha tác chiến (`fight`):** Khi chuyển sang pha `fight`, cả hai liên tục gửi lệnh chém `attack { angle }` hướng về phía đối thủ mỗi khi hồi chiêu đánh thường (`ATTACK_COOLDOWN_MS = 600 ms`) hồi xong. Sát thương PK được điều chỉnh theo hệ số `PK_DAMAGE_MULT = 0.125`.
@@ -528,11 +532,20 @@ Kịch bản `server/scripts/bots.ts` được bổ sung cờ `--duel` (hoặc `
 
 Cách chạy:
 ```bash
-# Chạy 10 bot (5 cặp) thách đấu liên tục:
-npm run bots -w server -- --bots=10 --duel --duration=30
+# Chạy 6 bot (3 cặp) thách đấu liên tục trong 45 giây:
+npm run bots -w server -- --bots=6 --duel --duration=45
 ```
 
-### 11.2. Kết quả Thử tải & Stress Test (`server/scripts/duel-stress.test.ts`)
+### 12.2. Kết quả Đo đạc Thực tế
+
+#### A. Kết quả chạy bot thật trên server Colyseus (`npm run bots -w server -- --bots=6 --duel --duration=45`)
+- **Quy mô:** 6 bot (3 cặp đấu), thời gian chạy 45 giây.
+- **Trận đấu hoàn thành:** 3 trận (3 thắng, 3 thua, 0 hoà).
+- **Số đòn chém giao tranh (`attacksSent`):** 536 đòn chém.
+- **Thời gian xử lý tick server (CPU):** Trung bình **0.44 ms** (p95: 1.10 ms, max: 5.25 ms), nằm sâu dưới ngân sách 10 ms.
+- **Độ ổn định:** 6/6 bot duy trì kết nối ổn định liên tục, 0 rò rỉ phòng hoặc sự kiện.
+
+#### B. Kết quả Stress Test tự động (`server/scripts/duel-stress.test.ts`)
 Bộ kiểm thử stress test tự động hoá 6 kịch bản then chốt trên tiến trình server Colyseus thật:
 
 | Kịch bản kiểm thử | Kết quả thực tế | Tiêu chuẩn đánh giá | Trạng thái |

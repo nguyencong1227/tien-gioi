@@ -1655,8 +1655,9 @@ async function runLoadTest(
 
       if (b.duelPhase === "fight") {
         if (oppPlayer && !oppPlayer.dead) {
-          const dist = Math.hypot(oppPlayer.x - b.predX, oppPlayer.y - b.predY);
-          const angle = Math.atan2(oppPlayer.y - b.predY, oppPlayer.x - b.predX);
+          // Người KHÁC chỉ có vị trí công khai `px`, `py` (`x`, `y` chỉ gửi cho chủ)
+          const dist = Math.hypot(oppPlayer.px - b.predX, oppPlayer.py - b.predY);
+          const angle = Math.atan2(oppPlayer.py - b.predY, oppPlayer.px - b.predX);
           if (dist > SKILLS.slash.range) {
             dx = Math.cos(angle);
             dy = Math.sin(angle);
@@ -1677,19 +1678,31 @@ async function runLoadTest(
         dx = 0;
         dy = 0;
       } else {
-        // Chưa trong trận: nếu là bên challenger (bot lẻ theo thứ tự 1-based: 1, 3, 5...), gửi lời thách đấu khi sẵn sàng
-        const isChallenger = (b.index - 1) % 2 === 0;
-        if (isChallenger) {
-          if (oppPlayer && !oppPlayer.dead && !oppPlayer.duel) {
-            const dist = Math.hypot(oppPlayer.x - b.predX, oppPlayer.y - b.predY);
-            if (dist <= DUEL_RANGE && now >= b.nextDuelChallengeAt) {
+        // Chưa trong trận. Server KHÔNG áp vị trí lưu trong file: bot luôn vào từ trấn (khu an toàn, không được thách đấu),
+        // nên trước hết đi tới điểm cắm trại của cặp (ngoài khu an toàn) rồi mới thách.
+        const distToCamp = Math.hypot(b.campX - b.predX, b.campY - b.predY);
+        const outside = !b.map.inSafe(b.predX, b.predY);
+        if (distToCamp > 12 || !outside) {
+          const a = Math.atan2(b.campY - b.predY, b.campX - b.predX);
+          dx = Math.cos(a);
+          dy = Math.sin(a);
+        } else {
+          dx = 0;
+          dy = 0;
+          // Bên thách = bot lẻ (1-based: 1, 3, 5...); chỉ thách khi cả hai đã ở ngoài khu an toàn và trong tầm
+          const isChallenger = (b.index - 1) % 2 === 0;
+          if (isChallenger && oppPlayer && !oppPlayer.dead && !oppPlayer.duel) {
+            const dist = Math.hypot(oppPlayer.px - b.predX, oppPlayer.py - b.predY);
+            if (
+              !b.map.inSafe(oppPlayer.px, oppPlayer.py) &&
+              dist <= DUEL_RANGE &&
+              now >= b.nextDuelChallengeAt
+            ) {
               b.room.send(DUEL_MSG.challenge, { name: oppName });
               b.nextDuelChallengeAt = now + DUEL_COOLDOWN_MS + 2000;
             }
           }
         }
-        dx = 0;
-        dy = 0;
       }
     } else {
       if (

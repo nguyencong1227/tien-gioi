@@ -12,3 +12,4 @@ export * from "./reincarnation";
 export * from "./account";
 export * from "./dungeon";
 export * from "./duel";
+export * from "./sect";
