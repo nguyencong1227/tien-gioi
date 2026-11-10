@@ -131,19 +131,12 @@ describe("connection helper (joinWithRedirect)", () => {
     expect(joinOrCreate).toHaveBeenCalledTimes(3); // 1 lần đầu + 2 lần redirect
   });
 
-  it("khôi phục khi phòng không tồn tại: xoá map lưu và thử lại DEFAULT_MAP_ID", async () => {
+  it("bảo vệ trước map lạ: tự động xoá map lưu không có trong GameMap và vào DEFAULT_MAP_ID", async () => {
     const storage = new MemoryStorage();
     saveMap(storage, "TieuPham", "map_la_khong_ton_tai");
 
     const fakeRoom = { sessionId: "s4" };
-    const joinOrCreate = vi
-      .fn()
-      .mockRejectedValueOnce({
-        code: 4212,
-        message: 'room "world_map_la_khong_ton_tai" not found',
-      })
-      .mockResolvedValueOnce(fakeRoom);
-
+    const joinOrCreate = vi.fn().mockResolvedValue(fakeRoom);
     const client: JoinClient<typeof fakeRoom> = { joinOrCreate };
 
     const res = await joinWithRedirect({
@@ -155,16 +148,19 @@ describe("connection helper (joinWithRedirect)", () => {
 
     expect(res.room).toBe(fakeRoom);
     expect(res.mapId).toBe(DEFAULT_MAP_ID);
-    expect(joinOrCreate).toHaveBeenCalledTimes(2);
-    expect(joinOrCreate).toHaveBeenNthCalledWith(1, "world_map_la_khong_ton_tai", {
-      name: "TieuPham",
-      secret: "sec123",
-    });
-    expect(joinOrCreate).toHaveBeenNthCalledWith(2, roomNameOf(DEFAULT_MAP_ID), {
+    expect(joinOrCreate).toHaveBeenCalledTimes(1);
+    expect(joinOrCreate).toHaveBeenCalledWith(roomNameOf(DEFAULT_MAP_ID), {
       name: "TieuPham",
       secret: "sec123",
     });
     expect(getSavedMap(storage, "TieuPham")).toBe(DEFAULT_MAP_ID);
+  });
+
+  it("getSavedMap: trả về DEFAULT_MAP_ID và xoá lưu trữ khi mapId không hợp lệ", () => {
+    const storage = new MemoryStorage();
+    saveMap(storage, "TieuPham", "map_la_khong_ton_tai");
+    expect(getSavedMap(storage, "TieuPham")).toBe(DEFAULT_MAP_ID);
+    expect(storage.getItem("tien-gioi:map:TieuPham")).toBeNull();
   });
 
   it("ném lỗi ra ngoài nếu gặp lỗi khác không phải sai map", async () => {

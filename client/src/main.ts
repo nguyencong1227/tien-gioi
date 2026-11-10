@@ -107,14 +107,20 @@ function setupRoomLifecycle(room: Room) {
         suggestedMapId: msg.mapId,
       });
 
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Quá thời gian chuyển bản đồ.")), TRAVEL_JOIN_TIMEOUT_MS),
-      );
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(
+          () => reject(new Error("Quá thời gian chuyển bản đồ.")),
+          TRAVEL_JOIN_TIMEOUT_MS,
+        );
+      });
 
       const { room: newRoom, mapId: finalMapId } = await Promise.race([
         joinPromise,
         timeoutPromise,
-      ]);
+      ]).finally(() => {
+        if (timeoutId) clearTimeout(timeoutId);
+      });
       const finalMap = getMap(finalMapId)!;
 
       // Cập nhật scene sang phòng mới và bản đồ mới
@@ -133,7 +139,7 @@ function setupRoomLifecycle(room: Room) {
       ui.hideTransition();
       activeScene?.setReconnecting(false);
       ui.toast({
-        text: `Không thể chuyển bản đồ: ${err?.message || "lỗi kết nối"}`,
+        text: `Không thể chuyển bản đồ: ${err?.message || "lỗi kết nối"}. Vui lòng đăng nhập lại để vào bản đồ mới.`,
         tone: "bad",
       });
       showDisconnected();

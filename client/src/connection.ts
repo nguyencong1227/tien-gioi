@@ -1,4 +1,10 @@
-import { DEFAULT_MAP_ID, parseWrongMap, roomNameOf, type JoinOptions } from "@tien-gioi/shared";
+import {
+  DEFAULT_MAP_ID,
+  getMap,
+  parseWrongMap,
+  roomNameOf,
+  type JoinOptions,
+} from "@tien-gioi/shared";
 
 /** Giao diện client Colyseus tối thiểu để thực hiện kết nối. */
 export interface JoinClient<R> {
@@ -17,9 +23,15 @@ export function getSavedMapKey(charName: string): string {
   return `tien-gioi:map:${charName.trim()}`;
 }
 
-/** Lấy bản đồ đã lưu của nhân vật, mặc định là DEFAULT_MAP_ID nếu chưa có. */
+/** Lấy bản đồ đã lưu của nhân vật. Nếu không có hoặc id lạ (không có trong GameMap) thì dọn và trả DEFAULT_MAP_ID. */
 export function getSavedMap(storage: JoinStorage, charName: string): string {
-  return storage.getItem(getSavedMapKey(charName)) || DEFAULT_MAP_ID;
+  const raw = storage.getItem(getSavedMapKey(charName));
+  if (!raw) return DEFAULT_MAP_ID;
+  if (!getMap(raw)) {
+    clearSavedMap(storage, charName);
+    return DEFAULT_MAP_ID;
+  }
+  return raw;
 }
 
 /** Lưu bản đồ hiện tại của nhân vật. */
@@ -48,10 +60,9 @@ export interface JoinResult<R> {
 
 /**
  * Vào phòng Colyseus theo roomNameOf(mapId) có hỗ trợ tự động chuyển hướng khi server báo JOIN_WRONG_MAP.
- * - Thử vào mapId gợi ý (hoặc lấy từ storage).
+ * - Thử vào mapId gợi ý (hoặc lấy từ storage). Nếu mapId lạ (không có trong getMap), tự động dọn và dùng DEFAULT_MAP_ID.
  * - Nếu server từ chối vì nhân vật đang ở map khác (`wrong_map:<id>`), tự động vào lại map đúng (không báo lỗi).
  * - Chặn tối đa `maxRedirects` lần (mặc định 3) để tránh vòng lặp vô hạn.
- * - Nếu phòng không tồn tại (do storage lưu map lạ), xóa storage và thử lại bằng DEFAULT_MAP_ID một lần.
  */
 export async function joinWithRedirect<R>(
   options: JoinWithRedirectOptions<R>,
@@ -59,8 +70,11 @@ export async function joinWithRedirect<R>(
   const { client, storage, name, secret, maxRedirects = 3 } = options;
 
   let currentMapId = options.suggestedMapId || getSavedMap(storage, name);
+  if (!getMap(currentMapId)) {
+    clearSavedMap(storage, name);
+    currentMapId = DEFAULT_MAP_ID;
+  }
   let redirectCount = 0;
-  let badMapRetried = false;
 
   while (redirectCount <= maxRedirects) {
     try {
@@ -84,19 +98,7 @@ export async function joinWithRedirect<R>(
         continue;
       }
 
-      // 2. Kiểm tra lỗi phòng không tồn tại (mapId lạ từ storage)
-      const isRoomNotFound =
-        err?.code === 4212 ||
-        (typeof err?.message === "string" && /not found|matchmake/i.test(err.message));
-      if (isRoomNotFound && currentMapId !== DEFAULT_MAP_ID && !badMapRetried) {
-        clearSavedMap(storage, name);
-        currentMapId = DEFAULT_MAP_ID;
-        badMapRetried = true;
-        redirectCount++;
-        continue;
-      }
-
-      // 3. Các lỗi khác (400, 403, 409, mất mạng...) ném lỗi ra ngoài
+      // 2. Các lỗi khác (400, 403, 409, mất mạng...) ném lỗi ra ngoài
       throw err;
     }
   }
