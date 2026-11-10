@@ -16,6 +16,12 @@
 //     `joinById(roomId)` (client không tạo được phòng bí cảnh bằng `joinOrCreate`).
 //  3. Trong phòng server gửi `dungeonState` (mỗi giây và khi đổi pha) cho HUD; kết thúc gửi `dungeonEnd`, rồi `travelTo`
 //     về Lạc Hà (không có `roomId`). Rời sớm: client gửi `dungeonLeave {}`.
+//  4. GỤC TRONG BÍ CẢNH KHÔNG MẤT KIẾP (quyết định của người dùng 11/11/2026, `~/TT/orchestra/QUYET_DINH_M3.md` mục 5): người hết khí
+//     huyết trong phòng bí cảnh KHÔNG chết thật (không Hoàng Tuyền, không mất cảnh giới / đồ / Linh thạch, không tính Duyên). Server gửi
+//     `dungeonFallen { exitInMs, rewardsLeft }`; người đó nằm `DUNGEON_FALL_EXIT_MS`, đứng dậy với `DUNGEON_FALL_HP_PCT` khí huyết rồi
+//     bị ĐẨY RA về cổng vào ở Lạc Hà (`travelTo` như thường). MẤT LƯỢT: tính vào giới hạn lượt ngày (`dungeonDaily`, như đã nhận
+//     một lần thưởng), không nhận thưởng hoàn thành của run đó, không vào lại được run đó. Đồng đội còn sống đánh tiếp; mọi người
+//     đều đã gục / rời thì run thua (`dungeonEnd { reason: "all_dead" }`). Chết ở bản đồ thường vẫn là luân hồi như cũ.
 // Phòng bí cảnh từ chối người không có tên trong danh sách thành viên của run: `ServerError(JOIN_NOT_IN_RUN)`.
 import { DEFAULT_MAP_ID, LINH_HU_MAP_ID } from "./map";
 import { dayKey } from "./quests";
@@ -30,10 +36,14 @@ export const DUNGEON_LOOT_MS = 60_000;
 export const DUNGEON_OPEN_COOLDOWN_MS = 5_000;
 /** Tổng số run đang mở tối đa trong một tiến trình (giữ ngân sách tick). Đầy thì không mở thêm. */
 export const MAX_DUNGEON_RUNS = 10;
-/** Mỗi nhân vật nhận thưởng hoàn thành tối đa chừng này lần mỗi ngày (vẫn vào được khi hết lượt, chỉ không có thưởng). */
+/** Mỗi nhân vật có chừng này lượt thưởng hoàn thành mỗi ngày; bị gục trong run cũng mất một lượt (vẫn vào được khi hết lượt, chỉ không có thưởng). */
 export const DUNGEON_DAILY_REWARDS = 3;
 /** Gửi `dungeonState` tối đa chừng này mỗi lần (ms): 1 lần / giây, không mỗi tick. */
 export const DUNGEON_STATE_MS = 1000;
+/** Người gục trong bí cảnh nằm chừng này (ms) cho đồng đội và màn hình kịp hiện, rồi đứng dậy và bị đẩy ra về cổng vào. */
+export const DUNGEON_FALL_EXIT_MS = 3_000;
+/** Khí huyết (tỉ lệ `maxHp`) của người gục khi đứng dậy, ngay trước khi bị đẩy ra. */
+export const DUNGEON_FALL_HP_PCT = 0.3;
 
 /** Mã lỗi vào phòng: không có tên trong danh sách thành viên của run, hoặc run đã hết hạn / đã kết thúc. */
 export const JOIN_NOT_IN_RUN = 422;
@@ -128,6 +138,7 @@ export const DUNGEON_MSG = {
   invite: "dungeonInvite",
   state: "dungeonState",
   end: "dungeonEnd",
+  fallen: "dungeonFallen",
 } as const;
 // (Nút "Mở bí cảnh" ở hộp thoại là `DialogAction { kind: "dungeon", dungeonId }` trong quests.ts; bấm thì client gửi `dungeonOpen`.)
 
@@ -211,11 +222,23 @@ export interface DungeonStateMsg {
 }
 
 /**
- * Lý do run kết thúc. `no_entry` (hết `DUNGEON_INVITE_MS` mà không ai vào) và `declined` (mọi người được mời đều từ chối)
+ * Lý do run kết thúc. `all_dead`: mọi thành viên đã gục (bị đẩy ra) hoặc rời mà có người gục; `all_left`: mọi người tự rời. `no_entry` (hết `DUNGEON_INVITE_MS` mà không ai vào) và `declined` (mọi người được mời đều từ chối)
  * là run huỷ TRƯỚC khi có phòng: chỉ gửi cho đội trưởng (đang ở ngoài), client hiện thông báo chứ không mở màn kết quả.
  */
 export type DungeonEndReason =
   "boss_dead" | "timeout" | "all_dead" | "all_left" | "no_entry" | "declined";
+
+/**
+ * Server -> client (CHỈ người vừa gục): ngươi hết khí huyết trong bí cảnh. KHÔNG phải chết thật (không Hoàng Tuyền, không mất gì);
+ * sau `exitInMs` bị đẩy ra về cổng vào (`travelTo` như khi run kết thúc), và lượt hôm nay bị trừ. Người khác trong phòng thấy
+ * `dungeonState.members[].alive = false`. Không gửi `dungeonEnd` cho người này (run vẫn chạy với đồng đội).
+ */
+export interface DungeonFallenMsg {
+  /** Còn bao nhiêu ms tới lúc bị đẩy ra (đồng hồ của server; client đếm ngược theo đó) */
+  exitInMs: number;
+  /** Lượt nhận thưởng hoàn thành còn lại hôm nay SAU khi bị trừ lượt này (0..`DUNGEON_DAILY_REWARDS`) */
+  rewardsLeft: number;
+}
 
 /** Vì sao một người thắng mà KHÔNG nhận thưởng hoàn thành (để màn kết quả giải thích, không để người chơi thắc mắc). */
 export type DungeonNoReward = "daily_limit" | "no_damage";
@@ -336,7 +359,7 @@ export function rewardEligible(i: { alive: boolean; present: boolean; damage: nu
 export interface DungeonDaily {
   /** `dayKey` (giờ Việt Nam) của ngày đang đếm */
   day: string;
-  /** Số lần đã nhận thưởng hoàn thành trong ngày đó */
+  /** Số lượt đã dùng trong ngày đó: mỗi lần nhận thưởng hoàn thành HOẶC bị gục trong một run (mất lượt) tính một lượt */
   rewards: number;
 }
 
