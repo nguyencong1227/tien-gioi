@@ -9,8 +9,8 @@ import {
   ITEM_BY_ID,
   PLAYER_RADIUS,
   MAX_ACTIVE_QUESTS,
-  inTown,
-  circleBlocked,
+  DEFAULT_MAP_ID,
+  getMap,
   emptyInventory,
   dayKey,
   countItem,
@@ -36,10 +36,14 @@ describe("dữ liệu NPC và đổi đồ", () => {
   it("id không trùng; NPC đứng trong trấn, chỗ đi lại được, không chồng lên nhau", () => {
     expect(new Set(NPCS.map((n) => n.id)).size).toBe(NPCS.length);
     for (const n of NPCS) {
-      expect(inTown(n.x, n.y)).toBe(true);
-      expect(circleBlocked(n.x, n.y, PLAYER_RADIUS)).toBe(false);
+      const mapId = n.mapId ?? DEFAULT_MAP_ID;
+      const map = getMap(mapId)!; // NPC đứng trong trấn của bản đồ CỦA NÓ
+      expect(map, `NPC ${n.id}: bản đồ ${mapId} không có`).toBeDefined();
+      expect(map.inTown(n.x, n.y)).toBe(true);
+      expect(map.circleBlocked(n.x, n.y, PLAYER_RADIUS)).toBe(false);
       for (const o of NPCS)
-        if (o !== n) expect(Math.hypot(o.x - n.x, o.y - n.y)).toBeGreaterThan(64);
+        if (o !== n && (o.mapId ?? DEFAULT_MAP_ID) === mapId)
+          expect(Math.hypot(o.x - n.x, o.y - n.y)).toBeGreaterThan(64);
     }
   });
 

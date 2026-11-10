@@ -1,5 +1,5 @@
 // NPC trong Lạc Hà Trấn và giao dịch đổi đồ: hợp đồng giữa client và server (Sprint 2).
-import { DEFAULT_MAP_ID, TOWN_PX } from "./map";
+import { DEFAULT_MAP_ID, HAC_PHONG_ID, TOWN_PX } from "./map";
 
 export interface NpcDef {
   id: string;
@@ -62,6 +62,20 @@ export const NPCS: NpcDef[] = [
     y: TOWN_PX.y + 110,
     dialog: ["Giấy dán chi chít, nhưng hôm nay chẳng còn việc nào chưa có người nhận."],
     color: 0xc9a66b,
+  },
+  {
+    id: "lai_buon",
+    mapId: HAC_PHONG_ID,
+    name: "Mạc Thông",
+    title: "Lái buôn Thanh Lộ",
+    // Trạm Thanh Lộ (Hắc Phong Cốc): tâm trấn (2048, 2688), lùi lên phía bắc 70 px; chỗ đi lại được (test giữ)
+    x: 2048,
+    y: 2618,
+    dialog: [
+      "Thanh Lộ Trạm dựng sát cổng cho kẻ vượt Hắc Phong Cốc dừng chân. Gió ngoài kia rát, thú cũng dữ hơn dưới Lạc Hà.",
+      "Thu được gì cứ bán cho ta, đỡ phải gánh về trấn dưới. Đan dược ta cũng có sẵn.",
+    ],
+    color: 0x6b4f8a,
   },
 ];
 

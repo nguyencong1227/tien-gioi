@@ -75,7 +75,11 @@ export interface ShopDef {
  * qua đường cong tu luyện đã cân bằng ở docs/CAN_BANG.md; cần quyết định riêng trước khi thêm.
  * NPC nào có trong `SHOPS` thì cũng thu mua mọi vật phẩm bán được (`sellPrice` > 0) của người chơi.
  */
-export const SHOPS: ShopDef[] = [{ npcId: "duoc_su", itemIds: ["hoi_huyet_dan", "hoi_linh_dan"] }];
+export const SHOPS: ShopDef[] = [
+  { npcId: "duoc_su", itemIds: ["hoi_huyet_dan", "hoi_linh_dan"] },
+  // Lái buôn ở Thanh Lộ Trạm (Hắc Phong Cốc): cùng hàng và cùng giá với Lão Dược Sư, để săn xa vẫn mua / bán được tại chỗ
+  { npcId: "lai_buon", itemIds: ["hoi_huyet_dan", "hoi_linh_dan"] },
+];
 
 export const SHOP_BY_NPC: Record<string, ShopDef> = Object.fromEntries(
   SHOPS.map((s) => [s.npcId, s]),

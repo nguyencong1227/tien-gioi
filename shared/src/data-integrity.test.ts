@@ -21,8 +21,8 @@ import {
   SHOP_BY_NPC,
   TRADES,
   TRADE_BY_ID,
-  circleBlocked,
-  inTown,
+  DEFAULT_MAP_ID,
+  getMap,
 } from "./index";
 
 describe("nhất quán dữ liệu game (Issue #112 - data-integrity)", () => {
@@ -223,14 +223,19 @@ describe("nhất quán dữ liệu game (Issue #112 - data-integrity)", () => {
 
       for (const n of NPCS) {
         expect(NPC_BY_ID[n.id]).toBe(n);
-        expect(inTown(n.x, n.y), `NPC "${n.id}" không đứng trong trấn`).toBe(true);
+        const mapId = n.mapId ?? DEFAULT_MAP_ID;
+        const map = getMap(mapId);
+        expect(map, `NPC "${n.id}" đứng ở bản đồ không có: "${mapId}"`).toBeDefined();
+        expect(map!.inTown(n.x, n.y), `NPC "${n.id}" không đứng trong trấn của ${mapId}`).toBe(
+          true,
+        );
         expect(
-          circleBlocked(n.x, n.y, PLAYER_RADIUS),
+          map!.circleBlocked(n.x, n.y, PLAYER_RADIUS),
           `NPC "${n.id}" đứng đè lên vật cản không thể tương tác`,
         ).toBe(false);
 
         for (const other of NPCS) {
-          if (other !== n) {
+          if (other !== n && (other.mapId ?? DEFAULT_MAP_ID) === mapId) {
             const dist = Math.hypot(other.x - n.x, other.y - n.y);
             expect(
               dist,
