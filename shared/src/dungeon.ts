@@ -75,8 +75,9 @@ export interface DungeonDef {
 export const LINH_HU_ID = "linh_hu";
 
 /**
- * Bảng bí cảnh. SỐ LIỆU THƯỞNG VÀ NGƯỠNG LÀ TẠM: A cân bằng ở PR 4c (`docs/CAN_BANG.md`) với mục tiêu một lượt thưởng
- * bằng ~15-20 phút săn quái cùng bậc, để bí cảnh là một lựa chọn chứ không phải đường duy nhất.
+ * Bảng bí cảnh. Số liệu đã cân bằng ở 4c-2 (`server/src/balance/dungeon.ts`, `docs/CAN_BANG.md`): một lượt thưởng (Linh thạch
+ * ròng sau khi trừ đan, và tu vi) bằng ~17 phút săn quái tốt nhất cùng bậc, để bí cảnh là một lựa chọn chứ không phải đường
+ * duy nhất (tối đa `DUNGEON_DAILY_REWARDS` lượt mỗi ngày).
  */
 export const DUNGEONS: readonly DungeonDef[] = [
   {
@@ -86,11 +87,11 @@ export const DUNGEONS: readonly DungeonDef[] = [
     entryMapId: DEFAULT_MAP_ID,
     partyMin: 2,
     partyMax: 4,
-    minStep: 9, // `stepOf(1, 8)` = Luyện Khí Tầng 9 (Phàm Nhân chiếm bậc 0): số tạm
+    minStep: 9, // `stepOf(1, 8)` = Luyện Khí Tầng 9 (Phàm Nhân chiếm bậc 0): ngưỡng mà mô phỏng 4c-2 dùng
     timeLimitMs: 12 * 60_000,
     boss: "yeu_vuong",
     reward: {
-      coin: 400,
+      coin: 700,
       items: [
         { itemId: "tu_khi_dan", qty: 2, chance: 1 },
         { itemId: "vay_mang", qty: 3, chance: 0.6 },

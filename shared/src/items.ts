@@ -292,7 +292,7 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: "hoi_huyet_dan", chance: 1, min: 2, max: 3 },
   ],
   // Trùm bí cảnh (docs/THIET_KE_BI_CANH.md): đồ rơi như quái thường (chủ đồ theo đội); thưởng hoàn thành riêng ở `DUNGEONS`.
-  // Số liệu tạm, cân bằng ở PR 4c.
+  // Đã tính vào cân bằng 4c-2 (`server/src/balance/dungeon.ts`).
   yeu_vuong: [
     { itemId: "vay_mang", chance: 1, min: 3, max: 5 },
     { itemId: "tu_khi_dan", chance: 0.8, min: 2, max: 3 },
