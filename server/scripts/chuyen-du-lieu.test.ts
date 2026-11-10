@@ -18,7 +18,9 @@ import { newDb } from "pg-mem";
 import { newSoul } from "@tien-gioi/shared";
 import type { Db } from "../src/pg/db";
 import type { PlayerStore } from "../src/player-store";
+import type { SectStore } from "../src/sect-store";
 import type { SoulStore } from "../src/soul";
+import { makeSect } from "../src/store-contract";
 import type { SavedPlayer } from "../src/store";
 
 const src = mkdtempSync(path.join(tmpdir(), "tien-gioi-cdl-"));
@@ -28,9 +30,11 @@ afterAll(() => rmSync(src, { recursive: true, force: true }));
 let mod: typeof import("./chuyen-du-lieu");
 let store: typeof import("../src/store");
 let FileSoulStoreCls: typeof import("../src/soul").FileSoulStore;
+let FileSectStoreCls: typeof import("../src/sect-store").FileSectStore;
 let pgMod: {
   PgPlayerStore: typeof import("../src/pg/game-store").PgPlayerStore;
   PgSoulStore: typeof import("../src/pg/game-store").PgSoulStore;
+  PgSectStore: typeof import("../src/pg/sect-store").PgSectStore;
   migrate: typeof import("../src/pg/migrate").migrate;
 };
 
@@ -38,8 +42,10 @@ beforeAll(async () => {
   mod = await import("./chuyen-du-lieu");
   store = await import("../src/store");
   FileSoulStoreCls = (await import("../src/soul")).FileSoulStore;
+  FileSectStoreCls = (await import("../src/sect-store")).FileSectStore;
   pgMod = {
     ...(await import("../src/pg/game-store")),
+    ...(await import("../src/pg/sect-store")),
     ...(await import("../src/pg/migrate")),
   } as never;
   // Dữ liệu nguồn do bộ ghi THẬT tạo
@@ -65,6 +71,15 @@ beforeAll(async () => {
     duyenTotal: 40,
   }));
   await souls.create("tô mộc");
+  // Tông môn do bộ ghi THẬT tạo (2 hợp lệ) + 2 tệp hỏng (không phải JSON mảng; tên tệp lệch id)
+  const sects = new FileSectStoreCls(path.join(src, "sects"), () => 1_700_000_000_000);
+  await sects.create(makeSect("tm1", { name: "Thanh Vân", tag: "TV", coin: 50 }));
+  await sects.create(makeSect("tm2", { name: "Hắc Long", tag: "HL", coin: 5 }));
+  writeFileSync(path.join(src, "sects", "tm-rac.json"), "[1]");
+  writeFileSync(
+    path.join(src, "sects", "tm-lech.json"),
+    JSON.stringify(makeSect("khacid", { name: "Lệch Tên", tag: "LT" })),
+  );
   // Tệp hỏng và lạ
   writeFileSync(path.join(src, "rac.json"), "{không phải json");
   writeFileSync(
@@ -82,13 +97,18 @@ beforeAll(async () => {
   symlinkSync("/etc/hostname", path.join(src, "lien-ket.json"));
 });
 
-async function memStores(): Promise<{ players: PlayerStore; souls: SoulStore }> {
+async function memStores(): Promise<{
+  players: PlayerStore;
+  souls: SoulStore;
+  sects: SectStore;
+}> {
   const { Pool } = newDb().adapters.createPg();
   const db = new Pool() as unknown as Db;
   await pgMod.migrate(db);
   return {
     players: new pgMod.PgPlayerStore(db),
     souls: new pgMod.PgSoulStore(db, () => "2026-11-10T00:00:00.000Z"),
+    sects: new pgMod.PgSectStore(db),
   };
 }
 /** Băm toàn bộ thư mục nguồn (tên + nội dung, cả thư mục con) để chứng minh không bị đổi. */
@@ -121,6 +141,7 @@ describe("chạy thử (--thu)", () => {
       existing: 0,
     });
     expect(r.souls).toMatchObject({ found: 4, invalid: 2, toMigrate: 2, migrated: 0 });
+    expect(r.sects).toMatchObject({ found: 4, invalid: 2, toMigrate: 2, migrated: 0, existing: 0 });
     const codes = Object.fromEntries(r.errors.map((e) => [e.file, e.code]));
     expect(codes["rac.json"]).toBe("invalid_json");
     expect(codes["sai-bam.json"]).toBe("invalid_secret_hash");
@@ -128,6 +149,8 @@ describe("chạy thử (--thu)", () => {
     expect(codes["lien-ket.json"]).toBe("not_regular_file");
     expect(codes["souls/soul-rac.json"]).toBeTruthy();
     expect(codes["souls/khong-id.json"]).toBe("invalid_soul_id");
+    expect(codes["sects/tm-rac.json"]).toBe("sect_invalid");
+    expect(codes["sects/tm-lech.json"]).toBe("sect_invalid"); // tên tệp phải khớp id
     expect(r.errors.map((e) => e.file)).not.toContain("x.json.tmp");
     expect(fingerprint(src)).toBe(before);
   });
@@ -147,6 +170,7 @@ describe("chạy thử (--thu)", () => {
     expect(r.players).toMatchObject({ existing: 1, toMigrate: 1, migrated: 0 });
     expect(await t.players.load("Lâm Thanh")).toBeNull();
     expect((await t.players.load("Tô Mộc"))?.exp).toBe(1);
+    expect(await t.sects.all()).toEqual([]); // chạy thử không ghi tông môn
   });
 });
 
@@ -157,18 +181,44 @@ describe("chuyển thật", () => {
     const r = await mod.migrateData(opts(), t);
     expect(r.players).toMatchObject({ toMigrate: 2, migrated: 2, failed: 0, existing: 0 });
     expect(r.souls).toMatchObject({ toMigrate: 2, migrated: 2, failed: 0 });
+    expect(r.sects).toMatchObject({
+      toMigrate: 2,
+      migrated: 2,
+      failed: 0,
+      existing: 0,
+      invalid: 2,
+    });
     const a = (await t.players.load("lâm thanh"))!;
     expect([a.name, a.realm, a.tier, a.exp, a.coin]).toEqual(["Lâm Thanh", 1, 2, 500, 55]);
     expect(a.secretHash).toBe(store.hashSecret("bi-mat-Lâm Thanh-0123456789"));
     expect(await t.players.load("Sai Bam")).toBeNull();
     const soul = (await t.souls.get("lâm thanh"))!;
     expect([soul.id, soul.kiep, soul.duyen, soul.duyenTotal]).toEqual(["lâm thanh", 3, 17, 40]);
+    const tm1 = (await t.sects.get("tm1"))!;
+    expect([tm1.name, tm1.tag, tm1.coin, tm1.leader]).toEqual(["Thanh Vân", "TV", 50, "chu_tm1"]);
+    expect((await t.sects.findBySoul("chu_tm2"))?.id).toBe("tm2");
+    expect(await t.sects.get("khacid")).toBeNull(); // tệp tên lệch id không được chuyển
     expect(fingerprint(src)).toBe(before);
     // chạy lại: tất cả đã có, không ghi thêm
     const again = await mod.migrateData(opts(), t);
     expect(again.players).toMatchObject({ existing: 2, toMigrate: 0, migrated: 0 });
     expect(again.souls).toMatchObject({ existing: 2, toMigrate: 0, migrated: 0 });
+    expect(again.sects).toMatchObject({ existing: 2, toMigrate: 0, migrated: 0 });
     expect((await t.souls.get("lâm thanh"))?.duyen).toBe(17);
+    expect(await t.sects.all()).toHaveLength(2);
+  });
+
+  it("tông môn trùng tên với tông môn ĐÃ CÓ trong DB: kho từ chối (failed, mã chỉ có tên lỗi), tông môn còn lại vẫn được chuyển", async () => {
+    const t = await memStores();
+    await t.sects.create(makeSect("cosan", { name: "THANH VÂN", tag: "CS" }));
+    const r = await mod.migrateData(opts(), t);
+    expect(r.sects).toMatchObject({ toMigrate: 2, migrated: 1, failed: 1 });
+    expect(r.errors.find((e) => e.file === "sects/tm1.json")?.code).toBe(
+      "ghi_loi:SectConflictError",
+    );
+    expect(await t.sects.get("tm1")).toBeNull();
+    expect((await t.sects.get("tm2"))?.name).toBe("Hắc Long");
+    expect((await t.sects.get("cosan"))?.name).toBe("THANH VÂN"); // không bị đè
   });
 
   it("DB đã có bản mới hơn: mặc định KHÔNG ghi đè; --ghi-de thì ghi đè", async () => {
@@ -183,13 +233,16 @@ describe("chuyển thật", () => {
       updatedAt: "t",
     });
     await t.souls.create("lâm thanh", (s) => ({ ...s, duyen: 777 }));
+    await t.sects.create(makeSect("tm1", { name: "Thanh Vân", tag: "TV", coin: 777 }));
     await mod.migrateData(opts(), t);
+    expect((await t.sects.get("tm1"))?.coin).toBe(777);
     expect((await t.players.load("Lâm Thanh"))?.exp).toBe(9999);
     expect((await t.souls.get("lâm thanh"))?.duyen).toBe(777);
     const r = await mod.migrateData(opts({ ghiDe: true }), t);
     expect(r.players.migrated).toBe(2);
     expect((await t.players.load("Lâm Thanh"))?.exp).toBe(500);
     expect((await t.souls.get("lâm thanh"))?.duyen).toBe(17);
+    expect((await t.sects.get("tm1"))?.coin).toBe(50);
   });
 
   it("ghi lỗi (DB): đếm failed, mã chỉ có tên lỗi (không lộ thông báo / mật khẩu), 20 lỗi liên tiếp thì dừng", async () => {
@@ -203,10 +256,16 @@ describe("chuyển thật", () => {
         create: async () => boom(),
         update: async () => boom(),
       } as unknown as SoulStore,
+      sects: {
+        get: async () => null,
+        create: async () => boom(),
+        update: async () => boom(),
+      } as unknown as SectStore,
     };
     const r = await mod.migrateData(opts(), dead);
     expect(r.players).toMatchObject({ toMigrate: 2, migrated: 0, failed: 2 });
     expect(r.souls).toMatchObject({ migrated: 0, failed: 2 });
+    expect(r.sects).toMatchObject({ migrated: 0, failed: 2 });
     expect(JSON.stringify(r)).not.toContain("bi-mat-xyz");
     expect(r.errors.find((e) => e.code.startsWith("ghi_loi"))?.code).toBe("ghi_loi:Error");
     // quá 20 lỗi liên tiếp: dừng
