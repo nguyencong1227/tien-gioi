@@ -57,3 +57,62 @@ describe("savePlayer", () => {
     expect((await store.loadPlayer("Nguoi B"))?.exp).toBe(2);
   });
 });
+
+describe("sanitizeLife: không tin bộ đếm trong file", () => {
+  it("giá trị hợp lệ giữ nguyên (số lẻ cắt xuống); số rác về 0; trùm không vượt số quái", async () => {
+    const { sanitizeLife } = store;
+    expect(sanitizeLife({ playMs: 123456.9, kills: 40, bossKills: 3 })).toEqual({
+      playMs: 123456,
+      kills: 40,
+      bossKills: 3,
+    });
+    expect(sanitizeLife({ playMs: 5, kills: 2, bossKills: 9 })).toEqual({
+      playMs: 5,
+      kills: 2,
+      bossKills: 2,
+    });
+    for (const bad of [
+      undefined,
+      null,
+      5,
+      "x",
+      [],
+      { playMs: "9", kills: -1, bossKills: Number.NaN },
+      { playMs: Infinity, kills: -Infinity },
+    ]) {
+      const l = sanitizeLife(bad);
+      expect(
+        Object.values(l).every((v) => Number.isInteger(v) && v >= 0),
+        JSON.stringify(bad),
+      ).toBe(true);
+    }
+    expect(sanitizeLife({ playMs: 1e30, kills: 1e30, bossKills: 1e30 }).playMs).toBeLessThanOrEqual(
+      1e12,
+    );
+  });
+
+  it("sanitizeLifeId: giữ mã hợp lệ; kiểu sai, quá ngắn / dài, ký tự lạ thì sinh mã mới", () => {
+    const ok = store.newLifeId();
+    expect(store.sanitizeLifeId(ok)).toBe(ok);
+    for (const bad of [
+      undefined,
+      null,
+      12345,
+      "",
+      "ngan",
+      "x".repeat(65),
+      "co khoang trang 12345",
+      "\u0000\u0001abcdefgh",
+      {},
+      [],
+    ]) {
+      const id = store.sanitizeLifeId(bad);
+      expect(id).not.toBe(bad);
+      expect(id).toMatch(/^[\x21-\x7e]{8,64}$/);
+    }
+  });
+
+  it("newLifeId: mỗi lần một mã khác nhau", () => {
+    expect(new Set(Array.from({ length: 50 }, () => store.newLifeId())).size).toBe(50);
+  });
+});
