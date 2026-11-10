@@ -21,7 +21,6 @@ import { Client, type Room } from "colyseus.js";
 import {
   DEFAULT_MAP,
   DEFAULT_MAP_ID,
-  DUEL_COUNTDOWN_MS,
   DUEL_INVITES_MAX,
   DUEL_KO_HP_PCT,
   DUEL_KO_MS,
