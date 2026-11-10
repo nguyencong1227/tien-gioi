@@ -191,12 +191,3 @@ export function savePlayer(p: SavedPlayer): Promise<void> {
   next.then(done, done);
   return next;
 }
-
-/** Tên 2–16 ký tự: chữ (có dấu), số, khoảng trắng đơn. */
-export function cleanName(raw: unknown): string | null {
-  if (typeof raw !== "string") return null;
-  const n = raw.normalize("NFC").trim().replace(/\s+/g, " ");
-  if (n.length < 2 || n.length > 16) return null;
-  if (!/^[\p{L}\p{N} ]+$/u.test(n)) return null;
-  return n;
-}

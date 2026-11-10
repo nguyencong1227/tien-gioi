@@ -22,8 +22,8 @@ import {
   stepOf,
   DUYEN_CAP,
   KIEP_CAP,
+  cleanName,
 } from "@tien-gioi/shared";
-import { cleanName } from "../src/store.js";
 import { byId } from "../src/systems/lookup.js";
 import { soulIdOf } from "../src/soul.js";
 import { createHash } from "node:crypto";

@@ -12,11 +12,11 @@ import {
   PARTY_SHARE_RANGE,
   PARTY_SNAPSHOT_MS,
   partyExpShare,
+  cleanName,
   type ChatOut,
   type PartyMember,
   type PartyMsg,
 } from "@tien-gioi/shared";
-import { cleanName } from "../store";
 import type { World } from "../world";
 import type { Located } from "../hub";
 
