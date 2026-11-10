@@ -186,7 +186,7 @@ export function auditPlayerSaveData(rawText: string, byteLength: number): AuditE
     if (!m) {
       errors.push({
         code: "invalid_map_id",
-        message: `Mã bản đồ "${show(data.mapId)}" không tồn tại trong MAPS`,
+        message: `Mã bản đồ ${show(data.mapId)} không tồn tại trong MAPS (server sẽ đưa về lac_ha)`,
       });
     } else {
       targetMap = m;
@@ -210,12 +210,12 @@ export function auditPlayerSaveData(rawText: string, byteLength: number): AuditE
     if (!isFinitePos) {
       errors.push({
         code: "pos_out_of_bounds",
-        message: `Toạ độ (x: ${show(x)}, y: ${show(y)}) nằm ngoài kích thước bản đồ (${targetMap.worldW}x${targetMap.worldH})`,
+        message: `Toạ độ (x: ${show(x)}, y: ${show(y)}) nằm ngoài kích thước bản đồ ${targetMap.def.name} (${targetMap.worldW}x${targetMap.worldH})`,
       });
     } else if (targetMap.circleBlocked(x, y, PLAYER_RADIUS)) {
       errors.push({
         code: "pos_blocked",
-        message: `Toạ độ (x: ${show(x)}, y: ${show(y)}) nằm đè lên vật cản không thể di chuyển`,
+        message: `Toạ độ (x: ${show(x)}, y: ${show(y)}) nằm đè lên vật cản không thể di chuyển trên bản đồ ${targetMap.def.name}`,
       });
     }
   }
