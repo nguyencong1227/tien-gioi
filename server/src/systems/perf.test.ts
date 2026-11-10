@@ -55,7 +55,7 @@ describe("góc nhìn ghi vào state được lượng tử hóa", () => {
       const a = i * 0.01; // quay 1 rad qua 100 bước
       c.inputs.push({ seq: i, dx: Math.cos(a), dy: Math.sin(a) });
       w.now += 50;
-      applyInputs(p, c);
+      applyInputs(w.map, p, c);
       seen.add(p.angle);
       if (p.angle !== last) changes++;
       last = p.angle;

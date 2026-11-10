@@ -8,7 +8,6 @@
 // Thực thể bị xoá khỏi state (quái chết, đồ biến mất, người rời) thì schema tự gửi lệnh xoá.
 // Không đụng tới Colyseus Room: WorldRoom tạo StateView, gán vào client.view rồi đưa cho join().
 import { StateView, type MapSchema, type Schema } from "@colyseus/schema";
-import { WORLD_H, WORLD_W } from "@tien-gioi/shared";
 import { TAG_OWNER } from "../schema";
 import type { World } from "../world";
 
@@ -24,8 +23,6 @@ export const VIEW_EXIT = 1300;
 export const VIEW_EVERY_TICKS = 4;
 /** Cạnh một ô lưới (px). Nhỏ hơn VIEW_ENTER vài lần để tìm gần chỉ duyệt vài chục ô. */
 const CELL = 256;
-const GW = Math.ceil(WORLD_W / CELL);
-const GH = Math.ceil(WORLD_H / CELL);
 
 type Kind = "players" | "monsters" | "loot";
 const KINDS: Kind[] = ["players", "monsters", "loot"];
@@ -33,14 +30,23 @@ type Entity = Schema & { x: number; y: number };
 
 /** Lưới ô chứa thực thể; dựng lại mỗi lần làm mới, tái dùng mảng để không tạo rác mỗi lần. */
 class Grid {
-  private ids: string[][] = Array.from({ length: GW * GH }, () => []);
-  private objs: Entity[][] = Array.from({ length: GW * GH }, () => []);
+  private readonly gw: number;
+  private readonly gh: number;
+  private ids: string[][];
+  private objs: Entity[][];
   private used: number[] = [];
 
+  constructor(worldW: number, worldH: number) {
+    this.gw = Math.ceil(worldW / CELL);
+    this.gh = Math.ceil(worldH / CELL);
+    this.ids = Array.from({ length: this.gw * this.gh }, () => []);
+    this.objs = Array.from({ length: this.gw * this.gh }, () => []);
+  }
+
   private cell(x: number, y: number) {
-    const cx = Math.min(GW - 1, Math.max(0, Math.floor(x / CELL)));
-    const cy = Math.min(GH - 1, Math.max(0, Math.floor(y / CELL)));
-    return cy * GW + cx;
+    const cx = Math.min(this.gw - 1, Math.max(0, Math.floor(x / CELL)));
+    const cy = Math.min(this.gh - 1, Math.max(0, Math.floor(y / CELL)));
+    return cy * this.gw + cx;
   }
 
   rebuild(map: MapSchema<Entity>) {
@@ -60,13 +66,13 @@ class Grid {
   /** Gọi fn cho mọi thực thể trong hình tròn bán kính r quanh (x, y). */
   near(x: number, y: number, r: number, fn: (id: string, o: Entity) => void) {
     const x0 = Math.max(0, Math.floor((x - r) / CELL));
-    const x1 = Math.min(GW - 1, Math.floor((x + r) / CELL));
+    const x1 = Math.min(this.gw - 1, Math.floor((x + r) / CELL));
     const y0 = Math.max(0, Math.floor((y - r) / CELL));
-    const y1 = Math.min(GH - 1, Math.floor((y + r) / CELL));
+    const y1 = Math.min(this.gh - 1, Math.floor((y + r) / CELL));
     const r2 = r * r;
     for (let cy = y0; cy <= y1; cy++) {
       for (let cx = x0; cx <= x1; cx++) {
-        const i = cy * GW + cx;
+        const i = cy * this.gw + cx;
         const ids = this.ids[i];
         for (let k = 0; k < ids.length; k++) {
           const o = this.objs[i][k];
@@ -88,11 +94,16 @@ interface ClientView {
 export class Interest {
   private tick = 0;
   private readonly clients = new Map<string, ClientView>();
-  private readonly grids: Record<Kind, Grid> = {
-    players: new Grid(),
-    monsters: new Grid(),
-    loot: new Grid(),
-  };
+  private readonly grids: Record<Kind, Grid>;
+
+  /** Kích thước bản đồ (px): lưới ô dựng theo bản đồ của phòng. */
+  constructor(worldW: number, worldH: number) {
+    this.grids = {
+      players: new Grid(worldW, worldH),
+      monsters: new Grid(worldW, worldH),
+      loot: new Grid(worldW, worldH),
+    };
+  }
 
   /**
    * Đăng ký view của một người chơi (đã có trong state.players). Gọi trong onJoin, trước khi Colyseus

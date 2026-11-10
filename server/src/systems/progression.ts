@@ -9,7 +9,6 @@ import {
   isLastTier,
   isPeak,
   breakthroughChance,
-  inTown,
 } from "@tien-gioi/shared";
 import type { Player } from "../schema";
 import { takeWhole, type World, type PlayerCtrl } from "../world";
@@ -115,7 +114,7 @@ export function tickRecovery(w: World, sid: string, p: Player, c: PlayerCtrl, dt
       c.frac.expAt = w.now + EXP_FLUSH_MS;
     }
   } else if (w.now - c.lastHitAt > 5000) {
-    hpRate = inTown(p.x, p.y) ? 0.08 : 0.01;
+    hpRate = w.map.inTown(p.x, p.y) ? 0.08 : 0.01;
   }
   regen(c, "hp", p.hp, p.maxHp, p.maxHp * hpRate * dt, (v) => (p.hp = v));
   regen(c, "mp", p.mp, p.maxMp, p.maxMp * mpRate * dt, (v) => (p.mp = v));

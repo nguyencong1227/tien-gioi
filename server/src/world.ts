@@ -1,6 +1,7 @@
 // Trạng thái thế giới dùng chung cho các system. Không phụ thuộc Colyseus Room,
 // nên các system có thể test riêng bằng một World giả.
 import type {
+  GameMap,
   InputMsg,
   FxMsg,
   DmgMsg,
@@ -106,7 +107,7 @@ export class World {
   readonly mctrl = new Map<string, MonsterCtrl>();
   readonly lctrl = new Map<string, LootCtrl>();
   /** Vùng nhìn của từng client: ai nhận state của thực thể nào (#62) */
-  readonly interest = new Interest();
+  readonly interest: Interest;
   /** Đội hình: ai ở đội nào, lời mời đang chờ (#74) */
   readonly parties = new Parties();
   monsterSeq = 0;
@@ -117,7 +118,11 @@ export class World {
   constructor(
     readonly state: WorldState,
     readonly events: WorldEvents,
-  ) {}
+    /** Bản đồ của phòng này: ô, va chạm, trấn. Mọi system đọc từ đây, không đọc hằng toàn cục (#123). */
+    readonly map: GameMap,
+  ) {
+    this.interest = new Interest(map.worldW, map.worldH);
+  }
 
   /** Người chơi còn sống và đang trong phòng; null nếu không. */
   ready(sessionId: string): { p: Player; c: PlayerCtrl } | null {
