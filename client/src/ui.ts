@@ -49,7 +49,6 @@ import {
   SHOP_MAX_QTY,
   type WalletMsg,
   UNLOCKS,
-  UNLOCK_BY_ID,
   ORIGINS,
   DEFAULT_ORIGIN,
   ORIGIN_BUY_PREFIX,
@@ -57,8 +56,6 @@ import {
   keepSlotsOf,
   nextCost,
   type LimboMsg,
-  type SoulMsg,
-  type RebornMsg,
   type RebirthChoice,
   type SoulView,
 } from "@tien-gioi/shared";

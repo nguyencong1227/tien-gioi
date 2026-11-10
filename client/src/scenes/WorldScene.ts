@@ -744,6 +744,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private onLimbo(m: LimboMsg) {
+    ui.setKiep(m.soul.kiep);
     ui.showLimbo(m, {
       onBuy: (id: string) => {
         const msg: SoulBuyMsg = { id };
@@ -773,7 +774,10 @@ export class WorldScene extends Phaser.Scene {
     this.room.onMessage("partyInvited", (m: PartyInvitedMsg) => ui.onPartyInvited(m));
     this.room.onMessage("wallet", (m: WalletMsg) => ui.onWallet(m));
     this.room.onMessage("limbo", (m: LimboMsg) => this.onLimbo(m));
-    this.room.onMessage("soul", (m: SoulMsg) => ui.updateSoul(m));
+    this.room.onMessage("soul", (m: SoulMsg) => {
+      ui.updateSoul(m);
+      ui.setKiep(m.kiep);
+    });
     this.room.onMessage("reborn", (m: RebornMsg) => ui.showReborn(m.kiep));
     if (isInitial) {
       ui.chat({

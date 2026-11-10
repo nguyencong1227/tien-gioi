@@ -2375,7 +2375,7 @@ body.reconnecting #btn-pickup {
   letter-spacing: 0.5px;
 }
 
-/* Khi đang ở Hoàng Tuyền: ẩn HUD gameplay, chỉ giữ chat */
+/* Khi đang ở Hoàng Tuyền: ẩn HUD gameplay, chỉ giữ chat thu gọn không che chữ */
 body.in-limbo #hud-col-left,
 body.in-limbo #minimap-wrap,
 body.in-limbo #quickbar,
@@ -2391,6 +2391,19 @@ body.in-limbo #help {
 
 body.in-limbo #chat {
   z-index: 10001;
+  width: min(280px, 85vw);
+  max-width: 280px;
+  opacity: 0.88;
+  transition: opacity 0.2s ease;
+}
+
+body.in-limbo #chat:hover,
+body.in-limbo #chat:focus-within {
+  opacity: 1;
+}
+
+body.in-limbo #chat-log {
+  height: 80px;
 }
 
 /* Màn hình Hoàng Tuyền */
@@ -2408,7 +2421,7 @@ body.in-limbo #chat {
   align-items: flex-start;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 24px 16px 80px;
+  padding: 24px 16px 200px;
   box-sizing: border-box;
   backdrop-filter: blur(8px);
 }
@@ -2845,7 +2858,13 @@ body.in-limbo #chat {
 /* Responsive di động cho Hoàng Tuyền */
 @media (max-width: 640px) {
   .limbo-overlay {
-    padding: 16px 8px 60px;
+    padding: 16px 8px 240px;
+  }
+  body.in-limbo #chat {
+    width: min(240px, 75vw);
+  }
+  body.in-limbo #chat-log {
+    height: 60px;
   }
   .limbo-box {
     padding: 16px 12px;
