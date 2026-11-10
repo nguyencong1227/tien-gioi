@@ -276,6 +276,73 @@ describe("rớt mạng và nối lại (#116)", () => {
     }
   });
 
+  it("rớt mạng không bị giết: quái đang đánh dừng lại, hết khí huyết cũng không chết, nối lại thì quái đánh tiếp", async () => {
+    const a = await join("Bat Tu");
+    const sid = a.room.sessionId;
+    const sr = serverRoom(a.room) as any;
+    const map = sr.world.map;
+    const p = serverState(a.room).players.get(sid)!;
+    // Ra khỏi trấn tới chỗ đi được, đặt Hắc Hổ sát bên (đánh ~42 mỗi 1.3 s, người chơi mới 100 khí huyết)
+    for (let k = 0; k < 40; k++) {
+      const ang = (k / 40) * Math.PI * 2;
+      const x = map.townPx.x + Math.cos(ang) * (map.townPx.r + 400);
+      const y = map.townPx.y + Math.sin(ang) * (map.townPx.r + 400);
+      if (!map.circleBlocked(x, y, 16) && !map.circleBlocked(x + 30, y, 16)) {
+        p.x = x;
+        p.y = y;
+        break;
+      }
+    }
+    const hoId = [...serverState(a.room).monsters].find(([, m]) => m.kind === "ho")![0];
+    const ho = serverState(a.room).monsters.get(hoId)!;
+    ho.x = p.x + 30;
+    ho.y = p.y;
+    const mc = sr.world.mctrl.get(hoId);
+    mc.homeX = ho.x;
+    mc.homeY = ho.y;
+    // Đang đánh nhau thật: quái đã nhắm người này và gây sát thương
+    await waitFor(() => mc.target === sid && p.hp < p.maxHp, 3000);
+    p.hp = 1; // chỉ một cú nữa là chết
+
+    dropConnection(a.room);
+    await waitFor(() => !a.room.connection.isOpen);
+    await waitFor(() => sr.world.ghosts.has(sid), 1000);
+    expect(mc.target).toBeNull(); // quái bỏ mục tiêu ngay
+    await sleep(2500); // đủ để Hắc Hổ đánh ít nhất hai lần nếu còn nhắm
+    expect(p.dead).toBe(false);
+    expect(p.hp).toBe(1);
+    expect(mc.target).toBeNull();
+
+    // Nối lại: hết bất tử, quái nhắm và đánh bình thường (ở đây là giết: chứng tỏ cờ đã gỡ)
+    const r2 = await reconnectTo(a.room);
+    expect(sr.world.ghosts.has(sid)).toBe(false);
+    await waitFor(() => p.dead === true, 4000);
+    void r2;
+  });
+
+  it("hết hạn chờ nối lại thì gỡ khỏi tập hồn lìa xác (không rò), kể cả khi bị đăng nhập lại huỷ chờ", async () => {
+    WorldRoomClass.reconnectGraceS = 0.4;
+    try {
+      const a = await join("Het Han Ma");
+      const sr = serverRoom(a.room) as any;
+      dropConnection(a.room);
+      await waitFor(() => sr.world.ghosts.has(a.room.sessionId), 1000);
+      await waitFor(() => gone(a), 3000);
+      expect(sr.world.ghosts.size).toBe(0);
+
+      WorldRoomClass.reconnectGraceS = 30;
+      const b = await join("Huy Cho Ma");
+      const sb = serverRoom(b.room) as any;
+      dropConnection(b.room);
+      await waitFor(() => sb.world.ghosts.has(b.room.sessionId), 1000);
+      const again = await join("Huy Cho Ma"); // chính chủ vào lại: huỷ chờ
+      expect(again.me()).toBeDefined();
+      expect(sb.world.ghosts.size).toBe(0);
+    } finally {
+      WorldRoomClass.reconnectGraceS = defaultGraceS;
+    }
+  });
+
   it("thoát chủ động và bị ngắt vì spam thì không giữ chỗ chờ", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const a = await join();
