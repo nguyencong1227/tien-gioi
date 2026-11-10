@@ -230,3 +230,41 @@ Linh thạch ròng = thưởng hoàn thành + giá bán đồ thưởng kỳ v�
 | 4 người | 983 | 15.8 | 1776 | 14.8 |
 
 Tối đa 3 lượt thưởng mỗi ngày (`DUNGEON_DAILY_REWARDS`) nên bí cảnh là một lựa chọn thêm chứ không thay được việc săn quái.
+
+
+## PK thách đấu (M3.5, 5c, #217)
+
+Mô phỏng ở `server/src/balance/pk.ts`; test `pk.test.ts` giữ mục tiêu. **Số liệu đang dùng:** `PK_DAMAGE_MULT` 0.125 (sát thương người lên người = `atk` × hệ số kỹ năng × hệ số này).
+
+**Mục tiêu (thiết kế):** hai người **cùng bậc** đánh thường liên tục hết khí huyết nhau trong 25-45 giây (đủ để có cảm giác đấu, không kéo lê), không đan, không đả tọa (bị khoá trong trận).
+
+### 1. Hai người cùng bậc
+
+`duelOnce` dựng một `World` thật, hai người nhận / thách bằng chính `duelChallenge` / `duelAnswer`, rồi đứng cạnh nhau đánh thường (`slash`) mỗi lần hồi chiêu cho tới khi trận kết thúc; sát thương, bạo kích, đếm ngược và `tickDuels` là mã server thật, `Math.random` có hạt giống. Trang bị tốt nhất đủ bậc. **Ca liên tục:** không né, đánh 100% thời gian; người chơi thật không đánh liên tục nên trận thật dài hơn. 20 trận mỗi dòng; test kiểm mọi bậc (tầng đầu, giữa, cuối của từng cảnh giới); bảng chỉ hiện tầng đầu mỗi cảnh giới và bậc cuối cùng.
+
+| Bậc | Giây đánh (trung vị) | Nhỏ nhất - lớn nhất |
+|---|---:|---:|
+| Phàm Nhân tầng 1 (bậc 0) | 35.6 | 34.4 - 37.6 |
+| Luyện Khí tầng 1 (bậc 1) | 31.6 | 30.0 - 33.2 |
+| Trúc Cơ tầng 1 (bậc 10) | 32.0 | 30.8 - 33.6 |
+| Kim Đan tầng 1 (bậc 13) | 32.4 | 31.2 - 34.0 |
+| Nguyên Anh tầng 1 (bậc 16) | 33.6 | 32.4 - 35.2 |
+| Hóa Thần tầng 1 (bậc 19) | 34.4 | 33.2 - 35.6 |
+| Luyện Hư tầng 1 (bậc 22) | 35.2 | 34.4 - 36.8 |
+| Hợp Thể tầng 1 (bậc 25) | 36.4 | 34.8 - 37.6 |
+| Đại Thừa tầng 1 (bậc 28) | 37.2 | 35.6 - 38.4 |
+| Độ Kiếp tầng 1 (bậc 31) | 38.0 | 36.8 - 39.2 |
+| Độ Kiếp tầng 3 (bậc 33) | 38.8 | 37.2 - 40.0 |
+
+`atk` và `maxHp` tăng gần cùng tỉ lệ theo bậc nên **một hệ số chung** đủ cho mọi bậc (chậm dần nhẹ vì `maxHp` tăng nhỉnh hơn).
+
+### 2. Chênh bậc (không hiệu chỉnh)
+
+| Chênh | Bên mạnh hơn thắng | Giây đánh (trung vị) |
+|---|---:|---:|
+| cùng bậc (Luyện Khí tầng 5) | 60% (bên đánh trước) | 30.4 |
+| 1 tầng | 100% | 27.2 |
+| 2 tầng | 100% | 20.0 |
+| 3 tầng | 100% | 17.6 |
+
+Không có hiệu chỉnh chênh lệch: bên mạnh hơn hầu như luôn thắng và nhanh hơn (trận này không có né / đan / kỹ năng nên ít bất ngờ); người yếu hơn có quyền từ chối lời thách. Hai người cùng bậc: bên **đánh trước** trong cùng một tick thắng thường hơn (đòn hạ khí huyết về 0 kết thúc trận ngay), nên tỉ lệ thắng của người thứ nhất ở dòng "cùng bậc" trên 50% là hiệu ứng thứ tự xử lý, không phải lợi thế bậc. Nếu muốn trận công bằng giữa người chênh bậc thì cần chuẩn hoá chỉ số về bậc thấp hơn: việc riêng, chờ người dùng quyết (câu hỏi 4 ở `questions.md`).
