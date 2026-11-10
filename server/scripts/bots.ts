@@ -32,11 +32,15 @@ import {
   type InputMsg,
   type InvMsg,
   type JoinOptions,
+  type LimboMsg,
   type PartyInvitedMsg,
   type PartyMsg,
   type PickupMsg,
+  type RebirthMsg,
+  type RebornMsg,
   type SellMsg,
   type SkillMsg,
+  type SoulBuyMsg,
   type TravelMsg,
   type TravelToMsg,
   type WalletMsg,
@@ -89,6 +93,7 @@ interface CliArgs {
   leak: boolean;
   map: string;
   travel: boolean;
+  die: boolean;
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -116,6 +121,7 @@ function parseArgs(argv: string[]): CliArgs {
   let leak = false;
   let map = DEFAULT_MAP.def.id;
   let travel = false;
+  let die = false;
 
   for (const arg of argv) {
     if (arg.startsWith("--bots=")) bots = Math.max(0, Number(arg.slice(7)));
@@ -123,6 +129,7 @@ function parseArgs(argv: string[]): CliArgs {
     else if (arg.startsWith("--url=")) url = arg.slice(6);
     else if (arg.startsWith("--map=")) map = arg.slice(6);
     else if (arg === "--travel" || arg === "--portal") travel = true;
+    else if (arg === "--die") die = true;
     else if (arg.startsWith("--party")) {
       const val = arg.slice(7).replace(/^=/, "");
       partySize = val ? Math.max(2, Math.min(4, Number(val))) : 4;
@@ -211,6 +218,7 @@ function parseArgs(argv: string[]): CliArgs {
     leak,
     map,
     travel,
+    die,
   };
 }
 
@@ -239,6 +247,7 @@ function seedBotSaveFile(
   realm: number,
   tier: number,
   mapId: string = DEFAULT_MAP.def.id,
+  life?: { playMs: number; kills: number; bossKills: number },
 ): void {
   mkdirSync(DATA_PLAYERS_DIR, { recursive: true });
   // Tên file PHẢI khớp với fileFor() trong server/src/store.ts (sha1 của tên NFC viết thường).
@@ -257,6 +266,7 @@ function seedBotSaveFile(
     mapId,
     x: Math.round(x),
     y: Math.round(y),
+    life,
     createdAt: now,
     updatedAt: now,
   };
@@ -455,6 +465,15 @@ interface BotState {
   travelCount: number;
   travelLatencies: number[];
   travelInitialBytes: number[];
+  // Các trường cho thử tải luân hồi / chết hàng loạt (#151)
+  die: boolean;
+  diedAt: number;
+  deathsCount: number;
+  rebirthsCount: number;
+  rebirthSentAt: number;
+  soulBuysCount: number;
+  limboLatencies: number[];
+  rebirthLatencies: number[];
 }
 
 export interface LoadTestMetrics {
@@ -539,6 +558,17 @@ export interface LoadTestMetrics {
   travelLatencyP50Ms?: number;
   travelLatencyP95Ms?: number;
   travelInitialBytesAvg?: number;
+  /** Các chỉ số thử tải luân hồi / chết hàng loạt (#151) */
+  die?: boolean;
+  deathsTotal?: number;
+  rebirthsTotal?: number;
+  soulBuysTotal?: number;
+  limboLatencyAvgMs?: number;
+  limboLatencyP50Ms?: number;
+  limboLatencyP95Ms?: number;
+  rebirthLatencyAvgMs?: number;
+  rebirthLatencyP50Ms?: number;
+  rebirthLatencyP95Ms?: number;
 }
 
 export interface IdleZeroBotMetrics {
@@ -701,6 +731,38 @@ function bindRoomEvents(
   room.onMessage("travelTo", (msg: TravelToMsg) => {
     if (onTravelTo) onTravelTo(msg);
   });
+  room.onMessage("limbo", (msg: LimboMsg) => {
+    if (isMeasuring()) {
+      b.deathsCount++;
+      if (b.diedAt > 0) {
+        b.limboLatencies.push(performance.now() - b.diedAt);
+        b.diedAt = 0;
+      }
+    }
+    // Khi nhận limbo, bot tiến hành mua mở khóa (soulBuy) và đầu thai (rebirth)
+    if (b.die) {
+      if (msg?.soul && typeof msg.soul.duyen === "number" && msg.soul.duyen >= 12) {
+        b.soulBuysCount++;
+        room.send("soulBuy", { id: "du_am" } satisfies SoulBuyMsg);
+      }
+      const keepChoice: string[] = [];
+      if (msg?.keepable && Array.isArray(msg.keepable) && msg.keepable.length > 0) {
+        keepChoice.push(msg.keepable[0]);
+      }
+      b.rebirthSentAt = performance.now();
+      room.send("rebirth", { origin: "pham_gia", keep: keepChoice } satisfies RebirthMsg);
+    }
+  });
+  room.onMessage("soul", () => {});
+  room.onMessage("reborn", (_msg: RebornMsg) => {
+    if (isMeasuring()) {
+      b.rebirthsCount++;
+      if (b.rebirthSentAt > 0) {
+        b.rebirthLatencies.push(performance.now() - b.rebirthSentAt);
+        b.rebirthSentAt = 0;
+      }
+    }
+  });
 
   room.onLeave((code) => {
     if (!b.isFlapping && !b.isTravelling && code !== 4000) {
@@ -802,6 +864,7 @@ async function runLoadTest(
   leak = false,
   mapId: string = DEFAULT_MAP.def.id,
   travel = false,
+  die = false,
 ): Promise<LoadTestMetrics> {
   const currentMap = getMap(mapId) ?? DEFAULT_MAP;
   const partySuffix = partySize > 1 ? `, tổ đội ${partySize} người` : "";
@@ -810,14 +873,15 @@ async function runLoadTest(
   const stormSuffix = storm ? ", storm" : "";
   const leakSuffix = leak ? ", leak-test" : "";
   const travelSuffix = travel ? ", travel qua cổng" : "";
+  const dieSuffix = die ? ", bot tự tử (--die)" : "";
   const mapSuffix =
     currentMap.def.id !== DEFAULT_MAP.def.id ? `, bản đồ=${currentMap.def.name}` : "";
   const modeLabel =
     mode === "realistic"
-      ? `Thực tế (vào tầm đứng chém${partySuffix}${shopSuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${mapSuffix})`
+      ? `Thực tế (vào tầm đứng chém${partySuffix}${shopSuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${mapSuffix})`
       : mode === "crowd"
-        ? `Đông người trong trấn/khu an toàn (${shop ? "25% ghé Dược Sư, 25% đứng, 50% đi" : "30% đứng yên, 70% đi lại"}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${mapSuffix})`
-        : `Xấu nhất (100% di chuyển 20 input/s${partySuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${mapSuffix})`;
+        ? `Đông người trong trấn/khu an toàn (${shop ? "25% ghé Dược Sư, 25% đứng, 50% đi" : "30% đứng yên, 70% đi lại"}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${mapSuffix})`
+        : `Xấu nhất (100% di chuyển 20 input/s${partySuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${mapSuffix})`;
   console.log(
     `\n=== Bắt đầu thử tải [${modeLabel}]: ${botCount} bot, đo trong ${durationSec}s (${url}) ===`,
   );
@@ -919,7 +983,17 @@ async function runLoadTest(
         }
       }
     }
-    seedBotSaveFile(name, secret, campX, campY, realm, tier, currentMap.def.id);
+    const lifeSeed = die ? { playMs: 180000, kills: 5, bossKills: 0 } : undefined;
+    seedBotSaveFile(
+      name,
+      secret,
+      campX,
+      campY,
+      die ? 1 : realm,
+      die ? 0 : tier,
+      currentMap.def.id,
+      lifeSeed,
+    );
 
     const client = new Client(url);
     const roomName = roomNameOf(currentMap.def.id);
@@ -1010,6 +1084,14 @@ async function runLoadTest(
       travelCount: 0,
       travelLatencies: [],
       travelInitialBytes: [],
+      die,
+      diedAt: 0,
+      deathsCount: 0,
+      rebirthsCount: 0,
+      rebirthSentAt: 0,
+      soulBuysCount: 0,
+      limboLatencies: [],
+      rebirthLatencies: [],
     };
 
     bindRoomEvents(
@@ -1052,7 +1134,11 @@ async function runLoadTest(
     if (!b.room.connection.isOpen) return;
     const state = b.room.state as any;
     const me = state?.players?.get(b.room.sessionId);
-    if (!me || me.dead) return;
+    if (!me) return;
+    if (me.dead) {
+      if (b.diedAt === 0) b.diedAt = now;
+      return;
+    }
 
     b.predX = me.x;
     b.predY = me.y;
@@ -1060,7 +1146,38 @@ async function runLoadTest(
     let dx: number;
     let dy: number;
 
-    if (
+    if (die) {
+      // Kịch bản thử tải luân hồi / chết hàng loạt (#151)
+      // Bot tìm quái gần nhất và lao thẳng vào quái, KHÔNG đánh trả, đứng chịu đòn cho tới khi chết
+      let targetMon: any = null;
+      let bestDist = Number.POSITIVE_INFINITY;
+      if (state?.monsters && typeof state.monsters.forEach === "function") {
+        state.monsters.forEach((m: any) => {
+          if (!m || m.hp <= 0) return;
+          const d = Math.hypot(m.x - b.predX, m.y - b.predY);
+          if (d < bestDist) {
+            bestDist = d;
+            targetMon = m;
+          }
+        });
+      }
+      if (targetMon) {
+        const dist = Math.hypot(targetMon.x - b.predX, targetMon.y - b.predY);
+        const a = Math.atan2(targetMon.y - b.predY, targetMon.x - b.predX);
+        if (dist > 15) {
+          dx = Math.cos(a);
+          dy = Math.sin(a);
+        } else {
+          dx = 0;
+          dy = 0;
+        }
+      } else {
+        // Chưa thấy quái: đi ra xa trấn về phía bãi quái
+        const a = Math.atan2(b.predY - b.map.townPx.y, b.predX - b.map.townPx.x);
+        dx = Math.cos(a);
+        dy = Math.sin(a);
+      }
+    } else if (
       shop &&
       mode === "realistic" &&
       !b.shopping &&
@@ -1708,6 +1825,28 @@ async function runLoadTest(
   const travelInitialBytesAvg =
     allTravelBytes.length > 0 ? Math.round(avg(allTravelBytes)) : undefined;
 
+  const allLimboLatencies = bots.flatMap((b) => b.limboLatencies).sort((a, b) => a - b);
+  const allRebirthLatencies = bots.flatMap((b) => b.rebirthLatencies).sort((a, b) => a - b);
+  const totalDeaths = bots.reduce((s, b) => s + b.deathsCount, 0);
+  const totalRebirths = bots.reduce((s, b) => s + b.rebirthsCount, 0);
+  const totalSoulBuys = bots.reduce((s, b) => s + b.soulBuysCount, 0);
+  const limboLatencyAvgMs =
+    allLimboLatencies.length > 0 ? Number(avg(allLimboLatencies).toFixed(2)) : undefined;
+  const limboLatencyP50Ms =
+    allLimboLatencies.length > 0 ? Number(percentile(allLimboLatencies, 50).toFixed(2)) : undefined;
+  const limboLatencyP95Ms =
+    allLimboLatencies.length > 0 ? Number(percentile(allLimboLatencies, 95).toFixed(2)) : undefined;
+  const rebirthLatencyAvgMs =
+    allRebirthLatencies.length > 0 ? Number(avg(allRebirthLatencies).toFixed(2)) : undefined;
+  const rebirthLatencyP50Ms =
+    allRebirthLatencies.length > 0
+      ? Number(percentile(allRebirthLatencies, 50).toFixed(2))
+      : undefined;
+  const rebirthLatencyP95Ms =
+    allRebirthLatencies.length > 0
+      ? Number(percentile(allRebirthLatencies, 95).toFixed(2))
+      : undefined;
+
   const metrics: LoadTestMetrics = {
     commit,
     note,
@@ -1792,6 +1931,16 @@ async function runLoadTest(
     travelLatencyP50Ms,
     travelLatencyP95Ms,
     travelInitialBytesAvg,
+    die: die ? true : undefined,
+    deathsTotal: die || totalDeaths > 0 ? totalDeaths : undefined,
+    rebirthsTotal: die || totalRebirths > 0 ? totalRebirths : undefined,
+    soulBuysTotal: die || totalSoulBuys > 0 ? totalSoulBuys : undefined,
+    limboLatencyAvgMs,
+    limboLatencyP50Ms,
+    limboLatencyP95Ms,
+    rebirthLatencyAvgMs,
+    rebirthLatencyP50Ms,
+    rebirthLatencyP95Ms,
   };
 
   printMetrics(metrics);
@@ -1876,6 +2025,15 @@ function printMetrics(m: LoadTestMetrics) {
   if (m.travel || (m.travelCount !== undefined && m.travelCount > 0)) {
     console.log(
       `- Thử tải chuyển bản đồ (Travel): ${m.travelCount ?? 0} lần qua cổng thành công | Độ trễ travel -> state phòng mới: TB ${m.travelLatencyAvgMs ?? "–"} ms (p50: ${m.travelLatencyP50Ms ?? "–"} ms, p95: ${m.travelLatencyP95Ms ?? "–"} ms) | State ban đầu: TB ${m.travelInitialBytesAvg ?? "–"} byte/lần`,
+    );
+  }
+  if (m.die || (m.deathsTotal !== undefined && m.deathsTotal > 0)) {
+    const latStr =
+      m.rebirthLatencyAvgMs !== undefined
+        ? ` | Độ trễ đầu thai (rebirth -> reborn): TB ${m.rebirthLatencyAvgMs} ms (p50: ${m.rebirthLatencyP50Ms ?? "–"} ms, p95: ${m.rebirthLatencyP95Ms ?? "–"} ms)`
+        : "";
+    console.log(
+      `- Thử tải luân hồi (--die): chết ${m.deathsTotal ?? 0} lần | đầu thai ${m.rebirthsTotal ?? 0} lần | mua Tam Sinh Thạch ${m.soulBuysTotal ?? 0} lần${latStr}`,
     );
   }
 }
@@ -2141,6 +2299,7 @@ async function main() {
           args.leak,
           args.map,
           args.travel,
+          args.die,
         ),
       );
     }
