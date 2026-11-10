@@ -355,6 +355,72 @@ Kịch bản thử tải và kiểm tra toàn diện cơ chế Luân hồi (M3 b
   2. *Chết hàng loạt (Mass Death Stress):* 10 người chơi bị hạ gục cùng lúc trong đúng 1 tick. Tải ghi kép (10 file nhân vật + 10 file chân linh) hoàn tất trơn tru, không có xung đột I/O hay tệp hỏng. Chạy `auditSavesDirectory` kiểm tra toàn bộ thư mục cho kết quả 100% sạch lỗi (`cleanFiles === 10, cleanSouls === 10, errorFiles === 0, errorSouls === 0`).
   3. *Rớt mạng ở Hoàng Tuyền (Limbo Disconnect & Idempotence):* Người chơi chết vào Hoàng Tuyền, nhận `LimboMsg` xong lập tức ngắt kết nối (chưa bấm đầu thai). Khi đăng nhập lại, server gửi lại `LimboMsg`, cơ chế `lastCreditedLife` ngăn cộng Duyên lần 2; người chơi bấm đầu thai thành công vào kiếp mới, hồ sơ `limbo` được dọn sạch hoàn toàn.
 
+## 7. Kiểm thử E2E trình duyệt thật với Google Chrome Headless & CDP (M3.2)
 
+### 7.1. Động lực & Sự cần thiết
+Các bài test đơn vị hoặc headless bot mô phỏng bằng WebSocket đơn thuần chỉ kiểm tra logic máy chủ và giao thức mạng, không thể phát hiện các lỗi đặc thù của môi trường trình duyệt thật:
+1. **Lỗi bỏ tin lúc vào phòng (Early Messages Race Condition):** Khi trình duyệt tải tài nguyên (font chữ tiếng Việt, spritesheet, atlas đồ hoạ), client mất từ vài trăm ms đến vài giây trước khi Phaser 3 dựng xong cảnh và đăng ký `room.onMessage(...)`. Trong khi đó máy chủ Colyseus gửi ngay các tin trạng thái ban đầu (`inv`, `quests`, `wallet`, `soul`, `limbo`...). `colyseus.js` mặc định **bỏ rơi** các tin không có handler kèm cảnh báo `colyseus.js: onMessage() not registered`. Lỗi này làm kẹt người chơi ở Hoàng Tuyền hoặc mất túi đồ/nhiệm vụ ban đầu mà test đơn vị máy chủ không thể thấy được (đã phát hiện và khắc phục trong PR #163).
+2. **Lỗi DOM & Render Canvas:** Lỗi phần tử giao diện bị ẩn, trùng đè (như ô chat che nội dung Hoàng Tuyền), hoặc canvas Phaser 3 không khởi tạo được.
+3. **Lỗi thực thi JavaScript trên trình duyệt:** Các lỗi runtime `Runtime.exceptionThrown` hoặc `console.error` do truy cập thuộc tính DOM undefined.
+
+### 7.2. Kiến trúc công cụ E2E (`server/scripts/e2e.ts`)
+Công cụ được xây dựng theo tiêu chí tối giản, mạnh mẽ và không phụ thuộc thư viện bên ngoài:
+- **Chrome DevTools Protocol (CDP):** Điều khiển Chrome headless (`--headless=new`) qua cổng gỡ lỗi từ xa bằng `WebSocket` native của Node 22 (`globalThis.WebSocket`), không cần cài đặt Puppeteer hay Playwright nặng nề.
+- **Môi trường cách ly hoàn toàn:**
+  - Tự động sinh `DATA_DIR` tạm trong `os.tmpdir()` (`mkdtempSync`) gieo sẵn nhân vật mẫu (`Do Hoang Tuyen` hoặc `Nguoi Kiem Thu`).
+  - Dựng server Colyseus + Express nội bộ trên cổng ngẫu nhiên độc lập (tránh xung đột với cổng làm việc của các dev khác).
+  - Tự dọn sạch 100% tiến trình Chrome, Server Colyseus và thư mục tạm trong khối `finally`.
+- **Giám sát giao diện & Bắt lỗi nghiêm ngặt:** Bắt tất cả `Runtime.exceptionThrown`, `CONSOLE ERROR`, và cảnh báo `onMessage() not registered`.
+
+### 7.3. Các kịch bản kiểm thử
+1. **Kịch bản Thế giới Thường (`normal`):**
+   - Đăng nhập với danh tính lưu trong `localStorage`.
+   - Vào phòng Lạc Hà Trấn thành công.
+   - Canvas đồ hoạ Phaser 3 kết nối và vẽ khung hình đầu tiên.
+   - HUD hiển thị đầy đủ tên nhân vật, cảnh giới, thanh khí huyết, thanh linh lực.
+   - Nhận đồng bộ `StateView` ban đầu từ máy chủ.
+2. **Kịch bản Luân Hồi Hoàng Tuyền (`limbo`):**
+   - Đăng nhập nhân vật đang trong trạng thái chờ đầu thai (`limbo`).
+   - Màn hình Hoàng Tuyền xuất hiện chính xác từ tin nhắn `limbo` thật của máy chủ (hiển thị Cảnh giới, chiến tích, số Duyên tích luỹ).
+   - Tương tác mở khoá nâng cấp Tam Sinh Thạch, xác nhận Duyên bị trừ tức thì từ tin nhắn `soul` thật.
+   - Nhấp nút Đầu thai -> màn hình Mạnh Bà (`reborn`) xuất hiện -> tự động đóng sau khi hoàn tất.
+   - Chuyển tiếp vào kiếp mới: HUD cập nhật số Kiếp mới và quay lại thế giới Lạc Hà Trấn.
+
+### 7.4. Hướng dẫn sử dụng
+
+```bash
+# Chạy kiểm thử E2E (tự động nhận diện kịch bản theo client dist):
+npm run e2e
+
+# Chỉ định kịch bản cụ thể:
+npm run e2e -w server -- --scenario=normal
+npm run e2e -w server -- --scenario=limbo
+
+# Cho phép bỏ qua cảnh báo bỏ tin nhắn lúc vào phòng (khi chạy trên client bản cũ chưa có bản vá #163):
+npm run e2e -w server -- --allow-early-drops
+
+# Lưu ảnh chụp màn hình từng bước để nghiệm thu:
+npm run e2e -w server -- --screenshots=/tmp/e2e-shots
+```
+
+Kết quả mẫu khi chạy thành công:
+```text
+=== Bắt đầu kiểm thử E2E trình duyệt thật (Chrome Headless + CDP) ===
+- Kịch bản thực thi: [NORMAL] (auto-detected: chưa có Hoàng Tuyền UI, chạy luồng chuẩn)
+- Cổng server HTTP/WS: 39657
+- Cổng Chrome CDP: 9663
+- Server E2E đã sẵn sàng tại http://127.0.0.1:39657
+- Mở trình duyệt tại http://127.0.0.1:39657/?debug
+  ✓ [1/5] Form đăng nhập tải thành công, tiến hành kết nối...
+  ✓ [2/5] Vào thế giới Lạc Hà Trấn thành công (Nhân vật: Nguoi Kiem Thu, Cảnh giới: Phàm Nhân)
+  ✓ [3/5] Canvas đồ hoạ Phaser 3 kết nối và vẽ thành công
+  ✓ [4/5] Hệ thống HUD, thanh máu, thanh khí hiển thị ổn định
+  ✓ [5/5] Nhận đồng bộ StateView ban đầu thành công
+
+- Kiểm tra ghi nhận console từ trình duyệt: 6 logs.
+  ✓ 0 lỗi console, 0 exception, 0 cảnh báo nghiêm trọng.
+
+🎉 KIỂM THỬ E2E TRÌNH DUYỆT THẬT HOÀN TOÀN THÀNH CÔNG (PASS 100%)!
+```
 
 

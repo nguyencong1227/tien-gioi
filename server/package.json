@@ -10,7 +10,8 @@
     "bench": "tsx src/perf/bench.ts",
     "bots": "tsx scripts/bots.ts",
     "backup": "tsx scripts/backup.ts",
-    "kiem-save": "tsx scripts/audit-saves.ts"
+    "kiem-save": "tsx scripts/audit-saves.ts",
+    "e2e": "tsx scripts/e2e.ts"
   },
   "dependencies": {
     "@colyseus/schema": "3.0.76",
