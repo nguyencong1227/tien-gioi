@@ -37,6 +37,8 @@ import {
   getMap,
   parseWrongMap,
   roomNameOf,
+  TRAVEL_COOLDOWN_MS,
+  type TravelToMsg,
 } from "@tien-gioi/shared";
 import { changeCoin } from "../systems/wallet";
 import type { WorldRoom } from "./WorldRoom";
@@ -1421,5 +1423,165 @@ describe("nhiều bản đồ: mỗi bản đồ một phòng (M3 bước 1)", (
     rooms.splice(rooms.indexOf(a.room), 1);
     await sleep(200);
     expect(JSON.parse(readFileSync(saveFileOf(name)!, "utf8")).mapId).toBe(DEFAULT_MAP_ID);
+  });
+});
+
+describe("đi qua cổng giữa hai bản đồ (M3 bước 1)", () => {
+  const lacHa = getMap(DEFAULT_MAP_ID)!;
+  const hacPhong = getMap(HAC_PHONG_ID)!;
+  const BAC = lacHa.portals[0];
+  const NAM = hacPhong.portals[0];
+  const fileOf = (name: string) => {
+    const f = readdirSync(dataDir).find(
+      (x) => JSON.parse(readFileSync(path.join(dataDir, x), "utf8")).name === name,
+    );
+    return JSON.parse(readFileSync(path.join(dataDir, f!), "utf8"));
+  };
+  /** Nghe tin `travelTo` của một phòng */
+  const listenTravel = (room: Room) => {
+    const got: TravelToMsg[] = [];
+    room.onMessage("travelTo", (m: TravelToMsg) => got.push(m));
+    return got;
+  };
+  /** Đặt người chơi (phía server) đứng ngay tâm cổng */
+  const standAt = (room: Room, portal: { x: number; y: number }) => {
+    const sp = serverState(room).players.get(room.sessionId)!;
+    sp.x = portal.x;
+    sp.y = portal.y;
+    return sp;
+  };
+
+  it("đi qua cổng bắc rồi quay về: không mất dữ liệu, đúng chỗ xuất hiện, đúng phòng, không còn ở phòng cũ", async () => {
+    const name = "Qua Cong";
+    const a = await join(name);
+    a.room.send("chat", { text: "/give nanh_soi 3" });
+    await waitFor(() => a.invs.find((m) => m.gained));
+    const sa = standAt(a.room, BAC);
+    sa.exp = 17;
+    const got = listenTravel(a.room);
+
+    a.room.send("travel", { portalId: BAC.id });
+    await waitFor(() => got.length === 1);
+    expect(got[0]).toEqual({ mapId: HAC_PHONG_ID });
+    await waitFor(() => !a.room.connection.isOpen); // server đóng kết nối sau travelTo
+    // Đã rời phòng cũ ngay (không chờ nối lại) và bản ghi đã nói bản đồ đích + chỗ xuất hiện
+    expect(serverState(a.room).players.get(a.room.sessionId)).toBeUndefined();
+    const saved = fileOf(name);
+    expect([saved.mapId, saved.x, saved.y]).toEqual([HAC_PHONG_ID, NAM.spawn.x, NAM.spawn.y]);
+    expect(saved.travelAt).toBeGreaterThan(Date.now() - 5000);
+    // Vào phòng cũ nữa thì được chỉ sang phòng đúng
+    const e = await (async () => {
+      try {
+        await new Client(`ws://localhost:${PORT}`).joinOrCreate(ROOM_NAME, {
+          name,
+          secret: secretOf(name),
+        });
+      } catch (err: any) {
+        return { code: err.code as number, message: String(err.message) };
+      }
+      throw new Error("đáng ra phải bị chuyển hướng");
+    })();
+    expect(parseWrongMap(e.code, e.message)).toBe(HAC_PHONG_ID);
+
+    const b = await join(name, secretOf(name), HAC_PHONG_ID);
+    expect(serverRoom(b.room).mapId).toBe(HAC_PHONG_ID);
+    expect(Math.hypot(b.me().x - NAM.spawn.x, b.me().y - NAM.spawn.y)).toBeLessThan(2);
+    expect(b.me().exp).toBe(17);
+    expect((await waitFor(() => b.invs[0])).slots.find((s) => s?.itemId === "nanh_soi")?.qty).toBe(
+      3,
+    );
+    // chỗ xuất hiện nằm trong khu an toàn của cổng: quái không nhắm
+    expect(hacPhong.inSafe(b.me().x, b.me().y)).toBe(true);
+
+    // Quay về ngay: hồi chiêu (lưu trong file) chặn; chờ hết hồi chiêu thì qua được
+    const gotB = listenTravel(b.room);
+    standAt(b.room, NAM);
+    const toastsBefore = b.toasts.length;
+    b.room.send("travel", { portalId: NAM.id });
+    await waitFor(() => b.toasts.length > toastsBefore);
+    expect(b.toasts.at(-1)!.text).toMatch(/chờ/);
+    expect(gotB).toHaveLength(0);
+    await sleep(TRAVEL_COOLDOWN_MS + 200);
+    b.room.send("travel", { portalId: NAM.id });
+    await waitFor(() => gotB.length === 1);
+    expect(gotB[0]).toEqual({ mapId: DEFAULT_MAP_ID });
+    await waitFor(() => !b.room.connection.isOpen);
+
+    const c = await join(name);
+    expect(serverRoom(c.room).mapId).toBe(DEFAULT_MAP_ID);
+    expect(Math.hypot(c.me().x - BAC.spawn.x, c.me().y - BAC.spawn.y)).toBeLessThan(2);
+    expect(c.me().exp).toBe(17);
+    expect(fileOf(name).mapId).toBe(DEFAULT_MAP_ID);
+  });
+
+  it("từ chối: xa cổng, cổng của bản đồ khác, id rác, vừa bị đánh: chỉ có toast, vẫn ở phòng, không đổi file", async () => {
+    const name = "Khong Qua";
+    const a = await join(name);
+    const got = listenTravel(a.room);
+    const sa = standAt(a.room, { x: BAC.x + BAC.r + 200, y: BAC.y + 100 });
+    const before = a.toasts.length;
+    a.room.send("travel", { portalId: BAC.id }); // xa cổng
+    a.room.send("travel", { portalId: NAM.id }); // cổng của bản đồ kia
+    for (const junk of [null, 5, {}, "constructor", "__proto__"])
+      a.room.send("travel", { portalId: junk });
+    a.room.send("travel", "rác");
+    await waitFor(() => a.toasts.length >= before + 2);
+    sa.x = BAC.x;
+    sa.y = BAC.y;
+    (serverRoom(a.room) as any).world.ctrl.get(a.room.sessionId).lastHitAt = Date.now();
+    const t2 = a.toasts.length;
+    a.room.send("travel", { portalId: BAC.id }); // vừa bị đánh
+    await waitFor(() => a.toasts.length > t2);
+    expect(a.toasts.at(-1)!.text).toMatch(/giao chiến/);
+    await sleep(300);
+    expect(got).toHaveLength(0);
+    expect(a.room.connection.isOpen).toBe(true);
+    expect(serverState(a.room).players.get(a.room.sessionId)).toBeDefined();
+    expect(fileOf(name).mapId ?? DEFAULT_MAP_ID).toBe(DEFAULT_MAP_ID);
+    expect(fileOf(name).travelAt).toBeUndefined();
+  });
+
+  it("chết trong lúc đang lưu thì huỷ: không travelTo, ở lại phòng cũ và file được ghi lại bản đồ cũ (tự chữa)", async () => {
+    const name = "Chet Cong";
+    const a = await join(name);
+    const got = listenTravel(a.room);
+    const sr = serverRoom(a.room) as any;
+    const sa = standAt(a.room, BAC);
+    // Làm việc lưu chậm lại để có khoảng hở giữa "đã lưu bản đồ đích" và "gỡ khỏi phòng"
+    const real = sr.persist.bind(sr);
+    let slowed = false;
+    vi.spyOn(sr, "persist").mockImplementation(async (...args: any[]) => {
+      await real(...args);
+      if (!slowed && args[2]) {
+        slowed = true;
+        sa.dead = true; // chết đúng lúc đó (deadAt mới: không hồi sinh ngay trong 100 ms)
+        sr.world.ctrl.get(a.room.sessionId).deadAt = Date.now();
+        await sleep(100);
+      }
+    });
+    a.room.send("travel", { portalId: BAC.id });
+    await waitFor(() => slowed, 3000);
+    await sleep(400);
+    expect(got).toHaveLength(0);
+    expect(a.room.connection.isOpen).toBe(true);
+    expect(serverState(a.room).players.get(a.room.sessionId)).toBeDefined();
+    expect(sr.world.ctrl.get(a.room.sessionId).travelling).toBe(false);
+    await waitFor(() => (fileOf(name).mapId ?? DEFAULT_MAP_ID) === DEFAULT_MAP_ID, 3000);
+  });
+
+  it("đang qua cổng thì lưu định kỳ không ghi đè bản đồ đích bằng bản đồ cũ", async () => {
+    const name = "Luu De";
+    const a = await join(name);
+    const sr = serverRoom(a.room) as any;
+    standAt(a.room, BAC);
+    const c = sr.world.ctrl.get(a.room.sessionId);
+    c.travelling = true; // như đang giữa lúc qua cổng
+    const p = serverState(a.room).players.get(a.room.sessionId)!;
+    const before = JSON.stringify(fileOf(name));
+    await sr.persist(p, c); // lưu định kỳ / lúc rớt mạng
+    expect(JSON.stringify(fileOf(name))).toBe(before);
+    c.travelling = false;
+    await sr.persist(p, c);
+    expect(fileOf(name).mapId).toBe(DEFAULT_MAP_ID);
   });
 });
