@@ -77,6 +77,19 @@ export const NPCS: NpcDef[] = [
     ],
     color: 0x6b4f8a,
   },
+  {
+    // Cổng vào bí cảnh (docs/THIET_KE_BI_CANH.md): chỉ đội trưởng mở được, nút do server dựng theo điều kiện của đội
+    id: "thu_mon",
+    name: "Huyền Cơ",
+    title: "Thủ môn bí cảnh",
+    x: TOWN_PX.x + 150,
+    y: TOWN_PX.y - 100,
+    dialog: [
+      "Linh Hư Bí Cảnh mở cho đội tu sĩ đồng tâm. Một mình vào đó chỉ là nạp mạng.",
+      "Đội trưởng nói một tiếng, ta mở cổng; ai không kịp bước vào trong thời hạn thì lỡ chuyến.",
+    ],
+    color: 0x3a6f8f,
+  },
 ];
 
 export const NPC_BY_ID: Record<string, NpcDef> = Object.fromEntries(NPCS.map((n) => [n.id, n]));

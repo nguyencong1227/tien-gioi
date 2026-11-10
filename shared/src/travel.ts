@@ -60,7 +60,16 @@ export interface TravelMsg {
  */
 export interface TravelToMsg {
   mapId: string;
+  /**
+   * Có thì đích là một phòng CỤ THỂ (bí cảnh, docs/THIET_KE_BI_CANH.md): client vào bằng `joinById(roomId, ...)` thay
+   * vì `joinOrCreate(roomNameOf(mapId), ...)`. Phòng bí cảnh chỉ do server tạo, client không tạo được bằng `joinOrCreate`.
+   * Bỏ trống = như cũ (client cũ bỏ qua trường lạ). `roomId` là id phòng Colyseus (chuỗi ngắn, đã kiểm ở `parseTravelTo`).
+   */
+  roomId?: string;
 }
+
+/** Id phòng Colyseus hợp lệ về hình dạng (chữ, số, `_`, `-`, tối đa 64 ký tự): client không tin chuỗi lạ từ mạng. */
+export const ROOM_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
 // ---------- Lỗi khi vào phòng ----------
 // Mã lỗi trong `ServerError` ở `onAuth` / `onCreate`; các mã cũ của server (400 tên sai, 403 tên đã có người dùng,

@@ -86,6 +86,14 @@ function generate(def: MapDef): Uint8Array {
     }
   }
 
+  // Hang trùm (bí cảnh): san thành đất để trùm và người chơi luôn đứng được (bản đồ không có `lair` không đổi một ô nào)
+  if (def.lair) {
+    const { cx, cy, r } = def.lair;
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++)
+        if (Math.hypot(x + 0.5 - cx, y + 0.5 - cy) <= r) tiles[y * w + x] = T.Dirt;
+  }
+
   // Lạc Hà Trấn + bốn con đường đất tỏa ra
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
@@ -151,6 +159,12 @@ export interface PortalDef {
 /** Mô tả một bản đồ: client và server cùng sinh ô từ `seed`, không gửi dữ liệu bản đồ qua mạng. */
 export interface MapDef {
   readonly id: string;
+  /**
+   * Loại bản đồ: `world` (mặc định: một phòng sống mãi, nhiều người) hoặc `dungeon` (bí cảnh: phòng tạm của MỘT đội,
+   * docs/THIET_KE_BI_CANH.md). Bản đồ `dungeon` KHÔNG nằm trong `MAPS` (không có phòng thường) mà ở `DUNGEON_MAPS`;
+   * khu an toàn `town` của nó là cổng vào.
+   */
+  readonly kind?: "world" | "dungeon";
   /** Tên bản đồ (màn chuyển cảnh, danh sách). Lạc Hà giữ "Lạc Hà Trấn" cho tương thích */
   readonly name: string;
   readonly seed: number;
@@ -165,6 +179,12 @@ export interface MapDef {
   readonly wildName?: string;
   /** Cổng chuyển bản đồ; bỏ trống là bản đồ không có cổng */
   readonly portals?: readonly PortalDef[];
+  /**
+   * Hang trùm (chỉ bí cảnh): ô tâm (số nguyên) và bán kính (ô). Trùm sinh ra ĐÚNG ở tâm hang (server: PR 4b/4c), nền trong
+   * bán kính được san thành đất (`T.Dirt`) nên luôn đi lại được. Client vẽ dấu hang trên bản đồ nhỏ từ `GameMap.lairPx`
+   * thay vì chép toạ độ. Bỏ trống là bản đồ không có hang cố định.
+   */
+  readonly lair?: Readonly<{ cx: number; cy: number; r: number }>;
   /**
    * Số quái tối đa mỗi loại (khoá là `MonsterKind.id`, loại không có khoá thì không sinh ra ở bản đồ này).
    * Bỏ trống thì dùng `MONSTER_CAP` (như Lạc Hà Trấn từ trước tới giờ).
@@ -191,6 +211,8 @@ export class GameMap {
   readonly portals: readonly PortalDef[];
   /** Số quái tối đa mỗi loại ở bản đồ này (đã có giá trị mặc định). Dùng `monsterCapOf` để tra theo id. */
   readonly monsterCap: Readonly<Record<string, number>>;
+  /** Hang trùm tính bằng px (tâm và bán kính); `undefined` nếu bản đồ không có (xem `MapDef.lair`) */
+  readonly lairPx: Readonly<{ x: number; y: number; r: number }> | undefined;
 
   constructor(readonly def: MapDef) {
     // Con đường đất đi từ ô (cx, cy) theo từng ô: số lẻ làm chỉ số mảng lệch và ghi hụt mà không báo lỗi
@@ -199,6 +221,12 @@ export class GameMap {
       ["h", def.h],
       ["town.cx", def.town.cx],
       ["town.cy", def.town.cy],
+      ...(def.lair
+        ? ([
+            ["lair.cx", def.lair.cx],
+            ["lair.cy", def.lair.cy],
+          ] as const)
+        : []),
     ] as const)
       if (!Number.isInteger(v))
         throw new Error(`MapDef ${def.id}: ${field} phải là số nguyên (${v})`);
@@ -214,8 +242,33 @@ export class GameMap {
     this.wildName = def.wildName ?? def.name;
     this.portals = def.portals ?? [];
     this.monsterCap = def.monsterCap ?? MONSTER_CAP;
+    this.lairPx = def.lair
+      ? { x: def.lair.cx * TILE, y: def.lair.cy * TILE, r: def.lair.r * TILE }
+      : undefined;
+    this.checkLair();
     this.checkPortals();
     this.checkMonsterCap();
+  }
+
+  /**
+   * Hang trùm sai chỗ (không nằm gọn trong bản đồ, đè lên khu an toàn): báo ngay khi dựng bản đồ. Nền hang đã được `generate`
+   * san phẳng nên không cần kiểm ô chặn; chỉ cần hang không bị khu an toàn (vẽ sau) nuốt mất.
+   */
+  private checkLair() {
+    const l = this.def.lair;
+    if (!l) return;
+    const at = `MapDef ${this.def.id}: hang trùm`;
+    if (!Number.isFinite(l.r) || !(l.r >= 1)) throw new Error(`${at}: r phải >= 1 ô (${l.r})`);
+    // Viền bản đồ là núi đá: hang phải nằm gọn trong phần còn lại
+    if (
+      l.cx - l.r < 1 ||
+      l.cy - l.r < 1 ||
+      l.cx + l.r > this.def.w - 2 ||
+      l.cy + l.r > this.def.h - 2
+    )
+      throw new Error(`${at}: không nằm gọn trong bản đồ`);
+    const d = Math.hypot(l.cx - this.def.town.cx, l.cy - this.def.town.cy);
+    if (d <= l.r + this.def.town.r + 2) throw new Error(`${at}: quá gần khu an toàn`);
   }
 
   /** Cổng sai chỗ (ngoài bản đồ, nằm trên ô chặn) làm người chơi kẹt hoặc không đi được: báo ngay khi dựng bản đồ. */
@@ -391,9 +444,45 @@ export const MAPS: readonly MapDef[] = [
   },
 ];
 
+/** Id bản đồ bí cảnh đầu tiên (docs/THIET_KE_BI_CANH.md). */
+export const LINH_HU_MAP_ID = "bi_canh_linh_hu";
+
+/**
+ * Bản đồ bí cảnh: phòng tạm theo đội, KHÔNG có phòng thường (`defineRooms` chỉ đăng ký `MAPS`) và không bao giờ là chỗ
+ * lưu của nhân vật. `getMap` vẫn tra được (client và server cùng dựng ô từ `seed`). Khu an toàn `town` là cổng vào ở
+ * phía nam (`GameMap.townPx`: tâm + bán kính an toàn, không cần trường `entry` riêng); trùm ở hang phía bắc (`lair` ->
+ * `GameMap.lairPx`). Không có cổng chuyển bản đồ: vào bằng NPC, ra khi hết run.
+ */
+export const DUNGEON_MAPS: readonly MapDef[] = [
+  {
+    id: LINH_HU_MAP_ID,
+    kind: "dungeon",
+    name: "Linh Hư Bí Cảnh",
+    seed: 20261112,
+    w: 64,
+    h: 64,
+    town: { cx: 32, cy: 56, r: 4 },
+    townName: "Cổng Vào",
+    wildName: "Linh Hư Bí Cảnh",
+    // Hang trùm ở phía bắc, xa cổng vào ~47 ô (dangerAt = 1)
+    lair: { cx: 32, cy: 9, r: 3 },
+    // Quái nhỏ (dọn một lần, không hồi sinh ở bí cảnh) + đúng một trùm (`yeu_vuong`, game.ts)
+    monsterCap: { lang: 12, ho: 10, yeu_vuong: 1 },
+  },
+];
+
 export const MAP_BY_ID: Readonly<Record<string, MapDef>> = Object.fromEntries(
-  MAPS.map((m) => [m.id, m]),
+  [...MAPS, ...DUNGEON_MAPS].map((m) => [m.id, m]),
 );
+
+/** Bản đồ `id` là bí cảnh? Id lạ / sai kiểu là `false`. */
+export function isDungeonMap(id: unknown): boolean {
+  return (
+    typeof id === "string" &&
+    Object.prototype.hasOwnProperty.call(MAP_BY_ID, id) &&
+    MAP_BY_ID[id].kind === "dungeon"
+  );
+}
 
 const mapCache = new Map<string, GameMap>();
 
