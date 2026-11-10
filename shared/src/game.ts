@@ -212,10 +212,10 @@ export interface ChatOut {
   text: string;
   sys?: boolean;
   /**
-   * Kênh chat đội (lệnh `/p <nội dung>`, chỉ gửi cho thành viên, kể cả thành viên ở bản đồ khác);
-   * bỏ trống là chat chung **cả server** (mọi bản đồ / phòng, đi qua kênh chung giữa các phòng, M3 bước 1)
+   * Kênh chat đội (lệnh `/p <nội dung>`) hoặc chat tông môn (lệnh `/s <nội dung>`, M3 bước 6): chỉ gửi cho thành viên,
+   * kể cả thành viên ở bản đồ khác; bỏ trống là chat chung **cả server** (mọi bản đồ / phòng, đi qua kênh chung giữa các phòng, M3 bước 1)
    */
-  channel?: "party";
+  channel?: "party" | "sect";
 }
 export interface ToastMsg {
   text: string;
