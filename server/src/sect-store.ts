@@ -87,8 +87,12 @@ export interface SectStore {
    * `coin` ngoài 0..`SECT_COIN_CAP` hoặc tên / biệt hiệu chưa chuẩn hoá là lỗi (KHÔNG im lặng kẹp: tiền không được biến mất).
    */
   update(id: string, fn: (s: Sect) => Sect): Promise<Sect | null>;
-  /** Xoá tông môn (và chỉ mục thành viên). `false` nếu không có. */
-  delete(id: string): Promise<boolean>;
+  /**
+   * Xoá tông môn (và chỉ mục thành viên). `false` nếu không có. `guard` (thuần, nhận BẢN SAO bản ghi hiện tại) chạy NGUYÊN TỬ
+   * với việc xoá, trong cùng phần độc quyền với `update`: ném lỗi thì không xoá gì và lỗi đi tới người gọi. Dùng để "chỉ giải
+   * tán khi kho đã rỗng" mà không có khoảng hở để một lần góp chen vào giữa kiểm và xoá (Linh thạch sẽ biến mất).
+   */
+  delete(id: string, guard?: (s: Sect) => void): Promise<boolean>;
 }
 
 // ---------- Làm sạch ----------
@@ -372,11 +376,12 @@ export class FileSectStore implements SectStore {
     });
   }
 
-  delete(id: string) {
+  delete(id: string, guard?: (s: Sect) => void) {
     return this.enqueue(async () => {
       await this.load();
       const cur = this.byId.get(id);
       if (!cur) return false;
+      guard?.(structuredClone(cur));
       await fs.unlink(this.fileOf(id)).catch((e: any) => {
         if (e?.code !== "ENOENT") throw e;
       });
