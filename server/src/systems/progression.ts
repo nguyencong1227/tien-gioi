@@ -9,6 +9,8 @@ import {
   isLastTier,
   isPeak,
   breakthroughChance,
+  type StatMult,
+  expMultOf,
 } from "@tien-gioi/shared";
 import type { Player } from "../schema";
 import { takeWhole, type World, type PlayerCtrl } from "../world";
@@ -17,8 +19,8 @@ import { refreshQuests } from "./quests";
 const BREAK_COOLDOWN_MS = 3000;
 
 /** Tính lại chỉ số tối đa theo cảnh giới; `heal` thì hồi đầy. */
-export function applyStats(p: Player, heal: boolean) {
-  const s = statsFor(p.realm, p.tier, p); // gồm trang bị
+export function applyStats(p: Player, heal: boolean, mult?: StatMult) {
+  const s = statsFor(p.realm, p.tier, p, mult); // gồm trang bị và hệ số xuất thân
   p.maxHp = s.maxHp;
   p.maxMp = s.maxMp;
   p.expMax = expToNext(p.realm, p.tier);
@@ -30,8 +32,13 @@ export function applyStats(p: Player, heal: boolean) {
   p.mp = Math.min(p.mp, p.maxMp);
 }
 
-/** Cộng tu vi; đủ thì tự lên bậc nhỏ. Bậc cuối của cảnh giới thì dừng ở đầy, chờ Đột phá. */
-export function gainExp(w: World, sid: string, p: Player, amount: number) {
+/**
+ * Cộng tu vi; đủ thì tự lên bậc nhỏ. Bậc cuối của cảnh giới thì dừng ở đầy, chờ Đột phá.
+ * `scale`: hệ số tốc độ tu luyện của chân linh (Dư âm tu hành, `expMultOf`): chỉ truyền cho tu vi từ HẠ QUÁI và ĐẢ TỌA;
+ * đan dược (phần trăm thanh) và thưởng nhiệm vụ (số cố định) không nhân.
+ */
+export function gainExp(w: World, sid: string, p: Player, amount: number, scale = 1) {
+  amount *= scale;
   if (isPeak(p.realm, p.tier)) {
     p.exp = Math.min(p.expMax, p.exp + amount);
     return;
@@ -44,7 +51,7 @@ export function gainExp(w: World, sid: string, p: Player, amount: number) {
     } // cần Đột phá
     p.exp -= p.expMax;
     p.tier += 1;
-    applyStats(p, true);
+    applyStats(p, true, w.ctrl.get(sid)?.mult);
     w.events.fx({ kind: "levelup", by: sid, x: p.x, y: p.y, major: false });
     refreshQuests(w, sid); // bước "reachRealm"
   }
@@ -76,7 +83,7 @@ export function breakthrough(w: World, sid: string) {
     p.realm += 1;
     p.tier = 0;
     p.exp = 0;
-    applyStats(p, true);
+    applyStats(p, true, c.mult);
     w.events.fx({ kind: "levelup", by: sid, x: p.x, y: p.y, major: true });
     refreshQuests(w, sid);
     w.events.sys(`⚡ ${p.name} đột phá thành công, bước vào ${REALMS[p.realm].name}!`);
@@ -109,7 +116,7 @@ export function tickRecovery(w: World, sid: string, p: Player, c: PlayerCtrl, dt
     mpRate = MEDITATE.mpRegenPct;
     c.frac.exp += meditateExpPerSec(p.realm, p.tier) * dt;
     if (w.now >= c.frac.expAt) {
-      gainExp(w, sid, p, c.frac.exp);
+      gainExp(w, sid, p, c.frac.exp, expMultOf(c.soul.unlocks));
       c.frac.exp = 0;
       c.frac.expAt = w.now + EXP_FLUSH_MS;
     }

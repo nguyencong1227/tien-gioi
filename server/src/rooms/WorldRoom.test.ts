@@ -25,6 +25,9 @@ import {
   type DialogMsg,
   type PartyMsg,
   type PartyInvitedMsg,
+  type LimboMsg,
+  type SoulMsg,
+  type RebornMsg,
   PARTY_INVITE_TTL_MS,
   PARTY_SNAPSHOT_MS,
   NPC_BY_ID,
@@ -74,6 +77,8 @@ afterAll(async () => {
 });
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** Đủ lâu để thấy nhân vật KHÔNG hồi sinh theo đồng hồ (RESPAWN_MS cũ là 5 giây): kiểm ngắn, đồng hồ giả ở test đơn vị lo phần còn lại */
+const RESPAWN_MS_TEST = 1200;
 
 async function waitFor<T>(fn: () => T | undefined | false, ms = 3000): Promise<T> {
   const end = Date.now() + ms;
@@ -99,6 +104,12 @@ async function join(name = `Thu ${++nameSeq}`, secret = secretOf(name), mapId = 
   room.onMessage("wallet", (m: WalletMsg) => wallets.push(m));
   const quests: QuestsMsg[] = [];
   const dialogs: DialogMsg[] = [];
+  const limbos: LimboMsg[] = [];
+  const souls: SoulMsg[] = [];
+  const reborns: RebornMsg[] = [];
+  room.onMessage("limbo", (m: LimboMsg) => limbos.push(m));
+  room.onMessage("soul", (m: SoulMsg) => souls.push(m));
+  room.onMessage("reborn", (m: RebornMsg) => reborns.push(m));
   room.onMessage("quests", (m: QuestsMsg) => quests.push(m));
   room.onMessage("dialog", (m: DialogMsg) => dialogs.push(m));
   room.onMessage("chat", (m: ChatOut) => chat.push(m));
@@ -116,6 +127,9 @@ async function join(name = `Thu ${++nameSeq}`, secret = secretOf(name), mapId = 
     wallets,
     quests,
     dialogs,
+    limbos,
+    souls,
+    reborns,
     me: () => (room.state as any).players.get(room.sessionId),
   };
 }
@@ -532,8 +546,8 @@ describe("chiến đấu và tu luyện", () => {
     await waitFor(() => !me().meditating);
   });
 
-  it("bị quái đánh hết máu thì trọng thương và mất tu vi", async () => {
-    const { room, me, toasts } = await join();
+  it("bị quái đánh hết máu thì chết thật: vào Hoàng Tuyền, kiếp cũ mất hẳn (không còn mất 10% tu vi rồi hồi sinh)", async () => {
+    const { room, me, toasts, limbos } = await join();
     const st = serverState(room);
     const p = st.players.get(room.sessionId)!;
     // Đưa người chơi ra ngoài trấn, đặt Hôi Lang sát bên
@@ -548,8 +562,11 @@ describe("chiến đấu và tu luyện", () => {
       break;
     }
     await waitFor(() => me().dead, 4000);
-    expect(me().exp).toBe(27); // mất 10%
-    expect(toasts.some((t) => t.tone === "bad")).toBe(true);
+    await waitFor(() => limbos[0]);
+    expect(me().exp).toBe(0); // kiếp cũ đã đặt lại (không phải 27)
+    expect(toasts.some((t) => t.tone === "bad" && /Hoàng Tuyền/.test(t.text))).toBe(true);
+    await sleep(RESPAWN_MS_TEST);
+    expect(me().dead).toBe(true); // không hồi sinh theo đồng hồ
   });
 });
 
@@ -1929,5 +1946,287 @@ describe("chân linh và bộ đếm kiếp (M3 bước 2)", () => {
     expect(c.life.playMs).toBeLessThan(5000); // "x" thành 0, rồi mới cộng thời gian chơi thật
     expect(typeof c.lifeId).toBe("string");
     expect(c.lifeId.length).toBeGreaterThan(10);
+  });
+});
+
+describe("luân hồi: chết thật, Hoàng Tuyền, đầu thai (M3 bước 2)", () => {
+  const sha = (name: string) =>
+    createHash("sha1").update(name.normalize("NFC").toLowerCase()).digest("hex");
+  const soulOf = (name: string) =>
+    JSON.parse(readFileSync(path.join(dataDir, "souls", `${sha(name)}.json`), "utf8"));
+  const playerOf = (name: string) => {
+    const f = readdirSync(dataDir)
+      .filter((x) => x.endsWith(".json"))
+      .find((x) => JSON.parse(readFileSync(path.join(dataDir, x), "utf8")).name === name)!;
+    return JSON.parse(readFileSync(path.join(dataDir, f), "utf8"));
+  };
+  const writePlayer = (name: string, patch: Record<string, unknown>) => {
+    const f = readdirSync(dataDir)
+      .filter((x) => x.endsWith(".json"))
+      .find((x) => JSON.parse(readFileSync(path.join(dataDir, x), "utf8")).name === name)!;
+    const full = path.join(dataDir, f);
+    writeFileSync(full, JSON.stringify({ ...JSON.parse(readFileSync(full, "utf8")), ...patch }));
+  };
+  const leave = async (a: { room: Room }) => {
+    await a.room.leave(true);
+    rooms.splice(rooms.indexOf(a.room), 1);
+    await sleep(250);
+  };
+
+  /** Dựng người đã chơi tới Luyện Khí tầng 9 sau 48 phút, mang đồ, rồi cho quái đánh chết */
+  async function playAndDie(a: Awaited<ReturnType<typeof join>>) {
+    const sr = serverRoom(a.room) as any;
+    const sid = a.room.sessionId;
+    const p = serverState(a.room).players.get(sid)!;
+    const c = sr.world.ctrl.get(sid);
+    p.realm = 1;
+    p.tier = 8;
+    c.life = { playMs: 48 * 60_000, kills: 30, bossKills: 0 };
+    c.coin = 250;
+    c.inv[0] = { itemId: "hac_ho_kiem", qty: 1 };
+    p.x = sr.world.map.townPx.x + sr.world.map.townPx.r + 300;
+    p.y = sr.world.map.townPx.y;
+    const [, m] = [...serverState(a.room).monsters].find(([, mm]) => mm.kind === "lang")!;
+    const { hurtPlayer } = await import("../systems/combat");
+    hurtPlayer(sr.world, sid, p, 1e9, m);
+    return { sr, sid, p, c };
+  }
+
+  it("chết thật -> hồ sơ đặt lại ở Hoàng Tuyền, Duyên được cộng, nhận LimboMsg; khoá gameplay; mua mở khóa; đầu thai thành kiếp mới", async () => {
+    const name = "Luan Hoi Mot";
+    const a = await join(name);
+    const { c } = await playAndDie(a);
+    const limbo = await waitFor(() => a.limbos[0]);
+    expect(limbo.summary).toMatchObject({
+      kiep: 1,
+      realm: 1,
+      tier: 8,
+      minutes: 48,
+      kills: 30,
+      bossKills: 0,
+    });
+    const gain = limbo.summary.gain;
+    expect(gain).toBeGreaterThan(15);
+    expect(limbo.soul).toMatchObject({ kiep: 2, duyen: gain });
+    expect(limbo.keepable).toEqual(["hac_ho_kiem"]);
+    // hồ sơ: đã đặt lại, ở Hoàng Tuyền, đã cộng Duyên; chân linh trong file
+    const saved = playerOf(name);
+    expect([saved.realm, saved.tier, saved.exp, saved.coin]).toEqual([0, 0, 0, 0]);
+    expect(saved.inventory.every((s: unknown) => s === null)).toBe(true);
+    expect(saved.limbo).toMatchObject({
+      credited: true,
+      coinAtDeath: 250,
+      counts: true,
+      keepable: ["hac_ho_kiem"],
+    });
+    expect(soulOf(name)).toMatchObject({ kiep: 2, duyen: gain, duyenTotal: gain });
+    expect(soulOf(name).history).toHaveLength(1);
+    expect(soulOf(name).lastCreditedLife).toBe(saved.limbo.endedLifeId);
+    // khoá gameplay: không đi được, không đánh, không hồi sinh theo đồng hồ
+    const sp = serverState(a.room).players.get(a.room.sessionId)!;
+    const pos = [sp.x, sp.y];
+    a.room.send("input", { seq: 1, dx: 1, dy: 0 });
+    a.room.send("attack", { angle: 0 });
+    await sleep(400);
+    expect([sp.x, sp.y]).toEqual(pos);
+    expect(sp.dead).toBe(true);
+
+    // mua mở khóa: đủ Duyên thì được (trừ + tăng nấc), không đủ / id rác thì toast và không đổi
+    expect(a.souls[0]).toMatchObject({ kiep: 1, duyen: 0, unlocks: {}, origins: [] }); // tin lúc vào phòng
+    a.room.send("soulBuy", { id: "du_am" });
+    const bought = await waitFor(() => a.souls[1]);
+    expect(bought).toMatchObject({ duyen: gain - 12, unlocks: { du_am: 1 } });
+    const t0 = a.toasts.length;
+    a.room.send("soulBuy", { id: "ky_vat" }); // 25 Duyên: chưa đủ
+    for (const junk of ["constructor", "__proto__", 5, null, {}, ["du_am"]])
+      a.room.send("soulBuy", { id: junk });
+    a.room.send("soulBuy", "rác");
+    await waitFor(() => a.toasts.length >= t0 + 2);
+    expect(soulOf(name)).toMatchObject({ duyen: gain - 12, unlocks: { du_am: 1 } });
+    expect(a.souls).toHaveLength(2); // vào phòng + một lần mua
+
+    // đầu thai: lựa chọn không hợp lệ bị từ chối (chưa mở Ký vật nên không giữ được đồ)
+    const t1 = a.toasts.length;
+    a.room.send("rebirth", { keep: ["hac_ho_kiem"] });
+    await waitFor(() => a.toasts.length > t1);
+    expect(a.toasts.at(-1)!.text).toMatch(/không hợp lệ/);
+    expect(a.reborns).toHaveLength(0);
+    // hợp lệ: gửi hai tin cùng lúc, chỉ một lần đầu thai
+    a.room.send("rebirth", { keep: [] });
+    a.room.send("rebirth", { keep: [] });
+    const reborn = await waitFor(() => a.reborns[0]);
+    expect(reborn.kiep).toBe(2);
+    await sleep(300);
+    expect(a.reborns).toHaveLength(1);
+    expect(sp.dead).toBe(false);
+    expect([sp.realm, sp.tier]).toEqual([0, 0]);
+    const sr = serverRoom(a.room) as any;
+    expect(sr.world.map.inTown(sp.x, sp.y)).toBe(true);
+    expect(c).toBeDefined();
+    const after = playerOf(name);
+    expect(after.limbo).toBeUndefined();
+    // Hoàng Tuyền đóng: đi lại được, Duyên và mở khóa vẫn còn
+    a.room.send("input", { seq: 99, dx: 1, dy: 0 });
+    await waitFor(() => a.me().lastSeq === 99);
+    expect(soulOf(name)).toMatchObject({ kiep: 2, duyen: gain - 12, unlocks: { du_am: 1 } });
+  });
+
+  it("thoát giữa lúc ở Hoàng Tuyền rồi vào lại: nhận lại màn hình Hoàng Tuyền, Duyên KHÔNG bị cộng hai lần", async () => {
+    const name = "Luan Hoi Hai";
+    const a = await join(name);
+    await playAndDie(a);
+    const first = await waitFor(() => a.limbos[0]);
+    await leave(a);
+    const b = await join(name);
+    const again = await waitFor(() => b.limbos[0]);
+    expect(again.summary).toEqual(first.summary);
+    expect(again.soul).toEqual(first.soul);
+    expect(b.me().dead).toBe(true);
+    expect(b.me().realm).toBe(0);
+    expect(soulOf(name).duyen).toBe(first.summary.gain);
+    expect(soulOf(name).kiep).toBe(2);
+  });
+
+  it("sập giữa lúc ghi hồ sơ và cộng Duyên: vào lại thì cộng đúng một lần rồi hiện màn hình; cộng lại không đổi", async () => {
+    const name = "Luan Hoi Ba";
+    const { FileSoulStore, soulsDir } = await import("../soul");
+    const real = new FileSoulStore(soulsDir());
+    let failNext = true;
+    WorldRoomClass.souls = {
+      get: (id) => real.get(id),
+      create: (id, init) => real.create(id, init),
+      update: (id, fn) => {
+        if (failNext) {
+          failNext = false;
+          return Promise.reject(new Error("đĩa lỗi giữa chừng"));
+        }
+        return real.update(id, fn);
+      },
+    };
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const a = await join(name);
+      await playAndDie(a);
+      await waitFor(() => failNext === false); // lần cộng đầu bị lỗi
+      await sleep(300);
+      // đã ghi Hoàng Tuyền (đặt lại) nhưng CHƯA cộng Duyên, chưa có màn hình
+      expect(playerOf(name).limbo).toMatchObject({ credited: false });
+      expect(soulOf(name)).toMatchObject({ kiep: 1, duyen: 0 });
+      expect(a.limbos).toHaveLength(0);
+      // người chơi bấm đầu thai khi chưa ghi sổ: bị chặn
+      a.room.send("rebirth", { keep: [] });
+      await sleep(200);
+      expect(a.reborns).toHaveLength(0);
+      await leave(a);
+      // vào lại: cộng bù, hiện màn hình
+      const b = await join(name);
+      const limbo = await waitFor(() => b.limbos[0]);
+      expect(limbo.soul).toMatchObject({ kiep: 2, duyen: limbo.summary.gain });
+      expect(soulOf(name)).toMatchObject({ kiep: 2, duyen: limbo.summary.gain });
+      expect(playerOf(name).limbo.credited).toBe(true);
+      // gọi cộng lần nữa cho cùng kiếp (như chạy lại sau sập): không đổi gì
+      const sr = serverRoom(b.room) as any;
+      await sr.creditLimbo(b.room.sessionId);
+      expect(soulOf(name)).toMatchObject({ kiep: 2, duyen: limbo.summary.gain });
+    } finally {
+      WorldRoomClass.souls = null;
+      vi.restoreAllMocks();
+    }
+  });
+
+  it("chết ở bản đồ khác: đầu thai xong được đưa về Lạc Hà (travelTo), hồ sơ ghi bản đồ mặc định", async () => {
+    const name = "Luan Hoi Bon";
+    const hp = getMap(HAC_PHONG_ID)!;
+    const first = await join(name);
+    await leave(first);
+    writePlayer(name, {
+      mapId: HAC_PHONG_ID,
+      x: Math.round(hp.townPx.x),
+      y: Math.round(hp.townPx.y),
+    });
+    const a = await join(name, secretOf(name), HAC_PHONG_ID);
+    const sr = serverRoom(a.room) as any;
+    const sid = a.room.sessionId;
+    const p = serverState(a.room).players.get(sid)!;
+    sr.world.ctrl.get(sid).life = { playMs: 10 * 60_000, kills: 3, bossKills: 0 };
+    p.realm = 1;
+    p.tier = 2;
+    p.x = hp.townPx.x + hp.townPx.r + 600;
+    p.y = hp.townPx.y - 300;
+    const [, m] = [...serverState(a.room).monsters].find(([, mm]) => mm.kind === "ho")!;
+    const { hurtPlayer } = await import("../systems/combat");
+    hurtPlayer(sr.world, sid, p, 1e9, m);
+    await waitFor(() => a.limbos[0]);
+    expect(playerOf(name).mapId).toBe(HAC_PHONG_ID); // chết ở Hắc Phong Cốc: hồ sơ ở lại bản đồ đó cho tới khi đầu thai
+    const travel: { mapId: string }[] = [];
+    a.room.onMessage("travelTo", (mm: { mapId: string }) => travel.push(mm));
+    a.room.send("rebirth", { keep: [] });
+    await waitFor(() => travel.length === 1);
+    expect(travel[0].mapId).toBe(DEFAULT_MAP_ID);
+    await waitFor(() => !a.room.connection.isOpen);
+    const saved = playerOf(name);
+    expect([saved.mapId, saved.limbo, saved.realm]).toEqual([DEFAULT_MAP_ID, undefined, 0]);
+    const b = await join(name); // vào phòng Lạc Hà, còn sống ở trấn
+    expect(b.me().dead).toBe(false);
+    expect(serverRoom(b.room).mapId).toBe(DEFAULT_MAP_ID);
+    expect(soulOf(name).kiep).toBe(2);
+  });
+
+  it("vào phòng nhận ngay tin `soul` của chân linh (HUD ghi kiếp N): kiếp, Duyên, mở khóa đúng như trong file", async () => {
+    const name = "Luan Hoi Soul";
+    const a = await join(name);
+    expect(await waitFor(() => a.souls[0])).toMatchObject({ kiep: 1, duyen: 0 });
+    await leave(a);
+    writeFileSync(
+      path.join(dataDir, "souls", `${sha(name)}.json`),
+      JSON.stringify({ ...soulOf(name), kiep: 4, duyen: 7, unlocks: { du_am: 2 } }),
+    );
+    const b = await join(name);
+    const soul = await waitFor(() => b.souls[0]);
+    expect(soul).toMatchObject({ kiep: 4, duyen: 7, unlocks: { du_am: 2 }, origins: [] });
+    expect(b.souls).toHaveLength(1); // chỉ một tin lúc vào, không lặp
+    expect(Object.keys(soul).sort()).toEqual(["duyen", "kiep", "origins", "unlocks"]); // SoulView, không lộ lịch sử / mã kiếp
+  });
+
+  it("hồ sơ Hoàng Tuyền hỏng trong file (kiểu sai, id vật phẩm lạ) được làm sạch khi vào game", async () => {
+    const name = "Luan Hoi Nam";
+    const a = await join(name);
+    await leave(a);
+    writePlayer(name, {
+      limbo: {
+        endedLifeId: "life-x-0123456789",
+        summary: {
+          kiep: -4,
+          realm: "a",
+          tier: 1e30,
+          minutes: -1,
+          kills: "x",
+          bossKills: null,
+          gain: Infinity,
+        },
+        keepable: ["hoi_huyet_dan", "khong_co", 5, "hac_ho_kiem"],
+        coinAtDeath: -9,
+        counts: "yes",
+        credited: true,
+      },
+    });
+    const b = await join(name);
+    const limbo = await waitFor(() => b.limbos[0]);
+    expect(limbo.keepable).toEqual(["hac_ho_kiem"]); // chỉ trang bị có thật
+    expect(limbo.summary.kiep).toBe(1);
+    for (const v of [
+      limbo.summary.minutes,
+      limbo.summary.kills,
+      limbo.summary.bossKills,
+      limbo.summary.gain,
+    ])
+      expect(Number.isInteger(v) && v >= 0).toBe(true);
+    // hồ sơ hỏng hẳn (không có endedLifeId): coi như không ở Hoàng Tuyền
+    await leave(b);
+    writePlayer(name, { limbo: { summary: {} } });
+    const c = await join(name);
+    await sleep(300);
+    expect(c.limbos).toHaveLength(0);
+    expect(c.me().dead).toBe(false);
   });
 });
