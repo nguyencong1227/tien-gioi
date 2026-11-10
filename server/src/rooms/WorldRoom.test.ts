@@ -596,7 +596,7 @@ describe("lưu nhân vật", () => {
     await room.leave(true);
     rooms.length = 0;
     const saved = await waitFor(() => {
-      for (const f of readdirSync(dataDir)) {
+      for (const f of readdirSync(dataDir).filter((x) => x.endsWith(".json"))) {
         const j = JSON.parse(readFileSync(path.join(dataDir, f), "utf8"));
         if (j.name === "Luu Tru" && j.realm === 1) return j;
       }
@@ -674,9 +674,9 @@ describe("túi đồ và đồ rơi", () => {
       await a.room.leave(true);
       rooms.splice(rooms.indexOf(a.room), 1);
       await sleep(200);
-      const file = readdirSync(dataDir).find(
-        (f) => JSON.parse(readFileSync(path.join(dataDir, f), "utf8")).name === name,
-      )!;
+      const file = readdirSync(dataDir)
+        .filter((x) => x.endsWith(".json"))
+        .find((f) => JSON.parse(readFileSync(path.join(dataDir, f), "utf8")).name === name)!;
       const full = path.join(dataDir, file);
       const j = JSON.parse(readFileSync(full, "utf8"));
       j.coin = bad;
@@ -1354,9 +1354,9 @@ describe("nhiều bản đồ: mỗi bản đồ một phòng (M3 bước 1)", (
     throw new Error("Đáng ra phải bị từ chối");
   }
   const saveFileOf = (name: string) => {
-    const f = readdirSync(dataDir).find(
-      (x) => JSON.parse(readFileSync(path.join(dataDir, x), "utf8")).name === name,
-    );
+    const f = readdirSync(dataDir)
+      .filter((x) => x.endsWith(".json"))
+      .find((x) => JSON.parse(readFileSync(path.join(dataDir, x), "utf8")).name === name);
     return f ? path.join(dataDir, f) : undefined;
   };
   /** Tạo nhân vật rồi sửa file lưu như thể đã đi qua cổng / file hỏng */
@@ -1502,9 +1502,9 @@ describe("chat toàn server giữa các bản đồ (M3 bước 1)", () => {
     await a.room.leave(true);
     rooms.splice(rooms.indexOf(a.room), 1);
     await sleep(200);
-    const f = readdirSync(dataDir).find(
-      (x) => JSON.parse(readFileSync(path.join(dataDir, x), "utf8")).name === name,
-    )!;
+    const f = readdirSync(dataDir)
+      .filter((x) => x.endsWith(".json"))
+      .find((x) => JSON.parse(readFileSync(path.join(dataDir, x), "utf8")).name === name)!;
     const full = path.join(dataDir, f);
     writeFileSync(
       full,
@@ -1567,9 +1567,9 @@ describe("đi qua cổng giữa hai bản đồ (M3 bước 1)", () => {
   const BAC = lacHa.portals[0];
   const NAM = hacPhong.portals[0];
   const fileOf = (name: string) => {
-    const f = readdirSync(dataDir).find(
-      (x) => JSON.parse(readFileSync(path.join(dataDir, x), "utf8")).name === name,
-    );
+    const f = readdirSync(dataDir)
+      .filter((x) => x.endsWith(".json"))
+      .find((x) => JSON.parse(readFileSync(path.join(dataDir, x), "utf8")).name === name);
     return JSON.parse(readFileSync(path.join(dataDir, f!), "utf8"));
   };
   /** Nghe tin `travelTo` của một phòng */
@@ -1733,11 +1733,13 @@ describe("chân linh và bộ đếm kiếp (M3 bước 2)", () => {
       `${createHash("sha1").update(name.normalize("NFC").toLowerCase()).digest("hex")}.json`,
     );
   const playerFile = (name: string) => {
-    const f = readdirSync(dataDir).find(
-      (x) =>
-        x.endsWith(".json") &&
-        JSON.parse(readFileSync(path.join(dataDir, x), "utf8")).name === name,
-    )!;
+    const f = readdirSync(dataDir)
+      .filter((x) => x.endsWith(".json"))
+      .find(
+        (x) =>
+          x.endsWith(".json") &&
+          JSON.parse(readFileSync(path.join(dataDir, x), "utf8")).name === name,
+      )!;
     return path.join(dataDir, f);
   };
   const leave = async (a: { room: Room }) => {
