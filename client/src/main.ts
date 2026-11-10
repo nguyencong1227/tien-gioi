@@ -210,14 +210,15 @@ async function start(room: Room, mapId: string) {
   ]);
   ui.show();
   ui.setCurrentMapId(mapId);
+  const currentMap = getMap(mapId) || getMap(DEFAULT_MAP_ID)!;
+  activeScene = new WorldScene(room, currentMap);
   if (
     typeof window !== "undefined" &&
     (import.meta.env.DEV || new URLSearchParams(location.search).has("debug"))
   ) {
     (window as any).__ui = ui;
+    (window as any).__scene = activeScene;
   }
-  const currentMap = getMap(mapId) || getMap(DEFAULT_MAP_ID)!;
-  activeScene = new WorldScene(room, currentMap);
   new Phaser.Game({
     type: Phaser.AUTO,
     parent: "game",
