@@ -108,6 +108,8 @@ import {
   formatSectLog,
   formatSectMembersSummary,
   mergeMemberPresence,
+  sectConfirmText,
+  type SectConfirmKind,
 } from "./sect";
 import { sound } from "./audio";
 
@@ -278,6 +280,24 @@ let sectModalOpen = false;
 let sectTab: "overview" | "members" | "treasury" = "overview";
 let currentSectInvite: SectInvitedMsg | null = null;
 let sectInviteInterval: number | null = null;
+let sectConfirmAction: (() => void) | null = null;
+
+/** Hộp xác nhận trong game cho Nhường / Trục xuất / Rời (#246): confirm() gốc bị chặn / xấu trên điện thoại và PWA */
+function askSectConfirm(kind: SectConfirmKind, name: string, onOk: () => void) {
+  const box = document.getElementById("sect-action-confirm");
+  if (!box) return;
+  const { text, ok } = sectConfirmText(kind, name);
+  sectConfirmAction = onOk;
+  $("sect-action-confirm-text").textContent = text;
+  $("sect-action-confirm-ok").textContent = ok;
+  box.hidden = false;
+}
+
+function closeSectConfirm() {
+  sectConfirmAction = null;
+  const box = document.getElementById("sect-action-confirm");
+  if (box) box.hidden = true;
+}
 
 function stopSectInviteTimer() {
   if (sectInviteInterval !== null) {
@@ -1974,9 +1994,7 @@ function renderSectMembersTab() {
         btnTransfer.textContent = "Nhường";
         btnTransfer.title = "Nhường vị Tông chủ";
         btnTransfer.addEventListener("click", () => {
-          if (confirm(`Bạn có chắc muốn nhường vị Tông chủ cho ${m.name}?`)) {
-            callbacks?.onSectTransfer?.(m.name);
-          }
+          askSectConfirm("transfer", m.name, () => callbacks?.onSectTransfer?.(m.name));
         });
         actions.append(btnTransfer);
       }
@@ -1989,9 +2007,7 @@ function renderSectMembersTab() {
         btnKick.textContent = "Trục xuất";
         btnKick.title = "Trục xuất khỏi tông môn";
         btnKick.addEventListener("click", () => {
-          if (confirm(`Trục xuất ${m.name} khỏi tông môn?`)) {
-            callbacks?.onSectKick?.(m.name);
-          }
+          askSectConfirm("kick", m.name, () => callbacks?.onSectKick?.(m.name));
         });
         actions.append(btnKick);
       }
@@ -2289,11 +2305,17 @@ export const ui = {
       $("sect-form-motd").hidden = true;
     });
 
-    // Rời tông môn
+    // Rời tông môn: hộp xác nhận trong game
     bindTap("sect-btn-leave", () => {
-      if (confirm("Bạn có chắc chắn muốn rời khỏi tông môn?")) {
-        callbacks?.onSectLeave?.();
-      }
+      askSectConfirm("leave", "", () => callbacks?.onSectLeave?.());
+    });
+
+    // Hộp xác nhận chung (Nhường / Trục xuất / Rời): dùng "click" để cú chạm mở hộp không rơi luôn vào nút đồng ý
+    $("sect-action-confirm-cancel")?.addEventListener("click", () => closeSectConfirm());
+    $("sect-action-confirm-ok")?.addEventListener("click", () => {
+      const action = sectConfirmAction;
+      closeSectConfirm();
+      action?.();
     });
 
     // Giải tán tông môn
@@ -3740,6 +3762,7 @@ export const ui = {
       sectModalOpen = true;
       renderSectModal();
     } else {
+      closeSectConfirm();
       $("sect-modal").hidden = true;
       $("btn-sect")?.classList.remove("active");
     }
@@ -3749,6 +3772,14 @@ export const ui = {
     return sectModalOpen;
   },
 
+  /** Đóng hộp xác nhận tông môn nếu đang mở (Esc đóng hộp trước, rồi mới tới bảng) */
+  closeSectConfirm(): boolean {
+    const box = document.getElementById("sect-action-confirm");
+    if (!box || box.hidden) return false;
+    closeSectConfirm();
+    return true;
+  },
+
   switchSectTab(tab: "overview" | "members" | "treasury") {
     sectTab = tab;
     renderSectModal();
@@ -3756,6 +3787,8 @@ export const ui = {
 
   onSect(m: SectMsg) {
     currentSect = m.sect;
+    // Không còn tông môn (bị trục xuất / giải tán): hộp xác nhận cũ không còn ý nghĩa
+    if (!m.sect) closeSectConfirm();
     if (sectModalOpen) {
       renderSectModal();
     }

@@ -590,6 +590,7 @@ export class WorldScene extends Phaser.Scene {
     kb.on("keydown-ESC", () => {
       if (typing()) return;
       if (ui.closeDuelEndModal()) return;
+      if (ui.closeSectConfirm()) return;
       ui.closeAllModals();
     });
     kb.on("keydown-F", () => !typing() && this.interactOrPickup());

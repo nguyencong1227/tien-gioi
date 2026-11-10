@@ -189,6 +189,15 @@ for (const sz of SIZES) {
     `);
     await snap(`sect-members-${sz.name}.png`);
 
+    // 2b. Hộp xác nhận trong game (#246): bấm nút "Trục xuất" đầu tiên trong danh sách
+    console.log("- Chụp hộp xác nhận Trục xuất...");
+    await evalJs(`
+      [...document.querySelectorAll("#sect-members-list .sect-action-btn")]
+        .find((b) => b.textContent === "Trục xuất")?.click();
+    `);
+    await snap(`sect-confirm-${sz.name}.png`);
+    await evalJs(`document.getElementById("sect-action-confirm-cancel").click();`);
+
     // 3. Bảng Tông Môn: Kho tông môn & sổ ghi
     console.log("- Chụp bảng tông môn Kho tông môn...");
     await evalJs(`

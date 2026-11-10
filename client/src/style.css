@@ -4384,6 +4384,66 @@ body.in-limbo #chat-log {
   justify-content: flex-end;
 }
 
+/* Nút hành động tông môn (Thăng / Giáng / Nhường / Trục xuất / xác nhận): trước đây chưa có kiểu, hiện nút mặc định của trình duyệt */
+.sect-action-btn {
+  padding: 3px 8px;
+  font-family: inherit;
+  font-size: 12px;
+  border-radius: 4px;
+  border: 1px solid rgba(212, 175, 55, 0.45);
+  background: rgba(212, 175, 55, 0.14);
+  color: #ffe08a;
+  cursor: pointer;
+}
+.sect-action-btn:hover {
+  background: rgba(212, 175, 55, 0.26);
+}
+.sect-action-btn.danger {
+  border-color: rgba(239, 68, 68, 0.55);
+  background: rgba(239, 68, 68, 0.16);
+  color: #fca5a5;
+}
+.sect-action-btn.danger:hover {
+  background: rgba(239, 68, 68, 0.3);
+}
+
+/* Hộp xác nhận trong game phủ lên bảng Tông môn (#246): .modal-box là position: fixed nên inset: 0 bám theo bảng */
+.sect-action-confirm {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(10, 8, 6, 0.72);
+  border-radius: 8px;
+}
+.sect-action-confirm[hidden] {
+  display: none;
+}
+.sect-action-confirm .sect-confirm-box {
+  max-width: 360px;
+  background: rgba(36, 18, 18, 0.97);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6);
+}
+.sect-action-confirm p {
+  font-size: 14px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.sect-action-confirm .sect-confirm-actions button {
+  min-height: 40px;
+  min-width: 96px;
+  padding: 6px 14px;
+  font-size: 13px;
+}
+@media (pointer: coarse), (max-width: 640px) {
+  .sect-action-confirm .sect-confirm-actions button {
+    min-height: 44px;
+  }
+}
+
 /* Tab 2: Thành viên */
 .sect-members-header {
   display: flex;
