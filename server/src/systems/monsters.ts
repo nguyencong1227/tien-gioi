@@ -1,5 +1,5 @@
 // Quái: sinh, bổ sung, AI (lang thang, phát hiện, đuổi, tấn công, về nhà).
-import { PLAYER_RADIUS, MONSTERS, MONSTER_CAP, type MonsterKind } from "@tien-gioi/shared";
+import { PLAYER_RADIUS, MONSTERS, type MonsterKind } from "@tien-gioi/shared";
 import { Monster } from "../schema";
 import { rand, quantAngle, takeWhole, type World, type MonsterCtrl } from "../world";
 import { hurtPlayer } from "./combat";
@@ -30,7 +30,7 @@ export function spawnMonster(w: World, def: MonsterKind) {
       y = rand(64, map.worldH - 64);
     const d = map.dangerAt(x, y);
     if (d < def.minDanger || (def.id === "tho" && d > 0.45)) continue;
-    if (map.inTown(x, y, 160) || map.circleBlocked(x, y, def.radius)) continue;
+    if (map.inSafe(x, y, 160) || map.circleBlocked(x, y, def.radius)) continue;
     const id = `m${++w.monsterSeq}`;
     const m = new Monster();
     m.kind = def.id;
@@ -57,9 +57,10 @@ export function spawnMonster(w: World, def: MonsterKind) {
   }
 }
 
-/** Sinh đủ số quái mỗi loại khi tạo thế giới. */
+/** Sinh đủ số quái mỗi loại khi tạo thế giới (số lượng theo bản đồ của phòng: `GameMap.monsterCapOf`). */
 export function spawnInitial(w: World) {
-  for (const def of MONSTERS) for (let i = 0; i < MONSTER_CAP[def.id]; i++) spawnMonster(w, def);
+  for (const def of MONSTERS)
+    for (let i = 0; i < w.map.monsterCapOf(def.id); i++) spawnMonster(w, def);
 }
 
 /** Bổ sung quái bị giết, mỗi lần tối đa vài con mỗi loại. */
@@ -67,7 +68,7 @@ export function topUpMonsters(w: World) {
   const count: Record<string, number> = {};
   for (const m of w.state.monsters.values()) count[m.kind] = (count[m.kind] ?? 0) + 1;
   for (const def of MONSTERS) {
-    const missing = MONSTER_CAP[def.id] - (count[def.id] ?? 0);
+    const missing = w.map.monsterCapOf(def.id) - (count[def.id] ?? 0);
     for (let i = 0; i < Math.min(missing, MAX_SPAWN_PER_TOPUP); i++) spawnMonster(w, def);
   }
 }
@@ -96,7 +97,7 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
     target &&
     (target.dead ||
       (w.ghosts.size > 0 && w.ghosts.has(mc.target!)) ||
-      w.map.inTown(target.x, target.y, 20) ||
+      w.map.inSafe(target.x, target.y, 20) ||
       Math.hypot(m.x - mc.homeX, m.y - mc.homeY) > LEASH_DIST)
   ) {
     mc.target = null;
@@ -112,7 +113,7 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
       if (w.ghosts.size > 0 && w.ghosts.has(sid)) return; // hồn lìa xác: quái không thấy
       const d = Math.hypot(p.x - m.x, p.y - m.y);
       if (d < nearest) nearest = d;
-      if (d < best && !w.map.inTown(p.x, p.y, 20)) {
+      if (d < best && !w.map.inSafe(p.x, p.y, 20)) {
         best = d;
         mc.target = sid;
         target = p;
@@ -181,7 +182,7 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
       (dy / dist) * step,
       def.radius * 0.8,
     );
-    if (!w.map.inTown(next.x, next.y, def.radius + 8)) {
+    if (!w.map.inSafe(next.x, next.y, def.radius + 8)) {
       m.x = next.x;
       m.y = next.y;
     }

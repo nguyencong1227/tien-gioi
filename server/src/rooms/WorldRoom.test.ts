@@ -30,6 +30,13 @@ import {
   QUEST_BY_ID,
   buyPrice,
   sellPrice,
+  DEFAULT_MAP_ID,
+  HAC_PHONG_ID,
+  JOIN_WRONG_MAP,
+  MAPS,
+  getMap,
+  parseWrongMap,
+  roomNameOf,
 } from "@tien-gioi/shared";
 import { changeCoin } from "../systems/wallet";
 import type { WorldRoom } from "./WorldRoom";
@@ -44,11 +51,11 @@ const rooms: Room[] = [];
 
 beforeAll(async () => {
   process.env.DATA_DIR = dataDir; // store.ts đọc biến này lúc nạp module
-  const { WorldRoom } = await import("./WorldRoom");
+  const { WorldRoom, defineRooms } = await import("./WorldRoom");
   WorldRoomClass = WorldRoom;
   defaultGraceS = WorldRoom.reconnectGraceS;
   server = new Server({ transport: new WebSocketTransport(), gracefullyShutdown: false });
-  server.define(ROOM_NAME, WorldRoom);
+  defineRooms(server);
   await server.listen(PORT);
 });
 
@@ -78,9 +85,9 @@ async function waitFor<T>(fn: () => T | undefined | false, ms = 3000): Promise<T
 let nameSeq = 0;
 const secretOf = (name: string) => `secret-${name}-0123456789abcdef`;
 
-async function join(name = `Thu ${++nameSeq}`, secret = secretOf(name)) {
+async function join(name = `Thu ${++nameSeq}`, secret = secretOf(name), mapId = DEFAULT_MAP_ID) {
   const client = new Client(`ws://localhost:${PORT}`);
-  const room = await client.joinOrCreate(ROOM_NAME, { name, secret });
+  const room = await client.joinOrCreate(roomNameOf(mapId), { name, secret });
   const chat: ChatOut[] = [];
   const toasts: ToastMsg[] = [];
   const invs: InvMsg[] = [];
@@ -1329,5 +1336,157 @@ describe("tổ đội", () => {
     // phòng vẫn chạy: b vẫn nhận / đi lại được
     b.room.send("input", { seq: 1, dx: 1, dy: 0 });
     await waitFor(() => b.me().lastSeq === 1);
+  });
+});
+
+describe("nhiều bản đồ: mỗi bản đồ một phòng (M3 bước 1)", () => {
+  /** Lỗi vào phòng của colyseus.js: mã + thông điệp như client thật nhận được */
+  async function joinError(name: string, secret: string, roomName: string, extra = {}) {
+    const client = new Client(`ws://localhost:${PORT}`);
+    try {
+      await client.joinOrCreate(roomName, { name, secret, ...extra });
+    } catch (e: any) {
+      return { code: e.code as number, message: String(e.message) };
+    }
+    throw new Error("Đáng ra phải bị từ chối");
+  }
+  const saveFileOf = (name: string) => {
+    const f = readdirSync(dataDir).find(
+      (x) => JSON.parse(readFileSync(path.join(dataDir, x), "utf8")).name === name,
+    );
+    return f ? path.join(dataDir, f) : undefined;
+  };
+  /** Tạo nhân vật rồi sửa file lưu như thể đã đi qua cổng / file hỏng */
+  async function seedSave(name: string, patch: Record<string, unknown>) {
+    const a = await join(name);
+    await a.room.leave(true);
+    rooms.splice(rooms.indexOf(a.room), 1);
+    await sleep(200);
+    const full = saveFileOf(name)!;
+    writeFileSync(full, JSON.stringify({ ...JSON.parse(readFileSync(full, "utf8")), ...patch }));
+    return full;
+  }
+  const cap = (id: string) => Object.values(getMap(id)!.monsterCap).reduce((a, b) => a + b, 0);
+  /** Số phòng thế giới đang có, mọi bản đồ */
+  const rooms_ = async () =>
+    (await Promise.all(MAPS.map((m) => matchMaker.query({ name: roomNameOf(m.id) })))).flat()
+      .length;
+
+  it("nhân vật mới vào phòng của bản đồ khác bị đưa về bản đồ mặc định, không tạo file lưu", async () => {
+    const name = "Lac Duong";
+    const e = await joinError(name, secretOf(name), roomNameOf(HAC_PHONG_ID));
+    expect(e.code).toBe(JOIN_WRONG_MAP);
+    expect(parseWrongMap(e.code, e.message)).toBe(DEFAULT_MAP_ID);
+    expect(saveFileOf(name)).toBeUndefined();
+  });
+
+  it("tên phòng của bản đồ không có thì Colyseus từ chối, không tạo phòng; tuỳ chọn mapId của client không đổi được bản đồ của phòng", async () => {
+    await join(); // bảo đảm phòng mặc định đã có
+    const before = await rooms_();
+    for (const bad of ["world_khong_co", "world_", "world_constructor", "world__proto__", "khac"]) {
+      const e = await joinError("Rac Ban Do", secretOf("Rac Ban Do"), bad);
+      expect(e.code, bad).toBeGreaterThanOrEqual(4000);
+    }
+    expect(await rooms_()).toBe(before);
+    expect(saveFileOf("Rac Ban Do")).toBeUndefined();
+    // Client gửi mapId trong tuỳ chọn (kể cả rác) vào phòng mặc định: bị bỏ qua, bản đồ vẫn là của phòng
+    for (const [i, forged] of [HAC_PHONG_ID, "khong_co", 5, { a: 1 }].entries()) {
+      const name = `Gia Mao ${i}`;
+      const client = new Client(`ws://localhost:${PORT}`);
+      const room = await client.joinOrCreate(ROOM_NAME, {
+        name,
+        secret: secretOf(name),
+        mapId: forged,
+      });
+      rooms.push(room);
+      expect(serverRoom(room).mapId).toBe(DEFAULT_MAP_ID);
+      await room.leave(true);
+      rooms.splice(rooms.indexOf(room), 1);
+    }
+    expect(await rooms_()).toBe(before);
+  });
+
+  it("nhân vật đang ở bản đồ khác: phòng sai báo đúng bản đồ, sai mã thì 403 (không lộ bản đồ), phòng đúng cho vào, lưu giữ mapId", async () => {
+    const name = "Hac Phong Khach";
+    const hp = getMap(HAC_PHONG_ID)!;
+    const full = await seedSave(name, {
+      mapId: HAC_PHONG_ID,
+      x: Math.round(hp.townPx.x),
+      y: Math.round(hp.townPx.y),
+    });
+
+    const wrong = await joinError(name, secretOf(name), roomNameOf(DEFAULT_MAP_ID));
+    expect(wrong.code).toBe(JOIN_WRONG_MAP);
+    expect(parseWrongMap(wrong.code, wrong.message)).toBe(HAC_PHONG_ID);
+    // Sai mã: không được biết nhân vật ở đâu
+    const thief = await joinError(name, "sai-ma-0123456789abcdef-zzz", roomNameOf(DEFAULT_MAP_ID));
+    expect(thief.code).toBe(403);
+    expect(parseWrongMap(thief.code, thief.message)).toBeUndefined();
+
+    const a = await join(name, secretOf(name), HAC_PHONG_ID);
+    const sr = serverRoom(a.room);
+    expect(sr.mapId).toBe(HAC_PHONG_ID);
+    // đúng bản đồ: vị trí đã lưu nằm trong trạm an toàn của Hắc Phong Cốc, không bị đưa về Lạc Hà
+    expect(Math.hypot(a.me().x - hp.townPx.x, a.me().y - hp.townPx.y)).toBeLessThan(2);
+    // quái theo bản đồ: không có Linh Thố, tổng số theo monsterCap của Hắc Phong Cốc (và khác Lạc Hà)
+    const kinds = new Map<string, number>();
+    serverState(a.room).monsters.forEach((m) => kinds.set(m.kind, (kinds.get(m.kind) ?? 0) + 1));
+    expect(kinds.has("tho")).toBe(false);
+    expect(serverState(a.room).monsters.size).toBeGreaterThan(cap(HAC_PHONG_ID) * 0.9);
+    expect(serverState(a.room).monsters.size).toBeLessThan(cap(DEFAULT_MAP_ID));
+    // người ở phòng đó không nói chuyện được với NPC của Lạc Hà dù đứng đúng toạ độ của NPC
+    const npc = NPC_BY_ID.truong_tran!;
+    const sp = serverState(a.room).players.get(a.room.sessionId)!;
+    sp.x = npc.x;
+    sp.y = npc.y + 20;
+    a.room.send("talk", { npcId: npc.id });
+    await sleep(300);
+    expect(a.dialogs).toHaveLength(0);
+
+    await a.room.leave(true);
+    rooms.splice(rooms.indexOf(a.room), 1);
+    await sleep(200);
+    expect(JSON.parse(readFileSync(full, "utf8")).mapId).toBe(HAC_PHONG_ID);
+  });
+
+  it("client cũ chỉ biết ROOM_NAME vẫn hội tụ: nhân vật ở bản đồ khác được báo bản đồ đúng, nhân vật mặc định vào bình thường", async () => {
+    const name = "Khach Cu";
+    const hp = getMap(HAC_PHONG_ID)!;
+    await seedSave(name, {
+      mapId: HAC_PHONG_ID,
+      x: Math.round(hp.townPx.x),
+      y: Math.round(hp.townPx.y),
+    });
+    const e = await joinError(name, secretOf(name), ROOM_NAME);
+    expect(parseWrongMap(e.code, e.message)).toBe(HAC_PHONG_ID);
+    // rồi vào đúng phòng bằng tên phòng của bản đồ đó
+    const a = await join(name, secretOf(name), HAC_PHONG_ID);
+    expect(serverRoom(a.room).mapId).toBe(HAC_PHONG_ID);
+    // Mọi phòng của một bản đồ là MỘT phòng: không có phòng "không nhãn" thứ hai
+    expect((await matchMaker.query({ name: ROOM_NAME })).length).toBe(1);
+  });
+
+  it("file lưu có mapId lạ hoặc sai kiểu coi như bản đồ mặc định, lưu lại thành mapId hợp lệ", async () => {
+    for (const [i, bad] of ["rac", 7, null, {}].entries()) {
+      const name = `Map Rac ${i}`;
+      const full = await seedSave(name, { mapId: bad });
+      const a = await join(name);
+      expect(serverRoom(a.room).mapId).toBe(DEFAULT_MAP_ID);
+      await a.room.leave(true);
+      rooms.splice(rooms.indexOf(a.room), 1);
+      await sleep(200);
+      expect(JSON.parse(readFileSync(full, "utf8")).mapId).toBe(DEFAULT_MAP_ID);
+    }
+  });
+
+  it("Lạc Hà không đổi: nhân vật mặc định vào phòng mặc định với đủ quái và lưu mapId mặc định", async () => {
+    const name = "Lac Ha Thuong";
+    const a = await join(name);
+    expect(serverRoom(a.room).mapId).toBe(DEFAULT_MAP_ID);
+    expect(serverState(a.room).monsters.size).toBeGreaterThan(cap(DEFAULT_MAP_ID) * 0.9);
+    await a.room.leave(true);
+    rooms.splice(rooms.indexOf(a.room), 1);
+    await sleep(200);
+    expect(JSON.parse(readFileSync(saveFileOf(name)!, "utf8")).mapId).toBe(DEFAULT_MAP_ID);
   });
 });

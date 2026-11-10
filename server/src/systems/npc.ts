@@ -1,6 +1,7 @@
 // Tương tác NPC: nói chuyện, nhận / trả / bỏ nhiệm vụ, đổi đồ.
 // Mọi thao tác đều kiểm tra lại ở server: còn sống, đứng gần NPC, đủ điều kiện.
 import {
+  DEFAULT_MAP_ID,
   NPC_BY_ID,
   NPC_RANGE,
   QUESTS,
@@ -36,6 +37,8 @@ export function nearNpc(
   const r = w.ready(sid);
   const npc = byId(NPC_BY_ID, npcId);
   if (!r || !npc) return null;
+  // NPC chỉ đứng ở bản đồ của mình: toạ độ của bản đồ khác không có nghĩa ở đây
+  if ((npc.mapId ?? DEFAULT_MAP_ID) !== w.map.def.id) return null;
   if (Math.hypot(npc.x - r.p.x, npc.y - r.p.y) > NPC_RANGE) return null;
   return { ...r, npc };
 }

@@ -1,8 +1,10 @@
 // Chuyển bản đồ: hợp đồng giữa client và server (M3 bước 1, phương án A của docs/THIET_KE_NHIEU_BAN_DO.md).
 //
-// Mỗi bản đồ là một phòng Colyseus (`ROOM_NAME` + `JoinOptions.mapId`), một người chỉ ở một phòng một lúc.
-// File lưu nhân vật ghi `mapId` (thiếu thì coi là `DEFAULT_MAP_ID`) và vị trí trong bản đồ đó.
-// **Server quyết định nhân vật thuộc bản đồ nào**: `JoinOptions.mapId` chỉ là gợi ý của client để chọn phòng.
+// Mỗi bản đồ là một phòng Colyseus với TÊN PHÒNG riêng (`roomNameOf(mapId)`; bản đồ mặc định giữ `ROOM_NAME`),
+// một người chỉ ở một phòng một lúc. File lưu nhân vật ghi `mapId` (thiếu thì coi là `DEFAULT_MAP_ID`) và vị trí
+// trong bản đồ đó. **Server quyết định nhân vật thuộc bản đồ nào**; tên phòng client chọn chỉ là đoán.
+// (Không dùng `filterBy(["mapId"])`: client bỏ trống `mapId` sẽ tạo ra một phòng "không nhãn" tách đôi bản đồ
+// mặc định, và mỗi `mapId` rác sẽ tạo thêm một phòng không bao giờ dọn. Tên phòng lạ thì Colyseus từ chối ngay.)
 //
 // Đi qua cổng (client -> server -> client):
 //  1. Client đứng trong tầm `PortalDef.r` của một cổng (`GameMap.portalNear`) thì hiện nút "Đi qua cổng" và gửi
@@ -11,16 +13,28 @@
 //     không vừa bị đánh trong `TRAVEL_COMBAT_LOCK_MS`). Không đạt thì chỉ gửi `ToastMsg` (không có tin riêng).
 //  3. Đạt: server lưu nhân vật với `mapId` = bản đồ đích và vị trí = `spawn` của cổng đích, đưa nhân vật ra khỏi
 //     phòng cũ (không chờ nối lại), rồi gửi `travelTo { mapId }` cho client.
-//  4. Client nhận `travelTo` thì rời phòng cũ và `joinOrCreate(ROOM_NAME, { name, secret, mapId })`
+//  4. Client nhận `travelTo` thì rời phòng cũ và `joinOrCreate(roomNameOf(mapId), { name, secret })`
 //     (vẽ màn chuyển cảnh trong lúc chờ, tối đa `TRAVEL_JOIN_TIMEOUT_MS`). Phòng đích nạp file lưu ĐÃ GHI ở bước 3.
 //
 // Vào nhầm phòng (mở game lần đầu không biết nhân vật đang ở đâu, cache cũ, kết nối lại sau khi đã đi qua cổng...):
 // `onAuth` của phòng so `mapId` đã lưu với bản đồ của phòng. Khác thì từ chối bằng `ServerError(JOIN_WRONG_MAP,
-// wrongMapMessage(mapId đúng))`; client gặp lỗi này (`parseWrongMap`) thì vào lại ngay phòng đúng, không báo lỗi cho
-// người chơi. Nhờ vậy client luôn có thể bắt đầu bằng `mapId` mặc định (hoặc cái nhớ lần trước) mà vẫn hội tụ.
-// `mapId` lạ (không có trong `MAPS`) bị từ chối `JOIN_BAD_MAP` ngay ở `onCreate` / `onAuth`: không tạo phòng cho id rác.
+// wrongMapMessage(mapId đúng))` (chỉ sau khi đúng mã nhân vật, để người lạ không dò được nhân vật đang ở đâu);
+// client gặp lỗi này (`parseWrongMap`) thì vào lại ngay phòng đúng, không báo lỗi cho người chơi. Nhân vật mới luôn
+// bắt đầu ở bản đồ mặc định. Nhờ vậy client luôn có thể bắt đầu bằng `ROOM_NAME` (hoặc phòng nhớ lần trước) mà
+// vẫn hội tụ; bot / công cụ cũ chỉ biết `ROOM_NAME` vẫn vào được Lạc Hà Trấn như trước.
 //
 // Token nối lại khi rớt mạng (#117) thuộc về MỘT phòng: sau khi vào phòng đích phải lưu token mới.
+
+import { ROOM_NAME } from "./game";
+import { DEFAULT_MAP_ID } from "./map";
+
+/**
+ * Tên phòng Colyseus của bản đồ `mapId`: bản đồ mặc định giữ `ROOM_NAME` ("world", tương thích bản cũ), bản đồ khác
+ * là `world_<mapId>`. Không kiểm `mapId` có trong `MAPS` (id lạ ra tên phòng không tồn tại, server từ chối).
+ */
+export function roomNameOf(mapId: string): string {
+  return mapId === DEFAULT_MAP_ID ? ROOM_NAME : `${ROOM_NAME}_${mapId}`;
+}
 
 /** Gửi lại `travel` trong bấy nhiêu ms sau lần đi qua cổng trước (chống bấm liên tục / vòng lặp qua lại). */
 export const TRAVEL_COOLDOWN_MS = 3000;
@@ -54,8 +68,6 @@ export interface TravelToMsg {
 
 /** Nhân vật thuộc bản đồ khác: thông điệp là `wrongMapMessage(mapId đúng)`. */
 export const JOIN_WRONG_MAP = 421;
-/** `mapId` không có trong `MAPS`. */
-export const JOIN_BAD_MAP = 422;
 
 const WRONG_MAP_PREFIX = "wrong_map:";
 

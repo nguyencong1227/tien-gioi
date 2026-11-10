@@ -2,7 +2,13 @@
 import { promises as fs } from "node:fs";
 import { createHash } from "node:crypto";
 import path from "node:path";
-import type { Equipment, Inventory, QuestProgress } from "@tien-gioi/shared";
+import {
+  DEFAULT_MAP_ID,
+  getMap,
+  type Equipment,
+  type Inventory,
+  type QuestProgress,
+} from "@tien-gioi/shared";
 
 const DIR = path.resolve(process.env.DATA_DIR ?? "data/players");
 
@@ -22,6 +28,11 @@ export interface SavedPlayer {
   equipment?: Equipment;
   /** Linh thạch; file cũ không có thì coi như 0. Nạp qua addCoin: không tin giá trị trong file. */
   coin?: number;
+  /**
+   * Bản đồ (phòng) nhân vật đang ở, kèm `x`, `y` tính trong bản đồ đó. File cũ không có thì coi là `DEFAULT_MAP_ID`;
+   * id không còn trong `MAPS` cũng vậy (đọc bằng `mapIdOf`, không tin giá trị trong file).
+   */
+  mapId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -32,6 +43,11 @@ export interface QuestSave {
   done: string[];
   /** Nhiệm vụ lặp: questId -> ngày làm xong gần nhất (dayKey) */
   daily: Record<string, string>;
+}
+
+/** Bản đồ của nhân vật đã lưu: id hợp lệ trong `MAPS`, còn lại (thiếu, lạ, sai kiểu) là bản đồ mặc định. */
+export function mapIdOf(save: Pick<SavedPlayer, "mapId">): string {
+  return getMap(save.mapId)?.def.id ?? DEFAULT_MAP_ID;
 }
 
 export const hashSecret = (s: string) => createHash("sha256").update(s).digest("hex");
