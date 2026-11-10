@@ -1781,7 +1781,8 @@ export class WorldScene extends Phaser.Scene {
         if (p.dead && !(e as any).deadSince) (e as any).deadSince = this.time.now;
         if (!p.dead) {
           (e as any).deadSince = 0;
-          this.duelKoUntil = 0;
+          // `duelEnd` tới TRƯỚC patch `dead = true`: khung xen giữa không được xoá mốc KO vừa đặt (chỉ xoá khi đã hết hạn)
+          if (this.time.now >= this.duelKoUntil) this.duelKoUntil = 0;
         }
       } else {
         const dist = Math.hypot(posX - e.root.x, posY - e.root.y);
