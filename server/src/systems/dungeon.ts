@@ -13,6 +13,8 @@ import { randomBytes } from "node:crypto";
 import {
   DUNGEONS,
   DUNGEON_DAILY_REWARDS,
+  DUNGEON_FALL_EXIT_MS,
+  DUNGEON_FALL_HP_PCT,
   DUNGEON_INVITE_MS,
   DUNGEON_LOOT_MS,
   DUNGEON_OPEN_COOLDOWN_MS,
@@ -39,6 +41,7 @@ import {
   type DungeonPhase,
   type DungeonStateMsg,
 } from "@tien-gioi/shared";
+import type { Player } from "../schema";
 import type { MonsterCtrl, PlayerCtrl, World } from "../world";
 import { giveItem } from "./inventory";
 import { spawnLoot } from "./loot";
@@ -64,6 +67,8 @@ export interface RunMember {
   /** Đạo hiệu hiển thị (lúc mở) */
   name: string;
   status: MemberStatus;
+  /** Đã gục trong run này (`dungeonFall`): bị đẩy ra, mất lượt, không vào lại (`status` là `left`). Dùng để báo `all_dead`. */
+  fell?: boolean;
 }
 
 export interface Run {
@@ -611,10 +616,75 @@ function exitRun(w: World, run: Run) {
 }
 
 /**
+ * Hết khí huyết TRONG PHÒNG BÍ CẢNH: KHÔNG chết thật (quyết định của người dùng 11/11/2026): không `beginLimbo`, không Hoàng
+ * Tuyền, không mất cảnh giới / đồ / Linh thạch, không Duyên. Người đó gục `DUNGEON_FALL_EXIT_MS` (`p.dead`, quái bỏ mục tiêu),
+ * đứng dậy với `DUNGEON_FALL_HP_PCT` khí huyết (`c.reviveAt`, `tickRespawn`) rồi `tickFallen` đưa về cổng vào ở Lạc Hà.
+ * MẤT LƯỢT: nếu run còn đang chạy thì tính một lượt vào `dungeonDaily` (như đã nhận một lần thưởng; không vượt
+ * `DUNGEON_DAILY_REWARDS`), ghi cùng bản ghi với phần còn lại ở lần lưu tới. Thành viên thành `left` + `fell`: không nhận thưởng
+ * khi đồng đội hạ trùm, không vào lại (`dungeonEnter` chỉ nhận `invited`). Run đã kết thúc (đang nhặt đồ sau khi thắng): vẫn
+ * không mất kiếp và vẫn bị đưa ra, nhưng KHÔNG trừ lượt thêm. Gọi từ `hurtPlayer` khi `p.hp <= 0`; trả `false` ở phòng thường
+ * (chết thật theo luật luân hồi).
+ */
+export function dungeonFall(w: World, sid: string, p: Player, c: PlayerCtrl): boolean {
+  if (w.runId === null) return false;
+  const run = runOfWorld(w);
+  const member = run?.members.get(keyOfName(p.name));
+  p.dead = true;
+  p.meditating = false;
+  c.deadAt = w.now;
+  c.inputs.length = 0;
+  c.reviveAt = w.now + DUNGEON_FALL_EXIT_MS;
+  c.reviveHpPct = DUNGEON_FALL_HP_PCT;
+  c.fallExitAt = c.reviveAt;
+  for (const m of w.mctrl.values()) if (m.target === sid) m.target = null;
+  let rewardsLeft = rewardsLeftOf(c, w.now);
+  if (run && member?.status === "inside") {
+    member.status = "left";
+    member.fell = true;
+    if (run.exitAt === null && rewardsLeft > 0) {
+      c.save = {
+        ...c.save,
+        dungeonDaily: { day: dayKey(w.now), rewards: DUNGEON_DAILY_REWARDS - rewardsLeft + 1 },
+      };
+      rewardsLeft -= 1;
+    }
+  }
+  w.events.dungeonFallen(sid, { exitInMs: DUNGEON_FALL_EXIT_MS, rewardsLeft });
+  toast(
+    w,
+    sid,
+    "Ngươi đã gục! Không mất kiếp, nhưng bị đưa ra khỏi bí cảnh và mất một lượt hôm nay.",
+    "bad",
+  );
+  if (run) sendDungeonState(w, run);
+  return true;
+}
+
+/** Thử lại việc đưa người gục ra sau chừng này (ms) nếu lần trước không thành (lưu lỗi...). */
+const FALL_RETRY_MS = 2000;
+
+/**
+ * Mỗi tick của phòng bí cảnh: đưa người đã gục (`c.fallExitAt`) và đã đứng dậy về cổng vào ở Lạc Hà (`onDungeonExit`: lưu rồi
+ * `travelTo`). Chưa đứng dậy (còn `dead`) hoặc đang đi qua cổng thì chờ; lỗi thì thử lại sau `FALL_RETRY_MS`. Chạy cả khi run đã
+ * kết thúc / bị xoá khỏi sổ (không để ai kẹt lại trong phòng).
+ */
+function tickFallen(w: World) {
+  for (const [sid, c] of w.ctrl) {
+    if (c.fallExitAt === undefined || w.now < c.fallExitAt || c.travelling) continue;
+    const p = w.state.players.get(sid);
+    if (!p || p.dead) continue;
+    c.fallExitAt = w.now + FALL_RETRY_MS;
+    w.onDungeonExit?.(sid);
+  }
+}
+
+/**
  * Mỗi tick của phòng bí cảnh: đồng hồ và điều kiện kết thúc, `dungeonState` mỗi `DUNGEON_STATE_MS`, đưa người về khi tới
  * `exitAt`. Phòng thường (`runId === null`) và run đã bị xoá thì thoát ngay.
  */
 export function tickDungeonRun(w: World) {
+  if (w.runId === null) return;
+  tickFallen(w); // trước khi xét run: người gục vẫn phải được đưa ra kể cả khi run đã kết thúc / bị xoá
   const run = runOfWorld(w);
   if (!run) return;
   if (run.exitAt !== null) {
@@ -631,8 +701,11 @@ export function tickDungeonRun(w: World) {
     const pending = [...run.members.values()].some(
       (m) => m.status === "invited" && w.now < run.inviteUntil,
     );
-    if (!standing && !pending)
-      return finishRun(w, run, "lost", inside.length > 0 ? "all_dead" : "all_left");
+    if (!standing && !pending) {
+      // `all_dead`: còn người nằm trong phòng, hoặc có người đã gục (bị đẩy ra); `all_left`: mọi người tự rời
+      const fell = [...run.members.values()].some((m) => m.fell);
+      return finishRun(w, run, "lost", inside.length > 0 || fell ? "all_dead" : "all_left");
+    }
   }
   if (w.tick % STATE_EVERY_TICKS === 0) sendDungeonState(w, run);
 }

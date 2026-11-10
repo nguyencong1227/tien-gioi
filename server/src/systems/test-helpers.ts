@@ -21,6 +21,7 @@ import {
   type RebornMsg,
   type DungeonInviteMsg,
   type DungeonEndMsg,
+  type DungeonFallenMsg,
   type DungeonStateMsg,
   type SectInvitedMsg,
   type SectMsg,
@@ -54,6 +55,7 @@ export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
   const dungeonInvites: { sid: string; msg: DungeonInviteMsg }[] = [];
   const dungeonEnds: { sid: string; msg: DungeonEndMsg }[] = [];
   const dungeonStates: { sid: string; msg: DungeonStateMsg }[] = [];
+  const dungeonFallens: { sid: string; msg: DungeonFallenMsg }[] = [];
   const duelInvites: { sid: string; msg: DuelInvitedMsg }[] = [];
   const duelStates: { sid: string; msg: DuelStateMsg }[] = [];
   const duelEnds: { sid: string; msg: DuelEndMsg }[] = [];
@@ -82,6 +84,7 @@ export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
       dungeonInvite: (sid, msg) => dungeonInvites.push({ sid, msg }),
       dungeonEnd: (sid, msg) => dungeonEnds.push({ sid, msg }),
       dungeonState: (sid, msg) => dungeonStates.push({ sid, msg }),
+      dungeonFallen: (sid, msg) => dungeonFallens.push({ sid, msg }),
       duelInvited: (sid, msg) => duelInvites.push({ sid, msg }),
       duelState: (sid, msg) => duelStates.push({ sid, msg }),
       duelEnd: (sid, msg) => duelEnds.push({ sid, msg }),
@@ -111,6 +114,7 @@ export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
     dungeonInvites,
     dungeonEnds,
     dungeonStates,
+    dungeonFallens,
     duelInvites,
     duelStates,
     duelEnds,

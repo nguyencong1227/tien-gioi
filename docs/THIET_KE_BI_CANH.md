@@ -3,7 +3,7 @@
 > Tài liệu thiết kế do Dev A soạn cho B và C review, trước khi viết mã. Quyết định gốc của người dùng (10/11/2026, `~/TT/orchestra/QUYET_DINH_M3.md`): bí cảnh là **bước 4** của M3, "phòng tạm theo đội". Dựa trên bước 1 (mỗi bản đồ một phòng Colyseus, `docs/THIET_KE_NHIEU_BAN_DO.md`), tổ đội (`Hub.parties`) và luân hồi (`docs/THIET_KE_LUAN_HOI.md`). Hợp đồng `shared/` ở mục 7; chia PR ở mục 9; câu hỏi cho người dùng ở mục 10.
 
 ## 1. Mục tiêu và phạm vi
-- Một **đội** (2-4 người) vào một **phòng riêng** của đội, đánh quái nhỏ rồi **trùm** trong thời hạn; thắng thì nhận thưởng, hết giờ / chết hết / rời hết thì phòng tự huỷ và mọi người về chỗ vào. Không ai ngoài đội vào được, nên không tranh quái, không tranh đồ.
+- Một **đội** (2-4 người) vào một **phòng riêng** của đội, đánh quái nhỏ rồi **trùm** trong thời hạn; thắng thì nhận thưởng, hết giờ / gục hết / rời hết thì phòng tự huỷ và mọi người về chỗ vào. Không ai ngoài đội vào được, nên không tranh quái, không tranh đồ.
 - Tái dùng tối đa cái đã có: hệ thống chiến đấu, quái, rơi đồ chia theo đội, chat đội xuyên phòng, luân hồi. **Không đổi giao thức gameplay** (di chuyển, đánh, kỹ năng giữ nguyên); thêm một nhóm tin nhắn nhỏ cho vòng đời bí cảnh.
 - Bản đầu: **một bí cảnh** (`linh_hu`, tên có thể đổi khi soạn nội dung), một trùm, một bảng thưởng. Dữ liệu theo bảng `DUNGEONS` nên thêm bí cảnh sau chỉ là thêm dữ liệu.
 - Ngoài phạm vi: nhiều tầng, hàng đợi ghép đội tự động, bí cảnh kéo dài nhiều phiên, xếp hạng tốc độ, khoá đồ.
@@ -14,14 +14,14 @@
 - `Hub` (một tiến trình): `worlds` + `locate(key)` tìm người ở phòng khác, `parties` (sổ đội khoá theo đạo hiệu viết thường, sống qua việc đổi phòng), `chat` toàn server.
 - `World` mang `map`; `spawnInitial` / `topUpMonsters` đọc `map.monsterCapOf`; quái có `boss?: true` (`mang` / Xích Mãng, 4000 HP). `loot.ts` chia chủ đồ rơi theo đội (`lootOwner`, `sameParty`). `LifeCounters.bossKills` đã nuôi điểm luân hồi (`DUYEN_BOSS_EACH`, trần `DUYEN_BOSS_CAP`).
 - `WorldRoom.persist(p, c, at?)`: tham số `at` ghi bản đồ + chỗ xuất hiện thay cho vị trí hiện tại (dùng khi qua cổng): đúng thứ ta cần để bí cảnh **không bao giờ ghi vị trí trong bí cảnh** vào file lưu (mục 4.3).
-- Chết (luân hồi): `beginLimbo` -> Hoàng Tuyền -> đầu thai luôn ở Lạc Hà Trấn (`THIET_KE_LUAN_HOI.md` mục "Chết ở bản đồ / phòng khác, trong đội, trong bí cảnh").
+- Chết (luân hồi): `beginLimbo` -> Hoàng Tuyền -> đầu thai luôn ở Lạc Hà Trấn (`THIET_KE_LUAN_HOI.md`). **Ngoại lệ (quyết định 11/11/2026): trong phòng bí cảnh gục KHÔNG mất kiếp** (mục 4.4); chết ở bản đồ thường vẫn là luân hồi.
 
 ## 3. Trải nghiệm (luồng người chơi)
 1. Ở Lạc Hà Trấn có NPC **Thủ Môn Bí Cảnh** (dữ liệu NPC mới trong `shared/`). Chỉ **đội trưởng** (`Party.leader` của `Hub.parties`) thấy nút "Mở bí cảnh" trong hộp thoại; người ngoài đội hoặc chưa đủ điều kiện thấy lý do bằng toast.
 2. Đội trưởng bấm mở: server kiểm điều kiện (mục 5), tạo một **lần chạy** (`run`) và phòng, rồi gửi lời mời `DungeonInviteMsg` cho **từng thành viên đang online** (dù đang ở bản đồ nào; qua `Hub.locate`). Mỗi người có `DUNGEON_INVITE_MS` (60 giây) để bấm "Vào" (`dungeonEnter`).
 3. Ai bấm "Vào": server kiểm lại, lưu nhân vật với **chỗ xuất hiện = cổng vào ở Lạc Hà** (không phải trong bí cảnh), đưa ra khỏi phòng cũ và gửi `TravelToMsg { mapId, roomId }` (mới: `roomId`). Client `joinById(roomId, ...)`.
 4. Trong phòng: khu vào an toàn (không quái) ở phía nam, càng lên bắc càng nhiều quái nhỏ, **trùm ở hang phía bắc**. HUD có đồng hồ đếm ngược, số quái còn lại, thanh máu trùm. Quái nhỏ không hồi sinh (dọn một lần).
-5. **Thắng:** hạ trùm -> phát thưởng (mục 6), mở `DUNGEON_LOOT_MS` (60 giây) để nhặt đồ, rồi đưa mọi người về cổng vào. **Thua:** hết giờ, hoặc mọi người đã chết / rời -> không thưởng, về cổng vào (người chết đã đầu thai ở Lạc Hà theo luật chung).
+5. **Thắng:** hạ trùm -> phát thưởng (mục 6), mở `DUNGEON_LOOT_MS` (60 giây) để nhặt đồ, rồi đưa mọi người về cổng vào. **Thua:** hết giờ, hoặc mọi người đã gục / rời -> không thưởng, về cổng vào. Người gục giữa chừng bị đẩy ra sớm và mất lượt (mục 4.4); gục KHÔNG phải chết thật.
 6. Mọi trường hợp phòng đều tự huỷ khi trống.
 
 ## 4. Kiến trúc
@@ -45,7 +45,11 @@
 - Trạng thái đếm thưởng theo ngày (mục 6) là một trường nhỏ `dungeonDaily?: { day: string; rewards: number }` trong `SavedPlayer`, nạp qua hàm làm sạch, `kiem-save` kiểm.
 
 ### 4.4 Chết, luân hồi, đội
-- **Chết trong bí cảnh = luật chung** (Hoàng Tuyền, đầu thai ở Lạc Hà), run vẫn tiếp tục với người còn lại. Đây là quyết định đã ghi ở `THIET_KE_LUAN_HOI.md`; **câu hỏi 1 ở mục 10** hỏi người dùng có muốn nới cho bí cảnh không.
+- **Gục trong bí cảnh KHÔNG mất kiếp** (quyết định của người dùng 11/11/2026, `~/TT/orchestra/QUYET_DINH_M3.md` mục 5; thay luật chung ở bản đầu của thiết kế): hết khí huyết trong phòng bí cảnh thì không `beginLimbo`, không Hoàng Tuyền, không mất cảnh giới / đồ / Linh thạch, không tính Duyên. Chết ở bản đồ thường vẫn theo luật luân hồi.
+  - **Hiện thực** (`systems/dungeon.ts` `dungeonFall`, gọi từ `hurtPlayer` TRƯỚC nhánh `beginLimbo`; chỉ khi `World.runId !== null`): người đó nằm `DUNGEON_FALL_EXIT_MS` (3 giây, `p.dead`, quái bỏ mục tiêu), đứng dậy với `DUNGEON_FALL_HP_PCT` (30%) khí huyết (`c.reviveAt` + `c.reviveHpPct`, `tickRespawn` / `reviveInPlace`), rồi `tickFallen` (mỗi tick, kể cả khi run đã kết thúc / bị xoá) gọi `onDungeonExit` đưa về cổng vào ở Lạc Hà (lưu rồi `travelTo`; thử lại mỗi 2 giây nếu lỗi). Chỉ người gục nhận `dungeonFallen { exitInMs, rewardsLeft }` (không có `dungeonEnd`: run vẫn chạy); đồng đội thấy `dungeonState.members[].alive = false`.
+  - **Mất lượt:** nếu run còn đang chạy thì trừ một lượt vào `dungeonDaily` (như đã nhận một lần thưởng; không vượt `DUNGEON_DAILY_REWARDS`; ghi cùng hồ sơ ở lần lưu tới), thành viên thành `left` + `fell` (không thưởng khi đồng đội hạ trùm, `dungeonEnter` chỉ nhận `invited` nên không vào lại). Gục khi run đã kết thúc (đang nhặt đồ sau khi thắng): vẫn không mất kiếp và vẫn bị đưa ra, nhưng KHÔNG trừ lượt thêm.
+  - **Cả đội gục:** mọi người đã gục / rời mà có người gục thì run thua `all_dead` (`inside.length > 0 || có người gục`); mọi người tự rời là `all_left`. Người gục không nhận `dungeonEnd`.
+  - **Giới hạn đã biết:** khí huyết KHÔNG nằm trong hồ sơ (mọi lần vào phòng / qua cổng đều đầy máu), nên 30% chỉ là lúc đứng dậy ở phòng bí cảnh; đến Lạc Hà người đó đầy khí huyết như mọi lần đi qua cổng (khu an toàn hồi nhanh dù sao). Muốn đến nơi còn 30% thì phải thêm trường lưu khí huyết (chưa làm).
 - Đội: `Hub.parties` dùng chung nên chat đội `/p` đi xuyên phòng (đã có). **Thành viên run cố định lúc mở** (người rời đội giữa chừng vẫn ở trong run, người mới vào đội không được vào). Người trong run không nhận lời mời / không `travel` sang bản đồ khác (server chặn: đang trong run).
 - `Hub.worlds` có cả phòng bí cảnh nên `locate` thấy người ở trong (mời đội, chat).
 
@@ -92,7 +96,7 @@ Hộp thoại NPC có nút "Mở bí cảnh" (chỉ đội trưởng) kèm danh 
 - Mỗi PR server có test đơn vị (`World` giả) và tích hợp (phòng Colyseus thật), thử đột biến (bỏ kiểm thành viên ở `onAuth`, bỏ giới hạn số run, bỏ chỉ lưu vị trí vào, bỏ lượt thưởng ngày, phát thưởng hai lần), và **kiểm "không kẹt"**: giết tiến trình giữa run rồi đăng nhập lại phải về Lạc Hà.
 
 ## 10. Câu hỏi mở (A chọn hướng an toàn, người dùng đổi nếu muốn)
-1. **Chết trong bí cảnh có mất kiếp (luân hồi) không?** Hiện theo luật chung (có), như `THIET_KE_LUAN_HOI.md`. Đây là chỗ dễ làm người chơi mới nản: lựa chọn thay thế "bí cảnh không mất kiếp: chết thì bị đưa ra ngoài, mất lượt thưởng, nhưng không luân hồi" (giống ngoại lệ đã dành cho chết vì PK). **Đề xuất của A: giữ luật chung cho bản đầu** vì đó là quyết định đã ghi, và mở rộng ngoại lệ sau nếu thử nghiệm cho thấy quá khắc nghiệt.
+1. ~~Chết trong bí cảnh có mất kiếp (luân hồi) không?~~ **Đã quyết (11/11/2026): KHÔNG mất kiếp** (bị đẩy ra, mất lượt, không thưởng; mục 4.4). Người dùng chưa đổi các mặc định còn lại ở mục này.
 2. **Cỡ đội tối thiểu:** mặc định `partyMin = 2` (bí cảnh là chơi cùng nhau); đặt 1 nếu muốn cho đi một mình.
 3. **Lượt thưởng mỗi ngày** `DUNGEON_DAILY_REWARDS = 3`: số hợp lý (giữ bí cảnh là phần thưởng chứ không cày) hay bỏ giới hạn?
 4. **Nội dung:** tên bí cảnh / trùm / đồ thưởng là của Tiên Giới (A soạn, không mượn tên từ game khác); trùm mới hay dùng lại Xích Mãng với số liệu mạnh hơn? **A đề xuất trùm mới** để bí cảnh có cái riêng và không lẫn với trùm ngoài hoang.
