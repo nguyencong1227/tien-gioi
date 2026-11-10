@@ -12,6 +12,14 @@ import {
   sellPrice,
 } from "@tien-gioi/shared";
 import {
+  ASSUME_DUNGEON,
+  LINH_HU,
+  dungeonValue,
+  realmTierOfStep,
+  runMinutes,
+  summarizeFights,
+} from "./dungeon";
+import {
   ASSUME,
   expectedCoinDrop,
   expectedLootValue,
@@ -177,6 +185,63 @@ const hoursToMaxDuAm = maxProgressionLife
       .reduce((s, p) => s + p.minutes, 0) / 60
   : 0;
 
+// ---------- Bí cảnh (M3.4, 4c-2) ----------
+const dun = realmTierOfStep(LINH_HU.minStep);
+const dunBoss = MONSTER_BY_ID[LINH_HU.boss]!;
+const dunLimit = LINH_HU.timeLimitMs / 60_000;
+const dunFights = [1, 2, 3, 4].map((n) => {
+  const f = summarizeFights(LINH_HU, n, dun, 20);
+  return {
+    ...f,
+    run: f.simSeconds === null ? null : runMinutes(LINH_HU, n, dun.realm, dun.tier, f.simSeconds),
+  };
+});
+const dunTable = [
+  "| Đội | Hạ được trùm | Trùm (giây mô phỏng) | Trùm (phút thật) | Cả lượt (phút) | Người chết / trận |",
+  "|---|---:|---:|---:|---:|---:|",
+  ...dunFights.map(
+    (f) =>
+      `| ${f.party} người | ${Math.round(f.winRate * 100)}% | ${f.simSeconds === null ? "–" : Math.round(f.simSeconds)} | ${f.realMinutes === null ? "–" : f.realMinutes.toFixed(1)} | ${f.run === null ? "–" : f.run.toFixed(1) + (f.run > dunLimit ? " ⚠️ quá giờ" : "")} | ${f.deathsPerRun.toFixed(2)} |`,
+  ),
+].join("\n");
+const dunValueTable = [
+  "| Đội | Linh thạch ròng / người | = phút săn | Tu vi / người | = phút săn |",
+  "|---|---:|---:|---:|---:|",
+  ...[2, 3, 4].map((n) => {
+    const v = dungeonValue(LINH_HU, n, dun.realm, dun.tier);
+    return `| ${n} người | ${Math.round(v.coinNet)} | ${v.coinMinutes.toFixed(1)} | ${Math.round(v.exp)} | ${v.expMinutes.toFixed(1)} |`;
+  }),
+].join("\n");
+const dungeonSection = `## Bí cảnh Linh Hư (M3.4, 4c-2, #203)
+
+Mô phỏng ở \`server/src/balance/dungeon.ts\`; test \`dungeon.test.ts\` giữ các mục tiêu bên dưới. **Số liệu đang dùng:** trùm \`${dunBoss.id}\`
+${dunBoss.hp} máu, đòn ${dunBoss.atk} mỗi ${dunBoss.attackCd / 1000} giây, ${dunBoss.exp} tu vi; thưởng hoàn thành ${LINH_HU.reward.coin} Linh thạch + đồ;
+ngưỡng bậc ${LINH_HU.minStep} (Luyện Khí tầng ${dun.tier + 1}); giới hạn ${dunLimit} phút; đội ${LINH_HU.partyMin}-${LINH_HU.partyMax} người.
+
+**Mục tiêu (thiết kế):** đội 3 người ở đúng ngưỡng hạ trùm trong 5-8 phút và không ai chết; đội 2 người không kịp giờ; một người không
+hạ nổi; một lượt thưởng bằng khoảng 15-20 phút săn quái tốt nhất cùng bậc. Trùm là một **bao máu**: đòn nhẹ nhưng trận dài, nên cần đan
+và đồng đội (chết trong bí cảnh là mất kiếp, nên chọn số liệu để ca khó nhất cũng không ai chết).
+
+### 1. Trận đánh trùm (mô phỏng bằng chính mã server)
+
+\`fightBoss\` dựng một thế giới thật, đặt trùm ở tâm hang, người chơi đứng cạnh đánh thường liên tục (\`slash\`), uống Hồi Huyết Đan khi khí huyết
+dưới ${ASSUME_DUNGEON.potionBelow * 100}% (\`useItem\`, hồi chiêu 8 giây), mỗi người mang ${ASSUME_DUNGEON.potions} viên; AI quái, sát thương, bạo kích đều là mã thật (hạt giống cố
+định). **Ca khó:** đứng yên, không né, trùm trúng 100% đòn. Người chơi thật né được nhưng mất thời gian đánh theo cùng tỉ lệ nên xác suất
+sống không đổi; thời gian thật = thời gian mô phỏng / ${ASSUME_DUNGEON.bossUptime} (giả định \`bossUptime\`, chưa kiểm bằng người chơi thật). Cả lượt = đi ${ASSUME_DUNGEON.walkSec}
+giây + dọn quái nhỏ (${ASSUME_DUNGEON.searchSecPerMob} giây tìm mỗi con, đánh ${ASSUME_DUNGEON.trashUptime * 100}% thời gian) + trùm. Bậc cả đội: ngưỡng, trang bị tốt nhất đủ bậc. 20 trận mỗi dòng.
+
+${dunTable}
+
+### 2. Một lượt thưởng đáng bao nhiêu phút săn
+
+Linh thạch ròng = thưởng hoàn thành + giá bán đồ thưởng kỳ vọng + phần chia từ tiền / đồ trùm rơi và quái nhỏ − ${ASSUME_DUNGEON.potions} đan (${ASSUME_DUNGEON.potions} × giá mua). Tu vi = trùm + quái nhỏ theo
+\`partyExpShare\`. So với săn quái tốt nhất cùng bậc (mục tiêu ${ASSUME_DUNGEON.equivMinutes} phút).
+
+${dunValueTable}
+
+Tối đa 3 lượt thưởng mỗi ngày (\`DUNGEON_DAILY_REWARDS\`) nên bí cảnh là một lựa chọn thêm chứ không thay được việc săn quái.
+`;
+
 const reincarnationSection = `## Luân hồi & Điểm Duyên (M3.2, #151)
 
 Mô phỏng cân bằng hệ thống Luân hồi theo thiết kế tại \`docs/THIET_KE_LUAN_HOI.md\` (mục 5 & 6) và hợp đồng \`shared/src/reincarnation.ts\`:
@@ -250,7 +315,9 @@ if (process.argv.includes("--stdout")) {
       "\n\n" +
       economySection +
       "\n\n" +
-      reincarnationSection,
+      reincarnationSection +
+      "\n\n" +
+      dungeonSection,
   );
 } else {
   const here = path.dirname(fileURLToPath(import.meta.url));
@@ -300,7 +367,9 @@ mục tiêu "không quá ~1.5×" của #74 chưa đạt ở những ô trên. Xe
 
 ${economySection}
 
-${reincarnationSection}`,
+${reincarnationSection}
+
+${dungeonSection}`,
   );
   console.log(`Đã ghi ${out}\n\n${summary}`);
 }
