@@ -17,6 +17,7 @@ import type {
   PartyInvitedMsg,
   DungeonInviteMsg,
   DungeonEndMsg,
+  DungeonFallenMsg,
   DungeonStateMsg,
   DuelInvitedMsg,
   DuelStateMsg,
@@ -50,6 +51,13 @@ export interface PlayerCtrl {
    * thì đứng dậy tại chỗ thay vì hồi sinh ở trấn.
    */
   reviveAt?: number;
+  /** Tỉ lệ `maxHp` khi đứng dậy (`reviveInPlace`); bỏ trống là `DUEL_KO_HP_PCT`. Bí cảnh đặt `DUNGEON_FALL_HP_PCT`. */
+  reviveHpPct?: number;
+  /**
+   * Gục trong bí cảnh (không mất kiếp, `dungeonFall`): lúc đưa người này về cổng vào (ms). Sau khi `reviveAt` tới và đã đứng dậy,
+   * `tickFallen` gọi `onDungeonExit`; thử lại mỗi 2 giây nếu việc đưa đi lỗi. Tự mất cùng `ctrl` khi người chơi rời phòng.
+   */
+  fallExitAt?: number;
   deadAt: number;
   /**
    * Đang đi qua cổng: bản ghi ở bản đồ đích đã / đang được ghi, nên `persist` thường (lưu định kỳ, lúc rớt mạng)
@@ -142,6 +150,8 @@ export interface WorldEvents {
   dungeonEnd(sessionId: string, msg: DungeonEndMsg): void;
   /** Trạng thái bí cảnh cho HUD (trong phòng bí cảnh): mỗi `DUNGEON_STATE_MS` và khi đổi pha. */
   dungeonState(sessionId: string, msg: DungeonStateMsg): void;
+  /** Vừa gục trong bí cảnh (không mất kiếp): chỉ người đó nhận. */
+  dungeonFallen(sessionId: string, msg: DungeonFallenMsg): void;
   /** Có người thách đấu (chỉ người được mời nhận). */
   duelInvited(sessionId: string, msg: DuelInvitedMsg): void;
   /** Trạng thái trận thách đấu cho HUD (hai người trong trận). */

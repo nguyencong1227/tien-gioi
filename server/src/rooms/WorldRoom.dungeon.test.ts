@@ -19,6 +19,7 @@ import {
   getMap,
   roomNameOf,
   type DungeonEndMsg,
+  type DungeonFallenMsg,
   type DungeonInviteMsg,
   type DungeonStateMsg,
   type PartyInvitedMsg,
@@ -38,13 +39,14 @@ let WorldRoomClass: typeof WorldRoom;
 // Nạp SAU khi đặt DATA_DIR: `combat` kéo theo `store.ts`, nơi đọc DATA_DIR lúc nạp module (import tĩnh thì nhân vật của test
 // ghi vào thư mục dữ liệu mặc định thay vì thư mục tạm)
 let killMonster: typeof import("../systems/combat").killMonster;
+let hurtPlayer: typeof import("../systems/combat").hurtPlayer;
 const rooms: Room[] = [];
 const gate = NPC_BY_ID.thu_mon;
 const LINH_HU = dungeonOf(LINH_HU_ID)!;
 
 beforeAll(async () => {
   process.env.DATA_DIR = dataDir; // store.ts đọc biến này lúc nạp module
-  ({ killMonster } = await import("../systems/combat"));
+  ({ killMonster, hurtPlayer } = await import("../systems/combat"));
   const { WorldRoom, defineRooms } = await import("./WorldRoom");
   WorldRoomClass = WorldRoom;
   server = new Server({ transport: new WebSocketTransport(), gracefullyShutdown: false });
@@ -98,6 +100,9 @@ interface Hero {
   invites: DungeonInviteMsg[];
   states: DungeonStateMsg[];
   ends: DungeonEndMsg[];
+  /** `dungeonFallen` (gục, không mất kiếp) và số lần nhận `limbo` (phải luôn 0 trong bí cảnh) */
+  fallens: DungeonFallenMsg[];
+  limbos: number;
   travels: TravelToMsg[];
   toasts: ToastMsg[];
   parties: PartyMsg[];
@@ -108,6 +113,8 @@ function listen(room: Room, h: Hero) {
   room.onMessage(DUNGEON_MSG.invite, (m: DungeonInviteMsg) => h.invites.push(m));
   room.onMessage(DUNGEON_MSG.state, (m: DungeonStateMsg) => h.states.push(m));
   room.onMessage(DUNGEON_MSG.end, (m: DungeonEndMsg) => h.ends.push(m));
+  room.onMessage(DUNGEON_MSG.fallen, (m: DungeonFallenMsg) => h.fallens.push(m));
+  room.onMessage("limbo", () => h.limbos++);
   room.onMessage("travelTo", (m: TravelToMsg) => h.travels.push(m));
   room.onMessage("toast", (m: ToastMsg) => h.toasts.push(m));
   room.onMessage("party", (m: PartyMsg) => h.parties.push(m));
@@ -131,6 +138,8 @@ async function spawn(
     invites: [],
     states: [],
     ends: [],
+    fallens: [],
+    limbos: 0,
     travels: [],
     toasts: [],
     parties: [],
@@ -179,6 +188,8 @@ async function followTravel(h: Hero, travel: TravelToMsg): Promise<Room> {
   h.invites = [];
   h.states = [];
   h.ends = [];
+  h.fallens = [];
+  h.limbos = 0;
   h.travels = [];
   h.toasts = [];
   listen(room, h);
@@ -643,4 +654,70 @@ describe("thắng bí cảnh: hạ trùm, thưởng, lượt mỗi ngày (4c)", 
     expect(eb.rewardsLeft).toBe(2);
     expect(wb.save.dungeonDaily).toEqual({ day: dayKey(Date.now()), rewards: 1 });
   });
+});
+
+describe("gục trong bí cảnh: không mất kiếp (quyết định 11/11)", () => {
+  /** Cả hai đã vào phòng bí cảnh; trả phòng, world phía server. */
+  async function inside() {
+    const { a, b, run } = await setupRun();
+    a.room.send(DUNGEON_MSG.enter, { runId: run.id });
+    const ra = await followTravel(a, await waitFor(() => a.travels[0], 5000));
+    b.room.send(DUNGEON_MSG.enter, { runId: run.id });
+    const rb = await followTravel(b, await waitFor(() => b.travels[0], 5000));
+    const world = (serverRoom(ra) as any).world;
+    return { a, b, run, ra, rb, world };
+  }
+  const lethal = (t: Awaited<ReturnType<typeof inside>>, r: Room) => {
+    const p = serverState(r).players.get(r.sessionId)!;
+    const monster = t.world.state.monsters.values().next().value;
+    hurtPlayer(t.world, r.sessionId, p, p.hp + 100000, monster);
+  };
+
+  it("A gục: nhận `dungeonFallen` (không `limbo`, không `dungeonEnd`), B thấy A `alive: false` và run chạy tiếp; sau ~3 giây A về Lạc Hà, hồ sơ KHÔNG limbo, đồ / Linh thạch / cảnh giới nguyên, mất MỘT lượt; B cũng gục thì run thua `all_dead` và được dọn", async () => {
+    const t = await inside();
+    const ctrlA = t.world.ctrl.get(t.ra.sessionId);
+    ctrlA.coin = 321;
+    const kiep = ctrlA.soul.kiep;
+    const lifeId = ctrlA.lifeId;
+
+    lethal(t, t.ra);
+    const fa = await waitFor(() => t.a.fallens[0], 4000, "dungeonFallen của A");
+    expect(fa).toMatchObject({ exitInMs: 3000, rewardsLeft: 2 });
+    expect(serverState(t.ra).players.get(t.ra.sessionId)!.dead).toBe(true);
+    expect(ctrlA.limbo).toBeUndefined();
+    expect(t.a.ends).toHaveLength(0);
+    expect(t.b.fallens).toHaveLength(0);
+    await waitFor(
+      () => t.b.states.at(-1)?.members.some((m) => m.name === t.a.name && !m.alive),
+      3000,
+      "B thấy A gục",
+    );
+    expect(t.run.phase).toBe("running"); // B còn đứng: tiếp tục
+
+    // ~3 giây sau: đứng dậy (khí huyết một phần) rồi bị đưa về Lạc Hà (travelTo không roomId)
+    expect(await waitFor(() => t.a.travels[0], 8000, "A bị đẩy ra")).toEqual({
+      mapId: DEFAULT_MAP_ID,
+    });
+    const rec = saveOf(t.a.name);
+    expect(rec.limbo).toBeUndefined();
+    expect(rec.coin).toBe(321);
+    expect([rec.realm, rec.tier]).toEqual([1, 8]);
+    expect(rec.lifeId).toBe(lifeId);
+    expect(rec.mapId).toBe(DEFAULT_MAP_ID);
+    expect(rec.dungeonDaily).toEqual({ day: dayKey(Date.now()), rewards: 1 });
+    expect(ctrlA.soul.kiep).toBe(kiep);
+    expect(t.a.limbos).toBe(0);
+
+    // B (người còn lại) cũng gục: run thua `all_dead`, dọn sạch
+    lethal(t, t.rb);
+    await waitFor(() => t.b.fallens[0], 4000, "dungeonFallen của B");
+    await waitFor(() => t.run.phase === "lost", 4000, "run thua");
+    expect(t.run.endReason).toBe("all_dead");
+    expect(await waitFor(() => t.b.travels[0], 8000, "B bị đẩy ra")).toEqual({
+      mapId: DEFAULT_MAP_ID,
+    });
+    expect(saveOf(t.b.name).limbo).toBeUndefined();
+    expect(t.b.limbos).toBe(0);
+    await waitFor(() => runs().size === 0, 8000, "run được dọn");
+  }, 30_000);
 });

@@ -79,7 +79,7 @@ interface SoulStore {
 
 **Rớt mạng không bị giết** (người dùng yêu cầu): hiện `ghosts` giữ nhân vật `RECONNECT_GRACE_S` (20) giây nhưng nhân vật vẫn bị quái đánh (`hurtPlayer` không kiểm gì). Sửa: cờ `PlayerCtrl.ghost` đặt khi vào `ghosts`; `hurtPlayer` bỏ qua người `ghost`, quái không chọn người `ghost` làm mục tiêu và bỏ mục tiêu ngay khi người đó thành ghost. Hết 20 s thì lưu và rời như hiện nay. Rủi ro lạm dụng (cố ý rút dây mạng để thoát trận): hồn lìa xác không hồi máu, không tu luyện, không nhặt đồ, nhân vật rời phòng sau 20 s nên không "đứng ngoài" mãi; ghi log số lần ghost mỗi người để C / A soi nếu thấy lạm dụng.
 
-**Chết ở bản đồ / phòng khác, trong đội, trong bí cảnh (bước 4):** như trên, luôn đầu thai ở Lạc Hà Trấn. Đội: người chết vẫn nằm trong đội (đội dùng đạo hiệu, không phụ thuộc kiếp); `partyExpShare` tính theo người có mặt như cũ.
+**Chết ở bản đồ / phòng khác, trong đội (bước 4):** như trên, luôn đầu thai ở Lạc Hà Trấn. **Ngoại lệ: gục TRONG PHÒNG BÍ CẢNH không phải chết thật** (quyết định 11/11/2026): không Hoàng Tuyền, không mất kiếp, không tính Duyên; bị đẩy ra về cổng vào, mất một lượt ngày, không thưởng (`THIET_KE_BI_CANH.md` mục 4.4). Cùng loại ngoại lệ với thua thách đấu PK. Đội: người chết vẫn nằm trong đội (đội dùng đạo hiệu, không phụ thuộc kiếp); `partyExpShare` tính theo người có mặt như cũ.
 
 **Đi cùng PK (bước 5):** chết vì thách đấu đi nhánh "hồi sinh" cũ (`RESPAWN_MS`, không mất gì); `DEATH_EXP_LOSS` bỏ ở bước này vì không còn nhánh nào dùng tới.
 

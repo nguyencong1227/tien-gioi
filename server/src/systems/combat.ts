@@ -16,6 +16,7 @@ import { dropLoot } from "./loot";
 import { bossKilled } from "./dungeon";
 import { onMonsterKilled } from "./quests";
 import { killShares } from "./party";
+import { dungeonFall } from "./dungeon";
 import { beginLimbo } from "./reincarnation";
 import { rollDamage } from "./damage";
 import { duelBeam, duelSlash, reviveInPlace } from "./duel";
@@ -140,6 +141,8 @@ export function hurtPlayer(w: World, sid: string, p: Player, dmg: number, from: 
   c.lastHitAt = w.now;
   w.events.dmg({ target: sid, amount: dmg, x: p.x, y: p.y - 20, toPlayer: true });
   if (p.hp <= 0) {
+    // Trong phòng bí cảnh: gục KHÔNG mất kiếp (bị đẩy ra, mất lượt; quyết định 11/11/2026, systems/dungeon.ts `dungeonFall`)
+    if (dungeonFall(w, sid, p, c)) return;
     // Chết thật = luân hồi (docs/THIET_KE_LUAN_HOI.md): nhân vật của kiếp mất hẳn, linh hồn vào Hoàng Tuyền
     if (w.reincarnate) return beginLimbo(w, sid, p, c);
     // Nhánh hồi sinh (chết không mất kiếp, vd PK thách đấu ở bước 5): nằm tại chỗ RESPAWN_MS rồi hồi sinh ở trấn, không mất gì
