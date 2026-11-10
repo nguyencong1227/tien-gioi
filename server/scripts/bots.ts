@@ -12,6 +12,7 @@ import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
 import { Client, Protocol, type Room } from "colyseus.js";
 import {
+  AUTH_API,
   DEFAULT_MAP,
   NPC_BY_ID,
   NPC_RANGE,
@@ -94,6 +95,8 @@ interface CliArgs {
   map: string;
   travel: boolean;
   die: boolean;
+  account: boolean;
+  loginStorm: boolean;
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -122,6 +125,8 @@ function parseArgs(argv: string[]): CliArgs {
   let map = DEFAULT_MAP.def.id;
   let travel = false;
   let die = false;
+  let account = false;
+  let loginStorm = false;
 
   for (const arg of argv) {
     if (arg.startsWith("--bots=")) bots = Math.max(0, Number(arg.slice(7)));
@@ -167,6 +172,8 @@ function parseArgs(argv: string[]): CliArgs {
     else if (arg === "--write-doc") writeDoc = true;
     else if (arg === "--suite") suite = true;
     else if (arg === "--allow-other-port") allowOtherPort = true;
+    else if (arg === "--account") account = true;
+    else if (arg === "--login-storm") loginStorm = true;
   }
 
   if (leak) {
@@ -219,6 +226,8 @@ function parseArgs(argv: string[]): CliArgs {
     map,
     travel,
     die,
+    account,
+    loginStorm,
   };
 }
 
@@ -290,6 +299,144 @@ function soulFileOf(name: string): string {
   const norm = name.normalize("NFC").toLowerCase().trim();
   const hash = createHash("sha1").update(norm).digest("hex");
   return path.join(soulsDirPath(), `${hash}.json`);
+}
+
+export interface BotAccountResult {
+  token: string;
+  username: string;
+  isNew: boolean;
+  latencyMs: number;
+}
+
+/**
+ * Xác thực tài khoản cho bot khi chạy với chế độ tài khoản (AUTH_MODE=account).
+ * Sử dụng header X-Forwarded-For với IP giả định riêng cho từng bot (10.0.x.y) để
+ * không kích hoạt giới hạn tần suất theo IP khi TRUST_PROXY bật.
+ */
+export async function authBotAccount(
+  httpBase: string,
+  botIndex: number,
+  botName: string,
+  customPassword?: string,
+): Promise<BotAccountResult> {
+  const numStr = String(botIndex).padStart(3, "0");
+  const username = `bot_u_${numStr}`;
+  const password = customPassword ?? `bot_pass_${numStr}_tien_gioi_123`;
+  const ip = `10.0.${Math.floor(botIndex / 250)}.${(botIndex % 250) + 1}`;
+  const headers = {
+    "Content-Type": "application/json",
+    "X-Forwarded-For": ip,
+  };
+
+  const t0 = performance.now();
+  let token: string | undefined;
+  let isNew = false;
+
+  // 1. Thử đăng nhập trước
+  const loginRes = await fetch(`${httpBase}${AUTH_API.login}`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ username, password }),
+  });
+
+  if (loginRes.ok) {
+    const data = (await loginRes.json()) as { token: string };
+    token = data.token;
+  } else {
+    // 2. Nếu chưa có tài khoản, đăng ký mới
+    const regRes = await fetch(`${httpBase}${AUTH_API.register}`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ username, password }),
+    });
+    if (!regRes.ok) {
+      const errText = await regRes.text();
+      throw new Error(`Bot ${botIndex} đăng ký thất bại (${regRes.status}): ${errText}`);
+    }
+    const data = (await regRes.json()) as { token: string };
+    token = data.token;
+    isNew = true;
+  }
+
+  if (!token) throw new Error(`Không lấy được token cho Bot ${botIndex}`);
+
+  // 3. Đặt đạo hiệu nếu chưa có
+  const charRes = await fetch(`${httpBase}${AUTH_API.character}`, {
+    method: "POST",
+    headers: {
+      ...headers,
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ name: botName }),
+  });
+
+  if (!charRes.ok) {
+    const errText = await charRes.text();
+    let errCode = "";
+    try {
+      errCode = JSON.parse(errText)?.error ?? "";
+    } catch {
+      // Bỏ qua nếu không phải JSON
+    }
+    if (errCode !== "has_character") {
+      throw new Error(`Bot ${botIndex} đặt đạo hiệu thất bại (${charRes.status}): ${errText}`);
+    }
+  }
+
+  const latencyMs = performance.now() - t0;
+  return { token, username, isNew, latencyMs };
+}
+
+export interface LoginStormReport {
+  total: number;
+  success: number;
+  failed: number;
+  avgLatencyMs: number;
+  p50LatencyMs: number;
+  p95LatencyMs: number;
+  maxLatencyMs: number;
+  totalDurationMs: number;
+}
+
+/**
+ * Thử tải bão đăng nhập (Login Storm): gửi đồng thời N yêu cầu xác thực tài khoản
+ * qua HTTP API và đo lường độ trễ cũng như tỷ lệ thành công.
+ */
+export async function runLoginStorm(
+  httpBase: string,
+  botCount: number,
+  prefix = "Bot",
+  customPassword?: string,
+): Promise<LoginStormReport> {
+  const start = performance.now();
+  const tasks = Array.from({ length: botCount }, (_, i) => {
+    const idx = i + 1;
+    const botName = `${prefix} ${String(idx).padStart(3, "0")}`;
+    return authBotAccount(httpBase, idx, botName, customPassword)
+      .then((res) => ({ ok: true, latency: res.latencyMs, err: null }))
+      .catch((err) => ({ ok: false, latency: 0, err: (err as Error).message }));
+  });
+
+  const results = await Promise.all(tasks);
+  const totalDurationMs = performance.now() - start;
+  const successes = results.filter((r) => r.ok);
+  const latencies = successes.map((r) => r.latency).sort((a, b) => a - b);
+
+  const avg = latencies.length ? latencies.reduce((a, b) => a + b, 0) / latencies.length : 0;
+  const p50 = latencies.length ? latencies[Math.floor(latencies.length * 0.5)] : 0;
+  const p95 = latencies.length ? latencies[Math.floor(latencies.length * 0.95)] : 0;
+  const max = latencies.length ? latencies[latencies.length - 1] : 0;
+
+  return {
+    total: botCount,
+    success: successes.length,
+    failed: results.length - successes.length,
+    avgLatencyMs: Math.round(avg * 10) / 10,
+    p50LatencyMs: Math.round(p50 * 10) / 10,
+    p95LatencyMs: Math.round(p95 * 10) / 10,
+    maxLatencyMs: Math.round(max * 10) / 10,
+    totalDurationMs: Math.round(totalDurationMs * 10) / 10,
+  };
 }
 
 /**
@@ -512,6 +659,8 @@ interface BotState {
   soulBuysCount: number;
   limboLatencies: number[];
   rebirthLatencies: number[];
+  // Trường cho chế độ tài khoản (#176)
+  token?: string;
 }
 
 export interface LoadTestMetrics {
@@ -906,6 +1055,7 @@ async function runLoadTest(
   mapId: string = DEFAULT_MAP.def.id,
   travel = false,
   die = false,
+  account = false,
 ): Promise<LoadTestMetrics> {
   const currentMap = getMap(mapId) ?? DEFAULT_MAP;
   const partySuffix = partySize > 1 ? `, tổ đội ${partySize} người` : "";
@@ -915,17 +1065,37 @@ async function runLoadTest(
   const leakSuffix = leak ? ", leak-test" : "";
   const travelSuffix = travel ? ", travel qua cổng" : "";
   const dieSuffix = die ? ", bot tự tử (--die)" : "";
+  const accountSuffix = account ? ", tài khoản (--account)" : "";
   const mapSuffix =
     currentMap.def.id !== DEFAULT_MAP.def.id ? `, bản đồ=${currentMap.def.name}` : "";
   const modeLabel =
     mode === "realistic"
-      ? `Thực tế (vào tầm đứng chém${partySuffix}${shopSuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${mapSuffix})`
+      ? `Thực tế (vào tầm đứng chém${partySuffix}${shopSuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${mapSuffix})`
       : mode === "crowd"
-        ? `Đông người trong trấn/khu an toàn (${shop ? "25% ghé Dược Sư, 25% đứng, 50% đi" : "30% đứng yên, 70% đi lại"}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${mapSuffix})`
-        : `Xấu nhất (100% di chuyển 20 input/s${partySuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${mapSuffix})`;
+        ? `Đông người trong trấn/khu an toàn (${shop ? "25% ghé Dược Sư, 25% đứng, 50% đi" : "30% đứng yên, 70% đi lại"}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${mapSuffix})`
+        : `Xấu nhất (100% di chuyển 20 input/s${partySuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${mapSuffix})`;
   console.log(
     `\n=== Bắt đầu thử tải [${modeLabel}]: ${botCount} bot, đo trong ${durationSec}s (${url}) ===`,
   );
+
+  let useAccount = account;
+  if (!useAccount) {
+    try {
+      const httpHealthUrl = url.replace(/^ws/, "http").replace(/\/$/, "");
+      const res = await fetch(`${httpHealthUrl}/health`, { signal: AbortSignal.timeout(1500) });
+      if (res.ok) {
+        const health = (await res.json()) as { authMode?: string };
+        if (health.authMode === "account") {
+          useAccount = true;
+          console.log(
+            "  [Tự động] Server chạy AUTH_MODE=account, tự động dùng xác thực tài khoản cho bot.",
+          );
+        }
+      }
+    } catch {
+      // Bỏ qua nếu không kết nối được qua HTTP
+    }
+  }
 
   const bots: BotState[] = [];
   const createdBotNames = new Set<string>();
@@ -964,7 +1134,6 @@ async function runLoadTest(
     const name = `Bot ${numStr}`;
     createdBotNames.add(name);
     const secret = `bot_secret_tien_gioi_${numStr}_loadtest`;
-    const joinOpts: JoinOptions = { name, secret };
 
     // Khởi tạo vị trí (campX, campY) rải đều khắp vùng hoang dã giống bench.ts trước khi joinOrCreate
     const realm = rnd() < 0.8 ? 1 : 2;
@@ -1024,17 +1193,26 @@ async function runLoadTest(
         }
       }
     }
-    const lifeSeed = die ? { playMs: 48 * 60_000, kills: 30, bossKills: 0 } : undefined;
-    seedBotSaveFile(
-      name,
-      secret,
-      campX,
-      campY,
-      die ? 1 : realm,
-      die ? 8 : tier,
-      currentMap.def.id,
-      lifeSeed,
-    );
+    let joinOpts: JoinOptions | { token: string } = { name, secret };
+    let botToken: string | undefined;
+    if (useAccount) {
+      const httpBase = url.replace(/^ws/, "http").replace(/\/$/, "");
+      const authRes = await authBotAccount(httpBase, i, name);
+      botToken = authRes.token;
+      joinOpts = { token: botToken };
+    } else {
+      const lifeSeed = die ? { playMs: 48 * 60_000, kills: 30, bossKills: 0 } : undefined;
+      seedBotSaveFile(
+        name,
+        secret,
+        campX,
+        campY,
+        die ? 1 : realm,
+        die ? 8 : tier,
+        currentMap.def.id,
+        lifeSeed,
+      );
+    }
 
     const client = new Client(url);
     const roomName = roomNameOf(currentMap.def.id);
@@ -1047,10 +1225,13 @@ async function runLoadTest(
       try {
         const nextMap = getMap(msg.mapId) ?? DEFAULT_MAP;
         const targetClient = new Client(url);
-        const nextRoom = await targetClient.joinOrCreate(roomNameOf(nextMap.def.id), {
-          name: bot.name,
-          secret: `bot_secret_tien_gioi_${String(bot.index).padStart(3, "0")}_loadtest`,
-        });
+        const nextOpts = bot.token
+          ? { token: bot.token }
+          : {
+              name: bot.name,
+              secret: `bot_secret_tien_gioi_${String(bot.index).padStart(3, "0")}_loadtest`,
+            };
+        const nextRoom = await targetClient.joinOrCreate(roomNameOf(nextMap.def.id), nextOpts);
         bot.map = nextMap;
         bindRoomEvents(
           bot,
@@ -1133,6 +1314,7 @@ async function runLoadTest(
       soulBuysCount: 0,
       limboLatencies: [],
       rebirthLatencies: [],
+      token: botToken,
     };
 
     bindRoomEvents(
@@ -2302,6 +2484,24 @@ async function main() {
   const commit = args.commitOverride || currentGitCommit();
   let idleZeroBots: IdleZeroBotMetrics | undefined;
 
+  if (args.loginStorm) {
+    const httpBase = args.url.replace(/^ws/, "http").replace(/\/$/, "");
+    console.log(`\n=== Bắt đầu thử tải Login Storm: ${args.bots} bot đồng thời (${httpBase}) ===`);
+    const report = await runLoginStorm(httpBase, args.bots);
+    console.log(`\n=== Kết quả Login Storm ===`);
+    console.log(`  Tổng yêu cầu:       ${report.total}`);
+    console.log(
+      `  Thành công:         ${report.success} (${Math.round((report.success / report.total) * 100)}%)`,
+    );
+    console.log(`  Thất bại:           ${report.failed}`);
+    console.log(`  Tổng thời gian:     ${report.totalDurationMs} ms`);
+    console.log(`  Độ trễ trung bình:  ${report.avgLatencyMs} ms`);
+    console.log(`  Độ trễ p50:         ${report.p50LatencyMs} ms`);
+    console.log(`  Độ trễ p95:         ${report.p95LatencyMs} ms`);
+    console.log(`  Độ trễ tối đa:      ${report.maxLatencyMs} ms`);
+    return;
+  }
+
   if (args.bots === 0 && !args.suite) {
     await runIdleZeroBotTest(args.durationSec, args.url, args.port, args.keepSaves, args.map);
     return;
@@ -2344,6 +2544,7 @@ async function main() {
           args.map,
           args.travel,
           args.die,
+          args.account,
         ),
       );
     }
