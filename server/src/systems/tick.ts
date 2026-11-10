@@ -14,6 +14,7 @@ export function tickWorld(w: World, dtMs: number) {
     if (!c) return;
     if (p.dead) return tickRespawn(w, p, c);
     if (w.ghosts.size > 0 && w.ghosts.has(sid)) return; // hồn lìa xác: đứng yên, không hồi phục, không tu luyện
+    c.life.playMs += dtMs; // thời gian chơi thật của kiếp (không tính chết, hồn lìa xác)
     applyInputs(w.map, p, c);
     if ((w.tick + c.posPhase) % POS_SYNC_EVERY_TICKS === 0) syncPublicPos(p);
     tickRecovery(w, sid, p, c, dt);

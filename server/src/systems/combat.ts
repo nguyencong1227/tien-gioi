@@ -105,6 +105,11 @@ export function killMonster(w: World, id: string, mc: MonsterCtrl) {
     const share = Math.max(1, Math.round(killExp(mc.def, p.realm, p.tier) * frac));
     gainExp(w, sid, p, share);
     onMonsterKilled(w, sid, mc.def.id); // ai góp sát thương (hoặc cùng đội) cũng được tính cho nhiệm vụ
+    const life = w.ctrl.get(sid)?.life; // và cho thành tựu của kiếp (Duyên khi luân hồi)
+    if (life) {
+      life.kills++;
+      if (mc.def.boss) life.bossKills++;
+    }
   }
   if (mon) dropCoin(w, mc, mon.x, mon.y);
   if (mc.def.boss) w.events.sys(`🐉 ${mc.def.name} đã bị hạ!`);

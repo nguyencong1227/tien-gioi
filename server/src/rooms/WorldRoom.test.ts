@@ -4,6 +4,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { Client, getStateCallbacks, type Room } from "colyseus.js";
@@ -595,7 +596,7 @@ describe("lưu nhân vật", () => {
     await room.leave(true);
     rooms.length = 0;
     const saved = await waitFor(() => {
-      for (const f of readdirSync(dataDir)) {
+      for (const f of readdirSync(dataDir).filter((x) => x.endsWith(".json"))) {
         const j = JSON.parse(readFileSync(path.join(dataDir, f), "utf8"));
         if (j.name === "Luu Tru" && j.realm === 1) return j;
       }
@@ -673,9 +674,9 @@ describe("túi đồ và đồ rơi", () => {
       await a.room.leave(true);
       rooms.splice(rooms.indexOf(a.room), 1);
       await sleep(200);
-      const file = readdirSync(dataDir).find(
-        (f) => JSON.parse(readFileSync(path.join(dataDir, f), "utf8")).name === name,
-      )!;
+      const file = readdirSync(dataDir)
+        .filter((x) => x.endsWith(".json"))
+        .find((f) => JSON.parse(readFileSync(path.join(dataDir, f), "utf8")).name === name)!;
       const full = path.join(dataDir, file);
       const j = JSON.parse(readFileSync(full, "utf8"));
       j.coin = bad;
@@ -1353,9 +1354,9 @@ describe("nhiều bản đồ: mỗi bản đồ một phòng (M3 bước 1)", (
     throw new Error("Đáng ra phải bị từ chối");
   }
   const saveFileOf = (name: string) => {
-    const f = readdirSync(dataDir).find(
-      (x) => JSON.parse(readFileSync(path.join(dataDir, x), "utf8")).name === name,
-    );
+    const f = readdirSync(dataDir)
+      .filter((x) => x.endsWith(".json"))
+      .find((x) => JSON.parse(readFileSync(path.join(dataDir, x), "utf8")).name === name);
     return f ? path.join(dataDir, f) : undefined;
   };
   /** Tạo nhân vật rồi sửa file lưu như thể đã đi qua cổng / file hỏng */
@@ -1501,9 +1502,9 @@ describe("chat toàn server giữa các bản đồ (M3 bước 1)", () => {
     await a.room.leave(true);
     rooms.splice(rooms.indexOf(a.room), 1);
     await sleep(200);
-    const f = readdirSync(dataDir).find(
-      (x) => JSON.parse(readFileSync(path.join(dataDir, x), "utf8")).name === name,
-    )!;
+    const f = readdirSync(dataDir)
+      .filter((x) => x.endsWith(".json"))
+      .find((x) => JSON.parse(readFileSync(path.join(dataDir, x), "utf8")).name === name)!;
     const full = path.join(dataDir, f);
     writeFileSync(
       full,
@@ -1552,8 +1553,10 @@ describe("chat toàn server giữa các bản đồ (M3 bước 1)", () => {
     const b = await joinHacPhong("Chat Phong Dong");
     const hub = WorldRoomClass.hub;
     const before = hub.chatSinkCount;
+    const worldsBefore = hub.worlds.size;
     await serverRoom(b.room).disconnect();
     await waitFor(() => hub.chatSinkCount === before - 1, 3000);
+    expect(hub.worlds.size).toBe(worldsBefore - 1); // thế giới của phòng đã đóng cũng rời Hub
     await sleep(900);
     a.room.send("chat", { text: "vẫn nói được" });
     await waitFor(() => a.chat.find((m) => m.text === "vẫn nói được"));
@@ -1566,9 +1569,9 @@ describe("đi qua cổng giữa hai bản đồ (M3 bước 1)", () => {
   const BAC = lacHa.portals[0];
   const NAM = hacPhong.portals[0];
   const fileOf = (name: string) => {
-    const f = readdirSync(dataDir).find(
-      (x) => JSON.parse(readFileSync(path.join(dataDir, x), "utf8")).name === name,
-    );
+    const f = readdirSync(dataDir)
+      .filter((x) => x.endsWith(".json"))
+      .find((x) => JSON.parse(readFileSync(path.join(dataDir, x), "utf8")).name === name);
     return JSON.parse(readFileSync(path.join(dataDir, f!), "utf8"));
   };
   /** Nghe tin `travelTo` của một phòng */
@@ -1721,5 +1724,210 @@ describe("đi qua cổng giữa hai bản đồ (M3 bước 1)", () => {
     c.travelling = false;
     await sr.persist(p, c);
     expect(fileOf(name).mapId).toBe(DEFAULT_MAP_ID);
+  });
+});
+
+describe("đội dùng chung giữa các bản đồ (M3 bước 1)", () => {
+  const hp = getMap(HAC_PHONG_ID)!;
+  const BAC = getMap(DEFAULT_MAP_ID)!.portals[0];
+  function listenParty(room: Room) {
+    const parties: PartyMsg[] = [];
+    const invited: PartyInvitedMsg[] = [];
+    room.onMessage("party", (m: PartyMsg) => parties.push(m));
+    room.onMessage("partyInvited", (m: PartyInvitedMsg) => invited.push(m));
+    return { parties, invited };
+  }
+  async function joinHacPhong(name: string) {
+    const a = await join(name);
+    await a.room.leave(true);
+    rooms.splice(rooms.indexOf(a.room), 1);
+    await sleep(200);
+    const f = readdirSync(dataDir).find(
+      (x) => JSON.parse(readFileSync(path.join(dataDir, x), "utf8")).name === name,
+    )!;
+    const full = path.join(dataDir, f);
+    writeFileSync(
+      full,
+      JSON.stringify({
+        ...JSON.parse(readFileSync(full, "utf8")),
+        mapId: HAC_PHONG_ID,
+        x: Math.round(hp.townPx.x),
+        y: Math.round(hp.townPx.y),
+      }),
+    );
+    return join(name, secretOf(name), HAC_PHONG_ID);
+  }
+
+  it("lập đội giữa hai bản đồ, chat đội chéo, đi qua cổng vẫn ở trong đội (nhận đội hình ngay ở phòng mới), thoát hẳn thì rời đội", async () => {
+    const a = await join("Doi Chu Lac");
+    const b = await joinHacPhong("Doi Chu Hac");
+    const la = listenParty(a.room);
+    const lb = listenParty(b.room);
+
+    a.room.send("partyInvite", { name: b.name });
+    await waitFor(() => lb.invited[0]);
+    b.room.send("partyAccept", { from: a.name });
+    const first = await waitFor(() => la.parties.find((m) => m.members.length === 2));
+    expect(first.members.map((m) => [m.name, m.mapId])).toEqual([
+      [a.name, DEFAULT_MAP_ID],
+      [b.name, HAC_PHONG_ID],
+    ]);
+    await waitFor(() => lb.parties.some((m) => m.members.length === 2));
+
+    // Chat đội đi chéo hai bản đồ
+    b.room.send("chat", { text: "/p đội ơi, mình ở Hắc Phong" });
+    await waitFor(() => a.chat.some((m) => m.channel === "party" && m.text.includes("Hắc Phong")));
+
+    // A đi qua cổng sang Hắc Phong Cốc: vẫn ở trong đội
+    const sp = serverState(a.room).players.get(a.room.sessionId)!;
+    sp.x = BAC.x;
+    sp.y = BAC.y;
+    const got: { mapId: string }[] = [];
+    a.room.onMessage("travelTo", (m: { mapId: string }) => got.push(m));
+    a.room.send("travel", { portalId: BAC.id });
+    await waitFor(() => got.length === 1);
+    await waitFor(() => !a.room.connection.isOpen);
+    const a2 = await join(a.name, secretOf(a.name), HAC_PHONG_ID);
+    const la2 = listenParty(a2.room);
+    // B (ở phòng cũ của A) thấy A đã đổi mapId trong đội hình
+    await waitFor(
+      () => lb.parties.at(-1)?.members.some((m) => m.name === a.name && m.mapId === HAC_PHONG_ID),
+      PARTY_SNAPSHOT_MS * 4,
+    );
+    // A nhận đội hình ở phòng mới (ngay khi vào hoặc theo nhịp kế tiếp), vẫn đủ hai người
+    const resync = await waitFor(
+      () => la2.parties.find((m) => m.members.length === 2),
+      PARTY_SNAPSHOT_MS * 3,
+    );
+    expect(resync.leader).toBe(a.name);
+    expect((serverRoom(a2.room) as any).world.parties.size).toBe(1);
+
+    // B thoát hẳn: đội giải tán, A nhận NO_PARTY
+    await b.room.leave(true);
+    rooms.splice(rooms.indexOf(b.room), 1);
+    await waitFor(() => la2.parties.at(-1)?.members.length === 0, 3000);
+    expect((serverRoom(a2.room) as any).world.parties.size).toBe(0);
+  });
+});
+
+describe("chân linh và bộ đếm kiếp (M3 bước 2)", () => {
+  const soulsPath = () => path.join(dataDir, "souls");
+  const soulFile = (name: string) =>
+    path.join(
+      soulsPath(),
+      `${createHash("sha1").update(name.normalize("NFC").toLowerCase()).digest("hex")}.json`,
+    );
+  const playerFile = (name: string) => {
+    const f = readdirSync(dataDir)
+      .filter((x) => x.endsWith(".json"))
+      .find(
+        (x) =>
+          x.endsWith(".json") &&
+          JSON.parse(readFileSync(path.join(dataDir, x), "utf8")).name === name,
+      )!;
+    return path.join(dataDir, f);
+  };
+  const leave = async (a: { room: Room }) => {
+    await a.room.leave(true);
+    rooms.splice(rooms.indexOf(a.room), 1);
+    await sleep(250);
+  };
+
+  it("vào game lần đầu: tạo chân linh (kiếp 1, 0 Duyên) trong DATA_DIR/souls; lifeId sinh một lần và giữ nguyên qua các lần vào", async () => {
+    const name = "Chan Linh Moi";
+    const a = await join(name);
+    const soul = JSON.parse(readFileSync(soulFile(name), "utf8"));
+    expect([soul.kiep, soul.duyen, soul.best.step, soul.id]).toEqual([1, 0, 0, name.toLowerCase()]);
+    await leave(a);
+    const life1 = JSON.parse(readFileSync(playerFile(name), "utf8"));
+    expect(typeof life1.lifeId).toBe("string");
+    expect(life1.lifeId.length).toBeGreaterThan(10);
+    const b = await join(name);
+    await leave(b);
+    expect(JSON.parse(readFileSync(playerFile(name), "utf8")).lifeId).toBe(life1.lifeId);
+    // hồ sơ nhân vật không lẫn với chân linh: thư mục souls/ không làm hỏng việc đọc file nhân vật
+    expect(readdirSync(dataDir).filter((f) => f.endsWith(".json")).length).toBeGreaterThan(0);
+  });
+
+  it("người chơi có từ trước khi có luân hồi: chân linh được tạo lặng lẽ, thành tựu cao nhất = bậc hiện tại, hồ sơ nguyên vẹn", async () => {
+    const name = "Nguoi Cu";
+    const a = await join(name);
+    await leave(a);
+    const pf = playerFile(name);
+    const old = JSON.parse(readFileSync(pf, "utf8"));
+    delete old.lifeId;
+    delete old.life;
+    writeFileSync(pf, JSON.stringify({ ...old, realm: 2, tier: 1, exp: 123 }));
+    rmSync(soulFile(name)); // như chưa từng có chân linh
+    const b = await join(name);
+    expect(b.me().realm).toBe(2);
+    expect(Math.floor(b.me().exp)).toBe(123);
+    const soul = JSON.parse(readFileSync(soulFile(name), "utf8"));
+    expect([soul.kiep, soul.best.realm, soul.best.tier, soul.best.step]).toEqual([1, 2, 1, 11]);
+    await leave(b);
+    const after = JSON.parse(readFileSync(pf, "utf8"));
+    expect(after.lifeId).toBeTruthy();
+    expect(after.life).toEqual({ playMs: expect.any(Number), kills: 0, bossKills: 0 });
+  });
+
+  it("bộ đếm được lưu: thời gian chơi cộng dồn qua các lần vào, quái và trùm đã hạ được tính", async () => {
+    const name = "Dem Kiep";
+    const a = await join(name);
+    const sr = serverRoom(a.room) as any;
+    const ctrl = () => sr.world.ctrl.get(a.room.sessionId);
+    await sleep(700);
+    expect(ctrl().life.playMs).toBeGreaterThan(400);
+    // hạ một con quái bằng đòn đánh thật (còn 1 máu), và một trùm (gọi thẳng killMonster: trùm sẽ giết người chơi mới trước khi kịp đánh)
+    const p = serverState(a.room).players.get(a.room.sessionId)!;
+    p.x = sr.world.map.townPx.x + sr.world.map.townPx.r + 300;
+    p.y = sr.world.map.townPx.y;
+    const [tid, tm] = [...serverState(a.room).monsters].find(([, mm]) => mm.kind === "tho")!;
+    tm.x = p.x + 20;
+    tm.y = p.y;
+    tm.hp = 1;
+    sr.world.mctrl.get(tid).homeX = tm.x;
+    sr.world.mctrl.get(tid).homeY = tm.y;
+    await sleep(SKILLS.slash.cooldown + 50);
+    a.room.send("attack", { angle: 0 });
+    await waitFor(() => !serverState(a.room).monsters.has(tid), 3000);
+    const [bid] = [...serverState(a.room).monsters].find(([, mm]) => mm.kind === "mang")!;
+    const bmc = sr.world.mctrl.get(bid);
+    bmc.damageBy.set(a.room.sessionId, 4000);
+    // nạp động: nạp tĩnh ở đầu tệp sẽ kéo store.ts vào trước khi beforeAll đặt DATA_DIR
+    const { killMonster } = await import("../systems/combat");
+    killMonster(sr.world, bid, bmc);
+    expect([ctrl().life.kills, ctrl().life.bossKills]).toEqual([2, 1]);
+    const first = ctrl().life.playMs;
+    await leave(a);
+    const saved1 = JSON.parse(readFileSync(playerFile(name), "utf8")).life;
+    expect([saved1.kills, saved1.bossKills]).toEqual([2, 1]);
+    expect(saved1.playMs).toBeGreaterThanOrEqual(Math.floor(first));
+    // vào lại: bộ đếm nạp từ file rồi cộng tiếp
+    const b = await join(name);
+    const sr2 = serverRoom(b.room) as any;
+    expect(sr2.world.ctrl.get(b.room.sessionId).life.kills).toBe(2);
+    await sleep(400);
+    expect(sr2.world.ctrl.get(b.room.sessionId).life.playMs).toBeGreaterThan(saved1.playMs);
+  });
+
+  it("bộ đếm hỏng trong file (âm, chữ, vô cùng) được làm sạch khi vào game, không làm hỏng phòng", async () => {
+    const name = "Dem Hong";
+    const a = await join(name);
+    await leave(a);
+    const pf = playerFile(name);
+    writeFileSync(
+      pf,
+      JSON.stringify({
+        ...JSON.parse(readFileSync(pf, "utf8")),
+        life: { playMs: "x", kills: -5, bossKills: 1e300 },
+        lifeId: 12345,
+      }),
+    );
+    const b = await join(name);
+    const c = (serverRoom(b.room) as any).world.ctrl.get(b.room.sessionId);
+    expect(c.life).toMatchObject({ kills: 0, bossKills: 0 });
+    expect(c.life.playMs).toBeLessThan(5000); // "x" thành 0, rồi mới cộng thời gian chơi thật
+    expect(typeof c.lifeId).toBe("string");
+    expect(c.lifeId.length).toBeGreaterThan(10);
   });
 });

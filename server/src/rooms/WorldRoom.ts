@@ -41,9 +41,21 @@ import {
   type TravelMsg,
   type TravelToMsg,
   type GameMap,
+  type Soul,
+  stepOf,
 } from "@tien-gioi/shared";
 import { WorldState, Player } from "../schema";
-import { loadPlayer, savePlayer, hashSecret, cleanName, mapIdOf, type SavedPlayer } from "../store";
+import {
+  loadPlayer,
+  savePlayer,
+  hashSecret,
+  cleanName,
+  mapIdOf,
+  sanitizeLife,
+  sanitizeLifeId,
+  type SavedPlayer,
+} from "../store";
+import { defaultSoulStore, soulIdOf, type SoulStore } from "../soul";
 import { World, type PlayerCtrl } from "../world";
 import { POS_SYNC_EVERY_TICKS, queueInput, safeSpot, syncPublicPos } from "../systems/movement";
 import { slash, swordQi } from "../systems/combat";
@@ -59,7 +71,14 @@ import { abandonQuest, acceptQuest, craft, talk, trade, turnInQuest } from "../s
 import { equip, equipmentOf, sanitizeEquipment, setEquipment, unequip } from "../systems/equipment";
 import { tickWorld } from "../systems/tick";
 import { VIEW_ENTER } from "../systems/interest";
-import { partyAnswer, partyDrop, partyInvite, partyKick, partyLeave } from "../systems/party";
+import {
+  partyAnswer,
+  partyDrop,
+  partyInvite,
+  partyKick,
+  partyLeave,
+  partyResync,
+} from "../systems/party";
 import { planTravel } from "../systems/travel";
 import { RateLimiter } from "../rate-limit";
 import { defaultHub, type Hub } from "../hub";
@@ -87,6 +106,8 @@ export class WorldRoom extends Room<WorldState> {
   autoDispose = false; // thế giới luôn sống, kể cả khi không có ai
   state = new WorldState();
 
+  /** Kho chân linh (file JSON; bước 3 thay bằng PostgreSQL). Test ghi đè để cô lập. */
+  static souls: SoulStore | null = null; // null: `defaultSoulStore()` (dựng lười, đọc DATA_DIR lúc dùng)
   /** Kênh chung giữa các phòng. Test ghi đè để cô lập. */
   static hub: Hub = defaultHub;
   private get hub() {
@@ -120,6 +141,7 @@ export class WorldRoom extends Room<WorldState> {
         chatTo: (sid, msg) => this.sendTo(sid, "chat", msg),
       },
       map,
+      this.hub,
     );
   }
 
@@ -261,7 +283,7 @@ export class WorldRoom extends Room<WorldState> {
       // chỉ là gợi ý chọn phòng, sai thì báo bản đồ đúng để client vào lại (shared/src/travel.ts).
       const home = mapIdOf(existing);
       if (home !== this.mapId) throw new ServerError(JOIN_WRONG_MAP, wrongMapMessage(home));
-      return existing;
+      return { save: existing, soul: await this.soulOf(existing) };
     }
     // Nhân vật mới luôn bắt đầu ở bản đồ mặc định (không tạo file ở phòng sai)
     if (this.mapId !== DEFAULT_MAP_ID)
@@ -277,10 +299,25 @@ export class WorldRoom extends Room<WorldState> {
       updatedAt: now,
     };
     await savePlayer(fresh);
-    return fresh;
+    return { save: fresh, soul: await this.soulOf(fresh) };
   }
 
-  onJoin(client: Client, _options: JoinOptions, save: SavedPlayer) {
+  /**
+   * Chân linh của người chơi: có rồi thì nạp, chưa có thì tạo (kiếp 1, 0 Duyên, thành tựu cao nhất = bậc hiện tại).
+   * Người chơi có từ trước khi có luân hồi được di chuyển lặng lẽ ở đây, vào game lần đầu.
+   */
+  private soulOf(save: SavedPlayer): Promise<Soul> {
+    const realm = Math.min(save.realm, REALMS.length - 1);
+    const tier = Math.min(save.tier, REALMS[realm].tiers.length - 1);
+    const store = WorldRoom.souls ?? defaultSoulStore();
+    return store.create(soulIdOf(save.name), (s) => ({
+      ...s,
+      best: { step: stepOf(realm, tier), realm, tier },
+    }));
+  }
+
+  onJoin(client: Client, _options: JoinOptions, auth: { save: SavedPlayer; soul: Soul }) {
+    const { save, soul } = auth;
     const p = new Player();
     p.name = save.name;
     p.realm = Math.min(save.realm, REALMS.length - 1);
@@ -307,6 +344,9 @@ export class WorldRoom extends Room<WorldState> {
       inv: sanitizeInventory(save.inventory),
       itemCd: new Map(),
       quests: sanitizeQuests(save.quests),
+      lifeId: sanitizeLifeId(save.lifeId),
+      life: sanitizeLife(save.life),
+      soul,
       coin: addCoin(0, save.coin ?? 0),
       frac: { hp: 0, mp: 0, exp: 0, expAt: 0 },
     });
@@ -318,6 +358,7 @@ export class WorldRoom extends Room<WorldState> {
     sendInv(this.world, client.sessionId);
     sendQuests(this.world, client.sessionId);
     sendWallet(this.world, client.sessionId);
+    partyResync(this.world, client.sessionId); // vừa qua cổng từ bản đồ khác: vẫn ở trong đội, nhận đội hình ngay
     this.world.events.sys(`${p.name} (${realmLabel(p.realm, p.tier)}) đã nhập thế.`);
   }
 
@@ -369,9 +410,12 @@ export class WorldRoom extends Room<WorldState> {
     }
   }
 
-  /** Gỡ người chơi khỏi thế giới (không lưu): dùng khi rời phòng và khi đi qua cổng. */
-  private dropPlayer(sid: string) {
-    partyDrop(this.world, sid); // trước khi xoá khỏi state: báo cho đội, dọn lời mời
+  /**
+   * Gỡ người chơi khỏi thế giới (không lưu): dùng khi rời phòng và khi đi qua cổng.
+   * `keepParty`: đi qua cổng thì vẫn ở trong đội (đội dùng chung giữa các phòng); rời hẳn thì rời đội.
+   */
+  private dropPlayer(sid: string, keepParty = false) {
+    if (!keepParty) partyDrop(this.world, sid); // trước khi xoá khỏi state: báo cho đội, dọn lời mời
     this.state.players.delete(sid);
     this.state.online = this.state.players.size;
     this.world.interest.leave(sid);
@@ -384,7 +428,7 @@ export class WorldRoom extends Room<WorldState> {
   /**
    * Đi qua cổng (shared/src/travel.ts): kiểm (`planTravel`), LƯU nhân vật với bản đồ đích + chỗ xuất hiện, đưa ra khỏi
    * phòng (không chờ nối lại), gửi `travelTo`, đóng kết nối. Lưu xong mới gửi: client vào phòng đích sẽ nạp đúng bản ghi đó.
-   * Đội tạm thời tan khi qua cổng (đội và chat dùng chung giữa các phòng là việc kế tiếp của #142).
+   * Đội giữ nguyên khi qua cổng (sổ đội dùng chung giữa các phòng, khoá theo đạo hiệu).
    */
   private async travel(sid: string, portalId: unknown) {
     const plan = planTravel(this.world, sid, portalId);
@@ -409,7 +453,7 @@ export class WorldRoom extends Room<WorldState> {
       if (here) await this.persist(here, c).catch((e) => console.error("save failed", e));
       return;
     }
-    this.dropPlayer(sid);
+    this.dropPlayer(sid, true);
     client.send("travelTo", { mapId: plan.mapId } satisfies TravelToMsg);
     client.leave(CLOSE_TRAVEL);
   }
@@ -417,6 +461,7 @@ export class WorldRoom extends Room<WorldState> {
   async onDispose() {
     this.removeChatSink?.();
     this.removeChatSink = null;
+    this.world?.dispose();
     await this.saveAll();
   }
 
@@ -446,6 +491,8 @@ export class WorldRoom extends Room<WorldState> {
       quests: c.quests,
       equipment: equipmentOf(p),
       coin: c.coin,
+      lifeId: c.lifeId,
+      life: { ...c.life, playMs: Math.floor(c.life.playMs) },
       mapId: at?.mapId ?? this.mapId,
       ...(at ? { travelAt: this.world.now } : {}),
     };

@@ -17,9 +17,10 @@ import type {
   PartyInvitedMsg,
 } from "@tien-gioi/shared";
 import type { WorldState, Player } from "./schema";
-import type { SavedPlayer, QuestSave } from "./store";
+import type { SavedPlayer, QuestSave, LifeCounters } from "./store";
+import type { Soul } from "@tien-gioi/shared";
 import { Interest } from "./systems/interest";
-import { Parties } from "./systems/party";
+import { Hub } from "./hub";
 
 /** Dữ liệu riêng của server cho mỗi người chơi (không gửi xuống client). */
 export interface PlayerCtrl {
@@ -45,6 +46,11 @@ export interface PlayerCtrl {
   itemCd: Map<string, number>;
   /** Sổ nhiệm vụ: chỉ gửi cho chủ qua tin nhắn `quests` */
   quests: QuestSave;
+  /** Định danh kiếp hiện tại và bộ đếm thành tựu của kiếp (lưu cùng nhân vật; không vào state chung) */
+  lifeId: string;
+  life: LifeCounters;
+  /** Ảnh chụp chân linh lúc vào game (nấc mở khóa dùng ở đường nóng: `expMultOf`...); cập nhật khi mua ở Hoàng Tuyền */
+  soul: Soul;
   /** Linh thạch: số nguyên 0..COIN_CAP, chỉ gửi cho chủ qua tin nhắn `wallet`; chỉ đổi bằng systems/wallet.ts */
   coin: number;
   /**
@@ -113,8 +119,10 @@ export class World {
   readonly lctrl = new Map<string, LootCtrl>();
   /** Vùng nhìn của từng client: ai nhận state của thực thể nào (#62) */
   readonly interest: Interest;
-  /** Đội hình: ai ở đội nào, lời mời đang chờ (#74) */
-  readonly parties = new Parties();
+  /** Đội hình: ai ở đội nào, lời mời đang chờ (#74). Dùng chung với mọi phòng qua `hub`, khoá theo đạo hiệu viết thường. */
+  get parties() {
+    return this.hub.parties;
+  }
   /**
    * Người chơi đang "hồn lìa xác": rớt mạng bất thường, nhân vật ở lại chờ nối lại (`RECONNECT_GRACE_S`, #116).
    * **Bất tử** trong lúc chờ (không bị đánh, quái không nhắm, không hồi phục / tu luyện): rớt mạng không được phép
@@ -132,8 +140,16 @@ export class World {
     readonly events: WorldEvents,
     /** Bản đồ của phòng này: ô, va chạm, trấn. Mọi system đọc từ đây, không đọc hằng toàn cục (#123). */
     readonly map: GameMap,
+    /** Kênh chung giữa các phòng (đội, tìm người ở phòng khác). Bỏ trống: một hub riêng, thế giới đứng một mình. */
+    readonly hub: Hub = new Hub(),
   ) {
     this.interest = new Interest(map.worldW, map.worldH);
+    hub.worlds.add(this);
+  }
+
+  /** Thế giới ngừng chạy (phòng đóng): người ở phòng khác không còn tìm thấy người ở đây. */
+  dispose() {
+    this.hub.worlds.delete(this);
   }
 
   /** Người chơi còn sống và đang trong phòng; null nếu không. */
