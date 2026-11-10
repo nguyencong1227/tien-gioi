@@ -58,7 +58,24 @@ import {
   type LimboMsg,
   type RebirthChoice,
   type SoulView,
+  DUNGEON_DAILY_REWARDS,
+  dungeonOf,
+  isDungeonMap,
+  type DungeonInviteMsg,
+  type DungeonStateMsg,
+  type DungeonEndMsg,
 } from "@tien-gioi/shared";
+import {
+  dungeonEndReasonText,
+  dungeonNoRewardText,
+  dungeonPhaseInfo,
+  formatBossView,
+  formatDungeonCountdown,
+  formatDungeonRewardItems,
+  formatInviteCountdown,
+  isMockDungeonEnabled,
+  shouldOpenEndModal,
+} from "./dungeon";
 import { sound } from "./audio";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -100,6 +117,9 @@ export interface UiCallbacks {
   onPartyDecline?: (from: string) => void;
   onBuy?: (npcId: string, itemId: string, qty: number) => void;
   onSell?: (npcId: string, slot: number, qty: number) => void;
+  onDungeonEnter?: (runId: string) => void;
+  onDungeonDecline?: (runId: string) => void;
+  onDungeonLeave?: () => void;
 }
 
 const fmt = (n: number) =>
@@ -148,6 +168,26 @@ function stopInviteTimer() {
   if (inviteInterval !== null) {
     window.clearInterval(inviteInterval);
     inviteInterval = null;
+  }
+}
+
+// ---------- Bí cảnh theo đội (M3.4, #200) ----------
+let currentDungeonInvite: DungeonInviteMsg | null = null;
+let dungeonInviteInterval: number | null = null;
+let dungeonHudInterval: number | null = null;
+let dungeonDeadlineAt = 0;
+
+function stopDungeonInviteTimer() {
+  if (dungeonInviteInterval !== null) {
+    window.clearInterval(dungeonInviteInterval);
+    dungeonInviteInterval = null;
+  }
+}
+
+function stopDungeonHudTimer() {
+  if (dungeonHudInterval !== null) {
+    window.clearInterval(dungeonHudInterval);
+    dungeonHudInterval = null;
   }
 }
 
@@ -1388,7 +1428,8 @@ function renderDialogOptions() {
       opt.action.kind === "accept" ||
       opt.action.kind === "turnIn" ||
       opt.action.kind === "forge" ||
-      opt.action.kind === "shop"
+      opt.action.kind === "shop" ||
+      opt.action.kind === "dungeon"
     ) {
       btn.classList.add("primary");
     }
@@ -1418,10 +1459,16 @@ function renderDialogOptions() {
       tag.textContent = "Cửa hàng";
       tag.style.color = "#ffe08a";
       btn.append(tag);
+    } else if (opt.action.kind === "dungeon") {
+      const tag = document.createElement("small");
+      tag.textContent = opt.disabled ? "Chưa đủ điều kiện" : "Bí cảnh";
+      tag.style.color = opt.disabled ? "#fca5a5" : "#ffe08a";
+      btn.append(tag);
     }
 
     btn.addEventListener("pointerdown", (e) => {
       e.preventDefault();
+      if (opt.disabled) return;
       const action = opt.action;
       const npcId = currentDialog?.npcId ?? "duoc_su";
       ui.closeDialog();
@@ -1873,6 +1920,53 @@ export const ui = {
       if (selectedPlayerName) callbacks?.onPartyInvite?.(selectedPlayerName);
     });
 
+    // Bí cảnh (M3.4, #200)
+    const mockBadge = $("dungeon-mock-badge");
+    if (mockBadge) {
+      mockBadge.hidden = !isMockDungeonEnabled();
+    }
+
+    bindTap("dib-btn-enter", () => {
+      stopDungeonInviteTimer();
+      const runId = currentDungeonInvite?.runId;
+      currentDungeonInvite = null;
+      $("dungeon-invite-box").hidden = true;
+      if (runId) callbacks?.onDungeonEnter?.(runId);
+    });
+
+    bindTap("dib-btn-decline", () => {
+      stopDungeonInviteTimer();
+      const runId = currentDungeonInvite?.runId;
+      currentDungeonInvite = null;
+      $("dungeon-invite-box").hidden = true;
+      if (runId) callbacks?.onDungeonDecline?.(runId);
+    });
+
+    bindTap("dhud-btn-leave", () => {
+      $("dhud-btn-leave").hidden = true;
+      $("dhud-leave-confirm").hidden = false;
+    });
+
+    bindTap("dhud-btn-leave-no", () => {
+      $("dhud-leave-confirm").hidden = true;
+      $("dhud-btn-leave").hidden = false;
+    });
+
+    bindTap("dhud-btn-leave-yes", () => {
+      $("dhud-leave-confirm").hidden = true;
+      $("dhud-btn-leave").hidden = false;
+      callbacks?.onDungeonLeave?.();
+    });
+
+    bindTap("dend-btn-close", () => {
+      $("dungeon-end-modal").hidden = true;
+    });
+
+    bindTap("dend-btn-leave", () => {
+      $("dungeon-end-modal").hidden = true;
+      callbacks?.onDungeonLeave?.();
+    });
+
     // Bảng nhân vật & Trang bị (#31) + Lò rèn (#32) + Cửa hàng (#100)
     bindTap("btn-char", () => this.toggleCharModal());
     bindTap("char-close", () => this.toggleCharModal(false));
@@ -2289,6 +2383,24 @@ export const ui = {
     const mapDef = getMap(mapId);
     const h2 = $("map-modal")?.querySelector("h2");
     if (h2 && mapDef) h2.textContent = `Sơn Hà Đồ · ${mapDef.def.name}`;
+    if (isDungeonMap(mapId)) {
+      document.body.classList.add("in-dungeon");
+      stopDungeonInviteTimer();
+      currentDungeonInvite = null;
+      const invBox = $("dungeon-invite-box");
+      if (invBox) invBox.hidden = true;
+      const hudEl = $("dungeon-hud");
+      if (hudEl) hudEl.hidden = false;
+      const mapNameEl = $("dhud-map-name");
+      if (mapNameEl && mapDef) mapNameEl.textContent = mapDef.def.name;
+      const confirmEl = $("dhud-leave-confirm");
+      if (confirmEl) confirmEl.hidden = true;
+      const leaveBtn = $("dhud-btn-leave");
+      if (leaveBtn) leaveBtn.hidden = false;
+    } else {
+      document.body.classList.remove("in-dungeon");
+      this.hideDungeonHud();
+    }
     renderPartyPanel();
   },
 
@@ -2643,5 +2755,200 @@ export const ui = {
     } else {
       onComplete?.();
     }
+  },
+
+  /** Nhận lời mời vào Bí cảnh (hộp nhỏ không chặn điều khiển, nhiều lời mời liên tiếp không chồng) */
+  onDungeonInvite(msg: DungeonInviteMsg) {
+    stopDungeonInviteTimer();
+    currentDungeonInvite = msg;
+
+    const d = dungeonOf(msg.dungeonId);
+    const titleEl = $("dib-title");
+    if (titleEl) titleEl.textContent = d?.name ?? "Linh Hư Bí Cảnh";
+
+    const msgEl = $("dib-msg");
+    if (msgEl) msgEl.textContent = `Đội trưởng ${msg.from} triệu tập vào bí cảnh.`;
+
+    const rewardsEl = $("dib-rewards-left");
+    if (rewardsEl) {
+      rewardsEl.textContent = `Lượt nhận thưởng hoàn thành hôm nay: ${msg.rewardsLeft}/${DUNGEON_DAILY_REWARDS}`;
+    }
+
+    const totalMs = Math.max(1000, Number.isFinite(msg.expiresInMs) ? msg.expiresInMs : 60_000);
+    const deadline = Date.now() + totalMs;
+
+    const countdownEl = $("dib-countdown");
+    if (countdownEl) countdownEl.textContent = formatInviteCountdown(totalMs);
+
+    const barEl = $("dib-timer-bar");
+    if (barEl) barEl.style.width = "100%";
+
+    const box = $("dungeon-invite-box");
+    if (box) box.hidden = false;
+
+    dungeonInviteInterval = window.setInterval(() => {
+      const rem = deadline - Date.now();
+      if (rem <= 0) {
+        stopDungeonInviteTimer();
+        currentDungeonInvite = null;
+        if (box) box.hidden = true;
+        return;
+      }
+      if (countdownEl) countdownEl.textContent = formatInviteCountdown(rem);
+      if (barEl) barEl.style.width = `${Math.max(0, Math.min(100, (rem / totalMs) * 100))}%`;
+    }, 200);
+  },
+
+  /** Cập nhật HUD Bí cảnh (1 lần / giây từ server + tự đếm đồng hồ mượt) */
+  onDungeonState(msg: DungeonStateMsg) {
+    document.body.classList.add("in-dungeon");
+    const hud = $("dungeon-hud");
+    if (hud) hud.hidden = false;
+
+    const pInfo = dungeonPhaseInfo(msg.phase);
+    const phaseEl = $("dhud-phase");
+    if (phaseEl) {
+      phaseEl.textContent = pInfo.label;
+      phaseEl.className = `dhud-phase ${pInfo.tone}`;
+    }
+
+    const mobsEl = $("dhud-mobs");
+    if (mobsEl) {
+      mobsEl.textContent = `Yêu thú hộ vệ còn lại: ${Math.max(0, Math.floor(msg.mobsLeft))}`;
+    }
+
+    const bView = formatBossView(msg.boss, currentMapId);
+    const bossWrap = $("dhud-boss-wrap");
+    if (bossWrap) {
+      bossWrap.hidden = !bView.visible;
+      if (bView.visible) {
+        $("dhud-boss-name").textContent = bView.name;
+        $("dhud-boss-text").textContent = bView.text;
+        $("dhud-boss-fill").style.width = `${bView.pct}%`;
+      }
+    }
+
+    const memContainer = $("dhud-members");
+    if (memContainer) {
+      memContainer.replaceChildren();
+      for (const m of msg.members) {
+        const tag = document.createElement("span");
+        tag.className = `dhud-mem${m.alive ? "" : " dead"}`;
+        tag.textContent = m.alive ? `● ${m.name}` : `✕ ${m.name} (Đã ngã)`;
+        memContainer.append(tag);
+      }
+    }
+
+    const leaveBtn = $("dhud-btn-leave");
+    const confirmBox = $("dhud-leave-confirm");
+    if (!pInfo.showLeaveBtn) {
+      if (leaveBtn) leaveBtn.hidden = true;
+      if (confirmBox) confirmBox.hidden = true;
+    } else if (confirmBox && confirmBox.hidden && leaveBtn) {
+      leaveBtn.hidden = false;
+    }
+
+    const safeDeadlineMs = Number.isFinite(msg.deadlineInMs) ? Math.max(0, msg.deadlineInMs) : 0;
+    dungeonDeadlineAt = Date.now() + safeDeadlineMs;
+    const timerEl = $("dhud-timer");
+    if (timerEl) timerEl.textContent = formatDungeonCountdown(safeDeadlineMs);
+
+    stopDungeonHudTimer();
+    dungeonHudInterval = window.setInterval(() => {
+      const rem = dungeonDeadlineAt - Date.now();
+      if (timerEl) timerEl.textContent = formatDungeonCountdown(rem);
+      if (rem <= 0) stopDungeonHudTimer();
+    }, 250);
+  },
+
+  /** Ẩn HUD và màn kết quả Bí cảnh khi rời phòng bí cảnh */
+  hideDungeonHud() {
+    stopDungeonHudTimer();
+    const hud = $("dungeon-hud");
+    if (hud) hud.hidden = true;
+    const endModal = $("dungeon-end-modal");
+    if (endModal) endModal.hidden = true;
+    const confirmBox = $("dhud-leave-confirm");
+    if (confirmBox) confirmBox.hidden = true;
+  },
+
+  /** Xử lý kết thúc Bí cảnh (thắng / thua hoặc huỷ trước khi vào) */
+  onDungeonEnd(msg: DungeonEndMsg) {
+    if (!shouldOpenEndModal(msg.reason)) {
+      stopDungeonInviteTimer();
+      currentDungeonInvite = null;
+      const invBox = $("dungeon-invite-box");
+      if (invBox) invBox.hidden = true;
+      this.toast({ text: dungeonEndReasonText(msg.reason), tone: "bad" });
+      return;
+    }
+
+    const isWon = msg.result === "won";
+    const sealEl = $("dend-seal");
+    if (sealEl) {
+      sealEl.textContent = isWon ? "勝" : "敗";
+      sealEl.className = `dend-seal ${isWon ? "won" : "lost"}`;
+    }
+
+    const titleEl = $("dend-title");
+    if (titleEl) {
+      titleEl.textContent = isWon ? "BÍ CẢNH ĐẠI THẮNG" : "KHIÊU CHIẾN THẤT BẠI";
+    }
+
+    const reasonEl = $("dend-reason");
+    if (reasonEl) {
+      reasonEl.textContent = dungeonEndReasonText(msg.reason);
+    }
+
+    const rewardSection = $("dend-reward-section");
+    const noRewardEl = $("dend-no-reward");
+
+    if (isWon && msg.reward) {
+      if (rewardSection) rewardSection.hidden = false;
+      if (noRewardEl) noRewardEl.hidden = true;
+
+      const coinEl = $("dend-reward-coin");
+      if (coinEl) {
+        coinEl.textContent = `+${msg.reward.coin} ${CURRENCY_NAME} 💎`;
+      }
+
+      const itemsEl = $("dend-reward-items");
+      if (itemsEl) {
+        itemsEl.replaceChildren();
+        const items = formatDungeonRewardItems(msg.reward.items);
+        for (const it of items) {
+          const row = document.createElement("div");
+          row.className = "dend-reward-item";
+          const nameSpan = document.createElement("span");
+          nameSpan.textContent = it.name;
+          const qtyB = document.createElement("b");
+          qtyB.className = "dend-reward-qty";
+          qtyB.textContent = `x${it.qty}`;
+          row.append(nameSpan, qtyB);
+          itemsEl.append(row);
+        }
+      }
+    } else {
+      if (rewardSection) rewardSection.hidden = true;
+      if (noRewardEl) {
+        noRewardEl.hidden = false;
+        noRewardEl.textContent = isWon
+          ? dungeonNoRewardText(msg.noReward)
+          : "Khiêu chiến thất bại nên không nhận được phần thưởng hoàn thành.";
+      }
+    }
+
+    const leftEl = $("dend-rewards-left");
+    if (leftEl) {
+      leftEl.textContent = `Lượt nhận thưởng hoàn thành còn lại hôm nay: ${msg.rewardsLeft}/${DUNGEON_DAILY_REWARDS}`;
+    }
+
+    const closeBtn = $("dend-btn-close");
+    if (closeBtn) {
+      closeBtn.textContent = isWon ? "Thu Chiến Lợi Phẩm (60s)" : "Đóng";
+    }
+
+    const modal = $("dungeon-end-modal");
+    if (modal) modal.hidden = false;
   },
 };

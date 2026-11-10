@@ -1,5 +1,6 @@
 import {
   DUNGEONS,
+  DUNGEON_DAILY_REWARDS,
   DUNGEON_INVITE_MS,
   DUNGEON_LOOT_MS,
   ITEM_BY_ID,
@@ -14,6 +15,7 @@ import {
   type DungeonEndMsg,
   type DungeonEndReason,
   type DungeonInviteMsg,
+  type DungeonNoReward,
   type DungeonPhase,
   type DungeonStateMsg,
 } from "@tien-gioi/shared";
@@ -66,6 +68,28 @@ export function dungeonEndReasonText(reason: DungeonEndReason): string {
       return "Toàn bộ thành viên đã rời khỏi bí cảnh.";
     case "no_entry":
       return "Không có thành viên nào bước vào bí cảnh kịp thời hạn.";
+    case "declined":
+      return "Các thành viên được mời đã từ chối vào bí cảnh.";
+  }
+}
+
+/**
+ * Quyết định có mở màn hình kết quả không:
+ * `no_entry` và `declined` xảy ra trước khi vào bí cảnh (gửi cho đội trưởng ở ngoài) -> chỉ hiện toast, không mở modal.
+ */
+export function shouldOpenEndModal(reason: DungeonEndReason): boolean {
+  return reason !== "no_entry" && reason !== "declined";
+}
+
+/** Giải thích lý do thắng bí cảnh nhưng không nhận được thưởng hoàn thành. */
+export function dungeonNoRewardText(noReward?: DungeonNoReward): string {
+  switch (noReward) {
+    case "daily_limit":
+      return "Bạn đã nhận đủ lượt thưởng hoàn thành bí cảnh trong ngày hôm nay.";
+    case "no_damage":
+      return "Bạn chưa gây sát thương lên Yêu Vương nên không nhận thưởng hoàn thành.";
+    default:
+      return "";
   }
 }
 
@@ -146,9 +170,11 @@ export function buildMockThuMonDialog(opts: {
   canOpen: boolean;
   failReason?: Parameters<typeof dungeonOpenFailMessage>[0];
   failWho?: string;
+  rewardsLeft?: number;
   dungeon?: DungeonDef;
 }): DialogMsg {
   const d = opts.dungeon ?? dungeonOf(LINH_HU_ID)!;
+  const left = opts.rewardsLeft ?? DUNGEON_DAILY_REWARDS;
   const reasonText =
     !opts.canOpen && opts.failReason
       ? dungeonOpenFailMessage(opts.failReason, opts.failWho)
@@ -156,7 +182,7 @@ export function buildMockThuMonDialog(opts: {
 
   const lines = [
     "Linh Hư Bí Cảnh mở cho đội tu sĩ đồng tâm (2–4 người, tối thiểu Luyện Khí Tầng 9).",
-    "Đội trưởng nói một tiếng, ta mở cổng; ai không kịp bước vào trong 60 giây thì lỡ chuyến.",
+    `Đội trưởng nói một tiếng, ta mở cổng; ai không kịp bước vào trong 60 giây thì lỡ chuyến. Lượt thưởng hoàn thành hôm nay của ngươi: ${left}/${DUNGEON_DAILY_REWARDS}.`,
   ];
   if (reasonText) {
     lines.push(`Điều kiện còn thiếu: ${reasonText}`);
@@ -181,12 +207,17 @@ export function buildMockThuMonDialog(opts: {
 
 /** Tạo dữ liệu mẫu cho máy chủ giả `?dungeon=mock` phục vụ thử nghiệm và chụp ảnh. */
 export const MOCK_DUNGEON_SAMPLES = {
-  invite(from = "Trương Tiểu Phàm", expiresInMs = DUNGEON_INVITE_MS): DungeonInviteMsg {
+  invite(
+    from = "Trương Tiểu Phàm",
+    expiresInMs = DUNGEON_INVITE_MS,
+    rewardsLeft = DUNGEON_DAILY_REWARDS,
+  ): DungeonInviteMsg {
     return {
       runId: "a1b2c3d4e5f60718293a4b5c6d7e8f90",
       dungeonId: LINH_HU_ID,
       from,
       expiresInMs,
+      rewardsLeft,
     };
   },
   stateBossFight(): DungeonStateMsg {
@@ -215,7 +246,7 @@ export const MOCK_DUNGEON_SAMPLES = {
       ],
     };
   },
-  endWon(): DungeonEndMsg {
+  endWon(rewardsLeft = 2): DungeonEndMsg {
     return {
       result: "won",
       reason: "boss_dead",
@@ -227,12 +258,14 @@ export const MOCK_DUNGEON_SAMPLES = {
           { itemId: "xich_lan_bao", qty: 1 },
         ],
       },
+      rewardsLeft,
     };
   },
-  endLost(reason: DungeonEndReason = "timeout"): DungeonEndMsg {
+  endLost(reason: DungeonEndReason = "timeout", rewardsLeft = 3): DungeonEndMsg {
     return {
       result: "lost",
       reason,
+      rewardsLeft,
     };
   },
   mapId: LINH_HU_MAP_ID,

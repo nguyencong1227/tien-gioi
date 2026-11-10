@@ -42,9 +42,20 @@ import {
   type SoulBuyMsg,
   type RebirthMsg,
   type RebirthChoice,
+  DUNGEON_MSG,
+  LINH_HU_MAP_ID,
+  WILD_MONSTERS,
+  type DungeonInviteMsg,
+  type DungeonStateMsg,
+  type DungeonEndMsg,
 } from "@tien-gioi/shared";
 import { preloadAssets, makeTextures, dirFromAngle, TILESET_KEY, ATLAS_KEY } from "../textures";
 import { ui } from "../ui";
+import {
+  buildMockThuMonDialog,
+  isMockDungeonEnabled,
+  MOCK_DUNGEON_SAMPLES,
+} from "../dungeon";
 import { replayEarlyMessages } from "../early-messages";
 import { sound } from "../audio";
 import { joystick, setupJoystick } from "../joystick";
@@ -230,6 +241,13 @@ export class WorldScene extends Phaser.Scene {
         else if (action.kind === "turnIn")
           this.room.send("questTurnIn", { questId: action.questId });
         else if (action.kind === "trade") this.room.send("trade", { tradeId: action.tradeId });
+        else if (action.kind === "dungeon") {
+          if (isMockDungeonEnabled()) {
+            ui.onDungeonInvite(MOCK_DUNGEON_SAMPLES.invite(this.me()?.name || "Trương Tiểu Phàm"));
+          } else {
+            this.room.send("dialogAction", action);
+          }
+        }
       },
       onTrackQuest: () => {
         // Tracker được cập nhật tự động trong update()
@@ -243,6 +261,35 @@ export class WorldScene extends Phaser.Scene {
         !this.isReconnecting && this.room.send("buy", { npcId, itemId, qty }),
       onSell: (npcId, slot, qty) =>
         !this.isReconnecting && this.room.send("sell", { npcId, slot, qty }),
+      onDungeonEnter: (runId) => {
+        if (this.isReconnecting) return;
+        if (isMockDungeonEnabled()) {
+          const dMap = getMap(LINH_HU_MAP_ID)!;
+          this.changeMap(this.room, dMap);
+          this.predX = dMap.townPx.x;
+          this.predY = dMap.townPx.y;
+          ui.onDungeonState(MOCK_DUNGEON_SAMPLES.stateBossFight());
+        } else {
+          this.room.send(DUNGEON_MSG.enter, { runId });
+        }
+      },
+      onDungeonDecline: (runId) => {
+        if (this.isReconnecting) return;
+        if (!isMockDungeonEnabled()) {
+          this.room.send(DUNGEON_MSG.decline, { runId });
+        }
+      },
+      onDungeonLeave: () => {
+        if (this.isReconnecting) return;
+        if (isMockDungeonEnabled()) {
+          const wMap = getMap(DEFAULT_MAP_ID)!;
+          this.changeMap(this.room, wMap);
+          this.predX = wMap.townPx.x;
+          this.predY = wMap.townPx.y;
+        } else {
+          this.room.send(DUNGEON_MSG.leave, {});
+        }
+      },
     });
 
     this.setupInput();
@@ -311,6 +358,28 @@ export class WorldScene extends Phaser.Scene {
         .setDepth(-5);
 
       this.townVisuals.push(t1, t2, c);
+    }
+
+    // 3b. Dựng hang trùm (nếu bản đồ có lairPx như trong bí cảnh)
+    if (this.map.lairPx) {
+      const lx = this.map.lairPx.x;
+      const ly = this.map.lairPx.y;
+      const lr = this.map.lairPx.r;
+      const lairCircle = this.add
+        .circle(lx, ly, lr, 0x581c87, 0.14)
+        .setStrokeStyle(2, 0xa855f7, 0.45)
+        .setDepth(-5);
+      const lairTitle = this.add
+        .text(lx, ly - 24, "Hang Yêu Vương", {
+          fontFamily: '"Noto Serif", Georgia, serif',
+          fontSize: "20px",
+          fontStyle: "bold",
+          color: "#d8b4fe",
+        })
+        .setOrigin(0.5)
+        .setAlpha(0.65)
+        .setDepth(-5);
+      this.townVisuals.push(lairCircle, lairTitle);
     }
 
     // 4. Dựng các cổng truyền tống của bản đồ
@@ -653,6 +722,10 @@ export class WorldScene extends Phaser.Scene {
     if (this.isReconnecting || ui.isLimboOpen()) return;
     const me = this.me();
     if (!me || me.dead || !this.closestNpcId) return;
+    if (isMockDungeonEnabled() && this.closestNpcId === "thu_mon") {
+      ui.onDialog(buildMockThuMonDialog({ canOpen: true }));
+      return;
+    }
     this.room.send("talk", { npcId: this.closestNpcId });
   }
 
@@ -787,6 +860,9 @@ export class WorldScene extends Phaser.Scene {
       ui.setKiep(m.kiep);
     });
     reg("reborn", (m: RebornMsg) => ui.showReborn(m.kiep));
+    reg(DUNGEON_MSG.invite, (m: DungeonInviteMsg) => ui.onDungeonInvite(m));
+    reg(DUNGEON_MSG.state, (m: DungeonStateMsg) => ui.onDungeonState(m));
+    reg(DUNGEON_MSG.end, (m: DungeonEndMsg) => ui.onDungeonEnd(m));
     replayEarlyMessages(this.room, handlers);
     if (isInitial) {
       ui.chat({
@@ -1252,6 +1328,25 @@ export class WorldScene extends Phaser.Scene {
           ctx.stroke();
         }
 
+        // Hang trùm (nếu bản đồ có lairPx như trong bí cảnh)
+        if (this.map.lairPx) {
+          const lx = ox + this.map.lairPx.x * scale;
+          const ly = oy + this.map.lairPx.y * scale;
+          const lr = Math.max(4, this.map.lairPx.r * scale);
+          ctx.fillStyle = "rgba(168, 85, 247, 0.28)";
+          ctx.beginPath();
+          ctx.arc(lx, ly, lr, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "#c084fc";
+          ctx.lineWidth = 1.2;
+          ctx.stroke();
+
+          ctx.fillStyle = "#ef4444";
+          ctx.beginPath();
+          ctx.arc(lx, ly, 2.8, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
         // Quái vật (chấm đỏ nhỏ)
         ctx.fillStyle = "#e57373";
         this.monsters.forEach((m) => {
@@ -1383,11 +1478,36 @@ export class WorldScene extends Phaser.Scene {
             ctx.fillText(p.name, px, py - 7);
           }
 
-          // Vòng nguy hiểm (minDanger) tính ngược từ dangerAt(x, y)
-          if (this.map.townPx.r > 0) {
+          // Hang trùm (nếu bản đồ có lairPx như trong bí cảnh)
+          if (this.map.lairPx) {
+            const lx = ox + this.map.lairPx.x * s;
+            const ly = oy + this.map.lairPx.y * s;
+            const lr = Math.max(8, this.map.lairPx.r * s);
+
+            ctx.fillStyle = "rgba(168, 85, 247, 0.25)";
+            ctx.beginPath();
+            ctx.arc(lx, ly, lr, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = "#c084fc";
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            ctx.fillStyle = "#ef4444";
+            ctx.beginPath();
+            ctx.arc(lx, ly, 4.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = "#e9d5ff";
+            ctx.font = "bold 11px serif";
+            ctx.textAlign = "center";
+            ctx.fillText("Hang Yêu Vương", lx, ly - lr - 5);
+          }
+
+          // Vòng nguy hiểm (minDanger) tính ngược từ dangerAt(x, y) cho bản đồ ngoài hoang
+          if (this.map.townPx.r > 0 && !this.map.lairPx) {
             const tx = ox + this.map.townPx.x * s;
             const ty = oy + this.map.townPx.y * s;
-            for (const m of MONSTERS) {
+            for (const m of WILD_MONSTERS) {
               const rPx =
                 m.minDanger > 0 ? this.dangerRadiusPx(m.minDanger) : this.map.townPx.r + 40;
               const rCanvas = Math.min(Math.min(w, h) * 0.49, rPx * s);

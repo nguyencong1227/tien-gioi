@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import { Client, type Room } from "colyseus.js";
 import {
   DEFAULT_MAP_ID,
+  LINH_HU_MAP_ID,
   TRAVEL_JOIN_TIMEOUT_MS,
   JOIN_BAD_TOKEN,
   JOIN_NEED_CHARACTER,
@@ -11,6 +12,7 @@ import {
 } from "@tien-gioi/shared";
 import { WorldScene } from "./scenes/WorldScene";
 import { ui } from "./ui";
+import { buildMockThuMonDialog, MOCK_DUNGEON_SAMPLES } from "./dungeon";
 import { captureEarlyMessages } from "./early-messages";
 import { joinWithRedirect } from "./connection";
 import { clearToken, getToken } from "./auth";
@@ -131,6 +133,7 @@ function setupRoomLifecycle(room: Room) {
         name: name || undefined,
         secret: token ? undefined : secret(),
         suggestedMapId: msg.mapId,
+        roomId: msg.roomId,
       });
 
       let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -141,12 +144,14 @@ function setupRoomLifecycle(room: Room) {
         );
       });
 
-      const { room: newRoom, mapId: finalMapId } = await Promise.race([
-        joinPromise,
-        timeoutPromise,
-      ]).finally(() => {
+      const {
+        room: newRoom,
+        mapId: finalMapId,
+        expiredDungeonFallback,
+      } = await Promise.race([joinPromise, timeoutPromise]).finally(() => {
         if (timeoutId) clearTimeout(timeoutId);
       });
+      captureEarlyMessages(newRoom);
       const finalMap = getMap(finalMapId)!;
 
       // Cập nhật scene sang phòng mới và bản đồ mới
@@ -157,9 +162,13 @@ function setupRoomLifecycle(room: Room) {
       // Thiết lập vòng đời mới cho phòng vừa vào
       setupRoomLifecycle(newRoom);
 
-      // Sáng dần và thông báo thành công
+      // Sáng dần và thông báo kết quả
       ui.hideTransition();
-      ui.toast({ text: `Đã tiến nhập ${finalMap.def.name}.`, tone: "good" });
+      if (expiredDungeonFallback) {
+        ui.toast({ text: "Bí cảnh đã hết hạn, đã đưa về Lạc Hà Trấn.", tone: "bad" });
+      } else {
+        ui.toast({ text: `Đã tiến nhập ${finalMap.def.name}.`, tone: "good" });
+      }
     } catch (err: any) {
       isTraveling = false;
       ui.hideTransition();
@@ -277,6 +286,34 @@ async function start(room: Room, mapId: string) {
           ui.showReborn(mock.summary.kiep + 1);
         },
       });
+    };
+    (window as any).__mockDungeon = {
+      openThuMonOk: () => ui.onDialog(buildMockThuMonDialog({ canOpen: true })),
+      openThuMonFail: () =>
+        ui.onDialog(
+          buildMockThuMonDialog({
+            canOpen: false,
+            failReason: "member_low",
+            failWho: "Lâm Kinh Vũ",
+          }),
+        ),
+      showInvite: () => ui.onDungeonInvite(MOCK_DUNGEON_SAMPLES.invite()),
+      enterBossFight: () => {
+        const dMap = getMap(LINH_HU_MAP_ID)!;
+        if (activeScene) {
+          activeScene.changeMap(room, dMap);
+          (activeScene as any).predX = dMap.lairPx ? dMap.lairPx.x : dMap.townPx.x;
+          (activeScene as any).predY = dMap.lairPx ? dMap.lairPx.y + 80 : dMap.townPx.y;
+        }
+        ui.onDungeonState(MOCK_DUNGEON_SAMPLES.stateBossFight());
+      },
+      showWon: () => {
+        ui.onDungeonState(MOCK_DUNGEON_SAMPLES.stateLoot());
+        ui.onDungeonEnd(MOCK_DUNGEON_SAMPLES.endWon());
+      },
+      showLost: () => {
+        ui.onDungeonEnd(MOCK_DUNGEON_SAMPLES.endLost());
+      },
     };
   }
   new Phaser.Game({

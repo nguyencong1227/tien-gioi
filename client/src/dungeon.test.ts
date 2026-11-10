@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   buildMockThuMonDialog,
   dungeonEndReasonText,
+  dungeonNoRewardText,
   dungeonPhaseInfo,
   formatBossView,
   formatDungeonCountdown,
@@ -9,6 +10,7 @@ import {
   formatInviteCountdown,
   isMockDungeonEnabled,
   MOCK_DUNGEON_SAMPLES,
+  shouldOpenEndModal,
 } from "./dungeon";
 import { LINH_HU_MAP_ID } from "@tien-gioi/shared";
 
@@ -60,6 +62,22 @@ describe("dungeon client pure logic", () => {
     expect(dungeonEndReasonText("all_dead")).toContain("ngã xuống");
     expect(dungeonEndReasonText("all_left")).toContain("rời khỏi");
     expect(dungeonEndReasonText("no_entry")).toContain("bước vào");
+    expect(dungeonEndReasonText("declined")).toContain("từ chối");
+  });
+
+  it("shouldOpenEndModal không mở màn kết quả cho no_entry và declined (chỉ hiện toast)", () => {
+    expect(shouldOpenEndModal("boss_dead")).toBe(true);
+    expect(shouldOpenEndModal("timeout")).toBe(true);
+    expect(shouldOpenEndModal("all_dead")).toBe(true);
+    expect(shouldOpenEndModal("all_left")).toBe(true);
+    expect(shouldOpenEndModal("no_entry")).toBe(false);
+    expect(shouldOpenEndModal("declined")).toBe(false);
+  });
+
+  it("dungeonNoRewardText giải thích rõ lý do thắng nhưng không nhận thưởng hoàn thành", () => {
+    expect(dungeonNoRewardText("daily_limit")).toContain("đủ lượt thưởng");
+    expect(dungeonNoRewardText("no_damage")).toContain("sát thương");
+    expect(dungeonNoRewardText(undefined)).toBe("");
   });
 
   it("formatBossView tính phần trăm máu trùm và ẩn khi boss = null hoặc hp <= 0", () => {
