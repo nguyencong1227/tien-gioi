@@ -1,6 +1,22 @@
 # Phân công M3 (bản đề xuất)
 
-> **Trạng thái: đề xuất của Dev A, chờ người dùng xác nhận.** Các câu hỏi cần quyết định ở cuối file (cũng ghi trong `~/TT/orchestra/questions.md`). Trong lúc chờ, chỉ làm Sprint 4 phần "hợp đồng `shared/`": nhỏ, ít rủi ro, không phụ thuộc các câu hỏi bên dưới.
+> **Trạng thái (10/11/2026): Sprint 4 (tổ đội) và phần không đổi kiến trúc của Sprint 5 (tiền tệ, Bước 0 nhiều bản đồ) đã xong và nằm trên `main`.** Phần còn lại (bản đồ thứ hai, bí cảnh, PK, tông môn) **chờ người dùng quyết định** các câu hỏi ở cuối file (cũng ghi trong `~/TT/orchestra/questions.md`). Bản đề xuất ban đầu của Dev A giữ nguyên bên dưới để đối chiếu.
+
+## Trạng thái thực tế
+
+| Hạng mục | Trạng thái | PR chính |
+|---|---|---|
+| Sprint 4: Tổ đội (hợp đồng, server, client, bot thử tải) | Xong | #73, #79, #90, #94 (cân bằng: #82) |
+| Sprint 5: Tiền tệ, cửa hàng (hợp đồng, server, client, công cụ) | Xong | #98, #103, #104, #107, #115, #110 (cân bằng: #106) |
+| Sprint 5: Nhiều bản đồ, **Bước 0** (bản đồ thành tham số, hành vi không đổi, chỉ `lac_ha`) | Xong | thiết kế #121; #124, #128, #130, #132; dọn: #131, #133, #134, #135 |
+| Sprint 5: Nhiều bản đồ, **Bước 1** (bản đồ thứ hai) và bí cảnh | **Chờ người dùng chọn phương án A / B** | `docs/THIET_KE_NHIEU_BAN_DO.md` mục 6 |
+| Sprint 6: PK có điều kiện, tông môn | Chưa làm, chờ người dùng (câu hỏi 2, 4) | |
+
+Việc ngoài kế hoạch M3 đã làm xen vào: tối ưu băng thông vùng nhìn (#70, #87, #89; 100 người: ~9.5 KB/s mỗi client ở ca đông người tụ trong trấn), bench hằng đêm (#97), nối lại khi rớt mạng (#118, #122, #127; thử tải #125), kiểm file lưu (#113, #114), Docker và triển khai (#81, #83), rà giao diện điện thoại (#105).
+
+Số đo trên `main` (10/11/2026): 385 test; bench 100 người: săn quái 191, đám đông 484 byte/tick mỗi client, tick trung bình ~1.05 / ~1.7 ms (ngân sách < 10 ms); 40 bot thật 15 s: 40/40 giữ kết nối, tick tối đa 8.92 ms.
+
+Chưa quyết, không chặn các việc đã xong: cân bằng tu vi của tổ đội (3 lựa chọn, mục "Đi theo đội" trong `docs/CAN_BANG.md`), kinh tế Linh thạch (3 câu trong `questions.md`).
 
 Mục tiêu M3 (theo `GDD.md`): biến Tiên Giới từ chơi một mình cạnh người khác thành **chơi cùng nhau**: tổ đội, tông môn, PK có điều kiện, nhiều bản đồ, bí cảnh. `PHAN_CONG.md` còn thêm tiền tệ và cửa hàng (Lão dược sư đang đổi nguyên liệu lấy đan vì chưa có tiền).
 
