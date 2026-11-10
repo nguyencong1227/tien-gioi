@@ -146,13 +146,13 @@ Tiến trình sẽ đóng nhận kết nối mới, lưu toàn bộ trạng thá
 
 ## 7. Sao lưu & Khôi phục dữ liệu nhân vật
 
-### 6.1. Dữ liệu cần bảo vệ (`DATA_DIR`)
+### 7.1. Dữ liệu cần bảo vệ (`DATA_DIR`)
 Thư mục `DATA_DIR` (mặc định `server/data/players`) lưu trữ toàn bộ hồ sơ nhân vật dạng JSON (`<sha1_hash>.json`), bao gồm:
 - Cảnh giới, tu vi, vị trí toạ độ.
 - Túi đồ, trang bị đang mặc.
 - Tiến độ nhiệm vụ (sổ nhiệm vụ, nhiệm vụ hàng ngày).
 
-### 6.2. Tạo bản sao lưu (`npm run backup`)
+### 7.2. Tạo bản sao lưu (`npm run backup`)
 Tiên Giới có sẵn kịch bản sao lưu nén bằng `tar` và tự động dọn dẹp các bản cũ theo chính sách giữ lại `keep` bản mới nhất:
 ```bash
 # Nén dữ liệu vào thư mục backups/ (mặc định giữ 14 bản mới nhất)
@@ -182,7 +182,7 @@ File nén được tạo theo định dạng: `backups/players-YYYYMMDD-HHMMSS.t
 tar -tzf /mnt/backups/players-*.tar.gz | head -n 10
 ```
 
-### 6.3. Khôi phục dữ liệu từ bản sao lưu
+### 7.3. Khôi phục dữ liệu từ bản sao lưu
 Khi cần khôi phục lại dữ liệu nhân vật:
 1. Dừng tiến trình server:
    ```bash
@@ -206,3 +206,61 @@ Khi cần khôi phục lại dữ liệu nhân vật:
    npm start
    ```
 6. Sau khi xác nhận mọi nhân vật đăng nhập bình thường, có thể xoá thư mục dự phòng `players.cu`.
+
+---
+
+## 8. Kiểm tra dữ liệu nhân vật (`npm run kiem-save`)
+
+Công cụ kiểm tra tính toàn vẹn (audit) file lưu nhân vật giúp người vận hành phát hiện sớm các file hỏng, file bị can thiệp trái phép, hoặc dữ liệu lệch chuẩn so với phiên bản game hiện tại. Công cụ hoạt động ở chế độ **CHỈ ĐỌC** (không ghi, không sửa, không xoá bất kỳ file nào và tuyệt đối không làm lộ `secretHash`).
+
+### 8.1. Khi nào cần chạy?
+- **Sau khi khôi phục bản sao lưu:** Trước khi khởi động server, đảm bảo các file giải nén ra hoàn chỉnh và không bị lỗi cú pháp.
+- **Sau khi chép dữ liệu giữa các máy chủ / môi trường:** Tránh file bị cắt cụt do truyền tải mạng hoặc lệch cấu hình phiên bản game.
+- **Trước các đợt thử tải lớn hoặc phát hành bản cập nhật mới:** Xác nhận dữ liệu người chơi tương thích 100% với các bảng dữ liệu của server (`items`, `quests`, `realms`, `currency`).
+
+### 8.2. Lệnh kiểm tra
+
+```bash
+# Kiểm tra thư mục dữ liệu mặc định (DATA_DIR hoặc server/data/players):
+npm run kiem-save -w server
+
+# Kiểm tra thư mục chỉ định:
+npm run kiem-save -w server -- --dir=/var/lib/tien-gioi/players
+
+# Xuất kết quả dạng JSON phục vụ giám sát tự động / CI / script:
+npm run kiem-save -w server -- --json
+```
+
+### 8.3. Ý nghĩa mã thoát (Exit code)
+- **`0`**: Hoàn toàn sạch. Toàn bộ file lưu đều hợp lệ và tương thích.
+- **`1`**: Phát hiện ít nhất một file vi phạm hoặc hỏng cấu trúc dữ liệu. Chi tiết lỗi của tối đa 10 file đầu tiên được in ra màn hình (kèm tên file và mã lỗi).
+- **`2`**: Lỗi I/O nghiêm trọng (thư mục không tồn tại, đường dẫn không phải thư mục, hoặc số file vượt quá giới hạn an toàn 100.000 file).
+
+### 8.4. Ý nghĩa các mã lỗi thường gặp
+
+| Mã lỗi | Nguyên nhân & Hành động xử lý |
+|---|---|
+| `read_error` | Không thể đọc file do lỗi phân quyền I/O hoặc đĩa cứng. |
+| `not_regular_file` | File không phải file thông thường (symlink, FIFO, socket, thư mục) có nguy cơ gây treo tiến trình. |
+| `file_too_large` | Kích thước file vượt ngưỡng an toàn 1 MB (bảo vệ chống cạn kiệt bộ nhớ). |
+| `invalid_json` | File bị cắt cụt hoặc hỏng cú pháp JSON. Thường do quá trình sao chép đĩa bị gián đoạn. |
+| `not_an_object` | Dữ liệu gốc trong JSON không phải Object (ví dụ: mảng, null, số, chuỗi). |
+| `invalid_name` | Tên nhân vật không khớp quy chuẩn (`cleanName`, độ dài 2–16 ký tự hợp lệ). |
+| `invalid_secret_hash` | Chuỗi mã băm bí mật không phải SHA-256 (64 ký tự hex). |
+| `invalid_realm` / `invalid_tier` | Cảnh giới hoặc tầng bậc vượt ngoài khoảng định nghĩa trong game. |
+| `invalid_exp` | Điểm tu vi bị âm, NaN hoặc Infinity. |
+| `coin_out_of_range` | Số lượng Linh thạch bị âm, chứa số lẻ (float) hoặc vượt trần `COIN_CAP` (999.999.999). |
+| `pos_out_of_bounds` / `pos_blocked` | Toạ độ nhân vật nằm ngoài bản đồ hoặc rơi vào ô vật cản không thể di chuyển (núi đá, nước sâu). |
+| `inv_not_array` | Trường `inventory` không phải là một mảng. |
+| `inv_too_many_slots` | Túi đồ có số ô vượt quá giới hạn tối đa `INVENTORY_SLOTS` ô (hiện tại là 24 ô). |
+| `inv_slot_invalid` | Ô đồ trong túi không phải đối tượng hợp lệ. |
+| `unknown_item` | Ô đồ chứa `itemId` lạ không tồn tại trong bảng `ITEM_BY_ID`, hoặc dính khoá prototype (`constructor`). |
+| `qty_out_of_range` | Số lượng vật phẩm trong ô <= 0, số lẻ hoặc vượt quá giới hạn cộng dồn `stack`. |
+| `equip_not_object` | Trường `equipment` không phải là một Object. |
+| `unknown_equip_slot` | Ô trang bị lạ không tồn tại trong game. |
+| `unknown_equip_item` | Ô trang bị chứa giá trị không phải chuỗi hoặc chứa `itemId` không tồn tại. |
+| `invalid_equip_slot` | Vật phẩm đeo vào không phải là trang bị phù hợp với ô đó. |
+| `quests_not_object` | Trường `quests` không phải là một Object. |
+| `unknown_quest` | Sổ nhiệm vụ chứa `questId` lạ không tồn tại trong game. |
+| `duplicate_quest_done` | Danh sách nhiệm vụ đã xong (`done`) chứa `questId` bị trùng lặp. |
+| `invalid_daily_key` | Nhiệm vụ hàng ngày không hợp lệ hoặc giá trị ngày không đúng chuẩn ISO. |
