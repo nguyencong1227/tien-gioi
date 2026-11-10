@@ -220,6 +220,17 @@ initAuthUi({
   },
 });
 
+// Giả lập hiển thị modal phiên bản quá cũ khi có cờ ?outdated=N (phục vụ kiểm thử và nghiệm thu giao diện, M4 2.5)
+if (typeof window !== "undefined") {
+  const outdatedParam = new URLSearchParams(location.search).get("outdated");
+  if (outdatedParam !== null) {
+    const minV = Number(outdatedParam) || 2;
+    ui.showClientOutdated(minV, handleOutdatedReload);
+  }
+  (window as any).__showClientOutdated = (minV = 2) =>
+    ui.showClientOutdated(minV, handleOutdatedReload);
+}
+
 // Chế độ máy chủ giả lập (?dungeon=mock, ?dungeon=fallen, ?duel=mock hoặc ?sect=mock) để thử nghiệm và chụp ảnh không cần server thật
 if (
   typeof window !== "undefined" &&
