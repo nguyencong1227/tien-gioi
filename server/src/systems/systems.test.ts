@@ -91,15 +91,15 @@ describe("combat", () => {
     expect(mc.damageBy.get("a")).toBe(statsFor(0, 0).atk);
   });
 
-  it("hết khí huyết thì trọng thương, mất 10% tu vi, quái bỏ mục tiêu", () => {
-    const { w, toasts } = makeWorld();
+  it("nhánh hồi sinh (chết không mất kiếp): trọng thương, KHÔNG mất tu vi nữa, quái bỏ mục tiêu", () => {
+    const { w, toasts } = makeWorld(); // w.reincarnate mặc định tắt: dùng nhánh hồi sinh (PK thách đấu ở bước 5)
     const { p } = addPlayer(w, "a");
     const { m, mc } = addMonster(w, "lang", p.x + 20, p.y);
     mc.target = "a";
     p.exp = 20;
     hurtPlayer(w, "a", p, 1e6, m);
     expect(p.dead).toBe(true);
-    expect(p.exp).toBe(18);
+    expect(p.exp).toBe(20);
     expect(mc.target).toBeNull();
     expect(toasts[0]).toMatchObject({ sid: "a", msg: { tone: "bad" } });
   });

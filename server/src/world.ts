@@ -17,8 +17,8 @@ import type {
   PartyInvitedMsg,
 } from "@tien-gioi/shared";
 import type { WorldState, Player } from "./schema";
-import type { SavedPlayer, QuestSave, LifeCounters } from "./store";
-import type { Soul } from "@tien-gioi/shared";
+import type { SavedPlayer, QuestSave, LifeCounters, LimboRecord } from "./store";
+import type { LimboMsg, RebornMsg, Soul, SoulMsg, StatMult } from "@tien-gioi/shared";
 import { Interest } from "./systems/interest";
 import { Parties } from "./systems/party";
 
@@ -49,6 +49,11 @@ export interface PlayerCtrl {
   /** Định danh kiếp hiện tại và bộ đếm thành tựu của kiếp (lưu cùng nhân vật; không vào state chung) */
   lifeId: string;
   life: LifeCounters;
+  /** Đang ở Hoàng Tuyền (đã chết thật, chờ đầu thai): mọi hành động gameplay bị bỏ qua. Xem systems/reincarnation.ts. */
+  limbo?: LimboRecord;
+  /** Xuất thân của kiếp này và hệ số chỉ số tương ứng (`originMult`) */
+  origin: string;
+  mult: StatMult;
   /** Ảnh chụp chân linh lúc vào game (nấc mở khóa dùng ở đường nóng: `expMultOf`...); cập nhật khi mua ở Hoàng Tuyền */
   soul: Soul;
   /** Linh thạch: số nguyên 0..COIN_CAP, chỉ gửi cho chủ qua tin nhắn `wallet`; chỉ đổi bằng systems/wallet.ts */
@@ -109,6 +114,12 @@ export interface WorldEvents {
   partyInvited(sessionId: string, msg: PartyInvitedMsg): void;
   /** Chat gửi cho một người (chat đội). */
   chatTo(sessionId: string, msg: ChatOut): void;
+  /** Vừa chết thật / đăng nhập lại khi đang ở Hoàng Tuyền: hiện màn hình Hoàng Tuyền cho chủ. */
+  limbo(sessionId: string, msg: LimboMsg): void;
+  /** Chân linh của chủ vừa đổi (sau khi mua ở Tam Sinh Thạch). */
+  soul(sessionId: string, msg: SoulMsg): void;
+  /** Đã đầu thai xong. */
+  reborn(sessionId: string, msg: RebornMsg): void;
 }
 
 export class World {
@@ -132,6 +143,13 @@ export class World {
   lootSeq = 0;
   /** Số tick đã chạy (dùng chia nhịp ghi px, py) */
   tick = 0;
+  /**
+   * Chết do quái = luân hồi (vào Hoàng Tuyền) thay vì hồi sinh sau `RESPAWN_MS`. WorldRoom bật; mặc định tắt để các
+   * system / bench chạy riêng không cần phòng. Nhánh hồi sinh còn dùng cho chết không mất kiếp (PK thách đấu, bước 5).
+   */
+  reincarnate = false;
+  /** Phòng đăng ký: được gọi (một lần) khi một người vừa vào Hoàng Tuyền, để lưu file, cộng Duyên và gửi `limbo`. */
+  onLimbo: ((sid: string) => void) | null = null;
 
   constructor(
     readonly state: WorldState,
