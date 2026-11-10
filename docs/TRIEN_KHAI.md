@@ -142,6 +142,10 @@ kill -TERM <server_pid>
 ```
 Tiến trình sẽ đóng nhận kết nối mới, lưu toàn bộ trạng thái nhân vật còn trong phòng chơi xuống đĩa cứng (`DATA_DIR`), ngắt kết nối client với mã phòng hợp lệ, rồi mới thoát hoàn toàn.
 
+> [!NOTE]
+> **Xử lý người chơi đang trong trạng thái chờ nối lại (20 giây grace period) (#116):**
+> Từ phiên bản có tính năng giữ nhân vật khi rớt mạng, người chơi rớt mạng bất thường sẽ được server giữ lại tối đa `RECONNECT_GRACE_S = 20` giây để chờ kết nối lại. Khi người vận hành tắt server (gửi `SIGTERM`), hàm `onDispose()` của `WorldRoom` sẽ tự động huỷ bỏ các phiên chờ nối lại (`ghosts`) và lưu trọn vẹn toàn bộ dữ liệu nhân vật đang chờ xuống đĩa cứng trước khi phòng giải phóng, bảo đảm tuyệt đối không bị mất dữ liệu hay rollback của bất kỳ ai. Docker Compose được cấu hình `stop_grace_period: 30s` để đảm bảo đủ thời gian cho quá trình lưu này hoàn tất.
+
 ---
 
 ## 7. Sao lưu & Khôi phục dữ liệu nhân vật

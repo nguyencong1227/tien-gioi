@@ -81,6 +81,11 @@ interface CliArgs {
   note: string;
   saveJson: string;
   compareJson: string;
+  flap: number;
+  flapInterval: [number, number];
+  flapDelay: [number, number];
+  storm: boolean;
+  leak: boolean;
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -101,6 +106,11 @@ function parseArgs(argv: string[]): CliArgs {
   let note = "chưa có #57, #59";
   let saveJson = "";
   let compareJson = "";
+  let flap = 0;
+  let flapInterval: [number, number] = [20, 40];
+  let flapDelay: [number, number] = [1, 5];
+  let storm = false;
+  let leak = false;
 
   for (const arg of argv) {
     if (arg.startsWith("--bots=")) bots = Math.max(0, Number(arg.slice(7)));
@@ -111,6 +121,22 @@ function parseArgs(argv: string[]): CliArgs {
       partySize = val ? Math.max(2, Math.min(4, Number(val))) : 4;
     } else if (arg === "--shop") {
       shop = true;
+    } else if (arg.startsWith("--flap=")) {
+      flap = Math.max(0, Number(arg.slice(7)));
+    } else if (arg.startsWith("--flap-interval=")) {
+      const parts = arg.slice(16).split(",").map(Number);
+      if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+        flapInterval = [Math.min(parts[0], parts[1]), Math.max(parts[0], parts[1])];
+      }
+    } else if (arg.startsWith("--flap-delay=")) {
+      const parts = arg.slice(13).split(",").map(Number);
+      if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+        flapDelay = [Math.min(parts[0], parts[1]), Math.max(parts[0], parts[1])];
+      }
+    } else if (arg === "--storm") {
+      storm = true;
+    } else if (arg === "--leak") {
+      leak = true;
     } else if (arg.startsWith("--mode=")) {
       const m = arg.slice(7);
       if (m === "both") bothModes = true;
@@ -127,6 +153,19 @@ function parseArgs(argv: string[]): CliArgs {
     else if (arg === "--write-doc") writeDoc = true;
     else if (arg === "--suite") suite = true;
     else if (arg === "--allow-other-port") allowOtherPort = true;
+  }
+
+  if (leak) {
+    if (flap === 0) flap = 20;
+    flapInterval = [1, 2];
+    flapDelay = [0.5, 1];
+  }
+
+  if (storm && durationSec < 20) {
+    console.warn(
+      `[CẢNH BÁO] --storm kích hoạt ở giây thứ 15 và cần 2s để các bot nối lại; thời lượng ${durationSec}s không đủ để đo bão. Tự động tăng --duration lên 20s.`,
+    );
+    durationSec = 20;
   }
 
   if (!url) url = `ws://localhost:${DEFAULT_PORT}`;
@@ -152,6 +191,11 @@ function parseArgs(argv: string[]): CliArgs {
     note,
     saveJson,
     compareJson,
+    flap,
+    flapInterval,
+    flapDelay,
+    storm,
+    leak,
   };
 }
 
@@ -319,6 +363,8 @@ function readServerRssMb(pid: number): number | null {
 function byteLengthOf(data: unknown): number {
   if (data instanceof ArrayBuffer) return data.byteLength;
   if (ArrayBuffer.isView(data)) return data.byteLength;
+  if (typeof (data as any)?.size === "number") return (data as any).size;
+  if (typeof (data as any)?.byteLength === "number") return (data as any).byteLength;
   if (typeof data === "string") return Buffer.byteLength(data);
   if (Array.isArray(data)) return data.reduce((sum, item) => sum + byteLengthOf(item), 0);
   return 0;
@@ -378,6 +424,12 @@ interface BotState {
   shopping: boolean;
   kicked4429: boolean;
   closedCode: number | null;
+  // Các trường mới cho flap / reconnect (#120)
+  isFlapping: boolean;
+  flapCount: number;
+  nextFlapAt: number;
+  reconnectAt: number;
+  reconnectToken: string;
 }
 
 export interface LoadTestMetrics {
@@ -438,6 +490,22 @@ export interface LoadTestMetrics {
   dmgEventsReceivedPerBot: number;
   partyEventsReceivedPerBot?: number;
   walletEventsReceivedPerBot?: number;
+  /** Các chỉ số thử tải rớt mạng và nối lại (#120) */
+  flapTarget?: number;
+  flapSuccess?: number;
+  flapFail?: number;
+  reconnectLatencyAvgMs?: number;
+  reconnectLatencyP50Ms?: number;
+  reconnectLatencyP95Ms?: number;
+  reconnectBytesAvg?: number;
+  storm?: boolean;
+  stormCpuTickMax?: number;
+  stormCpuTickP95?: number;
+  stormReconnected?: number;
+  stormTotalBytes?: number;
+  leakTested?: boolean;
+  leakEndOnline?: number;
+  leakRssDeltaMb?: number;
 }
 
 export interface IdleZeroBotMetrics {
@@ -539,6 +607,133 @@ async function runIdleZeroBotTest(
   return idle;
 }
 
+/** Gắn các trình xử lý tin nhắn, luồng đo băng thông và state change cho room của bot. */
+function bindRoomEvents(
+  b: BotState,
+  room: Room,
+  isMeasuring: () => boolean,
+  patchIntervals: number[],
+  ackRtts: number[],
+  onFirstState?: (tReceived: number, initialBytes: number) => void,
+) {
+  b.room = room;
+  b.reconnectToken = room.reconnectionToken;
+  b.closedCode = null;
+  b.kicked4429 = false;
+
+  room.onMessage("fx", () => {
+    if (isMeasuring()) b.fxCount++;
+  });
+  room.onMessage("dmg", () => {
+    if (isMeasuring()) b.dmgCount++;
+  });
+  room.onMessage("partyInvited", (msg: PartyInvitedMsg) => {
+    room.send("partyAccept", { from: msg.from });
+  });
+  room.onMessage("party", (msg: PartyMsg) => {
+    if (isMeasuring()) {
+      b.partyMsgsCount++;
+      b.partyBytes += Buffer.byteLength(JSON.stringify(msg)) + 9;
+    }
+    b.myParty = msg;
+  });
+  room.onMessage("wallet", (msg: WalletMsg) => {
+    if (isMeasuring()) {
+      b.walletMsgsCount++;
+      b.walletBytes += Buffer.byteLength(JSON.stringify(msg)) + WALLET_MSG_OVERHEAD;
+    }
+    b.coin = msg.coin;
+  });
+  room.onMessage("chat", () => {});
+  room.onMessage("toast", () => {});
+  room.onMessage("inv", (msg: InvMsg) => {
+    b.invSlots = msg.slots ?? [];
+  });
+  room.onMessage("quests", () => {});
+  room.onMessage("dialog", () => {});
+
+  room.onLeave((code) => {
+    if (!b.isFlapping) {
+      b.closedCode = code;
+      if (code === 4429) b.kicked4429 = true;
+    }
+  });
+
+  let initialRxBytes = 0;
+  let firstStateDone = false;
+
+  const ws = (room.connection as any)?.transport?.ws;
+  if (ws) {
+    const onIncomingData = (data: unknown) => {
+      const len = byteLengthOf(data);
+      initialRxBytes += len;
+      if (!isMeasuring()) return;
+      b.rxBytes += len;
+      b.rxMsgs += 1;
+      if (firstByteOf(data) === Protocol.ROOM_STATE_PATCH) {
+        b.rxPatchBytes += len;
+      }
+    };
+
+    if (typeof ws.addEventListener === "function") {
+      ws.addEventListener("message", (ev: { data: unknown }) => {
+        if (ev) onIncomingData(ev.data);
+      });
+    } else if (typeof ws.on === "function") {
+      ws.on("message", onIncomingData);
+    } else {
+      const origOnMessage = ws.onmessage;
+      ws.onmessage = (ev: { data: unknown }) => {
+        if (ev) onIncomingData(ev.data);
+        if (origOnMessage) origOnMessage.call(ws, ev);
+      };
+    }
+
+    const origSend = ws.send.bind(ws);
+    ws.send = (data: unknown, ...rest: unknown[]) => {
+      if (isMeasuring()) {
+        b.txBytes += byteLengthOf(data);
+        b.txMsgs += 1;
+      }
+      return origSend(data, ...rest);
+    };
+  }
+
+  room.onStateChange(() => {
+    const t = performance.now();
+    if (!firstStateDone && initialRxBytes > 0) {
+      firstStateDone = true;
+      if (onFirstState) {
+        onFirstState(t, initialRxBytes);
+      }
+    }
+
+    if (isMeasuring() && b.lastPatchAt > 0) {
+      const dt = t - b.lastPatchAt;
+      if (dt >= 5) patchIntervals.push(dt);
+    }
+    b.lastPatchAt = t;
+
+    const me = (room.state as any)?.players?.get(room.sessionId);
+    if (!me) return;
+    if (!b.hasPos || me.dead) {
+      b.predX = me.x;
+      b.predY = me.y;
+      b.hasPos = true;
+    }
+
+    if (typeof me.lastSeq === "number" && me.lastSeq > 0) {
+      const sentAt = b.sentAtBySeq.get(me.lastSeq);
+      if (sentAt !== undefined) {
+        if (isMeasuring()) ackRtts.push(t - sentAt);
+        for (const k of b.sentAtBySeq.keys()) {
+          if (k <= me.lastSeq) b.sentAtBySeq.delete(k);
+        }
+      }
+    }
+  });
+}
+
 async function runLoadTest(
   botCount: number,
   durationSec: number,
@@ -550,15 +745,23 @@ async function runLoadTest(
   mode: BotMode,
   partySize = 0,
   shop = false,
+  flap = 0,
+  flapInterval: [number, number] = [20, 40],
+  flapDelay: [number, number] = [1, 5],
+  storm = false,
+  leak = false,
 ): Promise<LoadTestMetrics> {
   const partySuffix = partySize > 1 ? `, tổ đội ${partySize} người` : "";
   const shopSuffix = shop ? ", mua bán shop" : "";
+  const flapSuffix = flap > 0 ? `, flap=${flap}` : "";
+  const stormSuffix = storm ? ", storm" : "";
+  const leakSuffix = leak ? ", leak-test" : "";
   const modeLabel =
     mode === "realistic"
-      ? `Thực tế (vào tầm đứng chém${partySuffix}${shopSuffix})`
+      ? `Thực tế (vào tầm đứng chém${partySuffix}${shopSuffix}${flapSuffix}${stormSuffix}${leakSuffix})`
       : mode === "crowd"
-        ? `Đông người trong trấn (${shop ? "25% ghé Dược Sư, 25% đứng, 50% đi" : "30% đứng yên, 70% đi lại"})`
-        : `Xấu nhất (100% di chuyển 20 input/s${partySuffix})`;
+        ? `Đông người trong trấn (${shop ? "25% ghé Dược Sư, 25% đứng, 50% đi" : "30% đứng yên, 70% đi lại"}${flapSuffix}${stormSuffix}${leakSuffix})`
+        : `Xấu nhất (100% di chuyển 20 input/s${partySuffix}${flapSuffix}${stormSuffix}${leakSuffix})`;
   console.log(
     `\n=== Bắt đầu thử tải [${modeLabel}]: ${botCount} bot, đo trong ${durationSec}s (${url}) ===`,
   );
@@ -572,11 +775,28 @@ async function runLoadTest(
   const visibleMonstersSamples: number[] = [];
   const visiblePlayersSamples: number[] = [];
   const unionMonstersSamples: number[] = [];
+  const reconnectLatencies: number[] = [];
+  const reconnectBytesList: number[] = [];
+  const stormCpuSamples: number[] = [];
+  let flapSuccessCount = 0;
+  let flapFailCount = 0;
+  let stormTriggered = false;
+  let stormWindowStart = 0;
+  let stormWindowEnd = 0;
+  let stormReconnectedCount = 0;
+  let stormTotalBytesReceived = 0;
+  let leakWarmupRssMb: number | null = null;
+  let leakEndOnline: number | undefined;
+  let leakRssDeltaMb: number | undefined;
+
   let measuring = false;
   let attacksSent = 0;
   let skillsSent = 0;
   let inputsSent = 0;
   const rnd = seededPrng(1);
+
+  const rndFlap = () =>
+    (flapInterval[0] + Math.random() * (flapInterval[1] - flapInterval[0])) * 1000;
 
   for (let i = 1; i <= botCount; i++) {
     const numStr = String(i).padStart(3, "0");
@@ -661,103 +881,14 @@ async function runLoadTest(
       shopping: false,
       kicked4429: false,
       closedCode: null,
+      isFlapping: false,
+      flapCount: 0,
+      nextFlapAt: now + rndFlap(),
+      reconnectAt: 0,
+      reconnectToken: room.reconnectionToken,
     };
 
-    room.onMessage("fx", () => {
-      if (measuring) b.fxCount++;
-    });
-    room.onMessage("dmg", () => {
-      if (measuring) b.dmgCount++;
-    });
-    room.onMessage("partyInvited", (msg: PartyInvitedMsg) => {
-      room.send("partyAccept", { from: msg.from });
-    });
-    room.onMessage("party", (msg: PartyMsg) => {
-      if (measuring) {
-        b.partyMsgsCount++;
-        b.partyBytes += Buffer.byteLength(JSON.stringify(msg)) + 9;
-      }
-      b.myParty = msg;
-    });
-    room.onMessage("wallet", (msg: WalletMsg) => {
-      if (measuring) {
-        b.walletMsgsCount++;
-        b.walletBytes += Buffer.byteLength(JSON.stringify(msg)) + WALLET_MSG_OVERHEAD;
-      }
-      b.coin = msg.coin;
-    });
-    room.onMessage("chat", () => {});
-    room.onMessage("toast", () => {});
-    room.onMessage("inv", (msg: InvMsg) => {
-      b.invSlots = msg.slots ?? [];
-    });
-    room.onMessage("quests", () => {});
-    room.onMessage("dialog", () => {});
-
-    room.onLeave((code) => {
-      b.closedCode = code;
-      if (code === 4429) b.kicked4429 = true;
-    });
-
-    const ws = (room.connection as any)?.transport?.ws;
-    if (ws) {
-      const onIncomingData = (data: unknown) => {
-        if (!measuring) return;
-        const len = byteLengthOf(data);
-        b.rxBytes += len;
-        b.rxMsgs += 1;
-        if (firstByteOf(data) === Protocol.ROOM_STATE_PATCH) {
-          b.rxPatchBytes += len;
-        }
-      };
-
-      if (typeof ws.on === "function") {
-        ws.on("message", onIncomingData);
-      } else {
-        const origOnMessage = ws.onmessage;
-        ws.onmessage = (ev: { data: unknown }) => {
-          if (ev) onIncomingData(ev.data);
-          if (origOnMessage) origOnMessage.call(ws, ev);
-        };
-      }
-
-      const origSend = ws.send.bind(ws);
-      ws.send = (data: unknown, ...rest: unknown[]) => {
-        if (measuring) {
-          b.txBytes += byteLengthOf(data);
-          b.txMsgs += 1;
-        }
-        return origSend(data, ...rest);
-      };
-    }
-
-    room.onStateChange(() => {
-      const t = performance.now();
-      if (measuring && b.lastPatchAt > 0) {
-        const dt = t - b.lastPatchAt;
-        if (dt >= 5) patchIntervals.push(dt);
-      }
-      b.lastPatchAt = t;
-
-      const me = (room.state as any)?.players?.get(room.sessionId);
-      if (!me) return;
-      if (!b.hasPos || me.dead) {
-        b.predX = me.x;
-        b.predY = me.y;
-        b.hasPos = true;
-      }
-
-      if (typeof me.lastSeq === "number" && me.lastSeq > 0) {
-        const sentAt = b.sentAtBySeq.get(me.lastSeq);
-        if (sentAt !== undefined) {
-          if (measuring) ackRtts.push(t - sentAt);
-          for (const k of b.sentAtBySeq.keys()) {
-            if (k <= me.lastSeq) b.sentAtBySeq.delete(k);
-          }
-        }
-      }
-    });
-
+    bindRoomEvents(b, room, () => measuring, patchIntervals, ackRtts);
     bots.push(b);
     await sleep(20);
   }
@@ -1072,7 +1203,104 @@ async function runLoadTest(
 
   const loopTimer = setInterval(() => {
     const now = performance.now();
-    for (const b of bots) stepBot(b, now);
+
+    // 1. Kích hoạt bão nối lại (--storm) ở giây thứ 15
+    if (storm && measuring && !stormTriggered && now - measureStart >= 15000) {
+      stormTriggered = true;
+      stormWindowStart = now;
+      stormWindowEnd = now + 5000;
+      console.log(
+        `\n>>> [BÃO NỐI LẠI --storm] Tất cả ${bots.length} bot rớt mạng cùng lúc! Nối lại rải rác trong 2s...`,
+      );
+      for (const b of bots) {
+        if (!b.isFlapping && b.room.connection.isOpen) {
+          b.isFlapping = true;
+          b.reconnectToken = b.room.reconnectionToken;
+          const ws = (b.room.connection as any)?.transport?.ws;
+          try {
+            ws?.close();
+          } catch {
+            // Bỏ qua lỗi nếu ws đã đóng
+          }
+          b.reconnectAt = now + Math.random() * 2000;
+        }
+      }
+    }
+
+    // 2. Chạy bot logic cho từng bot
+    for (const b of bots) {
+      if (!b.isFlapping) {
+        stepBot(b, now);
+
+        if (
+          measuring &&
+          flap > 0 &&
+          !storm &&
+          b.flapCount < flap &&
+          now >= b.nextFlapAt &&
+          b.room.connection.isOpen
+        ) {
+          b.isFlapping = true;
+          b.flapCount++;
+          b.reconnectToken = b.room.reconnectionToken;
+          const ws = (b.room.connection as any)?.transport?.ws;
+          try {
+            ws?.close();
+          } catch {
+            // Bỏ qua lỗi nếu ws đã đóng
+          }
+          const delay = (flapDelay[0] + Math.random() * (flapDelay[1] - flapDelay[0])) * 1000;
+          b.reconnectAt = now + delay;
+        }
+      } else if (b.reconnectAt > 0 && now >= b.reconnectAt) {
+        b.reconnectAt = -1; // đang thực hiện reconnect
+        (async () => {
+          const t0 = performance.now();
+          try {
+            const client = new Client(url);
+            const newRoom = await client.reconnect(b.reconnectToken);
+            let firstStateBytes = 0;
+            let latencyMs = 0;
+
+            await new Promise<void>((resolve) => {
+              const timer = setTimeout(resolve, 3500);
+              bindRoomEvents(
+                b,
+                newRoom,
+                () => measuring,
+                patchIntervals,
+                ackRtts,
+                (tRecv, bytes) => {
+                  latencyMs = tRecv - t0;
+                  firstStateBytes = bytes;
+                  clearTimeout(timer);
+                  resolve();
+                },
+              );
+            });
+
+            const finalLatency = latencyMs > 0 ? latencyMs : performance.now() - t0;
+            const finalBytes = firstStateBytes;
+
+            flapSuccessCount++;
+            reconnectLatencies.push(finalLatency);
+            reconnectBytesList.push(finalBytes);
+
+            if (stormTriggered) {
+              stormReconnectedCount++;
+              stormTotalBytesReceived += finalBytes;
+            }
+
+            b.isFlapping = false;
+            b.nextFlapAt = performance.now() + rndFlap();
+          } catch {
+            flapFailCount++;
+            b.isFlapping = false;
+            b.closedCode = 1006;
+          }
+        })();
+      }
+    }
 
     if (measuring) {
       const mSize = (bots[0]?.room.state as any)?.monsters?.size;
@@ -1109,6 +1337,9 @@ async function runLoadTest(
       if (curCpuMs !== null && prevServerCpuMs !== null) {
         const deltaCpuMs = Math.max(0, curCpuMs - prevServerCpuMs);
         serverTickCpuSamples.push(deltaCpuMs);
+        if (stormTriggered && now >= stormWindowStart && now <= stormWindowEnd) {
+          stormCpuSamples.push(deltaCpuMs);
+        }
       }
       prevServerCpuMs = curCpuMs;
     } else if (serverPid) {
@@ -1147,12 +1378,62 @@ async function runLoadTest(
   const measureStart = performance.now();
   measuring = true;
 
+  if (leak && serverPid) {
+    leakWarmupRssMb = readServerRssMb(serverPid);
+    console.log(`- Làm nóng xong. VmRSS server ban đầu: ${leakWarmupRssMb} MB`);
+  }
+
   await sleep(durationSec * 1000);
 
   measuring = false;
   const actualDurationSec = (performance.now() - measureStart) / 1000;
   const cpuEndMs = serverPid ? readServerExecRuntimeMs(serverPid) : null;
   const serverRssMb = serverPid ? readServerRssMb(serverPid) : null;
+
+  if (leak) {
+    console.log(`\n=== Kiểm tra rò rỉ (Leak test): dừng flap, đợi tất cả bot hoàn tất nối lại ===`);
+    // Tắt flap để không kích hoạt flap mới
+    flap = 0;
+    // Đợi các bot đang flap dở nối lại xong
+    const waitStart = performance.now();
+    while (performance.now() - waitStart < 8000) {
+      const pendingFlaps = bots.filter((b) => b.isFlapping).length;
+      if (pendingFlaps === 0) break;
+      await sleep(200);
+    }
+
+    const half = Math.floor(bots.length / 2);
+    console.log(
+      `Tất cả bot đã online (${bots.filter((b) => b.room.connection.isOpen).length}/${bots.length}). Cho ${half} bot rớt hẳn không nối lại...`,
+    );
+    for (let i = 0; i < half; i++) {
+      const b = bots[i];
+      b.isFlapping = true;
+      b.reconnectAt = -1;
+      const ws = (b.room.connection as any)?.transport?.ws;
+      try {
+        ws?.close();
+      } catch {
+        // Bỏ qua lỗi nếu ws đã đóng
+      }
+    }
+    console.log(`Đang đợi 25s để server hết hạn 20s grace period và dọn sạch ${half} ghost...`);
+    await sleep(25000);
+
+    const aliveBots = bots.filter((b) => b.room.connection.isOpen && !b.isFlapping);
+    const aliveBot = aliveBots[0];
+    if (aliveBot) {
+      leakEndOnline =
+        (aliveBot.room.state as any)?.online ?? (aliveBot.room.state as any)?.players?.size;
+    }
+    const finalRssMb = serverPid ? readServerRssMb(serverPid) : null;
+    if (finalRssMb !== null && leakWarmupRssMb !== null) {
+      leakRssDeltaMb = Number((finalRssMb - leakWarmupRssMb).toFixed(2));
+    }
+    console.log(
+      `- Kết quả đo rò rỉ: state.online = ${leakEndOnline} (kỳ vọng: ${bots.length - half}) | VmRSS: ${finalRssMb} MB (tăng ${leakRssDeltaMb} MB so với sau làm nóng ${leakWarmupRssMb} MB)`,
+    );
+  }
 
   clearInterval(loopTimer);
 
@@ -1219,6 +1500,27 @@ async function runLoadTest(
     unionMonstersSamples.length > 0 ? Math.round(avg(unionMonstersSamples)) : monstersAvg;
   const serverMonstersTotal = runBench(botCount, 1).monsters;
 
+  reconnectLatencies.sort((a, b) => a - b);
+  stormCpuSamples.sort((a, b) => a - b);
+
+  const reconnectLatencyAvgMs =
+    reconnectLatencies.length > 0 ? Number(avg(reconnectLatencies).toFixed(2)) : undefined;
+  const reconnectLatencyP50Ms =
+    reconnectLatencies.length > 0
+      ? Number(percentile(reconnectLatencies, 50).toFixed(2))
+      : undefined;
+  const reconnectLatencyP95Ms =
+    reconnectLatencies.length > 0
+      ? Number(percentile(reconnectLatencies, 95).toFixed(2))
+      : undefined;
+  const reconnectBytesAvg =
+    reconnectBytesList.length > 0 ? Math.round(avg(reconnectBytesList)) : undefined;
+
+  const stormCpuTickMax =
+    stormCpuSamples.length > 0 ? Number(stormCpuSamples.at(-1)!.toFixed(2)) : undefined;
+  const stormCpuTickP95 =
+    stormCpuSamples.length > 0 ? Number(percentile(stormCpuSamples, 95).toFixed(2)) : undefined;
+
   const metrics: LoadTestMetrics = {
     commit,
     note,
@@ -1281,6 +1583,21 @@ async function runLoadTest(
     rxPartyKBpsPerBot: Number((totalPartyBytes / botCount / actualDurationSec / 1024).toFixed(2)),
     walletEventsReceivedPerBot: Number((totalWalletMsgs / botCount / actualDurationSec).toFixed(2)),
     rxWalletKBpsPerBot: Number((totalWalletBytes / botCount / actualDurationSec / 1024).toFixed(3)),
+    flapTarget: flap > 0 ? flap : undefined,
+    flapSuccess: flap > 0 || storm ? flapSuccessCount : undefined,
+    flapFail: flap > 0 || storm ? flapFailCount : undefined,
+    reconnectLatencyAvgMs,
+    reconnectLatencyP50Ms,
+    reconnectLatencyP95Ms,
+    reconnectBytesAvg,
+    storm: storm ? true : undefined,
+    stormCpuTickMax,
+    stormCpuTickP95,
+    stormReconnected: storm ? stormReconnectedCount : undefined,
+    stormTotalBytes: storm ? stormTotalBytesReceived : undefined,
+    leakTested: leak ? true : undefined,
+    leakEndOnline,
+    leakRssDeltaMb,
   };
 
   printMetrics(metrics);
@@ -1345,6 +1662,21 @@ function printMetrics(m: LoadTestMetrics) {
   if (m.walletEventsReceivedPerBot !== undefined && m.walletEventsReceivedPerBot > 0) {
     console.log(
       `- Giao dịch ví Linh thạch: nhận ~${m.walletEventsReceivedPerBot} tin wallet/s mỗi bot (~${m.rxWalletKBpsPerBot ?? 0} KB/s)`,
+    );
+  }
+  if (m.flapSuccess !== undefined) {
+    console.log(
+      `- Thử tải nối lại (Flap): thành công ${m.flapSuccess} lần (thất bại: ${m.flapFail ?? 0}) | Độ trễ nhận lại state: TB ${m.reconnectLatencyAvgMs ?? "–"} ms (p50: ${m.reconnectLatencyP50Ms ?? "–"} ms, p95: ${m.reconnectLatencyP95Ms ?? "–"} ms) | State gửi lại: TB ${m.reconnectBytesAvg ?? "–"} byte/lần`,
+    );
+  }
+  if (m.storm) {
+    console.log(
+      `- Bão nối lại (Storm): ${m.stormReconnected ?? 0}/${m.botCount} bot nối lại thành công, tổng ${((m.stormTotalBytes ?? 0) / 1024).toFixed(1)} KB gửi lại | CPU quanh thời điểm bão: max ${m.stormCpuTickMax ?? "–"} ms, p95 ${m.stormCpuTickP95 ?? "–"} ms (ngân sách < 10 ms)`,
+    );
+  }
+  if (m.leakTested) {
+    console.log(
+      `- Kiểm tra rò rỉ (Leak): state.online về ${m.leakEndOnline} người chơi | VmRSS chênh lệch: ${m.leakRssDeltaMb ?? "–"} MB so với sau làm nóng (ngân sách < 10 MB)`,
     );
   }
 }
@@ -1597,6 +1929,11 @@ async function main() {
           m,
           args.partySize,
           args.shop,
+          args.flap,
+          args.flapInterval,
+          args.flapDelay,
+          args.storm,
+          args.leak,
         ),
       );
     }
