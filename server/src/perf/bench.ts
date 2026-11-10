@@ -115,6 +115,8 @@ export function runBench(
         limbo: () => {},
         soul: () => {},
         reborn: () => {},
+        dungeonInvite: () => {},
+        dungeonEnd: () => {},
       },
       map,
     );
@@ -364,6 +366,8 @@ export function runMultiMapBench(
           limbo: () => {},
           soul: () => {},
           reborn: () => {},
+          dungeonInvite: () => {},
+          dungeonEnd: () => {},
         },
         map,
       );
