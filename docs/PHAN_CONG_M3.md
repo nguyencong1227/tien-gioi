@@ -1,6 +1,14 @@
 # Phân công M3 (bản đề xuất)
 
-> **Trạng thái (10/11/2026): Sprint 4 (tổ đội) và phần không đổi kiến trúc của Sprint 5 (tiền tệ, Bước 0 nhiều bản đồ) đã xong và nằm trên `main`.** Phần còn lại (bản đồ thứ hai, bí cảnh, PK, tông môn) **chờ người dùng quyết định** các câu hỏi ở cuối file (cũng ghi trong `~/TT/orchestra/questions.md`). Bản đề xuất ban đầu của Dev A giữ nguyên bên dưới để đối chiếu.
+> **Trạng thái (10/11/2026, sau quyết định của người dùng): Sprint 4 (tổ đội) và phần không đổi kiến trúc của Sprint 5 (tiền tệ, Bước 0 nhiều bản đồ) đã xong và nằm trên `main`. Hướng đi phần còn lại đã được người dùng chốt (mục "Quyết định của người dùng"); bản đề xuất cũ của Dev A ở Sprint 5 / 6 bên dưới được thay bằng mục "Kế hoạch M3 theo quyết định".**
+
+## Quyết định của người dùng (10/11/2026)
+Thay cho các câu hỏi trước đây ở cuối file này và trong `questions.md`.
+
+1. **Bản đồ thứ hai: phương án A.** Mỗi bản đồ một phòng Colyseus, một người ở một phòng một lúc, cổng chuyển bản đồ ở rìa, file lưu có `mapId`. Cần thêm **kênh chung giữa các phòng** cho chat toàn server và tổ đội khác bản đồ.
+2. **Thứ tự M3 mới:** (1) bản đồ thứ hai; (2) luân hồi bản đầu; (3) tài khoản thật + PostgreSQL, để lưu **linh hồn** tách khỏi **nhân vật** (kéo từ M4 lên); (4) bí cảnh (phòng tạm theo đội); (5) PK chỉ khi hai bên đồng ý (thách đấu), chết vì PK **không** mất kiếp; (6) tông môn, gắn với linh hồn.
+3. **Chết = luân hồi** (bỏ luật cũ "hồi sinh ở trấn, mất 10% tu vi"): nhân vật của kiếp đó mất hẳn (cảnh giới, đồ, Linh thạch về 0), đầu thai sang kiếp mới; nhận **điểm luân hồi** theo thành tựu kiếp vừa rồi; tiêu điểm vào **bảng mở khóa vĩnh viễn** (bản đầu khoảng 4–5 mục: dư âm tu hành +% tốc độ tu luyện tối đa +100%, khắc chân linh, chọn xuất thân kiếp mới, đồ khởi đầu, giữ lại một món đồ). Không chết khi đang rớt mạng. Linh thạch mất theo kiếp (trừ phần mở khóa mang theo). Tên thuật ngữ theo phong cách tu tiên, tự đặt cho Tiên Giới (không chép chữ của game khác).
+4. **Câu chưa quyết** (cân bằng tu vi tổ đội, bán đan cộng tu vi): giữ hướng an toàn A đã đề xuất (giữ nguyên công thức tổ đội, cửa hàng **không** bán `tu_khi_dan`).
 
 ## Trạng thái thực tế
 
@@ -9,23 +17,21 @@
 | Sprint 4: Tổ đội (hợp đồng, server, client, bot thử tải) | Xong | #73, #79, #90, #94 (cân bằng: #82) |
 | Sprint 5: Tiền tệ, cửa hàng (hợp đồng, server, client, công cụ) | Xong | #98, #103, #104, #107, #115, #110 (cân bằng: #106) |
 | Sprint 5: Nhiều bản đồ, **Bước 0** (bản đồ thành tham số, hành vi không đổi, chỉ `lac_ha`) | Xong | thiết kế #121; #124, #128, #130, #132; dọn: #131, #133, #134, #135 |
-| Sprint 5: Nhiều bản đồ, **Bước 1** (bản đồ thứ hai) và bí cảnh | **Chờ người dùng chọn phương án A / B** | `docs/THIET_KE_NHIEU_BAN_DO.md` mục 6 |
-| Sprint 6: PK có điều kiện, tông môn | Chưa làm, chờ người dùng (câu hỏi 2, 4) | |
+| M3 bước 1: bản đồ thứ hai (phương án A) | **Đang làm**: hợp đồng `shared/` trước, rồi server / client / công cụ | `docs/THIET_KE_NHIEU_BAN_DO.md` |
+| M3 bước 2–6: luân hồi, tài khoản + PostgreSQL, bí cảnh, PK thách đấu, tông môn | Đã có quyết định; làm lần lượt sau bước 1 | `docs/THIET_KE_LUAN_HOI.md` (bước 2) |
 
 Việc ngoài kế hoạch M3 đã làm xen vào: tối ưu băng thông vùng nhìn (#70, #87, #89; 100 người: ~9.5 KB/s mỗi client ở ca đông người tụ trong trấn), bench hằng đêm (#97), nối lại khi rớt mạng (#118, #122, #127; thử tải #125), kiểm file lưu (#113, #114), Docker và triển khai (#81, #83), rà giao diện điện thoại (#105).
 
 Số đo trên `main` (10/11/2026): 385 test; bench 100 người: săn quái 191, đám đông 484 byte/tick mỗi client, tick trung bình ~1.05 / ~1.7 ms (ngân sách < 10 ms); 40 bot thật 15 s: 40/40 giữ kết nối, tick tối đa 8.92 ms.
 
-Chưa quyết, không chặn các việc đã xong: cân bằng tu vi của tổ đội (3 lựa chọn, mục "Đi theo đội" trong `docs/CAN_BANG.md`), kinh tế Linh thạch (3 câu trong `questions.md`).
+Hai câu cũ (cân bằng tu vi của tổ đội, bán đan cộng tu vi) đã chốt theo hướng an toàn của A, xem mục quyết định ở trên; kinh tế Linh thạch khi chết do bước 2 (luân hồi) quyết.
 
 Mục tiêu M3 (theo `GDD.md`): biến Tiên Giới từ chơi một mình cạnh người khác thành **chơi cùng nhau**: tổ đội, tông môn, PK có điều kiện, nhiều bản đồ, bí cảnh. `PHAN_CONG.md` còn thêm tiền tệ và cửa hàng (Lão dược sư đang đổi nguyên liệu lấy đan vì chưa có tiền).
 
 Cách làm giữ nguyên M2: hợp đồng `shared/` trước (PR riêng, dev khác review), rồi A / B / C làm song song trên nhánh riêng. Việc nào cũng ghi thành issue có hợp đồng, tin nhắn, phụ thuộc và tiêu chí xong, đủ để Antigravity đọc là làm được.
 
 ## Thứ tự và lý do
-1. **Sprint 4: Tổ đội** trước: tự đứng được, tận dụng vùng nhìn (#62) và chat, chưa cần đổi kiến trúc phòng.
-2. **Sprint 5: Tiền tệ, cửa hàng, nhiều bản đồ, bí cảnh:** đụng kiến trúc (mỗi bản đồ một phòng Colyseus, lưu `mapId`), nên làm khi tổ đội đã ổn.
-3. **Sprint 6: PK có điều kiện, tông môn:** cần cân bằng và lưu trữ lâu dài; tông môn nên đi sau tài khoản thật (M4) nếu muốn chống mạo danh.
+Sprint 4 (tổ đội) đã làm trước vì tự đứng được. Phần còn lại làm theo thứ tự người dùng chốt (mục "Quyết định của người dùng" và "Kế hoạch M3 theo quyết định" ở trên). Mục Sprint 4 bên dưới giữ nguyên để tra hợp đồng tổ đội.
 
 ## Sprint 4: Tổ đội
 
@@ -56,18 +62,31 @@ Cách làm giữ nguyên M2: hợp đồng `shared/` trước (PR riêng, dev kh
 
 **Xong khi:** bốn người mời nhau, đi săn chung, thấy máu nhau, chat riêng; thoát ra vào lại không còn trong đội; đội 4 người ở 100 người chơi vẫn trong ngân sách byte / tick.
 
-## Sprint 5: Tiền tệ, cửa hàng, nhiều bản đồ, bí cảnh (phác thảo, chưa giao)
-- **Tiền tệ (Linh thạch):** quái rơi, lưu vào nhân vật, Lão dược sư bán đan bằng tiền. A: server + cân bằng; B: hiển thị, cửa hàng.
-- **Nhiều bản đồ** (phân tích hai phương án, thứ tự làm và câu hỏi cần chọn: `docs/THIET_KE_NHIEU_BAN_DO.md`): `shared/src/map.ts` thành danh sách bản đồ (seed, kích thước, cổng nối); mỗi bản đồ một phòng Colyseus (`ROOM_NAME` + `mapId`), lưu `mapId` trong file nhân vật, cổng chuyển bản đồ ở rìa. Đây là đổi kiến trúc lớn nhất của M3, cần hợp đồng và test riêng.
-- **Bí cảnh:** phòng tạm theo đội (instance), có thời hạn, quái trùm, phần thưởng; dựa trên "nhiều bản đồ" và "tổ đội".
-- C: kịch bản thử tải nhiều phòng, theo dõi bộ nhớ khi tạo / huỷ phòng tạm.
+## Kế hoạch M3 theo quyết định (thay Sprint 5 / 6 cũ)
+Mỗi bước: hợp đồng `shared/` trước (PR riêng chỉ sửa `shared/` + tài liệu, một dev khác review), rồi A / B / C làm song song trên nhánh riêng, mỗi việc một issue có hợp đồng, tin nhắn, phụ thuộc, tiêu chí xong. Tiền tệ, cửa hàng của Sprint 5 cũ đã xong (bảng trên).
 
-## Sprint 6: PK có điều kiện, tông môn (phác thảo, chưa giao)
-- **PK có điều kiện:** chỉ bật ở khu vực đánh dấu hoặc khi hai bên cùng đồng ý (quyết định ở câu hỏi 2); không PK trong trấn; phạt giết người vô cớ.
-- **Tông môn:** tạo / gia nhập / chức vụ, chat tông môn, kho chung. Cần lưu trữ chung nhiều nhân vật nên nên đợi PostgreSQL (M4) hoặc tạm dùng file riêng cho tông môn.
+### Bước 1: Bản đồ thứ hai (phương án A)
+Thiết kế và lý do: `docs/THIET_KE_NHIEU_BAN_DO.md`. Bản đồ thứ hai là khu săn thường (cùng cách chơi, mạnh hơn), nối với Lạc Hà Trấn bằng cổng ở rìa; chuyển bản đồ = lưu nhân vật, rời phòng, vào phòng đích.
+- **A:** hợp đồng `shared/` (`MapDef` thêm cổng, quái, tên; tin `travel` / `travelTo`; mã lỗi `wrong_map`; kênh chat chung; `mapId` trong tin đội) → server (`WorldRoom` lọc theo `mapId`, sổ tên đang chơi toàn cục, hệ thống `travel`, lưu / nạp `mapId`, `PartyBook` và chat dùng chung giữa các phòng, quái / NPC theo bản đồ) → nội dung bản đồ thứ hai (seed, quái, trạm an toàn).
+- **B:** client vào đúng `mapId`, nút / hỏi "đi qua cổng", chuyển cảnh mờ dần + tên bản đồ, bản đồ nhỏ / lớn theo bản đồ, tổ đội thấy thành viên ở bản đồ khác, chat chung.
+- **C:** bot `--map`, bench nhiều `World` trong một tiến trình (ngân sách tổng tick), thử tải qua cổng liên tục (rò ghost, đua lưu / nạp, không nhân bản nhân vật, bộ nhớ khi tạo / huỷ phòng), `kiem-save` kiểm `mapId` và tọa độ; tiêu chí đo: `docs/THIET_KE_NHIEU_BAN_DO.md` mục 5.
+- **Xong khi:** đi qua cổng hai chiều không mất dữ liệu, chat chung và đội hoạt động qua hai phòng, bench một bản đồ vẫn 0.0% so mốc, tổng tick N bản đồ x M người < 10 ms.
 
-## Câu hỏi cần người dùng quyết định
-1. **Thứ tự:** có đồng ý bắt đầu bằng tổ đội, rồi tiền tệ / bản đồ, rồi PK / tông môn? Hay muốn làm PostgreSQL + tài khoản thật (M4) trước vì tông môn và mọi thứ về sau phụ thuộc vào nó?
-2. **PK:** chỉ ở khu riêng, hay hai bên đồng ý, hay tự do ngoài trấn? Ảnh hưởng tới cân bằng và trải nghiệm người mới.
-3. **Nhiều bản đồ = nhiều phòng Colyseus** (mở rộng ngang được, nhưng một người chỉ ở một phòng một lúc, chat chung toàn server cần thêm kênh): có chấp nhận cách này không?
-4. **Tông môn** có cần có trong M3, hay chuyển sang M4 cùng tài khoản thật?
+### Bước 2: Luân hồi bản đầu
+Thiết kế: `docs/THIET_KE_LUAN_HOI.md` (A soạn, B và C review trong lúc làm bước 1). Linh hồn lưu file riêng (qua một giao diện lưu trữ để bước 3 thay bằng PostgreSQL), điểm luân hồi, bảng mở khóa, luồng chết → đầu thai, bất tử khi rớt mạng, bỏ luật `DEATH_EXP_LOSS` / hồi sinh sau `RESPAWN_MS`.
+- **A:** hợp đồng + server + cân bằng (`docs/CAN_BANG.md`). **B:** màn hình chết → đầu thai, bảng mở khóa, hiển thị điểm. **C:** mô phỏng điểm luân hồi / đường cong mở khóa, `kiem-save` cho linh hồn, thử tải chết hàng loạt.
+
+### Bước 3: Tài khoản thật + PostgreSQL
+Kéo từ M4 lên để linh hồn tách khỏi nhân vật và có chủ. **Đăng nhập, mật khẩu, di chuyển dữ liệu từ file JSON, sao lưu:** thiết kế riêng khi tới bước này (A soạn trước, C lo Docker / sao lưu / di chuyển dữ liệu).
+
+### Bước 4: Bí cảnh
+Phòng tạm theo đội (`autoDispose`, hạn giờ, quái trùm, phần thưởng), dựa trên bước 1 (phòng theo bản đồ) và tổ đội. Thiết kế khi tới bước này.
+
+### Bước 5: PK thách đấu
+Chỉ khi hai bên đồng ý (lời thách đấu, nhận / từ chối, trận có kết thúc rõ); chết vì PK **không** mất kiếp (không luân hồi, không mất đồ). Không PK trong trấn. Thiết kế khi tới bước này.
+
+### Bước 6: Tông môn
+Gắn với **linh hồn** (không gắn nhân vật từng kiếp): tạo / gia nhập / chức vụ, chat tông môn, kho chung. Phụ thuộc bước 3. Thiết kế khi tới bước này.
+
+## Sprint 5 cũ: ghi chú đã được thay
+Phác thảo ban đầu (tiền tệ, nhiều bản đồ, bí cảnh) và Sprint 6 (PK, tông môn) đã được thay bằng kế hoạch trên; các câu hỏi ở cuối bản đề xuất cũ đã có trả lời (mục "Quyết định của người dùng").
