@@ -121,8 +121,8 @@ for (const sz of SIZES) {
       mobile: sz.w < 600,
     });
 
-    // Mở trang kèm cờ ?outdated=2
-    await send("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/?outdated=2` });
+    // Mở trang kèm cờ ?outdated=2&debug=1 (chế độ kiểm thử giao diện)
+    await send("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/?outdated=2&debug=1` });
     await sleep(800);
 
     // Chụp màn hình
