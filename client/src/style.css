@@ -2861,7 +2861,11 @@ body.in-limbo #chat-log {
     padding: 16px 8px 240px;
   }
   body.in-limbo #chat {
-    width: min(240px, 75vw);
+    top: auto !important;
+    right: auto !important;
+    left: 8px !important;
+    bottom: 8px !important;
+    width: min(240px, 75vw) !important;
   }
   body.in-limbo #chat-log {
     height: 60px;
