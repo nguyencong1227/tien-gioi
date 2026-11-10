@@ -13,11 +13,16 @@ import {
   LINH_HU_MAP_ID,
   REALMS,
   getMap,
+  SECT_COIN_CAP,
+  SECT_ELDERS_MAX,
+  SECT_LOG_MAX,
+  SECT_MAX_MEMBERS,
 } from "@tien-gioi/shared";
 import {
   auditAccountSaveData,
   auditPlayerSaveData,
   auditSavesDirectory,
+  auditSectSaveData,
   auditSessionSaveData,
   auditSoulSaveData,
   MAX_FILE_SIZE,
@@ -1049,6 +1054,292 @@ describe("audit-saves (Issue #112)", () => {
       expect(auditPlayerSaveData(rawOverCap, rawOverCap.length).map((e) => e.code)).toContain(
         "invalid_dungeon_daily_rewards",
       );
+    });
+  });
+
+  describe("audit tông môn (sects/) (Issue #231, M3.6 6e)", () => {
+    const validSect = {
+      v: 1,
+      id: "sect-uuid-001",
+      name: "Thái Huyền Tông",
+      tag: "TH",
+      leader: "soul_chu_1",
+      motd: "Tu tiên vấn đạo, cầu trường sinh.",
+      members: [
+        { soulKey: "soul_chu_1", name: "Huyền Chân Tử", rank: "chu", joinedAt: 1700000000000 },
+        {
+          soulKey: "soul_lao_1",
+          name: "Thanh Hư Đạo",
+          rank: "truong_lao",
+          joinedAt: 1700000001000,
+        },
+        { soulKey: "soul_de_1", name: "Bạch Vân Nhi", rank: "de_tu", joinedAt: 1700000002000 },
+      ],
+      coin: 50000,
+      log: [{ at: 1700000003000, name: "Huyền Chân Tử", kind: "deposit", amount: 50000 }],
+      createdAt: 1700000000000,
+      updatedAt: 1700000003000,
+    };
+
+    it("file tông môn hợp lệ: 0 lỗi", () => {
+      const raw = JSON.stringify(validSect);
+      const errors = auditSectSaveData(raw, raw.length);
+      expect(errors).toEqual([]);
+    });
+
+    it("file vượt quá MAX_FILE_SIZE -> file_too_large", () => {
+      const errors = auditSectSaveData("{}", MAX_FILE_SIZE + 1);
+      expect(errors.map((e) => e.code)).toContain("file_too_large");
+    });
+
+    it("JSON hỏng hoặc không phải object -> invalid_json / not_an_object", () => {
+      expect(auditSectSaveData("invalid json", 12).map((e) => e.code)).toContain("invalid_json");
+      expect(auditSectSaveData("[]", 2).map((e) => e.code)).toContain("not_an_object");
+      expect(auditSectSaveData("null", 4).map((e) => e.code)).toContain("not_an_object");
+    });
+
+    it("v !== 1 -> invalid_sect_version", () => {
+      const raw = JSON.stringify({ ...validSect, v: 2 });
+      expect(auditSectSaveData(raw, raw.length).map((e) => e.code)).toContain(
+        "invalid_sect_version",
+      );
+    });
+
+    it("id không hợp lệ -> invalid_sect_id", () => {
+      for (const badId of ["", "id có dấu cách", "id!@#$", "a".repeat(65)]) {
+        const raw = JSON.stringify({ ...validSect, id: badId });
+        expect(auditSectSaveData(raw, raw.length).map((e) => e.code)).toContain("invalid_sect_id");
+      }
+    });
+
+    it("name và tag sai luật -> invalid_sect_name, invalid_sect_tag", () => {
+      const badNames = [
+        "",
+        "A",
+        "Tên Tông Môn Rất Dài Quá Mười Sáu Ký Tự Này",
+        "Tông\tMôn",
+        "Tông<br>Môn",
+      ];
+      for (const name of badNames) {
+        const raw = JSON.stringify({ ...validSect, name });
+        expect(auditSectSaveData(raw, raw.length).map((e) => e.code)).toContain(
+          "invalid_sect_name",
+        );
+      }
+      const badTags = ["", "A", "TAGQUADAICANTREN6KYTU", "T G", "tag#1"];
+      for (const tag of badTags) {
+        const raw = JSON.stringify({ ...validSect, tag });
+        expect(auditSectSaveData(raw, raw.length).map((e) => e.code)).toContain("invalid_sect_tag");
+      }
+    });
+
+    it("danh sách thành viên rỗng hoặc vượt SECT_MAX_MEMBERS -> invalid_sect_members", () => {
+      const rawEmpty = JSON.stringify({ ...validSect, members: [] });
+      expect(auditSectSaveData(rawEmpty, rawEmpty.length).map((e) => e.code)).toContain(
+        "invalid_sect_members",
+      );
+
+      const tooMany = Array.from({ length: SECT_MAX_MEMBERS + 1 }, (_, i) => ({
+        soulKey: `soul_${i}`,
+        name: `Đệ Tử ${i}`,
+        rank: i === 0 ? "chu" : ("de_tu" as const),
+        joinedAt: 1700000000000 + i,
+      }));
+      const rawTooMany = JSON.stringify({ ...validSect, leader: "soul_0", members: tooMany });
+      expect(auditSectSaveData(rawTooMany, rawTooMany.length).map((e) => e.code)).toContain(
+        "invalid_sect_members",
+      );
+    });
+
+    it("leader lệch hoặc không có đúng 1 Tông chủ -> invalid_sect_leader_match", () => {
+      // Leader không khớp với ai
+      const raw1 = JSON.stringify({ ...validSect, leader: "soul_khac" });
+      expect(auditSectSaveData(raw1, raw1.length).map((e) => e.code)).toContain(
+        "invalid_sect_leader_match",
+      );
+
+      // Hai Tông chủ
+      const raw2 = JSON.stringify({
+        ...validSect,
+        members: [
+          { soulKey: "soul_chu_1", name: "Huyền Chân Tử", rank: "chu", joinedAt: 1700000000000 },
+          { soulKey: "soul_chu_2", name: "Đạo Chủ Hai", rank: "chu", joinedAt: 1700000001000 },
+        ],
+      });
+      expect(auditSectSaveData(raw2, raw2.length).map((e) => e.code)).toContain(
+        "invalid_sect_leader_match",
+      );
+
+      // Không có Tông chủ nào
+      const raw3 = JSON.stringify({
+        ...validSect,
+        members: [
+          {
+            soulKey: "soul_chu_1",
+            name: "Huyền Chân Tử",
+            rank: "truong_lao",
+            joinedAt: 1700000000000,
+          },
+        ],
+      });
+      expect(auditSectSaveData(raw3, raw3.length).map((e) => e.code)).toContain(
+        "invalid_sect_leader_match",
+      );
+    });
+
+    it("quá SECT_ELDERS_MAX Trưởng lão -> too_many_elders", () => {
+      const elders = Array.from({ length: SECT_ELDERS_MAX + 1 }, (_, i) => ({
+        soulKey: `soul_lao_${i}`,
+        name: `Trưởng Lão ${i}`,
+        rank: "truong_lao",
+        joinedAt: 1700000000000 + i,
+      }));
+      const raw = JSON.stringify({
+        ...validSect,
+        members: [validSect.members[0], ...elders],
+      });
+      expect(auditSectSaveData(raw, raw.length).map((e) => e.code)).toContain("too_many_elders");
+    });
+
+    it("thành viên trùng soulKey trong cùng tông môn -> duplicate_sect_member", () => {
+      const raw = JSON.stringify({
+        ...validSect,
+        members: [
+          validSect.members[0],
+          {
+            soulKey: "soul_chu_1",
+            name: "Huyền Chân Tử Hai",
+            rank: "de_tu",
+            joinedAt: 1700000001000,
+          },
+        ],
+      });
+      expect(auditSectSaveData(raw, raw.length).map((e) => e.code)).toContain(
+        "duplicate_sect_member",
+      );
+    });
+
+    it("coin âm, số thực hoặc vượt SECT_COIN_CAP -> invalid_sect_coin", () => {
+      for (const badCoin of [-1, 10.5, SECT_COIN_CAP + 1, Infinity, "1000"]) {
+        const raw = JSON.stringify({ ...validSect, coin: badCoin });
+        expect(auditSectSaveData(raw, raw.length).map((e) => e.code)).toContain(
+          "invalid_sect_coin",
+        );
+      }
+    });
+
+    it("sổ kho vượt SECT_LOG_MAX hoặc entry hỏng -> invalid_sect_log / invalid_sect_log_entry", () => {
+      const bigLog = Array.from({ length: SECT_LOG_MAX + 1 }, (_, i) => ({
+        at: 1700000000000 + i,
+        name: "Huyền Chân Tử",
+        kind: "deposit",
+        amount: 100,
+      }));
+      const raw1 = JSON.stringify({ ...validSect, log: bigLog });
+      expect(auditSectSaveData(raw1, raw1.length).map((e) => e.code)).toContain("invalid_sect_log");
+
+      const badLogEntry = JSON.stringify({
+        ...validSect,
+        log: [{ at: 1700000000000, name: "Huyền Chân Tử", kind: "bad_kind", amount: -5 }],
+      });
+      const errs = auditSectSaveData(badLogEntry, badLogEntry.length).map((e) => e.code);
+      expect(errs).toContain("invalid_sect_log_kind");
+      expect(errs).toContain("invalid_sect_log_amount");
+    });
+
+    it("quét thư mục sects/: phát hiện lệch tên file, trùng tên, trùng tag, và thành viên ở 2 tông môn", () => {
+      const sectsDir = path.join(tmpDir, "sects");
+      mkdirSync(sectsDir, { recursive: true });
+
+      // Tông môn 1 hợp lệ
+      writeFileSync(
+        path.join(sectsDir, "sect-001.json"),
+        JSON.stringify({ ...validSect, id: "sect-001" }),
+        "utf8",
+      );
+
+      // Tông môn 2: tên file sect-other.json lệch id sect-002
+      writeFileSync(
+        path.join(sectsDir, "sect-other.json"),
+        JSON.stringify({
+          ...validSect,
+          id: "sect-002",
+          name: "Tông Môn Hai",
+          tag: "TM2",
+          leader: "soul_chu_2",
+          members: [
+            { soulKey: "soul_chu_2", name: "Chủ Hai", rank: "chu", joinedAt: 1700000000000 },
+          ],
+        }),
+        "utf8",
+      );
+
+      // Tông môn 3: trùng tên (theo sectKey) với tông môn 1
+      writeFileSync(
+        path.join(sectsDir, "sect-003.json"),
+        JSON.stringify({
+          ...validSect,
+          id: "sect-003",
+          name: "thái huyền tông",
+          tag: "TM3",
+          leader: "soul_chu_3",
+          members: [
+            { soulKey: "soul_chu_3", name: "Chủ Ba", rank: "chu", joinedAt: 1700000000000 },
+          ],
+        }),
+        "utf8",
+      );
+
+      // Tông môn 4: trùng biệt hiệu (theo sectKey) với tông môn 1
+      writeFileSync(
+        path.join(sectsDir, "sect-004.json"),
+        JSON.stringify({
+          ...validSect,
+          id: "sect-004",
+          name: "Tông Môn Bốn",
+          tag: "th",
+          leader: "soul_chu_4",
+          members: [
+            { soulKey: "soul_chu_4", name: "Chủ Bốn", rank: "chu", joinedAt: 1700000000000 },
+          ],
+        }),
+        "utf8",
+      );
+
+      // Tông môn 5: có thành viên soul_lao_1 (đã ở tông môn 1)
+      writeFileSync(
+        path.join(sectsDir, "sect-005.json"),
+        JSON.stringify({
+          ...validSect,
+          id: "sect-005",
+          name: "Tông Môn Năm",
+          tag: "TM5",
+          leader: "soul_chu_5",
+          members: [
+            { soulKey: "soul_chu_5", name: "Chủ Năm", rank: "chu", joinedAt: 1700000000000 },
+            {
+              soulKey: "soul_lao_1",
+              name: "Thanh Hư Đạo",
+              rank: "truong_lao",
+              joinedAt: 1700000001000,
+            },
+          ],
+        }),
+        "utf8",
+      );
+
+      // File cách ly và file tạm phải bị bỏ qua
+      writeFileSync(path.join(sectsDir, "sect-006.hong-123.json"), "invalid json", "utf8");
+      writeFileSync(path.join(sectsDir, "sect-007.tmp"), "tmp data", "utf8");
+
+      const report = auditSavesDirectory(tmpDir);
+      expect(report.totalSects).toBe(5);
+      expect(report.cleanSects).toBe(1);
+      expect(report.errorSects).toBe(4);
+      expect(report.errorsByCode.mismatched_sect_filename).toBe(1);
+      expect(report.errorsByCode.duplicate_sect_name).toBe(1);
+      expect(report.errorsByCode.duplicate_sect_tag).toBe(1);
+      expect(report.errorsByCode.member_in_multiple_sects).toBe(1);
     });
   });
 });
