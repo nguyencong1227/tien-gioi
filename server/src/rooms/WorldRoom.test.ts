@@ -1454,6 +1454,7 @@ describe("đi qua cổng giữa hai bản đồ (M3 bước 1)", () => {
   it("đi qua cổng bắc rồi quay về: không mất dữ liệu, đúng chỗ xuất hiện, đúng phòng, không còn ở phòng cũ", async () => {
     const name = "Qua Cong";
     const a = await join(name);
+    const watcher = await join("Nguoi Xem Cong"); // người ở lại phòng cũ
     a.room.send("chat", { text: "/give nanh_soi 3" });
     await waitFor(() => a.invs.find((m) => m.gained));
     const sa = standAt(a.room, BAC);
@@ -1466,6 +1467,9 @@ describe("đi qua cổng giữa hai bản đồ (M3 bước 1)", () => {
     await waitFor(() => !a.room.connection.isOpen); // server đóng kết nối sau travelTo
     // Đã rời phòng cũ ngay (không chờ nối lại) và bản ghi đã nói bản đồ đích + chỗ xuất hiện
     expect(serverState(a.room).players.get(a.room.sessionId)).toBeUndefined();
+    await sleep(200);
+    // đi qua cổng không phải "rời đi": người ở lại không nhận thông báo rời đi
+    expect(watcher.chat.some((m) => m.text.includes(`${name} đã rời đi`))).toBe(false);
     const saved = fileOf(name);
     expect([saved.mapId, saved.x, saved.y]).toEqual([HAC_PHONG_ID, NAM.spawn.x, NAM.spawn.y]);
     expect(saved.travelAt).toBeGreaterThan(Date.now() - 5000);
