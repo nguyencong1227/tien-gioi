@@ -76,6 +76,25 @@ function open(t: T): Run {
   return run!;
 }
 
+/** Run giả đủ trường (test sổ run). */
+function fakeRun(leader: string, over: Partial<Run> = {}): Run {
+  return {
+    id: leader.padStart(32, "0"),
+    dungeonId: LINH_HU_ID,
+    roomId: `r-${leader}`,
+    leader,
+    members: new Map([[leader, { key: leader, name: leader, status: "invited" }]]),
+    phase: "gathering",
+    openedAt: 0,
+    inviteUntil: Infinity,
+    startedAt: null,
+    deadline: Infinity,
+    exitAt: null,
+    endReason: null,
+    ...over,
+  };
+}
+
 describe("mở bí cảnh (dungeonOpen)", () => {
   it("đội trưởng đủ điều kiện: lập run `gathering`, mời CẢ HAI người (kể cả người ở phòng khác) với runId 128 bit, tên đội trưởng, hạn mời, số lượt thưởng", () => {
     const t = setup();
@@ -476,6 +495,27 @@ describe("hộp thoại Thủ môn", () => {
 });
 
 describe("sổ run (Runs)", () => {
+  it("hồi chiêu mở không rò: mục của đội trưởng biến mất sau khi hết hồi chiêu và qua một nhịp kiểm (kể cả khi không còn run nào)", () => {
+    const t = setup();
+    open(t);
+    expect(t.hub.runs.cooldownSize).toBe(1);
+    t.hub.runs._remove([...t.hub.runs.all()][0]); // không còn run nào, chỉ còn hồi chiêu
+    t.lh.w.now += DUNGEON_OPEN_COOLDOWN_MS - 1000;
+    tickDungeons(t.lh.w);
+    expect(t.hub.runs.cooldownSize).toBe(1); // còn hồi chiêu: giữ
+    t.lh.w.now += 2000;
+    tickDungeons(t.lh.w);
+    expect(t.hub.runs.cooldownSize).toBe(0);
+    expect(t.hub.runs.cooldownLeft(key(LEADER), t.lh.w.now)).toBe(0);
+    // nhiều đội trưởng xoay vòng: không tích tụ
+    for (let i = 0; i < 50; i++) t.hub.runs._add(fakeRun(`x${i}`), t.lh.w.now);
+    expect(t.hub.runs.cooldownSize).toBe(50);
+    for (const r of [...t.hub.runs.all()]) t.hub.runs._remove(r);
+    t.lh.w.now += DUNGEON_OPEN_COOLDOWN_MS + 1000;
+    tickDungeons(t.lh.w);
+    expect(t.hub.runs.cooldownSize).toBe(0);
+  });
+
   it("mỗi người một run; xoá run giải phóng mọi thành viên; xoá hai lần không sao; id lạ không tra được", () => {
     const t = setup();
     const run = open(t);

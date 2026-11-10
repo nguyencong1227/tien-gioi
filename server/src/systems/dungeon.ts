@@ -113,6 +113,17 @@ export class Runs {
     return last === undefined ? 0 : Math.max(0, DUNGEON_OPEN_COOLDOWN_MS - (now - last));
   }
 
+  /** Số đội trưởng còn đang trong hồi chiêu mở (số đo / test rò rỉ: về 0 sau khi hết hồi chiêu và qua một nhịp kiểm). */
+  get cooldownSize() {
+    return this.lastOpenAt.size;
+  }
+
+  /** @internal Bỏ các mục hồi chiêu đã hết (không có thì mỗi đội trưởng từng mở để lại một mục suốt đời tiến trình). */
+  _sweepCooldowns(now: number) {
+    for (const [key, at] of this.lastOpenAt)
+      if (now - at >= DUNGEON_OPEN_COOLDOWN_MS) this.lastOpenAt.delete(key);
+  }
+
   /** @internal Đăng ký run mới và chiếm chỗ của từng thành viên. */
   _add(run: Run, now: number) {
     this.byId.set(run.id, run);
@@ -371,7 +382,8 @@ export function endGathering(
  */
 export function tickDungeons(w: World) {
   const runs = w.hub.runs;
-  if (runs.size === 0 || !runs._dueCheck(w.now)) return;
+  if ((runs.size === 0 && runs.cooldownSize === 0) || !runs._dueCheck(w.now)) return;
+  runs._sweepCooldowns(w.now);
   for (const run of [...runs.all()]) {
     if (run.phase === "gathering" && w.now >= run.inviteUntil) endGathering(w, run, "no_entry");
   }
