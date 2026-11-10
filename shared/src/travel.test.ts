@@ -1,14 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
-  JOIN_BAD_MAP,
   JOIN_WRONG_MAP,
   TRAVEL_COMBAT_LOCK_MS,
   TRAVEL_COOLDOWN_MS,
   TRAVEL_JOIN_TIMEOUT_MS,
   parseWrongMap,
+  roomNameOf,
   wrongMapMessage,
 } from "./travel";
-import { DEFAULT_MAP_ID, HAC_PHONG_ID } from "./map";
+import { DEFAULT_MAP_ID, HAC_PHONG_ID, MAPS } from "./map";
+import { ROOM_NAME } from "./game";
 import { NPCS, npcsOfMap } from "./npcs";
 
 describe("chuyển bản đồ: hợp đồng (M3 bước 1)", () => {
@@ -20,7 +21,6 @@ describe("chuyển bản đồ: hợp đồng (M3 bước 1)", () => {
 
   it("parseWrongMap: lỗi khác, thông điệp rác, id rỗng đều là undefined (không ném)", () => {
     expect(parseWrongMap(409, wrongMapMessage(HAC_PHONG_ID))).toBeUndefined();
-    expect(parseWrongMap(JOIN_BAD_MAP, wrongMapMessage(HAC_PHONG_ID))).toBeUndefined();
     expect(parseWrongMap(JOIN_WRONG_MAP, "Nhân vật này đang ở trong game.")).toBeUndefined();
     expect(parseWrongMap(JOIN_WRONG_MAP, "wrong_map:")).toBeUndefined();
     expect(parseWrongMap(JOIN_WRONG_MAP, "xwrong_map:hac_phong")).toBeUndefined();
@@ -30,8 +30,19 @@ describe("chuyển bản đồ: hợp đồng (M3 bước 1)", () => {
       expect(parseWrongMap(bad, wrongMapMessage(HAC_PHONG_ID))).toBeUndefined();
   });
 
-  it("mã lỗi không trùng các mã cũ của server (400, 403, 409) và khác nhau", () => {
-    expect(new Set([JOIN_WRONG_MAP, JOIN_BAD_MAP, 400, 403, 409]).size).toBe(5);
+  it("mã lỗi không trùng các mã cũ của server (400, 403, 409)", () => {
+    expect(new Set([JOIN_WRONG_MAP, 400, 403, 409]).size).toBe(4);
+  });
+
+  it("roomNameOf: bản đồ mặc định giữ ROOM_NAME; mỗi bản đồ một tên khác nhau, chỉ gồm chữ thường, số, gạch dưới", () => {
+    expect(roomNameOf(DEFAULT_MAP_ID)).toBe(ROOM_NAME);
+    expect(roomNameOf(HAC_PHONG_ID)).toBe("world_hac_phong");
+    const names = MAPS.map((m) => roomNameOf(m.id));
+    expect(new Set(names).size).toBe(MAPS.length);
+    for (const n of names) expect(n).toMatch(/^[a-z0-9_]+$/);
+    // Id bản đồ không được làm tên phòng của bản đồ này trùng tên phòng bản đồ kia
+    for (const a of MAPS)
+      for (const b of MAPS) if (a !== b) expect(roomNameOf(a.id)).not.toBe(roomNameOf(b.id));
   });
 
   it("hằng số hợp lý: hồi chiêu và khoá giao chiến dương, chờ vào phòng đích đủ lâu hơn hồi chiêu", () => {
