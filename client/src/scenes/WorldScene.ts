@@ -47,10 +47,17 @@ import {
   type DungeonInviteMsg,
   type DungeonStateMsg,
   type DungeonEndMsg,
+  DUEL_MSG,
+  isDungeonMap,
+  type DuelInvitedMsg,
+  type DuelStateMsg,
+  type DuelEndMsg,
+  type DuelChallengeCheck,
 } from "@tien-gioi/shared";
 import { preloadAssets, makeTextures, dirFromAngle, TILESET_KEY, ATLAS_KEY } from "../textures";
 import { ui } from "../ui";
 import { buildMockThuMonDialog, isMockDungeonEnabled, MOCK_DUNGEON_SAMPLES } from "../dungeon";
+import { clientCanChallenge } from "../duel";
 import { replayEarlyMessages } from "../early-messages";
 import { sound } from "../audio";
 import { joystick, setupJoystick } from "../joystick";
@@ -285,6 +292,11 @@ export class WorldScene extends Phaser.Scene {
           this.room.send(DUNGEON_MSG.leave, {});
         }
       },
+      onDuelChallenge: (name) =>
+        !this.isReconnecting && this.room.send(DUEL_MSG.challenge, { name }),
+      onDuelAccept: (from) => !this.isReconnecting && this.room.send(DUEL_MSG.accept, { from }),
+      onDuelDecline: (from) => !this.isReconnecting && this.room.send(DUEL_MSG.decline, { from }),
+      onDuelYield: () => !this.isReconnecting && this.room.send(DUEL_MSG.yield, {}),
     });
 
     this.setupInput();
@@ -653,7 +665,21 @@ export class WorldScene extends Phaser.Scene {
     if (closestId) {
       const sp = this.state.players.get(closestId);
       if (sp) {
-        ui.openPlayerMenu(sp.name, sp.realm, sp.tier, pointer.x, pointer.y);
+        const me = this.me();
+        let challengeCheck: DuelChallengeCheck | undefined;
+        if (me) {
+          const spX = sp.px ?? sp.x;
+          const spY = sp.py ?? sp.y;
+          challengeCheck = clientCanChallenge(
+            { name: me.name, dead: me.dead, duel: Boolean((me as any).duel) },
+            { x: me.x, y: me.y },
+            { name: sp.name, dead: sp.dead, duel: Boolean((sp as any).duel) },
+            { x: spX, y: spY },
+            this.map,
+            isDungeonMap(this.map.def.id),
+          );
+        }
+        ui.openPlayerMenu(sp.name, sp.realm, sp.tier, pointer.x, pointer.y, challengeCheck);
         return true;
       }
     }
@@ -746,6 +772,7 @@ export class WorldScene extends Phaser.Scene {
     this.isReconnecting = reconnecting;
     if (reconnecting) {
       this.moving = false;
+      ui.hideDuelHud();
       ui.showReconnectNotice("Mất kết nối, đang nối lại...");
     } else {
       ui.hideReconnectNotice();
@@ -753,6 +780,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   public changeMap(room: Room, newMap: GameMap) {
+    ui.hideDuelHud();
     this.map = newMap;
     this.buildMapVisuals();
     ui.setCurrentMapId(newMap.def.id);
@@ -858,6 +886,9 @@ export class WorldScene extends Phaser.Scene {
     reg(DUNGEON_MSG.invite, (m: DungeonInviteMsg) => ui.onDungeonInvite(m));
     reg(DUNGEON_MSG.state, (m: DungeonStateMsg) => ui.onDungeonState(m));
     reg(DUNGEON_MSG.end, (m: DungeonEndMsg) => ui.onDungeonEnd(m));
+    reg(DUEL_MSG.invited, (m: DuelInvitedMsg) => ui.onDuelInvited(m));
+    reg(DUEL_MSG.state, (m: DuelStateMsg) => ui.onDuelState(m));
+    reg(DUEL_MSG.end, (m: DuelEndMsg) => ui.onDuelEnd(m));
     replayEarlyMessages(this.room, handlers);
     if (isInitial) {
       ui.chat({
@@ -1784,13 +1815,23 @@ export class WorldScene extends Phaser.Scene {
       const showLabel = isMe || (!hideNames && distToMe <= 450);
       e.label!.setVisible(showLabel);
       if (showLabel) {
-        const label = `${p.name}\n${realmLabel(p.realm, p.tier)}`;
+        const isDuel = Boolean((p as any).duel);
+        const duelPrefix = isDuel ? "⚔ " : "";
+        const label = `${duelPrefix}${p.name}\n${realmLabel(p.realm, p.tier)}`;
         if (label !== e.lastLabel) {
           e.label!.setText(label);
           e.lastLabel = label;
         }
       }
       this.drawBar(e, p.hp / p.maxHp, isMe ? 0x6ad06a : 0xd0a040, -30, 28, p.hp < p.maxHp);
+
+      // Cập nhật máu đối thủ trong HUD quyết đấu nếu đang trong trận PK (M3.5, #218)
+      if (ui.isDuelActive()) {
+        const oppName = ui.getDuelOpponent();
+        if (oppName && p.name.toLowerCase() === oppName.toLowerCase()) {
+          ui.updateDuelOpponentHp(p.hp, p.maxHp);
+        }
+      }
     });
     for (const [id, e] of this.players)
       if (!seen.has(id)) {
