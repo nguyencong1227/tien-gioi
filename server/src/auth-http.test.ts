@@ -1,6 +1,7 @@
 // API HTTP của tài khoản qua máy chủ Express THẬT (cổng ngẫu nhiên, `fetch` thật): luồng đăng ký -> phiên -> khôi phục,
 // kiểu nội dung / cỡ thân / tiêu đề Authorization, giới hạn tần suất theo IP (kể cả giả X-Forwarded-For), 500 không rò rỉ.
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { MIN_PROTOCOL_VERSION, PROTOCOL_VERSION } from "@tien-gioi/shared";
 import { mkdtempSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -92,6 +93,8 @@ describe("authModeOf / /health", () => {
     expect(await (await fetch(`${s.base}/health`)).json()).toEqual({
       ok: true,
       authMode: "legacy",
+      protocol: PROTOCOL_VERSION,
+      minProtocol: MIN_PROTOCOL_VERSION,
     });
     const r = await post(s, "/api/auth/register", { username: "lam_thanh", password: PW });
     expect(r.status).toBe(404);
@@ -100,6 +103,8 @@ describe("authModeOf / /health", () => {
     expect(await (await fetch(`${a.base}/health`)).json()).toEqual({
       ok: true,
       authMode: "account",
+      protocol: PROTOCOL_VERSION,
+      minProtocol: MIN_PROTOCOL_VERSION,
     });
   });
 });

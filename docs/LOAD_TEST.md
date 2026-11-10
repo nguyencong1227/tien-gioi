@@ -612,9 +612,12 @@ Bộ kiểm thử stress test tự động hoá 7 kịch bản then chốt trên
 | **6. Kiểm tra dọn dẹp rò rỉ sau N chu kỳ** | 3 chu kỳ liên tiếp (từ chối, nhận rồi rời, disconnect khi có lời mời treo): `Hub.sects.invitesSize` về 0, `online.size` về 0, `cache.size` về 0, `_cooldownSize` về 0 sau sweep | 0 lời mời treo, 0 tông môn rò rỉ trong cache, sạch sẽ bộ nhớ | **PASS** (~0.9s) |
 | **7. Kiểm tra tính toàn vẹn lưu trữ (`audit-saves`)** | Chạy `auditSavesDirectory` trên toàn bộ file lưu nhân vật và tông môn phát sinh: 0 file lỗi, 0 lỗi tông môn, 0 file mồ côi | Lưu trữ nhất quán, không bẩn dữ liệu trên đĩa | **PASS** (~0.15s) |
 
-## 16. Red Team Từng Tin Nhắn Server (M4-sớm - Issue #252)
+## 16. E2E thật phiên bản giao thức (M4 2.5, `npm run e2e:phien-ban -w server`)
+Chrome headless + server Colyseus thật trong tiến trình (thư mục dữ liệu tạm), cùng khung với mục 13 (`server/scripts/e2e-kit.ts`). Server nâng `WorldRoom.minProtocol` lên `PROTOCOL_VERSION + 1` nên client thật (gửi `v: PROTOCOL_VERSION`) thành "quá cũ". Luồng 4 bước: (1) client thấy màn hình "Phiên Bản Đã Cũ" nêu đúng mức tối thiểu và KHÔNG vào được game; (2) sau 2,5 giây `onAuth` được gọi đúng 1 lần (lỗi dứt khoát, không vòng thử lại / `wrong_map`) và không có hồ sơ nhân vật nào được tạo; (3) server hạ mức, bấm "Tải Lại Trang": trang tải lại sạch, màn hình tắt; (4) đăng nhập lại vào game bình thường. Cần `npm run build` (client/dist mới) và google-chrome. Đột biến: bỏ `throw new ClientOutdatedError` ở `client/src/connection.ts` thì bước 1 đỏ. Chạy trên main sau #261 (server) + #264 (client): PASS 4/4.
 
-### 16.1. Phương pháp & Công cụ (`server/scripts/red-team.ts`)
+## 17. Red Team Từng Tin Nhắn Server (M4-sớm - Issue #252)
+
+### 17.1. Phương pháp & Công cụ (`server/scripts/red-team.ts`)
 Công cụ `npm run red-team -w server` dựng server Colyseus thật trong tiến trình với thư mục dữ liệu tạm cô lập và kiểm tra đối kháng (red team) toàn diện:
 - **Tự phát hiện loại tin nhắn:** Tự động đọc danh sách handler đã đăng ký từ `serverRoom.onMessageHandlers` (loại bỏ handler nội bộ `__no_message_handler` và handler toàn cục `*`), so khớp 100% với hợp đồng `shared/` (`EXPECTED_MESSAGE_TYPES` gồm 47 loại tin nghiệp vụ) + 1 tin lạ để kiểm tra handler `*`.
 - **Đa dạng hoá đối tượng tấn công (Poor & Rich Attacker):**
@@ -638,7 +641,7 @@ Công cụ `npm run red-team -w server` dựng server Colyseus thật trong ti�
     - Đột biến 1 (`useItem` cộng 5000 Linh thạch): Red team phát hiện 44 vi phạm bất biến tiền sống (ĐỎ).
     - Đột biến 2 (`useItem` ném TypeError khi thiếu kiểm tra null): Red team phát hiện 10 ngoại lệ handler `[lỗi]` (ĐỎ).
 
-### 16.2. Kết quả Đo đạc Thực tế
+### 17.2. Kết quả Đo đạc Thực tế
 Chạy 48 loại tin nhắn × 2 senders (Poor + Rich) × 26 biến thể payload (chế độ FAST):
 
 | Chỉ số kiểm thử | Giá trị đo được | Đánh giá | Trạng thái |
@@ -662,6 +665,3 @@ Chạy 48 loại tin nhắn × 2 senders (Poor + Rich) × 26 biến thể payloa
 - **Tông môn:** `sectCreate` (52/52 OK), `sectInvite` (52/52 OK), `sectAccept` (52/52 OK), `sectDecline` (52/52 OK), `sectLeave` (52/52 OK), `sectKick` (52/52 OK), `sectRank` (52/52 OK), `sectTransfer` (52/52 OK), `sectDisband` (52/52 OK), `sectMotd` (52/52 OK), `sectDeposit` (52/52 OK), `sectWithdraw` (52/52 OK).
 - **Luân hồi:** `soulBuy` (52/52 OK), `rebirth` (52/52 OK).
 - **Tin lạ không đăng ký:** `__unknown_unregistered_msg__` (52/52 OK, handler `*` từ chối an toàn).
-
-
-

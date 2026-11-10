@@ -137,3 +137,33 @@ describe("splitCoin", () => {
     expect(splitCoin(10, new Map([["z", 0]])).size).toBe(0);
   });
 });
+
+describe("nhật ký kiểm toán của ví (wallet.big)", () => {
+  it("chỉ ghi khi |phần đổi THẬT| >= ngưỡng (cộng hoặc trừ), kèm tên, số đổi và số dư mới; ví không đổi thì không ghi", () => {
+    const { w } = makeWorld();
+    addPlayer(w, "A");
+    const log: { ev: string; f: Record<string, unknown> }[] = [];
+    w.audit = (ev, f) => void log.push({ ev, f: f ?? {} });
+    w.auditCoinMin = 1000;
+    changeCoin(w, "A", 999); // dưới ngưỡng
+    changeCoin(w, "A", 1000); // đúng ngưỡng: ghi
+    changeCoin(w, "A", -1500); // trừ lớn: ghi
+    changeCoin(w, "A", -5000); // chỉ trừ được 499 (sàn 0): phần thật dưới ngưỡng, không ghi
+    changeCoin(w, "A", -5); // ví đã 0: không đổi, không ghi
+    expect(log).toEqual([
+      { ev: "wallet.big", f: { name: "A", delta: 1000, coin: 1999 } },
+      { ev: "wallet.big", f: { name: "A", delta: -1500, coin: 499 } },
+    ]);
+  });
+
+  it("không có hook (mặc định) hoặc ngưỡng Infinity: không ghi, không lỗi", () => {
+    const { w } = makeWorld();
+    addPlayer(w, "A");
+    expect(w.audit).toBeNull();
+    expect(() => changeCoin(w, "A", 999_999)).not.toThrow();
+    const log: string[] = [];
+    w.audit = (ev) => void log.push(ev);
+    changeCoin(w, "A", 999_999); // auditCoinMin mặc định Infinity
+    expect(log).toEqual([]);
+  });
+});

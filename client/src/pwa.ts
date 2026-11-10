@@ -14,7 +14,7 @@ export interface PwaGameState {
   isDead?: boolean;
   /** Có đang chuyển map qua cổng truyền tống hay không */
   isTravelling?: boolean;
-  /** Có đang trong giao tranh (máu giảm dưới mức tối đa) hay không */
+  /** Có đang trong giao tranh (vừa tấn công hoặc bị trừ máu gần đây) hay không */
   inCombat?: boolean;
 }
 

@@ -10,6 +10,10 @@ import {
   DEFAULT_MAP_ID,
   MAPS,
   JOIN_WRONG_MAP,
+  JOIN_CLIENT_OUTDATED,
+  MIN_PROTOCOL_VERSION,
+  clientOutdatedMessage,
+  isClientOutdated,
   JOIN_BAD_TOKEN,
   JOIN_NEED_CHARACTER,
   DUNGEON_MSG,
@@ -145,6 +149,7 @@ import {
 } from "../systems/dungeon";
 import { applyRebirth, creditSoul } from "../systems/reincarnation";
 import { RateLimiter } from "../rate-limit";
+import { audit, auditCoinThreshold } from "../audit";
 import { defaultHub, type Hub } from "../hub";
 
 const SAVE_EVERY_MS = 30_000;
@@ -178,6 +183,11 @@ export class WorldRoom extends Room<WorldState> {
    * `secret`. `null`: chế độ cũ (tên + mã bí mật).
    */
   static auth: AuthService | null = null;
+  /**
+   * Phiên bản giao thức thấp nhất còn nhận (M4 2.5, `shared/src/protocol.ts`); `index.ts` đặt từ `MIN_PROTOCOL_VERSION` trong môi
+   * trường (`server/src/protocol.ts`). Mặc định `MIN_PROTOCOL_VERSION` của `shared/` (0: nhận cả client chưa gửi `v`).
+   */
+  static minProtocol = MIN_PROTOCOL_VERSION;
   /**
    * Dịch vụ tông môn (đặt ở `index.ts` theo `STORE`). `null`: dùng kho tệp mặc định (`defaultSectStore`, dựng lười). `SECTS=off`
    * (biến môi trường) gỡ tính năng: không có dịch vụ, mọi tin tông môn bị từ chối.
@@ -241,6 +251,9 @@ export class WorldRoom extends Room<WorldState> {
     w.onLimbo = (sid) => void this.enterLimbo(sid);
     // Tông môn (M3.6): dịch vụ dùng chung (`SECTS=off` gỡ gấp); lưu hồ sơ NGAY khi chuyển Linh thạch sang kho
     w.sectService = WorldRoom.sectService();
+    // Nhật ký kiểm toán (M4 2.4): chỉ ghi khi `startAudit` đã bật ở index.ts
+    w.audit = audit;
+    w.auditCoinMin = auditCoinThreshold(process.env);
     w.onSaveNow = async (sid) => {
       const p = this.state.players.get(sid);
       const c = w.ctrl.get(sid);
@@ -394,6 +407,7 @@ export class WorldRoom extends Room<WorldState> {
     if (!this.limiters.delete(c.sessionId)) return; // đã ngắt rồi
     const name = this.state.players.get(c.sessionId)?.name ?? c.sessionId;
     console.warn(`[spam] ngắt kết nối ${name}: gửi quá nhiều tin nhắn`);
+    audit("room.spam_kick", { name, map: this.mapId });
     c.leave(CLOSE_SPAM, "Gửi quá nhiều thao tác.");
   }
 
@@ -409,6 +423,9 @@ export class WorldRoom extends Room<WorldState> {
   // ---------------- Vào / ra ----------------
 
   async onAuth(_client: Client, options: JoinOptions) {
+    // Phiên bản trước mọi thứ khác (kể cả xác thực): client quá cũ nhận lời nhắn "hãy tải lại", không lộ gì về nhân vật nào
+    if (isClientOutdated(options?.v, WorldRoom.minProtocol))
+      throw new ServerError(JOIN_CLIENT_OUTDATED, clientOutdatedMessage(WorldRoom.minProtocol));
     const accounts = WorldRoom.auth;
     if (accounts) return this.authByToken(accounts, options);
     return this.authLegacy(options);
@@ -426,8 +443,10 @@ export class WorldRoom extends Room<WorldState> {
     const identity = legacyIdentity(name);
     const existing = await this.players.load(name);
     if (existing) {
-      if (existing.secretHash !== hashSecret(secret))
+      if (existing.secretHash !== hashSecret(secret)) {
+        audit("join.denied", { reason: "bad_secret", name });
         throw new ServerError(403, "Tên này đã có người dùng.");
+      }
       return this.resume(existing, identity);
     }
     return this.createFresh(name, hashSecret(secret), identity);
@@ -439,8 +458,10 @@ export class WorldRoom extends Room<WorldState> {
    */
   private async authByToken(accounts: AuthService, options: JoinOptions) {
     const account = await accounts.resolve(options?.token);
-    if (!account)
+    if (!account) {
+      audit("join.denied", { reason: "bad_token" });
       throw new ServerError(JOIN_BAD_TOKEN, "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+    }
     if (account.name === undefined)
       throw new ServerError(JOIN_NEED_CHARACTER, "Tài khoản chưa có đạo hiệu.");
     const name = account.name;

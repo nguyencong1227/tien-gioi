@@ -161,6 +161,18 @@ export class WorldScene extends Phaser.Scene {
   private nextSword = 0;
   private nearestLootId: string | null = null;
   private closestNpcId: string | null = null;
+  public lastCombatAt = 0;
+  private prevHp = 0;
+
+  /** Đánh dấu người chơi vừa tham gia giao tranh (tấn công hoặc bị tấn công) */
+  public recordCombat() {
+    this.lastCombatAt = Date.now();
+  }
+
+  /** Kiểm tra xem người chơi có đang trong giao tranh (8 giây gần nhất) hay không */
+  public isInCombat(): boolean {
+    return Date.now() - this.lastCombatAt < 8000;
+  }
 
   // Mũi tên chỉ đường nhiệm vụ
   private navArrow!: Phaser.GameObjects.Container;
@@ -745,6 +757,7 @@ export class WorldScene extends Phaser.Scene {
     if (this.isReconnecting || ui.isLimboOpen()) return;
     const me = this.me();
     if (!me || me.dead || this.time.now < this.nextSlash) return;
+    this.recordCombat();
     this.nextSlash = this.time.now + SKILLS.slash.cooldown;
     const a = angle ?? this.aim(SKILLS.slash.range + 60);
     this.facing = a;
@@ -760,6 +773,7 @@ export class WorldScene extends Phaser.Scene {
     const me = this.me();
     if (!me || me.dead || this.time.now < this.nextSword) return;
     if (me.mp < SKILLS.sword.mp) return ui.toast({ text: "Linh lực không đủ.", tone: "bad" });
+    this.recordCombat();
     this.nextSword = this.time.now + SKILLS.sword.cooldown;
     const a = this.aim(SKILLS.sword.range);
     this.facing = a;
@@ -916,6 +930,9 @@ export class WorldScene extends Phaser.Scene {
     };
     reg("fx", (m: FxMsg) => this.onFx(m));
     reg("dmg", (m: DmgMsg) => {
+      if (m.target === this.sid) {
+        this.recordCombat();
+      }
       if (!this.inView(m.x, m.y, 96)) return;
       this.floatText(m);
       sound.hit(m.crit);
@@ -1061,6 +1078,10 @@ export class WorldScene extends Phaser.Scene {
 
     const me = this.me();
     if (me) {
+      if (this.prevHp > 0 && me.hp < this.prevHp) {
+        this.recordCombat();
+      }
+      this.prevHp = me.hp;
       ui.hud(me, this.state.online ?? this.state.players.size);
       const now = this.time.now;
       ui.cooldown("sk-slash", (this.nextSlash - now) / SKILLS.slash.cooldown);

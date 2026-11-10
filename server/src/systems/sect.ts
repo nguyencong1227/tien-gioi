@@ -304,6 +304,12 @@ export async function sectCreate(w: World, sid: string, raw: unknown) {
     return toastFail(w, sid, res.reason);
   }
   broadcastSect(w, res.sect);
+  w.audit?.("sect.create", {
+    name: a.name,
+    sect: res.sect.name,
+    tag: res.sect.tag,
+    cost: SECT_CREATE_COST,
+  });
   toastGood(w, sid, `Đã lập tông môn ${res.sect.name} [${res.sect.tag}].`);
 }
 
@@ -388,6 +394,7 @@ export async function sectKick(w: World, sid: string, raw: unknown) {
   const res = await svc.kick(a, msg.name);
   if (!res.ok) return toastFail(w, sid, res.reason);
   broadcastSect(w, res.sect, [res.removed]);
+  w.audit?.("sect.kick", { name: a.name, sect: res.sect.name, target: res.removed.name });
   const loc = locateMember(w, res.removed);
   if (loc) loc.w.events.toast(loc.sid, { text: "Ngươi đã bị mời ra khỏi tông môn.", tone: "bad" });
   toastGood(w, sid, `Đã mời ${res.removed.name} ra khỏi tông môn.`);
@@ -424,6 +431,11 @@ export async function sectDisband(w: World, sid: string) {
   if (!a) return;
   const res = await svc.disband(a);
   if (!res.ok) return toastFail(w, sid, res.reason);
+  w.audit?.("sect.disband", {
+    name: a.name,
+    sect: res.sect.name,
+    members: res.sect.members.length,
+  });
   const book = w.hub.sects;
   book.cache.delete(res.sect.id);
   book.lastPresence.delete(res.sect.id);
@@ -470,6 +482,12 @@ export async function sectDeposit(w: World, sid: string, raw: unknown) {
     return toastFail(w, sid, res.reason);
   }
   broadcastSect(w, res.sect);
+  w.audit?.("sect.deposit", {
+    name: a.name,
+    sect: res.sect.name,
+    amount: msg.amount,
+    treasury: res.sect.coin,
+  });
   toastGood(w, sid, `Đã góp ${msg.amount} Linh thạch vào kho tông môn.`);
 }
 
@@ -498,5 +516,12 @@ export async function sectWithdraw(w: World, sid: string, raw: unknown) {
   }
   if (credited > 0) await saveNow(w, sid);
   broadcastSect(w, sect);
+  if (credited > 0)
+    w.audit?.("sect.withdraw", {
+      name: a.name,
+      sect: sect.name,
+      amount: credited,
+      treasury: sect.coin,
+    });
   if (credited > 0) toastGood(w, sid, `Đã rút ${credited} Linh thạch từ kho tông môn.`);
 }

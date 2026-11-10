@@ -59,11 +59,11 @@ Tham khảo cơ chế của thể loại (chỉ lấy ý tưởng, mọi tên g�
 ## Lộ trình
 1. **M1 (bản này):** vào game bằng tên, một bản đồ, thấy nhau di chuyển, chat, đánh quái thời gian thực, tu vi/cảnh giới, lưu nhân vật.
 2. **M2:** túi đồ, rơi đồ, đan dược, NPC và nhiệm vụ, asset thật.
-3. **M3** (thứ tự chốt ngày 10/11/2026; chi tiết và người làm: `docs/PHAN_CONG_M3.md`). Đã xong: tổ đội, tiền tệ, cửa hàng, nối lại khi rớt mạng, bản đồ là tham số; phía server đã xong cả bản đồ thứ hai (trừ nội dung quái riêng của Hắc Phong Cốc) và luân hồi (chân linh, Hoàng Tuyền, đầu thai). Thứ tự và trạng thái (cập nhật 11/11/2026: bước 1-5 đã xong; bước 6 xong cả server và client, còn công cụ thử tải):
+3. **M3** (thứ tự chốt ngày 10/11/2026; chi tiết và người làm: `docs/PHAN_CONG_M3.md`). Đã xong: tổ đội, tiền tệ, cửa hàng, nối lại khi rớt mạng, bản đồ là tham số; phía server đã xong cả bản đồ thứ hai (trừ nội dung quái riêng của Hắc Phong Cốc) và luân hồi (chân linh, Hoàng Tuyền, đầu thai). Thứ tự và trạng thái (cập nhật 11/11/2026: **M3 xong**, cả sáu bước đã vào `main`):
    1. Bản đồ thứ hai (phương án A: mỗi bản đồ một phòng Colyseus).
    2. Luân hồi bản đầu (linh hồn lưu file, điểm luân hồi, bảng mở khóa).
    3. Tài khoản thật + PostgreSQL, để lưu linh hồn tách khỏi nhân vật.
    4. Bí cảnh (phòng tạm theo đội); gục trong bí cảnh không mất kiếp (quyết định 11/11/2026).
    5. PK: chỉ khi hai bên đồng ý (thách đấu); chết vì PK không mất kiếp.
-   6. Tông môn, gắn với linh hồn (không gắn với nhân vật của từng kiếp): hợp đồng, kho lưu, dịch vụ + chat + kho chung và client đã vào `main`; còn công cụ thử tải (#231).
+   6. Tông môn, gắn với linh hồn (không gắn với nhân vật của từng kiếp): hợp đồng, kho lưu, dịch vụ + chat + kho chung, client, E2E và công cụ thử tải / rò rỉ / mô phỏng sập kho đã vào `main`.
 4. **M4:** chống gian lận, deploy, build app Android/iOS (tài khoản thật + PostgreSQL đã kéo lên M3).

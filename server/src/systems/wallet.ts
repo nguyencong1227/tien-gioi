@@ -22,6 +22,9 @@ export function changeCoin(w: World, sid: string, amount: number): number {
   if (delta === 0) return 0;
   c.coin = next;
   sendWallet(w, sid, delta);
+  // Đổi ví lớn: ghi nhật ký kiểm toán (hiếm, không nằm trong tick nóng)
+  if (w.audit && Math.abs(delta) >= w.auditCoinMin)
+    w.audit("wallet.big", { name: w.state.players.get(sid)?.name, delta, coin: next });
   return delta;
 }
 
