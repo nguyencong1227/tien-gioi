@@ -104,6 +104,7 @@ import {
   formatSectTreasury,
   formatSectRole,
   formatSectLog,
+  formatSectMembersSummary,
   mergeMemberPresence,
 } from "./sect";
 import { sound } from "./audio";
@@ -1889,6 +1890,10 @@ function renderSectMembersTab() {
   list.replaceChildren();
 
   const merged = mergeMemberPresence(currentSect.members, currentSectPresence);
+  const summaryEl = $("sect-members-summary");
+  if (summaryEl) {
+    summaryEl.textContent = formatSectMembersSummary(merged.length);
+  }
   const myRank = currentSect.myRank;
 
   for (const m of merged) {

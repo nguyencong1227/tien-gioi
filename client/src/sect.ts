@@ -4,6 +4,8 @@
 import {
   type SectRank,
   SECT_RANK_LABEL,
+  SECT_MAX_MEMBERS,
+  sectKey,
   type SectView,
   type SectMember,
   type SectLogEntry,
@@ -52,6 +54,12 @@ export function sortSectMembers(members: readonly SectMember[]): SectMember[] {
   return [...members].sort(compareSectMembers);
 }
 
+/** Định dạng dòng tóm tắt số lượng thành viên tông môn (ví dụ: "Tổng số: 2 / 30") */
+export function formatSectMembersSummary(count: number, max: number = SECT_MAX_MEMBERS): string {
+  const safeCount = Math.max(0, Number.isFinite(count) ? Math.floor(count) : 0);
+  return `Tổng số: ${safeCount} / ${max}`;
+}
+
 export interface MergedSectMember extends SectMember {
   online: boolean;
   realm?: number;
@@ -59,7 +67,7 @@ export interface MergedSectMember extends SectMember {
   mapId?: string;
 }
 
-/** Kết hợp danh sách thành viên tông môn với trạng thái trực tuyến từ SectPresenceMsg */
+/** Kết hợp danh sách thành viên tông môn với trạng thái trực tuyến từ SectPresenceMsg (dùng sectKey NFC) */
 export function mergeMemberPresence(
   members: readonly SectMember[],
   presence: SectPresenceMsg | null,
@@ -67,13 +75,13 @@ export function mergeMemberPresence(
   const onlineMap = new Map<string, SectPresenceEntry>();
   if (presence && Array.isArray(presence.online)) {
     for (const o of presence.online) {
-      onlineMap.set(o.name.toLowerCase(), o);
+      onlineMap.set(sectKey(o.name), o);
     }
   }
 
   const sorted = sortSectMembers(members);
   return sorted.map((m) => {
-    const onl = onlineMap.get(m.name.toLowerCase());
+    const onl = onlineMap.get(sectKey(m.name));
     if (onl) {
       return {
         ...m,

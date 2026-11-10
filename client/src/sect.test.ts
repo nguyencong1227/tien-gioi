@@ -4,6 +4,7 @@ import {
   formatSectTreasury,
   formatSectRole,
   formatSectLog,
+  formatSectMembersSummary,
   sortSectMembers,
   mergeMemberPresence,
   isMockSectEnabled,
@@ -98,6 +99,24 @@ describe("client sect pure logic", () => {
     const lePhiVu = merged.find((m) => m.name === "Lệ Phi Vũ");
     expect(lePhiVu?.online).toBe(true);
     expect(lePhiVu?.mapId).toBe("lac_ha");
+
+    // Khớp online với tên tiếng Việt có dấu khác dạng phân rã Unicode (NFC vs NFD)
+    const nfcMembers: SectMember[] = [
+      { name: "Tiêu Viêm", rank: "chu", joinedAt: 100 }, // NFC
+    ];
+    const nfdPresence: SectPresenceMsg = {
+      online: [{ name: "Tiêu Viêm".normalize("NFD"), realm: 1, tier: 1, mapId: "lac_ha" }],
+    };
+    const nfdMerged = mergeMemberPresence(nfcMembers, nfdPresence);
+    expect(nfdMerged[0].online).toBe(true);
+  });
+
+  it("formatSectMembersSummary định dạng chuẩn 'Tổng số: N / 30'", () => {
+    expect(formatSectMembersSummary(0)).toBe("Tổng số: 0 / 30");
+    expect(formatSectMembersSummary(2)).toBe("Tổng số: 2 / 30");
+    expect(formatSectMembersSummary(30)).toBe("Tổng số: 30 / 30");
+    expect(formatSectMembersSummary(-5)).toBe("Tổng số: 0 / 30");
+    expect(formatSectMembersSummary(NaN)).toBe("Tổng số: 0 / 30");
   });
 
   it("isMockSectEnabled kiểm tra URL query ?sect=mock", () => {
