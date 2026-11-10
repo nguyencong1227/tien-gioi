@@ -5,7 +5,7 @@
 ## 1. Hiện trạng (đã đọc mã, không đoán)
 - Một phòng Colyseus duy nhất (`ROOM_NAME = "world"`, `WorldRoom`), tối đa `MAX_PLAYERS_PER_ROOM = 100`, một `World` / một vòng tick.
 - Bản đồ là **hằng số toàn cục** trong `shared/src/map.ts`: `MAP_TILES = generate()` (seed cố định `MAP_SEED`), `TOWN`, `TOWN_PX`, `tileAt`, `isBlockedPx`, `circleBlocked`, `moveWithCollision`, `inTown`, `dangerAt`. Client và server cùng nạp module nên ra cùng một bản đồ.
-- Nơi đang gọi thẳng các hàm / hằng đó: `server/src/systems/{monsters,movement,progression,interest}.ts`, `server/src/rooms/WorldRoom.ts`, `server/src/perf/bench.ts`, `client/src/scenes/WorldScene.ts` (vẽ ô) và các test. Khoảng 7 tệp mã + test, đủ ít để đổi một lượt.
+- Nơi đang gọi thẳng các hàm / hằng đó: `server/src/systems/{monsters,movement,progression,interest}.ts`, `server/src/rooms/WorldRoom.ts`, `server/src/perf/bench.ts`, `server/scripts/bots.ts`, `server/scripts/audit-saves.ts` (`kiem-save`), `client/src/scenes/WorldScene.ts` (vẽ ô) và các test. Khoảng 7 tệp mã + test, đủ ít để đổi một lượt.
 - `SavedPlayer` chưa có `mapId`; tên đang chơi được kiểm bằng `state.players` **của một phòng** (`onAuth` trả 409); đội (`PartyBook`) nằm trong `World` của phòng; chat là `broadcast` trong phòng.
 - Nối lại khi rớt mạng (#116) giữ nhân vật ở `ghosts` **của phòng đó**.
 
@@ -18,7 +18,7 @@
 |---|---|---|
 | Cách làm | `gameServer.define("world", WorldRoom).filterBy(["mapId"])`; chuyển bản đồ = lưu nhân vật, rời phòng, vào phòng đích | Mỗi thực thể có `mapId`; vùng nhìn (`interest`) lọc thêm theo bản đồ; quái, đồ rơi, NPC theo bản đồ |
 | Chat, đội, kiểm tên đang chơi | Phải dùng chung giữa các phòng (sổ đăng ký toàn cục + kênh chat chung) | Giữ nguyên, không đổi |
-| Mở rộng | Mỗi phòng một vòng tick, CPU chia theo phòng; mở rộng ngang được | Một vòng tick cho tất cả; trần là 100 người cả game cho tới khi tách phòng |
+| Mở rộng | Mỗi phòng một vòng tick nhưng **chung một luồng Node** trong một tiến trình: ngân sách thật là TỔNG thời gian tick của mọi phòng trong 50 ms; muốn mở rộng ngang (nhiều tiến trình) phải có presence chung (ngoài phạm vi) | Một vòng tick cho tất cả; trần là 100 người cả game cho tới khi tách phòng |
 | Bí cảnh theo đội (phòng tạm, có hạn giờ) | Tự nhiên: tạo phòng tạm, huỷ khi hết giờ | Không hợp: phải mô phỏng "phòng" bằng bản đồ động trong `World` |
 | Rủi ro lớn nhất | Nhất quán dữ liệu khi chuyển phòng (lưu xong mới nạp), đội / chat / nối lại liên phòng | Tick phình theo tổng số quái của mọi bản đồ; mã `World` phức tạp lên |
 | Chi phí ước tính | Lớn (2 sprint), nhiều chỗ chạm | Vừa (1 sprint) nhưng bí cảnh vẫn cần A sau đó |
@@ -41,14 +41,20 @@
 
 **Client:** `main.ts` vào đúng `mapId` đã lưu; `WorldScene` dựng ô từ `getMap`, không từ hằng toàn cục; đổi bản đồ có màn chuyển cảnh (mờ dần, tên bản đồ); bản đồ nhỏ / lớn theo bản đồ; token nối lại (#117) theo phòng hiện tại.
 
-**Công cụ (C):** bot `--map`, bench từng bản đồ, kịch bản người qua cổng liên tục (rò ghost, đua lưu / nạp), mục mới trong `docs/LOAD_TEST.md`.
+**Công cụ (C):** bot `--map`, bench từng bản đồ và ca "nhiều `World` một tiến trình", kịch bản người qua cổng liên tục (rò ghost, đua lưu / nạp), mục mới trong `docs/LOAD_TEST.md`; `kiem-save` kiểm thêm `mapId` (lạ thì báo, server sẽ đưa về `lac_ha`) và tọa độ phải nằm trong bản đồ CỦA `mapId` đó, không trên ô chặn.
 
 ## 5. Thứ tự làm
-- **Bước 0: refactor trung tính (không phụ thuộc quyết định nào, làm được ngay sau #117 để không đụng `WorldScene.ts` của B).** Đưa bản đồ thành tham số: `MAPS` chỉ có `lac_ha`, `getMap("lac_ha")`, mọi nơi đọc từ `w.map` / `scene.map`; các hằng và hàm cũ vẫn còn (trỏ tới bản đồ mặc định) để không vỡ gì. Hành vi, bench, ngân sách giữ nguyên (0.0%). PR 0a `shared/` (A, B hoặc C review), PR 0b server (A), PR 0c client (B).
+- **Bước 0: refactor trung tính (không phụ thuộc quyết định nào, làm được ngay sau #117 để không đụng `WorldScene.ts` của B).** Đưa bản đồ thành tham số: `MAPS` chỉ có `lac_ha`, `getMap("lac_ha")`, mọi nơi đọc từ `w.map` / `scene.map`; các hằng và hàm cũ vẫn còn (trỏ tới bản đồ mặc định) để không vỡ gì. Hành vi, bench, ngân sách giữ nguyên (0.0%). PR 0a `shared/` (A, #124, đã vào), PR 0b server (A, `server/src` kể cả `perf/bench.ts`), PR 0c client (B), PR 0d công cụ (C: `server/scripts/bots.ts` và `server/scripts/audit-saves.ts`).
 - Bước 1: bản đồ thứ hai + cổng + `travel` (cần quyết định câu 1-2). Nội dung bản đồ (seed, quái, NPC) do A soạn, B vẽ ô nếu cần.
 - Bước 2: đội, chat chung, sổ tên toàn cục (nếu chọn A).
 - Bước 3: bí cảnh theo đội.
-- Bước 4: thử tải liên phòng (C).
+- Bước 4: thử tải liên phòng (C). Tiêu chí đo (cách đã đo ở #120 / #125):
+  - **Ngân sách tổng:** tổng tick của mọi phòng trong một tiến trình < 10 ms cho ca N bản đồ x M người (ví dụ 3 x 100), đo thêm độ trễ vòng sự kiện, không chỉ thời gian tick; `bench-baseline.json` có khoá theo bản đồ để workflow hằng đêm so được.
+  - **Độ trễ và byte mỗi lần chuyển bản đồ:** từ lúc gửi `travel` tới khi nhận state đầy đủ ở phòng đích (p50 / p95); state đầy đủ ban đầu (~4.8 KB / lần ở #125) x tần suất qua cổng.
+  - **Không mất dữ liệu:** tu vi, Linh thạch, túi đồ, nhiệm vụ trước và sau mỗi lần chuyển y hệt nhau, qua hàng nghìn lần chuyển.
+  - **Không nhân bản nhân vật:** hai client cùng mã nhân vật đua vào hai bản đồ -> đúng một bên vào; người đang chờ nối lại (`ghosts`) mà vào bản đồ khác bằng mã đó thì bên chờ bị huỷ, lưu đúng một lần.
+  - **Rớt mạng giữa lúc chuyển** (sau khi phòng cũ lưu, trước khi vào phòng đích): không kẹt trong sổ tên toàn cục, vào lại được.
+  - **Rò rỉ:** tổng `online` của mọi phòng về đúng số người thật; số phòng bí cảnh về 0 sau khi hết giờ / hết người (không còn hẹn giờ treo); VmRSS sau N chu kỳ tạo / huỷ phòng tạm không tăng quá ngưỡng (như `--leak` của #125).
 
 ## 6. Cần người dùng chọn
 1. **A hay B** (mục 3)? Khuyến nghị A nếu muốn có bí cảnh trong M3.
