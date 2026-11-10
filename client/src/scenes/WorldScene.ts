@@ -2,12 +2,6 @@ import Phaser from "phaser";
 import type { Room } from "colyseus.js";
 import {
   TILE,
-  MAP_W,
-  MAP_H,
-  MAP_TILES,
-  WORLD_W,
-  WORLD_H,
-  TOWN_PX,
   TICK_MS,
   PLAYER_RADIUS,
   SKILLS,
@@ -23,9 +17,11 @@ import {
   QUEST_BY_ID,
   npcMarker,
   questReady,
-  moveWithCollision,
   statsFor,
   realmLabel,
+  GameMap,
+  getMap,
+  DEFAULT_MAP_ID,
   type InputMsg,
   type FxMsg,
   type DmgMsg,
@@ -161,8 +157,14 @@ export class WorldScene extends Phaser.Scene {
   private perfMonstersSum = 0;
   private perfLootsSum = 0;
 
-  constructor(private room: Room) {
+  public map: GameMap;
+
+  constructor(
+    private room: Room,
+    map?: GameMap,
+  ) {
     super("world");
+    this.map = map ?? getMap(DEFAULT_MAP_ID)!;
   }
 
   private get state(): any {
@@ -181,14 +183,16 @@ export class WorldScene extends Phaser.Scene {
 
     // Bản đồ (sinh từ seed chung, giống hệt server)
     const data: number[][] = [];
-    for (let y = 0; y < MAP_H; y++)
-      data.push(Array.from(MAP_TILES.subarray(y * MAP_W, (y + 1) * MAP_W)));
+    const mw = this.map.def.w;
+    const mh = this.map.def.h;
+    for (let y = 0; y < mh; y++)
+      data.push(Array.from(this.map.tiles.subarray(y * mw, (y + 1) * mw)));
     const map = this.make.tilemap({ data, tileWidth: TILE, tileHeight: TILE });
     const ts = map.addTilesetImage("tiles", TILESET_KEY, TILE, TILE, 0, 0)!;
     map.createLayer(0, ts, 0, 0)!.setDepth(-10);
 
     this.add
-      .text(TOWN_PX.x, TOWN_PX.y - 40, "落霞鎮", {
+      .text(this.map.townPx.x, this.map.townPx.y - 40, "落霞鎮", {
         fontFamily: '"Noto Serif", Georgia, serif',
         fontSize: "56px",
         color: "#7a3b2e",
@@ -197,7 +201,7 @@ export class WorldScene extends Phaser.Scene {
       .setAlpha(0.35)
       .setDepth(-5);
     this.add
-      .text(TOWN_PX.x, TOWN_PX.y + 14, "Lạc Hà Trấn · Khu an toàn", {
+      .text(this.map.townPx.x, this.map.townPx.y + 14, `${this.map.def.name} · Khu an toàn`, {
         fontFamily: '"Noto Serif", Georgia, serif',
         fontSize: "16px",
         color: "#5a4030",
@@ -206,7 +210,7 @@ export class WorldScene extends Phaser.Scene {
       .setAlpha(0.6)
       .setDepth(-5);
     this.add
-      .circle(TOWN_PX.x, TOWN_PX.y, TOWN_PX.r, 0, 0)
+      .circle(this.map.townPx.x, this.map.townPx.y, this.map.townPx.r, 0, 0)
       .setStrokeStyle(2, 0xa31d1d, 0.25)
       .setDepth(-5);
 
@@ -217,7 +221,7 @@ export class WorldScene extends Phaser.Scene {
     this.createNavArrow();
 
     const cam = this.cameras.main;
-    cam.setBounds(0, 0, WORLD_W, WORLD_H);
+    cam.setBounds(0, 0, this.map.worldW, this.map.worldH);
     const fitZoom = () => {
       const w = this.scale.width;
       const h = this.scale.height;
@@ -348,7 +352,7 @@ export class WorldScene extends Phaser.Scene {
   private createNavArrow() {
     this.navArrow = this.add
       .container(0, 0)
-      .setDepth(WORLD_H + 5)
+      .setDepth(this.map.worldH + 5)
       .setVisible(false);
     const arrowG = this.add.graphics();
     arrowG.fillStyle(0xffd74a, 0.9);
@@ -688,7 +692,7 @@ export class WorldScene extends Phaser.Scene {
     let x = me.x,
       y = me.y;
     for (const i of this.pending)
-      ({ x, y } = moveWithCollision(x, y, i.dx * speed, i.dy * speed, PLAYER_RADIUS));
+      ({ x, y } = this.map.moveWithCollision(x, y, i.dx * speed, i.dy * speed, PLAYER_RADIUS));
     this.predX = x;
     this.predY = y;
   }
@@ -713,7 +717,7 @@ export class WorldScene extends Phaser.Scene {
     this.room.send("input", msg);
     this.pending.push(msg);
     const speed = statsFor(me.realm, me.tier, me).speed * (TICK_MS / 1000);
-    ({ x: this.predX, y: this.predY } = moveWithCollision(
+    ({ x: this.predX, y: this.predY } = this.map.moveWithCollision(
       this.predX,
       this.predY,
       dx * speed,
@@ -865,10 +869,9 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private syncAudioZone() {
-    const distToTown = Math.hypot(this.predX - TOWN_PX.x, this.predY - TOWN_PX.y);
-    const inTown = distToTown <= TOWN_PX.r;
+    const inTown = this.map.inTown(this.predX, this.predY);
     sound.setZone(inTown ? "town" : "wild");
-    ui.setZoneName(inTown ? "Lạc Hà Trấn" : "Vân Mộng Sơn");
+    ui.setZoneName(inTown ? this.map.def.name : "Vân Mộng Sơn");
   }
 
   private syncNpcs() {
@@ -911,7 +914,7 @@ export class WorldScene extends Phaser.Scene {
 
   /** Bán kính tính từ tâm trấn ứng với ngưỡng dangerAt(x, y) = minDanger */
   private dangerRadiusPx(minDanger: number): number {
-    return TOWN_PX.r + minDanger * (WORLD_W * 0.5 - TOWN_PX.r);
+    return this.map.townPx.r + minDanger * (this.map.worldW * 0.5 - this.map.townPx.r);
   }
 
   /** Tìm con quái gần nhất cùng loại trong state.monsters; nếu chưa có thì chỉ ra vòng minDanger theo hướng đang đứng. */
@@ -930,14 +933,24 @@ export class WorldScene extends Phaser.Scene {
 
     const def = MONSTER_BY_ID[monsterKind];
     if (!def) return null;
-    const ringR = Math.max(TOWN_PX.r + 48, this.dangerRadiusPx(def.minDanger) + 32);
-    const fromTownDist = Math.hypot(this.predX - TOWN_PX.x, this.predY - TOWN_PX.y);
+    const ringR = Math.max(this.map.townPx.r + 48, this.dangerRadiusPx(def.minDanger) + 32);
+    const fromTownDist = Math.hypot(this.predX - this.map.townPx.x, this.predY - this.map.townPx.y);
     const dirAngle =
-      fromTownDist > 16 ? Math.atan2(this.predY - TOWN_PX.y, this.predX - TOWN_PX.x) : this.facing;
+      fromTownDist > 16
+        ? Math.atan2(this.predY - this.map.townPx.y, this.predX - this.map.townPx.x)
+        : this.facing;
     const pad = TILE * 2;
     return {
-      x: Phaser.Math.Clamp(TOWN_PX.x + Math.cos(dirAngle) * ringR, pad, WORLD_W - pad),
-      y: Phaser.Math.Clamp(TOWN_PX.y + Math.sin(dirAngle) * ringR, pad, WORLD_H - pad),
+      x: Phaser.Math.Clamp(
+        this.map.townPx.x + Math.cos(dirAngle) * ringR,
+        pad,
+        this.map.worldW - pad,
+      ),
+      y: Phaser.Math.Clamp(
+        this.map.townPx.y + Math.sin(dirAngle) * ringR,
+        pad,
+        this.map.worldH - pad,
+      ),
     };
   }
 
@@ -1002,7 +1015,7 @@ export class WorldScene extends Phaser.Scene {
 
     // Đột phá cảnh giới: chỉ về trung tâm trấn để an toàn
     if (step.kind === "reachRealm") {
-      return { x: TOWN_PX.x, y: TOWN_PX.y };
+      return { x: this.map.townPx.x, y: this.map.townPx.y };
     }
 
     return null;
@@ -1060,16 +1073,16 @@ export class WorldScene extends Phaser.Scene {
         const h = mmCanvas.height;
         ctx.clearRect(0, 0, w, h);
 
-        const scale = w / WORLD_W;
+        const scale = w / this.map.worldW;
 
         // Nền hoang dã
         ctx.fillStyle = "#273322";
         ctx.fillRect(0, 0, w, h);
 
         // Vòng Lạc Hà Trấn
-        const tx = TOWN_PX.x * scale;
-        const ty = TOWN_PX.y * scale;
-        const tr = TOWN_PX.r * scale;
+        const tx = this.map.townPx.x * scale;
+        const ty = this.map.townPx.y * scale;
+        const tr = this.map.townPx.r * scale;
         ctx.fillStyle = "rgba(163, 29, 29, 0.18)";
         ctx.beginPath();
         ctx.arc(tx, ty, tr, 0, Math.PI * 2);
@@ -1143,16 +1156,16 @@ export class WorldScene extends Phaser.Scene {
           const w = wmCanvas.width;
           const h = wmCanvas.height;
           ctx.clearRect(0, 0, w, h);
-          const s = w / WORLD_W;
+          const s = w / this.map.worldW;
 
           // Nền sơn thủy
           ctx.fillStyle = "#1e291b";
           ctx.fillRect(0, 0, w, h);
 
           // Khu an toàn Lạc Hà Trấn
-          const tx = TOWN_PX.x * s;
-          const ty = TOWN_PX.y * s;
-          const tr = TOWN_PX.r * s;
+          const tx = this.map.townPx.x * s;
+          const ty = this.map.townPx.y * s;
+          const tr = this.map.townPx.r * s;
           ctx.fillStyle = "rgba(163, 29, 29, 0.22)";
           ctx.beginPath();
           ctx.arc(tx, ty, tr, 0, Math.PI * 2);
@@ -1164,11 +1177,11 @@ export class WorldScene extends Phaser.Scene {
           ctx.fillStyle = "#f3ecda";
           ctx.font = "bold 12px serif";
           ctx.textAlign = "center";
-          ctx.fillText("Lạc Hà Trấn", tx, ty - tr - 6);
+          ctx.fillText(this.map.def.name, tx, ty - tr - 6);
 
           // Vòng nguy hiểm (minDanger) tính ngược từ dangerAt(x, y)
           for (const m of MONSTERS) {
-            const rPx = m.minDanger > 0 ? this.dangerRadiusPx(m.minDanger) : TOWN_PX.r + 40;
+            const rPx = m.minDanger > 0 ? this.dangerRadiusPx(m.minDanger) : this.map.townPx.r + 40;
             const rCanvas = Math.min(w * 0.49, rPx * s);
             const col = `#${m.color.toString(16).padStart(6, "0")}`;
             ctx.strokeStyle = col;
@@ -1739,7 +1752,7 @@ export class WorldScene extends Phaser.Scene {
       this.add.image(x, y - 10, "swordbeam").setBlendMode(Phaser.BlendModes.ADD);
     s.setPosition(x, y - 10)
       .setRotation(angle)
-      .setDepth(WORLD_H)
+      .setDepth(this.map.worldH)
       .setAlpha(1)
       .setVisible(true);
     if (tint !== 0xffffff) s.setTint(tint);
@@ -1763,7 +1776,7 @@ export class WorldScene extends Phaser.Scene {
         const ring = this.add
           .circle(x, y, 16, color, 0)
           .setStrokeStyle(3, color, 0.9)
-          .setDepth(WORLD_H);
+          .setDepth(this.map.worldH);
         this.tweens.add({
           targets: ring,
           scale: major ? 7 : 4,
@@ -1787,7 +1800,7 @@ export class WorldScene extends Phaser.Scene {
 
   private fxBreakFail(x: number, y: number) {
     sound.breakfail();
-    const puff = this.add.circle(x, y - 10, 20, 0x4a2a5a, 0.6).setDepth(WORLD_H);
+    const puff = this.add.circle(x, y - 10, 20, 0x4a2a5a, 0.6).setDepth(this.map.worldH);
     this.tweens.add({
       targets: puff,
       scale: 3,
@@ -1815,7 +1828,7 @@ export class WorldScene extends Phaser.Scene {
           fontStyle: "bold",
         })
         .setOrigin(0.5)
-        .setDepth(WORLD_H + 1);
+        .setDepth(this.map.worldH + 1);
       item = { t, y0, start: this.time.now, lastText: text, lastStyleKey: styleKey };
     } else {
       if (item.lastStyleKey !== styleKey) {
