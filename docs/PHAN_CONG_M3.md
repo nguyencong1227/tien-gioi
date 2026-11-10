@@ -22,7 +22,7 @@ Thay cho các câu hỏi trước đây ở cuối file này và trong `question
 | M3 bước 3: tài khoản thật + PostgreSQL | **Xong phía server và client** (#177 đã đóng): hợp đồng #174; kho / danh tính #178, #179; mật mã + kho tài khoản #180; `AuthService` #183; API HTTP #184; vào phòng bằng token #185; `tai-khoan` #188; Pg #190, #194, #197; client #182, #189, #196; E2E #193; CI Postgres thật #195; contract store #181, #187; `kiem-save` #192. **Còn (C, #176):** bot `--account`, login storm | `docs/THIET_KE_TAI_KHOAN.md` |
 | M3 bước 4: bí cảnh (phòng tạm theo đội) | **Xong phía server và công cụ cân bằng** (#202 đã đóng): thiết kế #198; hợp đồng #199, #205; kiem-save #206; sổ run + phòng bí cảnh thật #207; trùm / thắng / thưởng / lượt ngày #208; số liệu #209; công cụ cân bằng #210. **Còn:** client 4d (B, #200), bot / thử tải 4e (C, #201), E2E thật, cân nhắc luật chết trong bí cảnh (chờ người dùng); #203 mở tới khi đủ | `docs/THIET_KE_BI_CANH.md` |
 | M3 bước 5: PK thách đấu | **Đã có thiết kế** để B / C review, chưa viết mã | `docs/THIET_KE_PK.md` |
-| M3 bước 6: tông môn | Đã có quyết định; làm sau bước 5 | |
+| M3 bước 6: tông môn | **Đã có thiết kế** để B / C review, chưa viết mã | `docs/THIET_KE_TONG_MON.md` |
 
 Việc ngoài kế hoạch M3 đã làm xen vào: tối ưu băng thông vùng nhìn (#70, #87, #89; 100 người: ~9.5 KB/s mỗi client ở ca đông người tụ trong trấn), bench hằng đêm (#97), nối lại khi rớt mạng (#118, #122, #127; thử tải #125), kiểm file lưu (#113, #114), Docker và triển khai (#81, #83), rà giao diện điện thoại (#105).
 
@@ -90,7 +90,7 @@ Phòng tạm theo đội (`autoDispose`, hạn giờ, quái trùm, phần thư�
 Chỉ khi hai bên đồng ý (lời thách đấu, nhận / từ chối, trận có kết thúc rõ); chết vì PK **không** mất kiếp (không luân hồi, không mất đồ). Không PK trong trấn. **Thiết kế: `docs/THIET_KE_PK.md`** (A soạn, B và C review): chia PR 5a-5e ở mục 9 (A: hợp đồng + server + cân bằng; B: client; C: bot, thử tải, rò rỉ), 4 câu hỏi mở ở mục 10.
 
 ### Bước 6: Tông môn
-Gắn với **linh hồn** (không gắn nhân vật từng kiếp): tạo / gia nhập / chức vụ, chat tông môn, kho chung. Phụ thuộc bước 3. Thiết kế khi tới bước này.
+Gắn với **linh hồn** (không gắn nhân vật từng kiếp): tạo / gia nhập / chức vụ, chat tông môn, kho chung. Phụ thuộc bước 3. **Thiết kế: `docs/THIET_KE_TONG_MON.md`** (A soạn, B và C review): chia PR 6a-6e ở mục 8 (A: hợp đồng + kho lưu trữ + dịch vụ; B: client; C: `kiem-save`, bot, thử tải, rò rỉ), 5 câu hỏi mở ở mục 10.
 
 ## Sprint 5 cũ: ghi chú đã được thay
 Phác thảo ban đầu (tiền tệ, nhiều bản đồ, bí cảnh) và Sprint 6 (PK, tông môn) đã được thay bằng kế hoạch trên; các câu hỏi ở cuối bản đề xuất cũ đã có trả lời (mục "Quyết định của người dùng").
