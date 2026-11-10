@@ -430,7 +430,7 @@ export type DialogAction =
   | { kind: "forge" }
   /** Mở bảng cửa hàng của NPC này (`SHOP_BY_NPC` trong currency.ts); mua / bán đi qua tin `buy` / `sell` */
   | { kind: "shop" }
-  /** Mở bí cảnh `dungeonId` cho đội (chỉ đội trưởng; server kiểm mọi điều kiện, docs/THIET_KE_BI_CANH.md) */
+  /** Mở bí cảnh `dungeonId` cho đội (chỉ đội trưởng): bấm thì client gửi tin `dungeonOpen { dungeonId }` (dungeon.ts); server kiểm mọi điều kiện, docs/THIET_KE_BI_CANH.md */
   | { kind: "dungeon"; dungeonId: string }
   | { kind: "close" };
 

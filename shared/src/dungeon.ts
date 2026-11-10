@@ -5,7 +5,8 @@
 // giờ / chết hết / rời hết thì phòng huỷ và mọi người về cổng vào.
 //
 // Luồng tin nhắn:
-//  1. Client (đội trưởng) chọn "mở bí cảnh" ở hộp thoại Thủ môn -> `dialogAction { kind: "dungeon", dungeonId }`. Server kiểm
+//  1. Client (đội trưởng) chọn "mở bí cảnh" ở hộp thoại Thủ môn (`DialogAction { kind: "dungeon", dungeonId }`) -> gửi
+//     `dungeonOpen { dungeonId }` (như "shop" mở bảng rồi gửi `buy`: `DialogAction` chỉ là mô tả nút, không phải tin). Server kiểm
 //     (`canOpenDungeon` ở đây là bản chung để client ẩn nút; SERVER kiểm lại mọi thứ), tạo run + phòng, rồi gửi
 //     `dungeonInvite` cho từng thành viên đang online (dù đang ở bản đồ nào).
 //  2. Mỗi thành viên bấm "Vào" -> `dungeonEnter { runId }`, hoặc "Từ chối" -> `dungeonDecline { runId }` (server báo đội
@@ -119,6 +120,7 @@ export function dungeonOfMap(mapId: unknown): DungeonDef | undefined {
 
 /** Tên tin nhắn Colyseus của bí cảnh. */
 export const DUNGEON_MSG = {
+  open: "dungeonOpen",
   enter: "dungeonEnter",
   leave: "dungeonLeave",
   decline: "dungeonDecline",
@@ -126,10 +128,25 @@ export const DUNGEON_MSG = {
   state: "dungeonState",
   end: "dungeonEnd",
 } as const;
-// (Mở bí cảnh đi qua tin `dialogAction` có sẵn với `{ kind: "dungeon", dungeonId }`: quests.ts `DialogAction`.)
+// (Nút "Mở bí cảnh" ở hộp thoại là `DialogAction { kind: "dungeon", dungeonId }` trong quests.ts; bấm thì client gửi `dungeonOpen`.)
 
 /** Run id: 128 bit ngẫu nhiên, hex thường (32 ký tự). Đoán không được; server kiểm thành viên ở cả `dungeonEnter` và `onAuth`. */
 export const RUN_ID_RE = /^[a-f0-9]{32}$/;
+
+/** Id bí cảnh trong tin từ client: chữ thường, số, gạch dưới, ngắn (mọi `DungeonDef.id` thoả; test giữ). */
+export const DUNGEON_ID_RE = /^[a-z][a-z0-9_]{0,31}$/;
+
+/** Client -> server: đội trưởng mở bí cảnh `dungeonId` (đứng gần Thủ môn; server kiểm mọi điều kiện bằng `canOpenDungeon`). */
+export interface DungeonOpenMsg {
+  dungeonId: string;
+}
+
+/** Đọc `dungeonOpen` từ mạng: sai kiểu / id sai dạng thì `null`. Chỉ lấy đúng `dungeonId`, không mang trường lạ. */
+export function parseDungeonOpen(raw: unknown): DungeonOpenMsg | null {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const id = (raw as Record<string, unknown>).dungeonId;
+  return typeof id === "string" && DUNGEON_ID_RE.test(id) ? { dungeonId: id } : null;
+}
 
 /** Client -> server: bước vào run đã được mời. */
 export interface DungeonEnterMsg {

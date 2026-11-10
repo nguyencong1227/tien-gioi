@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   DUNGEONS,
   DUNGEON_DAILY_REWARDS,
+  DUNGEON_ID_RE,
   DUNGEON_MSG,
   JOIN_NOT_IN_RUN,
   LINH_HU_ID,
@@ -15,6 +16,7 @@ import {
   dungeonRewardsLeft,
   parseDungeonDecline,
   parseDungeonEnter,
+  parseDungeonOpen,
   rewardEligible,
   type DungeonMemberCheck,
   type DungeonOpenFail,
@@ -123,6 +125,7 @@ describe("dữ liệu bí cảnh nhất quán", () => {
     const names = Object.values(DUNGEON_MSG);
     expect(new Set(names).size).toBe(names.length);
     expect(DUNGEON_MSG.decline).toBe("dungeonDecline");
+    expect(DUNGEON_MSG.open).toBe("dungeonOpen");
     for (const n of names) expect(n).toMatch(/^dungeon[A-Z]/);
   });
 });
@@ -381,6 +384,45 @@ describe.each([
     const r = parse(raw)!;
     expect(Object.keys(r)).toEqual(["runId"]);
     expect((r as any).admin).toBeUndefined();
+  });
+});
+
+describe("parseDungeonOpen (không tin client)", () => {
+  it("nhận id bí cảnh đúng dạng (mọi DUNGEONS.id thoả); mọi thứ khác là null", () => {
+    for (const d of DUNGEONS) {
+      expect(DUNGEON_ID_RE.test(d.id), d.id).toBe(true);
+      expect(parseDungeonOpen({ dungeonId: d.id })).toEqual({ dungeonId: d.id });
+    }
+    const bad: unknown[] = [
+      undefined,
+      null,
+      5,
+      "linh_hu",
+      [],
+      [{ dungeonId: "linh_hu" }],
+      {},
+      { dungeonId: 5 },
+      { dungeonId: null },
+      { dungeonId: "" },
+      { dungeonId: "Linh_hu" },
+      { dungeonId: "1linh" },
+      { dungeonId: "linh hu" },
+      { dungeonId: "linh_hu\n" },
+      { dungeonId: "a".repeat(33) },
+      { dungeonId: "../x" },
+      { dungeonId: { toString: () => "linh_hu" } },
+    ];
+    for (const b of bad) expect(parseDungeonOpen(b), JSON.stringify(b)).toBeNull();
+  });
+
+  it("không mang trường lạ; id lạ nhưng đúng dạng vẫn qua bộ đọc (server tra `dungeonOf`, không `DUNGEON_BY_ID[id]`)", () => {
+    const raw = JSON.parse('{"dungeonId":"linh_hu","__proto__":{"x":1},"admin":true}');
+    const r = parseDungeonOpen(raw)!;
+    expect(Object.keys(r)).toEqual(["dungeonId"]);
+    // "constructor" đúng dạng nhưng không phải bí cảnh: dungeonOf trả undefined
+    const c = parseDungeonOpen({ dungeonId: "constructor" })!;
+    expect(c).toEqual({ dungeonId: "constructor" });
+    expect(dungeonOf(c.dungeonId)).toBeUndefined();
   });
 });
 
