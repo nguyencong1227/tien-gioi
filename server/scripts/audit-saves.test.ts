@@ -3,7 +3,14 @@ import { mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "nod
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { COIN_CAP, DEFAULT_MAP, INVENTORY_SLOTS, ITEM_BY_ID, REALMS } from "@tien-gioi/shared";
+import {
+  COIN_CAP,
+  DEFAULT_MAP,
+  INVENTORY_SLOTS,
+  ITEM_BY_ID,
+  REALMS,
+  getMap,
+} from "@tien-gioi/shared";
 import { auditPlayerSaveData, auditSavesDirectory, MAX_FILE_SIZE, show } from "./audit-saves.js";
 
 function hashFileSha256(filePath: string): string {
@@ -213,7 +220,7 @@ describe("audit-saves (Issue #112)", () => {
       );
     });
 
-    it("mapId lạ hoặc không hợp lệ -> invalid_map_id (#123 Bước 0d)", () => {
+    it("mapId lạ hoặc không hợp lệ -> invalid_map_id (#123 Bước 0d, #141)", () => {
       // mapId chuẩn: lac_ha -> hợp lệ, không có lỗi invalid_map_id
       const pValid = { ...validPlayer, mapId: "lac_ha" };
       const rawValid = JSON.stringify(pValid);
@@ -221,15 +228,59 @@ describe("audit-saves (Issue #112)", () => {
         "invalid_map_id",
       );
 
+      // mapId bản đồ thứ hai: hac_phong -> hợp lệ (#141)
+      const pHacPhong = {
+        ...validPlayer,
+        mapId: "hac_phong",
+        x: 2048,
+        y: 2944, // Trạm Thanh Lộ Trạm an toàn
+      };
+      const rawHacPhong = JSON.stringify(pHacPhong);
+      const errorsHp = auditPlayerSaveData(rawHacPhong, rawHacPhong.length);
+      expect(errorsHp.map((e) => e.code)).not.toContain("invalid_map_id");
+      expect(errorsHp.map((e) => e.code)).not.toContain("pos_out_of_bounds");
+      expect(errorsHp.map((e) => e.code)).not.toContain("pos_blocked");
+
       // mapId lạ không nằm trong MAPS
       for (const badMap of ["bi_canh_la", "khong_ton_tai", "__proto__", "constructor", 123]) {
         const pBad = { ...validPlayer, mapId: badMap };
         const rawBad = JSON.stringify(pBad);
+        const errs = auditPlayerSaveData(rawBad, rawBad.length);
         expect(
-          auditPlayerSaveData(rawBad, rawBad.length).map((e) => e.code),
+          errs.map((e) => e.code),
           `mapId: ${badMap}`,
         ).toContain("invalid_map_id");
+        const msg = errs.find((e) => e.code === "invalid_map_id")!.message;
+        expect(msg).toContain("server sẽ đưa về lac_ha");
       }
+    });
+
+    it("toạ độ trên bản đồ thứ hai hac_phong tuân thủ đúng ranh giới và ô chặn (#141)", () => {
+      const hacPhong = getMap("hac_phong")!;
+      expect(hacPhong).toBeDefined();
+
+      // Vượt quá kích thước Hắc Phong Cốc (128x96 ô = 4096x3072 px)
+      const pOutOfBoundsHp = {
+        ...validPlayer,
+        mapId: "hac_phong",
+        x: hacPhong.worldW + 200,
+        y: 1500,
+      };
+      const rawOut = JSON.stringify(pOutOfBoundsHp);
+      const errsOut = auditPlayerSaveData(rawOut, rawOut.length);
+      expect(errsOut.map((e) => e.code)).toContain("pos_out_of_bounds");
+      expect(errsOut.find((e) => e.code === "pos_out_of_bounds")!.message).toContain(
+        `${hacPhong.worldW}x${hacPhong.worldH}`,
+      );
+
+      // Toạ độ góc vách đá mép bản đồ (0, 0) trên Hắc Phong Cốc
+      const pBlockedHp = { ...validPlayer, mapId: "hac_phong", x: 0, y: 0 };
+      const rawBlocked = JSON.stringify(pBlockedHp);
+      const errsBlocked = auditPlayerSaveData(rawBlocked, rawBlocked.length);
+      expect(errsBlocked.map((e) => e.code)).toContain("pos_blocked");
+      expect(errsBlocked.find((e) => e.code === "pos_blocked")!.message).toContain(
+        hacPhong.def.name,
+      );
     });
 
     it("ngày tháng createdAt/updatedAt hỏng -> invalid_date", () => {

@@ -18,14 +18,16 @@ import {
   PICKUP_RANGE,
   PLAYER_RADIUS,
   REALMS,
-  ROOM_NAME,
   SKILLS,
   TICK_MS,
   buyPrice,
+  getMap,
+  roomNameOf,
   sellPrice,
   statsFor,
   type AttackMsg,
   type BuyMsg,
+  type GameMap,
   type InputMsg,
   type InvMsg,
   type JoinOptions,
@@ -82,6 +84,7 @@ interface CliArgs {
   flapDelay: [number, number];
   storm: boolean;
   leak: boolean;
+  map: string;
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -107,11 +110,13 @@ function parseArgs(argv: string[]): CliArgs {
   let flapDelay: [number, number] = [1, 5];
   let storm = false;
   let leak = false;
+  let map = DEFAULT_MAP.def.id;
 
   for (const arg of argv) {
     if (arg.startsWith("--bots=")) bots = Math.max(0, Number(arg.slice(7)));
     else if (arg.startsWith("--duration=")) durationSec = Math.max(2, Number(arg.slice(11)));
     else if (arg.startsWith("--url=")) url = arg.slice(6);
+    else if (arg.startsWith("--map=")) map = arg.slice(6);
     else if (arg.startsWith("--party")) {
       const val = arg.slice(7).replace(/^=/, "");
       partySize = val ? Math.max(2, Math.min(4, Number(val))) : 4;
@@ -164,6 +169,12 @@ function parseArgs(argv: string[]): CliArgs {
     durationSec = 20;
   }
 
+  if (!getMap(map)) {
+    console.warn(
+      `[CẢNH BÁO] Bản đồ "${map}" không tồn tại trong MAPS. Sẽ dùng bản đồ mặc định "${DEFAULT_MAP.def.id}".`,
+    );
+  }
+
   if (!url) url = `ws://localhost:${DEFAULT_PORT}`;
   const parsedUrl = new URL(url);
   const port = Number(parsedUrl.port || DEFAULT_PORT);
@@ -192,6 +203,7 @@ function parseArgs(argv: string[]): CliArgs {
     flapDelay,
     storm,
     leak,
+    map,
   };
 }
 
@@ -219,6 +231,7 @@ function seedBotSaveFile(
   y: number,
   realm: number,
   tier: number,
+  mapId: string = DEFAULT_MAP.def.id,
 ): void {
   mkdirSync(DATA_PLAYERS_DIR, { recursive: true });
   // Tên file PHẢI khớp với fileFor() trong server/src/store.ts (sha1 của tên NFC viết thường).
@@ -234,6 +247,7 @@ function seedBotSaveFile(
     tier,
     exp: 0,
     coin: 100,
+    mapId,
     x: Math.round(x),
     y: Math.round(y),
     createdAt: now,
@@ -388,6 +402,7 @@ interface BotState {
   index: number;
   name: string;
   room: Room;
+  map: GameMap;
   seq: number;
   predX: number;
   predY: number;
@@ -431,6 +446,7 @@ interface BotState {
 export interface LoadTestMetrics {
   commit: string;
   note: string;
+  map?: string;
   mode?: BotMode;
   partySize?: number;
   shop?: boolean;
@@ -535,15 +551,28 @@ async function runIdleZeroBotTest(
   url: string,
   port: number,
   keepSaves: boolean,
+  mapId: string = DEFAULT_MAP.def.id,
 ): Promise<IdleZeroBotMetrics> {
+  const currentMap = getMap(mapId) ?? DEFAULT_MAP;
   console.log(
-    `\n=== Đo mức 0 bot (phòng trống, kiểm tra quái ngủ) trong ${durationSec}s (${url}) ===`,
+    `\n=== Đo mức 0 bot (phòng trống, kiểm tra quái ngủ) trong ${durationSec}s (${url}, bản đồ=${currentMap.def.name}) ===`,
   );
   const seedName = "Bot 000";
+  const seedSecret = "bot_secret_tien_gioi_000_loadtest";
+  seedBotSaveFile(
+    seedName,
+    seedSecret,
+    currentMap.townPx.x,
+    currentMap.townPx.y,
+    1,
+    0,
+    currentMap.def.id,
+  );
   const client = new Client(url);
-  const room = await client.joinOrCreate(ROOM_NAME, {
+  const roomName = roomNameOf(currentMap.def.id);
+  const room = await client.joinOrCreate(roomName, {
     name: seedName,
-    secret: "bot_secret_tien_gioi_000_loadtest",
+    secret: seedSecret,
   });
   await sleep(150);
   const monstersCount = (room.state as any)?.monsters?.size ?? 88;
@@ -746,18 +775,22 @@ async function runLoadTest(
   flapDelay: [number, number] = [1, 5],
   storm = false,
   leak = false,
+  mapId: string = DEFAULT_MAP.def.id,
 ): Promise<LoadTestMetrics> {
+  const currentMap = getMap(mapId) ?? DEFAULT_MAP;
   const partySuffix = partySize > 1 ? `, tổ đội ${partySize} người` : "";
   const shopSuffix = shop ? ", mua bán shop" : "";
   const flapSuffix = flap > 0 ? `, flap=${flap}` : "";
   const stormSuffix = storm ? ", storm" : "";
   const leakSuffix = leak ? ", leak-test" : "";
+  const mapSuffix =
+    currentMap.def.id !== DEFAULT_MAP.def.id ? `, bản đồ=${currentMap.def.name}` : "";
   const modeLabel =
     mode === "realistic"
-      ? `Thực tế (vào tầm đứng chém${partySuffix}${shopSuffix}${flapSuffix}${stormSuffix}${leakSuffix})`
+      ? `Thực tế (vào tầm đứng chém${partySuffix}${shopSuffix}${flapSuffix}${stormSuffix}${leakSuffix}${mapSuffix})`
       : mode === "crowd"
-        ? `Đông người trong trấn (${shop ? "25% ghé Dược Sư, 25% đứng, 50% đi" : "30% đứng yên, 70% đi lại"}${flapSuffix}${stormSuffix}${leakSuffix})`
-        : `Xấu nhất (100% di chuyển 20 input/s${partySuffix}${flapSuffix}${stormSuffix}${leakSuffix})`;
+        ? `Đông người trong trấn/khu an toàn (${shop ? "25% ghé Dược Sư, 25% đứng, 50% đi" : "30% đứng yên, 70% đi lại"}${flapSuffix}${stormSuffix}${leakSuffix}${mapSuffix})`
+        : `Xấu nhất (100% di chuyển 20 input/s${partySuffix}${flapSuffix}${stormSuffix}${leakSuffix}${mapSuffix})`;
   console.log(
     `\n=== Bắt đầu thử tải [${modeLabel}]: ${botCount} bot, đo trong ${durationSec}s (${url}) ===`,
   );
@@ -807,13 +840,13 @@ async function runLoadTest(
     let campX: number;
     let campY: number;
     if (mode === "crowd") {
-      // Đông người tụ trong Lạc Hà Trấn (#78): rải bot hoàn toàn bên trong bán kính trấn
+      // Đông người tụ trong trấn/khu an toàn: rải bot hoàn toàn bên trong bán kính an toàn
       for (;;) {
         const a = rnd() * Math.PI * 2;
-        const r = rnd() * (DEFAULT_MAP.townPx.r - 28);
-        const x = DEFAULT_MAP.townPx.x + Math.cos(a) * r;
-        const y = DEFAULT_MAP.townPx.y + Math.sin(a) * r;
-        if (!DEFAULT_MAP.circleBlocked(x, y, PLAYER_RADIUS)) {
+        const r = rnd() * (currentMap.townPx.r - 28);
+        const x = currentMap.townPx.x + Math.cos(a) * r;
+        const y = currentMap.townPx.y + Math.sin(a) * r;
+        if (!currentMap.circleBlocked(x, y, PLAYER_RADIUS)) {
           campX = x;
           campY = y;
           break;
@@ -824,20 +857,21 @@ async function runLoadTest(
       for (;;) {
         const a = rnd() * Math.PI * 2;
         const r =
-          DEFAULT_MAP.townPx.r + 80 + rnd() * (DEFAULT_MAP.worldW * 0.45 - DEFAULT_MAP.townPx.r);
-        const x = DEFAULT_MAP.townPx.x + Math.cos(a) * r;
-        const y = DEFAULT_MAP.townPx.y + Math.sin(a) * r;
-        if (!DEFAULT_MAP.circleBlocked(x, y, PLAYER_RADIUS) && DEFAULT_MAP.dangerAt(x, y) < 0.9) {
+          currentMap.townPx.r + 80 + rnd() * (currentMap.worldW * 0.45 - currentMap.townPx.r);
+        const x = currentMap.townPx.x + Math.cos(a) * r;
+        const y = currentMap.townPx.y + Math.sin(a) * r;
+        if (!currentMap.circleBlocked(x, y, PLAYER_RADIUS) && currentMap.dangerAt(x, y) < 0.9) {
           campX = x;
           campY = y;
           break;
         }
       }
     }
-    seedBotSaveFile(name, secret, campX, campY, realm, tier);
+    seedBotSaveFile(name, secret, campX, campY, realm, tier, currentMap.def.id);
 
     const client = new Client(url);
-    const room = await client.joinOrCreate(ROOM_NAME, joinOpts);
+    const roomName = roomNameOf(currentMap.def.id);
+    const room = await client.joinOrCreate(roomName, joinOpts);
 
     const radialAngle = ((i - 1) / botCount) * Math.PI * 2;
     const now = performance.now();
@@ -846,6 +880,7 @@ async function runLoadTest(
       index: i,
       name,
       room,
+      map: currentMap,
       seq: 0,
       predX: campX,
       predY: campY,
@@ -970,13 +1005,10 @@ async function runLoadTest(
         dx = 0;
         dy = 0;
       } else {
-        const distFromCenter = Math.hypot(
-          b.predX - DEFAULT_MAP.townPx.x,
-          b.predY - DEFAULT_MAP.townPx.y,
-        );
-        if (distFromCenter > DEFAULT_MAP.townPx.r - 28) {
+        const distFromCenter = Math.hypot(b.predX - b.map.townPx.x, b.predY - b.map.townPx.y);
+        if (distFromCenter > b.map.townPx.r - 28) {
           b.wanderAngle =
-            Math.atan2(DEFAULT_MAP.townPx.y - b.predY, DEFAULT_MAP.townPx.x - b.predX) +
+            Math.atan2(b.map.townPx.y - b.predY, b.map.townPx.x - b.predX) +
             (Math.random() - 0.5) * 0.4;
           b.nextTurnAt = now + 1500;
         } else if (now >= b.nextTurnAt) {
@@ -1015,7 +1047,7 @@ async function runLoadTest(
         b.shopping = false;
         b.nextShopCheckAt = now + 12000 + Math.random() * 8000;
       }
-    } else if (DEFAULT_MAP.inTown(b.predX, b.predY)) {
+    } else if (b.map.inTown(b.predX, b.predY)) {
       dx = Math.cos(b.wanderAngle);
       dy = Math.sin(b.wanderAngle);
     } else if (partySize > 1 && b.myParty && b.myParty.leader && b.myParty.leader !== b.name) {
@@ -1131,15 +1163,9 @@ async function runLoadTest(
         // Kịch bản xấu nhất: bot tuần tra liên tục quanh khu bãi săn (campX, campY) của mình (20 input/s),
         // giữ phân bố rải đều khắp vùng hoang dã thay vì dồn hết về quanh trấn.
         const distToCamp = Math.hypot(b.predX - b.campX, b.predY - b.campY);
-        const distFromTown = Math.hypot(
-          b.predX - DEFAULT_MAP.townPx.x,
-          b.predY - DEFAULT_MAP.townPx.y,
-        );
-        if (distFromTown < DEFAULT_MAP.townPx.r + 60) {
-          b.wanderAngle = Math.atan2(
-            b.predY - DEFAULT_MAP.townPx.y,
-            b.predX - DEFAULT_MAP.townPx.x,
-          );
+        const distFromTown = Math.hypot(b.predX - b.map.townPx.x, b.predY - b.map.townPx.y);
+        if (distFromTown < b.map.townPx.r + 60) {
+          b.wanderAngle = Math.atan2(b.predY - b.map.townPx.y, b.predX - b.map.townPx.x);
           b.nextTurnAt = now + 2000;
         } else if (distToCamp > 260) {
           b.wanderAngle = Math.atan2(b.campY - b.predY, b.campX - b.predX);
@@ -1174,7 +1200,7 @@ async function runLoadTest(
       dx /= len;
       dy /= len;
       const stepPx = statsFor(me.realm ?? 0, me.tier ?? 0).speed * (TICK_MS / 1000);
-      const moved = DEFAULT_MAP.moveWithCollision(
+      const moved = b.map.moveWithCollision(
         b.predX,
         b.predY,
         dx * stepPx,
@@ -1184,14 +1210,14 @@ async function runLoadTest(
       if (
         Math.hypot(moved.x - b.predX, moved.y - b.predY) < stepPx * 0.2 ||
         moved.x < 64 ||
-        moved.x > DEFAULT_MAP.worldW - 64 ||
+        moved.x > b.map.worldW - 64 ||
         moved.y < 64 ||
-        moved.y > DEFAULT_MAP.worldH - 64
+        moved.y > b.map.worldH - 64
       ) {
         b.wanderAngle = Math.atan2(dy, dx) + (Math.random() < 0.5 ? 1 : -1) * (Math.PI * 0.45);
         b.avoidUntil = now + 800;
         // Nếu đang đứng ở bãi săn mà vướng cây thì nhận luôn vị trí hiện tại làm bãi săn
-        if (!DEFAULT_MAP.inTown(b.predX, b.predY)) {
+        if (!b.map.inTown(b.predX, b.predY)) {
           b.campX = b.predX;
           b.campY = b.predY;
         }
@@ -1537,6 +1563,7 @@ async function runLoadTest(
   const metrics: LoadTestMetrics = {
     commit,
     note,
+    map: currentMap.def.id,
     mode,
     botCount,
     connectedBots,
@@ -1915,12 +1942,18 @@ async function main() {
   let idleZeroBots: IdleZeroBotMetrics | undefined;
 
   if (args.bots === 0 && !args.suite) {
-    await runIdleZeroBotTest(args.durationSec, args.url, args.port, args.keepSaves);
+    await runIdleZeroBotTest(args.durationSec, args.url, args.port, args.keepSaves, args.map);
     return;
   }
 
   if (args.suite) {
-    idleZeroBots = await runIdleZeroBotTest(args.durationSec, args.url, args.port, args.keepSaves);
+    idleZeroBots = await runIdleZeroBotTest(
+      args.durationSec,
+      args.url,
+      args.port,
+      args.keepSaves,
+      args.map,
+    );
   }
 
   const modes: BotMode[] = args.bothModes ? ["realistic", "worst"] : [args.mode];
@@ -1947,6 +1980,7 @@ async function main() {
           args.flapDelay,
           args.storm,
           args.leak,
+          args.map,
         ),
       );
     }
