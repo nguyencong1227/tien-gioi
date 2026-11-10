@@ -513,3 +513,34 @@ Công cụ `npm run kiem-save -w server` đã được cập nhật thêm các l
 - **Kiểm tra tính hợp lệ của `dungeonDaily`:**
   - `day` phải đúng định dạng ngày tháng `YYYY-MM-DD`.
   - `rewards` phải là số nguyên nằm trong khoảng `[0, DUNGEON_DAILY_REWARDS]`.
+
+## 11. Thử tải PK Thách Đấu, Bot `--duel` & Kiểm tra Rò rỉ (M3.5 - Issue #219)
+
+### 11.1. Kịch bản bot `--duel` trong `server/scripts/bots.ts`
+Kịch bản `server/scripts/bots.ts` được bổ sung cờ `--duel` (hoặc `--pk`) để mô phỏng và thử tải tính năng PK Thách đấu:
+- **Xếp cặp tự động ngoài khu an toàn:** Bot được gieo với cảnh giới Luyện Khí Tầng 5 (`realm = 1, tier = 4`) theo từng cặp $2k$ (challenger) và $2k+1$ (challenged) ở ngoài khu an toàn của trấn Lạc Hà (cách tâm trấn `townPx.r + 120 px`, hai bot cách nhau 50 px, nằm trọn trong `DUEL_RANGE = 400 px`).
+- **Quy trình thách đấu và giao tranh tự động:**
+  1. **Thách đấu:** Bot chẵn gửi tin `duelChallenge { name: "Bot <lẻ>" }` khi hết hồi chiêu `DUEL_COOLDOWN_MS = 10_000 ms`.
+  2. **Chấp nhận lời mời:** Bot đối diện nhận tin `duelInvited` và tự động gửi `duelAccept { from: msg.from }`.
+  3. **Pha đếm ngược (`countdown`):** Cả hai nhận `duelState` pha countdown và đứng yên đối mặt nhau trong 3 giây.
+  4. **Pha tác chiến (`fight`):** Khi chuyển sang pha `fight`, cả hai liên tục gửi lệnh chém `attack { angle }` hướng về phía đối thủ mỗi khi hồi chiêu đánh thường (`ATTACK_COOLDOWN_MS = 600 ms`) hồi xong. Sát thương PK được điều chỉnh theo hệ số `PK_DAMAGE_MULT = 0.125`.
+  5. **Kết thúc và hồi sinh tại chỗ:** Khi một bên hết khí huyết, trận đấu kết thúc với kết quả `ko`. Người thua gục ngã tạm thời trong `DUEL_KO_MS = 3000 ms`, sau đó tự động đứng dậy tại chỗ với 30% HP (`DUEL_KO_HP_PCT = 0.3`). Tuyệt đối không vào Hoàng Tuyền, không mất kiếp, không lưu hồ sơ bẩn.
+
+Cách chạy:
+```bash
+# Chạy 10 bot (5 cặp) thách đấu liên tục:
+npm run bots -w server -- --bots=10 --duel --duration=30
+```
+
+### 11.2. Kết quả Thử tải & Stress Test (`server/scripts/duel-stress.test.ts`)
+Bộ kiểm thử stress test tự động hoá 6 kịch bản then chốt trên tiến trình server Colyseus thật:
+
+| Kịch bản kiểm thử | Kết quả thực tế | Tiêu chuẩn đánh giá | Trạng thái |
+| :--- | :---: | :---: | :---: |
+| **1. Thử tải N cặp đấu đồng thời (6 cặp = 12 người chơi)** | **6 trận đấu diễn ra song song** (`World.duels.size = 6`); cả 6 cặp chém nhau tới KO và cùng hồi sinh tại chỗ 30% HP sau 3s | Mọi cặp độc lập, không nghẽn tick, không vào Hoàng Tuyền | **PASS** (~3.9s) |
+| **2. Đua gửi / nhận lời mời & các ca biên** | Thách chéo nhau đồng thời: 1 lời mời được xác nhận, lời mời còn lại dọn sạch; nhận 2 lần: lần 2 từ chối an toàn; người mời đi xa (>400px): từ chối `stale`; rải lời mời quá `DUEL_INVITES_MAX = 3`: chặn lời mời thứ 4 với lỗi quá tải | Chống đua tin nhắn, chống rải spam, kiểm lại tầm lúc nhận | **PASS** (~0.8s) |
+| **3. Kiểm tra dọn dẹp rò rỉ sau N chu kỳ** | 5 chu kỳ thách / nhận / từ chối / đầu hàng (`duelYield`) / rớt mạng (`disconnect`): `World.duels.size` về 0, `invitesSize` về 0, `cooldownSize` về 0 sau sweep, `idle = true` | 0 trận rò rỉ, 0 lời mời treo, 0 timer mồ côi | **PASS** (~0.4s) |
+| **4. Kiểm tra 'Không mất kiếp' & Quái bỏ mục tiêu** | Quái đứng cạnh người chơi tự động bỏ mục tiêu khi vào trận PK; quái không gây sát thương lên người trong trận; người thua KO không có bản ghi `limbo`, file lưu không đổi | Cách ly tuyệt đối PK và sát thương quái / luân hồi | **PASS** (~3.6s) |
+| **5. Bỏ chạy khỏi trận đấu (`fled`)** | Người chơi chạy vào khu an toàn (trấn): trận đấu kết thúc ngay lập tức với lý do `fled`, người đối diện thắng | Ngăn chặn lạm dụng khu an toàn để né đòn | **PASS** (~0.4s) |
+| **6. Kiểm tra toàn vẹn lưu trữ (`audit-saves`)** | Chạy `auditSavesDirectory` trên thư mục dữ liệu: 0 file lưu lỗi, 0 lỗi tài khoản/phiên, các toạ độ đấu sĩ đều hợp lệ | Không sinh dữ liệu rác, không hỏng file lưu nhân vật | **PASS** (~0.2s) |
+
