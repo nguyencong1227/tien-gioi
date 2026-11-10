@@ -60,6 +60,7 @@ export function gainExp(w: World, sid: string, p: Player, amount: number, scale 
 export function setMeditating(w: World, sid: string, on: boolean) {
   const r = w.ready(sid);
   if (!r) return;
+  if (on && w.duels.has(sid)) return; // trong trận thách đấu không đả tọa
   r.p.meditating = on;
   if (on) r.c.inputs.length = 0;
 }

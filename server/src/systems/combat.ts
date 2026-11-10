@@ -9,14 +9,7 @@ import {
   expMultOf,
 } from "@tien-gioi/shared";
 import type { Player, Monster } from "../schema";
-import {
-  rand,
-  angleDiff,
-  quantAngle,
-  type World,
-  type PlayerCtrl,
-  type MonsterCtrl,
-} from "../world";
+import { angleDiff, quantAngle, type World, type PlayerCtrl, type MonsterCtrl } from "../world";
 import { applyStats, gainExp } from "./progression";
 import { safeSpot, syncPublicPos } from "./movement";
 import { dropLoot } from "./loot";
@@ -24,10 +17,9 @@ import { bossKilled } from "./dungeon";
 import { onMonsterKilled } from "./quests";
 import { killShares } from "./party";
 import { beginLimbo } from "./reincarnation";
+import { rollDamage } from "./damage";
+import { duelBeam, duelSlash, reviveInPlace } from "./duel";
 import { changeCoin, splitCoin } from "./wallet";
-
-const CRIT_CHANCE = 0.1;
-const CRIT_MULT = 1.8;
 
 /** Kiếm chém: hình quạt trước mặt. */
 export function slash(w: World, sid: string, angle: unknown) {
@@ -47,6 +39,7 @@ export function slash(w: World, sid: string, angle: unknown) {
       return;
     hitMonster(w, id, mon, sid, p, s.mult);
   });
+  if (w.duels.active) duelSlash(w, sid, p, angle, s.range, s.arc, s.mult);
 }
 
 /** Kiếm khí: luồng thẳng, tốn linh lực. */
@@ -74,6 +67,7 @@ export function swordQi(w: World, sid: string, angle: unknown) {
       return;
     hitMonster(w, id, mon, sid, p, s.mult);
   });
+  if (w.duels.active) duelBeam(w, sid, p, angle, s.range, s.width, s.mult);
 }
 
 export function hitMonster(
@@ -85,8 +79,7 @@ export function hitMonster(
   mult: number,
 ) {
   const atk = statsFor(p.realm, p.tier, p, w.ctrl.get(by)?.mult).atk; // gồm vũ khí và hệ số xuất thân
-  const crit = Math.random() < CRIT_CHANCE;
-  const dmg = Math.max(1, Math.round(atk * mult * rand(0.9, 1.1) * (crit ? CRIT_MULT : 1)));
+  const { dmg, crit } = rollDamage(atk, mult);
   mon.hp = Math.max(0, mon.hp - dmg);
   const mc = w.mctrl.get(id)!;
   mc.damageBy.set(by, (mc.damageBy.get(by) ?? 0) + dmg);
@@ -141,6 +134,7 @@ export function hurtPlayer(w: World, sid: string, p: Player, dmg: number, from: 
   const c = w.ctrl.get(sid);
   if (!c || p.dead) return;
   if (w.ghosts.has(sid)) return; // rớt mạng, đang chờ nối lại: bất tử
+  if (w.duels.has(sid)) return; // đang thách đấu: bất tử trước quái (không để một con hổ đi ngang giết người thật)
   p.hp = Math.max(0, p.hp - dmg);
   p.meditating = false;
   c.lastHitAt = w.now;
@@ -162,6 +156,11 @@ export function hurtPlayer(w: World, sid: string, p: Player, dmg: number, from: 
 
 /** Trọng thương đủ lâu thì hồi sinh ở Lạc Hà Trấn với đầy khí huyết. */
 export function tickRespawn(w: World, p: Player, c: PlayerCtrl) {
+  // Gục vì thua thách đấu (không phải chết thật): đứng dậy TẠI CHỖ sau `DUEL_KO_MS`, không về trấn
+  if (c.reviveAt !== undefined) {
+    if (w.now >= c.reviveAt) reviveInPlace(p, c);
+    return;
+  }
   if (w.now - c.deadAt < RESPAWN_MS) return;
   const s = safeSpot(w.map);
   p.x = s.x;

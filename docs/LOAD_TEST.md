@@ -475,3 +475,41 @@ Thực nghiệm được tự động hoá trong `server/scripts/bots-account.te
 Server Colyseus thật (trong tiến trình, thư mục dữ liệu tạm) phục vụ `client/dist` và **hai tab Chrome headless** điều khiển bằng CDP (hai nguồn khác nhau `127.0.0.1` / `localhost` nên không chung `localStorage`). Luồng qua giao diện thật: vào Lạc Hà -> lập đội -> nói chuyện Thủ môn -> bấm "Mở Linh Hư Bí Cảnh" -> cả hai nhận hộp mời (3/3 lượt thưởng) -> bấm "Vào Bí Cảnh" -> vào phòng bí cảnh bằng `joinById` (HUD, thanh máu trùm, danh sách đội) -> A hạ trùm bằng đòn chém của client (máu trùm đặt về 1 phía server) -> màn kết quả (A: +700 Linh thạch, 2 món, còn 2/3 lượt; B không đánh: lý do không có thưởng) -> hết thời gian nhặt đồ (rút ngắn) -> cả hai về Lạc Hà -> hồ sơ đúng (A ghi 1 lượt thưởng hôm nay và Linh thạch; B không; cả hai ở Lạc Hà) -> 0 lỗi console, 0 cảnh báo mất tin lúc vào phòng. Chạy: `npm run build && npm run e2e:bi-canh` (cần `google-chrome`); `E2E_SHOTS=<thư mục>` lưu ảnh chụp từng bước. Thoát 0 khi đạt.
 
 Lưu ý khi viết thêm kịch bản: các nút giao diện bắt `pointerdown` (không phải `click`), nên script phát `PointerEvent("pointerdown")`.
+
+## 10. Thử tải Bí cảnh, Bot `--dungeon` & Kiểm tra Rò rỉ (M3.4 - Issue #201)
+
+### 10.1. Kịch bản bot `--dungeon` trong `server/scripts/bots.ts`
+Kịch bản `server/scripts/bots.ts` được bổ sung cờ `--dungeon` để mô phỏng và thử tải tính năng Bí cảnh:
+- **Tổ đội tự động:** Khi bật `--dungeon`, nếu chưa chỉ định `--party` thì mặc định đặt `partySize = 4` (chuẩn theo thiết kế bí cảnh 2–4 người).
+- **Gieo hồ sơ cảnh giới hợp lệ:** Bot được gieo với cảnh giới Luyện Khí Tầng 9 (`realm = 1, tier = 8`, khớp với điều kiện tối thiểu `minStep` của Linh Hư Bí Cảnh) và xuất hiện tại khu vực gần NPC Thủ Môn ở Lạc Hà Trấn.
+- **Quy trình hoạt động tự động:**
+  1. **Đội trưởng mở bí cảnh:** Khi đứng gần NPC Thủ Môn (`dist <= 50 px`) và hết hồi chiêu `DUNGEON_OPEN_COOLDOWN_MS = 5000 ms`, đội trưởng gửi tin `dungeonOpen { dungeonId: "linh_hu" }` (không qua hộp thoại).
+  2. **Thành viên xác nhận vào bí cảnh:** Tất cả bot trong đội nhận tin `dungeonInvite` và tự động gửi `dungeonEnter { runId }`.
+  3. **Vào phòng bí cảnh riêng qua `joinById`:** Client nhận tin `travelTo { mapId: "linh_hu", roomId }` và tự động gọi `client.joinById(roomId)` để chuyển sang phòng Colyseus của bí cảnh.
+  4. **Tác chiến trong bí cảnh:** Bot di chuyển tới hang trùm `map.lairPx` (32, 9), tìm quái/trùm gần nhất và thi triển kiếm chiêu/kiếm khí.
+  5. **Dọn dẹp và rời phòng:** Khi nhận `dungeonEnd` (hoặc sau khi hạ trùm/hết giờ), bot gửi `dungeonLeave` để nhận `travelTo` trở về Lạc Hà Trấn.
+
+Cách chạy:
+```bash
+# Chạy 20 bot (5 đội 4 người) mở và tham gia bí cảnh:
+npm run bots -w server -- --bots=20 --dungeon --duration=30
+```
+
+### 10.2. Kết quả Thử tải & Stress Test (`server/scripts/dungeon-stress.test.ts`)
+Bộ kiểm thử stress test tự động hoá 6 kịch bản then chốt trên tiến trình server Colyseus thật:
+
+| Kịch bản kiểm thử | Kết quả thực tế | Tiêu chuẩn đánh giá | Trạng thái |
+| :--- | :---: | :---: | :---: |
+| **1. Đạt trần 10 run đồng thời (`MAX_DUNGEON_RUNS = 10`)** | **10 phòng Colyseus bí cảnh mở song song**; đội thứ 11 mở bị từ chối với lý do `full` | Đúng giới hạn 10 run, từ chối quá tải | **PASS** (~2.8s) |
+| **2. Kiểm tra rò rỉ phòng & sweep cooldown** | 2 chu kỳ mở run -> vào phòng -> gửi `dungeonLeave` -> dọn dẹp: `Hub.runs.size` về 0, `cooldownSize` về 0 sau sweep, số phòng bí cảnh về 0 | 0 run rò rỉ, 0 phòng treo | **PASS** (~2.5s) |
+| **3. Đua `dungeonEnter` đồng thời** | 2 thành viên cùng bấm enter trong cùng 1 tick: cả 2 đều nhận `travelTo` với cùng `roomId` và vào đúng phòng | Đua tin nhắn an toàn, không rớt ai | **PASS** (~1.1s) |
+| **4. Giết tiến trình giữa run (Crash / Disconnect)** | Bot ngắt socket đột ngột giữa trận bí cảnh, đăng nhập lại: vào thẳng Lạc Hà Trấn, file lưu giữ nguyên `mapId = DEFAULT_MAP_ID` | Không kẹt toạ độ bí cảnh, không lỗi mapId | **PASS** (~1.1s) |
+| **5. Bảo mật chặn người ngoài** | Thử `joinOrCreate` trực tiếp vào phòng bí cảnh: bị từ chối; dùng `joinById` với `roomId` thật khi không có trong đội: từ chối mã 422 `JOIN_NOT_IN_RUN` | Chặn tuyệt đối xâm nhập lậu | **PASS** (~1.1s) |
+| **6. Thành viên rời đội giữa run (`partyLeave`)** | Thành viên gửi `partyLeave`: không làm sập phòng bí cảnh; thành viên còn lại vẫn tiếp tục đánh bình thường | Cách ly an toàn lỗi đội và phòng run | **PASS** (~1.1s) |
+
+### 10.3. Kiểm thử Kiểm tra Lưu trữ Nhân vật (`kiem-save`)
+Công cụ `npm run kiem-save -w server` đã được cập nhật thêm các luật kiểm tra nghiêm ngặt cho Bí cảnh:
+- **Chặn tuyệt đối `mapId` bí cảnh trong hồ sơ lưu:** Phát hiện và cảnh báo lỗi `INVALID_DUNGEON_MAP` nếu bất kỳ tệp JSON nào lưu `mapId` là bản đồ bí cảnh (bảo đảm người chơi không bao giờ bị lưu kẹt trong bí cảnh).
+- **Kiểm tra tính hợp lệ của `dungeonDaily`:**
+  - `day` phải đúng định dạng ngày tháng `YYYY-MM-DD`.
+  - `rewards` phải là số nguyên nằm trong khoảng `[0, DUNGEON_DAILY_REWARDS]`.

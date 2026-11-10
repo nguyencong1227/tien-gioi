@@ -110,6 +110,11 @@ export function useItem(w: World, sid: string, slot: unknown) {
   const e = def.effect;
   switch (e.kind) {
     case "healHp":
+      if (w.duels.has(sid))
+        return w.events.toast(sid, {
+          text: "Đang thách đấu, không uống đan hồi huyết được.",
+          tone: "bad",
+        });
       if (p.hp >= p.maxHp)
         return w.events.toast(sid, { text: "Khí huyết đang đầy.", tone: "info" });
       p.hp = Math.min(p.maxHp, p.hp + Math.round(p.maxHp * e.pct));

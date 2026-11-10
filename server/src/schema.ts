@@ -36,6 +36,8 @@ export class Player extends Schema {
   @type("number") expMax = 40;
   @type("boolean") meditating = false;
   @type("boolean") dead = false;
+  /** Đang trong trận thách đấu (công khai: người ngoài vẽ dấu ⚔; đổi chỉ lúc bắt đầu / kết thúc, docs/THIET_KE_PK.md) */
+  @type("boolean") duel = false;
   // input cuối server đã xử lý (để client đối chiếu); chỉ chủ nhân vật nhận
   @view(TAG_OWNER) @type("uint32") lastSeq = 0;
   // Đồ đang mặc (itemId, "" = trống). Công khai để mọi người thấy ngoại hình; kiểu Equipment trong shared/src/items.ts.

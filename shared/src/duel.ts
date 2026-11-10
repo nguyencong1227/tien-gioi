@@ -37,11 +37,11 @@ export const DUEL_INVITES_MAX = 3;
 /** Gửi `duelState` mỗi chừng này (không mỗi tick). */
 export const DUEL_STATE_MS = 1_000;
 /**
- * Hệ số sát thương người lên người so với đánh quái (nhân vào `atk` như `hitMonster`): làm trận kéo dài vài chục giây thay vì
- * 4-5 đòn là hết. **SỐ TẠM**: A cân bằng ở PR 5c bằng mô phỏng mã server thật (mục tiêu ~25-45 giây cho hai người cùng bậc,
- * không đan, không đả tọa) và ghi vào `docs/CAN_BANG.md`.
+ * Hệ số sát thương người lên người so với đánh quái (nhân vào `atk` như `hitMonster`): làm trận kéo dài ~30 giây thay vì 4-5 đòn
+ * là hết. Đã cân bằng ở 5c bằng mô phỏng MÃ SERVER THẬT (hai người cùng bậc đánh thường liên tục, không đan, không đả tọa,
+ * hạt giống cố định): 30-36 giây ở mọi bậc từ Phàm Nhân tới Trúc Cơ (mục tiêu 25-45); xem `docs/CAN_BANG.md` mục "PK".
  */
-export const PK_DAMAGE_MULT = 0.25;
+export const PK_DAMAGE_MULT = 0.125;
 
 // ---------- Tin nhắn ----------
 

@@ -7,6 +7,7 @@ import { tickRecovery } from "./progression";
 import { tickLoot } from "./loot";
 import { tickParty } from "./party";
 import { tickDungeonRun, tickDungeons } from "./dungeon";
+import { tickDuels } from "./duel";
 
 export function tickWorld(w: World, dtMs: number) {
   const dt = dtMs / 1000;
@@ -19,13 +20,14 @@ export function tickWorld(w: World, dtMs: number) {
     c.life.playMs += dtMs; // thời gian chơi thật của kiếp (không tính chết, hồn lìa xác)
     applyInputs(w.map, p, c);
     if ((w.tick + c.posPhase) % POS_SYNC_EVERY_TICKS === 0) syncPublicPos(p);
-    tickRecovery(w, sid, p, c, dt);
+    if (!w.duels.has(sid)) tickRecovery(w, sid, p, c, dt); // trong trận thách đấu: không hồi khí huyết / linh lực, không đả tọa
   });
   tickMonsters(w, dt);
   tickLoot(w);
   tickParty(w);
   tickDungeons(w);
   tickDungeonRun(w);
+  tickDuels(w);
   w.interest.update(w); // sau cùng: dựa trên vị trí mới của tick này
   w.tick++;
 }

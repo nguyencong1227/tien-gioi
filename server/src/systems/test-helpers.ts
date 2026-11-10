@@ -6,6 +6,7 @@ import {
   emptyInventory,
   newSoul,
   type FxMsg,
+  type DmgMsg,
   type GameMap,
   type InvMsg,
   type QuestsMsg,
@@ -21,6 +22,9 @@ import {
   type DungeonInviteMsg,
   type DungeonEndMsg,
   type DungeonStateMsg,
+  type DuelInvitedMsg,
+  type DuelStateMsg,
+  type DuelEndMsg,
   originMult,
 } from "@tien-gioi/shared";
 import { WorldState, Player, Monster } from "../schema";
@@ -47,11 +51,15 @@ export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
   const dungeonInvites: { sid: string; msg: DungeonInviteMsg }[] = [];
   const dungeonEnds: { sid: string; msg: DungeonEndMsg }[] = [];
   const dungeonStates: { sid: string; msg: DungeonStateMsg }[] = [];
+  const duelInvites: { sid: string; msg: DuelInvitedMsg }[] = [];
+  const duelStates: { sid: string; msg: DuelStateMsg }[] = [];
+  const duelEnds: { sid: string; msg: DuelEndMsg }[] = [];
+  const dmgs: DmgMsg[] = [];
   const w = new World(
     new WorldState(),
     {
       fx: (m) => fx.push(m),
-      dmg: () => {},
+      dmg: (m) => dmgs.push(m),
       sys: (t) => sys.push(t),
       chat: (from, text) => chats.push({ from, text }),
       toast: (sid, msg) => toasts.push({ sid, msg }),
@@ -68,6 +76,9 @@ export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
       dungeonInvite: (sid, msg) => dungeonInvites.push({ sid, msg }),
       dungeonEnd: (sid, msg) => dungeonEnds.push({ sid, msg }),
       dungeonState: (sid, msg) => dungeonStates.push({ sid, msg }),
+      duelInvited: (sid, msg) => duelInvites.push({ sid, msg }),
+      duelState: (sid, msg) => duelStates.push({ sid, msg }),
+      duelEnd: (sid, msg) => duelEnds.push({ sid, msg }),
     },
     map,
     hub,
@@ -91,6 +102,10 @@ export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
     dungeonInvites,
     dungeonEnds,
     dungeonStates,
+    duelInvites,
+    duelStates,
+    duelEnds,
+    dmgs,
   };
 }
 

@@ -18,6 +18,9 @@ import type {
   DungeonInviteMsg,
   DungeonEndMsg,
   DungeonStateMsg,
+  DuelInvitedMsg,
+  DuelStateMsg,
+  DuelEndMsg,
 } from "@tien-gioi/shared";
 import type { WorldState, Player } from "./schema";
 import type { SavedPlayer, QuestSave, LifeCounters, LimboRecord } from "./store";
@@ -26,6 +29,7 @@ import { Interest } from "./systems/interest";
 import { Hub } from "./hub";
 import type { Identity } from "./identity";
 import type { Run } from "./systems/dungeon";
+import { Duels } from "./systems/duel";
 
 /** Dữ liệu riêng của server cho mỗi người chơi (không gửi xuống client). */
 export interface PlayerCtrl {
@@ -41,6 +45,11 @@ export interface PlayerCtrl {
   /** Lệch pha ghi px, py giữa các người chơi (0..POS_SYNC_EVERY_TICKS-1) để không cùng ghi một tick */
   posPhase: number;
   lastHitAt: number;
+  /**
+   * Đang gục sau khi thua thách đấu (`p.dead` nhưng KHÔNG phải chết thật): lúc đứng dậy TẠI CHỖ (ms). `tickRespawn` thấy cờ này
+   * thì đứng dậy tại chỗ thay vì hồi sinh ở trấn.
+   */
+  reviveAt?: number;
   deadAt: number;
   /**
    * Đang đi qua cổng: bản ghi ở bản đồ đích đã / đang được ghi, nên `persist` thường (lưu định kỳ, lúc rớt mạng)
@@ -133,6 +142,12 @@ export interface WorldEvents {
   dungeonEnd(sessionId: string, msg: DungeonEndMsg): void;
   /** Trạng thái bí cảnh cho HUD (trong phòng bí cảnh): mỗi `DUNGEON_STATE_MS` và khi đổi pha. */
   dungeonState(sessionId: string, msg: DungeonStateMsg): void;
+  /** Có người thách đấu (chỉ người được mời nhận). */
+  duelInvited(sessionId: string, msg: DuelInvitedMsg): void;
+  /** Trạng thái trận thách đấu cho HUD (hai người trong trận). */
+  duelState(sessionId: string, msg: DuelStateMsg): void;
+  /** Trận thách đấu kết thúc (cả hai nhận). */
+  duelEnd(sessionId: string, msg: DuelEndMsg): void;
 }
 
 export class World {
@@ -154,6 +169,8 @@ export class World {
    * chơi chỉ phải tra tập này khi nó khác rỗng (hầu hết thời gian là rỗng).
    */
   readonly ghosts = new Set<string>();
+  /** Trận thách đấu và lời mời của phòng này (hai người phải cùng phòng): systems/duel.ts, docs/THIET_KE_PK.md. */
+  readonly duels = new Duels();
   monsterSeq = 0;
   lootSeq = 0;
   /** Số tick đã chạy (dùng chia nhịp ghi px, py) */
