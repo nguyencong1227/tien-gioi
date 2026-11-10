@@ -15,6 +15,9 @@ import type {
   ChatOut,
   PartyMsg,
   PartyInvitedMsg,
+  DungeonInviteMsg,
+  DungeonEndMsg,
+  DungeonStateMsg,
 } from "@tien-gioi/shared";
 import type { WorldState, Player } from "./schema";
 import type { SavedPlayer, QuestSave, LifeCounters, LimboRecord } from "./store";
@@ -22,6 +25,7 @@ import type { LimboMsg, RebornMsg, Soul, SoulMsg, StatMult } from "@tien-gioi/sh
 import { Interest } from "./systems/interest";
 import { Hub } from "./hub";
 import type { Identity } from "./identity";
+import type { Run } from "./systems/dungeon";
 
 /** Dữ liệu riêng của server cho mỗi người chơi (không gửi xuống client). */
 export interface PlayerCtrl {
@@ -123,6 +127,12 @@ export interface WorldEvents {
   soul(sessionId: string, msg: SoulMsg): void;
   /** Đã đầu thai xong. */
   reborn(sessionId: string, msg: RebornMsg): void;
+  /** Lời mời vào bí cảnh, gửi riêng cho từng thành viên (ở bất cứ phòng nào). */
+  dungeonInvite(sessionId: string, msg: DungeonInviteMsg): void;
+  /** Bí cảnh kết thúc (hoặc bị huỷ trước khi có người vào: chỉ đội trưởng nhận). */
+  dungeonEnd(sessionId: string, msg: DungeonEndMsg): void;
+  /** Trạng thái bí cảnh cho HUD (trong phòng bí cảnh): mỗi `DUNGEON_STATE_MS` và khi đổi pha. */
+  dungeonState(sessionId: string, msg: DungeonStateMsg): void;
 }
 
 export class World {
@@ -155,6 +165,20 @@ export class World {
   reincarnate = false;
   /** Phòng đăng ký: được gọi (một lần) khi một người vừa vào Hoàng Tuyền, để lưu file, cộng Duyên và gửi `limbo`. */
   onLimbo: ((sid: string) => void) | null = null;
+  /**
+   * Phòng đăng ký (bí cảnh, 4b): được gọi khi một run vừa được lập, để TẠO phòng bí cảnh (`matchMaker.createRoom`, bất
+   * đồng bộ) rồi gọi `runReady(w, run, roomId)` (hoặc `runFailed`). Không có hook (test đơn vị): coi như phòng sẵn sàng ngay.
+   */
+  onDungeonOpen: ((run: Run) => void) | null = null;
+  /**
+   * Phòng đăng ký (bí cảnh, 4b): một thành viên đã bấm "Vào" và qua mọi kiểm tra; phòng lưu nhân vật với chỗ vào ở Lạc Hà
+   * rồi gửi `travelTo { mapId, roomId }` và ngắt kết nối. Không có hook thì `enterDungeon` không làm gì.
+   */
+  onDungeonEnter: ((sid: string, run: Run) => void) | null = null;
+  /** Phòng bí cảnh đăng ký: đưa một người từ phòng này về cổng vào (Lạc Hà): `dungeonLeave`, hết giờ nhặt đồ, run kết thúc. */
+  onDungeonExit: ((sid: string) => void) | null = null;
+  /** Phòng bí cảnh: id của run mà phòng này phục vụ (`Hub.runs`); `null` ở mọi phòng thường. */
+  runId: string | null = null;
 
   constructor(
     readonly state: WorldState,

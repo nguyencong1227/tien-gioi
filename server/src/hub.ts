@@ -4,6 +4,7 @@ import type { ChatOut } from "@tien-gioi/shared";
 import type { Player } from "./schema";
 import type { World } from "./world";
 import { Parties } from "./systems/party";
+import { Runs } from "./systems/dungeon";
 
 /** Nơi nhận chat toàn server của một phòng (thường là `room.broadcast("chat", msg)`). */
 export type ChatSink = (msg: ChatOut) => void;
@@ -24,6 +25,8 @@ export class Hub {
    * vào phòng, còn đội phải sống qua việc đi qua cổng). Xem systems/party.ts.
    */
   readonly parties = new Parties();
+  /** Sổ lần chạy bí cảnh của cả tiến trình (docs/THIET_KE_BI_CANH.md mục 4.2); khoá thành viên theo đạo hiệu viết thường như `parties`. */
+  readonly runs = new Runs();
 
   /** Tìm người chơi theo khoá đạo hiệu (viết thường) ở mọi phòng; không có thì `null`. */
   locate(key: string): Located | null {

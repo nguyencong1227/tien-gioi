@@ -191,3 +191,42 @@ Giả định người chơi kiếp nào cũng cày trọn vẹn đến hết Tr
   - Cần **16 kiếp** trọn vẹn để đạt tối đa nấc 10 Dư âm tu hành (+100% tốc độ tu luyện). Tổng thời gian chơi khoảng **~29 giờ**.
   - Tốc độ Duyên mỗi giờ tăng từ **25.6 Duyên/h** (kiếp 1) lên **45.8 Duyên/h** (khi max Dư âm tu hành), tương đương tỷ lệ **1.79×**.
   - **Đánh giá:** Tỷ lệ tăng trưởng **1.79×** nằm trong mục tiêu thiết kế (không vượt quá ~2.0× so với kiếp đầu), đem lại cảm giác nhân vật chuyển kiếp ngày càng mạnh mẽ và tu luyện thần tốc, nhưng kiểm soát tốt không gây lạm phát hay phá vỡ chiều sâu lối chơi.
+
+
+## Bí cảnh Linh Hư (M3.4, 4c-2, #203)
+
+Mô phỏng ở `server/src/balance/dungeon.ts`; test `dungeon.test.ts` giữ các mục tiêu bên dưới. **Số liệu đang dùng:** trùm `yeu_vuong`
+100000 máu, đòn 16 mỗi 1.5 giây, 4500 tu vi; thưởng hoàn thành 700 Linh thạch + đồ;
+ngưỡng bậc 9 (Luyện Khí tầng 9); giới hạn 12 phút; đội 2-4 người.
+
+**Mục tiêu (thiết kế):** đội 3 người ở đúng ngưỡng hạ trùm trong 5-8 phút và không ai chết; đội 2 người không kịp giờ; một người không
+hạ nổi; một lượt thưởng bằng khoảng 15-20 phút săn quái tốt nhất cùng bậc. Trùm là một **bao máu**: đòn nhẹ nhưng trận dài, nên cần đan
+và đồng đội (chết trong bí cảnh là mất kiếp, nên chọn số liệu để ca khó nhất cũng không ai chết).
+
+### 1. Trận đánh trùm (mô phỏng bằng chính mã server)
+
+`fightBoss` dựng một thế giới thật, đặt trùm ở tâm hang, người chơi đứng cạnh đánh thường liên tục (`slash`), uống Hồi Huyết Đan khi khí huyết
+dưới 50% (`useItem`, hồi chiêu 8 giây), mỗi người mang 8 viên; AI quái, sát thương, bạo kích đều là mã thật (hạt giống cố
+định). **Ca khó:** đứng yên, không né, trùm trúng 100% đòn. Người chơi thật né được nhưng mất thời gian đánh theo cùng tỉ lệ nên xác suất
+sống không đổi; thời gian thật = thời gian mô phỏng / 0.6 (giả định `bossUptime`, chưa kiểm bằng người chơi thật). Cả lượt = đi 30
+giây + dọn quái nhỏ (3 giây tìm mỗi con, đánh 80% thời gian) + trùm. Bậc cả đội: ngưỡng, trang bị tốt nhất đủ bậc. 20 trận mỗi dòng.
+
+| Đội | Hạ được trùm | Trùm (giây mô phỏng) | Trùm (phút thật) | Cả lượt (phút) | Người chết / trận |
+|---|---:|---:|---:|---:|---:|
+| 1 người | 0% | – | – | – | 1.00 |
+| 2 người | 100% | 407 | 11.3 | 13.4 ⚠️ quá giờ | 1.00 |
+| 3 người | 100% | 216 | 6.0 | 8.0 | 0.00 |
+| 4 người | 100% | 162 | 4.5 | 6.4 | 0.00 |
+
+### 2. Một lượt thưởng đáng bao nhiêu phút săn
+
+Linh thạch ròng = thưởng hoàn thành + giá bán đồ thưởng kỳ vọng + phần chia từ tiền / đồ trùm rơi và quái nhỏ − 8 đan (8 × giá mua). Tu vi = trùm + quái nhỏ theo
+`partyExpShare`. So với săn quái tốt nhất cùng bậc (mục tiêu 17.5 phút).
+
+| Đội | Linh thạch ròng / người | = phút săn | Tu vi / người | = phút săn |
+|---|---:|---:|---:|---:|
+| 2 người | 1235 | 19.8 | 2816 | 23.4 |
+| 3 người | 1067 | 17.1 | 2122 | 17.7 |
+| 4 người | 983 | 15.8 | 1776 | 14.8 |
+
+Tối đa 3 lượt thưởng mỗi ngày (`DUNGEON_DAILY_REWARDS`) nên bí cảnh là một lựa chọn thêm chứ không thay được việc săn quái.

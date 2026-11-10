@@ -11,7 +11,7 @@ import {
 } from "@tien-gioi/shared";
 import type { World } from "../world";
 import { exchangeItems, sendInv, slotIndex, takeFromSlot } from "./inventory";
-import { nearNpc } from "./npc";
+import { nearNpc } from "./near-npc";
 import { changeCoin, trySpendCoin } from "./wallet";
 
 const itemName = (id: string) => ITEM_BY_ID[id]?.name ?? id;

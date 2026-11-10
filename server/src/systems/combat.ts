@@ -20,6 +20,7 @@ import {
 import { applyStats, gainExp } from "./progression";
 import { safeSpot, syncPublicPos } from "./movement";
 import { dropLoot } from "./loot";
+import { bossKilled } from "./dungeon";
 import { onMonsterKilled } from "./quests";
 import { killShares } from "./party";
 import { beginLimbo } from "./reincarnation";
@@ -117,6 +118,7 @@ export function killMonster(w: World, id: string, mc: MonsterCtrl) {
   if (mon) dropLoot(w, mc, mon.x, mon.y);
   w.state.monsters.delete(id);
   w.mctrl.delete(id);
+  if (mc.def.boss && w.runId !== null) bossKilled(w, mc); // trùm bí cảnh chết: run thắng, phát thưởng hoàn thành
 }
 
 /**

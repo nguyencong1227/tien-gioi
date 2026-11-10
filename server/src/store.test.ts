@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { DEFAULT_MAP_ID, DUNGEON_MAPS, getMap } from "@tien-gioi/shared";
 import type { SavedPlayer } from "./store";
 
 const dir = mkdtempSync(path.join(tmpdir(), "tien-gioi-store-"));
@@ -114,5 +115,20 @@ describe("sanitizeLife: không tin bộ đếm trong file", () => {
 
   it("newLifeId: mỗi lần một mã khác nhau", () => {
     expect(new Set(Array.from({ length: 50 }, () => store.newLifeId())).size).toBe(50);
+  });
+});
+
+describe("mapIdOf: chỗ ở của nhân vật là bản đồ thường", () => {
+  it("bản đồ thường giữ nguyên; thiếu, lạ, sai kiểu, khoá nguyên mẫu về Lạc Hà", () => {
+    for (const id of ["lac_ha", "hac_phong"]) expect(store.mapIdOf({ mapId: id })).toBe(id);
+    for (const bad of [undefined, "", "khong_co", "constructor", "__proto__", 7, null, {}])
+      expect(store.mapIdOf({ mapId: bad as never }), String(bad)).toBe("lac_ha");
+  });
+
+  it("bản đồ bí cảnh (getMap tra được) KHÔNG phải chỗ ở: về Lạc Hà, không bao giờ đưa tới phòng bí cảnh", () => {
+    for (const m of DUNGEON_MAPS) {
+      expect(getMap(m.id)).toBeDefined(); // chính vì tra được mà mapIdOf phải loại
+      expect(store.mapIdOf({ mapId: m.id })).toBe(DEFAULT_MAP_ID);
+    }
   });
 });
