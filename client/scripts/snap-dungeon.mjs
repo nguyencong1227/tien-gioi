@@ -213,6 +213,17 @@ for (const sz of SIZES) {
       expression: `window.__mockDungeon.showLost()`,
     });
     await snap(`dungeon-lost-${sz.name}.png`);
+
+    // 7. Gục trong Bí cảnh (Issue #235)
+    console.log("- Chụp lớp phủ Gục trong bí cảnh (?dungeon=fallen)...");
+    await cdpSend("Runtime.evaluate", {
+      expression: `
+        const endModal = document.getElementById("dungeon-end-modal");
+        if (endModal) endModal.hidden = true;
+        window.__mockDungeon.showFallen(2, 3000);
+      `,
+    });
+    await snap(`dungeon-fallen-${sz.name}.png`);
   } finally {
     if (cdpWs) cdpWs.close();
     chromeProcess.kill();

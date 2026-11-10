@@ -1,6 +1,7 @@
 import {
   DUNGEONS,
   DUNGEON_DAILY_REWARDS,
+  DUNGEON_FALL_EXIT_MS,
   DUNGEON_INVITE_MS,
   DUNGEON_LOOT_MS,
   ITEM_BY_ID,
@@ -14,6 +15,7 @@ import {
   type DungeonDef,
   type DungeonEndMsg,
   type DungeonEndReason,
+  type DungeonFallenMsg,
   type DungeonInviteMsg,
   type DungeonNoReward,
   type DungeonPhase,
@@ -268,5 +270,50 @@ export const MOCK_DUNGEON_SAMPLES = {
       rewardsLeft,
     };
   },
+  fallen(rewardsLeft = 2, exitInMs = DUNGEON_FALL_EXIT_MS): DungeonFallenMsg {
+    return {
+      exitInMs,
+      rewardsLeft,
+    };
+  },
   mapId: LINH_HU_MAP_ID,
 };
+
+/**
+ * Câu thông báo chính trong lớp phủ khi gục trong bí cảnh (thay thế câu "Hồi sinh tại Lạc Hà Trấn sau Ns").
+ * Tuyệt đối không nhắc tới Hoàng Tuyền hay chết thật.
+ */
+export function dungeonFallenDeathText(remSec: number, rewardsLeft?: number): string {
+  const sec = Math.max(0, Math.ceil(remSec));
+  const countStr =
+    rewardsLeft !== undefined
+      ? ` Lượt hôm nay còn ${Math.max(0, Math.min(DUNGEON_DAILY_REWARDS, rewardsLeft))}/${DUNGEON_DAILY_REWARDS}.`
+      : "";
+  return `Ngươi đã gục! Bị đưa ra khỏi bí cảnh sau ${sec}s.${countStr}`;
+}
+
+/** Dòng phụ trấn an người chơi: khẳng định rõ không mất kiếp, không mất đồ. */
+export function dungeonFallenSubText(): string {
+  return "Không mất kiếp · Không mất đồ và Linh thạch";
+}
+
+/** Câu thông báo toast khi người chơi đã bị đưa ra cổng vào bí cảnh ở Lạc Hà. */
+export function dungeonFallenToastText(rewardsLeft?: number): string {
+  const countStr =
+    rewardsLeft !== undefined
+      ? ` Còn ${Math.max(0, Math.min(DUNGEON_DAILY_REWARDS, rewardsLeft))}/${DUNGEON_DAILY_REWARDS} lượt.`
+      : "";
+  return `Ngươi đã bị đưa ra khỏi bí cảnh, mất một lượt hôm nay.${countStr}`;
+}
+
+/**
+ * Kiểm tra chế độ thử nghiệm gục trong bí cảnh (?dungeon=fallen).
+ */
+export function isMockDungeonFallen(
+  search: string = typeof location !== "undefined" ? location.search : "",
+  isDev: boolean = typeof import.meta !== "undefined" && Boolean(import.meta.env?.DEV),
+): boolean {
+  const params = new URLSearchParams(search);
+  if (params.get("dungeon") !== "fallen") return false;
+  return isDev || params.has("debug");
+}

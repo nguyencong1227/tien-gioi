@@ -2,6 +2,9 @@ import { describe, it, expect } from "vitest";
 import {
   buildMockThuMonDialog,
   dungeonEndReasonText,
+  dungeonFallenDeathText,
+  dungeonFallenSubText,
+  dungeonFallenToastText,
   dungeonNoRewardText,
   dungeonPhaseInfo,
   formatBossView,
@@ -9,6 +12,7 @@ import {
   formatDungeonRewardItems,
   formatInviteCountdown,
   isMockDungeonEnabled,
+  isMockDungeonFallen,
   MOCK_DUNGEON_SAMPLES,
   shouldOpenEndModal,
 } from "./dungeon";
@@ -126,5 +130,46 @@ describe("dungeon client pure logic", () => {
 
     expect(MOCK_DUNGEON_SAMPLES.endWon().result).toBe("won");
     expect(MOCK_DUNGEON_SAMPLES.endLost().result).toBe("lost");
+  });
+
+  it("dungeonFallen thông báo gục trong bí cảnh rõ ràng, không hứa hồi sinh Lạc Hà hay Hoàng Tuyền", () => {
+    const text1 = dungeonFallenDeathText(3, 2);
+    expect(text1).toContain("Ngươi đã gục!");
+    expect(text1).toContain("sau 3s");
+    expect(text1).toContain("2/3");
+    expect(text1).not.toContain("Lạc Hà Trấn sau");
+    expect(text1).not.toContain("Hoàng Tuyền");
+    expect(text1).not.toContain("Hồi sinh");
+
+    const text2 = dungeonFallenDeathText(0);
+    expect(text2).toContain("sau 0s");
+    expect(text2).not.toContain("Lượt hôm nay");
+
+    const sub = dungeonFallenSubText();
+    expect(sub).toContain("Không mất kiếp");
+    expect(sub).toContain("Không mất đồ");
+    expect(sub).not.toContain("Hoàng Tuyền");
+
+    const toast1 = dungeonFallenToastText(2);
+    expect(toast1).toContain("mất một lượt hôm nay");
+    expect(toast1).toContain("Còn 2/3 lượt");
+    expect(toast1).not.toContain("Hoàng Tuyền");
+
+    const toast2 = dungeonFallenToastText();
+    expect(toast2).toBe("Ngươi đã bị đưa ra khỏi bí cảnh, mất một lượt hôm nay.");
+  });
+
+  it("isMockDungeonFallen chỉ bật khi có ?dungeon=fallen VÀ (isDev hoặc ?debug)", () => {
+    expect(isMockDungeonFallen("?dungeon=fallen", true)).toBe(true);
+    expect(isMockDungeonFallen("?dungeon=fallen&debug=1", false)).toBe(true);
+    expect(isMockDungeonFallen("?dungeon=fallen", false)).toBe(false);
+    expect(isMockDungeonFallen("?dungeon=mock", true)).toBe(false);
+    expect(isMockDungeonFallen("?debug=1", true)).toBe(false);
+  });
+
+  it("MOCK_DUNGEON_SAMPLES.fallen trả đúng cấu trúc DungeonFallenMsg", () => {
+    const sample = MOCK_DUNGEON_SAMPLES.fallen(1, 2500);
+    expect(sample.rewardsLeft).toBe(1);
+    expect(sample.exitInMs).toBe(2500);
   });
 });

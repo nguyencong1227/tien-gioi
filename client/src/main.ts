@@ -13,7 +13,14 @@ import {
 } from "@tien-gioi/shared";
 import { WorldScene } from "./scenes/WorldScene";
 import { ui } from "./ui";
-import { buildMockThuMonDialog, isMockDungeonEnabled, MOCK_DUNGEON_SAMPLES } from "./dungeon";
+import {
+  buildMockThuMonDialog,
+  dungeonFallenDeathText,
+  dungeonFallenSubText,
+  isMockDungeonEnabled,
+  isMockDungeonFallen,
+  MOCK_DUNGEON_SAMPLES,
+} from "./dungeon";
 import { isMockDuelEnabled, MOCK_DUEL_SAMPLES } from "./duel";
 import { captureEarlyMessages } from "./early-messages";
 import { joinWithRedirect } from "./connection";
@@ -23,7 +30,7 @@ import { initAuthUi, switchAuthView } from "./auth-ui";
 const NAME_KEY = "tien-gioi:name";
 const SECRET_KEY = "tien-gioi:secret";
 
-function createMockDungeonRoom(): any {
+function createMockDungeonRoom(dead = false): any {
   const handlers = new Map<string, ((msg: any) => void)[]>();
   return {
     sessionId: "mock-session-01",
@@ -53,15 +60,15 @@ function createMockDungeonRoom(): any {
             name: "Trương Tiểu Phàm",
             realm: 1,
             tier: 8,
-            hp: 2500,
+            hp: dead ? 0 : 2500,
             maxHp: 2500,
-            mp: 1200,
+            mp: dead ? 0 : 1200,
             maxMp: 1200,
             exp: 8000,
             x: 512,
             y: 896,
             lastSeq: 0,
-            dead: false,
+            dead,
             meditating: false,
           },
         ],
@@ -140,12 +147,25 @@ initAuthUi({
   },
 });
 
-// Chế độ máy chủ giả lập (?dungeon=mock hoặc ?duel=mock) để thử nghiệm và chụp ảnh không cần server thật
-if (typeof window !== "undefined" && (isMockDungeonEnabled() || isMockDuelEnabled())) {
-  const mockRoom = createMockDungeonRoom();
-  start(mockRoom, DEFAULT_MAP_ID).catch((err) => {
-    console.error("Lỗi khởi động máy chủ giả lập:", err);
-  });
+// Chế độ máy chủ giả lập (?dungeon=mock, ?dungeon=fallen hoặc ?duel=mock) để thử nghiệm và chụp ảnh không cần server thật
+if (
+  typeof window !== "undefined" &&
+  (isMockDungeonEnabled() || isMockDungeonFallen() || isMockDuelEnabled())
+) {
+  const isFallen = isMockDungeonFallen();
+  const mockRoom = createMockDungeonRoom(isFallen);
+  const startMapId = isFallen ? LINH_HU_MAP_ID : DEFAULT_MAP_ID;
+  start(mockRoom, startMapId)
+    .then(() => {
+      if (isFallen) {
+        setTimeout(() => {
+          (window as any).__mockDungeon?.showFallen?.();
+        }, 150);
+      }
+    })
+    .catch((err) => {
+      console.error("Lỗi khởi động máy chủ giả lập:", err);
+    });
 }
 
 if (
@@ -388,6 +408,18 @@ async function start(room: Room, mapId: string) {
       },
       showLost: () => {
         ui.onDungeonEnd(MOCK_DUNGEON_SAMPLES.endLost());
+      },
+      showFallen: (rewardsLeft = 2, exitInMs = 3000) => {
+        const msg = MOCK_DUNGEON_SAMPLES.fallen(rewardsLeft, exitInMs);
+        if (activeScene) {
+          (activeScene as any).dungeonFallUntil = (activeScene as any).time?.now
+            ? (activeScene as any).time.now + exitInMs
+            : performance.now() + exitInMs;
+        }
+        ui.onDungeonFallen(msg);
+        ui.onDungeonState(MOCK_DUNGEON_SAMPLES.stateBossFight());
+        const remSec = Math.max(1, Math.ceil(exitInMs / 1000));
+        ui.death(remSec, dungeonFallenDeathText(remSec, rewardsLeft), dungeonFallenSubText());
       },
     };
     (window as any).__mockDuel = {

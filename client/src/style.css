@@ -1255,6 +1255,22 @@ button {
   color: #ff9b8e;
   letter-spacing: 0.1em;
 }
+#death span {
+  display: block;
+  font-size: 15px;
+  color: #f3f4f6;
+  margin-top: 6px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+#death small {
+  display: block;
+  font-size: 12px;
+  color: #34d399;
+  margin-top: 6px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
 
 #help {
   position: fixed;
@@ -3137,7 +3153,15 @@ body.in-limbo #chat-log {
 .dib-rewards-left {
   font-size: 11px;
   color: #c4b5fd;
+  margin-bottom: 4px;
+}
+
+.dib-rule-hint {
+  display: block;
+  font-size: 11px;
+  color: #fcd34d;
   margin-bottom: 8px;
+  line-height: 1.35;
 }
 
 .dib-timer {
@@ -3337,6 +3361,7 @@ body.in-limbo #chat-log {
   border-color: rgba(248, 113, 113, 0.35);
   color: #fca5a5;
   text-decoration: line-through;
+  opacity: 0.65;
 }
 
 .dhud-actions {
