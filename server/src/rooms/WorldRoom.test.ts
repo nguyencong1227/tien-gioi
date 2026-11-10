@@ -1161,8 +1161,12 @@ describe("vùng nhìn (StateView)", () => {
     const sp = serverState(a.room).players.get(a.room.sessionId)!;
     sp.x = TOWN_PX.x + 60.6;
     sp.y = TOWN_PX.y + 20.4;
-    await waitFor(() => players(b.room).get(a.room.sessionId).px === Math.round(TOWN_PX.x + 60.6));
-    expect(players(b.room).get(a.room.sessionId).py).toBe(Math.round(TOWN_PX.y + 20.4));
+    // Chờ CẢ px lẫn py: chỗ vào ngẫu nhiên trong trấn có xác suất nhỏ (~0.5%) trùng đúng px đích, nếu chỉ chờ px
+    // thì điều kiện đúng ngay từ đầu và py vẫn là số cũ (flake đã gặp ở CI)
+    await waitFor(() => {
+      const o = players(b.room).get(a.room.sessionId);
+      return o.px === Math.round(TOWN_PX.x + 60.6) && o.py === Math.round(TOWN_PX.y + 20.4);
+    });
     expect(a.me().x).toBeCloseTo(TOWN_PX.x + 60.6, 1);
     expect(a.me().y).toBeCloseTo(TOWN_PX.y + 20.4, 1);
     // Đi xa rồi lại gần: schema gửi kèm trường có thẻ MỘT lần khi thêm lại vào view, nhưng các lần đổi sau vẫn bị lọc.
