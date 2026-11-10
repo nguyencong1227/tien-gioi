@@ -7,6 +7,7 @@
     "dev": "vite --host",
     "build": "vite build && node scripts/stamp-sw.mjs",
     "check:pwa": "node scripts/check-pwa.mjs",
+    "check:credits": "node scripts/check-credits.mjs",
     "perf:mobile": "node scripts/measure-mobile-perf.mjs",
     "preview": "vite preview --host",
     "assets": "node scripts/gen-assets.mjs"

@@ -23,6 +23,7 @@
     "tai-khoan": "npm run tai-khoan -w server --",
     "chuyen-du-lieu": "npm run chuyen-du-lieu -w server --",
     "check:pwa": "node client/scripts/check-pwa.mjs",
+    "check:credits": "node client/scripts/check-credits.mjs",
     "perf:mobile": "node client/scripts/measure-mobile-perf.mjs"
   },
   "devDependencies": {
