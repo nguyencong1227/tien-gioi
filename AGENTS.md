@@ -32,7 +32,7 @@ npm run build        # build client vào client/dist
 - `shared/src/`: **hợp đồng** giữa client và server.
   - `realms.ts`: cảnh giới, chỉ số.
   - `game.ts`: hằng số, quái, kiểu tin nhắn.
-  - `map.ts`: bản đồ sinh theo seed, va chạm.
+  - `map.ts`: bản đồ sinh theo seed, va chạm. **Bản đồ là tham số** (#123): `MapDef` mô tả, `GameMap` giữ ô và có `tileAt`, `isBlockedPx`, `circleBlocked`, `moveWithCollision`, `inTown`, `dangerAt`, `dangerRadius`, `townPx`, `worldW`, `worldH`; lấy bằng `getMap(id)` (id đến từ client / file lưu thì dùng hàm này, id lạ trả `undefined`) hoặc `DEFAULT_MAP`.
 - `server/src/rooms/WorldRoom.ts`: chỉ lo vào/ra phòng, lưu nhân vật, nối tin nhắn với system, vòng lặp 20 tick/giây. Rớt mạng bất thường thì nhân vật ở lại `RECONNECT_GRACE_S` (20) giây chờ `allowReconnection` (#116); thoát chủ động hoặc bị ngắt vì spam thì không chờ.
 - `server/src/systems/`: logic game, mỗi file một mảng: `movement`, `combat`, `monsters`, `progression`, `chat`, `inventory` (túi đồ, đan dược, lệnh `/give` khi không chạy production), `loot` (rơi đồ, nhặt, vứt đồ), `quests` (tiến độ nhiệm vụ cập nhật từ sự kiện), `npc` (nói chuyện, nhận / trả nhiệm vụ, đổi đồ), `wallet` (ví Linh thạch: mọi thay đổi số dư đi qua `changeCoin` / `trySpendCoin` / `splitCoin`), `shop` (mua / bán với NPC bán hàng, trọn vẹn hoặc không gì cả), `interest` (vùng nhìn: mỗi client chỉ nhận state của thực thể ở gần, bằng `StateView`).
   - Các system nhận `World` (`server/src/world.ts`: state, dữ liệu riêng của người chơi/quái, `events` để gửi tin), không đụng tới Colyseus `Room`. Tính năng mới thì thêm system mới.
@@ -42,6 +42,7 @@ npm run build        # build client vào client/dist
   - `server/src/rooms/WorldRoom.test.ts`: test tích hợp với server Colyseus thật.
   - Tính năng server mới cần có test.
 - `client/src/scenes/WorldScene.ts`: vẽ, input, đoán trước di chuyển. `ui.ts` là HUD DOM, `textures.ts` là ảnh tạm vẽ bằng code.
+- **Không import hằng / hàm bản đồ toàn cục** (`TOWN_PX`, `WORLD_W`, `MAP_TILES`, `tileAt`, `moveWithCollision`, `inTown`, `dangerAt`...) trong `server/` và `client/`: server đọc `world.map`, client đọc `scene.map` (`GameMap`). Các tên cũ chỉ còn trong `shared/` để giữ tương thích; `server/scripts/no-global-map-imports.test.ts` đỏ nếu ai import lại (kể cả `import * as`, `export ... from`, đường dẫn tương đối). Cần số đo của bản đồ (kích thước, trấn, độ nguy hiểm) thì thêm vào `GameMap`, không chép công thức ở nơi dùng.
 - Luồng di chuyển: client gửi `input {seq, dx, dy}` mỗi 50 ms và tự đoán trước vị trí. Server xử lý mỗi input đúng một bước 50 ms bằng `moveWithCollision` dùng chung. Client đối chiếu lại theo `lastSeq`.
   - Đổi tốc độ, va chạm hay bước tick thì phải sửa trong `shared/` để hai bên vẫn khớp.
 
