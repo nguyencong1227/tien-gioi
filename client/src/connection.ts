@@ -1,13 +1,35 @@
 import {
   DEFAULT_MAP_ID,
+  JOIN_CLIENT_OUTDATED,
   JOIN_NOT_IN_RUN,
+  PROTOCOL_VERSION,
   ROOM_ID_RE,
   getMap,
   isDungeonMap,
+  parseClientOutdated,
   parseWrongMap,
   roomNameOf,
   type JoinOptions,
 } from "@tien-gioi/shared";
+
+/** Lỗi dứt khoát khi phiên bản giao thức client quá cũ so với yêu cầu tối thiểu của server (M4 2.5). */
+export class ClientOutdatedError extends Error {
+  public readonly minVersion: number;
+  public readonly code = JOIN_CLIENT_OUTDATED;
+
+  constructor(minVersion: number, message?: string) {
+    super(message || `client_outdated:${minVersion}`);
+    this.name = "ClientOutdatedError";
+    this.minVersion = minVersion;
+  }
+}
+
+export function isClientOutdatedError(err: unknown): err is ClientOutdatedError {
+  return (
+    err instanceof ClientOutdatedError ||
+    (typeof err === "object" && err !== null && (err as any).name === "ClientOutdatedError")
+  );
+}
 
 /** Giao diện client Colyseus tối thiểu để thực hiện kết nối. */
 export interface JoinClient<R> {
@@ -111,7 +133,9 @@ export async function joinWithRedirect<R>(
 
   while (redirectCount <= maxRedirects) {
     try {
-      const joinOpts: JoinOptions = {};
+      const joinOpts: JoinOptions = {
+        v: PROTOCOL_VERSION,
+      };
       if (token) joinOpts.token = token;
       if (name) joinOpts.name = name;
       if (secret) joinOpts.secret = secret;
@@ -134,7 +158,14 @@ export async function joinWithRedirect<R>(
         ? { room, mapId: currentMapId, expiredDungeonFallback: true }
         : { room, mapId: currentMapId };
     } catch (err: any) {
-      // 0. Nếu đang vào phòng bí cảnh bằng roomId mà gặp JOIN_NOT_IN_RUN (422) hoặc phòng đã đóng (4212):
+      // 0a. Kiểm tra lỗi phiên bản client quá cũ (M4 2.5):
+      // Đây là lỗi dứt khoát: máy chủ yêu cầu bản mới hơn, KHÔNG thử lại (kể cả vòng wrong_map hay phòng khác).
+      const minProtocol = parseClientOutdated(err?.code, err?.message);
+      if (minProtocol !== undefined) {
+        throw new ClientOutdatedError(minProtocol, err?.message);
+      }
+
+      // 0b. Nếu đang vào phòng bí cảnh bằng roomId mà gặp JOIN_NOT_IN_RUN (422) hoặc phòng đã đóng (4212):
       // tự động khôi phục về DEFAULT_MAP_ID để người chơi về Lạc Hà, không bị treo.
       const isDungeonExpired =
         err?.code === JOIN_NOT_IN_RUN ||

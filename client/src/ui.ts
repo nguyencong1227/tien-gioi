@@ -3878,4 +3878,34 @@ export const ui = {
   getCurrentSect(): SectView | null {
     return currentSect;
   },
+
+  showClientOutdated(minVersion: number, onReload?: () => void) {
+    const modal = $("outdated-modal");
+    if (!modal) return;
+    const msg = $("outdated-msg");
+    if (msg) {
+      msg.textContent =
+        minVersion > 0
+          ? `Máy chủ đã nâng cấp phiên bản giao thức mới (yêu cầu tối thiểu v${minVersion}). Vui lòng tải lại trang để nạp bản cập nhật mới nhất.`
+          : "Máy chủ đã nâng cấp phiên bản giao thức mới. Vui lòng tải lại trang để tiếp tục phiêu bạt Tiên Giới.";
+    }
+    modal.hidden = false;
+
+    // Đóng auth screen nếu đang mở để modal hiển thị rõ ràng
+    const authOverlay = $("auth-overlay");
+    if (authOverlay) authOverlay.hidden = true;
+
+    const btn = $("btn-reload-outdated");
+    if (btn) {
+      btn.onclick = () => {
+        if (onReload) onReload();
+        else window.location.reload();
+      };
+    }
+  },
+
+  isOutdatedModalOpen(): boolean {
+    const modal = $("outdated-modal");
+    return Boolean(modal && !modal.hidden);
+  },
 };
