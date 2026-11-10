@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   TILE,
@@ -14,6 +15,15 @@ import {
   moveWithCollision,
   inTown,
   dangerAt,
+  DEFAULT_MAP,
+  DEFAULT_MAP_ID,
+  GameMap,
+  MAPS,
+  MAP_BY_ID,
+  WORLD_W,
+  WORLD_H,
+  getMap,
+  type MapDef,
 } from "./map";
 import { PLAYER_RADIUS } from "./game";
 
@@ -131,5 +141,112 @@ describe("va chạm", () => {
         ty = (i * 53) % MAP_H;
       expect(isBlockedPx(tx * TILE + 5, ty * TILE + 5)).toBe(BLOCKING.has(tileAt(tx, ty)));
     }
+  });
+});
+
+describe("bản đồ là tham số (#123, Bước 0)", () => {
+  /** Băm SHA-256 của ô Lạc Hà Trấn, ghi cứng từ lúc chưa tham số hoá: đổi trình sinh ô là test đỏ. */
+  const LAC_HA_SHA256 = "9c297aaad56a8cdb138b7037c3f28e996fd83dbcf54849110c9bffd80f38f664";
+
+  it("Lạc Hà Trấn sinh ra y hệt từng ô như trước khi tham số hoá", () => {
+    const h = createHash("sha256").update(DEFAULT_MAP.tiles).digest("hex");
+    expect(h).toBe(LAC_HA_SHA256);
+    expect(MAP_TILES).toBe(DEFAULT_MAP.tiles);
+    expect(new GameMap(MAP_BY_ID[DEFAULT_MAP_ID]).tiles).toEqual(DEFAULT_MAP.tiles);
+  });
+
+  it("danh sách bản đồ hợp lệ: id duy nhất, kích thước nguyên dương, trấn nằm trong bản đồ", () => {
+    expect(MAPS.length).toBeGreaterThan(0);
+    expect(new Set(MAPS.map((m) => m.id)).size).toBe(MAPS.length);
+    for (const m of MAPS) {
+      expect(MAP_BY_ID[m.id], m.id).toBe(m);
+      expect(Number.isInteger(m.w) && Number.isInteger(m.h) && m.w > 8 && m.h > 8, m.id).toBe(true);
+      expect(Number.isInteger(m.seed), m.id).toBe(true);
+      expect(m.town.cx - m.town.r).toBeGreaterThan(1);
+      expect(m.town.cy - m.town.r).toBeGreaterThan(1);
+      expect(m.town.cx + m.town.r).toBeLessThan(m.w - 1);
+      expect(m.town.cy + m.town.r).toBeLessThan(m.h - 1);
+    }
+    expect(MAP_BY_ID[DEFAULT_MAP_ID]).toBeDefined();
+  });
+
+  it("getMap: nhớ một bản duy nhất; id lạ hoặc tên thuộc tính của Object trả undefined", () => {
+    expect(getMap(DEFAULT_MAP_ID)).toBe(DEFAULT_MAP);
+    expect(getMap(DEFAULT_MAP_ID)).toBe(getMap(DEFAULT_MAP_ID));
+    for (const id of ["", "khong_co", "constructor", "__proto__", "toString", "hasOwnProperty"])
+      expect(getMap(id), id).toBeUndefined();
+    for (const id of [undefined, null, 0, 1, {}, [], ["lac_ha"]])
+      expect(getMap(id)).toBeUndefined();
+  });
+
+  it("các hàm cũ cho kết quả y hệt GameMap mặc định (giữ tên cũ để chuyển dần)", () => {
+    const r = rng(7);
+    expect(DEFAULT_MAP.worldW).toBe(WORLD_W);
+    expect(DEFAULT_MAP.worldH).toBe(WORLD_H);
+    expect(DEFAULT_MAP.townPx).toEqual(TOWN_PX);
+    for (let i = 0; i < 2000; i++) {
+      const x = r() * (WORLD_W + 200) - 100;
+      const y = r() * (WORLD_H + 200) - 100;
+      const dx = r() * 8 - 4;
+      const dy = r() * 8 - 4;
+      expect(tileAt(Math.floor(x / TILE), Math.floor(y / TILE))).toBe(
+        DEFAULT_MAP.tileAt(Math.floor(x / TILE), Math.floor(y / TILE)),
+      );
+      expect(isBlockedPx(x, y)).toBe(DEFAULT_MAP.isBlockedPx(x, y));
+      expect(circleBlocked(x, y, PLAYER_RADIUS)).toBe(
+        DEFAULT_MAP.circleBlocked(x, y, PLAYER_RADIUS),
+      );
+      expect(moveWithCollision(x, y, dx, dy, PLAYER_RADIUS)).toEqual(
+        DEFAULT_MAP.moveWithCollision(x, y, dx, dy, PLAYER_RADIUS),
+      );
+      expect(inTown(x, y, 16)).toBe(DEFAULT_MAP.inTown(x, y, 16));
+      expect(dangerAt(x, y)).toBe(DEFAULT_MAP.dangerAt(x, y));
+    }
+  });
+
+  it("GameMap thật sự theo MapDef: bản đồ khác seed / kích thước sinh ô khác, tất định, viền núi, trấn lát đá", () => {
+    const def: MapDef = {
+      id: "thu_nghiem",
+      name: "Thử nghiệm",
+      seed: 12345,
+      w: 40,
+      h: 56,
+      town: { cx: 20, cy: 28, r: 5 },
+    };
+    const m = new GameMap(def);
+    expect(m.tiles).toHaveLength(40 * 56);
+    expect(m.worldW).toBe(40 * TILE);
+    expect(m.worldH).toBe(56 * TILE);
+    expect(m.townPx).toEqual({ x: 20 * TILE, y: 28 * TILE, r: 5 * TILE });
+    expect(new GameMap(def).tiles).toEqual(m.tiles); // tất định
+    expect(new GameMap({ ...def, seed: 54321 }).tiles).not.toEqual(m.tiles);
+    for (let x = 0; x < 40; x++) {
+      expect(m.tileAt(x, 0)).toBe(T.Rock);
+      expect(m.tileAt(x, 55)).toBe(T.Rock);
+    }
+    for (let y = 0; y < 56; y++) {
+      expect(m.tileAt(0, y)).toBe(T.Rock);
+      expect(m.tileAt(39, y)).toBe(T.Rock);
+    }
+    expect(m.tileAt(20, 28)).toBe(T.Stone);
+    expect(m.inTown(20 * TILE, 28 * TILE)).toBe(true);
+    expect(m.inTown(2 * TILE, 2 * TILE)).toBe(false);
+    expect(m.dangerAt(20 * TILE, 28 * TILE)).toBe(0);
+    {
+      // 0 trong trấn, tăng dần ra xa theo kích thước CỦA BẢN ĐỒ NÀY (không theo WORLD_W của bản đồ mặc định)
+      const d = Math.hypot(1 * TILE - m.townPx.x, 1 * TILE - m.townPx.y);
+      expect(m.dangerAt(1 * TILE, 1 * TILE)).toBeCloseTo(
+        Math.min(1, (d - m.townPx.r) / (m.worldW * 0.5 - m.townPx.r)),
+        10,
+      );
+    }
+    // Ra ngoài bản đồ nhỏ này thì chặn, dù nó vẫn nằm trong bản đồ mặc định lớn hơn
+    for (const tx of [40, 41, 55, 95, -1])
+      for (let ty = 1; ty < 55; ty += 6) expect(m.tileAt(tx, ty), `(${tx}, ${ty})`).toBe(T.Rock);
+    for (const ty of [56, 57, 70, 95, -1])
+      for (let tx = 1; tx < 39; tx += 6) expect(m.tileAt(tx, ty), `(${tx}, ${ty})`).toBe(T.Rock);
+    expect(m.isBlockedPx(50 * TILE, 10 * TILE)).toBe(true);
+    // Không làm đổi bản đồ mặc định
+    expect(createHash("sha256").update(DEFAULT_MAP.tiles).digest("hex")).toBe(LAC_HA_SHA256);
   });
 });
