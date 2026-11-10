@@ -411,7 +411,7 @@ describe("thử tải & stress test PK thách đấu (M3.5, Issue #219)", () => 
       homeX: mon.x,
       homeY: mon.y,
       target: sidOf(a),
-      nextAttack: 0,
+      nextAttack: w.now + 10_000,
       wanderX: mon.x,
       wanderY: mon.y,
       nextWander: 0,
