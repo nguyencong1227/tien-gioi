@@ -94,3 +94,10 @@ Không có email, nên khi đăng ký server sinh **mã khôi phục** (ví dụ
 2. **Một tài khoản một nhân vật** ở bản đầu; nhiều nhân vật / đổi đạo hiệu để sau.
 3. **Postgres là backend production, file là mặc định dev**; không bắt dev cài Postgres. Việc cài đặt Postgres thật trên máy chủ chạy là việc của người triển khai (không làm được trong môi trường này: không có quyền cài gói hệ thống).
 4. **Mật khẩu tối thiểu 8 ký tự, không áp luật ký tự** (theo khuyến nghị hiện hành: dài hơn quan trọng hơn phức tạp).
+
+## 12. Quyết định khi cài đặt 3c (ghi lại để B, C và người triển khai khỏi đoán)
+- **Phát hiện chế độ:** `GET /health` -> `{ "ok": true, "authMode": "legacy" | "account" }`. Client: thiếu `authMode` hoặc `fetch` lỗi thì coi là `legacy` (ô đạo hiệu cũ). `/api/auth/*` **chỉ được gắn khi `AUTH_MODE=account`**; ở `legacy` các đường này là 404 (không thêm bề mặt tấn công cho dev, test, bot).
+- **Cùng nguồn, không CORS:** client gọi `/api/...` bằng đường dẫn tương đối (production cùng server; dev qua `server.proxy` / `preview.proxy` của Vite). Server KHÔNG bật CORS cho API có mật khẩu. Token ở tiêu đề `Authorization: Bearer <43 ký tự base64url>` (không cookie, nên không có CSRF); chỉ nhận `application/json`, thân tối đa 2 KB (413 nếu quá); `Cache-Control: no-store`.
+- **Phản hồi:** `register` / `login` / `recover` / `me` trả 200 + JSON; `logout` luôn 204 (token sai cũng vậy); lỗi `{ "error": <mã AUTH_ERRORS>, "retryAfterS"? }` với mã HTTP theo `AUTH_STATUS` (`server/src/auth-service.ts`), 429 kèm tiêu đề `Retry-After`; lỗi nội bộ 500 `{ "error": "server_error" }` (log chỉ có tên lỗi). Không ghi thân yêu cầu / mật khẩu / token vào log.
+- **IP khách:** `TRUST_PROXY` (số tầng hoặc mạng con, không nhận `true` / `*`); IPv6 gộp theo /64 khi đếm hạn mức.
+- **Lệch với mục 5:** biến chọn chế độ là `AUTH_MODE=legacy|account` (không phải `accounts`). Các đường `/api/character` và `/api/character/claim` vào cùng bước `onAuth` (3c-4), vì cần kho nhân vật và kiểm tra đang trực tuyến.

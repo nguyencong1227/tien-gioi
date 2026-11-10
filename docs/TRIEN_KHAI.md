@@ -36,6 +36,11 @@ npm run build
 | `NODE_ENV` | Môi trường chạy | **Bắt buộc: `production`** |
 | `PORT` | Cổng HTTP / WebSocket mà server lắng nghe | Mặc định: `2567` |
 | `DATA_DIR` | Thư mục lưu trữ dữ liệu nhân vật (`*.json`) | Mặc định: `server/data/players` |
+| `AUTH_MODE` | `legacy`: vào bằng đạo hiệu + mã bí mật lưu ở trình duyệt (dev, test, bot). `account`: đăng ký / đăng nhập bằng tài khoản (mục 4.1 của `docs/THIET_KE_TAI_KHOAN.md`) | Mặc định: `legacy`; khi mở thật nên dùng `account` (xem lưu ý bên dưới) |
+| `TRUST_PROXY` | Số tầng reverse proxy tin cậy (vd `1` khi chạy sau Caddy), hoặc danh sách mạng con (`loopback`, `10.0.0.0/8`). **Không nhận `true` / `*`.** | Mặc định: không tin proxy (dùng IP của kết nối) |
+
+> [!IMPORTANT]
+> **Tài khoản (`AUTH_MODE=account`) và proxy:** chỉ ở chế độ `account` server mới mở `/api/auth/*` (đăng ký, đăng nhập, phiên, khôi phục mật khẩu); `legacy` không mở API nào. Giới hạn tần suất đăng nhập tính **theo IP của khách** (10 lần sai / 10 phút, 5 lần đăng ký / giờ). Khi chạy sau reverse proxy (mục 4) mà không đặt `TRUST_PROXY=1`, mọi người chơi trông như cùng một IP (của proxy) và **dùng chung** hạn mức đó cho cả server; ngược lại, đặt `TRUST_PROXY` khi KHÔNG có proxy ghi đè `X-Forwarded-For` thì kẻ xấu tự đặt IP để qua mặt giới hạn. Mật khẩu đi qua mạng: chỉ mở thật qua HTTPS (mục 4). Server khởi động sẽ in cảnh báo nếu cấu hình production còn `legacy`, hoặc `account` mà chưa đặt `TRUST_PROXY`. Dữ liệu tài khoản nằm trong `DATA_DIR/accounts` và `DATA_DIR/sessions` (chỉ có băm; `npm run backup` đã gồm).
 
 > [!CAUTION]
 > **Bắt buộc phải đặt `NODE_ENV=production` khi mở cho người chơi thật:**
@@ -128,7 +133,7 @@ caddy run --config Caddyfile
 Server cung cấp endpoint kiểm tra tình trạng hoạt động tại `/health`:
 ```bash
 curl -f http://localhost:2567/health
-# Trả về: {"ok":true} với HTTP status 200
+# Trả về: {"ok":true,"authMode":"legacy"} (hoặc "account") với HTTP status 200
 ```
 Có thể dùng endpoint này cho Uptime Kuma, AWS Target Group Health Check, hoặc Docker `HEALTHCHECK`.
 
