@@ -271,6 +271,55 @@
     </section>
 
     <div id="ui" hidden>
+      <div id="dungeon-mock-badge" class="dungeon-mock-badge" hidden>
+        Chế độ Bí cảnh giả lập (DEV / Debug)
+      </div>
+
+      <!-- HUD Bí cảnh (M3.4, chỉ hiện khi ở trong bản đồ bí cảnh) -->
+      <section id="dungeon-hud" class="panel dungeon-hud" hidden aria-label="Bí cảnh">
+        <div class="dhud-head">
+          <div class="dhud-title-wrap">
+            <b id="dhud-map-name">Linh Hư Bí Cảnh</b>
+            <span id="dhud-phase" class="dhud-phase info">Đang khiêu chiến</span>
+          </div>
+          <div class="dhud-timer-box" title="Thời gian còn lại">
+            <span class="dhud-clock-icon">⏳</span>
+            <b id="dhud-timer">12:00</b>
+          </div>
+        </div>
+
+        <div class="dhud-stats-row">
+          <span id="dhud-mobs">Yêu thú hộ vệ còn lại: 0</span>
+        </div>
+
+        <div id="dhud-boss-wrap" class="dhud-boss-wrap" hidden>
+          <div class="dhud-boss-head">
+            <b id="dhud-boss-name">Linh Hư Yêu Vương</b>
+            <span id="dhud-boss-text">20000 / 20000 (100%)</span>
+          </div>
+          <div class="dhud-boss-bar">
+            <i id="dhud-boss-fill" style="width: 100%"></i>
+          </div>
+        </div>
+
+        <div id="dhud-members" class="dhud-members" aria-label="Thành viên bí cảnh"></div>
+
+        <div class="dhud-actions">
+          <button type="button" id="dhud-btn-leave" class="dhud-btn-leave">Rời Bí Cảnh</button>
+          <div id="dhud-leave-confirm" class="dhud-leave-confirm" hidden>
+            <span class="dhud-confirm-label">Xác nhận rời bí cảnh về Lạc Hà?</span>
+            <div class="dhud-confirm-btns">
+              <button type="button" id="dhud-btn-leave-yes" class="dhud-btn-confirm yes">
+                Rời ngay
+              </button>
+              <button type="button" id="dhud-btn-leave-no" class="dhud-btn-confirm no">
+                Ở lại
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <div id="hud-col-left">
         <div id="hud" class="panel">
           <div class="row">
@@ -602,6 +651,61 @@
           </div>
         </div>
       </div>
+
+      <!-- Lời mời vào Bí cảnh (M3.4, hộp nhỏ không chặn điều khiển) -->
+      <div id="dungeon-invite-box" class="dungeon-invite-box" hidden aria-label="Lời mời Bí cảnh">
+        <div class="dib-head">
+          <span class="dib-badge">BÍ CẢNH</span>
+          <b id="dib-title">Linh Hư Bí Cảnh</b>
+          <span id="dib-countdown" class="dib-countdown">60s</span>
+        </div>
+        <p id="dib-msg" class="dib-msg">Đội trưởng triệu tập tiến nhập bí cảnh.</p>
+        <div id="dib-rewards-left" class="dib-rewards-left">
+          Lượt nhận thưởng hoàn thành hôm nay: 3/3
+        </div>
+        <div class="dib-timer"><i id="dib-timer-bar"></i></div>
+        <div class="dib-actions">
+          <button type="button" id="dib-btn-enter" class="dib-btn enter">Vào Bí Cảnh</button>
+          <button type="button" id="dib-btn-decline" class="dib-btn decline">Từ Chối</button>
+        </div>
+      </div>
+
+      <!-- Màn hình kết quả Bí cảnh (M3.4) -->
+      <section
+        id="dungeon-end-modal"
+        class="panel modal-box dungeon-end-modal"
+        hidden
+        aria-label="Kết quả Bí cảnh"
+      >
+        <header class="dend-header">
+          <div id="dend-seal" class="dend-seal won">勝</div>
+          <h2 id="dend-title" class="dend-title">BÍ CẢNH ĐẠI THẮNG</h2>
+          <p id="dend-reason" class="dend-reason">
+            Toàn đội đã hợp lực tru diệt Linh Hư Yêu Vương!
+          </p>
+        </header>
+
+        <div class="dend-body">
+          <div id="dend-reward-section" class="dend-reward-section">
+            <div class="dend-section-label">Phần thưởng hoàn thành</div>
+            <div id="dend-reward-coin" class="dend-reward-coin">+400 Linh thạch 💎</div>
+            <div id="dend-reward-items" class="dend-reward-items"></div>
+          </div>
+          <p id="dend-no-reward" class="dend-no-reward" hidden></p>
+          <div id="dend-rewards-left" class="dend-rewards-left">
+            Lượt nhận thưởng hoàn thành còn lại hôm nay: 2/3
+          </div>
+        </div>
+
+        <footer class="dend-actions">
+          <button type="button" id="dend-btn-close" class="dend-btn primary">
+            Thu Chiến Lợi Phẩm (60s)
+          </button>
+          <button type="button" id="dend-btn-leave" class="dend-btn secondary">
+            Về Lạc Hà Trấn Ngay
+          </button>
+        </footer>
+      </section>
 
       <!-- Menu khi chạm người chơi khác -->
       <div id="player-menu" class="panel player-menu" hidden>
