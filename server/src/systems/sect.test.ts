@@ -214,6 +214,12 @@ describe("mời và nhận", () => {
     expect(tagOf(hp, B)).toBe("TV");
     expect(lastSnap(hp, B)).toMatchObject({ myRank: "de_tu", members: [{ name: A }, { name: B }] });
     expect(lastSnap(lh, A)?.members.map((m) => m.name)).toEqual([A, B]); // Tông chủ thấy người mới
+    // presence cập nhật NGAY (không chờ nhịp tick): Tông chủ thấy B trực tuyến ở Hắc Phong Cốc
+    expect(lh.sectPresences.at(-1)?.msg.online.map((e) => [e.name, e.mapId])).toEqual([
+      [A, DEFAULT_MAP.def.id],
+      [B, HAC_PHONG_ID],
+    ]);
+    expect(hp.sectPresences.at(-1)?.msg.online.map((e) => e.name)).toEqual([A, B]);
     expect(hub.sects.invitesSize).toBe(0);
     expect(lastToast(hp, B)).toMatch(/Đã gia nhập/);
     // nhận lại lời mời cũ: không còn
@@ -615,11 +621,12 @@ describe("danh tính theo linh hồn", () => {
     const impostor = hp.w.ctrl.get(B)!;
     impostor.identity = { name: B, soulKey: "linh-hon-khac" };
     const before = hp.sects.length;
+    const beforePres = hp.sectPresences.length;
     await sectMotd(lh.w, A, { motd: "Bi mat" });
     chat(lh.w, A, "/s bi mat");
     expect(hp.sects).toHaveLength(before);
     expect(hp.chatsTo.filter((c) => c.msg.channel === "sect")).toHaveLength(0);
-    expect(hp.sectPresences.at(-1)?.msg.online.some((e) => e.name === B) ?? false).toBe(false);
+    expect(hp.sectPresences).toHaveLength(beforePres);
   });
 
   it("người đầu thai (hồ sơ đặt lại, cùng linh hồn) vào phòng vẫn ở tông môn với đúng chức vụ", async () => {

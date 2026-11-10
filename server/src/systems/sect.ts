@@ -162,6 +162,7 @@ function broadcastSect(w: World, sect: Sect, removed: { soulKey: string; name: s
     book.online.set(m.soulKey, sect.id);
     loc.w.events.sect(loc.sid, { sect: sectViewOf(sect, m.soulKey) });
   }
+  sendPresence(w, sect); // ai đang trực tuyến cập nhật NGAY khi thành viên đổi (không chờ nhịp `tickSect`)
   sendRemoved(w, removed);
 }
 
