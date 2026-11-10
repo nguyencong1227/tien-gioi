@@ -6,10 +6,14 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, "..", "");
   const serverPort = env.PORT || "2567";
   const clientPort = Number(env.CLIENT_PORT || 5173);
+  const proxy = {
+    "/api": { target: `http://localhost:${serverPort}` },
+    "/health": { target: `http://localhost:${serverPort}` },
+  };
   return {
     envDir: "..",
-    server: { port: clientPort, strictPort: true },
-    preview: { port: clientPort, strictPort: true },
+    server: { port: clientPort, strictPort: true, proxy },
+    preview: { port: clientPort, strictPort: true, proxy },
     define: { __SERVER_PORT__: JSON.stringify(serverPort) },
     build: { chunkSizeWarningLimit: 2000 },
   };

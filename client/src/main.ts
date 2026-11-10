@@ -41,40 +41,14 @@ function secret() {
   return s;
 }
 
-const form = document.getElementById("login-form") as HTMLFormElement;
-const nameInput = document.getElementById("login-name") as HTMLInputElement;
-const btn = document.getElementById("login-btn") as HTMLButtonElement;
-const err = document.getElementById("login-err")!;
-nameInput.value = localStorage.getItem(NAME_KEY) ?? "";
+const nameInput = document.getElementById("login-name") as HTMLInputElement | null;
+if (nameInput) nameInput.value = localStorage.getItem(NAME_KEY) ?? "";
 
 let activeClient: Client | null = null;
 let activeScene: WorldScene | null = null;
 let activeToken: string | null = null;
 let isReconnecting = false;
 let isTraveling = false;
-
-form?.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  btn.disabled = true;
-  err.textContent = "";
-  const name = nameInput.value.trim();
-  try {
-    const client = new Client(serverUrl());
-    activeClient = client;
-    const { room, mapId } = await joinWithRedirect({
-      client,
-      storage: localStorage,
-      name,
-      secret: secret(),
-    });
-    localStorage.setItem(NAME_KEY, name);
-    await start(room, mapId);
-  } catch (e: any) {
-    err.textContent =
-      e?.message && !/^\d+$/.test(e.message) ? e.message : "Không kết nối được máy chủ.";
-    btn.disabled = false;
-  }
-});
 
 initAuthUi({
   onTokenAuth: async (token, charName) => {
@@ -149,7 +123,7 @@ function setupRoomLifecycle(room: Room) {
       room.leave(true);
 
       const token = getToken();
-      const name = nameInput.value.trim() || (localStorage.getItem(NAME_KEY) ?? "");
+      const name = nameInput?.value.trim() || (localStorage.getItem(NAME_KEY) ?? "");
       const joinPromise = joinWithRedirect({
         client: activeClient,
         storage: localStorage,

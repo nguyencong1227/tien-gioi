@@ -30,9 +30,12 @@
       <div class="seal">仙</div>
       <h1>Tiên Giới</h1>
       <p class="sub">Vạn người cùng tu, một con đường thành tiên.</p>
+      <div id="auth-mock-badge" class="auth-mock-badge" hidden>
+        ⚠ ĐANG DÙNG TÀI KHOẢN GIẢ (MOCK)
+      </div>
 
-      <!-- View 1: Đăng nhập tài khoản (mặc định) -->
-      <div id="auth-view-login" class="auth-view">
+      <!-- View 1: Đăng nhập tài khoản -->
+      <div id="auth-view-login" class="auth-view" hidden>
         <form id="auth-login-form" autocomplete="on">
           <div class="auth-field">
             <input
@@ -70,7 +73,7 @@
           </button>
           <button type="button" class="auth-link-btn" id="link-to-forgot">Quên mật khẩu?</button>
         </div>
-        <div class="auth-links-sub">
+        <div id="auth-links-legacy-sub" class="auth-links-sub">
           <button type="button" class="auth-link-btn muted" id="link-to-legacy">
             Chế độ đạo hiệu trực tiếp (cũ)
           </button>
@@ -250,8 +253,8 @@
         <p id="auth-forgot-err" class="err"></p>
       </div>
 
-      <!-- View 7: Chế độ cũ (Legacy) -->
-      <div id="auth-view-legacy" class="auth-view" hidden>
+      <!-- View 7: Chế độ cũ (Legacy, mặc định) -->
+      <div id="auth-view-legacy" class="auth-view">
         <form id="login-form" autocomplete="off">
           <div class="auth-field">
             <input id="login-name" maxlength="16" placeholder="Đạo hiệu (2–16 ký tự)" required />

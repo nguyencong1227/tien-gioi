@@ -166,3 +166,176 @@ describe("client/src/auth - Luồng xác thực Mock Auth", () => {
     expect(loginRes.token).toBeDefined();
   });
 });
+
+describe("client/src/auth - Đường gọi THẬT qua fetch (AuthClient)", () => {
+  let auth: AuthClient;
+  let originalFetch: typeof globalThis.fetch;
+
+  beforeEach(() => {
+    setMockAuthEnabled(false);
+    auth = new AuthClient("");
+    originalFetch = globalThis.fetch;
+  });
+
+  it("401/409/429 JSON -> ném đúng AuthErrorBody (kể cả retryAfterS)", async () => {
+    // 401
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify({ error: "bad_credentials" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    await expect(auth.login({ username: "user_a", password: "password123" })).rejects.toEqual({
+      error: "bad_credentials",
+    });
+
+    // 409
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify({ error: "username_taken" }), {
+        status: 409,
+        headers: { "Content-Type": "application/json" },
+      });
+    await expect(auth.register({ username: "user_a", password: "password123" })).rejects.toEqual({
+      error: "username_taken",
+    });
+
+    // 429 kèm retryAfterS
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify({ error: "rate_limited", retryAfterS: 45 }), {
+        status: 429,
+        headers: { "Content-Type": "application/json" },
+      });
+    await expect(auth.login({ username: "user_a", password: "password123" })).rejects.toEqual({
+      error: "rate_limited",
+      retryAfterS: 45,
+    });
+  });
+
+  it("thân không JSON / mã lạ / constructor -> ném { error: 'invalid' }", async () => {
+    // Phản hồi HTML / Text không JSON
+    globalThis.fetch = async () =>
+      new Response("<html>502 Bad Gateway</html>", {
+        status: 502,
+        headers: { "Content-Type": "text/html" },
+      });
+    await expect(auth.login({ username: "user_a", password: "password123" })).rejects.toEqual({
+      error: "invalid",
+    });
+
+    // Mã lỗi lạ không có trong bảng
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify({ error: "hack_attack" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    await expect(auth.login({ username: "user_a", password: "password123" })).rejects.toEqual({
+      error: "invalid",
+    });
+
+    // Thuộc tính nguyên mẫu constructor
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify({ error: "constructor" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    await expect(auth.login({ username: "user_a", password: "password123" })).rejects.toEqual({
+      error: "invalid",
+    });
+  });
+
+  it("gửi đúng header Content-Type và Authorization Bearer", async () => {
+    let capturedHeaders: HeadersInit | undefined;
+    globalThis.fetch = async (_url, init) => {
+      capturedHeaders = init?.headers;
+      return new Response(JSON.stringify({ username: "kiem_tu", hasCharacter: false }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    };
+
+    await auth.me("token_secret_123");
+    const h = capturedHeaders as Record<string, string>;
+    expect(h["Content-Type"]).toBe("application/json");
+    expect(h["Authorization"]).toBe("Bearer token_secret_123");
+  });
+
+  it("xử lý 204 No Content và 200 OK thân JSON", async () => {
+    // 204 No Content (logout / character)
+    globalThis.fetch = async () => new Response(null, { status: 204 });
+    const logoutRes = await auth.logout("token_xyz");
+    expect(logoutRes).toEqual({});
+
+    // 200 OK JSON
+    globalThis.fetch = async () =>
+      new Response(
+        JSON.stringify({ username: "kiem_tu", hasCharacter: true, name: "Thanh Phong Tử" }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    const meRes = await auth.me("token_xyz");
+    expect(meRes.username).toBe("kiem_tu");
+    expect(meRes.name).toBe("Thanh Phong Tử");
+  });
+
+  it("lỗi mạng -> ném { error: 'invalid' }, tuyệt đối không tự bật mock", async () => {
+    globalThis.fetch = async () => {
+      throw new TypeError("Failed to fetch");
+    };
+
+    await expect(auth.login({ username: "user_a", password: "password123" })).rejects.toEqual({
+      error: "invalid",
+    });
+
+    // Mock vẫn phải là false
+    const { isMockAuthEnabled } = await import("./auth");
+    expect(isMockAuthEnabled()).toBe(false);
+
+    // Khôi phục fetch gốc
+    globalThis.fetch = originalFetch;
+  });
+});
+
+describe("client/src/auth - detectAuthMode", () => {
+  let originalFetch: typeof globalThis.fetch;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+  });
+
+  it("phát hiện authMode: account khi /health trả account", async () => {
+    const { detectAuthMode } = await import("./auth");
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify({ ok: true, authMode: "account" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    expect(await detectAuthMode()).toBe("account");
+  });
+
+  it("phát hiện authMode: legacy khi /health trả legacy", async () => {
+    const { detectAuthMode } = await import("./auth");
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify({ ok: true, authMode: "legacy" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    expect(await detectAuthMode()).toBe("legacy");
+  });
+
+  it("phát hiện authMode: legacy khi /health thiếu trường authMode (server cũ)", async () => {
+    const { detectAuthMode } = await import("./auth");
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    expect(await detectAuthMode()).toBe("legacy");
+  });
+
+  it("phát hiện authMode: legacy khi /health gặp lỗi mạng hoặc 500", async () => {
+    const { detectAuthMode } = await import("./auth");
+    globalThis.fetch = async () => {
+      throw new Error("Network error");
+    };
+    expect(await detectAuthMode()).toBe("legacy");
+    globalThis.fetch = originalFetch;
+  });
+});

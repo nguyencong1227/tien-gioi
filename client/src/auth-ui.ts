@@ -1,10 +1,12 @@
-import { cleanName, validatePassword, validateUsername } from "@tien-gioi/shared";
+import { cleanName, validatePassword, validateUsername, JOIN_BAD_TOKEN } from "@tien-gioi/shared";
 import {
   authClient,
   authErrorMessage,
   clearToken,
+  detectAuthMode,
   formatRecoveryCode,
   getToken,
+  isMockAuthEnabled,
   passwordReasonMessage,
   setToken,
   usernameReasonMessage,
@@ -18,7 +20,7 @@ export interface AuthUiCallbacks {
   onLegacyAuth: (name: string) => Promise<void>;
 }
 
-let activeView: AuthView = "login";
+let activeView: AuthView = "legacy";
 let currentRecoveryCode = "";
 let currentUser = "";
 
@@ -101,7 +103,14 @@ function setupPasswordToggle(inputEl: HTMLInputElement, toggleBtn: HTMLButtonEle
   });
 }
 
-export function initAuthUi(callbacks: AuthUiCallbacks) {
+function extractJoinErrorMessage(err: any): string {
+  if (err?.message && !/^\d+$/.test(err.message)) {
+    return err.message;
+  }
+  return "Không thể kết nối vào phòng game.";
+}
+
+export async function initAuthUi(callbacks: AuthUiCallbacks): Promise<void> {
   // 1. Toggle mật khẩu
   const loginPass = $("auth-login-pass") as HTMLInputElement;
   const loginPassToggle = $("auth-login-pass-toggle") as HTMLButtonElement;
@@ -125,7 +134,32 @@ export function initAuthUi(callbacks: AuthUiCallbacks) {
   $("link-to-claim").onclick = () => switchAuthView("claim");
   $("link-back-to-char").onclick = () => switchAuthView("character");
 
-  // 3. Form Đăng Nhập
+  // 3. Form Legacy (Đạo hiệu trực tiếp cũ)
+  const legacyForm = document.getElementById("login-form") as HTMLFormElement | null;
+  const legacyName = document.getElementById("login-name") as HTMLInputElement | null;
+  const legacyBtn = document.getElementById("login-btn") as HTMLButtonElement | null;
+  const legacyErr = document.getElementById("login-err");
+
+  if (legacyForm && legacyName && legacyBtn) {
+    legacyForm.onsubmit = async (e) => {
+      e.preventDefault();
+      const raw = legacyName.value.trim();
+      if (!raw) return;
+      legacyBtn.disabled = true;
+      if (legacyErr) legacyErr.textContent = "";
+      try {
+        await callbacks.onLegacyAuth(raw);
+      } catch (err: any) {
+        if (legacyErr) {
+          legacyErr.textContent = extractJoinErrorMessage(err);
+        }
+      } finally {
+        legacyBtn.disabled = false;
+      }
+    };
+  }
+
+  // 4. Form Đăng Nhập
   const loginForm = $("auth-login-form") as HTMLFormElement;
   const loginBtn = $("auth-login-btn") as HTMLButtonElement;
   const loginUser = $("auth-login-user") as HTMLInputElement;
@@ -155,7 +189,11 @@ export function initAuthUi(callbacks: AuthUiCallbacks) {
 
       const me = await authClient.me(res.token);
       if (me.hasCharacter && me.name) {
-        await callbacks.onTokenAuth(res.token, me.name);
+        try {
+          await callbacks.onTokenAuth(res.token, me.name);
+        } catch (joinErr: any) {
+          setErr("auth-login-err", extractJoinErrorMessage(joinErr));
+        }
       } else {
         switchAuthView("character");
       }
@@ -166,7 +204,7 @@ export function initAuthUi(callbacks: AuthUiCallbacks) {
     }
   });
 
-  // 4. Form Đăng Ký
+  // 5. Form Đăng Ký
   const regForm = $("auth-reg-form") as HTMLFormElement;
   const regBtn = $("auth-reg-btn") as HTMLButtonElement;
   const regUser = $("auth-reg-user") as HTMLInputElement;
@@ -209,7 +247,7 @@ export function initAuthUi(callbacks: AuthUiCallbacks) {
     }
   });
 
-  // 5. Màn hình Lưu Mã Khôi Phục
+  // 6. Màn hình Lưu Mã Khôi Phục
   const copyBtn = $("auth-copy-code-btn") as HTMLButtonElement;
   copyBtn.onclick = async () => {
     if (!currentRecoveryCode) return;
@@ -234,7 +272,7 @@ export function initAuthUi(callbacks: AuthUiCallbacks) {
     switchAuthView("character");
   };
 
-  // 6. Form Khởi Tạo Đạo Hiệu
+  // 7. Form Khởi Tạo Đạo Hiệu
   const charForm = $("auth-char-form") as HTMLFormElement;
   const charBtn = $("auth-char-btn") as HTMLButtonElement;
   const charInput = $("auth-char-name") as HTMLInputElement;
@@ -259,7 +297,11 @@ export function initAuthUi(callbacks: AuthUiCallbacks) {
     try {
       await authClient.createCharacter(token, { name });
       localStorage.setItem("tien-gioi:name", name);
-      await callbacks.onTokenAuth(token, name);
+      try {
+        await callbacks.onTokenAuth(token, name);
+      } catch (joinErr: any) {
+        setErr("auth-char-err", extractJoinErrorMessage(joinErr));
+      }
     } catch (err: any) {
       setErr("auth-char-err", authErrorMessage(err));
     } finally {
@@ -267,7 +309,7 @@ export function initAuthUi(callbacks: AuthUiCallbacks) {
     }
   });
 
-  // 7. Form Nhận Nhân Vật Cũ
+  // 8. Form Nhận Nhân Vật Cũ
   const claimForm = $("auth-claim-form") as HTMLFormElement;
   const claimBtn = $("auth-claim-btn") as HTMLButtonElement;
   const claimNameInput = $("auth-claim-name") as HTMLInputElement;
@@ -295,7 +337,11 @@ export function initAuthUi(callbacks: AuthUiCallbacks) {
       await authClient.claimCharacter(token, { name, secret });
       localStorage.setItem("tien-gioi:name", name);
       localStorage.setItem("tien-gioi:secret", secret);
-      await callbacks.onTokenAuth(token, name);
+      try {
+        await callbacks.onTokenAuth(token, name);
+      } catch (joinErr: any) {
+        setErr("auth-claim-err", extractJoinErrorMessage(joinErr));
+      }
     } catch (err: any) {
       setErr("auth-claim-err", authErrorMessage(err));
     } finally {
@@ -303,7 +349,7 @@ export function initAuthUi(callbacks: AuthUiCallbacks) {
     }
   });
 
-  // 8. Form Quên Mật Khẩu
+  // 9. Form Quên Mật Khẩu
   const forgotForm = $("auth-forgot-form") as HTMLFormElement;
   const forgotBtn = $("auth-forgot-btn") as HTMLButtonElement;
   const forgotUser = $("auth-forgot-user") as HTMLInputElement;
@@ -352,7 +398,7 @@ export function initAuthUi(callbacks: AuthUiCallbacks) {
     }
   });
 
-  // 9. Nút Đăng Xuất (trong cài đặt)
+  // 10. Nút Đăng Xuất (trong cài đặt)
   const logoutBtn = document.getElementById("btn-logout");
   if (logoutBtn) {
     logoutBtn.onclick = async () => {
@@ -370,35 +416,62 @@ export function initAuthUi(callbacks: AuthUiCallbacks) {
     };
   }
 
-  // 10. Khởi động kiểm tra token phiên đã có
+  // 11. Phát hiện chế độ xác thực và khởi động
+  const mode = await detectAuthMode();
+  const legacyLinkSub = document.getElementById("auth-links-legacy-sub");
+  const legacyToAccountBtn = document.getElementById("link-legacy-to-account");
+  const mockBadge = document.getElementById("auth-mock-badge");
+
+  if (mockBadge) {
+    mockBadge.hidden = !isMockAuthEnabled();
+  }
+
+  if (mode === "legacy") {
+    // Chế độ legacy mặc định: hiện ô tên cũ, ẩn mọi link sang tài khoản
+    if (legacyToAccountBtn) legacyToAccountBtn.hidden = true;
+    if (legacyLinkSub) legacyLinkSub.hidden = true;
+    switchAuthView("legacy");
+    return;
+  }
+
+  // Chế độ tài khoản: ẩn link sang legacy
+  if (legacyLinkSub) legacyLinkSub.hidden = true;
+  if (legacyToAccountBtn) legacyToAccountBtn.hidden = true;
+
   const existingToken = getToken();
   if (existingToken) {
-    authClient
-      .me(existingToken)
-      .then(async (me) => {
-        updateAccountDisplay(me.username);
-        if (me.hasCharacter && me.name) {
+    try {
+      const me = await authClient.me(existingToken);
+      updateAccountDisplay(me.username);
+      if (me.hasCharacter && me.name) {
+        try {
           await callbacks.onTokenAuth(existingToken, me.name);
-        } else {
-          switchAuthView("character");
+        } catch (joinErr: any) {
+          if (joinErr?.code === JOIN_BAD_TOKEN) {
+            clearToken();
+            switchAuthView("login");
+          } else {
+            // Lỗi join khác (already_online, phòng đầy, mạng...): GIỮ token, hiện thông báo
+            switchAuthView("login");
+            const msg = extractJoinErrorMessage(joinErr);
+            setErr("auth-login-err", `${msg} (Vui lòng bấm Đăng Nhập để thử lại)`);
+          }
         }
-      })
-      .catch(() => {
+      } else {
+        switchAuthView("character");
+      }
+    } catch (meErr: any) {
+      if (meErr?.error === "unauthorized") {
         clearToken();
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get("legacy") === "1") {
-          switchAuthView("legacy");
-        } else {
-          switchAuthView("login");
-        }
-      });
-  } else {
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get("legacy") === "1") {
-      switchAuthView("legacy");
-    } else {
-      switchAuthView("login");
+        switchAuthView("login");
+      } else {
+        // Lỗi mạng hoặc server không phản hồi: GIỮ token
+        switchAuthView("login");
+        setErr("auth-login-err", "Không kết nối được máy chủ xác thực. Vui lòng thử lại sau.");
+      }
     }
+  } else {
+    switchAuthView("login");
   }
 
   // Debug Hook
@@ -410,6 +483,7 @@ export function initAuthUi(callbacks: AuthUiCallbacks) {
       switchView: switchAuthView,
       getView: getActiveAuthView,
       authClient,
+      authErrorMessage,
     };
   }
 }

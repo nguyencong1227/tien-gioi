@@ -144,18 +144,38 @@ export function formatRecoveryCode(code: string): string {
 }
 
 function getHttpBaseUrl(): string {
-  const env = import.meta.env?.VITE_SERVER_URL as string | undefined;
-  if (env) {
-    return env.replace(/^ws(s?):/, "http$1:");
+  // Cùng nguồn, dùng đường dẫn tương đối (proxy qua Vite ở dev, cùng host ở production)
+  return "";
+}
+
+export type AuthMode = "legacy" | "account";
+
+/**
+ * Phát hiện chế độ xác thực của server từ GET /health.
+ * Quy tắc: Thiếu authMode hoặc fetch lỗi => mặc định legacy (ô tên cũ).
+ * Chỉ khi authMode === 'account' mới bật màn hình tài khoản.
+ * Cho phép ép chế độ qua query param: ?auth=mock | ?auth=account => 'account', ?auth=legacy | ?legacy=1 => 'legacy'.
+ */
+export async function detectAuthMode(): Promise<AuthMode> {
+  if (typeof location !== "undefined") {
+    const p = new URLSearchParams(location.search);
+    const auth = p.get("auth");
+    if (auth === "account" || auth === "mock") return "account";
+    if (auth === "legacy" || p.has("legacy")) return "legacy";
   }
-  if (typeof location === "undefined") {
-    return "http://localhost:2567";
+
+  try {
+    const res = await fetch("/health");
+    if (res.ok) {
+      const data = await res.json();
+      if (data && typeof data === "object" && data.authMode === "account") {
+        return "account";
+      }
+    }
+  } catch {
+    /* fetch lỗi -> fallback an toàn về legacy */
   }
-  const proto = location.protocol === "https:" ? "https" : "http";
-  const port = typeof __SERVER_PORT__ !== "undefined" ? __SERVER_PORT__ : 2567;
-  return import.meta.env?.DEV
-    ? `${proto}://${location.hostname}:${port}`
-    : `${proto}://${location.host}`;
+  return "legacy";
 }
 
 // ==========================================
@@ -171,6 +191,14 @@ interface MockAccount {
 
 const mockAccounts = new Map<string, MockAccount>();
 let mockEnabled = false;
+
+// Tự động kiểm tra URL query param ?auth=mock
+if (typeof location !== "undefined") {
+  const p = new URLSearchParams(location.search);
+  if (p.get("auth") === "mock") {
+    mockEnabled = true;
+  }
+}
 
 export function setMockAuthEnabled(enabled: boolean) {
   mockEnabled = enabled;
@@ -335,14 +363,6 @@ export class AuthClient {
       throw { error: "invalid" as const };
     } catch (err: any) {
       if (err?.error) throw err;
-      // Nếu server chưa có API (404/ECONNREFUSED) và đang ở DEV, tự động fallback sang Mock
-      if (import.meta.env.DEV) {
-        console.warn(
-          `[AuthClient] API ${path} chưa khả dụng trên server, tự động kích hoạt Mock Auth.`,
-        );
-        mockEnabled = true;
-        return handleMockApi<T>(path, options);
-      }
       throw { error: "invalid" as const };
     }
   }
