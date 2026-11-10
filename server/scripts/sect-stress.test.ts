@@ -32,6 +32,7 @@ import {
 } from "@tien-gioi/shared";
 import type { WorldRoom } from "../src/rooms/WorldRoom";
 import type { WorldState } from "../src/schema";
+import type { Sect } from "../src/sect-store";
 import { auditSavesDirectory } from "./audit-saves";
 import { tickWorld } from "../src/systems/tick";
 
@@ -408,7 +409,7 @@ describe("Thử tải & Stress test Tông môn (M3.6, Issue #231)", () => {
     // Giả lập làm đầy tông môn: chèn thêm 29 thành viên giả vào store
     const sect = await w.sectService!.sectOf(w.ctrl.get(leader.room.sessionId)!.identity.soulKey);
     expect(sect).not.toBeNull();
-    await w.sectService!.store.update(sect!.id, (s) => {
+    await w.sectService!.store.update(sect!.id, (s: Sect) => {
       const dummyMembers = [...s.members];
       while (dummyMembers.length < 30) {
         dummyMembers.push({
