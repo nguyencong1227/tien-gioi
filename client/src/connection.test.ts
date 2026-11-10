@@ -222,4 +222,23 @@ describe("connection helper (joinWithRedirect)", () => {
 
     expect(joinOrCreate).toHaveBeenCalledTimes(1);
   });
+
+  it("vào phòng bằng token phiên ở chế độ tài khoản (JOIN_OPTIONS.token)", async () => {
+    const storage = new MemoryStorage();
+    const fakeRoom = { sessionId: "s_token" };
+    const joinOrCreate = vi.fn().mockResolvedValue(fakeRoom);
+    const client: JoinClient<typeof fakeRoom> = { joinOrCreate };
+
+    const result = await joinWithRedirect({
+      client,
+      storage,
+      token: "tok_session_12345",
+    });
+
+    expect(result.room).toBe(fakeRoom);
+    expect(result.mapId).toBe(DEFAULT_MAP_ID);
+    expect(joinOrCreate).toHaveBeenCalledWith(roomNameOf(DEFAULT_MAP_ID), {
+      token: "tok_session_12345",
+    });
+  });
 });

@@ -47,8 +47,9 @@ export function clearSavedMap(storage: JoinStorage, charName: string): void {
 export interface JoinWithRedirectOptions<R> {
   client: JoinClient<R>;
   storage: JoinStorage;
-  name: string;
-  secret: string;
+  name?: string;
+  secret?: string;
+  token?: string;
   suggestedMapId?: string;
   maxRedirects?: number;
 }
@@ -67,11 +68,12 @@ export interface JoinResult<R> {
 export async function joinWithRedirect<R>(
   options: JoinWithRedirectOptions<R>,
 ): Promise<JoinResult<R>> {
-  const { client, storage, name, secret, maxRedirects = 3 } = options;
+  const { client, storage, name, secret, token, maxRedirects = 3 } = options;
+  const storageKey = name || (token ? `token:${token.slice(0, 16)}` : "anonymous");
 
-  let currentMapId = options.suggestedMapId || getSavedMap(storage, name);
+  let currentMapId = options.suggestedMapId || getSavedMap(storage, storageKey);
   if (!getMap(currentMapId)) {
-    clearSavedMap(storage, name);
+    clearSavedMap(storage, storageKey);
     currentMapId = DEFAULT_MAP_ID;
   }
   let redirectCount = 0;
@@ -79,13 +81,15 @@ export async function joinWithRedirect<R>(
 
   while (redirectCount <= maxRedirects) {
     try {
-      const room = await client.joinOrCreate(roomNameOf(currentMapId), {
-        name,
-        secret,
-      });
+      const joinOpts: JoinOptions = {};
+      if (token) joinOpts.token = token;
+      if (name) joinOpts.name = name;
+      if (secret) joinOpts.secret = secret;
+
+      const room = await client.joinOrCreate(roomNameOf(currentMapId), joinOpts);
 
       // Kết nối thành công: lưu lại mapId đúng vào bộ nhớ
-      saveMap(storage, name, currentMapId);
+      saveMap(storage, storageKey, currentMapId);
       return { room, mapId: currentMapId };
     } catch (err: any) {
       // 1. Kiểm tra lỗi sai bản đồ (wrong_map:mapId)
@@ -104,7 +108,7 @@ export async function joinWithRedirect<R>(
         err?.code === 4210 ||
         (typeof err?.message === "string" && /not defined|MATCHMAKE_NO_HANDLER/i.test(err.message));
       if (isNoHandler && currentMapId !== DEFAULT_MAP_ID && !badMapRetried) {
-        clearSavedMap(storage, name);
+        clearSavedMap(storage, storageKey);
         currentMapId = DEFAULT_MAP_ID;
         badMapRetried = true;
         redirectCount++;
