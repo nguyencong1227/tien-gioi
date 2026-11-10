@@ -62,8 +62,14 @@ export interface PartyMember {
   tier: number;
   hp: number;
   maxHp: number;
+  /**
+   * Vị trí (px) **trong bản đồ `mapId` của thành viên đó**. Thành viên ở bản đồ khác (phòng khác) vẫn nằm trong đội;
+   * client chỉ vẽ chấm đồng đội trên bản đồ nhỏ / lớn khi `mapId` trùng bản đồ của mình.
+   */
   x: number;
   y: number;
+  /** Bản đồ thành viên đang đứng; bỏ trống là `DEFAULT_MAP_ID` (trước khi có nhiều bản đồ) */
+  mapId?: string;
 }
 
 /**

@@ -24,9 +24,11 @@ import {
   WORLD_W,
   WORLD_H,
   getMap,
+  HAC_PHONG_ID,
   type MapDef,
+  type PortalDef,
 } from "./map";
-import { MONSTERS, PLAYER_RADIUS } from "./game";
+import { MONSTERS, MONSTER_CAP, PLAYER_RADIUS } from "./game";
 
 /** Bộ sinh số ngẫu nhiên cố định để test lặp lại được. */
 function rng(seed: number) {
@@ -381,5 +383,206 @@ describe("bản đồ là tham số (#123, Bước 0)", () => {
     // Không gọi: chỉ cần các dòng trên biên dịch được với @ts-expect-error
     expect([sửaSeed, sửaTrấn, sửaTOWN, sửaPx]).toHaveLength(4);
     expect(DEFAULT_MAP.def.seed).toBe(MAP_SEED);
+  });
+});
+
+/** Các ô đi lại được nối với nhau từ ô (tx, ty) (4 hướng): dùng kiểm cổng với trấn có đường đi thật. */
+function reachableFrom(m: GameMap, tx: number, ty: number): Set<number> {
+  const seen = new Set<number>([ty * m.def.w + tx]);
+  const stack = [[tx, ty]];
+  while (stack.length) {
+    const [x, y] = stack.pop()!;
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ]) {
+      const nx = x + dx,
+        ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= m.def.w || ny >= m.def.h) continue;
+      if (BLOCKING.has(m.tileAt(nx, ny)) || seen.has(ny * m.def.w + nx)) continue;
+      seen.add(ny * m.def.w + nx);
+      stack.push([nx, ny]);
+    }
+  }
+  return seen;
+}
+
+describe("nhiều bản đồ: danh sách, cổng, khu an toàn (M3 bước 1)", () => {
+  const all = MAPS.map((d) => getMap(d.id)!);
+
+  it("MAPS có Lạc Hà và Hắc Phong Cốc; id duy nhất; getMap dựng được từng bản đồ", () => {
+    expect(MAPS.map((m) => m.id)).toEqual([DEFAULT_MAP_ID, HAC_PHONG_ID]);
+    expect(new Set(MAPS.map((m) => m.id)).size).toBe(MAPS.length);
+    for (const m of all) expect(m).toBeDefined();
+    expect(getMap(HAC_PHONG_ID)!.def.w).toBe(128);
+    expect(getMap("constructor")).toBeUndefined();
+  });
+
+  it("Lạc Hà không đổi gì sau khi thêm cổng: ô, tên, quái đúng như trước", () => {
+    expect(DEFAULT_MAP.townName).toBe("Lạc Hà Trấn");
+    expect(DEFAULT_MAP.wildName).toBe("Vân Mộng Sơn");
+    expect(DEFAULT_MAP.monsterCap).toBe(MONSTER_CAP);
+    for (const k of MONSTERS) expect(DEFAULT_MAP.monsterCapOf(k.id)).toBe(MONSTER_CAP[k.id]);
+  });
+
+  it("tên bản đồ, khu an toàn, vùng hoang: bỏ trống thì dùng `name`", () => {
+    const m = new GameMap({
+      id: "t",
+      name: "Tên",
+      seed: 1,
+      w: 40,
+      h: 40,
+      town: { cx: 20, cy: 20, r: 4 },
+    });
+    expect([m.townName, m.wildName, m.portals.length]).toEqual(["Tên", "Tên", 0]);
+  });
+
+  it("id cổng duy nhất trong CẢ game", () => {
+    const ids = all.flatMap((m) => m.portals.map((p) => p.id));
+    expect(ids.length).toBeGreaterThanOrEqual(2);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("cổng đi theo cặp: toMap / toPortal tồn tại và trỏ ngược lại đúng cổng đó", () => {
+    for (const m of all)
+      for (const p of m.portals) {
+        const dest = getMap(p.toMap);
+        expect(dest, `${p.id} -> ${p.toMap}`).toBeDefined();
+        const back = dest!.portal(p.toPortal);
+        expect(back, `${p.id} -> cổng ${p.toPortal}`).toBeDefined();
+        expect(back!.toMap).toBe(m.def.id);
+        expect(back!.toPortal).toBe(p.id);
+        expect(p.toMap).not.toBe(m.def.id); // cổng sang bản đồ khác, không tự trỏ chính mình
+      }
+  });
+
+  it("cổng nằm sát rìa, tâm và chỗ xuất hiện đi lại được, chỗ xuất hiện ngoài r và trong safeR", () => {
+    for (const m of all)
+      for (const p of m.portals) {
+        const rim = Math.min(p.x, p.y, m.worldW - p.x, m.worldH - p.y);
+        expect(rim, `${p.id} cách rìa`).toBeLessThanOrEqual(6 * TILE);
+        expect(m.isBlockedPx(p.x, p.y)).toBe(false);
+        expect(m.circleBlocked(p.spawn.x, p.spawn.y, PLAYER_RADIUS)).toBe(false);
+        const d = Math.hypot(p.spawn.x - p.x, p.spawn.y - p.y);
+        expect(d).toBeGreaterThan(p.r);
+        expect(d).toBeLessThanOrEqual(p.safeR);
+        expect(m.portalNear(p.spawn.x, p.spawn.y)).toBeUndefined(); // vừa tới không bị tính là đang đứng ở cổng
+      }
+  });
+
+  it("từ chỗ xuất hiện đi bộ được tới trấn và tới tâm cổng, và đi được tới mọi cổng khác của bản đồ", () => {
+    for (const m of all) {
+      const fromTown = reachableFrom(m, m.def.town.cx, m.def.town.cy);
+      // Phần lớn bản đồ nối được với trấn (còn lại là đảo nhỏ do hồ / núi tạo ra)
+      const walkable = [...m.tiles].filter((t) => !BLOCKING.has(t)).length;
+      expect(fromTown.size / walkable, `${m.def.id} liên thông`).toBeGreaterThan(0.9);
+      for (const p of m.portals) {
+        for (const [x, y] of [
+          [p.x, p.y],
+          [p.spawn.x, p.spawn.y],
+        ])
+          expect(
+            fromTown.has(Math.floor(y / TILE) * m.def.w + Math.floor(x / TILE)),
+            `${p.id} (${x}, ${y}) nối với trấn`,
+          ).toBe(true);
+      }
+    }
+  });
+
+  it("inSafe = trong trấn hoặc trong safeR của cổng (cộng pad); inTown vẫn chỉ là trấn", () => {
+    for (const m of all) {
+      expect(m.inSafe(m.townPx.x, m.townPx.y)).toBe(true);
+      for (const p of m.portals) {
+        expect(m.inSafe(p.x, p.y)).toBe(true);
+        expect(m.inSafe(p.spawn.x, p.spawn.y)).toBe(true);
+        expect(m.inSafe(p.x + p.safeR, p.y)).toBe(true); // đúng mép
+        expect(m.inSafe(p.x + p.safeR + 1, p.y)).toBe(m.inTown(p.x + p.safeR + 1, p.y));
+        expect(m.inSafe(p.x + p.safeR + 20, p.y, 20)).toBe(true); // pad nới khu an toàn
+        expect(m.inTown(p.x, p.y)).toBe(false); // cổng ở rìa, xa trấn (Lạc Hà)
+      }
+    }
+    // Hắc Phong Cốc: trạm và cổng gần nhau nên chồng lên nhau là chủ ý (người mới tới thấy trạm ngay)
+    const hp = getMap(HAC_PHONG_ID)!;
+    expect(hp.inTown(hp.portals[0].spawn.x, hp.portals[0].spawn.y)).toBe(true);
+  });
+
+  it("cổng Lạc Hà: ở rìa nguy hiểm nhưng quanh cổng là khu an toàn; Hắc Phong: trạm an toàn sát cổng", () => {
+    const [bac] = DEFAULT_MAP.portals;
+    expect(DEFAULT_MAP.dangerAt(bac.x, bac.y)).toBeGreaterThan(0.8);
+    expect(DEFAULT_MAP.inTown(bac.x, bac.y)).toBe(false);
+    expect(DEFAULT_MAP.inSafe(bac.x, bac.y)).toBe(true);
+    const hp = getMap(HAC_PHONG_ID)!;
+    expect(hp.dangerAt(hp.townPx.x, hp.townPx.y)).toBe(0);
+    expect(hp.dangerAt(hp.portals[0].x, hp.portals[0].y)).toBeLessThan(0.3);
+    // Càng lên bắc càng nguy hiểm, đủ chỗ cho quái trùm (minDanger của trùm là 0.78)
+    expect(hp.dangerAt(hp.townPx.x, 2 * TILE)).toBe(1);
+  });
+
+  it("portal / portalNear: id lạ không có; đứng trong r mới tính", () => {
+    const [bac] = DEFAULT_MAP.portals;
+    expect(DEFAULT_MAP.portal(bac.id)).toBe(bac);
+    for (const bad of ["", "constructor", "__proto__", 7, null, undefined, {}])
+      expect(DEFAULT_MAP.portal(bad)).toBeUndefined();
+    expect(DEFAULT_MAP.portalNear(bac.x, bac.y)).toBe(bac);
+    expect(DEFAULT_MAP.portalNear(bac.x + bac.r, bac.y)).toBe(bac);
+    expect(DEFAULT_MAP.portalNear(bac.x + bac.r + 1, bac.y)).toBeUndefined();
+    expect(DEFAULT_MAP.portalNear(Number.NaN, bac.y)).toBeUndefined();
+    expect(DEFAULT_MAP.portalNear(DEFAULT_MAP.townPx.x, DEFAULT_MAP.townPx.y)).toBeUndefined();
+  });
+
+  it("monsterCap: Hắc Phong Cốc chỉ khai báo loại quái có thật, không có Linh Thố; loại không khai báo là 0", () => {
+    const hp = getMap(HAC_PHONG_ID)!;
+    for (const id of Object.keys(hp.monsterCap))
+      expect(MONSTERS.some((k) => k.id === id)).toBe(true);
+    expect(hp.monsterCapOf("tho")).toBe(0);
+    expect(hp.monsterCapOf("mang")).toBeGreaterThan(0);
+    for (const bad of ["constructor", "__proto__", "toString", "không_có"])
+      expect(hp.monsterCapOf(bad)).toBe(0);
+    // Số quái mỗi người ở không vượt Lạc Hà quá nhiều (ngân sách tick cho nhiều phòng, docs/LOAD_TEST.md)
+    const total = (m: GameMap) => Object.values(m.monsterCap).reduce((a, b) => a + b, 0);
+    expect(total(hp)).toBeLessThanOrEqual(total(DEFAULT_MAP));
+  });
+
+  describe("MapDef sai bị từ chối ngay khi dựng", () => {
+    const portal = DEFAULT_MAP.portals[0];
+    const base: MapDef = MAP_BY_ID[DEFAULT_MAP_ID];
+    const withPortal = (p: Partial<PortalDef>): MapDef => ({
+      ...base,
+      portals: [{ ...portal, ...p }],
+    });
+
+    it("cổng hợp lệ dựng được; id trùng / rỗng, số không hữu hạn, r > safeR bị từ chối", () => {
+      expect(() => new GameMap(withPortal({}))).not.toThrow();
+      expect(() => new GameMap({ ...base, portals: [portal, portal] })).toThrow(/trùng/);
+      expect(() => new GameMap(withPortal({ id: "" }))).toThrow(/id/);
+      expect(() => new GameMap(withPortal({ x: Number.NaN }))).toThrow(/hữu hạn/);
+      expect(() => new GameMap(withPortal({ r: Number.POSITIVE_INFINITY }))).toThrow(/hữu hạn/);
+      expect(() => new GameMap(withPortal({ r: 0 }))).toThrow(/r <= safeR/);
+      expect(() => new GameMap(withPortal({ r: 300 }))).toThrow(/r <= safeR/);
+    });
+
+    it("tâm cổng hoặc chỗ xuất hiện trên ô chặn, hoặc chỗ xuất hiện sai khoảng cách, bị từ chối", () => {
+      expect(() => new GameMap(withPortal({ x: 0, y: 0 }))).toThrow(/ô chặn/); // góc núi
+      expect(() => new GameMap(withPortal({ spawn: { x: 0, y: 0 } }))).toThrow(/ô chặn/);
+      expect(() => new GameMap(withPortal({ spawn: { x: portal.x, y: portal.y } }))).toThrow(
+        /ngoài r/,
+      );
+      expect(() => new GameMap(withPortal({ spawn: { x: portal.x, y: portal.y + 200 } }))).toThrow(
+        /trong safeR/,
+      );
+    });
+
+    it("monsterCap có loại quái lạ, số âm hoặc số lẻ bị từ chối; {} cho phép (bản đồ không quái)", () => {
+      expect(() => new GameMap({ ...base, monsterCap: { rong: 3 } })).toThrow(/loại quái lạ/);
+      expect(() => new GameMap({ ...base, monsterCap: { constructor: 3 } })).toThrow(
+        /loại quái lạ/,
+      );
+      expect(() => new GameMap({ ...base, monsterCap: { ho: -1 } })).toThrow(/>= 0/);
+      expect(() => new GameMap({ ...base, monsterCap: { ho: 1.5 } })).toThrow(/>= 0/);
+      expect(() => new GameMap({ ...base, monsterCap: {} })).not.toThrow();
+      expect(new GameMap({ ...base, monsterCap: {} }).monsterCapOf("ho")).toBe(0);
+    });
   });
 });

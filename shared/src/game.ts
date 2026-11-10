@@ -180,7 +180,10 @@ export interface ChatOut {
   from: string;
   text: string;
   sys?: boolean;
-  /** Kênh chat đội (lệnh `/p <nội dung>`, chỉ gửi cho thành viên); bỏ trống là chat chung cả phòng */
+  /**
+   * Kênh chat đội (lệnh `/p <nội dung>`, chỉ gửi cho thành viên, kể cả thành viên ở bản đồ khác);
+   * bỏ trống là chat chung **cả server** (mọi bản đồ / phòng, đi qua kênh chung giữa các phòng, M3 bước 1)
+   */
   channel?: "party";
 }
 export interface ToastMsg {
@@ -191,4 +194,9 @@ export interface ToastMsg {
 export interface JoinOptions {
   name: string;
   secret: string;
+  /**
+   * Bản đồ (phòng) muốn vào; bỏ trống là `DEFAULT_MAP_ID`. Chỉ là **gợi ý** để chọn phòng: server so với `mapId`
+   * đã lưu của nhân vật, sai thì trả lỗi `JOIN_WRONG_MAP` kèm bản đồ đúng (shared/src/travel.ts).
+   */
+  mapId?: string;
 }

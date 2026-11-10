@@ -1,8 +1,10 @@
 // NPC trong Lạc Hà Trấn và giao dịch đổi đồ: hợp đồng giữa client và server (Sprint 2).
-import { TOWN_PX } from "./map";
+import { DEFAULT_MAP_ID, TOWN_PX } from "./map";
 
 export interface NpcDef {
   id: string;
+  /** Bản đồ NPC đứng; bỏ trống là `DEFAULT_MAP_ID`. Toạ độ `x`, `y` tính trong bản đồ đó. */
+  mapId?: string;
   name: string;
   /** Danh xưng hiện dưới tên, vd "Trưởng trấn" */
   title: string;
@@ -64,6 +66,11 @@ export const NPCS: NpcDef[] = [
 ];
 
 export const NPC_BY_ID: Record<string, NpcDef> = Object.fromEntries(NPCS.map((n) => [n.id, n]));
+
+/** NPC đứng ở bản đồ `mapId`. Server dựng NPC của phòng từ đây (không dùng thẳng `NPCS`). */
+export function npcsOfMap(mapId: string): NpcDef[] {
+  return NPCS.filter((n) => (n.mapId ?? DEFAULT_MAP_ID) === mapId);
+}
 
 /** Khoảng cách tối đa để nói chuyện / giao dịch với NPC (px) */
 export const NPC_RANGE = 80;

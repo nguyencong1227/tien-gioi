@@ -1,5 +1,6 @@
 // Bản đồ sinh tất định từ seed: client và server sinh ra cùng một bản đồ,
 // nên không phải gửi dữ liệu bản đồ qua mạng.
+import { MONSTER_BY_ID, MONSTER_CAP, PLAYER_RADIUS } from "./game";
 
 export const TILE = 32;
 export const MAP_W = 96;
@@ -119,9 +120,38 @@ function generate(def: MapDef): Uint8Array {
   return tiles;
 }
 
+/**
+ * Cổng chuyển bản đồ, nằm ở rìa bản đồ (docs/THIET_KE_NHIEU_BAN_DO.md). Cổng luôn đi theo cặp:
+ * đi qua cổng A (ở bản đồ X) thì tới bản đồ `A.toMap` và xuất hiện ở `spawn` của cổng `A.toPortal`;
+ * cổng `A.toPortal` phải trỏ ngược lại A (test giữ: map.test.ts).
+ * Luồng tin nhắn: shared/src/travel.ts.
+ */
+export interface PortalDef {
+  /** Duy nhất trong cả game (khác bản đồ cũng không trùng) */
+  readonly id: string;
+  /** Tên hiện cho người chơi, vd "Bắc Môn Quan" */
+  readonly name: string;
+  /** Tâm cổng (px) */
+  readonly x: number;
+  readonly y: number;
+  /** Đứng trong bán kính này (px) quanh tâm cổng thì được gửi `travel` */
+  readonly r: number;
+  /**
+   * Bán kính khu an toàn quanh cổng (px, không nhỏ hơn `r`): quái không sinh ra, không đuổi vào
+   * (`GameMap.inSafe`). Cổng ở rìa bản đồ là nơi rất nguy hiểm (`dangerAt` ~ 1), nên người vừa tới phải được yên.
+   */
+  readonly safeR: number;
+  /** Chỗ người đi QUA cổng này (từ bản đồ bên kia) xuất hiện (px): trong `safeR`, ngoài `r`, không chặn */
+  readonly spawn: Readonly<{ x: number; y: number }>;
+  /** Bản đồ đích và cổng ở bản đồ đích */
+  readonly toMap: string;
+  readonly toPortal: string;
+}
+
 /** Mô tả một bản đồ: client và server cùng sinh ô từ `seed`, không gửi dữ liệu bản đồ qua mạng. */
 export interface MapDef {
   readonly id: string;
+  /** Tên bản đồ (màn chuyển cảnh, danh sách). Lạc Hà giữ "Lạc Hà Trấn" cho tương thích */
   readonly name: string;
   readonly seed: number;
   /** Kích thước tính bằng ô */
@@ -129,6 +159,17 @@ export interface MapDef {
   readonly h: number;
   /** Khu an toàn (ô): tâm (số nguyên, ô chứa tâm) và bán kính */
   readonly town: Readonly<{ cx: number; cy: number; r: number }>;
+  /** Tên khu an toàn hiện ở HUD khi đứng trong đó; bỏ trống thì dùng `name` */
+  readonly townName?: string;
+  /** Tên vùng hoang hiện ở HUD khi ra ngoài khu an toàn; bỏ trống thì dùng `name` */
+  readonly wildName?: string;
+  /** Cổng chuyển bản đồ; bỏ trống là bản đồ không có cổng */
+  readonly portals?: readonly PortalDef[];
+  /**
+   * Số quái tối đa mỗi loại (khoá là `MonsterKind.id`, loại không có khoá thì không sinh ra ở bản đồ này).
+   * Bỏ trống thì dùng `MONSTER_CAP` (như Lạc Hà Trấn từ trước tới giờ).
+   */
+  readonly monsterCap?: Readonly<Record<string, number>>;
 }
 
 /**
@@ -143,6 +184,13 @@ export class GameMap {
   readonly townPx: Readonly<{ x: number; y: number; r: number }>;
   /** Từ mép trấn tới chỗ `dangerAt` đạt 1 (px): nửa cạnh ngắn của bản đồ trừ bán kính trấn */
   private readonly dangerSpanPx: number;
+  /** Tên khu an toàn / vùng hoang để hiện ở HUD (đã có giá trị mặc định) */
+  readonly townName: string;
+  readonly wildName: string;
+  /** Cổng chuyển bản đồ (rỗng nếu không có) */
+  readonly portals: readonly PortalDef[];
+  /** Số quái tối đa mỗi loại ở bản đồ này (đã có giá trị mặc định). Dùng `monsterCapOf` để tra theo id. */
+  readonly monsterCap: Readonly<Record<string, number>>;
 
   constructor(readonly def: MapDef) {
     // Con đường đất đi từ ô (cx, cy) theo từng ô: số lẻ làm chỉ số mảng lệch và ghi hụt mà không báo lỗi
@@ -162,6 +210,73 @@ export class GameMap {
     // Trấn phủ kín nửa bản đồ thì dangerAt chia cho 0 hoặc số âm
     if (!(this.dangerSpanPx > 0))
       throw new Error(`MapDef ${def.id}: bán kính trấn phải nhỏ hơn nửa cạnh ngắn của bản đồ`);
+    this.townName = def.townName ?? def.name;
+    this.wildName = def.wildName ?? def.name;
+    this.portals = def.portals ?? [];
+    this.monsterCap = def.monsterCap ?? MONSTER_CAP;
+    this.checkPortals();
+    this.checkMonsterCap();
+  }
+
+  /** Cổng sai chỗ (ngoài bản đồ, nằm trên ô chặn) làm người chơi kẹt hoặc không đi được: báo ngay khi dựng bản đồ. */
+  private checkPortals() {
+    const ids = new Set<string>();
+    for (const p of this.portals) {
+      const at = `MapDef ${this.def.id}: cổng ${p.id}`;
+      if (typeof p.id !== "string" || !p.id || ids.has(p.id))
+        throw new Error(`${at}: id rỗng hoặc trùng`);
+      ids.add(p.id);
+      for (const [f, v] of [
+        ["x", p.x],
+        ["y", p.y],
+        ["r", p.r],
+        ["safeR", p.safeR],
+        ["spawn.x", p.spawn.x],
+        ["spawn.y", p.spawn.y],
+      ] as const)
+        if (!Number.isFinite(v)) throw new Error(`${at}: ${f} phải là số hữu hạn (${v})`);
+      if (!(p.r > 0) || p.safeR < p.r) throw new Error(`${at}: cần 0 < r <= safeR`);
+      if (this.isBlockedPx(p.x, p.y)) throw new Error(`${at}: tâm cổng nằm trên ô chặn`);
+      if (this.circleBlocked(p.spawn.x, p.spawn.y, PLAYER_RADIUS))
+        throw new Error(`${at}: chỗ xuất hiện nằm trên ô chặn`);
+      const dSpawn = Math.hypot(p.spawn.x - p.x, p.spawn.y - p.y);
+      if (dSpawn <= p.r || dSpawn > p.safeR)
+        throw new Error(`${at}: chỗ xuất hiện phải ngoài r và trong safeR của cổng`);
+    }
+  }
+
+  private checkMonsterCap() {
+    for (const [id, n] of Object.entries(this.monsterCap)) {
+      if (!Object.prototype.hasOwnProperty.call(MONSTER_BY_ID, id))
+        throw new Error(`MapDef ${this.def.id}: monsterCap có loại quái lạ "${id}"`);
+      if (!Number.isInteger(n) || n < 0)
+        throw new Error(`MapDef ${this.def.id}: monsterCap.${id} phải là số nguyên >= 0 (${n})`);
+    }
+  }
+
+  /** Số quái tối đa của loại `id` ở bản đồ này (loại không khai báo là 0). Id lạ cũng là 0. */
+  monsterCapOf(id: string): number {
+    return Object.prototype.hasOwnProperty.call(this.monsterCap, id) ? this.monsterCap[id] : 0;
+  }
+
+  /** Tìm cổng theo id (id có thể đến từ client: id lạ trả `undefined`). */
+  portal(id: unknown): PortalDef | undefined {
+    return typeof id === "string" ? this.portals.find((p) => p.id === id) : undefined;
+  }
+
+  /** Cổng mà (x, y) đang đứng trong tầm `r` (điều kiện để gửi `travel`); không có thì `undefined`. */
+  portalNear(x: number, y: number): PortalDef | undefined {
+    return this.portals.find((p) => Math.hypot(x - p.x, y - p.y) <= p.r);
+  }
+
+  /**
+   * Khu an toàn: trong trấn (cộng `pad`) hoặc trong `safeR` của một cổng (cộng `pad`).
+   * Quái không sinh ra, không đuổi vào, không tấn công người đứng trong khu an toàn: nơi nào đang dùng `inTown`
+   * để quyết định chuyện đó thì dùng `inSafe`; `inTown` chỉ còn nghĩa "đang ở trấn" (hồi phục nhanh, tên khu, âm nhạc).
+   */
+  inSafe(x: number, y: number, pad = 0): boolean {
+    if (this.inTown(x, y, pad)) return true;
+    return this.portals.some((p) => Math.hypot(x - p.x, y - p.y) <= p.safeR + pad);
   }
 
   tileAt(tx: number, ty: number): T {
@@ -217,10 +332,63 @@ export class GameMap {
 }
 
 export const DEFAULT_MAP_ID = "lac_ha";
+/** Bản đồ thứ hai: khu săn mạnh hơn, nối với Lạc Hà Trấn bằng cổng ở rìa phía bắc / nam. */
+export const HAC_PHONG_ID = "hac_phong";
 
-/** Danh sách bản đồ của game. Hiện chỉ có Lạc Hà Trấn (docs/THIET_KE_NHIEU_BAN_DO.md). */
+/**
+ * Danh sách bản đồ của game (docs/THIET_KE_NHIEU_BAN_DO.md). Toạ độ cổng (px) đã đối chiếu với ô sinh từ seed:
+ * cổng nằm ở đầu mút con đường đất, ô xung quanh đi lại được (test giữ). Đổi seed / kích thước thì phải đặt lại cổng.
+ */
 export const MAPS: readonly MapDef[] = [
-  { id: DEFAULT_MAP_ID, name: "Lạc Hà Trấn", seed: MAP_SEED, w: MAP_W, h: MAP_H, town: TOWN },
+  {
+    id: DEFAULT_MAP_ID,
+    name: "Lạc Hà Trấn",
+    seed: MAP_SEED,
+    w: MAP_W,
+    h: MAP_H,
+    town: TOWN,
+    townName: "Lạc Hà Trấn",
+    wildName: "Vân Mộng Sơn",
+    portals: [
+      {
+        id: "lac_ha_bac",
+        name: "Bắc Môn Quan",
+        x: 1536,
+        y: 112,
+        r: 64,
+        safeR: 192,
+        spawn: { x: 1536, y: 240 },
+        toMap: HAC_PHONG_ID,
+        toPortal: "hac_phong_nam",
+      },
+    ],
+  },
+  {
+    id: HAC_PHONG_ID,
+    name: "Hắc Phong Cốc",
+    seed: 20261111,
+    w: 128,
+    h: 96,
+    // Trạm an toàn nằm sát cổng phía nam: người mới tới thấy trạm trước, càng đi lên bắc càng nguy hiểm
+    town: { cx: 64, cy: 84, r: 5 },
+    townName: "Thanh Lộ Trạm",
+    wildName: "Hắc Phong Cốc",
+    portals: [
+      {
+        id: "hac_phong_nam",
+        name: "Nam Môn Quan",
+        x: 2112,
+        y: 2960,
+        r: 64,
+        safeR: 192,
+        spawn: { x: 2112, y: 2832 },
+        toMap: DEFAULT_MAP_ID,
+        toPortal: "lac_ha_bac",
+      },
+    ],
+    // Tạm dùng các loại quái hiện có (không có Linh Thố); loại quái riêng của bản đồ thêm ở PR nội dung
+    monsterCap: { lang: 20, ho: 36, mang: 6 },
+  },
 ];
 
 export const MAP_BY_ID: Readonly<Record<string, MapDef>> = Object.fromEntries(
