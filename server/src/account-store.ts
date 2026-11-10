@@ -41,6 +41,8 @@ export interface AccountStore {
   byId(id: string): Promise<AccountRecord | null>;
   /** Đạo hiệu -> chủ (để biết tên đã có chủ chưa). */
   byName(name: string): Promise<AccountRecord | null>;
+  /** Mọi tài khoản, cũ trước (ngày tạo, rồi tên đăng nhập); chỉ cho công cụ quản trị `tai-khoan`, không dùng trong game. */
+  all(): Promise<AccountRecord[]>;
   /** Sửa mật khẩu / mã khôi phục / lần đăng nhập cuối / khoá; không có tài khoản thì `null`. */
   update(id: string, patch: AccountPatch): Promise<AccountRecord | null>;
   /**
@@ -258,6 +260,15 @@ export class FileAccountStore implements AccountStore {
       await this.ready();
       const id = this.byNameKey.get(nameKeyOf(name));
       return id ? (this.byIdMap.get(id) ?? null) : null;
+    });
+  }
+
+  all() {
+    return this.lane.run(async () => {
+      await this.ready();
+      return [...this.byIdMap.values()].sort(
+        (a, b) => a.createdAt.localeCompare(b.createdAt) || a.username.localeCompare(b.username),
+      );
     });
   }
 
