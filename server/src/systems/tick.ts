@@ -8,6 +8,7 @@ import { tickLoot } from "./loot";
 import { tickParty } from "./party";
 import { tickDungeonRun, tickDungeons } from "./dungeon";
 import { tickDuels } from "./duel";
+import { tickSect } from "./sect";
 
 export function tickWorld(w: World, dtMs: number) {
   const dt = dtMs / 1000;
@@ -28,6 +29,7 @@ export function tickWorld(w: World, dtMs: number) {
   tickDungeons(w);
   tickDungeonRun(w);
   tickDuels(w);
+  tickSect(w);
   w.interest.update(w); // sau cùng: dựa trên vị trí mới của tick này
   w.tick++;
 }

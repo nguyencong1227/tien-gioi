@@ -2,6 +2,7 @@
 import type { World } from "../world";
 import { giveCommand } from "./inventory";
 import { partyChat } from "./party";
+import { sectChat } from "./sect";
 
 const MAX_LEN = 120;
 const COOLDOWN_MS = 800;
@@ -26,6 +27,14 @@ export function chat(w: World, sid: string, raw: unknown) {
     if (!msg) return;
     c.nextChat = w.now + COOLDOWN_MS;
     return partyChat(w, sid, msg);
+  }
+  // Chat tông môn: `/s <nội dung>` (cùng hồi chiêu)
+  const sect = /^\/s(?:\s+(.*))?$/i.exec(text);
+  if (sect) {
+    const msg = sect[1]?.trim();
+    if (!msg) return;
+    c.nextChat = w.now + COOLDOWN_MS;
+    return sectChat(w, sid, msg);
   }
   c.nextChat = w.now + COOLDOWN_MS;
   w.events.chat(p.name, text);

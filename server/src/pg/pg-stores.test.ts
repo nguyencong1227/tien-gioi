@@ -10,11 +10,13 @@ import { newSoul } from "@tien-gioi/shared";
 import { PgAccountStore, PgSessionStore } from "./account-store";
 import { createPool, isUniqueViolation, tx, type Db } from "./db";
 import { PgPlayerStore, PgSoulStore } from "./game-store";
+import { PgSectStore } from "./sect-store";
 import { MIGRATIONS_DIR, migrate, splitStatements } from "./migrate";
 import { KeyedQueue } from "./queue";
 import {
   describeAccountStoreContract,
   describePlayerStoreContract,
+  describeSectStoreContract,
   describeSessionStoreContract,
   describeSoulStoreContract,
   makeSavedPlayer,
@@ -37,7 +39,7 @@ let realPool: (Db & { end(): Promise<void> }) | undefined;
 async function realDb(): Promise<Db> {
   realPool ??= await createPool(REAL_URL!);
   await migrate(realPool);
-  await realPool.query("TRUNCATE accounts, sessions, characters, souls");
+  await realPool.query("TRUNCATE accounts, sessions, characters, souls, sects, sect_members");
   return realPool;
 }
 afterAll(async () => {
@@ -57,6 +59,7 @@ for (const [label, dbOf] of backends) {
     `PgSoulStore (${label})`,
     async () => new PgSoulStore(await dbOf(), CLOCK),
   );
+  describeSectStoreContract(`PgSectStore (${label})`, async () => new PgSectStore(await dbOf()));
   describeAccountStoreContract(
     `PgAccountStore (${label})`,
     async () => new PgAccountStore(await dbOf()),

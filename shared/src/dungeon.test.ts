@@ -3,8 +3,12 @@ import { describe, expect, it } from "vitest";
 import {
   DUNGEONS,
   DUNGEON_DAILY_REWARDS,
+  DUNGEON_FALL_EXIT_MS,
+  DUNGEON_FALL_HP_PCT,
   DUNGEON_ID_RE,
+  DUNGEON_LOOT_MS,
   DUNGEON_MSG,
+  DUNGEON_STATE_MS,
   JOIN_NOT_IN_RUN,
   LINH_HU_ID,
   MAX_DUNGEON_RUNS,
@@ -18,6 +22,8 @@ import {
   parseDungeonEnter,
   parseDungeonOpen,
   rewardEligible,
+  type DungeonEndMsg,
+  type DungeonFallenMsg,
   type DungeonMemberCheck,
   type DungeonOpenFail,
   type DungeonOpenInput,
@@ -126,7 +132,43 @@ describe("dữ liệu bí cảnh nhất quán", () => {
     expect(new Set(names).size).toBe(names.length);
     expect(DUNGEON_MSG.decline).toBe("dungeonDecline");
     expect(DUNGEON_MSG.open).toBe("dungeonOpen");
+    expect(DUNGEON_MSG.fallen).toBe("dungeonFallen");
     for (const n of names) expect(n).toMatch(/^dungeon[A-Z]/);
+  });
+});
+
+describe("gục trong bí cảnh không mất kiếp (quyết định 11/11)", () => {
+  it("hằng số: nằm vài giây rồi đứng dậy với một PHẦN khí huyết; kịp hiện thông báo nhưng không dài hơn nhịp state / giờ nhặt đồ", () => {
+    for (const v of [DUNGEON_FALL_EXIT_MS, DUNGEON_STATE_MS]) {
+      expect(Number.isInteger(v)).toBe(true);
+      expect(v).toBeGreaterThan(0);
+    }
+    expect(DUNGEON_FALL_EXIT_MS).toBeGreaterThanOrEqual(DUNGEON_STATE_MS); // ít nhất một lần `dungeonState` kịp tới
+    expect(DUNGEON_FALL_EXIT_MS).toBeLessThan(DUNGEON_LOOT_MS);
+    expect(DUNGEON_FALL_HP_PCT).toBeGreaterThan(0);
+    expect(DUNGEON_FALL_HP_PCT).toBeLessThan(1); // MỘT PHẦN, không đầy
+  });
+
+  it("`dungeonFallen` là tin riêng, khác `dungeonEnd`: người gục không nhận kết quả run; các trường nằm trong khoảng hợp lệ", () => {
+    expect(DUNGEON_MSG.fallen).not.toBe(DUNGEON_MSG.end);
+    const msg: DungeonFallenMsg = {
+      exitInMs: DUNGEON_FALL_EXIT_MS,
+      rewardsLeft: DUNGEON_DAILY_REWARDS - 1,
+    };
+    expect(msg.exitInMs).toBeGreaterThan(0);
+    expect(msg.rewardsLeft).toBeGreaterThanOrEqual(0);
+    expect(msg.rewardsLeft).toBeLessThan(DUNGEON_DAILY_REWARDS); // vừa bị trừ một lượt nên không bao giờ còn đủ
+    // kiểu: DungeonEndMsg không có exitInMs (để client không nhầm hai tin)
+    const end: DungeonEndMsg = { result: "lost", reason: "all_dead", rewardsLeft: 0 };
+    expect("exitInMs" in end).toBe(false);
+  });
+
+  it("lượt ngày: bị gục tính như một lần dùng lượt (cùng bộ đếm `dungeonDaily`, cùng `dungeonRewardsLeft`)", () => {
+    const day = Date.parse("2026-11-11T05:00:00.000Z");
+    const today = "2026-11-11";
+    expect(dungeonRewardsLeft({ day: today, rewards: 0 }, day)).toBe(DUNGEON_DAILY_REWARDS);
+    expect(dungeonRewardsLeft({ day: today, rewards: 1 }, day)).toBe(DUNGEON_DAILY_REWARDS - 1);
+    expect(dungeonRewardsLeft({ day: today, rewards: DUNGEON_DAILY_REWARDS }, day)).toBe(0);
   });
 });
 

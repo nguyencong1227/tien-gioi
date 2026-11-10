@@ -42,8 +42,10 @@ import {
   type RebirthMsg,
   type RebirthChoice,
   DUNGEON_MSG,
+  DUNGEON_FALL_EXIT_MS,
   LINH_HU_MAP_ID,
   WILD_MONSTERS,
+  type DungeonFallenMsg,
   type DungeonInviteMsg,
   type DungeonStateMsg,
   type DungeonEndMsg,
@@ -61,7 +63,13 @@ import {
 } from "@tien-gioi/shared";
 import { preloadAssets, makeTextures, dirFromAngle, TILESET_KEY, ATLAS_KEY } from "../textures";
 import { ui } from "../ui";
-import { buildMockThuMonDialog, isMockDungeonEnabled, MOCK_DUNGEON_SAMPLES } from "../dungeon";
+import {
+  buildMockThuMonDialog,
+  dungeonFallenDeathText,
+  dungeonFallenSubText,
+  isMockDungeonEnabled,
+  MOCK_DUNGEON_SAMPLES,
+} from "../dungeon";
 import { clientCanChallenge } from "../duel";
 import { replayEarlyMessages } from "../early-messages";
 import { sound } from "../audio";
@@ -147,6 +155,7 @@ export class WorldScene extends Phaser.Scene {
   private moving = false;
   private isReconnecting = false;
   private duelKoUntil = 0;
+  private dungeonFallUntil = 0;
 
   private nextSlash = 0;
   private nextSword = 0;
@@ -808,6 +817,8 @@ export class WorldScene extends Phaser.Scene {
     if (reconnecting) {
       this.moving = false;
       this.duelKoUntil = 0;
+      this.dungeonFallUntil = 0;
+      ui.death(null);
       ui.hideDuelHud();
       ui.showReconnectNotice("Mất kết nối, đang nối lại...");
     } else {
@@ -817,6 +828,8 @@ export class WorldScene extends Phaser.Scene {
 
   public changeMap(room: Room, newMap: GameMap) {
     this.duelKoUntil = 0;
+    this.dungeonFallUntil = 0;
+    ui.death(null);
     ui.hideDuelHud();
     this.map = newMap;
     this.buildMapVisuals();
@@ -923,6 +936,14 @@ export class WorldScene extends Phaser.Scene {
     reg(DUNGEON_MSG.invite, (m: DungeonInviteMsg) => ui.onDungeonInvite(m));
     reg(DUNGEON_MSG.state, (m: DungeonStateMsg) => ui.onDungeonState(m));
     reg(DUNGEON_MSG.end, (m: DungeonEndMsg) => ui.onDungeonEnd(m));
+    reg(DUNGEON_MSG.fallen, (m: DungeonFallenMsg) => {
+      const exitMs = Math.max(
+        1000,
+        Number.isFinite(m.exitInMs) ? m.exitInMs : DUNGEON_FALL_EXIT_MS,
+      );
+      this.dungeonFallUntil = this.time.now + exitMs;
+      ui.onDungeonFallen(m);
+    });
     reg(DUEL_MSG.invited, (m: DuelInvitedMsg) => ui.onDuelInvited(m));
     reg(DUEL_MSG.state, (m: DuelStateMsg) => ui.onDuelState(m));
     reg(DUEL_MSG.end, (m: DuelEndMsg) => {
@@ -1803,6 +1824,19 @@ export class WorldScene extends Phaser.Scene {
           }
           const remSec = Math.max(1, Math.ceil((this.duelKoUntil - this.time.now) / 1000));
           ui.death(remSec, `Bị đánh gục, đứng dậy sau ${remSec}s`);
+        } else if (
+          this.time.now < this.dungeonFallUntil ||
+          (p.dead && isDungeonMap(this.map.def.id))
+        ) {
+          if (!this.dungeonFallUntil) {
+            this.dungeonFallUntil = this.time.now + DUNGEON_FALL_EXIT_MS;
+          }
+          const remSec = Math.max(1, Math.ceil((this.dungeonFallUntil - this.time.now) / 1000));
+          ui.death(
+            remSec,
+            dungeonFallenDeathText(remSec, ui.getDungeonRewardsLeft()),
+            dungeonFallenSubText(),
+          );
         } else {
           ui.death(
             p.dead
@@ -1813,8 +1847,9 @@ export class WorldScene extends Phaser.Scene {
         if (p.dead && !(e as any).deadSince) (e as any).deadSince = this.time.now;
         if (!p.dead) {
           (e as any).deadSince = 0;
-          // `duelEnd` tới TRƯỚC patch `dead = true`: khung xen giữa không được xoá mốc KO vừa đặt (chỉ xoá khi đã hết hạn)
+          // `duelEnd` và `dungeonFallen` tới TRƯỚC patch `dead = true`: khung xen giữa không được xoá mốc KO vừa đặt (chỉ xoá khi đã hết hạn)
           if (this.time.now >= this.duelKoUntil) this.duelKoUntil = 0;
+          if (this.time.now >= this.dungeonFallUntil) this.dungeonFallUntil = 0;
         }
       } else {
         const dist = Math.hypot(posX - e.root.x, posY - e.root.y);

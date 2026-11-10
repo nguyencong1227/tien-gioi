@@ -61,6 +61,7 @@ import {
   DUNGEON_DAILY_REWARDS,
   dungeonOf,
   isDungeonMap,
+  type DungeonFallenMsg,
   type DungeonInviteMsg,
   type DungeonStateMsg,
   type DungeonEndMsg,
@@ -83,6 +84,7 @@ import {
 } from "@tien-gioi/shared";
 import {
   dungeonEndReasonText,
+  dungeonFallenToastText,
   dungeonNoRewardText,
   dungeonPhaseInfo,
   formatBossView,
@@ -220,6 +222,8 @@ function stopInviteTimer() {
 
 // ---------- Bí cảnh theo đội (M3.4, #200) ----------
 let currentDungeonInvite: DungeonInviteMsg | null = null;
+let lastDungeonFallen: DungeonFallenMsg | null = null;
+let dungeonFallenPendingToast = false;
 let dungeonInviteInterval: number | null = null;
 let dungeonHudInterval: number | null = null;
 let dungeonDeadlineAt = 0;
@@ -2893,6 +2897,10 @@ export const ui = {
     } else {
       document.body.classList.remove("in-dungeon");
       this.hideDungeonHud();
+      if (this.takeDungeonFallenPending()) {
+        this.death(null);
+        this.toast({ text: dungeonFallenToastText(this.getDungeonRewardsLeft()), tone: "bad" });
+      }
     }
     renderPartyPanel();
   },
@@ -3174,10 +3182,23 @@ export const ui = {
     setTimeout(() => p.remove(), 3000);
   },
 
-  death(secondsLeft: number | null, text?: string) {
-    $("death").hidden = secondsLeft === null;
-    if (secondsLeft !== null)
+  death(secondsLeft: number | null, text?: string, subText?: string) {
+    const box = $("death");
+    box.hidden = secondsLeft === null;
+    if (secondsLeft !== null) {
       $("death-t").textContent = text ?? `Hồi sinh tại Lạc Hà Trấn sau ${secondsLeft}s`;
+      const sub = $("death-sub") as HTMLElement | null;
+      if (sub) {
+        sub.hidden = !subText;
+        sub.textContent = subText ?? "";
+      }
+    } else {
+      const sub = $("death-sub") as HTMLElement | null;
+      if (sub) {
+        sub.hidden = true;
+        sub.textContent = "";
+      }
+    }
   },
 
   /** Banner đỏ khi đang nối lại (chỉ một khung, không kèm toast trùng nội dung). */
@@ -3393,7 +3414,7 @@ export const ui = {
       for (const m of msg.members) {
         const tag = document.createElement("span");
         tag.className = `dhud-mem${m.alive ? "" : " dead"}`;
-        tag.textContent = m.alive ? `● ${m.name}` : `✕ ${m.name} (Đã ngã)`;
+        tag.textContent = m.alive ? `● ${m.name}` : `✕ ${m.name} (Đã gục)`;
         memContainer.append(tag);
       }
     }
@@ -3512,6 +3533,22 @@ export const ui = {
 
     const modal = $("dungeon-end-modal");
     if (modal) modal.hidden = false;
+  },
+
+  /** Người chơi gục trong bí cảnh (M3.4 luật mới, #235): lưu trạng thái để hiện toast sau khi ra Lạc Hà */
+  onDungeonFallen(msg: DungeonFallenMsg) {
+    lastDungeonFallen = msg;
+    dungeonFallenPendingToast = true;
+  },
+
+  getDungeonRewardsLeft(): number | undefined {
+    return lastDungeonFallen?.rewardsLeft;
+  },
+
+  takeDungeonFallenPending(): boolean {
+    const pending = dungeonFallenPendingToast;
+    dungeonFallenPendingToast = false;
+    return pending;
   },
 
   /** Nhận lời mời thách đấu PK (M3.5, #218) */

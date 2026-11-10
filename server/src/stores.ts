@@ -1,6 +1,6 @@
 // Chọn backend lưu trữ (M3 bước 3e-2, docs/THIET_KE_TAI_KHOAN.md mục 6): `STORE=file` (mặc định, dev / test / bot / bench, không
 // cần dịch vụ ngoài) hoặc `STORE=pg` (PostgreSQL qua `DATABASE_URL`, backend cho môi trường thật). Một nơi duy nhất dựng cả
-// bốn kho (nhân vật, chân linh, tài khoản, phiên) để cùng một backend cho mọi thứ: không có chuyện nhân vật ở Postgres mà
+// năm kho (nhân vật, chân linh, tông môn, tài khoản, phiên) để cùng một backend cho mọi thứ: không có chuyện nhân vật ở Postgres mà
 // phiên ở tệp.
 import {
   defaultAccountStore,
@@ -12,7 +12,9 @@ import { PgAccountStore, PgSessionStore } from "./pg/account-store";
 import { createPool, type Db } from "./pg/db";
 import { PgPlayerStore, PgSoulStore } from "./pg/game-store";
 import { migrate } from "./pg/migrate";
+import { PgSectStore } from "./pg/sect-store";
 import { defaultPlayerStore, type PlayerStore } from "./player-store";
+import { defaultSectStore, type SectStore } from "./sect-store";
 import { defaultSoulStore, type SoulStore } from "./soul";
 
 export type StoreKind = "file" | "pg";
@@ -26,6 +28,8 @@ export interface Stores {
   kind: StoreKind;
   players: PlayerStore;
   souls: SoulStore;
+  /** Tông môn (M3.6, 6b) */
+  sects: SectStore;
   accounts: AccountStore;
   sessions: SessionStore;
   /** Đóng kết nối (pool Postgres); bản file không làm gì. */
@@ -33,7 +37,7 @@ export interface Stores {
 }
 
 /**
- * Dựng bốn kho theo `STORE`. `pg`: cần `DATABASE_URL` (thiếu thì ném lỗi rõ ràng, KHÔNG in URL vì có mật khẩu), tạo pool, chạy
+ * Dựng năm kho theo `STORE`. `pg`: cần `DATABASE_URL` (thiếu thì ném lỗi rõ ràng, KHÔNG in URL vì có mật khẩu), tạo pool, chạy
  * migration chưa áp dụng rồi trả các `Pg*Store`. `opts.db` để test tiêm một DB (pg-mem) thay cho pool thật.
  */
 export async function createStores(
@@ -45,6 +49,7 @@ export async function createStores(
       kind: "file",
       players: defaultPlayerStore(),
       souls: defaultSoulStore(),
+      sects: defaultSectStore(),
       accounts: defaultAccountStore(),
       sessions: defaultSessionStore(),
       close: async () => {},
@@ -64,6 +69,7 @@ export async function createStores(
     kind: "pg",
     players: new PgPlayerStore(db),
     souls: new PgSoulStore(db),
+    sects: new PgSectStore(db),
     accounts: new PgAccountStore(db),
     sessions: new PgSessionStore(db),
     close: async () => {

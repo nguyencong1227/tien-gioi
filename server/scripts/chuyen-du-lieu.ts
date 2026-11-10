@@ -1,5 +1,5 @@
-// Chuyển dữ liệu từ tệp JSON sang PostgreSQL (M3 bước 3e-3, docs/THIET_KE_TAI_KHOAN.md mục 7): nhân vật (`<DATA_DIR>/*.json`) và
-// chân linh (`<DATA_DIR>/souls/*.json`) cũ -> kho của `STORE=pg`.
+// Chuyển dữ liệu từ tệp JSON sang PostgreSQL (M3 bước 3e-3, docs/THIET_KE_TAI_KHOAN.md mục 7): nhân vật (`<DATA_DIR>/*.json`),
+// chân linh (`<DATA_DIR>/souls/*.json`) và tông môn (`<DATA_DIR>/sects/*.json`, M3.6 bước 6b) cũ -> kho của `STORE=pg`.
 //
 //   npm run chuyen-du-lieu -w server -- --thu                 (chạy thử: chỉ đếm và báo lỗi, không ghi gì)
 //   STORE=pg DATABASE_URL=postgres://... npm run chuyen-du-lieu -w server
@@ -16,6 +16,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { sanitizeSoul } from "@tien-gioi/shared";
 import type { PlayerStore } from "../src/player-store.js";
+import { sanitizeSect, type SectStore } from "../src/sect-store.js";
 import type { SoulStore } from "../src/soul.js";
 import type { SavedPlayer } from "../src/store.js";
 import { createStores, storeKindOf } from "../src/stores.js";
@@ -27,7 +28,7 @@ import {
 } from "./audit-saves.js";
 
 export interface MigrateOptions {
-  /** Thư mục nhân vật (chân linh ở `souls/` bên trong) */
+  /** Thư mục nhân vật (chân linh ở `souls/`, tông môn ở `sects/` bên trong) */
   dir: string;
   /** Chạy thử: không ghi gì */
   thu: boolean;
@@ -38,6 +39,7 @@ export interface MigrateOptions {
 export interface MigrateTarget {
   players: PlayerStore;
   souls: SoulStore;
+  sects: SectStore;
 }
 
 export interface Counts {
@@ -58,6 +60,7 @@ export interface Counts {
 export interface MigrateReport {
   players: Counts;
   souls: Counts;
+  sects: Counts;
   /** Tên tệp + mã lỗi (không có nội dung) */
   errors: { file: string; code: string }[];
 }
@@ -98,14 +101,14 @@ function readRegular(file: string): { text: string; size: number } | { code: str
 const errName = (e: unknown) => (e instanceof Error ? e.name : "Error");
 
 /**
- * Chuyển nhân vật và chân linh. `target = null` (chỉ khi `thu`): không có DB để so, mọi tệp hợp lệ tính là "sẽ chuyển".
+ * Chuyển nhân vật, chân linh và tông môn. `target = null` (chỉ khi `thu`): không có DB để so, mọi tệp hợp lệ tính là "sẽ chuyển".
  * Không bao giờ ghi vào thư mục nguồn.
  */
 export async function migrateData(
   opts: MigrateOptions,
   target: MigrateTarget | null,
 ): Promise<MigrateReport> {
-  const report: MigrateReport = { players: zero(), souls: zero(), errors: [] };
+  const report: MigrateReport = { players: zero(), souls: zero(), sects: zero(), errors: [] };
   const write = !opts.thu && target !== null;
   let failures = 0;
   const guard = async (c: Counts, file: string, fn: () => Promise<void>) => {
@@ -171,6 +174,42 @@ export async function migrateData(
         c.migrated++;
       });
   }
+
+  // Tông môn: tệp `<id>.json` đúng bộ làm sạch của kho (`sanitizeSect`) và tên tệp khớp `id`; trùng tên / biệt hiệu / thành
+  // viên với tông môn đã có trong DB thì kho từ chối (đếm vào `failed`, mã chỉ có tên lỗi), không chuyển dở.
+  const sectsDir = path.join(opts.dir, "sects");
+  for (const f of listJson(sectsDir)) {
+    const c = report.sects;
+    c.found++;
+    const file = `sects/${f}`;
+    const r = readRegular(path.join(sectsDir, f));
+    let sect = null as ReturnType<typeof sanitizeSect>;
+    if ("text" in r) {
+      try {
+        sect = sanitizeSect(JSON.parse(r.text));
+      } catch {
+        sect = null;
+      }
+    }
+    if (!sect || `${sect.id}.json` !== f) {
+      c.invalid++;
+      report.errors.push({ file, code: "text" in r ? "sect_invalid" : r.code });
+      continue;
+    }
+    const exists = target ? await target.sects.get(sect.id) : null;
+    if (exists && !opts.ghiDe) {
+      c.existing++;
+      continue;
+    }
+    c.toMigrate++;
+    const sectData = sect;
+    if (write)
+      await guard(c, file, async () => {
+        if (exists) await target.sects.update(sectData.id, () => sectData);
+        else await target.sects.create(sectData);
+        c.migrated++;
+      });
+  }
   return report;
 }
 
@@ -182,6 +221,7 @@ export function formatReport(r: MigrateReport, thu: boolean): string[] {
     thu ? "=== CHẠY THỬ (không ghi gì) ===" : "=== KẾT QUẢ CHUYỂN DỮ LIỆU ===",
     row("Nhân vật", r.players),
     row("Chân linh", r.souls),
+    row("Tông môn", r.sects),
   ];
   for (const e of r.errors.slice(0, 50)) lines.push(`  ! ${e.file}: ${e.code}`);
   if (r.errors.length > 50) lines.push(`  ... và ${r.errors.length - 50} lỗi nữa`);
@@ -237,11 +277,16 @@ async function main(): Promise<number> {
     stores = toPg ? await createStores(process.env) : undefined;
     const report = await migrateData(
       { dir, thu: args.thu, ghiDe: args.ghiDe },
-      stores ? { players: stores.players, souls: stores.souls } : null,
+      stores ? { players: stores.players, souls: stores.souls, sects: stores.sects } : null,
     );
     for (const line of formatReport(report, args.thu)) console.log(line);
     const bad =
-      report.players.invalid + report.souls.invalid + report.players.failed + report.souls.failed;
+      report.players.invalid +
+      report.souls.invalid +
+      report.sects.invalid +
+      report.players.failed +
+      report.souls.failed +
+      report.sects.failed;
     return bad > 0 ? 3 : 0;
   } catch (e) {
     // Chỉ thông báo do ta viết hoặc tên lỗi: thông báo của driver DB có thể chứa chuỗi kết nối

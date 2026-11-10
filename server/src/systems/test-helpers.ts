@@ -21,7 +21,11 @@ import {
   type RebornMsg,
   type DungeonInviteMsg,
   type DungeonEndMsg,
+  type DungeonFallenMsg,
   type DungeonStateMsg,
+  type SectInvitedMsg,
+  type SectMsg,
+  type SectPresenceMsg,
   type DuelInvitedMsg,
   type DuelStateMsg,
   type DuelEndMsg,
@@ -51,9 +55,13 @@ export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
   const dungeonInvites: { sid: string; msg: DungeonInviteMsg }[] = [];
   const dungeonEnds: { sid: string; msg: DungeonEndMsg }[] = [];
   const dungeonStates: { sid: string; msg: DungeonStateMsg }[] = [];
+  const dungeonFallens: { sid: string; msg: DungeonFallenMsg }[] = [];
   const duelInvites: { sid: string; msg: DuelInvitedMsg }[] = [];
   const duelStates: { sid: string; msg: DuelStateMsg }[] = [];
   const duelEnds: { sid: string; msg: DuelEndMsg }[] = [];
+  const sects: { sid: string; msg: SectMsg }[] = [];
+  const sectPresences: { sid: string; msg: SectPresenceMsg }[] = [];
+  const sectInviteds: { sid: string; msg: SectInvitedMsg }[] = [];
   const dmgs: DmgMsg[] = [];
   const w = new World(
     new WorldState(),
@@ -76,9 +84,13 @@ export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
       dungeonInvite: (sid, msg) => dungeonInvites.push({ sid, msg }),
       dungeonEnd: (sid, msg) => dungeonEnds.push({ sid, msg }),
       dungeonState: (sid, msg) => dungeonStates.push({ sid, msg }),
+      dungeonFallen: (sid, msg) => dungeonFallens.push({ sid, msg }),
       duelInvited: (sid, msg) => duelInvites.push({ sid, msg }),
       duelState: (sid, msg) => duelStates.push({ sid, msg }),
       duelEnd: (sid, msg) => duelEnds.push({ sid, msg }),
+      sect: (sid, msg) => sects.push({ sid, msg }),
+      sectPresence: (sid, msg) => sectPresences.push({ sid, msg }),
+      sectInvited: (sid, msg) => sectInviteds.push({ sid, msg }),
     },
     map,
     hub,
@@ -102,9 +114,13 @@ export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
     dungeonInvites,
     dungeonEnds,
     dungeonStates,
+    dungeonFallens,
     duelInvites,
     duelStates,
     duelEnds,
+    sects,
+    sectPresences,
+    sectInviteds,
     dmgs,
   };
 }

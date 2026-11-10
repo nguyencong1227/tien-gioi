@@ -26,11 +26,26 @@ import {
   KIEP_CAP,
   cleanName,
   validateUsername,
+  SECT_COIN_CAP,
+  SECT_LOG_MAX,
+  SECT_MAX_MEMBERS,
+  SECT_ELDERS_MAX,
+  SECT_NAME_MIN,
+  SECT_NAME_MAX,
+  SECT_TAG_MIN,
+  SECT_TAG_MAX,
+  SECT_MOTD_MAX,
+  SECT_RANKS,
+  cleanMotd,
+  cleanSectName,
+  cleanSectTag,
+  sectKey,
 } from "@tien-gioi/shared";
 import { byId } from "../src/systems/lookup.js";
 import { soulIdOf } from "../src/soul.js";
 import { parseHash } from "../src/auth.js";
 import { nameKeyOf } from "../src/account-store.js";
+import { isSectId } from "../src/sect-store.js";
 import { createHash } from "node:crypto";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -68,6 +83,10 @@ export interface AuditReport {
   totalSessions?: number;
   cleanSessions?: number;
   errorSessions?: number;
+  /** Thống kê tông môn (sects/) (#231) */
+  totalSects?: number;
+  cleanSects?: number;
+  errorSects?: number;
   errorsByCode: Record<string, number>;
   failedFiles: AuditFileResult[];
 }
@@ -1095,6 +1114,264 @@ export function auditSessionSaveData(rawText: string, byteLength: number): Audit
 }
 
 /**
+ * Kiểm tra tính toàn vẹn của một file dữ liệu tông môn (.json) (Issue #231, M3.6 6e).
+ * Trả về danh sách các lỗi vi phạm (nếu có).
+ */
+export function auditSectSaveData(rawText: string, byteLength: number): AuditError[] {
+  const errors: AuditError[] = [];
+
+  if (byteLength > MAX_FILE_SIZE) {
+    errors.push({
+      code: "file_too_large",
+      message: `Kích thước file (${byteLength} bytes) vượt quá giới hạn an toàn 1 MB`,
+    });
+    return errors;
+  }
+
+  let data: any;
+  try {
+    data = JSON.parse(rawText);
+  } catch (err: any) {
+    errors.push({
+      code: "invalid_json",
+      message: `JSON không hợp lệ: ${err?.message ?? "lỗi cú pháp"}`,
+    });
+    return errors;
+  }
+
+  if (data === null || typeof data !== "object" || Array.isArray(data)) {
+    errors.push({
+      code: "not_an_object",
+      message: "Dữ liệu gốc phải là một JSON Object",
+    });
+    return errors;
+  }
+
+  // 1. Phiên bản schema: v === 1
+  if (data.v !== 1) {
+    errors.push({
+      code: "invalid_sect_version",
+      message: `Phiên bản schema v (${show(data.v)}) không hợp lệ, yêu cầu v=1`,
+    });
+  }
+
+  // 2. id: uuid/chuỗi an toàn
+  if (typeof data.id !== "string" || !isSectId(data.id)) {
+    errors.push({
+      code: "invalid_sect_id",
+      message: `id (${show(data.id)}) không hợp lệ (cần 1–64 ký tự chữ, số, gạch ngang, gạch dưới)`,
+    });
+  }
+
+  // 3. name: tên tông môn (phải là chuỗi đã chuẩn hoá)
+  if (
+    typeof data.name !== "string" ||
+    cleanSectName(data.name) === null ||
+    cleanSectName(data.name) !== data.name
+  ) {
+    errors.push({
+      code: "invalid_sect_name",
+      message: `name (${show(data.name)}) không hợp lệ (${SECT_NAME_MIN}–${SECT_NAME_MAX} ký tự, đã chuẩn hoá, không chứa ký tự cấm)`,
+    });
+  }
+
+  // 4. tag: biệt hiệu (phải là chuỗi đã chuẩn hoá)
+  if (
+    typeof data.tag !== "string" ||
+    cleanSectTag(data.tag) === null ||
+    cleanSectTag(data.tag) !== data.tag
+  ) {
+    errors.push({
+      code: "invalid_sect_tag",
+      message: `tag (${show(data.tag)}) không hợp lệ (${SECT_TAG_MIN}–${SECT_TAG_MAX} ký tự, chữ và số)`,
+    });
+  }
+
+  // 5. leader: soulKey của Tông chủ
+  if (typeof data.leader !== "string" || data.leader.length < 1 || data.leader.length > 200) {
+    errors.push({
+      code: "invalid_sect_leader",
+      message: `leader (${show(data.leader)}) phải là chuỗi soulKey 1–200 ký tự`,
+    });
+  }
+
+  // 6. motd: thông báo tông môn
+  if (data.motd !== undefined) {
+    if (typeof data.motd !== "string" || cleanMotd(data.motd) === null) {
+      errors.push({
+        code: "invalid_sect_motd",
+        message: `motd (${show(data.motd)}) không hợp lệ (tối đa ${SECT_MOTD_MAX} ký tự)`,
+      });
+    }
+  }
+
+  // 7. members: danh sách thành viên
+  if (
+    !Array.isArray(data.members) ||
+    data.members.length < 1 ||
+    data.members.length > SECT_MAX_MEMBERS
+  ) {
+    errors.push({
+      code: "invalid_sect_members",
+      message: `members phải là mảng chứa 1–${SECT_MAX_MEMBERS} thành viên`,
+    });
+  } else {
+    const seenSoulKeys = new Set<string>();
+    let chuCount = 0;
+    let elderCount = 0;
+    let leaderFound = false;
+
+    for (let i = 0; i < data.members.length; i++) {
+      const m = data.members[i];
+      if (m === null || typeof m !== "object" || Array.isArray(m)) {
+        errors.push({
+          code: "invalid_sect_member_record",
+          message: `Thành viên thứ ${i} không phải là một object`,
+        });
+        continue;
+      }
+
+      if (typeof m.soulKey !== "string" || m.soulKey.length < 1 || m.soulKey.length > 200) {
+        errors.push({
+          code: "invalid_sect_member_soul_key",
+          message: `Thành viên thứ ${i} có soulKey (${show(m.soulKey)}) không hợp lệ`,
+        });
+      } else if (seenSoulKeys.has(m.soulKey)) {
+        errors.push({
+          code: "duplicate_sect_member",
+          message: `Thành viên có soulKey (${show(m.soulKey)}) bị trùng lặp trong cùng tông môn`,
+        });
+      } else {
+        seenSoulKeys.add(m.soulKey);
+      }
+
+      if (typeof m.name !== "string" || cleanName(m.name) === null) {
+        errors.push({
+          code: "invalid_sect_member_name",
+          message: `Thành viên thứ ${i} có đạo hiệu (${show(m.name)}) không hợp lệ`,
+        });
+      }
+
+      if (typeof m.rank !== "string" || !SECT_RANKS.includes(m.rank as any)) {
+        errors.push({
+          code: "invalid_sect_member_rank",
+          message: `Thành viên thứ ${i} có chức vụ (${show(m.rank)}) không hợp lệ (cần chu, truong_lao hoặc de_tu)`,
+        });
+      } else {
+        if (m.rank === "chu") {
+          chuCount++;
+          if (typeof data.leader === "string" && m.soulKey === data.leader) {
+            leaderFound = true;
+          }
+        } else if (m.rank === "truong_lao") {
+          elderCount++;
+        }
+      }
+
+      if (!isFiniteEpoch(m.joinedAt)) {
+        errors.push({
+          code: "invalid_sect_member_joined_at",
+          message: `Thành viên thứ ${i} có joinedAt (${show(m.joinedAt)}) không phải số epoch ms hợp lệ`,
+        });
+      }
+    }
+
+    if (chuCount !== 1 || !leaderFound) {
+      errors.push({
+        code: "invalid_sect_leader_match",
+        message: `Tông môn phải có đúng 1 Tông chủ và phải trùng với trường leader (${show(data.leader)})`,
+      });
+    }
+
+    if (elderCount > SECT_ELDERS_MAX) {
+      errors.push({
+        code: "too_many_elders",
+        message: `Số lượng Trưởng lão (${elderCount}) vượt quá giới hạn tối đa ${SECT_ELDERS_MAX}`,
+      });
+    }
+  }
+
+  // 8. coin: kho Linh thạch
+  if (
+    typeof data.coin !== "number" ||
+    !Number.isSafeInteger(data.coin) ||
+    data.coin < 0 ||
+    data.coin > SECT_COIN_CAP
+  ) {
+    errors.push({
+      code: "invalid_sect_coin",
+      message: `coin (${show(data.coin)}) phải là số nguyên nằm trong khoảng 0..${SECT_COIN_CAP}`,
+    });
+  }
+
+  // 9. log: sổ kho
+  if (data.log !== undefined) {
+    if (!Array.isArray(data.log) || data.log.length > SECT_LOG_MAX) {
+      errors.push({
+        code: "invalid_sect_log",
+        message: `log phải là mảng chứa tối đa ${SECT_LOG_MAX} mục`,
+      });
+    } else {
+      for (let i = 0; i < data.log.length; i++) {
+        const entry = data.log[i];
+        if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
+          errors.push({
+            code: "invalid_sect_log_entry",
+            message: `Mục sổ kho thứ ${i} không phải là một object`,
+          });
+          continue;
+        }
+        if (!isFiniteEpoch(entry.at)) {
+          errors.push({
+            code: "invalid_sect_log_time",
+            message: `Mục sổ kho thứ ${i} có mốc thời gian (${show(entry.at)}) không hợp lệ`,
+          });
+        }
+        if (typeof entry.name !== "string" || cleanName(entry.name) === null) {
+          errors.push({
+            code: "invalid_sect_log_name",
+            message: `Mục sổ kho thứ ${i} có tên (${show(entry.name)}) không hợp lệ`,
+          });
+        }
+        if (entry.kind !== "deposit" && entry.kind !== "withdraw") {
+          errors.push({
+            code: "invalid_sect_log_kind",
+            message: `Mục sổ kho thứ ${i} có loại giao dịch (${show(entry.kind)}) không hợp lệ (cần deposit hoặc withdraw)`,
+          });
+        }
+        if (
+          typeof entry.amount !== "number" ||
+          !Number.isSafeInteger(entry.amount) ||
+          entry.amount < 1 ||
+          entry.amount > SECT_COIN_CAP
+        ) {
+          errors.push({
+            code: "invalid_sect_log_amount",
+            message: `Mục sổ kho thứ ${i} có số lượng (${show(entry.amount)}) không hợp lệ (cần số nguyên 1..${SECT_COIN_CAP})`,
+          });
+        }
+      }
+    }
+  }
+
+  // 10. createdAt, updatedAt
+  if (!isFiniteEpoch(data.createdAt)) {
+    errors.push({
+      code: "invalid_sect_time",
+      message: `createdAt (${show(data.createdAt)}) phải là số epoch ms hợp lệ`,
+    });
+  }
+  if (!isFiniteEpoch(data.updatedAt)) {
+    errors.push({
+      code: "invalid_sect_time",
+      message: `updatedAt (${show(data.updatedAt)}) phải là số epoch ms hợp lệ`,
+    });
+  }
+
+  return errors;
+}
+
+/**
  * Quét toàn bộ thư mục file lưu nhân vật và lập báo cáo audit chi tiết.
  * Ném lỗi nếu thư mục không tồn tại.
  */
@@ -1429,6 +1706,136 @@ export function auditSavesDirectory(dirPath: string): AuditReport {
     }
   }
 
+  // Kiểm tra thư mục con sects/ nếu có (#231, M3.6 6e)
+  const sectsDir = path.join(resolvedDir, "sects");
+  const hasSectsDir = existsSync(sectsDir) && statSync(sectsDir).isDirectory();
+  let totalSects: number | undefined;
+  let cleanSects: number | undefined;
+  let errorSects: number | undefined;
+  const sectsById = new Set<string>();
+  const sectsByNameKey = new Map<string, string>();
+  const sectsByTagKey = new Map<string, string>();
+  const memberSectsBySoulKey = new Map<string, string>();
+
+  if (hasSectsDir) {
+    const sectEntries = readdirSync(sectsDir);
+    const sectJsonFiles = sectEntries.filter(
+      (f) => f.endsWith(".json") && !f.includes(".hong-") && !f.endsWith(".tmp"),
+    );
+
+    totalSects = sectJsonFiles.length;
+    cleanSects = 0;
+    errorSects = 0;
+
+    for (const filename of sectJsonFiles) {
+      const fullPath = path.join(sectsDir, filename);
+      let rawContent = "";
+      let byteLength: number;
+
+      try {
+        const fileStat = lstatSync(fullPath);
+        if (!fileStat.isFile()) {
+          const errList = [
+            {
+              code: "not_regular_file",
+              message: "File tông môn không phải file thông thường",
+            },
+          ];
+          errorSects++;
+          errorsByCode.not_regular_file = (errorsByCode.not_regular_file ?? 0) + 1;
+          if (failedFiles.length < 10) {
+            failedFiles.push({ file: `sects/${filename}`, errors: errList });
+          }
+          continue;
+        }
+        byteLength = fileStat.size;
+        if (byteLength <= MAX_FILE_SIZE) {
+          rawContent = readFileSync(fullPath, "utf8");
+        }
+      } catch (err: any) {
+        const errList = [
+          {
+            code: "read_error",
+            message: `Không thể đọc file tông môn: ${err?.message ?? "lỗi I/O"}`,
+          },
+        ];
+        errorSects++;
+        errorsByCode.read_error = (errorsByCode.read_error ?? 0) + 1;
+        if (failedFiles.length < 10) {
+          failedFiles.push({ file: `sects/${filename}`, errors: errList });
+        }
+        continue;
+      }
+
+      const sectErrors = auditSectSaveData(rawContent, byteLength);
+
+      if (sectErrors.length === 0) {
+        try {
+          const parsed = JSON.parse(rawContent);
+          if (filename !== `${parsed.id}.json`) {
+            sectErrors.push({
+              code: "mismatched_sect_filename",
+              message: `Tên file tông môn (${show(filename)}) không khớp với id (${show(parsed.id)}.json)`,
+            });
+          }
+
+          const nKey = sectKey(parsed.name);
+          if (sectsByNameKey.has(nKey)) {
+            sectErrors.push({
+              code: "duplicate_sect_name",
+              message: `Tên tông môn (${show(parsed.name)}) bị trùng lặp với file ${sectsByNameKey.get(nKey)}`,
+            });
+          } else {
+            sectsByNameKey.set(nKey, filename);
+          }
+
+          const tKey = sectKey(parsed.tag);
+          if (sectsByTagKey.has(tKey)) {
+            sectErrors.push({
+              code: "duplicate_sect_tag",
+              message: `Biệt hiệu tông môn (${show(parsed.tag)}) bị trùng lặp với file ${sectsByTagKey.get(tKey)}`,
+            });
+          } else {
+            sectsByTagKey.set(tKey, filename);
+          }
+
+          if (Array.isArray(parsed.members)) {
+            for (const m of parsed.members) {
+              if (m && typeof m.soulKey === "string") {
+                if (memberSectsBySoulKey.has(m.soulKey)) {
+                  sectErrors.push({
+                    code: "member_in_multiple_sects",
+                    message: `Linh hồn (${show(m.soulKey)}) thuộc nhiều hơn 1 tông môn (đã có trong file ${memberSectsBySoulKey.get(m.soulKey)})`,
+                  });
+                } else {
+                  memberSectsBySoulKey.set(m.soulKey, filename);
+                }
+              }
+            }
+          }
+
+          if (sectErrors.length === 0) {
+            sectsById.add(parsed.id);
+          }
+        } catch {
+          // JSON đã được kiểm tra trong auditSectSaveData
+        }
+      }
+
+      if (sectErrors.length === 0) {
+        cleanSects++;
+      } else {
+        errorSects++;
+        for (const err of sectErrors) {
+          errorsByCode[err.code] = (errorsByCode[err.code] ?? 0) + 1;
+        }
+        if (failedFiles.length < 10) {
+          failedFiles.push({ file: `sects/${filename}`, errors: sectErrors });
+        }
+      }
+    }
+  }
+
   for (const filename of jsonFiles) {
     const fullPath = path.join(resolvedDir, filename);
     let rawContent = "";
@@ -1527,6 +1934,9 @@ export function auditSavesDirectory(dirPath: string): AuditReport {
     totalSessions,
     cleanSessions,
     errorSessions,
+    totalSects,
+    cleanSects,
+    errorSects,
     errorsByCode,
     failedFiles,
   };
@@ -1584,11 +1994,14 @@ export function main(): number {
       report.errorFiles === 0 &&
       (report.errorSouls ?? 0) === 0 &&
       (report.errorAccounts ?? 0) === 0 &&
-      (report.errorSessions ?? 0) === 0;
+      (report.errorSessions ?? 0) === 0 &&
+      (report.errorSects ?? 0) === 0;
     return ok ? 0 : 1;
   }
 
-  console.log(`\n=== BÁO CÁO KIỂM TRA DỮ LIỆU FILE LƯU NHÂN VẬT, CHÂN LINH & TÀI KHOẢN ===`);
+  console.log(
+    `\n=== BÁO CÁO KIỂM TRA DỮ LIỆU FILE LƯU NHÂN VẬT, CHÂN LINH, TÀI KHOẢN & TÔNG MÔN ===`,
+  );
   console.log(`- Thư mục kiểm tra: ${report.dataDir}`);
   console.log(`- Tổng số file nhân vật (.json): ${report.totalFiles}`);
   console.log(`- File nhân vật sạch (hợp lệ): ${report.cleanFiles}`);
@@ -1607,6 +2020,11 @@ export function main(): number {
     console.log(`- Tổng số file phiên (sessions/): ${report.totalSessions}`);
     console.log(`- File phiên sạch (hợp lệ): ${report.cleanSessions}`);
     console.log(`- File phiên có lỗi vi phạm: ${report.errorSessions}`);
+  }
+  if (report.totalSects !== undefined) {
+    console.log(`- Tổng số file tông môn (sects/): ${report.totalSects}`);
+    console.log(`- File tông môn sạch (hợp lệ): ${report.cleanSects}`);
+    console.log(`- File tông môn có lỗi vi phạm: ${report.errorSects}`);
   }
 
   if (Object.keys(report.errorsByCode).length > 0) {
@@ -1630,7 +2048,8 @@ export function main(): number {
     report.errorFiles +
     (report.errorSouls ?? 0) +
     (report.errorAccounts ?? 0) +
-    (report.errorSessions ?? 0);
+    (report.errorSessions ?? 0) +
+    (report.errorSects ?? 0);
   if (totalErrors === 0) {
     console.log(`\n✅ TẤT CẢ DỮ LIỆU ĐỀU HỢP LỆ VÀ AN TOÀN.\n`);
     return 0;

@@ -417,12 +417,14 @@ export function duelDrop(w: World, sid: string) {
   w.duels._forget(sid);
 }
 
-/** Đứng dậy tại chỗ sau khi gục (gọi từ `tickRespawn` khi `c.reviveAt` tới). */
+/** Đứng dậy tại chỗ sau khi gục (gọi từ `tickRespawn` khi `c.reviveAt` tới): thua thách đấu (`DUEL_KO_HP_PCT`) hoặc gục trong bí cảnh (`c.reviveHpPct`). */
 export function reviveInPlace(p: Player, c: PlayerCtrl) {
+  const pct = c.reviveHpPct ?? DUEL_KO_HP_PCT;
   c.reviveAt = undefined;
+  c.reviveHpPct = undefined;
   p.dead = false;
   p.meditating = false;
-  p.hp = Math.max(1, Math.round(p.maxHp * DUEL_KO_HP_PCT));
+  p.hp = Math.max(1, Math.round(p.maxHp * pct));
 }
 
 function sendState(w: World, d: Duel) {
