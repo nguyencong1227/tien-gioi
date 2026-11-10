@@ -18,7 +18,6 @@ import {
   PICKUP_RANGE,
   PLAYER_RADIUS,
   REALMS,
-  ROOM_NAME,
   SKILLS,
   TICK_MS,
   buyPrice,
@@ -559,11 +558,21 @@ async function runIdleZeroBotTest(
     `\n=== Đo mức 0 bot (phòng trống, kiểm tra quái ngủ) trong ${durationSec}s (${url}, bản đồ=${currentMap.def.name}) ===`,
   );
   const seedName = "Bot 000";
+  const seedSecret = "bot_secret_tien_gioi_000_loadtest";
+  seedBotSaveFile(
+    seedName,
+    seedSecret,
+    currentMap.townPx.x,
+    currentMap.townPx.y,
+    1,
+    0,
+    currentMap.def.id,
+  );
   const client = new Client(url);
   const roomName = roomNameOf(currentMap.def.id);
   const room = await client.joinOrCreate(roomName, {
     name: seedName,
-    secret: "bot_secret_tien_gioi_000_loadtest",
+    secret: seedSecret,
   });
   await sleep(150);
   const monstersCount = (room.state as any)?.monsters?.size ?? 88;

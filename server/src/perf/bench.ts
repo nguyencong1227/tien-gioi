@@ -14,7 +14,6 @@ import {
   TICK_MS,
   DEFAULT_MAP,
   getMap,
-  HAC_PHONG_ID,
   type GameMap,
 } from "@tien-gioi/shared";
 import { WorldState } from "../schema";

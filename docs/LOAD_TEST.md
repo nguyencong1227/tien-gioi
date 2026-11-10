@@ -225,20 +225,22 @@ Theo kiến trúc M3 phương án A (mỗi bản đồ là một phòng Colyseus
 - **Cách chạy:**
   ```bash
   # Chạy mô phỏng đồng thời 2 bản đồ: Lạc Hà (50 bot) + Hắc Phong Cốc (50 bot)
-  npm run bench -w server -- --multi --seconds 5
+  npm run bench -w server -- --multi --seconds 20
 
   # Hoặc chạy mô phỏng riêng 1 bản đồ chỉ định
-  npm run bench -w server -- --map=hac_phong --players 50 --seconds 5
+  npm run bench -w server -- --map=hac_phong --players 50 --seconds 20
   ```
 - **Tiêu chuẩn ngân sách:**
   - Tổng thời gian CPU tick của **toàn bộ các phòng** gộp lại trên tiến trình đơn luồng Node.js phải đạt **< 10 ms/tick** (để giữ vững nhịp 20 tick/giây).
   - Băng thông patch của từng client trên mỗi bản đồ phải tuân thủ ngân sách tương đương (< 520 byte/tick).
-- **Kết quả đo thực tế (Lạc Hà 50 + Hắc Phong Cốc 50 = 100 người chơi):**
-  - **Tổng thời gian tick (2 phòng):** TB **1.41 ms**, p95 **3.01 ms**, cao nhất **9.00 ms** (đạt sâu dưới ngân sách < 10 ms).
+- **Kết quả đo thực tế (`--multi --seconds 20`, seed = 1 cố định, 400 tick; Lạc Hà 50 + Hắc Phong Cốc 50 = 100 người chơi):**
+  - **Tổng thời gian tick (2 phòng):** TB **0.99 ms**, p95 **1.87 ms**, cao nhất **7.00 ms** (đạt sâu dưới ngân sách tổng < 10 ms).
   - **Băng thông patch mỗi client:**
-    - Lạc Hà (50 người): TB **220 byte/tick** (~4.4 KB/s)
-    - Hắc Phong Cốc (50 người): TB **220 byte/tick** (~4.4 KB/s)
-  - **Tính tương thích ngược:** Chế độ 1 bản đồ chuẩn (`npm run bench -w server`) giữ nguyên sai số **0.0% trên mọi dòng** so với mốc chuẩn `server/src/perf/bench-baseline.json`.
+    - Lạc Hà Trấn (50 người, 21 quái): TB **117 byte/tick** (~2.3 KB/s)
+    - Hắc Phong Cốc (50 người, 56 quái): TB **135 byte/tick** (~2.6 KB/s)
+  - **Lưu lượng tin riêng:** Party TB ~0.34 KB/s mỗi client; Wallet TB < 0.01 KB/s.
+  - **Lưu ý về phạm vi đo:** `bench --multi` hiện đo thời gian xử lý vòng lặp tick và mã hoá patch của các phòng trong bộ nhớ tiến trình, chưa đo độ trễ vòng lặp sự kiện (event loop lag) và I/O mạng của Colyseus khi kết nối qua WebSocket thật.
+  - **Tính tương thích:** Chế độ 1 bản đồ chuẩn (`npm run bench -w server`) không vượt ngưỡng của `bench-compare` (sau PR #145, số đo săn quái 100 người nhích -4.1% và đám đông 100 người nhích -2.0% do chuỗi Math.random khi thêm khu an toàn quanh cổng dịch chuyển; mốc `bench-baseline.json` sẽ được cập nhật ở PR riêng).
 
 ### 5.2. Kiểm tra toàn vẹn file lưu nhân vật có `mapId` (`audit-saves.ts`)
 
@@ -265,10 +267,10 @@ Theo kiến trúc M3 phương án A (mỗi bản đồ là một phòng Colyseus
 - **Cơ chế vận hành:**
   - Bot đọc thông số bản đồ qua `getMap(args.map) ?? DEFAULT_MAP`, không phụ thuộc vào hằng số toàn cục của Lạc Hà Trấn.
   - Sinh vị trí xuất phát `(campX, campY)` an toàn theo toạ độ khu an toàn `townPx` và ranh giới `worldW, worldH` của bản đồ đó.
-  - Khởi tạo save file nhân vật mang sẵn `mapId` tương ứng (`seedBotSaveFile`).
-  - Gửi `mapId` trong `JoinOptions` khi kết nối vào phòng.
+  - Khởi tạo save file nhân vật mang sẵn `mapId` tương ứng (`seedBotSaveFile`). Với kịch bản đo mức 0 bot (`runIdleZeroBotTest`), bot mồi "Bot 000" cũng được ghi sẵn file lưu có `mapId` tương ứng trước khi kết nối.
+  - Vào phòng tương ứng bằng `roomNameOf(targetMap.def.id)` qua `colyseus.js` `joinOrCreate(roomNameOf(id))` (không truyền `mapId` trong `JoinOptions` sau PR #144).
   - Vòng lặp di chuyển, né vật cản và tuần tra tuân thủ đúng thuật toán `moveWithCollision` và kích thước của bản đồ hiện tại.
-- **Kịch bản tiếp theo (chờ PR server #142 của Dev A):**
+- **Kịch bản kế tiếp của #141 (sau khi hạ tầng travel #153 đã vào main):**
   - Thử tải bot di chuyển qua lại liên tục giữa các cổng dịch chuyển (đo độ trễ chuyển phòng `travelTo`, tính trọn vẹn dữ liệu tu vi/Linh thạch/túi đồ, chống nhân bản và kiểm tra rò rỉ tài nguyên).
 
 
