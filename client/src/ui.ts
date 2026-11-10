@@ -113,6 +113,14 @@ import {
   type SectConfirmKind,
 } from "./sect";
 import { sound } from "./audio";
+import {
+  modalStack,
+  focusModal,
+  returnFocus,
+  trapTabKey,
+  isTypingElement,
+  processEscapeKey,
+} from "./a11y";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -2175,11 +2183,20 @@ export const ui = {
       grid.append(btn);
     }
 
-    const bindTap = (id: string, fn: () => void) =>
-      $(id).addEventListener("pointerdown", (e) => {
+    const bindTap = (id: string, fn: () => void) => {
+      const el = $(id);
+      if (!el) return;
+      el.addEventListener("pointerdown", (e) => {
         e.preventDefault();
         fn();
       });
+      el.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          fn();
+        }
+      });
+    };
 
     // Túi đồ
     bindTap("btn-bag", () => this.toggleInventory());
@@ -2587,6 +2604,23 @@ export const ui = {
     ) {
       $("perf-panel").hidden = false;
     }
+
+    // Trợ năng: Lắng nghe Escape để đóng modal trên cùng, Tab để trap focus
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        if (this.handleEscape()) {
+          e.preventDefault();
+        }
+      } else if (e.key === "Tab") {
+        const top = modalStack.peek();
+        if (top) {
+          const modalEl = $(top.id);
+          if (modalEl && !modalEl.hidden) {
+            trapTabKey(modalEl, e);
+          }
+        }
+      }
+    });
   },
 
   updatePerf(stats: {
@@ -2618,6 +2652,14 @@ export const ui = {
     settingsModalOpen = force ?? !settingsModalOpen;
     $("settings-modal").hidden = !settingsModalOpen;
     $("btn-settings").classList.toggle("active", settingsModalOpen);
+    $("btn-settings").setAttribute("aria-expanded", String(settingsModalOpen));
+    if (settingsModalOpen) {
+      modalStack.push("settings-modal", $("btn-settings"));
+      focusModal($("settings-modal"));
+    } else {
+      modalStack.remove("settings-modal");
+      returnFocus($("btn-settings"));
+    }
   },
 
   isSettingsModalOpen() {
@@ -2636,7 +2678,15 @@ export const ui = {
     invOpen = force ?? !invOpen;
     $("inv-modal").hidden = !invOpen;
     $("btn-bag").classList.toggle("active", invOpen);
-    if (invOpen) renderInventory();
+    $("btn-bag").setAttribute("aria-expanded", String(invOpen));
+    if (invOpen) {
+      modalStack.push("inv-modal", $("btn-bag"));
+      focusModal($("inv-modal"));
+      renderInventory();
+    } else {
+      modalStack.remove("inv-modal");
+      returnFocus($("btn-bag"));
+    }
   },
 
   isInventoryOpen() {
@@ -2647,9 +2697,15 @@ export const ui = {
     charModalOpen = force ?? !charModalOpen;
     $("char-modal").hidden = !charModalOpen;
     $("btn-char").classList.toggle("active", charModalOpen);
+    $("btn-char").setAttribute("aria-expanded", String(charModalOpen));
     if (charModalOpen) {
+      modalStack.push("char-modal", $("btn-char"));
+      focusModal($("char-modal"));
       previewEquipItemId = null;
       renderCharModal();
+    } else {
+      modalStack.remove("char-modal");
+      returnFocus($("btn-char"));
     }
   },
 
@@ -2665,7 +2721,14 @@ export const ui = {
   toggleForgeModal(force?: boolean) {
     forgeModalOpen = force ?? !forgeModalOpen;
     $("forge-modal").hidden = !forgeModalOpen;
-    if (forgeModalOpen) renderForgeModal();
+    if (forgeModalOpen) {
+      modalStack.push("forge-modal");
+      focusModal($("forge-modal"));
+      renderForgeModal();
+    } else {
+      modalStack.remove("forge-modal");
+      returnFocus();
+    }
   },
 
   isForgeModalOpen() {
@@ -2680,7 +2743,14 @@ export const ui = {
   toggleShopModal(force?: boolean) {
     shopModalOpen = force ?? !shopModalOpen;
     $("shop-modal").hidden = !shopModalOpen;
-    if (shopModalOpen) renderShopModal();
+    if (shopModalOpen) {
+      modalStack.push("shop-modal");
+      focusModal($("shop-modal"));
+      renderShopModal();
+    } else {
+      modalStack.remove("shop-modal");
+      returnFocus();
+    }
   },
 
   isShopModalOpen() {
@@ -2691,7 +2761,15 @@ export const ui = {
     questModalOpen = force ?? !questModalOpen;
     $("quest-modal").hidden = !questModalOpen;
     $("btn-quest").classList.toggle("active", questModalOpen);
-    if (questModalOpen) renderQuestModal();
+    $("btn-quest").setAttribute("aria-expanded", String(questModalOpen));
+    if (questModalOpen) {
+      modalStack.push("quest-modal", $("btn-quest"));
+      focusModal($("quest-modal"));
+      renderQuestModal();
+    } else {
+      modalStack.remove("quest-modal");
+      returnFocus($("btn-quest"));
+    }
   },
 
   isQuestModalOpen() {
@@ -2701,6 +2779,14 @@ export const ui = {
   toggleMapModal(force?: boolean) {
     mapModalOpen = force ?? !mapModalOpen;
     $("map-modal").hidden = !mapModalOpen;
+    $("minimap-wrap").setAttribute("aria-expanded", String(mapModalOpen));
+    if (mapModalOpen) {
+      modalStack.push("map-modal", $("minimap-wrap"));
+      focusModal($("map-modal"));
+    } else {
+      modalStack.remove("map-modal");
+      returnFocus($("minimap-wrap"));
+    }
   },
 
   isMapModalOpen() {
@@ -2716,6 +2802,8 @@ export const ui = {
     currentDialog = null;
     $("dialog-modal").hidden = true;
     $("dlg-options").replaceChildren();
+    modalStack.remove("dialog-modal");
+    returnFocus();
   },
 
   closeAllModals(): boolean {
@@ -2760,7 +2848,91 @@ export const ui = {
       this.closePlayerMenu();
       closedAny = true;
     }
+    modalStack.clear();
     return closedAny;
+  },
+
+  /** Đóng modal trên cùng của modal stack (LIFO) */
+  closeTopModal(): boolean {
+    const top = modalStack.peek();
+    if (!top) return false;
+    switch (top.id) {
+      case "inv-modal":
+        this.toggleInventory(false);
+        return true;
+      case "char-modal":
+        this.toggleCharModal(false);
+        return true;
+      case "forge-modal":
+        this.toggleForgeModal(false);
+        return true;
+      case "shop-modal":
+        this.toggleShopModal(false);
+        return true;
+      case "quest-modal":
+        this.toggleQuestModal(false);
+        return true;
+      case "map-modal":
+        this.toggleMapModal(false);
+        return true;
+      case "settings-modal":
+        this.toggleSettingsModal(false);
+        return true;
+      case "sect-modal":
+        this.toggleSectModal(false);
+        return true;
+      case "dialog-modal":
+        this.closeDialog();
+        return true;
+      case "player-menu":
+        this.closePlayerMenu();
+        return true;
+      default: {
+        const el = document.getElementById(top.id);
+        if (el) {
+          el.hidden = true;
+          modalStack.remove(top.id);
+          returnFocus(top.triggerEl);
+          return true;
+        }
+        modalStack.pop();
+        return false;
+      }
+    }
+  },
+
+  /** Đóng hộp xác nhận giải tán tông môn nếu đang mở (Esc = Huỷ) */
+  closeSectDisbandConfirm(): boolean {
+    const el = $("sect-disband-confirm");
+    if (el && !el.hidden) {
+      el.hidden = true;
+      return true;
+    }
+    return false;
+  },
+
+  /** Đóng hộp xác nhận rời bí cảnh nếu đang mở (Esc = Huỷ) */
+  closeDhudLeaveConfirm(): boolean {
+    const confirmEl = $("dhud-leave-confirm");
+    if (confirmEl && !confirmEl.hidden) {
+      confirmEl.hidden = true;
+      const leaveBtn = $("dhud-btn-leave");
+      if (leaveBtn) leaveBtn.hidden = false;
+      return true;
+    }
+    return false;
+  },
+
+  /** Đóng hộp xác nhận nhận thua quyết đấu nếu đang mở (Esc = Huỷ) */
+  closeDuelYieldConfirm(): boolean {
+    const confirmBox = $("duel-yield-confirm");
+    if (confirmBox && !confirmBox.hidden) {
+      confirmBox.hidden = true;
+      const yieldBtn = $("duel-btn-yield");
+      if (yieldBtn) yieldBtn.hidden = false;
+      return true;
+    }
+    return false;
   },
 
   /** Đóng modal kết quả quyết đấu riêng biệt (không gộp vào closeAllModals để người thua xem được khi bị KO) */
@@ -2776,6 +2948,96 @@ export const ui = {
   isDuelEndModalOpen(): boolean {
     const duelEndModal = $("duel-end-modal");
     return Boolean(duelEndModal && !duelEndModal.hidden);
+  },
+
+  /** Đóng modal kết quả bí cảnh */
+  closeDungeonEndModal(): boolean {
+    const endModal = $("dungeon-end-modal");
+    if (endModal && !endModal.hidden) {
+      endModal.hidden = true;
+      return true;
+    }
+    return false;
+  },
+
+  /** Đóng hộp lời mời nếu đang mở (Esc = Từ chối lời mời) */
+  closeInviteBox(): boolean {
+    const pib = $("party-invite-box");
+    if (pib && !pib.hidden) {
+      const declineBtn = $("pib-btn-decline");
+      declineBtn?.click();
+      pib.hidden = true;
+      return true;
+    }
+    const dib = $("dungeon-invite-box");
+    if (dib && !dib.hidden) {
+      const declineBtn = $("dib-btn-decline");
+      declineBtn?.click();
+      dib.hidden = true;
+      return true;
+    }
+    const duib = $("duel-invite-box");
+    if (duib && !duib.hidden) {
+      const declineBtn = $("duib-btn-decline");
+      declineBtn?.click();
+      duib.hidden = true;
+      return true;
+    }
+    const sib = $("sect-invite-box");
+    if (sib && !sib.hidden) {
+      const declineBtn = $("sib-btn-decline");
+      declineBtn?.click();
+      sib.hidden = true;
+      return true;
+    }
+    return false;
+  },
+
+  /**
+   * Xử lý phím Escape tổng quát theo thứ tự ưu tiên các tầng UI:
+   * 1. Blur chat nếu đang ở ô chat.
+   * 2. Bỏ qua nếu đang gõ input khác.
+   * 3. Đóng confirm box con (Huỷ).
+   * 4. Đóng menu người chơi / đối thoại NPC.
+   * 5. Đóng kết quả PK / bí cảnh.
+   * 6. Đóng modal trên cùng của modal stack (LIFO).
+   * 7. Từ chối lời mời đang hiển thị.
+   */
+  handleEscape(): boolean {
+    return processEscapeKey({
+      isTyping: () => isTypingElement(document.activeElement),
+      blurChat: () => {
+        const chatInput = $("chat-input") as HTMLInputElement | null;
+        if (chatInput && document.activeElement === chatInput) {
+          chatInput.blur();
+          returnFocus();
+          return true;
+        }
+        return false;
+      },
+      closeSectActionConfirm: () => this.closeSectConfirm(),
+      closeSectDisbandConfirm: () => this.closeSectDisbandConfirm(),
+      closeDhudLeaveConfirm: () => this.closeDhudLeaveConfirm(),
+      closeDuelYieldConfirm: () => this.closeDuelYieldConfirm(),
+      closePlayerMenu: () => {
+        if (this.isPlayerMenuOpen()) {
+          this.closePlayerMenu();
+          return true;
+        }
+        return false;
+      },
+      closeDialog: () => {
+        if (this.isDialogOpen()) {
+          this.closeDialog();
+          return true;
+        }
+        return false;
+      },
+      closeDuelEndModal: () => this.closeDuelEndModal(),
+      closeDungeonEndModal: () => this.closeDungeonEndModal(),
+      closeTopModal: () => this.closeTopModal(),
+      closeInviteBox: () => this.closeInviteBox(),
+    });
   },
 
   onInv(m: InvMsg) {
@@ -2860,6 +3122,8 @@ export const ui = {
     $("dialog-modal").hidden = false;
     $("dlg-options").replaceChildren();
     $("dlg-skip-hint").hidden = false;
+    modalStack.push("dialog-modal");
+    focusModal($("dialog-modal"));
 
     dlgFullText = m.lines.join("\n\n");
     dlgTypedLen = 0;
@@ -3187,10 +3451,14 @@ export const ui = {
     const clampedY = Math.max(pad, Math.min(window.innerHeight - mh - pad, y));
     menu.style.left = `${clampedX}px`;
     menu.style.top = `${clampedY}px`;
+    modalStack.push("player-menu");
+    focusModal(menu);
   },
 
   closePlayerMenu() {
     $("player-menu").hidden = true;
+    modalStack.remove("player-menu");
+    returnFocus();
   },
 
   isPlayerMenuOpen() {
@@ -3789,11 +4057,19 @@ export const ui = {
     if (sectModalOpen) {
       this.closeAllModals();
       sectModalOpen = true;
+      $("sect-modal").hidden = false;
+      $("btn-sect")?.classList.add("active");
+      $("btn-sect")?.setAttribute("aria-expanded", "true");
+      modalStack.push("sect-modal", $("btn-sect"));
+      focusModal($("sect-modal"));
       renderSectModal();
     } else {
       closeSectConfirm();
       $("sect-modal").hidden = true;
       $("btn-sect")?.classList.remove("active");
+      $("btn-sect")?.setAttribute("aria-expanded", "false");
+      modalStack.remove("sect-modal");
+      returnFocus($("btn-sect"));
     }
   },
 

@@ -74,6 +74,7 @@ import { clientCanChallenge } from "../duel";
 import { replayEarlyMessages } from "../early-messages";
 import { sound } from "../audio";
 import { joystick, setupJoystick } from "../joystick";
+import { isTypingElement } from "../a11y";
 
 interface Entity {
   root: Phaser.GameObjects.Container;
@@ -584,7 +585,7 @@ export class WorldScene extends Phaser.Scene {
       "W,A,S,D,UP,DOWN,LEFT,RIGHT,J,K,L,B,C,I,Q,M,N,O,F,ONE,TWO,ESC,SPACE,ENTER",
       false,
     ) as any;
-    const typing = () => document.activeElement instanceof HTMLInputElement;
+    const typing = () => isTypingElement(document.activeElement);
     const kb = this.input.keyboard!;
 
     kb.on("keydown-J", () => !typing() && this.slash());
@@ -600,10 +601,7 @@ export class WorldScene extends Phaser.Scene {
     kb.on("keydown-N", () => !typing() && sound.toggleMute());
     kb.on("keydown-O", () => !typing() && ui.toggleSettingsModal());
     kb.on("keydown-ESC", () => {
-      if (typing()) return;
-      if (ui.closeDuelEndModal()) return;
-      if (ui.closeSectConfirm()) return;
-      ui.closeAllModals();
+      ui.handleEscape();
     });
     kb.on("keydown-F", () => !typing() && this.interactOrPickup());
     kb.on("keydown-ONE", () => !typing() && ui.useQuick(1));
