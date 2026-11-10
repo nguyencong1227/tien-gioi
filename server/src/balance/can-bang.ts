@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   WILD_MONSTERS,
+  PK_DAMAGE_MULT,
   MONSTER_BY_ID,
   REALMS,
   TRADE_BY_ID,
@@ -11,6 +12,7 @@ import {
   buyPrice,
   sellPrice,
 } from "@tien-gioi/shared";
+import { PK_TARGET_SECONDS, representativeLevels, summarizeDuels } from "./pk";
 import {
   ASSUME_DUNGEON,
   LINH_HU,
@@ -242,6 +244,54 @@ ${dunValueTable}
 Tối đa 3 lượt thưởng mỗi ngày (\`DUNGEON_DAILY_REWARDS\`) nên bí cảnh là một lựa chọn thêm chứ không thay được việc săn quái.
 `;
 
+// ---------- PK thách đấu (M3.5, 5c) ----------
+const pkLevels = representativeLevels();
+const pkRows = pkLevels
+  .filter((l, i) => l.tier === 0 || i === pkLevels.length - 1)
+  .map((l) => ({ l, s: summarizeDuels(l, l, 20) }));
+const pkTable = [
+  "| Bậc | Giây đánh (trung vị) | Nhỏ nhất - lớn nhất |",
+  "|---|---:|---:|",
+  ...pkRows.map(
+    ({ l, s }) =>
+      `| ${l.label} (bậc ${l.step}) | ${s.median.toFixed(1)} | ${s.min.toFixed(1)} - ${s.max.toFixed(1)} |`,
+  ),
+].join("\n");
+const pkBase = { realm: 1, tier: 4 };
+const pkEven = summarizeDuels(pkBase, pkBase, 20);
+const pkGapRows = [1, 2, 3].map((g) => ({
+  g,
+  s: summarizeDuels({ realm: 1, tier: 4 + g }, pkBase, 20),
+}));
+const pkGapTable = [
+  "| Chênh | Bên mạnh hơn thắng | Giây đánh (trung vị) |",
+  "|---|---:|---:|",
+  `| cùng bậc (Luyện Khí tầng 5) | ${Math.round(pkEven.winRate * 100)}% (bên đánh trước) | ${pkEven.median.toFixed(1)} |`,
+  ...pkGapRows.map(
+    ({ g, s }) => `| ${g} tầng | ${Math.round(s.winRate * 100)}% | ${s.median.toFixed(1)} |`,
+  ),
+].join("\n");
+const pkSection = `## PK thách đấu (M3.5, 5c, #217)
+
+Mô phỏng ở \`server/src/balance/pk.ts\`; test \`pk.test.ts\` giữ mục tiêu. **Số liệu đang dùng:** \`PK_DAMAGE_MULT\` ${PK_DAMAGE_MULT} (sát thương người lên người = \`atk\` × hệ số kỹ năng × hệ số này).
+
+**Mục tiêu (thiết kế):** hai người **cùng bậc** đánh thường liên tục hết khí huyết nhau trong ${PK_TARGET_SECONDS.min}-${PK_TARGET_SECONDS.max} giây (đủ để có cảm giác đấu, không kéo lê), không đan, không đả tọa (bị khoá trong trận).
+
+### 1. Hai người cùng bậc
+
+\`duelOnce\` dựng một \`World\` thật, hai người nhận / thách bằng chính \`duelChallenge\` / \`duelAnswer\`, rồi đứng cạnh nhau đánh thường (\`slash\`) mỗi lần hồi chiêu cho tới khi trận kết thúc; sát thương, bạo kích, đếm ngược và \`tickDuels\` là mã server thật, \`Math.random\` có hạt giống. Trang bị tốt nhất đủ bậc. **Ca liên tục:** không né, đánh 100% thời gian; người chơi thật không đánh liên tục nên trận thật dài hơn. 20 trận mỗi dòng; test kiểm mọi bậc (tầng đầu, giữa, cuối của từng cảnh giới); bảng chỉ hiện tầng đầu mỗi cảnh giới và bậc cuối cùng.
+
+${pkTable}
+
+\`atk\` và \`maxHp\` tăng gần cùng tỉ lệ theo bậc nên **một hệ số chung** đủ cho mọi bậc (chậm dần nhẹ vì \`maxHp\` tăng nhỉnh hơn).
+
+### 2. Chênh bậc (không hiệu chỉnh)
+
+${pkGapTable}
+
+Không có hiệu chỉnh chênh lệch: bên mạnh hơn hầu như luôn thắng và nhanh hơn (trận này không có né / đan / kỹ năng nên ít bất ngờ); người yếu hơn có quyền từ chối lời thách. Hai người cùng bậc: bên **đánh trước** trong cùng một tick thắng thường hơn (đòn hạ khí huyết về 0 kết thúc trận ngay), nên tỉ lệ thắng của người thứ nhất ở dòng "cùng bậc" trên 50% là hiệu ứng thứ tự xử lý, không phải lợi thế bậc. Nếu muốn trận công bằng giữa người chênh bậc thì cần chuẩn hoá chỉ số về bậc thấp hơn: việc riêng, chờ người dùng quyết (câu hỏi 4 ở \`questions.md\`).
+`;
+
 const reincarnationSection = `## Luân hồi & Điểm Duyên (M3.2, #151)
 
 Mô phỏng cân bằng hệ thống Luân hồi theo thiết kế tại \`docs/THIET_KE_LUAN_HOI.md\` (mục 5 & 6) và hợp đồng \`shared/src/reincarnation.ts\`:
@@ -317,7 +367,9 @@ if (process.argv.includes("--stdout")) {
       "\n\n" +
       reincarnationSection +
       "\n\n" +
-      dungeonSection,
+      dungeonSection +
+      "\n\n" +
+      pkSection,
   );
 } else {
   const here = path.dirname(fileURLToPath(import.meta.url));
@@ -369,7 +421,9 @@ ${economySection}
 
 ${reincarnationSection}
 
-${dungeonSection}`,
+${dungeonSection}
+
+${pkSection}`,
   );
   console.log(`Đã ghi ${out}\n\n${summary}`);
 }
