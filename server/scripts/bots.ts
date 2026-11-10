@@ -370,9 +370,15 @@ export async function authBotAccount(
     body: JSON.stringify({ name: botName }),
   });
 
-  if (!charRes.ok && charRes.status !== 400) {
+  if (!charRes.ok) {
     const errText = await charRes.text();
-    if (!errText.includes("has_character")) {
+    let errCode = "";
+    try {
+      errCode = JSON.parse(errText)?.error ?? "";
+    } catch {
+      // Bỏ qua nếu không phải JSON
+    }
+    if (!(charRes.status === 400 && errCode === "has_character")) {
       throw new Error(`Bot ${botIndex} đặt đạo hiệu thất bại (${charRes.status}): ${errText}`);
     }
   }
