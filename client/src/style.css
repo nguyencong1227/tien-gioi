@@ -1248,6 +1248,8 @@ button {
 }
 #death div {
   text-align: center;
+  padding: 0 16px;
+  max-width: 92vw;
 }
 #death b {
   display: block;
@@ -2201,6 +2203,11 @@ body.low-fx #btn-talk {
   font-size: 11px;
   color: var(--paper);
   margin-bottom: 8px;
+}
+.pm-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 .pm-btn {
   width: 100%;
@@ -4706,12 +4713,67 @@ body.in-limbo #chat-log {
   color: #9ca3af;
 }
 
-/* Responsive di động cho Tông Môn */
+/* Responsive di động cho Tông Môn (390x844, #246) */
 @media (pointer: coarse), (max-width: 640px) {
   .sect-invite-box {
     top: auto;
     bottom: calc(max(12px, env(safe-area-inset-bottom)) + 195px);
     width: min(94vw, 356px);
     padding: 10px 12px;
+  }
+
+  #sect-modal {
+    width: min(94vw, 440px);
+    max-height: min(84vh, 600px);
+    padding: 12px;
+    justify-content: flex-start;
+  }
+
+  .sect-tab {
+    min-height: 44px;
+    font-size: 13px;
+  }
+
+  .sect-member-row {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .sect-member-actions {
+    width: 100%;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+
+  .sect-action-btn {
+    min-height: 38px;
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  .sect-danger-btn {
+    min-height: 44px;
+    font-size: 14px;
+  }
+
+  .sect-primary-btn {
+    min-height: 46px;
+    font-size: 15px;
+  }
+
+  .sect-tiny-btn,
+  .sect-small-btn {
+    min-height: 38px;
+    min-width: 60px;
+  }
+
+  .sect-input-row button {
+    min-height: 44px;
+    min-width: 84px;
+  }
+
+  .player-menu {
+    width: min(88vw, 240px);
   }
 }
