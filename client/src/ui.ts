@@ -20,6 +20,7 @@ import {
   realmLabel,
   isLastTier,
   isPeak,
+  expToNext,
   stepProgress,
   questReady,
   type ChatOut,
@@ -173,12 +174,14 @@ export interface UiCallbacks {
   onSectWithdraw?: (amount: number) => void;
 }
 
-const fmt = (n: number) =>
-  n >= 1e6
-    ? `${(n / 1e6).toFixed(1)}M`
-    : n >= 1e4
-      ? `${(n / 1e3).toFixed(1)}k`
-      : `${Math.floor(n)}`;
+export const fmt = (n: number) =>
+  !Number.isFinite(n) || n < 0
+    ? "0"
+    : n >= 1e6
+      ? `${(n / 1e6).toFixed(1)}M`
+      : n >= 1e4
+        ? `${(n / 1e3).toFixed(1)}k`
+        : `${Math.floor(n)}`;
 
 const hexColor = (c: number) => `#${c.toString(16).padStart(6, "0")}`;
 
@@ -3024,20 +3027,25 @@ export const ui = {
       $("hud-realm").textContent = rLabel;
     }
     const set = (k: string, v: number, max: number, label: string) => {
-      const pct = Math.round(Math.max(0, Math.min(1, max > 0 ? v / max : 0)) * 1000) / 10;
+      const validV = Number.isFinite(v) && v >= 0 ? v : 0;
+      const validMax = Number.isFinite(max) && max > 0 ? max : 0;
+      const pct =
+        Math.round(Math.max(0, Math.min(1, validMax > 0 ? validV / validMax : 0)) * 1000) / 10;
       if (pct !== cachedBarPct[k]) {
         cachedBarPct[k] = pct;
         $(`${k}-fill`).style.width = `${pct}%`;
       }
-      const text = `${label} ${fmt(v)} / ${fmt(max)}`;
+      const text = `${label} ${fmt(validV)} / ${fmt(validMax)}`;
       if (text !== cachedBarText[k]) {
         cachedBarText[k] = text;
         $(`${k}-text`).textContent = text;
       }
     };
+    const validExpMax =
+      Number.isFinite(p.expMax) && p.expMax > 0 ? p.expMax : expToNext(p.realm, p.tier);
     set("hp", p.hp, p.maxHp, "Khí huyết");
     set("mp", p.mp, p.maxMp, "Linh lực");
-    set("exp", p.exp, p.expMax, "Tu vi");
+    set("exp", p.exp, validExpMax, "Tu vi");
     if (online !== cachedHudOnline) {
       cachedHudOnline = online;
       $("hud-online").textContent = `Đạo hữu: ${online}`;

@@ -66,6 +66,7 @@ function createMockDungeonRoom(dead = false): any {
             mp: dead ? 0 : 1200,
             maxMp: 1200,
             exp: 8000,
+            expMax: 10000,
             x: 512,
             y: 896,
             lastSeq: 0,
