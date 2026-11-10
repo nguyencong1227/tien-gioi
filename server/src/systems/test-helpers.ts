@@ -3,6 +3,7 @@ import {
   MONSTER_BY_ID,
   DEFAULT_MAP,
   emptyInventory,
+  newSoul,
   type FxMsg,
   type GameMap,
   type InvMsg,
@@ -75,6 +76,9 @@ export function addPlayer(w: World, sid: string, realm = 0, tier = 0) {
     inv: emptyInventory(),
     itemCd: new Map(),
     quests: { active: [], done: [], daily: {} },
+    lifeId: `life-${sid}`,
+    life: { playMs: 0, kills: 0, bossKills: 0 },
+    soul: newSoul(sid.toLowerCase(), "t"),
     coin: 0,
     frac: { hp: 0, mp: 0, exp: 0, expAt: 0 },
   };
