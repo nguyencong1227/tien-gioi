@@ -7,10 +7,10 @@ import {
   MAX_PLAYERS_PER_ROOM,
   MONSTER_RESPAWN_MS,
   DEFAULT_MAP_ID,
-  ROOM_NAME,
-  JOIN_BAD_MAP,
+  MAPS,
   JOIN_WRONG_MAP,
   getMap,
+  roomNameOf,
   wrongMapMessage,
   REALMS,
   addCoin,
@@ -134,14 +134,13 @@ export class WorldRoom extends Room<WorldState> {
   }
 
   /**
-   * `options.mapId` (có vì `filterBy(["mapId"])`) chọn bản đồ của phòng; bỏ trống là bản đồ mặc định.
-   * Id lạ bị từ chối ngay ở đây: nếu không, mỗi `mapId` rác client gửi sẽ tạo thêm một phòng không bao giờ dọn
-   * (`autoDispose = false`). Ném lỗi ở onCreate thì Colyseus không đăng ký phòng.
+   * `options.mapId` do `defineRooms` đặt cho từng tên phòng (tuỳ chọn của handler ghi đè tuỳ chọn client, nên client
+   * không đổi được bản đồ của phòng). Bỏ trống là bản đồ mặc định (phòng đăng ký tay không qua `defineRooms`).
    */
-  onCreate(options?: Partial<JoinOptions>) {
+  onCreate(options?: { mapId?: unknown }) {
     const wanted = options?.mapId === undefined ? DEFAULT_MAP_ID : options.mapId;
     const map = getMap(wanted);
-    if (!map) throw new ServerError(JOIN_BAD_MAP, "Bản đồ không tồn tại.");
+    if (!map) throw new Error(`Phòng thế giới cấu hình bản đồ không tồn tại: ${String(wanted)}`);
     this.mapId = map.def.id;
     this.world = this.createWorld(map);
     this.setPatchRate(TICK_MS);
@@ -399,9 +398,9 @@ export class WorldRoom extends Room<WorldState> {
 }
 
 /**
- * Đăng ký phòng thế giới: mỗi bản đồ một phòng, chọn theo `mapId` trong tuỳ chọn vào phòng.
+ * Đăng ký phòng thế giới: mỗi bản đồ một phòng với tên phòng riêng (`roomNameOf`, shared/src/travel.ts).
  * Dùng chung cho `index.ts` và test tích hợp để cấu hình không lệch nhau.
  */
 export function defineRooms(gameServer: Server) {
-  gameServer.define(ROOM_NAME, WorldRoom).filterBy(["mapId"]);
+  for (const m of MAPS) gameServer.define(roomNameOf(m.id), WorldRoom, { mapId: m.id });
 }

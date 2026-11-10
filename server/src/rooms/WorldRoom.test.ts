@@ -32,10 +32,11 @@ import {
   sellPrice,
   DEFAULT_MAP_ID,
   HAC_PHONG_ID,
-  JOIN_BAD_MAP,
   JOIN_WRONG_MAP,
+  MAPS,
   getMap,
   parseWrongMap,
+  roomNameOf,
 } from "@tien-gioi/shared";
 import { changeCoin } from "../systems/wallet";
 import type { WorldRoom } from "./WorldRoom";
@@ -86,7 +87,7 @@ const secretOf = (name: string) => `secret-${name}-0123456789abcdef`;
 
 async function join(name = `Thu ${++nameSeq}`, secret = secretOf(name), mapId = DEFAULT_MAP_ID) {
   const client = new Client(`ws://localhost:${PORT}`);
-  const room = await client.joinOrCreate(ROOM_NAME, { name, secret, mapId });
+  const room = await client.joinOrCreate(roomNameOf(mapId), { name, secret });
   const chat: ChatOut[] = [];
   const toasts: ToastMsg[] = [];
   const invs: InvMsg[] = [];
@@ -1273,10 +1274,10 @@ describe("tổ đội", () => {
 
 describe("nhiều bản đồ: mỗi bản đồ một phòng (M3 bước 1)", () => {
   /** Lỗi vào phòng của colyseus.js: mã + thông điệp như client thật nhận được */
-  async function joinError(name: string, secret: string, mapId?: unknown) {
+  async function joinError(name: string, secret: string, roomName: string, extra = {}) {
     const client = new Client(`ws://localhost:${PORT}`);
     try {
-      await client.joinOrCreate(ROOM_NAME, { name, secret, mapId });
+      await client.joinOrCreate(roomName, { name, secret, ...extra });
     } catch (e: any) {
       return { code: e.code as number, message: String(e.message) };
     }
@@ -1299,25 +1300,43 @@ describe("nhiều bản đồ: mỗi bản đồ một phòng (M3 bước 1)", (
     return full;
   }
   const cap = (id: string) => Object.values(getMap(id)!.monsterCap).reduce((a, b) => a + b, 0);
-  const rooms_ = async () => (await matchMaker.query({ name: ROOM_NAME })).length;
+  /** Số phòng thế giới đang có, mọi bản đồ */
+  const rooms_ = async () =>
+    (await Promise.all(MAPS.map((m) => matchMaker.query({ name: roomNameOf(m.id) })))).flat()
+      .length;
 
   it("nhân vật mới vào phòng của bản đồ khác bị đưa về bản đồ mặc định, không tạo file lưu", async () => {
     const name = "Lac Duong";
-    const e = await joinError(name, secretOf(name), HAC_PHONG_ID);
+    const e = await joinError(name, secretOf(name), roomNameOf(HAC_PHONG_ID));
     expect(e.code).toBe(JOIN_WRONG_MAP);
     expect(parseWrongMap(e.code, e.message)).toBe(DEFAULT_MAP_ID);
     expect(saveFileOf(name)).toBeUndefined();
   });
 
-  it("mapId lạ hoặc sai kiểu bị từ chối JOIN_BAD_MAP và không tạo thêm phòng nào", async () => {
+  it("tên phòng của bản đồ không có thì Colyseus từ chối, không tạo phòng; tuỳ chọn mapId của client không đổi được bản đồ của phòng", async () => {
     await join(); // bảo đảm phòng mặc định đã có
     const before = await rooms_();
-    for (const bad of ["khong_co", "", "constructor", "__proto__", 5, true, { a: 1 }, ["lac_ha"]]) {
+    for (const bad of ["world_khong_co", "world_", "world_constructor", "world__proto__", "khac"]) {
       const e = await joinError("Rac Ban Do", secretOf("Rac Ban Do"), bad);
-      expect(e.code, JSON.stringify(bad)).toBe(JOIN_BAD_MAP);
+      expect(e.code, bad).toBeGreaterThanOrEqual(4000);
     }
     expect(await rooms_()).toBe(before);
     expect(saveFileOf("Rac Ban Do")).toBeUndefined();
+    // Client gửi mapId trong tuỳ chọn (kể cả rác) vào phòng mặc định: bị bỏ qua, bản đồ vẫn là của phòng
+    for (const [i, forged] of [HAC_PHONG_ID, "khong_co", 5, { a: 1 }].entries()) {
+      const name = `Gia Mao ${i}`;
+      const client = new Client(`ws://localhost:${PORT}`);
+      const room = await client.joinOrCreate(ROOM_NAME, {
+        name,
+        secret: secretOf(name),
+        mapId: forged,
+      });
+      rooms.push(room);
+      expect(serverRoom(room).mapId).toBe(DEFAULT_MAP_ID);
+      await room.leave(true);
+      rooms.splice(rooms.indexOf(room), 1);
+    }
+    expect(await rooms_()).toBe(before);
   });
 
   it("nhân vật đang ở bản đồ khác: phòng sai báo đúng bản đồ, sai mã thì 403 (không lộ bản đồ), phòng đúng cho vào, lưu giữ mapId", async () => {
@@ -1329,11 +1348,11 @@ describe("nhiều bản đồ: mỗi bản đồ một phòng (M3 bước 1)", (
       y: Math.round(hp.townPx.y),
     });
 
-    const wrong = await joinError(name, secretOf(name), DEFAULT_MAP_ID);
+    const wrong = await joinError(name, secretOf(name), roomNameOf(DEFAULT_MAP_ID));
     expect(wrong.code).toBe(JOIN_WRONG_MAP);
     expect(parseWrongMap(wrong.code, wrong.message)).toBe(HAC_PHONG_ID);
     // Sai mã: không được biết nhân vật ở đâu
-    const thief = await joinError(name, "sai-ma-0123456789abcdef-zzz", DEFAULT_MAP_ID);
+    const thief = await joinError(name, "sai-ma-0123456789abcdef-zzz", roomNameOf(DEFAULT_MAP_ID));
     expect(thief.code).toBe(403);
     expect(parseWrongMap(thief.code, thief.message)).toBeUndefined();
 
@@ -1363,28 +1382,21 @@ describe("nhiều bản đồ: mỗi bản đồ một phòng (M3 bước 1)", (
     expect(JSON.parse(readFileSync(full, "utf8")).mapId).toBe(HAC_PHONG_ID);
   });
 
-  it("client không gợi ý mapId vẫn hội tụ: hoặc vào thẳng đúng phòng, hoặc được báo bản đồ đúng", async () => {
-    const name = "Khong Goi Y";
+  it("client cũ chỉ biết ROOM_NAME vẫn hội tụ: nhân vật ở bản đồ khác được báo bản đồ đúng, nhân vật mặc định vào bình thường", async () => {
+    const name = "Khach Cu";
     const hp = getMap(HAC_PHONG_ID)!;
     await seedSave(name, {
       mapId: HAC_PHONG_ID,
       x: Math.round(hp.townPx.x),
       y: Math.round(hp.townPx.y),
     });
-    // Không có bộ lọc thì colyseus chọn phòng nào cũng được: mọi lần đều phải hội tụ
-    for (let i = 0; i < 6; i++) {
-      const client = new Client(`ws://localhost:${PORT}`);
-      try {
-        const room = await client.joinOrCreate(ROOM_NAME, { name, secret: secretOf(name) });
-        rooms.push(room);
-        expect(serverRoom(room).mapId).toBe(HAC_PHONG_ID); // vào được thì chỉ có thể là phòng đúng
-        await room.leave(true);
-        rooms.splice(rooms.indexOf(room), 1);
-        await sleep(150);
-      } catch (e: any) {
-        expect(parseWrongMap(e.code, String(e.message))).toBe(HAC_PHONG_ID);
-      }
-    }
+    const e = await joinError(name, secretOf(name), ROOM_NAME);
+    expect(parseWrongMap(e.code, e.message)).toBe(HAC_PHONG_ID);
+    // rồi vào đúng phòng bằng tên phòng của bản đồ đó
+    const a = await join(name, secretOf(name), HAC_PHONG_ID);
+    expect(serverRoom(a.room).mapId).toBe(HAC_PHONG_ID);
+    // Mọi phòng của một bản đồ là MỘT phòng: không có phòng "không nhãn" thứ hai
+    expect((await matchMaker.query({ name: ROOM_NAME })).length).toBe(1);
   });
 
   it("file lưu có mapId lạ hoặc sai kiểu coi như bản đồ mặc định, lưu lại thành mapId hợp lệ", async () => {
