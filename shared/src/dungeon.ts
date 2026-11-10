@@ -8,7 +8,9 @@
 //  1. Client (đội trưởng) chọn "mở bí cảnh" ở hộp thoại Thủ môn -> `dialogAction { kind: "dungeon", dungeonId }`. Server kiểm
 //     (`canOpenDungeon` ở đây là bản chung để client ẩn nút; SERVER kiểm lại mọi thứ), tạo run + phòng, rồi gửi
 //     `dungeonInvite` cho từng thành viên đang online (dù đang ở bản đồ nào).
-//  2. Mỗi thành viên bấm "Vào" -> `dungeonEnter { runId }`. Server kiểm lại, LƯU nhân vật với chỗ xuất hiện = chỗ vào ở Lạc
+//  2. Mỗi thành viên bấm "Vào" -> `dungeonEnter { runId }`, hoặc "Từ chối" -> `dungeonDecline { runId }` (server báo đội
+//     trưởng ngay bằng thông báo hệ thống; mọi người được mời đều từ chối mà chưa ai vào thì run huỷ sớm, đội trưởng nhận
+//     `dungeonEnd { reason: "declined" }`). Server kiểm lại, LƯU nhân vật với chỗ xuất hiện = chỗ vào ở Lạc
 //     Hà (không bao giờ lưu vị trí trong bí cảnh), đưa ra khỏi phòng cũ và gửi `travelTo { mapId, roomId }`: client vào bằng
 //     `joinById(roomId)` (client không tạo được phòng bí cảnh bằng `joinOrCreate`).
 //  3. Trong phòng server gửi `dungeonState` (mỗi giây và khi đổi pha) cho HUD; kết thúc gửi `dungeonEnd`, rồi `travelTo`
@@ -119,6 +121,7 @@ export function dungeonOfMap(mapId: unknown): DungeonDef | undefined {
 export const DUNGEON_MSG = {
   enter: "dungeonEnter",
   leave: "dungeonLeave",
+  decline: "dungeonDecline",
   invite: "dungeonInvite",
   state: "dungeonState",
   end: "dungeonEnd",
@@ -133,14 +136,29 @@ export interface DungeonEnterMsg {
   runId: string;
 }
 
+/** Client -> server: từ chối lời mời (đóng hộp mời; server báo đội trưởng sớm thay vì để họ đợi hết `DUNGEON_INVITE_MS`). */
+export interface DungeonDeclineMsg {
+  runId: string;
+}
+
 /** Client -> server: rời bí cảnh sớm (về cổng vào). Không có trường nào. */
 export type DungeonLeaveMsg = Record<string, never>;
 
-/** Đọc `dungeonEnter` từ mạng: sai kiểu / runId sai dạng thì `null` (server bỏ qua, tính vào hạn mức tin nhắn). */
-export function parseDungeonEnter(raw: unknown): DungeonEnterMsg | null {
+/** Đọc tin `{ runId }` từ mạng: sai kiểu / runId sai dạng thì `null`. Chỉ lấy đúng `runId`, không mang trường lạ. */
+function parseRunIdMsg(raw: unknown): { runId: string } | null {
   if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return null;
   const id = (raw as Record<string, unknown>).runId;
   return typeof id === "string" && RUN_ID_RE.test(id) ? { runId: id } : null;
+}
+
+/** Đọc `dungeonEnter` từ mạng: sai kiểu / runId sai dạng thì `null` (server bỏ qua, tính vào hạn mức tin nhắn). */
+export function parseDungeonEnter(raw: unknown): DungeonEnterMsg | null {
+  return parseRunIdMsg(raw);
+}
+
+/** Đọc `dungeonDecline` từ mạng (cùng luật với `parseDungeonEnter`). */
+export function parseDungeonDecline(raw: unknown): DungeonDeclineMsg | null {
+  return parseRunIdMsg(raw);
 }
 
 /** Server -> client: lời mời vào run (gửi cho từng thành viên đang online). */
@@ -151,6 +169,8 @@ export interface DungeonInviteMsg {
   from: string;
   /** Còn bao nhiêu ms để bấm "Vào" (đồng hồ của server; client đếm ngược theo đó) */
   expiresInMs: number;
+  /** Lượt nhận thưởng hoàn thành còn lại HÔM NAY của người nhận (`dungeonRewardsLeft`, 0..`DUNGEON_DAILY_REWARDS`), để hộp mời báo trước */
+  rewardsLeft: number;
 }
 
 export type DungeonPhase = "gathering" | "running" | "won" | "lost";
@@ -172,13 +192,26 @@ export interface DungeonStateMsg {
   members: DungeonMemberView[];
 }
 
-export type DungeonEndReason = "boss_dead" | "timeout" | "all_dead" | "all_left" | "no_entry";
+/**
+ * Lý do run kết thúc. `no_entry` (hết `DUNGEON_INVITE_MS` mà không ai vào) và `declined` (mọi người được mời đều từ chối)
+ * là run huỷ TRƯỚC khi có phòng: chỉ gửi cho đội trưởng (đang ở ngoài), client hiện thông báo chứ không mở màn kết quả.
+ */
+export type DungeonEndReason =
+  "boss_dead" | "timeout" | "all_dead" | "all_left" | "no_entry" | "declined";
 
-/** Server -> client: run kết thúc. `reward` chỉ có khi thắng VÀ nhân vật này đủ điều kiện nhận thưởng hôm nay. */
+/** Vì sao một người thắng mà KHÔNG nhận thưởng hoàn thành (để màn kết quả giải thích, không để người chơi thắc mắc). */
+export type DungeonNoReward = "daily_limit" | "no_damage";
+
+/**
+ * Server -> client: run kết thúc. `reward` chỉ có khi thắng VÀ nhân vật này đủ điều kiện nhận thưởng hôm nay; thắng mà
+ * không có `reward` thì `noReward` nói rõ lý do. `rewardsLeft` là lượt thưởng còn lại hôm nay của người nhận SAU run này.
+ */
 export interface DungeonEndMsg {
   result: "won" | "lost";
   reason: DungeonEndReason;
   reward?: { coin: number; items: { itemId: string; qty: number }[] };
+  noReward?: DungeonNoReward;
+  rewardsLeft: number;
 }
 
 // ---------- Điều kiện mở (hàm thuần, client dùng để ẩn nút, server kiểm lại) ----------
