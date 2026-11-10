@@ -71,6 +71,21 @@ describe("FileAccountStore", () => {
     expect(jsonFiles(dir)).toHaveLength(0);
   });
 
+  it("all: mọi tài khoản, cũ trước (ngày tạo, rồi tên đăng nhập); nạp lại từ đĩa vẫn đủ", async () => {
+    const dir = freshDir();
+    const s = new FileAccountStore(dir);
+    expect(await s.all()).toEqual([]);
+    await s.create({ ...acc("nguoi_c"), createdAt: "2026-11-12T00:00:00.000Z" });
+    await s.create({ ...acc("nguoi_b"), createdAt: "2026-11-10T00:00:00.000Z" });
+    await s.create({ ...acc("nguoi_a"), createdAt: "2026-11-10T00:00:00.000Z" });
+    expect((await s.all()).map((a) => a.username)).toEqual(["nguoi_a", "nguoi_b", "nguoi_c"]);
+    expect((await new FileAccountStore(dir).all()).map((a) => a.username)).toEqual([
+      "nguoi_a",
+      "nguoi_b",
+      "nguoi_c",
+    ]);
+  });
+
   it("setName: một lần; hai tài khoản tranh một tên (không phân biệt hoa thường, NFC) thì đúng một bên được", async () => {
     const s = new FileAccountStore(freshDir());
     const a = (await s.create(acc("nguoi_a")))!;

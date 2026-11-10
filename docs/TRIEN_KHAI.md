@@ -275,3 +275,24 @@ npm run kiem-save -w server -- --json
 | `unknown_quest` | Sổ nhiệm vụ chứa `questId` lạ không tồn tại trong game. |
 | `duplicate_quest_done` | Danh sách nhiệm vụ đã xong (`done`) chứa `questId` bị trùng lặp. |
 | `invalid_daily_key` | Nhiệm vụ hàng ngày không hợp lệ hoặc giá trị ngày không đúng chuẩn ISO. |
+
+---
+
+## 9. Quản trị tài khoản (`npm run tai-khoan`)
+
+Chỉ có ý nghĩa khi chạy `AUTH_MODE=account` (mục 2). Công cụ chạy **trên máy chủ, không qua mạng**; người chơi không tự đổi mật khẩu được, chỉ quên mật khẩu bằng mã khôi phục (mục 4.4 của `docs/THIET_KE_TAI_KHOAN.md`). Khi họ mất cả mật khẩu lẫn mã, quản trị viên đặt lại tay:
+
+```bash
+npm run tai-khoan -w server -- list                          # liệt kê tài khoản (không có băm / token)
+npm run tai-khoan -w server -- show <tên đăng nhập>          # chi tiết một tài khoản
+npm run tai-khoan -w server -- reset-password <tên đăng nhập> # mật khẩu tạm ngẫu nhiên + mã khôi phục MỚI (hiện MỘT lần)
+npm run tai-khoan -w server -- reset-recovery <tên đăng nhập> # chỉ đặt mã khôi phục MỚI
+npm run tai-khoan -w server -- disable <tên đăng nhập>       # khoá + đăng xuất mọi thiết bị
+npm run tai-khoan -w server -- enable <tên đăng nhập>
+npm run tai-khoan -w server -- logout-all <tên đăng nhập>
+```
+
+- **Phải TẮT server trước khi chạy lệnh ghi** (`reset-*`, `disable`, `enable`, `logout-all`): bản file giữ chỉ mục tài khoản trong bộ nhớ của server, sửa tệp lúc đó sẽ bị server ghi đè ở lần lưu kế. Công cụ hỏi `/health` (cổng `PORT`, mặc định 2567) và **từ chối với mã thoát `2`** nếu server còn trả lời; `--force` bỏ qua kiểm tra (chỉ khi chắc chắn). `list` / `show` chỉ đọc nên chạy được cả khi server đang chạy.
+- `reset-password` in mật khẩu tạm (20 ký tự ngẫu nhiên) và mã khôi phục mới **đúng một lần**, xoá mọi phiên cũ; gửi cho người chơi qua kênh an toàn và nhắc họ lưu mã khôi phục (họ vào được bằng mật khẩu tạm, hoặc đặt mật khẩu của riêng mình qua "Quên mật khẩu" với mã mới).
+- Mã thoát: `0` xong; `1` sai cách dùng hoặc không có tài khoản; `2` server đang chạy.
+- Dùng cùng thư mục dữ liệu với server: `DATA_DIR` (và `ACCOUNTS_DIR` / `SESSIONS_DIR` nếu đã đặt riêng); trên máy dev tự đọc `.env.local`. Công cụ chỉ dùng giao diện `AccountStore` / `SessionStore`: khi bước 3e (PostgreSQL) vào, nó sẽ được nối với `STORE=pg` (lúc đó không cần tắt server); hiện chỉ có bản file.
