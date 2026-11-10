@@ -45,6 +45,7 @@ import {
 } from "@tien-gioi/shared";
 import { preloadAssets, makeTextures, dirFromAngle, TILESET_KEY, ATLAS_KEY } from "../textures";
 import { ui } from "../ui";
+import { replayEarlyMessages } from "../early-messages";
 import { sound } from "../audio";
 import { joystick, setupJoystick } from "../joystick";
 
@@ -759,26 +760,33 @@ export class WorldScene extends Phaser.Scene {
 
   private setupNetwork(isInitial = true) {
     this.room.onStateChange(() => this.reconcile());
-    this.room.onMessage("fx", (m: FxMsg) => this.onFx(m));
-    this.room.onMessage("dmg", (m: DmgMsg) => {
+    // Ghi lại handler theo loại để phát lại các tin server gửi ngay lúc vào phòng (xem early-messages.ts)
+    const handlers: Record<string, (msg: any) => void> = {};
+    const reg = (type: string, fn: (msg: any) => void) => {
+      handlers[type] = fn;
+      this.room.onMessage(type, fn);
+    };
+    reg("fx", (m: FxMsg) => this.onFx(m));
+    reg("dmg", (m: DmgMsg) => {
       if (!this.inView(m.x, m.y, 96)) return;
       this.floatText(m);
       sound.hit(m.crit);
     });
-    this.room.onMessage("chat", (m: ChatOut) => ui.chat(m));
-    this.room.onMessage("toast", (m: ToastMsg) => ui.toast(m));
-    this.room.onMessage("inv", (m: InvMsg) => ui.onInv(m));
-    this.room.onMessage("quests", (m: QuestsMsg) => ui.onQuests(m));
-    this.room.onMessage("dialog", (m: DialogMsg) => ui.onDialog(m));
-    this.room.onMessage("party", (m: PartyMsg) => ui.onParty(m));
-    this.room.onMessage("partyInvited", (m: PartyInvitedMsg) => ui.onPartyInvited(m));
-    this.room.onMessage("wallet", (m: WalletMsg) => ui.onWallet(m));
-    this.room.onMessage("limbo", (m: LimboMsg) => this.onLimbo(m));
-    this.room.onMessage("soul", (m: SoulMsg) => {
+    reg("chat", (m: ChatOut) => ui.chat(m));
+    reg("toast", (m: ToastMsg) => ui.toast(m));
+    reg("inv", (m: InvMsg) => ui.onInv(m));
+    reg("quests", (m: QuestsMsg) => ui.onQuests(m));
+    reg("dialog", (m: DialogMsg) => ui.onDialog(m));
+    reg("party", (m: PartyMsg) => ui.onParty(m));
+    reg("partyInvited", (m: PartyInvitedMsg) => ui.onPartyInvited(m));
+    reg("wallet", (m: WalletMsg) => ui.onWallet(m));
+    reg("limbo", (m: LimboMsg) => this.onLimbo(m));
+    reg("soul", (m: SoulMsg) => {
       ui.updateSoul(m);
       ui.setKiep(m.kiep);
     });
-    this.room.onMessage("reborn", (m: RebornMsg) => ui.showReborn(m.kiep));
+    reg("reborn", (m: RebornMsg) => ui.showReborn(m.kiep));
+    replayEarlyMessages(this.room, handlers);
     if (isInitial) {
       ui.chat({
         from: "",

@@ -9,6 +9,7 @@ import {
 } from "@tien-gioi/shared";
 import { WorldScene } from "./scenes/WorldScene";
 import { ui } from "./ui";
+import { captureEarlyMessages } from "./early-messages";
 import { joinWithRedirect } from "./connection";
 
 const NAME_KEY = "tien-gioi:name";
@@ -204,6 +205,7 @@ function setupRoomLifecycle(room: Room) {
 }
 
 async function start(room: Room, mapId: string) {
+  captureEarlyMessages(room); // trước mọi await: tin lúc vào phòng tới trước khi cảnh đăng ký handler
   // Chờ font tiếng Việt tải xong trước khi Phaser vẽ Text lên canvas lần đầu
   await Promise.race([
     document.fonts.load('16px "Noto Serif"', "Tiếng Việt"),
