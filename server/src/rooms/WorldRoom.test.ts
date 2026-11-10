@@ -38,11 +38,15 @@ import type { WorldState } from "../schema";
 const dataDir = mkdtempSync(path.join(tmpdir(), "tien-gioi-test-"));
 const PORT = 41000 + Math.floor(Math.random() * 5000);
 let server: Server;
+let WorldRoomClass: typeof WorldRoom;
+let defaultGraceS = 20;
 const rooms: Room[] = [];
 
 beforeAll(async () => {
   process.env.DATA_DIR = dataDir; // store.ts đọc biến này lúc nạp module
   const { WorldRoom } = await import("./WorldRoom");
+  WorldRoomClass = WorldRoom;
+  defaultGraceS = WorldRoom.reconnectGraceS;
   server = new Server({ transport: new WebSocketTransport(), gracefullyShutdown: false });
   server.define(ROOM_NAME, WorldRoom);
   await server.listen(PORT);
@@ -168,6 +172,170 @@ describe("vào game", () => {
       client.joinOrCreate(ROOM_NAME, { name: "Chu Nhan", secret: secretOf("ke gian") }),
     ).rejects.toThrow(/đã có người dùng/);
   });
+});
+
+describe("rớt mạng và nối lại (#116)", () => {
+  /** Rớt mạng: đóng WebSocket mà không "thoát chủ động" (server thấy mã khác 4000). */
+  const dropConnection = (room: Room) => (room.connection.transport as any).ws.close();
+
+  /** Nối lại bằng token của phòng cũ, như client thật; trả về Room mới cùng các hộp thư. */
+  async function reconnectTo(old: Room) {
+    const client = new Client(`ws://localhost:${PORT}`);
+    const room = await client.reconnect(old.reconnectionToken);
+    const invs: InvMsg[] = [];
+    const wallets: WalletMsg[] = [];
+    const quests: QuestsMsg[] = [];
+    room.onMessage("inv", (m: InvMsg) => invs.push(m));
+    room.onMessage("wallet", (m: WalletMsg) => wallets.push(m));
+    room.onMessage("quests", (m: QuestsMsg) => quests.push(m));
+    for (const t of ["chat", "toast", "fx", "dmg", "party", "partyInvited", "dialog"])
+      room.onMessage(t, () => {});
+    rooms.push(room);
+    await waitFor(() => (room.state as any)?.players?.get(room.sessionId));
+    return {
+      room,
+      invs,
+      wallets,
+      quests,
+      me: () => (room.state as any).players.get(room.sessionId),
+    };
+  }
+
+  const gone = (a: { room: Room }) => !serverState(a.room).players.get(a.room.sessionId);
+
+  it("nối lại trong thời gian chờ: cùng sessionId, nhân vật còn nguyên, nhận lại túi / ví, vùng nhìn đúng, điều khiển được", async () => {
+    const a = await join("Noi Lai");
+    const b = await join("Hang Xom");
+    a.room.send("chat", { text: "/give nanh_soi 4" });
+    await waitFor(() => a.invs.find((m) => m.gained));
+    const sid = a.room.sessionId;
+    const p = serverState(a.room).players.get(sid)!;
+    const { x, y } = p;
+    const before = serverState(a.room).players.size;
+
+    dropConnection(a.room);
+    await waitFor(() => !a.room.connection.isOpen);
+    await sleep(300);
+    // Đang chờ: nhân vật vẫn ở trong thế giới, người khác vẫn thấy, số người không đổi
+    expect(serverState(a.room).players.get(sid)).toBeTruthy();
+    expect((b.room.state as any).players.get(sid)).toBeTruthy();
+    expect(serverState(a.room).players.size).toBe(before);
+    // Gửi tin riêng cho người đang chờ không gây lỗi
+    expect(() =>
+      (serverRoom(a.room) as any).sendTo(sid, "toast", { text: "x", tone: "info" }),
+    ).not.toThrow();
+
+    const r2 = await reconnectTo(a.room);
+    expect(r2.room.sessionId).toBe(sid);
+    const inv = await waitFor(() => r2.invs[0]);
+    expect(inv.slots[0]).toEqual({ itemId: "nanh_soi", qty: 4 });
+    expect((await waitFor(() => r2.wallets[0])).coin).toBe(0);
+    await waitFor(() => r2.quests[0]);
+    // Vùng nhìn còn đúng: thấy người ở gần; x, y riêng (TAG_OWNER) còn đủ và không đổi
+    await waitFor(() => (r2.room.state as any).players.get(b.room.sessionId));
+    expect(r2.me().x).toBeCloseTo(x, 3);
+    expect(r2.me().y).toBeCloseTo(y, 3);
+    // Điều khiển được tiếp
+    for (let seq = 1; seq <= 5; seq++) r2.room.send("input", { seq, dx: 1, dy: 0 });
+    await waitFor(() => r2.me().lastSeq === 5);
+    expect(r2.me().x).toBeGreaterThan(x);
+    // Người khác vẫn thấy một nhân vật duy nhất
+    expect(serverState(a.room).players.size).toBe(before);
+    expect((serverRoom(a.room) as any).ghosts.size).toBe(0);
+  });
+
+  it("hết thời gian chờ thì dọn như rời phòng, đã lưu, token cũ vô hiệu", async () => {
+    WorldRoomClass.reconnectGraceS = 0.4;
+    try {
+      const a = await join("Het Han");
+      a.room.send("chat", { text: "/give nanh_soi 2" });
+      await waitFor(() => a.invs.find((m) => m.gained));
+      const token = a.room.reconnectionToken;
+      const room = serverRoom(a.room);
+      dropConnection(a.room);
+      await waitFor(() => gone(a), 3000);
+      expect((room as any).ghosts.size).toBe(0);
+      expect((room as any).world.ctrl.has(a.room.sessionId)).toBe(false);
+      expect((room as any).limiters.has(a.room.sessionId)).toBe(false);
+      const late = new Client(`ws://localhost:${PORT}`);
+      await expect(late.reconnect(token)).rejects.toThrow();
+      // Đã lưu: vào lại bình thường vẫn còn đồ
+      const again = await join("Het Han");
+      expect((await waitFor(() => again.invs[0])).slots[0]).toEqual({ itemId: "nanh_soi", qty: 2 });
+    } finally {
+      WorldRoomClass.reconnectGraceS = defaultGraceS;
+    }
+  });
+
+  it("thoát chủ động và bị ngắt vì spam thì không giữ chỗ chờ", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const a = await join();
+    await a.room.leave(true);
+    await waitFor(() => gone(a), 1000);
+    const b = await join();
+    let code = 0;
+    b.room.onLeave((c) => (code = c));
+    for (let i = 0; i < 400; i++) b.room.send("talk", { npcId: "truong_tran" });
+    await waitFor(() => code);
+    expect(code).toBe(4429);
+    await waitFor(() => gone(b), 1000);
+    expect((serverRoom(b.room) as any).ghosts.size).toBe(0);
+  });
+
+  it("đăng nhập lại (đúng mã) khi đang chờ: huỷ chờ rồi vào, không nhân đôi, còn đồ; sai mã vẫn bị từ chối", async () => {
+    const name = "Tai Lai";
+    const a = await join(name);
+    a.room.send("chat", { text: "/give nanh_soi 3" });
+    await waitFor(() => a.invs.find((m) => m.gained));
+    const oldSid = a.room.sessionId;
+    const token = a.room.reconnectionToken;
+    dropConnection(a.room);
+    await waitFor(() => !a.room.connection.isOpen);
+    await sleep(200);
+    // Người lạ biết tên nhưng sai mã: vẫn bị từ chối, nhân vật vẫn chờ
+    const other = new Client(`ws://localhost:${PORT}`);
+    await expect(
+      other.joinOrCreate(ROOM_NAME, { name, secret: secretOf("ke gian") }),
+    ).rejects.toThrow(/đang ở trong game/);
+    expect(serverState(a.room).players.get(oldSid)).toBeTruthy();
+    // Chính chủ tải lại trang: vào được ngay
+    const again = await join(name);
+    expect((await waitFor(() => again.invs[0])).slots[0]).toEqual({ itemId: "nanh_soi", qty: 3 });
+    expect(again.room.sessionId).not.toBe(oldSid);
+    const names: string[] = [];
+    serverState(again.room).players.forEach((p) => names.push(p.name));
+    expect(names.filter((n) => n === name)).toHaveLength(1);
+    expect(serverState(again.room).players.get(oldSid)).toBeUndefined();
+    expect((serverRoom(again.room) as any).ghosts.size).toBe(0);
+    // Token cũ không dùng được nữa
+    await expect(new Client(`ws://localhost:${PORT}`).reconnect(token)).rejects.toThrow();
+  });
+
+  it("rớt mạng rồi nối lại nhiều lần liên tiếp không rò (kết nối, dữ liệu riêng, giới hạn tần suất, người chờ)", async () => {
+    const a = await join("Hay Rot");
+    const room = serverRoom(a.room);
+    const sid = a.room.sessionId;
+    const count = () => ({
+      clients: room.clients.length,
+      ctrl: (room as any).world.ctrl.size,
+      limiters: (room as any).limiters.size,
+      ghosts: (room as any).ghosts.size,
+      players: serverState(a.room).players.size,
+    });
+    const base = count();
+    let cur: Room = a.room;
+    for (let i = 0; i < 3; i++) {
+      dropConnection(cur);
+      await waitFor(() => !cur.connection.isOpen);
+      await sleep(150);
+      const r = await reconnectTo(cur);
+      expect(r.room.sessionId).toBe(sid);
+      await waitFor(() => r.invs[0]);
+      cur = r.room;
+      await waitFor(() => (room as any).ghosts.size === 0);
+    }
+    expect(count()).toEqual(base);
+  }, 15_000);
 });
 
 describe("di chuyển", () => {

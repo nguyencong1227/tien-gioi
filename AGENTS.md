@@ -33,7 +33,7 @@ npm run build        # build client vào client/dist
   - `realms.ts`: cảnh giới, chỉ số.
   - `game.ts`: hằng số, quái, kiểu tin nhắn.
   - `map.ts`: bản đồ sinh theo seed, va chạm.
-- `server/src/rooms/WorldRoom.ts`: chỉ lo vào/ra phòng, lưu nhân vật, nối tin nhắn với system, vòng lặp 20 tick/giây.
+- `server/src/rooms/WorldRoom.ts`: chỉ lo vào/ra phòng, lưu nhân vật, nối tin nhắn với system, vòng lặp 20 tick/giây. Rớt mạng bất thường thì nhân vật ở lại `RECONNECT_GRACE_S` (20) giây chờ `allowReconnection` (#116); thoát chủ động hoặc bị ngắt vì spam thì không chờ.
 - `server/src/systems/`: logic game, mỗi file một mảng: `movement`, `combat`, `monsters`, `progression`, `chat`, `inventory` (túi đồ, đan dược, lệnh `/give` khi không chạy production), `loot` (rơi đồ, nhặt, vứt đồ), `quests` (tiến độ nhiệm vụ cập nhật từ sự kiện), `npc` (nói chuyện, nhận / trả nhiệm vụ, đổi đồ), `wallet` (ví Linh thạch: mọi thay đổi số dư đi qua `changeCoin` / `trySpendCoin` / `splitCoin`), `shop` (mua / bán với NPC bán hàng, trọn vẹn hoặc không gì cả), `interest` (vùng nhìn: mỗi client chỉ nhận state của thực thể ở gần, bằng `StateView`).
   - Các system nhận `World` (`server/src/world.ts`: state, dữ liệu riêng của người chơi/quái, `events` để gửi tin), không đụng tới Colyseus `Room`. Tính năng mới thì thêm system mới.
 - `server/src/schema.ts` là state đồng bộ, `store.ts` lưu nhân vật dạng JSON ở `server/data/players/`.

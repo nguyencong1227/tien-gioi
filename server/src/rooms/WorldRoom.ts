@@ -59,6 +59,16 @@ const SAVE_EVERY_MS = 30_000;
 export const CLOSE_SPAM = 4429;
 /** Mã nhân vật dài hơn mức này thì từ chối luôn (client tạo mã 32 ký tự) */
 const MAX_SECRET_LEN = 256;
+/** Giây giữ nhân vật chờ kết nối lại khi rớt mạng bất thường (#116) */
+export const RECONNECT_GRACE_S = 20;
+
+/** Người chơi vừa rớt mạng, nhân vật vẫn ở trong thế giới chờ kết nối lại */
+interface Ghost {
+  /** Huỷ chờ: onLeave chạy tiếp phần dọn dẹp như khi rời phòng */
+  cancel: () => void;
+  /** Xong khi onLeave đã dọn xong (đã lưu, đã xoá khỏi state) */
+  done: Promise<void>;
+}
 
 export class WorldRoom extends Room<WorldState> {
   maxClients = MAX_PLAYERS_PER_ROOM;
@@ -83,6 +93,12 @@ export class WorldRoom extends Room<WorldState> {
 
   /** Giới hạn tần suất tin nhắn, theo sessionId */
   private limiters = new Map<string, RateLimiter>();
+
+  /** Thời gian chờ kết nối lại (giây). Test ghi đè để không phải đợi 20 giây. */
+  static reconnectGraceS = RECONNECT_GRACE_S;
+
+  /** Người đang chờ kết nối lại, theo sessionId (#116) */
+  private ghosts = new Map<string, Ghost>();
 
   /**
    * Gửi tin nhắn có vị trí cho những người chơi trong vùng nhìn quanh (x, y). `reach` là đoạn hiệu ứng còn
@@ -179,10 +195,21 @@ export class WorldRoom extends Room<WorldState> {
     const secret = typeof options?.secret === "string" ? options.secret : "";
     if (secret.length < 16 || secret.length > MAX_SECRET_LEN)
       throw new ServerError(400, "Thiếu mã nhân vật.");
-    for (const p of this.state.players.values()) {
-      if (p.name.toLowerCase() === name.toLowerCase())
-        throw new ServerError(409, "Nhân vật này đang ở trong game.");
-    }
+    // Tên đang có người chơi. Chỉ một trường hợp được vào tiếp: chính chủ (đúng mã) đăng nhập lại khi nhân vật
+    // đang chờ kết nối lại sau khi rớt mạng (tải lại trang, mất token) thì huỷ chờ rồi vào, thay vì bị 409 tới
+    // hết thời gian chờ. Người đang kết nối thật hoặc sai mã vẫn bị từ chối.
+    const taken: Ghost[] = [];
+    let busy = false;
+    this.state.players.forEach((p, sid) => {
+      if (p.name.toLowerCase() !== name.toLowerCase()) return;
+      const ghost = this.ghosts.get(sid);
+      if (ghost && this.world.ctrl.get(sid)?.save.secretHash === hashSecret(secret))
+        taken.push(ghost);
+      else busy = true;
+    });
+    if (busy) throw new ServerError(409, "Nhân vật này đang ở trong game.");
+    for (const g of taken) g.cancel();
+    for (const g of taken) await g.done; // đợi lưu xong rồi mới nạp file
     const existing = await loadPlayer(name);
     if (existing) {
       if (existing.secretHash !== hashSecret(secret))
@@ -244,22 +271,52 @@ export class WorldRoom extends Room<WorldState> {
     this.world.events.sys(`${p.name} (${realmLabel(p.realm, p.tier)}) đã nhập thế.`);
   }
 
-  async onLeave(client: Client) {
+  async onLeave(client: Client, consented?: boolean) {
     const sid = client.sessionId;
     const p = this.state.players.get(sid);
     const c = this.world.ctrl.get(sid);
-    if (p && c) {
+    // Rớt mạng bất thường (không phải chủ động thoát; bị ngắt vì spam thì `limiters` đã xoá): giữ nhân vật chờ
+    // kết nối lại. Dữ liệu theo sessionId nên giữ nguyên; Colyseus chuyển StateView sang kết nối mới.
+    let resolveDone = () => {};
+    if (p && c && consented === false && this.limiters.has(sid)) {
+      const done = new Promise<void>((r) => (resolveDone = r));
+      const wait = this.allowReconnection(client, WorldRoom.reconnectGraceS);
+      // allowReconnection trả về Promise đã bị từ chối (không có `reject`) khi phòng đang đóng: khi đó không có gì để huỷ
+      if (typeof wait.reject === "function")
+        this.ghosts.set(sid, { cancel: () => wait.reject(false), done });
+      c.inputs.length = 0; // không còn ai điều khiển: bỏ input đang chờ
+      // Lưu ngay, phòng khi server sập trong lúc chờ
       await this.persist(p, c).catch((e) => console.error("save failed", e));
-      this.world.events.sys(`${p.name} đã rời đi.`);
+      try {
+        await wait;
+        // Nối lại được: client nhận Room mới nên gửi lại dữ liệu riêng (tin `party` tới theo nhịp snapshot)
+        this.ghosts.delete(sid);
+        sendInv(this.world, sid);
+        sendQuests(this.world, sid);
+        sendWallet(this.world, sid);
+        resolveDone();
+        return;
+      } catch {
+        // hết hạn, bị huỷ (đăng nhập lại) hoặc phòng đang đóng: dọn dẹp như rời phòng
+      }
     }
-    partyDrop(this.world, sid); // trước khi xoá khỏi state: báo cho đội, dọn lời mời
-    this.state.players.delete(sid);
-    this.state.online = this.state.players.size;
-    this.world.interest.leave(sid);
-    this.world.ctrl.delete(sid);
-    this.limiters.delete(sid);
-    forgetTarget(this.world, sid);
-    releaseLootOwner(this.world, sid);
+    try {
+      if (p && c) {
+        await this.persist(p, c).catch((e) => console.error("save failed", e));
+        this.world.events.sys(`${p.name} đã rời đi.`);
+      }
+      partyDrop(this.world, sid); // trước khi xoá khỏi state: báo cho đội, dọn lời mời
+      this.state.players.delete(sid);
+      this.state.online = this.state.players.size;
+      this.world.interest.leave(sid);
+      this.world.ctrl.delete(sid);
+      this.limiters.delete(sid);
+      forgetTarget(this.world, sid);
+      releaseLootOwner(this.world, sid);
+    } finally {
+      this.ghosts.delete(sid);
+      resolveDone();
+    }
   }
 
   async onDispose() {
