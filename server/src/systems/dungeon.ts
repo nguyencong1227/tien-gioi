@@ -349,6 +349,7 @@ export function enterDungeon(w: World, sid: string, raw: unknown): boolean {
   const r = w.ready(sid);
   if (!r) return false; // đang trọng thương / không có trong phòng
   if (r.c.travelling || w.ghosts.has(sid)) return false;
+  if (w.duels.has(sid)) return toastFalse(w, sid, "Đang thách đấu, chưa vào bí cảnh được.");
   if (w.now - r.c.lastHitAt < TRAVEL_COMBAT_LOCK_MS)
     return toastFalse(w, sid, "Đang giao chiến, chưa vào bí cảnh được.");
   if (!w.onDungeonEnter) return false; // không có phòng nối vào (test đơn vị tự đặt hook)

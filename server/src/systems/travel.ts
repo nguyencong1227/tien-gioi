@@ -31,6 +31,7 @@ export function planTravel(w: World, sid: string, portalId: unknown): TravelPlan
     w.events.toast(sid, { text, tone: "bad" });
     return null;
   };
+  if (w.duels.has(sid)) return deny("Đang thách đấu, chưa qua cổng được.");
   const portal = w.map.portal(portalId);
   if (!portal) return deny("Không có cổng này ở đây.");
   if (Math.hypot(p.x - portal.x, p.y - portal.y) > portal.r + PORTAL_SLACK)
