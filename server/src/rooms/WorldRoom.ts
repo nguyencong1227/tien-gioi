@@ -149,6 +149,7 @@ import {
 } from "../systems/dungeon";
 import { applyRebirth, creditSoul } from "../systems/reincarnation";
 import { RateLimiter } from "../rate-limit";
+import { audit, auditCoinThreshold } from "../audit";
 import { defaultHub, type Hub } from "../hub";
 
 const SAVE_EVERY_MS = 30_000;
@@ -250,6 +251,9 @@ export class WorldRoom extends Room<WorldState> {
     w.onLimbo = (sid) => void this.enterLimbo(sid);
     // Tông môn (M3.6): dịch vụ dùng chung (`SECTS=off` gỡ gấp); lưu hồ sơ NGAY khi chuyển Linh thạch sang kho
     w.sectService = WorldRoom.sectService();
+    // Nhật ký kiểm toán (M4 2.4): chỉ ghi khi `startAudit` đã bật ở index.ts
+    w.audit = audit;
+    w.auditCoinMin = auditCoinThreshold(process.env);
     w.onSaveNow = async (sid) => {
       const p = this.state.players.get(sid);
       const c = w.ctrl.get(sid);
@@ -403,6 +407,7 @@ export class WorldRoom extends Room<WorldState> {
     if (!this.limiters.delete(c.sessionId)) return; // đã ngắt rồi
     const name = this.state.players.get(c.sessionId)?.name ?? c.sessionId;
     console.warn(`[spam] ngắt kết nối ${name}: gửi quá nhiều tin nhắn`);
+    audit("room.spam_kick", { name, map: this.mapId });
     c.leave(CLOSE_SPAM, "Gửi quá nhiều thao tác.");
   }
 
@@ -438,8 +443,10 @@ export class WorldRoom extends Room<WorldState> {
     const identity = legacyIdentity(name);
     const existing = await this.players.load(name);
     if (existing) {
-      if (existing.secretHash !== hashSecret(secret))
+      if (existing.secretHash !== hashSecret(secret)) {
+        audit("join.denied", { reason: "bad_secret", name });
         throw new ServerError(403, "Tên này đã có người dùng.");
+      }
       return this.resume(existing, identity);
     }
     return this.createFresh(name, hashSecret(secret), identity);
@@ -451,8 +458,10 @@ export class WorldRoom extends Room<WorldState> {
    */
   private async authByToken(accounts: AuthService, options: JoinOptions) {
     const account = await accounts.resolve(options?.token);
-    if (!account)
+    if (!account) {
+      audit("join.denied", { reason: "bad_token" });
       throw new ServerError(JOIN_BAD_TOKEN, "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+    }
     if (account.name === undefined)
       throw new ServerError(JOIN_NEED_CHARACTER, "Tài khoản chưa có đạo hiệu.");
     const name = account.name;

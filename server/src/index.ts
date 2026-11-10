@@ -8,6 +8,7 @@ import { WebSocketTransport } from "@colyseus/ws-transport";
 import { defineRooms, WorldRoom } from "./rooms/WorldRoom";
 import { SectService } from "./sect-service";
 import { startupWarnings } from "./startup";
+import { startAudit } from "./audit";
 import { minProtocolOf } from "./protocol";
 import { mountAuth } from "./auth-http";
 import { createStores } from "./stores";
@@ -17,6 +18,8 @@ const envFile = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../.
 if (existsSync(envFile)) process.loadEnvFile(envFile);
 
 for (const w of startupWarnings(process.env)) console.warn(`[CẢNH BÁO] ${w}`);
+// Nhật ký kiểm toán (M4 2.4): một dòng JSON mỗi sự kiện nhạy cảm ra stdout; AUDIT_LOG=off tắt
+if (startAudit(process.env)) console.log("Nhật ký kiểm toán: bật (AUDIT_LOG=off để tắt)");
 
 const PORT = Number(process.env.PORT ?? 2567);
 

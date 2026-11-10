@@ -16,6 +16,7 @@ import {
   type Kdf,
 } from "./auth-service";
 import { AUTH_ERRORS } from "@tien-gioi/shared";
+import { setAuditSink } from "./audit";
 
 const root = mkdtempSync(path.join(tmpdir(), "tien-gioi-auth-"));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
@@ -434,5 +435,67 @@ describe("bảng mã HTTP", () => {
       expect(s).toBeGreaterThanOrEqual(400);
       expect(s).toBeLessThan(500);
     }
+  });
+});
+
+describe("nhật ký kiểm toán", () => {
+  const lines: string[] = [];
+  const events = () => lines.map((l) => JSON.parse(l) as Record<string, unknown>);
+  beforeEach(() => {
+    lines.length = 0;
+    setAuditSink(
+      (l) => lines.push(l),
+      () => t,
+    );
+  });
+  afterAll(() => setAuditSink(null));
+
+  it("đăng nhập sai / tên không tồn tại ghi `auth.login_failed` (IP + tên chuẩn hoá); mật khẩu KHÔNG bao giờ xuất hiện trong log; đăng nhập đúng không ghi", async () => {
+    await reg();
+    await login("lam_thanh", "mat-khau-sai-bi-mat-1", "3.3.3.3");
+    await login("ten_khong_co", "mat-khau-sai-bi-mat-2", "3.3.3.4");
+    await login("lam_thanh", PW, "3.3.3.5"); // đúng: không ghi
+    expect(events().map((e) => [e.ev, e.ip, e.user])).toEqual([
+      ["auth.login_failed", "3.3.3.3", "lam_thanh"],
+      ["auth.login_failed", "3.3.3.4", "ten_khong_co"],
+    ]);
+    const all = lines.join("\n");
+    for (const secret of ["mat-khau-sai-bi-mat-1", "mat-khau-sai-bi-mat-2", PW])
+      expect(all).not.toContain(secret);
+  });
+
+  it("bị chặn theo IP, bị khoá mềm theo tên và đăng ký quá hạn mức ghi `auth.rate_limited` kèm lý do", async () => {
+    await reg();
+    for (let i = 0; i < LOGIN_FAIL_PER_IP; i++)
+      await login(`ten_la_${i}`, "sai-mat-khau-roi", "9.9.9.9");
+    lines.length = 0;
+    await login("lam_thanh", PW, "9.9.9.9"); // IP bị chặn
+    expect(events()).toEqual([
+      expect.objectContaining({ ev: "auth.rate_limited", kind: "login", ip: "9.9.9.9", by: "ip" }),
+    ]);
+    lines.length = 0;
+    for (let i = 0; i < REGISTER_PER_IP; i++)
+      await svc.register("7.7.7.7", { username: `nguoi_${i}`, password: PW });
+    lines.length = 0;
+    await svc.register("7.7.7.7", { username: "nguoi_cuoi", password: PW });
+    expect(events()).toEqual([
+      expect.objectContaining({ ev: "auth.rate_limited", kind: "register", ip: "7.7.7.7" }),
+    ]);
+    expect(lines.join("")).not.toContain(PW);
+  });
+
+  it("khôi phục mật khẩu sai ghi `auth.recover_failed` và không lộ mã khôi phục đã thử", async () => {
+    await reg();
+    await svc.recover("4.4.4.4", {
+      username: "lam_thanh",
+      recoveryCode: "ma-khoi-phuc-sai-kiem-tra",
+      newPassword: "mat-khau-moi-du-dai",
+    });
+    expect(events()).toEqual([
+      expect.objectContaining({ ev: "auth.recover_failed", ip: "4.4.4.4", user: "lam_thanh" }),
+    ]);
+    const all = lines.join("");
+    expect(all).not.toContain("ma-khoi-phuc-sai-kiem-tra");
+    expect(all).not.toContain("mat-khau-moi-du-dai");
   });
 });

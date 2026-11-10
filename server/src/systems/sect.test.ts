@@ -642,3 +642,52 @@ describe("danh tính theo linh hồn", () => {
     expect(lastSnap(hp, B)?.myRank).toBe("de_tu");
   });
 });
+
+describe("nhật ký kiểm toán", () => {
+  it("lập / góp / rút / mời ra / giải tán ghi đúng sự kiện và trường; thao tác bị từ chối không ghi gì; không có trường bí mật", async () => {
+    const log: { ev: string; f: Record<string, unknown> }[] = [];
+    for (const r of [lh, hp]) r.w.audit = (ev, f) => void log.push({ ev, f: f ?? {} });
+    await makeSect();
+    await join(hp, B);
+    await sectDeposit(hp.w, B, { amount: 300 });
+    // bị từ chối: Đệ tử rút, góp quá ví, tin rác: không thêm dòng nào
+    const n0 = log.length;
+    await sectWithdraw(hp.w, B, { amount: 10 });
+    await sectDeposit(hp.w, B, { amount: 999_999 });
+    await sectDeposit(hp.w, B, { amount: -3 });
+    await sectKick(hp.w, B, { name: A });
+    expect(log.length).toBe(n0);
+    await sectWithdraw(lh.w, A, { amount: 100 });
+    await sectKick(lh.w, A, { name: B });
+    await sectWithdraw(lh.w, A, { amount: 200 });
+    await sectDisband(lh.w, A);
+    expect(log.map((l) => l.ev)).toEqual([
+      "sect.create",
+      "sect.deposit",
+      "sect.withdraw",
+      "sect.kick",
+      "sect.withdraw",
+      "sect.disband",
+    ]);
+    expect(log[0]!.f).toMatchObject({
+      name: A,
+      sect: "Thanh Van",
+      tag: "TV",
+      cost: SECT_CREATE_COST,
+    });
+    expect(log[1]!.f).toMatchObject({ name: B, amount: 300, treasury: 300 });
+    expect(log[2]!.f).toMatchObject({ name: A, amount: 100, treasury: 200 });
+    expect(log[3]!.f).toMatchObject({ name: A, target: B });
+    expect(log[4]!.f).toMatchObject({ amount: 200, treasury: 0 });
+    expect(log[5]!.f).toMatchObject({ name: A, sect: "Thanh Van" });
+    for (const l of log) expect(JSON.stringify(l.f)).not.toMatch(/secret|token|pass|hash/i);
+  });
+
+  it("không có hook (mặc định, test / bench): không ghi và không lỗi", async () => {
+    expect(lh.w.audit).toBeNull();
+    await makeSect();
+    await join(hp, B);
+    await sectDeposit(hp.w, B, { amount: 50 });
+    expect(lastSnap(lh, A)?.coin).toBe(50);
+  });
+});

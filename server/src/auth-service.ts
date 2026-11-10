@@ -24,6 +24,7 @@ import {
 } from "./auth";
 import type { AccountRecord, AccountStore, SessionStore } from "./account-store";
 import { LoginLocks, WindowCounter } from "./auth-limits";
+import { audit } from "./audit";
 
 /** Mã HTTP cho từng mã lỗi (thân phản hồi `{ error: <mã> }`); lớp HTTP dùng bảng này. */
 export const AUTH_STATUS: Record<AuthErrorCode, number> = {
@@ -124,7 +125,10 @@ export class AuthService {
 
     // Giới hạn đăng ký theo IP: chỉ tính các yêu cầu đã hợp lệ về hình thức (gõ sai không đốt hạn mức)
     const wait = this.ipRegs.retryAfterMs(ip, now);
-    if (this.ipRegs.count(ip, now) >= REGISTER_PER_IP) return fail("rate_limited", wait);
+    if (this.ipRegs.count(ip, now) >= REGISTER_PER_IP) {
+      audit("auth.rate_limited", { kind: "register", ip });
+      return fail("rate_limited", wait);
+    }
     this.ipRegs.add(ip, now);
 
     // Kiểm nhanh trước khi tốn hai lần scrypt; cuộc đua thật sự do `create` xử lý (UNIQUE)
@@ -158,7 +162,7 @@ export class AuthService {
     const u = validateUsername(body.username);
     const key = u.ok ? u.value : null;
 
-    const blocked = this.blockedFor(ip, key, now);
+    const blocked = this.blockedFor(ip, key, now, "login");
     if (blocked) return blocked;
 
     // Tên sai luật thì không thể có tài khoản: không cần scrypt, coi như sai thông tin
@@ -167,7 +171,7 @@ export class AuthService {
     const good = key
       ? await this.kdf.verify(body.password, account?.passHash ?? (await this.kdf.dummy()))
       : false;
-    if (!account || !good || account.disabled) return this.failed(ip, key, now);
+    if (!account || !good || account.disabled) return this.failed(ip, key, now, "login");
 
     this.locks.success(key!);
     // Tham số băm yếu hơn mặc định: băm lại bằng mật khẩu vừa nhập đúng
@@ -195,7 +199,7 @@ export class AuthService {
     const pw = validatePassword(body.newPassword, key ?? body.username);
     if (!pw.ok) return fail("weak_password");
 
-    const blocked = this.blockedFor(ip, key, now);
+    const blocked = this.blockedFor(ip, key, now, "recover");
     if (blocked) return blocked;
 
     const code = normalizeRecoveryCode(body.recoveryCode);
@@ -205,7 +209,7 @@ export class AuthService {
       key && code !== null
         ? await this.kdf.verify(code, account?.recoveryHash ?? (await this.kdf.dummy()))
         : false;
-    if (!account || !good || account.disabled) return this.failed(ip, key, now);
+    if (!account || !good || account.disabled) return this.failed(ip, key, now, "recover");
 
     this.locks.success(key!);
     const recoveryCode = newRecoveryCode();
@@ -285,20 +289,36 @@ export class AuthService {
   }
 
   /** Bị chặn (IP đã thất bại quá nhiều, hoặc tên đang bị khoá mềm) thì từ chối TRƯỚC khi tốn scrypt. */
-  private blockedFor(ip: string, key: string | null, now: number): AuthResult<never> | null {
-    if (this.ipFails.count(ip, now) >= LOGIN_FAIL_PER_IP)
+  private blockedFor(
+    ip: string,
+    key: string | null,
+    now: number,
+    kind: "login" | "recover",
+  ): AuthResult<never> | null {
+    if (this.ipFails.count(ip, now) >= LOGIN_FAIL_PER_IP) {
+      audit("auth.rate_limited", { kind, ip, by: "ip" });
       return fail("rate_limited", this.ipFails.retryAfterMs(ip, now));
+    }
     if (key) {
       const ms = this.locks.lockedMs(key, now);
-      if (ms > 0) return fail("rate_limited", ms);
+      if (ms > 0) {
+        audit("auth.rate_limited", { kind, ip, user: key, by: "user" });
+        return fail("rate_limited", ms);
+      }
     }
     return null;
   }
 
   /** Ghi một lần thất bại (theo IP và theo tên, kể cả tên không tồn tại) rồi trả cùng một lỗi. */
-  private failed(ip: string, key: string | null, now: number): AuthResult<never> {
+  private failed(
+    ip: string,
+    key: string | null,
+    now: number,
+    kind: "login" | "recover",
+  ): AuthResult<never> {
     this.ipFails.add(ip, now);
     if (key) this.locks.fail(key, now);
+    audit(kind === "login" ? "auth.login_failed" : "auth.recover_failed", { ip, user: key });
     return fail("bad_credentials");
   }
 }
