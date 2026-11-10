@@ -17,22 +17,20 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { validateUsername } from "@tien-gioi/shared";
-import {
-  FileAccountStore,
-  FileSessionStore,
-  accountsDir,
-  sessionsDir,
-  type AccountRecord,
-  type AccountStore,
-  type SessionStore,
-} from "../src/account-store.js";
+import { type AccountRecord, type AccountStore, type SessionStore } from "../src/account-store.js";
 import { hashSecretScrypt, newRecoveryCode, normalizeRecoveryCode } from "../src/auth.js";
+import { createStores } from "../src/stores.js";
 
 export interface ToolDeps {
   accounts: AccountStore;
   sessions: SessionStore;
   /** Server đang chạy (trả lời ở `/health`)? */
   isServerUp: () => Promise<boolean>;
+  /**
+   * Lệnh ghi có bắt buộc TẮT server không (mặc định có). Bản file: có (chỉ mục trong bộ nhớ server). PostgreSQL: không,
+   * mọi thay đổi đi qua DB nên server đang chạy vẫn thấy ngay.
+   */
+  serverMustBeOff?: boolean;
   /** Băm mật khẩu / mã khôi phục (mặc định scrypt thật); test truyền bản rẻ */
   hash?: (secret: string) => Promise<string>;
 }
@@ -51,7 +49,7 @@ export const USAGE = [
   "  disable <tên>                 khoá tài khoản và đăng xuất mọi thiết bị",
   "  enable <tên>                  mở khoá",
   "  logout-all <tên>              đăng xuất mọi thiết bị",
-  "Phải TẮT server trước (--force để bỏ qua kiểm tra, chỉ khi chắc chắn).",
+  "Với STORE=file phải TẮT server trước lệnh ghi (--force để bỏ qua, chỉ khi chắc chắn); STORE=pg không cần.",
 ];
 
 /** Bảng chữ không có ký tự dễ nhầm (0 O 1 I l): 56 ký tự. */
@@ -101,7 +99,7 @@ export async function runTool(argv: string[], deps: ToolDeps): Promise<ToolResul
 
   // Chỉ lệnh GHI cần server tắt; list / show chỉ đọc nên vẫn chạy được (có thể cũ hơn bộ nhớ của server)
   const writes = !["list", "show"].includes(command);
-  if (writes && !force && (await deps.isServerUp()))
+  if (writes && !force && (deps.serverMustBeOff ?? true) && (await deps.isServerUp()))
     return fail(
       2,
       "Server đang chạy (trả lời ở /health): hãy TẮT server rồi chạy lại.",
@@ -193,17 +191,29 @@ async function serverIsUp(port: number): Promise<boolean> {
 }
 
 async function main() {
-  // Cùng cách server nạp cấu hình dev: .env.local ở gốc repo (PORT, DATA_DIR...)
+  // Cùng cách server nạp cấu hình dev: .env.local ở gốc repo (PORT, STORE, DATABASE_URL...)
   const envFile = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../.env.local");
   if (existsSync(envFile)) process.loadEnvFile(envFile);
   const port = Number(process.env.PORT ?? 2567);
-  const res = await runTool(process.argv.slice(2), {
-    accounts: new FileAccountStore(accountsDir()),
-    sessions: new FileSessionStore(sessionsDir()),
-    isServerUp: () => serverIsUp(port),
-  });
-  for (const line of res.lines) (res.code === 0 ? console.log : console.error)(line);
-  process.exit(res.code);
+  let code = 1;
+  let stores: Awaited<ReturnType<typeof createStores>> | undefined;
+  try {
+    stores = await createStores(process.env);
+    const res = await runTool(process.argv.slice(2), {
+      accounts: stores.accounts,
+      sessions: stores.sessions,
+      isServerUp: () => serverIsUp(port),
+      serverMustBeOff: stores.kind === "file",
+    });
+    for (const line of res.lines) (res.code === 0 ? console.log : console.error)(line);
+    code = res.code;
+  } catch (e) {
+    // Chỉ tên lỗi cấu hình / kết nối (thông báo của driver có thể chứa chuỗi kết nối)
+    console.error(`Không chạy được: ${e instanceof Error ? e.message : String(e)}`);
+  } finally {
+    await stores?.close().catch(() => {});
+  }
+  process.exit(code);
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {

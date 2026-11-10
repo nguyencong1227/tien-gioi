@@ -484,10 +484,23 @@ describe("startupWarnings (tài khoản)", () => {
   const prod = { NODE_ENV: "production" } as NodeJS.ProcessEnv;
   it("production + legacy: cảnh báo; production + account + TRUST_PROXY: sạch", () => {
     expect(startupWarnings(prod).join("|")).toContain("AUTH_MODE=legacy");
-    expect(startupWarnings({ ...prod, AUTH_MODE: "account", TRUST_PROXY: "1" })).toEqual([]);
+    expect(
+      startupWarnings({
+        ...prod,
+        AUTH_MODE: "account",
+        TRUST_PROXY: "1",
+        STORE: "pg",
+        DATABASE_URL: "postgres://x",
+      }),
+    ).toEqual([]);
   });
   it("account mà chưa đặt TRUST_PROXY (production): nhắc IP proxy dùng chung hạn mức", () => {
-    const w = startupWarnings({ ...prod, AUTH_MODE: "account" });
+    const w = startupWarnings({
+      ...prod,
+      AUTH_MODE: "account",
+      STORE: "pg",
+      DATABASE_URL: "postgres://x",
+    });
     expect(w).toHaveLength(1);
     expect(w[0]).toContain("TRUST_PROXY");
   });
