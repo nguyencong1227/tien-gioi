@@ -2357,3 +2357,518 @@ body.reconnecting #btn-pickup {
   color: #c9b07a;
   letter-spacing: 2px;
 }
+
+/* ==========================================================================
+   Luân Hồi (Hoàng Tuyền & Tam Sinh Thạch - M3.2)
+   ========================================================================== */
+
+/* Badge Kiếp N ở HUD */
+.hud-kiep-badge {
+  background: rgba(140, 80, 220, 0.25);
+  color: #d4a5ff;
+  border: 1px solid rgba(180, 120, 255, 0.45);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 6px;
+  letter-spacing: 0.5px;
+}
+
+/* Khi đang ở Hoàng Tuyền: ẩn HUD gameplay, chỉ giữ chat */
+body.in-limbo #hud-col-left,
+body.in-limbo #minimap-wrap,
+body.in-limbo #quickbar,
+body.in-limbo #skills,
+body.in-limbo #btn-pickup,
+body.in-limbo #btn-talk,
+body.in-limbo #btn-portal,
+body.in-limbo #gain-feed,
+body.in-limbo #death,
+body.in-limbo #help {
+  display: none !important;
+}
+
+body.in-limbo #chat {
+  z-index: 10001;
+}
+
+/* Màn hình Hoàng Tuyền */
+.limbo-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: radial-gradient(
+    circle at center,
+    rgba(22, 18, 30, 0.96) 0%,
+    rgba(10, 8, 14, 0.98) 100%
+  );
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 24px 16px 80px;
+  box-sizing: border-box;
+  backdrop-filter: blur(8px);
+}
+
+.limbo-box {
+  width: 100%;
+  max-width: 680px;
+  margin: auto;
+  background: rgba(28, 24, 38, 0.92);
+  border: 1px solid rgba(170, 130, 220, 0.35);
+  border-radius: 12px;
+  box-shadow:
+    0 16px 48px rgba(0, 0, 0, 0.75),
+    0 0 32px rgba(147, 51, 234, 0.15);
+  padding: 24px;
+  box-sizing: border-box;
+  color: #e8e2d8;
+  font-family: "Noto Serif", Georgia, serif;
+}
+
+.limbo-header {
+  text-align: center;
+  margin-bottom: 20px;
+  border-bottom: 1px solid rgba(160, 120, 200, 0.2);
+  padding-bottom: 18px;
+}
+
+.limbo-seal {
+  display: inline-block;
+  width: 44px;
+  height: 44px;
+  line-height: 44px;
+  border-radius: 50%;
+  border: 1px solid #c084fc;
+  color: #f5d0fe;
+  font-size: 20px;
+  font-weight: bold;
+  background: rgba(147, 51, 234, 0.25);
+  margin-bottom: 8px;
+  box-shadow: 0 0 16px rgba(168, 85, 247, 0.4);
+}
+
+.limbo-title {
+  font-size: 22px;
+  color: #faf5ff;
+  margin: 0 0 4px;
+  letter-spacing: 2px;
+  text-shadow: 0 0 14px rgba(192, 132, 252, 0.5);
+}
+
+.limbo-sub {
+  font-size: 13px;
+  color: #c084fc;
+  margin: 0 0 14px;
+  font-style: italic;
+}
+
+.limbo-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  background: rgba(16, 12, 22, 0.7);
+  border: 1px solid rgba(160, 120, 200, 0.2);
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 10px;
+}
+
+.lsum-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.lsum-label {
+  font-size: 11px;
+  color: #a1a1aa;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.lsum-val {
+  font-size: 13px;
+  color: #faf5ff;
+  font-weight: 600;
+}
+
+.lsum-duyen {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px dashed rgba(160, 120, 200, 0.25);
+  padding-top: 10px;
+  margin-top: 4px;
+  font-size: 13px;
+}
+
+.lduyen-gain b {
+  color: #4ade80;
+  font-size: 15px;
+  margin-left: 4px;
+}
+
+.lduyen-total b {
+  color: #fbbf24;
+  font-size: 17px;
+  margin-left: 4px;
+}
+
+.limbo-block {
+  margin-bottom: 20px;
+  background: rgba(18, 15, 26, 0.55);
+  border: 1px solid rgba(140, 100, 180, 0.2);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.lblock-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 14px;
+  border-bottom: 1px solid rgba(160, 120, 200, 0.15);
+  padding-bottom: 8px;
+}
+
+.lblock-head h2 {
+  font-size: 16px;
+  color: #e9d5ff;
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+
+.lblock-head small {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.limbo-stone-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.stone-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: rgba(30, 25, 42, 0.65);
+  border: 1px solid rgba(160, 120, 200, 0.25);
+  border-radius: 6px;
+  padding: 10px 14px;
+}
+
+.stone-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+}
+
+.stone-item-name {
+  font-size: 14px;
+  font-weight: bold;
+  color: #f5f3ff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stone-item-level {
+  font-size: 11px;
+  color: #c084fc;
+  background: rgba(192, 132, 252, 0.15);
+  border: 1px solid rgba(192, 132, 252, 0.3);
+  border-radius: 3px;
+  padding: 1px 6px;
+}
+
+.stone-item-desc {
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+.stone-item-effect {
+  font-size: 12px;
+  color: #fbbf24;
+  font-weight: 500;
+}
+
+.stone-buy-btn {
+  min-height: 44px;
+  min-width: 110px;
+  border-radius: 6px;
+  border: 1px solid #a855f7;
+  background: linear-gradient(180deg, #9333ea, #7e22ce);
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 12px;
+  box-shadow: 0 2px 8px rgba(147, 51, 234, 0.35);
+  transition: all 0.15s ease;
+}
+
+.stone-buy-btn:hover:not(:disabled) {
+  background: linear-gradient(180deg, #a855f7, #8b5cf6);
+  border-color: #c084fc;
+}
+
+.stone-buy-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  border-color: #475569;
+  background: #334155;
+  color: #94a3b8;
+  box-shadow: none;
+}
+
+.limbo-field {
+  margin-top: 14px;
+}
+
+.lfield-label {
+  font-size: 13px;
+  font-weight: bold;
+  color: #e9d5ff;
+  margin-bottom: 6px;
+}
+
+.lfield-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 6px;
+}
+
+.lrelic-hint {
+  font-size: 12px;
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+.lrelic-empty {
+  font-size: 12px;
+  color: #94a3b8;
+  font-style: italic;
+  margin: 6px 0;
+}
+
+.limbo-origin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+  gap: 8px;
+}
+
+.origin-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(160, 120, 200, 0.25);
+  background: rgba(26, 22, 36, 0.75);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  min-height: 44px;
+  box-sizing: border-box;
+  text-align: left;
+  color: inherit;
+  font-family: inherit;
+}
+
+.origin-card:hover:not(.locked) {
+  border-color: rgba(192, 132, 252, 0.6);
+  background: rgba(147, 51, 234, 0.15);
+}
+
+.origin-card.selected {
+  border-color: #c084fc;
+  background: rgba(147, 51, 234, 0.28);
+  box-shadow: 0 0 12px rgba(192, 132, 252, 0.35);
+}
+
+.origin-card.locked {
+  opacity: 0.45;
+  cursor: not-allowed;
+  border-style: dashed;
+}
+
+.origin-card-name {
+  font-size: 13px;
+  font-weight: bold;
+  color: #f5f3ff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.origin-card-desc {
+  font-size: 11px;
+  color: #cbd5e1;
+}
+
+.origin-card-cost {
+  font-size: 10px;
+  color: #fbbf24;
+}
+
+.limbo-relic-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.relic-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  min-height: 44px;
+  border-radius: 6px;
+  border: 1px solid rgba(160, 120, 200, 0.25);
+  background: rgba(26, 22, 36, 0.7);
+  cursor: pointer;
+  user-select: none;
+  font-size: 13px;
+  color: #f1f5f9;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
+}
+
+.relic-item:hover {
+  border-color: #38bdf8;
+}
+
+.relic-item.checked {
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.2);
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.25);
+}
+
+.relic-item.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.limbo-actions {
+  margin-top: 18px;
+}
+
+.limbo-btn-rebirth {
+  width: 100%;
+  min-height: 48px;
+  border-radius: 8px;
+  border: 1px solid #eab308;
+  background: linear-gradient(180deg, #ca8a04, #a16207);
+  color: #fef08a;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: bold;
+  cursor: pointer;
+  letter-spacing: 2px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  box-shadow: 0 4px 16px rgba(202, 138, 4, 0.35);
+  transition: all 0.15s ease;
+}
+
+.limbo-btn-rebirth:hover {
+  background: linear-gradient(180deg, #eab308, #ca8a04);
+  color: #ffffff;
+}
+
+/* Màn hình chuyển cảnh Mạnh Bà */
+.reborn-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10002;
+  background: #050407;
+  opacity: 0;
+  transition: opacity 0.6s ease-in-out;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.reborn-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.reborn-content {
+  text-align: center;
+  max-width: 520px;
+  padding: 24px;
+  color: #e9d5ff;
+  font-family: "Noto Serif", Georgia, serif;
+}
+
+.reborn-bowl {
+  font-size: 48px;
+  margin-bottom: 16px;
+  filter: drop-shadow(0 0 16px rgba(192, 132, 252, 0.5));
+}
+
+.reborn-quote {
+  font-size: 16px;
+  line-height: 1.6;
+  font-style: italic;
+  color: #e2e8f0;
+  margin: 0 0 20px;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+}
+
+.reborn-title {
+  font-size: 26px;
+  font-weight: bold;
+  letter-spacing: 3px;
+  color: #fef08a;
+  text-shadow: 0 0 18px rgba(234, 179, 8, 0.6);
+}
+
+/* Responsive di động cho Hoàng Tuyền */
+@media (max-width: 640px) {
+  .limbo-overlay {
+    padding: 16px 8px 60px;
+  }
+  .limbo-box {
+    padding: 16px 12px;
+  }
+  .limbo-title {
+    font-size: 18px;
+  }
+  .limbo-summary {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  .stone-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .stone-buy-btn {
+    width: 100%;
+  }
+  .limbo-origin-grid {
+    grid-template-columns: 1fr;
+  }
+  .limbo-relic-grid {
+    grid-template-columns: 1fr;
+  }
+}
