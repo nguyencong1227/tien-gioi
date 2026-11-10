@@ -13,6 +13,7 @@ import {
   dungeonOfMap,
   dungeonOpenFailMessage,
   dungeonRewardsLeft,
+  parseDungeonDecline,
   parseDungeonEnter,
   rewardEligible,
   type DungeonMemberCheck,
@@ -23,10 +24,13 @@ import {
   DEFAULT_MAP,
   DEFAULT_MAP_ID,
   DUNGEON_MAPS,
+  GameMap,
   HAC_PHONG_ID,
   LINH_HU_MAP_ID,
   MAPS,
+  BLOCKING,
   TILE,
+  T,
   getMap,
   isDungeonMap,
 } from "./map";
@@ -118,6 +122,7 @@ describe("dữ liệu bí cảnh nhất quán", () => {
     expect(JOIN_NOT_IN_RUN).toBe(422);
     const names = Object.values(DUNGEON_MSG);
     expect(new Set(names).size).toBe(names.length);
+    expect(DUNGEON_MSG.decline).toBe("dungeonDecline");
     for (const n of names) expect(n).toMatch(/^dungeon[A-Z]/);
   });
 });
@@ -181,6 +186,59 @@ describe("bản đồ và quái của bí cảnh", () => {
         }
       expect(ok, id).toBeGreaterThan(m.monsterCapOf(id) * 3);
     }
+  });
+
+  it("hang trùm: chỉ bí cảnh có; nền đi lại được, xa cổng vào, đủ nguy hiểm cho trùm, và đi bộ từ cổng vào tới được", () => {
+    for (const id of [DEFAULT_MAP_ID, HAC_PHONG_ID]) expect(getMap(id)!.lairPx).toBeUndefined();
+    const m = getMap(LINH_HU_MAP_ID)!;
+    const lair = m.lairPx!;
+    expect(lair).toBeDefined();
+    expect(lair).toEqual({ x: 32 * TILE, y: 9 * TILE, r: 3 * TILE });
+    // tâm hang đứng được và nằm ở nửa phía bắc, đối diện cổng vào
+    expect(m.circleBlocked(lair.x, lair.y, MONSTER_BY_ID.yeu_vuong.radius)).toBe(false);
+    expect(lair.y).toBeLessThan(m.worldH / 2);
+    // mọi ô trong bán kính hang là đất (không chặn), kể cả sát mép
+    for (let ty = 0; ty < m.def.h; ty++)
+      for (let tx = 0; tx < m.def.w; tx++)
+        if (Math.hypot((tx + 0.5) * TILE - lair.x, (ty + 0.5) * TILE - lair.y) <= lair.r - 1)
+          expect(m.tileAt(tx, ty), `${tx},${ty}`).toBe(T.Dirt);
+    // ngoài khu an toàn, đủ nguy hiểm để `minDanger` của trùm không loại mất chỗ sinh
+    expect(m.inSafe(lair.x, lair.y, lair.r)).toBe(false);
+    expect(m.dangerAt(lair.x, lair.y)).toBeGreaterThanOrEqual(MONSTER_BY_ID.yeu_vuong.minDanger);
+    // đi bộ (4 hướng, ô không chặn) từ tâm cổng vào tới tâm hang: nếu không, đội mở bí cảnh mà không bao giờ tới trùm
+    const seen = new Uint8Array(m.def.w * m.def.h);
+    const start = [Math.floor(m.townPx.x / TILE), Math.floor(m.townPx.y / TILE)];
+    const goal = [Math.floor(lair.x / TILE), Math.floor(lair.y / TILE)];
+    const q = [start];
+    seen[start[1] * m.def.w + start[0]] = 1;
+    while (q.length) {
+      const [x, y] = q.pop()!;
+      for (const [dx, dy] of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ]) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= m.def.w || ny >= m.def.h) continue;
+        if (seen[ny * m.def.w + nx] || BLOCKING.has(m.tileAt(nx, ny))) continue;
+        seen[ny * m.def.w + nx] = 1;
+        q.push([nx, ny]);
+      }
+    }
+    expect(seen[goal[1] * m.def.w + goal[0]]).toBe(1);
+  });
+
+  it("dựng bản đồ từ chối hang sai: ngoài / sát viền, đè khu an toàn, số lẻ, bán kính xấu", () => {
+    const base = DUNGEON_MAPS[0];
+    const make = (lair: { cx: number; cy: number; r: number }) => new GameMap({ ...base, lair });
+    expect(() => make({ cx: 32, cy: 9, r: 3 })).not.toThrow();
+    expect(() => make({ cx: 1, cy: 9, r: 3 })).toThrow(/hang trùm/); // sát viền núi đá
+    expect(() => make({ cx: 32, cy: 70, r: 3 })).toThrow(/hang trùm/); // ngoài bản đồ
+    expect(() => make({ cx: 32, cy: 50, r: 3 })).toThrow(/hang trùm/); // đè lên cổng vào (cy 56, r 4)
+    expect(() => make({ cx: 32.5, cy: 9, r: 3 })).toThrow(/số nguyên/);
+    for (const r of [0, 0.5, -2, NaN, Infinity]) expect(() => make({ cx: 32, cy: 9, r })).toThrow();
   });
 
   it("NPC Thủ môn: ở Lạc Hà, trong trấn, không trên ô chặn, không đè NPC khác", () => {
@@ -288,10 +346,13 @@ describe("canOpenDungeon", () => {
   });
 });
 
-describe("parseDungeonEnter (không tin client)", () => {
+describe.each([
+  ["parseDungeonEnter", parseDungeonEnter],
+  ["parseDungeonDecline", parseDungeonDecline],
+])("%s (không tin client)", (_name, parse) => {
   const id = "0123456789abcdef0123456789abcdef";
   it("nhận runId đúng dạng 128 bit hex thường; mọi thứ khác là null", () => {
-    expect(parseDungeonEnter({ runId: id })).toEqual({ runId: id });
+    expect(parse({ runId: id })).toEqual({ runId: id });
     expect(RUN_ID_RE.test(id)).toBe(true);
     const bad: unknown[] = [
       undefined,
@@ -312,17 +373,19 @@ describe("parseDungeonEnter (không tin client)", () => {
       { runId: "../".repeat(11) },
       { runId: { toString: () => id } },
     ];
-    for (const b of bad) expect(parseDungeonEnter(b), JSON.stringify(b)).toBeNull();
+    for (const b of bad) expect(parse(b), JSON.stringify(b)).toBeNull();
   });
 
   it("không mang trường lạ sang kết quả (không `__proto__`, không trường thừa)", () => {
     const raw = JSON.parse(`{"runId":"${id}","__proto__":{"x":1},"admin":true}`);
-    const r = parseDungeonEnter(raw)!;
+    const r = parse(raw)!;
     expect(Object.keys(r)).toEqual(["runId"]);
     expect((r as any).admin).toBeUndefined();
   });
+});
 
-  it("ROOM_ID_RE (TravelToMsg.roomId): id phòng Colyseus ngắn hợp lệ, chuỗi lạ bị từ chối", () => {
+describe("ROOM_ID_RE (TravelToMsg.roomId)", () => {
+  it("id phòng Colyseus ngắn hợp lệ, chuỗi lạ bị từ chối", () => {
     for (const ok of ["abc123", "a_b-C", "Xk2oVQb1y", "a".repeat(64)])
       expect(ROOM_ID_RE.test(ok), ok).toBe(true);
     for (const bad of ["", "a b", "../x", "a/b", "a".repeat(65), "é", "a\n", "<s>"])
