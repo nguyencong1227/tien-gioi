@@ -20,16 +20,24 @@ import { Hub } from "../hub";
 import { partyAnswer, partyInvite } from "./party";
 import {
   GATEKEEPER_ID,
+  DUNGEON_EXIT_DELAY_MS,
   declineDungeon,
   dungeonDialog,
   enterDungeon,
+  finishRun,
+  leaveDungeon,
+  memberJoined,
+  memberLeft,
   openDungeon,
   runFailed,
+  runOfWorld,
   runReady,
+  sendDungeonState,
+  tickDungeonRun,
   tickDungeons,
   type Run,
 } from "./dungeon";
-import { addPlayer, makeWorld } from "./test-helpers";
+import { addMonster, addPlayer, makeWorld } from "./test-helpers";
 
 const HAC_PHONG = getMap(HAC_PHONG_ID)!;
 const LEADER = "Alpha"; // ở Lạc Hà, đứng cạnh Thủ môn
@@ -479,5 +487,183 @@ describe("sổ run (Runs)", () => {
     expect(t.hub.runs.size).toBe(0);
     expect(t.hub.runs.ofKey(key(LEADER))).toBeUndefined();
     expect(t.hub.runs.ofKey(key(MEMBER))).toBeUndefined();
+  });
+});
+
+describe("trong phòng bí cảnh: đồng hồ, trạng thái, kết thúc", () => {
+  /** Run đã mở (có hook phòng giả), cộng thêm một World bí cảnh dùng chung Hub, các thành viên chưa vào. */
+  function inRoom() {
+    const t = setup();
+    const run = open(t);
+    const dun = makeWorld(getMap(LINH_HU_MAP_ID)!, t.hub);
+    dun.w.runId = run.id;
+    dun.w.now = t.lh.w.now;
+    return { ...t, run, dun, w: dun.w };
+  }
+  const join = (t: ReturnType<typeof inRoom>, name: string) => {
+    addPlayer(t.w, name, 1, 8);
+    memberJoined(t.w, t.run, key(name));
+  };
+  const tick = (t: ReturnType<typeof inRoom>, ms: number) => {
+    t.w.now += ms;
+    t.w.tick++;
+    tickDungeonRun(t.w);
+  };
+
+  it("người đầu tiên vào: `running`, đồng hồ `timeLimitMs` chạy từ lúc đó; người vào muộn không đổi đồng hồ; HUD nhận trạng thái", () => {
+    const t = inRoom();
+    expect(runOfWorld(t.w)).toBe(t.run);
+    expect(t.run.phase).toBe("gathering");
+    t.w.now += 7000;
+    join(t, LEADER);
+    expect(t.run.phase).toBe("running");
+    expect(t.run.startedAt).toBe(t.w.now);
+    const limit = dungeonOf(LINH_HU_ID)!.timeLimitMs;
+    expect(t.run.deadline).toBe(t.w.now + limit);
+    expect(t.run.members.get(key(LEADER))!.status).toBe("inside");
+    expect(t.dun.dungeonStates.at(-1)).toMatchObject({
+      sid: LEADER,
+      msg: { phase: "running", deadlineInMs: limit },
+    });
+    const deadline = t.run.deadline;
+    t.w.now += 5000;
+    join(t, MEMBER);
+    expect(t.run.deadline).toBe(deadline);
+  });
+
+  it("memberJoined cho người không phải thành viên: không đổi gì; phòng thường (runId null) không có run", () => {
+    const t = inRoom();
+    memberJoined(t.w, t.run, "nguoi la");
+    expect(t.run.phase).toBe("gathering");
+    expect(runOfWorld(t.lh.w)).toBeUndefined();
+    tickDungeonRun(t.lh.w); // phòng thường: không làm gì
+    expect(t.lh.dungeonStates).toHaveLength(0);
+  });
+
+  it("trạng thái: quái nhỏ còn lại KHÔNG tính trùm; máu trùm; danh sách đội (chưa vào / từ chối không hiện); `alive` theo người chơi", () => {
+    const t = inRoom();
+    const boss = dungeonOf(LINH_HU_ID)!.boss;
+    addMonster(t.w, "lang", 1000, 1000);
+    addMonster(t.w, "ho", 1100, 1000);
+    const { m: bossMonster } = addMonster(t.w, boss, 1200, 1000);
+    bossMonster.hp = 100;
+    join(t, LEADER);
+    const msg = t.dun.dungeonStates.at(-1)!.msg;
+    expect(msg.mobsLeft).toBe(2);
+    expect(msg.boss).toEqual({ hp: 100, maxHp: bossMonster.maxHp });
+    expect(msg.members).toEqual([{ name: LEADER, alive: true }]); // MEMBER chưa vào: chưa hiện
+    t.w.state.players.get(LEADER)!.dead = true;
+    sendDungeonState(t.w, t.run);
+    expect(t.dun.dungeonStates.at(-1)!.msg.members).toEqual([{ name: LEADER, alive: false }]);
+    // trùm chết (không còn trong state): boss = null
+    t.w.state.monsters.forEach((m, id) => {
+      if (m.kind === boss) t.w.state.monsters.delete(id);
+    });
+    sendDungeonState(t.w, t.run);
+    expect(t.dun.dungeonStates.at(-1)!.msg.boss).toBeNull();
+  });
+
+  it("`dungeonState` mỗi giây (20 tick), không mỗi tick", () => {
+    const t = inRoom();
+    join(t, LEADER);
+    t.dun.dungeonStates.length = 0;
+    t.w.tick = 1;
+    for (let i = 0; i < 40; i++) tick(t, 50);
+    expect(t.dun.dungeonStates.length).toBeGreaterThanOrEqual(1);
+    expect(t.dun.dungeonStates.length).toBeLessThanOrEqual(3);
+  });
+
+  it("hết giờ: `timeout`, run `lost`, mọi người trong phòng nhận `dungeonEnd`; đúng `DUNGEON_EXIT_DELAY_MS` sau đó mới đưa về và xoá run", () => {
+    const t = inRoom();
+    join(t, LEADER);
+    join(t, MEMBER);
+    const exit = vi.fn();
+    t.w.onDungeonExit = exit;
+    tick(t, dungeonOf(LINH_HU_ID)!.timeLimitMs - 100);
+    expect(t.run.phase).toBe("running");
+    tick(t, 200);
+    expect(t.run.phase).toBe("lost");
+    expect(t.run.endReason).toBe("timeout");
+    expect(t.dun.dungeonEnds.map((e) => [e.sid, e.msg.reason, e.msg.result]).sort()).toEqual([
+      [LEADER, "timeout", "lost"],
+      [MEMBER, "timeout", "lost"],
+    ]);
+    expect(t.dun.dungeonEnds[0].msg.rewardsLeft).toBe(DUNGEON_DAILY_REWARDS);
+    expect(t.dun.dungeonEnds.every((e) => e.msg.reward === undefined)).toBe(true); // thua: không thưởng
+    expect(exit).not.toHaveBeenCalled();
+    expect(t.hub.runs.get(t.run.id)).toBe(t.run);
+    tick(t, DUNGEON_EXIT_DELAY_MS - 500);
+    expect(exit).not.toHaveBeenCalled();
+    tick(t, 600);
+    expect(exit.mock.calls.map((c) => c[0]).sort()).toEqual([LEADER, MEMBER]);
+    expect(t.hub.runs.size).toBe(0);
+    expect(t.hub.runs.ofKey(key(LEADER))).toBeUndefined();
+    // kết thúc là một lần (idempotent)
+    finishRun(t.w, t.run, "lost", "timeout");
+    expect(t.dun.dungeonEnds).toHaveLength(2);
+  });
+
+  it("mọi người chết: `all_dead`; người chết (Hoàng Tuyền) không bị đưa đi ở đây (họ tự đầu thai rồi về), người còn sống thì có", () => {
+    const t = inRoom();
+    join(t, LEADER);
+    join(t, MEMBER);
+    const exit = vi.fn();
+    t.w.onDungeonExit = exit;
+    t.w.state.players.get(LEADER)!.dead = true;
+    tick(t, 50);
+    expect(t.run.phase).toBe("running"); // MEMBER còn sống: chưa thua
+    t.w.state.players.get(MEMBER)!.dead = true;
+    tick(t, 50);
+    expect(t.run.endReason).toBe("all_dead");
+    tick(t, DUNGEON_EXIT_DELAY_MS + 100);
+    expect(exit).not.toHaveBeenCalled(); // cả hai đang ở Hoàng Tuyền
+    expect(t.hub.runs.size).toBe(0);
+
+    // một người sống, một người chết khi hết giờ: chỉ người sống được đưa về
+    const u = inRoom();
+    join(u, LEADER);
+    join(u, MEMBER);
+    const exit2 = vi.fn();
+    u.w.onDungeonExit = exit2;
+    u.w.state.players.get(MEMBER)!.dead = true;
+    finishRun(u.w, u.run, "lost", "timeout", 0);
+    tick(u, 10);
+    expect(exit2.mock.calls.map((c) => c[0])).toEqual([LEADER]);
+  });
+
+  it("mọi người rời: `all_left` (không ai trong phòng); còn người được mời chưa tới và còn hạn thì chưa kết thúc", () => {
+    const t = inRoom();
+    join(t, LEADER); // MEMBER còn `invited`, hạn mời còn
+    memberLeft(t.w, t.run, key(LEADER));
+    t.w.state.players.delete(LEADER);
+    tick(t, 50);
+    expect(t.run.phase).toBe("running"); // MEMBER còn có thể vào
+    t.w.now = t.run.inviteUntil + 1;
+    tickDungeonRun(t.w);
+    expect(t.run.endReason).toBe("all_left");
+    expect(t.dun.dungeonEnds).toHaveLength(0); // không còn ai trong phòng để báo
+  });
+
+  it("memberLeft chỉ đổi người đang `inside`; `dungeonLeave` chỉ cho người còn sống đang ở trong run", () => {
+    const t = inRoom();
+    memberLeft(t.w, t.run, key(MEMBER)); // còn `invited`: không đổi
+    expect(t.run.members.get(key(MEMBER))!.status).toBe("invited");
+    const exit = vi.fn();
+    t.w.onDungeonExit = exit;
+    addPlayer(t.w, LEADER, 1, 8);
+    leaveDungeon(t.w, LEADER); // chưa `inside`
+    expect(exit).not.toHaveBeenCalled();
+    join(t, THIRD); // không phải thành viên
+    leaveDungeon(t.w, THIRD);
+    expect(exit).not.toHaveBeenCalled();
+    memberJoined(t.w, t.run, key(LEADER));
+    t.w.state.players.get(LEADER)!.dead = true;
+    leaveDungeon(t.w, LEADER); // đang chết: đầu thai thì mới về
+    expect(exit).not.toHaveBeenCalled();
+    t.w.state.players.get(LEADER)!.dead = false;
+    leaveDungeon(t.w, LEADER);
+    expect(exit).toHaveBeenCalledWith(LEADER);
+    leaveDungeon(t.lh.w, LEADER); // phòng thường: bỏ qua
+    expect(exit).toHaveBeenCalledTimes(1);
   });
 });

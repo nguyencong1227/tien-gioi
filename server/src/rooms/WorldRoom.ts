@@ -523,7 +523,10 @@ export class WorldRoom extends Room<WorldState> {
     // Rớt mạng bất thường (không phải chủ động thoát; bị ngắt vì spam thì `limiters` đã xoá): giữ nhân vật chờ
     // kết nối lại. Dữ liệu theo sessionId nên giữ nguyên; Colyseus chuyển StateView sang kết nối mới.
     let resolveDone = () => {};
-    if (p && c && consented === false && this.limiters.has(sid)) {
+    // Phòng bí cảnh KHÔNG giữ chỗ chờ nối lại: hồ sơ luôn ghi bản đồ vào (Lạc Hà) nên người rớt mạng đăng nhập lại sẽ vào
+    // PHÒNG KHÁC (Lạc Hà); một "hồn lìa xác" còn ở đây sẽ ghi đè hồ sơ mới bằng dữ liệu cũ khi hết hạn chờ. Rớt mạng = rời
+    // run (lưu ngay, gỡ khỏi phòng); nhân vật không có gì để mất vì không còn ở trong bí cảnh.
+    if (p && c && consented === false && this.limiters.has(sid) && this.world.runId === null) {
       const done = new Promise<void>((r) => (resolveDone = r));
       const wait = this.allowReconnection(client, WorldRoom.reconnectGraceS);
       // allowReconnection trả về Promise đã bị từ chối (không có `reject`) khi phòng đang đóng: khi đó không có gì để huỷ
