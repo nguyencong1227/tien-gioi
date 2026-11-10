@@ -62,6 +62,7 @@ import { VIEW_ENTER } from "../systems/interest";
 import { partyAnswer, partyDrop, partyInvite, partyKick, partyLeave } from "../systems/party";
 import { planTravel } from "../systems/travel";
 import { RateLimiter } from "../rate-limit";
+import { defaultHub, type Hub } from "../hub";
 
 const SAVE_EVERY_MS = 30_000;
 /** Mã đóng kết nối khi spam tin nhắn (client hiện "mất kết nối") */
@@ -86,6 +87,13 @@ export class WorldRoom extends Room<WorldState> {
   autoDispose = false; // thế giới luôn sống, kể cả khi không có ai
   state = new WorldState();
 
+  /** Kênh chung giữa các phòng. Test ghi đè để cô lập. */
+  static hub: Hub = defaultHub;
+  private get hub() {
+    return WorldRoom.hub;
+  }
+  private removeChatSink: (() => void) | null = null;
+
   /** Bản đồ của phòng này (mỗi bản đồ một phòng, docs/THIET_KE_NHIEU_BAN_DO.md); đặt ở onCreate */
   mapId = DEFAULT_MAP_ID;
   private world!: World;
@@ -100,7 +108,8 @@ export class WorldRoom extends Room<WorldState> {
         dmg: (msg) => this.sendNear(msg.x, msg.y, 0, "dmg", msg),
         sys: (text) =>
           this.broadcast("chat", { from: "Thiên Đạo", text, sys: true } satisfies ChatOut),
-        chat: (from, text) => this.broadcast("chat", { from, text } satisfies ChatOut),
+        // Chat người chơi là của CẢ SERVER (mọi bản đồ / phòng); thông báo hệ thống (`sys`) chỉ trong phòng
+        chat: (from, text) => this.hub.chat({ from, text } satisfies ChatOut),
         toast: (sid, msg) => this.sendTo(sid, "toast", msg),
         inv: (sid, msg) => this.sendTo(sid, "inv", msg),
         quests: (sid, msg) => this.sendTo(sid, "quests", msg),
@@ -148,6 +157,7 @@ export class WorldRoom extends Room<WorldState> {
     if (!map) throw new Error(`Phòng thế giới cấu hình bản đồ không tồn tại: ${String(wanted)}`);
     this.mapId = map.def.id;
     this.world = this.createWorld(map);
+    this.removeChatSink = this.hub.addChatSink((msg) => this.broadcast("chat", msg));
     this.setPatchRate(TICK_MS);
     this.setSimulationInterval((dt) => this.update(dt), TICK_MS);
     spawnInitial(this.world);
@@ -405,6 +415,8 @@ export class WorldRoom extends Room<WorldState> {
   }
 
   async onDispose() {
+    this.removeChatSink?.();
+    this.removeChatSink = null;
     await this.saveAll();
   }
 
