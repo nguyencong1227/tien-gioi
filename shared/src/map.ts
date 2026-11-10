@@ -141,6 +141,8 @@ export class GameMap {
   readonly worldH: number;
   /** Khu an toàn tính bằng px */
   readonly townPx: Readonly<{ x: number; y: number; r: number }>;
+  /** Từ mép trấn tới chỗ `dangerAt` đạt 1 (px): nửa cạnh ngắn của bản đồ trừ bán kính trấn */
+  private readonly dangerSpanPx: number;
 
   constructor(readonly def: MapDef) {
     // Con đường đất đi từ ô (cx, cy) theo từng ô: số lẻ làm chỉ số mảng lệch và ghi hụt mà không báo lỗi
@@ -156,6 +158,10 @@ export class GameMap {
     this.worldW = def.w * TILE;
     this.worldH = def.h * TILE;
     this.townPx = { x: def.town.cx * TILE, y: def.town.cy * TILE, r: def.town.r * TILE };
+    this.dangerSpanPx = Math.min(this.worldW, this.worldH) * 0.5 - this.townPx.r;
+    // Trấn phủ kín nửa bản đồ thì dangerAt chia cho 0 hoặc số âm
+    if (!(this.dangerSpanPx > 0))
+      throw new Error(`MapDef ${def.id}: bán kính trấn phải nhỏ hơn nửa cạnh ngắn của bản đồ`);
   }
 
   tileAt(tx: number, ty: number): T {
@@ -198,8 +204,15 @@ export class GameMap {
    */
   dangerAt(x: number, y: number): number {
     const d = Math.hypot(x - this.townPx.x, y - this.townPx.y);
-    const far = Math.min(this.worldW, this.worldH) * 0.5;
-    return Math.min(1, Math.max(0, (d - this.townPx.r) / (far - this.townPx.r)));
+    return Math.min(1, Math.max(0, (d - this.townPx.r) / this.dangerSpanPx));
+  }
+
+  /**
+   * Bán kính (px) quanh tâm trấn mà ở đó `dangerAt = danger`: nghịch đảo của `dangerAt` theo khoảng cách.
+   * Nơi vẽ vòng nguy hiểm (bản đồ nhỏ / lớn, mũi tên chỉ đường) gọi hàm này, không tự chép công thức.
+   */
+  dangerRadius(danger: number): number {
+    return this.townPx.r + danger * this.dangerSpanPx;
   }
 }
 
