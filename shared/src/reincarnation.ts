@@ -15,7 +15,7 @@ import { REALMS, expToNext, stepOf } from "./realms";
 /** Kiếp chết trong bấy nhiêu phút đầu, hoặc còn ở Phàm Nhân, không tính là một kiếp: 0 Duyên, bộ đếm kiếp không tăng. */
 export const MIN_LIFE_MINUTES_FOR_KIEP = 2;
 /** Mỗi bấy nhiêu phút chơi được 1 điểm thời gian, tối đa `DUYEN_TIME_CAP`. */
-export const DUYEN_MINUTES_PER_PT = 10;
+export const DUYEN_MINUTES_PER_PT = 9;
 export const DUYEN_TIME_CAP = 15;
 /** Mỗi trùm đã hạ được bấy nhiêu điểm, tối đa `DUYEN_BOSS_CAP`. */
 export const DUYEN_BOSS_EACH = 3;
@@ -75,9 +75,12 @@ export function calcDuyen(life: LifeStats): number {
   if (!life || !countsAsKiep(life)) return 0;
   const { realm, tier } = cleanStep(life.realm, life.tier);
   let pts = 0;
-  // Các bậc đã qua: mỗi cảnh giới r có REALMS[r].tiers.length bậc, bậc đầu của Phàm Nhân là bậc 0 (không có điểm)
+  // Các bậc ĐÃ VƯỢT QUA, tính theo cảnh giới nơi công sức đó được bỏ ra: cảnh giới trước thì đủ `tiers.length` bậc, cảnh giới
+  // đang đứng thì `tier` bậc (bậc hiện tại chưa vượt qua, chỉ có phần dở dang bên dưới). Không có "tiền vào cảnh giới":
+  // tính `tier + 1` (như bản đầu) làm bước đầu của mỗi cảnh giới nhận điểm cả cảnh giới đó mà chưa bỏ công sức nào, nên
+  // Duyên / giờ vọt lên ở đầu Trúc Cơ (gấp ~1.44 lần cuối Trúc Cơ, `can-bang` #151) và phá mục tiêu "mọi cách chơi như nhau".
   for (let r = 1; r <= realm; r++)
-    pts += duyenPerStep(r) * (r < realm ? REALMS[r].tiers.length : tier + 1);
+    pts += duyenPerStep(r) * (r < realm ? REALMS[r].tiers.length : tier);
   // Phần dở dang của bậc hiện tại: tu vi / thanh tu vi, tính theo điểm một bậc của cảnh giới đang đứng
   const bar = expToNext(realm, tier);
   const frac = bar > 0 ? Math.min(1, nonNeg(life.exp) / bar) : 0;

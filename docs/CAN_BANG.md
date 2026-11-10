@@ -146,15 +146,15 @@ Mô phỏng cân bằng hệ thống Luân hồi theo thiết kế tại `docs/T
 
 | Chết ngay khi vừa đạt | Phút | Duyên (0 trùm) | Duyên / giờ (0 trùm) | Duyên (hạ trùm) | Duyên / giờ (hạ trùm) |
 |---|---:|---:|---:|---:|---:|
-| Luyện Khí tầng 1 | 9 | 2 | 12.8 | 8 | **51.1** |
-| Luyện Khí tầng 5 | 29 | 12 | 24.6 | 18 | **36.9** |
-| Luyện Khí tầng 9 | 48 | 22 | 27.6 | 28 | **35.1** |
-| Trúc Cơ sơ kỳ | 53 | 35 | 39.8 | 41 | **46.6** |
-| Trúc Cơ trung kỳ | 86 | 50 | 35.0 | 56 | **39.2** |
-| Trúc Cơ hậu kỳ | 122 | 66 | 32.4 | 72 | **35.4** |
-| Hết Trúc Cơ (thanh đầy) | 175 | 81 | 27.7 | 90 | **30.8** |
+| Luyện Khí tầng 1 | 9 | 1 | 6.4 | 7 | **44.7** |
+| Luyện Khí tầng 5 | 29 | 11 | 22.5 | 17 | **34.8** |
+| Luyện Khí tầng 9 | 48 | 21 | 26.3 | 27 | **33.9** |
+| Trúc Cơ sơ kỳ | 53 | 23 | 26.2 | 29 | **33.0** |
+| Trúc Cơ trung kỳ | 86 | 39 | 27.3 | 45 | **31.5** |
+| Trúc Cơ hậu kỳ | 122 | 55 | 27.0 | 61 | **30.0** |
+| Hết Trúc Cơ (thanh đầy) | 175 | 69 | 23.6 | 78 | **26.7** |
 
-Đọc bảng: Tính từ Luyện Khí tầng 5 trở đi (bỏ qua giai đoạn mới vào game), Duyên / giờ (0 trùm) nhỏ nhất là **24.6** (Luyện Khí tầng 5), lớn nhất là **39.8** (Trúc Cơ sơ kỳ), tỷ lệ lớn / nhỏ là **1.62×** ⚠️ (vượt ngưỡng mục tiêu ~1.3×). Đỉnh Duyên / giờ rơi vào Trúc Cơ sơ kỳ (~39.8 Duyên/h, gấp ~1.44× so với cày hết Trúc Cơ).
+Đọc bảng: Tính từ Luyện Khí tầng 5 trở đi (bỏ qua giai đoạn mới vào game), Duyên / giờ (0 trùm) nhỏ nhất là **22.5** (Luyện Khí tầng 5), lớn nhất là **27.3** (Trúc Cơ trung kỳ), tỷ lệ lớn / nhỏ là **1.21×**. Đỉnh Duyên / giờ rơi vào Trúc Cơ trung kỳ (~27.3 Duyên/h, gấp ~1.16× so với cày hết Trúc Cơ).
 
 ### 2. Tiến trình luân hồi qua chuỗi kiếp (1..N) khi mở dần "Dư âm tu hành"
 
@@ -162,30 +162,32 @@ Giả định người chơi kiếp nào cũng cày trọn vẹn đến hết Tr
 
 | Kiếp | Dư âm tu hành | Tốc độ tu luyện | Thời gian chơi | Duyên nhận | Duyên còn lại | Duyên / giờ | So với kiếp 1 | Hành động tại Tam Sinh Thạch |
 |---:|---:|---:|---:|---:|---:|---:|---:|---|
-| 1 | Nấc 3 | +30% | 2 giờ 55 phút | +87 | 31 | **29.7** | 1.00× | Lên nấc 3 (+30%) |
-| 2 | Nấc 5 | +50% | 2 giờ 17 phút | +85 | 23 | **37.3** | 1.25× | Lên nấc 5 (+50%) |
-| 3 | Nấc 6 | +60% | 2 giờ 0 phút | +83 | 26 | **41.6** | 1.40× | Lên nấc 6 (+60%) |
-| 4 | Nấc 6 | +60% | 1 giờ 53 phút | +83 | 109 | **44.2** | 1.49× | Chờ đủ 115 Duyên |
-| 5 | Nấc 7 | +70% | 1 giờ 53 phút | +83 | 77 | **44.2** | 1.49× | Lên nấc 7 (+70%) |
-| 6 | Nấc 7 | +70% | 1 giờ 47 phút | +82 | 159 | **46.2** | 1.55× | Chờ đủ 165 Duyên |
-| 7 | Nấc 8 | +80% | 1 giờ 47 phút | +82 | 76 | **46.2** | 1.55× | Lên nấc 8 (+80%) |
-| 8 | Nấc 8 | +80% | 1 giờ 41 phút | +82 | 158 | **48.7** | 1.64× | Chờ đủ 235 Duyên |
-| 9 | Nấc 9 | +90% | 1 giờ 41 phút | +82 | 5 | **48.7** | 1.64× | Lên nấc 9 (+90%) |
-| 10 | Nấc 9 | +90% | 1 giờ 36 phút | +81 | 86 | **50.6** | 1.70× | Chờ đủ 335 Duyên |
-| 11 | Nấc 9 | +90% | 1 giờ 36 phút | +81 | 167 | **50.6** | 1.70× | Chờ đủ 335 Duyên |
-| 12 | Nấc 9 | +90% | 1 giờ 36 phút | +81 | 248 | **50.6** | 1.70× | Chờ đủ 335 Duyên |
-| 13 | Nấc 9 | +90% | 1 giờ 36 phút | +81 | 329 | **50.6** | 1.70× | Chờ đủ 335 Duyên |
-| 14 | Nấc 10 | +100% | 1 giờ 36 phút | +81 | 75 | **50.6** | 1.70× | Lên nấc 10 (+100%) |
-| 15 | Nấc 10 | +100% | 1 giờ 32 phút | +81 | 156 | **53.0** | 1.78× | Đã đạt tối đa (+100%) |
+| 1 | Nấc 3 | +30% | 2 giờ 55 phút | +75 | 19 | **25.6** | 1.00× | Lên nấc 3 (+30%) |
+| 2 | Nấc 5 | +50% | 2 giờ 17 phút | +75 | 1 | **32.9** | 1.28× | Lên nấc 5 (+50%) |
+| 3 | Nấc 5 | +50% | 2 giờ 0 phút | +73 | 74 | **36.6** | 1.43× | Chờ đủ 80 Duyên |
+| 4 | Nấc 6 | +60% | 2 giờ 0 phút | +73 | 67 | **36.6** | 1.43× | Lên nấc 6 (+60%) |
+| 5 | Nấc 7 | +70% | 1 giờ 53 phút | +72 | 24 | **38.3** | 1.50× | Lên nấc 7 (+70%) |
+| 6 | Nấc 7 | +70% | 1 giờ 47 phút | +71 | 95 | **40.0** | 1.56× | Chờ đủ 165 Duyên |
+| 7 | Nấc 8 | +80% | 1 giờ 47 phút | +71 | 1 | **40.0** | 1.56× | Lên nấc 8 (+80%) |
+| 8 | Nấc 8 | +80% | 1 giờ 41 phút | +71 | 72 | **42.2** | 1.64× | Chờ đủ 235 Duyên |
+| 9 | Nấc 8 | +80% | 1 giờ 41 phút | +71 | 143 | **42.2** | 1.64× | Chờ đủ 235 Duyên |
+| 10 | Nấc 8 | +80% | 1 giờ 41 phút | +71 | 214 | **42.2** | 1.64× | Chờ đủ 235 Duyên |
+| 11 | Nấc 9 | +90% | 1 giờ 41 phút | +71 | 50 | **42.2** | 1.64× | Lên nấc 9 (+90%) |
+| 12 | Nấc 9 | +90% | 1 giờ 36 phút | +70 | 120 | **43.7** | 1.70× | Chờ đủ 335 Duyên |
+| 13 | Nấc 9 | +90% | 1 giờ 36 phút | +70 | 190 | **43.7** | 1.70× | Chờ đủ 335 Duyên |
+| 14 | Nấc 9 | +90% | 1 giờ 36 phút | +70 | 260 | **43.7** | 1.70× | Chờ đủ 335 Duyên |
+| 15 | Nấc 9 | +90% | 1 giờ 36 phút | +70 | 330 | **43.7** | 1.70× | Chờ đủ 335 Duyên |
+| 16 | Nấc 10 | +100% | 1 giờ 36 phút | +70 | 65 | **43.7** | 1.70× | Lên nấc 10 (+100%) |
+| 17 | Nấc 10 | +100% | 1 giờ 32 phút | +70 | 135 | **45.8** | 1.79× | Đã đạt tối đa (+100%) |
 
 ### 3. Nhận xét & Đánh giá cân bằng luân hồi
 
 - **Tính chất ngang bằng giữa các cách chơi (chết ở bậc nào):**
-  - Người chơi cày chay chết ở Luyện Khí tầng 5 (29 phút): **24.6 Duyên/h** (0 trùm) / **36.9 Duyên/h** (hạ trùm).
-  - Người chơi cày tới Trúc Cơ sơ kỳ (53 phút): đạt đỉnh **39.8 Duyên/h** (0 trùm) / **46.6 Duyên/h** (hạ trùm).
-  - Người chơi cày hết Trúc Cơ (175 phút): **27.7 Duyên/h** (0 trùm) / **30.8 Duyên/h** (hạ trùm).
-  - **Đánh giá:** Mục tiêu thiết kế ("mọi cách chơi tương đương, ~25–32 Duyên/giờ") đạt tốt ở đa số các mốc, nhưng **chưa đạt ở Trúc Cơ sơ kỳ**: chết tại Trúc Cơ sơ kỳ cho Duyên/giờ gấp **~1.62×** so với cày hết Trúc Cơ (39.8 vs 27.7 Duyên/h). Đây là phát hiện quan trọng từ mô phỏng cân bằng (sẽ xem xét điều chỉnh công thức `calcDuyen` ở việc riêng để san phẳng đỉnh này).
+  - Người chơi cày chay chết ở Luyện Khí tầng 5 (29 phút): **22.5 Duyên/h** (0 trùm) / **34.8 Duyên/h** (hạ trùm).
+  - Người chơi cày tới Trúc Cơ sơ kỳ (53 phút): đạt đỉnh **26.2 Duyên/h** (0 trùm) / **33.0 Duyên/h** (hạ trùm).
+  - Người chơi cày hết Trúc Cơ (175 phút): **23.6 Duyên/h** (0 trùm) / **26.7 Duyên/h** (hạ trùm).
+  - **Đánh giá:** Mục tiêu thiết kế ("mọi cách chơi tương đương", mục 5 của docs/THIET_KE_LUAN_HOI.md) **đạt**: từ Luyện Khí tầng 5 trở đi mọi mốc nằm trong 22.5–27.3 Duyên/h (chênh 1.21×, ngưỡng 1.3×), không có bậc nào đáng để cố ý chết sớm; chết ở Luyện Khí tầng 1 (9 phút) chỉ nhận 1 Duyên.
 - **Tiến trình tăng trưởng qua các kiếp (Progression pacing):**
-  - Cần **14 kiếp** trọn vẹn để đạt tối đa nấc 10 Dư âm tu hành (+100% tốc độ tu luyện). Tổng thời gian chơi khoảng **~25–30 giờ**.
-  - Tốc độ Duyên mỗi giờ tăng từ **29.7 Duyên/h** (kiếp 1) lên **53.0 Duyên/h** (khi max Dư âm tu hành), tương đương tỷ lệ **1.78×**.
-  - **Đánh giá:** Tỷ lệ tăng trưởng **1.78×** nằm trong mục tiêu thiết kế (không vượt quá ~2.0× so với kiếp đầu), đem lại cảm giác nhân vật chuyển kiếp ngày càng mạnh mẽ và tu luyện thần tốc, nhưng kiểm soát tốt không gây lạm phát hay phá vỡ chiều sâu lối chơi.
+  - Cần **16 kiếp** trọn vẹn để đạt tối đa nấc 10 Dư âm tu hành (+100% tốc độ tu luyện). Tổng thời gian chơi khoảng **~29 giờ**.
+  - Tốc độ Duyên mỗi giờ tăng từ **25.6 Duyên/h** (kiếp 1) lên **45.8 Duyên/h** (khi max Dư âm tu hành), tương đương tỷ lệ **1.79×**.
+  - **Đánh giá:** Tỷ lệ tăng trưởng **1.79×** nằm trong mục tiêu thiết kế (không vượt quá ~2.0× so với kiếp đầu), đem lại cảm giác nhân vật chuyển kiếp ngày càng mạnh mẽ và tu luyện thần tốc, nhưng kiểm soát tốt không gây lạm phát hay phá vỡ chiều sâu lối chơi.
