@@ -95,6 +95,7 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
   if (
     target &&
     (target.dead ||
+      (w.ghosts.size > 0 && w.ghosts.has(mc.target!)) ||
       w.map.inTown(target.x, target.y, 20) ||
       Math.hypot(m.x - mc.homeX, m.y - mc.homeY) > LEASH_DIST)
   ) {
@@ -108,6 +109,7 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
     let best = def.aggro; // aggro 0 (quái hiền) thì không bao giờ chọn mục tiêu
     w.state.players.forEach((p, sid) => {
       if (p.dead) return;
+      if (w.ghosts.size > 0 && w.ghosts.has(sid)) return; // hồn lìa xác: quái không thấy
       const d = Math.hypot(p.x - m.x, p.y - m.y);
       if (d < nearest) nearest = d;
       if (d < best && !w.map.inTown(p.x, p.y, 20)) {
