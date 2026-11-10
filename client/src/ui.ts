@@ -226,6 +226,7 @@ function stopInviteTimer() {
 let currentDungeonInvite: DungeonInviteMsg | null = null;
 let lastDungeonFallen: DungeonFallenMsg | null = null;
 let dungeonFallenPendingToast = false;
+let isDungeonFallen = false;
 let dungeonInviteInterval: number | null = null;
 let dungeonHudInterval: number | null = null;
 let dungeonDeadlineAt = 0;
@@ -3431,7 +3432,7 @@ export const ui = {
     }
 
     const memContainer = $("dhud-members");
-    if (memContainer) {
+    if (memContainer && !isDungeonFallen) {
       memContainer.replaceChildren();
       for (const m of msg.members) {
         const tag = document.createElement("span");
@@ -3443,7 +3444,7 @@ export const ui = {
 
     const leaveBtn = $("dhud-btn-leave");
     const confirmBox = $("dhud-leave-confirm");
-    if (!pInfo.showLeaveBtn) {
+    if (isDungeonFallen || !pInfo.showLeaveBtn) {
       if (leaveBtn) leaveBtn.hidden = true;
       if (confirmBox) confirmBox.hidden = true;
     } else if (confirmBox && confirmBox.hidden && leaveBtn) {
@@ -3465,6 +3466,7 @@ export const ui = {
 
   /** Ẩn HUD và màn kết quả Bí cảnh khi rời phòng bí cảnh */
   hideDungeonHud() {
+    isDungeonFallen = false;
     stopDungeonHudTimer();
     const hud = $("dungeon-hud");
     if (hud) hud.hidden = true;
@@ -3561,6 +3563,21 @@ export const ui = {
   onDungeonFallen(msg: DungeonFallenMsg) {
     lastDungeonFallen = msg;
     dungeonFallenPendingToast = true;
+    isDungeonFallen = true;
+
+    // Cập nhật ngay danh sách đội trong HUD bí cảnh: thông báo đã gục (#246)
+    const memContainer = $("dhud-members");
+    if (memContainer) {
+      memContainer.replaceChildren();
+      const tag = document.createElement("span");
+      tag.className = "dhud-mem dead";
+      tag.textContent = "✕ Đã gục, đang được đưa ra...";
+      memContainer.append(tag);
+    }
+    const leaveBtn = $("dhud-btn-leave");
+    const confirmBox = $("dhud-leave-confirm");
+    if (leaveBtn) leaveBtn.hidden = true;
+    if (confirmBox) confirmBox.hidden = true;
   },
 
   getDungeonRewardsLeft(): number | undefined {
