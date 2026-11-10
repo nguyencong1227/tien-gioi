@@ -1,10 +1,4 @@
-import {
-  ROOM_NAME,
-  DEFAULT_MAP_ID,
-  JOIN_BAD_MAP,
-  parseWrongMap,
-  type JoinOptions,
-} from "@tien-gioi/shared";
+import { DEFAULT_MAP_ID, parseWrongMap, roomNameOf, type JoinOptions } from "@tien-gioi/shared";
 
 /** Giao diện client Colyseus tối thiểu để thực hiện kết nối. */
 export interface JoinClient<R> {
@@ -53,11 +47,11 @@ export interface JoinResult<R> {
 }
 
 /**
- * Vào phòng Colyseus có hỗ trợ tự động chuyển hướng khi server báo JOIN_WRONG_MAP.
+ * Vào phòng Colyseus theo roomNameOf(mapId) có hỗ trợ tự động chuyển hướng khi server báo JOIN_WRONG_MAP.
  * - Thử vào mapId gợi ý (hoặc lấy từ storage).
  * - Nếu server từ chối vì nhân vật đang ở map khác (`wrong_map:<id>`), tự động vào lại map đúng (không báo lỗi).
  * - Chặn tối đa `maxRedirects` lần (mặc định 3) để tránh vòng lặp vô hạn.
- * - Nếu server từ chối vì mapId lạ (`JOIN_BAD_MAP`), xóa storage và thử lại bằng DEFAULT_MAP_ID một lần.
+ * - Nếu phòng không tồn tại (do storage lưu map lạ), xóa storage và thử lại bằng DEFAULT_MAP_ID một lần.
  */
 export async function joinWithRedirect<R>(
   options: JoinWithRedirectOptions<R>,
@@ -70,10 +64,9 @@ export async function joinWithRedirect<R>(
 
   while (redirectCount <= maxRedirects) {
     try {
-      const room = await client.joinOrCreate(ROOM_NAME, {
+      const room = await client.joinOrCreate(roomNameOf(currentMapId), {
         name,
         secret,
-        mapId: currentMapId,
       });
 
       // Kết nối thành công: lưu lại mapId đúng vào bộ nhớ
@@ -91,11 +84,11 @@ export async function joinWithRedirect<R>(
         continue;
       }
 
-      // 2. Kiểm tra lỗi bản đồ không tồn tại (JOIN_BAD_MAP)
-      const isBadMap =
-        err?.code === JOIN_BAD_MAP ||
-        (typeof err?.message === "string" && err.message.includes(String(JOIN_BAD_MAP)));
-      if (isBadMap && !badMapRetried) {
+      // 2. Kiểm tra lỗi phòng không tồn tại (mapId lạ từ storage)
+      const isRoomNotFound =
+        err?.code === 4212 ||
+        (typeof err?.message === "string" && /not found|matchmake/i.test(err.message));
+      if (isRoomNotFound && currentMapId !== DEFAULT_MAP_ID && !badMapRetried) {
         clearSavedMap(storage, name);
         currentMapId = DEFAULT_MAP_ID;
         badMapRetried = true;

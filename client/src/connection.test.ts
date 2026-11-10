@@ -3,7 +3,7 @@ import {
   DEFAULT_MAP_ID,
   HAC_PHONG_ID,
   JOIN_WRONG_MAP,
-  JOIN_BAD_MAP,
+  roomNameOf,
   wrongMapMessage,
 } from "@tien-gioi/shared";
 import {
@@ -44,10 +44,9 @@ describe("connection helper (joinWithRedirect)", () => {
     expect(res.room).toBe(fakeRoom);
     expect(res.mapId).toBe(DEFAULT_MAP_ID);
     expect(joinOrCreate).toHaveBeenCalledTimes(1);
-    expect(joinOrCreate).toHaveBeenCalledWith("world", {
+    expect(joinOrCreate).toHaveBeenCalledWith(roomNameOf(DEFAULT_MAP_ID), {
       name: "TieuPham",
       secret: "sec123",
-      mapId: DEFAULT_MAP_ID,
     });
     expect(getSavedMap(storage, "TieuPham")).toBe(DEFAULT_MAP_ID);
   });
@@ -68,10 +67,9 @@ describe("connection helper (joinWithRedirect)", () => {
     });
 
     expect(res.mapId).toBe(HAC_PHONG_ID);
-    expect(joinOrCreate).toHaveBeenCalledWith("world", {
+    expect(joinOrCreate).toHaveBeenCalledWith(roomNameOf(HAC_PHONG_ID), {
       name: "TieuPham",
       secret: "sec123",
-      mapId: HAC_PHONG_ID,
     });
   });
 
@@ -79,7 +77,7 @@ describe("connection helper (joinWithRedirect)", () => {
     const storage = new MemoryStorage();
     const fakeRoom = { sessionId: "s3" };
 
-    // Lần 1: báo sai map (đang ở hac_phong). Lần 2: thành công.
+    // Lần 1: phòng mặc định báo sai map (đang ở hac_phong). Lần 2: vào world_hac_phong thành công.
     const joinOrCreate = vi
       .fn()
       .mockRejectedValueOnce({
@@ -100,6 +98,14 @@ describe("connection helper (joinWithRedirect)", () => {
     expect(res.room).toBe(fakeRoom);
     expect(res.mapId).toBe(HAC_PHONG_ID);
     expect(joinOrCreate).toHaveBeenCalledTimes(2);
+    expect(joinOrCreate).toHaveBeenNthCalledWith(1, roomNameOf(DEFAULT_MAP_ID), {
+      name: "TieuPham",
+      secret: "sec123",
+    });
+    expect(joinOrCreate).toHaveBeenNthCalledWith(2, roomNameOf(HAC_PHONG_ID), {
+      name: "TieuPham",
+      secret: "sec123",
+    });
     // Đã lưu lại map đúng vào storage
     expect(getSavedMap(storage, "TieuPham")).toBe(HAC_PHONG_ID);
   });
@@ -125,7 +131,7 @@ describe("connection helper (joinWithRedirect)", () => {
     expect(joinOrCreate).toHaveBeenCalledTimes(3); // 1 lần đầu + 2 lần redirect
   });
 
-  it("khôi phục khi gặp JOIN_BAD_MAP: xoá map lưu và thử lại DEFAULT_MAP_ID", async () => {
+  it("khôi phục khi phòng không tồn tại: xoá map lưu và thử lại DEFAULT_MAP_ID", async () => {
     const storage = new MemoryStorage();
     saveMap(storage, "TieuPham", "map_la_khong_ton_tai");
 
@@ -133,8 +139,8 @@ describe("connection helper (joinWithRedirect)", () => {
     const joinOrCreate = vi
       .fn()
       .mockRejectedValueOnce({
-        code: JOIN_BAD_MAP,
-        message: "bad map",
+        code: 4212,
+        message: 'room "world_map_la_khong_ton_tai" not found',
       })
       .mockResolvedValueOnce(fakeRoom);
 
@@ -150,15 +156,13 @@ describe("connection helper (joinWithRedirect)", () => {
     expect(res.room).toBe(fakeRoom);
     expect(res.mapId).toBe(DEFAULT_MAP_ID);
     expect(joinOrCreate).toHaveBeenCalledTimes(2);
-    expect(joinOrCreate).toHaveBeenNthCalledWith(1, "world", {
+    expect(joinOrCreate).toHaveBeenNthCalledWith(1, "world_map_la_khong_ton_tai", {
       name: "TieuPham",
       secret: "sec123",
-      mapId: "map_la_khong_ton_tai",
     });
-    expect(joinOrCreate).toHaveBeenNthCalledWith(2, "world", {
+    expect(joinOrCreate).toHaveBeenNthCalledWith(2, roomNameOf(DEFAULT_MAP_ID), {
       name: "TieuPham",
       secret: "sec123",
-      mapId: DEFAULT_MAP_ID,
     });
     expect(getSavedMap(storage, "TieuPham")).toBe(DEFAULT_MAP_ID);
   });
