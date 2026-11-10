@@ -197,6 +197,7 @@ export class WorldRoom extends Room<WorldState> {
         dungeonInvite: (sid, msg) => this.sendTo(sid, DUNGEON_MSG.invite, msg),
         dungeonEnd: (sid, msg) => this.sendTo(sid, DUNGEON_MSG.end, msg),
         dungeonState: (sid, msg) => this.sendTo(sid, DUNGEON_MSG.state, msg),
+        dungeonFallen: (sid, msg) => this.sendTo(sid, DUNGEON_MSG.fallen, msg),
         duelInvited: (sid, msg) => this.sendTo(sid, DUEL_MSG.invited, msg),
         duelState: (sid, msg) => this.sendTo(sid, DUEL_MSG.state, msg),
         duelEnd: (sid, msg) => this.sendTo(sid, DUEL_MSG.end, msg),
