@@ -116,7 +116,7 @@ describe("Thử tải luân hồi (Issue #151)", () => {
     const p = sr.state.players.get(c.room.sessionId)!;
     const ctrl = sr.world.ctrl.get(c.room.sessionId)!;
 
-    // Đưa ra ngoài trấn, Luyện Khí tầng 8, chơi 48 phút -> 22 Duyên (đủ mở nấc 1 giá 12, thiếu cho nấc 2 giá 18)
+    // Đưa ra ngoài trấn, Luyện Khí tầng 8, chơi 48 phút -> 21 Duyên (đủ mở nấc 1 giá 12, thiếu cho nấc 2 giá 18)
     p.realm = 1;
     p.tier = 8;
     p.exp = 100;
@@ -132,8 +132,8 @@ describe("Thử tải luân hồi (Issue #151)", () => {
     // Chờ nhận tin LimboMsg
     const limbo = await waitFor(() => c.limbos[0]);
     expect(limbo).toBeDefined();
-    expect(limbo.summary.gain).toBe(22);
-    expect(limbo.soul.duyen).toBe(22);
+    expect(limbo.summary.gain).toBe(21);
+    expect(limbo.soul.duyen).toBe(21);
 
     // Gửi 20 tin soulBuy liên tiếp cùng lúc cho 'du_am'
     for (let i = 0; i < 20; i++) {
@@ -145,10 +145,10 @@ describe("Thử tải luân hồi (Issue #151)", () => {
 
     const soulData = soulOf(name);
     expect(soulData.duyen).toBeGreaterThanOrEqual(0);
-    // 22 Duyên chỉ đủ mở nấc 1 (12 Duyên), nấc 2 cần 18 Duyên nữa (tổng 30 > 22) -> chỉ mở nấc 1
+    // 21 Duyên chỉ đủ mở nấc 1 (12 Duyên), nấc 2 cần 18 Duyên nữa (tổng 30 > 21) -> chỉ mở nấc 1
     expect(soulData.unlocks.du_am).toBe(1);
-    expect(soulData.duyen).toBe(22 - 12);
-    expect(soulData.duyenTotal).toBe(22);
+    expect(soulData.duyen).toBe(21 - 12);
+    expect(soulData.duyenTotal).toBe(21);
   });
 
   it("chết hàng loạt: 10 người chơi chết cùng lúc -> ghi kép file nhân vật + chân linh toàn vẹn, audit-saves sạch lỗi", async () => {

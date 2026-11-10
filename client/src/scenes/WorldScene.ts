@@ -36,9 +36,16 @@ import {
   type WalletMsg,
   type PortalDef,
   type TravelMsg,
+  type LimboMsg,
+  type SoulMsg,
+  type RebornMsg,
+  type SoulBuyMsg,
+  type RebirthMsg,
+  type RebirthChoice,
 } from "@tien-gioi/shared";
 import { preloadAssets, makeTextures, dirFromAngle, TILESET_KEY, ATLAS_KEY } from "../textures";
 import { ui } from "../ui";
+import { replayEarlyMessages } from "../early-messages";
 import { sound } from "../audio";
 import { joystick, setupJoystick } from "../joystick";
 
@@ -600,7 +607,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private slash(angle?: number) {
-    if (this.isReconnecting) return;
+    if (this.isReconnecting || ui.isLimboOpen()) return;
     const me = this.me();
     if (!me || me.dead || this.time.now < this.nextSlash) return;
     this.nextSlash = this.time.now + SKILLS.slash.cooldown;
@@ -614,7 +621,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private sword() {
-    if (this.isReconnecting) return;
+    if (this.isReconnecting || ui.isLimboOpen()) return;
     const me = this.me();
     if (!me || me.dead || this.time.now < this.nextSword) return;
     if (me.mp < SKILLS.sword.mp) return ui.toast({ text: "Linh lực không đủ.", tone: "bad" });
@@ -629,28 +636,28 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private toggleMeditate() {
-    if (this.isReconnecting) return;
+    if (this.isReconnecting || ui.isLimboOpen()) return;
     const me = this.me();
     if (!me || me.dead) return;
     this.room.send("meditate", { on: !me.meditating });
   }
 
   private pickupNearest() {
-    if (this.isReconnecting) return;
+    if (this.isReconnecting || ui.isLimboOpen()) return;
     const me = this.me();
     if (!me || me.dead || !this.nearestLootId) return;
     this.room.send("pickup", { lootId: this.nearestLootId });
   }
 
   private talkClosestNpc() {
-    if (this.isReconnecting) return;
+    if (this.isReconnecting || ui.isLimboOpen()) return;
     const me = this.me();
     if (!me || me.dead || !this.closestNpcId) return;
     this.room.send("talk", { npcId: this.closestNpcId });
   }
 
   private interactOrPickup() {
-    if (this.isReconnecting) return;
+    if (this.isReconnecting || ui.isLimboOpen()) return;
     if (this.nearPortal) {
       this.travelPortal(this.nearPortal.id);
     } else if (this.closestNpcId) {
@@ -738,22 +745,49 @@ export class WorldScene extends Phaser.Scene {
     ui.pickupPrompt(null);
   }
 
+  private onLimbo(m: LimboMsg) {
+    ui.setKiep(m.soul.kiep);
+    ui.showLimbo(m, {
+      onBuy: (id: string) => {
+        const msg: SoulBuyMsg = { id };
+        this.room.send("soulBuy", msg);
+      },
+      onRebirth: (choice: RebirthChoice) => {
+        const msg: RebirthMsg = { origin: choice.origin, keep: choice.keep };
+        this.room.send("rebirth", msg);
+      },
+    });
+  }
+
   private setupNetwork(isInitial = true) {
     this.room.onStateChange(() => this.reconcile());
-    this.room.onMessage("fx", (m: FxMsg) => this.onFx(m));
-    this.room.onMessage("dmg", (m: DmgMsg) => {
+    // Ghi lại handler theo loại để phát lại các tin server gửi ngay lúc vào phòng (xem early-messages.ts)
+    const handlers: Record<string, (msg: any) => void> = {};
+    const reg = (type: string, fn: (msg: any) => void) => {
+      handlers[type] = fn;
+      this.room.onMessage(type, fn);
+    };
+    reg("fx", (m: FxMsg) => this.onFx(m));
+    reg("dmg", (m: DmgMsg) => {
       if (!this.inView(m.x, m.y, 96)) return;
       this.floatText(m);
       sound.hit(m.crit);
     });
-    this.room.onMessage("chat", (m: ChatOut) => ui.chat(m));
-    this.room.onMessage("toast", (m: ToastMsg) => ui.toast(m));
-    this.room.onMessage("inv", (m: InvMsg) => ui.onInv(m));
-    this.room.onMessage("quests", (m: QuestsMsg) => ui.onQuests(m));
-    this.room.onMessage("dialog", (m: DialogMsg) => ui.onDialog(m));
-    this.room.onMessage("party", (m: PartyMsg) => ui.onParty(m));
-    this.room.onMessage("partyInvited", (m: PartyInvitedMsg) => ui.onPartyInvited(m));
-    this.room.onMessage("wallet", (m: WalletMsg) => ui.onWallet(m));
+    reg("chat", (m: ChatOut) => ui.chat(m));
+    reg("toast", (m: ToastMsg) => ui.toast(m));
+    reg("inv", (m: InvMsg) => ui.onInv(m));
+    reg("quests", (m: QuestsMsg) => ui.onQuests(m));
+    reg("dialog", (m: DialogMsg) => ui.onDialog(m));
+    reg("party", (m: PartyMsg) => ui.onParty(m));
+    reg("partyInvited", (m: PartyInvitedMsg) => ui.onPartyInvited(m));
+    reg("wallet", (m: WalletMsg) => ui.onWallet(m));
+    reg("limbo", (m: LimboMsg) => this.onLimbo(m));
+    reg("soul", (m: SoulMsg) => {
+      ui.updateSoul(m);
+      ui.setKiep(m.kiep);
+    });
+    reg("reborn", (m: RebornMsg) => ui.showReborn(m.kiep));
+    replayEarlyMessages(this.room, handlers);
     if (isInitial) {
       ui.chat({
         from: "",
@@ -790,7 +824,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private fixedStep() {
-    if (this.isReconnecting) {
+    if (this.isReconnecting || ui.isLimboOpen()) {
       this.moving = false;
       return;
     }
@@ -1570,9 +1604,15 @@ export class WorldScene extends Phaser.Scene {
         if (e.sprite.anims.isPaused) e.sprite.anims.resume();
         this.applyPlayerEquip(e, p, true);
         this.updatePlayerAnim(e, who, this.facing, this.moving && !p.dead && !p.meditating);
-        ui.death(
-          p.dead ? Math.max(0, Math.ceil(5 - (this.time.now - (e as any).deadSince) / 1000)) : null,
-        );
+        if (ui.isLimboOpen()) {
+          ui.death(null);
+        } else {
+          ui.death(
+            p.dead
+              ? Math.max(0, Math.ceil(5 - (this.time.now - (e as any).deadSince) / 1000))
+              : null,
+          );
+        }
         if (p.dead && !(e as any).deadSince) (e as any).deadSince = this.time.now;
         if (!p.dead) (e as any).deadSince = 0;
       } else {
@@ -1590,9 +1630,27 @@ export class WorldScene extends Phaser.Scene {
         if (e.sprite.anims.isPaused) e.sprite.anims.resume();
         this.applyPlayerEquip(e, p, false);
         this.updatePlayerAnim(e, who, p.angle, dist > 1.5 && !p.dead && !p.meditating);
+
+        // Xác người khác nằm ~5 giây rồi mờ dần và ẩn (#150)
+        if (p.dead) {
+          if (!(e as any).deadSince) (e as any).deadSince = this.time.now;
+          const deadAgeMs = this.time.now - (e as any).deadSince;
+          if (deadAgeMs > 5000) {
+            const fadeAlpha = Math.max(0, 0.35 * (1 - (deadAgeMs - 5000) / 1500));
+            e.root.setAlpha(fadeAlpha);
+            if (fadeAlpha <= 0) e.root.setVisible(false);
+          } else {
+            e.root.setAlpha(0.35);
+          }
+        } else {
+          (e as any).deadSince = 0;
+          e.root.setAlpha(1);
+        }
       }
       e.root.setDepth(e.root.y);
-      e.root.setAlpha(p.dead ? 0.35 : 1);
+      if (isMe) {
+        e.root.setAlpha(p.dead ? 0.35 : 1);
+      }
       const showAura = Boolean(p.meditating && !lowFx);
       e.aura!.setVisible(showAura);
       if (showAura) {

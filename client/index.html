@@ -40,7 +40,11 @@
     <div id="ui" hidden>
       <div id="hud-col-left">
         <div id="hud" class="panel">
-          <div class="row"><b id="hud-name"></b><span id="hud-realm"></span></div>
+          <div class="row">
+            <b id="hud-name"></b>
+            <span id="hud-kiep" class="hud-kiep-badge" hidden>Kiếp 1</span>
+            <span id="hud-realm"></span>
+          </div>
           <div class="bar hp"><i id="hp-fill"></i><span id="hp-text"></span></div>
           <div class="bar mp"><i id="mp-fill"></i><span id="mp-text"></span></div>
           <div class="bar exp"><i id="exp-fill"></i><span id="exp-text"></span></div>
@@ -396,6 +400,83 @@
         <div class="transition-content">
           <div id="transition-map-name" class="transition-map-name">Hắc Phong Cốc</div>
           <div class="transition-sub">Đang tiến nhập...</div>
+        </div>
+      </div>
+
+      <!-- Màn hình Hoàng Tuyền · Bến Vong Xuyên (Luân hồi M3.2) -->
+      <section id="limbo-overlay" class="limbo-overlay" hidden aria-label="Hoàng Tuyền">
+        <div class="limbo-box">
+          <header class="limbo-header">
+            <div class="limbo-seal">輪迴</div>
+            <h1 class="limbo-title">HOÀNG TUYỀN · Bến Vong Xuyên</h1>
+            <p id="limbo-kiep-sub" class="limbo-sub">Kiếp thứ 1 khép lại</p>
+            <div class="limbo-summary">
+              <div class="lsum-item">
+                <span class="lsum-label">Cảnh giới</span>
+                <b id="limbo-sum-realm" class="lsum-val">Luyện Khí Tầng 1</b>
+              </div>
+              <div class="lsum-item">
+                <span class="lsum-label">Thời gian</span>
+                <b id="limbo-sum-time" class="lsum-val">10 phút</b>
+              </div>
+              <div class="lsum-item">
+                <span class="lsum-label">Chiến tích</span>
+                <b id="limbo-sum-kills" class="lsum-val">0 quái · 0 trùm</b>
+              </div>
+              <div class="lsum-duyen">
+                <div class="lduyen-gain">Duyên nhận kiếp này: <b id="limbo-duyen-gain">+0</b></div>
+                <div class="lduyen-total">Duyên hiện có: <b id="limbo-duyen-total">0</b> ☯</div>
+              </div>
+            </div>
+          </header>
+
+          <section class="limbo-block">
+            <div class="lblock-head">
+              <h2>Tam Sinh Thạch</h2>
+              <small>Khắc ghi linh căn vĩnh hằng · Duyên tiêu không hoàn lại</small>
+            </div>
+            <div id="limbo-stone-list" class="limbo-stone-list"></div>
+          </section>
+
+          <section class="limbo-block">
+            <div class="lblock-head">
+              <h2>Đầu Thai Kiếp Sau</h2>
+              <small>Chọn xuất thân và ký vật mang qua Vong Xuyên</small>
+            </div>
+
+            <div class="limbo-field">
+              <div class="lfield-label">Xuất thân kiếp sau:</div>
+              <div id="limbo-origin-list" class="limbo-origin-grid"></div>
+            </div>
+
+            <div class="limbo-field">
+              <div class="lfield-label-row">
+                <div class="lfield-label">Ký vật mang theo (trang bị):</div>
+                <span id="limbo-relic-hint" class="lrelic-hint">Tối đa 0 món</span>
+              </div>
+              <p id="limbo-relic-empty" class="lrelic-empty">
+                Chưa mở Ký vật ở Tam Sinh Thạch hoặc không có trang bị để giữ.
+              </p>
+              <div id="limbo-relic-list" class="limbo-relic-grid"></div>
+            </div>
+
+            <div class="limbo-actions">
+              <button type="button" id="limbo-btn-rebirth" class="limbo-btn-rebirth">
+                Uống canh Mạnh Bà, đầu thai
+              </button>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <!-- Màn hình chuyển cảnh Mạnh Bà -->
+      <div id="reborn-overlay" class="reborn-overlay" hidden>
+        <div class="reborn-content">
+          <div class="reborn-bowl">🍵</div>
+          <p id="reborn-quote" class="reborn-quote">
+            "Cạn chén này, tên ngươi nhẹ như lá. Còn cái đã ngộ, bia đá giữ hộ."
+          </p>
+          <div id="reborn-title" class="reborn-title">Kiếp Mới Bắt Đầu</div>
         </div>
       </div>
     </div>

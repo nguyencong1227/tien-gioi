@@ -3,6 +3,7 @@ import {
   DEFAULT_ORIGIN,
   DUYEN_BOSS_CAP,
   DUYEN_CAP,
+  DUYEN_MINUTES_PER_PT,
   DUYEN_TIME_CAP,
   HISTORY_MAX,
   MIN_LIFE_MINUTES_FOR_KIEP,
@@ -65,21 +66,21 @@ const REACH: Record<number, number> = {
 
 describe("calcDuyen: bảng ước tính của docs/THIET_KE_LUAN_HOI.md mục 5", () => {
   it.each([
-    [1, 2, 8],
-    [5, 12, 18],
-    [9, 22, 28],
-    [10, 35, 41],
-    [11, 50, 56],
-    [12, 66, 72],
+    [1, 1, 7],
+    [5, 11, 17],
+    [9, 21, 27],
+    [10, 23, 29],
+    [11, 39, 45],
+    [12, 55, 61],
   ])("chết ngay khi vừa đạt bậc %i: %i Duyên (hạ 2 trùm: %i)", (step, duyen, withBoss) => {
     expect(calcDuyen(life(step, REACH[step]))).toBe(duyen);
     expect(calcDuyen(life(step, REACH[step], 2))).toBe(withBoss);
   });
 
-  it("hết Trúc Cơ, thanh tu vi đầy, 175 phút: 81 Duyên (hạ 3 trùm: 90)", () => {
+  it("hết Trúc Cơ, thanh tu vi đầy, 175 phút: 69 Duyên (hạ 3 trùm: 78)", () => {
     const l = { ...atStep(12), exp: expToNext(2, 2), playMs: min(175), bossKills: 0 };
-    expect(calcDuyen(l)).toBe(81);
-    expect(calcDuyen({ ...l, bossKills: 3 })).toBe(90);
+    expect(calcDuyen(l)).toBe(69);
+    expect(calcDuyen({ ...l, bossKills: 3 })).toBe(78);
   });
 
   it("điểm mỗi bậc: Phàm Nhân 0, Luyện Khí 2, Trúc Cơ 12, mỗi cảnh giới sau gấp 5; id lạ là 0", () => {
@@ -90,7 +91,9 @@ describe("calcDuyen: bảng ước tính của docs/THIET_KE_LUAN_HOI.md mục 5
 
   it("thời gian và trùm có trần: ở lâu / hạ nhiều trùm cũng không vượt trần", () => {
     const base = calcDuyen(life(9, 48));
-    expect(calcDuyen(life(9, 48 + 10_000))).toBe(base - Math.floor(48 / 10) + DUYEN_TIME_CAP);
+    expect(calcDuyen(life(9, 48 + 10_000))).toBe(
+      base - Math.floor(48 / DUYEN_MINUTES_PER_PT) + DUYEN_TIME_CAP,
+    );
     expect(calcDuyen(life(9, 48, 1000))).toBe(base + DUYEN_BOSS_CAP);
   });
 
@@ -121,14 +124,21 @@ describe("calcDuyen: bảng ước tính của docs/THIET_KE_LUAN_HOI.md mục 5
     expect(countsAsKiep(life(1, 2))).toBe(true);
   });
 
-  it("Duyên mỗi giờ tương đương nhau giữa các cách chơi (bậc 4..12 trong khoảng 20..42, chênh dưới 2 lần)", () => {
+  it("Duyên mỗi giờ tương đương nhau giữa các cách chơi (bậc 5..12 trong khoảng 20..30, chênh dưới 1.3 lần)", () => {
     const rates: number[] = [];
-    for (let s = 4; s <= 12; s++) rates.push(calcDuyen(life(s, REACH[s])) / (REACH[s] / 60));
+    for (let s = 5; s <= 12; s++) rates.push(calcDuyen(life(s, REACH[s])) / (REACH[s] / 60));
     for (const r of rates) {
       expect(r).toBeGreaterThan(20);
-      expect(r).toBeLessThan(42);
+      expect(r).toBeLessThan(30);
     }
-    expect(Math.max(...rates) / Math.min(...rates)).toBeLessThan(2);
+    expect(Math.max(...rates) / Math.min(...rates)).toBeLessThan(1.3);
+  });
+
+  it("không có tiền vào cảnh giới: vừa vào Trúc Cơ (chưa bỏ công sức bậc nào) chỉ hơn hết Luyện Khí đúng phần thời gian", () => {
+    // bậc 10 = Trúc Cơ sơ kỳ. Điểm bậc = 9 bậc Luyện Khí (18), không cộng thêm 12 của bậc Trúc Cơ chưa vượt qua
+    const tcStart = life(10, 53);
+    const lkFull = { ...atStep(9), exp: expToNext(1, 8), playMs: min(53), bossKills: 0 };
+    expect(calcDuyen(tcStart)).toBe(calcDuyen(lkFull));
   });
 
   it("đầu vào rác không bao giờ cho NaN, âm hay vô cùng", () => {

@@ -5,9 +5,11 @@ import {
   TRAVEL_JOIN_TIMEOUT_MS,
   getMap,
   type TravelToMsg,
+  type LimboMsg,
 } from "@tien-gioi/shared";
 import { WorldScene } from "./scenes/WorldScene";
 import { ui } from "./ui";
+import { captureEarlyMessages } from "./early-messages";
 import { joinWithRedirect } from "./connection";
 
 const NAME_KEY = "tien-gioi:name";
@@ -203,6 +205,7 @@ function setupRoomLifecycle(room: Room) {
 }
 
 async function start(room: Room, mapId: string) {
+  captureEarlyMessages(room); // trước mọi await: tin lúc vào phòng tới trước khi cảnh đăng ký handler
   // Chờ font tiếng Việt tải xong trước khi Phaser vẽ Text lên canvas lần đầu
   await Promise.race([
     document.fonts.load('16px "Noto Serif"', "Tiếng Việt"),
@@ -218,6 +221,39 @@ async function start(room: Room, mapId: string) {
   ) {
     (window as any).__ui = ui;
     (window as any).__scene = activeScene;
+    (window as any).__debugLimbo = (mockData?: LimboMsg) => {
+      const mock: LimboMsg = mockData || {
+        summary: {
+          kiep: 1,
+          realm: 1,
+          tier: 4,
+          minutes: 42,
+          kills: 68,
+          bossKills: 1,
+          gain: 16,
+        },
+        soul: {
+          kiep: 1,
+          duyen: 28,
+          unlocks: { du_am: 1 },
+          origins: [],
+        },
+        keepable: ["lang_nha_kiem", "tho_nhung_bao", "long_tho"],
+      };
+      ui.showLimbo(mock, {
+        onBuy: (id) => {
+          if (mock.soul.duyen >= 10) {
+            mock.soul.duyen -= 10;
+            if (id.startsWith("xuat_than:")) mock.soul.origins.push(id.slice(10));
+            else mock.soul.unlocks[id] = (mock.soul.unlocks[id] || 0) + 1;
+            ui.updateSoul(mock.soul);
+          }
+        },
+        onRebirth: () => {
+          ui.showReborn(mock.summary.kiep + 1);
+        },
+      });
+    };
   }
   new Phaser.Game({
     type: Phaser.AUTO,

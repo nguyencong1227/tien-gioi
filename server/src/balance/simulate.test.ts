@@ -161,16 +161,23 @@ describe("kinh tế Linh thạch (mô hình, #102)", () => {
 
 describe("cân bằng luân hồi (mô hình, #151)", () => {
   const milestones = simulateReincarnationMilestones();
-  const progression = simulateReincarnationProgression(15);
+  const progression = simulateReincarnationProgression(20);
 
-  it("mọi mốc kết thúc từ Luyện Khí 5 trở lên có tốc độ Duyên / giờ tương đương nhau (~25–50 Duyên/h)", () => {
-    // Bỏ qua Luyện Khí 1 (quá sớm 9 phút, chỉ 2-8 Duyên)
-    const validMilestones = milestones.slice(1);
-    for (const m of validMilestones) {
-      expect(m.duyenWithBoss, `${m.label} duyen`).toBeGreaterThanOrEqual(18);
-      expect(m.duyenPerHourWithBoss, `${m.label} rate`).toBeGreaterThanOrEqual(25);
-      expect(m.duyenPerHourWithBoss, `${m.label} rate`).toBeLessThanOrEqual(55);
+  it("mọi mốc kết thúc từ Luyện Khí 5 trở lên có tốc độ Duyên / giờ (0 trùm) tương đương nhau: 20–30 Duyên/h, chênh dưới 1.3 lần (mục tiêu b của THIET_KE_LUAN_HOI mục 5)", () => {
+    // Bỏ qua Luyện Khí 1 (quá sớm, 9 phút: gần như không có Duyên, đúng mục tiêu a)
+    const rates = milestones.slice(1).map((m) => m.duyenPerHourZeroBoss);
+    for (const [i, r] of rates.entries()) {
+      expect(r, `${milestones[i + 1]!.label} rate`).toBeGreaterThanOrEqual(20);
+      expect(r, `${milestones[i + 1]!.label} rate`).toBeLessThanOrEqual(30);
     }
+    expect(Math.max(...rates) / Math.min(...rates)).toBeLessThan(1.3);
+    // Hạ trùm sớm vẫn là phần thưởng thêm, nhưng không biến một mốc nào thành "chỗ cày Duyên" vượt trội (dưới 1.6 lần)
+    const withBoss = milestones.slice(1).map((m) => m.duyenPerHourWithBoss);
+    expect(Math.max(...withBoss) / Math.min(...withBoss)).toBeLessThan(1.6);
+  });
+
+  it("chết ngay khi vừa đạt Luyện Khí 1 (9 phút) gần như không có Duyên khi chưa hạ trùm (mục tiêu a)", () => {
+    expect(milestones[0]!.duyenZeroBoss).toBeLessThanOrEqual(2);
   });
 
   it("Duyên nhận được tăng dần theo tiến độ đạt được trong kiếp", () => {
@@ -180,11 +187,11 @@ describe("cân bằng luân hồi (mô hình, #151)", () => {
     }
   });
 
-  it("chuỗi kiếp mở dần Dư âm tu hành đạt tối đa (+100%) sau 12–16 kiếp", () => {
+  it("chuỗi kiếp mở dần Dư âm tu hành đạt tối đa (+100%) sau 14–18 kiếp", () => {
     const maxLife = progression.find((p) => p.duAmLevel === 10);
     expect(maxLife).toBeDefined();
-    expect(maxLife!.kiep).toBeGreaterThanOrEqual(12);
-    expect(maxLife!.kiep).toBeLessThanOrEqual(16);
+    expect(maxLife!.kiep).toBeGreaterThanOrEqual(14);
+    expect(maxLife!.kiep).toBeLessThanOrEqual(18);
   });
 
   it("tốc độ Duyên / giờ qua các kiếp khi max Dư âm tu hành không vượt quá 2× kiếp đầu (kiểm soát lạm phát)", () => {
