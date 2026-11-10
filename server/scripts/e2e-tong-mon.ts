@@ -383,6 +383,9 @@ async function main() {
     // 8. B rời tông môn
     await press(tb, "sect-tab-btn-overview");
     await press(tb, "sect-btn-leave");
+    // Hộp xác nhận trong game (#246) thay confirm() gốc
+    await tb.waitFor(visible("sect-action-confirm"), "hộp xác nhận rời tông môn");
+    await press(tb, "sect-action-confirm-ok");
     await tb.waitFor(visible("sect-view-none"), "B về màn chưa có tông môn");
     await tb.waitFor(`true`, "");
     for (let i = 0; i < 50 && playerOf(B.name).sect !== ""; i++) await sleep(100);

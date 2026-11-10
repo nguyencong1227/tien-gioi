@@ -882,6 +882,28 @@
             </div>
           </div>
         </div>
+
+        <!-- Hộp xác nhận trong game cho Nhường / Trục xuất / Rời (thay confirm() gốc, #246) -->
+        <div
+          id="sect-action-confirm"
+          class="sect-action-confirm"
+          hidden
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="sect-action-confirm-text"
+        >
+          <div class="sect-confirm-box">
+            <p id="sect-action-confirm-text"></p>
+            <div class="sect-confirm-actions">
+              <button type="button" id="sect-action-confirm-cancel" class="sect-small-btn">
+                Huỷ
+              </button>
+              <button type="button" id="sect-action-confirm-ok" class="sect-action-btn danger">
+                Xác nhận
+              </button>
+            </div>
+          </div>
+        </div>
       </section>
 
       <!-- Lời mời tổ đội -->

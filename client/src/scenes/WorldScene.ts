@@ -590,6 +590,7 @@ export class WorldScene extends Phaser.Scene {
     kb.on("keydown-ESC", () => {
       if (typing()) return;
       if (ui.closeDuelEndModal()) return;
+      if (ui.closeSectConfirm()) return;
       ui.closeAllModals();
     });
     kb.on("keydown-F", () => !typing() && this.interactOrPickup());
@@ -1907,8 +1908,10 @@ export class WorldScene extends Phaser.Scene {
       if (showLabel) {
         const isDuel = Boolean((p as any).duel);
         const duelPrefix = isDuel ? "⚔ " : "";
-        const sectTag = (p as any).sect ? `[${(p as any).sect}] ` : "";
-        const label = `${duelPrefix}${sectTag}${p.name}\n${realmLabel(p.realm, p.tier)}`;
+        const sectTag = (p as any).sect ? `[${(p as any).sect}]` : "";
+        const label = sectTag
+          ? `${sectTag}\n${duelPrefix}${p.name}\n${realmLabel(p.realm, p.tier)}`
+          : `${duelPrefix}${p.name}\n${realmLabel(p.realm, p.tier)}`;
         if (label !== e.lastLabel) {
           e.label!.setText(label);
           e.lastLabel = label;
