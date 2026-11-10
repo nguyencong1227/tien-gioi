@@ -216,3 +216,59 @@ Nhằm theo dõi xu hướng hiệu năng lâu dài trên nhánh `main` và phá
 - **Cách đặt lại mốc chuẩn (baseline) khi có thay đổi có chủ ý:**
   - Khi có tính năng mới làm tăng nhẹ kích thước state hoặc có bản tối ưu giảm sâu byte/tick, dev cập nhật file `server/src/perf/bench-baseline.json` bằng cách chạy lệnh bench 20s và ghi lại kết quả mới, kèm giải trình lý do trong pull request.
 
+## 5. Thử tải nhiều bản đồ & nhiều phòng đồng thời (M3.1, Issue #141)
+
+Theo kiến trúc M3 phương án A (mỗi bản đồ là một phòng Colyseus `WorldRoom` riêng biệt), server mở rộng để vận hành đồng thời nhiều bản đồ trên cùng một tiến trình (hoặc phân tán) mà không làm suy giảm hiệu năng của từng bản đồ riêng lẻ.
+
+### 5.1. Benchmark đa thế giới trong một tiến trình (`bench.ts --multi`)
+
+- **Cách chạy:**
+  ```bash
+  # Chạy mô phỏng đồng thời 2 bản đồ: Lạc Hà (50 bot) + Hắc Phong Cốc (50 bot)
+  npm run bench -w server -- --multi --seconds 5
+
+  # Hoặc chạy mô phỏng riêng 1 bản đồ chỉ định
+  npm run bench -w server -- --map=hac_phong --players 50 --seconds 5
+  ```
+- **Tiêu chuẩn ngân sách:**
+  - Tổng thời gian CPU tick của **toàn bộ các phòng** gộp lại trên tiến trình đơn luồng Node.js phải đạt **< 10 ms/tick** (để giữ vững nhịp 20 tick/giây).
+  - Băng thông patch của từng client trên mỗi bản đồ phải tuân thủ ngân sách tương đương (< 520 byte/tick).
+- **Kết quả đo thực tế (Lạc Hà 50 + Hắc Phong Cốc 50 = 100 người chơi):**
+  - **Tổng thời gian tick (2 phòng):** TB **1.41 ms**, p95 **3.01 ms**, cao nhất **9.00 ms** (đạt sâu dưới ngân sách < 10 ms).
+  - **Băng thông patch mỗi client:**
+    - Lạc Hà (50 người): TB **220 byte/tick** (~4.4 KB/s)
+    - Hắc Phong Cốc (50 người): TB **220 byte/tick** (~4.4 KB/s)
+  - **Tính tương thích ngược:** Chế độ 1 bản đồ chuẩn (`npm run bench -w server`) giữ nguyên sai số **0.0% trên mọi dòng** so với mốc chuẩn `server/src/perf/bench-baseline.json`.
+
+### 5.2. Kiểm tra toàn vẹn file lưu nhân vật có `mapId` (`audit-saves.ts`)
+
+- **Cách chạy:**
+  ```bash
+  npm run kiem-save -w server
+  ```
+- **Quy tắc kiểm định dữ liệu:**
+  1. Trường `mapId`:
+     - File lưu cũ không có `mapId` -> mặc định hợp lệ coi như `lac_ha` (Lạc Hà Trấn).
+     - File lưu có `mapId` lạ (không nằm trong `MAPS`) -> báo lỗi `invalid_map_id`, server đưa về `lac_ha`.
+  2. Toạ độ `(x, y)` theo bản đồ:
+     - Toạ độ phải nằm trong ranh giới `(worldW, worldH)` của bản đồ tương ứng (`getMap(mapId)`).
+     - Toạ độ không được đè lên ô cản `circleBlocked(x, y, PLAYER_RADIUS)` trên bản đồ tương ứng (ví dụ: vách đá hay vực sâu ở Hắc Phong Cốc).
+  3. Được bảo vệ bằng bộ test đơn vị 28 trường hợp trong `server/scripts/audit-saves.test.ts`.
+
+### 5.3. Bot thử tải trên bản đồ chỉ định (`bots.ts --map=<id>`)
+
+- **Cách chạy:**
+  ```bash
+  # Chạy 50 bot trên bản đồ Hắc Phong Cốc
+  npm run bots -w server -- --map=hac_phong --bots=50 --duration=15
+  ```
+- **Cơ chế vận hành:**
+  - Bot đọc thông số bản đồ qua `getMap(args.map) ?? DEFAULT_MAP`, không phụ thuộc vào hằng số toàn cục của Lạc Hà Trấn.
+  - Sinh vị trí xuất phát `(campX, campY)` an toàn theo toạ độ khu an toàn `townPx` và ranh giới `worldW, worldH` của bản đồ đó.
+  - Khởi tạo save file nhân vật mang sẵn `mapId` tương ứng (`seedBotSaveFile`).
+  - Gửi `mapId` trong `JoinOptions` khi kết nối vào phòng.
+  - Vòng lặp di chuyển, né vật cản và tuần tra tuân thủ đúng thuật toán `moveWithCollision` và kích thước của bản đồ hiện tại.
+- **Kịch bản tiếp theo (chờ PR server #142 của Dev A):**
+  - Thử tải bot di chuyển qua lại liên tục giữa các cổng dịch chuyển (đo độ trễ chuyển phòng `travelTo`, tính trọn vẹn dữ liệu tu vi/Linh thạch/túi đồ, chống nhân bản và kiểm tra rò rỉ tài nguyên).
+
+
