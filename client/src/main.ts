@@ -3,6 +3,8 @@ import { Client, type Room } from "colyseus.js";
 import {
   DEFAULT_MAP_ID,
   TRAVEL_JOIN_TIMEOUT_MS,
+  JOIN_BAD_TOKEN,
+  JOIN_NEED_CHARACTER,
   getMap,
   type TravelToMsg,
   type LimboMsg,
@@ -11,6 +13,8 @@ import { WorldScene } from "./scenes/WorldScene";
 import { ui } from "./ui";
 import { captureEarlyMessages } from "./early-messages";
 import { joinWithRedirect } from "./connection";
+import { clearToken, getToken } from "./auth";
+import { initAuthUi, switchAuthView } from "./auth-ui";
 
 const NAME_KEY = "tien-gioi:name";
 const SECRET_KEY = "tien-gioi:secret";
@@ -49,7 +53,7 @@ let activeToken: string | null = null;
 let isReconnecting = false;
 let isTraveling = false;
 
-form.addEventListener("submit", async (e) => {
+form?.addEventListener("submit", async (e) => {
   e.preventDefault();
   btn.disabled = true;
   err.textContent = "";
@@ -71,6 +75,50 @@ form.addEventListener("submit", async (e) => {
     btn.disabled = false;
   }
 });
+
+initAuthUi({
+  onTokenAuth: async (token, charName) => {
+    const client = new Client(serverUrl());
+    activeClient = client;
+    try {
+      const { room, mapId } = await joinWithRedirect({
+        client,
+        storage: localStorage,
+        token,
+        name: charName,
+      });
+      if (charName) localStorage.setItem(NAME_KEY, charName);
+      await start(room, mapId);
+    } catch (e: any) {
+      if (e?.code === JOIN_BAD_TOKEN) {
+        clearToken();
+        switchAuthView("login");
+      } else if (e?.code === JOIN_NEED_CHARACTER) {
+        switchAuthView("character");
+      }
+      throw e;
+    }
+  },
+  onLegacyAuth: async (name) => {
+    const client = new Client(serverUrl());
+    activeClient = client;
+    const { room, mapId } = await joinWithRedirect({
+      client,
+      storage: localStorage,
+      name,
+      secret: secret(),
+    });
+    localStorage.setItem(NAME_KEY, name);
+    await start(room, mapId);
+  },
+});
+
+if (
+  typeof window !== "undefined" &&
+  (import.meta.env.DEV || new URLSearchParams(location.search).has("debug"))
+) {
+  (window as any).__switchAuthView = switchAuthView;
+}
 
 const FAIL_TEXT = "Mất kết nối với Tiên Giới. Tải lại trang để vào lại.";
 
@@ -100,12 +148,14 @@ function setupRoomLifecycle(room: Room) {
       // Chủ động rời phòng cũ (không kích hoạt luồng reconnect)
       room.leave(true);
 
-      const name = nameInput.value.trim();
+      const token = getToken();
+      const name = nameInput.value.trim() || (localStorage.getItem(NAME_KEY) ?? "");
       const joinPromise = joinWithRedirect({
         client: activeClient,
         storage: localStorage,
-        name,
-        secret: secret(),
+        token: token || undefined,
+        name: name || undefined,
+        secret: token ? undefined : secret(),
         suggestedMapId: msg.mapId,
       });
 

@@ -85,11 +85,13 @@ button {
 }
 #login form {
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  gap: 10px;
 }
 #login input {
-  flex: 1;
-  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 44px;
   padding: 10px 12px;
   font: inherit;
   border: 1px solid #b9a77e;
@@ -99,6 +101,7 @@ button {
 }
 #login button {
   padding: 10px 16px;
+  min-height: 44px;
   border: 0;
   border-radius: 6px;
   background: var(--red);
@@ -106,7 +109,152 @@ button {
   font-weight: 700;
 }
 #login button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Các trường và nút chuyên dụng cho hệ thống tài khoản */
+.auth-view h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+  color: var(--red);
+}
+.auth-desc {
+  font-size: 13px;
+  margin: 0 0 12px;
+  opacity: 0.85;
+  line-height: 1.4;
+}
+.auth-field {
+  position: relative;
+  width: 100%;
+}
+.auth-pass-field input {
+  padding-right: 46px;
+}
+.auth-pass-toggle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 44px;
+  min-height: 44px;
+  display: grid;
+  place-items: center;
+  background: transparent !important;
+  color: var(--ink) !important;
+  border: 0 !important;
+  font-size: 16px;
+  cursor: pointer;
   opacity: 0.6;
+}
+.auth-pass-toggle:hover {
+  opacity: 1;
+}
+.auth-btn-primary {
+  width: 100%;
+  min-height: 44px;
+  background: var(--red);
+  color: #f6e7c4;
+  border: 0;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+}
+.auth-links,
+.auth-links-sub {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-top: 10px;
+}
+.auth-link-btn {
+  background: transparent !important;
+  color: var(--ink) !important;
+  border: 0 !important;
+  padding: 6px 8px !important;
+  min-height: 36px !important;
+  font-size: 13px !important;
+  font-weight: normal !important;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.auth-link-btn:hover {
+  color: var(--red) !important;
+}
+.auth-link-btn.muted {
+  opacity: 0.6;
+  font-size: 12px !important;
+}
+.auth-code-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #231c15;
+  border: 1px dashed #d4af37;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin: 10px 0;
+}
+.auth-code-text {
+  font-family: monospace;
+  font-size: 17px;
+  font-weight: 700;
+  color: #ffde7d;
+  letter-spacing: 0.08em;
+}
+.auth-btn-copy {
+  background: #d4af37 !important;
+  color: #1a1612 !important;
+  border: 0 !important;
+  border-radius: 4px !important;
+  padding: 6px 10px !important;
+  font-size: 12px !important;
+  min-height: 36px !important;
+  font-weight: 600 !important;
+}
+.auth-confirm-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  text-align: left;
+  margin: 8px 0 14px;
+  cursor: pointer;
+}
+.auth-confirm-row input {
+  width: 18px !important;
+  min-height: 18px !important;
+}
+
+/* Mục quản lý tài khoản trong cài đặt */
+.set-account-box {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+#set-account-info {
+  font-size: 13px;
+  color: var(--ink);
+}
+.btn-logout {
+  background: #5a2222 !important;
+  color: #fcebeb !important;
+  border: 1px solid #8e3535 !important;
+  border-radius: 4px !important;
+  padding: 6px 14px !important;
+  min-height: 44px !important;
+  font-weight: 600 !important;
+  cursor: pointer;
+}
+.btn-logout:hover {
+  background: #732a2a !important;
 }
 .err {
   min-height: 1.3em;
