@@ -9,7 +9,7 @@ import {
 import { Loot } from "../schema";
 import { rand, type World, type MonsterCtrl } from "../world";
 import { giveItem, sendInv, slotIndex, takeFromSlot } from "./inventory";
-import { lootOwner } from "./party";
+import { lootOwner, sameParty } from "./party";
 
 /** Tạo một món đồ rơi. owner = "" thì ai cũng nhặt được ngay. */
 export function spawnLoot(
@@ -54,7 +54,7 @@ export function pickup(w: World, sid: string, lootId: unknown) {
   if (!l) return;
   const { p } = r;
   if (Math.hypot(l.x - p.x, l.y - p.y) > PICKUP_RANGE) return;
-  if (l.owner && l.owner !== sid && !w.parties.sameParty(l.owner, sid))
+  if (l.owner && l.owner !== sid && !sameParty(w, l.owner, sid))
     return w.events.toast(sid, { text: "Vật phẩm này chưa thuộc về ngươi.", tone: "bad" });
   const left = giveItem(w, sid, l.itemId, l.qty);
   if (left === l.qty) return w.events.toast(sid, { text: "Túi đồ đã đầy.", tone: "bad" });

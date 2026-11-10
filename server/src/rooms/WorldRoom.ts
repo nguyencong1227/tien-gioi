@@ -71,7 +71,14 @@ import { abandonQuest, acceptQuest, craft, talk, trade, turnInQuest } from "../s
 import { equip, equipmentOf, sanitizeEquipment, setEquipment, unequip } from "../systems/equipment";
 import { tickWorld } from "../systems/tick";
 import { VIEW_ENTER } from "../systems/interest";
-import { partyAnswer, partyDrop, partyInvite, partyKick, partyLeave } from "../systems/party";
+import {
+  partyAnswer,
+  partyDrop,
+  partyInvite,
+  partyKick,
+  partyLeave,
+  partyResync,
+} from "../systems/party";
 import { planTravel } from "../systems/travel";
 import { RateLimiter } from "../rate-limit";
 import { defaultHub, type Hub } from "../hub";
@@ -134,6 +141,7 @@ export class WorldRoom extends Room<WorldState> {
         chatTo: (sid, msg) => this.sendTo(sid, "chat", msg),
       },
       map,
+      this.hub,
     );
   }
 
@@ -350,6 +358,7 @@ export class WorldRoom extends Room<WorldState> {
     sendInv(this.world, client.sessionId);
     sendQuests(this.world, client.sessionId);
     sendWallet(this.world, client.sessionId);
+    partyResync(this.world, client.sessionId); // vừa qua cổng từ bản đồ khác: vẫn ở trong đội, nhận đội hình ngay
     this.world.events.sys(`${p.name} (${realmLabel(p.realm, p.tier)}) đã nhập thế.`);
   }
 
@@ -401,9 +410,12 @@ export class WorldRoom extends Room<WorldState> {
     }
   }
 
-  /** Gỡ người chơi khỏi thế giới (không lưu): dùng khi rời phòng và khi đi qua cổng. */
-  private dropPlayer(sid: string) {
-    partyDrop(this.world, sid); // trước khi xoá khỏi state: báo cho đội, dọn lời mời
+  /**
+   * Gỡ người chơi khỏi thế giới (không lưu): dùng khi rời phòng và khi đi qua cổng.
+   * `keepParty`: đi qua cổng thì vẫn ở trong đội (đội dùng chung giữa các phòng); rời hẳn thì rời đội.
+   */
+  private dropPlayer(sid: string, keepParty = false) {
+    if (!keepParty) partyDrop(this.world, sid); // trước khi xoá khỏi state: báo cho đội, dọn lời mời
     this.state.players.delete(sid);
     this.state.online = this.state.players.size;
     this.world.interest.leave(sid);
@@ -416,7 +428,7 @@ export class WorldRoom extends Room<WorldState> {
   /**
    * Đi qua cổng (shared/src/travel.ts): kiểm (`planTravel`), LƯU nhân vật với bản đồ đích + chỗ xuất hiện, đưa ra khỏi
    * phòng (không chờ nối lại), gửi `travelTo`, đóng kết nối. Lưu xong mới gửi: client vào phòng đích sẽ nạp đúng bản ghi đó.
-   * Đội tạm thời tan khi qua cổng (đội và chat dùng chung giữa các phòng là việc kế tiếp của #142).
+   * Đội giữ nguyên khi qua cổng (sổ đội dùng chung giữa các phòng, khoá theo đạo hiệu).
    */
   private async travel(sid: string, portalId: unknown) {
     const plan = planTravel(this.world, sid, portalId);
@@ -441,7 +453,7 @@ export class WorldRoom extends Room<WorldState> {
       if (here) await this.persist(here, c).catch((e) => console.error("save failed", e));
       return;
     }
-    this.dropPlayer(sid);
+    this.dropPlayer(sid, true);
     client.send("travelTo", { mapId: plan.mapId } satisfies TravelToMsg);
     client.leave(CLOSE_TRAVEL);
   }
@@ -449,6 +461,7 @@ export class WorldRoom extends Room<WorldState> {
   async onDispose() {
     this.removeChatSink?.();
     this.removeChatSink = null;
+    this.world?.dispose();
     await this.saveAll();
   }
 
