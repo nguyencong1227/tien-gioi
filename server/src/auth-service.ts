@@ -148,6 +148,7 @@ export class AuthService {
       disabled: false,
     });
     if (!account) return fail("username_taken");
+    audit("auth.registered", { ip, user: username.value });
     return ok({ token: await this.newSession(account.id, now), recoveryCode });
   }
 
@@ -180,6 +181,7 @@ export class AuthService {
     };
     if (this.kdf.needsRehash(account.passHash)) patch.passHash = await this.kdf.hash(body.password);
     await this.accounts.update(account.id, patch);
+    audit("auth.login_ok", { ip, user: key });
     return ok({ token: await this.newSession(account.id, now) });
   }
 
@@ -223,6 +225,8 @@ export class AuthService {
       lastLoginAt: new Date(now).toISOString(),
     });
     await this.sessions.deleteAllOf(account.id);
+    // Đặt lại mật khẩu bằng mã khôi phục = dấu hiệu quan trọng nhất của chiếm tài khoản (mọi phiên cũ bị xoá)
+    audit("auth.recovered", { ip, user: key });
     return ok({ token: await this.newSession(account.id, now), recoveryCode });
   }
 
