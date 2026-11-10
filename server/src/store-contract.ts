@@ -1,15 +1,7 @@
 // Bộ ca kiểm thử hợp đồng store (M3 bước 3f, Issue #176, docs/THIET_KE_TAI_KHOAN.md mục 6).
 // Module này chỉ chứa định nghĩa hợp đồng kiểm thử, tái sử dụng cho cả File* và Pg*.
 import { describe, expect, it } from "vitest";
-import type {
-  AccountPatch,
-  AccountRecord,
-  AccountStore,
-  NewAccount,
-  SessionRecord,
-  SessionStore,
-  SetNameResult,
-} from "./account-store";
+import type { AccountStore, NewAccount, SessionRecord, SessionStore } from "./account-store";
 import { hashToken } from "./auth";
 import type { PlayerStore } from "./player-store";
 import type { SoulStore } from "./soul";
