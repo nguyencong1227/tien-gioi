@@ -592,11 +592,12 @@ export class WorldScene extends Phaser.Scene {
   public attachRoom(room: Room) {
     this.room = room;
     this.clearEntities();
+    // hasMe = false: lấy lại vị trí từ state của Room mới ở lần reconcile đầu
     this.hasMe = false;
     this.pending.length = 0;
-    this.predX = 0;
-    this.predY = 0;
-    this.seq = 0;
+    // Giữ seq tăng liên tục, không đặt lại 0: sau khi nối lại state.lastSeq vẫn là giá trị cũ
+    // cho tới khi server xử lý input đầu tiên, reconcile() lọc pending bằng seq > lastSeq
+    // nên seq bắt đầu lại từ 1 sẽ bị coi là đã xác nhận và nhân vật giật lùi.
     this.moving = false;
     this.setupNetwork(false);
   }

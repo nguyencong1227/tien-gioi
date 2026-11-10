@@ -2164,19 +2164,13 @@ export const ui = {
       $("death-t").textContent = `Hồi sinh tại Lạc Hà Trấn sau ${secondsLeft}s`;
   },
 
+  /** Banner đỏ khi đang nối lại (chỉ một khung, không kèm toast trùng nội dung). */
   showReconnectNotice(text: string) {
     const banner = $("reconnect-banner");
     banner.hidden = false;
+    banner.classList.remove("failed");
+    $("reconnect-reload").hidden = true;
     $("reconnect-banner-text").textContent = text;
-
-    let p = document.getElementById("toast-reconnecting");
-    if (!p) {
-      p = document.createElement("p");
-      p.id = "toast-reconnecting";
-      p.className = "bad reconnecting";
-      $("toast").prepend(p);
-    }
-    p.textContent = text;
 
     document.body.classList.add("reconnecting");
     this.closeAllModals();
@@ -2184,9 +2178,20 @@ export const ui = {
     this.closePlayerMenu();
   },
 
+  /** Nối lại thất bại hẳn: giữ banner cố định kèm nút tải lại trang, vẫn chặn điều khiển. */
+  showReconnectFailed(text: string) {
+    this.showReconnectNotice(text);
+    $("reconnect-banner").classList.add("failed");
+    const reload = $("reconnect-reload") as HTMLButtonElement;
+    reload.hidden = false;
+    reload.onclick = () => location.reload();
+  },
+
   hideReconnectNotice() {
-    $("reconnect-banner").hidden = true;
-    document.getElementById("toast-reconnecting")?.remove();
+    const banner = $("reconnect-banner");
+    banner.hidden = true;
+    banner.classList.remove("failed");
+    $("reconnect-reload").hidden = true;
     document.body.classList.remove("reconnecting");
   },
 };

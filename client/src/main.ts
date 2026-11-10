@@ -61,15 +61,21 @@ form.addEventListener("submit", async (e) => {
   }
 });
 
+const FAIL_TEXT = "Mất kết nối với Tiên Giới. Tải lại trang để vào lại.";
+
+/** Không nối lại được: chặn điều khiển, giữ banner cố định kèm nút "Tải lại trang". */
+function showDisconnected() {
+  activeScene?.setReconnecting(true);
+  ui.showReconnectFailed(FAIL_TEXT);
+}
+
 function setupRoomLifecycle(room: Room) {
   activeToken = room.reconnectionToken;
 
   room.onLeave(async (code) => {
     // 1000: đóng bình thường; 4000-4999: mã của ứng dụng (4000 chủ động thoát, 4429 bị ngắt vì spam)
     if (code === 1000 || (code >= 4000 && code <= 4999)) {
-      if (code !== 1000) {
-        ui.toast({ text: "Mất kết nối với Tiên Giới. Tải lại trang để vào lại.", tone: "bad" });
-      }
+      if (code !== 1000) showDisconnected();
       return;
     }
 
@@ -112,9 +118,9 @@ function setupRoomLifecycle(room: Room) {
       ui.toast({ text: "Đã nối lại.", tone: "good" });
       setupRoomLifecycle(reconnectedRoom);
     } else {
-      activeScene?.setReconnecting(false);
+      // Thất bại hẳn (hết 20 giây / token hết hạn): KHÔNG ẩn banner, vẫn chặn điều khiển
       isReconnecting = false;
-      ui.toast({ text: "Mất kết nối với Tiên Giới. Tải lại trang để vào lại.", tone: "bad" });
+      showDisconnected();
     }
   });
 }
