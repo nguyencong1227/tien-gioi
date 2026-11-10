@@ -48,3 +48,41 @@ jobs:
 
       - name: Build Docker image
         run: docker build .
+
+  postgres:
+    name: PostgreSQL Store Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: tien_gioi_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Chạy kiểm thử PostgreSQL thật
+        run: |
+          if [ -d server/src/pg ]; then
+            npx vitest run server/src/pg
+          else
+            echo "Chưa có server/src/pg trên nhánh này, bỏ qua."
+          fi
+        env:
+          TEST_DATABASE_URL: postgres://postgres:password@localhost:5432/tien_gioi_test
