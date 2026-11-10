@@ -1490,3 +1490,70 @@ describe("nhiều bản đồ: mỗi bản đồ một phòng (M3 bước 1)", (
     expect(JSON.parse(readFileSync(saveFileOf(name)!, "utf8")).mapId).toBe(DEFAULT_MAP_ID);
   });
 });
+
+describe("chat toàn server giữa các bản đồ (M3 bước 1)", () => {
+  const hp = getMap(HAC_PHONG_ID)!;
+  /** Nhân vật đang ở Hắc Phong Cốc (tạo rồi sửa file lưu như đã đi qua cổng) */
+  async function joinHacPhong(name: string) {
+    const a = await join(name);
+    await a.room.leave(true);
+    rooms.splice(rooms.indexOf(a.room), 1);
+    await sleep(200);
+    const f = readdirSync(dataDir).find(
+      (x) => JSON.parse(readFileSync(path.join(dataDir, x), "utf8")).name === name,
+    )!;
+    const full = path.join(dataDir, f);
+    writeFileSync(
+      full,
+      JSON.stringify({
+        ...JSON.parse(readFileSync(full, "utf8")),
+        mapId: HAC_PHONG_ID,
+        x: Math.round(hp.townPx.x),
+        y: Math.round(hp.townPx.y),
+      }),
+    );
+    return join(name, secretOf(name), HAC_PHONG_ID);
+  }
+
+  it("chat chung của người ở bản đồ này tới người ở bản đồ kia (hai chiều), kèm đúng tên người gửi", async () => {
+    const a = await join("Chat Lac Ha");
+    const b = await joinHacPhong("Chat Hac Phong");
+    expect(serverRoom(a.room).mapId).toBe(DEFAULT_MAP_ID);
+    expect(serverRoom(b.room).mapId).toBe(HAC_PHONG_ID);
+    a.room.send("chat", { text: "xin chào từ Lạc Hà" });
+    await waitFor(() => b.chat.find((m) => m.text === "xin chào từ Lạc Hà"));
+    expect(b.chat.find((m) => m.text === "xin chào từ Lạc Hà")!.from).toBe("Chat Lac Ha");
+    await sleep(900); // hồi chiêu chat
+    b.room.send("chat", { text: "đáp lại từ Hắc Phong" });
+    await waitFor(() => a.chat.find((m) => m.text === "đáp lại từ Hắc Phong"));
+    // Người gửi nhận đúng một lần (không nhân đôi khi phòng của mình cũng là người nghe)
+    expect(a.chat.filter((m) => m.text === "xin chào từ Lạc Hà")).toHaveLength(1);
+    expect(b.chat.filter((m) => m.text === "đáp lại từ Hắc Phong")).toHaveLength(1);
+  });
+
+  it("chat đội và thông báo hệ thống vẫn chỉ trong phạm vi của mình (không rò ra bản đồ khác)", async () => {
+    const a = await join("Doi Lac Ha");
+    const c = await join("Hang Xom Lac");
+    const b = await joinHacPhong("Doi Hac Phong");
+    // Người mới nhập thế ở Lạc Hà: thông báo hệ thống chỉ ở phòng đó
+    await waitFor(() => a.chat.find((m) => m.sys && m.text.includes("Hang Xom Lac")));
+    expect(b.chat.some((m) => m.sys && m.text.includes("Hang Xom Lac"))).toBe(false);
+    // Chat đội: người ngoài đội ở bản đồ khác không nhận
+    a.room.send("chat", { text: "/p bí mật của đội" });
+    await sleep(400);
+    expect(b.chat.some((m) => m.text.includes("bí mật của đội"))).toBe(false);
+    expect(c.chat.some((m) => m.text.includes("bí mật của đội"))).toBe(false);
+  });
+
+  it("phòng đóng thì ngừng nghe: không còn chỗ đăng ký của phòng đã đóng và chat vẫn tới các phòng còn lại", async () => {
+    const a = await join("Chat Con Lai");
+    const b = await joinHacPhong("Chat Phong Dong");
+    const hub = WorldRoomClass.hub;
+    const before = hub.chatSinkCount;
+    await serverRoom(b.room).disconnect();
+    await waitFor(() => hub.chatSinkCount === before - 1, 3000);
+    await sleep(900);
+    a.room.send("chat", { text: "vẫn nói được" });
+    await waitFor(() => a.chat.find((m) => m.text === "vẫn nói được"));
+  });
+});
