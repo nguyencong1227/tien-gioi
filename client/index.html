@@ -30,11 +30,244 @@
       <div class="seal">仙</div>
       <h1>Tiên Giới</h1>
       <p class="sub">Vạn người cùng tu, một con đường thành tiên.</p>
-      <form id="login-form" autocomplete="off">
-        <input id="login-name" maxlength="16" placeholder="Đạo hiệu (2–16 ký tự)" required />
-        <button type="submit" id="login-btn">Nhập thế</button>
-      </form>
-      <p id="login-err" class="err"></p>
+      <div id="auth-mock-badge" class="auth-mock-badge" hidden>
+        ⚠ ĐANG DÙNG TÀI KHOẢN GIẢ (MOCK)
+      </div>
+
+      <!-- View 1: Đăng nhập tài khoản -->
+      <div id="auth-view-login" class="auth-view" hidden>
+        <form id="auth-login-form" autocomplete="on">
+          <div class="auth-field">
+            <input
+              id="auth-login-user"
+              type="text"
+              autocomplete="username"
+              placeholder="Tên đăng nhập (3–20 ký tự)"
+              maxlength="20"
+              required
+            />
+          </div>
+          <div class="auth-field auth-pass-field">
+            <input
+              id="auth-login-pass"
+              type="password"
+              autocomplete="current-password"
+              placeholder="Mật khẩu"
+              maxlength="128"
+              required
+            />
+            <button
+              type="button"
+              class="auth-pass-toggle"
+              id="auth-login-pass-toggle"
+              title="Hiện/ẩn mật khẩu"
+            >
+              👁
+            </button>
+          </div>
+          <button type="submit" id="auth-login-btn" class="auth-btn-primary">Đăng Nhập</button>
+        </form>
+        <div class="auth-links">
+          <button type="button" class="auth-link-btn" id="link-to-register">
+            Chưa có tài khoản? Đăng ký
+          </button>
+          <button type="button" class="auth-link-btn" id="link-to-forgot">Quên mật khẩu?</button>
+        </div>
+        <div id="auth-links-legacy-sub" class="auth-links-sub">
+          <button type="button" class="auth-link-btn muted" id="link-to-legacy">
+            Chế độ đạo hiệu trực tiếp (cũ)
+          </button>
+        </div>
+        <p id="auth-login-err" class="err"></p>
+      </div>
+
+      <!-- View 2: Đăng ký tài khoản mới -->
+      <div id="auth-view-register" class="auth-view" hidden>
+        <form id="auth-reg-form" autocomplete="on">
+          <div class="auth-field">
+            <input
+              id="auth-reg-user"
+              type="text"
+              autocomplete="username"
+              placeholder="Tên đăng nhập (a-z, 0-9, _)"
+              maxlength="20"
+              required
+            />
+          </div>
+          <div class="auth-field auth-pass-field">
+            <input
+              id="auth-reg-pass"
+              type="password"
+              autocomplete="new-password"
+              placeholder="Mật khẩu (tối thiểu 8 ký tự)"
+              maxlength="128"
+              required
+            />
+            <button
+              type="button"
+              class="auth-pass-toggle"
+              id="auth-reg-pass-toggle"
+              title="Hiện/ẩn mật khẩu"
+            >
+              👁
+            </button>
+          </div>
+          <button type="submit" id="auth-reg-btn" class="auth-btn-primary">Tạo Tài Khoản</button>
+        </form>
+        <div class="auth-links">
+          <button type="button" class="auth-link-btn" id="link-to-login">
+            Đã có tài khoản? Đăng nhập
+          </button>
+        </div>
+        <p id="auth-reg-err" class="err"></p>
+      </div>
+
+      <!-- View 3: Hiển thị mã khôi phục sau khi đăng ký -->
+      <div id="auth-view-recovery" class="auth-view" hidden>
+        <h3>Lưu Mã Khôi Phục</h3>
+        <p class="auth-desc">
+          Mã này dùng để lấy lại tài khoản nếu quên mật khẩu. Máy chủ không lưu mật khẩu của bạn, vì
+          vậy mã chỉ hiện <b>DUY NHẤT một lần</b>.
+        </p>
+        <div class="auth-code-box">
+          <span id="auth-recovery-code-val" class="auth-code-text">ABCD-EFGH-JKMN-PQRT</span>
+          <button type="button" id="auth-copy-code-btn" class="auth-btn-copy">📋 Sao chép</button>
+        </div>
+        <label class="auth-confirm-row">
+          <input type="checkbox" id="auth-recovery-confirm-cb" />
+          <span>Tôi đã sao chép và lưu mã khôi phục ở nơi an toàn.</span>
+        </label>
+        <button type="button" id="auth-recovery-continue-btn" class="auth-btn-primary" disabled>
+          Tiếp Tục
+        </button>
+      </div>
+
+      <!-- View 4: Khởi tạo đạo hiệu (khi chưa có nhân vật) -->
+      <div id="auth-view-character" class="auth-view" hidden>
+        <h3>Khởi Tạo Đạo Hiệu</h3>
+        <p class="auth-desc">Đạo hiệu là danh xưng của bạn trong Tiên Giới (2–16 ký tự).</p>
+        <form id="auth-char-form" autocomplete="off">
+          <div class="auth-field">
+            <input
+              id="auth-char-name"
+              type="text"
+              placeholder="Đạo hiệu nhân vật"
+              maxlength="16"
+              required
+            />
+          </div>
+          <button type="submit" id="auth-char-btn" class="auth-btn-primary">Nhập Thế</button>
+        </form>
+        <div class="auth-links">
+          <button type="button" class="auth-link-btn" id="link-to-claim">
+            Tôi đã có nhân vật cũ từ trước
+          </button>
+        </div>
+        <p id="auth-char-err" class="err"></p>
+      </div>
+
+      <!-- View 5: Nhận lại nhân vật cũ -->
+      <div id="auth-view-claim" class="auth-view" hidden>
+        <h3>Nhận Lại Nhân Vật Cũ</h3>
+        <p class="auth-desc">
+          Gắn nhân vật bạn đã chơi trước đây (bằng đạo hiệu và mã bí mật) vào tài khoản này.
+        </p>
+        <form id="auth-claim-form" autocomplete="off">
+          <div class="auth-field">
+            <input
+              id="auth-claim-name"
+              type="text"
+              placeholder="Đạo hiệu cũ"
+              maxlength="16"
+              required
+            />
+          </div>
+          <div class="auth-field">
+            <input
+              id="auth-claim-secret"
+              type="text"
+              placeholder="Mã bí mật cũ (32 ký tự hex)"
+              required
+            />
+          </div>
+          <button type="submit" id="auth-claim-btn" class="auth-btn-primary">Nhận Nhân Vật</button>
+        </form>
+        <div class="auth-links">
+          <button type="button" class="auth-link-btn" id="link-back-to-char">
+            Quay lại tạo đạo hiệu mới
+          </button>
+        </div>
+        <p id="auth-claim-err" class="err"></p>
+      </div>
+
+      <!-- View 6: Quên mật khẩu / Khôi phục -->
+      <div id="auth-view-forgot" class="auth-view" hidden>
+        <h3>Khôi Phục Mật Khẩu</h3>
+        <form id="auth-forgot-form" autocomplete="on">
+          <div class="auth-field">
+            <input
+              id="auth-forgot-user"
+              type="text"
+              autocomplete="username"
+              placeholder="Tên đăng nhập"
+              maxlength="20"
+              required
+            />
+          </div>
+          <div class="auth-field">
+            <input
+              id="auth-forgot-code"
+              type="text"
+              placeholder="Mã khôi phục (16 ký tự)"
+              maxlength="24"
+              required
+            />
+          </div>
+          <div class="auth-field auth-pass-field">
+            <input
+              id="auth-forgot-pass"
+              type="password"
+              autocomplete="new-password"
+              placeholder="Mật khẩu mới (tối thiểu 8 ký tự)"
+              maxlength="128"
+              required
+            />
+            <button
+              type="button"
+              class="auth-pass-toggle"
+              id="auth-forgot-pass-toggle"
+              title="Hiện/ẩn mật khẩu"
+            >
+              👁
+            </button>
+          </div>
+          <button type="submit" id="auth-forgot-btn" class="auth-btn-primary">
+            Đặt Lại Mật Khẩu
+          </button>
+        </form>
+        <div class="auth-links">
+          <button type="button" class="auth-link-btn" id="link-forgot-to-login">
+            Quay lại đăng nhập
+          </button>
+        </div>
+        <p id="auth-forgot-err" class="err"></p>
+      </div>
+
+      <!-- View 7: Chế độ cũ (Legacy, mặc định) -->
+      <div id="auth-view-legacy" class="auth-view">
+        <form id="login-form" autocomplete="off">
+          <div class="auth-field">
+            <input id="login-name" maxlength="16" placeholder="Đạo hiệu (2–16 ký tự)" required />
+          </div>
+          <button type="submit" id="login-btn" class="auth-btn-primary">Nhập thế</button>
+        </form>
+        <div class="auth-links">
+          <button type="button" class="auth-link-btn" id="link-legacy-to-account">
+            Đăng nhập bằng tài khoản
+          </button>
+        </div>
+        <p id="login-err" class="err"></p>
+      </div>
     </section>
 
     <div id="ui" hidden>
@@ -298,6 +531,10 @@
             <span>Chất lượng thấp (tắt hiệu ứng phụ cho máy yếu / tiết kiệm pin)</span>
             <input type="checkbox" id="set-low-fx" />
           </label>
+          <div class="set-account-box">
+            <span id="set-account-info">Tài khoản: <b id="set-account-username">-</b></span>
+            <button type="button" id="btn-logout" class="btn-logout">Đăng Xuất</button>
+          </div>
         </div>
       </section>
 
