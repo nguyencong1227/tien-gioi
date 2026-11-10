@@ -2213,6 +2213,10 @@ body.low-fx #btn-talk {
   top: max(10px, env(safe-area-inset-top));
   left: 50%;
   transform: translateX(-50%);
+  /* left: 50% làm khối co theo 50vw; đặt bề rộng theo nội dung, tối đa gần hết màn hình */
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  box-sizing: border-box;
   background: rgba(163, 29, 29, 0.92);
   color: #fff;
   border: 1px solid #ff7875;
@@ -2244,15 +2248,33 @@ body.low-fx #btn-talk {
     transform: scale(1.2);
   }
 }
-body.reconnecting #hud-controls,
+/* Nối lại thất bại hẳn: banner nhận chạm để bấm nút tải lại, chấm đỏ đứng yên */
+.reconnect-banner.failed {
+  pointer-events: auto;
+  padding: 6px 6px 6px 16px;
+}
+.reconnect-banner.failed .reconnect-dot {
+  animation: none;
+}
+.reconnect-reload {
+  flex: none;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 16px;
+  border-radius: 22px;
+  border: 1px solid #ffd591;
+  background: #fff1d6;
+  color: #7a1010;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
 body.reconnecting #joyzone,
+body.reconnecting #skills,
+body.reconnecting #quickbar,
 body.reconnecting #btn-talk,
 body.reconnecting #btn-pickup {
   opacity: 0.35;
   pointer-events: none;
   filter: grayscale(0.5);
-}
-#toast-reconnecting {
-  animation: none !important;
-  opacity: 1 !important;
 }
