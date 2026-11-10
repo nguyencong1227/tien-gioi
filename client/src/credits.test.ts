@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import path from "node:path";
-// @ts-expect-error - Script mjs chạy trực tiếp trong Node CLI không có d.ts
 import {
   auditAssets,
   isAssetCredited,
