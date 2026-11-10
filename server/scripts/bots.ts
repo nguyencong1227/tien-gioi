@@ -35,6 +35,7 @@ import {
   statsFor,
   TRAVEL_COOLDOWN_MS,
   SECT_MSG,
+  PROTOCOL_VERSION,
   type AttackMsg,
   type BuyMsg,
   type DuelEndMsg,
@@ -978,6 +979,7 @@ async function runIdleZeroBotTest(
   const room = await client.joinOrCreate(roomName, {
     name: seedName,
     secret: seedSecret,
+    v: PROTOCOL_VERSION,
   });
   await sleep(150);
   const monstersCount = (room.state as any)?.monsters?.size ?? 88;
@@ -1460,13 +1462,17 @@ async function runLoadTest(
         }
       }
     }
-    let joinOpts: JoinOptions | { token: string } = { name, secret };
+    let joinOpts: JoinOptions | { token: string; v: number } = {
+      name,
+      secret,
+      v: PROTOCOL_VERSION,
+    };
     let botToken: string | undefined;
     if (useAccount) {
       const httpBase = url.replace(/^ws/, "http").replace(/\/$/, "");
       const authRes = await authBotAccount(httpBase, i, name);
       botToken = authRes.token;
-      joinOpts = { token: botToken };
+      joinOpts = { token: botToken, v: PROTOCOL_VERSION };
     } else {
       const lifeSeed = die ? { playMs: 48 * 60_000, kills: 30, bossKills: 0 } : undefined;
       seedBotSaveFile(
@@ -1494,10 +1500,11 @@ async function runLoadTest(
         const nextMap = getMap(msg.mapId) ?? DEFAULT_MAP;
         const targetClient = new Client(url);
         const nextOpts = bot.token
-          ? { token: bot.token }
+          ? { token: bot.token, v: PROTOCOL_VERSION }
           : {
               name: bot.name,
               secret: `bot_secret_tien_gioi_${String(bot.index).padStart(3, "0")}_loadtest`,
+              v: PROTOCOL_VERSION,
             };
         let nextRoom: Room;
         if (msg.roomId) {
