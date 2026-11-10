@@ -18,6 +18,7 @@
     "test:watch": "vitest",
     "e2e": "npm run e2e -w server --",
     "e2e:tai-khoan": "npm run e2e:tai-khoan -w server --",
+    "e2e:bi-canh": "npm run e2e:bi-canh -w server --",
     "tai-khoan": "npm run tai-khoan -w server --",
     "chuyen-du-lieu": "npm run chuyen-du-lieu -w server --"
   },
