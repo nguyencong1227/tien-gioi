@@ -2030,6 +2030,11 @@ body.low-fx #btn-talk {
   color: #ffd700;
   font-size: 11px;
 }
+.pmem-sect {
+  font-size: 11px;
+  color: #c084fc;
+  font-weight: 700;
+}
 .pmem-name {
   font-weight: 600;
   color: #fff6dc;
@@ -4086,5 +4091,567 @@ body.in-limbo #chat-log {
     transform: none;
     width: 218px;
     padding: 8px 10px;
+  }
+}
+
+/* ==================== TÔNG MÔN (M3.6, #230) ==================== */
+
+/* Kênh chat tông môn */
+#chat-log p.sect {
+  color: #c084fc;
+}
+#chat-log p.sect b {
+  color: #e9d5ff;
+}
+
+/* Nút Tông môn trong menu người chơi */
+.pm-btn-sect {
+  border-color: #a855f7 !important;
+  color: #f3e8ff !important;
+  background: rgba(168, 85, 247, 0.15) !important;
+}
+.pm-btn-sect:hover {
+  background: rgba(168, 85, 247, 0.3) !important;
+}
+
+/* Biệt hiệu tông môn trong bảng tổ đội */
+.pmem-sect {
+  font-size: 11px;
+  color: #c084fc;
+  font-weight: 700;
+  margin-right: 2px;
+}
+
+/* Bảng Tông môn */
+#sect-modal {
+  width: min(94vw, 560px);
+  max-height: min(88vh, 640px);
+  display: flex;
+  flex-direction: column;
+}
+
+.sect-view {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+/* View Chưa có tông môn */
+.sect-create-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(212, 175, 55, 0.2);
+  border-radius: 8px;
+  padding: 16px;
+}
+.sect-create-banner {
+  text-align: center;
+  border-bottom: 1px dashed rgba(212, 175, 55, 0.2);
+  padding-bottom: 12px;
+}
+.sect-icon {
+  font-size: 36px;
+  display: block;
+  margin-bottom: 4px;
+}
+.sect-create-banner h3 {
+  margin: 0 0 6px 0;
+  color: #ffe08a;
+  font-family: "Noto Serif", Georgia, serif;
+}
+.sect-create-banner p {
+  margin: 0;
+  font-size: 12px;
+  color: #c9b07a;
+  line-height: 1.4;
+}
+.sect-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sect-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+.sect-form-group label {
+  font-size: 13px;
+  color: #e5e7eb;
+}
+.sect-form-group input {
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #4a3e2b;
+  background: #1a1612;
+  color: #fff;
+  font-size: 14px;
+  outline: none;
+}
+.sect-form-group input:focus {
+  border-color: #d4af37;
+}
+.sect-create-cost-hint {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: #d1d5db;
+  padding: 8px 12px;
+  background: rgba(212, 175, 55, 0.08);
+  border-radius: 6px;
+}
+.sect-create-cost-hint b {
+  color: #fbbf24;
+}
+.sect-primary-btn {
+  min-height: 44px;
+  border-radius: 6px;
+  border: 1px solid #f6d878;
+  background: linear-gradient(180deg, #d4af37, #b8972e);
+  color: #1a1510;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.sect-primary-btn:hover {
+  background: linear-gradient(180deg, #f6d878, #d4af37);
+}
+
+/* Tabs trong Bảng Tông Môn */
+.sect-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.2);
+  padding-bottom: 6px;
+}
+.sect-tab {
+  flex: 1;
+  min-height: 40px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: #9ca3af;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.sect-tab.active {
+  background: rgba(212, 175, 55, 0.15);
+  border-color: rgba(212, 175, 55, 0.4);
+  color: #ffe08a;
+}
+.sect-tab-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Tab 1: Tổng quan */
+.sect-overview-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sect-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.sect-meta-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  font-size: 12px;
+}
+.sect-meta-item span {
+  color: #9ca3af;
+}
+.sect-meta-item b {
+  color: #fbbf24;
+}
+.sect-motd-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  background: rgba(168, 85, 247, 0.06);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  border-radius: 6px;
+  text-align: left;
+}
+.sect-motd-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: #e9d5ff;
+}
+.sect-motd-box p {
+  margin: 0;
+  font-size: 13px;
+  color: #f3e8ff;
+  line-height: 1.4;
+  word-break: break-word;
+}
+.sect-motd-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sect-motd-edit-form input {
+  padding: 6px 10px;
+  border-radius: 4px;
+  border: 1px solid #6b21a8;
+  background: #1e1329;
+  color: #fff;
+  font-size: 13px;
+}
+.sect-btn-row {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.sect-small-btn {
+  padding: 2px 8px;
+  font-size: 11px;
+  border-radius: 4px;
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  background: rgba(212, 175, 55, 0.15);
+  color: #ffe08a;
+  cursor: pointer;
+}
+.sect-tiny-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  cursor: pointer;
+}
+.sect-tiny-btn.ok {
+  background: #7e22ce;
+  border-color: #a855f7;
+}
+.sect-actions-box {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+.sect-danger-btn {
+  flex: 1;
+  min-height: 40px;
+  border-radius: 6px;
+  border: 1px solid #ef4444;
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+.sect-danger-btn:hover {
+  background: rgba(239, 68, 68, 0.3);
+}
+.sect-confirm-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  width: 100%;
+}
+.sect-confirm-box p {
+  margin: 0;
+  font-size: 12px;
+  color: #fca5a5;
+}
+.sect-confirm-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* Tab 2: Thành viên */
+.sect-members-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #9ca3af;
+  padding: 0 4px;
+}
+.sect-members-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+.sect-member-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  gap: 8px;
+}
+.sect-member-row.offline {
+  opacity: 0.55;
+}
+.sect-member-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+}
+.sect-member-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sect-member-name {
+  font-weight: 700;
+  font-size: 13px;
+  color: #f9fafb;
+}
+.sect-member-name.is-me {
+  color: #fbbf24;
+}
+.sect-member-rank {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+.sect-member-rank.chu {
+  background: rgba(251, 191, 36, 0.2);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+}
+.sect-member-rank.truong_lao {
+  background: rgba(168, 85, 247, 0.2);
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.4);
+}
+.sect-member-rank.de_tu {
+  background: rgba(156, 163, 175, 0.15);
+  color: #9ca3af;
+}
+.sect-member-status {
+  font-size: 11px;
+  color: #9ca3af;
+}
+.sect-member-status.online {
+  color: #34d399;
+}
+.sect-member-actions {
+  display: flex;
+  gap: 4px;
+}
+
+/* Tab 3: Kho tông môn */
+.sect-treasury-balance-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 14px;
+  background: rgba(212, 175, 55, 0.08);
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  border-radius: 8px;
+}
+.sect-treasury-balance-box small {
+  color: #9ca3af;
+  font-size: 12px;
+}
+.sect-treasury-amount {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 24px;
+  font-weight: 700;
+  color: #fbbf24;
+  margin-top: 4px;
+}
+.sect-treasury-amount span {
+  font-size: 14px;
+  color: #e5e7eb;
+}
+.sect-treasury-forms {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sect-treasury-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  text-align: left;
+}
+.sect-treasury-form h4 {
+  margin: 0;
+  font-size: 12px;
+  color: #e5e7eb;
+}
+.sect-input-row {
+  display: flex;
+  gap: 6px;
+}
+.sect-input-row input {
+  flex: 1;
+  padding: 6px 10px;
+  border-radius: 4px;
+  border: 1px solid #4a3e2b;
+  background: #1a1612;
+  color: #fff;
+  font-size: 13px;
+}
+.sect-input-row button {
+  padding: 0 16px;
+}
+.sect-logs-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+.sect-logs-box h4 {
+  margin: 0;
+  font-size: 12px;
+  color: #9ca3af;
+}
+.sect-logs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.sect-log-item {
+  font-size: 11px;
+  color: #d1d5db;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 4px;
+}
+.sect-log-item.deposit {
+  border-left: 2px solid #34d399;
+}
+.sect-log-item.withdraw {
+  border-left: 2px solid #f87171;
+}
+
+/* Hộp lời mời Tông môn góc màn hình */
+.sect-invite-box {
+  position: fixed;
+  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 195px);
+  right: max(12px, env(safe-area-inset-right));
+  z-index: 1000;
+  background: rgba(26, 21, 16, 0.96);
+  border: 1px solid #a855f7;
+  border-radius: 8px;
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.5),
+    0 0 12px rgba(168, 85, 247, 0.35);
+  padding: 12px 14px;
+  width: min(92vw, 340px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sib-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.sib-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: #c084fc;
+  background: rgba(168, 85, 247, 0.2);
+  padding: 2px 6px;
+  border-radius: 3px;
+  border: 1px solid rgba(168, 85, 247, 0.4);
+}
+.sib-head b {
+  font-size: 13px;
+  color: #ffe08a;
+  flex: 1;
+  text-align: left;
+}
+.sib-countdown {
+  font-size: 12px;
+  font-weight: 700;
+  color: #fbbf24;
+  font-family: monospace;
+}
+.sib-msg {
+  margin: 0;
+  font-size: 12px;
+  color: #e5e7eb;
+  line-height: 1.4;
+  text-align: left;
+}
+.sib-timer {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.sib-timer i {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: #a855f7;
+  transition: width 0.2s linear;
+}
+.sib-actions {
+  display: flex;
+  gap: 8px;
+}
+.sib-btn {
+  flex: 1;
+  min-height: 44px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+.sib-btn.accept {
+  background: linear-gradient(180deg, #9333ea, #7e22ce);
+  border: 1px solid #c084fc;
+  color: #fff;
+}
+.sib-btn.decline {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #9ca3af;
+}
+
+/* Responsive di động cho Tông Môn */
+@media (pointer: coarse), (max-width: 640px) {
+  .sect-invite-box {
+    top: auto;
+    bottom: calc(max(12px, env(safe-area-inset-bottom)) + 195px);
+    width: min(94vw, 356px);
+    padding: 10px 12px;
   }
 }

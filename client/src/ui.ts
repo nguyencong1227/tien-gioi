@@ -70,6 +70,17 @@ import {
   type DuelEndMsg,
   type DuelChallengeCheck,
   duelChallengeFailMessage,
+  type SectView,
+  type SectPresenceMsg,
+  type SectInvitedMsg,
+  type SectAssignableRank,
+  type SectMsg,
+  canSect,
+  SECT_MAX_MEMBERS,
+  SECT_ELDERS_MAX,
+  cleanSectName,
+  cleanSectTag,
+  cleanMotd,
 } from "@tien-gioi/shared";
 import {
   dungeonEndReasonText,
@@ -90,6 +101,14 @@ import {
   formatDuelInviteCountdown,
   isMockDuelEnabled,
 } from "./duel";
+import {
+  formatSectInviteCountdown,
+  formatSectTreasury,
+  formatSectRole,
+  formatSectLog,
+  formatSectMembersSummary,
+  mergeMemberPresence,
+} from "./sect";
 import { sound } from "./audio";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -138,6 +157,18 @@ export interface UiCallbacks {
   onDuelAccept?: (from: string) => void;
   onDuelDecline?: (from: string) => void;
   onDuelYield?: () => void;
+  onSectCreate?: (name: string, tag: string) => void;
+  onSectInvite?: (name: string) => void;
+  onSectAccept?: (from: string) => void;
+  onSectDecline?: (from: string) => void;
+  onSectLeave?: () => void;
+  onSectKick?: (name: string) => void;
+  onSectRank?: (name: string, rank: SectAssignableRank) => void;
+  onSectTransfer?: (name: string) => void;
+  onSectDisband?: () => void;
+  onSectMotd?: (motd: string) => void;
+  onSectDeposit?: (amount: number) => void;
+  onSectWithdraw?: (amount: number) => void;
 }
 
 const fmt = (n: number) =>
@@ -240,6 +271,21 @@ function stopDuelCountdownTimer() {
   }
 }
 
+// ---------- Tông môn (M3.6, #230) ----------
+let currentSect: SectView | null = null;
+let currentSectPresence: SectPresenceMsg | null = null;
+let sectModalOpen = false;
+let sectTab: "overview" | "members" | "treasury" = "overview";
+let currentSectInvite: SectInvitedMsg | null = null;
+let sectInviteInterval: number | null = null;
+
+function stopSectInviteTimer() {
+  if (sectInviteInterval !== null) {
+    window.clearInterval(sectInviteInterval);
+    sectInviteInterval = null;
+  }
+}
+
 function processNextInvite() {
   stopInviteTimer();
   const next = inviteQueue.shift();
@@ -309,6 +355,13 @@ function renderPartyPanel() {
       leaderIcon.textContent = "👑";
       leaderIcon.title = "Đội trưởng";
       nameWrap.append(leaderIcon);
+    }
+
+    if ((m as any).sect) {
+      const sectSpan = document.createElement("span");
+      sectSpan.className = "pmem-sect";
+      sectSpan.textContent = `[${(m as any).sect}]`;
+      nameWrap.append(sectSpan);
     }
 
     const nameSpan = document.createElement("span");
@@ -1833,6 +1886,212 @@ function renderLimboAll() {
   renderLimboRelics();
 }
 
+// ---------- Giao diện Tông môn (M3.6, #230) ----------
+
+function renderSectMembersTab() {
+  if (!currentSect) return;
+  const list = $("sect-members-list");
+  list.replaceChildren();
+
+  const merged = mergeMemberPresence(currentSect.members, currentSectPresence);
+  const summaryEl = $("sect-members-summary");
+  if (summaryEl) {
+    summaryEl.textContent = formatSectMembersSummary(merged.length);
+  }
+  const myRank = currentSect.myRank;
+
+  for (const m of merged) {
+    const item = document.createElement("div");
+    item.className = "sect-member-item";
+
+    const info = document.createElement("div");
+    info.className = "sect-member-info";
+
+    const titleRow = document.createElement("div");
+    titleRow.className = "sect-member-title-row";
+
+    const nameSpan = document.createElement("span");
+    nameSpan.className = `sect-member-name${m.name === currentName ? " is-me" : ""}`;
+    nameSpan.textContent = m.name;
+
+    const rankBadge = document.createElement("span");
+    rankBadge.className = `sect-member-rank ${m.rank}`;
+    rankBadge.textContent = formatSectRole(m.rank);
+
+    titleRow.append(nameSpan, rankBadge);
+
+    const statusRow = document.createElement("div");
+    statusRow.className = `sect-member-status${m.online ? " online" : ""}`;
+    if (m.online && m.realm !== undefined && m.tier !== undefined) {
+      statusRow.textContent = `Online · ${realmLabel(m.realm, m.tier)} · ${m.mapId ?? ""}`;
+    } else if (m.online) {
+      statusRow.textContent = `Online · ${m.mapId ?? ""}`;
+    } else {
+      statusRow.textContent = "Offline";
+    }
+
+    info.append(titleRow, statusRow);
+    item.append(info);
+
+    if (m.name !== currentName) {
+      const actions = document.createElement("div");
+      actions.className = "sect-member-actions";
+
+      // Thăng Trưởng lão: Tông chủ có thể thăng cho Đệ tử nếu chưa đạt giới hạn
+      if (myRank === "chu" && m.rank === "de_tu") {
+        const elderCount = currentSect.members.filter((x) => x.rank === "truong_lao").length;
+        const btnPromote = document.createElement("button");
+        btnPromote.type = "button";
+        btnPromote.className = "sect-action-btn";
+        btnPromote.textContent = "Thăng TL";
+        btnPromote.disabled = elderCount >= SECT_ELDERS_MAX;
+        btnPromote.title =
+          elderCount >= SECT_ELDERS_MAX ? "Đã tối đa 3 Trưởng lão" : "Thăng làm Trưởng lão";
+        btnPromote.addEventListener("click", () => {
+          callbacks?.onSectRank?.(m.name, "truong_lao");
+        });
+        actions.append(btnPromote);
+      }
+
+      // Giáng Đệ tử: Tông chủ có thể giáng Trưởng lão
+      if (myRank === "chu" && m.rank === "truong_lao") {
+        const btnDemote = document.createElement("button");
+        btnDemote.type = "button";
+        btnDemote.className = "sect-action-btn danger";
+        btnDemote.textContent = "Giáng";
+        btnDemote.title = "Giáng làm Đệ tử";
+        btnDemote.addEventListener("click", () => {
+          callbacks?.onSectRank?.(m.name, "de_tu");
+        });
+        actions.append(btnDemote);
+      }
+
+      // Chuyển vị Tông chủ (chỉ Tông chủ có quyền)
+      if (canSect("transfer", myRank, m.rank)) {
+        const btnTransfer = document.createElement("button");
+        btnTransfer.type = "button";
+        btnTransfer.className = "sect-action-btn danger";
+        btnTransfer.textContent = "Nhường";
+        btnTransfer.title = "Nhường vị Tông chủ";
+        btnTransfer.addEventListener("click", () => {
+          if (confirm(`Bạn có chắc muốn nhường vị Tông chủ cho ${m.name}?`)) {
+            callbacks?.onSectTransfer?.(m.name);
+          }
+        });
+        actions.append(btnTransfer);
+      }
+
+      // Trục xuất / Mời ra
+      if (canSect("kick", myRank, m.rank)) {
+        const btnKick = document.createElement("button");
+        btnKick.type = "button";
+        btnKick.className = "sect-action-btn danger";
+        btnKick.textContent = "Trục xuất";
+        btnKick.title = "Trục xuất khỏi tông môn";
+        btnKick.addEventListener("click", () => {
+          if (confirm(`Trục xuất ${m.name} khỏi tông môn?`)) {
+            callbacks?.onSectKick?.(m.name);
+          }
+        });
+        actions.append(btnKick);
+      }
+
+      if (actions.children.length > 0) {
+        item.append(actions);
+      }
+    }
+
+    list.append(item);
+  }
+}
+
+function renderSectTreasuryTab() {
+  if (!currentSect) return;
+  const valEl = $("sect-treasury-value");
+  if (valEl) valEl.textContent = formatSectTreasury(currentSect.coin);
+
+  const canWithdraw = canSect("withdraw", currentSect.myRank);
+  $("sect-form-withdraw").hidden = !canWithdraw;
+
+  const logsList = $("sect-logs-list");
+  logsList.replaceChildren();
+
+  const logs = currentSect.log || [];
+  if (logs.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "sect-empty-log";
+    empty.textContent = "Chưa có biến động kho.";
+    logsList.append(empty);
+  } else {
+    for (const entry of logs) {
+      const item = document.createElement("div");
+      item.className = `sect-log-item ${entry.kind}`;
+      item.textContent = formatSectLog(entry);
+      logsList.append(item);
+    }
+  }
+}
+
+function renderSectModal() {
+  const modal = $("sect-modal");
+  if (!sectModalOpen) {
+    modal.hidden = true;
+    $("btn-sect")?.classList.remove("active");
+    return;
+  }
+  modal.hidden = false;
+  $("btn-sect")?.classList.add("active");
+
+  const viewNone = $("sect-view-none");
+  const viewDetail = $("sect-view-detail");
+
+  if (!currentSect) {
+    viewNone.hidden = false;
+    viewDetail.hidden = true;
+    $("sect-head-title").textContent = "Tông Môn";
+    $("sect-head-sub").textContent = "Chưa gia nhập tông môn";
+    return;
+  }
+
+  viewNone.hidden = true;
+  viewDetail.hidden = false;
+  $("sect-head-title").textContent = currentSect.name;
+  $("sect-head-sub").textContent = `[${currentSect.tag}] · ${formatSectRole(currentSect.myRank)}`;
+
+  $("sect-tab-btn-overview").classList.toggle("active", sectTab === "overview");
+  $("sect-tab-btn-members").classList.toggle("active", sectTab === "members");
+  $("sect-tab-btn-treasury").classList.toggle("active", sectTab === "treasury");
+
+  $("sect-tab-overview").hidden = sectTab !== "overview";
+  $("sect-tab-members").hidden = sectTab !== "members";
+  $("sect-tab-treasury").hidden = sectTab !== "treasury";
+
+  if (sectTab === "overview") {
+    $("sect-meta-tag").textContent = `[${currentSect.tag}]`;
+    $("sect-meta-my-rank").textContent = formatSectRole(currentSect.myRank);
+    $("sect-meta-member-count").textContent = `${currentSect.members.length} / ${SECT_MAX_MEMBERS}`;
+    $("sect-meta-treasury").textContent = formatSectTreasury(currentSect.coin);
+
+    const motdEl = $("sect-motd-text");
+    motdEl.textContent = currentSect.motd || "(Chưa có thông báo)";
+    const canEditMotd = canSect("motd", currentSect.myRank);
+    $("sect-btn-edit-motd").hidden = !canEditMotd;
+    $("sect-form-motd").hidden = true;
+    motdEl.hidden = false;
+
+    const canLeave = canSect("leave", currentSect.myRank);
+    const canDisband = canSect("disband", currentSect.myRank);
+    $("sect-btn-leave").hidden = !canLeave;
+    $("sect-btn-disband").hidden = !canDisband;
+    const confirmEl = $("sect-disband-confirm");
+    if (confirmEl) confirmEl.hidden = true;
+  } else if (sectTab === "members") {
+    renderSectMembersTab();
+  } else if (sectTab === "treasury") {
+    renderSectTreasuryTab();
+  }
+}
+
 export const ui = {
   show() {
     $("ui").hidden = false;
@@ -1971,6 +2230,130 @@ export const ui = {
     bindTap("pm-duel-btn", () => {
       $("player-menu").hidden = true;
       if (selectedPlayerName) callbacks?.onDuelChallenge?.(selectedPlayerName);
+    });
+    bindTap("pm-sect-btn", () => {
+      $("player-menu").hidden = true;
+      if (selectedPlayerName) callbacks?.onSectInvite?.(selectedPlayerName);
+    });
+
+    // Tông môn (M3.6, #230)
+    bindTap("btn-sect", () => this.toggleSectModal());
+    bindTap("sect-close", () => this.toggleSectModal(false));
+
+    bindTap("sect-tab-btn-overview", () => this.switchSectTab("overview"));
+    bindTap("sect-tab-btn-members", () => this.switchSectTab("members"));
+    bindTap("sect-tab-btn-treasury", () => this.switchSectTab("treasury"));
+
+    // Form tạo tông môn
+    $("sect-form-create")?.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const nameInput = $("sect-input-name") as HTMLInputElement;
+      const tagInput = $("sect-input-tag") as HTMLInputElement;
+      const name = cleanSectName(nameInput.value);
+      const tag = cleanSectTag(tagInput.value);
+      if (!name) {
+        this.toast({ text: "Tên tông môn phải từ 2 đến 16 ký tự", tone: "bad" });
+        return;
+      }
+      if (!tag) {
+        this.toast({ text: "Biệt hiệu phải từ 2 đến 4 ký tự", tone: "bad" });
+        return;
+      }
+      callbacks?.onSectCreate?.(name, tag);
+    });
+
+    // Form sửa MOTD
+    bindTap("sect-btn-edit-motd", () => {
+      $("sect-motd-text").hidden = true;
+      $("sect-btn-edit-motd").hidden = true;
+      const form = $("sect-form-motd");
+      form.hidden = false;
+      const input = $("sect-input-motd") as HTMLInputElement;
+      input.value = currentSect?.motd || "";
+      input.focus();
+    });
+
+    bindTap("sect-btn-cancel-motd", () => {
+      $("sect-motd-text").hidden = false;
+      $("sect-btn-edit-motd").hidden = false;
+      $("sect-form-motd").hidden = true;
+    });
+
+    $("sect-form-motd")?.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const input = $("sect-input-motd") as HTMLInputElement;
+      const motd = cleanMotd(input.value) ?? "";
+      callbacks?.onSectMotd?.(motd);
+      $("sect-motd-text").hidden = false;
+      $("sect-btn-edit-motd").hidden = false;
+      $("sect-form-motd").hidden = true;
+    });
+
+    // Rời tông môn
+    bindTap("sect-btn-leave", () => {
+      if (confirm("Bạn có chắc chắn muốn rời khỏi tông môn?")) {
+        callbacks?.onSectLeave?.();
+      }
+    });
+
+    // Giải tán tông môn
+    bindTap("sect-btn-disband", () => {
+      $("sect-btn-disband").hidden = true;
+      $("sect-disband-confirm").hidden = false;
+    });
+
+    bindTap("sect-btn-disband-cancel", () => {
+      $("sect-disband-confirm").hidden = true;
+      $("sect-btn-disband").hidden = false;
+    });
+
+    bindTap("sect-btn-disband-confirm", () => {
+      $("sect-disband-confirm").hidden = true;
+      $("sect-btn-disband").hidden = false;
+      callbacks?.onSectDisband?.();
+    });
+
+    // Kho tông môn: Nộp
+    $("sect-form-deposit")?.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const input = $("sect-input-deposit") as HTMLInputElement;
+      const amount = parseInt(input.value, 10);
+      if (isNaN(amount) || amount <= 0) {
+        this.toast({ text: "Số lượng Linh thạch không hợp lệ", tone: "bad" });
+        return;
+      }
+      callbacks?.onSectDeposit?.(amount);
+      input.value = "";
+    });
+
+    // Kho tông môn: Rút
+    $("sect-form-withdraw")?.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const input = $("sect-input-withdraw") as HTMLInputElement;
+      const amount = parseInt(input.value, 10);
+      if (isNaN(amount) || amount <= 0) {
+        this.toast({ text: "Số lượng Linh thạch không hợp lệ", tone: "bad" });
+        return;
+      }
+      callbacks?.onSectWithdraw?.(amount);
+      input.value = "";
+    });
+
+    // Hộp lời mời tông môn
+    bindTap("sib-btn-accept", () => {
+      stopSectInviteTimer();
+      const from = currentSectInvite?.from;
+      currentSectInvite = null;
+      $("sect-invite-box").hidden = true;
+      if (from) callbacks?.onSectAccept?.(from);
+    });
+
+    bindTap("sib-btn-decline", () => {
+      stopSectInviteTimer();
+      const from = currentSectInvite?.from;
+      currentSectInvite = null;
+      $("sect-invite-box").hidden = true;
+      if (from) callbacks?.onSectDecline?.(from);
     });
 
     // Bí cảnh (M3.4, #200)
@@ -2343,6 +2726,10 @@ export const ui = {
       this.toggleSettingsModal(false);
       closedAny = true;
     }
+    if (sectModalOpen) {
+      this.toggleSectModal(false);
+      closedAny = true;
+    }
     if (this.isPlayerMenuOpen()) {
       this.closePlayerMenu();
       closedAny = true;
@@ -2662,6 +3049,11 @@ export const ui = {
       const b = document.createElement("b");
       b.textContent = `[Đội] ${m.from}: `;
       p.append(b, document.createTextNode(m.text));
+    } else if (m.channel === "sect") {
+      p.className = "sect";
+      const b = document.createElement("b");
+      b.textContent = `[Tông môn] ${m.from}: `;
+      p.append(b, document.createTextNode(m.text));
     } else {
       const b = document.createElement("b");
       b.textContent = `${m.from}: `;
@@ -2692,6 +3084,7 @@ export const ui = {
     x: number,
     y: number,
     challengeCheck?: DuelChallengeCheck,
+    targetSect?: string,
   ) {
     if (name === currentName) return;
     selectedPlayerName = name;
@@ -2717,6 +3110,39 @@ export const ui = {
         } else {
           duelHint.textContent = "";
           duelHint.hidden = true;
+        }
+      }
+    }
+
+    // Nút Mời Tông Môn (M3.6, #230)
+    const sectBtn = $("pm-sect-btn") as HTMLButtonElement | null;
+    const sectHint = $("pm-sect-hint");
+    if (sectBtn) {
+      if (!currentSect) {
+        sectBtn.hidden = true;
+        if (sectHint) sectHint.hidden = true;
+      } else {
+        sectBtn.hidden = false;
+        const canInvite = canSect("invite", currentSect.myRank);
+        if (!canInvite) {
+          sectBtn.disabled = true;
+          sectBtn.textContent = "Mời vào tông môn";
+          if (sectHint) {
+            sectHint.textContent = "Chỉ Tông chủ và Trưởng lão được mời";
+            sectHint.hidden = false;
+          }
+        } else if (targetSect && targetSect === currentSect.name) {
+          sectBtn.disabled = true;
+          sectBtn.textContent = "Đã cùng tông môn";
+          if (sectHint) sectHint.hidden = true;
+        } else if (currentSect.members.length >= SECT_MAX_MEMBERS) {
+          sectBtn.disabled = true;
+          sectBtn.textContent = `Tông môn đã đủ (${SECT_MAX_MEMBERS}/${SECT_MAX_MEMBERS})`;
+          if (sectHint) sectHint.hidden = true;
+        } else {
+          sectBtn.disabled = false;
+          sectBtn.textContent = "Mời vào tông môn";
+          if (sectHint) sectHint.hidden = true;
         }
       }
     }
@@ -3302,5 +3728,92 @@ export const ui = {
 
   getDuelOpponent(): string {
     return currentDuelOpponent;
+  },
+
+  // ---------- Tông môn (M3.6, #230) ----------
+  toggleSectModal(force?: boolean) {
+    const target = force ?? !sectModalOpen;
+    if (target === sectModalOpen) return;
+    sectModalOpen = target;
+    if (sectModalOpen) {
+      this.closeAllModals();
+      sectModalOpen = true;
+      renderSectModal();
+    } else {
+      $("sect-modal").hidden = true;
+      $("btn-sect")?.classList.remove("active");
+    }
+  },
+
+  isSectModalOpen(): boolean {
+    return sectModalOpen;
+  },
+
+  switchSectTab(tab: "overview" | "members" | "treasury") {
+    sectTab = tab;
+    renderSectModal();
+  },
+
+  onSect(m: SectMsg) {
+    currentSect = m.sect;
+    if (sectModalOpen) {
+      renderSectModal();
+    }
+  },
+
+  onSectPresence(m: SectPresenceMsg) {
+    currentSectPresence = m;
+    if (sectModalOpen && sectTab === "members") {
+      renderSectMembersTab();
+    }
+  },
+
+  onSectInvited(m: SectInvitedMsg) {
+    stopSectInviteTimer();
+    currentSectInvite = m;
+    const box = $("sect-invite-box");
+    box.hidden = false;
+    sound.typeBlip?.();
+
+    $("sib-title").textContent = m.sect;
+    const tagEl = $("sib-tag");
+    if (tagEl) tagEl.textContent = `[${m.tag}]`;
+    const msgEl = $("sib-msg");
+    msgEl.replaceChildren();
+    const b = document.createElement("b");
+    b.textContent = m.from;
+    msgEl.append(
+      b,
+      document.createTextNode(" mời bạn gia nhập tông môn "),
+      document.createTextNode(m.sect),
+    );
+
+    const startTime = Date.now();
+    const ttl = m.ttlMs || 30000;
+    const bar = $("sib-timer-bar");
+
+    const update = () => {
+      const elapsed = Date.now() - startTime;
+      const rem = Math.max(0, ttl - elapsed);
+      $("sib-countdown").textContent = formatSectInviteCountdown(rem);
+      if (bar) bar.style.width = `${(rem / ttl) * 100}%`;
+      if (rem <= 0) {
+        stopSectInviteTimer();
+        currentSectInvite = null;
+        box.hidden = true;
+      }
+    };
+    update();
+    sectInviteInterval = window.setInterval(update, 200);
+  },
+
+  closeSectInviteBox() {
+    stopSectInviteTimer();
+    currentSectInvite = null;
+    $("sect-invite-box").hidden = true;
+  },
+
+  getCurrentSect(): SectView | null {
+    return currentSect;
   },
 };

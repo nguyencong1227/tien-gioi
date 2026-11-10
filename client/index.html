@@ -393,6 +393,9 @@
               <button type="button" id="btn-quest" class="hud-btn" title="Sổ nhiệm vụ (Q)">
                 <span>卷</span><small>Nhiệm vụ</small>
               </button>
+              <button type="button" id="btn-sect" class="hud-btn" title="Tông môn (G)">
+                <span>宗</span><small>Tông môn</small>
+              </button>
               <button
                 type="button"
                 id="btn-mute"
@@ -683,6 +686,204 @@
         </div>
       </section>
 
+      <!-- Bảng Tông Môn (M3.6, #230) -->
+      <section id="sect-modal" class="panel modal-box" hidden aria-label="Tông môn">
+        <header class="inv-head">
+          <div>
+            <h2 id="sect-head-title">Tông Môn</h2>
+            <small id="sect-head-sub">Chưa gia nhập tông môn</small>
+          </div>
+          <button type="button" id="sect-close" class="modal-close" title="Đóng (G / Esc)">
+            ✕
+          </button>
+        </header>
+
+        <!-- View 1: Chưa có tông môn -> Lập tông môn -->
+        <div id="sect-view-none" class="sect-view">
+          <div class="sect-create-card">
+            <div class="sect-create-banner">
+              <span class="sect-icon">🏯</span>
+              <h3>Khai Tông Lập Phái</h3>
+              <p>Trở thành Tông chủ, chiêu mộ đạo hữu, cùng xây dựng thế lực tu tiên vững mạnh.</p>
+            </div>
+            <form id="sect-form-create" class="sect-form">
+              <div class="sect-form-group">
+                <label for="sect-input-name">Tên tông môn (2-16 chữ):</label>
+                <input
+                  type="text"
+                  id="sect-input-name"
+                  maxlength="16"
+                  placeholder="Ví dụ: Tiêu Dao Phái"
+                  autocomplete="off"
+                  required
+                />
+              </div>
+              <div class="sect-form-group">
+                <label for="sect-input-tag">Biệt hiệu cạnh tên [xxxx] (2-4 chữ):</label>
+                <input
+                  type="text"
+                  id="sect-input-tag"
+                  maxlength="4"
+                  placeholder="Ví dụ: TD"
+                  autocomplete="off"
+                  required
+                />
+              </div>
+              <div class="sect-create-cost-hint">
+                <span>Phí sáng lập:</span>
+                <b id="sect-create-cost">1.000 Linh thạch</b>
+              </div>
+              <button type="submit" id="sect-btn-create" class="sect-primary-btn">
+                Lập Tông Môn (1.000 Linh thạch)
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- View 2: Đã có tông môn -> Thông tin & Quản lý -->
+        <div id="sect-view-detail" class="sect-view" hidden>
+          <div class="sect-tabs">
+            <button type="button" id="sect-tab-btn-overview" class="sect-tab active">
+              Tổng quan
+            </button>
+            <button type="button" id="sect-tab-btn-members" class="sect-tab">Thành viên</button>
+            <button type="button" id="sect-tab-btn-treasury" class="sect-tab">Kho tông môn</button>
+          </div>
+
+          <!-- Tab 1: Tổng quan -->
+          <div id="sect-tab-overview" class="sect-tab-content">
+            <div class="sect-overview-card">
+              <div class="sect-meta-grid">
+                <div class="sect-meta-item">
+                  <span>Biệt hiệu:</span>
+                  <b id="sect-meta-tag">[TD]</b>
+                </div>
+                <div class="sect-meta-item">
+                  <span>Chức vụ:</span>
+                  <b id="sect-meta-my-rank">Tông chủ</b>
+                </div>
+                <div class="sect-meta-item">
+                  <span>Thành viên:</span>
+                  <b id="sect-meta-member-count">1 / 30</b>
+                </div>
+                <div class="sect-meta-item">
+                  <span>Kho tông môn:</span>
+                  <b id="sect-meta-treasury">0</b>
+                </div>
+              </div>
+
+              <div class="sect-motd-box">
+                <div class="sect-motd-header">
+                  <b>Thông báo tông môn:</b>
+                  <button type="button" id="sect-btn-edit-motd" class="sect-small-btn" hidden>
+                    Sửa
+                  </button>
+                </div>
+                <p id="sect-motd-text">Chưa có thông báo.</p>
+                <form id="sect-form-motd" class="sect-motd-edit-form" hidden>
+                  <input
+                    type="text"
+                    id="sect-input-motd"
+                    maxlength="120"
+                    placeholder="Nhập thông báo mới..."
+                  />
+                  <div class="sect-btn-row">
+                    <button type="submit" id="sect-btn-save-motd" class="sect-tiny-btn ok">
+                      Lưu
+                    </button>
+                    <button type="button" id="sect-btn-cancel-motd" class="sect-tiny-btn">
+                      Huỷ
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              <div class="sect-actions-box">
+                <button type="button" id="sect-btn-leave" class="sect-danger-btn">
+                  Rời tông môn
+                </button>
+                <button type="button" id="sect-btn-disband" class="sect-danger-btn" hidden>
+                  Giải tán tông môn
+                </button>
+                <div id="sect-disband-confirm" class="sect-confirm-box" hidden>
+                  <p>Giải tán tông môn? Hành động này không thể hoàn tác.</p>
+                  <div class="sect-confirm-actions">
+                    <button type="button" id="sect-btn-disband-cancel" class="sect-small-btn">
+                      Huỷ
+                    </button>
+                    <button
+                      type="button"
+                      id="sect-btn-disband-confirm"
+                      class="sect-action-btn danger"
+                    >
+                      Xác nhận giải tán
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab 2: Thành viên -->
+          <div id="sect-tab-members" class="sect-tab-content" hidden>
+            <div class="sect-members-header">
+              <span id="sect-members-summary">Tổng số: 0</span>
+              <small>Xếp theo chức vụ & gia nhập</small>
+            </div>
+            <div id="sect-members-list" class="sect-members-list"></div>
+          </div>
+
+          <!-- Tab 3: Kho tông môn -->
+          <div id="sect-tab-treasury" class="sect-tab-content" hidden>
+            <div class="sect-treasury-balance-box">
+              <small>Số dư quỹ tông môn:</small>
+              <div class="sect-treasury-amount">
+                <span class="coin-gem">💎</span>
+                <b id="sect-treasury-value">0</b>
+                <span>Linh thạch</span>
+              </div>
+            </div>
+
+            <div class="sect-treasury-forms">
+              <!-- Góp quỹ -->
+              <form id="sect-form-deposit" class="sect-treasury-form">
+                <h4>Góp quỹ tông môn</h4>
+                <div class="sect-input-row">
+                  <input
+                    type="number"
+                    id="sect-input-deposit"
+                    min="1"
+                    max="999999999"
+                    placeholder="Số lượng..."
+                  />
+                  <button type="submit" id="sect-btn-deposit" class="sect-primary-btn">Góp</button>
+                </div>
+              </form>
+
+              <!-- Rút quỹ (chỉ Tông chủ) -->
+              <form id="sect-form-withdraw" class="sect-treasury-form" hidden>
+                <h4>Rút từ kho tông môn (Tông chủ)</h4>
+                <div class="sect-input-row">
+                  <input
+                    type="number"
+                    id="sect-input-withdraw"
+                    min="1"
+                    max="999999999"
+                    placeholder="Số lượng..."
+                  />
+                  <button type="submit" id="sect-btn-withdraw" class="sect-danger-btn">Rút</button>
+                </div>
+              </form>
+            </div>
+
+            <div class="sect-logs-box">
+              <h4>Lịch sử biến động quỹ</h4>
+              <div id="sect-logs-list" class="sect-logs-list"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- Lời mời tổ đội -->
       <div id="party-invite-box" class="party-invite-box" hidden>
         <div class="pib-content">
@@ -728,6 +929,22 @@
         <div class="duib-actions">
           <button type="button" id="duib-btn-accept" class="duib-btn accept">Nhận Lời</button>
           <button type="button" id="duib-btn-decline" class="duib-btn decline">Từ Chối</button>
+        </div>
+      </div>
+
+      <!-- Lời mời vào Tông môn (M3.6, hộp nhỏ góc màn hình, không chặn điều khiển) -->
+      <div id="sect-invite-box" class="sect-invite-box" hidden aria-label="Lời mời Tông môn">
+        <div class="sib-head">
+          <span class="sib-badge">🏯 TÔNG MÔN</span>
+          <b id="sib-title">Chiêu Mộ Đạo Hữu</b>
+          <small id="sib-tag" class="sib-tag"></small>
+          <span id="sib-countdown" class="sib-countdown">30s</span>
+        </div>
+        <p id="sib-msg" class="sib-msg">Đạo hữu mời bạn gia nhập tông môn.</p>
+        <div class="sib-timer"><i id="sib-timer-bar"></i></div>
+        <div class="sib-actions">
+          <button type="button" id="sib-btn-accept" class="sib-btn accept">Gia Nhập</button>
+          <button type="button" id="sib-btn-decline" class="sib-btn decline">Từ Chối</button>
         </div>
       </div>
 
@@ -812,6 +1029,10 @@
           <button type="button" id="pm-invite-btn" class="pm-btn">Mời vào đội</button>
           <button type="button" id="pm-duel-btn" class="pm-btn pm-btn-duel">Thách Đấu</button>
           <div id="pm-duel-hint" class="pm-hint" hidden></div>
+          <button type="button" id="pm-sect-btn" class="pm-btn pm-btn-sect" hidden>
+            Mời vào Tông môn
+          </button>
+          <div id="pm-sect-hint" class="pm-hint" hidden></div>
         </div>
       </div>
 
@@ -833,7 +1054,7 @@
       </div>
       <div id="help">
         WASD đi · J/Space chém · K kiếm khí · 1/2 đan · F nhặt/nói/cổng · C nhân vật · I túi · Q
-        nhiệm vụ · M bản đồ · O cài đặt · L đả tọa · B đột phá
+        nhiệm vụ · M bản đồ · G tông môn · O cài đặt · L đả tọa · B đột phá
       </div>
 
       <!-- Màn hình chuyển cảnh bản đồ -->
