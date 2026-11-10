@@ -50,11 +50,11 @@ import {
   soulView,
   validateRebirth,
   DEFAULT_MAP,
+  cleanName,
 } from "@tien-gioi/shared";
 import { WorldState, Player } from "../schema";
 import {
   hashSecret,
-  cleanName,
   mapIdOf,
   sanitizeLife,
   sanitizeLifeId,
