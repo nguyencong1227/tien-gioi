@@ -100,6 +100,12 @@ async function spawn(slot: number, name = `Dau Si ${++seq}`): Promise<Hero> {
   const p = serverState(room).players.get(room.sessionId)!;
   p.x = DEFAULT_MAP.townPx.x + DEFAULT_MAP.townPx.r + 500 + slot * 45; // ngoài trấn, trong tầm chém
   p.y = DEFAULT_MAP.townPx.y;
+  // Quái hoang đi ngang sẽ đánh người đứng ngoài trấn => `lastHitAt` => "đang bận" 3 giây => lời thách bị từ chối (test chập chờn):
+  // dọn quái của phòng và xoá dấu vết bị đánh. Test cần quái thì tự thêm sau.
+  const w = worldOf(room);
+  w.state.monsters.clear();
+  w.mctrl.clear();
+  w.ctrl.get(room.sessionId).lastHitAt = 0;
   return h;
 }
 const sidOf = (h: Hero) => h.room.sessionId;
