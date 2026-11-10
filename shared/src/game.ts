@@ -117,20 +117,21 @@ export const MONSTERS: MonsterKind[] = [
     boss: true,
   },
   // Trùm của bí cảnh Linh Hư (docs/THIET_KE_BI_CANH.md). Không sinh ngoài hoang: `MONSTER_CAP.yeu_vuong = 0` và các bản đồ
-  // thường không khai báo loại này. SỐ LIỆU TẠM (A cân bằng ở PR 4c bằng `can-bang`: đội 3 người ở ngưỡng `minStep` hạ trùm
-  // trong 5-8 phút, một người gần như không hạ được).
+  // thường không khai báo loại này. Số liệu cân bằng ở 4c-2 (`server/src/balance/dungeon.ts`, docs/CAN_BANG.md mục "Bí cảnh"):
+  // đội 3 người ở ngưỡng `minStep` hạ trùm trong ~6 phút (không ai chết ở ca mô phỏng khó: đứng yên, không né), đội 2 người
+  // không kịp `timeLimitMs`, một người không hạ nổi. Là một BAO MÁU: sát thương nhẹ nhưng trận dài, nên cần đan và đồng đội.
   {
     id: "yeu_vuong",
     name: "Linh Hư Yêu Vương",
     minDanger: 0.8,
-    hp: 20000,
-    atk: 220,
+    hp: 100000,
+    atk: 16,
     speed: 120,
     radius: 30,
     aggro: 320,
     attackRange: 60,
     attackCd: 1500,
-    exp: 3000,
+    exp: 4500,
     level: 14,
     color: 0x5b2a8c,
     boss: true,

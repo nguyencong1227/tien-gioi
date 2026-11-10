@@ -104,7 +104,7 @@ export const COIN_DROPS: Record<string, CoinDrop> = {
   lang: { chance: 0.7, min: 2, max: 6 },
   ho: { chance: 0.8, min: 8, max: 20 },
   mang: { chance: 1, min: 150, max: 300 },
-  // Trùm bí cảnh (số tạm, cân bằng ở PR 4c); thưởng hoàn thành là `DUNGEONS[].reward.coin`, riêng với tiền rơi này
+  // Trùm bí cảnh (đã tính vào cân bằng 4c-2: `server/src/balance/dungeon.ts`); thưởng hoàn thành là `DUNGEONS[].reward.coin`, riêng với tiền rơi này
   yeu_vuong: { chance: 1, min: 300, max: 500 },
 };
 
