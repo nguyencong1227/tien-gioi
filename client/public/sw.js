@@ -11,8 +11,20 @@ self.addEventListener("install", (event) => {
     caches
       .open(CACHE_NAME)
       .then((cache) => cache.addAll(PRECACHE_URLS))
-      .then(() => self.skipWaiting()),
+      .then(() => {
+        // Lần đầu mở ứng dụng: kích hoạt ngay để sẵn sàng ngoại tuyến
+        if (!self.registration.active) {
+          return self.skipWaiting();
+        }
+      }),
   );
+});
+
+// Lắng nghe yêu cầu cập nhật an toàn từ client (khi người chơi không trong trận / bí cảnh)
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener("activate", (event) => {
@@ -50,7 +62,14 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
   if (url.protocol !== "http:" && url.protocol !== "https:") return;
   if (req.headers.get("upgrade") === "websocket") return;
-  if (url.pathname.startsWith("/matchmake") || url.pathname === "/health") return;
+  // Tuyệt đối không can thiệp vào WebSocket, matchmaking, /health hay API tài khoản /api/*
+  if (
+    url.pathname.startsWith("/matchmake") ||
+    url.pathname === "/health" ||
+    url.pathname.startsWith("/api/")
+  ) {
+    return;
+  }
 
   // Điều hướng trang (HTML): ưu tiên mạng để luôn nhận bản build mới nhất, mất mạng thì dùng bản đã lưu
   if (req.mode === "navigate") {

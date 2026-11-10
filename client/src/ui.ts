@@ -3773,6 +3773,10 @@ export const ui = {
     return Boolean(hud && !hud.hidden);
   },
 
+  isDungeonActive(): boolean {
+    return typeof document !== "undefined" && document.body.classList.contains("in-dungeon");
+  },
+
   getDuelOpponent(): string {
     return currentDuelOpponent;
   },
