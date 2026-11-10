@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import {
   COIN_CAP,
   DEFAULT_MAP,
+  DUNGEON_DAILY_REWARDS,
   EQUIP_SLOTS,
   INVENTORY_SLOTS,
   ITEM_BY_ID,
@@ -17,6 +18,7 @@ import {
   QUEST_BY_ID,
   REALMS,
   getMap,
+  isDungeonMap,
   UNLOCK_BY_ID,
   originOf,
   stepOf,
@@ -74,11 +76,17 @@ const HEX_64_REGEX = /^[0-9a-fA-F]{64}$/;
 const SAFE_ID_REGEX = /^[a-z0-9_]{1,32}$/;
 const ACCOUNT_ID_REGEX = /^[A-Za-z0-9-]{8,64}$/;
 const TOKEN_HASH_REGEX = /^[a-f0-9]{64}$/;
+const DAY_KEY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 const isIsoString = (s: unknown): s is string =>
   typeof s === "string" && s.length <= 40 && Number.isFinite(Date.parse(s));
 const isFiniteEpoch = (n: unknown): n is number =>
   typeof n === "number" && Number.isFinite(n) && n >= 0 && n < 1e15;
+const isValidDayKey = (v: unknown): v is string => {
+  if (typeof v !== "string" || !DAY_KEY_REGEX.test(v)) return false;
+  const ms = Date.parse(`${v}T00:00:00.000Z`);
+  return Number.isFinite(ms) && new Date(ms).toISOString().slice(0, 10) === v;
+};
 
 /**
  * Hiển thị an toàn một giá trị đến từ file không tin cậy trong thông báo lỗi.
@@ -216,6 +224,11 @@ export function auditPlayerSaveData(rawText: string, byteLength: number): AuditE
       errors.push({
         code: "invalid_map_id",
         message: `Mã bản đồ ${show(data.mapId)} không tồn tại trong MAPS (server sẽ đưa về lac_ha)`,
+      });
+    } else if (isDungeonMap(data.mapId)) {
+      errors.push({
+        code: "invalid_map_id",
+        message: `Mã bản đồ ${show(data.mapId)} là bản đồ bí cảnh, không tồn tại trong MAPS (server sẽ đưa về lac_ha)`,
       });
     } else {
       targetMap = m;
@@ -621,6 +634,39 @@ export function auditPlayerSaveData(rawText: string, byteLength: number): AuditE
         errors.push({
           code: "invalid_limbo_credited",
           message: "limbo.credited phải là giá trị boolean",
+        });
+      }
+    }
+  }
+
+  // 12. Bộ đếm thưởng bí cảnh theo ngày (#201): dungeonDaily
+  if (data.dungeonDaily !== undefined) {
+    if (
+      typeof data.dungeonDaily !== "object" ||
+      data.dungeonDaily === null ||
+      Array.isArray(data.dungeonDaily)
+    ) {
+      errors.push({
+        code: "invalid_dungeon_daily",
+        message: "dungeonDaily phải là một JSON Object { day, rewards }",
+      });
+    } else {
+      const { day, rewards } = data.dungeonDaily;
+      if (!isValidDayKey(day)) {
+        errors.push({
+          code: "invalid_dungeon_daily_day",
+          message: `dungeonDaily.day (${typeof day === "string" ? `<chuỗi ${day.length} ký tự>` : show(day)}) phải là chuỗi ngày YYYY-MM-DD hợp lệ`,
+        });
+      }
+      if (
+        typeof rewards !== "number" ||
+        !Number.isInteger(rewards) ||
+        rewards < 0 ||
+        rewards > DUNGEON_DAILY_REWARDS
+      ) {
+        errors.push({
+          code: "invalid_dungeon_daily_rewards",
+          message: `dungeonDaily.rewards (${typeof rewards === "string" ? `<chuỗi ${rewards.length} ký tự>` : show(rewards)}) phải là số nguyên trong khoảng [0, ${DUNGEON_DAILY_REWARDS}]`,
         });
       }
     }
