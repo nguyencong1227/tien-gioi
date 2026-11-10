@@ -25,10 +25,10 @@ import {
   DEFAULT_MAP_ID,
   DUEL_MSG,
   DUNGEON_MSG,
+  PROTOCOL_VERSION,
   SECT_MSG,
   roomNameOf,
   type ChatMsg,
-  type InputMsg,
 } from "@tien-gioi/shared";
 
 // Danh sách tất cả 47 loại tin nhắn hợp lệ mà WorldRoom đăng ký + 1 tin lạ kiểm tra handler '*'
@@ -244,6 +244,22 @@ export function buildBadPayloads(fastMode = false): AttackPayload[] {
         from: "prototype",
       },
     },
+
+    // 6. Trường v (phiên bản giao thức M4) và log injection (U+2028, xuống dòng, __proto__)
+    {
+      name: "field-protocol-v-bad",
+      category: "field",
+      data: {
+        v: "not_a_version",
+        text: "Line1\u2028Line2\r\nFake: audit_log",
+        name: "bad\u2028name",
+      },
+    },
+    {
+      name: "field-protocol-v-nan-neg",
+      category: "field",
+      data: { v: NaN, amount: NaN, slot: -1, angle: -0 },
+    },
   ];
 
   if (!fastMode) {
@@ -353,6 +369,7 @@ export async function runRedTeam(options: {
   const observerRoom = await client.joinOrCreate(roomName, {
     name: "RedTeamObserver",
     secret: "secret-observer-123456",
+    v: PROTOCOL_VERSION,
   });
   registerNoop(observerRoom);
   await sleep(150);
@@ -361,6 +378,7 @@ export async function runRedTeam(options: {
   let attackerRoom = await client.joinOrCreate(roomName, {
     name: "Red001",
     secret: "secret-attacker-123456",
+    v: PROTOCOL_VERSION,
   });
   registerNoop(attackerRoom);
   await sleep(150);
@@ -373,6 +391,7 @@ export async function runRedTeam(options: {
     attackerRoom = await client.joinOrCreate(roomName, {
       name: `Red${String(attackerSeq).padStart(3, "0")}`,
       secret: "secret-attacker-123456",
+      v: PROTOCOL_VERSION,
     });
     registerNoop(attackerRoom);
     await sleep(100);
@@ -428,7 +447,7 @@ export async function runRedTeam(options: {
       try {
         // Gửi payload qua kết nối WebSocket thật
         curAttackerRoom.send(msgType as any, payload.data as any);
-      } catch (err: any) {
+      } catch (_err: unknown) {
         // Gửi qua WebSocket ném lỗi phía client colyseus.js (vd serialization) là an toàn cho server
         results.push({
           messageType: msgType,
@@ -514,6 +533,7 @@ export async function runRedTeam(options: {
   const spammerRoom = await client.joinOrCreate(roomName, {
     name: "RedTeamSpammer",
     secret: "secret-spammer-123456",
+    v: PROTOCOL_VERSION,
   });
   registerNoop(spammerRoom);
   await sleep(100);
@@ -529,6 +549,31 @@ export async function runRedTeam(options: {
     spammerRoom.send("chat", { text: `Spam #${i}` } as ChatMsg);
   }
   await sleep(300);
+
+  // 5. Kiểm tra onAuth options xấu (trường v & prototype pollution ở bước join)
+  const badJoinOpts = [
+    { name: "RedVStr", secret: "secret-attacker-123456", v: "not_a_number" },
+    { name: "RedVNaN", secret: "secret-attacker-123456", v: NaN },
+    { name: "RedVNeg", secret: "secret-attacker-123456", v: -1 },
+    { name: "RedVObj", secret: "secret-attacker-123456", v: { nested: true } },
+    { name: "RedVArr", secret: "secret-attacker-123456", v: [1, 2] },
+    {
+      name: "RedProto",
+      secret: "secret-attacker-123456",
+      v: PROTOCOL_VERSION,
+      __proto__: { polluted: true },
+    },
+  ];
+
+  for (const opts of badJoinOpts) {
+    try {
+      const badRoom = await client.joinOrCreate(roomName, opts);
+      registerNoop(badRoom);
+      if (badRoom.connection.isOpen) await badRoom.leave(true);
+    } catch {
+      // Bị từ chối an toàn ở onAuth là đúng thiết kế
+    }
+  }
 
   // Dọn dẹp kết nối
   if (attackerRoom.connection.isOpen) await attackerRoom.leave(true);
