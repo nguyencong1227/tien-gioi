@@ -423,4 +423,52 @@ Kết quả mẫu khi chạy thành công:
 🎉 KIỂM THỬ E2E TRÌNH DUYỆT THẬT HOÀN TOÀN THÀNH CÔNG (PASS 100%)!
 ```
 
+## 8. Thử tải Tài khoản, Bão đăng nhập (Login Storm) & Kiểm thử PostgreSQL (M3.3 - Issue #176)
+
+### 8.1. Bot chế độ tài khoản (`--account`) & Bão đăng nhập (`--login-storm`)
+Kịch bản `server/scripts/bots.ts` được mở rộng để hỗ trợ đầy đủ luồng xác thực tài khoản (`AUTH_MODE=account`):
+- **Tự động phát hiện hoặc bật bằng cờ `--account`:** Bot đọc `/health` để biết `authMode === "account"` (hoặc ép qua `--account`).
+- **Luồng xác thực `authBotAccount`:**
+  1. Mỗi bot gửi kèm header `X-Forwarded-For: 10.0.<nhóm>.<máy>` riêng biệt (khi máy chủ bật `TRUST_PROXY=1`) để mô phỏng lưu lượng từ các IP thực tế khác nhau và không bị chặn bởi giới hạn tần suất theo IP (`5 đăng ký / giờ / IP`, `10 đăng nhập sai / 10 phút / IP`).
+  2. Thử `POST /api/auth/login` với `username = bot_<i+1>`. Nếu tài khoản chưa tồn tại (`invalid_credentials`), tự động gọi `POST /api/auth/register`.
+  3. Gọi `POST /api/character` kèm `Bearer <token>` để gắn đạo hiệu (bỏ qua `400 has_character` nếu tài khoản đã có nhân vật).
+  4. Dùng `token` nhận được để vào phòng Colyseus (`joinOrCreate(roomName, { token })`) và giữ nguyên `token` khi dịch chuyển qua cổng giữa các bản đồ (`travelTo`).
+- **Chế độ bão đăng nhập (`--login-storm`):** Bắn đồng thời `N` yêu cầu xác thực HTTP song song và thống kê độ trễ phân vị (`avg`, `p50`, `p95`, `max`) cùng tổng thời gian xử lý.
+
+Cách chạy:
+```bash
+# Chạy bão đăng nhập 100 tài khoản đồng thời (chỉ đo HTTP auth, không vào phòng):
+npm run bots -w server -- --count=100 --account --login-storm
+
+# Chạy 50 bot chế độ tài khoản vào phòng đánh quái 60 giây:
+npm run bots -w server -- --count=50 --duration=60 --account
+```
+
+### 8.2. Kết quả đo Bão đăng nhập 100 tài khoản đồng thời (`scrypt N=2^15, r=8, p=1`)
+Thực nghiệm được tự động hoá trong `server/scripts/bots-account.test.ts`:
+- **Cấu hình máy chủ:** `AUTH_MODE=account`, `TRUST_PROXY=1`, tham số băm mật khẩu chuẩn sản xuất `DEFAULT_SCRYPT` (`N = 32768`, `r = 8`, `p = 1`).
+- **Tải nền song song:** Một thế giới `World` đang chạy vòng lặp tick 20 Hz với **30 người chơi** đang di chuyển/chiến đấu và **88 quái vật**.
+- **Tải đột biến (Login Storm):** **100 tài khoản** gửi yêu cầu `POST /api/auth/login` tại cùng thời điểm `t = 0`.
+
+| Chỉ số đo | Kết quả thực tế | Ngân sách / Kỳ vọng | Đánh giá |
+| :--- | :---: | :---: | :---: |
+| Số yêu cầu thành công | **100 / 100 (100%)** | 100% | Đạt |
+| Tổng thời gian hoàn tất 100 login | **1526.5 ms** (~65.5 login/giây) | < 15 000 ms | Đạt (nhanh gấp ~10 lần ngưỡng) |
+| Độ trễ HTTP trung bình (`avg`) | **1516.4 ms** | — | Xếp hàng qua libuv threadpool |
+| Độ trễ phân vị `p50` / `p95` / `max` | **1518.8 / 1519.9 / 1521.6 ms** | — | Phân phối đồng đều, không treo |
+| Thời gian tick `World` trung bình (`tickAvg`) | **0.13 ms** | < 10.0 ms | **Không nghẽn event loop** |
+| Thời gian tick `World` cực đại (`tickMax`) | **0.22 ms** | < 10.0 ms | **Không làm giật/rớt tick game** |
+
+**Nhận xét kỹ thuật:**
+- Nhờ `crypto.scrypt` chạy bất đồng bộ trên worker threadpool của libuv (mặc định 4 luồng C++), vòng lặp sự kiện (event loop) chính của Node.js hoàn toàn rảnh để xử lý tick 20 Hz của phòng game (`tickMax` chỉ `0.22 ms`, thấp hơn 45 lần so với ngân sách `10 ms`).
+- Khi **không bật `TRUST_PROXY`**, bài kiểm thử xác nhận bộ giới hạn tần suất theo IP chặn chính xác từ yêu cầu đăng ký thứ 6 trở đi (`5 thành công, 7 bị từ chối HTTP 429 rate_limited`), bảo vệ CPU khỏi tấn công làm ngập `scrypt` từ một địa chỉ IP đơn lẻ.
+
+### 8.3. Bộ kiểm thử Hợp đồng Kho lưu trữ (`store-contract.ts`) & CI PostgreSQL thật
+- **Hợp đồng kiểm thử dùng chung (`server/src/store-contract.ts`):** Định nghĩa các bộ kiểm thử chuẩn (`describePlayerStoreContract`, `describeSoulStoreContract`, `describeAccountStoreContract`, `describeSessionStoreContract`) chạy chung cho cả hai tầng lưu trữ:
+  - Bản tệp JSON (`FilePlayerStore`, `FileSoulStore`, `FileAccountStore`, `FileSessionStore`).
+  - Bản cơ sở dữ liệu PostgreSQL (`PgPlayerStore`, `PgSoulStore`, `PgAccountStore`, `PgSessionStore`).
+- **Kiểm tra tài khoản & phiên trong `kiem-save` (`server/scripts/audit-saves.ts`):** Quét thêm `<DATA_DIR>/accounts` và `<DATA_DIR>/sessions`, phát hiện tệp hỏng JSON, trùng `username`, trùng `playerName`, tham chiếu nhân vật mồ côi, phiên mồ côi hoặc hết hạn mà **tuyệt đối không in lộ** các trường nhạy cảm (`passwordHash`, `recoveryHash`, `tokenHash`).
+- **Job CI `PostgreSQL Store Tests` (`.github/workflows/ci.yml`):** Khởi chạy container `postgres:16-alpine` thật trên GitHub Actions, kiểm tra toàn bộ `server/src/pg` (bao gồm các ca khoá hàng `SELECT ... FOR UPDATE`, đua `claimCharacter` và `ROLLBACK` migration khi lỗi), `WorldRoom.pg.test.ts`, và chạy thử công cụ di trú `npm run chuyen-du-lieu -w server -- --thu`.
+
+
 
