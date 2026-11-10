@@ -8,6 +8,7 @@ import { WebSocketTransport } from "@colyseus/ws-transport";
 import { defineRooms, WorldRoom } from "./rooms/WorldRoom";
 import { SectService } from "./sect-service";
 import { startupWarnings } from "./startup";
+import { minProtocolOf } from "./protocol";
 import { mountAuth } from "./auth-http";
 import { createStores } from "./stores";
 
@@ -22,6 +23,7 @@ const PORT = Number(process.env.PORT ?? 2567);
 async function main() {
   // Backend lưu trữ chung cho nhân vật, chân linh, tài khoản, phiên (STORE=file mặc định | pg + DATABASE_URL)
   const stores = await createStores(process.env);
+  WorldRoom.minProtocol = minProtocolOf(process.env).value; // client cũ hơn mức này bị từ chối khi vào phòng (M4 2.5)
   WorldRoom.players = stores.players;
   WorldRoom.souls = stores.souls;
   WorldRoom.sects = new SectService(stores.sects); // tông môn cùng backend với nhân vật / chân linh (`SECTS=off` gỡ tính năng)
