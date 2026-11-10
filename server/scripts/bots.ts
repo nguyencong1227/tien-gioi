@@ -26,7 +26,6 @@ import {
   statsFor,
   type AttackMsg,
   type BuyMsg,
-  type GameMap,
   type InputMsg,
   type InvMsg,
   type JoinOptions,
