@@ -1,3 +1,4 @@
+/* global console, setTimeout, fetch, Buffer */
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
@@ -36,7 +37,7 @@ const server = http.createServer((req, res) => {
     const data = fs.readFileSync(filePath);
     res.writeHead(200, { "Content-Type": mime });
     res.end(data);
-  } catch (err) {
+  } catch {
     res.writeHead(404);
     res.end();
   }
@@ -222,5 +223,7 @@ for (const sz of SIZES) {
 server.close();
 try {
   fs.rmSync(tmpChromeDir, { recursive: true, force: true });
-} catch {}
+} catch (e) {
+  void e;
+}
 console.log("\n Hoàn tất chụp 12 ảnh nghiệm thu Bí cảnh!");
