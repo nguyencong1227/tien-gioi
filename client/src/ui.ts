@@ -2163,4 +2163,30 @@ export const ui = {
     if (secondsLeft !== null)
       $("death-t").textContent = `Hồi sinh tại Lạc Hà Trấn sau ${secondsLeft}s`;
   },
+
+  showReconnectNotice(text: string) {
+    const banner = $("reconnect-banner");
+    banner.hidden = false;
+    $("reconnect-banner-text").textContent = text;
+
+    let p = document.getElementById("toast-reconnecting");
+    if (!p) {
+      p = document.createElement("p");
+      p.id = "toast-reconnecting";
+      p.className = "bad reconnecting";
+      $("toast").prepend(p);
+    }
+    p.textContent = text;
+
+    document.body.classList.add("reconnecting");
+    this.closeAllModals();
+    this.closeDialog();
+    this.closePlayerMenu();
+  },
+
+  hideReconnectNotice() {
+    $("reconnect-banner").hidden = true;
+    document.getElementById("toast-reconnecting")?.remove();
+    document.body.classList.remove("reconnecting");
+  },
 };

@@ -122,6 +122,7 @@ export class WorldScene extends Phaser.Scene {
   private acc = 0;
   private facing = Math.PI / 2;
   private moving = false;
+  private isReconnecting = false;
 
   private nextSlash = 0;
   private nextSword = 0;
@@ -229,15 +230,17 @@ export class WorldScene extends Phaser.Scene {
     this.scale.on("resize", fitZoom);
 
     ui.init({
-      onUse: (slot) => this.room.send("useItem", { slot }),
-      onEquip: (slot) => this.room.send("equip", { slot }),
-      onUnequip: (slot) => this.room.send("unequip", { slot }),
-      onCraft: (recipeId) => this.room.send("craft", { recipeId }),
+      onUse: (slot) => !this.isReconnecting && this.room.send("useItem", { slot }),
+      onEquip: (slot) => !this.isReconnecting && this.room.send("equip", { slot }),
+      onUnequip: (slot) => !this.isReconnecting && this.room.send("unequip", { slot }),
+      onCraft: (recipeId) => !this.isReconnecting && this.room.send("craft", { recipeId }),
       onDrop: (slot, qty) =>
+        !this.isReconnecting &&
         this.room.send("dropItem", qty !== undefined ? { slot, qty } : { slot }),
-      onPickup: () => this.pickupNearest(),
-      onTalk: () => this.talkClosestNpc(),
+      onPickup: () => !this.isReconnecting && this.pickupNearest(),
+      onTalk: () => !this.isReconnecting && this.talkClosestNpc(),
       onDialogAction: (action) => {
+        if (this.isReconnecting) return;
         if (action.kind === "accept") this.room.send("questAccept", { questId: action.questId });
         else if (action.kind === "turnIn")
           this.room.send("questTurnIn", { questId: action.questId });
@@ -246,13 +249,15 @@ export class WorldScene extends Phaser.Scene {
       onTrackQuest: () => {
         // Tracker được cập nhật tự động trong update()
       },
-      onPartyLeave: () => this.room.send("partyLeave"),
-      onPartyKick: (name) => this.room.send("partyKick", { name }),
-      onPartyInvite: (name) => this.room.send("partyInvite", { name }),
-      onPartyAccept: (from) => this.room.send("partyAccept", { from }),
-      onPartyDecline: (from) => this.room.send("partyDecline", { from }),
-      onBuy: (npcId, itemId, qty) => this.room.send("buy", { npcId, itemId, qty }),
-      onSell: (npcId, slot, qty) => this.room.send("sell", { npcId, slot, qty }),
+      onPartyLeave: () => !this.isReconnecting && this.room.send("partyLeave"),
+      onPartyKick: (name) => !this.isReconnecting && this.room.send("partyKick", { name }),
+      onPartyInvite: (name) => !this.isReconnecting && this.room.send("partyInvite", { name }),
+      onPartyAccept: (from) => !this.isReconnecting && this.room.send("partyAccept", { from }),
+      onPartyDecline: (from) => !this.isReconnecting && this.room.send("partyDecline", { from }),
+      onBuy: (npcId, itemId, qty) =>
+        !this.isReconnecting && this.room.send("buy", { npcId, itemId, qty }),
+      onSell: (npcId, slot, qty) =>
+        !this.isReconnecting && this.room.send("sell", { npcId, slot, qty }),
     });
 
     this.setupInput();
@@ -379,7 +384,7 @@ export class WorldScene extends Phaser.Scene {
     kb.on("keydown-SPACE", () => !typing() && this.slash());
     kb.on("keydown-K", () => !typing() && this.sword());
     kb.on("keydown-L", () => !typing() && this.toggleMeditate());
-    kb.on("keydown-B", () => !typing() && this.room.send("breakthrough"));
+    kb.on("keydown-B", () => !typing() && !this.isReconnecting && this.room.send("breakthrough"));
     kb.on("keydown-C", () => !typing() && ui.toggleCharModal());
     kb.on("keydown-I", () => !typing() && ui.toggleInventory());
     kb.on("keydown-Q", () => !typing() && ui.toggleQuestModal());
@@ -427,14 +432,14 @@ export class WorldScene extends Phaser.Scene {
     bind("sk-slash", () => this.slash());
     bind("sk-sword", () => this.sword());
     bind("sk-med", () => this.toggleMeditate());
-    bind("sk-break", () => this.room.send("breakthrough"));
+    bind("sk-break", () => !this.isReconnecting && this.room.send("breakthrough"));
 
     const chatForm = document.getElementById("chat-form") as HTMLFormElement;
     const chatInput = document.getElementById("chat-input") as HTMLInputElement;
     chatForm.addEventListener("submit", (e) => {
       e.preventDefault();
       const text = chatInput.value.trim();
-      if (text) this.room.send("chat", { text });
+      if (text && !this.isReconnecting) this.room.send("chat", { text });
       chatInput.value = "";
       chatInput.blur();
     });
@@ -514,6 +519,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private slash(angle?: number) {
+    if (this.isReconnecting) return;
     const me = this.me();
     if (!me || me.dead || this.time.now < this.nextSlash) return;
     this.nextSlash = this.time.now + SKILLS.slash.cooldown;
@@ -527,6 +533,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private sword() {
+    if (this.isReconnecting) return;
     const me = this.me();
     if (!me || me.dead || this.time.now < this.nextSword) return;
     if (me.mp < SKILLS.sword.mp) return ui.toast({ text: "Linh lực không đủ.", tone: "bad" });
@@ -541,24 +548,28 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private toggleMeditate() {
+    if (this.isReconnecting) return;
     const me = this.me();
     if (!me || me.dead) return;
     this.room.send("meditate", { on: !me.meditating });
   }
 
   private pickupNearest() {
+    if (this.isReconnecting) return;
     const me = this.me();
     if (!me || me.dead || !this.nearestLootId) return;
     this.room.send("pickup", { lootId: this.nearestLootId });
   }
 
   private talkClosestNpc() {
+    if (this.isReconnecting) return;
     const me = this.me();
     if (!me || me.dead || !this.closestNpcId) return;
     this.room.send("talk", { npcId: this.closestNpcId });
   }
 
   private interactOrPickup() {
+    if (this.isReconnecting) return;
     if (this.closestNpcId) {
       this.talkClosestNpc();
     } else if (this.nearestLootId) {
@@ -566,9 +577,71 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  // ---------------- Mạng ----------------
+  // ---------------- Mạng & Tự nối lại (#117) ----------------
 
-  private setupNetwork() {
+  public setReconnecting(reconnecting: boolean) {
+    this.isReconnecting = reconnecting;
+    if (reconnecting) {
+      this.moving = false;
+      ui.showReconnectNotice("Mất kết nối, đang nối lại...");
+    } else {
+      ui.hideReconnectNotice();
+    }
+  }
+
+  public attachRoom(room: Room) {
+    this.room = room;
+    this.clearEntities();
+    this.hasMe = false;
+    this.pending.length = 0;
+    this.predX = 0;
+    this.predY = 0;
+    this.seq = 0;
+    this.moving = false;
+    this.setupNetwork(false);
+  }
+
+  private clearEntities() {
+    for (const [, e] of this.players) {
+      e.root.destroy();
+    }
+    this.players.clear();
+
+    for (const [, e] of this.monsters) {
+      e.root.destroy();
+    }
+    this.monsters.clear();
+
+    for (const [, le] of this.loots) {
+      le.root.destroy();
+    }
+    this.loots.clear();
+
+    for (const it of this.activeSlashes) {
+      it.g.setVisible(false);
+      this.slashPool.push(it.g);
+    }
+    this.activeSlashes.length = 0;
+
+    for (const it of this.activeSwords) {
+      it.img.setVisible(false);
+      this.swordPool.push(it.img);
+    }
+    this.activeSwords.length = 0;
+
+    for (const it of this.activeFloats) {
+      it.t.setVisible(false);
+      this.floatPool.push(it);
+    }
+    this.activeFloats.length = 0;
+
+    this.nearestLootId = null;
+    this.closestNpcId = null;
+    ui.talkPrompt(null);
+    ui.pickupPrompt(null);
+  }
+
+  private setupNetwork(isInitial = true) {
     this.room.onStateChange(() => this.reconcile());
     this.room.onMessage("fx", (m: FxMsg) => this.onFx(m));
     this.room.onMessage("dmg", (m: DmgMsg) => {
@@ -584,11 +657,13 @@ export class WorldScene extends Phaser.Scene {
     this.room.onMessage("party", (m: PartyMsg) => ui.onParty(m));
     this.room.onMessage("partyInvited", (m: PartyInvitedMsg) => ui.onPartyInvited(m));
     this.room.onMessage("wallet", (m: WalletMsg) => ui.onWallet(m));
-    ui.chat({
-      from: "",
-      text: "Chào mừng đạo hữu tới Tiên Giới. Nhận nhiệm vụ ở Trưởng trấn (F), mở sổ nhiệm vụ (Q) và xem bản đồ (M).",
-      sys: true,
-    });
+    if (isInitial) {
+      ui.chat({
+        from: "",
+        text: "Chào mừng đạo hữu tới Tiên Giới. Nhận nhiệm vụ ở Trưởng trấn (F), mở sổ nhiệm vụ (Q) và xem bản đồ (M).",
+        sys: true,
+      });
+    }
   }
 
   /** Lấy vị trí server làm gốc rồi chạy lại các input server chưa xử lý. */
@@ -618,6 +693,10 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private fixedStep() {
+    if (this.isReconnecting) {
+      this.moving = false;
+      return;
+    }
     const me = this.me();
     if (!me || me.dead) {
       this.moving = false;
