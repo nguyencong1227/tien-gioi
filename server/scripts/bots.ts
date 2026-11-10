@@ -378,7 +378,7 @@ export async function authBotAccount(
     } catch {
       // Bỏ qua nếu không phải JSON
     }
-    if (!(charRes.status === 400 && errCode === "has_character")) {
+    if (errCode !== "has_character") {
       throw new Error(`Bot ${botIndex} đặt đạo hiệu thất bại (${charRes.status}): ${errText}`);
     }
   }

@@ -131,8 +131,9 @@ describe("Bot thử tải chế độ tài khoản (--account) & Login Storm (Is
     const player2 = (room2.state as any).players.get(room2.sessionId);
     expect(player2?.name).toBe("Bot 001");
 
-    // 3. Nếu tài khoản khác đặt trùng đạo hiệu "Bot 001" (400 name_taken) -> phải ném lỗi, không nuốt
-    await expect(authBotAccount(httpBase, 999, "Bot 001")).rejects.toThrow(/name_taken/);
+    // 3. Nếu tài khoản khác đặt trùng đạo hiệu "Bot 001" (409 name_taken) hoặc tên sai (400 name_invalid) -> phải ném lỗi, không nuốt
+    await expect(authBotAccount(httpBase, 998, "Bot 001")).rejects.toThrow(/name_taken/);
+    await expect(authBotAccount(httpBase, 999, "!")).rejects.toThrow(/name_invalid/);
   });
 
   it("runLoginStorm: 40 bot đồng thời đăng ký + đặt đạo hiệu và đăng nhập lại (100% thành công nhờ X-Forwarded-For)", async () => {
