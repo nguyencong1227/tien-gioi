@@ -471,9 +471,14 @@ Thực nghiệm được tự động hoá trong `server/scripts/bots-account.te
 - **Kiểm tra tài khoản & phiên trong `kiem-save` (`server/scripts/audit-saves.ts`):** Quét thêm `<DATA_DIR>/accounts` và `<DATA_DIR>/sessions`, phát hiện tệp hỏng JSON, trùng `username`, trùng `playerName`, tham chiếu nhân vật mồ côi, phiên mồ côi hoặc hết hạn mà **tuyệt đối không in lộ** các trường nhạy cảm (`passwordHash`, `recoveryHash`, `tokenHash`).
 - **Job CI `PostgreSQL Store Tests` (`.github/workflows/ci.yml`):** Khởi chạy container `postgres:16-alpine` thật trên GitHub Actions, kiểm tra toàn bộ `server/src/pg` (bao gồm các ca khoá hàng `SELECT ... FOR UPDATE`, đua `claimCharacter` và `ROLLBACK` migration khi lỗi), `WorldRoom.pg.test.ts`, và chạy thử công cụ di trú `npm run chuyen-du-lieu -w server -- --thu`.
 
-## 9. Thử tải Bí cảnh, Bot `--dungeon` & Kiểm tra Rò rỉ (M3.4 - Issue #201)
+## 9. E2E thật Bí cảnh (M3.4, `npm run e2e:bi-canh`)
+Server Colyseus thật (trong tiến trình, thư mục dữ liệu tạm) phục vụ `client/dist` và **hai tab Chrome headless** điều khiển bằng CDP (hai nguồn khác nhau `127.0.0.1` / `localhost` nên không chung `localStorage`). Luồng qua giao diện thật: vào Lạc Hà -> lập đội -> nói chuyện Thủ môn -> bấm "Mở Linh Hư Bí Cảnh" -> cả hai nhận hộp mời (3/3 lượt thưởng) -> bấm "Vào Bí Cảnh" -> vào phòng bí cảnh bằng `joinById` (HUD, thanh máu trùm, danh sách đội) -> A hạ trùm bằng đòn chém của client (máu trùm đặt về 1 phía server) -> màn kết quả (A: +700 Linh thạch, 2 món, còn 2/3 lượt; B không đánh: lý do không có thưởng) -> hết thời gian nhặt đồ (rút ngắn) -> cả hai về Lạc Hà -> hồ sơ đúng (A ghi 1 lượt thưởng hôm nay và Linh thạch; B không; cả hai ở Lạc Hà) -> 0 lỗi console, 0 cảnh báo mất tin lúc vào phòng. Chạy: `npm run build && npm run e2e:bi-canh` (cần `google-chrome`); `E2E_SHOTS=<thư mục>` lưu ảnh chụp từng bước. Thoát 0 khi đạt.
 
-### 9.1. Kịch bản bot `--dungeon` trong `server/scripts/bots.ts`
+Lưu ý khi viết thêm kịch bản: các nút giao diện bắt `pointerdown` (không phải `click`), nên script phát `PointerEvent("pointerdown")`.
+
+## 10. Thử tải Bí cảnh, Bot `--dungeon` & Kiểm tra Rò rỉ (M3.4 - Issue #201)
+
+### 10.1. Kịch bản bot `--dungeon` trong `server/scripts/bots.ts`
 Kịch bản `server/scripts/bots.ts` được bổ sung cờ `--dungeon` để mô phỏng và thử tải tính năng Bí cảnh:
 - **Tổ đội tự động:** Khi bật `--dungeon`, nếu chưa chỉ định `--party` thì mặc định đặt `partySize = 4` (chuẩn theo thiết kế bí cảnh 2–4 người).
 - **Gieo hồ sơ cảnh giới hợp lệ:** Bot được gieo với cảnh giới Luyện Khí Tầng 9 (`realm = 1, tier = 8`, khớp với điều kiện tối thiểu `minStep` của Linh Hư Bí Cảnh) và xuất hiện tại khu vực gần NPC Thủ Môn ở Lạc Hà Trấn.
@@ -490,7 +495,7 @@ Cách chạy:
 npm run bots -w server -- --bots=20 --dungeon --duration=30
 ```
 
-### 9.2. Kết quả Thử tải & Stress Test (`server/scripts/dungeon-stress.test.ts`)
+### 10.2. Kết quả Thử tải & Stress Test (`server/scripts/dungeon-stress.test.ts`)
 Bộ kiểm thử stress test tự động hoá 6 kịch bản then chốt trên tiến trình server Colyseus thật:
 
 | Kịch bản kiểm thử | Kết quả thực tế | Tiêu chuẩn đánh giá | Trạng thái |
@@ -502,13 +507,9 @@ Bộ kiểm thử stress test tự động hoá 6 kịch bản then chốt trên
 | **5. Bảo mật chặn người ngoài** | Thử `joinOrCreate` trực tiếp vào phòng bí cảnh: bị từ chối; dùng `joinById` với `roomId` thật khi không có trong đội: từ chối mã 422 `JOIN_NOT_IN_RUN` | Chặn tuyệt đối xâm nhập lậu | **PASS** (~1.1s) |
 | **6. Thành viên rời đội giữa run (`partyLeave`)** | Thành viên gửi `partyLeave`: không làm sập phòng bí cảnh; thành viên còn lại vẫn tiếp tục đánh bình thường | Cách ly an toàn lỗi đội và phòng run | **PASS** (~1.1s) |
 
-### 9.3. Kiểm thử Kiểm tra Lưu trữ Nhân vật (`kiem-save`)
+### 10.3. Kiểm thử Kiểm tra Lưu trữ Nhân vật (`kiem-save`)
 Công cụ `npm run kiem-save -w server` đã được cập nhật thêm các luật kiểm tra nghiêm ngặt cho Bí cảnh:
 - **Chặn tuyệt đối `mapId` bí cảnh trong hồ sơ lưu:** Phát hiện và cảnh báo lỗi `INVALID_DUNGEON_MAP` nếu bất kỳ tệp JSON nào lưu `mapId` là bản đồ bí cảnh (bảo đảm người chơi không bao giờ bị lưu kẹt trong bí cảnh).
 - **Kiểm tra tính hợp lệ của `dungeonDaily`:**
   - `day` phải đúng định dạng ngày tháng `YYYY-MM-DD`.
   - `rewards` phải là số nguyên nằm trong khoảng `[0, DUNGEON_DAILY_REWARDS]`.
-
-
-
-

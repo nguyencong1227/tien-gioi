@@ -2,15 +2,18 @@ import Phaser from "phaser";
 import { Client, type Room } from "colyseus.js";
 import {
   DEFAULT_MAP_ID,
+  LINH_HU_MAP_ID,
   TRAVEL_JOIN_TIMEOUT_MS,
   JOIN_BAD_TOKEN,
   JOIN_NEED_CHARACTER,
   getMap,
+  isDungeonMap,
   type TravelToMsg,
   type LimboMsg,
 } from "@tien-gioi/shared";
 import { WorldScene } from "./scenes/WorldScene";
 import { ui } from "./ui";
+import { buildMockThuMonDialog, isMockDungeonEnabled, MOCK_DUNGEON_SAMPLES } from "./dungeon";
 import { captureEarlyMessages } from "./early-messages";
 import { joinWithRedirect } from "./connection";
 import { clearToken, getToken } from "./auth";
@@ -18,6 +21,55 @@ import { initAuthUi, switchAuthView } from "./auth-ui";
 
 const NAME_KEY = "tien-gioi:name";
 const SECRET_KEY = "tien-gioi:secret";
+
+function createMockDungeonRoom(): any {
+  const handlers = new Map<string, ((msg: any) => void)[]>();
+  return {
+    sessionId: "mock-session-01",
+    reconnectionToken: "mock-token-01",
+    onMessage: (type: string, fn: (msg: any) => void) => {
+      if (!handlers.has(type)) handlers.set(type, []);
+      handlers.get(type)!.push(fn);
+      return () => {
+        const list = handlers.get(type);
+        if (list) {
+          const idx = list.indexOf(fn);
+          if (idx !== -1) list.splice(idx, 1);
+        }
+      };
+    },
+    onStateChange: () => {},
+    onLeave: () => {},
+    send: (type: string, data: any) => {
+      if (import.meta.env.DEV) console.log("[mock-dungeon-send]", type, data);
+    },
+    leave: () => {},
+    state: {
+      players: new Map([
+        [
+          "mock-session-01",
+          {
+            name: "Trương Tiểu Phàm",
+            realm: 1,
+            tier: 8,
+            hp: 2500,
+            maxHp: 2500,
+            mp: 1200,
+            maxMp: 1200,
+            exp: 8000,
+            x: 512,
+            y: 896,
+            lastSeq: 0,
+            dead: false,
+            meditating: false,
+          },
+        ],
+      ]),
+      monsters: new Map(),
+      loot: new Map(),
+    },
+  };
+}
 
 function serverUrl() {
   const env = import.meta.env.VITE_SERVER_URL as string | undefined;
@@ -87,6 +139,14 @@ initAuthUi({
   },
 });
 
+// Chế độ máy chủ Bí cảnh giả lập (?dungeon=mock) để thử nghiệm và chụp ảnh không cần server 4b/4c
+if (typeof window !== "undefined" && isMockDungeonEnabled()) {
+  const mockRoom = createMockDungeonRoom();
+  start(mockRoom, DEFAULT_MAP_ID).catch((err) => {
+    console.error("Lỗi khởi động máy chủ bí cảnh giả lập:", err);
+  });
+}
+
 if (
   typeof window !== "undefined" &&
   (import.meta.env.DEV || new URLSearchParams(location.search).has("debug"))
@@ -131,6 +191,7 @@ function setupRoomLifecycle(room: Room) {
         name: name || undefined,
         secret: token ? undefined : secret(),
         suggestedMapId: msg.mapId,
+        roomId: msg.roomId,
       });
 
       let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -141,12 +202,14 @@ function setupRoomLifecycle(room: Room) {
         );
       });
 
-      const { room: newRoom, mapId: finalMapId } = await Promise.race([
-        joinPromise,
-        timeoutPromise,
-      ]).finally(() => {
+      const {
+        room: newRoom,
+        mapId: finalMapId,
+        expiredDungeonFallback,
+      } = await Promise.race([joinPromise, timeoutPromise]).finally(() => {
         if (timeoutId) clearTimeout(timeoutId);
       });
+      captureEarlyMessages(newRoom);
       const finalMap = getMap(finalMapId)!;
 
       // Cập nhật scene sang phòng mới và bản đồ mới
@@ -157,9 +220,13 @@ function setupRoomLifecycle(room: Room) {
       // Thiết lập vòng đời mới cho phòng vừa vào
       setupRoomLifecycle(newRoom);
 
-      // Sáng dần và thông báo thành công
+      // Sáng dần và thông báo kết quả
       ui.hideTransition();
-      ui.toast({ text: `Đã tiến nhập ${finalMap.def.name}.`, tone: "good" });
+      if (expiredDungeonFallback) {
+        ui.toast({ text: "Bí cảnh đã hết hạn, đã đưa về Lạc Hà Trấn.", tone: "bad" });
+      } else {
+        ui.toast({ text: `Đã tiến nhập ${finalMap.def.name}.`, tone: "good" });
+      }
     } catch (err: any) {
       isTraveling = false;
       ui.hideTransition();
@@ -179,6 +246,12 @@ function setupRoomLifecycle(room: Room) {
     // 1000: đóng bình thường; 4000-4999: mã của ứng dụng (4000 chủ động thoát, 4429 bị ngắt vì spam)
     if (code === 1000 || (code >= 4000 && code <= 4999)) {
       if (code !== 1000) showDisconnected();
+      return;
+    }
+
+    // Nếu rớt mạng trong phòng bí cảnh: rời run ngay (không có allowReconnection), không cố nối lại
+    if (activeScene && isDungeonMap(activeScene.map.def.id)) {
+      showDisconnected();
       return;
     }
 
@@ -277,6 +350,44 @@ async function start(room: Room, mapId: string) {
           ui.showReborn(mock.summary.kiep + 1);
         },
       });
+    };
+    (window as any).__mockDungeon = {
+      openThuMonOk: () => ui.onDialog(buildMockThuMonDialog({ canOpen: true })),
+      openThuMonFail: () =>
+        ui.onDialog(
+          buildMockThuMonDialog({
+            canOpen: false,
+            failReason: "member_low",
+            failWho: "Lâm Kinh Vũ",
+          }),
+        ),
+      showInvite: () => ui.onDungeonInvite(MOCK_DUNGEON_SAMPLES.invite()),
+      enterBossFight: () => {
+        const dMap = getMap(LINH_HU_MAP_ID)!;
+        if (activeScene) {
+          activeScene.changeMap(room, dMap);
+          (activeScene as any).predX = dMap.lairPx ? dMap.lairPx.x : dMap.townPx.x;
+          (activeScene as any).predY = dMap.lairPx ? dMap.lairPx.y + 70 : dMap.townPx.y;
+          if (room?.state?.monsters) {
+            room.state.monsters.set("boss_yeu_vuong", {
+              kind: "yeu_vuong",
+              x: dMap.lairPx ? dMap.lairPx.x : 512,
+              y: dMap.lairPx ? dMap.lairPx.y : 150,
+              hp: 68000,
+              maxHp: 100000,
+              angle: Math.PI / 2,
+            });
+          }
+        }
+        ui.onDungeonState(MOCK_DUNGEON_SAMPLES.stateBossFight());
+      },
+      showWon: () => {
+        ui.onDungeonState(MOCK_DUNGEON_SAMPLES.stateLoot());
+        ui.onDungeonEnd(MOCK_DUNGEON_SAMPLES.endWon());
+      },
+      showLost: () => {
+        ui.onDungeonEnd(MOCK_DUNGEON_SAMPLES.endLost());
+      },
     };
   }
   new Phaser.Game({

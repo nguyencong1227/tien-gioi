@@ -1,6 +1,9 @@
 import {
   DEFAULT_MAP_ID,
+  JOIN_NOT_IN_RUN,
+  ROOM_ID_RE,
   getMap,
+  isDungeonMap,
   parseWrongMap,
   roomNameOf,
   type JoinOptions,
@@ -9,6 +12,7 @@ import {
 /** Giao diện client Colyseus tối thiểu để thực hiện kết nối. */
 export interface JoinClient<R> {
   joinOrCreate(roomName: string, options: JoinOptions): Promise<R>;
+  joinById?(roomId: string, options: JoinOptions): Promise<R>;
 }
 
 /** Giao diện bộ nhớ cục bộ (localStorage hoặc đối tượng giả lập để test). */
@@ -23,19 +27,20 @@ export function getSavedMapKey(charName: string): string {
   return `tien-gioi:map:${charName.trim()}`;
 }
 
-/** Lấy bản đồ đã lưu của nhân vật. Nếu không có hoặc id lạ (không có trong GameMap) thì dọn và trả DEFAULT_MAP_ID. */
+/** Lấy bản đồ đã lưu của nhân vật. Nếu không có, id lạ hoặc là bản đồ bí cảnh thì dọn và trả DEFAULT_MAP_ID. */
 export function getSavedMap(storage: JoinStorage, charName: string): string {
   const raw = storage.getItem(getSavedMapKey(charName));
   if (!raw) return DEFAULT_MAP_ID;
-  if (!getMap(raw)) {
+  if (!getMap(raw) || isDungeonMap(raw)) {
     clearSavedMap(storage, charName);
     return DEFAULT_MAP_ID;
   }
   return raw;
 }
 
-/** Lưu bản đồ hiện tại của nhân vật. */
+/** Lưu bản đồ hiện tại của nhân vật (không bao giờ lưu bản đồ bí cảnh). */
 export function saveMap(storage: JoinStorage, charName: string, mapId: string): void {
+  if (isDungeonMap(mapId)) return;
   storage.setItem(getSavedMapKey(charName), mapId);
 }
 
@@ -51,18 +56,24 @@ export interface JoinWithRedirectOptions<R> {
   secret?: string;
   token?: string;
   suggestedMapId?: string;
+  /** Id phòng Colyseus cụ thể (dùng khi vào bí cảnh bằng joinById). */
+  roomId?: string;
   maxRedirects?: number;
 }
 
 export interface JoinResult<R> {
   room: R;
   mapId: string;
+  /** Cờ báo bí cảnh đã hết hạn / không vào được và đã tự khôi phục về Lạc Hà. */
+  expiredDungeonFallback?: boolean;
 }
 
 /**
- * Vào phòng Colyseus theo roomNameOf(mapId) có hỗ trợ tự động chuyển hướng khi server báo JOIN_WRONG_MAP.
- * - Thử vào mapId gợi ý (hoặc lấy từ storage). Nếu mapId lạ (không có trong getMap), tự động dọn và dùng DEFAULT_MAP_ID.
- * - Nếu server từ chối vì nhân vật đang ở map khác (`wrong_map:<id>`), tự động vào lại map đúng (không báo lỗi).
+ * Vào phòng Colyseus theo roomNameOf(mapId) hoặc joinById(roomId) có hỗ trợ tự động chuyển hướng:
+ * - Khi có `roomId` hợp lệ (`ROOM_ID_RE`), gọi `client.joinById(roomId, joinOpts)`.
+ * - Nếu server từ chối `JOIN_NOT_IN_RUN` (422) hoặc phòng bí cảnh đã huỷ (4212), tự động đưa về `DEFAULT_MAP_ID`
+ *   kèm `expiredDungeonFallback = true` để client báo "bí cảnh đã hết hạn" và không treo.
+ * - Khi không có `roomId`: vào bằng `joinOrCreate(roomNameOf(mapId))`, tự động chuyển hướng nếu gặp `JOIN_WRONG_MAP`.
  * - Chặn tối đa `maxRedirects` lần (mặc định 3) để tránh vòng lặp vô hạn.
  */
 export async function joinWithRedirect<R>(
@@ -71,11 +82,30 @@ export async function joinWithRedirect<R>(
   const { client, storage, name, secret, token, maxRedirects = 3 } = options;
   const storageKey = name || (token ? `token:${token.slice(0, 16)}` : "anonymous");
 
+  let targetRoomId: string | undefined;
+  let expiredDungeonFallback = false;
+
+  if (options.roomId !== undefined) {
+    if (typeof options.roomId === "string" && ROOM_ID_RE.test(options.roomId)) {
+      targetRoomId = options.roomId;
+    } else {
+      // roomId sai hình dạng: không tin dữ liệu lạ, đưa về bản đồ mặc định
+      expiredDungeonFallback = true;
+    }
+  }
+
   let currentMapId = options.suggestedMapId || getSavedMap(storage, storageKey);
   if (!getMap(currentMapId)) {
     clearSavedMap(storage, storageKey);
     currentMapId = DEFAULT_MAP_ID;
   }
+
+  // Không bao giờ gọi joinOrCreate vào bản đồ bí cảnh nếu thiếu roomId hợp lệ
+  if (isDungeonMap(currentMapId) && !targetRoomId) {
+    currentMapId = DEFAULT_MAP_ID;
+    expiredDungeonFallback = true;
+  }
+
   let redirectCount = 0;
   let badMapRetried = false;
 
@@ -86,12 +116,39 @@ export async function joinWithRedirect<R>(
       if (name) joinOpts.name = name;
       if (secret) joinOpts.secret = secret;
 
-      const room = await client.joinOrCreate(roomNameOf(currentMapId), joinOpts);
+      let room: R;
+      if (targetRoomId) {
+        if (!client.joinById) {
+          throw new Error("Client không hỗ trợ joinById.");
+        }
+        room = await client.joinById(targetRoomId, joinOpts);
+      } else {
+        room = await client.joinOrCreate(roomNameOf(currentMapId), joinOpts);
+      }
 
-      // Kết nối thành công: lưu lại mapId đúng vào bộ nhớ
-      saveMap(storage, storageKey, currentMapId);
-      return { room, mapId: currentMapId };
+      // Kết nối thành công: lưu lại mapId đúng vào bộ nhớ (saveMap tự bỏ qua bản đồ bí cảnh)
+      if (!targetRoomId && !isDungeonMap(currentMapId)) {
+        saveMap(storage, storageKey, currentMapId);
+      }
+      return expiredDungeonFallback
+        ? { room, mapId: currentMapId, expiredDungeonFallback: true }
+        : { room, mapId: currentMapId };
     } catch (err: any) {
+      // 0. Nếu đang vào phòng bí cảnh bằng roomId mà gặp JOIN_NOT_IN_RUN (422) hoặc phòng đã đóng (4212):
+      // tự động khôi phục về DEFAULT_MAP_ID để người chơi về Lạc Hà, không bị treo.
+      const isDungeonExpired =
+        err?.code === JOIN_NOT_IN_RUN ||
+        err?.code === 4212 ||
+        (typeof err?.message === "string" &&
+          /not_in_run|not in run|room.*not found|expired/i.test(err.message));
+      if (targetRoomId && isDungeonExpired) {
+        targetRoomId = undefined;
+        currentMapId = DEFAULT_MAP_ID;
+        expiredDungeonFallback = true;
+        redirectCount++;
+        continue;
+      }
+
       // 1. Kiểm tra lỗi sai bản đồ (wrong_map:mapId)
       const correctMap = parseWrongMap(err?.code, err?.message);
       if (correctMap) {
@@ -99,6 +156,7 @@ export async function joinWithRedirect<R>(
         if (redirectCount > maxRedirects) {
           throw new Error("Chuyển hướng bản đồ vượt quá giới hạn cho phép.", { cause: err });
         }
+        targetRoomId = undefined;
         currentMapId = correctMap;
         continue;
       }
@@ -109,6 +167,7 @@ export async function joinWithRedirect<R>(
         (typeof err?.message === "string" && /not defined|MATCHMAKE_NO_HANDLER/i.test(err.message));
       if (isNoHandler && currentMapId !== DEFAULT_MAP_ID && !badMapRetried) {
         clearSavedMap(storage, storageKey);
+        targetRoomId = undefined;
         currentMapId = DEFAULT_MAP_ID;
         badMapRetried = true;
         redirectCount++;

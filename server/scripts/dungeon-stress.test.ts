@@ -10,7 +10,7 @@
 // 8. "Giết tiến trình giữa run" (rớt mạng trong bí cảnh) rồi đăng nhập lại: phải về Lạc Hà, hồ sơ giữ nguyên mapId mặc định
 // 9. Phòng bí cảnh chặn tuyệt đối người ngoài: joinOrCreate bị từ chối, joinById lậu bị từ chối JOIN_NOT_IN_RUN (422)
 
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -31,8 +31,6 @@ import {
   LINH_HU_MAP_ID,
   MAX_DUNGEON_RUNS,
   NPC_BY_ID,
-  dungeonOf,
-  getMap,
   roomNameOf,
   type DungeonEndMsg,
   type DungeonInviteMsg,
@@ -48,13 +46,10 @@ import type { WorldState } from "../src/schema";
 const PORT = 47000 + Math.floor(Math.random() * 2000);
 let server: Server;
 let WorldRoomClass: typeof WorldRoom;
-let hashSecret: typeof import("../src/store").hashSecret;
 const rooms: Room[] = [];
 const gate = NPC_BY_ID.thu_mon;
-const LINH_HU = dungeonOf(LINH_HU_ID)!;
 
 beforeAll(async () => {
-  ({ hashSecret } = await import("../src/store"));
   const { WorldRoom, defineRooms } = await import("../src/rooms/WorldRoom");
   WorldRoomClass = WorldRoom;
   WorldRoomClass.reconnectGraceS = 5;

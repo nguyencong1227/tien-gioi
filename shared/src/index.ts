@@ -11,3 +11,4 @@ export * from "./travel";
 export * from "./reincarnation";
 export * from "./account";
 export * from "./dungeon";
+export * from "./duel";

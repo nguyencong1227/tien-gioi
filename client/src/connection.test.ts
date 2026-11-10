@@ -2,7 +2,9 @@ import { describe, it, expect, vi } from "vitest";
 import {
   DEFAULT_MAP_ID,
   HAC_PHONG_ID,
+  JOIN_NOT_IN_RUN,
   JOIN_WRONG_MAP,
+  LINH_HU_MAP_ID,
   roomNameOf,
   wrongMapMessage,
 } from "@tien-gioi/shared";
@@ -240,5 +242,97 @@ describe("connection helper (joinWithRedirect)", () => {
     expect(joinOrCreate).toHaveBeenCalledWith(roomNameOf(DEFAULT_MAP_ID), {
       token: "tok_session_12345",
     });
+  });
+
+  it("vào phòng bí cảnh cụ thể bằng joinById khi có roomId hợp lệ và không ghi saveMap bí cảnh", async () => {
+    const storage = new MemoryStorage();
+    saveMap(storage, "TieuPham", DEFAULT_MAP_ID);
+
+    const fakeDungeonRoom = { sessionId: "s_dungeon" };
+    const joinOrCreate = vi.fn();
+    const joinById = vi.fn().mockResolvedValue(fakeDungeonRoom);
+    const client: JoinClient<typeof fakeDungeonRoom> = { joinOrCreate, joinById };
+
+    const res = await joinWithRedirect({
+      client,
+      storage,
+      name: "TieuPham",
+      secret: "sec123",
+      suggestedMapId: LINH_HU_MAP_ID,
+      roomId: "room_bi_canh_01",
+    });
+
+    expect(res.room).toBe(fakeDungeonRoom);
+    expect(res.mapId).toBe(LINH_HU_MAP_ID);
+    expect(res.expiredDungeonFallback).toBeUndefined();
+    expect(joinById).toHaveBeenCalledTimes(1);
+    expect(joinById).toHaveBeenCalledWith("room_bi_canh_01", {
+      name: "TieuPham",
+      secret: "sec123",
+    });
+    expect(joinOrCreate).not.toHaveBeenCalled();
+    // Không lưu map bí cảnh vào storage (vẫn giữ DEFAULT_MAP_ID)
+    expect(getSavedMap(storage, "TieuPham")).toBe(DEFAULT_MAP_ID);
+  });
+
+  it("khôi phục về DEFAULT_MAP_ID kèm expiredDungeonFallback khi joinById báo JOIN_NOT_IN_RUN (422)", async () => {
+    const storage = new MemoryStorage();
+    const fakeWorldRoom = { sessionId: "s_world" };
+    const joinById = vi.fn().mockRejectedValueOnce({
+      code: JOIN_NOT_IN_RUN,
+      message: "not_in_run",
+    });
+    const joinOrCreate = vi.fn().mockResolvedValueOnce(fakeWorldRoom);
+    const client: JoinClient<typeof fakeWorldRoom> = { joinOrCreate, joinById };
+
+    const res = await joinWithRedirect({
+      client,
+      storage,
+      token: "tok_abc",
+      suggestedMapId: LINH_HU_MAP_ID,
+      roomId: "room_expired_99",
+    });
+
+    expect(res.room).toBe(fakeWorldRoom);
+    expect(res.mapId).toBe(DEFAULT_MAP_ID);
+    expect(res.expiredDungeonFallback).toBe(true);
+    expect(joinById).toHaveBeenCalledTimes(1);
+    expect(joinOrCreate).toHaveBeenCalledTimes(1);
+    expect(joinOrCreate).toHaveBeenCalledWith(roomNameOf(DEFAULT_MAP_ID), {
+      token: "tok_abc",
+    });
+  });
+
+  it("từ chối roomId sai định dạng (không khớp ROOM_ID_RE) và đưa về DEFAULT_MAP_ID", async () => {
+    const storage = new MemoryStorage();
+    const fakeWorldRoom = { sessionId: "s_safe" };
+    const joinById = vi.fn();
+    const joinOrCreate = vi.fn().mockResolvedValueOnce(fakeWorldRoom);
+    const client: JoinClient<typeof fakeWorldRoom> = { joinOrCreate, joinById };
+
+    const res = await joinWithRedirect({
+      client,
+      storage,
+      name: "TieuPham",
+      secret: "sec123",
+      suggestedMapId: LINH_HU_MAP_ID,
+      roomId: "../../bad room id!",
+    });
+
+    expect(res.room).toBe(fakeWorldRoom);
+    expect(res.mapId).toBe(DEFAULT_MAP_ID);
+    expect(res.expiredDungeonFallback).toBe(true);
+    expect(joinById).not.toHaveBeenCalled();
+    expect(joinOrCreate).toHaveBeenCalledWith(roomNameOf(DEFAULT_MAP_ID), {
+      name: "TieuPham",
+      secret: "sec123",
+    });
+  });
+
+  it("getSavedMap: tự động dọn nếu trong storage có mapId là bí cảnh", () => {
+    const storage = new MemoryStorage();
+    storage.setItem("tien-gioi:map:TieuPham", LINH_HU_MAP_ID);
+    expect(getSavedMap(storage, "TieuPham")).toBe(DEFAULT_MAP_ID);
+    expect(storage.getItem("tien-gioi:map:TieuPham")).toBeNull();
   });
 });
