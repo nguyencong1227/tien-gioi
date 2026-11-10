@@ -400,7 +400,10 @@ async function start(room: Room, mapId: string) {
       showWon: (opponent = "Diệp Phàm") => ui.onDuelEnd(MOCK_DUEL_SAMPLES.endWon(opponent)),
       showLost: (opponent = "Diệp Phàm") => ui.onDuelEnd(MOCK_DUEL_SAMPLES.endLost(opponent)),
       showDraw: () => ui.onDuelEnd(MOCK_DUEL_SAMPLES.endDraw()),
-      hide: () => ui.hideDuelHud(),
+      hide: () => {
+        ui.hideDuelHud();
+        ui.closeDuelEndModal();
+      },
     };
   }
   new Phaser.Game({

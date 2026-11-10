@@ -48,6 +48,7 @@ import {
   type DungeonStateMsg,
   type DungeonEndMsg,
   DUEL_MSG,
+  DUEL_KO_MS,
   isDungeonMap,
   type DuelInvitedMsg,
   type DuelStateMsg,
@@ -141,6 +142,7 @@ export class WorldScene extends Phaser.Scene {
   private facing = Math.PI / 2;
   private moving = false;
   private isReconnecting = false;
+  private duelKoUntil = 0;
 
   private nextSlash = 0;
   private nextSword = 0;
@@ -555,7 +557,11 @@ export class WorldScene extends Phaser.Scene {
     kb.on("keydown-M", () => !typing() && ui.toggleMapModal());
     kb.on("keydown-N", () => !typing() && sound.toggleMute());
     kb.on("keydown-O", () => !typing() && ui.toggleSettingsModal());
-    kb.on("keydown-ESC", () => !typing() && ui.closeAllModals());
+    kb.on("keydown-ESC", () => {
+      if (typing()) return;
+      if (ui.closeDuelEndModal()) return;
+      ui.closeAllModals();
+    });
     kb.on("keydown-F", () => !typing() && this.interactOrPickup());
     kb.on("keydown-ONE", () => !typing() && ui.useQuick(1));
     kb.on("keydown-TWO", () => !typing() && ui.useQuick(2));
@@ -772,6 +778,7 @@ export class WorldScene extends Phaser.Scene {
     this.isReconnecting = reconnecting;
     if (reconnecting) {
       this.moving = false;
+      this.duelKoUntil = 0;
       ui.hideDuelHud();
       ui.showReconnectNotice("Mất kết nối, đang nối lại...");
     } else {
@@ -780,6 +787,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   public changeMap(room: Room, newMap: GameMap) {
+    this.duelKoUntil = 0;
     ui.hideDuelHud();
     this.map = newMap;
     this.buildMapVisuals();
@@ -888,7 +896,12 @@ export class WorldScene extends Phaser.Scene {
     reg(DUNGEON_MSG.end, (m: DungeonEndMsg) => ui.onDungeonEnd(m));
     reg(DUEL_MSG.invited, (m: DuelInvitedMsg) => ui.onDuelInvited(m));
     reg(DUEL_MSG.state, (m: DuelStateMsg) => ui.onDuelState(m));
-    reg(DUEL_MSG.end, (m: DuelEndMsg) => ui.onDuelEnd(m));
+    reg(DUEL_MSG.end, (m: DuelEndMsg) => {
+      if (m.result === "lost" && m.reason === "ko") {
+        this.duelKoUntil = this.time.now + DUEL_KO_MS + 400;
+      }
+      ui.onDuelEnd(m);
+    });
     replayEarlyMessages(this.room, handlers);
     if (isInitial) {
       ui.chat({
@@ -1752,6 +1765,12 @@ export class WorldScene extends Phaser.Scene {
         this.updatePlayerAnim(e, who, this.facing, this.moving && !p.dead && !p.meditating);
         if (ui.isLimboOpen()) {
           ui.death(null);
+        } else if (p.dead && (this.time.now < this.duelKoUntil || ui.isDuelActive())) {
+          if (!this.duelKoUntil) {
+            this.duelKoUntil = this.time.now + DUEL_KO_MS + 400;
+          }
+          const remSec = Math.max(1, Math.ceil((this.duelKoUntil - this.time.now) / 1000));
+          ui.death(remSec, `Bị đánh gục, đứng dậy sau ${remSec}s`);
         } else {
           ui.death(
             p.dead
@@ -1760,7 +1779,10 @@ export class WorldScene extends Phaser.Scene {
           );
         }
         if (p.dead && !(e as any).deadSince) (e as any).deadSince = this.time.now;
-        if (!p.dead) (e as any).deadSince = 0;
+        if (!p.dead) {
+          (e as any).deadSince = 0;
+          this.duelKoUntil = 0;
+        }
       } else {
         const dist = Math.hypot(posX - e.root.x, posY - e.root.y);
         e.tx = posX;

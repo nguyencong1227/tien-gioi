@@ -126,4 +126,14 @@ describe("client duel pure logic", () => {
     expect(isMockDuelEnabled("?duel=other", true)).toBe(false);
     expect(isMockDuelEnabled("", true)).toBe(false);
   });
+
+  it("thông điệp gục khi thua thách đấu (KO) không hứa về Lạc Hà Trấn", () => {
+    const endLost = MOCK_DUEL_SAMPLES.endLost("Diệp Phàm");
+    expect(endLost.result).toBe("lost");
+    expect(endLost.reason).toBe("ko");
+
+    const reason = duelEndReasonText(endLost.reason, endLost.result, "Diệp Phàm");
+    expect(reason).toContain("Đã bị Diệp Phàm đánh gục!");
+    expect(reason).not.toContain("Lạc Hà Trấn");
+  });
 });

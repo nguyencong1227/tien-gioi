@@ -2343,12 +2343,22 @@ export const ui = {
       this.closePlayerMenu();
       closedAny = true;
     }
+    return closedAny;
+  },
+
+  /** Đóng modal kết quả quyết đấu riêng biệt (không gộp vào closeAllModals để người thua xem được khi bị KO) */
+  closeDuelEndModal(): boolean {
     const duelEndModal = $("duel-end-modal");
     if (duelEndModal && !duelEndModal.hidden) {
       duelEndModal.hidden = true;
-      closedAny = true;
+      return true;
     }
-    return closedAny;
+    return false;
+  },
+
+  isDuelEndModalOpen(): boolean {
+    const duelEndModal = $("duel-end-modal");
+    return Boolean(duelEndModal && !duelEndModal.hidden);
   },
 
   onInv(m: InvMsg) {
@@ -2738,10 +2748,10 @@ export const ui = {
     setTimeout(() => p.remove(), 3000);
   },
 
-  death(secondsLeft: number | null) {
+  death(secondsLeft: number | null, text?: string) {
     $("death").hidden = secondsLeft === null;
     if (secondsLeft !== null)
-      $("death-t").textContent = `Hồi sinh tại Lạc Hà Trấn sau ${secondsLeft}s`;
+      $("death-t").textContent = text ?? `Hồi sinh tại Lạc Hà Trấn sau ${secondsLeft}s`;
   },
 
   /** Banner đỏ khi đang nối lại (chỉ một khung, không kèm toast trùng nội dung). */
@@ -2754,6 +2764,7 @@ export const ui = {
 
     document.body.classList.add("reconnecting");
     this.closeAllModals();
+    this.closeDuelEndModal();
     this.closeDialog();
     this.closePlayerMenu();
   },
@@ -2804,6 +2815,7 @@ export const ui = {
     limboRebirthCb = callbacks?.onRebirth ?? null;
 
     this.closeAllModals();
+    this.closeDuelEndModal();
     this.closeDialog();
     this.closePlayerMenu();
     this.death(null);
@@ -3078,6 +3090,7 @@ export const ui = {
 
   /** Nhận lời mời thách đấu PK (M3.5, #218) */
   onDuelInvited(msg: DuelInvitedMsg) {
+    this.closeDuelEndModal();
     stopDuelInviteTimer();
     currentDuelInvite = msg;
 
@@ -3115,6 +3128,7 @@ export const ui = {
 
   /** Cập nhật trạng thái trận đấu PK: đếm ngược 3-2-1 hoặc HUD chiến đấu */
   onDuelState(msg: DuelStateMsg) {
+    this.closeDuelEndModal();
     stopDuelInviteTimer();
     currentDuelInvite = null;
     const invBox = $("duel-invite-box");
