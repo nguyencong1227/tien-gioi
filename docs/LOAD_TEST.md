@@ -579,3 +579,37 @@ Cần `npm run build` (client/dist mới) và google-chrome. Chạy trên client
 Cùng khung với mục 13 (`server/scripts/e2e-kit.ts`). Luồng 8 bước qua giao diện thật: lập đội -> Thủ môn -> mở bí cảnh -> cả hai vào phòng -> A bị đánh gục bằng đường thật của quái (`hurtPlayer` phía server) -> lớp phủ của A ghi "Ngươi đã gục! Bị đưa ra khỏi bí cảnh sau Ns. Lượt hôm nay còn N/3." + dòng phụ "Không mất kiếp · Không mất đồ và Linh thạch", **không** hứa "Hồi sinh tại Lạc Hà Trấn", **không** màn Hoàng Tuyền, đếm ngược không bị xoá giữa chừng (bài học PK: `dungeonFallen` tới trước patch `dead`); B thấy A "Đã gục", run chạy tiếp -> ~3 giây sau A về Lạc Hà (lớp phủ + HUD bí cảnh tắt, toast "mất một lượt") -> hồ sơ A: không `limbo`, ví và cảnh giới nguyên, mất MỘT lượt, về Lạc Hà; `dungeonEnter` lại bị từ chối -> B cũng gục: run thua `all_dead`, B về Lạc Hà, run được dọn, B cũng mất một lượt và không mất gì -> 0 lỗi console. `E2E_SHOTS=<thư mục>` lưu ảnh.
 Chạy trên client #241 + server #238 (đã vào main): PASS 100% 4/4 lần. Cần `npm run build` và google-chrome. Nhận xét giao diện (không chặn): HUD bí cảnh của người vừa gục không còn cập nhật (họ không còn là thành viên "trong phòng" nên server ngừng gửi `dungeonState`), danh sách đội trên màn hình họ giữ nguyên lúc gục.
 
+## 15. Thử tải Tông môn, Bot `--sect` & Kiểm tra Rò rỉ (M3.6 - Issue #231)
+
+### 15.1. Kịch bản bot `--sect` trong `server/scripts/bots.ts`
+Kịch bản `server/scripts/bots.ts` được bổ sung cờ `--sect` để mô phỏng và thử tải tính năng Tông môn:
+- **Cấp Linh thạch ban đầu:** Bot chạy cờ `--sect` được gieo sẵn 5000 Linh thạch vào hồ sơ nhân vật (đủ 1000 Linh thạch phí `SECT_CREATE_COST` lập phái và số dư góp kho).
+- **Phân nhóm tông môn tự động:** Bot được chia theo các nhóm 3 người (`groupSize = 3`, gồm 1 Tông chủ và 2 Đệ tử).
+- **Quy trình hoạt động tự động:**
+  1. **Lập tông môn:** Bot Tông chủ (bot đầu nhóm) gửi `sectCreate` tạo tông môn mang tên `Phai Dao <N>` và biệt hiệu `P<N>` (vd: `P01`, `P02`).
+  2. **Mời đệ tử:** Tông chủ gửi lời mời `sectInvite` tới các thành viên trong nhóm.
+  3. **Nhận lời mời:** Đệ tử lắng nghe sự kiện `sectInvited` và tự động gửi `sectAccept` để gia nhập.
+  4. **Giao lưu & tương tác:** Cả Tông chủ và Đệ tử định kỳ chat kênh nội bộ `/s` (`sectChats`), nạp Linh thạch vào kho tông môn (`sectDeposit`), và Tông chủ rút Linh thạch từ kho (`sectWithdraw`).
+  5. **Dọn dẹp cuối đợt chạy:** Khi kết thúc kịch bản, Đệ tử tự động gửi `sectLeave` rời phái, Tông chủ rút hết Linh thạch trong kho rồi giải tán bằng `sectDisband` (đồng thời pha dọn dẹp file lưu của bot tự động quét và dọn sạch file tông môn phát sinh trong `<DATA_DIR>/sects`).
+- **Lưu ý quan trọng khi chạy bot thật:** Server thử tải phải dùng `DATA_DIR` mặc định của server (không đặt `DATA_DIR` khác với server) vì bot ghi hồ sơ vào `server/data/players`.
+
+Cách chạy:
+```bash
+# Chạy 6 bot (2 nhóm tông môn) hoạt động liên tục trong 30 giây:
+npm run bots -w server -- --bots=6 --sect --duration=30
+```
+
+### 15.2. Kết quả Stress Test Tông môn (`server/scripts/sect-stress.test.ts`)
+Bộ kiểm thử stress test tự động hoá 7 kịch bản then chốt trên tiến trình server Colyseus thật:
+
+| Kịch bản kiểm thử | Kết quả thực tế | Tiêu chuẩn đánh giá | Trạng thái |
+| :--- | :---: | :---: | :---: |
+| **1. N tông môn song song (3 nhóm = 6 bots)** | **3 tông môn hoạt động độc lập đồng thời**; lập, mời, nhận, nạp/rút kho, chat `/s` phân biệt đúng kênh; đo tick trung bình World < 10 ms | Tông môn độc lập, không nghẽn tick, chat `/s` không lộ sang phái khác | **PASS** (~0.8s) |
+| **2. Đua lập cùng tên / cùng biệt hiệu** | 2 người cùng gửi tạo tông môn cùng tên và cùng biệt hiệu trong 1 tick: đúng 1 người thành công (trừ 1000 Linh thạch), người kia nhận toast từ chối và **hoàn đủ 100% tiền ví** | Chống trùng lặp, bảo toàn Linh thạch, hoàn ví ngay khi thất bại | **PASS** (~0.2s) |
+| **3. Đua mời / nhận chéo, nhận 2 lần, giải tán giữa chừng** | Nhận 2 lần liên tiếp: lần 2 bị từ chối; giải tán tông môn khi đang có lời mời treo: người nhận bấm accept bị từ chối `invite_invalid`; 2 Tông chủ mời chéo nhau: từ chối vì đối phương đã có tông môn | Kiểm tra hợp lệ thời điểm nhận, chống đua và trạng thái mồ côi | **PASS** (~0.4s) |
+| **4. Rải lời mời quá `SECT_INVITES_MAX = 3`** | 4 Tông chủ cùng mời 1 người chơi: 3 lời mời đầu thành công, lời mời thứ 4 bị từ chối sớm với lý do quá tải (`target_overloaded`) | Chống spam lời mời, giới hạn trần lời mời đang chờ | **PASS** (~0.5s) |
+| **5. Nhận khi tông môn đã đầy (`SECT_MAX_MEMBERS = 30`)** | Tông môn đạt 30 thành viên: người tiếp theo bấm accept nhận toast từ chối `sect_full` ("Tông môn đã đủ người"), không bị đưa vào phái | Đúng giới hạn số lượng thành viên, từ chối an toàn | **PASS** (~0.3s) |
+| **6. Kiểm tra dọn dẹp rò rỉ sau N chu kỳ** | 3 chu kỳ liên tiếp (từ chối, nhận rồi rời, disconnect khi có lời mời treo): `Hub.sects.invitesSize` về 0, `online.size` về 0, `cache.size` về 0, `_cooldownSize` về 0 sau sweep | 0 lời mời treo, 0 tông môn rò rỉ trong cache, sạch sẽ bộ nhớ | **PASS** (~0.9s) |
+| **7. Kiểm tra tính toàn vẹn lưu trữ (`audit-saves`)** | Chạy `auditSavesDirectory` trên toàn bộ file lưu nhân vật và tông môn phát sinh: 0 file lỗi, 0 lỗi tông môn, 0 file mồ côi | Lưu trữ nhất quán, không bẩn dữ liệu trên đĩa | **PASS** (~0.15s) |
+
+
