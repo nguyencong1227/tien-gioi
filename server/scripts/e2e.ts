@@ -354,7 +354,12 @@ async function runE2e() {
     await sendCdp("Page.navigate", { url: `http://127.0.0.1:${cliArgs.port}/?debug` });
 
     await waitFor(`!!document.getElementById('login-form')`, 10000, "Form đăng nhập");
-    await sleep(300);
+    // Chờ bundle JS client nạp xong và gắn listener trước khi submit
+    await waitFor(
+      `typeof window.__switchAuthView === 'function'`,
+      10000,
+      "Client JS bundle sẵn sàng",
+    );
     console.log("  ✓ [1/5] Form đăng nhập tải thành công, tiến hành kết nối...");
     await ev(`document.getElementById('login-form').requestSubmit(); 1`);
 
