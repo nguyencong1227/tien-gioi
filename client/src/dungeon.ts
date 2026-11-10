@@ -225,7 +225,7 @@ export const MOCK_DUNGEON_SAMPLES = {
       phase: "running",
       deadlineInMs: 9 * 60_000 + 42_000,
       mobsLeft: 3,
-      boss: { hp: 13_600, maxHp: 20_000 },
+      boss: { hp: 68_000, maxHp: 100_000 },
       members: [
         { name: "Trương Tiểu Phàm", alive: true },
         { name: "Lục Tuyết Kỳ", alive: true },
@@ -251,7 +251,7 @@ export const MOCK_DUNGEON_SAMPLES = {
       result: "won",
       reason: "boss_dead",
       reward: {
-        coin: 400,
+        coin: 700,
         items: [
           { itemId: "tu_khi_dan", qty: 2 },
           { itemId: "vay_mang", qty: 3 },
