@@ -100,6 +100,40 @@ docker run --rm -v tien-gioi-data:/data -v "$PWD":/backup busybox sh -c "tar xzf
 docker compose start
 ```
 
+### 3.4. Chạy với PostgreSQL (`docker-compose.pg.yml`)
+Mặc định server lưu bằng tệp JSON (`STORE=file`, mục trên). Để dùng PostgreSQL, ghép thêm tệp `docker-compose.pg.yml` (thêm dịch vụ `db` = `postgres:16` với volume `tien-gioi-pg`, đặt `STORE=pg` + `DATABASE_URL` cho dịch vụ `game`, game chỉ khởi động khi DB đã sẵn sàng; **cổng DB không mở ra ngoài**):
+
+```bash
+# Tạo tệp .env cạnh docker-compose.yml (KHÔNG commit). Chỉ chữ và số: mật khẩu nằm trong DATABASE_URL.
+echo "POSTGRES_PASSWORD=$(openssl rand -hex 24)" > .env
+docker compose -f docker-compose.yml -f docker-compose.pg.yml up -d --build
+```
+Server tự chạy migration lúc khởi động (log `[pg] đã áp dụng migration: ...`); không kết nối được DB hoặc migration lỗi thì server **không khởi động** (xem `docker compose logs game`).
+
+**Chuyển dữ liệu từ tệp sang PostgreSQL** (đã có người chơi trên `STORE=file`). Công cụ `npm run chuyen-du-lieu` chuyển **nhân vật** (`*.json`) và **chân linh** (`souls/*.json`); tệp hỏng bị báo chứ không chuyển; chạy lại không nhân đôi; **không bao giờ xoá hay sửa tệp nguồn**. Tài khoản **không** chuyển được (giao diện kho tạo id mới nên không giữ được id mà chân linh của tài khoản khoá theo); người chơi nhận nhân vật cũ về tài khoản mới bằng "Tôi đã có nhân vật cũ" (tên + mã bí mật).
+```bash
+# 1. Sao lưu volume dữ liệu cũ (mục 3, Bước 3) và DỪNG game để tệp nguồn không đổi nữa:
+docker compose stop game
+# 2. Bật DB, chạy thử (chỉ đếm và báo lỗi, không ghi gì):
+docker compose -f docker-compose.yml -f docker-compose.pg.yml up -d db
+docker compose -f docker-compose.yml -f docker-compose.pg.yml run --rm game npm run chuyen-du-lieu -w server -- --thu
+# 3. Chuyển thật (mã thoát 0 xong; 3 = có tệp hỏng/ghi lỗi, phần còn lại vẫn được chuyển):
+docker compose -f docker-compose.yml -f docker-compose.pg.yml run --rm game npm run chuyen-du-lieu -w server
+# 4. Bật game với PostgreSQL:
+docker compose -f docker-compose.yml -f docker-compose.pg.yml up -d
+```
+`--ghi-de` ghi đè cả những nhân vật / chân linh đã có trong DB (mặc định bỏ qua). Giữ volume `tien-gioi-data` làm bản lưu trữ cho tới khi chắc chắn.
+
+**Sao lưu / khôi phục PostgreSQL** (thay cho `npm run backup`, chỉ dành cho `STORE=file`):
+```bash
+docker compose -f docker-compose.yml -f docker-compose.pg.yml exec -T db pg_dump -U tiengioi tiengioi | gzip > tiengioi-$(date +%Y%m%d-%H%M%S).sql.gz
+# Khôi phục vào DB TRỐNG (dừng game trước):
+docker compose -f docker-compose.yml -f docker-compose.pg.yml stop game
+gunzip -c tiengioi-YYYYMMDD-HHMMSS.sql.gz | docker compose -f docker-compose.yml -f docker-compose.pg.yml exec -T db psql -U tiengioi tiengioi
+docker compose -f docker-compose.yml -f docker-compose.pg.yml start game
+```
+`npm run kiem-save` hiện chỉ kiểm tệp (`STORE=file`); với PostgreSQL dùng ràng buộc của DB và `chuyen-du-lieu --thu` để rà dữ liệu cũ. `npm run tai-khoan` dùng cùng `STORE` / `DATABASE_URL` và **không cần tắt server** khi `STORE=pg`.
+
 > [!NOTE]
 > Nếu chạy trực tiếp bằng lệnh `docker run`, hãy luôn kèm cờ `--init` và `--stop-timeout 30`:
 > ```bash

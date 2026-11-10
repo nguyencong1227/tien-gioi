@@ -1,0 +1,32 @@
+# Chạy với PostgreSQL (M3 bước 3e, docs/TRIEN_KHAI.md mục 3.4). Ghép với tệp gốc:
+#   docker compose -f docker-compose.yml -f docker-compose.pg.yml up -d
+# Cần biến POSTGRES_PASSWORD (đặt trong tệp `.env` cạnh docker-compose.yml, KHÔNG commit). Chỉ dùng chữ và số
+# (vd `openssl rand -hex 24`): mật khẩu nằm trong DATABASE_URL nên ký tự đặc biệt như @ : / phải mã hoá URL.
+services:
+  db:
+    image: postgres:16
+    container_name: tien-gioi-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=tiengioi
+      - POSTGRES_USER=tiengioi
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Đặt POSTGRES_PASSWORD trong tệp .env}
+    volumes:
+      - tien-gioi-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tiengioi -d tiengioi"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    # Cố ý KHÔNG mở cổng ra máy chủ / Internet: chỉ dịch vụ `game` truy cập qua mạng nội bộ của compose
+
+  game:
+    environment:
+      - STORE=pg
+      - DATABASE_URL=postgres://tiengioi:${POSTGRES_PASSWORD}@db:5432/tiengioi
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  tien-gioi-pg:

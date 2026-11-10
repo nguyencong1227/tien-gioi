@@ -13,7 +13,8 @@
     "kiem-save": "tsx scripts/audit-saves.ts",
     "e2e": "tsx scripts/e2e.ts",
     "e2e:tai-khoan": "tsx scripts/e2e-account.ts",
-    "tai-khoan": "tsx scripts/tai-khoan.ts"
+    "tai-khoan": "tsx scripts/tai-khoan.ts",
+    "chuyen-du-lieu": "tsx scripts/chuyen-du-lieu.ts"
   },
   "dependencies": {
     "@colyseus/schema": "3.0.76",
