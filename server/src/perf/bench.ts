@@ -112,6 +112,9 @@ export function runBench(
           walletBytes += JSON.stringify(msg).length + 6 + 4; // "wallet".length = 6
         },
         chatTo: () => {},
+        limbo: () => {},
+        soul: () => {},
+        reborn: () => {},
       },
       map,
     );
@@ -358,6 +361,9 @@ export function runMultiMapBench(
             walletBytes += JSON.stringify(msg).length + 6 + 4;
           },
           chatTo: () => {},
+          limbo: () => {},
+          soul: () => {},
+          reborn: () => {},
         },
         map,
       );

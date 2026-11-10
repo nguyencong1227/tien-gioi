@@ -12,8 +12,10 @@ export function tickWorld(w: World, dtMs: number) {
   w.state.players.forEach((p, sid) => {
     const c = w.ctrl.get(sid);
     if (!c) return;
+    if (c.limbo) return; // ở Hoàng Tuyền: không hồi sinh theo đồng hồ, chỉ đầu thai khi người chơi chọn
     if (p.dead) return tickRespawn(w, p, c);
     if (w.ghosts.size > 0 && w.ghosts.has(sid)) return; // hồn lìa xác: đứng yên, không hồi phục, không tu luyện
+    c.life.playMs += dtMs; // thời gian chơi thật của kiếp (không tính chết, hồn lìa xác)
     applyInputs(w.map, p, c);
     if ((w.tick + c.posPhase) % POS_SYNC_EVERY_TICKS === 0) syncPublicPos(p);
     tickRecovery(w, sid, p, c, dt);

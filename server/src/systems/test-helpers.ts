@@ -3,6 +3,7 @@ import {
   MONSTER_BY_ID,
   DEFAULT_MAP,
   emptyInventory,
+  newSoul,
   type FxMsg,
   type GameMap,
   type InvMsg,
@@ -13,13 +14,18 @@ import {
   type ChatOut,
   type PartyMsg,
   type PartyInvitedMsg,
+  type LimboMsg,
+  type SoulMsg,
+  type RebornMsg,
+  originMult,
 } from "@tien-gioi/shared";
 import { WorldState, Player, Monster } from "../schema";
 import { World, type PlayerCtrl } from "../world";
+import type { Hub } from "../hub";
 import { applyStats } from "./progression";
 import { syncPublicPos } from "./movement";
 
-export function makeWorld(map: GameMap = DEFAULT_MAP) {
+export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
   const fx: FxMsg[] = [];
   const toasts: { sid: string; msg: ToastMsg }[] = [];
   const sys: string[] = [];
@@ -31,6 +37,9 @@ export function makeWorld(map: GameMap = DEFAULT_MAP) {
   const parties: { sid: string; msg: PartyMsg }[] = [];
   const invited: { sid: string; msg: PartyInvitedMsg }[] = [];
   const chatsTo: { sid: string; msg: ChatOut }[] = [];
+  const limbos: { sid: string; msg: LimboMsg }[] = [];
+  const souls: { sid: string; msg: SoulMsg }[] = [];
+  const reborns: { sid: string; msg: RebornMsg }[] = [];
   const w = new World(
     new WorldState(),
     {
@@ -46,10 +55,30 @@ export function makeWorld(map: GameMap = DEFAULT_MAP) {
       party: (sid, msg) => parties.push({ sid, msg }),
       partyInvited: (sid, msg) => invited.push({ sid, msg }),
       chatTo: (sid, msg) => chatsTo.push({ sid, msg }),
+      limbo: (sid, msg) => limbos.push({ sid, msg }),
+      soul: (sid, msg) => souls.push({ sid, msg }),
+      reborn: (sid, msg) => reborns.push({ sid, msg }),
     },
     map,
+    hub,
   );
-  return { w, fx, toasts, sys, chats, invs, quests, wallets, dialogs, parties, invited, chatsTo };
+  return {
+    w,
+    fx,
+    toasts,
+    sys,
+    chats,
+    invs,
+    quests,
+    wallets,
+    dialogs,
+    parties,
+    invited,
+    chatsTo,
+    limbos,
+    souls,
+    reborns,
+  };
 }
 
 export function addPlayer(w: World, sid: string, realm = 0, tier = 0) {
@@ -75,6 +104,11 @@ export function addPlayer(w: World, sid: string, realm = 0, tier = 0) {
     inv: emptyInventory(),
     itemCd: new Map(),
     quests: { active: [], done: [], daily: {} },
+    origin: "pham_gia",
+    mult: originMult("pham_gia"),
+    lifeId: `life-${sid}`,
+    life: { playMs: 0, kills: 0, bossKills: 0 },
+    soul: newSoul(sid.toLowerCase(), "t"),
     coin: 0,
     frac: { hp: 0, mp: 0, exp: 0, expAt: 0 },
   };

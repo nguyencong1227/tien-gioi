@@ -2,11 +2,11 @@
 import {
   SKILLS,
   RESPAWN_MS,
-  DEATH_EXP_LOSS,
   MONSTER_BY_ID,
   statsFor,
   killExp,
   rollCoin,
+  expMultOf,
 } from "@tien-gioi/shared";
 import type { Player, Monster } from "../schema";
 import {
@@ -22,6 +22,7 @@ import { safeSpot, syncPublicPos } from "./movement";
 import { dropLoot } from "./loot";
 import { onMonsterKilled } from "./quests";
 import { killShares } from "./party";
+import { beginLimbo } from "./reincarnation";
 import { changeCoin, splitCoin } from "./wallet";
 
 const CRIT_CHANCE = 0.1;
@@ -82,7 +83,7 @@ export function hitMonster(
   p: Player,
   mult: number,
 ) {
-  const atk = statsFor(p.realm, p.tier, p).atk; // gồm vũ khí
+  const atk = statsFor(p.realm, p.tier, p, w.ctrl.get(by)?.mult).atk; // gồm vũ khí và hệ số xuất thân
   const crit = Math.random() < CRIT_CHANCE;
   const dmg = Math.max(1, Math.round(atk * mult * rand(0.9, 1.1) * (crit ? CRIT_MULT : 1)));
   mon.hp = Math.max(0, mon.hp - dmg);
@@ -103,8 +104,13 @@ export function killMonster(w: World, id: string, mc: MonsterCtrl) {
     if (!p || p.dead) continue;
     // Quái càng mạnh, tu vi càng tăng theo cấp số nhân
     const share = Math.max(1, Math.round(killExp(mc.def, p.realm, p.tier) * frac));
-    gainExp(w, sid, p, share);
+    gainExp(w, sid, p, share, expMultOf(w.ctrl.get(sid)?.soul.unlocks));
     onMonsterKilled(w, sid, mc.def.id); // ai góp sát thương (hoặc cùng đội) cũng được tính cho nhiệm vụ
+    const life = w.ctrl.get(sid)?.life; // và cho thành tựu của kiếp (Duyên khi luân hồi)
+    if (life) {
+      life.kills++;
+      if (mc.def.boss) life.bossKills++;
+    }
   }
   if (mon) dropCoin(w, mc, mon.x, mon.y);
   if (mc.def.boss) w.events.sys(`🐉 ${mc.def.name} đã bị hạ!`);
@@ -138,12 +144,14 @@ export function hurtPlayer(w: World, sid: string, p: Player, dmg: number, from: 
   c.lastHitAt = w.now;
   w.events.dmg({ target: sid, amount: dmg, x: p.x, y: p.y - 20, toPlayer: true });
   if (p.hp <= 0) {
+    // Chết thật = luân hồi (docs/THIET_KE_LUAN_HOI.md): nhân vật của kiếp mất hẳn, linh hồn vào Hoàng Tuyền
+    if (w.reincarnate) return beginLimbo(w, sid, p, c);
+    // Nhánh hồi sinh (chết không mất kiếp, vd PK thách đấu ở bước 5): nằm tại chỗ RESPAWN_MS rồi hồi sinh ở trấn, không mất gì
     p.dead = true;
     c.deadAt = w.now;
     c.inputs.length = 0;
-    p.exp = Math.floor(p.exp * (1 - DEATH_EXP_LOSS));
     w.events.toast(sid, {
-      text: `Bị ${MONSTER_BY_ID[from.kind].name} đánh trọng thương, tổn hao tu vi.`,
+      text: `Bị ${MONSTER_BY_ID[from.kind].name} đánh trọng thương, tạm ngã xuống.`,
       tone: "bad",
     });
     for (const m of w.mctrl.values()) if (m.target === sid) m.target = null;
@@ -159,5 +167,5 @@ export function tickRespawn(w: World, p: Player, c: PlayerCtrl) {
   syncPublicPos(p); // dịch chuyển tức thời: người khác thấy ngay
   p.dead = false;
   p.meditating = false;
-  applyStats(p, true);
+  applyStats(p, true, c.mult);
 }

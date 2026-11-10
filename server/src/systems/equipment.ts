@@ -58,7 +58,7 @@ export function equip(w: World, sid: string, slot: unknown) {
   const old = p[e.slot];
   c.inv[i] = old ? { itemId: old, qty: 1 } : null;
   p[e.slot] = s.itemId;
-  applyStats(p, false);
+  applyStats(p, false, c.mult);
   sendInv(w, sid);
 }
 
@@ -72,6 +72,6 @@ export function unequip(w: World, sid: string, slot: unknown) {
   if (addToInventory(c.inv, id, 1) > 0)
     return w.events.toast(sid, { text: "Túi đồ đã đầy.", tone: "bad" });
   p[slot] = "";
-  applyStats(p, false);
+  applyStats(p, false, c.mult);
   sendInv(w, sid);
 }

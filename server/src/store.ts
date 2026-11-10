@@ -1,12 +1,16 @@
 // Lưu nhân vật bằng file JSON (bản thử). M4 sẽ thay bằng PostgreSQL.
 import { promises as fs } from "node:fs";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
 import {
   DEFAULT_MAP_ID,
+  DEFAULT_ORIGIN,
+  ITEM_BY_ID,
   getMap,
+  originOf,
   type Equipment,
   type Inventory,
+  type LifeSummary,
   type QuestProgress,
 } from "@tien-gioi/shared";
 
@@ -33,10 +37,105 @@ export interface SavedPlayer {
    * id không còn trong `MAPS` cũng vậy (đọc bằng `mapIdOf`, không tin giá trị trong file).
    */
   mapId?: string;
+  /** Định danh kiếp (chống cộng Duyên hai lần, xem docs/THIET_KE_LUAN_HOI.md mục 4); file cũ không có thì sinh khi vào game */
+  lifeId?: string;
+  /**
+   * Nhân vật đang ở Hoàng Tuyền (đã chết thật, chưa đầu thai): hồ sơ đã đặt lại về Phàm Nhân, đồ và Linh thạch của kiếp
+   * cũ chỉ còn ở đây (`keepable`, `coinAtDeath`). Có thì vào game là hiện lại màn hình Hoàng Tuyền (docs/THIET_KE_LUAN_HOI.md).
+   */
+  limbo?: LimboRecord;
+  /** Xuất thân của kiếp này (đã chọn lúc đầu thai); bỏ trống / lạ là Phàm gia */
+  origin?: string;
+  /** Bộ đếm thành tựu của kiếp này (dùng tính Duyên); file cũ không có thì bắt đầu từ 0 */
+  life?: LifeCounters;
   /** Lần đi qua cổng gần nhất (ms, `Date.now()`): hồi chiêu `TRAVEL_COOLDOWN_MS` tính qua cả các phòng */
   travelAt?: number;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Bản ghi Hoàng Tuyền trong hồ sơ nhân vật. */
+export interface LimboRecord {
+  /** `lifeId` của kiếp ĐÃ KẾT THÚC: khoá chống cộng Duyên hai lần (`Soul.lastCreditedLife`) */
+  endedLifeId: string;
+  summary: LifeSummary;
+  /** Trang bị có thể giữ lại (id vật phẩm, lặp lại nếu có nhiều món cùng loại), chụp lúc chết */
+  keepable: string[];
+  /** Linh thạch lúc chết (mang theo tới `coinCarryCap`) */
+  coinAtDeath: number;
+  /** Kiếp này có được tính (tăng bộ đếm kiếp) hay không */
+  counts: boolean;
+  /** Đã cộng Duyên vào chân linh chưa (chạy lại sau sập máy thì cộng tiếp, idempotent theo `endedLifeId`) */
+  credited: boolean;
+}
+
+const LIFE_CAP = 1_000_000_000_000;
+
+const int = (v: unknown, max = LIFE_CAP): number =>
+  typeof v === "number" && Number.isFinite(v) ? Math.min(max, Math.max(0, Math.floor(v))) : 0;
+
+/** Đọc bản ghi Hoàng Tuyền từ file lưu: không tin file. Không phải object hợp lệ thì `undefined` (coi như không ở Hoàng Tuyền). */
+export function sanitizeLimbo(raw: unknown): LimboRecord | undefined {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const r = raw as Record<string, unknown>;
+  const s =
+    r.summary !== null && typeof r.summary === "object"
+      ? (r.summary as Record<string, unknown>)
+      : {};
+  if (typeof r.endedLifeId !== "string" || !r.endedLifeId) return undefined;
+  const keepable = (Array.isArray(r.keepable) ? r.keepable : [])
+    .filter((id): id is string => typeof id === "string" && ITEM_BY_ID[id]?.type === "equip")
+    .slice(0, 30);
+  return {
+    endedLifeId: r.endedLifeId.slice(0, 64),
+    summary: {
+      kiep: Math.max(1, int(s.kiep, 1_000_000)),
+      realm: int(s.realm, 20),
+      tier: int(s.tier, 20),
+      minutes: int(s.minutes),
+      kills: int(s.kills),
+      bossKills: int(s.bossKills),
+      gain: int(s.gain, 1_000_000_000),
+    },
+    keepable,
+    coinAtDeath: int(r.coinAtDeath, 1_000_000_000),
+    counts: r.counts === true,
+    credited: r.credited === true,
+  };
+}
+
+/** Đọc xuất thân từ file lưu: id hợp lệ trong `ORIGINS`, còn lại là Phàm gia. */
+export function sanitizeOrigin(raw: unknown): string {
+  return originOf(raw)?.id ?? DEFAULT_ORIGIN;
+}
+
+/** Bộ đếm thành tựu của kiếp hiện tại (dữ liệu riêng của server, không vào state chung). */
+export interface LifeCounters {
+  /** Thời gian chơi thật (ms): nhân vật ở trong game, không tính hồn lìa xác / Hoàng Tuyền */
+  playMs: number;
+  /** Số quái đã hạ (góp sát thương hoặc cùng đội, như tiến độ nhiệm vụ) */
+  kills: number;
+  /** Trong đó số trùm */
+  bossKills: number;
+}
+
+/** Đọc bộ đếm từ file lưu: không tin giá trị trong file (kiểu sai, âm, NaN, vô cùng, số lẻ đều về số nguyên hợp lệ). */
+export function sanitizeLife(raw: unknown): LifeCounters {
+  const r = raw !== null && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const n = (v: unknown) =>
+    typeof v === "number" && Number.isFinite(v)
+      ? Math.min(LIFE_CAP, Math.max(0, Math.floor(v)))
+      : 0;
+  const kills = n(r.kills);
+  return { playMs: n(r.playMs), kills, bossKills: Math.min(kills, n(r.bossKills)) };
+}
+
+/** Định danh kiếp mới. */
+export const newLifeId = () => randomUUID();
+
+/** Đọc `lifeId` từ file lưu: không phải chuỗi hợp lý (8-64 ký tự, không ký tự điều khiển) thì sinh mã mới. */
+export function sanitizeLifeId(raw: unknown): string {
+  return typeof raw === "string" && /^[\x21-\x7e]{8,64}$/.test(raw) ? raw : newLifeId();
 }
 
 export interface QuestSave {
