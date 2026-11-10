@@ -51,11 +51,7 @@ import {
 } from "@tien-gioi/shared";
 import { preloadAssets, makeTextures, dirFromAngle, TILESET_KEY, ATLAS_KEY } from "../textures";
 import { ui } from "../ui";
-import {
-  buildMockThuMonDialog,
-  isMockDungeonEnabled,
-  MOCK_DUNGEON_SAMPLES,
-} from "../dungeon";
+import { buildMockThuMonDialog, isMockDungeonEnabled, MOCK_DUNGEON_SAMPLES } from "../dungeon";
 import { replayEarlyMessages } from "../early-messages";
 import { sound } from "../audio";
 import { joystick, setupJoystick } from "../joystick";

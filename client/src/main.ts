@@ -13,7 +13,7 @@ import {
 } from "@tien-gioi/shared";
 import { WorldScene } from "./scenes/WorldScene";
 import { ui } from "./ui";
-import { buildMockThuMonDialog, MOCK_DUNGEON_SAMPLES } from "./dungeon";
+import { buildMockThuMonDialog, isMockDungeonEnabled, MOCK_DUNGEON_SAMPLES } from "./dungeon";
 import { captureEarlyMessages } from "./early-messages";
 import { joinWithRedirect } from "./connection";
 import { clearToken, getToken } from "./auth";
@@ -21,6 +21,55 @@ import { initAuthUi, switchAuthView } from "./auth-ui";
 
 const NAME_KEY = "tien-gioi:name";
 const SECRET_KEY = "tien-gioi:secret";
+
+function createMockDungeonRoom(): any {
+  const handlers = new Map<string, ((msg: any) => void)[]>();
+  return {
+    sessionId: "mock-session-01",
+    reconnectionToken: "mock-token-01",
+    onMessage: (type: string, fn: (msg: any) => void) => {
+      if (!handlers.has(type)) handlers.set(type, []);
+      handlers.get(type)!.push(fn);
+      return () => {
+        const list = handlers.get(type);
+        if (list) {
+          const idx = list.indexOf(fn);
+          if (idx !== -1) list.splice(idx, 1);
+        }
+      };
+    },
+    onStateChange: () => {},
+    onLeave: () => {},
+    send: (type: string, data: any) => {
+      if (import.meta.env.DEV) console.log("[mock-dungeon-send]", type, data);
+    },
+    leave: () => {},
+    state: {
+      players: new Map([
+        [
+          "mock-session-01",
+          {
+            name: "Trương Tiểu Phàm",
+            realm: 1,
+            tier: 8,
+            hp: 2500,
+            maxHp: 2500,
+            mp: 1200,
+            maxMp: 1200,
+            exp: 8000,
+            x: 512,
+            y: 896,
+            lastSeq: 0,
+            dead: false,
+            meditating: false,
+          },
+        ],
+      ]),
+      monsters: new Map(),
+      loot: new Map(),
+    },
+  };
+}
 
 function serverUrl() {
   const env = import.meta.env.VITE_SERVER_URL as string | undefined;
@@ -89,6 +138,14 @@ initAuthUi({
     await start(room, mapId);
   },
 });
+
+// Chế độ máy chủ Bí cảnh giả lập (?dungeon=mock) để thử nghiệm và chụp ảnh không cần server 4b/4c
+if (typeof window !== "undefined" && isMockDungeonEnabled()) {
+  const mockRoom = createMockDungeonRoom();
+  start(mockRoom, DEFAULT_MAP_ID).catch((err) => {
+    console.error("Lỗi khởi động máy chủ bí cảnh giả lập:", err);
+  });
+}
 
 if (
   typeof window !== "undefined" &&
@@ -310,7 +367,17 @@ async function start(room: Room, mapId: string) {
         if (activeScene) {
           activeScene.changeMap(room, dMap);
           (activeScene as any).predX = dMap.lairPx ? dMap.lairPx.x : dMap.townPx.x;
-          (activeScene as any).predY = dMap.lairPx ? dMap.lairPx.y + 80 : dMap.townPx.y;
+          (activeScene as any).predY = dMap.lairPx ? dMap.lairPx.y + 70 : dMap.townPx.y;
+          if (room?.state?.monsters) {
+            room.state.monsters.set("boss_yeu_vuong", {
+              kind: "yeu_vuong",
+              x: dMap.lairPx ? dMap.lairPx.x : 512,
+              y: dMap.lairPx ? dMap.lairPx.y : 150,
+              hp: 68000,
+              maxHp: 100000,
+              angle: Math.PI / 2,
+            });
+          }
         }
         ui.onDungeonState(MOCK_DUNGEON_SAMPLES.stateBossFight());
       },
