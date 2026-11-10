@@ -35,6 +35,11 @@ const btn = document.getElementById("login-btn") as HTMLButtonElement;
 const err = document.getElementById("login-err")!;
 nameInput.value = localStorage.getItem(NAME_KEY) ?? "";
 
+let activeClient: Client | null = null;
+let activeScene: WorldScene | null = null;
+let activeToken: string | null = null;
+let isReconnecting = false;
+
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
   btn.disabled = true;
@@ -42,6 +47,7 @@ form.addEventListener("submit", async (e) => {
   const name = nameInput.value.trim();
   try {
     const client = new Client(serverUrl());
+    activeClient = client;
     const room = await client.joinOrCreate(ROOM_NAME, {
       name,
       secret: secret(),
@@ -54,6 +60,64 @@ form.addEventListener("submit", async (e) => {
     btn.disabled = false;
   }
 });
+
+function setupRoomLifecycle(room: Room) {
+  activeToken = room.reconnectionToken;
+
+  room.onLeave(async (code) => {
+    // 1000: đóng bình thường; 4000-4999: mã của ứng dụng (4000 chủ động thoát, 4429 bị ngắt vì spam)
+    if (code === 1000 || (code >= 4000 && code <= 4999)) {
+      if (code !== 1000) {
+        ui.toast({ text: "Mất kết nối với Tiên Giới. Tải lại trang để vào lại.", tone: "bad" });
+      }
+      return;
+    }
+
+    // Các mã khác (1006 rớt mạng, 1001 đi khỏi...): tự động thử nối lại trong tối đa 20s
+    if (!activeToken || !activeClient || isReconnecting) return;
+    isReconnecting = true;
+    activeScene?.setReconnecting(true);
+
+    const token = activeToken;
+    const client = activeClient;
+    const GRACE_SECONDS = 20;
+    const RETRY_INTERVAL_MS = 1500;
+    const deadline = Date.now() + GRACE_SECONDS * 1000;
+
+    let reconnectedRoom: Room | null = null;
+
+    while (Date.now() < deadline) {
+      const remainingSec = Math.max(1, Math.ceil((deadline - Date.now()) / 1000));
+      ui.showReconnectNotice(`Mất kết nối, đang nối lại... (còn ${remainingSec} giây)`);
+
+      try {
+        reconnectedRoom = await client.reconnect(token);
+        if (reconnectedRoom) break;
+      } catch (err: any) {
+        const msg = String(err?.message ?? "");
+        // Dừng sớm nếu server trả lỗi dứt khoát: phòng không tồn tại hoặc token hết hạn
+        if (msg.includes("not found") || msg.includes("expired") || err?.code === 4212) {
+          break;
+        }
+      }
+
+      await new Promise((r) => setTimeout(r, RETRY_INTERVAL_MS));
+    }
+
+    if (reconnectedRoom) {
+      activeToken = reconnectedRoom.reconnectionToken;
+      activeScene?.attachRoom(reconnectedRoom);
+      activeScene?.setReconnecting(false);
+      isReconnecting = false;
+      ui.toast({ text: "Đã nối lại.", tone: "good" });
+      setupRoomLifecycle(reconnectedRoom);
+    } else {
+      activeScene?.setReconnecting(false);
+      isReconnecting = false;
+      ui.toast({ text: "Mất kết nối với Tiên Giới. Tải lại trang để vào lại.", tone: "bad" });
+    }
+  });
+}
 
 async function start(room: Room) {
   // Chờ font tiếng Việt tải xong trước khi Phaser vẽ Text lên canvas lần đầu
@@ -68,6 +132,7 @@ async function start(room: Room) {
   ) {
     (window as any).__ui = ui;
   }
+  activeScene = new WorldScene(room);
   new Phaser.Game({
     type: Phaser.AUTO,
     parent: "game",
@@ -75,12 +140,9 @@ async function start(room: Room) {
     render: { batchSize: 8192 },
     scale: { mode: Phaser.Scale.RESIZE, width: window.innerWidth, height: window.innerHeight },
     input: { activePointers: 3 },
-    scene: [new WorldScene(room)],
+    scene: [activeScene],
   });
-  room.onLeave((code) => {
-    if (code !== 1000)
-      ui.toast({ text: "Mất kết nối với Tiên Giới. Tải lại trang để vào lại.", tone: "bad" });
-  });
+  setupRoomLifecycle(room);
 }
 
 // Chỉ đăng ký Service Worker ở bản build production; không bật khi chạy npm run dev để tránh làm lệch cache Vite HMR.

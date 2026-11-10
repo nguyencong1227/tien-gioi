@@ -2205,3 +2205,54 @@ body.low-fx #btn-talk {
     max-width: 100%;
   }
 }
+
+/* Chỉ báo tự động nối lại mạng (#117) */
+.reconnect-banner {
+  position: fixed;
+  z-index: 45;
+  top: max(10px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(163, 29, 29, 0.92);
+  color: #fff;
+  border: 1px solid #ff7875;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.7);
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+.reconnect-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff4d4f;
+  box-shadow: 0 0 8px #ff4d4f;
+  animation: pulse-dot 1s infinite alternate;
+}
+@keyframes pulse-dot {
+  from {
+    opacity: 0.4;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+body.reconnecting #hud-controls,
+body.reconnecting #joyzone,
+body.reconnecting #btn-talk,
+body.reconnecting #btn-pickup {
+  opacity: 0.35;
+  pointer-events: none;
+  filter: grayscale(0.5);
+}
+#toast-reconnecting {
+  animation: none !important;
+  opacity: 1 !important;
+}
