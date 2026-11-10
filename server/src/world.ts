@@ -31,6 +31,7 @@ import type { SavedPlayer, QuestSave, LifeCounters, LimboRecord } from "./store"
 import type { LimboMsg, RebornMsg, Soul, SoulMsg, StatMult } from "@tien-gioi/shared";
 import { Interest } from "./systems/interest";
 import type { SectService } from "./sect-service";
+import type { AuditFn } from "./audit";
 import { Hub } from "./hub";
 import type { Identity } from "./identity";
 import type { Run } from "./systems/dungeon";
@@ -228,6 +229,10 @@ export class World {
    * Không có hook: coi như đã lưu (bench, test đơn vị không có đĩa).
    */
   onSaveNow: ((sid: string) => Promise<boolean>) | null = null;
+  /** Nhật ký kiểm toán (`server/src/audit.ts`): `WorldRoom` đặt; null (test, bench) = không ghi. Chỉ gọi khi có sự kiện nhạy cảm, không trong tick nóng. */
+  audit: AuditFn | null = null;
+  /** Đổi ví từ ngần này trở lên (cộng hoặc trừ) thì ghi `wallet.big`. Infinity = không ghi. */
+  auditCoinMin = Infinity;
 
   constructor(
     readonly state: WorldState,
