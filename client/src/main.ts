@@ -589,7 +589,7 @@ function getPwaGameState(): PwaGameState {
     inLimbo: ui.isLimboOpen(),
     isDead: Boolean(me?.dead),
     isTravelling: isTraveling,
-    inCombat: me ? me.hp < me.maxHp : false,
+    inCombat: activeScene ? activeScene.isInCombat() : false,
   };
 }
 

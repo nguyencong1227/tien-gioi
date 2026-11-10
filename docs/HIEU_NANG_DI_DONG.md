@@ -33,12 +33,17 @@
    - Dung lượng bộ nhớ JS duy trì ổn định trong khoảng ~20–35 MB, hoàn toàn an toàn cho thiết bị di động có RAM từ 2 GB trở lên.
 
 ## 4. Đề xuất cải thiện khi chạy trên thiết bị yếu (tham khảo, chưa tối ưu mù)
-*Dành cho tương lai nếu gặp thiết bị cấu hình rất thấp (< 30 FPS):*
-1. **Bật chế độ Giảm hiệu ứng (`tg_low_fx = 1`)**: Tắt hào quang aura thiền định, vòng sáng pháp bảo và hiệu ứng nhấp nháy chữ bay. Số đo ở bảng trên cho thấy chế độ này giúp giảm thêm 2–3 ms thời gian render mỗi frame.
+*Dành cho tương lai nếu gặp thiết bị cấu hình rất thấp (< 30 FPS trên máy thật):*
+1. **Bật chế độ Giảm hiệu ứng (`tg_low_fx = 1`)**: Tắt hào quang aura thiền định, vòng sáng pháp bảo và hiệu ứng nhấp nháy chữ bay. Giúp giảm tải xử lý hạt và giải phóng dung lượng bộ nhớ JS heap.
 2. **Ẩn tên người chơi ở xa (`tg_hide_names = 1`)**: Giảm số lượng đối tượng Text canvas khi đông người tụ tập.
 3. **Phân trang vẽ sprite theo khoảng cách**: Chỉ cập nhật animation của người chơi trong bán kính 300px.
 
-## 5. Cách chạy lại lệnh đo
+## 5. Giới hạn của phép đo (Limitations)
+1. **Môi trường đo là Headless Browser**: Thử nghiệm được thực hiện trên Chrome Headless (Linux host) qua giao thức CDP; các nhân vật trong cảnh thử nghiệm đứng yên hoặc chạy animation định sẵn.
+2. **GPU di động thực tế**: Cơ chế làm chậm CPU 4x của Chrome chỉ đo lường thời gian thực thi mã nguồn JavaScript / WebAssembly, chưa phản ánh đầy đủ năng lực của chip đồ họa di động (GPU Mali / Adreno) về băng thông bộ nhớ và tỷ lệ lấp đầy (fillrate) khi nhiều layer canvas đè nhau.
+3. **Mục đích**: Bảng số liệu là căn cứ chứng minh kiến trúc hiện tại nhẹ nhàng và đủ mượt mà ở tầng CPU logic; tuyệt đối không tối ưu mù trước khi có số đo từ thiết bị thật.
+
+## 6. Cách chạy lại lệnh đo
 ```bash
 npm run build
 node client/scripts/measure-mobile-perf.mjs
