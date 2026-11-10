@@ -22,6 +22,7 @@ import {
   MOCK_DUNGEON_SAMPLES,
 } from "./dungeon";
 import { isMockDuelEnabled, MOCK_DUEL_SAMPLES } from "./duel";
+import { isMockSectEnabled, MOCK_SECT_SAMPLES } from "./sect";
 import { captureEarlyMessages } from "./early-messages";
 import { joinWithRedirect } from "./connection";
 import { clearToken, getToken } from "./auth";
@@ -147,10 +148,10 @@ initAuthUi({
   },
 });
 
-// Chế độ máy chủ giả lập (?dungeon=mock, ?dungeon=fallen hoặc ?duel=mock) để thử nghiệm và chụp ảnh không cần server thật
+// Chế độ máy chủ giả lập (?dungeon=mock, ?dungeon=fallen, ?duel=mock hoặc ?sect=mock) để thử nghiệm và chụp ảnh không cần server thật
 if (
   typeof window !== "undefined" &&
-  (isMockDungeonEnabled() || isMockDungeonFallen() || isMockDuelEnabled())
+  (isMockDungeonEnabled() || isMockDungeonFallen() || isMockDuelEnabled() || isMockSectEnabled())
 ) {
   const isFallen = isMockDungeonFallen();
   const mockRoom = createMockDungeonRoom(isFallen);
@@ -160,6 +161,10 @@ if (
       if (isFallen) {
         setTimeout(() => {
           (window as any).__mockDungeon?.showFallen?.();
+        }, 150);
+      } else if (isMockSectEnabled()) {
+        setTimeout(() => {
+          (window as any).__mockSect?.showLeader?.();
         }, 150);
       }
     })
@@ -437,6 +442,39 @@ async function start(room: Room, mapId: string) {
         ui.closeDuelEndModal();
       },
     };
+    (window as any).__mockSect = {
+      showNone: () => {
+        ui.onSect({ sect: null });
+        ui.toggleSectModal(true);
+      },
+      showLeader: () => {
+        ui.onSect({ sect: MOCK_SECT_SAMPLES.leaderView() });
+        ui.onSectPresence(MOCK_SECT_SAMPLES.presence());
+        ui.toggleSectModal(true);
+      },
+      showElder: () => {
+        ui.onSect({ sect: MOCK_SECT_SAMPLES.elderView() });
+        ui.onSectPresence(MOCK_SECT_SAMPLES.presence());
+        ui.toggleSectModal(true);
+      },
+      showMember: () => {
+        ui.onSect({ sect: MOCK_SECT_SAMPLES.memberView() });
+        ui.onSectPresence(MOCK_SECT_SAMPLES.presence());
+        ui.toggleSectModal(true);
+      },
+      showInvite: () => {
+        ui.onSectInvited(MOCK_SECT_SAMPLES.invited());
+      },
+      switchTab: (tab: "overview" | "members" | "treasury") => {
+        ui.switchSectTab(tab);
+      },
+      openModal: () => ui.toggleSectModal(true),
+      closeModal: () => ui.toggleSectModal(false),
+    };
+
+    if (isMockSectEnabled()) {
+      (window as any).__mockSect.showLeader();
+    }
   }
   new Phaser.Game({
     type: Phaser.AUTO,

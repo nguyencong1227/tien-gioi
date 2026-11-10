@@ -40,6 +40,7 @@ import {
   type DuelInvitedMsg,
   type DuelStateMsg,
   type DungeonEndMsg,
+  type DungeonFallenMsg,
   type DungeonInviteMsg,
   type DungeonStateMsg,
   type GameMap,
@@ -111,6 +112,8 @@ interface CliArgs {
   account: boolean;
   loginStorm: boolean;
   dungeon: boolean;
+  dungeonFall: boolean;
+  dungeonFallRate: number;
   duel: boolean;
 }
 
@@ -143,6 +146,8 @@ function parseArgs(argv: string[]): CliArgs {
   let account = false;
   let loginStorm = false;
   let dungeon = false;
+  let dungeonFall = false;
+  let dungeonFallRate = 0;
   let duel = false;
 
   for (const arg of argv) {
@@ -153,7 +158,16 @@ function parseArgs(argv: string[]): CliArgs {
     else if (arg === "--travel" || arg === "--portal") travel = true;
     else if (arg === "--die") die = true;
     else if (arg === "--dungeon") dungeon = true;
-    else if (arg === "--duel" || arg === "--pk") duel = true;
+    else if (arg === "--dungeon-fall") {
+      dungeon = true;
+      dungeonFall = true;
+      dungeonFallRate = 1;
+    } else if (arg.startsWith("--dungeon-fall=")) {
+      dungeon = true;
+      dungeonFall = true;
+      const rate = Number(arg.slice(15));
+      dungeonFallRate = isNaN(rate) ? 1 : Math.max(0, Math.min(1, rate));
+    } else if (arg === "--duel" || arg === "--pk") duel = true;
     else if (arg.startsWith("--party")) {
       const val = arg.slice(7).replace(/^=/, "");
       partySize = val ? Math.max(2, Math.min(4, Number(val))) : 4;
@@ -252,6 +266,8 @@ function parseArgs(argv: string[]): CliArgs {
     account,
     loginStorm,
     dungeon,
+    dungeonFall,
+    dungeonFallRate,
     duel,
   };
 }
@@ -696,6 +712,12 @@ interface BotState {
   dungeonState?: DungeonStateMsg;
   dungeonLastEndAt: number;
   nextDungeonOpenAt: number;
+  // Các trường cho thử tải gục bí cảnh (--dungeon-fall, #236)
+  dungeonFall?: boolean;
+  dungeonFallenCount: number;
+  dungeonFallExitCount: number;
+  dungeonNewLifesCount: number;
+  isFallenWaitingExit: boolean;
   // Các trường cho thử tải PK thách đấu (--duel, #219)
   duel?: boolean;
   duelOpponentName?: string;
@@ -809,6 +831,11 @@ export interface LoadTestMetrics {
   dungeonOpenLatencyAvgMs?: number;
   dungeonOpenLatencyP50Ms?: number;
   dungeonOpenLatencyP95Ms?: number;
+  /** Chỉ số gục trong bí cảnh (#236) */
+  dungeonFall?: boolean;
+  dungeonFallenTotal?: number;
+  dungeonFallExits?: number;
+  dungeonNewLifes?: number;
   /** Các chỉ số thử tải PK thách đấu (#219) */
   duel?: boolean;
   duelMatchesTotal?: number;
@@ -975,6 +1002,10 @@ function bindRoomEvents(
   room.onMessage("quests", () => {});
   room.onMessage("dialog", () => {});
   room.onMessage("travelTo", (msg: TravelToMsg) => {
+    if (b.isFallenWaitingExit) {
+      if (isMeasuring()) b.dungeonFallExitCount++;
+      b.isFallenWaitingExit = false;
+    }
     if (onTravelTo) onTravelTo(msg);
   });
   room.onMessage(DUNGEON_MSG.invite, (msg: DungeonInviteMsg) => {
@@ -984,6 +1015,10 @@ function bindRoomEvents(
   });
   room.onMessage(DUNGEON_MSG.state, (msg: DungeonStateMsg) => {
     b.dungeonState = msg;
+  });
+  room.onMessage(DUNGEON_MSG.fallen, (_msg: DungeonFallenMsg) => {
+    if (isMeasuring()) b.dungeonFallenCount++;
+    b.isFallenWaitingExit = true;
   });
   room.onMessage(DUNGEON_MSG.end, (msg: DungeonEndMsg) => {
     b.dungeonLastEndAt = performance.now();
@@ -1019,6 +1054,9 @@ function bindRoomEvents(
   room.onMessage("limbo", (msg: LimboMsg) => {
     if (isMeasuring()) {
       b.deathsCount++;
+      if (isDungeonMap(b.map.def.id)) {
+        b.dungeonNewLifesCount++;
+      }
       if (b.diedAt > 0) {
         b.limboLatencies.push(performance.now() - b.diedAt);
         b.diedAt = 0;
@@ -1155,6 +1193,8 @@ async function runLoadTest(
   die = false,
   account = false,
   dungeon = false,
+  dungeonFall = false,
+  dungeonFallRate = 0,
   duel = false,
 ): Promise<LoadTestMetrics> {
   const currentMap = getMap(mapId) ?? DEFAULT_MAP;
@@ -1166,7 +1206,11 @@ async function runLoadTest(
   const travelSuffix = travel ? ", travel qua cổng" : "";
   const dieSuffix = die ? ", bot tự tử (--die)" : "";
   const accountSuffix = account ? ", tài khoản (--account)" : "";
-  const dungeonSuffix = dungeon ? ", bí cảnh (--dungeon)" : "";
+  const dungeonSuffix = dungeon
+    ? dungeonFall
+      ? `, bí cảnh gục (--dungeon-fall=${dungeonFallRate})`
+      : ", bí cảnh (--dungeon)"
+    : "";
   const duelSuffix = duel ? ", thách đấu PK (--duel)" : "";
   const mapSuffix =
     currentMap.def.id !== DEFAULT_MAP.def.id ? `, bản đồ=${currentMap.def.name}` : "";
@@ -1453,6 +1497,11 @@ async function runLoadTest(
       dungeonOpenLatencies: [],
       dungeonLastEndAt: 0,
       nextDungeonOpenAt: now + 1500 + Math.random() * 2000,
+      dungeonFall: dungeonFall && (dungeonFallRate >= 1 || Math.random() < dungeonFallRate),
+      dungeonFallenCount: 0,
+      dungeonFallExitCount: 0,
+      dungeonNewLifesCount: 0,
+      isFallenWaitingExit: false,
       duel,
       duelOpponentName: undefined,
       duelPhase: undefined,
@@ -1574,7 +1623,34 @@ async function runLoadTest(
             });
           }
 
-          if (targetMon) {
+          if (b.isFallenWaitingExit) {
+            // Đã gục: đứng yên chờ server đưa về Lạc Hà
+            dx = 0;
+            dy = 0;
+          } else if (b.dungeonFall) {
+            // Bot cố ý gục: áp sát quái / hang trùm để quái đánh nhưng KHÔNG phản kháng
+            if (targetMon) {
+              const dist = Math.hypot(targetMon.x - b.predX, targetMon.y - b.predY);
+              if (dist > 30) {
+                const angle = Math.atan2(targetMon.y - b.predY, targetMon.x - b.predX);
+                dx = Math.cos(angle);
+                dy = Math.sin(angle);
+              } else {
+                dx = 0;
+                dy = 0;
+              }
+            } else {
+              const distToLair = Math.hypot(lair.x - b.predX, lair.y - b.predY);
+              if (distToLair > 20) {
+                const a = Math.atan2(lair.y - b.predY, lair.x - b.predX);
+                dx = Math.cos(a);
+                dy = Math.sin(a);
+              } else {
+                dx = 0;
+                dy = 0;
+              }
+            }
+          } else if (targetMon) {
             const dist = Math.hypot(targetMon.x - b.predX, targetMon.y - b.predY);
             const angle = Math.atan2(targetMon.y - b.predY, targetMon.x - b.predX);
             if (dist > SKILLS.slash.range) {
@@ -2381,6 +2457,9 @@ async function runLoadTest(
   const totalDungeonRuns = bots.reduce((s, b) => s + b.dungeonRunsCount, 0);
   const totalDungeonWins = bots.reduce((s, b) => s + b.dungeonRunsWon, 0);
   const totalDungeonLosses = bots.reduce((s, b) => s + b.dungeonRunsLost, 0);
+  const totalDungeonFallen = bots.reduce((s, b) => s + b.dungeonFallenCount, 0);
+  const totalDungeonFallExits = bots.reduce((s, b) => s + b.dungeonFallExitCount, 0);
+  const totalDungeonNewLifes = bots.reduce((s, b) => s + b.dungeonNewLifesCount, 0);
 
   const dungeonOpenLatencyAvgMs =
     allDungeonOpenLatencies.length > 0
@@ -2501,6 +2580,10 @@ async function runLoadTest(
     dungeonOpenLatencyAvgMs,
     dungeonOpenLatencyP50Ms,
     dungeonOpenLatencyP95Ms,
+    dungeonFall: dungeonFall ? true : undefined,
+    dungeonFallenTotal: dungeonFall || totalDungeonFallen > 0 ? totalDungeonFallen : undefined,
+    dungeonFallExits: dungeonFall || totalDungeonFallExits > 0 ? totalDungeonFallExits : undefined,
+    dungeonNewLifes: dungeonFall || totalDungeonNewLifes > 0 ? totalDungeonNewLifes : undefined,
     duel: duel ? true : undefined,
     duelMatchesTotal: duel || totalDuelMatches > 0 ? totalDuelMatches : undefined,
     duelMatchesWon: duel || totalDuelWins > 0 ? totalDuelWins : undefined,
@@ -2604,6 +2687,11 @@ function printMetrics(m: LoadTestMetrics) {
   if (m.dungeon || (m.dungeonRunsTotal !== undefined && m.dungeonRunsTotal > 0)) {
     console.log(
       `- Thử tải Bí cảnh (--dungeon): ${m.dungeonRunsTotal ?? 0} lần mở run | Thắng: ${m.dungeonRunsWon ?? 0} | Thua: ${m.dungeonRunsLost ?? 0} | Độ trễ mở -> vào phòng: TB ${m.dungeonOpenLatencyAvgMs ?? "–"} ms (p50: ${m.dungeonOpenLatencyP50Ms ?? "–"} ms, p95: ${m.dungeonOpenLatencyP95Ms ?? "–"} ms)`,
+    );
+  }
+  if (m.dungeonFall || (m.dungeonFallenTotal !== undefined && m.dungeonFallenTotal > 0)) {
+    console.log(
+      `- Thử tải gục bí cảnh (--dungeon-fall): ${m.dungeonFallenTotal ?? 0} lần gục | ${m.dungeonFallExits ?? 0} lần bị đẩy ra Lạc Hà | Kiếp mới phát sinh: ${m.dungeonNewLifes ?? 0} (mục tiêu 0)`,
     );
   }
   if (m.duel || (m.duelMatchesTotal !== undefined && m.duelMatchesTotal > 0)) {
@@ -2895,6 +2983,8 @@ async function main() {
           args.die,
           args.account,
           args.dungeon,
+          args.dungeonFall,
+          args.dungeonFallRate,
           args.duel,
         ),
       );

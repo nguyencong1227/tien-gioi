@@ -478,8 +478,8 @@ Lưu ý khi viết thêm kịch bản: các nút giao diện bắt `pointerdown`
 
 ## 10. Thử tải Bí cảnh, Bot `--dungeon` & Kiểm tra Rò rỉ (M3.4 - Issue #201)
 
-### 10.1. Kịch bản bot `--dungeon` trong `server/scripts/bots.ts`
-Kịch bản `server/scripts/bots.ts` được bổ sung cờ `--dungeon` để mô phỏng và thử tải tính năng Bí cảnh:
+### 10.1. Kịch bản bot `--dungeon` & `--dungeon-fall` trong `server/scripts/bots.ts`
+Kịch bản `server/scripts/bots.ts` được bổ sung cờ `--dungeon` và `--dungeon-fall` để mô phỏng và thử tải tính năng Bí cảnh:
 - **Tổ đội tự động:** Khi bật `--dungeon`, nếu chưa chỉ định `--party` thì mặc định đặt `partySize = 4` (chuẩn theo thiết kế bí cảnh 2–4 người).
 - **Gieo hồ sơ cảnh giới hợp lệ:** Bot được gieo với cảnh giới Luyện Khí Tầng 9 (`realm = 1, tier = 8`, khớp với điều kiện tối thiểu `minStep` của Linh Hư Bí Cảnh) và xuất hiện tại khu vực gần NPC Thủ Môn ở Lạc Hà Trấn.
 - **Quy trình hoạt động tự động:**
@@ -488,15 +488,21 @@ Kịch bản `server/scripts/bots.ts` được bổ sung cờ `--dungeon` để 
   3. **Vào phòng bí cảnh riêng qua `joinById`:** Client nhận tin `travelTo { mapId: "linh_hu", roomId }` và tự động gọi `client.joinById(roomId)` để chuyển sang phòng Colyseus của bí cảnh.
   4. **Tác chiến trong bí cảnh:** Bot di chuyển tới hang trùm `map.lairPx` (32, 9), tìm quái/trùm gần nhất và thi triển kiếm chiêu/kiếm khí.
   5. **Dọn dẹp và rời phòng:** Khi nhận `dungeonEnd` (hoặc sau khi hạ trùm/hết giờ), bot gửi `dungeonLeave` để nhận `travelTo` trở về Lạc Hà Trấn.
+- **Chế độ bot cố tình gục (`--dungeon-fall[=tỉ lệ]`):**
+  - Bot áp sát quái / hang trùm trong tầm 30 px nhưng không tấn công, đứng yên chịu đòn để kiểm thử cơ chế gục trong bí cảnh (M3.4).
+  - Ghi nhận metrics: số lần gục (`dungeonFallenTotal`), số lần bị đẩy ra Lạc Hà (`dungeonFallExits`), và kiểm tra số kiếp mới phát sinh (`dungeonNewLifes`: bắt buộc bằng 0).
 
 Cách chạy:
 ```bash
 # Chạy 20 bot (5 đội 4 người) mở và tham gia bí cảnh:
 npm run bots -w server -- --bots=20 --dungeon --duration=30
+
+# Chạy thử tải kịch bản bot cố ý gục trong bí cảnh (tỉ lệ 50%):
+npm run bots -w server -- --bots=8 --dungeon-fall=0.5 --duration=30
 ```
 
 ### 10.2. Kết quả Thử tải & Stress Test (`server/scripts/dungeon-stress.test.ts`)
-Bộ kiểm thử stress test tự động hoá 6 kịch bản then chốt trên tiến trình server Colyseus thật:
+Bộ kiểm thử stress test tự động hoá 14 kịch bản then chốt trên tiến trình server Colyseus thật:
 
 | Kịch bản kiểm thử | Kết quả thực tế | Tiêu chuẩn đánh giá | Trạng thái |
 | :--- | :---: | :---: | :---: |
@@ -506,6 +512,14 @@ Bộ kiểm thử stress test tự động hoá 6 kịch bản then chốt trên
 | **4. Giết tiến trình giữa run (Crash / Disconnect)** | Bot ngắt socket đột ngột giữa trận bí cảnh, đăng nhập lại: vào thẳng Lạc Hà Trấn, file lưu giữ nguyên `mapId = DEFAULT_MAP_ID` | Không kẹt toạ độ bí cảnh, không lỗi mapId | **PASS** (~1.1s) |
 | **5. Bảo mật chặn người ngoài** | Thử `joinOrCreate` trực tiếp vào phòng bí cảnh: bị từ chối; dùng `joinById` với `roomId` thật khi không có trong đội: từ chối mã 422 `JOIN_NOT_IN_RUN` | Chặn tuyệt đối xâm nhập lậu | **PASS** (~1.1s) |
 | **6. Thành viên rời đội giữa run (`partyLeave`)** | Thành viên gửi `partyLeave`: không làm sập phòng bí cảnh; thành viên còn lại vẫn tiếp tục đánh bình thường | Cách ly an toàn lỗi đội và phòng run | **PASS** (~1.1s) |
+| **7. Gục không mất kiếp (M3.4)** | Nhận `dungeonFallen`, không `limbo`, `soul.kiep`/`duyen`/`lifeId` không đổi; đồ, Linh thạch, cảnh giới nguyên vẹn; `dungeonDaily` +1; sau 3s về Lạc Hà | Luật gục không mất kiếp chuẩn 100% | **PASS** (~3.4s) |
+| **8. Chặn vào lại & không nhận thưởng thắng** | Sau gục: `dungeonEnter` lại run cũ bị từ chối; đồng đội ở lại hạ trùm thắng thì người gục không nhận `dungeonEnd` thắng hay thưởng | Không vào lại dở dang, không nhận ké thưởng | **PASS** (~3.5s) |
+| **9. Cả đội cùng gục (`all_dead`)** | Cả hai cùng gục: run kết thúc `lost` với lý do `all_dead`, mọi người được đưa về Lạc Hà, dọn sạch phòng và run | Xử lý thua all_dead sạch sẽ | **PASS** (~3.4s) |
+| **10. Đua 2 người gục cùng 1 tick** | Cả 2 cùng nhận sát thương chí tử trong 1 tick: cả hai nhận `dungeonFallen`, run chuyển `lost` (`all_dead`), không lỗi | Đua gục đồng thời an toàn | **PASS** (~1.1s) |
+| **11. Đua gục đúng lúc trùm chết** | 1 người gục và trùm chết cùng tick: người sống nhận `dungeonEnd` thắng có thưởng; người gục nhận `dungeonFallen` mất lượt, không thưởng | Phân định trạng thái trùm/người gục chuẩn | **PASS** (~1.1s) |
+| **12. Gục sau khi run đã thắng (pha nhặt đồ)** | Run đã thắng (đang nhặt đồ), người chơi bị đánh gục: nhận `dungeonFallen` nhưng KHÔNG bị trừ lượt thêm, vẫn về Lạc Hà an toàn | Không phạt trừ lượt khi đã thắng | **PASS** (~3.4s) |
+| **13. Rớt mạng giữa lúc chờ đẩy ra (3s)** | Gục xong ngắt kết nối đột ngột: file lưu ghi nhận `mapId = DEFAULT_MAP_ID`, không limbo; đăng nhập lại vào Lạc Hà bình thường | Không kẹt trạng thái gục khi mất mạng | **PASS** (~1.1s) |
+| **14. Kiểm tra toàn vẹn file lưu (`kiem-save`)** | Chạy `auditPlayerSaveData` qua toàn bộ file lưu sinh ra trong các ca gục: 100% hợp lệ, không vi phạm `dungeonDaily` hay `mapId` | Dữ liệu lưu trữ nhất quán 100% | **PASS** (~0.15s) |
 
 ### 10.3. Kiểm thử Kiểm tra Lưu trữ Nhân vật (`kiem-save`)
 Công cụ `npm run kiem-save -w server` đã được cập nhật thêm các luật kiểm tra nghiêm ngặt cho Bí cảnh:
@@ -515,7 +529,7 @@ Công cụ `npm run kiem-save -w server` đã được cập nhật thêm các l
   - `rewards` phải là số nguyên nằm trong khoảng `[0, DUNGEON_DAILY_REWARDS]`.
 
 ## 11. E2E thật PK thách đấu (M3.5, `npm run e2e:pk`)
-Cùng khung với mục 9 (server Colyseus thật trong tiến trình + hai tab Chrome headless, hai nguồn `127.0.0.1` / `localhost`). Luồng qua giao diện thật: bấm **chuột thật** (CDP `Input.dispatchMouseEvent` vào vị trí VẼ của người kia, đúng thứ `tryClickPlayer` so với con trỏ) -> menu có nút "Thách Đấu" bấm được -> B nhận hộp lời mời nêu đúng tên -> B **từ chối** (A nhận toast, không có trận) -> thách lại -> B **nhận** -> đếm ngược 3-2-1 nêu đối thủ -> HUD quyết đấu (tên đối thủ, thanh máu) + dấu ⚔ trên đầu -> A đánh bằng `WorldScene.slash` của client (máu B đặt về 1 phía server) -> màn kết quả cho CẢ HAI (A thắng, B thua "đánh gục") -> B gục rồi đứng dậy **tại chỗ** với khí huyết hồi lại, KHÔNG màn Hoàng Tuyền, lớp phủ không ghi "Lạc Hà Trấn" -> hồ sơ B không `limbo`, vẫn ở Lạc Hà -> 0 lỗi console. Chạy: `npm run build && npm run e2e:pk`; `E2E_SHOTS=<thư mục>` lưu ảnh từng bước. Hai lỗi đã bắt được ở client trước khi merge #224: màn kết quả của người thua bị `closeAllModals()` (gọi mỗi khung khi `me.dead`) đóng ngay, và lớp phủ "chết" hứa hồi sinh ở trấn.
+Cùng khung với mục 9 (server Colyseus thật trong tiến trình + hai tab Chrome headless, hai nguồn `127.0.0.1` / `localhost`). Luồng qua giao diện thật: bấm **chuột thật** (CDP `Input.dispatchMouseEvent` vào vị trí VẼ của người kia, đúng thứ `tryClickPlayer` so với con trỏ) -> menu có nút "Thách Đấu" bấm được -> B nhận hộp lời mời nêu đúng tên -> B **từ chối** (A nhận toast, không có trận) -> thách lại -> B **nhận** -> đếm ngược 3-2-1 nêu đối thủ -> HUD quyết đấu (tên đối thủ, thanh máu) + dấu ⚔ trên đầu -> A đánh bằng `WorldScene.slash` của client (máu B đặt về 1 phía server) -> màn kết quả cho CẢ HAI (A thắng, B thua "đánh gục") -> B gục rồi đứng dậy **tại chỗ** với khí huyết hồi lại, KHÔNG màn Hoàng Tuyền, lớp phủ không ghi "Lạc Hà Trấn" -> hồ sơ B không `limbo`, vẫn ở Lạc Hà -> 0 lỗi console. Chạy: `npm run build && npm run e2e:pk -w server` (script nằm ở workspace `server`); `E2E_SHOTS=<thư mục>` lưu ảnh từng bước. Hai lỗi đã bắt được ở client trước khi merge #224: màn kết quả của người thua bị `closeAllModals()` (gọi mỗi khung khi `me.dead`) đóng ngay, và lớp phủ "chết" hứa hồi sinh ở trấn.
 
 ## 12. Thử tải PK Thách Đấu, Bot `--duel` & Kiểm tra Rò rỉ (M3.5 - Issue #219)
 
@@ -556,4 +570,12 @@ Bộ kiểm thử stress test tự động hoá 6 kịch bản then chốt trên
 | **4. Kiểm tra 'Không mất kiếp' & Quái bỏ mục tiêu** | Quái đứng cạnh người chơi tự động bỏ mục tiêu khi vào trận PK; quái không gây sát thương lên người trong trận; người thua KO không có bản ghi `limbo`, file lưu không đổi | Cách ly tuyệt đối PK và sát thương quái / luân hồi | **PASS** (~3.6s) |
 | **5. Bỏ chạy khỏi trận đấu (`fled`)** | Người chơi chạy vào khu an toàn (trấn): trận đấu kết thúc ngay lập tức với lý do `fled`, người đối diện thắng | Ngăn chặn lạm dụng khu an toàn để né đòn | **PASS** (~0.4s) |
 | **6. Kiểm tra toàn vẹn lưu trữ (`audit-saves`)** | Chạy `auditSavesDirectory` trên thư mục dữ liệu: 0 file lưu lỗi, 0 lỗi tài khoản/phiên, các toạ độ đấu sĩ đều hợp lệ | Không sinh dữ liệu rác, không hỏng file lưu nhân vật | **PASS** (~0.2s) |
+
+## 13. E2E thật Tông môn (M3.6, `npm run e2e:tong-mon -w server`)
+Cùng khung với mục 9 / 11 (dùng chung lớp `Tab` ở `server/scripts/e2e-kit.ts`): server Colyseus thật trong tiến trình + hai tab Chrome headless (`127.0.0.1` / `localhost`). Luồng qua giao diện thật, 9 bước: A mở bảng Tông môn (nút HUD) -> **lập** bằng form (tên + biệt hiệu; mất `SECT_CREATE_COST`, tiền đã xuống hồ sơ TRƯỚC khi tông môn ra đời) -> B thấy `[TV]` cạnh tên A (state công khai + nhãn vẽ) -> A **bấm chuột thật** vào B -> nút "Mời vào tông môn" -> B nhận hộp mời -> **Gia Nhập** (B là Đệ tử, A thấy B trực tuyến ngay) -> chat `/s` tới B ở kênh `[Tông môn]` (chat thường vẫn đi kênh chung) -> B **góp** 200, A **rút** 150 (ví, hồ sơ, tệp tông môn khớp; **tổng Linh thạch chỉ giảm đúng phí lập**; Đệ tử không có ô rút) -> A thăng B Trưởng lão -> B **rời** (mất biệt hiệu) -> A **giải tán** (xác nhận hai bước; kho còn tiền thì bị chặn, rút hết rồi mới giải tán; tệp xoá) -> 0 lỗi console. `E2E_SHOTS=<thư mục>` lưu ảnh từng bước.
+Cần `npm run build` (client/dist mới) và google-chrome. Chạy trên client #237 + server #240. Hai chỗ E2E bắt được khi chạy lần đầu: (1) server chỉ gửi `sectPresence` theo nhịp 10 giây nên người vừa gia nhập hiện "Offline" (đã sửa ở server: gửi ngay khi thành viên đổi); (2) client: dòng "Tổng số: N" ở thẻ Thành viên luôn ghi 0 (báo B).
+
+## 14. E2E thật gục trong bí cảnh không mất kiếp (M3.4, `npm run e2e:bi-canh-nga -w server`)
+Cùng khung với mục 13 (`server/scripts/e2e-kit.ts`). Luồng 8 bước qua giao diện thật: lập đội -> Thủ môn -> mở bí cảnh -> cả hai vào phòng -> A bị đánh gục bằng đường thật của quái (`hurtPlayer` phía server) -> lớp phủ của A ghi "Ngươi đã gục! Bị đưa ra khỏi bí cảnh sau Ns. Lượt hôm nay còn N/3." + dòng phụ "Không mất kiếp · Không mất đồ và Linh thạch", **không** hứa "Hồi sinh tại Lạc Hà Trấn", **không** màn Hoàng Tuyền, đếm ngược không bị xoá giữa chừng (bài học PK: `dungeonFallen` tới trước patch `dead`); B thấy A "Đã gục", run chạy tiếp -> ~3 giây sau A về Lạc Hà (lớp phủ + HUD bí cảnh tắt, toast "mất một lượt") -> hồ sơ A: không `limbo`, ví và cảnh giới nguyên, mất MỘT lượt, về Lạc Hà; `dungeonEnter` lại bị từ chối -> B cũng gục: run thua `all_dead`, B về Lạc Hà, run được dọn, B cũng mất một lượt và không mất gì -> 0 lỗi console. `E2E_SHOTS=<thư mục>` lưu ảnh.
+Chạy trên client #241 + server #238 (đã vào main): PASS 100% 4/4 lần. Cần `npm run build` và google-chrome. Nhận xét giao diện (không chặn): HUD bí cảnh của người vừa gục không còn cập nhật (họ không còn là thành viên "trong phòng" nên server ngừng gửi `dungeonState`), danh sách đội trên màn hình họ giữ nguyên lúc gục.
 

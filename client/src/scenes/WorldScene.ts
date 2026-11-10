@@ -56,6 +56,10 @@ import {
   type DuelStateMsg,
   type DuelEndMsg,
   type DuelChallengeCheck,
+  SECT_MSG,
+  type SectMsg,
+  type SectPresenceMsg,
+  type SectInvitedMsg,
 } from "@tien-gioi/shared";
 import { preloadAssets, makeTextures, dirFromAngle, TILESET_KEY, ATLAS_KEY } from "../textures";
 import { ui } from "../ui";
@@ -308,6 +312,22 @@ export class WorldScene extends Phaser.Scene {
       onDuelAccept: (from) => !this.isReconnecting && this.room.send(DUEL_MSG.accept, { from }),
       onDuelDecline: (from) => !this.isReconnecting && this.room.send(DUEL_MSG.decline, { from }),
       onDuelYield: () => !this.isReconnecting && this.room.send(DUEL_MSG.yield, {}),
+      onSectCreate: (name, tag) =>
+        !this.isReconnecting && this.room.send(SECT_MSG.create, { name, tag }),
+      onSectInvite: (name) => !this.isReconnecting && this.room.send(SECT_MSG.invite, { name }),
+      onSectAccept: (from) => !this.isReconnecting && this.room.send(SECT_MSG.accept, { from }),
+      onSectDecline: (from) => !this.isReconnecting && this.room.send(SECT_MSG.decline, { from }),
+      onSectLeave: () => !this.isReconnecting && this.room.send(SECT_MSG.leave, {}),
+      onSectKick: (name) => !this.isReconnecting && this.room.send(SECT_MSG.kick, { name }),
+      onSectRank: (name, rank) =>
+        !this.isReconnecting && this.room.send(SECT_MSG.rank, { name, rank }),
+      onSectTransfer: (name) => !this.isReconnecting && this.room.send(SECT_MSG.transfer, { name }),
+      onSectDisband: () => !this.isReconnecting && this.room.send(SECT_MSG.disband, {}),
+      onSectMotd: (motd) => !this.isReconnecting && this.room.send(SECT_MSG.motd, { motd }),
+      onSectDeposit: (amount) =>
+        !this.isReconnecting && this.room.send(SECT_MSG.deposit, { amount }),
+      onSectWithdraw: (amount) =>
+        !this.isReconnecting && this.room.send(SECT_MSG.withdraw, { amount }),
     });
 
     this.setupInput();
@@ -564,6 +584,7 @@ export class WorldScene extends Phaser.Scene {
     kb.on("keydown-I", () => !typing() && ui.toggleInventory());
     kb.on("keydown-Q", () => !typing() && ui.toggleQuestModal());
     kb.on("keydown-M", () => !typing() && ui.toggleMapModal());
+    kb.on("keydown-G", () => !typing() && ui.toggleSectModal());
     kb.on("keydown-N", () => !typing() && sound.toggleMute());
     kb.on("keydown-O", () => !typing() && ui.toggleSettingsModal());
     kb.on("keydown-ESC", () => {
@@ -694,7 +715,15 @@ export class WorldScene extends Phaser.Scene {
             isDungeonMap(this.map.def.id),
           );
         }
-        ui.openPlayerMenu(sp.name, sp.realm, sp.tier, pointer.x, pointer.y, challengeCheck);
+        ui.openPlayerMenu(
+          sp.name,
+          sp.realm,
+          sp.tier,
+          pointer.x,
+          pointer.y,
+          challengeCheck,
+          (sp as any).sect,
+        );
         return true;
       }
     }
@@ -923,6 +952,9 @@ export class WorldScene extends Phaser.Scene {
       }
       ui.onDuelEnd(m);
     });
+    reg(SECT_MSG.snapshot, (m: SectMsg) => ui.onSect(m));
+    reg(SECT_MSG.presence, (m: SectPresenceMsg) => ui.onSectPresence(m));
+    reg(SECT_MSG.invited, (m: SectInvitedMsg) => ui.onSectInvited(m));
     replayEarlyMessages(this.room, handlers);
     if (isInitial) {
       ui.chat({
@@ -1875,7 +1907,8 @@ export class WorldScene extends Phaser.Scene {
       if (showLabel) {
         const isDuel = Boolean((p as any).duel);
         const duelPrefix = isDuel ? "⚔ " : "";
-        const label = `${duelPrefix}${p.name}\n${realmLabel(p.realm, p.tier)}`;
+        const sectTag = (p as any).sect ? `[${(p as any).sect}] ` : "";
+        const label = `${duelPrefix}${sectTag}${p.name}\n${realmLabel(p.realm, p.tier)}`;
         if (label !== e.lastLabel) {
           e.label!.setText(label);
           e.lastLabel = label;
