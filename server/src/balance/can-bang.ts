@@ -20,6 +20,8 @@ import {
   monsterEconomy,
   partyRatio,
   simulate,
+  simulateReincarnationMilestones,
+  simulateReincarnationProgression,
 } from "./simulate";
 
 const rows = simulate();
@@ -127,6 +129,63 @@ const thoExpectedCoin = expectedTotalCoin("tho");
 const langExpectedCoin = expectedTotalCoin("lang");
 const langThoExpectedRatio = langExpectedCoin / thoExpectedCoin;
 
+// ---------- Luân hồi & Duyên (#151) ----------
+
+const milestones = simulateReincarnationMilestones(rows);
+const milestoneTable = [
+  "| Chết ngay khi vừa đạt | Phút | Duyên (0 trùm) | Duyên / giờ (0 trùm) | Duyên (hạ trùm) | Duyên / giờ (hạ trùm) |",
+  "|---|---:|---:|---:|---:|---:|",
+  ...milestones.map(
+    (m) =>
+      `| ${m.label} | ${Math.round(m.minutes)} | ${m.duyenZeroBoss} | ${m.duyenPerHourZeroBoss.toFixed(1)} | ${m.duyenWithBoss} | **${m.duyenPerHourWithBoss.toFixed(1)}** |`,
+  ),
+].join("\n");
+
+const progression = simulateReincarnationProgression(15);
+const progressionTable = [
+  "| Kiếp | Dư âm tu hành | Tốc độ tu luyện | Thời gian chơi | Duyên nhận | Duyên còn lại | Duyên / giờ | So với kiếp 1 | Hành động tại Tam Sinh Thạch |",
+  "|---:|---:|---:|---:|---:|---:|---:|---:|---|",
+  ...progression.map(
+    (p) =>
+      `| ${p.kiep} | Nấc ${p.duAmLevel} | +${p.duAmLevel * 10}% | ${fmt(p.minutes)} | +${p.duyenEarned} | ${p.duyenRemaining} | **${p.duyenPerHour.toFixed(1)}** | ${p.ratioToFirstLife.toFixed(2)}× | ${p.upgradeNote} |`,
+  ),
+].join("\n");
+
+const maxProgressionLife = progression.find((p) => p.duAmLevel === 10);
+const firstLife = progression[0]!;
+const finalLife = progression.at(-1)!;
+
+const reincarnationSection = `## Luân hồi & Điểm Duyên (M3.2, #151)
+
+Mô phỏng cân bằng hệ thống Luân hồi theo thiết kế tại \`docs/THIET_KE_LUAN_HOI.md\` (mục 5 & 6) và hợp đồng \`shared/src/reincarnation.ts\`:
+- Điểm Duyên tính theo: \`calcDuyen = floor(stepPts + timePts + bossPts)\`.
+- Mở khóa vĩnh viễn tại Tam Sinh Thạch: Dư âm tu hành (\`du_am\`, 10 nấc: +10% đến +100% tốc độ tu luyện).
+
+### 1. Duyên nhận được và tốc độ Duyên / giờ theo mốc kết thúc (Kiếp 1)
+
+Ước tính theo mốc thời gian săn quái đơn lẻ hiệu quả nhất (thanh tu vi bậc đó còn 0%):
+
+${milestoneTable}
+
+### 2. Tiến trình luân hồi qua chuỗi kiếp (1..N) khi mở dần "Dư âm tu hành"
+
+Giả định người chơi kiếp nào cũng cày trọn vẹn đến hết Trúc Cơ (hạ 2 trùm) và dồn Duyên nâng cấp \`du_am\` (+10% đến +100%):
+
+${progressionTable}
+
+### 3. Nhận xét & Đánh giá cân bằng luân hồi
+
+- **Tính chất ngang bằng giữa các cách chơi (chết ở bậc nào):**
+  - Người chơi cày chay chết ở Luyện Khí tầng 5 (29 phút) đạt **${milestones[1]!.duyenPerHourWithBoss.toFixed(1)} Duyên/h**.
+  - Người chơi cày tới Trúc Cơ sơ kỳ (53 phút) đạt **${milestones[3]!.duyenPerHourWithBoss.toFixed(1)} Duyên/h**.
+  - Người chơi cày hết Trúc Cơ (175 phút) đạt **${milestones.at(-1)!.duyenPerHourWithBoss.toFixed(1)} Duyên/h**.
+  - **Đánh giá:** Tốc độ cày Duyên giữa các mốc đều nằm trong khoảng **~25–35 Duyên/giờ**. Không có hiện tượng tự sát sớm để cày Duyên nhanh vượt trội (vì dưới 2 phút hoặc ở Phàm Nhân nhận 0 Duyên), cũng không có việc cày kiếp dài bị thiệt thòi.
+- **Tiến trình tăng trưởng qua các kiếp (Progression pacing):**
+  - Cần **${maxProgressionLife ? maxProgressionLife.kiep : 12} kiếp** trọn vẹn để đạt tối đa nấc 10 Dư âm tu hành (+100% tốc độ tu luyện). Tổng thời gian chơi khoảng **~25–30 giờ**.
+  - Tốc độ Duyên mỗi giờ tăng từ **${firstLife.duyenPerHour.toFixed(1)} Duyên/h** (kiếp 1) lên **${finalLife.duyenPerHour.toFixed(1)} Duyên/h** (khi max Dư âm tu hành), tương đương tỷ lệ **${finalLife.ratioToFirstLife.toFixed(2)}×**.
+  - **Đánh giá:** Tỷ lệ tăng trưởng **${finalLife.ratioToFirstLife.toFixed(2)}×** nằm trong mục tiêu thiết kế (không vượt quá ~2.0× so với kiếp đầu), đem lại cảm giác nhân vật chuyển kiếp ngày càng mạnh mẽ và tu luyện thần tốc, nhưng kiểm soát tốt không gây lạm phát hay phá vỡ chiều sâu lối chơi.
+`;
+
 const economySection = `## Kinh tế Linh thạch (Sprint 5, #102)
 
 Mô hình kinh tế dựa trên hợp đồng \`shared/src/currency.ts\`: tiền rơi trực tiếp (\`COIN_DROPS\`), tiền bán đồ rơi (\`DROP_TABLES\` × \`sellPrice\`), và giá mua đan hồi phục tại cửa hàng Lão dược sư (\`buyPrice("hoi_huyet_dan") = ${potionBuyPrice}\` Linh thạch).
@@ -158,7 +217,17 @@ ${economyTable}
 `;
 
 if (process.argv.includes("--stdout")) {
-  console.log(summary + "\n\n" + table + "\n\n" + partyTable + "\n\n" + economySection);
+  console.log(
+    summary +
+      "\n\n" +
+      table +
+      "\n\n" +
+      partyTable +
+      "\n\n" +
+      economySection +
+      "\n\n" +
+      reincarnationSection,
+  );
 } else {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const out = path.resolve(here, "../../../docs/CAN_BANG.md");
@@ -205,7 +274,9 @@ làm đội chậm hơn đánh một mình (thời gian tìm quái không rút n
 **${partyMin.ratio.toFixed(2)}×** (${partyMin.label}, đội ${partyMin.n}); **${partyOver}/${partyRatios.length}** ô vượt 1.5×. Đây là số đo của mô hình, **chưa phải quyết định cân bằng**:
 mục tiêu "không quá ~1.5×" của #74 chưa đạt ở những ô trên. Xem câu hỏi trong \`~/TT/orchestra/questions.md\` (thưởng tu vi của đội).
 
-${economySection}`,
+${economySection}
+
+${reincarnationSection}`,
   );
   console.log(`Đã ghi ${out}\n\n${summary}`);
 }

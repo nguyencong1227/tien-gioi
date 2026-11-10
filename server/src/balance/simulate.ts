@@ -24,6 +24,8 @@ import {
   DROP_TABLES,
   sellPrice,
   buyPrice,
+  calcDuyen,
+  UNLOCK_BY_ID,
 } from "@tien-gioi/shared";
 
 /** Giả định về lối chơi. Đổi ở đây nếu thấy không giống người chơi thật. */
@@ -140,8 +142,11 @@ function questExpByRealm(): Map<number, number> {
   return out;
 }
 
-/** Mô phỏng từ Phàm Nhân tới hết `lastRealm` (mặc định: hết Trúc Cơ, sẵn sàng đột phá Kim Đan). */
-export function simulate(lastRealm = 2): Row[] {
+/**
+ * Mô phỏng từ Phàm Nhân tới hết `lastRealm` (mặc định: hết Trúc Cơ, sẵn sàng đột phá Kim Đan).
+ * `expMult` là hệ số tăng tốc tu luyện từ Dư âm tu hành (mặc định 1.0, tối đa 2.0).
+ */
+export function simulate(lastRealm = 2, expMult = 1.0): Row[] {
   const rows: Row[] = [];
   const questExp = questExpByRealm();
   let total = ASSUME.questOverheadSec / 60;
@@ -151,13 +156,14 @@ export function simulate(lastRealm = 2): Row[] {
       const bar = expToNext(realm, tier);
       const o = bestOption(realm, tier);
       let need = bar;
-      // Thưởng nhiệm vụ chia đều cho các bậc của cảnh giới đó
+      // Thưởng nhiệm vụ chia đều cho các bậc của cảnh giới đó (không nhân expMult)
       need = Math.max(0, need - (questExp.get(realm) ?? 0) / tiers);
-      let sec = need / o.rate;
+      // Tu vi từ săn quái & đả tọa được nhân expMult
+      let sec = need / (o.rate * expMult);
       if (tier === tiers - 1) {
         // Đột phá: mỗi lần thất bại mất 30% thanh, phải luyện lại
         const p = breakthroughChance(realm);
-        sec += ((1 / p - 1) * 0.3 * bar) / o.rate;
+        sec += ((1 / p - 1) * 0.3 * bar) / (o.rate * expMult);
       }
       const minutes = sec / 60;
       total += minutes;
@@ -167,7 +173,7 @@ export function simulate(lastRealm = 2): Row[] {
         label: `${REALMS[realm].name}${REALMS[realm].tiers[tier] ? " " + REALMS[realm].tiers[tier] : ""}`,
         bar,
         source: o.source,
-        kills: o.secPerKill ? Math.round(sec / o.secPerKill) : 0,
+        kills: o.secPerKill ? Math.round(sec / (o.secPerKill / expMult)) : 0,
         minutes,
         total,
       });
@@ -245,4 +251,166 @@ export function monsterEconomy(m: MonsterKind, realm: number, tier: number): Mon
     totalCoinPerHour,
     potionsPerHour,
   };
+}
+
+// ---------- Luân hồi & Duyên (#151) ----------
+
+export interface ReincarnationMilestone {
+  label: string;
+  realm: number;
+  tier: number;
+  minutes: number;
+  duyenZeroBoss: number;
+  duyenWithBoss: number;
+  duyenPerHourZeroBoss: number;
+  duyenPerHourWithBoss: number;
+}
+
+export interface ReincarnationLifeRow {
+  kiep: number;
+  duAmLevel: number;
+  expMult: number;
+  minutes: number;
+  duyenEarned: number;
+  duyenRemaining: number;
+  duyenPerHour: number;
+  ratioToFirstLife: number;
+  upgradeNote: string;
+}
+
+/**
+ * Mô phỏng các mốc kết thúc kiếp (chết ngay khi vừa đạt bậc đó) ở kiếp đầu tiên (chưa có Dư âm tu hành),
+ * kiểm tra số Duyên nhận được và tốc độ Duyên / giờ theo đúng bảng mục 5 của THIET_KE_LUAN_HOI.md.
+ */
+export function simulateReincarnationMilestones(
+  baseRows = simulate(2, 1.0),
+): ReincarnationMilestone[] {
+  const phamNhan = baseRows.find((r) => r.realm === 0 && r.tier === 0)!;
+  const lk4 = baseRows.find((r) => r.realm === 1 && r.tier === 3)!;
+  const lk8 = baseRows.find((r) => r.realm === 1 && r.tier === 7)!;
+  const lk9 = baseRows.find((r) => r.realm === 1 && r.tier === 8)!;
+  const tc0 = baseRows.find((r) => r.realm === 2 && r.tier === 0)!;
+  const tc1 = baseRows.find((r) => r.realm === 2 && r.tier === 1)!;
+  const tc2 = baseRows.find((r) => r.realm === 2 && r.tier === 2)!;
+
+  const rawMilestones = [
+    { label: "Luyện Khí tầng 1", realm: 1, tier: 0, exp: 0, minutes: phamNhan.total, bossKills: 2 },
+    { label: "Luyện Khí tầng 5", realm: 1, tier: 4, exp: 0, minutes: lk4.total, bossKills: 2 },
+    { label: "Luyện Khí tầng 9", realm: 1, tier: 8, exp: 0, minutes: lk8.total, bossKills: 2 },
+    { label: "Trúc Cơ sơ kỳ", realm: 2, tier: 0, exp: 0, minutes: lk9.total, bossKills: 2 },
+    { label: "Trúc Cơ trung kỳ", realm: 2, tier: 1, exp: 0, minutes: tc0.total, bossKills: 2 },
+    { label: "Trúc Cơ hậu kỳ", realm: 2, tier: 2, exp: 0, minutes: tc1.total, bossKills: 2 },
+    {
+      label: "Hết Trúc Cơ (thanh đầy)",
+      realm: 2,
+      tier: 2,
+      exp: tc2.bar,
+      minutes: tc2.total,
+      bossKills: 3,
+    },
+  ];
+
+  return rawMilestones.map((m) => {
+    const duyenZero = calcDuyen({
+      realm: m.realm,
+      tier: m.tier,
+      exp: m.exp,
+      playMs: m.minutes * 60_000,
+      bossKills: 0,
+    });
+    const duyenBoss = calcDuyen({
+      realm: m.realm,
+      tier: m.tier,
+      exp: m.exp,
+      playMs: m.minutes * 60_000,
+      bossKills: m.bossKills,
+    });
+    const hours = m.minutes / 60;
+    return {
+      label: m.label,
+      realm: m.realm,
+      tier: m.tier,
+      minutes: m.minutes,
+      duyenZeroBoss: duyenZero,
+      duyenWithBoss: duyenBoss,
+      duyenPerHourZeroBoss: duyenZero / hours,
+      duyenPerHourWithBoss: duyenBoss / hours,
+    };
+  });
+}
+
+/**
+ * Mô phỏng chuỗi kiếp 1..N: người chơi chơi trọn vẹn mỗi kiếp (đến hết Trúc Cơ, hạ 2 trùm)
+ * và ưu tiên dùng Duyên mở khóa dần 'Dư âm tu hành' (du_am) từ nấc 1 đến nấc 10 (+100%).
+ * Đo số kiếp, thời gian và tốc độ Duyên / giờ qua từng kiếp.
+ */
+export function simulateReincarnationProgression(maxLives = 20): ReincarnationLifeRow[] {
+  const duAmCosts = UNLOCK_BY_ID.du_am.costs;
+  let currentDuAmLevel = 0;
+  let accumulatedDuyen = 0;
+  const history: ReincarnationLifeRow[] = [];
+  let firstLifeDuyenPerHour = 0;
+
+  for (let kiep = 1; kiep <= maxLives; kiep++) {
+    const expMult = 1 + 0.1 * currentDuAmLevel;
+    const rows = simulate(2, expMult);
+    const lastRow = rows.at(-1)!;
+    const minutes = lastRow.total;
+
+    // Giả định hạ 2 trùm trong kiếp chơi trọn vẹn tới hết Trúc Cơ
+    const duyenEarned = calcDuyen({
+      realm: 2,
+      tier: 2,
+      exp: lastRow.bar,
+      playMs: minutes * 60_000,
+      bossKills: 2,
+    });
+
+    const hours = minutes / 60;
+    const duyenPerHour = duyenEarned / hours;
+    if (kiep === 1) {
+      firstLifeDuyenPerHour = duyenPerHour;
+    }
+    const ratioToFirstLife = duyenPerHour / firstLifeDuyenPerHour;
+
+    accumulatedDuyen += duyenEarned;
+
+    let upgradesBought = 0;
+    while (
+      currentDuAmLevel < duAmCosts.length &&
+      accumulatedDuyen >= duAmCosts[currentDuAmLevel]!
+    ) {
+      accumulatedDuyen -= duAmCosts[currentDuAmLevel]!;
+      currentDuAmLevel++;
+      upgradesBought++;
+    }
+
+    const upgradeNote =
+      upgradesBought > 0
+        ? `Lên nấc ${currentDuAmLevel} (+${currentDuAmLevel * 10}%)`
+        : currentDuAmLevel >= duAmCosts.length
+          ? "Đã đạt tối đa (+100%)"
+          : `Chờ đủ ${duAmCosts[currentDuAmLevel]} Duyên`;
+
+    history.push({
+      kiep,
+      duAmLevel: currentDuAmLevel,
+      expMult,
+      minutes,
+      duyenEarned,
+      duyenRemaining: accumulatedDuyen,
+      duyenPerHour,
+      ratioToFirstLife,
+      upgradeNote,
+    });
+
+    if (
+      currentDuAmLevel >= duAmCosts.length &&
+      history.filter((h) => h.duAmLevel === duAmCosts.length).length >= 2
+    ) {
+      break;
+    }
+  }
+
+  return history;
 }
