@@ -10,7 +10,7 @@
 // 8. "Giết tiến trình giữa run" (rớt mạng trong bí cảnh) rồi đăng nhập lại: phải về Lạc Hà, hồ sơ giữ nguyên mapId mặc định
 // 9. Phòng bí cảnh chặn tuyệt đối người ngoài: joinOrCreate bị từ chối, joinById lậu bị từ chối JOIN_NOT_IN_RUN (422)
 
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -24,6 +24,8 @@ import { WebSocketTransport } from "@colyseus/ws-transport";
 import { Client, type Room } from "colyseus.js";
 import {
   DEFAULT_MAP_ID,
+  DUNGEON_DAILY_REWARDS,
+  DUNGEON_FALL_EXIT_MS,
   DUNGEON_MSG,
   DUNGEON_OPEN_COOLDOWN_MS,
   JOIN_NOT_IN_RUN,
@@ -33,6 +35,7 @@ import {
   NPC_BY_ID,
   roomNameOf,
   type DungeonEndMsg,
+  type DungeonFallenMsg,
   type DungeonInviteMsg,
   type DungeonStateMsg,
   type PartyInvitedMsg,
@@ -42,14 +45,19 @@ import {
 } from "@tien-gioi/shared";
 import type { WorldRoom } from "../src/rooms/WorldRoom";
 import type { WorldState } from "../src/schema";
+import { auditPlayerSaveData } from "./audit-saves";
 
 const PORT = 47000 + Math.floor(Math.random() * 2000);
 let server: Server;
 let WorldRoomClass: typeof WorldRoom;
+let killMonster: typeof import("../src/systems/combat").killMonster;
+let hurtPlayer: typeof import("../src/systems/combat").hurtPlayer;
 const rooms: Room[] = [];
 const gate = NPC_BY_ID.thu_mon;
 
 beforeAll(async () => {
+  process.env.DATA_DIR = dataDir;
+  ({ killMonster, hurtPlayer } = await import("../src/systems/combat"));
   const { WorldRoom, defineRooms } = await import("../src/rooms/WorldRoom");
   WorldRoomClass = WorldRoom;
   WorldRoomClass.reconnectGraceS = 5;
@@ -103,6 +111,8 @@ interface BotPlayer {
   invites: DungeonInviteMsg[];
   states: DungeonStateMsg[];
   ends: DungeonEndMsg[];
+  fallens: DungeonFallenMsg[];
+  limbos: number[];
   toasts: ToastMsg[];
   travelTos: TravelToMsg[];
   parties: PartyMsg[];
@@ -118,6 +128,8 @@ function listen(room: Room, hero: BotPlayer) {
   room.onMessage(DUNGEON_MSG.invite, (m: DungeonInviteMsg) => hero.invites.push(m));
   room.onMessage(DUNGEON_MSG.state, (m: DungeonStateMsg) => hero.states.push(m));
   room.onMessage(DUNGEON_MSG.end, (m: DungeonEndMsg) => hero.ends.push(m));
+  room.onMessage(DUNGEON_MSG.fallen, (m: DungeonFallenMsg) => hero.fallens.push(m));
+  room.onMessage("limbo", () => hero.limbos.push(1));
   room.onMessage("travelTo", (m: TravelToMsg) => hero.travelTos.push(m));
   room.onMessage("toast", (m: ToastMsg) => hero.toasts.push(m));
   room.onMessage("party", (m: PartyMsg) => hero.parties.push(m));
@@ -144,6 +156,8 @@ async function spawnBot(
     invites: [],
     states: [],
     ends: [],
+    fallens: [],
+    limbos: [],
     toasts: [],
     travelTos: [],
     parties: [],
@@ -177,12 +191,44 @@ async function followTravel(hero: BotPlayer, travel: TravelToMsg): Promise<Room>
   hero.invites = [];
   hero.states = [];
   hero.ends = [];
+  hero.fallens = [];
+  hero.limbos = [];
   hero.travelTos = [];
   hero.toasts = [];
   listen(room, hero);
   rooms.push(room);
   await waitFor(() => (room.state as any)?.players?.get(room.sessionId), 4000, "vào phòng bí cảnh");
   return room;
+}
+
+function worldOf(room: Room): any {
+  return (serverRoom(room) as any).world;
+}
+
+function lethal(room: Room) {
+  const w = worldOf(room);
+  const p = w.state.players.get(room.sessionId)!;
+  const monster = w.state.monsters.values().next().value;
+  hurtPlayer(w, room.sessionId, p, p.hp + 100000, monster);
+}
+
+function killBoss(room: Room, killerSid?: string) {
+  const w = worldOf(room);
+  let bossId: string | null = null;
+  for (const [id, m] of w.state.monsters) {
+    if (m.kind === "linh_hu_thu" || m.maxHp >= 1000) {
+      bossId = id;
+      break;
+    }
+  }
+  if (!bossId) bossId = w.state.monsters.keys().next().value;
+  const mc = w.mctrl.get(bossId);
+  if (killerSid && mc) {
+    mc.damageBy.set(killerSid, 5000);
+  } else if (mc) {
+    mc.damageBy.set(room.sessionId, 5000);
+  }
+  killMonster(w, bossId!, mc);
 }
 
 async function dungeonRooms(): Promise<string[]> {
@@ -438,5 +484,335 @@ describe("Bí cảnh: Thử tải & Stress Test (Issue #201)", () => {
     // Cả 2 vẫn an toàn trong phòng bí cảnh
     expect(rL.connection.isOpen).toBe(true);
     expect(rM.connection.isOpen).toBe(true);
+  });
+
+  // ---------- Gục trong Bí cảnh không mất kiếp (M3.4, Issue #236) ----------
+
+  it("gục trong bí cảnh: nhận dungeonFallen, không limbo, không mất đồ/coin/cảnh giới/kiếp, trừ 1 lượt dungeonDaily, về Lạc Hà an toàn", async () => {
+    const leader = await spawnBot(`FallL ${++seq}`, DEFAULT_MAP_ID, true);
+    const member = await spawnBot(`FallM ${++seq}`, DEFAULT_MAP_ID, true);
+    await formParty(leader, member);
+
+    leader.room.send(DUNGEON_MSG.open, { dungeonId: LINH_HU_ID });
+    const inv = await waitFor(() => leader.invites[0], 2500, "invite");
+    leader.room.send(DUNGEON_MSG.enter, { runId: inv.runId });
+    member.room.send(DUNGEON_MSG.enter, { runId: inv.runId });
+
+    const [lTravel, mTravel] = await Promise.all([
+      waitFor(() => leader.travelTos[0], 2500, "lTravel"),
+      waitFor(() => member.travelTos[0], 2500, "mTravel"),
+    ]);
+
+    const [, rM] = await Promise.all([
+      followTravel(leader, lTravel),
+      followTravel(member, mTravel),
+    ]);
+
+    const ctrlM = worldOf(rM).ctrl.get(rM.sessionId)!;
+    ctrlM.coin = 999;
+    const initialKiep = ctrlM.soul.kiep;
+    const initialLifeId = ctrlM.lifeId;
+    const initialDuyen = ctrlM.soul.duyen;
+
+    // Đánh gục member
+    lethal(rM);
+
+    // Member nhận dungeonFallen
+    const fallen = await waitFor(() => member.fallens[0], 4000, "dungeonFallen");
+    expect(fallen.exitInMs).toBe(DUNGEON_FALL_EXIT_MS);
+    expect(fallen.rewardsLeft).toBe(DUNGEON_DAILY_REWARDS - 1);
+    expect(member.limbos).toHaveLength(0);
+
+    // Leader thấy member alive = false trong dungeonState
+    await waitFor(
+      () => leader.states.some((st) => st.members.some((m) => m.name === member.name && !m.alive)),
+      4000,
+      "state member dead",
+    );
+
+    // Sau ~3s (DUNGEON_FALL_EXIT_MS), member nhận travelTo về Lạc Hà
+    const returnTravel = await waitFor(
+      () => member.travelTos.find((t) => t.mapId === DEFAULT_MAP_ID),
+      6000,
+      "member về Lạc Hà",
+    );
+    expect(returnTravel.mapId).toBe(DEFAULT_MAP_ID);
+
+    // Đăng nhập / kết nối lại member vào Lạc Hà
+    const client = new Client(`ws://localhost:${PORT}`);
+    const mHomeRoom = await client.joinOrCreate(roomNameOf(DEFAULT_MAP_ID), {
+      name: member.name,
+      secret: member.secret,
+    });
+    rooms.push(mHomeRoom);
+
+    // Kiểm tra state của member ở Lạc Hà
+    const pM = serverState(mHomeRoom).players.get(mHomeRoom.sessionId)!;
+    expect(pM.dead).toBe(false);
+    expect(pM.hp).toBeGreaterThan(0);
+    const mHomeCtrl = worldOf(mHomeRoom).ctrl.get(mHomeRoom.sessionId)!;
+    expect(mHomeCtrl.coin).toBe(999);
+    expect(mHomeCtrl.soul.kiep).toBe(initialKiep);
+    expect(mHomeCtrl.soul.duyen).toBe(initialDuyen);
+    expect(mHomeCtrl.lifeId).toBe(initialLifeId);
+    expect(mHomeCtrl.limbo).toBeUndefined();
+
+    // File lưu của member: không limbo, dungeonDaily tăng 1
+    const saved = JSON.parse(readFileSync(fileFor(member.name), "utf8"));
+    expect(saved.mapId).toBe(DEFAULT_MAP_ID);
+    expect(saved.limbo).toBeUndefined();
+    expect(saved.dungeonDaily?.rewards).toBe(1);
+    expect(saved.coin).toBe(999);
+  });
+
+  it("sau khi gục: không vào lại được run cũ (dungeonEnter từ chối), đồng đội hạ trùm thì người gục không nhận dungeonEnd thắng", async () => {
+    const leader = await spawnBot(`NoReL ${++seq}`, DEFAULT_MAP_ID, true);
+    const member = await spawnBot(`NoReM ${++seq}`, DEFAULT_MAP_ID, true);
+    await formParty(leader, member);
+
+    leader.room.send(DUNGEON_MSG.open, { dungeonId: LINH_HU_ID });
+    const inv = await waitFor(() => leader.invites[0], 2500, "invite");
+    leader.room.send(DUNGEON_MSG.enter, { runId: inv.runId });
+    member.room.send(DUNGEON_MSG.enter, { runId: inv.runId });
+
+    const [lTravel, mTravel] = await Promise.all([
+      waitFor(() => leader.travelTos[0], 2500, "lTravel"),
+      waitFor(() => member.travelTos[0], 2500, "mTravel"),
+    ]);
+
+    const [rL, rM] = await Promise.all([
+      followTravel(leader, lTravel),
+      followTravel(member, mTravel),
+    ]);
+
+    // Đánh gục member
+    lethal(rM);
+    await waitFor(() => member.fallens[0], 4000, "member gục");
+    await waitFor(
+      () => member.travelTos.some((t) => t.mapId === DEFAULT_MAP_ID),
+      6000,
+      "member ra ngoài",
+    );
+
+    // Thử gửi dungeonEnter lại run cũ từ member
+    member.room.send(DUNGEON_MSG.enter, { runId: inv.runId });
+    await sleep(200);
+    expect(member.travelTos.filter((t) => t.roomId !== undefined)).toHaveLength(0);
+
+    // Leader ở lại hạ trùm
+    killBoss(rL);
+    const lEnd = await waitFor(() => leader.ends[0], 4000, "leader nhận end");
+    expect(lEnd.result).toBe("won");
+
+    // Member đã gục không nhận được dungeonEnd
+    expect(member.ends).toHaveLength(0);
+  });
+
+  it("cả đội gục: run kết thúc all_dead, mọi thành viên bị đẩy ra, dọn sạch phòng và run (không rò rỉ)", async () => {
+    const leader = await spawnBot(`AllDeadL ${++seq}`, DEFAULT_MAP_ID, true);
+    const member = await spawnBot(`AllDeadM ${++seq}`, DEFAULT_MAP_ID, true);
+    await formParty(leader, member);
+
+    leader.room.send(DUNGEON_MSG.open, { dungeonId: LINH_HU_ID });
+    const inv = await waitFor(() => leader.invites[0], 2500, "invite");
+    leader.room.send(DUNGEON_MSG.enter, { runId: inv.runId });
+    member.room.send(DUNGEON_MSG.enter, { runId: inv.runId });
+
+    const [lTravel, mTravel] = await Promise.all([
+      waitFor(() => leader.travelTos[0], 2500, "lTravel"),
+      waitFor(() => member.travelTos[0], 2500, "mTravel"),
+    ]);
+
+    const [rL, rM] = await Promise.all([
+      followTravel(leader, lTravel),
+      followTravel(member, mTravel),
+    ]);
+
+    // Cả hai cùng gục lần lượt
+    lethal(rL);
+    lethal(rM);
+
+    await Promise.all([
+      waitFor(() => leader.fallens[0], 4000, "leader fallen"),
+      waitFor(() => member.fallens[0], 4000, "member fallen"),
+    ]);
+
+    // Run chuyển sang kết thúc all_dead
+    const run = runs().get(inv.runId)!;
+    await waitFor(() => run.phase === "lost", 4000, "run lost");
+    expect(run.endReason).toBe("all_dead");
+
+    // Cả 2 được đẩy về Lạc Hà
+    await Promise.all([
+      waitFor(() => leader.travelTos.some((t) => t.mapId === DEFAULT_MAP_ID), 6000, "L về LH"),
+      waitFor(() => member.travelTos.some((t) => t.mapId === DEFAULT_MAP_ID), 6000, "M về LH"),
+    ]);
+
+    // Run và phòng bí cảnh tự dọn sạch
+    await waitFor(() => runs().size === 0, 6000, "runs dọn sạch");
+    await waitFor(async () => (await dungeonRooms()).length === 0, 6000, "phòng bí cảnh dọn sạch");
+  });
+
+  it("đua: hai người gục cùng một tick -> cả hai nhận dungeonFallen, run kết thúc all_dead", async () => {
+    const leader = await spawnBot(`SyncFallL ${++seq}`, DEFAULT_MAP_ID, true);
+    const member = await spawnBot(`SyncFallM ${++seq}`, DEFAULT_MAP_ID, true);
+    await formParty(leader, member);
+
+    leader.room.send(DUNGEON_MSG.open, { dungeonId: LINH_HU_ID });
+    const inv = await waitFor(() => leader.invites[0], 2500, "invite");
+    leader.room.send(DUNGEON_MSG.enter, { runId: inv.runId });
+    member.room.send(DUNGEON_MSG.enter, { runId: inv.runId });
+
+    const [lTravel, mTravel] = await Promise.all([
+      waitFor(() => leader.travelTos[0], 2500, "lTravel"),
+      waitFor(() => member.travelTos[0], 2500, "mTravel"),
+    ]);
+
+    const [rL, rM] = await Promise.all([
+      followTravel(leader, lTravel),
+      followTravel(member, mTravel),
+    ]);
+
+    // Gục cùng lúc
+    lethal(rL);
+    lethal(rM);
+
+    await Promise.all([
+      waitFor(() => leader.fallens[0], 4000, "L fallen"),
+      waitFor(() => member.fallens[0], 4000, "M fallen"),
+    ]);
+
+    const run = runs().get(inv.runId)!;
+    await waitFor(() => run.phase === "lost", 4000, "run phase lost");
+    expect(run.endReason).toBe("all_dead");
+  });
+
+  it("đua: gục đúng lúc trùm chết -> người sống thắng nhận thưởng, người gục nhận dungeonFallen mất lượt", async () => {
+    const leader = await spawnBot(`BossDieL ${++seq}`, DEFAULT_MAP_ID, true);
+    const member = await spawnBot(`BossDieM ${++seq}`, DEFAULT_MAP_ID, true);
+    await formParty(leader, member);
+
+    leader.room.send(DUNGEON_MSG.open, { dungeonId: LINH_HU_ID });
+    const inv = await waitFor(() => leader.invites[0], 2500, "invite");
+    leader.room.send(DUNGEON_MSG.enter, { runId: inv.runId });
+    member.room.send(DUNGEON_MSG.enter, { runId: inv.runId });
+
+    const [lTravel, mTravel] = await Promise.all([
+      waitFor(() => leader.travelTos[0], 2500, "lTravel"),
+      waitFor(() => member.travelTos[0], 2500, "mTravel"),
+    ]);
+
+    const [rL, rM] = await Promise.all([
+      followTravel(leader, lTravel),
+      followTravel(member, mTravel),
+    ]);
+
+    // Gục member và hạ boss cùng lúc
+    lethal(rM);
+    killBoss(rL);
+
+    await waitFor(() => member.fallens[0], 4000, "M fallen");
+    const endL = await waitFor(() => leader.ends[0], 4000, "L end");
+    expect(endL.result).toBe("won");
+    expect(member.ends).toHaveLength(0);
+  });
+
+  it("đua: gục sau khi run đã thắng (pha nhặt đồ) -> không trừ lượt thêm, vẫn không mất kiếp", async () => {
+    const leader = await spawnBot(`LootFallL ${++seq}`, DEFAULT_MAP_ID, true);
+    const member = await spawnBot(`LootFallM ${++seq}`, DEFAULT_MAP_ID, true);
+    await formParty(leader, member);
+
+    leader.room.send(DUNGEON_MSG.open, { dungeonId: LINH_HU_ID });
+    const inv = await waitFor(() => leader.invites[0], 2500, "invite");
+    leader.room.send(DUNGEON_MSG.enter, { runId: inv.runId });
+    member.room.send(DUNGEON_MSG.enter, { runId: inv.runId });
+
+    const [lTravel, mTravel] = await Promise.all([
+      waitFor(() => leader.travelTos[0], 2500, "lTravel"),
+      waitFor(() => member.travelTos[0], 2500, "mTravel"),
+    ]);
+
+    const [rL, rM] = await Promise.all([
+      followTravel(leader, lTravel),
+      followTravel(member, mTravel),
+    ]);
+
+    // Hạ trùm trước
+    killBoss(rL);
+    await waitFor(() => leader.ends[0], 4000, "run thắng");
+    await waitFor(() => member.ends[0], 4000, "member nhận win");
+
+    const ctrlM = worldOf(rM).ctrl.get(rM.sessionId)!;
+    const rewardsBefore = ctrlM.save.dungeonDaily?.rewards ?? 1;
+
+    // Lúc này run đang trong pha loot (exitAt !== null) -> member bị gục
+    lethal(rM);
+    const fallen = await waitFor(() => member.fallens[0], 4000, "member fallen");
+    expect(fallen.exitInMs).toBe(DUNGEON_FALL_EXIT_MS);
+
+    // Không bị trừ lượt thêm
+    expect(ctrlM.save.dungeonDaily?.rewards ?? 1).toBe(rewardsBefore);
+
+    // Đẩy về Lạc Hà an toàn
+    await waitFor(
+      () => member.travelTos.some((t) => t.mapId === DEFAULT_MAP_ID),
+      6000,
+      "member về Lạc Hà",
+    );
+  });
+
+  it("đua: rớt mạng giữa lúc chờ đẩy ra (DUNGEON_FALL_EXIT_MS) -> mapId lưu Lạc Hà, đăng nhập lại bình thường không kẹt limbo", async () => {
+    const leader = await spawnBot(`DisconnFallL ${++seq}`, DEFAULT_MAP_ID, true);
+    const member = await spawnBot(`DisconnFallM ${++seq}`, DEFAULT_MAP_ID, true);
+    await formParty(leader, member);
+
+    leader.room.send(DUNGEON_MSG.open, { dungeonId: LINH_HU_ID });
+    const inv = await waitFor(() => leader.invites[0], 2500, "invite");
+    leader.room.send(DUNGEON_MSG.enter, { runId: inv.runId });
+    member.room.send(DUNGEON_MSG.enter, { runId: inv.runId });
+
+    const [lTravel, mTravel] = await Promise.all([
+      waitFor(() => leader.travelTos[0], 2500, "lTravel"),
+      waitFor(() => member.travelTos[0], 2500, "mTravel"),
+    ]);
+
+    const [, rM] = await Promise.all([
+      followTravel(leader, lTravel),
+      followTravel(member, mTravel),
+    ]);
+
+    // Member gục
+    lethal(rM);
+    await waitFor(() => member.fallens[0], 4000, "member fallen");
+
+    // Ngay lập tức rớt mạng bất thường
+    await rM.leave(false);
+    await sleep(200);
+
+    // Kiểm tra file lưu của member
+    const saved = JSON.parse(readFileSync(fileFor(member.name), "utf8"));
+    expect(saved.mapId).toBe(DEFAULT_MAP_ID);
+    expect(saved.limbo).toBeUndefined();
+
+    // Đăng nhập lại vào Lạc Hà
+    const client = new Client(`ws://localhost:${PORT}`);
+    const resumeRoom = await client.joinOrCreate(roomNameOf(DEFAULT_MAP_ID), {
+      name: member.name,
+      secret: member.secret,
+    });
+    rooms.push(resumeRoom);
+    expect(serverRoom(resumeRoom).mapId).toBe(DEFAULT_MAP_ID);
+  });
+
+  it("audit-saves (kiem-save): toàn bộ hồ sơ sau các ca gục bí cảnh đều hợp lệ, không vi phạm dungeonDaily hay mapId", () => {
+    const files = readdirSync(dataDir).filter((f) => f.endsWith(".json"));
+    expect(files.length).toBeGreaterThan(0);
+    for (const f of files) {
+      const fullPath = path.join(dataDir, f);
+      const content = readFileSync(fullPath, "utf8");
+      const stat = statSync(fullPath);
+      const errors = auditPlayerSaveData(content, stat.size);
+      expect(errors).toEqual([]);
+    }
   });
 });
