@@ -13,6 +13,7 @@ import {
   JOIN_BAD_TOKEN,
   JOIN_NEED_CHARACTER,
   DUNGEON_MSG,
+  DUEL_MSG,
   DUNGEON_MAPS,
   JOIN_NOT_IN_RUN,
   dungeonOf,
@@ -111,6 +112,7 @@ import {
   partyResync,
 } from "../systems/party";
 import { planTravel } from "../systems/travel";
+import { duelAnswer, duelChallenge, duelDrop, duelYield } from "../systems/duel";
 import {
   declineDungeon,
   enterDungeon,
@@ -195,6 +197,9 @@ export class WorldRoom extends Room<WorldState> {
         dungeonInvite: (sid, msg) => this.sendTo(sid, DUNGEON_MSG.invite, msg),
         dungeonEnd: (sid, msg) => this.sendTo(sid, DUNGEON_MSG.end, msg),
         dungeonState: (sid, msg) => this.sendTo(sid, DUNGEON_MSG.state, msg),
+        duelInvited: (sid, msg) => this.sendTo(sid, DUEL_MSG.invited, msg),
+        duelState: (sid, msg) => this.sendTo(sid, DUEL_MSG.state, msg),
+        duelEnd: (sid, msg) => this.sendTo(sid, DUEL_MSG.end, msg),
       },
       map,
       this.hub,
@@ -298,6 +303,11 @@ export class WorldRoom extends Room<WorldState> {
     this.on(DUNGEON_MSG.enter, (sid, m) => void enterDungeon(w, sid, m));
     this.on(DUNGEON_MSG.decline, (sid, m) => declineDungeon(w, sid, m));
     this.on(DUNGEON_MSG.leave, (sid) => leaveDungeon(w, sid));
+    // PK thách đấu (docs/THIET_KE_PK.md): hai người cùng phòng, hai bên đồng ý
+    this.on(DUEL_MSG.challenge, (sid, m) => duelChallenge(w, sid, m));
+    this.on(DUEL_MSG.accept, (sid, m) => duelAnswer(w, sid, m, true));
+    this.on(DUEL_MSG.decline, (sid, m) => duelAnswer(w, sid, m, false));
+    this.on(DUEL_MSG.yield, (sid) => duelYield(w, sid));
     this.on<SoulBuyMsg>("soulBuy", (sid, m) => void this.soulBuy(sid, m?.id));
     this.on<RebirthMsg>("rebirth", (sid, m) => void this.rebirth(sid, m));
     // Loại tin nhắn không đăng ký: bỏ qua, tính là spam
@@ -577,6 +587,7 @@ export class WorldRoom extends Room<WorldState> {
    */
   private dropPlayer(sid: string, keepParty = false) {
     if (!keepParty) partyDrop(this.world, sid); // trước khi xoá khỏi state: báo cho đội, dọn lời mời
+    duelDrop(this.world, sid); // huỷ trận đang đấu (hoà) và dọn lời mời / hồi chiêu; trước khi xoá khỏi state
     const leaver = this.state.players.get(sid);
     const run = leaver ? runOfWorld(this.world) : undefined;
     if (leaver && run) memberLeft(this.world, run, leaver.name.toLowerCase());
