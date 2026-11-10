@@ -1,6 +1,6 @@
 # Thiết kế nhiều bản đồ và bí cảnh (đề xuất của Dev A, chờ người dùng quyết định)
 
-> **Trạng thái: đề xuất.** Chưa có dòng mã nào của tính năng này. Mục 1-4 là phân tích; mục 5 là thứ tự làm; mục 6 là những câu cần người dùng chọn. Riêng **Bước 0** (mục 5) không phụ thuộc câu trả lời nào và A sẽ giao khi không còn việc dở.
+> **Trạng thái (10/11/2026): người dùng đã chọn phương án A** (mục 6). Bước 0 đã xong (#123); Bước 1 (bản đồ thứ hai) đang làm, bắt đầu bằng hợp đồng `shared/`. Mục 1-4 là phân tích gốc; mục 5 là thứ tự làm; mục 6 ghi quyết định.
 
 ## 1. Hiện trạng (đã đọc mã, không đoán)
 - Một phòng Colyseus duy nhất (`ROOM_NAME = "world"`, `WorldRoom`), tối đa `MAX_PLAYERS_PER_ROOM = 100`, một `World` / một vòng tick.
@@ -56,10 +56,10 @@
   - **Rớt mạng giữa lúc chuyển** (sau khi phòng cũ lưu, trước khi vào phòng đích): không kẹt trong sổ tên toàn cục, vào lại được.
   - **Rò rỉ:** tổng `online` của mọi phòng về đúng số người thật; số phòng bí cảnh về 0 sau khi hết giờ / hết người (không còn hẹn giờ treo); VmRSS sau N chu kỳ tạo / huỷ phòng tạm không tăng quá ngưỡng (như `--leak` của #125).
 
-## 6. Cần người dùng chọn
-1. **A hay B** (mục 3)? Khuyến nghị A nếu muốn có bí cảnh trong M3.
-2. Có chấp nhận **một người chỉ ở một phòng một lúc**, chat thế giới cần kênh riêng, đội liên bản đồ chỉ hiện ở bản đồ cùng phòng (A)?
-3. Bản đồ thứ hai là khu săn thường (cùng cách chơi) hay có luật riêng (ví dụ cấm bay / PK sau này)?
-4. Bí cảnh mở cho một người hay chỉ cho đội?
+## 6. Quyết định của người dùng (10/11/2026)
+1. **Phương án A:** mỗi bản đồ một phòng Colyseus.
+2. **Một người ở một phòng một lúc**; cổng chuyển bản đồ ở **rìa** bản đồ; file lưu có `mapId`. **Chat toàn server** và **tổ đội khác bản đồ** đi qua kênh chung giữa các phòng (mục 4: sổ tên toàn cục, `PartyBook` dùng chung, bus chat).
+3. Bản đồ thứ hai là **khu săn thường** (cùng cách chơi, quái mạnh hơn, có trạm an toàn ở chỗ đến); chưa có luật riêng. Luật riêng (PK thách đấu...) làm ở bước sau.
+4. Bí cảnh: người dùng xếp ở **bước 4** của M3 (phòng tạm theo đội); thiết kế khi tới bước đó.
 
-Khi chưa có trả lời, A chỉ làm **Bước 0** (không đổi gì người chơi thấy).
+Thứ tự M3 và phân công: `docs/PHAN_CONG_M3.md`. Chết = luân hồi (`docs/THIET_KE_LUAN_HOI.md`) tác động tới chuyển bản đồ ở chỗ: nhân vật chết ở bản đồ nào cũng đầu thai ở Lạc Hà Trấn (kiếp mới bắt đầu từ đầu), nên không có "hồi sinh ở trấn của bản đồ đó".
