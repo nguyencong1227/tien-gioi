@@ -5,6 +5,7 @@ import type { Player } from "./schema";
 import type { World } from "./world";
 import { Parties } from "./systems/party";
 import { Runs } from "./systems/dungeon";
+import { SectBook } from "./systems/sect";
 
 /** Nơi nhận chat toàn server của một phòng (thường là `room.broadcast("chat", msg)`). */
 export type ChatSink = (msg: ChatOut) => void;
@@ -27,6 +28,8 @@ export class Hub {
   readonly parties = new Parties();
   /** Sổ lần chạy bí cảnh của cả tiến trình (docs/THIET_KE_BI_CANH.md mục 4.2); khoá thành viên theo đạo hiệu viết thường như `parties`. */
   readonly runs = new Runs();
+  /** Lời mời tông môn đang chờ, thành viên trực tuyến và bản ghi nhớ của cả tiến trình (systems/sect.ts). */
+  readonly sects = new SectBook();
 
   /** Tìm người chơi theo khoá đạo hiệu (viết thường) ở mọi phòng; không có thì `null`. */
   locate(key: string): Located | null {

@@ -121,6 +121,9 @@ export function runBench(
         duelInvited: () => {},
         duelState: () => {},
         duelEnd: () => {},
+        sect: () => {},
+        sectPresence: () => {},
+        sectInvited: () => {},
       },
       map,
     );
@@ -376,6 +379,9 @@ export function runMultiMapBench(
           duelInvited: () => {},
           duelState: () => {},
           duelEnd: () => {},
+          sect: () => {},
+          sectPresence: () => {},
+          sectInvited: () => {},
         },
         map,
       );

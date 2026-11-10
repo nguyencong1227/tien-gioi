@@ -21,11 +21,15 @@ import type {
   DuelInvitedMsg,
   DuelStateMsg,
   DuelEndMsg,
+  SectInvitedMsg,
+  SectMsg,
+  SectPresenceMsg,
 } from "@tien-gioi/shared";
 import type { WorldState, Player } from "./schema";
 import type { SavedPlayer, QuestSave, LifeCounters, LimboRecord } from "./store";
 import type { LimboMsg, RebornMsg, Soul, SoulMsg, StatMult } from "@tien-gioi/shared";
 import { Interest } from "./systems/interest";
+import type { SectService } from "./sect-service";
 import { Hub } from "./hub";
 import type { Identity } from "./identity";
 import type { Run } from "./systems/dungeon";
@@ -148,6 +152,12 @@ export interface WorldEvents {
   duelState(sessionId: string, msg: DuelStateMsg): void;
   /** Trận thách đấu kết thúc (cả hai nhận). */
   duelEnd(sessionId: string, msg: DuelEndMsg): void;
+  /** Ảnh chụp tông môn của chính người nhận (`sect: null` = không còn ở tông môn nào). */
+  sect(sessionId: string, msg: SectMsg): void;
+  /** Ai trong tông môn đang trực tuyến (cảnh giới, bản đồ). */
+  sectPresence(sessionId: string, msg: SectPresenceMsg): void;
+  /** Có người mời vào tông môn (chỉ người được mời nhận). */
+  sectInvited(sessionId: string, msg: SectInvitedMsg): void;
 }
 
 export class World {
@@ -196,6 +206,13 @@ export class World {
   onDungeonExit: ((sid: string) => void) | null = null;
   /** Phòng bí cảnh: id của run mà phòng này phục vụ (`Hub.runs`); `null` ở mọi phòng thường. */
   runId: string | null = null;
+  /**
+   * Dịch vụ tông môn (docs/THIET_KE_TONG_MON.md): WorldRoom đặt khi tạo phòng. `null` (test đơn vị không đặt, hoặc `SECTS=off`):
+   * mọi tin tông môn bị từ chối `disabled`, vào phòng không tra tông môn.
+   */
+  sectService: SectService | null = null;
+  /** Phòng đăng ký: lưu hồ sơ của một người NGAY và chờ ghi xong (trước khi chuyển Linh thạch sang kho tông môn). Không có hook: bỏ qua. */
+  onSaveNow: ((sid: string) => Promise<void>) | null = null;
 
   constructor(
     readonly state: WorldState,
