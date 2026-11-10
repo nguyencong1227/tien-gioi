@@ -885,5 +885,65 @@ export function describeSectStoreContract(
       await store.create(withMember(makeSect("x3", { name: "xoá tôi", tag: "x1" }), "dt_x"));
       expect((await store.findBySoul("dt_x"))?.id).toBe("x3");
     });
+
+    it("delete có guard: guard thấy BẢN SAO hiện tại; ném lỗi thì không xoá gì và lỗi đi tới người gọi; không có tông môn thì guard không chạy", async () => {
+      const store = await createStore();
+      await store.create(
+        withMember(makeSect("g1", { name: "Giữ Guard", tag: "G1", coin: 5 }), "dt_g"),
+      );
+      let seen: Sect | undefined;
+      await expect(
+        store.delete("g1", (s) => {
+          seen = s;
+          s.coin = 0; // sửa bản sao không được làm đổi kho
+          throw new Error("kho còn tiền");
+        }),
+      ).rejects.toThrow("kho còn tiền");
+      expect(seen?.coin).toBe(0);
+      const kept = await store.get("g1");
+      expect(kept?.coin).toBe(5);
+      expect((await store.findBySoul("dt_g"))?.id).toBe("g1");
+      // lần sau vẫn chạy (hàng đợi không kẹt) và guard không ném thì xoá
+      expect(await store.delete("g1", (s) => expect(s.coin).toBe(5))).toBe(true);
+      expect(await store.get("g1")).toBeNull();
+      let called = false;
+      expect(
+        await store.delete("khong_co", () => {
+          called = true;
+        }),
+      ).toBe(false);
+      expect(called).toBe(false);
+    });
+
+    it("delete có guard NGUYÊN TỬ với update: một lần góp chạy đua với giải tán thì hoặc kho còn tiền và KHÔNG xoá, hoặc xoá rồi góp nhận null (không bao giờ xoá khi kho còn tiền)", async () => {
+      for (let round = 0; round < 6; round++) {
+        const store = await createStore();
+        await store.create(makeSect("h1", { name: "Đua Xoá", tag: "H1", coin: 0 }));
+        const emptyOnly = (s: Sect) => {
+          if (s.coin > 0) throw new Error("kho còn tiền");
+        };
+        const [del, dep] = await Promise.allSettled(
+          round % 2 === 0
+            ? [
+                store.delete("h1", emptyOnly),
+                store.update("h1", (s) => ({ ...s, coin: s.coin + 9 })),
+              ]
+            : [
+                store.update("h1", (s) => ({ ...s, coin: s.coin + 9 })),
+                store.delete("h1", emptyOnly),
+              ].reverse(),
+        );
+        const left = await store.get("h1");
+        if (left) {
+          // tông môn còn: lần xoá bị guard chặn và kho giữ nguyên số vừa góp
+          expect(del.status).toBe("rejected");
+          expect(left.coin).toBe(9);
+        } else {
+          // đã xoá: lúc đó kho rỗng và lần góp thấy "không có" (null) chứ không cộng vào hư không
+          expect(del.status === "fulfilled" && del.value).toBe(true);
+          expect(dep.status === "fulfilled" && dep.value).toBeNull();
+        }
+      }
+    });
   });
 }

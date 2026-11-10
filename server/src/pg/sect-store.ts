@@ -168,9 +168,15 @@ export class PgSectStore implements SectStore {
     });
   }
 
-  delete(id: string): Promise<boolean> {
+  delete(id: string, guard?: (s: Sect) => void): Promise<boolean> {
     return this.queue.run(id, () =>
       tx(this.db, async (c) => {
+        // Khoá hàng rồi mới kiểm `guard`: một `update` đang chạy (kể cả ở tiến trình khác) xong trước, hoặc chờ sau khi xoá.
+        // Dòng hỏng (không đọc được) thì không có gì để kiểm: vẫn xoá cho gọn.
+        if (guard) {
+          const cur = await this.read(c, id, true);
+          if (cur) guard(cur);
+        }
         const r = await c.query("DELETE FROM sects WHERE id = $1", [id]);
         await c.query("DELETE FROM sect_members WHERE sect_id = $1", [id]);
         return (r.rowCount ?? 0) > 0;

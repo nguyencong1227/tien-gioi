@@ -6,6 +6,7 @@ import express from "express";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { defineRooms, WorldRoom } from "./rooms/WorldRoom";
+import { SectService } from "./sect-service";
 import { startupWarnings } from "./startup";
 import { mountAuth } from "./auth-http";
 import { createStores } from "./stores";
@@ -23,6 +24,7 @@ async function main() {
   const stores = await createStores(process.env);
   WorldRoom.players = stores.players;
   WorldRoom.souls = stores.souls;
+  WorldRoom.sects = new SectService(stores.sects); // tông môn cùng backend với nhân vật / chân linh (`SECTS=off` gỡ tính năng)
   console.log(`Lưu trữ: ${stores.kind === "pg" ? "PostgreSQL" : "tệp JSON"}`);
 
   const app = express();

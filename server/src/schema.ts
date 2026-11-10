@@ -38,6 +38,8 @@ export class Player extends Schema {
   @type("boolean") dead = false;
   /** Đang trong trận thách đấu (công khai: người ngoài vẽ dấu ⚔; đổi chỉ lúc bắt đầu / kết thúc, docs/THIET_KE_PK.md) */
   @type("boolean") duel = false;
+  /** Biệt hiệu tông môn (2-4 ký tự, "" = không có): người ngoài vẽ `[xxxx]` cạnh tên; đổi chỉ lúc vào / rời / lập / giải tán / bị mời ra. */
+  @type("string") sect = "";
   // input cuối server đã xử lý (để client đối chiếu); chỉ chủ nhân vật nhận
   @view(TAG_OWNER) @type("uint32") lastSeq = 0;
   // Đồ đang mặc (itemId, "" = trống). Công khai để mọi người thấy ngoại hình; kiểu Equipment trong shared/src/items.ts.

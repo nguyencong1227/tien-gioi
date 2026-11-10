@@ -14,6 +14,7 @@ import {
   JOIN_NEED_CHARACTER,
   DUNGEON_MSG,
   DUEL_MSG,
+  SECT_MSG,
   DUNGEON_MAPS,
   JOIN_NOT_IN_RUN,
   dungeonOf,
@@ -72,6 +73,8 @@ import {
   sanitizeOrigin,
   type SavedPlayer,
 } from "../store";
+import { defaultSectStore } from "../sect-store";
+import { SectService } from "../sect-service";
 import { defaultSoulStore, type SoulStore } from "../soul";
 import { defaultPlayerStore, type PlayerStore } from "../player-store";
 import { legacyIdentity, type Identity } from "../identity";
@@ -113,6 +116,21 @@ import {
 } from "../systems/party";
 import { planTravel } from "../systems/travel";
 import { duelAnswer, duelChallenge, duelDrop, duelYield } from "../systems/duel";
+import {
+  sectAnswer,
+  sectCreate,
+  sectDeposit,
+  sectDisband,
+  sectDrop,
+  sectInvite,
+  sectKick,
+  sectLeave,
+  sectMotd,
+  sectOnJoin,
+  sectRank,
+  sectTransfer,
+  sectWithdraw,
+} from "../systems/sect";
 import {
   declineDungeon,
   enterDungeon,
@@ -160,6 +178,16 @@ export class WorldRoom extends Room<WorldState> {
    * `secret`. `null`: chế độ cũ (tên + mã bí mật).
    */
   static auth: AuthService | null = null;
+  /**
+   * Dịch vụ tông môn (đặt ở `index.ts` theo `STORE`). `null`: dùng kho tệp mặc định (`defaultSectStore`, dựng lười). `SECTS=off`
+   * (biến môi trường) gỡ tính năng: không có dịch vụ, mọi tin tông môn bị từ chối.
+   */
+  static sects: SectService | null = null;
+  private static defaultSects: SectService | undefined;
+  static sectService(): SectService | null {
+    if (process.env.SECTS === "off") return null;
+    return (WorldRoom.sects ??= WorldRoom.defaultSects ??= new SectService(defaultSectStore()));
+  }
   /** Kênh chung giữa các phòng. Test ghi đè để cô lập. */
   static hub: Hub = defaultHub;
   private get hub() {
@@ -201,6 +229,9 @@ export class WorldRoom extends Room<WorldState> {
         duelInvited: (sid, msg) => this.sendTo(sid, DUEL_MSG.invited, msg),
         duelState: (sid, msg) => this.sendTo(sid, DUEL_MSG.state, msg),
         duelEnd: (sid, msg) => this.sendTo(sid, DUEL_MSG.end, msg),
+        sect: (sid, msg) => this.sendTo(sid, SECT_MSG.snapshot, msg),
+        sectPresence: (sid, msg) => this.sendTo(sid, SECT_MSG.presence, msg),
+        sectInvited: (sid, msg) => this.sendTo(sid, SECT_MSG.invited, msg),
       },
       map,
       this.hub,
@@ -208,6 +239,13 @@ export class WorldRoom extends Room<WorldState> {
     // Chết do quái = luân hồi: lưu hồ sơ ở trạng thái Hoàng Tuyền, cộng Duyên, gửi màn hình Hoàng Tuyền
     w.reincarnate = true;
     w.onLimbo = (sid) => void this.enterLimbo(sid);
+    // Tông môn (M3.6): dịch vụ dùng chung (`SECTS=off` gỡ gấp); lưu hồ sơ NGAY khi chuyển Linh thạch sang kho
+    w.sectService = WorldRoom.sectService();
+    w.onSaveNow = async (sid) => {
+      const p = this.state.players.get(sid);
+      const c = w.ctrl.get(sid);
+      if (p && c) await this.persist(p, c).catch((e) => console.error("save failed (sect)", e));
+    };
     // Bí cảnh (4b): tạo phòng cho run mới, đưa người vào phòng bí cảnh, đưa người về Lạc Hà
     w.onDungeonOpen = (run) => void this.openDungeonRoom(w, run);
     w.onDungeonEnter = (sid, run) => void this.enterDungeonRoom(sid, run);
@@ -309,6 +347,19 @@ export class WorldRoom extends Room<WorldState> {
     this.on(DUEL_MSG.accept, (sid, m) => duelAnswer(w, sid, m, true));
     this.on(DUEL_MSG.decline, (sid, m) => duelAnswer(w, sid, m, false));
     this.on(DUEL_MSG.yield, (sid) => duelYield(w, sid));
+    // Tông môn (docs/THIET_KE_TONG_MON.md): gắn với linh hồn, chung mọi phòng; thao tác bất đồng bộ (kho lưu)
+    this.on(SECT_MSG.create, (sid, m) => void sectCreate(w, sid, m));
+    this.on(SECT_MSG.invite, (sid, m) => void sectInvite(w, sid, m));
+    this.on(SECT_MSG.accept, (sid, m) => void sectAnswer(w, sid, m, true));
+    this.on(SECT_MSG.decline, (sid, m) => void sectAnswer(w, sid, m, false));
+    this.on(SECT_MSG.leave, (sid) => void sectLeave(w, sid));
+    this.on(SECT_MSG.kick, (sid, m) => void sectKick(w, sid, m));
+    this.on(SECT_MSG.rank, (sid, m) => void sectRank(w, sid, m));
+    this.on(SECT_MSG.transfer, (sid, m) => void sectTransfer(w, sid, m));
+    this.on(SECT_MSG.disband, (sid) => void sectDisband(w, sid));
+    this.on(SECT_MSG.motd, (sid, m) => void sectMotd(w, sid, m));
+    this.on(SECT_MSG.deposit, (sid, m) => void sectDeposit(w, sid, m));
+    this.on(SECT_MSG.withdraw, (sid, m) => void sectWithdraw(w, sid, m));
     this.on<SoulBuyMsg>("soulBuy", (sid, m) => void this.soulBuy(sid, m?.id));
     this.on<RebirthMsg>("rebirth", (sid, m) => void this.rebirth(sid, m));
     // Loại tin nhắn không đăng ký: bỏ qua, tính là spam
@@ -522,6 +573,7 @@ export class WorldRoom extends Room<WorldState> {
     sendWallet(this.world, client.sessionId);
     this.world.events.soul(client.sessionId, soulView(soul)); // HUD ghi "Kiếp N" ngay từ lúc vào (không chỉ sau khi mua)
     partyResync(this.world, client.sessionId); // vừa qua cổng từ bản đồ khác: vẫn ở trong đội, nhận đội hình ngay
+    void sectOnJoin(this.world, client.sessionId); // tông môn theo linh hồn: nhận ảnh chụp + đặt biệt hiệu (bất đồng bộ)
     this.world.events.sys(`${p.name} (${realmLabel(p.realm, p.tier)}) đã nhập thế.`);
     if (limbo) void this.resumeLimbo(client.sessionId); // vào lại giữa lúc ở Hoàng Tuyền: cộng Duyên nếu còn thiếu, hiện lại màn hình
     if (inRun) {
@@ -589,6 +641,7 @@ export class WorldRoom extends Room<WorldState> {
   private dropPlayer(sid: string, keepParty = false) {
     if (!keepParty) partyDrop(this.world, sid); // trước khi xoá khỏi state: báo cho đội, dọn lời mời
     duelDrop(this.world, sid); // huỷ trận đang đấu (hoà) và dọn lời mời / hồi chiêu; trước khi xoá khỏi state
+    sectDrop(this.world, sid); // không còn trực tuyến ở phòng này (đi qua cổng cũng vậy: phòng mới sẽ báo lại); trước khi xoá ctrl
     const leaver = this.state.players.get(sid);
     const run = leaver ? runOfWorld(this.world) : undefined;
     if (leaver && run) memberLeft(this.world, run, leaver.name.toLowerCase());
