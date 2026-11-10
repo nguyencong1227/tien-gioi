@@ -288,6 +288,10 @@ async function main() {
       "A thấy B trực tuyến trong danh sách",
       4000,
     );
+    // Dòng "Tổng số" phải khớp danh sách (lỗi đã bắt ở #237: luôn ghi 0)
+    const summary = await text(ta, "sect-members-summary");
+    if (!/2\s*\/\s*30/.test(summary))
+      throw new Error(`Tổng số thành viên phải ghi 2 / 30, thực tế "${summary}"`);
     await ta.shot("5-thanh-vien");
     if (playerOf(B.name).sect !== SECT.tag) throw new Error("B phải mang biệt hiệu trong state");
     out(
