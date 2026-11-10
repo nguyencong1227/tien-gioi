@@ -2032,8 +2032,9 @@ describe("luân hồi: chết thật, Hoàng Tuyền, đầu thai (M3 bước 2)
     expect(sp.dead).toBe(true);
 
     // mua mở khóa: đủ Duyên thì được (trừ + tăng nấc), không đủ / id rác thì toast và không đổi
+    expect(a.souls[0]).toMatchObject({ kiep: 1, duyen: 0, unlocks: {}, origins: [] }); // tin lúc vào phòng
     a.room.send("soulBuy", { id: "du_am" });
-    const bought = await waitFor(() => a.souls[0]);
+    const bought = await waitFor(() => a.souls[1]);
     expect(bought).toMatchObject({ duyen: gain - 12, unlocks: { du_am: 1 } });
     const t0 = a.toasts.length;
     a.room.send("soulBuy", { id: "ky_vat" }); // 25 Duyên: chưa đủ
@@ -2042,7 +2043,7 @@ describe("luân hồi: chết thật, Hoàng Tuyền, đầu thai (M3 bước 2)
     a.room.send("soulBuy", "rác");
     await waitFor(() => a.toasts.length >= t0 + 2);
     expect(soulOf(name)).toMatchObject({ duyen: gain - 12, unlocks: { du_am: 1 } });
-    expect(a.souls).toHaveLength(1);
+    expect(a.souls).toHaveLength(2); // vào phòng + một lần mua
 
     // đầu thai: lựa chọn không hợp lệ bị từ chối (chưa mở Ký vật nên không giữ được đồ)
     const t1 = a.toasts.length;
@@ -2169,6 +2170,22 @@ describe("luân hồi: chết thật, Hoàng Tuyền, đầu thai (M3 bước 2)
     expect(b.me().dead).toBe(false);
     expect(serverRoom(b.room).mapId).toBe(DEFAULT_MAP_ID);
     expect(soulOf(name).kiep).toBe(2);
+  });
+
+  it("vào phòng nhận ngay tin `soul` của chân linh (HUD ghi kiếp N): kiếp, Duyên, mở khóa đúng như trong file", async () => {
+    const name = "Luan Hoi Soul";
+    const a = await join(name);
+    expect(await waitFor(() => a.souls[0])).toMatchObject({ kiep: 1, duyen: 0 });
+    await leave(a);
+    writeFileSync(
+      path.join(dataDir, "souls", `${sha(name)}.json`),
+      JSON.stringify({ ...soulOf(name), kiep: 4, duyen: 7, unlocks: { du_am: 2 } }),
+    );
+    const b = await join(name);
+    const soul = await waitFor(() => b.souls[0]);
+    expect(soul).toMatchObject({ kiep: 4, duyen: 7, unlocks: { du_am: 2 }, origins: [] });
+    expect(b.souls).toHaveLength(1); // chỉ một tin lúc vào, không lặp
+    expect(Object.keys(soul).sort()).toEqual(["duyen", "kiep", "origins", "unlocks"]); // SoulView, không lộ lịch sử / mã kiếp
   });
 
   it("hồ sơ Hoàng Tuyền hỏng trong file (kiểu sai, id vật phẩm lạ) được làm sạch khi vào game", async () => {

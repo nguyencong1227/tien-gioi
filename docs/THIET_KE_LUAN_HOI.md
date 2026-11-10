@@ -158,7 +158,7 @@ Màn hình **Hoàng Tuyền** chặn toàn bộ HUD (như màn đăng nhập), c
 - Hàm thuần: `calcDuyen(life)` (mục 5), `UNLOCKS` (bảng mục 6: id, tên, mô tả, giá từng nấc, hiệu lực), `unlockLevelEffect(...)`, `expMultOf(unlocks)`, `coinCarryCap(unlocks)`, `startPackOf(unlocks)`, `keepSlotsOf(unlocks)`, `ORIGINS`, `originMult(origin)`.
 - Kiểu tin nhắn:
   - client → server: `SoulBuyMsg { id }`, `RebirthMsg { origin?: string; keep: string[] }`.
-  - server → client (chỉ chủ): `LimboMsg { summary: LifeSummary; soul: SoulView; keepable: string[] }` (lúc chết và lúc đăng nhập nếu đang ở Hoàng Tuyền), `SoulMsg` (`SoulView` mới sau khi mua), `RebornMsg { kiep }`.
+  - server → client (chỉ chủ): `LimboMsg { summary: LifeSummary; soul: SoulView; keepable: string[] }` (lúc chết và lúc đăng nhập nếu đang ở Hoàng Tuyền), `SoulMsg` (`SoulView`: một lần ngay khi vào phòng, để HUD ghi "Kiếp N"; và mỗi lần mua), `RebornMsg { kiep }`.
 - `statsFor` nhận thêm `origin?` (tham số cuối, tuỳ chọn: mọi chỗ gọi cũ không đổi).
 - Test: bảng Duyên khớp mục 5, giá tăng dần và tổng tối đa đúng (`+100%`), id duy nhất, `calcDuyen` không bao giờ `NaN`/âm với đầu vào rác.
 
