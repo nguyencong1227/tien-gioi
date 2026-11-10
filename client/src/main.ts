@@ -151,10 +151,7 @@ initAuthUi({
 // Chế độ máy chủ giả lập (?dungeon=mock, ?dungeon=fallen, ?duel=mock hoặc ?sect=mock) để thử nghiệm và chụp ảnh không cần server thật
 if (
   typeof window !== "undefined" &&
-  (isMockDungeonEnabled() ||
-    isMockDungeonFallen() ||
-    isMockDuelEnabled() ||
-    isMockSectEnabled())
+  (isMockDungeonEnabled() || isMockDungeonFallen() || isMockDuelEnabled() || isMockSectEnabled())
 ) {
   const isFallen = isMockDungeonFallen();
   const mockRoom = createMockDungeonRoom(isFallen);
