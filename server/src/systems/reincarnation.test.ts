@@ -11,7 +11,7 @@ import {
 } from "@tien-gioi/shared";
 import { hurtPlayer, killMonster } from "./combat";
 import { tickWorld } from "./tick";
-import { applyRebirth, beginLimbo, creditSoul, keepableOf } from "./reincarnation";
+import { applyRebirth, creditSoul, keepableOf } from "./reincarnation";
 import { setEquipment } from "./equipment";
 import { gainExp } from "./progression";
 import { addMonster, addPlayer, makeWorld } from "./test-helpers";

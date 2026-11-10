@@ -77,6 +77,8 @@ afterAll(async () => {
 });
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** Đủ lâu để thấy nhân vật KHÔNG hồi sinh theo đồng hồ (RESPAWN_MS cũ là 5 giây): kiểm ngắn, đồng hồ giả ở test đơn vị lo phần còn lại */
+const RESPAWN_MS_TEST = 1200;
 
 async function waitFor<T>(fn: () => T | undefined | false, ms = 3000): Promise<T> {
   const end = Date.now() + ms;
@@ -544,8 +546,8 @@ describe("chiến đấu và tu luyện", () => {
     await waitFor(() => !me().meditating);
   });
 
-  it("bị quái đánh hết máu thì trọng thương và mất tu vi", async () => {
-    const { room, me, toasts } = await join();
+  it("bị quái đánh hết máu thì chết thật: vào Hoàng Tuyền, kiếp cũ mất hẳn (không còn mất 10% tu vi rồi hồi sinh)", async () => {
+    const { room, me, toasts, limbos } = await join();
     const st = serverState(room);
     const p = st.players.get(room.sessionId)!;
     // Đưa người chơi ra ngoài trấn, đặt Hôi Lang sát bên
@@ -560,8 +562,11 @@ describe("chiến đấu và tu luyện", () => {
       break;
     }
     await waitFor(() => me().dead, 4000);
-    expect(me().exp).toBe(27); // mất 10%
-    expect(toasts.some((t) => t.tone === "bad")).toBe(true);
+    await waitFor(() => limbos[0]);
+    expect(me().exp).toBe(0); // kiếp cũ đã đặt lại (không phải 27)
+    expect(toasts.some((t) => t.tone === "bad" && /Hoàng Tuyền/.test(t.text))).toBe(true);
+    await sleep(RESPAWN_MS_TEST);
+    expect(me().dead).toBe(true); // không hồi sinh theo đồng hồ
   });
 });
 
