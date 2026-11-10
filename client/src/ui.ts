@@ -48,6 +48,16 @@ import {
   SHOP_BY_NPC,
   SHOP_MAX_QTY,
   type WalletMsg,
+  UNLOCKS,
+  ORIGINS,
+  DEFAULT_ORIGIN,
+  ORIGIN_BUY_PREFIX,
+  levelOf,
+  keepSlotsOf,
+  nextCost,
+  type LimboMsg,
+  type RebirthChoice,
+  type SoulView,
 } from "@tien-gioi/shared";
 import { sound } from "./audio";
 
@@ -1441,6 +1451,292 @@ const cachedBarPct: Record<string, number> = {};
 const cachedBarText: Record<string, string> = {};
 const cachedCooldownFrac: Record<string, number> = {};
 
+// ---------- Luân hồi (M3.2) ----------
+let activeLimboMsg: LimboMsg | null = null;
+let activeSoulView: SoulView | null = null;
+let selectedOrigin = DEFAULT_ORIGIN;
+let selectedRelics: string[] = [];
+let limboBuyCb: ((id: string) => void) | null = null;
+let limboRebirthCb: ((choice: RebirthChoice) => void) | null = null;
+
+function renderLimboStoneList() {
+  const container = $("limbo-stone-list");
+  if (!container || !activeSoulView) return;
+  container.replaceChildren();
+
+  // 1. Duyệt các mục nâng cấp chính trong UNLOCKS
+  for (const def of UNLOCKS) {
+    const item = document.createElement("div");
+    item.className = "stone-item";
+
+    const info = document.createElement("div");
+    info.className = "stone-item-info";
+
+    const nameRow = document.createElement("div");
+    nameRow.className = "stone-item-name";
+    nameRow.textContent = def.name;
+
+    const currentLv = levelOf(activeSoulView.unlocks, def.id);
+    const maxLv = def.costs.length;
+
+    const lvBadge = document.createElement("span");
+    lvBadge.className = "stone-item-level";
+    lvBadge.textContent = `Nấc ${currentLv}/${maxLv}`;
+    nameRow.append(lvBadge);
+    info.append(nameRow);
+
+    const desc = document.createElement("div");
+    desc.className = "stone-item-desc";
+    desc.textContent = def.desc;
+    info.append(desc);
+
+    const effect = document.createElement("div");
+    effect.className = "stone-item-effect";
+    if (currentLv > 0) {
+      effect.textContent = `Hiện tại: ${def.effects[currentLv - 1]}`;
+    } else {
+      effect.textContent = "Chưa mở khóa";
+    }
+    info.append(effect);
+
+    item.append(info);
+
+    // Nút mua
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "stone-buy-btn";
+
+    const cost = nextCost(activeSoulView, def.id);
+    if (cost === null) {
+      btn.disabled = true;
+      btn.textContent = "Đã tối đa";
+    } else {
+      btn.textContent = `Mở · ${cost} Duyên`;
+      if (activeSoulView.duyen < cost) {
+        btn.disabled = true;
+        btn.title = `Thiếu ${cost - activeSoulView.duyen} Duyên`;
+      } else {
+        btn.disabled = false;
+        btn.addEventListener("click", () => {
+          limboBuyCb?.(def.id);
+        });
+      }
+    }
+    item.append(btn);
+    container.append(item);
+  }
+
+  // 2. Các xuất thân mở bằng Duyên (ORIGINS khác phàm gia)
+  for (const o of ORIGINS) {
+    if (o.cost <= 0) continue;
+    const item = document.createElement("div");
+    item.className = "stone-item";
+
+    const info = document.createElement("div");
+    info.className = "stone-item-info";
+
+    const nameRow = document.createElement("div");
+    nameRow.className = "stone-item-name";
+    nameRow.textContent = `Xuất thân: ${o.name}`;
+
+    const isUnlocked = activeSoulView.origins.includes(o.id);
+    const lvBadge = document.createElement("span");
+    lvBadge.className = "stone-item-level";
+    lvBadge.textContent = isUnlocked ? "Đã mở" : "Chưa mở";
+    nameRow.append(lvBadge);
+    info.append(nameRow);
+
+    const desc = document.createElement("div");
+    desc.className = "stone-item-desc";
+    desc.textContent = o.desc;
+    info.append(desc);
+
+    item.append(info);
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "stone-buy-btn";
+    if (isUnlocked) {
+      btn.disabled = true;
+      btn.textContent = "Đã sở hữu";
+    } else {
+      btn.textContent = `Mở · ${o.cost} Duyên`;
+      if (activeSoulView.duyen < o.cost) {
+        btn.disabled = true;
+        btn.title = `Thiếu ${o.cost - activeSoulView.duyen} Duyên`;
+      } else {
+        btn.disabled = false;
+        btn.addEventListener("click", () => {
+          limboBuyCb?.(`${ORIGIN_BUY_PREFIX}${o.id}`);
+        });
+      }
+    }
+    item.append(btn);
+    container.append(item);
+  }
+
+  // 3. Khắc chân linh: ghi "(sắp có)"
+  const khacItem = document.createElement("div");
+  khacItem.className = "stone-item";
+  const khacInfo = document.createElement("div");
+  khacInfo.className = "stone-item-info";
+
+  const khacName = document.createElement("div");
+  khacName.className = "stone-item-name";
+  khacName.textContent = "Khắc chân linh";
+  const khacBadge = document.createElement("span");
+  khacBadge.className = "stone-item-level";
+  khacBadge.textContent = "Sắp có";
+  khacName.append(khacBadge);
+  khacInfo.append(khacName);
+
+  const khacDesc = document.createElement("div");
+  khacDesc.className = "stone-item-desc";
+  khacDesc.textContent =
+    "Lưu giữ một môn công pháp hoặc kỳ nghệ tâm đắc qua kiếp (chờ xuất hiện công pháp).";
+  khacInfo.append(khacDesc);
+  khacItem.append(khacInfo);
+
+  const khacBtn = document.createElement("button");
+  khacBtn.type = "button";
+  khacBtn.className = "stone-buy-btn";
+  khacBtn.disabled = true;
+  khacBtn.textContent = "Chưa mở";
+  khacItem.append(khacBtn);
+  container.append(khacItem);
+}
+
+function renderLimboOrigins() {
+  const container = $("limbo-origin-list");
+  if (!container || !activeSoulView) return;
+  container.replaceChildren();
+
+  for (const o of ORIGINS) {
+    const isAvailable = o.cost === 0 || activeSoulView.origins.includes(o.id);
+    const card = document.createElement("div");
+    card.className = `origin-card${isAvailable ? "" : " locked"}${selectedOrigin === o.id ? " selected" : ""}`;
+
+    const nameRow = document.createElement("div");
+    nameRow.className = "origin-card-name";
+    nameRow.textContent = o.name;
+
+    if (!isAvailable) {
+      const lockTag = document.createElement("span");
+      lockTag.className = "origin-card-cost";
+      lockTag.textContent = "🔒 Khóa";
+      nameRow.append(lockTag);
+    }
+    card.append(nameRow);
+
+    const desc = document.createElement("div");
+    desc.className = "origin-card-desc";
+    desc.textContent = o.desc;
+    card.append(desc);
+
+    if (isAvailable) {
+      card.addEventListener("click", () => {
+        selectedOrigin = o.id;
+        renderLimboOrigins();
+      });
+    }
+
+    container.append(card);
+  }
+}
+
+function renderLimboRelics() {
+  const container = $("limbo-relic-list");
+  const emptyEl = $("limbo-relic-empty");
+  const hintEl = $("limbo-relic-hint");
+  if (!container || !activeSoulView || !activeLimboMsg) return;
+
+  const cap = keepSlotsOf(activeSoulView.unlocks);
+  if (hintEl) hintEl.textContent = `Tối đa ${cap} món (đã chọn ${selectedRelics.length}/${cap})`;
+
+  const keepable = activeLimboMsg.keepable || [];
+  if (cap === 0 || keepable.length === 0) {
+    container.replaceChildren();
+    if (emptyEl) {
+      emptyEl.hidden = false;
+      emptyEl.textContent =
+        cap === 0
+          ? 'Chưa mở khóa "Ký vật" ở Tam Sinh Thạch.'
+          : "Không có trang bị nào để mang theo.";
+    }
+    return;
+  }
+
+  if (emptyEl) emptyEl.hidden = true;
+  container.replaceChildren();
+
+  keepable.forEach((itemId) => {
+    const itemDef = ITEM_BY_ID[itemId];
+    const itemName = itemDef?.name || itemId;
+    const isChecked = selectedRelics.includes(itemId);
+    const canCheck = isChecked || selectedRelics.length < cap;
+
+    const item = document.createElement("div");
+    item.className = `relic-item${isChecked ? " checked" : ""}${canCheck ? "" : " disabled"}`;
+
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = isChecked;
+    cb.disabled = !canCheck && !isChecked;
+    item.append(cb);
+
+    const nameSpan = document.createElement("span");
+    nameSpan.textContent = itemName;
+    if (itemDef?.rarity) {
+      nameSpan.style.color = hexColor(RARITY_COLORS[itemDef.rarity]);
+    }
+    item.append(nameSpan);
+
+    item.addEventListener("click", (e) => {
+      e.preventDefault();
+      const pos = selectedRelics.indexOf(itemId);
+      if (pos >= 0) {
+        selectedRelics.splice(pos, 1);
+      } else if (selectedRelics.length < cap) {
+        selectedRelics.push(itemId);
+      }
+      renderLimboRelics();
+    });
+
+    container.append(item);
+  });
+}
+
+function renderLimboAll() {
+  if (!activeLimboMsg || !activeSoulView) return;
+  const summary = activeLimboMsg.summary;
+
+  const sub = $("limbo-kiep-sub");
+  if (sub) sub.textContent = `Kiếp thứ ${summary.kiep} khép lại`;
+
+  const realmEl = $("limbo-sum-realm");
+  if (realmEl) realmEl.textContent = realmLabel(summary.realm, summary.tier);
+
+  const timeEl = $("limbo-sum-time");
+  if (timeEl) {
+    const hrs = Math.floor(summary.minutes / 60);
+    const mins = summary.minutes % 60;
+    timeEl.textContent = hrs > 0 ? `${hrs} giờ ${mins} phút` : `${mins} phút`;
+  }
+
+  const killsEl = $("limbo-sum-kills");
+  if (killsEl) killsEl.textContent = `${summary.kills} quái · ${summary.bossKills} trùm`;
+
+  const gainEl = $("limbo-duyen-gain");
+  if (gainEl) gainEl.textContent = `+${summary.gain}`;
+
+  const duyenEl = $("limbo-duyen-total");
+  if (duyenEl) duyenEl.textContent = `${activeSoulView.duyen}`;
+
+  renderLimboStoneList();
+  renderLimboOrigins();
+  renderLimboRelics();
+}
+
 export const ui = {
   show() {
     $("ui").hidden = false;
@@ -2241,5 +2537,108 @@ export const ui = {
     banner.classList.remove("failed");
     $("reconnect-reload").hidden = true;
     document.body.classList.remove("reconnecting");
+  },
+
+  /** Cập nhật số Kiếp hiển thị ở HUD */
+  setKiep(kiep: number) {
+    const badge = $("hud-kiep");
+    if (!badge) return;
+    if (kiep >= 1) {
+      badge.hidden = false;
+      badge.textContent = `Kiếp ${kiep}`;
+    } else {
+      badge.hidden = true;
+    }
+  },
+
+  /** Màn hình Hoàng Tuyền · Bến Vong Xuyên (M3.2) */
+  showLimbo(
+    msg: LimboMsg,
+    callbacks?: {
+      onBuy?: (id: string) => void;
+      onRebirth?: (choice: RebirthChoice) => void;
+    },
+  ) {
+    activeLimboMsg = msg;
+    activeSoulView = msg.soul;
+    selectedOrigin =
+      msg.soul.origins && msg.soul.origins.length > 0 ? msg.soul.origins[0] : DEFAULT_ORIGIN;
+    selectedRelics = [];
+    limboBuyCb = callbacks?.onBuy ?? null;
+    limboRebirthCb = callbacks?.onRebirth ?? null;
+
+    this.closeAllModals();
+    this.closeDialog();
+    this.closePlayerMenu();
+    this.death(null);
+
+    document.body.classList.add("in-limbo");
+    const overlay = $("limbo-overlay");
+    if (overlay) overlay.hidden = false;
+
+    renderLimboAll();
+
+    const rebirthBtn = $("limbo-btn-rebirth");
+    if (rebirthBtn) {
+      rebirthBtn.onclick = () => {
+        limboRebirthCb?.({
+          origin: selectedOrigin,
+          keep: selectedRelics,
+        });
+      };
+    }
+  },
+
+  /** Server cập nhật chân linh sau khi mua */
+  updateSoul(soul: SoulView) {
+    activeSoulView = soul;
+    if (activeLimboMsg) {
+      activeLimboMsg.soul = soul;
+    }
+    renderLimboAll();
+  },
+
+  /** Đóng màn hình Hoàng Tuyền */
+  hideLimbo() {
+    activeLimboMsg = null;
+    activeSoulView = null;
+    limboBuyCb = null;
+    limboRebirthCb = null;
+    const overlay = $("limbo-overlay");
+    if (overlay) overlay.hidden = true;
+    document.body.classList.remove("in-limbo");
+  },
+
+  isLimboOpen(): boolean {
+    const overlay = $("limbo-overlay");
+    return Boolean(overlay && !overlay.hidden);
+  },
+
+  /** Chuyển cảnh Mạnh Bà và bắt đầu kiếp mới */
+  showReborn(kiep: number, onComplete?: () => void) {
+    this.hideLimbo();
+    this.setKiep(kiep);
+
+    const overlay = $("reborn-overlay");
+    const title = $("reborn-title");
+    if (title) title.textContent = `Kiếp Thứ ${kiep} Bắt Đầu`;
+
+    if (overlay) {
+      overlay.hidden = false;
+      // Trigger animation
+      requestAnimationFrame(() => {
+        overlay.classList.add("active");
+      });
+
+      setTimeout(() => {
+        overlay.classList.remove("active");
+        setTimeout(() => {
+          overlay.hidden = true;
+          onComplete?.();
+        }, 600);
+      }, 2500);
+    } else {
+      onComplete?.();
+    }
   },
 };
