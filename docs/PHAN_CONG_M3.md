@@ -1,5 +1,7 @@
 # Phân công M3 (bản đề xuất)
 
+> **Cập nhật 11/11/2026: bước 1-5 của M3 đã xong và nằm trên `main`; bước 6 (tông môn) xong phía server (hợp đồng, kho lưu, dịch vụ), còn client #237 và công cụ #231; thêm quyết định mục 5 (gục trong bí cảnh không mất kiếp).**
+>
 > **Trạng thái (10/11/2026, sau quyết định của người dùng): Sprint 4 (tổ đội) và phần không đổi kiến trúc của Sprint 5 (tiền tệ, Bước 0 nhiều bản đồ) đã xong và nằm trên `main`. Hướng đi phần còn lại đã được người dùng chốt (mục "Quyết định của người dùng"); bản đề xuất cũ của Dev A ở Sprint 5 / 6 bên dưới được thay bằng mục "Kế hoạch M3 theo quyết định".**
 
 ## Quyết định của người dùng (10/11/2026)
@@ -9,6 +11,7 @@ Thay cho các câu hỏi trước đây ở cuối file này và trong `question
 2. **Thứ tự M3 mới:** (1) bản đồ thứ hai; (2) luân hồi bản đầu; (3) tài khoản thật + PostgreSQL, để lưu **linh hồn** tách khỏi **nhân vật** (kéo từ M4 lên); (4) bí cảnh (phòng tạm theo đội); (5) PK chỉ khi hai bên đồng ý (thách đấu), chết vì PK **không** mất kiếp; (6) tông môn, gắn với linh hồn.
 3. **Chết = luân hồi** (bỏ luật cũ "hồi sinh ở trấn, mất 10% tu vi"): nhân vật của kiếp đó mất hẳn (cảnh giới, đồ, Linh thạch về 0), đầu thai sang kiếp mới; nhận **điểm luân hồi** theo thành tựu kiếp vừa rồi; tiêu điểm vào **bảng mở khóa vĩnh viễn** (bản đầu khoảng 4–5 mục: dư âm tu hành +% tốc độ tu luyện tối đa +100%, khắc chân linh, chọn xuất thân kiếp mới, đồ khởi đầu, giữ lại một món đồ). Không chết khi đang rớt mạng. Linh thạch mất theo kiếp (trừ phần mở khóa mang theo). Tên thuật ngữ theo phong cách tu tiên, tự đặt cho Tiên Giới (không chép chữ của game khác).
 4. **Câu chưa quyết** (cân bằng tu vi tổ đội, bán đan cộng tu vi): giữ hướng an toàn A đã đề xuất (giữ nguyên công thức tổ đội, cửa hàng **không** bán `tu_khi_dan`).
+5. **Bổ sung 11/11/2026: gục trong bí cảnh KHÔNG mất kiếp.** Bị đẩy ra về cổng vào (hồi một phần khí huyết), mất một lượt ngày, không thưởng, không vào lại run đó; cả đội gục thì run thua; chết ở bản đồ thường vẫn là luân hồi. Đã làm: `shared/` #234, server #238, client #241, E2E #244; công cụ: #236 (C).
 
 ## Trạng thái thực tế
 
@@ -20,13 +23,13 @@ Thay cho các câu hỏi trước đây ở cuối file này và trong `question
 | M3 bước 1: bản đồ thứ hai (phương án A) | **Xong**: `shared/` (#139, #144), server (phòng theo bản đồ #145, qua cổng #153, chat chung #156, đội dùng chung #158), client (#146, ảnh nghiệm thu #160), công cụ (#155, #161); NPC lái buôn Thanh Lộ Trạm (#169, #170). Quái riêng của Hắc Phong Cốc: chuyển sang việc sau (#142 đã đóng) | `docs/THIET_KE_NHIEU_BAN_DO.md` |
 | M3 bước 2: luân hồi bản đầu | **Xong**: `shared/` (#152), ghost bất tử (#147), chân linh (#159), Hoàng Tuyền / đầu thai / Dư âm tu hành / xuất thân (#162), client Hoàng Tuyền (#163), công cụ (#168) | `docs/THIET_KE_LUAN_HOI.md` |
 | M3 bước 3: tài khoản thật + PostgreSQL | **Xong phía server và client** (#177 đã đóng): hợp đồng #174; kho / danh tính #178, #179; mật mã + kho tài khoản #180; `AuthService` #183; API HTTP #184; vào phòng bằng token #185; `tai-khoan` #188; Pg #190, #194, #197; client #182, #189, #196; E2E #193; CI Postgres thật #195; contract store #181, #187; `kiem-save` #192. **Còn (C, #176):** bot `--account`, login storm | `docs/THIET_KE_TAI_KHOAN.md` |
-| M3 bước 4: bí cảnh (phòng tạm theo đội) | **Xong phía server và công cụ cân bằng** (#202 đã đóng): thiết kế #198; hợp đồng #199, #205; kiem-save #206; sổ run + phòng bí cảnh thật #207; trùm / thắng / thưởng / lượt ngày #208; số liệu #209; công cụ cân bằng #210. **Còn:** client 4d (B, #200), bot / thử tải 4e (C, #201), E2E thật, cân nhắc luật chết trong bí cảnh (chờ người dùng); #203 mở tới khi đủ | `docs/THIET_KE_BI_CANH.md` |
-| M3 bước 5: PK thách đấu | **Đã có thiết kế** để B / C review, chưa viết mã | `docs/THIET_KE_PK.md` |
-| M3 bước 6: tông môn | **Đã có thiết kế** để B / C review, chưa viết mã | `docs/THIET_KE_TONG_MON.md` |
+| M3 bước 4: bí cảnh (phòng tạm theo đội) | **Xong** (còn công cụ #236 cho luật gục): thiết kế #198; hợp đồng #199, #205; kiem-save #206; sổ run + phòng bí cảnh thật #207; trùm / thắng / thưởng / lượt ngày #208; số liệu #209; công cụ cân bằng #210; client #213; E2E thật #214; bot `--dungeon` + stress #222. **Luật gục không mất kiếp (11/11):** #234, #238, #241, E2E #244 | `docs/THIET_KE_BI_CANH.md` |
+| M3 bước 5: PK thách đấu | **Xong**: thiết kế #212; hợp đồng #216, số liệu #221; server #220; công cụ cân bằng #223; client #224; E2E thật #226; bot `--duel` + stress #232 | `docs/THIET_KE_PK.md` |
+| M3 bước 6: tông môn | **Xong phía server**: thiết kế #225; hợp đồng `shared/` #227; kho lưu (tệp + PostgreSQL + migration) #233; dịch vụ + hệ thống + chat `/s` + kho chung #240; kiem-save #239. **Còn:** client 6d (B, #237, đã sửa, chờ ghép main), E2E thật hai tab (#242), công cụ 6e (C, #231: bot `--sect`, thử tải, mô phỏng sập giữa góp / rút kho) | `docs/THIET_KE_TONG_MON.md` |
 
 Việc ngoài kế hoạch M3 đã làm xen vào: tối ưu băng thông vùng nhìn (#70, #87, #89; 100 người: ~9.5 KB/s mỗi client ở ca đông người tụ trong trấn), bench hằng đêm (#97), nối lại khi rớt mạng (#118, #122, #127; thử tải #125), kiểm file lưu (#113, #114), Docker và triển khai (#81, #83), rà giao diện điện thoại (#105).
 
-Số đo trên `main` (10/11/2026, sau #162): 538 test; bench 100 người: săn quái 183, đám đông 474 byte/tick mỗi client (mốc `bench-baseline.json`), tick trung bình ~1.1 / ~1.85 ms (ngân sách < 10 ms); bot `--travel` 20 bot 15 s qua cổng liên tục: 52 lượt, trễ `travel` -> state phòng mới TB ~28 ms, 20/20 giữ kết nối.
+Số đo trên `main` (11/11/2026, sau #243): 1174 test; bench 10 giây, 100 người: săn quái 213, đám đông 459 byte/tick mỗi client (mốc CI `bench-baseline.json`, 20 giây: 183 / 474), tick trung bình ~1.2 / ~1.7 ms (ngân sách < 10 ms). Số đo cũ (10/11/2026, sau #162): 538 test, săn quái 183, đám đông 474, tick ~1.1 / ~1.85 ms; bot `--travel` 20 bot 15 s qua cổng liên tục: 52 lượt, trễ `travel` -> state phòng mới TB ~28 ms, 20/20 giữ kết nối.
 
 Hai câu cũ (cân bằng tu vi của tổ đội, bán đan cộng tu vi) đã chốt theo hướng an toàn của A, xem mục quyết định ở trên; kinh tế Linh thạch khi chết do bước 2 (luân hồi) quyết.
 
