@@ -6,6 +6,7 @@ import { afterAll } from "vitest";
 import {
   describeAccountStoreContract,
   describePlayerStoreContract,
+  describeSectStoreContract,
   describeSessionStoreContract,
   describeSoulStoreContract,
 } from "./store-contract";
@@ -18,6 +19,7 @@ process.env.DATA_DIR = testDir;
 // Nạp động các store sau khi đã cấu hình DATA_DIR
 const { FilePlayerStore } = await import("./player-store");
 const { FileSoulStore } = await import("./soul");
+const { FileSectStore } = await import("./sect-store");
 const { FileAccountStore, FileSessionStore } = await import("./account-store");
 
 afterAll(() => {
@@ -40,6 +42,12 @@ describeSoulStoreContract(
       path.join(testDir, `soul-store-${++soulStoreCounter}`),
       () => "2026-11-10T00:00:00.000Z",
     ),
+);
+
+let sectStoreCounter = 0;
+describeSectStoreContract(
+  "FileSectStore",
+  () => new FileSectStore(path.join(testDir, `sect-store-${++sectStoreCounter}`)),
 );
 
 let accountStoreCounter = 0;
