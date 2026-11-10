@@ -23,9 +23,12 @@ import {
   DUYEN_CAP,
   KIEP_CAP,
   cleanName,
+  validateUsername,
 } from "@tien-gioi/shared";
 import { byId } from "../src/systems/lookup.js";
 import { soulIdOf } from "../src/soul.js";
+import { parseHash } from "../src/auth.js";
+import { nameKeyOf } from "../src/account-store.js";
 import { createHash } from "node:crypto";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -55,12 +58,27 @@ export interface AuditReport {
   totalSouls?: number;
   cleanSouls?: number;
   errorSouls?: number;
+  /** Thống kê tài khoản (accounts/) (#176) */
+  totalAccounts?: number;
+  cleanAccounts?: number;
+  errorAccounts?: number;
+  /** Thống kê phiên (sessions/) (#176) */
+  totalSessions?: number;
+  cleanSessions?: number;
+  errorSessions?: number;
   errorsByCode: Record<string, number>;
   failedFiles: AuditFileResult[];
 }
 
 const HEX_64_REGEX = /^[0-9a-fA-F]{64}$/;
 const SAFE_ID_REGEX = /^[a-z0-9_]{1,32}$/;
+const ACCOUNT_ID_REGEX = /^[A-Za-z0-9-]{8,64}$/;
+const TOKEN_HASH_REGEX = /^[a-f0-9]{64}$/;
+
+const isIsoString = (s: unknown): s is string =>
+  typeof s === "string" && s.length <= 40 && Number.isFinite(Date.parse(s));
+const isFiniteEpoch = (n: unknown): n is number =>
+  typeof n === "number" && Number.isFinite(n) && n >= 0 && n < 1e15;
 
 /**
  * Hiển thị an toàn một giá trị đến từ file không tin cậy trong thông báo lỗi.
@@ -854,6 +872,183 @@ export function auditSoulSaveData(rawText: string, byteLength: number): AuditErr
 }
 
 /**
+ * Kiểm tra tính hợp lệ của nội dung một file tài khoản (accounts/<id>.json).
+ * Tuyệt đối không trả về hay in passHash / recoveryHash trong mã lỗi hoặc thông báo.
+ */
+export function auditAccountSaveData(rawText: string, byteLength: number): AuditError[] {
+  const errors: AuditError[] = [];
+
+  if (byteLength > MAX_FILE_SIZE) {
+    errors.push({
+      code: "file_too_large",
+      message: `Kích thước file (${byteLength} bytes) vượt quá giới hạn an toàn 1 MB`,
+    });
+    return errors;
+  }
+
+  let data: any;
+  try {
+    data = JSON.parse(rawText);
+  } catch (err: any) {
+    errors.push({
+      code: "invalid_json",
+      message: `JSON không hợp lệ: ${err?.message ?? "lỗi cú pháp"}`,
+    });
+    return errors;
+  }
+
+  if (data === null || typeof data !== "object" || Array.isArray(data)) {
+    errors.push({
+      code: "not_an_object",
+      message: "Dữ liệu gốc phải là một JSON Object",
+    });
+    return errors;
+  }
+
+  // 1. id
+  if (typeof data.id !== "string" || !ACCOUNT_ID_REGEX.test(data.id)) {
+    errors.push({
+      code: "invalid_account_id",
+      message: `id tài khoản (${show(data.id)}) không hợp lệ (cần chuỗi 8–64 ký tự chữ, số, gạch ngang)`,
+    });
+  }
+
+  // 2. username
+  const u = validateUsername(data.username);
+  if (!u.ok || u.value !== data.username) {
+    errors.push({
+      code: "invalid_username",
+      message: `Tên đăng nhập (${show(data.username)}) không hợp lệ (cần 3–20 ký tự chữ thường, số hoặc gạch dưới)`,
+    });
+  }
+
+  // 3. passHash & recoveryHash (scrypt băm hợp lệ)
+  if (typeof data.passHash !== "string" || parseHash(data.passHash) === null) {
+    errors.push({
+      code: "invalid_pass_hash",
+      message: "passHash không phải chuỗi băm scrypt hợp lệ",
+    });
+  }
+
+  if (typeof data.recoveryHash !== "string" || parseHash(data.recoveryHash) === null) {
+    errors.push({
+      code: "invalid_recovery_hash",
+      message: "recoveryHash không phải chuỗi băm scrypt hợp lệ",
+    });
+  }
+
+  // 4. createdAt & lastLoginAt
+  if (!isIsoString(data.createdAt)) {
+    errors.push({
+      code: "invalid_created_at",
+      message: `createdAt (${show(data.createdAt)}) không phải định dạng ngày ISO hợp lệ`,
+    });
+  }
+
+  if (!isIsoString(data.lastLoginAt)) {
+    errors.push({
+      code: "invalid_last_login_at",
+      message: `lastLoginAt (${show(data.lastLoginAt)}) không phải định dạng ngày ISO hợp lệ`,
+    });
+  }
+
+  // 5. disabled
+  if (typeof data.disabled !== "boolean") {
+    errors.push({
+      code: "invalid_disabled",
+      message: `disabled (${show(data.disabled)}) phải là kiểu boolean`,
+    });
+  }
+
+  // 6. name (đạo hiệu nếu có)
+  if (data.name !== undefined) {
+    if (typeof data.name !== "string" || cleanName(data.name) !== data.name) {
+      errors.push({
+        code: "invalid_account_name",
+        message: `Đạo hiệu (${show(data.name)}) không hợp lệ theo quy tắc cleanName`,
+      });
+    }
+  }
+
+  return errors;
+}
+
+/**
+ * Kiểm tra tính hợp lệ của nội dung một file phiên (sessions/<tokenHash>.json).
+ * Tuyệt đối không để lộ tokenHash hay thông tin nhạy cảm.
+ */
+export function auditSessionSaveData(rawText: string, byteLength: number): AuditError[] {
+  const errors: AuditError[] = [];
+
+  if (byteLength > MAX_FILE_SIZE) {
+    errors.push({
+      code: "file_too_large",
+      message: `Kích thước file (${byteLength} bytes) vượt quá giới hạn an toàn 1 MB`,
+    });
+    return errors;
+  }
+
+  let data: any;
+  try {
+    data = JSON.parse(rawText);
+  } catch (err: any) {
+    errors.push({
+      code: "invalid_json",
+      message: `JSON không hợp lệ: ${err?.message ?? "lỗi cú pháp"}`,
+    });
+    return errors;
+  }
+
+  if (data === null || typeof data !== "object" || Array.isArray(data)) {
+    errors.push({
+      code: "not_an_object",
+      message: "Dữ liệu gốc phải là một JSON Object",
+    });
+    return errors;
+  }
+
+  // 1. tokenHash: sha256 hex 64 ký tự chữ thường
+  if (typeof data.tokenHash !== "string" || !TOKEN_HASH_REGEX.test(data.tokenHash)) {
+    errors.push({
+      code: "invalid_token_hash",
+      message: "tokenHash phải là chuỗi hex sha256 64 ký tự chữ thường",
+    });
+  }
+
+  // 2. accountId
+  if (typeof data.accountId !== "string" || !ACCOUNT_ID_REGEX.test(data.accountId)) {
+    errors.push({
+      code: "invalid_account_id",
+      message: `accountId (${show(data.accountId)}) không hợp lệ (cần 8–64 ký tự chữ, số, gạch ngang)`,
+    });
+  }
+
+  // 3. Thời gian: createdAt, expiresAt, lastSeenAt
+  if (!isFiniteEpoch(data.createdAt)) {
+    errors.push({
+      code: "invalid_session_time",
+      message: `createdAt (${show(data.createdAt)}) phải là số epoch ms hợp lệ`,
+    });
+  }
+
+  if (!isFiniteEpoch(data.expiresAt)) {
+    errors.push({
+      code: "invalid_session_time",
+      message: `expiresAt (${show(data.expiresAt)}) phải là số epoch ms hợp lệ`,
+    });
+  }
+
+  if (!isFiniteEpoch(data.lastSeenAt)) {
+    errors.push({
+      code: "invalid_session_time",
+      message: `lastSeenAt (${show(data.lastSeenAt)}) phải là số epoch ms hợp lệ`,
+    });
+  }
+
+  return errors;
+}
+
+/**
  * Quét toàn bộ thư mục file lưu nhân vật và lập báo cáo audit chi tiết.
  * Ném lỗi nếu thư mục không tồn tại.
  */
@@ -982,6 +1177,212 @@ export function auditSavesDirectory(dirPath: string): AuditReport {
     }
   }
 
+  // Kiểm tra thư mục con accounts/ nếu có (#176)
+  const accountsDir = path.join(resolvedDir, "accounts");
+  const hasAccountsDir = existsSync(accountsDir) && statSync(accountsDir).isDirectory();
+  let totalAccounts: number | undefined;
+  let cleanAccounts: number | undefined;
+  let errorAccounts: number | undefined;
+  const accountsById = new Set<string>();
+  const accountsByUsername = new Map<string, string>();
+  const accountsByNameKey = new Map<string, string>();
+
+  if (hasAccountsDir) {
+    const accountEntries = readdirSync(accountsDir);
+    const accountJsonFiles = accountEntries.filter(
+      (f) => f.endsWith(".json") && !f.includes(".hong-") && !f.endsWith(".tmp"),
+    );
+
+    totalAccounts = accountJsonFiles.length;
+    cleanAccounts = 0;
+    errorAccounts = 0;
+
+    for (const filename of accountJsonFiles) {
+      const fullPath = path.join(accountsDir, filename);
+      let rawContent = "";
+      let byteLength: number;
+
+      try {
+        const fileStat = lstatSync(fullPath);
+        if (!fileStat.isFile()) {
+          const errList = [
+            {
+              code: "not_regular_file",
+              message: "File tài khoản không phải file thông thường",
+            },
+          ];
+          errorAccounts++;
+          errorsByCode.not_regular_file = (errorsByCode.not_regular_file ?? 0) + 1;
+          if (failedFiles.length < 10) {
+            failedFiles.push({ file: `accounts/${filename}`, errors: errList });
+          }
+          continue;
+        }
+        byteLength = fileStat.size;
+        if (byteLength <= MAX_FILE_SIZE) {
+          rawContent = readFileSync(fullPath, "utf8");
+        }
+      } catch (err: any) {
+        const errList = [
+          {
+            code: "read_error",
+            message: `Không thể đọc file tài khoản: ${err?.message ?? "lỗi I/O"}`,
+          },
+        ];
+        errorAccounts++;
+        errorsByCode.read_error = (errorsByCode.read_error ?? 0) + 1;
+        if (failedFiles.length < 10) {
+          failedFiles.push({ file: `accounts/${filename}`, errors: errList });
+        }
+        continue;
+      }
+
+      const accountErrors = auditAccountSaveData(rawContent, byteLength);
+
+      if (accountErrors.length === 0) {
+        try {
+          const parsed = JSON.parse(rawContent);
+          if (filename !== `${parsed.id}.json`) {
+            accountErrors.push({
+              code: "mismatched_account_filename",
+              message: `Tên file tài khoản (${show(filename)}) không khớp với id (${show(parsed.id)}.json)`,
+            });
+          }
+          if (accountsByUsername.has(parsed.username)) {
+            accountErrors.push({
+              code: "duplicate_username",
+              message: `Tên đăng nhập (${show(parsed.username)}) bị trùng lặp với file ${accountsByUsername.get(parsed.username)}`,
+            });
+          } else {
+            accountsByUsername.set(parsed.username, filename);
+          }
+          if (parsed.name) {
+            const nKey = nameKeyOf(parsed.name);
+            if (accountsByNameKey.has(nKey)) {
+              accountErrors.push({
+                code: "duplicate_account_name",
+                message: `Đạo hiệu (${show(parsed.name)}) bị trùng lặp với file ${accountsByNameKey.get(nKey)}`,
+              });
+            } else {
+              accountsByNameKey.set(nKey, filename);
+            }
+          }
+          if (accountErrors.length === 0) {
+            accountsById.add(parsed.id);
+          }
+        } catch {
+          // JSON đã được kiểm tra trong auditAccountSaveData
+        }
+      }
+
+      if (accountErrors.length === 0) {
+        cleanAccounts++;
+      } else {
+        errorAccounts++;
+        for (const err of accountErrors) {
+          errorsByCode[err.code] = (errorsByCode[err.code] ?? 0) + 1;
+        }
+        if (failedFiles.length < 10) {
+          failedFiles.push({ file: `accounts/${filename}`, errors: accountErrors });
+        }
+      }
+    }
+  }
+
+  // Kiểm tra thư mục con sessions/ nếu có (#176)
+  const sessionsDir = path.join(resolvedDir, "sessions");
+  const hasSessionsDir = existsSync(sessionsDir) && statSync(sessionsDir).isDirectory();
+  let totalSessions: number | undefined;
+  let cleanSessions: number | undefined;
+  let errorSessions: number | undefined;
+
+  if (hasSessionsDir) {
+    const sessionEntries = readdirSync(sessionsDir);
+    const sessionJsonFiles = sessionEntries.filter(
+      (f) => f.endsWith(".json") && !f.includes(".hong-") && !f.endsWith(".tmp"),
+    );
+
+    totalSessions = sessionJsonFiles.length;
+    cleanSessions = 0;
+    errorSessions = 0;
+
+    for (const filename of sessionJsonFiles) {
+      const fullPath = path.join(sessionsDir, filename);
+      let rawContent = "";
+      let byteLength: number;
+
+      try {
+        const fileStat = lstatSync(fullPath);
+        if (!fileStat.isFile()) {
+          const errList = [
+            {
+              code: "not_regular_file",
+              message: "File phiên không phải file thông thường",
+            },
+          ];
+          errorSessions++;
+          errorsByCode.not_regular_file = (errorsByCode.not_regular_file ?? 0) + 1;
+          if (failedFiles.length < 10) {
+            failedFiles.push({ file: `sessions/${filename}`, errors: errList });
+          }
+          continue;
+        }
+        byteLength = fileStat.size;
+        if (byteLength <= MAX_FILE_SIZE) {
+          rawContent = readFileSync(fullPath, "utf8");
+        }
+      } catch (err: any) {
+        const errList = [
+          {
+            code: "read_error",
+            message: `Không thể đọc file phiên: ${err?.message ?? "lỗi I/O"}`,
+          },
+        ];
+        errorSessions++;
+        errorsByCode.read_error = (errorsByCode.read_error ?? 0) + 1;
+        if (failedFiles.length < 10) {
+          failedFiles.push({ file: `sessions/${filename}`, errors: errList });
+        }
+        continue;
+      }
+
+      const sessionErrors = auditSessionSaveData(rawContent, byteLength);
+
+      if (sessionErrors.length === 0) {
+        try {
+          const parsed = JSON.parse(rawContent);
+          if (filename !== `${parsed.tokenHash}.json`) {
+            sessionErrors.push({
+              code: "mismatched_session_filename",
+              message: `Tên file phiên (${show(filename)}) không khớp với tokenHash (${show(parsed.tokenHash)}.json)`,
+            });
+          }
+          // Kiểm tra tính nhất quán tham chiếu tài khoản
+          if (hasAccountsDir && accountsById.size > 0 && !accountsById.has(parsed.accountId)) {
+            sessionErrors.push({
+              code: "orphan_session",
+              message: `Phiên trỏ tới accountId (${show(parsed.accountId)}) không tồn tại trong accounts/`,
+            });
+          }
+        } catch {
+          // JSON đã được kiểm tra trong auditSessionSaveData
+        }
+      }
+
+      if (sessionErrors.length === 0) {
+        cleanSessions++;
+      } else {
+        errorSessions++;
+        for (const err of sessionErrors) {
+          errorsByCode[err.code] = (errorsByCode[err.code] ?? 0) + 1;
+        }
+        if (failedFiles.length < 10) {
+          failedFiles.push({ file: `sessions/${filename}`, errors: sessionErrors });
+        }
+      }
+    }
+  }
+
   for (const filename of jsonFiles) {
     const fullPath = path.join(resolvedDir, filename);
     let rawContent = "";
@@ -1074,6 +1475,12 @@ export function auditSavesDirectory(dirPath: string): AuditReport {
     totalSouls,
     cleanSouls,
     errorSouls,
+    totalAccounts,
+    cleanAccounts,
+    errorAccounts,
+    totalSessions,
+    cleanSessions,
+    errorSessions,
     errorsByCode,
     failedFiles,
   };
@@ -1127,10 +1534,15 @@ export function main(): number {
 
   if (args.json) {
     console.log(JSON.stringify(report, null, 2));
-    return report.errorFiles === 0 && (report.errorSouls ?? 0) === 0 ? 0 : 1;
+    const ok =
+      report.errorFiles === 0 &&
+      (report.errorSouls ?? 0) === 0 &&
+      (report.errorAccounts ?? 0) === 0 &&
+      (report.errorSessions ?? 0) === 0;
+    return ok ? 0 : 1;
   }
 
-  console.log(`\n=== BÁO CÁO KIỂM TRA DỮ LIỆU FILE LƯU NHÂN VẬT & CHÂN LINH ===`);
+  console.log(`\n=== BÁO CÁO KIỂM TRA DỮ LIỆU FILE LƯU NHÂN VẬT, CHÂN LINH & TÀI KHOẢN ===`);
   console.log(`- Thư mục kiểm tra: ${report.dataDir}`);
   console.log(`- Tổng số file nhân vật (.json): ${report.totalFiles}`);
   console.log(`- File nhân vật sạch (hợp lệ): ${report.cleanFiles}`);
@@ -1139,6 +1551,16 @@ export function main(): number {
     console.log(`- Tổng số file chân linh (souls/): ${report.totalSouls}`);
     console.log(`- File chân linh sạch (hợp lệ): ${report.cleanSouls}`);
     console.log(`- File chân linh có lỗi vi phạm: ${report.errorSouls}`);
+  }
+  if (report.totalAccounts !== undefined) {
+    console.log(`- Tổng số file tài khoản (accounts/): ${report.totalAccounts}`);
+    console.log(`- File tài khoản sạch (hợp lệ): ${report.cleanAccounts}`);
+    console.log(`- File tài khoản có lỗi vi phạm: ${report.errorAccounts}`);
+  }
+  if (report.totalSessions !== undefined) {
+    console.log(`- Tổng số file phiên (sessions/): ${report.totalSessions}`);
+    console.log(`- File phiên sạch (hợp lệ): ${report.cleanSessions}`);
+    console.log(`- File phiên có lỗi vi phạm: ${report.errorSessions}`);
   }
 
   if (Object.keys(report.errorsByCode).length > 0) {
@@ -1158,7 +1580,11 @@ export function main(): number {
     }
   }
 
-  const totalErrors = report.errorFiles + (report.errorSouls ?? 0);
+  const totalErrors =
+    report.errorFiles +
+    (report.errorSouls ?? 0) +
+    (report.errorAccounts ?? 0) +
+    (report.errorSessions ?? 0);
   if (totalErrors === 0) {
     console.log(`\n✅ TẤT CẢ DỮ LIỆU ĐỀU HỢP LỆ VÀ AN TOÀN.\n`);
     return 0;
