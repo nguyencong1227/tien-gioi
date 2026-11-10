@@ -225,9 +225,12 @@ export interface ToastMsg {
 /**
  * Tuỳ chọn khi vào phòng. Chế độ cũ (`AUTH_MODE=legacy`, mặc định cho dev / test / bot): `name` + `secret`. Chế độ tài khoản
  * (`AUTH_MODE=account`, bắt buộc khi chạy thật): chỉ `token` phiên (xem `shared/src/account.ts`); server bỏ qua trường không dùng.
+ * `v`: phiên bản giao thức của client (`PROTOCOL_VERSION`, `shared/src/protocol.ts`); thiếu = client cũ (0). Server từ chối client
+ * quá cũ bằng `JOIN_CLIENT_OUTDATED` TRƯỚC khi xác thực.
  */
 export interface JoinOptions {
   name?: string;
   secret?: string;
   token?: string;
+  v?: number;
 }
