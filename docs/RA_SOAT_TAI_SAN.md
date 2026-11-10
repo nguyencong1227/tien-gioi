@@ -64,6 +64,9 @@
 ## 4. Công cụ kiểm soát bản quyền tự động (`npm run check:credits`)
 
 - Script tự động: `client/scripts/check-credits.mjs`.
-- Unit test: `client/src/credits.test.ts` (4 test cases, kiểm tra cả đột biến phát hiện tệp lậu).
+- Unit test: `client/src/credits.test.ts` (kiểm tra toàn diện 100% tài nguyên và các ca đột biến).
 - Thời gian chạy: `< 10 ms`.
+- Cơ chế kiểm duyệt nghiêm ngặt:
+  1. **Khớp trọn token (`matchExactToken`)**: Sử dụng ranh giới ký tự tên tệp `(^|[^A-Za-z0-9_.-])<escaped>($|[^A-Za-z0-9_.-])`, chống tuyệt đối việc lọt chuỗi con (ví dụ `con.svg` không thể lọt nhờ `icon.svg`, `512.png` không thể lọt nhờ `icon-512.png`).
+  2. **Không dùng wildcard thư mục**: Mọi tệp mới (kể cả trong `assets/items/`) đều bắt buộc phải được ghi rõ đích danh tên tệp trong `CREDITS.md`. Thêm bất kỳ tệp nào vào `assets/items/` mà không ghi danh sẽ lập tức bị chặn đỏ.
 - Chức năng: Khi có bất kỳ tệp mới nào được thêm vào `client/public/assets` hoặc `client/public/icons` mà chưa được khai báo đầy đủ trong `CREDITS.md`, lệnh `npm run check:credits` sẽ báo lỗi và ngăn chặn commit / build CI.

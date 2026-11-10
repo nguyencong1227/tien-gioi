@@ -39,12 +39,28 @@ export function scanFiles(dir) {
 }
 
 /**
+ * Kiểm tra xem một chuỗi token có xuất hiện trọn vẹn trong văn bản hay không
+ * (không bị dính vào ký tự tên tệp / đường dẫn hợp lệ ở hai đầu: [A-Za-z0-9_.-]).
+ * Ngăn chặn lỗi lọt chuỗi con (ví dụ 'con.svg' trong 'icon.svg' hay '512.png' trong 'icon-512.png').
+ *
+ * @param {string} content
+ * @param {string} token
+ * @returns {boolean}
+ */
+export function matchExactToken(content, token) {
+  if (!token) return false;
+  const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`(^|[^A-Za-z0-9_.-])${escaped}($|[^A-Za-z0-9_.-])`);
+  return re.test(content);
+}
+
+/**
  * Kiểm tra xem một tệp có được nhắc đến trong nội dung CREDITS.md hay không.
- * Khớp theo:
+ * Khớp trọn vẹn theo:
  * 1. Đường dẫn đầy đủ tương đối: client/public/assets/tileset.png
- * 2. Đường dẫn ngắn: assets/tileset.png
- * 3. Tên tệp đơn lẻ: tileset.png
- * 4. Quy tắc wildcard/thư mục: client/public/assets/items/*.png hoặc assets/items/*.png hoặc icons/
+ * 2. Đường dẫn ngắn: assets/tileset.png hoặc icons/icon.svg
+ * 3. Tên tệp đơn lẻ: tileset.png, hoi_huyet_dan.png
+ * Tuyệt đối không dùng wildcard thư mục để đảm bảo mọi tệp mới đều phải ghi danh.
  *
  * @param {string} filePath Đường dẫn tương đối từ repo root (vd: client/public/assets/tileset.png)
  * @param {string} creditsContent Nội dung văn bản của CREDITS.md
@@ -54,22 +70,16 @@ export function isAssetCredited(filePath, creditsContent) {
   // Chuẩn hoá phân cách đường dẫn sang forward-slash
   const normPath = filePath.replace(/\\/g, "/");
   const fileName = path.basename(normPath);
-
-  // 1. Khớp chính xác tên tệp hoặc đường dẫn
-  if (creditsContent.includes(normPath)) return true;
-  if (creditsContent.includes(fileName)) return true;
-
-  // 2. Cắt bớt tiền tố client/public/
   const shortPath = normPath.replace(/^client\/public\//, "");
-  if (creditsContent.includes(shortPath)) return true;
 
-  // 3. Khớp thư mục hoặc pattern có wildcard (vd: assets/items/*.png hoặc client/public/icons/)
-  const dirName = path.dirname(shortPath);
-  if (creditsContent.includes(`${dirName}/*.${normPath.split(".").pop()}`)) return true;
-  if (creditsContent.includes(`${dirName}/*`)) return true;
-  if (creditsContent.includes(`client/public/${dirName}/*.${normPath.split(".").pop()}`))
-    return true;
-  if (creditsContent.includes(`client/public/${dirName}/*`)) return true;
+  // 1. Khớp trọn token đường dẫn đầy đủ
+  if (matchExactToken(creditsContent, normPath)) return true;
+
+  // 2. Khớp trọn token đường dẫn ngắn (bỏ client/public/)
+  if (matchExactToken(creditsContent, shortPath)) return true;
+
+  // 3. Khớp trọn token tên tệp đơn lẻ
+  if (matchExactToken(creditsContent, fileName)) return true;
 
   return false;
 }
