@@ -323,11 +323,11 @@ Kịch bản thử tải và kiểm tra toàn diện cơ chế Luân hồi (M3 b
      - Bot chọn trang bị gửi lại và gửi lệnh `rebirth { origin: "pham_gia", keep }` để đầu thai kiếp mới.
   4. Server xử lý `applyRebirth`, đưa nhân vật về Lạc Hà Trấn với kiếp mới và gửi tin `reborn { kiep }`.
   5. Bot sống lại và tiếp tục chu kỳ đi ra bãi quái.
-- **Số đo thực tế (20 bot, 20s, commit 63a3f93):**
-  - **Số lượt luân hồi:** 5 lần chết và 5 lần đầu thai thành công.
-  - **Độ trễ đầu thai (`rebirth -> reborn`):** TB **0.72 ms** (p50: 0.36 ms, p95: 1.40 ms).
-  - **Thời gian CPU server mỗi tick:** TB **1.38 ms**, p95 **2.46 ms**, cao nhất **8.07 ms** (đạt sâu dưới ngân sách < 10 ms).
-  - **Toàn vẹn kết nối:** 20/20 bot giữ vững kết nối, không có ngắt kết nối bất thường (4429: 0).
+- **Số đo thực tế (6 bot, 25s, commit 90cde18):**
+  - **Số lượt luân hồi & Tam Sinh Thạch:** chết 3 lần | đầu thai 3 lần | **mua Tam Sinh Thạch 3 lần (`soulBuy = 3 > 0`)**.
+  - **Độ trễ đầu thai (`rebirth -> reborn`):** TB **0.90 ms** (p50: 0.89 ms, p95: 1.13 ms).
+  - **Thời gian CPU server mỗi tick:** TB **0.94 ms**, p95 **1.44 ms**, cao nhất **5.09 ms** (đạt sâu dưới ngân sách < 10 ms).
+  - **Toàn vẹn kết nối & dọn dẹp:** 6/6 bot giữ vững kết nối (4429: 0). Sau lượt chạy, bot dọn sạch 100% cả file nhân vật trong `players/` lẫn file chân linh trong `souls/`, không để lại rác trên đĩa.
 
 ### 6.2. Kiểm tra toàn vẹn chân linh & hồ sơ Hoàng Tuyền (`audit-saves.ts`)
 
@@ -351,7 +351,7 @@ Kịch bản thử tải và kiểm tra toàn diện cơ chế Luân hồi (M3 b
   npx vitest run server/src/rooms/reincarnation-stress.test.ts
   ```
 - **Các tiêu chuẩn kiểm tra (3/3 tests pass):**
-  1. *Đua `soulBuy` (Concurrency Race):* Gửi 20 tin nhắn `soulBuy` đồng thời dồn dập trên cùng một chân linh có 22 Duyên (`du_am` nấc 1 giá 12, nấc 2 giá 18 -> tổng 30). Hàng đợi nguyên tử của `SoulStore.update` đảm bảo chỉ nấc 1 được mua thành công, 19 tin còn lại bị từ chối; Duyên không bao giờ âm (còn đúng 10 Duyên), tổng Duyên giữ nguyên 22.
+  1. *Bất biến `soulBuy` khi gửi dồn dập (Spam Invariant):* Gửi 20 tin nhắn `soulBuy` dồn dập đồng thời trên cùng một chân linh có 22 Duyên (`du_am` nấc 1 giá 12, nấc 2 giá 18 -> tổng 30). Kiểm tra bất biến cấp phòng game kết hợp hàng đợi nguyên tử của `FileSoulStore.update`: chỉ nấc 1 được mua thành công, 19 tin còn lại bị từ chối; Duyên không bao giờ âm (còn đúng 10 Duyên), tổng Duyên giữ nguyên 22.
   2. *Chết hàng loạt (Mass Death Stress):* 10 người chơi bị hạ gục cùng lúc trong đúng 1 tick. Tải ghi kép (10 file nhân vật + 10 file chân linh) hoàn tất trơn tru, không có xung đột I/O hay tệp hỏng. Chạy `auditSavesDirectory` kiểm tra toàn bộ thư mục cho kết quả 100% sạch lỗi (`cleanFiles === 10, cleanSouls === 10, errorFiles === 0, errorSouls === 0`).
   3. *Rớt mạng ở Hoàng Tuyền (Limbo Disconnect & Idempotence):* Người chơi chết vào Hoàng Tuyền, nhận `LimboMsg` xong lập tức ngắt kết nối (chưa bấm đầu thai). Khi đăng nhập lại, server gửi lại `LimboMsg`, cơ chế `lastCreditedLife` ngăn cộng Duyên lần 2; người chơi bấm đầu thai thành công vào kiếp mới, hồ sơ `limbo` được dọn sạch hoàn toàn.
 

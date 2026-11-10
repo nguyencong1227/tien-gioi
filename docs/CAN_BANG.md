@@ -154,6 +154,8 @@ Mô phỏng cân bằng hệ thống Luân hồi theo thiết kế tại `docs/T
 | Trúc Cơ hậu kỳ | 122 | 66 | 32.4 | 72 | **35.4** |
 | Hết Trúc Cơ (thanh đầy) | 175 | 81 | 27.7 | 90 | **30.8** |
 
+Đọc bảng: Tính từ Luyện Khí tầng 5 trở đi (bỏ qua giai đoạn mới vào game), Duyên / giờ (0 trùm) nhỏ nhất là **24.6** (Luyện Khí tầng 5), lớn nhất là **39.8** (Trúc Cơ sơ kỳ), tỷ lệ lớn / nhỏ là **1.62×** ⚠️ (vượt ngưỡng mục tiêu ~1.3×). Đỉnh Duyên / giờ rơi vào Trúc Cơ sơ kỳ (~39.8 Duyên/h, gấp ~1.44× so với cày hết Trúc Cơ).
+
 ### 2. Tiến trình luân hồi qua chuỗi kiếp (1..N) khi mở dần "Dư âm tu hành"
 
 Giả định người chơi kiếp nào cũng cày trọn vẹn đến hết Trúc Cơ (hạ 2 trùm) và dồn Duyên nâng cấp `du_am` (+10% đến +100%):
@@ -162,7 +164,7 @@ Giả định người chơi kiếp nào cũng cày trọn vẹn đến hết Tr
 |---:|---:|---:|---:|---:|---:|---:|---:|---|
 | 1 | Nấc 3 | +30% | 2 giờ 55 phút | +87 | 31 | **29.7** | 1.00× | Lên nấc 3 (+30%) |
 | 2 | Nấc 5 | +50% | 2 giờ 17 phút | +85 | 23 | **37.3** | 1.25× | Lên nấc 5 (+50%) |
-| 3 | Nấc 6 | +60% | 1 giờ 60 phút | +83 | 26 | **41.6** | 1.40× | Lên nấc 6 (+60%) |
+| 3 | Nấc 6 | +60% | 2 giờ 0 phút | +83 | 26 | **41.6** | 1.40× | Lên nấc 6 (+60%) |
 | 4 | Nấc 6 | +60% | 1 giờ 53 phút | +83 | 109 | **44.2** | 1.49× | Chờ đủ 115 Duyên |
 | 5 | Nấc 7 | +70% | 1 giờ 53 phút | +83 | 77 | **44.2** | 1.49× | Lên nấc 7 (+70%) |
 | 6 | Nấc 7 | +70% | 1 giờ 47 phút | +82 | 159 | **46.2** | 1.55× | Chờ đủ 165 Duyên |
@@ -179,10 +181,10 @@ Giả định người chơi kiếp nào cũng cày trọn vẹn đến hết Tr
 ### 3. Nhận xét & Đánh giá cân bằng luân hồi
 
 - **Tính chất ngang bằng giữa các cách chơi (chết ở bậc nào):**
-  - Người chơi cày chay chết ở Luyện Khí tầng 5 (29 phút) đạt **36.9 Duyên/h**.
-  - Người chơi cày tới Trúc Cơ sơ kỳ (53 phút) đạt **46.6 Duyên/h**.
-  - Người chơi cày hết Trúc Cơ (175 phút) đạt **30.8 Duyên/h**.
-  - **Đánh giá:** Tốc độ cày Duyên giữa các mốc đều nằm trong khoảng **~25–35 Duyên/giờ**. Không có hiện tượng tự sát sớm để cày Duyên nhanh vượt trội (vì dưới 2 phút hoặc ở Phàm Nhân nhận 0 Duyên), cũng không có việc cày kiếp dài bị thiệt thòi.
+  - Người chơi cày chay chết ở Luyện Khí tầng 5 (29 phút): **24.6 Duyên/h** (0 trùm) / **36.9 Duyên/h** (hạ trùm).
+  - Người chơi cày tới Trúc Cơ sơ kỳ (53 phút): đạt đỉnh **39.8 Duyên/h** (0 trùm) / **46.6 Duyên/h** (hạ trùm).
+  - Người chơi cày hết Trúc Cơ (175 phút): **27.7 Duyên/h** (0 trùm) / **30.8 Duyên/h** (hạ trùm).
+  - **Đánh giá:** Mục tiêu thiết kế ("mọi cách chơi tương đương, ~25–32 Duyên/giờ") đạt tốt ở đa số các mốc, nhưng **chưa đạt ở Trúc Cơ sơ kỳ**: chết tại Trúc Cơ sơ kỳ cho Duyên/giờ gấp **~1.62×** so với cày hết Trúc Cơ (39.8 vs 27.7 Duyên/h). Đây là phát hiện quan trọng từ mô phỏng cân bằng (sẽ xem xét điều chỉnh công thức `calcDuyen` ở việc riêng để san phẳng đỉnh này).
 - **Tiến trình tăng trưởng qua các kiếp (Progression pacing):**
   - Cần **14 kiếp** trọn vẹn để đạt tối đa nấc 10 Dư âm tu hành (+100% tốc độ tu luyện). Tổng thời gian chơi khoảng **~25–30 giờ**.
   - Tốc độ Duyên mỗi giờ tăng từ **29.7 Duyên/h** (kiếp 1) lên **53.0 Duyên/h** (khi max Dư âm tu hành), tương đương tỷ lệ **1.78×**.

@@ -281,8 +281,20 @@ function currentGitCommit(): string {
   }
 }
 
+function soulsDirPath(): string {
+  if (process.env.SOULS_DIR) return path.resolve(process.env.SOULS_DIR);
+  return path.join(DATA_PLAYERS_DIR, "souls");
+}
+
+function soulFileOf(name: string): string {
+  const norm = name.normalize("NFC").toLowerCase().trim();
+  const hash = createHash("sha1").update(norm).digest("hex");
+  return path.join(soulsDirPath(), `${hash}.json`);
+}
+
 /**
- * Xoá đúng danh sách các file nhân vật bot mà lượt chạy hiện tại đã tạo ra trong `server/data/players/`.
+ * Xoá đúng danh sách các file nhân vật bot mà lượt chạy hiện tại đã tạo ra trong `server/data/players/`
+ * và tệp chân linh tương ứng trong `souls/` (#159/#151).
  * Tránh xoá nhầm người chơi thật có tên bắt đầu bằng "Bot ".
  */
 function cleanCreatedBotSaves(createdNames: ReadonlySet<string>): number {
@@ -301,6 +313,22 @@ function cleanCreatedBotSaves(createdNames: ReadonlySet<string>): number {
       // Bỏ qua file đang ghi dở hoặc lỗi đọc
     }
   }
+
+  // Xoá thêm các file chân linh tương ứng trong souls/
+  const sDir = soulsDirPath();
+  if (existsSync(sDir)) {
+    for (const name of createdNames) {
+      const sFile = soulFileOf(name);
+      if (existsSync(sFile)) {
+        try {
+          rmSync(sFile, { force: true });
+        } catch {
+          // Bỏ qua lỗi xoá file
+        }
+      }
+    }
+  }
+
   return removed;
 }
 
@@ -345,8 +373,18 @@ function cleanBotSavesManual(confirmYes: boolean): void {
 
   for (const item of matched) {
     rmSync(item.fullPath, { force: true });
+    const sFile = soulFileOf(item.name);
+    if (existsSync(sFile)) {
+      try {
+        rmSync(sFile, { force: true });
+      } catch {
+        // Bỏ qua lỗi xoá file chân linh
+      }
+    }
   }
-  console.log(`\nĐã xoá ${matched.length} file lưu nhân vật bot trong ${DATA_PLAYERS_DIR}.`);
+  console.log(
+    `\nĐã xoá ${matched.length} file lưu nhân vật bot (và chân linh tương ứng) trong ${DATA_PLAYERS_DIR}.`,
+  );
 }
 
 /** Tìm PID của tiến trình server đang lắng nghe trên cổng đích để đo thời gian CPU mỗi tick từ bên ngoài. */
@@ -755,12 +793,15 @@ function bindRoomEvents(
   });
   room.onMessage("soul", () => {});
   room.onMessage("reborn", (_msg: RebornMsg) => {
+    b.diedAt = 0;
     if (isMeasuring()) {
       b.rebirthsCount++;
       if (b.rebirthSentAt > 0) {
         b.rebirthLatencies.push(performance.now() - b.rebirthSentAt);
         b.rebirthSentAt = 0;
       }
+    } else {
+      b.rebirthSentAt = 0;
     }
   });
 
@@ -983,14 +1024,14 @@ async function runLoadTest(
         }
       }
     }
-    const lifeSeed = die ? { playMs: 180000, kills: 5, bossKills: 0 } : undefined;
+    const lifeSeed = die ? { playMs: 48 * 60_000, kills: 30, bossKills: 0 } : undefined;
     seedBotSaveFile(
       name,
       secret,
       campX,
       campY,
       die ? 1 : realm,
-      die ? 0 : tier,
+      die ? 8 : tier,
       currentMap.def.id,
       lifeSeed,
     );
@@ -1135,8 +1176,8 @@ async function runLoadTest(
     const state = b.room.state as any;
     const me = state?.players?.get(b.room.sessionId);
     if (!me) return;
-    if (me.dead) {
-      if (b.diedAt === 0) b.diedAt = now;
+    if (me.dead || b.rebirthSentAt > 0) {
+      if (b.diedAt === 0 && b.rebirthSentAt === 0) b.diedAt = now;
       return;
     }
 

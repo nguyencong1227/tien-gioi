@@ -25,8 +25,12 @@ import {
 } from "./simulate";
 
 const rows = simulate();
-const fmt = (m: number) =>
-  m >= 60 ? `${Math.floor(m / 60)} giờ ${Math.round(m % 60)} phút` : `${Math.round(m)} phút`;
+const fmt = (m: number) => {
+  const totalMin = Math.round(m);
+  const h = Math.floor(totalMin / 60);
+  const rem = totalMin % 60;
+  return h > 0 ? `${h} giờ ${rem} phút` : `${rem} phút`;
+};
 const table = [
   "| Bậc | Thanh tu vi | Săn gì | Số quái | Phút ở bậc này | Cộng dồn |",
   "|---|---:|---|---:|---:|---:|",
@@ -141,6 +145,17 @@ const milestoneTable = [
   ),
 ].join("\n");
 
+const viableMilestones = milestones.filter((_, idx) => idx >= 1);
+const minZeroBoss = viableMilestones.reduce((a, b) =>
+  b.duyenPerHourZeroBoss < a.duyenPerHourZeroBoss ? b : a,
+);
+const maxZeroBoss = viableMilestones.reduce((a, b) =>
+  b.duyenPerHourZeroBoss > a.duyenPerHourZeroBoss ? b : a,
+);
+const ratioZeroBoss = maxZeroBoss.duyenPerHourZeroBoss / minZeroBoss.duyenPerHourZeroBoss;
+const warnZeroBoss = ratioZeroBoss > 1.3 ? ` ⚠️ (vượt ngưỡng mục tiêu ~1.3×)` : "";
+const milestoneNote = `Đọc bảng: Tính từ Luyện Khí tầng 5 trở đi (bỏ qua giai đoạn mới vào game), Duyên / giờ (0 trùm) nhỏ nhất là **${minZeroBoss.duyenPerHourZeroBoss.toFixed(1)}** (${minZeroBoss.label}), lớn nhất là **${maxZeroBoss.duyenPerHourZeroBoss.toFixed(1)}** (${maxZeroBoss.label}), tỷ lệ lớn / nhỏ là **${ratioZeroBoss.toFixed(2)}×**${warnZeroBoss}. Đỉnh Duyên / giờ rơi vào Trúc Cơ sơ kỳ (~${maxZeroBoss.duyenPerHourZeroBoss.toFixed(1)} Duyên/h, gấp ~${(maxZeroBoss.duyenPerHourZeroBoss / milestones.at(-1)!.duyenPerHourZeroBoss).toFixed(2)}× so với cày hết Trúc Cơ).`;
+
 const progression = simulateReincarnationProgression(15);
 const progressionTable = [
   "| Kiếp | Dư âm tu hành | Tốc độ tu luyện | Thời gian chơi | Duyên nhận | Duyên còn lại | Duyên / giờ | So với kiếp 1 | Hành động tại Tam Sinh Thạch |",
@@ -167,6 +182,8 @@ Mô phỏng cân bằng hệ thống Luân hồi theo thiết kế tại \`docs/
 
 ${milestoneTable}
 
+${milestoneNote}
+
 ### 2. Tiến trình luân hồi qua chuỗi kiếp (1..N) khi mở dần "Dư âm tu hành"
 
 Giả định người chơi kiếp nào cũng cày trọn vẹn đến hết Trúc Cơ (hạ 2 trùm) và dồn Duyên nâng cấp \`du_am\` (+10% đến +100%):
@@ -176,10 +193,10 @@ ${progressionTable}
 ### 3. Nhận xét & Đánh giá cân bằng luân hồi
 
 - **Tính chất ngang bằng giữa các cách chơi (chết ở bậc nào):**
-  - Người chơi cày chay chết ở Luyện Khí tầng 5 (29 phút) đạt **${milestones[1]!.duyenPerHourWithBoss.toFixed(1)} Duyên/h**.
-  - Người chơi cày tới Trúc Cơ sơ kỳ (53 phút) đạt **${milestones[3]!.duyenPerHourWithBoss.toFixed(1)} Duyên/h**.
-  - Người chơi cày hết Trúc Cơ (175 phút) đạt **${milestones.at(-1)!.duyenPerHourWithBoss.toFixed(1)} Duyên/h**.
-  - **Đánh giá:** Tốc độ cày Duyên giữa các mốc đều nằm trong khoảng **~25–35 Duyên/giờ**. Không có hiện tượng tự sát sớm để cày Duyên nhanh vượt trội (vì dưới 2 phút hoặc ở Phàm Nhân nhận 0 Duyên), cũng không có việc cày kiếp dài bị thiệt thòi.
+  - Người chơi cày chay chết ở Luyện Khí tầng 5 (${Math.round(milestones[1]!.minutes)} phút): **${milestones[1]!.duyenPerHourZeroBoss.toFixed(1)} Duyên/h** (0 trùm) / **${milestones[1]!.duyenPerHourWithBoss.toFixed(1)} Duyên/h** (hạ trùm).
+  - Người chơi cày tới Trúc Cơ sơ kỳ (${Math.round(milestones[3]!.minutes)} phút): đạt đỉnh **${milestones[3]!.duyenPerHourZeroBoss.toFixed(1)} Duyên/h** (0 trùm) / **${milestones[3]!.duyenPerHourWithBoss.toFixed(1)} Duyên/h** (hạ trùm).
+  - Người chơi cày hết Trúc Cơ (${Math.round(milestones.at(-1)!.minutes)} phút): **${milestones.at(-1)!.duyenPerHourZeroBoss.toFixed(1)} Duyên/h** (0 trùm) / **${milestones.at(-1)!.duyenPerHourWithBoss.toFixed(1)} Duyên/h** (hạ trùm).
+  - **Đánh giá:** Mục tiêu thiết kế ("mọi cách chơi tương đương, ~25–32 Duyên/giờ") đạt tốt ở đa số các mốc, nhưng **chưa đạt ở Trúc Cơ sơ kỳ**: chết tại Trúc Cơ sơ kỳ cho Duyên/giờ gấp **~${ratioZeroBoss.toFixed(2)}×** so với cày hết Trúc Cơ (${maxZeroBoss.duyenPerHourZeroBoss.toFixed(1)} vs ${milestones.at(-1)!.duyenPerHourZeroBoss.toFixed(1)} Duyên/h). Đây là phát hiện quan trọng từ mô phỏng cân bằng (sẽ xem xét điều chỉnh công thức \`calcDuyen\` ở việc riêng để san phẳng đỉnh này).
 - **Tiến trình tăng trưởng qua các kiếp (Progression pacing):**
   - Cần **${maxProgressionLife ? maxProgressionLife.kiep : 12} kiếp** trọn vẹn để đạt tối đa nấc 10 Dư âm tu hành (+100% tốc độ tu luyện). Tổng thời gian chơi khoảng **~25–30 giờ**.
   - Tốc độ Duyên mỗi giờ tăng từ **${firstLife.duyenPerHour.toFixed(1)} Duyên/h** (kiếp 1) lên **${finalLife.duyenPerHour.toFixed(1)} Duyên/h** (khi max Dư âm tu hành), tương đương tỷ lệ **${finalLife.ratioToFirstLife.toFixed(2)}×**.

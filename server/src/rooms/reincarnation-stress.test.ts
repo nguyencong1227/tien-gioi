@@ -107,7 +107,9 @@ const playerOf = (name: string) => {
 };
 
 describe("Thử tải luân hồi (Issue #151)", () => {
-  it("đua soulBuy: 20 tin nhắn soulBuy gửi đồng thời trên cùng một chân linh -> Duyên không bao giờ âm, nấc mở đúng", async () => {
+  // Tính nguyên tử của cập nhật chân linh được đảm bảo bởi hàng đợi FileSoulStore.update (đã test ở soul.test.ts #159).
+  // Test này kiểm tra bất biến cấp phòng game: khi client spam nhiều tin soulBuy dồn dập, Duyên không âm và nấc mở đúng.
+  it("bất biến soulBuy: 20 tin nhắn soulBuy dồn dập trên cùng một chân linh -> Duyên không bao giờ âm, nấc mở đúng", async () => {
     const name = `Dua ${++botSeq}`;
     const c = await joinClient(name);
     const sr = serverRoom(c.room);

@@ -173,7 +173,7 @@ export function simulate(lastRealm = 2, expMult = 1.0): Row[] {
         label: `${REALMS[realm].name}${REALMS[realm].tiers[tier] ? " " + REALMS[realm].tiers[tier] : ""}`,
         bar,
         source: o.source,
-        kills: o.secPerKill ? Math.round(sec / (o.secPerKill / expMult)) : 0,
+        kills: o.secPerKill ? Math.round(sec / o.secPerKill) : 0,
         minutes,
         total,
       });
