@@ -1,6 +1,7 @@
 // Phòng thế giới: vào / ra phòng, lưu nhân vật, nối tin nhắn với các system.
 // Logic game nằm trong ../systems/*, trạng thái dùng chung trong ../world.ts.
 import { StateView } from "@colyseus/schema";
+import { randomBytes } from "node:crypto";
 import { Room, Client, ServerError, type RoomException, type Server } from "colyseus";
 import {
   TICK_MS,
@@ -9,6 +10,8 @@ import {
   DEFAULT_MAP_ID,
   MAPS,
   JOIN_WRONG_MAP,
+  JOIN_BAD_TOKEN,
+  JOIN_NEED_CHARACTER,
   getMap,
   roomNameOf,
   wrongMapMessage,
@@ -65,6 +68,7 @@ import {
 import { defaultSoulStore, type SoulStore } from "../soul";
 import { defaultPlayerStore, type PlayerStore } from "../player-store";
 import { legacyIdentity, type Identity } from "../identity";
+import type { AuthService } from "../auth-service";
 
 /** Mua mở khóa bị từ chối ngay trong `souls.update` (không ghi gì): mang theo lý do để báo người chơi. */
 class BuyRefused extends Error {
@@ -126,6 +130,11 @@ export class WorldRoom extends Room<WorldState> {
   /** Kho chân linh (file JSON; bước 3 thay bằng PostgreSQL). Test ghi đè để cô lập. */
   static players: PlayerStore | null = null; // null: `defaultPlayerStore()` (file JSON)
   static souls: SoulStore | null = null; // null: `defaultSoulStore()` (dựng lười, đọc DATA_DIR lúc dùng)
+  /**
+   * Dịch vụ tài khoản khi chạy `AUTH_MODE=account` (đặt ở `index.ts`): vào phòng bằng `JoinOptions.token`, BỎ QUA `name` /
+   * `secret`. `null`: chế độ cũ (tên + mã bí mật).
+   */
+  static auth: AuthService | null = null;
   /** Kênh chung giữa các phòng. Test ghi đè để cô lập. */
   static hub: Hub = defaultHub;
   private get hub() {
@@ -282,44 +291,88 @@ export class WorldRoom extends Room<WorldState> {
   // ---------------- Vào / ra ----------------
 
   async onAuth(_client: Client, options: JoinOptions) {
+    const accounts = WorldRoom.auth;
+    if (accounts) return this.authByToken(accounts, options);
+    return this.authLegacy(options);
+  }
+
+  /** Chế độ cũ: đạo hiệu + mã bí mật (client tự sinh, giữ ở trình duyệt). */
+  private async authLegacy(options: JoinOptions) {
     const name = cleanName(options?.name);
     if (!name) throw new ServerError(400, "Tên cần 2–16 ký tự, chỉ gồm chữ, số và khoảng trắng.");
     const secret = typeof options?.secret === "string" ? options.secret : "";
     if (secret.length < 16 || secret.length > MAX_SECRET_LEN)
       throw new ServerError(400, "Thiếu mã nhân vật.");
-    // Tên đang có người chơi. Chỉ một trường hợp được vào tiếp: chính chủ (đúng mã) đăng nhập lại khi nhân vật
-    // đang chờ kết nối lại sau khi rớt mạng (tải lại trang, mất token) thì huỷ chờ rồi vào, thay vì bị 409 tới
-    // hết thời gian chờ. Người đang kết nối thật hoặc sai mã vẫn bị từ chối.
-    const taken: Ghost[] = [];
-    let busy = false;
-    this.state.players.forEach((p, sid) => {
-      if (p.name.toLowerCase() !== name.toLowerCase()) return;
-      const ghost = this.ghosts.get(sid);
-      if (ghost && this.world.ctrl.get(sid)?.save.secretHash === hashSecret(secret))
-        taken.push(ghost);
-      else busy = true;
-    });
-    if (busy) throw new ServerError(409, "Nhân vật này đang ở trong game.");
-    for (const g of taken) g.cancel();
-    for (const g of taken) await g.done; // đợi lưu xong rồi mới nạp file
+    // Chỉ chính chủ (đúng mã) được huỷ chờ của nhân vật đang rớt mạng
+    await this.takeSeat(name, (c) => c.save.secretHash === hashSecret(secret));
     const identity = legacyIdentity(name);
     const existing = await this.players.load(name);
     if (existing) {
       if (existing.secretHash !== hashSecret(secret))
         throw new ServerError(403, "Tên này đã có người dùng.");
-      // Chỉ sau khi đúng mã mới tiết lộ nhân vật đang ở bản đồ nào. Server quyết định bản đồ; `options.mapId`
-      // chỉ là gợi ý chọn phòng, sai thì báo bản đồ đúng để client vào lại (shared/src/travel.ts).
-      const home = mapIdOf(existing);
-      if (home !== this.mapId) throw new ServerError(JOIN_WRONG_MAP, wrongMapMessage(home));
-      return { save: existing, identity, soul: await this.soulOf(existing, identity) };
+      return this.resume(existing, identity);
     }
-    // Nhân vật mới luôn bắt đầu ở bản đồ mặc định (không tạo file ở phòng sai)
+    return this.createFresh(name, hashSecret(secret), identity);
+  }
+
+  /**
+   * Chế độ tài khoản: token phiên -> tài khoản -> nhân vật (docs/THIET_KE_TAI_KHOAN.md mục 5). Không đọc `name` /
+   * `secret` của client. Chưa có đạo hiệu thì báo `JOIN_NEED_CHARACTER` để client gọi `POST /api/character`.
+   */
+  private async authByToken(accounts: AuthService, options: JoinOptions) {
+    const account = await accounts.resolve(options?.token);
+    if (!account)
+      throw new ServerError(JOIN_BAD_TOKEN, "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+    if (account.name === undefined)
+      throw new ServerError(JOIN_NEED_CHARACTER, "Tài khoản chưa có đạo hiệu.");
+    const name = account.name;
+    // Chỉ chính tài khoản đó được huỷ chờ của nhân vật đang rớt mạng
+    await this.takeSeat(name, (c) => c.identity.accountId === account.id);
+    const identity: Identity = { name, soulKey: account.id, accountId: account.id };
+    const existing = await this.players.load(name);
+    if (existing) return this.resume(existing, identity);
+    // Hồ sơ chưa có (lần vào đầu sau khi chọn đạo hiệu): tạo ở đây. Mã bí mật ngẫu nhiên không ai biết, để không ai
+    // vào hoặc nhận nhân vật này bằng đường tên + mã bí mật.
+    return this.createFresh(name, hashSecret(randomBytes(32).toString("hex")), identity);
+  }
+
+  /**
+   * Tên đang có người chơi trong phòng. Chỉ một trường hợp được vào tiếp: chính chủ (`owns` đúng) đăng nhập lại khi nhân
+   * vật đang chờ kết nối lại sau khi rớt mạng (tải lại trang, mất token) thì huỷ chờ rồi vào, thay vì bị 409 tới hết thời
+   * gian chờ. Người đang kết nối thật hoặc không đúng chủ vẫn bị từ chối.
+   */
+  private async takeSeat(name: string, owns: (c: PlayerCtrl) => boolean) {
+    const taken: Ghost[] = [];
+    let busy = false;
+    this.state.players.forEach((p, sid) => {
+      if (p.name.toLowerCase() !== name.toLowerCase()) return;
+      const ghost = this.ghosts.get(sid);
+      const c = this.world.ctrl.get(sid);
+      if (ghost && c && owns(c)) taken.push(ghost);
+      else busy = true;
+    });
+    if (busy) throw new ServerError(409, "Nhân vật này đang ở trong game.");
+    for (const g of taken) g.cancel();
+    for (const g of taken) await g.done; // đợi lưu xong rồi mới nạp file
+  }
+
+  /** Nhân vật đã có hồ sơ: chỉ vào đúng phòng của bản đồ nó đang ở. */
+  private async resume(existing: SavedPlayer, identity: Identity) {
+    // Chỉ sau khi xác thực xong mới tiết lộ nhân vật đang ở bản đồ nào. Server quyết định bản đồ; `options.mapId`
+    // chỉ là gợi ý chọn phòng, sai thì báo bản đồ đúng để client vào lại (shared/src/travel.ts).
+    const home = mapIdOf(existing);
+    if (home !== this.mapId) throw new ServerError(JOIN_WRONG_MAP, wrongMapMessage(home));
+    return { save: existing, identity, soul: await this.soulOf(existing, identity) };
+  }
+
+  /** Nhân vật mới luôn bắt đầu ở bản đồ mặc định (không tạo file ở phòng sai). */
+  private async createFresh(name: string, secretHash: string, identity: Identity) {
     if (this.mapId !== DEFAULT_MAP_ID)
       throw new ServerError(JOIN_WRONG_MAP, wrongMapMessage(DEFAULT_MAP_ID));
     const now = new Date().toISOString();
     const fresh: SavedPlayer = {
       name,
-      secretHash: hashSecret(secret),
+      secretHash,
       realm: 0,
       tier: 0,
       exp: 0,

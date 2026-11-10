@@ -15,6 +15,9 @@ import express, {
 } from "express";
 import { AUTH_API } from "@tien-gioi/shared";
 import { AuthService, type AuthResult, type Kdf } from "./auth-service";
+import { CharacterService } from "./character-service";
+import { defaultPlayerStore, type PlayerStore } from "./player-store";
+import { defaultSoulStore, type SoulStore } from "./soul";
 import {
   defaultAccountStore,
   defaultSessionStore,
@@ -96,6 +99,15 @@ function send<T>(res: Response, r: AuthResult<T>) {
   });
 }
 
+/** Thành công không có thân: 204; lỗi như `send`. */
+function sendEmpty(res: Response, r: AuthResult<unknown>) {
+  if (r.ok) {
+    res.status(204).end();
+    return;
+  }
+  send(res, r);
+}
+
 /** Bọc handler bất đồng bộ của Express 4 (không tự bắt lỗi từ Promise). */
 const h =
   (fn: (req: Request, res: Response) => Promise<void>): RequestHandler =>
@@ -108,7 +120,7 @@ const noStore: RequestHandler = (_req, res, next) => {
   next();
 };
 
-export function createAuthRouter(auth: AuthService): Router {
+export function createAuthRouter(auth: AuthService, characters?: CharacterService): Router {
   const r = express.Router();
   r.use(noStore);
   // Chỉ nhận `application/json`, thân tối đa 2 KB, chỉ object / mảng (strict). Kiểu khác thì `req.body` rỗng và
@@ -140,6 +152,20 @@ export function createAuthRouter(auth: AuthService): Router {
     }),
   );
 
+  if (characters) {
+    // Chọn đạo hiệu (tài khoản chưa có nhân vật) và nhận lại nhân vật cũ: 204 khi thành công
+    r.post(
+      AUTH_API.character,
+      h(async (req, res) => sendEmpty(res, await characters.create(tokenOf(req), req.body))),
+    );
+    r.post(
+      AUTH_API.claim,
+      h(async (req, res) =>
+        sendEmpty(res, await characters.claim(clientKey(req.ip), tokenOf(req), req.body)),
+      ),
+    );
+  }
+
   // Đường dẫn khác dưới /api: 404 dạng JSON (không rơi vào trang tĩnh của client)
   r.all("/api/*", (_req, res) => {
     res.status(404).json({ error: "not_found" });
@@ -167,6 +193,8 @@ export interface MountOptions {
   /** Mặc định: kho file dùng chung của tiến trình */
   accounts?: AccountStore;
   sessions?: SessionStore;
+  players?: PlayerStore;
+  souls?: SoulStore;
   kdf?: Kdf;
   now?: () => number;
 }
@@ -186,12 +214,20 @@ export function mountAuth(
     res.json({ ok: true, authMode: mode });
   });
   if (mode !== "account") return { mode, auth: null };
+  const accounts = o.accounts ?? defaultAccountStore();
   const auth = new AuthService({
-    accounts: o.accounts ?? defaultAccountStore(),
+    accounts,
     sessions: o.sessions ?? defaultSessionStore(),
     kdf: o.kdf,
     now: o.now,
   });
-  app.use(createAuthRouter(auth));
+  const characters = new CharacterService({
+    auth,
+    accounts,
+    players: o.players ?? defaultPlayerStore(),
+    souls: o.souls ?? defaultSoulStore(),
+    now: o.now,
+  });
+  app.use(createAuthRouter(auth, characters));
   return { mode, auth };
 }
