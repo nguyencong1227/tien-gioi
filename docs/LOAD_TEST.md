@@ -270,7 +270,39 @@ Theo kiến trúc M3 phương án A (mỗi bản đồ là một phòng Colyseus
   - Khởi tạo save file nhân vật mang sẵn `mapId` tương ứng (`seedBotSaveFile`). Với kịch bản đo mức 0 bot (`runIdleZeroBotTest`), bot mồi "Bot 000" cũng được ghi sẵn file lưu có `mapId` tương ứng trước khi kết nối.
   - Vào phòng tương ứng bằng `roomNameOf(targetMap.def.id)` qua `colyseus.js` `joinOrCreate(roomNameOf(id))` (không truyền `mapId` trong `JoinOptions` sau PR #144).
   - Vòng lặp di chuyển, né vật cản và tuần tra tuân thủ đúng thuật toán `moveWithCollision` và kích thước của bản đồ hiện tại.
-- **Kịch bản kế tiếp của #141 (sau khi hạ tầng travel #153 đã vào main):**
-  - Thử tải bot di chuyển qua lại liên tục giữa các cổng dịch chuyển (đo độ trễ chuyển phòng `travelTo`, tính trọn vẹn dữ liệu tu vi/Linh thạch/túi đồ, chống nhân bản và kiểm tra rò rỉ tài nguyên).
+
+### 5.4. Thử tải qua cổng liên tục (`--travel`) & Kiểm tra độ tin cậy (`portal-stress.test.ts`)
+
+Kịch bản thử tải và kiểm tra toàn diện cơ chế chuyển phòng qua cổng dịch chuyển hai chiều giữa các bản đồ (Lạc Hà Trấn <-> Hắc Phong Cốc), bảo đảm không mất dữ liệu, chống nhân bản và không rò rỉ tài nguyên phòng.
+
+- **Kịch bản bot qua cổng liên tục (`bots.ts --travel`):**
+  - **Cách chạy:**
+    ```bash
+    # Chạy 20 bot qua cổng liên tục trong 30 giây
+    npm run bots -w server -- --travel --bots=20 --duration=30
+    ```
+  - **Luồng hoạt động:**
+    1. Bot di chuyển hướng về cổng dịch chuyển gần nhất trên bản đồ (`b.map.portals[0]`).
+    2. Khi vào phạm vi cổng (`dist <= portal.r - 12`), bot gửi tin `travel { portalId }`.
+    3. Server lưu nhân vật với toạ độ đích của bản đồ mới (`c.save.mapId`, `spawn`), gửi `travelTo { mapId }` và đóng kết nối phòng cũ với mã `CLOSE_TRAVEL (4000)`.
+    4. Client nhận `travelTo`, kết nối sang phòng mới `roomNameOf(mapId)` qua `joinOrCreate`.
+    5. Đo độ trễ từ lúc gửi `travel` đến lúc nhận đầy đủ state đầu tiên ở phòng mới (`onFirstState`), ghi nhận kích thước byte của bản vá ban đầu.
+    6. Chờ hết thời gian hồi chiêu `TRAVEL_COOLDOWN_MS (3000 ms)` kèm độ trễ ngẫu nhiên rồi tiếp tục di chuyển tới cổng ở bản đồ mới để quay lại.
+  - **Số đo thực tế (20–50 bot, commit bbfdafc):**
+    - **Khởi đầu từ Lạc Hà Trấn (`--map=lac_ha`, 20 bot, 15s):** 15 lần qua cổng thành công | Độ trễ `travel -> onFirstState`: **TB 48.82 ms** (p50: 49.62 ms, p95: 53.13 ms) | State ban đầu: **TB 1004 byte/lần**.
+    - **Khởi đầu từ Hắc Phong Cốc (`--map=hac_phong`, 20 bot, 15s):** 50 lần qua cổng thành công | Độ trễ `travel -> onFirstState`: **TB 36.59 ms** (p50: 32.46 ms, p95: 50.62 ms) | State ban đầu: **TB 1683 byte/lần**.
+    - **Tải trọng cao (Lạc Hà Trấn, 50 bot, 15s):** 111 lần qua cổng thành công | Độ trễ: **TB 42.21 ms** (p50: 46.55 ms, p95: 51.79 ms) | State ban đầu: **TB 2543 byte/lần**.
+
+- **Bộ test độ tin cậy và chống rò rỉ phòng (`portal-stress.test.ts`):**
+  - **Cách chạy:**
+    ```bash
+    npx vitest run server/scripts/portal-stress.test.ts
+    ```
+  - **Các tiêu chuẩn kiểm tra (4/4 tests pass):**
+    1. *Đo độ trễ & toàn vẹn dữ liệu:* Khứ hồi liên tục 2 chiều (Lạc Hà -> Hắc Phong Cốc -> Lạc Hà). Đo độ trễ `travel -> full state` phòng đích đạt **p50 < 350 ms**, **p95 < 600 ms**. Toàn bộ tu vi (`exp`), Linh thạch (`coin`), và túi đồ (`inventory`) được bảo toàn tuyệt đối, file lưu trên đĩa cập nhật đúng `mapId` và toạ độ spawn.
+    2. *Nhân vật mới chỉ tạo ở bản đồ mặc định:* Kết nối tài khoản mới chưa có file lưu vào Hắc Phong Cốc -> server từ chối với mã lỗi `JOIN_WRONG_MAP (421)` kèm `wrong_map:lac_ha`, chỉ cho phép sinh nhân vật mới ở Lạc Hà Trấn.
+    3. *Chống kẹt ghost khác bản đồ & dọn ghost tức thời:* Người chơi rớt mạng bất thường tại Lạc Hà (chờ nối lại `ghost`) nhưng mở client vào Hắc Phong Cốc -> server từ chối với mã lỗi `JOIN_WRONG_MAP (421)` kèm `wrong_map:lac_ha`. Khi người chơi vào lại đúng phòng Lạc Hà, ghost cũ được huỷ ngay lập tức (`elapsed < reconnectGraceS`), test bắt được đột biến bỏ `g.cancel()`.
+    4. *Chống rò rỉ phòng:* Khi tất cả client rời phòng chủ động, `state.players.size` và `state.online` của toàn bộ các phòng trở về đúng 0, danh sách `ghosts` và bộ điều khiển `world.ctrl` được giải phóng sạch sẽ.
+
 
 
