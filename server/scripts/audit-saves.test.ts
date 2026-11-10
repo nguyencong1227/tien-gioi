@@ -6,8 +6,11 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   COIN_CAP,
   DEFAULT_MAP,
+  DUNGEON_DAILY_REWARDS,
+  DUNGEON_MAPS,
   INVENTORY_SLOTS,
   ITEM_BY_ID,
+  LINH_HU_MAP_ID,
   REALMS,
   getMap,
 } from "@tien-gioi/shared";
@@ -259,6 +262,26 @@ describe("audit-saves (Issue #112)", () => {
           `mapId: ${badMap}`,
         ).toContain("invalid_map_id");
         const msg = errs.find((e) => e.code === "invalid_map_id")!.message;
+        expect(msg).toContain("server sẽ đưa về lac_ha");
+      }
+
+      // mapId là bản đồ bí cảnh (có trong getMap nhưng không nằm trong MAPS) phải báo lỗi (#201)
+      expect(getMap(LINH_HU_MAP_ID)).toBeDefined();
+      for (const dMap of DUNGEON_MAPS) {
+        const pDungeon = {
+          ...validPlayer,
+          mapId: dMap.id,
+          x: dMap.town.cx * 32,
+          y: dMap.town.cy * 32,
+        };
+        const rawDungeon = JSON.stringify(pDungeon);
+        const errs = auditPlayerSaveData(rawDungeon, rawDungeon.length);
+        expect(
+          errs.map((e) => e.code),
+          `dungeon mapId: ${dMap.id}`,
+        ).toContain("invalid_map_id");
+        const msg = errs.find((e) => e.code === "invalid_map_id")!.message;
+        expect(msg).toContain("bản đồ bí cảnh");
         expect(msg).toContain("server sẽ đưa về lac_ha");
       }
     });
@@ -910,6 +933,122 @@ describe("audit-saves (Issue #112)", () => {
       expect(report.errorsByCode.duplicate_account_name).toBe(1);
       expect(report.errorsByCode.mismatched_session_filename).toBe(1);
       expect(report.errorsByCode.orphan_session).toBe(1);
+    });
+  });
+
+  describe("Bí cảnh: mapId bí cảnh & dungeonDaily (Issue #201)", () => {
+    it("dungeonDaily hợp lệ (rewards từ 0 đến DUNGEON_DAILY_REWARDS, day chuẩn YYYY-MM-DD) -> 0 lỗi", () => {
+      for (let rewards = 0; rewards <= DUNGEON_DAILY_REWARDS; rewards++) {
+        const p = {
+          ...validPlayer,
+          dungeonDaily: { day: "2026-11-10", rewards },
+        };
+        const raw = JSON.stringify(p);
+        expect(auditPlayerSaveData(raw, raw.length), `rewards=${rewards}`).toEqual([]);
+      }
+    });
+
+    it("dungeonDaily sai kiểu gốc (null, mảng, chuỗi, số) -> invalid_dungeon_daily và không lộ chuỗi", () => {
+      const secretStr = "secret_token_khong_duoc_lo";
+      for (const badDaily of [null, [], [1, 2], secretStr, 123, true]) {
+        const raw = JSON.stringify({ ...validPlayer, dungeonDaily: badDaily });
+        const errs = auditPlayerSaveData(raw, raw.length);
+        expect(
+          errs.map((e) => e.code),
+          JSON.stringify(badDaily),
+        ).toContain("invalid_dungeon_daily");
+        expect(JSON.stringify(errs)).not.toContain(secretStr);
+      }
+    });
+
+    it("dungeonDaily.day không đúng dạng YYYY-MM-DD hoặc ngày không tồn tại -> invalid_dungeon_daily_day, không lộ nội dung", () => {
+      const sensitiveDay = "mat_khau_ngan_123";
+      const secretHash64 = "f".repeat(64);
+      const badDays: unknown[] = [
+        "",
+        "2026-11-10T00:00:00.000Z",
+        "10-11-2026",
+        "2026/11/10",
+        "2026-13-01",
+        "2026-00-10",
+        "2026-02-30",
+        "2026-11-31",
+        sensitiveDay,
+        secretHash64,
+        "\x1b[31m2026-11-10",
+        20261110,
+        null,
+        undefined,
+        {},
+      ];
+      for (const day of badDays) {
+        const raw = JSON.stringify({
+          ...validPlayer,
+          dungeonDaily: { day, rewards: 1 },
+        });
+        const errs = auditPlayerSaveData(raw, raw.length);
+        expect(
+          errs.map((e) => e.code),
+          `day=${String(day)}`,
+        ).toContain("invalid_dungeon_daily_day");
+        const serialized = JSON.stringify(errs);
+        expect(serialized).not.toContain(sensitiveDay);
+        expect(serialized).not.toContain(secretHash64);
+        expect(serialized).not.toContain("\x1b");
+      }
+    });
+
+    it("dungeonDaily.rewards âm, số thực, vượt DUNGEON_DAILY_REWARDS hoặc sai kiểu -> invalid_dungeon_daily_rewards, không lộ nội dung", () => {
+      const sensitiveReward = "token_bi_mat_xyz";
+      const badRewards: unknown[] = [
+        -1,
+        -999,
+        DUNGEON_DAILY_REWARDS + 1,
+        99,
+        1.5,
+        null,
+        undefined,
+        "2",
+        sensitiveReward,
+        {},
+        [],
+      ];
+      for (const rewards of badRewards) {
+        const raw = JSON.stringify({
+          ...validPlayer,
+          dungeonDaily: { day: "2026-11-10", rewards },
+        });
+        const errs = auditPlayerSaveData(raw, raw.length);
+        expect(
+          errs.map((e) => e.code),
+          `rewards=${String(rewards)}`,
+        ).toContain("invalid_dungeon_daily_rewards");
+        expect(JSON.stringify(errs)).not.toContain(sensitiveReward);
+      }
+    });
+
+    it("đột biến: bỏ kiểm isDungeonMap hoặc bỏ trần DUNGEON_DAILY_REWARDS sẽ để lọt dữ liệu sai", () => {
+      // Đột biến 1: chỉ kiểm getMap(mapId) !== undefined mà quên isDungeonMap(mapId)
+      const laxMapCheck = (mapId: unknown) => getMap(mapId) !== undefined;
+      expect(laxMapCheck(LINH_HU_MAP_ID)).toBe(true); // Đột biến chấp nhận bản đồ bí cảnh trong file lưu!
+
+      const rawDungeonMap = JSON.stringify({ ...validPlayer, mapId: LINH_HU_MAP_ID });
+      expect(auditPlayerSaveData(rawDungeonMap, rawDungeonMap.length).map((e) => e.code)).toContain(
+        "invalid_map_id",
+      );
+
+      // Đột biến 2: chỉ kiểm Number.isInteger(rewards) && rewards >= 0 mà quên <= DUNGEON_DAILY_REWARDS
+      const laxRewardsCheck = (r: unknown) =>
+        typeof r === "number" && Number.isInteger(r) && r >= 0;
+      expect(laxRewardsCheck(DUNGEON_DAILY_REWARDS + 1)).toBe(true);
+
+      const rawOverCap = JSON.stringify({
+        ...validPlayer,
+        dungeonDaily: { day: "2026-11-10", rewards: DUNGEON_DAILY_REWARDS + 1 },
+      });
+      expect(auditPlayerSaveData(rawOverCap, rawOverCap.length).map((e) => e.code)).toContain(
+        "invalid_dungeon_daily_rewards",
+      );
     });
   });
 });

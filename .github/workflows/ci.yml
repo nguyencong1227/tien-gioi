@@ -80,7 +80,9 @@ jobs:
       - name: Chạy kiểm thử PostgreSQL thật
         run: |
           if [ -d server/src/pg ]; then
-            npx vitest run server/src/pg
+            npx vitest run server/src/pg server/src/rooms/WorldRoom.pg.test.ts
+            mkdir -p /tmp/tg-mig-src
+            STORE=pg DATABASE_URL=$TEST_DATABASE_URL npm run chuyen-du-lieu -w server -- --thu --dir=/tmp/tg-mig-src
           else
             echo "Chưa có server/src/pg trên nhánh này, bỏ qua."
           fi
