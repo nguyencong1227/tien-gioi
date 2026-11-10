@@ -21,10 +21,13 @@ import type { SavedPlayer, QuestSave, LifeCounters, LimboRecord } from "./store"
 import type { LimboMsg, RebornMsg, Soul, SoulMsg, StatMult } from "@tien-gioi/shared";
 import { Interest } from "./systems/interest";
 import { Hub } from "./hub";
+import type { Identity } from "./identity";
 
 /** Dữ liệu riêng của server cho mỗi người chơi (không gửi xuống client). */
 export interface PlayerCtrl {
   save: SavedPlayer;
+  /** Danh tính sau đăng nhập: khoá chân linh (`soulKey`), tài khoản nếu có (docs/THIET_KE_TAI_KHOAN.md mục 5) */
+  identity: Identity;
   inputs: InputMsg[];
   moveBudget: number; // token bucket chống gửi input quá nhanh
   nextSlash: number;

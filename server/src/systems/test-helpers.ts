@@ -1,4 +1,5 @@
 // World giả và các hàm dựng tình huống cho test đơn vị của system (không cần server Colyseus).
+import { legacyIdentity } from "../identity";
 import {
   MONSTER_BY_ID,
   DEFAULT_MAP,
@@ -92,6 +93,7 @@ export function addPlayer(w: World, sid: string, realm = 0, tier = 0) {
   syncPublicPos(p);
   const c: PlayerCtrl = {
     save: { name: sid, secretHash: "", realm, tier, exp: 0, createdAt: "", updatedAt: "" },
+    identity: legacyIdentity(sid),
     inputs: [],
     moveBudget: 4,
     posPhase: 0,
