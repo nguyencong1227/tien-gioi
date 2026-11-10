@@ -4,6 +4,7 @@ import {
   DEFAULT_MAP,
   DUNGEON_DAILY_REWARDS,
   DUNGEON_INVITE_MS,
+  DUNGEON_LOOT_MS,
   DUNGEON_OPEN_COOLDOWN_MS,
   HAC_PHONG_ID,
   LINH_HU_ID,
@@ -14,12 +15,16 @@ import {
   TRAVEL_COMBAT_LOCK_MS,
   dungeonOf,
   dungeonOpenFailMessage,
+  dayKey,
   getMap,
+  INVENTORY_SLOTS,
 } from "@tien-gioi/shared";
 import { Hub } from "../hub";
 import { partyAnswer, partyInvite } from "./party";
+import { killMonster } from "./combat";
 import {
   GATEKEEPER_ID,
+  bossKilled,
   DUNGEON_EXIT_DELAY_MS,
   declineDungeon,
   dungeonDialog,
@@ -31,6 +36,7 @@ import {
   openDungeon,
   runFailed,
   runOfWorld,
+  sanitizeDungeonDaily,
   runReady,
   sendDungeonState,
   tickDungeonRun,
@@ -705,5 +711,272 @@ describe("trong phòng bí cảnh: đồng hồ, trạng thái, kết thúc", ()
     expect(exit).toHaveBeenCalledWith(LEADER);
     leaveDungeon(t.lh.w, LEADER); // phòng thường: bỏ qua
     expect(exit).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("trùm chết: thắng, thưởng hoàn thành, lượt mỗi ngày (4c)", () => {
+  const def = dungeonOf(LINH_HU_ID)!;
+
+  /** Phòng bí cảnh đang chạy với LEADER và MEMBER đã vào, trùm có mặt. */
+  function fight() {
+    const t = setup();
+    const run = open(t);
+    const dun = makeWorld(getMap(LINH_HU_MAP_ID)!, t.hub);
+    dun.w.runId = run.id;
+    dun.w.now = t.lh.w.now;
+    addPlayer(dun.w, LEADER, 1, 8);
+    addPlayer(dun.w, MEMBER, 1, 8);
+    memberJoined(dun.w, run, key(LEADER));
+    memberJoined(dun.w, run, key(MEMBER));
+    const boss = addMonster(dun.w, def.boss, 1000, 1000);
+    // đứng cạnh trùm: chia tu vi / thành tích theo đội chỉ tính người trong tầm
+    for (const n of [LEADER, MEMBER]) {
+      const p = dun.w.state.players.get(n)!;
+      p.x = 1000;
+      p.y = 1060;
+    }
+    const cl = dun.w.ctrl.get(LEADER)!;
+    const cm = dun.w.ctrl.get(MEMBER)!;
+    boss.mc.damageBy.set(LEADER, 900);
+    boss.mc.damageBy.set(MEMBER, 100);
+    dun.dungeonEnds.length = 0;
+    return { ...t, run, dun, w: dun.w, boss, cl, cm };
+  }
+  const endOf = (f: ReturnType<typeof fight>, sid: string) =>
+    f.dun.dungeonEnds.find((e) => e.sid === sid)?.msg;
+
+  it("hạ trùm qua `killMonster` thật: run THẮNG, mỗi người đủ điều kiện nhận thưởng đúng MỘT lần (Linh thạch + đồ chắc chắn), lượt ngày trừ vào hồ sơ", () => {
+    const f = fight();
+    const before = { l: f.cl.coin, m: f.cm.coin };
+    killMonster(f.w, f.boss.id, f.boss.mc);
+    expect(f.run.phase).toBe("won");
+    expect(f.run.endReason).toBe("boss_dead");
+    expect(f.run.exitAt).toBe(f.w.now + DUNGEON_LOOT_MS);
+    for (const [sid, c, b] of [
+      [LEADER, f.cl, before.l],
+      [MEMBER, f.cm, before.m],
+    ] as const) {
+      const e = endOf(f, sid)!;
+      expect(e).toMatchObject({ result: "won", reason: "boss_dead", rewardsLeft: 2 });
+      expect(e.noReward).toBeUndefined();
+      expect(e.reward!.coin).toBe(def.reward.coin);
+      expect(e.reward!.items.map((i) => i.itemId)).toContain("tu_khi_dan"); // chance 1
+      expect(c.coin).toBeGreaterThanOrEqual(b + def.reward.coin);
+      expect(c.save.dungeonDaily).toEqual({ day: dayKey(f.w.now), rewards: 1 });
+    }
+    // thành tích kiếp: cả hai cùng đánh trùm -> bossKills++ (đường chia sát thương có sẵn)
+    expect(f.cl.life.bossKills).toBe(1);
+    // HUD: trùm đã biến mất
+    expect(f.dun.dungeonStates.at(-1)!.msg.boss).toBeNull();
+    expect(f.dun.dungeonStates.at(-1)!.msg.phase).toBe("won");
+  });
+
+  it("người chưa gây sát thương cho trùm: không thưởng, `noReward: no_damage`, không trừ lượt; người rời / đã chết không được tính", () => {
+    const f = fight();
+    f.boss.mc.damageBy.delete(MEMBER);
+    const mBefore = f.cm.coin;
+    bossKilled(f.w, f.boss.mc);
+    expect(endOf(f, MEMBER)).toMatchObject({ noReward: "no_damage", rewardsLeft: 3 });
+    expect(endOf(f, MEMBER)!.reward).toBeUndefined();
+    expect(f.cm.coin).toBe(mBefore);
+    expect(f.cm.save.dungeonDaily).toBeUndefined();
+    expect(endOf(f, LEADER)!.reward).toBeDefined();
+
+    // đã chết (Hoàng Tuyền): không thưởng, không lý do; đã rời: không nhận `dungeonEnd` và không thưởng
+    const g = fight();
+    g.w.state.players.get(MEMBER)!.dead = true;
+    const gBefore = g.cm.coin;
+    bossKilled(g.w, g.boss.mc);
+    expect(endOf(g, MEMBER)).toEqual({ result: "won", reason: "boss_dead", rewardsLeft: 3 });
+    expect(g.cm.coin).toBe(gBefore);
+    const h = fight();
+    memberLeft(h.w, h.run, key(MEMBER));
+    bossKilled(h.w, h.boss.mc);
+    expect(endOf(h, MEMBER)).toBeUndefined();
+    expect(h.cm.save.dungeonDaily).toBeUndefined();
+  });
+
+  it("hết lượt hôm nay (3/3): vẫn thắng nhưng không thưởng, `noReward: daily_limit`; sang ngày khác thì có lại; bộ đếm hỏng trong file coi như chưa dùng", () => {
+    const f = fight();
+    f.cl.save.dungeonDaily = { day: dayKey(f.w.now), rewards: DUNGEON_DAILY_REWARDS };
+    const lBefore = f.cl.coin;
+    bossKilled(f.w, f.boss.mc);
+    expect(f.run.phase).toBe("won");
+    expect(endOf(f, LEADER)).toMatchObject({
+      result: "won",
+      noReward: "daily_limit",
+      rewardsLeft: 0,
+    });
+    expect(endOf(f, LEADER)!.reward).toBeUndefined();
+    expect(f.cl.coin).toBe(lBefore);
+    expect(f.cl.save.dungeonDaily!.rewards).toBe(DUNGEON_DAILY_REWARDS); // không tăng thêm
+    expect(endOf(f, MEMBER)!.reward).toBeDefined(); // người còn lượt vẫn nhận
+
+    const g = fight();
+    g.cl.save.dungeonDaily = {
+      day: dayKey(g.w.now - 24 * 3600_000),
+      rewards: DUNGEON_DAILY_REWARDS,
+    };
+    bossKilled(g.w, g.boss.mc);
+    expect(endOf(g, LEADER)!.reward).toBeDefined();
+    expect(g.cl.save.dungeonDaily).toEqual({ day: dayKey(g.w.now), rewards: 1 });
+
+    for (const bad of [
+      { day: "hom nay", rewards: 3 },
+      { day: dayKey(Date.now()), rewards: 99 },
+      { day: dayKey(Date.now()), rewards: -1 },
+      { day: dayKey(Date.now()), rewards: 1.5 },
+      "3",
+      [],
+    ]) {
+      const h = fight();
+      h.cl.save.dungeonDaily = bad as never;
+      bossKilled(h.w, h.boss.mc);
+      expect(endOf(h, LEADER)!.reward, JSON.stringify(bad)).toBeDefined();
+      expect(endOf(h, LEADER)!.rewardsLeft).toBe(DUNGEON_DAILY_REWARDS - 1);
+    }
+  });
+
+  it("thưởng chỉ MỘT lần mỗi run: gọi lại (hoặc run đã kết thúc vì lý do khác) không thưởng thêm; thua thì không có thưởng", () => {
+    const f = fight();
+    bossKilled(f.w, f.boss.mc);
+    const coin = f.cl.coin;
+    const ends = f.dun.dungeonEnds.length;
+    bossKilled(f.w, f.boss.mc);
+    expect(f.cl.coin).toBe(coin);
+    expect(f.dun.dungeonEnds).toHaveLength(ends);
+    expect(f.cl.save.dungeonDaily!.rewards).toBe(1);
+
+    // hết giờ trước: run thua, trùm chết sau đó (trong lúc chờ về) không đổi kết quả
+    const g = fight();
+    finishRun(g.w, g.run, "lost", "timeout");
+    const gCoin = g.cl.coin;
+    bossKilled(g.w, g.boss.mc);
+    expect(g.run.phase).toBe("lost");
+    expect(g.cl.coin).toBe(gCoin);
+    expect(endOf(g, LEADER)!.reward).toBeUndefined();
+  });
+
+  it("chỉ trùm của bí cảnh này tính: quái thường chết, phòng thường (runId null), run chưa `running` không thắng", () => {
+    const f = fight();
+    const mob = addMonster(f.w, "lang", 1200, 1000);
+    mob.mc.damageBy.set(LEADER, 50);
+    killMonster(f.w, mob.id, mob.mc);
+    expect(f.run.phase).toBe("running");
+    // phòng thường có trùm riêng (Xích Mãng): không đụng tới run nào
+    const n = makeWorld(DEFAULT_MAP, f.hub);
+    addPlayer(n.w, THIRD, 1, 8);
+    const wild = addMonster(n.w, "mang", 1000, 1000);
+    wild.mc.damageBy.set(THIRD, 100);
+    killMonster(n.w, wild.id, wild.mc);
+    expect(f.run.phase).toBe("running");
+    // run còn `gathering`
+    f.run.phase = "gathering";
+    bossKilled(f.w, f.boss.mc);
+    expect(f.run.phase).toBe("gathering");
+  });
+
+  it("túi đầy: phần đồ không nhét được rơi dưới chân, chủ là chính người đó; Linh thạch vẫn nhận", () => {
+    const f = fight();
+    // túi toàn món khác, mỗi ô đầy
+    for (let i = 0; i < INVENTORY_SLOTS; i++) f.cl.inv[i] = { itemId: "hoi_huyet_dan", qty: 99 };
+    const coin = f.cl.coin;
+    bossKilled(f.w, f.boss.mc);
+    const e = endOf(f, LEADER)!;
+    expect(e.reward!.items.map((i) => i.itemId)).toContain("tu_khi_dan");
+    expect(f.cl.coin).toBeGreaterThanOrEqual(coin + def.reward.coin);
+    const drops = [...f.w.state.loot.values()].filter((l) => l.owner === LEADER);
+    expect(drops.some((l) => l.itemId === "tu_khi_dan" && l.qty === 2)).toBe(true);
+  });
+
+  it("món có xác suất (< 1): tung riêng cho từng người; xác suất 0.6 ở ngưỡng", async () => {
+    const { vi: v } = { vi };
+    const f = fight();
+    const spy = v.spyOn(Math, "random");
+    spy.mockReturnValue(0.59); // dưới 0.6: nhận `vay_mang`; trên 0.1: không nhận `xich_lan_bao`
+    bossKilled(f.w, f.boss.mc);
+    const ids = endOf(f, LEADER)!.reward!.items.map((i) => i.itemId);
+    spy.mockRestore();
+    expect(ids).toContain("tu_khi_dan");
+    expect(ids).toContain("vay_mang");
+    expect(ids).not.toContain("xich_lan_bao");
+    const g = fight();
+    const spy2 = v.spyOn(Math, "random").mockReturnValue(0.61);
+    bossKilled(g.w, g.boss.mc);
+    spy2.mockRestore();
+    expect(endOf(g, LEADER)!.reward!.items.map((i) => i.itemId)).toEqual(["tu_khi_dan"]);
+  });
+
+  it("sau thời gian nhặt đồ: người còn sống được đưa về Lạc Hà và run được xoá", () => {
+    const f = fight();
+    const exit = vi.fn();
+    f.w.onDungeonExit = exit;
+    bossKilled(f.w, f.boss.mc);
+    f.w.now += DUNGEON_LOOT_MS - 100;
+    f.w.tick++;
+    tickDungeonRun(f.w);
+    expect(exit).not.toHaveBeenCalled();
+    f.w.now += 200;
+    f.w.tick++;
+    tickDungeonRun(f.w);
+    expect(exit.mock.calls.map((c) => c[0]).sort()).toEqual([LEADER, MEMBER]);
+    expect(f.hub.runs.size).toBe(0);
+  });
+});
+
+describe("quái của phòng bí cảnh", () => {
+  it("trùm đúng MỘT con ở tâm hang; quái nhỏ theo `monsterCap`, ngoài khu an toàn; phòng thường không có hang nên vẫn rải như cũ", async () => {
+    const { spawnDungeonMonsters, spawnInitial } = await import("./monsters");
+    const map = getMap(LINH_HU_MAP_ID)!;
+    const d = makeWorld(map);
+    spawnDungeonMonsters(d.w);
+    const bossKind = dungeonOf(LINH_HU_ID)!.boss;
+    const all = [...d.w.state.monsters.values()];
+    const bosses = all.filter((m) => m.kind === bossKind);
+    expect(bosses).toHaveLength(1);
+    expect(bosses[0].x).toBe(map.lairPx!.x);
+    expect(bosses[0].y).toBe(map.lairPx!.y);
+    for (const id of ["lang", "ho"])
+      expect(all.filter((m) => m.kind === id).length).toBeLessThanOrEqual(map.monsterCapOf(id));
+    expect(all.length).toBeGreaterThan(10);
+    for (const m of all) if (m.kind !== bossKind) expect(map.inSafe(m.x, m.y, 100)).toBe(false);
+    // Lạc Hà: không có hang, `spawnInitial` như cũ (không trùm bí cảnh)
+    const n = makeWorld(DEFAULT_MAP);
+    spawnInitial(n.w);
+    expect([...n.w.state.monsters.values()].some((m) => m.kind === bossKind)).toBe(false);
+  });
+});
+
+describe("sanitizeDungeonDaily: không tin bộ đếm thưởng bí cảnh trong file", () => {
+  it("đúng dạng thì giữ; thiếu, sai kiểu, ngày không có, số lẻ / âm / quá trần thì bỏ", () => {
+    const ok = { day: "2026-11-10", rewards: 2 };
+    expect(sanitizeDungeonDaily(ok)).toEqual(ok);
+    expect(sanitizeDungeonDaily({ day: "2026-02-28", rewards: 0 })).toEqual({
+      day: "2026-02-28",
+      rewards: 0,
+    });
+    expect(sanitizeDungeonDaily({ ...ok, extra: 1, __proto__: { x: 1 } })).toEqual(ok); // không mang trường lạ
+    for (const bad of [
+      undefined,
+      null,
+      3,
+      "2026-11-10",
+      [],
+      {},
+      { day: "2026-11-10" },
+      { rewards: 1 },
+      { day: 20261110, rewards: 1 },
+      { day: "2026-11-10 ", rewards: 1 },
+      { day: "2026-13-01", rewards: 1 },
+      { day: "2026-02-30", rewards: 1 },
+      { day: "hom nay", rewards: 1 },
+      { day: "2026-11-10", rewards: "1" },
+      { day: "2026-11-10", rewards: 1.5 },
+      { day: "2026-11-10", rewards: -1 },
+      { day: "2026-11-10", rewards: 4 },
+      { day: "2026-11-10", rewards: NaN },
+      { day: "2026-11-10", rewards: Infinity },
+    ])
+      expect(sanitizeDungeonDaily(bad), JSON.stringify(bad)).toBeUndefined();
   });
 });

@@ -3,7 +3,8 @@
 // lưu nhân vật và đưa người sang phòng bí cảnh là I/O nên do WorldRoom làm, nối vào đây bằng hook của `World`
 // (`onDungeonOpen`, `onDungeonEnter`) như `onLimbo`.
 // Phần trong phòng bí cảnh (4b-2): `memberJoined` / `memberLeft`, đồng hồ, `dungeonState` mỗi giây, kết thúc (hết giờ, mọi
-// người chết / rời), đưa về Lạc Hà (`onDungeonExit`). Thắng (trùm chết), thưởng và lượt thưởng ngày là 4c (`finishRun` có sẵn).
+// người chết / rời), đưa về Lạc Hà (`onDungeonExit`). 4c: trùm chết là thắng (`bossKilled`, gọi từ `killMonster`), thưởng hoàn
+// thành một lần mỗi người đủ điều kiện, trần `DUNGEON_DAILY_REWARDS` lượt mỗi ngày (`dungeonDaily` trong file lưu).
 //
 // Server quyết định mọi thứ: tin từ client chỉ là ý định, kiểm lại hết (đội trưởng, cỡ đội, cảnh giới, còn sống, đứng gần
 // Thủ môn, hồi chiêu, số run tối đa). Khoá thành viên là ĐẠO HIỆU viết thường (như `Hub.parties`): sessionId đổi mỗi lần
@@ -13,28 +14,37 @@ import {
   DUNGEONS,
   DUNGEON_DAILY_REWARDS,
   DUNGEON_INVITE_MS,
+  DUNGEON_LOOT_MS,
   DUNGEON_OPEN_COOLDOWN_MS,
   DUNGEON_STATE_MS,
   TICK_MS,
   TRAVEL_COMBAT_LOCK_MS,
   canOpenDungeon,
+  dayKey,
   dungeonOf,
   dungeonOpenFailMessage,
   dungeonRewardsLeft,
   parseDungeonDecline,
   parseDungeonEnter,
   parseDungeonOpen,
+  rewardEligible,
   stepOf,
   type DialogOption,
+  type DungeonDaily,
   type DungeonDef,
+  type DungeonEndMsg,
   type DungeonEndReason,
   type DungeonMemberCheck,
   type DungeonMemberView,
   type DungeonPhase,
   type DungeonStateMsg,
 } from "@tien-gioi/shared";
-import type { PlayerCtrl, World } from "../world";
+import type { MonsterCtrl, PlayerCtrl, World } from "../world";
+import { giveItem } from "./inventory";
+import { spawnLoot } from "./loot";
 import { nearNpc } from "./near-npc";
+import { refreshQuests } from "./quests";
+import { changeCoin } from "./wallet";
 
 /** NPC mở bí cảnh (shared/src/npcs.ts). */
 export const GATEKEEPER_ID = "thu_mon";
@@ -166,12 +176,30 @@ function toastKey(w: World, key: string, text: string, tone: "good" | "bad" | "i
   if (loc) loc.w.events.toast(loc.sid, { text, tone });
 }
 
+const DAY_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 /**
- * Lượt nhận thưởng hoàn thành còn lại hôm nay của người chơi. 4b chưa có bộ đếm trong file lưu (`dungeonDaily`, 4c)
- * nên mọi người còn đủ lượt; 4c đọc `c.save.dungeonDaily` ở ĐÚNG hàm này.
+ * Bộ đếm thưởng bí cảnh từ file lưu: đúng dạng `{ day: "YYYY-MM-DD" thật, rewards: nguyên 0..DUNGEON_DAILY_REWARDS }` thì
+ * giữ, còn lại (thiếu, sai kiểu, ngày không có, số lẻ / âm / quá trần) bỏ (`undefined` = chưa nhận lượt nào hôm nay).
+ * Khớp luật của `kiem-save` (`audit-saves.ts`). Đặt ở đây (không ở store.ts): store.ts đọc `DATA_DIR` lúc nạp module, system không được kéo nó vào.
  */
-export function rewardsLeftOf(_c: PlayerCtrl, now: number): number {
-  return dungeonRewardsLeft(undefined, now);
+export function sanitizeDungeonDaily(raw: unknown): DungeonDaily | undefined {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const { day, rewards } = raw as Record<string, unknown>;
+  if (typeof day !== "string" || !DAY_KEY_RE.test(day)) return undefined;
+  const ms = Date.parse(`${day}T00:00:00.000Z`);
+  if (!Number.isFinite(ms) || new Date(ms).toISOString().slice(0, 10) !== day) return undefined;
+  if (typeof rewards !== "number" || !Number.isInteger(rewards)) return undefined;
+  if (rewards < 0 || rewards > DUNGEON_DAILY_REWARDS) return undefined;
+  return { day, rewards };
+}
+
+/**
+ * Lượt nhận thưởng hoàn thành còn lại hôm nay của người chơi (0..`DUNGEON_DAILY_REWARDS`). Đọc `dungeonDaily` trong hồ sơ
+ * qua hàm làm sạch (không tin file); bộ đếm của ngày khác coi như chưa dùng.
+ */
+export function rewardsLeftOf(c: PlayerCtrl, now: number): number {
+  return dungeonRewardsLeft(sanitizeDungeonDaily(c.save.dungeonDaily), now);
 }
 
 /** Người chơi ở bất cứ phòng nào, nhìn bằng con mắt của `canOpenDungeon`. */
@@ -488,6 +516,8 @@ export function finishRun(
   result: "won" | "lost",
   reason: DungeonEndReason,
   exitDelayMs: number = DUNGEON_EXIT_DELAY_MS,
+  /** Phần riêng của từng người (theo sessionId): thưởng nhận được / lý do không có, lượt còn lại SAU run này */
+  perMember?: ReadonlyMap<string, Pick<DungeonEndMsg, "reward" | "noReward" | "rewardsLeft">>,
 ) {
   if (run.exitAt !== null || w.hub.runs.get(run.id) !== run) return;
   run.phase = result;
@@ -495,9 +525,79 @@ export function finishRun(
   run.exitAt = w.now + exitDelayMs;
   for (const m of insideMembers(w, run)) {
     const c = w.ctrl.get(m.sid);
-    if (c) w.events.dungeonEnd(m.sid, { result, reason, rewardsLeft: rewardsLeftOf(c, w.now) });
+    if (!c) continue;
+    const mine = perMember?.get(m.sid);
+    w.events.dungeonEnd(m.sid, {
+      result,
+      reason,
+      rewardsLeft: mine?.rewardsLeft ?? rewardsLeftOf(c, w.now),
+      ...(mine?.reward ? { reward: mine.reward } : {}),
+      ...(mine?.noReward ? { noReward: mine.noReward } : {}),
+    });
   }
   sendDungeonState(w, run);
+}
+
+/**
+ * Phát thưởng hoàn thành cho MỘT người: Linh thạch cố định + từng món theo xác suất (tung riêng cho người này). Túi không đủ
+ * chỗ thì phần thừa rơi dưới chân, chủ là người đó (không ai khác nhặt trong `LOOT_OWNER_MS`). Trả phần đã phát để báo.
+ */
+function payReward(w: World, sid: string, def: DungeonDef): NonNullable<DungeonEndMsg["reward"]> {
+  const p = w.state.players.get(sid);
+  const items: { itemId: string; qty: number }[] = [];
+  const coin = Math.max(0, changeCoin(w, sid, def.reward.coin));
+  for (const r of def.reward.items) {
+    if (!(r.chance >= 1) && !(Math.random() < r.chance)) continue;
+    const left = giveItem(w, sid, r.itemId, r.qty);
+    if (left > 0 && p) spawnLoot(w, r.itemId, left, p.x, p.y, sid);
+    items.push({ itemId: r.itemId, qty: r.qty });
+  }
+  if (items.length > 0) refreshQuests(w, sid); // bước "thu thập" phụ thuộc túi đồ
+  return { coin, items };
+}
+
+/**
+ * Trùm bí cảnh vừa chết (gọi từ `killMonster` SAU khi quái đã xoá khỏi state, nên HUD thấy `boss: null`): run `running` thành
+ * THẮNG. Mỗi thành viên đang trong phòng nhận thưởng hoàn thành đúng MỘT lần nếu `rewardEligible` (còn sống, trong phòng,
+ * đã gây sát thương cho trùm: `damageBy`) VÀ còn lượt hôm nay; lượt trừ vào `dungeonDaily` trong hồ sơ (ghi file ở lần lưu tới:
+ * đồ, tiền và bộ đếm cùng một bản ghi, nên sập giữa chừng không để lại thưởng mà không trừ lượt hay ngược lại). Không đủ
+ * điều kiện thì không thưởng và `dungeonEnd.noReward` nói lý do (hết lượt / chưa đánh trùm). Mở `DUNGEON_LOOT_MS` để nhặt đồ
+ * rơi rồi `exitRun` đưa về Lạc Hà. Run đã kết thúc rồi thì không làm gì (không thưởng hai lần).
+ */
+export function bossKilled(w: World, mc: MonsterCtrl) {
+  const run = runOfWorld(w);
+  const def = run && dungeonOf(run.dungeonId);
+  if (!run || !def || run.phase !== "running" || run.exitAt !== null || mc.def.id !== def.boss)
+    return;
+  const perMember = new Map<string, Pick<DungeonEndMsg, "reward" | "noReward" | "rewardsLeft">>();
+  for (const m of insideMembers(w, run)) {
+    const c = w.ctrl.get(m.sid);
+    if (!c) continue;
+    const left = rewardsLeftOf(c, w.now);
+    // Người đang ở Hoàng Tuyền (chết): không thưởng và không có lý do để nói (họ đang xem màn đầu thai)
+    if (m.dead) {
+      perMember.set(m.sid, { rewardsLeft: left });
+      continue;
+    }
+    const eligible = rewardEligible({
+      alive: true,
+      present: true,
+      damage: mc.damageBy.get(m.sid) ?? 0,
+    });
+    if (!eligible) {
+      perMember.set(m.sid, { noReward: "no_damage", rewardsLeft: left });
+    } else if (left <= 0) {
+      perMember.set(m.sid, { noReward: "daily_limit", rewardsLeft: 0 });
+    } else {
+      const reward = payReward(w, m.sid, def);
+      c.save = {
+        ...c.save,
+        dungeonDaily: { day: dayKey(w.now), rewards: DUNGEON_DAILY_REWARDS - left + 1 },
+      };
+      perMember.set(m.sid, { reward, rewardsLeft: left - 1 });
+    }
+  }
+  finishRun(w, run, "won", "boss_dead", DUNGEON_LOOT_MS, perMember);
 }
 
 /**
