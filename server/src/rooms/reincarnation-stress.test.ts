@@ -23,7 +23,6 @@ import {
   type SoulBuyMsg,
   type RebirthMsg,
 } from "@tien-gioi/shared";
-import type { WorldRoom } from "./WorldRoom";
 
 const PORT = 43000 + Math.floor(Math.random() * 4000);
 let server: Server;
