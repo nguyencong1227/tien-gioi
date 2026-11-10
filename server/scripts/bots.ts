@@ -45,18 +45,6 @@ import {
 import { runBench } from "../src/perf/bench";
 import { hashSecret, type SavedPlayer } from "../src/store";
 
-const OrigWebSocket = globalThis.WebSocket;
-class MeasuredWebSocket extends OrigWebSocket {
-  public initialRxBytes = 0;
-  constructor(url: any, protocols?: any) {
-    super(url, protocols);
-    this.addEventListener("message", (ev: any) => {
-      this.initialRxBytes += byteLengthOf(ev.data);
-    });
-  }
-}
-(globalThis as any).WebSocket = MeasuredWebSocket;
-
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
 const envFile = path.join(repoRoot, ".env.local");
@@ -171,6 +159,13 @@ function parseArgs(argv: string[]): CliArgs {
     if (flap === 0) flap = 20;
     flapInterval = [1, 2];
     flapDelay = [0.5, 1];
+  }
+
+  if (storm && durationSec < 20) {
+    console.warn(
+      `[CẢNH BÁO] --storm kích hoạt ở giây thứ 15 và cần 2s để các bot nối lại; thời lượng ${durationSec}s không đủ để đo bão. Tự động tăng --duration lên 20s.`,
+    );
+    durationSec = 20;
   }
 
   if (!url) url = `ws://localhost:${DEFAULT_PORT}`;
@@ -1285,10 +1280,7 @@ async function runLoadTest(
             });
 
             const finalLatency = latencyMs > 0 ? latencyMs : performance.now() - t0;
-            const finalBytes =
-              firstStateBytes > 0
-                ? firstStateBytes
-                : ((newRoom.connection as any)?.transport?.ws?.initialRxBytes ?? 0);
+            const finalBytes = firstStateBytes;
 
             flapSuccessCount++;
             reconnectLatencies.push(finalLatency);
