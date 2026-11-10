@@ -155,6 +155,8 @@ Thư mục `DATA_DIR` (mặc định `server/data/players`) lưu trữ toàn b�
 - Cảnh giới, tu vi, vị trí toạ độ.
 - Túi đồ, trang bị đang mặc.
 - Tiến độ nhiệm vụ (sổ nhiệm vụ, nhiệm vụ hàng ngày).
+- Bản đồ đang ở, định danh kiếp và bộ đếm thành tựu của kiếp (luân hồi).
+- Thư mục con **`souls/`** (chân linh: Duyên đã nhận, mở khóa vĩnh viễn, lịch sử các kiếp): nằm **trong** `DATA_DIR` nên cùng volume Docker và cùng bản sao lưu; **mất `souls/` là mất toàn bộ tiến độ luân hồi của người chơi**. Có thể đặt chỗ khác bằng biến môi trường `SOULS_DIR`. File chân linh hỏng được đổi tên thành `*.hong-<giờ>-<mã>` (không bị ghi đè) để khôi phục thủ công.
 
 ### 7.2. Tạo bản sao lưu (`npm run backup`)
 Tiên Giới có sẵn kịch bản sao lưu nén bằng `tar` và tự động dọn dẹp các bản cũ theo chính sách giữ lại `keep` bản mới nhất:

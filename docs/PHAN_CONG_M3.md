@@ -17,12 +17,13 @@ Thay cho các câu hỏi trước đây ở cuối file này và trong `question
 | Sprint 4: Tổ đội (hợp đồng, server, client, bot thử tải) | Xong | #73, #79, #90, #94 (cân bằng: #82) |
 | Sprint 5: Tiền tệ, cửa hàng (hợp đồng, server, client, công cụ) | Xong | #98, #103, #104, #107, #115, #110 (cân bằng: #106) |
 | Sprint 5: Nhiều bản đồ, **Bước 0** (bản đồ thành tham số, hành vi không đổi, chỉ `lac_ha`) | Xong | thiết kế #121; #124, #128, #130, #132; dọn: #131, #133, #134, #135 |
-| M3 bước 1: bản đồ thứ hai (phương án A) | **Đang làm**: hợp đồng `shared/` trước, rồi server / client / công cụ | `docs/THIET_KE_NHIEU_BAN_DO.md` |
-| M3 bước 2–6: luân hồi, tài khoản + PostgreSQL, bí cảnh, PK thách đấu, tông môn | Đã có quyết định; làm lần lượt sau bước 1 | `docs/THIET_KE_LUAN_HOI.md` (bước 2) |
+| M3 bước 1: bản đồ thứ hai (phương án A) | **Gần xong**: `shared/` (#139, #144), server (phòng theo bản đồ #145, qua cổng #153, chat chung #156, đội dùng chung #158), client (#146), công cụ (#155, #161) đã vào `main`; còn ảnh nghiệm thu #140 (PR #160) và nội dung quái riêng của Hắc Phong Cốc (#142) | `docs/THIET_KE_NHIEU_BAN_DO.md` |
+| M3 bước 2: luân hồi bản đầu | **Server xong**: `shared/` (#152), ghost bất tử (#147), chân linh (#159), Hoàng Tuyền / đầu thai / Dư âm tu hành / xuất thân (#162); còn client Hoàng Tuyền (#150, PR #163) và công cụ (#151: kiem-save chân linh, mô phỏng nhiều kiếp, bot `--die`) | `docs/THIET_KE_LUAN_HOI.md` |
+| M3 bước 3–6: tài khoản + PostgreSQL, bí cảnh, PK thách đấu, tông môn | Đã có quyết định; làm lần lượt sau bước 2 | |
 
 Việc ngoài kế hoạch M3 đã làm xen vào: tối ưu băng thông vùng nhìn (#70, #87, #89; 100 người: ~9.5 KB/s mỗi client ở ca đông người tụ trong trấn), bench hằng đêm (#97), nối lại khi rớt mạng (#118, #122, #127; thử tải #125), kiểm file lưu (#113, #114), Docker và triển khai (#81, #83), rà giao diện điện thoại (#105).
 
-Số đo trên `main` (10/11/2026): 385 test; bench 100 người: săn quái 191, đám đông 484 byte/tick mỗi client, tick trung bình ~1.05 / ~1.7 ms (ngân sách < 10 ms); 40 bot thật 15 s: 40/40 giữ kết nối, tick tối đa 8.92 ms.
+Số đo trên `main` (10/11/2026, sau #162): 538 test; bench 100 người: săn quái 183, đám đông 474 byte/tick mỗi client (mốc `bench-baseline.json`), tick trung bình ~1.1 / ~1.85 ms (ngân sách < 10 ms); bot `--travel` 20 bot 15 s qua cổng liên tục: 52 lượt, trễ `travel` -> state phòng mới TB ~28 ms, 20/20 giữ kết nối.
 
 Hai câu cũ (cân bằng tu vi của tổ đội, bán đan cộng tu vi) đã chốt theo hướng an toàn của A, xem mục quyết định ở trên; kinh tế Linh thạch khi chết do bước 2 (luân hồi) quyết.
 

@@ -158,8 +158,8 @@ Màn hình **Hoàng Tuyền** chặn toàn bộ HUD (như màn đăng nhập), c
 - Hàm thuần: `calcDuyen(life)` (mục 5), `UNLOCKS` (bảng mục 6: id, tên, mô tả, giá từng nấc, hiệu lực), `unlockLevelEffect(...)`, `expMultOf(unlocks)`, `coinCarryCap(unlocks)`, `startPackOf(unlocks)`, `keepSlotsOf(unlocks)`, `ORIGINS`, `originMult(origin)`.
 - Kiểu tin nhắn:
   - client → server: `SoulBuyMsg { id }`, `RebirthMsg { origin?: string; keep: string[] }`.
-  - server → client (chỉ chủ): `LimboMsg { summary: LifeSummary; soul: SoulView; keepable: string[] }` (lúc chết và lúc đăng nhập nếu đang ở Hoàng Tuyền), `SoulMsg` (`SoulView` mới sau khi mua), `RebornMsg { kiep }`.
-- `statsFor` nhận thêm `origin?` (tham số cuối, tuỳ chọn: mọi chỗ gọi cũ không đổi).
+  - server → client (chỉ chủ): `LimboMsg { summary: LifeSummary; soul: SoulView; keepable: string[] }` (lúc chết và lúc đăng nhập nếu đang ở Hoàng Tuyền), `SoulMsg` (`SoulView`: một lần ngay khi vào phòng, để HUD ghi "Kiếp N"; và mỗi lần mua), `RebornMsg { kiep }`.
+- `statsFor` nhận thêm `mult?` (tham số cuối, tuỳ chọn: **hệ số** chỉ số của xuất thân, lấy từ `originMult(origin)`, thay vì nhận id xuất thân; mọi chỗ gọi cũ không đổi).
 - Test: bảng Duyên khớp mục 5, giá tăng dần và tổng tối đa đúng (`+100%`), id duy nhất, `calcDuyen` không bao giờ `NaN`/âm với đầu vào rác.
 
 ## 9. Server (PR 2b..2e, A) và chỗ trong mã hiện có phải đổi
@@ -167,6 +167,12 @@ Màn hình **Hoàng Tuyền** chặn toàn bộ HUD (như màn đăng nhập), c
 - 2c: `soul.ts` (`SoulStore`, `FileSoulStore`, `sanitizeSoul`), `lifeId` + `life` trong file nhân vật, bộ đếm (`playMs` ở tick, `kills` / `bossKills` ở xử lý quái chết). Test: nạp rác không làm hỏng, ghi nguyên tử, đua cập nhật cùng một linh hồn.
 - 2d: chết → Hoàng Tuyền (`hurtPlayer` + bỏ `tickRespawn` cho nhánh quái; bỏ `DEATH_EXP_LOSS` và `RESPAWN_MS` khỏi nhánh quái), `soulBuy`, `rebirth` (đăng ký bằng `this.on`, có giới hạn tần suất), áp `expMult` ở `progression`, `statsFor` với xuất thân. Test tích hợp: chết → Hoàng Tuyền → mua → đầu thai (kiểm toàn bộ mục 6); thoát giữa chừng và vào lại; sập giữa bước 2-3 (mô phỏng bằng ném lỗi ở `SoulStore.update`); cộng trùng bị chặn; tin gameplay bị từ chối khi ở Hoàng Tuyền; mutation check.
 - 2e: nối với nhiều bản đồ (đầu thai luôn về Lạc Hà: `travelTo`), đội, `kiem-save`.
+- **Thực tế đã làm (#159 = 2c, #162 = 2d; 2e một phần):**
+  - `systems/reincarnation.ts`: `beginLimbo` (tính Duyên, chụp `LimboRecord`, đặt lại nhân vật, nằm "chết" không có đồng hồ hồi sinh), `creditSoul` (thuần, idempotent theo `endedLifeId`), `applyRebirth` (dựng kiếp mới đồng bộ: tin `rebirth` thứ hai bị bỏ qua). `World.reincarnate` (mặc định **tắt**: bench và test đơn vị vẫn dùng nhánh hồi sinh cũ; `WorldRoom` bật) và hook `World.onLimbo` (phòng đăng ký để lưu file, cộng Duyên và gửi `limbo`).
+  - `WorldRoom`: `enterLimbo` ghi hồ sơ Hoàng Tuyền **trước**, rồi `souls.update` cộng Duyên, rồi ghi "đã cộng" và gửi `limbo`; lỗi cộng thì thử lại sau 3 s; `resumeLimbo` lúc vào lại (cộng bù đúng một lần, hiện lại màn hình); `soulBuy` (`buyUnlock` trong `souls.update` nguyên tử); `rebirth`; gửi `soul` một lần lúc vào phòng.
+  - Đầu thai ở phòng của bản đồ khác Lạc Hà: dùng chung `handOff` với `travel` (lưu bản ghi đích, `travelTo`), nên **đội được giữ** (`dropPlayer(sid, true)`); người chết trong đội không nhận chia tu vi / loot (`party.ts` bỏ qua `dead`).
+  - Dư âm tu hành nhân tu vi ở hạ quái và đả tọa (`gainExp(..., scale)`), xuất thân nhân chỉ số gốc (`c.mult` truyền vào `applyStats` / `hitMonster`).
+  - Còn lại của 2e: `kiem-save` kiểm chân linh và hồ sơ Hoàng Tuyền, mô phỏng nhiều kiếp (C, #151); chết vì PK không mất kiếp (bước 5).
 - **Hiệu năng:** không thêm trường vào state chung (người khác không cần biết Duyên / kiếp); mọi thứ là dữ liệu riêng gửi cho chủ khi có sự kiện (lúc chết, mua, đầu thai), không mỗi tick. `playMs` cộng trong `PlayerCtrl`. Bench một bản đồ phải giữ 0.0%.
 
 ## 10. Phân công và tiêu chí xong

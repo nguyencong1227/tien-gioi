@@ -51,9 +51,17 @@ describe("chuyển bản đồ: hợp đồng (M3 bước 1)", () => {
     expect(TRAVEL_JOIN_TIMEOUT_MS).toBeGreaterThan(TRAVEL_COOLDOWN_MS);
   });
 
-  it("npcsOfMap: NPC không ghi mapId thuộc Lạc Hà; bản đồ khác chưa có NPC; id lạ rỗng", () => {
-    expect(npcsOfMap(DEFAULT_MAP_ID)).toEqual(NPCS);
-    expect(npcsOfMap(HAC_PHONG_ID)).toEqual([]);
+  it("npcsOfMap: NPC không ghi mapId thuộc Lạc Hà; Hắc Phong Cốc có đúng lái buôn Thanh Lộ; id lạ rỗng", () => {
+    expect(npcsOfMap(DEFAULT_MAP_ID)).toEqual(NPCS.filter((n) => n.mapId === undefined));
+    expect(npcsOfMap(DEFAULT_MAP_ID).map((n) => n.id)).toEqual([
+      "truong_tran",
+      "duoc_su",
+      "tho_ren",
+      "cao_thi",
+    ]);
+    expect(npcsOfMap(HAC_PHONG_ID).map((n) => n.id)).toEqual(["lai_buon"]);
+    // mọi NPC thuộc đúng một bản đồ có thật
+    expect(npcsOfMap(DEFAULT_MAP_ID).length + npcsOfMap(HAC_PHONG_ID).length).toBe(NPCS.length);
     expect(npcsOfMap("constructor")).toEqual([]);
   });
 });

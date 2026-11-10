@@ -26,6 +26,8 @@
 **Khuyến nghị: A**, vì bí cảnh bắt buộc cần phòng tạm, và làm B xong vẫn phải làm lại một phần. Nếu chỉ cần thêm một hai khu săn mà chưa cần bí cảnh, B rẻ hơn. Quyết định ở câu hỏi 1-2 (mục 6).
 
 ## 4. Phương án A chi tiết (cái cần đổi)
+> **Đã làm (M3.1, #139 #144 #145 #153 #156 #158) khác bản thiết kế đầu bên dưới ở các điểm:** (1) mỗi bản đồ một **tên phòng** `roomNameOf(mapId)` thay cho `filterBy(["mapId"])` + `JoinOptions.mapId`: `filterBy` làm tách đôi phòng mặc định (client bỏ trống `mapId` tạo phòng "không nhãn"). (2) **Không có sổ tên `online.ts`**: bản đồ của nhân vật nằm trong file lưu (`mapId`), phòng sai bị từ chối bằng `wrong_map:<id>` sau khi đúng mã; huỷ `ghost` khi đăng nhập lại chỉ cần trong chính phòng đó. (3) Đội dùng chung nằm ở `Hub.parties` khoá theo **đạo hiệu viết thường** (không theo sessionId), thành viên đang qua cổng giữ `PARTY_AWAY_MS`; chat toàn server qua `Hub.addChatSink` (cùng tiến trình). (4) `World.dispose()` khi phòng đóng; `savePlayer` xếp hàng theo tệp để lưu của phòng cũ không đè phòng mới. Bí cảnh (phòng tạm) chưa làm.
+
 **`shared/` (PR riêng, một dev khác review):**
 - `MAPS`: bảng bản đồ `{ id, name, seed, w, h, town?, portals: [{ x, y, toMap, toPortal }], danger }` và `getMap(mapId)` trả về ô, va chạm, `inTown`, `dangerAt` theo bản đồ. Giữ các hàm cũ dưới dạng bản đồ mặc định (`lac_ha`) để chuyển dần.
 - `JoinOptions.mapId?` (mặc định `lac_ha`); tin `travel { portalId }` (client -> server) và `travelTo { mapId }` (server -> client); `SavedPlayer.mapId?` (tệp cũ không có thì coi là `lac_ha`).

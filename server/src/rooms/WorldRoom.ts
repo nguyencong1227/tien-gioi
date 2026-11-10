@@ -40,10 +40,38 @@ import {
   type PartyKickMsg,
   type TravelMsg,
   type TravelToMsg,
+  type SoulBuyMsg,
+  type RebirthMsg,
   type GameMap,
+  type Soul,
+  stepOf,
+  buyUnlock,
+  originMult,
+  soulView,
+  validateRebirth,
+  DEFAULT_MAP,
 } from "@tien-gioi/shared";
 import { WorldState, Player } from "../schema";
-import { loadPlayer, savePlayer, hashSecret, cleanName, mapIdOf, type SavedPlayer } from "../store";
+import {
+  loadPlayer,
+  savePlayer,
+  hashSecret,
+  cleanName,
+  mapIdOf,
+  sanitizeLife,
+  sanitizeLifeId,
+  sanitizeLimbo,
+  sanitizeOrigin,
+  type SavedPlayer,
+} from "../store";
+import { defaultSoulStore, soulIdOf, type SoulStore } from "../soul";
+
+/** Mua mở khóa bị từ chối ngay trong `souls.update` (không ghi gì): mang theo lý do để báo người chơi. */
+class BuyRefused extends Error {
+  constructor(readonly reason: "unknown" | "max" | "poor") {
+    super(reason);
+  }
+}
 import { World, type PlayerCtrl } from "../world";
 import { POS_SYNC_EVERY_TICKS, queueInput, safeSpot, syncPublicPos } from "../systems/movement";
 import { slash, swordQi } from "../systems/combat";
@@ -59,8 +87,16 @@ import { abandonQuest, acceptQuest, craft, talk, trade, turnInQuest } from "../s
 import { equip, equipmentOf, sanitizeEquipment, setEquipment, unequip } from "../systems/equipment";
 import { tickWorld } from "../systems/tick";
 import { VIEW_ENTER } from "../systems/interest";
-import { partyAnswer, partyDrop, partyInvite, partyKick, partyLeave } from "../systems/party";
+import {
+  partyAnswer,
+  partyDrop,
+  partyInvite,
+  partyKick,
+  partyLeave,
+  partyResync,
+} from "../systems/party";
 import { planTravel } from "../systems/travel";
+import { applyRebirth, creditSoul } from "../systems/reincarnation";
 import { RateLimiter } from "../rate-limit";
 import { defaultHub, type Hub } from "../hub";
 
@@ -87,6 +123,8 @@ export class WorldRoom extends Room<WorldState> {
   autoDispose = false; // thế giới luôn sống, kể cả khi không có ai
   state = new WorldState();
 
+  /** Kho chân linh (file JSON; bước 3 thay bằng PostgreSQL). Test ghi đè để cô lập. */
+  static souls: SoulStore | null = null; // null: `defaultSoulStore()` (dựng lười, đọc DATA_DIR lúc dùng)
   /** Kênh chung giữa các phòng. Test ghi đè để cô lập. */
   static hub: Hub = defaultHub;
   private get hub() {
@@ -100,7 +138,7 @@ export class WorldRoom extends Room<WorldState> {
 
   /** Nối các system với kênh gửi tin của phòng. Gọi một lần ở onCreate, khi đã biết bản đồ. */
   private createWorld(map: GameMap) {
-    return new World(
+    const w = new World(
       this.state,
       {
         // Hiệu ứng và số sát thương có vị trí: chỉ gửi cho người ở trong vùng nhìn (#62), không broadcast cả phòng
@@ -118,9 +156,17 @@ export class WorldRoom extends Room<WorldState> {
         partyInvited: (sid, msg) => this.sendTo(sid, "partyInvited", msg),
         wallet: (sid, msg) => this.sendTo(sid, "wallet", msg),
         chatTo: (sid, msg) => this.sendTo(sid, "chat", msg),
+        limbo: (sid, msg) => this.sendTo(sid, "limbo", msg),
+        soul: (sid, msg) => this.sendTo(sid, "soul", msg),
+        reborn: (sid, msg) => this.sendTo(sid, "reborn", msg),
       },
       map,
+      this.hub,
     );
+    // Chết do quái = luân hồi: lưu hồ sơ ở trạng thái Hoàng Tuyền, cộng Duyên, gửi màn hình Hoàng Tuyền
+    w.reincarnate = true;
+    w.onLimbo = (sid) => void this.enterLimbo(sid);
+    return w;
   }
 
   /** Giới hạn tần suất tin nhắn, theo sessionId */
@@ -194,6 +240,8 @@ export class WorldRoom extends Room<WorldState> {
     this.on("partyLeave", (sid) => partyLeave(w, sid));
     this.on<PartyKickMsg>("partyKick", (sid, m) => partyKick(w, sid, m?.name));
     this.on<TravelMsg>("travel", (sid, m) => void this.travel(sid, m?.portalId));
+    this.on<SoulBuyMsg>("soulBuy", (sid, m) => void this.soulBuy(sid, m?.id));
+    this.on<RebirthMsg>("rebirth", (sid, m) => void this.rebirth(sid, m));
     // Loại tin nhắn không đăng ký: bỏ qua, tính là spam
     this.onMessage("*", (c) => this.reject(c));
   }
@@ -261,7 +309,7 @@ export class WorldRoom extends Room<WorldState> {
       // chỉ là gợi ý chọn phòng, sai thì báo bản đồ đúng để client vào lại (shared/src/travel.ts).
       const home = mapIdOf(existing);
       if (home !== this.mapId) throw new ServerError(JOIN_WRONG_MAP, wrongMapMessage(home));
-      return existing;
+      return { save: existing, soul: await this.soulOf(existing) };
     }
     // Nhân vật mới luôn bắt đầu ở bản đồ mặc định (không tạo file ở phòng sai)
     if (this.mapId !== DEFAULT_MAP_ID)
@@ -277,10 +325,25 @@ export class WorldRoom extends Room<WorldState> {
       updatedAt: now,
     };
     await savePlayer(fresh);
-    return fresh;
+    return { save: fresh, soul: await this.soulOf(fresh) };
   }
 
-  onJoin(client: Client, _options: JoinOptions, save: SavedPlayer) {
+  /**
+   * Chân linh của người chơi: có rồi thì nạp, chưa có thì tạo (kiếp 1, 0 Duyên, thành tựu cao nhất = bậc hiện tại).
+   * Người chơi có từ trước khi có luân hồi được di chuyển lặng lẽ ở đây, vào game lần đầu.
+   */
+  private soulOf(save: SavedPlayer): Promise<Soul> {
+    const realm = Math.min(save.realm, REALMS.length - 1);
+    const tier = Math.min(save.tier, REALMS[realm].tiers.length - 1);
+    const store = WorldRoom.souls ?? defaultSoulStore();
+    return store.create(soulIdOf(save.name), (s) => ({
+      ...s,
+      best: { step: stepOf(realm, tier), realm, tier },
+    }));
+  }
+
+  onJoin(client: Client, _options: JoinOptions, auth: { save: SavedPlayer; soul: Soul }) {
+    const { save, soul } = auth;
     const p = new Player();
     p.name = save.name;
     p.realm = Math.min(save.realm, REALMS.length - 1);
@@ -291,7 +354,11 @@ export class WorldRoom extends Room<WorldState> {
     p.y = spot.y;
     syncPublicPos(p); // người khác thấy ngay chỗ vào, không phải (0, 0)
     setEquipment(p, sanitizeEquipment(save.equipment)); // trước applyStats: chỉ số gồm trang bị
-    applyStats(p, true);
+    const origin = sanitizeOrigin(save.origin);
+    const mult = originMult(origin);
+    applyStats(p, true, mult);
+    const limbo = sanitizeLimbo(save.limbo); // đang ở Hoàng Tuyền: nằm "chết" cho tới khi đầu thai
+    if (limbo) p.dead = true;
     this.state.players.set(client.sessionId, p);
     this.world.ctrl.set(client.sessionId, {
       save,
@@ -307,6 +374,12 @@ export class WorldRoom extends Room<WorldState> {
       inv: sanitizeInventory(save.inventory),
       itemCd: new Map(),
       quests: sanitizeQuests(save.quests),
+      lifeId: sanitizeLifeId(save.lifeId),
+      life: sanitizeLife(save.life),
+      limbo,
+      origin,
+      mult,
+      soul,
       coin: addCoin(0, save.coin ?? 0),
       frac: { hp: 0, mp: 0, exp: 0, expAt: 0 },
     });
@@ -318,7 +391,10 @@ export class WorldRoom extends Room<WorldState> {
     sendInv(this.world, client.sessionId);
     sendQuests(this.world, client.sessionId);
     sendWallet(this.world, client.sessionId);
+    this.world.events.soul(client.sessionId, soulView(soul)); // HUD ghi "Kiếp N" ngay từ lúc vào (không chỉ sau khi mua)
+    partyResync(this.world, client.sessionId); // vừa qua cổng từ bản đồ khác: vẫn ở trong đội, nhận đội hình ngay
     this.world.events.sys(`${p.name} (${realmLabel(p.realm, p.tier)}) đã nhập thế.`);
+    if (limbo) void this.resumeLimbo(client.sessionId); // vào lại giữa lúc ở Hoàng Tuyền: cộng Duyên nếu còn thiếu, hiện lại màn hình
   }
 
   async onLeave(client: Client, consented?: boolean) {
@@ -369,9 +445,12 @@ export class WorldRoom extends Room<WorldState> {
     }
   }
 
-  /** Gỡ người chơi khỏi thế giới (không lưu): dùng khi rời phòng và khi đi qua cổng. */
-  private dropPlayer(sid: string) {
-    partyDrop(this.world, sid); // trước khi xoá khỏi state: báo cho đội, dọn lời mời
+  /**
+   * Gỡ người chơi khỏi thế giới (không lưu): dùng khi rời phòng và khi đi qua cổng.
+   * `keepParty`: đi qua cổng thì vẫn ở trong đội (đội dùng chung giữa các phòng); rời hẳn thì rời đội.
+   */
+  private dropPlayer(sid: string, keepParty = false) {
+    if (!keepParty) partyDrop(this.world, sid); // trước khi xoá khỏi state: báo cho đội, dọn lời mời
     this.state.players.delete(sid);
     this.state.online = this.state.players.size;
     this.world.interest.leave(sid);
@@ -384,13 +463,21 @@ export class WorldRoom extends Room<WorldState> {
   /**
    * Đi qua cổng (shared/src/travel.ts): kiểm (`planTravel`), LƯU nhân vật với bản đồ đích + chỗ xuất hiện, đưa ra khỏi
    * phòng (không chờ nối lại), gửi `travelTo`, đóng kết nối. Lưu xong mới gửi: client vào phòng đích sẽ nạp đúng bản ghi đó.
-   * Đội tạm thời tan khi qua cổng (đội và chat dùng chung giữa các phòng là việc kế tiếp của #142).
+   * Đội giữ nguyên khi qua cổng (sổ đội dùng chung giữa các phòng, khoá theo đạo hiệu).
    */
   private async travel(sid: string, portalId: unknown) {
     const plan = planTravel(this.world, sid, portalId);
+    if (plan) await this.handOff(sid, plan);
+  }
+
+  /**
+   * Đưa người chơi sang phòng của bản đồ khác: lưu nhân vật với bản đồ đích + chỗ xuất hiện, gỡ khỏi phòng này (không chờ
+   * nối lại), gửi `travelTo`, đóng kết nối. Dùng cho `travel` (qua cổng) và `rebirth` (đầu thai luôn về Lạc Hà).
+   */
+  private async handOff(sid: string, plan: { mapId: string; x: number; y: number }) {
     const p = this.state.players.get(sid);
     const c = this.world.ctrl.get(sid);
-    if (!plan || !p || !c) return;
+    if (!p || !c) return;
     c.travelling = true;
     c.inputs.length = 0;
     try {
@@ -409,14 +496,119 @@ export class WorldRoom extends Room<WorldState> {
       if (here) await this.persist(here, c).catch((e) => console.error("save failed", e));
       return;
     }
-    this.dropPlayer(sid);
+    this.dropPlayer(sid, true);
     client.send("travelTo", { mapId: plan.mapId } satisfies TravelToMsg);
     client.leave(CLOSE_TRAVEL);
+  }
+
+  // ---------------- Luân hồi (docs/THIET_KE_LUAN_HOI.md mục 4) ----------------
+
+  private get souls(): SoulStore {
+    return WorldRoom.souls ?? defaultSoulStore();
+  }
+
+  /**
+   * Vừa chết thật (hook của World): ghi hồ sơ ở trạng thái Hoàng Tuyền TRƯỚC (thoát game lúc này cũng không giữ lại được gì
+   * của kiếp cũ), rồi cộng Duyên, rồi gửi màn hình Hoàng Tuyền. Sập giữa chừng: lần đăng nhập sau chạy tiếp (`resumeLimbo`).
+   */
+  private async enterLimbo(sid: string) {
+    const p = this.state.players.get(sid);
+    const c = this.world.ctrl.get(sid);
+    if (!p || !c?.limbo) return;
+    await this.persist(p, c).catch((e) => console.error("save failed (limbo)", e));
+    await this.resumeLimbo(sid);
+  }
+
+  /** Cộng Duyên nếu còn thiếu rồi gửi màn hình Hoàng Tuyền; cộng lỗi thì thử lại sau vài giây (người chơi còn trong phòng). */
+  private async resumeLimbo(sid: string) {
+    const c = this.world.ctrl.get(sid);
+    const limbo = c?.limbo;
+    if (!c || !limbo) return;
+    if (!limbo.credited && !(await this.creditLimbo(sid))) {
+      this.clock.setTimeout(() => void this.resumeLimbo(sid), 3000);
+      return;
+    }
+    this.world.events.limbo(sid, {
+      summary: limbo.summary,
+      soul: soulView(c.soul),
+      keepable: limbo.keepable,
+    });
+  }
+
+  /** Cộng Duyên của kiếp vừa qua vào chân linh (idempotent theo `endedLifeId`) và ghi "đã cộng" vào hồ sơ. */
+  private async creditLimbo(sid: string): Promise<boolean> {
+    const p = this.state.players.get(sid);
+    const c = this.world.ctrl.get(sid);
+    const limbo = c?.limbo;
+    if (!p || !c || !limbo) return false;
+    try {
+      c.soul = await this.souls.update(soulIdOf(p.name), (s) =>
+        creditSoul(s, limbo, new Date().toISOString()),
+      );
+    } catch (e) {
+      console.error("[luân hồi] cộng Duyên thất bại, sẽ thử lại", e);
+      return false;
+    }
+    limbo.credited = true;
+    await this.persist(p, c).catch((e) => console.error("save failed (credited)", e));
+    return true;
+  }
+
+  /** `soulBuy`: mở nấc kế tiếp của một mục ở Tam Sinh Thạch (chỉ ở Hoàng Tuyền, sau khi đã cộng Duyên). */
+  private async soulBuy(sid: string, id: unknown) {
+    const p = this.state.players.get(sid);
+    const c = this.world.ctrl.get(sid);
+    if (!p || !c?.limbo?.credited) return;
+    try {
+      // buyUnlock thuần trong update nguyên tử: trừ Duyên và tăng nấc cùng một lần ghi; hai tin cùng lúc xếp hàng
+      c.soul = await this.souls.update(soulIdOf(p.name), (s) => {
+        const r = buyUnlock(s, id);
+        if (!r.ok) throw new BuyRefused(r.reason);
+        return r.soul;
+      });
+      this.world.events.soul(sid, soulView(c.soul));
+    } catch (e) {
+      if (!(e instanceof BuyRefused))
+        return void console.error("[luân hồi] mua mở khóa thất bại", e);
+      const text = {
+        unknown: "Mục này không có.",
+        max: "Mục này đã mở hết.",
+        poor: "Duyên mỏng, chưa khắc nổi nét này.",
+      }[e.reason];
+      this.world.events.toast(sid, { text, tone: "bad" });
+    }
+  }
+
+  /** `rebirth`: đầu thai (chỉ ở Hoàng Tuyền, sau khi đã cộng Duyên): kiểm lựa chọn, dựng kiếp mới, lưu. Phòng khác Lạc Hà thì đưa về Lạc Hà. */
+  private async rebirth(sid: string, msg: unknown) {
+    const p = this.state.players.get(sid);
+    const c = this.world.ctrl.get(sid);
+    if (!p || !c?.limbo) return;
+    if (!c.limbo.credited) {
+      this.world.events.toast(sid, {
+        text: "Linh hồn chưa kịp ghi sổ, chờ một lát.",
+        tone: "info",
+      });
+      return;
+    }
+    const choice = validateRebirth(c.soul, msg, c.limbo.keepable);
+    if (!choice) {
+      this.world.events.toast(sid, { text: "Lựa chọn đầu thai không hợp lệ.", tone: "bad" });
+      return;
+    }
+    applyRebirth(this.world, sid, p, c, choice); // đồng bộ: tin `rebirth` thứ hai thấy `c.limbo` đã xoá
+    if (this.mapId !== DEFAULT_MAP_ID) {
+      const spot = safeSpot(DEFAULT_MAP);
+      await this.handOff(sid, { mapId: DEFAULT_MAP_ID, x: spot.x, y: spot.y });
+    } else {
+      await this.persist(p, c).catch((e) => console.error("save failed (rebirth)", e));
+    }
   }
 
   async onDispose() {
     this.removeChatSink?.();
     this.removeChatSink = null;
+    this.world?.dispose();
     await this.saveAll();
   }
 
@@ -446,6 +638,10 @@ export class WorldRoom extends Room<WorldState> {
       quests: c.quests,
       equipment: equipmentOf(p),
       coin: c.coin,
+      lifeId: c.lifeId,
+      life: { ...c.life, playMs: Math.floor(c.life.playMs) },
+      limbo: c.limbo,
+      origin: c.origin,
       mapId: at?.mapId ?? this.mapId,
       ...(at ? { travelAt: this.world.now } : {}),
     };

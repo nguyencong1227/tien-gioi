@@ -17,9 +17,10 @@ import type {
   PartyInvitedMsg,
 } from "@tien-gioi/shared";
 import type { WorldState, Player } from "./schema";
-import type { SavedPlayer, QuestSave } from "./store";
+import type { SavedPlayer, QuestSave, LifeCounters, LimboRecord } from "./store";
+import type { LimboMsg, RebornMsg, Soul, SoulMsg, StatMult } from "@tien-gioi/shared";
 import { Interest } from "./systems/interest";
-import { Parties } from "./systems/party";
+import { Hub } from "./hub";
 
 /** Dữ liệu riêng của server cho mỗi người chơi (không gửi xuống client). */
 export interface PlayerCtrl {
@@ -45,6 +46,16 @@ export interface PlayerCtrl {
   itemCd: Map<string, number>;
   /** Sổ nhiệm vụ: chỉ gửi cho chủ qua tin nhắn `quests` */
   quests: QuestSave;
+  /** Định danh kiếp hiện tại và bộ đếm thành tựu của kiếp (lưu cùng nhân vật; không vào state chung) */
+  lifeId: string;
+  life: LifeCounters;
+  /** Đang ở Hoàng Tuyền (đã chết thật, chờ đầu thai): mọi hành động gameplay bị bỏ qua. Xem systems/reincarnation.ts. */
+  limbo?: LimboRecord;
+  /** Xuất thân của kiếp này và hệ số chỉ số tương ứng (`originMult`) */
+  origin: string;
+  mult: StatMult;
+  /** Ảnh chụp chân linh lúc vào game (nấc mở khóa dùng ở đường nóng: `expMultOf`...); cập nhật khi mua ở Hoàng Tuyền */
+  soul: Soul;
   /** Linh thạch: số nguyên 0..COIN_CAP, chỉ gửi cho chủ qua tin nhắn `wallet`; chỉ đổi bằng systems/wallet.ts */
   coin: number;
   /**
@@ -103,6 +114,12 @@ export interface WorldEvents {
   partyInvited(sessionId: string, msg: PartyInvitedMsg): void;
   /** Chat gửi cho một người (chat đội). */
   chatTo(sessionId: string, msg: ChatOut): void;
+  /** Vừa chết thật / đăng nhập lại khi đang ở Hoàng Tuyền: hiện màn hình Hoàng Tuyền cho chủ. */
+  limbo(sessionId: string, msg: LimboMsg): void;
+  /** Chân linh của chủ vừa đổi (sau khi mua ở Tam Sinh Thạch). */
+  soul(sessionId: string, msg: SoulMsg): void;
+  /** Đã đầu thai xong. */
+  reborn(sessionId: string, msg: RebornMsg): void;
 }
 
 export class World {
@@ -113,8 +130,10 @@ export class World {
   readonly lctrl = new Map<string, LootCtrl>();
   /** Vùng nhìn của từng client: ai nhận state của thực thể nào (#62) */
   readonly interest: Interest;
-  /** Đội hình: ai ở đội nào, lời mời đang chờ (#74) */
-  readonly parties = new Parties();
+  /** Đội hình: ai ở đội nào, lời mời đang chờ (#74). Dùng chung với mọi phòng qua `hub`, khoá theo đạo hiệu viết thường. */
+  get parties() {
+    return this.hub.parties;
+  }
   /**
    * Người chơi đang "hồn lìa xác": rớt mạng bất thường, nhân vật ở lại chờ nối lại (`RECONNECT_GRACE_S`, #116).
    * **Bất tử** trong lúc chờ (không bị đánh, quái không nhắm, không hồi phục / tu luyện): rớt mạng không được phép
@@ -126,14 +145,29 @@ export class World {
   lootSeq = 0;
   /** Số tick đã chạy (dùng chia nhịp ghi px, py) */
   tick = 0;
+  /**
+   * Chết do quái = luân hồi (vào Hoàng Tuyền) thay vì hồi sinh sau `RESPAWN_MS`. WorldRoom bật; mặc định tắt để các
+   * system / bench chạy riêng không cần phòng. Nhánh hồi sinh còn dùng cho chết không mất kiếp (PK thách đấu, bước 5).
+   */
+  reincarnate = false;
+  /** Phòng đăng ký: được gọi (một lần) khi một người vừa vào Hoàng Tuyền, để lưu file, cộng Duyên và gửi `limbo`. */
+  onLimbo: ((sid: string) => void) | null = null;
 
   constructor(
     readonly state: WorldState,
     readonly events: WorldEvents,
     /** Bản đồ của phòng này: ô, va chạm, trấn. Mọi system đọc từ đây, không đọc hằng toàn cục (#123). */
     readonly map: GameMap,
+    /** Kênh chung giữa các phòng (đội, tìm người ở phòng khác). Bỏ trống: một hub riêng, thế giới đứng một mình. */
+    readonly hub: Hub = new Hub(),
   ) {
     this.interest = new Interest(map.worldW, map.worldH);
+    hub.worlds.add(this);
+  }
+
+  /** Thế giới ngừng chạy (phòng đóng): người ở phòng khác không còn tìm thấy người ở đây. */
+  dispose() {
+    this.hub.worlds.delete(this);
   }
 
   /** Người chơi còn sống và đang trong phòng; null nếu không. */

@@ -25,6 +25,7 @@ import {
   roomNameOf,
   sellPrice,
   statsFor,
+  TRAVEL_COOLDOWN_MS,
   type AttackMsg,
   type BuyMsg,
   type GameMap,
@@ -36,6 +37,8 @@ import {
   type PickupMsg,
   type SellMsg,
   type SkillMsg,
+  type TravelMsg,
+  type TravelToMsg,
   type WalletMsg,
 } from "@tien-gioi/shared";
 import { runBench } from "../src/perf/bench";
@@ -85,6 +88,7 @@ interface CliArgs {
   storm: boolean;
   leak: boolean;
   map: string;
+  travel: boolean;
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -111,12 +115,14 @@ function parseArgs(argv: string[]): CliArgs {
   let storm = false;
   let leak = false;
   let map = DEFAULT_MAP.def.id;
+  let travel = false;
 
   for (const arg of argv) {
     if (arg.startsWith("--bots=")) bots = Math.max(0, Number(arg.slice(7)));
     else if (arg.startsWith("--duration=")) durationSec = Math.max(2, Number(arg.slice(11)));
     else if (arg.startsWith("--url=")) url = arg.slice(6);
     else if (arg.startsWith("--map=")) map = arg.slice(6);
+    else if (arg === "--travel" || arg === "--portal") travel = true;
     else if (arg.startsWith("--party")) {
       const val = arg.slice(7).replace(/^=/, "");
       partySize = val ? Math.max(2, Math.min(4, Number(val))) : 4;
@@ -204,6 +210,7 @@ function parseArgs(argv: string[]): CliArgs {
     storm,
     leak,
     map,
+    travel,
   };
 }
 
@@ -441,6 +448,13 @@ interface BotState {
   nextFlapAt: number;
   reconnectAt: number;
   reconnectToken: string;
+  // Các trường cho thử tải qua cổng liên tục (#141)
+  isTravelling: boolean;
+  travelSentAt: number;
+  nextTravelAt: number;
+  travelCount: number;
+  travelLatencies: number[];
+  travelInitialBytes: number[];
 }
 
 export interface LoadTestMetrics {
@@ -518,6 +532,13 @@ export interface LoadTestMetrics {
   leakTested?: boolean;
   leakEndOnline?: number;
   leakRssDeltaMb?: number;
+  /** Các chỉ số thử tải qua cổng liên tục giữa các bản đồ (#141) */
+  travel?: boolean;
+  travelCount?: number;
+  travelLatencyAvgMs?: number;
+  travelLatencyP50Ms?: number;
+  travelLatencyP95Ms?: number;
+  travelInitialBytesAvg?: number;
 }
 
 export interface IdleZeroBotMetrics {
@@ -640,6 +661,7 @@ function bindRoomEvents(
   patchIntervals: number[],
   ackRtts: number[],
   onFirstState?: (tReceived: number, initialBytes: number) => void,
+  onTravelTo?: (msg: TravelToMsg) => void,
 ) {
   b.room = room;
   b.reconnectToken = room.reconnectionToken;
@@ -676,9 +698,12 @@ function bindRoomEvents(
   });
   room.onMessage("quests", () => {});
   room.onMessage("dialog", () => {});
+  room.onMessage("travelTo", (msg: TravelToMsg) => {
+    if (onTravelTo) onTravelTo(msg);
+  });
 
   room.onLeave((code) => {
-    if (!b.isFlapping) {
+    if (!b.isFlapping && !b.isTravelling && code !== 4000) {
       b.closedCode = code;
       if (code === 4429) b.kicked4429 = true;
     }
@@ -776,6 +801,7 @@ async function runLoadTest(
   storm = false,
   leak = false,
   mapId: string = DEFAULT_MAP.def.id,
+  travel = false,
 ): Promise<LoadTestMetrics> {
   const currentMap = getMap(mapId) ?? DEFAULT_MAP;
   const partySuffix = partySize > 1 ? `, tổ đội ${partySize} người` : "";
@@ -783,14 +809,15 @@ async function runLoadTest(
   const flapSuffix = flap > 0 ? `, flap=${flap}` : "";
   const stormSuffix = storm ? ", storm" : "";
   const leakSuffix = leak ? ", leak-test" : "";
+  const travelSuffix = travel ? ", travel qua cổng" : "";
   const mapSuffix =
     currentMap.def.id !== DEFAULT_MAP.def.id ? `, bản đồ=${currentMap.def.name}` : "";
   const modeLabel =
     mode === "realistic"
-      ? `Thực tế (vào tầm đứng chém${partySuffix}${shopSuffix}${flapSuffix}${stormSuffix}${leakSuffix}${mapSuffix})`
+      ? `Thực tế (vào tầm đứng chém${partySuffix}${shopSuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${mapSuffix})`
       : mode === "crowd"
-        ? `Đông người trong trấn/khu an toàn (${shop ? "25% ghé Dược Sư, 25% đứng, 50% đi" : "30% đứng yên, 70% đi lại"}${flapSuffix}${stormSuffix}${leakSuffix}${mapSuffix})`
-        : `Xấu nhất (100% di chuyển 20 input/s${partySuffix}${flapSuffix}${stormSuffix}${leakSuffix}${mapSuffix})`;
+        ? `Đông người trong trấn/khu an toàn (${shop ? "25% ghé Dược Sư, 25% đứng, 50% đi" : "30% đứng yên, 70% đi lại"}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${mapSuffix})`
+        : `Xấu nhất (100% di chuyển 20 input/s${partySuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${mapSuffix})`;
   console.log(
     `\n=== Bắt đầu thử tải [${modeLabel}]: ${botCount} bot, đo trong ${durationSec}s (${url}) ===`,
   );
@@ -837,9 +864,34 @@ async function runLoadTest(
     // Khởi tạo vị trí (campX, campY) rải đều khắp vùng hoang dã giống bench.ts trước khi joinOrCreate
     const realm = rnd() < 0.8 ? 1 : 2;
     const tier = Math.floor(rnd() * REALMS[realm].tiers.length);
-    let campX: number;
-    let campY: number;
-    if (mode === "crowd") {
+    let campX = 0;
+    let campY = 0;
+    if (travel) {
+      // Khi thử tải qua cổng: sinh bot gần cổng (quanh toạ độ spawn của cổng) để bot đi bộ vào cổng
+      const portal = currentMap.portals[0];
+      if (portal) {
+        let placed = false;
+        for (let tries = 0; tries < 20; tries++) {
+          const a = rnd() * Math.PI * 2;
+          const dist = portal.r + 20 + rnd() * 40;
+          const x = portal.x + Math.cos(a) * dist;
+          const y = portal.y + Math.sin(a) * dist;
+          if (!currentMap.circleBlocked(x, y, PLAYER_RADIUS)) {
+            campX = x;
+            campY = y;
+            placed = true;
+            break;
+          }
+        }
+        if (!placed) {
+          campX = portal.spawn.x;
+          campY = portal.spawn.y;
+        }
+      } else {
+        campX = currentMap.townPx.x;
+        campY = currentMap.townPx.y;
+      }
+    } else if (mode === "crowd") {
       // Đông người tụ trong trấn/khu an toàn: rải bot hoàn toàn bên trong bán kính an toàn
       for (;;) {
         const a = rnd() * Math.PI * 2;
@@ -875,6 +927,40 @@ async function runLoadTest(
 
     const radialAngle = ((i - 1) / botCount) * Math.PI * 2;
     const now = performance.now();
+
+    const handleBotTravel = async (bot: BotState, msg: TravelToMsg) => {
+      try {
+        const nextMap = getMap(msg.mapId) ?? DEFAULT_MAP;
+        const targetClient = new Client(url);
+        const nextRoom = await targetClient.joinOrCreate(roomNameOf(nextMap.def.id), {
+          name: bot.name,
+          secret: `bot_secret_tien_gioi_${String(bot.index).padStart(3, "0")}_loadtest`,
+        });
+        bot.map = nextMap;
+        bindRoomEvents(
+          bot,
+          nextRoom,
+          () => measuring,
+          patchIntervals,
+          ackRtts,
+          (tRecv, bytes) => {
+            const lat = tRecv - bot.travelSentAt;
+            if (measuring) {
+              bot.travelLatencies.push(lat);
+              bot.travelInitialBytes.push(bytes);
+              bot.travelCount++;
+            }
+            bot.isTravelling = false;
+            bot.nextTravelAt = performance.now() + TRAVEL_COOLDOWN_MS + 2000 + Math.random() * 2000;
+          },
+          (m) => void handleBotTravel(bot, m),
+        );
+      } catch (err) {
+        console.error(`[${bot.name}] Lỗi chuyển phòng sang ${msg.mapId}:`, err);
+        bot.isTravelling = false;
+        bot.nextTravelAt = performance.now() + 4000;
+      }
+    };
 
     const b: BotState = {
       index: i,
@@ -918,9 +1004,23 @@ async function runLoadTest(
       nextFlapAt: now + rndFlap(),
       reconnectAt: 0,
       reconnectToken: room.reconnectionToken,
+      isTravelling: false,
+      travelSentAt: 0,
+      nextTravelAt: now + 2000 + Math.random() * 3000,
+      travelCount: 0,
+      travelLatencies: [],
+      travelInitialBytes: [],
     };
 
-    bindRoomEvents(b, room, () => measuring, patchIntervals, ackRtts);
+    bindRoomEvents(
+      b,
+      room,
+      () => measuring,
+      patchIntervals,
+      ackRtts,
+      undefined,
+      (msg) => void handleBotTravel(b, msg),
+    );
     bots.push(b);
     await sleep(20);
   }
@@ -974,7 +1074,38 @@ async function runLoadTest(
       b.nextShopCheckAt = now + 6000 + Math.random() * 4000;
     }
 
-    if (mode === "crowd") {
+    if (travel) {
+      // Kịch bản thử tải qua cổng liên tục giữa các bản đồ (#141)
+      if (b.isTravelling) {
+        dx = 0;
+        dy = 0;
+      } else if (now < b.avoidUntil) {
+        // Đang né vật cản (cây/đá quanh lối vào cổng): đi theo góc né
+        dx = Math.cos(b.wanderAngle);
+        dy = Math.sin(b.wanderAngle);
+      } else {
+        const portal = b.map.portals[0];
+        if (portal) {
+          const dist = Math.hypot(portal.x - b.predX, portal.y - b.predY);
+          if (dist > portal.r - 12) {
+            const a = Math.atan2(portal.y - b.predY, portal.x - b.predX);
+            dx = Math.cos(a);
+            dy = Math.sin(a);
+          } else {
+            dx = 0;
+            dy = 0;
+            if (now >= b.nextTravelAt) {
+              b.isTravelling = true;
+              b.travelSentAt = performance.now();
+              b.room.send("travel", { portalId: portal.id } satisfies TravelMsg);
+            }
+          }
+        } else {
+          dx = 0;
+          dy = 0;
+        }
+      }
+    } else if (mode === "crowd") {
       // Kịch bản đông người tụ trong trấn (#78 & #80):
       // Khi có cờ --shop (#102): ~25% bot định kỳ ghé Lão Dược Sư mua/bán (phát sinh tin wallet), ~25% đứng yên, 50% đi lại.
       // Khi không có --shop (mặc định): 30% đứng yên (b.index % 3 === 0), 70% đi lại ngẫu nhiên trong trấn.
@@ -1560,6 +1691,23 @@ async function runLoadTest(
   const stormCpuTickP95 =
     stormCpuSamples.length > 0 ? Number(percentile(stormCpuSamples, 95).toFixed(2)) : undefined;
 
+  const allTravelLatencies = bots.flatMap((b) => b.travelLatencies).sort((a, b) => a - b);
+  const allTravelBytes = bots.flatMap((b) => b.travelInitialBytes);
+  const totalTravelCount = bots.reduce((s, b) => s + b.travelCount, 0);
+
+  const travelLatencyAvgMs =
+    allTravelLatencies.length > 0 ? Number(avg(allTravelLatencies).toFixed(2)) : undefined;
+  const travelLatencyP50Ms =
+    allTravelLatencies.length > 0
+      ? Number(percentile(allTravelLatencies, 50).toFixed(2))
+      : undefined;
+  const travelLatencyP95Ms =
+    allTravelLatencies.length > 0
+      ? Number(percentile(allTravelLatencies, 95).toFixed(2))
+      : undefined;
+  const travelInitialBytesAvg =
+    allTravelBytes.length > 0 ? Math.round(avg(allTravelBytes)) : undefined;
+
   const metrics: LoadTestMetrics = {
     commit,
     note,
@@ -1638,6 +1786,12 @@ async function runLoadTest(
     leakTested: leak ? true : undefined,
     leakEndOnline,
     leakRssDeltaMb,
+    travel: travel ? true : undefined,
+    travelCount: travel || totalTravelCount > 0 ? totalTravelCount : undefined,
+    travelLatencyAvgMs,
+    travelLatencyP50Ms,
+    travelLatencyP95Ms,
+    travelInitialBytesAvg,
   };
 
   printMetrics(metrics);
@@ -1717,6 +1871,11 @@ function printMetrics(m: LoadTestMetrics) {
   if (m.leakTested) {
     console.log(
       `- Kiểm tra rò rỉ (Leak): state.online về ${m.leakEndOnline} người chơi | VmRSS chênh lệch: ${m.leakRssDeltaMb ?? "–"} MB so với sau làm nóng (ngân sách < 10 MB)`,
+    );
+  }
+  if (m.travel || (m.travelCount !== undefined && m.travelCount > 0)) {
+    console.log(
+      `- Thử tải chuyển bản đồ (Travel): ${m.travelCount ?? 0} lần qua cổng thành công | Độ trễ travel -> state phòng mới: TB ${m.travelLatencyAvgMs ?? "–"} ms (p50: ${m.travelLatencyP50Ms ?? "–"} ms, p95: ${m.travelLatencyP95Ms ?? "–"} ms) | State ban đầu: TB ${m.travelInitialBytesAvg ?? "–"} byte/lần`,
     );
   }
 }
@@ -1981,6 +2140,7 @@ async function main() {
           args.storm,
           args.leak,
           args.map,
+          args.travel,
         ),
       );
     }
