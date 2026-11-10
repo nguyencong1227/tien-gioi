@@ -1,5 +1,5 @@
 // Kho chân linh: ghi nguyên tử theo từng linh hồn, nạp không tin file, file hỏng được cách ly chứ không bị ghi đè.
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
