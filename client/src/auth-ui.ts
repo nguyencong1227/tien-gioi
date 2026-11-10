@@ -35,11 +35,13 @@ function $(id: string): HTMLElement {
 }
 
 function setErr(elId: string, msg: string) {
+  if (typeof document === "undefined") return;
   const el = document.getElementById(elId);
   if (el) el.textContent = msg;
 }
 
 function clearAllErrors() {
+  if (typeof document === "undefined") return;
   for (const id of [
     "auth-login-err",
     "auth-reg-err",
@@ -55,6 +57,7 @@ function clearAllErrors() {
 
 export function switchAuthView(view: AuthView) {
   activeView = view;
+  if (typeof document === "undefined") return;
   clearAllErrors();
 
   const viewIds: Record<AuthView, string> = {
@@ -91,6 +94,7 @@ export function getActiveAuthView(): AuthView {
 
 export function updateAccountDisplay(username: string) {
   currentUser = username;
+  if (typeof document === "undefined") return;
   const badge = document.getElementById("set-account-username");
   if (badge) badge.textContent = username;
 }
@@ -108,6 +112,76 @@ function extractJoinErrorMessage(err: any): string {
     return err.message;
   }
   return "Không thể kết nối vào phòng game.";
+}
+
+export interface PostAuthDestination {
+  view: "game" | "character";
+  name?: string;
+}
+
+/**
+ * Xác định màn hình tiếp theo sau khi đã có token phiên (đăng nhập, khôi phục mật khẩu, mở lại trang):
+ * - Nếu tài khoản ĐÃ có nhân vật (`hasCharacter && name`): vào thẳng game với đạo hiệu đó.
+ * - Nếu tài khoản CHƯA có nhân vật: tới màn hình Khởi Tạo Đạo Hiệu (`character`).
+ */
+export function decidePostAuthDestination(me: {
+  hasCharacter: boolean;
+  name?: string;
+}): PostAuthDestination {
+  if (me.hasCharacter && me.name) {
+    return { view: "game", name: me.name };
+  }
+  return { view: "character" };
+}
+
+/**
+ * Vào game hoặc điều hướng sau khi đã có token phiên (đăng nhập, khôi phục mật khẩu, mở lại tab):
+ * Hỏi `client.me(token)`:
+ * - Đã có nhân vật -> gọi `callbacks.onTokenAuth(token, me.name)`.
+ * - Chưa có nhân vật -> chuyển sang view `character`.
+ * Xử lý lỗi:
+ * - `JOIN_BAD_TOKEN` hoặc `unauthorized`: xoá token, về view `login`, báo hết hạn phiên.
+ * - Lỗi join khác (409 already_online, phòng đầy...): giữ token, về view `login`, hiện rõ lý do.
+ * - Lỗi mạng / server không phản hồi: giữ token, về view `login`, hiện thông báo kết nối.
+ */
+export async function enterWithToken(
+  token: string,
+  callbacks: AuthUiCallbacks,
+  client = authClient,
+): Promise<void> {
+  try {
+    const me = await client.me(token);
+    updateAccountDisplay(me.username);
+    const dest = decidePostAuthDestination(me);
+    if (dest.view === "game" && dest.name) {
+      try {
+        await callbacks.onTokenAuth(token, dest.name);
+      } catch (joinErr: any) {
+        if (joinErr?.code === JOIN_BAD_TOKEN) {
+          clearToken();
+          switchAuthView("login");
+          setErr("auth-login-err", "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+        } else {
+          // Lỗi join khác (already_online, phòng đầy, mạng...): GIỮ token, hiện thông báo
+          switchAuthView("login");
+          const msg = extractJoinErrorMessage(joinErr);
+          setErr("auth-login-err", `${msg} (Vui lòng bấm Đăng Nhập để thử lại)`);
+        }
+      }
+    } else {
+      switchAuthView("character");
+    }
+  } catch (meErr: any) {
+    if (meErr?.error === "unauthorized") {
+      clearToken();
+      switchAuthView("login");
+      setErr("auth-login-err", "Phiên đăng nhập không hợp lệ hoặc đã hết hạn.");
+    } else {
+      // Lỗi mạng hoặc server không phản hồi: GIỮ token
+      switchAuthView("login");
+      setErr("auth-login-err", "Không kết nối được máy chủ xác thực. Vui lòng thử lại sau.");
+    }
+  }
 }
 
 export async function initAuthUi(callbacks: AuthUiCallbacks): Promise<void> {
@@ -187,16 +261,7 @@ export async function initAuthUi(callbacks: AuthUiCallbacks): Promise<void> {
       setToken(res.token);
       updateAccountDisplay(uCheck.value);
 
-      const me = await authClient.me(res.token);
-      if (me.hasCharacter && me.name) {
-        try {
-          await callbacks.onTokenAuth(res.token, me.name);
-        } catch (joinErr: any) {
-          setErr("auth-login-err", extractJoinErrorMessage(joinErr));
-        }
-      } else {
-        switchAuthView("character");
-      }
+      await enterWithToken(res.token, callbacks);
     } catch (err: any) {
       setErr("auth-login-err", authErrorMessage(err));
     } finally {
@@ -268,8 +333,20 @@ export async function initAuthUi(callbacks: AuthUiCallbacks): Promise<void> {
   confirmCb.onchange = () => {
     continueBtn.disabled = !confirmCb.checked;
   };
-  continueBtn.onclick = () => {
-    switchAuthView("character");
+  continueBtn.onclick = async () => {
+    const token = getToken();
+    if (!token) {
+      switchAuthView("login");
+      return;
+    }
+    continueBtn.disabled = true;
+    try {
+      await enterWithToken(token, callbacks);
+    } finally {
+      if (getActiveAuthView() === "recovery") {
+        continueBtn.disabled = !confirmCb.checked;
+      }
+    }
   };
 
   // 7. Form Khởi Tạo Đạo Hiệu
@@ -440,36 +517,7 @@ export async function initAuthUi(callbacks: AuthUiCallbacks): Promise<void> {
 
   const existingToken = getToken();
   if (existingToken) {
-    try {
-      const me = await authClient.me(existingToken);
-      updateAccountDisplay(me.username);
-      if (me.hasCharacter && me.name) {
-        try {
-          await callbacks.onTokenAuth(existingToken, me.name);
-        } catch (joinErr: any) {
-          if (joinErr?.code === JOIN_BAD_TOKEN) {
-            clearToken();
-            switchAuthView("login");
-          } else {
-            // Lỗi join khác (already_online, phòng đầy, mạng...): GIỮ token, hiện thông báo
-            switchAuthView("login");
-            const msg = extractJoinErrorMessage(joinErr);
-            setErr("auth-login-err", `${msg} (Vui lòng bấm Đăng Nhập để thử lại)`);
-          }
-        }
-      } else {
-        switchAuthView("character");
-      }
-    } catch (meErr: any) {
-      if (meErr?.error === "unauthorized") {
-        clearToken();
-        switchAuthView("login");
-      } else {
-        // Lỗi mạng hoặc server không phản hồi: GIỮ token
-        switchAuthView("login");
-        setErr("auth-login-err", "Không kết nối được máy chủ xác thực. Vui lòng thử lại sau.");
-      }
-    }
+    await enterWithToken(existingToken, callbacks);
   } else {
     switchAuthView("login");
   }
@@ -484,6 +532,8 @@ export async function initAuthUi(callbacks: AuthUiCallbacks): Promise<void> {
       getView: getActiveAuthView,
       authClient,
       authErrorMessage,
+      decidePostAuthDestination,
+      enterWithToken,
     };
   }
 }

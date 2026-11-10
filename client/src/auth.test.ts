@@ -339,3 +339,149 @@ describe("client/src/auth - detectAuthMode", () => {
     globalThis.fetch = originalFetch;
   });
 });
+
+describe("client/src/auth-ui - Quyết định điều hướng sau khi có token (decidePostAuthDestination & enterWithToken, Refs #186)", () => {
+  it("tài khoản ĐÃ có nhân vật -> vào thẳng game với đạo hiệu", async () => {
+    const { decidePostAuthDestination } = await import("./auth-ui");
+    const dest = decidePostAuthDestination({
+      hasCharacter: true,
+      name: "Tiêu Dao Tử",
+    });
+    expect(dest.view).toBe("game");
+    expect(dest.name).toBe("Tiêu Dao Tử");
+  });
+
+  it("tài khoản CHƯA có nhân vật (đăng ký mới hoặc khôi phục trước khi tạo nv) -> tới màn hình khởi tạo đạo hiệu", async () => {
+    const { decidePostAuthDestination } = await import("./auth-ui");
+    const dest1 = decidePostAuthDestination({
+      hasCharacter: false,
+    });
+    expect(dest1.view).toBe("character");
+    expect(dest1.name).toBeUndefined();
+
+    const dest2 = decidePostAuthDestination({
+      hasCharacter: false,
+      name: undefined,
+    });
+    expect(dest2.view).toBe("character");
+  });
+
+  it("tài khoản có cờ hasCharacter nhưng thiếu tên -> an toàn tới màn hình khởi tạo đạo hiệu", async () => {
+    const { decidePostAuthDestination } = await import("./auth-ui");
+    const dest1 = decidePostAuthDestination({
+      hasCharacter: true,
+      name: "",
+    });
+    expect(dest1.view).toBe("character");
+
+    const dest2 = decidePostAuthDestination({
+      hasCharacter: true,
+      name: undefined,
+    });
+    expect(dest2.view).toBe("character");
+  });
+
+  it("enterWithToken gọi onTokenAuth khi tài khoản đã có nhân vật", async () => {
+    const { enterWithToken } = await import("./auth-ui");
+    let joinedToken = "";
+    let joinedName = "";
+    const fakeClient = {
+      me: async () => ({
+        username: "user1",
+        hasCharacter: true,
+        name: "Lý Tiêu Dao",
+      }),
+    } as any;
+
+    await enterWithToken(
+      "test_token_abc",
+      {
+        onTokenAuth: async (token, name) => {
+          joinedToken = token;
+          joinedName = name ?? "";
+        },
+        onLegacyAuth: async () => {},
+      },
+      fakeClient,
+    );
+
+    expect(joinedToken).toBe("test_token_abc");
+    expect(joinedName).toBe("Lý Tiêu Dao");
+  });
+
+  it("enterWithToken không gọi onTokenAuth khi tài khoản chưa có nhân vật", async () => {
+    const { enterWithToken } = await import("./auth-ui");
+    let called = false;
+    const fakeClient = {
+      me: async () => ({
+        username: "user_moi",
+        hasCharacter: false,
+      }),
+    } as any;
+
+    await enterWithToken(
+      "token_tan_thu",
+      {
+        onTokenAuth: async () => {
+          called = true;
+        },
+        onLegacyAuth: async () => {},
+      },
+      fakeClient,
+    );
+
+    expect(called).toBe(false);
+  });
+
+  it("enterWithToken xóa token và về login khi onTokenAuth trả JOIN_BAD_TOKEN (401)", async () => {
+    const { enterWithToken, getActiveAuthView } = await import("./auth-ui");
+    const { setToken, getToken } = await import("./auth");
+    setToken("bad_token_123");
+    const fakeClient = {
+      me: async () => ({
+        username: "user_bad",
+        hasCharacter: true,
+        name: "Lý Tiêu Dao",
+      }),
+    } as any;
+
+    await enterWithToken(
+      "bad_token_123",
+      {
+        onTokenAuth: async () => {
+          const err: any = new Error("Phiên hết hạn");
+          err.code = 401; // JOIN_BAD_TOKEN
+          throw err;
+        },
+        onLegacyAuth: async () => {},
+      },
+      fakeClient,
+    );
+
+    expect(getToken()).toBeNull();
+    expect(getActiveAuthView()).toBe("login");
+  });
+
+  it("enterWithToken xóa token và về login khi me trả lỗi unauthorized", async () => {
+    const { enterWithToken, getActiveAuthView } = await import("./auth-ui");
+    const { setToken, getToken } = await import("./auth");
+    setToken("expired_token_456");
+    const fakeClient = {
+      me: async () => {
+        throw { error: "unauthorized" };
+      },
+    } as any;
+
+    await enterWithToken(
+      "expired_token_456",
+      {
+        onTokenAuth: async () => {},
+        onLegacyAuth: async () => {},
+      },
+      fakeClient,
+    );
+
+    expect(getToken()).toBeNull();
+    expect(getActiveAuthView()).toBe("login");
+  });
+});
