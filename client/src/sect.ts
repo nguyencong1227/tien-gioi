@@ -60,6 +60,24 @@ export function formatSectMembersSummary(count: number, max: number = SECT_MAX_M
   return `Tổng số: ${safeCount} / ${max}`;
 }
 
+/** Các hành động tông môn cần hộp xác nhận trong game (#246; "Giải tán" có ô riêng hai bước) */
+export type SectConfirmKind = "transfer" | "kick" | "leave";
+
+/** Nội dung hộp xác nhận trong game: câu hỏi + chữ trên nút đồng ý */
+export function sectConfirmText(kind: SectConfirmKind, name = ""): { text: string; ok: string } {
+  switch (kind) {
+    case "transfer":
+      return {
+        text: `Nhường vị Tông chủ cho ${name}? Ngươi sẽ thành Trưởng lão.`,
+        ok: "Nhường vị",
+      };
+    case "kick":
+      return { text: `Trục xuất ${name} khỏi tông môn?`, ok: "Trục xuất" };
+    case "leave":
+      return { text: "Rời khỏi tông môn? Ngươi sẽ mất biệt hiệu.", ok: "Rời tông môn" };
+  }
+}
+
 export interface MergedSectMember extends SectMember {
   online: boolean;
   realm?: number;

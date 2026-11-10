@@ -141,8 +141,9 @@ function locateMember(w: World, m: { soulKey: string; name: string }): Located |
   return loc && loc.w.ctrl.get(loc.sid)?.identity.soulKey === m.soulKey ? loc : null;
 }
 
-function saveNow(w: World, sid: string): Promise<void> {
-  return w.onSaveNow ? w.onSaveNow(sid) : Promise.resolve();
+/** Lưu hồ sơ NGAY; `true` khi đã nằm trên đĩa (hoặc không có hook lưu). `false`: người gọi phải huỷ và hoàn ví. */
+function saveNow(w: World, sid: string): Promise<boolean> {
+  return w.onSaveNow ? w.onSaveNow(sid) : Promise.resolve(true);
 }
 
 // ---------- Gửi ảnh chụp / presence ----------
@@ -292,7 +293,11 @@ export async function sectCreate(w: World, sid: string, raw: unknown) {
   if (svc.createCooldownLeft(a.soulKey) > 0) return toastFail(w, sid, "create_cooldown");
   if (!stillHere(w, sid, a.soulKey) || !trySpendCoin(w, sid, SECT_CREATE_COST))
     return toastFail(w, sid, "no_coin");
-  await saveNow(w, sid); // tiền đã trừ phải xuống file TRƯỚC khi tông môn ra đời (không nhân đôi nếu sập)
+  // Tiền đã trừ phải xuống file TRƯỚC khi tông môn ra đời (không nhân đôi nếu sập); lưu không được thì huỷ, hoàn ví
+  if (!(await saveNow(w, sid))) {
+    if (stillHere(w, sid, a.soulKey)) changeCoin(w, sid, SECT_CREATE_COST);
+    return toastFail(w, sid, "error");
+  }
   const res = await svc.create(a, name, tag);
   if (!res.ok) {
     if (stillHere(w, sid, a.soulKey)) changeCoin(w, sid, SECT_CREATE_COST); // hoàn tiền
@@ -454,7 +459,11 @@ export async function sectDeposit(w: World, sid: string, raw: unknown) {
   if (!(await svc.sectOf(a.soulKey))) return toastFail(w, sid, "not_in_sect"); // khỏi trừ rồi hoàn
   if (!stillHere(w, sid, a.soulKey) || !trySpendCoin(w, sid, msg.amount))
     return toastFail(w, sid, "no_coin");
-  await saveNow(w, sid);
+  // Ví đã trừ phải xuống file TRƯỚC khi kho được cộng; lưu không được thì huỷ, hoàn ví (kho chưa đụng tới)
+  if (!(await saveNow(w, sid))) {
+    if (stillHere(w, sid, a.soulKey)) changeCoin(w, sid, msg.amount);
+    return toastFail(w, sid, "error");
+  }
   const res = await svc.deposit(a, msg.amount);
   if (!res.ok) {
     if (stillHere(w, sid, a.soulKey)) changeCoin(w, sid, msg.amount); // hoàn tiền
@@ -477,6 +486,8 @@ export async function sectWithdraw(w: World, sid: string, raw: unknown) {
   if (!a || !c) return;
   if (!msg) return toastFail(w, sid, "amount_invalid");
   if (COIN_CAP - c.coin < msg.amount) return toastFail(w, sid, "wallet_full");
+  // Đang qua cổng: hồ sơ không lưu được lúc này, rút ra sẽ mất (kho đã trừ, ví không xuống đĩa). Thử lại sau.
+  if (c.travelling) return toastFail(w, sid, "error");
   const res = await svc.withdraw(a, msg.amount);
   if (!res.ok) return toastFail(w, sid, res.reason);
   const credited = stillHere(w, sid, a.soulKey) ? changeCoin(w, sid, msg.amount) : 0;

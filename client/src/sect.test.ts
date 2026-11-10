@@ -7,10 +7,33 @@ import {
   formatSectMembersSummary,
   sortSectMembers,
   mergeMemberPresence,
+  sectConfirmText,
   isMockSectEnabled,
   MOCK_SECT_SAMPLES,
 } from "./sect";
 import type { SectMember, SectPresenceMsg, SectLogEntry } from "@tien-gioi/shared";
+
+describe("sectConfirmText (hộp xác nhận trong game, #246)", () => {
+  it("nêu tên người bị tác động và chữ nút đồng ý riêng cho từng hành động", () => {
+    const t = sectConfirmText("transfer", "Lâm Phong");
+    expect(t.text).toContain("Lâm Phong");
+    expect(t.text).toContain("Tông chủ");
+    expect(t.ok).toBe("Nhường vị");
+    const k = sectConfirmText("kick", "Tiểu Vân");
+    expect(k.text).toContain("Tiểu Vân");
+    expect(k.ok).toBe("Trục xuất");
+    const l = sectConfirmText("leave");
+    expect(l.text).toContain("Rời");
+    expect(l.ok).toBe("Rời tông môn");
+  });
+
+  it("ba hành động có câu hỏi khác nhau (không dùng chung một câu chung chung)", () => {
+    const texts = new Set(
+      (["transfer", "kick", "leave"] as const).map((k) => sectConfirmText(k, "A").text),
+    );
+    expect(texts.size).toBe(3);
+  });
+});
 
 describe("client sect pure logic", () => {
   it("formatSectInviteCountdown định dạng đếm ngược giây hợp lý", () => {

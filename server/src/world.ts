@@ -221,8 +221,13 @@ export class World {
    * mọi tin tông môn bị từ chối `disabled`, vào phòng không tra tông môn.
    */
   sectService: SectService | null = null;
-  /** Phòng đăng ký: lưu hồ sơ của một người NGAY và chờ ghi xong (trước khi chuyển Linh thạch sang kho tông môn). Không có hook: bỏ qua. */
-  onSaveNow: ((sid: string) => Promise<void>) | null = null;
+  /**
+   * Phòng đăng ký: lưu hồ sơ của một người NGAY và chờ ghi xong (trước khi chuyển Linh thạch sang kho tông môn).
+   * Trả `true` CHỈ khi hồ sơ đã nằm trên đĩa / DB; `false` khi lưu lỗi hoặc không lưu được lúc này (đang qua cổng: bản ghi
+   * của cổng đã giữ ví cũ). Người gọi gặp `false` phải HUỶ chuyển tiền vào kho (không thì sập là nhân đôi Linh thạch).
+   * Không có hook: coi như đã lưu (bench, test đơn vị không có đĩa).
+   */
+  onSaveNow: ((sid: string) => Promise<boolean>) | null = null;
 
   constructor(
     readonly state: WorldState,
