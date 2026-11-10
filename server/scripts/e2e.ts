@@ -16,7 +16,6 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
-import { defineRooms } from "../src/rooms/WorldRoom.js";
 import { type SavedPlayer } from "../src/store.js";
 import { DEFAULT_MAP_ID, type Soul } from "@tien-gioi/shared";
 
@@ -170,6 +169,9 @@ async function runE2e() {
   const tmpDataDir = mkdtempSync(path.join(os.tmpdir(), "tien-gioi-e2e-data-"));
   const tmpChromeDir = mkdtempSync(path.join(os.tmpdir(), "tien-gioi-e2e-chrome-"));
   process.env.DATA_DIR = tmpDataDir;
+  // `store.ts` đọc DATA_DIR LÚC NẠP MODULE: phải nạp WorldRoom (kéo theo store) SAU khi đặt biến môi trường, nếu không server
+  // ghi vào `server/data/players` thật còn chân linh lại vào thư mục tạm (chia đôi dữ liệu).
+  const { defineRooms } = await import("../src/rooms/WorldRoom.js");
 
   const testName = selectedScenario === "limbo" ? "Do Hoang Tuyen" : "Nguoi Kiem Thu";
   const testSecret = "e2e_secret_token_123456789";
@@ -207,6 +209,12 @@ async function runE2e() {
       { stdio: "ignore" },
     );
 
+    // Không có Chrome (ENOENT) thì `spawn` phát sự kiện `error` bất đồng bộ: không bắt thì cả tiến trình sập, bỏ lại thư mục tạm
+    let chromeSpawnError: Error | null = null;
+    chromeProcess.once("error", (e) => {
+      chromeSpawnError = e;
+    });
+
     // Chờ Chrome CDP sẵn sàng
     let targets: any[] = [];
     const waitChromeStart = Date.now();
@@ -222,6 +230,8 @@ async function runE2e() {
       }
     }
 
+    if (chromeSpawnError)
+      throw new Error(`Không chạy được google-chrome: ${(chromeSpawnError as Error).message}`);
     const pageTarget = targets.find((t) => t.type === "page");
     if (!pageTarget?.webSocketDebuggerUrl) {
       throw new Error("Không thể kết nối Chrome DevTools: page target không phản hồi.");
@@ -417,6 +427,9 @@ async function runE2e() {
       const hudKiep = await ev(
         `document.getElementById('hud-kiep')?.textContent || '(chưa hiển thị)'`,
       );
+      // Hạt giống: kiếp 1 vừa kết thúc, đã cộng Duyên -> kiếp mới là kiếp 2 (HUD phải ghi đúng, không chỉ "có gì đó")
+      if (!/2/.test(hudKiep))
+        throw new Error(`HUD kiếp mới phải ghi kiếp 2, thực tế: "${hudKiep}"`);
       console.log(`  ✓ [5/5] Vào kiếp mới thành công! HUD hiển thị: ${hudKiep}`);
       await screenshot("4-new-life.png");
     } else {
@@ -481,7 +494,8 @@ async function runE2e() {
     }
     await new Promise<void>((resolve) =>
       gameServer
-        .gracefullyShutdown()
+        .gracefullyShutdown(false) // false: không process.exit, giữ process.exitCode = 1 khi thất bại
+
         .catch(() => {})
         .finally(() => resolve()),
     );
