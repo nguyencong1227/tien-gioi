@@ -53,8 +53,6 @@ import {
 } from "@tien-gioi/shared";
 import { WorldState, Player } from "../schema";
 import {
-  loadPlayer,
-  savePlayer,
   hashSecret,
   cleanName,
   mapIdOf,
@@ -64,7 +62,9 @@ import {
   sanitizeOrigin,
   type SavedPlayer,
 } from "../store";
-import { defaultSoulStore, soulIdOf, type SoulStore } from "../soul";
+import { defaultSoulStore, type SoulStore } from "../soul";
+import { defaultPlayerStore, type PlayerStore } from "../player-store";
+import { legacyIdentity, type Identity } from "../identity";
 
 /** Mua mở khóa bị từ chối ngay trong `souls.update` (không ghi gì): mang theo lý do để báo người chơi. */
 class BuyRefused extends Error {
@@ -124,6 +124,7 @@ export class WorldRoom extends Room<WorldState> {
   state = new WorldState();
 
   /** Kho chân linh (file JSON; bước 3 thay bằng PostgreSQL). Test ghi đè để cô lập. */
+  static players: PlayerStore | null = null; // null: `defaultPlayerStore()` (file JSON)
   static souls: SoulStore | null = null; // null: `defaultSoulStore()` (dựng lười, đọc DATA_DIR lúc dùng)
   /** Kênh chung giữa các phòng. Test ghi đè để cô lập. */
   static hub: Hub = defaultHub;
@@ -301,7 +302,8 @@ export class WorldRoom extends Room<WorldState> {
     if (busy) throw new ServerError(409, "Nhân vật này đang ở trong game.");
     for (const g of taken) g.cancel();
     for (const g of taken) await g.done; // đợi lưu xong rồi mới nạp file
-    const existing = await loadPlayer(name);
+    const identity = legacyIdentity(name);
+    const existing = await this.players.load(name);
     if (existing) {
       if (existing.secretHash !== hashSecret(secret))
         throw new ServerError(403, "Tên này đã có người dùng.");
@@ -309,7 +311,7 @@ export class WorldRoom extends Room<WorldState> {
       // chỉ là gợi ý chọn phòng, sai thì báo bản đồ đúng để client vào lại (shared/src/travel.ts).
       const home = mapIdOf(existing);
       if (home !== this.mapId) throw new ServerError(JOIN_WRONG_MAP, wrongMapMessage(home));
-      return { save: existing, soul: await this.soulOf(existing) };
+      return { save: existing, identity, soul: await this.soulOf(existing, identity) };
     }
     // Nhân vật mới luôn bắt đầu ở bản đồ mặc định (không tạo file ở phòng sai)
     if (this.mapId !== DEFAULT_MAP_ID)
@@ -324,26 +326,30 @@ export class WorldRoom extends Room<WorldState> {
       createdAt: now,
       updatedAt: now,
     };
-    await savePlayer(fresh);
-    return { save: fresh, soul: await this.soulOf(fresh) };
+    await this.players.save(fresh);
+    return { save: fresh, identity, soul: await this.soulOf(fresh, identity) };
   }
 
   /**
    * Chân linh của người chơi: có rồi thì nạp, chưa có thì tạo (kiếp 1, 0 Duyên, thành tựu cao nhất = bậc hiện tại).
    * Người chơi có từ trước khi có luân hồi được di chuyển lặng lẽ ở đây, vào game lần đầu.
    */
-  private soulOf(save: SavedPlayer): Promise<Soul> {
+  private soulOf(save: SavedPlayer, identity: Identity): Promise<Soul> {
     const realm = Math.min(save.realm, REALMS.length - 1);
     const tier = Math.min(save.tier, REALMS[realm].tiers.length - 1);
     const store = WorldRoom.souls ?? defaultSoulStore();
-    return store.create(soulIdOf(save.name), (s) => ({
+    return store.create(identity.soulKey, (s) => ({
       ...s,
       best: { step: stepOf(realm, tier), realm, tier },
     }));
   }
 
-  onJoin(client: Client, _options: JoinOptions, auth: { save: SavedPlayer; soul: Soul }) {
-    const { save, soul } = auth;
+  onJoin(
+    client: Client,
+    _options: JoinOptions,
+    auth: { save: SavedPlayer; identity: Identity; soul: Soul },
+  ) {
+    const { save, identity, soul } = auth;
     const p = new Player();
     p.name = save.name;
     p.realm = Math.min(save.realm, REALMS.length - 1);
@@ -362,6 +368,7 @@ export class WorldRoom extends Room<WorldState> {
     this.state.players.set(client.sessionId, p);
     this.world.ctrl.set(client.sessionId, {
       save,
+      identity,
       inputs: [],
       moveBudget: 4,
       posPhase: this.world.ctrl.size % POS_SYNC_EVERY_TICKS,
@@ -503,6 +510,10 @@ export class WorldRoom extends Room<WorldState> {
 
   // ---------------- Luân hồi (docs/THIET_KE_LUAN_HOI.md mục 4) ----------------
 
+  private get players(): PlayerStore {
+    return WorldRoom.players ?? defaultPlayerStore();
+  }
+
   private get souls(): SoulStore {
     return WorldRoom.souls ?? defaultSoulStore();
   }
@@ -542,7 +553,7 @@ export class WorldRoom extends Room<WorldState> {
     const limbo = c?.limbo;
     if (!p || !c || !limbo) return false;
     try {
-      c.soul = await this.souls.update(soulIdOf(p.name), (s) =>
+      c.soul = await this.souls.update(c.identity.soulKey, (s) =>
         creditSoul(s, limbo, new Date().toISOString()),
       );
     } catch (e) {
@@ -561,7 +572,7 @@ export class WorldRoom extends Room<WorldState> {
     if (!p || !c?.limbo?.credited) return;
     try {
       // buyUnlock thuần trong update nguyên tử: trừ Duyên và tăng nấc cùng một lần ghi; hai tin cùng lúc xếp hàng
-      c.soul = await this.souls.update(soulIdOf(p.name), (s) => {
+      c.soul = await this.souls.update(c.identity.soulKey, (s) => {
         const r = buyUnlock(s, id);
         if (!r.ok) throw new BuyRefused(r.reason);
         return r.soul;
@@ -645,7 +656,7 @@ export class WorldRoom extends Room<WorldState> {
       mapId: at?.mapId ?? this.mapId,
       ...(at ? { travelAt: this.world.now } : {}),
     };
-    await savePlayer(c.save);
+    await this.players.save(c.save);
   }
 
   private async saveAll() {

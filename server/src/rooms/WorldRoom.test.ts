@@ -1949,6 +1949,49 @@ describe("chân linh và bộ đếm kiếp (M3 bước 2)", () => {
   });
 });
 
+describe("kho nhân vật thay được (M3 bước 3b): WorldRoom chỉ biết giao diện PlayerStore", () => {
+  it("nhân vật tạo, nạp và lưu đều đi qua kho được tiêm vào; không có tệp nhân vật nào bị ghi vào DATA_DIR", async () => {
+    const memory = new Map<string, any>();
+    const calls: string[] = [];
+    const filesBefore = readdirSync(dataDir).filter((x) => x.endsWith(".json")).length;
+    const key = (n: string) => n.normalize("NFC").toLowerCase();
+    WorldRoomClass.players = {
+      load: async (name) => {
+        calls.push(`load:${key(name)}`);
+        return memory.get(key(name)) ?? null;
+      },
+      save: async (p) => {
+        calls.push(`save:${key(p.name)}`);
+        memory.set(key(p.name), JSON.parse(JSON.stringify(p)));
+      },
+    };
+    try {
+      const name = "Kho Bo Nho";
+      const a = await join(name);
+      expect(memory.get(key(name))).toMatchObject({ name, realm: 0 }); // tạo mới -> ghi vào kho giả
+      await a.room.leave(true); // lưu lúc rời phòng
+      rooms.splice(rooms.indexOf(a.room), 1);
+      await sleep(250);
+      expect(calls.filter((c) => c === `save:${key(name)}`).length).toBeGreaterThanOrEqual(2);
+      // vào lại: nạp từ kho giả (đúng mã), không tạo nhân vật mới
+      const b = await join(name);
+      expect(calls).toContain(`load:${key(name)}`);
+      expect(b.me().name).toBe(name);
+      await b.room.leave(true);
+      rooms.splice(rooms.indexOf(b.room), 1);
+      await sleep(250);
+      // sai mã bí mật bị từ chối dựa trên dữ liệu của kho giả
+      const client = new Client(`ws://localhost:${PORT}`);
+      await expect(
+        client.joinOrCreate(roomNameOf(DEFAULT_MAP_ID), { name, secret: "mot-ma-khac-0123456789" }),
+      ).rejects.toMatchObject({ code: 403 });
+      expect(readdirSync(dataDir).filter((x) => x.endsWith(".json")).length).toBe(filesBefore);
+    } finally {
+      WorldRoomClass.players = null;
+    }
+  });
+});
+
 describe("luân hồi: chết thật, Hoàng Tuyền, đầu thai (M3 bước 2)", () => {
   const sha = (name: string) =>
     createHash("sha1").update(name.normalize("NFC").toLowerCase()).digest("hex");
