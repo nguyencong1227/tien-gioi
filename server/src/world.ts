@@ -34,6 +34,11 @@ export interface PlayerCtrl {
   posPhase: number;
   lastHitAt: number;
   deadAt: number;
+  /**
+   * Đang đi qua cổng: bản ghi ở bản đồ đích đã / đang được ghi, nên `persist` thường (lưu định kỳ, lúc rớt mạng)
+   * không được ghi đè bằng bản đồ cũ, và không nhận thêm `travel`. Gỡ nếu việc đi qua cổng bị huỷ.
+   */
+  travelling?: boolean;
   /** Túi đồ: chỉ chủ túi nhận được qua tin nhắn `inv`, không nằm trong state chung */
   inv: Inventory;
   /** Thời điểm hết hồi chiêu theo itemId */
