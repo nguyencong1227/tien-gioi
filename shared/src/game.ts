@@ -32,7 +32,6 @@ export function meditateExpPerSec(realm: number, tier: number): number {
 }
 
 export const RESPAWN_MS = 5000;
-export const DEATH_EXP_LOSS = 0.1;
 export const BREAK_FAIL_EXP_LOSS = 0.3;
 
 export interface MonsterKind {
