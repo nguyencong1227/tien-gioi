@@ -14,6 +14,9 @@ import { Client, Protocol, type Room } from "colyseus.js";
 import {
   AUTH_API,
   DEFAULT_MAP,
+  DUNGEON_MSG,
+  DUNGEON_OPEN_COOLDOWN_MS,
+  LINH_HU_ID,
   NPC_BY_ID,
   NPC_RANGE,
   PICKUP_RANGE,
@@ -23,12 +26,16 @@ import {
   TICK_MS,
   buyPrice,
   getMap,
+  isDungeonMap,
   roomNameOf,
   sellPrice,
   statsFor,
   TRAVEL_COOLDOWN_MS,
   type AttackMsg,
   type BuyMsg,
+  type DungeonEndMsg,
+  type DungeonInviteMsg,
+  type DungeonStateMsg,
   type GameMap,
   type InputMsg,
   type InvMsg,
@@ -97,6 +104,7 @@ interface CliArgs {
   die: boolean;
   account: boolean;
   loginStorm: boolean;
+  dungeon: boolean;
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -127,6 +135,7 @@ function parseArgs(argv: string[]): CliArgs {
   let die = false;
   let account = false;
   let loginStorm = false;
+  let dungeon = false;
 
   for (const arg of argv) {
     if (arg.startsWith("--bots=")) bots = Math.max(0, Number(arg.slice(7)));
@@ -135,6 +144,7 @@ function parseArgs(argv: string[]): CliArgs {
     else if (arg.startsWith("--map=")) map = arg.slice(6);
     else if (arg === "--travel" || arg === "--portal") travel = true;
     else if (arg === "--die") die = true;
+    else if (arg === "--dungeon") dungeon = true;
     else if (arg.startsWith("--party")) {
       const val = arg.slice(7).replace(/^=/, "");
       partySize = val ? Math.max(2, Math.min(4, Number(val))) : 4;
@@ -180,6 +190,10 @@ function parseArgs(argv: string[]): CliArgs {
     if (flap === 0) flap = 20;
     flapInterval = [1, 2];
     flapDelay = [0.5, 1];
+  }
+
+  if (dungeon && partySize === 0) {
+    partySize = 4;
   }
 
   if (storm && durationSec < 20) {
@@ -228,6 +242,7 @@ function parseArgs(argv: string[]): CliArgs {
     die,
     account,
     loginStorm,
+    dungeon,
   };
 }
 
@@ -661,6 +676,16 @@ interface BotState {
   rebirthLatencies: number[];
   // Trường cho chế độ tài khoản (#176)
   token?: string;
+  // Các trường cho thử tải bí cảnh (--dungeon, #201)
+  dungeon?: boolean;
+  dungeonOpenSentAt: number;
+  dungeonRunsCount: number;
+  dungeonRunsWon: number;
+  dungeonRunsLost: number;
+  dungeonOpenLatencies: number[];
+  dungeonState?: DungeonStateMsg;
+  dungeonLastEndAt: number;
+  nextDungeonOpenAt: number;
 }
 
 export interface LoadTestMetrics {
@@ -756,6 +781,14 @@ export interface LoadTestMetrics {
   rebirthLatencyAvgMs?: number;
   rebirthLatencyP50Ms?: number;
   rebirthLatencyP95Ms?: number;
+  /** Các chỉ số thử tải bí cảnh (#201) */
+  dungeon?: boolean;
+  dungeonRunsTotal?: number;
+  dungeonRunsWon?: number;
+  dungeonRunsLost?: number;
+  dungeonOpenLatencyAvgMs?: number;
+  dungeonOpenLatencyP50Ms?: number;
+  dungeonOpenLatencyP95Ms?: number;
 }
 
 export interface IdleZeroBotMetrics {
@@ -918,6 +951,21 @@ function bindRoomEvents(
   room.onMessage("travelTo", (msg: TravelToMsg) => {
     if (onTravelTo) onTravelTo(msg);
   });
+  room.onMessage(DUNGEON_MSG.invite, (msg: DungeonInviteMsg) => {
+    if (b.dungeon) {
+      room.send(DUNGEON_MSG.enter, { runId: msg.runId });
+    }
+  });
+  room.onMessage(DUNGEON_MSG.state, (msg: DungeonStateMsg) => {
+    b.dungeonState = msg;
+  });
+  room.onMessage(DUNGEON_MSG.end, (msg: DungeonEndMsg) => {
+    b.dungeonLastEndAt = performance.now();
+    if (isMeasuring()) {
+      if (msg.result === "won") b.dungeonRunsWon++;
+      else b.dungeonRunsLost++;
+    }
+  });
   room.onMessage("limbo", (msg: LimboMsg) => {
     if (isMeasuring()) {
       b.deathsCount++;
@@ -1056,6 +1104,7 @@ async function runLoadTest(
   travel = false,
   die = false,
   account = false,
+  dungeon = false,
 ): Promise<LoadTestMetrics> {
   const currentMap = getMap(mapId) ?? DEFAULT_MAP;
   const partySuffix = partySize > 1 ? `, tổ đội ${partySize} người` : "";
@@ -1066,14 +1115,15 @@ async function runLoadTest(
   const travelSuffix = travel ? ", travel qua cổng" : "";
   const dieSuffix = die ? ", bot tự tử (--die)" : "";
   const accountSuffix = account ? ", tài khoản (--account)" : "";
+  const dungeonSuffix = dungeon ? ", bí cảnh (--dungeon)" : "";
   const mapSuffix =
     currentMap.def.id !== DEFAULT_MAP.def.id ? `, bản đồ=${currentMap.def.name}` : "";
   const modeLabel =
     mode === "realistic"
-      ? `Thực tế (vào tầm đứng chém${partySuffix}${shopSuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${mapSuffix})`
+      ? `Thực tế (vào tầm đứng chém${partySuffix}${shopSuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${dungeonSuffix}${mapSuffix})`
       : mode === "crowd"
-        ? `Đông người trong trấn/khu an toàn (${shop ? "25% ghé Dược Sư, 25% đứng, 50% đi" : "30% đứng yên, 70% đi lại"}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${mapSuffix})`
-        : `Xấu nhất (100% di chuyển 20 input/s${partySuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${mapSuffix})`;
+        ? `Đông người trong trấn/khu an toàn (${shop ? "25% ghé Dược Sư, 25% đứng, 50% đi" : "30% đứng yên, 70% đi lại"}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${dungeonSuffix}${mapSuffix})`
+        : `Xấu nhất (100% di chuyển 20 input/s${partySuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${dungeonSuffix}${mapSuffix})`;
   console.log(
     `\n=== Bắt đầu thử tải [${modeLabel}]: ${botCount} bot, đo trong ${durationSec}s (${url}) ===`,
   );
@@ -1136,11 +1186,16 @@ async function runLoadTest(
     const secret = `bot_secret_tien_gioi_${numStr}_loadtest`;
 
     // Khởi tạo vị trí (campX, campY) rải đều khắp vùng hoang dã giống bench.ts trước khi joinOrCreate
-    const realm = rnd() < 0.8 ? 1 : 2;
-    const tier = Math.floor(rnd() * REALMS[realm].tiers.length);
+    const realm = dungeon ? 1 : rnd() < 0.8 ? 1 : 2;
+    const tier = dungeon ? 8 : Math.floor(rnd() * REALMS[realm].tiers.length);
     let campX = 0;
     let campY = 0;
-    if (travel) {
+    if (dungeon) {
+      // Khi thử tải bí cảnh: sinh bot quanh NPC Thủ Môn ở Lạc Hà Trấn
+      const gate = NPC_BY_ID.thu_mon;
+      campX = gate.x + (rnd() - 0.5) * 40;
+      campY = gate.y + (rnd() - 0.5) * 40;
+    } else if (travel) {
       // Khi thử tải qua cổng: sinh bot gần cổng (quanh toạ độ spawn của cổng) để bot đi bộ vào cổng
       const portal = currentMap.portals[0];
       if (portal) {
@@ -1207,8 +1262,8 @@ async function runLoadTest(
         secret,
         campX,
         campY,
-        die ? 1 : realm,
-        die ? 8 : tier,
+        dungeon ? 1 : die ? 1 : realm,
+        dungeon ? 8 : die ? 8 : tier,
         currentMap.def.id,
         lifeSeed,
       );
@@ -1231,8 +1286,14 @@ async function runLoadTest(
               name: bot.name,
               secret: `bot_secret_tien_gioi_${String(bot.index).padStart(3, "0")}_loadtest`,
             };
-        const nextRoom = await targetClient.joinOrCreate(roomNameOf(nextMap.def.id), nextOpts);
+        let nextRoom: Room;
+        if (msg.roomId) {
+          nextRoom = await targetClient.joinById(msg.roomId, nextOpts);
+        } else {
+          nextRoom = await targetClient.joinOrCreate(roomNameOf(nextMap.def.id), nextOpts);
+        }
         bot.map = nextMap;
+        bot.hasPos = false;
         bindRoomEvents(
           bot,
           nextRoom,
@@ -1240,11 +1301,17 @@ async function runLoadTest(
           patchIntervals,
           ackRtts,
           (tRecv, bytes) => {
-            const lat = tRecv - bot.travelSentAt;
-            if (measuring) {
-              bot.travelLatencies.push(lat);
-              bot.travelInitialBytes.push(bytes);
-              bot.travelCount++;
+            if (msg.roomId) {
+              const lat = tRecv - bot.dungeonOpenSentAt;
+              if (measuring && lat > 0) bot.dungeonOpenLatencies.push(lat);
+            } else {
+              const lat = tRecv - bot.travelSentAt;
+              if (measuring) {
+                bot.travelLatencies.push(lat);
+                bot.travelInitialBytes.push(bytes);
+                bot.travelCount++;
+              }
+              bot.nextDungeonOpenAt = performance.now() + DUNGEON_OPEN_COOLDOWN_MS + 1000;
             }
             bot.isTravelling = false;
             bot.nextTravelAt = performance.now() + TRAVEL_COOLDOWN_MS + 2000 + Math.random() * 2000;
@@ -1315,6 +1382,14 @@ async function runLoadTest(
       limboLatencies: [],
       rebirthLatencies: [],
       token: botToken,
+      dungeon,
+      dungeonOpenSentAt: 0,
+      dungeonRunsCount: 0,
+      dungeonRunsWon: 0,
+      dungeonRunsLost: 0,
+      dungeonOpenLatencies: [],
+      dungeonLastEndAt: 0,
+      nextDungeonOpenAt: now + 1500 + Math.random() * 2000,
     };
 
     bindRoomEvents(
@@ -1399,6 +1474,99 @@ async function runLoadTest(
         const a = Math.atan2(b.predY - b.map.townPx.y, b.predX - b.map.townPx.x);
         dx = Math.cos(a);
         dy = Math.sin(a);
+      }
+    } else if (dungeon) {
+      // Kịch bản thử tải bí cảnh (--dungeon, #201)
+      const inDungeon = isDungeonMap(b.map.def.id);
+      if (inDungeon) {
+        // Đang trong phòng bí cảnh:
+        if (b.dungeonLastEndAt > 0 && now - b.dungeonLastEndAt > 2000) {
+          // Run đã kết thúc: rời bí cảnh về Lạc Hà
+          b.room.send(DUNGEON_MSG.leave, {});
+          b.dungeonLastEndAt = 0;
+          dx = 0;
+          dy = 0;
+        } else {
+          // Tìm trùm tại hang trùm lairPx hoặc quái gần nhất
+          const lair = b.map.lairPx ?? { x: 32 * 32 + 16, y: 9 * 32 + 16, r: 60 };
+          let targetMon: any = null;
+          let bestDist = Number.POSITIVE_INFINITY;
+          if (state?.monsters && typeof state.monsters.forEach === "function") {
+            state.monsters.forEach((m: any) => {
+              if (!m || m.hp <= 0) return;
+              const d = Math.hypot(m.x - b.predX, m.y - b.predY);
+              if (d < bestDist) {
+                bestDist = d;
+                targetMon = m;
+              }
+            });
+          }
+
+          if (targetMon) {
+            const dist = Math.hypot(targetMon.x - b.predX, targetMon.y - b.predY);
+            const angle = Math.atan2(targetMon.y - b.predY, targetMon.x - b.predX);
+            if (dist > SKILLS.slash.range) {
+              dx = Math.cos(angle);
+              dy = Math.sin(angle);
+            } else {
+              dx = 0;
+              dy = 0;
+            }
+            if (dist <= SKILLS.slash.range && now >= b.nextSlashAt) {
+              b.room.send("attack", { angle });
+              b.nextSlashAt = now + SKILLS.slash.cooldown + 60;
+              if (measuring) attacksSent++;
+            }
+            if (dist <= SKILLS.sword.range && me.mp >= SKILLS.sword.mp && now >= b.nextSwordAt) {
+              b.room.send("skill", { id: "sword", angle });
+              b.nextSwordAt = now + SKILLS.sword.cooldown + 100;
+              if (measuring) skillsSent++;
+            }
+          } else {
+            // Chưa thấy quái: đi về phía hang trùm
+            const distToLair = Math.hypot(lair.x - b.predX, lair.y - b.predY);
+            if (distToLair > lair.r - 20) {
+              const a = Math.atan2(lair.y - b.predY, lair.x - b.predX);
+              dx = Math.cos(a);
+              dy = Math.sin(a);
+            } else {
+              dx = 0;
+              dy = 0;
+            }
+          }
+        }
+      } else {
+        // Đang ở Lạc Hà Trấn:
+        const gate = NPC_BY_ID.thu_mon;
+        const isLeader = b.myParty ? b.myParty.leader === b.name : (b.index - 1) % partySize === 0;
+        const distToGate = Math.hypot(gate.x - b.predX, gate.y - b.predY);
+
+        if (isLeader) {
+          if (distToGate > 50) {
+            const a = Math.atan2(gate.y - b.predY, gate.x - b.predX);
+            dx = Math.cos(a);
+            dy = Math.sin(a);
+          } else {
+            dx = 0;
+            dy = 0;
+            if (now >= b.nextDungeonOpenAt) {
+              b.dungeonOpenSentAt = performance.now();
+              b.room.send(DUNGEON_MSG.open, { dungeonId: LINH_HU_ID });
+              b.nextDungeonOpenAt = now + DUNGEON_OPEN_COOLDOWN_MS + 2000;
+              if (measuring) b.dungeonRunsCount++;
+            }
+          }
+        } else {
+          // Thành viên: đứng quanh Thủ Môn chờ lời mời
+          if (distToGate > 80) {
+            const a = Math.atan2(gate.y - b.predY, gate.x - b.predX);
+            dx = Math.cos(a);
+            dy = Math.sin(a);
+          } else {
+            dx = 0;
+            dy = 0;
+          }
+        }
       }
     } else {
       if (
@@ -2073,6 +2241,24 @@ async function runLoadTest(
       ? Number(percentile(allRebirthLatencies, 95).toFixed(2))
       : undefined;
 
+  const allDungeonOpenLatencies = bots.flatMap((b) => b.dungeonOpenLatencies).sort((a, b) => a - b);
+  const totalDungeonRuns = bots.reduce((s, b) => s + b.dungeonRunsCount, 0);
+  const totalDungeonWins = bots.reduce((s, b) => s + b.dungeonRunsWon, 0);
+  const totalDungeonLosses = bots.reduce((s, b) => s + b.dungeonRunsLost, 0);
+
+  const dungeonOpenLatencyAvgMs =
+    allDungeonOpenLatencies.length > 0
+      ? Number(avg(allDungeonOpenLatencies).toFixed(2))
+      : undefined;
+  const dungeonOpenLatencyP50Ms =
+    allDungeonOpenLatencies.length > 0
+      ? Number(percentile(allDungeonOpenLatencies, 50).toFixed(2))
+      : undefined;
+  const dungeonOpenLatencyP95Ms =
+    allDungeonOpenLatencies.length > 0
+      ? Number(percentile(allDungeonOpenLatencies, 95).toFixed(2))
+      : undefined;
+
   const metrics: LoadTestMetrics = {
     commit,
     note,
@@ -2167,6 +2353,13 @@ async function runLoadTest(
     rebirthLatencyAvgMs,
     rebirthLatencyP50Ms,
     rebirthLatencyP95Ms,
+    dungeon: dungeon ? true : undefined,
+    dungeonRunsTotal: dungeon || totalDungeonRuns > 0 ? totalDungeonRuns : undefined,
+    dungeonRunsWon: dungeon || totalDungeonWins > 0 ? totalDungeonWins : undefined,
+    dungeonRunsLost: dungeon || totalDungeonLosses > 0 ? totalDungeonLosses : undefined,
+    dungeonOpenLatencyAvgMs,
+    dungeonOpenLatencyP50Ms,
+    dungeonOpenLatencyP95Ms,
   };
 
   printMetrics(metrics);
@@ -2260,6 +2453,11 @@ function printMetrics(m: LoadTestMetrics) {
         : "";
     console.log(
       `- Thử tải luân hồi (--die): chết ${m.deathsTotal ?? 0} lần | đầu thai ${m.rebirthsTotal ?? 0} lần | mua Tam Sinh Thạch ${m.soulBuysTotal ?? 0} lần${latStr}`,
+    );
+  }
+  if (m.dungeon || (m.dungeonRunsTotal !== undefined && m.dungeonRunsTotal > 0)) {
+    console.log(
+      `- Thử tải Bí cảnh (--dungeon): ${m.dungeonRunsTotal ?? 0} lần mở run | Thắng: ${m.dungeonRunsWon ?? 0} | Thua: ${m.dungeonRunsLost ?? 0} | Độ trễ mở -> vào phòng: TB ${m.dungeonOpenLatencyAvgMs ?? "–"} ms (p50: ${m.dungeonOpenLatencyP50Ms ?? "–"} ms, p95: ${m.dungeonOpenLatencyP95Ms ?? "–"} ms)`,
     );
   }
 }
@@ -2545,6 +2743,7 @@ async function main() {
           args.travel,
           args.die,
           args.account,
+          args.dungeon,
         ),
       );
     }
