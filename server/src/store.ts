@@ -1,6 +1,6 @@
 // Lưu nhân vật bằng file JSON (bản thử). M4 sẽ thay bằng PostgreSQL.
 import { promises as fs } from "node:fs";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
 import {
   DEFAULT_MAP_ID,
@@ -33,10 +33,45 @@ export interface SavedPlayer {
    * id không còn trong `MAPS` cũng vậy (đọc bằng `mapIdOf`, không tin giá trị trong file).
    */
   mapId?: string;
+  /** Định danh kiếp (chống cộng Duyên hai lần, xem docs/THIET_KE_LUAN_HOI.md mục 4); file cũ không có thì sinh khi vào game */
+  lifeId?: string;
+  /** Bộ đếm thành tựu của kiếp này (dùng tính Duyên); file cũ không có thì bắt đầu từ 0 */
+  life?: LifeCounters;
   /** Lần đi qua cổng gần nhất (ms, `Date.now()`): hồi chiêu `TRAVEL_COOLDOWN_MS` tính qua cả các phòng */
   travelAt?: number;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Bộ đếm thành tựu của kiếp hiện tại (dữ liệu riêng của server, không vào state chung). */
+export interface LifeCounters {
+  /** Thời gian chơi thật (ms): nhân vật ở trong game, không tính hồn lìa xác / Hoàng Tuyền */
+  playMs: number;
+  /** Số quái đã hạ (góp sát thương hoặc cùng đội, như tiến độ nhiệm vụ) */
+  kills: number;
+  /** Trong đó số trùm */
+  bossKills: number;
+}
+
+const LIFE_CAP = 1_000_000_000_000; // ~31 năm tính bằng ms; số lượng quái không bao giờ tới mức này
+
+/** Đọc bộ đếm từ file lưu: không tin giá trị trong file (kiểu sai, âm, NaN, vô cùng, số lẻ đều về số nguyên hợp lệ). */
+export function sanitizeLife(raw: unknown): LifeCounters {
+  const r = raw !== null && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const n = (v: unknown) =>
+    typeof v === "number" && Number.isFinite(v)
+      ? Math.min(LIFE_CAP, Math.max(0, Math.floor(v)))
+      : 0;
+  const kills = n(r.kills);
+  return { playMs: n(r.playMs), kills, bossKills: Math.min(kills, n(r.bossKills)) };
+}
+
+/** Định danh kiếp mới. */
+export const newLifeId = () => randomUUID();
+
+/** Đọc `lifeId` từ file lưu: không phải chuỗi hợp lý (8-64 ký tự, không ký tự điều khiển) thì sinh mã mới. */
+export function sanitizeLifeId(raw: unknown): string {
+  return typeof raw === "string" && /^[\x21-\x7e]{8,64}$/.test(raw) ? raw : newLifeId();
 }
 
 export interface QuestSave {

@@ -17,7 +17,8 @@ import type {
   PartyInvitedMsg,
 } from "@tien-gioi/shared";
 import type { WorldState, Player } from "./schema";
-import type { SavedPlayer, QuestSave } from "./store";
+import type { SavedPlayer, QuestSave, LifeCounters } from "./store";
+import type { Soul } from "@tien-gioi/shared";
 import { Interest } from "./systems/interest";
 import { Hub } from "./hub";
 
@@ -45,6 +46,11 @@ export interface PlayerCtrl {
   itemCd: Map<string, number>;
   /** Sổ nhiệm vụ: chỉ gửi cho chủ qua tin nhắn `quests` */
   quests: QuestSave;
+  /** Định danh kiếp hiện tại và bộ đếm thành tựu của kiếp (lưu cùng nhân vật; không vào state chung) */
+  lifeId: string;
+  life: LifeCounters;
+  /** Ảnh chụp chân linh lúc vào game (nấc mở khóa dùng ở đường nóng: `expMultOf`...); cập nhật khi mua ở Hoàng Tuyền */
+  soul: Soul;
   /** Linh thạch: số nguyên 0..COIN_CAP, chỉ gửi cho chủ qua tin nhắn `wallet`; chỉ đổi bằng systems/wallet.ts */
   coin: number;
   /**

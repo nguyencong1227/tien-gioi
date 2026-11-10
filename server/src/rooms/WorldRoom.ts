@@ -41,9 +41,21 @@ import {
   type TravelMsg,
   type TravelToMsg,
   type GameMap,
+  type Soul,
+  stepOf,
 } from "@tien-gioi/shared";
 import { WorldState, Player } from "../schema";
-import { loadPlayer, savePlayer, hashSecret, cleanName, mapIdOf, type SavedPlayer } from "../store";
+import {
+  loadPlayer,
+  savePlayer,
+  hashSecret,
+  cleanName,
+  mapIdOf,
+  sanitizeLife,
+  sanitizeLifeId,
+  type SavedPlayer,
+} from "../store";
+import { defaultSoulStore, soulIdOf, type SoulStore } from "../soul";
 import { World, type PlayerCtrl } from "../world";
 import { POS_SYNC_EVERY_TICKS, queueInput, safeSpot, syncPublicPos } from "../systems/movement";
 import { slash, swordQi } from "../systems/combat";
@@ -94,6 +106,8 @@ export class WorldRoom extends Room<WorldState> {
   autoDispose = false; // thế giới luôn sống, kể cả khi không có ai
   state = new WorldState();
 
+  /** Kho chân linh (file JSON; bước 3 thay bằng PostgreSQL). Test ghi đè để cô lập. */
+  static souls: SoulStore | null = null; // null: `defaultSoulStore()` (dựng lười, đọc DATA_DIR lúc dùng)
   /** Kênh chung giữa các phòng. Test ghi đè để cô lập. */
   static hub: Hub = defaultHub;
   private get hub() {
@@ -269,7 +283,7 @@ export class WorldRoom extends Room<WorldState> {
       // chỉ là gợi ý chọn phòng, sai thì báo bản đồ đúng để client vào lại (shared/src/travel.ts).
       const home = mapIdOf(existing);
       if (home !== this.mapId) throw new ServerError(JOIN_WRONG_MAP, wrongMapMessage(home));
-      return existing;
+      return { save: existing, soul: await this.soulOf(existing) };
     }
     // Nhân vật mới luôn bắt đầu ở bản đồ mặc định (không tạo file ở phòng sai)
     if (this.mapId !== DEFAULT_MAP_ID)
@@ -285,10 +299,25 @@ export class WorldRoom extends Room<WorldState> {
       updatedAt: now,
     };
     await savePlayer(fresh);
-    return fresh;
+    return { save: fresh, soul: await this.soulOf(fresh) };
   }
 
-  onJoin(client: Client, _options: JoinOptions, save: SavedPlayer) {
+  /**
+   * Chân linh của người chơi: có rồi thì nạp, chưa có thì tạo (kiếp 1, 0 Duyên, thành tựu cao nhất = bậc hiện tại).
+   * Người chơi có từ trước khi có luân hồi được di chuyển lặng lẽ ở đây, vào game lần đầu.
+   */
+  private soulOf(save: SavedPlayer): Promise<Soul> {
+    const realm = Math.min(save.realm, REALMS.length - 1);
+    const tier = Math.min(save.tier, REALMS[realm].tiers.length - 1);
+    const store = WorldRoom.souls ?? defaultSoulStore();
+    return store.create(soulIdOf(save.name), (s) => ({
+      ...s,
+      best: { step: stepOf(realm, tier), realm, tier },
+    }));
+  }
+
+  onJoin(client: Client, _options: JoinOptions, auth: { save: SavedPlayer; soul: Soul }) {
+    const { save, soul } = auth;
     const p = new Player();
     p.name = save.name;
     p.realm = Math.min(save.realm, REALMS.length - 1);
@@ -315,6 +344,9 @@ export class WorldRoom extends Room<WorldState> {
       inv: sanitizeInventory(save.inventory),
       itemCd: new Map(),
       quests: sanitizeQuests(save.quests),
+      lifeId: sanitizeLifeId(save.lifeId),
+      life: sanitizeLife(save.life),
+      soul,
       coin: addCoin(0, save.coin ?? 0),
       frac: { hp: 0, mp: 0, exp: 0, expAt: 0 },
     });
@@ -459,6 +491,8 @@ export class WorldRoom extends Room<WorldState> {
       quests: c.quests,
       equipment: equipmentOf(p),
       coin: c.coin,
+      lifeId: c.lifeId,
+      life: { ...c.life, playMs: Math.floor(c.life.playMs) },
       mapId: at?.mapId ?? this.mapId,
       ...(at ? { travelAt: this.world.now } : {}),
     };
