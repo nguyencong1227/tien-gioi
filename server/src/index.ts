@@ -7,6 +7,7 @@ import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { defineRooms } from "./rooms/WorldRoom";
 import { startupWarnings } from "./startup";
+import { mountAuth } from "./auth-http";
 
 // Đọc .env.local ở gốc repo (cổng riêng cho từng dev). Không có file thì dùng mặc định.
 const envFile = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../.env.local");
@@ -16,7 +17,10 @@ for (const w of startupWarnings(process.env)) console.warn(`[CẢNH BÁO] ${w}`)
 
 const PORT = Number(process.env.PORT ?? 2567);
 const app = express();
-app.get("/health", (_req, res) => res.json({ ok: true }));
+// /health (kèm authMode) và, khi AUTH_MODE=account, API tài khoản /api/auth/*: gắn TRƯỚC trang tĩnh bên dưới
+const { auth } = mountAuth(app, { env: process.env });
+// Dọn phiên hết hạn mỗi giờ (unref: không giữ tiến trình sống)
+if (auth) setInterval(() => void auth.sweep().catch(() => {}), 3_600_000).unref();
 
 // Production: phục vụ luôn bản build của client (client/dist) từ cùng server
 const dist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../client/dist");

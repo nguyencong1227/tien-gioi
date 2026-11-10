@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import { startupWarnings } from "./startup";
 
 describe("startupWarnings", () => {
-  it("production: không cảnh báo", () => {
-    expect(startupWarnings({ NODE_ENV: "production" })).toEqual([]);
+  it("production, tài khoản và TRUST_PROXY đã đặt: không cảnh báo", () => {
+    expect(
+      startupWarnings({ NODE_ENV: "production", AUTH_MODE: "account", TRUST_PROXY: "1" }),
+    ).toEqual([]);
   });
 
   it("không đặt NODE_ENV hoặc đặt khác chữ production: cảnh báo lệnh /give", () => {
