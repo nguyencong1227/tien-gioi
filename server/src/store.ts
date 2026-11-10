@@ -33,6 +33,8 @@ export interface SavedPlayer {
    * id không còn trong `MAPS` cũng vậy (đọc bằng `mapIdOf`, không tin giá trị trong file).
    */
   mapId?: string;
+  /** Lần đi qua cổng gần nhất (ms, `Date.now()`): hồi chiêu `TRAVEL_COOLDOWN_MS` tính qua cả các phòng */
+  travelAt?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -65,12 +67,30 @@ export async function loadPlayer(name: string): Promise<SavedPlayer | null> {
   }
 }
 
-export async function savePlayer(p: SavedPlayer): Promise<void> {
-  await fs.mkdir(DIR, { recursive: true });
+/** Hàng đợi ghi theo từng file: các lần lưu cùng một nhân vật chạy lần lượt, đúng thứ tự gọi. */
+const writing = new Map<string, Promise<void>>();
+
+/**
+ * Lưu nhân vật (ghi tệp tạm rồi `rename`). Các lần lưu cùng một nhân vật được xếp hàng: lưu định kỳ, lưu lúc rớt mạng
+ * và lưu lúc đi qua cổng có thể chồng nhau; nếu cùng ghi một tệp tạm thì lần `rename` thứ hai hỏng (ENOENT) hoặc bản
+ * cũ ghi đè bản mới. Xếp hàng thì bản gọi sau luôn là bản cuối cùng trong file. Một lần lỗi không chặn các lần sau.
+ */
+export function savePlayer(p: SavedPlayer): Promise<void> {
   const file = fileFor(p.name);
-  const tmp = `${file}.tmp`;
-  await fs.writeFile(tmp, JSON.stringify({ ...p, updatedAt: new Date().toISOString() }, null, 1));
-  await fs.rename(tmp, file);
+  const run = async () => {
+    await fs.mkdir(DIR, { recursive: true });
+    const tmp = `${file}.tmp`;
+    await fs.writeFile(tmp, JSON.stringify({ ...p, updatedAt: new Date().toISOString() }, null, 1));
+    await fs.rename(tmp, file);
+  };
+  const prev = writing.get(file) ?? Promise.resolve();
+  const next = prev.then(run, run);
+  writing.set(file, next);
+  const done = () => {
+    if (writing.get(file) === next) writing.delete(file);
+  };
+  next.then(done, done);
+  return next;
 }
 
 /** Tên 2–16 ký tự: chữ (có dấu), số, khoảng trắng đơn. */
