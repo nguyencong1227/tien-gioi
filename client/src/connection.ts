@@ -75,6 +75,7 @@ export async function joinWithRedirect<R>(
     currentMapId = DEFAULT_MAP_ID;
   }
   let redirectCount = 0;
+  let badMapRetried = false;
 
   while (redirectCount <= maxRedirects) {
     try {
@@ -98,7 +99,19 @@ export async function joinWithRedirect<R>(
         continue;
       }
 
-      // 2. Các lỗi khác (400, 403, 409, mất mạng...) ném lỗi ra ngoài
+      // 2. Lớp phòng thủ thứ hai: nếu phòng chưa được định nghĩa (Colyseus MATCHMAKE_NO_HANDLER = 4210)
+      const isNoHandler =
+        err?.code === 4210 ||
+        (typeof err?.message === "string" && /not defined|MATCHMAKE_NO_HANDLER/i.test(err.message));
+      if (isNoHandler && currentMapId !== DEFAULT_MAP_ID && !badMapRetried) {
+        clearSavedMap(storage, name);
+        currentMapId = DEFAULT_MAP_ID;
+        badMapRetried = true;
+        redirectCount++;
+        continue;
+      }
+
+      // 3. Các lỗi khác (400, 403, 409, mất mạng...) ném lỗi ra ngoài
       throw err;
     }
   }
