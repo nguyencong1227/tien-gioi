@@ -17,6 +17,7 @@
     "e2e:pk": "tsx scripts/e2e-pk.ts",
     "e2e:tong-mon": "tsx scripts/e2e-tong-mon.ts",
     "e2e:bi-canh-nga": "tsx scripts/e2e-bi-canh-nga.ts",
+    "e2e:phien-ban": "tsx scripts/e2e-phien-ban.ts",
     "tai-khoan": "tsx scripts/tai-khoan.ts",
     "chuyen-du-lieu": "tsx scripts/chuyen-du-lieu.ts"
   },
