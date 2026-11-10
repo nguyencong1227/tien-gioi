@@ -36,7 +36,7 @@ MMORPG 2D tu tiên, chiến đấu thời gian thực, chơi trên web và app (
 | Đả tọa | L | Ngồi tu luyện: hồi khí huyết/linh lực, tăng tu vi chậm, di chuyển thì dừng |
 | Đột phá | B | Thử đột phá cảnh giới lớn |
 
-- **Chết = luân hồi** (quyết định 10/11/2026, thay luật cũ "hồi sinh ở trấn sau 5 giây, mất 10% tu vi"): xem mục "Luân hồi". Luật cũ vẫn là hành vi của mã nguồn **cho tới khi bước 2 của M3 xong**.
+- **Chết = luân hồi** (quyết định 10/11/2026, thay luật cũ "hồi sinh ở trấn sau 5 giây, mất 10% tu vi"): xem mục "Luân hồi". Đã vào mã nguồn từ #162: chết do quái đưa nhân vật vào Hoàng Tuyền (màn hình phía client: #150, đang làm). Nhánh hồi sinh cũ chỉ còn cho chết không mất kiếp (PK, bước 5 của M3) và cho bench / test đơn vị.
 
 ## Luân hồi
 Tham khảo cơ chế của thể loại (chỉ lấy ý tưởng, mọi tên gọi, con số và chữ đều tự đặt cho Tiên Giới).
@@ -58,7 +58,7 @@ Tham khảo cơ chế của thể loại (chỉ lấy ý tưởng, mọi tên g�
 ## Lộ trình
 1. **M1 (bản này):** vào game bằng tên, một bản đồ, thấy nhau di chuyển, chat, đánh quái thời gian thực, tu vi/cảnh giới, lưu nhân vật.
 2. **M2:** túi đồ, rơi đồ, đan dược, NPC và nhiệm vụ, asset thật.
-3. **M3** (thứ tự chốt ngày 10/11/2026; chi tiết và người làm: `docs/PHAN_CONG_M3.md`). Đã xong: tổ đội, tiền tệ, cửa hàng, nối lại khi rớt mạng, bản đồ là tham số. Còn lại, theo thứ tự:
+3. **M3** (thứ tự chốt ngày 10/11/2026; chi tiết và người làm: `docs/PHAN_CONG_M3.md`). Đã xong: tổ đội, tiền tệ, cửa hàng, nối lại khi rớt mạng, bản đồ là tham số; phía server đã xong cả bản đồ thứ hai (trừ nội dung quái riêng của Hắc Phong Cốc) và luân hồi (chân linh, Hoàng Tuyền, đầu thai). Còn lại, theo thứ tự:
    1. Bản đồ thứ hai (phương án A: mỗi bản đồ một phòng Colyseus).
    2. Luân hồi bản đầu (linh hồn lưu file, điểm luân hồi, bảng mở khóa).
    3. Tài khoản thật + PostgreSQL, để lưu linh hồn tách khỏi nhân vật.
