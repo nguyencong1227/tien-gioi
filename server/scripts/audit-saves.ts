@@ -186,7 +186,7 @@ export function auditPlayerSaveData(rawText: string, byteLength: number): AuditE
     if (!m) {
       errors.push({
         code: "invalid_map_id",
-        message: `Mã bản đồ "${show(data.mapId)}" không tồn tại trong MAPS (server sẽ đưa về lac_ha)`,
+        message: `Mã bản đồ "${show(data.mapId)}" không tồn tại trong MAPS`,
       });
     } else {
       targetMap = m;
