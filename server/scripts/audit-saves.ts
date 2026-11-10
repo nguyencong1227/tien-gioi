@@ -17,9 +17,16 @@ import {
   QUEST_BY_ID,
   REALMS,
   getMap,
+  UNLOCK_BY_ID,
+  originOf,
+  stepOf,
+  DUYEN_CAP,
+  KIEP_CAP,
 } from "@tien-gioi/shared";
 import { cleanName } from "../src/store.js";
 import { byId } from "../src/systems/lookup.js";
+import { soulIdOf } from "../src/soul.js";
+import { createHash } from "node:crypto";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
@@ -44,6 +51,10 @@ export interface AuditReport {
   totalFiles: number;
   cleanFiles: number;
   errorFiles: number;
+  /** Thống kê chân linh (souls/) (#151) */
+  totalSouls?: number;
+  cleanSouls?: number;
+  errorSouls?: number;
   errorsByCode: Record<string, number>;
   failedFiles: AuditFileResult[];
 }
@@ -420,6 +431,425 @@ export function auditPlayerSaveData(rawText: string, byteLength: number): AuditE
     }
   }
 
+  // 11. Luân hồi & Kiếp (#151): lifeId, life, origin, limbo
+  if (data.lifeId !== undefined) {
+    if (typeof data.lifeId !== "string" || !/^[\x21-\x7e]{8,64}$/.test(data.lifeId)) {
+      errors.push({
+        code: "invalid_life_id",
+        message: "lifeId phải là chuỗi ASCII 8–64 ký tự hợp lệ",
+      });
+    }
+  }
+
+  if (data.life !== undefined) {
+    if (typeof data.life !== "object" || data.life === null || Array.isArray(data.life)) {
+      errors.push({
+        code: "invalid_life_counters",
+        message: "life phải là một JSON Object chứa các bộ đếm kiếp",
+      });
+    } else {
+      const { playMs, kills, bossKills } = data.life;
+      if (typeof playMs !== "number" || !Number.isFinite(playMs) || playMs < 0) {
+        errors.push({
+          code: "invalid_life_play_ms",
+          message: `life.playMs (${show(playMs)}) phải là số hữu hạn không âm`,
+        });
+      }
+      if (typeof kills !== "number" || !Number.isInteger(kills) || kills < 0) {
+        errors.push({
+          code: "invalid_life_kills",
+          message: `life.kills (${show(kills)}) phải là số nguyên không âm`,
+        });
+      }
+      if (typeof bossKills !== "number" || !Number.isInteger(bossKills) || bossKills < 0) {
+        errors.push({
+          code: "invalid_life_boss_kills",
+          message: `life.bossKills (${show(bossKills)}) phải là số nguyên không âm`,
+        });
+      } else if (typeof kills === "number" && Number.isInteger(kills) && bossKills > kills) {
+        errors.push({
+          code: "invalid_life_boss_kills",
+          message: `life.bossKills (${show(bossKills)}) không được vượt quá tổng số quái kills (${show(kills)})`,
+        });
+      }
+    }
+  }
+
+  if (data.origin !== undefined) {
+    if (typeof data.origin !== "string" || !originOf(data.origin)) {
+      errors.push({
+        code: "unknown_origin_id",
+        message: `Xuất thân ${show(data.origin)} không tồn tại trong ORIGINS`,
+      });
+    }
+  }
+
+  if (data.limbo !== undefined) {
+    if (typeof data.limbo !== "object" || data.limbo === null || Array.isArray(data.limbo)) {
+      errors.push({
+        code: "invalid_limbo",
+        message: "limbo phải là một JSON Object",
+      });
+    } else {
+      const { endedLifeId, summary, keepable, coinAtDeath, counts, credited } = data.limbo;
+      if (typeof endedLifeId !== "string" || !/^[\x21-\x7e]{8,64}$/.test(endedLifeId)) {
+        errors.push({
+          code: "invalid_limbo_life_id",
+          message: "limbo.endedLifeId phải là chuỗi ASCII 8–64 ký tự hợp lệ",
+        });
+      }
+      if (typeof summary !== "object" || summary === null || Array.isArray(summary)) {
+        errors.push({
+          code: "invalid_limbo_summary",
+          message: "limbo.summary phải là một JSON Object",
+        });
+      } else {
+        if (!Number.isInteger(summary.kiep) || summary.kiep < 1) {
+          errors.push({
+            code: "invalid_limbo_summary_kiep",
+            message: `limbo.summary.kiep (${show(summary.kiep)}) phải là số nguyên >= 1`,
+          });
+        }
+        if (
+          !Number.isInteger(summary.realm) ||
+          summary.realm < 0 ||
+          summary.realm >= REALMS.length
+        ) {
+          errors.push({
+            code: "invalid_limbo_summary_realm",
+            message: `limbo.summary.realm (${show(summary.realm)}) không hợp lệ`,
+          });
+        }
+        if (
+          !Number.isInteger(summary.tier) ||
+          summary.tier < 0 ||
+          (summary.realm >= 0 &&
+            summary.realm < REALMS.length &&
+            summary.tier >= REALMS[summary.realm].tiers.length)
+        ) {
+          errors.push({
+            code: "invalid_limbo_summary_tier",
+            message: `limbo.summary.tier (${show(summary.tier)}) không hợp lệ`,
+          });
+        }
+        if (
+          typeof summary.minutes !== "number" ||
+          !Number.isFinite(summary.minutes) ||
+          summary.minutes < 0
+        ) {
+          errors.push({
+            code: "invalid_limbo_summary_minutes",
+            message: `limbo.summary.minutes (${show(summary.minutes)}) phải là số hữu hạn không âm`,
+          });
+        }
+        if (!Number.isInteger(summary.kills) || summary.kills < 0) {
+          errors.push({
+            code: "invalid_limbo_summary_kills",
+            message: `limbo.summary.kills (${show(summary.kills)}) phải là số nguyên không âm`,
+          });
+        }
+        if (
+          !Number.isInteger(summary.bossKills) ||
+          summary.bossKills < 0 ||
+          (Number.isInteger(summary.kills) && summary.bossKills > summary.kills)
+        ) {
+          errors.push({
+            code: "invalid_limbo_summary_boss_kills",
+            message: `limbo.summary.bossKills (${show(summary.bossKills)}) không hợp lệ`,
+          });
+        }
+        if (!Number.isInteger(summary.gain) || summary.gain < 0) {
+          errors.push({
+            code: "invalid_limbo_summary_gain",
+            message: `limbo.summary.gain (${show(summary.gain)}) phải là số nguyên không âm`,
+          });
+        }
+      }
+
+      if (!Array.isArray(keepable)) {
+        errors.push({
+          code: "invalid_limbo_keepable",
+          message: "limbo.keepable phải là mảng itemId trang bị",
+        });
+      } else {
+        for (const itemId of keepable) {
+          const itemDef = byId(ITEM_BY_ID, itemId);
+          if (!itemDef || itemDef.type !== "equip") {
+            errors.push({
+              code: "invalid_limbo_keepable_item",
+              message: `limbo.keepable chứa vật phẩm không phải trang bị: ${show(itemId)}`,
+            });
+          }
+        }
+      }
+
+      if (coinAtDeath !== undefined) {
+        if (!Number.isInteger(coinAtDeath) || coinAtDeath < 0 || coinAtDeath > COIN_CAP) {
+          errors.push({
+            code: "coin_out_of_range",
+            message: `limbo.coinAtDeath (${show(coinAtDeath)}) phải là số nguyên [0, ${COIN_CAP}]`,
+          });
+        }
+      }
+
+      if (typeof counts !== "boolean") {
+        errors.push({
+          code: "invalid_limbo_counts",
+          message: "limbo.counts phải là giá trị boolean",
+        });
+      }
+
+      if (typeof credited !== "boolean") {
+        errors.push({
+          code: "invalid_limbo_credited",
+          message: "limbo.credited phải là giá trị boolean",
+        });
+      }
+    }
+  }
+
+  return errors;
+}
+
+/**
+ * Kiểm tra tính hợp lệ và toàn vẹn của một file chân linh (Soul, #151).
+ */
+export function auditSoulSaveData(rawText: string, byteLength: number): AuditError[] {
+  const errors: AuditError[] = [];
+
+  if (byteLength > MAX_FILE_SIZE) {
+    errors.push({
+      code: "file_too_large",
+      message: `Kích thước file (${byteLength} bytes) vượt quá giới hạn tối đa cho phép (${MAX_FILE_SIZE} bytes)`,
+    });
+    return errors;
+  }
+
+  if (byteLength === 0 || rawText.trim().length === 0) {
+    errors.push({
+      code: "file_empty",
+      message: "File rỗng (0 bytes)",
+    });
+    return errors;
+  }
+
+  let data: any;
+  try {
+    data = JSON.parse(rawText);
+  } catch (err: any) {
+    errors.push({
+      code: "invalid_json",
+      message: `File không phải định dạng JSON hợp lệ: ${err?.message ?? "JSON parse error"}`,
+    });
+    return errors;
+  }
+
+  if (typeof data !== "object" || data === null || Array.isArray(data)) {
+    errors.push({
+      code: "not_json_object",
+      message: "Dữ liệu JSON gốc phải là một JSON Object (không phải mảng, chuỗi, hay số)",
+    });
+    return errors;
+  }
+
+  // 1. Version
+  if (data.v !== 1) {
+    errors.push({
+      code: "invalid_soul_version",
+      message: `Phiên bản chân linh v (${show(data.v)}) phải bằng 1`,
+    });
+  }
+
+  // 2. id
+  if (typeof data.id !== "string" || data.id.length === 0 || data.id.length > 64) {
+    errors.push({
+      code: "invalid_soul_id",
+      message: `id chân linh (${show(data.id)}) phải là chuỗi từ 1 đến 64 ký tự`,
+    });
+  }
+
+  // 3. kiep
+  if (!Number.isInteger(data.kiep) || data.kiep < 1 || data.kiep > KIEP_CAP) {
+    errors.push({
+      code: "invalid_soul_kiep",
+      message: `Số kiếp (${show(data.kiep)}) phải là số nguyên [1, ${KIEP_CAP}]`,
+    });
+  }
+
+  // 4. duyen & duyenTotal
+  const duyenValid = Number.isInteger(data.duyen) && data.duyen >= 0 && data.duyen <= DUYEN_CAP;
+  if (!duyenValid) {
+    errors.push({
+      code: "invalid_soul_duyen",
+      message: `Duyên (${show(data.duyen)}) phải là số nguyên [0, ${DUYEN_CAP}]`,
+    });
+  }
+
+  const duyenTotalValid =
+    Number.isInteger(data.duyenTotal) && data.duyenTotal >= 0 && data.duyenTotal <= DUYEN_CAP;
+  if (!duyenTotalValid) {
+    errors.push({
+      code: "invalid_soul_duyen_total",
+      message: `Tổng Duyên (${show(data.duyenTotal)}) phải là số nguyên [0, ${DUYEN_CAP}]`,
+    });
+  } else if (duyenValid && data.duyenTotal < data.duyen) {
+    errors.push({
+      code: "invalid_soul_duyen_total",
+      message: `Tổng Duyên (${show(data.duyenTotal)}) không được nhỏ hơn Duyên hiện có (${show(data.duyen)})`,
+    });
+  }
+
+  // 5. unlocks
+  if (typeof data.unlocks !== "object" || data.unlocks === null || Array.isArray(data.unlocks)) {
+    errors.push({
+      code: "invalid_soul_unlocks",
+      message: "unlocks phải là một JSON Object",
+    });
+  } else {
+    for (const [key, val] of Object.entries(data.unlocks)) {
+      const def = byId(UNLOCK_BY_ID, key);
+      if (!def) {
+        errors.push({
+          code: "unknown_soul_unlock",
+          message: `Mục mở khóa ${show(key)} không tồn tại trong UNLOCKS`,
+        });
+      } else if (
+        !Number.isInteger(val) ||
+        (val as number) < 1 ||
+        (val as number) > def.costs.length
+      ) {
+        errors.push({
+          code: "invalid_soul_unlock_level",
+          message: `Nấc mở khóa của ${show(key)} (${show(val)}) phải là số nguyên [1, ${def.costs.length}]`,
+        });
+      }
+    }
+  }
+
+  // 6. origins
+  if (!Array.isArray(data.origins)) {
+    errors.push({
+      code: "invalid_soul_origins",
+      message: "origins phải là một mảng chuỗi id xuất thân",
+    });
+  } else {
+    const seen = new Set<string>();
+    for (const ogId of data.origins) {
+      if (typeof ogId !== "string" || !originOf(ogId)) {
+        errors.push({
+          code: "unknown_soul_origin",
+          message: `Xuất thân ${show(ogId)} không tồn tại trong ORIGINS`,
+        });
+      } else if (ogId === "pham_gia") {
+        errors.push({
+          code: "invalid_soul_origin",
+          message: "Xuất thân pham_gia luôn có sẵn, không được nằm trong origins mở khóa",
+        });
+      } else if (seen.has(ogId)) {
+        errors.push({
+          code: "duplicate_soul_origin",
+          message: `Xuất thân ${show(ogId)} bị lặp lại trong origins`,
+        });
+      } else {
+        seen.add(ogId);
+      }
+    }
+  }
+
+  // 7. best
+  if (typeof data.best !== "object" || data.best === null || Array.isArray(data.best)) {
+    errors.push({
+      code: "invalid_soul_best",
+      message: "best phải là một JSON Object { step, realm, tier }",
+    });
+  } else {
+    const { step, realm, tier } = data.best;
+    const realmValid = Number.isInteger(realm) && realm >= 0 && realm < REALMS.length;
+    const tierValid =
+      realmValid && Number.isInteger(tier) && tier >= 0 && tier < REALMS[realm].tiers.length;
+    if (!realmValid || !tierValid) {
+      errors.push({
+        code: "invalid_soul_best",
+        message: `best.realm (${show(realm)}) hoặc best.tier (${show(tier)}) không hợp lệ`,
+      });
+    } else {
+      const expectedStep = stepOf(realm, tier);
+      if (step !== expectedStep) {
+        errors.push({
+          code: "invalid_soul_best",
+          message: `best.step (${show(step)}) không khớp với stepOf(${realm}, ${tier}) = ${expectedStep}`,
+        });
+      }
+    }
+  }
+
+  // 8. lastCreditedLife
+  if (data.lastCreditedLife !== undefined && data.lastCreditedLife !== "") {
+    if (
+      typeof data.lastCreditedLife !== "string" ||
+      !/^[\x21-\x7e]{8,64}$/.test(data.lastCreditedLife)
+    ) {
+      errors.push({
+        code: "invalid_soul_last_credited_life",
+        message: "lastCreditedLife phải là chuỗi ASCII 8–64 ký tự hợp lệ",
+      });
+    }
+  }
+
+  // 9. history
+  if (data.history !== undefined) {
+    if (!Array.isArray(data.history)) {
+      errors.push({
+        code: "invalid_soul_history",
+        message: "history phải là một mảng các mục SoulHistoryEntry",
+      });
+    } else {
+      if (data.history.length > 20) {
+        errors.push({
+          code: "invalid_soul_history",
+          message: `history có ${data.history.length} mục, vượt quá giới hạn tối đa (20)`,
+        });
+      }
+      for (const entry of data.history) {
+        if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
+          errors.push({
+            code: "invalid_soul_history_entry",
+            message: "Mục lịch sử chân linh phải là một JSON Object",
+          });
+        } else {
+          if (!Number.isInteger(entry.kiep) || entry.kiep < 1) {
+            errors.push({
+              code: "invalid_soul_history_entry",
+              message: `entry.kiep (${show(entry.kiep)}) phải là số nguyên >= 1`,
+            });
+          }
+          if (!Number.isInteger(entry.step) || entry.step < 0) {
+            errors.push({
+              code: "invalid_soul_history_entry",
+              message: `entry.step (${show(entry.step)}) phải là số nguyên >= 0`,
+            });
+          }
+          if (
+            typeof entry.minutes !== "number" ||
+            !Number.isFinite(entry.minutes) ||
+            entry.minutes < 0
+          ) {
+            errors.push({
+              code: "invalid_soul_history_entry",
+              message: `entry.minutes (${show(entry.minutes)}) phải là số hữu hạn không âm`,
+            });
+          }
+          if (!Number.isInteger(entry.gain) || entry.gain < 0) {
+            errors.push({
+              code: "invalid_soul_history_entry",
+              message: `entry.gain (${show(entry.gain)}) phải là số nguyên không âm`,
+            });
+          }
+        }
+      }
+    }
+  }
+
   return errors;
 }
 
@@ -452,6 +882,105 @@ export function auditSavesDirectory(dirPath: string): AuditReport {
   let errorFiles = 0;
   const errorsByCode: Record<string, number> = {};
   const failedFiles: AuditFileResult[] = [];
+
+  // Kiểm tra thư mục con souls/ nếu có (#151)
+  const soulsDir = path.join(resolvedDir, "souls");
+  const hasSoulsDir = existsSync(soulsDir) && statSync(soulsDir).isDirectory();
+  let totalSouls: number | undefined;
+  let cleanSouls: number | undefined;
+  let errorSouls: number | undefined;
+
+  // Map lưu thông tin chân linh để đối chiếu với limbo: sha1(id) -> { id, lastCreditedLife }
+  const soulsByHash = new Map<string, { id: string; lastCreditedLife: string }>();
+
+  if (hasSoulsDir) {
+    const soulEntries = readdirSync(soulsDir);
+    // Bỏ qua các file cách ly (*.hong-*) và file tạm (*.tmp)
+    const soulJsonFiles = soulEntries.filter(
+      (f) => f.endsWith(".json") && !f.includes(".hong-") && !f.endsWith(".tmp"),
+    );
+
+    totalSouls = soulJsonFiles.length;
+    cleanSouls = 0;
+    errorSouls = 0;
+
+    for (const filename of soulJsonFiles) {
+      const fullPath = path.join(soulsDir, filename);
+      let rawContent = "";
+      let byteLength: number;
+
+      try {
+        const fileStat = lstatSync(fullPath);
+        if (!fileStat.isFile()) {
+          const errList = [
+            {
+              code: "not_regular_file",
+              message: "File chân linh không phải file thông thường",
+            },
+          ];
+          errorSouls++;
+          errorsByCode.not_regular_file = (errorsByCode.not_regular_file ?? 0) + 1;
+          if (failedFiles.length < 10) {
+            failedFiles.push({ file: `souls/${filename}`, errors: errList });
+          }
+          continue;
+        }
+        byteLength = fileStat.size;
+        if (byteLength <= MAX_FILE_SIZE) {
+          rawContent = readFileSync(fullPath, "utf8");
+        }
+      } catch (err: any) {
+        const errList = [
+          {
+            code: "read_error",
+            message: `Không thể đọc file chân linh: ${err?.message ?? "lỗi I/O"}`,
+          },
+        ];
+        errorSouls++;
+        errorsByCode.read_error = (errorsByCode.read_error ?? 0) + 1;
+        if (failedFiles.length < 10) {
+          failedFiles.push({ file: `souls/${filename}`, errors: errList });
+        }
+        continue;
+      }
+
+      const soulErrors = auditSoulSaveData(rawContent, byteLength);
+
+      // Kiểm tra tên file <sha1(id)>.json có khớp với sha1(soulIdOf(data.id)) không
+      if (soulErrors.length === 0) {
+        try {
+          const parsed = JSON.parse(rawContent);
+          const expectedHash = createHash("sha1").update(soulIdOf(parsed.id)).digest("hex");
+          if (filename !== `${expectedHash}.json`) {
+            soulErrors.push({
+              code: "mismatched_soul_filename",
+              message: `Tên file chân linh (${show(filename)}) không khớp với sha1(id) (${expectedHash}.json)`,
+            });
+          } else {
+            soulsByHash.set(expectedHash, {
+              id: parsed.id,
+              lastCreditedLife:
+                typeof parsed.lastCreditedLife === "string" ? parsed.lastCreditedLife : "",
+            });
+          }
+        } catch {
+          // JSON đã được kiểm tra trong auditSoulSaveData
+        }
+      }
+
+      if (soulErrors.length === 0) {
+        cleanSouls++;
+      } else {
+        errorSouls++;
+        for (const err of soulErrors) {
+          errorsByCode[err.code] = (errorsByCode[err.code] ?? 0) + 1;
+        }
+        if (failedFiles.length < 10) {
+          failedFiles.push({ file: `souls/${filename}`, errors: soulErrors });
+        }
+      }
+    }
+  }
 
   for (const filename of jsonFiles) {
     const fullPath = path.join(resolvedDir, filename);
@@ -492,6 +1021,38 @@ export function auditSavesDirectory(dirPath: string): AuditReport {
 
     const errors = auditPlayerSaveData(rawContent, byteLength);
 
+    // Kiểm tra tính nhất quán giữa limbo và chân linh (#151)
+    if (errors.length === 0) {
+      try {
+        const pData = JSON.parse(rawContent);
+        if (pData?.limbo && pData.limbo.credited === true) {
+          if (!hasSoulsDir) {
+            errors.push({
+              code: "limbo_soul_missing",
+              message: `Hồ sơ limbo đã ghi nhận (credited: true) nhưng thư mục chân linh souls/ không tồn tại`,
+            });
+          } else {
+            const sid = soulIdOf(pData.name);
+            const hash = createHash("sha1").update(sid).digest("hex");
+            const soulInfo = soulsByHash.get(hash);
+            if (!soulInfo) {
+              errors.push({
+                code: "limbo_soul_missing",
+                message: `Hồ sơ limbo đã ghi nhận (credited: true) nhưng không tìm thấy file chân linh souls/${hash}.json`,
+              });
+            } else if (soulInfo.lastCreditedLife !== pData.limbo.endedLifeId) {
+              errors.push({
+                code: "limbo_soul_inconsistent",
+                message: `Hồ sơ limbo ghi endedLifeId=${show(pData.limbo.endedLifeId)} nhưng chân linh ghi lastCreditedLife=${show(soulInfo.lastCreditedLife)}`,
+              });
+            }
+          }
+        }
+      } catch {
+        // Bỏ qua lỗi parse nếu đã được ghi nhận trước đó
+      }
+    }
+
     if (errors.length === 0) {
       cleanFiles++;
     } else {
@@ -510,6 +1071,9 @@ export function auditSavesDirectory(dirPath: string): AuditReport {
     totalFiles: jsonFiles.length,
     cleanFiles,
     errorFiles,
+    totalSouls,
+    cleanSouls,
+    errorSouls,
     errorsByCode,
     failedFiles,
   };
@@ -563,14 +1127,19 @@ export function main(): number {
 
   if (args.json) {
     console.log(JSON.stringify(report, null, 2));
-    return report.errorFiles === 0 ? 0 : 1;
+    return report.errorFiles === 0 && (report.errorSouls ?? 0) === 0 ? 0 : 1;
   }
 
-  console.log(`\n=== BÁO CÁO KIỂM TRA DỮ LIỆU FILE LƯU NHÂN VẬT ===`);
+  console.log(`\n=== BÁO CÁO KIỂM TRA DỮ LIỆU FILE LƯU NHÂN VẬT & CHÂN LINH ===`);
   console.log(`- Thư mục kiểm tra: ${report.dataDir}`);
-  console.log(`- Tổng số file .json: ${report.totalFiles}`);
-  console.log(`- File sạch (hợp lệ): ${report.cleanFiles}`);
-  console.log(`- File có lỗi vi phạm: ${report.errorFiles}`);
+  console.log(`- Tổng số file nhân vật (.json): ${report.totalFiles}`);
+  console.log(`- File nhân vật sạch (hợp lệ): ${report.cleanFiles}`);
+  console.log(`- File nhân vật có lỗi vi phạm: ${report.errorFiles}`);
+  if (report.totalSouls !== undefined) {
+    console.log(`- Tổng số file chân linh (souls/): ${report.totalSouls}`);
+    console.log(`- File chân linh sạch (hợp lệ): ${report.cleanSouls}`);
+    console.log(`- File chân linh có lỗi vi phạm: ${report.errorSouls}`);
+  }
 
   if (Object.keys(report.errorsByCode).length > 0) {
     console.log(`\n--- Phân loại số lượng lỗi theo mã vi phạm ---`);
@@ -589,11 +1158,12 @@ export function main(): number {
     }
   }
 
-  if (report.errorFiles === 0) {
+  const totalErrors = report.errorFiles + (report.errorSouls ?? 0);
+  if (totalErrors === 0) {
     console.log(`\n✅ TẤT CẢ DỮ LIỆU ĐỀU HỢP LỆ VÀ AN TOÀN.\n`);
     return 0;
   } else {
-    console.log(`\n⚠️ PHÁT HIỆN ${report.errorFiles} FILE DỮ LIỆU KHÔNG HỢP LỆ!\n`);
+    console.log(`\n⚠️ PHÁT HIỆN ${totalErrors} FILE DỮ LIỆU KHÔNG HỢP LỆ!\n`);
     return 1;
   }
 }

@@ -132,3 +132,60 @@ Giả định người chơi đánh đơn lẻ (solo), dùng Kiếm chém, đả
   - Hắc Hổ (cấp 2, an toàn từ Luyện Khí Tầng 6): thu nhập tăng mạnh từ ~2,570 LT/h lên ~4,650 LT/h ở Trúc Cơ.
   - Xích Mãng (trùm cấp 3): cho kỳ vọng tới 460.5 LT/con nhưng không an toàn khi solo trước Kim Đan; thích hợp đi săn theo tổ đội (xem mục "Đi theo đội" ở trên).
   - **Lưu ý cân bằng:** Hiện tại cửa hàng Lão dược sư chỉ bán 2 loại đan hồi phục cơ bản (24 LT/viên), trang bị chỉ rèn qua nguyên liệu rơi mà không tốn tiền. Người chơi từ Luyện Khí hậu kỳ đến Trúc Cơ sẽ nhanh chóng tích lũy hàng ngàn đến hàng vạn Linh thạch mà **gần như không có chỗ tiêu** từ giữa game. Cần bổ sung các chỗ xả tiền lớn (mua bí kíp, phí nâng cấp/rèn trang bị cao cấp, phí dịch chuyển, vào bí cảnh hoặc đấu giá) trong các sprint tiếp theo của M3.
+
+
+## Luân hồi & Điểm Duyên (M3.2, #151)
+
+Mô phỏng cân bằng hệ thống Luân hồi theo thiết kế tại `docs/THIET_KE_LUAN_HOI.md` (mục 5 & 6) và hợp đồng `shared/src/reincarnation.ts`:
+- Điểm Duyên tính theo: `calcDuyen = floor(stepPts + timePts + bossPts)`.
+- Mở khóa vĩnh viễn tại Tam Sinh Thạch: Dư âm tu hành (`du_am`, 10 nấc: +10% đến +100% tốc độ tu luyện).
+
+### 1. Duyên nhận được và tốc độ Duyên / giờ theo mốc kết thúc (Kiếp 1)
+
+Ước tính theo mốc thời gian săn quái đơn lẻ hiệu quả nhất (thanh tu vi bậc đó còn 0%):
+
+| Chết ngay khi vừa đạt | Phút | Duyên (0 trùm) | Duyên / giờ (0 trùm) | Duyên (hạ trùm) | Duyên / giờ (hạ trùm) |
+|---|---:|---:|---:|---:|---:|
+| Luyện Khí tầng 1 | 9 | 2 | 12.8 | 8 | **51.1** |
+| Luyện Khí tầng 5 | 29 | 12 | 24.6 | 18 | **36.9** |
+| Luyện Khí tầng 9 | 48 | 22 | 27.6 | 28 | **35.1** |
+| Trúc Cơ sơ kỳ | 53 | 35 | 39.8 | 41 | **46.6** |
+| Trúc Cơ trung kỳ | 86 | 50 | 35.0 | 56 | **39.2** |
+| Trúc Cơ hậu kỳ | 122 | 66 | 32.4 | 72 | **35.4** |
+| Hết Trúc Cơ (thanh đầy) | 175 | 81 | 27.7 | 90 | **30.8** |
+
+Đọc bảng: Tính từ Luyện Khí tầng 5 trở đi (bỏ qua giai đoạn mới vào game), Duyên / giờ (0 trùm) nhỏ nhất là **24.6** (Luyện Khí tầng 5), lớn nhất là **39.8** (Trúc Cơ sơ kỳ), tỷ lệ lớn / nhỏ là **1.62×** ⚠️ (vượt ngưỡng mục tiêu ~1.3×). Đỉnh Duyên / giờ rơi vào Trúc Cơ sơ kỳ (~39.8 Duyên/h, gấp ~1.44× so với cày hết Trúc Cơ).
+
+### 2. Tiến trình luân hồi qua chuỗi kiếp (1..N) khi mở dần "Dư âm tu hành"
+
+Giả định người chơi kiếp nào cũng cày trọn vẹn đến hết Trúc Cơ (hạ 2 trùm) và dồn Duyên nâng cấp `du_am` (+10% đến +100%):
+
+| Kiếp | Dư âm tu hành | Tốc độ tu luyện | Thời gian chơi | Duyên nhận | Duyên còn lại | Duyên / giờ | So với kiếp 1 | Hành động tại Tam Sinh Thạch |
+|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| 1 | Nấc 3 | +30% | 2 giờ 55 phút | +87 | 31 | **29.7** | 1.00× | Lên nấc 3 (+30%) |
+| 2 | Nấc 5 | +50% | 2 giờ 17 phút | +85 | 23 | **37.3** | 1.25× | Lên nấc 5 (+50%) |
+| 3 | Nấc 6 | +60% | 2 giờ 0 phút | +83 | 26 | **41.6** | 1.40× | Lên nấc 6 (+60%) |
+| 4 | Nấc 6 | +60% | 1 giờ 53 phút | +83 | 109 | **44.2** | 1.49× | Chờ đủ 115 Duyên |
+| 5 | Nấc 7 | +70% | 1 giờ 53 phút | +83 | 77 | **44.2** | 1.49× | Lên nấc 7 (+70%) |
+| 6 | Nấc 7 | +70% | 1 giờ 47 phút | +82 | 159 | **46.2** | 1.55× | Chờ đủ 165 Duyên |
+| 7 | Nấc 8 | +80% | 1 giờ 47 phút | +82 | 76 | **46.2** | 1.55× | Lên nấc 8 (+80%) |
+| 8 | Nấc 8 | +80% | 1 giờ 41 phút | +82 | 158 | **48.7** | 1.64× | Chờ đủ 235 Duyên |
+| 9 | Nấc 9 | +90% | 1 giờ 41 phút | +82 | 5 | **48.7** | 1.64× | Lên nấc 9 (+90%) |
+| 10 | Nấc 9 | +90% | 1 giờ 36 phút | +81 | 86 | **50.6** | 1.70× | Chờ đủ 335 Duyên |
+| 11 | Nấc 9 | +90% | 1 giờ 36 phút | +81 | 167 | **50.6** | 1.70× | Chờ đủ 335 Duyên |
+| 12 | Nấc 9 | +90% | 1 giờ 36 phút | +81 | 248 | **50.6** | 1.70× | Chờ đủ 335 Duyên |
+| 13 | Nấc 9 | +90% | 1 giờ 36 phút | +81 | 329 | **50.6** | 1.70× | Chờ đủ 335 Duyên |
+| 14 | Nấc 10 | +100% | 1 giờ 36 phút | +81 | 75 | **50.6** | 1.70× | Lên nấc 10 (+100%) |
+| 15 | Nấc 10 | +100% | 1 giờ 32 phút | +81 | 156 | **53.0** | 1.78× | Đã đạt tối đa (+100%) |
+
+### 3. Nhận xét & Đánh giá cân bằng luân hồi
+
+- **Tính chất ngang bằng giữa các cách chơi (chết ở bậc nào):**
+  - Người chơi cày chay chết ở Luyện Khí tầng 5 (29 phút): **24.6 Duyên/h** (0 trùm) / **36.9 Duyên/h** (hạ trùm).
+  - Người chơi cày tới Trúc Cơ sơ kỳ (53 phút): đạt đỉnh **39.8 Duyên/h** (0 trùm) / **46.6 Duyên/h** (hạ trùm).
+  - Người chơi cày hết Trúc Cơ (175 phút): **27.7 Duyên/h** (0 trùm) / **30.8 Duyên/h** (hạ trùm).
+  - **Đánh giá:** Mục tiêu thiết kế ("mọi cách chơi tương đương, ~25–32 Duyên/giờ") đạt tốt ở đa số các mốc, nhưng **chưa đạt ở Trúc Cơ sơ kỳ**: chết tại Trúc Cơ sơ kỳ cho Duyên/giờ gấp **~1.62×** so với cày hết Trúc Cơ (39.8 vs 27.7 Duyên/h). Đây là phát hiện quan trọng từ mô phỏng cân bằng (sẽ xem xét điều chỉnh công thức `calcDuyen` ở việc riêng để san phẳng đỉnh này).
+- **Tiến trình tăng trưởng qua các kiếp (Progression pacing):**
+  - Cần **14 kiếp** trọn vẹn để đạt tối đa nấc 10 Dư âm tu hành (+100% tốc độ tu luyện). Tổng thời gian chơi khoảng **~25–30 giờ**.
+  - Tốc độ Duyên mỗi giờ tăng từ **29.7 Duyên/h** (kiếp 1) lên **53.0 Duyên/h** (khi max Dư âm tu hành), tương đương tỷ lệ **1.78×**.
+  - **Đánh giá:** Tỷ lệ tăng trưởng **1.78×** nằm trong mục tiêu thiết kế (không vượt quá ~2.0× so với kiếp đầu), đem lại cảm giác nhân vật chuyển kiếp ngày càng mạnh mẽ và tu luyện thần tốc, nhưng kiểm soát tốt không gây lạm phát hay phá vỡ chiều sâu lối chơi.

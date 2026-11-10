@@ -22,6 +22,8 @@ import {
   expectedLootValue,
   expectedTotalCoin,
   monsterEconomy,
+  simulateReincarnationMilestones,
+  simulateReincarnationProgression,
 } from "./simulate";
 
 describe("đường cong tu luyện", () => {
@@ -154,5 +156,43 @@ describe("kinh tế Linh thạch (mô hình, #102)", () => {
     const potionPrice = buyPrice(trade.get.itemId);
     const killsToBuy = potionPrice / expectedTotalCoin("tho");
     expect(killsToTrade).toBeLessThan(killsToBuy);
+  });
+});
+
+describe("cân bằng luân hồi (mô hình, #151)", () => {
+  const milestones = simulateReincarnationMilestones();
+  const progression = simulateReincarnationProgression(15);
+
+  it("mọi mốc kết thúc từ Luyện Khí 5 trở lên có tốc độ Duyên / giờ tương đương nhau (~25–50 Duyên/h)", () => {
+    // Bỏ qua Luyện Khí 1 (quá sớm 9 phút, chỉ 2-8 Duyên)
+    const validMilestones = milestones.slice(1);
+    for (const m of validMilestones) {
+      expect(m.duyenWithBoss, `${m.label} duyen`).toBeGreaterThanOrEqual(18);
+      expect(m.duyenPerHourWithBoss, `${m.label} rate`).toBeGreaterThanOrEqual(25);
+      expect(m.duyenPerHourWithBoss, `${m.label} rate`).toBeLessThanOrEqual(55);
+    }
+  });
+
+  it("Duyên nhận được tăng dần theo tiến độ đạt được trong kiếp", () => {
+    for (let i = 1; i < milestones.length; i++) {
+      expect(milestones[i]!.duyenZeroBoss).toBeGreaterThan(milestones[i - 1]!.duyenZeroBoss);
+      expect(milestones[i]!.duyenWithBoss).toBeGreaterThan(milestones[i - 1]!.duyenWithBoss);
+    }
+  });
+
+  it("chuỗi kiếp mở dần Dư âm tu hành đạt tối đa (+100%) sau 12–16 kiếp", () => {
+    const maxLife = progression.find((p) => p.duAmLevel === 10);
+    expect(maxLife).toBeDefined();
+    expect(maxLife!.kiep).toBeGreaterThanOrEqual(12);
+    expect(maxLife!.kiep).toBeLessThanOrEqual(16);
+  });
+
+  it("tốc độ Duyên / giờ qua các kiếp khi max Dư âm tu hành không vượt quá 2× kiếp đầu (kiểm soát lạm phát)", () => {
+    const first = progression[0]!;
+    const last = progression.at(-1)!;
+    expect(last.ratioToFirstLife).toBeGreaterThanOrEqual(1.5);
+    expect(last.ratioToFirstLife).toBeLessThanOrEqual(2.0);
+    expect(first.duyenPerHour).toBeGreaterThanOrEqual(25);
+    expect(last.duyenPerHour).toBeLessThanOrEqual(60);
   });
 });
