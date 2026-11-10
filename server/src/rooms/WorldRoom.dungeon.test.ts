@@ -29,17 +29,22 @@ import {
 import type { WorldRoom } from "./WorldRoom";
 import type { WorldState } from "../schema";
 import type { Run } from "../systems/dungeon";
+import { dayKey } from "@tien-gioi/shared";
 
 const dataDir = mkdtempSync(path.join(tmpdir(), "tien-gioi-dungeon-"));
 const PORT = 46000 + Math.floor(Math.random() * 3000);
 let server: Server;
 let WorldRoomClass: typeof WorldRoom;
+// Nạp SAU khi đặt DATA_DIR: `combat` kéo theo `store.ts`, nơi đọc DATA_DIR lúc nạp module (import tĩnh thì nhân vật của test
+// ghi vào thư mục dữ liệu mặc định thay vì thư mục tạm)
+let killMonster: typeof import("../systems/combat").killMonster;
 const rooms: Room[] = [];
 const gate = NPC_BY_ID.thu_mon;
 const LINH_HU = dungeonOf(LINH_HU_ID)!;
 
 beforeAll(async () => {
   process.env.DATA_DIR = dataDir; // store.ts đọc biến này lúc nạp module
+  ({ killMonster } = await import("../systems/combat"));
   const { WorldRoom, defineRooms } = await import("./WorldRoom");
   WorldRoomClass = WorldRoom;
   server = new Server({ transport: new WebSocketTransport(), gracefullyShutdown: false });
@@ -554,5 +559,88 @@ describe("không bao giờ kẹt trong bí cảnh", () => {
     );
     rooms.push(back);
     expect(serverRoom(back).mapId).toBe(DEFAULT_MAP_ID);
+  });
+});
+
+describe("thắng bí cảnh: hạ trùm, thưởng, lượt mỗi ngày (4c)", () => {
+  /** Cả hai đã vào phòng bí cảnh; trả phòng, world và trùm phía server. */
+  async function inside() {
+    const { a, b, run } = await setupRun();
+    a.room.send(DUNGEON_MSG.enter, { runId: run.id });
+    const ra = await followTravel(a, await waitFor(() => a.travels[0], 5000));
+    b.room.send(DUNGEON_MSG.enter, { runId: run.id });
+    const rb = await followTravel(b, await waitFor(() => b.travels[0], 5000));
+    const world = (serverRoom(ra) as any).world;
+    const bossId = [...world.state.monsters.entries()].find(
+      ([, m]: [string, { kind: string }]) => m.kind === LINH_HU.boss,
+    )![0] as string;
+    return { a, b, run, ra, rb, world, bossId };
+  }
+
+  it("trùm ở tâm hang; A đánh trùm, B không: trùm chết -> `dungeonEnd` thắng, A nhận thưởng (ví, hồ sơ ghi lượt ngày), B `no_damage`; hết thời gian nhặt đồ thì cả hai về Lạc Hà", async () => {
+    const t = await inside();
+    const lair = getMap(LINH_HU_MAP_ID)!.lairPx!;
+    const boss = t.world.state.monsters.get(t.bossId);
+    expect([boss.x, boss.y]).toEqual([lair.x, lair.y]);
+    // người chơi đứng cạnh trùm; A gây sát thương
+    for (const r of [t.ra, t.rb]) {
+      const p = serverState(r).players.get(r.sessionId)!;
+      p.x = lair.x;
+      p.y = lair.y + 80;
+    }
+    const mc = t.world.mctrl.get(t.bossId);
+    mc.damageBy.set(t.ra.sessionId, 5000);
+    killMonster(t.world, t.bossId, mc);
+    const ea = await waitFor(() => t.a.ends[0], 4000, "dungeonEnd của A");
+    expect(ea).toMatchObject({ result: "won", reason: "boss_dead", rewardsLeft: 2 });
+    expect(ea.reward!.coin).toBe(LINH_HU.reward.coin);
+    expect(ea.reward!.items.map((i) => i.itemId)).toContain("tu_khi_dan");
+    const eb = await waitFor(() => t.b.ends[0], 4000, "dungeonEnd của B");
+    expect(eb).toMatchObject({ result: "won", noReward: "no_damage", rewardsLeft: 3 });
+    expect(eb.reward).toBeUndefined();
+    expect(t.run.phase).toBe("won");
+    // HUD: trùm đã chết
+    await waitFor(
+      () => t.a.states.at(-1)?.phase === "won" && t.a.states.at(-1)?.boss === null,
+      3000,
+      "HUD thắng",
+    );
+    // hồ sơ: lượt ngày ghi vào file ở lần lưu tới; đồ và tiền cùng bản ghi
+    await (serverRoom(t.ra) as any).saveAll();
+    expect(saveOf(t.a.name).dungeonDaily).toEqual({ day: dayKey(Date.now()), rewards: 1 });
+    expect(saveOf(t.a.name).coin).toBeGreaterThanOrEqual(LINH_HU.reward.coin);
+    expect(saveOf(t.b.name).dungeonDaily).toBeUndefined();
+    expect(saveOf(t.a.name).mapId).toBe(DEFAULT_MAP_ID); // vẫn ghi Lạc Hà
+    // hết thời gian nhặt đồ (rút ngắn): cả hai về Lạc Hà
+    (t.run as { exitAt: number | null }).exitAt = Date.now();
+    expect(await waitFor(() => t.a.travels[0], 5000, "A về Lạc Hà")).toEqual({
+      mapId: DEFAULT_MAP_ID,
+    });
+    expect(await waitFor(() => t.b.travels[0], 5000, "B về Lạc Hà")).toEqual({
+      mapId: DEFAULT_MAP_ID,
+    });
+    await waitFor(() => runs().size === 0, 5000, "run được dọn");
+  });
+
+  it("đã nhận đủ 3 lượt hôm nay (hồ sơ): vẫn thắng nhưng `daily_limit`, không thêm thưởng, bộ đếm giữ nguyên; hồ sơ bộ đếm hỏng thì coi như chưa dùng", async () => {
+    const t = await inside();
+    const wa = t.world.ctrl.get(t.ra.sessionId);
+    wa.save.dungeonDaily = { day: dayKey(Date.now()), rewards: 3 };
+    const wb = t.world.ctrl.get(t.rb.sessionId);
+    wb.save.dungeonDaily = { day: "khong-phai-ngay", rewards: 99 }; // hỏng
+    const mc = t.world.mctrl.get(t.bossId);
+    mc.damageBy.set(t.ra.sessionId, 100);
+    mc.damageBy.set(t.rb.sessionId, 100);
+    const coinA = wa.coin;
+    killMonster(t.world, t.bossId, mc);
+    const ea = await waitFor(() => t.a.ends[0], 4000);
+    const eb = await waitFor(() => t.b.ends[0], 4000);
+    expect(ea).toMatchObject({ result: "won", noReward: "daily_limit", rewardsLeft: 0 });
+    expect(ea.reward).toBeUndefined();
+    expect(wa.coin).toBeGreaterThanOrEqual(coinA); // chỉ tiền rơi từ xác trùm (nếu có), không có thưởng hoàn thành
+    expect(wa.save.dungeonDaily).toEqual({ day: dayKey(Date.now()), rewards: 3 });
+    expect(eb.reward!.coin).toBe(LINH_HU.reward.coin);
+    expect(eb.rewardsLeft).toBe(2);
+    expect(wb.save.dungeonDaily).toEqual({ day: dayKey(Date.now()), rewards: 1 });
   });
 });

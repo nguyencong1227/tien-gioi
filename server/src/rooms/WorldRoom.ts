@@ -85,7 +85,12 @@ class BuyRefused extends Error {
 import { World, type PlayerCtrl } from "../world";
 import { POS_SYNC_EVERY_TICKS, queueInput, safeSpot, syncPublicPos } from "../systems/movement";
 import { slash, swordQi } from "../systems/combat";
-import { spawnInitial, topUpMonsters, forgetTarget } from "../systems/monsters";
+import {
+  spawnDungeonMonsters,
+  spawnInitial,
+  topUpMonsters,
+  forgetTarget,
+} from "../systems/monsters";
 import { applyStats, breakthrough, setMeditating } from "../systems/progression";
 import { chat } from "../systems/chat";
 import { sanitizeInventory, sendInv, useItem } from "../systems/inventory";
@@ -245,7 +250,8 @@ export class WorldRoom extends Room<WorldState> {
     this.removeChatSink = this.hub.addChatSink((msg) => this.broadcast("chat", msg));
     this.setPatchRate(TICK_MS);
     this.setSimulationInterval((dt) => this.update(dt), TICK_MS);
-    spawnInitial(this.world);
+    if (run) spawnDungeonMonsters(this.world);
+    else spawnInitial(this.world);
     this.clock.setInterval(() => this.saveAll(), SAVE_EVERY_MS);
     if (run) {
       // Quái nhỏ dọn một lần (không hồi sinh); phòng trống thì huỷ (`autoDispose` bật ở lần vào đầu tiên: bật ngay bây giờ

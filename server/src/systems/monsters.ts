@@ -23,6 +23,32 @@ export const MONSTER_WAKE_DIST = 900;
  */
 export const WANDER_STRIDE = 4;
 
+/** Dựng một con quái `def` ở (x, y): vào state và dữ liệu riêng. Không kiểm vị trí (người gọi lo). */
+function placeMonster(w: World, def: MonsterKind, x: number, y: number) {
+  const id = `m${++w.monsterSeq}`;
+  const m = new Monster();
+  m.kind = def.id;
+  m.x = x;
+  m.y = y;
+  m.hp = def.hp;
+  m.maxHp = def.hp;
+  w.state.monsters.set(id, m);
+  w.mctrl.set(id, {
+    def,
+    homeX: x,
+    homeY: y,
+    target: null,
+    nextAttack: 0,
+    wanderX: x,
+    wanderY: y,
+    nextWander: 0,
+    damageBy: new Map(),
+    hpFrac: 0,
+    // Lệch pha theo số thứ tự để quái không cùng nhúc nhích một tick (không dùng random: giữ nguyên chuỗi của bench có seed)
+    strideLeft: w.monsterSeq % WANDER_STRIDE,
+  });
+}
+
 export function spawnMonster(w: World, def: MonsterKind) {
   const map = w.map;
   for (let i = 0; i < 40; i++) {
@@ -31,28 +57,7 @@ export function spawnMonster(w: World, def: MonsterKind) {
     const d = map.dangerAt(x, y);
     if (d < def.minDanger || (def.id === "tho" && d > 0.45)) continue;
     if (map.inSafe(x, y, 160) || map.circleBlocked(x, y, def.radius)) continue;
-    const id = `m${++w.monsterSeq}`;
-    const m = new Monster();
-    m.kind = def.id;
-    m.x = x;
-    m.y = y;
-    m.hp = def.hp;
-    m.maxHp = def.hp;
-    w.state.monsters.set(id, m);
-    w.mctrl.set(id, {
-      def,
-      homeX: x,
-      homeY: y,
-      target: null,
-      nextAttack: 0,
-      wanderX: x,
-      wanderY: y,
-      nextWander: 0,
-      damageBy: new Map(),
-      hpFrac: 0,
-      // Lệch pha theo số thứ tự để quái không cùng nhúc nhích một tick (không dùng random: giữ nguyên chuỗi của bench có seed)
-      strideLeft: w.monsterSeq % WANDER_STRIDE,
-    });
+    placeMonster(w, def, x, y);
     return;
   }
 }
@@ -61,6 +66,23 @@ export function spawnMonster(w: World, def: MonsterKind) {
 export function spawnInitial(w: World) {
   for (const def of MONSTERS)
     for (let i = 0; i < w.map.monsterCapOf(def.id); i++) spawnMonster(w, def);
+}
+
+/**
+ * Quái của một phòng bí cảnh: trùm đúng MỘT con, đặt ở tâm hang (`GameMap.lairPx`) nên đội biết đường tới và test giữ được
+ * vị trí; quái nhỏ rải theo `monsterCap` như thường. Không có hang thì trùm rải như quái khác. Quái nhỏ không hồi sinh
+ * (phòng bí cảnh không gọi `topUpMonsters`).
+ */
+export function spawnDungeonMonsters(w: World) {
+  const lair = w.map.lairPx;
+  for (const def of MONSTERS) {
+    const cap = w.map.monsterCapOf(def.id);
+    if (def.boss && lair) {
+      if (cap > 0) placeMonster(w, def, lair.x, lair.y);
+      continue;
+    }
+    for (let i = 0; i < cap; i++) spawnMonster(w, def);
+  }
 }
 
 /** Bổ sung quái bị giết, mỗi lần tối đa vài con mỗi loại. */

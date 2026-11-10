@@ -9,6 +9,7 @@ import {
   getMap,
   isDungeonMap,
   originOf,
+  type DungeonDaily,
   type Equipment,
   type Inventory,
   type LifeSummary,
@@ -49,6 +50,11 @@ export interface SavedPlayer {
   origin?: string;
   /** Bộ đếm thành tựu của kiếp này (dùng tính Duyên); file cũ không có thì bắt đầu từ 0 */
   life?: LifeCounters;
+  /**
+   * Bộ đếm thưởng hoàn thành bí cảnh theo ngày (`dayKey` UTC+7; tối đa `DUNGEON_DAILY_REWARDS` lượt mỗi ngày). Thiếu = chưa
+   * nhận lượt nào. Đọc bằng `sanitizeDungeonDaily` (systems/dungeon.ts), không tin giá trị trong file.
+   */
+  dungeonDaily?: DungeonDaily;
   /** Lần đi qua cổng gần nhất (ms, `Date.now()`): hồi chiêu `TRAVEL_COOLDOWN_MS` tính qua cả các phòng */
   travelAt?: number;
   createdAt: string;
