@@ -1,12 +1,17 @@
 // Phòng thế giới: vào / ra phòng, lưu nhân vật, nối tin nhắn với các system.
 // Logic game nằm trong ../systems/*, trạng thái dùng chung trong ../world.ts.
 import { StateView } from "@colyseus/schema";
-import { Room, Client, ServerError, type RoomException } from "colyseus";
+import { Room, Client, ServerError, type RoomException, type Server } from "colyseus";
 import {
   TICK_MS,
   MAX_PLAYERS_PER_ROOM,
   MONSTER_RESPAWN_MS,
-  DEFAULT_MAP,
+  DEFAULT_MAP_ID,
+  ROOM_NAME,
+  JOIN_BAD_MAP,
+  JOIN_WRONG_MAP,
+  getMap,
+  wrongMapMessage,
   REALMS,
   addCoin,
   realmLabel,
@@ -33,9 +38,10 @@ import {
   type PartyInviteMsg,
   type PartyAnswerMsg,
   type PartyKickMsg,
+  type GameMap,
 } from "@tien-gioi/shared";
 import { WorldState, Player } from "../schema";
-import { loadPlayer, savePlayer, hashSecret, cleanName, type SavedPlayer } from "../store";
+import { loadPlayer, savePlayer, hashSecret, cleanName, mapIdOf, type SavedPlayer } from "../store";
 import { World, type PlayerCtrl } from "../world";
 import { POS_SYNC_EVERY_TICKS, queueInput, safeSpot, syncPublicPos } from "../systems/movement";
 import { slash, swordQi } from "../systems/combat";
@@ -75,27 +81,33 @@ export class WorldRoom extends Room<WorldState> {
   autoDispose = false; // thế giới luôn sống, kể cả khi không có ai
   state = new WorldState();
 
-  private world = new World(
-    this.state,
-    {
-      // Hiệu ứng và số sát thương có vị trí: chỉ gửi cho người ở trong vùng nhìn (#62), không broadcast cả phòng
-      fx: (msg) => this.sendNear(msg.x, msg.y, "range" in msg ? msg.range : 0, "fx", msg),
-      dmg: (msg) => this.sendNear(msg.x, msg.y, 0, "dmg", msg),
-      sys: (text) =>
-        this.broadcast("chat", { from: "Thiên Đạo", text, sys: true } satisfies ChatOut),
-      chat: (from, text) => this.broadcast("chat", { from, text } satisfies ChatOut),
-      toast: (sid, msg) => this.sendTo(sid, "toast", msg),
-      inv: (sid, msg) => this.sendTo(sid, "inv", msg),
-      quests: (sid, msg) => this.sendTo(sid, "quests", msg),
-      dialog: (sid, msg) => this.sendTo(sid, "dialog", msg),
-      party: (sid, msg) => this.sendTo(sid, "party", msg),
-      partyInvited: (sid, msg) => this.sendTo(sid, "partyInvited", msg),
-      wallet: (sid, msg) => this.sendTo(sid, "wallet", msg),
-      chatTo: (sid, msg) => this.sendTo(sid, "chat", msg),
-    },
-    // Hiện chỉ có một bản đồ; nhiều bản đồ thì phòng chọn theo mapId (docs/THIET_KE_NHIEU_BAN_DO.md)
-    DEFAULT_MAP,
-  );
+  /** Bản đồ của phòng này (mỗi bản đồ một phòng, docs/THIET_KE_NHIEU_BAN_DO.md); đặt ở onCreate */
+  mapId = DEFAULT_MAP_ID;
+  private world!: World;
+
+  /** Nối các system với kênh gửi tin của phòng. Gọi một lần ở onCreate, khi đã biết bản đồ. */
+  private createWorld(map: GameMap) {
+    return new World(
+      this.state,
+      {
+        // Hiệu ứng và số sát thương có vị trí: chỉ gửi cho người ở trong vùng nhìn (#62), không broadcast cả phòng
+        fx: (msg) => this.sendNear(msg.x, msg.y, "range" in msg ? msg.range : 0, "fx", msg),
+        dmg: (msg) => this.sendNear(msg.x, msg.y, 0, "dmg", msg),
+        sys: (text) =>
+          this.broadcast("chat", { from: "Thiên Đạo", text, sys: true } satisfies ChatOut),
+        chat: (from, text) => this.broadcast("chat", { from, text } satisfies ChatOut),
+        toast: (sid, msg) => this.sendTo(sid, "toast", msg),
+        inv: (sid, msg) => this.sendTo(sid, "inv", msg),
+        quests: (sid, msg) => this.sendTo(sid, "quests", msg),
+        dialog: (sid, msg) => this.sendTo(sid, "dialog", msg),
+        party: (sid, msg) => this.sendTo(sid, "party", msg),
+        partyInvited: (sid, msg) => this.sendTo(sid, "partyInvited", msg),
+        wallet: (sid, msg) => this.sendTo(sid, "wallet", msg),
+        chatTo: (sid, msg) => this.sendTo(sid, "chat", msg),
+      },
+      map,
+    );
+  }
 
   /** Giới hạn tần suất tin nhắn, theo sessionId */
   private limiters = new Map<string, RateLimiter>();
@@ -121,7 +133,17 @@ export class WorldRoom extends Room<WorldState> {
     this.clients.find((c) => c.sessionId === sid)?.send(type, msg);
   }
 
-  onCreate() {
+  /**
+   * `options.mapId` (có vì `filterBy(["mapId"])`) chọn bản đồ của phòng; bỏ trống là bản đồ mặc định.
+   * Id lạ bị từ chối ngay ở đây: nếu không, mỗi `mapId` rác client gửi sẽ tạo thêm một phòng không bao giờ dọn
+   * (`autoDispose = false`). Ném lỗi ở onCreate thì Colyseus không đăng ký phòng.
+   */
+  onCreate(options?: Partial<JoinOptions>) {
+    const wanted = options?.mapId === undefined ? DEFAULT_MAP_ID : options.mapId;
+    const map = getMap(wanted);
+    if (!map) throw new ServerError(JOIN_BAD_MAP, "Bản đồ không tồn tại.");
+    this.mapId = map.def.id;
+    this.world = this.createWorld(map);
     this.setPatchRate(TICK_MS);
     this.setSimulationInterval((dt) => this.update(dt), TICK_MS);
     spawnInitial(this.world);
@@ -220,8 +242,15 @@ export class WorldRoom extends Room<WorldState> {
     if (existing) {
       if (existing.secretHash !== hashSecret(secret))
         throw new ServerError(403, "Tên này đã có người dùng.");
+      // Chỉ sau khi đúng mã mới tiết lộ nhân vật đang ở bản đồ nào. Server quyết định bản đồ; `options.mapId`
+      // chỉ là gợi ý chọn phòng, sai thì báo bản đồ đúng để client vào lại (shared/src/travel.ts).
+      const home = mapIdOf(existing);
+      if (home !== this.mapId) throw new ServerError(JOIN_WRONG_MAP, wrongMapMessage(home));
       return existing;
     }
+    // Nhân vật mới luôn bắt đầu ở bản đồ mặc định (không tạo file ở phòng sai)
+    if (this.mapId !== DEFAULT_MAP_ID)
+      throw new ServerError(JOIN_WRONG_MAP, wrongMapMessage(DEFAULT_MAP_ID));
     const now = new Date().toISOString();
     const fresh: SavedPlayer = {
       name,
@@ -347,6 +376,7 @@ export class WorldRoom extends Room<WorldState> {
       quests: c.quests,
       equipment: equipmentOf(p),
       coin: c.coin,
+      mapId: this.mapId,
     };
     await savePlayer(c.save);
   }
@@ -366,4 +396,12 @@ export class WorldRoom extends Room<WorldState> {
     this.world.now = Date.now();
     tickWorld(this.world, dtMs);
   }
+}
+
+/**
+ * Đăng ký phòng thế giới: mỗi bản đồ một phòng, chọn theo `mapId` trong tuỳ chọn vào phòng.
+ * Dùng chung cho `index.ts` và test tích hợp để cấu hình không lệch nhau.
+ */
+export function defineRooms(gameServer: Server) {
+  gameServer.define(ROOM_NAME, WorldRoom).filterBy(["mapId"]);
 }

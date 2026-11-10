@@ -5,8 +5,7 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
-import { ROOM_NAME } from "@tien-gioi/shared";
-import { WorldRoom } from "./rooms/WorldRoom";
+import { defineRooms } from "./rooms/WorldRoom";
 import { startupWarnings } from "./startup";
 
 // Đọc .env.local ở gốc repo (cổng riêng cho từng dev). Không có file thì dùng mặc định.
@@ -28,5 +27,5 @@ if (existsSync(dist)) {
 
 const server = http.createServer(app);
 const gameServer = new Server({ transport: new WebSocketTransport({ server }) });
-gameServer.define(ROOM_NAME, WorldRoom);
+defineRooms(gameServer);
 gameServer.listen(PORT).then(() => console.log(`Tiên Giới server: http://localhost:${PORT}`));
