@@ -42,7 +42,7 @@ Cách làm giữ nguyên M2: hợp đồng `shared/` trước (PR riêng, dev kh
 
 ## Sprint 5: Tiền tệ, cửa hàng, nhiều bản đồ, bí cảnh (phác thảo, chưa giao)
 - **Tiền tệ (Linh thạch):** quái rơi, lưu vào nhân vật, Lão dược sư bán đan bằng tiền. A: server + cân bằng; B: hiển thị, cửa hàng.
-- **Nhiều bản đồ:** `shared/src/map.ts` thành danh sách bản đồ (seed, kích thước, cổng nối); mỗi bản đồ một phòng Colyseus (`ROOM_NAME` + `mapId`), lưu `mapId` trong file nhân vật, cổng chuyển bản đồ ở rìa. Đây là đổi kiến trúc lớn nhất của M3, cần hợp đồng và test riêng.
+- **Nhiều bản đồ** (phân tích hai phương án, thứ tự làm và câu hỏi cần chọn: `docs/THIET_KE_NHIEU_BAN_DO.md`): `shared/src/map.ts` thành danh sách bản đồ (seed, kích thước, cổng nối); mỗi bản đồ một phòng Colyseus (`ROOM_NAME` + `mapId`), lưu `mapId` trong file nhân vật, cổng chuyển bản đồ ở rìa. Đây là đổi kiến trúc lớn nhất của M3, cần hợp đồng và test riêng.
 - **Bí cảnh:** phòng tạm theo đội (instance), có thời hạn, quái trùm, phần thưởng; dựa trên "nhiều bản đồ" và "tổ đội".
 - C: kịch bản thử tải nhiều phòng, theo dõi bộ nhớ khi tạo / huỷ phòng tạm.
 
