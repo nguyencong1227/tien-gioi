@@ -1026,7 +1026,7 @@ function renderForgeModal() {
     forgeBtn.className = "forge-btn";
     forgeBtn.disabled = !canCraft;
     forgeBtn.textContent = "Rèn";
-    forgeBtn.addEventListener("pointerdown", (e) => {
+    forgeBtn.addEventListener("click", (e) => {
       e.preventDefault();
       if (!canCraft) return;
       callbacks?.onCraft(rec.id);
@@ -1184,7 +1184,7 @@ function renderShopBuy() {
       : `Thiếu ${totalPrice - currentCoin} 💎`;
     buyBtn.append(buyBtnText);
 
-    buyBtn.addEventListener("pointerdown", (e) => {
+    buyBtn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
       if (!canAfford) return;
@@ -1308,7 +1308,7 @@ function renderShopSell() {
       sellBtnText.textContent = `Bán (+${totalPrice} 💎)`;
       sellBtn.append(sellBtnText);
 
-      sellBtn.addEventListener("pointerdown", (e) => {
+      sellBtn.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
         sound.pickup();

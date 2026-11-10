@@ -1595,6 +1595,10 @@ body.low-fx #btn-talk {
       max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
     justify-content: space-between;
   }
+  #shop-modal,
+  #forge-modal {
+    justify-content: flex-start;
+  }
   #inv-grid {
     gap: 8px;
     max-width: 480px;
