@@ -190,7 +190,12 @@ export interface ToastMsg {
   tone?: "good" | "bad" | "info";
 }
 
+/**
+ * Tuỳ chọn khi vào phòng. Chế độ cũ (`AUTH_MODE=legacy`, mặc định cho dev / test / bot): `name` + `secret`. Chế độ tài khoản
+ * (`AUTH_MODE=account`, bắt buộc khi chạy thật): chỉ `token` phiên (xem `shared/src/account.ts`); server bỏ qua trường không dùng.
+ */
 export interface JoinOptions {
-  name: string;
-  secret: string;
+  name?: string;
+  secret?: string;
+  token?: string;
 }
