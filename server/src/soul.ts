@@ -54,7 +54,7 @@ export class FileSoulStore implements SoulStore {
       if (e?.code === "ENOENT") return null;
       throw e;
     }
-    let soul: Soul | null = null;
+    let soul: Soul | null;
     try {
       soul = sanitizeSoul(JSON.parse(text), this.clock());
     } catch {
