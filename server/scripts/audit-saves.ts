@@ -9,15 +9,14 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   COIN_CAP,
+  DEFAULT_MAP,
   EQUIP_SLOTS,
   INVENTORY_SLOTS,
   ITEM_BY_ID,
   PLAYER_RADIUS,
   QUEST_BY_ID,
   REALMS,
-  WORLD_H,
-  WORLD_W,
-  circleBlocked,
+  getMap,
 } from "@tien-gioi/shared";
 import { cleanName } from "../src/store.js";
 import { byId } from "../src/systems/lookup.js";
@@ -180,7 +179,21 @@ export function auditPlayerSaveData(rawText: string, byteLength: number): AuditE
     }
   }
 
-  // 6. Vị trí toạ độ (x, y)
+  // 6. Bản đồ (mapId)
+  let targetMap = DEFAULT_MAP;
+  if (data.mapId !== undefined) {
+    const m = getMap(data.mapId);
+    if (!m) {
+      errors.push({
+        code: "invalid_map_id",
+        message: `Mã bản đồ "${show(data.mapId)}" không tồn tại trong MAPS (server sẽ đưa về lac_ha)`,
+      });
+    } else {
+      targetMap = m;
+    }
+  }
+
+  // 7. Vị trí toạ độ (x, y)
   if (data.x !== undefined || data.y !== undefined) {
     const x = data.x;
     const y = data.y;
@@ -190,16 +203,16 @@ export function auditPlayerSaveData(rawText: string, byteLength: number): AuditE
       Number.isFinite(x) &&
       Number.isFinite(y) &&
       x >= 0 &&
-      x <= WORLD_W &&
+      x <= targetMap.worldW &&
       y >= 0 &&
-      y <= WORLD_H;
+      y <= targetMap.worldH;
 
     if (!isFinitePos) {
       errors.push({
         code: "pos_out_of_bounds",
-        message: `Toạ độ (x: ${show(x)}, y: ${show(y)}) nằm ngoài kích thước bản đồ (${WORLD_W}x${WORLD_H})`,
+        message: `Toạ độ (x: ${show(x)}, y: ${show(y)}) nằm ngoài kích thước bản đồ (${targetMap.worldW}x${targetMap.worldH})`,
       });
-    } else if (circleBlocked(x, y, PLAYER_RADIUS)) {
+    } else if (targetMap.circleBlocked(x, y, PLAYER_RADIUS)) {
       errors.push({
         code: "pos_blocked",
         message: `Toạ độ (x: ${show(x)}, y: ${show(y)}) nằm đè lên vật cản không thể di chuyển`,
@@ -207,7 +220,7 @@ export function auditPlayerSaveData(rawText: string, byteLength: number): AuditE
     }
   }
 
-  // 7. Ngày tháng (createdAt, updatedAt)
+  // 8. Ngày tháng (createdAt, updatedAt)
   if (data.createdAt !== undefined) {
     if (typeof data.createdAt !== "string" || isNaN(Date.parse(data.createdAt))) {
       errors.push({
