@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "nod
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { COIN_CAP, INVENTORY_SLOTS, ITEM_BY_ID, REALMS, WORLD_H, WORLD_W } from "@tien-gioi/shared";
+import { COIN_CAP, DEFAULT_MAP, INVENTORY_SLOTS, ITEM_BY_ID, REALMS } from "@tien-gioi/shared";
 import { auditPlayerSaveData, auditSavesDirectory, MAX_FILE_SIZE, show } from "./audit-saves.js";
 
 function hashFileSha256(filePath: string): string {
@@ -199,7 +199,7 @@ describe("audit-saves (Issue #112)", () => {
     });
 
     it("vị trí x, y ngoài bản đồ hoặc nằm trong ô chặn -> pos_out_of_bounds, pos_blocked", () => {
-      const pOutOfBounds = { ...validPlayer, x: WORLD_W + 500, y: 1536 };
+      const pOutOfBounds = { ...validPlayer, x: DEFAULT_MAP.worldW + 500, y: 1536 };
       const rawOut = JSON.stringify(pOutOfBounds);
       expect(auditPlayerSaveData(rawOut, rawOut.length).map((e) => e.code)).toContain(
         "pos_out_of_bounds",
@@ -211,6 +211,25 @@ describe("audit-saves (Issue #112)", () => {
       expect(auditPlayerSaveData(rawBlocked, rawBlocked.length).map((e) => e.code)).toContain(
         "pos_blocked",
       );
+    });
+
+    it("mapId lạ hoặc không hợp lệ -> invalid_map_id (#123 Bước 0d)", () => {
+      // mapId chuẩn: lac_ha -> hợp lệ, không có lỗi invalid_map_id
+      const pValid = { ...validPlayer, mapId: "lac_ha" };
+      const rawValid = JSON.stringify(pValid);
+      expect(auditPlayerSaveData(rawValid, rawValid.length).map((e) => e.code)).not.toContain(
+        "invalid_map_id",
+      );
+
+      // mapId lạ không nằm trong MAPS
+      for (const badMap of ["bi_canh_la", "khong_ton_tai", "__proto__", "constructor", 123]) {
+        const pBad = { ...validPlayer, mapId: badMap };
+        const rawBad = JSON.stringify(pBad);
+        expect(
+          auditPlayerSaveData(rawBad, rawBad.length).map((e) => e.code),
+          `mapId: ${badMap}`,
+        ).toContain("invalid_map_id");
+      }
     });
 
     it("ngày tháng createdAt/updatedAt hỏng -> invalid_date", () => {
@@ -437,9 +456,9 @@ describe("audit-saves (Issue #112)", () => {
     });
 
     it("đột biến 4: bỏ qua kiểm tra toạ độ rơi vào ô chặn circleBlocked()", () => {
-      // Giả sử mutation chỉ kiểm tra x, y trong khoảng [0, WORLD_W] / [0, WORLD_H]
+      // Giả sử mutation chỉ kiểm tra x, y trong khoảng [0, DEFAULT_MAP.worldW] / [0, DEFAULT_MAP.worldH]
       const laxPosCheck = (x: number, y: number) =>
-        x >= 0 && x <= WORLD_W && y >= 0 && y <= WORLD_H;
+        x >= 0 && x <= DEFAULT_MAP.worldW && y >= 0 && y <= DEFAULT_MAP.worldH;
       expect(laxPosCheck(0, 0)).toBe(true); // (0, 0) là ô nước/vách cản trở mép bản đồ
 
       // Hàm auditPlayerSaveData THẬT bắt buộc phát hiện vị trí bị chặn:

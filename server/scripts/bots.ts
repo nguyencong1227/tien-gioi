@@ -12,6 +12,7 @@ import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
 import { Client, Protocol, type Room } from "colyseus.js";
 import {
+  DEFAULT_MAP,
   NPC_BY_ID,
   NPC_RANGE,
   PICKUP_RANGE,
@@ -20,14 +21,7 @@ import {
   ROOM_NAME,
   SKILLS,
   TICK_MS,
-  TOWN_PX,
-  WORLD_H,
-  WORLD_W,
   buyPrice,
-  circleBlocked,
-  dangerAt,
-  inTown,
-  moveWithCollision,
   sellPrice,
   statsFor,
   type AttackMsg,
@@ -814,10 +808,10 @@ async function runLoadTest(
       // Đông người tụ trong Lạc Hà Trấn (#78): rải bot hoàn toàn bên trong bán kính trấn
       for (;;) {
         const a = rnd() * Math.PI * 2;
-        const r = rnd() * (TOWN_PX.r - 28);
-        const x = TOWN_PX.x + Math.cos(a) * r;
-        const y = TOWN_PX.y + Math.sin(a) * r;
-        if (!circleBlocked(x, y, PLAYER_RADIUS)) {
+        const r = rnd() * (DEFAULT_MAP.townPx.r - 28);
+        const x = DEFAULT_MAP.townPx.x + Math.cos(a) * r;
+        const y = DEFAULT_MAP.townPx.y + Math.sin(a) * r;
+        if (!DEFAULT_MAP.circleBlocked(x, y, PLAYER_RADIUS)) {
           campX = x;
           campY = y;
           break;
@@ -827,10 +821,11 @@ async function runLoadTest(
       // Khởi tạo vị trí (campX, campY) rải đều khắp vùng hoang dã giống bench.ts trước khi joinOrCreate
       for (;;) {
         const a = rnd() * Math.PI * 2;
-        const r = TOWN_PX.r + 80 + rnd() * (WORLD_W * 0.45 - TOWN_PX.r);
-        const x = TOWN_PX.x + Math.cos(a) * r;
-        const y = TOWN_PX.y + Math.sin(a) * r;
-        if (!circleBlocked(x, y, PLAYER_RADIUS) && dangerAt(x, y) < 0.9) {
+        const r =
+          DEFAULT_MAP.townPx.r + 80 + rnd() * (DEFAULT_MAP.worldW * 0.45 - DEFAULT_MAP.townPx.r);
+        const x = DEFAULT_MAP.townPx.x + Math.cos(a) * r;
+        const y = DEFAULT_MAP.townPx.y + Math.sin(a) * r;
+        if (!DEFAULT_MAP.circleBlocked(x, y, PLAYER_RADIUS) && DEFAULT_MAP.dangerAt(x, y) < 0.9) {
           campX = x;
           campY = y;
           break;
@@ -973,10 +968,14 @@ async function runLoadTest(
         dx = 0;
         dy = 0;
       } else {
-        const distFromCenter = Math.hypot(b.predX - TOWN_PX.x, b.predY - TOWN_PX.y);
-        if (distFromCenter > TOWN_PX.r - 28) {
+        const distFromCenter = Math.hypot(
+          b.predX - DEFAULT_MAP.townPx.x,
+          b.predY - DEFAULT_MAP.townPx.y,
+        );
+        if (distFromCenter > DEFAULT_MAP.townPx.r - 28) {
           b.wanderAngle =
-            Math.atan2(TOWN_PX.y - b.predY, TOWN_PX.x - b.predX) + (Math.random() - 0.5) * 0.4;
+            Math.atan2(DEFAULT_MAP.townPx.y - b.predY, DEFAULT_MAP.townPx.x - b.predX) +
+            (Math.random() - 0.5) * 0.4;
           b.nextTurnAt = now + 1500;
         } else if (now >= b.nextTurnAt) {
           b.wanderAngle += (Math.random() - 0.5) * Math.PI;
@@ -1014,7 +1013,7 @@ async function runLoadTest(
         b.shopping = false;
         b.nextShopCheckAt = now + 12000 + Math.random() * 8000;
       }
-    } else if (inTown(b.predX, b.predY)) {
+    } else if (DEFAULT_MAP.inTown(b.predX, b.predY)) {
       dx = Math.cos(b.wanderAngle);
       dy = Math.sin(b.wanderAngle);
     } else if (partySize > 1 && b.myParty && b.myParty.leader && b.myParty.leader !== b.name) {
@@ -1130,9 +1129,15 @@ async function runLoadTest(
         // Kịch bản xấu nhất: bot tuần tra liên tục quanh khu bãi săn (campX, campY) của mình (20 input/s),
         // giữ phân bố rải đều khắp vùng hoang dã thay vì dồn hết về quanh trấn.
         const distToCamp = Math.hypot(b.predX - b.campX, b.predY - b.campY);
-        const distFromTown = Math.hypot(b.predX - TOWN_PX.x, b.predY - TOWN_PX.y);
-        if (distFromTown < TOWN_PX.r + 60) {
-          b.wanderAngle = Math.atan2(b.predY - TOWN_PX.y, b.predX - TOWN_PX.x);
+        const distFromTown = Math.hypot(
+          b.predX - DEFAULT_MAP.townPx.x,
+          b.predY - DEFAULT_MAP.townPx.y,
+        );
+        if (distFromTown < DEFAULT_MAP.townPx.r + 60) {
+          b.wanderAngle = Math.atan2(
+            b.predY - DEFAULT_MAP.townPx.y,
+            b.predX - DEFAULT_MAP.townPx.x,
+          );
           b.nextTurnAt = now + 2000;
         } else if (distToCamp > 260) {
           b.wanderAngle = Math.atan2(b.campY - b.predY, b.campX - b.predX);
@@ -1167,18 +1172,24 @@ async function runLoadTest(
       dx /= len;
       dy /= len;
       const stepPx = statsFor(me.realm ?? 0, me.tier ?? 0).speed * (TICK_MS / 1000);
-      const moved = moveWithCollision(b.predX, b.predY, dx * stepPx, dy * stepPx, PLAYER_RADIUS);
+      const moved = DEFAULT_MAP.moveWithCollision(
+        b.predX,
+        b.predY,
+        dx * stepPx,
+        dy * stepPx,
+        PLAYER_RADIUS,
+      );
       if (
         Math.hypot(moved.x - b.predX, moved.y - b.predY) < stepPx * 0.2 ||
         moved.x < 64 ||
-        moved.x > WORLD_W - 64 ||
+        moved.x > DEFAULT_MAP.worldW - 64 ||
         moved.y < 64 ||
-        moved.y > WORLD_H - 64
+        moved.y > DEFAULT_MAP.worldH - 64
       ) {
         b.wanderAngle = Math.atan2(dy, dx) + (Math.random() < 0.5 ? 1 : -1) * (Math.PI * 0.45);
         b.avoidUntil = now + 800;
         // Nếu đang đứng ở bãi săn mà vướng cây thì nhận luôn vị trí hiện tại làm bãi săn
-        if (!inTown(b.predX, b.predY)) {
+        if (!DEFAULT_MAP.inTown(b.predX, b.predY)) {
           b.campX = b.predX;
           b.campY = b.predY;
         }
