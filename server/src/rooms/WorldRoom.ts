@@ -10,6 +10,10 @@ import {
   DEFAULT_MAP_ID,
   MAPS,
   JOIN_WRONG_MAP,
+  JOIN_CLIENT_OUTDATED,
+  MIN_PROTOCOL_VERSION,
+  clientOutdatedMessage,
+  isClientOutdated,
   JOIN_BAD_TOKEN,
   JOIN_NEED_CHARACTER,
   DUNGEON_MSG,
@@ -179,6 +183,11 @@ export class WorldRoom extends Room<WorldState> {
    * `secret`. `null`: chế độ cũ (tên + mã bí mật).
    */
   static auth: AuthService | null = null;
+  /**
+   * Phiên bản giao thức thấp nhất còn nhận (M4 2.5, `shared/src/protocol.ts`); `index.ts` đặt từ `MIN_PROTOCOL_VERSION` trong môi
+   * trường (`server/src/protocol.ts`). Mặc định `MIN_PROTOCOL_VERSION` của `shared/` (0: nhận cả client chưa gửi `v`).
+   */
+  static minProtocol = MIN_PROTOCOL_VERSION;
   /**
    * Dịch vụ tông môn (đặt ở `index.ts` theo `STORE`). `null`: dùng kho tệp mặc định (`defaultSectStore`, dựng lười). `SECTS=off`
    * (biến môi trường) gỡ tính năng: không có dịch vụ, mọi tin tông môn bị từ chối.
@@ -414,6 +423,9 @@ export class WorldRoom extends Room<WorldState> {
   // ---------------- Vào / ra ----------------
 
   async onAuth(_client: Client, options: JoinOptions) {
+    // Phiên bản trước mọi thứ khác (kể cả xác thực): client quá cũ nhận lời nhắn "hãy tải lại", không lộ gì về nhân vật nào
+    if (isClientOutdated(options?.v, WorldRoom.minProtocol))
+      throw new ServerError(JOIN_CLIENT_OUTDATED, clientOutdatedMessage(WorldRoom.minProtocol));
     const accounts = WorldRoom.auth;
     if (accounts) return this.authByToken(accounts, options);
     return this.authLegacy(options);

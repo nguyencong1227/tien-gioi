@@ -13,7 +13,8 @@ import express, {
   type Response,
   type Router,
 } from "express";
-import { AUTH_API } from "@tien-gioi/shared";
+import { AUTH_API, PROTOCOL_VERSION } from "@tien-gioi/shared";
+import { minProtocolOf } from "./protocol";
 import { AuthService, type AuthResult, type Kdf } from "./auth-service";
 import { CharacterService } from "./character-service";
 import { defaultPlayerStore, type PlayerStore } from "./player-store";
@@ -210,8 +211,10 @@ export function mountAuth(
 ): { mode: AuthMode; auth: AuthService | null } {
   const mode = authModeOf(o.env);
   app.set("trust proxy", parseTrustProxy(o.env.TRUST_PROXY));
+  // `protocol` / `minProtocol` (M4 2.5): client biết phiên bản của server; công cụ giám sát thấy mức tối thiểu đang áp dụng
+  const minProtocol = minProtocolOf(o.env).value;
   app.get("/health", (_req, res) => {
-    res.json({ ok: true, authMode: mode });
+    res.json({ ok: true, authMode: mode, protocol: PROTOCOL_VERSION, minProtocol });
   });
   if (mode !== "account") return { mode, auth: null };
   const accounts = o.accounts ?? defaultAccountStore();

@@ -24,7 +24,7 @@ import {
 import { isMockDuelEnabled, MOCK_DUEL_SAMPLES } from "./duel";
 import { isMockSectEnabled, MOCK_SECT_SAMPLES } from "./sect";
 import { captureEarlyMessages } from "./early-messages";
-import { joinWithRedirect } from "./connection";
+import { joinWithRedirect, isClientOutdatedError } from "./connection";
 import { clearToken, getToken } from "./auth";
 import { initAuthUi, switchAuthView } from "./auth-ui";
 import { setupPwa, canReloadSafely, type PwaGameState } from "./pwa";
@@ -149,6 +149,28 @@ let activeToken: string | null = null;
 let isReconnecting = false;
 let isTraveling = false;
 
+/** Dọn sạch bộ nhớ cache của Service Worker (nếu có) và tải lại trang để nạp client mới nhất (M4 2.5). */
+async function handleOutdatedReload() {
+  if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+    try {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg) {
+        if (reg.waiting) {
+          reg.waiting.postMessage({ type: "SKIP_WAITING" });
+        }
+        await reg.unregister();
+      }
+      if ("caches" in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      }
+    } catch {
+      // Bỏ qua lỗi dọn cache ngoại tuyến
+    }
+  }
+  window.location.reload();
+}
+
 initAuthUi({
   onTokenAuth: async (token, charName) => {
     const client = new Client(serverUrl());
@@ -163,6 +185,10 @@ initAuthUi({
       if (charName) localStorage.setItem(NAME_KEY, charName);
       await start(room, mapId);
     } catch (e: any) {
+      if (isClientOutdatedError(e)) {
+        ui.showClientOutdated(e.minVersion, handleOutdatedReload);
+        return;
+      }
       if (e?.code === JOIN_BAD_TOKEN) {
         clearToken();
         switchAuthView("login");
@@ -175,16 +201,35 @@ initAuthUi({
   onLegacyAuth: async (name) => {
     const client = new Client(serverUrl());
     activeClient = client;
-    const { room, mapId } = await joinWithRedirect({
-      client,
-      storage: localStorage,
-      name,
-      secret: secret(),
-    });
-    localStorage.setItem(NAME_KEY, name);
-    await start(room, mapId);
+    try {
+      const { room, mapId } = await joinWithRedirect({
+        client,
+        storage: localStorage,
+        name,
+        secret: secret(),
+      });
+      localStorage.setItem(NAME_KEY, name);
+      await start(room, mapId);
+    } catch (e: any) {
+      if (isClientOutdatedError(e)) {
+        ui.showClientOutdated(e.minVersion, handleOutdatedReload);
+        return;
+      }
+      throw e;
+    }
   },
 });
+
+// Giả lập hiển thị modal phiên bản quá cũ khi có cờ ?outdated=N (phục vụ kiểm thử và nghiệm thu giao diện, M4 2.5)
+if (typeof window !== "undefined") {
+  const outdatedParam = new URLSearchParams(location.search).get("outdated");
+  if (outdatedParam !== null) {
+    const minV = Number(outdatedParam) || 2;
+    ui.showClientOutdated(minV, handleOutdatedReload);
+  }
+  (window as any).__showClientOutdated = (minV = 2) =>
+    ui.showClientOutdated(minV, handleOutdatedReload);
+}
 
 // Chế độ máy chủ giả lập (?dungeon=mock, ?dungeon=fallen, ?duel=mock hoặc ?sect=mock) để thử nghiệm và chụp ảnh không cần server thật
 if (
@@ -299,6 +344,10 @@ function setupRoomLifecycle(room: Room) {
       isTraveling = false;
       ui.hideTransition();
       activeScene?.setReconnecting(false);
+      if (isClientOutdatedError(err)) {
+        ui.showClientOutdated(err.minVersion, handleOutdatedReload);
+        return;
+      }
       ui.toast({
         text: `Không thể chuyển bản đồ: ${err?.message || "lỗi kết nối"}. Vui lòng đăng nhập lại để vào bản đồ mới.`,
         tone: "bad",

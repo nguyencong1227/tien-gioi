@@ -2,9 +2,12 @@ import { describe, it, expect, vi } from "vitest";
 import {
   DEFAULT_MAP_ID,
   HAC_PHONG_ID,
+  JOIN_CLIENT_OUTDATED,
   JOIN_NOT_IN_RUN,
   JOIN_WRONG_MAP,
   LINH_HU_MAP_ID,
+  PROTOCOL_VERSION,
+  clientOutdatedMessage,
   roomNameOf,
   wrongMapMessage,
 } from "@tien-gioi/shared";
@@ -12,6 +15,8 @@ import {
   joinWithRedirect,
   getSavedMap,
   saveMap,
+  ClientOutdatedError,
+  isClientOutdatedError,
   type JoinClient,
   type JoinStorage,
 } from "./connection";
@@ -30,7 +35,7 @@ class MemoryStorage implements JoinStorage {
 }
 
 describe("connection helper (joinWithRedirect)", () => {
-  it("vào phòng thành công với bản đồ mặc định khi chưa có lưu trữ", async () => {
+  it("vào phòng thành công với bản đồ mặc định khi chưa có lưu trữ (luôn gửi v: PROTOCOL_VERSION)", async () => {
     const storage = new MemoryStorage();
     const fakeRoom = { sessionId: "s1", reconnectionToken: "t1" };
     const joinOrCreate = vi.fn().mockResolvedValue(fakeRoom);
@@ -49,6 +54,7 @@ describe("connection helper (joinWithRedirect)", () => {
     expect(joinOrCreate).toHaveBeenCalledWith(roomNameOf(DEFAULT_MAP_ID), {
       name: "TieuPham",
       secret: "sec123",
+      v: PROTOCOL_VERSION,
     });
     expect(getSavedMap(storage, "TieuPham")).toBe(DEFAULT_MAP_ID);
   });
@@ -72,6 +78,7 @@ describe("connection helper (joinWithRedirect)", () => {
     expect(joinOrCreate).toHaveBeenCalledWith(roomNameOf(HAC_PHONG_ID), {
       name: "TieuPham",
       secret: "sec123",
+      v: PROTOCOL_VERSION,
     });
   });
 
@@ -103,10 +110,12 @@ describe("connection helper (joinWithRedirect)", () => {
     expect(joinOrCreate).toHaveBeenNthCalledWith(1, roomNameOf(DEFAULT_MAP_ID), {
       name: "TieuPham",
       secret: "sec123",
+      v: PROTOCOL_VERSION,
     });
     expect(joinOrCreate).toHaveBeenNthCalledWith(2, roomNameOf(HAC_PHONG_ID), {
       name: "TieuPham",
       secret: "sec123",
+      v: PROTOCOL_VERSION,
     });
     // Đã lưu lại map đúng vào storage
     expect(getSavedMap(storage, "TieuPham")).toBe(HAC_PHONG_ID);
@@ -154,6 +163,7 @@ describe("connection helper (joinWithRedirect)", () => {
     expect(joinOrCreate).toHaveBeenCalledWith(roomNameOf(DEFAULT_MAP_ID), {
       name: "TieuPham",
       secret: "sec123",
+      v: PROTOCOL_VERSION,
     });
     expect(getSavedMap(storage, "TieuPham")).toBe(DEFAULT_MAP_ID);
   });
@@ -194,10 +204,12 @@ describe("connection helper (joinWithRedirect)", () => {
     expect(joinOrCreate).toHaveBeenNthCalledWith(1, roomNameOf(HAC_PHONG_ID), {
       name: "TieuPham",
       secret: "sec123",
+      v: PROTOCOL_VERSION,
     });
     expect(joinOrCreate).toHaveBeenNthCalledWith(2, roomNameOf(DEFAULT_MAP_ID), {
       name: "TieuPham",
       secret: "sec123",
+      v: PROTOCOL_VERSION,
     });
     expect(getSavedMap(storage, "TieuPham")).toBe(DEFAULT_MAP_ID);
   });
@@ -241,6 +253,7 @@ describe("connection helper (joinWithRedirect)", () => {
     expect(result.mapId).toBe(DEFAULT_MAP_ID);
     expect(joinOrCreate).toHaveBeenCalledWith(roomNameOf(DEFAULT_MAP_ID), {
       token: "tok_session_12345",
+      v: PROTOCOL_VERSION,
     });
   });
 
@@ -269,6 +282,7 @@ describe("connection helper (joinWithRedirect)", () => {
     expect(joinById).toHaveBeenCalledWith("room_bi_canh_01", {
       name: "TieuPham",
       secret: "sec123",
+      v: PROTOCOL_VERSION,
     });
     expect(joinOrCreate).not.toHaveBeenCalled();
     // Không lưu map bí cảnh vào storage (vẫn giữ DEFAULT_MAP_ID)
@@ -300,6 +314,7 @@ describe("connection helper (joinWithRedirect)", () => {
     expect(joinOrCreate).toHaveBeenCalledTimes(1);
     expect(joinOrCreate).toHaveBeenCalledWith(roomNameOf(DEFAULT_MAP_ID), {
       token: "tok_abc",
+      v: PROTOCOL_VERSION,
     });
   });
 
@@ -326,6 +341,7 @@ describe("connection helper (joinWithRedirect)", () => {
     expect(joinOrCreate).toHaveBeenCalledWith(roomNameOf(DEFAULT_MAP_ID), {
       name: "TieuPham",
       secret: "sec123",
+      v: PROTOCOL_VERSION,
     });
   });
 
@@ -334,5 +350,90 @@ describe("connection helper (joinWithRedirect)", () => {
     storage.setItem("tien-gioi:map:TieuPham", LINH_HU_MAP_ID);
     expect(getSavedMap(storage, "TieuPham")).toBe(DEFAULT_MAP_ID);
     expect(storage.getItem("tien-gioi:map:TieuPham")).toBeNull();
+  });
+
+  // ---------- M4 2.5: PROTOCOL_VERSION & Client Outdated Tests ----------
+
+  it("từ chối và ném ClientOutdatedError dứt khoát khi server báo JOIN_CLIENT_OUTDATED (426) - không thử lại", async () => {
+    const storage = new MemoryStorage();
+    const joinOrCreate = vi.fn().mockRejectedValue({
+      code: JOIN_CLIENT_OUTDATED,
+      message: clientOutdatedMessage(2),
+    });
+    const client: JoinClient<any> = { joinOrCreate };
+
+    let caughtErr: any;
+    try {
+      await joinWithRedirect({
+        client,
+        storage,
+        name: "TieuPham",
+        secret: "sec123",
+      });
+    } catch (err) {
+      caughtErr = err;
+    }
+
+    expect(caughtErr).toBeInstanceOf(ClientOutdatedError);
+    expect(isClientOutdatedError(caughtErr)).toBe(true);
+    expect(caughtErr.minVersion).toBe(2);
+    expect(caughtErr.code).toBe(426);
+    // KHÔNG thử lại: chỉ gọi joinOrCreate ĐÚNG 1 LẦN
+    expect(joinOrCreate).toHaveBeenCalledTimes(1);
+    expect(joinOrCreate).toHaveBeenCalledWith(roomNameOf(DEFAULT_MAP_ID), {
+      name: "TieuPham",
+      secret: "sec123",
+      v: PROTOCOL_VERSION,
+    });
+  });
+
+  it("vẫn ném ClientOutdatedError dứt khoát khi message bị hỏng hoặc thiếu (minVersion = 0)", async () => {
+    const storage = new MemoryStorage();
+    const joinOrCreate = vi.fn().mockRejectedValue({
+      code: JOIN_CLIENT_OUTDATED,
+      message: "corrupted_message_123",
+    });
+    const client: JoinClient<any> = { joinOrCreate };
+
+    let caughtErr: any;
+    try {
+      await joinWithRedirect({
+        client,
+        storage,
+        token: "tok_session",
+      });
+    } catch (err) {
+      caughtErr = err;
+    }
+
+    expect(isClientOutdatedError(caughtErr)).toBe(true);
+    expect(caughtErr.minVersion).toBe(0);
+    expect(joinOrCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it("JOIN_CLIENT_OUTDATED không bị lẫn với JOIN_WRONG_MAP và không chạy vòng chuyển hướng", async () => {
+    const storage = new MemoryStorage();
+    saveMap(storage, "TieuPham", HAC_PHONG_ID);
+
+    const joinOrCreate = vi.fn().mockRejectedValue({
+      code: JOIN_CLIENT_OUTDATED,
+      message: clientOutdatedMessage(3),
+    });
+    const client: JoinClient<any> = { joinOrCreate };
+
+    await expect(
+      joinWithRedirect({
+        client,
+        storage,
+        name: "TieuPham",
+        secret: "sec123",
+        maxRedirects: 5,
+      }),
+    ).rejects.toThrow("client_outdated:3");
+
+    // Tuyệt đối không thử lại dù maxRedirects = 5
+    expect(joinOrCreate).toHaveBeenCalledTimes(1);
+    // Không làm hỏng map đã lưu trong storage
+    expect(storage.getItem("tien-gioi:map:TieuPham")).toBe(HAC_PHONG_ID);
   });
 });

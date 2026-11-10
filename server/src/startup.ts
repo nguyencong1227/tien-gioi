@@ -1,5 +1,6 @@
 import { authModeOf, parseTrustProxy } from "./auth-http";
 import { storeKindOf } from "./stores";
+import { minProtocolOf } from "./protocol";
 
 /** Cảnh báo cấu hình in ra khi server khởi động (thuần hàm để test được). */
 export function startupWarnings(env: NodeJS.ProcessEnv): string[] {
@@ -43,6 +44,7 @@ export function startupWarnings(env: NodeJS.ProcessEnv): string[] {
         "proxy đặt X-Forwarded-For; bỏ qua cảnh báo này nếu mở thẳng ra Internet.",
     );
   }
+  warnings.push(...minProtocolOf(env).warnings);
   const kind = storeKindOf(env);
   if (env.STORE !== undefined && env.STORE !== "" && env.STORE !== "file" && env.STORE !== "pg") {
     warnings.push(`STORE='${env.STORE}' không hợp lệ (chỉ 'file' hoặc 'pg'): đang dùng 'file'.`);
