@@ -275,6 +275,10 @@
         Chế độ Bí cảnh giả lập (DEV / Debug)
       </div>
 
+      <div id="duel-mock-badge" class="duel-mock-badge" hidden>
+        Chế độ Quyết đấu giả lập (DEV / Debug)
+      </div>
+
       <!-- HUD Bí cảnh (M3.4, chỉ hiện khi ở trong bản đồ bí cảnh) -->
       <section id="dungeon-hud" class="panel dungeon-hud" hidden aria-label="Bí cảnh">
         <div class="dhud-head">
@@ -314,6 +318,45 @@
               </button>
               <button type="button" id="dhud-btn-leave-no" class="dhud-btn-confirm no">
                 Ở lại
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- HUD Quyết Đấu PK (M3.5, chỉ hiện khi đang trong trận PK) -->
+      <section id="duel-hud" class="panel duel-hud" hidden aria-label="Quyết đấu">
+        <div class="duel-hud-head">
+          <div class="duel-hud-title-wrap">
+            <span class="duel-hud-badge">⚔ QUYẾT ĐẤU</span>
+            <b id="duel-hud-opponent">Đối thủ</b>
+          </div>
+          <div class="duel-hud-timer-box" title="Thời gian quyết đấu còn lại">
+            <span class="duel-hud-clock-icon">⏱</span>
+            <b id="duel-hud-timer">03:00</b>
+          </div>
+        </div>
+
+        <div class="duel-hud-hp-row">
+          <div class="duel-hud-hp-head">
+            <span class="duel-hud-hp-label">Khí huyết đối thủ:</span>
+            <span id="duel-hud-hp-text">100%</span>
+          </div>
+          <div class="duel-hud-hp-bar">
+            <i id="duel-hud-hp-fill" style="width: 100%"></i>
+          </div>
+        </div>
+
+        <div class="duel-hud-actions">
+          <button type="button" id="duel-btn-yield" class="duel-btn-yield">Đầu Hàng</button>
+          <div id="duel-yield-confirm" class="duel-yield-confirm" hidden>
+            <span class="duel-confirm-label">Xác nhận nhận thua và đầu hàng?</span>
+            <div class="duel-confirm-btns">
+              <button type="button" id="duel-btn-yield-yes" class="duel-btn-confirm yes">
+                Đầu Hàng
+              </button>
+              <button type="button" id="duel-btn-yield-no" class="duel-btn-confirm no">
+                Đánh Tiếp
               </button>
             </div>
           </div>
@@ -670,6 +713,30 @@
         </div>
       </div>
 
+      <!-- Lời mời PK Thách Đấu (M3.5, hộp nhỏ góc màn hình, không chặn điều khiển) -->
+      <div id="duel-invite-box" class="duel-invite-box" hidden aria-label="Lời mời Thách Đấu">
+        <div class="duib-head">
+          <span class="duib-badge">⚔ THÁCH ĐẤU</span>
+          <b id="duib-title">Quyết Đấu Luận Võ</b>
+          <span id="duib-countdown" class="duib-countdown">20s</span>
+        </div>
+        <p id="duib-msg" class="duib-msg"><b>Đạo hữu</b> muốn cùng bạn luận bàn võ nghệ.</p>
+        <div class="duib-timer"><i id="duib-timer-bar"></i></div>
+        <div class="duib-actions">
+          <button type="button" id="duib-btn-accept" class="duib-btn accept">Nhận Lời</button>
+          <button type="button" id="duib-btn-decline" class="duib-btn decline">Từ Chối</button>
+        </div>
+      </div>
+
+      <!-- Đếm ngược 3-2-1 vào trận PK (M3.5) -->
+      <div id="duel-countdown-overlay" class="duel-countdown-overlay" hidden aria-live="assertive">
+        <div class="dco-wrap">
+          <div class="dco-sub">CHUẨN BỊ QUYẾT ĐẤU</div>
+          <div id="dco-number" class="dco-number">3</div>
+          <div id="dco-vs" class="dco-vs">Đang chuẩn bị...</div>
+        </div>
+      </div>
+
       <!-- Màn hình kết quả Bí cảnh (M3.4) -->
       <section
         id="dungeon-end-modal"
@@ -707,6 +774,30 @@
         </footer>
       </section>
 
+      <!-- Màn hình Kết quả Quyết Đấu (M3.5) -->
+      <section
+        id="duel-end-modal"
+        class="panel modal-box duel-end-modal"
+        hidden
+        aria-label="Kết quả Quyết Đấu"
+      >
+        <header class="duend-header">
+          <div id="duend-seal" class="duend-seal won">⚔</div>
+          <h2 id="duend-title" class="duend-title">ĐẠI THẮNG QUYẾT ĐẤU</h2>
+        </header>
+
+        <div class="duend-body">
+          <p id="duend-reason" class="duend-reason">Đã đánh gục đối thủ!</p>
+          <div class="duend-note">
+            Quyết đấu luận võ không mất kiếp và đứng dậy tại chỗ sau 3 giây.
+          </div>
+        </div>
+
+        <footer class="duend-actions">
+          <button type="button" id="duend-btn-close" class="duend-btn primary">Đóng</button>
+        </footer>
+      </section>
+
       <!-- Menu khi chạm người chơi khác -->
       <div id="player-menu" class="panel player-menu" hidden>
         <div class="pm-head">
@@ -716,6 +807,8 @@
         <div class="pm-body">
           <div id="pm-realm" class="pm-realm"></div>
           <button type="button" id="pm-invite-btn" class="pm-btn">Mời vào đội</button>
+          <button type="button" id="pm-duel-btn" class="pm-btn pm-btn-duel">Thách Đấu</button>
+          <div id="pm-duel-hint" class="pm-hint" hidden></div>
         </div>
       </div>
 

@@ -64,6 +64,11 @@ import {
   type DungeonInviteMsg,
   type DungeonStateMsg,
   type DungeonEndMsg,
+  type DuelInvitedMsg,
+  type DuelStateMsg,
+  type DuelEndMsg,
+  type DuelChallengeCheck,
+  duelChallengeFailMessage,
 } from "@tien-gioi/shared";
 import {
   dungeonEndReasonText,
@@ -76,6 +81,13 @@ import {
   isMockDungeonEnabled,
   shouldOpenEndModal,
 } from "./dungeon";
+import {
+  duelEndReasonText,
+  duelResultTitle,
+  formatDuelCountdown,
+  formatDuelInviteCountdown,
+  isMockDuelEnabled,
+} from "./duel";
 import { sound } from "./audio";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -120,6 +132,10 @@ export interface UiCallbacks {
   onDungeonEnter?: (runId: string) => void;
   onDungeonDecline?: (runId: string) => void;
   onDungeonLeave?: () => void;
+  onDuelChallenge?: (name: string) => void;
+  onDuelAccept?: (from: string) => void;
+  onDuelDecline?: (from: string) => void;
+  onDuelYield?: () => void;
 }
 
 const fmt = (n: number) =>
@@ -188,6 +204,35 @@ function stopDungeonHudTimer() {
   if (dungeonHudInterval !== null) {
     window.clearInterval(dungeonHudInterval);
     dungeonHudInterval = null;
+  }
+}
+
+// ---------- PK Thách Đấu (M3.5, #218) ----------
+let currentDuelInvite: DuelInvitedMsg | null = null;
+let duelInviteInterval: number | null = null;
+let duelHudInterval: number | null = null;
+let duelCountdownInterval: number | null = null;
+let duelDeadlineAt = 0;
+let currentDuelOpponent = "";
+
+function stopDuelInviteTimer() {
+  if (duelInviteInterval !== null) {
+    window.clearInterval(duelInviteInterval);
+    duelInviteInterval = null;
+  }
+}
+
+function stopDuelHudTimer() {
+  if (duelHudInterval !== null) {
+    window.clearInterval(duelHudInterval);
+    duelHudInterval = null;
+  }
+}
+
+function stopDuelCountdownTimer() {
+  if (duelCountdownInterval !== null) {
+    window.clearInterval(duelCountdownInterval);
+    duelCountdownInterval = null;
   }
 }
 
@@ -1919,12 +1964,58 @@ export const ui = {
       $("player-menu").hidden = true;
       if (selectedPlayerName) callbacks?.onPartyInvite?.(selectedPlayerName);
     });
+    bindTap("pm-duel-btn", () => {
+      $("player-menu").hidden = true;
+      if (selectedPlayerName) callbacks?.onDuelChallenge?.(selectedPlayerName);
+    });
 
     // Bí cảnh (M3.4, #200)
     const mockBadge = $("dungeon-mock-badge");
     if (mockBadge) {
       mockBadge.hidden = !isMockDungeonEnabled();
     }
+
+    // PK Thách đấu (M3.5, #218)
+    const duelMockBadge = $("duel-mock-badge");
+    if (duelMockBadge) {
+      duelMockBadge.hidden = !isMockDuelEnabled();
+    }
+
+    bindTap("duib-btn-accept", () => {
+      stopDuelInviteTimer();
+      const from = currentDuelInvite?.from;
+      currentDuelInvite = null;
+      $("duel-invite-box").hidden = true;
+      if (from) callbacks?.onDuelAccept?.(from);
+    });
+
+    bindTap("duib-btn-decline", () => {
+      stopDuelInviteTimer();
+      const from = currentDuelInvite?.from;
+      currentDuelInvite = null;
+      $("duel-invite-box").hidden = true;
+      if (from) callbacks?.onDuelDecline?.(from);
+    });
+
+    bindTap("duel-btn-yield", () => {
+      $("duel-btn-yield").hidden = true;
+      $("duel-yield-confirm").hidden = false;
+    });
+
+    bindTap("duel-btn-yield-no", () => {
+      $("duel-yield-confirm").hidden = true;
+      $("duel-btn-yield").hidden = false;
+    });
+
+    bindTap("duel-btn-yield-yes", () => {
+      $("duel-yield-confirm").hidden = true;
+      $("duel-btn-yield").hidden = false;
+      callbacks?.onDuelYield?.();
+    });
+
+    bindTap("duend-btn-close", () => {
+      $("duel-end-modal").hidden = true;
+    });
 
     bindTap("dib-btn-enter", () => {
       stopDungeonInviteTimer();
@@ -2255,6 +2346,21 @@ export const ui = {
     return closedAny;
   },
 
+  /** Đóng modal kết quả quyết đấu riêng biệt (không gộp vào closeAllModals để người thua xem được khi bị KO) */
+  closeDuelEndModal(): boolean {
+    const duelEndModal = $("duel-end-modal");
+    if (duelEndModal && !duelEndModal.hidden) {
+      duelEndModal.hidden = true;
+      return true;
+    }
+    return false;
+  },
+
+  isDuelEndModalOpen(): boolean {
+    const duelEndModal = $("duel-end-modal");
+    return Boolean(duelEndModal && !duelEndModal.hidden);
+  },
+
   onInv(m: InvMsg) {
     invSlots = m.slots;
     const now = performance.now();
@@ -2571,7 +2677,14 @@ export const ui = {
     }
   },
 
-  openPlayerMenu(name: string, realm: number, tier: number, x: number, y: number) {
+  openPlayerMenu(
+    name: string,
+    realm: number,
+    tier: number,
+    x: number,
+    y: number,
+    challengeCheck?: DuelChallengeCheck,
+  ) {
     if (name === currentName) return;
     selectedPlayerName = name;
     $("pm-name").textContent = name;
@@ -2582,11 +2695,29 @@ export const ui = {
     btn.disabled = isFull;
     btn.textContent = isFull ? "Đội đã đủ (4/4)" : "Mời vào tổ đội";
 
+    // Nút Thách đấu (M3.5, #218)
+    const duelBtn = $("pm-duel-btn") as HTMLButtonElement | null;
+    const duelHint = $("pm-duel-hint");
+    if (duelBtn) {
+      const canDuel = challengeCheck ? challengeCheck.ok : true;
+      duelBtn.disabled = !canDuel;
+      duelBtn.textContent = "Thách Đấu (PK)";
+      if (duelHint) {
+        if (!canDuel && challengeCheck && !challengeCheck.ok) {
+          duelHint.textContent = duelChallengeFailMessage(challengeCheck.reason);
+          duelHint.hidden = false;
+        } else {
+          duelHint.textContent = "";
+          duelHint.hidden = true;
+        }
+      }
+    }
+
     const menu = $("player-menu");
     menu.hidden = false;
     const pad = 10;
     const mw = menu.offsetWidth || 200;
-    const mh = menu.offsetHeight || 100;
+    const mh = menu.offsetHeight || 140;
     const clampedX = Math.max(pad, Math.min(window.innerWidth - mw - pad, x));
     const clampedY = Math.max(pad, Math.min(window.innerHeight - mh - pad, y));
     menu.style.left = `${clampedX}px`;
@@ -2617,10 +2748,10 @@ export const ui = {
     setTimeout(() => p.remove(), 3000);
   },
 
-  death(secondsLeft: number | null) {
+  death(secondsLeft: number | null, text?: string) {
     $("death").hidden = secondsLeft === null;
     if (secondsLeft !== null)
-      $("death-t").textContent = `Hồi sinh tại Lạc Hà Trấn sau ${secondsLeft}s`;
+      $("death-t").textContent = text ?? `Hồi sinh tại Lạc Hà Trấn sau ${secondsLeft}s`;
   },
 
   /** Banner đỏ khi đang nối lại (chỉ một khung, không kèm toast trùng nội dung). */
@@ -2633,6 +2764,7 @@ export const ui = {
 
     document.body.classList.add("reconnecting");
     this.closeAllModals();
+    this.closeDuelEndModal();
     this.closeDialog();
     this.closePlayerMenu();
   },
@@ -2683,6 +2815,7 @@ export const ui = {
     limboRebirthCb = callbacks?.onRebirth ?? null;
 
     this.closeAllModals();
+    this.closeDuelEndModal();
     this.closeDialog();
     this.closePlayerMenu();
     this.death(null);
@@ -2953,5 +3086,184 @@ export const ui = {
 
     const modal = $("dungeon-end-modal");
     if (modal) modal.hidden = false;
+  },
+
+  /** Nhận lời mời thách đấu PK (M3.5, #218) */
+  onDuelInvited(msg: DuelInvitedMsg) {
+    this.closeDuelEndModal();
+    stopDuelInviteTimer();
+    currentDuelInvite = msg;
+
+    const titleEl = $("duib-title");
+    if (titleEl) titleEl.textContent = "Quyết Đấu Luận Võ";
+
+    const msgEl = $("duib-msg");
+    if (msgEl) msgEl.textContent = `${msg.from} muốn luận bàn võ nghệ cùng đạo hữu!`;
+
+    const totalMs = Math.max(1000, Number.isFinite(msg.ttlMs) ? msg.ttlMs : 20_000);
+    const deadline = Date.now() + totalMs;
+
+    const countdownEl = $("duib-countdown");
+    if (countdownEl) countdownEl.textContent = formatDuelInviteCountdown(totalMs);
+
+    const barEl = $("duib-timer-bar");
+    if (barEl) barEl.style.width = "100%";
+
+    const box = $("duel-invite-box");
+    if (box) box.hidden = false;
+    sound.typeBlip?.();
+
+    duelInviteInterval = window.setInterval(() => {
+      const rem = deadline - Date.now();
+      if (rem <= 0) {
+        stopDuelInviteTimer();
+        currentDuelInvite = null;
+        if (box) box.hidden = true;
+        return;
+      }
+      if (countdownEl) countdownEl.textContent = formatDuelInviteCountdown(rem);
+      if (barEl) barEl.style.width = `${Math.max(0, Math.min(100, (rem / totalMs) * 100))}%`;
+    }, 200);
+  },
+
+  /** Cập nhật trạng thái trận đấu PK: đếm ngược 3-2-1 hoặc HUD chiến đấu */
+  onDuelState(msg: DuelStateMsg) {
+    this.closeDuelEndModal();
+    stopDuelInviteTimer();
+    currentDuelInvite = null;
+    const invBox = $("duel-invite-box");
+    if (invBox) invBox.hidden = true;
+
+    currentDuelOpponent = msg.opponent;
+
+    if (msg.phase === "countdown") {
+      this.hideDuelHud();
+      currentDuelOpponent = msg.opponent;
+      const overlay = $("duel-countdown-overlay");
+      const numEl = $("dco-number");
+      const vsEl = $("dco-vs");
+      if (vsEl) vsEl.textContent = `VS ${msg.opponent}`;
+      if (overlay && numEl) {
+        overlay.hidden = false;
+        stopDuelCountdownTimer();
+        const safeStartsIn = Math.max(0, msg.startsInMs);
+        const updateNum = (remMs: number) => {
+          const sec = Math.max(1, Math.ceil(remMs / 1000));
+          numEl.textContent = String(sec);
+        };
+        updateNum(safeStartsIn);
+        const startDeadline = Date.now() + safeStartsIn;
+        duelCountdownInterval = window.setInterval(() => {
+          const rem = startDeadline - Date.now();
+          if (rem <= 0) {
+            stopDuelCountdownTimer();
+            overlay.hidden = true;
+            return;
+          }
+          updateNum(rem);
+        }, 150);
+      }
+      return;
+    }
+
+    // Phase "fight"
+    stopDuelCountdownTimer();
+    const overlay = $("duel-countdown-overlay");
+    if (overlay) overlay.hidden = true;
+
+    document.body.classList.add("in-duel");
+    const hud = $("duel-hud");
+    if (hud) hud.hidden = false;
+
+    const oppEl = $("duel-hud-opponent");
+    if (oppEl) oppEl.textContent = msg.opponent;
+
+    const safeEndsIn = Math.max(0, msg.endsInMs);
+    duelDeadlineAt = Date.now() + safeEndsIn;
+    const timerEl = $("duel-hud-timer");
+    if (timerEl) timerEl.textContent = formatDuelCountdown(safeEndsIn);
+
+    stopDuelHudTimer();
+    duelHudInterval = window.setInterval(() => {
+      const rem = duelDeadlineAt - Date.now();
+      if (timerEl) timerEl.textContent = formatDuelCountdown(rem);
+      if (rem <= 0) stopDuelHudTimer();
+    }, 250);
+  },
+
+  /** Cập nhật thanh máu và số lượng máu của đối thủ trong HUD quyết đấu */
+  updateDuelOpponentHp(hp: number, maxHp: number) {
+    const safeMax = Math.max(1, maxHp);
+    const safeHp = Math.max(0, Math.min(safeMax, hp));
+    const pct = Math.round((safeHp / safeMax) * 100);
+    const fill = $("duel-hud-hp-fill");
+    if (fill) fill.style.width = `${pct}%`;
+    const text = $("duel-hud-hp-text");
+    if (text) text.textContent = `${safeHp} / ${safeMax} (${pct}%)`;
+  },
+
+  /** Ẩn HUD và dừng mọi timer quyết đấu */
+  hideDuelHud() {
+    stopDuelInviteTimer();
+    stopDuelHudTimer();
+    stopDuelCountdownTimer();
+    currentDuelInvite = null;
+    currentDuelOpponent = "";
+    document.body.classList.remove("in-duel");
+
+    const hud = $("duel-hud");
+    if (hud) hud.hidden = true;
+    const overlay = $("duel-countdown-overlay");
+    if (overlay) overlay.hidden = true;
+    const confirmBox = $("duel-yield-confirm");
+    if (confirmBox) confirmBox.hidden = true;
+    const yieldBtn = $("duel-btn-yield");
+    if (yieldBtn) yieldBtn.hidden = false;
+    const invBox = $("duel-invite-box");
+    if (invBox) invBox.hidden = true;
+  },
+
+  /** Xử lý kết thúc trận quyết đấu (màn kết quả, không mất kiếp) */
+  onDuelEnd(msg: DuelEndMsg) {
+    const oppName = currentDuelOpponent;
+    this.hideDuelHud();
+
+    // Không mở nếu đang ở Hoàng Tuyền (chết do quái trước đó)
+    if (this.isLimboOpen()) return;
+
+    const modal = $("duel-end-modal");
+    if (!modal) return;
+
+    const sealEl = $("duend-seal");
+    if (sealEl) {
+      sealEl.className = `duend-seal ${msg.result}`;
+      sealEl.textContent = "⚔";
+    }
+
+    const titleEl = $("duend-title");
+    if (titleEl) {
+      titleEl.textContent = duelResultTitle(msg.result);
+    }
+
+    const reasonEl = $("duend-reason");
+    if (reasonEl) {
+      reasonEl.textContent = duelEndReasonText(msg.reason, msg.result, oppName || "Đối thủ");
+    }
+
+    modal.hidden = false;
+    if (msg.result === "won") {
+      sound.questDone?.();
+    } else if (msg.result === "lost") {
+      sound.hit?.();
+    }
+  },
+
+  isDuelActive(): boolean {
+    const hud = $("duel-hud");
+    return Boolean(hud && !hud.hidden);
+  },
+
+  getDuelOpponent(): string {
+    return currentDuelOpponent;
   },
 };

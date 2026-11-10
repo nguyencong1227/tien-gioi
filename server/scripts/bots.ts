@@ -14,6 +14,9 @@ import { Client, Protocol, type Room } from "colyseus.js";
 import {
   AUTH_API,
   DEFAULT_MAP,
+  DUEL_COOLDOWN_MS,
+  DUEL_MSG,
+  DUEL_RANGE,
   DUNGEON_MSG,
   DUNGEON_OPEN_COOLDOWN_MS,
   LINH_HU_ID,
@@ -33,6 +36,9 @@ import {
   TRAVEL_COOLDOWN_MS,
   type AttackMsg,
   type BuyMsg,
+  type DuelEndMsg,
+  type DuelInvitedMsg,
+  type DuelStateMsg,
   type DungeonEndMsg,
   type DungeonInviteMsg,
   type DungeonStateMsg,
@@ -105,6 +111,7 @@ interface CliArgs {
   account: boolean;
   loginStorm: boolean;
   dungeon: boolean;
+  duel: boolean;
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -136,6 +143,7 @@ function parseArgs(argv: string[]): CliArgs {
   let account = false;
   let loginStorm = false;
   let dungeon = false;
+  let duel = false;
 
   for (const arg of argv) {
     if (arg.startsWith("--bots=")) bots = Math.max(0, Number(arg.slice(7)));
@@ -145,6 +153,7 @@ function parseArgs(argv: string[]): CliArgs {
     else if (arg === "--travel" || arg === "--portal") travel = true;
     else if (arg === "--die") die = true;
     else if (arg === "--dungeon") dungeon = true;
+    else if (arg === "--duel" || arg === "--pk") duel = true;
     else if (arg.startsWith("--party")) {
       const val = arg.slice(7).replace(/^=/, "");
       partySize = val ? Math.max(2, Math.min(4, Number(val))) : 4;
@@ -243,6 +252,7 @@ function parseArgs(argv: string[]): CliArgs {
     account,
     loginStorm,
     dungeon,
+    duel,
   };
 }
 
@@ -686,6 +696,16 @@ interface BotState {
   dungeonState?: DungeonStateMsg;
   dungeonLastEndAt: number;
   nextDungeonOpenAt: number;
+  // Các trường cho thử tải PK thách đấu (--duel, #219)
+  duel?: boolean;
+  duelOpponentName?: string;
+  duelPhase?: "countdown" | "fight";
+  duelMatchesCount: number;
+  duelMatchesWon: number;
+  duelMatchesLost: number;
+  duelMatchesDraw: number;
+  duelLastEndAt: number;
+  nextDuelChallengeAt: number;
 }
 
 export interface LoadTestMetrics {
@@ -789,6 +809,12 @@ export interface LoadTestMetrics {
   dungeonOpenLatencyAvgMs?: number;
   dungeonOpenLatencyP50Ms?: number;
   dungeonOpenLatencyP95Ms?: number;
+  /** Các chỉ số thử tải PK thách đấu (#219) */
+  duel?: boolean;
+  duelMatchesTotal?: number;
+  duelMatchesWon?: number;
+  duelMatchesLost?: number;
+  duelMatchesDraw?: number;
 }
 
 export interface IdleZeroBotMetrics {
@@ -966,6 +992,30 @@ function bindRoomEvents(
       else b.dungeonRunsLost++;
     }
   });
+  room.onMessage(DUEL_MSG.invited, (msg: DuelInvitedMsg) => {
+    if (b.duel) {
+      room.send(DUEL_MSG.accept, { from: msg.from });
+    }
+  });
+  room.onMessage(DUEL_MSG.state, (msg: DuelStateMsg) => {
+    if (b.duel) {
+      b.duelPhase = msg.phase;
+      b.duelOpponentName = msg.opponent;
+    }
+  });
+  room.onMessage(DUEL_MSG.end, (msg: DuelEndMsg) => {
+    if (b.duel) {
+      b.duelPhase = undefined;
+      b.duelLastEndAt = performance.now();
+      b.nextDuelChallengeAt = performance.now() + DUEL_COOLDOWN_MS + 500;
+      if (isMeasuring()) {
+        b.duelMatchesCount++;
+        if (msg.result === "won") b.duelMatchesWon++;
+        else if (msg.result === "lost") b.duelMatchesLost++;
+        else b.duelMatchesDraw++;
+      }
+    }
+  });
   room.onMessage("limbo", (msg: LimboMsg) => {
     if (isMeasuring()) {
       b.deathsCount++;
@@ -1105,6 +1155,7 @@ async function runLoadTest(
   die = false,
   account = false,
   dungeon = false,
+  duel = false,
 ): Promise<LoadTestMetrics> {
   const currentMap = getMap(mapId) ?? DEFAULT_MAP;
   const partySuffix = partySize > 1 ? `, tổ đội ${partySize} người` : "";
@@ -1116,14 +1167,15 @@ async function runLoadTest(
   const dieSuffix = die ? ", bot tự tử (--die)" : "";
   const accountSuffix = account ? ", tài khoản (--account)" : "";
   const dungeonSuffix = dungeon ? ", bí cảnh (--dungeon)" : "";
+  const duelSuffix = duel ? ", thách đấu PK (--duel)" : "";
   const mapSuffix =
     currentMap.def.id !== DEFAULT_MAP.def.id ? `, bản đồ=${currentMap.def.name}` : "";
   const modeLabel =
     mode === "realistic"
-      ? `Thực tế (vào tầm đứng chém${partySuffix}${shopSuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${dungeonSuffix}${mapSuffix})`
+      ? `Thực tế (vào tầm đứng chém${partySuffix}${shopSuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${dungeonSuffix}${duelSuffix}${mapSuffix})`
       : mode === "crowd"
-        ? `Đông người trong trấn/khu an toàn (${shop ? "25% ghé Dược Sư, 25% đứng, 50% đi" : "30% đứng yên, 70% đi lại"}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${dungeonSuffix}${mapSuffix})`
-        : `Xấu nhất (100% di chuyển 20 input/s${partySuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${dungeonSuffix}${mapSuffix})`;
+        ? `Đông người trong trấn/khu an toàn (${shop ? "25% ghé Dược Sư, 25% đứng, 50% đi" : "30% đứng yên, 70% đi lại"}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${dungeonSuffix}${duelSuffix}${mapSuffix})`
+        : `Xấu nhất (100% di chuyển 20 input/s${partySuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${dungeonSuffix}${duelSuffix}${mapSuffix})`;
   console.log(
     `\n=== Bắt đầu thử tải [${modeLabel}]: ${botCount} bot, đo trong ${durationSec}s (${url}) ===`,
   );
@@ -1186,11 +1238,22 @@ async function runLoadTest(
     const secret = `bot_secret_tien_gioi_${numStr}_loadtest`;
 
     // Khởi tạo vị trí (campX, campY) rải đều khắp vùng hoang dã giống bench.ts trước khi joinOrCreate
-    const realm = dungeon ? 1 : rnd() < 0.8 ? 1 : 2;
-    const tier = dungeon ? 8 : Math.floor(rnd() * REALMS[realm].tiers.length);
+    const realm = duel ? 1 : dungeon ? 1 : rnd() < 0.8 ? 1 : 2;
+    const tier = duel ? 4 : dungeon ? 8 : Math.floor(rnd() * REALMS[realm].tiers.length);
     let campX = 0;
     let campY = 0;
-    if (dungeon) {
+    if (duel) {
+      // Khi thử tải PK thách đấu: xếp theo cặp ngoài khu an toàn của trấn
+      const pairIndex = Math.floor((i - 1) / 2);
+      const totalPairs = Math.max(1, Math.ceil(botCount / 2));
+      const pairAngle = (pairIndex / totalPairs) * Math.PI * 2;
+      const distFromTown = currentMap.townPx.r + 120;
+      const cx = currentMap.townPx.x + Math.cos(pairAngle) * distFromTown;
+      const cy = currentMap.townPx.y + Math.sin(pairAngle) * distFromTown;
+      const offset = (i - 1) % 2 === 0 ? -25 : 25;
+      campX = cx + offset;
+      campY = cy;
+    } else if (dungeon) {
       // Khi thử tải bí cảnh: sinh bot quanh NPC Thủ Môn ở Lạc Hà Trấn
       const gate = NPC_BY_ID.thu_mon;
       campX = gate.x + (rnd() - 0.5) * 40;
@@ -1262,8 +1325,8 @@ async function runLoadTest(
         secret,
         campX,
         campY,
-        dungeon ? 1 : die ? 1 : realm,
-        dungeon ? 8 : die ? 8 : tier,
+        duel ? 1 : dungeon ? 1 : die ? 1 : realm,
+        duel ? 4 : dungeon ? 8 : die ? 8 : tier,
         currentMap.def.id,
         lifeSeed,
       );
@@ -1390,6 +1453,15 @@ async function runLoadTest(
       dungeonOpenLatencies: [],
       dungeonLastEndAt: 0,
       nextDungeonOpenAt: now + 1500 + Math.random() * 2000,
+      duel,
+      duelOpponentName: undefined,
+      duelPhase: undefined,
+      duelMatchesCount: 0,
+      duelMatchesWon: 0,
+      duelMatchesLost: 0,
+      duelMatchesDraw: 0,
+      duelLastEndAt: 0,
+      nextDuelChallengeAt: now + 1500 + ((i - 1) % 2 === 0 ? 0 : 5000),
     };
 
     bindRoomEvents(
@@ -1565,6 +1637,70 @@ async function runLoadTest(
           } else {
             dx = 0;
             dy = 0;
+          }
+        }
+      }
+    } else if (duel) {
+      // Kịch bản thử tải PK thách đấu (--duel, #219)
+      const oppIndex = (b.index - 1) % 2 === 0 ? b.index + 1 : b.index - 1;
+      const oppName = b.duelOpponentName ?? `Bot ${String(oppIndex).padStart(3, "0")}`;
+      let oppPlayer: any = null;
+      if (state?.players && typeof state.players.forEach === "function") {
+        state.players.forEach((p: any) => {
+          if (p && p.name && p.name.toLowerCase() === oppName.toLowerCase()) {
+            oppPlayer = p;
+          }
+        });
+      }
+
+      if (b.duelPhase === "fight") {
+        if (oppPlayer && !oppPlayer.dead) {
+          // Người KHÁC chỉ có vị trí công khai `px`, `py` (`x`, `y` chỉ gửi cho chủ)
+          const dist = Math.hypot(oppPlayer.px - b.predX, oppPlayer.py - b.predY);
+          const angle = Math.atan2(oppPlayer.py - b.predY, oppPlayer.px - b.predX);
+          if (dist > SKILLS.slash.range) {
+            dx = Math.cos(angle);
+            dy = Math.sin(angle);
+          } else {
+            dx = 0;
+            dy = 0;
+          }
+          if (dist <= SKILLS.slash.range + 20 && now >= b.nextSlashAt) {
+            b.room.send("attack", { angle });
+            b.nextSlashAt = now + SKILLS.slash.cooldown + 50;
+            if (measuring) attacksSent++;
+          }
+        } else {
+          dx = 0;
+          dy = 0;
+        }
+      } else if (b.duelPhase === "countdown") {
+        dx = 0;
+        dy = 0;
+      } else {
+        // Chưa trong trận. Server KHÔNG áp vị trí lưu trong file: bot luôn vào từ trấn (khu an toàn, không được thách đấu),
+        // nên trước hết đi tới điểm cắm trại của cặp (ngoài khu an toàn) rồi mới thách.
+        const distToCamp = Math.hypot(b.campX - b.predX, b.campY - b.predY);
+        const outside = !b.map.inSafe(b.predX, b.predY);
+        if (distToCamp > 12 || !outside) {
+          const a = Math.atan2(b.campY - b.predY, b.campX - b.predX);
+          dx = Math.cos(a);
+          dy = Math.sin(a);
+        } else {
+          dx = 0;
+          dy = 0;
+          // Bên thách = bot lẻ (1-based: 1, 3, 5...); chỉ thách khi cả hai đã ở ngoài khu an toàn và trong tầm
+          const isChallenger = (b.index - 1) % 2 === 0;
+          if (isChallenger && oppPlayer && !oppPlayer.dead && !oppPlayer.duel) {
+            const dist = Math.hypot(oppPlayer.px - b.predX, oppPlayer.py - b.predY);
+            if (
+              !b.map.inSafe(oppPlayer.px, oppPlayer.py) &&
+              dist <= DUEL_RANGE &&
+              now >= b.nextDuelChallengeAt
+            ) {
+              b.room.send(DUEL_MSG.challenge, { name: oppName });
+              b.nextDuelChallengeAt = now + DUEL_COOLDOWN_MS + 2000;
+            }
           }
         }
       }
@@ -2259,6 +2395,11 @@ async function runLoadTest(
       ? Number(percentile(allDungeonOpenLatencies, 95).toFixed(2))
       : undefined;
 
+  const totalDuelMatches = bots.reduce((s, b) => s + b.duelMatchesCount, 0);
+  const totalDuelWins = bots.reduce((s, b) => s + b.duelMatchesWon, 0);
+  const totalDuelLosses = bots.reduce((s, b) => s + b.duelMatchesLost, 0);
+  const totalDuelDraws = bots.reduce((s, b) => s + b.duelMatchesDraw, 0);
+
   const metrics: LoadTestMetrics = {
     commit,
     note,
@@ -2360,6 +2501,11 @@ async function runLoadTest(
     dungeonOpenLatencyAvgMs,
     dungeonOpenLatencyP50Ms,
     dungeonOpenLatencyP95Ms,
+    duel: duel ? true : undefined,
+    duelMatchesTotal: duel || totalDuelMatches > 0 ? totalDuelMatches : undefined,
+    duelMatchesWon: duel || totalDuelWins > 0 ? totalDuelWins : undefined,
+    duelMatchesLost: duel || totalDuelLosses > 0 ? totalDuelLosses : undefined,
+    duelMatchesDraw: duel || totalDuelDraws > 0 ? totalDuelDraws : undefined,
   };
 
   printMetrics(metrics);
@@ -2458,6 +2604,11 @@ function printMetrics(m: LoadTestMetrics) {
   if (m.dungeon || (m.dungeonRunsTotal !== undefined && m.dungeonRunsTotal > 0)) {
     console.log(
       `- Thử tải Bí cảnh (--dungeon): ${m.dungeonRunsTotal ?? 0} lần mở run | Thắng: ${m.dungeonRunsWon ?? 0} | Thua: ${m.dungeonRunsLost ?? 0} | Độ trễ mở -> vào phòng: TB ${m.dungeonOpenLatencyAvgMs ?? "–"} ms (p50: ${m.dungeonOpenLatencyP50Ms ?? "–"} ms, p95: ${m.dungeonOpenLatencyP95Ms ?? "–"} ms)`,
+    );
+  }
+  if (m.duel || (m.duelMatchesTotal !== undefined && m.duelMatchesTotal > 0)) {
+    console.log(
+      `- Thử tải PK thách đấu (--duel): ${m.duelMatchesTotal ?? 0} trận | Thắng: ${m.duelMatchesWon ?? 0} | Thua: ${m.duelMatchesLost ?? 0} | Hoà: ${m.duelMatchesDraw ?? 0}`,
     );
   }
 }
@@ -2744,6 +2895,7 @@ async function main() {
           args.die,
           args.account,
           args.dungeon,
+          args.duel,
         ),
       );
     }

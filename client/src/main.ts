@@ -14,6 +14,7 @@ import {
 import { WorldScene } from "./scenes/WorldScene";
 import { ui } from "./ui";
 import { buildMockThuMonDialog, isMockDungeonEnabled, MOCK_DUNGEON_SAMPLES } from "./dungeon";
+import { isMockDuelEnabled, MOCK_DUEL_SAMPLES } from "./duel";
 import { captureEarlyMessages } from "./early-messages";
 import { joinWithRedirect } from "./connection";
 import { clearToken, getToken } from "./auth";
@@ -139,11 +140,11 @@ initAuthUi({
   },
 });
 
-// Chế độ máy chủ Bí cảnh giả lập (?dungeon=mock) để thử nghiệm và chụp ảnh không cần server 4b/4c
-if (typeof window !== "undefined" && isMockDungeonEnabled()) {
+// Chế độ máy chủ giả lập (?dungeon=mock hoặc ?duel=mock) để thử nghiệm và chụp ảnh không cần server thật
+if (typeof window !== "undefined" && (isMockDungeonEnabled() || isMockDuelEnabled())) {
   const mockRoom = createMockDungeonRoom();
   start(mockRoom, DEFAULT_MAP_ID).catch((err) => {
-    console.error("Lỗi khởi động máy chủ bí cảnh giả lập:", err);
+    console.error("Lỗi khởi động máy chủ giả lập:", err);
   });
 }
 
@@ -387,6 +388,21 @@ async function start(room: Room, mapId: string) {
       },
       showLost: () => {
         ui.onDungeonEnd(MOCK_DUNGEON_SAMPLES.endLost());
+      },
+    };
+    (window as any).__mockDuel = {
+      showInvite: (from = "Diệp Phàm") => ui.onDuelInvited(MOCK_DUEL_SAMPLES.invited(from)),
+      showCountdown: (opponent = "Diệp Phàm") =>
+        ui.onDuelState(MOCK_DUEL_SAMPLES.stateCountdown(opponent)),
+      showFighting: (opponent = "Diệp Phàm") =>
+        ui.onDuelState(MOCK_DUEL_SAMPLES.stateFighting(opponent)),
+      updateOpponentHp: (hp: number, maxHp: number) => ui.updateDuelOpponentHp(hp, maxHp),
+      showWon: (opponent = "Diệp Phàm") => ui.onDuelEnd(MOCK_DUEL_SAMPLES.endWon(opponent)),
+      showLost: (opponent = "Diệp Phàm") => ui.onDuelEnd(MOCK_DUEL_SAMPLES.endLost(opponent)),
+      showDraw: () => ui.onDuelEnd(MOCK_DUEL_SAMPLES.endDraw()),
+      hide: () => {
+        ui.hideDuelHud();
+        ui.closeDuelEndModal();
       },
     };
   }
