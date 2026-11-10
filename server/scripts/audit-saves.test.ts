@@ -12,8 +12,10 @@ import {
   getMap,
 } from "@tien-gioi/shared";
 import {
+  auditAccountSaveData,
   auditPlayerSaveData,
   auditSavesDirectory,
+  auditSessionSaveData,
   auditSoulSaveData,
   MAX_FILE_SIZE,
   show,
@@ -690,6 +692,224 @@ describe("audit-saves (Issue #112)", () => {
       const reportInconsistent = auditSavesDirectory(tmpDir);
       expect(reportInconsistent.errorFiles).toBe(1);
       expect(reportInconsistent.errorsByCode.limbo_soul_inconsistent).toBe(1);
+    });
+  });
+
+  describe("auditAccountSaveData & auditSessionSaveData (Issue #176)", () => {
+    const sampleHash = "scrypt$1024$8$1$c2FsdHNhbHRzYWx0$aGFzaGhhc2hoYXNoaGFzaGhhc2g";
+    const validAccount = {
+      id: "11111111-2222-3333-4444-555555555555",
+      username: "han_lap",
+      passHash: sampleHash,
+      recoveryHash: sampleHash,
+      createdAt: "2026-11-10T00:00:00.000Z",
+      lastLoginAt: "2026-11-10T00:00:00.000Z",
+      disabled: false,
+      name: "Hàn Lập",
+    };
+
+    const validSession = {
+      tokenHash: "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90",
+      accountId: "11111111-2222-3333-4444-555555555555",
+      createdAt: 1000,
+      expiresAt: 5000,
+      lastSeenAt: 2000,
+    };
+
+    it("file tài khoản hợp lệ -> 0 lỗi", () => {
+      const raw = JSON.stringify(validAccount);
+      expect(auditAccountSaveData(raw, raw.length)).toEqual([]);
+    });
+
+    it("bắt các lỗi định dạng của tài khoản và không lộ băm mật khẩu", () => {
+      // 1. Lỗi JSON
+      expect(auditAccountSaveData("{", 1).map((e) => e.code)).toContain("invalid_json");
+      expect(auditAccountSaveData("[]", 2).map((e) => e.code)).toContain("not_an_object");
+
+      // 2. id không hợp lệ
+      const badId = JSON.stringify({ ...validAccount, id: "ngan" });
+      expect(auditAccountSaveData(badId, badId.length).map((e) => e.code)).toContain(
+        "invalid_account_id",
+      );
+
+      // 3. username không hợp lệ (chữ hoa, ký tự lạ, quá ngắn)
+      const badUser = JSON.stringify({ ...validAccount, username: "HanLap" });
+      expect(auditAccountSaveData(badUser, badUser.length).map((e) => e.code)).toContain(
+        "invalid_username",
+      );
+
+      // 4. passHash & recoveryHash không hợp lệ (không phải scrypt)
+      const badPass = JSON.stringify({ ...validAccount, passHash: "plain_password" });
+      const passErrors = auditAccountSaveData(badPass, badPass.length);
+      expect(passErrors.map((e) => e.code)).toContain("invalid_pass_hash");
+      expect(JSON.stringify(passErrors)).not.toContain("plain_password");
+
+      const badRec = JSON.stringify({ ...validAccount, recoveryHash: "plain_code" });
+      const recErrors = auditAccountSaveData(badRec, badRec.length);
+      expect(recErrors.map((e) => e.code)).toContain("invalid_recovery_hash");
+      expect(JSON.stringify(recErrors)).not.toContain("plain_code");
+
+      // 5. createdAt / lastLoginAt không hợp lệ
+      const badTime = JSON.stringify({
+        ...validAccount,
+        createdAt: "invalid-date",
+        lastLoginAt: 12345,
+      });
+      const timeErrors = auditAccountSaveData(badTime, badTime.length).map((e) => e.code);
+      expect(timeErrors).toContain("invalid_created_at");
+      expect(timeErrors).toContain("invalid_last_login_at");
+
+      // 6. disabled không phải boolean
+      const badDisabled = JSON.stringify({ ...validAccount, disabled: "true" });
+      expect(auditAccountSaveData(badDisabled, badDisabled.length).map((e) => e.code)).toContain(
+        "invalid_disabled",
+      );
+
+      // 7. name không hợp lệ theo cleanName
+      const badName = JSON.stringify({ ...validAccount, name: "x" });
+      expect(auditAccountSaveData(badName, badName.length).map((e) => e.code)).toContain(
+        "invalid_account_name",
+      );
+    });
+
+    it("file phiên hợp lệ -> 0 lỗi", () => {
+      const raw = JSON.stringify(validSession);
+      expect(auditSessionSaveData(raw, raw.length)).toEqual([]);
+    });
+
+    it("bắt các lỗi định dạng của phiên", () => {
+      // 1. tokenHash không đúng sha256 hex
+      const badHash = JSON.stringify({ ...validSession, tokenHash: "not-hex-64" });
+      expect(auditSessionSaveData(badHash, badHash.length).map((e) => e.code)).toContain(
+        "invalid_token_hash",
+      );
+
+      // 2. accountId không hợp lệ
+      const badAccId = JSON.stringify({ ...validSession, accountId: "ngan" });
+      expect(auditSessionSaveData(badAccId, badAccId.length).map((e) => e.code)).toContain(
+        "invalid_account_id",
+      );
+
+      // 3. Thời gian phiên không hợp lệ
+      const badTime = JSON.stringify({
+        ...validSession,
+        createdAt: -1,
+        expiresAt: NaN,
+        lastSeenAt: "1000",
+      });
+      const timeErrors = auditSessionSaveData(badTime, badTime.length).map((e) => e.code);
+      expect(timeErrors).toContain("invalid_session_time");
+    });
+
+    it("auditSavesDirectory quét thư mục accounts/ và sessions/ đầy đủ và kiểm tra toàn vẹn", () => {
+      const accountsSubDir = path.join(tmpDir, "accounts");
+      const sessionsSubDir = path.join(tmpDir, "sessions");
+      mkdirSync(accountsSubDir, { recursive: true });
+      mkdirSync(sessionsSubDir, { recursive: true });
+
+      // Lưu file tài khoản hợp lệ: <id>.json
+      const accFile = path.join(accountsSubDir, `${validAccount.id}.json`);
+      writeFileSync(accFile, JSON.stringify(validAccount, null, 2));
+
+      // Lưu file phiên hợp lệ: <tokenHash>.json
+      const sessFile = path.join(sessionsSubDir, `${validSession.tokenHash}.json`);
+      writeFileSync(sessFile, JSON.stringify(validSession, null, 2));
+
+      // Thêm 1 file nhân vật sạch
+      const pFile = path.join(tmpDir, "nhan_vat.json");
+      writeFileSync(pFile, JSON.stringify(validPlayer, null, 2));
+
+      const report = auditSavesDirectory(tmpDir);
+      expect(report.totalFiles).toBe(1);
+      expect(report.cleanFiles).toBe(1);
+      expect(report.errorFiles).toBe(0);
+
+      expect(report.totalAccounts).toBe(1);
+      expect(report.cleanAccounts).toBe(1);
+      expect(report.errorAccounts).toBe(0);
+
+      expect(report.totalSessions).toBe(1);
+      expect(report.cleanSessions).toBe(1);
+      expect(report.errorSessions).toBe(0);
+
+      expect(report.failedFiles).toHaveLength(0);
+    });
+
+    it("phát hiện tên file không khớp, trùng username, trùng đạo hiệu, và phiên mồ côi (orphan)", () => {
+      const accountsSubDir = path.join(tmpDir, "accounts");
+      const sessionsSubDir = path.join(tmpDir, "sessions");
+      mkdirSync(accountsSubDir, { recursive: true });
+      mkdirSync(sessionsSubDir, { recursive: true });
+
+      // 1. Tên file tài khoản không khớp id
+      const mismatchedAcc = { ...validAccount, id: "22222222-2222-2222-2222-222222222222" };
+      writeFileSync(
+        path.join(accountsSubDir, "sai_ten_file.json"),
+        JSON.stringify(mismatchedAcc, null, 2),
+      );
+
+      // 2. Trùng username giữa 2 tài khoản
+      const acc1 = {
+        ...validAccount,
+        id: "33333333-3333-3333-3333-333333333333",
+        username: "trung_username",
+        name: "Đạo Hiệu 1",
+      };
+      const acc2 = {
+        ...validAccount,
+        id: "44444444-4444-4444-4444-444444444444",
+        username: "trung_username",
+        name: "Đạo Hiệu 2",
+      };
+      writeFileSync(path.join(accountsSubDir, `${acc1.id}.json`), JSON.stringify(acc1, null, 2));
+      writeFileSync(path.join(accountsSubDir, `${acc2.id}.json`), JSON.stringify(acc2, null, 2));
+
+      // 3. Trùng đạo hiệu (không phân biệt hoa thường, NFC)
+      const acc3 = {
+        ...validAccount,
+        id: "55555555-5555-5555-5555-555555555555",
+        username: "user_a",
+        name: "Bạch Tiểu Thuần",
+      };
+      const acc4 = {
+        ...validAccount,
+        id: "66666666-6666-6666-6666-666666666666",
+        username: "user_b",
+        name: "BẠCH TIỂU THUẦN",
+      };
+      writeFileSync(path.join(accountsSubDir, `${acc3.id}.json`), JSON.stringify(acc3, null, 2));
+      writeFileSync(path.join(accountsSubDir, `${acc4.id}.json`), JSON.stringify(acc4, null, 2));
+
+      // 4. Tên file phiên không khớp tokenHash (accountId trỏ tới tài khoản hợp lệ acc1)
+      const mismatchedHashSess = { ...validSession, accountId: acc1.id };
+      writeFileSync(
+        path.join(sessionsSubDir, "sai_hash.json"),
+        JSON.stringify(mismatchedHashSess, null, 2),
+      );
+
+      // 5. Phiên mồ côi: trỏ tới accountId không có trong accounts/
+      const orphanSess = {
+        ...validSession,
+        tokenHash: "b1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90",
+        accountId: "99999999-9999-9999-9999-999999999999",
+      };
+      writeFileSync(
+        path.join(sessionsSubDir, `${orphanSess.tokenHash}.json`),
+        JSON.stringify(orphanSess, null, 2),
+      );
+
+      // 6. Tệp tạm (*.tmp) và tệp cách ly (*.hong-*) phải được bỏ qua
+      writeFileSync(path.join(accountsSubDir, "tam.tmp"), "{");
+      writeFileSync(path.join(accountsSubDir, "bi_hong.hong-123"), "{");
+      writeFileSync(path.join(sessionsSubDir, "tam.tmp"), "{");
+      writeFileSync(path.join(sessionsSubDir, "bi_hong.hong-123"), "{");
+
+      const report = auditSavesDirectory(tmpDir);
+      expect(report.errorsByCode.mismatched_account_filename).toBe(1);
+      expect(report.errorsByCode.duplicate_username).toBe(1);
+      expect(report.errorsByCode.duplicate_account_name).toBe(1);
+      expect(report.errorsByCode.mismatched_session_filename).toBe(1);
+      expect(report.errorsByCode.orphan_session).toBe(1);
     });
   });
 });
