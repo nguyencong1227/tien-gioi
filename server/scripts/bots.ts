@@ -46,7 +46,9 @@ if (existsSync(envFile)) process.loadEnvFile(envFile);
 
 const DEFAULT_PORT = Number(process.env.PORT ?? 2587);
 const FORBIDDEN_PORTS = new Set([2567, 2577]); // Cổng của Dev A và Dev B
-const DATA_PLAYERS_DIR = path.resolve(here, "../data/players");
+const DATA_PLAYERS_DIR = process.env.DATA_DIR
+  ? path.resolve(process.env.DATA_DIR)
+  : path.resolve(here, "../data/players");
 const DOC_PATH = path.resolve(repoRoot, "docs/LOAD_TEST.md");
 
 /** 4 byte overhead khung WebSocket Colyseus (RFC 6455 header + masking). */
@@ -221,7 +223,7 @@ function seedBotSaveFile(
   mkdirSync(DATA_PLAYERS_DIR, { recursive: true });
   // Tên file PHẢI khớp với fileFor() trong server/src/store.ts (sha1 của tên NFC viết thường).
   // store.ts đổi cách đặt tên file thì bot sẽ ghi nhầm chỗ mà không báo lỗi: sửa cả hai nơi.
-  // Server phải chạy với thư mục làm việc server/ (npm run dev / start -w server) để DATA_DIR mặc định trỏ đúng server/data/players.
+  // Ưu tiên DATA_DIR từ môi trường (giống store.ts), mặc định trỏ về server/data/players.
   const key = createHash("sha1").update(name.normalize("NFC").toLowerCase()).digest("hex");
   const file = path.join(DATA_PLAYERS_DIR, `${key}.json`);
   const now = new Date().toISOString();
@@ -1468,7 +1470,7 @@ async function runLoadTest(
   if (!keepSaves) {
     const removed = cleanCreatedBotSaves(createdBotNames);
     console.log(
-      `Đã dọn ${removed}/${createdBotNames.size} file lưu của đợt bot vừa chạy trong server/data/players/.`,
+      `Đã dọn ${removed}/${createdBotNames.size} file lưu của đợt bot vừa chạy trong ${DATA_PLAYERS_DIR}.`,
     );
   }
 
