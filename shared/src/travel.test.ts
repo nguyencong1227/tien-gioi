@@ -58,6 +58,7 @@ describe("chuyển bản đồ: hợp đồng (M3 bước 1)", () => {
       "duoc_su",
       "tho_ren",
       "cao_thi",
+      "thu_mon",
     ]);
     expect(npcsOfMap(HAC_PHONG_ID).map((n) => n.id)).toEqual(["lai_buon"]);
     // mọi NPC thuộc đúng một bản đồ có thật

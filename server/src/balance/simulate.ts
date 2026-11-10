@@ -8,7 +8,7 @@ import {
   emptyEquipment,
   stepOf,
   type Equipment,
-  MONSTERS,
+  WILD_MONSTERS,
   MEDITATE,
   REALMS,
   QUESTS,
@@ -116,7 +116,7 @@ export function bestOption(realm: number, tier: number, party = 1): Option {
     secPerKill: 0,
   };
   let best = meditate;
-  for (const m of MONSTERS) {
+  for (const m of WILD_MONSTERS) {
     const o = huntRate(m, realm, tier, party);
     if (o && o.rate > best.rate) best = o;
   }

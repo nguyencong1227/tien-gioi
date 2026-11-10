@@ -151,6 +151,12 @@ export interface PortalDef {
 /** Mô tả một bản đồ: client và server cùng sinh ô từ `seed`, không gửi dữ liệu bản đồ qua mạng. */
 export interface MapDef {
   readonly id: string;
+  /**
+   * Loại bản đồ: `world` (mặc định: một phòng sống mãi, nhiều người) hoặc `dungeon` (bí cảnh: phòng tạm của MỘT đội,
+   * docs/THIET_KE_BI_CANH.md). Bản đồ `dungeon` KHÔNG nằm trong `MAPS` (không có phòng thường) mà ở `DUNGEON_MAPS`;
+   * khu an toàn `town` của nó là cổng vào.
+   */
+  readonly kind?: "world" | "dungeon";
   /** Tên bản đồ (màn chuyển cảnh, danh sách). Lạc Hà giữ "Lạc Hà Trấn" cho tương thích */
   readonly name: string;
   readonly seed: number;
@@ -391,9 +397,42 @@ export const MAPS: readonly MapDef[] = [
   },
 ];
 
+/** Id bản đồ bí cảnh đầu tiên (docs/THIET_KE_BI_CANH.md). */
+export const LINH_HU_MAP_ID = "bi_canh_linh_hu";
+
+/**
+ * Bản đồ bí cảnh: phòng tạm theo đội, KHÔNG có phòng thường (`defineRooms` chỉ đăng ký `MAPS`) và không bao giờ là chỗ
+ * lưu của nhân vật. `getMap` vẫn tra được (client và server cùng dựng ô từ `seed`). Khu an toàn `town` là cổng vào ở
+ * phía nam; trùm nằm xa cổng vào (`minDanger` cao). Không có cổng chuyển bản đồ: vào bằng NPC, ra khi hết run.
+ */
+export const DUNGEON_MAPS: readonly MapDef[] = [
+  {
+    id: LINH_HU_MAP_ID,
+    kind: "dungeon",
+    name: "Linh Hư Bí Cảnh",
+    seed: 20261112,
+    w: 64,
+    h: 64,
+    town: { cx: 32, cy: 56, r: 4 },
+    townName: "Cổng Vào",
+    wildName: "Linh Hư Bí Cảnh",
+    // Quái nhỏ (dọn một lần, không hồi sinh ở bí cảnh) + đúng một trùm (`yeu_vuong`, game.ts)
+    monsterCap: { lang: 12, ho: 10, yeu_vuong: 1 },
+  },
+];
+
 export const MAP_BY_ID: Readonly<Record<string, MapDef>> = Object.fromEntries(
-  MAPS.map((m) => [m.id, m]),
+  [...MAPS, ...DUNGEON_MAPS].map((m) => [m.id, m]),
 );
+
+/** Bản đồ `id` là bí cảnh? Id lạ / sai kiểu là `false`. */
+export function isDungeonMap(id: unknown): boolean {
+  return (
+    typeof id === "string" &&
+    Object.prototype.hasOwnProperty.call(MAP_BY_ID, id) &&
+    MAP_BY_ID[id].kind === "dungeon"
+  );
+}
 
 const mapCache = new Map<string, GameMap>();
 

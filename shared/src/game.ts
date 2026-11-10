@@ -116,6 +116,25 @@ export const MONSTERS: MonsterKind[] = [
     color: 0xb3262a,
     boss: true,
   },
+  // Trùm của bí cảnh Linh Hư (docs/THIET_KE_BI_CANH.md). Không sinh ngoài hoang: `MONSTER_CAP.yeu_vuong = 0` và các bản đồ
+  // thường không khai báo loại này. SỐ LIỆU TẠM (A cân bằng ở PR 4c bằng `can-bang`: đội 3 người ở ngưỡng `minStep` hạ trùm
+  // trong 5-8 phút, một người gần như không hạ được).
+  {
+    id: "yeu_vuong",
+    name: "Linh Hư Yêu Vương",
+    minDanger: 0.8,
+    hp: 20000,
+    atk: 220,
+    speed: 120,
+    radius: 30,
+    aggro: 320,
+    attackRange: 60,
+    attackCd: 1500,
+    exp: 3000,
+    level: 14,
+    color: 0x5b2a8c,
+    boss: true,
+  },
 ];
 
 /** Người chơi cao hơn quái quá số bậc này thì tu vi bắt đầu giảm */
@@ -137,8 +156,20 @@ export const MONSTER_BY_ID: Record<string, MonsterKind> = Object.fromEntries(
 );
 
 /** Số quái tối đa mỗi loại trên bản đồ */
-export const MONSTER_CAP: Record<string, number> = { tho: 40, lang: 30, ho: 16, mang: 2 };
+export const MONSTER_CAP: Record<string, number> = {
+  tho: 40,
+  lang: 30,
+  ho: 16,
+  mang: 2,
+  yeu_vuong: 0, // trùm bí cảnh: không sinh ở bản đồ thường
+};
 export const MONSTER_RESPAWN_MS = 10000;
+
+/**
+ * Quái sinh ra ngoài hoang ở bản đồ mặc định (`MONSTER_CAP` > 0). Trùm bí cảnh (`yeu_vuong`) không nằm đây: mô hình cân
+ * bằng săn quái ngoài hoang (`server/src/balance`) dùng danh sách này để không tính nó như một bãi săn.
+ */
+export const WILD_MONSTERS: MonsterKind[] = MONSTERS.filter((m) => (MONSTER_CAP[m.id] ?? 0) > 0);
 
 // ---------- Tin nhắn client -> server ----------
 export interface InputMsg {

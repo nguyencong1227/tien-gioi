@@ -3,7 +3,7 @@ import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  MONSTERS,
+  WILD_MONSTERS,
   MONSTER_BY_ID,
   REALMS,
   TRADE_BY_ID,
@@ -70,7 +70,7 @@ const summary = [
 const monsterTable = [
   "| Quái | Cấp | Máu | Tiền rơi TB | Bán đồ rơi TB | Tổng LT / con | Đồ bán có giá |",
   "|---|---:|---:|---:|---:|---:|---|",
-  ...MONSTERS.map((m) => {
+  ...WILD_MONSTERS.map((m) => {
     const coin = expectedCoinDrop(m.id);
     const loot = expectedLootValue(m.id);
     const total = expectedTotalCoin(m.id);
@@ -85,7 +85,7 @@ const monsterTable = [
 ].join("\n");
 
 const economyRows = rows.flatMap((r) =>
-  MONSTERS.map((m) => {
+  WILD_MONSTERS.map((m) => {
     const eco = monsterEconomy(m, r.realm, r.tier);
     return eco ? { label: r.label, realm: r.realm, tier: r.tier, ...eco } : null;
   }).filter((x): x is NonNullable<typeof x> => x !== null),
