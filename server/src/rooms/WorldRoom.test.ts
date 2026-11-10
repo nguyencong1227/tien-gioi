@@ -1552,8 +1552,10 @@ describe("chat toàn server giữa các bản đồ (M3 bước 1)", () => {
     const b = await joinHacPhong("Chat Phong Dong");
     const hub = WorldRoomClass.hub;
     const before = hub.chatSinkCount;
+    const worldsBefore = hub.worlds.size;
     await serverRoom(b.room).disconnect();
     await waitFor(() => hub.chatSinkCount === before - 1, 3000);
+    expect(hub.worlds.size).toBe(worldsBefore - 1); // thế giới của phòng đã đóng cũng rời Hub
     await sleep(900);
     a.room.send("chat", { text: "vẫn nói được" });
     await waitFor(() => a.chat.find((m) => m.text === "vẫn nói được"));
@@ -1721,5 +1723,88 @@ describe("đi qua cổng giữa hai bản đồ (M3 bước 1)", () => {
     c.travelling = false;
     await sr.persist(p, c);
     expect(fileOf(name).mapId).toBe(DEFAULT_MAP_ID);
+  });
+});
+
+describe("đội dùng chung giữa các bản đồ (M3 bước 1)", () => {
+  const hp = getMap(HAC_PHONG_ID)!;
+  const BAC = getMap(DEFAULT_MAP_ID)!.portals[0];
+  function listenParty(room: Room) {
+    const parties: PartyMsg[] = [];
+    const invited: PartyInvitedMsg[] = [];
+    room.onMessage("party", (m: PartyMsg) => parties.push(m));
+    room.onMessage("partyInvited", (m: PartyInvitedMsg) => invited.push(m));
+    return { parties, invited };
+  }
+  async function joinHacPhong(name: string) {
+    const a = await join(name);
+    await a.room.leave(true);
+    rooms.splice(rooms.indexOf(a.room), 1);
+    await sleep(200);
+    const f = readdirSync(dataDir).find(
+      (x) => JSON.parse(readFileSync(path.join(dataDir, x), "utf8")).name === name,
+    )!;
+    const full = path.join(dataDir, f);
+    writeFileSync(
+      full,
+      JSON.stringify({
+        ...JSON.parse(readFileSync(full, "utf8")),
+        mapId: HAC_PHONG_ID,
+        x: Math.round(hp.townPx.x),
+        y: Math.round(hp.townPx.y),
+      }),
+    );
+    return join(name, secretOf(name), HAC_PHONG_ID);
+  }
+
+  it("lập đội giữa hai bản đồ, chat đội chéo, đi qua cổng vẫn ở trong đội (nhận đội hình ngay ở phòng mới), thoát hẳn thì rời đội", async () => {
+    const a = await join("Doi Chu Lac");
+    const b = await joinHacPhong("Doi Chu Hac");
+    const la = listenParty(a.room);
+    const lb = listenParty(b.room);
+
+    a.room.send("partyInvite", { name: b.name });
+    await waitFor(() => lb.invited[0]);
+    b.room.send("partyAccept", { from: a.name });
+    const first = await waitFor(() => la.parties.find((m) => m.members.length === 2));
+    expect(first.members.map((m) => [m.name, m.mapId])).toEqual([
+      [a.name, DEFAULT_MAP_ID],
+      [b.name, HAC_PHONG_ID],
+    ]);
+    await waitFor(() => lb.parties.some((m) => m.members.length === 2));
+
+    // Chat đội đi chéo hai bản đồ
+    b.room.send("chat", { text: "/p đội ơi, mình ở Hắc Phong" });
+    await waitFor(() => a.chat.some((m) => m.channel === "party" && m.text.includes("Hắc Phong")));
+
+    // A đi qua cổng sang Hắc Phong Cốc: vẫn ở trong đội
+    const sp = serverState(a.room).players.get(a.room.sessionId)!;
+    sp.x = BAC.x;
+    sp.y = BAC.y;
+    const got: { mapId: string }[] = [];
+    a.room.onMessage("travelTo", (m: { mapId: string }) => got.push(m));
+    a.room.send("travel", { portalId: BAC.id });
+    await waitFor(() => got.length === 1);
+    await waitFor(() => !a.room.connection.isOpen);
+    const a2 = await join(a.name, secretOf(a.name), HAC_PHONG_ID);
+    const la2 = listenParty(a2.room);
+    // B (ở phòng cũ của A) thấy A đã đổi mapId trong đội hình
+    await waitFor(
+      () => lb.parties.at(-1)?.members.some((m) => m.name === a.name && m.mapId === HAC_PHONG_ID),
+      PARTY_SNAPSHOT_MS * 4,
+    );
+    // A nhận đội hình ở phòng mới (ngay khi vào hoặc theo nhịp kế tiếp), vẫn đủ hai người
+    const resync = await waitFor(
+      () => la2.parties.find((m) => m.members.length === 2),
+      PARTY_SNAPSHOT_MS * 3,
+    );
+    expect(resync.leader).toBe(a.name);
+    expect((serverRoom(a2.room) as any).world.parties.size).toBe(1);
+
+    // B thoát hẳn: đội giải tán, A nhận NO_PARTY
+    await b.room.leave(true);
+    rooms.splice(rooms.indexOf(b.room), 1);
+    await waitFor(() => la2.parties.at(-1)?.members.length === 0, 3000);
+    expect((serverRoom(a2.room) as any).world.parties.size).toBe(0);
   });
 });

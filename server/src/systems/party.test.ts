@@ -20,6 +20,7 @@ import {
   partyInvite,
   partyKick,
   partyLeave,
+  sameParty,
   tickParty,
 } from "./party";
 import { killMonster } from "./combat";
@@ -63,7 +64,7 @@ describe("mời và nhận lời mời", () => {
     partyInvite(t.w, A, B);
     partyAnswer(t.w, B, A, true);
     expect(t.w.parties.size).toBe(1);
-    expect(t.w.parties.sameParty(A, B)).toBe(true);
+    expect(sameParty(t.w, A, B)).toBe(true);
     const msgs = t.parties.filter((x) => x.msg.members.length === 2);
     expect(msgs.map((x) => x.sid).sort()).toEqual([A, B]);
     expect(msgs[0].msg.leader).toBe(A);
@@ -143,7 +144,7 @@ describe("mời và nhận lời mời", () => {
     t.w.now += PARTY_INVITE_COOLDOWN_MS;
     join(t.w, A, C); // A lập đội với C
     partyAnswer(t.w, B, A, true);
-    expect(t.w.parties.partyIdOf(B)).toBeUndefined();
+    expect(t.w.parties.partyIdOf(B.toLowerCase())).toBeUndefined();
     expect(lastToast(t, B)?.text).toContain("không còn hiệu lực");
   });
 
@@ -161,12 +162,12 @@ describe("mời và nhận lời mời", () => {
     const t = setup(...names);
     join(t.w, A, B);
     join(t.w, B, C); // B (không phải đội trưởng) mời C
-    expect(t.w.parties.sameParty(A, C)).toBe(true);
+    expect(sameParty(t.w, A, C)).toBe(true);
     join(t.w, C, D);
-    expect(t.w.parties.membersOf(t.w.parties.partyIdOf(A)!)).toHaveLength(PARTY_MAX);
+    expect(t.w.parties.membersOf(t.w.parties.partyIdOf(A.toLowerCase())!)).toHaveLength(PARTY_MAX);
     partyInvite(t.w, A, E);
     expect(t.invited.filter((x) => x.sid === E)).toEqual([]);
-    expect(t.w.parties.partyIdOf(E)).toBeUndefined();
+    expect(t.w.parties.partyIdOf(E.toLowerCase())).toBeUndefined();
   });
 
   it("hai lời mời cùng lúc khi chỗ chỉ còn một: người nhận sau bị từ chối", () => {
@@ -178,8 +179,8 @@ describe("mời và nhận lời mời", () => {
     partyInvite(t.w, B, E);
     partyAnswer(t.w, D, A, true);
     partyAnswer(t.w, E, B, true);
-    expect(t.w.parties.sameParty(A, D)).toBe(true);
-    expect(t.w.parties.partyIdOf(E)).toBeUndefined();
+    expect(sameParty(t.w, A, D)).toBe(true);
+    expect(t.w.parties.partyIdOf(E.toLowerCase())).toBeUndefined();
     expect(lastToast(t, E)?.text).toContain("đủ người");
   });
 });
@@ -191,7 +192,7 @@ describe("rời đội, kick, rời phòng", () => {
     join(t.w, A, C);
     t.parties.length = 0;
     partyLeave(t.w, A);
-    expect(t.w.parties.partyIdOf(A)).toBeUndefined();
+    expect(t.w.parties.partyIdOf(A.toLowerCase())).toBeUndefined();
     expect(t.parties.find((x) => x.sid === A)?.msg).toEqual(NO_PARTY);
     const toB = t.parties.filter((x) => x.sid === B).at(-1)!.msg;
     expect(toB.leader).toBe(B);
@@ -204,7 +205,7 @@ describe("rời đội, kick, rời phòng", () => {
     t.parties.length = 0;
     partyLeave(t.w, B);
     expect(t.w.parties.size).toBe(0);
-    expect(t.w.parties.partyIdOf(A)).toBeUndefined();
+    expect(t.w.parties.partyIdOf(A.toLowerCase())).toBeUndefined();
     expect(
       t.parties
         .filter((x) => x.msg.members.length === 0)
@@ -224,15 +225,15 @@ describe("rời đội, kick, rời phòng", () => {
     join(t.w, A, B);
     join(t.w, A, C);
     partyKick(t.w, B, C); // B không phải đội trưởng
-    expect(t.w.parties.sameParty(A, C)).toBe(true);
+    expect(sameParty(t.w, A, C)).toBe(true);
     partyKick(t.w, A, D); // D không ở trong đội
     partyKick(t.w, A, A); // tự kick
-    expect(t.w.parties.membersOf(t.w.parties.partyIdOf(A)!)).toHaveLength(3);
+    expect(t.w.parties.membersOf(t.w.parties.partyIdOf(A.toLowerCase())!)).toHaveLength(3);
     partyKick(t.w, A, C);
-    expect(t.w.parties.partyIdOf(C)).toBeUndefined();
+    expect(t.w.parties.partyIdOf(C.toLowerCase())).toBeUndefined();
     expect(t.parties.filter((x) => x.sid === C).at(-1)?.msg).toEqual(NO_PARTY);
     expect(lastToast(t, C)?.tone).toBe("bad");
-    expect(t.w.parties.sameParty(A, B)).toBe(true);
+    expect(sameParty(t.w, A, B)).toBe(true);
   });
 
   it("rời phòng (partyDrop): bị loại khỏi đội và lời mời liên quan bị xoá", () => {
@@ -243,7 +244,7 @@ describe("rời đội, kick, rời phòng", () => {
     t.w.state.players.delete(A);
     expect(t.w.parties.size).toBe(0);
     partyAnswer(t.w, C, A, true); // A không còn
-    expect(t.w.parties.partyIdOf(C)).toBeUndefined();
+    expect(t.w.parties.partyIdOf(C.toLowerCase())).toBeUndefined();
     expect(() => partyDrop(t.w, A)).not.toThrow(); // gọi lại cũng không sao
   });
 });

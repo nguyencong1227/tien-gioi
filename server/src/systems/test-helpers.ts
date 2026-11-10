@@ -16,10 +16,11 @@ import {
 } from "@tien-gioi/shared";
 import { WorldState, Player, Monster } from "../schema";
 import { World, type PlayerCtrl } from "../world";
+import type { Hub } from "../hub";
 import { applyStats } from "./progression";
 import { syncPublicPos } from "./movement";
 
-export function makeWorld(map: GameMap = DEFAULT_MAP) {
+export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
   const fx: FxMsg[] = [];
   const toasts: { sid: string; msg: ToastMsg }[] = [];
   const sys: string[] = [];
@@ -48,6 +49,7 @@ export function makeWorld(map: GameMap = DEFAULT_MAP) {
       chatTo: (sid, msg) => chatsTo.push({ sid, msg }),
     },
     map,
+    hub,
   );
   return { w, fx, toasts, sys, chats, invs, quests, wallets, dialogs, parties, invited, chatsTo };
 }
