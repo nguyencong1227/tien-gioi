@@ -1,6 +1,6 @@
 # Phân công M4 (BẢN ĐỀ XUẤT của Dev A, chờ người dùng chốt, chưa bắt đầu làm)
 
-> Dựa trên `GDD.md` (M4: chống gian lận, deploy, build app Android / iOS) và trạng thái thực tế sau M3 (bước 1-6 xong trừ công cụ thử tải tông môn #231). **Chỉ có ba issue "M4-sớm" (việc không phụ thuộc các câu hỏi ở mục 6): #251 (B, PWA + đo hiệu năng di động), #252 (C, red team tin nhắn), #253 (A, property test kinh tế)**; các việc còn lại chưa có issue. Các câu hỏi cần người dùng ở cuối file. Khi người dùng chốt hướng đi, A tạo issue theo bảng ở mục 5.
+> Dựa trên `GDD.md` (M4: chống gian lận, deploy, build app Android / iOS) và trạng thái thực tế sau M3 (bước 1-6 xong, #231 đã đóng: tổng kết ở `docs/PHAN_CONG_M3.md`). **Chỉ có ba issue "M4-sớm" (việc không phụ thuộc các câu hỏi ở mục 6): #251 (B, PWA + đo hiệu năng di động), #252 (C, red team tin nhắn), #253 (A, property test kinh tế)**; các việc còn lại chưa có issue. Các câu hỏi cần người dùng ở cuối file. Khi người dùng chốt hướng đi, A tạo issue theo bảng ở mục 5.
 
 ## 1. Đã có (không làm lại)
 - **Server quyết định mọi kết quả**: sát thương, rơi đồ, tu vi, nhiệm vụ, ví, kho tông môn; client chỉ gửi ý định (`AGENTS.md` "Quy tắc bắt buộc").
