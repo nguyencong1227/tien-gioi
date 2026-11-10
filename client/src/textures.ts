@@ -191,4 +191,20 @@ export function makeTextures(scene: Phaser.Scene) {
     g.generateTexture("swordbeam", 48, 12);
     g.destroy();
   }
+  if (!scene.textures.exists("portal")) {
+    const g = scene.make.graphics({}, false);
+    // Vòng xoáy hào quang tiên hiệp xanh lam - tím ngọc
+    g.fillStyle(0x000000, 0.25);
+    g.fillEllipse(24, 44, 34, 10); // bóng đổ
+    g.fillStyle(0x3a1c71, 0.7);
+    g.fillCircle(24, 24, 20);
+    g.fillStyle(0x4a90e2, 0.85);
+    g.fillCircle(24, 24, 15);
+    g.fillStyle(0xa8ff78, 0.9);
+    g.fillCircle(24, 24, 8);
+    g.lineStyle(2, 0xffffff, 0.95);
+    g.strokeCircle(24, 24, 20);
+    g.generateTexture("portal", 48, 48);
+    g.destroy();
+  }
 }

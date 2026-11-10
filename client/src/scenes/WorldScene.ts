@@ -11,9 +11,9 @@ import {
   DROP_TABLES,
   RARITY_COLORS,
   PICKUP_RANGE,
-  NPCS,
   NPC_BY_ID,
   NPC_RANGE,
+  npcsOfMap,
   QUEST_BY_ID,
   npcMarker,
   questReady,
@@ -34,6 +34,8 @@ import {
   type PartyMsg,
   type PartyInvitedMsg,
   type WalletMsg,
+  type PortalDef,
+  type TravelMsg,
 } from "@tien-gioi/shared";
 import { preloadAssets, makeTextures, dirFromAngle, TILESET_KEY, ATLAS_KEY } from "../textures";
 import { ui } from "../ui";
@@ -158,6 +160,11 @@ export class WorldScene extends Phaser.Scene {
   private perfLootsSum = 0;
 
   public map: GameMap;
+  private mapTilemap?: Phaser.Tilemaps.Tilemap;
+  private mapLayer?: Phaser.Tilemaps.TilemapLayer;
+  private townVisuals: Phaser.GameObjects.GameObject[] = [];
+  private portalVisuals: Phaser.GameObjects.GameObject[] = [];
+  private nearPortal: PortalDef | null = null;
 
   constructor(
     private room: Room,
@@ -181,41 +188,7 @@ export class WorldScene extends Phaser.Scene {
   create() {
     makeTextures(this);
 
-    // Bản đồ (sinh từ seed chung, giống hệt server)
-    const data: number[][] = [];
-    const mw = this.map.def.w;
-    const mh = this.map.def.h;
-    for (let y = 0; y < mh; y++)
-      data.push(Array.from(this.map.tiles.subarray(y * mw, (y + 1) * mw)));
-    const tilemap = this.make.tilemap({ data, tileWidth: TILE, tileHeight: TILE });
-    const ts = tilemap.addTilesetImage("tiles", TILESET_KEY, TILE, TILE, 0, 0)!;
-    tilemap.createLayer(0, ts, 0, 0)!.setDepth(-10);
-
-    this.add
-      .text(this.map.townPx.x, this.map.townPx.y - 40, "落霞鎮", {
-        fontFamily: '"Noto Serif", Georgia, serif',
-        fontSize: "56px",
-        color: "#7a3b2e",
-      })
-      .setOrigin(0.5)
-      .setAlpha(0.35)
-      .setDepth(-5);
-    this.add
-      .text(this.map.townPx.x, this.map.townPx.y + 14, `${this.map.def.name} · Khu an toàn`, {
-        fontFamily: '"Noto Serif", Georgia, serif',
-        fontSize: "16px",
-        color: "#5a4030",
-      })
-      .setOrigin(0.5)
-      .setAlpha(0.6)
-      .setDepth(-5);
-    this.add
-      .circle(this.map.townPx.x, this.map.townPx.y, this.map.townPx.r, 0, 0)
-      .setStrokeStyle(2, 0xa31d1d, 0.25)
-      .setDepth(-5);
-
-    // Tạo các NPC trong Lạc Hà Trấn
-    this.spawnNpcs();
+    this.buildMapVisuals();
 
     // Mũi tên chỉ hướng nhiệm vụ xoay quanh người chơi
     this.createNavArrow();
@@ -277,8 +250,111 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
+  private buildMapVisuals() {
+    // 1. Hủy lớp ô cũ nếu có
+    if (this.mapLayer) {
+      this.mapLayer.destroy();
+      this.mapLayer = undefined;
+    }
+    if (this.mapTilemap) {
+      this.mapTilemap.destroy();
+      this.mapTilemap = undefined;
+    }
+
+    // 2. Dựng tilemap mới
+    const data: number[][] = [];
+    const mw = this.map.def.w;
+    const mh = this.map.def.h;
+    for (let y = 0; y < mh; y++)
+      data.push(Array.from(this.map.tiles.subarray(y * mw, (y + 1) * mw)));
+    this.mapTilemap = this.make.tilemap({ data, tileWidth: TILE, tileHeight: TILE });
+    const ts = this.mapTilemap.addTilesetImage("tiles", TILESET_KEY, TILE, TILE, 0, 0)!;
+    this.mapLayer = this.mapTilemap.createLayer(0, ts, 0, 0)!;
+    this.mapLayer.setDepth(-10);
+
+    // 3. Dựng nhãn và vòng an toàn của trấn / trạm (nếu có trấn)
+    for (const obj of this.townVisuals) obj.destroy();
+    this.townVisuals = [];
+    if (this.map.townPx.r > 0) {
+      const townLabel = this.map.def.id === DEFAULT_MAP_ID ? "落霞鎮" : this.map.townName;
+      const t1 = this.add
+        .text(this.map.townPx.x, this.map.townPx.y - 40, townLabel, {
+          fontFamily: '"Noto Serif", Georgia, serif',
+          fontSize: this.map.def.id === DEFAULT_MAP_ID ? "56px" : "36px",
+          color: "#7a3b2e",
+        })
+        .setOrigin(0.5)
+        .setAlpha(0.35)
+        .setDepth(-5);
+
+      const t2 = this.add
+        .text(this.map.townPx.x, this.map.townPx.y + 14, `${this.map.townName} · Khu an toàn`, {
+          fontFamily: '"Noto Serif", Georgia, serif',
+          fontSize: "16px",
+          color: "#5a4030",
+        })
+        .setOrigin(0.5)
+        .setAlpha(0.6)
+        .setDepth(-5);
+
+      const c = this.add
+        .circle(this.map.townPx.x, this.map.townPx.y, this.map.townPx.r, 0, 0)
+        .setStrokeStyle(2, 0xa31d1d, 0.25)
+        .setDepth(-5);
+
+      this.townVisuals.push(t1, t2, c);
+    }
+
+    // 4. Dựng các cổng truyền tống của bản đồ
+    for (const obj of this.portalVisuals) obj.destroy();
+    this.portalVisuals = [];
+    for (const p of this.map.portals) {
+      const safeCircle = this.add
+        .circle(p.x, p.y, p.safeR, 0, 0)
+        .setStrokeStyle(2, 0x4a90e2, 0.25)
+        .setDepth(-5);
+
+      const spr = this.add.sprite(p.x, p.y, "portal").setDepth(p.y);
+      this.tweens.add({
+        targets: spr,
+        angle: 360,
+        duration: 6000,
+        repeat: -1,
+      });
+
+      const label = this.add
+        .text(p.x, p.y - 32, p.name, {
+          fontFamily: '"Noto Serif", Georgia, serif',
+          fontSize: "13px",
+          fontStyle: "bold",
+          color: "#a8ff78",
+          stroke: "#1d1a16",
+          strokeThickness: 3,
+        })
+        .setOrigin(0.5)
+        .setDepth(p.y + 1);
+
+      this.portalVisuals.push(safeCircle, spr, label);
+    }
+
+    // 5. Khởi tạo / cập nhật lại các NPC của bản đồ hiện tại
+    this.spawnNpcs();
+
+    // 6. Camera bounds
+    if (this.cameras?.main) {
+      this.cameras.main.setBounds(0, 0, this.map.worldW, this.map.worldH);
+    }
+  }
+
   private spawnNpcs() {
-    for (const npc of NPCS) {
+    for (const [, ne] of this.npcs) {
+      ne.root.destroy();
+    }
+    this.npcs.clear();
+    this.closestNpcId = null;
+
+    const mapNpcs = npcsOfMap(this.map.def.id);
+    for (const npc of mapNpcs) {
       const root = this.add.container(npc.x, npc.y).setDepth(npc.y);
       const texKey = `npc-${npc.id}`;
       const hasTex = this.textures.exists(texKey);
@@ -574,11 +650,18 @@ export class WorldScene extends Phaser.Scene {
 
   private interactOrPickup() {
     if (this.isReconnecting) return;
-    if (this.closestNpcId) {
+    if (this.nearPortal) {
+      this.travelPortal(this.nearPortal.id);
+    } else if (this.closestNpcId) {
       this.talkClosestNpc();
     } else if (this.nearestLootId) {
       this.pickupNearest();
     }
+  }
+
+  public travelPortal(portalId: string) {
+    if (this.isReconnecting) return;
+    this.room.send("travel", { portalId } satisfies TravelMsg);
   }
 
   // ---------------- Mạng & Tự nối lại (#117) ----------------
@@ -591,6 +674,14 @@ export class WorldScene extends Phaser.Scene {
     } else {
       ui.hideReconnectNotice();
     }
+  }
+
+  public changeMap(room: Room, newMap: GameMap) {
+    this.map = newMap;
+    ui.setCurrentMapId(newMap.def.id);
+    this.buildMapVisuals();
+    this.attachRoom(room);
+    this.syncAudioZone();
   }
 
   public attachRoom(room: Room) {
@@ -758,6 +849,7 @@ export class WorldScene extends Phaser.Scene {
     if (this.time.now - this.lastAuxSync >= 150) {
       this.lastAuxSync = this.time.now;
       this.syncNpcs();
+      this.syncPortals();
       this.syncAudioZone();
       this.syncQuestNav();
     }
@@ -871,7 +963,20 @@ export class WorldScene extends Phaser.Scene {
   private syncAudioZone() {
     const inTown = this.map.inTown(this.predX, this.predY);
     sound.setZone(inTown ? "town" : "wild");
-    ui.setZoneName(inTown ? this.map.def.name : "Vân Mộng Sơn");
+    ui.setZoneName(inTown ? this.map.townName : this.map.wildName);
+  }
+
+  private syncPortals() {
+    const near = this.map.portalNear(this.predX, this.predY);
+    if (near) {
+      this.nearPortal = near;
+      ui.portalPrompt(near.name, () => this.travelPortal(near.id));
+    } else {
+      if (this.nearPortal) {
+        this.nearPortal = null;
+        ui.portalPrompt(null);
+      }
+    }
   }
 
   private syncNpcs() {
@@ -1073,28 +1178,49 @@ export class WorldScene extends Phaser.Scene {
         const h = mmCanvas.height;
         ctx.clearRect(0, 0, w, h);
 
-        const scale = w / this.map.worldW;
+        const scale = Math.min(w / this.map.worldW, h / this.map.worldH);
+        const mapW = this.map.worldW * scale;
+        const mapH = this.map.worldH * scale;
+        const ox = (w - mapW) / 2;
+        const oy = (h - mapH) / 2;
 
-        // Nền hoang dã
-        ctx.fillStyle = "#273322";
+        // Nền đen ngoài bản đồ (khi canvas vuông nhưng bản đồ chữ nhật)
+        ctx.fillStyle = "#161b14";
         ctx.fillRect(0, 0, w, h);
 
-        // Vòng Lạc Hà Trấn
-        const tx = this.map.townPx.x * scale;
-        const ty = this.map.townPx.y * scale;
-        const tr = this.map.townPx.r * scale;
-        ctx.fillStyle = "rgba(163, 29, 29, 0.18)";
-        ctx.beginPath();
-        ctx.arc(tx, ty, tr, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = "rgba(163, 29, 29, 0.65)";
-        ctx.lineWidth = 1.2;
-        ctx.stroke();
+        // Nền hoang dã của bản đồ
+        ctx.fillStyle = "#273322";
+        ctx.fillRect(ox, oy, mapW, mapH);
+
+        // Vòng Trấn / Trạm (nếu có bán kính trấn > 0)
+        if (this.map.townPx.r > 0) {
+          const tx = ox + this.map.townPx.x * scale;
+          const ty = oy + this.map.townPx.y * scale;
+          const tr = this.map.townPx.r * scale;
+          ctx.fillStyle = "rgba(163, 29, 29, 0.18)";
+          ctx.beginPath();
+          ctx.arc(tx, ty, tr, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "rgba(163, 29, 29, 0.65)";
+          ctx.lineWidth = 1.2;
+          ctx.stroke();
+        }
+
+        // Cổng truyền tống (chấm xanh ngọc viền trắng)
+        ctx.fillStyle = "#a8ff78";
+        for (const p of this.map.portals) {
+          ctx.beginPath();
+          ctx.arc(ox + p.x * scale, oy + p.y * scale, 3, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "#ffffff";
+          ctx.lineWidth = 0.8;
+          ctx.stroke();
+        }
 
         // Quái vật (chấm đỏ nhỏ)
         ctx.fillStyle = "#e57373";
         this.monsters.forEach((m) => {
-          ctx.fillRect(m.tx * scale - 1, m.ty * scale - 1, 2, 2);
+          ctx.fillRect(ox + m.tx * scale - 1, oy + m.ty * scale - 1, 2, 2);
         });
 
         // Người chơi khác (chấm lam, trừ đồng đội)
@@ -1103,15 +1229,16 @@ export class WorldScene extends Phaser.Scene {
           if (id === this.sid) return;
           const sp = this.state.players.get(id);
           if (sp && partyNames.has(sp.name)) return;
-          ctx.fillRect(p.tx * scale - 1.5, p.ty * scale - 1.5, 3, 3);
+          ctx.fillRect(ox + p.tx * scale - 1.5, oy + p.ty * scale - 1.5, 3, 3);
         });
 
-        // Đồng đội (chấm xanh lá #52c41a, lấy tọa độ từ party kể cả ngoài vùng nhìn)
-        if (partyMems.length > 0) {
+        // Đồng đội (chấm xanh lá #52c41a, CHỈ VẼ ĐỒNG ĐỘI Ở CÙNG BẢN ĐỒ)
+        const sameMapPartyMems = partyMems.filter((m) => !m.mapId || m.mapId === this.map.def.id);
+        if (sameMapPartyMems.length > 0) {
           ctx.fillStyle = "#52c41a";
-          for (const pm of partyMems) {
+          for (const pm of sameMapPartyMems) {
             ctx.beginPath();
-            ctx.arc(pm.x * scale, pm.y * scale, 3.2, 0, Math.PI * 2);
+            ctx.arc(ox + pm.x * scale, oy + pm.y * scale, 3.2, 0, Math.PI * 2);
             ctx.fill();
             ctx.strokeStyle = "#ffffff";
             ctx.lineWidth = 0.8;
@@ -1119,17 +1246,18 @@ export class WorldScene extends Phaser.Scene {
           }
         }
 
-        // NPC (chấm hoàng kim)
+        // NPC của bản đồ hiện tại (chấm hoàng kim)
+        const mapNpcs = npcsOfMap(this.map.def.id);
         ctx.fillStyle = "#ffd74a";
-        for (const npc of NPCS) {
+        for (const npc of mapNpcs) {
           ctx.beginPath();
-          ctx.arc(npc.x * scale, npc.y * scale, 2.8, 0, Math.PI * 2);
+          ctx.arc(ox + npc.x * scale, oy + npc.y * scale, 2.8, 0, Math.PI * 2);
           ctx.fill();
         }
 
         // Chính mình (chấm lục bảo sáng + vạch hướng nhìn)
-        const mx = this.predX * scale;
-        const my = this.predY * scale;
+        const mx = ox + this.predX * scale;
+        const my = oy + this.predY * scale;
         ctx.fillStyle = "#6ad06a";
         ctx.beginPath();
         ctx.arc(mx, my, 3.5, 0, Math.PI * 2);
@@ -1156,57 +1284,104 @@ export class WorldScene extends Phaser.Scene {
           const w = wmCanvas.width;
           const h = wmCanvas.height;
           ctx.clearRect(0, 0, w, h);
-          const s = w / this.map.worldW;
+          const s = Math.min(w / this.map.worldW, h / this.map.worldH);
+          const mapW = this.map.worldW * s;
+          const mapH = this.map.worldH * s;
+          const ox = (w - mapW) / 2;
+          const oy = (h - mapH) / 2;
 
-          // Nền sơn thủy
-          ctx.fillStyle = "#1e291b";
+          // Nền ngoài bản đồ
+          ctx.fillStyle = "#121810";
           ctx.fillRect(0, 0, w, h);
 
-          // Khu an toàn Lạc Hà Trấn
-          const tx = this.map.townPx.x * s;
-          const ty = this.map.townPx.y * s;
-          const tr = this.map.townPx.r * s;
-          ctx.fillStyle = "rgba(163, 29, 29, 0.22)";
-          ctx.beginPath();
-          ctx.arc(tx, ty, tr, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.strokeStyle = "#a31d1d";
-          ctx.lineWidth = 2;
-          ctx.stroke();
+          // Nền sơn thủy của bản đồ
+          ctx.fillStyle = "#1e291b";
+          ctx.fillRect(ox, oy, mapW, mapH);
 
-          ctx.fillStyle = "#f3ecda";
-          ctx.font = "bold 12px serif";
-          ctx.textAlign = "center";
-          ctx.fillText(this.map.def.name, tx, ty - tr - 6);
+          // Khu an toàn Trấn / Trạm (nếu có bán kính trấn > 0)
+          if (this.map.townPx.r > 0) {
+            const tx = ox + this.map.townPx.x * s;
+            const ty = oy + this.map.townPx.y * s;
+            const tr = this.map.townPx.r * s;
+            ctx.fillStyle = "rgba(163, 29, 29, 0.22)";
+            ctx.beginPath();
+            ctx.arc(tx, ty, tr, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = "#a31d1d";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.fillStyle = "#f3ecda";
+            ctx.font = "bold 12px serif";
+            ctx.textAlign = "center";
+            ctx.fillText(this.map.townName, tx, ty - tr - 6);
+          }
+
+          // Cổng truyền tống (vòng an toàn mờ + điểm cổng + tên)
+          for (const p of this.map.portals) {
+            const px = ox + p.x * s;
+            const py = oy + p.y * s;
+            const pr = p.safeR * s;
+
+            // Vòng an toàn
+            ctx.fillStyle = "rgba(74, 144, 226, 0.15)";
+            ctx.beginPath();
+            ctx.arc(px, py, pr, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = "rgba(74, 144, 226, 0.6)";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Điểm cổng
+            ctx.fillStyle = "#a8ff78";
+            ctx.beginPath();
+            ctx.arc(px, py, 4.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = "#ffffff";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Nhãn tên cổng
+            ctx.fillStyle = "#a8ff78";
+            ctx.font = "bold 10px serif";
+            ctx.textAlign = "center";
+            ctx.fillText(p.name, px, py - 7);
+          }
 
           // Vòng nguy hiểm (minDanger) tính ngược từ dangerAt(x, y)
-          for (const m of MONSTERS) {
-            const rPx = m.minDanger > 0 ? this.dangerRadiusPx(m.minDanger) : this.map.townPx.r + 40;
-            const rCanvas = Math.min(w * 0.49, rPx * s);
-            const col = `#${m.color.toString(16).padStart(6, "0")}`;
-            ctx.strokeStyle = col;
-            ctx.lineWidth = 1;
-            ctx.setLineDash([4, 4]);
-            ctx.beginPath();
-            ctx.arc(tx, ty, rCanvas, 0, Math.PI * 2);
-            ctx.stroke();
-            ctx.setLineDash([]);
-            ctx.fillStyle = col;
-            ctx.font = "10px serif";
-            const labelY = Math.max(11, ty - rCanvas - 3);
-            ctx.fillText(
-              m.minDanger > 0
-                ? `${m.name} (≥${Math.round(m.minDanger * 100)}%)`
-                : `${m.name} (ngoài trấn)`,
-              tx,
-              labelY,
-            );
+          if (this.map.townPx.r > 0) {
+            const tx = ox + this.map.townPx.x * s;
+            const ty = oy + this.map.townPx.y * s;
+            for (const m of MONSTERS) {
+              const rPx =
+                m.minDanger > 0 ? this.dangerRadiusPx(m.minDanger) : this.map.townPx.r + 40;
+              const rCanvas = Math.min(Math.min(w, h) * 0.49, rPx * s);
+              const col = `#${m.color.toString(16).padStart(6, "0")}`;
+              ctx.strokeStyle = col;
+              ctx.lineWidth = 1;
+              ctx.setLineDash([4, 4]);
+              ctx.beginPath();
+              ctx.arc(tx, ty, rCanvas, 0, Math.PI * 2);
+              ctx.stroke();
+              ctx.setLineDash([]);
+              ctx.fillStyle = col;
+              ctx.font = "10px serif";
+              ctx.textAlign = "center";
+              const labelY = Math.max(oy + 11, ty - rCanvas - 3);
+              ctx.fillText(
+                m.minDanger > 0
+                  ? `${m.name} (≥${Math.round(m.minDanger * 100)}%)`
+                  : `${m.name} (ngoài trấn)`,
+                tx,
+                labelY,
+              );
+            }
           }
 
           // Quái hiện hành
           ctx.fillStyle = "#e57373";
           this.monsters.forEach((m) => {
-            ctx.fillRect(m.tx * s - 1.5, m.ty * s - 1.5, 3, 3);
+            ctx.fillRect(ox + m.tx * s - 1.5, oy + m.ty * s - 1.5, 3, 3);
           });
 
           // Người chơi khác (chấm lam, trừ đồng đội)
@@ -1216,16 +1391,17 @@ export class WorldScene extends Phaser.Scene {
             const sp = this.state.players.get(id);
             if (sp && partyNames.has(sp.name)) return;
             ctx.beginPath();
-            ctx.arc(p.tx * s, p.ty * s, 3.5, 0, Math.PI * 2);
+            ctx.arc(ox + p.tx * s, oy + p.ty * s, 3.5, 0, Math.PI * 2);
             ctx.fill();
           });
 
-          // Đồng đội (chấm xanh lá #52c41a + tên, lấy tọa độ từ party)
-          if (partyMems.length > 0) {
+          // Đồng đội (CHỈ VẼ ĐỒNG ĐỘI Ở CÙNG BẢN ĐỒ)
+          const sameMapPartyMems = partyMems.filter((m) => !m.mapId || m.mapId === this.map.def.id);
+          if (sameMapPartyMems.length > 0) {
             ctx.fillStyle = "#52c41a";
-            for (const pm of partyMems) {
-              const pmx = pm.x * s;
-              const pmy = pm.y * s;
+            for (const pm of sameMapPartyMems) {
+              const pmx = ox + pm.x * s;
+              const pmy = oy + pm.y * s;
               ctx.beginPath();
               ctx.arc(pmx, pmy, 5, 0, Math.PI * 2);
               ctx.fill();
@@ -1235,16 +1411,18 @@ export class WorldScene extends Phaser.Scene {
 
               ctx.fillStyle = "#52c41a";
               ctx.font = "bold 10px serif";
+              ctx.textAlign = "center";
               ctx.fillText(pm.name, pmx, pmy - 7);
             }
           }
 
-          // NPC trong trấn
+          // NPC của bản đồ hiện tại
+          const mapNpcs = npcsOfMap(this.map.def.id);
           const qLog = ui.getQuestLog();
           const qCtx = ui.getQuestContext();
-          for (const npc of NPCS) {
-            const nx = npc.x * s;
-            const ny = npc.y * s;
+          for (const npc of mapNpcs) {
+            const nx = ox + npc.x * s;
+            const ny = oy + npc.y * s;
             ctx.fillStyle = "#ffd74a";
             ctx.beginPath();
             ctx.arc(nx, ny, 4.5, 0, Math.PI * 2);
@@ -1253,6 +1431,7 @@ export class WorldScene extends Phaser.Scene {
             if (marker) {
               ctx.fillStyle = marker === "?" ? "#6ad06a" : "#ff4d4d";
               ctx.font = "bold 11px serif";
+              ctx.textAlign = "center";
               ctx.fillText(marker, nx, ny - 6);
             }
           }
@@ -1266,16 +1445,16 @@ export class WorldScene extends Phaser.Scene {
               ctx.lineWidth = 1.5;
               ctx.setLineDash([3, 3]);
               ctx.beginPath();
-              ctx.moveTo(this.predX * s, this.predY * s);
-              ctx.lineTo(t.x * s, t.y * s);
+              ctx.moveTo(ox + this.predX * s, oy + this.predY * s);
+              ctx.lineTo(ox + t.x * s, oy + t.y * s);
               ctx.stroke();
               ctx.setLineDash([]);
             }
           }
 
           // Chính mình
-          const px = this.predX * s;
-          const py = this.predY * s;
+          const px = ox + this.predX * s;
+          const py = oy + this.predY * s;
           ctx.fillStyle = "#6ad06a";
           ctx.beginPath();
           ctx.arc(px, py, 6, 0, Math.PI * 2);

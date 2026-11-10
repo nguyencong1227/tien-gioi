@@ -41,6 +41,8 @@ import {
   type PartyMsg,
   type PartyInvitedMsg,
   CURRENCY_NAME,
+  DEFAULT_MAP_ID,
+  getMap,
   buyPrice,
   sellPrice,
   SHOP_BY_NPC,
@@ -50,6 +52,9 @@ import {
 import { sound } from "./audio";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
+
+let currentMapId: string = DEFAULT_MAP_ID;
+let portalCallback: (() => void) | null = null;
 
 export interface HudPlayer {
   name: string;
@@ -216,6 +221,14 @@ function renderPartyPanel() {
     realmSpan.className = "pmem-realm";
     realmSpan.textContent = realmLabel(m.realm, m.tier);
     nameWrap.append(realmSpan);
+
+    if (m.mapId && m.mapId !== currentMapId) {
+      const mapDef = getMap(m.mapId);
+      const mapSpan = document.createElement("span");
+      mapSpan.className = "pmem-map";
+      mapSpan.textContent = `(${mapDef?.def.name ?? m.mapId})`;
+      nameWrap.append(mapSpan);
+    }
 
     info.append(nameWrap);
 
@@ -1520,6 +1533,7 @@ export const ui = {
     bindTap("quick-2", () => this.useQuick(2));
     bindTap("btn-pickup", () => callbacks?.onPickup());
     bindTap("btn-talk", () => callbacks?.onTalk());
+    bindTap("btn-portal", () => portalCallback?.());
 
     // Tổ đội (#75, #91)
     try {
@@ -1957,10 +1971,44 @@ export const ui = {
     if (label !== null) $("talk-label").textContent = label;
   },
 
+  portalPrompt(label: string | null, onTravel?: () => void) {
+    const btn = $("btn-portal");
+    btn.hidden = label === null;
+    if (label !== null) {
+      $("portal-label").textContent = `${label} (F)`;
+      if (onTravel) portalCallback = onTravel;
+    } else {
+      portalCallback = null;
+    }
+  },
+
   pickupPrompt(label: string | null) {
     const btn = $("btn-pickup");
     btn.hidden = label === null;
     if (label !== null) $("pickup-label").textContent = label;
+  },
+
+  setCurrentMapId(mapId: string) {
+    currentMapId = mapId;
+    renderPartyPanel();
+  },
+
+  showTransition(mapName: string) {
+    const overlay = $("transition-overlay");
+    const nameEl = $("transition-map-name");
+    if (nameEl) nameEl.textContent = mapName;
+    overlay.hidden = false;
+    requestAnimationFrame(() => {
+      overlay.classList.add("active");
+    });
+  },
+
+  hideTransition() {
+    const overlay = $("transition-overlay");
+    overlay.classList.remove("active");
+    setTimeout(() => {
+      overlay.hidden = true;
+    }, 350);
   },
 
   setZoneName(name: string) {
