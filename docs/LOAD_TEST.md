@@ -359,7 +359,7 @@ Kịch bản thử tải và kiểm tra toàn diện cơ chế Luân hồi (M3 b
 
 ### 7.1. Động lực & Sự cần thiết
 Các bài test đơn vị hoặc headless bot mô phỏng bằng WebSocket đơn thuần chỉ kiểm tra logic máy chủ và giao thức mạng, không thể phát hiện các lỗi đặc thù của môi trường trình duyệt thật:
-1. **Lỗi bỏ tin lúc vào phòng (Early Messages Race Condition):** Khi trình duyệt tải tài nguyên (font chữ tiếng Việt, spritesheet, atlas đồ hoạ), client mất từ vài trăm ms đến vài giây trước khi Phaser 3 dựng xong cảnh và đăng ký `room.onMessage(...)`. Trong khi đó máy chủ Colyseus gửi ngay các tin trạng thái ban đầu (`inv`, `quests`, `wallet`, `soul`, `limbo`...). `colyseus.js` mặc định **bỏ rơi** các tin không có handler kèm cảnh báo `colyseus.js: onMessage() not registered`. Lỗi này làm kẹt người chơi ở Hoàng Tuyền hoặc mất túi đồ/nhiệm vụ ban đầu mà test đơn vị máy chủ không thể thấy được (đã phát hiện trong PR #163).
+1. **Lỗi bỏ tin lúc vào phòng (Early Messages Race Condition):** Khi trình duyệt tải tài nguyên (font chữ tiếng Việt, spritesheet, atlas đồ hoạ), client mất từ vài trăm ms đến vài giây trước khi Phaser 3 dựng xong cảnh và đăng ký `room.onMessage(...)`. Trong khi đó máy chủ Colyseus gửi ngay các tin trạng thái ban đầu (`inv`, `quests`, `wallet`, `soul`, `limbo`...). `colyseus.js` mặc định **bỏ rơi** các tin không có handler kèm cảnh báo `colyseus.js: onMessage() not registered`. Lỗi này làm kẹt người chơi ở Hoàng Tuyền hoặc mất túi đồ/nhiệm vụ ban đầu mà test đơn vị máy chủ không thể thấy được (đã phát hiện và khắc phục trong PR #163).
 2. **Lỗi DOM & Render Canvas:** Lỗi phần tử giao diện bị ẩn, trùng đè (như ô chat che nội dung Hoàng Tuyền), hoặc canvas Phaser 3 không khởi tạo được.
 3. **Lỗi thực thi JavaScript trên trình duyệt:** Các lỗi runtime `Runtime.exceptionThrown` hoặc `console.error` do truy cập thuộc tính DOM undefined.
 
@@ -396,7 +396,7 @@ npm run e2e
 npm run e2e -w server -- --scenario=normal
 npm run e2e -w server -- --scenario=limbo
 
-# Cho phép bỏ qua cảnh báo bỏ tin nhắn lúc vào phòng (khi client chưa cập nhật PR #163):
+# Cho phép bỏ qua cảnh báo bỏ tin nhắn lúc vào phòng (khi chạy trên client bản cũ chưa có bản vá #163):
 npm run e2e -w server -- --allow-early-drops
 
 # Lưu ảnh chụp màn hình từng bước để nghiệm thu:

@@ -464,7 +464,7 @@ async function runE2e() {
     console.log(`\n- Kiểm tra ghi nhận console từ trình duyệt: ${consoleLogs.length} logs.`);
     if (earlyDropWarnings.length > 0) {
       console.log(
-        `  ⚠️ Có ${earlyDropWarnings.length} cảnh báo colyseus.js bỏ tin lúc vào phòng (đã bỏ qua do --allow-early-drops; PR #163 đang vá).`,
+        `  ⚠️ Có ${earlyDropWarnings.length} cảnh báo colyseus.js bỏ tin lúc vào phòng (đã bỏ qua do --allow-early-drops; client cũ chưa nạp bản vá #163).`,
       );
     }
     if (browserErrors.length > 0) {
