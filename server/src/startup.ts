@@ -1,4 +1,5 @@
 import { authModeOf, parseTrustProxy } from "./auth-http";
+import { storeKindOf } from "./stores";
 
 /** Cảnh báo cấu hình in ra khi server khởi động (thuần hàm để test được). */
 export function startupWarnings(env: NodeJS.ProcessEnv): string[] {
@@ -40,6 +41,21 @@ export function startupWarnings(env: NodeJS.ProcessEnv): string[] {
       "AUTH_MODE=account mà TRUST_PROXY chưa đặt: nếu chạy sau reverse proxy (Caddy / Nginx) mọi người chơi sẽ dùng chung " +
         "IP của proxy và chung hạn mức đăng nhập (10 lần sai / 10 phút cho CẢ server). Đặt TRUST_PROXY=1 khi có đúng một " +
         "proxy đặt X-Forwarded-For; bỏ qua cảnh báo này nếu mở thẳng ra Internet.",
+    );
+  }
+  const kind = storeKindOf(env);
+  if (env.STORE !== undefined && env.STORE !== "" && env.STORE !== "file" && env.STORE !== "pg") {
+    warnings.push(`STORE='${env.STORE}' không hợp lệ (chỉ 'file' hoặc 'pg'): đang dùng 'file'.`);
+  }
+  if (kind === "file" && (env.DATABASE_URL ?? "").trim() !== "") {
+    warnings.push(
+      "DATABASE_URL đã đặt nhưng STORE chưa phải 'pg': đang lưu bằng tệp JSON, PostgreSQL KHÔNG được dùng. Đặt STORE=pg để dùng.",
+    );
+  }
+  if (production && kind === "file") {
+    warnings.push(
+      "STORE=file: nhân vật, chân linh, tài khoản nằm trong tệp JSON ở DATA_DIR (chỉ một máy, một tiến trình). Khuyến nghị " +
+        "STORE=pg + DATABASE_URL (PostgreSQL) khi mở cho người chơi thật (xem docs/TRIEN_KHAI.md).",
     );
   }
   return warnings;

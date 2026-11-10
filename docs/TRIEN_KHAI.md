@@ -36,6 +36,8 @@ npm run build
 | `NODE_ENV` | Môi trường chạy | **Bắt buộc: `production`** |
 | `PORT` | Cổng HTTP / WebSocket mà server lắng nghe | Mặc định: `2567` |
 | `DATA_DIR` | Thư mục lưu trữ dữ liệu nhân vật (`*.json`) | Mặc định: `server/data/players` |
+| `STORE` | Nơi lưu nhân vật, chân linh, tài khoản, phiên: `file` (tệp JSON ở `DATA_DIR`, một máy một tiến trình) hoặc `pg` (PostgreSQL, cần `DATABASE_URL`). Server chạy migration chưa áp dụng lúc khởi động; thiếu `DATABASE_URL` hoặc không kết nối được thì **không khởi động** (thoát mã 1, thông báo không chứa mật khẩu) | Mặc định: `file`; khi mở thật khuyến nghị `pg` |
+| `DATABASE_URL` | Chuỗi kết nối PostgreSQL, vd `postgres://người_dùng:mật_khẩu@máy:5432/tiengioi` (chỉ dùng khi `STORE=pg`). **Là bí mật**: không ghi vào log, không commit | Không có |
 | `AUTH_MODE` | `legacy`: vào bằng đạo hiệu + mã bí mật lưu ở trình duyệt (dev, test, bot). `account`: đăng ký / đăng nhập bằng tài khoản (mục 4.1 của `docs/THIET_KE_TAI_KHOAN.md`) | Mặc định: `legacy`; khi mở thật nên dùng `account` (xem lưu ý bên dưới) |
 | `TRUST_PROXY` | Số tầng reverse proxy tin cậy (vd `1` khi chạy sau Caddy), hoặc danh sách mạng con (`loopback`, `10.0.0.0/8`). **Không nhận `true` / `*`.** | Mặc định: không tin proxy (dùng IP của kết nối) |
 
@@ -292,7 +294,7 @@ npm run tai-khoan -w server -- enable <tên đăng nhập>
 npm run tai-khoan -w server -- logout-all <tên đăng nhập>
 ```
 
-- **Phải TẮT server trước khi chạy lệnh ghi** (`reset-*`, `disable`, `enable`, `logout-all`): bản file giữ chỉ mục tài khoản trong bộ nhớ của server, sửa tệp lúc đó sẽ bị server ghi đè ở lần lưu kế. Công cụ hỏi `/health` (cổng `PORT`, mặc định 2567) và **từ chối với mã thoát `2`** nếu server còn trả lời; `--force` bỏ qua kiểm tra (chỉ khi chắc chắn). `list` / `show` chỉ đọc nên chạy được cả khi server đang chạy.
+- **Với `STORE=file` phải TẮT server trước khi chạy lệnh ghi** (`reset-*`, `disable`, `enable`, `logout-all`): bản file giữ chỉ mục tài khoản trong bộ nhớ của server, sửa tệp lúc đó sẽ bị server ghi đè ở lần lưu kế. Công cụ hỏi `/health` (cổng `PORT`, mặc định 2567) và **từ chối với mã thoát `2`** nếu server còn trả lời; `--force` bỏ qua kiểm tra (chỉ khi chắc chắn). `list` / `show` chỉ đọc nên chạy được cả khi server đang chạy.
 - `reset-password` in mật khẩu tạm (20 ký tự ngẫu nhiên) và mã khôi phục mới **đúng một lần**, xoá mọi phiên cũ; gửi cho người chơi qua kênh an toàn và nhắc họ lưu mã khôi phục (họ vào được bằng mật khẩu tạm, hoặc đặt mật khẩu của riêng mình qua "Quên mật khẩu" với mã mới).
 - Mã thoát: `0` xong; `1` sai cách dùng hoặc không có tài khoản; `2` server đang chạy.
-- Dùng cùng thư mục dữ liệu với server: `DATA_DIR` (và `ACCOUNTS_DIR` / `SESSIONS_DIR` nếu đã đặt riêng); trên máy dev tự đọc `.env.local`. Công cụ chỉ dùng giao diện `AccountStore` / `SessionStore`: khi bước 3e (PostgreSQL) vào, nó sẽ được nối với `STORE=pg` (lúc đó không cần tắt server); hiện chỉ có bản file.
+- Dùng cùng thư mục dữ liệu với server: `DATA_DIR` (và `ACCOUNTS_DIR` / `SESSIONS_DIR` nếu đã đặt riêng); trên máy dev tự đọc `.env.local`. Công cụ dùng cùng `STORE` / `DATABASE_URL` với server (qua `createStores`): với `STORE=pg` mọi thay đổi đi qua DB nên **không cần tắt server** (công cụ không hỏi `/health`).

@@ -247,6 +247,18 @@ describe("server đang chạy", () => {
   });
 });
 
+describe("PostgreSQL (serverMustBeOff = false)", () => {
+  it("server đang chạy vẫn đặt lại / khoá được (mọi thay đổi đi qua DB); --force không cần", async () => {
+    await reg("lam_thanh");
+    up = true;
+    deps = { ...deps, serverMustBeOff: false };
+    const r = await runTool(["reset-password", "lam_thanh"], deps);
+    expect(r.code).toBe(0);
+    expect((await runTool(["disable", "lam_thanh"], deps)).code).toBe(0);
+    expect((await accounts.byUsername("lam_thanh"))?.disabled).toBe(true);
+  });
+});
+
 describe("randomPassword", () => {
   it("đủ dài, chỉ ký tự trong bảng (không 0 O 1 I l), qua validatePassword, khác nhau; phân bố không lệch", () => {
     const seen = new Set<string>();
