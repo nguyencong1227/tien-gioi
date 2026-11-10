@@ -73,7 +73,7 @@ beforeEach(() => {
   for (const r of [lh, hp]) {
     r.w.now = now;
     r.w.sectService = svc;
-    r.w.onSaveNow = async (sid) => void order.push(`save:${sid}`);
+    r.w.onSaveNow = async (sid) => (order.push(`save:${sid}`), true);
   }
   addPlayer(lh.w, A, 1, 8);
   addPlayer(hp.w, B, 1, 8);

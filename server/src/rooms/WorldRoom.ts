@@ -244,7 +244,15 @@ export class WorldRoom extends Room<WorldState> {
     w.onSaveNow = async (sid) => {
       const p = this.state.players.get(sid);
       const c = w.ctrl.get(sid);
-      if (p && c) await this.persist(p, c).catch((e) => console.error("save failed (sect)", e));
+      // Đang qua cổng: `persist` bỏ qua (bản ghi của cổng đã giữ ví cũ) nên KHÔNG được coi là đã lưu
+      if (!p || !c || c.travelling) return false;
+      try {
+        await this.persist(p, c);
+        return true;
+      } catch (e) {
+        console.error("save failed (sect)", e);
+        return false;
+      }
     };
     // Bí cảnh (4b): tạo phòng cho run mới, đưa người vào phòng bí cảnh, đưa người về Lạc Hà
     w.onDungeonOpen = (run) => void this.openDungeonRoom(w, run);
