@@ -34,6 +34,8 @@ import {
   sellPrice,
   statsFor,
   TRAVEL_COOLDOWN_MS,
+  SECT_MSG,
+  SECT_CREATE_COST,
   type AttackMsg,
   type BuyMsg,
   type DuelEndMsg,
@@ -53,6 +55,9 @@ import {
   type PickupMsg,
   type RebirthMsg,
   type RebornMsg,
+  type SectInvitedMsg,
+  type SectMsg,
+  type SectPresenceMsg,
   type SellMsg,
   type SkillMsg,
   type SoulBuyMsg,
@@ -115,6 +120,7 @@ interface CliArgs {
   dungeonFall: boolean;
   dungeonFallRate: number;
   duel: boolean;
+  sect: boolean;
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -149,6 +155,7 @@ function parseArgs(argv: string[]): CliArgs {
   let dungeonFall = false;
   let dungeonFallRate = 0;
   let duel = false;
+  let sect = false;
 
   for (const arg of argv) {
     if (arg.startsWith("--bots=")) bots = Math.max(0, Number(arg.slice(7)));
@@ -168,6 +175,7 @@ function parseArgs(argv: string[]): CliArgs {
       const rate = Number(arg.slice(15));
       dungeonFallRate = isNaN(rate) ? 1 : Math.max(0, Math.min(1, rate));
     } else if (arg === "--duel" || arg === "--pk") duel = true;
+    else if (arg === "--sect") sect = true;
     else if (arg.startsWith("--party")) {
       const val = arg.slice(7).replace(/^=/, "");
       partySize = val ? Math.max(2, Math.min(4, Number(val))) : 4;
@@ -269,6 +277,7 @@ function parseArgs(argv: string[]): CliArgs {
     dungeonFall,
     dungeonFallRate,
     duel,
+    sect,
   };
 }
 
@@ -298,11 +307,13 @@ function seedBotSaveFile(
   tier: number,
   mapId: string = DEFAULT_MAP.def.id,
   life?: { playMs: number; kills: number; bossKills: number },
+  coinOverride?: number,
 ): void {
   mkdirSync(DATA_PLAYERS_DIR, { recursive: true });
   // Tên file PHẢI khớp với fileFor() trong server/src/store.ts (sha1 của tên NFC viết thường).
   // store.ts đổi cách đặt tên file thì bot sẽ ghi nhầm chỗ mà không báo lỗi: sửa cả hai nơi.
   // Ưu tiên DATA_DIR từ môi trường (giống store.ts), mặc định trỏ về server/data/players.
+  // LƯU Ý: Server thử tải thật phải dùng DATA_DIR mặc định để bot ghi hồ sơ vào đúng server/data/players.
   const key = createHash("sha1").update(name.normalize("NFC").toLowerCase()).digest("hex");
   const file = path.join(DATA_PLAYERS_DIR, `${key}.json`);
   const now = new Date().toISOString();
@@ -312,7 +323,7 @@ function seedBotSaveFile(
     realm,
     tier,
     exp: 0,
-    coin: 100,
+    coin: coinOverride ?? 100,
     mapId,
     x: Math.round(x),
     y: Math.round(y),
@@ -728,6 +739,18 @@ interface BotState {
   duelMatchesDraw: number;
   duelLastEndAt: number;
   nextDuelChallengeAt: number;
+  // Các trường cho thử tải Tông môn (--sect, #231)
+  sect?: boolean;
+  sectTag?: string;
+  sectIsLeader?: boolean;
+  sectGroupLeaderName?: string;
+  nextSectActionAt?: number;
+  sectsCreatedCount: number;
+  sectInvitesSentCount: number;
+  sectInvitesAcceptedCount: number;
+  sectDepositsCount: number;
+  sectWithdrawsCount: number;
+  sectChatsCount: number;
 }
 
 export interface LoadTestMetrics {
@@ -842,6 +865,14 @@ export interface LoadTestMetrics {
   duelMatchesWon?: number;
   duelMatchesLost?: number;
   duelMatchesDraw?: number;
+  /** Các chỉ số thử tải Tông môn (#231) */
+  sect?: boolean;
+  sectsCreatedTotal?: number;
+  sectInvitesSentTotal?: number;
+  sectInvitesAcceptedTotal?: number;
+  sectDepositsTotal?: number;
+  sectWithdrawsTotal?: number;
+  sectChatsTotal?: number;
 }
 
 export interface IdleZeroBotMetrics {
@@ -1051,6 +1082,19 @@ function bindRoomEvents(
       }
     }
   });
+  room.onMessage(SECT_MSG.invited, (msg: SectInvitedMsg) => {
+    if (b.sect && !b.sectIsLeader) {
+      room.send(SECT_MSG.accept, { from: msg.from });
+      if (isMeasuring()) {
+        b.sectInvitesAcceptedCount++;
+      }
+    }
+  });
+  room.onMessage(SECT_MSG.snapshot, (msg: SectMsg) => {
+    if (b.sect && msg.sect) {
+      b.sectTag = msg.sect.tag;
+    }
+  });
   room.onMessage("limbo", (msg: LimboMsg) => {
     if (isMeasuring()) {
       b.deathsCount++;
@@ -1196,6 +1240,7 @@ async function runLoadTest(
   dungeonFall = false,
   dungeonFallRate = 0,
   duel = false,
+  sect = false,
 ): Promise<LoadTestMetrics> {
   const currentMap = getMap(mapId) ?? DEFAULT_MAP;
   const partySuffix = partySize > 1 ? `, tổ đội ${partySize} người` : "";
@@ -1212,14 +1257,15 @@ async function runLoadTest(
       : ", bí cảnh (--dungeon)"
     : "";
   const duelSuffix = duel ? ", thách đấu PK (--duel)" : "";
+  const sectSuffix = sect ? ", tông môn (--sect)" : "";
   const mapSuffix =
     currentMap.def.id !== DEFAULT_MAP.def.id ? `, bản đồ=${currentMap.def.name}` : "";
   const modeLabel =
     mode === "realistic"
-      ? `Thực tế (vào tầm đứng chém${partySuffix}${shopSuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${dungeonSuffix}${duelSuffix}${mapSuffix})`
+      ? `Thực tế (vào tầm đứng chém${partySuffix}${shopSuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${dungeonSuffix}${duelSuffix}${sectSuffix}${mapSuffix})`
       : mode === "crowd"
-        ? `Đông người trong trấn/khu an toàn (${shop ? "25% ghé Dược Sư, 25% đứng, 50% đi" : "30% đứng yên, 70% đi lại"}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${dungeonSuffix}${duelSuffix}${mapSuffix})`
-        : `Xấu nhất (100% di chuyển 20 input/s${partySuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${dungeonSuffix}${duelSuffix}${mapSuffix})`;
+        ? `Đông người trong trấn/khu an toàn (${shop ? "25% ghé Dược Sư, 25% đứng, 50% đi" : "30% đứng yên, 70% đi lại"}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${dungeonSuffix}${duelSuffix}${sectSuffix}${mapSuffix})`
+        : `Xấu nhất (100% di chuyển 20 input/s${partySuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${dungeonSuffix}${duelSuffix}${sectSuffix}${mapSuffix})`;
   console.log(
     `\n=== Bắt đầu thử tải [${modeLabel}]: ${botCount} bot, đo trong ${durationSec}s (${url}) ===`,
   );
@@ -1373,6 +1419,7 @@ async function runLoadTest(
         duel ? 4 : dungeon ? 8 : die ? 8 : tier,
         currentMap.def.id,
         lifeSeed,
+        sect ? 5000 : undefined,
       );
     }
 
@@ -1511,6 +1558,17 @@ async function runLoadTest(
       duelMatchesDraw: 0,
       duelLastEndAt: 0,
       nextDuelChallengeAt: now + 1500 + ((i - 1) % 2 === 0 ? 0 : 5000),
+      sect,
+      sectTag: undefined,
+      sectIsLeader: (i - 1) % 3 === 0,
+      sectGroupLeaderName: `Bot ${String(Math.floor((i - 1) / 3) * 3 + 1).padStart(3, "0")}`,
+      nextSectActionAt: now + 1000 + ((i - 1) % 3) * 500,
+      sectsCreatedCount: 0,
+      sectInvitesSentCount: 0,
+      sectInvitesAcceptedCount: 0,
+      sectDepositsCount: 0,
+      sectWithdrawsCount: 0,
+      sectChatsCount: 0,
     };
 
     bindRoomEvents(
@@ -1778,6 +1836,66 @@ async function runLoadTest(
               b.nextDuelChallengeAt = now + DUEL_COOLDOWN_MS + 2000;
             }
           }
+        }
+      }
+    } else if (sect) {
+      // Kịch bản thử tải Tông môn (--sect, #231)
+      const distFromCamp = Math.hypot(b.predX - b.campX, b.predY - b.campY);
+      if (distFromCamp > 60) {
+        b.wanderAngle = Math.atan2(b.campY - b.predY, b.campX - b.predX);
+      } else if (now >= b.nextTurnAt) {
+        b.wanderAngle += (Math.random() - 0.5) * Math.PI;
+        b.nextTurnAt = now + 1500 + Math.random() * 2000;
+      }
+      dx = Math.cos(b.wanderAngle);
+      dy = Math.sin(b.wanderAngle);
+
+      if (now >= (b.nextSectActionAt ?? 0)) {
+        const groupSize = 3;
+        const groupIndex = Math.floor((b.index - 1) / groupSize);
+        const roleIndex = (b.index - 1) % groupSize;
+        const isLeader = roleIndex === 0;
+
+        if (isLeader) {
+          if (!b.sectTag) {
+            const sectName = `Phai Dao ${groupIndex + 1}`;
+            const sectTag = `P${String(groupIndex + 1).padStart(2, "0")}`;
+            b.room.send(SECT_MSG.create, { name: sectName, tag: sectTag });
+            b.sectTag = sectTag;
+            b.nextSectActionAt = now + 3000;
+            if (measuring) b.sectsCreatedCount++;
+          } else {
+            const member1Index = groupIndex * groupSize + 2;
+            const member2Index = groupIndex * groupSize + 3;
+            const targetIndex = Math.random() < 0.5 ? member1Index : member2Index;
+            const targetName = `Bot ${String(targetIndex).padStart(3, "0")}`;
+            b.room.send(SECT_MSG.invite, { name: targetName });
+            if (measuring) b.sectInvitesSentCount++;
+
+            const r = Math.random();
+            if (r < 0.4) {
+              b.room.send(SECT_MSG.deposit, { amount: 100 });
+              if (measuring) b.sectDepositsCount++;
+            } else if (r < 0.7) {
+              b.room.send(SECT_MSG.withdraw, { amount: 50 });
+              if (measuring) b.sectWithdrawsCount++;
+            } else {
+              b.room.send("chat", { text: `/s Tông môn ${b.sectTag} đồng đạo cố lên` });
+              if (measuring) b.sectChatsCount++;
+            }
+            b.nextSectActionAt = now + 4000 + Math.random() * 2000;
+          }
+        } else {
+          if (b.sectTag) {
+            if (Math.random() < 0.5) {
+              b.room.send(SECT_MSG.deposit, { amount: 50 });
+              if (measuring) b.sectDepositsCount++;
+            } else {
+              b.room.send("chat", { text: `/s Bái kiến Tông chủ ${b.sectTag}` });
+              if (measuring) b.sectChatsCount++;
+            }
+          }
+          b.nextSectActionAt = now + 4000 + Math.random() * 3000;
         }
       }
     } else {
@@ -2479,6 +2597,13 @@ async function runLoadTest(
   const totalDuelLosses = bots.reduce((s, b) => s + b.duelMatchesLost, 0);
   const totalDuelDraws = bots.reduce((s, b) => s + b.duelMatchesDraw, 0);
 
+  const totalSectsCreated = bots.reduce((s, b) => s + b.sectsCreatedCount, 0);
+  const totalSectInvitesSent = bots.reduce((s, b) => s + b.sectInvitesSentCount, 0);
+  const totalSectInvitesAccepted = bots.reduce((s, b) => s + b.sectInvitesAcceptedCount, 0);
+  const totalSectDeposits = bots.reduce((s, b) => s + b.sectDepositsCount, 0);
+  const totalSectWithdraws = bots.reduce((s, b) => s + b.sectWithdrawsCount, 0);
+  const totalSectChats = bots.reduce((s, b) => s + b.sectChatsCount, 0);
+
   const metrics: LoadTestMetrics = {
     commit,
     note,
@@ -2589,6 +2714,14 @@ async function runLoadTest(
     duelMatchesWon: duel || totalDuelWins > 0 ? totalDuelWins : undefined,
     duelMatchesLost: duel || totalDuelLosses > 0 ? totalDuelLosses : undefined,
     duelMatchesDraw: duel || totalDuelDraws > 0 ? totalDuelDraws : undefined,
+    sect: sect ? true : undefined,
+    sectsCreatedTotal: sect || totalSectsCreated > 0 ? totalSectsCreated : undefined,
+    sectInvitesSentTotal: sect || totalSectInvitesSent > 0 ? totalSectInvitesSent : undefined,
+    sectInvitesAcceptedTotal:
+      sect || totalSectInvitesAccepted > 0 ? totalSectInvitesAccepted : undefined,
+    sectDepositsTotal: sect || totalSectDeposits > 0 ? totalSectDeposits : undefined,
+    sectWithdrawsTotal: sect || totalSectWithdraws > 0 ? totalSectWithdraws : undefined,
+    sectChatsTotal: sect || totalSectChats > 0 ? totalSectChats : undefined,
   };
 
   printMetrics(metrics);
@@ -2697,6 +2830,11 @@ function printMetrics(m: LoadTestMetrics) {
   if (m.duel || (m.duelMatchesTotal !== undefined && m.duelMatchesTotal > 0)) {
     console.log(
       `- Thử tải PK thách đấu (--duel): ${m.duelMatchesTotal ?? 0} trận | Thắng: ${m.duelMatchesWon ?? 0} | Thua: ${m.duelMatchesLost ?? 0} | Hoà: ${m.duelMatchesDraw ?? 0}`,
+    );
+  }
+  if (m.sect || (m.sectsCreatedTotal !== undefined && m.sectsCreatedTotal > 0)) {
+    console.log(
+      `- Thử tải Tông môn (--sect): Lập: ${m.sectsCreatedTotal ?? 0} | Mời: ${m.sectInvitesSentTotal ?? 0} | Nhận: ${m.sectInvitesAcceptedTotal ?? 0} | Nạp: ${m.sectDepositsTotal ?? 0} | Rút: ${m.sectWithdrawsTotal ?? 0} | Chat /s: ${m.sectChatsTotal ?? 0}`,
     );
   }
 }
@@ -2986,6 +3124,7 @@ async function main() {
           args.dungeonFall,
           args.dungeonFallRate,
           args.duel,
+          args.sect,
         ),
       );
     }
