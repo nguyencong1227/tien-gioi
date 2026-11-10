@@ -89,6 +89,8 @@ export interface AuthDeps {
   maxTracked?: number;
 }
 
+export { ok as authOk, fail as authFail };
+
 export class AuthService {
   private readonly accounts: AccountStore;
   private readonly sessions: SessionStore;

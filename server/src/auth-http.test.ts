@@ -8,6 +8,9 @@ import http from "node:http";
 import type { AddressInfo } from "node:net";
 import express from "express";
 import { FileAccountStore, FileSessionStore, type AccountStore } from "./account-store";
+import type { PlayerStore } from "./player-store";
+import { FileSoulStore } from "./soul";
+import { hashSecret, type SavedPlayer } from "./store";
 import { hashSecretScrypt, needsRehash, verifyScrypt } from "./auth";
 import { LOGIN_FAIL_PER_IP, type Kdf } from "./auth-service";
 import { authModeOf, clientKey, mountAuth, parseTrustProxy } from "./auth-http";
@@ -29,6 +32,8 @@ const kdf: Kdf = {
 interface Srv {
   base: string;
   dir: string;
+  /** Kho nhân vật giả trong bộ nhớ (khoá: tên chữ thường) */
+  saves: Map<string, SavedPlayer>;
   close: () => Promise<void>;
 }
 const open: Srv[] = [];
@@ -36,15 +41,23 @@ const open: Srv[] = [];
 async function serve(env: NodeJS.ProcessEnv, accounts?: AccountStore): Promise<Srv> {
   const dir = path.join(root, `s${++n}`);
   const app = express();
+  const saves = new Map<string, SavedPlayer>();
+  const players: PlayerStore = {
+    load: async (name) => saves.get(name.normalize("NFC").toLowerCase()) ?? null,
+    save: async (p) => void saves.set(p.name.normalize("NFC").toLowerCase(), p),
+  };
   mountAuth(app, {
     env,
     accounts: accounts ?? new FileAccountStore(path.join(dir, "accounts")),
     sessions: new FileSessionStore(path.join(dir, "sessions")),
+    players,
+    souls: new FileSoulStore(path.join(dir, "souls")),
     kdf,
   });
   const server = http.createServer(app);
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
   const s: Srv = {
+    saves,
     base: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
     dir,
     close: () => new Promise((r) => server.close(() => r())),
@@ -303,6 +316,109 @@ describe("giới hạn tần suất theo IP", () => {
     expect((await failLogin(s, 51, { "X-Forwarded-For": "8.8.8.8" })).status).toBe(401); // IP khác còn hạn mức
     // Khách tự thêm tầng giả phía trước: proxy tin cậy (1 tầng) chỉ coi mục CUỐI là IP thật
     expect((await failLogin(s, 52, { "X-Forwarded-For": "1.2.3.4, 9.9.9.9" })).status).toBe(429);
+  });
+});
+
+describe("nhân vật của tài khoản (/api/character, /api/character/claim)", () => {
+  const SECRET = "0123456789abcdef0123456789abcdef";
+  const reg = async (s: Srv, username = "lam_thanh") => {
+    const r = await post(s, "/api/auth/register", { username, password: PW }, JSON_H);
+    return (await r.json()).token as string;
+  };
+  const authed = (token: string) => ({ ...JSON_H, ...bearer(token) });
+  const legacyChar = (name: string): SavedPlayer => ({
+    name,
+    secretHash: hashSecret(SECRET),
+    realm: 1,
+    tier: 0,
+    exp: 0,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  });
+
+  it("chọn đạo hiệu: 204 (no-store), me báo hasCharacter + name; lần hai 409 has_character", async () => {
+    const s = await serve(ACC);
+    const token = await reg(s);
+    const r = await post(s, "/api/character", { name: "Thanh Phong" }, authed(token));
+    expect(r.status).toBe(204);
+    expect(r.headers.get("cache-control")).toBe("no-store");
+    expect(await (await fetch(`${s.base}/api/auth/me`, { headers: bearer(token) })).json()).toEqual(
+      {
+        username: "lam_thanh",
+        hasCharacter: true,
+        name: "Thanh Phong",
+      },
+    );
+    const again = await post(s, "/api/character", { name: "Ten Khac" }, authed(token));
+    expect([again.status, await again.json()]).toEqual([409, { error: "has_character" }]);
+  });
+
+  it("lỗi: không token 401, tên sai 400, trùng 409, thân sai 400, kiểu nội dung sai 400", async () => {
+    const s = await serve(ACC);
+    const t1 = await reg(s, "nguoi_mot");
+    const t2 = await reg(s, "nguoi_hai");
+    await post(s, "/api/character", { name: "Trung Ten" }, authed(t1));
+    const cases: [Record<string, string>, unknown, number, string][] = [
+      [JSON_H, { name: "Ten Hay" }, 401, "unauthorized"],
+      [authed("a".repeat(43)), { name: "Ten Hay" }, 401, "unauthorized"],
+      [authed(t2), { name: "a" }, 400, "name_invalid"],
+      [authed(t2), { name: "TRUNG TEN" }, 409, "name_taken"],
+      [authed(t2), "[1]", 400, "invalid"],
+      [{ ...bearer(t2), "Content-Type": "text/plain" }, { name: "Ten Hay" }, 400, "invalid"],
+    ];
+    for (const [headers, body, status, error] of cases) {
+      const r = await post(s, "/api/character", body, headers);
+      expect([r.status, await r.json()], JSON.stringify(body)).toEqual([status, { error }]);
+    }
+  });
+
+  it("nhận nhân vật cũ: sai mã 404 not_found (không giữ chỗ), đúng mã 204; me báo đạo hiệu", async () => {
+    const s = await serve(ACC);
+    s.saves.set("co nhan", legacyChar("Co Nhan"));
+    const token = await reg(s);
+    const bad = await post(
+      s,
+      "/api/character/claim",
+      { name: "Co Nhan", secret: "sai-ma-0123456789abcdef-zzz" },
+      authed(token),
+    );
+    expect([bad.status, await bad.json()]).toEqual([404, { error: "not_found" }]);
+    const ok = await post(
+      s,
+      "/api/character/claim",
+      { name: "Co Nhan", secret: SECRET },
+      authed(token),
+    );
+    expect(ok.status).toBe(204);
+    expect(
+      (await (await fetch(`${s.base}/api/auth/me`, { headers: bearer(token) })).json()).name,
+    ).toBe("Co Nhan");
+  });
+
+  it("dò mã bí mật: quá hạn mức thì 429 kèm Retry-After; không token 401", async () => {
+    const s = await serve(ACC);
+    s.saves.set("co nhan", legacyChar("Co Nhan"));
+    const token = await reg(s);
+    let last: Response | undefined;
+    for (let i = 0; i < 11; i++)
+      last = await post(
+        s,
+        "/api/character/claim",
+        { name: "Co Nhan", secret: `sai-${i}-0123456789abcdef` },
+        authed(token),
+      );
+    expect(last!.status).toBe(429);
+    const body = await last!.json();
+    expect(body.error).toBe("rate_limited");
+    expect(last!.headers.get("retry-after")).toBe(String(body.retryAfterS));
+    expect(
+      (await post(s, "/api/character/claim", { name: "Co Nhan", secret: SECRET }, JSON_H)).status,
+    ).toBe(401);
+  });
+
+  it("legacy không mở /api/character", async () => {
+    const s = await serve({});
+    expect((await post(s, "/api/character", { name: "Ten Hay" }, JSON_H)).status).toBe(404);
   });
 });
 

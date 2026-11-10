@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
-import { defineRooms } from "./rooms/WorldRoom";
+import { defineRooms, WorldRoom } from "./rooms/WorldRoom";
 import { startupWarnings } from "./startup";
 import { mountAuth } from "./auth-http";
 
@@ -20,6 +20,7 @@ const app = express();
 // /health (kèm authMode) và, khi AUTH_MODE=account, API tài khoản /api/auth/*: gắn TRƯỚC trang tĩnh bên dưới
 const { auth } = mountAuth(app, { env: process.env });
 // Dọn phiên hết hạn mỗi giờ (unref: không giữ tiến trình sống)
+WorldRoom.auth = auth; // vào phòng bằng token phiên (null: chế độ cũ, tên + mã bí mật)
 if (auth) setInterval(() => void auth.sweep().catch(() => {}), 3_600_000).unref();
 
 // Production: phục vụ luôn bản build của client (client/dist) từ cùng server
