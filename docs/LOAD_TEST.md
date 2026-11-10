@@ -288,6 +288,10 @@ Kịch bản thử tải và kiểm tra toàn diện cơ chế chuyển phòng q
     4. Client nhận `travelTo`, kết nối sang phòng mới `roomNameOf(mapId)` qua `joinOrCreate`.
     5. Đo độ trễ từ lúc gửi `travel` đến lúc nhận đầy đủ state đầu tiên ở phòng mới (`onFirstState`), ghi nhận kích thước byte của bản vá ban đầu.
     6. Chờ hết thời gian hồi chiêu `TRAVEL_COOLDOWN_MS (3000 ms)` kèm độ trễ ngẫu nhiên rồi tiếp tục di chuyển tới cổng ở bản đồ mới để quay lại.
+  - **Số đo thực tế (20–50 bot, commit bbfdafc):**
+    - **Khởi đầu từ Lạc Hà Trấn (`--map=lac_ha`, 20 bot, 15s):** 15 lần qua cổng thành công | Độ trễ `travel -> onFirstState`: **TB 48.82 ms** (p50: 49.62 ms, p95: 53.13 ms) | State ban đầu: **TB 1004 byte/lần**.
+    - **Khởi đầu từ Hắc Phong Cốc (`--map=hac_phong`, 20 bot, 15s):** 50 lần qua cổng thành công | Độ trễ `travel -> onFirstState`: **TB 36.59 ms** (p50: 32.46 ms, p95: 50.62 ms) | State ban đầu: **TB 1683 byte/lần**.
+    - **Tải trọng cao (Lạc Hà Trấn, 50 bot, 15s):** 111 lần qua cổng thành công | Độ trễ: **TB 42.21 ms** (p50: 46.55 ms, p95: 51.79 ms) | State ban đầu: **TB 2543 byte/lần**.
 
 - **Bộ test độ tin cậy và chống rò rỉ phòng (`portal-stress.test.ts`):**
   - **Cách chạy:**
@@ -296,9 +300,9 @@ Kịch bản thử tải và kiểm tra toàn diện cơ chế chuyển phòng q
     ```
   - **Các tiêu chuẩn kiểm tra (4/4 tests pass):**
     1. *Đo độ trễ & toàn vẹn dữ liệu:* Khứ hồi liên tục 2 chiều (Lạc Hà -> Hắc Phong Cốc -> Lạc Hà). Đo độ trễ `travel -> full state` phòng đích đạt **p50 < 350 ms**, **p95 < 600 ms**. Toàn bộ tu vi (`exp`), Linh thạch (`coin`), và túi đồ (`inventory`) được bảo toàn tuyệt đối, file lưu trên đĩa cập nhật đúng `mapId` và toạ độ spawn.
-    2. *Chống nhân bản (Race condition):* Hai client cùng tài khoản đua kết nối đồng thời vào hai bản đồ khác nhau (`lac_ha` và `hac_phong`) -> server chỉ cho phép đúng một bên vào thành công, bên còn lại bị từ chối với lỗi hoặc đóng kết nối, không nhân bản thực thể trong game.
-    3. *Chống kẹt ghost khác bản đồ:* Người chơi rớt mạng bất thường tại Lạc Hà (chờ nối lại `ghost`) nhưng mở client vào Hắc Phong Cốc -> server từ chối với mã lỗi `JOIN_WRONG_MAP (421)` kèm `wrong_map:lac_ha`. Khi người chơi vào lại đúng phòng Lạc Hà, ghost cũ được huỷ và dọn sạch, cho phép vào phòng bình thường.
-    4. *Chống rò rỉ phòng:* Khi tất cả client rời phòng chủ động, biến `state.online` của toàn bộ các phòng trở về đúng 0, danh sách `ghosts` và bộ điều khiển `ctrl` trong `World` được giải phóng sạch sẽ.
+    2. *Nhân vật mới chỉ tạo ở bản đồ mặc định:* Kết nối tài khoản mới chưa có file lưu vào Hắc Phong Cốc -> server từ chối với mã lỗi `JOIN_WRONG_MAP (421)` kèm `wrong_map:lac_ha`, chỉ cho phép sinh nhân vật mới ở Lạc Hà Trấn.
+    3. *Chống kẹt ghost khác bản đồ & dọn ghost tức thời:* Người chơi rớt mạng bất thường tại Lạc Hà (chờ nối lại `ghost`) nhưng mở client vào Hắc Phong Cốc -> server từ chối với mã lỗi `JOIN_WRONG_MAP (421)` kèm `wrong_map:lac_ha`. Khi người chơi vào lại đúng phòng Lạc Hà, ghost cũ được huỷ ngay lập tức (`elapsed < reconnectGraceS`), test bắt được đột biến bỏ `g.cancel()`.
+    4. *Chống rò rỉ phòng:* Khi tất cả client rời phòng chủ động, `state.players.size` và `state.online` của toàn bộ các phòng trở về đúng 0, danh sách `ghosts` và bộ điều khiển `world.ctrl` được giải phóng sạch sẽ.
 
 
 

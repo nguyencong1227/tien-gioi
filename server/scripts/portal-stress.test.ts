@@ -2,9 +2,9 @@
 // Kiểm tra:
 // 1. Bot qua cổng liên tục giữa hai phòng (Lạc Hà <-> Hắc Phong Cốc), đo độ trễ travel -> full state phòng đích
 // 2. Không mất dữ liệu nhân vật (tu vi, Linh thạch, túi đồ) qua nhiều lần chuyển phòng
-// 3. Không nhân bản: 2 client cùng tài khoản đua vào hai bản đồ -> đúng 1 bên vào, không tạo 2 thực thể
-// 4. Người đang chờ nối lại ở phòng này mà vào phòng khác -> nhận wrong_map, vào lại đúng phòng dọn ghost sạch
-// 5. Giải phóng tài nguyên và không rò rỉ: khi rời hết phòng, online về 0, ghosts và ctrl được dọn sạch.
+// 3. Nhân vật mới chỉ tạo ở Lạc Hà Trấn: client kết nối vào bản đồ khác bị từ chối wrong_map
+// 4. Người đang chờ nối lại ở phòng này mà vào phòng khác -> nhận wrong_map, vào lại đúng phòng dọn ghost sạch ngay lập tức
+// 5. Giải phóng tài nguyên và không rò rỉ: khi rời hết phòng, online và players về 0, ghosts và ctrl được dọn sạch.
 
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
@@ -40,7 +40,7 @@ beforeAll(async () => {
   savePlayer = store.savePlayer;
   hashSecret = store.hashSecret;
   const { WorldRoom, defineRooms } = await import("../src/rooms/WorldRoom");
-  WorldRoom.reconnectGraceS = 2; // Rút ngắn thời gian chờ nối lại cho test nhanh
+  WorldRoom.reconnectGraceS = 5; // Đủ dài để phân biệt ghost bị huỷ do đăng nhập lại vs hết hạn tự nhiên
   server = new Server({ transport: new WebSocketTransport(), gracefullyShutdown: false });
   defineRooms(server);
   await server.listen(PORT);
@@ -208,11 +208,11 @@ describe("Thử tải & độ tin cậy chuyển bản đồ qua cổng (Issue #
     expect(finalSaved.inventory?.find((s: any) => s?.itemId === "nanh_soi")?.qty).toBe(5);
   }, 20_000);
 
-  it("chống nhân bản: hai client cùng tài khoản đua kết nối vào hai bản đồ cùng lúc -> đúng một bên vào", async () => {
-    const name = `Bot Race ${++nameSeq}`;
+  it("nhân vật mới chỉ được tạo ở bản đồ mặc định (Lạc Hà Trấn); phòng khác từ chối wrong_map", async () => {
+    const name = `Bot LH Only ${++nameSeq}`;
     const secret = secretOf(name);
 
-    // Đua kết nối đồng thời vào 2 phòng khác nhau
+    // Thử kết nối đồng thời vào 2 phòng khác nhau khi chưa có file lưu
     const client1 = new Client(`ws://localhost:${PORT}`);
     const client2 = new Client(`ws://localhost:${PORT}`);
 
@@ -221,20 +221,14 @@ describe("Thử tải & độ tin cậy chuyển bản đồ qua cổng (Issue #
       client2.joinOrCreate(roomNameOf(HAC_PHONG_ID), { name, secret }),
     ]);
 
-    // Đúng một bên thành công, một bên bị từ chối
-    const successCount = [res1, res2].filter((r) => r.status === "fulfilled").length;
-    const rejectedCount = [res1, res2].filter((r) => r.status === "rejected").length;
-
-    expect(successCount).toBe(1);
-    expect(rejectedCount).toBe(1);
-
-    // Bên bị từ chối phải là lỗi chuyển hướng hoặc mã trùng
-    const rejected = res1.status === "rejected" ? res1.reason : (res2 as any).reason;
-    expect(rejected).toBeDefined();
-
-    // Dọn dẹp phòng thành công
+    // Lạc Hà tạo nhân vật thành công, Hắc Phong Cốc từ chối vì nhân vật mới chỉ được sinh ở Lạc Hà
+    expect(res1.status).toBe("fulfilled");
+    expect(res2.status).toBe("rejected");
     if (res1.status === "fulfilled") rooms.push(res1.value);
-    if (res2.status === "fulfilled") rooms.push(res2.value);
+    if (res2.status === "rejected") {
+      const err = (res2 as PromiseRejectedResult).reason;
+      expect(parseWrongMap(err?.code, err?.message)).toBe(DEFAULT_MAP_ID);
+    }
   });
 
   it("người đang chờ nối lại ở phòng này mà vào phòng khác -> nhận wrong_map, vào lại phòng cũ dọn sạch ghost", async () => {
@@ -247,6 +241,7 @@ describe("Thử tải & độ tin cậy chuyển bản đồ qua cổng (Issue #
     const sid = c1.room.sessionId;
 
     // Rớt mạng bất thường (ws close không leave) -> thành ghost
+    const tDrop = Date.now();
     (c1.room.connection.transport as any).ws.close();
     await waitFor(() => sr.ghosts.has(sid));
     expect(sr.ghosts.has(sid)).toBe(true);
@@ -262,11 +257,15 @@ describe("Thử tải & độ tin cậy chuyển bản đồ qua cổng (Issue #
     expect(wrongMapErr).toBeDefined();
     expect(parseWrongMap(wrongMapErr.code, wrongMapErr.message)).toBe(DEFAULT_MAP_ID);
 
-    // Vào lại đúng phòng Lạc Hà -> ghost cũ bị huỷ, vào phòng bình thường
+    // Vào lại đúng phòng Lạc Hà -> ghost cũ bị huỷ ngay lập tức, vào phòng bình thường
     const client3 = new Client(`ws://localhost:${PORT}`);
     const c3 = await client3.joinOrCreate(roomNameOf(DEFAULT_MAP_ID), { name, secret });
     rooms.push(c3);
-    await waitFor(() => !sr.ghosts.has(sid));
+    const elapsed = (Date.now() - tDrop) / 1000;
+    // Đảm bảo thời gian chưa hết hạn grace (reconnectGraceS = 5s)
+    const { WorldRoom } = await import("../src/rooms/WorldRoom");
+    expect(elapsed).toBeLessThan(WorldRoom.reconnectGraceS);
+    // Ghost phải được dọn dẹp NGAY sau joinOrCreate chứ không phải do grace timer hết hạn
     expect(sr.ghosts.has(sid)).toBe(false);
   });
 
@@ -296,6 +295,8 @@ describe("Thử tải & độ tin cậy chuyển bản đồ qua cổng (Issue #
 
     expect((sr1.state as any).players.size).toBe(1);
     expect((sr2.state as any).players.size).toBe(1);
+    expect((sr1.state as any).online).toBe(1);
+    expect((sr2.state as any).online).toBe(1);
 
     // Cả 2 rời phòng chủ động
     await b1.room.leave(true);
@@ -303,10 +304,14 @@ describe("Thử tải & độ tin cậy chuyển bản đồ qua cổng (Issue #
 
     await sleep(200);
 
-    // Cả 2 phòng online về đúng 0
+    // Cả 2 phòng online về đúng 0, players rỗng, ghosts rỗng, ctrl rỗng
     expect((sr1.state as any).players.size).toBe(0);
     expect((sr2.state as any).players.size).toBe(0);
+    expect((sr1.state as any).online).toBe(0);
+    expect((sr2.state as any).online).toBe(0);
     expect(sr1.ghosts.size).toBe(0);
     expect(sr2.ghosts.size).toBe(0);
+    expect(sr1.world.ctrl.size).toBe(0);
+    expect(sr2.world.ctrl.size).toBe(0);
   });
 });

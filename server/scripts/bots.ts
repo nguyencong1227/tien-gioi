@@ -864,9 +864,34 @@ async function runLoadTest(
     // Khởi tạo vị trí (campX, campY) rải đều khắp vùng hoang dã giống bench.ts trước khi joinOrCreate
     const realm = rnd() < 0.8 ? 1 : 2;
     const tier = Math.floor(rnd() * REALMS[realm].tiers.length);
-    let campX: number;
-    let campY: number;
-    if (mode === "crowd") {
+    let campX = 0;
+    let campY = 0;
+    if (travel) {
+      // Khi thử tải qua cổng: sinh bot gần cổng (quanh toạ độ spawn của cổng) để bot đi bộ vào cổng
+      const portal = currentMap.portals[0];
+      if (portal) {
+        let placed = false;
+        for (let tries = 0; tries < 20; tries++) {
+          const a = rnd() * Math.PI * 2;
+          const dist = portal.r + 20 + rnd() * 40;
+          const x = portal.x + Math.cos(a) * dist;
+          const y = portal.y + Math.sin(a) * dist;
+          if (!currentMap.circleBlocked(x, y, PLAYER_RADIUS)) {
+            campX = x;
+            campY = y;
+            placed = true;
+            break;
+          }
+        }
+        if (!placed) {
+          campX = portal.spawn.x;
+          campY = portal.spawn.y;
+        }
+      } else {
+        campX = currentMap.townPx.x;
+        campY = currentMap.townPx.y;
+      }
+    } else if (mode === "crowd") {
       // Đông người tụ trong trấn/khu an toàn: rải bot hoàn toàn bên trong bán kính an toàn
       for (;;) {
         const a = rnd() * Math.PI * 2;
@@ -1054,6 +1079,10 @@ async function runLoadTest(
       if (b.isTravelling) {
         dx = 0;
         dy = 0;
+      } else if (now < b.avoidUntil) {
+        // Đang né vật cản (cây/đá quanh lối vào cổng): đi theo góc né
+        dx = Math.cos(b.wanderAngle);
+        dy = Math.sin(b.wanderAngle);
       } else {
         const portal = b.map.portals[0];
         if (portal) {
