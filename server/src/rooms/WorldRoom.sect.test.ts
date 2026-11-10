@@ -1,6 +1,6 @@
 // Test tích hợp Tông môn (M3.6 bước 6c): server Colyseus thật, client colyseus.js như client thật. Lập (mất phí) -> mời người Ở PHÒNG
 // KHÁC -> nhận -> chat /s xuyên phòng -> góp / rút kho (ví + hồ sơ + tệp tông môn) -> thoát và vào lại (theo linh hồn) -> giải tán.
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -211,6 +211,74 @@ describe("tông môn: luồng đầy đủ", () => {
     expect(playerOf(B2).sect).toBe("");
     expect(sectFiles()).toEqual([]);
   }, 40_000);
+
+  it("hồ sơ không lưu được lúc này (đang qua cổng / đĩa lỗi): lập và góp bị huỷ và HOÀN ví, đĩa không đổi; rút bị từ chối sớm (không nhân đôi, không mất)", async () => {
+    const A = await join(`Tong Chu ${++seq}`, roomNameOf(DEFAULT_MAP_ID));
+    ctrlOf(A).coin = 3000;
+    const trucTrac = (h: Hero) => h.toasts.filter((t) => /trục trặc/.test(t)).length;
+
+    // Lập khi đang qua cổng: `persist` bỏ qua nên KHÔNG được coi là đã lưu -> huỷ, hoàn phí, không có tệp tông môn
+    ctrlOf(A).travelling = true;
+    A.room.send(SECT_MSG.create, { name: "Thanh Van Mon", tag: "TV" });
+    await waitFor(() => trucTrac(A) === 1, 4000, "bị từ chối vì đang qua cổng");
+    expect(ctrlOf(A).coin).toBe(3000);
+    expect(sectFiles()).toEqual([]);
+    ctrlOf(A).travelling = false;
+
+    // Lập khi ghi hồ sơ lỗi (đĩa / DB): huỷ, hoàn phí
+    const players = (serverRoom(A.room) as any).players;
+    const realSave = players.save;
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    players.save = async () => {
+      throw new Error("đĩa lỗi (mô phỏng)");
+    };
+    A.room.send(SECT_MSG.create, { name: "Thanh Van Mon", tag: "TV" });
+    await waitFor(() => trucTrac(A) === 2, 4000, "bị từ chối vì lưu lỗi");
+    expect(ctrlOf(A).coin).toBe(3000);
+    expect(sectFiles()).toEqual([]);
+    players.save = realSave;
+    log.mockRestore();
+
+    // Đĩa lành lại: lập được; hồ sơ trên đĩa đã trừ phí
+    A.room.send(SECT_MSG.create, { name: "Thanh Van Mon", tag: "TV" });
+    await waitFor(() => lastSnap(A), 5000, "lập được khi đĩa lành");
+    const after = 3000 - SECT_CREATE_COST;
+    expect(ctrlOf(A).coin).toBe(after);
+    expect(saveOf(A.name).coin).toBe(after);
+
+    // Góp khi ghi hồ sơ lỗi: huỷ, hoàn ví, kho nguyên; đĩa không đổi (không có "ví cũ + kho mới")
+    players.save = async () => {
+      throw new Error("đĩa lỗi (mô phỏng)");
+    };
+    const quiet = vi.spyOn(console, "error").mockImplementation(() => {});
+    A.room.send(SECT_MSG.deposit, { amount: 300 });
+    await waitFor(() => trucTrac(A) === 3, 4000, "góp bị từ chối vì lưu lỗi");
+    expect(ctrlOf(A).coin).toBe(after);
+    expect(lastSnap(A)?.coin).toBe(0);
+    players.save = realSave;
+    quiet.mockRestore();
+    expect(saveOf(A.name).coin).toBe(after);
+    expect(JSON.parse(readFileSync(path.join(dataDir, "sects", sectFiles()[0]), "utf8")).coin).toBe(
+      0,
+    );
+
+    // Góp khi đang qua cổng: huỷ, hoàn ví; rút khi đang qua cổng: từ chối sớm (kho nguyên)
+    ctrlOf(A).travelling = true;
+    A.room.send(SECT_MSG.deposit, { amount: 300 });
+    await waitFor(() => trucTrac(A) === 4, 4000, "góp bị từ chối khi qua cổng");
+    expect(ctrlOf(A).coin).toBe(after);
+    A.room.send(SECT_MSG.withdraw, { amount: 1 });
+    await waitFor(() => trucTrac(A) === 5, 4000, "rút bị từ chối khi qua cổng");
+    ctrlOf(A).travelling = false;
+
+    // Hết qua cổng: góp được, đĩa đủ cả hai phía
+    A.room.send(SECT_MSG.deposit, { amount: 300 });
+    await waitFor(() => lastSnap(A)?.coin === 300, 4000, "góp được");
+    expect(saveOf(A.name).coin).toBe(after - 300);
+    expect(JSON.parse(readFileSync(path.join(dataDir, "sects", sectFiles()[0]), "utf8")).coin).toBe(
+      300,
+    );
+  }, 30_000);
 
   it("tin rác và quá quyền không phá gì: Đệ tử mời / rút / giải tán / mời ra bị từ chối; client không thể tự đặt chức vụ Tông chủ", async () => {
     const A = await join(`Tong Chu ${++seq}`, roomNameOf(DEFAULT_MAP_ID));
