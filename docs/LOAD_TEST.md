@@ -513,3 +513,7 @@ Công cụ `npm run kiem-save -w server` đã được cập nhật thêm các l
 - **Kiểm tra tính hợp lệ của `dungeonDaily`:**
   - `day` phải đúng định dạng ngày tháng `YYYY-MM-DD`.
   - `rewards` phải là số nguyên nằm trong khoảng `[0, DUNGEON_DAILY_REWARDS]`.
+
+## 11. E2E thật PK thách đấu (M3.5, `npm run e2e:pk`)
+Cùng khung với mục 9 (server Colyseus thật trong tiến trình + hai tab Chrome headless, hai nguồn `127.0.0.1` / `localhost`). Luồng qua giao diện thật: bấm **chuột thật** (CDP `Input.dispatchMouseEvent` vào vị trí VẼ của người kia, đúng thứ `tryClickPlayer` so với con trỏ) -> menu có nút "Thách Đấu" bấm được -> B nhận hộp lời mời nêu đúng tên -> B **từ chối** (A nhận toast, không có trận) -> thách lại -> B **nhận** -> đếm ngược 3-2-1 nêu đối thủ -> HUD quyết đấu (tên đối thủ, thanh máu) + dấu ⚔ trên đầu -> A đánh bằng `WorldScene.slash` của client (máu B đặt về 1 phía server) -> màn kết quả cho CẢ HAI (A thắng, B thua "đánh gục") -> B gục rồi đứng dậy **tại chỗ** với khí huyết hồi lại, KHÔNG màn Hoàng Tuyền, lớp phủ không ghi "Lạc Hà Trấn" -> hồ sơ B không `limbo`, vẫn ở Lạc Hà -> 0 lỗi console. Chạy: `npm run build && npm run e2e:pk`; `E2E_SHOTS=<thư mục>` lưu ảnh từng bước. Hai lỗi đã bắt được ở client trước khi merge #224: màn kết quả của người thua bị `closeAllModals()` (gọi mỗi khung khi `me.dead`) đóng ngay, và lớp phủ "chết" hứa hồi sinh ở trấn.
+

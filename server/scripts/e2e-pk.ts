@@ -285,8 +285,9 @@ async function main() {
 
     // 2. A bấm chuột (thật, qua CDP) vào B: menu có nút "Thách Đấu" bấm được
     const clickOn = async (tab: Tab, name: string) => {
+      // Vị trí VẼ của người đó (`root`, đã nội suy): đúng thứ `tryClickPlayer` so với con trỏ (trong 28 px)
       const pos = await tab.ev(
-        `(() => { const s = window.__scene; const cam = s.cameras.main; const e = [...s.state.players.values()].find(p => p.name === ${JSON.stringify(name)}); return { x: ((e.px ?? e.x) - cam.worldView.x) * cam.zoom, y: ((e.py ?? e.y) - cam.worldView.y) * cam.zoom }; })()`,
+        `(() => { const s = window.__scene; const cam = s.cameras.main; const [, e] = [...s.players.entries()].find(([id]) => s.state.players.get(id)?.name === ${JSON.stringify(name)}); return { x: (e.root.x - cam.worldView.x) * cam.zoom, y: (e.root.y - cam.worldView.y) * cam.zoom }; })()`,
       );
       for (const type of ["mousePressed", "mouseReleased"])
         await tab.send("Input.dispatchMouseEvent", {
