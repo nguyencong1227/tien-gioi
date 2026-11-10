@@ -319,12 +319,16 @@ export class WorldRoom extends Room<WorldState> {
       if (typeof wait.reject === "function")
         this.ghosts.set(sid, { cancel: () => wait.reject(false), done });
       c.inputs.length = 0; // không còn ai điều khiển: bỏ input đang chờ
+      // Hồn lìa xác: bất tử trong lúc chờ, quái bỏ mục tiêu ngay (rớt mạng không được làm mất kiếp)
+      this.world.ghosts.add(sid);
+      forgetTarget(this.world, sid);
       // Lưu ngay, phòng khi server sập trong lúc chờ
       await this.persist(p, c).catch((e) => console.error("save failed", e));
       try {
         await wait;
         // Nối lại được: client nhận Room mới nên gửi lại dữ liệu riêng (tin `party` tới theo nhịp snapshot)
         this.ghosts.delete(sid);
+        this.world.ghosts.delete(sid);
         sendInv(this.world, sid);
         sendQuests(this.world, sid);
         sendWallet(this.world, sid);
@@ -349,6 +353,7 @@ export class WorldRoom extends Room<WorldState> {
       releaseLootOwner(this.world, sid);
     } finally {
       this.ghosts.delete(sid);
+      this.world.ghosts.delete(sid);
       resolveDone();
     }
   }

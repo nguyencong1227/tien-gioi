@@ -110,6 +110,13 @@ export class World {
   readonly interest: Interest;
   /** Đội hình: ai ở đội nào, lời mời đang chờ (#74) */
   readonly parties = new Parties();
+  /**
+   * Người chơi đang "hồn lìa xác": rớt mạng bất thường, nhân vật ở lại chờ nối lại (`RECONNECT_GRACE_S`, #116).
+   * **Bất tử** trong lúc chờ (không bị đánh, quái không nhắm, không hồi phục / tu luyện): rớt mạng không được phép
+   * làm mất kiếp (docs/THIET_KE_LUAN_HOI.md mục 4). Là tập riêng thay vì cờ trong `PlayerCtrl` để vòng lặp quái × người
+   * chơi chỉ phải tra tập này khi nó khác rỗng (hầu hết thời gian là rỗng).
+   */
+  readonly ghosts = new Set<string>();
   monsterSeq = 0;
   lootSeq = 0;
   /** Số tick đã chạy (dùng chia nhịp ghi px, py) */

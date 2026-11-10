@@ -132,6 +132,7 @@ function dropCoin(w: World, mc: MonsterCtrl, x: number, y: number) {
 export function hurtPlayer(w: World, sid: string, p: Player, dmg: number, from: Monster) {
   const c = w.ctrl.get(sid);
   if (!c || p.dead) return;
+  if (w.ghosts.has(sid)) return; // rớt mạng, đang chờ nối lại: bất tử
   p.hp = Math.max(0, p.hp - dmg);
   p.meditating = false;
   c.lastHitAt = w.now;
