@@ -84,32 +84,34 @@ interface SoulStore {
 **Đi cùng PK (bước 5):** chết vì thách đấu đi nhánh "hồi sinh" cũ (`RESPAWN_MS`, không mất gì); `DEATH_EXP_LOSS` bỏ ở bước này vì không còn nhánh nào dùng tới.
 
 ## 5. Điểm luân hồi (Duyên)
-Mục tiêu: (a) chết sớm gần như không có Duyên, nên không lợi dụng cách tự sát để cày; (b) mọi cách chơi cho **tốc độ Duyên tương đương nhau** (~25-32 Duyên mỗi giờ chơi), nên không có "kiểu chơi tối ưu" bóp méo trò chơi; (c) tiến bộ thật nhận nhiều hơn ở lại.
+Mục tiêu: (a) chết sớm gần như không có Duyên, nên không lợi dụng cách tự sát để cày; (b) mọi cách chơi cho **tốc độ Duyên tương đương nhau** (~22-28 Duyên mỗi giờ chơi, chênh dưới 1.3 lần từ Luyện Khí tầng 5), nên không có "kiểu chơi tối ưu" bóp méo trò chơi; (c) tiến bộ thật nhận nhiều hơn ở lại.
 
 ```
 Duyên = floor( stepPts + timePts + bossPts )
-stepPts = tổng điểm các bậc ĐÃ QUA + điểm bậc hiện tại × (tu vi / thanh tu vi)
-          điểm mỗi bậc theo cảnh giới: Phàm Nhân → Luyện Khí: 2 / bậc;  Trúc Cơ: 12 / bậc;  Kim Đan: 60 / bậc (chưa có nội dung)
-timePts = min( 15, floor(phút chơi / 10) )     // phút chơi = thời gian nhân vật thật sự ở trong game (không tính ghost, Hoàng Tuyền)
+stepPts = tổng điểm các bậc ĐÃ VƯỢT QUA + điểm bậc hiện tại × (tu vi / thanh tu vi)
+          (bậc hiện tại CHƯA vượt qua: đứng ở Trúc Cơ sơ kỳ với 0% tu vi thì mới có điểm của 9 bậc Luyện Khí, chưa có điểm Trúc Cơ nào)
+          điểm mỗi bậc theo cảnh giới nơi công sức được bỏ ra: Luyện Khí: 2 / bậc;  Trúc Cơ: 12 / bậc;  Kim Đan: 60 / bậc (chưa có nội dung); Phàm Nhân: 0
+timePts = min( 15, floor(phút chơi / 9) )     // phút chơi = thời gian nhân vật thật sự ở trong game (không tính ghost, Hoàng Tuyền)
 bossPts = min( 15, 3 × số trùm đã hạ )
 ```
 Ước tính theo mốc thời gian của `docs/CAN_BANG.md` (săn hiệu quả một mình; "phút" là lúc đạt bậc; thanh tu vi bậc đó còn 0%):
 
 | Chết ngay khi vừa đạt | Phút | Duyên (0 trùm) | Duyên (hạ 2 trùm) |
 |---|---:|---:|---:|
-| Luyện Khí tầng 1 | 9 | 2 | 8 |
-| Luyện Khí tầng 5 | 29 | 12 | 18 |
-| Luyện Khí tầng 9 | 48 | 22 | 28 |
-| Trúc Cơ sơ kỳ | 53 | 35 | 41 |
-| Trúc Cơ trung kỳ | 86 | 50 | 56 |
-| Trúc Cơ hậu kỳ | 122 | 66 | 72 |
-| Hết Trúc Cơ, thanh đầy (175 phút) | 175 | 81 | 90 (hạ 3 trùm) |
+| Luyện Khí tầng 1 | 9 | 1 | 7 |
+| Luyện Khí tầng 5 | 29 | 11 | 17 |
+| Luyện Khí tầng 9 | 48 | 21 | 27 |
+| Trúc Cơ sơ kỳ | 53 | 23 | 29 |
+| Trúc Cơ trung kỳ | 86 | 39 | 45 |
+| Trúc Cơ hậu kỳ | 122 | 55 | 61 |
+| Hết Trúc Cơ, thanh đầy (175 phút) | 175 | 69 | 78 (hạ 3 trùm) |
 
 Chết trong 2 phút đầu hoặc ở Phàm Nhân: 0 Duyên, và không tăng bộ đếm kiếp (chỉ đặt lại, tránh làm "đầu thai" thành nút bấm).
-Sau khi có nhiều Duyên, kiếp mới nhanh hơn nhờ Dư âm tu hành (mục 6) nên Duyên mỗi giờ **tăng nhẹ** theo thời gian: đó là chủ ý (cảm giác tiến bộ qua kiếp), `can-bang` đo và test giữ để không vượt ~2× so với kiếp đầu.
+**Lịch sử:** bản đầu của công thức (và của bảng này) tính `tier + 1` bậc đã qua ở cảnh giới đang đứng, nên bước vào Trúc Cơ nhận ngay 12 điểm mà chưa bỏ công sức nào: Duyên / giờ vọt lên 39.8 ở Trúc Cơ sơ kỳ so với 27.7 ở cuối Trúc Cơ (gấp 1.44 lần, phá mục tiêu b). `can-bang` (#151) phát hiện; mã nay đúng với công thức viết ở trên (chỉ tính bậc đã vượt qua) và thời gian đổi từ 10 sang 9 phút / điểm để dải 22-28 nằm giữa mục tiêu.
+Sau khi có nhiều Duyên, kiếp mới nhanh hơn nhờ Dư âm tu hành (mục 6) nên Duyên mỗi giờ **tăng nhẹ** theo thời gian: đó là chủ ý (cảm giác tiến bộ qua kiếp), `can-bang` đo và test giữ để không vượt ~2× so với kiếp đầu (hiện ~1.8× ở kiếp 17).
 
 ## 6. Tam Sinh Thạch: bảng mở khóa bản đầu
-Mỗi mục có nhiều **nấc**; mua nấc kế bằng Duyên, vĩnh viễn, chỉ mua được **ở Hoàng Tuyền**. Tổng chi phí mọi mục ≈ 1700 Duyên (~20 kiếp trọn vẹn); riêng Dư âm tu hành ≈ 1080.
+Mỗi mục có nhiều **nấc**; mua nấc kế bằng Duyên, vĩnh viễn, chỉ mua được **ở Hoàng Tuyền**. Tổng chi phí mọi mục ≈ 1700 Duyên (~24 kiếp trọn vẹn, mỗi kiếp ~71 Duyên); riêng Dư âm tu hành ≈ 1080 (~16 kiếp).
 
 | Mục (id) | Nấc: hiệu lực (giá Duyên) | Áp dụng thế nào ở server |
 |---|---|---|
