@@ -1,8 +1,14 @@
 import Phaser from "phaser";
 import { Client, type Room } from "colyseus.js";
-import { ROOM_NAME, type JoinOptions } from "@tien-gioi/shared";
+import {
+  DEFAULT_MAP_ID,
+  TRAVEL_JOIN_TIMEOUT_MS,
+  getMap,
+  type TravelToMsg,
+} from "@tien-gioi/shared";
 import { WorldScene } from "./scenes/WorldScene";
 import { ui } from "./ui";
+import { joinWithRedirect } from "./connection";
 
 const NAME_KEY = "tien-gioi:name";
 const SECRET_KEY = "tien-gioi:secret";
@@ -39,6 +45,7 @@ let activeClient: Client | null = null;
 let activeScene: WorldScene | null = null;
 let activeToken: string | null = null;
 let isReconnecting = false;
+let isTraveling = false;
 
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -48,12 +55,14 @@ form.addEventListener("submit", async (e) => {
   try {
     const client = new Client(serverUrl());
     activeClient = client;
-    const room = await client.joinOrCreate(ROOM_NAME, {
+    const { room, mapId } = await joinWithRedirect({
+      client,
+      storage: localStorage,
       name,
       secret: secret(),
-    } satisfies JoinOptions);
+    });
     localStorage.setItem(NAME_KEY, name);
-    await start(room);
+    await start(room, mapId);
   } catch (e: any) {
     err.textContent =
       e?.message && !/^\d+$/.test(e.message) ? e.message : "Không kết nối được máy chủ.";
@@ -72,7 +81,75 @@ function showDisconnected() {
 function setupRoomLifecycle(room: Room) {
   activeToken = room.reconnectionToken;
 
+  // Lắng nghe sự kiện đi qua cổng chuyển phòng (M3 bước 1)
+  room.onMessage("travelTo", async (msg: TravelToMsg) => {
+    if (!msg?.mapId || !activeClient || isTraveling) return;
+    const targetMap = getMap(msg.mapId);
+    if (!targetMap) return;
+
+    isTraveling = true;
+    activeScene?.setReconnecting(true);
+    ui.showTransition(targetMap.def.name);
+
+    try {
+      // Chờ màn hình chuyển cảnh mờ dần (350ms)
+      await new Promise((r) => setTimeout(r, 350));
+
+      // Chủ động rời phòng cũ (không kích hoạt luồng reconnect)
+      room.leave(true);
+
+      const name = nameInput.value.trim();
+      const joinPromise = joinWithRedirect({
+        client: activeClient,
+        storage: localStorage,
+        name,
+        secret: secret(),
+        suggestedMapId: msg.mapId,
+      });
+
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(
+          () => reject(new Error("Quá thời gian chuyển bản đồ.")),
+          TRAVEL_JOIN_TIMEOUT_MS,
+        );
+      });
+
+      const { room: newRoom, mapId: finalMapId } = await Promise.race([
+        joinPromise,
+        timeoutPromise,
+      ]).finally(() => {
+        if (timeoutId) clearTimeout(timeoutId);
+      });
+      const finalMap = getMap(finalMapId)!;
+
+      // Cập nhật scene sang phòng mới và bản đồ mới
+      activeScene?.changeMap(newRoom, finalMap);
+      activeScene?.setReconnecting(false);
+      isTraveling = false;
+
+      // Thiết lập vòng đời mới cho phòng vừa vào
+      setupRoomLifecycle(newRoom);
+
+      // Sáng dần và thông báo thành công
+      ui.hideTransition();
+      ui.toast({ text: `Đã tiến nhập ${finalMap.def.name}.`, tone: "good" });
+    } catch (err: any) {
+      isTraveling = false;
+      ui.hideTransition();
+      activeScene?.setReconnecting(false);
+      ui.toast({
+        text: `Không thể chuyển bản đồ: ${err?.message || "lỗi kết nối"}. Vui lòng đăng nhập lại để vào bản đồ mới.`,
+        tone: "bad",
+      });
+      showDisconnected();
+    }
+  });
+
   room.onLeave(async (code) => {
+    // Nếu đang trong quá trình chuyển phòng, bỏ qua xử lý rớt mạng
+    if (isTraveling) return;
+
     // 1000: đóng bình thường; 4000-4999: mã của ứng dụng (4000 chủ động thoát, 4429 bị ngắt vì spam)
     if (code === 1000 || (code >= 4000 && code <= 4999)) {
       if (code !== 1000) showDisconnected();
@@ -125,20 +202,22 @@ function setupRoomLifecycle(room: Room) {
   });
 }
 
-async function start(room: Room) {
+async function start(room: Room, mapId: string) {
   // Chờ font tiếng Việt tải xong trước khi Phaser vẽ Text lên canvas lần đầu
   await Promise.race([
     document.fonts.load('16px "Noto Serif"', "Tiếng Việt"),
     new Promise((r) => setTimeout(r, 3000)),
   ]);
   ui.show();
+  ui.setCurrentMapId(mapId);
   if (
     typeof window !== "undefined" &&
     (import.meta.env.DEV || new URLSearchParams(location.search).has("debug"))
   ) {
     (window as any).__ui = ui;
   }
-  activeScene = new WorldScene(room);
+  const currentMap = getMap(mapId) || getMap(DEFAULT_MAP_ID)!;
+  activeScene = new WorldScene(room, currentMap);
   new Phaser.Game({
     type: Phaser.AUTO,
     parent: "game",

@@ -370,6 +370,34 @@ button {
   }
 }
 
+/* Nút đi qua cổng truyền tống khi đứng gần */
+#btn-portal {
+  position: fixed;
+  z-index: 6;
+  right: calc(max(14px, env(safe-area-inset-right)) + 168px);
+  bottom: calc(max(14px, env(safe-area-inset-bottom)) + 144px);
+  width: 66px;
+  height: 66px;
+  border-color: #a8ff78;
+  background: rgba(30, 60, 50, 0.92);
+  box-shadow: 0 0 16px rgba(168, 255, 120, 0.5);
+  animation: pulsePortal 1.2s ease-in-out infinite;
+}
+#btn-portal span {
+  color: #a8ff78;
+}
+#btn-portal small {
+  max-width: 58px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@keyframes pulsePortal {
+  50% {
+    box-shadow: 0 0 22px #a8ff78;
+  }
+}
+
 /* Hộp thoại NPC */
 #dialog-modal {
   position: fixed;
@@ -1116,6 +1144,7 @@ body.low-fx #dialog-modal {
 }
 body.low-fx .sk.ready,
 body.low-fx #btn-pickup,
+body.low-fx #btn-portal,
 body.low-fx #btn-talk {
   animation: none !important;
 }
@@ -1562,6 +1591,12 @@ body.low-fx #btn-talk {
     height: 55px;
   }
   #btn-talk {
+    right: calc(max(10px, env(safe-area-inset-right)) + 144px);
+    bottom: calc(max(10px, env(safe-area-inset-bottom)) + 130px);
+    width: 58px;
+    height: 58px;
+  }
+  #btn-portal {
     right: calc(max(10px, env(safe-area-inset-right)) + 144px);
     bottom: calc(max(10px, env(safe-area-inset-bottom)) + 130px);
     width: 58px;
@@ -2273,8 +2308,52 @@ body.reconnecting #joyzone,
 body.reconnecting #skills,
 body.reconnecting #quickbar,
 body.reconnecting #btn-talk,
+body.reconnecting #btn-portal,
 body.reconnecting #btn-pickup {
   opacity: 0.35;
   pointer-events: none;
   filter: grayscale(0.5);
+}
+
+/* Tên bản đồ của thành viên đội ở bản đồ khác */
+.pmem-map {
+  font-size: 10px;
+  color: #a8ff78;
+  margin-left: 4px;
+  font-style: italic;
+}
+
+/* Màn hình chuyển cảnh mờ dần */
+.transition-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #000000;
+  opacity: 0;
+  transition: opacity 0.35s ease-in-out;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.transition-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+.transition-content {
+  text-align: center;
+  color: #ffe08a;
+  font-family: "Noto Serif", Georgia, serif;
+}
+.transition-map-name {
+  font-size: 32px;
+  font-weight: bold;
+  letter-spacing: 4px;
+  margin-bottom: 8px;
+  text-shadow: 0 0 18px rgba(255, 224, 138, 0.6);
+}
+.transition-sub {
+  font-size: 14px;
+  color: #c9b07a;
+  letter-spacing: 2px;
 }
