@@ -20,8 +20,9 @@ Thay cho các câu hỏi trước đây ở cuối file này và trong `question
 | M3 bước 1: bản đồ thứ hai (phương án A) | **Xong**: `shared/` (#139, #144), server (phòng theo bản đồ #145, qua cổng #153, chat chung #156, đội dùng chung #158), client (#146, ảnh nghiệm thu #160), công cụ (#155, #161); NPC lái buôn Thanh Lộ Trạm (#169, #170). Quái riêng của Hắc Phong Cốc: chuyển sang việc sau (#142 đã đóng) | `docs/THIET_KE_NHIEU_BAN_DO.md` |
 | M3 bước 2: luân hồi bản đầu | **Xong**: `shared/` (#152), ghost bất tử (#147), chân linh (#159), Hoàng Tuyền / đầu thai / Dư âm tu hành / xuất thân (#162), client Hoàng Tuyền (#163), công cụ (#168) | `docs/THIET_KE_LUAN_HOI.md` |
 | M3 bước 3: tài khoản thật + PostgreSQL | **Xong phía server và client** (#177 đã đóng): hợp đồng #174; kho / danh tính #178, #179; mật mã + kho tài khoản #180; `AuthService` #183; API HTTP #184; vào phòng bằng token #185; `tai-khoan` #188; Pg #190, #194, #197; client #182, #189, #196; E2E #193; CI Postgres thật #195; contract store #181, #187; `kiem-save` #192. **Còn (C, #176):** bot `--account`, login storm | `docs/THIET_KE_TAI_KHOAN.md` |
-| M3 bước 4: bí cảnh (phòng tạm theo đội) | **Đã có thiết kế** để B / C review, chưa viết mã | `docs/THIET_KE_BI_CANH.md` |
-| M3 bước 5-6: PK thách đấu, tông môn | Đã có quyết định; làm lần lượt sau bước 4 | |
+| M3 bước 4: bí cảnh (phòng tạm theo đội) | **Xong phía server và công cụ cân bằng** (#202 đã đóng): thiết kế #198; hợp đồng #199, #205; kiem-save #206; sổ run + phòng bí cảnh thật #207; trùm / thắng / thưởng / lượt ngày #208; số liệu #209; công cụ cân bằng #210. **Còn:** client 4d (B, #200), bot / thử tải 4e (C, #201), E2E thật, cân nhắc luật chết trong bí cảnh (chờ người dùng); #203 mở tới khi đủ | `docs/THIET_KE_BI_CANH.md` |
+| M3 bước 5: PK thách đấu | **Đã có thiết kế** để B / C review, chưa viết mã | `docs/THIET_KE_PK.md` |
+| M3 bước 6: tông môn | Đã có quyết định; làm sau bước 5 | |
 
 Việc ngoài kế hoạch M3 đã làm xen vào: tối ưu băng thông vùng nhìn (#70, #87, #89; 100 người: ~9.5 KB/s mỗi client ở ca đông người tụ trong trấn), bench hằng đêm (#97), nối lại khi rớt mạng (#118, #122, #127; thử tải #125), kiểm file lưu (#113, #114), Docker và triển khai (#81, #83), rà giao diện điện thoại (#105).
 
@@ -86,7 +87,7 @@ Kéo từ M4 lên để linh hồn tách khỏi nhân vật và có chủ. **Đ�
 Phòng tạm theo đội (`autoDispose`, hạn giờ, quái trùm, phần thưởng), dựa trên bước 1 (phòng theo bản đồ) và tổ đội. **Thiết kế: `docs/THIET_KE_BI_CANH.md`** (A soạn, B và C review): chia PR 4a-4e ở mục 9 (A: hợp đồng + server; B: client; C: thử tải, rò rỉ, bot, `kiem-save`), 4 câu hỏi mở cho người dùng ở mục 10.
 
 ### Bước 5: PK thách đấu
-Chỉ khi hai bên đồng ý (lời thách đấu, nhận / từ chối, trận có kết thúc rõ); chết vì PK **không** mất kiếp (không luân hồi, không mất đồ). Không PK trong trấn. Thiết kế khi tới bước này.
+Chỉ khi hai bên đồng ý (lời thách đấu, nhận / từ chối, trận có kết thúc rõ); chết vì PK **không** mất kiếp (không luân hồi, không mất đồ). Không PK trong trấn. **Thiết kế: `docs/THIET_KE_PK.md`** (A soạn, B và C review): chia PR 5a-5e ở mục 9 (A: hợp đồng + server + cân bằng; B: client; C: bot, thử tải, rò rỉ), 4 câu hỏi mở ở mục 10.
 
 ### Bước 6: Tông môn
 Gắn với **linh hồn** (không gắn nhân vật từng kiếp): tạo / gia nhập / chức vụ, chat tông môn, kho chung. Phụ thuộc bước 3. Thiết kế khi tới bước này.
