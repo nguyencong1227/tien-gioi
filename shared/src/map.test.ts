@@ -4,6 +4,7 @@ import {
   TILE,
   MAP_W,
   MAP_H,
+  MAP_SEED,
   MAP_TILES,
   TOWN,
   TOWN_PX,
@@ -248,5 +249,74 @@ describe("bản đồ là tham số (#123, Bước 0)", () => {
     expect(m.isBlockedPx(50 * TILE, 10 * TILE)).toBe(true);
     // Không làm đổi bản đồ mặc định
     expect(createHash("sha256").update(DEFAULT_MAP.tiles).digest("hex")).toBe(LAC_HA_SHA256);
+  });
+
+  it("dangerAt bản đồ chữ nhật: đạt 1 ở nửa cạnh NGẮN, không theo cạnh dài (#124)", () => {
+    // Bản đồ rộng (56 x 40 ô): nửa cạnh ngắn = 20 ô; nếu tính theo cạnh dài (28 ô) thì mức nguy hiểm bị loãng
+    const wide = new GameMap({
+      id: "rong",
+      name: "Rộng",
+      seed: 1,
+      w: 56,
+      h: 40,
+      town: { cx: 28, cy: 20, r: 4 },
+    });
+    const tall = new GameMap({
+      id: "cao",
+      name: "Cao",
+      seed: 1,
+      w: 40,
+      h: 56,
+      town: { cx: 20, cy: 28, r: 4 },
+    });
+    for (const m of [wide, tall]) {
+      const { x, y, r } = m.townPx;
+      const half = Math.min(m.worldW, m.worldH) * 0.5;
+      expect(m.dangerAt(x, y), m.def.id).toBe(0);
+      expect(m.dangerAt(x + r, y), m.def.id).toBe(0);
+      expect(m.dangerAt(x + half, y), m.def.id).toBe(1);
+      expect(m.dangerAt(x, y - half), m.def.id).toBe(1);
+      expect(m.dangerAt(x + (r + half) / 2, y), m.def.id).toBeCloseTo(0.5, 10);
+      expect(m.dangerAt(x + (r + half) / 2, y), m.def.id).toBeCloseTo(
+        tall.dangerAt(tall.townPx.x, tall.townPx.y + (tall.townPx.r + half) / 2),
+        10,
+      );
+    }
+    // Bản đồ vuông (mặc định) giữ công thức cũ: nửa cạnh
+    const { x, y, r } = DEFAULT_MAP.townPx;
+    expect(DEFAULT_MAP.dangerAt(x + (r + WORLD_W * 0.5) / 2, y)).toBeCloseTo(0.5, 10);
+  });
+
+  it("MapDef: tâm trấn, w, h phải là số nguyên (số lẻ làm đường đất ghi lệch chỉ số mảng) (#124)", () => {
+    const def: MapDef = {
+      id: "le",
+      name: "Lẻ",
+      seed: 3,
+      w: 40,
+      h: 40,
+      town: { cx: 20, cy: 20, r: 5 },
+    };
+    expect(() => new GameMap(def)).not.toThrow();
+    expect(() => new GameMap({ ...def, town: { cx: 20.5, cy: 20, r: 5 } })).toThrow(/town\.cx/);
+    expect(() => new GameMap({ ...def, town: { cx: 20, cy: 19.5, r: 5 } })).toThrow(/town\.cy/);
+    expect(() => new GameMap({ ...def, w: 40.5 })).toThrow(/\bw\b/);
+    expect(() => new GameMap({ ...def, h: Number.NaN })).toThrow(/\bh\b/);
+    // Bán kính được phép lẻ
+    expect(() => new GameMap({ ...def, town: { cx: 20, cy: 20, r: 5.5 } })).not.toThrow();
+  });
+
+  it("MapDef và TOWN chỉ đọc ở mức kiểu: gán vào là lỗi biên dịch (#124)", () => {
+    const def = MAP_BY_ID[DEFAULT_MAP_ID];
+    // @ts-expect-error MapDef.seed là readonly
+    const sửaSeed = () => (def.seed = 1);
+    // @ts-expect-error MapDef.town là readonly
+    const sửaTrấn = () => (def.town.cx = 1);
+    // @ts-expect-error TOWN là readonly
+    const sửaTOWN = () => (TOWN.r = 1);
+    // @ts-expect-error townPx là readonly
+    const sửaPx = () => (DEFAULT_MAP.townPx.x = 1);
+    // Không gọi: chỉ cần các dòng trên biên dịch được với @ts-expect-error
+    expect([sửaSeed, sửaTrấn, sửaTOWN, sửaPx]).toHaveLength(4);
+    expect(DEFAULT_MAP.def.seed).toBe(MAP_SEED);
   });
 });

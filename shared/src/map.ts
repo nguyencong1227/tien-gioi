@@ -22,7 +22,11 @@ export enum T {
 export const BLOCKING = new Set<T>([T.Water, T.Tree, T.Rock]);
 
 /** Lạc Hà Trấn: khu an toàn ở giữa bản đồ. */
-export const TOWN = { cx: MAP_W / 2, cy: MAP_H / 2, r: 7 };
+export const TOWN: Readonly<{ cx: number; cy: number; r: number }> = {
+  cx: MAP_W / 2,
+  cy: MAP_H / 2,
+  r: 7,
+};
 export const TOWN_PX = { x: TOWN.cx * TILE, y: TOWN.cy * TILE, r: TOWN.r * TILE };
 
 function mulberry32(seed: number) {
@@ -117,14 +121,14 @@ function generate(def: MapDef): Uint8Array {
 
 /** Mô tả một bản đồ: client và server cùng sinh ô từ `seed`, không gửi dữ liệu bản đồ qua mạng. */
 export interface MapDef {
-  id: string;
-  name: string;
-  seed: number;
+  readonly id: string;
+  readonly name: string;
+  readonly seed: number;
   /** Kích thước tính bằng ô */
-  w: number;
-  h: number;
-  /** Khu an toàn (ô): tâm và bán kính */
-  town: { cx: number; cy: number; r: number };
+  readonly w: number;
+  readonly h: number;
+  /** Khu an toàn (ô): tâm (số nguyên, ô chứa tâm) và bán kính */
+  readonly town: Readonly<{ cx: number; cy: number; r: number }>;
 }
 
 /**
@@ -136,9 +140,18 @@ export class GameMap {
   readonly worldW: number;
   readonly worldH: number;
   /** Khu an toàn tính bằng px */
-  readonly townPx: { x: number; y: number; r: number };
+  readonly townPx: Readonly<{ x: number; y: number; r: number }>;
 
   constructor(readonly def: MapDef) {
+    // Con đường đất đi từ ô (cx, cy) theo từng ô: số lẻ làm chỉ số mảng lệch và ghi hụt mà không báo lỗi
+    for (const [field, v] of [
+      ["w", def.w],
+      ["h", def.h],
+      ["town.cx", def.town.cx],
+      ["town.cy", def.town.cy],
+    ] as const)
+      if (!Number.isInteger(v))
+        throw new Error(`MapDef ${def.id}: ${field} phải là số nguyên (${v})`);
     this.tiles = generate(def);
     this.worldW = def.w * TILE;
     this.worldH = def.h * TILE;
@@ -179,10 +192,14 @@ export class GameMap {
     return Math.hypot(x - this.townPx.x, y - this.townPx.y) <= this.townPx.r + pad;
   }
 
-  /** Độ nguy hiểm theo khoảng cách tới trấn: 0..1 */
+  /**
+   * Độ nguy hiểm theo khoảng cách tới trấn: 0..1. Đạt 1 ở khoảng cách bằng nửa cạnh NGẮN của bản đồ
+   * (bản đồ vuông thì là nửa cạnh, như trước); bản đồ chữ nhật không bị "dài" làm loãng.
+   */
   dangerAt(x: number, y: number): number {
     const d = Math.hypot(x - this.townPx.x, y - this.townPx.y);
-    return Math.min(1, Math.max(0, (d - this.townPx.r) / (this.worldW * 0.5 - this.townPx.r)));
+    const far = Math.min(this.worldW, this.worldH) * 0.5;
+    return Math.min(1, Math.max(0, (d - this.townPx.r) / (far - this.townPx.r)));
   }
 }
 
