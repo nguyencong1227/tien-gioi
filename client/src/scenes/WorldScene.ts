@@ -600,9 +600,7 @@ export class WorldScene extends Phaser.Scene {
     kb.on("keydown-G", () => !typing() && ui.toggleSectModal());
     kb.on("keydown-N", () => !typing() && sound.toggleMute());
     kb.on("keydown-O", () => !typing() && ui.toggleSettingsModal());
-    kb.on("keydown-ESC", () => {
-      ui.handleEscape();
-    });
+    // Esc do `ui.ts` xử lý ở `window` (một chỗ duy nhất): đăng ký thêm ở đây làm MỖI lần Esc chạy hai lần (đóng hai tầng)
     kb.on("keydown-F", () => !typing() && this.interactOrPickup());
     kb.on("keydown-ONE", () => !typing() && ui.useQuick(1));
     kb.on("keydown-TWO", () => !typing() && ui.useQuick(2));

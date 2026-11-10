@@ -33,6 +33,10 @@ export class ModalStack {
   push(id: string, triggerEl?: HTMLElement | null): void {
     // Nếu modal đã có trong stack, đưa lên đỉnh
     this.remove(id);
+    // Chỉ trả focus về nút khi chính nút đó đang giữ focus lúc mở (người dùng Tab tới rồi bấm Enter / Space). Mở bằng phím tắt (I, C...)
+    // hay bằng chuột thì KHÔNG: nếu không, focus nằm trên nút HUD và phím Space (chém) bị `bindTap` biến thành "bấm nút" mở lại bảng.
+    if (triggerEl?.dataset)
+      triggerEl.dataset.a11yRestore = document.activeElement === triggerEl ? "1" : "";
     this.stack.push({ id, triggerEl });
     if (triggerEl && typeof triggerEl.setAttribute === "function") {
       triggerEl.setAttribute("aria-expanded", "true");
@@ -140,7 +144,12 @@ export function focusModal(modalEl: HTMLElement | null): void {
  * Trả focus về trigger element đã mở modal, hoặc canvas của game
  */
 export function returnFocus(triggerEl?: HTMLElement | null): void {
-  if (triggerEl && typeof triggerEl.focus === "function" && document.body.contains(triggerEl)) {
+  if (
+    triggerEl &&
+    triggerEl.dataset?.a11yRestore === "1" &&
+    typeof triggerEl.focus === "function" &&
+    document.body.contains(triggerEl)
+  ) {
     triggerEl.focus();
     return;
   }

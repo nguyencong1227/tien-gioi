@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { ModalStack, isTypingElement, processEscapeKey, type EscapeHandlers } from "./a11y";
 
@@ -212,10 +214,8 @@ describe("a11y: processEscapeKey", () => {
 });
 
 describe("a11y: Cấu trúc HTML & ARIA trong client/index.html", () => {
-  const fs = require("node:fs");
-  const path = require("node:path");
   const htmlPath = path.resolve(__dirname, "../index.html");
-  const html = fs.readFileSync(htmlPath, "utf-8");
+  const html = readFileSync(htmlPath, "utf-8");
 
   it("mọi modal chính đều có role=dialog hoặc role=alertdialog và aria-modal=true", () => {
     const requiredModals = [
