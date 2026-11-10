@@ -397,6 +397,18 @@ export function describeAccountStoreContract(
         await store.update("00000000-0000-0000-0000-000000000000", { disabled: true }),
       ).toBeNull();
     });
+
+    it("all: trả về toàn bộ tài khoản, sắp xếp theo ngày tạo (cũ trước), rồi đến tên đăng nhập", async () => {
+      const store = await createStore();
+      expect(await store.all()).toEqual([]);
+
+      await store.create({ ...makeNewAccount("user_c"), createdAt: "2026-11-12T00:00:00.000Z" });
+      await store.create({ ...makeNewAccount("user_b"), createdAt: "2026-11-10T00:00:00.000Z" });
+      await store.create({ ...makeNewAccount("user_a"), createdAt: "2026-11-10T00:00:00.000Z" });
+
+      const all = await store.all();
+      expect(all.map((a) => a.username)).toEqual(["user_a", "user_b", "user_c"]);
+    });
   });
 }
 
