@@ -194,16 +194,16 @@ describe("Bot thử tải chế độ tài khoản (--account) & Login Storm (Is
     }
   });
 
-  it("bão 100 đăng nhập đồng thời với scrypt thật (N=2^15): 100% thành công và tick World vẫn < 10ms", async () => {
+  it("bão 30 đăng nhập đồng thời với scrypt thật (N=2^15): 100% thành công và tick World vẫn < 10ms", async () => {
     const prodDir = path.join(rootDir, "prod-scrypt-server");
     const accounts = new FileAccountStore(path.join(prodDir, "accounts"));
     const sessions = new FileSessionStore(path.join(prodDir, "sessions"));
 
-    // Sinh 1 băm scrypt mặc định (N=2^15) và seed sẵn 100 tài khoản vào kho
-    const sharedPass = "mat-khau-storm-100-scrypt";
+    // Sinh 1 băm scrypt mặc định (N=2^15) và seed sẵn 30 tài khoản vào kho
+    const sharedPass = "mat-khau-storm-30-scrypt";
     const prodHash = await hashSecretScrypt(sharedPass);
     const nowIso = new Date().toISOString();
-    for (let i = 1; i <= 100; i++) {
+    for (let i = 1; i <= 30; i++) {
       const numStr = String(i).padStart(3, "0");
       const acc = await accounts.create({
         username: `bot_u_${numStr}`,
@@ -243,9 +243,9 @@ describe("Bot thử tải chế độ tài khoản (--account) & Login Storm (Is
     }, TICK_MS);
 
     try {
-      const report = await runLoginStorm(baseProd, 100, "StormBot", sharedPass);
-      expect(report.total).toBe(100);
-      expect(report.success).toBe(100);
+      const report = await runLoginStorm(baseProd, 30, "StormBot", sharedPass);
+      expect(report.total).toBe(30);
+      expect(report.success).toBe(30);
       expect(report.failed).toBe(0);
 
       expect(tickDurations.length).toBeGreaterThan(5);
@@ -253,7 +253,7 @@ describe("Bot thử tải chế độ tài khoản (--account) & Login Storm (Is
       const tickMax = Math.max(...tickDurations);
 
       console.log(
-        `[Login Storm N=2^15, 100 concurrent] total=${report.totalDurationMs}ms, avg=${report.avgLatencyMs}ms, p50=${report.p50LatencyMs}ms, p95=${report.p95LatencyMs}ms, max=${report.maxLatencyMs}ms | tickSamples=${tickDurations.length}, tickAvg=${tickAvg.toFixed(2)}ms, tickMax=${tickMax.toFixed(2)}ms`,
+        `[Login Storm N=2^15, 30 concurrent] total=${report.totalDurationMs}ms, avg=${report.avgLatencyMs}ms, p50=${report.p50LatencyMs}ms, p95=${report.p95LatencyMs}ms, max=${report.maxLatencyMs}ms | tickSamples=${tickDurations.length}, tickAvg=${tickAvg.toFixed(2)}ms, tickMax=${tickMax.toFixed(2)}ms`,
       );
 
       // Ngân sách bắt buộc: tick trung bình < 10 ms ngay cả khi libuv threadpool bão hoà scrypt

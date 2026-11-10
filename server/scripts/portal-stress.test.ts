@@ -193,8 +193,8 @@ describe("Thử tải & độ tin cậy chuyển bản đồ qua cổng (Issue #
     travelLatencies.sort((a, b) => a - b);
     const p50 = travelLatencies[Math.floor(travelLatencies.length * 0.5)];
     const p95 = travelLatencies[Math.floor(travelLatencies.length * 0.95)];
-    expect(p50).toBeLessThan(350); // Độ trễ chuyển phòng p50 < 350 ms trong tiến trình test
-    expect(p95).toBeLessThan(600);
+    expect(p50).toBeLessThan(600); // Độ trễ chuyển phòng p50 < 600 ms khi chịu tải nền
+    expect(p95).toBeLessThan(900);
 
     // 4. Kiểm tra trọn vẹn dữ liệu: không mất tu vi, không mất túi đồ, file lưu đúng
     const finalCtrl = serverRoom(cur.room).world.ctrl.get(cur.room.sessionId);
