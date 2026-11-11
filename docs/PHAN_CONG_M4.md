@@ -11,11 +11,11 @@
 | 2.4 audit log | **Xong lát 1 + 2** (#266, #268) | còn (khi cần): đầu thai, PK, thưởng bí cảnh lớn (issue #263 còn mở) |
 | 2.5 `PROTOCOL_VERSION` | **Xong** | shared #258, server #261, client #264, sửa modal #270, E2E #267 + #272 |
 | 3.1 release workflow | Chưa | chờ người dùng (kho ảnh Docker) |
-| 3.2 cấu hình / bí mật; 3.4 sao lưu + khôi phục | **Đang làm** (C) | issue #276 |
+| 3.2 cấu hình / bí mật; 3.4 sao lưu + khôi phục | **Xong** (#279, issue #276) | `npm run check:env`, `npm run khoi-phuc-thu`, `docs/TRIEN_KHAI.md` mục 7.3 / 7.4 |
 | 3.3 giám sát (`/health` mở rộng, `/metrics`) | Chưa | A + C |
-| 3.5 thử tải dài | Chưa | C |
+| 3.5 thử tải dài | **Đang làm** (C) | issue #282 (`npm run soak`) |
 | 4.1 PWA | **Xong** (#251) | `npm run check:pwa` |
-| 4.2 Capacitor Android | Chưa | chờ người dùng (Android trước?) |
+| 4.2 Capacitor Android | **Có thiết kế** (#283, issue #280) | `docs/THIET_KE_APP_ANDROID.md`; chờ người dùng chốt hướng (Capacitor hay TWA, kênh phát hành, tên miền / `applicationId`) rồi A tạo issue M4.2a-1 (CORS, bắt buộc trước) và M4.2a-e |
 | 4.3 hiệu năng di động + trợ năng | **Xong** | đo + tài liệu (#251, `docs/HIEU_NANG_DI_DONG.md`); trợ năng (#269): lát 1 #274 (Esc theo tầng, focus, ARIA), lát 2 #277 (giảm chuyển động theo OS / cài đặt, tương phản AA, bảng chỉ dẫn người mới); A đo giảm chuyển động THẬT bằng giả lập `prefers-reduced-motion` |
 | 4.4 tài sản / giấy phép | **Xong** (#259) | `npm run check:credits` |
 
