@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { HEARTBEAT_INTERVAL_MS } from "@tien-gioi/shared";
 import { ABUSE, DEFAULT_LIMIT, MESSAGE_LIMITS, RateLimiter } from "./rate-limit";
 
 describe("giới hạn tần suất tin nhắn", () => {
@@ -9,6 +10,19 @@ describe("giới hạn tần suất tin nhắn", () => {
     expect(lim.check("attack", 0)).toBe("drop");
     expect(lim.check("attack", 1000 / perSec)).toBe("ok"); // hồi đúng 1 lượt
     expect(lim.check("attack", 1000 / perSec)).toBe("drop");
+  });
+
+  it("nhịp tim: client thật (1 ping / 5 giây + 1 lúc quay lại tiền cảnh) không bao giờ bị bỏ; dồn dập thì bị chặn chặt", () => {
+    const lim = new RateLimiter(0);
+    for (let t = 0; t < 600_000; t += HEARTBEAT_INTERVAL_MS)
+      expect(lim.check("ping", t)).toBe("ok");
+    expect(lim.check("ping", 600_000)).toBe("ok");
+    expect(lim.check("ping", 600_100)).toBe("ok"); // quay lại tiền cảnh ngay sau một nhịp
+    const burst = new RateLimiter(0);
+    let ok = 0;
+    for (let i = 0; i < 50; i++) if (burst.check("ping", 0) === "ok") ok++;
+    expect(ok).toBe(MESSAGE_LIMITS.ping.burst); // chặt hơn DEFAULT_LIMIT: mỗi ping tốn một tin trả lời
+    expect(MESSAGE_LIMITS.ping.burst).toBeLessThan(DEFAULT_LIMIT.burst);
   });
 
   it("client bình thường (input 20 lần/giây) không bao giờ bị bỏ", () => {

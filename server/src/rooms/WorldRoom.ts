@@ -19,6 +19,9 @@ import {
   JOIN_NEED_CHARACTER,
   DUNGEON_MSG,
   DUEL_MSG,
+  HEARTBEAT_MSG,
+  parsePing,
+  type PongMsg,
   SECT_MSG,
   DUNGEON_MAPS,
   JOIN_NOT_IN_RUN,
@@ -358,6 +361,11 @@ export class WorldRoom extends Room<WorldState> {
     this.on<PartyAnswerMsg>("partyAccept", (sid, m) => partyAnswer(w, sid, m?.from, true));
     this.on<PartyAnswerMsg>("partyDecline", (sid, m) => partyAnswer(w, sid, m?.from, false));
     this.on("partyLeave", (sid) => partyLeave(w, sid));
+    // Nhịp tim ứng dụng (M4.2b, shared/src/heartbeat.ts): chỉ lặp lại số hữu hạn `t` để client phát hiện socket nửa mở
+    this.on(HEARTBEAT_MSG.ping, (sid, m) => {
+      const ping = parsePing(m);
+      if (ping) this.sendTo(sid, HEARTBEAT_MSG.pong, { t: ping.t } satisfies PongMsg);
+    });
     this.on<PartyKickMsg>("partyKick", (sid, m) => partyKick(w, sid, m?.name));
     this.on<TravelMsg>("travel", (sid, m) => void this.travel(sid, m?.portalId));
     // Bí cảnh: mở / vào / từ chối đi qua mọi phòng thường (người ở bản đồ nào cũng nhận được lời mời); rời chỉ trong bí cảnh
