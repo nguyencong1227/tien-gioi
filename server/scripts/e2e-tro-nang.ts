@@ -222,6 +222,61 @@ async function main() {
       "settings-modal vẫn mở",
     );
 
+    // 0c. Giả lập OS bật giảm chuyển động qua CDP (Issue #280)
+    await tab.send("Emulation.setEmulatedMedia", {
+      features: [{ name: "prefers-reduced-motion", value: "reduce" }],
+    });
+    // Tổ hợp 1: OS bật nhưng người chơi TẮT trong game (=0)
+    await ev(`localStorage.setItem("tg_reduced_motion", "0"); window.__ui?.syncReducedMotion(); 1`);
+    const motionOk = await ev(
+      `document.body.classList.contains("motion-ok") && !document.body.classList.contains("reduced-motion")`,
+    );
+    check(
+      "OS bật reduced-motion nhưng game chọn tắt (=0): body có class motion-ok",
+      !!motionOk,
+      `classes=${await ev(`document.body.className`)}`,
+    );
+    const cssDuration = await ev(
+      `(() => {
+        const btn = document.getElementById("btn-portal");
+        return btn ? window.getComputedStyle(btn).animationDuration : "none";
+      })()`,
+    );
+    check(
+      "OS bật nhưng game tắt (=0): thời lượng animation CSS bình thường (> 0.1s)",
+      cssDuration !== "0.01ms" && cssDuration !== "0.00001s",
+      `animationDuration=${cssDuration}`,
+    );
+
+    // Tổ hợp 2: OS bật và người chơi KHÔNG cài đặt (mặc định)
+    await ev(`localStorage.removeItem("tg_reduced_motion"); window.__ui?.syncReducedMotion(); 1`);
+    const osDefaultReduced = await ev(
+      `document.body.classList.contains("reduced-motion") && !document.body.classList.contains("motion-ok")`,
+    );
+    check(
+      "OS bật và chưa có cài đặt: body có class reduced-motion",
+      !!osDefaultReduced,
+      `classes=${await ev(`document.body.className`)}`,
+    );
+    const cssDurationReduced = await ev(
+      `(() => {
+        const btn = document.getElementById("btn-portal");
+        return btn ? window.getComputedStyle(btn).animationDuration : "none";
+      })()`,
+    );
+    const isDurationReduced =
+      parseFloat(String(cssDurationReduced)) <= 0.001 ||
+      String(cssDurationReduced) === "0.01ms" ||
+      String(cssDurationReduced).includes("1e-05");
+    check(
+      "OS bật và chưa có cài đặt: CSS bị ép giảm chuyển động (<= 0.01ms)",
+      Boolean(isDurationReduced),
+      `animationDuration=${cssDurationReduced}`,
+    );
+    // Khôi phục giả lập OS
+    await tab.send("Emulation.setEmulatedMedia", { features: [] });
+    await ev(`localStorage.removeItem("tg_reduced_motion"); window.__ui?.syncReducedMotion(); 1`);
+
     // 5. ARIA cơ bản + mở bảng thì focus vào trong bảng
     await press(t, K.i);
     check(
@@ -309,6 +364,24 @@ async function main() {
       "Esc lần sau đóng túi",
       !(await ev(shown("inv-modal"))),
       `inv=${await ev(shown("inv-modal"))}`,
+    );
+
+    // 6. Kiểm tra Esc với lời mời (Issue #280): Esc chỉ ẩn hộp lời mời trên màn hình, không gửi tin từ chối
+    await ev(`(() => {
+      const pib = document.getElementById('party-invite-box');
+      if (pib) pib.hidden = false;
+      return true;
+    })()`);
+    check(
+      "Mở hộp lời mời tổ đội",
+      !!(await ev(shown("party-invite-box"))),
+      "party-invite-box không hiện",
+    );
+    await press(t, K.esc);
+    check(
+      "Bấm Esc: chỉ tạm ẩn hộp lời mời trên màn hình",
+      !(await ev(shown("party-invite-box"))),
+      "party-invite-box vẫn mở",
     );
 
     check("0 lỗi console / exception", t.errors.length === 0, t.errors.slice(0, 3).join(" | "));

@@ -4,10 +4,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ModalStack,
   isTypingElement,
+  getFocusableElements,
   processEscapeKey,
   type EscapeHandlers,
   isReducedMotion,
   setReducedMotionPref,
+  syncReducedMotionDom,
   shouldShowNewbieGuide,
   markNewbieGuideDismissed,
   NEWBIE_GUIDE_STORAGE_KEY,
@@ -411,5 +413,104 @@ describe("a11y: NewbieGuide helper", () => {
     markNewbieGuideDismissed();
     expect(store[NEWBIE_GUIDE_STORAGE_KEY]).toBe("1");
     expect(shouldShowNewbieGuide()).toBe(false);
+  });
+});
+
+describe("a11y: getFocusableElements (Issue #280)", () => {
+  it("nhận diện được phần tử position: fixed có offsetParent === null", () => {
+    const btnFixed = {
+      tagName: "BUTTON",
+      hidden: false,
+      offsetParent: null, // theo chuẩn DOM, position: fixed có offsetParent === null
+      getClientRects: () => [{ width: 100, height: 40 }] as unknown as DOMRectList,
+    } as unknown as HTMLElement;
+
+    const btnNormal = {
+      tagName: "BUTTON",
+      hidden: false,
+      offsetParent: {} as Element,
+      getClientRects: () => [{ width: 80, height: 32 }] as unknown as DOMRectList,
+    } as unknown as HTMLElement;
+
+    const container = {
+      querySelectorAll: vi.fn().mockReturnValue([btnFixed, btnNormal]),
+    } as unknown as HTMLElement;
+
+    vi.stubGlobal("window", {
+      getComputedStyle: vi.fn().mockReturnValue({ display: "block", visibility: "visible" }),
+    });
+
+    const result = getFocusableElements(container);
+    expect(result).toHaveLength(2);
+    expect(result).toContain(btnFixed);
+    expect(result).toContain(btnNormal);
+  });
+
+  it("loại bỏ phần tử có getClientRects().length === 0 hoặc display: none", () => {
+    const btnZero = {
+      tagName: "BUTTON",
+      hidden: false,
+      getClientRects: () => [] as unknown as DOMRectList,
+    } as unknown as HTMLElement;
+
+    const btnNone = {
+      tagName: "BUTTON",
+      hidden: false,
+      getClientRects: () => [{ width: 50, height: 20 }] as unknown as DOMRectList,
+    } as unknown as HTMLElement;
+
+    const container = {
+      querySelectorAll: vi.fn().mockReturnValue([btnZero, btnNone]),
+    } as unknown as HTMLElement;
+
+    vi.stubGlobal("window", {
+      getComputedStyle: vi.fn().mockImplementation((el: HTMLElement) => ({
+        display: el === btnNone ? "none" : "block",
+        visibility: "visible",
+      })),
+    });
+
+    const result = getFocusableElements(container);
+    expect(result).toHaveLength(0);
+  });
+});
+
+describe("a11y: syncReducedMotionDom & motion-ok (Issue #280)", () => {
+  const store: Record<string, string> = {};
+
+  beforeEach(() => {
+    for (const k of Object.keys(store)) delete store[k];
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => store[key] ?? null,
+      setItem: (key: string, val: string) => {
+        store[key] = val;
+      },
+    });
+    vi.stubGlobal("window", {
+      matchMedia: vi.fn().mockImplementation((query: string) => ({
+        matches: query.includes("prefers-reduced-motion: reduce"),
+      })),
+    });
+    vi.stubGlobal("document", {
+      body: {
+        classList: {
+          toggle: vi.fn(),
+        },
+      },
+    });
+  });
+
+  it("khi người chơi chọn tắt trong game (=0), gắn motion-ok để loại trừ khỏi prefers-reduced-motion", () => {
+    store[REDUCED_MOTION_STORAGE_KEY] = "0";
+    syncReducedMotionDom();
+    expect(document.body.classList.toggle).toHaveBeenCalledWith("reduced-motion", false);
+    expect(document.body.classList.toggle).toHaveBeenCalledWith("motion-ok", true);
+  });
+
+  it("khi người chơi chọn bật trong game (=1), gỡ motion-ok và gắn reduced-motion", () => {
+    store[REDUCED_MOTION_STORAGE_KEY] = "1";
+    syncReducedMotionDom();
+    expect(document.body.classList.toggle).toHaveBeenCalledWith("reduced-motion", true);
+    expect(document.body.classList.toggle).toHaveBeenCalledWith("motion-ok", false);
   });
 });

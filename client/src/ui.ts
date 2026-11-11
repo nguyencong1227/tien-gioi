@@ -122,6 +122,7 @@ import {
   processEscapeKey,
   isReducedMotion,
   setReducedMotionPref,
+  syncReducedMotionDom,
   shouldShowNewbieGuide,
   markNewbieGuideDismissed,
 } from "./a11y";
@@ -2203,6 +2204,10 @@ export const ui = {
         fn();
       });
       el.addEventListener("keydown", (e) => {
+        if (e.repeat) return;
+        const tag = el.tagName.toLowerCase();
+        // Nút hoặc liên kết nguyên bản đã có hành vi mặc định của trình duyệt kích hoạt click khi Enter/Space
+        if (tag === "button" || tag === "a") return;
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           fn();
@@ -2591,12 +2596,12 @@ export const ui = {
       }
     });
 
-    // Giảm chuyển động (#269)
+    // Giảm chuyển động (#269, #280)
+    syncReducedMotionDom();
     const reducedMotionChk = $("set-reduced-motion") as HTMLInputElement | null;
     if (reducedMotionChk) {
       const reduced = isReducedMotion();
       reducedMotionChk.checked = reduced;
-      document.body.classList.toggle("reduced-motion", reduced);
       reducedMotionChk.addEventListener("change", () => {
         setReducedMotionPref(reducedMotionChk.checked);
       });
@@ -2991,33 +2996,25 @@ export const ui = {
     return false;
   },
 
-  /** Đóng hộp lời mời nếu đang mở (Esc = Từ chối lời mời) */
+  /** Đóng hộp lời mời nếu đang mở (Esc = chỉ tạm ẩn hộp trên màn hình, không gửi tin từ chối) */
   closeInviteBox(): boolean {
     const pib = $("party-invite-box");
     if (pib && !pib.hidden) {
-      const declineBtn = $("pib-btn-decline");
-      declineBtn?.click();
       pib.hidden = true;
       return true;
     }
     const dib = $("dungeon-invite-box");
     if (dib && !dib.hidden) {
-      const declineBtn = $("dib-btn-decline");
-      declineBtn?.click();
       dib.hidden = true;
       return true;
     }
     const duib = $("duel-invite-box");
     if (duib && !duib.hidden) {
-      const declineBtn = $("duib-btn-decline");
-      declineBtn?.click();
       duib.hidden = true;
       return true;
     }
     const sib = $("sect-invite-box");
     if (sib && !sib.hidden) {
-      const declineBtn = $("sib-btn-decline");
-      declineBtn?.click();
       sib.hidden = true;
       return true;
     }
@@ -3098,6 +3095,10 @@ export const ui = {
 
   isReducedMotion(): boolean {
     return isReducedMotion();
+  },
+
+  syncReducedMotion(): void {
+    syncReducedMotionDom();
   },
 
   onInv(m: InvMsg) {
