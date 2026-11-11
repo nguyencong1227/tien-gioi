@@ -82,6 +82,7 @@ jobs:
           docker exec -d -w /app tg sh -c 'node --input-type=module -e "
             import { Client } from \"colyseus.js\";
             const room = await new Client(\"ws://127.0.0.1:2567\").joinOrCreate(\"world\", { name: \"CI Tat Em\", secret: \"ci_tat_em_secret_0123456789\", v: 1 });
+            room.send(\"meditate\", { on: true });
             console.log(\"da vao\", room.sessionId);
             setInterval(() => {}, 1000);
           " > /tmp/vao.log 2>&1'
@@ -91,6 +92,9 @@ jobs:
           done
           docker exec tg cat /tmp/vao.log
           docker exec tg grep -q "da vao" /tmp/vao.log
+          # Đả tọa ~10 giây: tu vi tăng chỉ nằm trong bộ nhớ (hồ sơ lúc vào có exp 0; lưu định kỳ mỗi 30 giây chưa tới), nên tu vi > 0 trên
+          # đĩa SAU `docker stop` chứng minh server đã lưu khi nhận SIGTERM
+          sleep 10
           start=$(date +%s)
           docker stop -t 30 tg > /dev/null
           took=$(( $(date +%s) - start ))
@@ -101,7 +105,9 @@ jobs:
           rm -rf /tmp/players-sau && mkdir /tmp/players-sau
           docker cp tg:/app/data/players/. /tmp/players-sau/
           ls -la /tmp/players-sau
-          grep -l "CI Tat Em" /tmp/players-sau/*.json
+          f=$(grep -l "CI Tat Em" /tmp/players-sau/*.json)
+          cat "$f"
+          grep -E '"exp": [1-9]' "$f"
           # 7. Log sạch lỗi
           if docker logs tg 2>&1 | grep -E "\[LỖI\]|unhandledRejection|uncaughtException"; then
             echo "::error::Log của ảnh có lỗi"; exit 1
