@@ -23,7 +23,7 @@ import {
   NPC_BY_ID,
   dayKey,
 } from "@tien-gioi/shared";
-import { Tab, sleep } from "./e2e-kit";
+import { Tab, shown, sleep } from "./e2e-kit";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
@@ -180,10 +180,7 @@ async function main() {
       `[...document.querySelectorAll('#dlg-options .dlg-opt-btn')].find(b => b.textContent.includes('Linh Hư Bí Cảnh')).dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true })); 1`,
     );
     for (const tab of tabs) {
-      await tab.waitFor(
-        `!document.getElementById('dungeon-invite-box')?.hidden`,
-        "hộp mời bí cảnh",
-      );
+      await tab.waitFor(shown("dungeon-invite-box"), "hộp mời bí cảnh");
       // Hộp mời nhắc gục = mất lượt (client #241)
       await tab.ev(
         `document.getElementById('dib-btn-enter').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true })); 1`,
@@ -195,7 +192,7 @@ async function main() {
         "vào bản đồ bí cảnh",
       );
       await tab.waitFor(
-        `document.body.classList.contains('in-dungeon') && !document.getElementById('dungeon-hud').hidden`,
+        `document.body.classList.contains('in-dungeon') && ${shown("dungeon-hud")}`,
         "HUD bí cảnh",
       );
     }
@@ -225,7 +222,7 @@ async function main() {
     const lifeBefore = ctrlOf(A.name).lifeId;
     const pa = playerOf(A.name);
     hurtPlayer(world, sids.get(A.name)!, pa, pa.hp + 100000, monster);
-    await ta.waitFor(`!document.getElementById('death').hidden`, "lớp phủ gục của A");
+    await ta.waitFor(shown("death"), "lớp phủ gục của A");
     const death = await ta.ev(`document.getElementById('death-t')?.textContent || ''`);
     const sub = await ta.ev(
       `document.getElementById('death-sub')?.hidden ? '' : (document.getElementById('death-sub').textContent || '')`,
@@ -304,7 +301,7 @@ async function main() {
     // 6. B cũng gục: run thua all_dead; B về Lạc Hà
     const pb = playerOf(B.name);
     hurtPlayer(world, sids.get(B.name)!, pb, pb.hp + 100000, monster);
-    await tb.waitFor(`!document.getElementById('death').hidden`, "lớp phủ gục của B");
+    await tb.waitFor(shown("death"), "lớp phủ gục của B");
     const phase = () => String(run.phase); // (TS đã thu hẹp `run.phase` sau kiểm "running" ở bước 3)
     for (let i = 0; i < 50 && phase() !== "lost"; i++) await sleep(100);
     if (phase() !== "lost" || run.endReason !== "all_dead")
