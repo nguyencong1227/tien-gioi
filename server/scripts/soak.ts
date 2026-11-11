@@ -235,6 +235,8 @@ interface BotState {
   dungeonOpenSentAt: number;
   dungeonLastEndAt: number;
   nextDungeonOpenAt: number;
+  /** Mốc sớm nhất được mời đội lần nữa (đội trưởng bí cảnh): mời MỖI tick là spam và bị server ngắt (`[spam]`) */
+  nextPartyInviteAt: number;
   dungeonState: DungeonStateMsg | null;
   duelPhase?: "countdown" | "fight";
   duelOpponentName?: string;
@@ -431,7 +433,7 @@ export async function main(): Promise<number> {
     return 1;
   }
 
-  const handleServerLogLine = (line: string) => {
+  const handleServerLogLine = (line: string, stream: "stdout" | "stderr") => {
     const trimmed = line.trim();
     if (!trimmed) return;
 
@@ -443,7 +445,7 @@ export async function main(): Promise<number> {
       serverReady = true;
     }
 
-    const category = classifyServerLogLine(trimmed, serverReady);
+    const category = classifyServerLogLine(trimmed, serverReady, stream);
     if (category === "error") {
       serverLogErrors++;
       console.log(`  [Phát hiện lỗi log server] ${trimmed}`);
@@ -455,13 +457,13 @@ export async function main(): Promise<number> {
 
   serverProc.stdout?.on("data", (chunk: Buffer) => {
     for (const line of chunk.toString().split("\n")) {
-      handleServerLogLine(line);
+      handleServerLogLine(line, "stdout");
     }
   });
 
   serverProc.stderr?.on("data", (chunk: Buffer) => {
     for (const line of chunk.toString().split("\n")) {
-      handleServerLogLine(line);
+      handleServerLogLine(line, "stderr");
     }
   });
 
@@ -678,6 +680,7 @@ export async function main(): Promise<number> {
       dungeonOpenSentAt: 0,
       dungeonLastEndAt: 0,
       nextDungeonOpenAt: performance.now() + 3000 + Math.random() * 5000,
+      nextPartyInviteAt: performance.now() + 2000,
       dungeonState: null,
       nextDuelChallengeAt: performance.now() + 3000 + Math.random() * 4000,
       sectIsLeader: role === "sect" && (i - 1) % 3 === 0,
@@ -802,7 +805,9 @@ export async function main(): Promise<number> {
         const isLeader = (b.index - 1) % 4 === 0;
         if (isLeader) {
           const partyMembers = b.myParty?.members ?? [];
-          if (partyMembers.length < 4) {
+          if (partyMembers.length < 4 && now >= b.nextPartyInviteAt) {
+            // Mỗi 6 giây một lượt (3 lời mời); trước đây gửi 3 lời mời MỖI tick 50 ms (60 tin/giây) nên server ngắt đội trưởng vì spam
+            b.nextPartyInviteAt = now + 6000;
             const groupBase = b.index;
             for (let offset = 1; offset < 4; offset++) {
               const targetIdx = groupBase + offset;

@@ -11,8 +11,15 @@ export type ServerLogCategory = "error" | "monitorAlert" | "startupWarning" | "i
  * - `[CẢNH BÁO]` sau khi sẵn sàng (serverReady = true) là cảnh báo giám sát (tick, hàng đợi ghi) -> monitorAlert (làm soak ĐỎ)
  * - `[lỗi]`, `unhandledRejection`, `uncaughtException`, stack trace lỗi Node -> error (làm soak ĐỎ)
  * - Dòng thông tin thông thường -> info
+ * - **Mọi dòng ở STDERR còn lại -> error** (server chỉ ghi stderr bằng `console.warn` / `console.error`): `console.error("save failed", e)` in
+ *   `save failed Error: ENOSPC...` (chữ `Error:` không ở đầu dòng) và mọi dòng của stack trace, nên khớp theo mẫu chữ sẽ bỏ lỡ chính loại lỗi mà
+ *   soak sinh ra để bắt (A bắt được khi review #291).
  */
-export function classifyServerLogLine(line: string, ready: boolean): ServerLogCategory {
+export function classifyServerLogLine(
+  line: string,
+  ready: boolean,
+  stream: "stdout" | "stderr" = "stdout",
+): ServerLogCategory {
   if (!line || line.trim() === "") return "info";
   const trimmed = line.trim();
 
@@ -38,7 +45,7 @@ export function classifyServerLogLine(line: string, ready: boolean): ServerLogCa
     return "error";
   }
 
-  return "info";
+  return stream === "stderr" ? "error" : "info";
 }
 
 export interface SoakSample {

@@ -38,6 +38,29 @@ describe("classifyServerLogLine", () => {
     expect(classifyServerLogLine("Error: ETIMEDOUT", true)).toBe("error");
   });
 
+  it('STDERR: mọi dòng không phải [CẢNH BÁO] / [ĐÃ ỔN] là lỗi, kể cả dạng `console.error("save failed", e)` mà chữ Error: không ở đầu dòng', () => {
+    for (const line of [
+      "save failed Error: ENOSPC: no space left on device, write",
+      "save failed (limbo) Error: EACCES: permission denied",
+      "[hub] gửi chat thất bại Error: boom",
+      "    at async WorldRoom.persist (/app/server/src/rooms/WorldRoom.ts:900:5)",
+      "một dòng lạ nào đó",
+    ]) {
+      expect(classifyServerLogLine(line, true, "stderr"), line).toBe("error");
+      expect(classifyServerLogLine(line, false, "stderr"), line).toBe("error");
+    }
+    // stdout giữ nguyên: dòng thường vẫn là info
+    expect(classifyServerLogLine("save failed Error: ENOSPC", true, "stdout")).toBe("info");
+    // ngoại lệ trên stderr: cảnh báo cấu hình / giám sát vẫn theo luật riêng
+    expect(classifyServerLogLine("[ĐÃ ỔN] tick: trở lại dưới ngưỡng", true, "stderr")).toBe("info");
+    expect(classifyServerLogLine("[CẢNH BÁO] tick p95 28 ms > 25 ms", true, "stderr")).toBe(
+      "monitorAlert",
+    );
+    expect(classifyServerLogLine("[CẢNH BÁO] STORE=file: ...", false, "stderr")).toBe(
+      "startupWarning",
+    );
+  });
+
   it("log thông tin thông thường trả 'info'", () => {
     expect(classifyServerLogLine("Khởi động server trên cổng 2567", false)).toBe("info");
     expect(classifyServerLogLine("Đã mở phòng world (lac_ha)", true)).toBe("info");
