@@ -158,13 +158,28 @@ docker compose -f docker-compose.yml -f docker-compose.pg.yml start game
 
 ---
 
-## 4. Reverse Proxy & HTTPS (Khuyến nghị Caddy)
+## 4. HTTPS: Cloudflare Tunnel (bản chạy thật hiện tại) hoặc Caddy
 
 ### Vì sao bắt buộc cần HTTPS?
 1. **PWA (Progressive Web App):** Service Worker ([client/public/sw.js](../client/public/sw.js)) và Web App Manifest chỉ hoạt động trên kết nối an toàn `https://` (hoặc `localhost`).
 2. **WebSocket bảo mật (`wss://`):** Tránh bị nhà mạng hoặc firewall chặn kết nối WebSocket không mã hoá (`ws://`).
 
-### Cấu hình bằng Caddy (Tự động cấp chứng chỉ SSL Let's Encrypt)
+### 4.1. Phương án đang dùng cho bản chạy thật: Cloudflare Tunnel
+Bản chạy thật đặt tại máy nhà, `https://tiengioi.hethongtm.site` đi qua **Cloudflare Tunnel** (người dùng dựng và quản; agent KHÔNG sửa, dừng hay khởi động lại, không đụng `~/.cloudflared/`):
+
+```
+Người chơi --HTTPS / WSS--> Cloudflare --đường hầm--> cloudflared (dịch vụ systemd người dùng) --HTTP--> 127.0.0.1:2567 --> server (container game) --> PostgreSQL
+```
+- **Server chỉ nghe `127.0.0.1:2567`** (compose `127.0.0.1:2567:2567`). Không Caddy, không mở cổng 80 / 443, không sửa router; chứng chỉ HTTPS và WebSocket do Cloudflare lo. Cổng **2567 dành riêng cho bản chạy thật** (dev dùng cổng trong `.env.local`; xem `AGENTS.md`).
+- **`TRUST_PROXY=1`** (một tầng proxy tin cậy là `cloudflared`). **Không cần đọc `CF-Connecting-IP`:** Cloudflare nối IP thật của khách vào CUỐI `X-Forwarded-For`; `cloudflared` nối vào server từ `127.0.0.1`; Express với 1 tầng tin cậy bỏ tầng socket (`127.0.0.1`) rồi lấy mục PHẢI NHẤT của `X-Forwarded-For` (IP thật do Cloudflare nối), còn mục khách tự gửi nằm bên TRÁI nên không qua mặt được giới hạn tần suất (test `auth-http.test.ts`: "TRUST_PROXY=1 ... giả nhiều tầng vẫn chỉ lấy tầng cuối của proxy"). **Điều kiện:** KHÔNG bao giờ mở cổng 2567 ra `0.0.0.0` / Internet (ai gọi thẳng được cổng đó thì tự đặt `X-Forwarded-For` tuỳ ý).
+- **Client web cùng nguồn** nên không cần `VITE_SERVER_URL` / CORS; app Android (Capacitor) chạy ở nguồn WebView riêng: đặt `CORS_ORIGINS` (mục 5.2) và build với `VITE_SERVER_URL=wss://tiengioi.hethongtm.site`.
+- **WebSocket qua Cloudflare:** kết nối không bao giờ nhàn rỗi (client gửi `input` 20 lần / giây, server ping khung mỗi 3 giây, thêm nhịp tim ứng dụng #293). Khi `cloudflared` khởi động lại (Cloudflare bảo trì), người chơi rớt mạng và vòng nối lại / nhịp tim lo trong 20 giây grace.
+- **Bản cũ sau khi phát hành:** `express.static` gửi `ETag` + `Cache-Control: public, max-age=0`; nếu vẫn thấy client cũ, kiểm `curl -sI https://tiengioi.hethongtm.site/ | grep -i cf-cache-status` và nhờ người dùng "Purge Cache" ở Cloudflare (agent không có quyền vào Cloudflare).
+- **Khi sự cố:** domain báo lỗi 1033 / 502 mà `curl http://127.0.0.1:2567/health` vẫn `ok` thì lỗi ở tunnel (`systemctl --user status cloudflared-tiengioi`: chỉ ĐỌC, báo người dùng); `curl` cổng nội bộ cũng lỗi thì lỗi ở server / container (`docs/VAN_HANH.md`).
+
+### 4.2. Cấu hình bằng Caddy (Tự động cấp chứng chỉ SSL Let's Encrypt)
+Dùng khi máy có IP công khai và mở được cổng 80 / 443 (không phải bản chạy thật hiện tại).
+
 Caddy tự động xử lý WebSocket proxy và HTTP/2. Tạo file `Caddyfile`:
 
 ```caddy
