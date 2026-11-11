@@ -1,6 +1,49 @@
 // Unit test cho bộ phân tích số liệu thử tải dài (soak-analysis.ts)
 import { describe, expect, it } from "vitest";
-import { analyzeSoak, formatSoakTable, linearRegression, type SoakSample } from "./soak-analysis";
+import {
+  analyzeSoak,
+  classifyServerLogLine,
+  formatSoakTable,
+  linearRegression,
+  type SoakSample,
+} from "./soak-analysis";
+
+describe("classifyServerLogLine", () => {
+  it("dòng rỗng hoặc khoảng trắng trả 'info'", () => {
+    expect(classifyServerLogLine("", false)).toBe("info");
+    expect(classifyServerLogLine("   \t  ", true)).toBe("info");
+  });
+
+  it("[ĐÃ ỔN] luôn trả 'info' kể cả trước hay sau khi sẵn sàng", () => {
+    expect(classifyServerLogLine("[ĐÃ ỔN] tick p95 đã hạ xuống 3.2 ms", true)).toBe("info");
+    expect(classifyServerLogLine("[ĐÃ ỔN] hàng đợi ghi đã xả hết", false)).toBe("info");
+  });
+
+  it("[CẢNH BÁO] trước khi sẵn sàng là 'startupWarning', sau khi sẵn sàng là 'monitorAlert'", () => {
+    const startupLine = "[CẢNH BÁO] NODE_ENV không phải 'production': cho phép lệnh /give";
+    expect(classifyServerLogLine(startupLine, false)).toBe("startupWarning");
+
+    const monitorLine = "[CẢNH BÁO] tick p95 của 'lac_ha' là 28.5 ms (> 25 ms)";
+    expect(classifyServerLogLine(monitorLine, true)).toBe("monitorAlert");
+  });
+
+  it("phát hiện chính xác các dạng lỗi nghiêm trọng trả 'error'", () => {
+    expect(classifyServerLogLine("[lỗi] Không thể kết nối cơ sở dữ liệu", true)).toBe("error");
+    expect(classifyServerLogLine("unhandledRejection: connection reset", true)).toBe("error");
+    expect(classifyServerLogLine("uncaughtException: out of memory", false)).toBe("error");
+    expect(classifyServerLogLine("TypeError: Cannot read properties of undefined", true)).toBe(
+      "error",
+    );
+    expect(classifyServerLogLine("AssertionError: state invariant violated", true)).toBe("error");
+    expect(classifyServerLogLine("Error: ETIMEDOUT", true)).toBe("error");
+  });
+
+  it("log thông tin thông thường trả 'info'", () => {
+    expect(classifyServerLogLine("Khởi động server trên cổng 2567", false)).toBe("info");
+    expect(classifyServerLogLine("Đã mở phòng world (lac_ha)", true)).toBe("info");
+    expect(classifyServerLogLine("Người chơi Bot 001 vào phòng", true)).toBe("info");
+  });
+});
 
 describe("linearRegression", () => {
   it("trả slope và intercept chính xác cho đường thẳng y = 2x + 10", () => {
@@ -49,21 +92,25 @@ describe("analyzeSoak", () => {
         timestamp: Date.now() + elapsedSec * 1000,
         rssMb: rssFn(elapsedSec),
         activeBots: 100,
-        tickCpuAvgMs: 1.8,
-        tickCpuP95Ms: 2.5,
-        patchBytesPerTick: 410,
+        cpuMsPerTickAvg: 1.8,
+        worstTickP95Ms: 2.5,
+        tickOverruns: 0,
+        writesInflight: 1,
+        writesOldestAgeMs: 50,
+        writesFailed: 0,
+        loopLagP99Ms: 15,
+        bytesPerTickPerBot: 410,
         rxKBpsPerBot: 8.2,
-        txKBpsPerBot: 1.1,
         sampleErrors: 0,
+        metricsFetchFailed: false,
         ...overrides,
       });
     }
     return samples;
   }
 
-  it("ĐẠT (PASS) khi máy chủ chạy ổn định 30 phút không rò rỉ bộ nhớ, tick thấp, 0 lỗi", () => {
+  it("ĐẠT (PASS) khi máy chủ chạy ổn định 30 phút không rò rỉ bộ nhớ, tick thấp, /metrics tốt, 0 lỗi", () => {
     // 30 phút, đo mỗi 10s = 180 mẫu
-    // Khởi động tăng nhẹ từ 80MB lên 95MB trong 5 phút đầu, sau đó dao động ổn định quanh 96MB
     const samples = generateSamples(180, 10, (sec) => {
       if (sec <= 300) return 80 + (sec / 300) * 15;
       return 95 + Math.sin(sec / 60) * 2;
@@ -74,6 +121,7 @@ describe("analyzeSoak", () => {
       {},
       {
         serverLogErrors: 0,
+        monitorAlerts: 0,
         auditErrorsTotal: 0,
         hongFilesCount: 0,
         currencyConservationPassed: true,
@@ -85,13 +133,13 @@ describe("analyzeSoak", () => {
     expect(res.startRssMb).toBeCloseTo(80.5, 1);
     expect(res.rssDeltaAfterWarmupMb).toBeLessThan(10);
     expect(res.secondHalfRssSlopeMbPerMin).toBeLessThan(0.5);
-    expect(res.tickCpuP95Ms).toBeLessThan(10);
-    expect(res.patchBytesAvg).toBeLessThan(600);
+    expect(res.worstTickP95MaxMs).toBeLessThan(10);
+    expect(res.bytesPerTickAvg).toBeLessThan(600);
     expect(res.serverLogErrors).toBe(0);
+    expect(res.monitorAlerts).toBe(0);
   });
 
   it("KHÔNG ĐẠT khi VmRSS tăng vọt > 50 MB sau khởi động (rò rỉ bộ nhớ)", () => {
-    // Tăng đều từ 90 lên 160 sau warmup (+70 MB)
     const samples = generateSamples(180, 10, (sec) => {
       if (sec <= 300) return 90;
       return 90 + ((sec - 300) / 1500) * 70;
@@ -103,7 +151,6 @@ describe("analyzeSoak", () => {
   });
 
   it("KHÔNG ĐẠT khi dốc nửa sau > 1.0 MB/phút liên tục", () => {
-    // Nửa sau tăng mạnh với dốc 1.8 MB/phút
     const samples = generateSamples(180, 10, (sec) => {
       if (sec <= 900) return 90;
       return 90 + ((sec - 900) / 60) * 1.8;
@@ -114,26 +161,75 @@ describe("analyzeSoak", () => {
     expect(res.reasons.some((r) => r.includes("Dốc VmRSS nửa sau tăng liên tục"))).toBe(true);
   });
 
-  it("KHÔNG ĐẠT khi độ trễ tick CPU p95 > 10 ms (vượt ngân sách perf.test.ts)", () => {
+  it("KHÔNG ĐẠT khi tick p95 phòng tệ nhất từ /metrics > 10 ms (vượt ngân sách perf.test.ts)", () => {
     const samples = generateSamples(60, 10, () => 90, {
-      tickCpuP95Ms: 14.5,
+      worstTickP95Ms: 14.5,
     });
 
     const res = analyzeSoak(samples);
     expect(res.pass).toBe(false);
-    expect(res.reasons.some((r) => r.includes("CPU tick p95 vượt ngân sách"))).toBe(true);
+    expect(res.reasons.some((r) => r.includes("Tick p95 phòng tệ nhất vượt ngân sách"))).toBe(true);
   });
 
-  it("KHÔNG ĐẠT khi bản vá patch bytes / tick > 600 byte (vượt ngân sách StateView)", () => {
+  it("KHÔNG ĐẠT khi hàng đợi ghi nhân vật bị kẹt (tuổi > 30s hoặc failed > 0)", () => {
+    const samplesStuck = generateSamples(60, 10, () => 90, {
+      writesOldestAgeMs: 35000,
+    });
+    const resStuck = analyzeSoak(samplesStuck);
+    expect(resStuck.pass).toBe(false);
+    expect(
+      resStuck.reasons.some((r) => r.includes("Tuổi lần ghi nhân vật lâu nhất vượt ngưỡng")),
+    ).toBe(true);
+
+    const samplesFailed = generateSamples(60, 10, () => 90, {
+      writesFailed: 2,
+    });
+    const resFailed = analyzeSoak(samplesFailed);
+    expect(resFailed.pass).toBe(false);
+    expect(resFailed.reasons.some((r) => r.includes("Phát hiện 2 lần ghi nhân vật thất bại"))).toBe(
+      true,
+    );
+  });
+
+  it("KHÔNG ĐẠT khi độ trễ vòng lặp sự kiện loop lag p99 > 100 ms", () => {
     const samples = generateSamples(60, 10, () => 90, {
-      patchBytesPerTick: 750,
+      loopLagP99Ms: 125,
     });
 
     const res = analyzeSoak(samples);
     expect(res.pass).toBe(false);
-    expect(res.reasons.some((r) => r.includes("Bản vá StateView mỗi client vượt ngân sách"))).toBe(
+    expect(res.reasons.some((r) => r.includes("Độ trễ vòng lặp sự kiện p99 vượt ngưỡng"))).toBe(
       true,
     );
+  });
+
+  it("KHÔNG ĐẠT khi gọi /metrics thất bại", () => {
+    const samples = generateSamples(60, 10, () => 90);
+    samples[10].metricsFetchFailed = true;
+
+    const res = analyzeSoak(samples);
+    expect(res.pass).toBe(false);
+    expect(res.reasons.some((r) => r.includes("Thu thập số đo /metrics thất bại"))).toBe(true);
+  });
+
+  it("KHÔNG ĐẠT khi có cảnh báo giám sát [CẢNH BÁO] sau khi server đã sẵn sàng", () => {
+    const samples = generateSamples(60, 10, () => 90);
+    const res = analyzeSoak(samples, {}, { monitorAlerts: 1 });
+
+    expect(res.pass).toBe(false);
+    expect(res.reasons.some((r) => r.includes("Phát hiện 1 cảnh báo giám sát"))).toBe(true);
+  });
+
+  it("KHÔNG ĐẠT khi byte WebSocket nhận / tick > 600 byte (vượt ngân sách StateView)", () => {
+    const samples = generateSamples(60, 10, () => 90, {
+      bytesPerTickPerBot: 750,
+    });
+
+    const res = analyzeSoak(samples);
+    expect(res.pass).toBe(false);
+    expect(
+      res.reasons.some((r) => r.includes("Byte WebSocket nhận mỗi client vượt ngân sách")),
+    ).toBe(true);
   });
 
   it("KHÔNG ĐẠT khi log server xuất hiện lỗi ([lỗi] / unhandledRejection)", () => {
@@ -177,16 +273,18 @@ describe("analyzeSoak", () => {
     expect(res.reasons.some((r) => r.includes("Bảo toàn Linh thạch thất bại"))).toBe(true);
   });
 
-  it("formatSoakTable hiển thị đầy đủ các trường và trạng thái", () => {
+  it("formatSoakTable hiển thị đầy đủ các trường và số đo từ /metrics", () => {
     const samples = generateSamples(60, 10, () => 90);
-    const res = analyzeSoak(samples, {}, { serverLogErrors: 0 });
+    const res = analyzeSoak(samples, {}, { serverLogErrors: 0, monitorAlerts: 0 });
     const formatted = formatSoakTable(res);
 
     expect(formatted).toContain("KẾT QUẢ THỬ TẢI DÀI (SOAK TEST)");
     expect(formatted).toContain("ĐẠT (PASS)");
     expect(formatted).toContain("BỘ NHỚ TIẾN TRÌNH SERVER (VmRSS)");
-    expect(formatted).toContain("ĐỘ TRỄ TICK CPU SERVER");
-    expect(formatted).toContain("BĂNG THÔNG STATEVIEW MÃ HOÁ");
+    expect(formatted).toContain("SỐ ĐO VẬN HÀNH THẬT (/metrics & /proc/<pid>/sched)");
+    expect(formatted).toContain("Tick p95 phòng tệ nhất");
+    expect(formatted).toContain("Hàng đợi ghi nhân vật");
+    expect(formatted).toContain("BĂNG THÔNG WEBSOCKET CLIENT");
     expect(formatted).toContain("TOÀN VẸN DỮ LIỆU & TÍNH ỔN ĐỊNH");
   });
 });

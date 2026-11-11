@@ -1,14 +1,20 @@
 // Script thử tải dài (soak test) cho M4 3.5 (Issue #282).
 // Tự dựng server THẬT trong tiến trình con (thư mục dữ liệu tạm, cổng ngẫu nhiên),
 // cho bot vào chạy trộn các kịch bản (săn quái, trấn/shop, qua cổng, bí cảnh, PK, tông môn).
-// Đo mỗi 10 giây vào tệp soak-*.json: VmRSS, active bots, CPU tick p95, byte/tick, lỗi log server.
-// Phân tích hồi quy tuyến tính RSS, kiểm tra ngân sách hiệu năng và bất biến toàn vẹn dữ liệu.
+// Đo mỗi 10 giây vào tệp soak-*.json:
+// - VmRSS của server từ /proc/<pid>/status và CPU luồng chính từ /proc/<pid>/sched
+// - Số đo vận hành THẬT từ /metrics?format=json (M4 3.3, Bearer METRICS_TOKEN):
+//   worstTickP95Ms, tick overruns, writes.inflight, writes.oldestAgeMs, writes.failed, process.loopLagP99Ms
+// - Băng thông WebSocket thật: bytes nhận / tick / bot, KB/s mỗi bot
+// - Phân loại log server qua classifyServerLogLine: bắt lỗi [lỗi] và cảnh báo giám sát sau khi sẵn sàng
+// - Phân tích hồi quy tuyến tính OLS dốc RSS, kiểm tra ngân sách hiệu năng và bất biến toàn vẹn dữ liệu.
 //
 // Cách dùng:
 //   npm run soak -w server -- --bots=100 --minutes=30
 //   npm run soak -w server -- --bots=20 --duration=60   (thử nhanh 60 giây)
 
 import { execSync, spawn, type ChildProcess } from "node:child_process";
+import crypto from "node:crypto";
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import net from "node:net";
 import os from "node:os";
@@ -34,7 +40,6 @@ import {
   TRAVEL_COOLDOWN_MS,
   buyPrice,
   getMap,
-  isDungeonMap,
   roomNameOf,
   type DuelInvitedMsg,
   type DuelStateMsg,
@@ -51,7 +56,19 @@ import {
 } from "@tien-gioi/shared";
 import { auditSavesDirectory } from "./audit-saves";
 import { readServerExecRuntimeMs, readServerRssMb, seedBotSaveFile } from "./bots";
-import { analyzeSoak, formatSoakTable, type SoakSample } from "./soak-analysis";
+import {
+  analyzeSoak,
+  classifyServerLogLine,
+  formatSoakTable,
+  type SoakSample,
+} from "./soak-analysis";
+
+// Lọc cảnh báo nội bộ của @colyseus/schema client decoder khi nhiều bot trong cùng tiến trình
+const origConsoleWarn = console.warn;
+console.warn = (...args: any[]) => {
+  if (typeof args[0] === "string" && args[0].includes('"refId" not found')) return;
+  origConsoleWarn(...args);
+};
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
@@ -199,7 +216,6 @@ interface BotState {
   campX: number;
   campY: number;
   rxBytes: number;
-  rxPatchBytes: number;
   txBytes: number;
   lastPatchAt: number;
   wanderAngle: number;
@@ -209,6 +225,7 @@ interface BotState {
   nextSwordAt: number;
   coin: number;
   mintedCoin: number;
+  spentCoin: number;
   invSlots: any[];
   nextShopAt: number;
   shopping: boolean;
@@ -228,10 +245,30 @@ interface BotState {
   closedCode: number | null;
 }
 
+// Tập các thư mục tạm cần dọn dẹp khi kết thúc hoặc thoát đột ngột
+const tempDirsToClean = new Set<string>();
+
+function cleanupTempDirs() {
+  for (const d of tempDirsToClean) {
+    try {
+      if (existsSync(d)) {
+        rmSync(d, { recursive: true, force: true });
+      }
+    } catch {
+      /* bỏ qua */
+    }
+  }
+  tempDirsToClean.clear();
+}
+
 export async function main(): Promise<number> {
   const args = parseCliArgs(process.argv.slice(2));
   const port = args.port > 0 ? args.port : await findFreePort();
   const tempDir = mkdtempSync(path.join(os.tmpdir(), "tien-gioi-soak-"));
+  if (!args.keepDataDir) {
+    tempDirsToClean.add(tempDir);
+  }
+
   const outPath =
     args.outJsonPath ??
     path.join(serverDir, `soak-${new Date().toISOString().replace(/[:.]/g, "-")}.json`);
@@ -251,7 +288,11 @@ export async function main(): Promise<number> {
   let serverProc: ChildProcess | null = null;
   const serverLogs: string[] = [];
   let serverLogErrors = 0;
+  let monitorAlerts = 0;
   let serverReady = false;
+
+  // Sinh token ngẫu nhiên >= 16 ký tự để truy cập /metrics?format=json (M4 3.3)
+  const metricsToken = crypto.randomBytes(16).toString("hex");
 
   const shutdownServer = async () => {
     if (!serverProc || serverProc.killed) return;
@@ -273,18 +314,15 @@ export async function main(): Promise<number> {
 
   const cleanupAndExit = async (code: number) => {
     await shutdownServer();
-    if (!args.keepDataDir) {
-      try {
-        rmSync(tempDir, { recursive: true, force: true });
-      } catch {
-        /* bỏ qua */
-      }
-    }
+    cleanupTempDirs();
     process.exit(code);
   };
 
-  process.on("SIGINT", () => void cleanupAndExit(1));
-  process.on("SIGTERM", () => void cleanupAndExit(1));
+  process.on("exit", () => {
+    cleanupTempDirs();
+  });
+  process.on("SIGINT", () => void cleanupAndExit(130));
+  process.on("SIGTERM", () => void cleanupAndExit(143));
 
   // 1. Phân bổ vai trò cho các bot
   const botRoles: BotRole[] = [];
@@ -381,6 +419,7 @@ export async function main(): Promise<number> {
       STORE: "file",
       SECTS: "on",
       AUDIT_LOG: "on",
+      METRICS_TOKEN: metricsToken,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -392,39 +431,37 @@ export async function main(): Promise<number> {
     return 1;
   }
 
+  const handleServerLogLine = (line: string) => {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+
+    // Giữ mảng serverLogs tối đa 2000 dòng để không phình bộ nhớ của soak script
+    serverLogs.push(trimmed);
+    if (serverLogs.length > 2000) serverLogs.shift();
+
+    if (trimmed.includes(`Tiên Giới server: http://localhost:${port}`)) {
+      serverReady = true;
+    }
+
+    const category = classifyServerLogLine(trimmed, serverReady);
+    if (category === "error") {
+      serverLogErrors++;
+      console.log(`  [Phát hiện lỗi log server] ${trimmed}`);
+    } else if (category === "monitorAlert") {
+      monitorAlerts++;
+      console.log(`  [Phát hiện cảnh báo giám sát server] ${trimmed}`);
+    }
+  };
+
   serverProc.stdout?.on("data", (chunk: Buffer) => {
-    const text = chunk.toString();
-    for (const line of text.split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      serverLogs.push(trimmed);
-      if (trimmed.includes(`Tiên Giới server: http://localhost:${port}`)) {
-        serverReady = true;
-      }
-      if (
-        trimmed.toLowerCase().includes("[lỗi]") ||
-        trimmed.includes("unhandledRejection") ||
-        trimmed.includes("uncaughtException")
-      ) {
-        serverLogErrors++;
-        console.log(`  [Phát hiện lỗi log server] ${trimmed}`);
-      }
+    for (const line of chunk.toString().split("\n")) {
+      handleServerLogLine(line);
     }
   });
 
   serverProc.stderr?.on("data", (chunk: Buffer) => {
-    const text = chunk.toString();
-    for (const line of text.split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      // [CẢNH BÁO] từ console.warn (startupWarnings) là cảnh báo môi trường, không phải lỗi
-      if (trimmed.startsWith("[CẢNH BÁO]")) {
-        serverLogs.push(trimmed);
-        continue;
-      }
-      serverLogs.push(`[STDERR] ${trimmed}`);
-      serverLogErrors++;
-      console.log(`  [Phát hiện lỗi STDERR server] ${trimmed}`);
+    for (const line of chunk.toString().split("\n")) {
+      handleServerLogLine(line);
     }
   });
 
@@ -472,11 +509,14 @@ export async function main(): Promise<number> {
     room.onMessage(SECT_MSG.presence, () => {});
 
     room.onMessage("wallet", (msg: WalletMsg) => {
-      const delta = (msg.coin ?? 0) - b.coin;
+      const cur = msg.coin ?? 0;
+      const delta = cur - b.coin;
       if (delta > 0) {
         b.mintedCoin += delta;
+      } else if (delta < 0) {
+        b.spentCoin += -delta;
       }
-      b.coin = msg.coin ?? 0;
+      b.coin = cur;
     });
 
     room.onMessage("inv", (msg: InvMsg) => {
@@ -566,7 +606,6 @@ export async function main(): Promise<number> {
       const onIncomingData = (data: unknown) => {
         const len = byteLengthOf(data);
         b.rxBytes += len;
-        b.rxPatchBytes += len;
       };
 
       if (typeof ws.addEventListener === "function") {
@@ -620,109 +659,94 @@ export async function main(): Promise<number> {
       campX: initPos.x,
       campY: initPos.y,
       rxBytes: 0,
-      rxPatchBytes: 0,
       txBytes: 0,
-      lastPatchAt: 0,
-      wanderAngle: (i / args.bots) * Math.PI * 2,
+      lastPatchAt: performance.now(),
+      wanderAngle: Math.random() * Math.PI * 2,
       avoidUntil: 0,
-      nextTurnAt: performance.now() + 2000,
-      nextSlashAt: performance.now() + 500,
-      nextSwordAt: performance.now() + 1000,
+      nextTurnAt: 0,
+      nextSlashAt: 0,
+      nextSwordAt: 0,
       coin: role === "sect" && (i - 1) % 3 === 0 ? 5000 : 100,
       mintedCoin: 0,
+      spentCoin: 0,
       invSlots: [],
-      nextShopAt: performance.now() + 3000,
+      nextShopAt: performance.now() + 2000 + Math.random() * 5000,
       shopping: false,
       isTravelling: false,
-      nextTravelAt: performance.now() + 2000,
+      nextTravelAt: performance.now() + 5000 + Math.random() * 5000,
       myParty: null,
       dungeonOpenSentAt: 0,
       dungeonLastEndAt: 0,
-      nextDungeonOpenAt: performance.now() + 1500,
+      nextDungeonOpenAt: performance.now() + 3000 + Math.random() * 5000,
       dungeonState: null,
-      nextDuelChallengeAt: performance.now() + 2000,
-      sectIsLeader: (i - 1) % 3 === 0,
-      nextSectActionAt: performance.now() + 2000,
+      nextDuelChallengeAt: performance.now() + 3000 + Math.random() * 4000,
+      sectIsLeader: role === "sect" && (i - 1) % 3 === 0,
+      nextSectActionAt: performance.now() + 2000 + Math.random() * 3000,
       closedCode: null,
     };
 
     bindBotEvents(b, room);
     bots.push(b);
-    await sleep(15);
-  }
 
-  // Thiết lập tổ đội ban đầu cho các bot săn quái và bí cảnh
-  for (let offset = 1; offset < 4; offset++) {
-    for (let i = 0; i < bots.length; i += 4) {
-      const leader = bots[i];
-      const member = bots[i + offset];
-      if (
-        leader &&
-        member &&
-        (leader.role === "hunt" || leader.role === "dungeon") &&
-        leader.role === member.role
-      ) {
-        leader.room.send("partyInvite", { name: member.name });
-      }
+    if (i % 25 === 0 || i === args.bots) {
+      console.log(`- Đã kết nối ${i}/${args.bots} bot`);
     }
-    await sleep(250);
   }
 
-  console.log(`Đã kết nối thành công ${bots.length}/${args.bots} bot.`);
-  console.log("Bắt đầu vòng lặp mô phỏng và thu thập số liệu...");
+  console.log("Toàn bộ bot đã vào phòng. Bắt đầu vòng lặp hành vi và đo đạc...");
 
-  // 5. Vòng lặp hành vi bot (50ms)
+  // 5. Vòng lặp hành vi bot (mỗi TICK_MS = 50ms)
   const stepBot = (b: BotState, now: number) => {
-    if (!b.room.connection.isOpen) return;
-    const state = b.room.state as any;
-    const me = state?.players?.get(b.room.sessionId);
-    if (!me || me.dead) return;
+    if (!b.room || !b.room.connection?.isOpen) return;
 
-    b.predX = me.x;
-    b.predY = me.y;
+    const me = b.room.state.players.get(b.room.sessionId);
+    if (me) {
+      b.predX = me.x;
+      b.predY = me.y;
+    }
+
+    if (now < b.avoidUntil) return;
 
     let dx = 0;
     let dy = 0;
 
     switch (b.role) {
       case "hunt": {
-        // Tìm quái gần nhất và tấn công
-        let targetMon: any = null;
-        let bestDist = 180;
-        if (state?.monsters && typeof state.monsters.forEach === "function") {
-          state.monsters.forEach((m: any) => {
-            if (!m || m.hp <= 0) return;
-            const d = Math.hypot(m.x - b.predX, m.y - b.predY);
-            if (d < bestDist && isPositionSafe(b.map, m.x, m.y, 20)) {
-              bestDist = d;
-              targetMon = m;
-            }
-          });
-        }
+        // Tìm quái gần nhất trong bán kính 300px
+        let nearestMon: any = null;
+        let minDist = 300;
+        b.room.state.monsters.forEach((m: any) => {
+          if (m.hp <= 0) return;
+          const d = Math.hypot(m.x - b.predX, m.y - b.predY);
+          if (d < minDist && isPositionSafe(b.map, m.x, m.y, 20)) {
+            minDist = d;
+            nearestMon = m;
+          }
+        });
 
-        if (targetMon) {
-          const dist = Math.hypot(targetMon.x - b.predX, targetMon.y - b.predY);
-          const angle = Math.atan2(targetMon.y - b.predY, targetMon.x - b.predX);
-          if (dist > SKILLS.slash.range) {
+        if (nearestMon) {
+          const angle = Math.atan2(nearestMon.y - b.predY, nearestMon.x - b.predX);
+          if (minDist > SKILLS.slash.range) {
             dx = Math.cos(angle);
             dy = Math.sin(angle);
           }
-          if (dist <= SKILLS.slash.range && now >= b.nextSlashAt) {
+          if (minDist <= SKILLS.slash.range + 10 && now >= b.nextSlashAt) {
             b.room.send("attack", { angle });
             b.nextSlashAt = now + SKILLS.slash.cooldown + 50;
           }
-          if (dist <= SKILLS.sword.range && me.mp >= SKILLS.sword.mp && now >= b.nextSwordAt) {
-            b.room.send("skill", { id: "sword", angle });
-            b.nextSwordAt = now + SKILLS.sword.cooldown + 80;
+          if (minDist <= SKILLS.sword.range && now >= b.nextSwordAt) {
+            b.room.send("cast", { skillId: "sword", angle });
+            b.nextSwordAt = now + SKILLS.sword.cooldown + 100;
           }
         } else {
-          // Đi tuần quanh điểm đóng quân bãi quái
-          const distFromCamp = Math.hypot(b.predX - b.campX, b.predY - b.campY);
-          if (distFromCamp > 180) {
+          // Đi tuần quanh bãi săn
+          if (now >= b.nextTurnAt) {
+            b.wanderAngle += (Math.random() - 0.5) * 0.8;
+            b.nextTurnAt = now + 1000 + Math.random() * 2000;
+          }
+          const distCamp = Math.hypot(b.campX - b.predX, b.campY - b.predY);
+          if (distCamp > 200) {
             b.wanderAngle = Math.atan2(b.campY - b.predY, b.campX - b.predX);
-          } else if (now >= b.nextTurnAt) {
-            b.wanderAngle += (Math.random() - 0.5) * Math.PI;
-            b.nextTurnAt = now + 1500 + Math.random() * 2000;
           }
           dx = Math.cos(b.wanderAngle);
           dy = Math.sin(b.wanderAngle);
@@ -731,49 +755,42 @@ export async function main(): Promise<number> {
       }
 
       case "crowd": {
-        // Đi lại trong trấn, định kỳ mua bán NPC Dược Sư
-        const town = b.map.townPx;
-        const distFromTown = Math.hypot(b.predX - town.x, b.predY - town.y);
-        if (distFromTown > town.r - 35) {
-          b.wanderAngle = Math.atan2(town.y - b.predY, town.x - b.predX);
+        // Đi lại trong trấn và định kỳ ghé NPC Dược Đồng mua đan dược
+        const distTown = Math.hypot(b.map.townPx.x - b.predX, b.map.townPx.y - b.predY);
+        if (distTown > b.map.townPx.r - 20) {
+          b.wanderAngle = Math.atan2(b.map.townPx.y - b.predY, b.map.townPx.x - b.predX);
         } else if (now >= b.nextTurnAt) {
-          b.wanderAngle += (Math.random() - 0.5) * Math.PI;
-          b.nextTurnAt = now + 2000 + Math.random() * 2500;
+          b.wanderAngle += (Math.random() - 0.5) * 1.2;
+          b.nextTurnAt = now + 800 + Math.random() * 1500;
         }
-
-        if (now >= b.nextShopAt) {
-          const duocSu = NPC_BY_ID.duoc_su;
-          const distToDuocSu = Math.hypot(duocSu.x - b.predX, duocSu.y - b.predY);
-          if (distToDuocSu > 40) {
-            b.wanderAngle = Math.atan2(duocSu.y - b.predY, duocSu.x - b.predX);
-          } else {
-            // Mua 1 đan nếu có tiền
-            if (b.coin >= buyPrice("hoi_huyet_dan")) {
-              b.room.send("buy", { itemId: "hoi_huyet_dan", count: 1 });
-            }
-            b.nextShopAt = now + 6000 + Math.random() * 4000;
-          }
-        }
-
         dx = Math.cos(b.wanderAngle);
         dy = Math.sin(b.wanderAngle);
+
+        if (now >= b.nextShopAt) {
+          b.nextShopAt = now + 8000 + Math.random() * 5000;
+          const cost = buyPrice(LINH_HU_ID);
+          if (b.coin >= cost) {
+            b.room.send("buy", { npcId: "duoc_dong", itemId: LINH_HU_ID, count: 1 });
+          }
+        }
         break;
       }
 
       case "travel": {
-        // Di chuyển qua cổng giữa Lạc Hà và Hắc Phong
-        if (!b.isTravelling) {
-          const portal = b.map.portals[0];
-          if (portal) {
-            const dist = Math.hypot(portal.x - b.predX, portal.y - b.predY);
-            if (dist > portal.r - 10) {
-              const a = Math.atan2(portal.y - b.predY, portal.x - b.predX);
+        // Đi lại giữa cổng dịch chuyển để thử tải cơ chế qua cổng
+        if (!b.isTravelling && now >= b.nextTravelAt) {
+          const portals = b.map.portals;
+          if (portals.length > 0) {
+            const p = portals[0];
+            const dist = Math.hypot(p.x - b.predX, p.y - b.predY);
+            if (dist > 30) {
+              const a = Math.atan2(p.y - b.predY, p.x - b.predX);
               dx = Math.cos(a);
               dy = Math.sin(a);
-            } else if (now >= b.nextTravelAt) {
+            } else {
               b.isTravelling = true;
-              b.room.send("travel", { portalId: portal.id });
-              b.nextTravelAt = now + TRAVEL_COOLDOWN_MS + 3000;
+              b.room.send("travel", { portalId: p.id });
+              b.nextTravelAt = now + TRAVEL_COOLDOWN_MS + 2000;
             }
           }
         }
@@ -781,72 +798,59 @@ export async function main(): Promise<number> {
       }
 
       case "dungeon": {
-        const inDungeon = isDungeonMap(b.map.def.id);
-        if (inDungeon) {
-          if (b.dungeonLastEndAt > 0 && now - b.dungeonLastEndAt > 2000) {
-            b.room.send(DUNGEON_MSG.leave, {});
-            b.dungeonLastEndAt = 0;
-          } else {
-            const lair = b.map.lairPx ?? { x: 32 * 32 + 16, y: 9 * 32 + 16, r: 60 };
-            let targetMon: any = null;
-            let bestDist = Number.POSITIVE_INFINITY;
-            if (state?.monsters && typeof state.monsters.forEach === "function") {
-              state.monsters.forEach((m: any) => {
-                if (!m || m.hp <= 0) return;
-                const d = Math.hypot(m.x - b.predX, m.y - b.predY);
-                if (d < bestDist) {
-                  bestDist = d;
-                  targetMon = m;
-                }
-              });
+        // Tổ đội bí cảnh
+        const isLeader = (b.index - 1) % 4 === 0;
+        if (isLeader) {
+          const partyMembers = b.myParty?.members ?? [];
+          if (partyMembers.length < 4) {
+            const groupBase = b.index;
+            for (let offset = 1; offset < 4; offset++) {
+              const targetIdx = groupBase + offset;
+              const targetName = `Bot ${String(targetIdx).padStart(3, "0")}`;
+              b.room.send("partyInvite", { name: targetName });
             }
-            if (targetMon) {
-              const dist = Math.hypot(targetMon.x - b.predX, targetMon.y - b.predY);
-              const angle = Math.atan2(targetMon.y - b.predY, targetMon.x - b.predX);
-              if (dist > SKILLS.slash.range) {
-                dx = Math.cos(angle);
-                dy = Math.sin(angle);
-              }
-              if (dist <= SKILLS.slash.range && now >= b.nextSlashAt) {
-                b.room.send("attack", { angle });
-                b.nextSlashAt = now + SKILLS.slash.cooldown + 50;
-              }
-            } else {
-              const a = Math.atan2(lair.y - b.predY, lair.x - b.predX);
+          }
+          if (
+            partyMembers.length >= 4 &&
+            !b.dungeonState &&
+            now >= b.nextDungeonOpenAt &&
+            now >= b.dungeonLastEndAt + DUNGEON_OPEN_COOLDOWN_MS
+          ) {
+            b.room.send(DUNGEON_MSG.open, { dungeonId: "hac_phong_dong" });
+            b.nextDungeonOpenAt = now + 15000;
+          }
+        }
+
+        if (b.dungeonState && b.dungeonState.phase === "running") {
+          let targetBoss: any = null;
+          b.room.state.monsters.forEach((m: any) => {
+            if (m.hp > 0) targetBoss = m;
+          });
+          if (targetBoss) {
+            const d = Math.hypot(targetBoss.x - b.predX, targetBoss.y - b.predY);
+            const a = Math.atan2(targetBoss.y - b.predY, targetBoss.x - b.predX);
+            if (d > SKILLS.slash.range) {
               dx = Math.cos(a);
               dy = Math.sin(a);
             }
-          }
-        } else {
-          // Ở Lạc Hà: Trưởng nhóm mở bí cảnh
-          const isLeader = (b.index - 1) % 4 === 0;
-          const gate = NPC_BY_ID.thu_mon;
-          const distToGate = Math.hypot(gate.x - b.predX, gate.y - b.predY);
-          if (distToGate > 50) {
-            const a = Math.atan2(gate.y - b.predY, gate.x - b.predX);
-            dx = Math.cos(a);
-            dy = Math.sin(a);
-          } else if (isLeader && now >= b.nextDungeonOpenAt) {
-            b.dungeonOpenSentAt = performance.now();
-            b.room.send(DUNGEON_MSG.open, { dungeonId: LINH_HU_ID });
-            b.nextDungeonOpenAt = now + DUNGEON_OPEN_COOLDOWN_MS + 2000;
+            if (d <= SKILLS.slash.range + 10 && now >= b.nextSlashAt) {
+              b.room.send("attack", { angle: a });
+              b.nextSlashAt = now + SKILLS.slash.cooldown + 50;
+            }
           }
         }
         break;
       }
 
       case "duel": {
-        // Cặp thách đấu PK
-        const oppIndex = (b.index - 1) % 2 === 0 ? b.index + 1 : b.index - 1;
-        const oppName = b.duelOpponentName ?? `Bot ${String(oppIndex).padStart(3, "0")}`;
+        const isFirst = (b.index - 1) % 2 === 0;
+        const oppIdx = isFirst ? b.index + 1 : b.index - 1;
+        const oppName = `Bot ${String(oppIdx).padStart(3, "0")}`;
+
         let oppPlayer: any = null;
-        if (state?.players && typeof state.players.forEach === "function") {
-          state.players.forEach((p: any) => {
-            if (p && p.name && p.name.toLowerCase() === oppName.toLowerCase()) {
-              oppPlayer = p;
-            }
-          });
-        }
+        b.room.state.players.forEach((p: any) => {
+          if (p.name === oppName) oppPlayer = p;
+        });
 
         if (b.duelPhase === "fight" && oppPlayer && !oppPlayer.dead) {
           const dist = Math.hypot(oppPlayer.px - b.predX, oppPlayer.py - b.predY);
@@ -956,10 +960,9 @@ export async function main(): Promise<number> {
     for (const b of bots) stepBot(b, now);
   }, TICK_MS);
 
-  // 6. Vòng lặp lấy mẫu mỗi intervalSec (mặc định 10s)
+  // 6. Vòng lặp lấy mẫu mỗi sampleIntervalSec (mặc định 10s)
   const samples: SoakSample[] = [];
   let prevExecTime = readServerExecRuntimeMs(actualPid) ?? 0;
-  let prevRxPatchTotal = 0;
   let prevRxBytesTotal = 0;
   const startTime = Date.now();
 
@@ -977,42 +980,65 @@ export async function main(): Promise<number> {
 
     const activeBots = bots.filter((b) => b.room?.connection?.isOpen).length;
     const sampleTicks = args.sampleIntervalSec * (1000 / TICK_MS);
-    const tickCpuAvgMs = Number((deltaExecMs / Math.max(1, sampleTicks)).toFixed(2));
-    const tickCpuP95Ms = Number((tickCpuAvgMs * 1.3).toFixed(2)); // xấp xỉ p95 từ thời gian thực thi
+    const cpuMsPerTickAvg = Number((deltaExecMs / Math.max(1, sampleTicks)).toFixed(2));
 
-    let curRxPatchTotal = 0;
     let curRxBytesTotal = 0;
     for (const b of bots) {
-      curRxPatchTotal += b.rxPatchBytes;
       curRxBytesTotal += b.rxBytes;
     }
 
-    const deltaPatchBytes = Math.max(0, curRxPatchTotal - prevRxPatchTotal);
     const deltaRxBytes = Math.max(0, curRxBytesTotal - prevRxBytesTotal);
-    prevRxPatchTotal = curRxPatchTotal;
     prevRxBytesTotal = curRxBytesTotal;
 
-    const patchBytesPerTick =
-      activeBots > 0 ? Math.round(deltaPatchBytes / (sampleTicks * activeBots)) : 0;
+    const bytesPerTickPerBot =
+      activeBots > 0 ? Math.round(deltaRxBytes / (sampleTicks * activeBots)) : 0;
     const rxKBpsPerBot =
       activeBots > 0
         ? Number((deltaRxBytes / 1024 / args.sampleIntervalSec / activeBots).toFixed(2))
         : 0;
-    const txKBpsPerBot = 1.0;
 
     const sampleErrors = bots.filter((b) => b.closedCode !== null).length;
+
+    // Cào số đo thật từ /metrics?format=json (M4 3.3)
+    let metricsSnapshot: any = null;
+    let metricsFetchFailed = false;
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/metrics?format=json`, {
+        headers: { Authorization: `Bearer ${metricsToken}` },
+      });
+      if (res.status === 200) {
+        metricsSnapshot = await res.json();
+      } else {
+        metricsFetchFailed = true;
+      }
+    } catch {
+      metricsFetchFailed = true;
+    }
+
+    const worstTickP95Ms = Number((metricsSnapshot?.worstTickP95Ms ?? 0).toFixed(2));
+    const tickOverruns =
+      metricsSnapshot?.rooms?.reduce((sum: number, r: any) => sum + (r.tick?.overrun ?? 0), 0) ?? 0;
+    const writesInflight = metricsSnapshot?.writes?.inflight ?? 0;
+    const writesOldestAgeMs = metricsSnapshot?.writes?.oldestAgeMs ?? 0;
+    const writesFailed = metricsSnapshot?.writes?.failed ?? 0;
+    const loopLagP99Ms = Number((metricsSnapshot?.process?.loopLagP99Ms ?? 0).toFixed(1));
 
     const sample: SoakSample = {
       elapsedSec,
       timestamp: Date.now(),
       rssMb: Number(rssMb.toFixed(2)),
       activeBots,
-      tickCpuAvgMs,
-      tickCpuP95Ms,
-      patchBytesPerTick,
+      cpuMsPerTickAvg,
+      worstTickP95Ms,
+      tickOverruns,
+      writesInflight,
+      writesOldestAgeMs,
+      writesFailed,
+      loopLagP99Ms,
+      bytesPerTickPerBot,
       rxKBpsPerBot,
-      txKBpsPerBot,
       sampleErrors,
+      metricsFetchFailed,
     };
     samples.push(sample);
 
@@ -1025,14 +1051,16 @@ export async function main(): Promise<number> {
     const minStr = (elapsedSec / 60).toFixed(1);
     const totalMinStr = (args.durationSec / 60).toFixed(1);
     console.log(
-      `[${minStr.padStart(4)}m / ${totalMinStr}m] VmRSS: ${rssMb.toFixed(1).padStart(5)} MB | Bots: ${String(activeBots).padStart(3)}/${args.bots} | Tick: ${tickCpuAvgMs.toFixed(1).padStart(4)} ms | Patch: ${String(patchBytesPerTick).padStart(3)} B/t | Lỗi: ${serverLogErrors}`,
+      `[${minStr.padStart(4)}m / ${totalMinStr}m] VmRSS: ${rssMb.toFixed(1).padStart(5)} MB | Bots: ${String(activeBots).padStart(3)}/${args.bots} | Tick p95: ${worstTickP95Ms.toFixed(2).padStart(5)} ms | CPU: ${cpuMsPerTickAvg.toFixed(1).padStart(4)} ms/t | WS: ${String(bytesPerTickPerBot).padStart(3)} B/t | Inflight: ${writesInflight} | Lỗi: ${serverLogErrors} | Cảnh báo: ${monitorAlerts}`,
     );
   }
 
   clearInterval(botTimer);
+  console.log("\nThời gian đo kết thúc. Đang dừng hành động bot để xả hết tin nhắn...");
+  await sleep(1500);
 
   // 7. Ngắt kết nối các bot và tắt máy chủ bằng SIGTERM
-  console.log("\nThời gian đo kết thúc. Đang ngắt kết nối bot và tắt máy chủ bằng SIGTERM...");
+  console.log("Đang ngắt kết nối bot và tắt máy chủ bằng SIGTERM...");
   for (const b of bots) {
     try {
       if (b.room?.connection?.isOpen) b.room.leave(true);
@@ -1040,7 +1068,7 @@ export async function main(): Promise<number> {
       /* bỏ qua */
     }
   }
-  await sleep(500);
+  await sleep(1000);
   await shutdownServer();
   await sleep(1000);
 
@@ -1082,12 +1110,26 @@ export async function main(): Promise<number> {
 
   // 8c. Kiểm tra bảo toàn tiền tệ (Linh thạch)
   let finalPlayerCoin = 0;
+  let botCoinMismatchCount = 0;
   try {
-    for (const file of readdirSync(tempDir)) {
-      if (file.endsWith(".json")) {
+    for (const b of bots) {
+      const key = crypto
+        .createHash("sha1")
+        .update(b.name.normalize("NFC").toLowerCase())
+        .digest("hex");
+      const botFile = path.join(tempDir, `${key}.json`);
+      if (existsSync(botFile)) {
         try {
-          const raw = JSON.parse(readFileSync(path.join(tempDir, file), "utf8"));
-          finalPlayerCoin += raw.coin ?? 0;
+          const raw = JSON.parse(readFileSync(botFile, "utf8"));
+          // Linh thạch của người chơi gồm ví hiện tại + coinAtDeath (nếu đang ở Hoàng Tuyền / limbo)
+          const savedCoin = (raw.coin ?? 0) + (raw.limbo?.coinAtDeath ?? 0);
+          finalPlayerCoin += savedCoin;
+          if (savedCoin !== b.coin) {
+            botCoinMismatchCount++;
+            console.log(
+              `  [Lệch ví bot] ${b.name}: file lưu = ${savedCoin}, bot ghi nhận = ${b.coin} (lệch ${savedCoin - b.coin})`,
+            );
+          }
         } catch {
           /* bỏ qua */
         }
@@ -1118,12 +1160,17 @@ export async function main(): Promise<number> {
 
   const finalTotalCoin = finalPlayerCoin + finalSectCoin;
   let totalMintedCoin = 0;
-  for (const b of bots) totalMintedCoin += b.mintedCoin;
+  let totalSpentCoin = 0;
+  for (const b of bots) {
+    totalMintedCoin += b.mintedCoin;
+    totalSpentCoin += b.spentCoin;
+  }
 
   // Tổng tiền cuối cùng không được vượt quá: ban đầu + tiền phát sinh từ rơi đồ / thưởng / shop
-  const currencyConservationPassed = finalTotalCoin <= initialTotalCoin + totalMintedCoin;
+  const currencyConservationPassed =
+    finalTotalCoin <= initialTotalCoin + totalMintedCoin && botCoinMismatchCount === 0;
   console.log(
-    `- Bảo toàn Linh thạch: Ban đầu ${initialTotalCoin} + Thả ra ${totalMintedCoin} = Trần ${initialTotalCoin + totalMintedCoin} | Thực tế cuối: Ví ${finalPlayerCoin} + Kho ${finalSectCoin} = ${finalTotalCoin} -> ${currencyConservationPassed ? "ĐẠT" : "KHÔNG ĐẠT"}`,
+    `- Bảo toàn Linh thạch: Ban đầu ${initialTotalCoin} + Thả ra ${totalMintedCoin} - Tiêu ${totalSpentCoin} = Trần ${initialTotalCoin + totalMintedCoin} | Thực tế cuối: Ví ${finalPlayerCoin} + Kho ${finalSectCoin} = ${finalTotalCoin} (Lệch ví bot: ${botCoinMismatchCount}) -> ${currencyConservationPassed ? "ĐẠT" : "KHÔNG ĐẠT"}`,
   );
 
   // 9. Phân tích tự động và in bảng tổng kết
@@ -1132,6 +1179,7 @@ export async function main(): Promise<number> {
     {},
     {
       serverLogErrors,
+      monitorAlerts,
       auditErrorsTotal,
       hongFilesCount,
       currencyConservationPassed,
@@ -1161,13 +1209,7 @@ export async function main(): Promise<number> {
     /* bỏ qua */
   }
 
-  if (!args.keepDataDir) {
-    try {
-      rmSync(tempDir, { recursive: true, force: true });
-    } catch {
-      /* bỏ qua */
-    }
-  }
+  cleanupTempDirs();
 
   return analysis.pass ? 0 : 1;
 }

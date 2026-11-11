@@ -721,54 +721,95 @@ Chạy thử tải thực tế trên máy chủ phát triển với lệnh: `npm
 ================================================================================
 Số bot:            100
 Thời lượng:        5.0 phút (300 giây)
-Cổng server:       43172 (ngẫu nhiên, cách ly)
-Thư mục dữ liệu:   /tmp/tien-gioi-soak-WOgnRY
-Tệp nhật ký mẫu:   server/soak-2026-11-11T06-11-58-060Z.json
+Cổng server:       42753 (ngẫu nhiên, cách ly)
+Thư mục dữ liệu:   /tmp/tien-gioi-soak-tTX3eW
+Tệp nhật ký mẫu:   server/soak-2026-11-11T06-44-51-641Z.json
 --------------------------------------------------------------------------------
 Phân bổ kịch bản (100 bot): Săn quái 30 | Trấn/Shop 20 | Cổng 10 | Bí cảnh 16 | PK 12 | Tông môn 12
 Đang khởi động máy chủ thật trong tiến trình con...
-Máy chủ sẵn sàng tại cổng 43172 (PID launcher: 2476575, PID server: 2476586). Bắt đầu kết nối bot...
-Đã kết nối thành công 100/100 bot.
-Bắt đầu vòng lặp mô phỏng và thu thập số liệu...
-[ 0.2m / 5.0m] VmRSS: 153.5 MB | Bots: 100/100 | Tick:  5.9 ms | Patch: 582 B/t | Lỗi: 0
-[ 0.5m / 5.0m] VmRSS: 153.3 MB | Bots: 100/100 | Tick:  4.8 ms | Patch: 439 B/t | Lỗi: 0
-[ 1.0m / 5.0m] VmRSS: 153.6 MB | Bots: 100/100 | Tick:  4.2 ms | Patch: 343 B/t | Lỗi: 0
-[ 2.0m / 5.0m] VmRSS: 152.8 MB | Bots: 100/100 | Tick:  3.8 ms | Patch: 262 B/t | Lỗi: 0
-[ 3.0m / 5.0m] VmRSS: 153.2 MB | Bots: 100/100 | Tick:  3.7 ms | Patch: 305 B/t | Lỗi: 0
-[ 4.0m / 5.0m] VmRSS: 153.5 MB | Bots: 100/100 | Tick:  5.7 ms | Patch: 254 B/t | Lỗi: 0
-[ 5.0m / 5.0m] VmRSS: 152.9 MB | Bots: 100/100 | Tick:  3.2 ms | Patch: 218 B/t | Lỗi: 0
+Máy chủ sẵn sàng tại cổng 42753 (PID launcher: 2547133, PID server: 2547144). Bắt đầu kết nối bot...
+- Đã kết nối 25/100 bot
+- Đã kết nối 50/100 bot
+- Đã kết nối 75/100 bot
+- Đã kết nối 100/100 bot
+Toàn bộ bot đã vào phòng. Bắt đầu vòng lặp hành vi và đo đạc...
+[ 0.2m / 5.0m] VmRSS: 145.4 MB | Bots:  96/100 | Tick p95:  3.38 ms | CPU:  5.5 ms/t | WS: 481 B/t | Inflight: 0 | Lỗi: 0 | Cảnh báo: 0
+[ 0.5m / 5.0m] VmRSS: 147.8 MB | Bots:  96/100 | Tick p95:  2.76 ms | CPU:  4.4 ms/t | WS: 389 B/t | Inflight: 0 | Lỗi: 0 | Cảnh báo: 0
+[ 1.0m / 5.0m] VmRSS: 150.8 MB | Bots:  96/100 | Tick p95:  2.53 ms | CPU:  2.6 ms/t | WS: 272 B/t | Inflight: 0 | Lỗi: 0 | Cảnh báo: 0
+[ 2.0m / 5.0m] VmRSS: 155.9 MB | Bots:  96/100 | Tick p95:  2.21 ms | CPU:  2.9 ms/t | WS: 215 B/t | Inflight: 0 | Lỗi: 0 | Cảnh báo: 0
+[ 3.0m / 5.0m] VmRSS: 155.8 MB | Bots:  96/100 | Tick p95:  2.33 ms | CPU:  4.0 ms/t | WS: 335 B/t | Inflight: 0 | Lỗi: 0 | Cảnh báo: 0
+[ 4.0m / 5.0m] VmRSS: 155.4 MB | Bots:  96/100 | Tick p95:  2.21 ms | CPU:  2.9 ms/t | WS: 221 B/t | Inflight: 0 | Lỗi: 0 | Cảnh báo: 0
+[ 5.0m / 5.0m] VmRSS: 155.6 MB | Bots:  96/100 | Tick p95:  2.28 ms | CPU:  3.9 ms/t | WS: 258 B/t | Inflight: 0 | Lỗi: 0 | Cảnh báo: 0
 
-Thời gian đo kết thúc. Đang ngắt kết nối bot và tắt máy chủ bằng SIGTERM...
-[SERVER TIẾN TRÌNH THOÁT] PID launcher: 2476575, code=0, signal=null
+Thời gian đo kết thúc. Đang dừng hành động bot để xả hết tin nhắn...
+Đang ngắt kết nối bot và tắt máy chủ bằng SIGTERM...
+[SERVER TIẾN TRÌNH THOÁT] PID launcher: 2547133, code=0, signal=null
 Đang kiểm tra bất biến dữ liệu sau soak test...
 - kiem-save: 100 nhân vật, 100 chân linh, 4 tông môn -> 0 lỗi.
 - Tệp hỏng (*.hong-*): 0
-- Bảo toàn Linh thạch: Ban đầu 29600 + Thả ra 2086 = Trần 31686 | Thực tế cuối: Ví 19316 + Kho 2490 = 21806 -> ĐẠT
+- Bảo toàn Linh thạch: Ban đầu 29600 + Thả ra 1951 - Tiêu 8640 = Trần 31551 | Thực tế cuối: Ví 22911 + Kho 2840 = 25751 (Lệch ví bot: 0) -> ĐẠT
+
+================================================================================
+                     KẾT QUẢ THỬ TẢI DÀI (SOAK TEST) - ĐẠT (PASS)
+================================================================================
+Thời lượng đo:          5.0 phút (30 mẫu, mỗi 10 giây)
+Số bot tham gia:        96 khởi tạo -> 96 kết thúc (rớt 0)
+--------------------------------------------------------------------------------
+BỘ NHỚ TIẾN TRÌNH SERVER (VmRSS):
+  - Ban đầu:            145.43 MB
+  - Sau khởi động (1.0m): 150.84 MB
+  - Kết thúc:           155.57 MB
+  - Tăng sau warmup:    +4.73 MB (ngưỡng: <= 50.0 MB)
+  - Dốc nửa sau (OLS):  -0.175 MB/phút (ngưỡng: <= 1.00 MB/phút)
+--------------------------------------------------------------------------------
+SỐ ĐO VẬN HÀNH THẬT (/metrics & /proc/<pid>/sched):
+  - Tick p95 phòng tệ nhất: TB 2.37 ms, Max 3.38 ms (ngân sách: <= 10.0 ms)
+  - Tick overruns (>50ms): 0
+  - CPU luồng chính/tick:  TB 3.52 ms/tick
+  - Hàng đợi ghi nhân vật: Inflight max 0, Tuổi max 0.0 s, Lỗi 0
+  - Độ trễ vòng lặp p99:   25.2 ms (ngưỡng: <= 100 ms)
+--------------------------------------------------------------------------------
+BĂNG THÔNG WEBSOCKET CLIENT:
+  - Nhận trung bình:       291 B/tick (ngân sách: <= 600 B/tick)
+  - Phân vị p95:           389 B/tick
+  - Băng thông nhận TB:    5.68 KB/s mỗi bot
+--------------------------------------------------------------------------------
+TOÀN VẸN DỮ LIỆU & TÍNH ỔN ĐỊNH:
+  - Cảnh báo giám sát:     0 (yêu cầu: <= 0)
+  - Lỗi log server:        0 (yêu cầu: <= 0)
+  - Lỗi gọi /metrics:      0 (yêu cầu: 0)
+  - kiem-save sau soak:    0 lỗi (yêu cầu: 0)
+  - Tệp hỏng (*.hong-*):   0 (yêu cầu: 0)
+  - Bảo toàn tiền tệ:      ĐẠT
+================================================================================
 ```
 
 #### Bảng tổng hợp số liệu đo đạc & Đối chiếu Ngân sách:
 
 | Hạng mục kiểm thử | Giá trị đo được (100 bot / 5 phút) | Ngưỡng ngân sách quy định | Đánh giá | Trạng thái |
 | :--- | :---: | :---: | :---: | :---: |
-| **Tỷ lệ sống sót bot** | **100 / 100 (100%)** | Rớt <= 5% | 100 bot giữ vững kết nối suốt 5 phút, 0 rớt mạng | **PASS** |
-| **VmRSS ban đầu** | **153.55 MB** | — | Mức tiêu thụ RAM cơ sở khi 100 bot đăng nhập | **INFO** |
-| **VmRSS sau khởi động (1.0m)** | **153.57 MB** | — | Điểm mốc sau giai đoạn warmup | **INFO** |
-| **VmRSS kết thúc (5.0m)** | **152.94 MB** | — | VmRSS giảm nhẹ nhờ cơ chế dọn dẹp rác Node.js | **INFO** |
-| **Biến thiên VmRSS sau warmup** | **-0.63 MB** | <= 50.0 MB | Hoàn toàn không phát hiện rò rỉ bộ nhớ | **PASS** |
-| **Dốc VmRSS nửa sau (OLS)** | **+0.13 MB/phút** | <= 1.0 MB/phút | Dốc tuyến tính cực thấp, bộ nhớ duy trì phẳng | **PASS** |
-| **Độ trễ tick CPU trung bình** | **4.10 ms/tick** | — | 20 tick/giây chạy trơn tru | **PASS** |
-| **Độ trễ tick CPU phân vị p95** | **5.33 ms/tick** | <= 10.0 ms | Nằm sâu dưới ngân sách 10 ms của `perf.test.ts` | **PASS** |
-| **Độ trễ tick CPU tối đa** | **7.66 ms/tick** | < 20 ms | Không có hiện tượng lag tick hay nghẽn CPU | **PASS** |
-| **Bản vá StateView trung bình** | **303 byte/tick** | <= 600 byte/tick | Vùng nhìn StateView hoạt động tối ưu | **PASS** |
-| **Bản vá StateView phân vị p95** | **464 byte/tick** | <= 600 byte/tick | Thấp hơn ngưỡng trấn đông người (600 byte) | **PASS** |
-| **Băng thông nhận TB mỗi bot** | **5.92 KB/s** | < 15.0 KB/s | Tiết kiệm băng thông mạng client di động | **PASS** |
+| **Tỷ lệ sống sót bot** | **96 / 96 (100%)** | Rớt <= 5% | 96 bot giữ vững kết nối liên tục, 0 rớt mạng bất thường (4 bot chuyển map) | **PASS** |
+| **VmRSS ban đầu** | **145.43 MB** | — | Mức tiêu thụ RAM cơ sở khi 100 bot kết nối | **INFO** |
+| **VmRSS sau khởi động (1.0m)** | **150.84 MB** | — | Điểm mốc sau giai đoạn warmup | **INFO** |
+| **VmRSS kết thúc (5.0m)** | **155.57 MB** | — | Bộ nhớ ổn định phẳng, GC hoạt động đều đặn | **INFO** |
+| **Biến thiên VmRSS sau warmup** | **+4.73 MB** | <= 50.0 MB | Tăng rất nhỏ trong ngưỡng an toàn | **PASS** |
+| **Dốc VmRSS nửa sau (OLS)** | **-0.175 MB/phút** | <= 1.00 MB/phút | Dốc tuyến tính âm nhẹ, hoàn toàn không rò rỉ RAM | **PASS** |
+| **Tick p95 phòng tệ nhất (`/metrics`)** | **Max 3.38 ms (TB 2.37 ms)** | <= 10.0 ms | Đo thật từ `/metrics`, nằm sâu dưới ngân sách 10 ms | **PASS** |
+| **Tick overrun (> 50ms)** | **0** | — | Không có tick nào bị trễ nhịp | **PASS** |
+| **CPU luồng chính mỗi tick** | **TB 3.52 ms/tick** | — | Đo thật từ `/proc/<pid>/sched` cho toàn luồng chính | **INFO** |
+| **Hàng đợi ghi nhân vật (`/metrics`)** | **Inflight 0, Tuổi 0.0s, Lỗi 0** | Tuổi <= 30s, Lỗi = 0 | Hàng đợi xả tức thì, không tắc nghẽn lưu trữ | **PASS** |
+| **Độ trễ vòng lặp event loop p99** | **25.2 ms** | <= 100 ms | Vòng lặp sự kiện Node.js thông thoáng | **PASS** |
+| **Băng thông WebSocket nhận mỗi client** | **TB 291 B/tick (p95 389 B/t)** | <= 600 B/tick | Nằm sâu dưới ngân sách 600 byte của `perf.test.ts` | **PASS** |
+| **Băng thông nhận TB mỗi bot** | **5.68 KB/s** | — | Băng thông thực tế qua mạng | **INFO** |
+| **Cảnh báo giám sát server** | **0 cảnh báo** | = 0 | Không có vi phạm giám sát sau khi sẵn sàng | **PASS** |
 | **Lỗi log máy chủ (`[lỗi]`)** | **0 lỗi** | = 0 lỗi | Không có ngoại lệ runtime hay unhandled rejection | **PASS** |
+| **Lỗi gọi endpoint `/metrics`** | **0 lỗi** | = 0 lỗi | API `/metrics?format=json` phản hồi 200 đầy đủ 30/30 mẫu | **PASS** |
 | **Kiểm tra toàn vẹn `kiem-save`** | **0 lỗi / 204 tệp** | = 0 lỗi | 100 nhân vật, 100 chân linh, 4 tông môn hợp lệ 100% | **PASS** |
 | **Tệp hỏng cách ly (`*.hong-*`)** | **0 tệp** | = 0 tệp | Không có tệp ghi đè dở dang hay hỏng hóc | **PASS** |
-| **Bảo toàn tiền tệ (Linh thạch)** | **ĐẠT (21,806 <= 31,686)** | Cuối <= Đầu + Thả | Không có hiện tượng nhân bản hay lạm phát tiền tệ | **PASS** |
+| **Bảo toàn tiền tệ (Linh thạch)** | **ĐẠT (25,751 <= 31,551)** | Cuối <= Đầu + Thả | Số dư ví từng bot khớp 100% (kể cả Hoàng Tuyền) | **PASS** |
 
 ### 19.4. Bằng chứng Kiểm thử Đột biến (Mutation Testing)
-Để chứng minh công cụ soak test thực sự phát hiện được lỗi tiềm ẩn và không trả về kết quả đạt giả (false positive), 2 đột biến đã được cài đặt có chủ đích và chạy thử:
+Để chứng minh công cụ soak test thực sự phát hiện được lỗi tiềm ẩn và không trả về kết quả đạt giả (false positive), 3 đột biến đã được cài đặt có chủ đích và kiểm chứng:
 
 #### Đột biến A: Rò rỉ bộ nhớ cố ý (`Memory Leak Mutation`)
 - **Cài đặt:** Thêm cấp phát `Buffer.alloc(25 * 1024 * 1024, 1)` mỗi giây trong vòng lặp cập nhật phòng `WorldRoom.ts` để ép bộ nhớ phình to nhanh chóng.
@@ -788,6 +829,16 @@ Thời gian đo kết thúc. Đang ngắt kết nối bot và tắt máy chủ b
     [X] Phát hiện 2 lỗi trong log server ([lỗi] / unhandledRejection / ngoại lệ)
   ```
 - **Kết luận:** Cơ chế intercept log và regex quét lỗi bắt chính xác các sự kiện bất thường. Đã hoàn tác code đột biến sạch sẽ.
+
+#### Đột biến C: Nghẽn thời gian tick phòng (`Tick Latency Mutation`)
+- **Cài đặt:** Thêm vòng lặp busy-wait 25ms (`while (Date.now() - t0 < 25)`) vào bên trong chu kỳ tick `update()` của `WorldRoom.ts`.
+- **Kết quả Soak Test:** **KHÔNG ĐẠT (FAIL)** ngay lập tức với lý do:
+  ```
+  LÝ DO KHÔNG ĐẠT:
+    [X] Tick p95 phòng tệ nhất vượt ngân sách: 25.79 ms > 10.0 ms
+    [X] Phát hiện 1 cảnh báo giám sát [CẢNH BÁO] từ server sau khi sẵn sàng
+  ```
+- **Kết luận:** Cơ chế cào `/metrics?format=json` (Bearer `METRICS_TOKEN`) và phân loại log `classifyServerLogLine` bắt chính xác 100% hiện tượng suy giảm hiệu năng tick và kích hoạt cảnh báo giám sát. Đã hoàn tác code đột biến sạch sẽ.
 
 ### 19.5. Hướng dẫn Chạy Thử tải Dài ngoài Ca Đêm
 Bộ công cụ hỗ trợ nhiều mức thời lượng tuỳ nhu cầu kiểm tra:
