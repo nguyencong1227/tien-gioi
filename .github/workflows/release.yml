@@ -1,0 +1,135 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Thẻ phiên bản để phát hành lại (vd v0.1.0)"
+        required: true
+        type: string
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    name: Build, Kiểm thử & Đẩy ảnh Docker lên GHCR
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      # Thẻ phiên bản: `inputs.tag` (chạy tay) hoặc tên thẻ vừa đẩy. KHÔNG viết `github.ref_name || inputs.tag`: `ref_name` luôn có giá trị
+      # (khi chạy tay là TÊN NHÁNH, vd main) nên vế sau không bao giờ được dùng. Đưa qua `env` (không nội suy `${{ }}` vào lệnh shell:
+      # chặn chèn lệnh qua tên thẻ / đầu vào) và kiểm đúng dạng vX.Y.Z[-hậu-tố] trước khi dùng.
+      - name: Xác định và kiểm tra thẻ phiên bản
+        id: tag
+        env:
+          TAG_INPUT: ${{ inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          TAG="${TAG_INPUT:-$REF_NAME}"
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Thẻ phiên bản không hợp lệ: '$TAG' (cần vX.Y.Z hoặc vX.Y.Z-rc.1)"
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      # Luôn checkout ĐÚNG thẻ (chạy tay từ nhánh khác vẫn phát hành nội dung của thẻ, không phải của nhánh đó)
+      - name: Checkout mã nguồn
+        uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ steps.tag.outputs.tag }}
+          fetch-depth: 0
+
+      # Chỉ phát hành mã ĐÃ QUA review và nằm trên main: thẻ gắn vào commit của một nhánh chưa merge bị chặn
+      - name: Kiểm tra thẻ nằm trên main
+        run: |
+          git fetch origin main
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "::error::Commit của thẻ không nằm trên main: chỉ phát hành mã đã merge"
+            exit 1
+          fi
+
+      - name: Cài đặt Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Cài đặt dependencies
+        run: npm ci
+
+      - name: Kiểm tra kiểu
+        run: npm run typecheck
+
+      - name: Lint mã nguồn
+        run: npm run lint
+
+      - name: Kiểm tra định dạng
+        run: npx prettier --check .
+
+      - name: Kiểm thử toàn bộ
+        run: npm test
+
+      - name: Build client production
+        run: npm run build
+
+      - name: Thiết lập Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Đăng nhập GitHub Container Registry (ghcr.io)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Trích xuất metadata Docker (tags & labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/nguyencong1227/tien-gioi
+          tags: |
+            type=semver,pattern={{version}},value=${{ steps.tag.outputs.tag }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ steps.tag.outputs.tag }}
+            type=semver,pattern={{major}},value=${{ steps.tag.outputs.tag }}
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable=${{ !contains(steps.tag.outputs.tag, '-') }}
+          labels: |
+            org.opencontainers.image.title=Tiên Giới
+            org.opencontainers.image.description=MMORPG 2D tu tiên Colyseus + Phaser
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+
+      - name: Build và đẩy ảnh Docker lên GHCR
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Tạo GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ steps.tag.outputs.tag }}
+        run: |
+          # Chạy lại cùng thẻ (workflow_dispatch) khi bản phát hành đã có: không lỗi
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            echo "Bản phát hành $TAG_NAME đã tồn tại, giữ nguyên."
+          else
+            gh release create "$TAG_NAME" \
+              --title "Tiên Giới $TAG_NAME" \
+              --generate-notes \
+              --verify-tag
+          fi
