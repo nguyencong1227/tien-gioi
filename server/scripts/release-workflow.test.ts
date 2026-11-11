@@ -146,6 +146,12 @@ export function validateReleaseWorkflow(content: string): ReleaseValidationResul
   if (!/merge-base --is-ancestor/.test(code) || !/origin\/main/.test(code)) {
     errors.push("Thiếu bước kiểm commit của thẻ nằm trên main (chỉ phát hành mã đã merge)");
   }
+  // 7b. Bản thử nghiệm (thẻ có dấu '-'): phải thêm cờ --prerelease cho gh release create
+  if (!/--prerelease/.test(code) || !/\*-\*/.test(code)) {
+    errors.push(
+      "Bản phát hành phải thêm cờ --prerelease khi tên thẻ có dấu '-' (thẻ thử nghiệm / rc)",
+    );
+  }
   // 8. Chống chèn lệnh: không nội suy đầu vào / tên nhánh / tên thẻ trực tiếp vào lệnh shell (`run:`); phải đi qua `env:`
   let runIndent = -1;
   for (const line of codeLines) {
@@ -274,6 +280,14 @@ describe("Kiểm tra tĩnh Workflow Release (.github/workflows/release.yml) (#29
       const res = validateReleaseWorkflow(mutated);
       expect(res.valid).toBe(false);
       expect(res.errors.some((e) => e.includes("vX.Y.Z"))).toBe(true);
+    });
+
+    it("Đột biến 10: bỏ cờ --prerelease cho thẻ rc/thử nghiệm -> KHÔNG ĐẠT", () => {
+      const mutated = workflowContent.replace("--prerelease", "--draft");
+      expect(mutated).not.toBe(workflowContent);
+      const res = validateReleaseWorkflow(mutated);
+      expect(res.valid).toBe(false);
+      expect(res.errors.some((e) => e.includes("--prerelease"))).toBe(true);
     });
   });
 });

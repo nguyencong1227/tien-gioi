@@ -55,6 +55,7 @@ import {
   type WalletMsg,
 } from "@tien-gioi/shared";
 import { auditSavesDirectory } from "./audit-saves";
+import { assertNotProd } from "./assert-not-prod";
 import { readServerExecRuntimeMs, readServerRssMb, seedBotSaveFile } from "./bots";
 import {
   analyzeSoak,
@@ -113,6 +114,7 @@ function parseCliArgs(argv: string[]): SoakCliArgs {
       durationSec = Math.max(5, Number(arg.slice(11)));
     } else if (arg.startsWith("--port=")) {
       port = Math.max(0, Number(arg.slice(7)));
+      assertNotProd(port, "soak");
     } else if (arg.startsWith("--interval=")) {
       sampleIntervalSec = Math.max(1, Number(arg.slice(11)));
     } else if (arg.startsWith("--out=")) {

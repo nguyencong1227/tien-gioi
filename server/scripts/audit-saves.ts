@@ -47,6 +47,7 @@ import { parseHash } from "../src/auth.js";
 import { nameKeyOf } from "../src/account-store.js";
 import { isSectId } from "../src/sect-store.js";
 import { createHash } from "node:crypto";
+import { assertNotProd } from "./assert-not-prod.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
@@ -1376,7 +1377,9 @@ export function auditSectSaveData(rawText: string, byteLength: number): AuditErr
  * Ném lỗi nếu thư mục không tồn tại.
  */
 export function auditSavesDirectory(dirPath: string): AuditReport {
+  assertNotProd(dirPath, "kiem-save");
   const resolvedDir = path.resolve(dirPath);
+  assertNotProd(resolvedDir, "kiem-save");
 
   if (!existsSync(resolvedDir)) {
     throw new Error(`Thư mục không tồn tại: "${resolvedDir}"`);

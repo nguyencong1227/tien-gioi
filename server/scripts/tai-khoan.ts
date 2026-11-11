@@ -20,6 +20,7 @@ import { validateUsername } from "@tien-gioi/shared";
 import { type AccountRecord, type AccountStore, type SessionStore } from "../src/account-store.js";
 import { hashSecretScrypt, newRecoveryCode, normalizeRecoveryCode } from "../src/auth.js";
 import { createStores } from "../src/stores.js";
+import { assertNotProd } from "./assert-not-prod.js";
 
 export interface ToolDeps {
   accounts: AccountStore;
@@ -194,7 +195,10 @@ async function main() {
   // Cùng cách server nạp cấu hình dev: .env.local ở gốc repo (PORT, STORE, DATABASE_URL...)
   const envFile = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../.env.local");
   if (existsSync(envFile)) process.loadEnvFile(envFile);
-  const port = Number(process.env.PORT ?? 2567);
+  assertNotProd(process.env.DATA_DIR, "tai-khoan");
+  assertNotProd(process.env.DATABASE_URL, "tai-khoan");
+  const port = Number(process.env.PORT ?? 2587);
+  assertNotProd(port, "tai-khoan");
   let code = 1;
   let stores: Awaited<ReturnType<typeof createStores>> | undefined;
   try {

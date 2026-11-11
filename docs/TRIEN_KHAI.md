@@ -178,6 +178,7 @@ Người chơi --HTTPS / WSS--> Cloudflare --đường hầm--> cloudflared (d�
 - **WebSocket qua Cloudflare:** kết nối không bao giờ nhàn rỗi (client gửi `input` 20 lần / giây, server ping khung mỗi 3 giây, thêm nhịp tim ứng dụng #293). Khi `cloudflared` khởi động lại (Cloudflare bảo trì), người chơi rớt mạng và vòng nối lại / nhịp tim lo trong 20 giây grace.
 - **Bản cũ sau khi phát hành:** `express.static` gửi `ETag` + `Cache-Control: public, max-age=0`; nếu vẫn thấy client cũ, kiểm `curl -sI https://tiengioi.hethongtm.site/ | grep -i cf-cache-status` và nhờ người dùng "Purge Cache" ở Cloudflare (agent không có quyền vào Cloudflare).
 - **Khi sự cố:** domain báo lỗi 1033 / 502 mà `curl http://127.0.0.1:2567/health` vẫn `ok` thì lỗi ở tunnel (`systemctl --user status cloudflared-tiengioi`: chỉ ĐỌC, báo người dùng); `curl` cổng nội bộ cũng lỗi thì lỗi ở server / container (`docs/VAN_HANH.md`).
+- **Chi tiết vận hành:** Khởi tạo, cập nhật (`up <thẻ>`), quay lại (`rollback`), sao lưu, khôi phục và xử lý sự cố bản chạy thật xem tại [Sổ tay Vận hành `docs/VAN_HANH.md`](VAN_HANH.md). Gói triển khai nằm tại thư mục `deploy/` (`deploy/docker-compose.prod.yml`, `deploy/prod.sh`).
 
 ### 4.2. Cấu hình bằng Caddy (Tự động cấp chứng chỉ SSL Let's Encrypt)
 Dùng khi máy có IP công khai và mở được cổng 80 / 443 (không phải bản chạy thật hiện tại).

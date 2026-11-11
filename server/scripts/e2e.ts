@@ -18,6 +18,7 @@ import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { type SavedPlayer } from "../src/store.js";
 import { DEFAULT_MAP_ID, type Soul } from "@tien-gioi/shared";
+import { assertNotProd } from "./assert-not-prod.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
@@ -52,6 +53,7 @@ function parseCliArgs(args: string[]): E2eArgs {
       if (val === "limbo" || val === "normal" || val === "auto") scenario = val;
     } else if (arg.startsWith("--port=")) {
       port = Number(arg.slice("--port=".length)) || port;
+      assertNotProd(port, "e2e");
     } else if (arg.startsWith("--chrome-port=")) {
       chromePort = Number(arg.slice("--chrome-port=".length)) || chromePort;
     } else if (arg.startsWith("--screenshots=")) {
