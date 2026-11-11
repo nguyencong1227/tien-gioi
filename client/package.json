@@ -14,6 +14,8 @@
     "assets": "node scripts/gen-assets.mjs"
   },
   "dependencies": {
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.6.0",
     "@tien-gioi/shared": "*",
     "colyseus.js": "0.16.22",
     "phaser": "3.90.0"

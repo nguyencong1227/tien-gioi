@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -21,25 +21,40 @@ export function validateRootPackageJson(content: string): { ok: boolean; errors:
 
 export function validateCapacitorConfig(content: string): { ok: boolean; errors: string[] } {
   const errors: string[] = [];
-  if (!/appId:\s*["']site\.hethongtm\.tiengioi["']/.test(content)) {
+  // Loại bỏ comments để kiểm tra chính xác cấu trúc code
+  const code = content.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, "");
+
+  if (!/appId:\s*["']site\.hethongtm\.tiengioi["']/.test(code)) {
     errors.push("appId phải là 'site.hethongtm.tiengioi'");
   }
-  if (!/appName:\s*["']Tiên Giới["']/.test(content)) {
+  if (!/appName:\s*["']Tiên Giới["']/.test(code)) {
     errors.push("appName phải là 'Tiên Giới'");
   }
-  if (!/webDir:\s*["']\.\.\/client\/dist["']/.test(content)) {
+  if (!/webDir:\s*["']\.\.\/client\/dist["']/.test(code)) {
     errors.push("webDir phải là '../client/dist'");
   }
-  if (!/androidScheme:\s*["']https["']/.test(content)) {
-    errors.push("androidScheme phải là 'https'");
+  if (!/androidScheme/i.test(code) || !/https/i.test(code)) {
+    errors.push("androidScheme mặc định phải là 'https'");
   }
-  if (/\burl\s*:/i.test(content) || /server\.url/i.test(content)) {
+  if (/\burl\s*:/i.test(code) || /server\s*:\s*\{[^}]*\burl\b/i.test(code)) {
     errors.push("Bản phát hành không được chứa server.url");
   }
-  if (/cleartext:\s*true/i.test(content)) {
+  if (/\bcleartext:\s*true\b/i.test(code) && !/isDebug|CAP_DEBUG/i.test(code)) {
     errors.push("Bản phát hành không được bật cleartext: true");
   }
   return { ok: errors.length === 0, errors };
+}
+
+/**
+ * Nạp `app/capacitor.config.ts` THẬT với biến CAP_DEBUG cho trước (Capacitor CLI nạp tệp này khi `cap sync`).
+ * Không dùng bản sao logic trong tệp test: sửa tệp thật làm hỏng luật thì test phải đỏ (review #314).
+ */
+export async function loadRealCapacitorConfig(capDebug?: string) {
+  vi.resetModules();
+  if (capDebug === undefined) vi.stubEnv("CAP_DEBUG", undefined);
+  else vi.stubEnv("CAP_DEBUG", capDebug);
+  const mod = await import(/* @vite-ignore */ resolve(REPO_ROOT, "app/capacitor.config.ts"));
+  return mod.default as { server?: { androidScheme?: string; cleartext?: boolean; url?: string } };
 }
 
 export function validateAndroidManifest(content: string): { ok: boolean; errors: string[] } {
@@ -138,6 +153,37 @@ describe("Kiểm tra tĩnh cấu hình Android Capacitor (Issue #300)", () => {
     const res = validateEnvNative(raw);
     expect(res.ok).toBe(true);
     expect(res.errors).toEqual([]);
+  });
+
+  it("không còn các tệp test Java mẫu com.getcapacitor.myapp", () => {
+    const test1 = resolve(
+      REPO_ROOT,
+      "app/android/app/src/androidTest/java/com/getcapacitor/myapp/ExampleInstrumentedTest.java",
+    );
+    const test2 = resolve(
+      REPO_ROOT,
+      "app/android/app/src/test/java/com/getcapacitor/myapp/ExampleUnitTest.java",
+    );
+    expect(existsSync(test1)).toBe(false);
+    expect(existsSync(test2)).toBe(false);
+  });
+
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("cấu hình Capacitor THẬT: không có CAP_DEBUG (hoặc giá trị lạ) thì https, không cleartext, không server.url", async () => {
+    for (const v of [undefined, "", "0", "false", "yes"]) {
+      const cfg = await loadRealCapacitorConfig(v);
+      expect(cfg.server?.androidScheme).toBe("https");
+      expect(cfg.server?.cleartext).toBeUndefined();
+      expect(cfg.server?.url).toBeUndefined();
+    }
+  });
+
+  it("cấu hình Capacitor THẬT: CAP_DEBUG=1 thì http + cleartext cho LAN (vẫn không server.url)", async () => {
+    const cfg = await loadRealCapacitorConfig("1");
+    expect(cfg.server?.androidScheme).toBe("http");
+    expect(cfg.server?.cleartext).toBe(true);
+    expect(cfg.server?.url).toBeUndefined();
   });
 });
 
