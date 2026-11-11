@@ -28,6 +28,8 @@ import { joinWithRedirect, isClientOutdatedError } from "./connection";
 import { clearToken, getToken } from "./auth";
 import { initAuthUi, switchAuthView } from "./auth-ui";
 import { setupPwa, canReloadSafely, type PwaGameState } from "./pwa";
+import { HeartbeatController } from "./heartbeat";
+import { sound } from "./audio";
 
 const NAME_KEY = "tien-gioi:name";
 const SECRET_KEY = "tien-gioi:secret";
@@ -146,6 +148,8 @@ if (nameInput) nameInput.value = localStorage.getItem(NAME_KEY) ?? "";
 let activeClient: Client | null = null;
 let activeScene: WorldScene | null = null;
 let activeToken: string | null = null;
+let activeRoom: Room | null = null;
+let activeHeartbeat: HeartbeatController | null = null;
 let isReconnecting = false;
 let isTraveling = false;
 
@@ -274,12 +278,115 @@ const FAIL_TEXT = "Mất kết nối với Tiên Giới. Tải lại trang để
 
 /** Không nối lại được: chặn điều khiển, giữ banner cố định kèm nút "Tải lại trang". */
 function showDisconnected() {
+  activeHeartbeat?.stop();
+  activeHeartbeat = null;
   activeScene?.setReconnecting(true);
   ui.showReconnectFailed(FAIL_TEXT);
 }
 
+/** Bắt đầu vòng lặp thử nối lại khi rớt mạng hoặc khi nhịp tim phát hiện chết (M4.2b). */
+async function startReconnect(codeOrReason?: number | string) {
+  // Nếu đang trong quá trình chuyển phòng, bỏ qua xử lý rớt mạng
+  if (isTraveling) return;
+
+  // Dừng nhịp tim của phòng cũ ngay khi bắt đầu nối lại
+  activeHeartbeat?.stop();
+  activeHeartbeat = null;
+
+  // 1000: đóng bình thường; 4000-4999: mã của ứng dụng (4000 chủ động thoát, 4429 bị ngắt vì spam)
+  if (typeof codeOrReason === "number") {
+    if (codeOrReason === 1000 || (codeOrReason >= 4000 && codeOrReason <= 4999)) {
+      if (codeOrReason !== 1000) showDisconnected();
+      return;
+    }
+  }
+
+  // Nếu rớt mạng trong phòng bí cảnh: rời run ngay (không có allowReconnection), không cố nối lại
+  if (activeScene && isDungeonMap(activeScene.map.def.id)) {
+    showDisconnected();
+    return;
+  }
+
+  // Các mã khác (1006 rớt mạng, 1001 đi khỏi, heartbeat...): tự động thử nối lại trong tối đa 20s
+  if (!activeToken || !activeClient || isReconnecting) return;
+  isReconnecting = true;
+  activeScene?.setReconnecting(true);
+
+  // Đóng socket cũ êm nếu socket vẫn còn mở (tránh onLeave kích hoạt vòng nối lại lần 2)
+  try {
+    if ((activeRoom as any)?.connection?.isOpen) {
+      (activeRoom as any).connection.close();
+    }
+  } catch {
+    // Bỏ qua lỗi đóng socket cũ
+  }
+
+  const token = activeToken;
+  const client = activeClient;
+  const GRACE_SECONDS = 20;
+  const RETRY_INTERVAL_MS = 1500;
+  const deadline = Date.now() + GRACE_SECONDS * 1000;
+
+  let reconnectedRoom: Room | null = null;
+
+  while (Date.now() < deadline) {
+    const remainingSec = Math.max(1, Math.ceil((deadline - Date.now()) / 1000));
+    ui.showReconnectNotice(`Mất kết nối, đang nối lại... (còn ${remainingSec} giây)`);
+
+    try {
+      reconnectedRoom = await client.reconnect(token);
+      if (reconnectedRoom) break;
+    } catch (err: any) {
+      const msg = String(err?.message ?? "");
+      // Dừng sớm nếu server trả lỗi dứt khoát: phòng không tồn tại hoặc token hết hạn
+      if (msg.includes("not found") || msg.includes("expired") || err?.code === 4212) {
+        break;
+      }
+    }
+
+    await new Promise((r) => setTimeout(r, RETRY_INTERVAL_MS));
+  }
+
+  if (reconnectedRoom) {
+    activeToken = reconnectedRoom.reconnectionToken;
+    activeScene?.attachRoom(reconnectedRoom);
+    activeScene?.setReconnecting(false);
+    isReconnecting = false;
+    ui.toast({ text: "Đã nối lại.", tone: "good" });
+    setupRoomLifecycle(reconnectedRoom);
+  } else {
+    // Thất bại hẳn (hết 20 giây / token hết hạn): KHÔNG ẩn banner, vẫn chặn điều khiển
+    isReconnecting = false;
+    showDisconnected();
+  }
+}
+
 function setupRoomLifecycle(room: Room) {
+  activeRoom = room;
   activeToken = room.reconnectionToken;
+
+  // Dọn dẹp bộ điều khiển nhịp tim của phòng trước (nếu có)
+  activeHeartbeat?.stop();
+  activeHeartbeat = null;
+
+  // Khởi động nhịp tim nếu không phải phòng bí cảnh (M4.2b)
+  const isDungeon = activeScene && isDungeonMap(activeScene.map.def.id);
+  if (!isDungeon) {
+    activeHeartbeat = new HeartbeatController({
+      room,
+      sound,
+      onDead: () => {
+        startReconnect("heartbeat");
+      },
+    });
+    activeHeartbeat.start();
+    if (
+      typeof window !== "undefined" &&
+      (import.meta.env.DEV || new URLSearchParams(location.search).has("debug"))
+    ) {
+      (window as any).__heartbeat = activeHeartbeat;
+    }
+  }
 
   // Lắng nghe sự kiện đi qua cổng chuyển phòng (M3 bước 1)
   room.onMessage("travelTo", async (msg: TravelToMsg) => {
@@ -288,6 +395,8 @@ function setupRoomLifecycle(room: Room) {
     if (!targetMap) return;
 
     isTraveling = true;
+    activeHeartbeat?.stop();
+    activeHeartbeat = null;
     activeScene?.setReconnecting(true);
     ui.showTransition(targetMap.def.name);
 
@@ -360,64 +469,11 @@ function setupRoomLifecycle(room: Room) {
   });
 
   room.onLeave(async (code) => {
-    // Nếu đang trong quá trình chuyển phòng, bỏ qua xử lý rớt mạng
-    if (isTraveling) return;
-
-    // 1000: đóng bình thường; 4000-4999: mã của ứng dụng (4000 chủ động thoát, 4429 bị ngắt vì spam)
-    if (code === 1000 || (code >= 4000 && code <= 4999)) {
-      if (code !== 1000) showDisconnected();
-      return;
-    }
-
-    // Nếu rớt mạng trong phòng bí cảnh: rời run ngay (không có allowReconnection), không cố nối lại
-    if (activeScene && isDungeonMap(activeScene.map.def.id)) {
-      showDisconnected();
-      return;
-    }
-
-    // Các mã khác (1006 rớt mạng, 1001 đi khỏi...): tự động thử nối lại trong tối đa 20s
-    if (!activeToken || !activeClient || isReconnecting) return;
-    isReconnecting = true;
-    activeScene?.setReconnecting(true);
-
-    const token = activeToken;
-    const client = activeClient;
-    const GRACE_SECONDS = 20;
-    const RETRY_INTERVAL_MS = 1500;
-    const deadline = Date.now() + GRACE_SECONDS * 1000;
-
-    let reconnectedRoom: Room | null = null;
-
-    while (Date.now() < deadline) {
-      const remainingSec = Math.max(1, Math.ceil((deadline - Date.now()) / 1000));
-      ui.showReconnectNotice(`Mất kết nối, đang nối lại... (còn ${remainingSec} giây)`);
-
-      try {
-        reconnectedRoom = await client.reconnect(token);
-        if (reconnectedRoom) break;
-      } catch (err: any) {
-        const msg = String(err?.message ?? "");
-        // Dừng sớm nếu server trả lỗi dứt khoát: phòng không tồn tại hoặc token hết hạn
-        if (msg.includes("not found") || msg.includes("expired") || err?.code === 4212) {
-          break;
-        }
-      }
-
-      await new Promise((r) => setTimeout(r, RETRY_INTERVAL_MS));
-    }
-
-    if (reconnectedRoom) {
-      activeToken = reconnectedRoom.reconnectionToken;
-      activeScene?.attachRoom(reconnectedRoom);
-      activeScene?.setReconnecting(false);
-      isReconnecting = false;
-      ui.toast({ text: "Đã nối lại.", tone: "good" });
-      setupRoomLifecycle(reconnectedRoom);
-    } else {
-      // Thất bại hẳn (hết 20 giây / token hết hạn): KHÔNG ẩn banner, vẫn chặn điều khiển
-      isReconnecting = false;
-      showDisconnected();
-    }
+    // Sự kiện đóng MUỘN của phòng CŨ (vd socket nửa mở bị `close()` lúc nhịp tim phát hiện chết, nhưng chỉ thật sự đóng rất lâu sau,
+    // khi mạng về hoặc hệ điều hành bỏ cuộc) KHÔNG được chạy lại vòng nối lại: nó dừng nhịp tim của phòng MỚI, chặn điều khiển và
+    // thử nối lại bằng token mới (A bắt được khi review #310: E2E `onLeave.invoke(1006)` của phòng cũ làm banner "đang nối lại" hiện lại)
+    if (room !== activeRoom) return;
+    await startReconnect(code);
   });
 }
 
