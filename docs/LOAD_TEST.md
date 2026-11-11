@@ -878,3 +878,49 @@ npm run soak -w server -- --bots=100 --minutes=120
 # 5. Lưu kết quả ra đường dẫn tệp JSON tuỳ chọn và giữ lại thư mục dữ liệu để kiểm tra:
 npm run soak -w server -- --bots=100 --minutes=30 --out=./soak-report.json --keep-data
 ```
+
+## 21. E2E thật Nhịp tim ứng dụng (ping / pong): Phát hiện socket nửa mở và vòng đời nền / tiền cảnh (M4.2b, Issue #293)
+
+### 21.1. Bối cảnh & Mục tiêu
+Khi ứng dụng di động (Capacitor/WebView) hoặc trình duyệt xuống nền, đổi mạng giữa Wi-Fi và 4G, hoặc người chơi đi vào thang máy/hầm sóng yếu: kết nối TCP bên dưới thường rơi vào trạng thái "nửa mở" (half-open socket). Trình duyệt không nhận được tín hiệu TCP RST/FIN nên sự kiện `WebSocket.onclose` (`onLeave`) không được kích hoạt trong nhiều phút.
+Để giải quyết dứt điểm, giao thức nhịp tim cấp ứng dụng nhẹ (`ping` / `pong`, M4.2b) được triển khai:
+- `HEARTBEAT_INTERVAL_MS = 5000` (5 giây): client gửi ping định kỳ khi ở tiền cảnh.
+- `HEARTBEAT_TIMEOUT_MS = 8000` (8 giây): quá hạn không có pong thì coi socket đã chết.
+- `RESUME_CHECK_AFTER_MS = 2000` (2 giây): ở nền trên 2 giây khi quay lại tiền cảnh gửi ping kiểm tra ngay lập tức.
+- `RESUME_TIMEOUT_MS = 3000` (3 giây): thời hạn kiểm tra chết nhanh khi quay lại tiền cảnh.
+- **Tương thích ngược an toàn:** Client chỉ coi socket chết khi server đã từng trả ít nhất một pong (`supported = true`). Server cũ không hỗ trợ thì client mới không tự ngắt kết nối oan.
+
+### 21.2. Kiến trúc Kiểm thử E2E (`server/scripts/e2e-nhip-tim.ts`)
+Kịch bản tự động hoá kiểm thử E2E sử dụng:
+1. **Server Colyseus thật** chạy trong tiến trình với thư mục dữ liệu tạm riêng biệt.
+2. **Proxy TCP trung gian (`TcpProxy`)** nằm giữa Chrome headless và Server Colyseus:
+   - Hỗ trợ chế độ `blackhole`: socket TCP phía client và server vẫn giữ mở 100%, nhưng proxy ngừng chuyển tiếp byte hai chiều (mô phỏng socket nửa mở thật sự).
+   - Hỗ trợ chế độ `dropPong`: proxy lọc bỏ riêng các tin `pong` từ server gửi về để mô phỏng máy chủ cũ không có nhịp tim.
+3. **Chrome headless CDP** điều khiển người chơi thật qua màn hình canvas và giao diện DOM.
+
+### 21.3. Ba ca kiểm thử thực tế
+
+| Ca kiểm thử | Điều kiện mô phỏng | Kết quả thực tế | Ngưỡng cho phép | Đánh giá |
+| :--- | :--- | :---: | :---: | :---: |
+| **Ca 1: Blackhole tiền cảnh** | Bật TCP blackhole (socket nửa mở) khi đang chơi ở tiền cảnh | Phát hiện chết sau **13.6 giây** (~chu kỳ 5s + timeout 8s) | <= 14.0 giây | **PASS** |
+| | Banner nối lại hiển thị và đếm ngược | `"Mất kết nối, đang nối lại... (còn 20 giây)"` | Hiện banner | **PASS** |
+| | Mở lại proxy, client tự nối lại | Bảo toàn `sessionId`, ví 168 Linh thạch + túi đồ nguyên vẹn | Khớp 100% | **PASS** |
+| | Điều khiển di chuyển sau nối lại | Nhân vật di chuyển toạ độ phản hồi bình thường | Phản hồi | **PASS** |
+| **Ca 2: Background -> Foreground** | Xuống nền 2.5s, bật blackhole lúc ở nền, quay lại tiền cảnh | Phát hiện chết sau **3.1 giây** (`RESUME_TIMEOUT_MS` 3s + 134ms) | <= 4.5 giây | **PASS** |
+| | Nối lại sau ca quay lại tiền cảnh | Nối lại thành công, banner ẩn | Nối lại | **PASS** |
+| **Ca 3: Server cũ không trả pong** | Proxy drop 100% pong, người chơi ở trong game 12s | Banner KHÔNG hiển thị, client KHÔNG tự ngắt kết nối | Không ngắt oan | **PASS** |
+| **Độ ổn định chung** | Toàn bộ 3 ca liên tục | **0 lỗi console / exception** | 0 lỗi | **PASS** |
+
+### 21.4. Bằng chứng Kiểm thử Đột biến (Mutation Testing)
+Cả 4 khẳng định cốt lõi đều được kiểm chứng với đột biến làm đỏ kịch bản E2E:
+1. **Đột biến 1 (Bỏ `isConnectionDead` ở `tick()`):** Ca 1 BÁO ĐỎ (`[LỖI E2E NHỊP TIM] Hết thời gian chờ (18000ms) ở A: banner nối lại hiển thị sau blackhole`).
+2. **Đột biến 2 (Bỏ cờ `supported`, luôn coi là true):** Ca 3 BÁO ĐỎ (`[LỖI E2E NHỊP TIM] Client tự ngắt kết nối oan dù chưa từng nhận pong (vi phạm cờ supported)! (bannerCount=1, tokenChanged=true)`).
+3. **Đột biến 3 (Bỏ xử lý `visibilitychange`):** Ca 2 BÁO ĐỎ (`[LỖI E2E NHỊP TIM] Hết thời gian chờ (8000ms) ở A: banner nối lại hiển thị sau khi quay lại tiền cảnh`).
+4. **Đột biến 4 (Server không trả pong):** Ca 2 BÁO ĐỎ (vì `supported = false` nên client không kích hoạt ngắt kết nối).
+
+Cách chạy:
+```bash
+npm run build -w client
+npm run e2e:nhip-tim -w server
+```
+

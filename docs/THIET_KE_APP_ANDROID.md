@@ -46,9 +46,11 @@
 - **Vấn đề:** Khi người chơi ấn phím Home, nhận cuộc gọi hoặc chuyển sang ứng dụng khác, hệ điều hành Android sẽ đóng băng hoặc hạn chế tiến trình mạng của WebView, dẫn đến mất kết nối WebSocket Colyseus.
 - **Giải pháp:**
   - Tiên Giới đã có sẵn kiến trúc giữ nhân vật `RECONNECT_GRACE_S = 20s` trên server (#116) và cơ chế tự động kết nối lại bằng `activeToken` trong RAM (#117). Phần client nằm trong `client/src/main.ts` (`setupRoomLifecycle`: `onLeave` với mã khác 1000 / 4xxx chạy vòng `client.reconnect(token)` mỗi 1,5 giây tối đa 20 giây, banner `ui.showReconnectNotice`), không phải `connection.ts` (file đó chỉ lo lỗi 426).
-  - **Đang làm (#293):** nhịp tim ứng dụng `ping` / `pong` (`shared/src/heartbeat.ts`, server trả `pong`, client dùng `isConnectionDead` + `visibilitychange`) để phát hiện socket nửa mở; áp dụng cho cả PWA / trình duyệt di động chứ không chỉ app đóng gói.
-  - **Hiện chưa có** bộ lắng nghe `visibilitychange` / `appStateChange` nào: vòng nối lại chỉ chạy khi `onLeave` bắn. Khi app xuống nền, socket có thể chết mà WebView chưa báo (nửa mở), nên cần thêm (M4.2b), khi app quay lại tiền cảnh (`appStateChange` của `@capacitor/app` hoặc `visibilitychange`):
-    - Nếu app ở nền quá vài giây hoặc `room.connection.isOpen` là `false`: coi như đã rớt và chạy vòng nối lại sẵn có ngay, không chờ WebView tự phát hiện.
+  - **Đã hoàn thành (#293):** nhịp tim ứng dụng `ping` / `pong` (`shared/src/heartbeat.ts`, server trả `pong`, client dùng `isConnectionDead` + `visibilitychange` qua `HeartbeatController`) để phát hiện socket nửa mở; áp dụng cho cả PWA / trình duyệt di động và app native đóng gói.
+  - **Vòng đời nền / tiền cảnh:**
+    - Khi app xuống nền (`visibilitychange: hidden`): tạm dừng âm thanh (`AudioContext.suspend()`) và ngắt nhịp tim.
+    - Khi quay lại tiền cảnh (`visibilitychange: visible`): phục hồi âm thanh (`AudioContext.resume()`). Nếu ở nền >= 2 giây (`RESUME_CHECK_AFTER_MS`), gửi ping kiểm tra ngay lập tức với hạn 3 giây (`RESUME_TIMEOUT_MS`) để phát hiện socket nửa mở cực nhanh, không chờ WebView tự phát hiện.
+    - Tương thích ngược: chỉ kích hoạt kết luận chết khi server đã từng trả pong (`supported = true`). Đã kiểm chứng qua E2E thật `npm run e2e:nhip-tim -w server` (3 ca PASS, 4 đột biến đỏ).
     - Hiển thị banner `Đang kết nối lại...` (đã có `showReconnectNotice`).
   - **Ở nền quá 20 giây:** server đã gỡ nhân vật (`allowReconnection` hết hạn), `client.reconnect(token)` báo lỗi và client rơi vào `showDisconnected()`. Nhân vật vẫn được lưu nên người chơi chỉ cần vào lại; bản native phải kiểm màn hình này dẫn về đăng nhập thay vì kẹt banner.
   - Trong bí cảnh không có nối lại (`main.ts`: rớt mạng thì rời run ngay, không thử `reconnect`), nên xuống nền giữa bí cảnh là rời run; cần xem lại hệ quả lượt ngày (`docs/THIET_KE_BI_CANH.md`) và cân nhắc cảnh báo trước khi vào bí cảnh trên app (nhỏ, để M4.2b quyết).
@@ -178,7 +180,7 @@ Khi Người Dùng quyết định triển khai Android, công việc sẽ đư�
 |---|---|---|---|
 | **M4.2a-1** | **Server + client: HTTP tuyệt đối và CORS allowlist** (mục 5.2): hàm base URL dùng chung, `CORS_ORIGINS` cho `/health` và `/api/auth/*`, test, `docs/TRIEN_KHAI.md`. Làm TRƯỚC vì chặn mọi thứ khác. **XONG:** client #284 / #287, server `CORS_ORIGINS` (mặc định tắt). | Dev A (server) + Dev B (client) | 1 PR mỗi bên |
 | **M4.2a** | Khởi tạo dự án Capacitor (`app/`), `capacitor.config.ts`, `applicationId` do người dùng chốt, icon & splash screen, cờ build native (tắt service worker, mục 4), cấu hình cleartext chỉ cho debug (mục 5.3). | Dev B | 1 PR |
-| **M4.2b** | Phím Back Android, kiểm Safe Area Insets trong WebView, bộ lắng nghe nền / tiền cảnh và tạm dừng âm thanh (mục 3), nhãn + callback mở cửa hàng khi lỗi 426 (mục 4). | Dev B | 1 PR |
+| **M4.2b** | Nhịp tim ứng dụng ping / pong + phát hiện socket nửa mở sau khi xuống nền / đổi mạng (#293, đã xong phần client + E2E nhip-tim). Tiếp theo (#301): Phím Back Android, kiểm Safe Area Insets trong WebView, nhãn + callback mở cửa hàng khi lỗi 426. | Dev B | 1 PR |
 | **M4.2c** | Workflow GitHub Actions tự động build APK unsigned / test artifact cho mỗi release tag. | Dev C | 1 PR |
 | **M4.2d** | Thử nghiệm thực tế trên máy Android thật, tối ưu FPS và kiểm tra bàn phím ảo. | Dev B + C | 1 PR |
 | **M4.2e** | E2E nối lại bằng proxy TCP (mục 6.1) và ca viền màn hình / vùng an toàn. | Dev B (đã xong phần proxy TCP #288) / Dev C | Đã hoàn thành phần E2E nối lại (#288) |

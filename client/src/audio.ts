@@ -368,6 +368,20 @@ class SoundEngine {
     const now = this.ctx.currentTime;
     this.playPluck(480, now, 0.04, "sine", this.sfxGain, 0.08);
   }
+
+  /** Tạm dừng AudioContext khi ứng dụng xuống nền (M4.2b). */
+  suspend() {
+    if (this.ctx && this.ctx.state === "running") {
+      void this.ctx.suspend();
+    }
+  }
+
+  /** Phục hồi AudioContext khi ứng dụng quay lại tiền cảnh (M4.2b). */
+  resume() {
+    if (this.ctx && this.ctx.state === "suspended" && this.unlocked) {
+      void this.ctx.resume();
+    }
+  }
 }
 
 export const sound = new SoundEngine();
