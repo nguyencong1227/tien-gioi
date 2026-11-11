@@ -15,7 +15,7 @@
 
 Việc người dùng phải tự làm (cần `sudo` / tài khoản): `~/TT/orchestra/questions.md`, mục "M4: bước người dùng phải tự làm".
 
-## 0. Trạng thái (cập nhật 11/11/2026, `main` `8c4babf` trở đi)
+## 0. Trạng thái (cập nhật 11/11/2026 ~18:10, `main` `48550b3` trở đi)
 | Mục | Trạng thái | Bằng chứng / việc còn lại |
 |---|---|---|
 | 2.1 red team tin nhắn | **Xong** | `npm run red-team -w server` (#265): 49 loại tin (từ M4.2b có thêm `ping`) x nhiều biến thể payload x 2 người gửi (nghèo / giàu) = 2744 đòn, bắt `[lỗi]`, bất biến SỐNG, tự phát hiện loại tin; A đã thử 3 đột biến thật vào `WorldRoom.ts`, đều đỏ |
@@ -23,13 +23,13 @@ Việc người dùng phải tự làm (cần `sudo` / tài khoản): `~/TT/orch
 | 2.3 kiểm tốc độ / dịch chuyển | **Kết luận: đủ bằng cấu trúc** | không làm cờ riêng (xem mục 2.3) |
 | 2.4 audit log | **Xong lát 1 + 2 + 3** (#266, #268, lát 3 PR #307) | thêm đầu thai (`soul.*`), PK (`duel.*`), bí cảnh (`dungeon.*`) và **cảnh báo lặp lại** (`alert.*`, in `[CẢNH BÁO]`; người dùng chốt: chỉ ghi nhận + cảnh báo); danh sách đầy đủ ở `docs/TRIEN_KHAI.md` mục 5.3 |
 | 2.5 `PROTOCOL_VERSION` | **Xong** | shared #258, server #261, client #264, sửa modal #270, E2E #267 + #272 |
-| 3.1 release workflow → ghcr | **Đang giao** (C) | issue #298 |
+| 3.1 release workflow → ghcr | **Xong** (#298, #306) | thẻ `v*` -> ảnh `ghcr.io/nguyencong1227/tien-gioi:<thẻ không chữ v>`; `v0.1.0` đã phát hành, `v0.1.1-rc.1` thử luồng thẻ + APK; `release.yml` kiểm thẻ nằm trên `main`, chống chèn lệnh |
 | 3.2 cấu hình / bí mật; 3.4 sao lưu + khôi phục | **Xong** (#279, issue #276) | `npm run check:env`, `npm run khoi-phuc-thu`, `docs/TRIEN_KHAI.md` mục 7.3 / 7.4 |
 | 3.3 giám sát (`/metrics`, cảnh báo log, xoay vòng log) | **Xong** (PR của nhánh `a/health-mo-rong`) | `server/src/metrics.ts`: `GET /metrics` (Bearer `METRICS_TOKEN`, mặc định tắt) với tick p50 / p95 / max theo phòng, hàng đợi ghi nhân vật, phòng / người, RSS, độ trễ vòng lặp; `[CẢNH BÁO]` / `[ĐÃ ỔN]` trong log; `docker-compose.yml` xoay vòng log; `/health` giữ nguyên; `docs/TRIEN_KHAI.md` mục 5.1 |
 | 3.5 thử tải dài | **Xong** (#291) | `npm run soak -w server`; số liệu thật 100 bot / 30 phút (RSS +0,37 MB, tick p95 thật 2,5 ms, 0 lỗi) ở `docs/LOAD_TEST.md` mục 20; lộ và sửa `BUFFER_SIZE` 512 KB (#297) |
-| 3.6 bản chạy thật (MỚI) | **Đang giao** (C), chờ Docker (người dùng) | issue #299 |
+| 3.6 bản chạy thật | **Xong, ĐANG CHẠY** (#299, #305, #309, #311) | 11/11/2026 17:15: `https://tiengioi.hethongtm.site` chạy ảnh `0.1.0` + PostgreSQL trong Docker (`~/TT/tien-gioi-prod/`, `prod.sh`, `docs/VAN_HANH.md`); đã thử đăng ký / vào phòng qua `wss`, khởi động lại giữ dữ liệu, sao lưu + khôi phục thử. **Còn lại của người dùng:** bật timer sao lưu / khôi phục thử (`deploy/tien-gioi-*.timer`, agent không được sửa `~/.config/systemd/`), Cloudflare Bot Fight Mode (Bước 4 `questions.md`) |
 | 4.1 PWA | **Xong** (#251) | `npm run check:pwa` |
-| 4.2 Capacitor Android | **Đang giao** (B, C) | M4.2a #300, M4.2b #301 (B), M4.2c #302 (C), M4.2d máy thật (người dùng + B + C, tạo sau khi có APK). Đã xong: thiết kế #283, M4.2a-1 (HTTP tuyệt đối + CORS) #284 / #287 / #290, E2E nối lại #292, nhịp tim ứng dụng #293 (hợp đồng #294, server #295, client B đang làm) |
+| 4.2 Capacitor Android | **M4.2a-c xong; M4.2d chờ thiết bị** | M4.2a #300 / #312, M4.2b #301 / #314 (Back, xuống nền, 426, `privacy.html`; sửa lỗi bridge không tự điền `Capacitor.Plugins.App`), M4.2c #302 / #315 (`android.yml`: thẻ `v*` -> APK debug + sha256 đính vào bản phát hành; ký release khi đủ 4 bí mật `ANDROID_*`). Đã chạy thật trên Actions (APK debug + release ký bằng keystore thử). **M4.2d (máy Android thật):** người dùng cài APK từ Releases; việc của người dùng: tạo keystore + 4 bí mật, thông tin liên hệ cho `privacy.html` |
 | 4.3 hiệu năng di động + trợ năng | **Xong** | đo + tài liệu (#251, `docs/HIEU_NANG_DI_DONG.md`); trợ năng (#269): lát 1 #274 (Esc theo tầng, focus, ARIA), lát 2 #277 (giảm chuyển động theo OS / cài đặt, tương phản AA, bảng chỉ dẫn người mới); A đo giảm chuyển động THẬT bằng giả lập `prefers-reduced-motion` |
 | 4.4 tài sản / giấy phép | **Xong** (#259) | `npm run check:credits` |
 
