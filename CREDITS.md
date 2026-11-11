@@ -51,3 +51,16 @@ Khi bổ sung thêm sprite, biểu tượng hoặc hiệu ứng từ thư viện
 - **Số tệp thiếu nguồn / không rõ tác giả:** **0 tệp**.
 - **Số tài sản vi phạm bản quyền / sao chép từ game khác:** **0 tệp**.
 - **Công cụ kiểm tra tự động:** `client/scripts/check-credits.mjs` (kiểm tra tự động trong CI).
+
+---
+
+## 5. Thư viện Đóng gói Ứng dụng Di động (Capacitor)
+
+Các thư viện mã nguồn mở dùng để đóng gói ứng dụng di động trong thư mục `app/`:
+
+| Gói | Phiên bản | Tác giả / Nguồn | Giấy phép |
+|---|---|---|---|
+| `@capacitor/core` | 8.6.0 | Ionic / Max Lynch ([github.com/ionic-team/capacitor](https://github.com/ionic-team/capacitor)) | **MIT** |
+| `@capacitor/cli` | 8.6.0 | Ionic / Max Lynch ([github.com/ionic-team/capacitor](https://github.com/ionic-team/capacitor)) | **MIT** |
+| `@capacitor/android` | 8.6.0 | Ionic / Max Lynch ([github.com/ionic-team/capacitor](https://github.com/ionic-team/capacitor)) | **MIT** |
+| `@capacitor/app` | 8.1.2 | Ionic / Max Lynch ([github.com/ionic-team/capacitor-plugins](https://github.com/ionic-team/capacitor-plugins)) | **MIT** |

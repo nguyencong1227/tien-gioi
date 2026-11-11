@@ -19,6 +19,19 @@ export interface PwaGameState {
 }
 
 /**
+ * Kiểm tra xem client có đang chạy ở chế độ native đóng gói (Capacitor/Android) hay không.
+ * Bản native KHÔNG đăng ký Service Worker và không dùng cơ chế cập nhật của PWA.
+ */
+export function isNativeApp(
+  env: Record<string, unknown> = typeof import.meta !== "undefined" && import.meta.env
+    ? (import.meta.env as unknown as Record<string, unknown>)
+    : {},
+): boolean {
+  const val = env?.VITE_NATIVE;
+  return val === "1" || val === true || val === "true";
+}
+
+/**
  * Kiểm tra xem client có thể tự động tải lại an toàn để cập nhật bản mới hay không.
  * Trả về false nếu người chơi đang ở trong tình huống căng thẳng không thể bị ngắt quãng.
  */

@@ -174,43 +174,39 @@ Các hạng mục có thể kiểm thử tự động 100% trong môi trường 
 
 ## 7. Kế hoạch Triển khai (Đề xuất phân công công việc)
 
-Khi Người Dùng quyết định triển khai Android, công việc sẽ được chia thành các Issue nhỏ, gọn:
-
-| Mã việc | Nội dung việc | Dev phụ trách | Ước lượng |
+| Mã việc | Nội dung việc | Dev phụ trách | Trạng thái |
 |---|---|---|---|
-| **M4.2a-1** | **Server + client: HTTP tuyệt đối và CORS allowlist** (mục 5.2): hàm base URL dùng chung, `CORS_ORIGINS` cho `/health` và `/api/auth/*`, test, `docs/TRIEN_KHAI.md`. Làm TRƯỚC vì chặn mọi thứ khác. **XONG:** client #284 / #287, server `CORS_ORIGINS` (mặc định tắt). | Dev A (server) + Dev B (client) | 1 PR mỗi bên |
-| **M4.2a** | Khởi tạo dự án Capacitor (`app/`), `capacitor.config.ts`, `applicationId` do người dùng chốt, icon & splash screen, cờ build native (tắt service worker, mục 4), cấu hình cleartext chỉ cho debug (mục 5.3). | Dev B | 1 PR |
-| **M4.2b** | Nhịp tim ứng dụng ping / pong + phát hiện socket nửa mở sau khi xuống nền / đổi mạng (#293, đã xong phần client + E2E nhip-tim). Tiếp theo (#301): Phím Back Android, kiểm Safe Area Insets trong WebView, nhãn + callback mở cửa hàng khi lỗi 426. | Dev B | 1 PR |
-| **M4.2c** | Workflow GitHub Actions tự động build APK unsigned / test artifact cho mỗi release tag. | Dev C | 1 PR |
-| **M4.2d** | Thử nghiệm thực tế trên máy Android thật, tối ưu FPS và kiểm tra bàn phím ảo. | Dev B + C | 1 PR |
-| **M4.2e** | E2E nối lại bằng proxy TCP (mục 6.1) và ca viền màn hình / vùng an toàn. | Dev B (đã xong phần proxy TCP #288) / Dev C | Đã hoàn thành phần E2E nối lại (#288) |
+| **M4.2a-1** | **Server + client: HTTP tuyệt đối và CORS allowlist** (mục 5.2): hàm base URL dùng chung, `CORS_ORIGINS` cho `/health` và `/api/auth/*`, test, `docs/TRIEN_KHAI.md`. | Dev A (server) + Dev B (client) | **HOÀN THÀNH** (PR #284, #287) |
+| **M4.2a** | Khởi tạo dự án Capacitor (`app/`), `capacitor.config.ts`, `applicationId` `site.hethongtm.tiengioi`, icon & splash screen từ `client/public/icons/`, cờ build native `VITE_NATIVE`, cấu hình cleartext chỉ cho debug `CAP_DEBUG=1`. | Dev B | **HOÀN THÀNH** (#300) |
+| **M4.2b** | Nhịp tim ứng dụng ping / pong (#293, PR #310). Tiếp theo (#301): Phím Back Android, vùng an toàn Safe Area Insets, nhãn thông báo và callback mở trang tải khi server trả lỗi 426. | Dev B | Đang làm (#301) |
+| **M4.2c** | Workflow GitHub Actions tự động build APK unsigned / test artifact cho mỗi release tag. | Dev C | Sắp làm (#302) |
+| **M4.2d** | Thử nghiệm thực tế trên máy Android thật, tối ưu FPS và kiểm tra bàn phím ảo. | Dev B + C | Chờ bản APK |
+| **M4.2e** | E2E nối lại bằng proxy TCP (mục 6.1) và ca viền màn hình / vùng an toàn. | Dev B + C | **HOÀN THÀNH** (PR #288, #310) |
 
-Ngoài mã: để lên Google Play còn cần trang chính sách quyền riêng tư (game có tài khoản), bảng khai Data safety, xếp hạng nội dung và đáp ứng yêu cầu API mục tiêu mới nhất của Google tại thời điểm phát hành; đây là việc của người dùng, ghi ở câu hỏi 2.
+Ngoài mã: để lên Google Play còn cần trang chính sách quyền riêng tư (game có tài khoản), bảng khai Data safety, xếp hạng nội dung và đáp ứng yêu cầu API mục tiêu mới nhất của Google tại thời điểm phát hành (sẽ thực hiện ở M4.2b/c).
 
 ---
 
 ## 8. Giấy phép Tài nguyên & Biểu tượng (Licensing & Assets)
 
-- **Tuân thủ bản quyền:** Toàn bộ ảnh tileset, sprite quái, trang bị và âm thanh của game đều là tài sản CC0 hoặc CC-BY được ghi danh rõ ràng trong `CREDITS.md`. Trò chơi không sử dụng bất kỳ tài nguyên vi phạm bản quyền hay tài sản từ game khác.
-- **Biểu tượng ứng dụng (App Icons):**
-  - Đã có sẵn bộ icon tiêu chuẩn tại `client/public/icons/`:
+- **Tuân thủ bản quyền:** Toàn bộ ảnh tileset, sprite quái, trang bị và âm thanh của game đều là tài sản CC0 hoặc CC-BY được ghi danh rõ ràng trong `CREDITS.md`. Trò chơi không sử dụng bất kỳ tài nguyên vi phạm bản quyền hay tài sản từ game khác (`npm run check:credits` kiểm tra tự động).
+- **Biểu tượng ứng dụng (App Icons) & Splash Screen:**
+  - Bộ icon gốc tiêu chuẩn tại `client/public/icons/`:
     - `icon-192.png`: 192x192 px.
     - `icon-512.png`: 512x512 px.
     - `icon-maskable-512.png`: Icon thích ứng (Adaptive Icon) đáp ứng chuẩn an toàn hiển thị của Google Play Store (vùng an toàn 80% đường kính tròn).
-  - Có thể tạo thêm icon định dạng Vector Drawable XML cho Android Native mà không mất thêm chi phí thiết kế.
+  - Đã được đồng bộ tự động sang `app/android/app/src/main/res/` (bao gồm `mipmap-*` cho `ic_launcher`, `ic_launcher_round`, `ic_launcher_foreground` và `drawable-*` cho màn hình chờ `splash.png` trên nền tối `#1d1a16` đồng bộ với giao diện trò chơi).
 
 ---
 
-## 9. Quyết định của Người Dùng (đã trả lời 11/11/2026; câu hỏi gốc giữ lại để tra cứu)
+## 9. Quyết định Đã Chốt (Official Decisions)
 
-> **Đã chốt:** (1) **Phương án A, Capacitor**; (2) kênh phát hành bản đầu **APK cài trực tiếp** từ Releases (Google Play để sau; người dùng chưa chọn kênh nên đây là mặc định của A, đổi được); (3) **Android trước, iOS sau**; (4) tên miền `tiengioi.hethongtm.site`, `applicationId` `site.hethongtm.tiengioi` (thay các giá trị minh hoạ `game.tiengioi.vn` / `vn.tiengioi.game` ở các mục trên). `CORS_ORIGINS` của bản chạy thật phải gồm nguồn của WebView (chốt theo `androidScheme` ở M4.2a, dự kiến `https://localhost`).
-
-1. **Phương án đóng gói:**
-   - [ ] **Phương án A (Capacitor), khuyến nghị:** Đóng gói toàn bộ bundle offline, khởi động tức thì, hỗ trợ phím Back native, thử được trên LAN bằng bản debug. Cái giá: mỗi lần nâng `MIN_PROTOCOL_VERSION` bắt buộc người chơi cập nhật qua Store (xem mục 2); cần thêm CORS ở server (mục 5.2).
-   - [ ] **Phương án B (TWA / Bubblewrap):** Đóng gói PWA siêu nhẹ (< 3 MB), bắt buộc có domain HTTPS thật và cài đặt `assetlinks.json`; client luôn là bản web mới nhất nên không vướng ràng buộc cập nhật ở trên.
-2. **Kênh phát hành ban đầu:**
-   - Bạn muốn xuất file **APK cài trực tiếp** (cho tester tải về cài qua link) hay đưa thẳng lên **Google Play Store** (cần tài khoản Google Play Developer, phí một lần 25 USD, cùng trang chính sách quyền riêng tư và bảng Data safety)?
-3. **Thứ tự ưu tiên nền tảng:**
-   - Tập trung hoàn thiện Android trước, hay muốn chuẩn bị cấu hình để sau này build đồng thời cả iOS (cần macOS & tài khoản Apple Developer)?
-4. **Tên miền và mã ứng dụng:**
-   - Tên miền thật của server (dùng cho `VITE_SERVER_URL` và CORS) và `applicationId` (dạng `com.xxx.yyy`) là gì? `applicationId` không đổi được sau khi lên Google Play; tài liệu này chỉ dùng giá trị minh hoạ.
+> **Thông số kỹ thuật chính thức (chốt ngày 11/11/2026):**
+> 1. **Khung đóng gói:** **Capacitor 8.6.0** (gồm `@capacitor/core`, `@capacitor/cli`, `@capacitor/android`, `@capacitor/app`).
+> 2. **Kênh phát hành ban đầu:** Xuất **APK cài trực tiếp** gắn vào GitHub Releases (Dev C xây dựng workflow CI ở M4.2c). Google Play Store sẽ đưa lên ở giai đoạn sau.
+> 3. **Nền tảng:** Tập trung Android trước, iOS để sau.
+> 4. **Mã ứng dụng (Package Name / ApplicationId):** `site.hethongtm.tiengioi`.
+> 5. **Tên ứng dụng hiển thị:** `Tiên Giới`.
+> 6. **Máy chủ bản chạy thật:** `https://tiengioi.hethongtm.site` (WebSocket: `wss://tiengioi.hethongtm.site`).
+> 7. **Sơ đồ WebView (`androidScheme`):** `https` (nguồn WebView cục bộ là `https://localhost`, đã có trong `CORS_ORIGINS` của máy chủ).
+> 8. **Bảo mật bản phát hành:** `allowBackup="false"`, `usesCleartextTraffic="false"`, không có `server.url` trong cấu hình đóng gói phát hành. Bản debug LAN dùng cấu hình riêng qua biến `CAP_DEBUG=1`.

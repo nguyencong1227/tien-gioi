@@ -3,7 +3,9 @@ import { defineConfig, loadEnv } from "vite";
 // Cổng đọc từ .env.local ở gốc repo, để 2 dev chạy song song trên cùng một máy
 // mà không đụng cổng nhau (xem docs/LAM_CHUNG_MAY.md).
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, "..", "");
+  const rootEnv = loadEnv(mode, "..", "");
+  const clientEnv = loadEnv(mode, ".", "");
+  const env = { ...rootEnv, ...clientEnv };
   // Mặc định mẫu của Dev A; KHÔNG dùng 2567 (cổng của bản chạy thật: client dev không được trỏ vào đó)
   const serverPort = env.PORT || "2597";
   const clientPort = Number(env.CLIENT_PORT || 5173);
@@ -15,7 +17,19 @@ export default defineConfig(({ mode }) => {
     envDir: "..",
     server: { port: clientPort, strictPort: true, proxy },
     preview: { port: clientPort, strictPort: true, proxy },
-    define: { __SERVER_PORT__: JSON.stringify(serverPort) },
+    define: {
+      __SERVER_PORT__: JSON.stringify(serverPort),
+      ...(clientEnv.VITE_NATIVE !== undefined
+        ? {
+            "import.meta.env.VITE_NATIVE": JSON.stringify(clientEnv.VITE_NATIVE),
+          }
+        : {}),
+      ...(clientEnv.VITE_SERVER_URL !== undefined
+        ? {
+            "import.meta.env.VITE_SERVER_URL": JSON.stringify(clientEnv.VITE_SERVER_URL),
+          }
+        : {}),
+    },
     build: { chunkSizeWarningLimit: 2000 },
   };
 });

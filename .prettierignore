@@ -4,4 +4,5 @@ client/dist/
 server/data/
 package-lock.json
 *.md
+app/android/
 

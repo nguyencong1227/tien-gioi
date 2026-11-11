@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Tiên Giới</string>
+    <string name="title_activity_main">Tiên Giới</string>
+    <string name="package_name">site.hethongtm.tiengioi</string>
+    <string name="custom_url_scheme">site.hethongtm.tiengioi</string>
+</resources>
