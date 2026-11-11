@@ -46,6 +46,7 @@
 - **Vấn đề:** Khi người chơi ấn phím Home, nhận cuộc gọi hoặc chuyển sang ứng dụng khác, hệ điều hành Android sẽ đóng băng hoặc hạn chế tiến trình mạng của WebView, dẫn đến mất kết nối WebSocket Colyseus.
 - **Giải pháp:**
   - Tiên Giới đã có sẵn kiến trúc giữ nhân vật `RECONNECT_GRACE_S = 20s` trên server (#116) và cơ chế tự động kết nối lại bằng `activeToken` trong RAM (#117). Phần client nằm trong `client/src/main.ts` (`setupRoomLifecycle`: `onLeave` với mã khác 1000 / 4xxx chạy vòng `client.reconnect(token)` mỗi 1,5 giây tối đa 20 giây, banner `ui.showReconnectNotice`), không phải `connection.ts` (file đó chỉ lo lỗi 426).
+  - **Đang làm (#293):** nhịp tim ứng dụng `ping` / `pong` (`shared/src/heartbeat.ts`, server trả `pong`, client dùng `isConnectionDead` + `visibilitychange`) để phát hiện socket nửa mở; áp dụng cho cả PWA / trình duyệt di động chứ không chỉ app đóng gói.
   - **Hiện chưa có** bộ lắng nghe `visibilitychange` / `appStateChange` nào: vòng nối lại chỉ chạy khi `onLeave` bắn. Khi app xuống nền, socket có thể chết mà WebView chưa báo (nửa mở), nên cần thêm (M4.2b), khi app quay lại tiền cảnh (`appStateChange` của `@capacitor/app` hoặc `visibilitychange`):
     - Nếu app ở nền quá vài giây hoặc `room.connection.isOpen` là `false`: coi như đã rớt và chạy vòng nối lại sẵn có ngay, không chờ WebView tự phát hiện.
     - Hiển thị banner `Đang kết nối lại...` (đã có `showReconnectNotice`).

@@ -14,3 +14,4 @@ export * from "./dungeon";
 export * from "./duel";
 export * from "./sect";
 export * from "./protocol";
+export * from "./heartbeat";

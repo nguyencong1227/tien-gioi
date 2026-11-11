@@ -5,7 +5,7 @@
 ## 0. Trạng thái (cập nhật 11/11/2026, `main` `a28de68` trở đi)
 | Mục | Trạng thái | Bằng chứng / việc còn lại |
 |---|---|---|
-| 2.1 red team tin nhắn | **Xong** | `npm run red-team -w server` (#265): 48 loại tin x nhiều biến thể payload x 2 người gửi (nghèo / giàu) = 2688 đòn, bắt `[lỗi]`, bất biến SỐNG, tự phát hiện loại tin; A đã thử 3 đột biến thật vào `WorldRoom.ts`, đều đỏ |
+| 2.1 red team tin nhắn | **Xong** | `npm run red-team -w server` (#265): 49 loại tin (từ M4.2b có thêm `ping`) x nhiều biến thể payload x 2 người gửi (nghèo / giàu) = 2744 đòn, bắt `[lỗi]`, bất biến SỐNG, tự phát hiện loại tin; A đã thử 3 đột biến thật vào `WorldRoom.ts`, đều đỏ |
 | 2.2 fuzz bất biến kinh tế | **Xong** | `economy-fuzz` (gđ 1), `kill-share-fuzz`, `sect-life-fuzz` (#271: tìm và sửa lỗi MẤT Linh thạch khi rút kho ở Hoàng Tuyền), `sect-crash` |
 | 2.3 kiểm tốc độ / dịch chuyển | **Kết luận: đủ bằng cấu trúc** | không làm cờ riêng (xem mục 2.3) |
 | 2.4 audit log | **Xong lát 1 + 2** (#266, #268) | còn (khi cần): đầu thai, PK, thưởng bí cảnh lớn (issue #263 còn mở) |
