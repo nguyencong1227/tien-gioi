@@ -24,11 +24,98 @@ const KEY_RE = /^[A-Za-z][A-Za-z0-9_]{0,31}$/;
 
 let sink: AuditSink | null = null;
 let clock: () => number = Date.now;
+let warnFn: (line: string) => void = (line) => console.warn(line);
 
-/** Đặt nơi ghi (null: tắt). Test dùng để bắt dòng log; `startAudit` dùng stdout. */
-export function setAuditSink(s: AuditSink | null, now: () => number = Date.now) {
+/**
+ * Đặt nơi ghi (null: tắt). Test dùng để bắt dòng log; `startAudit` dùng stdout. `warn` là nơi in cảnh báo (mặc định `console.warn`,
+ * vào stderr kèm tiền tố `[CẢNH BÁO]` như các cảnh báo vận hành khác). Đặt lại sink thì xoá bộ nhớ của luật cảnh báo.
+ */
+export function setAuditSink(
+  s: AuditSink | null,
+  now: () => number = Date.now,
+  warn: (line: string) => void = (line) => console.warn(line),
+) {
   sink = s;
   clock = now;
+  warnFn = warn;
+  alertHits.clear();
+  alertedAt.clear();
+}
+
+/**
+ * Luật CẢNH BÁO (người dùng chốt 11/11/2026: gian lận chỉ ghi nhận + cảnh báo, KHÔNG tự khoá tài khoản): cùng một khoá
+ * (`keyField`) gây ít nhất `count` sự kiện `ev` trong `windowMs` thì ghi thêm một sự kiện `alert` và in một dòng `[CẢNH BÁO]` để người vận
+ * hành để ý. Mỗi (luật, khoá) chỉ báo một lần mỗi cửa sổ. Không phạt gì: chỉ để con người xem log rồi quyết định.
+ */
+export interface AlertRule {
+  ev: string;
+  keyField: string;
+  count: number;
+  windowMs: number;
+  alert: string;
+}
+export const ALERT_RULES: readonly AlertRule[] = [
+  // Bị ngắt vì spam tin nhắn nhiều lần: client sửa / bot
+  {
+    ev: "room.spam_kick",
+    keyField: "name",
+    count: 3,
+    windowMs: 600_000,
+    alert: "alert.spam_kicks",
+  },
+  // Một IP bị giới hạn tần suất đăng ký / đăng nhập / khôi phục nhiều lần: dò mật khẩu / tạo tài khoản hàng loạt
+  {
+    ev: "auth.rate_limited",
+    keyField: "ip",
+    count: 5,
+    windowMs: 600_000,
+    alert: "alert.auth_flood",
+  },
+  // Nhiều lần sai mã bí mật cho cùng một đạo hiệu: dò mã
+  { ev: "join.denied", keyField: "name", count: 5, windowMs: 600_000, alert: "alert.join_guess" },
+];
+/** Số khoá tối đa theo dõi (chặn phình bộ nhớ nếu kẻ xấu đổi khoá liên tục). */
+const MAX_ALERT_KEYS = 2000;
+const alertHits = new Map<string, number[]>();
+const alertedAt = new Map<string, number>();
+
+/** Số khoá đang được theo dõi cho luật cảnh báo (test kiểm trần bộ nhớ). */
+export function auditAlertKeyCount(): number {
+  return alertHits.size;
+}
+
+function observeAlerts(ev: string, fields: Record<string, AuditValue>) {
+  for (const rule of ALERT_RULES) {
+    if (rule.ev !== ev) continue;
+    const keyVal = fields[rule.keyField];
+    if (typeof keyVal !== "string" && typeof keyVal !== "number") continue;
+    const now = clock();
+    const id = `${rule.alert}|${keyVal}`;
+    const hits = (alertHits.get(id) ?? []).filter((t) => now - t < rule.windowMs);
+    hits.push(now);
+    alertHits.delete(id); // đưa khoá về cuối Map: khoá lâu không động tới bị loại trước
+    alertHits.set(id, hits);
+    if (alertHits.size > MAX_ALERT_KEYS) {
+      const oldest = alertHits.keys().next().value;
+      if (oldest !== undefined) {
+        alertHits.delete(oldest);
+        alertedAt.delete(oldest);
+      }
+    }
+    const last = alertedAt.get(id);
+    if (hits.length >= rule.count && (last === undefined || now - last >= rule.windowMs)) {
+      alertedAt.set(id, now);
+      const windowS = Math.round(rule.windowMs / 1000);
+      audit(rule.alert, { of: rule.ev, key: keyVal, count: hits.length, windowS });
+      try {
+        warnFn(
+          `[CẢNH BÁO] ${rule.alert}: '${cleanAuditString(String(keyVal))}' gây ${hits.length} lần ${rule.ev} trong ${windowS} giây (chỉ ghi nhận, không tự khoá).`,
+        );
+      } catch {
+        // cảnh báo hỏng không được kéo game sập
+      }
+    }
+  }
 }
 
 export function auditEnabled(): boolean {
@@ -69,13 +156,10 @@ export function cleanAuditFields(fields: AuditFields | undefined): Record<string
 export const audit: AuditFn = (ev, fields) => {
   if (!sink) return;
   try {
-    const line = JSON.stringify({
-      t: new Date(clock()).toISOString(),
-      audit: 1,
-      ev: cleanAuditString(String(ev)),
-      ...cleanAuditFields(fields),
-    });
-    sink(line);
+    const clean = cleanAuditFields(fields);
+    const name = cleanAuditString(String(ev));
+    sink(JSON.stringify({ t: new Date(clock()).toISOString(), audit: 1, ev: name, ...clean }));
+    observeAlerts(name, clean);
   } catch {
     // audit hỏng không được kéo game sập
   }

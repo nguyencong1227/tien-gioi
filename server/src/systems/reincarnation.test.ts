@@ -271,3 +271,51 @@ describe("Dư âm tu hành: tu vi từ hạ quái và đả tọa được nhân
     expect(a.p.exp).toBe(30);
   });
 });
+
+describe("nhật ký kiểm toán: chết thật và đầu thai (M4 2.4, lát 3)", () => {
+  const withAudit = (t: ReturnType<typeof setup>) => {
+    const log: { ev: string; f: Record<string, unknown> }[] = [];
+    t.w.audit = (ev, f) => void log.push({ ev, f: f ?? {} });
+    return log;
+  };
+
+  it("chết thật ghi soul.limbo MỘT lần với số liệu của kiếp cũ (Linh thạch, cảnh giới, Duyên), không lộ bí mật", () => {
+    const t = setup();
+    const log = withAudit(t);
+    kill(t);
+    expect(log).toHaveLength(1);
+    expect(log[0].ev).toBe("soul.limbo");
+    expect(log[0].f).toMatchObject({
+      name: "a",
+      kiep: 1,
+      realm: 1,
+      tier: 8,
+      coin: 250,
+      counts: true,
+    });
+    expect(log[0].f.gain).toBe(t.c.limbo!.summary.gain);
+    expect(JSON.stringify(log[0].f)).not.toMatch(/secret|token|pass/i);
+    // bị đánh thêm lúc đã chết: không ghi lần hai
+    kill(t);
+    expect(log.filter((x) => x.ev === "soul.limbo")).toHaveLength(1);
+  });
+
+  it("đầu thai ghi soul.rebirth (kiếp mới, xuất thân, Linh thạch mang theo / lúc chết, số món giữ)", () => {
+    const t = setup();
+    kill(t);
+    t.c.soul = creditSoul(t.c.soul, { ...t.c.limbo!, credited: true }, "n");
+    const log = withAudit(t);
+    applyRebirth(t.w, "a", t.p, t.c, { origin: "pham_gia", keep: [] });
+    expect(log).toHaveLength(1);
+    expect(log[0]).toEqual({
+      ev: "soul.rebirth",
+      f: { name: "a", kiep: 2, origin: "pham_gia", coin: 0, coinAtDeath: 250, kept: 0 },
+    });
+  });
+
+  it("world.audit = null (test / bench): không ghi và không lỗi", () => {
+    const t = setup();
+    expect(t.w.audit).toBeNull();
+    expect(() => kill(t)).not.toThrow();
+  });
+});
