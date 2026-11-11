@@ -282,11 +282,14 @@ Quy trình: Tự động sinh dữ liệu mẫu đầy đủ (nhân vật, chân
 
 ### 7.4. Sao lưu & Khôi phục với PostgreSQL (`STORE=pg`)
 Khi triển khai với PostgreSQL (`docker-compose.pg.yml` hoặc dịch vụ Postgres bên ngoài):
+> [!IMPORTANT]
+> Mọi lệnh `docker compose` ở mục này (kể cả `exec`, `stop`, `start`) cần `--env-file .env.production`, hoặc đặt `POSTGRES_PASSWORD` trong tệp `.env` cạnh `docker-compose.yml`: `docker-compose.pg.yml` yêu cầu `${POSTGRES_PASSWORD:?...}` mỗi lần Compose đọc cấu hình, nên thiếu biến thì Compose báo lỗi ngay cả khi chỉ dừng / bật lại dịch vụ.
+
 - **Tạo bản sao lưu cơ sở dữ liệu (`pg_dump`):**
   Dùng cờ `--clean --if-exists --no-owner` để bản sao lưu chứa lệnh tự dọn dẹp các bảng cũ trước khi nạp lại, tránh lỗi trùng khoá hoặc "already exists" khi khôi phục vào cơ sở dữ liệu đang có dữ liệu:
   ```bash
   # Với Docker Compose (dịch vụ db của docker-compose.pg.yml ghép cùng docker-compose.yml):
-  docker compose -f docker-compose.yml -f docker-compose.pg.yml exec -T db pg_dump -U tiengioi --clean --if-exists --no-owner tiengioi | gzip > backups/tiengioi-pg-$(date +%Y%m%d-%H%M%S).sql.gz
+  docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.pg.yml exec -T db pg_dump -U tiengioi --clean --if-exists --no-owner tiengioi | gzip > backups/tiengioi-pg-$(date +%Y%m%d-%H%M%S).sql.gz
 
   # Với máy chủ PostgreSQL thông thường:
   pg_dump -d "$DATABASE_URL" --clean --if-exists --no-owner | gzip > backups/tiengioi-pg-$(date +%Y%m%d-%H%M%S).sql.gz
@@ -294,19 +297,19 @@ Khi triển khai với PostgreSQL (`docker-compose.pg.yml` hoặc dịch vụ Po
 - **Khôi phục dữ liệu cơ sở dữ liệu (`psql`):**
   1. Dừng container game server trước để ngắt các kết nối ghi:
      ```bash
-     docker compose -f docker-compose.yml -f docker-compose.pg.yml stop game
+     docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.pg.yml stop game
      ```
   2. Nạp lại bản sao lưu vào database (chỉ định file sao lưu cụ thể; cờ `--clean --if-exists` ở bước sao lưu giúp dọn bảng cũ sạch sẽ trước khi tạo lại):
      ```bash
      # Với Docker Compose:
-     gunzip -c backups/tiengioi-pg-20261110-020000.sql.gz | docker compose -f docker-compose.yml -f docker-compose.pg.yml exec -T db psql -U tiengioi tiengioi
+     gunzip -c backups/tiengioi-pg-20261110-020000.sql.gz | docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.pg.yml exec -T db psql -U tiengioi tiengioi
 
      # Với máy chủ PostgreSQL thông thường:
      gunzip -c backups/tiengioi-pg-20261110-020000.sql.gz | psql -d "$DATABASE_URL"
      ```
   3. Khởi động lại game server:
      ```bash
-     docker compose -f docker-compose.yml -f docker-compose.pg.yml start game
+     docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.pg.yml start game
      ```
 
 > [!NOTE]
