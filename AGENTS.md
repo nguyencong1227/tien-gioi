@@ -7,7 +7,7 @@ Trả lời người dùng bằng tiếng Việt. Comment trong code viết ti�
 
 ## Nhóm và nơi làm việc
 - 3 dev cùng SSH vào một máy, cùng user Linux `nguyencong`, cùng tài khoản GitHub `nguyencong1227`.
-- **Dev A (Server & Gameplay, giao việc):** `~/TT/tien-gioi-a`, cổng 2567/5173, nhánh `a/...`. Dùng Claude Code.
+- **Dev A (Server & Gameplay, giao việc):** `~/TT/tien-gioi-a`, cổng 2597/5173, nhánh `a/...`. Dùng Claude Code.
 - **Dev B (Client & Trải nghiệm):** `~/TT/tien-gioi-b`, cổng 2577/5183, nhánh `b/...`. Dùng Antigravity CLI (`agy`).
 - **Dev C (Công cụ, Thử tải & Phát hành):** `~/TT/tien-gioi-c`, cổng 2587/5193, nhánh `c/...`. Dùng Antigravity CLI (`agy`).
 - Thư mục mở lúc khởi động là thư mục của dev đang làm việc với bạn: chỉ làm trong đó. Không sửa, không `git switch`, không chạy server trong thư mục của người khác.
@@ -25,6 +25,7 @@ npm run format       # định dạng code bằng Prettier (CI kiểm bằng npx
 npm run build        # build client vào client/dist
 ```
 
+- **Cổng 2567 dành riêng cho BẢN CHẠY THẬT** (`https://tiengioi.hethongtm.site` qua Cloudflare Tunnel, `~/TT/tien-gioi-prod/`): dev / test / bot KHÔNG dùng; `server/src/index.ts` từ chối khởi động ở 2567 nếu không có `TIEN_GIOI_PROD=1` (`portPolicy`), `bots.ts` từ chối bắn vào đó. Không đụng thư mục `~/TT/tien-gioi-prod/` và dịch vụ `cloudflared-tiengioi` (của người dùng).
 - `.env.local` ở gốc repo (không commit) giữ `PORT` và `CLIENT_PORT` của từng dev. Vite dùng `strictPort`: lỗi cổng bị chiếm thì kiểm tra xem có đang chạy nhầm thư mục không, đừng đổi cổng cho xong.
 - Chạy server nền xong nhớ tắt, để không giữ cổng của dev.
 

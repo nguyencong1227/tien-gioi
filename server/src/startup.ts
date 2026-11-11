@@ -66,3 +66,34 @@ export function startupWarnings(env: NodeJS.ProcessEnv): string[] {
   }
   return warnings;
 }
+
+/** Cổng dành riêng cho BẢN CHẠY THẬT (Cloudflare Tunnel trỏ vào `127.0.0.1:2567`, docs/TRIEN_KHAI.md mục 4.1). */
+export const PROD_PORT = 2567;
+
+/**
+ * Chọn cổng lắng nghe và CHẶN việc dev / test / bot vô tình chiếm cổng của bản chạy thật: `PORT` (kể cả khi không đặt, mặc định
+ * 2567) là `PROD_PORT` mà `TIEN_GIOI_PROD` không phải `1` thì từ chối khởi động. Bản chạy thật (`deploy/docker-compose.prod.yml`,
+ * `docker-compose.yml`) đặt `TIEN_GIOI_PROD=1`. Một server dev chiếm 2567 lúc bản thật đang tắt sẽ nhận người chơi thật qua đường hầm
+ * (và có lệnh `/give`); lúc bản thật đang chạy thì làm nó không khởi động nổi. `PORT` sai (không phải số nguyên 1-65535) cũng bị từ chối
+ * thay vì để `listen` ném lỗi khó hiểu.
+ */
+export function portPolicy(
+  env: NodeJS.ProcessEnv,
+): { ok: true; port: number } | { ok: false; error: string } {
+  const raw = env.PORT;
+  const text = raw === undefined || raw.trim() === "" ? undefined : raw.trim();
+  const port = text === undefined ? PROD_PORT : /^\d{1,5}$/.test(text) ? Number(text) : NaN;
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    return { ok: false, error: `PORT='${raw}' không hợp lệ (cần số nguyên từ 1 đến 65535).` };
+  }
+  if (port === PROD_PORT && env.TIEN_GIOI_PROD !== "1") {
+    return {
+      ok: false,
+      error:
+        `Cổng ${PROD_PORT} dành riêng cho BẢN CHẠY THẬT (tiengioi.hethongtm.site qua Cloudflare Tunnel). ` +
+        "Dev / test / bot phải dùng cổng riêng trong .env.local (xem AGENTS.md). " +
+        "Bản chạy thật phải đặt TIEN_GIOI_PROD=1 (deploy/docker-compose.prod.yml đã đặt).",
+    };
+  }
+  return { ok: true, port };
+}

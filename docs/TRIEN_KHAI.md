@@ -37,6 +37,7 @@ npm run build
 |---|---|---|:---:|---|---|
 | `NODE_ENV` | `undefined` (dev) | Xác định môi trường thực thi; vô hiệu hoá hoàn toàn lệnh chat quản trị `/give` khi bằng `production` | Không | **Bắt buộc: `production`** | `server/src/systems/inventory.ts`, `server/src/startup.ts` |
 | `PORT` | `2567` | Cổng HTTP / WebSocket mà server lắng nghe | Không | `2567` (hoặc theo quy hoạch mạng) | `server/src/index.ts` |
+| `TIEN_GIOI_PROD` | Không có | Cờ "đây là bản chạy thật": `1` mới cho server khởi động ở cổng **2567** (cổng dành riêng cho bản chạy thật). Thiếu cờ mà `PORT` là 2567 (kể cả không đặt `PORT`) thì server từ chối khởi động (mã 1) để dev / test / bot không chiếm cổng của bản thật | Không | **`1`** trên bản chạy thật; KHÔNG đặt ở máy dev | `server/src/startup.ts`, `server/src/index.ts` |
 | `DATA_DIR` | `server/data/players` (hoặc `data/players`) | Thư mục gốc lưu trữ dữ liệu tệp JSON khi `STORE=file` (nhân vật, chân linh, tông môn, tài khoản, phiên) | Không | Trỏ tới mount volume bền vững (vd `/app/data/players` hoặc `/var/lib/tien-gioi/players`) | `server/src/store.ts`, `server/src/soul.ts`, `server/src/sect-store.ts`, `server/src/account-store.ts` |
 | `SOULS_DIR` | `<DATA_DIR>/souls` | Thư mục lưu dữ liệu chân linh (tiến trình luân hồi, Duyên). Ghi đè thư mục con mặc định trong `DATA_DIR` | Không | Để mặc định theo `DATA_DIR` để cùng sao lưu một volume | `server/src/soul.ts` |
 | `SECTS_DIR` | `<DATA_DIR>/sects` | Thư mục lưu dữ liệu tông môn (thành viên, kho chung, sổ kho). Ghi đè thư mục con mặc định trong `DATA_DIR` | Không | Để mặc định theo `DATA_DIR` để cùng sao lưu một volume | `server/src/sect-store.ts` |
@@ -68,6 +69,7 @@ Chạy ứng dụng:
 ```bash
 export NODE_ENV=production
 export PORT=2567
+export TIEN_GIOI_PROD=1   # bắt buộc ở cổng 2567: cổng dành riêng cho bản chạy thật
 export DATA_DIR=/var/lib/tien-gioi/players
 
 npm start
@@ -153,18 +155,33 @@ docker compose -f docker-compose.yml -f docker-compose.pg.yml start game
 > [!NOTE]
 > Nếu chạy trực tiếp bằng lệnh `docker run`, hãy luôn kèm cờ `--init` và `--stop-timeout 30`:
 > ```bash
-> docker run -d --name tien-gioi --init --stop-timeout 30 -p 127.0.0.1:2567:2567 -v tien-gioi-data:/app/data/players tien-gioi
+> docker run -d --name tien-gioi --init --stop-timeout 30 -e TIEN_GIOI_PROD=1 -p 127.0.0.1:2567:2567 -v tien-gioi-data:/app/data/players tien-gioi
 > ```
 
 ---
 
-## 4. Reverse Proxy & HTTPS (Khuyến nghị Caddy)
+## 4. HTTPS: Cloudflare Tunnel (bản chạy thật hiện tại) hoặc Caddy
 
 ### Vì sao bắt buộc cần HTTPS?
 1. **PWA (Progressive Web App):** Service Worker ([client/public/sw.js](../client/public/sw.js)) và Web App Manifest chỉ hoạt động trên kết nối an toàn `https://` (hoặc `localhost`).
 2. **WebSocket bảo mật (`wss://`):** Tránh bị nhà mạng hoặc firewall chặn kết nối WebSocket không mã hoá (`ws://`).
 
-### Cấu hình bằng Caddy (Tự động cấp chứng chỉ SSL Let's Encrypt)
+### 4.1. Phương án đang dùng cho bản chạy thật: Cloudflare Tunnel
+Bản chạy thật đặt tại máy nhà, `https://tiengioi.hethongtm.site` đi qua **Cloudflare Tunnel** (người dùng dựng và quản; agent KHÔNG sửa, dừng hay khởi động lại, không đụng `~/.cloudflared/`):
+
+```
+Người chơi --HTTPS / WSS--> Cloudflare --đường hầm--> cloudflared (dịch vụ systemd người dùng) --HTTP--> 127.0.0.1:2567 --> server (container game) --> PostgreSQL
+```
+- **Server chỉ nghe `127.0.0.1:2567`** (compose `127.0.0.1:2567:2567`). Không Caddy, không mở cổng 80 / 443, không sửa router; chứng chỉ HTTPS và WebSocket do Cloudflare lo. Cổng **2567 dành riêng cho bản chạy thật** (dev dùng cổng trong `.env.local`; xem `AGENTS.md`).
+- **`TRUST_PROXY=1`** (một tầng proxy tin cậy là `cloudflared`). **Không cần đọc `CF-Connecting-IP`:** Cloudflare nối IP thật của khách vào CUỐI `X-Forwarded-For`; `cloudflared` nối vào server từ `127.0.0.1`; Express với 1 tầng tin cậy bỏ tầng socket (`127.0.0.1`) rồi lấy mục PHẢI NHẤT của `X-Forwarded-For` (IP thật do Cloudflare nối), còn mục khách tự gửi nằm bên TRÁI nên không qua mặt được giới hạn tần suất (test `auth-http.test.ts`: "TRUST_PROXY=1 ... giả nhiều tầng vẫn chỉ lấy tầng cuối của proxy"). **Điều kiện:** KHÔNG bao giờ mở cổng 2567 ra `0.0.0.0` / Internet (ai gọi thẳng được cổng đó thì tự đặt `X-Forwarded-For` tuỳ ý).
+- **Client web cùng nguồn** nên không cần `VITE_SERVER_URL` / CORS; app Android (Capacitor) chạy ở nguồn WebView riêng: đặt `CORS_ORIGINS` (mục 5.2) và build với `VITE_SERVER_URL=wss://tiengioi.hethongtm.site`.
+- **WebSocket qua Cloudflare:** kết nối không bao giờ nhàn rỗi (client gửi `input` 20 lần / giây, server ping khung mỗi 3 giây, thêm nhịp tim ứng dụng #293). Khi `cloudflared` khởi động lại (Cloudflare bảo trì), người chơi rớt mạng và vòng nối lại / nhịp tim lo trong 20 giây grace.
+- **Bản cũ sau khi phát hành:** `express.static` gửi `ETag` + `Cache-Control: public, max-age=0`; nếu vẫn thấy client cũ, kiểm `curl -sI https://tiengioi.hethongtm.site/ | grep -i cf-cache-status` và nhờ người dùng "Purge Cache" ở Cloudflare (agent không có quyền vào Cloudflare).
+- **Khi sự cố:** domain báo lỗi 1033 / 502 mà `curl http://127.0.0.1:2567/health` vẫn `ok` thì lỗi ở tunnel (`systemctl --user status cloudflared-tiengioi`: chỉ ĐỌC, báo người dùng); `curl` cổng nội bộ cũng lỗi thì lỗi ở server / container (`docs/VAN_HANH.md`).
+
+### 4.2. Cấu hình bằng Caddy (Tự động cấp chứng chỉ SSL Let's Encrypt)
+Dùng khi máy có IP công khai và mở được cổng 80 / 443 (không phải bản chạy thật hiện tại).
+
 Caddy tự động xử lý WebSocket proxy và HTTP/2. Tạo file `Caddyfile`:
 
 ```caddy
@@ -460,3 +477,85 @@ npm run tai-khoan -w server -- logout-all <tên đăng nhập>
 - `reset-password` in mật khẩu tạm (20 ký tự ngẫu nhiên) và mã khôi phục mới **đúng một lần**, xoá mọi phiên cũ; gửi cho người chơi qua kênh an toàn và nhắc họ lưu mã khôi phục (họ vào được bằng mật khẩu tạm, hoặc đặt mật khẩu của riêng mình qua "Quên mật khẩu" với mã mới).
 - Mã thoát: `0` xong; `1` sai cách dùng hoặc không có tài khoản; `2` server đang chạy.
 - Dùng cùng thư mục dữ liệu với server: `DATA_DIR` (và `ACCOUNTS_DIR` / `SESSIONS_DIR` nếu đã đặt riêng); trên máy dev tự đọc `.env.local`. Công cụ dùng cùng `STORE` / `DATABASE_URL` với server (qua `createStores`): với `STORE=pg` mọi thay đổi đi qua DB nên **không cần tắt server** (công cụ không hỏi `/health`).
+
+---
+
+## 10. Quy trình phát hành phiên bản (Release Workflow, M4 3.1)
+
+Hệ thống phát hành tự động qua GitHub Actions (`.github/workflows/release.yml`) đẩy ảnh Docker lên **GitHub Container Registry (GHCR)**: `ghcr.io/nguyencong1227/tien-gioi`.
+
+### 10.1. Quy tắc đánh số phiên bản (Semantic Versioning)
+Phiên bản tuân theo chuẩn `vMAJOR.MINOR.PATCH`:
+- **Bản phát hành đầu tiên:** `v0.1.0`.
+- **Sửa lỗi / Tối ưu nhỏ (tăng `PATCH`):** Khi sửa lỗi hiển thị, sửa logic nhiệm vụ, cân bằng quái vật hoặc tối ưu hiệu năng mà **không** làm thay đổi cấu trúc gói tin `shared/` (ví dụ: `v0.1.0` -> `v0.1.1`).
+- **Thay đổi giao thức / Hợp đồng `shared/` (tăng `MINOR`):** Bắt buộc phải tăng `MINOR` (ví dụ: `v0.1.0` -> `v0.2.0`), đồng thời tăng hằng số `PROTOCOL_VERSION` trong `shared/src/protocol.ts` (xem mục 2.5). Client quá cũ sẽ nhận lỗi 426 và hướng dẫn người chơi tải lại trang.
+- **Bản phát hành chính thức lớn (tăng `MAJOR`):** Khi hệ thống bước vào giai đoạn phát hành rộng rãi toàn diện (`v1.0.0`).
+
+### 10.2. Cách thức phát hành bản mới
+Quy trình phát hành chỉ được kích hoạt khi đẩy một thẻ git tag hợp lệ (`vX.Y.Z`).
+
+1. **Kiểm tra chất lượng trước khi gắn thẻ:**
+   ```bash
+   npm run typecheck
+   npm run lint
+   npx prettier --check .
+   npm test
+   npm run build
+   ```
+2. **Gắn thẻ phiên bản và đẩy lên GitHub:**
+   ```bash
+   # Gắn thẻ (người phụ trách Dev A thực hiện theo kế hoạch):
+   git tag -a v0.1.0 -m "Phát hành Tiên Giới v0.1.0"
+   git push origin v0.1.0
+   ```
+3. **Quy trình tự động của GitHub Actions (`release.yml`):**
+   - Kiểm thẻ đúng dạng `vX.Y.Z[-hậu-tố]`, checkout ĐÚNG thẻ, và **chỉ phát hành mã đã nằm trên `main`** (thẻ gắn vào commit của nhánh chưa merge bị chặn).
+   - Tự động chạy toàn bộ cổng chất lượng (typecheck, lint, prettier, vitest, build client).
+   - Thiết lập Docker Buildx và biên dịch ảnh một nền tảng `linux/amd64` (tối ưu cho máy chủ production x86_64).
+   - Đăng nhập GHCR bằng `GITHUB_TOKEN` (chỉ cấp 2 quyền tối thiểu `contents: write` và `packages: write`, không dùng PAT).
+   - Gắn nhãn OCI tiêu chuẩn và các thẻ ảnh:
+     - `ghcr.io/nguyencong1227/tien-gioi:0.1.0`
+     - `ghcr.io/nguyencong1227/tien-gioi:0.1`
+     - `ghcr.io/nguyencong1227/tien-gioi:latest` (chỉ kích hoạt với bản chính thức, không có hậu tố `-rc`/`-beta`)
+     - `ghcr.io/nguyencong1227/tien-gioi:sha-<commit>`
+   - Tự động tạo bản phát hành `GitHub Release` kèm nhật ký thay đổi (`CHANGELOG`) sinh tự động từ tiêu đề PR.
+   - Hỗ trợ `workflow_dispatch` (nhập `tag`, vd `v0.1.0`) để phát hành lại thủ công khi một thẻ bị lỗi hạ tầng: workflow checkout đúng thẻ đó (không phải nhánh đang chọn), đẩy lại ảnh, giữ nguyên bản phát hành nếu đã có.
+   - **Thẻ ảnh KHÔNG có chữ `v`** (quy ước của Docker): thẻ git `v0.1.0` cho ảnh `...:0.1.0`.
+
+### 10.3. Quyền riêng tư của ảnh Docker trên GHCR
+- **Mặc định riêng tư (Private):** Do mã nguồn máy chủ chứa logic trò chơi và TypeScript của server, package `ghcr.io/nguyencong1227/tien-gioi` được đặt ở chế độ **Private**, không công khai ra Internet.
+- **Đăng nhập trên máy chủ chạy thật:** Quản trị viên tạo một GitHub Personal Access Token (Classic) với phạm vi duy nhất là **`read:packages`** (token chỉ đọc, an toàn, không có quyền sửa code) và lưu vào biến môi trường máy chủ:
+  ```bash
+  echo "$GHCR_READ_TOKEN" | docker login ghcr.io -u <github-username> --password-stdin
+  ```
+
+### 10.4. Kéo ảnh và Triển khai trên máy chủ thật
+1. **Kéo ảnh phiên bản mới:**
+   ```bash
+   docker pull ghcr.io/nguyencong1227/tien-gioi:0.1.0
+   ```
+2. **Chạy qua Docker Compose:**
+   Bản chạy thật dùng `deploy/docker-compose.prod.yml` (issue #299) với biến `TIEN_GIOI_TAG=0.1.0`. Cách thủ công: cập nhật trường `image`:
+   ```yaml
+   services:
+     game:
+       image: ghcr.io/nguyencong1227/tien-gioi:0.1.0
+   ```
+   Khởi động lại container dịch vụ:
+   ```bash
+   docker compose up -d
+   ```
+
+### 10.5. Quy trình quay lại bản trước (Rollback khi gặp sự cố)
+Nếu bản phát hành mới phát sinh lỗi nghiêm trọng sau khi đưa lên production:
+1. Xác định phiên bản ổn định gần nhất (ví dụ: `v0.1.0`).
+2. Sửa lại thẻ ảnh (`TIEN_GIOI_TAG` hoặc trường `image`):
+   ```yaml
+   image: ghcr.io/nguyencong1227/tien-gioi:0.1.0
+   ```
+3. Ra lệnh Docker Compose nạp lại phiên bản cũ:
+   ```bash
+   docker compose up -d
+   ```
+   Hệ thống sẽ thay thế container ngay lập tức trong vài giây mà không làm gián đoạn cơ sở dữ liệu PostgreSQL gắn ngoài.
+

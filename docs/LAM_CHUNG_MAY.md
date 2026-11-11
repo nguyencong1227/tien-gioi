@@ -5,7 +5,7 @@ Ba dev cùng SSH vào một máy, cùng user Linux `nguyencong`, dùng chung m�
 
 | | Thư mục | Server | Client (Vite) | Tên commit |
 |---|---|---|---|---|
-| **Dev A** (Server & Gameplay) | `~/TT/tien-gioi-a` | 2567 | 5173 | đặt trong `.git/config` của thư mục |
+| **Dev A** (Server & Gameplay) | `~/TT/tien-gioi-a` | 2597 | 5173 | đặt trong `.git/config` của thư mục |
 | **Dev B** (Client & Trải nghiệm) | `~/TT/tien-gioi-b` | 2577 | 5183 | đặt trong `.git/config` của thư mục |
 | **Dev C** (Công cụ, Thử tải & Phát hành) | `~/TT/tien-gioi-c` | 2587 | 5193 | `Dev C`, đã đặt sẵn |
 
@@ -75,7 +75,7 @@ Client tự kết nối tới server cùng địa chỉ, cổng lấy theo `PORT
 
 ```bash
 # Dev A
-ssh -L 5173:localhost:5173 -L 2567:localhost:2567 nguyencong@100.109.206.6
+ssh -L 5173:localhost:5173 -L 2597:localhost:2597 nguyencong@100.109.206.6
 # Dev B
 ssh -L 5183:localhost:5183 -L 2577:localhost:2577 nguyencong@100.109.206.6
 # Dev C
