@@ -135,6 +135,15 @@ function stillHere(w: World, sid: string, soulKey: string): boolean {
   return w.ctrl.get(sid)?.identity.soulKey === soulKey;
 }
 
+/**
+ * Ví của người này đang nhận được tiền: còn trong phòng, cùng linh hồn, và KHÔNG ở Hoàng Tuyền. Lúc đầu thai `applyRebirth` GHI ĐÈ
+ * `coin` bằng phần mang theo (`min(coinAtDeath, coinCarryCap)`), nên Linh thạch cộng vào ví của kiếp đã mất sẽ biến mất.
+ */
+function walletOpen(w: World, sid: string, soulKey: string): boolean {
+  const c = w.ctrl.get(sid);
+  return c?.identity.soulKey === soulKey && !c.limbo;
+}
+
 /** Thành viên đang trực tuyến ở bất cứ phòng nào (khớp cả `soulKey`, không chỉ đạo hiệu). */
 function locateMember(w: World, m: { soulKey: string; name: string }): Located | null {
   const loc = w.hub.locate(m.name.toLowerCase());
@@ -506,10 +515,12 @@ export async function sectWithdraw(w: World, sid: string, raw: unknown) {
   if (!msg) return toastFail(w, sid, "amount_invalid");
   if (COIN_CAP - c.coin < msg.amount) return toastFail(w, sid, "wallet_full");
   // Đang qua cổng: hồ sơ không lưu được lúc này, rút ra sẽ mất (kho đã trừ, ví không xuống đĩa). Thử lại sau.
-  if (c.travelling) return toastFail(w, sid, "error");
+  // Đang ở Hoàng Tuyền: ví của kiếp đã mất, đầu thai sẽ ghi đè, rút ra cũng mất. Từ chối từ đầu, kho nguyên.
+  if (c.travelling || c.limbo) return toastFail(w, sid, "error");
   const res = await svc.withdraw(a, msg.amount);
   if (!res.ok) return toastFail(w, sid, res.reason);
-  const credited = stillHere(w, sid, a.soulKey) ? changeCoin(w, sid, msg.amount) : 0;
+  // Chết giữa lúc đang rút (kho đã trừ) thì không cộng vào ví kiếp đã mất: phần chưa cộng được góp lại kho ngay dưới
+  const credited = walletOpen(w, sid, a.soulKey) ? changeCoin(w, sid, msg.amount) : 0;
   let sect = res.sect;
   if (credited < msg.amount) {
     const back = await svc.deposit(a, msg.amount - credited);
