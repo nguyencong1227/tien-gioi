@@ -10,7 +10,7 @@ Cần Node.js 22 (`.nvmrc`).
 ```bash
 npm install
 cp .env.example .env.local   # chỉnh cổng nếu cần
-npm run dev        # server :2567 + client :5173 (Vite, tự reload)
+npm run dev        # server + client (cổng lấy từ .env.local; KHÔNG dùng 2567, cổng đó dành cho bản chạy thật)
 npm test           # chạy test (Vitest); npm run test:watch để tự chạy lại khi sửa
 ```
 
@@ -19,7 +19,7 @@ Mở http://localhost:5173. Mở thêm tab ẩn danh hoặc điện thoại cùn
 Chạy kiểu production (một cổng duy nhất):
 
 ```bash
-npm run build && npm start   # http://localhost:2567
+npm run build && npm start   # http://localhost:<PORT trong .env.local>
 ```
 
 ## Cấu trúc

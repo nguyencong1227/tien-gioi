@@ -7,7 +7,7 @@ import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { defineRooms, WorldRoom } from "./rooms/WorldRoom";
 import { SectService } from "./sect-service";
-import { startupWarnings } from "./startup";
+import { portPolicy, startupWarnings } from "./startup";
 import { startAudit } from "./audit";
 import { minProtocolOf } from "./protocol";
 import { mountAuth } from "./auth-http";
@@ -23,7 +23,13 @@ for (const w of startupWarnings(process.env)) console.warn(`[CẢNH BÁO] ${w}`)
 // Nhật ký kiểm toán (M4 2.4): một dòng JSON mỗi sự kiện nhạy cảm ra stdout; AUDIT_LOG=off tắt
 if (startAudit(process.env)) console.log("Nhật ký kiểm toán: bật (AUDIT_LOG=off để tắt)");
 
-const PORT = Number(process.env.PORT ?? 2567);
+// Cổng 2567 chỉ của bản chạy thật: dev / test / bot dùng cổng riêng (portPolicy từ chối, thoát mã 1)
+const portCheck = portPolicy(process.env);
+if (!portCheck.ok) {
+  console.error(`[LỖI] ${portCheck.error}`);
+  process.exit(1);
+}
+const PORT = portCheck.port;
 
 async function main() {
   // Backend lưu trữ chung cho nhân vật, chân linh, tài khoản, phiên (STORE=file mặc định | pg + DATABASE_URL)
