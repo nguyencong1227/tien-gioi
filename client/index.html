@@ -801,6 +801,10 @@
             <span>Chất lượng thấp (tắt hiệu ứng phụ cho máy yếu / tiết kiệm pin)</span>
             <input type="checkbox" id="set-low-fx" />
           </label>
+          <label class="set-row toggle">
+            <span>Giảm chuyển động (tắt hiệu ứng rung lắc, chữ chạy nhanh)</span>
+            <input type="checkbox" id="set-reduced-motion" />
+          </label>
           <div class="set-account-box">
             <span id="set-account-info">Tài khoản: <b id="set-account-username">-</b></span>
             <button type="button" id="btn-logout" class="btn-logout">Đăng Xuất</button>
@@ -1380,7 +1384,13 @@
           <small id="death-sub" hidden></small>
         </div>
       </div>
-      <div id="help">
+      <div
+        id="help"
+        role="button"
+        tabindex="0"
+        aria-label="Chỉ dẫn phím tắt và luật chơi Tiên Giới"
+        title="Nhấn để xem chỉ dẫn chi tiết"
+      >
         WASD đi · J/Space chém · K kiếm khí · 1/2 đan · F nhặt/nói/cổng · C nhân vật · I túi · Q
         nhiệm vụ · M bản đồ · G tông môn · O cài đặt · L đả tọa · B đột phá
       </div>
@@ -1465,6 +1475,81 @@
             </div>
           </section>
         </div>
+      </section>
+
+      <!-- Bảng gợi ý người mới (Issue #269, hiện 1 lần lần đầu nhập thế) -->
+      <section
+        id="newbie-guide-modal"
+        class="panel modal-box newbie-guide-modal"
+        hidden
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="newbie-title"
+        tabindex="-1"
+      >
+        <header class="inv-head">
+          <div>
+            <h2 id="newbie-title">Nhập Thế Tu Tiên · Chỉ Dẫn</h2>
+            <small>Chỉ dẫn căn bản cho đạo hữu mới bước chân vào Tiên Giới</small>
+          </div>
+          <button
+            type="button"
+            id="newbie-close"
+            class="modal-close"
+            title="Đóng (Esc)"
+            aria-label="Đóng chỉ dẫn (Phím Esc hoặc Phím Cách)"
+          >
+            ✕
+          </button>
+        </header>
+        <div class="newbie-body">
+          <div class="newbie-card">
+            <span class="newbie-icon">🚶</span>
+            <div class="newbie-info">
+              <b>Di Chuyển & Điều Khiển</b>
+              <p>
+                Phím <b>W / A / S / D</b> hoặc 4 phím mũi tên. Trên điện thoại: vuốt cần điều khiển
+                ảo ở góc trái.
+              </p>
+            </div>
+          </div>
+          <div class="newbie-card">
+            <span class="newbie-icon">⚔</span>
+            <div class="newbie-info">
+              <b>Chiến Đấu & Trừ Yêu</b>
+              <p>
+                Phím <b>J</b> hoặc <b>Space</b> để chém kiếm thường, <b>K</b> phóng Kiếm khí tầm xa
+                tiêu hao Linh lực.
+              </p>
+            </div>
+          </div>
+          <div class="newbie-card">
+            <span class="newbie-icon">🧘</span>
+            <div class="newbie-info">
+              <b>Tu Luyện & Hồi Phục</b>
+              <p>
+                Phím <b>L</b> đả tọa hồi Sinh lực và Linh lực. Phím <b>1</b> và <b>2</b> cắn nhanh
+                Đan dược trong lúc nguy cấp.
+              </p>
+            </div>
+          </div>
+          <div class="newbie-card">
+            <span class="newbie-icon">📜</span>
+            <div class="newbie-info">
+              <b>Tương Tác & Hành Trang</b>
+              <p>
+                Phím <b>F</b> để nhặt vật phẩm rơi, đối thoại NPC hoặc qua Cổng truyền tống. Phím
+                <b>I</b> mở Túi đồ, <b>C</b> xem Đạo thể trang bị, <b>Q</b> xem Sổ nhiệm vụ,
+                <b>M</b> xem Sơn Hà Đồ.
+              </p>
+            </div>
+          </div>
+        </div>
+        <footer class="newbie-footer">
+          <button type="button" id="newbie-btn-dismiss" class="auth-btn-primary">
+            Đã Hiểu (Phím Cách hoặc Esc)
+          </button>
+        </footer>
       </section>
 
       <!-- Màn hình chuyển cảnh Mạnh Bà -->

@@ -120,6 +120,10 @@ import {
   trapTabKey,
   isTypingElement,
   processEscapeKey,
+  isReducedMotion,
+  setReducedMotionPref,
+  shouldShowNewbieGuide,
+  markNewbieGuideDismissed,
 } from "./a11y";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -2124,6 +2128,7 @@ export const ui = {
   show() {
     $("ui").hidden = false;
     $("login").hidden = true;
+    this.showNewbieGuide();
   },
 
   init(cb: UiCallbacks) {
@@ -2186,7 +2191,14 @@ export const ui = {
     const bindTap = (id: string, fn: () => void) => {
       const el = $(id);
       if (!el) return;
+      let lastTap = 0;
       el.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        lastTap = performance.now();
+        fn();
+      });
+      el.addEventListener("click", (e) => {
+        if (performance.now() - lastTap < 300) return;
         e.preventDefault();
         fn();
       });
@@ -2579,6 +2591,22 @@ export const ui = {
       }
     });
 
+    // Giảm chuyển động (#269)
+    const reducedMotionChk = $("set-reduced-motion") as HTMLInputElement | null;
+    if (reducedMotionChk) {
+      const reduced = isReducedMotion();
+      reducedMotionChk.checked = reduced;
+      document.body.classList.toggle("reduced-motion", reduced);
+      reducedMotionChk.addEventListener("change", () => {
+        setReducedMotionPref(reducedMotionChk.checked);
+      });
+    }
+
+    // Bảng chỉ dẫn người mới (#269)
+    bindTap("newbie-close", () => this.dismissNewbieGuide());
+    bindTap("newbie-btn-dismiss", () => this.dismissNewbieGuide());
+    bindTap("help", () => this.showNewbieGuide(true));
+
     // Âm thanh
     bindTap("btn-mute", () => {
       const isMuted = sound.toggleMute();
@@ -2887,6 +2915,9 @@ export const ui = {
       case "player-menu":
         this.closePlayerMenu();
         return true;
+      case "newbie-guide-modal":
+        this.dismissNewbieGuide();
+        return true;
       default: {
         const el = document.getElementById(top.id);
         if (el) {
@@ -3040,6 +3071,35 @@ export const ui = {
     });
   },
 
+  showNewbieGuide(force = false) {
+    if (!force && !shouldShowNewbieGuide()) return;
+    const modal = $("newbie-guide-modal");
+    if (modal) {
+      modal.hidden = false;
+      modalStack.push("newbie-guide-modal", $("help"));
+      focusModal(modal);
+    }
+  },
+
+  dismissNewbieGuide() {
+    const modal = $("newbie-guide-modal");
+    if (modal && !modal.hidden) {
+      modal.hidden = true;
+      markNewbieGuideDismissed();
+      modalStack.remove("newbie-guide-modal");
+      returnFocus($("help"));
+    }
+  },
+
+  isNewbieGuideOpen(): boolean {
+    const modal = $("newbie-guide-modal");
+    return Boolean(modal && !modal.hidden);
+  },
+
+  isReducedMotion(): boolean {
+    return isReducedMotion();
+  },
+
   onInv(m: InvMsg) {
     invSlots = m.slots;
     const now = performance.now();
@@ -3131,15 +3191,20 @@ export const ui = {
     textEl.textContent = "";
 
     stopTypewriter();
-    dlgTypeTimer = window.setInterval(() => {
-      dlgTypedLen += 2;
-      if (dlgTypedLen >= dlgFullText.length) {
-        finishTypewriter();
-      } else {
-        textEl.textContent = dlgFullText.slice(0, dlgTypedLen);
-        sound.typeBlip();
-      }
-    }, 28);
+    if (isReducedMotion()) {
+      finishTypewriter();
+      textEl.textContent = dlgFullText;
+    } else {
+      dlgTypeTimer = window.setInterval(() => {
+        dlgTypedLen += 2;
+        if (dlgTypedLen >= dlgFullText.length) {
+          finishTypewriter();
+        } else {
+          textEl.textContent = dlgFullText.slice(0, dlgTypedLen);
+          sound.typeBlip();
+        }
+      }, 28);
+    }
   },
 
   talkPrompt(label: string | null) {

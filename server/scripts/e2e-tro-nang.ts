@@ -140,6 +140,68 @@ async function main() {
     const t = tab;
     const ev = (e: string) => t.ev(e);
 
+    // 0. Bảng gợi ý người mới (hiện 1 lần lần đầu nhập thế, #269 lát 2)
+    check(
+      "Lần đầu nhập thế: bảng chỉ dẫn người mới hiện thật",
+      !!(await ev(shown("newbie-guide-modal"))),
+      "newbie-guide-modal không hiện",
+    );
+    check(
+      "Bảng chỉ dẫn có role=dialog và aria-modal=true",
+      (await ev(
+        `[document.getElementById('newbie-guide-modal').getAttribute('role'), document.getElementById('newbie-guide-modal').getAttribute('aria-modal')].join('|')`,
+      )) === "dialog|true",
+      String(await ev(`document.getElementById('newbie-guide-modal').getAttribute('role')`)),
+    );
+    // Đóng bằng Esc
+    await press(t, K.esc);
+    check(
+      "Bấm Esc: đóng bảng chỉ dẫn người mới",
+      !(await ev(shown("newbie-guide-modal"))),
+      "newbie-guide-modal vẫn mở",
+    );
+    check(
+      "Đã ghi nhận dismiss vào localStorage",
+      (await ev(`localStorage.getItem("tg_newbie_guide_dismissed")`)) === "1",
+      String(await ev(`localStorage.getItem("tg_newbie_guide_dismissed")`)),
+    );
+    // Bấm nút Trợ giúp (?) mở lại được
+    await ev(`document.getElementById('help').click(); 1`);
+    check(
+      "Bấm nút Trợ giúp (?): mở lại bảng chỉ dẫn",
+      !!(await ev(shown("newbie-guide-modal"))),
+      "newbie-guide-modal không mở lại",
+    );
+    await press(t, K.esc);
+    if (await ev(shown("newbie-guide-modal"))) {
+      await ev(`document.getElementById('newbie-btn-dismiss').click(); 1`);
+    }
+    check(
+      "Đóng bảng chỉ dẫn người mới thành công",
+      !(await ev(shown("newbie-guide-modal"))),
+      "newbie-guide-modal chưa đóng",
+    );
+
+    // 0b. Kiểm tra tuỳ chọn Giảm chuyển động (#269 lát 2)
+    await ev(`document.getElementById('set-reduced-motion').click(); 1`);
+    const reducedOn =
+      (await ev(`document.body.classList.contains('reduced-motion')`)) &&
+      (await ev(`localStorage.getItem('tg_reduced_motion')`)) === "1";
+    check(
+      "Bật tuỳ chọn giảm chuyển động: body có class reduced-motion và lưu localStorage",
+      !!reducedOn,
+      `class=${await ev(`document.body.className`)}, storage=${await ev(`localStorage.getItem('tg_reduced_motion')`)}`,
+    );
+    await ev(`document.getElementById('set-reduced-motion').click(); 1`);
+    const reducedOff =
+      !(await ev(`document.body.classList.contains('reduced-motion')`)) &&
+      (await ev(`localStorage.getItem('tg_reduced_motion')`)) === "0";
+    check(
+      "Tắt tuỳ chọn giảm chuyển động: gỡ class và lưu localStorage",
+      !!reducedOff,
+      `class=${await ev(`document.body.className`)}, storage=${await ev(`localStorage.getItem('tg_reduced_motion')`)}`,
+    );
+
     // 5. ARIA cơ bản + mở bảng thì focus vào trong bảng
     await press(t, K.i);
     check(
