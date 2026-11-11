@@ -8,7 +8,7 @@
 | 2.1 red team tin nhắn | **Xong** | `npm run red-team -w server` (#265): 49 loại tin (từ M4.2b có thêm `ping`) x nhiều biến thể payload x 2 người gửi (nghèo / giàu) = 2744 đòn, bắt `[lỗi]`, bất biến SỐNG, tự phát hiện loại tin; A đã thử 3 đột biến thật vào `WorldRoom.ts`, đều đỏ |
 | 2.2 fuzz bất biến kinh tế | **Xong** | `economy-fuzz` (gđ 1), `kill-share-fuzz`, `sect-life-fuzz` (#271: tìm và sửa lỗi MẤT Linh thạch khi rút kho ở Hoàng Tuyền), `sect-crash` |
 | 2.3 kiểm tốc độ / dịch chuyển | **Kết luận: đủ bằng cấu trúc** | không làm cờ riêng (xem mục 2.3) |
-| 2.4 audit log | **Xong lát 1 + 2** (#266, #268) | còn (khi cần): đầu thai, PK, thưởng bí cảnh lớn (issue #263 còn mở) |
+| 2.4 audit log | **Xong lát 1 + 2 + 3** (#266, #268, lát 3 PR #306) | thêm đầu thai (`soul.*`), PK (`duel.*`), bí cảnh (`dungeon.*`) và **cảnh báo lặp lại** (`alert.*`, in `[CẢNH BÁO]`; người dùng chốt: chỉ ghi nhận + cảnh báo); danh sách đầy đủ ở `docs/TRIEN_KHAI.md` mục 5.3 |
 | 2.5 `PROTOCOL_VERSION` | **Xong** | shared #258, server #261, client #264, sửa modal #270, E2E #267 + #272 |
 | 3.1 release workflow | Chưa | chờ người dùng (kho ảnh Docker) |
 | 3.2 cấu hình / bí mật; 3.4 sao lưu + khôi phục | **Xong** (#279, issue #276) | `npm run check:env`, `npm run khoi-phuc-thu`, `docs/TRIEN_KHAI.md` mục 7.3 / 7.4 |

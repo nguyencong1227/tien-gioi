@@ -68,6 +68,16 @@ export function beginLimbo(w: World, sid: string, p: Player, c: PlayerCtrl) {
     counts,
     credited: false,
   };
+  // Nhật ký kiểm toán (M4 2.4): chết thật là sự kiện quan trọng của kinh tế (tiền / đồ về 0), ghi LÚC còn số liệu kiếp cũ
+  w.audit?.("soul.limbo", {
+    name: p.name,
+    kiep: c.soul.kiep,
+    realm: life.realm,
+    tier: life.tier,
+    coin: c.coin,
+    counts,
+    gain: c.limbo.summary.gain,
+  });
   p.dead = true;
   p.meditating = false;
   c.deadAt = w.now;
@@ -132,6 +142,14 @@ export function applyRebirth(
   for (const it of startPackOf(c.soul.unlocks)) addToInventory(c.inv, it.itemId, it.qty);
   for (const id of choice.keep) addToInventory(c.inv, id, 1);
   c.coin = Math.min(limbo.coinAtDeath, coinCarryCap(c.soul.unlocks));
+  w.audit?.("soul.rebirth", {
+    name: p.name,
+    kiep: c.soul.kiep,
+    origin: choice.origin,
+    coin: c.coin,
+    coinAtDeath: limbo.coinAtDeath,
+    kept: choice.keep.length,
+  });
   c.origin = choice.origin;
   c.mult = originMult(choice.origin);
   c.limbo = undefined;

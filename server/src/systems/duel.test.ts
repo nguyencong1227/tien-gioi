@@ -604,3 +604,52 @@ describe("khoá thời gian khi vừa bị đánh", () => {
     expect(t.duelInvites).toHaveLength(1);
   });
 });
+
+describe("nhật ký kiểm toán: PK thách đấu (M4 2.4, lát 3)", () => {
+  const withAudit = (t: T) => {
+    const log: { ev: string; f: Record<string, unknown> }[] = [];
+    t.w.audit = (ev, f) => void log.push({ ev, f: f ?? {} });
+    return log;
+  };
+
+  it("nhận lời thách ghi duel.start (hai đạo hiệu); từ chối hoặc lời mời hết hạn thì không", () => {
+    const t = setup([A, B, C, D]);
+    const log = withAudit(t);
+    duelChallenge(t.w, C, { name: D });
+    decline(t, D, C);
+    expect(log).toEqual([]);
+    startDuel(t, A, B);
+    expect(log).toEqual([{ ev: "duel.start", f: { a: A, b: B } }]);
+  });
+
+  it("đầu hàng ghi duel.end MỘT lần với người thắng và lý do; hai bên rời / gọi lại không ghi thêm", () => {
+    const t = setup();
+    startDuel(t, A, B);
+    const log = withAudit(t);
+    toFight(t);
+    duelYield(t.w, B);
+    expect(log).toEqual([{ ev: "duel.end", f: { a: A, b: B, winner: A, reason: "yield" } }]);
+    duelYield(t.w, B);
+    duelDrop(t.w, A);
+    expect(log.filter((x) => x.ev === "duel.end")).toHaveLength(1);
+  });
+
+  it("hoà (rớt kết nối) ghi winner = null", () => {
+    const t = setup();
+    startDuel(t, A, B);
+    const log = withAudit(t);
+    duelDrop(t.w, B);
+    expect(log).toEqual([
+      { ev: "duel.end", f: { a: A, b: B, winner: null, reason: "disconnect" } },
+    ]);
+  });
+
+  it("world.audit = null: không ghi và không lỗi", () => {
+    const t = setup();
+    expect(t.w.audit).toBeNull();
+    expect(() => {
+      startDuel(t, A, B);
+      duelYield(t.w, B);
+    }).not.toThrow();
+  });
+});

@@ -529,6 +529,7 @@ export function finishRun(
   run.phase = result;
   run.endReason = reason;
   run.exitAt = w.now + exitDelayMs;
+  w.audit?.("dungeon.end", { run: run.id, dungeon: run.dungeonId, result, reason });
   for (const m of insideMembers(w, run)) {
     const c = w.ctrl.get(m.sid);
     if (!c) continue;
@@ -559,6 +560,12 @@ function payReward(w: World, sid: string, def: DungeonDef): NonNullable<DungeonE
     items.push({ itemId: r.itemId, qty: r.qty });
   }
   if (items.length > 0) refreshQuests(w, sid); // bước "thu thập" phụ thuộc túi đồ
+  w.audit?.("dungeon.reward", {
+    name: p?.name ?? null,
+    dungeon: def.id,
+    coin,
+    items: items.length,
+  });
   return { coin, items };
 }
 

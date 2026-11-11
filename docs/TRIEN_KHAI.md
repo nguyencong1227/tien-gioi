@@ -230,7 +230,26 @@ CORS_ORIGINS=https://localhost,capacitor://localhost   # khớp CHÍNH XÁC từ
 - Mục sai (`*`, `https://x/`, `https://x/app`, thiếu lược đồ) bị bỏ kèm cảnh báo `[CẢNH BÁO]` lúc khởi động; tối đa 20 nguồn.
 - Đường `/matchmake/*` (vào phòng) do Colyseus tự xử lý CORS: mặc định phản chiếu mọi nguồn và KHÔNG đổi bởi biến này (Vite dev ở cổng 5173 cần nó). Đã kiểm bằng Chrome thật: không đặt biến thì trang khác nguồn không đọc được `/health` hay `/api/auth/*`; đặt biến thì đọc được cả hai (kể cả POST JSON kèm `Authorization`).
 
-**Xoay vòng log:** `docker-compose.yml` giới hạn log của container (`json-file`, 10 MB x 5 tệp) để log không ăn đầy đĩa; log cũ hơn bị Docker xoá, nên nếu cần lưu lâu thì chuyển log sang nơi khác (hoặc đổi `logging.driver`). Nhật ký kiểm toán (`AUDIT_LOG`) cùng đi qua đường này.
+### 5.3. Nhật ký kiểm toán và cảnh báo gian lận (M4 2.4)
+Mỗi sự kiện nhạy cảm là MỘT dòng JSON trên stdout (`{"t":"<ISO>","audit":1,"ev":"nhóm.việc",...}`), bật mặc định (`AUDIT_LOG=off` tắt; mục 2). Xem: `docker logs tien-gioi | grep '"audit":1'` (lọc theo sự kiện: `... | grep '"ev":"wallet.big"'`). Quyết định của người dùng (11/11/2026): bản đầu **chỉ ghi nhận và cảnh báo, KHÔNG tự khoá tài khoản**; con người xem log rồi quyết định.
+
+| Nhóm | Sự kiện | Ghi khi |
+|---|---|---|
+| Tài khoản | `auth.registered`, `auth.login_ok`, `auth.login_failed`, `auth.recovered`, `auth.recover_failed`, `auth.rate_limited` | đăng ký, đăng nhập, khôi phục; bị giới hạn tần suất (kèm IP) |
+| Vào phòng | `join.denied` (`bad_secret` / `bad_token`), `room.spam_kick` | sai mã / token; bị ngắt vì gửi quá nhiều tin |
+| Ví | `wallet.big` | một giao dịch >= `AUDIT_COIN_THRESHOLD` |
+| Tông môn | `sect.create`, `sect.kick`, `sect.transfer`, `sect.disband`, `sect.deposit`, `sect.withdraw` | thay đổi quan trọng / tiền vào ra kho |
+| Luân hồi | `soul.limbo`, `soul.rebirth` | chết thật (kèm Linh thạch, cảnh giới, kiếp, Duyên) / đầu thai (kiếp mới, xuất thân, Linh thạch mang theo và lúc chết) |
+| PK | `duel.start`, `duel.end` | nhận lời thách đấu / hết trận (người thắng hoặc `null` nếu hoà, lý do) |
+| Bí cảnh | `dungeon.reward`, `dungeon.end` | phát thưởng cho từng người (Linh thạch, số món) / run kết thúc (thắng thua, lý do) |
+| Cảnh báo | `alert.spam_kicks`, `alert.auth_flood`, `alert.join_guess` | xem dưới |
+
+**Cảnh báo lặp lại** (`server/src/audit.ts`, `ALERT_RULES`): cùng một khoá gây đủ số lần trong 10 phút thì ghi thêm một sự kiện `alert.*` (kèm `of`, `key`, `count`, `windowS`) và in một dòng **`[CẢNH BÁO] ...` ra stderr**: `room.spam_kick` >= 3 lần cùng đạo hiệu (`alert.spam_kicks`: client sửa / bot); `auth.rate_limited` >= 5 lần cùng IP (`alert.auth_flood`: dò mật khẩu / đăng ký hàng loạt); `join.denied` >= 5 lần cùng đạo hiệu (`alert.join_guess`: dò mã bí mật). Mỗi (luật, khoá) chỉ báo một lần mỗi cửa sổ; bộ nhớ theo dõi có trần 2000 khoá. Đặt cảnh báo trên chuỗi `[CẢNH BÁO]` / `"audit":1,"ev":"alert.` trong log. Không có luật nào tự ngắt hay khoá ai.
+
+**Riêng tư:** dòng audit có thể chứa đạo hiệu, tên tài khoản và IP của người chơi: chỉ dành cho vận hành, không đưa ra ngoài. Mật khẩu, mã khôi phục, token, mã bí mật không bao giờ vào audit (khoá giống bí mật bị loại ở `cleanAuditFields`).
+
+### 5.4. Xoay vòng log
+`docker-compose.yml` giới hạn log của container (`json-file`, 10 MB x 5 tệp) để log không ăn đầy đĩa; log cũ hơn bị Docker xoá, nên nếu cần lưu lâu thì chuyển log sang nơi khác (hoặc đổi `logging.driver`). Nhật ký kiểm toán (`AUDIT_LOG`) cùng đi qua đường này.
 
 ---
 

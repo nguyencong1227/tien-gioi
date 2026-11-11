@@ -771,6 +771,31 @@ describe("trùm chết: thắng, thưởng hoàn thành, lượt mỗi ngày (4c
     expect(f.dun.dungeonStates.at(-1)!.msg.phase).toBe("won");
   });
 
+  it("nhật ký kiểm toán: hạ trùm ghi dungeon.end MỘT lần và dungeon.reward cho từng người nhận thưởng (không cho người không đủ điều kiện)", () => {
+    const f = fight();
+    const log: { ev: string; f: Record<string, unknown> }[] = [];
+    f.w.audit = (ev, fields) => void log.push({ ev, f: fields ?? {} });
+    f.boss.mc.damageBy.delete(MEMBER); // chỉ LEADER đủ điều kiện
+    bossKilled(f.w, f.boss.mc);
+    const ends = log.filter((x) => x.ev === "dungeon.end");
+    expect(ends).toHaveLength(1);
+    expect(ends[0].f).toMatchObject({
+      run: f.run.id,
+      dungeon: def.id,
+      result: "won",
+      reason: "boss_dead",
+    });
+    const rewards = log.filter((x) => x.ev === "dungeon.reward");
+    expect(rewards).toHaveLength(1);
+    expect(rewards[0].f).toMatchObject({ name: LEADER, dungeon: def.id, coin: def.reward.coin });
+    expect(Number(rewards[0].f.items)).toBeGreaterThanOrEqual(1);
+    // kết thúc là một lần: gọi lại không ghi thêm
+    finishRun(f.w, f.run, "lost", "timeout");
+    bossKilled(f.w, f.boss.mc);
+    expect(log.filter((x) => x.ev === "dungeon.end")).toHaveLength(1);
+    expect(log.filter((x) => x.ev === "dungeon.reward")).toHaveLength(1);
+  });
+
   it("người chưa gây sát thương cho trùm: không thưởng, `noReward: no_damage`, không trừ lượt; người rời / đã chết không được tính", () => {
     const f = fight();
     f.boss.mc.damageBy.delete(MEMBER);
