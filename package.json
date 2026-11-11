@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "concurrently -n server,client -c yellow,cyan \"npm run dev -w server\" \"npm run dev -w client\"",
     "build": "npm run build -w client",
+    "build:native": "npm run build:native -w client",
     "start": "npm run start -w server",
     "typecheck": "tsc -p server --noEmit && tsc -p client --noEmit",
     "lint": "eslint .",

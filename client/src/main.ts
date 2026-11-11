@@ -27,7 +27,7 @@ import { captureEarlyMessages } from "./early-messages";
 import { joinWithRedirect, isClientOutdatedError } from "./connection";
 import { clearToken, getToken } from "./auth";
 import { initAuthUi, switchAuthView } from "./auth-ui";
-import { setupPwa, canReloadSafely, type PwaGameState } from "./pwa";
+import { setupPwa, canReloadSafely, isNativeApp, type PwaGameState } from "./pwa";
 import { HeartbeatController } from "./heartbeat";
 import { sound } from "./audio";
 
@@ -369,23 +369,20 @@ function setupRoomLifecycle(room: Room) {
   activeHeartbeat?.stop();
   activeHeartbeat = null;
 
-  // Khởi động nhịp tim nếu không phải phòng bí cảnh (M4.2b)
-  const isDungeon = activeScene && isDungeonMap(activeScene.map.def.id);
-  if (!isDungeon) {
-    activeHeartbeat = new HeartbeatController({
-      room,
-      sound,
-      onDead: () => {
-        startReconnect("heartbeat");
-      },
-    });
-    activeHeartbeat.start();
-    if (
-      typeof window !== "undefined" &&
-      (import.meta.env.DEV || new URLSearchParams(location.search).has("debug"))
-    ) {
-      (window as any).__heartbeat = activeHeartbeat;
-    }
+  // Khởi động nhịp tim (M4.2b: cả trong bí cảnh, chết sẽ gọi startReconnect -> showDisconnected)
+  activeHeartbeat = new HeartbeatController({
+    room,
+    sound,
+    onDead: () => {
+      startReconnect("heartbeat");
+    },
+  });
+  activeHeartbeat.start();
+  if (
+    typeof window !== "undefined" &&
+    (import.meta.env.DEV || new URLSearchParams(location.search).has("debug"))
+  ) {
+    (window as any).__heartbeat = activeHeartbeat;
   }
 
   // Lắng nghe sự kiện đi qua cổng chuyển phòng (M3 bước 1)
@@ -654,7 +651,8 @@ function getPwaGameState(): PwaGameState {
 
 let pendingPwaUpdate: (() => void) | null = null;
 
-if (import.meta.env.PROD || new URLSearchParams(location.search).has("pwa")) {
+// Quản lý PWA và cập nhật an toàn: chỉ kích hoạt Service Worker ở web production (không bật khi build native)
+if (!isNativeApp() && (import.meta.env.PROD || new URLSearchParams(location.search).has("pwa"))) {
   const pwa = setupPwa({
     getGameState: getPwaGameState,
     onUpdateReady: (applyUpdate, isSafe) => {

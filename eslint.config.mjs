@@ -6,7 +6,7 @@ import eslintConfigPrettier from "eslint-config-prettier";
 
 export default tseslint.config(
   {
-    ignores: ["**/node_modules/**", "**/dist/**", "server/data/**"],
+    ignores: ["**/node_modules/**", "**/dist/**", "server/data/**", "app/android/**"],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
