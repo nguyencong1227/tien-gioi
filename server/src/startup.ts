@@ -1,6 +1,7 @@
 import { authModeOf, parseTrustProxy } from "./auth-http";
 import { storeKindOf } from "./stores";
 import { minProtocolOf } from "./protocol";
+import { corsOriginsOf } from "./cors";
 import { metricsTokenOf, thresholdsOf } from "./metrics";
 
 /** Cảnh báo cấu hình in ra khi server khởi động (thuần hàm để test được). */
@@ -47,6 +48,7 @@ export function startupWarnings(env: NodeJS.ProcessEnv): string[] {
   }
   warnings.push(...minProtocolOf(env).warnings);
   warnings.push(...metricsTokenOf(env).warnings, ...thresholdsOf(env).warnings);
+  warnings.push(...corsOriginsOf(env).warnings);
   const kind = storeKindOf(env);
   if (env.STORE !== undefined && env.STORE !== "" && env.STORE !== "file" && env.STORE !== "pg") {
     warnings.push(`STORE='${env.STORE}' không hợp lệ (chỉ 'file' hoặc 'pg'): đang dùng 'file'.`);

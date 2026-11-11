@@ -55,6 +55,7 @@ npm run build
 | `TICK_WARN_MS` | `25` | Ngưỡng cảnh báo `[CẢNH BÁO]` trong log khi p95 thời gian tick của phòng tệ nhất (cửa sổ ~60 giây) vượt quá số ms này; nhịp tick là 50 ms, ngân sách thiết kế < 10 ms | Không | Mặc định; hạ xuống nếu muốn báo sớm | `server/src/metrics.ts` |
 | `WRITE_WARN_PENDING` | `200` | Cảnh báo khi số lần ghi hồ sơ nhân vật đang chờ vượt quá số này (kho lưu trữ chậm) | Không | Mặc định | `server/src/metrics.ts` |
 | `WRITE_WARN_AGE_S` | `30` | Cảnh báo khi lần ghi hồ sơ chờ lâu nhất quá số giây này (kho lưu trữ có thể đã kẹt) | Không | Mặc định | `server/src/metrics.ts` |
+| `CORS_ORIGINS` | Không có (TẮT) | Danh sách nguồn (phẩy ngăn cách) được đọc `/health` và `/api/*` từ trình duyệt khác nguồn, vd `https://localhost,capacitor://localhost` cho app đóng gói (mục 5.2). Chỉ nhận dạng `lược đồ://máy[:cổng]`; `*`, đường dẫn, dấu `/` cuối bị bỏ kèm cảnh báo | Không | Để trống cho web cùng nguồn; chỉ đặt khi có client đóng gói / đặt khác nguồn | `server/src/cors.ts`, `server/src/startup.ts`, `server/src/index.ts` |
 
 > [!IMPORTANT]
 > **Tài khoản (`AUTH_MODE=account`) và proxy:** chỉ ở chế độ `account` server mới mở `/api/auth/*` (đăng ký, đăng nhập, phiên, khôi phục mật khẩu); `legacy` không mở API nào. Giới hạn tần suất đăng nhập tính **theo IP của khách** (10 lần sai / 10 phút, 5 lần đăng ký / giờ). Khi chạy sau reverse proxy (mục 4) mà không đặt `TRUST_PROXY=1`, mọi người chơi trông như cùng một IP (của proxy) và **dùng chung** hạn mức đó cho cả server; ngược lại, đặt `TRUST_PROXY` khi KHÔNG có proxy ghi đè `X-Forwarded-For` thì kẻ xấu tự đặt IP để qua mặt giới hạn. Mật khẩu đi qua mạng: chỉ mở thật qua HTTPS (mục 4). Server khởi động sẽ in cảnh báo nếu cấu hình production còn `legacy`, hoặc `account` mà chưa đặt `TRUST_PROXY`. Dữ liệu tài khoản nằm trong `DATA_DIR/accounts` và `DATA_DIR/sessions` (chỉ có băm; `npm run backup` đã gồm).
@@ -217,6 +218,17 @@ Số đo chính (tiền tố `tiengioi_`):
 > }
 > ```
 > Token vẫn là lớp bảo vệ cuối (so sánh thời gian hằng, không in token vào log), nhưng đừng dựa vào nó một mình.
+
+### 5.2. CORS cho client khác nguồn (app đóng gói, M4.2a-1)
+Web phục vụ client và server cùng một địa chỉ nên không cần CORS và **mặc định server không gửi tiêu đề CORS nào** (`CORS_ORIGINS` không đặt = hành vi y như trước). App đóng gói (Capacitor) chạy ở nguồn riêng (`https://localhost`, `http://localhost`, `capacitor://localhost`) và gọi HTTP sang server nên cần được cho phép:
+```bash
+CORS_ORIGINS=https://localhost,capacitor://localhost   # khớp CHÍNH XÁC từng nguồn, không ký tự đại diện
+```
+- Chỉ áp cho `/health` và `/api/*` (đăng ký / đăng nhập / phiên). **Không** áp cho `/metrics` (dành cho máy giám sát, không cho trình duyệt).
+- Nguồn trong danh sách nhận `Access-Control-Allow-Origin: <đúng nguồn đó>` (không bao giờ `*`), preflight trả 204 với phương thức `GET, POST, OPTIONS` và tiêu đề `Content-Type, Authorization`; **không** `Allow-Credentials` (API dùng `Authorization: Bearer`, không cookie). Nguồn lạ không nhận tiêu đề nào, preflight bị 403.
+- Đây KHÔNG phải rào chắn CSRF: yêu cầu từ nguồn lạ vẫn được xử lý như trước (chỉ trình duyệt của nguồn lạ không đọc được phản hồi). Lớp bảo vệ thật là kiểu nội dung `application/json` và token trong tiêu đề.
+- Mục sai (`*`, `https://x/`, `https://x/app`, thiếu lược đồ) bị bỏ kèm cảnh báo `[CẢNH BÁO]` lúc khởi động; tối đa 20 nguồn.
+- Đường `/matchmake/*` (vào phòng) do Colyseus tự xử lý CORS: mặc định phản chiếu mọi nguồn và KHÔNG đổi bởi biến này (Vite dev ở cổng 5173 cần nó). Đã kiểm bằng Chrome thật: không đặt biến thì trang khác nguồn không đọc được `/health` hay `/api/auth/*`; đặt biến thì đọc được cả hai (kể cả POST JSON kèm `Authorization`).
 
 **Xoay vòng log:** `docker-compose.yml` giới hạn log của container (`json-file`, 10 MB x 5 tệp) để log không ăn đầy đĩa; log cũ hơn bị Docker xoá, nên nếu cần lưu lâu thì chuyển log sang nơi khác (hoặc đổi `logging.driver`). Nhật ký kiểm toán (`AUDIT_LOG`) cùng đi qua đường này.
 
