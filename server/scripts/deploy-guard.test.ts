@@ -21,7 +21,8 @@ export function validateProdCompose(content: string): { valid: boolean; errors: 
   }
 
   // 2. Cổng dịch vụ game CHỈ được lắng nghe trên loopback 127.0.0.1:2567
-  const gameBlock = content.match(/\n  game:\s*\n([\s\S]*?)(?=\n  [a-z0-9_-]+:|\s*$)/i)?.[1] ?? "";
+  const gameBlock =
+    content.match(/\n {2}game:\s*\n([\s\S]*?)(?=\n {2}[a-z0-9_-]+:|\s*$)/i)?.[1] ?? "";
   const portsMatch = gameBlock.match(/ports:\s*\n([\s\S]*?)(?=\n {4}[a-zA-Z0-9_-]+:|\s*$)/);
   if (!portsMatch) {
     errors.push("dịch vụ game thiếu cấu hình ports rõ ràng");
@@ -38,7 +39,7 @@ export function validateProdCompose(content: string): { valid: boolean; errors: 
   }
 
   // 3. Cơ sở dữ liệu db tuyệt đối không được mở cổng (không có mục ports trong khối db)
-  const dbBlock = content.match(/\n  db:\s*\n([\s\S]*?)(?=\n  [a-z0-9_-]+:|\s*$)/i)?.[1] ?? "";
+  const dbBlock = content.match(/\n {2}db:\s*\n([\s\S]*?)(?=\n {2}[a-z0-9_-]+:|\s*$)/i)?.[1] ?? "";
   if (/^\s*ports\s*:/m.test(dbBlock)) {
     errors.push("Dịch vụ db (PostgreSQL) không được mở cổng ra ngoài host / Internet");
   }
@@ -172,6 +173,14 @@ describe("Hàng rào bảo vệ môi trường dev và kiểm tra triển khai (
     const res = validateProdSh(content);
     expect(res.errors).toEqual([]);
     expect(res.valid).toBe(true);
+  });
+
+  it("tệp restore-test.sh đạt chuẩn kiểm tra khôi phục sao lưu", () => {
+    const content = readFileSync(restoreTestShPath, "utf-8");
+    expect(content).toContain("pg_isready");
+    expect(content).toContain("LAST_RESTORE_OK");
+    expect(content).toContain("restore-test.log");
+    expect(content).toContain("SELECT count(*) FROM");
   });
 
   describe("Kiểm thử 8 đột biến kiểm chứng (Mutation Testing)", () => {
