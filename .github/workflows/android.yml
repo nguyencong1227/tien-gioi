@@ -23,6 +23,11 @@ jobs:
     name: Dựng gói APK Android (Debug & Release)
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    env:
+      # `secrets` KHÔNG được phép trong `if:` của bước: GitHub báo "workflow file issue" và không chạy gì
+      # (A đo bằng workflow thật trên nhánh tạm, review #315). Tính cờ ở cấp job rồi so `env.HAS_SIGNING_SECRETS`.
+      # Giá trị chỉ là true / false, không phải bí mật; bản thân các bí mật chỉ nằm trong `env:` của bước ký.
+      HAS_SIGNING_SECRETS: ${{ secrets.ANDROID_KEYSTORE_B64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '' }}
 
     steps:
       # 1. Xác định thẻ phiên bản: `inputs.tag` (chạy tay) hoặc tên thẻ vừa đẩy.
@@ -46,22 +51,27 @@ jobs:
         with:
           ref: refs/tags/${{ steps.tag.outputs.tag }}
           fetch-depth: 0
+          # Token có quyền contents: write KHÔNG được nằm trong .git/config khi `npm ci` / Gradle chạy mã bên thứ ba;
+          # các bước cần token (`gh release`) tự nhận qua `env:`. fetch-depth 0 đã lấy sẵn origin/main.
+          persist-credentials: false
 
       # 3. Chỉ dựng APK từ commit ĐÃ MERGE trên main
       - name: Kiểm tra thẻ nằm trên main
         run: |
-          git fetch origin main
+          git rev-parse --verify --quiet refs/remotes/origin/main >/dev/null \
+            || { echo "::error::Không có origin/main sau checkout"; exit 1; }
           if ! git merge-base --is-ancestor HEAD origin/main; then
             echo "::error::Commit của thẻ không nằm trên main: chỉ phát hành mã đã merge"
             exit 1
           fi
 
-      # 4. Môi trường Java 17 cho Gradle và Android build tools
-      - name: Thiết lập Java 17
+      # 4. Java 21: dự án Android do Capacitor 8 sinh ra đặt `sourceCompatibility JavaVersion.VERSION_21`
+      # (app/android/app/capacitor.build.gradle); Java 17 làm mọi lần dựng lỗi "invalid source release: 21".
+      - name: Thiết lập Java 21
         uses: actions/setup-java@v4
         with:
           distribution: "temurin"
-          java-version: "17"
+          java-version: "21"
 
       # 5. Thiết lập Gradle với bộ đệm tự động
       - name: Thiết lập Gradle
@@ -109,7 +119,7 @@ jobs:
 
       # 10. Dựng và ký APK Release (chỉ khi có đủ 4 bí mật ký)
       - name: Dựng và ký APK Release
-        if: ${{ secrets.ANDROID_KEYSTORE_B64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '' }}
+        if: ${{ env.HAS_SIGNING_SECRETS == 'true' }}
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
           KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -156,7 +166,7 @@ jobs:
 
       # 11. Thông báo nếu thiếu bí mật ký APK Release
       - name: Thông báo trạng thái bí mật ký APK
-        if: ${{ !(secrets.ANDROID_KEYSTORE_B64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '') }}
+        if: ${{ env.HAS_SIGNING_SECRETS != 'true' }}
         run: |
           echo "::notice::Bí mật ký Android chưa được cấu hình đầy đủ (cần ANDROID_KEYSTORE_B64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD)."
           echo "Chỉ dựng bản Debug APK. Để tạo bản Release APK đã ký, xem hướng dẫn trong docs/APP_ANDROID.md."
@@ -177,9 +187,16 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG_NAME: ${{ steps.tag.outputs.tag }}
         run: |
-          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+          # release.yml (chạy song song cùng thẻ) tạo bản phát hành ở CUỐI job sau khi chạy test: chờ tối đa ~10 phút.
+          found=0
+          for _ in $(seq 1 20); do
+            if gh release view "$TAG_NAME" >/dev/null 2>&1; then found=1; break; fi
+            echo "Chưa có GitHub Release $TAG_NAME, chờ 30 giây..."
+            sleep 30
+          done
+          if [ "$found" = 1 ]; then
             echo "Đang đính tệp APK lên GitHub Release $TAG_NAME..."
             gh release upload "$TAG_NAME" tien-gioi-*.apk tien-gioi-*.sha256 --clobber
           else
-            echo "Chưa có GitHub Release cho $TAG_NAME. Bỏ qua upload (tệp APK đã lưu ở Actions Artifacts)."
+            echo "::warning::Chưa có GitHub Release cho $TAG_NAME sau ~10 phút. Bỏ qua upload (APK đã lưu ở Actions Artifacts; chạy lại workflow bằng workflow_dispatch khi release đã có)."
           fi

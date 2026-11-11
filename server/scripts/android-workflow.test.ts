@@ -114,23 +114,45 @@ export function validateAndroidWorkflow(content: string): AndroidWorkflowValidat
     }
   }
 
-  // 5. Điều kiện `if:` của bước ký APK Release
-  // Bước ký phải có điều kiện `if:` kiểm tra đầy đủ 4 bí mật ký
-  const releaseSigningStep = content.match(/name:\s*Dựng và ký APK Release\s*\n\s*if:\s*([^\n]+)/);
-  if (!releaseSigningStep) {
-    errors.push("Bước 'Dựng và ký APK Release' phải có điều kiện 'if:' kiểm tra bí mật ký Android");
+  // 5. Điều kiện ký APK Release.
+  // `secrets` KHÔNG dùng được trong `if:` của bước: GitHub coi cả tệp là không hợp lệ ("workflow file issue",
+  // không chạy gì; A đo bằng workflow thật, review #315). Mẫu đúng: cờ HAS_SIGNING_SECRETS tính ở `env:` CẤP JOB từ
+  // đủ 4 bí mật, bước ký chỉ so `env.HAS_SIGNING_SECRETS == 'true'`.
+  lines.forEach((line, idx) => {
+    if (/^\s*(?:-\s+)?if:/.test(line) && /\bsecrets\./.test(line)) {
+      errors.push(
+        `'secrets' không được dùng trong 'if:' của bước (workflow thành không hợp lệ): dòng ${idx + 1}: ${line.trim()}`,
+      );
+    }
+  });
+  const flag = content.match(/^ {6}HAS_SIGNING_SECRETS:\s*([^\n]+)/m);
+  if (!flag) {
+    errors.push("Thiếu cờ HAS_SIGNING_SECRETS ở 'env:' cấp job (tính từ 4 bí mật ký Android)");
   } else {
-    const ifCondition = releaseSigningStep[1];
-    const requiredInIf = [
+    for (const req of [
       "ANDROID_KEYSTORE_B64",
       "ANDROID_KEYSTORE_PASSWORD",
       "ANDROID_KEY_ALIAS",
       "ANDROID_KEY_PASSWORD",
-    ];
-    for (const req of requiredInIf) {
-      if (!ifCondition.includes(req)) {
-        errors.push(`Điều kiện 'if:' của bước ký Release thiếu kiểm tra bí mật '${req}'`);
+    ]) {
+      if (!flag[1].includes(`secrets.${req}`)) {
+        errors.push(`Cờ HAS_SIGNING_SECRETS thiếu kiểm tra bí mật '${req}'`);
       }
+    }
+  }
+  const releaseSigningStep = content.match(/name:\s*Dựng và ký APK Release\s*\n\s*if:\s*([^\n]+)/);
+  if (!releaseSigningStep) {
+    errors.push("Bước 'Dựng và ký APK Release' phải có điều kiện 'if:' theo cờ bí mật ký Android");
+  } else if (!/env\.HAS_SIGNING_SECRETS\s*==\s*'true'/.test(releaseSigningStep[1])) {
+    errors.push("Điều kiện 'if:' của bước ký Release phải là env.HAS_SIGNING_SECRETS == 'true'");
+  }
+  // Bí mật chỉ nằm trong `env:` của BƯỚC KÝ (không ở cấp job / workflow, để các bước npm / Gradle không thấy)
+  const jobEnvBlock = content.match(/^ {4}env:\s*\n((?: {6}.*\n)+)/m)?.[1] ?? "";
+  for (const l of jobEnvBlock.split("\n")) {
+    if (/secrets\./.test(l) && !/^\s*#/.test(l) && !/^ {6}HAS_SIGNING_SECRETS:/.test(l)) {
+      errors.push(
+        `Bí mật không được nằm trong env cấp job (chỉ cờ HAS_SIGNING_SECRETS): ${l.trim()}`,
+      );
     }
   }
 
@@ -156,8 +178,9 @@ export function validateAndroidWorkflow(content: string): AndroidWorkflowValidat
   if (!/actions\/setup-java@v4/.test(code)) {
     errors.push("Thiếu bước thiết lập Java (actions/setup-java@v4)");
   }
-  if (!/java-version:\s*["']?17["']?/.test(code)) {
-    errors.push("Java phải được cấu hình phiên bản 17 cho Android Gradle Plugin");
+  // Dự án Capacitor 8 đặt sourceCompatibility = VERSION_21 (app/android/app/capacitor.build.gradle)
+  if (!/java-version:\s*["']?21["']?/.test(code)) {
+    errors.push("Java phải được cấu hình phiên bản 21 (dự án Android yêu cầu VERSION_21)");
   }
   if (!/gradle\/actions\/setup-gradle@v4/.test(code)) {
     errors.push("Thiếu bước thiết lập bộ đệm Gradle (gradle/actions/setup-gradle@v4)");
@@ -184,6 +207,11 @@ export function validateAndroidWorkflow(content: string): AndroidWorkflowValidat
   // 9. Thẻ phiên bản và chống chèn lệnh
   if (!/ref:\s*refs\/tags\//.test(code)) {
     errors.push("Bước checkout phải lấy đúng thẻ (`ref: refs/tags/...`)");
+  }
+  if (!/persist-credentials:\s*false/.test(code)) {
+    errors.push(
+      "Bước checkout phải đặt persist-credentials: false (token ghi không nằm trong .git/config khi npm / Gradle chạy)",
+    );
   }
   if (!/\^v\[0-9\]\+/.test(code)) {
     errors.push("Thiếu bước kiểm tra thẻ đúng định dạng vX.Y.Z trước khi dựng");
@@ -252,9 +280,10 @@ describe("Kiểm tra tĩnh Workflow Dựng APK Android (.github/workflows/androi
 
     it("Đột biến 2: Bỏ điều kiện if: của bước ký APK Release -> BỊ CHẶN", () => {
       const mutated = workflowContent.replace(
-        /if:\s*\$\{\{\s*secrets\.ANDROID_KEYSTORE_B64[^}]+\}\}/,
-        "",
+        /(name:\s*Dựng và ký APK Release\s*\n\s*)if:[^\n]+\n/,
+        "$1",
       );
+      expect(mutated).not.toBe(workflowContent);
       const res = validateAndroidWorkflow(mutated);
       expect(res.valid).toBe(false);
       expect(res.errors.some((e) => e.includes("điều kiện 'if:'"))).toBe(true);
@@ -335,6 +364,55 @@ describe("Kiểm tra tĩnh Workflow Dựng APK Android (.github/workflows/androi
       const res = validateAndroidWorkflow(mutated);
       expect(res.valid).toBe(false);
       expect(res.errors.some((e) => e.includes("vX.Y.Z"))).toBe(true);
+    });
+
+    it("Đột biến 11: dùng secrets.* trực tiếp trong if: của bước (workflow thành không hợp lệ trên GitHub) -> BỊ CHẶN", () => {
+      const mutated = workflowContent.replace(
+        "if: ${{ env.HAS_SIGNING_SECRETS == 'true' }}",
+        "if: ${{ secrets.ANDROID_KEYSTORE_B64 != '' }}",
+      );
+      expect(mutated).not.toBe(workflowContent);
+      const res = validateAndroidWorkflow(mutated);
+      expect(res.valid).toBe(false);
+      expect(res.errors.some((e) => e.includes("không được dùng trong 'if:'"))).toBe(true);
+    });
+
+    it("Đột biến 12: cờ HAS_SIGNING_SECRETS thiếu một bí mật (ký với keystore mà thiếu mật khẩu) -> BỊ CHẶN", () => {
+      const mutated = workflowContent.replace(" && secrets.ANDROID_KEY_PASSWORD != ''", "");
+      expect(mutated).not.toBe(workflowContent);
+      const res = validateAndroidWorkflow(mutated);
+      expect(res.valid).toBe(false);
+      expect(res.errors.some((e) => e.includes("ANDROID_KEY_PASSWORD"))).toBe(true);
+    });
+
+    it("Đột biến 13: Java 17 thay vì 21 (build Capacitor 8 lỗi 'invalid source release: 21') -> BỊ CHẶN", () => {
+      const mutated = workflowContent.replace('java-version: "21"', 'java-version: "17"');
+      expect(mutated).not.toBe(workflowContent);
+      const res = validateAndroidWorkflow(mutated);
+      expect(res.valid).toBe(false);
+      expect(res.errors.some((e) => e.includes("Java phải được cấu hình phiên bản 21"))).toBe(true);
+    });
+
+    it("Đột biến 14: bỏ persist-credentials: false (token ghi nằm trong .git/config) -> BỊ CHẶN", () => {
+      const mutated = workflowContent.replace(
+        "persist-credentials: false",
+        "persist-credentials: true",
+      );
+      expect(mutated).not.toBe(workflowContent);
+      const res = validateAndroidWorkflow(mutated);
+      expect(res.valid).toBe(false);
+      expect(res.errors.some((e) => e.includes("persist-credentials"))).toBe(true);
+    });
+
+    it("Đột biến 15: bí mật ký nằm ở env cấp job (mọi bước npm / Gradle đều thấy) -> BỊ CHẶN", () => {
+      const mutated = workflowContent.replace(
+        "    env:\n      # `secrets` KHÔNG",
+        "    env:\n      LEAK: ${{ secrets.ANDROID_KEY_PASSWORD }}\n      # `secrets` KHÔNG",
+      );
+      expect(mutated).not.toBe(workflowContent);
+      const res = validateAndroidWorkflow(mutated);
+      expect(res.valid).toBe(false);
+      expect(res.errors.some((e) => e.includes("env cấp job"))).toBe(true);
     });
   });
 });
