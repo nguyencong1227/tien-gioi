@@ -11,6 +11,7 @@ import { startupWarnings } from "./startup";
 import { startAudit } from "./audit";
 import { minProtocolOf } from "./protocol";
 import { mountAuth } from "./auth-http";
+import { mountCors } from "./cors";
 import { createStores } from "./stores";
 import { Monitor, mountMetrics, thresholdsOf } from "./metrics";
 
@@ -34,6 +35,10 @@ async function main() {
   console.log(`Lưu trữ: ${stores.kind === "pg" ? "PostgreSQL" : "tệp JSON"}`);
 
   const app = express();
+  // CORS theo danh sách cho phép (CORS_ORIGINS, mặc định TẮT) cho /health và /api/*: gắn TRƯỚC mountAuth (app đóng gói khác nguồn)
+  const cors = mountCors(app, process.env);
+  if (cors.enabled)
+    console.log(`CORS: cho phép ${cors.origins.length} nguồn (${cors.origins.join(", ")})`);
   // /health (kèm authMode) và, khi AUTH_MODE=account, API tài khoản /api/auth/*: gắn TRƯỚC trang tĩnh bên dưới
   const { auth } = mountAuth(app, {
     env: process.env,
