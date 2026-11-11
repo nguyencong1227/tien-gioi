@@ -4,7 +4,8 @@ import { defineConfig, loadEnv } from "vite";
 // mà không đụng cổng nhau (xem docs/LAM_CHUNG_MAY.md).
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, "..", "");
-  const serverPort = env.PORT || "2567";
+  // Mặc định mẫu của Dev A; KHÔNG dùng 2567 (cổng của bản chạy thật: client dev không được trỏ vào đó)
+  const serverPort = env.PORT || "2597";
   const clientPort = Number(env.CLIENT_PORT || 5173);
   const proxy = {
     "/api": { target: `http://localhost:${serverPort}` },

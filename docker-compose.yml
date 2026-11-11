@@ -16,6 +16,7 @@ services:
     environment:
       - NODE_ENV=production # Bắt buộc đặt production để vô hiệu hóa lệnh quản trị /give
       - PORT=2567
+      - TIEN_GIOI_PROD=1 # Cổng 2567 chỉ cho bản chạy thật: server từ chối khởi động ở 2567 nếu thiếu cờ này (server/src/startup.ts)
       - DATA_DIR=/app/data/players
     volumes:
       - tien-gioi-data:/app/data/players

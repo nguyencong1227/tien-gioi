@@ -37,6 +37,7 @@ npm run build
 |---|---|---|:---:|---|---|
 | `NODE_ENV` | `undefined` (dev) | Xác định môi trường thực thi; vô hiệu hoá hoàn toàn lệnh chat quản trị `/give` khi bằng `production` | Không | **Bắt buộc: `production`** | `server/src/systems/inventory.ts`, `server/src/startup.ts` |
 | `PORT` | `2567` | Cổng HTTP / WebSocket mà server lắng nghe | Không | `2567` (hoặc theo quy hoạch mạng) | `server/src/index.ts` |
+| `TIEN_GIOI_PROD` | Không có | Cờ "đây là bản chạy thật": `1` mới cho server khởi động ở cổng **2567** (cổng dành riêng cho bản chạy thật). Thiếu cờ mà `PORT` là 2567 (kể cả không đặt `PORT`) thì server từ chối khởi động (mã 1) để dev / test / bot không chiếm cổng của bản thật | Không | **`1`** trên bản chạy thật; KHÔNG đặt ở máy dev | `server/src/startup.ts`, `server/src/index.ts` |
 | `DATA_DIR` | `server/data/players` (hoặc `data/players`) | Thư mục gốc lưu trữ dữ liệu tệp JSON khi `STORE=file` (nhân vật, chân linh, tông môn, tài khoản, phiên) | Không | Trỏ tới mount volume bền vững (vd `/app/data/players` hoặc `/var/lib/tien-gioi/players`) | `server/src/store.ts`, `server/src/soul.ts`, `server/src/sect-store.ts`, `server/src/account-store.ts` |
 | `SOULS_DIR` | `<DATA_DIR>/souls` | Thư mục lưu dữ liệu chân linh (tiến trình luân hồi, Duyên). Ghi đè thư mục con mặc định trong `DATA_DIR` | Không | Để mặc định theo `DATA_DIR` để cùng sao lưu một volume | `server/src/soul.ts` |
 | `SECTS_DIR` | `<DATA_DIR>/sects` | Thư mục lưu dữ liệu tông môn (thành viên, kho chung, sổ kho). Ghi đè thư mục con mặc định trong `DATA_DIR` | Không | Để mặc định theo `DATA_DIR` để cùng sao lưu một volume | `server/src/sect-store.ts` |
@@ -68,6 +69,7 @@ Chạy ứng dụng:
 ```bash
 export NODE_ENV=production
 export PORT=2567
+export TIEN_GIOI_PROD=1   # bắt buộc ở cổng 2567: cổng dành riêng cho bản chạy thật
 export DATA_DIR=/var/lib/tien-gioi/players
 
 npm start
@@ -153,7 +155,7 @@ docker compose -f docker-compose.yml -f docker-compose.pg.yml start game
 > [!NOTE]
 > Nếu chạy trực tiếp bằng lệnh `docker run`, hãy luôn kèm cờ `--init` và `--stop-timeout 30`:
 > ```bash
-> docker run -d --name tien-gioi --init --stop-timeout 30 -p 127.0.0.1:2567:2567 -v tien-gioi-data:/app/data/players tien-gioi
+> docker run -d --name tien-gioi --init --stop-timeout 30 -e TIEN_GIOI_PROD=1 -p 127.0.0.1:2567:2567 -v tien-gioi-data:/app/data/players tien-gioi
 > ```
 
 ---

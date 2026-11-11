@@ -122,7 +122,7 @@ function serverUrl() {
   const env = import.meta.env.VITE_SERVER_URL as string | undefined;
   if (env) return env;
   const proto = location.protocol === "https:" ? "wss" : "ws";
-  // Dev: client chạy ở Vite, server ở cổng PORT (.env.local, mặc định 2567). Production: cùng một địa chỉ.
+  // Dev: client chạy ở Vite, server ở cổng PORT (.env.local; 2567 dành riêng cho bản chạy thật). Production: cùng một địa chỉ.
   return import.meta.env.DEV
     ? `${proto}://${location.hostname}:${__SERVER_PORT__}`
     : `${proto}://${location.host}`;
