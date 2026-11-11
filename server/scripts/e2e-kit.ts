@@ -8,6 +8,14 @@ export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export const SHOTS = process.env.E2E_SHOTS ? path.resolve(process.env.E2E_SHOTS) : undefined;
 export const TIMEOUT = 15000;
 
+/**
+ * Biểu thức JS (chạy trong trang): phần tử `#id` THẤY THẬT. `!e.hidden` không đủ: thuộc tính `hidden` (hay `display: none`) của một
+ * PHẦN TỬ CHA làm con biến mất mà `e.hidden` của con vẫn `false` (lỗi modal "Phiên Bản Đã Cũ" nằm trong `#ui` ở #264). Kiểm: có phần
+ * tử, không `hidden`, `checkVisibility` (tính cả cha, `visibility: hidden`), và có kích thước.
+ */
+export const shown = (id: string) =>
+  `(() => { const e = document.getElementById(${JSON.stringify(id)}); if (!e || e.hidden || !e.checkVisibility({ checkVisibilityCSS: true })) return false; const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; })()`;
+
 /** Một tab Chrome điều khiển bằng CDP. Gom lỗi console / exception để E2E thất bại nếu có. */
 export class Tab {
   private id = 0;

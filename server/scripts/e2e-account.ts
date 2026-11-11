@@ -11,6 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
+import { shown } from "./e2e-kit";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const PORT = 36000 + Math.floor(Math.random() * 4000);
@@ -180,8 +181,7 @@ try {
     writeFileSync(path.join(SHOTS, f), Buffer.from(r.result.data, "base64"));
   };
   const step = (n: string, m: string) => out(`  ✓ [${n}] ${m}`);
-  const visible = (view: string) =>
-    `document.getElementById('auth-view-${view}') && !document.getElementById('auth-view-${view}').hidden`;
+  const visible = (view: string) => shown(`auth-view-${view}`); // thấy thật, không chỉ `!hidden`
   const fill = (idEl: string, v: string) =>
     ev(
       `(() => { const e = document.getElementById(${JSON.stringify(idEl)}); e.value = ${JSON.stringify(v)}; e.dispatchEvent(new Event('input', { bubbles: true })); return 1; })()`,
