@@ -198,27 +198,29 @@ export function setupNativeApp(opts: SetupNativeAppOptions): {
     const backResult = cap.addListener("backButton", () => {
       backController.handleBackButton();
     });
-    if (backResult && typeof backResult.remove === "function") {
-      removeBack = () => backResult.remove();
-    } else if (backResult && typeof backResult.then === "function") {
+    // Plugin thật trả về Promise<{ remove }> (kèm `.remove` kiểu cũ đã bị Capacitor đánh dấu deprecated):
+    // ưu tiên `.then` để lấy handle; chỉ khi không phải thenable mới dùng `.remove` trực tiếp.
+    if (backResult && typeof backResult.then === "function") {
       backResult.then((handle: any) => {
         if (handle && typeof handle.remove === "function") {
           removeBack = () => handle.remove();
         }
       });
+    } else if (backResult && typeof backResult.remove === "function") {
+      removeBack = () => backResult.remove();
     }
 
     const stateResult = cap.addListener("appStateChange", (state: { isActive: boolean }) => {
       lifecycleController.handleAppStateChange(state);
     });
-    if (stateResult && typeof stateResult.remove === "function") {
-      removeState = () => stateResult.remove();
-    } else if (stateResult && typeof stateResult.then === "function") {
+    if (stateResult && typeof stateResult.then === "function") {
       stateResult.then((handle: any) => {
         if (handle && typeof handle.remove === "function") {
           removeState = () => handle.remove();
         }
       });
+    } else if (stateResult && typeof stateResult.remove === "function") {
+      removeState = () => stateResult.remove();
     }
   } catch {
     // Bỏ qua lỗi đăng ký plugin

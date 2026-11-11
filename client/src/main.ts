@@ -186,18 +186,29 @@ function showOutdatedModal(minVersion: number) {
   });
 }
 
-// Khởi tạo điều khiển phím Back và vòng đời ứng dụng Android Native (M4.2b)
-setupNativeApp({
-  isOutdatedOpen: () => ui.isOutdatedModalOpen(),
-  isLoginOpen: () => {
-    const loginEl = document.getElementById("login");
-    return Boolean(loginEl && !loginEl.hidden);
-  },
-  handleEscape: () => ui.handleEscape(),
-  showToast: (t) => ui.toast(t),
-  getHeartbeat: () => activeHeartbeat,
-  sound,
-});
+// Khởi tạo điều khiển phím Back và vòng đời ứng dụng Android Native (M4.2b).
+// PHẢI nạp plugin thật `@capacitor/app` ở đây: bridge native KHÔNG tự điền `window.Capacitor.Plugins.App`,
+// chỉ `registerPlugin("App")` (chạy khi gói JS này được import) mới điền. Thiếu import thì `setupNativeApp`
+// không có plugin để gắn, phím Back không bao giờ được bắt và `appStateChange` không tới (A đo bằng
+// @capacitor/core thật, review #314). Nạp động để bản web không tải thêm gói này.
+if (isNativeApp()) {
+  void import("@capacitor/app")
+    .then(({ App }) =>
+      setupNativeApp({
+        isOutdatedOpen: () => ui.isOutdatedModalOpen(),
+        isLoginOpen: () => {
+          const loginEl = document.getElementById("login");
+          return Boolean(loginEl && !loginEl.hidden);
+        },
+        handleEscape: () => ui.handleEscape(),
+        showToast: (t) => ui.toast(t),
+        getHeartbeat: () => activeHeartbeat,
+        sound,
+        capacitorApp: App,
+      }),
+    )
+    .catch((e) => console.error("Không nạp được @capacitor/app (Back / vòng đời native tắt):", e));
+}
 
 initAuthUi({
   onTokenAuth: async (token, charName) => {

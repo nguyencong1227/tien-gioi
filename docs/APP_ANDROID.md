@@ -6,7 +6,7 @@ Tài liệu hướng dẫn quy trình build, đồng bộ và phát triển ứn
 
 ## 1. Cấu trúc Dự án
 
-- `app/`: Thư mục dự án Capacitor riêng biệt (nằm ngoài `workspaces` của `package.json` gốc để CI/Docker không kéo thừa phụ thuộc Android).
+- `app/`: Thư mục dự án Capacitor riêng biệt (nằm ngoài `workspaces` của `package.json` gốc để CI/Docker không kéo thừa phụ thuộc Android: CLI, `@capacitor/android`). Riêng `client/` có `@capacitor/core` + `@capacitor/app` bản JS (xem mục 3).
   - `capacitor.config.ts`: Cấu hình chính cho bản phát hành (`appId: "site.hethongtm.tiengioi"`, `appName: "Tiên Giới"`, `androidScheme: "https"`, trỏ tới `../client/dist`).
   - `capacitor.config.debug.ts`: Cấu hình debug nội bộ khi `CAP_DEBUG=1` (cho phép HTTP LAN / cleartext).
   - `android/`: Mã nguồn dự án Android Studio nguyên bản (đã cấu hình `allowBackup="false"`, `usesCleartextTraffic="false"`, `adjustResize`, `sensorLandscape`).
@@ -49,9 +49,10 @@ cd app && npm run sync
 ## 3. Quản lý Plugin Capacitor
 
 **Quy tắc bắt buộc:**
-1. Mọi plugin Capacitor chỉ cài đặt bên trong thư mục `app/` (`cd app && npm install <plugin>`), **tuyệt đối không** thêm vào `package.json` gốc hay `workspaces`.
+1. Phần NATIVE của plugin (Android, `cap sync`) chỉ cài trong thư mục `app/` (`cd app && npm install <plugin>`), **không** thêm `app/` vào `workspaces` của gốc.
 2. Phải ghim phiên bản chính xác (không dùng dấu `^` hoặc `~`).
-3. Sau khi thêm hoặc gỡ bỏ plugin:
+3. **Phần JS của plugin cũng phải nằm trong `client/package.json`** (cùng phiên bản đúng từng số với `app/package.json`; test `native-capacitor-wiring.test.ts` giữ điều này). Lý do: bridge Android KHÔNG tự điền `window.Capacitor.Plugins.<Tên>`; chỉ `registerPlugin('<Tên>')`, chạy khi gói JS được `import`, mới điền. Không import thì plugin không dùng được trên máy thật (đã dính với `@capacitor/app`, review #314). Hiện `client/` phụ thuộc `@capacitor/core` + `@capacitor/app` (chỉ JS, vài kB); `main.ts` nạp động `@capacitor/app` chỉ khi `VITE_NATIVE=1`, bản web không tải. Plugin mới: thêm vào CẢ hai nơi, `import` nó trong mã client, thêm test nối dây như `native-capacitor-wiring.test.ts` (dùng `@capacitor/core` thật với bridge giả).
+4. Sau khi thêm hoặc gỡ bỏ plugin:
    ```bash
    cd app
    npx cap sync android

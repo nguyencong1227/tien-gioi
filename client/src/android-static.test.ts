@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -46,19 +46,15 @@ export function validateCapacitorConfig(content: string): { ok: boolean; errors:
 }
 
 /**
- * Hàm sinh config theo môi trường để kiểm tra logic CAP_DEBUG (M4.2a / #301)
+ * Nạp `app/capacitor.config.ts` THẬT với biến CAP_DEBUG cho trước (Capacitor CLI nạp tệp này khi `cap sync`).
+ * Không dùng bản sao logic trong tệp test: sửa tệp thật làm hỏng luật thì test phải đỏ (review #314).
  */
-export function evaluateCapacitorConfig(env: { CAP_DEBUG?: string } = {}) {
-  const isDebug = env.CAP_DEBUG === "1" || env.CAP_DEBUG === "true";
-  return {
-    appId: "site.hethongtm.tiengioi",
-    appName: "Tiên Giới",
-    webDir: "../client/dist",
-    server: {
-      androidScheme: isDebug ? "http" : "https",
-      ...(isDebug ? { cleartext: true } : {}),
-    },
-  };
+export async function loadRealCapacitorConfig(capDebug?: string) {
+  vi.resetModules();
+  if (capDebug === undefined) vi.stubEnv("CAP_DEBUG", undefined);
+  else vi.stubEnv("CAP_DEBUG", capDebug);
+  const mod = await import(/* @vite-ignore */ resolve(REPO_ROOT, "app/capacitor.config.ts"));
+  return mod.default as { server?: { androidScheme?: string; cleartext?: boolean; url?: string } };
 }
 
 export function validateAndroidManifest(content: string): { ok: boolean; errors: string[] } {
@@ -172,16 +168,22 @@ describe("Kiểm tra tĩnh cấu hình Android Capacitor (Issue #300)", () => {
     expect(existsSync(test2)).toBe(false);
   });
 
-  it("cấu hình Capacitor: không có CAP_DEBUG thì không bật cleartext và scheme https", () => {
-    const cfg = evaluateCapacitorConfig({});
-    expect(cfg.server?.androidScheme).toBe("https");
-    expect(cfg.server?.cleartext).toBeUndefined();
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("cấu hình Capacitor THẬT: không có CAP_DEBUG (hoặc giá trị lạ) thì https, không cleartext, không server.url", async () => {
+    for (const v of [undefined, "", "0", "false", "yes"]) {
+      const cfg = await loadRealCapacitorConfig(v);
+      expect(cfg.server?.androidScheme).toBe("https");
+      expect(cfg.server?.cleartext).toBeUndefined();
+      expect(cfg.server?.url).toBeUndefined();
+    }
   });
 
-  it("cấu hình Capacitor: có CAP_DEBUG=1 thì bật cleartext và scheme http cho LAN", () => {
-    const cfg = evaluateCapacitorConfig({ CAP_DEBUG: "1" });
+  it("cấu hình Capacitor THẬT: CAP_DEBUG=1 thì http + cleartext cho LAN (vẫn không server.url)", async () => {
+    const cfg = await loadRealCapacitorConfig("1");
     expect(cfg.server?.androidScheme).toBe("http");
     expect(cfg.server?.cleartext).toBe(true);
+    expect(cfg.server?.url).toBeUndefined();
   });
 });
 
