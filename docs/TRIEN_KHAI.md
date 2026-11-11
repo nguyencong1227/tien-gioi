@@ -29,20 +29,27 @@ npm run build
 ```
 
 ### Bước 3: Chạy server production
-> **Lưu ý về cấu hình:** File `.env.local` chỉ dùng khi phát triển trên máy dev (để chia cổng riêng cho Dev A, B, C) và **không** được commit. Trên production, cấu hình hoàn toàn qua **biến môi trường**:
+> **Lưu ý về cấu hình:** File `.env.local` chỉ dùng khi phát triển trên máy dev (để chia cổng riêng cho Dev A, B, C) và **không** được commit. Trên production, cấu hình hoàn toàn qua **biến môi trường** (hoặc dùng `.env.production` sao chép từ `.env.production.example` kết hợp `docker compose --env-file .env.production up -d`):
 
-| Biến môi trường | Ý nghĩa | Bắt buộc / Mặc định |
-|---|---|---|
-| `NODE_ENV` | Môi trường chạy | **Bắt buộc: `production`** |
-| `PORT` | Cổng HTTP / WebSocket mà server lắng nghe | Mặc định: `2567` |
-| `DATA_DIR` | Thư mục lưu trữ dữ liệu nhân vật (`*.json`) | Mặc định: `server/data/players` |
-| `STORE` | Nơi lưu nhân vật, chân linh, tài khoản, phiên: `file` (tệp JSON ở `DATA_DIR`, một máy một tiến trình) hoặc `pg` (PostgreSQL, cần `DATABASE_URL`). Server chạy migration chưa áp dụng lúc khởi động; thiếu `DATABASE_URL` hoặc không kết nối được thì **không khởi động** (thoát mã 1, thông báo không chứa mật khẩu) | Mặc định: `file`; khi mở thật khuyến nghị `pg` |
-| `DATABASE_URL` | Chuỗi kết nối PostgreSQL, vd `postgres://người_dùng:mật_khẩu@máy:5432/tiengioi` (chỉ dùng khi `STORE=pg`). **Là bí mật**: không ghi vào log, không commit | Không có |
-| `AUTH_MODE` | `legacy`: vào bằng đạo hiệu + mã bí mật lưu ở trình duyệt (dev, test, bot). `account`: đăng ký / đăng nhập bằng tài khoản (mục 4.1 của `docs/THIET_KE_TAI_KHOAN.md`) | Mặc định: `legacy`; khi mở thật nên dùng `account` (xem lưu ý bên dưới) |
-| `TRUST_PROXY` | Số tầng reverse proxy tin cậy (vd `1` khi chạy sau Caddy), hoặc danh sách mạng con (`loopback`, `10.0.0.0/8`). **Không nhận `true` / `*`.** | Mặc định: không tin proxy (dùng IP của kết nối) |
-| `AUDIT_LOG` | Nhật ký kiểm toán (M4 2.4, `server/src/audit.ts`): mỗi sự kiện nhạy cảm một dòng JSON ra stdout, dạng `{"t":"…","audit":1,"ev":"sect.withdraw",...}`. Mặc định **bật**; `off` tắt. Sự kiện: `auth.registered`, `auth.login_ok`, `auth.login_failed`, `auth.recovered` (đặt lại mật khẩu bằng mã khôi phục: dấu hiệu chiếm tài khoản quan trọng nhất), `auth.recover_failed`, `auth.rate_limited`, `join.denied` (sai mã nhân vật / phiên hết hạn), `room.spam_kick`, `wallet.big`, `sect.create` / `sect.deposit` / `sect.withdraw` / `sect.kick` / `sect.transfer` / `sect.disband`. Tìm bằng `docker compose logs server \| grep '"audit":1'`. **Không bao giờ ghi mật khẩu, mã khôi phục, token, mã bí mật** (khoá giống `pass` / `secret` / `token` / `hash` / `recover` / `session` bị loại, chuỗi được cắt 200 ký tự và bỏ ký tự điều khiển). Riêng tư: có đạo hiệu, tên tài khoản và IP của người chơi, chỉ dùng cho vận hành. Bản này chỉ GHI NHẬN, không phạt | Mặc định: bật |
-| `AUDIT_COIN_THRESHOLD` | Ngưỡng ghi `wallet.big`: mỗi lần ví một người đổi (cộng hoặc trừ, phần đổi thật) từ ngần này Linh thạch trở lên. Số nguyên dương | Mặc định: `5000` |
-| `MIN_PROTOCOL_VERSION` | Phiên bản giao thức thấp nhất server còn nhận khi vào phòng (số nguyên không âm; `shared/src/protocol.ts`). Client cũ hơn (kể cả không gửi `v`, coi là 0) bị từ chối bằng lỗi 426 `client_outdated:<số>` TRƯỚC khi xác thực; client hiện màn hình "Có bản mới, hãy tải lại". **Chỉ nâng khi đã triển khai client mới cho người chơi** (PWA / app cần thời gian cập nhật); bot / công cụ phải gửi `v: PROTOCOL_VERSION`. Cao hơn phiên bản của bản server này thì bị kẹp (kèm cảnh báo). `/health` báo `protocol` và `minProtocol` hiện hành | Mặc định: `0` (nhận mọi client) |
+### Bảng biến môi trường chính thức (Production)
+
+| Biến môi trường | Mặc định | Tác dụng | Bí mật? | Khuyến nghị production | Nơi dùng |
+|---|---|---|:---:|---|---|
+| `NODE_ENV` | `undefined` (dev) | Xác định môi trường thực thi; vô hiệu hoá hoàn toàn lệnh chat quản trị `/give` khi bằng `production` | Không | **Bắt buộc: `production`** | `server/src/systems/inventory.ts`, `server/src/startup.ts` |
+| `PORT` | `2567` | Cổng HTTP / WebSocket mà server lắng nghe | Không | `2567` (hoặc theo quy hoạch mạng) | `server/src/index.ts` |
+| `DATA_DIR` | `server/data/players` (hoặc `data/players`) | Thư mục gốc lưu trữ dữ liệu tệp JSON khi `STORE=file` (nhân vật, chân linh, tông môn, tài khoản, phiên) | Không | Trỏ tới mount volume bền vững (vd `/app/data/players` hoặc `/var/lib/tien-gioi/players`) | `server/src/store.ts`, `server/src/soul.ts`, `server/src/sect-store.ts`, `server/src/account-store.ts` |
+| `SOULS_DIR` | `<DATA_DIR>/souls` | Thư mục lưu dữ liệu chân linh (tiến trình luân hồi, Duyên). Ghi đè thư mục con mặc định trong `DATA_DIR` | Không | Để mặc định theo `DATA_DIR` để cùng sao lưu một volume | `server/src/soul.ts` |
+| `SECTS_DIR` | `<DATA_DIR>/sects` | Thư mục lưu dữ liệu tông môn (thành viên, kho chung, sổ kho). Ghi đè thư mục con mặc định trong `DATA_DIR` | Không | Để mặc định theo `DATA_DIR` để cùng sao lưu một volume | `server/src/sect-store.ts` |
+| `ACCOUNTS_DIR` | `<DATA_DIR>/accounts` | Thư mục lưu trữ tài khoản người chơi (băm mật khẩu scrypt, mã khôi phục) khi `STORE=file` | Không | Để mặc định theo `DATA_DIR` | `server/src/account-store.ts` |
+| `SESSIONS_DIR` | `<DATA_DIR>/sessions` | Thư mục lưu trữ phiên đăng nhập (băm token phiên) khi `STORE=file` | Không | Để mặc định theo `DATA_DIR` | `server/src/account-store.ts` |
+| `STORE` | `file` | Backend lưu trữ: `file` (tệp JSON ở `DATA_DIR`, một máy một tiến trình) hoặc `pg` (PostgreSQL qua `DATABASE_URL`). Server tự chạy migrations lúc khởi động | Không | `pg` khi mở cụm server thật; `file` cho máy chủ đơn | `server/src/stores.ts`, `server/src/startup.ts` |
+| `DATABASE_URL` | Không có (chỉ dùng khi `STORE=pg`) | Chuỗi kết nối PostgreSQL (vd `postgres://tiengioi:matkhau@db:5432/tiengioi`). Không in ra log, không commit | **CÓ** | Bắt buộc khi `STORE=pg`. Cung cấp chuỗi kết nối an toàn | `server/src/stores.ts`, `server/src/startup.ts` |
+| `AUTH_MODE` | `legacy` | Cơ chế xác thực: `legacy` (đạo hiệu + secretHash lưu trình duyệt) hoặc `account` (tài khoản mật khẩu scrypt + phiên + mã khôi phục, mở `/api/auth/*`) | Không | **`account`** khi mở cho người chơi thật | `server/src/auth-http.ts`, `server/src/startup.ts` |
+| `TRUST_PROXY` | Không tin proxy (dùng IP kết nối) | Số tầng reverse proxy tin cậy (vd `1` sau Caddy/Nginx) hoặc danh sách mạng con (`loopback`, `10.0.0.0/8`). Không nhận `true` / `*` | Không | `1` khi chạy sau 1 tầng reverse proxy để giới hạn tần suất theo đúng IP khách | `server/src/auth-http.ts`, `server/src/startup.ts` |
+| `SECTS` | Bật tính năng | Kiểm soát tính năng tông môn; đặt `SECTS=off` để gỡ bỏ hoàn toàn tính năng tông môn (bảo trì khẩn cấp) | Không | Để trống (mặc định bật) | `server/src/rooms/WorldRoom.ts` |
+| `AUDIT_LOG` | Bật (stdout) | Nhật ký kiểm toán có cấu trúc M4 2.4: mỗi sự kiện nhạy cảm 1 dòng JSON ra stdout. Đặt `AUDIT_LOG=off` để tắt | Không | Để trống / bật | `server/src/audit.ts`, `server/src/index.ts` |
+| `AUDIT_COIN_THRESHOLD` | `5000` | Ngưỡng biến động Linh thạch trong 1 giao dịch để ghi sự kiện `wallet.big` vào nhật ký kiểm toán. Số nguyên dương | Không | `5000` (hoặc tuỳ chỉnh theo kinh tế game) | `server/src/audit.ts`, `server/src/rooms/WorldRoom.ts` |
+| `MIN_PROTOCOL_VERSION` | `0` (nhận mọi client) | Phiên bản giao thức thấp nhất server chấp nhận khi vào phòng. Client cũ hơn bị từ chối bằng lỗi 426 trước khi xác thực | Không | Nâng khi phát hành bản cập nhật client bắt buộc mới | `server/src/protocol.ts`, `server/src/startup.ts`, `server/src/index.ts` |
 
 > [!IMPORTANT]
 > **Tài khoản (`AUTH_MODE=account`) và proxy:** chỉ ở chế độ `account` server mới mở `/api/auth/*` (đăng ký, đăng nhập, phiên, khôi phục mật khẩu); `legacy` không mở API nào. Giới hạn tần suất đăng nhập tính **theo IP của khách** (10 lần sai / 10 phút, 5 lần đăng ký / giờ). Khi chạy sau reverse proxy (mục 4) mà không đặt `TRUST_PROXY=1`, mọi người chơi trông như cùng một IP (của proxy) và **dùng chung** hạn mức đó cho cả server; ngược lại, đặt `TRUST_PROXY` khi KHÔNG có proxy ghi đè `X-Forwarded-For` thì kẻ xấu tự đặt IP để qua mặt giới hạn. Mật khẩu đi qua mạng: chỉ mở thật qua HTTPS (mục 4). Server khởi động sẽ in cảnh báo nếu cấu hình production còn `legacy`, hoặc `account` mà chưa đặt `TRUST_PROXY`. Dữ liệu tài khoản nằm trong `DATA_DIR/accounts` và `DATA_DIR/sessions` (chỉ có băm; `npm run backup` đã gồm).
@@ -96,8 +103,8 @@ docker run --rm -v tien-gioi-data:/data -v "$PWD":/out busybox tar czf /out/play
 # 1. Dừng container game trước khi khôi phục:
 docker compose stop
 
-# 2. Giải nén bản sao lưu vào volume:
-docker run --rm -v tien-gioi-data:/data -v "$PWD":/backup busybox sh -c "tar xzf /backup/players-*.tar.gz -C /data"
+# 2. Giải nén bản sao lưu vào volume (luôn chỉ định tên file cụ thể, tránh dùng wildcard *):
+docker run --rm -v tien-gioi-data:/data -v "$PWD":/backup busybox sh -c "tar xzf /backup/players-20261110-020000.tar.gz -C /data"
 
 # 3. Khởi động lại container game:
 docker compose start
@@ -248,15 +255,57 @@ Khi cần khôi phục lại dữ liệu nhân vật:
    # Bản sao lưu chứa thư mục 'players/', nên giải nén vào thư mục cha /var/lib/tien-gioi/
    tar -xzf /mnt/backups/players-20261110-020000.tar.gz -C /var/lib/tien-gioi/
    ```
+   > [!WARNING]
+   > Luôn chỉ định **đúng tên file sao lưu cụ thể**, không dùng wildcard `players-*.tar.gz` khi có nhiều bản sao lưu trong thư mục vì `tar` sẽ xem các file sau là tên tệp cần trích xuất và báo lỗi.
+
 4. Kiểm tra danh sách file sau khi giải nén:
    ```bash
    ls -la /var/lib/tien-gioi/players/
    ```
-5. Khởi động lại server:
+5. Chạy kiểm tra tính toàn vẹn trước khi khởi động:
+   ```bash
+   DATA_DIR=/var/lib/tien-gioi/players npm run kiem-save -w server
+   ```
+6. Khởi động lại server:
    ```bash
    npm start
    ```
-6. Sau khi xác nhận mọi nhân vật đăng nhập bình thường, có thể xoá thư mục dự phòng `players.cu`.
+7. Sau khi xác nhận mọi nhân vật đăng nhập bình thường, có thể xoá thư mục dự phòng `players.cu`.
+
+**Khôi phục thử nghiệm có kiểm chứng (`npm run khoi-phuc-thu`):**
+Tiên Giới cung cấp script tự động kiểm chứng toàn bộ chu trình khôi phục:
+```bash
+npm run khoi-phuc-thu -w server
+```
+Quy trình: Tự động sinh dữ liệu mẫu đầy đủ (nhân vật, chân linh, tông môn, tài khoản, phiên) -> Tính SHA-256 từng file -> Nén sao lưu bằng `performBackup` -> Xoá sạch thư mục -> Giải nén bằng lệnh `tar -xzf` ở mục 7.3 -> Chạy `kiem-save` kiểm tra toàn vẹn (phải 0 lỗi) -> Đối chiếu khớp 100% SHA-256 từng file.
+
+### 7.4. Sao lưu & Khôi phục với PostgreSQL (`STORE=pg`)
+Khi triển khai với PostgreSQL (`docker-compose.pg.yml` hoặc dịch vụ Postgres bên ngoài):
+- **Tạo bản sao lưu cơ sở dữ liệu (`pg_dump`):**
+  ```bash
+  # Với Docker Compose (dịch vụ db của docker-compose.pg.yml):
+  docker compose -f docker-compose.pg.yml exec -T db pg_dump -U tiengioi tiengioi | gzip > backups/tiengioi-pg-$(date +%Y%m%d-%H%M%S).sql.gz
+
+  # Với máy chủ PostgreSQL thông thường:
+  pg_dump -d "$DATABASE_URL" | gzip > backups/tiengioi-pg-$(date +%Y%m%d-%H%M%S).sql.gz
+  ```
+- **Khôi phục dữ liệu cơ sở dữ liệu (`psql`):**
+  1. Dừng container game server trước để ngắt các kết nối ghi:
+     ```bash
+     docker compose -f docker-compose.pg.yml stop game
+     ```
+  2. Nạp lại bản sao lưu vào database (chỉ định file sao lưu cụ thể):
+     ```bash
+     # Với Docker Compose:
+     gunzip -c backups/tiengioi-pg-20261110-020000.sql.gz | docker compose -f docker-compose.pg.yml exec -T db psql -U tiengioi tiengioi
+
+     # Với máy chủ PostgreSQL thông thường:
+     gunzip -c backups/tiengioi-pg-20261110-020000.sql.gz | psql -d "$DATABASE_URL"
+     ```
+  3. Khởi động lại game server:
+     ```bash
+     docker compose -f docker-compose.pg.yml start game
+     ```
 
 ---
 
