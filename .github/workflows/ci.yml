@@ -47,7 +47,51 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build Docker image
-        run: docker build .
+        run: docker build -t tien-gioi:ci .
+
+      # Ảnh chưa từng được CHẠY ở đâu ngoài máy người dùng: kiểm nó khởi động thật, phục vụ client, vào được phòng, tắt êm
+      # (docker stop phải kết thúc nhanh: SIGTERM tới được server để lưu nhân vật; bị SIGKILL sau 30 giây là mất dữ liệu).
+      - name: Chạy thử ảnh (hàng rào cổng 2567, /health, /metrics, vào phòng, tắt êm)
+        run: |
+          set -euo pipefail
+          # 1. Cổng 2567 mà thiếu TIEN_GIOI_PROD=1: PHẢI từ chối khởi động (dev / test / bot không được chiếm cổng bản chạy thật)
+          if timeout 120 docker run --rm tien-gioi:ci > /tmp/khong-co.log 2>&1; then
+            echo "::error::Ảnh khởi động ở cổng 2567 mà không có TIEN_GIOI_PROD=1"; cat /tmp/khong-co.log; exit 1
+          fi
+          grep -q "BẢN CHẠY THẬT" /tmp/khong-co.log
+          # 2. Có cờ, như docker-compose (init: true): khởi động
+          docker run -d --init --name tg -e TIEN_GIOI_PROD=1 -e METRICS_TOKEN=ci-metrics-token-0123456789 \
+            -p 127.0.0.1:2567:2567 tien-gioi:ci
+          for i in $(seq 1 60); do
+            curl -fsS http://127.0.0.1:2567/health > /tmp/health.json 2>/dev/null && break
+            sleep 1
+          done
+          grep -q '"ok":true' /tmp/health.json
+          # 3. /metrics: tắt khi không token, bật với token
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:2567/metrics)" = "401"
+          curl -fsS -H "Authorization: Bearer ci-metrics-token-0123456789" "http://127.0.0.1:2567/metrics?format=json" | grep -q '"players"'
+          # 4. Phục vụ client đã build
+          curl -fsS http://127.0.0.1:2567/ | grep -qi "<html"
+          # 5. Vào phòng thật qua matchmaking (tạo phòng Lạc Hà trong ảnh)
+          curl -fsS -X POST http://127.0.0.1:2567/matchmake/joinOrCreate/world \
+            -H 'Content-Type: application/json' \
+            -d '{"name":"CI Chay Thu","secret":"ci_chay_thu_secret_0123456789","v":1}' | grep -q '"sessionId"'
+          # 6. Tắt êm: docker stop (SIGTERM) phải xong nhanh và không bị SIGKILL (mã 137)
+          start=$(date +%s)
+          docker stop -t 30 tg > /dev/null
+          took=$(( $(date +%s) - start ))
+          code=$(docker inspect -f '{{.State.ExitCode}}' tg)
+          echo "docker stop mất ${took}s, mã thoát ${code}"
+          test "$took" -lt 25
+          test "$code" != "137"
+          # 7. Log sạch lỗi
+          if docker logs tg 2>&1 | grep -E "\[LỖI\]|unhandledRejection|uncaughtException"; then
+            echo "::error::Log của ảnh có lỗi"; exit 1
+          fi
+
+      - name: Log của ảnh khi thất bại
+        if: failure()
+        run: docker logs tg 2>&1 | tail -80 || true
 
   postgres:
     name: PostgreSQL Store Tests
