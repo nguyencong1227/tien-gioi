@@ -614,3 +614,54 @@ Bộ kiểm thử stress test tự động hoá 7 kịch bản then chốt trên
 
 ## 16. E2E thật phiên bản giao thức (M4 2.5, `npm run e2e:phien-ban -w server`)
 Chrome headless + server Colyseus thật trong tiến trình (thư mục dữ liệu tạm), cùng khung với mục 13 (`server/scripts/e2e-kit.ts`). Server nâng `WorldRoom.minProtocol` lên `PROTOCOL_VERSION + 1` nên client thật (gửi `v: PROTOCOL_VERSION`) thành "quá cũ". Luồng 4 bước: (1) client thấy màn hình "Phiên Bản Đã Cũ" nêu đúng mức tối thiểu và KHÔNG vào được game; (2) sau 2,5 giây `onAuth` được gọi đúng 1 lần (lỗi dứt khoát, không vòng thử lại / `wrong_map`) và không có hồ sơ nhân vật nào được tạo; (3) server hạ mức, bấm "Tải Lại Trang": trang tải lại sạch, màn hình tắt; (4) đăng nhập lại vào game bình thường. Cần `npm run build` (client/dist mới) và google-chrome. Đột biến: bỏ `throw new ClientOutdatedError` ở `client/src/connection.ts` thì bước 1 đỏ. Bước 1 kiểm HIỂN THỊ THẬT (không chỉ `!m.hidden`): `checkVisibility()`, kích thước, `elementFromPoint` ở giữa modal nằm trong modal (không bị che), màn hình đăng nhập đã ẩn; lý do: `hidden` của phần tử cha (`#ui` lúc chưa vào game) làm modal biến mất mà `m.hidden` vẫn `false`, nên bản chỉ kiểm `!m.hidden` đã để lọt lỗi ở #264 (modal nằm trong `#ui` nên người chơi không bao giờ thấy; sửa ở #270). Chạy trên main sau #261 (server) + #264 (client): bản kiểm hiển thị thật ĐỎ ở bước 1 (hết 15 giây chờ), sau #270: PASS 4/4.
+
+## 18. Red Team Từng Tin Nhắn Server (M4-sớm - Issue #252)
+
+### 18.1. Phương pháp & Công cụ (`server/scripts/red-team.ts`)
+Công cụ `npm run red-team -w server` dựng server Colyseus thật trong tiến trình với thư mục dữ liệu tạm cô lập và kiểm tra đối kháng (red team) toàn diện:
+- **Tự phát hiện loại tin nhắn:** Tự động đọc danh sách handler đã đăng ký từ `serverRoom.onMessageHandlers` (loại bỏ handler nội bộ `__no_message_handler` và handler toàn cục `*`), so khớp 100% với hợp đồng `shared/` (`EXPECTED_MESSAGE_TYPES` gồm 47 loại tin nghiệp vụ) + 1 tin lạ để kiểm tra handler `*`.
+- **Đa dạng hoá đối tượng tấn công (Poor & Rich Attacker):**
+  1. **Poor Attacker:** Nhân vật mới tạo (0 Linh thạch, túi trống, không có đội, không có tông môn) để kiểm tra các ca biên chia cho 0, số âm, thiếu đồ/tiền.
+  2. **Rich Attacker:** Nhân vật giàu có tài nguyên thực tế trong bộ nhớ sống server: 100,000 Linh thạch sống (`ctrl.coin`), túi đồ sống (`ctrl.inv`) chứa dược phẩm (`hoi_huyet_dan`, `tu_khi_dan`), vũ khí (`lang_nha_kiem`), giáp (`tho_nhung_bao`), pháp bảo (`ho_hon_phu`), nguyên liệu rèn (`long_tho`), đứng cạnh NPC Lão Dược Sư tại Lạc Hà Trấn, có tổ đội với Observer và là Tông chủ của tông môn có kho 5000 Linh thạch (Observer là Đệ tử). Đối tượng này kích hoạt sâu vào logic nghiệp vụ của các handler thay vì thoát sớm ở các dòng kiểm tra ban đầu.
+- **Phân loại Payload tấn công (26 biến thể payload):**
+  1. **Kiểu dữ liệu sai & Primitive Confusion:** `null`, `undefined`, boolean (`true`), số nguyên thuần túy, chuỗi ký tự thô thay thế cho object, mảng rỗng `[]`, mảng chứa dữ liệu phức hợp.
+  2. **Giá trị số biên (Number Edge Cases):** `NaN`, `Infinity`, `-Infinity`, số âm cực đoan (`-999999`, `-Math.PI * 4`), số thực dấu phẩy động phân đoạn (`2.7`, `0.5`, `100.99`), số nguyên vượt trần an toàn (`Number.MAX_SAFE_INTEGER + 100`, `1e12`).
+  3. **Chuỗi độc hại (String Attacks):** Chuỗi rỗng, chuỗi dài tới 2.0–3.5 KB (sát trần 4 KB của transport), byte NUL (`\x00`), chuỗi ký tự điều khiển và mã màu ANSI (`\r\n\x08\x1b[31m`), chuỗi emoji ghép phức tạp (Zero-Width Joiner sequences), Path Traversal (`../../../etc/passwd`, `..\\win.ini`), XSS / SQL Injection payloads (`<script>alert(1)</script>`, `' OR 1=1--`).
+  4. **Khai thác cấu trúc đối tượng (Prototype Pollution & Deep Nesting):** Gửi đối tượng có các khoá nhạy cảm `__proto__`, `constructor`, `prototype`; mảng và đối tượng lồng nhau sâu 50–80 cấp.
+  5. **Mã định danh độc hại (Malicious Field IDs):** Tra cứu id bằng các thuộc tính prototype (`"constructor"`, `"prototype"`, `"__proto__"`, `"toString"`), id lạ không tồn tại trong mọi trường nghiệp vụ (`npcId`, `itemId`, `questId`, `portalId`, `lootId`, `tradeId`, `recipeId`, `name`, `from`).
+  6. **Trường phiên bản & Log Injection:** Kiểm tra trường `v` (`JoinOptions`) và các chuỗi ngắt dòng giả mạo log (`\u2028`, `\r\nFake: audit_log`).
+  7. **Trạng thái dị thường (State Machine Confusion):** Gửi đòn đánh, buôn bán, lập tông môn khi nhân vật đang ở trạng thái thiền (`meditate`) hoặc Hoàng Tuyền (`limbo`).
+  8. **Bão tin nhắn (Spam Flood & Rate Limit):** Bắn phá 250 tin nhắn liên tiếp từ một kết nối riêng để xác minh cơ chế phòng thủ `rate-limit.ts` ngắt kết nối với mã lỗi `4429`.
+- **Giám sát & Tiêu chuẩn an toàn sau mỗi đòn tấn công:**
+  - **Bắt ngoại lệ handler:** Intercept `console.error` và `onUncaughtException` trong tiến trình server để phát hiện mọi dòng lỗi `[lỗi]`. Bất kỳ lỗi runtime nào trong handler (như TypeError) đều bị bắt và tính là thất bại (FAIL).
+  - **Kiểm tra bất biến SỐNG (Live State Invariants):** Đọc trực tiếp `ctrl.coin`, `ctrl.inv` (tổng số lượng và số lượng từng loại itemId trong túi), `p.exp`, `p.realm`, `p.hp` từ bộ nhớ sống server (không đọc snapshot lưu đĩa `ctrl.save`). Kẻ tấn công không được tự tăng Linh thạch, Exp hay bất kỳ vật phẩm nào trong túi.
+  - **Observer bất biến:** Tiền, exp và túi đồ của Observer hoàn toàn giữ nguyên.
+  - **Server an toàn:** Server không crash, phòng Observer không bị ngắt kết nối.
+  - **Xác thực bằng 2 đột biến thật:**
+    - Đột biến 1 (`useItem` cộng 5000 Linh thạch): Red team phát hiện 44 vi phạm bất biến tiền sống (ĐỎ).
+    - Đột biến 2 (`useItem` ném TypeError khi thiếu kiểm tra null): Red team phát hiện 10 ngoại lệ handler `[lỗi]` (ĐỎ).
+
+### 18.2. Kết quả Đo đạc Thực tế
+Chạy 48 loại tin nhắn × 2 senders (Poor + Rich) × 26 biến thể payload (chế độ FAST):
+
+| Chỉ số kiểm thử | Giá trị đo được | Đánh giá | Trạng thái |
+| :--- | :---: | :---: | :---: |
+| **Tổng số đòn tấn công đối kháng** | **2496 đòn** (48 tin × 2 senders × 26 payloads) | Phủ kín 100% tin nhắn WorldRoom trên cả 2 đối tượng | **PASS** |
+| **Tỷ lệ an toàn (không crash, không hưởng lợi, không lỗi)** | **2496 / 2496 (100%)** | 0 lỗi bảo mật / 0 lỗ hổng logic / 0 ngoại lệ handler | **PASS** |
+| **Ngoại lệ handler phát hiện (`[lỗi]`)** | **0** | Mọi payload xấu được xử lý an toàn | **PASS** |
+| **Unhandled Rejection / Exception** | **0** | Tiến trình server nguyên vẹn | **PASS** |
+| **Độ trễ xử lý mỗi payload (TB / Max)** | **TB 15.36 ms** / Max 17.99 ms | Nhanh, không nghẽn vòng lặp hay I/O | **PASS** |
+| **Bảo vệ chống spam (RateLimiter kick 4429)** | **PASS** (ngắt kết nối đúng mã `4429`) | Chống cạn kiệt tài nguyên hiệu quả | **PASS** |
+| **Biến thiên bộ nhớ VmRSS** | **+0 MB** | Không rò rỉ bộ nhớ sau 2496 đòn tấn công | **PASS** |
+
+#### Bảng kết quả chi tiết theo 48 loại tin nhắn WorldRoom:
+- **Di chuyển & Chiến đấu:** `input` (52/52 OK), `attack` (52/52 OK), `skill` (52/52 OK), `meditate` (52/52 OK), `breakthrough` (52/52 OK), `chat` (52/52 OK).
+- **Túi đồ & Trang bị:** `useItem` (52/52 OK), `pickup` (52/52 OK), `dropItem` (52/52 OK), `equip` (52/52 OK), `unequip` (52/52 OK).
+- **NPC, Nhiệm vụ & Giao dịch:** `talk` (52/52 OK), `questAccept` (52/52 OK), `questTurnIn` (52/52 OK), `questAbandon` (52/52 OK), `trade` (52/52 OK), `craft` (52/52 OK), `buy` (52/52 OK), `sell` (52/52 OK).
+- **Tổ đội:** `partyInvite` (52/52 OK), `partyAccept` (52/52 OK), `partyDecline` (52/52 OK), `partyLeave` (52/52 OK), `partyKick` (52/52 OK).
+- **Dịch chuyển & Bản đồ:** `travel` (52/52 OK).
+- **Bí cảnh:** `dungeonOpen` (52/52 OK), `dungeonEnter` (52/52 OK), `dungeonDecline` (52/52 OK), `dungeonLeave` (52/52 OK).
+- **PK Thách đấu:** `duelChallenge` (52/52 OK), `duelAccept` (52/52 OK), `duelDecline` (52/52 OK), `duelYield` (52/52 OK).
+- **Tông môn:** `sectCreate` (52/52 OK), `sectInvite` (52/52 OK), `sectAccept` (52/52 OK), `sectDecline` (52/52 OK), `sectLeave` (52/52 OK), `sectKick` (52/52 OK), `sectRank` (52/52 OK), `sectTransfer` (52/52 OK), `sectDisband` (52/52 OK), `sectMotd` (52/52 OK), `sectDeposit` (52/52 OK), `sectWithdraw` (52/52 OK).
+- **Luân hồi:** `soulBuy` (52/52 OK), `rebirth` (52/52 OK).
+- **Tin lạ không đăng ký:** `__unknown_unregistered_msg__` (52/52 OK, handler `*` từ chối an toàn).

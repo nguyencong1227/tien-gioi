@@ -450,14 +450,16 @@ describe("nhật ký kiểm toán", () => {
   });
   afterAll(() => setAuditSink(null));
 
-  it("đăng nhập sai / tên không tồn tại ghi `auth.login_failed` (IP + tên chuẩn hoá); mật khẩu KHÔNG bao giờ xuất hiện trong log; đăng nhập đúng không ghi", async () => {
+  it("đăng nhập sai / tên không tồn tại ghi `auth.login_failed` (IP + tên chuẩn hoá), đăng nhập đúng ghi `auth.login_ok`; mật khẩu KHÔNG bao giờ xuất hiện trong log", async () => {
     await reg();
+    lines.length = 0;
     await login("lam_thanh", "mat-khau-sai-bi-mat-1", "3.3.3.3");
     await login("ten_khong_co", "mat-khau-sai-bi-mat-2", "3.3.3.4");
-    await login("lam_thanh", PW, "3.3.3.5"); // đúng: không ghi
+    await login("lam_thanh", PW, "3.3.3.5");
     expect(events().map((e) => [e.ev, e.ip, e.user])).toEqual([
       ["auth.login_failed", "3.3.3.3", "lam_thanh"],
       ["auth.login_failed", "3.3.3.4", "ten_khong_co"],
+      ["auth.login_ok", "3.3.3.5", "lam_thanh"],
     ]);
     const all = lines.join("\n");
     for (const secret of ["mat-khau-sai-bi-mat-1", "mat-khau-sai-bi-mat-2", PW])
@@ -484,8 +486,41 @@ describe("nhật ký kiểm toán", () => {
     expect(lines.join("")).not.toContain(PW);
   });
 
+  it("đăng ký, đăng nhập đúng, khôi phục thành công ghi `auth.registered` / `auth.login_ok` / `auth.recovered` (IP + tên); token, mã khôi phục và mật khẩu KHÔNG xuất hiện trong log", async () => {
+    const r = await reg("lam_thanh", "5.5.5.5");
+    const li = await svc.login("5.5.5.6", { username: "lam_thanh", password: PW });
+    expect(li.ok).toBe(true);
+    const NEWPW = "mat-khau-moi-rat-dai-1";
+    const rec = await svc.recover("5.5.5.7", {
+      username: "lam_thanh",
+      recoveryCode: r.recoveryCode,
+      newPassword: NEWPW,
+    });
+    expect(rec.ok).toBe(true);
+    expect(events().map((e) => [e.ev, e.ip, e.user])).toEqual([
+      ["auth.registered", "5.5.5.5", "lam_thanh"],
+      ["auth.login_ok", "5.5.5.6", "lam_thanh"],
+      ["auth.recovered", "5.5.5.7", "lam_thanh"],
+    ]);
+    const all = lines.join("\n");
+    const secrets = [PW, NEWPW, r.recoveryCode, r.recoveryCode.replace(/-/g, ""), r.token];
+    if (li.ok) secrets.push(li.value.token);
+    if (rec.ok) secrets.push(rec.value.token, rec.value.recoveryCode);
+    for (const secret of secrets) expect(all, secret).not.toContain(secret);
+  });
+
+  it("đăng ký / đăng nhập / khôi phục THẤT BẠI không ghi sự kiện thành công", async () => {
+    await reg("lam_thanh", "6.6.6.6");
+    lines.length = 0;
+    await login("lam_thanh", "sai-mat-khau-dai", "6.6.6.7");
+    await svc.register("6.6.6.8", { username: "lam_thanh", password: PW }); // tên đã có
+    await svc.register("6.6.6.9", { username: "x", password: "yeu" }); // sai luật
+    expect(events().map((e) => e.ev)).toEqual(["auth.login_failed"]);
+  });
+
   it("khôi phục mật khẩu sai ghi `auth.recover_failed` và không lộ mã khôi phục đã thử", async () => {
     await reg();
+    lines.length = 0;
     await svc.recover("4.4.4.4", {
       username: "lam_thanh",
       recoveryCode: "ma-khoi-phuc-sai-kiem-tra",

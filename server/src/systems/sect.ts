@@ -420,6 +420,7 @@ export async function sectTransfer(w: World, sid: string, raw: unknown) {
   const res = await svc.transfer(a, msg.name);
   if (!res.ok) return toastFail(w, sid, res.reason);
   broadcastSect(w, res.sect);
+  w.audit?.("sect.transfer", { name: a.name, sect: res.sect.name, target: msg.name });
   toastGood(w, sid, `Đã chuyển quyền Tông chủ cho ${msg.name}.`);
 }
 

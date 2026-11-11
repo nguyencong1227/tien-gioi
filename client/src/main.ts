@@ -221,7 +221,10 @@ initAuthUi({
 });
 
 // Giả lập hiển thị modal phiên bản quá cũ khi có cờ ?outdated=N (phục vụ kiểm thử và nghiệm thu giao diện, M4 2.5)
-if (typeof window !== "undefined") {
+if (
+  typeof window !== "undefined" &&
+  (import.meta.env.DEV || new URLSearchParams(location.search).has("debug"))
+) {
   const outdatedParam = new URLSearchParams(location.search).get("outdated");
   if (outdatedParam !== null) {
     const minV = Number(outdatedParam) || 2;
