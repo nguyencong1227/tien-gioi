@@ -76,7 +76,21 @@ jobs:
           curl -fsS -X POST http://127.0.0.1:2567/matchmake/joinOrCreate/world \
             -H 'Content-Type: application/json' \
             -d '{"name":"CI Chay Thu","secret":"ci_chay_thu_secret_0123456789","v":1}' | grep -q '"sessionId"'
-          # 6. Tắt êm: docker stop (SIGTERM) phải xong nhanh và không bị SIGKILL (mã 137)
+          # 6. Tắt êm THẬT: một người chơi đang nối (tiến trình riêng TRONG container, dùng colyseus.js có sẵn) rồi `docker stop`:
+          #    SIGTERM phải tới server để nó lưu nhân vật (mã thoát 143 / thoát tức thì cũng có thể là bị giết mà KHÔNG lưu: chỉ tệp
+          #    hồ sơ trên đĩa mới chứng minh được)
+          docker exec -d -w /app tg sh -c 'node --input-type=module -e "
+            import { Client } from \"colyseus.js\";
+            const room = await new Client(\"ws://127.0.0.1:2567\").joinOrCreate(\"world\", { name: \"CI Tat Em\", secret: \"ci_tat_em_secret_0123456789\", v: 1 });
+            console.log(\"da vao\", room.sessionId);
+            setInterval(() => {}, 1000);
+          " > /tmp/vao.log 2>&1'
+          for i in $(seq 1 30); do
+            docker exec tg grep -q "da vao" /tmp/vao.log 2>/dev/null && break
+            sleep 1
+          done
+          docker exec tg cat /tmp/vao.log
+          docker exec tg grep -q "da vao" /tmp/vao.log
           start=$(date +%s)
           docker stop -t 30 tg > /dev/null
           took=$(( $(date +%s) - start ))
@@ -84,6 +98,10 @@ jobs:
           echo "docker stop mất ${took}s, mã thoát ${code}"
           test "$took" -lt 25
           test "$code" != "137"
+          rm -rf /tmp/players-sau && mkdir /tmp/players-sau
+          docker cp tg:/app/data/players/. /tmp/players-sau/
+          ls -la /tmp/players-sau
+          grep -l "CI Tat Em" /tmp/players-sau/*.json
           # 7. Log sạch lỗi
           if docker logs tg 2>&1 | grep -E "\[LỖI\]|unhandledRejection|uncaughtException"; then
             echo "::error::Log của ảnh có lỗi"; exit 1
