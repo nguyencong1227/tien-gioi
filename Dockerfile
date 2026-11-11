@@ -53,4 +53,9 @@ VOLUME ["/app/data/players"]
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
   CMD node -e "fetch('http://localhost:' + (process.env.PORT || 2567) + '/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"
 
-CMD ["npm", "start", "-w", "server"]
+# Chạy node TRỰC TIẾP (không qua `npm start`): npm KHÔNG chuyển SIGTERM cho tiến trình con, nên `docker stop` giết npm ngay (mã 143, 6 ms)
+# và server (tiến trình cháu) bị giết mà KHÔNG chạy được lưu nhân vật khi tắt: mất tới 30 giây tiến trình của mọi người mỗi lần cập nhật
+# bản chạy thật (CI "Chạy thử ảnh" bắt được: đả tọa rồi docker stop, tu vi trên đĩa vẫn 0). `node --import tsx` là một tiến trình duy nhất
+# nên Colyseus nhận SIGTERM, lưu rồi thoát mã 0. Cần cwd = server/ để tsx đọc `server/tsconfig.json` (decorator của schema).
+WORKDIR /app/server
+CMD ["node", "--import", "tsx", "src/index.ts"]

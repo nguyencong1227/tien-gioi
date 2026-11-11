@@ -272,6 +272,9 @@ Mỗi sự kiện nhạy cảm là MỘT dòng JSON trên stdout (`{"t":"<ISO>",
 
 ## 6. Tắt máy an toàn (Graceful Shutdown)
 
+> [!IMPORTANT]
+> **Trong Docker, ảnh phải chạy `node` trực tiếp** (`CMD ["node", "--import", "tsx", "src/index.ts"]`, cwd `server/`), KHÔNG qua `npm start`: `npm` không chuyển SIGTERM cho tiến trình con nên `docker stop` giết npm ngay (mã 143, vài ms) và server bị giết mà không lưu nhân vật (mất tới 30 giây tiến trình của mọi người mỗi lần cập nhật). Lỗi này đã có trong ảnh cũ và được CI bắt (bước "Chạy thử ảnh" của job `Docker Build`: nối một người đả tọa rồi `docker stop`, tu vi trên đĩa phải > 0, mã thoát 0).
+
 Khi cập nhật phiên bản hoặc khởi động lại máy chủ, gửi tín hiệu `SIGTERM` hoặc `SIGINT` đến tiến trình Node.js:
 ```bash
 kill -TERM <server_pid>
