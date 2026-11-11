@@ -3,6 +3,8 @@ dist/
 server/data/
 backups/
 server/bench-*.json
+server/soak-*.json
+soak-*.json
 *.log
 .DS_Store
 .env.local

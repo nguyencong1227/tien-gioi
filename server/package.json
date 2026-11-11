@@ -24,7 +24,8 @@
     "chuyen-du-lieu": "tsx scripts/chuyen-du-lieu.ts",
     "red-team": "tsx scripts/red-team.ts",
     "check:env": "tsx scripts/check-env.ts",
-    "khoi-phuc-thu": "tsx scripts/verify-restore.ts"
+    "khoi-phuc-thu": "tsx scripts/verify-restore.ts",
+    "soak": "tsx scripts/soak.ts"
   },
   "dependencies": {
     "@colyseus/schema": "3.0.76",

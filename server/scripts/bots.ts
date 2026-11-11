@@ -297,7 +297,7 @@ function seededPrng(seed: number) {
  * để ngay lúc WorldRoom.onJoin khởi tạo StateView (#62), các bot đã đứng ở bãi săn khắp bản đồ (khớp với bench.ts)
  * thay vì tụ hết trong Lạc Hà Trấn.
  */
-function seedBotSaveFile(
+export function seedBotSaveFile(
   name: string,
   secret: string,
   x: number,
@@ -307,14 +307,16 @@ function seedBotSaveFile(
   mapId: string = DEFAULT_MAP.def.id,
   life?: { playMs: number; kills: number; bossKills: number },
   coinOverride?: number,
+  dataDirOverride?: string,
 ): void {
-  mkdirSync(DATA_PLAYERS_DIR, { recursive: true });
+  const targetDir = dataDirOverride ? path.resolve(dataDirOverride) : DATA_PLAYERS_DIR;
+  mkdirSync(targetDir, { recursive: true });
   // Tên file PHẢI khớp với fileFor() trong server/src/store.ts (sha1 của tên NFC viết thường).
   // store.ts đổi cách đặt tên file thì bot sẽ ghi nhầm chỗ mà không báo lỗi: sửa cả hai nơi.
   // Ưu tiên DATA_DIR từ môi trường (giống store.ts), mặc định trỏ về server/data/players.
   // LƯU Ý: Server thử tải thật phải dùng DATA_DIR mặc định để bot ghi hồ sơ vào đúng server/data/players.
   const key = createHash("sha1").update(name.normalize("NFC").toLowerCase()).digest("hex");
-  const file = path.join(DATA_PLAYERS_DIR, `${key}.json`);
+  const file = path.join(targetDir, `${key}.json`);
   const now = new Date().toISOString();
   const saved: SavedPlayer = {
     name,
@@ -653,7 +655,7 @@ function findServerPid(port: number): number | null {
  * Đọc tổng thời gian CPU thực thi (ms, độ chính xác nano-giây) của luồng chính Node.js
  * từ `/proc/<pid>/sched` (`se.sum_exec_runtime`).
  */
-function readServerExecRuntimeMs(pid: number): number | null {
+export function readServerExecRuntimeMs(pid: number): number | null {
   try {
     const sched = readFileSync(`/proc/${pid}/sched`, "utf8");
     const m = /se\.sum_exec_runtime\s*:\s*([\d.]+)/.exec(sched);
@@ -664,7 +666,7 @@ function readServerExecRuntimeMs(pid: number): number | null {
 }
 
 /** Đọc RSS memory (MB) của tiến trình server từ `/proc/<pid>/status`. */
-function readServerRssMb(pid: number): number | null {
+export function readServerRssMb(pid: number): number | null {
   try {
     const status = readFileSync(`/proc/${pid}/status`, "utf8");
     const m = /VmRSS:\s*(\d+)\s*kB/.exec(status);
