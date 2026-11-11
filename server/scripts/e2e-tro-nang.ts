@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
-import { Tab, sleep } from "./e2e-kit";
+import { Tab, sleep, shown } from "./e2e-kit";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
@@ -60,9 +60,6 @@ async function press(tab: Tab, k: Key, shift = false) {
   await sleep(120); // cho Phaser / DOM xử lý xong
 }
 
-/** Biểu thức JS: phần tử `#id` thấy thật (kể cả khi phần tử cha ẩn). */
-const shown = (id: string) =>
-  `(() => { const e = document.getElementById(${JSON.stringify(id)}); if (!e || e.hidden || !e.checkVisibility({ checkVisibilityCSS: true })) return false; const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; })()`;
 const active = `(() => { const a = document.activeElement; return a ? (a.id || a.tagName.toLowerCase()) : ''; })()`;
 
 async function main() {
@@ -139,6 +136,91 @@ async function main() {
     await sleep(500);
     const t = tab;
     const ev = (e: string) => t.ev(e);
+
+    // 0. Bảng gợi ý người mới (hiện 1 lần lần đầu nhập thế, #269 lát 2)
+    check(
+      "Lần đầu nhập thế: bảng chỉ dẫn người mới hiện thật",
+      !!(await ev(shown("newbie-guide-modal"))),
+      "newbie-guide-modal không hiện",
+    );
+    check(
+      "Bảng chỉ dẫn có role=dialog và aria-modal=true",
+      (await ev(
+        `[document.getElementById('newbie-guide-modal').getAttribute('role'), document.getElementById('newbie-guide-modal').getAttribute('aria-modal')].join('|')`,
+      )) === "dialog|true",
+      String(await ev(`document.getElementById('newbie-guide-modal').getAttribute('role')`)),
+    );
+    // Đóng bằng Esc
+    await press(t, K.esc);
+    check(
+      "Bấm Esc: đóng bảng chỉ dẫn người mới",
+      !(await ev(shown("newbie-guide-modal"))),
+      "newbie-guide-modal vẫn mở",
+    );
+    check(
+      "Đã ghi nhận dismiss vào localStorage",
+      (await ev(`localStorage.getItem("tg_newbie_guide_dismissed")`)) === "1",
+      String(await ev(`localStorage.getItem("tg_newbie_guide_dismissed")`)),
+    );
+    // Nút Trợ giúp (?) ở đáy HUD hiển thị thật
+    check(
+      "Nút Trợ giúp (?) ở HUD đáy hiển thị thật",
+      !!(await ev(shown("help"))),
+      "help không hiện",
+    );
+    // Bấm nút Trợ giúp (?) mở lại được
+    await ev(`document.getElementById('help').click(); 1`);
+    check(
+      "Bấm nút Trợ giúp (?): mở lại bảng chỉ dẫn",
+      !!(await ev(shown("newbie-guide-modal"))),
+      "newbie-guide-modal không mở lại",
+    );
+    // Bấm nút 'Đã Hiểu'
+    await ev(`document.getElementById('newbie-btn-dismiss').click(); 1`);
+    check(
+      "Bấm nút 'Đã Hiểu': đóng bảng chỉ dẫn người mới thành công",
+      !(await ev(shown("newbie-guide-modal"))),
+      "newbie-guide-modal chưa đóng",
+    );
+
+    // 0b. Bảng Cài đặt & tuỳ chọn Giảm chuyển động (#269 lát 2)
+    await ev(`document.getElementById('btn-settings').click(); 1`);
+    check(
+      "Mở bảng Cài đặt: bảng hiện thật",
+      !!(await ev(shown("settings-modal"))),
+      "settings-modal không hiện",
+    );
+    check(
+      "Bảng Cài đặt có role=dialog và aria-modal=true",
+      (await ev(
+        `[document.getElementById('settings-modal').getAttribute('role'), document.getElementById('settings-modal').getAttribute('aria-modal')].join('|')`,
+      )) === "dialog|true",
+      String(await ev(`document.getElementById('settings-modal').getAttribute('role')`)),
+    );
+    await ev(`document.getElementById('set-reduced-motion').click(); 1`);
+    const reducedOn =
+      (await ev(`document.body.classList.contains('reduced-motion')`)) &&
+      (await ev(`localStorage.getItem('tg_reduced_motion')`)) === "1";
+    check(
+      "Bật tuỳ chọn giảm chuyển động: body có class reduced-motion và lưu localStorage",
+      !!reducedOn,
+      `class=${await ev(`document.body.className`)}, storage=${await ev(`localStorage.getItem('tg_reduced_motion')`)}`,
+    );
+    await ev(`document.getElementById('set-reduced-motion').click(); 1`);
+    const reducedOff =
+      !(await ev(`document.body.classList.contains('reduced-motion')`)) &&
+      (await ev(`localStorage.getItem('tg_reduced_motion')`)) === "0";
+    check(
+      "Tắt tuỳ chọn giảm chuyển động: gỡ class và lưu localStorage",
+      !!reducedOff,
+      `class=${await ev(`document.body.className`)}, storage=${await ev(`localStorage.getItem('tg_reduced_motion')`)}`,
+    );
+    await press(t, K.esc);
+    check(
+      "Bấm Esc: đóng bảng Cài đặt",
+      !(await ev(shown("settings-modal"))),
+      "settings-modal vẫn mở",
+    );
 
     // 5. ARIA cơ bản + mở bảng thì focus vào trong bảng
     await press(t, K.i);

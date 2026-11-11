@@ -1,7 +1,18 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { describe, expect, it, vi } from "vitest";
-import { ModalStack, isTypingElement, processEscapeKey, type EscapeHandlers } from "./a11y";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  ModalStack,
+  isTypingElement,
+  processEscapeKey,
+  type EscapeHandlers,
+  isReducedMotion,
+  setReducedMotionPref,
+  shouldShowNewbieGuide,
+  markNewbieGuideDismissed,
+  NEWBIE_GUIDE_STORAGE_KEY,
+  REDUCED_MOTION_STORAGE_KEY,
+} from "./a11y";
 
 describe("a11y: ModalStack", () => {
   it("quản lý thứ tự modal và cập nhật aria-expanded trên trigger", () => {
@@ -308,5 +319,97 @@ describe("a11y: Cấu trúc HTML & ARIA trong client/index.html", () => {
       expect(match, `Không tìm thấy nút "${id}"`).toBeTruthy();
       expect(match![0], `Nút "${id}" phải có aria-label`).toContain("aria-label=");
     }
+  });
+
+  it("newbie-guide-modal có đầy đủ role dialog, aria-modal, aria-labelledby và close button", () => {
+    const match = html.match(/<section[^>]*id=["']newbie-guide-modal["'][^>]*>/s);
+    expect(match, 'Không tìm thấy section id="newbie-guide-modal"').toBeTruthy();
+    const tag = match![0];
+    expect(tag).toContain('role="dialog"');
+    expect(tag).toContain('aria-modal="true"');
+    expect(tag).toContain('aria-labelledby="newbie-title"');
+    expect(tag).toContain('tabindex="-1"');
+
+    const closeBtn = html.match(/<button[^>]*id=["']newbie-close["'][^>]*>/s);
+    expect(closeBtn).toBeTruthy();
+    expect(closeBtn![0]).toContain("aria-label=");
+  });
+
+  it("settings-modal có checkbox set-reduced-motion để điều khiển giảm chuyển động", () => {
+    expect(html).toContain('id="set-reduced-motion"');
+  });
+});
+
+describe("a11y: isReducedMotion và setReducedMotionPref", () => {
+  const store: Record<string, string> = {};
+
+  beforeEach(() => {
+    for (const k of Object.keys(store)) delete store[k];
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => store[key] ?? null,
+      setItem: (key: string, val: string) => {
+        store[key] = val;
+      },
+      removeItem: (key: string) => {
+        delete store[key];
+      },
+    });
+    vi.stubGlobal("window", {
+      matchMedia: vi.fn().mockImplementation((query: string) => ({
+        matches: query.includes("prefers-reduced-motion: reduce") ? false : false,
+      })),
+    });
+    vi.stubGlobal("document", {
+      body: {
+        classList: {
+          toggle: vi.fn(),
+        },
+      },
+    });
+  });
+
+  it("mặc định đọc matchMedia khi chưa lưu localStorage", () => {
+    expect(isReducedMotion()).toBe(false);
+  });
+
+  it("setReducedMotionPref(true) cập nhật localStorage và toggle body class", () => {
+    setReducedMotionPref(true);
+    expect(store[REDUCED_MOTION_STORAGE_KEY]).toBe("1");
+    expect(isReducedMotion()).toBe(true);
+    expect(document.body.classList.toggle).toHaveBeenCalledWith("reduced-motion", true);
+  });
+
+  it("setReducedMotionPref(false) cập nhật localStorage và toggle body class tắt", () => {
+    setReducedMotionPref(false);
+    expect(store[REDUCED_MOTION_STORAGE_KEY]).toBe("0");
+    expect(isReducedMotion()).toBe(false);
+    expect(document.body.classList.toggle).toHaveBeenCalledWith("reduced-motion", false);
+  });
+});
+
+describe("a11y: NewbieGuide helper", () => {
+  const store: Record<string, string> = {};
+
+  beforeEach(() => {
+    for (const k of Object.keys(store)) delete store[k];
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => store[key] ?? null,
+      setItem: (key: string, val: string) => {
+        store[key] = val;
+      },
+      removeItem: (key: string) => {
+        delete store[key];
+      },
+    });
+  });
+
+  it("shouldShowNewbieGuide trả true khi chưa lưu dismiss", () => {
+    expect(shouldShowNewbieGuide()).toBe(true);
+  });
+
+  it("markNewbieGuideDismissed ghi vào localStorage và shouldShowNewbieGuide trả false", () => {
+    markNewbieGuideDismissed();
+    expect(store[NEWBIE_GUIDE_STORAGE_KEY]).toBe("1");
+    expect(shouldShowNewbieGuide()).toBe(false);
   });
 });

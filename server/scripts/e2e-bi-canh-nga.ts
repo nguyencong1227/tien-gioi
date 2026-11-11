@@ -142,7 +142,7 @@ async function main() {
       [tb, B],
     ] as const) {
       await tab.send("Page.addScriptToEvaluateOnNewDocument", {
-        source: `localStorage.setItem("tien-gioi:name", ${JSON.stringify(p.name)}); localStorage.setItem("tien-gioi:secret", ${JSON.stringify(p.secret)});`,
+        source: `localStorage.setItem("tg_newbie_guide_dismissed", "1"); localStorage.setItem("tien-gioi:name", ${JSON.stringify(p.name)}); localStorage.setItem("tien-gioi:secret", ${JSON.stringify(p.secret)});`,
       });
       await tab.send("Page.navigate", { url: `http://${p.host}:${PORT}/?debug` });
     }
