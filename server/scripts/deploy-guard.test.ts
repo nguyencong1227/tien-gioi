@@ -364,6 +364,8 @@ fi
       expect(secret).toMatch(/^[0-9a-f]{48}$/);
       expect(r.out).not.toContain(secret);
     }
+    // App Android (nguồn https://localhost) cần CORS để đăng nhập với server thật; mặc định server TẮT CORS
+    expect(env).toMatch(/^CORS_ORIGINS=https:\/\/localhost$/m);
     expect(existsSync(path.join(prodDir(), "docker-compose.yml"))).toBe(true);
     // Bộ hẹn giờ systemd gọi các tệp này TRONG thư mục chạy thật
     for (const f of ["prod.sh", "restore-test.sh"]) {

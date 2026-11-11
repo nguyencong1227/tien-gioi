@@ -52,7 +52,7 @@ Bản chạy thật hoàn toàn tách biệt với thư mục phát triển củ
 |---|---|---|
 | `docker-compose.yml` | `644` | Khai báo dịch vụ `db` (PostgreSQL 16) và `game` (ghcr.io) |
 | `prod.sh`, `restore-test.sh` | `755` | Bản chép của `deploy/prod.sh` và `deploy/restore-test.sh` do `init` đặt vào đây (bộ hẹn giờ systemd gọi các bản này) |
-| `.env.production` | `600` | Bí mật vận hành: `POSTGRES_PASSWORD`, `DATABASE_URL`, `METRICS_TOKEN`, `TIEN_GIOI_TAG` |
+| `.env.production` | `600` | Bí mật vận hành: `POSTGRES_PASSWORD`, `DATABASE_URL`, `METRICS_TOKEN`, `TIEN_GIOI_TAG`, `CORS_ORIGINS=https://localhost` (cho app Android) |
 | `.current-tag` | `644` | Thẻ phiên bản đang chạy (vd: `0.1.0`) |
 | `.last-tag` | `644` | Thẻ phiên bản chạy trước đó (dùng khi cần `rollback`) |
 | `data/pg/` | `700` | Dữ liệu gốc của PostgreSQL (bind-mount vào container db) |

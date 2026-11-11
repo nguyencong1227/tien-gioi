@@ -100,6 +100,9 @@ POSTGRES_PASSWORD=$pg_pass
 DATABASE_URL=postgres://tiengioi:$pg_pass@db:5432/tiengioi
 AUTH_MODE=account
 TRUST_PROXY=1
+# Nguồn của app Android (Capacitor, androidScheme https) được đọc /health và /api/* khác nguồn.
+# Khớp CHÍNH XÁC, không ký tự đại diện (docs/TRIEN_KHAI.md mục 5.2, THIET_KE_APP_ANDROID.md mục 7).
+CORS_ORIGINS=https://localhost
 METRICS_TOKEN=$metrics_token
 TIEN_GIOI_TAG=0.1.0
 EOF
