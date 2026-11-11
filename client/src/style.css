@@ -2149,11 +2149,11 @@ body.low-fx #btn-talk {
   justify-content: center;
 }
 .pib-btn.accept {
-  background: #389e0d;
+  background: #237804;
   color: #fff;
 }
 .pib-btn.accept:hover {
-  background: #52c41a;
+  background: #27860a;
 }
 .pib-btn.decline {
   background: rgba(255, 255, 255, 0.12);
@@ -2404,12 +2404,12 @@ body.low-fx #btn-talk {
   cursor: not-allowed;
 }
 .shop-act-btn.sell {
-  background: #389e0d;
+  background: #237804;
   border: 1px solid #52c41a;
   color: #fff;
 }
 .shop-act-btn.sell:hover:not(:disabled) {
-  background: #52c41a;
+  background: #27860a;
 }
 .shop-lock-label {
   font-size: 11px;
@@ -4851,4 +4851,102 @@ body.in-limbo #chat-log {
   min-height: 48px;
   font-size: 15px;
   font-weight: bold;
+}
+
+/* Bảng chỉ dẫn người mới (#269) */
+.newbie-guide-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(520px, 94vw);
+  max-height: min(600px, 90dvh);
+  display: flex;
+  flex-direction: column;
+  z-index: 1000;
+  box-shadow:
+    0 0 0 100vmax rgba(0, 0, 0, 0.75),
+    0 12px 32px rgba(0, 0, 0, 0.85);
+  border: 1px solid #d4af37;
+  border-radius: 8px;
+  background: #1d1a16;
+}
+
+.newbie-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  overflow-y: auto;
+}
+
+.newbie-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(212, 175, 55, 0.2);
+  border-radius: 6px;
+}
+
+.newbie-icon {
+  font-size: 24px;
+  flex: none;
+  line-height: 1;
+}
+
+.newbie-info b {
+  display: block;
+  font-size: 14px;
+  color: #ffe08a;
+  margin-bottom: 4px;
+}
+
+.newbie-info p {
+  font-size: 13px;
+  color: #d1d5db;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.newbie-info p b {
+  display: inline;
+  color: #fff6dc;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.newbie-footer {
+  padding: 12px 16px 16px;
+  border-top: 1px solid rgba(212, 175, 55, 0.2);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.newbie-footer button {
+  min-height: 44px;
+  padding: 0 20px;
+}
+
+/* Giảm chuyển động (Accessibility: prefers-reduced-motion, Issue #269) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+body.reduced-motion *,
+body.reduced-motion *::before,
+body.reduced-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
 }

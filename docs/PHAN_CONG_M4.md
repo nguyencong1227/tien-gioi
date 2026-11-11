@@ -1,6 +1,6 @@
 # Phân công M4 (các việc "M4-sớm" đã làm; phần còn lại là ĐỀ XUẤT của Dev A, chờ người dùng chốt)
 
-> Dựa trên `GDD.md` (M4: chống gian lận, deploy, build app Android / iOS) và trạng thái thực tế sau M3 (bước 1-6 xong: tổng kết ở `docs/PHAN_CONG_M3.md`). Các việc "M4-sớm" (không phụ thuộc các câu hỏi ở mục 6) đã được giao và làm: #251 (B, PWA + hiệu năng di động), #252 (C, red team), #253 (A, fuzz kinh tế), #257 (B + A, `PROTOCOL_VERSION` và rà tài sản), #263 (A, audit log), #269 (B, trợ năng), #276 (C, cấu hình + khôi phục). Các việc còn lại (release, Capacitor, giám sát, thử tải dài) chưa có issue và cần người dùng trả lời các câu hỏi ở mục 6. Bảng trạng thái ngay dưới đây.
+> Dựa trên `GDD.md` (M4: chống gian lận, deploy, build app Android / iOS) và trạng thái thực tế sau M3 (bước 1-6 xong: tổng kết ở `docs/PHAN_CONG_M3.md`). Các việc "M4-sớm" (không phụ thuộc các câu hỏi ở mục 6) đã được giao và làm: #251 (B, PWA + hiệu năng di động), #252 (C, red team), #253 (A, fuzz kinh tế), #257 (B + A, `PROTOCOL_VERSION` và rà tài sản), #263 (A, audit log), #269 (B, trợ năng; **xong**), #276 (C, cấu hình + khôi phục). Các việc còn lại (release, Capacitor, giám sát, thử tải dài) chưa có issue và cần người dùng trả lời các câu hỏi ở mục 6. Bảng trạng thái ngay dưới đây.
 
 ## 0. Trạng thái (cập nhật 11/11/2026, `main` `a28de68` trở đi)
 | Mục | Trạng thái | Bằng chứng / việc còn lại |
@@ -16,7 +16,7 @@
 | 3.5 thử tải dài | Chưa | C |
 | 4.1 PWA | **Xong** (#251) | `npm run check:pwa` |
 | 4.2 Capacitor Android | Chưa | chờ người dùng (Android trước?) |
-| 4.3 hiệu năng di động | **Một phần** | đo + tài liệu (#251, `docs/HIEU_NANG_DI_DONG.md`); trợ năng / giảm chuyển động: #269 (lát 1 #274 xong, lát 2 B đang làm) |
+| 4.3 hiệu năng di động + trợ năng | **Xong** | đo + tài liệu (#251, `docs/HIEU_NANG_DI_DONG.md`); trợ năng (#269): lát 1 #274 (Esc theo tầng, focus, ARIA), lát 2 #277 (giảm chuyển động theo OS / cài đặt, tương phản AA, bảng chỉ dẫn người mới); A đo giảm chuyển động THẬT bằng giả lập `prefers-reduced-motion` |
 | 4.4 tài sản / giấy phép | **Xong** (#259) | `npm run check:credits` |
 
 **Công cụ kiểm thử thật đã có (chạy cục bộ và trong CI):** E2E hai tab Chrome thật `e2e:tai-khoan`, `e2e:bi-canh`, `e2e:bi-canh-nga`, `e2e:pk`, `e2e:tong-mon`, `e2e:phien-ban`, `e2e:tro-nang` (phím thật qua CDP); quy ước kiểm "hiện ra" bằng `shown(id)` ở `server/scripts/e2e-kit.ts` (`docs/LOAD_TEST.md` cuối mục 13); `red-team`; bench / thử tải (`docs/LOAD_TEST.md`). Bài học đã thấm: lỗi nằm ở chỗ giao hai thành phần (Phaser + DOM, client + server, hidden của phần tử cha) thường không bị test thuần bắt, cần E2E thật + đột biến.

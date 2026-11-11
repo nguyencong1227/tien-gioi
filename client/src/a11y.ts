@@ -231,3 +231,60 @@ export function processEscapeKey(handlers: EscapeHandlers): boolean {
 
   return false;
 }
+
+export const NEWBIE_GUIDE_STORAGE_KEY = "tg_newbie_guide_dismissed";
+export const REDUCED_MOTION_STORAGE_KEY = "tg_reduced_motion";
+
+/**
+ * Kiểm tra xem người dùng có kích hoạt chế độ giảm chuyển động không
+ * (ưu tiên cài đặt thủ công trong game tg_reduced_motion, sau đó fallback theo prefers-reduced-motion của OS)
+ */
+export function isReducedMotion(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const userPref = localStorage.getItem(REDUCED_MOTION_STORAGE_KEY);
+    if (userPref === "1") return true;
+    if (userPref === "0") return false;
+  } catch {
+    /* localStorage bị chặn trong chế độ duyệt web ẩn danh */
+  }
+  return Boolean(
+    window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
+}
+
+/**
+ * Cập nhật cấu hình giảm chuyển động vào localStorage và toggle class trên body
+ */
+export function setReducedMotionPref(enabled: boolean): void {
+  try {
+    localStorage.setItem(REDUCED_MOTION_STORAGE_KEY, enabled ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+  if (typeof document !== "undefined") {
+    document.body.classList.toggle("reduced-motion", enabled);
+  }
+}
+
+/**
+ * Kiểm tra xem có cần hiển thị bảng chỉ dẫn người mới không
+ */
+export function shouldShowNewbieGuide(): boolean {
+  try {
+    return localStorage.getItem(NEWBIE_GUIDE_STORAGE_KEY) !== "1";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Ghi nhớ đã đóng bảng chỉ dẫn người mới
+ */
+export function markNewbieGuideDismissed(): void {
+  try {
+    localStorage.setItem(NEWBIE_GUIDE_STORAGE_KEY, "1");
+  } catch {
+    /* ignore */
+  }
+}

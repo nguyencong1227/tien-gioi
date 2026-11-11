@@ -87,7 +87,7 @@ async function main() {
     if (!first?.webSocketDebuggerUrl) throw new Error("Không kết nối được Chrome DevTools");
     tab = await Tab.open("A", first.webSocketDebuggerUrl);
     await tab.send("Page.addScriptToEvaluateOnNewDocument", {
-      source: `localStorage.setItem("tien-gioi:name", ${JSON.stringify(NAME)}); localStorage.setItem("tien-gioi:secret", ${JSON.stringify(SECRET)});`,
+      source: `localStorage.setItem("tg_newbie_guide_dismissed", "1"); localStorage.setItem("tien-gioi:name", ${JSON.stringify(NAME)}); localStorage.setItem("tien-gioi:secret", ${JSON.stringify(SECRET)});`,
     });
     await tab.send("Page.navigate", { url: `http://127.0.0.1:${PORT}/?debug` });
     await tab.waitFor(
