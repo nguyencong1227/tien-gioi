@@ -615,9 +615,9 @@ Bộ kiểm thử stress test tự động hoá 7 kịch bản then chốt trên
 ## 16. E2E thật phiên bản giao thức (M4 2.5, `npm run e2e:phien-ban -w server`)
 Chrome headless + server Colyseus thật trong tiến trình (thư mục dữ liệu tạm), cùng khung với mục 13 (`server/scripts/e2e-kit.ts`). Server nâng `WorldRoom.minProtocol` lên `PROTOCOL_VERSION + 1` nên client thật (gửi `v: PROTOCOL_VERSION`) thành "quá cũ". Luồng 4 bước: (1) client thấy màn hình "Phiên Bản Đã Cũ" nêu đúng mức tối thiểu và KHÔNG vào được game; (2) sau 2,5 giây `onAuth` được gọi đúng 1 lần (lỗi dứt khoát, không vòng thử lại / `wrong_map`) và không có hồ sơ nhân vật nào được tạo; (3) server hạ mức, bấm "Tải Lại Trang": trang tải lại sạch, màn hình tắt; (4) đăng nhập lại vào game bình thường. Cần `npm run build` (client/dist mới) và google-chrome. Đột biến: bỏ `throw new ClientOutdatedError` ở `client/src/connection.ts` thì bước 1 đỏ. Chạy trên main sau #261 (server) + #264 (client): PASS 4/4.
 
-## 17. Red Team Từng Tin Nhắn Server (M4-sớm - Issue #252)
+## 18. Red Team Từng Tin Nhắn Server (M4-sớm - Issue #252)
 
-### 17.1. Phương pháp & Công cụ (`server/scripts/red-team.ts`)
+### 18.1. Phương pháp & Công cụ (`server/scripts/red-team.ts`)
 Công cụ `npm run red-team -w server` dựng server Colyseus thật trong tiến trình với thư mục dữ liệu tạm cô lập và kiểm tra đối kháng (red team) toàn diện:
 - **Tự phát hiện loại tin nhắn:** Tự động đọc danh sách handler đã đăng ký từ `serverRoom.onMessageHandlers` (loại bỏ handler nội bộ `__no_message_handler` và handler toàn cục `*`), so khớp 100% với hợp đồng `shared/` (`EXPECTED_MESSAGE_TYPES` gồm 47 loại tin nghiệp vụ) + 1 tin lạ để kiểm tra handler `*`.
 - **Đa dạng hoá đối tượng tấn công (Poor & Rich Attacker):**
@@ -641,7 +641,7 @@ Công cụ `npm run red-team -w server` dựng server Colyseus thật trong ti�
     - Đột biến 1 (`useItem` cộng 5000 Linh thạch): Red team phát hiện 44 vi phạm bất biến tiền sống (ĐỎ).
     - Đột biến 2 (`useItem` ném TypeError khi thiếu kiểm tra null): Red team phát hiện 10 ngoại lệ handler `[lỗi]` (ĐỎ).
 
-### 17.2. Kết quả Đo đạc Thực tế
+### 18.2. Kết quả Đo đạc Thực tế
 Chạy 48 loại tin nhắn × 2 senders (Poor + Rich) × 26 biến thể payload (chế độ FAST):
 
 | Chỉ số kiểm thử | Giá trị đo được | Đánh giá | Trạng thái |

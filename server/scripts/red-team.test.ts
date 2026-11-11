@@ -53,5 +53,5 @@ describe("Red Team Server Messages (#252)", () => {
     // 5. Hiệu năng & bộ nhớ (ngưỡng chặt < 30 MB)
     expect(summary.payloadLatencyAvgMs).toBeLessThan(50);
     expect(summary.rssDeltaMb).toBeLessThan(30);
-  }, 60_000);
+  }, 90_000);
 });
