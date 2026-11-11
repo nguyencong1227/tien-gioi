@@ -1,15 +1,19 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   AuthClient,
   authErrorMessage,
   clearToken,
+  detectAuthMode,
   formatRecoveryCode,
+  getHttpBaseUrl,
   getToken,
   passwordReasonMessage,
+  serverUrlToHttpBase,
   setMockAuthEnabled,
   setToken,
   usernameReasonMessage,
 } from "./auth";
+import { ui } from "./ui";
 
 describe("client/src/auth - Tiện ích và Ánh xạ lỗi", () => {
   it("formatRecoveryCode định dạng mã mỗi 4 ký tự viết hoa", () => {
@@ -509,5 +513,236 @@ describe("client/src/auth-ui - Quyết định điều hướng sau khi có toke
     );
 
     expect(getActiveAuthView()).toBe("character");
+  });
+});
+
+describe("client/src/auth - Chuyển đổi VITE_SERVER_URL sang HTTP Base URL (M4.2 #284)", () => {
+  it("bảng ca chuyển đổi serverUrlToHttpBase chuẩn xác theo đặc tả", () => {
+    const testCases: Array<{ input: string | null | undefined; expected: string }> = [
+      // wss -> https
+      { input: "wss://h", expected: "https://h" },
+      { input: "wss://game.tiengioi.vn", expected: "https://game.tiengioi.vn" },
+      { input: "wss://game.tiengioi.vn/", expected: "https://game.tiengioi.vn" },
+      { input: "wss://game.tiengioi.vn:8443/", expected: "https://game.tiengioi.vn:8443" },
+
+      // ws -> http
+      { input: "ws://h:2567", expected: "http://h:2567" },
+      { input: "ws://localhost:2567", expected: "http://localhost:2567" },
+      { input: "ws://localhost:2567/", expected: "http://localhost:2567" },
+      { input: "ws://192.168.1.100:2577///", expected: "http://192.168.1.100:2577" },
+
+      // https -> giữ nguyên https
+      { input: "https://h", expected: "https://h" },
+      { input: "https://game.tiengioi.vn", expected: "https://game.tiengioi.vn" },
+      { input: "https://game.tiengioi.vn/", expected: "https://game.tiengioi.vn" },
+      { input: "https://api.tiengioi.vn/sub/path/", expected: "https://api.tiengioi.vn/sub/path" },
+
+      // http -> giữ nguyên http
+      { input: "http://h:2567", expected: "http://h:2567" },
+      { input: "http://localhost:2567", expected: "http://localhost:2567" },
+      { input: "http://localhost:2567/", expected: "http://localhost:2567" },
+
+      // Rỗng, undefined, null, khoảng trắng -> ""
+      { input: "", expected: "" },
+      { input: "   ", expected: "" },
+      { input: null, expected: "" },
+      { input: undefined, expected: "" },
+
+      // Scheme lạ hoặc URL không hợp lệ -> ""
+      { input: "ftp://files.example.com", expected: "" },
+      { input: "gopher://old.example.com", expected: "" },
+      { input: "javascript:alert(1)", expected: "" },
+      { input: "file:///path/to/file", expected: "" },
+      { input: "http://", expected: "" },
+      { input: "ws:///", expected: "" },
+      { input: "not-a-url", expected: "" },
+    ];
+
+    for (const { input, expected } of testCases) {
+      expect(serverUrlToHttpBase(input)).toBe(expected);
+    }
+  });
+
+  it("getHttpBaseUrl trả đúng theo URL truyền vào hoặc chuỗi rỗng", () => {
+    expect(getHttpBaseUrl("ws://localhost:2577/")).toBe("http://localhost:2577");
+    expect(getHttpBaseUrl("wss://tiengioi.vn/")).toBe("https://tiengioi.vn");
+    expect(getHttpBaseUrl("")).toBe("");
+  });
+
+  describe("detectAuthMode với HTTP Base URL", () => {
+    const originalFetch = globalThis.fetch;
+
+    afterEach(() => {
+      globalThis.fetch = originalFetch;
+    });
+
+    it("gọi fetch với /health khi base url rỗng", async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ authMode: "account" }),
+      });
+      globalThis.fetch = mockFetch;
+
+      const mode = await detectAuthMode();
+      expect(mockFetch).toHaveBeenCalledWith("/health");
+      expect(mode).toBe("account");
+    });
+
+    it("gọi fetch với ${base}/health khi có VITE_SERVER_URL", async () => {
+      const originalEnv = process.env.VITE_SERVER_URL;
+      process.env.VITE_SERVER_URL = "wss://server.tiengioi.vn/";
+
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ authMode: "account" }),
+      });
+      globalThis.fetch = mockFetch;
+
+      try {
+        const mode = await detectAuthMode();
+        expect(mockFetch).toHaveBeenCalledWith("https://server.tiengioi.vn/health");
+        expect(mode).toBe("account");
+      } finally {
+        if (originalEnv !== undefined) {
+          process.env.VITE_SERVER_URL = originalEnv;
+        } else {
+          delete process.env.VITE_SERVER_URL;
+        }
+      }
+    });
+  });
+
+  describe("AuthClient ghép URL với Base URL", () => {
+    const originalFetch = globalThis.fetch;
+
+    beforeEach(() => {
+      setMockAuthEnabled(false);
+    });
+
+    afterEach(() => {
+      globalThis.fetch = originalFetch;
+      setMockAuthEnabled(true);
+    });
+
+    it("ghép đúng base URL tuyệt đối khi được cung cấp", async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ token: "mock_tok_123" }),
+      });
+      globalThis.fetch = mockFetch;
+
+      const client = new AuthClient("https://auth.tiengioi.vn");
+      await client.login({ username: "user_test", password: "password123" });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://auth.tiengioi.vn/api/auth/login",
+        expect.objectContaining({
+          method: "POST",
+          headers: expect.objectContaining({
+            "Content-Type": "application/json",
+          }),
+        }),
+      );
+    });
+
+    it("dùng đường dẫn tương đối khi base url rỗng", async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ token: "mock_tok_456" }),
+      });
+      globalThis.fetch = mockFetch;
+
+      const client = new AuthClient("");
+      await client.login({ username: "user_test_2", password: "password456" });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/auth/login",
+        expect.objectContaining({
+          method: "POST",
+        }),
+      );
+    });
+  });
+});
+
+describe("client/src/ui - showClientOutdated với tuỳ chọn nội dung và nhãn nút (M4.2 #284)", () => {
+  let modalEl: HTMLElement;
+  let msgEl: HTMLElement;
+  let loginEl: HTMLElement;
+  let btnEl: HTMLElement;
+
+  beforeEach(() => {
+    modalEl = { hidden: true } as any;
+    msgEl = { textContent: "" } as any;
+    loginEl = { hidden: false } as any;
+    btnEl = { textContent: "Tải Lại Trang", onclick: null } as any;
+
+    const elements: Record<string, any> = {
+      "outdated-modal": modalEl,
+      "outdated-msg": msgEl,
+      login: loginEl,
+      "btn-reload-outdated": btnEl,
+    };
+
+    vi.stubGlobal("document", {
+      getElementById: (id: string) => elements[id] ?? null,
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("mặc định không truyền opts: giữ nguyên văn thông báo phiên bản và nhãn nút Tải Lại Trang", () => {
+    ui.showClientOutdated(5);
+
+    expect(modalEl.hidden).toBe(false);
+    expect(loginEl.hidden).toBe(true);
+    expect(msgEl.textContent).toBe(
+      "Máy chủ đã nâng cấp phiên bản giao thức mới (yêu cầu tối thiểu v5). Vui lòng tải lại trang để nạp bản cập nhật mới nhất.",
+    );
+    expect(btnEl.textContent).toBe("Tải Lại Trang");
+  });
+
+  it("mặc định minVersion <= 0 và không truyền opts: giữ nguyên câu thông báo chung", () => {
+    ui.showClientOutdated(0);
+
+    expect(modalEl.hidden).toBe(false);
+    expect(msgEl.textContent).toBe(
+      "Máy chủ đã nâng cấp phiên bản giao thức mới. Vui lòng tải lại trang để tiếp tục phiêu bạt Tiên Giới.",
+    );
+    expect(btnEl.textContent).toBe("Tải Lại Trang");
+  });
+
+  it("truyền opts tuỳ biến message và buttonLabel", () => {
+    ui.showClientOutdated(3, undefined, {
+      message: "Có bản cài đặt mới trên Google Play Store. Vui lòng cập nhật để tiếp tục.",
+      buttonLabel: "Cập Nhật Ngay",
+    });
+
+    expect(modalEl.hidden).toBe(false);
+    expect(msgEl.textContent).toBe(
+      "Có bản cài đặt mới trên Google Play Store. Vui lòng cập nhật để tiếp tục.",
+    );
+    expect(btnEl.textContent).toBe("Cập Nhật Ngay");
+  });
+
+  it("chỉ truyền opts.buttonLabel: giữ nguyên câu message mặc định", () => {
+    ui.showClientOutdated(4, undefined, {
+      buttonLabel: "Mở Cửa Hàng Ứng Dụng",
+    });
+
+    expect(msgEl.textContent).toContain("yêu cầu tối thiểu v4");
+    expect(btnEl.textContent).toBe("Mở Cửa Hàng Ứng Dụng");
+  });
+
+  it("gọi onReload khi người dùng bấm nút", () => {
+    const onReload = vi.fn();
+    ui.showClientOutdated(2, onReload, { buttonLabel: "Tải Lại" });
+
+    btnEl.onclick?.({} as any);
+    expect(onReload).toHaveBeenCalledTimes(1);
   });
 });

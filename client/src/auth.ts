@@ -143,9 +143,49 @@ export function formatRecoveryCode(code: string): string {
   return chunks.join("-");
 }
 
-function getHttpBaseUrl(): string {
-  // Cùng nguồn, dùng đường dẫn tương đối (proxy qua Vite ở dev, cùng host ở production)
-  return "";
+/**
+ * Đổi địa chỉ server (VITE_SERVER_URL) thành địa chỉ HTTP base cho API fetch.
+ * Quy tắc:
+ * - wss://h -> https://h
+ * - ws://h:port -> http://h:port
+ * - https://h -> https://h (giữ nguyên)
+ * - http://h:port -> http://h:port (giữ nguyên)
+ * - Cắt bỏ tất cả dấu gạch chéo '/' ở cuối (trailing slashes)
+ * - Rỗng, không đặt hoặc giá trị lạ (ftp://..., javascript:..., ...) -> trả "" (mặc định cùng nguồn)
+ */
+export function serverUrlToHttpBase(serverUrl?: string | null): string {
+  if (!serverUrl || typeof serverUrl !== "string") return "";
+  const trimmed = serverUrl.trim();
+  if (!trimmed) return "";
+
+  const match = trimmed.match(/^([a-zA-Z][a-zA-Z0-9+.-]*):\/\/(.+)$/);
+  if (!match) return "";
+
+  const scheme = match[1].toLowerCase();
+  const rest = match[2].trim().replace(/\/+$/, "");
+  if (!rest) return "";
+
+  let targetScheme: string;
+  if (scheme === "wss" || scheme === "https") {
+    targetScheme = "https";
+  } else if (scheme === "ws" || scheme === "http") {
+    targetScheme = "http";
+  } else {
+    return "";
+  }
+
+  return `${targetScheme}://${rest}`;
+}
+
+export function getHttpBaseUrl(overrideUrl?: string): string {
+  if (typeof overrideUrl === "string") {
+    return serverUrlToHttpBase(overrideUrl);
+  }
+  const envUrl =
+    (typeof import.meta !== "undefined" && import.meta.env?.VITE_SERVER_URL) ||
+    (typeof process !== "undefined" && process.env?.VITE_SERVER_URL) ||
+    undefined;
+  return serverUrlToHttpBase(envUrl);
 }
 
 export type AuthMode = "legacy" | "account";
@@ -164,8 +204,11 @@ export async function detectAuthMode(): Promise<AuthMode> {
     if (auth === "legacy" || p.has("legacy")) return "legacy";
   }
 
+  const base = getHttpBaseUrl();
+  const url = base ? `${base}/health` : "/health";
+
   try {
-    const res = await fetch("/health");
+    const res = await fetch(url);
     if (res.ok) {
       const data = await res.json();
       if (data && typeof data === "object" && data.authMode === "account") {
