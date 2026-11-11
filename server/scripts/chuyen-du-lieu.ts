@@ -26,6 +26,7 @@ import {
   auditPlayerSaveData,
   auditSoulSaveData,
 } from "./audit-saves.js";
+import { assertNotProd } from "./assert-not-prod.js";
 
 export interface MigrateOptions {
   /** Thư mục nhân vật (chân linh ở `souls/`, tông môn ở `sects/` bên trong) */
@@ -108,6 +109,7 @@ export async function migrateData(
   opts: MigrateOptions,
   target: MigrateTarget | null,
 ): Promise<MigrateReport> {
+  assertNotProd(opts.dir, "chuyen-du-lieu");
   const report: MigrateReport = { players: zero(), souls: zero(), sects: zero(), errors: [] };
   const write = !opts.thu && target !== null;
   let failures = 0;
@@ -274,6 +276,8 @@ async function main(): Promise<number> {
   let stores: Awaited<ReturnType<typeof createStores>> | undefined;
   try {
     console.log(`Nguồn: ${dir}`);
+    assertNotProd(dir, "chuyen-du-lieu");
+    assertNotProd(process.env.DATABASE_URL, "chuyen-du-lieu");
     stores = toPg ? await createStores(process.env) : undefined;
     const report = await migrateData(
       { dir, thu: args.thu, ghiDe: args.ghiDe },

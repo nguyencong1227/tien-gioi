@@ -128,8 +128,13 @@ jobs:
           if gh release view "$TAG_NAME" >/dev/null 2>&1; then
             echo "Bản phát hành $TAG_NAME đã tồn tại, giữ nguyên."
           else
+            extra_args=()
+            if [[ "$TAG_NAME" == *-* ]]; then
+              extra_args+=(--prerelease)
+            fi
             gh release create "$TAG_NAME" \
               --title "Tiên Giới $TAG_NAME" \
               --generate-notes \
-              --verify-tag
+              --verify-tag \
+              "${extra_args[@]}"
           fi

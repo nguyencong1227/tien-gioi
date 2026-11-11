@@ -66,6 +66,7 @@ import {
 } from "@tien-gioi/shared";
 import { runBench } from "../src/perf/bench";
 import { hashSecret, type SavedPlayer } from "../src/store";
+import { assertNotProd } from "./assert-not-prod";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
@@ -242,6 +243,9 @@ function parseArgs(argv: string[]): CliArgs {
   if (!url) url = `ws://localhost:${DEFAULT_PORT}`;
   const parsedUrl = new URL(url);
   const port = Number(parsedUrl.port || DEFAULT_PORT);
+  assertNotProd(port, "bots");
+  assertNotProd(url, "bots");
+  assertNotProd(DATA_PLAYERS_DIR, "bots");
 
   return {
     bots,

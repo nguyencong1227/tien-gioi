@@ -1,0 +1,11 @@
+[Unit]
+Description=Sao lưu cơ sở dữ liệu Tiên Giới định kỳ (PostgreSQL)
+After=network.target
+
+[Service]
+Type=oneshot
+# Thực thi lệnh backup qua prod.sh của bản chạy thật
+ExecStart=%h/TT/tien-gioi-prod/prod.sh backup
+# Giới hạn tài nguyên để không ảnh hưởng tới game server
+Nice=19
+CPUSchedulingPolicy=idle

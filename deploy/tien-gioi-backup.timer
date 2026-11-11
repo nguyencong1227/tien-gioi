@@ -1,0 +1,10 @@
+[Unit]
+Description=Lịch chạy sao lưu cơ sở dữ liệu Tiên Giới lúc 04:00 hàng ngày
+
+[Timer]
+OnCalendar=*-*-* 04:00:00
+RandomizedDelaySec=300
+Persistent=true
+
+[Install]
+WantedBy=timers.target

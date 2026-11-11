@@ -1,0 +1,9 @@
+[Unit]
+Description=Kiểm tra khôi phục thử bản sao lưu mới nhất của Tiên Giới (container PostgreSQL tạm)
+
+[Service]
+Type=oneshot
+# restore-test.sh được `prod.sh init` chép vào thư mục chạy thật cùng prod.sh
+ExecStart=%h/TT/tien-gioi-prod/restore-test.sh
+Nice=19
+CPUSchedulingPolicy=idle

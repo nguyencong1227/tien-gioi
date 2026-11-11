@@ -5,6 +5,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { assertNotProd } from "./assert-not-prod.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
@@ -80,6 +81,9 @@ export function performBackup(opts: BackupOptions = {}): BackupResult {
   const backupDir = opts.backupDir
     ? path.resolve(opts.backupDir)
     : path.resolve(repoRoot, "backups");
+
+  assertNotProd(dataDir, "backup");
+  assertNotProd(backupDir, "backup");
 
   if (!existsSync(dataDir)) {
     throw new Error(
