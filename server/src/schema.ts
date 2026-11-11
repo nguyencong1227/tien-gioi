@@ -5,8 +5,11 @@ import { Schema, MapSchema, Encoder, type, view } from "@colyseus/schema";
 // - Mỗi tick, patch của MỌI client (theo StateView, #62) được ghi nối tiếp vào cùng một bộ đệm:
 //   100 người cùng tụ trong trấn thì mỗi người nhận patch của ~100 người khác, tổng vài trăm KB.
 // Tràn thì schema tự nới rồi mã hóa lại, in cảnh báo: chậm đúng lúc đông người nhất.
+// 256 KB không đủ khi người chơi vào DỒN DẬP (khởi động lại server rồi mọi người nối lại, hoặc thử tải dài `npm run soak`: 100 bot vào
+// trong vài giây): đo được một tick cần 272-304 KB, schema in `buffer overflow` nhiều lần rồi cấp lại bộ đệm (docs/LOAD_TEST.md mục 20).
+// 512 KB có biên ~1,7 lần so với số đo đó; giá: thêm 256 KB x 2 bộ đệm mỗi phòng (kể cả phòng bí cảnh tạm).
 // Phải đặt trước khi tạo phòng (Colyseus cấp bộ đệm lúc khởi tạo serializer; mỗi phòng 2 bộ đệm).
-Encoder.BUFFER_SIZE = 256 * 1024;
+Encoder.BUFFER_SIZE = 512 * 1024;
 
 /**
  * Thẻ `@view` cho trường chỉ chủ nhân vật cần (xem systems/interest.ts: view.add(p, TAG_OWNER)).
