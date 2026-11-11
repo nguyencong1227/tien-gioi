@@ -42,6 +42,14 @@ export class PgPlayerStore implements PlayerStore {
       );
     });
   }
+
+  delete(name: string): Promise<boolean> {
+    const key = nameKeyOf(name);
+    return this.queue.run(key, async () => {
+      const r = await this.db.query("DELETE FROM characters WHERE name_key = $1", [key]);
+      return (r.rowCount ?? 0) > 0;
+    });
+  }
 }
 
 export class PgSoulStore implements SoulStore {
@@ -123,6 +131,13 @@ export class PgSoulStore implements SoulStore {
           throw e;
         }
       }
+    });
+  }
+
+  delete(id: string): Promise<boolean> {
+    return this.queue.run(id, async () => {
+      const r = await this.db.query("DELETE FROM souls WHERE id = $1", [id]);
+      return (r.rowCount ?? 0) > 0;
     });
   }
 }

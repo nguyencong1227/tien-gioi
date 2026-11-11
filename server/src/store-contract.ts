@@ -159,6 +159,25 @@ export function describePlayerStoreContract(
       expect(loadedA?.exp).toBe(111);
       expect(loadedB?.exp).toBe(222);
     });
+
+    it("delete xoá nhân vật đã lưu; gọi lại trả về false", async () => {
+      const store = await createStore();
+      const player = makeSavedPlayer("Nhân Vật Xoá");
+      await store.save(player);
+      expect(await store.load("Nhân Vật Xoá")).not.toBeNull();
+
+      const deleted = await store.delete("Nhân Vật Xoá");
+      expect(deleted).toBe(true);
+      expect(await store.load("Nhân Vật Xoá")).toBeNull();
+
+      // Xoá lại lần hai trả về false
+      expect(await store.delete("Nhân Vật Xoá")).toBe(false);
+    });
+
+    it("delete nhân vật chưa từng tồn tại trả về false", async () => {
+      const store = await createStore();
+      expect(await store.delete("Chua Tung Co")).toBe(false);
+    });
   });
 }
 
@@ -269,6 +288,25 @@ export function describeSoulStoreContract(
 
       expect((await store.get(id1))?.duyen).toBe(100);
       expect((await store.get(id2))?.duyen).toBe(200);
+    });
+
+    it("delete xoá chân linh đã lưu; gọi lại trả về false", async () => {
+      const store = await createStore();
+      const id = "linh_hon_can_xoa";
+      await store.create(id);
+      expect(await store.get(id)).not.toBeNull();
+
+      const deleted = await store.delete(id);
+      expect(deleted).toBe(true);
+      expect(await store.get(id)).toBeNull();
+
+      // Xoá lại lần hai trả về false
+      expect(await store.delete(id)).toBe(false);
+    });
+
+    it("delete chân linh chưa từng tồn tại trả về false", async () => {
+      const store = await createStore();
+      expect(await store.delete("chua_tung_co")).toBe(false);
     });
   });
 }
@@ -410,6 +448,39 @@ export function describeAccountStoreContract(
 
       const all = await store.all();
       expect(all.map((a) => a.username)).toEqual(["user_a", "user_b", "user_c"]);
+    });
+
+    it("delete xoá tài khoản theo id; giải phóng username và name để đăng ký lại được", async () => {
+      const store = await createStore();
+      const acc = await store.create(makeNewAccount("user_can_xoa"));
+      expect(acc).not.toBeNull();
+      const id = acc!.id;
+      await store.setName(id, "Đạo Hiệu Xoá");
+
+      expect(await store.byId(id)).not.toBeNull();
+      expect(await store.byUsername("user_can_xoa")).not.toBeNull();
+      expect(await store.byName("Đạo Hiệu Xoá")).not.toBeNull();
+
+      const deleted = await store.delete(id);
+      expect(deleted).toBe(true);
+
+      expect(await store.byId(id)).toBeNull();
+      expect(await store.byUsername("user_can_xoa")).toBeNull();
+      expect(await store.byName("Đạo Hiệu Xoá")).toBeNull();
+
+      // Xoá lại trả về false
+      expect(await store.delete(id)).toBe(false);
+
+      // Có thể đăng ký lại cùng username sau khi xoá
+      const reCreated = await store.create(makeNewAccount("user_can_xoa"));
+      expect(reCreated).not.toBeNull();
+      expect(reCreated!.id).not.toBe(id);
+      expect(await store.setName(reCreated!.id, "Đạo Hiệu Xoá")).toBe("ok");
+    });
+
+    it("delete id chưa từng có trả về false", async () => {
+      const store = await createStore();
+      expect(await store.delete("00000000-0000-0000-0000-000000000000")).toBe(false);
     });
   });
 }

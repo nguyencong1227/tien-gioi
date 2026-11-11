@@ -253,7 +253,7 @@ Mỗi sự kiện nhạy cảm là MỘT dòng JSON trên stdout (`{"t":"<ISO>",
 
 | Nhóm | Sự kiện | Ghi khi |
 |---|---|---|
-| Tài khoản | `auth.registered`, `auth.login_ok`, `auth.login_failed`, `auth.recovered`, `auth.recover_failed`, `auth.rate_limited` | đăng ký, đăng nhập, khôi phục; bị giới hạn tần suất (kèm IP) |
+| Tài khoản | `auth.registered`, `auth.login_ok`, `auth.login_failed`, `auth.recovered`, `auth.recover_failed`, `auth.rate_limited`, `account.deleted` | đăng ký, đăng nhập, khôi phục; bị giới hạn tần suất (kèm IP); xoá vĩnh viễn tài khoản theo yêu cầu (kèm id, userDigest, character, sessions) |
 | Vào phòng | `join.denied` (`bad_secret` / `bad_token`), `room.spam_kick` | sai mã / token; bị ngắt vì gửi quá nhiều tin |
 | Ví | `wallet.big` | một giao dịch >= `AUDIT_COIN_THRESHOLD` |
 | Tông môn | `sect.create`, `sect.kick`, `sect.transfer`, `sect.disband`, `sect.deposit`, `sect.withdraw` | thay đổi quan trọng / tiền vào ra kho |

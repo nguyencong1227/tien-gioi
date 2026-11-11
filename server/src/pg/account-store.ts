@@ -126,6 +126,11 @@ export class PgAccountStore implements AccountStore {
     // Không cập nhật được: không có tài khoản, hay tài khoản đã có đạo hiệu?
     return (await this.byId(id)) ? "has_character" : "not_found";
   }
+
+  async delete(id: string): Promise<boolean> {
+    const r = await this.db.query("DELETE FROM accounts WHERE id = $1", [id]);
+    return (r.rowCount ?? 0) > 0;
+  }
 }
 
 function toSession(r: any): SessionRecord {

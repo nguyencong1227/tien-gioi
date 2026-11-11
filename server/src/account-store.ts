@@ -50,6 +50,8 @@ export interface AccountStore {
    * đúng một bên được `ok`, bên kia `name_taken`.
    */
   setName(id: string, name: string): Promise<SetNameResult>;
+  /** Xoá tài khoản theo id; trả về true nếu có và đã xoá, false nếu không tìm thấy. */
+  delete(id: string): Promise<boolean>;
 }
 
 export interface SessionRecord {
@@ -298,6 +300,24 @@ export class FileAccountStore implements AccountStore {
       if (owner !== undefined) return "name_taken";
       await this.save({ ...cur, name });
       return "ok";
+    });
+  }
+
+  delete(id: string) {
+    return this.lane.run(async () => {
+      await this.ready();
+      const cur = this.byIdMap.get(id);
+      if (!cur) return false;
+      this.byIdMap.delete(id);
+      this.byUser.delete(cur.username);
+      if (cur.name) this.byNameKey.delete(nameKeyOf(cur.name));
+      const file = this.fileOf(id);
+      try {
+        await fs.unlink(file);
+      } catch (e: any) {
+        if (e?.code !== "ENOENT") throw e;
+      }
+      return true;
     });
   }
 }

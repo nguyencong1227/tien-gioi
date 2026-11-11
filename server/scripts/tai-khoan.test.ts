@@ -8,6 +8,11 @@ import { validatePassword } from "@tien-gioi/shared";
 import { FileAccountStore, FileSessionStore } from "../src/account-store";
 import { hashSecretScrypt, needsRehash, verifyScrypt } from "../src/auth";
 import { AuthService } from "../src/auth-service";
+import { FileSoulStore } from "../src/soul";
+import { FileSectStore } from "../src/sect-store";
+import type { PlayerStore } from "../src/player-store";
+import { cleanAuditFields } from "../src/audit";
+import { makeSavedPlayer, makeSect } from "../src/store-contract";
 import { randomPassword, runTool, type ToolDeps } from "./tai-khoan";
 
 const root = mkdtempSync(path.join(tmpdir(), "tien-gioi-tk-"));
@@ -21,6 +26,11 @@ const PW = "mat-khau-dai-du";
 let dir: string;
 let accounts: FileAccountStore;
 let sessions: FileSessionStore;
+let players: PlayerStore;
+let souls: FileSoulStore;
+let sects: FileSectStore;
+let memPlayers: Map<string, any>;
+let auditEvents: Array<{ ev: string; fields?: Record<string, unknown> }>;
 let auth: AuthService;
 let up: boolean;
 let deps: ToolDeps;
@@ -30,6 +40,15 @@ beforeEach(() => {
   dir = path.join(root, `t${++n}`);
   accounts = new FileAccountStore(path.join(dir, "accounts"));
   sessions = new FileSessionStore(path.join(dir, "sessions"));
+  memPlayers = new Map();
+  players = {
+    load: async (name) => memPlayers.get(name.normalize("NFC").toLowerCase()) ?? null,
+    save: async (p) => void memPlayers.set(p.name.normalize("NFC").toLowerCase(), p),
+    delete: async (name) => memPlayers.delete(name.normalize("NFC").toLowerCase()),
+  };
+  souls = new FileSoulStore(path.join(dir, "souls"));
+  sects = new FileSectStore(path.join(dir, "sects"));
+  auditEvents = [];
   auth = new AuthService({
     accounts,
     sessions,
@@ -44,8 +63,12 @@ beforeEach(() => {
   deps = {
     accounts,
     sessions,
+    players,
+    souls,
+    sects,
     isServerUp: async () => up,
     hash: (s) => hashSecretScrypt(s, CHEAP),
+    auditFn: (ev, fields) => auditEvents.push({ ev, fields }),
   };
 });
 
@@ -280,3 +303,281 @@ describe("randomPassword", () => {
 function errOf(r: { ok: boolean; error?: string }) {
   return r.ok ? "ok" : r.error;
 }
+
+describe("xoa - chạy thử (mặc định hoặc có --thu)", () => {
+  it("không có cờ hoặc có --thu: in kế hoạch xoá, không đổi bất kỳ dữ liệu nào", async () => {
+    const a = await reg("lam_thanh", "Lâm Thanh");
+    const acc = (await accounts.byUsername("lam_thanh"))!;
+    memPlayers.set("lâm thanh", makeSavedPlayer("Lâm Thanh"));
+    await souls.create(acc.id);
+    await login("lam_thanh", PW); // tạo 2 phiên
+    await login("lam_thanh", PW); // tạo 3 phiên
+    await sects.create(
+      makeSect("tm1", {
+        leader: "khac",
+        members: [
+          { soulKey: "khac", name: "Chủ", rank: "chu", joinedAt: 1000 },
+          { soulKey: acc.id, name: "Lâm Thanh", rank: "de_tu", joinedAt: 1000 },
+        ],
+      }),
+    );
+
+    // Chạy thử mặc định (không có --yes)
+    const r1 = await runTool(["xoa", "lam_thanh"], deps);
+    expect(r1.code).toBe(0);
+    expect(text(r1)).toContain("[CHẠY THỬ]");
+    expect(text(r1)).toContain(acc.id);
+    expect(text(r1)).toContain("Lâm Thanh");
+    expect(text(r1)).toContain("--yes");
+
+    // Dữ liệu còn nguyên vẹn
+    expect(await accounts.byUsername("lam_thanh")).not.toBeNull();
+    expect(await players.load("Lâm Thanh")).not.toBeNull();
+    expect(await souls.get(acc.id)).not.toBeNull();
+    expect((await sects.findBySoul(acc.id))?.id).toBe("tm1");
+    expect((await auth.me(a.token)).ok).toBe(true);
+
+    // Chạy thử với --thu
+    const r2 = await runTool(["xoa", "lam_thanh", "--thu"], deps);
+    expect(r2.code).toBe(0);
+    expect(text(r2)).toContain("[CHẠY THỬ]");
+  });
+
+  it("chạy thử vẫn chạy được khi server đang chạy (chỉ đọc)", async () => {
+    await reg("lam_thanh");
+    up = true;
+    const r = await runTool(["xoa", "lam_thanh"], deps);
+    expect(r.code).toBe(0);
+    expect(text(r)).toContain("[CHẠY THỬ]");
+  });
+});
+
+describe("xoa - từ chối an toàn", () => {
+  it("tên không tồn tại: mã 1", async () => {
+    const r = await runTool(["xoa", "chua_tung_co"], deps);
+    expect(r.code).toBe(1);
+    expect(text(r)).toContain('Không có tài khoản "chua_tung_co"');
+  });
+
+  it("tài khoản đang trực tuyến: từ chối mã 1", async () => {
+    await reg("lam_thanh");
+    deps = { ...deps, isOnline: () => true };
+    const r = await runTool(["xoa", "lam_thanh", "--yes"], deps);
+    expect(r.code).toBe(1);
+    expect(text(r)).toContain("đang trực tuyến: không xoá");
+    expect(await accounts.byUsername("lam_thanh")).not.toBeNull();
+  });
+
+  it("Tông chủ còn thành viên khác: từ chối mã 1, yêu cầu chuyển quyền / giải tán trước", async () => {
+    await reg("chu_phai", "Tông Chủ");
+    const acc = (await accounts.byUsername("chu_phai"))!;
+    await sects.create(
+      makeSect("tm2", {
+        name: "Côn Lôn",
+        leader: acc.id,
+        members: [
+          { soulKey: acc.id, name: "Tông Chủ", rank: "chu", joinedAt: 1000 },
+          { soulKey: "thanh_vien_khac", name: "Đệ Tử", rank: "de_tu", joinedAt: 1000 },
+        ],
+      }),
+    );
+
+    const r = await runTool(["xoa", "chu_phai", "--yes"], deps);
+    expect(r.code).toBe(1);
+    expect(text(r)).toContain("là Tông chủ của tông môn");
+    expect(text(r)).toContain("còn 1 thành viên khác");
+    expect(await accounts.byUsername("chu_phai")).not.toBeNull();
+    expect(await sects.findBySoul(acc.id)).not.toBeNull();
+  });
+
+  it("Tông chủ một mình nhưng kho còn Linh thạch: từ chối mã 1, không làm mồ côi tiền", async () => {
+    await reg("chu_giau", "Chủ Giàu");
+    const acc = (await accounts.byUsername("chu_giau"))!;
+    await sects.create(
+      makeSect("tm3", {
+        name: "Phú Quý Tông",
+        leader: acc.id,
+        coin: 5000,
+        members: [{ soulKey: acc.id, name: "Chủ Giàu", rank: "chu", joinedAt: 1000 }],
+      }),
+    );
+
+    const r = await runTool(["xoa", "chu_giau", "--yes"], deps);
+    expect(r.code).toBe(1);
+    expect(text(r)).toContain("còn 5000 Linh thạch trong kho");
+    expect(await accounts.byUsername("chu_giau")).not.toBeNull();
+    expect((await sects.get("tm3"))?.coin).toBe(5000);
+  });
+
+  it("server đang chạy với STORE=file: xoá thật (--yes) bị từ chối mã 2; --force bỏ qua", async () => {
+    await reg("lam_thanh");
+    up = true;
+    const r = await runTool(["xoa", "lam_thanh", "--yes"], deps);
+    expect(r.code).toBe(2);
+    expect(text(r)).toContain("TẮT server");
+    expect(await accounts.byUsername("lam_thanh")).not.toBeNull();
+
+    const forced = await runTool(["xoa", "lam_thanh", "--yes", "--force"], deps);
+    expect(forced.code).toBe(0);
+    expect(await accounts.byUsername("lam_thanh")).toBeNull();
+  });
+});
+
+describe("xoa - xoá thật khi có --yes", () => {
+  it("xoá thành viên thường trong tông môn: dọn sạch tài khoản, phiên, nhân vật, chân linh, gỡ khỏi tông môn, ghi audit", async () => {
+    const a = await reg("nguoi_dung", "Người Dùng");
+    const acc = (await accounts.byUsername("nguoi_dung"))!;
+    memPlayers.set("người dùng", makeSavedPlayer("Người Dùng"));
+    await souls.create(acc.id);
+    await login("nguoi_dung", PW); // tạo phiên thứ 2
+
+    // Tông môn có Tông chủ khác và người dùng này là thành viên
+    await sects.create(
+      makeSect("tm4", {
+        name: "Thái Huyền",
+        leader: "chu_khac",
+        members: [
+          { soulKey: "chu_khac", name: "Chủ", rank: "chu", joinedAt: 1000 },
+          { soulKey: acc.id, name: "Người Dùng", rank: "de_tu", joinedAt: 1000 },
+        ],
+      }),
+    );
+
+    const r = await runTool(["xoa", "nguoi_dung", "--yes"], deps);
+    expect(r.code).toBe(0);
+    expect(text(r)).toContain("Đã xoá vĩnh viễn tài khoản");
+
+    // 1. Tài khoản bị xoá
+    expect(await accounts.byId(acc.id)).toBeNull();
+    expect(await accounts.byUsername("nguoi_dung")).toBeNull();
+    expect(await accounts.byName("Người Dùng")).toBeNull();
+
+    // 2. Phiên bị thu hồi
+    expect((await auth.me(a.token)).ok).toBe(false);
+
+    // 3. Nhân vật bị xoá
+    expect(await players.load("Người Dùng")).toBeNull();
+
+    // 4. Chân linh bị xoá
+    expect(await souls.get(acc.id)).toBeNull();
+
+    // 5. Gỡ khỏi tông môn (tông môn còn lại 1 thành viên)
+    const sectAfter = await sects.get("tm4");
+    expect(sectAfter).not.toBeNull();
+    expect(sectAfter?.members.map((m) => m.soulKey)).toEqual(["chu_khac"]);
+
+    // 6. Ghi kiểm toán đúng định dạng và không bị lọc
+    expect(auditEvents.length).toBe(1);
+    const ev = auditEvents[0];
+    expect(ev.ev).toBe("account.deleted");
+    expect(ev.fields?.id).toBe(acc.id);
+    expect(ev.fields?.character).toBe("Người Dùng");
+    expect(ev.fields?.sessions).toBe(2);
+    expect(typeof ev.fields?.userDigest).toBe("string");
+    // Kiểm tra sạch sẽ qua cleanAuditFields
+    const clean = cleanAuditFields(ev.fields);
+    expect(clean.userDigest).toBe(ev.fields?.userDigest);
+    expect(clean.id).toBe(acc.id);
+
+    // 7. Giải phóng tên đăng nhập, có thể đăng ký lại
+    expect((await reg("nguoi_dung")).token).toBeTruthy();
+  });
+
+  it("Tông chủ một mình có kho = 0: giải tán tông môn", async () => {
+    await reg("chu_doc_than", "Độc Thân");
+    const acc = (await accounts.byUsername("chu_doc_than"))!;
+    await sects.create(
+      makeSect("tm5", {
+        name: "Cô Độc Môn",
+        leader: acc.id,
+        coin: 0,
+        members: [{ soulKey: acc.id, name: "Độc Thân", rank: "chu", joinedAt: 1000 }],
+      }),
+    );
+
+    const r = await runTool(["xoa", "chu_doc_than", "--yes"], deps);
+    expect(r.code).toBe(0);
+    expect(text(r)).toContain('đã giải tán tông môn "Cô Độc Môn"');
+    expect(await sects.get("tm5")).toBeNull();
+  });
+});
+
+describe("đột biến kiểm chứng (5 khẳng định của Issue #317)", () => {
+  it("Đột biến 1: Bỏ kiểm Tông chủ làm Tông chủ có thành viên khác bị xoá và làm tông môn mất chủ", async () => {
+    await reg("chu_db1", "Chủ ĐB1");
+    const acc = (await accounts.byUsername("chu_db1"))!;
+    await sects.create(
+      makeSect("tmdb1", {
+        name: "Tông ĐB1",
+        tag: "TDB1",
+        leader: acc.id,
+        members: [
+          { soulKey: acc.id, name: "Chủ ĐB1", rank: "chu", joinedAt: 1000 },
+          { soulKey: "tv_khac", name: "Đệ Tử", rank: "de_tu", joinedAt: 1000 },
+        ],
+      }),
+    );
+    const r = await runTool(["xoa", "chu_db1", "--yes"], deps);
+    expect(r.code).toBe(1);
+    expect(text(r)).toContain("Tông chủ");
+    expect(await accounts.byUsername("chu_db1")).not.toBeNull();
+    expect((await sects.get("tmdb1"))?.leader).toBe(acc.id);
+  });
+
+  it("Đột biến 2: Bỏ kiểm trực tuyến làm tài khoản đang chơi trong phòng bị xoá ngầm", async () => {
+    await reg("online_user");
+    deps = { ...deps, isOnline: () => true };
+    const r = await runTool(["xoa", "online_user", "--yes"], deps);
+    expect(r.code).toBe(1);
+    expect(text(r)).toContain("đang trực tuyến");
+    expect(await accounts.byUsername("online_user")).not.toBeNull();
+  });
+
+  it("Đột biến 3: Xoá không có --yes vẫn xoá dữ liệu người chơi", async () => {
+    await reg("no_yes_user");
+    const r = await runTool(["xoa", "no_yes_user"], deps);
+    expect(r.code).toBe(0);
+    expect(text(r)).toContain("[CHẠY THỬ]");
+    expect(await accounts.byUsername("no_yes_user")).not.toBeNull();
+  });
+
+  it("Đột biến 4: Quên xoá phiên hoặc chân linh khi xoá tài khoản", async () => {
+    const a = await reg("leak_test", "Đạo Leak");
+    const acc = (await accounts.byUsername("leak_test"))!;
+    await souls.create(acc.id);
+    const r = await runTool(["xoa", "leak_test", "--yes"], deps);
+    expect(r.code).toBe(0);
+    expect(await accounts.byId(acc.id)).toBeNull();
+    // Khẳng định phiên và chân linh không bị bỏ sót
+    expect(await souls.get(acc.id)).toBeNull();
+    expect((await auth.me(a.token)).ok).toBe(false);
+  });
+
+  it("Đột biến 5: Chạy thử (--thu) mà vẫn thay đổi dữ liệu trên hệ thống", async () => {
+    const a = await reg("dry_run_user", "Đạo Hữu Dry");
+    const acc = (await accounts.byUsername("dry_run_user"))!;
+    memPlayers.set("đạo hữu dry", makeSavedPlayer("Đạo Hữu Dry"));
+    await souls.create(acc.id);
+    await sects.create(
+      makeSect("tmdry", {
+        name: "Tông Dry",
+        tag: "TDRY",
+        leader: "other",
+        members: [
+          { soulKey: "other", name: "Chủ", rank: "chu", joinedAt: 1000 },
+          { soulKey: acc.id, name: "Đạo Hữu Dry", rank: "de_tu", joinedAt: 1000 },
+        ],
+      }),
+    );
+
+    const r = await runTool(["xoa", "dry_run_user", "--thu"], deps);
+    expect(r.code).toBe(0);
+
+    // Mọi bản ghi giữ nguyên không đổi
+    expect(await accounts.byId(acc.id)).not.toBeNull();
+    expect(await players.load("Đạo Hữu Dry")).not.toBeNull();
+    expect(await souls.get(acc.id)).not.toBeNull();
+    expect((await auth.me(a.token)).ok).toBe(true);
+    expect((await sects.findBySoul(acc.id))?.id).toBe("tmdry");
+  });
+});

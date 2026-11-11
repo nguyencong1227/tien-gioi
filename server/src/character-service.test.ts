@@ -39,6 +39,7 @@ let soulCreates: number;
 const players: PlayerStore = {
   load: async (name) => saves.get(name.normalize("NFC").toLowerCase()) ?? null,
   save: async (p) => void saves.set(p.name.normalize("NFC").toLowerCase(), p),
+  delete: async (name) => saves.delete(name.normalize("NFC").toLowerCase()),
 };
 const legacy = (name: string, secret = SECRET): SavedPlayer => ({
   name,
@@ -62,6 +63,7 @@ function setup(souls2?: SoulStore) {
     get: (id) => real.get(id),
     update: (id, fn) => real.update(id, fn),
     create: (id, init) => (soulCreates++, real.create(id, init)),
+    delete: (id) => real.delete(id),
   };
   auth = new AuthService({
     accounts,
@@ -286,6 +288,7 @@ describe("claim (nhận nhân vật cũ)", () => {
         if (fails-- > 0) throw new Error("đĩa lỗi");
         return { ...init!(newSoul(id, "x")), id };
       },
+      delete: async () => false,
     };
     setup(flaky);
     saves.set("co nhan", legacy("Co Nhan"));

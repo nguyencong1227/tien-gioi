@@ -22,6 +22,8 @@ export interface SoulStore {
    * không ghi gì và các lần sau vẫn chạy.
    */
   update(id: string, fn: (s: Soul) => Soul): Promise<Soul>;
+  /** Xoá chân linh theo id; trả về true nếu có và đã xoá, false nếu không tìm thấy. */
+  delete(id: string): Promise<boolean>;
 }
 
 /**
@@ -109,6 +111,19 @@ export class FileSoulStore implements SoulStore {
       const next: Soul = { ...fn(cur), id, updatedAt: this.clock() };
       await this.write(next);
       return next;
+    });
+  }
+
+  delete(id: string) {
+    return this.enqueue(id, async () => {
+      const file = this.fileOf(id);
+      try {
+        await fs.unlink(file);
+        return true;
+      } catch (e: any) {
+        if (e?.code === "ENOENT") return false;
+        throw e;
+      }
     });
   }
 }

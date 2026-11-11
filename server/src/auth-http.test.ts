@@ -46,6 +46,7 @@ async function serve(env: NodeJS.ProcessEnv, accounts?: AccountStore): Promise<S
   const players: PlayerStore = {
     load: async (name) => saves.get(name.normalize("NFC").toLowerCase()) ?? null,
     save: async (p) => void saves.set(p.name.normalize("NFC").toLowerCase(), p),
+    delete: async (name) => saves.delete(name.normalize("NFC").toLowerCase()),
   };
   mountAuth(app, {
     env,

@@ -738,6 +738,7 @@ describe("giám sát vận hành (M4 3.3)", () => {
         calls++;
         throw new Error("đĩa đầy (giả)");
       },
+      delete: async () => false,
     };
     try {
       vi.spyOn(console, "error").mockImplementation(() => {});
@@ -2094,6 +2095,10 @@ describe("kho nhân vật thay được (M3 bước 3b): WorldRoom chỉ biết 
         calls.push(`save:${key(p.name)}`);
         memory.set(key(p.name), JSON.parse(JSON.stringify(p)));
       },
+      delete: async (name) => {
+        calls.push(`delete:${key(name)}`);
+        return memory.delete(key(name));
+      },
     };
     try {
       const name = "Kho Bo Nho";
@@ -2277,6 +2282,7 @@ describe("luân hồi: chết thật, Hoàng Tuyền, đầu thai (M3 bước 2)
         }
         return real.update(id, fn);
       },
+      delete: (id) => real.delete(id),
     };
     vi.spyOn(console, "error").mockImplementation(() => {});
     try {
