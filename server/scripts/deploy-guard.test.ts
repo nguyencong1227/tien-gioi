@@ -187,6 +187,14 @@ describe("Hàng rào bảo vệ môi trường dev và kiểm tra triển khai (
     expect(res.valid).toBe(true);
   });
 
+  it("tệp restore-test.sh đạt chuẩn kiểm tra khôi phục sao lưu", () => {
+    const content = readFileSync(restoreTestShPath, "utf-8");
+    expect(content).toContain("pg_isready");
+    expect(content).toContain("LAST_RESTORE_OK");
+    expect(content).toContain("restore-test.log");
+    expect(content).toContain("SELECT count(*) FROM");
+  });
+
   describe("Kiểm thử 8 đột biến kiểm chứng (Mutation Testing)", () => {
     const composeContent = readFileSync(composeProdPath, "utf-8");
     const prodShContent = readFileSync(prodShPath, "utf-8");
