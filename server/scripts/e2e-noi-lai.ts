@@ -7,14 +7,15 @@
 //  3. Thoát chủ động (room.leave()): KHÔNG hiện banner nối lại.
 // Chạy: `npm run build && npm run e2e:noi-lai -w server` (cần google-chrome).
 import { spawn, execSync, type ChildProcess } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import http from "node:http";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
-import { Server } from "colyseus";
+import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { Tab, sleep, shown } from "./e2e-kit";
 
@@ -31,6 +32,9 @@ class TcpProxy {
   private server: net.Server;
   private connections = new Set<{ client: net.Socket; target: net.Socket }>();
   private allowNew = true;
+  /** Tổng số byte client đã gửi lên server: sau một lần thoát chủ động mà số này còn tăng nghĩa là client vẫn đang thử nối lại.
+   *  (Không đếm số kết nối TCP: HTTP matchmaking của lần nối lại có thể đi trên socket keep-alive sẵn có nên không tạo kết nối mới.) */
+  clientBytes = 0;
 
   constructor(
     readonly listenPort: number,
@@ -45,6 +49,7 @@ class TcpProxy {
       const pair = { client: clientSocket, target: targetSocket };
       this.connections.add(pair);
 
+      clientSocket.on("data", (d: Buffer) => (this.clientBytes += d.length));
       clientSocket.pipe(targetSocket);
       targetSocket.pipe(clientSocket);
 
@@ -95,6 +100,7 @@ async function main() {
   process.env.DATA_DIR = dataDir;
 
   const { WorldRoom, defineRooms } = await import("../src/rooms/WorldRoom.js");
+  const { changeCoin } = await import("../src/systems/wallet.js");
   WorldRoom.reconnectGraceS = 20;
 
   // Dựng HTTP + WebSocket Server Colyseus
@@ -147,6 +153,48 @@ async function main() {
     const first = targets.find((t) => t.type === "page");
     if (!first?.webSocketDebuggerUrl) throw new Error("Không kết nối được Chrome DevTools");
     tab = await Tab.open("A", first.webSocketDebuggerUrl);
+    const T = tab;
+
+    // Danh tính theo TỪNG ca: script chạy lúc tạo mỗi tài liệu mới, nên phải gỡ script của ca trước (nếu không mọi ca đều
+    // đăng nhập bằng danh tính của ca 1: lỗi đã bắt được khi A review #292)
+    let identityScript: string | null = null;
+    const setIdentity = async (name: string, secret: string) => {
+      if (identityScript) {
+        await T.send("Page.removeScriptToEvaluateOnNewDocument", { identifier: identityScript });
+      }
+      const r = await T.send("Page.addScriptToEvaluateOnNewDocument", {
+        source: `localStorage.setItem("tg_newbie_guide_dismissed", "1"); localStorage.setItem("tien-gioi:name", ${JSON.stringify(name)}); localStorage.setItem("tien-gioi:secret", ${JSON.stringify(secret)});`,
+      });
+      identityScript = String(r.result?.identifier ?? "");
+    };
+    /** Sự thật phía SERVER (cùng tiến trình): phòng, người chơi, ví, túi đồ của người đang mở trong tab */
+    const serverPlayer = async () => {
+      const roomId = String(await T.ev(`window.__scene?.room?.roomId ?? ''`));
+      const sid = String(await T.ev(`window.__scene?.room?.sessionId ?? ''`));
+      const room = matchMaker.getLocalRoomById(roomId) as any;
+      return {
+        roomId,
+        sid,
+        room,
+        world: room?.world as any,
+        ctrl: room?.world?.ctrl?.get(sid) as any,
+      };
+    };
+    const until = async (fn: () => boolean | Promise<boolean>, label: string, ms = 5000) => {
+      for (const end = Date.now() + ms; Date.now() < end;) {
+        if (await fn()) return;
+        await sleep(100);
+      }
+      throw new Error(`Hết thời gian chờ (${ms}ms): ${label}`);
+    };
+    /** Cho nhân vật trong tab 2 nanh sói qua chat (/give chỉ bật khi không chạy production) và chờ server nhận */
+    const giveItem = async () => {
+      await T.ev(`window.__scene.room.send("chat", { text: "/give nanh_soi 2" }); 1`);
+      await until(
+        async () => JSON.stringify((await serverPlayer()).ctrl?.inv ?? "").includes("nanh_soi"),
+        "server nhận /give",
+      );
+    };
 
     // =========================================================================
     // CA 1: Rớt mạng rồi nối lại được
@@ -155,9 +203,7 @@ async function main() {
     const NAME_1 = "Noi Lai Ok";
     const SECRET_1 = "e2e_secret_reconnect_11111111";
 
-    await tab.send("Page.addScriptToEvaluateOnNewDocument", {
-      source: `localStorage.setItem("tg_newbie_guide_dismissed", "1"); localStorage.setItem("tien-gioi:name", ${JSON.stringify(NAME_1)}); localStorage.setItem("tien-gioi:secret", ${JSON.stringify(SECRET_1)});`,
-    });
+    await setIdentity(NAME_1, SECRET_1);
     await tab.send("Page.navigate", { url: `http://127.0.0.1:${PORT_PROXY}/?debug` });
     await tab.waitFor(
       `typeof window.__switchAuthView === 'function' && !!document.getElementById('login-form')`,
@@ -178,8 +224,20 @@ async function main() {
 
     out(`  - Người chơi vào game: sessionId=${sidBefore}, toạ độ=(${posBefore.x}, ${posBefore.y})`);
 
-    // Proxy ngắt toàn bộ kết nối hiện tại (gây mã 1006 cho client)
-    out("  - Proxy TCP destroy kết nối hiện tại (mã 1006)...");
+    // Trạng thái có giá trị phía server: Linh thạch 123 + 2 nanh sói. Phải còn NGUYÊN sau khi nối lại.
+    const sp1 = await serverPlayer();
+    if (sp1.sid !== sidBefore || !sp1.ctrl)
+      throw new Error("Không tìm thấy người chơi ca 1 trên server");
+    changeCoin(sp1.world, sp1.sid, 123);
+    await giveItem();
+    const before = { coin: sp1.ctrl.coin as number, inv: JSON.stringify(sp1.ctrl.inv) };
+    if (before.coin !== 123) throw new Error(`Linh thạch ca 1 không như dựng: ${before.coin}`);
+
+    // Proxy ngắt toàn bộ kết nối hiện tại (gây mã 1006 cho client) và TẠM chặn kết nối mới: nối lại thành công chỉ mất
+    // vài chục ms nên nếu cho nối ngay thì banner chỉ lóe lên và vòng thăm dò 100 ms có thể bỏ lỡ (E2E chập chờn khi máy bận,
+    // A bắt được khi review #292). Chặn rồi mở lại làm banner hiện đủ lâu và có thể kiểm một cách chắc chắn.
+    out("  - Proxy TCP destroy kết nối hiện tại (mã 1006) và tạm chặn kết nối mới...");
+    proxy.setAllowNewConnections(false);
     proxy.dropAll();
 
     // Banner nối lại phải hiện thật
@@ -192,8 +250,9 @@ async function main() {
     }
     out(`  ✓ Banner nối lại hiển thị thật: "${bannerMsg}"`);
 
-    // Vì proxy vẫn cho phép kết nối mới, client sẽ tự động reconnect thành công
-    out("  - Chờ client tự động kết nối lại...");
+    // Mở lại proxy (còn trong 20 giây grace): lần thử kế tiếp của client phải nối lại thành công
+    proxy.setAllowNewConnections(true);
+    out("  - Mở lại proxy, chờ client tự động kết nối lại...");
     await tab.waitFor(
       `(() => { const b = document.getElementById('reconnect-banner'); return !b || b.hidden; })()`,
       "banner nối lại ẩn đi sau khi nối lại thành công",
@@ -216,6 +275,19 @@ async function main() {
       );
     }
     out(`  ✓ Vị trí nhân vật bảo toàn sau reconnect: (${posAfter.x}, ${posAfter.y})`);
+
+    const sp1b = await serverPlayer();
+    if (sp1b.roomId !== sp1.roomId || sp1b.ctrl !== sp1.ctrl) {
+      throw new Error("Sau nối lại không phải cùng nhân vật / cùng phòng phía server");
+    }
+    if (sp1b.ctrl.coin !== before.coin || JSON.stringify(sp1b.ctrl.inv) !== before.inv) {
+      throw new Error(`Ví / túi đồ đổi sau nối lại: ví ${before.coin} -> ${sp1b.ctrl.coin}`);
+    }
+    if (sp1b.world.ghosts.size !== 0)
+      throw new Error("Còn nhân vật chờ nối lại (ghost) sau khi đã nối lại");
+    out(
+      `  ✓ Server: cùng nhân vật, ví ${sp1b.ctrl.coin} Linh thạch + túi đồ (nanh sói) nguyên vẹn, không còn ghost`,
+    );
 
     // Kiểm tra điều khiển dùng lại được: nhấn phím D để di chuyển
     await tab.send("Input.dispatchKeyEvent", {
@@ -257,10 +329,7 @@ async function main() {
 
     WorldRoom.reconnectGraceS = 2; // Hạ thời gian grace để kiểm thử chạy nhanh
 
-    await tab.ev(`
-      localStorage.setItem("tien-gioi:name", ${JSON.stringify(NAME_2)});
-      localStorage.setItem("tien-gioi:secret", ${JSON.stringify(SECRET_2)});
-    `);
+    await setIdentity(NAME_2, SECRET_2);
     await tab.send("Page.navigate", { url: `http://127.0.0.1:${PORT_PROXY}/?debug` });
     await tab.waitFor(
       `typeof window.__switchAuthView === 'function' && !!document.getElementById('login-form')`,
@@ -272,11 +341,24 @@ async function main() {
       "vào game ca 2",
     );
     await tab.waitFor(shown("hud-name"), "đạo hiệu ca 2");
+    const hudName2 = String(await tab.ev(`document.getElementById('hud-name')?.textContent ?? ''`));
+    if (hudName2 !== NAME_2)
+      throw new Error(`Ca 2 đăng nhập nhầm danh tính: "${hudName2}" (cần "${NAME_2}")`);
+    const sp2 = await serverPlayer();
+    await giveItem(); // thay đổi sau lần ghi lúc vào phòng: chỉ có thể xuống đĩa nếu server lưu khi hết grace
 
     // Chặn kết nối mới tại proxy trong 2.5s để server hết 2s grace
     out("  - Khóa proxy trong 2.5s và drop kết nối hiện tại (chờ server hết 2s grace)...");
     proxy.setAllowNewConnections(false);
     proxy.dropAll();
+    // Server lưu ngay lúc rớt (phòng khi sập), nên lần lưu khi HẾT grace chỉ được chứng minh bằng thay đổi xảy ra SAU đó:
+    // cộng 77 Linh thạch trong lúc nhân vật đang chờ nối lại
+    await until(
+      () => sp2.world.ghosts.has(sp2.sid),
+      "server đưa nhân vật ca 2 vào trạng thái chờ nối lại",
+    );
+    const coin2 = (sp2.ctrl.coin as number) + 77;
+    changeCoin(sp2.world, sp2.sid, 77);
 
     // Đợi 2.5s để server hết hạn 2s grace, dọn ghost và hủy token
     await sleep(2500);
@@ -303,12 +385,23 @@ async function main() {
 
     await sleep(1000); // Đợi server hoàn tất persist nếu còn đang ghi
 
-    // Kiểm tra server: nhân vật đã được lưu vào đĩa
-    const playerFiles = readdirSync(dataDir).filter((f) => f.endsWith(".json"));
-    if (playerFiles.length === 0) {
-      throw new Error("Server không lưu hồ sơ nhân vật sau khi rớt mạng quá hạn");
-    }
-    out(`  ✓ Server đã lưu hồ sơ nhân vật sau khi quá hạn grace: ${playerFiles.length} tệp`);
+    // Kiểm tra server: ĐÚNG hồ sơ của nhân vật ca 2 đã xuống đĩa kèm thay đổi (nanh sói), và không còn ghost / ctrl
+    const file2 = path.join(
+      dataDir,
+      `${createHash("sha1").update(NAME_2.normalize("NFC").toLowerCase()).digest("hex")}.json`,
+    );
+    await until(() => {
+      if (!existsSync(file2)) return false;
+      const saved = JSON.parse(readFileSync(file2, "utf8"));
+      return JSON.stringify(saved.inventory).includes("nanh_soi") && saved.coin === coin2;
+    }, "hồ sơ nhân vật ca 2 (nanh sói + Linh thạch cộng trong lúc chờ) được lưu xuống đĩa khi hết grace");
+    const roomAfter2 = matchMaker.getLocalRoomById(sp2.roomId) as any;
+    if (roomAfter2?.world?.ghosts?.size) throw new Error("Còn ghost sau khi hết grace");
+    if (roomAfter2?.world?.ctrl?.has(sp2.sid))
+      throw new Error("Nhân vật ca 2 vẫn còn trong phòng sau khi hết grace");
+    out(
+      `  ✓ Hồ sơ ${NAME_2} (nanh sói + ${coin2} Linh thạch, gồm phần cộng lúc chờ) đã lưu xuống đĩa khi hết grace; không còn ghost, không còn trong phòng`,
+    );
 
     // =========================================================================
     // CA 3: Thoát chủ động không nối lại
@@ -319,10 +412,7 @@ async function main() {
     const NAME_3 = "Thoat Chu Dong";
     const SECRET_3 = "e2e_secret_active_leave_333";
 
-    await tab.ev(`
-      localStorage.setItem("tien-gioi:name", ${JSON.stringify(NAME_3)});
-      localStorage.setItem("tien-gioi:secret", ${JSON.stringify(SECRET_3)});
-    `);
+    await setIdentity(NAME_3, SECRET_3);
     await tab.send("Page.navigate", { url: `http://127.0.0.1:${PORT_PROXY}/?debug` });
     await tab.waitFor(
       `typeof window.__switchAuthView === 'function' && !!document.getElementById('login-form')`,
@@ -334,10 +424,24 @@ async function main() {
       "vào game ca 3",
     );
     await tab.waitFor(shown("hud-name"), "đạo hiệu ca 3");
+    const hudName3 = String(await tab.ev(`document.getElementById('hud-name')?.textContent ?? ''`));
+    if (hudName3 !== NAME_3)
+      throw new Error(`Ca 3 đăng nhập nhầm danh tính: "${hudName3}" (cần "${NAME_3}")`);
+    const sp3 = await serverPlayer();
+    // Ghi lại MỌI thay đổi của banner nối lại: lần thử nối lại bị từ chối dứt khoát (token đã vô hiệu vì thoát chủ động) làm
+    // banner lóe "đang nối lại" rồi chuyển ngay sang "thất bại" trong vài ms, nên chỉ đọc chữ cuối cùng thì bỏ lỡ
+    await tab.ev(`window.__bannerLog = [];
+      const el = document.getElementById('reconnect-banner');
+      new MutationObserver(() => window.__bannerLog.push(((document.getElementById('reconnect-banner-text') || {}).textContent || '') + '|hidden=' + (el ? el.hidden : 'x')))
+        .observe(el, { subtree: true, childList: true, characterData: true, attributes: true });
+      1`);
+    await sleep(500);
 
     out("  - Gọi chủ động đóng kết nối (mã 4000)...");
     await tab.ev(`window.__scene?.room?.connection?.close(4000); 1`);
-    await sleep(1500);
+    await sleep(300); // khung đóng của chính lần thoát này đã đi qua proxy
+    const bytesBefore = proxy.clientBytes;
+    await sleep(3200); // dài hơn hai nhịp thử lại (1,5 giây) của vòng nối lại
 
     const bannerMsgCa3 = String(
       await tab.ev(`document.getElementById('reconnect-banner-text')?.textContent ?? ''`),
@@ -345,8 +449,22 @@ async function main() {
     if (bannerMsgCa3.includes("đang nối lại")) {
       throw new Error(`Thoát chủ động mà vẫn hiển thị banner đang nối lại: "${bannerMsgCa3}"`);
     }
+    const bannerLog = (await tab.ev(`window.__bannerLog ?? []`)) as string[];
+    if (bannerLog.some((t) => t.includes("đang nối lại"))) {
+      throw new Error(
+        `Thoát chủ động mà banner từng hiện "đang nối lại": ${JSON.stringify(bannerLog)}`,
+      );
+    }
+    if (proxy.clientBytes !== bytesBefore) {
+      throw new Error(
+        `Thoát chủ động mà client vẫn gửi ${proxy.clientBytes - bytesBefore} byte lên server (đang thử nối lại)`,
+      );
+    }
+    const room3 = matchMaker.getLocalRoomById(sp3.roomId) as any;
+    if (room3?.world?.ghosts?.size)
+      throw new Error("Thoát chủ động mà server vẫn giữ ghost chờ nối lại");
     out(
-      `  ✓ Thoát chủ động: KHÔNG kích hoạt luồng reconnect (không hiện banner đếm ngược nối lại)`,
+      `  ✓ Thoát chủ động: banner không từng hiện "đang nối lại", client không gửi thêm byte nào, server không giữ ghost`,
     );
   } catch (e) {
     failed = (e as Error).message;
