@@ -36,6 +36,7 @@ import { Hub } from "./hub";
 import type { Identity } from "./identity";
 import type { Run } from "./systems/dungeon";
 import { Duels } from "./systems/duel";
+import { TickStats } from "./metrics";
 
 /** Dữ liệu riêng của server cho mỗi người chơi (không gửi xuống client). */
 export interface PlayerCtrl {
@@ -217,6 +218,10 @@ export class World {
   onDungeonExit: ((sid: string) => void) | null = null;
   /** Phòng bí cảnh: id của run mà phòng này phục vụ (`Hub.runs`); `null` ở mọi phòng thường. */
   runId: string | null = null;
+  /** Id phòng Colyseus của thế giới này (nhãn cho `/metrics`); rỗng ở test / bench. */
+  roomId = "";
+  /** Thời gian xử lý mỗi tick của phòng này (M4 3.3); `WorldRoom.update` ghi, `/metrics` đọc. Bench / test không ghi. */
+  readonly tickStats = new TickStats();
   /**
    * Dịch vụ tông môn (docs/THIET_KE_TONG_MON.md): WorldRoom đặt khi tạo phòng. `null` (test đơn vị không đặt, hoặc `SECTS=off`):
    * mọi tin tông môn bị từ chối `disabled`, vào phòng không tra tông môn.

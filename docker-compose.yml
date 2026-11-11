@@ -19,6 +19,11 @@ services:
       - DATA_DIR=/app/data/players
     volumes:
       - tien-gioi-data:/app/data/players
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m" # Xoay vòng log của container: tối đa 5 tệp x 10 MB (docs/TRIEN_KHAI.md mục 5.1)
+        max-file: "5"
 
 volumes:
   tien-gioi-data:

@@ -51,6 +51,10 @@ npm run build
 | `AUDIT_LOG` | Bật (stdout) | Nhật ký kiểm toán có cấu trúc M4 2.4: mỗi sự kiện nhạy cảm 1 dòng JSON ra stdout. Đặt `AUDIT_LOG=off` để tắt | Không | Để trống / bật | `server/src/audit.ts`, `server/src/index.ts` |
 | `AUDIT_COIN_THRESHOLD` | `5000` | Ngưỡng biến động Linh thạch trong 1 giao dịch để ghi sự kiện `wallet.big` vào nhật ký kiểm toán. Số nguyên dương | Không | `5000` (hoặc tuỳ chỉnh theo kinh tế game) | `server/src/audit.ts`, `server/src/rooms/WorldRoom.ts` |
 | `MIN_PROTOCOL_VERSION` | `0` (nhận mọi client) | Phiên bản giao thức thấp nhất server chấp nhận khi vào phòng. Client cũ hơn bị từ chối bằng lỗi 426 trước khi xác thực | Không | Nâng khi phát hành bản cập nhật client bắt buộc mới | `server/src/protocol.ts`, `server/src/startup.ts`, `server/src/index.ts` |
+| `METRICS_TOKEN` | Không có (`/metrics` TẮT) | Bật `GET /metrics` (số đo vận hành, mục 5): đòi tiêu đề `Authorization: Bearer <token>`. Ngắn hơn 16 ký tự bị coi là chưa đặt (kèm cảnh báo khi khởi động) | **CÓ** | Chuỗi ngẫu nhiên dài (`openssl rand -hex 24`), chỉ đưa cho hệ thống giám sát | `server/src/metrics.ts`, `server/src/startup.ts`, `server/src/index.ts` |
+| `TICK_WARN_MS` | `25` | Ngưỡng cảnh báo `[CẢNH BÁO]` trong log khi p95 thời gian tick của phòng tệ nhất (cửa sổ ~60 giây) vượt quá số ms này; nhịp tick là 50 ms, ngân sách thiết kế < 10 ms | Không | Mặc định; hạ xuống nếu muốn báo sớm | `server/src/metrics.ts` |
+| `WRITE_WARN_PENDING` | `200` | Cảnh báo khi số lần ghi hồ sơ nhân vật đang chờ vượt quá số này (kho lưu trữ chậm) | Không | Mặc định | `server/src/metrics.ts` |
+| `WRITE_WARN_AGE_S` | `30` | Cảnh báo khi lần ghi hồ sơ chờ lâu nhất quá số giây này (kho lưu trữ có thể đã kẹt) | Không | Mặc định | `server/src/metrics.ts` |
 
 > [!IMPORTANT]
 > **Tài khoản (`AUTH_MODE=account`) và proxy:** chỉ ở chế độ `account` server mới mở `/api/auth/*` (đăng ký, đăng nhập, phiên, khôi phục mật khẩu); `legacy` không mở API nào. Giới hạn tần suất đăng nhập tính **theo IP của khách** (10 lần sai / 10 phút, 5 lần đăng ký / giờ). Khi chạy sau reverse proxy (mục 4) mà không đặt `TRUST_PROXY=1`, mọi người chơi trông như cùng một IP (của proxy) và **dùng chung** hạn mức đó cho cả server; ngược lại, đặt `TRUST_PROXY` khi KHÔNG có proxy ghi đè `X-Forwarded-For` thì kẻ xấu tự đặt IP để qua mặt giới hạn. Mật khẩu đi qua mạng: chỉ mở thật qua HTTPS (mục 4). Server khởi động sẽ in cảnh báo nếu cấu hình production còn `legacy`, hoặc `account` mà chưa đặt `TRUST_PROXY`. Dữ liệu tài khoản nằm trong `DATA_DIR/accounts` và `DATA_DIR/sessions` (chỉ có băm; `npm run backup` đã gồm).
@@ -182,7 +186,39 @@ Server cung cấp endpoint kiểm tra tình trạng hoạt động tại `/healt
 curl -f http://localhost:2567/health
 # Trả về: {"ok":true,"authMode":"legacy"} (hoặc "account") với HTTP status 200
 ```
-Có thể dùng endpoint này cho Uptime Kuma, AWS Target Group Health Check, hoặc Docker `HEALTHCHECK`.
+Có thể dùng endpoint này cho Uptime Kuma, AWS Target Group Health Check, hoặc Docker `HEALTHCHECK`. `/health` công khai và chỉ cho biết tiến trình còn trả lời (kèm `authMode`, `protocol`, `minProtocol`): số đo vận hành nằm ở `/metrics` bên dưới.
+
+### 5.1. Số đo vận hành `/metrics` (M4 3.3)
+`/metrics` **tắt** cho tới khi đặt `METRICS_TOKEN` (chuỗi ngẫu nhiên từ 16 ký tự). Khi bật, mọi lời gọi phải có tiêu đề `Authorization: Bearer <token>` (token trên URL KHÔNG được nhận vì URL đi vào log của proxy); thiếu / sai là `401`, chưa bật là `404`.
+```bash
+curl -s -H "Authorization: Bearer $METRICS_TOKEN" http://localhost:2567/metrics            # văn bản kiểu Prometheus
+curl -s -H "Authorization: Bearer $METRICS_TOKEN" 'http://localhost:2567/metrics?format=json' # cùng số đo dạng JSON
+```
+Số đo chính (tiền tố `tiengioi_`):
+
+| Số đo | Ý nghĩa | Khi nào đáng lo |
+|---|---|---|
+| `room_tick_ms{quantile="0.5\|0.95\|1"}`, `tick_p95_worst_ms` | Thời gian xử lý **mô phỏng** một tick của từng phòng, cửa sổ trượt ~60 giây (1200 tick). **Chưa gồm** mã hoá patch state của Colyseus (đo bằng `npm run bench`) | p95 > 25 ms (nửa nhịp 50 ms) kéo dài |
+| `room_tick_overrun_total` | Số tick chạy lâu hơn một nhịp (50 ms) từ lúc phòng mở | tăng đều |
+| `event_loop_lag_p99_ms` | Độ trễ p99 của vòng lặp sự kiện trong cửa sổ 10 giây, tính cả mã hoá patch, ghi đĩa, HTTP | > 100 ms |
+| `writes_inflight`, `writes_oldest_age_seconds`, `writes_failed_total` | Hàng đợi ghi **hồ sơ nhân vật** (đúng cho cả `STORE=file` và `pg`). Kho chân linh / tông môn chưa được đo riêng | `oldest_age` tăng mãi = kho lưu trữ kẹt; `failed_total` tăng |
+| `players_online`, `rooms`, `room_players`, `room_ghosts`, `room_monsters` | Số người (kể cả đang chờ nối lại), số phòng, người / quái từng phòng (phòng bí cảnh tạm cũng hiện) | tăng không dừng khi không có người mới |
+| `process_rss_bytes`, `process_heap_used_bytes`, `uptime_seconds`, `store_info{kind}` | Bộ nhớ, thời gian chạy, backend lưu trữ | RSS dốc lên đều (thử tải dài: `docs/LOAD_TEST.md`) |
+
+**Cảnh báo trong log** (không cần dịch vụ ngoài): mỗi 10 giây server kiểm ngưỡng và in `[CẢNH BÁO] ...` một lần khi vi phạm, nhắc lại mỗi phút nếu còn kéo dài, rồi in `[ĐÃ ỔN] ...` khi hết. Ngưỡng đổi bằng `TICK_WARN_MS`, `WRITE_WARN_PENDING`, `WRITE_WARN_AGE_S`; độ trễ vòng lặp cố định 100 ms. Đặt cảnh báo trên chuỗi `[CẢNH BÁO]` trong log của container (Uptime Kuma có thể theo dõi từ khoá, hoặc `docker logs tien-gioi | grep CẢNH`).
+
+> [!IMPORTANT]
+> **Không để `/metrics` ra Internet nếu không cần:** cổng mặc định trong `docker-compose.yml` chỉ mở trên `127.0.0.1`, nên hệ thống giám sát trên cùng máy gọi thẳng `localhost:2567`. Nếu Caddy proxy cả máy ra ngoài và giám sát chạy cùng máy, chặn đường này ở Caddy:
+> ```caddy
+> tiengioi.example.com {
+>     @metrics path /metrics
+>     respond @metrics 404
+>     reverse_proxy localhost:2567
+> }
+> ```
+> Token vẫn là lớp bảo vệ cuối (so sánh thời gian hằng, không in token vào log), nhưng đừng dựa vào nó một mình.
+
+**Xoay vòng log:** `docker-compose.yml` giới hạn log của container (`json-file`, 10 MB x 5 tệp) để log không ăn đầy đĩa; log cũ hơn bị Docker xoá, nên nếu cần lưu lâu thì chuyển log sang nơi khác (hoặc đổi `logging.driver`). Nhật ký kiểm toán (`AUDIT_LOG`) cùng đi qua đường này.
 
 ---
 
