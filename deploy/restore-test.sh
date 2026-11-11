@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # Script kiểm tra khôi phục sao lưu định kỳ (M4 3.6, Issue #299)
-# Nạp bản sao lưu mới nhất vào container PostgreSQL TẠM, kiểm tra tính toàn vẹn
-# của các bảng dữ liệu chính, ghi log và mốc LAST_RESTORE_OK, sau đó dọn dẹp.
+# Nạp bản sao lưu mới nhất vào container PostgreSQL TẠM, kiểm tra các bảng dữ liệu
+# chính TỒN TẠI và đọc được, ghi log và mốc LAST_RESTORE_OK, sau đó dọn dẹp.
+#
+# Bài kiểm này phải có khả năng ĐỎ: nạp lỗi (ON_ERROR_STOP), bảng thiếu hoặc truy vấn lỗi
+# đều làm script thoát khác 0 và KHÔNG ghi LAST_RESTORE_OK. Không có chỗ nào che lỗi bằng giá trị 0.
 # ==============================================================================
 set -euo pipefail
 
@@ -11,7 +14,10 @@ BACKUP_DIR="$PROD_DIR/backups"
 LOG_FILE="$BACKUP_DIR/restore-test.log"
 MARK_FILE="$BACKUP_DIR/LAST_RESTORE_OK"
 TEST_CONTAINER="tien-gioi-restore-test-db"
-TEMP_PORT=25432 # Cổng tạm thời (nội bộ hoặc không mở)
+
+# Các bảng bắt buộc có trong bản sao lưu (khớp server/migrations/*.sql; test tĩnh
+# server/scripts/deploy-guard.test.ts giữ danh sách này khớp với các tệp migration).
+REQUIRED_TABLES=(schema_migrations accounts sessions characters souls sects sect_members)
 
 docker_cmd() {
   if command -v docker >/dev/null 2>&1 && docker ps >/dev/null 2>&1; then
@@ -33,7 +39,7 @@ trap cleanup EXIT
 echo "==> Bắt đầu kiểm tra khôi phục bản sao lưu định kỳ..."
 mkdir -p "$BACKUP_DIR"
 
-# Tìm bản sao lưu mới nhất
+# Tìm bản sao lưu mới nhất (bỏ qua .partial: bản dở không khớp mẫu *.sql.gz)
 latest_backup="$(ls -1t "$BACKUP_DIR"/tiengioi-*.sql.gz 2>/dev/null | head -n 1 || true)"
 if [[ -z "$latest_backup" || ! -f "$latest_backup" ]]; then
   echo "[LỖI] Không tìm thấy bản sao lưu nào trong $BACKUP_DIR" >&2
@@ -41,8 +47,9 @@ if [[ -z "$latest_backup" || ! -f "$latest_backup" ]]; then
 fi
 
 echo "  - Bản sao lưu được kiểm tra: $(basename "$latest_backup")"
+gzip -t "$latest_backup" || { echo "[LỖI] Bản sao lưu không phải gzip hợp lệ (hỏng / cụt)." >&2; exit 1; }
 
-# 1. Khởi chạy container PostgreSQL tạm
+# 1. Khởi chạy container PostgreSQL tạm (cùng phiên bản với bản chạy thật, KHÔNG mở cổng)
 cleanup
 echo "  - Khởi chạy container tạm $TEST_CONTAINER (postgres:16)..."
 docker_cmd run -d \
@@ -55,7 +62,7 @@ docker_cmd run -d \
 # 2. Chờ PostgreSQL sẵn sàng
 echo "  - Chờ cơ sở dữ liệu tạm khởi động..."
 ready=0
-for i in {1..20}; do
+for _ in {1..30}; do
   if docker_cmd exec "$TEST_CONTAINER" pg_isready -U tiengioi -d tiengioi >/dev/null 2>&1; then
     ready=1
     break
@@ -64,28 +71,28 @@ for i in {1..20}; do
 done
 
 if [[ "$ready" -ne 1 ]]; then
-  echo "[LỖI] Container PostgreSQL tạm không sẵn sàng sau 20 giây!" >&2
+  echo "[LỖI] Container PostgreSQL tạm không sẵn sàng sau 30 giây!" >&2
   exit 1
 fi
 
-# 3. Nạp dữ liệu sao lưu vào container tạm
+# 3. Nạp dữ liệu sao lưu vào container tạm. Lỗi SQL bất kỳ => thoát khác 0 (ON_ERROR_STOP).
 echo "  - Đang nạp dữ liệu từ $(basename "$latest_backup")..."
-gunzip -c "$latest_backup" | docker_cmd exec -i "$TEST_CONTAINER" psql -U tiengioi -d tiengioi >/dev/null
+gunzip -c "$latest_backup" | docker_cmd exec -i "$TEST_CONTAINER" \
+  psql -U tiengioi -d tiengioi -v ON_ERROR_STOP=1 --single-transaction -q >/dev/null
 
-# 4. Kiểm tra số lượng bản ghi của các bảng chính
-echo "  - Đang kiểm tra cấu trúc và đếm số hàng các bảng..."
-run_sql() {
-  docker_cmd exec -i "$TEST_CONTAINER" psql -U tiengioi -d tiengioi -t -A -c "$1"
-}
-
-players_count="$(run_sql "SELECT count(*) FROM players;" 2>/dev/null || echo "0")"
-souls_count="$(run_sql "SELECT count(*) FROM souls;" 2>/dev/null || echo "0")"
-accounts_count="$(run_sql "SELECT count(*) FROM accounts;" 2>/dev/null || echo "0")"
-sessions_count="$(run_sql "SELECT count(*) FROM sessions;" 2>/dev/null || echo "0")"
-sects_count="$(run_sql "SELECT count(*) FROM sects;" 2>/dev/null || echo "0")"
+# 4. Đếm số hàng các bảng chính. Bảng thiếu => truy vấn lỗi => set -e dừng script (KHÔNG
+#    được thay bằng 0).
+echo "  - Đang kiểm tra và đếm số hàng các bảng..."
+counts=""
+for table in "${REQUIRED_TABLES[@]}"; do
+  n="$(docker_cmd exec "$TEST_CONTAINER" \
+    psql -U tiengioi -d tiengioi -v ON_ERROR_STOP=1 -t -A -c "SELECT count(*) FROM $table;")"
+  counts+="$table: $n, "
+done
+counts="${counts%, }"
 
 timestamp="$(date -Iseconds)"
-summary="[$timestamp] KHÔI PHỤC THỬ THÀNH CÔNG: $(basename "$latest_backup") -> players: $players_count, souls: $souls_count, accounts: $accounts_count, sessions: $sessions_count, sects: $sects_count"
+summary="[$timestamp] KHÔI PHỤC THỬ THÀNH CÔNG: $(basename "$latest_backup") -> $counts"
 
 echo "==> $summary"
 echo "$summary" >> "$LOG_FILE"

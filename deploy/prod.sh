@@ -11,6 +11,9 @@ COMPOSE_FILE="$PROD_DIR/docker-compose.yml"
 ENV_FILE="$PROD_DIR/.env.production"
 BACKUP_DIR="$PROD_DIR/backups"
 DATA_PG_DIR="$PROD_DIR/data/pg"
+# Tên container (khớp container_name trong docker-compose.prod.yml)
+DB_CONTAINER="${DB_CONTAINER:-tien-gioi-db}"
+GAME_CONTAINER="${GAME_CONTAINER:-tien-gioi}"
 
 # ------------------------------------------------------------------------------
 # Hàm kiểm tra và thực thi lệnh Docker an toàn (hỗ trợ nhóm docker của sg)
@@ -28,11 +31,14 @@ docker_cmd() {
   fi
 }
 
+# BẮT BUỘC có --env-file: `env_file:` trong compose chỉ đưa biến vào container, KHÔNG dùng để
+# nội suy ${POSTGRES_PASSWORD} / ${TIEN_GIOI_TAG} trong chính tệp compose (compose chỉ đọc `.env`).
+# Thiếu cờ này thì `up` chết ngay với "required variable POSTGRES_PASSWORD is missing".
 compose_cmd() {
   if docker_cmd compose version >/dev/null 2>&1; then
-    docker_cmd compose -f "$COMPOSE_FILE" "$@"
+    docker_cmd compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"
   elif command -v docker-compose >/dev/null 2>&1; then
-    docker-compose -f "$COMPOSE_FILE" "$@"
+    docker-compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"
   else
     echo "[LỖI] Không tìm thấy docker compose hoặc docker-compose." >&2
     exit 1
@@ -47,14 +53,29 @@ cmd_init() {
   mkdir -p "$PROD_DIR" "$DATA_PG_DIR" "$BACKUP_DIR"
   chmod 700 "$PROD_DIR"
 
-  # Chép file docker-compose.prod.yml mẫu vào thư mục prod
+  # Chép docker-compose.prod.yml mẫu vào thư mục prod (chạy lại init từ bản chép trong
+  # thư mục prod thì không có tệp mẫu: giữ nguyên compose đang dùng)
   local src_compose="$SCRIPT_DIR/docker-compose.prod.yml"
-  if [[ ! -f "$src_compose" ]]; then
+  if [[ -f "$src_compose" ]]; then
+    cp "$src_compose" "$COMPOSE_FILE"
+    echo "  - Đã chép docker-compose.yml"
+  elif [[ -f "$COMPOSE_FILE" ]]; then
+    echo "  - Giữ nguyên docker-compose.yml hiện có"
+  else
     echo "[LỖI] Không tìm thấy tệp mẫu $src_compose" >&2
     exit 1
   fi
-  cp "$src_compose" "$COMPOSE_FILE"
-  echo "  - Đã chép docker-compose.yml"
+
+  # Chép prod.sh và restore-test.sh vào thư mục prod: bộ hẹn giờ systemd
+  # (tien-gioi-*.service) gọi chúng ở đây, bản trong thư mục dev có thể đổi nhánh / bị xoá.
+  local f
+  for f in prod.sh restore-test.sh; do
+    if [[ -f "$SCRIPT_DIR/$f" && ! "$SCRIPT_DIR/$f" -ef "$PROD_DIR/$f" ]]; then
+      cp "$SCRIPT_DIR/$f" "$PROD_DIR/$f"
+      chmod 755 "$PROD_DIR/$f"
+      echo "  - Đã chép $f"
+    fi
+  done
 
   # Sinh tệp .env.production nếu chưa có
   if [[ -f "$ENV_FILE" ]]; then
@@ -65,6 +86,9 @@ cmd_init() {
     pg_pass="$(openssl rand -hex 24)"
     metrics_token="$(openssl rand -hex 24)"
 
+    # Tạo tệp và đặt quyền 600 TRƯỚC khi ghi bí mật (không có khoảng hở đọc được)
+    : > "$ENV_FILE"
+    chmod 600 "$ENV_FILE"
     cat > "$ENV_FILE" <<EOF
 # Cấu hình môi trường bản chạy thật Tiên Giới
 # Tự động sinh bởi deploy/prod.sh init - TUYỆT ĐỐI KHÔNG COMMIT HOẶC CHIA SẺ
@@ -79,7 +103,6 @@ TRUST_PROXY=1
 METRICS_TOKEN=$metrics_token
 TIEN_GIOI_TAG=0.1.0
 EOF
-    chmod 600 "$ENV_FILE"
     echo "  - Đã tạo .env.production (quyền 600, bí mật được bảo vệ)."
   fi
 
@@ -109,6 +132,12 @@ cmd_up() {
     exit 1
   fi
 
+  # KÉO ẢNH TRƯỚC, ghi trạng thái SAU: kéo hỏng (mạng, chưa docker login, thẻ không có)
+  # thì .env.production, .current-tag, .last-tag giữ nguyên, bản đang chạy không bị ảnh hưởng.
+  # Biến môi trường ưu tiên hơn --env-file nên thẻ mới được dùng ngay khi tệp chưa đổi.
+  echo "==> Đang kéo ảnh ghcr.io/nguyencong1227/tien-gioi:$tag..."
+  TIEN_GIOI_TAG="$tag" compose_cmd pull game
+
   # Lưu lại thẻ hiện tại vào .last-tag để hỗ trợ rollback
   if [[ -f "$PROD_DIR/.current-tag" ]]; then
     local current_tag
@@ -126,9 +155,6 @@ cmd_up() {
     echo "TIEN_GIOI_TAG=$tag" >> "$ENV_FILE"
   fi
   echo "$tag" > "$PROD_DIR/.current-tag"
-
-  echo "==> Đang kéo ảnh ghcr.io/nguyencong1227/tien-gioi:$tag..."
-  compose_cmd pull game
 
   echo "==> Đang khởi động các dịch vụ (db + game)..."
   compose_cmd up -d --remove-orphans
@@ -185,9 +211,22 @@ cmd_backup() {
   local timestamp
   timestamp="$(date +%Y%m%d-%H%M%S)"
   local target_file="$BACKUP_DIR/tiengioi-$timestamp.sql.gz"
+  local partial_file="$target_file.partial"
 
   echo "==> Đang sao lưu PostgreSQL vào: $target_file..."
-  docker_cmd exec -t tien-gioi-db pg_dump -U tiengioi tiengioi | gzip -c > "$target_file"
+  # Không dùng `exec -t` (cấp TTY làm mỗi dòng kết thúc bằng CRLF, lẫn vào bản sao lưu).
+  # --clean --if-exists: bản sao lưu tự DROP bảng cũ trước khi tạo lại nên `restore` GHI ĐÈ được
+  # lên cơ sở dữ liệu đang có dữ liệu (không có hai cờ này thì nạp lại báo "already exists" và
+  # giữ nguyên dữ liệu hiện tại). --no-owner: không phụ thuộc tên vai trò khi nạp.
+  # Ghi ra tệp .partial rồi mới đổi tên: lỗi giữa chừng không để lại bản sao lưu hỏng
+  # (vừa chiếm một trong 14 chỗ, vừa bị restore-test.sh chọn làm "bản mới nhất").
+  if ! docker_cmd exec "$DB_CONTAINER" pg_dump -U tiengioi --clean --if-exists --no-owner tiengioi \
+      | gzip -c > "$partial_file" || ! gzip -t "$partial_file"; then
+    rm -f "$partial_file"
+    echo "[LỖI] Sao lưu thất bại (pg_dump hoặc nén lỗi), đã xoá bản dở." >&2
+    exit 1
+  fi
+  mv "$partial_file" "$target_file"
 
   local file_size
   file_size="$(du -h "$target_file" | awk '{print $1}')"
@@ -225,8 +264,26 @@ cmd_restore() {
     fi
   fi
 
+  gzip -t "$file" || { echo "[LỖI] Tệp $file không phải gzip hợp lệ, không khôi phục." >&2; exit 1; }
+
+  # Dừng game trong lúc khôi phục (không để máy chủ ghi / giữ khoá bảng giữa chừng).
+  echo "==> Dừng dịch vụ game..."
+  compose_cmd stop game
+
+  # --single-transaction + ON_ERROR_STOP: tệp hỏng / cụt thì HOÀN TÁC, cơ sở dữ liệu giữ
+  # nguyên như trước (không bao giờ ở trạng thái nửa cũ nửa mới).
   echo "==> Đang khôi phục cơ sở dữ liệu từ $file..."
-  gunzip -c "$file" | docker_cmd exec -i tien-gioi-db psql -U tiengioi -d tiengioi
+  local rc=0
+  gunzip -c "$file" | docker_cmd exec -i "$DB_CONTAINER" \
+    psql -U tiengioi -d tiengioi -v ON_ERROR_STOP=1 --single-transaction -q >/dev/null || rc=$?
+
+  echo "==> Khởi động lại dịch vụ game..."
+  compose_cmd up -d game >/dev/null
+
+  if [[ "$rc" -ne 0 ]]; then
+    echo "[LỖI] Khôi phục thất bại (mã $rc): cơ sở dữ liệu giữ nguyên như trước khi khôi phục." >&2
+    exit "$rc"
+  fi
   echo "==> Khôi phục hoàn tất!"
 }
 
@@ -303,23 +360,17 @@ cmd_smoke() {
 
   # 3. Kiểm tra tắt êm (Graceful Shutdown) container game (docker stop < 25s, mã thoát 0)
   echo "  3. Kiểm tra tắt êm container game (docker stop < 25s, mã thoát 0)..."
+  echo "     (bước này làm game gián đoạn vài giây: người chơi đang nối bị rớt rồi tự nối lại)"
   local start took code
   start=$(date +%s)
-  docker_cmd stop -t 30 tien-gioi >/dev/null
+  docker_cmd stop -t 30 "$GAME_CONTAINER" >/dev/null
   took=$(( $(date +%s) - start ))
-  code=$(docker_cmd inspect -f '{{.State.ExitCode}}' tien-gioi 2>/dev/null || echo 0)
-  echo "     Container tien-gioi dừng trong ${took}s (mã thoát: $code)"
-  if [[ "$took" -ge 25 ]]; then
-    echo "     [THẤT BẠI] docker stop mất quá lâu (${took}s >= 25s)!" >&2
-    exit 1
-  fi
-  if [[ "$code" != "0" ]]; then
-    echo "     [THẤT BẠI] Mã thoát của container không phải 0 (mã: $code)!" >&2
-    exit 1
-  fi
-  echo "     [ĐẠT] Tắt êm thành công trong ${took}s, mã thoát 0"
+  # Không dùng `|| echo 0`: không đọc được mã thoát thì phải báo thất bại, không coi là đạt.
+  code="$(docker_cmd inspect -f '{{.State.ExitCode}}' "$GAME_CONTAINER" 2>/dev/null || echo "không-đọc-được")"
+  echo "     Container $GAME_CONTAINER dừng trong ${took}s (mã thoát: $code)"
 
-  # 4. Khởi động lại dịch vụ game và xác nhận sẵn sàng
+  # 4. LUÔN khởi động lại game TRƯỚC khi kết luận kiểm tra tắt êm: bước 3 đỏ cũng không được
+  # để bản chạy thật nằm tắt.
   echo "  4. Khởi động lại dịch vụ game và xác nhận phục hồi..."
   compose_cmd up -d game >/dev/null
   local revived=0
@@ -337,6 +388,17 @@ cmd_smoke() {
     echo "     [THẤT BẠI] Dịch vụ game không sẵn sàng sau khi khởi động lại" >&2
     exit 1
   fi
+
+  # Kết luận kiểm tra tắt êm (bước 3) SAU KHI game đã chạy lại.
+  if [[ "$took" -ge 25 ]]; then
+    echo "     [THẤT BẠI] docker stop mất quá lâu (${took}s >= 25s): SIGTERM có thể không tới server!" >&2
+    exit 1
+  fi
+  if [[ "$code" != "0" ]]; then
+    echo "     [THẤT BẠI] Mã thoát của container không phải 0 (mã: $code): server bị giết thay vì tắt êm!" >&2
+    exit 1
+  fi
+  echo "     [ĐẠT] Tắt êm thành công trong ${took}s, mã thoát 0"
 
   echo "==> Mọi kiểm tra Smoke Test đều THÀNH CÔNG!"
 }

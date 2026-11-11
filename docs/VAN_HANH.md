@@ -32,12 +32,13 @@ Người chơi trên Internet (Trình duyệt web / PWA / Android)
 │      * TRUST_PROXY=1, TIEN_GIOI_PROD=1                 │
 │      * Dừng êm ái: stop_grace_period 30s               │
 │    - Dịch vụ db (Container tien-gioi-db):              │
-│      * PostgreSQL 16 Alpine, dữ liệu tại ./data/pg     │
+│      * PostgreSQL 16, dữ liệu tại ./data/pg     │
 │      * KHÔNG mở cổng ra ngoài host / Internet          │
 │                                                        │
 │ 3. Bản sao lưu tự động (backups/):                     │
 │    - tien-gioi-backup.timer (Chạy lúc 04:00 hàng ngày) │
-│    - restore-test.sh (Kiểm tra khôi phục định kỳ)      │
+│    - tien-gioi-restore-test.timer (CN 05:00, khôi phục │
+│      thử bản mới nhất vào container tạm)               │
 └────────────────────────────────────────────────────────┘
 ```
 
@@ -50,6 +51,7 @@ Bản chạy thật hoàn toàn tách biệt với thư mục phát triển củ
 | Tệp / Thư mục | Quyền | Mục đích |
 |---|---|---|
 | `docker-compose.yml` | `644` | Khai báo dịch vụ `db` (PostgreSQL 16) và `game` (ghcr.io) |
+| `prod.sh`, `restore-test.sh` | `755` | Bản chép của `deploy/prod.sh` và `deploy/restore-test.sh` do `init` đặt vào đây (bộ hẹn giờ systemd gọi các bản này) |
 | `.env.production` | `600` | Bí mật vận hành: `POSTGRES_PASSWORD`, `DATABASE_URL`, `METRICS_TOKEN`, `TIEN_GIOI_TAG` |
 | `.current-tag` | `644` | Thẻ phiên bản đang chạy (vd: `0.1.0`) |
 | `.last-tag` | `644` | Thẻ phiên bản chạy trước đó (dùng khi cần `rollback`) |
@@ -65,13 +67,13 @@ Bản chạy thật hoàn toàn tách biệt với thư mục phát triển củ
 
 ## 3. Quản trị Bản chạy thật với `prod.sh`
 
-Mọi thao tác hàng ngày được thực hiện thông qua script `deploy/prod.sh` (hoặc bản chép tại `~/TT/tien-gioi-prod/prod.sh`).
+Mọi thao tác hàng ngày được thực hiện thông qua script `deploy/prod.sh` (hoặc bản chép tại `~/TT/tien-gioi-prod/prod.sh`). Cập nhật script trong repo thì chạy lại `./deploy/prod.sh init` để chép bản mới (giữ nguyên bí mật cũ).
 
 ### 3.1. Khởi tạo ban đầu (chỉ chạy 1 lần)
 ```bash
 ./deploy/prod.sh init
 ```
-- Tạo cấu trúc thư mục tại `~/TT/tien-gioi-prod/`.
+- Tạo cấu trúc thư mục tại `~/TT/tien-gioi-prod/`, chép `docker-compose.yml`, `prod.sh`, `restore-test.sh` vào đó.
 - Tự động sinh `POSTGRES_PASSWORD` và `METRICS_TOKEN` ngẫu nhiên bảo mật cao bằng `openssl rand -hex 24`.
 - Phân quyền `chmod 600` cho `.env.production`.
 
@@ -83,10 +85,12 @@ Script nhận cả dạng `vX.Y.Z` hoặc `X.Y.Z` và tự chuẩn hoá bỏ ti�
 ./deploy/prod.sh up 0.1.0
 ```
 Lệnh sẽ tự động:
-1. Ghi nhận phiên bản hiện tại vào `.last-tag`.
-2. Cập nhật `TIEN_GIOI_TAG` trong `.env.production` và `.current-tag`.
-3. Kéo ảnh từ GitHub Container Registry: `ghcr.io/nguyencong1227/tien-gioi:<tag>`.
+1. Kéo ảnh từ GitHub Container Registry: `ghcr.io/nguyencong1227/tien-gioi:<tag>` (cần đã `docker login ghcr.io`). **Kéo hỏng thì dừng ở đây, không đổi gì**: bản đang chạy, `.env.production`, `.current-tag`, `.last-tag` giữ nguyên.
+2. Ghi nhận phiên bản hiện tại vào `.last-tag`.
+3. Cập nhật `TIEN_GIOI_TAG` trong `.env.production` và `.current-tag`.
 4. Khởi động lại dịch vụ với `docker compose up -d --remove-orphans`.
+
+Mọi lệnh `docker compose` của script đều truyền `--env-file .env.production` (compose không tự đọc tệp này để nội suy `${POSTGRES_PASSWORD}` / `${TIEN_GIOI_TAG}`). Chạy `docker compose` tay trong thư mục chạy thật thì phải thêm cờ này.
 
 ### 3.3. Kiểm tra trạng thái & Nhật ký (Logs)
 ```bash
@@ -105,6 +109,8 @@ Sau mỗi lần cập nhật, luôn chạy lệnh kiểm tra nhanh:
 ```bash
 ./deploy/prod.sh smoke
 ```
+> [!NOTE]
+> Bước 3 của `smoke` **dừng rồi bật lại container game** (người chơi đang nối bị rớt vài giây rồi tự nối lại). Game luôn được bật lại trước khi `smoke` kết luận, kể cả khi bước tắt êm đỏ. Chạy lúc ít người chơi.
 Lệnh kiểm tra toàn diện 4 bước:
 1. Endpoint `http://127.0.0.1:2567/health` trả về HTTP 200 kèm `{"ok":true,"authMode":"account"}`.
 2. Endpoint `/metrics` từ chối truy cập ẩn danh (HTTP 401) và chấp nhận truy cập kèm `Authorization: Bearer <METRICS_TOKEN>` (HTTP 200).
@@ -129,7 +135,7 @@ Script sẽ đọc thẻ từ `.last-tag` và kích hoạt lại phiên bản �
 ```bash
 ./deploy/prod.sh backup
 ```
-- Bản sao lưu được nén `gzip` và lưu tại `~/TT/tien-gioi-prod/backups/tiengioi-YYYYmmdd-HHMMSS.sql.gz`.
+- Bản sao lưu là `pg_dump --clean --if-exists --no-owner` nén `gzip`, lưu tại `~/TT/tien-gioi-prod/backups/tiengioi-YYYYmmdd-HHMMSS.sql.gz`. Ghi ra tệp `.partial` rồi mới đổi tên sau khi `gzip -t` đạt: sao lưu lỗi giữa chừng không để lại tệp hỏng.
 - Script tự động giữ lại **14 bản mới nhất** và dọn dẹp các bản cũ hơn.
 - Tự động cảnh báo nếu dung lượng đĩa khả dụng của máy chủ còn dưới 3 GB.
 
@@ -140,6 +146,8 @@ Script sẽ đọc thẻ từ `.last-tag` và kích hoạt lại phiên bản �
 ```
 > [!WARNING]
 > Thao tác khôi phục sẽ ghi đè toàn bộ dữ liệu hiện tại trong cơ sở dữ liệu! Script sẽ yêu cầu gõ `dong y` để xác nhận (trừ khi có cờ `--yes`).
+
+Thứ tự: kiểm `gzip -t` -> **dừng game** -> nạp bằng `psql -v ON_ERROR_STOP=1 --single-transaction` -> bật lại game. Tệp hỏng / cụt thì giao dịch bị HOÀN TÁC, cơ sở dữ liệu giữ nguyên như trước (game vẫn được bật lại và script báo lỗi). Dữ liệu ghi SAU thời điểm sao lưu bị mất: đó là bản chất của khôi phục, hãy chọn đúng tệp.
 
 ### 5.3. Cài đặt lịch sao lưu tự động hàng ngày (Systemd Timer)
 Để máy chủ tự động sao lưu lúc 04:00 sáng hàng ngày:
@@ -155,17 +163,26 @@ Kiểm tra lịch hẹn giờ:
 systemctl --user list-timers | grep tien-gioi
 ```
 
-### 5.4. Kiểm tra khôi phục định kỳ (restore-test.sh)
-Chạy script kiểm tra khôi phục thử nghiệm vào container PostgreSQL tạm:
+Cài thêm bộ hẹn giờ kiểm tra khôi phục hằng tuần (Chủ nhật 05:00, sau bản sao lưu 04:00):
 ```bash
-./deploy/restore-test.sh
+cp deploy/tien-gioi-restore-test.service deploy/tien-gioi-restore-test.timer ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now tien-gioi-restore-test.timer
+```
+
+### 5.4. Kiểm tra khôi phục định kỳ (restore-test.sh)
+Chạy tay (hoặc để bộ hẹn giờ ở 5.3 chạy):
+```bash
+~/TT/tien-gioi-prod/restore-test.sh
 ```
 Script sẽ:
-1. Dựng container tạm `tien-gioi-restore-test-db`.
-2. Nạp bản sao lưu mới nhất vào.
-3. Truy vấn đếm số lượng bản ghi của các bảng: `players`, `souls`, `accounts`, `sessions`, `sects`.
-4. Ghi kết quả vào `backups/restore-test.log` và cập nhật mốc `backups/LAST_RESTORE_OK`.
-5. Dọn dẹp và xoá container tạm.
+1. Kiểm `gzip -t` bản sao lưu mới nhất, dựng container tạm `tien-gioi-restore-test-db` (postgres:16, không mở cổng).
+2. Nạp bản sao lưu vào bằng `ON_ERROR_STOP=1 --single-transaction`.
+3. Đếm số hàng của MỌI bảng game: `schema_migrations`, `accounts`, `sessions`, `characters`, `souls`, `sects`, `sect_members` (test tĩnh giữ danh sách này khớp `server/migrations/*.sql`). Bảng thiếu hoặc truy vấn lỗi = script thoát khác 0.
+4. Chỉ khi mọi bước đạt: ghi kết quả vào `backups/restore-test.log` và cập nhật mốc `backups/LAST_RESTORE_OK`.
+5. Dọn dẹp và xoá container tạm (kể cả khi lỗi).
+
+Kiểm tra mốc: `cat ~/TT/tien-gioi-prod/backups/LAST_RESTORE_OK` (nếu cũ hơn ~8 ngày thì bộ hẹn giờ không chạy hoặc đang đỏ: xem `journalctl --user -u tien-gioi-restore-test`).
 
 ---
 
