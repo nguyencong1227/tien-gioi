@@ -55,11 +55,14 @@ button {
   left: 50%;
   transform: translate(-50%, -50%);
   width: min(92vw, 380px);
+  max-height: min(94dvh, 620px);
+  overflow-y: auto;
   padding: 28px 24px 20px;
   text-align: center;
   background: radial-gradient(ellipse at 50% 30%, #f7f1e1, #e3d6b8);
   color: var(--ink);
   border: 1px solid #b9a77e;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
 }
 #login .seal {
   display: inline-grid;
@@ -4780,9 +4783,38 @@ body.in-limbo #chat-log {
 
 /* Modal Client quá cũ / Cập nhật phiên bản (M4 2.5) */
 .outdated-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(92vw, 440px);
   max-width: 440px;
+  max-height: 85dvh;
   text-align: center;
   z-index: 10000;
+  border-radius: 12px;
+  border: 1px solid rgba(201, 162, 74, 0.4);
+  background: radial-gradient(ellipse at 50% 20%, #2a2318, #18140f);
+  box-shadow:
+    0 0 0 100vmax rgba(0, 0, 0, 0.75),
+    0 16px 40px rgba(0, 0, 0, 0.9);
+  justify-content: flex-start;
+}
+
+@media (pointer: coarse), (max-width: 640px) {
+  .outdated-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(90vw, 360px);
+    height: auto;
+    border-radius: 12px;
+    border: 1px solid rgba(201, 162, 74, 0.4);
+    box-shadow:
+      0 0 0 100vmax rgba(0, 0, 0, 0.8),
+      0 16px 40px rgba(0, 0, 0, 0.95);
+  }
 }
 
 .outdated-body {
