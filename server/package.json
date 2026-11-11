@@ -19,7 +19,8 @@
     "e2e:bi-canh-nga": "tsx scripts/e2e-bi-canh-nga.ts",
     "e2e:phien-ban": "tsx scripts/e2e-phien-ban.ts",
     "tai-khoan": "tsx scripts/tai-khoan.ts",
-    "chuyen-du-lieu": "tsx scripts/chuyen-du-lieu.ts"
+    "chuyen-du-lieu": "tsx scripts/chuyen-du-lieu.ts",
+    "red-team": "tsx scripts/red-team.ts"
   },
   "dependencies": {
     "@colyseus/schema": "3.0.76",
