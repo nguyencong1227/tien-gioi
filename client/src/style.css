@@ -2390,12 +2390,12 @@ body.low-fx #btn-talk {
   transition: all 0.15s;
 }
 .shop-act-btn.buy {
-  background: #d48806;
-  border: 1px solid #faad14;
+  background: #a36100;
+  border: 1px solid #d48806;
   color: #fff;
 }
 .shop-act-btn.buy:hover:not(:disabled) {
-  background: #faad14;
+  background: #874d00;
 }
 .shop-act-btn.buy:disabled {
   background: rgba(100, 90, 80, 0.4);
@@ -2983,21 +2983,21 @@ body.in-limbo #chat-log {
   width: 100%;
   min-height: 48px;
   border-radius: 8px;
-  border: 1px solid #eab308;
-  background: linear-gradient(180deg, #ca8a04, #a16207);
-  color: #fef08a;
+  border: 1px solid #b45309;
+  background: linear-gradient(180deg, #92400e, #78350f);
+  color: #ffffff;
   font-family: inherit;
   font-size: 15px;
   font-weight: bold;
   cursor: pointer;
   letter-spacing: 2px;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-  box-shadow: 0 4px 16px rgba(202, 138, 4, 0.35);
+  box-shadow: 0 4px 16px rgba(120, 53, 15, 0.45);
   transition: all 0.15s ease;
 }
 
 .limbo-btn-rebirth:hover {
-  background: linear-gradient(180deg, #eab308, #ca8a04);
+  background: linear-gradient(180deg, #a14610, #853b12);
   color: #ffffff;
 }
 
@@ -3578,9 +3578,13 @@ body.in-limbo #chat-log {
 }
 
 .dend-btn.primary {
-  background: linear-gradient(180deg, #ca8a04, #a16207);
+  background: linear-gradient(180deg, #9a5b02, #7a4300);
   color: #fff;
-  border: 1px solid #facc15;
+  border: 1px solid #d48806;
+}
+
+.dend-btn.primary:hover {
+  background: linear-gradient(180deg, #854d00, #663800);
 }
 
 .dend-btn.secondary {
@@ -4930,11 +4934,11 @@ body.in-limbo #chat-log {
   padding: 0 20px;
 }
 
-/* Giảm chuyển động (Accessibility: prefers-reduced-motion, Issue #269) */
+/* Giảm chuyển động (Accessibility: prefers-reduced-motion, Issue #269, #280) */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  body:not(.motion-ok) *,
+  body:not(.motion-ok) *::before,
+  body:not(.motion-ok) *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
