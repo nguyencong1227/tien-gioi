@@ -25,6 +25,7 @@ import {
   DEFAULT_MAP_ID,
   DUEL_MSG,
   DUNGEON_MSG,
+  HEARTBEAT_MSG,
   NPCS,
   PROTOCOL_VERSION,
   SECT_MSG,
@@ -32,7 +33,7 @@ import {
   type ChatMsg,
 } from "@tien-gioi/shared";
 
-// Danh sách 47 loại tin nhắn hợp lệ mà WorldRoom đăng ký (dùng để test so khớp với room.onMessageHandlers)
+// Danh sách 48 loại tin nhắn hợp lệ mà WorldRoom đăng ký (dùng để test so khớp với room.onMessageHandlers)
 export const EXPECTED_MESSAGE_TYPES = [
   // Di chuyển & chiến đấu
   "input",
@@ -90,6 +91,8 @@ export const EXPECTED_MESSAGE_TYPES = [
   // Luân hồi
   "soulBuy",
   "rebirth",
+  // Nhịp tim ứng dụng (M4.2b)
+  HEARTBEAT_MSG.ping,
 ] as const;
 
 /** Tự phát hiện các loại tin nhắn đã đăng ký từ Colyseus Room handler */

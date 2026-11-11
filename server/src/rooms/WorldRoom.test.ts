@@ -623,6 +623,73 @@ describe("lưu nhân vật", () => {
   });
 });
 
+describe("nhịp tim ứng dụng ping / pong (M4.2b)", () => {
+  /** Gom mọi tin `pong` của một người chơi */
+  const collectPongs = (room: Room) => {
+    const pongs: unknown[] = [];
+    room.onMessage("pong", (m: unknown) => pongs.push(m));
+    return pongs;
+  };
+
+  it("ping hợp lệ: nhận lại đúng pong {t}, không thêm trường nào, chỉ người gửi nhận", async () => {
+    const a = await join("Nhip Tim A");
+    const b = await join("Nhip Tim B");
+    const pa = collectPongs(a.room);
+    const pb = collectPongs(b.room);
+    a.room.send("ping", { t: 1731000000123 });
+    await waitFor(() => pa.length >= 1);
+    expect(pa).toEqual([{ t: 1731000000123 }]);
+    await sleep(150);
+    expect(pb).toEqual([]); // người khác không nhận pong của ai
+  });
+
+  it("ping thừa trường: chỉ lặp lại t (không phản chiếu dữ liệu của client)", async () => {
+    const a = await join("Nhip Tim Thua");
+    const pongs = collectPongs(a.room);
+    a.room.send("ping", { t: 5, bi_mat: "x".repeat(200), nested: { a: 1 } });
+    await waitFor(() => pongs.length >= 1);
+    expect(pongs[0]).toEqual({ t: 5 });
+  });
+
+  it("ping xấu (không có t, sai kiểu, âm, không phải object): không trả lời, vẫn còn kết nối", async () => {
+    const a = await join("Nhip Tim Xau");
+    const pongs = collectPongs(a.room);
+    for (const bad of [
+      undefined,
+      null,
+      7,
+      "ping",
+      [],
+      {},
+      { t: "1" },
+      { t: -1 },
+      { t: null },
+      { t: {} },
+      { t: [1] },
+    ]) {
+      a.room.send("ping", bad as never);
+    }
+    await sleep(300);
+    expect(pongs).toEqual([]);
+    expect(a.room.connection.isOpen).toBe(true);
+    // Tin xấu cũng tiêu hao quỹ giới hạn (3 lượt, hồi 1 lượt / giây): chờ hồi rồi tin tốt vẫn được trả lời
+    await sleep(1200);
+    a.room.send("ping", { t: 9 });
+    await waitFor(() => pongs.length >= 1);
+    expect(pongs).toEqual([{ t: 9 }]);
+  });
+
+  it("giới hạn tần suất: gửi dồn 30 ping chỉ được trả lời tối đa burst (3) + vài lượt hồi, và không bị ngắt", async () => {
+    const a = await join("Nhip Tim Spam");
+    const pongs = collectPongs(a.room);
+    for (let i = 0; i < 30; i++) a.room.send("ping", { t: i });
+    await sleep(400);
+    expect(pongs.length).toBeGreaterThanOrEqual(3);
+    expect(pongs.length).toBeLessThanOrEqual(5);
+    expect(a.room.connection.isOpen).toBe(true); // 30 tin vẫn nằm xa ngưỡng ngắt vì spam
+  });
+});
+
 describe("giám sát vận hành (M4 3.3)", () => {
   it("phòng thật ghi thời gian tick, gắn roomId và xuất hiện trong ảnh chụp số đo", async () => {
     const { room } = await join("Giam Sat");
