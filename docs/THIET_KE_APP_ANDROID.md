@@ -126,7 +126,7 @@
 - `server/src/index.ts` (express) **chưa có CORS ở đâu cả** (`AGENTS.md` ghi auth là "cùng nguồn, không CORS"). Khi trang ở nguồn khác (`https://localhost`, `http://localhost`, và `capacitor://localhost` nếu làm iOS) trình duyệt sẽ chặn phản hồi.
 - Việc cần làm (đưa vào M4.2a, **gồm một phần phía server của Dev A**):
   1. Client: một hàm base URL HTTP dùng chung, dẫn xuất từ `VITE_SERVER_URL` (`wss` thành `https`, `ws` thành `http`; rỗng thì giữ `""` như hiện nay), dùng cho `AuthClient` và `detectAuthMode`.
-  2. Server: CORS theo **danh sách cho phép** các nguồn (biến môi trường, ví dụ `CORS_ORIGINS`; mặc định rỗng = như hiện nay) cho `/health` và `/api/auth/*`, kèm xử lý `OPTIONS` cho header `Content-Type` / `Authorization`; không bao giờ `*` cho `/api/auth/*`; có test (nguồn lạ không nhận header, nguồn được phép nhận) và ghi `docs/TRIEN_KHAI.md`. Colyseus có xử lý CORS riêng cho đường matchmaking: kiểm lại khi làm, đừng giả định.
+  2. Server: CORS theo **danh sách cho phép** các nguồn (biến môi trường, ví dụ `CORS_ORIGINS`; mặc định rỗng = như hiện nay) cho `/health` và `/api/auth/*`, kèm xử lý `OPTIONS` cho header `Content-Type` / `Authorization`; không bao giờ `*` cho `/api/auth/*`; có test (nguồn lạ không nhận header, nguồn được phép nhận) và ghi `docs/TRIEN_KHAI.md`. **Đã làm (phần server của M4.2a-1):** `CORS_ORIGINS` (`server/src/cors.ts`, `docs/TRIEN_KHAI.md` mục 5.2), mặc định tắt, đã kiểm bằng Chrome thật. Đã kiểm Colyseus: `/matchmake/*` tự gửi CORS phản chiếu mọi nguồn nên vào phòng không cần cấu hình thêm; còn lại phần client (hàm base URL, #284) cũng đã vào `main`.
   3. Cách khác (cân nhắc ở M4.2a): dùng `CapacitorHttp` của Capacitor để lời gọi HTTP đi qua native, tránh CORS, nhưng làm hai đường mã (web / native) và khó kiểm bằng Chrome headless; đề xuất mặc định là CORS allowlist.
 
 ### 5.3. Phát triển trên mạng LAN (chỉ bản debug)
@@ -175,7 +175,7 @@ Khi Người Dùng quyết định triển khai Android, công việc sẽ đư�
 
 | Mã việc | Nội dung việc | Dev phụ trách | Ước lượng |
 |---|---|---|---|
-| **M4.2a-1** | **Server + client: HTTP tuyệt đối và CORS allowlist** (mục 5.2): hàm base URL dùng chung, `CORS_ORIGINS` cho `/health` và `/api/auth/*`, test, `docs/TRIEN_KHAI.md`. Làm TRƯỚC vì chặn mọi thứ khác. | Dev A (server) + Dev B (client) | 1 PR mỗi bên |
+| **M4.2a-1** | **Server + client: HTTP tuyệt đối và CORS allowlist** (mục 5.2): hàm base URL dùng chung, `CORS_ORIGINS` cho `/health` và `/api/auth/*`, test, `docs/TRIEN_KHAI.md`. Làm TRƯỚC vì chặn mọi thứ khác. **XONG:** client #284 / #287, server `CORS_ORIGINS` (mặc định tắt). | Dev A (server) + Dev B (client) | 1 PR mỗi bên |
 | **M4.2a** | Khởi tạo dự án Capacitor (`app/`), `capacitor.config.ts`, `applicationId` do người dùng chốt, icon & splash screen, cờ build native (tắt service worker, mục 4), cấu hình cleartext chỉ cho debug (mục 5.3). | Dev B | 1 PR |
 | **M4.2b** | Phím Back Android, kiểm Safe Area Insets trong WebView, bộ lắng nghe nền / tiền cảnh và tạm dừng âm thanh (mục 3), nhãn + callback mở cửa hàng khi lỗi 426 (mục 4). | Dev B | 1 PR |
 | **M4.2c** | Workflow GitHub Actions tự động build APK unsigned / test artifact cho mỗi release tag. | Dev C | 1 PR |
