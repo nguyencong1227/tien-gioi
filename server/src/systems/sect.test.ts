@@ -683,6 +683,19 @@ describe("nhật ký kiểm toán", () => {
     for (const l of log) expect(JSON.stringify(l.f)).not.toMatch(/secret|token|pass|hash/i);
   });
 
+  it("chuyển quyền Tông chủ ghi `sect.transfer` (người nhường + người nhận); bị từ chối thì không ghi", async () => {
+    const log: { ev: string; f: Record<string, unknown> }[] = [];
+    for (const r of [lh, hp]) r.w.audit = (ev, f) => void log.push({ ev, f: f ?? {} });
+    await makeSect();
+    await join(hp, B);
+    log.length = 0;
+    await sectTransfer(hp.w, B, { name: A }); // Đệ tử không nhường được
+    await sectTransfer(lh.w, A, { name: "Nguoi La" }); // người lạ
+    expect(log).toEqual([]);
+    await sectTransfer(lh.w, A, { name: B });
+    expect(log).toEqual([{ ev: "sect.transfer", f: { name: A, sect: "Thanh Van", target: B } }]);
+  });
+
   it("không có hook (mặc định, test / bench): không ghi và không lỗi", async () => {
     expect(lh.w.audit).toBeNull();
     await makeSect();

@@ -3891,9 +3891,9 @@ export const ui = {
     }
     modal.hidden = false;
 
-    // Đóng auth screen nếu đang mở để modal hiển thị rõ ràng
-    const authOverlay = $("auth-overlay");
-    if (authOverlay) authOverlay.hidden = true;
+    // Ẩn màn hình đăng nhập nếu đang mở để modal hiển thị trực diện
+    const login = $("login");
+    if (login) login.hidden = true;
 
     const btn = $("btn-reload-outdated");
     if (btn) {
