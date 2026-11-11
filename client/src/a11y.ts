@@ -107,10 +107,16 @@ export function isTypingElement(el?: Element | null): boolean {
 export function getFocusableElements(container: HTMLElement): HTMLElement[] {
   const selector =
     'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-  return Array.from(container.querySelectorAll<HTMLElement>(selector)).filter(
-    (el) =>
-      !el.hidden && el.offsetParent !== null && window.getComputedStyle(el).display !== "none",
-  );
+  return Array.from(container.querySelectorAll<HTMLElement>(selector)).filter((el) => {
+    if (el.hidden) return false;
+    // Kiểm tra hiển thị: không dùng offsetParent vì phần tử position: fixed có offsetParent === null
+    if (typeof el.getClientRects === "function" && el.getClientRects().length === 0) return false;
+    if (typeof window !== "undefined" && window.getComputedStyle) {
+      const style = window.getComputedStyle(el);
+      if (style.display === "none" || style.visibility === "hidden") return false;
+    }
+    return true;
+  });
 }
 
 /**
@@ -254,6 +260,24 @@ export function isReducedMotion(): boolean {
 }
 
 /**
+ * Đồng bộ class trên document.body theo cài đặt giảm chuyển động:
+ * - body.reduced-motion: khi bật (trong game = 1 hoặc OS bật mà chưa cài đặt).
+ * - body.motion-ok: khi người chơi chủ động tắt trong game (= 0), giúp loại trừ khỏi media query prefers-reduced-motion.
+ */
+export function syncReducedMotionDom(): void {
+  if (typeof document === "undefined") return;
+  const reduced = isReducedMotion();
+  document.body.classList.toggle("reduced-motion", reduced);
+  let userPref: string | null = null;
+  try {
+    userPref = localStorage.getItem(REDUCED_MOTION_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+  document.body.classList.toggle("motion-ok", userPref === "0");
+}
+
+/**
  * Cập nhật cấu hình giảm chuyển động vào localStorage và toggle class trên body
  */
 export function setReducedMotionPref(enabled: boolean): void {
@@ -262,9 +286,7 @@ export function setReducedMotionPref(enabled: boolean): void {
   } catch {
     /* ignore */
   }
-  if (typeof document !== "undefined") {
-    document.body.classList.toggle("reduced-motion", enabled);
-  }
+  syncReducedMotionDom();
 }
 
 /**
