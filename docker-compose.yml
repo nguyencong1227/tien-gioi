@@ -10,6 +10,9 @@ services:
       - "127.0.0.1:2567:2567"
       # Nếu muốn mở trực tiếp ra ngoài Internet (không qua proxy), dùng dòng dưới:
       # - "2567:2567"
+    env_file:
+      - path: .env.production
+        required: false # Docker Compose >= 2.24: không có tệp thì bỏ qua
     environment:
       - NODE_ENV=production # Bắt buộc đặt production để vô hiệu hóa lệnh quản trị /give
       - PORT=2567

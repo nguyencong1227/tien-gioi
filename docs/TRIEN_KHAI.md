@@ -29,7 +29,7 @@ npm run build
 ```
 
 ### Bước 3: Chạy server production
-> **Lưu ý về cấu hình:** File `.env.local` chỉ dùng khi phát triển trên máy dev (để chia cổng riêng cho Dev A, B, C) và **không** được commit. Trên production, cấu hình hoàn toàn qua **biến môi trường** (hoặc dùng `.env.production` sao chép từ `.env.production.example` kết hợp `docker compose --env-file .env.production up -d`):
+> **Lưu ý về cấu hình:** File `.env.local` chỉ dùng khi phát triển trên máy dev (để chia cổng riêng cho Dev A, B, C) và **không** được commit. Trên production, cấu hình hoàn toàn qua **biến môi trường** (hoặc dùng `.env.production` sao chép từ `.env.production.example` kết hợp Docker Compose >= 2.24: `docker compose up -d --build` tự động nạp `.env.production` qua khai báo `env_file` của container `game`; khi dùng PostgreSQL, thêm `--env-file .env.production` để nội suy `${POSTGRES_PASSWORD}`):
 
 ### Bảng biến môi trường chính thức (Production)
 
@@ -44,6 +44,7 @@ npm run build
 | `SESSIONS_DIR` | `<DATA_DIR>/sessions` | Thư mục lưu trữ phiên đăng nhập (băm token phiên) khi `STORE=file` | Không | Để mặc định theo `DATA_DIR` | `server/src/account-store.ts` |
 | `STORE` | `file` | Backend lưu trữ: `file` (tệp JSON ở `DATA_DIR`, một máy một tiến trình) hoặc `pg` (PostgreSQL qua `DATABASE_URL`). Server tự chạy migrations lúc khởi động | Không | `pg` khi mở cụm server thật; `file` cho máy chủ đơn | `server/src/stores.ts`, `server/src/startup.ts` |
 | `DATABASE_URL` | Không có (chỉ dùng khi `STORE=pg`) | Chuỗi kết nối PostgreSQL (vd `postgres://tiengioi:matkhau@db:5432/tiengioi`). Không in ra log, không commit | **CÓ** | Bắt buộc khi `STORE=pg`. Cung cấp chuỗi kết nối an toàn | `server/src/stores.ts`, `server/src/startup.ts` |
+| `POSTGRES_PASSWORD` | Không có | Mật khẩu cơ sở dữ liệu PostgreSQL, được Docker Compose dùng để khởi tạo service `db` và nội suy vào `DATABASE_URL` của service `game` khi chạy `docker-compose.pg.yml`. Không đọc trực tiếp bởi server Node.js | **CÓ** | Chuỗi ngẫu nhiên chỉ gồm chữ và số (vd `openssl rand -hex 24`), tránh ký tự đặc biệt | `docker-compose.pg.yml` (chỉ dùng cho Docker Compose) |
 | `AUTH_MODE` | `legacy` | Cơ chế xác thực: `legacy` (đạo hiệu + secretHash lưu trình duyệt) hoặc `account` (tài khoản mật khẩu scrypt + phiên + mã khôi phục, mở `/api/auth/*`) | Không | **`account`** khi mở cho người chơi thật | `server/src/auth-http.ts`, `server/src/startup.ts` |
 | `TRUST_PROXY` | Không tin proxy (dùng IP kết nối) | Số tầng reverse proxy tin cậy (vd `1` sau Caddy/Nginx) hoặc danh sách mạng con (`loopback`, `10.0.0.0/8`). Không nhận `true` / `*` | Không | `1` khi chạy sau 1 tầng reverse proxy để giới hạn tần suất theo đúng IP khách | `server/src/auth-http.ts`, `server/src/startup.ts` |
 | `SECTS` | Bật tính năng | Kiểm soát tính năng tông môn; đặt `SECTS=off` để gỡ bỏ hoàn toàn tính năng tông môn (bảo trì khẩn cấp) | Không | Để trống (mặc định bật) | `server/src/rooms/WorldRoom.ts` |
@@ -282,30 +283,34 @@ Quy trình: Tự động sinh dữ liệu mẫu đầy đủ (nhân vật, chân
 ### 7.4. Sao lưu & Khôi phục với PostgreSQL (`STORE=pg`)
 Khi triển khai với PostgreSQL (`docker-compose.pg.yml` hoặc dịch vụ Postgres bên ngoài):
 - **Tạo bản sao lưu cơ sở dữ liệu (`pg_dump`):**
+  Dùng cờ `--clean --if-exists --no-owner` để bản sao lưu chứa lệnh tự dọn dẹp các bảng cũ trước khi nạp lại, tránh lỗi trùng khoá hoặc "already exists" khi khôi phục vào cơ sở dữ liệu đang có dữ liệu:
   ```bash
-  # Với Docker Compose (dịch vụ db của docker-compose.pg.yml):
-  docker compose -f docker-compose.pg.yml exec -T db pg_dump -U tiengioi tiengioi | gzip > backups/tiengioi-pg-$(date +%Y%m%d-%H%M%S).sql.gz
+  # Với Docker Compose (dịch vụ db của docker-compose.pg.yml ghép cùng docker-compose.yml):
+  docker compose -f docker-compose.yml -f docker-compose.pg.yml exec -T db pg_dump -U tiengioi --clean --if-exists --no-owner tiengioi | gzip > backups/tiengioi-pg-$(date +%Y%m%d-%H%M%S).sql.gz
 
   # Với máy chủ PostgreSQL thông thường:
-  pg_dump -d "$DATABASE_URL" | gzip > backups/tiengioi-pg-$(date +%Y%m%d-%H%M%S).sql.gz
+  pg_dump -d "$DATABASE_URL" --clean --if-exists --no-owner | gzip > backups/tiengioi-pg-$(date +%Y%m%d-%H%M%S).sql.gz
   ```
 - **Khôi phục dữ liệu cơ sở dữ liệu (`psql`):**
   1. Dừng container game server trước để ngắt các kết nối ghi:
      ```bash
-     docker compose -f docker-compose.pg.yml stop game
+     docker compose -f docker-compose.yml -f docker-compose.pg.yml stop game
      ```
-  2. Nạp lại bản sao lưu vào database (chỉ định file sao lưu cụ thể):
+  2. Nạp lại bản sao lưu vào database (chỉ định file sao lưu cụ thể; cờ `--clean --if-exists` ở bước sao lưu giúp dọn bảng cũ sạch sẽ trước khi tạo lại):
      ```bash
      # Với Docker Compose:
-     gunzip -c backups/tiengioi-pg-20261110-020000.sql.gz | docker compose -f docker-compose.pg.yml exec -T db psql -U tiengioi tiengioi
+     gunzip -c backups/tiengioi-pg-20261110-020000.sql.gz | docker compose -f docker-compose.yml -f docker-compose.pg.yml exec -T db psql -U tiengioi tiengioi
 
      # Với máy chủ PostgreSQL thông thường:
      gunzip -c backups/tiengioi-pg-20261110-020000.sql.gz | psql -d "$DATABASE_URL"
      ```
   3. Khởi động lại game server:
      ```bash
-     docker compose -f docker-compose.pg.yml start game
+     docker compose -f docker-compose.yml -f docker-compose.pg.yml start game
      ```
+
+> [!NOTE]
+> Các lệnh trên dành cho PostgreSQL chưa chạy thử nghiệm trong môi trường CI tự động; người vận hành cần kiểm tra trên bản sao trước khi áp dụng vào môi trường production thật.
 
 ---
 

@@ -1,7 +1,8 @@
 // Công cụ kiểm tra tính nhất quán của bảng biến môi trường (M4 3.2 - Issue #276).
-// Quét toàn bộ server/src (bỏ qua *.test.ts), đối chiếu với:
+// Quét toàn bộ server/src (bỏ qua *.test.ts) và docker-compose*.yml, đối chiếu với:
 // 1. Bảng biến môi trường chính thức trong docs/TRIEN_KHAI.md
 // 2. Mẫu cấu hình production .env.production.example
+// 3. Khai báo env_file trong docker-compose.yml
 // Đỏ nếu có biến trong mã chưa được ghi nhận, hoặc có biến trong bảng không còn dùng.
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -76,6 +77,56 @@ export function scanSourceEnvVars(srcDir: string = serverSrc): Set<string> {
 }
 
 /**
+ * Quét các tệp cấu hình Docker Compose (docker-compose*.yml) để tìm các biến
+ * môi trường được nội suy qua cú pháp ${VAR} hoặc ${VAR:...}.
+ */
+export function scanComposeInterpolatedVars(root: string = repoRoot): Set<string> {
+  const vars = new Set<string>();
+  if (!existsSync(root)) return vars;
+  for (const entry of readdirSync(root)) {
+    if (
+      (entry === "docker-compose.yml" ||
+        entry === "docker-compose.pg.yml" ||
+        (entry.startsWith("docker-compose") && entry.endsWith(".yml"))) &&
+      statSync(path.join(root, entry)).isFile()
+    ) {
+      const content = readFileSync(path.join(root, entry), "utf8");
+      const re = /\$\{([A-Z][A-Z0-9_]+)(?::[^}]*)?\}/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(content)) !== null) {
+        vars.add(m[1]);
+      }
+    }
+  }
+  return vars;
+}
+
+/**
+ * Kiểm tra tĩnh cấu hình Docker Compose: service `game` trong `docker-compose.yml`
+ * phải khai báo `env_file` trỏ tới `.env.production` và `required: false` (Docker Compose >= 2.24).
+ */
+export function verifyDockerComposeEnvFile(root: string = repoRoot): {
+  ok: boolean;
+  error?: string;
+} {
+  const composePath = path.join(root, "docker-compose.yml");
+  if (!existsSync(composePath)) {
+    return { ok: false, error: "Không tìm thấy docker-compose.yml" };
+  }
+  const content = readFileSync(composePath, "utf8");
+  if (!content.includes(".env.production")) {
+    return { ok: false, error: "docker-compose.yml chưa cấu hình .env.production trong env_file" };
+  }
+  if (!/required:\s*false/.test(content)) {
+    return {
+      ok: false,
+      error: "docker-compose.yml env_file cần có required: false cho Compose >= 2.24",
+    };
+  }
+  return { ok: true };
+}
+
+/**
  * Đọc bảng biến môi trường từ docs/TRIEN_KHAI.md.
  * Bảng nằm trong mục "Bảng biến môi trường chính thức", có cột `Biến môi trường`.
  */
@@ -136,12 +187,16 @@ export function parseEnvExampleVars(examplePath: string = envProdExample): Set<s
 
 export interface CheckEnvResult {
   codeVars: string[];
+  composeVars: string[];
   docVars: string[];
   exampleVars: string[];
   undocumentedInCode: string[]; // Có trong code nhưng chưa có trong docs
-  staleInDoc: string[]; // Có trong docs nhưng không còn trong code
-  missingInExample: string[]; // Có trong docs nhưng thiếu trong .env.production.example (nếu là biến production quan trọng)
+  undocumentedInCompose: string[]; // Có trong compose nhưng chưa có trong docs
+  staleInDoc: string[]; // Có trong docs nhưng không còn trong code lẫn compose
+  missingInExample: string[]; // Có trong docs nhưng thiếu trong .env.production.example
   unknownInExample: string[]; // Có trong .env.production.example nhưng không có trong docs
+  composeEnvFileOk: boolean;
+  composeEnvFileError?: string;
   ok: boolean;
 }
 
@@ -150,6 +205,7 @@ export function checkEnvConsistency(
     srcDir?: string;
     docPath?: string;
     examplePath?: string;
+    repoRoot?: string;
   } = {},
 ): CheckEnvResult {
   const codeRaw = scanSourceEnvVars(opts.srcDir ?? serverSrc);
@@ -161,24 +217,39 @@ export function checkEnvConsistency(
     }
   }
 
+  const composeVarsSet = scanComposeInterpolatedVars(opts.repoRoot ?? repoRoot);
   const docVarsSet = parseTrienKhaiEnvVars(opts.docPath ?? trienKhaiDoc);
   const exampleVarsSet = parseEnvExampleVars(opts.examplePath ?? envProdExample);
 
+  // Biến hợp lệ được phép ghi nhận trong docs: từ code server HOẶC từ docker compose
+  const validDocVars = new Set([...codeVarsSet, ...composeVarsSet]);
+
   const undocumentedInCode = [...codeVarsSet].filter((v) => !docVarsSet.has(v)).sort();
-  const staleInDoc = [...docVarsSet].filter((v) => !codeVarsSet.has(v)).sort();
+  const undocumentedInCompose = [...composeVarsSet].filter((v) => !docVarsSet.has(v)).sort();
+  const staleInDoc = [...docVarsSet].filter((v) => !validDocVars.has(v)).sort();
   const unknownInExample = [...exampleVarsSet].filter((v) => !docVarsSet.has(v)).sort();
 
+  const composeCheck = verifyDockerComposeEnvFile(opts.repoRoot ?? repoRoot);
+
   const ok =
-    undocumentedInCode.length === 0 && staleInDoc.length === 0 && unknownInExample.length === 0;
+    undocumentedInCode.length === 0 &&
+    undocumentedInCompose.length === 0 &&
+    staleInDoc.length === 0 &&
+    unknownInExample.length === 0 &&
+    composeCheck.ok;
 
   return {
     codeVars: [...codeVarsSet].sort(),
+    composeVars: [...composeVarsSet].sort(),
     docVars: [...docVarsSet].sort(),
     exampleVars: [...exampleVarsSet].sort(),
     undocumentedInCode,
+    undocumentedInCompose,
     staleInDoc,
     missingInExample: [],
     unknownInExample,
+    composeEnvFileOk: composeCheck.ok,
+    composeEnvFileError: composeCheck.error,
     ok,
   };
 }
@@ -189,6 +260,9 @@ export function main(): number {
 
   console.log(
     `- Biến phát hiện trong server/src (${res.codeVars.length}): ${res.codeVars.join(", ")}`,
+  );
+  console.log(
+    `- Biến phát hiện trong docker-compose*.yml (${res.composeVars.length}): ${res.composeVars.join(", ")}`,
   );
   console.log(
     `- Biến ghi nhận trong docs/TRIEN_KHAI.md (${res.docVars.length}): ${res.docVars.join(", ")}`,
@@ -209,9 +283,19 @@ export function main(): number {
     fail = true;
   }
 
+  if (res.undocumentedInCompose.length > 0) {
+    console.error(
+      `\n❌ [LỖI] Biến môi trường nội suy trong docker-compose*.yml nhưng CHƯA có trong docs/TRIEN_KHAI.md:`,
+    );
+    for (const v of res.undocumentedInCompose) {
+      console.error(`   - ${v}`);
+    }
+    fail = true;
+  }
+
   if (res.staleInDoc.length > 0) {
     console.error(
-      `\n❌ [LỖI] Biến trong docs/TRIEN_KHAI.md nhưng KHÔNG còn dùng trong server/src:`,
+      `\n❌ [LỖI] Biến trong docs/TRIEN_KHAI.md nhưng KHÔNG còn dùng trong server/src lẫn compose:`,
     );
     for (const v of res.staleInDoc) {
       console.error(`   - ${v}`);
@@ -229,8 +313,16 @@ export function main(): number {
     fail = true;
   }
 
+  if (!res.composeEnvFileOk) {
+    console.error(`\n❌ [LỖI] docker-compose.yml không đạt yêu cầu env_file:`);
+    console.error(`   - ${res.composeEnvFileError}`);
+    fail = true;
+  }
+
   if (!fail) {
-    console.log("\n✅ Bảng biến môi trường và file cấu hình mẫu hoàn toàn nhất quán!");
+    console.log(
+      "\n✅ Bảng biến môi trường, docker-compose.yml và file cấu hình mẫu hoàn toàn nhất quán!",
+    );
     return 0;
   }
 
