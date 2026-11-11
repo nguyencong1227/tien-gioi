@@ -674,3 +674,138 @@ Chạy 48 loại tin nhắn × 2 senders (Poor + Rich) × 26 biến thể payloa
 - **Tông môn:** `sectCreate` (52/52 OK), `sectInvite` (52/52 OK), `sectAccept` (52/52 OK), `sectDecline` (52/52 OK), `sectLeave` (52/52 OK), `sectKick` (52/52 OK), `sectRank` (52/52 OK), `sectTransfer` (52/52 OK), `sectDisband` (52/52 OK), `sectMotd` (52/52 OK), `sectDeposit` (52/52 OK), `sectWithdraw` (52/52 OK).
 - **Luân hồi:** `soulBuy` (52/52 OK), `rebirth` (52/52 OK).
 - **Tin lạ không đăng ký:** `__unknown_unregistered_msg__` (52/52 OK, handler `*` từ chối an toàn).
+
+## 19. Thử tải dài (Soak Test) 100 Bot: Rò rỉ bộ nhớ, Tick p95, Băng thông & Toàn vẹn dữ liệu (M4 3.5 - Issue #282)
+
+### 19.1. Đặt vấn đề & Mục tiêu
+Các công cụ thử tải trước đây (`bench.ts` 20 giây mốc `bench-baseline.json`, `bots.ts` 15–30 giây) chủ yếu đo tải đỉnh tức thời. Một máy chủ MMORPG chạy production liên tục nhiều giờ/ngày cần đối mặt với các rủi ro tích luỹ theo thời gian:
+1. **Rò rỉ bộ nhớ (Memory Leak):** Giữ tham chiếu sự kiện, mảng cache không giải phóng, hoặc rò rỉ buffer WebSocket làm `VmRSS` phình to dần.
+2. **Trôi dạt hiệu năng (Performance Drift):** Độ trễ tick CPU p95 hoặc kích thước bản vá StateView (`byte/tick`) tăng dần khi số lượng thực thể / dữ liệu tích luỹ.
+3. **Tồn đọng hàng đợi I/O:** Hàng đợi ghi file lưu nhân vật (`savePlayer`), chân linh (`FileSoulStore`), hoặc tông môn (`FileSectStore`) bị nghẽn dẫn đến sai lệch dữ liệu.
+4. **Mất an toàn dữ liệu:** Chết server bất ngờ hoặc khi tắt bằng tín hiệu `SIGTERM` làm phát sinh tệp lưu hỏng (`*.hong-*`) hoặc thất thoát / lạm phát tiền tệ (Linh thạch).
+
+Công cụ thử tải dài (`npm run soak -w server`) được xây dựng để kiểm chứng các đặc tính trên trong điều kiện chạy tải nặng liên tục với 100 bot kết hợp đa kịch bản gameplay.
+
+### 19.2. Phương pháp & Công cụ (`server/scripts/soak.ts`, `soak-analysis.ts`, `soak-analysis.test.ts`)
+- **Cách ly tuyệt đối:** Script tự tìm cổng TCP rảnh ngẫu nhiên (`findFreePort`), tạo thư mục dữ liệu tạm riêng biệt (`/tmp/tien-gioi-soak-XXXXXX`), gieo sẵn hồ sơ nhân vật và khởi động server THẬT trong tiến trình con (không chiếm cổng 2567/2577/2587 của các dev).
+- **Đa dạng hoá 100 bot tham gia theo 6 kịch bản gameplay thực tế:**
+  1. **Săn quái (30 bot):** Di chuyển tuần tra ngoài trấn, áp sát quái vật, tung kỹ năng `slash` (Trảm Kích) và `sword` (Ngự Kiếm Thuật), nhặt chiến lợi phẩm rơi.
+  2. **Trấn & Cửa hàng (20 bot):** Tụ tập tại Lạc Hà Trấn, di chuyển qua lại, định kỳ giao dịch mua đan dược tại NPC Lão Dược Sư.
+  3. **Chuyển bản đồ qua cổng (10 bot):** Di chuyển liên tục qua lại giữa cổng Lạc Hà Trấn và Hắc Phong Sơn (kích hoạt luồng `travelTo`, ngắt kết nối phòng cũ và kết nối phòng mới).
+  4. **Bí cảnh Linh Hư Giới (16 bot = 4 đội):** Đội trưởng mở bí cảnh tại NPC Thủ Môn, mời thành viên vào phòng bí cảnh riêng, chiến đấu với quái vật bí cảnh.
+  5. **PK Thách đấu (12 bot = 6 cặp):** Di chuyển ra ngoài khu an toàn, gửi lời thách đấu `duelChallenge`, chấp nhận, đếm ngược và giao chiến 1v1 đến khi gục ngã (`duelYield`).
+  6. **Tông môn (12 bot = 4 nhóm):** Tông chủ thành lập tông môn, mời đệ tử, nạp Linh thạch vào kho chung và gửi tin nhắn chat kênh tông môn `/s`.
+- **Tránh vật cản & Chống sai số làm tròn toạ độ:** Bot kiểm tra an toàn đa hướng (`isPositionSafe`) với đệm an toàn 32 px (lớn hơn nhiều so với `PLAYER_RADIUS = 14 px`), loại bỏ triệt để hiện tượng sai số làm tròn số nguyên (`Math.round`) khi lưu toạ độ xuống đĩa.
+- **Thu thập mẫu mỗi 10 giây ghi vào tệp `server/soak-*.json` (được chặn trong `.gitignore`):**
+  - `VmRSS` bộ nhớ thực của PID server thật từ `/proc/<pid>/status`.
+  - Độ trễ tick CPU p95 đọc từ `/proc/<pid>/sched` (`se.sum_exec_runtime`).
+  - Kích thước bản vá StateView (`patchBytesPerTick`) và lưu lượng mạng nhận vào (`rxKBpsPerBot`).
+  - Số lượng bot còn sống và số lỗi / ngắt kết nối bất thường.
+  - Quét thời gian thực các lỗi log server (`[lỗi]`, `unhandledRejection`, `uncaughtException`, STDERR).
+- **Phân tích tự động bằng Hồi quy tuyến tính (OLS Linear Regression):**
+  - Bỏ qua thời gian khởi động (warmup 1 phút cho đợt 5 phút; 5 phút cho đợt 30 phút).
+  - Tính mức tăng `VmRSS` sau warmup và dốc hồi quy tuyến tính của nửa sau thời gian chạy (`secondHalfSlope`).
+  - Đánh giá theo các ngân sách: VmRSS tăng sau warmup <= 50 MB; dốc nửa sau <= 1.0 MB/phút; Tick p95 <= 10.0 ms; Patch <= 600 byte/tick; Lỗi log server = 0; Tỷ lệ rớt bot <= 5%.
+- **Kiểm tra bất biến toàn vẹn dữ liệu sau soak:**
+  - Tắt server bằng tín hiệu `SIGTERM` (mô phỏng quy trình bảo trì / cập nhật production).
+  - Chạy `kiem-save` (`auditSavesDirectory`) trên toàn bộ thư mục dữ liệu tạm (0 lỗi).
+  - Kiểm tra tệp hỏng cách ly: số tệp `*.hong-*` = 0.
+  - Kiểm tra bảo toàn tiền tệ: Tổng Linh thạch cuối kỳ (ví nhân vật + kho tông môn) <= Ban đầu + Tổng Linh thạch phát sinh từ rơi đồ / thưởng.
+
+### 19.3. Bảng Kết quả Thử tải Thực tế 100 Bot (5 phút, 30 mẫu đo)
+Chạy thử tải thực tế trên máy chủ phát triển với lệnh: `npm run soak -w server -- --bots=100 --minutes=5`:
+
+```
+================================================================================
+            BẮT ĐẦU THỬ TẢI DÀI TIÊN GIỚI (M4 3.5 - ISSUE #282)
+================================================================================
+Số bot:            100
+Thời lượng:        5.0 phút (300 giây)
+Cổng server:       43172 (ngẫu nhiên, cách ly)
+Thư mục dữ liệu:   /tmp/tien-gioi-soak-WOgnRY
+Tệp nhật ký mẫu:   server/soak-2026-11-11T06-11-58-060Z.json
+--------------------------------------------------------------------------------
+Phân bổ kịch bản (100 bot): Săn quái 30 | Trấn/Shop 20 | Cổng 10 | Bí cảnh 16 | PK 12 | Tông môn 12
+Đang khởi động máy chủ thật trong tiến trình con...
+Máy chủ sẵn sàng tại cổng 43172 (PID launcher: 2476575, PID server: 2476586). Bắt đầu kết nối bot...
+Đã kết nối thành công 100/100 bot.
+Bắt đầu vòng lặp mô phỏng và thu thập số liệu...
+[ 0.2m / 5.0m] VmRSS: 153.5 MB | Bots: 100/100 | Tick:  5.9 ms | Patch: 582 B/t | Lỗi: 0
+[ 0.5m / 5.0m] VmRSS: 153.3 MB | Bots: 100/100 | Tick:  4.8 ms | Patch: 439 B/t | Lỗi: 0
+[ 1.0m / 5.0m] VmRSS: 153.6 MB | Bots: 100/100 | Tick:  4.2 ms | Patch: 343 B/t | Lỗi: 0
+[ 2.0m / 5.0m] VmRSS: 152.8 MB | Bots: 100/100 | Tick:  3.8 ms | Patch: 262 B/t | Lỗi: 0
+[ 3.0m / 5.0m] VmRSS: 153.2 MB | Bots: 100/100 | Tick:  3.7 ms | Patch: 305 B/t | Lỗi: 0
+[ 4.0m / 5.0m] VmRSS: 153.5 MB | Bots: 100/100 | Tick:  5.7 ms | Patch: 254 B/t | Lỗi: 0
+[ 5.0m / 5.0m] VmRSS: 152.9 MB | Bots: 100/100 | Tick:  3.2 ms | Patch: 218 B/t | Lỗi: 0
+
+Thời gian đo kết thúc. Đang ngắt kết nối bot và tắt máy chủ bằng SIGTERM...
+[SERVER TIẾN TRÌNH THOÁT] PID launcher: 2476575, code=0, signal=null
+Đang kiểm tra bất biến dữ liệu sau soak test...
+- kiem-save: 100 nhân vật, 100 chân linh, 4 tông môn -> 0 lỗi.
+- Tệp hỏng (*.hong-*): 0
+- Bảo toàn Linh thạch: Ban đầu 29600 + Thả ra 2086 = Trần 31686 | Thực tế cuối: Ví 19316 + Kho 2490 = 21806 -> ĐẠT
+```
+
+#### Bảng tổng hợp số liệu đo đạc & Đối chiếu Ngân sách:
+
+| Hạng mục kiểm thử | Giá trị đo được (100 bot / 5 phút) | Ngưỡng ngân sách quy định | Đánh giá | Trạng thái |
+| :--- | :---: | :---: | :---: | :---: |
+| **Tỷ lệ sống sót bot** | **100 / 100 (100%)** | Rớt <= 5% | 100 bot giữ vững kết nối suốt 5 phút, 0 rớt mạng | **PASS** |
+| **VmRSS ban đầu** | **153.55 MB** | — | Mức tiêu thụ RAM cơ sở khi 100 bot đăng nhập | **INFO** |
+| **VmRSS sau khởi động (1.0m)** | **153.57 MB** | — | Điểm mốc sau giai đoạn warmup | **INFO** |
+| **VmRSS kết thúc (5.0m)** | **152.94 MB** | — | VmRSS giảm nhẹ nhờ cơ chế dọn dẹp rác Node.js | **INFO** |
+| **Biến thiên VmRSS sau warmup** | **-0.63 MB** | <= 50.0 MB | Hoàn toàn không phát hiện rò rỉ bộ nhớ | **PASS** |
+| **Dốc VmRSS nửa sau (OLS)** | **+0.13 MB/phút** | <= 1.0 MB/phút | Dốc tuyến tính cực thấp, bộ nhớ duy trì phẳng | **PASS** |
+| **Độ trễ tick CPU trung bình** | **4.10 ms/tick** | — | 20 tick/giây chạy trơn tru | **PASS** |
+| **Độ trễ tick CPU phân vị p95** | **5.33 ms/tick** | <= 10.0 ms | Nằm sâu dưới ngân sách 10 ms của `perf.test.ts` | **PASS** |
+| **Độ trễ tick CPU tối đa** | **7.66 ms/tick** | < 20 ms | Không có hiện tượng lag tick hay nghẽn CPU | **PASS** |
+| **Bản vá StateView trung bình** | **303 byte/tick** | <= 600 byte/tick | Vùng nhìn StateView hoạt động tối ưu | **PASS** |
+| **Bản vá StateView phân vị p95** | **464 byte/tick** | <= 600 byte/tick | Thấp hơn ngưỡng trấn đông người (600 byte) | **PASS** |
+| **Băng thông nhận TB mỗi bot** | **5.92 KB/s** | < 15.0 KB/s | Tiết kiệm băng thông mạng client di động | **PASS** |
+| **Lỗi log máy chủ (`[lỗi]`)** | **0 lỗi** | = 0 lỗi | Không có ngoại lệ runtime hay unhandled rejection | **PASS** |
+| **Kiểm tra toàn vẹn `kiem-save`** | **0 lỗi / 204 tệp** | = 0 lỗi | 100 nhân vật, 100 chân linh, 4 tông môn hợp lệ 100% | **PASS** |
+| **Tệp hỏng cách ly (`*.hong-*`)** | **0 tệp** | = 0 tệp | Không có tệp ghi đè dở dang hay hỏng hóc | **PASS** |
+| **Bảo toàn tiền tệ (Linh thạch)** | **ĐẠT (21,806 <= 31,686)** | Cuối <= Đầu + Thả | Không có hiện tượng nhân bản hay lạm phát tiền tệ | **PASS** |
+
+### 19.4. Bằng chứng Kiểm thử Đột biến (Mutation Testing)
+Để chứng minh công cụ soak test thực sự phát hiện được lỗi tiềm ẩn và không trả về kết quả đạt giả (false positive), 2 đột biến đã được cài đặt có chủ đích và chạy thử:
+
+#### Đột biến A: Rò rỉ bộ nhớ cố ý (`Memory Leak Mutation`)
+- **Cài đặt:** Thêm cấp phát `Buffer.alloc(25 * 1024 * 1024, 1)` mỗi giây trong vòng lặp cập nhật phòng `WorldRoom.ts` để ép bộ nhớ phình to nhanh chóng.
+- **Kết quả Soak Test:** **KHÔNG ĐẠT (FAIL)** ngay lập tức với lý do:
+  ```
+  LÝ DO KHÔNG ĐẠT:
+    [X] VmRSS tăng sau khởi động vượt ngưỡng: +992.75 MB > 50.0 MB
+    [X] Dốc VmRSS nửa sau tăng liên tục vượt ngưỡng: +6001.32 MB/phút > 1.0 MB/phút
+  ```
+- **Kết luận:** Thuật toán hồi quy OLS và cơ chế giám sát `/proc/<pid>/status` bắt chính xác 100% hiện tượng rò rỉ RAM. Đã hoàn tác code đột biến sạch sẽ.
+
+#### Đột biến B: Lỗi log máy chủ cố ý (`Server Log Error Mutation`)
+- **Cài đặt:** Thêm `console.error("[lỗi] kiểm thử đột biến bắt lỗi log server")` vào handler tin nhắn của `WorldRoom.ts`.
+- **Kết quả Soak Test:** **KHÔNG ĐẠT (FAIL)** ngay lập tức với lý do:
+  ```
+  LÝ DO KHÔNG ĐẠT:
+    [X] Phát hiện 2 lỗi trong log server ([lỗi] / unhandledRejection / ngoại lệ)
+  ```
+- **Kết luận:** Cơ chế intercept log và regex quét lỗi bắt chính xác các sự kiện bất thường. Đã hoàn tác code đột biến sạch sẽ.
+
+### 19.5. Hướng dẫn Chạy Thử tải Dài ngoài Ca Đêm
+Bộ công cụ hỗ trợ nhiều mức thời lượng tuỳ nhu cầu kiểm tra:
+```bash
+# 1. Thử nhanh 60 giây (mặc định để dev kiểm tra nhanh tính năng trước khi commit):
+npm run soak -w server
+
+# 2. Thử nghiệm chuẩn 5 phút với 100 bot:
+npm run soak -w server -- --bots=100 --minutes=5
+
+# 3. Thử tải dài 30 phút với 100 bot (khuyến nghị chạy trước khi phát hành release):
+npm run soak -w server -- --bots=100 --minutes=30
+
+# 4. Thử tải trường kỳ 1–2 giờ (chạy qua đêm hoặc trên máy chủ staging):
+npm run soak -w server -- --bots=100 --minutes=60
+npm run soak -w server -- --bots=100 --minutes=120
+
+# 5. Lưu kết quả ra đường dẫn tệp JSON tuỳ chọn và giữ lại thư mục dữ liệu để kiểm tra:
+npm run soak -w server -- --bots=100 --minutes=30 --out=./soak-report.json --keep-data
+```
+

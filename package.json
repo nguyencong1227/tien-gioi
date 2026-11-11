@@ -26,6 +26,7 @@
     "chuyen-du-lieu": "npm run chuyen-du-lieu -w server --",
     "check:env": "npm run check:env -w server",
     "khoi-phuc-thu": "npm run khoi-phuc-thu -w server",
+    "soak": "npm run soak -w server --",
     "check:pwa": "node client/scripts/check-pwa.mjs",
     "check:credits": "node client/scripts/check-credits.mjs",
     "perf:mobile": "node client/scripts/measure-mobile-perf.mjs"
