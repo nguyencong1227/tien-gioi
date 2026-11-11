@@ -2149,11 +2149,11 @@ body.low-fx #btn-talk {
   justify-content: center;
 }
 .pib-btn.accept {
-  background: #389e0d;
+  background: #237804;
   color: #fff;
 }
 .pib-btn.accept:hover {
-  background: #52c41a;
+  background: #27860a;
 }
 .pib-btn.decline {
   background: rgba(255, 255, 255, 0.12);
@@ -2404,12 +2404,12 @@ body.low-fx #btn-talk {
   cursor: not-allowed;
 }
 .shop-act-btn.sell {
-  background: #389e0d;
+  background: #237804;
   border: 1px solid #52c41a;
   color: #fff;
 }
 .shop-act-btn.sell:hover:not(:disabled) {
-  background: #52c41a;
+  background: #27860a;
 }
 .shop-lock-label {
   font-size: 11px;
