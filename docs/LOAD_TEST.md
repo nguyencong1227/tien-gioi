@@ -895,28 +895,31 @@ Kịch bản tự động hoá kiểm thử E2E sử dụng:
 1. **Server Colyseus thật** chạy trong tiến trình với thư mục dữ liệu tạm riêng biệt.
 2. **Proxy TCP trung gian (`TcpProxy`)** nằm giữa Chrome headless và Server Colyseus:
    - Hỗ trợ chế độ `blackhole`: socket TCP phía client và server vẫn giữ mở 100%, nhưng proxy ngừng chuyển tiếp byte hai chiều (mô phỏng socket nửa mở thật sự).
+   - Hỗ trợ chế độ `holeExisting` / `destroyHoled`: chỉ socket ĐANG CÓ bị blackhole, kết nối mới vẫn thông (đổi mạng); sau đó huỷ socket cũ để trình duyệt bắn sự kiện đóng muộn.
    - Hỗ trợ chế độ `dropPong`: proxy lọc bỏ riêng các tin `pong` từ server gửi về để mô phỏng máy chủ cũ không có nhịp tim.
 3. **Chrome headless CDP** điều khiển người chơi thật qua màn hình canvas và giao diện DOM.
 
-### 21.3. Ba ca kiểm thử thực tế
+### 21.3. Bốn ca kiểm thử thực tế
 
 | Ca kiểm thử | Điều kiện mô phỏng | Kết quả thực tế | Ngưỡng cho phép | Đánh giá |
 | :--- | :--- | :---: | :---: | :---: |
-| **Ca 1: Blackhole tiền cảnh** | Bật TCP blackhole (socket nửa mở) khi đang chơi ở tiền cảnh | Phát hiện chết sau **13.6 giây** (~chu kỳ 5s + timeout 8s) | <= 14.0 giây | **PASS** |
+| **Ca 1: Blackhole tiền cảnh** | Bật TCP blackhole (socket nửa mở) khi đang chơi ở tiền cảnh | Phát hiện chết sau **~13.6 giây** | <= **16.5 giây** (xấu nhất 15 giây: chờ tới nhịp ping kế 5s + hạn 8s làm tròn lên bội của nhịp 5s = 10s, kiểm tra mỗi nhịp; bản đầu đặt 14s nên chập chờn) | **PASS** |
 | | Banner nối lại hiển thị và đếm ngược | `"Mất kết nối, đang nối lại... (còn 20 giây)"` | Hiện banner | **PASS** |
 | | Mở lại proxy, client tự nối lại | Bảo toàn `sessionId`, ví 168 Linh thạch + túi đồ nguyên vẹn | Khớp 100% | **PASS** |
 | | Điều khiển di chuyển sau nối lại | Nhân vật di chuyển toạ độ phản hồi bình thường | Phản hồi | **PASS** |
 | **Ca 2: Background -> Foreground** | Xuống nền 2.5s, bật blackhole lúc ở nền, quay lại tiền cảnh | Phát hiện chết sau **3.1 giây** (`RESUME_TIMEOUT_MS` 3s + 134ms) | <= 4.5 giây | **PASS** |
 | | Nối lại sau ca quay lại tiền cảnh | Nối lại thành công, banner ẩn | Nối lại | **PASS** |
 | **Ca 3: Server cũ không trả pong** | Proxy drop 100% pong, người chơi ở trong game 12s | Banner KHÔNG hiển thị, client KHÔNG tự ngắt kết nối | Không ngắt oan | **PASS** |
-| **Độ ổn định chung** | Toàn bộ 3 ca liên tục | **0 lỗi console / exception** | 0 lỗi | **PASS** |
+| **Ca 4: Socket cũ đóng muộn** (A thêm khi review #310) | Blackhole CHỈ socket đang có, kết nối mới vẫn thông (như đổi wifi sang 4G); nối lại qua kết nối mới; socket cũ đóng (1006) ~200 ms SAU khi nối lại xong | Chỉ nối lại ĐÚNG MỘT lần (`attachRoom` 1 lần), banner ẩn, nhịp tim phòng mới còn chạy | 1 lần nối lại | **PASS** |
+| **Độ ổn định chung** | Toàn bộ 4 ca liên tục | **0 lỗi console / exception** | 0 lỗi | **PASS** |
 
 ### 21.4. Bằng chứng Kiểm thử Đột biến (Mutation Testing)
-Cả 4 khẳng định cốt lõi đều được kiểm chứng với đột biến làm đỏ kịch bản E2E:
+Cả các khẳng định cốt lõi đều được kiểm chứng với đột biến làm đỏ kịch bản E2E:
 1. **Đột biến 1 (Bỏ `isConnectionDead` ở `tick()`):** Ca 1 BÁO ĐỎ (`[LỖI E2E NHỊP TIM] Hết thời gian chờ (18000ms) ở A: banner nối lại hiển thị sau blackhole`).
 2. **Đột biến 2 (Bỏ cờ `supported`, luôn coi là true):** Ca 3 BÁO ĐỎ (`[LỖI E2E NHỊP TIM] Client tự ngắt kết nối oan dù chưa từng nhận pong (vi phạm cờ supported)! (bannerCount=1, tokenChanged=true)`).
 3. **Đột biến 3 (Bỏ xử lý `visibilitychange`):** Ca 2 BÁO ĐỎ (`[LỖI E2E NHỊP TIM] Hết thời gian chờ (8000ms) ở A: banner nối lại hiển thị sau khi quay lại tiền cảnh`).
 4. **Đột biến 4 (Server không trả pong):** Ca 2 BÁO ĐỎ (vì `supported = false` nên client không kích hoạt ngắt kết nối).
+5. **Đột biến 5 (bỏ `if (room !== activeRoom) return;` trong `room.onLeave`):** Ca 4 BÁO ĐỎ (`socket cũ đóng muộn gây nối lại thừa (số lần nối lại=2, cần 1)`): sự kiện đóng của phòng CŨ chạy lại vòng nối lại, đóng phòng MỚI vừa nối và nối lại lần hai (R1 → R2 → R3). `onLeave.invoke()` giả trên phòng đã đóng KHÔNG tái hiện được (colyseus.js xoá handler khi phòng đóng); chỉ sự kiện đóng thật của socket nửa mở mới gây ra, nên ca 4 dùng chế độ proxy `holeExisting`.
 
 Cách chạy:
 ```bash

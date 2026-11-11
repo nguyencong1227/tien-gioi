@@ -10,7 +10,7 @@ import {
   RESUME_TIMEOUT_MS,
   type HeartbeatState,
   type PongMsg,
-} from "../../shared/src/heartbeat";
+} from "@tien-gioi/shared";
 
 export interface HeartbeatRoom {
   send(type: string, message?: any): void;

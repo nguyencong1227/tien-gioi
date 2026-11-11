@@ -469,6 +469,10 @@ function setupRoomLifecycle(room: Room) {
   });
 
   room.onLeave(async (code) => {
+    // Sự kiện đóng MUỘN của phòng CŨ (vd socket nửa mở bị `close()` lúc nhịp tim phát hiện chết, nhưng chỉ thật sự đóng rất lâu sau,
+    // khi mạng về hoặc hệ điều hành bỏ cuộc) KHÔNG được chạy lại vòng nối lại: nó dừng nhịp tim của phòng MỚI, chặn điều khiển và
+    // thử nối lại bằng token mới (A bắt được khi review #310: E2E `onLeave.invoke(1006)` của phòng cũ làm banner "đang nối lại" hiện lại)
+    if (room !== activeRoom) return;
     await startReconnect(code);
   });
 }

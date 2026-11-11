@@ -1,9 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  HEARTBEAT_INTERVAL_MS,
-  HEARTBEAT_MSG,
-  RESUME_TIMEOUT_MS,
-} from "../../shared/src/heartbeat";
+import { HEARTBEAT_INTERVAL_MS, HEARTBEAT_MSG, RESUME_TIMEOUT_MS } from "@tien-gioi/shared";
 import {
   HeartbeatController,
   type DocumentVisibilityLike,

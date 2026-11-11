@@ -1,10 +1,11 @@
 // E2E THẬT nhịp tim ứng dụng (ping / pong) và vòng đời nền / tiền cảnh (M4.2b, Issue #293):
 // Server Colyseus thật + Proxy TCP trung gian (hỗ trợ chế độ BLACKHOLE mô phỏng socket nửa mở thật) + Chrome headless.
-// Ba ca:
+// Bốn ca:
 //  1. Blackhole ở tiền cảnh: socket TCP vẫn mở nhưng ngừng byte -> client phát hiện chết trong <= HEARTBEAT_TIMEOUT_MS + nhịp (<= 14s)
 //     rồi mở lại proxy thì nối lại thành công, cùng sessionId, ví / túi đồ nguyên vẹn.
 //  2. Quay lại tiền cảnh sau khi ở nền: ghi đè document.visibilityState + bắn visibilitychange -> phát hiện chết trong <= RESUME_TIMEOUT_MS + dung sai (<= 4.5s).
 //  3. Server không trả pong (server cũ không hỗ trợ nhịp tim): proxy chặn tin pong -> client KHÔNG tự ngắt kết nối.
+//  4. Socket cũ (nửa mở) đóng MUỘN sau khi đã nối lại xong (đổi mạng): sự kiện đóng của phòng CŨ không được chạy lại vòng nối lại.
 // Chạy: `npm run build && npm run e2e:nhip-tim -w server` (cần google-chrome).
 
 import { spawn, execSync, type ChildProcess } from "node:child_process";
@@ -17,11 +18,7 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
-import {
-  HEARTBEAT_INTERVAL_MS,
-  HEARTBEAT_TIMEOUT_MS,
-  RESUME_TIMEOUT_MS,
-} from "../../shared/src/heartbeat";
+import { HEARTBEAT_INTERVAL_MS, HEARTBEAT_TIMEOUT_MS, RESUME_TIMEOUT_MS } from "@tien-gioi/shared";
 import { Tab, sleep, shown } from "./e2e-kit";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -31,6 +28,9 @@ const PORT_SERVER = 38000 + Math.floor(Math.random() * 2000);
 const PORT_PROXY = PORT_SERVER + 100 + Math.floor(Math.random() * 500);
 const CDP = 9800 + Math.floor(Math.random() * 300);
 const out = (m: string) => console.log(m);
+/** Xấu nhất phát hiện socket chết ở tiền cảnh: tới nhịp ping kế + hạn chờ làm tròn lên bội nhịp, cộng dung sai 1,5s */
+const DETECT_MAX_MS =
+  HEARTBEAT_INTERVAL_MS * (1 + Math.ceil(HEARTBEAT_TIMEOUT_MS / HEARTBEAT_INTERVAL_MS)) + 1500;
 
 /** Proxy TCP chuyển tiếp byte giữa client Chrome và server Colyseus thật, hỗ trợ BLACKHOLE và DROP PONG. */
 class TcpProxy {
@@ -39,6 +39,7 @@ class TcpProxy {
   private allowNew = true;
   private blackhole = false;
   private dropPong = false;
+  private holed = new Set<{ client: net.Socket; target: net.Socket }>();
   clientBytes = 0;
 
   constructor(
@@ -56,7 +57,7 @@ class TcpProxy {
 
       clientSocket.on("data", (d: Buffer) => {
         this.clientBytes += d.length;
-        if (this.blackhole) {
+        if (this.blackhole || this.holed.has(pair)) {
           // Blackhole: giữ socket mở nhưng ngừng chuyển tiếp byte hai chiều
           return;
         }
@@ -64,7 +65,7 @@ class TcpProxy {
       });
 
       targetSocket.on("data", (d: Buffer) => {
-        if (this.blackhole) {
+        if (this.blackhole || this.holed.has(pair)) {
           return;
         }
         if (this.dropPong && d.includes(Buffer.from("pong"))) {
@@ -75,7 +76,7 @@ class TcpProxy {
       });
 
       const cleanup = () => {
-        if (this.blackhole) {
+        if (this.blackhole || this.holed.has(pair)) {
           // Khi đang blackhole, giữ nguyên socket phía client để duy trì trạng thái nửa mở (half-open)
           return;
         }
@@ -110,6 +111,21 @@ class TcpProxy {
         }
       }
     }
+  }
+
+  /** Socket ĐANG CÓ bị blackhole (nửa mở), nhưng kết nối MỚI vẫn thông: mô phỏng đổi mạng (wifi -> 4G): nối lại được ngay, socket cũ còn treo */
+  holeExisting() {
+    for (const pair of this.connections) this.holed.add(pair);
+  }
+
+  /** Huỷ các socket nửa mở: trình duyệt nhận sự kiện đóng MUỘN (1006) của phòng cũ */
+  destroyHoled() {
+    for (const pair of Array.from(this.holed)) {
+      pair.client.destroy();
+      pair.target.destroy();
+      this.connections.delete(pair);
+    }
+    this.holed.clear();
   }
 
   setDropPong(drop: boolean) {
@@ -286,13 +302,14 @@ async function main() {
     const t0 = Date.now();
     proxy.setBlackhole(true);
 
-    // Client phải phát hiện chết trong <= HEARTBEAT_TIMEOUT_MS (8s) + HEARTBEAT_INTERVAL_MS (5s) + 1s dung sai = <= 14s
-    await tab.waitFor(shown("reconnect-banner"), "banner nối lại hiển thị sau blackhole", 18000);
+    // Kiểm tra mỗi HEARTBEAT_INTERVAL_MS nên xấu nhất = chờ tới nhịp ping kế (5s) + hạn chờ làm tròn lên bội nhịp (10s) = 15s (bản đầu
+    // đặt 14s: chạy 13,7s, chập chờn). Dung sai 1,5s.
+    await tab.waitFor(shown("reconnect-banner"), "banner nối lại hiển thị sau blackhole", 20000);
     const tDetect = Date.now();
     const detectDuration = tDetect - t0;
-    out(`  ✓ Client phát hiện socket chết sau ${detectDuration}ms (ngưỡng <= 14000ms)`);
+    out(`  ✓ Client phát hiện socket chết sau ${detectDuration}ms (ngưỡng <= ${DETECT_MAX_MS}ms)`);
 
-    if (detectDuration > HEARTBEAT_TIMEOUT_MS + HEARTBEAT_INTERVAL_MS + 1000) {
+    if (detectDuration > DETECT_MAX_MS) {
       throw new Error(`Thời gian phát hiện socket chết quá lâu: ${detectDuration}ms`);
     }
 
@@ -484,12 +501,76 @@ async function main() {
 
     proxy.setDropPong(false);
 
+    // =========================================================================
+    // CA 4 (A thêm khi review #310): socket CŨ đóng MUỘN sau khi đã nối lại xong
+    // =========================================================================
+    out("\n--- Ca 4: Socket cũ (nửa mở) đóng muộn sau khi đã nối lại xong ---");
+    const NAME_4 = "Dong Muon";
+    const SECRET_4 = "e2e_secret_heartbeat_44444444";
+    await setIdentity(NAME_4, SECRET_4);
+    await tab.send("Page.navigate", { url: `http://127.0.0.1:${PORT_PROXY}/?debug` });
+    await tab.waitFor(
+      `typeof window.__switchAuthView === 'function' && !!document.getElementById('login-form')`,
+      "form đăng nhập ca 4",
+    );
+    await tab.ev(
+      `const inp = document.getElementById('login-name'); if (inp) inp.value = ${JSON.stringify(NAME_4)}; document.getElementById('login-form').requestSubmit(); 1`,
+    );
+    await tab.waitFor(
+      `!document.getElementById('ui')?.hidden && !!window.__scene?.room && !!document.getElementById('hud-name')?.textContent`,
+      "vào game ca 4",
+    );
+    await tab.waitFor(shown("hud-name"), "đạo hiệu ca 4");
+    const sid4 = String(await tab.ev(`window.__scene?.room?.sessionId ?? ''`));
+    await sleep(6000); // nhịp tim đầu tiên: supported = true
+
+    const token4 = String(await tab.ev(`window.__scene?.room?.reconnectionToken ?? ''`));
+    out("  - Blackhole CHỈ socket đang có (kết nối mới vẫn thông, như đổi wifi sang 4G)...");
+    // Đếm số lần cảnh bám vào phòng MỚI (mỗi lần nối lại thành công gọi attachRoom một lần): đúng 1 lần là đúng
+    await tab.ev(
+      `window.__attachCount = 0; const sc = window.__scene; const orig = sc.attachRoom.bind(sc); sc.attachRoom = (r) => { window.__attachCount++; return orig(r); }; 1`,
+    );
+    proxy.holeExisting();
+    // Nối lại qua kết nối mới xong rất nhanh (banner chỉ lóe vài chục ms), nên chờ TOKEN phòng đổi thay vì thăm dò banner
+    await tab.waitFor(
+      `window.__scene?.room?.reconnectionToken && window.__scene.room.reconnectionToken !== ${JSON.stringify(token4)}`,
+      "nhịp tim phát hiện chết và nối lại qua kết nối mới (token phòng đổi)",
+      25000,
+    );
+    await tab.waitFor(
+      `(() => { const b = document.getElementById('reconnect-banner'); return !b || b.hidden; })()`,
+      "banner nối lại ẩn sau khi nối lại",
+      5000,
+    );
+    if (String(await tab.ev(`window.__scene?.room?.sessionId ?? ''`)) !== sid4) {
+      throw new Error("Ca 4: sessionId đổi sau khi nối lại");
+    }
+    const hb4 = (await tab.ev(`window.__heartbeat`)) !== undefined;
+    out(`  ✓ Đã nối lại qua kết nối mới, cùng sessionId; nhịp tim phòng mới có mặt: ${hb4}`);
+
+    // Socket CŨ (còn treo từ lúc blackhole) đóng MUỘN: trình duyệt bắn sự kiện đóng (1006) của phòng CŨ ngay sau khi đã nối lại xong
+    // (đo: ~200ms sau). Bản đầu chạy lại vòng nối lại: đóng phòng MỚI vừa nối, nối lại LẦN HAI (R1 -> R2 -> R3), dừng nhịp tim mới.
+    proxy.destroyHoled(); // phòng khi sự kiện đóng chưa tới thì ép tới
+    await sleep(4000);
+    const attached = Number(await tab.ev(`window.__attachCount`));
+    const live4 = await tab.ev(
+      `!!window.__scene?.room?.connection?.isOpen && document.getElementById('reconnect-banner')?.hidden !== false && !window.__heartbeat?.stopped`,
+    );
+    if (attached !== 1 || !live4) {
+      throw new Error(
+        `Ca 4: socket cũ đóng muộn gây nối lại thừa (số lần nối lại=${attached}, cần 1; phòng mới sống và có nhịp tim=${live4})`,
+      );
+    }
+    out(
+      "  ✓ Chỉ nối lại ĐÚNG MỘT lần; sự kiện đóng muộn của phòng cũ bị bỏ qua, nhịp tim phòng mới còn chạy",
+    );
+
     if (tab.errors.length) {
       throw new Error(`Có lỗi console trong quá trình test: ${tab.errors.join("; ")}`);
     }
-    out("  ✓ 0 lỗi console / exception trong toàn bộ 3 ca");
+    out("  ✓ 0 lỗi console / exception trong toàn bộ 4 ca");
 
-    out("\n=== TẤT CẢ 3 CA E2E NHỊP TIM ĐỀU ĐẠT CHUẨN XUẤT SẮC! ===");
+    out("\n=== TẤT CẢ 4 CA E2E NHỊP TIM ĐỀU ĐẠT ===");
   } catch (err: any) {
     failed = err?.message || String(err);
     out(`\n[LỖI E2E NHỊP TIM] ${failed}`);
