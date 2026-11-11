@@ -2219,10 +2219,12 @@ describe("luân hồi: chết thật, Hoàng Tuyền, đầu thai (M3 bước 2)
     expect(a.souls).toHaveLength(2); // vào phòng + một lần mua
 
     // đầu thai: lựa chọn không hợp lệ bị từ chối (chưa mở Ký vật nên không giữ được đồ)
+    // Đợi ĐÚNG toast "không hợp lệ", không phải "toast cuối cùng": loạt soulBuy rác ở trên gửi 8 tin
+    // nhưng test chỉ đợi 2 toast, nên toast "Mục này không có." đến muộn (máy CI chậm) từng bị bắt
+    // nhầm làm phản hồi của rebirth (main đỏ 11/11).
     const t1 = a.toasts.length;
     a.room.send("rebirth", { keep: ["hac_ho_kiem"] });
-    await waitFor(() => a.toasts.length > t1);
-    expect(a.toasts.at(-1)!.text).toMatch(/không hợp lệ/);
+    await waitFor(() => a.toasts.slice(t1).some((t) => /không hợp lệ/.test(t.text)));
     expect(a.reborns).toHaveLength(0);
     // hợp lệ: gửi hai tin cùng lúc, chỉ một lần đầu thai
     a.room.send("rebirth", { keep: [] });
