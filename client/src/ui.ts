@@ -2125,6 +2125,11 @@ function renderSectModal() {
   }
 }
 
+export interface ShowClientOutdatedOptions {
+  message?: string;
+  buttonLabel?: string;
+}
+
 export const ui = {
   show() {
     $("ui").hidden = false;
@@ -4223,15 +4228,19 @@ export const ui = {
     return currentSect;
   },
 
-  showClientOutdated(minVersion: number, onReload?: () => void) {
+  showClientOutdated(minVersion: number, onReload?: () => void, opts?: ShowClientOutdatedOptions) {
     const modal = $("outdated-modal");
     if (!modal) return;
     const msg = $("outdated-msg");
     if (msg) {
-      msg.textContent =
-        minVersion > 0
-          ? `Máy chủ đã nâng cấp phiên bản giao thức mới (yêu cầu tối thiểu v${minVersion}). Vui lòng tải lại trang để nạp bản cập nhật mới nhất.`
-          : "Máy chủ đã nâng cấp phiên bản giao thức mới. Vui lòng tải lại trang để tiếp tục phiêu bạt Tiên Giới.";
+      if (opts?.message) {
+        msg.textContent = opts.message;
+      } else {
+        msg.textContent =
+          minVersion > 0
+            ? `Máy chủ đã nâng cấp phiên bản giao thức mới (yêu cầu tối thiểu v${minVersion}). Vui lòng tải lại trang để nạp bản cập nhật mới nhất.`
+            : "Máy chủ đã nâng cấp phiên bản giao thức mới. Vui lòng tải lại trang để tiếp tục phiêu bạt Tiên Giới.";
+      }
     }
     modal.hidden = false;
 
@@ -4241,6 +4250,7 @@ export const ui = {
 
     const btn = $("btn-reload-outdated");
     if (btn) {
+      btn.textContent = opts?.buttonLabel ?? "Tải Lại Trang";
       btn.onclick = () => {
         if (onReload) onReload();
         else window.location.reload();
