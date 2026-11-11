@@ -1,8 +1,21 @@
-# Phân công M4 (các việc "M4-sớm" đã làm; phần còn lại là ĐỀ XUẤT của Dev A, chờ người dùng chốt)
+# Phân công M4: KẾ HOẠCH ĐÃ CHỐT (người dùng chốt 11/11/2026)
 
-> Dựa trên `GDD.md` (M4: chống gian lận, deploy, build app Android / iOS) và trạng thái thực tế sau M3 (bước 1-6 xong: tổng kết ở `docs/PHAN_CONG_M3.md`). Các việc "M4-sớm" (không phụ thuộc các câu hỏi ở mục 6) đã được giao và làm: #251 (B, PWA + hiệu năng di động), #252 (C, red team), #253 (A, fuzz kinh tế), #257 (B + A, `PROTOCOL_VERSION` và rà tài sản), #263 (A, audit log), #269 (B, trợ năng; **xong**), #276 (C, cấu hình + khôi phục). Các việc còn lại (release, Capacitor, giám sát, thử tải dài) chưa có issue và cần người dùng trả lời các câu hỏi ở mục 6. Bảng trạng thái ngay dưới đây.
+> Quyết định gốc: `~/TT/orchestra/QUYET_DINH_M3.md` mục 6-7. Dựa trên `GDD.md` (M4: chống gian lận, deploy, build app) và trạng thái sau M3. Việc "M4-sớm" đã làm: #251, #252, #253, #257, #263, #269, #276, #279-#297 (xem bảng). Các việc còn lại đã có issue (bảng mục 5).
 
-## 0. Trạng thái (cập nhật 11/11/2026, `main` `a28de68` trở đi)
+## Quyết định đã chốt
+| Câu hỏi | Quyết định |
+|---|---|
+| Máy chủ chạy thật | **Tại máy nhà `nguyencong` (chính máy dev)**, nghe `127.0.0.1:2567`; tên miền **`https://tiengioi.hethongtm.site`** qua **Cloudflare Tunnel** (`cloudflared-tiengioi.service`, do người dùng quản; agent KHÔNG đụng). Không Caddy, không mở cổng router. `TRUST_PROXY=1` |
+| Kho ảnh Docker | **`ghcr.io/nguyencong1227/tien-gioi`** (gói riêng tư; mục 3.1) |
+| Dữ liệu | **PostgreSQL** (`STORE=pg`), kèm sao lưu định kỳ và thử khôi phục |
+| Tách biệt với dev | Thư mục `~/TT/tien-gioi-prod/`, cổng **2567 chỉ của bản chạy thật**, dữ liệu riêng; dev / test / bot KHÔNG đụng (hàng rào ở mục 3.6) |
+| App | **Android trước** (Capacitor), iOS để sau; `applicationId` **`site.hethongtm.tiengioi`** |
+| Phạt gian lận bản đầu | **Chỉ ghi nhận (audit log) và cảnh báo**; KHÔNG tự khoá tài khoản |
+| Câu nhỏ từ M3 | Giữ nguyên: phí lập tông môn 1000 Linh thạch; gục trong bí cảnh về Lạc Hà đầy khí huyết |
+
+Việc người dùng phải tự làm (cần `sudo` / tài khoản): `~/TT/orchestra/questions.md`, mục "M4: bước người dùng phải tự làm".
+
+## 0. Trạng thái (cập nhật 11/11/2026, `main` `8c4babf` trở đi)
 | Mục | Trạng thái | Bằng chứng / việc còn lại |
 |---|---|---|
 | 2.1 red team tin nhắn | **Xong** | `npm run red-team -w server` (#265): 49 loại tin (từ M4.2b có thêm `ping`) x nhiều biến thể payload x 2 người gửi (nghèo / giàu) = 2744 đòn, bắt `[lỗi]`, bất biến SỐNG, tự phát hiện loại tin; A đã thử 3 đột biến thật vào `WorldRoom.ts`, đều đỏ |
@@ -10,12 +23,13 @@
 | 2.3 kiểm tốc độ / dịch chuyển | **Kết luận: đủ bằng cấu trúc** | không làm cờ riêng (xem mục 2.3) |
 | 2.4 audit log | **Xong lát 1 + 2** (#266, #268) | còn (khi cần): đầu thai, PK, thưởng bí cảnh lớn (issue #263 còn mở) |
 | 2.5 `PROTOCOL_VERSION` | **Xong** | shared #258, server #261, client #264, sửa modal #270, E2E #267 + #272 |
-| 3.1 release workflow | Chưa | chờ người dùng (kho ảnh Docker) |
+| 3.1 release workflow → ghcr | **Đang giao** (C) | issue #298 |
 | 3.2 cấu hình / bí mật; 3.4 sao lưu + khôi phục | **Xong** (#279, issue #276) | `npm run check:env`, `npm run khoi-phuc-thu`, `docs/TRIEN_KHAI.md` mục 7.3 / 7.4 |
 | 3.3 giám sát (`/metrics`, cảnh báo log, xoay vòng log) | **Xong** (PR của nhánh `a/health-mo-rong`) | `server/src/metrics.ts`: `GET /metrics` (Bearer `METRICS_TOKEN`, mặc định tắt) với tick p50 / p95 / max theo phòng, hàng đợi ghi nhân vật, phòng / người, RSS, độ trễ vòng lặp; `[CẢNH BÁO]` / `[ĐÃ ỔN]` trong log; `docker-compose.yml` xoay vòng log; `/health` giữ nguyên; `docs/TRIEN_KHAI.md` mục 5.1 |
-| 3.5 thử tải dài | **Đang làm** (C) | issue #282 (`npm run soak`) |
+| 3.5 thử tải dài | **Xong** (#291) | `npm run soak -w server`; số liệu thật 100 bot / 30 phút (RSS +0,37 MB, tick p95 thật 2,5 ms, 0 lỗi) ở `docs/LOAD_TEST.md` mục 20; lộ và sửa `BUFFER_SIZE` 512 KB (#297) |
+| 3.6 bản chạy thật (MỚI) | **Đang giao** (C), chờ Docker (người dùng) | issue #299 |
 | 4.1 PWA | **Xong** (#251) | `npm run check:pwa` |
-| 4.2 Capacitor Android | **Có thiết kế** (#283, issue #280) | `docs/THIET_KE_APP_ANDROID.md`; chờ người dùng chốt hướng (Capacitor hay TWA, kênh phát hành, tên miền / `applicationId`) rồi A tạo issue M4.2a-e. **M4.2a-1 (HTTP tuyệt đối + CORS) đã xong:** client #284 / #287, server `CORS_ORIGINS` (mặc định tắt) |
+| 4.2 Capacitor Android | **Đang giao** (B, C) | M4.2a #300, M4.2b #301 (B), M4.2c #302 (C), M4.2d máy thật (người dùng + B + C, tạo sau khi có APK). Đã xong: thiết kế #283, M4.2a-1 (HTTP tuyệt đối + CORS) #284 / #287 / #290, E2E nối lại #292, nhịp tim ứng dụng #293 (hợp đồng #294, server #295, client B đang làm) |
 | 4.3 hiệu năng di động + trợ năng | **Xong** | đo + tài liệu (#251, `docs/HIEU_NANG_DI_DONG.md`); trợ năng (#269): lát 1 #274 (Esc theo tầng, focus, ARIA), lát 2 #277 (giảm chuyển động theo OS / cài đặt, tương phản AA, bảng chỉ dẫn người mới); A đo giảm chuyển động THẬT bằng giả lập `prefers-reduced-motion` |
 | 4.4 tài sản / giấy phép | **Xong** (#259) | `npm run check:credits` |
 
@@ -39,33 +53,35 @@ Mục tiêu: không ai có lợi thế bằng cách sửa client hoặc gửi ti
 5. **Kiểm thử đối xử với client lỗi thời** (B + A): `PROTOCOL_VERSION` trong `shared/` gửi lúc vào phòng, server từ chối client quá cũ bằng thông báo thân thiện (không treo).
 
 ## 3. Deploy
-1. **Phát hành tự động** (C): workflow `release.yml` khi gắn thẻ phiên bản: build + test + đẩy ảnh Docker (kho ảnh do người dùng chọn), kèm `CHANGELOG` sinh từ tiêu đề PR.
+1. **Phát hành tự động** (C, #298): workflow `release.yml` khi gắn thẻ phiên bản `vX.Y.Z`: cổng chất lượng, rồi đẩy ảnh lên **`ghcr.io/nguyencong1227/tien-gioi`** (thẻ `X.Y.Z`, `X.Y`, `latest`, `sha-…`), kèm ghi chú phát hành sinh từ tiêu đề PR. Chỉ chạy khi có thẻ (hạn mức phút Actions từng cạn). Người đẩy thẻ đầu tiên là A.
 2. **Cấu hình và bí mật** (C + A): danh sách biến môi trường chính thức (`docs/TRIEN_KHAI.md`), kiểm khi khởi động (`startupWarnings`), mẫu `.env.production.example`; không bao giờ commit bí mật. **Xong (#276):** bảng 15 biến chính thức trong `docs/TRIEN_KHAI.md`, script/test `check:env` quét `server/src` chống hồi quy / phát hiện biến chưa khai báo (đột biến đỏ), file `.env.production.example` chuẩn cho Docker Compose.
 3. **Giám sát** (A + C): `/health` mở rộng (số phòng, người chơi, tick p95, kích thước hàng đợi ghi), có thể `/metrics` dạng văn bản đơn giản; cảnh báo khi tick > ngưỡng hoặc hàng đợi ghi đầy; xoay vòng log.
 4. **Sao lưu và khôi phục có kiểm chứng** (C): lịch `backup`, thử khôi phục định kỳ trong CI (đã có `backup.test.ts`), tài liệu "khi sập" cho cả `STORE=file` và `STORE=pg` (kể cả di chuyển tệp -> PostgreSQL bằng `chuyen-du-lieu`). **Xong (#276):** `npm run khoi-phuc-thu` (`server/scripts/verify-restore.ts`), test tích hợp trong `backup.test.ts` (0 lỗi `kiem-save`, SHA-256 100% khớp, 2 đột biến thiếu `souls/` hoặc `sects/` đều đỏ), tài liệu mục 7.3 & 7.4 `docs/TRIEN_KHAI.md` (chuẩn hoá lệnh giải nén cụ thể + `pg_dump`/`pg_restore`).
-5. **Thử tải dài** (C): 100+ người 1-2 giờ (bot), đo rò rỉ bộ nhớ (`VmRSS`), tick p95, byte/tick; hồi quy so với mốc `bench-baseline.json`.
+5. **Thử tải dài** (C, **xong #291**): 100 bot / 30 phút, `/metrics` thật, kiem-save sau soak.
+6. **Bản chạy thật tại máy này** (MỚI; C, #299; A: hàng rào cổng #303): gói `deploy/` (compose riêng `127.0.0.1:2567`, `prod.sh`, sao lưu `pg_dump` hằng ngày + thử khôi phục hằng tuần, `docs/VAN_HANH.md`), thư mục `~/TT/tien-gioi-prod/` tách khỏi dev, bí mật sinh ngẫu nhiên (`600`, không vào git / log). Máy **chưa có Docker / PostgreSQL / JDK** và agent không dùng `sudo`: phần chạy thật chờ người dùng cài Docker (`questions.md`) và ảnh `v0.1.0`. Ổ đĩa còn ~16 GB (92% đầy): tính cỡ sao lưu. Cloudflare Tunnel: xem `docs/TRIEN_KHAI.md` mục 4.1.
 
 ## 4. App Android / iOS (Capacitor)
 1. **PWA hoàn chỉnh** (B): kiểm Lighthouse (cài được, ngoại tuyến cho vỏ ứng dụng, biểu tượng đủ cỡ, `theme_color`), cập nhật `sw.js` an toàn (không giữ bản client cũ).
-2. **Dự án Capacitor** (B): thư mục `app/` (cấu hình, nền tảng Android trước), build từ `client/dist`; kết nối tới server qua HTTPS + WSS (địa chỉ cấu hình được); xử lý vòng đời ứng dụng (nền / tiền cảnh = rớt mạng và nối lại), thanh trạng thái, tai thỏ, phím quay lại.
+2. **Dự án Capacitor** (B, **M4.2a #300 và M4.2b #301**; C: **M4.2c #302** dựng APK trên Actions vì máy này không có JDK / Android SDK): thư mục `app/` (gói riêng, ngoài `workspaces`), `applicationId` `site.hethongtm.tiengioi`, build từ `client/dist` với cờ `VITE_NATIVE` (không service worker), kết nối `wss://tiengioi.hethongtm.site`; vòng đời nền / tiền cảnh dùng nhịp tim ứng dụng (#293), phím Back, vùng an toàn, trang quyền riêng tư. Kênh phát hành bản đầu: **APK cài trực tiếp** (Releases); Google Play để sau (cần tài khoản + trang quyền riêng tư + Data safety).
 3. **Hiệu năng di động** (B): đo FPS / bộ nhớ trên máy tầm trung; giảm hiệu ứng khi yếu; âm thanh theo luật tự phát của trình duyệt / WebView.
 4. **Tài sản và giấy phép** (B + A): rà `CREDITS.md` (chỉ CC0 / CC-BY, không dùng chữ / hình / âm của game khác), ảnh cửa hàng ứng dụng do người dùng cung cấp (ngoài phạm vi tự động).
-5. **iOS**: cần máy macOS và tài khoản nhà phát triển: người dùng quyết định (xem câu hỏi).
+5. **iOS**: để sau (cần macOS + tài khoản nhà phát triển trả phí).
 
-## 5. Đề xuất chia việc (A tạo issue sau khi người dùng chốt)
-| Nhóm | Việc | Ai |
-|---|---|---|
-| Chống gian lận | 2.1 red team tin nhắn (công cụ) / sửa lỗi tìm ra | C / A |
-| Chống gian lận | 2.2 property test bất biến kinh tế; 2.3 cờ tốc độ; 2.4 audit log; 2.5 `PROTOCOL_VERSION` | A (2.5: A + B) |
-| Deploy | 3.1 release workflow; 3.2 cấu hình / bí mật; 3.4 sao lưu + khôi phục; 3.5 thử tải dài | C |
-| Deploy | 3.3 giám sát (`/health` mở rộng, `/metrics`) | A + C |
-| App | 4.1 PWA hoàn chỉnh; 4.2 Capacitor Android; 4.3 hiệu năng di động; 4.4 giấy phép | B (4.4: B + A) |
+## 5. Chia việc (đã tạo issue)
+| Nhóm | Việc | Ai | Issue |
+|---|---|---|---|
+| Chống gian lận | 2.1 red team; 2.2 fuzz kinh tế; 2.3 (đủ bằng cấu trúc); 2.4 audit log; 2.5 `PROTOCOL_VERSION` | C / A | xong (còn #263: ghi nhận thêm đầu thai, PK, thưởng bí cảnh lớn khi cần) |
+| Deploy | 3.1 release → ghcr | C | #298 |
+| Deploy | 3.2 cấu hình / bí mật; 3.3 giám sát; 3.4 sao lưu + khôi phục; 3.5 thử tải dài | C / A | xong (#279, #286, #291) |
+| Deploy | 3.6 bản chạy thật + gói `deploy/` + `VAN_HANH.md` | C | #299 |
+| Deploy | hàng rào cổng 2567 + ghi nhận Cloudflare Tunnel | A | #303 |
+| App | nhịp tim ứng dụng (cả PWA) | A (shared + server, xong) / B (client + E2E) | #293 |
+| App | M4.2a dự án Capacitor | B | #300 |
+| App | M4.2b Back, xuống nền native, 426, quyền riêng tư | B | #301 |
+| App | M4.2c dựng APK trên Actions | C | #302 |
+| App | M4.2d thử máy Android thật | người dùng + B + C | tạo sau khi có APK |
 
-Thứ tự gợi ý: 2.1 và 2.2 trước (rẻ, tìm lỗi thật), 2.4 và 3.3 (cần cho vận hành), rồi 3.x, 4.x song song.
+Thứ tự: B: #293 → #300 → #301. C: #298 → #299 (phần tĩnh) → #302 (sau #300) → #299 phần chạy thật (sau khi có Docker + ảnh). A: merge #295, #303, review, đẩy thẻ `v0.1.0` sau khi #298 vào, #263.
 
-## 6. Câu hỏi cho người dùng (không chặn M3, cần trả lời trước khi bắt đầu M4)
-1. **Máy chủ chạy thật ở đâu** (VPS tự quản, nhà cung cấp đám mây, máy tại nhà) và **kho ảnh Docker** nào (GitHub Container Registry?), tên miền? Quyết định này định hình `release.yml`, HTTPS và giám sát.
-2. **PostgreSQL thật** hay giữ `STORE=file` cho bản đầu? (Đã sẵn cả hai; PostgreSQL cần dịch vụ và sao lưu riêng.)
-3. **Android trước, iOS sau?** iOS cần macOS + tài khoản nhà phát triển trả phí (ngoài khả năng tự động hoá ban đêm).
-4. **Mức phạt khi phát hiện gian lận** ở bản đầu: chỉ ghi nhận / cảnh báo (đề xuất), hay ngắt kết nối / khoá tài khoản?
-5. Các câu còn mở từ M3 (không chặn): phí lập tông môn 1000 Linh thạch; người gục trong bí cảnh đến Lạc Hà đầy khí huyết (không lưu khí huyết trong hồ sơ).
+## 6. Quyết định của người dùng (đã trả lời 11/11/2026)
+Xem bảng "Quyết định đã chốt" ở đầu tài liệu. Các bước cần tay người dùng (cài Docker, đăng nhập `ghcr.io`, keystore Android...) nằm ở `~/TT/orchestra/questions.md`.

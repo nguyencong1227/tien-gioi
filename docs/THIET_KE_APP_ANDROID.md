@@ -3,7 +3,7 @@
 > **Tài liệu tham chiếu thiết kế kiến trúc đóng gói Android cho Tiên Giới.**  
 > Biên soạn: Dev B (Client & Trải nghiệm).  
 > Liên quan: Milestone M4 (Mục 4.2), Issue #280.  
-> Trạng thái: **Bản thiết kế đề xuất (chỉ tài liệu)** chờ Người Dùng chốt hướng đi trước khi tạo issue mã nguồn.  
+> Trạng thái: **ĐÃ CHỐT (11/11/2026)**: Capacitor, Android trước, `applicationId` `site.hethongtm.tiengioi`, server `https://tiengioi.hethongtm.site` (mục 9). Việc: M4.2a #300, M4.2b #301 (B), M4.2c #302 (C), M4.2d máy thật (sau khi có APK).  
 > Rà soát: Dev A đối chiếu từng tham chiếu (hàm, biến, đường dẫn) với mã trên `main` ngày 11/11/2026; chỗ nào lệch đã sửa tại chỗ, thêm mục 5.2 (lời gọi HTTP và CORS) và số đo ở 6.1.
 
 ---
@@ -199,7 +199,9 @@ Ngoài mã: để lên Google Play còn cần trang chính sách quyền riêng 
 
 ---
 
-## 9. Các câu hỏi quyết định cần Người Dùng chốt
+## 9. Quyết định của Người Dùng (đã trả lời 11/11/2026; câu hỏi gốc giữ lại để tra cứu)
+
+> **Đã chốt:** (1) **Phương án A, Capacitor**; (2) kênh phát hành bản đầu **APK cài trực tiếp** từ Releases (Google Play để sau; người dùng chưa chọn kênh nên đây là mặc định của A, đổi được); (3) **Android trước, iOS sau**; (4) tên miền `tiengioi.hethongtm.site`, `applicationId` `site.hethongtm.tiengioi` (thay các giá trị minh hoạ `game.tiengioi.vn` / `vn.tiengioi.game` ở các mục trên). `CORS_ORIGINS` của bản chạy thật phải gồm nguồn của WebView (chốt theo `androidScheme` ở M4.2a, dự kiến `https://localhost`).
 
 1. **Phương án đóng gói:**
    - [ ] **Phương án A (Capacitor), khuyến nghị:** Đóng gói toàn bộ bundle offline, khởi động tức thì, hỗ trợ phím Back native, thử được trên LAN bằng bản debug. Cái giá: mỗi lần nâng `MIN_PROTOCOL_VERSION` bắt buộc người chơi cập nhật qua Store (xem mục 2); cần thêm CORS ở server (mục 5.2).
