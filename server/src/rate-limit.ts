@@ -18,6 +18,8 @@ export const MESSAGE_LIMITS: Record<string, Limit> = {
   attack: { perSec: 10, burst: 10 },
   skill: { perSec: 10, burst: 10 },
   chat: { perSec: 2, burst: 5 },
+  // Nhịp tim: client gửi 1 lần / 5 giây (+ 1 lần lúc quay lại tiền cảnh); chặn chặt vì mỗi ping tốn một tin trả lời
+  ping: { perSec: 1, burst: 3 },
 };
 /** Loại tin nhắn không có trong MESSAGE_LIMITS (nhặt đồ, dùng đan, nói chuyện, nhận nhiệm vụ...) */
 export const DEFAULT_LIMIT: Limit = { perSec: 8, burst: 16 };
