@@ -21,7 +21,9 @@
     "e2e:tro-nang": "tsx scripts/e2e-tro-nang.ts",
     "tai-khoan": "tsx scripts/tai-khoan.ts",
     "chuyen-du-lieu": "tsx scripts/chuyen-du-lieu.ts",
-    "red-team": "tsx scripts/red-team.ts"
+    "red-team": "tsx scripts/red-team.ts",
+    "check:env": "tsx scripts/check-env.ts",
+    "khoi-phuc-thu": "tsx scripts/verify-restore.ts"
   },
   "dependencies": {
     "@colyseus/schema": "3.0.76",

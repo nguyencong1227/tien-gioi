@@ -162,3 +162,80 @@ describe("performBackup (tích hợp với thư mục tạm)", () => {
     }
   });
 });
+
+describe("khôi phục có kiểm chứng (M4 3.4 - Issue #276)", () => {
+  it("khôi phục thành công bằng lệnh tar mục 7.3, kiem-save đạt 0 lỗi, SHA-256 khớp 100%", async () => {
+    const { runRestoreVerification } = await import("./verify-restore");
+    const res = await runRestoreVerification();
+    expect(res.fileCount).toBeGreaterThanOrEqual(5);
+    expect(res.hashMatch).toBe(true);
+    expect(res.totalErrors).toBe(0);
+    expect(res.auditReport.cleanFiles).toBe(1);
+    expect(res.auditReport.cleanSouls).toBe(1);
+    expect(res.auditReport.cleanSects).toBe(1);
+    expect(res.auditReport.cleanAccounts).toBe(1);
+    expect(res.auditReport.cleanSessions).toBe(1);
+  });
+
+  describe("kiểm chứng đột biến khôi phục (Mutation Testing)", () => {
+    it("đỏ khi bản sao lưu bị thiếu thư mục souls/", async () => {
+      const { createSampleGameData, hashDirectoryTree } = await import("./verify-restore");
+      const tmpRoot = mkdtempSync(path.join(os.tmpdir(), "tien-gioi-restore-mut-souls-"));
+      try {
+        const dataDir = path.join(tmpRoot, "players");
+        const backupDir = path.join(tmpRoot, "backups");
+        await createSampleGameData(dataDir);
+        const originalHashes = hashDirectoryTree(dataDir);
+
+        // ĐỘT BIẾN: Xoá thư mục souls/ trước khi sao lưu
+        rmSync(path.join(dataDir, "souls"), { recursive: true, force: true });
+
+        const backupRes = performBackup({ dataDir, backupDir, keep: 2 });
+        rmSync(dataDir, { recursive: true, force: true });
+
+        // Khôi phục bằng lệnh tar
+        execFileSync("tar", ["-xzf", backupRes.archivePath, "-C", tmpRoot], { stdio: "pipe" });
+
+        const restoredHashes = hashDirectoryTree(dataDir);
+        // Kiểm tra phát hiện thiếu file souls
+        expect(restoredHashes.size).toBeLessThan(originalHashes.size);
+        const missingSoul = [...originalHashes.keys()].some(
+          (k) => k.startsWith("souls/") && !restoredHashes.has(k),
+        );
+        expect(missingSoul).toBe(true);
+      } finally {
+        rmSync(tmpRoot, { recursive: true, force: true });
+      }
+    });
+
+    it("đỏ khi bản sao lưu bị thiếu thư mục sects/", async () => {
+      const { createSampleGameData, hashDirectoryTree } = await import("./verify-restore");
+      const tmpRoot = mkdtempSync(path.join(os.tmpdir(), "tien-gioi-restore-mut-sects-"));
+      try {
+        const dataDir = path.join(tmpRoot, "players");
+        const backupDir = path.join(tmpRoot, "backups");
+        await createSampleGameData(dataDir);
+        const originalHashes = hashDirectoryTree(dataDir);
+
+        // ĐỘT BIẾN: Xoá thư mục sects/ trước khi sao lưu
+        rmSync(path.join(dataDir, "sects"), { recursive: true, force: true });
+
+        const backupRes = performBackup({ dataDir, backupDir, keep: 2 });
+        rmSync(dataDir, { recursive: true, force: true });
+
+        // Khôi phục bằng lệnh tar
+        execFileSync("tar", ["-xzf", backupRes.archivePath, "-C", tmpRoot], { stdio: "pipe" });
+
+        const restoredHashes = hashDirectoryTree(dataDir);
+        // Kiểm tra phát hiện thiếu file sects
+        expect(restoredHashes.size).toBeLessThan(originalHashes.size);
+        const missingSect = [...originalHashes.keys()].some(
+          (k) => k.startsWith("sects/") && !restoredHashes.has(k),
+        );
+        expect(missingSect).toBe(true);
+      } finally {
+        rmSync(tmpRoot, { recursive: true, force: true });
+      }
+    });
+  });
+});

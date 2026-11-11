@@ -40,9 +40,9 @@ Mục tiêu: không ai có lợi thế bằng cách sửa client hoặc gửi ti
 
 ## 3. Deploy
 1. **Phát hành tự động** (C): workflow `release.yml` khi gắn thẻ phiên bản: build + test + đẩy ảnh Docker (kho ảnh do người dùng chọn), kèm `CHANGELOG` sinh từ tiêu đề PR.
-2. **Cấu hình và bí mật** (C + A): danh sách biến môi trường chính thức (`docs/TRIEN_KHAI.md` đã có một phần), kiểm khi khởi động (`startupWarnings`), mẫu `.env.production.example`; không bao giờ commit bí mật.
+2. **Cấu hình và bí mật** (C + A): danh sách biến môi trường chính thức (`docs/TRIEN_KHAI.md`), kiểm khi khởi động (`startupWarnings`), mẫu `.env.production.example`; không bao giờ commit bí mật. **Xong (#276):** bảng 15 biến chính thức trong `docs/TRIEN_KHAI.md`, script/test `check:env` quét `server/src` chống hồi quy / phát hiện biến chưa khai báo (đột biến đỏ), file `.env.production.example` chuẩn cho Docker Compose.
 3. **Giám sát** (A + C): `/health` mở rộng (số phòng, người chơi, tick p95, kích thước hàng đợi ghi), có thể `/metrics` dạng văn bản đơn giản; cảnh báo khi tick > ngưỡng hoặc hàng đợi ghi đầy; xoay vòng log.
-4. **Sao lưu và khôi phục có kiểm chứng** (C): lịch `backup`, thử khôi phục định kỳ trong CI (đã có `backup.test.ts`), tài liệu "khi sập" cho cả `STORE=file` và `STORE=pg` (kể cả di chuyển tệp -> PostgreSQL bằng `chuyen-du-lieu`).
+4. **Sao lưu và khôi phục có kiểm chứng** (C): lịch `backup`, thử khôi phục định kỳ trong CI (đã có `backup.test.ts`), tài liệu "khi sập" cho cả `STORE=file` và `STORE=pg` (kể cả di chuyển tệp -> PostgreSQL bằng `chuyen-du-lieu`). **Xong (#276):** `npm run khoi-phuc-thu` (`server/scripts/verify-restore.ts`), test tích hợp trong `backup.test.ts` (0 lỗi `kiem-save`, SHA-256 100% khớp, 2 đột biến thiếu `souls/` hoặc `sects/` đều đỏ), tài liệu mục 7.3 & 7.4 `docs/TRIEN_KHAI.md` (chuẩn hoá lệnh giải nén cụ thể + `pg_dump`/`pg_restore`).
 5. **Thử tải dài** (C): 100+ người 1-2 giờ (bot), đo rò rỉ bộ nhớ (`VmRSS`), tick p95, byte/tick; hồi quy so với mốc `bench-baseline.json`.
 
 ## 4. App Android / iOS (Capacitor)
