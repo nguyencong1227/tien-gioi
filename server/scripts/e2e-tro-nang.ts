@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
-import { Tab, sleep } from "./e2e-kit";
+import { Tab, shown, sleep } from "./e2e-kit";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
@@ -60,9 +60,6 @@ async function press(tab: Tab, k: Key, shift = false) {
   await sleep(120); // cho Phaser / DOM xử lý xong
 }
 
-/** Biểu thức JS: phần tử `#id` thấy thật (kể cả khi phần tử cha ẩn). */
-const shown = (id: string) =>
-  `(() => { const e = document.getElementById(${JSON.stringify(id)}); if (!e || e.hidden || !e.checkVisibility({ checkVisibilityCSS: true })) return false; const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; })()`;
 const active = `(() => { const a = document.activeElement; return a ? (a.id || a.tagName.toLowerCase()) : ''; })()`;
 
 async function main() {

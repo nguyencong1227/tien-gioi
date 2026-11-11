@@ -1,6 +1,25 @@
-# Phân công M4 (BẢN ĐỀ XUẤT của Dev A, chờ người dùng chốt, chưa bắt đầu làm)
+# Phân công M4 (các việc "M4-sớm" đã làm; phần còn lại là ĐỀ XUẤT của Dev A, chờ người dùng chốt)
 
-> Dựa trên `GDD.md` (M4: chống gian lận, deploy, build app Android / iOS) và trạng thái thực tế sau M3 (bước 1-6 xong, #231 đã đóng: tổng kết ở `docs/PHAN_CONG_M3.md`). **Chỉ có ba issue "M4-sớm" (việc không phụ thuộc các câu hỏi ở mục 6): #251 (B, PWA + đo hiệu năng di động), #252 (C, red team tin nhắn), #253 (A, property test kinh tế)**; các việc còn lại chưa có issue. Các câu hỏi cần người dùng ở cuối file. Khi người dùng chốt hướng đi, A tạo issue theo bảng ở mục 5.
+> Dựa trên `GDD.md` (M4: chống gian lận, deploy, build app Android / iOS) và trạng thái thực tế sau M3 (bước 1-6 xong: tổng kết ở `docs/PHAN_CONG_M3.md`). Các việc "M4-sớm" (không phụ thuộc các câu hỏi ở mục 6) đã được giao và làm: #251 (B, PWA + hiệu năng di động), #252 (C, red team), #253 (A, fuzz kinh tế), #257 (B + A, `PROTOCOL_VERSION` và rà tài sản), #263 (A, audit log), #269 (B, trợ năng), #276 (C, cấu hình + khôi phục). Các việc còn lại (release, Capacitor, giám sát, thử tải dài) chưa có issue và cần người dùng trả lời các câu hỏi ở mục 6. Bảng trạng thái ngay dưới đây.
+
+## 0. Trạng thái (cập nhật 11/11/2026, `main` `a28de68` trở đi)
+| Mục | Trạng thái | Bằng chứng / việc còn lại |
+|---|---|---|
+| 2.1 red team tin nhắn | **Xong** | `npm run red-team -w server` (#265): 48 loại tin x nhiều biến thể payload x 2 người gửi (nghèo / giàu) = 2688 đòn, bắt `[lỗi]`, bất biến SỐNG, tự phát hiện loại tin; A đã thử 3 đột biến thật vào `WorldRoom.ts`, đều đỏ |
+| 2.2 fuzz bất biến kinh tế | **Xong** | `economy-fuzz` (gđ 1), `kill-share-fuzz`, `sect-life-fuzz` (#271: tìm và sửa lỗi MẤT Linh thạch khi rút kho ở Hoàng Tuyền), `sect-crash` |
+| 2.3 kiểm tốc độ / dịch chuyển | **Kết luận: đủ bằng cấu trúc** | không làm cờ riêng (xem mục 2.3) |
+| 2.4 audit log | **Xong lát 1 + 2** (#266, #268) | còn (khi cần): đầu thai, PK, thưởng bí cảnh lớn (issue #263 còn mở) |
+| 2.5 `PROTOCOL_VERSION` | **Xong** | shared #258, server #261, client #264, sửa modal #270, E2E #267 + #272 |
+| 3.1 release workflow | Chưa | chờ người dùng (kho ảnh Docker) |
+| 3.2 cấu hình / bí mật; 3.4 sao lưu + khôi phục | **Đang làm** (C) | issue #276 |
+| 3.3 giám sát (`/health` mở rộng, `/metrics`) | Chưa | A + C |
+| 3.5 thử tải dài | Chưa | C |
+| 4.1 PWA | **Xong** (#251) | `npm run check:pwa` |
+| 4.2 Capacitor Android | Chưa | chờ người dùng (Android trước?) |
+| 4.3 hiệu năng di động | **Một phần** | đo + tài liệu (#251, `docs/HIEU_NANG_DI_DONG.md`); trợ năng / giảm chuyển động: #269 (lát 1 #274 xong, lát 2 B đang làm) |
+| 4.4 tài sản / giấy phép | **Xong** (#259) | `npm run check:credits` |
+
+**Công cụ kiểm thử thật đã có (chạy cục bộ và trong CI):** E2E hai tab Chrome thật `e2e:tai-khoan`, `e2e:bi-canh`, `e2e:bi-canh-nga`, `e2e:pk`, `e2e:tong-mon`, `e2e:phien-ban`, `e2e:tro-nang` (phím thật qua CDP); quy ước kiểm "hiện ra" bằng `shown(id)` ở `server/scripts/e2e-kit.ts` (`docs/LOAD_TEST.md` cuối mục 13); `red-team`; bench / thử tải (`docs/LOAD_TEST.md`). Bài học đã thấm: lỗi nằm ở chỗ giao hai thành phần (Phaser + DOM, client + server, hidden của phần tử cha) thường không bị test thuần bắt, cần E2E thật + đột biến.
 
 ## 1. Đã có (không làm lại)
 - **Server quyết định mọi kết quả**: sát thương, rơi đồ, tu vi, nhiệm vụ, ví, kho tông môn; client chỉ gửi ý định (`AGENTS.md` "Quy tắc bắt buộc").
