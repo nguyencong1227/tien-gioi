@@ -36,6 +36,7 @@ interface Key {
 const K = {
   esc: { key: "Escape", code: "Escape", vk: 27 },
   space: { key: " ", code: "Space", vk: 32, text: " " },
+  enter: { key: "Enter", code: "Enter", vk: 13, text: "\r" },
   tab: { key: "Tab", code: "Tab", vk: 9 },
   i: { key: "i", code: "KeyI", vk: 73, text: "i" },
   c: { key: "c", code: "KeyC", vk: 67, text: "c" },
@@ -383,6 +384,52 @@ async function main() {
       !(await ev(shown("party-invite-box"))),
       "party-invite-box vẫn mở",
     );
+
+    // 7. Kích hoạt nút HUD bằng bàn phím (bindTap, #280): nút thật `<button>` và phần tử không phải nút
+    const closeAll = async () => {
+      for (
+        let n = 0;
+        n < 4 && ((await ev(shown("inv-modal"))) || (await ev(shown("map-modal"))));
+        n++
+      )
+        await press(t, K.esc);
+      await ev(
+        `document.activeElement && document.activeElement.blur && document.activeElement.blur(); 1`,
+      );
+    };
+    await closeAll();
+    await ev(`document.getElementById('btn-bag').focus(); 1`);
+    await press(t, K.enter);
+    check(
+      "Enter trên nút btn-bag (<button>): túi mở đúng một lần",
+      !!(await ev(shown("inv-modal"))),
+      "inv-modal không mở",
+    );
+    check(
+      "Enter trên nút HUD: focus nằm TRONG bảng vừa mở, không bị Phaser kéo về ô chat",
+      !!(await ev(`document.getElementById('inv-modal').contains(document.activeElement)`)),
+      `activeElement=${await ev(active)}`,
+    );
+    await closeAll();
+    await ev(`document.getElementById('btn-bag').focus(); 1`);
+    await press(t, K.space);
+    check(
+      "Space trên nút btn-bag (<button>): túi mở đúng một lần",
+      !!(await ev(shown("inv-modal"))),
+      "inv-modal không mở",
+    );
+    await closeAll();
+    // phím lặp (giữ phím): sự kiện giả có repeat bắn thẳng vào phần tử (focus chuyển vào bảng sẽ làm nhiễu phím thật)
+    await ev(
+      `(() => { const el = document.getElementById('minimap-wrap'); const mk = (rep) => new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', repeat: rep, bubbles: true, cancelable: true }); el.dispatchEvent(mk(false)); for (let i = 0; i < 3; i++) el.dispatchEvent(mk(true)); return 1; })()`,
+    );
+    await sleep(200);
+    check(
+      "Giữ Enter (1 + 3 lặp) trên #minimap-wrap (không phải <button>): bản đồ mở đúng một lần",
+      !!(await ev(shown("map-modal"))),
+      "map-modal đóng vì bị bật / tắt nhiều lần",
+    );
+    await closeAll();
 
     check("0 lỗi console / exception", t.errors.length === 0, t.errors.slice(0, 3).join(" | "));
   } catch (e) {

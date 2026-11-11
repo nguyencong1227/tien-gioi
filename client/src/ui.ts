@@ -2204,14 +2204,16 @@ export const ui = {
         fn();
       });
       el.addEventListener("keydown", (e) => {
-        if (e.repeat) return;
-        const tag = el.tagName.toLowerCase();
-        // Nút hoặc liên kết nguyên bản đã có hành vi mặc định của trình duyệt kích hoạt click khi Enter/Space
-        if (tag === "button" || tag === "a") return;
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          fn();
-        }
+        if (e.key !== "Enter" && e.key !== " ") return;
+        // PHẢI luôn preventDefault (kể cả <button> / <a> và phím lặp): Phaser bỏ qua phím đã bị chặn nên Enter không kéo focus về ô chat
+        // sau khi bảng vừa mở (focusModal); đồng thời chặn click mặc định của Enter để không gọi `fn` hai lần.
+        e.preventDefault();
+        if (e.repeat) return; // giữ phím không kích hoạt liên tục
+        fn();
+      });
+      // Firefox vẫn bắn click khi nhả Space dù keydown đã bị chặn: chặn ở keyup để không gọi `fn` lần hai
+      el.addEventListener("keyup", (e) => {
+        if (e.key === " ") e.preventDefault();
       });
     };
 
