@@ -441,3 +441,83 @@ npm run tai-khoan -w server -- logout-all <tên đăng nhập>
 - `reset-password` in mật khẩu tạm (20 ký tự ngẫu nhiên) và mã khôi phục mới **đúng một lần**, xoá mọi phiên cũ; gửi cho người chơi qua kênh an toàn và nhắc họ lưu mã khôi phục (họ vào được bằng mật khẩu tạm, hoặc đặt mật khẩu của riêng mình qua "Quên mật khẩu" với mã mới).
 - Mã thoát: `0` xong; `1` sai cách dùng hoặc không có tài khoản; `2` server đang chạy.
 - Dùng cùng thư mục dữ liệu với server: `DATA_DIR` (và `ACCOUNTS_DIR` / `SESSIONS_DIR` nếu đã đặt riêng); trên máy dev tự đọc `.env.local`. Công cụ dùng cùng `STORE` / `DATABASE_URL` với server (qua `createStores`): với `STORE=pg` mọi thay đổi đi qua DB nên **không cần tắt server** (công cụ không hỏi `/health`).
+
+---
+
+## 10. Quy trình phát hành phiên bản (Release Workflow, M4 3.1)
+
+Hệ thống phát hành tự động qua GitHub Actions (`.github/workflows/release.yml`) đẩy ảnh Docker lên **GitHub Container Registry (GHCR)**: `ghcr.io/nguyencong1227/tien-gioi`.
+
+### 10.1. Quy tắc đánh số phiên bản (Semantic Versioning)
+Phiên bản tuân theo chuẩn `vMAJOR.MINOR.PATCH`:
+- **Bản phát hành đầu tiên:** `v0.1.0`.
+- **Sửa lỗi / Tối ưu nhỏ (tăng `PATCH`):** Khi sửa lỗi hiển thị, sửa logic nhiệm vụ, cân bằng quái vật hoặc tối ưu hiệu năng mà **không** làm thay đổi cấu trúc gói tin `shared/` (ví dụ: `v0.1.0` -> `v0.1.1`).
+- **Thay đổi giao thức / Hợp đồng `shared/` (tăng `MINOR`):** Bắt buộc phải tăng `MINOR` (ví dụ: `v0.1.0` -> `v0.2.0`), đồng thời tăng hằng số `PROTOCOL_VERSION` trong `shared/src/protocol.ts` (xem mục 2.5). Client quá cũ sẽ nhận lỗi 426 và hướng dẫn người chơi tải lại trang.
+- **Bản phát hành chính thức lớn (tăng `MAJOR`):** Khi hệ thống bước vào giai đoạn phát hành rộng rãi toàn diện (`v1.0.0`).
+
+### 10.2. Cách thức phát hành bản mới
+Quy trình phát hành chỉ được kích hoạt khi đẩy một thẻ git tag hợp lệ (`vX.Y.Z`).
+
+1. **Kiểm tra chất lượng trước khi gắn thẻ:**
+   ```bash
+   npm run typecheck
+   npm run lint
+   npx prettier --check .
+   npm test
+   npm run build
+   ```
+2. **Gắn thẻ phiên bản và đẩy lên GitHub:**
+   ```bash
+   # Gắn thẻ (người phụ trách Dev A thực hiện theo kế hoạch):
+   git tag -a v0.1.0 -m "Phát hành Tiên Giới v0.1.0"
+   git push origin v0.1.0
+   ```
+3. **Quy trình tự động của GitHub Actions (`release.yml`):**
+   - Tự động chạy toàn bộ cổng chất lượng (typecheck, lint, prettier, vitest, build client).
+   - Thiết lập Docker Buildx và biên dịch ảnh một nền tảng `linux/amd64` (tối ưu cho máy chủ production x86_64).
+   - Đăng nhập GHCR bằng `GITHUB_TOKEN` (chỉ cấp 2 quyền tối thiểu `contents: write` và `packages: write`, không dùng PAT).
+   - Gắn nhãn OCI tiêu chuẩn và các thẻ ảnh:
+     - `ghcr.io/nguyencong1227/tien-gioi:0.1.0`
+     - `ghcr.io/nguyencong1227/tien-gioi:0.1`
+     - `ghcr.io/nguyencong1227/tien-gioi:latest` (chỉ kích hoạt với bản chính thức, không có hậu tố `-rc`/`-beta`)
+     - `ghcr.io/nguyencong1227/tien-gioi:sha-<commit>`
+   - Tự động tạo bản phát hành `GitHub Release` kèm nhật ký thay đổi (`CHANGELOG`) sinh tự động từ tiêu đề PR.
+   - Hỗ trợ `workflow_dispatch` để quản trị viên phát hành lại thủ công khi một thẻ tag bị lỗi hạ tầng.
+
+### 10.3. Quyền riêng tư của ảnh Docker trên GHCR
+- **Mặc định riêng tư (Private):** Do mã nguồn máy chủ chứa logic trò chơi và TypeScript của server, package `ghcr.io/nguyencong1227/tien-gioi` được đặt ở chế độ **Private**, không công khai ra Internet.
+- **Đăng nhập trên máy chủ chạy thật:** Quản trị viên tạo một GitHub Personal Access Token (Classic) với phạm vi duy nhất là **`read:packages`** (token chỉ đọc, an toàn, không có quyền sửa code) và lưu vào biến môi trường máy chủ:
+  ```bash
+  echo "$GHCR_READ_TOKEN" | docker login ghcr.io -u <github-username> --password-stdin
+  ```
+
+### 10.4. Kéo ảnh và Triển khai trên máy chủ thật
+1. **Kéo ảnh phiên bản mới:**
+   ```bash
+   docker pull ghcr.io/nguyencong1227/tien-gioi:v0.1.0
+   ```
+2. **Chạy qua Docker Compose:**
+   Cập nhật trường `image` trong `docker-compose.yml`:
+   ```yaml
+   services:
+     game:
+       image: ghcr.io/nguyencong1227/tien-gioi:v0.1.0
+   ```
+   Khởi động lại container dịch vụ:
+   ```bash
+   docker compose up -d
+   ```
+
+### 10.5. Quy trình quay lại bản trước (Rollback khi gặp sự cố)
+Nếu bản phát hành mới phát sinh lỗi nghiêm trọng sau khi đưa lên production:
+1. Xác định phiên bản ổn định gần nhất (ví dụ: `v0.1.0`).
+2. Sửa lại thẻ ảnh trong cấu hình `docker-compose.yml`:
+   ```yaml
+   image: ghcr.io/nguyencong1227/tien-gioi:v0.1.0
+   ```
+3. Ra lệnh Docker Compose nạp lại phiên bản cũ:
+   ```bash
+   docker compose up -d
+   ```
+   Hệ thống sẽ thay thế container ngay lập tức trong vài giây mà không làm gián đoạn cơ sở dữ liệu PostgreSQL gắn ngoài.
+
