@@ -674,3 +674,38 @@ Chạy 48 loại tin nhắn × 2 senders (Poor + Rich) × 26 biến thể payloa
 - **Tông môn:** `sectCreate` (52/52 OK), `sectInvite` (52/52 OK), `sectAccept` (52/52 OK), `sectDecline` (52/52 OK), `sectLeave` (52/52 OK), `sectKick` (52/52 OK), `sectRank` (52/52 OK), `sectTransfer` (52/52 OK), `sectDisband` (52/52 OK), `sectMotd` (52/52 OK), `sectDeposit` (52/52 OK), `sectWithdraw` (52/52 OK).
 - **Luân hồi:** `soulBuy` (52/52 OK), `rebirth` (52/52 OK).
 - **Tin lạ không đăng ký:** `__unknown_unregistered_msg__` (52/52 OK, handler `*` từ chối an toàn).
+
+## 19. E2E thật nối lại sau rớt mạng bất thường bằng proxy TCP (M4-sớm, `npm run e2e:noi-lai -w server`)
+Chrome headless + server Colyseus thật trong tiến trình (thư mục dữ liệu tạm), kết hợp một proxy TCP trung gian (`node:net`) đặt giữa tab Chrome và server (#116 / #117 / #288).
+
+### 19.1. Bối cảnh kỹ thuật
+- **Vấn đề trên trình duyệt headless:** Chrome CDP `Network.emulateNetworkConditions` (offline) chỉ làm nghẽn lưu lượng truyền dữ liệu nhưng **không ngắt** kết nối TCP/WebSocket đang mở (cả client lẫn server đều không thấy sự kiện `close`). Đồng thời, phương thức `WebSocket.close(code)` trong trình duyệt chỉ chấp nhận các mã `1000` hoặc `3000–4999` (vốn được game xử lý là thoát chủ động nên không kích hoạt vòng lặp nối lại). Trình duyệt không thể tự sinh mã rớt mạng bất thường `1006`.
+- **Giải pháp Proxy TCP:** Khởi chạy một TCP Server nhỏ trung gian bằng `node:net` làm cầu nối giữa Chrome và server Colyseus. Khi cần mô phỏng rớt mạng bất thường, proxy gọi `clientSocket.destroy()` để gửi gói TCP RST/FIN trực tiếp tới Chrome, buộc trình duyệt nhận mã đóng `1006` và kích hoạt luồng tự động nối lại (`setupRoomLifecycle` trong `client/src/main.ts`).
+
+### 19.2. Ba Ca Kiểm Thử Bắt Buộc
+1. **Ca 1: Rớt mạng rồi tự nối lại thành công:**
+   - Proxy huỷ toàn bộ socket đang mở (mã 1006).
+   - Banner `Mất kết nối, đang nối lại...` hiển thị thật (`shown("reconnect-banner")` từ `e2e-kit.ts`).
+   - Proxy tiếp tục nhận kết nối mới; client tự động thử lại bằng `client.reconnect(token)` và thành công.
+   - Banner tắt, toast "Đã nối lại." xuất hiện, giữ nguyên đúng `sessionId`, vị trí nhân vật, túi đồ và Linh thạch được bảo toàn trọn vẹn, 0 lỗi console, điều khiển di chuyển phản hồi bình thường sau khi nối lại.
+2. **Ca 2: Rớt quá hạn grace (hết thời gian chờ nối lại):**
+   - Tạm thời hạ `WorldRoom.reconnectGraceS = 2` (ngắn hơn mức 20s chuẩn để bài test chạy nhanh).
+   - Proxy ngắt kết nối và khóa trong 2.5s để server hết thời gian chờ grace và huỷ token.
+   - Proxy mở lại để client nhận phản hồi dứt khoát `reconnection token invalid or expired` từ server -> vòng lặp reconnect dừng sớm.
+   - Hiển thị màn hình `showDisconnected` (banner cố định mang class `.failed` và nút "Tải lại trang" hiển thị thật).
+   - Kiểm tra hồ sơ nhân vật trên đĩa: máy chủ đã lưu trữ an toàn trạng thái nhân vật, không còn nhân vật ma (ghost) trong phòng.
+3. **Ca 3: Thoát chủ động không nối lại:**
+   - Đóng kết nối bằng mã thoát chủ động `4000`.
+   - Client hiển thị màn hình ngắt kết nối dứt khoát; tuyệt đối **KHÔNG** kích hoạt vòng lặp reconnect và **KHÔNG** hiển thị banner đếm ngược nối lại.
+
+### 19.3. Cách Chạy & Ngưỡng Đo
+- Lệnh chạy: `npm run build && npm run e2e:noi-lai -w server` (yêu cầu Google Chrome).
+- Ngưỡng thời gian: Toàn bộ 3 ca kiểm thử hoàn tất trong **~10–15 giây** (ngân sách < 3 phút).
+
+### 19.4. Kiểm Chứng Bằng 3 Đột Biến (Mutations)
+1. **Đột biến (a) - Bỏ `client.reconnect(token)` trong `main.ts`:**
+   - Ca 1 hết thời gian chờ 15s vì banner nối lại không bao giờ tắt -> **ĐỎ** (`Hết thời gian chờ (15000ms) ở A: banner nối lại ẩn đi sau khi nối lại thành công`).
+2. **Đột biến (b) - Server không giữ nhân vật (`reconnectGraceS = 0`):**
+   - Server từ chối ngay khi rớt, trả lỗi `reconnection token invalid or expired` -> Ca 1 **ĐỎ** (`Nội dung banner không đúng mong đợi: "Mất kết nối với Tiên Giới. Tải lại trang để vào lại."`).
+3. **Đột biến (c) - Coi mã 1006 là thoát chủ động (trong `main.ts`):**
+   - Client không bao giờ thử kết nối lại khi gặp lỗi 1006 -> Ca 1 **ĐỎ** (`Nội dung banner không đúng mong đợi: "Mất kết nối với Tiên Giới. Tải lại trang để vào lại."`).
