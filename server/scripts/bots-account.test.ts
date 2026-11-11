@@ -38,6 +38,7 @@ function createMemoryPlayerStore(): PlayerStore {
   return {
     load: async (name) => saves.get(name.normalize("NFC").toLowerCase().trim()) ?? null,
     save: async (p) => void saves.set(p.name.normalize("NFC").toLowerCase().trim(), p),
+    delete: async (name) => saves.delete(name.normalize("NFC").toLowerCase().trim()),
   };
 }
 

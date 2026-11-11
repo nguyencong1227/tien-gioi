@@ -89,7 +89,11 @@ const kdf: Kdf = {
   dummy: () => cheapDummy,
   needsRehash: (h) => needsRehash(h, CHEAP),
 };
-const noPlayers: PlayerStore = { load: async () => null, save: async () => {} };
+const noPlayers: PlayerStore = {
+  load: async () => null,
+  save: async () => {},
+  delete: async () => false,
+};
 
 const closers: Array<() => Promise<void>> = [];
 afterEach(async () => {

@@ -245,3 +245,49 @@ Nếu dung lượng còn dưới 2 GB:
    ```
 2. Dọn bớt các bản sao lưu cũ trong `~/TT/tien-gioi-prod/backups/`.
 3. Kiểm tra log Docker: `docker system df`.
+
+---
+
+## 8. Xoá Dữ liệu Người chơi theo Yêu cầu (Privacy / GDPR)
+
+Trang chính sách quyền riêng tư (`client/public/privacy.html`, #314) cam kết hỗ trợ xoá tài khoản và toàn bộ dữ liệu nhân vật theo yêu cầu của người chơi (yêu cầu bắt buộc trước khi đưa ứng dụng lên Google Play Store).
+
+> [!CAUTION]
+> **THAO TÁC KHÔNG THỂ HOÀN TÁC.**
+> Trợ lý AI **tuyệt đối KHÔNG tự ý chạy công cụ này trên bản chạy thật** khi không có yêu cầu cụ thể từ người dùng. Thao tác này chỉ do Dev A hoặc Người dùng trực tiếp thực hiện.
+
+### 8.1. Quy trình chuẩn bị trước khi xoá
+1. **Sao lưu cơ sở dữ liệu ngay trước khi thao tác:**
+   ```bash
+   ~/TT/tien-gioi-prod/prod.sh backup
+   ```
+2. **Lưu ý về các bản sao lưu cũ:**
+   Các bản sao lưu nén tự động lưu trữ tại `~/TT/tien-gioi-prod/backups/` được lưu giữ tối đa 14 bản (tối đa 14 ngày). Dữ liệu tài khoản đã xoá vẫn sẽ tồn tại trong các file sao lưu lịch sử này cho đến khi các bản sao lưu bị xoay vòng và dọn dẹp hoàn toàn sau 14 ngày.
+
+### 8.2. Chạy thử trước (Dry-Run)
+Luôn chạy thử trước để kiểm tra danh sách bản ghi và các ràng buộc an toàn (Tông chủ, trực tuyến, kho Linh thạch):
+```bash
+sg docker -c "docker exec tien-gioi npm run tai-khoan -w server -- xoa <tên-đăng-nhập> --thu"
+```
+Kết quả in ra chi tiết tài khoản, ID chân linh, hồ sơ nhân vật, phiên đăng nhập, và tông môn (sẽ giải tán hoặc gỡ khỏi danh sách) mà **không thay đổi bất kỳ dữ liệu nào** trên máy chủ.
+
+### 8.3. Thực hiện xoá thật (`--yes`)
+Khi đã xác nhận đầy đủ thông tin:
+```bash
+sg docker -c "docker exec tien-gioi npm run tai-khoan -w server -- xoa <tên-đăng-nhập> --yes"
+```
+Lệnh sẽ nguyên tử:
+- Thu hồi và xoá toàn bộ phiên (`sessions`).
+- Gỡ thành viên khỏi tông môn (hoặc giải tán tông môn nếu là Tông chủ một mình và kho 0 Linh thạch).
+- Xoá hồ sơ nhân vật (`characters`).
+- Xoá chân linh (`souls`).
+- Xoá tài khoản (`accounts`), giải phóng tên đăng nhập để người khác có thể đăng ký lại.
+- Tự động ghi MỘT sự kiện kiểm toán `account.deleted` vào log container (gồm `id`, `userDigest`, `character`, `sessions`).
+
+### 8.4. Các trường hợp bị từ chối an toàn
+Công cụ sẽ từ chối thao tác (mã thoát `1`) trong các trường hợp:
+- **Tài khoản đang trực tuyến:** Không xoá khi người chơi đang ở trong phòng game. Báo rõ để người chơi thoát game trước.
+- **Tông chủ còn thành viên khác:** Phải chuyển giao chức Tông chủ cho người khác hoặc giải tán tông môn trước khi xoá tài khoản.
+- **Tông môn còn Linh thạch trong kho:** Nếu Tông chủ một mình nhưng kho còn > 0 Linh thạch, phải rút hết Linh thạch ra để tránh mất quỹ mồ côi.
+- **Tên đăng nhập không tồn tại.**
+

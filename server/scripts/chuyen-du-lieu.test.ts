@@ -250,7 +250,11 @@ describe("chuyển thật", () => {
       throw new Error("lỗi kết nối postgres://nguoi:bi-mat-xyz@may-chu/db");
     };
     const dead = {
-      players: { load: async () => null, save: async () => boom() } as PlayerStore,
+      players: {
+        load: async () => null,
+        save: async () => boom(),
+        delete: async () => boom(),
+      } as PlayerStore,
       souls: {
         get: async () => null,
         create: async () => boom(),

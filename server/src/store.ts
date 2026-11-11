@@ -180,7 +180,7 @@ export async function loadPlayer(name: string): Promise<SavedPlayer | null> {
 }
 
 /** Hàng đợi ghi theo từng file: các lần lưu cùng một nhân vật chạy lần lượt, đúng thứ tự gọi. */
-const writing = new Map<string, Promise<void>>();
+const writing = new Map<string, Promise<unknown>>();
 
 /**
  * Lưu nhân vật (ghi tệp tạm rồi `rename`). Các lần lưu cùng một nhân vật được xếp hàng: lưu định kỳ, lưu lúc rớt mạng
@@ -194,6 +194,28 @@ export function savePlayer(p: SavedPlayer): Promise<void> {
     const tmp = `${file}.tmp`;
     await fs.writeFile(tmp, JSON.stringify({ ...p, updatedAt: new Date().toISOString() }, null, 1));
     await fs.rename(tmp, file);
+  };
+  const prev = writing.get(file) ?? Promise.resolve();
+  const next = prev.then(run, run);
+  writing.set(file, next);
+  const done = () => {
+    if (writing.get(file) === next) writing.delete(file);
+  };
+  next.then(done, done);
+  return next;
+}
+
+/** Xoá nhân vật theo tên. Xếp hàng cùng tệp như savePlayer. */
+export function deletePlayer(name: string): Promise<boolean> {
+  const file = fileFor(name);
+  const run = async () => {
+    try {
+      await fs.unlink(file);
+      return true;
+    } catch (e: any) {
+      if (e?.code === "ENOENT") return false;
+      throw e;
+    }
   };
   const prev = writing.get(file) ?? Promise.resolve();
   const next = prev.then(run, run);
