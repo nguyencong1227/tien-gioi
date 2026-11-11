@@ -521,6 +521,8 @@ describe("client/src/auth - Chuyển đổi VITE_SERVER_URL sang HTTP Base URL (
     const testCases: Array<{ input: string | null | undefined; expected: string }> = [
       // wss -> https
       { input: "wss://h", expected: "https://h" },
+      { input: "wss://h/game", expected: "https://h/game" },
+      { input: "wss://h/game/", expected: "https://h/game" },
       { input: "wss://game.tiengioi.vn", expected: "https://game.tiengioi.vn" },
       { input: "wss://game.tiengioi.vn/", expected: "https://game.tiengioi.vn" },
       { input: "wss://game.tiengioi.vn:8443/", expected: "https://game.tiengioi.vn:8443" },
@@ -736,6 +738,17 @@ describe("client/src/ui - showClientOutdated với tuỳ chọn nội dung và n
 
     expect(msgEl.textContent).toContain("yêu cầu tối thiểu v4");
     expect(btnEl.textContent).toBe("Mở Cửa Hàng Ứng Dụng");
+  });
+
+  it("gọi lần đầu với opts tuỳ biến, lần sau không truyền opts: khôi phục đúng nhãn ban đầu", () => {
+    ui.showClientOutdated(1, undefined, {
+      buttonLabel: "Cập Nhật Ngay",
+    });
+    expect(btnEl.textContent).toBe("Cập Nhật Ngay");
+
+    // Lần gọi kế tiếp không có opts: phải khôi phục về nhãn gốc
+    ui.showClientOutdated(2);
+    expect(btnEl.textContent).toBe("Tải Lại Trang");
   });
 
   it("gọi onReload khi người dùng bấm nút", () => {

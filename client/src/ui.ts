@@ -2130,6 +2130,8 @@ export interface ShowClientOutdatedOptions {
   buttonLabel?: string;
 }
 
+let defaultOutdatedButtonLabel: string | null = null;
+
 export const ui = {
   show() {
     $("ui").hidden = false;
@@ -4250,7 +4252,10 @@ export const ui = {
 
     const btn = $("btn-reload-outdated");
     if (btn) {
-      btn.textContent = opts?.buttonLabel ?? "Tải Lại Trang";
+      if (defaultOutdatedButtonLabel === null) {
+        defaultOutdatedButtonLabel = btn.textContent || "Tải Lại Trang";
+      }
+      btn.textContent = opts?.buttonLabel ?? defaultOutdatedButtonLabel;
       btn.onclick = () => {
         if (onReload) onReload();
         else window.location.reload();
