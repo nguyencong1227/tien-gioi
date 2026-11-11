@@ -12,10 +12,10 @@
 | 2.5 `PROTOCOL_VERSION` | **Xong** | shared #258, server #261, client #264, sửa modal #270, E2E #267 + #272 |
 | 3.1 release workflow | Chưa | chờ người dùng (kho ảnh Docker) |
 | 3.2 cấu hình / bí mật; 3.4 sao lưu + khôi phục | **Xong** (#279, issue #276) | `npm run check:env`, `npm run khoi-phuc-thu`, `docs/TRIEN_KHAI.md` mục 7.3 / 7.4 |
-| 3.3 giám sát (`/health` mở rộng, `/metrics`) | Chưa | A + C |
+| 3.3 giám sát (`/metrics`, cảnh báo log, xoay vòng log) | **Xong** (PR của nhánh `a/health-mo-rong`) | `server/src/metrics.ts`: `GET /metrics` (Bearer `METRICS_TOKEN`, mặc định tắt) với tick p50 / p95 / max theo phòng, hàng đợi ghi nhân vật, phòng / người, RSS, độ trễ vòng lặp; `[CẢNH BÁO]` / `[ĐÃ ỔN]` trong log; `docker-compose.yml` xoay vòng log; `/health` giữ nguyên; `docs/TRIEN_KHAI.md` mục 5.1 |
 | 3.5 thử tải dài | **Đang làm** (C) | issue #282 (`npm run soak`) |
 | 4.1 PWA | **Xong** (#251) | `npm run check:pwa` |
-| 4.2 Capacitor Android | **Có thiết kế** (#283, issue #280) | `docs/THIET_KE_APP_ANDROID.md`; chờ người dùng chốt hướng (Capacitor hay TWA, kênh phát hành, tên miền / `applicationId`) rồi A tạo issue M4.2a-1 (CORS, bắt buộc trước) và M4.2a-e |
+| 4.2 Capacitor Android | **Có thiết kế** (#283, issue #280) | `docs/THIET_KE_APP_ANDROID.md`; chờ người dùng chốt hướng (Capacitor hay TWA, kênh phát hành, tên miền / `applicationId`) rồi A tạo issue M4.2a-e. **M4.2a-1 (HTTP tuyệt đối + CORS) đã xong:** client #284 / #287, server `CORS_ORIGINS` (mặc định tắt) |
 | 4.3 hiệu năng di động + trợ năng | **Xong** | đo + tài liệu (#251, `docs/HIEU_NANG_DI_DONG.md`); trợ năng (#269): lát 1 #274 (Esc theo tầng, focus, ARIA), lát 2 #277 (giảm chuyển động theo OS / cài đặt, tương phản AA, bảng chỉ dẫn người mới); A đo giảm chuyển động THẬT bằng giả lập `prefers-reduced-motion` |
 | 4.4 tài sản / giấy phép | **Xong** (#259) | `npm run check:credits` |
 

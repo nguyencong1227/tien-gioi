@@ -6,6 +6,7 @@ import type { World } from "./world";
 import { Parties } from "./systems/party";
 import { Runs } from "./systems/dungeon";
 import { SectBook } from "./systems/sect";
+import { WriteGauge } from "./metrics";
 
 /** Nơi nhận chat toàn server của một phòng (thường là `room.broadcast("chat", msg)`). */
 export type ChatSink = (msg: ChatOut) => void;
@@ -30,6 +31,8 @@ export class Hub {
   readonly runs = new Runs();
   /** Lời mời tông môn đang chờ, thành viên trực tuyến và bản ghi nhớ của cả tiến trình (systems/sect.ts). */
   readonly sects = new SectBook();
+  /** Hàng đợi ghi hồ sơ nhân vật của cả tiến trình (đo ở `WorldRoom.persist`, đọc ở `/metrics`: M4 3.3). */
+  readonly writes = new WriteGauge();
 
   /** Tìm người chơi theo khoá đạo hiệu (viết thường) ở mọi phòng; không có thì `null`. */
   locate(key: string): Located | null {

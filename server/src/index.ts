@@ -11,7 +11,9 @@ import { startupWarnings } from "./startup";
 import { startAudit } from "./audit";
 import { minProtocolOf } from "./protocol";
 import { mountAuth } from "./auth-http";
+import { mountCors } from "./cors";
 import { createStores } from "./stores";
+import { Monitor, mountMetrics, thresholdsOf } from "./metrics";
 
 // Đọc .env.local ở gốc repo (cổng riêng cho từng dev). Không có file thì dùng mặc định.
 const envFile = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../.env.local");
@@ -33,6 +35,10 @@ async function main() {
   console.log(`Lưu trữ: ${stores.kind === "pg" ? "PostgreSQL" : "tệp JSON"}`);
 
   const app = express();
+  // CORS theo danh sách cho phép (CORS_ORIGINS, mặc định TẮT) cho /health và /api/*: gắn TRƯỚC mountAuth (app đóng gói khác nguồn)
+  const cors = mountCors(app, process.env);
+  if (cors.enabled)
+    console.log(`CORS: cho phép ${cors.origins.length} nguồn (${cors.origins.join(", ")})`);
   // /health (kèm authMode) và, khi AUTH_MODE=account, API tài khoản /api/auth/*: gắn TRƯỚC trang tĩnh bên dưới
   const { auth } = mountAuth(app, {
     env: process.env,
@@ -42,6 +48,16 @@ async function main() {
     souls: stores.souls,
   });
   WorldRoom.auth = auth; // vào phòng bằng token phiên (null: chế độ cũ, tên + mã bí mật)
+  // Giám sát (M4 3.3): canh ngưỡng tick / hàng đợi ghi trong log; `/metrics` chỉ bật khi đặt METRICS_TOKEN (trước trang tĩnh)
+  const monitor = new Monitor(WorldRoom.hub, {
+    store: stores.kind,
+    thresholds: thresholdsOf(process.env).value,
+  });
+  const { enabled: metricsOn } = mountMetrics(app, { env: process.env, monitor });
+  monitor.start();
+  console.log(
+    `Giám sát: /metrics ${metricsOn ? "bật (METRICS_TOKEN)" : "tắt (đặt METRICS_TOKEN để bật)"}`,
+  );
   // Dọn phiên hết hạn mỗi giờ (unref: không giữ tiến trình sống)
   if (auth) setInterval(() => void auth.sweep().catch(() => {}), 3_600_000).unref();
 
@@ -56,7 +72,10 @@ async function main() {
   const gameServer = new Server({ transport: new WebSocketTransport({ server }) });
   defineRooms(gameServer);
   // Tắt máy an toàn: Colyseus đóng phòng (lưu nhân vật) rồi mới đóng kết nối DB
-  gameServer.onShutdown(() => stores.close());
+  gameServer.onShutdown(() => {
+    monitor.stop();
+    return stores.close();
+  });
   await gameServer.listen(PORT);
   console.log(`Tiên Giới server: http://localhost:${PORT}`);
 }
