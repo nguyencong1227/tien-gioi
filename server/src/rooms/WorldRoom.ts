@@ -1,5 +1,6 @@
 // Phòng thế giới: vào / ra phòng, lưu nhân vật, nối tin nhắn với các system.
 // Logic game nằm trong ../systems/*, trạng thái dùng chung trong ../world.ts.
+import { performance } from "node:perf_hooks";
 import { StateView } from "@colyseus/schema";
 import { randomBytes } from "node:crypto";
 import { Room, Client, ServerError, matchMaker, type RoomException, type Server } from "colyseus";
@@ -312,6 +313,7 @@ export class WorldRoom extends Room<WorldState> {
     // không có `runId` hợp lệ nên bị từ chối tại đây.
     const run = isDungeonMap(this.mapId) ? this.claimRun(options?.runId) : null;
     this.world = this.createWorld(map);
+    this.world.roomId = this.roomId;
     this.removeChatSink = this.hub.addChatSink((msg) => this.broadcast("chat", msg));
     this.setPatchRate(TICK_MS);
     this.setSimulationInterval((dt) => this.update(dt), TICK_MS);
@@ -977,7 +979,15 @@ export class WorldRoom extends Room<WorldState> {
         (inRun ? (dungeonOfMap(this.mapId)?.entryMapId ?? DEFAULT_MAP_ID) : this.mapId),
       ...(at ? { travelAt: this.world.now } : {}),
     };
-    await this.players.save(c.save);
+    // Đo hàng đợi ghi (M4 3.3): lần ghi chưa xong tính là đang chờ, lỗi tính vào `failed`
+    const done = this.hub.writes.begin();
+    try {
+      await this.players.save(c.save);
+      done(true);
+    } catch (e) {
+      done(false);
+      throw e;
+    }
   }
 
   private async saveAll() {
@@ -993,7 +1003,9 @@ export class WorldRoom extends Room<WorldState> {
 
   private update(dtMs: number) {
     this.world.now = Date.now();
+    const t0 = performance.now();
     tickWorld(this.world, dtMs);
+    this.world.tickStats.record(performance.now() - t0); // chưa gồm mã hoá patch của Colyseus (xem docs/TRIEN_KHAI.md mục 5)
   }
 }
 

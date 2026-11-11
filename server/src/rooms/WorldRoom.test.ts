@@ -623,6 +623,69 @@ describe("lưu nhân vật", () => {
   });
 });
 
+describe("giám sát vận hành (M4 3.3)", () => {
+  it("phòng thật ghi thời gian tick, gắn roomId và xuất hiện trong ảnh chụp số đo", async () => {
+    const { room } = await join("Giam Sat");
+    const sr = serverRoom(room) as any;
+    expect(sr.world.roomId).toBe(room.roomId);
+    await waitFor(() => sr.world.tickStats.summary().total >= 5);
+    const { collectMetrics } = await import("../metrics");
+    const snap = collectMetrics(WorldRoomClass.hub, {
+      now: Date.now(),
+      uptimeS: 1,
+      store: "file",
+      rssBytes: 1,
+      heapUsedBytes: 1,
+      loopLagP99Ms: 0,
+    });
+    const mine = snap.rooms.find((r) => r.room === room.roomId)!;
+    expect(mine).toBeTruthy();
+    expect(mine.map).toBe(DEFAULT_MAP_ID);
+    expect(mine.players).toBe(1);
+    expect(mine.tick.total).toBeGreaterThanOrEqual(5);
+    expect(mine.tick.p95).toBeGreaterThan(0);
+    expect(mine.tick.p95).toBeLessThan(50); // một tick của phòng gần như trống không thể dài hơn một nhịp
+  });
+
+  it("mỗi lần lưu hồ sơ đi qua hàng đợi ghi: đếm đủ, không còn lần nào treo, không có lần lỗi", async () => {
+    const hub = WorldRoomClass.hub;
+    const before = hub.writes.summary();
+    const { room } = await join("Hang Doi Ghi");
+    await room.leave(true); // lưu khi rời phòng
+    rooms.length = 0;
+    await waitFor(() => hub.writes.summary().started > before.started);
+    await waitFor(() => hub.writes.summary().inflight === 0);
+    const after = hub.writes.summary();
+    expect(after.started).toBeGreaterThan(before.started);
+    expect(after.failed).toBe(before.failed);
+  });
+
+  it("kho lưu trữ ném lỗi lúc lưu: lần ghi tính vào failed và hàng đợi không bị kẹt", async () => {
+    const hub = WorldRoomClass.hub;
+    const real = WorldRoomClass.players;
+    const { room } = await join("Kho Loi"); // vào bằng kho thật (tạo hồ sơ), rồi mới làm hỏng kho
+    let calls = 0;
+    WorldRoomClass.players = {
+      load: async () => null,
+      save: async () => {
+        calls++;
+        throw new Error("đĩa đầy (giả)");
+      },
+    };
+    try {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      const before = hub.writes.summary();
+      await room.leave(true);
+      rooms.length = 0;
+      await waitFor(() => calls > 0);
+      await waitFor(() => hub.writes.summary().inflight === 0);
+      expect(hub.writes.summary().failed).toBeGreaterThan(before.failed);
+    } finally {
+      WorldRoomClass.players = real;
+    }
+  });
+});
+
 describe("túi đồ và đồ rơi", () => {
   it("vào game nhận túi trống 24 ô; /give chỉ gửi túi cho chủ túi", async () => {
     const a = await join();
