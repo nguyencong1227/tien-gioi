@@ -473,6 +473,7 @@ Quy trình phát hành chỉ được kích hoạt khi đẩy một thẻ git ta
    git push origin v0.1.0
    ```
 3. **Quy trình tự động của GitHub Actions (`release.yml`):**
+   - Kiểm thẻ đúng dạng `vX.Y.Z[-hậu-tố]`, checkout ĐÚNG thẻ, và **chỉ phát hành mã đã nằm trên `main`** (thẻ gắn vào commit của nhánh chưa merge bị chặn).
    - Tự động chạy toàn bộ cổng chất lượng (typecheck, lint, prettier, vitest, build client).
    - Thiết lập Docker Buildx và biên dịch ảnh một nền tảng `linux/amd64` (tối ưu cho máy chủ production x86_64).
    - Đăng nhập GHCR bằng `GITHUB_TOKEN` (chỉ cấp 2 quyền tối thiểu `contents: write` và `packages: write`, không dùng PAT).
@@ -482,7 +483,8 @@ Quy trình phát hành chỉ được kích hoạt khi đẩy một thẻ git ta
      - `ghcr.io/nguyencong1227/tien-gioi:latest` (chỉ kích hoạt với bản chính thức, không có hậu tố `-rc`/`-beta`)
      - `ghcr.io/nguyencong1227/tien-gioi:sha-<commit>`
    - Tự động tạo bản phát hành `GitHub Release` kèm nhật ký thay đổi (`CHANGELOG`) sinh tự động từ tiêu đề PR.
-   - Hỗ trợ `workflow_dispatch` để quản trị viên phát hành lại thủ công khi một thẻ tag bị lỗi hạ tầng.
+   - Hỗ trợ `workflow_dispatch` (nhập `tag`, vd `v0.1.0`) để phát hành lại thủ công khi một thẻ bị lỗi hạ tầng: workflow checkout đúng thẻ đó (không phải nhánh đang chọn), đẩy lại ảnh, giữ nguyên bản phát hành nếu đã có.
+   - **Thẻ ảnh KHÔNG có chữ `v`** (quy ước của Docker): thẻ git `v0.1.0` cho ảnh `...:0.1.0`.
 
 ### 10.3. Quyền riêng tư của ảnh Docker trên GHCR
 - **Mặc định riêng tư (Private):** Do mã nguồn máy chủ chứa logic trò chơi và TypeScript của server, package `ghcr.io/nguyencong1227/tien-gioi` được đặt ở chế độ **Private**, không công khai ra Internet.
@@ -494,14 +496,14 @@ Quy trình phát hành chỉ được kích hoạt khi đẩy một thẻ git ta
 ### 10.4. Kéo ảnh và Triển khai trên máy chủ thật
 1. **Kéo ảnh phiên bản mới:**
    ```bash
-   docker pull ghcr.io/nguyencong1227/tien-gioi:v0.1.0
+   docker pull ghcr.io/nguyencong1227/tien-gioi:0.1.0
    ```
 2. **Chạy qua Docker Compose:**
-   Cập nhật trường `image` trong `docker-compose.yml`:
+   Bản chạy thật dùng `deploy/docker-compose.prod.yml` (issue #299) với biến `TIEN_GIOI_TAG=0.1.0`. Cách thủ công: cập nhật trường `image`:
    ```yaml
    services:
      game:
-       image: ghcr.io/nguyencong1227/tien-gioi:v0.1.0
+       image: ghcr.io/nguyencong1227/tien-gioi:0.1.0
    ```
    Khởi động lại container dịch vụ:
    ```bash
@@ -511,9 +513,9 @@ Quy trình phát hành chỉ được kích hoạt khi đẩy một thẻ git ta
 ### 10.5. Quy trình quay lại bản trước (Rollback khi gặp sự cố)
 Nếu bản phát hành mới phát sinh lỗi nghiêm trọng sau khi đưa lên production:
 1. Xác định phiên bản ổn định gần nhất (ví dụ: `v0.1.0`).
-2. Sửa lại thẻ ảnh trong cấu hình `docker-compose.yml`:
+2. Sửa lại thẻ ảnh (`TIEN_GIOI_TAG` hoặc trường `image`):
    ```yaml
-   image: ghcr.io/nguyencong1227/tien-gioi:v0.1.0
+   image: ghcr.io/nguyencong1227/tien-gioi:0.1.0
    ```
 3. Ra lệnh Docker Compose nạp lại phiên bản cũ:
    ```bash

@@ -126,6 +126,47 @@ export function validateReleaseWorkflow(content: string): ReleaseValidationResul
     );
   }
 
+  // 7. Thẻ phiên bản (A bắt được lỗi này khi review #306): chạy tay thì `github.ref_name` là TÊN NHÁNH nên `github.ref_name || inputs.tag`
+  // không bao giờ dùng `inputs.tag`; phải kiểm đúng dạng vX.Y.Z, checkout ĐÚNG thẻ và chỉ phát hành mã đã nằm trên main.
+  const codeLines = content.split("\n").filter((l) => !l.trim().startsWith("#"));
+  const code = codeLines.join("\n");
+  if (/github\.ref_name\s*\|\|\s*inputs\.tag/.test(code)) {
+    errors.push(
+      "Sai thứ tự: `github.ref_name || inputs.tag` luôn ra tên nhánh khi chạy tay (phải `inputs.tag || github.ref_name`)",
+    );
+  }
+  if (!/ref:\s*refs\/tags\//.test(code)) {
+    errors.push(
+      "Bước checkout phải lấy đúng thẻ (`ref: refs/tags/...`), nếu không chạy tay sẽ phát hành nhánh khác",
+    );
+  }
+  if (!/\^v\[0-9\]\+/.test(code)) {
+    errors.push("Thiếu bước kiểm thẻ đúng dạng vX.Y.Z trước khi dùng");
+  }
+  if (!/merge-base --is-ancestor/.test(code) || !/origin\/main/.test(code)) {
+    errors.push("Thiếu bước kiểm commit của thẻ nằm trên main (chỉ phát hành mã đã merge)");
+  }
+  // 8. Chống chèn lệnh: không nội suy đầu vào / tên nhánh / tên thẻ trực tiếp vào lệnh shell (`run:`); phải đi qua `env:`
+  let runIndent = -1;
+  for (const line of codeLines) {
+    const indent = line.length - line.trimStart().length;
+    const runStart = /^\s*(?:-\s+)?run:\s*(.*)$/.exec(line);
+    if (runStart) {
+      runIndent = indent;
+      if (/\$\{\{\s*(inputs\.|github\.(ref_name|head_ref|event\.))/.test(runStart[1])) {
+        errors.push(`Nội suy trực tiếp vào lệnh shell (nguy cơ chèn lệnh): ${line.trim()}`);
+      }
+      continue;
+    }
+    if (runIndent >= 0 && line.trim() !== "" && indent > runIndent) {
+      if (/\$\{\{\s*(inputs\.|github\.(ref_name|head_ref|event\.))/.test(line)) {
+        errors.push(`Nội suy trực tiếp vào lệnh shell (nguy cơ chèn lệnh): ${line.trim()}`);
+      }
+    } else if (line.trim() !== "") {
+      runIndent = -1;
+    }
+  }
+
   return {
     valid: errors.length === 0,
     errors,
@@ -180,6 +221,59 @@ describe("Kiểm tra tĩnh Workflow Release (.github/workflows/release.yml) (#29
       const res = validateReleaseWorkflow(mutated);
       expect(res.valid).toBe(false);
       expect(res.errors.some((e) => e.includes("npm test"))).toBe(true);
+    });
+
+    // Các đột biến dưới đây do A thêm khi review #306 (bản đầu hỏng khi chạy tay và dễ bị chèn lệnh)
+    it("Đột biến 5: đảo thứ tự `github.ref_name || inputs.tag` (chạy tay ra tên nhánh) -> KHÔNG ĐẠT", () => {
+      const mutated = workflowContent.replace(
+        "group: release-${{ inputs.tag || github.ref_name }}",
+        "group: release-${{ github.ref_name || inputs.tag }}",
+      );
+      expect(mutated).not.toBe(workflowContent);
+      const res = validateReleaseWorkflow(mutated);
+      expect(res.valid).toBe(false);
+      expect(res.errors.some((e) => e.includes("Sai thứ tự"))).toBe(true);
+    });
+
+    it("Đột biến 6: checkout không lấy đúng thẻ -> KHÔNG ĐẠT", () => {
+      const mutated = workflowContent.replace(
+        /ref: refs\/tags\/\$\{\{ steps\.tag\.outputs\.tag \}\}\n\s*/,
+        "",
+      );
+      expect(mutated).not.toBe(workflowContent);
+      const res = validateReleaseWorkflow(mutated);
+      expect(res.valid).toBe(false);
+      expect(res.errors.some((e) => e.includes("refs/tags"))).toBe(true);
+    });
+
+    it("Đột biến 7: bỏ kiểm thẻ nằm trên main -> KHÔNG ĐẠT", () => {
+      const mutated = workflowContent.replace(
+        "merge-base --is-ancestor",
+        "merge-base --is-descendant",
+      );
+      expect(mutated).not.toBe(workflowContent);
+      const res = validateReleaseWorkflow(mutated);
+      expect(res.valid).toBe(false);
+      expect(res.errors.some((e) => e.includes("nằm trên main"))).toBe(true);
+    });
+
+    it("Đột biến 8: nội suy đầu vào thẳng vào lệnh shell (chèn lệnh) -> KHÔNG ĐẠT", () => {
+      const mutated = workflowContent.replace(
+        'if gh release view "$TAG_NAME"',
+        'if gh release view "${{ inputs.tag }}"',
+      );
+      expect(mutated).not.toBe(workflowContent);
+      const res = validateReleaseWorkflow(mutated);
+      expect(res.valid).toBe(false);
+      expect(res.errors.some((e) => e.includes("chèn lệnh"))).toBe(true);
+    });
+
+    it("Đột biến 9: bỏ kiểm thẻ đúng dạng vX.Y.Z -> KHÔNG ĐẠT", () => {
+      const mutated = workflowContent.replace("^v[0-9]+", "^[a-z0-9]+");
+      expect(mutated).not.toBe(workflowContent);
+      const res = validateReleaseWorkflow(mutated);
+      expect(res.valid).toBe(false);
+      expect(res.errors.some((e) => e.includes("vX.Y.Z"))).toBe(true);
     });
   });
 });
