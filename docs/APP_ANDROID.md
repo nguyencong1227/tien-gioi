@@ -150,6 +150,11 @@ Sau khi workflow hoàn tất:
   3. Khi hệ thống hỏi quyền, bật **"Cài đặt ứng dụng từ nguồn không xác định"** (Install unknown apps) cho ứng dụng Quản lý tệp.
   4. Nhấn **Cài đặt** (Install) và mở trò chơi để trải nghiệm.
 
+> [!NOTE]
+> **Cài đè bản cũ:** mỗi lần dựng, bản debug được ký bằng khoá debug do máy chạy Actions tự sinh MỚI, nên không cài đè lên bản debug của lần dựng trước được (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`): gỡ cài đặt rồi cài lại (mất phiên đăng nhập lưu trên máy). Bản release ký bằng khoá của bạn (mục 9) cài đè được. `versionCode` hiện cố định là 1 trong `app/android/app/build.gradle`: cần tăng theo từng bản phát hành trước khi đưa lên Google Play (việc của M4.2d, chưa làm).
+>
+> **Java:** dự án Android do Capacitor 8 sinh ra đòi **Java 21** (`sourceCompatibility JavaVersion.VERSION_21`); workflow dùng Temurin 21. Dựng cục bộ cũng cần JDK 21.
+
 ---
 
 ## 9. Ký Bản Phát Hành (Release Signing)
