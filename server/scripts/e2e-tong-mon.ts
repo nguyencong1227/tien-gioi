@@ -25,7 +25,7 @@ import express from "express";
 import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { DEFAULT_MAP, DEFAULT_MAP_ID, SECT_CREATE_COST, roomNameOf } from "@tien-gioi/shared";
-import { Tab, sleep } from "./e2e-kit";
+import { Tab, shown, sleep } from "./e2e-kit";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
@@ -147,7 +147,7 @@ async function main() {
       [tb, B],
     ] as const) {
       await tab.send("Page.addScriptToEvaluateOnNewDocument", {
-        source: `localStorage.setItem("tien-gioi:name", ${JSON.stringify(p.name)}); localStorage.setItem("tien-gioi:secret", ${JSON.stringify(p.secret)}); window.confirm = () => true;`,
+        source: `localStorage.setItem("tg_newbie_guide_dismissed", "1"); localStorage.setItem("tien-gioi:name", ${JSON.stringify(p.name)}); localStorage.setItem("tien-gioi:secret", ${JSON.stringify(p.secret)}); window.confirm = () => true;`,
       });
       await tab.send("Page.navigate", { url: `http://${p.host}:${PORT}/?debug` });
     }
@@ -189,8 +189,7 @@ async function main() {
       tab.ev(
         `(() => { const e = document.getElementById(${JSON.stringify(id)}); if (!e) throw new Error('không có #${id}'); e.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true })); e.click(); return 1; })()`,
       );
-    const visible = (id: string) =>
-      `(() => { const e = document.getElementById(${JSON.stringify(id)}); return !!e && !e.hidden; })()`;
+    const visible = shown; // thấy thật (kể cả khi phần tử cha ẩn), không chỉ `!hidden`
     const text = (tab: Tab, id: string) =>
       tab.ev(`document.getElementById(${JSON.stringify(id)})?.textContent ?? ''`);
     const fill = (tab: Tab, id: string, value: string) =>
@@ -251,7 +250,7 @@ async function main() {
     await clickOn(ta, B.name);
     await ta.waitFor(visible("player-menu"), "menu người chơi");
     await ta.waitFor(
-      `!document.getElementById('pm-sect-btn').hidden && !document.getElementById('pm-sect-btn').disabled`,
+      `${shown("pm-sect-btn")} && !document.getElementById('pm-sect-btn').disabled`,
       "nút Mời vào tông môn bấm được",
     );
     await ta.shot("3-menu");
@@ -329,7 +328,7 @@ async function main() {
     if (ctrlOf(B.name).coin !== B.coin - 200)
       throw new Error(`Ví B phải còn ${B.coin - 200}, thực tế ${ctrlOf(B.name).coin}`);
     if (saveOf(B.name).coin !== B.coin - 200) throw new Error("Số góp phải xuống hồ sơ B");
-    await ta.waitFor(`!document.getElementById('sect-form-withdraw').hidden`, "ô rút của Tông chủ");
+    await ta.waitFor(shown("sect-form-withdraw"), "ô rút của Tông chủ");
     await fill(ta, "sect-input-withdraw", "150");
     await submit(ta, "sect-form-withdraw");
     await ta.waitFor(

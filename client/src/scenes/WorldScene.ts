@@ -74,6 +74,7 @@ import { clientCanChallenge } from "../duel";
 import { replayEarlyMessages } from "../early-messages";
 import { sound } from "../audio";
 import { joystick, setupJoystick } from "../joystick";
+import { isTypingElement, isReducedMotion } from "../a11y";
 
 interface Entity {
   root: Phaser.GameObjects.Container;
@@ -442,12 +443,14 @@ export class WorldScene extends Phaser.Scene {
         .setDepth(-5);
 
       const spr = this.add.sprite(p.x, p.y, "portal").setDepth(p.y);
-      this.tweens.add({
-        targets: spr,
-        angle: 360,
-        duration: 6000,
-        repeat: -1,
-      });
+      if (!isReducedMotion()) {
+        this.tweens.add({
+          targets: spr,
+          angle: 360,
+          duration: 6000,
+          repeat: -1,
+        });
+      }
 
       const label = this.add
         .text(p.x, p.y - 32, p.name, {
@@ -529,14 +532,16 @@ export class WorldScene extends Phaser.Scene {
 
       root.add([sprite, nameLabel, titleLabel, markerAura, markerText]);
 
-      this.tweens.add({
-        targets: [markerAura, markerText],
-        y: "-=6",
-        yoyo: true,
-        repeat: -1,
-        duration: 700,
-        ease: "Sine.easeInOut",
-      });
+      if (!isReducedMotion()) {
+        this.tweens.add({
+          targets: [markerAura, markerText],
+          y: "-=6",
+          yoyo: true,
+          repeat: -1,
+          duration: 700,
+          ease: "Sine.easeInOut",
+        });
+      }
 
       this.npcs.set(npc.id, {
         id: npc.id,
@@ -564,14 +569,16 @@ export class WorldScene extends Phaser.Scene {
     arrowG.strokeTriangle(14, 0, -8, -7, -8, 7);
 
     const aura = this.add.circle(0, 0, 16, 0xffd74a, 0.25);
-    this.tweens.add({
-      targets: aura,
-      scale: 1.35,
-      alpha: 0.1,
-      yoyo: true,
-      repeat: -1,
-      duration: 650,
-    });
+    if (!isReducedMotion()) {
+      this.tweens.add({
+        targets: aura,
+        scale: 1.35,
+        alpha: 0.1,
+        yoyo: true,
+        repeat: -1,
+        duration: 650,
+      });
+    }
 
     this.navArrow.add([aura, arrowG]);
   }
@@ -584,7 +591,7 @@ export class WorldScene extends Phaser.Scene {
       "W,A,S,D,UP,DOWN,LEFT,RIGHT,J,K,L,B,C,I,Q,M,N,O,F,ONE,TWO,ESC,SPACE,ENTER",
       false,
     ) as any;
-    const typing = () => document.activeElement instanceof HTMLInputElement;
+    const typing = () => isTypingElement(document.activeElement);
     const kb = this.input.keyboard!;
 
     kb.on("keydown-J", () => !typing() && this.slash());
@@ -599,12 +606,7 @@ export class WorldScene extends Phaser.Scene {
     kb.on("keydown-G", () => !typing() && ui.toggleSectModal());
     kb.on("keydown-N", () => !typing() && sound.toggleMute());
     kb.on("keydown-O", () => !typing() && ui.toggleSettingsModal());
-    kb.on("keydown-ESC", () => {
-      if (typing()) return;
-      if (ui.closeDuelEndModal()) return;
-      if (ui.closeSectConfirm()) return;
-      ui.closeAllModals();
-    });
+    // Esc do `ui.ts` xử lý ở `window` (một chỗ duy nhất): đăng ký thêm ở đây làm MỖI lần Esc chạy hai lần (đóng hai tầng)
     kb.on("keydown-F", () => !typing() && this.interactOrPickup());
     kb.on("keydown-ONE", () => !typing() && ui.useQuick(1));
     kb.on("keydown-TWO", () => !typing() && ui.useQuick(2));
@@ -2189,15 +2191,19 @@ export class WorldScene extends Phaser.Scene {
       }
     }
 
-    // 3. Chữ sát thương bay lên (800ms, Cubic.easeOut)
+    // 3. Chữ sát thương bay lên (800ms, Cubic.easeOut; reduced motion: 300ms, trôi nhẹ 8px)
+    const isReduced = isReducedMotion();
+    const floatDuration = isReduced ? 300 : 800;
     for (let i = this.activeFloats.length - 1; i >= 0; i--) {
       const it = this.activeFloats[i];
-      const p = (now - it.start) / 800;
+      const p = (now - it.start) / floatDuration;
       if (p >= 1) {
         it.t.setVisible(false);
         this.floatPool.push(it);
         const last = this.activeFloats.pop()!;
         if (i < this.activeFloats.length) this.activeFloats[i] = last;
+      } else if (isReduced) {
+        it.t.setY(it.y0 - 8 * p).setAlpha(1 - p);
       } else {
         const inv = 1 - p;
         const ease = 1 - inv * inv * inv;

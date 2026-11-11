@@ -87,7 +87,7 @@ async function main() {
     if (!first?.webSocketDebuggerUrl) throw new Error("Không kết nối được Chrome DevTools");
     tab = await Tab.open("A", first.webSocketDebuggerUrl);
     await tab.send("Page.addScriptToEvaluateOnNewDocument", {
-      source: `localStorage.setItem("tien-gioi:name", ${JSON.stringify(NAME)}); localStorage.setItem("tien-gioi:secret", ${JSON.stringify(SECRET)});`,
+      source: `localStorage.setItem("tg_newbie_guide_dismissed", "1"); localStorage.setItem("tien-gioi:name", ${JSON.stringify(NAME)}); localStorage.setItem("tien-gioi:secret", ${JSON.stringify(SECRET)});`,
     });
     await tab.send("Page.navigate", { url: `http://127.0.0.1:${PORT}/?debug` });
     await tab.waitFor(
@@ -97,9 +97,18 @@ async function main() {
     await tab.ev(`document.getElementById('login-form').requestSubmit(); 1`);
 
     // 1. Client quá cũ: màn hình cập nhật hiện ra
+    // Phải THẤY thật: `hidden` của phần tử cha (vd #ui chưa vào game) làm modal biến mất mà `m.hidden` vẫn false
     await tab.waitFor(
-      `(() => { const m = document.getElementById('outdated-modal'); return !!m && !m.hidden; })()`,
-      "màn hình 'Phiên Bản Đã Cũ'",
+      `(() => {
+        const m = document.getElementById('outdated-modal');
+        if (!m || m.hidden || !m.checkVisibility()) return false;
+        const r = m.getBoundingClientRect();
+        if (r.width < 100 || r.height < 60) return false;
+        const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        const login = document.getElementById('login');
+        return !!top && m.contains(top) && !(login && login.checkVisibility());
+      })()`,
+      "màn hình 'Phiên Bản Đã Cũ' (nhìn thấy thật, không bị che, màn hình đăng nhập đã ẩn)",
     );
     const msg = String(await tab.ev(`document.getElementById('outdated-msg')?.textContent ?? ''`));
     if (!msg.includes(`v${PROTOCOL_VERSION + 1}`))

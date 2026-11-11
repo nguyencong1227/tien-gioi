@@ -21,6 +21,7 @@
     "e2e:bi-canh": "npm run e2e:bi-canh -w server --",
     "e2e:pk": "npm run e2e:pk -w server --",
     "e2e:phien-ban": "npm run e2e:phien-ban -w server --",
+    "e2e:tro-nang": "npm run e2e:tro-nang -w server --",
     "tai-khoan": "npm run tai-khoan -w server --",
     "chuyen-du-lieu": "npm run chuyen-du-lieu -w server --",
     "check:env": "npm run check:env -w server",

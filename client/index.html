@@ -61,6 +61,8 @@
               class="auth-pass-toggle"
               id="auth-login-pass-toggle"
               title="Hiện/ẩn mật khẩu"
+              aria-label="Hiện hoặc ẩn mật khẩu"
+              aria-pressed="false"
             >
               👁
             </button>
@@ -108,6 +110,8 @@
               class="auth-pass-toggle"
               id="auth-reg-pass-toggle"
               title="Hiện/ẩn mật khẩu"
+              aria-label="Hiện hoặc ẩn mật khẩu"
+              aria-pressed="false"
             >
               👁
             </button>
@@ -237,6 +241,8 @@
               class="auth-pass-toggle"
               id="auth-forgot-pass-toggle"
               title="Hiện/ẩn mật khẩu"
+              aria-label="Hiện hoặc ẩn mật khẩu"
+              aria-pressed="false"
             >
               👁
             </button>
@@ -384,16 +390,39 @@
                 id="btn-char"
                 class="hud-btn"
                 title="Bảng nhân vật & Trang bị (C)"
+                aria-label="Bảng nhân vật & Trang bị (Phím C)"
+                aria-expanded="false"
               >
                 <span>身</span><small>Nhân vật</small>
               </button>
-              <button type="button" id="btn-bag" class="hud-btn" title="Túi đồ (I)">
+              <button
+                type="button"
+                id="btn-bag"
+                class="hud-btn"
+                title="Túi đồ (I)"
+                aria-label="Túi đồ (Phím I)"
+                aria-expanded="false"
+              >
                 <span>袋</span><small>Túi</small>
               </button>
-              <button type="button" id="btn-quest" class="hud-btn" title="Sổ nhiệm vụ (Q)">
+              <button
+                type="button"
+                id="btn-quest"
+                class="hud-btn"
+                title="Sổ nhiệm vụ (Q)"
+                aria-label="Sổ nhiệm vụ (Phím Q)"
+                aria-expanded="false"
+              >
                 <span>卷</span><small>Nhiệm vụ</small>
               </button>
-              <button type="button" id="btn-sect" class="hud-btn" title="Tông môn (G)">
+              <button
+                type="button"
+                id="btn-sect"
+                class="hud-btn"
+                title="Tông môn (G)"
+                aria-label="Tông môn (Phím G)"
+                aria-expanded="false"
+              >
                 <span>宗</span><small>Tông môn</small>
               </button>
               <button
@@ -401,10 +430,19 @@
                 id="btn-mute"
                 class="hud-btn icon-only"
                 title="Bật/tắt âm thanh (N)"
+                aria-label="Bật hoặc tắt âm thanh (Phím N)"
+                aria-pressed="false"
               >
                 <span id="mute-icon">🔊</span>
               </button>
-              <button type="button" id="btn-settings" class="hud-btn icon-only" title="Cài đặt (O)">
+              <button
+                type="button"
+                id="btn-settings"
+                class="hud-btn icon-only"
+                title="Cài đặt (O)"
+                aria-label="Màn hình cài đặt (Phím O)"
+                aria-expanded="false"
+              >
                 <span>⚙</span>
               </button>
             </div>
@@ -440,7 +478,14 @@
         </aside>
       </div>
 
-      <div id="minimap-wrap" class="panel" title="Bản đồ thế giới (M)">
+      <div
+        id="minimap-wrap"
+        class="panel"
+        title="Bản đồ thế giới (M)"
+        role="button"
+        tabindex="0"
+        aria-label="Mở bản đồ thế giới (Phím M)"
+      >
         <canvas id="minimap" width="120" height="120"></canvas>
         <div class="mm-foot">
           <span id="minimap-zone">Lạc Hà Trấn</span>
@@ -456,35 +501,79 @@
       </aside>
 
       <div id="chat" class="panel">
-        <div id="chat-log"></div>
+        <div
+          id="chat-log"
+          role="log"
+          aria-live="polite"
+          aria-relevant="additions"
+          aria-atomic="false"
+        ></div>
         <form id="chat-form" autocomplete="off">
-          <input id="chat-input" maxlength="120" placeholder="Truyền âm… (Enter)" />
+          <input
+            id="chat-input"
+            maxlength="120"
+            placeholder="Truyền âm… (Enter)"
+            aria-label="Ô nhập tin nhắn truyền âm"
+          />
         </form>
       </div>
 
       <div id="gain-feed" aria-live="polite"></div>
 
-      <button type="button" id="btn-pickup" class="sk pickup" hidden title="Nhặt vật phẩm (F)">
+      <button
+        type="button"
+        id="btn-pickup"
+        class="sk pickup"
+        hidden
+        title="Nhặt vật phẩm (F)"
+        aria-label="Nhặt vật phẩm rơi (Phím F)"
+      >
         <span>拾</span><small id="pickup-label">Nhặt (F)</small>
       </button>
 
-      <button type="button" id="btn-talk" class="sk talk" hidden title="Nói chuyện với NPC (F)">
+      <button
+        type="button"
+        id="btn-talk"
+        class="sk talk"
+        hidden
+        title="Nói chuyện với NPC (F)"
+        aria-label="Nói chuyện với NPC (Phím F)"
+      >
         <span>話</span><small id="talk-label">Nói chuyện</small>
       </button>
 
-      <button type="button" id="btn-portal" class="sk portal" hidden title="Đi qua cổng (F)">
+      <button
+        type="button"
+        id="btn-portal"
+        class="sk portal"
+        hidden
+        title="Đi qua cổng (F)"
+        aria-label="Đi qua cổng truyền tống (Phím F)"
+      >
         <span>門</span><small id="portal-label">Qua cổng (F)</small>
       </button>
 
       <div id="quickbar">
-        <button type="button" class="qslot" id="quick-1" title="Đan dược 1 (Phím 1)">
+        <button
+          type="button"
+          class="qslot"
+          id="quick-1"
+          title="Đan dược 1 (Phím 1)"
+          aria-label="Đan dược ô 1 (Phím 1)"
+        >
           <i class="qicon" id="quick-1-icon"></i>
           <span class="qkey">1</span>
           <b class="qqty" id="quick-1-qty"></b>
           <small id="quick-1-name">Đan 1</small>
           <em class="cd"></em>
         </button>
-        <button type="button" class="qslot" id="quick-2" title="Đan dược 2 (Phím 2)">
+        <button
+          type="button"
+          class="qslot"
+          id="quick-2"
+          title="Đan dược 2 (Phím 2)"
+          aria-label="Đan dược ô 2 (Phím 2)"
+        >
           <i class="qicon" id="quick-2-icon"></i>
           <span class="qkey">2</span>
           <b class="qqty" id="quick-2-qty"></b>
@@ -494,27 +583,53 @@
       </div>
 
       <div id="skills">
-        <button class="sk" id="sk-break" title="Đột phá (B)">
+        <button
+          class="sk"
+          id="sk-break"
+          title="Đột phá (B)"
+          aria-label="Đột phá cảnh giới (Phím B)"
+        >
           <span>破</span><small>Đột phá</small>
         </button>
-        <button class="sk" id="sk-med" title="Đả tọa (L)">
+        <button class="sk" id="sk-med" title="Đả tọa (L)" aria-label="Đả tọa hồi phục (Phím L)">
           <span>坐</span><small>Đả tọa</small>
         </button>
-        <button class="sk" id="sk-sword" title="Kiếm khí (K)">
+        <button class="sk" id="sk-sword" title="Kiếm khí (K)" aria-label="Phóng kiếm khí (Phím K)">
           <span>氣</span><small>Kiếm khí</small><em class="cd"></em>
         </button>
-        <button class="sk big" id="sk-slash" title="Kiếm chém (J / Space)">
+        <button
+          class="sk big"
+          id="sk-slash"
+          title="Kiếm chém (J / Space)"
+          aria-label="Kiếm chém tấn công (Phím J hoặc Phím Cách)"
+        >
           <span>劍</span><small>Chém</small><em class="cd"></em>
         </button>
       </div>
 
-      <section id="inv-modal" class="panel modal-box" hidden aria-label="Túi đồ">
+      <section
+        id="inv-modal"
+        class="panel modal-box"
+        hidden
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="inv-title"
+        tabindex="-1"
+      >
         <header class="inv-head">
           <div>
-            <h2>Túi Càn Khôn</h2>
+            <h2 id="inv-title">Túi Càn Khôn</h2>
             <small id="inv-count">0 / 24 ô</small>
           </div>
-          <button type="button" id="inv-close" class="modal-close" title="Đóng (I / Esc)">✕</button>
+          <button
+            type="button"
+            id="inv-close"
+            class="modal-close"
+            title="Đóng (I / Esc)"
+            aria-label="Đóng túi đồ (Phím I hoặc Esc)"
+          >
+            ✕
+          </button>
         </header>
         <div id="inv-grid" role="grid"></div>
         <footer id="inv-detail">
@@ -535,16 +650,30 @@
         </footer>
       </section>
 
-      <section id="char-modal" class="panel modal-box" hidden aria-label="Bảng nhân vật">
+      <section
+        id="char-modal"
+        class="panel modal-box"
+        hidden
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="char-title"
+        tabindex="-1"
+      >
         <header class="inv-head">
           <div>
-            <h2>Đạo Thể · Trang Bị</h2>
+            <h2 id="char-title">Đạo Thể · Trang Bị</h2>
             <small id="char-subtitle"
               >Chạm trang bị để mặc hoặc tháo · Linh thạch:
               <b id="char-coin" class="coin-val">0</b> 💎</small
             >
           </div>
-          <button type="button" id="char-close" class="modal-close" title="Đóng (C / Esc)">
+          <button
+            type="button"
+            id="char-close"
+            class="modal-close"
+            title="Đóng (C / Esc)"
+            aria-label="Đóng bảng nhân vật (Phím C hoặc Esc)"
+          >
             ✕
           </button>
         </header>
@@ -560,18 +689,42 @@
         </div>
       </section>
 
-      <section id="forge-modal" class="panel modal-box" hidden aria-label="Lò rèn trang bị">
+      <section
+        id="forge-modal"
+        class="panel modal-box"
+        hidden
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="forge-title"
+        tabindex="-1"
+      >
         <header class="inv-head">
           <div>
             <h2 id="forge-title">Lò Rèn Thiết Ngưu</h2>
             <small>Rèn trước để dành · Đủ cảnh giới mới mặc được</small>
           </div>
-          <button type="button" id="forge-close" class="modal-close" title="Đóng (Esc)">✕</button>
+          <button
+            type="button"
+            id="forge-close"
+            class="modal-close"
+            title="Đóng (Esc)"
+            aria-label="Đóng lò rèn (Phím Esc)"
+          >
+            ✕
+          </button>
         </header>
         <div id="forge-list" class="forge-list"></div>
       </section>
 
-      <section id="shop-modal" class="panel modal-box" hidden aria-label="Cửa hàng">
+      <section
+        id="shop-modal"
+        class="panel modal-box"
+        hidden
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="shop-title"
+        tabindex="-1"
+      >
         <header class="inv-head">
           <div>
             <h2 id="shop-title">Cửa Hàng Lão Dược Sư</h2>
@@ -579,7 +732,15 @@
               >Linh thạch hiện có: <b id="shop-coin" class="coin-val">0</b> 💎</small
             >
           </div>
-          <button type="button" id="shop-close" class="modal-close" title="Đóng (Esc)">✕</button>
+          <button
+            type="button"
+            id="shop-close"
+            class="modal-close"
+            title="Đóng (Esc)"
+            aria-label="Đóng cửa hàng (Phím Esc)"
+          >
+            ✕
+          </button>
         </header>
         <div class="shop-tabs">
           <button type="button" class="q-tab active" id="tab-shop-buy">Mua Đan Dược</button>
@@ -589,13 +750,27 @@
         <div id="shop-sell-list" class="shop-list" hidden></div>
       </section>
 
-      <section id="settings-modal" class="panel modal-box" hidden aria-label="Màn hình cài đặt">
+      <section
+        id="settings-modal"
+        class="panel modal-box"
+        hidden
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-title"
+        tabindex="-1"
+      >
         <header class="inv-head">
           <div>
-            <h2>Cài Đặt Hệ Thống</h2>
+            <h2 id="settings-title">Cài Đặt Hệ Thống</h2>
             <small>Tự động lưu trên thiết bị này</small>
           </div>
-          <button type="button" id="settings-close" class="modal-close" title="Đóng (O / Esc)">
+          <button
+            type="button"
+            id="settings-close"
+            class="modal-close"
+            title="Đóng (O / Esc)"
+            aria-label="Đóng cài đặt (Phím O hoặc Esc)"
+          >
             ✕
           </button>
         </header>
@@ -626,6 +801,10 @@
             <span>Chất lượng thấp (tắt hiệu ứng phụ cho máy yếu / tiết kiệm pin)</span>
             <input type="checkbox" id="set-low-fx" />
           </label>
+          <label class="set-row toggle">
+            <span>Giảm chuyển động (tắt hiệu ứng rung lắc, chữ chạy nhanh)</span>
+            <input type="checkbox" id="set-reduced-motion" />
+          </label>
           <div class="set-account-box">
             <span id="set-account-info">Tài khoản: <b id="set-account-username">-</b></span>
             <button type="button" id="btn-logout" class="btn-logout">Đăng Xuất</button>
@@ -633,13 +812,29 @@
         </div>
       </section>
 
-      <section id="dialog-modal" class="panel" hidden aria-label="Hộp thoại NPC">
+      <section
+        id="dialog-modal"
+        class="panel"
+        hidden
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="dlg-npc-name"
+        tabindex="-1"
+      >
         <header class="dlg-head">
           <div>
             <b id="dlg-npc-name">NPC</b>
             <span id="dlg-npc-title" class="dlg-badge"></span>
           </div>
-          <button type="button" id="dlg-close" class="modal-close" title="Đóng (Esc)">✕</button>
+          <button
+            type="button"
+            id="dlg-close"
+            class="modal-close"
+            title="Đóng (Esc)"
+            aria-label="Đóng đối thoại (Phím Esc)"
+          >
+            ✕
+          </button>
         </header>
         <div id="dlg-body" title="Chạm để tua nhanh chữ">
           <p id="dlg-text"></p>
@@ -648,13 +843,27 @@
         <div id="dlg-options"></div>
       </section>
 
-      <section id="quest-modal" class="panel modal-box" hidden aria-label="Sổ nhiệm vụ">
+      <section
+        id="quest-modal"
+        class="panel modal-box"
+        hidden
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="quest-title"
+        tabindex="-1"
+      >
         <header class="inv-head">
           <div>
-            <h2>Sổ Nhiệm Vụ</h2>
+            <h2 id="quest-title">Sổ Nhiệm Vụ</h2>
             <small id="quest-count">0 / 8 đang làm</small>
           </div>
-          <button type="button" id="quest-close" class="modal-close" title="Đóng (Q / Esc)">
+          <button
+            type="button"
+            id="quest-close"
+            class="modal-close"
+            title="Đóng (Q / Esc)"
+            aria-label="Đóng sổ nhiệm vụ (Phím Q hoặc Esc)"
+          >
             ✕
           </button>
         </header>
@@ -665,13 +874,29 @@
         <div id="quest-list"></div>
       </section>
 
-      <section id="map-modal" class="panel modal-box" hidden aria-label="Bản đồ thế giới">
+      <section
+        id="map-modal"
+        class="panel modal-box"
+        hidden
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="map-title"
+        tabindex="-1"
+      >
         <header class="inv-head">
           <div>
-            <h2>Sơn Hà Đồ · Vân Mộng Sơn</h2>
+            <h2 id="map-title">Sơn Hà Đồ · Vân Mộng Sơn</h2>
             <small id="map-coords">Chạm vào bản đồ để đặt hướng chỉ đường</small>
           </div>
-          <button type="button" id="map-close" class="modal-close" title="Đóng (M / Esc)">✕</button>
+          <button
+            type="button"
+            id="map-close"
+            class="modal-close"
+            title="Đóng (M / Esc)"
+            aria-label="Đóng bản đồ (Phím M hoặc Esc)"
+          >
+            ✕
+          </button>
         </header>
         <div class="map-body">
           <canvas id="worldmap" width="384" height="384"></canvas>
@@ -687,13 +912,27 @@
       </section>
 
       <!-- Bảng Tông Môn (M3.6, #230) -->
-      <section id="sect-modal" class="panel modal-box" hidden aria-label="Tông môn">
+      <section
+        id="sect-modal"
+        class="panel modal-box"
+        hidden
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="sect-head-title"
+        tabindex="-1"
+      >
         <header class="inv-head">
           <div>
             <h2 id="sect-head-title">Tông Môn</h2>
             <small id="sect-head-sub">Chưa gia nhập tông môn</small>
           </div>
-          <button type="button" id="sect-close" class="modal-close" title="Đóng (G / Esc)">
+          <button
+            type="button"
+            id="sect-close"
+            class="modal-close"
+            title="Đóng (G / Esc)"
+            aria-label="Đóng tông môn (Phím G hoặc Esc)"
+          >
             ✕
           </button>
         </header>
@@ -805,8 +1044,17 @@
                 <button type="button" id="sect-btn-disband" class="sect-danger-btn" hidden>
                   Giải tán tông môn
                 </button>
-                <div id="sect-disband-confirm" class="sect-confirm-box" hidden>
-                  <p>Giải tán tông môn? Hành động này không thể hoàn tác.</p>
+                <div
+                  id="sect-disband-confirm"
+                  class="sect-confirm-box"
+                  hidden
+                  role="alertdialog"
+                  aria-modal="true"
+                  aria-labelledby="sect-disband-confirm-msg"
+                >
+                  <p id="sect-disband-confirm-msg">
+                    Giải tán tông môn? Hành động này không thể hoàn tác.
+                  </p>
                   <div class="sect-confirm-actions">
                     <button type="button" id="sect-btn-disband-cancel" class="sect-small-btn">
                       Huỷ
@@ -907,7 +1155,14 @@
       </section>
 
       <!-- Lời mời tổ đội -->
-      <div id="party-invite-box" class="party-invite-box" hidden>
+      <div
+        id="party-invite-box"
+        class="party-invite-box"
+        hidden
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="pib-msg"
+      >
         <div class="pib-content">
           <p id="pib-msg"><b>Đạo hữu</b> mời bạn gia nhập tổ đội</p>
           <div class="pib-timer"><i id="pib-timer-bar"></i></div>
@@ -919,7 +1174,14 @@
       </div>
 
       <!-- Lời mời vào Bí cảnh (M3.4, hộp nhỏ không chặn điều khiển) -->
-      <div id="dungeon-invite-box" class="dungeon-invite-box" hidden aria-label="Lời mời Bí cảnh">
+      <div
+        id="dungeon-invite-box"
+        class="dungeon-invite-box"
+        hidden
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="dib-title"
+      >
         <div class="dib-head">
           <span class="dib-badge">BÍ CẢNH</span>
           <b id="dib-title">Linh Hư Bí Cảnh</b>
@@ -940,7 +1202,14 @@
       </div>
 
       <!-- Lời mời PK Thách Đấu (M3.5, hộp nhỏ góc màn hình, không chặn điều khiển) -->
-      <div id="duel-invite-box" class="duel-invite-box" hidden aria-label="Lời mời Thách Đấu">
+      <div
+        id="duel-invite-box"
+        class="duel-invite-box"
+        hidden
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="duib-title"
+      >
         <div class="duib-head">
           <span class="duib-badge">⚔ THÁCH ĐẤU</span>
           <b id="duib-title">Quyết Đấu Luận Võ</b>
@@ -955,7 +1224,14 @@
       </div>
 
       <!-- Lời mời vào Tông môn (M3.6, hộp nhỏ góc màn hình, không chặn điều khiển) -->
-      <div id="sect-invite-box" class="sect-invite-box" hidden aria-label="Lời mời Tông môn">
+      <div
+        id="sect-invite-box"
+        class="sect-invite-box"
+        hidden
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="sib-title"
+      >
         <div class="sib-head">
           <span class="sib-badge">🏯 TÔNG MÔN</span>
           <b id="sib-title">Chiêu Mộ Đạo Hữu</b>
@@ -984,7 +1260,10 @@
         id="dungeon-end-modal"
         class="panel modal-box dungeon-end-modal"
         hidden
-        aria-label="Kết quả Bí cảnh"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="dend-title"
+        tabindex="-1"
       >
         <header class="dend-header">
           <div id="dend-seal" class="dend-seal won">勝</div>
@@ -1007,7 +1286,12 @@
         </div>
 
         <footer class="dend-actions">
-          <button type="button" id="dend-btn-close" class="dend-btn primary">
+          <button
+            type="button"
+            id="dend-btn-close"
+            class="dend-btn primary"
+            aria-label="Thu chiến lợi phẩm và đóng bảng kết quả"
+          >
             Thu Chiến Lợi Phẩm (60s)
           </button>
           <button type="button" id="dend-btn-leave" class="dend-btn secondary">
@@ -1021,7 +1305,10 @@
         id="duel-end-modal"
         class="panel modal-box duel-end-modal"
         hidden
-        aria-label="Kết quả Quyết Đấu"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="duend-title"
+        tabindex="-1"
       >
         <header class="duend-header">
           <div id="duend-seal" class="duend-seal won">⚔</div>
@@ -1036,15 +1323,38 @@
         </div>
 
         <footer class="duend-actions">
-          <button type="button" id="duend-btn-close" class="duend-btn primary">Đóng</button>
+          <button
+            type="button"
+            id="duend-btn-close"
+            class="duend-btn primary"
+            aria-label="Đóng bảng kết quả quyết đấu"
+          >
+            Đóng
+          </button>
         </footer>
       </section>
 
       <!-- Menu khi chạm người chơi khác -->
-      <div id="player-menu" class="panel player-menu" hidden>
+      <div
+        id="player-menu"
+        class="panel player-menu"
+        hidden
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pm-name"
+        tabindex="-1"
+      >
         <div class="pm-head">
           <b id="pm-name">Đồng đạo</b>
-          <button type="button" id="pm-close" class="pm-close" title="Đóng">✕</button>
+          <button
+            type="button"
+            id="pm-close"
+            class="pm-close"
+            title="Đóng (Esc)"
+            aria-label="Đóng menu người chơi (Phím Esc)"
+          >
+            ✕
+          </button>
         </div>
         <div class="pm-body">
           <div id="pm-realm" class="pm-realm"></div>
@@ -1058,7 +1368,7 @@
         </div>
       </div>
 
-      <div id="reconnect-banner" class="reconnect-banner" hidden>
+      <div id="reconnect-banner" class="reconnect-banner" hidden role="alert" aria-live="assertive">
         <span class="reconnect-dot"></span>
         <span id="reconnect-banner-text">Mất kết nối · Đang nối lại...</span>
         <button type="button" id="reconnect-reload" class="reconnect-reload" hidden>
@@ -1066,7 +1376,7 @@
         </button>
       </div>
 
-      <div id="toast"></div>
+      <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
       <div id="death" hidden>
         <div>
           <b>Trọng thương</b>
@@ -1074,7 +1384,13 @@
           <small id="death-sub" hidden></small>
         </div>
       </div>
-      <div id="help">
+      <div
+        id="help"
+        role="button"
+        tabindex="0"
+        aria-label="Chỉ dẫn phím tắt và luật chơi Tiên Giới"
+        title="Nhấn để xem chỉ dẫn chi tiết"
+      >
         WASD đi · J/Space chém · K kiếm khí · 1/2 đan · F nhặt/nói/cổng · C nhân vật · I túi · Q
         nhiệm vụ · M bản đồ · G tông môn · O cài đặt · L đả tọa · B đột phá
       </div>
@@ -1088,11 +1404,19 @@
       </div>
 
       <!-- Màn hình Hoàng Tuyền · Bến Vong Xuyên (Luân hồi M3.2) -->
-      <section id="limbo-overlay" class="limbo-overlay" hidden aria-label="Hoàng Tuyền">
+      <section
+        id="limbo-overlay"
+        class="limbo-overlay"
+        hidden
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="limbo-title"
+        tabindex="-1"
+      >
         <div class="limbo-box">
           <header class="limbo-header">
             <div class="limbo-seal">輪迴</div>
-            <h1 class="limbo-title">HOÀNG TUYỀN · Bến Vong Xuyên</h1>
+            <h1 id="limbo-title" class="limbo-title">HOÀNG TUYỀN · Bến Vong Xuyên</h1>
             <p id="limbo-kiep-sub" class="limbo-sub">Kiếp thứ 1 khép lại</p>
             <div class="limbo-summary">
               <div class="lsum-item">
@@ -1153,6 +1477,81 @@
         </div>
       </section>
 
+      <!-- Bảng gợi ý người mới (Issue #269, hiện 1 lần lần đầu nhập thế) -->
+      <section
+        id="newbie-guide-modal"
+        class="panel modal-box newbie-guide-modal"
+        hidden
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="newbie-title"
+        tabindex="-1"
+      >
+        <header class="inv-head">
+          <div>
+            <h2 id="newbie-title">Nhập Thế Tu Tiên · Chỉ Dẫn</h2>
+            <small>Chỉ dẫn căn bản cho đạo hữu mới bước chân vào Tiên Giới</small>
+          </div>
+          <button
+            type="button"
+            id="newbie-close"
+            class="modal-close"
+            title="Đóng (Esc)"
+            aria-label="Đóng chỉ dẫn (Phím Esc hoặc Phím Cách)"
+          >
+            ✕
+          </button>
+        </header>
+        <div class="newbie-body">
+          <div class="newbie-card">
+            <span class="newbie-icon">🚶</span>
+            <div class="newbie-info">
+              <b>Di Chuyển & Điều Khiển</b>
+              <p>
+                Phím <b>W / A / S / D</b> hoặc 4 phím mũi tên. Trên điện thoại: vuốt cần điều khiển
+                ảo ở góc trái.
+              </p>
+            </div>
+          </div>
+          <div class="newbie-card">
+            <span class="newbie-icon">⚔</span>
+            <div class="newbie-info">
+              <b>Chiến Đấu & Trừ Yêu</b>
+              <p>
+                Phím <b>J</b> hoặc <b>Space</b> để chém kiếm thường, <b>K</b> phóng Kiếm khí tầm xa
+                tiêu hao Linh lực.
+              </p>
+            </div>
+          </div>
+          <div class="newbie-card">
+            <span class="newbie-icon">🧘</span>
+            <div class="newbie-info">
+              <b>Tu Luyện & Hồi Phục</b>
+              <p>
+                Phím <b>L</b> đả tọa hồi Sinh lực và Linh lực. Phím <b>1</b> và <b>2</b> cắn nhanh
+                Đan dược trong lúc nguy cấp.
+              </p>
+            </div>
+          </div>
+          <div class="newbie-card">
+            <span class="newbie-icon">📜</span>
+            <div class="newbie-info">
+              <b>Tương Tác & Hành Trang</b>
+              <p>
+                Phím <b>F</b> để nhặt vật phẩm rơi, đối thoại NPC hoặc qua Cổng truyền tống. Phím
+                <b>I</b> mở Túi đồ, <b>C</b> xem Đạo thể trang bị, <b>Q</b> xem Sổ nhiệm vụ,
+                <b>M</b> xem Sơn Hà Đồ.
+              </p>
+            </div>
+          </div>
+        </div>
+        <footer class="newbie-footer">
+          <button type="button" id="newbie-btn-dismiss" class="auth-btn-primary">
+            Đã Hiểu (Phím Cách hoặc Esc)
+          </button>
+        </footer>
+      </section>
+
       <!-- Màn hình chuyển cảnh Mạnh Bà -->
       <div id="reborn-overlay" class="reborn-overlay" hidden>
         <div class="reborn-content">
@@ -1173,10 +1572,11 @@
       aria-label="Cập nhật phiên bản mới"
       role="alertdialog"
       aria-modal="true"
+      aria-labelledby="outdated-title"
     >
       <header class="inv-head">
         <div>
-          <h2>Phiên Bản Đã Cũ</h2>
+          <h2 id="outdated-title">Phiên Bản Đã Cũ</h2>
           <small id="outdated-subtitle">Máy chủ yêu cầu phiên bản mới hơn</small>
         </div>
       </header>

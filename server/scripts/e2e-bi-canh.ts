@@ -34,6 +34,7 @@ import {
   dayKey,
   dungeonOf,
 } from "@tien-gioi/shared";
+import { shown } from "./e2e-kit";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -254,7 +255,7 @@ async function main() {
       [tb, B],
     ] as const) {
       await tab.send("Page.addScriptToEvaluateOnNewDocument", {
-        source: `localStorage.setItem("tien-gioi:name", ${JSON.stringify(p.name)}); localStorage.setItem("tien-gioi:secret", ${JSON.stringify(p.secret)});`,
+        source: `localStorage.setItem("tg_newbie_guide_dismissed", "1"); localStorage.setItem("tien-gioi:name", ${JSON.stringify(p.name)}); localStorage.setItem("tien-gioi:secret", ${JSON.stringify(p.secret)});`,
       });
       await tab.send("Page.navigate", { url: `http://${p.host}:${PORT}/?debug` });
     }
@@ -299,10 +300,7 @@ async function main() {
 
     // 4. Cả hai nhận hộp mời và bấm Vào
     for (const tab of tabs) {
-      await tab.waitFor(
-        `!document.getElementById('dungeon-invite-box')?.hidden`,
-        "hộp mời bí cảnh",
-      );
+      await tab.waitFor(shown("dungeon-invite-box"), "hộp mời bí cảnh");
       const txt = await tab.ev(`document.getElementById('dib-rewards-left')?.textContent || ''`);
       if (!/3\/3/.test(txt))
         throw new Error(`${tab.label}: hộp mời phải báo 3/3 lượt thưởng, thực tế "${txt}"`);
@@ -321,10 +319,10 @@ async function main() {
         "vào bản đồ bí cảnh",
       );
       await tab.waitFor(
-        `document.body.classList.contains('in-dungeon') && !document.getElementById('dungeon-hud').hidden`,
+        `document.body.classList.contains('in-dungeon') && ${shown("dungeon-hud")}`,
         "HUD bí cảnh",
       );
-      await tab.waitFor(`!document.getElementById('dhud-boss-wrap').hidden`, "thanh máu trùm");
+      await tab.waitFor(shown("dhud-boss-wrap"), "thanh máu trùm");
     }
     await ta.waitFor(
       `document.getElementById('dhud-members').children.length === 2`,
@@ -362,8 +360,8 @@ async function main() {
     out("  ✓ [6/8] A hạ trùm bằng đòn chém của client thật");
 
     // 7. Màn kết quả: A có thưởng, B (không đánh) có lý do
-    await ta.waitFor(`!document.getElementById('dungeon-end-modal').hidden`, "màn kết quả của A");
-    await tb.waitFor(`!document.getElementById('dungeon-end-modal').hidden`, "màn kết quả của B");
+    await ta.waitFor(shown("dungeon-end-modal"), "màn kết quả của A");
+    await tb.waitFor(shown("dungeon-end-modal"), "màn kết quả của B");
     const titleA = await ta.ev(`document.getElementById('dend-title').textContent`);
     const coinA = await ta.ev(`document.getElementById('dend-reward-coin')?.textContent || ''`);
     const itemsA = await ta.ev(

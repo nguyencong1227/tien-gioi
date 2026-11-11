@@ -27,6 +27,7 @@ import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import WebSocket from "ws";
 import { DEFAULT_MAP, DEFAULT_MAP_ID, roomNameOf } from "@tien-gioi/shared";
+import { shown } from "./e2e-kit";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -242,7 +243,7 @@ async function main() {
       [tb, B],
     ] as const) {
       await tab.send("Page.addScriptToEvaluateOnNewDocument", {
-        source: `localStorage.setItem("tien-gioi:name", ${JSON.stringify(p.name)}); localStorage.setItem("tien-gioi:secret", ${JSON.stringify(p.secret)});`,
+        source: `localStorage.setItem("tg_newbie_guide_dismissed", "1"); localStorage.setItem("tien-gioi:name", ${JSON.stringify(p.name)}); localStorage.setItem("tien-gioi:secret", ${JSON.stringify(p.secret)});`,
       });
       await tab.send("Page.navigate", { url: `http://${p.host}:${PORT}/?debug` });
     }
@@ -304,13 +305,13 @@ async function main() {
       );
     const challenge = async () => {
       await clickOn(ta, B.name);
-      await ta.waitFor(`!document.getElementById('player-menu').hidden`, "menu người chơi");
+      await ta.waitFor(shown("player-menu"), "menu người chơi");
       await ta.waitFor(
         `!document.getElementById('pm-duel-btn').disabled`,
         "nút Thách Đấu bấm được",
       );
       await tap(ta, "pm-duel-btn");
-      await tb.waitFor(`!document.getElementById('duel-invite-box').hidden`, "hộp lời thách");
+      await tb.waitFor(shown("duel-invite-box"), "hộp lời thách");
     };
     await challenge();
     await ta.shot("1-menu-ok");
@@ -333,11 +334,7 @@ async function main() {
     calm();
     await challenge();
     await tap(tb, "duib-btn-accept");
-    for (const tab of tabs)
-      await tab.waitFor(
-        `!document.getElementById('duel-countdown-overlay').hidden`,
-        "đếm ngược 3-2-1",
-      );
+    for (const tab of tabs) await tab.waitFor(shown("duel-countdown-overlay"), "đếm ngược 3-2-1");
     await ta.shot("3-countdown");
     const vs = await ta.ev(`document.getElementById('dco-vs').textContent`);
     if (!vs.includes(B.name))
@@ -345,8 +342,7 @@ async function main() {
     if (!(world.duels.size === 1 && pa.duel === true && pb.duel === true))
       throw new Error("Trận chưa bắt đầu đúng ở server");
     world.duels.all()[0].fightAt = Date.now() - 1; // bỏ chờ đếm ngược
-    for (const tab of tabs)
-      await tab.waitFor(`!document.getElementById('duel-hud').hidden`, "HUD quyết đấu");
+    for (const tab of tabs) await tab.waitFor(shown("duel-hud"), "HUD quyết đấu");
     const oppA = await ta.ev(`document.getElementById('duel-hud-opponent').textContent`);
     if (oppA !== B.name)
       throw new Error(`HUD của A phải ghi đối thủ "${B.name}", thực tế "${oppA}"`);
@@ -370,8 +366,8 @@ async function main() {
     out("  ✓ [5/7] A hạ B bằng đòn chém của client thật");
 
     // 6. Màn kết quả; B gục: KHÔNG hiện màn Hoàng Tuyền, KHÔNG hiện chữ hồi sinh ở trấn; rồi đứng dậy tại chỗ
-    await ta.waitFor(`!document.getElementById('duel-end-modal').hidden`, "màn kết quả của A");
-    await tb.waitFor(`!document.getElementById('duel-end-modal').hidden`, "màn kết quả của B");
+    await ta.waitFor(shown("duel-end-modal"), "màn kết quả của A");
+    await tb.waitFor(shown("duel-end-modal"), "màn kết quả của B");
     const titleA = await ta.ev(`document.getElementById('duend-title').textContent`);
     const titleB = await tb.ev(`document.getElementById('duend-title').textContent`);
     const reasonB = await tb.ev(`document.getElementById('duend-reason').textContent`);
@@ -381,7 +377,7 @@ async function main() {
       throw new Error(`Lý do của B phải nêu bị đánh gục, thực tế "${reasonB}"`);
     await tb.shot("5-lost");
     await ta.shot("6-won");
-    const limboOpen = await tb.ev(`!document.getElementById('limbo-overlay')?.hidden`);
+    const limboOpen = await tb.ev(shown("limbo-overlay"));
     if (limboOpen) throw new Error("Thua thách đấu KHÔNG được mở màn Hoàng Tuyền");
     // B đang gục (3 giây): lớp phủ "chết" không được hứa hồi sinh ở Lạc Hà Trấn (người thua đứng dậy TẠI CHỖ)
     const deathText = await tb.ev(

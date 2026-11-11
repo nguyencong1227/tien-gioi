@@ -344,7 +344,7 @@ async function runE2e() {
     // Nạp sẵn localStorage danh tính
     await sendCdp("Page.addScriptToEvaluateOnNewDocument", {
       source: `
-        localStorage.setItem("tien-gioi:name", ${JSON.stringify(testName)});
+        localStorage.setItem("tg_newbie_guide_dismissed", "1"); localStorage.setItem("tien-gioi:name", ${JSON.stringify(testName)});
         localStorage.setItem("tien-gioi:secret", ${JSON.stringify(testSecret)});
       `,
     });
