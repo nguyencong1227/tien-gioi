@@ -675,9 +675,49 @@ Chạy 48 loại tin nhắn × 2 senders (Poor + Rich) × 26 biến thể payloa
 - **Luân hồi:** `soulBuy` (52/52 OK), `rebirth` (52/52 OK).
 - **Tin lạ không đăng ký:** `__unknown_unregistered_msg__` (52/52 OK, handler `*` từ chối an toàn).
 
-## 19. Thử tải dài (Soak Test) 100 Bot: Rò rỉ bộ nhớ, Tick p95, Băng thông & Toàn vẹn dữ liệu (M4 3.5 - Issue #282)
+## 19. E2E thật nối lại sau rớt mạng bất thường bằng proxy TCP (M4-sớm, `npm run e2e:noi-lai -w server`)
+Chrome headless + server Colyseus thật trong tiến trình (thư mục dữ liệu tạm), kết hợp một proxy TCP trung gian (`node:net`) đặt giữa tab Chrome và server (#116 / #117 / #288).
 
-### 19.1. Đặt vấn đề & Mục tiêu
+### 19.1. Bối cảnh kỹ thuật
+- **Vấn đề trên trình duyệt headless:** Chrome CDP `Network.emulateNetworkConditions` (offline) chỉ làm nghẽn lưu lượng truyền dữ liệu nhưng **không ngắt** kết nối TCP/WebSocket đang mở (cả client lẫn server đều không thấy sự kiện `close`). Đồng thời, phương thức `WebSocket.close(code)` trong trình duyệt chỉ chấp nhận các mã `1000` hoặc `3000–4999` (vốn được game xử lý là thoát chủ động nên không kích hoạt vòng lặp nối lại). Trình duyệt không thể tự sinh mã rớt mạng bất thường `1006`.
+- **Giải pháp Proxy TCP:** Khởi chạy một TCP Server nhỏ trung gian bằng `node:net` làm cầu nối giữa Chrome và server Colyseus. Khi cần mô phỏng rớt mạng bất thường, proxy gọi `clientSocket.destroy()` để gửi gói TCP RST/FIN trực tiếp tới Chrome, buộc trình duyệt nhận mã đóng `1006` và kích hoạt luồng tự động nối lại (`setupRoomLifecycle` trong `client/src/main.ts`).
+
+### 19.2. Ba Ca Kiểm Thử Bắt Buộc
+1. **Ca 1: Rớt mạng rồi tự nối lại thành công:**
+   - Proxy huỷ toàn bộ socket đang mở (mã 1006) và TẠM chặn kết nối mới: nối lại thành công chỉ mất vài chục ms, nếu cho nối ngay thì banner chỉ lóe lên và E2E chập chờn khi máy bận (A bắt được lúc review #292). Chặn rồi mở lại (còn trong 20 giây grace) làm banner hiện đủ lâu để kiểm chắc chắn.
+   - Banner `Mất kết nối, đang nối lại...` hiển thị thật (`shown("reconnect-banner")` từ `e2e-kit.ts`).
+   - Mở lại proxy; lần thử kế tiếp của client (`client.reconnect(token)`) thành công.
+   - Banner tắt, giữ nguyên đúng `sessionId`, vị trí; **phía server (cùng tiến trình)** cùng một nhân vật trong cùng phòng, ví 123 Linh thạch (đặt bằng `changeCoin`) và 2 nanh sói (`/give`) còn NGUYÊN, không còn ghost; 0 lỗi console; điều khiển di chuyển phản hồi sau khi nối lại.
+2. **Ca 2: Rớt quá hạn grace (hết thời gian chờ nối lại):**
+   - Tạm thời hạ `WorldRoom.reconnectGraceS = 2` (ngắn hơn mức 20s chuẩn để bài test chạy nhanh).
+   - Proxy ngắt kết nối và khóa trong 2.5s để server hết thời gian chờ grace và huỷ token.
+   - Proxy mở lại để client nhận phản hồi dứt khoát `reconnection token invalid or expired` từ server -> vòng lặp reconnect dừng sớm.
+   - Hiển thị màn hình `showDisconnected` (banner cố định mang class `.failed` và nút "Tải lại trang" hiển thị thật).
+   - Trong lúc nhân vật chờ nối lại (server đã lưu ngay lúc rớt, phòng khi sập), E2E cộng thêm 77 Linh thạch phía server; sau khi hết grace phải thấy hồ sơ của ĐÚNG nhân vật ca 2 (tên băm sha1) trên đĩa có nanh sói + Linh thạch gồm phần 77 đó (chứng minh lần lưu KHI hết grace), và không còn ghost, không còn trong phòng.
+3. **Ca 3: Thoát chủ động không nối lại:**
+   - Đóng kết nối bằng mã thoát chủ động `4000`; `MutationObserver` ghi mọi thay đổi của banner trong 3,5 giây sau đó (lần thử nối lại bị từ chối dứt khoát chỉ làm banner lóe "đang nối lại" vài ms rồi chuyển sang "thất bại", nên đọc chữ cuối cùng là bỏ lỡ) và proxy đếm byte client gửi lên: phải không có.
+   - Client hiển thị màn hình ngắt kết nối dứt khoát; tuyệt đối **KHÔNG** kích hoạt vòng lặp reconnect và **KHÔNG** hiển thị banner đếm ngược nối lại.
+
+**Danh tính theo từng ca:** `Page.addScriptToEvaluateOnNewDocument` chạy ở MỌI tài liệu mới, nên mỗi ca gỡ script của ca trước (`setIdentity`) và E2E xác nhận tên trên HUD khớp (bản đầu của #292 vô tình đăng nhập cả ba ca bằng cùng một nhân vật).
+
+### 19.3. Cách Chạy & Ngưỡng Đo
+- Lệnh chạy: `npm run build && npm run e2e:noi-lai -w server` (yêu cầu Google Chrome).
+- Ngưỡng thời gian: Toàn bộ 3 ca kiểm thử hoàn tất trong **~10–15 giây** (ngân sách < 3 phút).
+
+### 19.4. Kiểm Chứng Bằng 6 Đột Biến (Mutations)
+1. **Đột biến (a) - Bỏ `client.reconnect(token)` trong `main.ts`:**
+   - Ca 1 hết thời gian chờ 15s vì banner nối lại không bao giờ tắt -> **ĐỎ** (`Hết thời gian chờ (15000ms) ở A: banner nối lại ẩn đi sau khi nối lại thành công`).
+2. **Đột biến (b) - Server không giữ nhân vật (`reconnectGraceS = 0`):**
+   - Server từ chối ngay khi rớt, trả lỗi `reconnection token invalid or expired` -> Ca 1 **ĐỎ** (`Nội dung banner không đúng mong đợi: "Mất kết nối với Tiên Giới. Tải lại trang để vào lại."`).
+3. **Đột biến (c) - Coi mã 1006 là thoát chủ động (trong `main.ts`):**
+   - Client không bao giờ thử kết nối lại khi gặp lỗi 1006 -> Ca 1 **ĐỎ** (`Nội dung banner không đúng mong đợi: "Mất kết nối với Tiên Giới. Tải lại trang để vào lại."`).
+4. **Đột biến (d) - Server không lưu khi hết grace (`WorldRoom.onLeave`):** Ca 2 **ĐỎ** (`Hết thời gian chờ (5000ms): hồ sơ nhân vật ca 2 ... được lưu xuống đĩa khi hết grace`).
+5. **Đột biến (e) - Coi mã `4000` là rớt mạng (`main.ts`):** Ca 3 **ĐỎ** (banner từng hiện "đang nối lại" rồi "thất bại"); bản đầu của ca 3 chỉ đọc chữ cuối của banner nên KHÔNG bắt được đột biến này.
+6. **Đột biến (f) - Nối lại xong mà mất Linh thạch (`ctrl.coin = 0` sau `allowReconnection`):** Ca 1 **ĐỎ** (`Ví / túi đồ đổi sau nối lại: ví 123 -> 0`).
+
+## 20. Thử tải dài (Soak Test) 100 Bot: Rò rỉ bộ nhớ, Tick p95, Băng thông & Toàn vẹn dữ liệu (M4 3.5 - Issue #282)
+
+### 20.1. Đặt vấn đề & Mục tiêu
 Các công cụ thử tải trước đây (`bench.ts` 20 giây mốc `bench-baseline.json`, `bots.ts` 15–30 giây) chủ yếu đo tải đỉnh tức thời. Một máy chủ MMORPG chạy production liên tục nhiều giờ/ngày cần đối mặt với các rủi ro tích luỹ theo thời gian:
 1. **Rò rỉ bộ nhớ (Memory Leak):** Giữ tham chiếu sự kiện, mảng cache không giải phóng, hoặc rò rỉ buffer WebSocket làm `VmRSS` phình to dần.
 2. **Trôi dạt hiệu năng (Performance Drift):** Độ trễ tick CPU p95 hoặc kích thước bản vá StateView (`byte/tick`) tăng dần khi số lượng thực thể / dữ liệu tích luỹ.
@@ -686,7 +726,7 @@ Các công cụ thử tải trước đây (`bench.ts` 20 giây mốc `bench-bas
 
 Công cụ thử tải dài (`npm run soak -w server`) được xây dựng để kiểm chứng các đặc tính trên trong điều kiện chạy tải nặng liên tục với 100 bot kết hợp đa kịch bản gameplay.
 
-### 19.2. Phương pháp & Công cụ (`server/scripts/soak.ts`, `soak-analysis.ts`, `soak-analysis.test.ts`)
+### 20.2. Phương pháp & Công cụ (`server/scripts/soak.ts`, `soak-analysis.ts`, `soak-analysis.test.ts`)
 - **Cách ly tuyệt đối:** Script tự tìm cổng TCP rảnh ngẫu nhiên (`findFreePort`), tạo thư mục dữ liệu tạm riêng biệt (`/tmp/tien-gioi-soak-XXXXXX`), gieo sẵn hồ sơ nhân vật và khởi động server THẬT trong tiến trình con (không chiếm cổng 2567/2577/2587 của các dev).
 - **Đa dạng hoá 100 bot tham gia theo 6 kịch bản gameplay thực tế:**
   1. **Săn quái (30 bot):** Di chuyển tuần tra ngoài trấn, áp sát quái vật, tung kỹ năng `slash` (Trảm Kích) và `sword` (Ngự Kiếm Thuật), nhặt chiến lợi phẩm rơi.
@@ -712,7 +752,7 @@ Công cụ thử tải dài (`npm run soak -w server`) được xây dựng đ�
   - Kiểm tra tệp hỏng cách ly: số tệp `*.hong-*` = 0.
   - Kiểm tra bảo toàn tiền tệ: Tổng Linh thạch cuối kỳ (ví nhân vật + kho tông môn) <= Ban đầu + Tổng Linh thạch phát sinh từ rơi đồ / thưởng.
 
-### 19.3. Bảng Kết quả Thử tải Thực tế 100 Bot (5 phút, 30 mẫu đo)
+### 20.3. Bảng Kết quả Thử tải Thực tế 100 Bot (5 phút, 30 mẫu đo)
 Chạy thử tải thực tế trên máy chủ phát triển với lệnh: `npm run soak -w server -- --bots=100 --minutes=5`:
 
 ```
@@ -808,7 +848,7 @@ TOÀN VẸN DỮ LIỆU & TÍNH ỔN ĐỊNH:
 | **Tệp hỏng cách ly (`*.hong-*`)** | **0 tệp** | = 0 tệp | Không có tệp ghi đè dở dang hay hỏng hóc | **PASS** |
 | **Bảo toàn tiền tệ (Linh thạch)** | **ĐẠT (25,751 <= 31,551)** | Cuối <= Đầu + Thả | Số dư ví từng bot khớp 100% (kể cả Hoàng Tuyền) | **PASS** |
 
-### 19.4. Bằng chứng Kiểm thử Đột biến (Mutation Testing)
+### 20.4. Bằng chứng Kiểm thử Đột biến (Mutation Testing)
 Để chứng minh công cụ soak test thực sự phát hiện được lỗi tiềm ẩn và không trả về kết quả đạt giả (false positive), 3 đột biến đã được cài đặt có chủ đích và kiểm chứng:
 
 #### Đột biến A: Rò rỉ bộ nhớ cố ý (`Memory Leak Mutation`)
@@ -840,7 +880,7 @@ TOÀN VẸN DỮ LIỆU & TÍNH ỔN ĐỊNH:
   ```
 - **Kết luận:** Cơ chế cào `/metrics?format=json` (Bearer `METRICS_TOKEN`) và phân loại log `classifyServerLogLine` bắt chính xác 100% hiện tượng suy giảm hiệu năng tick và kích hoạt cảnh báo giám sát. Đã hoàn tác code đột biến sạch sẽ.
 
-### 19.5. Hướng dẫn Chạy Thử tải Dài ngoài Ca Đêm
+### 20.5. Hướng dẫn Chạy Thử tải Dài ngoài Ca Đêm
 Bộ công cụ hỗ trợ nhiều mức thời lượng tuỳ nhu cầu kiểm tra:
 ```bash
 # 1. Thử nhanh 60 giây (mặc định để dev kiểm tra nhanh tính năng trước khi commit):
@@ -859,4 +899,3 @@ npm run soak -w server -- --bots=100 --minutes=120
 # 5. Lưu kết quả ra đường dẫn tệp JSON tuỳ chọn và giữ lại thư mục dữ liệu để kiểm tra:
 npm run soak -w server -- --bots=100 --minutes=30 --out=./soak-report.json --keep-data
 ```
-

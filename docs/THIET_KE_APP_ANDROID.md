@@ -153,7 +153,7 @@ Các hạng mục có thể kiểm thử tự động 100% trong môi trường 
 3. **Giả lập ngắt mạng và tự động nối lại:**
    - **Không dùng** `Network.emulateNetworkConditions` (offline) một mình: Dev A đo trên Chrome 156 headless, bật offline 6 giây khi một WebSocket đang mở và gửi đều thì lưu lượng bị nghẽn nhưng **không bên nào thấy sự kiện đóng** (client `onclose` không bắn, server không thấy ngắt), nên `onLeave` không bắn và vòng nối lại của `main.ts` không chạy.
    - Trình duyệt cũng không tự gây mã 1006: `WebSocket.close(code)` chỉ nhận 1000 hoặc 3000-4999, mà `main.ts` coi 1000 và 4xxx là thoát chủ động (không nối lại). Bot Node (`server/scripts/bots.ts`, `ws.close()`) làm được vì không bị giới hạn đó.
-   - Cách đề xuất: đặt một proxy TCP nhỏ (Node `net`) giữa tab Chrome và server trong E2E, rồi `destroy()` socket phía proxy để tạo rớt bất thường thật; xác nhận banner nối lại, nhân vật cùng `sessionId`, vị trí / túi đồ giữ nguyên. Thêm ca 'rớt quá 20 giây' (không nối lại được, `showDisconnected`).
+   - **Đã triển khai trong `npm run e2e:noi-lai -w server` (#288):** Sử dụng một proxy TCP trung gian (`node:net`) đặt giữa tab Chrome headless và server Colyseus thật; proxy chủ động gọi `destroy()` trên socket để tạo lỗi ngắt kết nối bất thường (mã 1006) ép trình duyệt kích hoạt vòng lặp `setupRoomLifecycle`. Kiểm thử 3 ca hoàn chỉnh: (1) rớt mạng rồi tự nối lại thành công bảo toàn `sessionId`, túi đồ, vị trí; (2) rớt quá hạn grace (hạ `reconnectGraceS = 2`) nhận lỗi dứt khoát, hiện banner thất bại và lưu đĩa; (3) thoát chủ động mã 4000 không kích hoạt nối lại.
 4. **Giả lập màn hình tai thỏ:**
    - Kiểm tra padding CSS safe-area không làm tràn hoặc che mất các nút HUD.
 
@@ -180,7 +180,7 @@ Khi Người Dùng quyết định triển khai Android, công việc sẽ đư�
 | **M4.2b** | Phím Back Android, kiểm Safe Area Insets trong WebView, bộ lắng nghe nền / tiền cảnh và tạm dừng âm thanh (mục 3), nhãn + callback mở cửa hàng khi lỗi 426 (mục 4). | Dev B | 1 PR |
 | **M4.2c** | Workflow GitHub Actions tự động build APK unsigned / test artifact cho mỗi release tag. | Dev C | 1 PR |
 | **M4.2d** | Thử nghiệm thực tế trên máy Android thật, tối ưu FPS và kiểm tra bàn phím ảo. | Dev B + C | 1 PR |
-| **M4.2e** | E2E nối lại bằng proxy TCP (mục 6.1) và ca viền màn hình / vùng an toàn. | Dev C | 1 PR |
+| **M4.2e** | E2E nối lại bằng proxy TCP (mục 6.1) và ca viền màn hình / vùng an toàn. | Dev B (đã xong phần proxy TCP #288) / Dev C | Đã hoàn thành phần E2E nối lại (#288) |
 
 Ngoài mã: để lên Google Play còn cần trang chính sách quyền riêng tư (game có tài khoản), bảng khai Data safety, xếp hạng nội dung và đáp ứng yêu cầu API mục tiêu mới nhất của Google tại thời điểm phát hành; đây là việc của người dùng, ghi ở câu hỏi 2.
 
