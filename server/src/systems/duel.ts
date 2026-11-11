@@ -303,6 +303,7 @@ function startDuel(w: World, a: string, pa: Player, b: string, pb: Player) {
     oy: (pa.y + pb.y) / 2,
   };
   w.duels._start(d);
+  w.audit?.("duel.start", { a: pa.name, b: pb.name });
   for (const [sid, p] of [
     [a, pa],
     [b, pb],
@@ -393,6 +394,12 @@ export function duelBeam(
 export function endDuel(w: World, d: Duel, winner: string | undefined, reason: DuelEndReason) {
   if (w.duels.of(d.a) !== d && w.duels.of(d.b) !== d) return;
   w.duels._end(d);
+  w.audit?.("duel.end", {
+    a: w.state.players.get(d.a)?.name ?? null,
+    b: w.state.players.get(d.b)?.name ?? null,
+    winner: winner === undefined ? null : (w.state.players.get(winner)?.name ?? null),
+    reason,
+  });
   for (const sid of [d.a, d.b]) {
     const p = w.state.players.get(sid);
     const c = w.ctrl.get(sid);
