@@ -149,15 +149,24 @@ export class HeartbeatController {
     }
   }
 
-  /** Xử lý khi ứng dụng xuống nền hoặc quay lại tiền cảnh. */
-  private onVisibilityChange(): void {
+  /**
+   * Xử lý khi ứng dụng xuống nền hoặc quay lại tiền cảnh.
+   * Hỗ trợ cả sự kiện DOM `visibilitychange` lẫn sự kiện native `appStateChange` của Capacitor.
+   */
+  public onVisibilityChange(forcedHidden?: boolean): void {
     if (this.stopped) return;
 
-    if (this.isDocumentHidden()) {
+    const isHidden = forcedHidden !== undefined ? forcedHidden : this.isDocumentHidden();
+
+    if (isHidden) {
       // Xuống nền: tạm dừng âm thanh và dừng vòng lặp ping định kỳ
       this.hiddenSince = this.now();
       this.sound?.suspend();
       this.stopInterval();
+      if (this.resumeTimeoutId !== null) {
+        this.clearTimeoutFn(this.resumeTimeoutId);
+        this.resumeTimeoutId = null;
+      }
     } else {
       // Quay lại tiền cảnh: phục hồi âm thanh
       this.sound?.resume();

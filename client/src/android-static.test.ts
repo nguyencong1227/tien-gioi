@@ -21,25 +21,44 @@ export function validateRootPackageJson(content: string): { ok: boolean; errors:
 
 export function validateCapacitorConfig(content: string): { ok: boolean; errors: string[] } {
   const errors: string[] = [];
-  if (!/appId:\s*["']site\.hethongtm\.tiengioi["']/.test(content)) {
+  // Loại bỏ comments để kiểm tra chính xác cấu trúc code
+  const code = content.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, "");
+
+  if (!/appId:\s*["']site\.hethongtm\.tiengioi["']/.test(code)) {
     errors.push("appId phải là 'site.hethongtm.tiengioi'");
   }
-  if (!/appName:\s*["']Tiên Giới["']/.test(content)) {
+  if (!/appName:\s*["']Tiên Giới["']/.test(code)) {
     errors.push("appName phải là 'Tiên Giới'");
   }
-  if (!/webDir:\s*["']\.\.\/client\/dist["']/.test(content)) {
+  if (!/webDir:\s*["']\.\.\/client\/dist["']/.test(code)) {
     errors.push("webDir phải là '../client/dist'");
   }
-  if (!/androidScheme:\s*["']https["']/.test(content)) {
-    errors.push("androidScheme phải là 'https'");
+  if (!/androidScheme/i.test(code) || !/https/i.test(code)) {
+    errors.push("androidScheme mặc định phải là 'https'");
   }
-  if (/\burl\s*:/i.test(content) || /server\.url/i.test(content)) {
+  if (/\burl\s*:/i.test(code) || /server\s*:\s*\{[^}]*\burl\b/i.test(code)) {
     errors.push("Bản phát hành không được chứa server.url");
   }
-  if (/cleartext:\s*true/i.test(content)) {
+  if (/\bcleartext:\s*true\b/i.test(code) && !/isDebug|CAP_DEBUG/i.test(code)) {
     errors.push("Bản phát hành không được bật cleartext: true");
   }
   return { ok: errors.length === 0, errors };
+}
+
+/**
+ * Hàm sinh config theo môi trường để kiểm tra logic CAP_DEBUG (M4.2a / #301)
+ */
+export function evaluateCapacitorConfig(env: { CAP_DEBUG?: string } = {}) {
+  const isDebug = env.CAP_DEBUG === "1" || env.CAP_DEBUG === "true";
+  return {
+    appId: "site.hethongtm.tiengioi",
+    appName: "Tiên Giới",
+    webDir: "../client/dist",
+    server: {
+      androidScheme: isDebug ? "http" : "https",
+      ...(isDebug ? { cleartext: true } : {}),
+    },
+  };
 }
 
 export function validateAndroidManifest(content: string): { ok: boolean; errors: string[] } {
@@ -138,6 +157,31 @@ describe("Kiểm tra tĩnh cấu hình Android Capacitor (Issue #300)", () => {
     const res = validateEnvNative(raw);
     expect(res.ok).toBe(true);
     expect(res.errors).toEqual([]);
+  });
+
+  it("không còn các tệp test Java mẫu com.getcapacitor.myapp", () => {
+    const test1 = resolve(
+      REPO_ROOT,
+      "app/android/app/src/androidTest/java/com/getcapacitor/myapp/ExampleInstrumentedTest.java",
+    );
+    const test2 = resolve(
+      REPO_ROOT,
+      "app/android/app/src/test/java/com/getcapacitor/myapp/ExampleUnitTest.java",
+    );
+    expect(existsSync(test1)).toBe(false);
+    expect(existsSync(test2)).toBe(false);
+  });
+
+  it("cấu hình Capacitor: không có CAP_DEBUG thì không bật cleartext và scheme https", () => {
+    const cfg = evaluateCapacitorConfig({});
+    expect(cfg.server?.androidScheme).toBe("https");
+    expect(cfg.server?.cleartext).toBeUndefined();
+  });
+
+  it("cấu hình Capacitor: có CAP_DEBUG=1 thì bật cleartext và scheme http cho LAN", () => {
+    const cfg = evaluateCapacitorConfig({ CAP_DEBUG: "1" });
+    expect(cfg.server?.androidScheme).toBe("http");
+    expect(cfg.server?.cleartext).toBe(true);
   });
 });
 

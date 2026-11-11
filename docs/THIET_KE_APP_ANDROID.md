@@ -178,7 +178,7 @@ Các hạng mục có thể kiểm thử tự động 100% trong môi trường 
 |---|---|---|---|
 | **M4.2a-1** | **Server + client: HTTP tuyệt đối và CORS allowlist** (mục 5.2): hàm base URL dùng chung, `CORS_ORIGINS` cho `/health` và `/api/auth/*`, test, `docs/TRIEN_KHAI.md`. | Dev A (server) + Dev B (client) | **HOÀN THÀNH** (PR #284, #287) |
 | **M4.2a** | Khởi tạo dự án Capacitor (`app/`), `capacitor.config.ts`, `applicationId` `site.hethongtm.tiengioi`, icon & splash screen từ `client/public/icons/`, cờ build native `VITE_NATIVE`, cấu hình cleartext chỉ cho debug `CAP_DEBUG=1`. | Dev B | **HOÀN THÀNH** (#300) |
-| **M4.2b** | Nhịp tim ứng dụng ping / pong (#293, PR #310). Tiếp theo (#301): Phím Back Android, vùng an toàn Safe Area Insets, nhãn thông báo và callback mở trang tải khi server trả lỗi 426. | Dev B | Đang làm (#301) |
+| **M4.2b** | Nhịp tim ứng dụng ping / pong (#293, PR #310). Phím Back Android, vòng đời native, vùng an toàn Safe Area Insets, nhãn thông báo và mở trang tải khi lỗi 426, trang quyền riêng tư `privacy.html`. | Dev B | **HOÀN THÀNH** (#301) |
 | **M4.2c** | Workflow GitHub Actions tự động build APK unsigned / test artifact cho mỗi release tag. | Dev C | Sắp làm (#302) |
 | **M4.2d** | Thử nghiệm thực tế trên máy Android thật, tối ưu FPS và kiểm tra bàn phím ảo. | Dev B + C | Chờ bản APK |
 | **M4.2e** | E2E nối lại bằng proxy TCP (mục 6.1) và ca viền màn hình / vùng an toàn. | Dev B + C | **HOÀN THÀNH** (PR #288, #310) |

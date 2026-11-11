@@ -62,14 +62,16 @@ cd app && npm run sync
 ## 4. Chế độ Thử Nghiệm LAN (Debug)
 
 Khi cần kết nối máy thật tới server dev nội bộ trên mạng WiFi:
-1. Đặt IP máy tính vào cấu hình debug.
-2. Chạy sync với cờ debug:
+1. Chạy sync với cờ `CAP_DEBUG=1`:
    ```bash
    cd app
-   CAP_DEBUG=1 npx cap sync android
+   CAP_DEBUG=1 npm run sync
    ```
+   Khi có biến môi trường `CAP_DEBUG=1`, `capacitor.config.ts` tự động cấu hình `androidScheme: "http"` và `cleartext: true`.
+2. Mặc định (khi không có biến `CAP_DEBUG`), `npm run sync` luôn sinh cấu hình phát hành an toàn (`androidScheme: "https"`, không cleartext).
+
 > [!WARNING]
-> Bản phát hành trên Google Play hoặc APK phát hành cho người chơi **bắt buộc** dùng `capacitor.config.ts` mặc định (không bật `cleartext` hay `server.url`).
+> Bản phát hành trên Google Play hoặc APK phát hành cho người chơi **bắt buộc** chạy không có cờ `CAP_DEBUG` (không bật `cleartext` hay `server.url`).
 
 ---
 
@@ -78,3 +80,35 @@ Khi cần kết nối máy thật tới server dev nội bộ trên mạng WiFi:
 - Việc dựng và ký file APK phát hành tự động được thực hiện qua GitHub Actions (Dev C phụ trách ở M4.2c, tham khảo `docs/TRIEN_KHAI.md`).
 - **Tuyệt đối không lưu trữ:** tệp keystore (`*.jks`, `*.keystore`), mật khẩu store/key trong git. Mọi thông tin nhạy cảm được quản lý qua GitHub Secrets và biến môi trường của CI.
 - Mọi thắc mắc về khóa ký được ghi nhận tại `~/TT/orchestra/questions.md`.
+
+---
+
+## 6. Phím Back Android & Vòng đời Native (M4.2b)
+
+- **Phím Back vật lý / Cử chỉ điều hướng:**
+  - Được quản lý bởi `NativeBackButtonController` (`client/src/native-app.ts`).
+  - Khi có modal/dialog/menu mở: gọi `ui.handleEscape()` đóng tầng trên cùng.
+  - Khi đang ở màn hình đăng nhập: thoát ứng dụng ngay lập tức (`App.exitApp()`).
+  - Khi đang hiển thị modal "Phiên bản đã cũ" (426): phím Back bị vô hiệu hóa để không thoát nhầm.
+  - Khi đang phiêu bạt trong thế giới game: nhấn 2 lần trong 2 giây mới thoát game (lần đầu hiển thị thông báo toast: *"Nhấn lần nữa để thoát trò chơi"*).
+- **Vòng đời xuống nền / tiền cảnh:**
+  - Sự kiện `appStateChange` của `@capacitor/app`:
+    - `isActive: false` (xuống nền): tạm dừng âm thanh (`sound.suspend()`) và thông báo cho bộ nhịp tim `HeartbeatController.onVisibilityChange(true)` dừng ping định kỳ.
+    - `isActive: true` (quay lại tiền cảnh): phục hồi âm thanh (`sound.resume()`) và thông báo cho bộ nhịp tim kiểm tra ngay kết nối còn sống hay socket nửa mở.
+
+---
+
+## 7. Cập nhật Phiên bản Cũ (Lỗi 426) & Cấu hình URL
+
+- Khi máy chủ nâng cấp `MIN_PROTOCOL_VERSION` và trả về mã lỗi `426` (`JOIN_CLIENT_OUTDATED`):
+  - Trên web: hiển thị nút *"Tải Lại Trang"* để tải lại bundle mới từ máy chủ.
+  - Trên bản native: hiển thị nút *"Cập Nhật Bản Mới"* và khi bấm sẽ mở liên kết tải bản mới.
+- **Biến môi trường URL tải:**
+  - Mặc định mở trang GitHub Releases: `https://github.com/nguyencong1227/tien-gioi/releases`.
+  - Khi phát hành trên Google Play Store, cấu hình biến build `VITE_APP_UPDATE_URL` (ví dụ: `https://play.google.com/store/apps/details?id=site.hethongtm.tiengioi` hoặc link tải APK trực tiếp) mà không cần sửa mã nguồn.
+
+---
+
+## 8. Trang Quyền Riêng Tư (Privacy Policy)
+
+- Tệp tĩnh `client/public/privacy.html` chứa nội dung chính sách quyền riêng tư bằng tiếng Việt theo yêu cầu của Google Play Store (mục đích dữ liệu, lưu trữ mã hóa scrypt, quyền xóa tài khoản và thông tin liên hệ).

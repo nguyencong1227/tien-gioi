@@ -28,6 +28,7 @@ import { joinWithRedirect, isClientOutdatedError } from "./connection";
 import { clearToken, getToken } from "./auth";
 import { initAuthUi, switchAuthView } from "./auth-ui";
 import { setupPwa, canReloadSafely, isNativeApp, type PwaGameState } from "./pwa";
+import { setupNativeApp, getOutdatedUiConfig, getAppUpdateUrl } from "./native-app";
 import { HeartbeatController } from "./heartbeat";
 import { sound } from "./audio";
 
@@ -175,6 +176,29 @@ async function handleOutdatedReload() {
   window.location.reload();
 }
 
+/** Hiển thị modal phiên bản quá cũ phù hợp với môi trường (Web hoặc Android Native, M4.2b #301). */
+function showOutdatedModal(minVersion: number) {
+  const isNative = isNativeApp();
+  const cfg = getOutdatedUiConfig(minVersion, isNative, handleOutdatedReload, getAppUpdateUrl());
+  ui.showClientOutdated(minVersion, cfg.onAction, {
+    message: cfg.message,
+    buttonLabel: cfg.buttonLabel,
+  });
+}
+
+// Khởi tạo điều khiển phím Back và vòng đời ứng dụng Android Native (M4.2b)
+setupNativeApp({
+  isOutdatedOpen: () => ui.isOutdatedModalOpen(),
+  isLoginOpen: () => {
+    const loginEl = document.getElementById("login");
+    return Boolean(loginEl && !loginEl.hidden);
+  },
+  handleEscape: () => ui.handleEscape(),
+  showToast: (t) => ui.toast(t),
+  getHeartbeat: () => activeHeartbeat,
+  sound,
+});
+
 initAuthUi({
   onTokenAuth: async (token, charName) => {
     const client = new Client(serverUrl());
@@ -190,7 +214,7 @@ initAuthUi({
       await start(room, mapId);
     } catch (e: any) {
       if (isClientOutdatedError(e)) {
-        ui.showClientOutdated(e.minVersion, handleOutdatedReload);
+        showOutdatedModal(e.minVersion);
         return;
       }
       if (e?.code === JOIN_BAD_TOKEN) {
@@ -216,7 +240,7 @@ initAuthUi({
       await start(room, mapId);
     } catch (e: any) {
       if (isClientOutdatedError(e)) {
-        ui.showClientOutdated(e.minVersion, handleOutdatedReload);
+        showOutdatedModal(e.minVersion);
         return;
       }
       throw e;
@@ -232,10 +256,9 @@ if (
   const outdatedParam = new URLSearchParams(location.search).get("outdated");
   if (outdatedParam !== null) {
     const minV = Number(outdatedParam) || 2;
-    ui.showClientOutdated(minV, handleOutdatedReload);
+    showOutdatedModal(minV);
   }
-  (window as any).__showClientOutdated = (minV = 2) =>
-    ui.showClientOutdated(minV, handleOutdatedReload);
+  (window as any).__showClientOutdated = (minV = 2) => showOutdatedModal(minV);
 }
 
 // Chế độ máy chủ giả lập (?dungeon=mock, ?dungeon=fallen, ?duel=mock hoặc ?sect=mock) để thử nghiệm và chụp ảnh không cần server thật
@@ -454,7 +477,7 @@ function setupRoomLifecycle(room: Room) {
       ui.hideTransition();
       activeScene?.setReconnecting(false);
       if (isClientOutdatedError(err)) {
-        ui.showClientOutdated(err.minVersion, handleOutdatedReload);
+        showOutdatedModal(err.minVersion);
         return;
       }
       ui.toast({
