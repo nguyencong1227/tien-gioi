@@ -106,6 +106,26 @@ describe("e2e-kit: listenWithRetry", () => {
     }
   });
 
+  it("net.Server + host (proxy TCP của E2E): nghe đúng địa chỉ, cổng bận thì thử cổng mới", async () => {
+    const busy = await occupyPort(); // chiếm trên 127.0.0.1
+    const free = await freeOne();
+    const server = net.createServer();
+    try {
+      const got = await listenWithRetry(server, busy.port, {
+        explicit: false,
+        pick: () => free,
+        host: "127.0.0.1",
+      });
+      expect(got).toBe(free);
+      const addr = server.address() as net.AddressInfo;
+      expect(addr.port).toBe(free);
+      expect(addr.address).toBe("127.0.0.1");
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+      await busy.close();
+    }
+  });
+
   it("hết số lần thử: reject (không lặp vô hạn)", async () => {
     const busy = await occupyPort();
     const server = http.createServer();

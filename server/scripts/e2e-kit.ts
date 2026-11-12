@@ -1,7 +1,7 @@
 // Khung dùng chung cho các E2E thật hai tab Chrome (CDP): lớp `Tab` (gom lỗi console, evaluate, chờ điều kiện, ảnh chụp).
 // Tách từ `e2e-pk.ts` cho E2E mới (`e2e-tong-mon.ts`); các E2E cũ giữ bản sao riêng của chúng.
 import type { ChildProcess } from "node:child_process";
-import type http from "node:http";
+import type net from "node:net";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import WebSocket from "ws";
@@ -166,9 +166,9 @@ export class Tab {
  * Trả về cổng thực sự đang nghe.
  */
 export function listenWithRetry(
-  server: http.Server,
+  server: net.Server, // http.Server là con của net.Server: dùng được cho cả máy chủ HTTP lẫn proxy TCP
   port: number,
-  opts: { explicit: boolean; pick: () => number; attempts?: number },
+  opts: { explicit: boolean; pick: () => number; attempts?: number; host?: string },
 ): Promise<number> {
   const attempts = opts.attempts ?? 6;
   return new Promise<number>((resolve, reject) => {
@@ -185,7 +185,8 @@ export function listenWithRetry(
       };
       server.once("error", onError);
       server.once("listening", onListening);
-      server.listen(p);
+      if (opts.host) server.listen(p, opts.host);
+      else server.listen(p);
     };
     tryListen(port, attempts);
   });
