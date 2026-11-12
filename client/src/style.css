@@ -1557,8 +1557,7 @@ body.low-fx #btn-talk {
 
 /* Giao diện rèn đồ (#forge-modal - #32) */
 #forge-modal {
-  width: min(95vw, 480px);
-  max-height: 92dvh;
+  --sheet-w: 480px;
 }
 .forge-list {
   max-height: 410px;
@@ -1817,10 +1816,6 @@ body.low-fx #btn-talk {
       max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
     justify-content: space-between;
   }
-  #shop-modal,
-  #forge-modal {
-    justify-content: flex-start;
-  }
   #inv-grid {
     gap: 8px;
     max-width: 480px;
@@ -1900,10 +1895,6 @@ body.low-fx #btn-talk {
   .modal-box:not(.sheet) {
     overflow-y: auto;
     justify-content: flex-start;
-  }
-  .forge-list,
-  .shop-list {
-    max-height: calc(100dvh - 96px);
   }
 }
 
@@ -5350,6 +5341,12 @@ body.reduced-motion *::after {
 
 /* Sổ nhiệm vụ trong tấm trên điện thoại: tấm tự cuộn nên danh sách không cần khung cuộn riêng (tránh hai thanh cuộn lồng nhau) */
 html[data-form="phone"] #quest-list {
+  max-height: none;
+  overflow: visible;
+}
+
+/* Lò rèn / Cửa hàng trong tấm trên điện thoại: tấm tự cuộn nên danh sách không cần khung cuộn riêng (tránh hai thanh cuộn lồng nhau) */
+html[data-form="phone"] :is(.forge-list, .shop-list) {
   max-height: none;
   overflow: visible;
 }

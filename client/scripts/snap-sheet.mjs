@@ -37,6 +37,8 @@ const PANELS = [
   ["settings-modal", "toggleSettingsModal"],
   ["map-modal", "toggleMapModal"],
   ["quest-modal", "toggleQuestModal"],
+  ["shop-modal", "toggleShopModal"],
+  ["forge-modal", "toggleForgeModal"],
 ];
 
 const CDP_PORT = 39100 + Math.floor(Math.random() * 400);
@@ -134,6 +136,8 @@ try {
   await evalJs(
     "document.querySelectorAll('.duel-mock-badge,.dungeon-mock-badge').forEach((e) => e.remove());0",
   );
+  // Cửa hàng / Lò rèn TỰ ĐÓNG khi không có NPC ở gần (WorldScene.syncNpcs mỗi khung), mà cảnh mock không có NPC: vô hiệu hoá để tấm ở yên cho phép đo
+  await evalJs("window.__scene.syncNpcs = () => {};0");
   await sleep(500);
   if (!NO_SHOT) fs.mkdirSync(OUT_DIR, { recursive: true });
 
@@ -195,7 +199,12 @@ try {
               if (!t || !el.contains(t)) foreign++;
             }
           }
+          // Danh sách trong tấm (Lò rèn / Cửa hàng / Sổ nhiệm vụ) không được có khung cuộn riêng khi tấm đã tự cuộn (hai thanh cuộn lồng nhau)
+          const nestedScroll = [...el.querySelectorAll(".forge-list, .shop-list, #quest-list")].filter((l) =>
+            ["auto", "scroll"].includes(getComputedStyle(l).overflowY),
+          ).length;
           return JSON.stringify({
+            nestedScroll,
             foreign,
             iw: innerWidth, ih: innerHeight,
             sheet: { x: r.x, y: r.y, w: r.width, h: r.height, r: r.right, b: r.bottom },
@@ -227,6 +236,10 @@ try {
         );
       }
       if (vp.form === "phone") {
+        check(
+          m.nestedScroll === 0,
+          `phone: danh sách trong tấm không có khung cuộn riêng (${m.nestedScroll} khung)`,
+        );
         check(
           Math.abs(m.sheet.h - m.ih) < 1,
           `phone: tấm cao đủ màn hình (${Math.round(m.sheet.h)} / ${m.ih})`,
