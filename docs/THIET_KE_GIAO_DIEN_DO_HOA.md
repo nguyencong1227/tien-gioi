@@ -181,6 +181,12 @@ Quy tắc MỚI viết theo thuộc tính (`html[data-form="phone"] ...`). Mỗi
 | Thế giới | cổng truyền tống xoáy; vào / ra bí cảnh; rơi đồ lấp lánh theo độ hiếm; nhặt đồ |
 | Chuyển cảnh | mờ / mống mắt 300-500 ms khi qua cổng và vào bí cảnh; bỏ qua được; giảm chuyển động -> mờ dần |
 
+### 7.2b Công thức đã làm (B, #329)
+- **Cách thêm:** mảng dữ liệu theo nhóm ở `gfx/fx/recipes-<nhóm>.ts` (chỉ kiểu, KHÔNG import `registerRecipe` để khỏi vòng import), `recipes.ts` đăng ký mảng đó. Logic chọn công thức từ sự kiện nằm ở hàm thuần cạnh đó (`combat-fx.ts`), `WorldScene` chỉ gọi; không thêm nhánh `if` theo loại hiệu ứng.
+- **Chiến đấu (đợt 1):** `hit-spark` (thường), `hit-crit`, `hit-heavy` (chí mạng hoặc >= 15 % khí huyết tối đa của mục tiêu; rung nhẹ 0,004 / 110 ms), `hurt-self` / `hurt-heavy` (mình bị đánh; ưu tiên 2), `heal-glow` (khí huyết của mình tăng một bước >= 10 % tối đa: đan dược...; hồi tự nhiên từng số nguyên không qua ngưỡng), `mon-vanish` (quái biến khỏi state khi đang hiện trong khung camera). Chữ bay: thường trắng, chí mạng "Bạo!" vàng cỡ 20, đánh người chơi đỏ, hồi máu "+N" xanh.
+- **"Của mình" không cần đổi giao thức:** `DmgMsg` không có người đánh, nên đòn là của mình khi mình vừa ra đòn trong 450 ms và chỗ trúng nằm trong tầm đòn + 80 px (`isMyHit`). Suy sai chỉ khiến hạt được ưu tiên 2 / rung nhẹ, không ảnh hưởng kết quả. Rung chỉ khi ưu tiên 2 (lõi), nên người khác chí mạng gần mình KHÔNG làm màn mình rung.
+- **Kiểm:** `combat-fx.test.ts` (thuần) + `node client/scripts/check-combat-fx.mjs [--shot ảnh.webp]` (Chrome thật, chế độ mock; hạt sống THẬT, rung, chữ bay, hồi máu, quái tan, cảnh đông 120 đòn: đỉnh 270 hạt <= trần 520).
+
 ## 8. Hoạt ảnh nhân vật và quái (B làm)
 - **Tạo bằng mã**, tiếp tục `client/scripts/gen-assets.mjs` (tất định, không tệp ngoài): khung hình `đứng` (2-4), `đi` (4 hướng x 4), `đánh` (3), `bị đánh` (1-2), `gục` (4). Biến thể quái bằng màu (`tint` / bảng màu) thay vì thêm khung hình để atlas không phình (trần **2048×2048**, tổng bộ nhớ texture theo mục 10).
 - **Máy trạng thái phía client** suy từ dữ liệu đã có (vận tốc từ `px,py`, tin đánh, `hp`, `dead`); không cần đồng bộ thêm. Người ở xa cập nhật theo `farAnimHz`.

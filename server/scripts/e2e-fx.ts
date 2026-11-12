@@ -2,7 +2,7 @@
 // Kiểm: atlas hạt + phông chữ bay được dựng bằng mã (kích thước trong ngân sách bộ nhớ); số HẠT SỐNG THẬT của Phaser không vượt
 // ngân sách theo bậc chất lượng (Thấp / Vừa / Cao); ưu tiên 2 (của mình) vượt được trần tới gấp đôi, ưu tiên 0 chỉ tới 60 %; ngân sách
 // được trả lại khi hạt hết thời gian sống; chữ bay bằng BitmapText không vượt `damageNumbers` và TÁI DÙNG đối tượng; giảm chuyển động giảm
-// hạt 70 %; `floatText` thật của WorldScene dùng lõi mới; đóng lõi thì không còn emitter / chữ nào; 0 lỗi console.
+// hạt 70 %; `onHitFx` thật của WorldScene dùng lõi mới; đóng lõi thì không còn emitter / chữ nào; 0 lỗi console.
 // Chạy: `npm run build && npm run e2e:fx -w server` (cần google-chrome).
 import { spawn, execSync, type ChildProcess } from "node:child_process";
 import { existsSync, mkdtempSync } from "node:fs";
@@ -273,20 +273,20 @@ async function main() {
       `5 đợt × 28 chữ: không tạo thêm đối tượng nào (tái dùng pool, ${created1} đối tượng cho cả phiên)`,
     );
 
-    // floatText thật của WorldScene (đường sát thương) dùng lõi mới; chữ của mình bị đánh (ưu tiên 2) thay chữ cũ khi đầy
+    // onHitFx thật của WorldScene (đường sát thương) dùng lõi mới; chữ của mình bị đánh (ưu tiên 2) thay chữ cũ khi đầy
     await fx(
       `(() => { for (let i = 0; i < 28; i++) fx.floatNumber('1', 0, 0, { color: 0xffffff, size: 15 }); return 1; })()`,
     );
     const before2 = await fx(`fx.stats().floatsActive`);
     await T.ev(
-      `(() => { const s = window.__scene; s.floatText({ target: s.sid, amount: 77, x: s.predX, y: s.predY - 20, crit: true, toPlayer: true }); })(); 1`,
+      `(() => { const s = window.__scene; s.onHitFx({ target: s.sid, amount: 77, x: s.predX, y: s.predY - 20, crit: true, toPlayer: true }); })(); 1`,
     );
     const after2 = await fx(`fx.stats()`);
     must(
       before2 === 28 && after2.floatsActive === 28,
       `đầy: chữ của mình thay chữ cũ, vẫn 28: ${before2} -> ${after2.floatsActive}`,
     );
-    ok("floatText thật (mình bị đánh, 'Bạo! 77') dùng lõi mới; đầy thì thay chữ cũ nhất");
+    ok("onHitFx thật (mình bị đánh, 'Bạo! 77') dùng lõi mới; đầy thì thay chữ cũ nhất");
     const label = await T.ev(
       `window.__scene.children.list.filter((c) => c.type === 'BitmapText' && c.visible).map((c) => c.text).filter((t) => t.includes('Bạo')).pop()`,
     );
