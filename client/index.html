@@ -472,10 +472,18 @@
         </aside>
 
         <aside id="quest-tracker" class="panel" aria-label="Theo dõi nhiệm vụ">
-          <div class="qt-head">
-            <b>Nhiệm vụ</b>
+          <button
+            type="button"
+            id="qt-toggle"
+            class="qt-head"
+            aria-expanded="true"
+            aria-controls="quest-tracker-list"
+            title="Thu gọn / mở bảng nhiệm vụ"
+          >
+            <b>Nhiệm vụ<span id="qt-count"></span></b>
             <small>Chạm để chỉ đường</small>
-          </div>
+            <span class="qt-caret" aria-hidden="true">▾</span>
+          </button>
           <div id="quest-tracker-list"></div>
         </aside>
       </div>
