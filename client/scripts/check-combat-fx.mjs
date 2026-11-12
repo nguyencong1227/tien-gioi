@@ -1,4 +1,4 @@
-/* global console, setTimeout, fetch, process */
+/* global console, setTimeout, fetch, process, Buffer */
 // Kiểm hiệu ứng chiến đấu (hạt, rung, chữ bay, hồi máu, quái tan) trong Chrome thật (M5.2 #329). Cần client đang chạy
 // (`npm run dev -w client`, cổng của dev B là 5183). Dùng chế độ mock (?duel=mock&debug=1) nên KHÔNG cần server.
 //   node client/scripts/check-combat-fx.mjs [--url http://127.0.0.1:5183] [--shot docs/screenshots/combat-fx.webp]
@@ -214,10 +214,14 @@ try {
     await settle();
     await dmg({ target: "quai-1", amount: 88, crit: true }, true);
     await dmg({ target: "mock-session-01", amount: 420, toPlayer: true }, false);
-    await evalJs(`(() => { const sc = window.__scene; sc.state.players.get(sc.sid).hp = 900; 0; })()`);
+    await evalJs(
+      `(() => { const sc = window.__scene; sc.state.players.get(sc.sid).hp = 900; 0; })()`,
+    );
     await sleep(200);
     await settle();
-    await evalJs(`(() => { const sc = window.__scene; sc.state.players.get(sc.sid).hp = 1700; 0; })()`);
+    await evalJs(
+      `(() => { const sc = window.__scene; sc.state.players.get(sc.sid).hp = 1700; 0; })()`,
+    );
     await dmg({ target: "quai-1", amount: 88, crit: true }, true);
     await dmg({ target: "mock-session-01", amount: 420, toPlayer: true }, false);
     await sleep(110);
@@ -238,7 +242,9 @@ try {
         scale: 2.5,
       },
     });
-    console.log(`    (nhân vật ở ${Math.round(pos.x)},${Math.round(pos.y)} px, thu phóng ${pos.zoom})`);
+    console.log(
+      `    (nhân vật ở ${Math.round(pos.x)},${Math.round(pos.y)} px, thu phóng ${pos.zoom})`,
+    );
     fs.writeFileSync(process.argv[si + 1], Buffer.from(shot.result.data, "base64"));
     console.log(`    (đã chụp ${process.argv[si + 1]})`);
     await settle();
@@ -261,7 +267,10 @@ try {
   console.log(
     `    (số đo: đỉnh ${peak} hạt sống / trần ${lim.particleLimit}; đỉnh ${peakFloats} chữ bay; bỏ ${st.dropped} hiệu ứng, ${st.floatsDropped} chữ)`,
   );
-  check(peak > 0 && peak <= lim.particleLimit, `cảnh đông: hạt sống ${peak} <= trần ${lim.particleLimit}`);
+  check(
+    peak > 0 && peak <= lim.particleLimit,
+    `cảnh đông: hạt sống ${peak} <= trần ${lim.particleLimit}`,
+  );
   check(st.dropped > 0, `cảnh đông: ngân sách có bỏ bớt hiệu ứng ưu tiên thấp (${st.dropped})`);
   check(peakFloats <= 28, `cảnh đông: chữ bay ${peakFloats} <= damageNumbers (Cao 28)`);
   await settle();
