@@ -238,6 +238,51 @@ try {
     }
     await evalJs("document.getElementById('force-ctx').remove();0");
 
+    // --- 2a) Kiểm kê MỌI mục tiêu chạm đang hiện (nút, ô nhập, liên kết...) >= 44x44 (mục 4.2 điều 1, #326): nút HUD (đặc biệt ở điện thoại
+    // ngang trước đây 34x32), nút âm thanh / cài đặt (38 px), ô chat (33 px) từng lọt qua vì chỉ kiểm nút kỹ năng + nút ngữ cảnh ---
+    const smallTargets = await J(`(() => {
+      const out = [];
+      for (const el of document.querySelectorAll("button, [role=button], input, select, textarea, a[href], summary")) {
+        if (el.closest("[hidden]")) continue;
+        const cs = getComputedStyle(el);
+        if (cs.display === "none" || cs.visibility === "hidden" || cs.pointerEvents === "none") continue;
+        const b = el.getBoundingClientRect();
+        if (b.width === 0 || b.height === 0 || b.right < 0 || b.bottom < 0 || b.left > innerWidth || b.top > innerHeight) continue;
+        if (b.width < 43.5 || b.height < 43.5)
+          out.push((el.id ? "#" + el.id : el.tagName.toLowerCase() + "." + String(el.className).split(" ")[0]) + " " + Math.round(b.width) + "x" + Math.round(b.height));
+      }
+      return out;
+    })()`);
+    check(
+      smallTargets.length === 0,
+      `mọi mục tiêu chạm đang hiện >= 44x44 (${smallTargets.length} nhỏ hơn${smallTargets.length ? ": " + smallTargets.slice(0, 8).join(", ") : ""})`,
+    );
+    const hudGrid = await J(`(() => {
+      const hud = document.getElementById("hud");
+      const h = hud.getBoundingClientRect();
+      const cs = getComputedStyle(hud);
+      const inner = { l: h.left + parseFloat(cs.borderLeftWidth) + parseFloat(cs.paddingLeft), r: h.right - parseFloat(cs.borderRightWidth) - parseFloat(cs.paddingRight),
+        b: h.bottom - parseFloat(cs.borderBottomWidth) - parseFloat(cs.paddingBottom) };
+      const btns = [...hud.querySelectorAll(".hud-btn")].filter((b) => b.getClientRects().length > 0).map((b) => { const q = b.getBoundingClientRect(); return { x: q.x, y: q.y, r: q.right, b: q.bottom }; });
+      let minGap = Infinity;
+      for (let i = 0; i < btns.length; i++)
+        for (let j = i + 1; j < btns.length; j++) {
+          const a = btns[i], c = btns[j];
+          minGap = Math.min(minGap, Math.max(a.x - c.r, c.x - a.r, a.y - c.b, c.y - a.b));
+        }
+      const inside = btns.every((q) => q.x >= inner.l - 0.5 && q.r <= inner.r + 0.5 && q.b <= inner.b + 0.5);
+      return { n: btns.length, minGap, inside };
+    })()`);
+    check(hudGrid.n >= 6, `bảng HUD có ${hudGrid.n} nút (>= 6)`);
+    check(
+      hudGrid.inside,
+      "mọi nút HUD nằm trọn trong vùng nội dung của bảng HUD (không tràn / không bị cắt)",
+    );
+    check(
+      hudGrid.minGap >= 4,
+      `khoảng cách nhỏ nhất giữa các nút HUD >= 4 px (${Math.round(hudGrid.minGap)} px)`,
+    );
+
     // --- 2b) Vùng joystick không bị thân bảng HUD nuốt chạm (#326; phát hiện ở điện thoại ngang: chạm vào thân bảng Nhiệm vụ không bắt đầu được joystick) ---
     // Mọi điểm lưới trong vùng joystick mà bị phần tử khác che phải thuộc một phần tử TƯƠNG TÁC (nút, mục nhiệm vụ...); thân bảng thì không
     const blockers = await J(`(() => {

@@ -36,6 +36,7 @@ Tài liệu này dành cho **người dùng** (có điện thoại Android tầm
 Làm ở **cả dọc và ngang**.
 1. **Bố cục:** HUD không che quá nửa cảnh; joystick (nửa trái, nửa dưới) kéo được kể cả khi ngón đặt trên bảng Nhiệm vụ / HUD; nút Chém / kỹ năng / Nhặt / Mục tiêu bấm đúng, không dính nhau; không phần tử nào lọt dưới tai thỏ / thanh điều hướng.
    - **Bảng Nhiệm vụ** (cột HUD trái): ở điện thoại ngang và điện thoại dọc thấp (< 700 px) thu gọn sẵn thành một dòng `Nhiệm vụ (n) ▸`; bấm tiêu đề để mở / thu, lựa chọn được nhớ kể cả sau khi tải lại và xoay máy; cột HUD trái nên chiếm khoảng 65-70 % chiều cao ở điện thoại ngang.
+   - **Nút HUD** (Nhân vật, Túi, Nhiệm vụ, Tông môn, Âm thanh, Cài đặt) và ô chat: đủ to để chạm bằng ngón cái (>= 44 px), không bấm nhầm nút bên cạnh; ở điện thoại ngang sáu nút xếp lưới 3 cột x 2 hàng, nằm gọn trong bảng HUD, không bị cắt. Khi mở bảng Nhiệm vụ có nhiệm vụ, dòng gợi ý "Chạm vào một nhiệm vụ để chỉ đường" nằm dưới tiêu đề (không phải trong nút thu gọn).
    - **Điều khiển di chuyển:** thử cả hai kiểu ở **Cài đặt -> Điều khiển di chuyển**: *Joystick nổi* (nửa trái, 65 % chiều cao phía dưới) và *Nút hướng cố định* (D-pad 8 hướng, không đè cột HUD trái).
    - **Nút Mục tiêu:** mờ khi không có quái trong tầm khoá (520 px); bấm khoá con gần nhất, bấm tiếp chuyển sang con xa hơn (vòng lại), vòng đánh dấu hiện trên mục tiêu; Chém xoay về con đang khoá.
    - **Đa chạm:** vừa đi (joystick / D-pad) vừa bấm Chém và Kiếm khí cùng lúc; chạm đúp / chụm hai ngón KHÔNG làm trang phóng to.

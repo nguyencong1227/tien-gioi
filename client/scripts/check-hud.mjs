@@ -251,6 +251,37 @@ try {
   );
   await evalJs('localStorage.removeItem("tg_qt_open");0');
 
+  // 4) Gợi ý "chạm nhiệm vụ để chỉ đường" nằm NGOÀI nút thu gọn / mở (nit của A ở #386: nằm trong nút thì dễ hiểu nhầm bấm tiêu đề là chỉ đường)
+  const hintState = () =>
+    evalJs(`(() => {
+      const t = document.getElementById("qt-toggle"), h = document.getElementById("qt-hint");
+      const hr = h.getBoundingClientRect(), tr = t.getBoundingClientRect();
+      return JSON.stringify({ inButton: t.contains(h), btnText: t.textContent, shown: getComputedStyle(h).display !== "none" && !h.hidden,
+        below: hr.top >= tr.bottom - 1, text: h.textContent });
+    })()`).then((v) => JSON.parse(v));
+  await fresh(390, 844, true); // mở mặc định
+  let hs = await hintState();
+  check(
+    !hs.inButton && !/chỉ đường/i.test(hs.btnText),
+    `nhãn gợi ý nằm ngoài nút thu gọn / mở (nút chỉ có "${hs.btnText.trim()}")`,
+  );
+  check(!hs.shown, "chưa có nhiệm vụ: không hiện gợi ý chỉ đường (không có gì để chạm)");
+  await evalJs(
+    `window.__ui.onQuests({ active: [{ id: "nhap_the", step: 0, count: 0 }], done: [], dailyDone: [] });0`,
+  );
+  await sleep(150);
+  hs = await hintState();
+  check(hs.shown && hs.below, `có nhiệm vụ + bảng mở: hiện gợi ý ngay dưới tiêu đề ("${hs.text}")`);
+  await tap(); // thu gọn
+  hs = await hintState();
+  check(!hs.shown, "bảng thu gọn: ẩn gợi ý");
+  await tap(); // mở lại
+  await evalJs(`window.__ui.onQuests({ active: [], done: [], dailyDone: [] });0`);
+  await sleep(150);
+  hs = await hintState();
+  check(!hs.shown, "hết nhiệm vụ: ẩn gợi ý");
+  await evalJs('localStorage.removeItem("tg_qt_open");0');
+
   check(pageErrors === 0, `không ngoại lệ trong trang (${pageErrors})`);
   ws.close();
 } finally {

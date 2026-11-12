@@ -783,6 +783,8 @@ function renderQuestTracker() {
   list.replaceChildren();
   // Số nhiệm vụ đang làm ở tiêu đề (còn thấy khi thu gọn)
   $("qt-count").textContent = questLog.active.length ? ` (${questLog.active.length})` : "";
+  // Gợi ý "chạm nhiệm vụ để chỉ đường" nằm NGOÀI nút thu gọn / mở (nằm trong nút thì người chơi tưởng bấm tiêu đề là chỉ đường); chỉ hiện khi có nhiệm vụ để chạm
+  $("qt-hint").hidden = questLog.active.length === 0;
 
   if (!questLog.active.length) {
     const p = document.createElement("p");
