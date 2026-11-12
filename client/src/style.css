@@ -543,7 +543,8 @@ button {
   position: fixed;
   z-index: 6;
   right: calc(max(14px, env(safe-area-inset-right)) + 168px);
-  bottom: calc(max(14px, env(safe-area-inset-bottom)) + 144px);
+  /* ô thứ 3 của cột nút ngữ cảnh (nhặt +68, nói chuyện +144, cổng +220): ba nút có thể hiện cùng lúc mà không chồng nhau */
+  bottom: calc(max(14px, env(safe-area-inset-bottom)) + 220px);
   width: 66px;
   height: 66px;
   border-color: #a8ff78;
@@ -1275,7 +1276,8 @@ button {
   opacity: 0.6;
   text-shadow: 0 1px 2px #000;
 }
-/* Joystick: chỉ bật trên màn hình cảm ứng */
+/* Joystick: chỉ bật khi đang dùng cảm ứng (html[data-input="touch"] do gfx/display.ts đặt theo lần nhập gần nhất:
+   máy lai tự đổi, cửa sổ trình duyệt hẹp dùng chuột KHÔNG hiện joystick) */
 #joyzone {
   display: none;
   position: fixed;
@@ -1706,12 +1708,6 @@ body.low-fx #btn-talk {
 }
 
 @media (pointer: coarse), (max-width: 640px) {
-  #joyzone {
-    display: block;
-  }
-  #help {
-    display: none;
-  }
   #hud-col-left {
     top: max(8px, env(safe-area-inset-top));
     left: max(8px, env(safe-area-inset-left));
@@ -1763,27 +1759,29 @@ body.low-fx #btn-talk {
   #chat-log {
     height: 55px;
   }
+  /* Cụm nút ngữ cảnh + thanh đan dược nằm LEFT của cụm kỹ năng (rộng 156 px + lề 14): cạnh phải cách mép 14 + 168 = 182 px
+     (cũ 154 px nên chồng lên nút kỹ năng 16 px). Ba nút ngữ cảnh xếp cột, cách nhau 8 px, ô dưới cùng cách thanh đan dược 8 px. */
   #btn-talk {
-    right: calc(max(10px, env(safe-area-inset-right)) + 144px);
-    bottom: calc(max(10px, env(safe-area-inset-bottom)) + 130px);
+    right: calc(max(14px, env(safe-area-inset-right)) + 168px);
+    bottom: calc(max(14px, env(safe-area-inset-bottom)) + 128px);
     width: 58px;
     height: 58px;
   }
   #btn-portal {
-    right: calc(max(10px, env(safe-area-inset-right)) + 144px);
-    bottom: calc(max(10px, env(safe-area-inset-bottom)) + 130px);
+    right: calc(max(14px, env(safe-area-inset-right)) + 168px);
+    bottom: calc(max(14px, env(safe-area-inset-bottom)) + 194px);
     width: 58px;
     height: 58px;
   }
   #btn-pickup {
-    right: calc(max(10px, env(safe-area-inset-right)) + 144px);
-    bottom: calc(max(10px, env(safe-area-inset-bottom)) + 64px);
+    right: calc(max(14px, env(safe-area-inset-right)) + 168px);
+    bottom: calc(max(14px, env(safe-area-inset-bottom)) + 62px);
     width: 58px;
     height: 58px;
   }
   #quickbar {
-    right: calc(max(10px, env(safe-area-inset-right)) + 144px);
-    bottom: max(10px, env(safe-area-inset-bottom));
+    right: calc(max(14px, env(safe-area-inset-right)) + 168px);
+    bottom: max(14px, env(safe-area-inset-bottom));
   }
   .qslot {
     width: 48px;
@@ -4940,4 +4938,26 @@ body.reduced-motion *::after {
   animation-iteration-count: 1 !important;
   transition-duration: 0.01ms !important;
   scroll-behavior: auto !important;
+}
+
+/* ===== Điều khiển cảm ứng (M5.1, #327) ===== */
+/* Bật joystick + ẩn gợi ý phím khi người chơi đang dùng cảm ứng (display.ts đổi theo lần nhập gần nhất: máy lai tự chuyển) */
+html[data-input="touch"] #joyzone {
+  display: block;
+}
+html[data-input="touch"] #help {
+  display: none;
+}
+/* Nút điều khiển: không bôi sáng khi chạm, không trình đơn / chọn chữ khi nhấn giữ (iOS), vuốt không cuộn / phóng to */
+#joyzone,
+#skills,
+#quickbar,
+#btn-talk,
+#btn-pickup,
+#btn-portal {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: none;
 }
