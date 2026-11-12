@@ -3830,14 +3830,12 @@ body.low-fx.in-limbo .stone-item {
 }
 
 /* Màn hình kết quả Bí cảnh */
-.dungeon-end-modal {
-  width: min(92vw, 440px);
+.sheet.dungeon-end-modal {
+  --sheet-w: 440px;
   z-index: 42;
   background: rgba(18, 15, 24, 0.98);
   border: 2px solid #a855f7;
   padding: 18px 16px;
-  display: flex;
-  flex-direction: column;
   gap: 14px;
 }
 
@@ -4011,8 +4009,7 @@ body.low-fx.in-limbo .stone-item {
     padding: 2px 6px;
   }
 
-  .dungeon-end-modal {
-    justify-content: flex-start;
+  .sheet.dungeon-end-modal {
     padding: 24px 16px;
   }
 
@@ -4375,12 +4372,8 @@ body.low-fx.in-limbo .stone-item {
 }
 
 /* Màn hình Kết quả Quyết Đấu */
-.duel-end-modal {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: min(90vw, 360px);
+.sheet.duel-end-modal {
+  --sheet-w: 360px;
   background: rgba(24, 20, 18, 0.98);
   border: 1px solid #d4af37;
   border-radius: 10px;
@@ -4389,8 +4382,6 @@ body.low-fx.in-limbo .stone-item {
     0 10px 30px rgba(0, 0, 0, 0.8),
     0 0 20px rgba(212, 175, 55, 0.2);
   z-index: 100;
-  display: flex;
-  flex-direction: column;
   align-items: center;
   text-align: center;
   gap: 16px;
@@ -5172,14 +5163,8 @@ body.low-fx.in-limbo .stone-item {
 }
 
 /* Modal Client quá cũ / Cập nhật phiên bản (M4 2.5) */
-.outdated-modal {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: min(92vw, 440px);
-  max-width: 440px;
-  max-height: 85dvh;
+.sheet.outdated-modal {
+  --sheet-w: 440px;
   text-align: center;
   z-index: 10000;
   border-radius: 12px;
@@ -5192,15 +5177,8 @@ body.low-fx.in-limbo .stone-item {
 }
 
 @media (pointer: coarse), (max-width: 640px) {
-  .outdated-modal {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: min(90vw, 360px);
-    height: auto;
-    border-radius: 12px;
-    border: 1px solid rgba(201, 162, 74, 0.4);
+  .sheet.outdated-modal {
+    --sheet-w: 360px;
     box-shadow:
       0 0 0 100vmax rgba(0, 0, 0, 0.8),
       0 16px 40px rgba(0, 0, 0, 0.95);
@@ -5244,15 +5222,8 @@ body.low-fx.in-limbo .stone-item {
 }
 
 /* Bảng chỉ dẫn người mới (#269) */
-.newbie-guide-modal {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: min(520px, 94vw);
-  max-height: min(600px, 90dvh);
-  display: flex;
-  flex-direction: column;
+.sheet.newbie-guide-modal {
+  --sheet-w: 520px;
   z-index: 1000;
   box-shadow:
     0 0 0 100vmax rgba(0, 0, 0, 0.75),

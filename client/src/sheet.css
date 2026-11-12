@@ -14,6 +14,10 @@
  *   - phone ngang: ngăn kéo sát cạnh phải, trượt từ phải sang.
  *   - phone: nút đóng tròn ở góc dưới phải (vùng với tay), luôn nhìn thấy kể cả khi nội dung cuộn.
  *
+ * Biến thể THẺ (`.sheet.sheet-card`): hộp thoại kết quả / chỉ dẫn / cảnh báo có nút hành động riêng (Bí cảnh, Quyết đấu, Chỉ dẫn người mới, Phiên bản cũ).
+ * Là cửa sổ nổi giữa màn hình Ở MỌI DẠNG MÁY (kể cả điện thoại: không toàn màn hình, không nút Đóng cố định góc dưới phải); nội dung dài thì
+ * thẻ tự cuộn (`max-height` theo `--vh`). Vẫn đặt bề rộng bằng `--sheet-w`; `z-index` / viền / nền riêng của từng thẻ giữ ở CSS của thẻ đó.
+ *
  * Bảng nào chưa chuyển vẫn dùng luật cũ (.modal-box:not(.sheet) trong style.css); chuyển xong thì xoá luật cũ tương ứng.
  */
 
@@ -38,7 +42,7 @@
 }
 
 /* Điện thoại: phần tử neo mép phải trừ vùng an toàn; nút đóng cố định nên chừa chỗ ở đáy nội dung */
-html[data-form="phone"] .sheet {
+html[data-form="phone"] .sheet:not(.sheet-card) {
   inset: 0;
   width: 100%;
   height: var(--vh, 100dvh);
@@ -59,7 +63,7 @@ html[data-form="phone"] .sheet {
 }
 
 /* Điện thoại xoay ngang: ngăn kéo sát cạnh phải, chừa cảnh game bên trái */
-html[data-form="phone"][data-orient="landscape"] .sheet {
+html[data-form="phone"][data-orient="landscape"] .sheet:not(.sheet-card) {
   left: auto;
   width: min(560px, 64%);
   border-left: 1px solid var(--gold);
@@ -67,7 +71,7 @@ html[data-form="phone"][data-orient="landscape"] .sheet {
 }
 
 /* Nút đóng của tấm trên điện thoại: tròn, to (>= 52 px), góc dưới phải, kèm nhãn Đóng cho mắt đọc nhanh */
-html[data-form="phone"] .sheet .modal-close {
+html[data-form="phone"] .sheet:not(.sheet-card) .modal-close {
   position: fixed;
   z-index: 1;
   right: max(12px, var(--safe-r, env(safe-area-inset-right, 0px)));
@@ -81,7 +85,7 @@ html[data-form="phone"] .sheet .modal-close {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
   font-size: var(--fs-16);
 }
-html[data-form="phone"] .sheet .modal-close::after {
+html[data-form="phone"] .sheet:not(.sheet-card) .modal-close::after {
   content: " Đóng";
   font-size: var(--fs-14);
 }

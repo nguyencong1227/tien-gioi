@@ -124,6 +124,7 @@ try {
     ["shop-modal", "toggleShopModal"],
     ["forge-modal", "toggleForgeModal"],
   ];
+  const CARDS = ["dungeon-end-modal", "duel-end-modal", "newbie-guide-modal", "outdated-modal"];
   const HUD = ["#hud", "#quest-tracker", "#party-panel", "#skills", "#quickbar", "#minimap-wrap"];
   /** Cỡ chữ tính ra của mọi phần tử đang hiện có chữ trực tiếp dưới `root`: { px: { khoá: số lượng } }. */
   const scan = (rootSel) =>
@@ -206,6 +207,26 @@ try {
             `${vp.name} [large] ${id}: không tràn ngang / dọc ngoài ý muốn`,
           );
         await open(toggle, false);
+      }
+      // Thẻ (.sheet-card: kết quả Bí cảnh / Quyết đấu, Chỉ dẫn người mới, Phiên bản cũ): mở bằng cách bỏ `hidden`
+      for (const id of CARDS) {
+        await evalJs(`document.getElementById(${JSON.stringify(id)}).hidden = false;0`);
+        await sleep(450);
+        const o = await scan("#" + id);
+        if (vp.phone) {
+          const bad = offenders(o, 14);
+          check(
+            !bad,
+            `${vp.name} [${mode}] ${id} (thẻ): mọi chữ >= 14 px${bad ? " (nhỏ hơn: " + bad + ")" : ""}`,
+          );
+        }
+        if (mode === "large" && vp.phone)
+          check(
+            await noOverflow(),
+            `${vp.name} [large] ${id} (thẻ): không tràn ngang / dọc ngoài ý muốn`,
+          );
+        await evalJs(`document.getElementById(${JSON.stringify(id)}).hidden = true;0`);
+        await sleep(100);
       }
       // HUD: điện thoại >= 12 px; HUD không co giãn theo cỡ chữ
       if (vp.phone) {

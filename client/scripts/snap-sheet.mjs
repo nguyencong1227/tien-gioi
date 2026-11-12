@@ -40,6 +40,8 @@ const PANELS = [
   ["shop-modal", "toggleShopModal"],
   ["forge-modal", "toggleForgeModal"],
 ];
+// Thẻ (.sheet.sheet-card): hộp thoại kết quả / chỉ dẫn / cảnh báo có nút hành động riêng; mở bằng cách bỏ `hidden` (bố cục đo theo nội dung mặc định)
+const CARDS = ["dungeon-end-modal", "duel-end-modal", "newbie-guide-modal", "outdated-modal"];
 
 const CDP_PORT = 39100 + Math.floor(Math.random() * 400);
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-snap-sheet-"));
@@ -270,6 +272,82 @@ try {
         console.log(`  ✓ ảnh ${file}`);
       }
       await evalJs(`window.__ui.${toggle}(false);0`);
+      await sleep(100);
+    }
+    for (const id of CARDS) {
+      console.log(`\n[${vp.name} ${vp.form}/${vp.orient}] ${id} (thẻ)`);
+      await evalJs(`document.getElementById(${JSON.stringify(id)}).hidden = false;0`);
+      await sleep(450);
+      const c = JSON.parse(
+        await evalJs(`(() => {
+          const el = document.getElementById(${JSON.stringify(id)});
+          const r0 = el.getBoundingClientRect();
+          let foreign = 0;
+          for (let i = 0; i < 5; i++)
+            for (let j = 0; j < 5; j++) {
+              const t = document.elementFromPoint(Math.min(r0.x + ((i + 0.5) / 5) * r0.width, innerWidth - 1), Math.min(r0.y + ((j + 0.5) / 5) * r0.height, innerHeight - 1));
+              if (!t || !el.contains(t)) foreign++;
+            }
+          const cantScroll = el.scrollHeight <= el.clientHeight + 1;
+          el.scrollTop = el.scrollHeight; // kéo xuống đáy: nút hành động cuối phải với tới được
+          const r = el.getBoundingClientRect();
+          const btns = [...el.querySelectorAll("button")].filter((b) => b.getClientRects().length > 0).map((b) => {
+            const q = b.getBoundingClientRect();
+            return { id: b.id, w: q.width, h: q.height, top: q.top, bottom: q.bottom, inCard: q.top >= r.top - 1 && q.bottom <= r.bottom + 1, fixed: getComputedStyle(b).position === "fixed" };
+          });
+          el.scrollTop = 0;
+          const de = document.documentElement;
+          return JSON.stringify({
+            foreign, iw: innerWidth, ih: innerHeight, cantScroll,
+            card: { x: r.x, y: r.y, w: r.width, h: r.height, r: r.right, b: r.bottom },
+            sheetW: parseFloat(getComputedStyle(el).getPropertyValue("--sheet-w")),
+            btns,
+            docScrollW: de.scrollWidth, docScrollH: de.scrollHeight,
+          });
+        })()`),
+      );
+      check(
+        c.foreign === 0,
+        `thẻ nằm trên cùng, không lớp khác chắn (${c.foreign}/25 điểm mẫu bị chắn)`,
+      );
+      check(
+        c.docScrollW <= c.iw && c.docScrollH <= c.ih,
+        `không thanh cuộn ngoài ý muốn (doc ${c.docScrollW}x${c.docScrollH} / khung ${c.iw}x${c.ih})`,
+      );
+      check(
+        c.card.x >= 0 && c.card.r <= c.iw && c.card.y >= 0 && c.card.b <= c.ih,
+        `thẻ nằm gọn trong màn hình (${Math.round(c.card.x)},${Math.round(c.card.y)} ${Math.round(c.card.w)}x${Math.round(c.card.h)} / ${c.iw}x${c.ih})`,
+      );
+      check(Math.abs(c.card.x + c.card.w / 2 - c.iw / 2) < 2, "thẻ căn giữa ngang");
+      check(
+        c.cantScroll
+          ? Math.abs(c.card.y + c.card.h / 2 - c.ih / 2) < 2
+          : c.card.h <= c.ih - 23 && c.card.h >= c.ih * 0.5,
+        `thẻ căn giữa dọc (hoặc, nếu dài, cuộn trong khung chừa lề >= 12 px: cao ${Math.round(c.card.h)} / ${c.ih})`,
+      );
+      check(
+        c.card.w <= Math.min(c.iw * 0.94, c.sheetW) + 1,
+        `bề rộng thẻ <= min(94 % khung, --sheet-w ${c.sheetW}) (${Math.round(c.card.w)})`,
+      );
+      check(
+        c.btns.length > 0,
+        `thẻ có nút hành động hiện (${c.btns.map((b) => b.id || "?").join(", ")})`,
+      );
+      check(
+        c.btns.every((b) => b.h >= 44 && b.w >= 44),
+        `mọi nút >= 44x44 (${c.btns.map((b) => `${b.id || "?"} ${Math.round(b.w)}x${Math.round(b.h)}`).join(", ")})`,
+      );
+      check(
+        c.btns.every((b) => b.inCard && b.bottom <= c.ih && b.top >= 0 && !b.fixed),
+        "kéo xuống đáy: mọi nút nằm trong thẻ, với tới được, không bị ghim ra ngoài thẻ",
+      );
+      if (!NO_SHOT) {
+        const shot = await send("Page.captureScreenshot", { format: "webp", quality: 90 });
+        const file = `sheet-${id.replace("-modal", "")}-${vp.name}.webp`;
+        fs.writeFileSync(path.join(OUT_DIR, file), Buffer.from(shot.result.data, "base64"));
+        console.log(`  ✓ ảnh ${file}`);
+      }
+      await evalJs(`document.getElementById(${JSON.stringify(id)}).hidden = true;0`);
       await sleep(100);
     }
   }
