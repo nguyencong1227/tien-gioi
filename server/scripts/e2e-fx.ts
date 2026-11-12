@@ -175,12 +175,16 @@ async function main() {
         s.fx.floatNumber('88', s.predX, s.predY - 40, { color: 0xff00ff, size: 48, priority: 2 });
         const r = s.game.canvas.getBoundingClientRect();
         const w = Math.round(r.width), h = Math.round(r.height);
-        setTimeout(() => s.game.renderer.snapshotArea(0, 0, w, h, (img) => {
+        // Thăm dò tối đa 3 s (máy dùng chung có thể quá tải, khung chậm: chờ cố định 60 ms làm ca kiểm chập chờn); lấy số LỚN NHẤT thấy được
+        let best = 0, tries = 0;
+        const grab = () => s.game.renderer.snapshotArea(0, 0, w, h, (img) => {
           const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
           const x = c.getContext('2d'); x.drawImage(img, 0, 0);
           const d = x.getImageData(0, 0, c.width, c.height).data; let n = 0;
           for (let i = 0; i < d.length; i += 4) if (d[i] > 180 && d[i + 2] > 180 && d[i + 1] < 90) n++;
-          resolve(n); }), 60); })`),
+          if (n > best) best = n;
+          if (best > 150 || ++tries >= 25) resolve(best); else setTimeout(grab, 120); });
+        setTimeout(grab, 60); })`),
     );
     must(painted > 150, `chữ bay được VẼ thật ra màn hình (điểm ảnh tím: ${painted})`);
     ok(`glyph có UV hợp lệ và chữ bay thật sự được vẽ (${painted} điểm ảnh)`);
@@ -203,7 +207,11 @@ async function main() {
     const alive2 = await aliveParticles();
     must(alive2 <= 520 * 2, `hạt sống thật <= gấp đôi trần: ${alive2}`);
     // ưu tiên 0: tối đa 60 % trần
-    await sleep(700); // hạt hết thời gian sống (<= 320 ms): ngân sách được trả lại
+    // Hạt hết thời gian sống (<= 320 ms theo đồng hồ Phaser): thăm dò tới 15 s thay vì chờ cố định (máy quá tải thì khung chậm)
+    await T.waitFor(
+      `window.__fx.stats().liveEmitters === 0 && window.__scene.children.list.filter((c) => c.type === 'ParticleEmitter').reduce((n, e) => n + e.getAliveParticleCount(), 0) === 0`,
+      "hạt hết thời gian sống",
+    );
     must((await fx(`fx.stats().liveEmitters`)) === 0, "hết thời gian sống -> ngân sách trả về 0");
     must((await aliveParticles()) === 0, `hạt sống thật về 0: ${await aliveParticles()}`);
     ok("hạt hết thời gian sống: ngân sách VÀ hạt thật đều về 0");
