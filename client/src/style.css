@@ -412,9 +412,46 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+  padding: 0 0 4px;
+  margin: 0 0 6px;
+  border: 0;
   border-bottom: 1px solid var(--line);
-  padding-bottom: 4px;
-  margin-bottom: 6px;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+/* Tiêu đề là nút bấm thu gọn / mở: trên cảm ứng đủ 44 px */
+html[data-input="touch"] .qt-head {
+  min-height: 44px;
+}
+.qt-head #qt-count {
+  margin-left: 4px;
+  color: var(--paper);
+  font-weight: 400;
+  opacity: 0.8;
+}
+.qt-caret {
+  flex: none;
+  color: var(--gold);
+  transition: transform 0.15s;
+}
+/* Thu gọn (tg_qt_open; mặc định ở điện thoại ngang / dọc thấp, gfx/hud-compact.ts): chỉ còn tiêu đề + số nhiệm vụ */
+#quest-tracker.collapsed #quest-tracker-list,
+#quest-tracker.collapsed .qt-head small {
+  display: none;
+}
+#quest-tracker.collapsed .qt-head {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+#quest-tracker.collapsed .qt-caret {
+  transform: rotate(-90deg);
 }
 .qt-head b {
   white-space: nowrap; /* "Nhiệm vụ" không gãy dòng khi nhãn bên cạnh được nâng lên 12 px trên điện thoại */
