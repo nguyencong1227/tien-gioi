@@ -11,6 +11,9 @@ import {
   type MyAttack,
 } from "../gfx/fx/combat-fx";
 import { getQuality } from "../gfx/quality";
+import { buildDecorGrid } from "../gfx/map-decor";
+import { styleOf } from "../gfx/map-style";
+import { decorTilesetKey, ensureDecorTileset } from "../gfx/decor-tileset";
 import { fitZoom, toCssPoint } from "../gfx/scale";
 import Phaser from "phaser";
 import type { Room } from "colyseus.js";
@@ -250,6 +253,9 @@ export class WorldScene extends Phaser.Scene {
   public map: GameMap;
   private mapTilemap?: Phaser.Tilemaps.Tilemap;
   private mapLayer?: Phaser.Tilemaps.TilemapLayer;
+  /** Lớp trang trí tất định (M5.3 #332): tilemap thứ hai, tileset vẽ bằng mã theo kiểu bản đồ. */
+  private decorTilemap?: Phaser.Tilemaps.Tilemap;
+  decorLayer?: Phaser.Tilemaps.TilemapLayer;
   private townVisuals: Phaser.GameObjects.GameObject[] = [];
   private portalVisuals: Phaser.GameObjects.GameObject[] = [];
   private nearPortal: PortalDef | null = null;
@@ -409,6 +415,14 @@ export class WorldScene extends Phaser.Scene {
       this.mapTilemap.destroy();
       this.mapTilemap = undefined;
     }
+    if (this.decorLayer) {
+      this.decorLayer.destroy();
+      this.decorLayer = undefined;
+    }
+    if (this.decorTilemap) {
+      this.decorTilemap.destroy();
+      this.decorTilemap = undefined;
+    }
 
     // 2. Dựng tilemap mới
     const data: number[][] = [];
@@ -420,6 +434,25 @@ export class WorldScene extends Phaser.Scene {
     const ts = this.mapTilemap.addTilesetImage("tiles", TILESET_KEY, TILE, TILE, 0, 0)!;
     this.mapLayer = this.mapTilemap.createLayer(0, ts, 0, 0)!;
     this.mapLayer.setDepth(-10);
+
+    // 2b. Lớp trang trí tất định (cỏ, hoa, đá, nấm, bụi): thuần thị giác, sinh từ seed + mapId nên mọi người thấy giống nhau
+    const style = styleOf(this.map.def.id);
+    const decorGrid = buildDecorGrid(this.map, style);
+    const decorRows: number[][] = [];
+    for (let y = 0; y < mh; y++)
+      decorRows.push(Array.from(decorGrid.subarray(y * mw, (y + 1) * mw)));
+    this.decorTilemap = this.make.tilemap({ data: decorRows, tileWidth: TILE, tileHeight: TILE });
+    const decorKey = ensureDecorTileset(this, this.map.def.id, style);
+    const decorTs = this.decorTilemap.addTilesetImage(
+      decorTilesetKey(this.map.def.id),
+      decorKey,
+      TILE,
+      TILE,
+      0,
+      0,
+    )!;
+    this.decorLayer = this.decorTilemap.createLayer(0, decorTs, 0, 0)!;
+    this.decorLayer.setDepth(-9);
 
     // 3. Dựng nhãn và vòng an toàn của trấn / trạm (nếu có trấn)
     for (const obj of this.townVisuals) obj.destroy();
