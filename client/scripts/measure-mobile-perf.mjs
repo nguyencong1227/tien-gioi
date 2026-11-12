@@ -1,22 +1,36 @@
 /* global console, setTimeout, fetch */
-// Script đo hiệu năng di động qua CDP Chrome headless theo Issue #251 & docs/PHAN_CONG_M4.md (mục 4.3):
-// - Viewport: 390x844 (màn hình di động chuẩn)
-// - Giả lập CPU chậm 4x (Emulation.setCPUThrottlingRate)
-// - Đo: thời gian vào game (TTG), FPS trung bình, FPS thấp nhất (p5), bộ nhớ JS heap
-// - Kịch bản: Trấn bình thường (1 người) và Trấn đông (30 người tụ tập)
+/**
+ * Script đo hiệu năng di động & đồ hoạ đa kịch bản qua Chrome CDP Headless
+ * M5.1, Issue #330, THIET_KE_GIAO_DIEN_DO_HOA.md mục 10 và 12.
+ *
+ * - Giả lập viewport di động: 390x844 (DPR 2)
+ * - Tự động thiết lập localStorage.tg_quality tường minh (low / mid / high) để không phụ thuộc SwiftShader
+ * - Throttling CPU: 1x, 4x, 6x (giả lập Android tầm trung và thiết bị yếu)
+ * - Kịch bản: solo (1 người), crowd (50 bot), combat (chiến đấu fx), dungeon (bí cảnh)
+ * - Đối chiếu thời gian khung p95 và các chỉ số tài nguyên với client/perf-budget.json
+ *
+ * Chạy:
+ *   npm run perf:mobile
+ *   node client/scripts/measure-mobile-perf.mjs [--quick] [--tier low|mid|high] [--cpu 1|4|6]
+ */
+
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import process from "node:process";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const REPO = path.resolve(__dirname, "../..");
 const DIST = path.join(REPO, "client/dist");
 const DOC_PATH = path.join(REPO, "docs/HIEU_NANG_DI_DONG.md");
+const BUDGET_PATH = path.join(REPO, "client/perf-budget.json");
+const RESULTS_JSON_PATH = path.join(REPO, "docs/perf-mobile-results.json");
 
 const MIMES = {
   ".html": "text/html; charset=utf-8",
@@ -24,11 +38,28 @@ const MIMES = {
   ".css": "text/css; charset=utf-8",
   ".json": "application/json",
   ".png": "image/png",
+  ".webp": "image/webp",
   ".svg": "image/svg+xml",
   ".webmanifest": "application/manifest+json",
 };
 
-// 1. Static server phục vụ client/dist
+// Đọc tham số dòng lệnh
+const args = process.argv.slice(2);
+const isQuick = args.includes("--quick");
+const filterTier = args.find((a) => a.startsWith("--tier="))?.split("=")[1] || null;
+const filterCpu = args.find((a) => a.startsWith("--cpu="))?.split("=")[1] || null;
+
+// Đọc ngân sách nếu có
+let budget = null;
+if (fs.existsSync(BUDGET_PATH)) {
+  try {
+    budget = JSON.parse(fs.readFileSync(BUDGET_PATH, "utf-8"));
+  } catch (e) {
+    console.warn(`[Cảnh báo] Không thể nạp ${BUDGET_PATH}:`, e.message);
+  }
+}
+
+// 1. Static web server phục vụ client/dist
 const server = http.createServer((req, res) => {
   const urlPath = req.url.split("?")[0];
   let filePath = path.join(DIST, urlPath === "/" ? "index.html" : urlPath);
@@ -64,39 +95,99 @@ const chromeProcess = spawn("google-chrome", [
   "about:blank",
 ]);
 
-const SCENARIOS = [
+// Danh sách các kịch bản chuẩn
+export const ALL_SCENARIOS = [
+  // Chế độ solo (1 người)
   {
-    name: "Trấn vắng (1 người)",
-    url: `http://127.0.0.1:${HTTP_PORT}/?sect=mock&debug=1&perf=1`,
+    id: "solo",
+    name: "Một mình (Trấn vắng)",
+    query: "dungeon=mock&debug=1&perf=1",
+    tier: "low",
     cpuRate: 1,
-    cpuLabel: "1x (Bình thường)",
   },
   {
-    name: "Trấn vắng (1 người)",
-    url: `http://127.0.0.1:${HTTP_PORT}/?sect=mock&debug=1&perf=1`,
+    id: "solo-4x",
+    name: "Một mình (Trấn vắng)",
+    query: "dungeon=mock&debug=1&perf=1",
+    tier: "low",
     cpuRate: 4,
-    cpuLabel: "4x (Di động chậm)",
+  },
+  // Chế độ crowd (50 người đông)
+  {
+    id: "crowd-low-4x",
+    name: "Trấn đông (50 bot)",
+    query: "crowd=50&debug=1&perf=1",
+    tier: "low",
+    cpuRate: 4,
   },
   {
-    name: "Trấn đông (30 người tụ tập)",
-    url: `http://127.0.0.1:${HTTP_PORT}/?crowd=30&debug=1&perf=1`,
+    id: "crowd-mid-4x",
+    name: "Trấn đông (50 bot)",
+    query: "crowd=50&debug=1&perf=1",
+    tier: "mid",
+    cpuRate: 4,
+  },
+  {
+    id: "crowd-high-4x",
+    name: "Trấn đông (50 bot)",
+    query: "crowd=50&debug=1&perf=1",
+    tier: "high",
+    cpuRate: 4,
+  },
+  {
+    id: "crowd-high-1x",
+    name: "Trấn đông (50 bot)",
+    query: "crowd=50&debug=1&perf=1",
+    tier: "high",
     cpuRate: 1,
-    cpuLabel: "1x (Bình thường)",
   },
   {
-    name: "Trấn đông (30 người tụ tập)",
-    url: `http://127.0.0.1:${HTTP_PORT}/?crowd=30&debug=1&perf=1`,
+    id: "crowd-low-6x",
+    name: "Trấn đông (50 bot) - Máy rất yếu",
+    query: "crowd=50&debug=1&perf=1",
+    tier: "low",
+    cpuRate: 6,
+  },
+  // Chế độ combat (chiến đấu có hiệu ứng fx)
+  {
+    id: "combat-low-4x",
+    name: "Chiến đấu có hiệu ứng hạt",
+    query: "duel=mock&debug=1&perf=1",
+    tier: "low",
     cpuRate: 4,
-    cpuLabel: "4x (Di động chậm)",
   },
   {
-    name: "Trấn đông (30 người) + Giảm hiệu ứng",
-    url: `http://127.0.0.1:${HTTP_PORT}/?crowd=30&debug=1&perf=1`,
+    id: "combat-high-4x",
+    name: "Chiến đấu có hiệu ứng hạt",
+    query: "duel=mock&debug=1&perf=1",
+    tier: "high",
     cpuRate: 4,
-    cpuLabel: "4x (Di động chậm)",
-    lowFx: true,
+  },
+  // Chế độ bí cảnh (dungeon)
+  {
+    id: "dungeon-mid-4x",
+    name: "Bí cảnh",
+    query: "dungeon=mock&debug=1&perf=1",
+    tier: "mid",
+    cpuRate: 4,
   },
 ];
+
+// Lọc kịch bản theo cờ
+let scenariosToRun = ALL_SCENARIOS;
+if (isQuick) {
+  // Chế độ nhanh: chỉ đo 3 ca tiêu biểu của Trấn đông 50 bot ở CPU 4x cho 3 bậc
+  scenariosToRun = ALL_SCENARIOS.filter((s) =>
+    ["crowd-low-4x", "crowd-mid-4x", "crowd-high-4x"].includes(s.id),
+  );
+} else {
+  if (filterTier) {
+    scenariosToRun = scenariosToRun.filter((s) => s.tier === filterTier);
+  }
+  if (filterCpu) {
+    scenariosToRun = scenariosToRun.filter((s) => s.cpuRate === Number(filterCpu));
+  }
+}
 
 const results = [];
 
@@ -110,15 +201,18 @@ try {
         break;
       }
     } catch {
-      // Chrome chưa mở cổng, đợi vòng lặp kế
+      // Đợi Chrome mở cổng
     }
     await sleep(100);
   }
 
   if (!versionData) throw new Error("Chrome headless không khởi động kịp sau 4 giây.");
 
-  for (const sc of SCENARIOS) {
-    console.log(`\n>>> Đo kịch bản: ${sc.name} | CPU: ${sc.cpuLabel}...`);
+  for (const sc of scenariosToRun) {
+    const targetUrl = `http://127.0.0.1:${HTTP_PORT}/?${sc.query}`;
+    console.log(
+      `\n>>> Đo kịch bản: ${sc.name} | Bậc: ${sc.tier.toUpperCase()} | CPU: ${sc.cpuRate}x...`,
+    );
 
     const newTabRes = await fetch(`http://127.0.0.1:${CDP_PORT}/json/new?about:blank`, {
       method: "PUT",
@@ -146,17 +240,28 @@ try {
 
     await cdpSend("Page.enable");
     await cdpSend("Runtime.enable");
+
+    // Đặt viewport chuẩn di động 390x844
     await cdpSend("Emulation.setDeviceMetricsOverride", {
       width: 390,
       height: 844,
-      deviceScaleFactor: 1,
+      deviceScaleFactor: 2,
       mobile: true,
     });
     await cdpSend("Emulation.setCPUThrottlingRate", { rate: sc.cpuRate });
 
-    // Đo thời gian vào game (TTG)
+    // ĐẶT CHẤT LƯỢNG TƯỜNG MINH TRƯỚC KHI TRANG TẢI (chống fallback SwiftShader)
+    await cdpSend("Page.addScriptToEvaluateOnNewDocument", {
+      source: `
+        try {
+          localStorage.setItem("tg_quality", ${JSON.stringify(sc.tier)});
+          localStorage.setItem("tg_newbie_guide_dismissed", "1");
+        } catch (e) {}
+      `,
+    });
+
     const t0 = Date.now();
-    await cdpSend("Page.navigate", { url: sc.url });
+    await cdpSend("Page.navigate", { url: targetUrl });
 
     // Đợi scene và __tgPerf sẵn sàng
     let ready = false;
@@ -174,31 +279,22 @@ try {
 
     if (!ready) {
       console.error("  ✗ Kịch bản không tải xong sau 10s.");
+      cdpWs.close();
+      await fetch(`http://127.0.0.1:${CDP_PORT}/json/close/${tabData.id}`);
       continue;
     }
 
     const ttgMs = Date.now() - t0;
     console.log(`  - Thời gian tới lúc vào game (TTG): ${(ttgMs / 1000).toFixed(2)}s`);
 
-    // Bật Low Fx nếu kịch bản yêu cầu
-    if (sc.lowFx) {
-      await cdpSend("Runtime.evaluate", {
-        expression: `
-          if (window.__ui) {
-            localStorage.setItem("tg_low_fx", "1");
-            window.__ui.setLowFx(true);
-          }
-        `,
-      });
-    }
-
-    // Đợi ổn định và reset bộ đếm hiệu năng
+    // Chờ 1.5s cho cảnh ổn định rồi reset bộ đếm
     await sleep(1500);
     await cdpSend("Runtime.evaluate", { expression: `window.__tgPerf.reset()` });
 
-    // Lấy mẫu đo đạc trong 6 giây (~360 khung hình)
-    console.log("  - Đang thu thập mẫu hiệu năng trong 6 giây...");
-    await sleep(6000);
+    // Thu thập mẫu trong 5 giây
+    const sampleDurationMs = isQuick ? 3000 : 5000;
+    console.log(`  - Đang thu thập mẫu hiệu năng trong ${sampleDurationMs / 1000} giây...`);
+    await sleep(sampleDurationMs);
 
     const snapRes = await cdpSend("Runtime.evaluate", {
       expression: `JSON.stringify(window.__tgPerf.snapshot())`,
@@ -210,29 +306,45 @@ try {
       returnByValue: true,
     });
 
+    // Đọc thêm chỉ số từ ?perf=1 overlay nếu có
+    const overlayRes = await cdpSend("Runtime.evaluate", {
+      expression: `document.getElementById("perf-overlay")?.innerText || ""`,
+      returnByValue: true,
+    });
+
     const rawSnap = snapRes?.result?.result?.value;
     const snap = rawSnap ? JSON.parse(rawSnap) : null;
     const heapBytes = memoryRes?.result?.result?.value || 0;
     const heapMb = Number((heapBytes / (1024 * 1024)).toFixed(1));
+    const overlayText = overlayRes?.result?.result?.value || "";
 
     if (snap) {
-      // FPS thấp nhất (p5): tương ứng với phân vị 95 của thời gian khung hình (frameP95Ms)
       const fpsP5 = Number((1000 / snap.frameP95Ms).toFixed(1));
+      const tierBudget = budget?.runtime?.tiers?.[sc.tier];
+      const maxP95Allowed = tierBudget?.jsFrameP95Ms || 999;
+      const budgetMet = snap.frameP95Ms <= maxP95Allowed;
+
       const resItem = {
+        id: sc.id,
         scenario: sc.name,
-        cpu: sc.cpuLabel,
+        tier: sc.tier,
+        cpu: `${sc.cpuRate}x`,
         ttgSec: Number((ttgMs / 1000).toFixed(2)),
         fpsAvg: snap.fpsAvg,
         fpsP5: Math.min(snap.fpsAvg, fpsP5),
         frameAvgMs: snap.frameAvgMs,
         frameP95Ms: snap.frameP95Ms,
+        budgetP95Ms: maxP95Allowed,
+        budgetMet,
         heapMb,
         frames: snap.frames,
-        players: snap.playersAvg,
+        overlayExcerpt: overlayText.split("\n").slice(0, 3).join(" | "),
       };
       results.push(resItem);
+
+      const statusTag = budgetMet ? "✓ ĐẠT" : "⚠ VƯỢT";
       console.log(
-        `  ✓ FPS TB: ${resItem.fpsAvg} | FPS p5 (thấp nhất): ${resItem.fpsP5} | Heap: ${resItem.heapMb} MB | Frames: ${resItem.frames}`,
+        `  ${statusTag} FPS TB: ${resItem.fpsAvg} | Frame p95: ${resItem.frameP95Ms} ms (Ngân sách: <= ${maxP95Allowed} ms) | Heap: ${resItem.heapMb} MB`,
       );
     }
 
@@ -250,63 +362,59 @@ try {
 }
 
 // ---------------------------------------------------------------------------
-// Ghi bảng kết quả vào docs/HIEU_NANG_DI_DONG.md
+// Xuất bảng kết quả và lưu tệp
 // ---------------------------------------------------------------------------
-console.log("\n=== TỔNG HỢP KẾT QUẢ ĐO HIỆU NĂNG DI ĐỘNG ===");
-console.table(results);
+console.log("\n=== TỔNG HỢP KẾT QUẢ ĐO HIỆU NĂNG DI ĐỘNG & ĐỒ HOẠ (M5.1) ===");
+console.table(
+  results.map((r) => ({
+    Kịch_bản: r.scenario,
+    Bậc: r.tier,
+    CPU: r.cpu,
+    FPS_TB: r.fpsAvg,
+    FPS_p5: r.fpsP5,
+    Frame_p95: `${r.frameP95Ms} ms`,
+    Ngân_sách: `<=${r.budgetP95Ms} ms`,
+    Đạt: r.budgetMet ? "PASS" : "FAIL",
+    Heap: `${r.heapMb} MB`,
+  })),
+);
 
-let markdown = `# Đo Hiệu Năng Di Động (Mobile Performance Benchmark)
+// Lưu JSON
+fs.writeFileSync(RESULTS_JSON_PATH, JSON.stringify(results, null, 2), "utf-8");
+console.log(`\n- Đã lưu kết quả chi tiết dạng JSON vào: ${RESULTS_JSON_PATH}`);
 
-> Tài liệu thực nghiệm đo hiệu năng giao diện và đồ hoạ client trên thiết bị di động (Issue #251, M4 mục 4.3).
+// Ghi tài liệu docs/HIEU_NANG_DI_DONG.md
+let markdown = `# Đo Hiệu Năng Di Động & Đồ Hoạ (Mobile Performance Benchmark)
+
+> Tài liệu thực nghiệm đo hiệu năng giao diện và đồ hoạ client trên thiết bị di động (M5.1, Issue #330).
 > **Nguyên tắc**: Đo bằng số liệu thực tế, **không tối ưu mù**.
 
 ## 1. Môi trường và thông số đo
 - **Thiết bị giả lập**: Chrome Headless CDP qua \`Emulation.setDeviceMetricsOverride\`.
-- **Độ phân giải viewport**: 390 × 844 px (tỷ lệ màn hình iPhone 12/13/14 Pro chuẩn).
+- **Độ phân giải viewport**: 390 × 844 px (tỷ lệ màn hình iPhone 12/13/14 Pro chuẩn, DPR 2).
+- **Chất lượng**: Được cố định tường minh qua \`localStorage.setItem('tg_quality', tier)\` cho từng kịch bản (\`low\`, \`mid\`, \`high\`).
 - **CPU Throttling**:
-  - **1x (Bình thường)**: Tương đương máy tính bàn hoặc điện thoại phân khúc cao cấp (flagship).
-  - **4x (Di động chậm)**: Giảm 4 lần tốc độ xử lý CPU để giả lập điện thoại Android / iOS tầm trung hoặc đời cũ.
-- **Thời gian lấy mẫu**: 6 giây liên tục (~360 frames) cho mỗi kịch bản.
+  - **1x**: Máy tính bàn hoặc chip flagship cao cấp.
+  - **4x**: Đại diện điện thoại Android / iOS tầm trung.
+  - **6x**: Thiết bị đời cũ hoặc phân khúc thấp.
 
-## 2. Bảng số liệu thực nghiệm
+## 2. Bảng số liệu thực nghiệm ma trận
 
-| Kịch bản | Giả lập CPU | Vào game (s) | FPS TB | FPS thấp nhất (p5) | Frame TB (ms) | Frame p95 (ms) | JS Heap (MB) |
-|---|---|---|---|---|---|---|---|
+| Kịch bản | Bậc chất lượng | CPU | Vào game (s) | FPS TB | FPS p5 | Frame TB (ms) | Frame p95 (ms) | Ngân sách p95 | Trạng thái | JS Heap (MB) |
+|---|---|---|---|---|---|---|---|---|---|---|
 `;
 
 for (const r of results) {
-  markdown += `| ${r.scenario} | ${r.cpu} | ${r.ttgSec}s | **${r.fpsAvg}** | **${r.fpsP5}** | ${r.frameAvgMs} ms | ${r.frameP95Ms} ms | ${r.heapMb} MB |\n`;
+  const statusStr = r.budgetMet ? "✓ ĐẠT" : "⚠ VƯỢT";
+  markdown += `| ${r.scenario} | ${r.tier.toUpperCase()} | ${r.cpu} | ${r.ttgSec}s | **${r.fpsAvg}** | **${r.fpsP5}** | ${r.frameAvgMs} ms | ${r.frameP95Ms} ms | <= ${r.budgetP95Ms} ms | ${statusStr} | ${r.heapMb} MB |\n`;
 }
 
-markdown += `
-## 3. Nhận xét và đánh giá
-1. **Khả năng duy trì khung hình (FPS)**:
-   - Ở chế độ bình thường (CPU 1x): Client đạt ngưỡng tối đa màn hình 60 FPS mượt mà cả khi 30 người chơi tụ tập trong trấn.
-   - Ở chế độ di động chậm (CPU 4x):
-     - Khi ở trấn bình thường: FPS trung bình đạt trên 55–60 FPS, không bị giật lag.
-     - Khi ở trấn đông (30 người tụ tập với đầy đủ biệt hiệu tông môn, dấu thách đấu, trang bị và animation di chuyển): FPS trung bình vẫn duy trì ở mức an toàn (> 40–50 FPS), không bị sụt dưới ngưỡng 30 FPS.
-2. **Thời gian nạp vào game (Time to Game)**:
-   - Khoảng 1.2 – 2.5 giây từ lúc nạp trang đến khi nhân vật xuất hiện trên bản đồ và nhận điều khiển.
-3. **Bộ nhớ RAM (JS Heap)**:
-   - Dung lượng bộ nhớ JS duy trì ổn định trong khoảng ~20–35 MB, hoàn toàn an toàn cho thiết bị di động có RAM từ 2 GB trở lên.
-
-## 4. Đề xuất cải thiện khi chạy trên thiết bị yếu (tham khảo, chưa tối ưu mù)
-*Dành cho tương lai nếu gặp thiết bị cấu hình rất thấp (< 30 FPS trên máy thật):*
-1. **Bật chế độ Giảm hiệu ứng (\`tg_low_fx = 1\`)**: Tắt hào quang aura thiền định, vòng sáng pháp bảo và hiệu ứng nhấp nháy chữ bay. Giúp giảm tải xử lý hạt và giải phóng dung lượng bộ nhớ JS heap.
-2. **Ẩn tên người chơi ở xa (\`tg_hide_names = 1\`)**: Giảm số lượng đối tượng Text canvas khi đông người tụ tập.
-3. **Phân trang vẽ sprite theo khoảng cách**: Chỉ cập nhật animation của người chơi trong bán kính 300px.
-
-## 5. Giới hạn của phép đo (Limitations)
-1. **Môi trường đo là Headless Browser**: Thử nghiệm được thực hiện trên Chrome Headless (Linux host) qua giao thức CDP; các nhân vật trong cảnh thử nghiệm đứng yên hoặc chạy animation định sẵn.
-2. **GPU di động thực tế**: Cơ chế làm chậm CPU 4x của Chrome chỉ đo lường thời gian thực thi mã nguồn JavaScript / WebAssembly, chưa phản ánh đầy đủ năng lực của chip đồ họa di động (GPU Mali / Adreno) về băng thông bộ nhớ và tỷ lệ lấp đầy (fillrate) khi nhiều layer canvas đè nhau.
-3. **Mục đích**: Bảng số liệu là căn cứ chứng minh kiến trúc hiện tại nhẹ nhàng và đủ mượt mà ở tầng CPU logic; tuyệt đối không tối ưu mù trước khi có số đo từ thiết bị thật.
-
-## 6. Cách chạy lại lệnh đo
-\`\`\`bash
-npm run build
-node client/scripts/measure-mobile-perf.mjs
-\`\`\`
+markdown += `\n## 3. Đối chiếu Ngân sách perf-budget.json
+- Bậc Thấp (CPU 4x): Frame p95 <= 9.0 ms
+- Bậc Vừa (CPU 4x): Frame p95 <= 11.0 ms
+- Bậc Cao (CPU 4x): Frame p95 <= 13.0 ms
+- Kết quả chi tiết máy đọc được lưu tại \`docs/perf-mobile-results.json\`.
 `;
 
-fs.writeFileSync(DOC_PATH, markdown, "utf8");
-console.log(`\n✓ Đã ghi bảng số liệu và phân tích vào: ${DOC_PATH}`);
+fs.writeFileSync(DOC_PATH, markdown, "utf-8");
+console.log(`- Đã cập nhật bảng số liệu vào: ${DOC_PATH}`);

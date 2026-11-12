@@ -1,0 +1,50 @@
+[
+  {
+    "id": "crowd-low-4x",
+    "scenario": "Trấn đông (50 bot)",
+    "tier": "low",
+    "cpu": "4x",
+    "ttgSec": 1.36,
+    "fpsAvg": 60,
+    "fpsP5": 60,
+    "frameAvgMs": 16.66,
+    "frameP95Ms": 16.67,
+    "budgetP95Ms": 9,
+    "budgetMet": false,
+    "heapMb": 26.5,
+    "frames": 180,
+    "overlayExcerpt": "FPS 60  p95 16.7 ms | chất lượng low (low)  hạ 0  xấu 0 tốt 0 | 390x844 dpr 2 x1"
+  },
+  {
+    "id": "crowd-mid-4x",
+    "scenario": "Trấn đông (50 bot)",
+    "tier": "mid",
+    "cpu": "4x",
+    "ttgSec": 1.08,
+    "fpsAvg": 60,
+    "fpsP5": 60,
+    "frameAvgMs": 16.66,
+    "frameP95Ms": 16.67,
+    "budgetP95Ms": 11,
+    "budgetMet": false,
+    "heapMb": 28.1,
+    "frames": 180,
+    "overlayExcerpt": "FPS 60  p95 16.7 ms | chất lượng mid (mid)  hạ 0  xấu 0 tốt 0 | 390x844 dpr 2 x1.5"
+  },
+  {
+    "id": "crowd-high-4x",
+    "scenario": "Trấn đông (50 bot)",
+    "tier": "high",
+    "cpu": "4x",
+    "ttgSec": 1.15,
+    "fpsAvg": 48.5,
+    "fpsP5": 40,
+    "frameAvgMs": 20.63,
+    "frameP95Ms": 25,
+    "budgetP95Ms": 13,
+    "budgetMet": false,
+    "heapMb": 22.9,
+    "frames": 126,
+    "overlayExcerpt": "FPS 42  p95 33.4 ms | chất lượng high (high)  hạ 0  xấu 0 tốt 0 | 390x844 dpr 2 x2"
+  }
+]

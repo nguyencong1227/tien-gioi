@@ -34,7 +34,9 @@
     "check:credits": "node client/scripts/check-credits.mjs",
     "perf:mobile": "node client/scripts/measure-mobile-perf.mjs",
     "capture:viewports": "node client/scripts/capture-viewports.mjs",
-    "chup-viewport": "node client/scripts/capture-viewports.mjs"
+    "chup-viewport": "node client/scripts/capture-viewports.mjs",
+    "check:budget": "node client/scripts/check-perf-budget.mjs",
+    "leak:test": "node client/scripts/leak-test.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
