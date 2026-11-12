@@ -1796,8 +1796,12 @@ body.low-fx #btn-talk {
     font-size: var(--fs-11);
     padding: 6px 8px;
   }
-  .hud-btn {
+  .hud-btn,
+  .hud-btn.icon-only {
     min-width: 44px;
+    min-height: 44px;
+  }
+  #chat-input {
     min-height: 44px;
   }
   #party-panel {
@@ -1920,6 +1924,25 @@ body.low-fx #btn-talk {
     padding: 5px 8px;
     font-size: var(--fs-11);
   }
+  /* Dòng chân HUD: cột trái xếp chồng (Đạo hữu trực tuyến, Linh thạch) + lưới nút 3 x 44 px bên phải; xếp ngang thì không đủ 194 px */
+  .hud-foot {
+    display: grid;
+    grid-template-columns: auto 144px;
+    grid-template-areas:
+      "on btns"
+      "coin btns";
+    justify-content: space-between;
+    align-content: center;
+    align-items: start;
+    column-gap: 6px;
+    row-gap: 4px;
+  }
+  #hud-online {
+    grid-area: on;
+  }
+  #hud-coin-badge {
+    grid-area: coin;
+  }
   .bar {
     height: 12px;
     margin: 2px 0;
@@ -1928,10 +1951,16 @@ body.low-fx #btn-talk {
     font-size: var(--fs-10);
     line-height: 12px;
   }
+  /* Nút HUD >= 44x44 (mục 4.2 điều 1). Lưới 3 cột x 2 hàng cho 6 nút (3 x 44 + 2 x 6 = 144 px) thấp hơn 3 hàng x 32 px trước đây */
   .hud-btn {
-    min-width: 34px;
-    min-height: 32px;
+    min-width: 44px;
+    min-height: 44px;
     padding: 2px 5px;
+  }
+  .hud-btns {
+    grid-area: btns;
+    width: 144px;
+    gap: 6px;
   }
   .hud-btn small {
     display: none;
