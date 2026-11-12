@@ -696,6 +696,12 @@ async function start(room: Room, mapId: string) {
   // Scale Manager + DPR (#324): canvas = khung nhìn logic (CSS px) x renderScale, hiển thị bằng zoom = 1 / renderScale
   // (spike Chrome thật: `RESIZE` giữ canvas = CSS px nên mờ ở DPR 2-3, `RESIZE + zoom` bị bỏ qua; `NONE` + zoom đúng và
   // toạ độ chạm sai số 0). `attachScale` giữ khớp khi đổi kích thước / chất lượng và đổi giới hạn FPS lúc chạy.
+  // Phông chữ bay (gfx/fx) được vẽ từ canvas bằng Noto Serif: đợi phông nạp xong (tối đa 1,5 s; ngoại tuyến thì dùng phông
+  // dự phòng) để glyph đúng hình ngay từ đầu
+  await Promise.race([
+    document.fonts?.load?.('bold 38px "Noto Serif"', "Bạo!0123456789") ?? Promise.resolve(),
+    new Promise((r) => setTimeout(r, 1500)),
+  ]).catch(() => {});
   const d0 = getDisplay();
   const q0 = getQuality();
   const rs0 = computeRenderScale(d0.cssW, d0.cssH, d0.dpr, q0);
