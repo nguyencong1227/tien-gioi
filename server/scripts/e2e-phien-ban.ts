@@ -11,12 +11,13 @@ import express from "express";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { PROTOCOL_VERSION } from "@tien-gioi/shared";
-import { Tab, sleep } from "./e2e-kit";
+import { Tab, sleep, listenWithRetry, removeTmpDirs } from "./e2e-kit";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
 const clientDist = path.resolve(repoRoot, "client/dist");
-const PORT = 36000 + Math.floor(Math.random() * 4000);
+const pickPort = () => 36000 + Math.floor(Math.random() * 4000);
+let PORT = pickPort();
 const CDP = 9500 + Math.floor(Math.random() * 400);
 const out = (m: string) => console.log(m);
 const NAME = "Cu Ky Phien Ban";
@@ -49,7 +50,14 @@ async function main() {
   const httpServer = http.createServer(app);
   const gameServer = new Server({ transport: new WebSocketTransport({ server: httpServer }) });
   defineRooms(gameServer);
-  await new Promise<void>((resolve) => httpServer.listen(PORT, resolve));
+  // Lỗi listen (cổng bận) phải thành lỗi THẬT (e2e-kit.listenWithRetry): `new Promise((r) => server.listen(PORT, r))` không bao giờ resolve khi cổng bận
+  // nên script thoát mã 0 không in gì (false green) và sót thư mục tạm. Cổng ngẫu nhiên bận thì thử cổng khác.
+  try {
+    PORT = await listenWithRetry(httpServer, PORT, { explicit: false, pick: pickPort });
+  } catch (err) {
+    await removeTmpDirs(dataDir, chromeDir);
+    throw err;
+  }
   out(
     `- Server E2E: http://127.0.0.1:${PORT} (client v${PROTOCOL_VERSION}, server yêu cầu >= v${WorldRoom.minProtocol})`,
   );

@@ -17,13 +17,16 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
-import { Tab, sleep, shown } from "./e2e-kit";
+import { Tab, sleep, shown, listenWithRetry, removeTmpDirs } from "./e2e-kit";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
 const clientDist = path.resolve(repoRoot, "client/dist");
-const PORT_SERVER = 37000 + Math.floor(Math.random() * 2000);
-const PORT_PROXY = PORT_SERVER + 100 + Math.floor(Math.random() * 500);
+const pickPortServer = () => 37000 + Math.floor(Math.random() * 2000);
+let PORT_SERVER = pickPortServer();
+// Cổng proxy tính theo cổng server HIỆN TẠI (có thể đã đổi sau khi thử lại cổng bận)
+const pickPortProxy = () => PORT_SERVER + 100 + Math.floor(Math.random() * 500);
+let PORT_PROXY = pickPortProxy();
 const CDP = 9600 + Math.floor(Math.random() * 300);
 const out = (m: string) => console.log(m);
 
@@ -37,7 +40,7 @@ class TcpProxy {
   clientBytes = 0;
 
   constructor(
-    readonly listenPort: number,
+    public listenPort: number,
     readonly targetPort: number,
   ) {
     this.server = net.createServer((clientSocket) => {
@@ -66,8 +69,14 @@ class TcpProxy {
     });
   }
 
-  async listen(): Promise<void> {
-    return new Promise((resolve) => this.server.listen(this.listenPort, "127.0.0.1", resolve));
+  /** Nghe trên 127.0.0.1; lỗi (cổng bận) là lỗi THẬT, cổng bận thì thử cổng khác. Trả về cổng thật sự đang nghe. */
+  async listen(): Promise<number> {
+    this.listenPort = await listenWithRetry(this.server, this.listenPort, {
+      explicit: false,
+      pick: pickPortProxy,
+      host: "127.0.0.1",
+    });
+    return this.listenPort;
   }
 
   setAllowNewConnections(allow: boolean) {
@@ -111,11 +120,26 @@ async function main() {
   const httpServer = http.createServer(app);
   const gameServer = new Server({ transport: new WebSocketTransport({ server: httpServer }) });
   defineRooms(gameServer);
-  await new Promise<void>((resolve) => httpServer.listen(PORT_SERVER, resolve));
+  // Lỗi listen (cổng bận) phải thành lỗi THẬT (e2e-kit.listenWithRetry): `new Promise((r) => server.listen(PORT, r))` không bao giờ resolve khi cổng bận
+  // nên script thoát mã 0 không in gì (false green) và sót thư mục tạm. Cổng ngẫu nhiên bận thì thử cổng khác.
+  try {
+    PORT_SERVER = await listenWithRetry(httpServer, PORT_SERVER, {
+      explicit: false,
+      pick: pickPortServer,
+    });
+  } catch (err) {
+    await removeTmpDirs(dataDir, chromeDir);
+    throw err;
+  }
 
   // Dựng Proxy TCP trung gian
-  const proxy = new TcpProxy(PORT_PROXY, PORT_SERVER);
-  await proxy.listen();
+  const proxy = new TcpProxy(pickPortProxy(), PORT_SERVER);
+  try {
+    PORT_PROXY = await proxy.listen();
+  } catch (err) {
+    await removeTmpDirs(dataDir, chromeDir);
+    throw err;
+  }
   out(`- Server thật: http://127.0.0.1:${PORT_SERVER}`);
   out(`- Proxy TCP:   http://127.0.0.1:${PORT_PROXY} -> 127.0.0.1:${PORT_SERVER}`);
 

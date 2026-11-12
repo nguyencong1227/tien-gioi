@@ -12,12 +12,13 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
-import { Tab, sleep } from "./e2e-kit";
+import { Tab, sleep, listenWithRetry, removeTmpDirs } from "./e2e-kit";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
 const clientDist = path.resolve(repoRoot, "client/dist");
-const PORT = 38000 + Math.floor(Math.random() * 2000);
+const pickPort = () => 38000 + Math.floor(Math.random() * 2000);
+let PORT = pickPort();
 const CDP = 9800 + Math.floor(Math.random() * 300);
 const out = (m: string) => console.log(m);
 
@@ -38,7 +39,14 @@ async function main() {
   const httpServer = http.createServer(app);
   const gameServer = new Server({ transport: new WebSocketTransport({ server: httpServer }) });
   defineRooms(gameServer);
-  await new Promise<void>((resolve) => httpServer.listen(PORT, resolve));
+  // Lỗi listen (cổng bận) phải thành lỗi THẬT (e2e-kit.listenWithRetry): `new Promise((r) => server.listen(PORT, r))` không bao giờ resolve khi cổng bận
+  // nên script thoát mã 0 không in gì (false green) và sót thư mục tạm. Cổng ngẫu nhiên bận thì thử cổng khác.
+  try {
+    PORT = await listenWithRetry(httpServer, PORT, { explicit: false, pick: pickPort });
+  } catch (err) {
+    await removeTmpDirs(dataDir, chromeDir);
+    throw err;
+  }
 
   let chrome: ChildProcess | null = null;
   let tab: Tab | null = null;

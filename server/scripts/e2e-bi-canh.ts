@@ -34,13 +34,14 @@ import {
   dayKey,
   dungeonOf,
 } from "@tien-gioi/shared";
-import { shown } from "./e2e-kit";
+import { shown, listenWithRetry, removeTmpDirs } from "./e2e-kit";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
 const clientDist = path.resolve(repoRoot, "client/dist");
-const PORT = 36000 + Math.floor(Math.random() * 4000);
+const pickPort = () => 36000 + Math.floor(Math.random() * 4000);
+let PORT = pickPort();
 const CDP = 9500 + Math.floor(Math.random() * 400);
 const SHOTS = process.env.E2E_SHOTS ? path.resolve(process.env.E2E_SHOTS) : undefined;
 const TIMEOUT = 15000;
@@ -204,7 +205,14 @@ async function main() {
   const httpServer = http.createServer(app);
   const gameServer = new Server({ transport: new WebSocketTransport({ server: httpServer }) });
   defineRooms(gameServer);
-  await new Promise<void>((resolve) => httpServer.listen(PORT, resolve));
+  // Lỗi listen (cổng bận) phải thành lỗi THẬT (e2e-kit.listenWithRetry): `new Promise((r) => server.listen(PORT, r))` không bao giờ resolve khi cổng bận
+  // nên script thoát mã 0 không in gì (false green) và sót thư mục tạm. Cổng ngẫu nhiên bận thì thử cổng khác.
+  try {
+    PORT = await listenWithRetry(httpServer, PORT, { explicit: false, pick: pickPort });
+  } catch (err) {
+    await removeTmpDirs(dataDir, chromeDir);
+    throw err;
+  }
   out(`- Server E2E: http://127.0.0.1:${PORT} (dữ liệu tạm ${dataDir})`);
 
   let chrome: ChildProcess | null = null;
