@@ -232,6 +232,39 @@ try {
   check(r.peak === 0, `yêu thú chém: ${r.peak} hạt (không thêm tia lửa)`);
   await settle();
 
+  // 5b) Bậc Thấp (4 emitter): một đòn kiếm khí của mình chỉ chiếm 1 điểm qi + mũi = 2 emitter (không nuốt ngân sách), nên hiệu ứng
+  // ưu tiên 1 của người khác phát ngay sau đó VẪN được nhận; chém chỉ một đầu cung (nit A ở #356)
+  await evalJs(
+    `(() => { const c = document.getElementById("set-quality"); c.value = "low"; c.dispatchEvent(new Event("change")); return 1; })()`,
+  );
+  await sleep(300);
+  await settle();
+  const a0 = await evalJs("window.__fx.stats().admitted");
+  r = await act("sc.fxSword(sc.predX, sc.predY, 0, 260, 0xffffff, true)", "lo", 300);
+  const a1 = await evalJs("window.__fx.stats().admitted");
+  check(
+    a1 - a0 === 2,
+    `bậc Thấp: kiếm khí của mình phát ${a1 - a0} lần (1 qi + mũi = 2; trước sửa: 5)`,
+  );
+  const accepted = await evalJs(
+    `window.__fx.play("hit-spark", window.__scene.predX + 200, window.__scene.predY, { priority: 1 })`,
+  );
+  check(
+    accepted === true,
+    "bậc Thấp: ngay sau kiếm khí, hiệu ứng ưu tiên 1 của người khác vẫn được nhận (không bị nuốt ngân sách)",
+  );
+  await settle();
+  const b0 = await evalJs("window.__fx.stats().admitted");
+  await act("sc.nextSlash = 0; sc.slash(0)", "lo2", 60);
+  const b1 = await evalJs("window.__fx.stats().admitted");
+  check(b1 - b0 === 1, `bậc Thấp: chém của mình phát ${b1 - b0} lần (1 đầu cung)`);
+  await settle();
+  await evalJs(
+    `(() => { const c = document.getElementById("set-quality"); c.value = "high"; c.dispatchEvent(new Event("change")); return 1; })()`,
+  );
+  await sleep(300);
+  await settle();
+
   // 6) Giảm chuyển động: ít hạt hơn (x 0,3)
   await evalJs(
     `(() => { const c = document.getElementById("set-reduced-motion"); c.checked = true; c.dispatchEvent(new Event("change")); })()`,

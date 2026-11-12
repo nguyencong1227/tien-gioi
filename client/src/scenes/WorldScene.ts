@@ -1,6 +1,12 @@
 import { getDisplay } from "../gfx/display";
 import { createFxSystem, type FxSystem } from "../gfx/fx/fx";
-import { planSlashEdges, planSwordBeam, type FxPoint } from "../gfx/fx/skill-fx";
+import {
+  planSlashEdges,
+  planSwordBeam,
+  qiPointsFor,
+  slashEdgesFor,
+  type FxPoint,
+} from "../gfx/fx/skill-fx";
 import { motePriority, nextMoteAt, planBreakFail, planLevelUp } from "../gfx/fx/cultivation-fx";
 import {
   PORTAL_SWIRL_INTERVAL_MS,
@@ -2695,7 +2701,16 @@ export class WorldScene extends Phaser.Scene {
     // Tia lửa ở hai đầu cung (gfx/fx/skill-fx.ts); đòn của yêu thú (scale < 1) không thêm
     if (scale >= 1)
       this.playFxPoints(
-        planSlashEdges(x, y, angle, SKILLS.slash.range, SKILLS.slash.arc, mine, color),
+        planSlashEdges(
+          x,
+          y,
+          angle,
+          SKILLS.slash.range,
+          SKILLS.slash.arc,
+          mine,
+          color,
+          slashEdgesFor(getQuality().emitterBudget),
+        ),
       );
   }
 
@@ -2740,7 +2755,9 @@ export class WorldScene extends Phaser.Scene {
       start: this.time.now,
     });
     // Tia sáng rải dọc đường bay + nổ ở mũi (gfx/fx/skill-fx.ts), trễ theo thời gian bay của ảnh kiếm khí
-    this.playFxPoints(planSwordBeam(x, y, angle, range, mine, tint));
+    this.playFxPoints(
+      planSwordBeam(x, y, angle, range, mine, tint, qiPointsFor(getQuality().emitterBudget)),
+    );
   }
 
   private fxLevelUp(x: number, y: number, major: boolean, mine: boolean) {
