@@ -45,7 +45,7 @@
 | 24 | `client/public/icons/apple-touch-icon.png` | Icon iOS Touch 180×180 px | Sinh từ `icon.svg` | **CC0 1.0** | ✓ Hợp lệ |
 | 25 | `client/src/textures.ts` | Texture đồ họa canvas runtime | Do nhóm Tiên Giới (Dev B) dựng bằng Canvas API | **CC0 1.0** | ✓ Hợp lệ |
 | 26 | `client/src/audio.ts` | Nhạc nền & hiệu ứng SFX runtime | Do nhóm Tiên Giới (Dev B) tổng hợp bằng Web Audio API | **CC0 1.0** | ✓ Hợp lệ |
-| 27 | Google Fonts: `Noto Serif` | Phông chữ tiếng Việt cổ phong | Noto Project / Google Fonts qua CDN | **SIL OFL 1.1** | ✓ Hợp lệ |
+| 27 | `client/public/fonts/` (4 tệp `woff2` + `OFL.txt`): `Noto Serif` | Phông chữ tiếng Việt cổ phong, **tự lưu từ #331** (trước đây nạp từ Google Fonts qua CDN) | The Noto Project Authors (gói Fontsource `@fontsource-variable/noto-serif@5.3.0`) | **SIL OFL 1.1** | ✓ Hợp lệ (nguồn, ngày, SHA-256 ở `CREDITS.md` mục 6) |
 
 ---
 
@@ -69,4 +69,5 @@
 - Cơ chế kiểm duyệt nghiêm ngặt:
   1. **Khớp trọn token (`matchExactToken`)**: Sử dụng ranh giới ký tự tên tệp `(^|[^A-Za-z0-9_.-])<escaped>($|[^A-Za-z0-9_.-])`, chống tuyệt đối việc lọt chuỗi con (ví dụ `con.svg` không thể lọt nhờ `icon.svg`, `512.png` không thể lọt nhờ `icon-512.png`).
   2. **Không dùng wildcard thư mục**: Mọi tệp mới (kể cả trong `assets/items/`) đều bắt buộc phải được ghi rõ đích danh tên tệp trong `CREDITS.md`. Thêm bất kỳ tệp nào vào `assets/items/` mà không ghi danh sẽ lập tức bị chặn đỏ.
-- Chức năng: Khi có bất kỳ tệp mới nào được thêm vào `client/public/assets` hoặc `client/public/icons` mà chưa được khai báo đầy đủ trong `CREDITS.md`, lệnh `npm run check:credits` sẽ báo lỗi và ngăn chặn commit / build CI.
+- Chức năng: Khi có bất kỳ tệp mới nào được thêm vào `client/public/assets`, `client/public/icons` hoặc `client/public/fonts` mà chưa được khai báo đầy đủ trong `CREDITS.md`, lệnh `npm run check:credits` sẽ báo lỗi và ngăn chặn commit / build CI.
+  3. **SHA-256 cho tài sản bên thứ ba (#331)**: mỗi tệp trong `client/public/fonts/` phải có dòng bảng ở `CREDITS.md` mục 6 chứa CẢ tên tệp LẪN SHA-256 thật của nội dung hiện tại (`auditHashes`). Đổi / thay tệp mà quên cập nhật nguồn + băm, thiếu băm, băm của tệp khác hay băm nằm ở dòng khác đều đỏ (3 đột biến trong `credits.test.ts`).
