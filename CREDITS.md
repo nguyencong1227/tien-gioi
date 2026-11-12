@@ -16,7 +16,7 @@ Toàn bộ các file hình ảnh pixel-art, biểu tượng và âm thanh hiện
 | **Bộ biểu tượng PWA & Favicon** (`icon.svg`, `icon-192.png`, `icon-512.png`, `icon-maskable-512.png`, `apple-touch-icon.png`) | `client/public/icons/icon.svg`, `client/public/icons/icon-192.png`, `client/public/icons/icon-512.png`, `client/public/icons/icon-maskable-512.png`, `client/public/icons/apple-touch-icon.png` | **Nhóm Tiên Giới (Dev C)** — vẽ huy hiệu kiếm Tiên Giới cổ phong bằng SVG thuần và render ảnh PNG | **CC0 1.0** (Do dự án tạo) |
 | **Texture tự vẽ bằng mã nguồn (Procedural Canvas)** (vòng sáng thiền định, tia sáng đột phá, minimap, dấu ấn quyết đấu, hiệu ứng hạt) | `client/src/textures.ts` | **Nhóm Tiên Giới (Dev B)** — dựng bằng HTML5 Canvas 2D API | **CC0 1.0** (Do dự án tạo) |
 | **Nhạc nền ngũ cung & hiệu ứng âm thanh (SFX)** (nhạc Lạc Hà Trấn, nhạc hoang dã, tiếng kiếm chém, kiếm khí, trúng đòn, nhặt đồ, lên cấp, đột phá) | `client/src/audio.ts` | **Nhóm Tiên Giới (Dev B)** — tổng hợp thời gian thực bằng Web Audio API | **CC0 1.0** (Do dự án tạo) |
-| **Phông chữ tiếng Việt cổ phong** (`Noto Serif` hỗ trợ đầy đủ dấu tiếng Việt) | Nạp từ Google Fonts trong `client/index.html` | **Google Fonts / Noto Project** ([fonts.google.com/noto/specimen/Noto+Serif](https://fonts.google.com/noto/specimen/Noto+Serif)) | **SIL OFL 1.1** |
+| **Phông chữ tiếng Việt cổ phong** (`Noto Serif` hỗ trợ đầy đủ dấu tiếng Việt; **tự lưu** từ #331, KHÔNG còn nạp từ Google Fonts) | `client/public/fonts/` (4 tệp `woff2` + `OFL.txt`, khai báo ở `client/src/fonts.css`; nguồn, ngày và SHA-256 từng tệp ở mục 6) | **The Noto Project Authors** ([github.com/notofonts/latin-greek-cyrillic](https://github.com/notofonts/latin-greek-cyrillic)), đóng gói bởi Fontsource | **SIL OFL 1.1** |
 
 > **Cách đóng gói lại atlas khi thêm sprite mới:** sửa hoặc bổ sung hàm vẽ trong `client/scripts/gen-assets.mjs`, sau đó chạy `npm run assets -w client`.
 
@@ -64,3 +64,30 @@ Các thư viện mã nguồn mở dùng để đóng gói ứng dụng di độn
 | `@capacitor/cli` | 8.6.0 | Ionic / Max Lynch ([github.com/ionic-team/capacitor](https://github.com/ionic-team/capacitor)) | **MIT** |
 | `@capacitor/android` | 8.6.0 | Ionic / Max Lynch ([github.com/ionic-team/capacitor](https://github.com/ionic-team/capacitor)) | **MIT** |
 | `@capacitor/app` | 8.1.2 | Ionic / Max Lynch ([github.com/ionic-team/capacitor-plugins](https://github.com/ionic-team/capacitor-plugins)) | **MIT** |
+
+---
+
+## 6. Tài sản bên thứ ba có tệp trong repo (nguồn, tác giả, giấy phép, ngày, SHA-256)
+
+Mỗi tệp của bên thứ ba trong `client/public/fonts/` PHẢI có một dòng ở bảng dưới, cùng dòng với **tên tệp** và **SHA-256 thật** của nội dung tệp hiện tại (`sha256sum <tệp>`). `npm run check:credits` (và `client/src/credits.test.ts` trong CI) đỏ nếu thiếu tệp, thiếu băm hoặc băm sai (đổi tệp mà quên cập nhật dòng này).
+
+| Tệp | Nguồn | Tác giả | Giấy phép | Ngày lấy | SHA-256 |
+|---|---|---|---|---|---|
+| `noto-serif-latin-wght-normal.woff2` (Latin + dấu câu, đứng, độ đậm 400-700) | npm `@fontsource-variable/noto-serif@5.3.0` (`files/noto-serif-latin-wght-normal.woff2`; bản gốc: [notofonts/latin-greek-cyrillic](https://github.com/notofonts/latin-greek-cyrillic)) | The Noto Project Authors | SIL OFL 1.1 | 12/11/2026 | `46281456234014ceb2a79bff447245de0f76b8d803be0738972ed374c3206c5b` |
+| `noto-serif-vietnamese-wght-normal.woff2` (chữ có dấu tiếng Việt, đứng) | npm `@fontsource-variable/noto-serif@5.3.0` (`files/noto-serif-vietnamese-wght-normal.woff2`) | The Noto Project Authors | SIL OFL 1.1 | 12/11/2026 | `fb6a5ed734c2fbe39794a1e11ea075c70676ed82b8e8cd57c175ebbb4af805c1` |
+| `noto-serif-latin-wght-italic.woff2` (Latin + dấu câu, nghiêng) | npm `@fontsource-variable/noto-serif@5.3.0` (`files/noto-serif-latin-wght-italic.woff2`) | The Noto Project Authors | SIL OFL 1.1 | 12/11/2026 | `a1a6ebee6d69b2628ac102f55cb447135643a5401ae92eb77f4e2c6888dfce22` |
+| `noto-serif-vietnamese-wght-italic.woff2` (chữ có dấu tiếng Việt, nghiêng) | npm `@fontsource-variable/noto-serif@5.3.0` (`files/noto-serif-vietnamese-wght-italic.woff2`) | The Noto Project Authors | SIL OFL 1.1 | 12/11/2026 | `7b88e337afea323d51a3ec524b4da220f4913646eb590cab048feda319364390` |
+| `OFL.txt` (văn bản giấy phép SIL OFL 1.1 đi kèm phông, OFL yêu cầu giữ cùng bản phân phối) | npm `@fontsource-variable/noto-serif@5.3.0` (`LICENSE`) | The Noto Project Authors | SIL OFL 1.1 | 12/11/2026 | `45d545469122348b916bfa4d362f691c3f7f3af7169fd46f920845cae97923df` |
+
+Chỉ dùng tập con `latin` + `vietnamese` (đủ cho tiếng Việt); không đóng gói `latin-ext` (~187 KB) vì chữ ngoài hai tập con này rơi về `Georgia` / `serif` hệ thống. Không sửa nội dung tệp phông (OFL cho phép phân phối lại nguyên bản).
+
+### Mẫu mục cho tài sản bên thứ ba (CC0 / CC-BY / OFL) để B / C dùng về sau
+
+1. Chỉ lấy tài sản CC0, CC-BY hoặc OFL (xem mục 3); KHÔNG lấy gì của game khác.
+2. Bỏ tệp vào `client/public/<thư mục>/` rồi thêm dòng vào bảng mục 6 theo mẫu dưới. Với CC-BY, cột "Tác giả" phải đúng tên người ghi công và cột "Nguồn" là đường dẫn trang gốc; kèm tệp giấy phép nếu giấy phép yêu cầu (như `OFL.txt`).
+3. Chạy `sha256sum client/public/<thư mục>/<tệp>` và dán băm VÀO ĐÚNG DÒNG CÓ TÊN TỆP; thêm thư mục mới vào `hashDirs` của `auditHashes` (`client/scripts/check-credits.mjs`) nếu chưa có.
+4. `npm run check:credits` phải xanh.
+
+```
+| `ten-tep.ext` (mô tả ngắn) | URL trang gốc hoặc gói + phiên bản | Tên tác giả | CC0 1.0 / CC-BY 4.0 / OFL 1.1 | dd/mm/yyyy | `<64 ký tự hex từ sha256sum>` |
+```
