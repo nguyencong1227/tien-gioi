@@ -113,6 +113,7 @@ import {
   type SectConfirmKind,
 } from "./sect";
 import { sound } from "./audio";
+import { transitionMs, waitOrSkip } from "./gfx/scene-transition";
 import {
   getQuality,
   onQualityChange,
@@ -3284,17 +3285,39 @@ export const ui = {
     const nameEl = $("transition-map-name");
     if (nameEl) nameEl.textContent = mapName;
     overlay.hidden = false;
-    requestAnimationFrame(() => {
-      overlay.classList.add("active");
-    });
+    // Ép tính kiểu (reflow) để trình duyệt GHI NHẬN kiểu "trước khi đổi" (mở) rồi mới thêm `active`: phần tử vừa bỏ `hidden`
+    // (display: none) mà thêm lớp ngay trong cùng khung thì chuyển động CSS không chạy, màn đổi tức thì.
+    void overlay.offsetWidth;
+    overlay.classList.add("active");
   },
 
   hideTransition() {
     const overlay = $("transition-overlay");
     overlay.classList.remove("active");
-    setTimeout(() => {
-      overlay.hidden = true;
-    }, 350);
+    // Chờ mống mắt mở ra / mờ xong (cùng số với CSS, gfx/scene-transition.ts) rồi mới ẩn hẳn
+    setTimeout(
+      () => {
+        if (!overlay.classList.contains("active")) overlay.hidden = true;
+      },
+      transitionMs(getQuality().fadeOnly) + 50,
+    );
+  },
+
+  /**
+   * Chờ màn chuyển cảnh khép xong (mặc định đúng thời lượng mống mắt / mờ dần của chế độ hiện tại) trong lúc nó đang che, nhưng
+   * bấm chuột / chạm / gõ phím thì xong sớm ("bỏ qua được"). Trả `true` nếu người chơi bỏ qua.
+   */
+  transitionHold(ms: number = transitionMs(getQuality().fadeOnly)): Promise<boolean> {
+    const overlay = $("transition-overlay");
+    return waitOrSkip(ms, (onSkip) => {
+      const h = () => onSkip();
+      overlay.addEventListener("pointerdown", h);
+      window.addEventListener("keydown", h);
+      return () => {
+        overlay.removeEventListener("pointerdown", h);
+        window.removeEventListener("keydown", h);
+      };
+    });
   },
 
   setZoneName(name: string) {
