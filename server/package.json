@@ -21,6 +21,7 @@
     "e2e:tro-nang": "tsx scripts/e2e-tro-nang.ts",
     "e2e:noi-lai": "tsx scripts/e2e-noi-lai.ts",
     "e2e:nhip-tim": "tsx scripts/e2e-nhip-tim.ts",
+    "e2e:chat-luong": "tsx scripts/e2e-chat-luong.ts",
     "tai-khoan": "tsx scripts/tai-khoan.ts",
     "chuyen-du-lieu": "tsx scripts/chuyen-du-lieu.ts",
     "red-team": "tsx scripts/red-team.ts",

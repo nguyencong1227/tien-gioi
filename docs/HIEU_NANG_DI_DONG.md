@@ -34,7 +34,7 @@
 
 ## 4. Đề xuất cải thiện khi chạy trên thiết bị yếu (tham khảo, chưa tối ưu mù)
 *Dành cho tương lai nếu gặp thiết bị cấu hình rất thấp (< 30 FPS trên máy thật):*
-1. **Bật chế độ Giảm hiệu ứng (`tg_low_fx = 1`)**: Tắt hào quang aura thiền định, vòng sáng pháp bảo và hiệu ứng nhấp nháy chữ bay. Giúp giảm tải xử lý hạt và giải phóng dung lượng bộ nhớ JS heap.
+1. **Chọn chất lượng Thấp (Cài đặt -> Chất lượng đồ hoạ, lưu ở `tg_quality=low`; khoá cũ `tg_low_fx = 1` được di cư, M5 #323)**: Tắt hào quang aura thiền định, vòng sáng pháp bảo và hiệu ứng nhấp nháy chữ bay. Giúp giảm tải xử lý hạt và giải phóng dung lượng bộ nhớ JS heap.
 2. **Ẩn tên người chơi ở xa (`tg_hide_names = 1`)**: Giảm số lượng đối tượng Text canvas khi đông người tụ tập.
 3. **Phân trang vẽ sprite theo khoảng cách**: Chỉ cập nhật animation của người chơi trong bán kính 300px.
 
