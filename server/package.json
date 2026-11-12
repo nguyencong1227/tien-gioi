@@ -25,6 +25,7 @@
     "e2e:dpr": "tsx scripts/e2e-dpr.ts",
     "e2e:fx": "tsx scripts/e2e-fx.ts",
     "e2e:map": "tsx scripts/e2e-map.ts",
+    "e2e:chuyen-canh": "tsx scripts/e2e-chuyen-canh.ts",
     "tai-khoan": "tsx scripts/tai-khoan.ts",
     "chuyen-du-lieu": "tsx scripts/chuyen-du-lieu.ts",
     "red-team": "tsx scripts/red-team.ts",
