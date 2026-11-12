@@ -154,8 +154,8 @@ async function runLeakTest() {
   ]);
 
   try {
-    // 15 s (không phải 4 s): lần mở Chrome đầu tiên trên runner CI lạnh có thể chậm
-    for (let i = 0; i < 150; i++) {
+    // 30 s (không phải 4 s): lần mở Chrome đầu tiên trên runner CI lạnh có thể chậm (run đầu của #398 đỏ vì 15 s không đủ)
+    for (let i = 0; i < 300; i++) {
       try {
         const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json/version`);
         if (res.ok) break;
