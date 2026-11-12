@@ -1,5 +1,5 @@
 {
-  "capturedAt": "2026-11-12T02:57:53.072Z",
+  "capturedAt": "2026-11-12T03:04:49.965Z",
   "format": "webp",
   "quality": 75,
   "viewports": [
@@ -101,7 +101,7 @@
       "scenarioName": "Màn hình Đăng nhập",
       "fileName": "mobile-p__01-auth-login.webp",
       "sizeKb": 26.7,
-      "sha256": "4b4d28bf9272a46c5e37714e8faf0d6b8fdd9f8d95c13b8faeb41b88ca041121"
+      "sha256": "20ff80f94e52f0c83e75f71cd583355e523269e3487554e7431615710856411f"
     },
     {
       "viewportId": "mobile-p",
@@ -112,8 +112,8 @@
       "scenarioId": "02-auth-register",
       "scenarioName": "Màn hình Đăng ký",
       "fileName": "mobile-p__02-auth-register.webp",
-      "sizeKb": 26.4,
-      "sha256": "f90367ebe218b311c306c348c1d3ce0ed6467a624fed0e21d504d0ff5a575b26"
+      "sizeKb": 26.3,
+      "sha256": "c6c62dc5f728c8b3faa2d54fbcf9fa706ba98d3704e7db61977c758a5a82fbc2"
     },
     {
       "viewportId": "mobile-p",
@@ -124,8 +124,8 @@
       "scenarioId": "03-game-hud",
       "scenarioName": "Giao diện chính trong game (HUD & Bản đồ)",
       "fileName": "mobile-p__03-game-hud.webp",
-      "sizeKb": 59.5,
-      "sha256": "724e347df86b476f5c8f84423f35fdd8fadf5cf4ffcc88edaf36f1c5b5c2b4e6"
+      "sizeKb": 59.3,
+      "sha256": "8d97a9d5c75bd1056f27a7622e19147464473a9491289498f7d975980c170c96"
     },
     {
       "viewportId": "mobile-p",
@@ -136,8 +136,8 @@
       "scenarioId": "04-game-char",
       "scenarioName": "Bảng Nhân vật (Chỉ số & Cảnh giới)",
       "fileName": "mobile-p__04-game-char.webp",
-      "sizeKb": 58.7,
-      "sha256": "88b9f6249c65ad80bdae3c4d96aa504204ac793d0952730e12b77aa837133a31"
+      "sizeKb": 58.9,
+      "sha256": "87bcce4187e32fdbadf657fab82b520e0901adade2ed8543d6b99b099484d3cf"
     },
     {
       "viewportId": "mobile-p",
@@ -148,8 +148,8 @@
       "scenarioId": "05-game-inventory",
       "scenarioName": "Bảng Túi đồ & Đan dược",
       "fileName": "mobile-p__05-game-inventory.webp",
-      "sizeKb": 56,
-      "sha256": "a3e7ba0361f81f821ceb8befb0980da4b2bb9575f0c957def2c2ad9007080dde"
+      "sizeKb": 56.2,
+      "sha256": "42b0e88bf84250aae5274f864c3b98e7d85a072a4751cd6301a2eb8440a6ebeb"
     },
     {
       "viewportId": "mobile-p",
@@ -161,7 +161,7 @@
       "scenarioName": "Bảng Cài đặt & Tuỳ chọn",
       "fileName": "mobile-p__06-game-settings.webp",
       "sizeKb": 54.7,
-      "sha256": "4c54f60576498db0e04da1df12a5892aa8c47587ef401648e0784a3311635fbf"
+      "sha256": "308d7684dabcc8b01344ae21a02f022360aa168bc2a006f5be4c9e6ccff8740e"
     },
     {
       "viewportId": "mobile-p",
@@ -172,8 +172,8 @@
       "scenarioId": "07-game-crowd",
       "scenarioName": "Trấn đông người (30 người tụ tập)",
       "fileName": "mobile-p__07-game-crowd.webp",
-      "sizeKb": 59.2,
-      "sha256": "5a3a6b4a7597c817909301e8a776633217c8ad94b159748a963fafe2281c7546"
+      "sizeKb": 58.8,
+      "sha256": "6e6dfff9f48794284a4f8401b855f461cb002008ab0a7ea0ad64e4f2f4cda845"
     },
     {
       "viewportId": "mobile-l",
@@ -184,8 +184,8 @@
       "scenarioId": "01-auth-login",
       "scenarioName": "Màn hình Đăng nhập",
       "fileName": "mobile-l__01-auth-login.webp",
-      "sizeKb": 21.3,
-      "sha256": "bc1649ab492d9e5d570e834d6eaebfc968985be064df5d0afd13e936ea196787"
+      "sizeKb": 21.4,
+      "sha256": "be0c66e3de56f6ebbbd58bdec07e232f4ce10b9a37b938d40c46300c65bcda21"
     },
     {
       "viewportId": "mobile-l",
@@ -196,8 +196,8 @@
       "scenarioId": "02-auth-register",
       "scenarioName": "Màn hình Đăng ký",
       "fileName": "mobile-l__02-auth-register.webp",
-      "sizeKb": 22.7,
-      "sha256": "5588bf12e26c5408f1e8e38e7598eae02ca7541d9fe975f311bb3643ca6a9c0b"
+      "sizeKb": 22.8,
+      "sha256": "92898b47c8c25497c0aeec212d8be8e08cc6d199a676050de1c4104edae1aa17"
     },
     {
       "viewportId": "mobile-l",
@@ -208,8 +208,8 @@
       "scenarioId": "03-game-hud",
       "scenarioName": "Giao diện chính trong game (HUD & Bản đồ)",
       "fileName": "mobile-l__03-game-hud.webp",
-      "sizeKb": 49,
-      "sha256": "a4060056df285a59bf877d9e29eec86027c8d0393688fccc382df6318ee289a8"
+      "sizeKb": 49.3,
+      "sha256": "b6a2cc4f9feb3380e00f1ae1cd1e12a552b9e5547b7a03596dc566fb87236497"
     },
     {
       "viewportId": "mobile-l",
@@ -220,8 +220,8 @@
       "scenarioId": "04-game-char",
       "scenarioName": "Bảng Nhân vật (Chỉ số & Cảnh giới)",
       "fileName": "mobile-l__04-game-char.webp",
-      "sizeKb": 48.9,
-      "sha256": "e02c852224f42d9afb0fd7ab95a29b8c93327ddfc010ce034d8a47c8883c1992"
+      "sizeKb": 49.1,
+      "sha256": "c6398110200b96d0f9ffc038c318e2882ef82f1eb09647f21c5a1c217a4128b9"
     },
     {
       "viewportId": "mobile-l",
@@ -232,8 +232,8 @@
       "scenarioId": "05-game-inventory",
       "scenarioName": "Bảng Túi đồ & Đan dược",
       "fileName": "mobile-l__05-game-inventory.webp",
-      "sizeKb": 48.8,
-      "sha256": "ccf8b458c29061777e2e0f6ec143e637d7a826828c1446b8fb3b72d37b61fe70"
+      "sizeKb": 49.1,
+      "sha256": "dad8df5f4efddf4c1502153498d7861af4203db76780de7c6e8aadc74196da95"
     },
     {
       "viewportId": "mobile-l",
@@ -244,8 +244,8 @@
       "scenarioId": "06-game-settings",
       "scenarioName": "Bảng Cài đặt & Tuỳ chọn",
       "fileName": "mobile-l__06-game-settings.webp",
-      "sizeKb": 49.2,
-      "sha256": "445133551b6c3a9984d1080a66430f6f7f2986c06f1483d3484b98d551677872"
+      "sizeKb": 48.9,
+      "sha256": "27631dbc42c34a668360ba69eb1f85d99666ea226e4933cfb2d54ecdfdfe7a3c"
     },
     {
       "viewportId": "mobile-l",
@@ -256,8 +256,8 @@
       "scenarioId": "07-game-crowd",
       "scenarioName": "Trấn đông người (30 người tụ tập)",
       "fileName": "mobile-l__07-game-crowd.webp",
-      "sizeKb": 48.6,
-      "sha256": "874e9e31be1dc5dbf33353cf4181879b825cebe73e222b1f4fb2c158861e8f9f"
+      "sizeKb": 48.7,
+      "sha256": "29a6bfc49abef3f29195490a865658ce6d572a65394e21db2a5d07810f81e47f"
     },
     {
       "viewportId": "mobile-sm",
@@ -269,7 +269,7 @@
       "scenarioName": "Màn hình Đăng nhập",
       "fileName": "mobile-sm__01-auth-login.webp",
       "sizeKb": 26.1,
-      "sha256": "1453afde5a1fc112637bfe0a435316bdaf064e85075e2a2ed85b7c2092ac2836"
+      "sha256": "9d58283cc365de7c592a783b9bd09e1de228b3588753063566af048ce418455b"
     },
     {
       "viewportId": "mobile-sm",
@@ -280,8 +280,8 @@
       "scenarioId": "02-auth-register",
       "scenarioName": "Màn hình Đăng ký",
       "fileName": "mobile-sm__02-auth-register.webp",
-      "sizeKb": 25.6,
-      "sha256": "9567522041c6b67bc0241714682eac2b9e274bfd48e91697f862097ba5eea315"
+      "sizeKb": 25.5,
+      "sha256": "ad2b2044125635e57786cf230ab9714208fea924fc7471d194fcb03d5546f812"
     },
     {
       "viewportId": "mobile-sm",
@@ -292,8 +292,8 @@
       "scenarioId": "03-game-hud",
       "scenarioName": "Giao diện chính trong game (HUD & Bản đồ)",
       "fileName": "mobile-sm__03-game-hud.webp",
-      "sizeKb": 46.4,
-      "sha256": "1847dcb66f861dabd5a731281d73031822a7dac47de71c03938cf3472e8fed44"
+      "sizeKb": 46.5,
+      "sha256": "379579694f6c43ad4a1052d00af0f2812096765469a4757b8b3b05c7d836dadc"
     },
     {
       "viewportId": "mobile-sm",
@@ -305,7 +305,7 @@
       "scenarioName": "Bảng Nhân vật (Chỉ số & Cảnh giới)",
       "fileName": "mobile-sm__04-game-char.webp",
       "sizeKb": 46,
-      "sha256": "4f8b0c6e3963dfdc4f72612076531cbc1df719f8c270c069609d58fb279b53db"
+      "sha256": "c5f0cbfba62009566afb7b300d78bc16d39e83ebe46f4d065c06af37e3d2c2f4"
     },
     {
       "viewportId": "mobile-sm",
@@ -316,8 +316,8 @@
       "scenarioId": "05-game-inventory",
       "scenarioName": "Bảng Túi đồ & Đan dược",
       "fileName": "mobile-sm__05-game-inventory.webp",
-      "sizeKb": 45.7,
-      "sha256": "fa3f8340d04b1e6db5f4a90f5ba5f8a21c11c804696b32612b18301349c462e3"
+      "sizeKb": 45.8,
+      "sha256": "b2a43dbebd51dd22faf7d2d928f6cf366bf08d3914c7cdfd2ec206b9fb99a15c"
     },
     {
       "viewportId": "mobile-sm",
@@ -328,8 +328,8 @@
       "scenarioId": "06-game-settings",
       "scenarioName": "Bảng Cài đặt & Tuỳ chọn",
       "fileName": "mobile-sm__06-game-settings.webp",
-      "sizeKb": 45.8,
-      "sha256": "4056384b771eecbe626ef28005250c720c0d3d284391b53e8b36e0b232cb8412"
+      "sizeKb": 46.2,
+      "sha256": "715d87f57c69ae5853abded3c48b44dc2cebe37c97cd6153cd0290c5a757ffde"
     },
     {
       "viewportId": "mobile-sm",
@@ -340,8 +340,8 @@
       "scenarioId": "07-game-crowd",
       "scenarioName": "Trấn đông người (30 người tụ tập)",
       "fileName": "mobile-sm__07-game-crowd.webp",
-      "sizeKb": 45.8,
-      "sha256": "07660fc9476b9e3521d211478ae80d809ccadd6767659f92795f77dc5cc8e9c3"
+      "sizeKb": 45.9,
+      "sha256": "bfeb54a048482d4ef328aed0846f967ec291bbbc1e47d34dd947a9f147e3743e"
     },
     {
       "viewportId": "tablet-p",
@@ -353,7 +353,7 @@
       "scenarioName": "Màn hình Đăng nhập",
       "fileName": "tablet-p__01-auth-login.webp",
       "sizeKb": 30.3,
-      "sha256": "de6756014b29552ae524fe6a2351d18b100646ceca724c58c87ec058ad135c30"
+      "sha256": "5f03bd64e564914b443ebfd891b4631e3a6cf645c83aa3cdd905292d3a606364"
     },
     {
       "viewportId": "tablet-p",
@@ -365,7 +365,7 @@
       "scenarioName": "Màn hình Đăng ký",
       "fileName": "tablet-p__02-auth-register.webp",
       "sizeKb": 29.8,
-      "sha256": "6a66916baed2827f42e36dee4ba8fbb251fefb039a7f7b1c3801c61d75cadc08"
+      "sha256": "ae6848c90b14a3d840bed69ca1b146cb274e4c4e461fb40ba0c6ae416122e7a7"
     },
     {
       "viewportId": "tablet-p",
@@ -376,8 +376,8 @@
       "scenarioId": "03-game-hud",
       "scenarioName": "Giao diện chính trong game (HUD & Bản đồ)",
       "fileName": "tablet-p__03-game-hud.webp",
-      "sizeKb": 92.1,
-      "sha256": "7cf62fe9bc1a7884167c8721cc659e1b0ee94d269be86974942028a3aaa1c529"
+      "sizeKb": 92.5,
+      "sha256": "fdd8026ba86ee3642707fce4e7337810d4c151fc6a7e5b8a5d626f685a9176c8"
     },
     {
       "viewportId": "tablet-p",
@@ -388,8 +388,8 @@
       "scenarioId": "04-game-char",
       "scenarioName": "Bảng Nhân vật (Chỉ số & Cảnh giới)",
       "fileName": "tablet-p__04-game-char.webp",
-      "sizeKb": 92.1,
-      "sha256": "ab9abe76b1583a8b71cd71283fa14dc263f92d23be5f9789a330b5d40e1a95e9"
+      "sizeKb": 92.4,
+      "sha256": "30b6a5e77271b9fc4b15120057278fb2caa9dda0ba4a899e57df7c33aec09138"
     },
     {
       "viewportId": "tablet-p",
@@ -400,8 +400,8 @@
       "scenarioId": "05-game-inventory",
       "scenarioName": "Bảng Túi đồ & Đan dược",
       "fileName": "tablet-p__05-game-inventory.webp",
-      "sizeKb": 92.1,
-      "sha256": "4ee1e288bb8fd9ec8790117101e73f9fcbb14c00c4e0526137d6e81a85fdd67f"
+      "sizeKb": 92.4,
+      "sha256": "1c7a0a3e1c48e3626809f47f32db9e7fbdde4791376c676115451f9efebde142"
     },
     {
       "viewportId": "tablet-p",
@@ -412,8 +412,8 @@
       "scenarioId": "06-game-settings",
       "scenarioName": "Bảng Cài đặt & Tuỳ chọn",
       "fileName": "tablet-p__06-game-settings.webp",
-      "sizeKb": 92,
-      "sha256": "3406b5c8a0b32361baadff5be5666c2a17c06a3c500a1d915582e0e5619ebbbc"
+      "sizeKb": 92.9,
+      "sha256": "19fcb1b9a990139edc3e41c180a497e772e5ad057973669e63aef09e1e569b53"
     },
     {
       "viewportId": "tablet-p",
@@ -424,8 +424,8 @@
       "scenarioId": "07-game-crowd",
       "scenarioName": "Trấn đông người (30 người tụ tập)",
       "fileName": "tablet-p__07-game-crowd.webp",
-      "sizeKb": 93.2,
-      "sha256": "be0f24d8ab740d68455bc55103a4fe815a4d700acf449d30e26286c63af8eda8"
+      "sizeKb": 93.5,
+      "sha256": "a39ce584fc17690f7ae31f578a024f87d49a372a336a8dc31478a46622e85469"
     },
     {
       "viewportId": "tablet-l",
@@ -436,8 +436,8 @@
       "scenarioId": "01-auth-login",
       "scenarioName": "Màn hình Đăng nhập",
       "fileName": "tablet-l__01-auth-login.webp",
-      "sizeKb": 30.3,
-      "sha256": "54a657f66f0f4d09750bc0795c7878204d65d42e5fbe7a619991cc143d8efe10"
+      "sizeKb": 30.4,
+      "sha256": "1ca949bcc63715ff175a8631670077a7fef2b085f6f3f934232d8a103e946b7c"
     },
     {
       "viewportId": "tablet-l",
@@ -449,7 +449,7 @@
       "scenarioName": "Màn hình Đăng ký",
       "fileName": "tablet-l__02-auth-register.webp",
       "sizeKb": 29.9,
-      "sha256": "d0822ff950348fdbbd671a465b45339c55e03f89cc7b089843ade5c3edd36ecd"
+      "sha256": "802480c508aa6621174b09e79fffa100e15a22996ffd8bf4345e4811ce55ad41"
     },
     {
       "viewportId": "tablet-l",
@@ -460,8 +460,8 @@
       "scenarioId": "03-game-hud",
       "scenarioName": "Giao diện chính trong game (HUD & Bản đồ)",
       "fileName": "tablet-l__03-game-hud.webp",
-      "sizeKb": 93.4,
-      "sha256": "9899ffd509a906950213da83697b2700f58221480c0964f58b46bbd0208a7aba"
+      "sizeKb": 93.6,
+      "sha256": "65e18679e234293c9f9a73d2324728e13999647ddeb53281b6fc7e4840a2379c"
     },
     {
       "viewportId": "tablet-l",
@@ -472,8 +472,8 @@
       "scenarioId": "04-game-char",
       "scenarioName": "Bảng Nhân vật (Chỉ số & Cảnh giới)",
       "fileName": "tablet-l__04-game-char.webp",
-      "sizeKb": 93.3,
-      "sha256": "cb07179369ff943e29c9dceecebfccde75f7e18a2a531a28231b5335a558a050"
+      "sizeKb": 93.4,
+      "sha256": "df4735c965d70493ef882ac8e02d2bf17481826ecc5853d114d5019a499b5752"
     },
     {
       "viewportId": "tablet-l",
@@ -484,8 +484,8 @@
       "scenarioId": "05-game-inventory",
       "scenarioName": "Bảng Túi đồ & Đan dược",
       "fileName": "tablet-l__05-game-inventory.webp",
-      "sizeKb": 93.3,
-      "sha256": "a6b57fe6fb180a0f5448c1a5c9ea2a4eebc365f36b00972772e88e260072c7c5"
+      "sizeKb": 93.4,
+      "sha256": "4dd3e51d35d5dd2c719ab5eda72e0e148ff28052f04ce2b6d886c7d530431609"
     },
     {
       "viewportId": "tablet-l",
@@ -496,8 +496,8 @@
       "scenarioId": "06-game-settings",
       "scenarioName": "Bảng Cài đặt & Tuỳ chọn",
       "fileName": "tablet-l__06-game-settings.webp",
-      "sizeKb": 93.2,
-      "sha256": "6d089e3495a68bea4df002bab6e7998af642f0e95bfbee775d05aeb60513f695"
+      "sizeKb": 94.7,
+      "sha256": "f427d14784c5022ddb6b08d37d65b1d11dc0c10b3ba4005671f89bf3ab674328"
     },
     {
       "viewportId": "tablet-l",
@@ -508,8 +508,8 @@
       "scenarioId": "07-game-crowd",
       "scenarioName": "Trấn đông người (30 người tụ tập)",
       "fileName": "tablet-l__07-game-crowd.webp",
-      "sizeKb": 93,
-      "sha256": "147d254da89cb155f1c025e78d4567fbc4f7e84d48ed66c19df6bd0d29f02fc8"
+      "sizeKb": 93.2,
+      "sha256": "565a6cff0716177fccdf997173a5f6c1066e998d2c5e422d494ea8315f9e18fe"
     },
     {
       "viewportId": "desktop-hd",
@@ -520,8 +520,8 @@
       "scenarioId": "01-auth-login",
       "scenarioName": "Màn hình Đăng nhập",
       "fileName": "desktop-hd__01-auth-login.webp",
-      "sizeKb": 12.5,
-      "sha256": "88681ac488bf366f530af5060f6fcd5231ca9c006e69e4419a967d8ba1e427ce"
+      "sizeKb": 12.4,
+      "sha256": "4984db4003e3cdcedeaf6affbabc5c8e5025399d31b79a4d0e93b0a8f45f8a84"
     },
     {
       "viewportId": "desktop-hd",
@@ -533,7 +533,7 @@
       "scenarioName": "Màn hình Đăng ký",
       "fileName": "desktop-hd__02-auth-register.webp",
       "sizeKb": 12.6,
-      "sha256": "9ec7f7364d0285a558e5575233b070ab0f779f87331b33c8f0980d2dfd9f4f25"
+      "sha256": "c485016070b99b8797fdd6129acf556621aec38669e349c5b32c1564d6f26fbf"
     },
     {
       "viewportId": "desktop-hd",
@@ -544,8 +544,8 @@
       "scenarioId": "03-game-hud",
       "scenarioName": "Giao diện chính trong game (HUD & Bản đồ)",
       "fileName": "desktop-hd__03-game-hud.webp",
-      "sizeKb": 41.4,
-      "sha256": "4afe92838bc579835efbd1a19f3a121df9fd12fd37805df3697dc26618a27d15"
+      "sizeKb": 41.2,
+      "sha256": "e63d5f0ff550d3a70a3afccca5f8d30b8d7ae6ce8a9d81d330dcd5f6c5fc6c28"
     },
     {
       "viewportId": "desktop-hd",
@@ -556,8 +556,8 @@
       "scenarioId": "04-game-char",
       "scenarioName": "Bảng Nhân vật (Chỉ số & Cảnh giới)",
       "fileName": "desktop-hd__04-game-char.webp",
-      "sizeKb": 41.5,
-      "sha256": "881328133a2a9c5203b73edb62059bc8733496b42268ee904036693bb279a0ec"
+      "sizeKb": 41.2,
+      "sha256": "3a43db8e19602187484ebbd67ab5227ac305b8a6d48e18779479cb88be2b9416"
     },
     {
       "viewportId": "desktop-hd",
@@ -568,8 +568,8 @@
       "scenarioId": "05-game-inventory",
       "scenarioName": "Bảng Túi đồ & Đan dược",
       "fileName": "desktop-hd__05-game-inventory.webp",
-      "sizeKb": 41.5,
-      "sha256": "4b690b273ea14d303a1b0a21ac0ae17d3e47b0bca04ac2706fd01d9060722463"
+      "sizeKb": 41.2,
+      "sha256": "8bc7c29f360e68a5a1e1586e26218b710cbc671774191090c86f7d5bf1679362"
     },
     {
       "viewportId": "desktop-hd",
@@ -580,8 +580,8 @@
       "scenarioId": "06-game-settings",
       "scenarioName": "Bảng Cài đặt & Tuỳ chọn",
       "fileName": "desktop-hd__06-game-settings.webp",
-      "sizeKb": 41.4,
-      "sha256": "72b88167ba2d1198c8993ce0b14e75389d1ab5d91c9e39d76ef7dcd75cf97e60"
+      "sizeKb": 41.9,
+      "sha256": "0e72c7891ff0dcda54e85e2590f40b478fbfb940c547630fa65b17dcb65e6797"
     },
     {
       "viewportId": "desktop-hd",
@@ -592,8 +592,8 @@
       "scenarioId": "07-game-crowd",
       "scenarioName": "Trấn đông người (30 người tụ tập)",
       "fileName": "desktop-hd__07-game-crowd.webp",
-      "sizeKb": 41,
-      "sha256": "5f7fabe1c0ef3cc7474010cdedc27209bc714a15506b46e86313b5a5d6bda38e"
+      "sizeKb": 41.3,
+      "sha256": "ce1c57d3bde533d049fc3203b0ab85fe058e74b119b150a73821f287f40546a7"
     },
     {
       "viewportId": "desktop-fhd",
@@ -605,7 +605,7 @@
       "scenarioName": "Màn hình Đăng nhập",
       "fileName": "desktop-fhd__01-auth-login.webp",
       "sizeKb": 14.7,
-      "sha256": "0c92fc5c494f8f7362066d6c55a35e5b6df32e6bcecbab158e01a7a30d64169f"
+      "sha256": "dec54aff08d7febc350dd8c9d0924c212adc0baf0acabbc89e5352703c424f9c"
     },
     {
       "viewportId": "desktop-fhd",
@@ -617,7 +617,7 @@
       "scenarioName": "Màn hình Đăng ký",
       "fileName": "desktop-fhd__02-auth-register.webp",
       "sizeKb": 14.7,
-      "sha256": "cb42a827d1e95bf8f7869eaa39aa26e3aa099bd5bf5d6ffda4d7dccfa982dd88"
+      "sha256": "c7a0d9fb7e47ea4864143b1440bf46c05d65ed069498f2ff3bb5a8e1009631fb"
     },
     {
       "viewportId": "desktop-fhd",
@@ -628,8 +628,8 @@
       "scenarioId": "03-game-hud",
       "scenarioName": "Giao diện chính trong game (HUD & Bản đồ)",
       "fileName": "desktop-fhd__03-game-hud.webp",
-      "sizeKb": 53.1,
-      "sha256": "24e56225dabf1b68c465fada04225b17f2a652e6251b2618668090a488845e31"
+      "sizeKb": 53.3,
+      "sha256": "8dd93fc1835472335591dad973a83426153ed9f58a81787b3bdc361542bd9536"
     },
     {
       "viewportId": "desktop-fhd",
@@ -641,7 +641,7 @@
       "scenarioName": "Bảng Nhân vật (Chỉ số & Cảnh giới)",
       "fileName": "desktop-fhd__04-game-char.webp",
       "sizeKb": 53.2,
-      "sha256": "4648d88869045420801555bc74f7b9902485fa06680baef2149f378f0e4ac667"
+      "sha256": "ad7f5a505ee1241414bc59ae44f66c8e2fcd72d8b1a4e15d50ca45172d5a0147"
     },
     {
       "viewportId": "desktop-fhd",
@@ -652,8 +652,8 @@
       "scenarioId": "05-game-inventory",
       "scenarioName": "Bảng Túi đồ & Đan dược",
       "fileName": "desktop-fhd__05-game-inventory.webp",
-      "sizeKb": 53.1,
-      "sha256": "7544bcfd547fd5eef0676c17e7c78da83ce424daaa2cfe1768a7fb1632d384c1"
+      "sizeKb": 53.2,
+      "sha256": "00af95beaa81174835d59d0b1a7b9f495e1c1bedb08f33d95f18c70282f76147"
     },
     {
       "viewportId": "desktop-fhd",
@@ -664,8 +664,8 @@
       "scenarioId": "06-game-settings",
       "scenarioName": "Bảng Cài đặt & Tuỳ chọn",
       "fileName": "desktop-fhd__06-game-settings.webp",
-      "sizeKb": 53.2,
-      "sha256": "46bfb965411ddb55f4214c060877fdafb3a415eeb6a39ec5df72d0a59b479529"
+      "sizeKb": 53.8,
+      "sha256": "14bb9a05963659b11c4230d03301725184969b6d12f10560a239b60243a0064d"
     },
     {
       "viewportId": "desktop-fhd",
@@ -676,8 +676,8 @@
       "scenarioId": "07-game-crowd",
       "scenarioName": "Trấn đông người (30 người tụ tập)",
       "fileName": "desktop-fhd__07-game-crowd.webp",
-      "sizeKb": 53.6,
-      "sha256": "78e62d070686527a80354f11d9a5b2edfac51b88d78665145844ed5d80c92ca4"
+      "sizeKb": 53.7,
+      "sha256": "68976380ed8f664dc4fd270f73dd028ca1c42e619707c45b4a32d62dfa5cd8d8"
     }
   ]
 }
