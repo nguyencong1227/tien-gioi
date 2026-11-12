@@ -1,0 +1,632 @@
+{
+  "capturedAt": "2026-11-12T02:02:02.616Z",
+  "viewports": [
+    {
+      "id": "mobile-p",
+      "name": "Điện thoại dọc (iPhone / Android chuẩn)",
+      "width": 390,
+      "height": 844,
+      "dpr": 2,
+      "mobile": true
+    },
+    {
+      "id": "mobile-l",
+      "name": "Điện thoại ngang (Gaming landscape)",
+      "width": 844,
+      "height": 390,
+      "dpr": 2,
+      "mobile": true
+    },
+    {
+      "id": "mobile-sm",
+      "name": "Điện thoại nhỏ (Compact 360x640)",
+      "width": 360,
+      "height": 640,
+      "dpr": 2,
+      "mobile": true
+    },
+    {
+      "id": "tablet-p",
+      "name": "Máy tính bảng dọc (iPad Portrait)",
+      "width": 768,
+      "height": 1024,
+      "dpr": 2,
+      "mobile": true
+    },
+    {
+      "id": "tablet-l",
+      "name": "Máy tính bảng ngang (iPad Landscape)",
+      "width": 1024,
+      "height": 768,
+      "dpr": 2,
+      "mobile": true
+    },
+    {
+      "id": "desktop-hd",
+      "name": "Máy tính Laptop / HD (1280x720)",
+      "width": 1280,
+      "height": 720,
+      "dpr": 1,
+      "mobile": false
+    },
+    {
+      "id": "desktop-fhd",
+      "name": "Máy tính Full HD (1920x1080)",
+      "width": 1920,
+      "height": 1080,
+      "dpr": 1,
+      "mobile": false
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "01-auth-login",
+      "name": "Màn hình Đăng nhập"
+    },
+    {
+      "id": "02-auth-register",
+      "name": "Màn hình Đăng ký"
+    },
+    {
+      "id": "03-game-hud",
+      "name": "Giao diện chính trong game (HUD & Bản đồ)"
+    },
+    {
+      "id": "04-game-char",
+      "name": "Bảng Nhân vật (Chỉ số & Cảnh giới)"
+    },
+    {
+      "id": "05-game-inventory",
+      "name": "Bảng Túi đồ & Đan dược"
+    },
+    {
+      "id": "06-game-settings",
+      "name": "Bảng Cài đặt & Tuỳ chọn"
+    },
+    {
+      "id": "07-game-crowd",
+      "name": "Trấn đông người (30 người tụ tập)"
+    }
+  ],
+  "images": [
+    {
+      "viewportId": "mobile-p",
+      "viewportName": "Điện thoại dọc (iPhone / Android chuẩn)",
+      "width": 390,
+      "height": 844,
+      "dpr": 2,
+      "scenarioId": "01-auth-login",
+      "scenarioName": "Màn hình Đăng nhập",
+      "fileName": "mobile-p__01-auth-login.png",
+      "sizeKb": 341.8
+    },
+    {
+      "viewportId": "mobile-p",
+      "viewportName": "Điện thoại dọc (iPhone / Android chuẩn)",
+      "width": 390,
+      "height": 844,
+      "dpr": 2,
+      "scenarioId": "02-auth-register",
+      "scenarioName": "Màn hình Đăng ký",
+      "fileName": "mobile-p__02-auth-register.png",
+      "sizeKb": 313.3
+    },
+    {
+      "viewportId": "mobile-p",
+      "viewportName": "Điện thoại dọc (iPhone / Android chuẩn)",
+      "width": 390,
+      "height": 844,
+      "dpr": 2,
+      "scenarioId": "03-game-hud",
+      "scenarioName": "Giao diện chính trong game (HUD & Bản đồ)",
+      "fileName": "mobile-p__03-game-hud.png",
+      "sizeKb": 276.5
+    },
+    {
+      "viewportId": "mobile-p",
+      "viewportName": "Điện thoại dọc (iPhone / Android chuẩn)",
+      "width": 390,
+      "height": 844,
+      "dpr": 2,
+      "scenarioId": "04-game-char",
+      "scenarioName": "Bảng Nhân vật (Chỉ số & Cảnh giới)",
+      "fileName": "mobile-p__04-game-char.png",
+      "sizeKb": 276.5
+    },
+    {
+      "viewportId": "mobile-p",
+      "viewportName": "Điện thoại dọc (iPhone / Android chuẩn)",
+      "width": 390,
+      "height": 844,
+      "dpr": 2,
+      "scenarioId": "05-game-inventory",
+      "scenarioName": "Bảng Túi đồ & Đan dược",
+      "fileName": "mobile-p__05-game-inventory.png",
+      "sizeKb": 276.5
+    },
+    {
+      "viewportId": "mobile-p",
+      "viewportName": "Điện thoại dọc (iPhone / Android chuẩn)",
+      "width": 390,
+      "height": 844,
+      "dpr": 2,
+      "scenarioId": "06-game-settings",
+      "scenarioName": "Bảng Cài đặt & Tuỳ chọn",
+      "fileName": "mobile-p__06-game-settings.png",
+      "sizeKb": 276.5
+    },
+    {
+      "viewportId": "mobile-p",
+      "viewportName": "Điện thoại dọc (iPhone / Android chuẩn)",
+      "width": 390,
+      "height": 844,
+      "dpr": 2,
+      "scenarioId": "07-game-crowd",
+      "scenarioName": "Trấn đông người (30 người tụ tập)",
+      "fileName": "mobile-p__07-game-crowd.png",
+      "sizeKb": 336
+    },
+    {
+      "viewportId": "mobile-l",
+      "viewportName": "Điện thoại ngang (Gaming landscape)",
+      "width": 844,
+      "height": 390,
+      "dpr": 2,
+      "scenarioId": "01-auth-login",
+      "scenarioName": "Màn hình Đăng nhập",
+      "fileName": "mobile-l__01-auth-login.png",
+      "sizeKb": 146.3
+    },
+    {
+      "viewportId": "mobile-l",
+      "viewportName": "Điện thoại ngang (Gaming landscape)",
+      "width": 844,
+      "height": 390,
+      "dpr": 2,
+      "scenarioId": "02-auth-register",
+      "scenarioName": "Màn hình Đăng ký",
+      "fileName": "mobile-l__02-auth-register.png",
+      "sizeKb": 150
+    },
+    {
+      "viewportId": "mobile-l",
+      "viewportName": "Điện thoại ngang (Gaming landscape)",
+      "width": 844,
+      "height": 390,
+      "dpr": 2,
+      "scenarioId": "03-game-hud",
+      "scenarioName": "Giao diện chính trong game (HUD & Bản đồ)",
+      "fileName": "mobile-l__03-game-hud.png",
+      "sizeKb": 293.9
+    },
+    {
+      "viewportId": "mobile-l",
+      "viewportName": "Điện thoại ngang (Gaming landscape)",
+      "width": 844,
+      "height": 390,
+      "dpr": 2,
+      "scenarioId": "04-game-char",
+      "scenarioName": "Bảng Nhân vật (Chỉ số & Cảnh giới)",
+      "fileName": "mobile-l__04-game-char.png",
+      "sizeKb": 293.9
+    },
+    {
+      "viewportId": "mobile-l",
+      "viewportName": "Điện thoại ngang (Gaming landscape)",
+      "width": 844,
+      "height": 390,
+      "dpr": 2,
+      "scenarioId": "05-game-inventory",
+      "scenarioName": "Bảng Túi đồ & Đan dược",
+      "fileName": "mobile-l__05-game-inventory.png",
+      "sizeKb": 293.9
+    },
+    {
+      "viewportId": "mobile-l",
+      "viewportName": "Điện thoại ngang (Gaming landscape)",
+      "width": 844,
+      "height": 390,
+      "dpr": 2,
+      "scenarioId": "06-game-settings",
+      "scenarioName": "Bảng Cài đặt & Tuỳ chọn",
+      "fileName": "mobile-l__06-game-settings.png",
+      "sizeKb": 293.9
+    },
+    {
+      "viewportId": "mobile-l",
+      "viewportName": "Điện thoại ngang (Gaming landscape)",
+      "width": 844,
+      "height": 390,
+      "dpr": 2,
+      "scenarioId": "07-game-crowd",
+      "scenarioName": "Trấn đông người (30 người tụ tập)",
+      "fileName": "mobile-l__07-game-crowd.png",
+      "sizeKb": 291.8
+    },
+    {
+      "viewportId": "mobile-sm",
+      "viewportName": "Điện thoại nhỏ (Compact 360x640)",
+      "width": 360,
+      "height": 640,
+      "dpr": 2,
+      "scenarioId": "01-auth-login",
+      "scenarioName": "Màn hình Đăng nhập",
+      "fileName": "mobile-sm__01-auth-login.png",
+      "sizeKb": 322.7
+    },
+    {
+      "viewportId": "mobile-sm",
+      "viewportName": "Điện thoại nhỏ (Compact 360x640)",
+      "width": 360,
+      "height": 640,
+      "dpr": 2,
+      "scenarioId": "02-auth-register",
+      "scenarioName": "Màn hình Đăng ký",
+      "fileName": "mobile-sm__02-auth-register.png",
+      "sizeKb": 298.5
+    },
+    {
+      "viewportId": "mobile-sm",
+      "viewportName": "Điện thoại nhỏ (Compact 360x640)",
+      "width": 360,
+      "height": 640,
+      "dpr": 2,
+      "scenarioId": "03-game-hud",
+      "scenarioName": "Giao diện chính trong game (HUD & Bản đồ)",
+      "fileName": "mobile-sm__03-game-hud.png",
+      "sizeKb": 171.8
+    },
+    {
+      "viewportId": "mobile-sm",
+      "viewportName": "Điện thoại nhỏ (Compact 360x640)",
+      "width": 360,
+      "height": 640,
+      "dpr": 2,
+      "scenarioId": "04-game-char",
+      "scenarioName": "Bảng Nhân vật (Chỉ số & Cảnh giới)",
+      "fileName": "mobile-sm__04-game-char.png",
+      "sizeKb": 171.8
+    },
+    {
+      "viewportId": "mobile-sm",
+      "viewportName": "Điện thoại nhỏ (Compact 360x640)",
+      "width": 360,
+      "height": 640,
+      "dpr": 2,
+      "scenarioId": "05-game-inventory",
+      "scenarioName": "Bảng Túi đồ & Đan dược",
+      "fileName": "mobile-sm__05-game-inventory.png",
+      "sizeKb": 171.8
+    },
+    {
+      "viewportId": "mobile-sm",
+      "viewportName": "Điện thoại nhỏ (Compact 360x640)",
+      "width": 360,
+      "height": 640,
+      "dpr": 2,
+      "scenarioId": "06-game-settings",
+      "scenarioName": "Bảng Cài đặt & Tuỳ chọn",
+      "fileName": "mobile-sm__06-game-settings.png",
+      "sizeKb": 171.8
+    },
+    {
+      "viewportId": "mobile-sm",
+      "viewportName": "Điện thoại nhỏ (Compact 360x640)",
+      "width": 360,
+      "height": 640,
+      "dpr": 2,
+      "scenarioId": "07-game-crowd",
+      "scenarioName": "Trấn đông người (30 người tụ tập)",
+      "fileName": "mobile-sm__07-game-crowd.png",
+      "sizeKb": 194.4
+    },
+    {
+      "viewportId": "tablet-p",
+      "viewportName": "Máy tính bảng dọc (iPad Portrait)",
+      "width": 768,
+      "height": 1024,
+      "dpr": 2,
+      "scenarioId": "01-auth-login",
+      "scenarioName": "Màn hình Đăng nhập",
+      "fileName": "tablet-p__01-auth-login.png",
+      "sizeKb": 382.4
+    },
+    {
+      "viewportId": "tablet-p",
+      "viewportName": "Máy tính bảng dọc (iPad Portrait)",
+      "width": 768,
+      "height": 1024,
+      "dpr": 2,
+      "scenarioId": "02-auth-register",
+      "scenarioName": "Màn hình Đăng ký",
+      "fileName": "tablet-p__02-auth-register.png",
+      "sizeKb": 351.1
+    },
+    {
+      "viewportId": "tablet-p",
+      "viewportName": "Máy tính bảng dọc (iPad Portrait)",
+      "width": 768,
+      "height": 1024,
+      "dpr": 2,
+      "scenarioId": "03-game-hud",
+      "scenarioName": "Giao diện chính trong game (HUD & Bản đồ)",
+      "fileName": "tablet-p__03-game-hud.png",
+      "sizeKb": 755.6
+    },
+    {
+      "viewportId": "tablet-p",
+      "viewportName": "Máy tính bảng dọc (iPad Portrait)",
+      "width": 768,
+      "height": 1024,
+      "dpr": 2,
+      "scenarioId": "04-game-char",
+      "scenarioName": "Bảng Nhân vật (Chỉ số & Cảnh giới)",
+      "fileName": "tablet-p__04-game-char.png",
+      "sizeKb": 755.6
+    },
+    {
+      "viewportId": "tablet-p",
+      "viewportName": "Máy tính bảng dọc (iPad Portrait)",
+      "width": 768,
+      "height": 1024,
+      "dpr": 2,
+      "scenarioId": "05-game-inventory",
+      "scenarioName": "Bảng Túi đồ & Đan dược",
+      "fileName": "tablet-p__05-game-inventory.png",
+      "sizeKb": 755.6
+    },
+    {
+      "viewportId": "tablet-p",
+      "viewportName": "Máy tính bảng dọc (iPad Portrait)",
+      "width": 768,
+      "height": 1024,
+      "dpr": 2,
+      "scenarioId": "06-game-settings",
+      "scenarioName": "Bảng Cài đặt & Tuỳ chọn",
+      "fileName": "tablet-p__06-game-settings.png",
+      "sizeKb": 755.6
+    },
+    {
+      "viewportId": "tablet-p",
+      "viewportName": "Máy tính bảng dọc (iPad Portrait)",
+      "width": 768,
+      "height": 1024,
+      "dpr": 2,
+      "scenarioId": "07-game-crowd",
+      "scenarioName": "Trấn đông người (30 người tụ tập)",
+      "fileName": "tablet-p__07-game-crowd.png",
+      "sizeKb": 791.7
+    },
+    {
+      "viewportId": "tablet-l",
+      "viewportName": "Máy tính bảng ngang (iPad Landscape)",
+      "width": 1024,
+      "height": 768,
+      "dpr": 2,
+      "scenarioId": "01-auth-login",
+      "scenarioName": "Màn hình Đăng nhập",
+      "fileName": "tablet-l__01-auth-login.png",
+      "sizeKb": 385.2
+    },
+    {
+      "viewportId": "tablet-l",
+      "viewportName": "Máy tính bảng ngang (iPad Landscape)",
+      "width": 1024,
+      "height": 768,
+      "dpr": 2,
+      "scenarioId": "02-auth-register",
+      "scenarioName": "Màn hình Đăng ký",
+      "fileName": "tablet-l__02-auth-register.png",
+      "sizeKb": 356.1
+    },
+    {
+      "viewportId": "tablet-l",
+      "viewportName": "Máy tính bảng ngang (iPad Landscape)",
+      "width": 1024,
+      "height": 768,
+      "dpr": 2,
+      "scenarioId": "03-game-hud",
+      "scenarioName": "Giao diện chính trong game (HUD & Bản đồ)",
+      "fileName": "tablet-l__03-game-hud.png",
+      "sizeKb": 750.4
+    },
+    {
+      "viewportId": "tablet-l",
+      "viewportName": "Máy tính bảng ngang (iPad Landscape)",
+      "width": 1024,
+      "height": 768,
+      "dpr": 2,
+      "scenarioId": "04-game-char",
+      "scenarioName": "Bảng Nhân vật (Chỉ số & Cảnh giới)",
+      "fileName": "tablet-l__04-game-char.png",
+      "sizeKb": 750.4
+    },
+    {
+      "viewportId": "tablet-l",
+      "viewportName": "Máy tính bảng ngang (iPad Landscape)",
+      "width": 1024,
+      "height": 768,
+      "dpr": 2,
+      "scenarioId": "05-game-inventory",
+      "scenarioName": "Bảng Túi đồ & Đan dược",
+      "fileName": "tablet-l__05-game-inventory.png",
+      "sizeKb": 750.4
+    },
+    {
+      "viewportId": "tablet-l",
+      "viewportName": "Máy tính bảng ngang (iPad Landscape)",
+      "width": 1024,
+      "height": 768,
+      "dpr": 2,
+      "scenarioId": "06-game-settings",
+      "scenarioName": "Bảng Cài đặt & Tuỳ chọn",
+      "fileName": "tablet-l__06-game-settings.png",
+      "sizeKb": 750.4
+    },
+    {
+      "viewportId": "tablet-l",
+      "viewportName": "Máy tính bảng ngang (iPad Landscape)",
+      "width": 1024,
+      "height": 768,
+      "dpr": 2,
+      "scenarioId": "07-game-crowd",
+      "scenarioName": "Trấn đông người (30 người tụ tập)",
+      "fileName": "tablet-l__07-game-crowd.png",
+      "sizeKb": 747.4
+    },
+    {
+      "viewportId": "desktop-hd",
+      "viewportName": "Máy tính Laptop / HD (1280x720)",
+      "width": 1280,
+      "height": 720,
+      "dpr": 1,
+      "scenarioId": "01-auth-login",
+      "scenarioName": "Màn hình Đăng nhập",
+      "fileName": "desktop-hd__01-auth-login.png",
+      "sizeKb": 122.3
+    },
+    {
+      "viewportId": "desktop-hd",
+      "viewportName": "Máy tính Laptop / HD (1280x720)",
+      "width": 1280,
+      "height": 720,
+      "dpr": 1,
+      "scenarioId": "02-auth-register",
+      "scenarioName": "Màn hình Đăng ký",
+      "fileName": "desktop-hd__02-auth-register.png",
+      "sizeKb": 114.4
+    },
+    {
+      "viewportId": "desktop-hd",
+      "viewportName": "Máy tính Laptop / HD (1280x720)",
+      "width": 1280,
+      "height": 720,
+      "dpr": 1,
+      "scenarioId": "03-game-hud",
+      "scenarioName": "Giao diện chính trong game (HUD & Bản đồ)",
+      "fileName": "desktop-hd__03-game-hud.png",
+      "sizeKb": 258.9
+    },
+    {
+      "viewportId": "desktop-hd",
+      "viewportName": "Máy tính Laptop / HD (1280x720)",
+      "width": 1280,
+      "height": 720,
+      "dpr": 1,
+      "scenarioId": "04-game-char",
+      "scenarioName": "Bảng Nhân vật (Chỉ số & Cảnh giới)",
+      "fileName": "desktop-hd__04-game-char.png",
+      "sizeKb": 258.9
+    },
+    {
+      "viewportId": "desktop-hd",
+      "viewportName": "Máy tính Laptop / HD (1280x720)",
+      "width": 1280,
+      "height": 720,
+      "dpr": 1,
+      "scenarioId": "05-game-inventory",
+      "scenarioName": "Bảng Túi đồ & Đan dược",
+      "fileName": "desktop-hd__05-game-inventory.png",
+      "sizeKb": 258.9
+    },
+    {
+      "viewportId": "desktop-hd",
+      "viewportName": "Máy tính Laptop / HD (1280x720)",
+      "width": 1280,
+      "height": 720,
+      "dpr": 1,
+      "scenarioId": "06-game-settings",
+      "scenarioName": "Bảng Cài đặt & Tuỳ chọn",
+      "fileName": "desktop-hd__06-game-settings.png",
+      "sizeKb": 258.9
+    },
+    {
+      "viewportId": "desktop-hd",
+      "viewportName": "Máy tính Laptop / HD (1280x720)",
+      "width": 1280,
+      "height": 720,
+      "dpr": 1,
+      "scenarioId": "07-game-crowd",
+      "scenarioName": "Trấn đông người (30 người tụ tập)",
+      "fileName": "desktop-hd__07-game-crowd.png",
+      "sizeKb": 250.3
+    },
+    {
+      "viewportId": "desktop-fhd",
+      "viewportName": "Máy tính Full HD (1920x1080)",
+      "width": 1920,
+      "height": 1080,
+      "dpr": 1,
+      "scenarioId": "01-auth-login",
+      "scenarioName": "Màn hình Đăng nhập",
+      "fileName": "desktop-fhd__01-auth-login.png",
+      "sizeKb": 130
+    },
+    {
+      "viewportId": "desktop-fhd",
+      "viewportName": "Máy tính Full HD (1920x1080)",
+      "width": 1920,
+      "height": 1080,
+      "dpr": 1,
+      "scenarioId": "02-auth-register",
+      "scenarioName": "Màn hình Đăng ký",
+      "fileName": "desktop-fhd__02-auth-register.png",
+      "sizeKb": 122.5
+    },
+    {
+      "viewportId": "desktop-fhd",
+      "viewportName": "Máy tính Full HD (1920x1080)",
+      "width": 1920,
+      "height": 1080,
+      "dpr": 1,
+      "scenarioId": "03-game-hud",
+      "scenarioName": "Giao diện chính trong game (HUD & Bản đồ)",
+      "fileName": "desktop-fhd__03-game-hud.png",
+      "sizeKb": 559.7
+    },
+    {
+      "viewportId": "desktop-fhd",
+      "viewportName": "Máy tính Full HD (1920x1080)",
+      "width": 1920,
+      "height": 1080,
+      "dpr": 1,
+      "scenarioId": "04-game-char",
+      "scenarioName": "Bảng Nhân vật (Chỉ số & Cảnh giới)",
+      "fileName": "desktop-fhd__04-game-char.png",
+      "sizeKb": 559.7
+    },
+    {
+      "viewportId": "desktop-fhd",
+      "viewportName": "Máy tính Full HD (1920x1080)",
+      "width": 1920,
+      "height": 1080,
+      "dpr": 1,
+      "scenarioId": "05-game-inventory",
+      "scenarioName": "Bảng Túi đồ & Đan dược",
+      "fileName": "desktop-fhd__05-game-inventory.png",
+      "sizeKb": 559.7
+    },
+    {
+      "viewportId": "desktop-fhd",
+      "viewportName": "Máy tính Full HD (1920x1080)",
+      "width": 1920,
+      "height": 1080,
+      "dpr": 1,
+      "scenarioId": "06-game-settings",
+      "scenarioName": "Bảng Cài đặt & Tuỳ chọn",
+      "fileName": "desktop-fhd__06-game-settings.png",
+      "sizeKb": 559.7
+    },
+    {
+      "viewportId": "desktop-fhd",
+      "viewportName": "Máy tính Full HD (1920x1080)",
+      "width": 1920,
+      "height": 1080,
+      "dpr": 1,
+      "scenarioId": "07-game-crowd",
+      "scenarioName": "Trấn đông người (30 người tụ tập)",
+      "fileName": "desktop-fhd__07-game-crowd.png",
+      "sizeKb": 559.6
+    }
+  ]
+}

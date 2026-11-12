@@ -1,0 +1,959 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Tiên Giới - Bộ Ảnh Mốc Đa Viewport M5 (Baseline)</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: #12100e;
+        color: #e6dec8;
+        margin: 0;
+        padding: 24px;
+      }
+      h1 {
+        color: #d4a359;
+        margin-bottom: 8px;
+      }
+      p.sub {
+        color: #a89a80;
+        margin-top: 0;
+      }
+      .filters {
+        margin: 20px 0;
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .filter-btn {
+        background: #26211a;
+        color: #d4a359;
+        border: 1px solid #4a3d2c;
+        padding: 8px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      .filter-btn.active {
+        background: #8b5a2b;
+        color: #fff;
+        border-color: #d4a359;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+        gap: 20px;
+        margin-top: 24px;
+      }
+      .card {
+        background: #1c1813;
+        border: 1px solid #3d3324;
+        border-radius: 8px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+      .card-header {
+        padding: 12px 16px;
+        background: #231e17;
+        border-bottom: 1px solid #3d3324;
+      }
+      .card-title {
+        font-weight: 600;
+        color: #d4a359;
+        margin: 0 0 4px 0;
+        font-size: 15px;
+      }
+      .card-meta {
+        font-size: 12px;
+        color: #8e806a;
+      }
+      .img-wrap {
+        padding: 12px;
+        background: #0a0908;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 220px;
+      }
+      .img-wrap img {
+        max-width: 100%;
+        max-height: 380px;
+        object-fit: contain;
+        border-radius: 4px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+      }
+      .card-footer {
+        padding: 8px 16px;
+        font-size: 12px;
+        color: #736754;
+        border-top: 1px solid #231e17;
+        text-align: right;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Tiên Giới - Bộ Ảnh Mốc Đa Viewport M5 (Baseline)</h1>
+    <p class="sub">Thời gian chụp: 2026-11-12T02:02:02.616Z | Tổng cộng: 49 ảnh</p>
+
+    <div class="filters">
+      <button class="filter-btn active" onclick="filterVp('all')">Tất cả Viewports</button>
+      <button class="filter-btn" onclick="filterVp('mobile-p')">mobile-p (390x844)</button>
+      <button class="filter-btn" onclick="filterVp('mobile-l')">mobile-l (844x390)</button>
+      <button class="filter-btn" onclick="filterVp('mobile-sm')">mobile-sm (360x640)</button>
+      <button class="filter-btn" onclick="filterVp('tablet-p')">tablet-p (768x1024)</button>
+      <button class="filter-btn" onclick="filterVp('tablet-l')">tablet-l (1024x768)</button>
+      <button class="filter-btn" onclick="filterVp('desktop-hd')">desktop-hd (1280x720)</button>
+      <button class="filter-btn" onclick="filterVp('desktop-fhd')">desktop-fhd (1920x1080)</button>
+    </div>
+
+    <div class="grid" id="gallery">
+      <div class="card" data-vp="mobile-p">
+        <div class="card-header">
+          <div class="card-title">Màn hình Đăng nhập</div>
+          <div class="card-meta">Điện thoại dọc (iPhone / Android chuẩn) • 390×844 (DPR 2)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="mobile-p__01-auth-login.png" target="_blank">
+            <img
+              src="mobile-p__01-auth-login.png"
+              alt="Màn hình Đăng nhập - Điện thoại dọc (iPhone / Android chuẩn)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">mobile-p__01-auth-login.png (341.8 KB)</div>
+      </div>
+
+      <div class="card" data-vp="mobile-p">
+        <div class="card-header">
+          <div class="card-title">Màn hình Đăng ký</div>
+          <div class="card-meta">Điện thoại dọc (iPhone / Android chuẩn) • 390×844 (DPR 2)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="mobile-p__02-auth-register.png" target="_blank">
+            <img
+              src="mobile-p__02-auth-register.png"
+              alt="Màn hình Đăng ký - Điện thoại dọc (iPhone / Android chuẩn)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">mobile-p__02-auth-register.png (313.3 KB)</div>
+      </div>
+
+      <div class="card" data-vp="mobile-p">
+        <div class="card-header">
+          <div class="card-title">Giao diện chính trong game (HUD & Bản đồ)</div>
+          <div class="card-meta">Điện thoại dọc (iPhone / Android chuẩn) • 390×844 (DPR 2)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="mobile-p__03-game-hud.png" target="_blank">
+            <img
+              src="mobile-p__03-game-hud.png"
+              alt="Giao diện chính trong game (HUD & Bản đồ) - Điện thoại dọc (iPhone / Android chuẩn)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">mobile-p__03-game-hud.png (276.5 KB)</div>
+      </div>
+
+      <div class="card" data-vp="mobile-p">
+        <div class="card-header">
+          <div class="card-title">Bảng Nhân vật (Chỉ số & Cảnh giới)</div>
+          <div class="card-meta">Điện thoại dọc (iPhone / Android chuẩn) • 390×844 (DPR 2)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="mobile-p__04-game-char.png" target="_blank">
+            <img
+              src="mobile-p__04-game-char.png"
+              alt="Bảng Nhân vật (Chỉ số & Cảnh giới) - Điện thoại dọc (iPhone / Android chuẩn)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">mobile-p__04-game-char.png (276.5 KB)</div>
+      </div>
+
+      <div class="card" data-vp="mobile-p">
+        <div class="card-header">
+          <div class="card-title">Bảng Túi đồ & Đan dược</div>
+          <div class="card-meta">Điện thoại dọc (iPhone / Android chuẩn) • 390×844 (DPR 2)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="mobile-p__05-game-inventory.png" target="_blank">
+            <img
+              src="mobile-p__05-game-inventory.png"
+              alt="Bảng Túi đồ & Đan dược - Điện thoại dọc (iPhone / Android chuẩn)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">mobile-p__05-game-inventory.png (276.5 KB)</div>
+      </div>
+
+      <div class="card" data-vp="mobile-p">
+        <div class="card-header">
+          <div class="card-title">Bảng Cài đặt & Tuỳ chọn</div>
+          <div class="card-meta">Điện thoại dọc (iPhone / Android chuẩn) • 390×844 (DPR 2)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="mobile-p__06-game-settings.png" target="_blank">
+            <img
+              src="mobile-p__06-game-settings.png"
+              alt="Bảng Cài đặt & Tuỳ chọn - Điện thoại dọc (iPhone / Android chuẩn)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">mobile-p__06-game-settings.png (276.5 KB)</div>
+      </div>
+
+      <div class="card" data-vp="mobile-p">
+        <div class="card-header">
+          <div class="card-title">Trấn đông người (30 người tụ tập)</div>
+          <div class="card-meta">Điện thoại dọc (iPhone / Android chuẩn) • 390×844 (DPR 2)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="mobile-p__07-game-crowd.png" target="_blank">
+            <img
+              src="mobile-p__07-game-crowd.png"
+              alt="Trấn đông người (30 người tụ tập) - Điện thoại dọc (iPhone / Android chuẩn)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">mobile-p__07-game-crowd.png (336 KB)</div>
+      </div>
+
+      <div class="card" data-vp="mobile-l">
+        <div class="card-header">
+          <div class="card-title">Màn hình Đăng nhập</div>
+          <div class="card-meta">Điện thoại ngang (Gaming landscape) • 844×390 (DPR 2)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="mobile-l__01-auth-login.png" target="_blank">
+            <img
+              src="mobile-l__01-auth-login.png"
+              alt="Màn hình Đăng nhập - Điện thoại ngang (Gaming landscape)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">mobile-l__01-auth-login.png (146.3 KB)</div>
+      </div>
+
+      <div class="card" data-vp="mobile-l">
+        <div class="card-header">
+          <div class="card-title">Màn hình Đăng ký</div>
+          <div class="card-meta">Điện thoại ngang (Gaming landscape) • 844×390 (DPR 2)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="mobile-l__02-auth-register.png" target="_blank">
+            <img
+              src="mobile-l__02-auth-register.png"
+              alt="Màn hình Đăng ký - Điện thoại ngang (Gaming landscape)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">mobile-l__02-auth-register.png (150 KB)</div>
+      </div>
+
+      <div class="card" data-vp="mobile-l">
+        <div class="card-header">
+          <div class="card-title">Giao diện chính trong game (HUD & Bản đồ)</div>
+          <div class="card-meta">Điện thoại ngang (Gaming landscape) • 844×390 (DPR 2)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="mobile-l__03-game-hud.png" target="_blank">
+            <img
+              src="mobile-l__03-game-hud.png"
+              alt="Giao diện chính trong game (HUD & Bản đồ) - Điện thoại ngang (Gaming landscape)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">mobile-l__03-game-hud.png (293.9 KB)</div>
+      </div>
+
+      <div class="card" data-vp="mobile-l">
+        <div class="card-header">
+          <div class="card-title">Bảng Nhân vật (Chỉ số & Cảnh giới)</div>
+          <div class="card-meta">Điện thoại ngang (Gaming landscape) • 844×390 (DPR 2)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="mobile-l__04-game-char.png" target="_blank">
+            <img
+              src="mobile-l__04-game-char.png"
+              alt="Bảng Nhân vật (Chỉ số & Cảnh giới) - Điện thoại ngang (Gaming landscape)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">mobile-l__04-game-char.png (293.9 KB)</div>
+      </div>
+
+      <div class="card" data-vp="mobile-l">
+        <div class="card-header">
+          <div class="card-title">Bảng Túi đồ & Đan dược</div>
+          <div class="card-meta">Điện thoại ngang (Gaming landscape) • 844×390 (DPR 2)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="mobile-l__05-game-inventory.png" target="_blank">
+            <img
+              src="mobile-l__05-game-inventory.png"
+              alt="Bảng Túi đồ & Đan dược - Điện thoại ngang (Gaming landscape)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">mobile-l__05-game-inventory.png (293.9 KB)</div>
+      </div>
+
+      <div class="card" data-vp="mobile-l">
+        <div class="card-header">
+          <div class="card-title">Bảng Cài đặt & Tuỳ chọn</div>
+          <div class="card-meta">Điện thoại ngang (Gaming landscape) • 844×390 (DPR 2)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="mobile-l__06-game-settings.png" target="_blank">
+            <img
+              src="mobile-l__06-game-settings.png"
+              alt="Bảng Cài đặt & Tuỳ chọn - Điện thoại ngang (Gaming landscape)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">mobile-l__06-game-settings.png (293.9 KB)</div>
+      </div>
+
+      <div class="card" data-vp="mobile-l">
+        <div class="card-header">
+          <div class="card-title">Trấn đông người (30 người tụ tập)</div>
+          <div class="card-meta">Điện thoại ngang (Gaming landscape) • 844×390 (DPR 2)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="mobile-l__07-game-crowd.png" target="_blank">
+            <img
+              src="mobile-l__07-game-crowd.png"
+              alt="Trấn đông người (30 người tụ tập) - Điện thoại ngang (Gaming landscape)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">mobile-l__07-game-crowd.png (291.8 KB)</div>
+      </div>
+
+      <div class="card" data-vp="mobile-sm">
+        <div class="card-header">
+          <div class="card-title">Màn hình Đăng nhập</div>
+          <div class="card-meta">Điện thoại nhỏ (Compact 360x640) • 360×640 (DPR 2)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="mobile-sm__01-auth-login.png" target="_blank">
+            <img
+              src="mobile-sm__01-auth-login.png"
+              alt="Màn hình Đăng nhập - Điện thoại nhỏ (Compact 360x640)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">mobile-sm__01-auth-login.png (322.7 KB)</div>
+      </div>
+
+      <div class="card" data-vp="mobile-sm">
+        <div class="card-header">
+          <div class="card-title">Màn hình Đăng ký</div>
+          <div class="card-meta">Điện thoại nhỏ (Compact 360x640) • 360×640 (DPR 2)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="mobile-sm__02-auth-register.png" target="_blank">
+            <img
+              src="mobile-sm__02-auth-register.png"
+              alt="Màn hình Đăng ký - Điện thoại nhỏ (Compact 360x640)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">mobile-sm__02-auth-register.png (298.5 KB)</div>
+      </div>
+
+      <div class="card" data-vp="mobile-sm">
+        <div class="card-header">
+          <div class="card-title">Giao diện chính trong game (HUD & Bản đồ)</div>
+          <div class="card-meta">Điện thoại nhỏ (Compact 360x640) • 360×640 (DPR 2)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="mobile-sm__03-game-hud.png" target="_blank">
+            <img
+              src="mobile-sm__03-game-hud.png"
+              alt="Giao diện chính trong game (HUD & Bản đồ) - Điện thoại nhỏ (Compact 360x640)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">mobile-sm__03-game-hud.png (171.8 KB)</div>
+      </div>
+
+      <div class="card" data-vp="mobile-sm">
+        <div class="card-header">
+          <div class="card-title">Bảng Nhân vật (Chỉ số & Cảnh giới)</div>
+          <div class="card-meta">Điện thoại nhỏ (Compact 360x640) • 360×640 (DPR 2)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="mobile-sm__04-game-char.png" target="_blank">
+            <img
+              src="mobile-sm__04-game-char.png"
+              alt="Bảng Nhân vật (Chỉ số & Cảnh giới) - Điện thoại nhỏ (Compact 360x640)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">mobile-sm__04-game-char.png (171.8 KB)</div>
+      </div>
+
+      <div class="card" data-vp="mobile-sm">
+        <div class="card-header">
+          <div class="card-title">Bảng Túi đồ & Đan dược</div>
+          <div class="card-meta">Điện thoại nhỏ (Compact 360x640) • 360×640 (DPR 2)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="mobile-sm__05-game-inventory.png" target="_blank">
+            <img
+              src="mobile-sm__05-game-inventory.png"
+              alt="Bảng Túi đồ & Đan dược - Điện thoại nhỏ (Compact 360x640)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">mobile-sm__05-game-inventory.png (171.8 KB)</div>
+      </div>
+
+      <div class="card" data-vp="mobile-sm">
+        <div class="card-header">
+          <div class="card-title">Bảng Cài đặt & Tuỳ chọn</div>
+          <div class="card-meta">Điện thoại nhỏ (Compact 360x640) • 360×640 (DPR 2)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="mobile-sm__06-game-settings.png" target="_blank">
+            <img
+              src="mobile-sm__06-game-settings.png"
+              alt="Bảng Cài đặt & Tuỳ chọn - Điện thoại nhỏ (Compact 360x640)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">mobile-sm__06-game-settings.png (171.8 KB)</div>
+      </div>
+
+      <div class="card" data-vp="mobile-sm">
+        <div class="card-header">
+          <div class="card-title">Trấn đông người (30 người tụ tập)</div>
+          <div class="card-meta">Điện thoại nhỏ (Compact 360x640) • 360×640 (DPR 2)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="mobile-sm__07-game-crowd.png" target="_blank">
+            <img
+              src="mobile-sm__07-game-crowd.png"
+              alt="Trấn đông người (30 người tụ tập) - Điện thoại nhỏ (Compact 360x640)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">mobile-sm__07-game-crowd.png (194.4 KB)</div>
+      </div>
+
+      <div class="card" data-vp="tablet-p">
+        <div class="card-header">
+          <div class="card-title">Màn hình Đăng nhập</div>
+          <div class="card-meta">Máy tính bảng dọc (iPad Portrait) • 768×1024 (DPR 2)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="tablet-p__01-auth-login.png" target="_blank">
+            <img
+              src="tablet-p__01-auth-login.png"
+              alt="Màn hình Đăng nhập - Máy tính bảng dọc (iPad Portrait)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">tablet-p__01-auth-login.png (382.4 KB)</div>
+      </div>
+
+      <div class="card" data-vp="tablet-p">
+        <div class="card-header">
+          <div class="card-title">Màn hình Đăng ký</div>
+          <div class="card-meta">Máy tính bảng dọc (iPad Portrait) • 768×1024 (DPR 2)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="tablet-p__02-auth-register.png" target="_blank">
+            <img
+              src="tablet-p__02-auth-register.png"
+              alt="Màn hình Đăng ký - Máy tính bảng dọc (iPad Portrait)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">tablet-p__02-auth-register.png (351.1 KB)</div>
+      </div>
+
+      <div class="card" data-vp="tablet-p">
+        <div class="card-header">
+          <div class="card-title">Giao diện chính trong game (HUD & Bản đồ)</div>
+          <div class="card-meta">Máy tính bảng dọc (iPad Portrait) • 768×1024 (DPR 2)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="tablet-p__03-game-hud.png" target="_blank">
+            <img
+              src="tablet-p__03-game-hud.png"
+              alt="Giao diện chính trong game (HUD & Bản đồ) - Máy tính bảng dọc (iPad Portrait)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">tablet-p__03-game-hud.png (755.6 KB)</div>
+      </div>
+
+      <div class="card" data-vp="tablet-p">
+        <div class="card-header">
+          <div class="card-title">Bảng Nhân vật (Chỉ số & Cảnh giới)</div>
+          <div class="card-meta">Máy tính bảng dọc (iPad Portrait) • 768×1024 (DPR 2)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="tablet-p__04-game-char.png" target="_blank">
+            <img
+              src="tablet-p__04-game-char.png"
+              alt="Bảng Nhân vật (Chỉ số & Cảnh giới) - Máy tính bảng dọc (iPad Portrait)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">tablet-p__04-game-char.png (755.6 KB)</div>
+      </div>
+
+      <div class="card" data-vp="tablet-p">
+        <div class="card-header">
+          <div class="card-title">Bảng Túi đồ & Đan dược</div>
+          <div class="card-meta">Máy tính bảng dọc (iPad Portrait) • 768×1024 (DPR 2)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="tablet-p__05-game-inventory.png" target="_blank">
+            <img
+              src="tablet-p__05-game-inventory.png"
+              alt="Bảng Túi đồ & Đan dược - Máy tính bảng dọc (iPad Portrait)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">tablet-p__05-game-inventory.png (755.6 KB)</div>
+      </div>
+
+      <div class="card" data-vp="tablet-p">
+        <div class="card-header">
+          <div class="card-title">Bảng Cài đặt & Tuỳ chọn</div>
+          <div class="card-meta">Máy tính bảng dọc (iPad Portrait) • 768×1024 (DPR 2)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="tablet-p__06-game-settings.png" target="_blank">
+            <img
+              src="tablet-p__06-game-settings.png"
+              alt="Bảng Cài đặt & Tuỳ chọn - Máy tính bảng dọc (iPad Portrait)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">tablet-p__06-game-settings.png (755.6 KB)</div>
+      </div>
+
+      <div class="card" data-vp="tablet-p">
+        <div class="card-header">
+          <div class="card-title">Trấn đông người (30 người tụ tập)</div>
+          <div class="card-meta">Máy tính bảng dọc (iPad Portrait) • 768×1024 (DPR 2)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="tablet-p__07-game-crowd.png" target="_blank">
+            <img
+              src="tablet-p__07-game-crowd.png"
+              alt="Trấn đông người (30 người tụ tập) - Máy tính bảng dọc (iPad Portrait)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">tablet-p__07-game-crowd.png (791.7 KB)</div>
+      </div>
+
+      <div class="card" data-vp="tablet-l">
+        <div class="card-header">
+          <div class="card-title">Màn hình Đăng nhập</div>
+          <div class="card-meta">Máy tính bảng ngang (iPad Landscape) • 1024×768 (DPR 2)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="tablet-l__01-auth-login.png" target="_blank">
+            <img
+              src="tablet-l__01-auth-login.png"
+              alt="Màn hình Đăng nhập - Máy tính bảng ngang (iPad Landscape)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">tablet-l__01-auth-login.png (385.2 KB)</div>
+      </div>
+
+      <div class="card" data-vp="tablet-l">
+        <div class="card-header">
+          <div class="card-title">Màn hình Đăng ký</div>
+          <div class="card-meta">Máy tính bảng ngang (iPad Landscape) • 1024×768 (DPR 2)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="tablet-l__02-auth-register.png" target="_blank">
+            <img
+              src="tablet-l__02-auth-register.png"
+              alt="Màn hình Đăng ký - Máy tính bảng ngang (iPad Landscape)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">tablet-l__02-auth-register.png (356.1 KB)</div>
+      </div>
+
+      <div class="card" data-vp="tablet-l">
+        <div class="card-header">
+          <div class="card-title">Giao diện chính trong game (HUD & Bản đồ)</div>
+          <div class="card-meta">Máy tính bảng ngang (iPad Landscape) • 1024×768 (DPR 2)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="tablet-l__03-game-hud.png" target="_blank">
+            <img
+              src="tablet-l__03-game-hud.png"
+              alt="Giao diện chính trong game (HUD & Bản đồ) - Máy tính bảng ngang (iPad Landscape)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">tablet-l__03-game-hud.png (750.4 KB)</div>
+      </div>
+
+      <div class="card" data-vp="tablet-l">
+        <div class="card-header">
+          <div class="card-title">Bảng Nhân vật (Chỉ số & Cảnh giới)</div>
+          <div class="card-meta">Máy tính bảng ngang (iPad Landscape) • 1024×768 (DPR 2)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="tablet-l__04-game-char.png" target="_blank">
+            <img
+              src="tablet-l__04-game-char.png"
+              alt="Bảng Nhân vật (Chỉ số & Cảnh giới) - Máy tính bảng ngang (iPad Landscape)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">tablet-l__04-game-char.png (750.4 KB)</div>
+      </div>
+
+      <div class="card" data-vp="tablet-l">
+        <div class="card-header">
+          <div class="card-title">Bảng Túi đồ & Đan dược</div>
+          <div class="card-meta">Máy tính bảng ngang (iPad Landscape) • 1024×768 (DPR 2)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="tablet-l__05-game-inventory.png" target="_blank">
+            <img
+              src="tablet-l__05-game-inventory.png"
+              alt="Bảng Túi đồ & Đan dược - Máy tính bảng ngang (iPad Landscape)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">tablet-l__05-game-inventory.png (750.4 KB)</div>
+      </div>
+
+      <div class="card" data-vp="tablet-l">
+        <div class="card-header">
+          <div class="card-title">Bảng Cài đặt & Tuỳ chọn</div>
+          <div class="card-meta">Máy tính bảng ngang (iPad Landscape) • 1024×768 (DPR 2)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="tablet-l__06-game-settings.png" target="_blank">
+            <img
+              src="tablet-l__06-game-settings.png"
+              alt="Bảng Cài đặt & Tuỳ chọn - Máy tính bảng ngang (iPad Landscape)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">tablet-l__06-game-settings.png (750.4 KB)</div>
+      </div>
+
+      <div class="card" data-vp="tablet-l">
+        <div class="card-header">
+          <div class="card-title">Trấn đông người (30 người tụ tập)</div>
+          <div class="card-meta">Máy tính bảng ngang (iPad Landscape) • 1024×768 (DPR 2)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="tablet-l__07-game-crowd.png" target="_blank">
+            <img
+              src="tablet-l__07-game-crowd.png"
+              alt="Trấn đông người (30 người tụ tập) - Máy tính bảng ngang (iPad Landscape)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">tablet-l__07-game-crowd.png (747.4 KB)</div>
+      </div>
+
+      <div class="card" data-vp="desktop-hd">
+        <div class="card-header">
+          <div class="card-title">Màn hình Đăng nhập</div>
+          <div class="card-meta">Máy tính Laptop / HD (1280x720) • 1280×720 (DPR 1)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="desktop-hd__01-auth-login.png" target="_blank">
+            <img
+              src="desktop-hd__01-auth-login.png"
+              alt="Màn hình Đăng nhập - Máy tính Laptop / HD (1280x720)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">desktop-hd__01-auth-login.png (122.3 KB)</div>
+      </div>
+
+      <div class="card" data-vp="desktop-hd">
+        <div class="card-header">
+          <div class="card-title">Màn hình Đăng ký</div>
+          <div class="card-meta">Máy tính Laptop / HD (1280x720) • 1280×720 (DPR 1)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="desktop-hd__02-auth-register.png" target="_blank">
+            <img
+              src="desktop-hd__02-auth-register.png"
+              alt="Màn hình Đăng ký - Máy tính Laptop / HD (1280x720)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">desktop-hd__02-auth-register.png (114.4 KB)</div>
+      </div>
+
+      <div class="card" data-vp="desktop-hd">
+        <div class="card-header">
+          <div class="card-title">Giao diện chính trong game (HUD & Bản đồ)</div>
+          <div class="card-meta">Máy tính Laptop / HD (1280x720) • 1280×720 (DPR 1)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="desktop-hd__03-game-hud.png" target="_blank">
+            <img
+              src="desktop-hd__03-game-hud.png"
+              alt="Giao diện chính trong game (HUD & Bản đồ) - Máy tính Laptop / HD (1280x720)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">desktop-hd__03-game-hud.png (258.9 KB)</div>
+      </div>
+
+      <div class="card" data-vp="desktop-hd">
+        <div class="card-header">
+          <div class="card-title">Bảng Nhân vật (Chỉ số & Cảnh giới)</div>
+          <div class="card-meta">Máy tính Laptop / HD (1280x720) • 1280×720 (DPR 1)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="desktop-hd__04-game-char.png" target="_blank">
+            <img
+              src="desktop-hd__04-game-char.png"
+              alt="Bảng Nhân vật (Chỉ số & Cảnh giới) - Máy tính Laptop / HD (1280x720)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">desktop-hd__04-game-char.png (258.9 KB)</div>
+      </div>
+
+      <div class="card" data-vp="desktop-hd">
+        <div class="card-header">
+          <div class="card-title">Bảng Túi đồ & Đan dược</div>
+          <div class="card-meta">Máy tính Laptop / HD (1280x720) • 1280×720 (DPR 1)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="desktop-hd__05-game-inventory.png" target="_blank">
+            <img
+              src="desktop-hd__05-game-inventory.png"
+              alt="Bảng Túi đồ & Đan dược - Máy tính Laptop / HD (1280x720)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">desktop-hd__05-game-inventory.png (258.9 KB)</div>
+      </div>
+
+      <div class="card" data-vp="desktop-hd">
+        <div class="card-header">
+          <div class="card-title">Bảng Cài đặt & Tuỳ chọn</div>
+          <div class="card-meta">Máy tính Laptop / HD (1280x720) • 1280×720 (DPR 1)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="desktop-hd__06-game-settings.png" target="_blank">
+            <img
+              src="desktop-hd__06-game-settings.png"
+              alt="Bảng Cài đặt & Tuỳ chọn - Máy tính Laptop / HD (1280x720)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">desktop-hd__06-game-settings.png (258.9 KB)</div>
+      </div>
+
+      <div class="card" data-vp="desktop-hd">
+        <div class="card-header">
+          <div class="card-title">Trấn đông người (30 người tụ tập)</div>
+          <div class="card-meta">Máy tính Laptop / HD (1280x720) • 1280×720 (DPR 1)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="desktop-hd__07-game-crowd.png" target="_blank">
+            <img
+              src="desktop-hd__07-game-crowd.png"
+              alt="Trấn đông người (30 người tụ tập) - Máy tính Laptop / HD (1280x720)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">desktop-hd__07-game-crowd.png (250.3 KB)</div>
+      </div>
+
+      <div class="card" data-vp="desktop-fhd">
+        <div class="card-header">
+          <div class="card-title">Màn hình Đăng nhập</div>
+          <div class="card-meta">Máy tính Full HD (1920x1080) • 1920×1080 (DPR 1)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="desktop-fhd__01-auth-login.png" target="_blank">
+            <img
+              src="desktop-fhd__01-auth-login.png"
+              alt="Màn hình Đăng nhập - Máy tính Full HD (1920x1080)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">desktop-fhd__01-auth-login.png (130 KB)</div>
+      </div>
+
+      <div class="card" data-vp="desktop-fhd">
+        <div class="card-header">
+          <div class="card-title">Màn hình Đăng ký</div>
+          <div class="card-meta">Máy tính Full HD (1920x1080) • 1920×1080 (DPR 1)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="desktop-fhd__02-auth-register.png" target="_blank">
+            <img
+              src="desktop-fhd__02-auth-register.png"
+              alt="Màn hình Đăng ký - Máy tính Full HD (1920x1080)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">desktop-fhd__02-auth-register.png (122.5 KB)</div>
+      </div>
+
+      <div class="card" data-vp="desktop-fhd">
+        <div class="card-header">
+          <div class="card-title">Giao diện chính trong game (HUD & Bản đồ)</div>
+          <div class="card-meta">Máy tính Full HD (1920x1080) • 1920×1080 (DPR 1)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="desktop-fhd__03-game-hud.png" target="_blank">
+            <img
+              src="desktop-fhd__03-game-hud.png"
+              alt="Giao diện chính trong game (HUD & Bản đồ) - Máy tính Full HD (1920x1080)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">desktop-fhd__03-game-hud.png (559.7 KB)</div>
+      </div>
+
+      <div class="card" data-vp="desktop-fhd">
+        <div class="card-header">
+          <div class="card-title">Bảng Nhân vật (Chỉ số & Cảnh giới)</div>
+          <div class="card-meta">Máy tính Full HD (1920x1080) • 1920×1080 (DPR 1)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="desktop-fhd__04-game-char.png" target="_blank">
+            <img
+              src="desktop-fhd__04-game-char.png"
+              alt="Bảng Nhân vật (Chỉ số & Cảnh giới) - Máy tính Full HD (1920x1080)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">desktop-fhd__04-game-char.png (559.7 KB)</div>
+      </div>
+
+      <div class="card" data-vp="desktop-fhd">
+        <div class="card-header">
+          <div class="card-title">Bảng Túi đồ & Đan dược</div>
+          <div class="card-meta">Máy tính Full HD (1920x1080) • 1920×1080 (DPR 1)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="desktop-fhd__05-game-inventory.png" target="_blank">
+            <img
+              src="desktop-fhd__05-game-inventory.png"
+              alt="Bảng Túi đồ & Đan dược - Máy tính Full HD (1920x1080)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">desktop-fhd__05-game-inventory.png (559.7 KB)</div>
+      </div>
+
+      <div class="card" data-vp="desktop-fhd">
+        <div class="card-header">
+          <div class="card-title">Bảng Cài đặt & Tuỳ chọn</div>
+          <div class="card-meta">Máy tính Full HD (1920x1080) • 1920×1080 (DPR 1)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="desktop-fhd__06-game-settings.png" target="_blank">
+            <img
+              src="desktop-fhd__06-game-settings.png"
+              alt="Bảng Cài đặt & Tuỳ chọn - Máy tính Full HD (1920x1080)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">desktop-fhd__06-game-settings.png (559.7 KB)</div>
+      </div>
+
+      <div class="card" data-vp="desktop-fhd">
+        <div class="card-header">
+          <div class="card-title">Trấn đông người (30 người tụ tập)</div>
+          <div class="card-meta">Máy tính Full HD (1920x1080) • 1920×1080 (DPR 1)</div>
+        </div>
+        <div class="img-wrap">
+          <a href="desktop-fhd__07-game-crowd.png" target="_blank">
+            <img
+              src="desktop-fhd__07-game-crowd.png"
+              alt="Trấn đông người (30 người tụ tập) - Máy tính Full HD (1920x1080)"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div class="card-footer">desktop-fhd__07-game-crowd.png (559.6 KB)</div>
+      </div>
+    </div>
+
+    <script>
+      function filterVp(vpId) {
+        document.querySelectorAll(".filter-btn").forEach((b) => b.classList.remove("active"));
+        event.target.classList.add("active");
+        document.querySelectorAll(".card").forEach((c) => {
+          if (vpId === "all" || c.getAttribute("data-vp") === vpId) {
+            c.style.display = "flex";
+          } else {
+            c.style.display = "none";
+          }
+        });
+      }
+    </script>
+  </body>
+</html>
