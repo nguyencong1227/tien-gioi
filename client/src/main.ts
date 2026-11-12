@@ -33,15 +33,23 @@ import { HeartbeatController } from "./heartbeat";
 import { sound } from "./audio";
 import { initDisplay } from "./gfx/display";
 import { installTouchGuards } from "./touch";
-import { getDisplay } from "./gfx/display";
+import { getDisplay, onDisplayChange, setRenderScale } from "./gfx/display";
 import {
   browserQualityEnv,
   getQuality,
   initQuality,
+  onQualityChange,
   qualityFrame,
   refreshQuality,
   setQualityActive,
 } from "./gfx/quality";
+import {
+  attachScale,
+  canvasSizeFor,
+  computeRenderScale,
+  fpsLimitFor,
+  type GameLike,
+} from "./gfx/scale";
 import { mountPerfOverlay } from "./gfx/perf-overlay";
 import { isReducedMotion } from "./a11y";
 
@@ -685,17 +693,31 @@ async function start(room: Room, mapId: string) {
       (window as any).__mockSect.showLeader();
     }
   }
+  // Scale Manager + DPR (#324): canvas = khung nhìn logic (CSS px) x renderScale, hiển thị bằng zoom = 1 / renderScale
+  // (spike Chrome thật: `RESIZE` giữ canvas = CSS px nên mờ ở DPR 2-3, `RESIZE + zoom` bị bỏ qua; `NONE` + zoom đúng và
+  // toạ độ chạm sai số 0). `attachScale` giữ khớp khi đổi kích thước / chất lượng và đổi giới hạn FPS lúc chạy.
+  const d0 = getDisplay();
+  const q0 = getQuality();
+  const rs0 = computeRenderScale(d0.cssW, d0.cssH, d0.dpr, q0);
+  setRenderScale(rs0); // trước khi cảnh tạo camera (camera zoom = fitZoom * renderScale)
+  const size0 = canvasSizeFor(d0.cssW, d0.cssH, rs0);
   const game = new Phaser.Game({
     type: Phaser.AUTO,
     parent: "game",
     backgroundColor: "#2b2620",
     render: { batchSize: 8192 },
-    scale: { mode: Phaser.Scale.RESIZE, width: window.innerWidth, height: window.innerHeight },
+    scale: { mode: Phaser.Scale.NONE, width: size0.width, height: size0.height, zoom: 1 / rs0 },
     input: { activePointers: 3 },
-    // Tiết kiệm pin = 30 FPS. Phaser chỉ gắn bộ giới hạn khi khởi động vòng lặp nên áp từ lần vào game sau
-    // (đổi lúc chạy cần đụng thành phần nội bộ của Phaser: để spike #324 kiểm chứng).
-    fps: { limit: getQuality().targetFps === 30 ? 30 : 0 },
+    // Tiết kiệm pin = ~30 FPS: ngưỡng 31 (ngưỡng 30 ra ~21 FPS ở 60 Hz: đo thật), đổi được lúc chạy bởi attachScale
+    fps: { limit: fpsLimitFor(q0.targetFps) },
     scene: [activeScene],
+  });
+  attachScale(game as unknown as GameLike, {
+    getDisplay,
+    onDisplayChange: (cb) => onDisplayChange(() => cb()),
+    getQuality,
+    onQualityChange: (cb) => onQualityChange(() => cb()),
+    setRenderScale,
   });
   // Cấp thời gian khung (thô, không làm mượt) cho bộ điều tốc chất lượng và lớp phủ ?perf=1
   game.events.on(Phaser.Core.Events.POST_STEP, () => qualityFrame(game.loop.rawDelta));

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   BATTERY_SAVER_STORAGE_KEY,
+  browserQualityEnv,
   DEFAULT_GOVERNOR,
   FrameGovernor,
   LEGACY_LOW_FX_KEY,
@@ -225,6 +226,34 @@ describe("gfx/quality: bộ điều tốc (đồng hồ giả, thời gian = t�
     expect(run(g, framesFor(5000, 10), 10)).toEqual(["up"]);
   });
 
+  it("MÀN 60 Hz: khung 16,7 ms đều (p95 ~16,8) vẫn là 'tốt' -> sau một lần hạ + khoá 60 s, máy khoẻ được NÂNG trở lại", () => {
+    // Bản đầu có goodP95Ms = 14 < chu kỳ 60 Hz nên KHÔNG BAO GIỜ nâng được trên màn 60 Hz (B đo thật); test cũ dùng khung 10 ms
+    // nên không thấy.
+    const g = new FrameGovernor();
+    run(g, framesFor(10_000, 30), 30); // hạ
+    const ups: number[] = [];
+    let t = 0;
+    for (let i = 0; i < framesFor(150_000, 16.7); i++) {
+      if (g.frame(16.7, true, true) === "up") ups.push(t);
+      t += 16.7;
+    }
+    expect(ups.length).toBeGreaterThan(0);
+    expect(ups[0]).toBeGreaterThanOrEqual(DEFAULT_GOVERNOR.upLockoutAfterDownMs - 100);
+  });
+
+  it("vsync có rung nhẹ (16,7 +- 1 ms, p95 ~17,7) vẫn 'tốt'; p95 ~20 ms (vùng chết) không nâng cũng không hạ", () => {
+    const g = new FrameGovernor();
+    const jitter = (i: number) => 16.7 + (i % 5 === 0 ? 1 : 0);
+    let ups = 0;
+    for (let i = 0; i < framesFor(60_000, 16.7); i++)
+      if (g.frame(jitter(i), true, true) === "up") ups++;
+    expect(ups).toBeGreaterThan(0);
+    const g2 = new FrameGovernor();
+    let any = 0;
+    for (let i = 0; i < framesFor(120_000, 20); i++) if (g2.frame(20, true, true)) any++;
+    expect(any).toBe(0); // 20 ms: > 19 (không tốt) và < 22 (không xấu)
+  });
+
   it("không nâng khi canUp=false (đã chạm trần của thiết bị)", () => {
     const g = new FrameGovernor();
     expect(run(g, framesFor(120_000, 10), 10, true, false)).toEqual([]);
@@ -429,5 +458,71 @@ describe("gfx/quality: bộ điều khiển", () => {
     q.dispose();
     feed(q, 400, 30);
     expect(cb).not.toHaveBeenCalled();
+  });
+});
+
+describe("gfx/quality: đọc chuỗi GPU (browserQualityEnv)", () => {
+  function fakeBrowser() {
+    const lose = vi.fn();
+    let created = 0;
+    const gl = {
+      getExtension: (name: string) =>
+        name === "WEBGL_debug_renderer_info"
+          ? { UNMASKED_RENDERER_WEBGL: 37446 }
+          : name === "WEBGL_lose_context"
+            ? { loseContext: lose }
+            : null,
+      getParameter: () => "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device))",
+    };
+    const doc = {
+      createElement: () => {
+        created++;
+        return { getContext: () => gl };
+      },
+      documentElement: { setAttribute: () => {} },
+      body: null,
+    };
+    const win = {
+      navigator: { hardwareConcurrency: 8, deviceMemory: 8 },
+      localStorage: { getItem: () => null, setItem: () => {} },
+    };
+    return { lose, created: () => created, doc, win };
+  }
+
+  it("chỉ tạo MỘT ngữ cảnh WebGL cho mọi lần signals() và giải phóng nó ngay (không chạm trần ngữ cảnh của Chrome)", () => {
+    const b = fakeBrowser();
+    const env = browserQualityEnv(
+      () => "desktop",
+      () => false,
+      b.win as never,
+      b.doc as never,
+    );
+    for (let i = 0; i < 20; i++) expect(env.signals().gpu).toMatch(/SwiftShader/);
+    expect(b.created()).toBe(1);
+    expect(b.lose).toHaveBeenCalledTimes(1);
+  });
+
+  it("không đọc được GPU (ném lỗi) thì undefined và cũng chỉ thử MỘT lần", () => {
+    const b = fakeBrowser();
+    b.doc.createElement = () => {
+      throw new Error("không có WebGL");
+    };
+    let tries = 0;
+    const doc = {
+      ...b.doc,
+      createElement: () => {
+        tries++;
+        throw new Error("không có WebGL");
+      },
+    };
+    const env = browserQualityEnv(
+      () => "phone",
+      () => false,
+      b.win as never,
+      doc as never,
+    );
+    expect(env.signals().gpu).toBeUndefined();
+    expect(env.signals().gpu).toBeUndefined();
+    expect(tries).toBe(1);
   });
 });

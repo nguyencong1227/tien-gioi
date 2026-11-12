@@ -98,7 +98,9 @@ export type DisplayEventType =
   | "viewport"
   | "pointerdown"
   /** `(pointer: coarse)` đổi (máy lai gắn / tháo bàn phím, chế độ tablet) mà không có `resize`. */
-  | "pointermedia";
+  | "pointermedia"
+  /** `devicePixelRatio` đổi (kéo cửa sổ sang màn hình khác) mà kích thước CSS giữ nguyên nên không có `resize`. */
+  | "dpr";
 
 /** Phần tối thiểu của môi trường mà lõi hiển thị cần (tiêm vào để test không cần DOM). */
 export interface DisplayEnv {
@@ -230,6 +232,7 @@ export function createDisplay(env: DisplayEnv): DisplayController {
     env.listen("orientationchange", schedule),
     env.listen("viewport", schedule),
     env.listen("pointermedia", schedule),
+    env.listen("dpr", schedule),
     env.listen("pointerdown", (e) => {
       const t = e?.pointerType;
       // Chỉ đổi theo loại con trỏ đã biết; loại lạ không làm nhảy chế độ.
@@ -309,6 +312,25 @@ export function browserEnv(win: Window = window, doc: Document = document): Disp
         const h = () => cb();
         vv.addEventListener("resize", h);
         return () => vv.removeEventListener("resize", h);
+      }
+      if (type === "dpr") {
+        // `(resolution: Xdppx)` chỉ báo khi giá trị X ĐÃ ĐĂNG KÝ không còn khớp: đăng ký lại theo DPR mới sau mỗi lần phát
+        let mq: MediaQueryList | null = null;
+        let off = false;
+        const h = () => {
+          cb();
+          if (!off) arm();
+        };
+        const arm = () => {
+          mq?.removeEventListener?.("change", h);
+          mq = win.matchMedia(`(resolution: ${win.devicePixelRatio}dppx)`);
+          mq.addEventListener?.("change", h);
+        };
+        arm();
+        return () => {
+          off = true;
+          mq?.removeEventListener?.("change", h);
+        };
       }
       if (type === "pointermedia") {
         const mq = win.matchMedia("(pointer: coarse)");
