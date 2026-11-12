@@ -28,6 +28,15 @@ import { styleOf } from "../gfx/map-style";
 import { decorTilesetKey, ensureDecorTileset } from "../gfx/decor-tileset";
 import { ambientEnabledByUrl, planWeather, weatherEnabledByUrl } from "../gfx/map-weather";
 import {
+  NO_WATER,
+  WATER_KEY,
+  WATER_STEP_MS,
+  drawShimmer,
+  ensureWaterTexture,
+  shimmerPhaseKey,
+  waterGrid,
+} from "../gfx/map-water";
+import {
   FOG_KEY,
   advanceU,
   ensureFogTexture,
@@ -301,6 +310,12 @@ export class WorldScene extends Phaser.Scene {
    * e2e bật / tắt lúc chạy bằng thuộc tính này.
    */
   weatherPaused = false;
+  /** Mặt nước lấp lánh (M5.3 #332 bước 2e): MỘT lớp tilemap chỉ gồm ô nước, tileset canvas nhỏ vẽ lại ~4 lần/giây. */
+  private waterTilemap?: Phaser.Tilemaps.Tilemap;
+  waterLayer?: Phaser.Tilemaps.TilemapLayer;
+  private waterPhaseKey = -1;
+  /** Đốm nước đứng yên khi `?debug` (trừ `?water=1`): cảnh tĩnh để các script điểm ảnh có ảnh đối chứng không nhiễu. */
+  waterPaused = false;
   /** Sương trôi (M5.3 #332 bước 2d): các ảnh mảng sương (cố định theo màn hình) + bố cục theo tỉ lệ khung nhìn. */
   fogImages: Phaser.GameObjects.Image[] = [];
   private fogPatches: FogPatch[] = [];
@@ -342,6 +357,8 @@ export class WorldScene extends Phaser.Scene {
     this.fx = createFxSystem(this, { getProfile: getQuality, depth: () => this.map.worldH });
     this.weatherPaused =
       typeof window !== "undefined" && !weatherEnabledByUrl(window.location.search);
+    this.waterPaused =
+      typeof window !== "undefined" && !ambientEnabledByUrl(window.location.search, "water");
     this.fogPaused =
       typeof window !== "undefined" && !ambientEnabledByUrl(window.location.search, "fog");
     const offQuality = onQualityChange(() => {
@@ -539,6 +556,21 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
+  /** Đốm sáng mặt nước: vẽ lại mỗi `WATER_STEP_MS` (giảm chuyển động hoặc bậc Thấp: một khung tĩnh, không vẽ lại). */
+  private stepWater(now: number) {
+    if (!this.waterLayer) return;
+    const prof = getQuality();
+    const still = prof.reducedMotion || prof.tier === "low" || this.waterPaused;
+    const key = shimmerPhaseKey(now, still);
+    if (key === this.waterPhaseKey) return;
+    this.waterPhaseKey = key;
+    drawShimmer(
+      ensureWaterTexture(this),
+      styleOf(this.map.def.id),
+      still ? 0 : key * WATER_STEP_MS,
+    );
+  }
+
   /** Thời tiết: mỗi nhịp một lần phát phủ khung nhìn (kế hoạch thuần ở gfx/map-weather.ts; hồ sơ chất lượng quyết định tốc độ). */
   private emitWeather(now: number) {
     if (this.weatherPaused) return;
@@ -578,6 +610,14 @@ export class WorldScene extends Phaser.Scene {
       this.mapTilemap.destroy();
       this.mapTilemap = undefined;
     }
+    if (this.waterLayer) {
+      this.waterLayer.destroy();
+      this.waterLayer = undefined;
+    }
+    if (this.waterTilemap) {
+      this.waterTilemap.destroy();
+      this.waterTilemap = undefined;
+    }
     if (this.decorLayer) {
       this.decorLayer.destroy();
       this.decorLayer = undefined;
@@ -616,6 +656,21 @@ export class WorldScene extends Phaser.Scene {
     )!;
     this.decorLayer = this.decorTilemap.createLayer(0, decorTs, 0, 0)!;
     this.decorLayer.setDepth(-9);
+
+    // 2b'. Mặt nước lấp lánh: một lớp chỉ gồm các ô nước, đốm sáng trôi (vẽ lại ở stepWater)
+    const waterCells = waterGrid(this.map);
+    if (waterCells.some((v) => v !== NO_WATER)) {
+      const waterRows: number[][] = [];
+      for (let y = 0; y < mh; y++)
+        waterRows.push(Array.from(waterCells.subarray(y * mw, (y + 1) * mw)));
+      this.waterTilemap = this.make.tilemap({ data: waterRows, tileWidth: TILE, tileHeight: TILE });
+      const waterTex = ensureWaterTexture(this);
+      drawShimmer(waterTex, style, 0);
+      this.waterPhaseKey = 0;
+      const waterTs = this.waterTilemap.addTilesetImage(WATER_KEY, WATER_KEY, TILE, TILE, 0, 0)!;
+      this.waterLayer = this.waterTilemap.createLayer(0, waterTs, 0, 0)!;
+      this.waterLayer.setDepth(-8);
+    }
 
     // 2c. Ánh sáng môi trường + vignette theo kiểu bản đồ (hiện theo hồ sơ chất lượng)
     this.applyLight();
@@ -2621,6 +2676,7 @@ export class WorldScene extends Phaser.Scene {
     this.layoutLight();
     this.emitWeather(now);
     this.stepFog(now);
+    this.stepWater(now);
   }
 
   /** Tin `dmg`: chữ bay + âm thanh, và đánh dấu "bị đánh" cho quái / người chơi bị trúng (hoạt ảnh bị đánh, M5.2 #328). */
