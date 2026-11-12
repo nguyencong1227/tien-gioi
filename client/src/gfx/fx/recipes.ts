@@ -7,6 +7,7 @@ import { COMBAT_RECIPES } from "./recipes-combat";
 import { CULTIVATION_RECIPES } from "./recipes-cultivation";
 import { SKILL_RECIPES } from "./recipes-skill";
 import { WORLD_RECIPES } from "./recipes-world";
+import { WEATHER_RECIPES } from "./recipes-weather";
 
 /** Tên khung hình trong atlas hạt (`atlas.ts`). */
 export type FxFrame = "dot" | "spark" | "ring" | "smoke" | "petal" | "ember";
@@ -34,6 +35,11 @@ export interface FxParticles {
   /** Cộng sáng (ADD, mặc định) hay thường (NORMAL, vd khói). */
   blend?: "add" | "normal";
   gravityY?: number;
+  /**
+   * Vùng phát hình chữ nhật (px thế giới) CĂN GIỮA điểm phát: mỗi hạt xuất hiện ở một điểm ngẫu nhiên trong vùng (thời tiết phủ
+   * cả khung nhìn bằng MỘT lần phát). `opts.area` của `fx.play` ghi đè kích thước. Thiếu = phát từ đúng một điểm.
+   */
+  zone?: { w: number; h: number };
 }
 
 export interface FxFlash {
@@ -71,6 +77,8 @@ export function validateRecipe(r: FxRecipe): void {
     if (!(p.lifespan.min > 0) || p.lifespan.max < p.lifespan.min || p.lifespan.max > 4000)
       throw new Error(`${r.id}: lifespan phải 0 < min <= max <= 4000 ms`);
     if (p.speed.min < 0 || p.speed.max < p.speed.min) throw new Error(`${r.id}: speed lạ`);
+    if (p.zone && !(p.zone.w > 0 && p.zone.h > 0 && p.zone.w <= 4000 && p.zone.h <= 4000))
+      throw new Error(`${r.id}: zone phải 0 < w, h <= 4000`);
   }
   if (!r.particles && !r.flash && !r.shake) throw new Error(`${r.id}: công thức rỗng`);
 }
@@ -122,6 +130,7 @@ for (const r of COMBAT_RECIPES) registerRecipe(r);
 for (const r of CULTIVATION_RECIPES) registerRecipe(r);
 for (const r of WORLD_RECIPES) registerRecipe(r);
 for (const r of SKILL_RECIPES) registerRecipe(r);
+for (const r of WEATHER_RECIPES) registerRecipe(r);
 
 registerRecipe({
   id: "ambient-glimmer",

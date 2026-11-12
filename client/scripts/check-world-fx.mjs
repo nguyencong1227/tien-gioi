@@ -185,6 +185,32 @@ try {
   await delLoot("l-lam2");
   await clearFx();
 
+  // 2b) Đồ lam NGOÀI khung camera nhưng vẫn trong vùng nhìn của server (xa 1000 px, màn hình ~900 px): không nổ hạt xuất hiện,
+  // không lấp lánh (tiết kiệm ngân sách; nit của A ở #353). Đếm số lần PHÁT thay vì đếm hạt để khỏi lẫn hạt môi trường khác.
+  await evalJs(
+    `(() => { const f = window.__fx, o = f.play.bind(f); window.__lootPlays = 0; f.play = (id, x, y, op) => { if (id.startsWith("loot-")) window.__lootPlays++; return o(id, x, y, op); }; return 1; })()`,
+  );
+  await putLoot("l-xa", "vay_mang", 1000);
+  await sleep(2500);
+  check(
+    (await evalJs("window.__lootPlays")) === 0,
+    "đồ lam ngoài khung camera (xa 1000 px): không nổ hạt xuất hiện, không lấp lánh",
+  );
+  // ...và khi nó đi vào khung (dời camera sang) thì lấp lánh trở lại
+  await evalJs(
+    `(() => { const sc = window.__scene; sc.cameras.main.centerOn(sc.predX + 1000, sc.predY); return 1; })()`,
+  );
+  await sleep(1500);
+  check(
+    (await evalJs("window.__lootPlays")) > 0,
+    "đồ lam vào khung camera thì lấp lánh (điều kiện đối chứng của phép đo)",
+  );
+  await evalJs(
+    `(() => { const sc = window.__scene; sc.cameras.main.centerOn(sc.predX, sc.predY); return 1; })()`,
+  );
+  await delLoot("l-xa");
+  await clearFx();
+
   // 3) Nhặt đồ: nhặt của mình -> đốm bay lên (loot-pickup 8); đồ biến mất vì lý do khác (người khác nhặt / hết hạn) -> không nổ
   await delLoot("l-thuong");
   await clearFx();

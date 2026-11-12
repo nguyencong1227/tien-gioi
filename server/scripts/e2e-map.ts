@@ -237,6 +237,189 @@ async function main() {
     must(after.tex === before.tex, `số texture không đổi (${before.tex} -> ${after.tex})`);
     ok(`không rò: ${before.kids} đối tượng, ${before.tex} texture trước và sau 20 lần dựng lại`);
 
+    // ---------------- Ca 5: ánh sáng môi trường + vignette ----------------
+    out("\n--- Ca 5: ánh sáng môi trường + vignette (điểm ảnh thật theo bậc chất lượng) ---");
+    const setQuality = (v: string) =>
+      ev(
+        `(() => { const s = document.getElementById('set-quality'); s.value = ${JSON.stringify(v)}; s.dispatchEvent(new Event('change')); })(); 1`,
+      );
+    /** Độ sáng trung bình bốn góc (16x16) và giữa màn hình (32x32) của canvas WebGL THẬT. */
+    const luma = () =>
+      ev(`new Promise((resolve) => { const g = window.__scene.game, w = g.canvas.width, h = g.canvas.height;
+        setTimeout(() => g.renderer.snapshotArea(0, 0, w, h, (img) => {
+          const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+          const x = c.getContext('2d'); x.drawImage(img, 0, 0);
+          const patch = (x0, y0, pw, ph) => { const d = x.getImageData(x0, y0, pw, ph).data; let sum = 0;
+            for (let i = 0; i < d.length; i += 4) sum += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+            return sum / (d.length / 4); };
+          resolve({ w, h, tl: patch(2, 2, 16, 16), tr: patch(w - 18, 2, 16, 16), bl: patch(2, h - 18, 16, 16),
+            br: patch(w - 18, h - 18, 16, 16), c: patch(Math.round(w / 2) - 16, Math.round(h / 2) - 16, 32, 32) }); }), 250); })`) as Promise<
+        Record<string, number>
+      >;
+    const flags = () =>
+      ev(`({ amb: window.__scene.lightAmbient.visible, vig: window.__scene.lightVignette.visible,
+        vw: Math.round(window.__scene.lightVignette.displayWidth), cw: Math.round(window.__scene.cameras.main.displayWidth) })`) as Promise<{
+        amb: boolean;
+        vig: boolean;
+        vw: number;
+        cw: number;
+      }>;
+    await setQuality("high");
+    await sleep(500);
+    const fHigh = await flags();
+    must(fHigh.amb && fHigh.vig, "bậc Cao: cả ánh sáng môi trường lẫn vignette hiện");
+    must(
+      fHigh.vw >= fHigh.cw,
+      `ảnh phủ che đủ khung nhìn (${fHigh.vw} >= ${fHigh.cw} px thế giới)`,
+    );
+    const lumaHigh = await luma();
+    const lumaHigh2 = await luma();
+    await T.shot("map-light-cao");
+    await setQuality("low");
+    await sleep(500);
+    const fLow = await flags();
+    must(!fLow.amb && !fLow.vig, "bậc Thấp: cả hai đều tắt");
+    const lumaLow = await luma();
+    await T.shot("map-light-thap");
+    const corners = ["tl", "tr", "bl", "br"] as const;
+    for (const k of corners) {
+      const ctl = Math.abs(lumaHigh[k] / lumaHigh2[k] - 1);
+      must(
+        ctl < 0.05,
+        `đối chứng góc ${k}: hai ảnh cùng bậc khác ${(ctl * 100).toFixed(1)} % (< 5 %)`,
+      );
+      const ratio = lumaHigh[k] / lumaLow[k];
+      must(
+        ratio < 0.9,
+        `góc ${k} tối đi khi bật vignette: độ sáng ${lumaHigh[k].toFixed(0)} / ${lumaLow[k].toFixed(0)} = ${ratio.toFixed(2)} (< 0,9)`,
+      );
+    }
+    const cRatio = Math.abs(lumaHigh.c / lumaLow.c - 1);
+    must(
+      cRatio < 0.1,
+      `giữa màn hình gần như không đổi (${(cRatio * 100).toFixed(1)} % < 10 %): vùng chơi sạch`,
+    );
+    ok(
+      `ánh sáng: góc tối ${corners.map((k) => (lumaHigh[k] / lumaLow[k]).toFixed(2)).join(" / ")} so với bậc Thấp, giữa màn hình đổi ${(cRatio * 100).toFixed(1)} %`,
+    );
+    // Draw call: bật / tắt hai ảnh phủ trực tiếp (cùng bậc, cùng cảnh)
+    await setQuality("high");
+    await sleep(500);
+    const drawsWithLight = (on: boolean) =>
+      ev(`new Promise((resolve) => { const s = window.__scene, g = s.game, gl = g.renderer.gl;
+        if (!gl) return resolve(-1); s.lightAmbient.setVisible(${on}); s.lightVignette.setVisible(${on});
+        let draws = 0, f = 0; const de = gl.drawElements, da = gl.drawArrays;
+        gl.drawElements = function () { draws++; return de.apply(this, arguments); };
+        gl.drawArrays = function () { draws++; return da.apply(this, arguments); };
+        const on2 = () => { if (++f > 30) { g.events.off('postrender', on2); gl.drawElements = de; gl.drawArrays = da; resolve(draws / 30); } };
+        g.events.on('postrender', on2); })`) as Promise<number>;
+    const dOff = Number(await drawsWithLight(false));
+    const dOn = Number(await drawsWithLight(true));
+    must(dOff >= 0, "renderer là WebGL");
+    must(
+      dOn - dOff <= 2.01,
+      `hai ảnh phủ thêm <= 2 draw call mỗi khung (tắt ${dOff.toFixed(1)}, bật ${dOn.toFixed(1)})`,
+    );
+    ok(
+      `draw call mỗi khung: tắt ${dOff.toFixed(1)} -> bật ${dOn.toFixed(1)} (+${(dOn - dOff).toFixed(1)})`,
+    );
+
+    // ---------------- Ca 6: thời tiết bằng hạt ----------------
+    out(
+      "\n--- Ca 6: thời tiết (cánh hoa đào ở Lạc Hà): hạt sống thật, ngân sách, điểm ảnh, theo bậc ---",
+    );
+    const setCheck = (id: string, on: boolean) =>
+      ev(
+        `(() => { const c = document.getElementById(${JSON.stringify(id)}); c.checked = ${on}; c.dispatchEvent(new Event('change')); })(); 1`,
+      );
+    const alive = async () =>
+      Number(
+        await ev(
+          `window.__scene.children.list.filter((c) => c.type === 'ParticleEmitter').reduce((n, e) => n + e.getAliveParticleCount(), 0)`,
+        ),
+      );
+    const emitters = async () => Number(await ev(`window.__fx.stats().liveEmitters`));
+    const waitDrain = () =>
+      T.waitFor(
+        `window.__fx.stats().liveEmitters === 0 && window.__scene.children.list.filter((c) => c.type === 'ParticleEmitter').reduce((n, e) => n + e.getAliveParticleCount(), 0) === 0`,
+        "hạt thời tiết hết",
+      );
+    // Mặc định ở ?debug: thời tiết TẮT để các script đo khác có cảnh sạch
+    must(
+      Boolean(await ev(`window.__scene.weatherPaused`)),
+      "?debug mặc định tắt thời tiết (weatherPaused = true)",
+    );
+    await setQuality("high");
+    await sleep(400);
+    await sleep(1500);
+    must((await alive()) === 0, "tạm dừng: không có hạt nào");
+    // Bắt đầu: bật thời tiết, đợi 5 s THEO ĐỒNG HỒ PHASER (nhịp ~1,7 s, tuổi thọ <= 3,8 s)
+    await ev(`window.__scene.weatherPaused = false; 1`);
+    await T.waitFor(
+      `window.__scene.time.now > ${Number(await ev(`window.__scene.time.now`)) + 5000}`,
+      "5 s đồng hồ trò chơi",
+    );
+    const wAlive = await alive();
+    const wEm = await emitters();
+    must(wAlive >= 8, `bậc Cao: có hạt thời tiết sống thật (${wAlive} >= 8)`);
+    must(wAlive <= 120, `số hạt thời tiết hợp lý (${wAlive} <= 120)`);
+    must(
+      wEm >= 1 && wEm <= 8,
+      `chỉ vài emitter ưu tiên 0 (${wEm} trong 1..8; trần ưu tiên 0 bậc Cao = 14)`,
+    );
+    ok(`bậc Cao: ${wAlive} hạt sống, ${wEm} emitter`);
+    // Hạt ĐƯỢC VẼ: so ảnh khi thời tiết chạy với ảnh sau khi tạm dừng và hết hạt (có đối chứng)
+    const diffRun = (
+      a: string,
+      b: string,
+    ) => `(() => { let n = 0; const A = window.${a}, B = window.${b};
+      for (let i = 0; i < A.length; i += 4) if (Math.abs(A[i] - B[i]) + Math.abs(A[i + 1] - B[i + 1]) + Math.abs(A[i + 2] - B[i + 2]) > 60) n++; return n; })()`;
+    const stash = (name: string) =>
+      ev(`new Promise((resolve) => { const g = window.__scene.game, w = g.canvas.width, h = g.canvas.height;
+        setTimeout(() => g.renderer.snapshotArea(0, 0, w, h, (img) => {
+          const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+          const x = c.getContext('2d'); x.drawImage(img, 0, 0); window.${name} = x.getImageData(0, 0, c.width, c.height).data; resolve(1); }), 150); })`);
+    await T.shot("map-weather-bat");
+    await stash("__wOn");
+    await ev(`window.__scene.weatherPaused = true; 1`);
+    await waitDrain();
+    await stash("__wOff1");
+    await stash("__wOff2");
+    const wControl = Number(await ev(diffRun("__wOff1", "__wOff2")));
+    const wDiff = Number(await ev(diffRun("__wOn", "__wOff1")));
+    must(
+      wControl < 300,
+      `đối chứng: hai ảnh không thời tiết chỉ khác ${wControl} điểm ảnh (< 300)`,
+    );
+    must(
+      wDiff > 400 && wDiff > wControl * 3,
+      `hạt thời tiết ĐƯỢC VẼ: ${wDiff} điểm ảnh khác ảnh không thời tiết (đối chứng ${wControl}; cần > 400 và gấp 3 lần)`,
+    );
+    ok(`hạt thời tiết được vẽ: ${wDiff} điểm ảnh khác, đối chứng ${wControl}`);
+    // Bậc Thấp: không có thời tiết
+    await setQuality("low");
+    await sleep(500);
+    await ev(`window.__scene.weatherPaused = false; 1`);
+    await T.waitFor(
+      `window.__scene.time.now > ${Number(await ev(`window.__scene.time.now`)) + 4000}`,
+      "4 s đồng hồ trò chơi",
+    );
+    must((await alive()) === 0, "bậc Thấp: không có hạt thời tiết");
+    ok("bậc Thấp: 0 hạt thời tiết");
+    // Giảm chuyển động: không có thời tiết ở bậc Cao
+    await setQuality("high");
+    await sleep(500);
+    await setCheck("set-reduced-motion", true);
+    await sleep(500);
+    await T.waitFor(
+      `window.__scene.time.now > ${Number(await ev(`window.__scene.time.now`)) + 4000}`,
+      "4 s đồng hồ trò chơi",
+    );
+    must((await alive()) === 0, "giảm chuyển động: không có hạt thời tiết");
+    ok("giảm chuyển động: 0 hạt thời tiết");
+    await setCheck("set-reduced-motion", false);
+    await ev(`window.__scene.weatherPaused = true; 1`);
+
     must(T.errors.length === 0, `0 lỗi console / exception (${T.errors.slice(0, 2).join(" | ")})`);
     ok("0 lỗi console / exception");
     out("\n=== E2E LỚP TRANG TRÍ ĐẠT ===");
