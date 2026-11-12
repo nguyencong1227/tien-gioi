@@ -3,16 +3,23 @@
 // Phục vụ Milestone M5 (giao diện đa thiết bị & đồ hoạ Phaser)
 // Chụp bộ ảnh mốc (baseline) trên nhiều kích thước màn hình và kịch bản giao diện.
 //
+// Định dạng lưu trữ: WebP (quality: 75) nhằm tối ưu dung lượng git (~1-2 MB thay vì ~18 MB).
+// Tự động kiểm tra tính duy nhất (tránh ảnh trùng lặp khi modal chưa mở thật).
+//
 // Cách dùng:
 //   node client/scripts/capture-viewports.mjs
 //   npm run capture:viewports
+//   npm run chup-viewport
 //   node client/scripts/capture-viewports.mjs --out-dir=docs/screenshots/m5-baseline
 //   node client/scripts/capture-viewports.mjs --viewports=mobile-p,desktop-hd --scenarios=hud,char
 
+import process from "node:process";
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import crypto from "node:crypto";
+import { Buffer } from "node:buffer";
 import { spawn, execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
@@ -22,7 +29,66 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, "../..");
 const DIST = path.join(REPO, "client/dist");
 
-// Danh sách các viewport tiêu chuẩn cho đa thiết bị
+/** Tính băm sha256 cho bộ đệm ảnh để kiểm tra toàn vẹn và chống trùng lặp */
+export function computeImageHash(buffer) {
+  return crypto.createHash("sha256").update(buffer).digest("hex");
+}
+
+/**
+ * Tự kiểm tra trùng lặp ảnh trong cùng một viewport.
+ * Nếu hai kịch bản khác nhau trong cùng một viewport cho ra cùng một băm ảnh,
+ * chứng tỏ bảng giao diện chưa được mở thật và công cụ phải thoát lỗi ngay lập tức.
+ */
+export function checkDuplicateScreenshots(records) {
+  const seenByViewport = new Map();
+  for (const r of records) {
+    if (!seenByViewport.has(r.viewportId)) {
+      seenByViewport.set(r.viewportId, new Map());
+    }
+    const hashes = seenByViewport.get(r.viewportId);
+    if (hashes.has(r.sha256)) {
+      const prevScenarioId = hashes.get(r.sha256);
+      throw new Error(
+        `Phát hiện ảnh trùng lặp trong viewport "${r.viewportId}": kịch bản "${prevScenarioId}" và "${r.scenarioId}" có cùng băm sha256 (${r.sha256.slice(0, 10)}...). Bảng giao diện có thể chưa được mở thật!`,
+      );
+    }
+    hashes.set(r.sha256, r.scenarioId);
+  }
+}
+
+/** Chờ một phần tử hiển thị và kiểm tra kích thước hợp lệ trên DOM */
+export async function assertElementVisible(cdpSend, selector, timeoutMs = 4000) {
+  const start = Date.now();
+  let lastReason = "Chưa kiểm tra";
+  while (Date.now() - start < timeoutMs) {
+    const res = await cdpSend("Runtime.evaluate", {
+      expression: `
+        (() => {
+          const el = document.querySelector(${JSON.stringify(selector)});
+          if (!el) return { ok: false, reason: "Phần tử không tồn tại trong DOM" };
+          if (el.hidden) return { ok: false, reason: "Thuộc tính hidden = true" };
+          const rect = el.getBoundingClientRect();
+          if (rect.width <= 0 || rect.height <= 0) return { ok: false, reason: "Kích thước phần tử <= 0 (" + rect.width + "x" + rect.height + ")" };
+          const style = window.getComputedStyle(el);
+          if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") {
+            return { ok: false, reason: "Phần tử bị ẩn bởi CSS (display=" + style.display + ", visibility=" + style.visibility + ")" };
+          }
+          return { ok: true };
+        })()
+      `,
+      returnByValue: true,
+    });
+    const val = res?.result?.result?.value;
+    if (val?.ok) return true;
+    if (val?.reason) lastReason = val.reason;
+    await sleep(100);
+  }
+  throw new Error(
+    `Phần tử "${selector}" không hiển thị hợp lệ sau ${timeoutMs}ms. Lý do: ${lastReason}`,
+  );
+}
+
+// Danh sách các viewport tiêu chuẩn cho đa thiết bị (Milestone M5 Mục 12)
 export const VIEWPORTS = [
   {
     id: "mobile-p",
@@ -88,86 +154,149 @@ export const SCENARIOS = [
     id: "01-auth-login",
     name: "Màn hình Đăng nhập",
     mode: "auth",
+    targetSelector: "#auth-view-login",
     action: async (send) => {
+      for (let i = 0; i < 40; i++) {
+        const r = await send("Runtime.evaluate", {
+          expression: `Boolean(window.__authUi)`,
+          returnByValue: true,
+        });
+        if (r?.result?.result?.value) break;
+        await sleep(100);
+      }
       await send("Runtime.evaluate", {
         expression: `
           if (window.__authUi) window.__authUi.switchView("login");
           else if (document.getElementById("link-to-login")) document.getElementById("link-to-login").click();
         `,
       });
-      await sleep(400);
+      await sleep(300);
     },
   },
   {
     id: "02-auth-register",
     name: "Màn hình Đăng ký",
     mode: "auth",
+    targetSelector: "#auth-view-register",
     action: async (send) => {
+      for (let i = 0; i < 40; i++) {
+        const r = await send("Runtime.evaluate", {
+          expression: `Boolean(window.__authUi)`,
+          returnByValue: true,
+        });
+        if (r?.result?.result?.value) break;
+        await sleep(100);
+      }
       await send("Runtime.evaluate", {
         expression: `
           if (window.__authUi) window.__authUi.switchView("register");
           else if (document.getElementById("link-to-register")) document.getElementById("link-to-register").click();
         `,
       });
-      await sleep(400);
+      await sleep(300);
     },
   },
   {
     id: "03-game-hud",
     name: "Giao diện chính trong game (HUD & Bản đồ)",
     mode: "game",
-    action: async () => {
-      await sleep(600);
+    targetSelector: "#hud",
+    action: async (send) => {
+      // Đảm bảo đóng tất cả modal để chỉ hiển thị HUD gốc
+      await send("Runtime.evaluate", {
+        expression: `
+          if (window.__ui) {
+            window.__ui.closeAllModals();
+          }
+        `,
+      });
+      await sleep(300);
+      // Khẳng định tất cả modal đã đóng
+      const r = await send("Runtime.evaluate", {
+        expression: `
+          (() => {
+            const modals = ["char-modal", "inv-modal", "settings-modal", "map-modal"];
+            for (const id of modals) {
+              const el = document.getElementById(id);
+              if (el && !el.hidden) return { open: id };
+            }
+            return { ok: true };
+          })()
+        `,
+        returnByValue: true,
+      });
+      if (r?.result?.result?.value?.open) {
+        throw new Error(
+          `Kịch bản HUD yêu cầu đóng tất cả modal nhưng modal #${r.result.result.value.open} vẫn mở!`,
+        );
+      }
     },
   },
   {
     id: "04-game-char",
     name: "Bảng Nhân vật (Chỉ số & Cảnh giới)",
     mode: "game",
+    targetSelector: "#char-modal",
     action: async (send) => {
       await send("Runtime.evaluate", {
         expression: `
-          const btn = document.getElementById("btn-char");
-          if (btn) btn.click();
+          if (window.__ui) {
+            window.__ui.closeAllModals();
+            window.__ui.toggleCharModal(true);
+          }
         `,
       });
-      await sleep(500);
+      await sleep(400);
     },
   },
   {
     id: "05-game-inventory",
     name: "Bảng Túi đồ & Đan dược",
     mode: "game",
+    targetSelector: "#inv-modal",
     action: async (send) => {
       await send("Runtime.evaluate", {
         expression: `
-          const btn = document.getElementById("btn-bag");
-          if (btn) btn.click();
+          if (window.__ui) {
+            window.__ui.closeAllModals();
+            window.__ui.toggleInventory(true);
+          }
         `,
       });
-      await sleep(500);
+      await sleep(400);
     },
   },
   {
     id: "06-game-settings",
     name: "Bảng Cài đặt & Tuỳ chọn",
     mode: "game",
+    targetSelector: "#settings-modal",
     action: async (send) => {
       await send("Runtime.evaluate", {
         expression: `
-          const btn = document.getElementById("btn-settings");
-          if (btn) btn.click();
+          if (window.__ui) {
+            window.__ui.closeAllModals();
+            window.__ui.toggleSettingsModal(true);
+          }
         `,
       });
-      await sleep(500);
+      await sleep(400);
     },
   },
   {
     id: "07-game-crowd",
     name: "Trấn đông người (30 người tụ tập)",
     mode: "crowd",
-    action: async () => {
-      await sleep(1200);
+    targetSelector: "#hud",
+    action: async (send) => {
+      await send("Runtime.evaluate", {
+        expression: `
+          if (window.__ui) {
+            window.__ui.closeAllModals();
+          }
+        `,
+      });
+      await sleep(1000);
     },
   },
 ];
@@ -178,6 +307,7 @@ const MIMES = {
   ".css": "text/css; charset=utf-8",
   ".json": "application/json",
   ".png": "image/png",
+  ".webp": "image/webp",
   ".svg": "image/svg+xml",
   ".webmanifest": "application/manifest+json",
 };
@@ -210,7 +340,7 @@ function parseArgs() {
 async function main() {
   const { outDir, filterViewports, filterScenarios } = parseArgs();
 
-  console.log("=== Bắt đầu công cụ E2E chụp ảnh đa viewport (M5 Baseline) ===");
+  console.log("=== Bắt đầu công cụ E2E chụp ảnh đa viewport (M5 Baseline - WebP) ===");
   console.log(`- Thư mục lưu ảnh: ${outDir}`);
 
   // 1. Kiểm tra build client
@@ -274,6 +404,8 @@ async function main() {
 
   const manifest = {
     capturedAt: new Date().toISOString(),
+    format: "webp",
+    quality: 75,
     viewports: activeViewports,
     scenarios: activeScenarios.map((s) => ({ id: s.id, name: s.name })),
     images: [],
@@ -350,7 +482,7 @@ async function main() {
         } else if (sc.mode === "crowd") {
           targetUrl = `http://127.0.0.1:${HTTP_PORT}/?crowd=30&debug=1`;
         } else {
-          targetUrl = `http://127.0.0.1:${HTTP_PORT}/?sect=mock&debug=1`;
+          targetUrl = `http://127.0.0.1:${HTTP_PORT}/?dungeon=mock&debug=1`;
         }
 
         // Điều hướng tới URL
@@ -358,11 +490,11 @@ async function main() {
 
         // Chờ tải xong trang
         if (sc.mode === "auth") {
-          // Chờ form auth xuất hiện
-          for (let i = 0; i < 40; i++) {
+          // Chờ auth UI và module sẵn sàng
+          for (let i = 0; i < 50; i++) {
             await sleep(150);
             const r = await cdpSend("Runtime.evaluate", {
-              expression: `Boolean(document.getElementById("login"))`,
+              expression: `Boolean(window.__authUi && document.getElementById("login") && !document.getElementById("login")?.hidden)`,
               returnByValue: true,
             });
             if (r?.result?.result?.value) break;
@@ -384,19 +516,30 @@ async function main() {
           await sc.action(cdpSend);
         }
 
-        // Đợi render ổn định trước khi chụp
+        // Khẳng định phần tử đích đang hiển thị hợp lệ trước khi chụp
+        if (sc.targetSelector) {
+          await assertElementVisible(cdpSend, sc.targetSelector);
+        }
+
+        // Đợi render và animation CSS ổn định trước khi chụp
         await sleep(300);
 
-        // Chụp ảnh màn hình
-        const shotRes = await cdpSend("Page.captureScreenshot", { format: "png" });
+        // Chụp ảnh màn hình định dạng WebP quality 75 để tối ưu git
+        const shotRes = await cdpSend("Page.captureScreenshot", {
+          format: "webp",
+          quality: 75,
+        });
         const imgBuffer = Buffer.from(shotRes.result.data, "base64");
-        const fileName = `${vp.id}__${sc.id}.png`;
+        const hash = computeImageHash(imgBuffer);
+        const fileName = `${vp.id}__${sc.id}.webp`;
         const filePath = path.join(outDir, fileName);
 
         fs.writeFileSync(filePath, imgBuffer);
-        console.log(`     ✓ Đã lưu: ${fileName} (${(imgBuffer.length / 1024).toFixed(1)} KB)`);
+        console.log(
+          `     ✓ Đã lưu: ${fileName} (${(imgBuffer.length / 1024).toFixed(1)} KB, sha: ${hash.slice(0, 8)})`,
+        );
 
-        manifest.images.push({
+        const record = {
           viewportId: vp.id,
           viewportName: vp.name,
           width: vp.width,
@@ -406,7 +549,13 @@ async function main() {
           scenarioName: sc.name,
           fileName,
           sizeKb: Number((imgBuffer.length / 1024).toFixed(1)),
-        });
+          sha256: hash,
+        };
+
+        manifest.images.push(record);
+
+        // Tự kiểm tra trùng lặp ảnh ngay lập tức: nếu trùng hash trong cùng viewport -> ném lỗi
+        checkDuplicateScreenshots(manifest.images);
 
         // Đóng tab
         cdpWs.close();
@@ -425,7 +574,10 @@ async function main() {
     const readmeMd = generateReadmeMd(manifest);
     fs.writeFileSync(path.join(outDir, "README.md"), readmeMd);
 
-    console.log(`\n🎉 HOÀN THÀNH CHỤP ẢNH ĐA VIEWPORT (TỔNG CỘNG: ${manifest.images.length} ẢNH)`);
+    const totalSizeKb = manifest.images.reduce((sum, img) => sum + img.sizeKb, 0);
+    console.log(
+      `\n🎉 HOÀN THÀNH CHỤP ẢNH ĐA VIEWPORT (TỔNG CỘNG: ${manifest.images.length} ẢNH, ${(totalSizeKb / 1024).toFixed(2)} MB)`,
+    );
     console.log(`- Xem trực quan tại: file://${path.join(outDir, "index.html")}`);
     console.log(`- Tài liệu tóm tắt: ${path.join(outDir, "README.md")}`);
   } finally {
@@ -444,7 +596,7 @@ function generateGalleryHtml(manifest) {
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>Tiên Giới - Bộ Ảnh Mốc Đa Viewport M5 (Baseline)</title>
+  <title>Tiên Giới - Bộ Ảnh Mốc Đa Viewport M5 (Baseline WebP)</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #12100e; color: #e6dec8; margin: 0; padding: 24px; }
     h1 { color: #d4a359; margin-bottom: 8px; }
@@ -459,12 +611,13 @@ function generateGalleryHtml(manifest) {
     .card-meta { font-size: 12px; color: #8e806a; }
     .img-wrap { padding: 12px; background: #0a0908; display: flex; justify-content: center; align-items: center; min-height: 220px; }
     .img-wrap img { max-width: 100%; max-height: 380px; object-fit: contain; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
-    .card-footer { padding: 8px 16px; font-size: 12px; color: #736754; border-top: 1px solid #231e17; text-align: right; }
+    .card-footer { padding: 8px 16px; font-size: 12px; color: #736754; border-top: 1px solid #231e17; display: flex; justify-content: space-between; }
+    .sha { font-family: monospace; color: #9c8b74; }
   </style>
 </head>
 <body>
-  <h1>Tiên Giới - Bộ Ảnh Mốc Đa Viewport M5 (Baseline)</h1>
-  <p class="sub">Thời gian chụp: ${manifest.capturedAt} | Tổng cộng: ${manifest.images.length} ảnh</p>
+  <h1>Tiên Giới - Bộ Ảnh Mốc Đa Viewport M5 (Baseline WebP)</h1>
+  <p class="sub">Thời gian chụp: ${manifest.capturedAt} | Định dạng: WebP (quality 75) | Tổng cộng: ${manifest.images.length} ảnh</p>
 
   <div class="filters">
     <button class="filter-btn active" onclick="filterVp('all')">Tất cả Viewports</button>
@@ -485,7 +638,10 @@ function generateGalleryHtml(manifest) {
             <img src="${img.fileName}" alt="${img.scenarioName} - ${img.viewportName}" loading="lazy">
           </a>
         </div>
-        <div class="card-footer">${img.fileName} (${img.sizeKb} KB)</div>
+        <div class="card-footer">
+          <span>${img.fileName} (${img.sizeKb} KB)</span>
+          <span class="sha">sha: ${img.sha256 ? img.sha256.slice(0, 8) : "n/a"}</span>
+        </div>
       </div>
     `,
       )
@@ -510,11 +666,14 @@ function generateGalleryHtml(manifest) {
 }
 
 function generateReadmeMd(manifest) {
+  const totalSizeKb = manifest.images.reduce((sum, img) => sum + img.sizeKb, 0);
   return `# Bộ Ảnh Mốc Đa Viewport M5 (Baseline Multi-Viewport Screenshots)
 
 > Thư mục chứa bộ ảnh chụp màn hình làm mốc đối chiếu trước khi thực hiện các cải tiến giao diện đa thiết bị & đồ hoạ Phaser trong Milestone M5.
-> Được sinh tự động bởi \`client/scripts/capture-viewports.mjs\` (\`npm run capture:viewports\`).
+> Được sinh tự động bởi \`client/scripts/capture-viewports.mjs\` (\`npm run capture:viewports\` hoặc \`npm run chup-viewport\`).
+> Định dạng: **WebP (quality 75)**, tự động kiểm tra chống trùng lặp băm sha256 giữa các kịch bản.
 > Thời điểm chụp mốc: \`${manifest.capturedAt}\`.
+> Tổng dung lượng: **${(totalSizeKb / 1024).toFixed(2)} MB** (${manifest.images.length} tệp WebP).
 
 ## 1. Danh sách Viewport đo đạc
 
@@ -524,18 +683,21 @@ ${manifest.viewports.map((v) => `| \`${v.id}\` | ${v.name} | ${v.width} × ${v.h
 
 ## 2. Danh sách Kịch bản giao diện
 
-| Mã kịch bản | Tên kịch bản | Mô tả kiểm tra |
-|---|---|---|
-${manifest.scenarios.map((s) => `| \`${s.id}\` | ${s.name} | Ảnh mốc hiển thị |`).join("\n")}
+| Mã kịch bản | Tên kịch bản | Phần tử hiển thị yêu cầu | Mô tả kiểm tra |
+|---|---|---|---|
+${manifest.scenarios.map((s) => `| \`${s.id}\` | ${s.name} | \`${SCENARIOS.find((sc) => sc.id === s.id)?.targetSelector || ""}\` | Ảnh mốc hiển thị |`).join("\n")}
 
-## 3. Tổng hợp ảnh chụp mốc (${manifest.images.length} ảnh)
+## 3. Tổng hợp ảnh chụp mốc (${manifest.images.length} ảnh WebP)
 
 - Xem trực quan dưới dạng gallery HTML tương tác tại: \`index.html\` (mở trong trình duyệt).
 - Tệp siêu dữ liệu: \`manifest.json\`.
+- Tất cả các ảnh trong cùng một viewport đều có băm sha256 duy nhất, đảm bảo các bảng modal (Nhân vật, Túi đồ, Cài đặt) được mở thật.
 
 ## 4. Cách chạy lại lệnh chụp
 \`\`\`bash
 npm run capture:viewports
+# hoặc:
+npm run chup-viewport
 \`\`\`
 `;
 }

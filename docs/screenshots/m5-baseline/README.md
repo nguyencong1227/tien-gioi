@@ -1,8 +1,10 @@
 # Bộ Ảnh Mốc Đa Viewport M5 (Baseline Multi-Viewport Screenshots)
 
 > Thư mục chứa bộ ảnh chụp màn hình làm mốc đối chiếu trước khi thực hiện các cải tiến giao diện đa thiết bị & đồ hoạ Phaser trong Milestone M5.
-> Được sinh tự động bởi `client/scripts/capture-viewports.mjs` (`npm run capture:viewports`).
-> Thời điểm chụp mốc: `2026-11-12T02:02:02.616Z`.
+> Được sinh tự động bởi `client/scripts/capture-viewports.mjs` (`npm run capture:viewports` hoặc `npm run chup-viewport`).
+> Định dạng: **WebP (quality 75)**, tự động kiểm tra chống trùng lặp băm sha256 giữa các kịch bản.
+> Thời điểm chụp mốc: `2026-11-12T02:57:53.072Z`.
+> Tổng dung lượng: **2.43 MB** (49 tệp WebP).
 
 ## 1. Danh sách Viewport đo đạc
 
@@ -18,22 +20,25 @@
 
 ## 2. Danh sách Kịch bản giao diện
 
-| Mã kịch bản | Tên kịch bản | Mô tả kiểm tra |
-|---|---|---|
-| `01-auth-login` | Màn hình Đăng nhập | Ảnh mốc hiển thị |
-| `02-auth-register` | Màn hình Đăng ký | Ảnh mốc hiển thị |
-| `03-game-hud` | Giao diện chính trong game (HUD & Bản đồ) | Ảnh mốc hiển thị |
-| `04-game-char` | Bảng Nhân vật (Chỉ số & Cảnh giới) | Ảnh mốc hiển thị |
-| `05-game-inventory` | Bảng Túi đồ & Đan dược | Ảnh mốc hiển thị |
-| `06-game-settings` | Bảng Cài đặt & Tuỳ chọn | Ảnh mốc hiển thị |
-| `07-game-crowd` | Trấn đông người (30 người tụ tập) | Ảnh mốc hiển thị |
+| Mã kịch bản | Tên kịch bản | Phần tử hiển thị yêu cầu | Mô tả kiểm tra |
+|---|---|---|---|
+| `01-auth-login` | Màn hình Đăng nhập | `#auth-view-login` | Ảnh mốc hiển thị |
+| `02-auth-register` | Màn hình Đăng ký | `#auth-view-register` | Ảnh mốc hiển thị |
+| `03-game-hud` | Giao diện chính trong game (HUD & Bản đồ) | `#hud` | Ảnh mốc hiển thị |
+| `04-game-char` | Bảng Nhân vật (Chỉ số & Cảnh giới) | `#char-modal` | Ảnh mốc hiển thị |
+| `05-game-inventory` | Bảng Túi đồ & Đan dược | `#inv-modal` | Ảnh mốc hiển thị |
+| `06-game-settings` | Bảng Cài đặt & Tuỳ chọn | `#settings-modal` | Ảnh mốc hiển thị |
+| `07-game-crowd` | Trấn đông người (30 người tụ tập) | `#hud` | Ảnh mốc hiển thị |
 
-## 3. Tổng hợp ảnh chụp mốc (49 ảnh)
+## 3. Tổng hợp ảnh chụp mốc (49 ảnh WebP)
 
 - Xem trực quan dưới dạng gallery HTML tương tác tại: `index.html` (mở trong trình duyệt).
 - Tệp siêu dữ liệu: `manifest.json`.
+- Tất cả các ảnh trong cùng một viewport đều có băm sha256 duy nhất, đảm bảo các bảng modal (Nhân vật, Túi đồ, Cài đặt) được mở thật.
 
 ## 4. Cách chạy lại lệnh chụp
 ```bash
 npm run capture:viewports
+# hoặc:
+npm run chup-viewport
 ```
