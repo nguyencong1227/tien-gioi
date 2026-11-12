@@ -89,13 +89,96 @@ export async function assertElementVisible(cdpSend, selector, timeoutMs = 4000) 
 }
 
 /**
- * Script chạy TRƯỚC mọi mã của trang (Page.addScriptToEvaluateOnNewDocument): đánh dấu đã đọc
- * bảng "Chỉ dẫn" của người mới. Không có dòng này, bảng chỉ dẫn tự mở lúc vào game và che
- * lên mọi bảng khác trong ảnh mốc (lỗi đã gặp ở bản đầu: ảnh 04, 06, 07 đều bị che).
- * Khoá lấy từ client/src/a11y.ts (NEWBIE_GUIDE_STORAGE_KEY).
+ * Script chạy TRƯỚC mọi mã của trang (Page.addScriptToEvaluateOnNewDocument):
+ * - Đánh dấu đã đọc bảng "Chỉ dẫn" của người mới.
+ * - Đặt chất lượng tường minh 'high' để headless Chrome không rơi về Thấp do SwiftShader.
  */
-export const PRELOAD_SCRIPT =
-  "try{localStorage.setItem('tg_newbie_guide_dismissed','1')}catch(e){}";
+export const PRELOAD_SCRIPT = `
+  try {
+    localStorage.setItem('tg_newbie_guide_dismissed', '1');
+    if (!localStorage.getItem('tg_quality')) localStorage.setItem('tg_quality', 'high');
+  } catch(e) {}
+`;
+
+/**
+ * Khẳng định tính toàn vẹn của bố cục giao diện tự động (Layout Assertions):
+ * 1. Không tràn khung hình ngang / dọc ngoài ý muốn.
+ * 2. Các vùng HUD chính (#hud-col-left, #chat, #minimap-wrap, touch pads) không chồng chéo nhau.
+ * 3. Trên thiết bị cảm ứng, mục tiêu tương tác phím ảo phải đủ lớn (>= 40px).
+ */
+export async function assertLayoutIntegrity(cdpSend, isMobile = false) {
+  const res = await cdpSend("Runtime.evaluate", {
+    expression: `
+      (() => {
+        const errors = [];
+        const docEl = document.documentElement;
+
+        // 1. Kiểm tra tràn khung nhìn ngang / dọc ngoài ý muốn
+        const sw = docEl.scrollWidth;
+        const sh = docEl.scrollHeight;
+        const iw = window.innerWidth;
+        const ih = window.innerHeight;
+        if (sw > iw + 2) {
+          errors.push("Tràn ngang ngoài ý muốn: scrollWidth=" + sw + " > innerWidth=" + iw);
+        }
+        if (sh > ih + 2) {
+          errors.push("Tràn dọc ngoài ý muốn: scrollHeight=" + sh + " > innerHeight=" + ih);
+        }
+
+        // 2. Kiểm tra không chồng chéo giữa các vùng HUD chính nếu cùng hiển thị
+        const hudRegions = [
+          { id: "hud-col-left", el: document.getElementById("hud-col-left") },
+          { id: "chat", el: document.getElementById("chat") },
+          { id: "minimap-wrap", el: document.getElementById("minimap-wrap") },
+          { id: "touch-action-pad", el: document.getElementById("touch-action-pad") },
+          { id: "touch-dpad", el: document.getElementById("touch-dpad") },
+        ].filter((r) => r.el && !r.el.hidden && window.getComputedStyle(r.el).display !== "none");
+
+        for (let i = 0; i < hudRegions.length; i++) {
+          for (let j = i + 1; j < hudRegions.length; j++) {
+            const a = hudRegions[i].el.getBoundingClientRect();
+            const b = hudRegions[j].el.getBoundingClientRect();
+            if (a.width > 0 && a.height > 0 && b.width > 0 && b.height > 0) {
+              const xOverlap = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
+              const yOverlap = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+              // Cho phép biên an toàn 4px
+              if (xOverlap > 4 && yOverlap > 4) {
+                errors.push(
+                  "Vùng HUD #" + hudRegions[i].id + " chồng lên #" + hudRegions[j].id +
+                    " (Giao nhau: " + Math.round(xOverlap) + "x" + Math.round(yOverlap) + "px)"
+                );
+              }
+            }
+          }
+        }
+
+        // 3. Trên thiết bị cảm ứng, kiểm tra kích thước mục tương tác trong cụm phím ảo >= 40x40
+        if (${isMobile}) {
+          const touchBtns = document.querySelectorAll("#touch-action-pad button, #touch-dpad button");
+          for (const btn of touchBtns) {
+            if (!btn.hidden && window.getComputedStyle(btn).display !== "none") {
+              const r = btn.getBoundingClientRect();
+              if (r.width > 0 && r.height > 0 && (r.width < 40 || r.height < 40)) {
+                errors.push(
+                  "Nút cảm ứng #" + (btn.id || btn.className) + " quá nhỏ: " +
+                    Math.round(r.width) + "x" + Math.round(r.height) + "px (< 40px)"
+                );
+              }
+            }
+          }
+        }
+
+        return { ok: errors.length === 0, errors };
+      })()
+    `,
+    returnByValue: true,
+  });
+
+  const val = res?.result?.result?.value;
+  if (!val?.ok && val?.errors?.length > 0) {
+    throw new Error(`Lỗi bố cục giao diện:\n  - ${val.errors.join("\n  - ")}`);
+  }
+}
 
 /**
  * Khẳng định đúng tập bảng (section.modal-box) đang mở: không bảng lạ nào được che ảnh.
@@ -131,28 +214,40 @@ export async function assertOnlyModalsOpen(cdpSend, allowedIds = []) {
 }
 
 // Danh sách các viewport tiêu chuẩn cho đa thiết bị (Milestone M5 Mục 12)
+// QUAN TRỌNG: Thiết bị Desktop (chuột) phải chạy TRƯỚC thiết bị Cảm ứng (mobile/tablet),
+// vì một khi Chrome headless bật touch emulation thì không thể tắt lại trong cùng phiên.
 export const VIEWPORTS = [
+  // 1. Máy tính Desktop / Laptop (Chuột/Phím - chạy trước)
   {
-    id: "mobile-p",
-    name: "Điện thoại dọc (iPhone / Android chuẩn)",
-    width: 390,
-    height: 844,
-    dpr: 2,
-    mobile: true,
+    id: "desktop-qhd",
+    name: "Máy tính 2K QHD (2560x1440)",
+    width: 2560,
+    height: 1440,
+    dpr: 1,
+    mobile: false,
   },
   {
-    id: "mobile-l",
-    name: "Điện thoại ngang (Gaming landscape)",
-    width: 844,
-    height: 390,
-    dpr: 2,
-    mobile: true,
+    id: "desktop-fhd",
+    name: "Máy tính Full HD (1920x1080)",
+    width: 1920,
+    height: 1080,
+    dpr: 1,
+    mobile: false,
   },
   {
-    id: "mobile-sm",
-    name: "Điện thoại nhỏ (Compact 360x640)",
-    width: 360,
-    height: 640,
+    id: "desktop-hd",
+    name: "Máy tính Laptop / HD (1280x720)",
+    width: 1280,
+    height: 720,
+    dpr: 1,
+    mobile: false,
+  },
+  // 2. Máy tính bảng (Cảm ứng)
+  {
+    id: "tablet-l",
+    name: "Máy tính bảng ngang (iPad Landscape)",
+    width: 1024,
+    height: 768,
     dpr: 2,
     mobile: true,
   },
@@ -164,29 +259,30 @@ export const VIEWPORTS = [
     dpr: 2,
     mobile: true,
   },
+  // 3. Điện thoại di động (Cảm ứng)
   {
-    id: "tablet-l",
-    name: "Máy tính bảng ngang (iPad Landscape)",
-    width: 1024,
-    height: 768,
+    id: "mobile-l",
+    name: "Điện thoại ngang (Gaming landscape)",
+    width: 844,
+    height: 390,
     dpr: 2,
     mobile: true,
   },
   {
-    id: "desktop-hd",
-    name: "Máy tính Laptop / HD (1280x720)",
-    width: 1280,
-    height: 720,
-    dpr: 1,
-    mobile: false,
+    id: "mobile-p",
+    name: "Điện thoại dọc (iPhone / Android chuẩn)",
+    width: 390,
+    height: 844,
+    dpr: 2,
+    mobile: true,
   },
   {
-    id: "desktop-fhd",
-    name: "Máy tính Full HD (1920x1080)",
-    width: 1920,
-    height: 1080,
-    dpr: 1,
-    mobile: false,
+    id: "mobile-sm",
+    name: "Điện thoại nhỏ (Compact 360x640)",
+    width: 360,
+    height: 640,
+    dpr: 2,
+    mobile: true,
   },
 ];
 
@@ -516,6 +612,12 @@ async function main() {
           deviceScaleFactor: vp.dpr,
           mobile: vp.mobile,
         });
+        if (vp.mobile) {
+          await cdpSend("Emulation.setTouchEmulationEnabled", {
+            enabled: true,
+            maxTouchPoints: 5,
+          });
+        }
 
         // Xác định URL theo mode
         let targetUrl = `http://127.0.0.1:${HTTP_PORT}/?debug=1`;
@@ -581,6 +683,11 @@ async function main() {
         // Đợi render và animation CSS ổn định trước khi chụp
         await sleep(300);
 
+        // Khẳng định tính toàn vẹn bố cục (không tràn, HUD không chồng nhau)
+        if (sc.mode !== "auth") {
+          await assertLayoutIntegrity(cdpSend, vp.mobile);
+        }
+
         // Chụp ảnh màn hình định dạng WebP quality 75 để tối ưu git
         const shotRes = await cdpSend("Page.captureScreenshot", {
           format: "webp",
@@ -630,6 +737,18 @@ async function main() {
     // Sinh tài liệu tóm tắt README.md
     const readmeMd = generateReadmeMd(manifest);
     fs.writeFileSync(path.join(outDir, "README.md"), readmeMd);
+
+    // Tự động định dạng các tệp văn bản vừa sinh bằng Prettier (đảm bảo CI format không báo đỏ)
+    try {
+      execSync(
+        `npx prettier --write "${path.join(outDir, "index.html")}" "${path.join(outDir, "manifest.json")}" "${path.join(outDir, "README.md")}"`,
+        {
+          stdio: "ignore",
+        },
+      );
+    } catch {
+      // Bỏ qua lỗi nhỏ nếu prettier không khả dụng
+    }
 
     const totalSizeKb = manifest.images.reduce((sum, img) => sum + img.sizeKb, 0);
     console.log(
@@ -729,6 +848,7 @@ function generateReadmeMd(manifest) {
 > Thư mục chứa bộ ảnh chụp màn hình làm mốc đối chiếu trước khi thực hiện các cải tiến giao diện đa thiết bị & đồ hoạ Phaser trong Milestone M5.
 > Được sinh tự động bởi \`client/scripts/capture-viewports.mjs\` (\`npm run capture:viewports\` hoặc \`npm run chup-viewport\`).
 > Định dạng: **WebP (quality 75)**, tự động kiểm tra chống trùng lặp băm sha256 giữa các kịch bản.
+> **Chế độ kiểm thử**: Sử dụng các chế độ giả lập client có sẵn (\`?dungeon=mock&debug=1\`, \`?crowd=30\`, \`?auth=mock\`) không phụ thuộc server mạng thật.
 > Thời điểm chụp mốc: \`${manifest.capturedAt}\`.
 > Tổng dung lượng: **${(totalSizeKb / 1024).toFixed(2)} MB** (${manifest.images.length} tệp WebP).
 
