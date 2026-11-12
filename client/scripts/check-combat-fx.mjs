@@ -185,9 +185,10 @@ try {
   };
 
   const WHITE = "r > 235 && g > 215 && b > 150"; // tia lửa (ADD) và chữ trắng chồng lên cỏ thành rất sáng
-  const white0 = await count("base", WHITE);
 
   // 1) Mình đánh thường: tia lửa + chữ, KHÔNG rung
+  await snap("pre1"); // đối chứng NGAY TRƯỚC (nền có thể trôi chậm), thay vì ảnh nền chụp từ đầu phiên
+  const white0 = await count("pre1", WHITE);
   await act(dmgJs({ target: "quai-1", amount: 12 }, true), "s1");
   let n = await alive();
   check(n > 0 && n <= 8, `đòn thường: ${n} hạt sống (hit-spark 8)`);
@@ -285,6 +286,43 @@ try {
   await evalJs(`window.__scene.state.monsters.delete("t-xa"); 0`);
   await sleep(120);
   check((await alive()) === 0, "quái rời vùng nhìn (ngoài camera): không nổ hạt");
+
+  // Màn hình RỘNG (thu phóng thấp): quái còn sống ở xa 1200 px (ngoài vùng nhìn của server) vẫn nằm trong khung camera. Nó biến
+  // khỏi state vì rời vùng nhìn, KHÔNG phải gục: không được nổ hạt. Cùng cảnh đó, quái gần 300 px biến thì nổ (gục thật).
+  // (đếm số lần PHÁT mon-vanish thay vì đếm hạt: ở thu phóng 0,3 khung hình thấy cả cổng truyền tống nên hạt xoáy của cổng lẫn vào)
+  await evalJs(
+    `(() => { const f = window.__fx, o = f.play.bind(f); window.__vanish = 0; f.play = (id, x, y, op) => { if (id === "mon-vanish") window.__vanish++; return o(id, x, y, op); }; return 1; })()`,
+  );
+  await evalJs(
+    `(() => { const sc = window.__scene; sc.cameras.main.setZoom(0.3); sc.cameras.main.centerOn(sc.predX, sc.predY); return 1; })()`,
+  );
+  await sleep(300);
+  await evalJs(`(() => {
+    const sc = window.__scene;
+    sc.state.monsters.set("t-roi", { kind: "tho", x: sc.predX + 1200, y: sc.predY, hp: 40, maxHp: 40, angle: 0 });
+    sc.state.monsters.set("t-gan", { kind: "tho", x: sc.predX + 300, y: sc.predY, hp: 40, maxHp: 40, angle: 0 });
+    return 1;
+  })()`);
+  await sleep(500);
+  const visFar = await evalJs(`window.__scene.monsters.get("t-roi").root.visible`);
+  check(
+    visFar === true,
+    "(điều kiện thử) quái ở xa 1200 px đang HIỆN trong khung camera thu phóng 0,3",
+  );
+  await act(`sc.state.monsters.delete("t-roi")`, "far");
+  check(
+    (await evalJs("window.__vanish")) === 0,
+    "quái còn sống rời vùng nhìn (xa 1200 px, vẫn trong khung): KHÔNG phát hạt tan",
+  );
+  await act(`sc.state.monsters.delete("t-gan")`, "near");
+  check(
+    (await evalJs("window.__vanish")) === 1,
+    "quái gục gần (300 px) trong cùng cảnh: phát đúng 1 lần hạt tan",
+  );
+  await evalJs(
+    `(() => { const sc = window.__scene; sc.cameras.main.setZoom(0.9375); sc.cameras.main.centerOn(sc.predX, sc.predY); return 1; })()`,
+  );
+  await settle();
 
   // Ảnh chụp (tuỳ chọn --shot <tệp.webp>): chí mạng + bị đòn nặng + hồi máu cùng lúc, phóng to quanh nhân vật
   const si = process.argv.indexOf("--shot");
