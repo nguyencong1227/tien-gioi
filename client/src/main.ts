@@ -31,6 +31,31 @@ import { setupPwa, canReloadSafely, isNativeApp, type PwaGameState } from "./pwa
 import { setupNativeApp, getOutdatedUiConfig, getAppUpdateUrl } from "./native-app";
 import { HeartbeatController } from "./heartbeat";
 import { sound } from "./audio";
+import { initDisplay } from "./gfx/display";
+import { getDisplay } from "./gfx/display";
+import {
+  browserQualityEnv,
+  getQuality,
+  initQuality,
+  qualityFrame,
+  refreshQuality,
+  setQualityActive,
+} from "./gfx/quality";
+import { mountPerfOverlay } from "./gfx/perf-overlay";
+import { isReducedMotion } from "./a11y";
+
+// Lõi hiển thị M5 (#322): đặt data-form / data-orient / data-input và --safe-*, --vw, --vh lên <html> SỚM, trước khi dựng giao diện.
+initDisplay();
+
+// Chất lượng đồ hoạ M5 (#323): hồ sơ Thấp / Vừa / Cao, Tự động + bộ điều tốc; SAU initDisplay (cần `form`)
+initQuality(browserQualityEnv(() => getDisplay().form, isReducedMotion));
+document.addEventListener("visibilitychange", () => setQualityActive(!document.hidden));
+if (typeof window.matchMedia === "function") {
+  // Hệ điều hành đổi "giảm chuyển động" lúc đang chơi
+  window
+    .matchMedia("(prefers-reduced-motion: reduce)")
+    .addEventListener?.("change", refreshQuality);
+}
 
 const NAME_KEY = "tien-gioi:name";
 const SECRET_KEY = "tien-gioi:secret";
@@ -657,15 +682,21 @@ async function start(room: Room, mapId: string) {
       (window as any).__mockSect.showLeader();
     }
   }
-  new Phaser.Game({
+  const game = new Phaser.Game({
     type: Phaser.AUTO,
     parent: "game",
     backgroundColor: "#2b2620",
     render: { batchSize: 8192 },
     scale: { mode: Phaser.Scale.RESIZE, width: window.innerWidth, height: window.innerHeight },
     input: { activePointers: 3 },
+    // Tiết kiệm pin = 30 FPS. Phaser chỉ gắn bộ giới hạn khi khởi động vòng lặp nên áp từ lần vào game sau
+    // (đổi lúc chạy cần đụng thành phần nội bộ của Phaser: để spike #324 kiểm chứng).
+    fps: { limit: getQuality().targetFps === 30 ? 30 : 0 },
     scene: [activeScene],
   });
+  // Cấp thời gian khung (thô, không làm mượt) cho bộ điều tốc chất lượng và lớp phủ ?perf=1
+  game.events.on(Phaser.Core.Events.POST_STEP, () => qualityFrame(game.loop.rawDelta));
+  if (new URLSearchParams(location.search).has("perf")) mountPerfOverlay();
   setupRoomLifecycle(room);
 }
 

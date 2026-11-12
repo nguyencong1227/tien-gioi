@@ -1,6 +1,7 @@
 // Công cụ quản trị tài khoản: đặt lại mật khẩu / mã khôi phục, khoá / mở, đăng xuất, liệt kê; từ chối khi server đang chạy;
 // không bao giờ in băm / token. Dùng kho file thật trong thư mục tạm và AuthService thật để kiểm HIỆU QUẢ (đăng nhập được hay không).
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -500,6 +501,31 @@ describe("xoa - xoá thật khi có --yes", () => {
     expect(text(r)).toContain('đã giải tán tông môn "Cô Độc Môn"');
     expect(await sects.get("tm5")).toBeNull();
   });
+
+  it("xoa --yes đòi server phải tắt ở cả hai kho (serverMustBeOff: false vẫn đòi tắt)", async () => {
+    await reg("tk_test");
+    up = true; // server đang chạy
+
+    // 1. Dù serverMustBeOff: false (PostgreSQL), xoa --yes vẫn bị từ chối với mã 2
+    const pgDeps: ToolDeps = { ...deps, serverMustBeOff: false };
+    const r1 = await runTool(["xoa", "tk_test", "--yes"], pgDeps);
+    expect(r1.code).toBe(2);
+    expect(text(r1)).toContain(
+      "Server đang chạy (trả lời ở /health): hãy TẮT server rồi chạy lại.",
+    );
+    expect(text(r1)).toContain("nhân vật trong bộ nhớ sống lại");
+    expect(await accounts.byUsername("tk_test")).not.toBeNull();
+
+    // 2. Chạy thử (không --yes): vẫn chạy được bình thường khi server đang bật
+    const rDry = await runTool(["xoa", "tk_test"], pgDeps);
+    expect(rDry.code).toBe(0);
+    expect(text(rDry)).toContain("[CHẠY THỬ]");
+
+    // 3. Có cờ --force: bỏ qua kiểm tra server tắt
+    const rForce = await runTool(["xoa", "tk_test", "--yes", "--force"], pgDeps);
+    expect(rForce.code).toBe(0);
+    expect(await accounts.byUsername("tk_test")).toBeNull();
+  });
 });
 
 describe("đột biến kiểm chứng (5 khẳng định của Issue #317)", () => {
@@ -579,5 +605,56 @@ describe("đột biến kiểm chứng (5 khẳng định của Issue #317)", ()
     expect(await souls.get(acc.id)).not.toBeNull();
     expect((await auth.me(a.token)).ok).toBe(true);
     expect((await sects.findBySoul(acc.id))?.id).toBe("tmdry");
+  });
+});
+
+describe("hàng rào bảo vệ và cờ TIEN_GIOI_PROD (Issue #321)", () => {
+  it("CLI scripts/tai-khoan.ts từ chối cổng 2567 khi không có TIEN_GIOI_PROD=1; cho phép khi có TIEN_GIOI_PROD=1", () => {
+    const scriptPath = path.resolve(__dirname, "tai-khoan.ts");
+
+    // 1. Khi PORT=2567 và TIEN_GIOI_PROD không phải 1: in lỗi hàng rào gọn, mã thoát 1, không in stack trace
+    const bad = spawnSync("node", ["--import", "tsx", scriptPath, "list"], {
+      encoding: "utf-8",
+      env: {
+        ...process.env,
+        PORT: "2567",
+        TIEN_GIOI_PROD: "0",
+      },
+    });
+    expect(bad.status).toBe(1);
+    expect(bad.stderr).toContain("[HÀNG RÀO BẢO VỆ]");
+    expect(bad.stderr).toContain("cổng 2567");
+    expect(bad.stderr).not.toContain("Error:"); // không in stack trace
+    expect(bad.stderr).not.toContain("at main (");
+
+    // 2. Khi TIEN_GIOI_PROD=1: vượt qua hàng rào bảo vệ
+    const goodDir = mkdtempSync(path.join(tmpdir(), "tk-prod-test-"));
+    try {
+      const good = spawnSync("node", ["--import", "tsx", scriptPath, "list"], {
+        encoding: "utf-8",
+        env: {
+          ...process.env,
+          PORT: "2567",
+          TIEN_GIOI_PROD: "1",
+          STORE: "file",
+          DATA_DIR: goodDir,
+        },
+      });
+      expect(good.stderr).not.toContain("[HÀNG RÀO BẢO VỆ]");
+      expect(good.stdout).toContain("Tổng: 0 tài khoản.");
+      expect(good.status).toBe(0);
+    } finally {
+      rmSync(goodDir, { recursive: true, force: true });
+    }
+  });
+
+  it("Đột biến: bỏ kiểm tra TIEN_GIOI_PROD === '1' thì môi trường prod bị hàng rào chặn", () => {
+    const scriptContent = readFileSync(path.resolve(__dirname, "tai-khoan.ts"), "utf-8");
+    expect(scriptContent).toContain('process.env.TIEN_GIOI_PROD !== "1"');
+    const mutated = scriptContent.replace(
+      'if (process.env.TIEN_GIOI_PROD !== "1")',
+      "if (true /* đột biến */)",
+    );
+    expect(mutated).not.toBe(scriptContent);
   });
 });
