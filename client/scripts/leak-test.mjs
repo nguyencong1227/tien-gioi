@@ -224,11 +224,20 @@ async function runLeakTest() {
           (() => {
             const sc = window.__scene;
             const textures = sc ? Object.keys(sc.textures.list || {}).length : 0;
+            let vramBytes = 0;
+            if (sc && sc.textures?.list) {
+              for (const tex of Object.values(sc.textures.list)) {
+                const src = tex.source?.[0] || tex.frames?.__BASE__?.source;
+                if (src && src.width > 0 && src.height > 0) {
+                  vramBytes += src.width * src.height * 4;
+                }
+              }
+            }
             const gameObjects = sc ? (sc.children?.list?.length || 0) : 0;
             const tweens = sc ? ((sc.tweens?.tweens?.length) ?? (sc.tweens?.getTweens?.().length || 0)) : 0;
             const heapBytes = performance?.memory ? performance.memory.usedJSHeapSize : 0;
             const bitmapTexts = sc ? sc.children.list.filter(c => c.type === 'BitmapText' || c.constructor.name === 'BitmapText').length : 0;
-            return { textures, gameObjects, tweens, heapBytes, bitmapTexts };
+            return { textures, vramBytes, gameObjects, tweens, heapBytes, bitmapTexts };
           })()
         `,
         returnByValue: true,
@@ -259,10 +268,12 @@ async function runLeakTest() {
 
     const initial = await readMetrics();
     console.log(
-      `- Ban đầu: Textures=${initial.textures} | GameObjects=${initial.gameObjects} (Base=${initial.gameObjects - initial.bitmapTexts}, BitmapTexts=${initial.bitmapTexts}) | Heap=${(initial.heapBytes / 1048576).toFixed(1)} MB`,
+      `- Ban đầu: Textures=${initial.textures} (VRAM ${(initial.vramBytes / 1048576).toFixed(2)} MB) | GameObjects=${initial.gameObjects} (Base=${initial.gameObjects - initial.bitmapTexts}, BitmapTexts=${initial.bitmapTexts}) | Heap=${(initial.heapBytes / 1048576).toFixed(1)} MB`,
     );
 
-    console.log(`- Đang thực hiện ${iterations} chu kỳ mở/đóng modal & tương tác hiệu ứng...`);
+    console.log(
+      `- Đang thực hiện ${iterations} chu kỳ mở/đóng modal, tương tác hiệu ứng & dựng lại bản đồ...`,
+    );
     for (let cycle = 1; cycle <= iterations; cycle++) {
       await cdpSend("Runtime.evaluate", {
         expression: `
@@ -272,9 +283,14 @@ async function runLeakTest() {
             window.__ui.toggleSettingsModal(true);
             window.__ui.closeAllModals();
           }
-          if (window.__scene?.fx) {
-            window.__scene.fx.play("hit-spark", 100, 100, { priority: 2 });
-            window.__scene.fx.floatNumber("+99", 100, 100, { color: 0x44ff44, size: 16 });
+          if (window.__scene) {
+            if (window.__scene.fx) {
+              window.__scene.fx.play("hit-spark", 100, 100, { priority: 2 });
+              window.__scene.fx.floatNumber("+99", 100, 100, { color: 0x44ff44, size: 16 });
+            }
+            if (typeof window.__scene.buildMapVisuals === "function") {
+              window.__scene.buildMapVisuals();
+            }
           }
         `,
       });
@@ -292,7 +308,7 @@ async function runLeakTest() {
 
     const final = await readMetrics();
     console.log(
-      `- Sau cùng: Textures=${final.textures} | GameObjects=${final.gameObjects} (Base=${final.gameObjects - final.bitmapTexts}, BitmapTexts=${final.bitmapTexts}) | Heap=${(final.heapBytes / 1048576).toFixed(1)} MB`,
+      `- Sau cùng: Textures=${final.textures} (VRAM ${(final.vramBytes / 1048576).toFixed(2)} MB) | GameObjects=${final.gameObjects} (Base=${final.gameObjects - final.bitmapTexts}, BitmapTexts=${final.bitmapTexts}) | Heap=${(final.heapBytes / 1048576).toFixed(1)} MB`,
     );
 
     const evaluation = evaluateLeakResults({ initial, final, maxHeapGrowthPercent });

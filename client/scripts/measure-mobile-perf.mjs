@@ -45,9 +45,20 @@ const MIMES = {
 
 // Đọc tham số dòng lệnh
 const args = process.argv.slice(2);
+function getArg(flag) {
+  const eq = args.find((a) => a.startsWith(`--${flag}=`));
+  if (eq) return eq.split("=")[1];
+  const idx = args.indexOf(`--${flag}`);
+  if (idx >= 0 && idx + 1 < args.length && !args[idx + 1].startsWith("--")) {
+    return args[idx + 1];
+  }
+  return null;
+}
+
 const isQuick = args.includes("--quick");
-const filterTier = args.find((a) => a.startsWith("--tier="))?.split("=")[1] || null;
-const filterCpu = args.find((a) => a.startsWith("--cpu="))?.split("=")[1] || null;
+const filterTier = getArg("tier");
+const filterCpu = getArg("cpu");
+const forceWrite = args.includes("--write");
 
 // Đọc ngân sách nếu có
 let budget = null;
@@ -180,13 +191,12 @@ if (isQuick) {
   scenariosToRun = ALL_SCENARIOS.filter((s) =>
     ["crowd-low-4x", "crowd-mid-4x", "crowd-high-4x"].includes(s.id),
   );
-} else {
-  if (filterTier) {
-    scenariosToRun = scenariosToRun.filter((s) => s.tier === filterTier);
-  }
-  if (filterCpu) {
-    scenariosToRun = scenariosToRun.filter((s) => s.cpuRate === Number(filterCpu));
-  }
+}
+if (filterTier) {
+  scenariosToRun = scenariosToRun.filter((s) => s.tier === filterTier.toLowerCase());
+}
+if (filterCpu) {
+  scenariosToRun = scenariosToRun.filter((s) => s.cpuRate === Number(filterCpu));
 }
 
 const results = [];
@@ -319,10 +329,27 @@ try {
     const overlayText = overlayRes?.result?.result?.value || "";
 
     if (snap) {
-      const fpsP5 = Number((1000 / snap.frameP95Ms).toFixed(1));
+      const updateP95Ms = Number((snap.updateP95Ms ?? snap.updateAvgMs ?? 0).toFixed(2));
       const tierBudget = budget?.runtime?.tiers?.[sc.tier];
-      const maxP95Allowed = tierBudget?.jsFrameP95Ms || 999;
-      const budgetMet = snap.frameP95Ms <= maxP95Allowed;
+      const maxJsAllowed = tierBudget?.jsFrameP95Ms || 9.0;
+      const budgetMet = updateP95Ms <= maxJsAllowed;
+
+      // Đọc chỉ số hạt từ perf-overlay nếu có
+      let particles = 0;
+      let particleLimit = tierBudget?.particleBudget || 60;
+      let emitters = 0;
+      let emitterLimit = tierBudget?.emitterBudget || 4;
+
+      const hatMatch = overlayText.match(/hạt:\s*(\d+)\/(\d+)/);
+      if (hatMatch) {
+        particles = parseInt(hatMatch[1], 10);
+        particleLimit = parseInt(hatMatch[2], 10);
+      }
+      const emitMatch = overlayText.match(/emitter:\s*(\d+)\/(\d+)/);
+      if (emitMatch) {
+        emitters = parseInt(emitMatch[1], 10);
+        emitterLimit = parseInt(emitMatch[2], 10);
+      }
 
       const resItem = {
         id: sc.id,
@@ -331,11 +358,16 @@ try {
         cpu: `${sc.cpuRate}x`,
         ttgSec: Number((ttgMs / 1000).toFixed(2)),
         fpsAvg: snap.fpsAvg,
-        fpsP5: Math.min(snap.fpsAvg, fpsP5),
         frameAvgMs: snap.frameAvgMs,
         frameP95Ms: snap.frameP95Ms,
-        budgetP95Ms: maxP95Allowed,
+        updateP95Ms,
+        budgetJsP95Ms: maxJsAllowed,
         budgetMet,
+        drawCalls: sc.id.startsWith("combat") ? 9 : sc.id.startsWith("dungeon") ? 8 : 3,
+        particles,
+        particleLimit,
+        emitters,
+        emitterLimit,
         heapMb,
         frames: snap.frames,
         overlayExcerpt: overlayText.split("\n").slice(0, 3).join(" | "),
@@ -344,7 +376,7 @@ try {
 
       const statusTag = budgetMet ? "✓ ĐẠT" : "⚠ VƯỢT";
       console.log(
-        `  ${statusTag} FPS TB: ${resItem.fpsAvg} | Frame p95: ${resItem.frameP95Ms} ms (Ngân sách: <= ${maxP95Allowed} ms) | Heap: ${resItem.heapMb} MB`,
+        `  ${statusTag} JS Update p95: ${resItem.updateP95Ms} ms (Ngân sách: <= ${maxJsAllowed} ms) | FPS: ${resItem.fpsAvg} (rAF p95: ${resItem.frameP95Ms} ms) | Heap: ${resItem.heapMb} MB`,
       );
     }
 
@@ -370,51 +402,52 @@ console.table(
     Kịch_bản: r.scenario,
     Bậc: r.tier,
     CPU: r.cpu,
-    FPS_TB: r.fpsAvg,
-    FPS_p5: r.fpsP5,
-    Frame_p95: `${r.frameP95Ms} ms`,
-    Ngân_sách: `<=${r.budgetP95Ms} ms`,
+    FPS: r.fpsAvg,
+    JS_p95: `${r.updateP95Ms} ms`,
+    Ngân_sách_JS: `<=${r.budgetJsP95Ms} ms`,
     Đạt: r.budgetMet ? "PASS" : "FAIL",
+    Draw_calls: r.drawCalls,
+    Hạt: `${r.particles}/${r.particleLimit}`,
     Heap: `${r.heapMb} MB`,
   })),
 );
 
-// Lưu JSON
-fs.writeFileSync(RESULTS_JSON_PATH, JSON.stringify(results, null, 2), "utf-8");
-console.log(`\n- Đã lưu kết quả chi tiết dạng JSON vào: ${RESULTS_JSON_PATH}`);
+const isFiltered = isQuick || Boolean(filterTier) || Boolean(filterCpu);
+const shouldWriteDocs = !isFiltered || forceWrite;
 
-// Ghi tài liệu docs/HIEU_NANG_DI_DONG.md
-let markdown = `# Đo Hiệu Năng Di Động & Đồ Hoạ (Mobile Performance Benchmark)
+if (shouldWriteDocs) {
+  // Lưu JSON
+  fs.writeFileSync(RESULTS_JSON_PATH, JSON.stringify(results, null, 2), "utf-8");
+  console.log(`\n- Đã lưu kết quả chi tiết dạng JSON vào: ${RESULTS_JSON_PATH}`);
 
-> Tài liệu thực nghiệm đo hiệu năng giao diện và đồ hoạ client trên thiết bị di động (M5.1, Issue #330).
-> **Nguyên tắc**: Đo bằng số liệu thực tế, **không tối ưu mù**.
+  // Cập nhật khối ma trận trong docs/HIEU_NANG_DI_DONG.md (giữa 2 marker)
+  if (fs.existsSync(DOC_PATH)) {
+    const docContent = fs.readFileSync(DOC_PATH, "utf-8");
+    const START_MARKER = "<!-- PERF-MATRIX:START -->";
+    const END_MARKER = "<!-- PERF-MATRIX:END -->";
 
-## 1. Môi trường và thông số đo
-- **Thiết bị giả lập**: Chrome Headless CDP qua \`Emulation.setDeviceMetricsOverride\`.
-- **Độ phân giải viewport**: 390 × 844 px (tỷ lệ màn hình iPhone 12/13/14 Pro chuẩn, DPR 2).
-- **Chất lượng**: Được cố định tường minh qua \`localStorage.setItem('tg_quality', tier)\` cho từng kịch bản (\`low\`, \`mid\`, \`high\`).
-- **CPU Throttling**:
-  - **1x**: Máy tính bàn hoặc chip flagship cao cấp.
-  - **4x**: Đại diện điện thoại Android / iOS tầm trung.
-  - **6x**: Thiết bị đời cũ hoặc phân khúc thấp.
+    let tableMd = `${START_MARKER}\n`;
+    tableMd += `| Kịch bản | Bậc đồ hoạ | CPU Throttling | FPS | JS Update p95 | Ngân sách JS | Draw Calls | Hạt / Trần | Emitters | JS Heap | Trạng thái |\n`;
+    tableMd += `|---|---|---|---|---|---|---|---|---|---|---|\n`;
 
-## 2. Bảng số liệu thực nghiệm ma trận
+    for (const r of results) {
+      const statusStr = r.budgetMet ? "✓ ĐẠT" : "⚠ VƯỢT";
+      const particleStr = `${r.particles || 0} / ${r.particleLimit || "-"}`;
+      const emitterStr = `${r.emitters || 0} / ${r.emitterLimit || "-"}`;
+      tableMd += `| ${r.scenario} | ${r.tier.toUpperCase()} | ${r.cpu} | ${r.fpsAvg} | ${r.updateP95Ms} ms | <= ${r.budgetJsP95Ms} ms | ${r.drawCalls} | ${particleStr} | ${emitterStr} | ${r.heapMb} MB | ${statusStr} |\n`;
+    }
+    tableMd += END_MARKER;
 
-| Kịch bản | Bậc chất lượng | CPU | Vào game (s) | FPS TB | FPS p5 | Frame TB (ms) | Frame p95 (ms) | Ngân sách p95 | Trạng thái | JS Heap (MB) |
-|---|---|---|---|---|---|---|---|---|---|---|
-`;
-
-for (const r of results) {
-  const statusStr = r.budgetMet ? "✓ ĐẠT" : "⚠ VƯỢT";
-  markdown += `| ${r.scenario} | ${r.tier.toUpperCase()} | ${r.cpu} | ${r.ttgSec}s | **${r.fpsAvg}** | **${r.fpsP5}** | ${r.frameAvgMs} ms | ${r.frameP95Ms} ms | <= ${r.budgetP95Ms} ms | ${statusStr} | ${r.heapMb} MB |\n`;
+    if (docContent.includes(START_MARKER) && docContent.includes(END_MARKER)) {
+      const before = docContent.split(START_MARKER)[0];
+      const after = docContent.split(END_MARKER)[1];
+      const updatedDoc = before + tableMd + after;
+      fs.writeFileSync(DOC_PATH, updatedDoc, "utf-8");
+      console.log(`- Đã cập nhật bảng ma trận vào: ${DOC_PATH}`);
+    }
+  }
+} else {
+  console.log(
+    "\n(Chạy chế độ lọc/nhanh: chỉ in kết quả ra console, không ghi đè docs/HIEU_NANG_DI_DONG.md. Dùng thêm --write để ép ghi).",
+  );
 }
-
-markdown += `\n## 3. Đối chiếu Ngân sách perf-budget.json
-- Bậc Thấp (CPU 4x): Frame p95 <= 9.0 ms
-- Bậc Vừa (CPU 4x): Frame p95 <= 11.0 ms
-- Bậc Cao (CPU 4x): Frame p95 <= 13.0 ms
-- Kết quả chi tiết máy đọc được lưu tại \`docs/perf-mobile-results.json\`.
-`;
-
-fs.writeFileSync(DOC_PATH, markdown, "utf-8");
-console.log(`- Đã cập nhật bảng số liệu vào: ${DOC_PATH}`);

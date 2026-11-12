@@ -171,10 +171,11 @@ export function calculateStaticTextureMemory(assetsDir) {
 
   scanPngs(assetsDir);
 
-  // 2. Texture sinh bằng mã lúc chạy (từ gfx/fx: fx-font 576x1008, fx-atlas 192x32)
+  // 2. Texture sinh bằng mã lúc chạy (từ gfx/fx và gfx/decor-tileset: fx-font 576x1008, fx-atlas 192x32, decor-tileset 320x32)
   const codeGenerated = [
     { name: "fx-font (sinh bằng mã)", width: 576, height: 1008 },
     { name: "fx-atlas (sinh bằng mã)", width: 192, height: 32 },
+    { name: "decor-tileset (sinh bằng mã)", width: 320, height: 32 },
   ];
 
   for (const gen of codeGenerated) {
