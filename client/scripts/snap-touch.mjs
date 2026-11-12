@@ -22,6 +22,8 @@ const arg = (name, def) => {
 const BASE_URL = arg("url", "http://127.0.0.1:5183");
 const OUT_DIR = path.resolve(REPO, arg("out", "docs/screenshots"));
 const NO_SHOT = process.argv.includes("--no-shot");
+// Mật độ điểm ảnh giả lập (1 / 2 / 3): kiểm điều khiển cảm ứng vẫn đúng khi canvas lớn gấp renderScale lần (#324)
+const DPR = Number(arg("dpr", "1"));
 
 const VIEWPORTS = [
   { name: "390x844", w: 390, h: 844 },
@@ -130,11 +132,11 @@ try {
   };
 
   for (const vp of VIEWPORTS) {
-    console.log(`\\n=== ${vp.name} ===`);
+    console.log(`\\n=== ${vp.name} (DPR ${DPR}) ===`);
     await send("Emulation.setDeviceMetricsOverride", {
       width: vp.w,
       height: vp.h,
-      deviceScaleFactor: 1,
+      deviceScaleFactor: DPR,
       mobile: true,
     });
     await send("Page.navigate", { url: `${BASE_URL}/?duel=mock&debug=1` });
