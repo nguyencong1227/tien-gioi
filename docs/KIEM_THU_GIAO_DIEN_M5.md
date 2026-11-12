@@ -35,12 +35,18 @@ Tài liệu này dành cho **người dùng** (có điện thoại Android tầm
 ## 4. Kiểm tra bằng mắt (đánh dấu Đạt / Lỗi, ghi chú lỗi kèm ảnh chụp màn hình)
 Làm ở **cả dọc và ngang**.
 1. **Bố cục:** HUD không che quá nửa cảnh; joystick (nửa trái, nửa dưới) kéo được kể cả khi ngón đặt trên bảng Nhiệm vụ / HUD; nút Chém / kỹ năng / Nhặt / Mục tiêu bấm đúng, không dính nhau; không phần tử nào lọt dưới tai thỏ / thanh điều hướng.
-2. **Tấm bảng** (Nhân vật, Túi, Nhiệm vụ, Bản đồ, Cài đặt, Cửa hàng, Lò rèn): mở ra toàn màn hình (dọc) hoặc ngăn kéo bên phải (ngang), cuộn mượt, nút **Đóng** ở góc dưới phải với tới bằng ngón cái; thẻ kết quả (Bí cảnh, Quyết đấu, Chỉ dẫn) nằm giữa màn hình.
+   - **Điều khiển di chuyển:** thử cả hai kiểu ở **Cài đặt -> Điều khiển di chuyển**: *Joystick nổi* (nửa trái, 65 % chiều cao phía dưới) và *Nút hướng cố định* (D-pad 8 hướng, không đè cột HUD trái).
+   - **Nút Mục tiêu:** mờ khi không có quái trong tầm khoá (520 px); bấm khoá con gần nhất, bấm tiếp chuyển sang con xa hơn (vòng lại), vòng đánh dấu hiện trên mục tiêu; Chém xoay về con đang khoá.
+   - **Đa chạm:** vừa đi (joystick / D-pad) vừa bấm Chém và Kiếm khí cùng lúc; chạm đúp / chụm hai ngón KHÔNG làm trang phóng to.
+2. **Tấm bảng** (Nhân vật, Túi, Nhiệm vụ, Bản đồ, Cài đặt, Cửa hàng, Lò rèn, **Tông môn**): mở ra toàn màn hình (dọc) hoặc ngăn kéo bên phải (ngang), cuộn mượt, nút **Đóng** ở góc dưới phải với tới bằng ngón cái; thẻ kết quả (Bí cảnh, Quyết đấu, Chỉ dẫn người mới, Phiên bản cũ nếu gặp) nằm giữa màn hình.
+   - **Tông môn:** cuộn danh sách thành viên rồi bấm Nhường / Trục xuất / Rời: hộp xác nhận phủ kín tấm (không trôi ra ngoài màn hình dù đã cuộn).
+   - **Hộp thoại NPC** (dock đáy màn hình): không che nút Chém, chạm để hiện hết chữ, các lựa chọn bấm được.
 3. **Chữ:** nội dung bảng đọc được không phải nheo mắt (≥ 14 px); thử **Cài đặt -> Cỡ chữ** Nhỏ / Vừa / Lớn, rồi **xoay máy** (cỡ đã chọn phải được giữ).
+   - Để khỏi báo nhầm: nhãn HUD ≥ 12 px và **KHÔNG đổi theo Cỡ chữ** (đúng thiết kế); trên điện thoại **Nhỏ ≈ Vừa** (sàn 14 px thắng), **Lớn** chỉ nới chữ gốc ≥ 13 px; **tên ô đan dược ở thanh nhanh bị cắt** ("Hồi H…") là hạn chế đã biết (tên đầy đủ ở `title`).
 4. **Hiệu ứng:** chém / kỹ năng có hạt và rung nhẹ, chữ sát thương bay rõ; đột phá cảnh giới, Tam Sinh Thạch, cổng truyền tống (chuyển cảnh mống mắt) hiện đúng; **Giảm chuyển động** của hệ điều hành thì rung / chớp tắt.
-5. **Hoạt ảnh:** người và yêu thú đi / đánh / bị đánh / gục mượt; thực thể ở xa không giật.
-6. **Bản đồ:** thời tiết, sương trôi, nước lấp lánh, bóng đốm dưới chân; ở bậc Thấp thì tối giản nhưng không lỗi.
-7. **Mất mạng:** tắt Wi-Fi 10 giây rồi bật lại: game tự nối lại và nhân vật còn nguyên chỗ cũ (server giữ chỗ 20 giây).
+5. **Hoạt ảnh:** người và yêu thú đi / đánh / bị đánh / gục mượt; thực thể ở xa không giật; tween nhẹ (nhấp nhô khi đi, co giãn khi đánh / bị đánh, chân đứng yên một chỗ) và bóng đốm dưới chân. Bật **Giảm chuyển động** của hệ điều hành: gục chỉ hiện khung xác nằm lại, không tween.
+6. **Bản đồ:** thời tiết, sương trôi, nước lấp lánh (trôi ở bậc Vừa / Cao, đứng yên ở bậc Thấp), bóng đốm dưới chân; ở bậc Thấp thì tối giản nhưng không lỗi.
+7. **Mất mạng:** tắt Wi-Fi 10 giây rồi bật lại: game tự nối lại và nhân vật còn nguyên chỗ cũ (server giữ chỗ 20 giây). Thử thêm **tắt > 25 giây**: sau 20 giây server không giữ chỗ nữa nên phải hiện thông báo / nút **Tải lại trang** (không treo im).
 8. **Nóng máy / pin:** sau 15 phút chơi, ghi nhiệt độ cảm nhận (bình thường / ấm / nóng) và % pin đã tụt.
 
 ## 5. Mẫu báo cáo (sao chép, điền, gửi cho Dev A)
