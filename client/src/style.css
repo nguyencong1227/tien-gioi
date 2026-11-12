@@ -3094,6 +3094,356 @@ body.in-limbo #chat-log {
   text-shadow: 0 0 18px rgba(234, 179, 8, 0.6);
 }
 
+/* --- Hiệu ứng luân hồi (M5.2 #329): CSS thuần vì hai màn là lớp DOM đục phủ kín canvas (hạt canvas sẽ bị che) --- */
+
+/* Hoàng Tuyền: vignette tím đen ở mép + hồn lửa xanh trôi lên, phủ TRÊN màn (không bắt chuột, alpha thấp để không che chữ) */
+.limbo-fx {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 10001;
+  pointer-events: none;
+  overflow: hidden;
+  box-shadow: inset 0 0 20vmin 5vmin rgba(38, 12, 66, 0.7);
+}
+body.in-limbo .limbo-fx {
+  display: block;
+}
+.limbo-fx i {
+  position: absolute;
+  bottom: -6vh;
+  left: var(--x, 50%);
+  width: var(--s, 12px);
+  height: var(--s, 12px);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(200, 255, 238, 0.85) 0%,
+    rgba(96, 230, 205, 0.45) 42%,
+    rgba(60, 200, 190, 0) 72%
+  );
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: limbo-wisp var(--d, 12s) linear var(--delay, 0s) infinite;
+}
+.limbo-fx i:nth-child(1) {
+  --x: 6%;
+  --s: 14px;
+  --d: 13s;
+  --delay: -2s;
+  --sway: 26px;
+}
+.limbo-fx i:nth-child(2) {
+  --x: 14%;
+  --s: 9px;
+  --d: 10s;
+  --delay: -7s;
+  --sway: -18px;
+}
+.limbo-fx i:nth-child(3) {
+  --x: 23%;
+  --s: 12px;
+  --d: 15s;
+  --delay: -4s;
+  --sway: 30px;
+}
+.limbo-fx i:nth-child(4) {
+  --x: 33%;
+  --s: 8px;
+  --d: 11s;
+  --delay: -9s;
+  --sway: -24px;
+}
+.limbo-fx i:nth-child(5) {
+  --x: 44%;
+  --s: 13px;
+  --d: 14s;
+  --delay: -1s;
+  --sway: 20px;
+}
+.limbo-fx i:nth-child(6) {
+  --x: 55%;
+  --s: 10px;
+  --d: 12s;
+  --delay: -6s;
+  --sway: -28px;
+}
+.limbo-fx i:nth-child(7) {
+  --x: 66%;
+  --s: 15px;
+  --d: 16s;
+  --delay: -11s;
+  --sway: 24px;
+}
+.limbo-fx i:nth-child(8) {
+  --x: 76%;
+  --s: 9px;
+  --d: 10.5s;
+  --delay: -3s;
+  --sway: -20px;
+}
+.limbo-fx i:nth-child(9) {
+  --x: 86%;
+  --s: 12px;
+  --d: 13.5s;
+  --delay: -8s;
+  --sway: 28px;
+}
+.limbo-fx i:nth-child(10) {
+  --x: 94%;
+  --s: 10px;
+  --d: 12.5s;
+  --delay: -5s;
+  --sway: -22px;
+}
+@keyframes limbo-wisp {
+  0% {
+    transform: translate(0, 0) scale(0.6);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.9;
+  }
+  50% {
+    transform: translate(var(--sway, 20px), -56vh) scale(1);
+  }
+  88% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translate(calc(var(--sway, 20px) * -1), -112vh) scale(0.5);
+    opacity: 0;
+  }
+}
+
+/* Tam Sinh Thạch: các nấc chân linh toả sáng tím nhịp thở chậm */
+body.in-limbo .stone-item {
+  animation: stone-glow 3.6s ease-in-out infinite;
+}
+@keyframes stone-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 rgba(180, 120, 255, 0);
+  }
+  50% {
+    box-shadow: 0 0 14px rgba(180, 120, 255, 0.28);
+  }
+}
+
+/* Đầu thai: nền sáng mờ trắng nở ra sau chữ + cánh hoa rơi */
+.reborn-bloom {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at 50% 44%,
+    rgba(255, 255, 255, 0.85) 0%,
+    rgba(255, 236, 250, 0.32) 34%,
+    rgba(255, 236, 250, 0) 70%
+  );
+  opacity: 0;
+  pointer-events: none;
+}
+.reborn-overlay.active .reborn-bloom {
+  animation: reborn-bloom 2.4s ease-out forwards;
+}
+@keyframes reborn-bloom {
+  0% {
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.45;
+  }
+}
+.reborn-petals {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.reborn-petals i {
+  position: absolute;
+  top: -6vh;
+  left: var(--x, 50%);
+  width: var(--w, 10px);
+  height: calc(var(--w, 10px) * 1.4);
+  border-radius: 150% 0 150% 0;
+  background: linear-gradient(135deg, rgba(255, 244, 250, 0.95), rgba(255, 183, 214, 0.8));
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: petal-fall var(--d, 6s) ease-in var(--delay, 0s) infinite paused;
+}
+.reborn-overlay.active .reborn-petals i {
+  animation-play-state: running;
+}
+.reborn-petals i:nth-child(1) {
+  --x: 5%;
+  --w: 11px;
+  --d: 5.5s;
+  --delay: 0s;
+  --sway: 40px;
+}
+.reborn-petals i:nth-child(2) {
+  --x: 13%;
+  --w: 8px;
+  --d: 6.5s;
+  --delay: -2s;
+  --sway: -34px;
+}
+.reborn-petals i:nth-child(3) {
+  --x: 21%;
+  --w: 12px;
+  --d: 5s;
+  --delay: -1s;
+  --sway: 46px;
+}
+.reborn-petals i:nth-child(4) {
+  --x: 30%;
+  --w: 9px;
+  --d: 7s;
+  --delay: -3.5s;
+  --sway: -40px;
+}
+.reborn-petals i:nth-child(5) {
+  --x: 39%;
+  --w: 13px;
+  --d: 5.8s;
+  --delay: -0.5s;
+  --sway: 36px;
+}
+.reborn-petals i:nth-child(6) {
+  --x: 48%;
+  --w: 8px;
+  --d: 6.2s;
+  --delay: -2.5s;
+  --sway: -44px;
+}
+.reborn-petals i:nth-child(7) {
+  --x: 57%;
+  --w: 12px;
+  --d: 5.2s;
+  --delay: -1.5s;
+  --sway: 38px;
+}
+.reborn-petals i:nth-child(8) {
+  --x: 66%;
+  --w: 10px;
+  --d: 6.8s;
+  --delay: -4s;
+  --sway: -36px;
+}
+.reborn-petals i:nth-child(9) {
+  --x: 75%;
+  --w: 13px;
+  --d: 5.6s;
+  --delay: -0.8s;
+  --sway: 42px;
+}
+.reborn-petals i:nth-child(10) {
+  --x: 83%;
+  --w: 9px;
+  --d: 6.4s;
+  --delay: -3s;
+  --sway: -38px;
+}
+.reborn-petals i:nth-child(11) {
+  --x: 91%;
+  --w: 11px;
+  --d: 5.9s;
+  --delay: -2.2s;
+  --sway: 34px;
+}
+.reborn-petals i:nth-child(12) {
+  --x: 97%;
+  --w: 8px;
+  --d: 7.2s;
+  --delay: -4.5s;
+  --sway: -30px;
+}
+@keyframes petal-fall {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.95;
+  }
+  50% {
+    transform: translate(var(--sway, 30px), 52vh) rotate(160deg);
+  }
+  100% {
+    transform: translate(calc(var(--sway, 30px) * -0.6), 108vh) rotate(340deg);
+    opacity: 0.85;
+  }
+}
+.reborn-content {
+  position: relative;
+  z-index: 1;
+}
+
+/* Giảm chuyển động: hồn lửa và cánh hoa đứng yên (mờ, rải rác), vầng sáng hiện thẳng, Tam Sinh Thạch không nhấp nháy */
+html[data-reduce-motion="1"] .limbo-fx i,
+body.reduced-motion .limbo-fx i {
+  animation: none;
+  opacity: 0.4;
+  bottom: auto;
+  top: calc(var(--s, 12px) * 6);
+}
+html[data-reduce-motion="1"] body.in-limbo .stone-item,
+body.reduced-motion.in-limbo .stone-item {
+  animation: none;
+}
+html[data-reduce-motion="1"] .reborn-overlay.active .reborn-bloom,
+body.reduced-motion .reborn-overlay.active .reborn-bloom {
+  animation: none;
+  opacity: 0.6;
+}
+html[data-reduce-motion="1"] .reborn-petals i,
+body.reduced-motion .reborn-petals i {
+  animation: none;
+  opacity: 0.55;
+  top: calc(var(--w, 10px) * 5);
+}
+@media (prefers-reduced-motion: reduce) {
+  body:not(.motion-ok) .limbo-fx i {
+    animation: none;
+    opacity: 0.4;
+    bottom: auto;
+    top: calc(var(--s, 12px) * 6);
+  }
+  body:not(.motion-ok).in-limbo .stone-item {
+    animation: none;
+  }
+  body:not(.motion-ok) .reborn-overlay.active .reborn-bloom {
+    animation: none;
+    opacity: 0.6;
+  }
+  body:not(.motion-ok) .reborn-petals i {
+    animation: none;
+    opacity: 0.55;
+    top: calc(var(--w, 10px) * 5);
+  }
+}
+
+/* Bậc đồ hoạ Thấp (body.low-fx): chỉ vài hồn lửa / cánh hoa, Tam Sinh Thạch không nhấp nháy */
+body.low-fx .limbo-fx i:nth-child(n + 5),
+body.low-fx .reborn-petals i:nth-child(n + 5) {
+  display: none;
+}
+body.low-fx.in-limbo .stone-item {
+  animation: none;
+}
+
+/* Điện thoại: ít hồn lửa / cánh hoa hơn cho nhẹ máy */
+@media (max-width: 640px) {
+  .limbo-fx i:nth-child(n + 7),
+  .reborn-petals i:nth-child(n + 8) {
+    display: none;
+  }
+}
+
 /* Responsive di động cho Hoàng Tuyền */
 @media (max-width: 640px) {
   .limbo-overlay {
