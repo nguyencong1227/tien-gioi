@@ -490,6 +490,35 @@ try {
       console.log(`  ✓ ảnh touch-dpad-${vp.name}.png`);
     }
 
+    // --- 3b') Nút Mục tiêu mờ đi khi không có quái trong tầm khoá (nit của A ở #344: hiện cả ở trấn), sáng lại khi có ---
+    const idleState = () =>
+      J(
+        `({ idle: document.getElementById("btn-target").classList.contains("idle"), aria: document.getElementById("btn-target").getAttribute("aria-disabled"), op: parseFloat(getComputedStyle(document.getElementById("btn-target")).opacity) })`,
+      );
+    await sleep(350);
+    let I = await idleState();
+    check(
+      I.idle && I.aria === "true" && I.op < 0.6,
+      `không có quái: nút Mục tiêu mờ (opacity ${I.op}, aria-disabled=${I.aria})`,
+    );
+    await evalJs(
+      `(() => { const sc = window.__scene; sc.state.monsters.set("t-idle", { kind: "tho", x: sc.predX + 300, y: sc.predY, hp: 40, maxHp: 40, angle: 0 }); 0; })()`,
+    );
+    await sleep(450);
+    I = await idleState();
+    check(
+      !I.idle && I.aria === "false" && I.op === 1,
+      `có quái trong tầm: nút Mục tiêu sáng lại (opacity ${I.op})`,
+    );
+    await evalJs(
+      `(() => { const sc = window.__scene; const m = sc.state.monsters.get("t-idle"); m.x = sc.predX + 900; m.y = sc.predY; 0; })()`,
+    );
+    await sleep(450);
+    I = await idleState();
+    check(I.idle, "quái chỉ còn ngoài tầm khoá (900 px > 520): nút Mục tiêu mờ lại");
+    await evalJs('window.__scene.state.monsters.delete("t-idle");0');
+    await sleep(300);
+
     // --- 3c) Nút khoá mục tiêu: ba quái thật trong state mock (gần nhất, xa hơn, ngoài tầm) ---
     await evalJs(`(() => {
       const sc = window.__scene;

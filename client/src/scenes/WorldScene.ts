@@ -212,6 +212,8 @@ interface Entity {
   spriteBaseY?: number;
   tweenPhase?: number;
   tweenActive?: boolean;
+  /** Khoảng cách tới nhân vật của mình (px) do `animDue` tính ở khung này; `stepTween` dùng lại (không tính `Math.hypot` lần nữa). */
+  distMe?: number;
 }
 
 /** Thời lượng đòn đánh của người chơi (ms): `slashUntil = now + SLASH_MS` (hoạt ảnh Chém và tween co giãn dùng chung). */
@@ -285,6 +287,9 @@ export class WorldScene extends Phaser.Scene {
   /** Khoá mục tiêu (#327): id quái đang khoá (null = tự ngắm quái gần nhất như cũ) và vòng đánh dấu. */
   private lockedTargetId: string | null = null;
   private targetRing?: Phaser.GameObjects.Arc;
+  /** Nút Mục tiêu mờ đi khi không có quái trong tầm khoá (kiểm mỗi 200 ms, chỉ ghi DOM khi đổi). */
+  private targetIdleAt = 0;
+  private targetBtnIdle?: boolean;
   private nextSword = 0;
   private nearestLootId: string | null = null;
   private closestNpcId: string | null = null;
@@ -1064,6 +1069,31 @@ export class WorldScene extends Phaser.Scene {
     if (id === null) this.targetRing?.setVisible(false);
   }
 
+  /**
+   * Nút Mục tiêu mờ đi (class `idle`, `aria-disabled`) khi chưa khoá và KHÔNG có quái nào trong tầm khoá: bấm cũng không làm gì
+   * (nit của A ở #344: hiện cả ở trấn). Vẫn bấm được (không `disabled`) để bố cục / chạm không đổi.
+   */
+  private syncTargetBtnIdle() {
+    const now = this.time.now;
+    if (now - this.targetIdleAt < 200) return;
+    this.targetIdleAt = now;
+    let any = this.lockedTargetId !== null;
+    if (!any)
+      for (const m of this.monsters.values())
+        if (keepLock(Math.hypot(m.tx - this.predX, m.ty - this.predY))) {
+          any = true;
+          break;
+        }
+    const idle = !any;
+    if (idle === this.targetBtnIdle) return;
+    this.targetBtnIdle = idle;
+    const btn = document.getElementById("btn-target");
+    if (btn) {
+      btn.classList.toggle("idle", idle);
+      btn.setAttribute("aria-disabled", String(idle));
+    }
+  }
+
   /** Mỗi khung: vòng đánh dấu bám theo mục tiêu khoá; mất mục tiêu (chết / ra xa / rời vùng) thì tự nhả khoá. */
   private syncTargetLock() {
     const id = this.lockedTargetId;
@@ -1470,6 +1500,7 @@ export class WorldScene extends Phaser.Scene {
     this.syncPlayers(k, deltaMs);
     this.syncMonsters(k);
     this.syncTargetLock();
+    this.syncTargetBtnIdle();
     this.syncLoot();
     this.stepTransientFx(this.time.now);
     if (this.time.now - this.lastAuxSync >= 150) {
@@ -2694,7 +2725,7 @@ export class WorldScene extends Phaser.Scene {
     strikeSince: number,
     hurtSince: number,
   ) {
-    const near = me || Math.hypot(e.root.x - this.predX, e.root.y - this.predY) < FAR_ANIM_DIST;
+    const near = me || (e.distMe ?? Number.POSITIVE_INFINITY) < FAR_ANIM_DIST;
     const t = spriteTween({
       enabled: tweenEnabled(getQuality(), near),
       nowMs: this.time.now,
@@ -2723,6 +2754,7 @@ export class WorldScene extends Phaser.Scene {
   /** Thực thể ở xa (không phải mình) chỉ cập nhật trạng thái hoạt ảnh theo `farAnimHz` (gfx/anim/entity-lod.ts). */
   private animDue(e: Entity): boolean {
     const dme = Math.hypot(e.root.x - this.predX, e.root.y - this.predY);
+    e.distMe = dme;
     const now = this.time.now;
     if (!animUpdateDue(now, e.lastAnimAt ?? -1e9, dme, getQuality().farAnimHz)) return false;
     e.lastAnimAt = now;
