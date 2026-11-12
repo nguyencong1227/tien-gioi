@@ -5,6 +5,11 @@ on:
     # 21:00 UTC = 04:00 AM giờ Việt Nam
     - cron: "0 21 * * *"
   workflow_dispatch:
+    inputs:
+      time_slack:
+        description: "Hệ số nới ngân sách THỜI GIAN của job client-perf (>= 1; số hạt / emitter không nới)"
+        required: false
+        default: "1.5"
 
 concurrency:
   group: bench-nightly
@@ -49,4 +54,54 @@ jobs:
           path: |
             server/bench-hunt.json
             server/bench-crowd.json
+          retention-days: 90
+
+  # Hiệu năng client trên "điện thoại" giả lập (Chrome headless, CPU 1x / 4x / 6x), M5.1 #330 tiêu chí 4 + 5.
+  # PR chỉ chạy phần tĩnh (check:budget trong ci.yml) để không cạn phút Actions; phần động chạy ở đây hằng đêm + thủ công.
+  # Không tự commit gì vào main: kết quả JSON + bảng ma trận chỉ lên artifact.
+  client-perf:
+    name: Hiệu năng + rò rỉ client (perf:mobile, leak:test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      # Runner CI chậm hơn máy dev; 1.5 là giá trị khởi đầu, chỉnh sau vài đêm dựa vào bảng trong job summary
+      PERF_TIME_SLACK: ${{ inputs.time_slack || '1.5' }}
+
+    steps:
+      - name: Checkout mã nguồn
+        uses: actions/checkout@v4
+
+      - name: Cài đặt Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Cài đặt dependencies
+        run: npm ci
+
+      - name: Build client (harness phục vụ client/dist)
+        run: npm run build
+
+      - name: Đo ma trận kịch bản x bậc đồ hoạ x CPU (thoát mã 1 nếu có kịch bản không đo được)
+        id: perf
+        run: npm run perf:mobile
+
+      - name: So với client/perf-budget.json (đỏ nếu vượt) và ghi job summary
+        if: ${{ !cancelled() && steps.perf.outcome != 'skipped' }}
+        run: node client/scripts/perf-gate.mjs docs/perf-mobile-results.json
+
+      - name: Kiểm rò rỉ (ra / vào bản đồ, mở / đóng bảng 20 lần)
+        if: ${{ !cancelled() }}
+        run: npm run leak:test
+
+      - name: Lưu artifact kết quả hiệu năng client
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-perf-results-${{ github.sha }}
+          path: |
+            docs/perf-mobile-results.json
+            docs/HIEU_NANG_DI_DONG.md
+          if-no-files-found: warn
           retention-days: 90

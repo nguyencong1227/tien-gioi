@@ -67,3 +67,11 @@ node client/scripts/measure-mobile-perf.mjs
 node client/scripts/measure-mobile-perf.mjs --quick
 node client/scripts/measure-mobile-perf.mjs --tier=low --cpu=4
 ```
+
+## 7. Chạy hằng đêm trên GitHub Actions (#330) và cổng ngân sách
+Job `client-perf` trong `.github/workflows/bench.yml` (lịch 04:00 giờ Việt Nam + `workflow_dispatch`, có ô nhập `time_slack`) chạy: `npm run build` -> `npm run perf:mobile` (đủ ma trận, ~80 s) -> `node client/scripts/perf-gate.mjs` -> `npm run leak:test` (~10 s) và đưa `docs/perf-mobile-results.json` + `docs/HIEU_NANG_DI_DONG.md` lên artifact `client-perf-results-<sha>` (90 ngày; KHÔNG tự commit vào `main`). PR chỉ chạy phần tĩnh (`check:budget` trong `ci.yml`) để không cạn phút Actions.
+
+- **Đỏ khi nào:** (1) `perf:mobile` thoát mã 1 nếu có kịch bản không tải được / không có mẫu (không bao giờ xanh giả khi thiếu số đo); (2) `perf-gate.mjs` thoát mã 1 nếu một kịch bản vượt `client/perf-budget.json`: JS update p95 (`runtime.tiers.<bậc>.jsFrameP95Ms` x `time-slack`), số hạt sống (`peakParticles`), số emitter (`emitterBudget`), hay thiếu / sai kiểu số đo; (3) `leak:test` thoát mã 1 khi rò texture / GameObject / heap > 10 %. Bảng từng kịch bản nằm trong job summary.
+- **`time-slack`** (mặc định 1,5 trong workflow; biến `PERF_TIME_SLACK` hoặc `--time-slack`) chỉ nới ngân sách THỜI GIAN để bù runner CI chậm hơn máy dev; số hạt / emitter là số đếm tất định nên không nới. Số đo trên máy dev: JS update p95 0,3-2,2 ms so với ngân sách 9-13 ms (dư 4-30 lần), nên 1,5 là bước khởi đầu thận trọng: chỉnh sau vài đêm dựa vào bảng.
+- **Không chặn trên FPS** (SwiftShader không phản ánh GPU thật, mục 5) và **không chặn trên `drawCalls`**: cột này trong kết quả của harness hiện GÁN CỨNG theo tên kịch bản (3 / 8 / 9), chưa đo thật. Muốn chặn cần đo thật từ renderer Phaser trước (việc tách riêng).
+- Chạy tay: `npm run build && npm run perf:mobile && node client/scripts/perf-gate.mjs` (thêm `--time-slack 1.5` nếu máy chậm).

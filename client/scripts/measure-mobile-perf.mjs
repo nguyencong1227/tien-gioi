@@ -200,10 +200,13 @@ if (filterCpu) {
 }
 
 const results = [];
+// Kịch bản không tải được / không có mẫu: đếm để thoát mã 1 (nightly #330 không được xanh giả khi thiếu số đo)
+let loadFailures = 0;
 
 try {
   let versionData = null;
-  for (let i = 0; i < 40; i++) {
+  // 15 s (không phải 4 s): lần mở Chrome đầu tiên trên runner CI lạnh có thể chậm
+  for (let i = 0; i < 150; i++) {
     try {
       const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json/version`);
       if (res.ok) {
@@ -216,7 +219,7 @@ try {
     await sleep(100);
   }
 
-  if (!versionData) throw new Error("Chrome headless không khởi động kịp sau 4 giây.");
+  if (!versionData) throw new Error("Chrome headless không khởi động kịp sau 15 giây.");
 
   for (const sc of scenariosToRun) {
     const targetUrl = `http://127.0.0.1:${HTTP_PORT}/?${sc.query}`;
@@ -289,6 +292,7 @@ try {
 
     if (!ready) {
       console.error("  ✗ Kịch bản không tải xong sau 10s.");
+      loadFailures++;
       cdpWs.close();
       await fetch(`http://127.0.0.1:${CDP_PORT}/json/close/${tabData.id}`);
       continue;
@@ -336,7 +340,7 @@ try {
 
       // Đọc chỉ số hạt từ perf-overlay nếu có
       let particles = 0;
-      let particleLimit = tierBudget?.particleBudget || 60;
+      let particleLimit = tierBudget?.peakParticles || 60;
       let emitters = 0;
       let emitterLimit = tierBudget?.emitterBudget || 4;
 
@@ -378,6 +382,11 @@ try {
       console.log(
         `  ${statusTag} JS Update p95: ${resItem.updateP95Ms} ms (Ngân sách: <= ${maxJsAllowed} ms) | FPS: ${resItem.fpsAvg} (rAF p95: ${resItem.frameP95Ms} ms) | Heap: ${resItem.heapMb} MB`,
       );
+    }
+
+    if (!snap) {
+      console.error("  ✗ Không có mẫu hiệu năng (không khung nào được ghi).");
+      loadFailures++;
     }
 
     cdpWs.close();
@@ -450,4 +459,11 @@ if (shouldWriteDocs) {
   console.log(
     "\n(Chạy chế độ lọc/nhanh: chỉ in kết quả ra console, không ghi đè docs/HIEU_NANG_DI_DONG.md. Dùng thêm --write để ép ghi).",
   );
+}
+
+if (loadFailures > 0) {
+  console.error(
+    `\n❌ ${loadFailures} kịch bản không đo được: kết quả thiếu, KHÔNG được coi là đạt.`,
+  );
+  process.exitCode = 1;
 }
