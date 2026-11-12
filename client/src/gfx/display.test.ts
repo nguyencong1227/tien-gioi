@@ -422,6 +422,18 @@ describe("gfx/display: bộ điều khiển với môi trường giả", () => {
     expect(d.get().form).toBe("desktop");
   });
 
+  it("DPR đổi mà kích thước CSS giữ nguyên (kéo sang màn hình khác) -> đọc lại, phát sự kiện với dpr mới", () => {
+    const f = fakeEnv({ w: 1280, h: 720, dpr: 1 });
+    const d = createDisplay(f.env);
+    const cb = vi.fn();
+    d.onChange(cb);
+    f.state.dpr = 2;
+    f.fire("dpr");
+    f.flush();
+    expect(cb).toHaveBeenCalledTimes(1);
+    expect(d.get()).toMatchObject({ dpr: 2, cssW: 1280, cssH: 720 });
+  });
+
   it("dispose gọi env.dispose (gỡ phần tử dò vùng an toàn) và không để lại listener", () => {
     const f = fakeEnv({ w: 390, h: 844, coarse: true });
     const d = createDisplay(f.env);

@@ -1,3 +1,5 @@
+import { getDisplay } from "../gfx/display";
+import { fitZoom, toCssPoint } from "../gfx/scale";
 import Phaser from "phaser";
 import type { Room } from "colyseus.js";
 import {
@@ -244,16 +246,14 @@ export class WorldScene extends Phaser.Scene {
 
     const cam = this.cameras.main;
     cam.setBounds(0, 0, this.map.worldW, this.map.worldH);
-    const fitZoom = () => {
-      const w = this.scale.width;
-      const h = this.scale.height;
-      // Chặn zoom thấp nhất để vùng nhìn (w / zoom <= 1900, h / zoom <= 1100) nằm gọn trong bán kính StateView (1100 px)
-      const minZoom = Math.max(0.75, w / 1900, h / 1100);
-      const baseZoom = Phaser.Math.Clamp(Math.min(w, h) / 640, 0.75, 1.3);
-      cam.setZoom(Math.max(baseZoom, minZoom));
+    // Luật zoom theo ĐƠN VỊ CSS (gfx/scale.fitZoom: giữ vùng nhìn trong bán kính StateView 1100 px) nhân renderScale:
+    // canvas lớn gấp renderScale lần nên camera zoom cũng nhân lên, vùng nhìn trong thế giới KHÔNG đổi (#324)
+    const applyZoom = () => {
+      const d = getDisplay();
+      cam.setZoom(fitZoom(d.cssW, d.cssH) * d.renderScale);
     };
-    fitZoom();
-    this.scale.on("resize", fitZoom);
+    applyZoom();
+    this.scale.on("resize", applyZoom);
 
     ui.init({
       onUse: (slot) => !this.isReconnecting && this.room.send("useItem", { slot }),
@@ -730,12 +730,14 @@ export class WorldScene extends Phaser.Scene {
             isDungeonMap(this.map.def.id),
           );
         }
+        // Menu là phần tử DOM: toạ độ CSS px, KHÔNG phải điểm ảnh canvas (lệch gấp renderScale lần khi renderScale > 1)
+        const menuAt = toCssPoint(pointer.x, pointer.y, this.scale.displayScale);
         ui.openPlayerMenu(
           sp.name,
           sp.realm,
           sp.tier,
-          pointer.x,
-          pointer.y,
+          menuAt.x,
+          menuAt.y,
           challengeCheck,
           (sp as any).sect,
         );
