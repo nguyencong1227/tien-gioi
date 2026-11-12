@@ -15,6 +15,7 @@ import { ensureFxAtlas, ensureFxFont, FX_ATLAS_KEY, FX_FONT_KEY } from "./atlas"
 import { getRecipe, recipeCost, type FxRecipe } from "./recipes";
 import { registerPerfStat } from "../perf-overlay";
 import { REDUCED_MOTION_PARTICLE_FACTOR, type QualityProfile } from "../quality";
+import { makeZoneSource, type ZoneSource } from "./zone";
 
 export interface FxOpts {
   /** Ghi đè ưu tiên mặc định của công thức. */
@@ -25,6 +26,8 @@ export interface FxOpts {
   scale?: number;
   /** Ghi đè màu hạt (0xRRGGBB). */
   tint?: number;
+  /** Ghi đè kích thước vùng phát (px thế giới) của công thức có `zone` (vd phủ khung nhìn cho thời tiết). */
+  area?: { w: number; h: number };
 }
 
 export interface FxStats {
@@ -64,7 +67,10 @@ export interface FxDeps {
 
 const DEG = 180 / Math.PI;
 
-function buildEmitterConfig(r: FxRecipe): Phaser.Types.GameObjects.Particles.ParticleEmitterConfig {
+function buildEmitterConfig(
+  r: FxRecipe,
+  zone?: ZoneSource,
+): Phaser.Types.GameObjects.Particles.ParticleEmitterConfig {
   const p = r.particles!;
   const cfg: Phaser.Types.GameObjects.Particles.ParticleEmitterConfig = {
     frame: [...p.frames],
@@ -78,6 +84,7 @@ function buildEmitterConfig(r: FxRecipe): Phaser.Types.GameObjects.Particles.Par
     tint: p.tint ?? 0xffffff,
   };
   if (p.angle) cfg.angle = { min: p.angle.min, max: p.angle.max };
+  if (zone) cfg.emitZone = { type: "random", source: zone, quantity: 1 };
   return cfg;
 }
 
@@ -94,10 +101,16 @@ export function createFxSystem(scene: Phaser.Scene, deps: FxDeps): FxSystem {
   );
 
   const emitters = new Map<string, Phaser.GameObjects.Particles.ParticleEmitter>();
+  const zones = new Map<string, ZoneSource>();
   const emitterFor = (r: FxRecipe): Phaser.GameObjects.Particles.ParticleEmitter => {
     let e = emitters.get(r.id);
     if (!e) {
-      e = scene.add.particles(0, 0, FX_ATLAS_KEY, buildEmitterConfig(r));
+      let zone: ZoneSource | undefined;
+      if (r.particles?.zone) {
+        zone = makeZoneSource(r.particles.zone.w, r.particles.zone.h);
+        zones.set(r.id, zone);
+      }
+      e = scene.add.particles(0, 0, FX_ATLAS_KEY, buildEmitterConfig(r, zone));
       e.setDepth(deps.depth());
       emitters.set(r.id, e);
     }
@@ -162,6 +175,11 @@ export function createFxSystem(scene: Phaser.Scene, deps: FxDeps): FxSystem {
             e.setEmitterAngle({ min: deg - 20, max: deg + 20 });
           } else if (!r.particles.angle) {
             e.setEmitterAngle({ min: 0, max: 360 });
+          }
+          const zone = zones.get(r.id);
+          if (zone) {
+            zone.w = opts?.area?.w ?? r.particles.zone!.w;
+            zone.h = opts?.area?.h ?? r.particles.zone!.h;
           }
           e.setParticleTint(opts?.tint ?? r.particles.tint ?? 0xffffff);
           const k = opts?.scale ?? 1;

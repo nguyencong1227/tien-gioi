@@ -324,6 +324,102 @@ async function main() {
       `draw call mỗi khung: tắt ${dOff.toFixed(1)} -> bật ${dOn.toFixed(1)} (+${(dOn - dOff).toFixed(1)})`,
     );
 
+    // ---------------- Ca 6: thời tiết bằng hạt ----------------
+    out(
+      "\n--- Ca 6: thời tiết (cánh hoa đào ở Lạc Hà): hạt sống thật, ngân sách, điểm ảnh, theo bậc ---",
+    );
+    const setCheck = (id: string, on: boolean) =>
+      ev(
+        `(() => { const c = document.getElementById(${JSON.stringify(id)}); c.checked = ${on}; c.dispatchEvent(new Event('change')); })(); 1`,
+      );
+    const alive = async () =>
+      Number(
+        await ev(
+          `window.__scene.children.list.filter((c) => c.type === 'ParticleEmitter').reduce((n, e) => n + e.getAliveParticleCount(), 0)`,
+        ),
+      );
+    const emitters = async () => Number(await ev(`window.__fx.stats().liveEmitters`));
+    const waitDrain = () =>
+      T.waitFor(
+        `window.__fx.stats().liveEmitters === 0 && window.__scene.children.list.filter((c) => c.type === 'ParticleEmitter').reduce((n, e) => n + e.getAliveParticleCount(), 0) === 0`,
+        "hạt thời tiết hết",
+      );
+    // Mặc định ở ?debug: thời tiết TẮT để các script đo khác có cảnh sạch
+    must(
+      Boolean(await ev(`window.__scene.weatherPaused`)),
+      "?debug mặc định tắt thời tiết (weatherPaused = true)",
+    );
+    await setQuality("high");
+    await sleep(400);
+    await sleep(1500);
+    must((await alive()) === 0, "tạm dừng: không có hạt nào");
+    // Bắt đầu: bật thời tiết, đợi 5 s THEO ĐỒNG HỒ PHASER (nhịp ~1,7 s, tuổi thọ <= 3,8 s)
+    await ev(`window.__scene.weatherPaused = false; 1`);
+    await T.waitFor(
+      `window.__scene.time.now > ${Number(await ev(`window.__scene.time.now`)) + 5000}`,
+      "5 s đồng hồ trò chơi",
+    );
+    const wAlive = await alive();
+    const wEm = await emitters();
+    must(wAlive >= 8, `bậc Cao: có hạt thời tiết sống thật (${wAlive} >= 8)`);
+    must(wAlive <= 120, `số hạt thời tiết hợp lý (${wAlive} <= 120)`);
+    must(
+      wEm >= 1 && wEm <= 8,
+      `chỉ vài emitter ưu tiên 0 (${wEm} trong 1..8; trần ưu tiên 0 bậc Cao = 14)`,
+    );
+    ok(`bậc Cao: ${wAlive} hạt sống, ${wEm} emitter`);
+    // Hạt ĐƯỢC VẼ: so ảnh khi thời tiết chạy với ảnh sau khi tạm dừng và hết hạt (có đối chứng)
+    const diffRun = (
+      a: string,
+      b: string,
+    ) => `(() => { let n = 0; const A = window.${a}, B = window.${b};
+      for (let i = 0; i < A.length; i += 4) if (Math.abs(A[i] - B[i]) + Math.abs(A[i + 1] - B[i + 1]) + Math.abs(A[i + 2] - B[i + 2]) > 60) n++; return n; })()`;
+    const stash = (name: string) =>
+      ev(`new Promise((resolve) => { const g = window.__scene.game, w = g.canvas.width, h = g.canvas.height;
+        setTimeout(() => g.renderer.snapshotArea(0, 0, w, h, (img) => {
+          const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+          const x = c.getContext('2d'); x.drawImage(img, 0, 0); window.${name} = x.getImageData(0, 0, c.width, c.height).data; resolve(1); }), 150); })`);
+    await T.shot("map-weather-bat");
+    await stash("__wOn");
+    await ev(`window.__scene.weatherPaused = true; 1`);
+    await waitDrain();
+    await stash("__wOff1");
+    await stash("__wOff2");
+    const wControl = Number(await ev(diffRun("__wOff1", "__wOff2")));
+    const wDiff = Number(await ev(diffRun("__wOn", "__wOff1")));
+    must(
+      wControl < 300,
+      `đối chứng: hai ảnh không thời tiết chỉ khác ${wControl} điểm ảnh (< 300)`,
+    );
+    must(
+      wDiff > 400 && wDiff > wControl * 3,
+      `hạt thời tiết ĐƯỢC VẼ: ${wDiff} điểm ảnh khác ảnh không thời tiết (đối chứng ${wControl}; cần > 400 và gấp 3 lần)`,
+    );
+    ok(`hạt thời tiết được vẽ: ${wDiff} điểm ảnh khác, đối chứng ${wControl}`);
+    // Bậc Thấp: không có thời tiết
+    await setQuality("low");
+    await sleep(500);
+    await ev(`window.__scene.weatherPaused = false; 1`);
+    await T.waitFor(
+      `window.__scene.time.now > ${Number(await ev(`window.__scene.time.now`)) + 4000}`,
+      "4 s đồng hồ trò chơi",
+    );
+    must((await alive()) === 0, "bậc Thấp: không có hạt thời tiết");
+    ok("bậc Thấp: 0 hạt thời tiết");
+    // Giảm chuyển động: không có thời tiết ở bậc Cao
+    await setQuality("high");
+    await sleep(500);
+    await setCheck("set-reduced-motion", true);
+    await sleep(500);
+    await T.waitFor(
+      `window.__scene.time.now > ${Number(await ev(`window.__scene.time.now`)) + 4000}`,
+      "4 s đồng hồ trò chơi",
+    );
+    must((await alive()) === 0, "giảm chuyển động: không có hạt thời tiết");
+    ok("giảm chuyển động: 0 hạt thời tiết");
+    await setCheck("set-reduced-motion", false);
+    await ev(`window.__scene.weatherPaused = true; 1`);
+
     must(T.errors.length === 0, `0 lỗi console / exception (${T.errors.slice(0, 2).join(" | ")})`);
     ok("0 lỗi console / exception");
     out("\n=== E2E LỚP TRANG TRÍ ĐẠT ===");

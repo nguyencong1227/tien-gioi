@@ -26,6 +26,7 @@ import { getQuality, onQualityChange } from "../gfx/quality";
 import { buildDecorGrid } from "../gfx/map-decor";
 import { styleOf } from "../gfx/map-style";
 import { decorTilesetKey, ensureDecorTileset } from "../gfx/decor-tileset";
+import { planWeather, weatherEnabledByUrl } from "../gfx/map-weather";
 import {
   LIGHT_WHITE_KEY,
   VIGNETTE_KEY,
@@ -286,6 +287,12 @@ export class WorldScene extends Phaser.Scene {
   lightAmbient?: Phaser.GameObjects.Image;
   lightVignette?: Phaser.GameObjects.Image;
   private lightLayoutKey = "";
+  /**
+   * Thời tiết bằng hạt (M5.3 #332 bước 2c). Tắt khi `?debug` (trừ `?weather=1`) để các script đo hạt / điểm ảnh có cảnh sạch;
+   * e2e bật / tắt lúc chạy bằng thuộc tính này.
+   */
+  weatherPaused = false;
+  private weatherNextAt: number | undefined;
   private townVisuals: Phaser.GameObjects.GameObject[] = [];
   private portalVisuals: Phaser.GameObjects.GameObject[] = [];
   private nearPortal: PortalDef | null = null;
@@ -317,6 +324,8 @@ export class WorldScene extends Phaser.Scene {
 
     // Lõi hiệu ứng (#325): ngân sách theo hồ sơ chất lượng; đóng cảnh thì giải phóng sạch
     this.fx = createFxSystem(this, { getProfile: getQuality, depth: () => this.map.worldH });
+    this.weatherPaused =
+      typeof window !== "undefined" && !weatherEnabledByUrl(window.location.search);
     const offQuality = onQualityChange(() => this.applyLight());
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       offQuality();
@@ -470,6 +479,23 @@ export class WorldScene extends Phaser.Scene {
     this.lightLayoutKey = ""; // đặt lại kích thước ở khung kế
   }
 
+  /** Thời tiết: mỗi nhịp một lần phát phủ khung nhìn (kế hoạch thuần ở gfx/map-weather.ts; hồ sơ chất lượng quyết định tốc độ). */
+  private emitWeather(now: number) {
+    if (this.weatherPaused) return;
+    const prof = getQuality();
+    const plan = planWeather(
+      styleOf(this.map.def.id).weather,
+      prof.weather,
+      prof.reducedMotion,
+      this.cameras.main.worldView,
+      now,
+      this.weatherNextAt,
+    );
+    if (!plan) return;
+    this.weatherNextAt = plan.nextAt;
+    this.fx.play(plan.recipe, plan.x, plan.y, { area: plan.area });
+  }
+
   /** Giữ hai ảnh phủ che đủ khung nhìn khi camera đổi cỡ / thu phóng (so sánh vài con số mỗi khung, không cấp phát). */
   private layoutLight() {
     const cam = this.cameras.main;
@@ -533,6 +559,7 @@ export class WorldScene extends Phaser.Scene {
 
     // 2c. Ánh sáng môi trường + vignette theo kiểu bản đồ (hiện theo hồ sơ chất lượng)
     this.applyLight();
+    this.weatherNextAt = undefined; // đổi bản đồ: thời tiết của bản đồ mới phát ngay
 
     // 3. Dựng nhãn và vòng an toàn của trấn / trạm (nếu có trấn)
     for (const obj of this.townVisuals) obj.destroy();
@@ -2531,6 +2558,7 @@ export class WorldScene extends Phaser.Scene {
     // 3. Chữ sát thương bay lên + hạt: lõi hiệu ứng (gfx/fx; giảm chuyển động theo hồ sơ chất lượng)
     this.fx.update(now);
     this.layoutLight();
+    this.emitWeather(now);
   }
 
   /** Tin `dmg`: chữ bay + âm thanh, và đánh dấu "bị đánh" cho quái / người chơi bị trúng (hoạt ảnh bị đánh, M5.2 #328). */

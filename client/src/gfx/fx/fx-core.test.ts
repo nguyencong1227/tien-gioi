@@ -323,6 +323,60 @@ describe("gfx/fx: công thức", () => {
   });
 });
 
+describe("gfx/fx: vùng phát (zone) cho thời tiết", () => {
+  const base: FxParticles = {
+    frames: ["dot"],
+    count: 4,
+    lifespan: { min: 100, max: 200 },
+    speed: { min: 0, max: 10 },
+    scale: { start: 1, end: 0 },
+    alpha: { start: 1, end: 0 },
+  };
+  const rec = (zone?: { w: number; h: number }): FxRecipe => ({
+    id: "zone-test",
+    priority: 0,
+    particles: { ...base, zone },
+  });
+
+  it("chấp nhận vùng hợp lệ và thiếu vùng; từ chối vùng không dương / quá lớn / rác", () => {
+    expect(() => validateRecipe(rec())).not.toThrow();
+    expect(() => validateRecipe(rec({ w: 1200, h: 700 }))).not.toThrow();
+    expect(() => validateRecipe(rec({ w: 4000, h: 4000 }))).not.toThrow();
+    for (const bad of [
+      { w: 0, h: 10 },
+      { w: 10, h: -1 },
+      { w: 4001, h: 10 },
+      { w: Number.NaN, h: 10 },
+      { w: 10, h: Infinity },
+    ])
+      expect(() => validateRecipe(rec(bad)), JSON.stringify(bad)).toThrow(/zone/);
+  });
+
+  it("makeZoneSource: điểm ngẫu nhiên nằm trong hình chữ nhật căn giữa và đổi kích thước được", async () => {
+    const { makeZoneSource } = await import("./zone");
+    const z = makeZoneSource(200, 100);
+    const p = { x: 0, y: 0 };
+    let minX = Infinity,
+      maxX = -Infinity;
+    for (let i = 0; i < 2000; i++) {
+      z.getRandomPoint(p);
+      expect(Math.abs(p.x)).toBeLessThanOrEqual(100);
+      expect(Math.abs(p.y)).toBeLessThanOrEqual(50);
+      minX = Math.min(minX, p.x);
+      maxX = Math.max(maxX, p.x);
+    }
+    expect(minX).toBeLessThan(-80);
+    expect(maxX).toBeGreaterThan(80); // phủ cả bề rộng, không dồn vào một chỗ
+    z.w = 20;
+    z.h = 10;
+    for (let i = 0; i < 200; i++) {
+      z.getRandomPoint(p);
+      expect(Math.abs(p.x)).toBeLessThanOrEqual(10);
+      expect(Math.abs(p.y)).toBeLessThanOrEqual(5);
+    }
+  });
+});
+
 describe("gfx/fx: glyphUvs (UV bắt buộc cho BitmapText WebGL)", () => {
   it("chia toạ độ điểm ảnh cho kích thước texture; mọi glyph của lưới thật nằm trong [0,1]", () => {
     expect(glyphUvs({ x: 48, y: 56, width: 24, height: 56 }, 576, 1008)).toEqual({
