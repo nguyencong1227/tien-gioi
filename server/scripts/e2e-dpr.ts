@@ -290,6 +290,12 @@ async function main() {
 
     // ---------------- Ca 5: Tiết kiệm pin = ~30 FPS, đổi lúc chạy ----------------
     out("\n--- Ca 5: Tiết kiệm pin đổi giới hạn FPS lúc chạy ---");
+    // Khung NHỎ: ca này kiểm giới hạn FPS (fps.limit), không kiểm tốc độ vẽ. Chrome headless vẽ bằng phần mềm (SwiftShader): ở 1280x720
+    // bậc Cao trò chơi chỉ ~25-33 FPS (đo 12/11 17:30, cả ở commit 0c17203 lúc viết E2E này đo được 59,6), nên ngưỡng 52-70 đỏ vì máy,
+    // không vì mã. 480x270 vẽ đủ nhanh để đạt trần 60 và 30 => ngưỡng đo đúng cái cần kiểm.
+    await metrics(480, 270, 1);
+    await waitCanvas(480, 270, "khung nhỏ 480x270");
+    await sleep(500);
     const f0 = await stepRate();
     must(f0 > 52 && f0 < 70, `mặc định ~60 FPS, đo ${f0.toFixed(1)}`);
     await setCheck("set-battery-saver", true);
