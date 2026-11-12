@@ -608,9 +608,8 @@ async function main() {
     await removeTmpDirs(dataDir, chromeDir);
   }
 
-  if (failed) {
-    process.exit(1);
-  }
+  // thoát tường minh (cùng chat-luong / dpr): gracefullyShutdown(false) không còn tự thoát, và thoát mã 1 khi đỏ
+  process.exit(failed ? 1 : 0);
 }
 
 main().catch((err) => {
