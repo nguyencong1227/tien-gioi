@@ -40,6 +40,7 @@ Làm ở **cả dọc và ngang**.
    - **Nút Mục tiêu:** mờ khi không có quái trong tầm khoá (520 px); bấm khoá con gần nhất, bấm tiếp chuyển sang con xa hơn (vòng lại), vòng đánh dấu hiện trên mục tiêu; Chém xoay về con đang khoá.
    - **Đa chạm:** vừa đi (joystick / D-pad) vừa bấm Chém và Kiếm khí cùng lúc; chạm đúp / chụm hai ngón KHÔNG làm trang phóng to.
 2. **Tấm bảng** (Nhân vật, Túi, Nhiệm vụ, Bản đồ, Cài đặt, Cửa hàng, Lò rèn, **Tông môn**): mở ra toàn màn hình (dọc) hoặc ngăn kéo bên phải (ngang), cuộn mượt, nút **Đóng** ở góc dưới phải với tới bằng ngón cái; thẻ kết quả (Bí cảnh, Quyết đấu, Chỉ dẫn người mới, Phiên bản cũ nếu gặp) nằm giữa màn hình.
+   - **Kéo để đóng:** vuốt TIÊU ĐỀ tấm xuống (dọc) / sang phải (ngang): tấm đi theo ngón tay; thả sớm thì trượt về, kéo qua khoảng 1/3 hoặc vuốt nhanh thì đóng. Vuốt ở thân tấm chỉ cuộn nội dung, không đóng. Có thanh nắm nhỏ ở mép tiêu đề. Bật Giảm chuyển động thì đóng ngay, không trượt.
    - **Tông môn:** cuộn danh sách thành viên rồi bấm Nhường / Trục xuất / Rời: hộp xác nhận phủ kín tấm (không trôi ra ngoài màn hình dù đã cuộn).
    - **Hộp thoại NPC** (dock đáy màn hình): không che nút Chém, chạm để hiện hết chữ, các lựa chọn bấm được.
 3. **Chữ:** nội dung bảng đọc được không phải nheo mắt (≥ 14 px); thử **Cài đặt -> Cỡ chữ** Nhỏ / Vừa / Lớn, rồi **xoay máy** (cỡ đã chọn phải được giữ).
