@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AMBIENT_SHARE, FxBudget, OWN_OVERSHOOT, type FxCost } from "./budget";
 import { FLOAT_MS, FLOAT_MS_REDUCED, FloatSet, type FloatHooks, type FloatSpec } from "./float-set";
-import { FX_CHARS, layoutGlyphGrid, missingGlyphs } from "./glyphs";
+import { FX_CHARS, glyphUvs, layoutGlyphGrid, missingGlyphs } from "./glyphs";
 import {
   FX_FRAMES,
   getRecipe,
@@ -320,5 +320,27 @@ describe("gfx/fx: công thức", () => {
     registerRecipe({ ...ok, id: "test-register" });
     expect(() => registerRecipe({ ...ok, id: "test-register" })).toThrow(/trùng/);
     expect(FX_FRAMES).toEqual(["dot", "spark", "ring", "smoke", "petal", "ember"]);
+  });
+});
+
+describe("gfx/fx: glyphUvs (UV bắt buộc cho BitmapText WebGL)", () => {
+  it("chia toạ độ điểm ảnh cho kích thước texture; mọi glyph của lưới thật nằm trong [0,1]", () => {
+    expect(glyphUvs({ x: 48, y: 56, width: 24, height: 56 }, 576, 1008)).toEqual({
+      u0: 48 / 576,
+      v0: 56 / 1008,
+      u1: 72 / 576,
+      v1: 112 / 1008,
+    });
+    const grid = layoutGlyphGrid(FX_CHARS, 48, 56, 12);
+    for (const c of grid.cells) {
+      const uv = glyphUvs({ x: c.x, y: c.y, width: 48, height: 56 }, grid.width, grid.height);
+      for (const v of [uv.u0, uv.v0, uv.u1, uv.v1]) {
+        expect(Number.isFinite(v)).toBe(true);
+        expect(v).toBeGreaterThanOrEqual(0);
+        expect(v).toBeLessThanOrEqual(1);
+      }
+      expect(uv.u1).toBeGreaterThan(uv.u0);
+      expect(uv.v1).toBeGreaterThan(uv.v0);
+    }
   });
 });
