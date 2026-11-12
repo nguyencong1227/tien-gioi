@@ -124,13 +124,17 @@ export async function runTool(argv: string[], deps: ToolDeps): Promise<ToolResul
   )
     return fail(1, "Sai số tham số.", ...USAGE);
 
-  // Chỉ lệnh GHI cần server tắt; list / show và xoa ở chế độ chạy thử chỉ đọc nên vẫn chạy được
+  // Chỉ lệnh GHI cần server tắt; list / show và xoa ở chế độ chạy thử chỉ đọc nên vẫn chạy được.
+  // Riêng lệnh xoa thật (--yes): BẮT BUỘC server phải tắt ở cả hai kho (file và pg) để tránh nhân vật trong RAM sống lại.
   const writes = !["list", "show"].includes(command) && (command !== "xoa" || isConfirmed);
-  if (writes && !force && (deps.serverMustBeOff ?? true) && (await deps.isServerUp()))
+  const mustBeOff = command === "xoa" && isConfirmed ? true : (deps.serverMustBeOff ?? true);
+  if (writes && !force && mustBeOff && (await deps.isServerUp()))
     return fail(
       2,
       "Server đang chạy (trả lời ở /health): hãy TẮT server rồi chạy lại.",
-      "Bản file giữ chỉ mục tài khoản trong bộ nhớ của server; sửa tệp lúc đó sẽ bị server ghi đè.",
+      command === "xoa"
+        ? "Xoá khi server đang chạy có thể làm dữ liệu nhân vật trong bộ nhớ sống lại ở lần lưu kế tiếp."
+        : "Bản file giữ chỉ mục tài khoản trong bộ nhớ của server; sửa tệp lúc đó sẽ bị server ghi đè.",
       "Chỉ dùng --force khi chắc chắn không có server nào dùng thư mục dữ liệu này.",
     );
 
@@ -358,10 +362,21 @@ async function main() {
   // Cùng cách server nạp cấu hình dev: .env.local ở gốc repo (PORT, STORE, DATABASE_URL...)
   const envFile = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../.env.local");
   if (existsSync(envFile)) process.loadEnvFile(envFile);
-  assertNotProd(process.env.DATA_DIR, "tai-khoan");
-  assertNotProd(process.env.DATABASE_URL, "tai-khoan");
-  const port = Number(process.env.PORT ?? 2587);
-  assertNotProd(port, "tai-khoan");
+
+  // Hàng rào bảo vệ (Issue #299, #321): Bỏ qua KHI VÀ CHỈ KHI TIEN_GIOI_PROD === "1"
+  if (process.env.TIEN_GIOI_PROD !== "1") {
+    try {
+      assertNotProd(process.env.DATA_DIR, "tai-khoan");
+      assertNotProd(process.env.DATABASE_URL, "tai-khoan");
+      const port = Number(process.env.PORT ?? 2587);
+      assertNotProd(port, "tai-khoan");
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : String(err));
+      process.exit(1);
+    }
+  }
+
+  const port = Number(process.env.PORT ?? (process.env.TIEN_GIOI_PROD === "1" ? 2567 : 2587));
   startAudit(process.env);
   let code = 1;
   let stores: Awaited<ReturnType<typeof createStores>> | undefined;

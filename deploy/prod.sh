@@ -416,6 +416,53 @@ cmd_stop() {
 }
 
 # ------------------------------------------------------------------------------
+# Lệnh xoa-tai-khoan: xoá vĩnh viễn dữ liệu tài khoản người chơi (Issue #317, #321)
+# ------------------------------------------------------------------------------
+cmd_xoa_tai_khoan() {
+  local username="${1:-}"
+  local confirm="${2:-}"
+
+  if [[ -z "$username" ]]; then
+    echo "[LỖI] Thiếu tên đăng nhập cần xoá." >&2
+    echo "  Cách dùng: $0 xoa-tai-khoan <tên-đăng-nhập> [--yes]" >&2
+    exit 1
+  fi
+
+  # Kiểm tra tên bằng regex ^[a-z0-9_]{3,20}$ TRƯỚC mọi lệnh Docker (chống chèn shell)
+  if [[ ! "$username" =~ ^[a-z0-9_]{3,20}$ ]]; then
+    echo "[LỖI] Tên đăng nhập '$username' không hợp lệ (chỉ gồm a-z, 0-9, _, độ dài 3-20 ký tự)." >&2
+    exit 1
+  fi
+
+  if [[ "$confirm" != "--yes" ]]; then
+    echo "==> Chạy thử kiểm tra xoá tài khoản: $username (chưa thay đổi gì trên hệ thống)..."
+    compose_cmd run --rm --no-deps game node --import tsx scripts/tai-khoan.ts xoa "$username"
+    return $?
+  fi
+
+  echo "==> Tiến hành xoá THẬT tài khoản: $username"
+  echo "  1. Tự động sao lưu cơ sở dữ liệu trước khi xoá..."
+  cmd_backup
+
+  echo "  2. Tạm dừng dịch vụ game để đảm bảo an toàn..."
+  compose_cmd stop game
+
+  echo "  3. Chạy công cụ xoá tài khoản trong container dùng một lần..."
+  local rc=0
+  compose_cmd run --rm --no-deps game node --import tsx scripts/tai-khoan.ts xoa "$username" --yes || rc=$?
+
+  echo "  4. Khởi động lại dịch vụ game..."
+  compose_cmd up -d game >/dev/null
+
+  if [[ "$rc" -ne 0 ]]; then
+    echo "[LỖI] Thao tác xoá tài khoản thất bại (mã thoát: $rc)." >&2
+    exit "$rc"
+  fi
+
+  echo "==> Xoá tài khoản $username hoàn tất!"
+}
+
+# ------------------------------------------------------------------------------
 # Điều phối lệnh chính
 # ------------------------------------------------------------------------------
 usage() {
@@ -432,6 +479,7 @@ Các lệnh:
   restore <tệp>     Khôi phục cơ sở dữ liệu từ tệp sao lưu (.sql.gz)
   rollback          Quay lại phiên bản trước đó (được ghi trong .last-tag)
   smoke             Kiểm tra sức khoẻ server chạy thật (health, metrics, tắt êm < 25s)
+  xoa-tai-khoan <tên> [--yes] Xoá tài khoản người chơi (tự sao lưu + tắt game khi có --yes)
 EOF
 }
 
@@ -448,6 +496,7 @@ case "$action" in
   restore)  cmd_restore "$@" ;;
   rollback) cmd_rollback "$@" ;;
   smoke)    cmd_smoke "$@" ;;
+  xoa-tai-khoan) cmd_xoa_tai_khoan "$@" ;;
   -h|--help|help|"") usage ;;
   *)
     echo "[LỖI] Lệnh không hợp lệ: $action" >&2
