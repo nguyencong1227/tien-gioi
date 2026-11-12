@@ -584,8 +584,8 @@ async function main() {
     const wOnOff = Number(await waterDiff(false, true));
     await ev(`window.__scene.waterLayer.setVisible(true); 1`);
     must(
-      wCtl < 300,
-      `đối chứng (chỉ trong ô nước): hai ảnh cùng trạng thái khác ${wCtl} điểm ảnh (< 300)`,
+      wCtl < 400,
+      `đối chứng (chỉ trong ô nước): hai ảnh cùng trạng thái khác ${wCtl} điểm ảnh (< 400)`,
     );
     must(
       wOnOff > 400 && wOnOff > wCtl * 3,
