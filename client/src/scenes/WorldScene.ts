@@ -1,8 +1,20 @@
 import { getDisplay } from "../gfx/display";
 import { createFxSystem, type FxSystem } from "../gfx/fx/fx";
+import { motePriority, nextMoteAt, planBreakFail, planLevelUp } from "../gfx/fx/cultivation-fx";
+import {
+  PORTAL_SWIRL_INTERVAL_MS,
+  glintIntervalMs,
+  lootGlints,
+  nextDueAt,
+  planLootDrop,
+  planLootPickup,
+  portalSwirlPoints,
+  rarityTint,
+} from "../gfx/fx/world-fx";
 import {
   healAmount,
   healNumber,
+  isMonsterDeath,
   isMyHit,
   planHitFx,
   planHitNumber,
@@ -134,6 +146,8 @@ interface Entity {
   /** Hoạt ảnh người chơi (M5.2 #328 phần 2): cờ bị đánh và trạng thái đang phát. */
   playerAnim?: PlayerAnimClock;
   playerAnimState?: PlayerAnimState;
+  /** Mốc phát đốm sáng thiền định kế tiếp (ms, đồng hồ cảnh; M5.2 #329). */
+  nextMoteAt?: number;
 }
 
 interface SlashFxItem {
@@ -157,6 +171,8 @@ interface LootEntity {
   label: Phaser.GameObjects.Text;
   itemId: string;
   qty: number;
+  /** Mốc lấp lánh kế tiếp (ms, đồng hồ cảnh) cho đồ từ lam trở lên (M5.2 #329). */
+  nextGlintAt?: number;
 }
 
 interface NpcEntity {
@@ -177,6 +193,11 @@ export class WorldScene extends Phaser.Scene {
   private players = new Map<string, Entity>();
   private monsters = new Map<string, Entity>();
   private loots = new Map<string, LootEntity>();
+  /** Chưa phát hiệu ứng "đồ xuất hiện" trước mốc này (vào phòng / đổi bản đồ: đồ có sẵn không nổ hạt cùng lúc). */
+  private lootFxFrom = 0;
+  /** Lần nhặt gần nhất của chính mình: đồ biến mất ngay sau đó thì mới nổ hiệu ứng nhặt. */
+  private lastPickup: { id: string; at: number } | null = null;
+  private portalFxAt = new Map<string, number>();
   private npcs = new Map<string, NpcEntity>();
   private keys!: Record<string, Phaser.Input.Keyboard.Key>;
 
@@ -930,6 +951,7 @@ export class WorldScene extends Phaser.Scene {
     if (this.isReconnecting || ui.isLimboOpen()) return;
     const me = this.me();
     if (!me || me.dead || !this.nearestLootId) return;
+    this.lastPickup = { id: this.nearestLootId, at: this.time.now };
     this.room.send("pickup", { lootId: this.nearestLootId });
   }
 
@@ -1031,6 +1053,8 @@ export class WorldScene extends Phaser.Scene {
     this.activeSwords.length = 0;
 
     this.fx.clear();
+    this.lootFxFrom = this.time.now + 1500;
+    this.portalFxAt.clear();
 
     this.nearestLootId = null;
     this.closestNpcId = null;
@@ -1325,6 +1349,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private syncPortals() {
+    this.emitPortalSwirls();
     const near = this.map.portalNear(this.predX, this.predY);
     if (near) {
       this.nearPortal = near;
@@ -1334,6 +1359,25 @@ export class WorldScene extends Phaser.Scene {
         this.nearPortal = null;
         ui.portalPrompt(null);
       }
+    }
+  }
+
+  /** Cổng truyền tống xoáy: đốm sáng tím trôi lên từ hai điểm quay quanh cổng (ngân sách hiệu ứng, ưu tiên 0). */
+  private emitPortalSwirls() {
+    if (ui.isLowFx()) return;
+    const now = this.time.now;
+    for (const p of this.map.portals) {
+      if (!this.inView(p.x, p.y, 48)) continue;
+      const due = nextDueAt(
+        this.portalFxAt.get(p.id),
+        now,
+        PORTAL_SWIRL_INTERVAL_MS,
+        120,
+        Math.random(),
+      );
+      if (due === null) continue;
+      this.portalFxAt.set(p.id, due);
+      for (const pt of portalSwirlPoints(p.x, p.y, now)) this.fx.play("portal-swirl", pt.x, pt.y);
     }
   }
 
@@ -2071,6 +2115,13 @@ export class WorldScene extends Phaser.Scene {
       if (showAura) {
         const s = 1 + 0.25 * this.auraWave;
         e.aura!.setScale(s, s).setAlpha(0.25 + 0.25 * this.auraWave);
+        // Đốm sáng trôi lên theo ngân sách hiệu ứng (đông người đả tọa thì tự bị bỏ bớt, ưu tiên 0)
+        const nextAt = nextMoteAt(e.nextMoteAt, this.time.now, Math.random());
+        if (nextAt !== null) {
+          e.nextMoteAt = nextAt;
+          if (this.inView(e.root.x, e.root.y, 32))
+            this.fx.play("meditate-mote", e.root.x, e.root.y - 6, { priority: motePriority(isMe) });
+        }
       }
       if (e.talismanRing) {
         const showTalisman = Boolean(p.talisman && ITEM_BY_ID[p.talisman] && !lowFx);
@@ -2164,7 +2215,9 @@ export class WorldScene extends Phaser.Scene {
       if (seen.has(id)) continue;
       if (e.root.visible) {
         // Quái biến khỏi state khi đang hiện trong màn hình = gục: tan thành điểm sáng (ngoài camera thì root ẩn, không vào đây)
-        this.fx.play("mon-vanish", e.root.x, e.root.y - 8);
+        // Chỉ khi còn gần mình: quái rời vùng nhìn của server (xa hơn 1100 px) cũng biến khỏi state nhưng KHÔNG gục
+        if (isMonsterDeath(Math.hypot(e.root.x - this.predX, e.root.y - this.predY)))
+          this.fx.play("mon-vanish", e.root.x, e.root.y - 8);
         const dieKey = e.monKind ? monAnimKey(e.monKind, "die") : "";
         if (dieKey && e.monAnim && !animReducedMotion() && this.anims.exists(dieKey)) {
           // Gục: 4 khung (đổ bẹp, tan thành điểm sáng) rồi mờ dần; thanh máu ẩn ngay
@@ -2210,6 +2263,8 @@ export class WorldScene extends Phaser.Scene {
       ui.pickupPrompt(null);
       return;
     }
+    // Lần đồng bộ đầu tiên: đồ có sẵn trong vùng nhìn không nổ hạt "xuất hiện" cùng lúc
+    if (this.lootFxFrom === 0) this.lootFxFrom = this.time.now + 1000;
     const seen = this.seenIds;
     seen.clear();
     let bestId: string | null = null;
@@ -2246,6 +2301,11 @@ export class WorldScene extends Phaser.Scene {
         root.add([ring, icon, label]);
         le = { root, ring, icon, label, itemId: l.itemId, qty: 0 };
         this.loots.set(id, le);
+        if (this.time.now >= this.lootFxFrom && this.inView(l.x, l.y, 48)) {
+          // Đồ xuất hiện: hạt màu theo độ hiếm (gfx/fx/world-fx.ts)
+          const plan = planLootDrop(def?.rarity);
+          this.fx.play(plan.recipe, l.x, l.y - 4, { priority: plan.priority, tint: plan.tint });
+        }
       }
 
       const ownerPlayer = l.owner ? this.state.players.get(l.owner) : null;
@@ -2274,6 +2334,21 @@ export class WorldScene extends Phaser.Scene {
         le.ring.setScale(s, s).setAlpha(0.18 + 0.17 * this.lootWave);
       }
       le.icon.y = -3 - 3 * this.lootWave;
+      if (!lowFx && def && lootGlints(def.rarity)) {
+        const due = nextDueAt(
+          le.nextGlintAt,
+          this.time.now,
+          glintIntervalMs(def.rarity),
+          400,
+          Math.random(),
+        );
+        if (due !== null) {
+          le.nextGlintAt = due;
+          this.fx.play("loot-glint", l.x + Phaser.Math.Between(-9, 9), l.y - 6, {
+            tint: rarityTint(def.rarity),
+          });
+        }
+      }
       if (le.qty !== l.qty) {
         le.qty = l.qty;
         const name = def?.name ?? l.itemId;
@@ -2285,6 +2360,15 @@ export class WorldScene extends Phaser.Scene {
 
     for (const [id, le] of this.loots) {
       if (seen.has(id)) continue;
+      if (this.lastPickup?.id === id && this.time.now - this.lastPickup.at < 1200) {
+        // Mình vừa nhặt món này: đốm màu độ hiếm bay lên
+        const plan = planLootPickup(ITEM_BY_ID[le.itemId]?.rarity);
+        this.fx.play(plan.recipe, le.root.x, le.root.y - 4, {
+          priority: plan.priority,
+          tint: plan.tint,
+        });
+        this.lastPickup = null;
+      }
       le.root.destroy();
       this.loots.delete(id);
     }
@@ -2425,7 +2509,7 @@ export class WorldScene extends Phaser.Scene {
         return this.fxLevelUp(m.x, m.y, m.major, m.by === this.sid);
       case "breakfail":
         if (!this.inView(m.x, m.y, 120)) return;
-        return this.fxBreakFail(m.x, m.y);
+        return this.fxBreakFail(m.x, m.y, m.by === this.sid);
     }
   }
 
@@ -2472,24 +2556,11 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private fxLevelUp(x: number, y: number, major: boolean, mine: boolean) {
-    const color = major ? 0xffd34d : 0xbfe8ff;
     if (mine) sound.levelup(major);
     if (mine || this.inView(x, y, 160)) {
-      const rings = ui.isLowFx() ? 1 : major ? 3 : 1;
-      for (let i = 0; i < rings; i++) {
-        const ring = this.add
-          .circle(x, y, 16, color, 0)
-          .setStrokeStyle(3, color, 0.9)
-          .setDepth(this.map.worldH);
-        this.tweens.add({
-          targets: ring,
-          scale: major ? 7 : 4,
-          alpha: 0,
-          delay: i * 180,
-          duration: 700,
-          onComplete: () => ring.destroy(),
-        });
-      }
+      // Công thức dữ liệu (gfx/fx/recipes-cultivation.ts): vòng sóng + hạt sáng; đột phá thêm cột sáng + chớp nhẹ (chỉ của mình)
+      const plan = planLevelUp(major, mine);
+      for (const id of plan.recipes) this.fx.play(id, x, y - 8, { priority: plan.priority });
     }
     if (mine) {
       const me = this.me();
@@ -2502,16 +2573,10 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  private fxBreakFail(x: number, y: number) {
+  private fxBreakFail(x: number, y: number, mine: boolean) {
     sound.breakfail();
-    const puff = this.add.circle(x, y - 10, 20, 0x4a2a5a, 0.6).setDepth(this.map.worldH);
-    this.tweens.add({
-      targets: puff,
-      scale: 3,
-      alpha: 0,
-      duration: 800,
-      onComplete: () => puff.destroy(),
-    });
+    const plan = planBreakFail(mine);
+    for (const id of plan.recipes) this.fx.play(id, x, y - 10, { priority: plan.priority });
   }
 
   /** Trúng đòn: hạt + chữ bay theo kế hoạch thuần `gfx/fx/combat-fx.ts` (không nhánh `if` theo loại hiệu ứng ở đây). */
