@@ -270,10 +270,13 @@ try {
         const b = e.getBoundingClientRect();
         const x0 = Math.max(b.left, z.left), x1 = Math.min(b.right, z.right), y0 = Math.max(b.top, z.top), y1 = Math.min(b.bottom, z.bottom);
         if (x1 - x0 < 24 || y1 - y0 < 24) continue;
-        // điểm trong giao mà KHÔNG nằm trên nút / mục tương tác
+        // điểm trong giao mà KHÔNG nằm trên nút / mục tương tác VÀ cách mọi nút >= 22 px: Chrome "điều chỉnh chạm" (touch adjustment) kéo
+        // chạm trong vài chục px quanh một phần tử bấm được về phần tử đó, nên điểm sát nút thật sự thuộc nút dù elementFromPoint báo vùng joystick
+        const inter = "button, .qt-item, a, input, select, textarea, [role=button]";
+        const free = (x, y) => { const el = document.elementFromPoint(x, y); return Boolean(el) && !el.closest(inter); };
+        const ring = [[22, 0], [-22, 0], [0, 22], [0, -22], [16, 16], [-16, 16], [16, -16], [-16, -16]];
         for (let y = y0 + 6; y < y1 - 6; y += 6) for (let x = x0 + 6; x < x1 - 6; x += 6) {
-          const el = document.elementFromPoint(x, y);
-          if (el && !el.closest("button, .qt-item, a, input, select, textarea, [role=button]")) return { id, x: Math.round(x), y: Math.round(y) };
+          if (free(x, y) && ring.every(([dx, dy]) => free(x + dx, y + dy))) return { id, x: Math.round(x), y: Math.round(y) };
         }
       }
       return null;
