@@ -48,6 +48,7 @@ npm run build        # build client vào client/dist
 - Test:
   - `shared/**/*.test.ts`, `server/src/systems/*.test.ts`: test đơn vị với `World` giả (dựng bằng `server/src/systems/test-helpers.ts`).
   - `server/src/rooms/WorldRoom.test.ts`: test tích hợp với server Colyseus thật.
+  - Test cần server Colyseus thật lấy cổng bằng `freePort()` (`server/src/test-port.ts`), KHÔNG tự chọn `BASE + Math.random()`: các tệp vitest chạy song song, cổng ngẫu nhiên chồng nhau hoặc trùng dải cổng tạm của Linux gây `EADDRINUSE` làm đỏ CI không do mã (#376).
   - Tính năng server mới cần có test.
 - `client/src/scenes/WorldScene.ts`: vẽ, input, đoán trước di chuyển. `ui.ts` là HUD DOM, `textures.ts` là ảnh tạm vẽ bằng code.
 - **Không import hằng / hàm bản đồ toàn cục** (`TOWN_PX`, `WORLD_W`, `MAP_TILES`, `tileAt`, `moveWithCollision`, `inTown`, `dangerAt`...) trong `server/` và `client/`: server đọc `world.map`, client đọc `scene.map` (`GameMap`). Các tên cũ chỉ còn trong `shared/` để giữ tương thích; `server/scripts/no-global-map-imports.test.ts` đỏ nếu ai import lại (kể cả `import * as`, `export ... from`, đường dẫn tương đối). Cần số đo của bản đồ (kích thước, trấn, độ nguy hiểm) thì thêm vào `GameMap`, không chép công thức ở nơi dùng.

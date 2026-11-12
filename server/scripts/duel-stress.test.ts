@@ -35,7 +35,10 @@ import type { WorldRoom } from "../src/rooms/WorldRoom";
 import type { WorldState } from "../src/schema";
 import { auditSavesDirectory } from "./audit-saves";
 
-const PORT = 48500 + Math.floor(Math.random() * 2500);
+import { freePort } from "../src/test-port";
+
+// cổng do hệ điều hành cấp ở beforeAll (`freePort`): cổng ngẫu nhiên trong khoảng chồng nhau từng gây EADDRINUSE giữa các tệp chạy song song
+let PORT = 0;
 let server: Server;
 let WorldRoomClass: typeof WorldRoom;
 const rooms: Room[] = [];
@@ -46,6 +49,7 @@ beforeAll(async () => {
   WorldRoomClass.reconnectGraceS = 5;
   server = new Server({ transport: new WebSocketTransport(), gracefullyShutdown: false });
   defineRooms(server);
+  PORT = await freePort();
   await server.listen(PORT);
 });
 

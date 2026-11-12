@@ -20,6 +20,7 @@ import { defineRooms, WorldRoom } from "../src/rooms/WorldRoom";
 import { makeWorld, addPlayer } from "../src/systems/test-helpers";
 import { tickWorld } from "../src/systems/tick";
 import { authBotAccount, runLoginStorm } from "./bots";
+import { freePort } from "../src/test-port";
 
 const rootDir = mkdtempSync(path.join(tmpdir(), "tien-gioi-bots-acc-"));
 afterAll(() => rmSync(rootDir, { recursive: true, force: true }));
@@ -73,7 +74,7 @@ describe("Bot thử tải chế độ tài khoản (--account) & Login Storm (Is
     });
     WorldRoom.auth = auth;
 
-    port = 41000 + Math.floor(Math.random() * 3000);
+    port = await freePort();
     const httpServer = http.createServer(app);
     gameServer = new Server({
       transport: new WebSocketTransport({ server: httpServer }),

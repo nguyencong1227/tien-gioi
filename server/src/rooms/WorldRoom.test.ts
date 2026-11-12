@@ -49,7 +49,10 @@ import type { WorldRoom } from "./WorldRoom";
 import type { WorldState } from "../schema";
 
 const dataDir = mkdtempSync(path.join(tmpdir(), "tien-gioi-test-"));
-const PORT = 41000 + Math.floor(Math.random() * 5000);
+import { freePort } from "../test-port";
+
+// cổng do hệ điều hành cấp ở beforeAll (`freePort`): cổng ngẫu nhiên trong khoảng chồng nhau từng gây EADDRINUSE giữa các tệp chạy song song
+let PORT = 0;
 let server: Server;
 let WorldRoomClass: typeof WorldRoom;
 let defaultGraceS = 20;
@@ -62,6 +65,7 @@ beforeAll(async () => {
   defaultGraceS = WorldRoom.reconnectGraceS;
   server = new Server({ transport: new WebSocketTransport(), gracefullyShutdown: false });
   defineRooms(server);
+  PORT = await freePort();
   await server.listen(PORT);
 });
 
