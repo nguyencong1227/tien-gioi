@@ -171,7 +171,7 @@ export function calculateStaticTextureMemory(assetsDir) {
 
   scanPngs(assetsDir);
 
-  // 2. Texture sinh bằng mã lúc chạy (từ gfx/fx và gfx/decor-tileset: fx-font 576x1008, fx-atlas 192x32, decor-tileset 320x32, light-vignette 128x128, light-white 4x4)
+  // 2. Texture sinh bằng mã lúc chạy (từ gfx/fx và gfx/decor-tileset: fx-font 576x1008, fx-atlas 192x32, decor-tileset 320x32, light-vignette 128x128, light-white 4x4, blob-shadow 64x28)
   const codeGenerated = [
     { name: "fx-font (sinh bằng mã)", width: 576, height: 1008 },
     { name: "fx-atlas (sinh bằng mã)", width: 192, height: 32 },
@@ -179,6 +179,7 @@ export function calculateStaticTextureMemory(assetsDir) {
     { name: "light-vignette (sinh bằng mã)", width: 128, height: 128 },
     { name: "light-white (sinh bằng mã)", width: 4, height: 4 },
     { name: "fog-blob (sinh bằng mã)", width: 128, height: 128 },
+    { name: "blob-shadow (sinh bằng mã)", width: 64, height: 28 },
   ];
 
   for (const gen of codeGenerated) {

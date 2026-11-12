@@ -140,6 +140,16 @@ import {
   type MonAnimState,
 } from "../gfx/anim/mon-anim";
 import {
+  SHADOW_ALPHA,
+  SHADOW_KEY,
+  animUpdateDue,
+  ensureShadowTexture,
+  labelVisible,
+  monsterShadow,
+  playerShadow,
+  type ShadowDims,
+} from "../gfx/anim/entity-lod";
+import {
   animReducedMotion,
   markPlayerHurt,
   newPlayerAnimClock,
@@ -173,6 +183,11 @@ interface Entity {
   playerAnimState?: PlayerAnimState;
   /** Mốc phát đốm sáng thiền định kế tiếp (ms, đồng hồ cảnh; M5.2 #329). */
   nextMoteAt?: number;
+  /** Lần cập nhật trạng thái hoạt ảnh gần nhất (ms): thực thể ở xa chỉ cập nhật theo `farAnimHz` (M5.2 #328 2b). */
+  lastAnimAt?: number;
+  /** Bóng đốm dưới chân (hiện theo `blobShadows` của hồ sơ chất lượng) và trạng thái đã áp dụng. */
+  shadow?: Phaser.GameObjects.Image;
+  shadowOn?: boolean;
 }
 
 interface SlashFxItem {
@@ -349,6 +364,7 @@ export class WorldScene extends Phaser.Scene {
 
     // Lõi hiệu ứng (#325): ngân sách theo hồ sơ chất lượng; đóng cảnh thì giải phóng sạch
     this.fx = createFxSystem(this, { getProfile: getQuality, depth: () => this.map.worldH });
+    ensureShadowTexture(this);
     this.weatherPaused =
       typeof window !== "undefined" && !weatherEnabledByUrl(window.location.search);
     this.fogPaused =
@@ -2253,13 +2269,14 @@ export class WorldScene extends Phaser.Scene {
         if (!e.root.visible) e.root.setVisible(true);
         if (e.sprite.anims.isPaused) e.sprite.anims.resume();
         this.applyPlayerEquip(e, p, false);
-        this.updatePlayerAnim(
-          e,
-          who,
-          p.angle,
-          dist > 1.5 && !p.dead && !p.meditating,
-          Boolean(p.dead),
-        );
+        if (this.animDue(e))
+          this.updatePlayerAnim(
+            e,
+            who,
+            p.angle,
+            dist > 1.5 && !p.dead && !p.meditating,
+            Boolean(p.dead),
+          );
 
         // Xác người khác nằm ~5 giây rồi mờ dần và ẩn (#150)
         if (p.dead) {
@@ -2303,7 +2320,8 @@ export class WorldScene extends Phaser.Scene {
         }
       }
       const distToMe = isMe ? 0 : Math.hypot(e.root.x - this.predX, e.root.y - this.predY);
-      const showLabel = isMe || (!hideNames && distToMe <= 450);
+      const showLabel = labelVisible(isMe, hideNames, distToMe, getQuality().nameLabelRadius);
+      this.syncShadow(e);
       e.label!.setVisible(showLabel);
       if (showLabel) {
         const isDuel = Boolean((p as any).duel);
@@ -2342,7 +2360,7 @@ export class WorldScene extends Phaser.Scene {
       let e = this.monsters.get(id);
       const def = MONSTER_BY_ID[m.kind];
       if (!e) {
-        e = this.makeEntity(`mon-${m.kind}`, m.x, m.y, false);
+        e = this.makeEntity(`mon-${m.kind}`, m.x, m.y, false, monsterShadow(def.radius));
         e.monKind = m.kind;
         e.monAnim = newMonAnimClock();
         if (def.boss) {
@@ -2370,7 +2388,8 @@ export class WorldScene extends Phaser.Scene {
       }
       if (!e.root.visible) e.root.setVisible(true);
       if (e.sprite.anims.isPaused) e.sprite.anims.resume();
-      this.updateMonsterAnim(e);
+      if (this.animDue(e)) this.updateMonsterAnim(e);
+      this.syncShadow(e);
       e.root.setDepth(e.root.y);
       e.sprite.setFlipX(Math.cos(m.angle) < 0);
       this.drawBar(
@@ -2548,7 +2567,30 @@ export class WorldScene extends Phaser.Scene {
     ui.pickupPrompt(bestLabel);
   }
 
-  private makeEntity(texture: string, x: number, y: number, isPlayer: boolean): Entity {
+  /** Áp cờ `blobShadows` của hồ sơ chất lượng cho bóng của thực thể (chỉ chạm tới đối tượng khi cờ đổi). */
+  private syncShadow(e: Entity) {
+    const on = getQuality().blobShadows;
+    if (e.shadowOn === on) return;
+    e.shadowOn = on;
+    e.shadow?.setVisible(on);
+  }
+
+  /** Thực thể ở xa (không phải mình) chỉ cập nhật trạng thái hoạt ảnh theo `farAnimHz` (gfx/anim/entity-lod.ts). */
+  private animDue(e: Entity): boolean {
+    const dme = Math.hypot(e.root.x - this.predX, e.root.y - this.predY);
+    const now = this.time.now;
+    if (!animUpdateDue(now, e.lastAnimAt ?? -1e9, dme, getQuality().farAnimHz)) return false;
+    e.lastAnimAt = now;
+    return true;
+  }
+
+  private makeEntity(
+    texture: string,
+    x: number,
+    y: number,
+    isPlayer: boolean,
+    shadowDims: ShadowDims = playerShadow(),
+  ): Entity {
     const root = this.add.container(x, y);
     const hasAtlas = this.textures.exists(ATLAS_KEY) && this.textures.get(ATLAS_KEY).has(texture);
     const sprite = hasAtlas
@@ -2556,6 +2598,12 @@ export class WorldScene extends Phaser.Scene {
       : this.add.sprite(0, isPlayer ? -12 : 0, texture);
     const bar = this.add.graphics();
     const e: Entity = { root, sprite, bar, tx: x, ty: y };
+    // Bóng đốm dưới chân, vẽ DƯỚI mọi thứ khác của thực thể; hiện / ẩn theo hồ sơ chất lượng (syncShadow)
+    e.shadow = this.add
+      .image(0, shadowDims.y, SHADOW_KEY)
+      .setDisplaySize(shadowDims.w, shadowDims.h)
+      .setAlpha(SHADOW_ALPHA)
+      .setVisible(false);
     if (isPlayer) {
       e.aura = this.add
         .ellipse(0, 6, 54, 22, 0xffe08a, 0.25)
@@ -2577,9 +2625,9 @@ export class WorldScene extends Phaser.Scene {
           lineSpacing: -2,
         })
         .setOrigin(0.5, 1);
-      root.add([e.aura, e.talismanRing, e.weaponVisual, sprite, bar, e.label]);
+      root.add([e.shadow, e.aura, e.talismanRing, e.weaponVisual, sprite, bar, e.label]);
     } else {
-      root.add([sprite, bar]);
+      root.add([e.shadow, sprite, bar]);
     }
     return e;
   }
