@@ -8,7 +8,7 @@
 //   npm run e2e -w server -- --scenario=limbo
 import { spawn, execSync, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
@@ -19,6 +19,7 @@ import { WebSocketTransport } from "@colyseus/ws-transport";
 import { type SavedPlayer } from "../src/store.js";
 import { DEFAULT_MAP_ID, type Soul } from "@tien-gioi/shared";
 import { assertNotProd } from "./assert-not-prod.js";
+import { killChrome, removeTmpDirs } from "./e2e-kit.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
@@ -208,7 +209,7 @@ async function runE2e() {
         "--window-size=1280,720",
         "about:blank",
       ],
-      { stdio: "ignore" },
+      { stdio: "ignore", detached: true },
     );
 
     // Không có Chrome (ENOENT) thì `spawn` phát sự kiện `error` bất đồng bộ: không bắt thì cả tiến trình sập, bỏ lại thư mục tạm
@@ -492,13 +493,7 @@ async function runE2e() {
     } catch {
       /* bỏ qua lỗi đóng cdp */
     }
-    if (chromeProcess) {
-      try {
-        chromeProcess.kill("SIGKILL");
-      } catch {
-        /* bỏ qua lỗi kill chrome */
-      }
-    }
+    killChrome(chromeProcess); // cả nhóm tiến trình (Chrome detached), không chỉ tiến trình gốc
     await new Promise<void>((resolve) =>
       gameServer
         .gracefullyShutdown(false) // false: không process.exit, giữ process.exitCode = 1 khi thất bại
@@ -508,12 +503,7 @@ async function runE2e() {
     );
     await new Promise<void>((resolve) => httpServer.close(() => resolve()));
 
-    try {
-      rmSync(tmpDataDir, { recursive: true, force: true });
-      rmSync(tmpChromeDir, { recursive: true, force: true });
-    } catch {
-      /* bỏ qua lỗi dọn file tạm */
-    }
+    await removeTmpDirs(tmpDataDir, tmpChromeDir); // chờ tiến trình con của Chrome tắt hẳn rồi xoá hai lần (không sót /tmp/tien-gioi-e2e-chrome-*)
   }
 }
 
