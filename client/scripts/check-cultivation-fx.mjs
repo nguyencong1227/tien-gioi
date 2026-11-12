@@ -104,6 +104,12 @@ try {
     const sc = window.__scene, me = sc.me();
     sc.predX = me.x; sc.predY = me.y;
     sc.cameras.main.centerOn(me.x, me.y);
+    // Sương trôi (#362) và thời tiết làm nền ĐỔI THEO THỜI GIAN nên phép so điểm ảnh / đối chứng nhiễu sai: các script đo hạt tắt hẳn
+    // sương (không dựng lại khi đổi bậc chất lượng / bản đồ). Kiểm riêng sương nằm ở server/scripts/e2e-map.ts (Ca 7).
+    sc.applyFog = () => {};
+    sc.stepFog = () => {};
+    for (const im of sc.fogImages || []) im.destroy();
+    sc.fogImages = [];
     return 0;
   })()`);
 
@@ -195,15 +201,16 @@ try {
   await settle();
   check((await alive()) === 0, "ban đầu không hạt");
   // Đối chứng: hai ảnh chụp liên tiếp KHÔNG hiệu ứng khác nhau bao nhiêu (hoạt ảnh nền); mọi phép so ảnh phải vượt mức này.
-  // Camera nội suy có thể "nhích" 1 điểm ảnh đúng giữa hai ảnh (cả khung lệch: ~10 000 điểm ảnh, một lần duy nhất): chụp lại tối đa 4 lần
-  // cho tới khi hai ảnh liên tiếp ổn định (< 1500), rồi mới lấy mốc.
-  let noise = Infinity;
-  for (let t = 0; t < 4 && noise >= 1500; t++) {
+  // Đôi lúc ngay sau khi vào cảnh nền còn đổi MỘT lần (nhiễu 11972 điểm ảnh rồi về 0, xảy ra cả trên main chưa có sương): chờ nền
+  // đứng yên (hai ảnh liên tiếp giống hệt), tối đa 8 lần, rồi mới lấy nhiễu làm đối chứng.
+  let noise = -1;
+  for (let k = 0; k < 8; k++) {
     await snap("base");
     await sleep(80);
     await snap("ctl");
     noise = await diff("base", "ctl");
-    if (noise >= 1500) await sleep(300);
+    if (noise === 0) break;
+    await sleep(300);
   }
   console.log(`    (nhiễu nền giữa hai ảnh không hiệu ứng: ${noise} điểm ảnh)`);
 
