@@ -5,6 +5,7 @@
 import type { FxPriority } from "./budget";
 import { COMBAT_RECIPES } from "./recipes-combat";
 import { CULTIVATION_RECIPES } from "./recipes-cultivation";
+import { WORLD_RECIPES } from "./recipes-world";
 
 /** Tên khung hình trong atlas hạt (`atlas.ts`). */
 export type FxFrame = "dot" | "spark" | "ring" | "smoke" | "petal" | "ember";
@@ -118,6 +119,7 @@ registerRecipe({
 // --- Công thức theo nhóm (B, #329): mảng dữ liệu ở `recipes-*.ts`, đăng ký ở đây ---
 for (const r of COMBAT_RECIPES) registerRecipe(r);
 for (const r of CULTIVATION_RECIPES) registerRecipe(r);
+for (const r of WORLD_RECIPES) registerRecipe(r);
 
 registerRecipe({
   id: "ambient-glimmer",
