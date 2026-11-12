@@ -114,6 +114,8 @@ import {
 } from "./sect";
 import { sound } from "./audio";
 import { transitionMs, waitOrSkip } from "./gfx/scene-transition";
+import { getDisplay, onDisplayChange } from "./gfx/display";
+import { TRACKER_PREF_KEY, parseTrackerPref, trackerOpen } from "./gfx/hud-compact";
 import {
   getQuality,
   onQualityChange,
@@ -748,9 +750,39 @@ function describeStep(
   }
 }
 
+/** Bảng Nhiệm vụ thu gọn / mở (gfx/hud-compact.ts): lựa chọn của người chơi (`tg_qt_open`) thắng, chưa chọn thì theo độ gọn của máy. */
+function setupQuestTrackerToggle(bindTap: (id: string, fn: () => void) => void) {
+  const tracker = $("quest-tracker");
+  const btn = $("qt-toggle");
+  let pref: boolean | null = null;
+  try {
+    pref = parseTrackerPref(localStorage.getItem(TRACKER_PREF_KEY));
+  } catch {
+    /* chế độ riêng tư: bỏ qua */
+  }
+  const apply = () => {
+    const open = trackerOpen(pref, getDisplay());
+    tracker.classList.toggle("collapsed", !open);
+    btn.setAttribute("aria-expanded", String(open));
+  };
+  apply();
+  onDisplayChange(apply); // xoay máy: chưa chọn thì tự đổi theo độ gọn mới
+  bindTap("qt-toggle", () => {
+    pref = !trackerOpen(pref, getDisplay());
+    try {
+      localStorage.setItem(TRACKER_PREF_KEY, pref ? "1" : "0");
+    } catch {
+      /* bỏ qua */
+    }
+    apply();
+  });
+}
+
 function renderQuestTracker() {
   const list = $("quest-tracker-list");
   list.replaceChildren();
+  // Số nhiệm vụ đang làm ở tiêu đề (còn thấy khi thu gọn)
+  $("qt-count").textContent = questLog.active.length ? ` (${questLog.active.length})` : "";
 
   if (!questLog.active.length) {
     const p = document.createElement("p");
@@ -2647,6 +2679,7 @@ export const ui = {
 
     renderInventory();
     renderQuestTracker();
+    setupQuestTrackerToggle(bindTap);
 
     // Bảng đo hiệu năng chỉ hiện khi mở bằng ?perf=1 (#71)
     if (
