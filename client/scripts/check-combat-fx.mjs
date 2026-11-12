@@ -201,6 +201,44 @@ try {
   );
   await settle();
 
+  // 1b) Dồn đòn lên CÙNG mục tiêu (nit của A ở #349): các chữ bay xếp hàng lệch lên, không đè lên nhau
+  await settle();
+  const ys = await J(`(() => {
+    const sc = window.__scene;
+    sc.lastAttack = null;
+    const base = { target: "quai-chong", x: sc.predX + 30, y: sc.predY };
+    sc.onHitFx({ ...base, amount: 11 });
+    sc.onHitFx({ ...base, amount: 22, crit: true });
+    sc.onHitFx({ ...base, amount: 33 });
+    sc.onHitFx({ ...base, amount: 44, crit: true });
+    return sc.children.list.filter((c) => c.type === "BitmapText" && c.visible).map((c) => ({ t: c.text, y: Math.round(c.y) }));
+  })()`);
+  const sortedY = ys.map((f) => f.y).sort((a, b) => a - b);
+  const minGap =
+    sortedY.length > 1 ? Math.min(...sortedY.slice(1).map((v, i) => v - sortedY[i])) : 0;
+  check(ys.length === 4, `dồn 4 đòn lên cùng mục tiêu: ${ys.length} chữ bay`);
+  check(
+    minGap >= 10,
+    `4 chữ xếp 4 hàng, hai chữ gần nhất cách ${minGap} px (>= 10, không đè nhau): ${ys.map((f) => `${f.t}@${f.y}`).join(" | ")}`,
+  );
+  // Mục tiêu KHÁC không bị đẩy lên: hai đòn lên quái A (hàng 0, 1) rồi một đòn lên quái B => chữ của B ở hàng 0 (cùng độ cao với chữ đầu của A)
+  await settle();
+  const ys2 = await J(`(() => {
+    const sc = window.__scene;
+    sc.lastAttack = null;
+    const at = (id, amount) => {
+      const before = new Set(sc.children.list.filter((c) => c.type === "BitmapText" && c.visible));
+      sc.onHitFx({ target: id, x: sc.predX + 30, y: sc.predY, amount });
+      return sc.children.list.filter((c) => c.type === "BitmapText" && c.visible && !before.has(c)).map((c) => Math.round(c.y))[0];
+    };
+    return { a1: at("quai-a", 1), a2: at("quai-a", 2), b1: at("quai-b", 3) };
+  })()`);
+  check(
+    ys2.a2 < ys2.a1 && ys2.b1 === ys2.a1,
+    `mục tiêu khác ở hàng 0: A ${ys2.a1} -> ${ys2.a2} (lên một hàng), B ${ys2.b1} (= hàng 0 của A)`,
+  );
+  await settle();
+
   // 2) Mình chí mạng: nhiều hạt hơn + rung nhẹ (ưu tiên 2, hồ sơ Cao cho rung)
   await act(dmgJs({ target: "quai-1", amount: 40, crit: true }, true), "s2");
   n = await alive();
