@@ -119,10 +119,14 @@ try {
   const touchMove = async (id, x, y) => {
     touches.set(id, { x, y });
     await dispatch("touchMove");
+    await sleep(60); // pointermove được gom theo khung hình: chờ trang xử lý xong rồi mới đọc kết quả
   };
+  // CDP: touchEnd KHÔNG được kèm điểm chạm và nhả TẤT CẢ; muốn nhả một ngón khi còn ngón khác thì gửi touchMove chỉ còn các
+  // ngón đang giữ (điểm nào biến mất khỏi danh sách coi là đã nhả). (Bản đầu gửi touchEnd kèm ngón còn lại: nhả nhầm ngón 1.)
   const touchUp = async (id) => {
     touches.delete(id);
-    await dispatch("touchEnd");
+    await dispatch(touches.size ? "touchMove" : "touchEnd");
+    await sleep(40);
   };
   const center = async (sel) => {
     const r = await J(
@@ -130,6 +134,28 @@ try {
     );
     return r;
   };
+
+  // Khoảng cách nhỏ nhất giữa mọi cặp hộp (< 0 nghĩa là chồng nhau)
+  const minGap = (list) => {
+    let worst = Infinity;
+    let pair = "";
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        const a = list[i];
+        const b = list[j];
+        const gap = Math.max(Math.max(a.x - b.r, b.x - a.r), Math.max(a.y - b.b, b.y - a.b));
+        if (gap < worst) {
+          worst = gap;
+          pair = `${a.s} / ${b.s}`;
+        }
+      }
+    }
+    return { worst, pair };
+  };
+  const rectsOf = (sels) =>
+    J(
+      `(() => ${JSON.stringify(sels)}.map((s) => { const b = document.querySelector(s).getBoundingClientRect(); return { s, x: b.x, y: b.y, w: b.width, h: b.height, r: b.right, b: b.bottom }; }))()`,
+    );
 
   for (const vp of VIEWPORTS) {
     console.log(`\\n=== ${vp.name} (DPR ${DPR}) ===`);
@@ -248,6 +274,226 @@ try {
       `({ on: document.querySelector(".joy-base").classList.contains("on"), knob: document.querySelector(".joy-knob").style.transform })`,
     );
     check(!j.on && j.knob === "", "thả ngón 1: joystick về trạng thái nghỉ");
+
+    // --- 3b) Nút hướng cố định (D-pad): chọn trong Cài đặt như người chơi thật ---
+    await evalJs("window.__ui.toggleSettingsModal(true);0");
+    await sleep(200);
+    const rowShown = await evalJs(
+      "getComputedStyle(document.getElementById('set-touch-row')).display !== 'none'",
+    );
+    check(rowShown === true, "Cài đặt có hàng 'Điều khiển di chuyển' khi dùng cảm ứng");
+    await evalJs(
+      "(() => { const sel = document.getElementById('set-touch-scheme'); sel.value = 'dpad'; sel.dispatchEvent(new Event('change')); })();0",
+    );
+    await evalJs("window.__ui.toggleSettingsModal(false);0");
+    await sleep(300);
+    let dp = await J(`({
+      scheme: document.documentElement.dataset.touchScheme,
+      stored: localStorage.getItem("tg_touch_scheme"),
+      joy: getComputedStyle(document.getElementById("joyzone")).display,
+      pad: getComputedStyle(document.getElementById("dpad")).display,
+    })`);
+    check(
+      dp.scheme === "dpad" && dp.stored === "dpad",
+      `chọn D-pad: data-touch-scheme + lưu tg_touch_scheme (${dp.scheme} / ${dp.stored})`,
+    );
+    check(
+      dp.joy === "none" && dp.pad === "block",
+      `D-pad hiện, joystick nổi ẩn (${dp.pad} / ${dp.joy})`,
+    );
+    const pad = await center("#dpad");
+    const padBox = await J(
+      `(() => { const b = document.getElementById("dpad").getBoundingClientRect(); return { w: b.width, h: b.height, x: b.x, y: b.y, r: b.right, b: b.bottom }; })()`,
+    );
+    check(
+      padBox.w >= 120 && padBox.h >= 120,
+      `D-pad đủ lớn (${Math.round(padBox.w)}x${Math.round(padBox.h)})`,
+    );
+    const padTop = await evalJs(`document.elementFromPoint(${pad.x}, ${pad.y})?.id`);
+    check(padTop === "dpad", `tâm D-pad không bị HUD che (${padTop})`);
+    // Ép hiện ba nút ngữ cảnh (cảnh ẩn lại mỗi khung nếu không có NPC / đồ rơi / cổng gần) để đo chồng nhau cả khi hiện cùng lúc
+    await evalJs(
+      "(() => { const st = document.createElement('style'); st.id = 'force-ctx2'; st.textContent = '#btn-pickup[hidden],#btn-talk[hidden],#btn-portal[hidden]{display:grid !important}'; document.head.append(st); })();0",
+    );
+    await sleep(150);
+    const ctl2 = await rectsOf([
+      "#sk-break",
+      "#sk-med",
+      "#sk-sword",
+      "#sk-slash",
+      "#quick-1",
+      "#quick-2",
+      "#btn-target",
+      "#dpad",
+      "#btn-pickup",
+      "#btn-talk",
+      "#btn-portal",
+    ]);
+    await evalJs("document.getElementById('force-ctx2').remove();0");
+    const g2 = minGap(ctl2);
+    check(
+      g2.worst >= 8,
+      `D-pad + nút mục tiêu + cụm kỹ năng: khoảng cách nhỏ nhất >= 8 px (${Math.round(g2.worst)} px: ${g2.pair})`,
+    );
+    const tgt = ctl2.find((c) => c.s === "#btn-target");
+    check(
+      tgt.w >= 56 && tgt.h >= 56,
+      `nút khoá mục tiêu >= 56x56 (${Math.round(tgt.w)}x${Math.round(tgt.h)})`,
+    );
+    const hudBox = await J(
+      `(() => { const b = document.getElementById("hud-col-left").getBoundingClientRect(); return { b: b.bottom }; })()`,
+    );
+    check(
+      hudBox.b <= padBox.y,
+      `cột HUD trái kết thúc phía trên D-pad (${Math.round(hudBox.b)} <= ${Math.round(padBox.y)})`,
+    );
+    // Hướng: phải, lên-trái (chéo), vùng chết; rồi nhả
+    const vec = async () =>
+      J("({ x: window.__joystick.x, y: window.__joystick.y, active: window.__joystick.active })");
+    // pointermove được gom theo khung hình nên có thể tới trễ: thăm dò tới khi vector thoả điều kiện (tối đa ~1 s)
+    const vecWhen = async (pred) => {
+      let last = await vec();
+      for (let i = 0; i < 30 && !pred(last); i++) {
+        await sleep(35);
+        last = await vec();
+      }
+      return last;
+    };
+    await touchDown(1, pad.x + 50, pad.y);
+    let v = await vec();
+    check(
+      v.active && Math.abs(v.x - 1) < 0.01 && Math.abs(v.y) < 0.01,
+      `chạm bên phải tâm: đi sang phải (${v.x.toFixed(2)}, ${v.y.toFixed(2)})`,
+    );
+    await touchMove(1, pad.x - 40, pad.y - 40);
+    v = await vecWhen((q) => q.x < -0.5 && q.y < -0.5);
+    check(
+      Math.abs(v.x + Math.SQRT1_2) < 0.01 && Math.abs(v.y + Math.SQRT1_2) < 0.01,
+      `kéo sang trên-trái: đi chéo chuẩn hoá (${v.x.toFixed(2)}, ${v.y.toFixed(2)})`,
+    );
+    const upOn = await evalJs(
+      `document.querySelector("#dpad .dp-up").classList.contains("on") && document.querySelector("#dpad .dp-left").classList.contains("on")`,
+    );
+    check(upOn === true, "hai mũi tên lên + trái sáng");
+    await touchMove(1, pad.x + 3, pad.y + 2);
+    v = await vecWhen((q) => q.x === 0 && q.y === 0);
+    check(
+      v.active && v.x === 0 && v.y === 0,
+      "về giữa nút (vùng chết): đứng yên nhưng vẫn đang giữ",
+    );
+    // Đa chạm: ngón 1 giữ D-pad, ngón 2 bấm Chém
+    await evalJs("window.__n.slash = 0;0");
+    await touchMove(1, pad.x, pad.y + 55);
+    await touchDown(2, slash.x, slash.y);
+    await touchUp(2);
+    v = await vecWhen((q) => q.y > 0.5);
+    const n2 = await J("window.__n");
+    check(
+      v.active && Math.abs(v.y - 1) < 0.01,
+      `giữ D-pad (xuống) vẫn đi khi bấm Chém bằng ngón khác (${v.x.toFixed(2)}, ${v.y.toFixed(2)})`,
+    );
+    check(n2.slash === 1, `Chém gọi đúng 1 lần khi đang giữ D-pad (${n2.slash})`);
+    await touchUp(1);
+    v = await vec();
+    check(!v.active && v.x === 0 && v.y === 0, "thả ngón: D-pad về nghỉ");
+    // Vùng chạm cũ của joystick nổi không còn tác dụng ở chế độ D-pad (chạm giữa màn hình bên trái không khởi động joystick)
+    await touchDown(1, jx + 90, jy - 60);
+    v = await vec();
+    await touchUp(1);
+    check(!v.active, "chế độ D-pad: chạm vùng joystick nổi cũ không đi");
+    if (!NO_SHOT) {
+      const shot = await send("Page.captureScreenshot", { format: "png" });
+      fs.writeFileSync(
+        path.join(OUT_DIR, `touch-dpad-${vp.name}.png`),
+        Buffer.from(shot.result.data, "base64"),
+      );
+      console.log(`  ✓ ảnh touch-dpad-${vp.name}.png`);
+    }
+
+    // --- 3c) Nút khoá mục tiêu: ba quái thật trong state mock (gần nhất, xa hơn, ngoài tầm) ---
+    await evalJs(`(() => {
+      const sc = window.__scene;
+      const at = (dx, dy) => ({ kind: "tho", x: sc.predX + dx, y: sc.predY + dy, hp: 40, maxHp: 40, angle: 0 });
+      sc.state.monsters.set("t-gan", at(100, 0));
+      sc.state.monsters.set("t-giua", at(0, 220));
+      sc.state.monsters.set("t-xa", at(-650, 0)); // ngoài tầm khoá 520
+      0;
+    })()`);
+    await sleep(300);
+    const lockState = () =>
+      J(
+        `({ id: window.__scene.lockedTargetId, cls: document.getElementById("btn-target").classList.contains("locked"), pressed: document.getElementById("btn-target").getAttribute("aria-pressed"), label: document.getElementById("btn-target-label").textContent })`,
+      );
+    const tgtC = await center("#btn-target");
+    const tap = async () => {
+      await touchDown(1, tgtC.x, tgtC.y);
+      await touchUp(1);
+      await sleep(120);
+    };
+    let L = await lockState();
+    check(L.id === null && !L.cls, "chưa khoá: nút ở trạng thái thường");
+    await tap();
+    L = await lockState();
+    check(
+      L.id === "t-gan" && L.cls && L.pressed === "true",
+      `bấm lần 1: khoá con GẦN nhất (${L.id}, aria-pressed=${L.pressed})`,
+    );
+    check(L.label.length > 0 && L.label !== "Mục tiêu", `nút hiện tên quái đang khoá (${L.label})`);
+    const ringOn = await evalJs(
+      "Boolean(window.__scene.targetRing && window.__scene.targetRing.visible)",
+    );
+    check(ringOn === true, "vòng đánh dấu hiện trên mục tiêu");
+    await tap();
+    L = await lockState();
+    check(L.id === "t-giua", `bấm lần 2: chuyển sang con xa hơn trong tầm (${L.id})`);
+    await tap();
+    L = await lockState();
+    check(L.id === "t-gan", `bấm lần 3: vòng lại con gần nhất, bỏ qua con ngoài tầm (${L.id})`);
+    // Đánh về phía mục tiêu khoá dù con khác gần hơn: khoá con ở xa hơn rồi hỏi hướng ngắm
+    await tap(); // -> t-giua (phía dưới)
+    const ang = await evalJs("window.__scene.aim(500)");
+    check(
+      Math.abs(ang - Math.PI / 2) < 0.01,
+      `ngắm về con đang khoá (phía dưới) dù con kia gần hơn (${Number(ang).toFixed(2)} rad)`,
+    );
+    // Phím T cũng chuyển mục tiêu (bàn phím)
+    await send("Input.dispatchKeyEvent", {
+      type: "keyDown",
+      code: "KeyT",
+      key: "t",
+      windowsVirtualKeyCode: 84,
+      nativeVirtualKeyCode: 84,
+    });
+    await send("Input.dispatchKeyEvent", {
+      type: "keyUp",
+      code: "KeyT",
+      key: "t",
+      windowsVirtualKeyCode: 84,
+      nativeVirtualKeyCode: 84,
+    });
+    await sleep(120);
+    L = await lockState();
+    check(L.id === "t-gan", `phím T chuyển mục tiêu (${L.id})`);
+    // Quái bị khoá biến mất: tự nhả khoá
+    await evalJs('window.__scene.state.monsters.delete("t-gan");0');
+    await sleep(300);
+    L = await lockState();
+    check(L.id === null && !L.cls, "mục tiêu biến mất: tự nhả khoá, nút về thường");
+    const ringOff = await evalJs(
+      "Boolean(window.__scene.targetRing && window.__scene.targetRing.visible)",
+    );
+    check(ringOff === false, "vòng đánh dấu ẩn khi nhả khoá");
+    await evalJs(
+      `(() => { const m = window.__scene.state.monsters; m.delete("t-giua"); m.delete("t-xa"); 0; })()`,
+    );
+
+    // Trả về joystick nổi để các mục sau (và khung nhìn kế tiếp) chạy như mặc định
+    await evalJs("window.__ui.toggleSettingsModal(true);0");
+    await evalJs(
+      "(() => { const sel = document.getElementById('set-touch-scheme'); sel.value = 'float'; sel.dispatchEvent(new Event('change')); })();0",
+    );
+    await evalJs("window.__ui.toggleSettingsModal(false);0");
+    await sleep(200);
 
     // --- 4) Phóng to hai ngón / chạm đúp không đổi tỉ lệ trang ---
     const s0 = await evalJs("visualViewport.scale");
