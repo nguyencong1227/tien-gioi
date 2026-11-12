@@ -238,6 +238,76 @@ try {
     }
     await evalJs("document.getElementById('force-ctx').remove();0");
 
+    // --- 2b) Vùng joystick không bị thân bảng HUD nuốt chạm (#326; phát hiện ở điện thoại ngang: chạm vào thân bảng Nhiệm vụ không bắt đầu được joystick) ---
+    // Mọi điểm lưới trong vùng joystick mà bị phần tử khác che phải thuộc một phần tử TƯƠNG TÁC (nút, mục nhiệm vụ...); thân bảng thì không
+    const blockers = await J(`(() => {
+      const z = document.getElementById("joyzone").getBoundingClientRect();
+      const bad = {}; let total = 0, blocked = 0, badN = 0;
+      for (let x = z.left + 8; x < z.right; x += 16)
+        for (let y = z.top + 8; y < z.bottom; y += 16) {
+          total++;
+          const el = document.elementFromPoint(x, y);
+          if (!el || el.id === "joyzone") continue;
+          blocked++;
+          if (!el.closest("button, .qt-item, a, input, select, textarea, [role=button]")) {
+            badN++;
+            const k = el.closest("[id]")?.id || el.tagName;
+            bad[k] = (bad[k] || 0) + 1;
+          }
+        }
+      return { total, blocked, badN, bad };
+    })()`);
+    check(
+      blockers.badN === 0,
+      `vùng joystick: ${blockers.total} điểm lưới, ${blockers.blocked} bị che toàn bởi nút / mục tương tác, ${blockers.badN} bị thân bảng KHÔNG tương tác nuốt chạm ${JSON.stringify(blockers.bad)}`,
+    );
+    // Chạm thật vào thân bảng HUD nằm trong vùng joystick (giao của #hud / #quest-tracker / #party-panel với vùng joystick) phải bắt đầu được joystick
+    const overlap = await J(`(() => {
+      const z = document.getElementById("joyzone").getBoundingClientRect();
+      for (const id of ["quest-tracker", "hud", "party-panel"]) {
+        const e = document.getElementById(id);
+        if (!e || e.hidden || getComputedStyle(e).display === "none") continue;
+        const b = e.getBoundingClientRect();
+        const x0 = Math.max(b.left, z.left), x1 = Math.min(b.right, z.right), y0 = Math.max(b.top, z.top), y1 = Math.min(b.bottom, z.bottom);
+        if (x1 - x0 < 24 || y1 - y0 < 24) continue;
+        // điểm trong giao mà KHÔNG nằm trên nút / mục tương tác
+        for (let y = y0 + 6; y < y1 - 6; y += 6) for (let x = x0 + 6; x < x1 - 6; x += 6) {
+          const el = document.elementFromPoint(x, y);
+          if (el && !el.closest("button, .qt-item, a, input, select, textarea, [role=button]")) return { id, x: Math.round(x), y: Math.round(y) };
+        }
+      }
+      return null;
+    })()`);
+    if (overlap) {
+      await touchDown(9, overlap.x, overlap.y);
+      await touchMove(9, overlap.x + 40, overlap.y - 30);
+      const jb = await J(
+        `({ on: document.querySelector(".joy-base").classList.contains("on"), knob: document.querySelector(".joy-knob").style.transform })`,
+      );
+      check(
+        jb.on && jb.knob.includes("translate"),
+        `chạm vào thân #${overlap.id} (${overlap.x}, ${overlap.y}) trong vùng joystick vẫn khởi động joystick (${jb.knob})`,
+      );
+      await touchUp(9);
+    } else {
+      console.log("  (không có thân bảng HUD giao với vùng joystick ở khung này)");
+    }
+    // Nút HUD vẫn bắt chạm (không bị pointer-events: none lây sang)
+    const btnHit = await J(`(() => {
+      const out = {};
+      for (const id of ["btn-bag", "btn-char", "btn-quest"]) {
+        const b = document.getElementById(id); if (!b) continue;
+        const r = b.getBoundingClientRect();
+        const el = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+        out[id] = Boolean(el && el.closest("button") === b);
+      }
+      return out;
+    })()`);
+    check(
+      Object.values(btnHit).length > 0 && Object.values(btnHit).every(Boolean),
+      `nút HUD vẫn bắt chạm giữa các thân bảng trong suốt (${JSON.stringify(btnHit)})`,
+    );
+
     // --- 3) Đa chạm: joystick (ngón 1) + Chém (ngón 2) + Kiếm khí (ngón 3) cùng lúc ---
     await evalJs(
       "window.__n = { slash: 0, sword: 0 }; window.__scene.slash = () => { window.__n.slash++ }; window.__scene.sword = () => { window.__n.sword++ };0",
