@@ -1,11 +1,13 @@
 // Test cho phần dọn dẹp dùng chung của E2E (`killChrome`, `removeTmpDirs`): nguyên nhân thật của thư mục /tmp/tien-gioi-e2e-*-chrome-* bị sót
 // là tiến trình CON của Chrome còn sống (chỉ giết tiến trình gốc) và ghi lại thư mục sau khi đã xoá.
 import { spawn } from "node:child_process";
+import http from "node:http";
+import net from "node:net";
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { killChrome, removeTmpDirs, sleep } from "./e2e-kit";
+import { killChrome, listenWithRetry, removeTmpDirs, sleep } from "./e2e-kit";
 
 const alive = (pid: number) => {
   try {
@@ -51,4 +53,77 @@ describe("e2e-kit: dọn dẹp Chrome", () => {
     await removeTmpDirs(a, missing);
     expect(existsSync(a)).toBe(false);
   }, 10000);
+});
+
+/** Một cổng đang bị chiếm (giữ mở) và một hàm đóng. */
+async function occupyPort(): Promise<{ port: number; close: () => Promise<void> }> {
+  const srv = net.createServer();
+  await new Promise<void>((r) => srv.listen(0, "127.0.0.1", r));
+  const port = (srv.address() as net.AddressInfo).port;
+  return { port, close: () => new Promise<void>((r) => srv.close(() => r())) };
+}
+async function freeOne(): Promise<number> {
+  const o = await occupyPort();
+  await o.close();
+  return o.port;
+}
+
+describe("e2e-kit: listenWithRetry", () => {
+  it("cổng trống: nghe đúng cổng đó và trả về nó", async () => {
+    const port = await freeOne();
+    const server = http.createServer();
+    try {
+      expect(await listenWithRetry(server, port, { explicit: false, pick: () => 0 })).toBe(port);
+      expect((server.address() as net.AddressInfo).port).toBe(port);
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
+
+  it("cổng NGẪU NHIÊN bận: thử lại bằng cổng mới và trả về cổng thật", async () => {
+    const busy = await occupyPort();
+    const free = await freeOne();
+    const server = http.createServer();
+    try {
+      const got = await listenWithRetry(server, busy.port, { explicit: false, pick: () => free });
+      expect(got).toBe(free);
+      expect((server.address() as net.AddressInfo).port).toBe(free);
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+      await busy.close();
+    }
+  });
+
+  it("cổng do người chạy CHỈ ĐỊNH bận: reject EADDRINUSE (không im lặng, không đổi cổng)", async () => {
+    const busy = await occupyPort();
+    const server = http.createServer();
+    try {
+      await expect(
+        listenWithRetry(server, busy.port, { explicit: true, pick: () => 1 }),
+      ).rejects.toMatchObject({ code: "EADDRINUSE" });
+    } finally {
+      await busy.close();
+    }
+  });
+
+  it("hết số lần thử: reject (không lặp vô hạn)", async () => {
+    const busy = await occupyPort();
+    const server = http.createServer();
+    let picks = 0;
+    try {
+      await expect(
+        listenWithRetry(server, busy.port, {
+          explicit: false,
+          attempts: 3,
+          pick: () => {
+            picks++;
+            return busy.port;
+          },
+        }),
+      ).rejects.toMatchObject({ code: "EADDRINUSE" });
+      expect(picks).toBe(2);
+    } finally {
+      await busy.close();
+    }
+  });
 });
