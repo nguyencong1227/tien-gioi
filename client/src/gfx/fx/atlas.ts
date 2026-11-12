@@ -5,7 +5,7 @@
  */
 import Phaser from "phaser";
 import { FX_FRAMES, type FxFrame } from "./recipes";
-import { FX_CHARS, layoutGlyphGrid } from "./glyphs";
+import { FX_CHARS, glyphUvs, layoutGlyphGrid } from "./glyphs";
 
 export const FX_ATLAS_KEY = "fx-atlas";
 export const FX_FONT_KEY = "fx-font";
@@ -137,6 +137,11 @@ export function ensureFxFont(scene: Phaser.Scene): void {
     xAdvance: number;
     data: Record<string, never>;
     kerning: Record<string, never>;
+    /** UV cho bộ vẽ WebGL của BitmapText (xem `glyphUvs`). */
+    u0: number;
+    v0: number;
+    u1: number;
+    v1: number;
   }
   const chars: Record<number, Glyph> = {};
   for (const cell of grid.cells) {
@@ -152,11 +157,13 @@ export function ensureFxFont(scene: Phaser.Scene): void {
       ctx.fillText(cell.ch, x, y, CELL_W - STROKE);
     }
     const w = isSpace ? 1 : Math.min(CELL_W, Math.ceil(measured) + STROKE);
+    const h = isSpace ? 1 : CELL_H;
     chars[cell.ch.charCodeAt(0)] = {
+      ...glyphUvs({ x: cell.x, y: cell.y, width: w, height: h }, grid.width, grid.height),
       x: cell.x,
       y: cell.y,
       width: w,
-      height: isSpace ? 1 : CELL_H,
+      height: h,
       centerX: w / 2,
       centerY: CELL_H / 2,
       xOffset: 0,

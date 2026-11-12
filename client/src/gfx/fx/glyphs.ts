@@ -55,3 +55,21 @@ export function layoutGlyphGrid(
   const cells = list.map((ch, i) => ({ ch, x: (i % c) * cellW, y: Math.floor(i / c) * cellH }));
   return { cols: c, rows, width: c * cellW, height: rows * cellH, cells };
 }
+
+/**
+ * Toạ độ UV (0..1) của một glyph trong texture phông. BẮT BUỘC cho `BitmapText` ở WebGL: bộ vẽ `BatchChar` của Phaser đọc
+ * `glyph.u0 / v0 / u1 / v1` (khác `x / y / width / height` dùng cho Canvas). Thiếu UV thì chữ không vẽ gì (số sát thương vô hình,
+ * không báo lỗi). Phaser tự điền khi nạp phông XML; phông sinh bằng mã (`atlas.ts`) phải tự tính.
+ */
+export function glyphUvs(
+  g: { x: number; y: number; width: number; height: number },
+  texW: number,
+  texH: number,
+): { u0: number; v0: number; u1: number; v1: number } {
+  return {
+    u0: g.x / texW,
+    v0: g.y / texH,
+    u1: (g.x + g.width) / texW,
+    v1: (g.y + g.height) / texH,
+  };
+}

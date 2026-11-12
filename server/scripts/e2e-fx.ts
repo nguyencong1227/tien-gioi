@@ -160,6 +160,32 @@ async function main() {
       `atlas hạt ${(tex.atlasPx / 1024).toFixed(0)} KB + phông ${(tex.fontPx / 1024).toFixed(0)} KB (${tex.glyphs} glyph)`,
     );
 
+    // Phông phải có UV (u0..v1) trong [0,1]: bộ vẽ WebGL của BitmapText đọc UV chứ không đọc x / y; thiếu UV thì chữ KHÔNG vẽ gì
+    // (số sát thương vô hình, không báo lỗi; lỗi này đã lọt qua #345 vì các ca kiểm chỉ đếm đối tượng chữ)
+    const uv =
+      (await T.ev(`(() => { const chars = window.__scene.cache.bitmapFont.get('fx-font').data.chars;
+      const bad = Object.keys(chars).filter((k) => { const g = chars[k];
+        return ![g.u0, g.v0, g.u1, g.v1].every((v) => Number.isFinite(v) && v >= 0 && v <= 1) || g.u1 < g.u0 || g.v1 < g.v0; });
+      return { total: Object.keys(chars).length, bad: bad.length }; })()`)) as any;
+    must(uv.bad === 0, `mọi glyph có UV hợp lệ trong [0,1] (${uv.total} glyph, hỏng ${uv.bad})`);
+    // Và chữ bay THẬT SỰ ĐƯỢC VẼ: chữ tím (nền cỏ không có màu tím) chụp từ canvas WebGL phải có nhiều điểm ảnh tím
+    const painted = Number(
+      await T.ev(`new Promise((resolve) => { const s = window.__scene, cam = s.cameras.main;
+        cam.centerOn(s.predX, s.predY);
+        s.fx.floatNumber('88', s.predX, s.predY - 40, { color: 0xff00ff, size: 48, priority: 2 });
+        const r = s.game.canvas.getBoundingClientRect();
+        const w = Math.round(r.width), h = Math.round(r.height);
+        setTimeout(() => s.game.renderer.snapshotArea(0, 0, w, h, (img) => {
+          const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+          const x = c.getContext('2d'); x.drawImage(img, 0, 0);
+          const d = x.getImageData(0, 0, c.width, c.height).data; let n = 0;
+          for (let i = 0; i < d.length; i += 4) if (d[i] > 180 && d[i + 2] > 180 && d[i + 1] < 90) n++;
+          resolve(n); }), 60); })`),
+    );
+    must(painted > 150, `chữ bay được VẼ thật ra màn hình (điểm ảnh tím: ${painted})`);
+    ok(`glyph có UV hợp lệ và chữ bay thật sự được vẽ (${painted} điểm ảnh)`);
+    await T.ev(`window.__fx.clear(); 1`);
+
     // ---------------- Ca 2: ngân sách hạt theo bậc ----------------
     out("\n--- Ca 2: số hạt sống THẬT không vượt ngân sách (Cao: 520 hạt / 24 emitter) ---");
     const okN = await burst(60, "{}");
