@@ -108,8 +108,8 @@ describe("M5.1: check-perf-budget (Kiểm tra ngân sách hiệu năng tĩnh)", 
       fs.writeFileSync(path.join(tmpDir, "sample.png"), pngBuf);
 
       const res = calculateStaticTextureMemory(tmpDir);
-      // Gồm: sample.png (40.000 B) + fx-font (576*1008*4 = 2.322.432 B) + fx-atlas (192*32*4 = 24.576 B) + decor-tileset (320*32*4 = 40.960 B) + light-vignette (128*128*4 = 65.536 B) + light-white (4*4*4 = 64 B)
-      const expectedBytes = 40000 + 2322432 + 24576 + 40960 + 65536 + 64;
+      // Gồm: sample.png (40.000 B) + fx-font (576*1008*4 = 2.322.432 B) + fx-atlas (192*32*4 = 24.576 B) + decor-tileset (320*32*4 = 40.960 B) + light-vignette (128*128*4 = 65.536 B) + light-white (4*4*4 = 64 B) + fog-blob (128*128*4 = 65.536 B) + blob-shadow (64*28*4 = 7.168 B)
+      const expectedBytes = 40000 + 2322432 + 24576 + 40960 + 65536 + 64 + 65536 + 7168;
       expect(res.totalBytes).toBe(expectedBytes);
       expect(res.items.some((i) => i.name === "sample.png")).toBe(true);
       expect(res.items.some((i) => i.name.includes("fx-font"))).toBe(true);

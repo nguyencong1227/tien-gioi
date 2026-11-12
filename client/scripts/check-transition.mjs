@@ -104,6 +104,12 @@ try {
     const sc = window.__scene, me = sc.me();
     sc.predX = me.x; sc.predY = me.y;
     sc.cameras.main.centerOn(me.x, me.y);
+    // Sương trôi (#362) và thời tiết làm nền ĐỔI THEO THỜI GIAN nên phép so điểm ảnh / đối chứng nhiễu sai: các script đo hạt tắt hẳn
+    // sương (không dựng lại khi đổi bậc chất lượng / bản đồ). Kiểm riêng sương nằm ở server/scripts/e2e-map.ts (Ca 7).
+    sc.applyFog = () => {};
+    sc.stepFog = () => {};
+    for (const im of sc.fogImages || []) im.destroy();
+    sc.fogImages = [];
     return 0;
   })()`);
 

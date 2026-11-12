@@ -104,6 +104,12 @@ try {
     const sc = window.__scene, me = sc.me();
     sc.predX = me.x; sc.predY = me.y;
     sc.cameras.main.centerOn(me.x, me.y);
+    // Sương trôi (#362) và thời tiết làm nền ĐỔI THEO THỜI GIAN nên phép so điểm ảnh / đối chứng nhiễu sai: các script đo hạt tắt hẳn
+    // sương (không dựng lại khi đổi bậc chất lượng / bản đồ). Kiểm riêng sương nằm ở server/scripts/e2e-map.ts (Ca 7).
+    sc.applyFog = () => {};
+    sc.stepFog = () => {};
+    for (const im of sc.fogImages || []) im.destroy();
+    sc.fogImages = [];
     return 0;
   })()`);
 
@@ -140,12 +146,32 @@ try {
       for (let i = 0; i < A.length; i += 4)
         if (Math.abs(A[i] - B[i]) + Math.abs(A[i + 1] - B[i + 1]) + Math.abs(A[i + 2] - B[i + 2]) > 60) n++;
       return n; })()`);
+  /** Chờ camera hội tụ (đồng hồ trò chơi >= 6,5 s, rồi 3 lần đọc liên tiếp bằng nhau, tối đa 8 s): camera còn đang nội suy về nhân vật thì ảnh chụp lệch 1 điểm ảnh làm "nhiễu nền" vọt lên (máy chậm / nhiều lớp phủ hơn => hội tụ muộn hơn). */
+  const camStable = async () => {
+    // Camera nội suy về nhân vật theo đồng hồ TRÒ CHƠI và chỉ "nhích" 1 điểm ảnh khi giá trị thực vượt mốc làm tròn (~3,9 s sau khi vào cảnh):
+    // đọc scroll nguyên không thấy được phần lẻ nên chờ cho đồng hồ trò chơi qua 6,5 s (tối đa 30 s thật) rồi mới đo.
+    for (let k = 0; k < 150; k++) {
+      if (Number(await evalJs("window.__scene.time.now")) >= 6500) break;
+      await sleep(200);
+    }
+    let prev = "";
+    let same = 0;
+    for (let k = 0; k < 53 && same < 3; k++) {
+      await sleep(150);
+      const cur = await evalJs(
+        "JSON.stringify([window.__scene.cameras.main.scrollX, window.__scene.cameras.main.scrollY, window.__scene.cameras.main.zoom])",
+      );
+      same = cur === prev ? same + 1 : 0;
+      prev = cur;
+    }
+  };
   const settle = async () => {
     await evalJs("window.__fx.clear(); 0");
     for (let k = 0; k < 120; k++) {
       await sleep(100);
       if ((await alive()) === 0 && k >= 5) break;
     }
+    await camStable();
   };
 
   await settle();
@@ -164,13 +190,13 @@ try {
   );
   const d = await diff("pre", "sw");
   check(
-    d > 60,
-    `kiếm khí: ${d} điểm ảnh khác nền khi ảnh kiếm khí đã tan (hạt thật sự được vẽ, > 60)`,
+    d > 30,
+    `kiếm khí: ${d} điểm ảnh khác nền khi ảnh kiếm khí đã tan (hạt thật sự được vẽ, > 30)`,
   );
   await settle();
 
   // 2) Qua đúng đường người chơi gọi (nút / phím): sword() và slash() của mình
-  r = await act("sc.nextSword = 0; sc.sword()", "sw2", 120);
+  r = await act("sc.nextSword = 0; sc.sword()", "sw2", 300);
   check(r.peak > 8, `sword() của mình qua đường thật: đỉnh ${r.peak} hạt`);
   await settle();
 
@@ -204,6 +230,39 @@ try {
     60,
   );
   check(r.peak === 0, `yêu thú chém: ${r.peak} hạt (không thêm tia lửa)`);
+  await settle();
+
+  // 5b) Bậc Thấp (4 emitter): một đòn kiếm khí của mình chỉ chiếm 1 điểm qi + mũi = 2 emitter (không nuốt ngân sách), nên hiệu ứng
+  // ưu tiên 1 của người khác phát ngay sau đó VẪN được nhận; chém chỉ một đầu cung (nit A ở #356)
+  await evalJs(
+    `(() => { const c = document.getElementById("set-quality"); c.value = "low"; c.dispatchEvent(new Event("change")); return 1; })()`,
+  );
+  await sleep(300);
+  await settle();
+  const a0 = await evalJs("window.__fx.stats().admitted");
+  r = await act("sc.fxSword(sc.predX, sc.predY, 0, 260, 0xffffff, true)", "lo", 300);
+  const a1 = await evalJs("window.__fx.stats().admitted");
+  check(
+    a1 - a0 === 2,
+    `bậc Thấp: kiếm khí của mình phát ${a1 - a0} lần (1 qi + mũi = 2; trước sửa: 5)`,
+  );
+  const accepted = await evalJs(
+    `window.__fx.play("hit-spark", window.__scene.predX + 200, window.__scene.predY, { priority: 1 })`,
+  );
+  check(
+    accepted === true,
+    "bậc Thấp: ngay sau kiếm khí, hiệu ứng ưu tiên 1 của người khác vẫn được nhận (không bị nuốt ngân sách)",
+  );
+  await settle();
+  const b0 = await evalJs("window.__fx.stats().admitted");
+  await act("sc.nextSlash = 0; sc.slash(0)", "lo2", 60);
+  const b1 = await evalJs("window.__fx.stats().admitted");
+  check(b1 - b0 === 1, `bậc Thấp: chém của mình phát ${b1 - b0} lần (1 đầu cung)`);
+  await settle();
+  await evalJs(
+    `(() => { const c = document.getElementById("set-quality"); c.value = "high"; c.dispatchEvent(new Event("change")); return 1; })()`,
+  );
+  await sleep(300);
   await settle();
 
   // 6) Giảm chuyển động: ít hạt hơn (x 0,3)

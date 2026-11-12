@@ -104,6 +104,12 @@ try {
     const sc = window.__scene, me = sc.me();
     sc.predX = me.x; sc.predY = me.y;
     sc.cameras.main.centerOn(me.x, me.y);
+    // Sương trôi (#362) và thời tiết làm nền ĐỔI THEO THỜI GIAN nên phép so điểm ảnh / đối chứng nhiễu sai: các script đo hạt tắt hẳn
+    // sương (không dựng lại khi đổi bậc chất lượng / bản đồ). Kiểm riêng sương nằm ở server/scripts/e2e-map.ts (Ca 7).
+    sc.applyFog = () => {};
+    sc.stepFog = () => {};
+    for (const im of sc.fogImages || []) im.destroy();
+    sc.fogImages = [];
     return 0;
   })()`);
 
@@ -115,6 +121,25 @@ try {
   const shaking = () => evalJs("window.__scene.cameras.main.shakeEffect.isRunning");
   const floats = () => evalJs("window.__fx.stats().floatsActive");
   /** Chờ rung cũ tắt và hạt cũ tan để mỗi ca đo độc lập. */
+  /** Chờ camera hội tụ (đồng hồ trò chơi >= 6,5 s, rồi 3 lần đọc liên tiếp bằng nhau, tối đa 8 s): camera còn đang nội suy về nhân vật thì ảnh chụp lệch 1 điểm ảnh làm "nhiễu nền" vọt lên (máy chậm / nhiều lớp phủ hơn => hội tụ muộn hơn). */
+  const camStable = async () => {
+    // Camera nội suy về nhân vật theo đồng hồ TRÒ CHƠI và chỉ "nhích" 1 điểm ảnh khi giá trị thực vượt mốc làm tròn (~3,9 s sau khi vào cảnh):
+    // đọc scroll nguyên không thấy được phần lẻ nên chờ cho đồng hồ trò chơi qua 6,5 s (tối đa 30 s thật) rồi mới đo.
+    for (let k = 0; k < 150; k++) {
+      if (Number(await evalJs("window.__scene.time.now")) >= 6500) break;
+      await sleep(200);
+    }
+    let prev = "";
+    let same = 0;
+    for (let k = 0; k < 53 && same < 3; k++) {
+      await sleep(150);
+      const cur = await evalJs(
+        "JSON.stringify([window.__scene.cameras.main.scrollX, window.__scene.cameras.main.scrollY, window.__scene.cameras.main.zoom])",
+      );
+      same = cur === prev ? same + 1 : 0;
+      prev = cur;
+    }
+  };
   const settle = async () => {
     await evalJs("window.__scene.cameras.main.resetFX(); 0");
     // Chờ hạt tan HẾT (thăm dò, tối đa 12 s): đồng hồ trò chơi chậm lại khi máy bận nên chờ cố định không đủ
@@ -128,6 +153,7 @@ try {
       )
         break;
     }
+    await camStable();
   };
   /** Phát tin dmg như server gửi (đi qua đúng đường onHitFx), `mine` bằng cách giả lập một đòn vừa ra. */
   const dmg = (o, mine) =>
@@ -198,6 +224,44 @@ try {
   check(
     white1 - white0 > 20,
     `đòn thường: điểm ảnh trắng sáng ${white0} -> ${white1} (tia lửa + chữ thật sự được vẽ)`,
+  );
+  await settle();
+
+  // 1b) Dồn đòn lên CÙNG mục tiêu (nit của A ở #349): các chữ bay xếp hàng lệch lên, không đè lên nhau
+  await settle();
+  const ys = await J(`(() => {
+    const sc = window.__scene;
+    sc.lastAttack = null;
+    const base = { target: "quai-chong", x: sc.predX + 30, y: sc.predY };
+    sc.onHitFx({ ...base, amount: 11 });
+    sc.onHitFx({ ...base, amount: 22, crit: true });
+    sc.onHitFx({ ...base, amount: 33 });
+    sc.onHitFx({ ...base, amount: 44, crit: true });
+    return sc.children.list.filter((c) => c.type === "BitmapText" && c.visible).map((c) => ({ t: c.text, y: Math.round(c.y) }));
+  })()`);
+  const sortedY = ys.map((f) => f.y).sort((a, b) => a - b);
+  const minGap =
+    sortedY.length > 1 ? Math.min(...sortedY.slice(1).map((v, i) => v - sortedY[i])) : 0;
+  check(ys.length === 4, `dồn 4 đòn lên cùng mục tiêu: ${ys.length} chữ bay`);
+  check(
+    minGap >= 10,
+    `4 chữ xếp 4 hàng, hai chữ gần nhất cách ${minGap} px (>= 10, không đè nhau): ${ys.map((f) => `${f.t}@${f.y}`).join(" | ")}`,
+  );
+  // Mục tiêu KHÁC không bị đẩy lên: hai đòn lên quái A (hàng 0, 1) rồi một đòn lên quái B => chữ của B ở hàng 0 (cùng độ cao với chữ đầu của A)
+  await settle();
+  const ys2 = await J(`(() => {
+    const sc = window.__scene;
+    sc.lastAttack = null;
+    const at = (id, amount) => {
+      const before = new Set(sc.children.list.filter((c) => c.type === "BitmapText" && c.visible));
+      sc.onHitFx({ target: id, x: sc.predX + 30, y: sc.predY, amount });
+      return sc.children.list.filter((c) => c.type === "BitmapText" && c.visible && !before.has(c)).map((c) => Math.round(c.y))[0];
+    };
+    return { a1: at("quai-a", 1), a2: at("quai-a", 2), b1: at("quai-b", 3) };
+  })()`);
+  check(
+    ys2.a2 < ys2.a1 && ys2.b1 === ys2.a1,
+    `mục tiêu khác ở hàng 0: A ${ys2.a1} -> ${ys2.a2} (lên một hàng), B ${ys2.b1} (= hàng 0 của A)`,
   );
   await settle();
 

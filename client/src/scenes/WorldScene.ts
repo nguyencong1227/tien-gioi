@@ -1,6 +1,12 @@
 import { getDisplay } from "../gfx/display";
 import { createFxSystem, type FxSystem } from "../gfx/fx/fx";
-import { planSlashEdges, planSwordBeam, type FxPoint } from "../gfx/fx/skill-fx";
+import {
+  planSlashEdges,
+  planSwordBeam,
+  qiPointsFor,
+  slashEdgesFor,
+  type FxPoint,
+} from "../gfx/fx/skill-fx";
 import { motePriority, nextMoteAt, planBreakFail, planLevelUp } from "../gfx/fx/cultivation-fx";
 import {
   PORTAL_SWIRL_INTERVAL_MS,
@@ -13,6 +19,7 @@ import {
   rarityTint,
 } from "../gfx/fx/world-fx";
 import {
+  FloatLanes,
   healAmount,
   healNumber,
   isMonsterDeath,
@@ -26,7 +33,16 @@ import { getQuality, onQualityChange } from "../gfx/quality";
 import { buildDecorGrid } from "../gfx/map-decor";
 import { styleOf } from "../gfx/map-style";
 import { decorTilesetKey, ensureDecorTileset } from "../gfx/decor-tileset";
-import { planWeather, weatherEnabledByUrl } from "../gfx/map-weather";
+import { ambientEnabledByUrl, planWeather, weatherEnabledByUrl } from "../gfx/map-weather";
+import {
+  FOG_KEY,
+  advanceU,
+  ensureFogTexture,
+  fogPatchLayout,
+  fogRect,
+  planFog,
+  type FogPatch,
+} from "../gfx/map-fog";
 import {
   LIGHT_WHITE_KEY,
   VIGNETTE_KEY,
@@ -124,6 +140,16 @@ import {
   type MonAnimState,
 } from "../gfx/anim/mon-anim";
 import {
+  SHADOW_ALPHA,
+  SHADOW_KEY,
+  animUpdateDue,
+  ensureShadowTexture,
+  labelVisible,
+  monsterShadow,
+  playerShadow,
+  type ShadowDims,
+} from "../gfx/anim/entity-lod";
+import {
   animReducedMotion,
   markPlayerHurt,
   newPlayerAnimClock,
@@ -157,6 +183,11 @@ interface Entity {
   playerAnimState?: PlayerAnimState;
   /** Mốc phát đốm sáng thiền định kế tiếp (ms, đồng hồ cảnh; M5.2 #329). */
   nextMoteAt?: number;
+  /** Lần cập nhật trạng thái hoạt ảnh gần nhất (ms): thực thể ở xa chỉ cập nhật theo `farAnimHz` (M5.2 #328 2b). */
+  lastAnimAt?: number;
+  /** Bóng đốm dưới chân (hiện theo `blobShadows` của hồ sơ chất lượng) và trạng thái đã áp dụng. */
+  shadow?: Phaser.GameObjects.Image;
+  shadowOn?: boolean;
 }
 
 interface SlashFxItem {
@@ -234,6 +265,8 @@ export class WorldScene extends Phaser.Scene {
   private prevHp = 0;
   /** Đòn gần nhất của chính mình (suy "đòn trúng này của mình" cho hiệu ứng; xem gfx/fx/combat-fx.ts). */
   private lastAttack: MyAttack | null = null;
+  /** Hàng chữ bay theo mục tiêu: dồn đòn không đè chữ lên nhau (gfx/fx/combat-fx.ts). */
+  private floatLanes = new FloatLanes();
 
   /** Đánh dấu người chơi vừa tham gia giao tranh (tấn công hoặc bị tấn công) */
   public recordCombat() {
@@ -292,6 +325,13 @@ export class WorldScene extends Phaser.Scene {
    * e2e bật / tắt lúc chạy bằng thuộc tính này.
    */
   weatherPaused = false;
+  /** Sương trôi (M5.3 #332 bước 2d): các ảnh mảng sương (cố định theo màn hình) + bố cục theo tỉ lệ khung nhìn. */
+  fogImages: Phaser.GameObjects.Image[] = [];
+  private fogPatches: FogPatch[] = [];
+  private fogSpeed = 0;
+  private fogLastNow = 0;
+  /** Sương đứng yên khi `?debug` (trừ `?fog=1`): cảnh tĩnh để các script điểm ảnh có ảnh đối chứng không nhiễu. */
+  fogPaused = false;
   private weatherNextAt: number | undefined;
   private townVisuals: Phaser.GameObjects.GameObject[] = [];
   private portalVisuals: Phaser.GameObjects.GameObject[] = [];
@@ -324,9 +364,15 @@ export class WorldScene extends Phaser.Scene {
 
     // Lõi hiệu ứng (#325): ngân sách theo hồ sơ chất lượng; đóng cảnh thì giải phóng sạch
     this.fx = createFxSystem(this, { getProfile: getQuality, depth: () => this.map.worldH });
+    ensureShadowTexture(this);
     this.weatherPaused =
       typeof window !== "undefined" && !weatherEnabledByUrl(window.location.search);
-    const offQuality = onQualityChange(() => this.applyLight());
+    this.fogPaused =
+      typeof window !== "undefined" && !ambientEnabledByUrl(window.location.search, "fog");
+    const offQuality = onQualityChange(() => {
+      this.applyLight();
+      this.applyFog();
+    });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       offQuality();
       this.fx.destroy();
@@ -479,6 +525,45 @@ export class WorldScene extends Phaser.Scene {
     this.lightLayoutKey = ""; // đặt lại kích thước ở khung kế
   }
 
+  /** Dựng lại các mảng sương theo kiểu bản đồ + hồ sơ chất lượng (số mảng 0 / không sương thì chỉ dọn). */
+  private applyFog() {
+    for (const im of this.fogImages) im.destroy();
+    this.fogImages = [];
+    this.fogPatches = [];
+    const plan = planFog(styleOf(this.map.def.id).fog, getQuality());
+    if (!plan) return;
+    ensureFogTexture(this);
+    this.fogPatches = fogPatchLayout(plan.count, this.map.def.seed);
+    this.fogSpeed = plan.speed;
+    for (let i = 0; i < plan.count; i++)
+      this.fogImages.push(
+        this.add
+          .image(0, 0, FOG_KEY)
+          .setScrollFactor(0)
+          .setOrigin(0.5)
+          .setDepth(this.map.worldH + 150) // trên thực thể và hạt, dưới ánh sáng + vignette (+200)
+          .setTint(plan.color)
+          .setAlpha(plan.alpha),
+      );
+    this.fogLastNow = 0;
+    this.stepFog(this.time.now); // đặt chỗ NGAY: không để mảng sương nằm ở (0, 0) với cỡ gốc một khung nào
+  }
+
+  /** Mỗi khung: trôi các mảng sương (đứng yên khi giảm chuyển động) và đặt chỗ theo khung nhìn hiện tại. */
+  private stepFog(now: number) {
+    if (this.fogImages.length === 0) return;
+    const cam = this.cameras.main;
+    const dt = this.fogLastNow ? Math.min(100, now - this.fogLastNow) : 0;
+    this.fogLastNow = now;
+    const still = getQuality().reducedMotion || this.fogPaused;
+    for (let i = 0; i < this.fogImages.length; i++) {
+      const p = this.fogPatches[i];
+      if (!still) p.u = advanceU(p.u, dt, this.fogSpeed, p.speed, cam.displayWidth, p.size);
+      const r = fogRect(p, cam.width, cam.height, cam.displayWidth, cam.displayHeight);
+      if (r) this.fogImages[i].setPosition(r.x, r.y).setDisplaySize(r.w, r.h);
+    }
+  }
+
   /** Thời tiết: mỗi nhịp một lần phát phủ khung nhìn (kế hoạch thuần ở gfx/map-weather.ts; hồ sơ chất lượng quyết định tốc độ). */
   private emitWeather(now: number) {
     if (this.weatherPaused) return;
@@ -559,6 +644,7 @@ export class WorldScene extends Phaser.Scene {
 
     // 2c. Ánh sáng môi trường + vignette theo kiểu bản đồ (hiện theo hồ sơ chất lượng)
     this.applyLight();
+    this.applyFog();
     this.weatherNextAt = undefined; // đổi bản đồ: thời tiết của bản đồ mới phát ngay
 
     // 3. Dựng nhãn và vòng an toàn của trấn / trạm (nếu có trấn)
@@ -1332,7 +1418,12 @@ export class WorldScene extends Phaser.Scene {
         // Hồi máu bằng đan dược...: chữ xanh + ánh sáng (hồi tự nhiên từng số nguyên không qua ngưỡng nên không ồn)
         const n = healNumber(healed);
         this.fx.play("heal-glow", this.predX, this.predY - 8);
-        this.fx.floatNumber(n.text, this.predX, this.predY - 24, n);
+        this.fx.floatNumber(
+          n.text,
+          this.predX,
+          this.predY - 24 + this.floatLanes.offset("heal", this.time.now),
+          n,
+        );
       }
       this.prevHp = me.hp;
       ui.hud(me, this.state.online ?? this.state.players.size);
@@ -2178,13 +2269,14 @@ export class WorldScene extends Phaser.Scene {
         if (!e.root.visible) e.root.setVisible(true);
         if (e.sprite.anims.isPaused) e.sprite.anims.resume();
         this.applyPlayerEquip(e, p, false);
-        this.updatePlayerAnim(
-          e,
-          who,
-          p.angle,
-          dist > 1.5 && !p.dead && !p.meditating,
-          Boolean(p.dead),
-        );
+        if (this.animDue(e))
+          this.updatePlayerAnim(
+            e,
+            who,
+            p.angle,
+            dist > 1.5 && !p.dead && !p.meditating,
+            Boolean(p.dead),
+          );
 
         // Xác người khác nằm ~5 giây rồi mờ dần và ẩn (#150)
         if (p.dead) {
@@ -2228,7 +2320,8 @@ export class WorldScene extends Phaser.Scene {
         }
       }
       const distToMe = isMe ? 0 : Math.hypot(e.root.x - this.predX, e.root.y - this.predY);
-      const showLabel = isMe || (!hideNames && distToMe <= 450);
+      const showLabel = labelVisible(isMe, hideNames, distToMe, getQuality().nameLabelRadius);
+      this.syncShadow(e);
       e.label!.setVisible(showLabel);
       if (showLabel) {
         const isDuel = Boolean((p as any).duel);
@@ -2267,7 +2360,7 @@ export class WorldScene extends Phaser.Scene {
       let e = this.monsters.get(id);
       const def = MONSTER_BY_ID[m.kind];
       if (!e) {
-        e = this.makeEntity(`mon-${m.kind}`, m.x, m.y, false);
+        e = this.makeEntity(`mon-${m.kind}`, m.x, m.y, false, monsterShadow(def.radius));
         e.monKind = m.kind;
         e.monAnim = newMonAnimClock();
         if (def.boss) {
@@ -2295,7 +2388,8 @@ export class WorldScene extends Phaser.Scene {
       }
       if (!e.root.visible) e.root.setVisible(true);
       if (e.sprite.anims.isPaused) e.sprite.anims.resume();
-      this.updateMonsterAnim(e);
+      if (this.animDue(e)) this.updateMonsterAnim(e);
+      this.syncShadow(e);
       e.root.setDepth(e.root.y);
       e.sprite.setFlipX(Math.cos(m.angle) < 0);
       this.drawBar(
@@ -2473,7 +2567,30 @@ export class WorldScene extends Phaser.Scene {
     ui.pickupPrompt(bestLabel);
   }
 
-  private makeEntity(texture: string, x: number, y: number, isPlayer: boolean): Entity {
+  /** Áp cờ `blobShadows` của hồ sơ chất lượng cho bóng của thực thể (chỉ chạm tới đối tượng khi cờ đổi). */
+  private syncShadow(e: Entity) {
+    const on = getQuality().blobShadows;
+    if (e.shadowOn === on) return;
+    e.shadowOn = on;
+    e.shadow?.setVisible(on);
+  }
+
+  /** Thực thể ở xa (không phải mình) chỉ cập nhật trạng thái hoạt ảnh theo `farAnimHz` (gfx/anim/entity-lod.ts). */
+  private animDue(e: Entity): boolean {
+    const dme = Math.hypot(e.root.x - this.predX, e.root.y - this.predY);
+    const now = this.time.now;
+    if (!animUpdateDue(now, e.lastAnimAt ?? -1e9, dme, getQuality().farAnimHz)) return false;
+    e.lastAnimAt = now;
+    return true;
+  }
+
+  private makeEntity(
+    texture: string,
+    x: number,
+    y: number,
+    isPlayer: boolean,
+    shadowDims: ShadowDims = playerShadow(),
+  ): Entity {
     const root = this.add.container(x, y);
     const hasAtlas = this.textures.exists(ATLAS_KEY) && this.textures.get(ATLAS_KEY).has(texture);
     const sprite = hasAtlas
@@ -2481,6 +2598,12 @@ export class WorldScene extends Phaser.Scene {
       : this.add.sprite(0, isPlayer ? -12 : 0, texture);
     const bar = this.add.graphics();
     const e: Entity = { root, sprite, bar, tx: x, ty: y };
+    // Bóng đốm dưới chân, vẽ DƯỚI mọi thứ khác của thực thể; hiện / ẩn theo hồ sơ chất lượng (syncShadow)
+    e.shadow = this.add
+      .image(0, shadowDims.y, SHADOW_KEY)
+      .setDisplaySize(shadowDims.w, shadowDims.h)
+      .setAlpha(SHADOW_ALPHA)
+      .setVisible(false);
     if (isPlayer) {
       e.aura = this.add
         .ellipse(0, 6, 54, 22, 0xffe08a, 0.25)
@@ -2502,9 +2625,9 @@ export class WorldScene extends Phaser.Scene {
           lineSpacing: -2,
         })
         .setOrigin(0.5, 1);
-      root.add([e.aura, e.talismanRing, e.weaponVisual, sprite, bar, e.label]);
+      root.add([e.shadow, e.aura, e.talismanRing, e.weaponVisual, sprite, bar, e.label]);
     } else {
-      root.add([sprite, bar]);
+      root.add([e.shadow, sprite, bar]);
     }
     return e;
   }
@@ -2559,6 +2682,7 @@ export class WorldScene extends Phaser.Scene {
     this.fx.update(now);
     this.layoutLight();
     this.emitWeather(now);
+    this.stepFog(now);
   }
 
   /** Tin `dmg`: chữ bay + âm thanh, và đánh dấu "bị đánh" cho quái / người chơi bị trúng (hoạt ảnh bị đánh, M5.2 #328). */
@@ -2633,7 +2757,16 @@ export class WorldScene extends Phaser.Scene {
     // Tia lửa ở hai đầu cung (gfx/fx/skill-fx.ts); đòn của yêu thú (scale < 1) không thêm
     if (scale >= 1)
       this.playFxPoints(
-        planSlashEdges(x, y, angle, SKILLS.slash.range, SKILLS.slash.arc, mine, color),
+        planSlashEdges(
+          x,
+          y,
+          angle,
+          SKILLS.slash.range,
+          SKILLS.slash.arc,
+          mine,
+          color,
+          slashEdgesFor(getQuality().emitterBudget),
+        ),
       );
   }
 
@@ -2678,7 +2811,9 @@ export class WorldScene extends Phaser.Scene {
       start: this.time.now,
     });
     // Tia sáng rải dọc đường bay + nổ ở mũi (gfx/fx/skill-fx.ts), trễ theo thời gian bay của ảnh kiếm khí
-    this.playFxPoints(planSwordBeam(x, y, angle, range, mine, tint));
+    this.playFxPoints(
+      planSwordBeam(x, y, angle, range, mine, tint, qiPointsFor(getQuality().emitterBudget)),
+    );
   }
 
   private fxLevelUp(x: number, y: number, major: boolean, mine: boolean) {
@@ -2711,7 +2846,12 @@ export class WorldScene extends Phaser.Scene {
     const plan = planHitFx(input);
     this.fx.play(plan.recipe, m.x, m.y - 8, { priority: plan.priority });
     const n = planHitNumber(input);
-    this.fx.floatNumber(n.text, m.x + Phaser.Math.Between(-8, 8), m.y, n);
+    this.fx.floatNumber(
+      n.text,
+      m.x + Phaser.Math.Between(-8, 8),
+      m.y + this.floatLanes.offset(m.target, this.time.now),
+      n,
+    );
   }
 
   private hitInput(m: DmgMsg): HitInput {
