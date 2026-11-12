@@ -111,3 +111,15 @@ export function healAmount(
 export function healNumber(amount: number): NumberPlan {
   return { text: `+${amount}`, color: FX_COLOR.heal, size: 16, priority: 2 };
 }
+
+/**
+ * Quái biến khỏi state chỉ coi là GỤC khi còn gần mình hơn mức này (px). Server cũng xoá quái khỏi state khi nó rời vùng nhìn
+ * (xa hơn `VIEW_EXIT` = 1300 px), mà màn hình rất rộng / thu phóng thấp vẫn thấy tới đó: quái còn sống rời vùng nhìn không được
+ * "tan thành điểm sáng". Khớp `VIEW_ENTER` của `server/src/systems/interest.ts` (test giữ cho hai số bằng nhau; client không
+ * import được từ server).
+ */
+export const MON_DEATH_MAX_DIST = 1100;
+
+export function isMonsterDeath(distToMe: number): boolean {
+  return Number.isFinite(distToMe) && distToMe < MON_DEATH_MAX_DIST;
+}
