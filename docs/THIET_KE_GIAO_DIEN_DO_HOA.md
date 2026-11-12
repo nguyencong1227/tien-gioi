@@ -88,11 +88,13 @@ export interface FxOpts { priority?: 0 | 1 | 2; angle?: number; scale?: number; 
 ## 4. Bố cục đáp ứng (B làm, C kiểm)
 
 ### 4.1 Phân loại thiết bị (theo kích thước khung nhìn và hướng, KHÔNG theo User-Agent)
-| `form` | Điều kiện (CSS px, cạnh ngắn `s` / cạnh dài `l`) | Ví dụ |
+| `form` | Điều kiện (CSS px; `s` = cạnh ngắn) | Ví dụ |
 |---|---|---|
-| `phone` | `s < 600` | 360×640, 390×844, 412×915, 844×390 |
-| `tablet` | `600 ≤ s < 900` (hoặc `s ≥ 900` và cảm ứng thô) | 768×1024, 1024×768 |
-| `desktop` | `s ≥ 900` và con trỏ chính xác | 1280×720, 1920×1080, 2560×1440 |
+| `phone` | `s < 600` (kể cả cửa sổ trình duyệt hẹp trên máy tính) | 360×640, 390×844, 412×915, 844×390 |
+| `tablet` | `s ≥ 600` và con trỏ CHÍNH là cảm ứng (`pointer: coarse`) | iPad / máy tính bảng Android: 768×1024, 1024×768 |
+| `desktop` | `s ≥ 600` và con trỏ chính là chuột (`pointer: fine`) | 1280×720, 1920×1080, 2560×1440, laptop cảm ứng có chuột |
+
+Cài trong `client/src/gfx/display.ts` (`classifyForm`, có test ma trận).
 
 `data-input` theo **lần nhập gần nhất** (`pointerdown` với `pointerType`): máy lai (laptop cảm ứng) tự đổi, gợi ý phím và nút ảo theo đó.
 
