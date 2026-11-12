@@ -447,9 +447,18 @@ cmd_xoa_tai_khoan() {
   echo "  2. Tạm dừng dịch vụ game để đảm bảo an toàn..."
   compose_cmd stop game
 
-  echo "  3. Chạy công cụ xoá tài khoản trong container dùng một lần..."
+  echo "  3. Chạy công cụ xoá tài khoản trong container dùng một lần và ghi nhật ký kiểm toán..."
+  local audit_log="$PROD_DIR/audit-xoa-tai-khoan.log"
+  touch "$audit_log"
+  chmod 600 "$audit_log"
+  local tmp_out
+  tmp_out="$(mktemp)"
   local rc=0
-  compose_cmd run --rm --no-deps game node --import tsx scripts/tai-khoan.ts xoa "$username" --yes || rc=$?
+  compose_cmd run --rm --no-deps game node --import tsx scripts/tai-khoan.ts xoa "$username" --yes | tee "$tmp_out" || rc="${PIPESTATUS[0]}"
+
+  # Nối các dòng kiểm toán JSON (chứa '"audit":1') vào tệp audit log lâu dài
+  grep '"audit":1' "$tmp_out" >> "$audit_log" || true
+  rm -f "$tmp_out"
 
   echo "  4. Khởi động lại dịch vụ game..."
   compose_cmd up -d game >/dev/null
@@ -459,7 +468,7 @@ cmd_xoa_tai_khoan() {
     exit "$rc"
   fi
 
-  echo "==> Xoá tài khoản $username hoàn tất!"
+  echo "==> Xoá tài khoản $username hoàn tất! Nhật ký kiểm toán đã lưu tại $audit_log"
 }
 
 # ------------------------------------------------------------------------------

@@ -92,7 +92,7 @@ export function validateProdSh(content: string): { valid: boolean; errors: strin
   }
 
   // 3. Phân quyền tệp .env.production là 600
-  if (!content.includes("chmod 600")) {
+  if (!content.includes('chmod 600 "$ENV_FILE"')) {
     errors.push("prod.sh init phải gán quyền chmod 600 cho file .env.production");
   }
 
@@ -144,6 +144,12 @@ export function validateProdSh(content: string): { valid: boolean; errors: strin
       errors.push(
         "cmd_xoa_tai_khoan phải kiểm tra định dạng tên đăng nhập bằng regex ^[a-z0-9_]{3,20}$",
       );
+    }
+    if (!xoaBlock.includes("audit-xoa-tai-khoan.log")) {
+      errors.push("cmd_xoa_tai_khoan phải lưu nhật ký kiểm toán vào audit-xoa-tai-khoan.log");
+    }
+    if (!xoaBlock.includes("chmod 600") || !xoaBlock.includes("audit_log")) {
+      errors.push("cmd_xoa_tai_khoan phải phân quyền chmod 600 cho tệp audit-xoa-tai-khoan.log");
     }
   }
 
@@ -338,6 +344,26 @@ describe("Hàng rào bảo vệ môi trường dev và kiểm tra triển khai (
       expect(res.valid).toBe(false);
       expect(res.errors.some((e) => e.includes("^[a-z0-9_]{3,20}$"))).toBe(true);
     });
+
+    it("Đột biến 13: prod.sh xoa-tai-khoan bỏ lưu vết vào audit-xoa-tai-khoan.log -> KHÔNG ĐẠT", () => {
+      const mutated = prodShContent.replace(/cmd_xoa_tai_khoan\(\)\s*\{[\s\S]*?\n\}/, (block) =>
+        block.replaceAll("audit-xoa-tai-khoan.log", "audit-temp.log"),
+      );
+      expect(mutated).not.toBe(prodShContent);
+      const res = validateProdSh(mutated);
+      expect(res.valid).toBe(false);
+      expect(res.errors.some((e) => e.includes("audit-xoa-tai-khoan.log"))).toBe(true);
+    });
+
+    it("Đột biến 14: prod.sh xoa-tai-khoan bỏ chmod 600 cho tệp audit log -> KHÔNG ĐẠT", () => {
+      const mutated = prodShContent.replace(/cmd_xoa_tai_khoan\(\)\s*\{[\s\S]*?\n\}/, (block) =>
+        block.replace('chmod 600 "$audit_log"', "# bỏ chmod audit_log"),
+      );
+      expect(mutated).not.toBe(prodShContent);
+      const res = validateProdSh(mutated);
+      expect(res.valid).toBe(false);
+      expect(res.errors.some((e) => e.includes("chmod 600"))).toBe(true);
+    });
   });
 });
 
@@ -360,7 +386,10 @@ case "$1" in
   ps) exit 0 ;;
   compose)
     if [[ " $* " == *" pull "* && "\${STUB_PULL_FAIL:-}" == 1 ]]; then echo "pull loi" >&2; exit 1; fi
-    if [[ " $* " == *" run "* && -n "\${STUB_RUN_RC:-}" ]]; then exit "$STUB_RUN_RC"; fi
+    if [[ " $* " == *" run "* ]]; then
+      if [[ -n "\${STUB_RUN_OUTPUT:-}" ]]; then echo "$STUB_RUN_OUTPUT"; fi
+      if [[ -n "\${STUB_RUN_RC:-}" ]]; then exit "$STUB_RUN_RC"; fi
+    fi
     exit 0 ;;
   exec)
     if [[ " $* " == *" pg_dump "* ]]; then
@@ -581,8 +610,9 @@ fi
       expect(dockerLog().some((l) => l.includes(" run "))).toBe(false);
     }
 
-    // 2. Chạy thử (không có --yes): gọi compose run, KHÔNG gọi backup, KHÔNG stop game, KHÔNG up game
+    // 2. Chạy thử (không có --yes): gọi compose run, KHÔNG gọi backup, KHÔNG stop game, KHÔNG up game, KHÔNG ghi audit log
     writeFileSync(logFile, "");
+    const auditLogFile = path.join(prodDir(), "audit-xoa-tai-khoan.log");
     const dry = prod(["xoa-tai-khoan", "nguoi_dung_1"]);
     expect(dry.code).toBe(0);
     const dryCalls = dockerLog();
@@ -590,10 +620,15 @@ fi
     expect(dryCalls.some((l) => l.includes(" pg_dump "))).toBe(false);
     expect(dryCalls.some((l) => l.includes(" stop game"))).toBe(false);
     expect(dryCalls.some((l) => l.includes(" up -d game"))).toBe(false);
+    expect(existsSync(auditLogFile)).toBe(false);
 
-    // 3. Chạy thật (có --yes): backup -> stop game -> run ... --yes -> up -d game
+    // 3. Chạy thật (có --yes): backup -> stop game -> run ... --yes -> up -d game; lưu audit vào audit-xoa-tai-khoan.log (chmod 600)
     writeFileSync(logFile, "");
-    const real = prod(["xoa-tai-khoan", "nguoi_dung_1", "--yes"]);
+    const stubAudit =
+      '{"t":"2026-11-12T02:17:45.810Z","audit":1,"ev":"account.deleted","id":"acc-test-123","userDigest":"a2af36e17534032e","character":"Nguoi Dung 1"}';
+    const real = prod(["xoa-tai-khoan", "nguoi_dung_1", "--yes"], {
+      STUB_RUN_OUTPUT: `${stubAudit}\nĐã xoá thành công tài khoản nguoi_dung_1!`,
+    });
     expect(real.code).toBe(0);
     const realCalls = dockerLog();
     const iBackup = realCalls.findIndex((l) => l.includes(" pg_dump "));
@@ -604,6 +639,15 @@ fi
     expect(iStop).toBeGreaterThan(iBackup);
     expect(iRun).toBeGreaterThan(iStop);
     expect(iUp).toBeGreaterThan(iRun);
+
+    // Kiểm tra tệp audit log: có quyền 600, chứa đúng dòng JSON có audit:1, không chứa dòng văn bản thường
+    expect(existsSync(auditLogFile)).toBe(true);
+    expect(statSync(auditLogFile).mode & 0o777).toBe(0o600);
+    const auditText = readFileSync(auditLogFile, "utf-8");
+    expect(auditText).toContain('"audit":1');
+    expect(auditText).toContain('"account.deleted"');
+    expect(auditText).toContain("acc-test-123");
+    expect(auditText).not.toContain("Đã xoá thành công tài khoản");
 
     // 4. Chạy thật có lỗi (STUB_RUN_RC: "2"): trả mã lỗi 2, nhưng game VẪN ĐƯỢC BẬT LẠI sau đó
     writeFileSync(logFile, "");

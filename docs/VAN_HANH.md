@@ -59,6 +59,7 @@ Bản chạy thật hoàn toàn tách biệt với thư mục phát triển củ
 | `backups/` | `700` | Chứa tối đa 14 bản sao lưu nén `tiengioi-YYYYmmdd-HHMMSS.sql.gz` |
 | `backups/restore-test.log` | `644` | Nhật ký các lần khôi phục thử nghiệm định kỳ |
 | `backups/LAST_RESTORE_OK` | `644` | Mốc thời gian ISO của lần khôi phục thử thành công gần nhất |
+| `audit-xoa-tai-khoan.log` | `600` | Nhật ký kiểm toán lưu vết các lần xoá tài khoản (`account.deleted`) |
 
 > [!CAUTION]
 > Tuyệt đối **KHÔNG COMMIT** hoặc chia sẻ tệp `.env.production`. Mật khẩu và token phải được bảo vệ nghiêm ngặt.
@@ -286,7 +287,7 @@ Toàn bộ quy trình an toàn đã được tích hợp trong lệnh `~/TT/tien
      - Xoá hồ sơ nhân vật (`characters`).
      - Xoá chân linh (`souls`).
      - Xoá tài khoản (`accounts`), giải phóng tên đăng nhập để người khác có thể đăng ký lại.
-     - Tự động ghi MỘT sự kiện kiểm toán `account.deleted` vào log container (gồm `id`, `userDigest`, `character`, `sessions`).
+     - Tự động ghi MỘT sự kiện kiểm toán `account.deleted` vào tệp `$PROD_DIR/audit-xoa-tai-khoan.log` (phân quyền `chmod 600`, gồm `id`, `userDigest`, `character`, `sessions`) để lưu vết vĩnh viễn.
    - **LUÔN LUÔN khởi động lại dịch vụ game** (`compose up -d game`) sau đó, bất kể lệnh xoá thành công hay gặp lỗi.
 
 ### 8.2. Các trường hợp bị từ chối an toàn
