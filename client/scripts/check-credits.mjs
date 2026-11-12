@@ -2,12 +2,15 @@
 
 /**
  * Script kiểm tra tài sản & bản quyền (License & Credits Checker)
- * Đảm bảo 100% tài nguyên tĩnh trong client/public/assets và client/public/icons
+ * Đảm bảo 100% tài nguyên tĩnh trong client/public/assets, client/public/icons và client/public/fonts
  * đều được khai báo nguồn gốc, tác giả và giấy phép trong CREDITS.md.
+ * Riêng tài sản bên thứ ba (client/public/fonts, #331) còn phải có SHA-256 THẬT của tệp trong CREDITS.md,
+ * cùng dòng bảng với tên tệp: đổi / thay tệp mà quên cập nhật nguồn + băm thì đỏ.
  *
  * Chạy: node client/scripts/check-credits.mjs
  */
 
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -92,7 +95,11 @@ export function isAssetCredited(filePath, creditsContent) {
  */
 export function auditAssets(
   creditsPath = CREDITS_FILE,
-  targetDirs = [path.join(CLIENT_PUBLIC, "assets"), path.join(CLIENT_PUBLIC, "icons")],
+  targetDirs = [
+    path.join(CLIENT_PUBLIC, "assets"),
+    path.join(CLIENT_PUBLIC, "icons"),
+    path.join(CLIENT_PUBLIC, "fonts"),
+  ],
 ) {
   if (!fs.existsSync(creditsPath)) {
     throw new Error(`Không tìm thấy file CREDITS: ${creditsPath}`);
@@ -113,6 +120,41 @@ export function auditAssets(
   }
 
   return { scanned, missing };
+}
+
+/** SHA-256 (hex thường) của một tệp. */
+export function sha256File(file) {
+  return crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
+}
+
+/**
+ * Tài sản bên thứ ba (mặc định: client/public/fonts) phải có dòng bảng trong CREDITS.md chứa cả TÊN TỆP lẫn
+ * SHA-256 thật của nội dung tệp hiện tại. Một băm của tệp khác, hay băm cũ sau khi đổi tệp, đều không qua.
+ *
+ * @param {string} creditsPath
+ * @param {string[]} hashDirs
+ * @returns {{ hashed: string[], wrongHash: string[] }}
+ */
+export function auditHashes(
+  creditsPath = CREDITS_FILE,
+  hashDirs = [path.join(CLIENT_PUBLIC, "fonts")],
+) {
+  if (!fs.existsSync(creditsPath)) {
+    throw new Error(`Không tìm thấy file CREDITS: ${creditsPath}`);
+  }
+  const lines = fs.readFileSync(creditsPath, "utf8").split("\n");
+  const hashed = [];
+  const wrongHash = [];
+  for (const dir of hashDirs) {
+    for (const f of scanFiles(dir)) {
+      hashed.push(f);
+      const fileName = path.basename(f);
+      const sha = sha256File(path.resolve(ROOT_DIR, f));
+      const ok = lines.some((l) => matchExactToken(l, fileName) && matchExactToken(l, sha));
+      if (!ok) wrongHash.push(f);
+    }
+  }
+  return { hashed, wrongHash };
 }
 
 // Chạy trực tiếp qua CLI
@@ -139,6 +181,18 @@ if (process.argv[1] === __filename) {
       );
       process.exit(1);
     }
+
+    const { hashed, wrongHash } = auditHashes();
+    if (wrongHash.length > 0) {
+      console.error(
+        `\n❌ LỖI BẢN QUYỀN: ${wrongHash.length} / ${hashed.length} tài sản bên thứ ba thiếu SHA-256 đúng (cùng dòng với tên tệp) trong CREDITS.md:`,
+      );
+      for (const m of wrongHash) {
+        console.error(`  - ${m}  sha256 = ${sha256File(path.resolve(ROOT_DIR, m))}`);
+      }
+      process.exit(1);
+    }
+    console.log(`✓ ${hashed.length} tài sản bên thứ ba có SHA-256 khớp trong CREDITS.md.`);
 
     console.log(`\n✓ TẤT CẢ ${scanned.length} TỆP TÀI NGUYÊN ĐỀU HỢP LỆ VÀ CÓ NGUỒN GỐC RÕ RÀNG.`);
   } catch (err) {

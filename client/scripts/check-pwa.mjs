@@ -133,6 +133,34 @@ if (!match) {
   } else {
     errors.push(`Có ${missingCount} file trong PRECACHE_URLS bị thiếu trên đĩa.`);
   }
+
+  // Phông tự lưu (#331): mọi /fonts/*.woff2 mà CSS bản build tham chiếu phải nằm trong PRECACHE_URLS,
+  // nếu không ngoại tuyến / APK sẽ rơi về phông hệ thống
+  const assetsDir = path.join(DIST, "assets");
+  const builtCss = fs
+    .readdirSync(assetsDir)
+    .filter((n) => n.endsWith(".css"))
+    .map((n) => fs.readFileSync(path.join(assetsDir, n), "utf8"))
+    .join("\n");
+  const fontUrls = [
+    ...new Set(
+      [...builtCss.matchAll(/url\(\s*["']?(\/fonts\/[^"')]+\.woff2)["']?\s*\)/g)].map((m) => m[1]),
+    ),
+  ];
+  const fontsNotCached = fontUrls.filter((u) => !precacheUrls.includes(u));
+  if (fontUrls.length === 0) {
+    const msg = "CSS bản build không tham chiếu phông tự lưu /fonts/*.woff2 (đã mất @font-face?).";
+    console.error(`  ✗ ${msg}`);
+    errors.push(msg);
+  } else if (fontsNotCached.length > 0) {
+    const msg = `Phông không nằm trong PRECACHE_URLS (ngoại tuyến sẽ mất phông): ${fontsNotCached.join(", ")}`;
+    console.error(`  ✗ ${msg}`);
+    errors.push(msg);
+  } else {
+    console.log(
+      `  ✓ ${fontUrls.length}/${fontUrls.length} phông tự lưu nằm trong PRECACHE_URLS (chạy ngoại tuyến vẫn đúng chữ).`,
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -148,6 +176,7 @@ const MIMES = {
   ".png": "image/png",
   ".svg": "image/svg+xml",
   ".webmanifest": "application/manifest+json",
+  ".woff2": "font/woff2",
 };
 
 const server = http.createServer((req, res) => {

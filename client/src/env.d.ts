@@ -9,4 +9,9 @@ declare module "*check-credits.mjs" {
     creditsPath?: string,
     targetDirs?: string[],
   ): { scanned: string[]; missing: string[] };
+  export function sha256File(file: string): string;
+  export function auditHashes(
+    creditsPath?: string,
+    hashDirs?: string[],
+  ): { hashed: string[]; wrongHash: string[] };
 }

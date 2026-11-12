@@ -15,12 +15,22 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="/icons/icon.svg" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Phông tự lưu (#331): tải trước hai tệp thân đứng (crossorigin bắt buộc với phông, kể cả cùng nguồn) -->
     <link
-      href="https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,400;0,600;0,700;1,400&subset=vietnamese&display=swap"
-      rel="stylesheet"
+      rel="preload"
+      href="/fonts/noto-serif-vietnamese-wght-normal.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
     />
+    <link
+      rel="preload"
+      href="/fonts/noto-serif-latin-wght-normal.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link rel="stylesheet" href="/src/fonts.css" />
     <link rel="stylesheet" href="/src/style.css" />
     <link rel="stylesheet" href="/src/sheet.css" />
     <link rel="stylesheet" href="/src/text-scale.css" />
