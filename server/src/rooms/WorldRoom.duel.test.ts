@@ -24,7 +24,10 @@ import type { WorldRoom } from "./WorldRoom";
 import type { WorldState } from "../schema";
 
 const dataDir = mkdtempSync(path.join(tmpdir(), "tien-gioi-duel-"));
-const PORT = 49000 + Math.floor(Math.random() * 3000);
+import { freePort } from "../test-port";
+
+// cổng do hệ điều hành cấp ở beforeAll (`freePort`): cổng ngẫu nhiên trong khoảng chồng nhau từng gây EADDRINUSE giữa các tệp chạy song song
+let PORT = 0;
 let server: Server;
 const rooms: Room[] = [];
 
@@ -33,6 +36,7 @@ beforeAll(async () => {
   const { defineRooms } = await import("./WorldRoom");
   server = new Server({ transport: new WebSocketTransport(), gracefullyShutdown: false });
   defineRooms(server);
+  PORT = await freePort();
   await server.listen(PORT);
 });
 afterEach(async () => {

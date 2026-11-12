@@ -24,7 +24,10 @@ import {
   type RebirthMsg,
 } from "@tien-gioi/shared";
 
-const PORT = 43000 + Math.floor(Math.random() * 4000);
+import { freePort } from "../test-port";
+
+// cổng do hệ điều hành cấp ở beforeAll (`freePort`): cổng ngẫu nhiên trong khoảng chồng nhau từng gây EADDRINUSE giữa các tệp chạy song song
+let PORT = 0;
 let server: Server;
 const activeRooms: Room[] = [];
 
@@ -32,6 +35,7 @@ beforeAll(async () => {
   const { defineRooms } = await import("./WorldRoom");
   server = new Server({ transport: new WebSocketTransport(), gracefullyShutdown: false });
   defineRooms(server);
+  PORT = await freePort();
   await server.listen(PORT);
 });
 

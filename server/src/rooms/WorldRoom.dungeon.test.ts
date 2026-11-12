@@ -33,7 +33,10 @@ import type { Run } from "../systems/dungeon";
 import { dayKey } from "@tien-gioi/shared";
 
 const dataDir = mkdtempSync(path.join(tmpdir(), "tien-gioi-dungeon-"));
-const PORT = 46000 + Math.floor(Math.random() * 3000);
+import { freePort } from "../test-port";
+
+// cổng do hệ điều hành cấp ở beforeAll (`freePort`): cổng ngẫu nhiên trong khoảng chồng nhau từng gây EADDRINUSE giữa các tệp chạy song song
+let PORT = 0;
 let server: Server;
 let WorldRoomClass: typeof WorldRoom;
 // Nạp SAU khi đặt DATA_DIR: `combat` kéo theo `store.ts`, nơi đọc DATA_DIR lúc nạp module (import tĩnh thì nhân vật của test
@@ -51,6 +54,7 @@ beforeAll(async () => {
   WorldRoomClass = WorldRoom;
   server = new Server({ transport: new WebSocketTransport(), gracefullyShutdown: false });
   defineRooms(server);
+  PORT = await freePort();
   await server.listen(PORT);
 });
 

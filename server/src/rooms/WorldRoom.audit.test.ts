@@ -10,7 +10,10 @@ import { ROOM_NAME } from "@tien-gioi/shared";
 import { setAuditSink } from "../audit";
 
 const dataDir = mkdtempSync(path.join(tmpdir(), "tien-gioi-audit-room-"));
-const PORT = 60000 + Math.floor(Math.random() * 3000);
+import { freePort } from "../test-port";
+
+// cổng do hệ điều hành cấp ở beforeAll (`freePort`): cổng ngẫu nhiên trong khoảng chồng nhau từng gây EADDRINUSE giữa các tệp chạy song song
+let PORT = 0;
 let server: Server;
 const rooms: Room[] = [];
 const lines: string[] = [];
@@ -21,6 +24,7 @@ beforeAll(async () => {
   const { defineRooms } = await import("./WorldRoom");
   server = new Server({ transport: new WebSocketTransport(), gracefullyShutdown: false });
   defineRooms(server);
+  PORT = await freePort();
   await server.listen(PORT);
 });
 afterEach(async () => {

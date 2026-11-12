@@ -19,7 +19,10 @@ import {
 import type { WorldRoom as WorldRoomType } from "./WorldRoom";
 
 const dataDir = mkdtempSync(path.join(tmpdir(), "tien-gioi-proto-room-"));
-const PORT = 57000 + Math.floor(Math.random() * 3000);
+import { freePort } from "../test-port";
+
+// cổng do hệ điều hành cấp ở beforeAll (`freePort`): cổng ngẫu nhiên trong khoảng chồng nhau từng gây EADDRINUSE giữa các tệp chạy song song
+let PORT = 0;
 let server: Server;
 let WorldRoom: typeof WorldRoomType;
 const rooms: Room[] = [];
@@ -30,6 +33,7 @@ beforeAll(async () => {
   WorldRoom = mod.WorldRoom;
   server = new Server({ transport: new WebSocketTransport(), gracefullyShutdown: false });
   mod.defineRooms(server);
+  PORT = await freePort();
   await server.listen(PORT);
 });
 afterEach(async () => {
