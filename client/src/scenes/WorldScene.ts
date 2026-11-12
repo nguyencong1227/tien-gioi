@@ -149,6 +149,7 @@ import {
   type MonAnimState,
 } from "../gfx/anim/mon-anim";
 import {
+  FAR_ANIM_DIST,
   SHADOW_ALPHA,
   SHADOW_KEY,
   animUpdateDue,
@@ -158,6 +159,15 @@ import {
   playerShadow,
   type ShadowDims,
 } from "../gfx/anim/entity-lod";
+import {
+  HURT_PULSE_MS,
+  NEUTRAL_TWEEN,
+  WALK_BOB_PERIOD_MS,
+  footPlant,
+  sinceStart,
+  spriteTween,
+  tweenEnabled,
+} from "../gfx/anim/tween";
 import {
   PLAYER_DIE_FRAMES,
   animReducedMotion,
@@ -198,7 +208,14 @@ interface Entity {
   /** Bóng đốm dưới chân (hiện theo `blobShadows` của hồ sơ chất lượng) và trạng thái đã áp dụng. */
   shadow?: Phaser.GameObjects.Image;
   shadowOn?: boolean;
+  /** Tween nhẹ (M5.2 #328 2b đợt 3): vị trí dọc gốc của sprite, lệch pha nhịp nảy riêng, đang áp tween (để trả về trung tính đúng một lần). */
+  spriteBaseY?: number;
+  tweenPhase?: number;
+  tweenActive?: boolean;
 }
+
+/** Thời lượng đòn đánh của người chơi (ms): `slashUntil = now + SLASH_MS` (hoạt ảnh Chém và tween co giãn dùng chung). */
+const SLASH_MS = 220;
 
 interface SlashFxItem {
   g: Phaser.GameObjects.Graphics;
@@ -1148,7 +1165,7 @@ export class WorldScene extends Phaser.Scene {
     const a = angle ?? this.aim(SKILLS.slash.range + 60);
     this.facing = a;
     const myEntity = this.players.get(this.sid);
-    if (myEntity) myEntity.slashUntil = this.time.now + 220;
+    if (myEntity) myEntity.slashUntil = this.time.now + SLASH_MS;
     this.room.send("attack", { angle: a });
     sound.slash();
     this.fxSlash(this.predX, this.predY, a, this.weaponColorFor(me, 0xffffff), 1, true);
@@ -1165,7 +1182,7 @@ export class WorldScene extends Phaser.Scene {
     const a = this.aim(SKILLS.sword.range);
     this.facing = a;
     const myEntity = this.players.get(this.sid);
-    if (myEntity) myEntity.slashUntil = this.time.now + 220;
+    if (myEntity) myEntity.slashUntil = this.time.now + SLASH_MS;
     this.room.send("skill", { id: "sword", angle: a });
     sound.sword();
     this.fxSword(
@@ -2284,6 +2301,14 @@ export class WorldScene extends Phaser.Scene {
           this.moving && !p.dead && !p.meditating,
           Boolean(p.dead),
         );
+        this.stepTween(
+          e,
+          true,
+          this.moving && !p.dead && !p.meditating,
+          Boolean(p.dead),
+          sinceStart(this.time.now, e.slashUntil ?? 0, SLASH_MS),
+          this.playerHurtSince(e),
+        );
         if (ui.isLimboOpen()) {
           ui.death(null);
         } else if (p.dead && (this.time.now < this.duelKoUntil || ui.isDuelActive())) {
@@ -2341,6 +2366,14 @@ export class WorldScene extends Phaser.Scene {
             dist > 1.5 && !p.dead && !p.meditating,
             Boolean(p.dead),
           );
+        this.stepTween(
+          e,
+          false,
+          dist > 1.5 && !p.dead && !p.meditating,
+          Boolean(p.dead),
+          sinceStart(this.time.now, e.slashUntil ?? 0, SLASH_MS),
+          this.playerHurtSince(e),
+        );
 
         // Xác người khác nằm ~5 giây rồi mờ dần và ẩn (#150)
         if (p.dead) {
@@ -2441,6 +2474,7 @@ export class WorldScene extends Phaser.Scene {
         }
         this.monsters.set(id, e);
       }
+      const monDist = Math.hypot(m.x - e.root.x, m.y - e.root.y);
       e.tx = m.x;
       e.ty = m.y;
       e.root.x += (e.tx - e.root.x) * k;
@@ -2453,6 +2487,14 @@ export class WorldScene extends Phaser.Scene {
       if (!e.root.visible) e.root.setVisible(true);
       if (e.sprite.anims.isPaused) e.sprite.anims.resume();
       if (this.animDue(e)) this.updateMonsterAnim(e);
+      this.stepTween(
+        e,
+        false,
+        monDist > 1.5,
+        false,
+        e.monAnim ? sinceStart(this.time.now, e.monAnim.attackUntil, monAnimMs("attack")) : -1,
+        e.monAnim ? sinceStart(this.time.now, e.monAnim.hurtUntil, monAnimMs("hurt")) : -1,
+      );
       this.syncShadow(e);
       e.root.setDepth(e.root.y);
       e.sprite.setFlipX(Math.cos(m.angle) < 0);
@@ -2467,6 +2509,7 @@ export class WorldScene extends Phaser.Scene {
     });
     for (const [id, e] of this.monsters) {
       if (seen.has(id)) continue;
+      this.stepTween(e, false, false, true, -1, -1); // gục: trả sprite về tỉ lệ gốc (nhát chí mạng đang nén dở thì không kẹt tỉ lệ lệch)
       if (e.root.visible) {
         // Quái biến khỏi state khi đang hiện trong màn hình = gục: tan thành điểm sáng (ngoài camera thì root ẩn, không vào đây)
         // Chỉ khi còn gần mình: quái rời vùng nhìn của server (xa hơn 1100 px) cũng biến khỏi state nhưng KHÔNG gục
@@ -2639,6 +2682,44 @@ export class WorldScene extends Phaser.Scene {
     e.shadow?.setVisible(on);
   }
 
+  /**
+   * Tween nhẹ mỗi khung (gfx/anim/tween.ts): nhấp nhô khi đi, co giãn khi đánh / bị đánh. Tắt khi giảm chuyển động, bậc Thấp, ở xa
+   * (`tweenEnabled`); lúc tắt trả sprite về vị trí / tỉ lệ gốc đúng MỘT lần rồi không ghi gì nữa (không tốn mỗi khung).
+   */
+  private stepTween(
+    e: Entity,
+    me: boolean,
+    moving: boolean,
+    dead: boolean,
+    strikeSince: number,
+    hurtSince: number,
+  ) {
+    const near = me || Math.hypot(e.root.x - this.predX, e.root.y - this.predY) < FAR_ANIM_DIST;
+    const t = spriteTween({
+      enabled: tweenEnabled(getQuality(), near),
+      nowMs: this.time.now,
+      moving,
+      dead,
+      strikeSince,
+      hurtSince,
+      phaseMs: (e.tweenPhase ??= Math.random() * WALK_BOB_PERIOD_MS),
+    });
+    if (t === NEUTRAL_TWEEN) {
+      if (!e.tweenActive) return;
+      e.tweenActive = false;
+    } else e.tweenActive = true;
+    e.sprite.setScale(t.sx, t.sy);
+    e.sprite.y = (e.spriteBaseY ?? 0) + t.dy + footPlant(e.sprite.height, t.sy);
+  }
+
+  /** Đã bao lâu kể từ lúc người chơi bắt đầu bị đánh (tween), -1 nếu không (mốc 0 = chưa từng, không tính từ đầu cảnh). */
+  private playerHurtSince(e: Entity): number {
+    const c = e.playerAnim;
+    return c && c.hurtFrom > 0
+      ? sinceStart(this.time.now, c.hurtFrom + HURT_PULSE_MS, HURT_PULSE_MS)
+      : -1;
+  }
+
   /** Thực thể ở xa (không phải mình) chỉ cập nhật trạng thái hoạt ảnh theo `farAnimHz` (gfx/anim/entity-lod.ts). */
   private animDue(e: Entity): boolean {
     const dme = Math.hypot(e.root.x - this.predX, e.root.y - this.predY);
@@ -2661,7 +2742,7 @@ export class WorldScene extends Phaser.Scene {
       ? this.add.sprite(0, isPlayer ? -12 : 0, ATLAS_KEY, texture)
       : this.add.sprite(0, isPlayer ? -12 : 0, texture);
     const bar = this.add.graphics();
-    const e: Entity = { root, sprite, bar, tx: x, ty: y };
+    const e: Entity = { root, sprite, bar, tx: x, ty: y, spriteBaseY: isPlayer ? -12 : 0 };
     // Bóng đốm dưới chân, vẽ DƯỚI mọi thứ khác của thực thể; hiện / ẩn theo hồ sơ chất lượng (syncShadow)
     e.shadow = this.add
       .image(0, shadowDims.y, SHADOW_KEY)
@@ -2779,14 +2860,14 @@ export class WorldScene extends Phaser.Scene {
     switch (m.kind) {
       case "slash": {
         const other = this.players.get(m.by);
-        if (other) other.slashUntil = this.time.now + 220;
+        if (other) other.slashUntil = this.time.now + SLASH_MS;
         if (!this.inView(m.x, m.y, 110)) return;
         const attacker = this.state?.players?.get(m.by);
         return this.fxSlash(m.x, m.y, m.angle, this.weaponColorFor(attacker, 0xdfe8f0));
       }
       case "sword": {
         const other = this.players.get(m.by);
-        if (other) other.slashUntil = this.time.now + 220;
+        if (other) other.slashUntil = this.time.now + SLASH_MS;
         if (!this.inView(m.x, m.y, m.range + 96)) return;
         const attacker = this.state?.players?.get(m.by);
         return this.fxSword(m.x, m.y, m.angle, m.range, this.weaponColorFor(attacker, 0xffffff));
