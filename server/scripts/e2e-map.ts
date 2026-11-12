@@ -266,6 +266,8 @@ async function main() {
       }>;
     await setQuality("high");
     await sleep(500);
+    // Sương (#362) chỉ có ở bậc Cao và làm sáng vùng giữa ~4 %: ẩn nó trong phép đo ánh sáng để Ca 5 đo ĐÚNG ánh sáng + vignette
+    await ev(`(window.__scene.fogImages || []).forEach((im) => im.setVisible(false)); 1`);
     const fHigh = await flags();
     must(fHigh.amb && fHigh.vig, "bậc Cao: cả ánh sáng môi trường lẫn vignette hiện");
     must(
@@ -323,6 +325,7 @@ async function main() {
     ok(
       `draw call mỗi khung: tắt ${dOff.toFixed(1)} -> bật ${dOn.toFixed(1)} (+${(dOn - dOff).toFixed(1)})`,
     );
+    await ev(`(window.__scene.fogImages || []).forEach((im) => im.setVisible(true)); 1`); // trả sương lại cho các ca sau
 
     // ---------------- Ca 6: thời tiết bằng hạt ----------------
     out(
