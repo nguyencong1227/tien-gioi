@@ -24,6 +24,7 @@ import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
 import { parseOverlayCounts } from "./perf-gate.mjs";
 import { DRAW_COUNTER_SOURCE, parseDrawCounterSnapshot } from "./draw-counter.mjs";
+import { FX_DRIVER_SOURCE, parseFxDriverReport } from "./fx-driver.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const __filename = fileURLToPath(import.meta.url);
@@ -162,12 +163,14 @@ export const ALL_SCENARIOS = [
     cpuRate: 6,
   },
   // Chế độ combat (chiến đấu có hiệu ứng fx)
+  // `fx`: kế hoạch bắn hiệu ứng THẬT trong cửa sổ lấy mẫu (fx-driver.mjs, #400): mock không tự phát hạt / chữ bay đúng lúc lấy mẫu
   {
     id: "combat-low-4x",
     name: "Chiến đấu có hiệu ứng hạt",
     query: "duel=mock&debug=1&perf=1",
     tier: "low",
     cpuRate: 4,
+    fx: "combat",
   },
   {
     id: "combat-high-4x",
@@ -175,6 +178,24 @@ export const ALL_SCENARIOS = [
     query: "duel=mock&debug=1&perf=1",
     tier: "high",
     cpuRate: 4,
+    fx: "combat",
+  },
+  // Nhiều chiêu liên tục (đòn dồn dập + công pháp liên tiếp): thử ngân sách hiệu ứng ở bậc Thấp (trần chặt nhất) và Cao
+  {
+    id: "burst-low-4x",
+    name: "Nhiều chiêu liên tục",
+    query: "duel=mock&debug=1&perf=1",
+    tier: "low",
+    cpuRate: 4,
+    fx: "burst",
+  },
+  {
+    id: "burst-high-4x",
+    name: "Nhiều chiêu liên tục",
+    query: "duel=mock&debug=1&perf=1",
+    tier: "high",
+    cpuRate: 4,
+    fx: "burst",
   },
   // Chế độ bí cảnh (dungeon)
   {
@@ -183,6 +204,7 @@ export const ALL_SCENARIOS = [
     query: "dungeon=mock&debug=1&perf=1",
     tier: "mid",
     cpuRate: 4,
+    fx: "combat",
   },
 ];
 
@@ -311,6 +333,24 @@ try {
     await cdpSend("Runtime.evaluate", {
       expression: `window.__tgPerf.reset(); window.__tgDraw && window.__tgDraw.reset()`,
     });
+    // Bắn hiệu ứng THẬT trong cả cửa sổ lấy mẫu (fx-driver.mjs): mock không tự phát hạt / chữ bay đúng lúc lấy mẫu
+    let fxStart = null;
+    if (sc.fx) {
+      const started = await cdpSend("Runtime.evaluate", {
+        expression: `${FX_DRIVER_SOURCE}\n;JSON.stringify(window.__tgFxDriver.start(${JSON.stringify(sc.fx)}))`,
+        returnByValue: true,
+      });
+      try {
+        fxStart = JSON.parse(started?.result?.result?.value ?? "null");
+      } catch {
+        fxStart = null;
+      }
+      if (!fxStart?.ok) {
+        console.error(
+          `  ✗ Không bắn được hiệu ứng (kế hoạch "${sc.fx}"): ${fxStart?.error ?? "không rõ"}`,
+        );
+      }
+    }
 
     // Thu thập mẫu trong 5 giây
     const sampleDurationMs = isQuick ? 3000 : 5000;
@@ -321,6 +361,14 @@ try {
       expression: `JSON.stringify(window.__tgPerf.snapshot())`,
       returnByValue: true,
     });
+
+    // Dừng bắn NGAY khi lấy snapshot (cùng lúc): báo cáo đỉnh hạt / emitter / chữ bay trong cả cửa sổ
+    const fxRes = sc.fx
+      ? await cdpSend("Runtime.evaluate", {
+          expression: `JSON.stringify(window.__tgFxDriver ? window.__tgFxDriver.stop() : null)`,
+          returnByValue: true,
+        })
+      : null;
 
     const drawRes = await cdpSend("Runtime.evaluate", {
       expression: `JSON.stringify(window.__tgDraw ? window.__tgDraw.snapshot() : null)`,
@@ -365,6 +413,11 @@ try {
         );
       }
 
+      const fxReport = sc.fx ? parseFxDriverReport(fxRes?.result?.result?.value) : null;
+      if (sc.fx && !fxReport) {
+        console.error("  ✗ Không đọc được báo cáo bắn hiệu ứng: perf-gate sẽ ĐỎ 'thiếu số đo'.");
+      }
+
       const resItem = {
         id: sc.id,
         scenario: sc.name,
@@ -380,6 +433,16 @@ try {
         drawCallsAvg,
         drawCallsP95,
         drawCallFrames,
+        // Hiệu ứng bắn THẬT (null nếu kịch bản không bắn): kế hoạch, số lần phát, ĐỈNH hạt / emitter / chữ bay trong cả cửa sổ
+        fxPlan: sc.fx ?? null,
+        fxPlayed: fxReport?.fxPlayed ?? null,
+        fxRejected: fxReport?.fxRejected ?? null,
+        floatsPlayed: fxReport?.floatsPlayed ?? null,
+        particlesPeak: fxReport?.particlesPeak ?? null,
+        emittersPeak: fxReport?.emittersPeak ?? null,
+        floatsPeak: fxReport?.floatsPeak ?? null,
+        fxAdmitted: fxReport?.fxAdmitted ?? null,
+        fxDropped: fxReport?.fxDropped ?? null,
         particles,
         particleLimit,
         emitters,
@@ -389,6 +452,13 @@ try {
         overlayExcerpt: overlayText.split("\n").slice(0, 3).join(" | "),
       };
       results.push(resItem);
+
+      if (sc.fx) {
+        const t = budget?.runtime?.tiers?.[sc.tier];
+        console.log(
+          `  - Hiệu ứng bắn thật ("${sc.fx}"): phát ${resItem.fxPlayed ?? "?"} (ngân sách bỏ ${resItem.fxDropped ?? "?"}), ĐỈNH hạt ${resItem.particlesPeak ?? "?"} (trần ${t?.peakParticles ?? "?"}) | emitter ${resItem.emittersPeak ?? "?"} (trần ${t?.emitterBudget ?? "?"}) | chữ bay ${resItem.floatsPeak ?? "?"} (trần ${t?.damageNumbers ?? "?"})`,
+        );
+      }
 
       const statusTag = budgetMet ? "✓ ĐẠT" : "⚠ VƯỢT";
       console.log(
@@ -429,7 +499,13 @@ console.table(
     Đạt: r.budgetMet ? "PASS" : "FAIL",
     Draw_call_TB: r.drawCallsAvg ?? "?",
     Draw_call_p95: `${r.drawCallsP95 ?? "?"}/${budget?.runtime?.tiers?.[r.tier]?.drawCalls ?? "?"}`,
-    Hạt: `${r.particles ?? "?"}/${r.particleLimit ?? "?"}`,
+    Hạt: r.fxPlan
+      ? `${r.particlesPeak ?? "?"} đỉnh/${r.particleLimit ?? "?"}`
+      : `${r.particles ?? "?"}/${r.particleLimit ?? "?"}`,
+    Emitter: r.fxPlan
+      ? `${r.emittersPeak ?? "?"} đỉnh/${r.emitterLimit ?? "?"}`
+      : `${r.emitters ?? "?"}/${r.emitterLimit ?? "?"}`,
+    Chữ_bay: r.fxPlan ? `${r.floatsPeak ?? "?"} đỉnh` : "-",
     Heap: `${r.heapMb} MB`,
   })),
 );
@@ -449,14 +525,22 @@ if (shouldWriteDocs) {
     const END_MARKER = "<!-- PERF-MATRIX:END -->";
 
     let tableMd = `${START_MARKER}\n`;
-    tableMd += `| Kịch bản | Bậc đồ hoạ | CPU Throttling | FPS | JS Update p95 | Ngân sách JS | Draw call TB / p95 / Trần | Hạt / Trần | Emitters | JS Heap | Trạng thái |\n`;
-    tableMd += `|---|---|---|---|---|---|---|---|---|---|---|\n`;
+    tableMd += `| Kịch bản | Bậc đồ hoạ | CPU Throttling | FPS | JS Update p95 | Ngân sách JS | Draw call TB / p95 / Trần | Hạt / Trần | Emitters | Chữ bay đỉnh / Trần | JS Heap | Trạng thái |\n`;
+    tableMd += `|---|---|---|---|---|---|---|---|---|---|---|---|\n`;
 
     for (const r of results) {
       const statusStr = r.budgetMet ? "✓ ĐẠT" : "⚠ VƯỢT";
-      const particleStr = `${r.particles ?? "?"} / ${r.particleLimit ?? "-"}`;
-      const emitterStr = `${r.emitters ?? "?"} / ${r.emitterLimit ?? "-"}`;
-      tableMd += `| ${r.scenario} | ${r.tier.toUpperCase()} | ${r.cpu} | ${r.fpsAvg} | ${r.updateP95Ms} ms | <= ${r.budgetJsP95Ms} ms | ${r.drawCallsAvg ?? "?"} / ${r.drawCallsP95 ?? "?"} / ${budget?.runtime?.tiers?.[r.tier]?.drawCalls ?? "-"} | ${particleStr} | ${emitterStr} | ${r.heapMb} MB | ${statusStr} |\n`;
+      // Kịch bản bắn hiệu ứng thật: ĐỈNH trong cả cửa sổ (đánh dấu "đỉnh"); không bắn: số SỐNG lúc lớp phủ vẽ lần cuối
+      const particleStr = r.fxPlan
+        ? `${r.particlesPeak ?? "?"} đỉnh / ${r.particleLimit ?? "-"}`
+        : `${r.particles ?? "?"} / ${r.particleLimit ?? "-"}`;
+      const emitterStr = r.fxPlan
+        ? `${r.emittersPeak ?? "?"} đỉnh / ${r.emitterLimit ?? "-"}`
+        : `${r.emitters ?? "?"} / ${r.emitterLimit ?? "-"}`;
+      const floatStr = r.fxPlan
+        ? `${r.floatsPeak ?? "?"} đỉnh / ${budget?.runtime?.tiers?.[r.tier]?.damageNumbers ?? "-"}`
+        : "-";
+      tableMd += `| ${r.scenario} | ${r.tier.toUpperCase()} | ${r.cpu} | ${r.fpsAvg} | ${r.updateP95Ms} ms | <= ${r.budgetJsP95Ms} ms | ${r.drawCallsAvg ?? "?"} / ${r.drawCallsP95 ?? "?"} / ${budget?.runtime?.tiers?.[r.tier]?.drawCalls ?? "-"} | ${particleStr} | ${emitterStr} | ${floatStr} | ${r.heapMb} MB | ${statusStr} |\n`;
     }
     tableMd += END_MARKER;
 

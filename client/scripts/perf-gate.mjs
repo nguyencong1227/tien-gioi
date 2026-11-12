@@ -7,6 +7,8 @@
  *
  * Chỉ chặn trên số đo TIN ĐƯỢC của harness: thời gian `update` p95 của cảnh (JS), số hạt sống, số emitter, và số draw call mỗi khung
  * (p95 trong cửa sổ lấy mẫu; ĐO THẬT bằng bộ đếm tiêm vào WebGL, `draw-counter.mjs`, #397; trước đó là số gán cứng nên không chặn).
+ * Kịch bản bắn hiệu ứng THẬT (`fxPlan`, fx-driver.mjs, #400) chặn trên ĐỈNH hạt / emitter (trần x `OWN_OVERSHOOT`) và ĐỈNH chữ bay
+ * (`damageNumbers`) trong cả cửa sổ lấy mẫu thay cho số sống lúc lớp phủ vẽ lần cuối.
  * KHÔNG chặn trên FPS (headless SwiftShader không phản ánh GPU thật).
  * `--time-slack` (hoặc biến PERF_TIME_SLACK) nhân hệ số vào ngân sách thời gian để bù runner CI chậm hơn máy dev;
  * số hạt / emitter / draw call là đếm tất định nên KHÔNG nới.
@@ -14,11 +16,20 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { MIN_FX_PLAYED } from "./fx-driver.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const REPO = path.resolve(path.dirname(__filename), "../..");
 
 const isNum = (v) => typeof v === "number" && Number.isFinite(v) && v >= 0;
+
+/**
+ * Ưu tiên 2 (hiệu ứng của CHÍNH MÌNH: đòn, kỹ năng, bị đánh) được vượt trần hạt / emitter của hồ sơ tới bấy nhiêu lần trước khi bị bỏ
+ * (`OWN_OVERSHOOT` trong `client/src/gfx/fx/budget.ts`, docs/THIET_KE_GIAO_DIEN_DO_HOA.md mục 7.1; test hợp đồng đối chiếu hằng số thật).
+ * Kịch bản có bắn hiệu ứng thật (`fxPlan`, #400) tính theo ĐỈNH trong cả cửa sổ lấy mẫu: trần CỨNG = trần x `OWN_OVERSHOOT` (đỉnh vượt
+ * trần danh nghĩa nhưng trong trần cứng là THIẾT KẾ, không phải lỗi; vượt trần cứng nghĩa là kiểm soát ngân sách hỏng).
+ */
+export const OWN_OVERSHOOT = 2;
 
 /** Số khung CÓ VẼ tối thiểu trong cửa sổ lấy mẫu để tin p95 draw call (5 giây ở 6x CPU vẫn ra hàng chục khung). */
 export const MIN_DRAW_FRAMES = 10;
@@ -74,10 +85,21 @@ export function evaluatePerfResults(results, budget, { timeSlack = 1 } = {}) {
       row.bad.push("bậc");
       continue;
     }
+    // Kịch bản có bắn hiệu ứng THẬT: ĐỈNH trong cả cửa sổ (hạt / emitter tới trần x OWN_OVERSHOOT vì ưu tiên 2, chữ bay tới `damageNumbers`);
+    // không bắn thì số SỐNG lúc lớp phủ vẽ lần cuối so với trần danh nghĩa như trước
+    const fx = r.fxPlan !== undefined && r.fxPlan !== null;
     const checks = [
       ["JS update p95 (ms)", r.updateP95Ms, tier.jsFrameP95Ms * timeSlack, "ms"],
-      ["số hạt sống", r.particles, tier.peakParticles, "hạt"],
-      ["số emitter", r.emitters, tier.emitterBudget, "emitter"],
+      ...(fx
+        ? [
+            ["đỉnh hạt (fx)", r.particlesPeak, tier.peakParticles * OWN_OVERSHOOT, "hạt"],
+            ["đỉnh emitter (fx)", r.emittersPeak, tier.emitterBudget * OWN_OVERSHOOT, "emitter"],
+            ["đỉnh chữ bay (fx)", r.floatsPeak, tier.damageNumbers, "chữ"],
+          ]
+        : [
+            ["số hạt sống", r.particles, tier.peakParticles, "hạt"],
+            ["số emitter", r.emitters, tier.emitterBudget, "emitter"],
+          ]),
       ["draw call p95 mỗi khung", r.drawCallsP95, tier.drawCalls, "draw call"],
     ];
     row.p95 = r.updateP95Ms;
@@ -86,6 +108,13 @@ export function evaluatePerfResults(results, budget, { timeSlack = 1 } = {}) {
     row.particleLimit = tier.peakParticles;
     row.emitters = r.emitters;
     row.emitterLimit = tier.emitterBudget;
+    row.fxPlan = fx ? String(r.fxPlan) : null;
+    row.fxPlayed = r.fxPlayed;
+    row.fxDropped = r.fxDropped;
+    row.particlesPeak = r.particlesPeak;
+    row.emittersPeak = r.emittersPeak;
+    row.floatsPeak = r.floatsPeak;
+    row.floatsLimit = tier.damageNumbers;
     row.drawCalls = r.drawCallsP95;
     row.drawCallsAvg = r.drawCallsAvg;
     row.drawCallsLimit = tier.drawCalls;
@@ -105,6 +134,29 @@ export function evaluatePerfResults(results, budget, { timeSlack = 1 } = {}) {
       } else if (actual > limit) {
         violations.push({ id, metric, actual, limit });
         row.bad.push(metric);
+      }
+    }
+    // Bắn hiệu ứng thật mà phát được quá ít, hoặc đỉnh bằng 0 dù đã phát: bộ bắn / bộ đọc đỉnh hỏng, KHÔNG được xanh giả
+    if (fx) {
+      if (!(isNum(r.fxPlayed) && r.fxPlayed >= MIN_FX_PLAYED)) {
+        violations.push({
+          id,
+          metric: "số hiệu ứng bắn thật phát được",
+          actual: String(r.fxPlayed),
+          limit: `số >= ${MIN_FX_PLAYED}`,
+        });
+        row.bad.push("bắn hiệu ứng quá ít");
+      } else {
+        for (const [metric, peak] of [
+          ["đỉnh hạt (fx)", r.particlesPeak],
+          ["đỉnh emitter (fx)", r.emittersPeak],
+          ["đỉnh chữ bay (fx)", r.floatsPeak],
+        ]) {
+          if (peak === 0) {
+            violations.push({ id, metric, actual: 0, limit: "> 0 (đã phát hiệu ứng)" });
+            row.bad.push(`${metric} = 0`);
+          }
+        }
       }
     }
     // p95 draw call chỉ đáng tin khi đủ khung có vẽ: ít quá thì ĐỎ (bộ đếm không bắt được khung nào / cửa sổ lấy mẫu hỏng)
@@ -133,12 +185,26 @@ export function evaluatePerfResults(results, budget, { timeSlack = 1 } = {}) {
   }
   // Bậc Vừa / Cao mà MỌI kịch bản đều 0 hạt + 0 emitter thì số đo hạt gần như chắc chắn không đọc được (đừng tin cổng hạt)
   const rich = rows.filter((x) => x.tier === "mid" || x.tier === "high");
-  if (rich.length > 0 && rich.every((x) => x.particles === 0 && x.emitters === 0)) {
+  if (
+    rich.length > 0 &&
+    rich.every(
+      (x) => (x.particlesPeak ?? x.particles) === 0 && (x.emittersPeak ?? x.emitters) === 0,
+    )
+  ) {
     warnings.push(
       "Mọi kịch bản bậc Vừa / Cao đều 0 hạt + 0 emitter: nhiều khả năng harness không đọc được số hạt từ lớp phủ (cổng hạt / emitter KHÔNG có tác dụng).",
     );
   }
   return { ok: violations.length === 0, violations, rows, warnings };
+}
+
+/** Ô "hiệu ứng bắn thật" của bảng tóm tắt: kế hoạch, phát / bỏ, đỉnh hạt · emitter (trần cứng) · chữ; "-" nếu kịch bản không bắn. */
+function fxCell(r) {
+  if (!r.fxPlan) return "-";
+  const f = (v) => (v === undefined || v === null ? "?" : String(v));
+  const hardP = isNum(r.particleLimit) ? r.particleLimit * OWN_OVERSHOOT : "?";
+  const hardE = isNum(r.emitterLimit) ? r.emitterLimit * OWN_OVERSHOOT : "?";
+  return `${r.fxPlan}: ${f(r.fxPlayed)} / ${f(r.fxDropped)}; ${f(r.particlesPeak)}/${f(hardP)} · ${f(r.emittersPeak)}/${f(hardE)} · ${f(r.floatsPeak)}/${f(r.floatsLimit)}`;
 }
 
 /** Bản tóm tắt Markdown (job summary của GitHub Actions). */
@@ -150,13 +216,13 @@ export function formatSummary(evaluation, { timeSlack = 1 } = {}) {
       ? "✅ Mọi kịch bản nằm trong ngân sách."
       : `❌ ${evaluation.violations.length} chỉ số vượt ngân sách.`,
     "",
-    "| Kịch bản | Bậc | CPU | JS update p95 | Draw call p95 (TB) | Hạt | Emitter | FPS | |",
-    "|---|---|---|---|---|---|---|---|---|",
+    "| Kịch bản | Bậc | CPU | JS update p95 | Draw call p95 (TB) | Hạt sống | Emitter sống | Hiệu ứng bắn thật: phát / bỏ, đỉnh hạt · emitter · chữ | FPS | |",
+    "|---|---|---|---|---|---|---|---|---|---|",
   ];
   for (const r of evaluation.rows) {
     const f = (v) => (v === undefined || v === null ? "?" : String(v));
     lines.push(
-      `| ${f(r.scenario ?? r.id)} (\`${r.id}\`) | ${f(r.tier)} | ${f(r.cpu)} | ${f(r.p95)} / ${f(r.p95Limit)} ms | ${f(r.drawCalls)} / ${f(r.drawCallsLimit)} (${f(r.drawCallsAvg)}) | ${f(r.particles)} / ${f(r.particleLimit)} | ${f(r.emitters)} / ${f(r.emitterLimit)} | ${f(r.fps)} | ${r.bad.length ? "❌ " + r.bad.join(", ") : "✅"} |`,
+      `| ${f(r.scenario ?? r.id)} (\`${r.id}\`) | ${f(r.tier)} | ${f(r.cpu)} | ${f(r.p95)} / ${f(r.p95Limit)} ms | ${f(r.drawCalls)} / ${f(r.drawCallsLimit)} (${f(r.drawCallsAvg)}) | ${r.fxPlan ? "-" : `${f(r.particles)} / ${f(r.particleLimit)}`} | ${r.fxPlan ? "-" : `${f(r.emitters)} / ${f(r.emitterLimit)}`} | ${fxCell(r)} | ${f(r.fps)} | ${r.bad.length ? "❌ " + r.bad.join(", ") : "✅"} |`,
     );
   }
   for (const w of evaluation.warnings ?? []) lines.push("", `⚠️ ${w}`);
@@ -170,7 +236,7 @@ export function formatSummary(evaluation, { timeSlack = 1 } = {}) {
     "",
     `Ngân sách thời gian nhân hệ số \`time-slack\` = ${timeSlack} (bù runner CI chậm hơn máy dev); số hạt / emitter / draw call không nới.`,
     "Không chặn trên FPS (SwiftShader không phản ánh GPU thật). Draw call = số lệnh vẽ WebGL mỗi khung CÓ VẼ (bộ đếm tiêm vào `drawElements` / `drawArrays` và bản instanced, gom theo `requestAnimationFrame`; khung không vẽ không tính), p95 trong cửa sổ lấy mẫu.",
-    "Số hạt / emitter là số SỐNG lúc lớp phủ vẽ lần cuối (không phải đỉnh trong cả cửa sổ lấy mẫu); kịch bản duel / dungeon giả lập không phát hạt đúng lúc lấy mẫu nên 0 là bình thường, chỉ `crowd-mid` / `crowd-high` thật sự kiểm hạt.",
+    `Kịch bản có bắn hiệu ứng thật (cột "Hiệu ứng bắn thật") chặn trên ĐỈNH trong cả cửa sổ: hạt / emitter tới trần x ${OWN_OVERSHOOT} (ưu tiên 2 được vượt trần danh nghĩa, docs 7.1) và chữ bay tới \`damageNumbers\`. Kịch bản không bắn (crowd) kiểm số hạt / emitter SỐNG lúc lớp phủ vẽ lần cuối (không phải đỉnh).`,
   );
   return lines.join("\n") + "\n";
 }
