@@ -123,6 +123,7 @@ try {
     ["quest-modal", "toggleQuestModal"],
     ["shop-modal", "toggleShopModal"],
     ["forge-modal", "toggleForgeModal"],
+    ["sect-modal", "toggleSectModal"],
   ];
   const CARDS = ["dungeon-end-modal", "duel-end-modal", "newbie-guide-modal", "outdated-modal"];
   const HUD = ["#hud", "#quest-tracker", "#party-panel", "#skills", "#quickbar", "#minimap-wrap"];
