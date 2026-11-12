@@ -59,6 +59,7 @@ Bản chạy thật hoàn toàn tách biệt với thư mục phát triển củ
 | `backups/` | `700` | Chứa tối đa 14 bản sao lưu nén `tiengioi-YYYYmmdd-HHMMSS.sql.gz` |
 | `backups/restore-test.log` | `644` | Nhật ký các lần khôi phục thử nghiệm định kỳ |
 | `backups/LAST_RESTORE_OK` | `644` | Mốc thời gian ISO của lần khôi phục thử thành công gần nhất |
+| `audit-xoa-tai-khoan.log` | `600` | Nhật ký kiểm toán lưu vết các lần xoá tài khoản (`account.deleted`) |
 
 > [!CAUTION]
 > Tuyệt đối **KHÔNG COMMIT** hoặc chia sẻ tệp `.env.production`. Mật khẩu và token phải được bảo vệ nghiêm ngặt.
@@ -256,38 +257,45 @@ Trang chính sách quyền riêng tư (`client/public/privacy.html`, #314) cam k
 > **THAO TÁC KHÔNG THỂ HOÀN TÁC.**
 > Trợ lý AI **tuyệt đối KHÔNG tự ý chạy công cụ này trên bản chạy thật** khi không có yêu cầu cụ thể từ người dùng. Thao tác này chỉ do Dev A hoặc Người dùng trực tiếp thực hiện.
 
-### 8.1. Quy trình chuẩn bị trước khi xoá
-1. **Sao lưu cơ sở dữ liệu ngay trước khi thao tác:**
-   ```bash
-   ~/TT/tien-gioi-prod/prod.sh backup
-   ```
-2. **Lưu ý về các bản sao lưu cũ:**
+> [!NOTE]
+> Lệnh `xoa-tai-khoan` trong `prod.sh` chỉ khả dụng trên bản chạy thật sau khi triển khai phiên bản mới (thẻ phiên bản phát hành sau PR #320 / Issue #321). Bản chạy thật hiện tại (`0.1.0`) chưa chứa lệnh này.
+
+### 8.1. Quy trình thực hiện qua `prod.sh`
+Toàn bộ quy trình an toàn đã được tích hợp trong lệnh `~/TT/tien-gioi-prod/prod.sh xoa-tai-khoan`:
+
+1. **Lưu ý về các bản sao lưu cũ:**
    Các bản sao lưu nén tự động lưu trữ tại `~/TT/tien-gioi-prod/backups/` được lưu giữ tối đa 14 bản (tối đa 14 ngày). Dữ liệu tài khoản đã xoá vẫn sẽ tồn tại trong các file sao lưu lịch sử này cho đến khi các bản sao lưu bị xoay vòng và dọn dẹp hoàn toàn sau 14 ngày.
 
-### 8.2. Chạy thử trước (Dry-Run)
-Luôn chạy thử trước để kiểm tra danh sách bản ghi và các ràng buộc an toàn (Tông chủ, trực tuyến, kho Linh thạch):
-```bash
-sg docker -c "docker exec tien-gioi npm run tai-khoan -w server -- xoa <tên-đăng-nhập> --thu"
-```
-Kết quả in ra chi tiết tài khoản, ID chân linh, hồ sơ nhân vật, phiên đăng nhập, và tông môn (sẽ giải tán hoặc gỡ khỏi danh sách) mà **không thay đổi bất kỳ dữ liệu nào** trên máy chủ.
+2. **Chạy thử trước (Dry-Run):**
+   Luôn chạy thử trước để kiểm tra danh sách bản ghi và các ràng buộc an toàn (Tông chủ, kho Linh thạch). Chạy thử chạy trong một container dùng một lần (`compose run --no-deps`), dịch vụ game vẫn hoạt động bình thường, không gián đoạn người chơi khác:
+   ```bash
+   ~/TT/tien-gioi-prod/prod.sh xoa-tai-khoan <tên-đăng-nhập>
+   ```
+   Kết quả in ra chi tiết tài khoản, ID chân linh, hồ sơ nhân vật, phiên đăng nhập, và tông môn (sẽ giải tán hoặc gỡ khỏi danh sách) mà **không thay đổi bất kỳ dữ liệu nào** trên máy chủ.
 
-### 8.3. Thực hiện xoá thật (`--yes`)
-Khi đã xác nhận đầy đủ thông tin:
-```bash
-sg docker -c "docker exec tien-gioi npm run tai-khoan -w server -- xoa <tên-đăng-nhập> --yes"
-```
-Lệnh sẽ nguyên tử:
-- Thu hồi và xoá toàn bộ phiên (`sessions`).
-- Gỡ thành viên khỏi tông môn (hoặc giải tán tông môn nếu là Tông chủ một mình và kho 0 Linh thạch).
-- Xoá hồ sơ nhân vật (`characters`).
-- Xoá chân linh (`souls`).
-- Xoá tài khoản (`accounts`), giải phóng tên đăng nhập để người khác có thể đăng ký lại.
-- Tự động ghi MỘT sự kiện kiểm toán `account.deleted` vào log container (gồm `id`, `userDigest`, `character`, `sessions`).
+3. **Thực hiện xoá thật (`--yes`):**
+   Khi đã xác nhận đầy đủ thông tin:
+   ```bash
+   ~/TT/tien-gioi-prod/prod.sh xoa-tai-khoan <tên-đăng-nhập> --yes
+   ```
+   Lệnh sẽ tự động thực hiện quy trình bảo vệ 4 bước khép kín:
+   - **Tự động sao lưu cơ sở dữ liệu** (`cmd_backup`) vào `backups/tiengioi-YYYYMMDD-HHMMSS.sql.gz` phòng hờ sự cố.
+   - **Tạm dừng dịch vụ game** (`compose stop game`) để đảm bảo người chơi không thể trực tuyến trong lúc xoá, triệt tiêu nguy cơ dữ liệu nhân vật trong RAM của WorldRoom sống lại ở lần lưu định kỳ.
+   - **Chạy công cụ xoá** trong container dùng một lần với cờ `--yes`:
+     - Thu hồi và xoá toàn bộ phiên (`sessions`).
+     - Gỡ thành viên khỏi tông môn (hoặc giải tán tông môn nếu là Tông chủ một mình và kho 0 Linh thạch).
+     - Xoá hồ sơ nhân vật (`characters`).
+     - Xoá chân linh (`souls`).
+     - Xoá tài khoản (`accounts`), giải phóng tên đăng nhập để người khác có thể đăng ký lại.
+     - Tự động ghi MỘT sự kiện kiểm toán `account.deleted` vào tệp `$PROD_DIR/audit-xoa-tai-khoan.log` (phân quyền `chmod 600`, gồm `id`, `userDigest`, `character`, `sessions`) để lưu vết vĩnh viễn.
+   - **LUÔN LUÔN khởi động lại dịch vụ game** (`compose up -d game`) sau đó, bất kể lệnh xoá thành công hay gặp lỗi.
 
-### 8.4. Các trường hợp bị từ chối an toàn
-Công cụ sẽ từ chối thao tác (mã thoát `1`) trong các trường hợp:
-- **Tài khoản đang trực tuyến:** Không xoá khi người chơi đang ở trong phòng game. Báo rõ để người chơi thoát game trước.
-- **Tông chủ còn thành viên khác:** Phải chuyển giao chức Tông chủ cho người khác hoặc giải tán tông môn trước khi xoá tài khoản.
-- **Tông môn còn Linh thạch trong kho:** Nếu Tông chủ một mình nhưng kho còn > 0 Linh thạch, phải rút hết Linh thạch ra để tránh mất quỹ mồ côi.
+### 8.2. Các trường hợp bị từ chối an toàn
+Công cụ sẽ từ chối thao tác (mã thoát `1` hoặc `2`) trong các trường hợp:
+- **Tên đăng nhập không hợp lệ:** Phải khớp định dạng `^[a-z0-9_]{3,20}$` (được kiểm tra trước mọi lệnh Docker để chống chèn lệnh).
 - **Tên đăng nhập không tồn tại.**
+- **Dịch vụ game chưa dừng khi xoá thật:** Lệnh `xoa --yes` bắt buộc game phải dừng (trừ khi có `--force`) để ngăn chặn dữ liệu trong bộ nhớ sống lại.
+- **Tài khoản đang trực tuyến:** Không xoá khi người chơi đang ở trong phòng game.
+- **Tông chủ còn thành viên khác:** Phải chuyển giao chức Tông chủ cho người khác hoặc giải tán tông môn trước khi xoá tài khoản.
+- **Tông môn còn Linh thạch trong kho:** Nếu Tông chủ một mình nhưng kho còn > 0 Linh thạch, phải rút hết Linh thạch ra để tránh làm mồ côi ngân sách tông môn.
 

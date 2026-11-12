@@ -32,6 +32,7 @@ function fakeEnv(init: {
   const attrs: Record<string, string> = {};
   const props: Record<string, string> = {};
   const store: Record<string, string> = {};
+  const disposed = { count: 0 };
   const env: DisplayEnv = {
     size: () => ({ w: state.w, h: state.h }),
     dpr: () => state.dpr,
@@ -48,6 +49,9 @@ function fakeEnv(init: {
       return () => {
         t.live = false;
       };
+    },
+    dispose: () => {
+      disposed.count++;
     },
     root: {
       setAttribute: (n, v) => {
@@ -70,7 +74,7 @@ function fakeEnv(init: {
   const flush = () => {
     for (const t of timers.splice(0)) if (t.live) t.fn();
   };
-  return { env, state, fire, flush, timers, attrs, props, store, handlers };
+  return { env, state, fire, flush, timers, attrs, props, store, handlers, disposed };
 }
 
 describe("gfx/display: phân loại thiết bị theo khung nhìn (không theo User-Agent)", () => {
@@ -312,19 +316,117 @@ describe("gfx/display: bộ điều khiển với môi trường giả", () => {
     expect(f.attrs["data-orient"]).toBe(before);
   });
 
-  it("callback ném lỗi không chặn callback khác trên cùng một lần phát? (hiện trạng: lỗi nổi lên, ghi nhận bằng test)", () => {
+  it("một callback ném lỗi KHÔNG chặn các callback khác, lỗi được ghi log, trạng thái vẫn cập nhật", () => {
     const f = fakeEnv({ w: 390, h: 844, coarse: true });
     const d = createDisplay(f.env);
     const second = vi.fn();
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
     d.onChange(() => {
       throw new Error("lỗi người nghe");
     });
     d.onChange(second);
     f.state.w = 600;
     f.fire("resize");
-    expect(() => f.flush()).toThrow("lỗi người nghe");
-    // trạng thái đã cập nhật trước khi gọi người nghe nên lần đọc sau vẫn đúng
+    expect(() => f.flush()).not.toThrow();
     expect(d.get().cssW).toBe(600);
-    expect(second).not.toHaveBeenCalled();
+    expect(second).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledTimes(1);
+    log.mockRestore();
+  });
+
+  describe("bàn phím ảo không được lật orient / form (chiều cao ổn định)", () => {
+    it("điện thoại dọc 360x640 + bàn phím (khung nhìn còn 360x340): vẫn portrait / phone, --vh theo chiều cao THẬT", () => {
+      const f = fakeEnv({ w: 360, h: 640, coarse: true });
+      const d = createDisplay(f.env);
+      expect(d.get()).toMatchObject({ orient: "portrait", form: "phone" });
+      f.state.h = 340; // bàn phím mở
+      f.fire("viewport");
+      f.flush();
+      expect(d.get()).toMatchObject({ cssH: 340, orient: "portrait", form: "phone" });
+      expect(f.attrs["data-orient"]).toBe("portrait");
+      expect(f.props["--vh"]).toBe("340px"); // tấm vẫn co theo chỗ còn lại
+      f.state.h = 640; // đóng bàn phím
+      f.fire("viewport");
+      f.flush();
+      expect(d.get()).toMatchObject({ cssH: 640, orient: "portrait" });
+    });
+
+    it("xoay máy (bề rộng đổi): orient đổi đúng và chiều cao ổn định được đặt lại", () => {
+      const f = fakeEnv({ w: 360, h: 640, coarse: true });
+      const d = createDisplay(f.env);
+      f.state.h = 340;
+      f.fire("viewport");
+      f.flush();
+      f.state.w = 640;
+      f.state.h = 360; // xoay ngang
+      f.fire("orientationchange");
+      f.flush();
+      expect(d.get()).toMatchObject({ cssW: 640, cssH: 360, orient: "landscape", form: "phone" });
+      // ngang + bàn phím (còn 640x180): vẫn landscape
+      f.state.h = 180;
+      f.fire("viewport");
+      f.flush();
+      expect(d.get()).toMatchObject({ orient: "landscape" });
+      // xoay lại dọc
+      f.state.w = 360;
+      f.state.h = 640;
+      f.fire("orientationchange");
+      f.flush();
+      expect(d.get().orient).toBe("portrait");
+    });
+
+    it("máy tính bảng 768x1024 + bàn phím (còn 768x500): vẫn tablet / portrait (không thành phone)", () => {
+      const f = fakeEnv({ w: 768, h: 1024, coarse: true });
+      const d = createDisplay(f.env);
+      f.state.h = 500;
+      f.fire("viewport");
+      f.flush();
+      expect(d.get()).toMatchObject({ form: "tablet", orient: "portrait", cssH: 500 });
+    });
+
+    it("máy tính (chuột): đổi chiều cao cửa sổ là thật, theo sát (không giữ chiều cao cũ)", () => {
+      const f = fakeEnv({ w: 800, h: 1200, coarse: false });
+      const d = createDisplay(f.env);
+      expect(d.get().orient).toBe("portrait");
+      f.state.h = 500; // kéo thấp cửa sổ
+      f.fire("resize");
+      f.flush();
+      // cạnh ngắn mới là 500 < 600: cửa sổ hẹp coi là phone (luật đã chốt), nhưng orient theo sát chiều cao THẬT
+      expect(d.get()).toMatchObject({ orient: "landscape", form: "phone" });
+    });
+
+    it("chiều cao tăng lại (bàn phím đóng, thanh địa chỉ ẩn) cập nhật chiều cao ổn định lên mức mới", () => {
+      const f = fakeEnv({ w: 360, h: 600, coarse: true });
+      const d = createDisplay(f.env);
+      f.state.h = 700; // thanh địa chỉ co lại
+      f.fire("resize");
+      f.flush();
+      f.state.h = 300; // bàn phím
+      f.fire("viewport");
+      f.flush();
+      expect(d.get().orient).toBe("portrait");
+    });
+  });
+
+  it("(pointer: coarse) đổi mà không có resize (máy lai) -> đọc lại, form đổi tablet <-> desktop", () => {
+    const f = fakeEnv({ w: 1024, h: 768, coarse: false });
+    const d = createDisplay(f.env);
+    expect(d.get().form).toBe("desktop");
+    f.state.coarse = true;
+    f.fire("pointermedia");
+    f.flush();
+    expect(d.get().form).toBe("tablet");
+    f.state.coarse = false;
+    f.fire("pointermedia");
+    f.flush();
+    expect(d.get().form).toBe("desktop");
+  });
+
+  it("dispose gọi env.dispose (gỡ phần tử dò vùng an toàn) và không để lại listener", () => {
+    const f = fakeEnv({ w: 390, h: 844, coarse: true });
+    const d = createDisplay(f.env);
+    d.dispose();
+    expect(f.disposed.count).toBe(1);
+    for (const set of f.handlers.values()) expect(set.size).toBe(0);
   });
 });

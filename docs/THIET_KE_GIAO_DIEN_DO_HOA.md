@@ -83,7 +83,7 @@ export function playFx(recipeId: string, x: number, y: number, opts?: FxOpts): v
 export interface FxOpts { priority?: 0 | 1 | 2; angle?: number; scale?: number; tint?: number; target?: Phaser.GameObjects.GameObject }
 ```
 
-**Thuộc tính trên `<html>`** (do `display.ts` cập nhật mỗi lần đổi; CSS của B dùng chúng thay cho `@media` rải rác): `data-form="phone|tablet|desktop"`, `data-orient="portrait|landscape"`, `data-input="touch|mouse"`, `data-quality="low|mid|high"`, `data-reduce-motion="1|0"`; biến CSS `--safe-t/r/b/l` (px), `--vw`, `--vh` (px thật, tránh lỗi `100vh` trên di động), `--ui-scale`.
+**Thuộc tính trên `<html>`** (do `display.ts` cập nhật mỗi lần đổi; CSS của B dùng chúng thay cho `@media` rải rác): `data-form="phone|tablet|desktop"`, `data-orient="portrait|landscape"`, `data-input="touch|mouse"`, `data-quality="low|mid|high"`, `data-reduce-motion="1|0"`; biến CSS `--safe-t/r/b/l` (px), `--vw`, `--vh` (**CHIỀU RỘNG / CHIỀU CAO khung nhìn tính bằng px**, ví dụ `--vh: 844px`; dùng `var(--vh)` thay cho `100vh`, KHÔNG nhân 100; theo chiều cao THẬT nên bàn phím ảo làm tấm co lại; tránh lỗi `100vh` trên di động), `--ui-scale`.
 
 ## 4. Bố cục đáp ứng (B làm, C kiểm)
 
@@ -96,11 +96,13 @@ export interface FxOpts { priority?: 0 | 1 | 2; angle?: number; scale?: number; 
 
 Cài trong `client/src/gfx/display.ts` (`classifyForm`, có test ma trận).
 
+**Chiều cao ổn định (bàn phím ảo):** `form` và `orient` được tính theo chiều cao ỔN ĐỊNH, không theo chiều cao thật: trên cảm ứng, nếu bề rộng không đổi mà chiều cao chỉ giảm (bàn phím ảo mở: 360×640 -> 360×340) thì giữ chiều cao lớn nhất đã thấy ở bề rộng này; bề rộng đổi (xoay máy, đổi cỡ cửa sổ) thì đặt lại. Nhờ đó tấm toàn màn hình không biến thành ngăn kéo cạnh phải lúc người chơi đang gõ chữ, và máy tính bảng 768×1024 + bàn phím không thành `phone`. `cssH` và `--vh` vẫn là chiều cao thật (tấm co theo chỗ còn lại). Trên máy tính (chuột) đổi chiều cao cửa sổ là thật nên theo sát. `(pointer: coarse)` đổi mà không có `resize` (máy lai gắn / tháo bàn phím) cũng được nghe.
+
 `data-input` theo **lần nhập gần nhất** (`pointerdown` với `pointerType`): máy lai (laptop cảm ứng) tự đổi, gợi ý phím và nút ảo theo đó.
 
 ### 4.2 Quy tắc bắt buộc
 1. **Mục tiêu chạm ≥ 44×44 CSS px** (nút kỹ năng ≥ 56, khoảng cách ≥ 8). Kiểm tự động (C, mục 12).
-2. **Chữ:** thân ≥ 14 px trên `phone`, tiêu đề dùng `clamp()`; tương phản AA (đã có từ #277); cỡ chữ người chơi chỉnh được (Nhỏ/Vừa/Lớn) qua `--ui-scale`.
+2. **Chữ:** **chữ nội dung** (bảng, hộp thoại, chat, nhiệm vụ) ≥ 14 px trên `phone`; **nhãn số liệu HUD** dày đặc (thanh khí huyết / linh lực, tên nút, bảng đội) ≥ 12 px kèm tương phản AA (HUD hiện dùng 11 px: đặt 14 px cho mọi chữ HUD sẽ làm HUD tràn); tiêu đề dùng `clamp()`; tương phản AA (đã có từ #277); cỡ chữ người chơi chỉnh được (Nhỏ/Vừa/Lớn) qua `--ui-scale`.
 3. **Không thanh cuộn ngoài ý muốn:** `html, body { overscroll-behavior: none; overflow: hidden }`, chiều cao dùng `--vh` / `100dvh`, chỉ cuộn BÊN TRONG bảng; kiểm `scrollWidth ≤ innerWidth` và `scrollHeight ≤ innerHeight` ở mọi khung nhìn.
 4. **Vùng an toàn:** mọi phần tử neo mép dùng `--safe-*`; app Android cấu hình `StatusBar` / `SystemBars` đúng phiên bản Capacitor đã cài (xem `docs/APP_ANDROID.md`).
 5. **Bảng thành tấm:** `phone` = tấm toàn màn hình (dọc: kéo từ dưới lên; ngang: kéo từ cạnh phải) với nút đóng ở vùng với tay; `tablet` / `desktop` = cửa sổ nổi như hiện nay. Mỗi bảng dùng MỘT thành phần tấm chung (không sao chép CSS từng bảng).
@@ -117,7 +119,7 @@ Quy tắc MỚI viết theo thuộc tính (`html[data-form="phone"] ...`). Mỗi
 
 **Hướng đề xuất** (A thử bằng Chrome headless và ghi số đo trước khi chốt; PR đầu của A là "spike + đo"):
 - `scale: { mode: NONE hoặc RESIZE, ... }` tự quản kích thước: `game.scale.resize(cssW * rs, cssH * rs)` rồi đặt kích thước hiển thị của canvas bằng CSS (`zoom = 1/rs` hoặc `canvas.style.width/height`), do `display.ts` điều khiển trên `ResizeObserver` của `#game` và `visualViewport` (bàn phím ảo), có chống rung (debounce ~100 ms, bỏ qua thay đổi < 2 px).
-- `renderScale = clamp(dpr, 1, profile.renderScaleMax)` rồi hạ thêm nếu `cssW*cssH*rs² > profile.maxPixels` (trần điểm ảnh, bảng mục 6.2).
+- `renderScale = clamp(dpr, 1, profile.renderScaleMax)` rồi hạ thêm nếu `cssW*cssH*rs² > profile.maxPixels` (trần điểm ảnh, bảng mục 6.2). **`renderScale` có thể < 1** (sàn 0,5): `Thấp` có `maxPixels` 1,0 M nên màn 1920×1080 (2,07 M điểm ảnh ở `renderScale` 1) bị ép xuống ~0,69; chấp nhận được vì máy tính mặc định `Cao`, và người chơi chọn `Thấp` là chọn đánh đổi độ nét lấy hiệu năng.
 - **Camera:** `fitZoom` giữ nguyên LUẬT theo đơn vị logic (CSS px) rồi nhân `renderScale` vào `camera.zoom`; **ràng buộc StateView (`w/zoom ≤ 1900`, `h/zoom ≤ 1100`, tính theo CSS px / zoom logic) phải được test** (đột biến đỏ nếu bỏ).
 - **Pixel-art:** sprite hiện là pixel-art; zoom không nguyên làm nhấp nháy cạnh. Quyết định (xác nhận bằng ảnh chụp): giữ lọc `NEAREST` + `roundPixels`, hoặc bắt `camera.zoom * renderScale` về bội số của 0,25. A chọn theo ảnh chụp thật và ghi lý do.
 - **Tiết kiệm pin:** tuỳ chọn 30 FPS (`game.loop.targetFps`), tự bật khi `Battery Status` báo yếu nếu khả dụng; tạm dừng khi ẩn (đã có qua nhịp tim #293).
@@ -157,7 +159,7 @@ Quy tắc MỚI viết theo thuộc tính (`html[data-form="phone"] ...`). Mỗi
 2. **Công thức theo dữ liệu** (`gfx/fx/recipes.ts`): `{ id, particles[], flash?, shake?, light?, sound?, cost }`, thêm hiệu ứng = thêm dữ liệu, không thêm nhánh `if` trong `WorldScene`.
 3. **Ngân sách tập trung (`FxBudget`):** mỗi `playFx` xin ngân sách; vượt `particleBudget` / `emitterBudget` thì bỏ hiệu ứng ưu tiên thấp (`priority 0` = môi trường, `1` = người khác, `2` = người chơi này và sự kiện quan trọng như đột phá). Ưu tiên của chính mình KHÔNG bao giờ bị bỏ trừ khi vượt gấp đôi trần.
 4. **Không cấp phát trong vòng nóng:** emitter và chữ bay dùng **pool**; `maxAliveParticles` đặt theo hồ sơ; một **atlas hạt** duy nhất (đốm mềm, tia, vòng, khói, cánh hoa, hồn lửa) với hoà trộn cộng (`ADD`) để gộp lệnh vẽ.
-5. **Chữ bay bằng `BitmapText`** (một texture phông bit-map sinh bằng mã) thay vì `Text` canvas (mỗi `Text` là một texture, đắt trên di động); tối đa `damageNumbers`.
+5. **Chữ bay bằng `BitmapText`** (một texture phông bit-map sinh bằng mã) thay vì `Text` canvas (mỗi `Text` là một texture, đắt trên di động); tối đa `damageNumbers`. **Phông bit-map sinh bằng mã phải có đủ ký tự dùng thật**: chữ số, `+`, `-`, `!`, và các chữ có dấu của nhãn hiện tại (`floatText` in "Bạo! 123": cần `B`, `ạ`, `o`, `!`), hoặc đổi nhãn chí mạng thành kiểu không chữ (cỡ + màu + biểu tượng). B chọn khi làm #329; C kiểm tài sản (#331) biết để đối chiếu.
 6. **Không chặn nhập liệu, không phụ thuộc thời gian thực của server:** hiệu ứng chỉ là hình ảnh; đóng cảnh (`shutdown`) phải giải phóng sạch (kiểm rò rỉ, mục 12).
 7. Tôn trọng `shake`, `reducedMotion()`, `onQualityChange` (đổi bậc giữa chừng không giật: hiệu ứng đang chạy xong tự nhiên, hiệu ứng MỚI theo hồ sơ mới).
 
@@ -205,7 +207,7 @@ Mục tiêu "≥ 50 FPS" được chứng minh bằng: (a) các số trên đạ
 3. Cấm: tài sản / chữ / tên / âm thanh của game khác (kể cả bản clone Vạn Kiếp Tu Tiên), tài sản không rõ giấy phép, sinh bằng công cụ mà điều khoản không cho dùng thương mại.
 
 ## 12. Kiểm thử và công cụ đo (C làm, A review)
-1. **Ma trận khung nhìn** (ảnh chụp trước / sau, `npm run chup-viewport`): 360×640, 390×844, 412×915 (điện thoại dọc); 844×390, 915×412 (điện thoại ngang); 768×1024, 1024×768 (tablet); 1280×720, 1920×1080, 2560×1440 (máy tính), DPR 1 / 2 / 3 ở mẫu đại diện. Dùng chế độ giả lập có sẵn (`?dungeon=mock`, `?duel=mock`, `?sect=mock`...) để có đủ màn hình. So điểm ảnh với ảnh chuẩn (ngưỡng), ảnh mới lưu cạnh để người duyệt xem trước / sau.
+1. **Ma trận khung nhìn** (ảnh chụp trước / sau, `npm run chup-viewport`): 360×640, 390×844, 412×915 (điện thoại dọc); 844×390, 915×412 (điện thoại ngang); 768×1024, 1024×768 (tablet); 1280×720, 1920×1080, 2560×1440 (máy tính), DPR 1 / 2 / 3 ở mẫu đại diện. Dùng chế độ giả lập có sẵn (`?dungeon=mock`, `?duel=mock`, `?sect=mock`...) để có đủ màn hình. So điểm ảnh với ảnh chuẩn (ngưỡng), ảnh mới lưu cạnh để người duyệt xem trước / sau. **Giả lập con trỏ chính cho đúng** (cảm ứng cho phone / tablet, chuột cho desktop) vì `display.ts` phân loại `tablet` bằng `(pointer: coarse)`; trong Chrome headless, bật giả lập cảm ứng xong không tắt lại được trong cùng phiên nên chạy các khung DESKTOP TRƯỚC (`client/scripts/snap-sheet.mjs` của B đã làm vậy).
 2. **Khẳng định bố cục tự động** ở mỗi khung nhìn: không tràn ngang / dọc; mọi phần tử tương tác trên cảm ứng ≥ 44×44; không phần tử HUD nào nằm ngoài vùng an toàn; các vùng HUD chính (`#hud`, `#hud-col-left`, `#chat`, `#minimap-wrap`, cụm nút ảo) không chồng nhau (hộp bao).
 3. **Harness hiệu năng** (mở rộng `client/scripts/measure-mobile-perf.mjs`): kịch bản {một mình, đông 50 bot, đang đánh với hiệu ứng, bí cảnh} x {Thấp, Vừa, Cao} x {CPU 1×, 4×, 6×}; xuất JSON; so với `perf-budget.json`. Chạy trong `bench.yml` hằng đêm + thủ công; PR chỉ chạy phần tĩnh (kích cỡ gói, bộ nhớ texture suy ra từ atlas) để không cạn phút Actions.
 4. **Rò rỉ:** vào / ra bản đồ và bí cảnh 20 lần, đo số texture, số `GameObject`, listener, heap.
