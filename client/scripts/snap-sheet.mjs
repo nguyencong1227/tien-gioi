@@ -257,6 +257,73 @@ try {
       await sleep(100);
     }
   }
+  // ---- Bàn phím ảo: khung nhìn chỉ thấp đi (không xoay máy) thì tấm KHÔNG được đổi dạng (#339) ----
+  // Ca thật: điện thoại nhỏ 360x640 mở bàn phím còn ~360x340 (rộng >= cao nên phân loại thô sẽ ra landscape).
+  console.log("\n[bàn phím ảo] 360x640 -> 360x340 -> xoay 640x360 -> về 360x640");
+  const measure = async (id) =>
+    JSON.parse(
+      await evalJs(`(() => {
+        const el = document.getElementById(${JSON.stringify(id)});
+        const r = el.getBoundingClientRect();
+        const de = document.documentElement;
+        return JSON.stringify({
+          form: de.dataset.form, orient: de.dataset.orient, input: de.dataset.input,
+          vh: de.style.getPropertyValue("--vh"), iw: innerWidth, ih: innerHeight,
+          x: r.x, w: r.width, h: r.height, r: r.right,
+        });
+      })()`),
+    );
+  const setSize = async (w, h) => {
+    await send("Emulation.setDeviceMetricsOverride", {
+      width: w,
+      height: h,
+      deviceScaleFactor: 1,
+      mobile: true,
+    });
+    await sleep(400);
+  };
+  await setSize(360, 640);
+  // Một lần chạm thật để display.ts biết đang dùng cảm ứng (data-input="touch"), như người chơi thật
+  await send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: 5, y: 5 }] });
+  await send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await evalJs("window.__ui.toggleInventory(true);0");
+  await sleep(450);
+  let k = await measure("inv-modal");
+  check(k.input === "touch", `đã nhận cảm ứng (data-input=${k.input})`);
+  check(k.form === "phone" && k.orient === "portrait", `trước bàn phím: ${k.form}/${k.orient}`);
+  await setSize(360, 340);
+  k = await measure("inv-modal");
+  check(k.vh === "340px", `--vh theo chiều cao THẬT khi mở bàn phím (${k.vh})`);
+  check(
+    k.form === "phone" && k.orient === "portrait",
+    `bàn phím mở: vẫn phone/portrait, không lật landscape (${k.form}/${k.orient})`,
+  );
+  check(
+    k.x < 1 && Math.abs(k.w - k.iw) < 1 && Math.abs(k.h - k.ih) < 1,
+    `tấm vẫn toàn màn hình và co theo chỗ còn lại (${Math.round(k.w)}x${Math.round(k.h)} / ${k.iw}x${k.ih})`,
+  );
+  await setSize(360, 640);
+  k = await measure("inv-modal");
+  check(k.orient === "portrait" && k.vh === "640px", `đóng bàn phím: portrait, --vh=${k.vh}`);
+  await setSize(640, 360); // xoay máy thật: bề rộng đổi nên phân loại lại
+  k = await measure("inv-modal");
+  check(
+    k.form === "phone" && k.orient === "landscape",
+    `xoay máy: phone/landscape (${k.form}/${k.orient})`,
+  );
+  check(
+    Math.abs(k.r - k.iw) < 1 && k.w <= k.iw * 0.64 + 1,
+    `xoay máy: ngăn kéo cạnh phải (rộng ${Math.round(k.w)})`,
+  );
+  await setSize(360, 640);
+  k = await measure("inv-modal");
+  check(k.orient === "portrait", `xoay lại: portrait (${k.orient})`);
+  await evalJs("window.__ui.toggleInventory(false);0");
+  // Máy tính bảng + bàn phím: 768x1024 -> 768x560 vẫn là tablet (cửa sổ nổi), không thành phone
+  await setSize(768, 1024);
+  await setSize(768, 560);
+  k = await measure("inv-modal");
+  check(k.form === "tablet", `tablet + bàn phím vẫn là tablet (${k.form}/${k.orient})`);
   ws.close();
 } finally {
   chrome.kill();
