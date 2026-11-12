@@ -39,7 +39,12 @@ const PANELS = [
   ["quest-modal", "toggleQuestModal"],
   ["shop-modal", "toggleShopModal"],
   ["forge-modal", "toggleForgeModal"],
+  ["sect-modal", "toggleSectModal"],
 ];
+// Tấm KHÔNG tự cuộn, từng view cuộn bên trong (để hộp xác nhận lồng luôn phủ kín tấm): bỏ ca "tấm cuộn được" và đo hộp xác nhận
+const INNER_SCROLL = new Set(["sect-modal"]);
+// Bảng mới chụp ảnh WebP
+const WEBP_PANELS = new Set(["sect-modal"]);
 // Thẻ (.sheet.sheet-card): hộp thoại kết quả / chỉ dẫn / cảnh báo có nút hành động riêng; mở bằng cách bỏ `hidden` (bố cục đo theo nội dung mặc định)
 const CARDS = ["dungeon-end-modal", "duel-end-modal", "newbie-guide-modal", "outdated-modal"];
 
@@ -181,6 +186,9 @@ try {
           const r = el.getBoundingClientRect();
           const close = el.querySelector(".modal-close");
           const c = close.getBoundingClientRect();
+          // Trước khi chèn chiều cao giả: tấm có vừa nội dung tự nhiên không, và có cho cuộn không (overflow-y)
+          const naturalFits = el.scrollHeight <= el.clientHeight + 1;
+          const overflowY = getComputedStyle(el).overflowY;
           // Ép nội dung dài để tấm CHẮC CHẮN cuộn được, rồi cuộn xuống đáy: nút đóng phải đứng yên
           const spacer = document.createElement("div");
           spacer.style.cssText = "height:1800px;flex:none";
@@ -207,6 +215,8 @@ try {
           ).length;
           return JSON.stringify({
             nestedScroll,
+            naturalFits,
+            overflowY,
             foreign,
             iw: innerWidth, ih: innerHeight,
             sheet: { x: r.x, y: r.y, w: r.width, h: r.height, r: r.right, b: r.bottom },
@@ -232,10 +242,18 @@ try {
       );
       if (vp.form === "phone") {
         // Chỉ điện thoại: nút đóng cố định ở vùng với tay. Cửa sổ nổi (tablet / desktop) để nút đóng ở đầu bảng như cũ.
-        check(
-          m.scrolled > 0 && Math.abs(m.closeAfterScrollY - m.close.y) < 1,
-          `nút đóng đứng yên khi cuộn nội dung (đã cuộn ${Math.round(m.scrolled)} px)`,
-        );
+        if (INNER_SCROLL.has(id))
+          check(
+            m.overflowY === "hidden" &&
+              m.naturalFits &&
+              Math.abs(m.closeAfterScrollY - m.close.y) < 1,
+            `tấm không tự cuộn (overflow-y ${m.overflowY}, vừa nội dung: ${m.naturalFits}; view cuộn bên trong), nút đóng đứng yên`,
+          );
+        else
+          check(
+            m.scrolled > 0 && Math.abs(m.closeAfterScrollY - m.close.y) < 1,
+            `nút đóng đứng yên khi cuộn nội dung (đã cuộn ${Math.round(m.scrolled)} px)`,
+          );
       }
       if (vp.form === "phone") {
         check(
@@ -266,10 +284,46 @@ try {
         check(Math.abs(m.sheet.x + m.sheet.w / 2 - m.iw / 2) < 2, "cửa sổ nổi căn giữa ngang");
       }
       if (!NO_SHOT) {
-        const shot = await send("Page.captureScreenshot", { format: "png" });
-        const file = `sheet-${id.replace("-modal", "")}-${vp.name}.png`;
+        // Bảng mới dùng WebP (nhẹ hơn PNG ~3 lần); các bảng cũ giữ PNG để ảnh cũ không thành mồ côi
+        const webp = WEBP_PANELS.has(id);
+        const shot = await send(
+          "Page.captureScreenshot",
+          webp ? { format: "webp", quality: 90 } : { format: "png" },
+        );
+        const file = `sheet-${id.replace("-modal", "")}-${vp.name}.${webp ? "webp" : "png"}`;
         fs.writeFileSync(path.join(OUT_DIR, file), Buffer.from(shot.result.data, "base64"));
         console.log(`  ✓ ảnh ${file}`);
+      }
+      if (id === "sect-modal") {
+        // Hộp xác nhận lồng (Nhường / Trục xuất / Rời): phải phủ KÍN tấm, nằm trên cùng, nút >= 44 px trên điện thoại
+        const cf = JSON.parse(
+          await evalJs(`(() => {
+            const el = document.getElementById("sect-modal"), ov = document.getElementById("sect-action-confirm");
+            document.getElementById("sect-action-confirm-text").textContent = "Xác nhận thao tác tông môn?";
+            ov.hidden = false;
+            const s = el.getBoundingClientRect(), o = ov.getBoundingClientRect();
+            const pts = [[0.05, 0.05], [0.95, 0.05], [0.05, 0.95], [0.95, 0.95], [0.5, 0.5]];
+            let foreign = 0;
+            for (const [fx, fy] of pts) {
+              const t = document.elementFromPoint(Math.min(s.x + fx * s.width, innerWidth - 1), Math.min(s.y + fy * s.height, innerHeight - 1));
+              if (!t || !ov.contains(t)) foreign++;
+            }
+            const btns = [...ov.querySelectorAll("button")].map((b) => { const q = b.getBoundingClientRect(); return { w: q.width, h: q.height, ok: q.top >= s.top && q.bottom <= s.bottom && q.left >= s.left && q.right <= s.right }; });
+            ov.hidden = true;
+            return JSON.stringify({ dx: Math.abs(o.x - s.x), dy: Math.abs(o.y - s.y), dw: Math.abs(o.width - s.width), dh: Math.abs(o.height - s.height), foreign, btns });
+          })()`),
+        );
+        check(
+          // hộp phủ khung đệm của tấm, tấm có viền 1 px (cửa sổ nổi) nên lệch <= 1 px mỗi cạnh, cỡ lệch <= 2 px
+          cf.dx < 1.5 && cf.dy < 1.5 && cf.dw < 2.5 && cf.dh < 2.5,
+          `hộp xác nhận lồng phủ kín tấm (lệch ${cf.dx.toFixed(1)},${cf.dy.toFixed(1)} cỡ ${cf.dw.toFixed(1)}x${cf.dh.toFixed(1)})`,
+        );
+        check(cf.foreign === 0, `hộp xác nhận nằm trên cùng (${cf.foreign}/5 điểm mẫu bị chắn)`);
+        check(
+          cf.btns.length === 2 &&
+            cf.btns.every((b) => b.ok && b.h >= (vp.form === "phone" ? 44 : 36)),
+          `hai nút xác nhận nằm trong tấm, đủ lớn (${cf.btns.map((b) => Math.round(b.h)).join(", ")} px)`,
+        );
       }
       await evalJs(`window.__ui.${toggle}(false);0`);
       await sleep(100);

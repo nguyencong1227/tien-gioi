@@ -4515,16 +4515,18 @@ body.low-fx.in-limbo .stone-item {
 
 /* Bảng Tông môn */
 #sect-modal {
-  width: min(94vw, 560px);
-  max-height: min(88vh, 640px);
-  display: flex;
-  flex-direction: column;
+  --sheet-w: 560px;
+  /* Tấm KHÔNG tự cuộn: từng view (.sect-view) cuộn bên trong, để hộp xác nhận lồng (.sect-action-confirm, absolute inset 0)
+     luôn phủ kín tấm dù đang cuộn (nếu tấm tự cuộn thì hộp nằm ở đầu nội dung, có thể trôi ra ngoài màn hình) */
+  overflow: hidden;
 }
 
 .sect-view {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   padding: 4px;
 }
@@ -5104,13 +5106,6 @@ body.low-fx.in-limbo .stone-item {
     bottom: calc(max(12px, env(safe-area-inset-bottom)) + 195px);
     width: min(94vw, 356px);
     padding: 10px 12px;
-  }
-
-  #sect-modal {
-    width: min(94vw, 440px);
-    max-height: min(84vh, 600px);
-    padding: 12px;
-    justify-content: flex-start;
   }
 
   .sect-tab {
