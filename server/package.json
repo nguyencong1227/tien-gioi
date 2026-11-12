@@ -24,6 +24,7 @@
     "e2e:chat-luong": "tsx scripts/e2e-chat-luong.ts",
     "e2e:dpr": "tsx scripts/e2e-dpr.ts",
     "e2e:fx": "tsx scripts/e2e-fx.ts",
+    "e2e:map": "tsx scripts/e2e-map.ts",
     "tai-khoan": "tsx scripts/tai-khoan.ts",
     "chuyen-du-lieu": "tsx scripts/chuyen-du-lieu.ts",
     "red-team": "tsx scripts/red-team.ts",
