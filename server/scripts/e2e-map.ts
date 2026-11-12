@@ -443,6 +443,11 @@ async function main() {
       Boolean(await ev(`window.__scene.fogImages.every((im) => im.visible && im.alpha > 0)`)),
       "mọi mảng sương hiện và có độ đậm",
     );
+    must(
+      Boolean(await ev(`window.__scene.fogPaused`)),
+      "?debug mặc định để sương đứng yên (fogPaused = true)",
+    );
+    await ev(`window.__scene.fogPaused = false; 1`); // bật lại chuyển động sương để kiểm trôi
     const xs0 = await fogXs();
     await waitGame(2500, "2,5 s đồng hồ trò chơi");
     const xs1 = await fogXs();
@@ -508,6 +513,7 @@ async function main() {
     const stillMoved = still1.filter((x, i) => Math.abs(x - still0[i]) > 0.01).length;
     must(stillMoved === 0, `giảm chuyển động: sương đứng yên (${stillMoved} mảng còn dời)`);
     await setCheck("set-reduced-motion", false);
+    await ev(`window.__scene.fogPaused = true; 1`);
     ok("giảm chuyển động: sương hiện nhưng đứng yên");
     // Đổi bản đồ (dựng lại): số mảng không đổi, không rò đối tượng
     const kidsBefore = Number(await ev(`window.__scene.children.list.length`));

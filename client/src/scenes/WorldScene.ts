@@ -26,7 +26,7 @@ import { getQuality, onQualityChange } from "../gfx/quality";
 import { buildDecorGrid } from "../gfx/map-decor";
 import { styleOf } from "../gfx/map-style";
 import { decorTilesetKey, ensureDecorTileset } from "../gfx/decor-tileset";
-import { planWeather, weatherEnabledByUrl } from "../gfx/map-weather";
+import { ambientEnabledByUrl, planWeather, weatherEnabledByUrl } from "../gfx/map-weather";
 import {
   FOG_KEY,
   advanceU,
@@ -306,6 +306,8 @@ export class WorldScene extends Phaser.Scene {
   private fogPatches: FogPatch[] = [];
   private fogSpeed = 0;
   private fogLastNow = 0;
+  /** Sương đứng yên khi `?debug` (trừ `?fog=1`): cảnh tĩnh để các script điểm ảnh có ảnh đối chứng không nhiễu. */
+  fogPaused = false;
   private weatherNextAt: number | undefined;
   private townVisuals: Phaser.GameObjects.GameObject[] = [];
   private portalVisuals: Phaser.GameObjects.GameObject[] = [];
@@ -340,6 +342,8 @@ export class WorldScene extends Phaser.Scene {
     this.fx = createFxSystem(this, { getProfile: getQuality, depth: () => this.map.worldH });
     this.weatherPaused =
       typeof window !== "undefined" && !weatherEnabledByUrl(window.location.search);
+    this.fogPaused =
+      typeof window !== "undefined" && !ambientEnabledByUrl(window.location.search, "fog");
     const offQuality = onQualityChange(() => {
       this.applyLight();
       this.applyFog();
@@ -517,6 +521,7 @@ export class WorldScene extends Phaser.Scene {
           .setAlpha(plan.alpha),
       );
     this.fogLastNow = 0;
+    this.stepFog(this.time.now); // đặt chỗ NGAY: không để mảng sương nằm ở (0, 0) với cỡ gốc một khung nào
   }
 
   /** Mỗi khung: trôi các mảng sương (đứng yên khi giảm chuyển động) và đặt chỗ theo khung nhìn hiện tại. */
@@ -525,7 +530,7 @@ export class WorldScene extends Phaser.Scene {
     const cam = this.cameras.main;
     const dt = this.fogLastNow ? Math.min(100, now - this.fogLastNow) : 0;
     this.fogLastNow = now;
-    const still = getQuality().reducedMotion;
+    const still = getQuality().reducedMotion || this.fogPaused;
     for (let i = 0; i < this.fogImages.length; i++) {
       const p = this.fogPatches[i];
       if (!still) p.u = advanceU(p.u, dt, this.fogSpeed, p.speed, cam.displayWidth, p.size);

@@ -140,12 +140,32 @@ try {
       for (let i = 0; i < A.length; i += 4)
         if (Math.abs(A[i] - B[i]) + Math.abs(A[i + 1] - B[i + 1]) + Math.abs(A[i + 2] - B[i + 2]) > 60) n++;
       return n; })()`);
+  /** Chờ camera hội tụ (đồng hồ trò chơi >= 6,5 s, rồi 3 lần đọc liên tiếp bằng nhau, tối đa 8 s): camera còn đang nội suy về nhân vật thì ảnh chụp lệch 1 điểm ảnh làm "nhiễu nền" vọt lên (máy chậm / nhiều lớp phủ hơn => hội tụ muộn hơn). */
+  const camStable = async () => {
+    // Camera nội suy về nhân vật theo đồng hồ TRÒ CHƠI và chỉ "nhích" 1 điểm ảnh khi giá trị thực vượt mốc làm tròn (~3,9 s sau khi vào cảnh):
+    // đọc scroll nguyên không thấy được phần lẻ nên chờ cho đồng hồ trò chơi qua 6,5 s (tối đa 30 s thật) rồi mới đo.
+    for (let k = 0; k < 150; k++) {
+      if (Number(await evalJs("window.__scene.time.now")) >= 6500) break;
+      await sleep(200);
+    }
+    let prev = "";
+    let same = 0;
+    for (let k = 0; k < 53 && same < 3; k++) {
+      await sleep(150);
+      const cur = await evalJs(
+        "JSON.stringify([window.__scene.cameras.main.scrollX, window.__scene.cameras.main.scrollY, window.__scene.cameras.main.zoom])",
+      );
+      same = cur === prev ? same + 1 : 0;
+      prev = cur;
+    }
+  };
   const settle = async () => {
     await evalJs("window.__fx.clear(); 0");
     for (let k = 0; k < 120; k++) {
       await sleep(100);
       if ((await alive()) === 0 && k >= 5) break;
     }
+    await camStable();
   };
 
   await settle();

@@ -113,6 +113,25 @@ try {
       `window.__scene.children.list.filter((c) => c.type === 'ParticleEmitter').reduce((n, e) => n + e.getAliveParticleCount(), 0)`,
     );
   const flashing = () => evalJs("window.__scene.cameras.main.flashEffect.isRunning");
+  /** Chờ camera hội tụ (đồng hồ trò chơi >= 6,5 s, rồi 3 lần đọc liên tiếp bằng nhau, tối đa 8 s): camera còn đang nội suy về nhân vật thì ảnh chụp lệch 1 điểm ảnh làm "nhiễu nền" vọt lên (máy chậm / nhiều lớp phủ hơn => hội tụ muộn hơn). */
+  const camStable = async () => {
+    // Camera nội suy về nhân vật theo đồng hồ TRÒ CHƠI và chỉ "nhích" 1 điểm ảnh khi giá trị thực vượt mốc làm tròn (~3,9 s sau khi vào cảnh):
+    // đọc scroll nguyên không thấy được phần lẻ nên chờ cho đồng hồ trò chơi qua 6,5 s (tối đa 30 s thật) rồi mới đo.
+    for (let k = 0; k < 150; k++) {
+      if (Number(await evalJs("window.__scene.time.now")) >= 6500) break;
+      await sleep(200);
+    }
+    let prev = "";
+    let same = 0;
+    for (let k = 0; k < 53 && same < 3; k++) {
+      await sleep(150);
+      const cur = await evalJs(
+        "JSON.stringify([window.__scene.cameras.main.scrollX, window.__scene.cameras.main.scrollY, window.__scene.cameras.main.zoom])",
+      );
+      same = cur === prev ? same + 1 : 0;
+      prev = cur;
+    }
+  };
   const settle = async () => {
     await evalJs("window.__scene.cameras.main.resetFX(); 0");
     // Chờ hạt tan HẾT (thăm dò, tối đa 12 s): đồng hồ trò chơi chậm lại khi máy bận nên chờ cố định không đủ
@@ -126,6 +145,7 @@ try {
       )
         break;
     }
+    await camStable();
   };
   /** Chụp canvas WebGL (điểm ảnh thật) vào window[name]. */
   const snap = (name) =>
@@ -173,12 +193,18 @@ try {
     `{ const o = ${JSON.stringify(o)}; if (o.by === "me") o.by = sc.sid; sc.onFx(Object.assign({ x: sc.predX, y: sc.predY }, o)); }`;
 
   await settle();
-  await snap("base");
   check((await alive()) === 0, "ban đầu không hạt");
-  // Đối chứng: hai ảnh chụp liên tiếp KHÔNG hiệu ứng khác nhau bao nhiêu (hoạt ảnh nền); mọi phép so ảnh phải vượt mức này
-  await sleep(80);
-  await snap("ctl");
-  const noise = await diff("base", "ctl");
+  // Đối chứng: hai ảnh chụp liên tiếp KHÔNG hiệu ứng khác nhau bao nhiêu (hoạt ảnh nền); mọi phép so ảnh phải vượt mức này.
+  // Camera nội suy có thể "nhích" 1 điểm ảnh đúng giữa hai ảnh (cả khung lệch: ~10 000 điểm ảnh, một lần duy nhất): chụp lại tối đa 4 lần
+  // cho tới khi hai ảnh liên tiếp ổn định (< 1500), rồi mới lấy mốc.
+  let noise = Infinity;
+  for (let t = 0; t < 4 && noise >= 1500; t++) {
+    await snap("base");
+    await sleep(80);
+    await snap("ctl");
+    noise = await diff("base", "ctl");
+    if (noise >= 1500) await sleep(300);
+  }
   console.log(`    (nhiễu nền giữa hai ảnh không hiệu ứng: ${noise} điểm ảnh)`);
 
   // 1) Đột phá của mình: vòng nổ + cột sáng + chớp nhẹ, vẽ ra điểm ảnh thật
