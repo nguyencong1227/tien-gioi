@@ -320,7 +320,9 @@ async function runLeakTest() {
       for (const err of evaluation.errors) {
         console.error(`  - ${err}`);
       }
-      process.exit(1);
+      // KHÔNG gọi process.exit(1) ở đây: nó bỏ qua `finally` nên Chrome mồ côi chạy mãi (mỗi con ~250 % CPU, đã làm tải máy lên 75)
+      process.exitCode = 1;
+      return;
     }
 
     console.log("🎉 KHÔNG CÓ RÒ RỈ TÀI NGUYÊN! TẤT CẢ CHỈ SỐ ỔN ĐỊNH.");
