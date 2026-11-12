@@ -1,0 +1,73 @@
+/*
+ * Cỡ chữ theo hồ sơ hiển thị + người chơi (M5.1, #326, docs/THIET_KE_GIAO_DIEN_DO_HOA.md mục 4.2 điều 2).
+ *
+ * `style.css` / `sheet.css` KHÔNG ghi cỡ chữ px cứng mà dùng `font-size: var(--fs-N)` (N = cỡ gốc tính bằng px, 9..22): MỘT nguồn
+ * để đổi cỡ chữ cho cả giao diện thay vì sửa từng luật. Biến định nghĩa ở đây:
+ *   - Mặc định (HUD, máy tính): đúng N px, KHÔNG co giãn theo `--ui-scale` (HUD dày đặc dễ tràn).
+ *   - Điện thoại (`html[data-form="phone"]`): nhãn HUD nhỏ (9 / 10 / 11) nâng lên >= 12 px (HUD hiện dùng 11 px; 14 px sẽ làm HUD tràn).
+ *   - NỘI DUNG (bảng / hộp thoại `.modal-box`, chat, Hoàng Tuyền): co giãn theo `--ui-scale` (Nhỏ 0,9 / Vừa 1 / Lớn 1,15, Cài đặt -> "Cỡ chữ");
+ *     trên điện thoại chữ nội dung >= 14 px dù chọn Nhỏ (`max(14px, ...)`).
+ * Biến chứa `var()` được thay giá trị ở phần tử KHAI BÁO biến nên phải khai lại cả danh sách ở từng vùng (không thể chỉ đổi `--ui-scale`).
+ * Thêm cỡ chữ mới: thêm N vào các danh sách dưới đây (`client/scripts/check-text-size.mjs` đo cỡ thật và đỏ nếu quên).
+ */
+
+:root {
+  --ui-scale: 1;
+  --fs-9: 9px;
+  --fs-10: 10px;
+  --fs-11: 11px;
+  --fs-12: 12px;
+  --fs-13: 13px;
+  --fs-14: 14px;
+  --fs-15: 15px;
+  --fs-16: 16px;
+  --fs-17: 17px;
+  --fs-18: 18px;
+  --fs-19: 19px;
+  --fs-20: 20px;
+  --fs-21: 21px;
+  --fs-22: 22px;
+}
+
+/* Điện thoại: nhãn HUD nhỏ >= 12 px */
+html[data-form="phone"] {
+  --fs-9: 12px;
+  --fs-10: 12px;
+  --fs-11: 12px;
+}
+
+/* Nội dung: co giãn theo --ui-scale */
+:is(.modal-box, #chat, .limbo-overlay) {
+  --fs-9: calc(9px * var(--ui-scale));
+  --fs-10: calc(10px * var(--ui-scale));
+  --fs-11: calc(11px * var(--ui-scale));
+  --fs-12: calc(12px * var(--ui-scale));
+  --fs-13: calc(13px * var(--ui-scale));
+  --fs-14: calc(14px * var(--ui-scale));
+  --fs-15: calc(15px * var(--ui-scale));
+  --fs-16: calc(16px * var(--ui-scale));
+  --fs-17: calc(17px * var(--ui-scale));
+  --fs-18: calc(18px * var(--ui-scale));
+  --fs-19: calc(19px * var(--ui-scale));
+  --fs-20: calc(20px * var(--ui-scale));
+  --fs-21: calc(21px * var(--ui-scale));
+  --fs-22: calc(22px * var(--ui-scale));
+}
+
+/* Điện thoại: chữ nội dung >= 14 px (kể cả khi chọn cỡ chữ Nhỏ) */
+html[data-form="phone"] :is(.modal-box, #chat, .limbo-overlay) {
+  --fs-9: max(14px, calc(9px * var(--ui-scale)));
+  --fs-10: max(14px, calc(10px * var(--ui-scale)));
+  --fs-11: max(14px, calc(11px * var(--ui-scale)));
+  --fs-12: max(14px, calc(12px * var(--ui-scale)));
+  --fs-13: max(14px, calc(13px * var(--ui-scale)));
+  --fs-14: max(14px, calc(14px * var(--ui-scale)));
+  --fs-15: max(14px, calc(15px * var(--ui-scale)));
+  --fs-16: max(14px, calc(16px * var(--ui-scale)));
+  --fs-17: max(14px, calc(17px * var(--ui-scale)));
+  --fs-18: max(14px, calc(18px * var(--ui-scale)));
+  --fs-19: max(14px, calc(19px * var(--ui-scale)));
+  --fs-20: max(14px, calc(20px * var(--ui-scale)));
+  --fs-21: max(14px, calc(21px * var(--ui-scale)));
+  --fs-22: max(14px, calc(22px * var(--ui-scale)));
+}

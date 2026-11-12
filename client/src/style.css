@@ -119,11 +119,11 @@ button {
 /* Các trường và nút chuyên dụng cho hệ thống tài khoản */
 .auth-view h3 {
   margin: 0 0 8px;
-  font-size: 18px;
+  font-size: var(--fs-18);
   color: var(--red);
 }
 .auth-desc {
-  font-size: 13px;
+  font-size: var(--fs-13);
   margin: 0 0 12px;
   opacity: 0.85;
   line-height: 1.4;
@@ -147,7 +147,7 @@ button {
   background: transparent !important;
   color: var(--ink) !important;
   border: 0 !important;
-  font-size: 16px;
+  font-size: var(--fs-16);
   cursor: pointer;
   opacity: 0.6;
 }
@@ -162,7 +162,7 @@ button {
   border: 0;
   border-radius: 6px;
   font-weight: 700;
-  font-size: 15px;
+  font-size: var(--fs-15);
   cursor: pointer;
 }
 .auth-links,
@@ -179,7 +179,7 @@ button {
   border: 0 !important;
   padding: 6px 8px !important;
   min-height: 36px !important;
-  font-size: 13px !important;
+  font-size: var(--fs-13) !important;
   font-weight: normal !important;
   text-decoration: underline;
   cursor: pointer;
@@ -189,7 +189,7 @@ button {
 }
 .auth-link-btn.muted {
   opacity: 0.6;
-  font-size: 12px !important;
+  font-size: var(--fs-12) !important;
 }
 .auth-mock-badge {
   background: #4a3618;
@@ -197,7 +197,7 @@ button {
   border: 1px solid #d4af37;
   border-radius: 4px;
   padding: 4px 8px;
-  font-size: 11px;
+  font-size: var(--fs-11);
   font-weight: 700;
   letter-spacing: 0.05em;
   margin-bottom: 10px;
@@ -216,7 +216,7 @@ button {
 }
 .auth-code-text {
   font-family: monospace;
-  font-size: 16px;
+  font-size: var(--fs-16);
   font-weight: 700;
   color: #ffde7d;
   letter-spacing: 0.12em;
@@ -230,7 +230,7 @@ button {
   border: 0 !important;
   border-radius: 4px !important;
   padding: 8px 12px !important;
-  font-size: 13px !important;
+  font-size: var(--fs-13) !important;
   min-height: 44px !important;
   font-weight: 600 !important;
   cursor: pointer;
@@ -239,7 +239,7 @@ button {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: var(--fs-12);
   text-align: left;
   margin: 8px 0 14px;
   cursor: pointer;
@@ -260,7 +260,7 @@ button {
   gap: 10px;
 }
 #set-account-info {
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: var(--ink);
 }
 .btn-logout {
@@ -280,14 +280,14 @@ button {
   min-height: 1.3em;
   margin: 10px 0 0;
   color: var(--red);
-  font-size: 14px;
+  font-size: var(--fs-14);
 }
 
 /* HUD */
 #hud {
   width: 266px;
   padding: 8px 10px;
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 #hud .row {
   display: flex;
@@ -325,7 +325,7 @@ button {
   position: relative;
   display: block;
   text-align: center;
-  font-size: 11px;
+  font-size: var(--fs-11);
   line-height: 14px;
   text-shadow: 0 1px 2px #000;
 }
@@ -337,7 +337,7 @@ button {
   margin-top: 6px;
 }
 #hud-online {
-  font-size: 11px;
+  font-size: var(--fs-11);
   opacity: 0.75;
 }
 .hud-btns {
@@ -362,12 +362,12 @@ button {
   gap: 3px;
 }
 .hud-btn span {
-  font-size: 16px;
+  font-size: var(--fs-16);
   line-height: 1;
   color: #ffe08a;
 }
 .hud-btn small {
-  font-size: 10px;
+  font-size: var(--fs-10);
 }
 .hud-btn.active {
   background: rgba(201, 162, 74, 0.48);
@@ -404,7 +404,7 @@ button {
   max-height: calc(100vh - 280px);
   overflow-y: auto;
   padding: 8px 10px;
-  font-size: 12px;
+  font-size: var(--fs-12);
   background: rgba(24, 21, 18, 0.88);
   border: 1px solid rgba(201, 162, 74, 0.45);
 }
@@ -417,11 +417,12 @@ button {
   margin-bottom: 6px;
 }
 .qt-head b {
+  white-space: nowrap; /* "Nhiệm vụ" không gãy dòng khi nhãn bên cạnh được nâng lên 12 px trên điện thoại */
   color: #ffe08a;
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 .qt-head small {
-  font-size: 10px;
+  font-size: var(--fs-10);
   opacity: 0.7;
 }
 #quest-tracker-list {
@@ -453,7 +454,7 @@ button {
   color: #fff6dc;
 }
 .qt-badge {
-  font-size: 9px;
+  font-size: var(--fs-9);
   padding: 1px 4px;
   border-radius: 3px;
   background: rgba(201, 162, 74, 0.35);
@@ -461,7 +462,7 @@ button {
 }
 .qt-step {
   margin-top: 3px;
-  font-size: 11px;
+  font-size: var(--fs-11);
   opacity: 0.9;
   line-height: 1.3;
 }
@@ -495,7 +496,7 @@ button {
   align-items: center;
   justify-content: space-between;
   margin-top: 3px;
-  font-size: 10px;
+  font-size: var(--fs-10);
   padding: 0 2px;
 }
 #minimap-zone {
@@ -507,6 +508,7 @@ button {
   white-space: nowrap;
 }
 .mm-foot small {
+  font-size: inherit; /* <small> mặc định là `smaller` (10 px -> 8,3 px): giữ đúng cỡ nhãn chân bản đồ */
   opacity: 0.7;
 }
 
@@ -593,12 +595,12 @@ button {
   padding-bottom: 6px;
 }
 #dlg-npc-name {
-  font-size: 17px;
+  font-size: var(--fs-17);
   color: #ffe08a;
   letter-spacing: 0.05em;
 }
 .dlg-badge {
-  font-size: 11px;
+  font-size: var(--fs-11);
   margin-left: 8px;
   padding: 2px 7px;
   border-radius: 4px;
@@ -613,7 +615,7 @@ button {
 }
 #dlg-text {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--fs-14);
   line-height: 1.55;
   color: #fffaf0;
   white-space: pre-wrap;
@@ -621,7 +623,7 @@ button {
 #dlg-skip-hint {
   display: block;
   margin-top: 6px;
-  font-size: 11px;
+  font-size: var(--fs-11);
   color: var(--gold);
   opacity: 0.75;
   text-align: right;
@@ -639,7 +641,7 @@ button {
   border: 1px solid rgba(201, 162, 74, 0.6);
   background: rgba(201, 162, 74, 0.16);
   color: #fff6dc;
-  font-size: 13px;
+  font-size: var(--fs-13);
   font-weight: 600;
   text-align: left;
   display: flex;
@@ -685,7 +687,7 @@ button {
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.06);
   color: var(--paper);
-  font-size: 18px;
+  font-size: var(--fs-18);
 }
 
 /* Sổ nhiệm vụ (Q) */
@@ -704,7 +706,7 @@ button {
   background: rgba(255, 255, 255, 0.05);
   color: var(--paper);
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 .q-tab.active {
   background: rgba(201, 162, 74, 0.28);
@@ -740,22 +742,22 @@ button {
   justify-content: space-between;
 }
 .q-card-title {
-  font-size: 14px;
+  font-size: var(--fs-14);
   font-weight: 700;
   color: #fff6dc;
 }
 .q-card-desc {
-  font-size: 12px;
+  font-size: var(--fs-12);
   opacity: 0.85;
   line-height: 1.4;
 }
 .q-card-progress {
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: #6ad06a;
   margin-top: 2px;
 }
 .q-card-rewards {
-  font-size: 11px;
+  font-size: var(--fs-11);
   color: var(--gold);
   opacity: 0.9;
 }
@@ -781,7 +783,7 @@ button {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  font-size: 11px;
+  font-size: var(--fs-11);
   opacity: 0.9;
   justify-content: center;
 }
@@ -821,7 +823,7 @@ button {
   bottom: max(10px, env(safe-area-inset-bottom));
   width: min(360px, 46vw);
   padding: 6px;
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 #chat-log {
   height: 130px;
@@ -878,11 +880,11 @@ button {
   overflow: hidden;
 }
 .sk span {
-  font-size: 22px;
+  font-size: var(--fs-22);
   line-height: 1;
 }
 .sk small {
-  font-size: 10px;
+  font-size: var(--fs-10);
   opacity: 0.85;
 }
 .sk.big {
@@ -983,7 +985,7 @@ button {
   box-shadow: inset 0 -2px 4px rgba(0, 0, 0, 0.45);
 }
 .qslot small {
-  font-size: 9px;
+  font-size: var(--fs-9);
   line-height: 1.1;
   max-width: 48px;
   overflow: hidden;
@@ -995,14 +997,14 @@ button {
   position: absolute;
   top: 2px;
   left: 4px;
-  font-size: 9px;
+  font-size: var(--fs-9);
   opacity: 0.7;
 }
 .qslot .qqty {
   position: absolute;
   top: 2px;
   right: 4px;
-  font-size: 10px;
+  font-size: var(--fs-10);
   color: #ffe08a;
   text-shadow: 0 1px 2px #000;
 }
@@ -1027,7 +1029,7 @@ button {
   border-radius: 6px;
   background: rgba(29, 26, 22, 0.88);
   border-left: 3px solid var(--gold);
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 600;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
   animation: gainSlide 2.8s ease-out forwards;
@@ -1069,12 +1071,12 @@ button {
 }
 .inv-head h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: var(--fs-18);
   color: #ffe08a;
   letter-spacing: 0.05em;
 }
 .inv-head small {
-  font-size: 12px;
+  font-size: var(--fs-12);
   opacity: 0.75;
 }
 #inv-close {
@@ -1084,7 +1086,7 @@ button {
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.06);
   color: var(--paper);
-  font-size: 18px;
+  font-size: var(--fs-18);
 }
 #inv-grid {
   display: grid;
@@ -1122,7 +1124,7 @@ button {
   box-shadow: inset 0 -2px 5px rgba(0, 0, 0, 0.45);
 }
 .inv-slot .slot-name {
-  font-size: 9px;
+  font-size: var(--fs-9);
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1134,7 +1136,7 @@ button {
   position: absolute;
   bottom: 2px;
   right: 4px;
-  font-size: 11px;
+  font-size: var(--fs-11);
   font-weight: 700;
   color: #fff6dc;
   text-shadow: 0 1px 2px #000;
@@ -1155,17 +1157,17 @@ button {
   gap: 8px;
 }
 #inv-item-name {
-  font-size: 15px;
+  font-size: var(--fs-15);
 }
 .rarity-tag {
-  font-size: 11px;
+  font-size: var(--fs-11);
   padding: 2px 8px;
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.08);
 }
 #inv-item-desc {
   margin: 4px 0 0;
-  font-size: 13px;
+  font-size: var(--fs-13);
   opacity: 0.85;
   line-height: 1.35;
 }
@@ -1181,7 +1183,7 @@ button {
   border-radius: 6px;
   border: 1px solid var(--line);
   font-weight: 700;
-  font-size: 14px;
+  font-size: var(--fs-14);
   color: var(--paper);
   background: rgba(255, 255, 255, 0.08);
 }
@@ -1252,14 +1254,14 @@ button {
 }
 #death span {
   display: block;
-  font-size: 15px;
+  font-size: var(--fs-15);
   color: #f3f4f6;
   margin-top: 6px;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
 }
 #death small {
   display: block;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: #34d399;
   margin-top: 6px;
   font-weight: 600;
@@ -1272,7 +1274,7 @@ button {
   z-index: 4;
   top: 10px;
   right: 12px;
-  font-size: 11px;
+  font-size: var(--fs-11);
   opacity: 0.6;
   text-shadow: 0 1px 2px #000;
 }
@@ -1333,7 +1335,7 @@ body.low-fx #btn-talk {
   border-radius: 5px;
   background: rgba(0, 0, 0, 0.45);
   border: 1px solid rgba(201, 162, 74, 0.35);
-  font-size: 12px;
+  font-size: var(--fs-12);
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -1400,7 +1402,7 @@ body.low-fx #btn-talk {
   background: rgba(201, 162, 74, 0.14);
 }
 .equip-slot-card .slot-label {
-  font-size: 10px;
+  font-size: var(--fs-10);
   opacity: 0.72;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -1414,12 +1416,12 @@ body.low-fx #btn-talk {
   background-repeat: no-repeat;
 }
 .equip-slot-card .slot-item-name {
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 700;
   line-height: 1.2;
 }
 .equip-slot-card .slot-hint {
-  font-size: 10px;
+  font-size: var(--fs-10);
   opacity: 0.7;
 }
 .char-stats-box {
@@ -1430,7 +1432,7 @@ body.low-fx #btn-talk {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 7px 14px;
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 .stat-row {
   display: flex;
@@ -1455,7 +1457,7 @@ body.low-fx #btn-talk {
   gap: 5px;
 }
 .stat-bonus {
-  font-size: 11px;
+  font-size: var(--fs-11);
   color: var(--gold);
   font-weight: 400;
 }
@@ -1468,7 +1470,7 @@ body.low-fx #btn-talk {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: #ffe08a;
 }
 .mini-btn {
@@ -1479,7 +1481,7 @@ body.low-fx #btn-talk {
   border: 1px solid var(--gold);
   background: rgba(201, 162, 74, 0.2);
   color: #ffe08a;
-  font-size: 11px;
+  font-size: var(--fs-11);
   font-weight: 600;
 }
 .char-bag-list {
@@ -1527,13 +1529,13 @@ body.low-fx #btn-talk {
   min-width: 0;
 }
 .char-bag-meta b {
-  font-size: 13px;
+  font-size: var(--fs-13);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .char-bag-meta small {
-  font-size: 11px;
+  font-size: var(--fs-11);
   opacity: 0.85;
 }
 .char-equip-btn {
@@ -1545,7 +1547,7 @@ body.low-fx #btn-talk {
   background: var(--red);
   color: #f6e7c4;
   font-weight: 700;
-  font-size: 12px;
+  font-size: var(--fs-12);
   flex-shrink: 0;
 }
 .char-equip-btn:disabled {
@@ -1610,10 +1612,10 @@ body.low-fx #btn-talk {
   gap: 2px;
 }
 .forge-title-col b {
-  font-size: 14px;
+  font-size: var(--fs-14);
 }
 .forge-title-col small {
-  font-size: 11px;
+  font-size: var(--fs-11);
   opacity: 0.85;
 }
 .forge-mats {
@@ -1623,7 +1625,7 @@ body.low-fx #btn-talk {
   align-items: center;
 }
 .forge-mat {
-  font-size: 11px;
+  font-size: var(--fs-11);
   padding: 2px 7px;
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.06);
@@ -1646,7 +1648,7 @@ body.low-fx #btn-talk {
   background: linear-gradient(180deg, #b83a28, #8c2318);
   color: #ffe08a;
   font-weight: 700;
-  font-size: 13px;
+  font-size: var(--fs-13);
   flex-shrink: 0;
 }
 .forge-btn:disabled {
@@ -1674,7 +1676,7 @@ body.low-fx #btn-talk {
   border-radius: 6px;
   background: rgba(0, 0, 0, 0.38);
   border: 1px solid var(--line);
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 .set-row.toggle {
   flex-direction: row;
@@ -1719,7 +1721,7 @@ body.low-fx #btn-talk {
   min-width: 42px;
   text-align: right;
   color: #ffe08a;
-  font-size: 12px;
+  font-size: var(--fs-12);
 }
 
 @media (pointer: coarse), (max-width: 640px) {
@@ -1733,7 +1735,7 @@ body.low-fx #btn-talk {
   }
   #hud {
     width: 200px;
-    font-size: 11px;
+    font-size: var(--fs-11);
     padding: 6px 8px;
   }
   .hud-btn {
@@ -1743,14 +1745,14 @@ body.low-fx #btn-talk {
   #party-panel {
     width: 192px;
     max-width: 53vw;
-    font-size: 11px;
+    font-size: var(--fs-11);
     padding: 6px 8px;
   }
   #quest-tracker {
     width: 190px;
     max-width: 53vw;
     max-height: 180px;
-    font-size: 11px;
+    font-size: var(--fs-11);
     padding: 6px 8px;
   }
   #minimap-wrap {
@@ -1769,7 +1771,7 @@ body.low-fx #btn-talk {
     right: max(8px, env(safe-area-inset-right));
     top: calc(max(8px, env(safe-area-inset-top)) + 120px);
     width: min(145px, 39vw);
-    font-size: 11px;
+    font-size: var(--fs-11);
   }
   #chat-log {
     height: 55px;
@@ -1846,14 +1848,14 @@ body.low-fx #btn-talk {
   #hud {
     width: 210px;
     padding: 5px 8px;
-    font-size: 11px;
+    font-size: var(--fs-11);
   }
   .bar {
     height: 12px;
     margin: 2px 0;
   }
   .bar span {
-    font-size: 10px;
+    font-size: var(--fs-10);
     line-height: 12px;
   }
   .hud-btn {
@@ -1866,7 +1868,7 @@ body.low-fx #btn-talk {
   }
   #party-panel {
     width: 200px;
-    font-size: 11px;
+    font-size: var(--fs-11);
     max-height: calc(100dvh - 115px);
     overflow-y: auto;
   }
@@ -1912,7 +1914,7 @@ body.low-fx #btn-talk {
   right: max(14px, env(safe-area-inset-right));
   width: 176px;
   padding: 6px 10px;
-  font-size: 11px;
+  font-size: var(--fs-11);
   line-height: 1.45;
   pointer-events: none;
   font-variant-numeric: tabular-nums;
@@ -1934,7 +1936,7 @@ body.low-fx #btn-talk {
 #party-panel {
   width: 240px;
   padding: 6px 8px;
-  font-size: 12px;
+  font-size: var(--fs-12);
   background: rgba(24, 21, 18, 0.92);
   border: 1px solid rgba(115, 209, 61, 0.55);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
@@ -1961,7 +1963,7 @@ body.low-fx #btn-talk {
   background: transparent;
   border: 0;
   color: #95de64;
-  font-size: 15px;
+  font-size: var(--fs-15);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1976,7 +1978,7 @@ body.low-fx #btn-talk {
 }
 #party-title {
   color: #95de64;
-  font-size: 12px;
+  font-size: var(--fs-12);
 }
 .party-btn-leave {
   min-width: 44px;
@@ -1986,7 +1988,7 @@ body.low-fx #btn-talk {
   background: rgba(163, 29, 29, 0.6);
   border: 1px solid #e57373;
   color: #fff6dc;
-  font-size: 11px;
+  font-size: var(--fs-11);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -2024,10 +2026,10 @@ body.low-fx #btn-talk {
 }
 .pmem-leader-icon {
   color: #ffd700;
-  font-size: 11px;
+  font-size: var(--fs-11);
 }
 .pmem-sect {
-  font-size: 11px;
+  font-size: var(--fs-11);
   color: #c084fc;
   font-weight: 700;
 }
@@ -2043,7 +2045,7 @@ body.low-fx #btn-talk {
   color: #6ad06a;
 }
 .pmem-realm {
-  font-size: 10px;
+  font-size: var(--fs-10);
   color: var(--gold);
 }
 .pmem-kick-btn {
@@ -2053,7 +2055,7 @@ body.low-fx #btn-talk {
   border-radius: 4px;
   background: rgba(255, 77, 79, 0.25);
   color: #ff7875;
-  font-size: 13px;
+  font-size: var(--fs-13);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -2102,7 +2104,7 @@ body.low-fx #btn-talk {
 }
 .pib-content p {
   margin: 0 0 8px 0;
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: #fff6dc;
   text-align: center;
 }
@@ -2132,7 +2134,7 @@ body.low-fx #btn-talk {
   min-height: 44px;
   border-radius: 6px;
   font-weight: 700;
-  font-size: 14px;
+  font-size: var(--fs-14);
   border: 0;
   cursor: pointer;
   display: flex;
@@ -2175,7 +2177,7 @@ body.low-fx #btn-talk {
 }
 #pm-name {
   color: #ffe08a;
-  font-size: 13px;
+  font-size: var(--fs-13);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2187,14 +2189,14 @@ body.low-fx #btn-talk {
   background: transparent;
   border: 0;
   color: #fff;
-  font-size: 16px;
+  font-size: var(--fs-16);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .pm-realm {
-  font-size: 11px;
+  font-size: var(--fs-11);
   color: var(--paper);
   margin-bottom: 8px;
 }
@@ -2211,7 +2213,7 @@ body.low-fx #btn-talk {
   background: rgba(201, 162, 74, 0.25);
   color: #fff6dc;
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--fs-13);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -2235,7 +2237,7 @@ body.low-fx #btn-talk {
   display: flex;
   align-items: center;
   gap: 3px;
-  font-size: 11px;
+  font-size: var(--fs-11);
   color: #ffe08a;
   background: rgba(0, 0, 0, 0.4);
   padding: 2px 6px;
@@ -2243,7 +2245,7 @@ body.low-fx #btn-talk {
   border: 1px solid rgba(255, 224, 138, 0.3);
 }
 .coin-gem {
-  font-size: 11px;
+  font-size: var(--fs-11);
 }
 .coin-val {
   color: #ffe08a;
@@ -2263,7 +2265,7 @@ body.low-fx #btn-talk {
 }
 .shop-empty {
   text-align: center;
-  font-size: 12px;
+  font-size: var(--fs-12);
   opacity: 0.72;
   margin: 16px 0;
 }
@@ -2302,7 +2304,7 @@ body.low-fx #btn-talk {
   flex-wrap: wrap;
 }
 .shop-item-name {
-  font-size: 13px;
+  font-size: var(--fs-13);
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -2310,7 +2312,7 @@ body.low-fx #btn-talk {
   max-width: 160px;
 }
 .shop-price-tag {
-  font-size: 11px;
+  font-size: var(--fs-11);
   color: #ffe08a;
   background: rgba(201, 162, 74, 0.15);
   padding: 1px 6px;
@@ -2319,7 +2321,7 @@ body.low-fx #btn-talk {
   white-space: nowrap;
 }
 .shop-item-desc {
-  font-size: 11px;
+  font-size: var(--fs-11);
   opacity: 0.75;
   line-height: 1.3;
   overflow: hidden;
@@ -2348,7 +2350,7 @@ body.low-fx #btn-talk {
   background: transparent;
   border: 0;
   color: #ffe08a;
-  font-size: 18px;
+  font-size: var(--fs-18);
   font-weight: bold;
   cursor: pointer;
   display: flex;
@@ -2363,7 +2365,7 @@ body.low-fx #btn-talk {
 .shop-qty-val {
   min-width: 28px;
   text-align: center;
-  font-size: 13px;
+  font-size: var(--fs-13);
   font-weight: bold;
   color: #fff;
 }
@@ -2373,7 +2375,7 @@ body.low-fx #btn-talk {
   padding: 4px 12px;
   border-radius: 6px;
   font-weight: 600;
-  font-size: 12px;
+  font-size: var(--fs-12);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -2403,7 +2405,7 @@ body.low-fx #btn-talk {
   background: #27860a;
 }
 .shop-lock-label {
-  font-size: 11px;
+  font-size: var(--fs-11);
   opacity: 0.55;
   padding: 4px 8px;
   min-height: 44px;
@@ -2445,7 +2447,7 @@ body.low-fx #btn-talk {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.7);
   padding: 6px 16px;
   border-radius: 20px;
-  font-size: 13px;
+  font-size: var(--fs-13);
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -2504,7 +2506,7 @@ body.reconnecting #btn-pickup {
 
 /* Tên bản đồ của thành viên đội ở bản đồ khác */
 .pmem-map {
-  font-size: 10px;
+  font-size: var(--fs-10);
   color: #a8ff78;
   margin-left: 4px;
   font-style: italic;
@@ -2583,7 +2585,7 @@ body.reduced-motion .transition-overlay.active {
   text-shadow: 0 0 18px rgba(255, 224, 138, 0.6);
 }
 .transition-sub {
-  font-size: 14px;
+  font-size: var(--fs-14);
   color: #c9b07a;
   letter-spacing: 2px;
 }
@@ -2599,7 +2601,7 @@ body.reduced-motion .transition-overlay.active {
   border: 1px solid rgba(180, 120, 255, 0.45);
   border-radius: 4px;
   padding: 1px 6px;
-  font-size: 11px;
+  font-size: var(--fs-11);
   font-weight: 600;
   margin-left: 6px;
   letter-spacing: 0.5px;
@@ -2687,7 +2689,7 @@ body.in-limbo #chat-log {
   border-radius: 50%;
   border: 1px solid #c084fc;
   color: #f5d0fe;
-  font-size: 20px;
+  font-size: var(--fs-20);
   font-weight: bold;
   background: rgba(147, 51, 234, 0.25);
   margin-bottom: 8px;
@@ -2695,7 +2697,7 @@ body.in-limbo #chat-log {
 }
 
 .limbo-title {
-  font-size: 22px;
+  font-size: var(--fs-22);
   color: #faf5ff;
   margin: 0 0 4px;
   letter-spacing: 2px;
@@ -2703,7 +2705,7 @@ body.in-limbo #chat-log {
 }
 
 .limbo-sub {
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: #c084fc;
   margin: 0 0 14px;
   font-style: italic;
@@ -2729,14 +2731,14 @@ body.in-limbo #chat-log {
 }
 
 .lsum-label {
-  font-size: 11px;
+  font-size: var(--fs-11);
   color: #a1a1aa;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .lsum-val {
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: #faf5ff;
   font-weight: 600;
 }
@@ -2749,18 +2751,18 @@ body.in-limbo #chat-log {
   border-top: 1px dashed rgba(160, 120, 200, 0.25);
   padding-top: 10px;
   margin-top: 4px;
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 
 .lduyen-gain b {
   color: #4ade80;
-  font-size: 15px;
+  font-size: var(--fs-15);
   margin-left: 4px;
 }
 
 .lduyen-total b {
   color: #fbbf24;
-  font-size: 17px;
+  font-size: var(--fs-17);
   margin-left: 4px;
 }
 
@@ -2782,7 +2784,7 @@ body.in-limbo #chat-log {
 }
 
 .lblock-head h2 {
-  font-size: 16px;
+  font-size: var(--fs-16);
   color: #e9d5ff;
   margin: 0;
   font-weight: 600;
@@ -2790,7 +2792,7 @@ body.in-limbo #chat-log {
 }
 
 .lblock-head small {
-  font-size: 11px;
+  font-size: var(--fs-11);
   color: #94a3b8;
 }
 
@@ -2819,7 +2821,7 @@ body.in-limbo #chat-log {
 }
 
 .stone-item-name {
-  font-size: 14px;
+  font-size: var(--fs-14);
   font-weight: bold;
   color: #f5f3ff;
   display: flex;
@@ -2828,7 +2830,7 @@ body.in-limbo #chat-log {
 }
 
 .stone-item-level {
-  font-size: 11px;
+  font-size: var(--fs-11);
   color: #c084fc;
   background: rgba(192, 132, 252, 0.15);
   border: 1px solid rgba(192, 132, 252, 0.3);
@@ -2837,12 +2839,12 @@ body.in-limbo #chat-log {
 }
 
 .stone-item-desc {
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: #cbd5e1;
 }
 
 .stone-item-effect {
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: #fbbf24;
   font-weight: 500;
 }
@@ -2855,7 +2857,7 @@ body.in-limbo #chat-log {
   background: linear-gradient(180deg, #9333ea, #7e22ce);
   color: #ffffff;
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--fs-13);
   font-weight: 600;
   cursor: pointer;
   display: flex;
@@ -2886,7 +2888,7 @@ body.in-limbo #chat-log {
 }
 
 .lfield-label {
-  font-size: 13px;
+  font-size: var(--fs-13);
   font-weight: bold;
   color: #e9d5ff;
   margin-bottom: 6px;
@@ -2900,13 +2902,13 @@ body.in-limbo #chat-log {
 }
 
 .lrelic-hint {
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: #38bdf8;
   font-weight: 600;
 }
 
 .lrelic-empty {
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: #94a3b8;
   font-style: italic;
   margin: 6px 0;
@@ -2953,7 +2955,7 @@ body.in-limbo #chat-log {
 }
 
 .origin-card-name {
-  font-size: 13px;
+  font-size: var(--fs-13);
   font-weight: bold;
   color: #f5f3ff;
   display: flex;
@@ -2962,12 +2964,12 @@ body.in-limbo #chat-log {
 }
 
 .origin-card-desc {
-  font-size: 11px;
+  font-size: var(--fs-11);
   color: #cbd5e1;
 }
 
 .origin-card-cost {
-  font-size: 10px;
+  font-size: var(--fs-10);
   color: #fbbf24;
 }
 
@@ -2988,7 +2990,7 @@ body.in-limbo #chat-log {
   background: rgba(26, 22, 36, 0.7);
   cursor: pointer;
   user-select: none;
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: #f1f5f9;
   box-sizing: border-box;
   transition: all 0.15s ease;
@@ -3021,7 +3023,7 @@ body.in-limbo #chat-log {
   background: linear-gradient(180deg, #92400e, #78350f);
   color: #ffffff;
   font-family: inherit;
-  font-size: 15px;
+  font-size: var(--fs-15);
   font-weight: bold;
   cursor: pointer;
   letter-spacing: 2px;
@@ -3069,7 +3071,7 @@ body.in-limbo #chat-log {
 }
 
 .reborn-quote {
-  font-size: 16px;
+  font-size: var(--fs-16);
   line-height: 1.6;
   font-style: italic;
   color: #e2e8f0;
@@ -3454,7 +3456,7 @@ body.low-fx.in-limbo .stone-item {
     padding: 16px 12px;
   }
   .limbo-title {
-    font-size: 18px;
+    font-size: var(--fs-18);
   }
   .limbo-summary {
     grid-template-columns: 1fr;
@@ -3489,7 +3491,7 @@ body.low-fx.in-limbo .stone-item {
   background: rgba(124, 58, 237, 0.88);
   border: 1px solid #c4b5fd;
   color: #f5f3ff;
-  font-size: 11px;
+  font-size: var(--fs-11);
   font-weight: 700;
   letter-spacing: 0.4px;
   pointer-events: none;
@@ -3524,7 +3526,7 @@ body.low-fx.in-limbo .stone-item {
   background: rgba(168, 85, 247, 0.25);
   border: 1px solid #a855f7;
   color: #e9d5ff;
-  font-size: 10px;
+  font-size: var(--fs-10);
   font-weight: 700;
   padding: 2px 6px;
   border-radius: 4px;
@@ -3534,30 +3536,30 @@ body.low-fx.in-limbo .stone-item {
 #dib-title {
   flex: 1;
   color: #f3e8ff;
-  font-size: 14px;
+  font-size: var(--fs-14);
 }
 
 .dib-countdown {
   color: #fde047;
   font-weight: 700;
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 
 .dib-msg {
   margin: 0 0 4px 0;
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: #e2e8f0;
 }
 
 .dib-rewards-left {
-  font-size: 11px;
+  font-size: var(--fs-11);
   color: #c4b5fd;
   margin-bottom: 4px;
 }
 
 .dib-rule-hint {
   display: block;
-  font-size: 11px;
+  font-size: var(--fs-11);
   color: #fcd34d;
   margin-bottom: 8px;
   line-height: 1.35;
@@ -3590,7 +3592,7 @@ body.low-fx.in-limbo .stone-item {
   min-width: 44px;
   border-radius: 6px;
   font-weight: 700;
-  font-size: 13px;
+  font-size: var(--fs-13);
   border: 0;
   cursor: pointer;
   display: flex;
@@ -3649,12 +3651,12 @@ body.low-fx.in-limbo .stone-item {
 
 #dhud-map-name {
   color: #f3e8ff;
-  font-size: 14px;
+  font-size: var(--fs-14);
 }
 
 .dhud-phase {
   display: inline-block;
-  font-size: 11px;
+  font-size: var(--fs-11);
   font-weight: 700;
   padding: 1px 6px;
   border-radius: 4px;
@@ -3690,11 +3692,11 @@ body.low-fx.in-limbo .stone-item {
   padding: 4px 8px;
   border-radius: 6px;
   color: #fef08a;
-  font-size: 14px;
+  font-size: var(--fs-14);
 }
 
 .dhud-stats-row {
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: #d8b4fe;
   margin-bottom: 6px;
 }
@@ -3711,7 +3713,7 @@ body.low-fx.in-limbo .stone-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 12px;
+  font-size: var(--fs-12);
   margin-bottom: 4px;
 }
 
@@ -3721,7 +3723,7 @@ body.low-fx.in-limbo .stone-item {
 
 #dhud-boss-text {
   color: #fecaca;
-  font-size: 11px;
+  font-size: var(--fs-11);
 }
 
 .dhud-boss-bar {
@@ -3747,7 +3749,7 @@ body.low-fx.in-limbo .stone-item {
 }
 
 .dhud-mem {
-  font-size: 11px;
+  font-size: var(--fs-11);
   padding: 2px 7px;
   border-radius: 4px;
   background: rgba(34, 197, 94, 0.15);
@@ -3777,7 +3779,7 @@ body.low-fx.in-limbo .stone-item {
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(252, 165, 165, 0.4);
   color: #fca5a5;
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 700;
   cursor: pointer;
 }
@@ -3795,7 +3797,7 @@ body.low-fx.in-limbo .stone-item {
 
 .dhud-confirm-label {
   display: block;
-  font-size: 11px;
+  font-size: var(--fs-11);
   color: #fecaca;
   text-align: center;
   margin-bottom: 6px;
@@ -3811,7 +3813,7 @@ body.low-fx.in-limbo .stone-item {
   min-height: 44px;
   min-width: 44px;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 700;
   cursor: pointer;
   border: 0;
@@ -3873,14 +3875,14 @@ body.low-fx.in-limbo .stone-item {
 
 .dend-title {
   margin: 0 0 6px;
-  font-size: 20px;
+  font-size: var(--fs-20);
   color: #fef08a;
   letter-spacing: 1px;
 }
 
 .dend-reason {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: #e2e8f0;
 }
 
@@ -3892,7 +3894,7 @@ body.low-fx.in-limbo .stone-item {
 }
 
 .dend-section-label {
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 700;
   color: #d8b4fe;
   margin-bottom: 8px;
@@ -3901,7 +3903,7 @@ body.low-fx.in-limbo .stone-item {
 }
 
 .dend-reward-coin {
-  font-size: 15px;
+  font-size: var(--fs-15);
   font-weight: 700;
   color: #fde047;
   margin-bottom: 8px;
@@ -3920,7 +3922,7 @@ body.low-fx.in-limbo .stone-item {
   padding: 6px 10px;
   background: rgba(255, 255, 255, 0.06);
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: #f8fafc;
 }
 
@@ -3931,7 +3933,7 @@ body.low-fx.in-limbo .stone-item {
 
 .dend-no-reward {
   margin: 0 0 8px;
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: #fca5a5;
   text-align: center;
 }
@@ -3940,7 +3942,7 @@ body.low-fx.in-limbo .stone-item {
   margin-top: 10px;
   padding-top: 8px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: #c4b5fd;
   text-align: center;
 }
@@ -3955,7 +3957,7 @@ body.low-fx.in-limbo .stone-item {
   min-height: 44px;
   min-width: 44px;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--fs-13);
   font-weight: 700;
   cursor: pointer;
   border: 0;
@@ -4001,11 +4003,11 @@ body.low-fx.in-limbo .stone-item {
   }
 
   #dhud-map-name {
-    font-size: 12px;
+    font-size: var(--fs-12);
   }
 
   .dhud-timer-box {
-    font-size: 12px;
+    font-size: var(--fs-12);
     padding: 2px 6px;
   }
 
@@ -4031,7 +4033,7 @@ body.low-fx.in-limbo .stone-item {
   transform: translateX(-50%);
   background: rgba(220, 38, 38, 0.9);
   color: #fff;
-  font-size: 11px;
+  font-size: var(--fs-11);
   font-weight: 600;
   padding: 3px 12px;
   border-radius: 999px;
@@ -4058,7 +4060,7 @@ body.low-fx.in-limbo .stone-item {
   filter: grayscale(0.6);
 }
 .pm-hint {
-  font-size: 11px;
+  font-size: var(--fs-11);
   color: #f87171;
   margin-top: 4px;
   text-align: center;
@@ -4108,7 +4110,7 @@ body.low-fx.in-limbo .stone-item {
   gap: 8px;
 }
 .duib-badge {
-  font-size: 10px;
+  font-size: var(--fs-10);
   font-weight: 700;
   color: #fee2e2;
   background: #991b1b;
@@ -4118,20 +4120,20 @@ body.low-fx.in-limbo .stone-item {
 }
 #duib-title {
   flex: 1;
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: #fff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .duib-countdown {
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 700;
   color: #fbbf24;
   font-family: monospace;
 }
 .duib-msg {
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: #d1d5db;
   margin: 0;
   line-height: 1.4;
@@ -4157,7 +4159,7 @@ body.low-fx.in-limbo .stone-item {
 .duib-btn {
   flex: 1;
   min-height: 44px;
-  font-size: 13px;
+  font-size: var(--fs-13);
   font-weight: 600;
   border-radius: 6px;
   cursor: pointer;
@@ -4203,7 +4205,7 @@ body.low-fx.in-limbo .stone-item {
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9);
 }
 .dco-sub {
-  font-size: 14px;
+  font-size: var(--fs-14);
   font-weight: 700;
   letter-spacing: 2px;
   color: #fca5a5;
@@ -4227,7 +4229,7 @@ body.low-fx.in-limbo .stone-item {
   }
 }
 .dco-vs {
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: #d1d5db;
   letter-spacing: 0.5px;
 }
@@ -4263,7 +4265,7 @@ body.low-fx.in-limbo .stone-item {
   gap: 6px;
 }
 .duel-hud-badge {
-  font-size: 10px;
+  font-size: var(--fs-10);
   font-weight: 700;
   color: #fee2e2;
   background: #991b1b;
@@ -4271,7 +4273,7 @@ body.low-fx.in-limbo .stone-item {
   border-radius: 4px;
 }
 #duel-hud-opponent {
-  font-size: 14px;
+  font-size: var(--fs-14);
   color: #fff;
 }
 .duel-hud-timer-box {
@@ -4282,7 +4284,7 @@ body.low-fx.in-limbo .stone-item {
   padding: 2px 8px;
   border-radius: 4px;
   font-family: monospace;
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: #fbbf24;
 }
 .duel-hud-hp-row {
@@ -4293,7 +4295,7 @@ body.low-fx.in-limbo .stone-item {
 .duel-hud-hp-head {
   display: flex;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: var(--fs-11);
   color: #9ca3af;
 }
 .duel-hud-hp-bar {
@@ -4317,7 +4319,7 @@ body.low-fx.in-limbo .stone-item {
 .duel-btn-yield {
   min-height: 44px;
   width: 100%;
-  font-size: 13px;
+  font-size: var(--fs-13);
   font-weight: 600;
   background: rgba(185, 28, 28, 0.2);
   color: #fca5a5;
@@ -4342,7 +4344,7 @@ body.low-fx.in-limbo .stone-item {
   border-radius: 6px;
 }
 .duel-confirm-label {
-  font-size: 11px;
+  font-size: var(--fs-11);
   color: #fca5a5;
   text-align: center;
 }
@@ -4353,7 +4355,7 @@ body.low-fx.in-limbo .stone-item {
 .duel-btn-confirm {
   flex: 1;
   min-height: 44px;
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 600;
   border-radius: 4px;
   cursor: pointer;
@@ -4430,7 +4432,7 @@ body.low-fx.in-limbo .stone-item {
 }
 .duend-title {
   margin: 0;
-  font-size: 18px;
+  font-size: var(--fs-18);
   font-weight: 700;
   letter-spacing: 1px;
   color: #fbbf24;
@@ -4444,12 +4446,12 @@ body.low-fx.in-limbo .stone-item {
 }
 .duend-reason {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--fs-14);
   color: #fff;
   line-height: 1.4;
 }
 .duend-note {
-  font-size: 11px;
+  font-size: var(--fs-11);
   color: #9ca3af;
   line-height: 1.4;
   background: rgba(255, 255, 255, 0.04);
@@ -4462,7 +4464,7 @@ body.low-fx.in-limbo .stone-item {
 .duend-btn {
   width: 100%;
   min-height: 44px;
-  font-size: 14px;
+  font-size: var(--fs-14);
   font-weight: 600;
   border-radius: 6px;
   cursor: pointer;
@@ -4514,7 +4516,7 @@ body.low-fx.in-limbo .stone-item {
 
 /* Biệt hiệu tông môn trong bảng tổ đội */
 .pmem-sect {
-  font-size: 11px;
+  font-size: var(--fs-11);
   color: #c084fc;
   font-weight: 700;
   margin-right: 2px;
@@ -4563,7 +4565,7 @@ body.low-fx.in-limbo .stone-item {
 }
 .sect-create-banner p {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: #c9b07a;
   line-height: 1.4;
 }
@@ -4579,7 +4581,7 @@ body.low-fx.in-limbo .stone-item {
   text-align: left;
 }
 .sect-form-group label {
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: #e5e7eb;
 }
 .sect-form-group input {
@@ -4588,7 +4590,7 @@ body.low-fx.in-limbo .stone-item {
   border: 1px solid #4a3e2b;
   background: #1a1612;
   color: #fff;
-  font-size: 14px;
+  font-size: var(--fs-14);
   outline: none;
 }
 .sect-form-group input:focus {
@@ -4598,7 +4600,7 @@ body.low-fx.in-limbo .stone-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: #d1d5db;
   padding: 8px 12px;
   background: rgba(212, 175, 55, 0.08);
@@ -4614,7 +4616,7 @@ body.low-fx.in-limbo .stone-item {
   background: linear-gradient(180deg, #d4af37, #b8972e);
   color: #1a1510;
   font-weight: 700;
-  font-size: 14px;
+  font-size: var(--fs-14);
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -4636,7 +4638,7 @@ body.low-fx.in-limbo .stone-item {
   border: 1px solid transparent;
   border-radius: 6px;
   color: #9ca3af;
-  font-size: 13px;
+  font-size: var(--fs-13);
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -4670,7 +4672,7 @@ body.low-fx.in-limbo .stone-item {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 6px;
-  font-size: 12px;
+  font-size: var(--fs-12);
 }
 .sect-meta-item span {
   color: #9ca3af;
@@ -4692,12 +4694,12 @@ body.low-fx.in-limbo .stone-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: #e9d5ff;
 }
 .sect-motd-box p {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: #f3e8ff;
   line-height: 1.4;
   word-break: break-word;
@@ -4713,7 +4715,7 @@ body.low-fx.in-limbo .stone-item {
   border: 1px solid #6b21a8;
   background: #1e1329;
   color: #fff;
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 .sect-btn-row {
   display: flex;
@@ -4722,7 +4724,7 @@ body.low-fx.in-limbo .stone-item {
 }
 .sect-small-btn {
   padding: 2px 8px;
-  font-size: 11px;
+  font-size: var(--fs-11);
   border-radius: 4px;
   border: 1px solid rgba(212, 175, 55, 0.4);
   background: rgba(212, 175, 55, 0.15);
@@ -4731,7 +4733,7 @@ body.low-fx.in-limbo .stone-item {
 }
 .sect-tiny-btn {
   padding: 4px 10px;
-  font-size: 12px;
+  font-size: var(--fs-12);
   border-radius: 4px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   background: rgba(255, 255, 255, 0.1);
@@ -4755,7 +4757,7 @@ body.low-fx.in-limbo .stone-item {
   background: rgba(239, 68, 68, 0.15);
   color: #fca5a5;
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--fs-13);
   cursor: pointer;
 }
 .sect-danger-btn:hover {
@@ -4773,7 +4775,7 @@ body.low-fx.in-limbo .stone-item {
 }
 .sect-confirm-box p {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: #fca5a5;
 }
 .sect-confirm-actions {
@@ -4786,7 +4788,7 @@ body.low-fx.in-limbo .stone-item {
 .sect-action-btn {
   padding: 3px 8px;
   font-family: inherit;
-  font-size: 12px;
+  font-size: var(--fs-12);
   border-radius: 4px;
   border: 1px solid rgba(212, 175, 55, 0.45);
   background: rgba(212, 175, 55, 0.14);
@@ -4826,7 +4828,7 @@ body.low-fx.in-limbo .stone-item {
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6);
 }
 .sect-action-confirm p {
-  font-size: 14px;
+  font-size: var(--fs-14);
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
@@ -4834,7 +4836,7 @@ body.low-fx.in-limbo .stone-item {
   min-height: 40px;
   min-width: 96px;
   padding: 6px 14px;
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 @media (pointer: coarse), (max-width: 640px) {
   .sect-action-confirm .sect-confirm-actions button {
@@ -4846,7 +4848,7 @@ body.low-fx.in-limbo .stone-item {
 .sect-members-header {
   display: flex;
   justify-content: space-between;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: #9ca3af;
   padding: 0 4px;
 }
@@ -4883,14 +4885,14 @@ body.low-fx.in-limbo .stone-item {
 }
 .sect-member-name {
   font-weight: 700;
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: #f9fafb;
 }
 .sect-member-name.is-me {
   color: #fbbf24;
 }
 .sect-member-rank {
-  font-size: 10px;
+  font-size: var(--fs-10);
   padding: 1px 6px;
   border-radius: 3px;
   font-weight: 600;
@@ -4910,7 +4912,7 @@ body.low-fx.in-limbo .stone-item {
   color: #9ca3af;
 }
 .sect-member-status {
-  font-size: 11px;
+  font-size: var(--fs-11);
   color: #9ca3af;
 }
 .sect-member-status.online {
@@ -4933,7 +4935,7 @@ body.low-fx.in-limbo .stone-item {
 }
 .sect-treasury-balance-box small {
   color: #9ca3af;
-  font-size: 12px;
+  font-size: var(--fs-12);
 }
 .sect-treasury-amount {
   display: flex;
@@ -4945,7 +4947,7 @@ body.low-fx.in-limbo .stone-item {
   margin-top: 4px;
 }
 .sect-treasury-amount span {
-  font-size: 14px;
+  font-size: var(--fs-14);
   color: #e5e7eb;
 }
 .sect-treasury-forms {
@@ -4965,7 +4967,7 @@ body.low-fx.in-limbo .stone-item {
 }
 .sect-treasury-form h4 {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: #e5e7eb;
 }
 .sect-input-row {
@@ -4979,7 +4981,7 @@ body.low-fx.in-limbo .stone-item {
   border: 1px solid #4a3e2b;
   background: #1a1612;
   color: #fff;
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 .sect-input-row button {
   padding: 0 16px;
@@ -4992,7 +4994,7 @@ body.low-fx.in-limbo .stone-item {
 }
 .sect-logs-box h4 {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: #9ca3af;
 }
 .sect-logs-list {
@@ -5003,7 +5005,7 @@ body.low-fx.in-limbo .stone-item {
   overflow-y: auto;
 }
 .sect-log-item {
-  font-size: 11px;
+  font-size: var(--fs-11);
   color: #d1d5db;
   padding: 4px 8px;
   background: rgba(255, 255, 255, 0.02);
@@ -5041,7 +5043,7 @@ body.low-fx.in-limbo .stone-item {
   gap: 8px;
 }
 .sib-badge {
-  font-size: 10px;
+  font-size: var(--fs-10);
   font-weight: 700;
   color: #c084fc;
   background: rgba(168, 85, 247, 0.2);
@@ -5050,20 +5052,20 @@ body.low-fx.in-limbo .stone-item {
   border: 1px solid rgba(168, 85, 247, 0.4);
 }
 .sib-head b {
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: #ffe08a;
   flex: 1;
   text-align: left;
 }
 .sib-countdown {
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 700;
   color: #fbbf24;
   font-family: monospace;
 }
 .sib-msg {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: #e5e7eb;
   line-height: 1.4;
   text-align: left;
@@ -5090,7 +5092,7 @@ body.low-fx.in-limbo .stone-item {
   min-height: 44px;
   border-radius: 6px;
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--fs-13);
   cursor: pointer;
 }
 .sib-btn.accept {
@@ -5122,7 +5124,7 @@ body.low-fx.in-limbo .stone-item {
 
   .sect-tab {
     min-height: 44px;
-    font-size: 13px;
+    font-size: var(--fs-13);
   }
 
   .sect-member-row {
@@ -5140,17 +5142,17 @@ body.low-fx.in-limbo .stone-item {
   .sect-action-btn {
     min-height: 38px;
     padding: 6px 12px;
-    font-size: 12px;
+    font-size: var(--fs-12);
   }
 
   .sect-danger-btn {
     min-height: 44px;
-    font-size: 14px;
+    font-size: var(--fs-14);
   }
 
   .sect-primary-btn {
     min-height: 46px;
-    font-size: 15px;
+    font-size: var(--fs-15);
   }
 
   .sect-tiny-btn,
@@ -5221,7 +5223,7 @@ body.low-fx.in-limbo .stone-item {
 }
 
 .outdated-desc {
-  font-size: 15px;
+  font-size: var(--fs-15);
   line-height: 1.6;
   color: #f3ecda;
   margin: 0;
@@ -5237,7 +5239,7 @@ body.low-fx.in-limbo .stone-item {
   width: 100%;
   max-width: 260px;
   min-height: 48px;
-  font-size: 15px;
+  font-size: var(--fs-15);
   font-weight: bold;
 }
 
@@ -5286,13 +5288,13 @@ body.low-fx.in-limbo .stone-item {
 
 .newbie-info b {
   display: block;
-  font-size: 14px;
+  font-size: var(--fs-14);
   color: #ffe08a;
   margin-bottom: 4px;
 }
 
 .newbie-info p {
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: #d1d5db;
   line-height: 1.4;
   margin: 0;
@@ -5413,7 +5415,7 @@ html[data-input="touch"]:not([data-touch-scheme="dpad"])
   place-content: center;
   width: 48px;
   height: 48px;
-  font-size: 22px;
+  font-size: var(--fs-22);
   color: rgba(243, 220, 160, 0.55);
   pointer-events: none;
 }
