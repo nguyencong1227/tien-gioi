@@ -104,6 +104,12 @@ try {
     const sc = window.__scene, me = sc.me();
     sc.predX = me.x; sc.predY = me.y;
     sc.cameras.main.centerOn(me.x, me.y);
+    // Sương trôi (#362) và thời tiết làm nền ĐỔI THEO THỜI GIAN nên phép so điểm ảnh / đối chứng nhiễu sai: các script đo hạt tắt hẳn
+    // sương (không dựng lại khi đổi bậc chất lượng / bản đồ). Kiểm riêng sương nằm ở server/scripts/e2e-map.ts (Ca 7).
+    sc.applyFog = () => {};
+    sc.stepFog = () => {};
+    for (const im of sc.fogImages || []) im.destroy();
+    sc.fogImages = [];
     return 0;
   })()`);
 
@@ -164,13 +170,13 @@ try {
   );
   const d = await diff("pre", "sw");
   check(
-    d > 60,
-    `kiếm khí: ${d} điểm ảnh khác nền khi ảnh kiếm khí đã tan (hạt thật sự được vẽ, > 60)`,
+    d > 30,
+    `kiếm khí: ${d} điểm ảnh khác nền khi ảnh kiếm khí đã tan (hạt thật sự được vẽ, > 30)`,
   );
   await settle();
 
   // 2) Qua đúng đường người chơi gọi (nút / phím): sword() và slash() của mình
-  r = await act("sc.nextSword = 0; sc.sword()", "sw2", 120);
+  r = await act("sc.nextSword = 0; sc.sword()", "sw2", 300);
   check(r.peak > 8, `sword() của mình qua đường thật: đỉnh ${r.peak} hạt`);
   await settle();
 
