@@ -60,7 +60,7 @@ async function main() {
         "--window-size=1280,720",
         "about:blank",
       ],
-      { stdio: "ignore" },
+      { stdio: "ignore", detached: true },
     );
     let targets: any[] = [];
     for (const start = Date.now(); Date.now() - start < 8000;) {
@@ -110,6 +110,10 @@ async function main() {
     const ev = (expr: string) => T.ev(expr) as Promise<any>;
     await setStorage("");
     await login(url);
+    // Chrome headless không GPU tự rơi vào bậc Thấp (không sương, không ánh sáng): ép bậc Cao để các lớp M5.3 ở bản đồ đích thật sự có mặt
+    await ev(
+      `(() => { const s = document.getElementById('set-quality'); s.value = 'high'; s.dispatchEvent(new Event('change')); })(); 1`,
+    );
 
     // ---------------- Đi bộ tới Bắc Môn Quan ----------------
     out("\n--- Đi bộ tới cổng (joystick ảo + BFS trên ô) ---");
@@ -187,7 +191,7 @@ async function main() {
     // Bản đồ đích có đủ lớp M5.3 (dựng lại đúng khi đổi bản đồ thật)
     await sleep(800);
     const dest =
-      await ev(`(() => { try { const s = window.__scene; return { decor: !!s.decorLayer, fog: s.fogImages ? s.fogImages.length : -1, light: s.lightVignette === undefined ? -1 : (s.lightVignette ? 1 : 0), mapId: s.map.def.id,
+      await ev(`(() => { try { const s = window.__scene; return { decor: !!s.decorLayer, fog: s.fogImages.length, light: s.lightVignette ? 1 : 0, mapId: s.map.def.id,
       decorKey: s.decorLayer ? s.decorLayer.tileset[0].image.key : '' }; } catch (e) { return { err: String((e && e.stack) || e) }; } })()`);
     must(!dest.err, `đọc trạng thái bản đồ đích (${dest.err})`);
     must(dest.decor, "bản đồ đích có lớp trang trí");
@@ -195,12 +199,9 @@ async function main() {
       dest.decorKey === "decor-hac_phong",
       `lớp trang trí dùng kiểu của Hắc Phong (${dest.decorKey})`,
     );
-    // Ánh sáng / sương chỉ kiểm khi bản dựng có (-1 = chưa có tính năng đó trong bản dựng này)
-    if (dest.light !== -1) must(dest.light === 1, "bản đồ đích có ánh sáng / vignette");
-    if (dest.fog !== -1) must(dest.fog > 0, `bản đồ đích có sương (${dest.fog} mảng)`);
-    ok(
-      `bản đồ đích: trang trí ${dest.decorKey}, ánh sáng ${dest.light === -1 ? "(chưa có)" : "có"}, sương ${dest.fog === -1 ? "(chưa có)" : dest.fog + " mảng"}`,
-    );
+    must(dest.light === 1, "bản đồ đích có ánh sáng / vignette");
+    must(dest.fog > 0, `bản đồ đích có sương (${dest.fog} mảng)`);
+    ok(`bản đồ đích: trang trí ${dest.decorKey}, ánh sáng có, sương ${dest.fog} mảng`);
     must(T.errors.length === 0, `0 lỗi console / exception (${T.errors.slice(0, 2).join(" | ")})`);
     ok("0 lỗi console / exception");
     out("\n=== E2E CHUYỂN CẢNH QUA CỔNG ĐẠT ===");
@@ -215,11 +216,23 @@ async function main() {
         /* bỏ qua */
       }
     }
-    if (chrome) chrome.kill("SIGKILL");
+    // detached: Chrome là chủ một NHÓM tiến trình; giết cả nhóm (-pid) thì tiến trình con (gpu, renderer) không sống sót để ghi lại thư mục dữ liệu
+    if (chrome?.pid) {
+      try {
+        process.kill(-chrome.pid, "SIGKILL");
+      } catch {
+        chrome.kill("SIGKILL");
+      }
+    }
     await new Promise<void>((r) => httpServer.close(() => r()));
-    await gameServer.gracefullyShutdown();
+    // false: mặc định Colyseus GỌI process.exit ngay trong gracefullyShutdown nên các dòng dọn dẹp phía sau không bao giờ chạy (sót thư mục /tmp/tien-gioi-e2e-*)
+    await gameServer.gracefullyShutdown(false);
     try {
+      // Chrome vừa bị SIGKILL: tiến trình con còn ghi thư mục dữ liệu một lúc, xoá ngay thì sót lại /tmp/tien-gioi-e2e-*-chrome-*: chờ rồi xoá hai lần
+      await sleep(1200);
       execSync(`rm -rf "${dataDir}" "${chromeDir}"`);
+      await sleep(600);
+      execSync(`rm -rf "${chromeDir}"`);
     } catch {
       /* bỏ qua */
     }
