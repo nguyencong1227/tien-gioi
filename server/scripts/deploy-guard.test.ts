@@ -2,7 +2,6 @@ import { spawnSync } from "node:child_process";
 import {
   chmodSync,
   existsSync,
-  mkdirSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
@@ -361,7 +360,7 @@ case "$1" in
   ps) exit 0 ;;
   compose)
     if [[ " $* " == *" pull "* && "\${STUB_PULL_FAIL:-}" == 1 ]]; then echo "pull loi" >&2; exit 1; fi
-    if [[ " $* " == *" run "* && -n "\${STUB_RUN_RC:-}" ]]; then exit "\$STUB_RUN_RC"; fi
+    if [[ " $* " == *" run "* && -n "\${STUB_RUN_RC:-}" ]]; then exit "$STUB_RUN_RC"; fi
     exit 0 ;;
   exec)
     if [[ " $* " == *" pg_dump "* ]]; then
