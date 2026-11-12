@@ -332,7 +332,8 @@ async function main() {
     }
     if (chrome) chrome.kill("SIGKILL");
     await new Promise<void>((r) => httpServer.close(() => r()));
-    await gameServer.gracefullyShutdown();
+    // false: mặc định Colyseus GỌI process.exit ngay trong gracefullyShutdown nên các dòng dọn dẹp phía sau không bao giờ chạy (sót thư mục /tmp/tien-gioi-e2e-*)
+    await gameServer.gracefullyShutdown(false);
     try {
       execSync(`rm -rf "${dataDir}" "${chromeDir}"`);
     } catch {

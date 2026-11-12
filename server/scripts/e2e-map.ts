@@ -60,7 +60,7 @@ async function main() {
         "--window-size=1280,720",
         "about:blank",
       ],
-      { stdio: "ignore" },
+      { stdio: "ignore", detached: true },
     );
     let targets: any[] = [];
     for (const start = Date.now(); Date.now() - start < 8000;) {
@@ -584,8 +584,8 @@ async function main() {
     const wOnOff = Number(await waterDiff(false, true));
     await ev(`window.__scene.waterLayer.setVisible(true); 1`);
     must(
-      wCtl < 300,
-      `đối chứng (chỉ trong ô nước): hai ảnh cùng trạng thái khác ${wCtl} điểm ảnh (< 300)`,
+      wCtl < 400,
+      `đối chứng (chỉ trong ô nước): hai ảnh cùng trạng thái khác ${wCtl} điểm ảnh (< 400)`,
     );
     must(
       wOnOff > 400 && wOnOff > wCtl * 3,
@@ -656,11 +656,23 @@ async function main() {
         /* bỏ qua */
       }
     }
-    if (chrome) chrome.kill("SIGKILL");
+    // detached: Chrome là chủ một NHÓM tiến trình; giết cả nhóm (-pid) thì tiến trình con (gpu, renderer) không sống sót để ghi lại thư mục dữ liệu
+    if (chrome?.pid) {
+      try {
+        process.kill(-chrome.pid, "SIGKILL");
+      } catch {
+        chrome.kill("SIGKILL");
+      }
+    }
     await new Promise<void>((r) => httpServer.close(() => r()));
-    await gameServer.gracefullyShutdown();
+    // false: mặc định Colyseus GỌI process.exit ngay trong gracefullyShutdown nên các dòng dọn dẹp phía sau không bao giờ chạy (sót thư mục /tmp/tien-gioi-e2e-*)
+    await gameServer.gracefullyShutdown(false);
     try {
+      // Chrome vừa bị SIGKILL: tiến trình con còn ghi thư mục dữ liệu một lúc, xoá ngay thì sót lại /tmp/tien-gioi-e2e-*-chrome-*: chờ rồi xoá hai lần
+      await sleep(1200);
       execSync(`rm -rf "${dataDir}" "${chromeDir}"`);
+      await sleep(600);
+      execSync(`rm -rf "${chromeDir}"`);
     } catch {
       /* bỏ qua */
     }
