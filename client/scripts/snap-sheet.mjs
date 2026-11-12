@@ -34,6 +34,9 @@ const VIEWPORTS = [
 const PANELS = [
   ["inv-modal", "toggleInventory"],
   ["char-modal", "toggleCharModal"],
+  ["settings-modal", "toggleSettingsModal"],
+  ["map-modal", "toggleMapModal"],
+  ["quest-modal", "toggleQuestModal"],
 ];
 
 const CDP_PORT = 39100 + Math.floor(Math.random() * 400);

@@ -762,7 +762,7 @@ button {
 
 /* Bản đồ lớn toàn thế giới (M) */
 #map-modal {
-  width: min(96vw, 420px);
+  --sheet-w: 420px;
 }
 .map-body {
   display: flex;
@@ -1660,7 +1660,7 @@ body.low-fx #btn-talk {
 
 /* Màn hình cài đặt (#settings-modal - #35) */
 #settings-modal {
-  width: min(94vw, 410px);
+  --sheet-w: 410px;
 }
 .settings-body {
   display: flex;
@@ -1886,8 +1886,7 @@ body.low-fx #btn-talk {
     justify-content: flex-start;
   }
   .forge-list,
-  .shop-list,
-  #quest-list {
+  .shop-list {
     max-height: calc(100dvh - 96px);
   }
 }
@@ -4938,6 +4937,18 @@ body.reduced-motion *::after {
   animation-iteration-count: 1 !important;
   transition-duration: 0.01ms !important;
   scroll-behavior: auto !important;
+}
+
+/* Sổ nhiệm vụ trong tấm trên điện thoại: tấm tự cuộn nên danh sách không cần khung cuộn riêng (tránh hai thanh cuộn lồng nhau) */
+html[data-form="phone"] #quest-list {
+  max-height: none;
+  overflow: visible;
+}
+
+/* Bản đồ lớn trong ngăn kéo điện thoại ngang: vuông vừa chiều cao còn lại (đầu tấm ~70 px + chú giải ~35 px + chỗ nút đóng ~80 px) để thấy trọn bản đồ không phải cuộn */
+html[data-form="phone"][data-orient="landscape"] #worldmap {
+  width: min(92vw, 320px, calc(var(--vh, 100dvh) - 180px));
+  height: min(92vw, 320px, calc(var(--vh, 100dvh) - 180px));
 }
 
 /* ===== Điều khiển cảm ứng (M5.1, #327) ===== */
