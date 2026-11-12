@@ -281,6 +281,23 @@ describe("gfx/display: bộ điều khiển với môi trường giả", () => {
     expect(f3.props["--ui-scale"]).toBe("1");
   });
 
+  it("đổi kích thước / xoay máy KHÔNG ghi đè cỡ chữ đã chọn (--ui-scale giữ 1,15, storage giữ nguyên) (#381)", () => {
+    // Lỗi thật ở #376: ô Cỡ chữ tự ghi --ui-scale, còn write() của display.ts ghi lại giá trị riêng (1) mỗi lần đổi kích thước
+    const f = fakeEnv({ w: 390, h: 844, coarse: true });
+    const d = createDisplay(f.env);
+    d.setUiScale(1.15);
+    expect(f.props["--ui-scale"]).toBe("1.15");
+    f.state.w = 844;
+    f.state.h = 390;
+    f.fire("resize");
+    f.fire("orientationchange");
+    f.flush();
+    expect(f.props["--ui-scale"]).toBe("1.15");
+    expect(f.store[UI_SCALE_STORAGE_KEY]).toBe("1.15");
+    d.refresh();
+    expect(f.props["--ui-scale"]).toBe("1.15");
+  });
+
   it("refresh: đọc lại ngay, huỷ hẹn giờ đang chờ", () => {
     const f = fakeEnv({ w: 390, h: 844, coarse: true });
     const d = createDisplay(f.env);
