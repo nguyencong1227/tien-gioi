@@ -80,13 +80,19 @@ export function planWeather(
 }
 
 /**
- * Bật / tắt thời tiết theo địa chỉ trang: `?weather=1` bật, `?weather=0|off` tắt; không ghi gì thì BẬT trừ khi đang `?debug`
- * (các script đo đếm hạt sống / điểm ảnh đều chạy ở `?debug=1` và cần cảnh không có hạt môi trường).
+ * Bật / tắt một hiệu ứng môi trường CHUYỂN ĐỘNG liên tục (`name` = "weather" | "water") theo địa chỉ trang: `?<name>=1|on` bật,
+ * `?<name>=0|off` tắt; không ghi gì thì BẬT trừ khi đang `?debug` (các script đo hạt sống / điểm ảnh đều chạy ở `?debug=1` và cần
+ * cảnh tĩnh để ảnh đối chứng không nhiễu). e2e bật lại lúc chạy bằng thuộc tính của cảnh.
  */
-export function weatherEnabledByUrl(search: string): boolean {
+export function ambientEnabledByUrl(search: string, name: string): boolean {
   const q = new URLSearchParams(search);
-  const v = q.get("weather");
+  const v = q.get(name);
   if (v === "1" || v === "on") return true;
   if (v === "0" || v === "off") return false;
   return !q.has("debug");
+}
+
+/** Thời tiết bằng hạt theo địa chỉ trang (xem `ambientEnabledByUrl`). */
+export function weatherEnabledByUrl(search: string): boolean {
+  return ambientEnabledByUrl(search, "weather");
 }

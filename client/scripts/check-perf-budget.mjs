@@ -178,6 +178,7 @@ export function calculateStaticTextureMemory(assetsDir) {
     { name: "decor-tileset (sinh bằng mã)", width: 320, height: 32 },
     { name: "light-vignette (sinh bằng mã)", width: 128, height: 128 },
     { name: "light-white (sinh bằng mã)", width: 4, height: 4 },
+    { name: "fog-blob (sinh bằng mã)", width: 128, height: 128 },
     { name: "blob-shadow (sinh bằng mã)", width: 64, height: 28 },
   ];
 

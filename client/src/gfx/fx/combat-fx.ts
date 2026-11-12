@@ -123,3 +123,39 @@ export const MON_DEATH_MAX_DIST = 1100;
 export function isMonsterDeath(distToMe: number): boolean {
   return Number.isFinite(distToMe) && distToMe < MON_DEATH_MAX_DIST;
 }
+
+/** Hai chữ bay trên CÙNG một mục tiêu cách nhau không quá khoảng này (ms) thì xếp lệch lên để khỏi đè nhau. */
+export const LANE_WINDOW_MS = 450;
+/** Số hàng chữ lệch lên tối đa trước khi quay về hàng 0, và độ lệch mỗi hàng (px thế giới). */
+export const LANE_COUNT = 4;
+export const LANE_STEP_PX = 12;
+
+/**
+ * Xếp hàng chữ bay theo mục tiêu (nit của A ở #349: "Bạo!" chồng số khác khi dồn đòn): lần đầu (hoặc sau `LANE_WINDOW_MS` yên
+ * ắng) ở hàng 0, mỗi chữ kế tiếp trong cửa sổ lên một hàng (0..LANE_COUNT-1 rồi quay lại). Trả độ lệch dọc (px, âm = lên).
+ * Bộ nhớ nhỏ: mục đã quá hạn bị dọn khi số mục vượt `LANE_PRUNE_AT`. Thuần (đồng hồ truyền vào) nên test tất định.
+ */
+export const LANE_PRUNE_AT = 32;
+export class FloatLanes {
+  private readonly m = new Map<string, { lane: number; at: number }>();
+
+  offset(key: string, now: number): number {
+    if (this.m.size > LANE_PRUNE_AT) {
+      for (const [k, v] of this.m) if (!(now - v.at <= LANE_WINDOW_MS)) this.m.delete(k);
+    }
+    const prev = this.m.get(key);
+    const lane =
+      prev && now >= prev.at && now - prev.at <= LANE_WINDOW_MS ? (prev.lane + 1) % LANE_COUNT : 0;
+    this.m.set(key, { lane, at: now });
+    return lane === 0 ? 0 : -lane * LANE_STEP_PX; // tránh -0
+  }
+
+  /** Số mục đang nhớ (để test dọn bộ nhớ). */
+  size(): number {
+    return this.m.size;
+  }
+
+  clear(): void {
+    this.m.clear();
+  }
+}
