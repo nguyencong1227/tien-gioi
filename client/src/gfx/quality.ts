@@ -211,7 +211,11 @@ export interface GovernorOptions {
   windowMs: number;
   /** p95 vượt mức này (ms) là cửa sổ XẤU (~45 FPS). */
   badP95Ms: number;
-  /** p95 dưới mức này (ms) là cửa sổ TỐT. */
+  /**
+   * p95 dưới mức này (ms) là cửa sổ TỐT. PHẢI > chu kỳ làm tươi 60 Hz (16,7 ms): p95 của KHOẢNG CÁCH khung ở đúng 60 FPS
+   * luôn >= 16,7 ms nên ngưỡng 14 ms (bản đầu) không bao giờ đạt trên màn 60 Hz và bộ điều tốc chỉ biết hạ, không biết nâng
+   * (B đo thật: `p95 16.7-16.8 ms`, `tốt 0` sau nhiều chục giây). 19 ms = ~52 FPS xấu nhất; vùng chết 19-22 ms giữ trễ.
+   */
   goodP95Ms: number;
   badWindowsToDown: number;
   goodWindowsToUp: number;
@@ -227,7 +231,7 @@ export interface GovernorOptions {
 export const DEFAULT_GOVERNOR: GovernorOptions = {
   windowMs: 5000,
   badP95Ms: 22,
-  goodP95Ms: 14,
+  goodP95Ms: 19,
   badWindowsToDown: 2,
   goodWindowsToUp: 6, // 6 x 5 s = 30 s
   minChangeGapMs: 20_000,
@@ -517,16 +521,24 @@ export function browserQualityEnv(
   win: Window = window,
   doc: Document = document,
 ): QualityEnv {
+  // Chuỗi GPU không đổi trong phiên: đọc MỘT lần và nhớ (mỗi lần gọi mà tạo ngữ cảnh WebGL mới rồi bỏ sẽ chạm trần ~16
+  // ngữ cảnh sống của Chrome), rồi giải phóng ngữ cảnh ngay.
+  let gpuRead = false;
+  let gpuCache: string | undefined;
   const gpuString = (): string | undefined => {
+    if (gpuRead) return gpuCache;
+    gpuRead = true;
     try {
       const c = doc.createElement("canvas");
       const gl = (c.getContext("webgl") ||
         c.getContext("experimental-webgl")) as WebGLRenderingContext | null;
       const ext = gl?.getExtension("WEBGL_debug_renderer_info");
-      return ext && gl ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : undefined;
+      gpuCache = ext && gl ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : undefined;
+      gl?.getExtension("WEBGL_lose_context")?.loseContext();
     } catch {
-      return undefined;
+      gpuCache = undefined;
     }
+    return gpuCache;
   };
   return {
     signals: () => {

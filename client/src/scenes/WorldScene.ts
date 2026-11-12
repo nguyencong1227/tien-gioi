@@ -1,3 +1,5 @@
+import { getDisplay } from "../gfx/display";
+import { fitZoom, toCssPoint } from "../gfx/scale";
 import Phaser from "phaser";
 import type { Room } from "colyseus.js";
 import {
@@ -75,6 +77,16 @@ import { replayEarlyMessages } from "../early-messages";
 import { sound } from "../audio";
 import { joystick, setupJoystick } from "../joystick";
 import { isTypingElement, isReducedMotion } from "../a11y";
+import {
+  markMonAttack,
+  markMonHurt,
+  monAnimKey,
+  monAnimMs,
+  monAnimState,
+  newMonAnimClock,
+  type MonAnimClock,
+  type MonAnimState,
+} from "../gfx/anim/mon-anim";
 
 interface Entity {
   root: Phaser.GameObjects.Container;
@@ -91,6 +103,10 @@ interface Entity {
   ty: number;
   lastLabel?: string;
   slashUntil?: number;
+  /** Hoạt ảnh yêu thú (M5.2 #328): loại quái, cờ thời gian đánh / bị đánh, trạng thái đang phát. */
+  monKind?: string;
+  monAnim?: MonAnimClock;
+  monAnimState?: MonAnimState;
 }
 
 interface SlashFxItem {
@@ -244,16 +260,14 @@ export class WorldScene extends Phaser.Scene {
 
     const cam = this.cameras.main;
     cam.setBounds(0, 0, this.map.worldW, this.map.worldH);
-    const fitZoom = () => {
-      const w = this.scale.width;
-      const h = this.scale.height;
-      // Chặn zoom thấp nhất để vùng nhìn (w / zoom <= 1900, h / zoom <= 1100) nằm gọn trong bán kính StateView (1100 px)
-      const minZoom = Math.max(0.75, w / 1900, h / 1100);
-      const baseZoom = Phaser.Math.Clamp(Math.min(w, h) / 640, 0.75, 1.3);
-      cam.setZoom(Math.max(baseZoom, minZoom));
+    // Luật zoom theo ĐƠN VỊ CSS (gfx/scale.fitZoom: giữ vùng nhìn trong bán kính StateView 1100 px) nhân renderScale:
+    // canvas lớn gấp renderScale lần nên camera zoom cũng nhân lên, vùng nhìn trong thế giới KHÔNG đổi (#324)
+    const applyZoom = () => {
+      const d = getDisplay();
+      cam.setZoom(fitZoom(d.cssW, d.cssH) * d.renderScale);
     };
-    fitZoom();
-    this.scale.on("resize", fitZoom);
+    applyZoom();
+    this.scale.on("resize", applyZoom);
 
     ui.init({
       onUse: (slot) => !this.isReconnecting && this.room.send("useItem", { slot }),
@@ -730,12 +744,14 @@ export class WorldScene extends Phaser.Scene {
             isDungeonMap(this.map.def.id),
           );
         }
+        // Menu là phần tử DOM: toạ độ CSS px, KHÔNG phải điểm ảnh canvas (lệch gấp renderScale lần khi renderScale > 1)
+        const menuAt = toCssPoint(pointer.x, pointer.y, this.scale.displayScale);
         ui.openPlayerMenu(
           sp.name,
           sp.realm,
           sp.tier,
-          pointer.x,
-          pointer.y,
+          menuAt.x,
+          menuAt.y,
           challengeCheck,
           (sp as any).sect,
         );
@@ -936,6 +952,10 @@ export class WorldScene extends Phaser.Scene {
         this.recordCombat();
       }
       if (!this.inView(m.x, m.y, 96)) return;
+      if (!m.toPlayer && !isReducedMotion()) {
+        const mon = this.monsters.get(m.target);
+        if (mon?.monAnim) markMonHurt(mon.monAnim, this.time.now);
+      }
       this.floatText(m);
       sound.hit(m.crit);
     });
@@ -1966,8 +1986,8 @@ export class WorldScene extends Phaser.Scene {
       const def = MONSTER_BY_ID[m.kind];
       if (!e) {
         e = this.makeEntity(`mon-${m.kind}`, m.x, m.y, false);
-        const animKey = `mon-${m.kind}-move`;
-        if (this.anims.exists(animKey)) e.sprite.play(animKey);
+        e.monKind = m.kind;
+        e.monAnim = newMonAnimClock();
         if (def.boss) {
           e.label = this.add
             .text(0, -def.radius - 22, def.name, {
@@ -1993,6 +2013,7 @@ export class WorldScene extends Phaser.Scene {
       }
       if (!e.root.visible) e.root.setVisible(true);
       if (e.sprite.anims.isPaused) e.sprite.anims.resume();
+      this.updateMonsterAnim(e);
       e.root.setDepth(e.root.y);
       e.sprite.setFlipX(Math.cos(m.angle) < 0);
       this.drawBar(
@@ -2007,18 +2028,44 @@ export class WorldScene extends Phaser.Scene {
     for (const [id, e] of this.monsters) {
       if (seen.has(id)) continue;
       if (e.root.visible) {
-        this.tweens.add({
-          targets: e.root,
-          alpha: 0,
-          scale: 0.6,
-          duration: 300,
-          onComplete: () => e.root.destroy(),
-        });
+        const dieKey = e.monKind ? monAnimKey(e.monKind, "die") : "";
+        if (dieKey && e.monAnim && !isReducedMotion() && this.anims.exists(dieKey)) {
+          // Gục: 4 khung (đổ bẹp, tan thành điểm sáng) rồi mờ dần; thanh máu ẩn ngay
+          e.monAnim.dying = true;
+          e.monAnimState = "die";
+          e.bar.setVisible(false);
+          e.sprite.play(dieKey, true);
+          this.tweens.add({
+            targets: e.root,
+            alpha: 0,
+            delay: monAnimMs("die") - 60,
+            duration: 220,
+            onComplete: () => e.root.destroy(),
+          });
+        } else {
+          this.tweens.add({
+            targets: e.root,
+            alpha: 0,
+            scale: 0.6,
+            duration: 300,
+            onComplete: () => e.root.destroy(),
+          });
+        }
       } else {
         e.root.destroy();
       }
       this.monsters.delete(id);
     }
+  }
+
+  /** Phát hoạt ảnh theo máy trạng thái (gfx/anim/mon-anim.ts); chỉ đổi khi trạng thái đổi. */
+  private updateMonsterAnim(e: Entity) {
+    if (!e.monKind || !e.monAnim) return;
+    const st = monAnimState(e.monAnim, this.time.now);
+    if (e.monAnimState === st) return;
+    e.monAnimState = st;
+    const key = monAnimKey(e.monKind, st);
+    if (this.anims.exists(key)) e.sprite.play(key, true);
   }
 
   private syncLoot() {
@@ -2229,9 +2276,12 @@ export class WorldScene extends Phaser.Scene {
         const attacker = this.state?.players?.get(m.by);
         return this.fxSword(m.x, m.y, m.angle, m.range, this.weaponColorFor(attacker, 0xffffff));
       }
-      case "mslash":
+      case "mslash": {
+        const mon = this.monsters.get(m.by);
+        if (mon?.monAnim && !isReducedMotion()) markMonAttack(mon.monAnim, this.time.now);
         if (!this.inView(m.x, m.y, 96)) return;
         return this.fxSlash(m.x, m.y, m.angle, 0xff6050, 0.6);
+      }
       case "levelup":
         return this.fxLevelUp(m.x, m.y, m.major, m.by === this.sid);
       case "breakfail":

@@ -2,6 +2,7 @@
 // Giữ cơ chế fallback vẽ tạm bằng code cho các quái/vật phẩm mới thêm trong shared/ mà chưa kịp đóng gói vào atlas.
 import Phaser from "phaser";
 import { TILE, T, MONSTERS, ITEMS, NPCS } from "@tien-gioi/shared";
+import { MON_ONE_SHOT, monAnimKey } from "./gfx/anim/mon-anim";
 
 export const TILESET_KEY = "tileset";
 export const ATLAS_KEY = "atlas";
@@ -82,19 +83,25 @@ function registerAnimations(scene: Phaser.Scene) {
     }
   }
 
-  // Hoạt ảnh cho yêu thú
+  // Hoạt ảnh cho yêu thú: đi (lặp), đánh, bị đánh, gục (một lần; M5.2 #328, máy trạng thái ở gfx/anim/mon-anim.ts)
+  const monFrames = (id: string, names: string[]) =>
+    names.map((n) => ({ key: ATLAS_KEY, frame: `mon-${id}-${n}` }));
   for (const m of MONSTERS) {
     const animKey = `mon-${m.id}-move`;
     if (!scene.anims.exists(animKey) && atlasTex.has(`mon-${m.id}-0`)) {
       scene.anims.create({
         key: animKey,
-        frames: [
-          { key: ATLAS_KEY, frame: `mon-${m.id}-0` },
-          { key: ATLAS_KEY, frame: `mon-${m.id}-1` },
-        ],
+        frames: monFrames(m.id, ["0", "1"]),
         frameRate: 4,
         repeat: -1,
       });
+    }
+    for (const state of Object.keys(MON_ONE_SHOT) as Array<keyof typeof MON_ONE_SHOT>) {
+      const { frames, fps } = MON_ONE_SHOT[state];
+      const key = monAnimKey(m.id, state);
+      if (scene.anims.exists(key) || !frames.every((n) => atlasTex.has(`mon-${m.id}-${n}`)))
+        continue;
+      scene.anims.create({ key, frames: monFrames(m.id, [...frames]), frameRate: fps, repeat: 0 });
     }
   }
 }

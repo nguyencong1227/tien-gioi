@@ -3360,9 +3360,149 @@
         "h": 32
       }
     },
-    "mon-lang": {
+    "mon-tho-atk-0": {
       "frame": {
         "x": 206,
+        "y": 380,
+        "w": 32,
+        "h": 32
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 32
+      }
+    },
+    "mon-tho-atk-1": {
+      "frame": {
+        "x": 240,
+        "y": 380,
+        "w": 32,
+        "h": 32
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 32
+      }
+    },
+    "mon-tho-hurt": {
+      "frame": {
+        "x": 274,
+        "y": 380,
+        "w": 32,
+        "h": 32
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 32
+      }
+    },
+    "mon-tho-die-0": {
+      "frame": {
+        "x": 308,
+        "y": 380,
+        "w": 32,
+        "h": 32
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 32
+      }
+    },
+    "mon-tho-die-1": {
+      "frame": {
+        "x": 342,
+        "y": 380,
+        "w": 32,
+        "h": 32
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 32
+      }
+    },
+    "mon-tho-die-2": {
+      "frame": {
+        "x": 376,
+        "y": 380,
+        "w": 32,
+        "h": 32
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 32
+      }
+    },
+    "mon-tho-die-3": {
+      "frame": {
+        "x": 410,
+        "y": 380,
+        "w": 32,
+        "h": 32
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 32
+      }
+    },
+    "mon-lang": {
+      "frame": {
+        "x": 444,
         "y": 380,
         "w": 40,
         "h": 40
@@ -3382,7 +3522,7 @@
     },
     "mon-lang-0": {
       "frame": {
-        "x": 248,
+        "x": 486,
         "y": 380,
         "w": 40,
         "h": 40
@@ -3402,8 +3542,148 @@
     },
     "mon-lang-1": {
       "frame": {
-        "x": 290,
+        "x": 528,
         "y": 380,
+        "w": 40,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 40,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 40,
+        "h": 40
+      }
+    },
+    "mon-lang-atk-0": {
+      "frame": {
+        "x": 570,
+        "y": 380,
+        "w": 40,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 40,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 40,
+        "h": 40
+      }
+    },
+    "mon-lang-atk-1": {
+      "frame": {
+        "x": 2,
+        "y": 422,
+        "w": 40,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 40,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 40,
+        "h": 40
+      }
+    },
+    "mon-lang-hurt": {
+      "frame": {
+        "x": 44,
+        "y": 422,
+        "w": 40,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 40,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 40,
+        "h": 40
+      }
+    },
+    "mon-lang-die-0": {
+      "frame": {
+        "x": 86,
+        "y": 422,
+        "w": 40,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 40,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 40,
+        "h": 40
+      }
+    },
+    "mon-lang-die-1": {
+      "frame": {
+        "x": 128,
+        "y": 422,
+        "w": 40,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 40,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 40,
+        "h": 40
+      }
+    },
+    "mon-lang-die-2": {
+      "frame": {
+        "x": 170,
+        "y": 422,
+        "w": 40,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 40,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 40,
+        "h": 40
+      }
+    },
+    "mon-lang-die-3": {
+      "frame": {
+        "x": 212,
+        "y": 422,
         "w": 40,
         "h": 40
       },
@@ -3422,8 +3702,8 @@
     },
     "mon-ho": {
       "frame": {
-        "x": 332,
-        "y": 380,
+        "x": 254,
+        "y": 422,
         "w": 48,
         "h": 48
       },
@@ -3442,8 +3722,8 @@
     },
     "mon-ho-0": {
       "frame": {
-        "x": 382,
-        "y": 380,
+        "x": 304,
+        "y": 422,
         "w": 48,
         "h": 48
       },
@@ -3462,8 +3742,148 @@
     },
     "mon-ho-1": {
       "frame": {
-        "x": 432,
-        "y": 380,
+        "x": 354,
+        "y": 422,
+        "w": 48,
+        "h": 48
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 48,
+        "h": 48
+      },
+      "sourceSize": {
+        "w": 48,
+        "h": 48
+      }
+    },
+    "mon-ho-atk-0": {
+      "frame": {
+        "x": 404,
+        "y": 422,
+        "w": 48,
+        "h": 48
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 48,
+        "h": 48
+      },
+      "sourceSize": {
+        "w": 48,
+        "h": 48
+      }
+    },
+    "mon-ho-atk-1": {
+      "frame": {
+        "x": 454,
+        "y": 422,
+        "w": 48,
+        "h": 48
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 48,
+        "h": 48
+      },
+      "sourceSize": {
+        "w": 48,
+        "h": 48
+      }
+    },
+    "mon-ho-hurt": {
+      "frame": {
+        "x": 504,
+        "y": 422,
+        "w": 48,
+        "h": 48
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 48,
+        "h": 48
+      },
+      "sourceSize": {
+        "w": 48,
+        "h": 48
+      }
+    },
+    "mon-ho-die-0": {
+      "frame": {
+        "x": 554,
+        "y": 422,
+        "w": 48,
+        "h": 48
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 48,
+        "h": 48
+      },
+      "sourceSize": {
+        "w": 48,
+        "h": 48
+      }
+    },
+    "mon-ho-die-1": {
+      "frame": {
+        "x": 2,
+        "y": 472,
+        "w": 48,
+        "h": 48
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 48,
+        "h": 48
+      },
+      "sourceSize": {
+        "w": 48,
+        "h": 48
+      }
+    },
+    "mon-ho-die-2": {
+      "frame": {
+        "x": 52,
+        "y": 472,
+        "w": 48,
+        "h": 48
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 48,
+        "h": 48
+      },
+      "sourceSize": {
+        "w": 48,
+        "h": 48
+      }
+    },
+    "mon-ho-die-3": {
+      "frame": {
+        "x": 102,
+        "y": 472,
         "w": 48,
         "h": 48
       },
@@ -3482,8 +3902,8 @@
     },
     "mon-mang": {
       "frame": {
-        "x": 482,
-        "y": 380,
+        "x": 152,
+        "y": 472,
         "w": 64,
         "h": 64
       },
@@ -3502,8 +3922,8 @@
     },
     "mon-mang-0": {
       "frame": {
-        "x": 548,
-        "y": 380,
+        "x": 218,
+        "y": 472,
         "w": 64,
         "h": 64
       },
@@ -3522,8 +3942,148 @@
     },
     "mon-mang-1": {
       "frame": {
+        "x": 284,
+        "y": 472,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      }
+    },
+    "mon-mang-atk-0": {
+      "frame": {
+        "x": 350,
+        "y": 472,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      }
+    },
+    "mon-mang-atk-1": {
+      "frame": {
+        "x": 416,
+        "y": 472,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      }
+    },
+    "mon-mang-hurt": {
+      "frame": {
+        "x": 482,
+        "y": 472,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      }
+    },
+    "mon-mang-die-0": {
+      "frame": {
+        "x": 548,
+        "y": 472,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      }
+    },
+    "mon-mang-die-1": {
+      "frame": {
         "x": 2,
-        "y": 446,
+        "y": 538,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      }
+    },
+    "mon-mang-die-2": {
+      "frame": {
+        "x": 68,
+        "y": 538,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      }
+    },
+    "mon-mang-die-3": {
+      "frame": {
+        "x": 134,
+        "y": 538,
         "w": 64,
         "h": 64
       },
@@ -3542,8 +4102,8 @@
     },
     "npc-truong_tran": {
       "frame": {
-        "x": 68,
-        "y": 446,
+        "x": 200,
+        "y": 538,
         "w": 36,
         "h": 42
       },
@@ -3562,8 +4122,8 @@
     },
     "npc-duoc_su": {
       "frame": {
-        "x": 106,
-        "y": 446,
+        "x": 238,
+        "y": 538,
         "w": 36,
         "h": 42
       },
@@ -3582,8 +4142,8 @@
     },
     "npc-tho_ren": {
       "frame": {
-        "x": 144,
-        "y": 446,
+        "x": 276,
+        "y": 538,
         "w": 36,
         "h": 42
       },
@@ -3602,8 +4162,8 @@
     },
     "npc-cao_thi": {
       "frame": {
-        "x": 182,
-        "y": 446,
+        "x": 314,
+        "y": 538,
         "w": 36,
         "h": 42
       },
@@ -3622,8 +4182,8 @@
     },
     "item-hoi_huyet_dan": {
       "frame": {
-        "x": 220,
-        "y": 446,
+        "x": 352,
+        "y": 538,
         "w": 24,
         "h": 24
       },
@@ -3642,8 +4202,8 @@
     },
     "item-hoi_linh_dan": {
       "frame": {
-        "x": 246,
-        "y": 446,
+        "x": 378,
+        "y": 538,
         "w": 24,
         "h": 24
       },
@@ -3662,8 +4222,8 @@
     },
     "item-tu_khi_dan": {
       "frame": {
-        "x": 272,
-        "y": 446,
+        "x": 404,
+        "y": 538,
         "w": 24,
         "h": 24
       },
@@ -3682,8 +4242,8 @@
     },
     "item-long_tho": {
       "frame": {
-        "x": 298,
-        "y": 446,
+        "x": 430,
+        "y": 538,
         "w": 24,
         "h": 24
       },
@@ -3702,8 +4262,8 @@
     },
     "item-nanh_soi": {
       "frame": {
-        "x": 324,
-        "y": 446,
+        "x": 456,
+        "y": 538,
         "w": 24,
         "h": 24
       },
@@ -3722,8 +4282,8 @@
     },
     "item-da_ho": {
       "frame": {
-        "x": 350,
-        "y": 446,
+        "x": 482,
+        "y": 538,
         "w": 24,
         "h": 24
       },
@@ -3742,8 +4302,8 @@
     },
     "item-vay_mang": {
       "frame": {
-        "x": 376,
-        "y": 446,
+        "x": 508,
+        "y": 538,
         "w": 24,
         "h": 24
       },
@@ -3762,8 +4322,8 @@
     },
     "item-lang_nha_kiem": {
       "frame": {
-        "x": 402,
-        "y": 446,
+        "x": 534,
+        "y": 538,
         "w": 24,
         "h": 24
       },
@@ -3782,8 +4342,8 @@
     },
     "item-tho_nhung_bao": {
       "frame": {
-        "x": 428,
-        "y": 446,
+        "x": 560,
+        "y": 538,
         "w": 24,
         "h": 24
       },
@@ -3802,8 +4362,8 @@
     },
     "item-lang_nha_phu": {
       "frame": {
-        "x": 454,
-        "y": 446,
+        "x": 586,
+        "y": 538,
         "w": 24,
         "h": 24
       },
@@ -3822,8 +4382,8 @@
     },
     "item-hac_ho_kiem": {
       "frame": {
-        "x": 480,
-        "y": 446,
+        "x": 612,
+        "y": 538,
         "w": 24,
         "h": 24
       },
@@ -3842,8 +4402,8 @@
     },
     "item-hac_ho_bao": {
       "frame": {
-        "x": 506,
-        "y": 446,
+        "x": 2,
+        "y": 604,
         "w": 24,
         "h": 24
       },
@@ -3862,8 +4422,8 @@
     },
     "item-ho_hon_phu": {
       "frame": {
-        "x": 532,
-        "y": 446,
+        "x": 28,
+        "y": 604,
         "w": 24,
         "h": 24
       },
@@ -3882,8 +4442,8 @@
     },
     "item-xich_mang_kiem": {
       "frame": {
-        "x": 558,
-        "y": 446,
+        "x": 54,
+        "y": 604,
         "w": 24,
         "h": 24
       },
@@ -3902,8 +4462,8 @@
     },
     "item-xich_lan_bao": {
       "frame": {
-        "x": 584,
-        "y": 446,
+        "x": 80,
+        "y": 604,
         "w": 24,
         "h": 24
       },
@@ -3922,8 +4482,8 @@
     },
     "item-mang_dam_phu": {
       "frame": {
-        "x": 610,
-        "y": 446,
+        "x": 106,
+        "y": 604,
         "w": 24,
         "h": 24
       },
@@ -3942,8 +4502,8 @@
     },
     "swordbeam": {
       "frame": {
-        "x": 2,
-        "y": 512,
+        "x": 132,
+        "y": 604,
         "w": 48,
         "h": 16
       },
@@ -3962,8 +4522,8 @@
     },
     "dot": {
       "frame": {
-        "x": 52,
-        "y": 512,
+        "x": 182,
+        "y": 604,
         "w": 16,
         "h": 16
       },
