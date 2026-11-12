@@ -31,6 +31,10 @@ import { setupPwa, canReloadSafely, isNativeApp, type PwaGameState } from "./pwa
 import { setupNativeApp, getOutdatedUiConfig, getAppUpdateUrl } from "./native-app";
 import { HeartbeatController } from "./heartbeat";
 import { sound } from "./audio";
+import { initDisplay } from "./gfx/display";
+
+// Lõi hiển thị M5 (#322): đặt data-form / data-orient / data-input và --safe-*, --vw, --vh lên <html> SỚM, trước khi dựng giao diện.
+initDisplay();
 
 const NAME_KEY = "tien-gioi:name";
 const SECRET_KEY = "tien-gioi:secret";
