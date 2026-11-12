@@ -261,9 +261,27 @@ try {
   // Lưu lựa chọn và nạp lại trang
   await setScale("large");
   check(
-    (await evalJs('localStorage.getItem("tg_ui_scale")')) === "large",
-    "lựa chọn lưu vào tg_ui_scale",
+    (await evalJs('localStorage.getItem("tg_ui_scale")')) === "1.15",
+    "lựa chọn lưu vào tg_ui_scale (số 1.15: cùng định dạng với display.ts, một nguồn)",
   );
+  // Đổi kích thước / xoay máy SAU khi chọn: display.ts ghi lại --ui-scale mỗi lần cập nhật, cỡ chữ đã chọn không được về 1
+  for (const [w, h] of [
+    [1100, 700],
+    [700, 1100],
+    [1280, 720],
+  ]) {
+    await send("Emulation.setDeviceMetricsOverride", {
+      width: w,
+      height: h,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    await sleep(450);
+    check(
+      (await evalJs('document.documentElement.style.getPropertyValue("--ui-scale")')) === "1.15",
+      `đổi cỡ cửa sổ ${w}x${h}: cỡ chữ Lớn vẫn giữ (--ui-scale 1.15)`,
+    );
+  }
   await send("Page.reload");
   for (let k = 0; k < 40; k++) {
     await sleep(300);
