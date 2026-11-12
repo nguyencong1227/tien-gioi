@@ -22,6 +22,7 @@ import process from "node:process";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
+import { parseOverlayCounts } from "./perf-gate.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const __filename = fileURLToPath(import.meta.url);
@@ -200,10 +201,13 @@ if (filterCpu) {
 }
 
 const results = [];
+// Kịch bản không tải được / không có mẫu: đếm để thoát mã 1 (nightly #330 không được xanh giả khi thiếu số đo)
+let loadFailures = 0;
 
 try {
   let versionData = null;
-  for (let i = 0; i < 40; i++) {
+  // 15 s (không phải 4 s): lần mở Chrome đầu tiên trên runner CI lạnh có thể chậm
+  for (let i = 0; i < 150; i++) {
     try {
       const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json/version`);
       if (res.ok) {
@@ -216,7 +220,7 @@ try {
     await sleep(100);
   }
 
-  if (!versionData) throw new Error("Chrome headless không khởi động kịp sau 4 giây.");
+  if (!versionData) throw new Error("Chrome headless không khởi động kịp sau 15 giây.");
 
   for (const sc of scenariosToRun) {
     const targetUrl = `http://127.0.0.1:${HTTP_PORT}/?${sc.query}`;
@@ -289,6 +293,7 @@ try {
 
     if (!ready) {
       console.error("  ✗ Kịch bản không tải xong sau 10s.");
+      loadFailures++;
       cdpWs.close();
       await fetch(`http://127.0.0.1:${CDP_PORT}/json/close/${tabData.id}`);
       continue;
@@ -334,22 +339,10 @@ try {
       const maxJsAllowed = tierBudget?.jsFrameP95Ms || 9.0;
       const budgetMet = updateP95Ms <= maxJsAllowed;
 
-      // Đọc chỉ số hạt từ perf-overlay nếu có
-      let particles = 0;
-      let particleLimit = tierBudget?.particleBudget || 60;
-      let emitters = 0;
-      let emitterLimit = tierBudget?.emitterBudget || 4;
-
-      const hatMatch = overlayText.match(/hạt:\s*(\d+)\/(\d+)/);
-      if (hatMatch) {
-        particles = parseInt(hatMatch[1], 10);
-        particleLimit = parseInt(hatMatch[2], 10);
-      }
-      const emitMatch = overlayText.match(/emitter:\s*(\d+)\/(\d+)/);
-      if (emitMatch) {
-        emitters = parseInt(emitMatch[1], 10);
-        emitterLimit = parseInt(emitMatch[2], 10);
-      }
+      // Số hạt / emitter SỐNG từ lớp phủ `?perf=1` (hàm thuần `parseOverlayCounts`, có test hợp đồng với `formatPerfLines`).
+      // Không đọc được thì để null (cổng perf-gate báo "thiếu số đo"), KHÔNG mặc định 0 như trước (regex sai dấu hai chấm
+      // làm mọi kịch bản ra 0 hạt, cổng hạt xanh giả).
+      const { particles, particleLimit, emitters, emitterLimit } = parseOverlayCounts(overlayText);
 
       const resItem = {
         id: sc.id,
@@ -380,6 +373,11 @@ try {
       );
     }
 
+    if (!snap) {
+      console.error("  ✗ Không có mẫu hiệu năng (không khung nào được ghi).");
+      loadFailures++;
+    }
+
     cdpWs.close();
     await fetch(`http://127.0.0.1:${CDP_PORT}/json/close/${tabData.id}`);
   }
@@ -407,7 +405,7 @@ console.table(
     Ngân_sách_JS: `<=${r.budgetJsP95Ms} ms`,
     Đạt: r.budgetMet ? "PASS" : "FAIL",
     Draw_calls: r.drawCalls,
-    Hạt: `${r.particles}/${r.particleLimit}`,
+    Hạt: `${r.particles ?? "?"}/${r.particleLimit ?? "?"}`,
     Heap: `${r.heapMb} MB`,
   })),
 );
@@ -432,8 +430,8 @@ if (shouldWriteDocs) {
 
     for (const r of results) {
       const statusStr = r.budgetMet ? "✓ ĐẠT" : "⚠ VƯỢT";
-      const particleStr = `${r.particles || 0} / ${r.particleLimit || "-"}`;
-      const emitterStr = `${r.emitters || 0} / ${r.emitterLimit || "-"}`;
+      const particleStr = `${r.particles ?? "?"} / ${r.particleLimit ?? "-"}`;
+      const emitterStr = `${r.emitters ?? "?"} / ${r.emitterLimit ?? "-"}`;
       tableMd += `| ${r.scenario} | ${r.tier.toUpperCase()} | ${r.cpu} | ${r.fpsAvg} | ${r.updateP95Ms} ms | <= ${r.budgetJsP95Ms} ms | ${r.drawCalls} | ${particleStr} | ${emitterStr} | ${r.heapMb} MB | ${statusStr} |\n`;
     }
     tableMd += END_MARKER;
@@ -450,4 +448,11 @@ if (shouldWriteDocs) {
   console.log(
     "\n(Chạy chế độ lọc/nhanh: chỉ in kết quả ra console, không ghi đè docs/HIEU_NANG_DI_DONG.md. Dùng thêm --write để ép ghi).",
   );
+}
+
+if (loadFailures > 0) {
+  console.error(
+    `\n❌ ${loadFailures} kịch bản không đo được: kết quả thiếu, KHÔNG được coi là đạt.`,
+  );
+  process.exitCode = 1;
 }
