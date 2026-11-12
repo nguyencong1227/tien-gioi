@@ -114,6 +114,14 @@ import {
 } from "./sect";
 import { sound } from "./audio";
 import {
+  getQuality,
+  onQualityChange,
+  refreshQuality,
+  setBatterySaver,
+  setQualityMode,
+  type QualityMode,
+} from "./gfx/quality";
+import {
   modalStack,
   focusModal,
   returnFocus,
@@ -200,7 +208,6 @@ const hexColor = (c: number) => `#${c.toString(16).padStart(6, "0")}`;
 
 // ---------- Trạng thái Client ----------
 const HIDE_NAMES_KEY = "tg_hide_names";
-const LOW_FX_KEY = "tg_low_fx";
 
 let invSlots: Inventory = emptyInventory();
 const itemCdUntil = new Map<string, number>();
@@ -215,7 +222,6 @@ let questModalOpen = false;
 let mapModalOpen = false;
 let settingsModalOpen = false;
 let hideOtherNames = false;
-let lowFx = false;
 let questTab: "active" | "done" = "active";
 let trackingQuestId: string | null = null;
 let currentName = "";
@@ -450,14 +456,10 @@ function renderPartyPanel() {
 function loadSettings() {
   try {
     hideOtherNames = localStorage.getItem(HIDE_NAMES_KEY) === "1";
-    lowFx = localStorage.getItem(LOW_FX_KEY) === "1";
   } catch {
     hideOtherNames = false;
-    lowFx = false;
   }
-  if (typeof document !== "undefined") {
-    document.body.classList.toggle("low-fx", lowFx);
-  }
+  // Chất lượng đồ hoạ (và class body.low-fx tương thích) do gfx/quality.ts quản lý (#323): một nguồn duy nhất
 }
 
 // Hộp thoại NPC
@@ -2559,7 +2561,10 @@ export const ui = {
     const sfxVal = $("set-sfx-val");
     const muteChk = $("set-mute") as HTMLInputElement;
     const hideNamesChk = $("set-hide-names") as HTMLInputElement;
-    const lowFxChk = $("set-low-fx") as HTMLInputElement;
+    const qualitySel = $("set-quality") as HTMLSelectElement;
+    const qualityNow = $("set-quality-now");
+    const batterySaverChk = $("set-battery-saver") as HTMLInputElement;
+    const TIER_NAME = { low: "Thấp", mid: "Vừa", high: "Cao" } as const;
 
     const syncSettingsDom = () => {
       const bPct = Math.round(sound.getBgmVolume() * 100);
@@ -2570,7 +2575,10 @@ export const ui = {
       sfxVal.textContent = `${sPct}%`;
       muteChk.checked = sound.isMuted();
       hideNamesChk.checked = hideOtherNames;
-      lowFxChk.checked = lowFx;
+      const q = getQuality();
+      qualitySel.value = q.mode;
+      qualityNow.textContent = `Đang dùng: ${TIER_NAME[q.tier]}`;
+      batterySaverChk.checked = q.batterySaver;
     };
     syncSettingsDom();
 
@@ -2595,15 +2603,14 @@ export const ui = {
         // Bỏ qua nếu trình duyệt chặn localStorage
       }
     });
-    lowFxChk.addEventListener("change", () => {
-      lowFx = lowFxChk.checked;
-      document.body.classList.toggle("low-fx", lowFx);
-      try {
-        localStorage.setItem(LOW_FX_KEY, lowFx ? "1" : "0");
-      } catch {
-        // Bỏ qua nếu trình duyệt chặn localStorage
-      }
+    qualitySel.addEventListener("change", () => {
+      setQualityMode(qualitySel.value as QualityMode);
     });
+    batterySaverChk.addEventListener("change", () => {
+      setBatterySaver(batterySaverChk.checked);
+    });
+    // Bộ điều tốc có thể tự đổi bậc: cập nhật dòng "Đang dùng"
+    onQualityChange(syncSettingsDom);
 
     // Giảm chuyển động (#269, #280)
     syncReducedMotionDom();
@@ -2613,6 +2620,7 @@ export const ui = {
       reducedMotionChk.checked = reduced;
       reducedMotionChk.addEventListener("change", () => {
         setReducedMotionPref(reducedMotionChk.checked);
+        refreshQuality(); // hồ sơ chất lượng đọc lại giảm chuyển động (tắt rung, giảm hạt...)
       });
     }
 
@@ -2712,8 +2720,9 @@ export const ui = {
     return hideOtherNames;
   },
 
+  /** Bậc Thấp (hiệu ứng phụ tắt). Nguồn duy nhất: gfx/quality.ts (di cư từ `tg_low_fx`). */
   isLowFx() {
-    return lowFx;
+    return getQuality().tier === "low";
   },
 
   toggleInventory(force?: boolean) {
