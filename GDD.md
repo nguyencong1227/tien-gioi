@@ -67,3 +67,4 @@ Tham khảo cơ chế của thể loại (chỉ lấy ý tưởng, mọi tên g�
    5. PK: chỉ khi hai bên đồng ý (thách đấu); chết vì PK không mất kiếp.
    6. Tông môn, gắn với linh hồn (không gắn với nhân vật của từng kiếp): hợp đồng, kho lưu, dịch vụ + chat + kho chung, client, E2E và công cụ thử tải / rò rỉ / mô phỏng sập kho đã vào `main`.
 4. **M4:** chống gian lận, deploy, build app Android/iOS (tài khoản thật + PostgreSQL đã kéo lên M3).
+5. **M5** (quyết định 12/11/2026): giao diện đa thiết bị (điện thoại, máy tính bảng, máy tính; web lẫn app Android) và đồ hoạ đẹp hơn, nhiều hiệu ứng hơn bằng Phaser, với ràng buộc cứng: Android tầm trung ≥ 50 FPS, cài đặt chất lượng Thấp / Vừa / Cao, không tăng băng thông, chỉ dùng tài sản tự vẽ bằng mã hoặc giấy phép rõ ràng. Thiết kế, ngân sách và chia việc: `docs/THIET_KE_GIAO_DIEN_DO_HOA.md`.
