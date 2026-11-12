@@ -468,8 +468,8 @@ function setupRoomLifecycle(room: Room) {
     ui.showTransition(targetMap.def.name);
 
     try {
-      // Chờ màn hình chuyển cảnh mờ dần (350ms)
-      await new Promise((r) => setTimeout(r, 350));
+      // Chờ màn chuyển cảnh khép (mống mắt 400 ms, giảm chuyển động: mờ 300 ms); bấm / gõ phím thì bỏ qua (gfx/scene-transition.ts)
+      await ui.transitionHold();
 
       // Chủ động rời phòng cũ (không kích hoạt luồng reconnect)
       room.leave(true);
