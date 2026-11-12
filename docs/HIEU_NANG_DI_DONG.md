@@ -19,18 +19,18 @@
 ## 2. Bảng số liệu thực nghiệm
 
 <!-- PERF-MATRIX:START -->
-| Kịch bản | Bậc đồ hoạ | CPU Throttling | FPS | JS Update p95 | Ngân sách JS | Draw Calls | Hạt / Trần | Emitters | JS Heap | Trạng thái |
+| Kịch bản | Bậc đồ hoạ | CPU Throttling | FPS | JS Update p95 | Ngân sách JS | Draw call TB / p95 / Trần | Hạt / Trần | Emitters | JS Heap | Trạng thái |
 |---|---|---|---|---|---|---|---|---|---|---|
-| Solo (1 người) | Thấp (low) | 1x (Bình thường) | 60 | 0.3 ms | <= 9.0 ms | 3 | 0 / 60 | 0 / 4 | 22.4 MB | ✓ ĐẠT |
-| Solo (1 người) | Thấp (low) | 4x (Di động tầm trung) | 60 | 0.4 ms | <= 9.0 ms | 3 | 0 / 60 | 0 / 4 | 22.5 MB | ✓ ĐẠT |
-| Đám đông (50 người) | Thấp (low) | 4x (Di động tầm trung) | 60 | 1.2 ms | <= 9.0 ms | 3 | 0 / 60 | 0 / 4 | 22.8 MB | ✓ ĐẠT |
-| Đám đông (50 người) | Vừa (mid) | 4x (Di động tầm trung) | 60 | 1.3 ms | <= 11.0 ms | 3 | 0 / 220 | 0 / 10 | 23.1 MB | ✓ ĐẠT |
-| Đám đông (50 người) | Cao (high) | 4x (Di động tầm trung) | 60 | 1.3 ms | <= 13.0 ms | 3 | 0 / 520 | 0 / 24 | 23.5 MB | ✓ ĐẠT |
-| Đám đông (50 người) | Thấp (low) | 6x (Di động yếu) | 60 | 1.8 ms | <= 9.0 ms | 3 | 0 / 60 | 0 / 4 | 22.9 MB | ✓ ĐẠT |
-| Chiến đấu (FX hạt + chữ) | Thấp (low) | 4x (Di động tầm trung) | 60 | 0.8 ms | <= 9.0 ms | 7 | 24 / 60 | 2 / 4 | 22.7 MB | ✓ ĐẠT |
-| Chiến đấu (FX hạt + chữ) | Vừa (mid) | 4x (Di động tầm trung) | 60 | 1.1 ms | <= 11.0 ms | 9 | 56 / 220 | 4 / 10 | 23.2 MB | ✓ ĐẠT |
-| Chiến đấu (FX hạt + chữ) | Cao (high) | 4x (Di động tầm trung) | 60 | 1.4 ms | <= 13.0 ms | 12 | 112 / 520 | 6 / 24 | 23.6 MB | ✓ ĐẠT |
-| Bí cảnh (Dungeon Run) | Cao (high) | 4x (Di động tầm trung) | 60 | 0.9 ms | <= 13.0 ms | 8 | 18 / 520 | 3 / 24 | 23.0 MB | ✓ ĐẠT |
+| Một mình (Trấn vắng) | LOW | 1x | 60 | 0.3 ms | <= 9 ms | 2 / 2 / 60 | 0 / 60 | 0 / 4 | 29 MB | ✓ ĐẠT |
+| Một mình (Trấn vắng) | LOW | 4x | 60 | 1 ms | <= 9 ms | 2 / 2 / 60 | 0 / 60 | 0 / 4 | 28.3 MB | ✓ ĐẠT |
+| Trấn đông (50 bot) | LOW | 4x | 60 | 1.1 ms | <= 9 ms | 2 / 2 / 60 | 0 / 60 | 0 / 4 | 32 MB | ✓ ĐẠT |
+| Trấn đông (50 bot) | MID | 4x | 49.2 | 1.5 ms | <= 11 ms | 4 / 4 / 100 | 15 / 220 | 5 / 10 | 27.3 MB | ✓ ĐẠT |
+| Trấn đông (50 bot) | HIGH | 4x | 40.7 | 1.5 ms | <= 13 ms | 4 / 4 / 160 | 30 / 520 | 10 / 24 | 28.9 MB | ✓ ĐẠT |
+| Trấn đông (50 bot) | HIGH | 1x | 44.1 | 0.4 ms | <= 13 ms | 4 / 4 / 160 | 24 / 520 | 8 / 24 | 26.9 MB | ✓ ĐẠT |
+| Trấn đông (50 bot) - Máy rất yếu | LOW | 6x | 60 | 1.5 ms | <= 9 ms | 2 / 2 / 60 | 0 / 60 | 0 / 4 | 27.4 MB | ✓ ĐẠT |
+| Chiến đấu có hiệu ứng hạt | LOW | 4x | 60 | 1 ms | <= 9 ms | 2 / 2 / 60 | 0 / 60 | 0 / 4 | 28.3 MB | ✓ ĐẠT |
+| Chiến đấu có hiệu ứng hạt | HIGH | 4x | 42.2 | 1.3 ms | <= 13 ms | 2 / 2 / 160 | 0 / 520 | 0 / 24 | 32.3 MB | ✓ ĐẠT |
+| Bí cảnh | MID | 4x | 57.4 | 1.1 ms | <= 11 ms | 2 / 2 / 100 | 0 / 220 | 0 / 10 | 29.4 MB | ✓ ĐẠT |
 <!-- PERF-MATRIX:END -->
 
 ## 3. Nhận xét và đánh giá
@@ -42,7 +42,7 @@
    - Ở CPU 6x (thiết bị yếu): Vòng lặp JS tiêu tốn tối đa 1.8 ms tại kịch bản đông người ở bậc Thấp, đáp ứng hoàn toàn chỉ tiêu $\le 9.0$ ms.
 2. **Quản lý đối tượng hạt và Draw Calls**:
    - Số hạt sống và emitters luôn tuân thủ nghiêm ngặt theo trần phân bậc của `perf-budget.json` (Thấp 60 hạt / 4 emitter; Vừa 220 hạt / 10 emitter; Cao 520 hạt / 24 emitter).
-   - Draw calls giữ ở mức rất thấp (3–12 calls/frame), không gây nghẽn lệnh vẽ sang WebGL.
+   - Draw calls giữ ở mức rất thấp, ĐO THẬT (#397, bộ đếm tiêm vào WebGL, mục 7): 2 (bậc Thấp, kịch bản mock) – 4 (Trấn đông 50 bot ở bậc Vừa / Cao) lệnh vẽ / khung có vẽ, so với trần 60 / 100 / 160; không gây nghẽn lệnh vẽ sang WebGL. (Các con số 3 / 8 / 9 trong bản trước là GÁN CỨNG theo tên kịch bản, không phải số đo.)
 3. **Bộ nhớ RAM (JS Heap)**:
    - Dung lượng bộ nhớ JS duy trì ổn định trong khoảng ~22–24 MB trên tất cả các kịch bản, an toàn cho các thiết bị di động có dung lượng RAM khiêm tốn.
 
@@ -71,8 +71,9 @@ node client/scripts/measure-mobile-perf.mjs --tier=low --cpu=4
 ## 7. Chạy hằng đêm trên GitHub Actions (#330) và cổng ngân sách
 Job `client-perf` trong `.github/workflows/bench.yml` (lịch 04:00 giờ Việt Nam + `workflow_dispatch`, có ô nhập `time_slack`) chạy: `npm run build` -> `npm run perf:mobile` (đủ ma trận, ~80 s) -> `node client/scripts/perf-gate.mjs` -> `npm run leak:test` (~10 s) và đưa `docs/perf-mobile-results.json` + `docs/HIEU_NANG_DI_DONG.md` lên artifact `client-perf-results-<sha>` (90 ngày; KHÔNG tự commit vào `main`). PR chỉ chạy phần tĩnh (`check:budget` trong `ci.yml`) để không cạn phút Actions.
 
-- **Đỏ khi nào:** (1) `perf:mobile` thoát mã 1 nếu có kịch bản không tải được / không có mẫu (không bao giờ xanh giả khi thiếu số đo); (2) `perf-gate.mjs` thoát mã 1 nếu một kịch bản vượt `client/perf-budget.json`: JS update p95 (`runtime.tiers.<bậc>.jsFrameP95Ms` x `time-slack`), số hạt sống (`peakParticles`), số emitter (`emitterBudget`), hay thiếu / sai kiểu số đo; (3) `leak:test` thoát mã 1 khi rò texture / GameObject / heap > 10 %. Bảng từng kịch bản nằm trong job summary.
-- **`time-slack`** (mặc định 1,5 trong workflow; biến `PERF_TIME_SLACK` hoặc `--time-slack`) chỉ nới ngân sách THỜI GIAN để bù runner CI chậm hơn máy dev; số hạt / emitter là số đếm tất định nên không nới. Số đo trên máy dev: JS update p95 0,3-2,2 ms so với ngân sách 9-13 ms (dư 4-30 lần), nên 1,5 là bước khởi đầu thận trọng: chỉnh sau vài đêm dựa vào bảng.
+- **Đỏ khi nào:** (1) `perf:mobile` thoát mã 1 nếu có kịch bản không tải được / không có mẫu (không bao giờ xanh giả khi thiếu số đo); (2) `perf-gate.mjs` thoát mã 1 nếu một kịch bản vượt `client/perf-budget.json`: JS update p95 (`runtime.tiers.<bậc>.jsFrameP95Ms` x `time-slack`), số hạt sống (`peakParticles`), số emitter (`emitterBudget`), draw call p95 mỗi khung (`drawCalls`), hay thiếu / sai kiểu số đo (kể cả ngân sách thiếu khoá); (3) `leak:test` thoát mã 1 khi rò texture / GameObject / heap > 10 %. Bảng từng kịch bản nằm trong job summary.
+- **`time-slack`** (mặc định 1,5 trong workflow; biến `PERF_TIME_SLACK` hoặc `--time-slack`) chỉ nới ngân sách THỜI GIAN để bù runner CI chậm hơn máy dev; số hạt / emitter / draw call là số đếm tất định nên không nới. Số đo trên máy dev: JS update p95 0,3-2,2 ms so với ngân sách 9-13 ms (dư 4-30 lần), nên 1,5 là bước khởi đầu thận trọng: chỉnh sau vài đêm dựa vào bảng.
 - **Số hạt / emitter** do `perf-gate` kiểm là số SỐNG lúc lớp phủ `?perf=1` vẽ lần cuối (~4 lần / giây), KHÔNG phải đỉnh trong cả cửa sổ lấy mẫu; harness đọc bằng `parseOverlayCounts` (`perf-gate.mjs`, có test hợp đồng với `formatPerfLines` và khoá `registerPerfStat` trong `fx.ts`), không đọc được thì `null` và cổng ĐỎ "thiếu số đo" (trước đây regex sai dấu hai chấm làm mọi kịch bản ra 0 hạt, cổng hạt xanh giả; #390 review). Kịch bản `duel=mock` / `dungeon=mock` không phát hạt đúng lúc lấy mẫu nên luôn 0: chỉ `crowd-mid-4x`, `crowd-high-4x`, `crowd-high-1x` thật sự kiểm hạt (bậc Thấp tắt hạt). Nếu mọi kịch bản Vừa / Cao đều 0 hạt + 0 emitter, job summary ghi cảnh báo. Cổng còn đối chiếu trần mà lớp phủ báo (hồ sơ chất lượng trong mã) với `perf-budget.json` (`peakParticles`, `emitterBudget`) và đỏ khi ngân sách thiếu khoá / sai kiểu.
-- **Không chặn trên FPS** (SwiftShader không phản ánh GPU thật, mục 5) và **không chặn trên `drawCalls`**: cột này trong kết quả của harness hiện GÁN CỨNG theo tên kịch bản (3 / 8 / 9), chưa đo thật. Muốn chặn cần đo thật từ renderer Phaser trước (việc tách riêng).
+- **Draw call (#397, ĐO THẬT):** `client/scripts/draw-counter.mjs` (`DRAW_COUNTER_SOURCE`) được tiêm bằng `Page.addScriptToEvaluateOnNewDocument` (chạy TRƯỚC mã của trang, KHÔNG sửa mã game): bọc `drawElements` / `drawArrays` / `drawElementsInstanced` / `drawArraysInstanced` trên `WebGLRenderingContext.prototype` và `WebGL2RenderingContext.prototype`, gom theo khung bằng `requestAnimationFrame` (đăng ký trước Phaser nên mỗi ô = lệnh vẽ của đúng một lần render). Cửa sổ lấy mẫu = cửa sổ của `__tgPerf` (`reset()` cùng lúc). Kết quả `drawCallsAvg` / `drawCallsP95` / `drawCallFrames` (chỉ tính khung CÓ vẽ; khung Phaser không vẽ, vd tiết kiệm pin, bị bỏ). `perf-gate` chặn `drawCallsP95 <= runtime.tiers.<bậc>.drawCalls` (60 / 100 / 160) và đòi `drawCallFrames >= 10`; không đếm được (null) thì ĐỎ "thiếu số đo". Đối chiếu độc lập tại instance `gl` theo sự kiện `postrender` của Phaser (cách của `check-lod.mjs`) ra CÙNG số (4 / 4 / 2 / 2). Phaser 3.90 trên WebGL1 vẽ bằng `drawArrays`. Test hợp đồng `draw-counter.test.ts` chạy CHÍNH đoạn tiêm trong `node:vm` với WebGL giả (bọc thiếu `drawArrays` -> 0 khung -> null -> cổng đỏ). Lưu ý: các kịch bản mock chỉ có 2-4 lệnh vẽ (Phaser gộp lô rất mạnh, chưa có chữ bay / hạt phát đúng lúc lấy mẫu), nên trần 60 / 100 / 160 còn dư rất nhiều: cổng chỉ bắt hồi quy lớn (vd mỗi thực thể một texture riêng làm vỡ gộp lô), chưa phản ánh tải chiến đấu thật.
+- **Không chặn trên FPS** (SwiftShader không phản ánh GPU thật, mục 5).
 - Chạy tay: `npm run build && npm run perf:mobile && node client/scripts/perf-gate.mjs` (thêm `--time-slack 1.5` nếu máy chậm).

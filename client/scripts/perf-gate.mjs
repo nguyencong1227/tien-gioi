@@ -5,11 +5,11 @@
  *   node client/scripts/perf-gate.mjs [docs/perf-mobile-results.json] [--budget client/perf-budget.json]
  *                                     [--time-slack 1.5] [--summary tệp.md]
  *
- * Chỉ chặn trên số đo TIN ĐƯỢC của harness: thời gian `update` p95 của cảnh (JS), số hạt sống, số emitter.
- * KHÔNG chặn trên FPS (headless SwiftShader không phản ánh GPU thật) và KHÔNG chặn trên `drawCalls`
- * (harness hiện GÁN CỨNG theo tên kịch bản, chưa đo thật: xem ghi chú trong bản tóm tắt).
+ * Chỉ chặn trên số đo TIN ĐƯỢC của harness: thời gian `update` p95 của cảnh (JS), số hạt sống, số emitter, và số draw call mỗi khung
+ * (p95 trong cửa sổ lấy mẫu; ĐO THẬT bằng bộ đếm tiêm vào WebGL, `draw-counter.mjs`, #397; trước đó là số gán cứng nên không chặn).
+ * KHÔNG chặn trên FPS (headless SwiftShader không phản ánh GPU thật).
  * `--time-slack` (hoặc biến PERF_TIME_SLACK) nhân hệ số vào ngân sách thời gian để bù runner CI chậm hơn máy dev;
- * số hạt / emitter là đếm tất định nên KHÔNG nới.
+ * số hạt / emitter / draw call là đếm tất định nên KHÔNG nới.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -19,6 +19,9 @@ const __filename = fileURLToPath(import.meta.url);
 const REPO = path.resolve(path.dirname(__filename), "../..");
 
 const isNum = (v) => typeof v === "number" && Number.isFinite(v) && v >= 0;
+
+/** Số khung CÓ VẼ tối thiểu trong cửa sổ lấy mẫu để tin p95 draw call (5 giây ở 6x CPU vẫn ra hàng chục khung). */
+export const MIN_DRAW_FRAMES = 10;
 
 /**
  * Đọc số hạt / emitter từ văn bản lớp phủ `?perf=1` (`gfx/perf-overlay.ts`: `formatPerfLines` in `${tên} ${giá trị}`,
@@ -75,6 +78,7 @@ export function evaluatePerfResults(results, budget, { timeSlack = 1 } = {}) {
       ["JS update p95 (ms)", r.updateP95Ms, tier.jsFrameP95Ms * timeSlack, "ms"],
       ["số hạt sống", r.particles, tier.peakParticles, "hạt"],
       ["số emitter", r.emitters, tier.emitterBudget, "emitter"],
+      ["draw call p95 mỗi khung", r.drawCallsP95, tier.drawCalls, "draw call"],
     ];
     row.p95 = r.updateP95Ms;
     row.p95Limit = tier.jsFrameP95Ms * timeSlack;
@@ -82,6 +86,9 @@ export function evaluatePerfResults(results, budget, { timeSlack = 1 } = {}) {
     row.particleLimit = tier.peakParticles;
     row.emitters = r.emitters;
     row.emitterLimit = tier.emitterBudget;
+    row.drawCalls = r.drawCallsP95;
+    row.drawCallsAvg = r.drawCallsAvg;
+    row.drawCallsLimit = tier.drawCalls;
     for (const [metric, actual, limit] of checks) {
       // Ngân sách thiếu khoá / sai kiểu (đổi tên khoá trong perf-budget.json): so `actual > undefined` luôn false => xanh giả
       if (!isNum(limit)) {
@@ -99,6 +106,19 @@ export function evaluatePerfResults(results, budget, { timeSlack = 1 } = {}) {
         violations.push({ id, metric, actual, limit });
         row.bad.push(metric);
       }
+    }
+    // p95 draw call chỉ đáng tin khi đủ khung có vẽ: ít quá thì ĐỎ (bộ đếm không bắt được khung nào / cửa sổ lấy mẫu hỏng)
+    if (
+      isNum(r.drawCallsP95) &&
+      !(isNum(r.drawCallFrames) && r.drawCallFrames >= MIN_DRAW_FRAMES)
+    ) {
+      violations.push({
+        id,
+        metric: "số khung có vẽ trong cửa sổ lấy mẫu",
+        actual: String(r.drawCallFrames),
+        limit: `số >= ${MIN_DRAW_FRAMES}`,
+      });
+      row.bad.push("mẫu draw call quá ít");
     }
     // Trần mà harness đọc từ lớp phủ (hồ sơ chất lượng trong mã) phải khớp perf-budget.json, nếu không ngân sách bị trôi khỏi mã
     for (const [metric, shown, budgeted] of [
@@ -130,13 +150,13 @@ export function formatSummary(evaluation, { timeSlack = 1 } = {}) {
       ? "✅ Mọi kịch bản nằm trong ngân sách."
       : `❌ ${evaluation.violations.length} chỉ số vượt ngân sách.`,
     "",
-    "| Kịch bản | Bậc | CPU | JS update p95 | Hạt | Emitter | FPS | |",
-    "|---|---|---|---|---|---|---|---|",
+    "| Kịch bản | Bậc | CPU | JS update p95 | Draw call p95 (TB) | Hạt | Emitter | FPS | |",
+    "|---|---|---|---|---|---|---|---|---|",
   ];
   for (const r of evaluation.rows) {
     const f = (v) => (v === undefined || v === null ? "?" : String(v));
     lines.push(
-      `| ${f(r.scenario ?? r.id)} (\`${r.id}\`) | ${f(r.tier)} | ${f(r.cpu)} | ${f(r.p95)} / ${f(r.p95Limit)} ms | ${f(r.particles)} / ${f(r.particleLimit)} | ${f(r.emitters)} / ${f(r.emitterLimit)} | ${f(r.fps)} | ${r.bad.length ? "❌ " + r.bad.join(", ") : "✅"} |`,
+      `| ${f(r.scenario ?? r.id)} (\`${r.id}\`) | ${f(r.tier)} | ${f(r.cpu)} | ${f(r.p95)} / ${f(r.p95Limit)} ms | ${f(r.drawCalls)} / ${f(r.drawCallsLimit)} (${f(r.drawCallsAvg)}) | ${f(r.particles)} / ${f(r.particleLimit)} | ${f(r.emitters)} / ${f(r.emitterLimit)} | ${f(r.fps)} | ${r.bad.length ? "❌ " + r.bad.join(", ") : "✅"} |`,
     );
   }
   for (const w of evaluation.warnings ?? []) lines.push("", `⚠️ ${w}`);
@@ -148,8 +168,8 @@ export function formatSummary(evaluation, { timeSlack = 1 } = {}) {
   }
   lines.push(
     "",
-    `Ngân sách thời gian nhân hệ số \`time-slack\` = ${timeSlack} (bù runner CI chậm hơn máy dev); số hạt / emitter không nới.`,
-    "Không chặn trên FPS (SwiftShader không phản ánh GPU thật) và `drawCalls` (harness đang gán cứng theo tên kịch bản, chưa đo thật).",
+    `Ngân sách thời gian nhân hệ số \`time-slack\` = ${timeSlack} (bù runner CI chậm hơn máy dev); số hạt / emitter / draw call không nới.`,
+    "Không chặn trên FPS (SwiftShader không phản ánh GPU thật). Draw call = số lệnh vẽ WebGL mỗi khung CÓ VẼ (bộ đếm tiêm vào `drawElements` / `drawArrays` và bản instanced, gom theo `requestAnimationFrame`; khung không vẽ không tính), p95 trong cửa sổ lấy mẫu.",
     "Số hạt / emitter là số SỐNG lúc lớp phủ vẽ lần cuối (không phải đỉnh trong cả cửa sổ lấy mẫu); kịch bản duel / dungeon giả lập không phát hạt đúng lúc lấy mẫu nên 0 là bình thường, chỉ `crowd-mid` / `crowd-high` thật sự kiểm hạt.",
   );
   return lines.join("\n") + "\n";

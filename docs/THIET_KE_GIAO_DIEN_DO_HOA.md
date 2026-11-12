@@ -231,7 +231,7 @@ Quy tắc MỚI viết theo thuộc tính (`html[data-form="phone"] ...`). Mỗi
 | Đại lượng | Thấp | Vừa | Cao | Đo ở đâu |
 |---|---|---|---|---|
 | Thời gian JS mỗi khung p95 (CPU 4×, cảnh đông) | ≤ 9 ms | ≤ 11 ms | ≤ 13 ms | harness C |
-| Draw call mỗi khung (cảnh đông, 50 thực thể + hiệu ứng) | ≤ 60 | ≤ 100 | ≤ 160 | `renderer` của Phaser / lớp phủ |
+| Draw call mỗi khung (cảnh đông, 50 thực thể + hiệu ứng) | ≤ 60 | ≤ 100 | ≤ 160 | bộ đếm tiêm vào WebGL của harness (`draw-counter.mjs`, #397; p95 trong cửa sổ lấy mẫu; `perf-gate` chặn) |
 | Hạt sống đỉnh | ≤ 60 | ≤ 220 | ≤ 520 | `FxBudget` |
 | Bộ nhớ texture (tổng w×h×4) | ≤ 48 MB | ≤ 80 MB | ≤ 128 MB | tính từ danh sách texture |
 | JS heap sau 20 lần đổi bản đồ | tăng ≤ 10 % | | | rò rỉ |

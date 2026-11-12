@@ -23,6 +23,7 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
 import { parseOverlayCounts } from "./perf-gate.mjs";
+import { DRAW_COUNTER_SOURCE, parseDrawCounterSnapshot } from "./draw-counter.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const __filename = fileURLToPath(import.meta.url);
@@ -274,6 +275,9 @@ try {
       `,
     });
 
+    // Đếm THẬT draw call mỗi khung (#397): bọc các hàm vẽ WebGL TRƯỚC mã của trang (draw-counter.mjs, có test hợp đồng)
+    await cdpSend("Page.addScriptToEvaluateOnNewDocument", { source: DRAW_COUNTER_SOURCE });
+
     const t0 = Date.now();
     await cdpSend("Page.navigate", { url: targetUrl });
 
@@ -304,7 +308,9 @@ try {
 
     // Chờ 1.5s cho cảnh ổn định rồi reset bộ đếm
     await sleep(1500);
-    await cdpSend("Runtime.evaluate", { expression: `window.__tgPerf.reset()` });
+    await cdpSend("Runtime.evaluate", {
+      expression: `window.__tgPerf.reset(); window.__tgDraw && window.__tgDraw.reset()`,
+    });
 
     // Thu thập mẫu trong 5 giây
     const sampleDurationMs = isQuick ? 3000 : 5000;
@@ -313,6 +319,11 @@ try {
 
     const snapRes = await cdpSend("Runtime.evaluate", {
       expression: `JSON.stringify(window.__tgPerf.snapshot())`,
+      returnByValue: true,
+    });
+
+    const drawRes = await cdpSend("Runtime.evaluate", {
+      expression: `JSON.stringify(window.__tgDraw ? window.__tgDraw.snapshot() : null)`,
       returnByValue: true,
     });
 
@@ -344,6 +355,16 @@ try {
       // làm mọi kịch bản ra 0 hạt, cổng hạt xanh giả).
       const { particles, particleLimit, emitters, emitterLimit } = parseOverlayCounts(overlayText);
 
+      // Draw call mỗi khung CÓ VẼ (trung bình / p95); không đọc được thì null (perf-gate báo "thiếu số đo"), KHÔNG gán cứng như trước
+      const { drawCallsAvg, drawCallsP95, drawCallFrames } = parseDrawCounterSnapshot(
+        drawRes?.result?.result?.value,
+      );
+      if (drawCallsP95 === null) {
+        console.error(
+          "  ✗ Không đếm được draw call (WebGL không vẽ khung nào / bộ đếm không bắt được): perf-gate sẽ ĐỎ 'thiếu số đo'.",
+        );
+      }
+
       const resItem = {
         id: sc.id,
         scenario: sc.name,
@@ -356,7 +377,9 @@ try {
         updateP95Ms,
         budgetJsP95Ms: maxJsAllowed,
         budgetMet,
-        drawCalls: sc.id.startsWith("combat") ? 9 : sc.id.startsWith("dungeon") ? 8 : 3,
+        drawCallsAvg,
+        drawCallsP95,
+        drawCallFrames,
         particles,
         particleLimit,
         emitters,
@@ -369,7 +392,7 @@ try {
 
       const statusTag = budgetMet ? "✓ ĐẠT" : "⚠ VƯỢT";
       console.log(
-        `  ${statusTag} JS Update p95: ${resItem.updateP95Ms} ms (Ngân sách: <= ${maxJsAllowed} ms) | FPS: ${resItem.fpsAvg} (rAF p95: ${resItem.frameP95Ms} ms) | Heap: ${resItem.heapMb} MB`,
+        `  ${statusTag} JS Update p95: ${resItem.updateP95Ms} ms (Ngân sách: <= ${maxJsAllowed} ms) | Draw call TB / p95: ${resItem.drawCallsAvg ?? "?"} / ${resItem.drawCallsP95 ?? "?"} (${resItem.drawCallFrames} khung) | FPS: ${resItem.fpsAvg} (rAF p95: ${resItem.frameP95Ms} ms) | Heap: ${resItem.heapMb} MB`,
       );
     }
 
@@ -404,7 +427,8 @@ console.table(
     JS_p95: `${r.updateP95Ms} ms`,
     Ngân_sách_JS: `<=${r.budgetJsP95Ms} ms`,
     Đạt: r.budgetMet ? "PASS" : "FAIL",
-    Draw_calls: r.drawCalls,
+    Draw_call_TB: r.drawCallsAvg ?? "?",
+    Draw_call_p95: `${r.drawCallsP95 ?? "?"}/${budget?.runtime?.tiers?.[r.tier]?.drawCalls ?? "?"}`,
     Hạt: `${r.particles ?? "?"}/${r.particleLimit ?? "?"}`,
     Heap: `${r.heapMb} MB`,
   })),
@@ -425,14 +449,14 @@ if (shouldWriteDocs) {
     const END_MARKER = "<!-- PERF-MATRIX:END -->";
 
     let tableMd = `${START_MARKER}\n`;
-    tableMd += `| Kịch bản | Bậc đồ hoạ | CPU Throttling | FPS | JS Update p95 | Ngân sách JS | Draw Calls | Hạt / Trần | Emitters | JS Heap | Trạng thái |\n`;
+    tableMd += `| Kịch bản | Bậc đồ hoạ | CPU Throttling | FPS | JS Update p95 | Ngân sách JS | Draw call TB / p95 / Trần | Hạt / Trần | Emitters | JS Heap | Trạng thái |\n`;
     tableMd += `|---|---|---|---|---|---|---|---|---|---|---|\n`;
 
     for (const r of results) {
       const statusStr = r.budgetMet ? "✓ ĐẠT" : "⚠ VƯỢT";
       const particleStr = `${r.particles ?? "?"} / ${r.particleLimit ?? "-"}`;
       const emitterStr = `${r.emitters ?? "?"} / ${r.emitterLimit ?? "-"}`;
-      tableMd += `| ${r.scenario} | ${r.tier.toUpperCase()} | ${r.cpu} | ${r.fpsAvg} | ${r.updateP95Ms} ms | <= ${r.budgetJsP95Ms} ms | ${r.drawCalls} | ${particleStr} | ${emitterStr} | ${r.heapMb} MB | ${statusStr} |\n`;
+      tableMd += `| ${r.scenario} | ${r.tier.toUpperCase()} | ${r.cpu} | ${r.fpsAvg} | ${r.updateP95Ms} ms | <= ${r.budgetJsP95Ms} ms | ${r.drawCallsAvg ?? "?"} / ${r.drawCallsP95 ?? "?"} / ${budget?.runtime?.tiers?.[r.tier]?.drawCalls ?? "-"} | ${particleStr} | ${emitterStr} | ${r.heapMb} MB | ${statusStr} |\n`;
     }
     tableMd += END_MARKER;
 
