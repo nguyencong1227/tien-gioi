@@ -37,7 +37,7 @@ html[data-form="phone"] {
 }
 
 /* Nội dung: co giãn theo --ui-scale */
-:is(.modal-box, #chat, .limbo-overlay) {
+:is(.modal-box, #dialog-modal, #chat, .limbo-overlay) {
   --fs-9: calc(9px * var(--ui-scale));
   --fs-10: calc(10px * var(--ui-scale));
   --fs-11: calc(11px * var(--ui-scale));
@@ -55,7 +55,7 @@ html[data-form="phone"] {
 }
 
 /* Điện thoại: chữ nội dung >= 14 px (kể cả khi chọn cỡ chữ Nhỏ) */
-html[data-form="phone"] :is(.modal-box, #chat, .limbo-overlay) {
+html[data-form="phone"] :is(.modal-box, #dialog-modal, #chat, .limbo-overlay) {
   --fs-9: max(14px, calc(9px * var(--ui-scale)));
   --fs-10: max(14px, calc(10px * var(--ui-scale)));
   --fs-11: max(14px, calc(11px * var(--ui-scale)));

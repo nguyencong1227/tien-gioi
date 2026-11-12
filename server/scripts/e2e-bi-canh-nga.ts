@@ -177,7 +177,7 @@ async function main() {
       "nút Mở bí cảnh bấm được",
     );
     await ta.ev(
-      `[...document.querySelectorAll('#dlg-options .dlg-opt-btn')].find(b => b.textContent.includes('Linh Hư Bí Cảnh')).dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true })); 1`,
+      `[...document.querySelectorAll('#dlg-options .dlg-opt-btn')].find(b => b.textContent.includes('Linh Hư Bí Cảnh')).click(); 1`,
     );
     for (const tab of tabs) {
       await tab.waitFor(shown("dungeon-invite-box"), "hộp mời bí cảnh");

@@ -126,6 +126,19 @@ try {
     ["sect-modal", "toggleSectModal"],
   ];
   const CARDS = ["dungeon-end-modal", "duel-end-modal", "newbie-guide-modal", "outdated-modal"];
+  // Hộp thoại NPC (#dialog-modal, dock đáy): mở bằng ui.onDialog với tin mẫu có đủ loại nhãn (tiêu đề, huy hiệu, chữ, gợi ý, lựa chọn + nhãn phụ)
+  const DIALOG_MSG = {
+    npcId: "duoc_su",
+    lines: [
+      "Đạo hữu đến thật đúng lúc. Linh dược trong núi Hắc Phong dạo này bị yêu thú giẫm nát hết cả.",
+    ],
+    options: [
+      { label: "Nhận nhiệm vụ: Thu hái Huyết Tinh Thảo", action: { kind: "accept", questId: "x" } },
+      { label: "Cửa hàng", action: { kind: "shop" } },
+      { label: "Bí cảnh Hắc Phong", action: { kind: "dungeon" }, disabled: true },
+      { label: "Rời đi", action: { kind: "close" } },
+    ],
+  };
   const HUD = ["#hud", "#quest-tracker", "#party-panel", "#skills", "#quickbar", "#minimap-wrap"];
   /** Cỡ chữ tính ra của mọi phần tử đang hiện có chữ trực tiếp dưới `root`: { px: { khoá: số lượng } }. */
   const scan = (rootSel) =>
@@ -229,6 +242,24 @@ try {
         await evalJs(`document.getElementById(${JSON.stringify(id)}).hidden = true;0`);
         await sleep(100);
       }
+      // Hộp thoại NPC: nội dung >= 14 px trên điện thoại (kể cả Nhỏ), co giãn theo cỡ chữ
+      await evalJs(`window.__ui.onDialog(${JSON.stringify(DIALOG_MSG)});0`);
+      await evalJs(
+        'document.getElementById("dlg-body").dispatchEvent(new Event("pointerdown", { cancelable: true }));0', // bỏ qua hiệu ứng gõ chữ để lựa chọn hiện ra
+      );
+      await sleep(300);
+      const dlg = await scan("#dialog-modal");
+      if (vp.phone) {
+        const bad = offenders(dlg, 14);
+        check(
+          !bad,
+          `${vp.name} [${mode}] #dialog-modal (hộp thoại NPC): mọi chữ >= 14 px${bad ? " (nhỏ hơn: " + bad + ")" : ""}`,
+        );
+      }
+      if (mode === "large" && vp.phone)
+        check(await noOverflow(), `${vp.name} [large] #dialog-modal: không tràn ngang / dọc`);
+      await evalJs("window.__ui.closeDialog();0");
+      await sleep(100);
       // HUD: điện thoại >= 12 px; HUD không co giãn theo cỡ chữ
       if (vp.phone) {
         let worst = "";
@@ -280,6 +311,23 @@ try {
     `HUD không co giãn theo cỡ chữ (#hud-name ${hudBase} -> ${hudLarge} px)`,
   );
   await open("toggleInventory", false);
+  // Hộp thoại NPC trên máy tính: chữ 14 px giữ ở Vừa, co giãn theo Nhỏ / Lớn
+  await evalJs(`window.__ui.onDialog(${JSON.stringify(DIALOG_MSG)});0`);
+  await evalJs(
+    'document.getElementById("dlg-body").dispatchEvent(new Event("pointerdown", { cancelable: true }));0',
+  );
+  await sleep(300);
+  await setScale("normal");
+  const dBase = await sizeOf("#dlg-text");
+  await setScale("large");
+  const dLarge = await sizeOf("#dlg-text");
+  await setScale("small");
+  const dSmall = await sizeOf("#dlg-text");
+  check(
+    dBase === 14 && near(dLarge, 14 * 1.15) && near(dSmall, 14 * 0.9),
+    `máy tính: chữ hộp thoại NPC Vừa ${dBase} px, Lớn ${dLarge} (14 x 1,15), Nhỏ ${dSmall} (14 x 0,9)`,
+  );
+  await evalJs("window.__ui.closeDialog();0");
   // Lưu lựa chọn và nạp lại trang
   await setScale("large");
   check(

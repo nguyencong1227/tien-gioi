@@ -1640,8 +1640,8 @@ function renderDialogOptions() {
       btn.append(tag);
     }
 
-    btn.addEventListener("pointerdown", (e) => {
-      e.preventDefault();
+    // `click` chứ không `pointerdown`: danh sách lựa chọn có thể cuộn trong hộp (điện thoại ngang), ngón vuốt không được kích hoạt lựa chọn
+    btn.addEventListener("click", () => {
       if (opt.disabled) return;
       const action = opt.action;
       const npcId = currentDialog?.npcId ?? "duoc_su";

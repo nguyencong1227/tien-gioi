@@ -47,6 +47,33 @@ const INNER_SCROLL = new Set(["sect-modal"]);
 const WEBP_PANELS = new Set(["sect-modal"]);
 // Thẻ (.sheet.sheet-card): hộp thoại kết quả / chỉ dẫn / cảnh báo có nút hành động riêng; mở bằng cách bỏ `hidden` (bố cục đo theo nội dung mặc định)
 const CARDS = ["dungeon-end-modal", "duel-end-modal", "newbie-guide-modal", "outdated-modal"];
+// Hộp thoại NPC (#dialog-modal, dock đáy): hai tin mẫu. "dien-hinh" = NPC thường (3 lựa chọn), "nhieu" = ca xấu (chữ dài + 12 lựa chọn, buộc phải cuộn)
+const DIALOG_LINES = [
+  "Đạo hữu đến thật đúng lúc. Linh dược trong núi Hắc Phong dạo này bị yêu thú giẫm nát hết cả, ta cần người giúp hái ba cây Huyết Tinh Thảo.",
+  "Làm xong ta sẽ không để đạo hữu thiệt thòi: một bình Hồi Huyết Đan cùng chút linh thạch lộ phí.",
+];
+const DIALOGS = {
+  "dien-hinh": {
+    npcId: "duoc_su",
+    lines: DIALOG_LINES,
+    options: [
+      { label: "Nhận nhiệm vụ: Thu hái Huyết Tinh Thảo", action: { kind: "accept", questId: "x" } },
+      { label: "Cửa hàng", action: { kind: "shop" } },
+      { label: "Rời đi", action: { kind: "close" } },
+    ],
+  },
+  nhieu: {
+    npcId: "duoc_su",
+    lines: DIALOG_LINES,
+    options: [
+      ...Array.from({ length: 11 }, (_, k) => ({
+        label: `Đổi ${k + 2} Huyết Tinh Thảo lấy ${k + 1} Hồi Huyết Đan`,
+        action: { kind: "accept", questId: "x" },
+      })),
+      { label: "Rời đi", action: { kind: "close" } },
+    ],
+  },
+};
 
 const CDP_PORT = 39100 + Math.floor(Math.random() * 400);
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-snap-sheet-"));
@@ -402,6 +429,168 @@ try {
         console.log(`  ✓ ảnh ${file}`);
       }
       await evalJs(`document.getElementById(${JSON.stringify(id)}).hidden = true;0`);
+      await sleep(100);
+    }
+    for (const [kind, msg] of Object.entries(DIALOGS)) {
+      console.log(`\n[${vp.name} ${vp.form}/${vp.orient}] dialog-modal (hộp thoại NPC, ${kind})`);
+      await evalJs(`window.__ui.onDialog(${JSON.stringify(msg)});0`);
+      // Bỏ qua hiệu ứng gõ chữ: lựa chọn chỉ hiện khi gõ xong
+      await evalJs(
+        'document.getElementById("dlg-body").dispatchEvent(new Event("pointerdown", { cancelable: true }));0',
+      );
+      await sleep(300);
+      const d = JSON.parse(
+        await evalJs(`(() => {
+          const el = document.getElementById("dialog-modal");
+          const sc = el.querySelector(".dlg-scroll");
+          const r = el.getBoundingClientRect();
+          let foreign = 0;
+          for (let i = 0; i < 5; i++)
+            for (let j = 0; j < 5; j++) {
+              const t = document.elementFromPoint(Math.min(r.x + ((i + 0.5) / 5) * r.width, innerWidth - 1), Math.min(r.y + ((j + 0.5) / 5) * r.height, innerHeight - 1));
+              if (!t || !el.contains(t)) foreign++;
+            }
+          const closeR = el.querySelector("#dlg-close").getBoundingClientRect();
+          const scrollable = sc.scrollHeight > sc.clientHeight + 1;
+          const scr0 = sc.scrollTop;
+          sc.scrollTop = sc.scrollHeight; // kéo xuống đáy: tiêu đề + nút đóng phải đứng yên, lựa chọn cuối với tới được
+          const closeAfter = el.querySelector("#dlg-close").getBoundingClientRect();
+          const rb = el.getBoundingClientRect();
+          const opts = [...el.querySelectorAll(".dlg-opt-btn")].map((b) => {
+            const q = b.getBoundingClientRect();
+            return { h: q.height };
+          });
+          const bodyR = el.querySelector("#dlg-body").getBoundingClientRect();
+          const optsR = el.querySelector("#dlg-options").getBoundingClientRect();
+          const textR = el.querySelector("#dlg-text").getBoundingClientRect();
+          // Chữ và danh sách lựa chọn không được chồng nhau (hộp chữ phải chứa vừa đoạn chữ, hai khối không giao nhau)
+          const overlap = !(bodyR.bottom <= optsR.top + 1 || optsR.bottom <= bodyR.top + 1 || bodyR.right <= optsR.left + 1 || optsR.right <= bodyR.left + 1);
+          const textClipped = textR.bottom > bodyR.bottom + 1;
+          const lastR = el.querySelector(".dlg-opt-btn:last-child").getBoundingClientRect();
+          const scrolledTo = sc.scrollTop;
+          sc.scrollTop = scr0;
+          const de = document.documentElement;
+          return JSON.stringify({
+            foreign, iw: innerWidth, ih: innerHeight, scrollable, scrolledTo,
+            box: { x: r.x, y: r.y, w: r.width, h: r.height, r: r.right, b: r.bottom },
+            close: { w: closeR.width, h: closeR.height, top: closeR.top, bottom: closeR.bottom },
+            closeMoved: Math.abs(closeAfter.top - closeR.top),
+            overlap, textClipped,
+            lastInside: lastR.bottom <= rb.bottom + 1 && lastR.top >= rb.top - 1,
+            opts, cols: getComputedStyle(sc).gridTemplateColumns,
+            docScrollW: de.scrollWidth, docScrollH: de.scrollHeight,
+          });
+        })()`),
+      );
+      check(
+        d.foreign === 0,
+        `hộp thoại nằm trên cùng, không lớp khác chắn (${d.foreign}/25 điểm mẫu bị chắn)`,
+      );
+      check(
+        d.box.x >= 0 && d.box.r <= d.iw && d.box.y >= 0 && d.box.b <= d.ih,
+        `hộp thoại nằm gọn trong màn hình (${Math.round(d.box.x)},${Math.round(d.box.y)} ${Math.round(d.box.w)}x${Math.round(d.box.h)} / ${d.iw}x${d.ih})`,
+      );
+      check(
+        d.docScrollW <= d.iw && d.docScrollH <= d.ih,
+        `không thanh cuộn ngoài ý muốn (doc ${d.docScrollW}x${d.docScrollH} / khung ${d.iw}x${d.ih})`,
+      );
+      check(
+        d.close.w >= 44 && d.close.h >= 44 && d.close.top >= 0 && d.close.bottom <= d.ih,
+        `nút đóng >= 44x44 và nằm trong màn hình (${Math.round(d.close.w)}x${Math.round(d.close.h)} ở y=${Math.round(d.close.top)})`,
+      );
+      check(
+        d.opts.length > 0 && d.opts.every((o) => o.h >= 44),
+        `mọi lựa chọn >= 44 px cao (${d.opts.length} nút, nhỏ nhất ${Math.round(Math.min(...d.opts.map((o) => o.h)))} px)`,
+      );
+      check(
+        !d.overlap && !d.textClipped,
+        "chữ và danh sách lựa chọn không chồng nhau, chữ không bị ép",
+      );
+      check(d.closeMoved < 1, "kéo xuống đáy: tiêu đề + nút đóng đứng yên");
+      check(
+        d.box.h <= d.ih - 23,
+        `hộp thoại chừa lề >= 12 px trên + dưới (cao ${Math.round(d.box.h)} / ${d.ih})`,
+      );
+      if (kind === "nhieu") {
+        // Khung nhìn đủ cao (máy tính bảng) thì 12 lựa chọn vẫn vừa: chỉ đòi cuộn khi hộp đã chạm trần chiều cao
+        const capped = d.box.h >= d.ih - 30;
+        check(
+          !capped || (d.scrollable && d.scrolledTo > 0),
+          `ca xấu ${capped ? "chạm trần chiều cao nên cuộn được trong hộp" : "vừa khung nhìn"} (cuộn ${Math.round(d.scrolledTo)} px)`,
+        );
+        check(d.lastInside, "kéo xuống đáy: lựa chọn cuối nằm trong hộp, với tới được");
+      }
+      if (vp.orient === "landscape" && vp.form === "phone")
+        check(
+          d.cols.trim().split(/\s+/).length === 2,
+          `điện thoại ngang: chữ + lựa chọn xếp 2 cột (${d.cols})`,
+        );
+      // Ngón vuốt để cuộn KHÔNG được kích hoạt lựa chọn (đổi pointerdown -> click); chạm thật thì có
+      if (kind === "nhieu" && vp.form === "phone" && d.scrollable) {
+        const pt = JSON.parse(
+          await evalJs(`(() => {
+            const sc = document.querySelector("#dialog-modal .dlg-scroll");
+            sc.scrollTop = 0;
+            const b = [...sc.querySelectorAll(".dlg-opt-btn")].find((x) => { const q = x.getBoundingClientRect(); return q.top > ${d.box.y} + 90 && q.bottom < innerHeight - 30; });
+            const q = b.getBoundingClientRect();
+            return JSON.stringify({ x: q.x + q.width / 2, y: q.y + q.height / 2 });
+          })()`),
+        );
+        await send("Input.dispatchTouchEvent", {
+          type: "touchStart",
+          touchPoints: [{ x: pt.x, y: pt.y }],
+        });
+        for (let step = 1; step <= 8; step++) {
+          await send("Input.dispatchTouchEvent", {
+            type: "touchMove",
+            touchPoints: [{ x: pt.x, y: pt.y - step * 14 }],
+          });
+          await sleep(16);
+        }
+        await send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+        await sleep(300);
+        const after = JSON.parse(
+          await evalJs(`JSON.stringify({
+            open: !document.getElementById("dialog-modal").hidden,
+            top: document.querySelector("#dialog-modal .dlg-scroll").scrollTop,
+          })`),
+        );
+        check(after.open, "vuốt trên danh sách lựa chọn KHÔNG kích hoạt lựa chọn (hộp vẫn mở)");
+        check(after.top > 0, `vuốt cuộn được danh sách (scrollTop ${Math.round(after.top)})`);
+        // Chạm thật vào nút "Rời đi" (action close): hộp đóng
+        const leave = JSON.parse(
+          await evalJs(`(() => {
+            const sc = document.querySelector("#dialog-modal .dlg-scroll");
+            sc.scrollTop = sc.scrollHeight;
+            const b = sc.querySelector(".dlg-opt-btn:last-child");
+            const q = b.getBoundingClientRect();
+            return JSON.stringify({ x: q.x + q.width / 2, y: q.y + q.height / 2 });
+          })()`),
+        );
+        await send("Input.dispatchTouchEvent", {
+          type: "touchStart",
+          touchPoints: [{ x: leave.x, y: leave.y }],
+        });
+        await send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+        await sleep(300);
+        check(
+          await evalJs('document.getElementById("dialog-modal").hidden'),
+          'chạm thật vào "Rời đi": hộp đóng',
+        );
+        // Mở lại để chụp ảnh
+        await evalJs(`window.__ui.onDialog(${JSON.stringify(msg)});0`);
+        await evalJs(
+          'document.getElementById("dlg-body").dispatchEvent(new Event("pointerdown", { cancelable: true }));0',
+        );
+        await sleep(300);
+      }
+      if (!NO_SHOT) {
+        const shot = await send("Page.captureScreenshot", { format: "webp", quality: 90 });
+        const file = `sheet-dialog-${kind}-${vp.name}.webp`;
+        fs.writeFileSync(path.join(OUT_DIR, file), Buffer.from(shot.result.data, "base64"));
+        console.log(`  ✓ ảnh ${file}`);
+      }
+      await evalJs("window.__ui.closeDialog();0");
       await sleep(100);
     }
   }
