@@ -1,12 +1,15 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   HEAL_JUMP_FRAC,
   HEAVY_HIT_FRAC,
   MY_HIT_RANGE_SLACK,
+  MON_DEATH_MAX_DIST,
   MY_HIT_WINDOW_MS,
   healAmount,
   healNumber,
   isHeavyHit,
+  isMonsterDeath,
   isMyHit,
   planHitFx,
   planHitNumber,
@@ -140,5 +143,27 @@ describe("gfx/fx: healAmount (chỉ hồi lớn của mình)", () => {
     expect(healAmount(100, 200, 200, true, 16)).toBe(0);
     expect(healAmount(100, 200, 200, false, 900)).toBe(0);
     expect(healAmount(100, 200, 0, false, 16)).toBe(0);
+  });
+});
+
+describe("gfx/fx: isMonsterDeath (quái rời vùng nhìn không phải là gục)", () => {
+  it("chỉ gần hơn MON_DEATH_MAX_DIST mới coi là gục; khoảng cách hỏng thì không", () => {
+    expect(isMonsterDeath(0)).toBe(true);
+    expect(isMonsterDeath(500)).toBe(true);
+    expect(isMonsterDeath(MON_DEATH_MAX_DIST - 1)).toBe(true);
+    expect(isMonsterDeath(MON_DEATH_MAX_DIST)).toBe(false);
+    expect(isMonsterDeath(1300)).toBe(false);
+    expect(isMonsterDeath(Number.NaN)).toBe(false);
+    expect(isMonsterDeath(Number.POSITIVE_INFINITY)).toBe(false);
+  });
+
+  it("MON_DEATH_MAX_DIST bằng VIEW_ENTER của server (client không import được từ server nên đọc tệp)", () => {
+    const src = readFileSync(
+      new URL("../../../../server/src/systems/interest.ts", import.meta.url),
+      "utf8",
+    );
+    const m = /export const VIEW_ENTER\s*=\s*(\d+)/.exec(src);
+    expect(m, "không thấy VIEW_ENTER trong interest.ts").not.toBeNull();
+    expect(Number(m![1])).toBe(MON_DEATH_MAX_DIST);
   });
 });

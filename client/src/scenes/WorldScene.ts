@@ -3,6 +3,7 @@ import { createFxSystem, type FxSystem } from "../gfx/fx/fx";
 import {
   healAmount,
   healNumber,
+  isMonsterDeath,
   isMyHit,
   planHitFx,
   planHitNumber,
@@ -2164,7 +2165,9 @@ export class WorldScene extends Phaser.Scene {
       if (seen.has(id)) continue;
       if (e.root.visible) {
         // Quái biến khỏi state khi đang hiện trong màn hình = gục: tan thành điểm sáng (ngoài camera thì root ẩn, không vào đây)
-        this.fx.play("mon-vanish", e.root.x, e.root.y - 8);
+        // Chỉ khi còn gần mình: quái rời vùng nhìn của server (xa hơn 1100 px) cũng biến khỏi state nhưng KHÔNG gục
+        if (isMonsterDeath(Math.hypot(e.root.x - this.predX, e.root.y - this.predY)))
+          this.fx.play("mon-vanish", e.root.x, e.root.y - 8);
         const dieKey = e.monKind ? monAnimKey(e.monKind, "die") : "";
         if (dieKey && e.monAnim && !animReducedMotion() && this.anims.exists(dieKey)) {
           // Gục: 4 khung (đổ bẹp, tan thành điểm sáng) rồi mờ dần; thanh máu ẩn ngay
