@@ -1,5 +1,6 @@
 import { getDisplay } from "../gfx/display";
 import { createFxSystem, type FxSystem } from "../gfx/fx/fx";
+import { motePriority, nextMoteAt, planBreakFail, planLevelUp } from "../gfx/fx/cultivation-fx";
 import {
   healAmount,
   healNumber,
@@ -134,6 +135,8 @@ interface Entity {
   /** Hoạt ảnh người chơi (M5.2 #328 phần 2): cờ bị đánh và trạng thái đang phát. */
   playerAnim?: PlayerAnimClock;
   playerAnimState?: PlayerAnimState;
+  /** Mốc phát đốm sáng thiền định kế tiếp (ms, đồng hồ cảnh; M5.2 #329). */
+  nextMoteAt?: number;
 }
 
 interface SlashFxItem {
@@ -2071,6 +2074,13 @@ export class WorldScene extends Phaser.Scene {
       if (showAura) {
         const s = 1 + 0.25 * this.auraWave;
         e.aura!.setScale(s, s).setAlpha(0.25 + 0.25 * this.auraWave);
+        // Đốm sáng trôi lên theo ngân sách hiệu ứng (đông người đả tọa thì tự bị bỏ bớt, ưu tiên 0)
+        const nextAt = nextMoteAt(e.nextMoteAt, this.time.now, Math.random());
+        if (nextAt !== null) {
+          e.nextMoteAt = nextAt;
+          if (this.inView(e.root.x, e.root.y, 32))
+            this.fx.play("meditate-mote", e.root.x, e.root.y - 6, { priority: motePriority(isMe) });
+        }
       }
       if (e.talismanRing) {
         const showTalisman = Boolean(p.talisman && ITEM_BY_ID[p.talisman] && !lowFx);
@@ -2425,7 +2435,7 @@ export class WorldScene extends Phaser.Scene {
         return this.fxLevelUp(m.x, m.y, m.major, m.by === this.sid);
       case "breakfail":
         if (!this.inView(m.x, m.y, 120)) return;
-        return this.fxBreakFail(m.x, m.y);
+        return this.fxBreakFail(m.x, m.y, m.by === this.sid);
     }
   }
 
@@ -2472,24 +2482,11 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private fxLevelUp(x: number, y: number, major: boolean, mine: boolean) {
-    const color = major ? 0xffd34d : 0xbfe8ff;
     if (mine) sound.levelup(major);
     if (mine || this.inView(x, y, 160)) {
-      const rings = ui.isLowFx() ? 1 : major ? 3 : 1;
-      for (let i = 0; i < rings; i++) {
-        const ring = this.add
-          .circle(x, y, 16, color, 0)
-          .setStrokeStyle(3, color, 0.9)
-          .setDepth(this.map.worldH);
-        this.tweens.add({
-          targets: ring,
-          scale: major ? 7 : 4,
-          alpha: 0,
-          delay: i * 180,
-          duration: 700,
-          onComplete: () => ring.destroy(),
-        });
-      }
+      // Công thức dữ liệu (gfx/fx/recipes-cultivation.ts): vòng sóng + hạt sáng; đột phá thêm cột sáng + chớp nhẹ (chỉ của mình)
+      const plan = planLevelUp(major, mine);
+      for (const id of plan.recipes) this.fx.play(id, x, y - 8, { priority: plan.priority });
     }
     if (mine) {
       const me = this.me();
@@ -2502,16 +2499,10 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  private fxBreakFail(x: number, y: number) {
+  private fxBreakFail(x: number, y: number, mine: boolean) {
     sound.breakfail();
-    const puff = this.add.circle(x, y - 10, 20, 0x4a2a5a, 0.6).setDepth(this.map.worldH);
-    this.tweens.add({
-      targets: puff,
-      scale: 3,
-      alpha: 0,
-      duration: 800,
-      onComplete: () => puff.destroy(),
-    });
+    const plan = planBreakFail(mine);
+    for (const id of plan.recipes) this.fx.play(id, x, y - 10, { priority: plan.priority });
   }
 
   /** Trúng đòn: hạt + chữ bay theo kế hoạch thuần `gfx/fx/combat-fx.ts` (không nhánh `if` theo loại hiệu ứng ở đây). */
