@@ -531,6 +531,117 @@ async function main() {
     must(Number(await ev(`window.__scene.fogImages.length`)) === 8, "dựng lại: vẫn 8 mảng sương");
     ok("dựng lại bản đồ 20 lần: không rò mảng sương");
 
+    // ---------------- Ca 8: mặt nước lấp lánh ----------------
+    out(
+      "\n--- Ca 8: mặt nước lấp lánh (lớp ô nước, đốm trôi, điểm ảnh, theo bậc / giảm chuyển động) ---",
+    );
+    const wl = await ev(`(() => { const s = window.__scene, L = s.waterLayer; if (!L) return null;
+      let water = 0; for (let i = 0; i < s.map.tiles.length; i++) if (s.map.tiles[i] === 3) water++;
+      let cells = 0, bad = 0; const d = L.layer.data;
+      for (let y = 0; y < d.length; y++) for (let x = 0; x < d[y].length; x++) { const t = d[y][x].index;
+        if (t >= 0) { cells++; if (t > 3 || s.map.tiles[y * s.map.def.w + x] !== 3) bad++; } }
+      return { water, cells, bad, depth: L.depth, key: L.tileset[0].image.key }; })()`);
+    must(wl !== null, "WorldScene có waterLayer");
+    must(
+      wl.cells === wl.water && wl.bad === 0,
+      `lớp nước chỉ gồm ĐÚNG các ô nước (${wl.cells} ô = ${wl.water} ô nước, ${wl.bad} ô sai)`,
+    );
+    must(
+      wl.depth > -9 && wl.depth < 0,
+      `lớp nước nằm trên lớp trang trí và dưới thực thể (depth ${wl.depth})`,
+    );
+    ok(`waterLayer: ${wl.cells} ô nước, depth ${wl.depth}, texture ${wl.key}`);
+    must(
+      Boolean(await ev(`window.__scene.waterPaused`)),
+      "?debug mặc định để đốm nước đứng yên (waterPaused = true)",
+    );
+    // Đổi bậc chất lượng TRƯỚC khi đặt camera: đổi bậc làm cảnh dựng lại khung nhìn / theo nhân vật lại (ảnh đối chứng sẽ trôi)
+    await setQuality("low");
+    await sleep(800);
+    // Đưa camera tới vùng nhiều nước nhất (20 x 12 ô)
+    const wview =
+      await ev(`(() => { const s = window.__scene, m = s.map, cam = s.cameras.main, W = 20, H = 12; let best = -1, bx = 0, by = 0;
+      for (let y = 1; y + H < m.def.h - 1; y += 2) for (let x = 1; x + W < m.def.w - 1; x += 2) { let c = 0;
+        for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) if (m.tiles[(y + j) * m.def.w + x + i] === 3) c++;
+        if (c > best) { best = c; bx = x; by = y; } }
+      cam.stopFollow(); cam.centerOn((bx + W / 2) * 32, (by + H / 2) * 32); return best; })()`);
+    must(Number(wview) >= 60, `vùng đo có đủ nước (${wview} ô nước trong 20x12)`);
+    // Điểm ảnh đo ở bậc Thấp (đốm TĨNH nên đối chứng ổn định): bật / tắt lớp nước
+    await sleep(400);
+    // Chỉ đếm điểm ảnh NẰM TRONG ô nước (suy từ khung nhìn camera): quái / người chơi đi lại trong khung (máy chủ thật có quái) làm
+    // ảnh đổi ở chỗ khác, nhưng không ai bơi, nên đối chứng trong ô nước ổn định
+    const waterDiff = (visA: boolean, visB: boolean) =>
+      ev(`new Promise((resolve) => { const s = window.__scene;
+        const grab = (v) => new Promise((res) => { s.waterLayer.setVisible(v); const g = s.game, w = g.canvas.width, h = g.canvas.height;
+          setTimeout(() => g.renderer.snapshotArea(0, 0, w, h, (img) => { const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+            const x = c.getContext('2d'); x.drawImage(img, 0, 0); res(x.getImageData(0, 0, c.width, c.height).data); }), 200); });
+        grab(${visA}).then((a) => grab(${visB}).then((b) => { let n = 0; const W = s.game.canvas.width, wv = s.cameras.main.worldView, m = s.map;
+          for (let i = 0; i < a.length; i += 4) { if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) <= 24) continue;
+            const px = (i / 4) % W, py = Math.floor(i / 4 / W), tx = Math.floor((wv.x + (px * wv.width) / W) / 32), ty = Math.floor((wv.y + (py * wv.width) / W) / 32);
+            if (tx >= 0 && ty >= 0 && tx < m.def.w && ty < m.def.h && m.tiles[ty * m.def.w + tx] === 3) n++; }
+          resolve(n); })); })`) as Promise<number>;
+    const wCtl = Number(await waterDiff(true, true));
+    const wOnOff = Number(await waterDiff(false, true));
+    await ev(`window.__scene.waterLayer.setVisible(true); 1`);
+    must(
+      wCtl < 300,
+      `đối chứng (chỉ trong ô nước): hai ảnh cùng trạng thái khác ${wCtl} điểm ảnh (< 300)`,
+    );
+    must(
+      wOnOff > 400 && wOnOff > wCtl * 3,
+      `đốm nước ĐƯỢC VẼ: ${wOnOff} điểm ảnh khác (đối chứng ${wCtl}; cần > 400 và gấp 3 lần)`,
+    );
+    ok(`nước được vẽ: ${wOnOff} điểm ảnh khác, đối chứng ${wCtl}`);
+    await ev(`window.__scene.waterLayer.setVisible(false); 1`);
+    await sleep(250);
+    await T.shot("map-water-tat");
+    await ev(`window.__scene.waterLayer.setVisible(true); 1`);
+    await sleep(250);
+    await T.shot("map-water-bat");
+    // Đốm TRÔI thật: nội dung texture đổi theo thời gian ở bậc Cao; đứng yên ở bậc Thấp / giảm chuyển động
+    const texSum = () =>
+      ev(`(() => { const t = window.__scene.textures.get('water-shimmer'); const c = t.getSourceImage().getContext('2d');
+        const d = c.getImageData(0, 0, c.canvas.width, c.canvas.height).data; let h = 0; for (let i = 0; i < d.length; i++) h = (h * 31 + d[i]) | 0; return h; })()`) as Promise<number>;
+    const hLow0 = await texSum();
+    await waitGame(1500, "1,5 s đồng hồ trò chơi");
+    const hLow1 = await texSum();
+    must(hLow0 === hLow1, "bậc Thấp: đốm nước TĨNH (texture không đổi)");
+    await ev(`window.__scene.waterPaused = false; 1`); // bật lại chuyển động nước để kiểm trôi
+    await setQuality("high");
+    await sleep(600);
+    const hHi0 = await texSum();
+    await waitGame(1500, "1,5 s đồng hồ trò chơi");
+    const hHi1 = await texSum();
+    must(hHi0 !== hHi1, "bậc Cao: đốm nước TRÔI (texture đổi sau 1,5 s)");
+    await setCheck("set-reduced-motion", true);
+    await sleep(600);
+    const hRm0 = await texSum();
+    await waitGame(1500, "1,5 s đồng hồ trò chơi");
+    const hRm1 = await texSum();
+    must(hRm0 === hRm1, "giảm chuyển động: đốm nước đứng yên");
+    await setCheck("set-reduced-motion", false);
+    await ev(`window.__scene.waterPaused = true; 1`);
+    ok("đốm nước: Thấp tĩnh, Cao trôi, giảm chuyển động đứng yên");
+    // Draw call: bật / tắt lớp nước
+    const drawsWater = (on: boolean) =>
+      ev(`new Promise((resolve) => { const s = window.__scene, g = s.game, gl = g.renderer.gl;
+        if (!gl) return resolve(-1); s.waterLayer.setVisible(${on});
+        let draws = 0, f = 0; const de = gl.drawElements, da = gl.drawArrays;
+        gl.drawElements = function () { draws++; return de.apply(this, arguments); };
+        gl.drawArrays = function () { draws++; return da.apply(this, arguments); };
+        const on2 = () => { if (++f > 30) { g.events.off('postrender', on2); gl.drawElements = de; gl.drawArrays = da; resolve(draws / 30); } };
+        g.events.on('postrender', on2); })`) as Promise<number>;
+    const wdOff = Number(await drawsWater(false));
+    const wdOn = Number(await drawsWater(true));
+    must(wdOff >= 0, "renderer là WebGL");
+    must(
+      wdOn - wdOff <= 2.01,
+      `lớp nước thêm <= 2 draw call mỗi khung (tắt ${wdOff.toFixed(1)}, bật ${wdOn.toFixed(1)})`,
+    );
+    ok(
+      `draw call mỗi khung: tắt ${wdOff.toFixed(1)} -> bật ${wdOn.toFixed(1)} (+${(wdOn - wdOff).toFixed(1)})`,
+    );
+
     must(T.errors.length === 0, `0 lỗi console / exception (${T.errors.slice(0, 2).join(" | ")})`);
     ok("0 lỗi console / exception");
     out("\n=== E2E LỚP TRANG TRÍ ĐẠT ===");

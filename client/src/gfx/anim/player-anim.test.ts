@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  HURT_MAX_DEFER_MS,
   PLAYER_DIE_FRAMES,
   markPlayerHurt,
   newPlayerAnimClock,
@@ -61,5 +62,45 @@ describe("gfx/anim/player-anim: máy trạng thái hoạt ảnh người chơi",
     expect(PLAYER_DIE_FRAMES).toBe(4);
     expect(playerAnimMs("die")).toBe(400);
     expect(playerAnimMs("hurt")).toBe(167);
+  });
+});
+
+describe("gfx/anim: bị đánh KHÔNG cắt ngang đòn đánh (nit của A ở #346)", () => {
+  it("bị đánh giữa đòn: vẫn Chém tới hết đòn rồi mới giật lùi đủ thời lượng, rồi về đứng", () => {
+    const c = newPlayerAnimClock();
+    const hurtMs = playerAnimMs("hurt");
+    markPlayerHurt(c, 1000, 1200); // đòn đánh còn tới 1200
+    expect(playerAnimState(c, 1000, input({ slashUntil: 1200 }))).toBe("slash");
+    expect(playerAnimState(c, 1199, input({ slashUntil: 1200 }))).toBe("slash");
+    expect(playerAnimState(c, 1200, input({ slashUntil: 1200 }))).toBe("hurt");
+    expect(playerAnimState(c, 1200 + hurtMs - 1, input())).toBe("hurt");
+    expect(playerAnimState(c, 1200 + hurtMs, input())).toBe("idle");
+  });
+
+  it("không đang đánh (slashUntil 0 / đã qua): giật lùi ngay như cũ", () => {
+    const c = newPlayerAnimClock();
+    markPlayerHurt(c, 1000);
+    expect(playerAnimState(c, 1000, input())).toBe("hurt");
+    markPlayerHurt(c, 5000, 4000); // đòn đánh đã xong từ lâu
+    expect(playerAnimState(c, 5000, input())).toBe("hurt");
+  });
+
+  it("chờ tối đa HURT_MAX_DEFER_MS dù slashUntil lạ (không kẹt tư thế đánh hoặc hoãn vô hạn)", () => {
+    const c = newPlayerAnimClock();
+    markPlayerHurt(c, 1000, 999_999);
+    expect(c.hurtFrom).toBe(1000 + HURT_MAX_DEFER_MS);
+    markPlayerHurt(c, 1000, Number.NaN);
+    expect(c.hurtFrom).toBe(1000);
+    markPlayerHurt(c, 1000, Number.POSITIVE_INFINITY);
+    expect(c.hurtFrom).toBe(1000);
+  });
+
+  it("gục vẫn thắng cả lúc đang chờ giật lùi; bị đánh lần hai trong lúc chờ thì mốc bắt đầu tính lại", () => {
+    const c = newPlayerAnimClock();
+    markPlayerHurt(c, 1000, 1200);
+    expect(playerAnimState(c, 1100, input({ dead: true, slashUntil: 1200 }))).toBe("die");
+    markPlayerHurt(c, 1100, 1200); // đòn thứ hai khi vẫn đang chờ
+    expect(c.hurtFrom).toBe(1200);
+    expect(playerAnimState(c, 1250, input())).toBe("hurt");
   });
 });

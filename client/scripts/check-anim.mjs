@@ -172,6 +172,27 @@ try {
     `hồi sinh: về đứng (${s.state} / ${s.key})`,
   );
 
+  // 3b) Bị đánh GIỮA đòn đánh không cắt khung Chém (nit của A ở #346): chuỗi trạng thái theo từng khung hình phải là slash -> hurt -> idle
+  const sample = (ms) =>
+    evalJs(`new Promise((resolve) => {
+      const sc = window.__scene, e = sc.players.get(sc.sid), t0 = sc.time.now, seq = [];
+      e.slashUntil = t0 + 240;
+      sc.onDmg({ target: sc.sid, amount: 7, x: sc.predX, y: sc.predY - 20, toPlayer: true });
+      const tick = () => {
+        const st = e.playerAnimState;
+        if (st && seq[seq.length - 1] !== st) seq.push(st);
+        if (sc.time.now - t0 >= ${ms}) return resolve(JSON.stringify(seq));
+        requestAnimationFrame(tick);
+      };
+      tick();
+    })`).then((v) => JSON.parse(v));
+  const seq = await sample(900);
+  check(
+    JSON.stringify(seq.slice(Math.max(0, seq.indexOf("slash")))) ===
+      JSON.stringify(["slash", "hurt", "idle"]),
+    `bị đánh giữa đòn Chém: chuỗi trạng thái ${seq.join(" -> ")} (slash trước, hurt sau, rồi idle; trước sửa: hurt cắt slash)`,
+  );
+
   // 4) Giảm chuyển động: không chớp bị đánh (gục vẫn đổi tư thế vì là trạng thái, không phải hiệu ứng)
   await evalJs(
     `localStorage.setItem("tg_reduced_motion", "1"); document.querySelector("#set-reduced-motion") && 0; 0`,
@@ -186,6 +207,32 @@ try {
   await sleep(70);
   s = await st();
   check(s.state === "idle", `giảm chuyển động: trúng đòn không chớp (${s.state})`);
+
+  // 5) Giảm chuyển động: gục KHÔNG phát 4 khung đổ xuống, chỉ hiện thẳng khung xác nằm lại (nit của A ở #346); hồi sinh thì về đứng
+  const dieFrames = await evalJs(`new Promise((resolve) => {
+    const sc = window.__scene, e = sc.players.get(sc.sid), t0 = sc.time.now, seen = new Set();
+    sc.state.players.get(sc.sid).dead = true;
+    const tick = () => {
+      seen.add(e.sprite.frame.name);
+      if (sc.time.now - t0 >= 700) return resolve(JSON.stringify({ frames: [...seen], playing: e.sprite.anims.isPlaying }));
+      requestAnimationFrame(tick);
+    };
+    tick();
+  })`).then((v) => JSON.parse(v));
+  const dieSeen = dieFrames.frames.filter((f) => /-die-\d$/.test(f));
+  check(
+    dieSeen.length === 1 && /-die-3$/.test(dieSeen[0]) && dieFrames.playing === false,
+    `giảm chuyển động: gục chỉ hiện khung cuối (${dieSeen.join(", ") || "không có"}; đang phát hoạt ảnh: ${dieFrames.playing})`,
+  );
+  await evalJs(
+    `(() => { const sc = window.__scene; sc.state.players.get(sc.sid).dead = false; 0; })()`,
+  );
+  await sleep(300);
+  s = await st();
+  check(
+    s.state === "idle" && /-idle-/.test(s.key ?? ""),
+    `giảm chuyển động: hồi sinh về đứng (${s.state} / ${s.key})`,
+  );
 
   check(pageErrors === 0, `không ngoại lệ trong trang (${pageErrors})`);
   ws.close();
