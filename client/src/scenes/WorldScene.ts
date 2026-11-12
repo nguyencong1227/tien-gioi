@@ -1,6 +1,18 @@
 import { getDisplay } from "../gfx/display";
 import { createFxSystem, type FxSystem } from "../gfx/fx/fx";
+import {
+  healAmount,
+  healNumber,
+  isMyHit,
+  planHitFx,
+  planHitNumber,
+  type HitInput,
+  type MyAttack,
+} from "../gfx/fx/combat-fx";
 import { getQuality } from "../gfx/quality";
+import { buildDecorGrid } from "../gfx/map-decor";
+import { styleOf } from "../gfx/map-style";
+import { decorTilesetKey, ensureDecorTileset } from "../gfx/decor-tileset";
 import { fitZoom, toCssPoint } from "../gfx/scale";
 import Phaser from "phaser";
 import type { Room } from "colyseus.js";
@@ -190,6 +202,8 @@ export class WorldScene extends Phaser.Scene {
   private closestNpcId: string | null = null;
   public lastCombatAt = 0;
   private prevHp = 0;
+  /** Đòn gần nhất của chính mình (suy "đòn trúng này của mình" cho hiệu ứng; xem gfx/fx/combat-fx.ts). */
+  private lastAttack: MyAttack | null = null;
 
   /** Đánh dấu người chơi vừa tham gia giao tranh (tấn công hoặc bị tấn công) */
   public recordCombat() {
@@ -236,6 +250,9 @@ export class WorldScene extends Phaser.Scene {
   public map: GameMap;
   private mapTilemap?: Phaser.Tilemaps.Tilemap;
   private mapLayer?: Phaser.Tilemaps.TilemapLayer;
+  /** Lớp trang trí tất định (M5.3 #332): tilemap thứ hai, tileset vẽ bằng mã theo kiểu bản đồ. */
+  private decorTilemap?: Phaser.Tilemaps.Tilemap;
+  decorLayer?: Phaser.Tilemaps.TilemapLayer;
   private townVisuals: Phaser.GameObjects.GameObject[] = [];
   private portalVisuals: Phaser.GameObjects.GameObject[] = [];
   private nearPortal: PortalDef | null = null;
@@ -395,6 +412,14 @@ export class WorldScene extends Phaser.Scene {
       this.mapTilemap.destroy();
       this.mapTilemap = undefined;
     }
+    if (this.decorLayer) {
+      this.decorLayer.destroy();
+      this.decorLayer = undefined;
+    }
+    if (this.decorTilemap) {
+      this.decorTilemap.destroy();
+      this.decorTilemap = undefined;
+    }
 
     // 2. Dựng tilemap mới
     const data: number[][] = [];
@@ -406,6 +431,25 @@ export class WorldScene extends Phaser.Scene {
     const ts = this.mapTilemap.addTilesetImage("tiles", TILESET_KEY, TILE, TILE, 0, 0)!;
     this.mapLayer = this.mapTilemap.createLayer(0, ts, 0, 0)!;
     this.mapLayer.setDepth(-10);
+
+    // 2b. Lớp trang trí tất định (cỏ, hoa, đá, nấm, bụi): thuần thị giác, sinh từ seed + mapId nên mọi người thấy giống nhau
+    const style = styleOf(this.map.def.id);
+    const decorGrid = buildDecorGrid(this.map, style);
+    const decorRows: number[][] = [];
+    for (let y = 0; y < mh; y++)
+      decorRows.push(Array.from(decorGrid.subarray(y * mw, (y + 1) * mw)));
+    this.decorTilemap = this.make.tilemap({ data: decorRows, tileWidth: TILE, tileHeight: TILE });
+    const decorKey = ensureDecorTileset(this, this.map.def.id, style);
+    const decorTs = this.decorTilemap.addTilesetImage(
+      decorTilesetKey(this.map.def.id),
+      decorKey,
+      TILE,
+      TILE,
+      0,
+      0,
+    )!;
+    this.decorLayer = this.decorTilemap.createLayer(0, decorTs, 0, 0)!;
+    this.decorLayer.setDepth(-9);
 
     // 3. Dựng nhãn và vòng an toàn của trấn / trạm (nếu có trấn)
     for (const obj of this.townVisuals) obj.destroy();
@@ -848,6 +892,7 @@ export class WorldScene extends Phaser.Scene {
     if (!me || me.dead || this.time.now < this.nextSlash) return;
     this.recordCombat();
     this.nextSlash = this.time.now + SKILLS.slash.cooldown;
+    this.lastAttack = { at: this.time.now, range: SKILLS.slash.range };
     const a = angle ?? this.aim(SKILLS.slash.range + 60);
     this.facing = a;
     const myEntity = this.players.get(this.sid);
@@ -864,6 +909,7 @@ export class WorldScene extends Phaser.Scene {
     if (me.mp < SKILLS.sword.mp) return ui.toast({ text: "Linh lực không đủ.", tone: "bad" });
     this.recordCombat();
     this.nextSword = this.time.now + SKILLS.sword.cooldown;
+    this.lastAttack = { at: this.time.now, range: SKILLS.sword.range };
     const a = this.aim(SKILLS.sword.range);
     this.facing = a;
     const myEntity = this.players.get(this.sid);
@@ -1160,6 +1206,13 @@ export class WorldScene extends Phaser.Scene {
     if (me) {
       if (this.prevHp > 0 && me.hp < this.prevHp) {
         this.recordCombat();
+      }
+      const healed = healAmount(this.prevHp, me.hp, me.maxHp, me.dead, deltaMs);
+      if (healed > 0) {
+        // Hồi máu bằng đan dược...: chữ xanh + ánh sáng (hồi tự nhiên từng số nguyên không qua ngưỡng nên không ồn)
+        const n = healNumber(healed);
+        this.fx.play("heal-glow", this.predX, this.predY - 8);
+        this.fx.floatNumber(n.text, this.predX, this.predY - 24, n);
       }
       this.prevHp = me.hp;
       ui.hud(me, this.state.online ?? this.state.players.size);
@@ -2110,6 +2163,8 @@ export class WorldScene extends Phaser.Scene {
     for (const [id, e] of this.monsters) {
       if (seen.has(id)) continue;
       if (e.root.visible) {
+        // Quái biến khỏi state khi đang hiện trong màn hình = gục: tan thành điểm sáng (ngoài camera thì root ẩn, không vào đây)
+        this.fx.play("mon-vanish", e.root.x, e.root.y - 8);
         const dieKey = e.monKind ? monAnimKey(e.monKind, "die") : "";
         if (dieKey && e.monAnim && !animReducedMotion() && this.anims.exists(dieKey)) {
           // Gục: 4 khung (đổ bẹp, tan thành điểm sáng) rồi mờ dần; thanh máu ẩn ngay
@@ -2339,7 +2394,7 @@ export class WorldScene extends Phaser.Scene {
         if (mon?.monAnim) markMonHurt(mon.monAnim, this.time.now);
       }
     }
-    this.floatText(m);
+    this.onHitFx(m);
     sound.hit(m.crit);
   }
 
@@ -2459,13 +2514,31 @@ export class WorldScene extends Phaser.Scene {
     });
   }
 
-  private floatText(m: DmgMsg) {
-    const text = `${m.crit ? "Bạo! " : ""}${m.amount}`;
-    this.fx.floatNumber(text, m.x + Phaser.Math.Between(-8, 8), m.y, {
-      color: m.toPlayer ? 0xff6b5e : m.crit ? 0xffd34d : 0xffffff,
-      size: m.crit ? 20 : 15,
-      // Mình bị đánh = ưu tiên 2 (không bao giờ bị bỏ khi đông); sát thương khác = 1 (DmgMsg không có người đánh)
-      priority: m.target === this.sid ? 2 : 1,
-    });
+  /** Trúng đòn: hạt + chữ bay theo kế hoạch thuần `gfx/fx/combat-fx.ts` (không nhánh `if` theo loại hiệu ứng ở đây). */
+  private onHitFx(m: DmgMsg) {
+    const input = this.hitInput(m);
+    const plan = planHitFx(input);
+    this.fx.play(plan.recipe, m.x, m.y - 8, { priority: plan.priority });
+    const n = planHitNumber(input);
+    this.fx.floatNumber(n.text, m.x + Phaser.Math.Between(-8, 8), m.y, n);
+  }
+
+  private hitInput(m: DmgMsg): HitInput {
+    const targetIsMe = m.target === this.sid;
+    const maxHp = targetIsMe
+      ? (this.me()?.maxHp ?? 0)
+      : ((m.toPlayer ? this.state?.players?.get(m.target) : this.state?.monsters?.get(m.target))
+          ?.maxHp ?? 0);
+    return {
+      amount: m.amount,
+      crit: Boolean(m.crit),
+      toPlayer: Boolean(m.toPlayer),
+      targetIsMe,
+      targetMaxHp: maxHp,
+      mine:
+        !targetIsMe &&
+        !m.toPlayer &&
+        isMyHit(this.lastAttack, this.time.now, { x: this.predX, y: this.predY }, m),
+    };
   }
 }
