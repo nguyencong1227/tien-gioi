@@ -19,6 +19,7 @@ import {
   rarityTint,
 } from "../gfx/fx/world-fx";
 import {
+  FloatLanes,
   healAmount,
   healNumber,
   isMonsterDeath,
@@ -249,6 +250,8 @@ export class WorldScene extends Phaser.Scene {
   private prevHp = 0;
   /** Đòn gần nhất của chính mình (suy "đòn trúng này của mình" cho hiệu ứng; xem gfx/fx/combat-fx.ts). */
   private lastAttack: MyAttack | null = null;
+  /** Hàng chữ bay theo mục tiêu: dồn đòn không đè chữ lên nhau (gfx/fx/combat-fx.ts). */
+  private floatLanes = new FloatLanes();
 
   /** Đánh dấu người chơi vừa tham gia giao tranh (tấn công hoặc bị tấn công) */
   public recordCombat() {
@@ -1399,7 +1402,12 @@ export class WorldScene extends Phaser.Scene {
         // Hồi máu bằng đan dược...: chữ xanh + ánh sáng (hồi tự nhiên từng số nguyên không qua ngưỡng nên không ồn)
         const n = healNumber(healed);
         this.fx.play("heal-glow", this.predX, this.predY - 8);
-        this.fx.floatNumber(n.text, this.predX, this.predY - 24, n);
+        this.fx.floatNumber(
+          n.text,
+          this.predX,
+          this.predY - 24 + this.floatLanes.offset("heal", this.time.now),
+          n,
+        );
       }
       this.prevHp = me.hp;
       ui.hud(me, this.state.online ?? this.state.players.size);
@@ -2790,7 +2798,12 @@ export class WorldScene extends Phaser.Scene {
     const plan = planHitFx(input);
     this.fx.play(plan.recipe, m.x, m.y - 8, { priority: plan.priority });
     const n = planHitNumber(input);
-    this.fx.floatNumber(n.text, m.x + Phaser.Math.Between(-8, 8), m.y, n);
+    this.fx.floatNumber(
+      n.text,
+      m.x + Phaser.Math.Between(-8, 8),
+      m.y + this.floatLanes.offset(m.target, this.time.now),
+      n,
+    );
   }
 
   private hitInput(m: DmgMsg): HitInput {

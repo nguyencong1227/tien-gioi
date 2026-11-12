@@ -2,7 +2,12 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   HEAL_JUMP_FRAC,
+  FloatLanes,
   HEAVY_HIT_FRAC,
+  LANE_COUNT,
+  LANE_PRUNE_AT,
+  LANE_STEP_PX,
+  LANE_WINDOW_MS,
   MY_HIT_RANGE_SLACK,
   MON_DEATH_MAX_DIST,
   MY_HIT_WINDOW_MS,
@@ -165,5 +170,50 @@ describe("gfx/fx: isMonsterDeath (quái rời vùng nhìn không phải là gụ
     const m = /export const VIEW_ENTER\s*=\s*(\d+)/.exec(src);
     expect(m, "không thấy VIEW_ENTER trong interest.ts").not.toBeNull();
     expect(Number(m![1])).toBe(MON_DEATH_MAX_DIST);
+  });
+});
+
+describe("gfx/fx: FloatLanes (chữ bay không đè nhau khi dồn đòn)", () => {
+  it("lần đầu ở hàng 0; các chữ liên tiếp trong cửa sổ lên từng hàng rồi quay vòng", () => {
+    const l = new FloatLanes();
+    const offs = [0, 50, 100, 150, 200, 250].map((t) => l.offset("quai-1", t));
+    expect(offs).toEqual([
+      0,
+      -LANE_STEP_PX,
+      -2 * LANE_STEP_PX,
+      -3 * LANE_STEP_PX,
+      0,
+      -LANE_STEP_PX,
+    ]);
+    expect(LANE_COUNT).toBe(4);
+  });
+
+  it("yên ắng quá LANE_WINDOW_MS thì về hàng 0; đúng bằng cửa sổ vẫn còn tính", () => {
+    const l = new FloatLanes();
+    l.offset("a", 0);
+    expect(l.offset("a", LANE_WINDOW_MS)).toBe(-LANE_STEP_PX);
+    expect(l.offset("a", LANE_WINDOW_MS + LANE_WINDOW_MS + 1)).toBe(0);
+  });
+
+  it("mỗi mục tiêu một hàng riêng: đòn lên quái khác không đẩy chữ của quái này", () => {
+    const l = new FloatLanes();
+    expect(l.offset("a", 0)).toBe(0);
+    expect(l.offset("b", 10)).toBe(0);
+    expect(l.offset("a", 20)).toBe(-LANE_STEP_PX);
+    expect(l.offset("b", 30)).toBe(-LANE_STEP_PX);
+  });
+
+  it("đồng hồ lùi (now < lần trước) thì về hàng 0, không ra số lạ", () => {
+    const l = new FloatLanes();
+    l.offset("a", 1000);
+    expect(l.offset("a", 500)).toBe(0);
+  });
+
+  it("dọn mục quá hạn khi nhiều mục tiêu: bộ nhớ không phình mãi", () => {
+    const l = new FloatLanes();
+    for (let i = 0; i < 200; i++) l.offset(`quai-${i}`, i * (LANE_WINDOW_MS + 1));
+    expect(l.size()).toBeLessThanOrEqual(LANE_PRUNE_AT + 2);
+    l.clear();
+    expect(l.size()).toBe(0);
   });
 });
