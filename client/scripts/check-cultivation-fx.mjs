@@ -119,6 +119,8 @@ try {
       `window.__scene.children.list.filter((c) => c.type === 'ParticleEmitter').reduce((n, e) => n + e.getAliveParticleCount(), 0)`,
     );
   const flashing = () => evalJs("window.__scene.cameras.main.flashEffect.isRunning");
+  /** Chớp ở đúng khung hình mà `act` vừa chụp (không bị trễ theo độ bận của máy). */
+  const flashedAtShot = () => evalJs("window.__shotFlash");
   /** Chờ camera hội tụ (đồng hồ trò chơi >= 6,5 s, rồi 3 lần đọc liên tiếp bằng nhau, tối đa 8 s): camera còn đang nội suy về nhân vật thì ảnh chụp lệch 1 điểm ảnh làm "nhiễu nền" vọt lên (máy chậm / nhiều lớp phủ hơn => hội tụ muộn hơn). */
   const camStable = async () => {
     // Camera nội suy về nhân vật theo đồng hồ TRÒ CHƠI và chỉ "nhích" 1 điểm ảnh khi giá trị thực vượt mốc làm tròn (~3,9 s sau khi vào cảnh):
@@ -187,6 +189,8 @@ try {
       ${js};
       const shoot = () => {
         if (sc.time.now - t0 < 150) return void requestAnimationFrame(shoot);
+        // Chớp chỉ kéo dài 260 ms: ghi trạng thái NGAY LÚC chụp (đọc sau vài vòng CDP khi máy bận thì chớp đã tắt => đỏ giả)
+        window.__shotFlash = sc.cameras.main.flashEffect.isRunning;
         sc.game.renderer.snapshotArea(0, 0, Math.round(r.width), Math.round(r.height), (img) => {
           const c = document.createElement("canvas"); c.width = img.width; c.height = img.height;
           const x = c.getContext("2d"); x.drawImage(img, 0, 0);
@@ -218,7 +222,7 @@ try {
   await act(fxJs({ kind: "levelup", by: "me", major: true }), "a");
   let n = await alive();
   check(n > 0 && n <= 31, `đột phá của mình: ${n} hạt sống (3 vòng + 28 cột sáng)`);
-  check(Boolean(await flashing()), "đột phá của mình: chớp nhẹ toàn màn hình");
+  check(Boolean(await flashedAtShot()), "đột phá của mình: chớp nhẹ toàn màn hình (đúng lúc chụp)");
   let d = await diff("base", "a");
   check(d > 300, `đột phá: ${d} điểm ảnh thật khác nền (gồm cả chớp toàn màn hình)`);
   await settle();
@@ -228,7 +232,7 @@ try {
   await act(fxJs({ kind: "levelup", by: "me", major: false }), "m");
   n = await alive();
   check(n > 0 && n <= 12, `lên cấp thường: ${n} hạt`);
-  check(!(await flashing()), "lên cấp thường không chớp");
+  check(!(await flashedAtShot()), "lên cấp thường không chớp (đúng lúc chụp)");
   // Không có chớp che: điểm ảnh khác nền chính là hạt vẽ ra thật (bài học #348: đếm đối tượng không chứng minh được có vẽ)
   d = await diff("pre", "m");
   check(
