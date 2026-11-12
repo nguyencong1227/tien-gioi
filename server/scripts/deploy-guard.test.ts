@@ -92,15 +92,26 @@ export function validateProdSh(content: string): { valid: boolean; errors: strin
   }
 
   // 3. Phân quyền tệp .env.production là 600
-  if (!content.includes("chmod 600")) {
+  if (!content.includes('chmod 600 "$ENV_FILE"')) {
     errors.push("prod.sh init phải gán quyền chmod 600 cho file .env.production");
   }
 
   // 4. Có các lệnh vận hành cốt lõi
-  const requiredCmds = ["init", "up", "status", "logs", "backup", "restore", "rollback", "smoke"];
+  const requiredCmds = [
+    "init",
+    "up",
+    "status",
+    "logs",
+    "backup",
+    "restore",
+    "rollback",
+    "smoke",
+    "xoa-tai-khoan",
+  ];
   for (const cmd of requiredCmds) {
-    if (!content.includes(`cmd_${cmd}`) && !content.includes(`${cmd})`)) {
-      errors.push(`prod.sh thiếu lệnh '${cmd}'`);
+    const fnName = `cmd_${cmd.replace(/-/g, "_")}`;
+    if (!content.includes(fnName) || !content.includes(`${cmd})`)) {
+      errors.push(`prod.sh thiếu lệnh '${cmd}' (cần cả ${fnName} và ${cmd}))`);
     }
   }
 
@@ -113,6 +124,33 @@ export function validateProdSh(content: string): { valid: boolean; errors: strin
     errors.push(
       "prod.sh smoke phải có bước kiểm tra tắt êm container game (docker stop < 25s, mã thoát 0)",
     );
+  }
+
+  // 6. Kiểm tra an toàn của xoa-tai-khoan (tự backup, stop game, run tai-khoan, up game, regex tên)
+  const xoaBlock = content.match(/cmd_xoa_tai_khoan\(\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+  if (!xoaBlock) {
+    errors.push("prod.sh thiếu định nghĩa hàm cmd_xoa_tai_khoan");
+  } else {
+    if (!xoaBlock.includes("cmd_backup")) {
+      errors.push("cmd_xoa_tai_khoan phải tự động gọi cmd_backup trước khi xoá");
+    }
+    if (!xoaBlock.includes("compose_cmd stop game")) {
+      errors.push("cmd_xoa_tai_khoan phải tạm dừng game bằng compose_cmd stop game");
+    }
+    if (!xoaBlock.includes("compose_cmd up -d game")) {
+      errors.push("cmd_xoa_tai_khoan phải đảm bảo bật lại game bằng compose_cmd up -d game");
+    }
+    if (!xoaBlock.includes("^[a-z0-9_]{3,20}$")) {
+      errors.push(
+        "cmd_xoa_tai_khoan phải kiểm tra định dạng tên đăng nhập bằng regex ^[a-z0-9_]{3,20}$",
+      );
+    }
+    if (!xoaBlock.includes("audit-xoa-tai-khoan.log")) {
+      errors.push("cmd_xoa_tai_khoan phải lưu nhật ký kiểm toán vào audit-xoa-tai-khoan.log");
+    }
+    if (!xoaBlock.includes("chmod 600") || !xoaBlock.includes("audit_log")) {
+      errors.push("cmd_xoa_tai_khoan phải phân quyền chmod 600 cho tệp audit-xoa-tai-khoan.log");
+    }
   }
 
   return { valid: errors.length === 0, errors };
@@ -268,6 +306,64 @@ describe("Hàng rào bảo vệ môi trường dev và kiểm tra triển khai (
       expect(res.valid).toBe(false);
       expect(res.errors.some((e) => e.includes("docker stop < 25s"))).toBe(true);
     });
+
+    it("Đột biến 9: prod.sh thiếu lệnh xoa-tai-khoan -> KHÔNG ĐẠT", () => {
+      const mutated = prodShContent.replace("xoa-tai-khoan)", "disabled-xoa)");
+      expect(mutated).not.toBe(prodShContent);
+      const res = validateProdSh(mutated);
+      expect(res.valid).toBe(false);
+      expect(res.errors.some((e) => e.includes("xoa-tai-khoan"))).toBe(true);
+    });
+
+    it("Đột biến 10: prod.sh xoa-tai-khoan bỏ tự động sao lưu trước khi xoá -> KHÔNG ĐẠT", () => {
+      const mutated = prodShContent.replace(/cmd_xoa_tai_khoan\(\)\s*\{[\s\S]*?\n\}/, (block) =>
+        block.replace("cmd_backup", "# bỏ backup"),
+      );
+      expect(mutated).not.toBe(prodShContent);
+      const res = validateProdSh(mutated);
+      expect(res.valid).toBe(false);
+      expect(res.errors.some((e) => e.includes("cmd_backup"))).toBe(true);
+    });
+
+    it("Đột biến 11: prod.sh xoa-tai-khoan bỏ bật lại game sau khi xoá -> KHÔNG ĐẠT", () => {
+      const mutated = prodShContent.replace(/cmd_xoa_tai_khoan\(\)\s*\{[\s\S]*?\n\}/, (block) =>
+        block.replace("compose_cmd up -d game >/dev/null", "# bỏ compose_cmd up"),
+      );
+      expect(mutated).not.toBe(prodShContent);
+      const res = validateProdSh(mutated);
+      expect(res.valid).toBe(false);
+      expect(res.errors.some((e) => e.includes("compose_cmd up -d game"))).toBe(true);
+    });
+
+    it("Đột biến 12: prod.sh xoa-tai-khoan bỏ kiểm tra regex tên đăng nhập -> KHÔNG ĐẠT", () => {
+      const mutated = prodShContent.replace(/cmd_xoa_tai_khoan\(\)\s*\{[\s\S]*?\n\}/, (block) =>
+        block.replaceAll("^[a-z0-9_]{3,20}$", ".*"),
+      );
+      expect(mutated).not.toBe(prodShContent);
+      const res = validateProdSh(mutated);
+      expect(res.valid).toBe(false);
+      expect(res.errors.some((e) => e.includes("^[a-z0-9_]{3,20}$"))).toBe(true);
+    });
+
+    it("Đột biến 13: prod.sh xoa-tai-khoan bỏ lưu vết vào audit-xoa-tai-khoan.log -> KHÔNG ĐẠT", () => {
+      const mutated = prodShContent.replace(/cmd_xoa_tai_khoan\(\)\s*\{[\s\S]*?\n\}/, (block) =>
+        block.replaceAll("audit-xoa-tai-khoan.log", "audit-temp.log"),
+      );
+      expect(mutated).not.toBe(prodShContent);
+      const res = validateProdSh(mutated);
+      expect(res.valid).toBe(false);
+      expect(res.errors.some((e) => e.includes("audit-xoa-tai-khoan.log"))).toBe(true);
+    });
+
+    it("Đột biến 14: prod.sh xoa-tai-khoan bỏ chmod 600 cho tệp audit log -> KHÔNG ĐẠT", () => {
+      const mutated = prodShContent.replace(/cmd_xoa_tai_khoan\(\)\s*\{[\s\S]*?\n\}/, (block) =>
+        block.replace('chmod 600 "$audit_log"', "# bỏ chmod audit_log"),
+      );
+      expect(mutated).not.toBe(prodShContent);
+      const res = validateProdSh(mutated);
+      expect(res.valid).toBe(false);
+      expect(res.errors.some((e) => e.includes("chmod 600"))).toBe(true);
+    });
   });
 });
 
@@ -290,6 +386,10 @@ case "$1" in
   ps) exit 0 ;;
   compose)
     if [[ " $* " == *" pull "* && "\${STUB_PULL_FAIL:-}" == 1 ]]; then echo "pull loi" >&2; exit 1; fi
+    if [[ " $* " == *" run "* ]]; then
+      if [[ -n "\${STUB_RUN_OUTPUT:-}" ]]; then echo "$STUB_RUN_OUTPUT"; fi
+      if [[ -n "\${STUB_RUN_RC:-}" ]]; then exit "$STUB_RUN_RC"; fi
+    fi
     exit 0 ;;
   exec)
     if [[ " $* " == *" pg_dump "* ]]; then
@@ -497,6 +597,67 @@ fi
     const iUp = calls.findIndex((l) => / up -d game/.test(l));
     expect(iStop).toBeGreaterThanOrEqual(0);
     expect(iUp).toBeGreaterThan(iStop); // bản chạy thật không bị bỏ nằm tắt
+  });
+
+  it("xoa-tai-khoan: tên sai regex bị từ chối trước Docker; chạy thử không backup/stop/up; chạy thật có backup -> stop -> run -> up", () => {
+    prod(["init"]);
+
+    // 1. Tên sai regex bị từ chối trước khi gọi bất kỳ lệnh Docker nào
+    for (const bad of ["", "ab", "user;rm -rf", "user name", "user@email", "a".repeat(21)]) {
+      writeFileSync(logFile, "");
+      const r = prod(bad === "" ? ["xoa-tai-khoan"] : ["xoa-tai-khoan", bad]);
+      expect(r.code, bad).toBe(1);
+      expect(dockerLog().some((l) => l.includes(" run "))).toBe(false);
+    }
+
+    // 2. Chạy thử (không có --yes): gọi compose run, KHÔNG gọi backup, KHÔNG stop game, KHÔNG up game, KHÔNG ghi audit log
+    writeFileSync(logFile, "");
+    const auditLogFile = path.join(prodDir(), "audit-xoa-tai-khoan.log");
+    const dry = prod(["xoa-tai-khoan", "nguoi_dung_1"]);
+    expect(dry.code).toBe(0);
+    const dryCalls = dockerLog();
+    expect(dryCalls.some((l) => l.includes(" run ") && l.includes("nguoi_dung_1"))).toBe(true);
+    expect(dryCalls.some((l) => l.includes(" pg_dump "))).toBe(false);
+    expect(dryCalls.some((l) => l.includes(" stop game"))).toBe(false);
+    expect(dryCalls.some((l) => l.includes(" up -d game"))).toBe(false);
+    expect(existsSync(auditLogFile)).toBe(false);
+
+    // 3. Chạy thật (có --yes): backup -> stop game -> run ... --yes -> up -d game; lưu audit vào audit-xoa-tai-khoan.log (chmod 600)
+    writeFileSync(logFile, "");
+    const stubAudit =
+      '{"t":"2026-11-12T02:17:45.810Z","audit":1,"ev":"account.deleted","id":"acc-test-123","userDigest":"a2af36e17534032e","character":"Nguoi Dung 1"}';
+    const real = prod(["xoa-tai-khoan", "nguoi_dung_1", "--yes"], {
+      STUB_RUN_OUTPUT: `${stubAudit}\nĐã xoá thành công tài khoản nguoi_dung_1!`,
+    });
+    expect(real.code).toBe(0);
+    const realCalls = dockerLog();
+    const iBackup = realCalls.findIndex((l) => l.includes(" pg_dump "));
+    const iStop = realCalls.findIndex((l) => l.includes(" stop game"));
+    const iRun = realCalls.findIndex((l) => l.includes(" run ") && l.includes("--yes"));
+    const iUp = realCalls.findIndex((l) => l.includes(" up -d game"));
+    expect(iBackup).toBeGreaterThanOrEqual(0);
+    expect(iStop).toBeGreaterThan(iBackup);
+    expect(iRun).toBeGreaterThan(iStop);
+    expect(iUp).toBeGreaterThan(iRun);
+
+    // Kiểm tra tệp audit log: có quyền 600, chứa đúng dòng JSON có audit:1, không chứa dòng văn bản thường
+    expect(existsSync(auditLogFile)).toBe(true);
+    expect(statSync(auditLogFile).mode & 0o777).toBe(0o600);
+    const auditText = readFileSync(auditLogFile, "utf-8");
+    expect(auditText).toContain('"audit":1');
+    expect(auditText).toContain('"account.deleted"');
+    expect(auditText).toContain("acc-test-123");
+    expect(auditText).not.toContain("Đã xoá thành công tài khoản");
+
+    // 4. Chạy thật có lỗi (STUB_RUN_RC: "2"): trả mã lỗi 2, nhưng game VẪN ĐƯỢC BẬT LẠI sau đó
+    writeFileSync(logFile, "");
+    const fail = prod(["xoa-tai-khoan", "nguoi_dung_1", "--yes"], { STUB_RUN_RC: "2" });
+    expect(fail.code).toBe(2);
+    const failCalls = dockerLog();
+    const failRun = failCalls.findIndex((l) => l.includes(" run "));
+    const failUp = failCalls.findIndex((l) => l.includes(" up -d game"));
+    expect(failRun).toBeGreaterThanOrEqual(0);
+    expect(failUp).toBeGreaterThan(failRun);
   });
 
   it("restore-test.sh: danh sách bảng khớp migration, không nuốt lỗi, nạp bằng ON_ERROR_STOP", () => {
