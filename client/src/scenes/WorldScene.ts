@@ -87,6 +87,7 @@ import { clientCanChallenge } from "../duel";
 import { replayEarlyMessages } from "../early-messages";
 import { sound } from "../audio";
 import { joystick, setupJoystick } from "../joystick";
+import { keepLock, pickNextTarget } from "../target-lock";
 import { isTypingElement, isReducedMotion } from "../a11y";
 import {
   markMonAttack,
@@ -98,6 +99,15 @@ import {
   type MonAnimClock,
   type MonAnimState,
 } from "../gfx/anim/mon-anim";
+import {
+  animReducedMotion,
+  markPlayerHurt,
+  newPlayerAnimClock,
+  playerAnimKey,
+  playerAnimState,
+  type PlayerAnimClock,
+  type PlayerAnimState,
+} from "../gfx/anim/player-anim";
 
 interface Entity {
   root: Phaser.GameObjects.Container;
@@ -118,6 +128,9 @@ interface Entity {
   monKind?: string;
   monAnim?: MonAnimClock;
   monAnimState?: MonAnimState;
+  /** Hoạt ảnh người chơi (M5.2 #328 phần 2): cờ bị đánh và trạng thái đang phát. */
+  playerAnim?: PlayerAnimClock;
+  playerAnimState?: PlayerAnimState;
 }
 
 interface SlashFxItem {
@@ -178,6 +191,9 @@ export class WorldScene extends Phaser.Scene {
   private dungeonFallUntil = 0;
 
   private nextSlash = 0;
+  /** Khoá mục tiêu (#327): id quái đang khoá (null = tự ngắm quái gần nhất như cũ) và vòng đánh dấu. */
+  private lockedTargetId: string | null = null;
+  private targetRing?: Phaser.GameObjects.Arc;
   private nextSword = 0;
   private nearestLootId: string | null = null;
   private closestNpcId: string | null = null;
@@ -632,6 +648,7 @@ export class WorldScene extends Phaser.Scene {
     kb.on("keydown-O", () => !typing() && ui.toggleSettingsModal());
     // Esc do `ui.ts` xử lý ở `window` (một chỗ duy nhất): đăng ký thêm ở đây làm MỖI lần Esc chạy hai lần (đóng hai tầng)
     kb.on("keydown-F", () => !typing() && this.interactOrPickup());
+    kb.on("keydown-T", () => !typing() && this.toggleLockTarget());
     kb.on("keydown-ONE", () => !typing() && ui.useQuick(1));
     kb.on("keydown-TWO", () => !typing() && ui.useQuick(2));
     kb.on("keydown-ENTER", () => {
@@ -669,6 +686,7 @@ export class WorldScene extends Phaser.Scene {
         fn();
       });
     bind("sk-slash", () => this.slash());
+    bind("btn-target", () => this.toggleLockTarget());
     bind("sk-sword", () => this.sword());
     bind("sk-med", () => this.toggleMeditate());
     bind("sk-break", () => !this.isReconnecting && this.room.send("breakthrough"));
@@ -705,6 +723,12 @@ export class WorldScene extends Phaser.Scene {
   private aim(range: number) {
     let best = range,
       angle = this.facing;
+    // Đang khoá mục tiêu còn trong tầm: đánh về phía nó (nhả khoá nếu nó đã mất / quá xa)
+    const locked = this.lockedTargetId ? this.monsters.get(this.lockedTargetId) : undefined;
+    if (locked) {
+      const d = Math.hypot(locked.tx - this.predX, locked.ty - this.predY);
+      if (keepLock(d)) return Math.atan2(locked.ty - this.predY, locked.tx - this.predX);
+    }
     this.monsters.forEach((m) => {
       const d = Math.hypot(m.tx - this.predX, m.ty - this.predY);
       if (d < best) {
@@ -713,6 +737,54 @@ export class WorldScene extends Phaser.Scene {
       }
     });
     return angle;
+  }
+
+  /** Bấm nút / phím T: khoá con quái gần nhất, bấm tiếp chuyển sang con xa hơn, hết vòng hoặc chỉ còn một con thì nhả khoá. */
+  private toggleLockTarget() {
+    if (this.isReconnecting || ui.isLimboOpen()) return;
+    const cands: Array<{ id: string; dist: number }> = [];
+    this.monsters.forEach((m, id) => {
+      cands.push({ id, dist: Math.hypot(m.tx - this.predX, m.ty - this.predY) });
+    });
+    this.setLockedTarget(pickNextTarget(cands, this.lockedTargetId));
+  }
+
+  private setLockedTarget(id: string | null) {
+    this.lockedTargetId = id;
+    const btn = document.getElementById("btn-target");
+    if (btn) {
+      btn.classList.toggle("locked", id !== null);
+      btn.setAttribute("aria-pressed", String(id !== null));
+      const kind = id ? this.monsters.get(id)?.monKind : undefined;
+      const label = document.getElementById("btn-target-label");
+      if (label) label.textContent = kind ? (MONSTER_BY_ID[kind]?.name ?? "Mục tiêu") : "Mục tiêu";
+    }
+    if (id === null) this.targetRing?.setVisible(false);
+  }
+
+  /** Mỗi khung: vòng đánh dấu bám theo mục tiêu khoá; mất mục tiêu (chết / ra xa / rời vùng) thì tự nhả khoá. */
+  private syncTargetLock() {
+    const id = this.lockedTargetId;
+    if (!id) return;
+    const e = this.monsters.get(id);
+    const d = e ? Math.hypot(e.tx - this.predX, e.ty - this.predY) : null;
+    if (!e || !keepLock(d)) {
+      this.setLockedTarget(null);
+      return;
+    }
+    if (!this.targetRing) {
+      this.targetRing = this.add
+        .circle(0, 0, 26, 0xff6b5e, 0)
+        .setStrokeStyle(3, 0xff6b5e, 0.95)
+        .setDepth(this.map.worldH);
+    }
+    const r = (MONSTER_BY_ID[e.monKind ?? ""]?.radius ?? 16) + 12;
+    // Nhịp thở nhẹ của vòng; giảm chuyển động thì đứng yên
+    const pulse = isReducedMotion() ? 1 : 1 + 0.08 * Math.sin(this.time.now / 160);
+    this.targetRing
+      .setPosition(e.root.x, e.root.y)
+      .setRadius(r * pulse)
+      .setVisible(true);
   }
 
   /** Bấm/chạm trúng người chơi khác thì mở menu tương tác (mời tổ đội). */
@@ -906,6 +978,7 @@ export class WorldScene extends Phaser.Scene {
       e.root.destroy();
     }
     this.monsters.clear();
+    this.setLockedTarget(null);
 
     for (const [, le] of this.loots) {
       le.root.destroy();
@@ -955,18 +1028,7 @@ export class WorldScene extends Phaser.Scene {
       this.room.onMessage(type, fn);
     };
     reg("fx", (m: FxMsg) => this.onFx(m));
-    reg("dmg", (m: DmgMsg) => {
-      if (m.target === this.sid) {
-        this.recordCombat();
-      }
-      if (!this.inView(m.x, m.y, 96)) return;
-      if (!m.toPlayer && !isReducedMotion()) {
-        const mon = this.monsters.get(m.target);
-        if (mon?.monAnim) markMonHurt(mon.monAnim, this.time.now);
-      }
-      this.onHitFx(m);
-      sound.hit(m.crit);
-    });
+    reg("dmg", (m: DmgMsg) => this.onDmg(m));
     reg("chat", (m: ChatOut) => ui.chat(m));
     reg("toast", (m: ToastMsg) => ui.toast(m));
     reg("inv", (m: InvMsg) => ui.onInv(m));
@@ -1095,6 +1157,7 @@ export class WorldScene extends Phaser.Scene {
     const k = 1 - Math.exp(-LERP_RATE * (deltaMs / 1000));
     this.syncPlayers(k, deltaMs);
     this.syncMonsters(k);
+    this.syncTargetLock();
     this.syncLoot();
     this.stepTransientFx(this.time.now);
     if (this.time.now - this.lastAuxSync >= 150) {
@@ -1773,12 +1836,24 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  private updatePlayerAnim(e: Entity, who: "me" | "other", angle: number, isMoving: boolean) {
+  private updatePlayerAnim(
+    e: Entity,
+    who: "me" | "other",
+    angle: number,
+    isMoving: boolean,
+    dead = false,
+  ) {
     const dir = dirFromAngle(angle);
-    const slashing = (e.slashUntil ?? 0) > this.time.now;
-    const mode = slashing ? "slash" : isMoving ? "walk" : "idle";
+    // Máy trạng thái thuần (gfx/anim/player-anim.ts): gục > bị đánh > đánh > đi > đứng
+    const clock = (e.playerAnim ??= newPlayerAnimClock());
+    const state = playerAnimState(clock, this.time.now, {
+      dead,
+      slashUntil: e.slashUntil ?? 0,
+      moving: isMoving,
+    });
+    e.playerAnimState = state;
     const prefix = e.animPrefix ?? who;
-    const animKey = `${prefix}-${mode}-${dir}`;
+    const animKey = playerAnimKey(prefix, state, dir);
     if (this.anims.exists(animKey)) {
       if (e.sprite.anims.currentAnim?.key !== animKey) e.sprite.play(animKey, true);
       e.sprite.setFlipX(false);
@@ -1874,7 +1949,13 @@ export class WorldScene extends Phaser.Scene {
         e.root.setVisible(true);
         if (e.sprite.anims.isPaused) e.sprite.anims.resume();
         this.applyPlayerEquip(e, p, true);
-        this.updatePlayerAnim(e, who, this.facing, this.moving && !p.dead && !p.meditating);
+        this.updatePlayerAnim(
+          e,
+          who,
+          this.facing,
+          this.moving && !p.dead && !p.meditating,
+          Boolean(p.dead),
+        );
         if (ui.isLimboOpen()) {
           ui.death(null);
         } else if (p.dead && (this.time.now < this.duelKoUntil || ui.isDuelActive())) {
@@ -1924,7 +2005,13 @@ export class WorldScene extends Phaser.Scene {
         if (!e.root.visible) e.root.setVisible(true);
         if (e.sprite.anims.isPaused) e.sprite.anims.resume();
         this.applyPlayerEquip(e, p, false);
-        this.updatePlayerAnim(e, who, p.angle, dist > 1.5 && !p.dead && !p.meditating);
+        this.updatePlayerAnim(
+          e,
+          who,
+          p.angle,
+          dist > 1.5 && !p.dead && !p.meditating,
+          Boolean(p.dead),
+        );
 
         // Xác người khác nằm ~5 giây rồi mờ dần và ẩn (#150)
         if (p.dead) {
@@ -2046,7 +2133,7 @@ export class WorldScene extends Phaser.Scene {
         // Quái biến khỏi state khi đang hiện trong màn hình = gục: tan thành điểm sáng (ngoài camera thì root ẩn, không vào đây)
         this.fx.play("mon-vanish", e.root.x, e.root.y - 8);
         const dieKey = e.monKind ? monAnimKey(e.monKind, "die") : "";
-        if (dieKey && e.monAnim && !isReducedMotion() && this.anims.exists(dieKey)) {
+        if (dieKey && e.monAnim && !animReducedMotion() && this.anims.exists(dieKey)) {
           // Gục: 4 khung (đổ bẹp, tan thành điểm sáng) rồi mờ dần; thanh máu ẩn ngay
           e.monAnim.dying = true;
           e.monAnimState = "die";
@@ -2259,6 +2346,25 @@ export class WorldScene extends Phaser.Scene {
     this.fx.update(now);
   }
 
+  /** Tin `dmg`: chữ bay + âm thanh, và đánh dấu "bị đánh" cho quái / người chơi bị trúng (hoạt ảnh bị đánh, M5.2 #328). */
+  private onDmg(m: DmgMsg) {
+    if (m.target === this.sid) {
+      this.recordCombat();
+    }
+    if (!this.inView(m.x, m.y, 96)) return;
+    if (!animReducedMotion()) {
+      if (m.toPlayer) {
+        const pe = this.players.get(m.target);
+        if (pe) markPlayerHurt((pe.playerAnim ??= newPlayerAnimClock()), this.time.now);
+      } else {
+        const mon = this.monsters.get(m.target);
+        if (mon?.monAnim) markMonHurt(mon.monAnim, this.time.now);
+      }
+    }
+    this.onHitFx(m);
+    sound.hit(m.crit);
+  }
+
   private onFx(m: FxMsg) {
     if ((m.kind === "slash" || m.kind === "sword") && m.by === this.sid) return; // đã vẽ ngay khi bấm
     switch (m.kind) {
@@ -2278,7 +2384,7 @@ export class WorldScene extends Phaser.Scene {
       }
       case "mslash": {
         const mon = this.monsters.get(m.by);
-        if (mon?.monAnim && !isReducedMotion()) markMonAttack(mon.monAnim, this.time.now);
+        if (mon?.monAnim && !animReducedMotion()) markMonAttack(mon.monAnim, this.time.now);
         if (!this.inView(m.x, m.y, 96)) return;
         return this.fxSlash(m.x, m.y, m.angle, 0xff6050, 0.6);
       }

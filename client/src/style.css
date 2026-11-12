@@ -1684,6 +1684,22 @@ body.low-fx #btn-talk {
   min-height: 46px;
   cursor: pointer;
 }
+/* Ô chọn trong Cài đặt (chất lượng đồ hoạ, kiểu điều khiển): theo tông tối của game, cao >= 44 px cho cảm ứng (nit của A ở #343) */
+.set-row select {
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--gold);
+  background: #1d1a16;
+  color: var(--paper);
+  font: inherit;
+  color-scheme: dark;
+}
+.set-row select:focus-visible {
+  outline: 2px solid #ffe08a;
+  outline-offset: 2px;
+}
 .set-row.toggle input[type="checkbox"] {
   width: 22px;
   height: 22px;
@@ -4971,4 +4987,111 @@ html[data-input="touch"] #help {
   -webkit-user-select: none;
   user-select: none;
   touch-action: none;
+}
+
+/* ----- Nút hướng cố định (D-pad) và nút khoá mục tiêu (#327 phần 2) ----- */
+#dpad {
+  display: none;
+  position: fixed;
+  z-index: 4;
+  left: max(14px, var(--safe-l, env(safe-area-inset-left, 0px)));
+  bottom: max(14px, var(--safe-b, env(safe-area-inset-bottom, 0px)));
+  width: 152px;
+  height: 152px;
+  border-radius: 50%;
+  border: 2px solid rgba(243, 220, 160, 0.4);
+  background: rgba(29, 26, 22, 0.5);
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+#dpad .dp {
+  position: absolute;
+  display: grid;
+  place-content: center;
+  width: 48px;
+  height: 48px;
+  font-size: 22px;
+  color: rgba(243, 220, 160, 0.55);
+  pointer-events: none;
+}
+#dpad .dp.on {
+  color: #ffe08a;
+  text-shadow: 0 0 10px #ffe08a;
+}
+#dpad .dp-up {
+  left: calc(50% - 24px);
+  top: 4px;
+}
+#dpad .dp-down {
+  left: calc(50% - 24px);
+  bottom: 4px;
+}
+#dpad .dp-left {
+  top: calc(50% - 24px);
+  left: 4px;
+}
+#dpad .dp-right {
+  top: calc(50% - 24px);
+  right: 4px;
+}
+/* Chọn D-pad: hiện nút hướng, ẩn joystick nổi; chỉ khi đang dùng cảm ứng */
+html[data-input="touch"][data-touch-scheme="dpad"] #dpad {
+  display: block;
+}
+html[data-input="touch"][data-touch-scheme="dpad"] #joyzone {
+  display: none;
+}
+/* D-pad choán góc dưới trái: cột HUD trái co lại để KHÔNG che nút hướng (thân cột cuộn bên trong) */
+html[data-input="touch"][data-touch-scheme="dpad"] #hud-col-left {
+  max-height: calc(var(--vh, 100dvh) - 200px);
+}
+/* Hàng cài đặt kiểu điều khiển chỉ có nghĩa với cảm ứng */
+html[data-input="mouse"] #set-touch-row {
+  display: none;
+}
+
+/* Nút khoá / chuyển mục tiêu: trên cụm kỹ năng, chỉ hiện với cảm ứng (bàn phím dùng phím T) */
+#btn-target {
+  display: none;
+  position: fixed;
+  z-index: 5;
+  right: max(14px, var(--safe-r, env(safe-area-inset-right, 0px)));
+  bottom: calc(max(14px, var(--safe-b, env(safe-area-inset-bottom, 0px))) + 166px);
+  width: 58px;
+  height: 58px;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+  touch-action: none;
+}
+html[data-input="touch"] #btn-target {
+  display: grid;
+}
+#btn-target.locked {
+  border-color: #ff6b5e;
+  background: rgba(120, 28, 24, 0.9);
+  box-shadow: 0 0 14px rgba(255, 107, 94, 0.6);
+}
+
+/* D-pad + điện thoại DỌC: bề rộng 360-430 px không đủ cho D-pad (152) + thanh đan dược + cột nút ngữ cảnh + cụm kỹ năng (156) trên cùng một hàng,
+   nên thanh đan dược nằm cạnh trái nút mục tiêu (trên cụm kỹ năng) và cột nút ngữ cảnh xếp ngay phía trên nút mục tiêu. Điện thoại ngang giữ bố cục cũ. */
+html[data-input="touch"][data-touch-scheme="dpad"][data-orient="portrait"] #quickbar {
+  right: calc(max(14px, var(--safe-r, env(safe-area-inset-right, 0px))) + 68px);
+  bottom: calc(max(14px, var(--safe-b, env(safe-area-inset-bottom, 0px))) + 166px);
+}
+html[data-input="touch"][data-touch-scheme="dpad"][data-orient="portrait"] #btn-pickup,
+html[data-input="touch"][data-touch-scheme="dpad"][data-orient="portrait"] #btn-talk,
+html[data-input="touch"][data-touch-scheme="dpad"][data-orient="portrait"] #btn-portal {
+  right: max(14px, var(--safe-r, env(safe-area-inset-right, 0px)));
+}
+html[data-input="touch"][data-touch-scheme="dpad"][data-orient="portrait"] #btn-pickup {
+  bottom: calc(max(14px, var(--safe-b, env(safe-area-inset-bottom, 0px))) + 234px);
+}
+html[data-input="touch"][data-touch-scheme="dpad"][data-orient="portrait"] #btn-talk {
+  bottom: calc(max(14px, var(--safe-b, env(safe-area-inset-bottom, 0px))) + 302px);
+}
+html[data-input="touch"][data-touch-scheme="dpad"][data-orient="portrait"] #btn-portal {
+  bottom: calc(max(14px, var(--safe-b, env(safe-area-inset-bottom, 0px))) + 370px);
 }
