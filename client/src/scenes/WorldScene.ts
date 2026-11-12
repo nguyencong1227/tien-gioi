@@ -78,6 +78,7 @@ import { clientCanChallenge } from "../duel";
 import { replayEarlyMessages } from "../early-messages";
 import { sound } from "../audio";
 import { joystick, setupJoystick } from "../joystick";
+import { keepLock, pickNextTarget } from "../target-lock";
 import { isTypingElement, isReducedMotion } from "../a11y";
 import {
   markMonAttack,
@@ -169,6 +170,9 @@ export class WorldScene extends Phaser.Scene {
   private dungeonFallUntil = 0;
 
   private nextSlash = 0;
+  /** Khoá mục tiêu (#327): id quái đang khoá (null = tự ngắm quái gần nhất như cũ) và vòng đánh dấu. */
+  private lockedTargetId: string | null = null;
+  private targetRing?: Phaser.GameObjects.Arc;
   private nextSword = 0;
   private nearestLootId: string | null = null;
   private closestNpcId: string | null = null;
@@ -621,6 +625,7 @@ export class WorldScene extends Phaser.Scene {
     kb.on("keydown-O", () => !typing() && ui.toggleSettingsModal());
     // Esc do `ui.ts` xử lý ở `window` (một chỗ duy nhất): đăng ký thêm ở đây làm MỖI lần Esc chạy hai lần (đóng hai tầng)
     kb.on("keydown-F", () => !typing() && this.interactOrPickup());
+    kb.on("keydown-T", () => !typing() && this.toggleLockTarget());
     kb.on("keydown-ONE", () => !typing() && ui.useQuick(1));
     kb.on("keydown-TWO", () => !typing() && ui.useQuick(2));
     kb.on("keydown-ENTER", () => {
@@ -658,6 +663,7 @@ export class WorldScene extends Phaser.Scene {
         fn();
       });
     bind("sk-slash", () => this.slash());
+    bind("btn-target", () => this.toggleLockTarget());
     bind("sk-sword", () => this.sword());
     bind("sk-med", () => this.toggleMeditate());
     bind("sk-break", () => !this.isReconnecting && this.room.send("breakthrough"));
@@ -694,6 +700,12 @@ export class WorldScene extends Phaser.Scene {
   private aim(range: number) {
     let best = range,
       angle = this.facing;
+    // Đang khoá mục tiêu còn trong tầm: đánh về phía nó (nhả khoá nếu nó đã mất / quá xa)
+    const locked = this.lockedTargetId ? this.monsters.get(this.lockedTargetId) : undefined;
+    if (locked) {
+      const d = Math.hypot(locked.tx - this.predX, locked.ty - this.predY);
+      if (keepLock(d)) return Math.atan2(locked.ty - this.predY, locked.tx - this.predX);
+    }
     this.monsters.forEach((m) => {
       const d = Math.hypot(m.tx - this.predX, m.ty - this.predY);
       if (d < best) {
@@ -702,6 +714,54 @@ export class WorldScene extends Phaser.Scene {
       }
     });
     return angle;
+  }
+
+  /** Bấm nút / phím T: khoá con quái gần nhất, bấm tiếp chuyển sang con xa hơn, hết vòng hoặc chỉ còn một con thì nhả khoá. */
+  private toggleLockTarget() {
+    if (this.isReconnecting || ui.isLimboOpen()) return;
+    const cands: Array<{ id: string; dist: number }> = [];
+    this.monsters.forEach((m, id) => {
+      cands.push({ id, dist: Math.hypot(m.tx - this.predX, m.ty - this.predY) });
+    });
+    this.setLockedTarget(pickNextTarget(cands, this.lockedTargetId));
+  }
+
+  private setLockedTarget(id: string | null) {
+    this.lockedTargetId = id;
+    const btn = document.getElementById("btn-target");
+    if (btn) {
+      btn.classList.toggle("locked", id !== null);
+      btn.setAttribute("aria-pressed", String(id !== null));
+      const kind = id ? this.monsters.get(id)?.monKind : undefined;
+      const label = document.getElementById("btn-target-label");
+      if (label) label.textContent = kind ? (MONSTER_BY_ID[kind]?.name ?? "Mục tiêu") : "Mục tiêu";
+    }
+    if (id === null) this.targetRing?.setVisible(false);
+  }
+
+  /** Mỗi khung: vòng đánh dấu bám theo mục tiêu khoá; mất mục tiêu (chết / ra xa / rời vùng) thì tự nhả khoá. */
+  private syncTargetLock() {
+    const id = this.lockedTargetId;
+    if (!id) return;
+    const e = this.monsters.get(id);
+    const d = e ? Math.hypot(e.tx - this.predX, e.ty - this.predY) : null;
+    if (!e || !keepLock(d)) {
+      this.setLockedTarget(null);
+      return;
+    }
+    if (!this.targetRing) {
+      this.targetRing = this.add
+        .circle(0, 0, 26, 0xff6b5e, 0)
+        .setStrokeStyle(3, 0xff6b5e, 0.95)
+        .setDepth(this.map.worldH);
+    }
+    const r = (MONSTER_BY_ID[e.monKind ?? ""]?.radius ?? 16) + 12;
+    // Nhịp thở nhẹ của vòng; giảm chuyển động thì đứng yên
+    const pulse = isReducedMotion() ? 1 : 1 + 0.08 * Math.sin(this.time.now / 160);
+    this.targetRing
+      .setPosition(e.root.x, e.root.y)
+      .setRadius(r * pulse)
+      .setVisible(true);
   }
 
   /** Bấm/chạm trúng người chơi khác thì mở menu tương tác (mời tổ đội). */
@@ -893,6 +953,7 @@ export class WorldScene extends Phaser.Scene {
       e.root.destroy();
     }
     this.monsters.clear();
+    this.setLockedTarget(null);
 
     for (const [, le] of this.loots) {
       le.root.destroy();
@@ -1082,6 +1143,7 @@ export class WorldScene extends Phaser.Scene {
     const k = 1 - Math.exp(-LERP_RATE * (deltaMs / 1000));
     this.syncPlayers(k, deltaMs);
     this.syncMonsters(k);
+    this.syncTargetLock();
     this.syncLoot();
     this.stepTransientFx(this.time.now);
     if (this.time.now - this.lastAuxSync >= 150) {
