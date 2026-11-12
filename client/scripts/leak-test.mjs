@@ -155,15 +155,21 @@ async function runLeakTest() {
 
   try {
     // 30 s (không phải 4 s): lần mở Chrome đầu tiên trên runner CI lạnh có thể chậm (run đầu của #398 đỏ vì 15 s không đủ)
+    let chromeUp = false;
     for (let i = 0; i < 300; i++) {
       try {
         const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json/version`);
-        if (res.ok) break;
+        if (res.ok) {
+          chromeUp = true;
+          break;
+        }
       } catch {
         // Đợi Chrome
       }
       await sleep(100);
     }
+    // Báo rõ (giống measure-mobile-perf.mjs) thay vì nổ ECONNREFUSED ở fetch(/json/new) bên dưới
+    if (!chromeUp) throw new Error("Chrome headless không khởi động kịp sau 30 giây.");
 
     const newTabRes = await fetch(`http://127.0.0.1:${CDP_PORT}/json/new?about:blank`, {
       method: "PUT",
