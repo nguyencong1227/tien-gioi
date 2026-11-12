@@ -54,7 +54,7 @@ export interface TouchGuardDoc {
 /**
  * Cài các chốt chặn; trả về hàm gỡ. Gọi một lần lúc khởi động (`main.ts`).
  * - `gesturestart|change|end` (Safari iOS): chặn phóng to hai ngón.
- * - `touchend` hai lần trong DOUBLE_TAP_MS ngoài ô nhập chữ: chặn phóng to chạm đúp.
+ * - `touchend` hai lần trong DOUBLE_TAP_MS TRÊN vùng điều khiển trò chơi: chặn phóng to chạm đúp (không đụng tới nút / ô túi đồ bình thường).
  * - `contextmenu` trên vùng điều khiển: chặn trình đơn nhấn giữ.
  */
 export function installTouchGuards(
@@ -65,7 +65,10 @@ export function installTouchGuards(
   let lastTap = 0;
   const onTouchEnd = (e: { target: unknown; preventDefault(): void }) => {
     const t = now();
-    if (!isEditableTarget(e.target) && isDoubleTap(lastTap, t)) e.preventDefault();
+    // CHỈ trên vùng điều khiển trò chơi (canvas, joystick, nút kỹ năng...): `preventDefault` ở `touchend` huỷ luôn `click`
+    // mô phỏng của lần chạm thứ hai, nên làm ở mọi nơi sẽ nuốt lần bấm nhanh thứ hai vào nút / ô túi đồ dùng `click`
+    // (17 chỗ trong ui.ts). Phóng to chạm đúp ở chỗ khác đã bị `html, body { touch-action: none }` chặn.
+    if (isGuardedTarget(e.target) && isDoubleTap(lastTap, t)) e.preventDefault();
     lastTap = t;
   };
   const onContextMenu = (e: { target: unknown; preventDefault(): void }) => {

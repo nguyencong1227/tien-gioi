@@ -84,15 +84,30 @@ describe("touch: installTouchGuards", () => {
       expect(f.fire(t).preventDefault).toHaveBeenCalledTimes(1);
   });
 
-  it("chạm đúp ngoài ô nhập chữ bị chặn, chạm đơn và chạm cách xa không bị chặn", () => {
+  it("chạm đúp trên vùng điều khiển bị chặn, chạm đơn và chạm cách xa không bị chặn", () => {
     const f = fakeDoc();
     let t = 1000;
     installTouchGuards(f.doc, () => t);
-    expect(f.fire("touchend").preventDefault).not.toHaveBeenCalled(); // lần đầu
+    const pad = el("BUTTON", ["#skills"]);
+    expect(f.fire("touchend", pad).preventDefault).not.toHaveBeenCalled(); // lần đầu
     t += 100;
-    expect(f.fire("touchend").preventDefault).toHaveBeenCalledTimes(1); // chạm đúp
+    expect(f.fire("touchend", pad).preventDefault).toHaveBeenCalledTimes(1); // chạm đúp
     t += DOUBLE_TAP_MS + 10;
-    expect(f.fire("touchend").preventDefault).not.toHaveBeenCalled(); // quá xa
+    expect(f.fire("touchend", pad).preventDefault).not.toHaveBeenCalled(); // quá xa
+  });
+
+  it("bấm nhanh hai lần vào nút / ô ngoài vùng điều khiển (túi đồ, hộp thoại...) KHÔNG bị nuốt click thứ hai", () => {
+    const f = fakeDoc();
+    let t = 1000;
+    installTouchGuards(f.doc, () => t);
+    const slot = el("BUTTON"); // vd ô túi đồ: dùng `click`, không nằm trong GUARDED_SELECTOR
+    f.fire("touchend", slot);
+    t += 100;
+    expect(f.fire("touchend", slot).preventDefault).not.toHaveBeenCalled();
+    const div = el("DIV");
+    f.fire("touchend", div);
+    t += 100;
+    expect(f.fire("touchend", div).preventDefault).not.toHaveBeenCalled();
   });
 
   it("chạm đúp trong ô nhập chữ KHÔNG bị chặn (vẫn chọn từ / đặt con trỏ được)", () => {
