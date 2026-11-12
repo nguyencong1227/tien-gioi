@@ -121,6 +121,25 @@ try {
   const shaking = () => evalJs("window.__scene.cameras.main.shakeEffect.isRunning");
   const floats = () => evalJs("window.__fx.stats().floatsActive");
   /** Chờ rung cũ tắt và hạt cũ tan để mỗi ca đo độc lập. */
+  /** Chờ camera hội tụ (đồng hồ trò chơi >= 6,5 s, rồi 3 lần đọc liên tiếp bằng nhau, tối đa 8 s): camera còn đang nội suy về nhân vật thì ảnh chụp lệch 1 điểm ảnh làm "nhiễu nền" vọt lên (máy chậm / nhiều lớp phủ hơn => hội tụ muộn hơn). */
+  const camStable = async () => {
+    // Camera nội suy về nhân vật theo đồng hồ TRÒ CHƠI và chỉ "nhích" 1 điểm ảnh khi giá trị thực vượt mốc làm tròn (~3,9 s sau khi vào cảnh):
+    // đọc scroll nguyên không thấy được phần lẻ nên chờ cho đồng hồ trò chơi qua 6,5 s (tối đa 30 s thật) rồi mới đo.
+    for (let k = 0; k < 150; k++) {
+      if (Number(await evalJs("window.__scene.time.now")) >= 6500) break;
+      await sleep(200);
+    }
+    let prev = "";
+    let same = 0;
+    for (let k = 0; k < 53 && same < 3; k++) {
+      await sleep(150);
+      const cur = await evalJs(
+        "JSON.stringify([window.__scene.cameras.main.scrollX, window.__scene.cameras.main.scrollY, window.__scene.cameras.main.zoom])",
+      );
+      same = cur === prev ? same + 1 : 0;
+      prev = cur;
+    }
+  };
   const settle = async () => {
     await evalJs("window.__scene.cameras.main.resetFX(); 0");
     // Chờ hạt tan HẾT (thăm dò, tối đa 12 s): đồng hồ trò chơi chậm lại khi máy bận nên chờ cố định không đủ
@@ -134,6 +153,7 @@ try {
       )
         break;
     }
+    await camStable();
   };
   /** Phát tin dmg như server gửi (đi qua đúng đường onHitFx), `mine` bằng cách giả lập một đòn vừa ra. */
   const dmg = (o, mine) =>
