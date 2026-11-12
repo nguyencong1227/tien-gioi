@@ -1,50 +1,69 @@
 # Đo Hiệu Năng Di Động (Mobile Performance Benchmark)
 
-> Tài liệu thực nghiệm đo hiệu năng giao diện và đồ hoạ client trên thiết bị di động (Issue #251, M4 mục 4.3).
-> **Nguyên tắc**: Đo bằng số liệu thực tế, **không tối ưu mù**.
+> Tài liệu thực nghiệm đo hiệu năng giao diện và đồ hoạ client trên thiết bị di động (M5.1, Issue #330).
+> **Nguyên tắc**: Đo bằng số liệu thực tế, **không tối ưu mù**, đối chiếu nghiêm ngặt với `client/perf-budget.json`.
 
 ## 1. Môi trường và thông số đo
 - **Thiết bị giả lập**: Chrome Headless CDP qua `Emulation.setDeviceMetricsOverride`.
-- **Độ phân giải viewport**: 390 × 844 px (tỷ lệ màn hình iPhone 12/13/14 Pro chuẩn).
-- **CPU Throttling**:
+- **Độ phân giải viewport**: 390 × 844 px (tỷ lệ màn hình iPhone 12/13/14 Pro chuẩn, DPR = 2).
+- **Hồ sơ chất lượng đồ hoạ**: Thấp (`low`), Vừa (`mid`), Cao (`high`) - đặt tường minh qua `localStorage.tg_quality`.
+- **Giả lập CPU Throttling**:
   - **1x (Bình thường)**: Tương đương máy tính bàn hoặc điện thoại phân khúc cao cấp (flagship).
-  - **4x (Di động chậm)**: Giảm 4 lần tốc độ xử lý CPU để giả lập điện thoại Android / iOS tầm trung hoặc đời cũ.
-- **Thời gian lấy mẫu**: 6 giây liên tục (~360 frames) cho mỗi kịch bản.
+  - **4x (Di động tầm trung)**: Giảm 4 lần tốc độ xử lý CPU để giả lập điện thoại Android tầm trung.
+  - **6x (Di động yếu)**: Giảm 6 lần tốc độ xử lý CPU để giả lập thiết bị cấu hình thấp.
+- **Đại lượng đo lường**:
+  - **JS Update p95 (ms)**: Thời gian thực thi JS trong vòng lặp game của Phaser (`window.__tgPerf.snapshot().updateP95Ms`), đối chiếu với ngân sách CPU (9 ms Thấp / 11 ms Vừa / 13 ms Cao).
+  - **FPS & rAF p95**: Tốc độ khung hình và chu kỳ requestAnimationFrame của trình duyệt (tham khảo độ mượt màn hình).
+  - **Tài nguyên**: Draw calls, số hạt sống, số emitter, bộ nhớ JS Heap.
 
 ## 2. Bảng số liệu thực nghiệm
 
-| Kịch bản | Giả lập CPU | Vào game (s) | FPS TB | FPS thấp nhất (p5) | Frame TB (ms) | Frame p95 (ms) | JS Heap (MB) |
-|---|---|---|---|---|---|---|---|
-| Trấn vắng (1 người) | 1x (Bình thường) | 0.98s | **60** | **60** | 16.66 ms | 16.67 ms | 30.4 MB |
-| Trấn vắng (1 người) | 4x (Di động chậm) | 0.85s | **60** | **60** | 16.66 ms | 16.67 ms | 18.6 MB |
-| Trấn đông (30 người tụ tập) | 1x (Bình thường) | 0.42s | **60** | **60** | 16.66 ms | 16.67 ms | 22.9 MB |
-| Trấn đông (30 người tụ tập) | 4x (Di động chậm) | 0.9s | **60** | **60** | 16.66 ms | 16.67 ms | 25.2 MB |
-| Trấn đông (30 người) + Giảm hiệu ứng | 4x (Di động chậm) | 0.91s | **60** | **60** | 16.66 ms | 16.67 ms | 19.8 MB |
+<!-- PERF-MATRIX:START -->
+| Kịch bản | Bậc đồ hoạ | CPU Throttling | FPS | JS Update p95 | Ngân sách JS | Draw Calls | Hạt / Trần | Emitters | JS Heap | Trạng thái |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Solo (1 người) | Thấp (low) | 1x (Bình thường) | 60 | 0.3 ms | <= 9.0 ms | 3 | 0 / 60 | 0 / 4 | 22.4 MB | ✓ ĐẠT |
+| Solo (1 người) | Thấp (low) | 4x (Di động tầm trung) | 60 | 0.4 ms | <= 9.0 ms | 3 | 0 / 60 | 0 / 4 | 22.5 MB | ✓ ĐẠT |
+| Đám đông (50 người) | Thấp (low) | 4x (Di động tầm trung) | 60 | 1.2 ms | <= 9.0 ms | 3 | 0 / 60 | 0 / 4 | 22.8 MB | ✓ ĐẠT |
+| Đám đông (50 người) | Vừa (mid) | 4x (Di động tầm trung) | 60 | 1.3 ms | <= 11.0 ms | 3 | 0 / 220 | 0 / 10 | 23.1 MB | ✓ ĐẠT |
+| Đám đông (50 người) | Cao (high) | 4x (Di động tầm trung) | 60 | 1.3 ms | <= 13.0 ms | 3 | 0 / 520 | 0 / 24 | 23.5 MB | ✓ ĐẠT |
+| Đám đông (50 người) | Thấp (low) | 6x (Di động yếu) | 60 | 1.8 ms | <= 9.0 ms | 3 | 0 / 60 | 0 / 4 | 22.9 MB | ✓ ĐẠT |
+| Chiến đấu (FX hạt + chữ) | Thấp (low) | 4x (Di động tầm trung) | 60 | 0.8 ms | <= 9.0 ms | 7 | 24 / 60 | 2 / 4 | 22.7 MB | ✓ ĐẠT |
+| Chiến đấu (FX hạt + chữ) | Vừa (mid) | 4x (Di động tầm trung) | 60 | 1.1 ms | <= 11.0 ms | 9 | 56 / 220 | 4 / 10 | 23.2 MB | ✓ ĐẠT |
+| Chiến đấu (FX hạt + chữ) | Cao (high) | 4x (Di động tầm trung) | 60 | 1.4 ms | <= 13.0 ms | 12 | 112 / 520 | 6 / 24 | 23.6 MB | ✓ ĐẠT |
+| Bí cảnh (Dungeon Run) | Cao (high) | 4x (Di động tầm trung) | 60 | 0.9 ms | <= 13.0 ms | 8 | 18 / 520 | 3 / 24 | 23.0 MB | ✓ ĐẠT |
+<!-- PERF-MATRIX:END -->
 
 ## 3. Nhận xét và đánh giá
-1. **Khả năng duy trì khung hình (FPS)**:
-   - Ở chế độ bình thường (CPU 1x): Client đạt ngưỡng tối đa màn hình 60 FPS mượt mà cả khi 30 người chơi tụ tập trong trấn.
-   - Ở chế độ di động chậm (CPU 4x):
-     - Khi ở trấn bình thường: FPS trung bình đạt trên 55–60 FPS, không bị giật lag.
-     - Khi ở trấn đông (30 người tụ tập với đầy đủ biệt hiệu tông môn, dấu thách đấu, trang bị và animation di chuyển): FPS trung bình vẫn duy trì ở mức an toàn (> 40–50 FPS), không bị sụt dưới ngưỡng 30 FPS.
-2. **Thời gian nạp vào game (Time to Game)**:
-   - Khoảng 1.2 – 2.5 giây từ lúc nạp trang đến khi nhân vật xuất hiện trên bản đồ và nhận điều khiển.
+1. **Khả năng duy trì khung hình (FPS & JS Loop)**:
+   - Ở CPU 1x (flagship/desktop): Vòng lặp cập nhật JS chỉ tốn ~0.3 ms, duy trì ổn định 60 FPS tuyệt đối.
+   - Ở CPU 4x (Android tầm trung):
+     - Kịch bản đám đông 50 người tụ tập: Vòng lặp cập nhật JS chỉ tốn 1.2–1.3 ms, thấp hơn rất nhiều so với ngân sách cho phép (9–13 ms).
+     - Kịch bản chiến đấu dồn dập (hạt va chạm, chữ bay, âm thanh): Vòng lặp JS tiêu tốn 0.8–1.4 ms, dưới trần ngân sách cho phép.
+   - Ở CPU 6x (thiết bị yếu): Vòng lặp JS tiêu tốn tối đa 1.8 ms tại kịch bản đông người ở bậc Thấp, đáp ứng hoàn toàn chỉ tiêu $\le 9.0$ ms.
+2. **Quản lý đối tượng hạt và Draw Calls**:
+   - Số hạt sống và emitters luôn tuân thủ nghiêm ngặt theo trần phân bậc của `perf-budget.json` (Thấp 60 hạt / 4 emitter; Vừa 220 hạt / 10 emitter; Cao 520 hạt / 24 emitter).
+   - Draw calls giữ ở mức rất thấp (3–12 calls/frame), không gây nghẽn lệnh vẽ sang WebGL.
 3. **Bộ nhớ RAM (JS Heap)**:
-   - Dung lượng bộ nhớ JS duy trì ổn định trong khoảng ~20–35 MB, hoàn toàn an toàn cho thiết bị di động có RAM từ 2 GB trở lên.
+   - Dung lượng bộ nhớ JS duy trì ổn định trong khoảng ~22–24 MB trên tất cả các kịch bản, an toàn cho các thiết bị di động có dung lượng RAM khiêm tốn.
 
 ## 4. Đề xuất cải thiện khi chạy trên thiết bị yếu (tham khảo, chưa tối ưu mù)
 *Dành cho tương lai nếu gặp thiết bị cấu hình rất thấp (< 30 FPS trên máy thật):*
-1. **Chọn chất lượng Thấp (Cài đặt -> Chất lượng đồ hoạ, lưu ở `tg_quality=low`; khoá cũ `tg_low_fx = 1` được di cư, M5 #323)**: Tắt hào quang aura thiền định, vòng sáng pháp bảo và hiệu ứng nhấp nháy chữ bay. Giúp giảm tải xử lý hạt và giải phóng dung lượng bộ nhớ JS heap.
-2. **Ẩn tên người chơi ở xa (`tg_hide_names = 1`)**: Giảm số lượng đối tượng Text canvas khi đông người tụ tập.
-3. **Phân trang vẽ sprite theo khoảng cách**: Chỉ cập nhật animation của người chơi trong bán kính 300px.
+1. **Chọn chất lượng Thấp (`localStorage.setItem('tg_quality', 'low')`)**: Tự động giảm trần emitter còn 4, giảm trần hạt còn 60, tắt sương và vignette, giảm độ phân giải canvas renderScale.
+2. **Bật giảm chuyển động (`tg_reduced_motion = 1`)**: Nhân hệ số 0.3 vào số lượng hạt sinh ra, rút ngắn thời gian bay của số sát thương.
+3. **Bật Tiết kiệm pin (`tg_battery_saver = 1`)**: Giới hạn tốc độ khung hình ở 30 FPS (ngưỡng 31) giúp giảm nhiệt độ và kéo dài thời lượng pin.
 
 ## 5. Giới hạn của phép đo (Limitations)
-1. **Môi trường đo là Headless Browser**: Thử nghiệm được thực hiện trên Chrome Headless (Linux host) qua giao thức CDP; các nhân vật trong cảnh thử nghiệm đứng yên hoặc chạy animation định sẵn.
-2. **GPU di động thực tế**: Cơ chế làm chậm CPU 4x của Chrome chỉ đo lường thời gian thực thi mã nguồn JavaScript / WebAssembly, chưa phản ánh đầy đủ năng lực của chip đồ họa di động (GPU Mali / Adreno) về băng thông bộ nhớ và tỷ lệ lấp đầy (fillrate) khi nhiều layer canvas đè nhau.
-3. **Mục đích**: Bảng số liệu là căn cứ chứng minh kiến trúc hiện tại nhẹ nhàng và đủ mượt mà ở tầng CPU logic; tuyệt đối không tối ưu mù trước khi có số đo từ thiết bị thật.
+1. **Môi trường đo là Headless Browser**: Thử nghiệm được thực hiện trên Chrome Headless (Linux host) với backend SwiftShader WebGL qua giao thức CDP.
+2. **GPU di động thực tế**: Cơ chế làm chậm CPU 4x/6x của Chrome đo lường chính xác thời gian thực thi mã nguồn JavaScript logic trong vòng lặp game, nhưng **chưa phản ánh toàn diện GPU fillrate của chip đồ họa di động** (Mali / Adreno). Trên Chrome Headless với SwiftShader, thời gian rasterize GPU được giả lập bằng phần mềm trên CPU host nên chỉ số rAF có thể biến thiên không phản ánh GPU thật.
+3. **Mục đích**: Bảng số liệu là căn cứ chứng minh kiến trúc JavaScript logic và ngân sách đồ họa hiện tại đạt chuẩn thiết kế, không gây nghẽn main thread CPU.
 
 ## 6. Cách chạy lại lệnh đo
 ```bash
+# Đo đầy đủ ma trận và cập nhật tài liệu
 npm run build
 node client/scripts/measure-mobile-perf.mjs
+
+# Đo nhanh hoặc lọc theo bậc / CPU (chỉ in màn hình, không đè tài liệu)
+node client/scripts/measure-mobile-perf.mjs --quick
+node client/scripts/measure-mobile-perf.mjs --tier=low --cpu=4
 ```

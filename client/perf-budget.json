@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "version": "1.0.0",
+  "description": "Ngân sách hiệu năng đồ hoạ và tài nguyên client (M5.1, Issue #330, THIET_KE_GIAO_DIEN_DO_HOA.md mục 10)",
+  "static": {
+    "bundleGzipKb": 520,
+    "atlasTilesetKb": 1024,
+    "textureMemoryMb": {
+      "low": 48,
+      "mid": 80,
+      "high": 128
+    }
+  },
+  "runtime": {
+    "cpuThrottlingRates": [1, 4, 6],
+    "tiers": {
+      "low": {
+        "jsFrameP95Ms": 9.0,
+        "drawCalls": 60,
+        "peakParticles": 60,
+        "emitterBudget": 4,
+        "damageNumbers": 8,
+        "targetFps": 30,
+        "maxTextureMemoryMb": 48
+      },
+      "mid": {
+        "jsFrameP95Ms": 11.0,
+        "drawCalls": 100,
+        "peakParticles": 220,
+        "emitterBudget": 10,
+        "damageNumbers": 16,
+        "targetFps": 60,
+        "maxTextureMemoryMb": 80
+      },
+      "high": {
+        "jsFrameP95Ms": 13.0,
+        "drawCalls": 160,
+        "peakParticles": 520,
+        "emitterBudget": 24,
+        "damageNumbers": 28,
+        "targetFps": 60,
+        "maxTextureMemoryMb": 128
+      }
+    },
+    "leak": {
+      "iterations": 20,
+      "maxHeapGrowthPercent": 10.0
+    }
+  }
+}

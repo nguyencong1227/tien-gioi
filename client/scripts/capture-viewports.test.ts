@@ -6,22 +6,31 @@ import {
   computeImageHash,
   checkDuplicateScreenshots,
   assertOnlyModalsOpen,
+  assertLayoutIntegrity,
   PRELOAD_SCRIPT,
 } from "./capture-viewports.mjs";
 
 describe("capture-viewports", () => {
-  it("định nghĩa đầy đủ 7 viewports tiêu chuẩn cho đa thiết bị", () => {
-    expect(VIEWPORTS.length).toBe(7);
+  it("định nghĩa đầy đủ các viewports tiêu chuẩn cho đa thiết bị với Desktop đứng đầu", () => {
+    expect(VIEWPORTS.length).toBeGreaterThanOrEqual(8);
     const ids = VIEWPORTS.map((v) => v.id);
-    expect(ids).toContain("mobile-p");
-    expect(ids).toContain("mobile-l");
-    expect(ids).toContain("mobile-sm");
-    expect(ids).toContain("tablet-p");
-    expect(ids).toContain("tablet-l");
-    expect(ids).toContain("desktop-hd");
+    expect(ids).toContain("desktop-qhd");
     expect(ids).toContain("desktop-fhd");
+    expect(ids).toContain("desktop-hd");
+    expect(ids).toContain("tablet-l");
+    expect(ids).toContain("tablet-p");
+    expect(ids).toContain("mobile-l");
+    expect(ids).toContain("mobile-p");
+    expect(ids).toContain("mobile-sm");
 
+    // BẮT BUỘC: Các thiết bị desktop (mobile: false) phải đứng TRƯỚC thiết bị cảm ứng
+    let seenMobile = false;
     for (const vp of VIEWPORTS) {
+      if (vp.mobile) {
+        seenMobile = true;
+      } else {
+        expect(seenMobile).toBe(false);
+      }
       expect(vp.width).toBeGreaterThan(0);
       expect(vp.height).toBeGreaterThan(0);
       expect(vp.dpr).toBeGreaterThanOrEqual(1);
@@ -88,7 +97,6 @@ describe("capture-viewports", () => {
     });
 
     it("ĐỘT BIẾN ĐỎ 1: phát hiện và ném lỗi khi 2 kịch bản trong cùng viewport có cùng băm (tái hiện lỗi ảnh 03-06 trùng nhau)", () => {
-      // Mô phỏng trường hợp bảng modal chưa mở thật dẫn đến kịch bản hud và char có ảnh giống hệt nhau
       const mutantRecords = [
         { viewportId: "mobile-p", scenarioId: "03-game-hud", sha256: "identical-blob-hash" },
         { viewportId: "mobile-p", scenarioId: "04-game-char", sha256: "identical-blob-hash" },
@@ -120,7 +128,6 @@ describe("capture-viewports", () => {
   });
 
   describe("assertOnlyModalsOpen (bảng lạ che ảnh)", () => {
-    /** CDP giả: trả về danh sách id bảng đang mở */
     const fakeCdp = (open: unknown) => async () => ({ result: { result: { value: open } } });
 
     it("chấp nhận khi chỉ có bảng đích mở, hoặc không bảng nào khi chụp HUD", async () => {
@@ -145,8 +152,35 @@ describe("capture-viewports", () => {
     });
   });
 
-  it("PRELOAD_SCRIPT đặt đúng khoá đã đọc chỉ dẫn mà client dùng", async () => {
+  describe("assertLayoutIntegrity (khẳng định bố cục tự động)", () => {
+    const fakeLayoutCdp = (res: unknown) => async () => ({ result: { result: { value: res } } });
+
+    it("chấp nhận khi bố cục không có lỗi", async () => {
+      await expect(
+        assertLayoutIntegrity(fakeLayoutCdp({ ok: true, errors: [] }), false),
+      ).resolves.toBeUndefined();
+    });
+
+    it("ĐỘT BIẾN ĐỎ 4: ném lỗi chi tiết khi phát hiện tràn ngang/dọc hoặc chồng chéo HUD", async () => {
+      const mutantLayout = {
+        ok: false,
+        errors: [
+          "Tràn ngang ngoài ý muốn: scrollWidth=400 > innerWidth=390",
+          "Vùng HUD #hud-col-left chồng lên #chat (Giao nhau: 20x30px)",
+        ],
+      };
+      await expect(assertLayoutIntegrity(fakeLayoutCdp(mutantLayout), false)).rejects.toThrow(
+        /Tràn ngang ngoài ý muốn/,
+      );
+      await expect(assertLayoutIntegrity(fakeLayoutCdp(mutantLayout), false)).rejects.toThrow(
+        /chồng lên #chat/,
+      );
+    });
+  });
+
+  it("PRELOAD_SCRIPT đặt đúng khoá đã đọc chỉ dẫn mà client dùng và chất lượng", async () => {
     const { NEWBIE_GUIDE_STORAGE_KEY } = await import("../src/a11y");
-    expect(PRELOAD_SCRIPT).toContain(`'${NEWBIE_GUIDE_STORAGE_KEY}','1'`);
+    expect(PRELOAD_SCRIPT).toContain(NEWBIE_GUIDE_STORAGE_KEY);
+    expect(PRELOAD_SCRIPT).toContain("tg_quality");
   });
 });
