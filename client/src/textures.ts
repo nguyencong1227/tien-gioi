@@ -3,6 +3,7 @@
 import Phaser from "phaser";
 import { TILE, T, MONSTERS, ITEMS, NPCS } from "@tien-gioi/shared";
 import { MON_ONE_SHOT, monAnimKey } from "./gfx/anim/mon-anim";
+import { PLAYER_DIE_FPS, PLAYER_DIE_FRAMES, PLAYER_HURT_FPS } from "./gfx/anim/player-anim";
 
 export const TILESET_KEY = "tileset";
 export const ATLAS_KEY = "atlas";
@@ -71,6 +72,16 @@ function registerAnimations(scene: Phaser.Scene) {
           repeat: -1,
         });
       }
+      // Bị đánh (1 khung, một lần): `<bộ>-hurt-<hướng>` (M5.2 #328)
+      const hurtKey = `${who}-hurt-${d}`;
+      if (!scene.anims.exists(hurtKey) && atlasTex.has(hurtKey)) {
+        scene.anims.create({
+          key: hurtKey,
+          frames: [{ key: ATLAS_KEY, frame: hurtKey }],
+          frameRate: PLAYER_HURT_FPS,
+          repeat: 0,
+        });
+      }
       const slashKey = `${who}-slash-${d}`;
       if (!scene.anims.exists(slashKey) && atlasTex.has(`${slashKey}-0`)) {
         scene.anims.create({
@@ -80,6 +91,20 @@ function registerAnimations(scene: Phaser.Scene) {
           repeat: 0,
         });
       }
+    }
+  }
+
+  // Gục (không hướng, 4 khung, một lần): `<bộ>-die` (xác nằm lại, hồi sinh thì đổi sang đứng)
+  for (const who of ["me", "other", ...robeKeys]) {
+    const dieKey = `${who}-die`;
+    const names = Array.from({ length: PLAYER_DIE_FRAMES }, (_, i) => `${who}-die-${i}`);
+    if (!scene.anims.exists(dieKey) && names.every((n) => atlasTex.has(n))) {
+      scene.anims.create({
+        key: dieKey,
+        frames: names.map((n) => ({ key: ATLAS_KEY, frame: n })),
+        frameRate: PLAYER_DIE_FPS,
+        repeat: 0,
+      });
     }
   }
 
