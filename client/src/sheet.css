@@ -79,11 +79,11 @@ html[data-form="phone"] .sheet .modal-close {
   border-color: var(--gold);
   background: rgba(60, 46, 24, 0.96);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
-  font-size: 16px;
+  font-size: var(--fs-16);
 }
 html[data-form="phone"] .sheet .modal-close::after {
   content: " Đóng";
-  font-size: 14px;
+  font-size: var(--fs-14);
 }
 
 @keyframes sheet-in-up {

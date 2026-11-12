@@ -755,7 +755,7 @@ function renderQuestTracker() {
   if (!questLog.active.length) {
     const p = document.createElement("p");
     p.style.opacity = "0.7";
-    p.style.fontSize = "11px";
+    p.style.fontSize = "var(--fs-11)";
     p.style.margin = "2px 0";
     p.textContent = "Chưa nhận nhiệm vụ. Gặp Trưởng trấn hoặc Bảng cáo thị để nhận việc.";
     list.append(p);
@@ -1150,7 +1150,7 @@ function renderCharModal() {
   if (countEquips === 0) {
     const p = document.createElement("p");
     p.style.opacity = "0.72";
-    p.style.fontSize = "12px";
+    p.style.fontSize = "var(--fs-12)";
     p.style.margin = "6px 0";
     p.style.textAlign = "center";
     p.textContent =
