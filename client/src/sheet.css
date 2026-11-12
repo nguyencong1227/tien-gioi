@@ -1,0 +1,115 @@
+/*
+ * Tấm chung (.sheet): MỘT thành phần cho mọi bảng / hộp thoại (M5.1, #326, docs/THIET_KE_GIAO_DIEN_DO_HOA.md mục 4.2).
+ *
+ * Cách dùng: thêm class `sheet` vào bảng (đã có `panel modal-box`), đặt bề rộng riêng bằng biến `--sheet-w`
+ * trong CSS của bảng đó (vd `#inv-modal { --sheet-w: 430px; }`). KHÔNG đặt position / top / left / transform / width
+ * trong CSS riêng của bảng; chỉ nội dung bên trong.
+ *
+ * Bố cục chọn theo thuộc tính trên <html> do gfx/display.ts cập nhật (không dùng @media rải rác):
+ *   data-form   = phone | tablet | desktop
+ *   data-orient = portrait | landscape
+ * và biến --safe-t/r/b/l (vùng an toàn), --vh (1 vh thật, px).
+ *   - tablet / desktop: cửa sổ nổi giữa màn hình (như trước).
+ *   - phone dọc:  tấm toàn màn hình, trượt từ dưới lên.
+ *   - phone ngang: ngăn kéo sát cạnh phải, trượt từ phải sang.
+ *   - phone: nút đóng tròn ở góc dưới phải (vùng với tay), luôn nhìn thấy kể cả khi nội dung cuộn.
+ *
+ * Bảng nào chưa chuyển vẫn dùng luật cũ (.modal-box:not(.sheet) trong style.css); chuyển xong thì xoá luật cũ tương ứng.
+ */
+
+.sheet {
+  position: fixed;
+  z-index: 22;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(94vw, var(--sheet-w, 440px));
+  max-height: calc(var(--vh, 1dvh) * 100 - 24px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: rgba(24, 21, 18, 0.95);
+  border: 1px solid var(--gold);
+  border-radius: 8px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.75);
+}
+
+/* Điện thoại: phần tử neo mép phải trừ vùng an toàn; nút đóng cố định nên chừa chỗ ở đáy nội dung */
+html[data-form="phone"] .sheet {
+  inset: 0;
+  width: 100%;
+  height: calc(var(--vh, 1dvh) * 100);
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  transform: none;
+  /* backdrop-filter làm tấm thành "khung chứa" của phần tử fixed, khiến nút đóng cuộn theo nội dung */
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: #181512;
+  padding: max(12px, var(--safe-t, env(safe-area-inset-top, 0px)))
+    max(12px, var(--safe-r, env(safe-area-inset-right, 0px)))
+    calc(max(12px, var(--safe-b, env(safe-area-inset-bottom, 0px))) + 68px)
+    max(12px, var(--safe-l, env(safe-area-inset-left, 0px)));
+  animation: sheet-in-up 0.22s ease-out;
+}
+
+/* Điện thoại xoay ngang: ngăn kéo sát cạnh phải, chừa cảnh game bên trái */
+html[data-form="phone"][data-orient="landscape"] .sheet {
+  left: auto;
+  width: min(560px, 64%);
+  border-left: 1px solid var(--gold);
+  animation-name: sheet-in-right;
+}
+
+/* Nút đóng của tấm trên điện thoại: tròn, to (>= 52 px), góc dưới phải, kèm nhãn Đóng cho mắt đọc nhanh */
+html[data-form="phone"] .sheet .modal-close {
+  position: fixed;
+  z-index: 1;
+  right: max(12px, var(--safe-r, env(safe-area-inset-right, 0px)));
+  bottom: max(12px, var(--safe-b, env(safe-area-inset-bottom, 0px)));
+  min-width: 52px;
+  min-height: 52px;
+  padding: 0 16px;
+  border-radius: 26px;
+  border-color: var(--gold);
+  background: rgba(60, 46, 24, 0.96);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+  font-size: 16px;
+}
+html[data-form="phone"] .sheet .modal-close::after {
+  content: " Đóng";
+  font-size: 14px;
+}
+
+@keyframes sheet-in-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes sheet-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* Giảm chuyển động: hiện ngay, không trượt */
+html[data-reduce-motion="1"] .sheet,
+body.reduced-motion .sheet {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  body:not(.motion-ok) .sheet {
+    animation: none;
+  }
+}
