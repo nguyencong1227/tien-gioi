@@ -21,10 +21,17 @@ import {
   type HitInput,
   type MyAttack,
 } from "../gfx/fx/combat-fx";
-import { getQuality } from "../gfx/quality";
+import { getQuality, onQualityChange } from "../gfx/quality";
 import { buildDecorGrid } from "../gfx/map-decor";
 import { styleOf } from "../gfx/map-style";
 import { decorTilesetKey, ensureDecorTileset } from "../gfx/decor-tileset";
+import {
+  LIGHT_WHITE_KEY,
+  VIGNETTE_KEY,
+  ensureLightTextures,
+  lightRect,
+  planLight,
+} from "../gfx/map-light";
 import { fitZoom, toCssPoint } from "../gfx/scale";
 import Phaser from "phaser";
 import type { Room } from "colyseus.js";
@@ -274,6 +281,10 @@ export class WorldScene extends Phaser.Scene {
   /** Lớp trang trí tất định (M5.3 #332): tilemap thứ hai, tileset vẽ bằng mã theo kiểu bản đồ. */
   private decorTilemap?: Phaser.Tilemaps.Tilemap;
   decorLayer?: Phaser.Tilemaps.TilemapLayer;
+  /** Ánh sáng môi trường + vignette (M5.3 #332 bước 2b): hai ảnh phủ cố định theo màn hình, hiện theo hồ sơ chất lượng. */
+  lightAmbient?: Phaser.GameObjects.Image;
+  lightVignette?: Phaser.GameObjects.Image;
+  private lightLayoutKey = "";
   private townVisuals: Phaser.GameObjects.GameObject[] = [];
   private portalVisuals: Phaser.GameObjects.GameObject[] = [];
   private nearPortal: PortalDef | null = null;
@@ -305,7 +316,11 @@ export class WorldScene extends Phaser.Scene {
 
     // Lõi hiệu ứng (#325): ngân sách theo hồ sơ chất lượng; đóng cảnh thì giải phóng sạch
     this.fx = createFxSystem(this, { getProfile: getQuality, depth: () => this.map.worldH });
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.fx.destroy());
+    const offQuality = onQualityChange(() => this.applyLight());
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      offQuality();
+      this.fx.destroy();
+    });
 
     // Mũi tên chỉ hướng nhiệm vụ xoay quanh người chơi
     this.createNavArrow();
@@ -423,6 +438,49 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
+  /** Dựng / cập nhật hai ảnh phủ ánh sáng theo kiểu bản đồ hiện tại và hồ sơ chất lượng (gọi lại khi đổi bản đồ / chất lượng). */
+  private applyLight() {
+    ensureLightTextures(this);
+    const depth = this.map.worldH + 200; // trên mọi thực thể và hạt, dưới HUD (DOM)
+    if (!this.lightAmbient)
+      this.lightAmbient = this.add
+        .image(0, 0, LIGHT_WHITE_KEY)
+        .setScrollFactor(0)
+        .setOrigin(0.5)
+        .setVisible(false);
+    if (!this.lightVignette)
+      this.lightVignette = this.add
+        .image(0, 0, VIGNETTE_KEY)
+        .setScrollFactor(0)
+        .setOrigin(0.5)
+        .setVisible(false);
+    this.lightAmbient.setDepth(depth);
+    this.lightVignette.setDepth(depth + 1);
+    const plan = planLight(styleOf(this.map.def.id), getQuality());
+    if (plan.ambient)
+      this.lightAmbient.setTint(plan.ambient.color).setAlpha(plan.ambient.alpha).setVisible(true);
+    else this.lightAmbient.setVisible(false);
+    if (plan.vignette)
+      this.lightVignette
+        .setTint(plan.vignette.color)
+        .setAlpha(plan.vignette.alpha)
+        .setVisible(true);
+    else this.lightVignette.setVisible(false);
+    this.lightLayoutKey = ""; // đặt lại kích thước ở khung kế
+  }
+
+  /** Giữ hai ảnh phủ che đủ khung nhìn khi camera đổi cỡ / thu phóng (so sánh vài con số mỗi khung, không cấp phát). */
+  private layoutLight() {
+    const cam = this.cameras.main;
+    const k = `${cam.width}|${cam.height}|${cam.zoom}`;
+    if (k === this.lightLayoutKey) return;
+    const r = lightRect(cam.width, cam.height, cam.displayWidth, cam.displayHeight);
+    if (!r) return;
+    this.lightLayoutKey = k;
+    this.lightAmbient?.setPosition(r.x, r.y).setDisplaySize(r.w, r.h);
+    this.lightVignette?.setPosition(r.x, r.y).setDisplaySize(r.w, r.h);
+  }
+
   private buildMapVisuals() {
     // 1. Hủy lớp ô cũ nếu có
     if (this.mapLayer) {
@@ -471,6 +529,9 @@ export class WorldScene extends Phaser.Scene {
     )!;
     this.decorLayer = this.decorTilemap.createLayer(0, decorTs, 0, 0)!;
     this.decorLayer.setDepth(-9);
+
+    // 2c. Ánh sáng môi trường + vignette theo kiểu bản đồ (hiện theo hồ sơ chất lượng)
+    this.applyLight();
 
     // 3. Dựng nhãn và vòng an toàn của trấn / trạm (nếu có trấn)
     for (const obj of this.townVisuals) obj.destroy();
@@ -2461,6 +2522,7 @@ export class WorldScene extends Phaser.Scene {
 
     // 3. Chữ sát thương bay lên + hạt: lõi hiệu ứng (gfx/fx; giảm chuyển động theo hồ sơ chất lượng)
     this.fx.update(now);
+    this.layoutLight();
   }
 
   /** Tin `dmg`: chữ bay + âm thanh, và đánh dấu "bị đánh" cho quái / người chơi bị trúng (hoạt ảnh bị đánh, M5.2 #328). */

@@ -237,6 +237,93 @@ async function main() {
     must(after.tex === before.tex, `số texture không đổi (${before.tex} -> ${after.tex})`);
     ok(`không rò: ${before.kids} đối tượng, ${before.tex} texture trước và sau 20 lần dựng lại`);
 
+    // ---------------- Ca 5: ánh sáng môi trường + vignette ----------------
+    out("\n--- Ca 5: ánh sáng môi trường + vignette (điểm ảnh thật theo bậc chất lượng) ---");
+    const setQuality = (v: string) =>
+      ev(
+        `(() => { const s = document.getElementById('set-quality'); s.value = ${JSON.stringify(v)}; s.dispatchEvent(new Event('change')); })(); 1`,
+      );
+    /** Độ sáng trung bình bốn góc (16x16) và giữa màn hình (32x32) của canvas WebGL THẬT. */
+    const luma = () =>
+      ev(`new Promise((resolve) => { const g = window.__scene.game, w = g.canvas.width, h = g.canvas.height;
+        setTimeout(() => g.renderer.snapshotArea(0, 0, w, h, (img) => {
+          const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+          const x = c.getContext('2d'); x.drawImage(img, 0, 0);
+          const patch = (x0, y0, pw, ph) => { const d = x.getImageData(x0, y0, pw, ph).data; let sum = 0;
+            for (let i = 0; i < d.length; i += 4) sum += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+            return sum / (d.length / 4); };
+          resolve({ w, h, tl: patch(2, 2, 16, 16), tr: patch(w - 18, 2, 16, 16), bl: patch(2, h - 18, 16, 16),
+            br: patch(w - 18, h - 18, 16, 16), c: patch(Math.round(w / 2) - 16, Math.round(h / 2) - 16, 32, 32) }); }), 250); })`) as Promise<
+        Record<string, number>
+      >;
+    const flags = () =>
+      ev(`({ amb: window.__scene.lightAmbient.visible, vig: window.__scene.lightVignette.visible,
+        vw: Math.round(window.__scene.lightVignette.displayWidth), cw: Math.round(window.__scene.cameras.main.displayWidth) })`) as Promise<{
+        amb: boolean;
+        vig: boolean;
+        vw: number;
+        cw: number;
+      }>;
+    await setQuality("high");
+    await sleep(500);
+    const fHigh = await flags();
+    must(fHigh.amb && fHigh.vig, "bậc Cao: cả ánh sáng môi trường lẫn vignette hiện");
+    must(
+      fHigh.vw >= fHigh.cw,
+      `ảnh phủ che đủ khung nhìn (${fHigh.vw} >= ${fHigh.cw} px thế giới)`,
+    );
+    const lumaHigh = await luma();
+    const lumaHigh2 = await luma();
+    await T.shot("map-light-cao");
+    await setQuality("low");
+    await sleep(500);
+    const fLow = await flags();
+    must(!fLow.amb && !fLow.vig, "bậc Thấp: cả hai đều tắt");
+    const lumaLow = await luma();
+    await T.shot("map-light-thap");
+    const corners = ["tl", "tr", "bl", "br"] as const;
+    for (const k of corners) {
+      const ctl = Math.abs(lumaHigh[k] / lumaHigh2[k] - 1);
+      must(
+        ctl < 0.05,
+        `đối chứng góc ${k}: hai ảnh cùng bậc khác ${(ctl * 100).toFixed(1)} % (< 5 %)`,
+      );
+      const ratio = lumaHigh[k] / lumaLow[k];
+      must(
+        ratio < 0.9,
+        `góc ${k} tối đi khi bật vignette: độ sáng ${lumaHigh[k].toFixed(0)} / ${lumaLow[k].toFixed(0)} = ${ratio.toFixed(2)} (< 0,9)`,
+      );
+    }
+    const cRatio = Math.abs(lumaHigh.c / lumaLow.c - 1);
+    must(
+      cRatio < 0.1,
+      `giữa màn hình gần như không đổi (${(cRatio * 100).toFixed(1)} % < 10 %): vùng chơi sạch`,
+    );
+    ok(
+      `ánh sáng: góc tối ${corners.map((k) => (lumaHigh[k] / lumaLow[k]).toFixed(2)).join(" / ")} so với bậc Thấp, giữa màn hình đổi ${(cRatio * 100).toFixed(1)} %`,
+    );
+    // Draw call: bật / tắt hai ảnh phủ trực tiếp (cùng bậc, cùng cảnh)
+    await setQuality("high");
+    await sleep(500);
+    const drawsWithLight = (on: boolean) =>
+      ev(`new Promise((resolve) => { const s = window.__scene, g = s.game, gl = g.renderer.gl;
+        if (!gl) return resolve(-1); s.lightAmbient.setVisible(${on}); s.lightVignette.setVisible(${on});
+        let draws = 0, f = 0; const de = gl.drawElements, da = gl.drawArrays;
+        gl.drawElements = function () { draws++; return de.apply(this, arguments); };
+        gl.drawArrays = function () { draws++; return da.apply(this, arguments); };
+        const on2 = () => { if (++f > 30) { g.events.off('postrender', on2); gl.drawElements = de; gl.drawArrays = da; resolve(draws / 30); } };
+        g.events.on('postrender', on2); })`) as Promise<number>;
+    const dOff = Number(await drawsWithLight(false));
+    const dOn = Number(await drawsWithLight(true));
+    must(dOff >= 0, "renderer là WebGL");
+    must(
+      dOn - dOff <= 2.01,
+      `hai ảnh phủ thêm <= 2 draw call mỗi khung (tắt ${dOff.toFixed(1)}, bật ${dOn.toFixed(1)})`,
+    );
+    ok(
+      `draw call mỗi khung: tắt ${dOff.toFixed(1)} -> bật ${dOn.toFixed(1)} (+${(dOn - dOff).toFixed(1)})`,
+    );
+
     must(T.errors.length === 0, `0 lỗi console / exception (${T.errors.slice(0, 2).join(" | ")})`);
     ok("0 lỗi console / exception");
     out("\n=== E2E LỚP TRANG TRÍ ĐẠT ===");
