@@ -145,6 +145,7 @@ async function runLeakTest() {
   const chromeProcess = spawn("google-chrome", [
     "--headless=new",
     `--remote-debugging-port=${CDP_PORT}`,
+    "--enable-precise-memory-info", // không có cờ này performance.memory bị làm nhiễu / lượng tử hoá (±2 MB), phép đo heap dao động
     `--user-data-dir=${tmpChromeDir}`,
     "--no-sandbox",
     "--disable-gpu",
@@ -245,38 +246,19 @@ async function runLeakTest() {
       return r?.result?.result?.value;
     };
 
-    // Khởi động 1 chu kỳ warm-up để khởi tạo sẵn các pool đối tượng (emitter, BitmapText)
-    await cdpSend("Runtime.evaluate", {
-      expression: `
-        if (window.__ui) {
-          window.__ui.toggleCharModal(true);
-          window.__ui.closeAllModals();
+    // Dọn rác 3 lần liên tiếp rồi mới đọc heap: một lần GC thường để sót các đối tượng thế hệ già, đọc lệch +-1,5 MB giữa các lần chạy
+    const settleHeap = async () => {
+      for (let g = 0; g < 3; g++) {
+        try {
+          await cdpSend("HeapProfiler.collectGarbage");
+        } catch {
+          // Bỏ qua nếu trình duyệt không hỗ trợ HeapProfiler
         }
-        if (window.__scene?.fx) {
-          window.__scene.fx.play("hit-spark", 100, 100, { priority: 2 });
-          window.__scene.fx.floatNumber("+99", 100, 100, { color: 0x44ff44, size: 16 });
-        }
-      `,
-    });
-    // Ép buộc dọn rác (GC) trước khi đọc chỉ số ban đầu để kết quả đo heap chính xác
-    try {
-      await cdpSend("HeapProfiler.collectGarbage");
-    } catch {
-      // Bỏ qua nếu trình duyệt không hỗ trợ HeapProfiler
-    }
-    await sleep(300);
-
-    const initial = await readMetrics();
-    console.log(
-      `- Ban đầu: Textures=${initial.textures} (VRAM ${(initial.vramBytes / 1048576).toFixed(2)} MB) | GameObjects=${initial.gameObjects} (Base=${initial.gameObjects - initial.bitmapTexts}, BitmapTexts=${initial.bitmapTexts}) | Heap=${(initial.heapBytes / 1048576).toFixed(1)} MB`,
-    );
-
-    console.log(
-      `- Đang thực hiện ${iterations} chu kỳ mở/đóng modal, tương tác hiệu ứng & dựng lại bản đồ...`,
-    );
-    for (let cycle = 1; cycle <= iterations; cycle++) {
-      await cdpSend("Runtime.evaluate", {
-        expression: `
+        await sleep(150);
+      }
+    };
+    // Một chu kỳ của phép đo (modal + hiệu ứng + dựng lại bản đồ). Dùng chung cho giai đoạn khởi động và giai đoạn đo.
+    const CYCLE_EXPR = `
           if (window.__ui) {
             window.__ui.toggleCharModal(true);
             window.__ui.toggleInventory(true);
@@ -292,18 +274,35 @@ async function runLeakTest() {
               window.__scene.buildMapVisuals();
             }
           }
-        `,
-      });
+        `;
+    // Khởi động: vài chu kỳ ĐẦY ĐỦ (cả dựng lại bản đồ) trước khi đọc chỉ số ban đầu. Lần dựng lại đầu tiên làm V8 / Phaser
+    // nạp bộ nhớ đệm một lần (~2 MB heap, đo bằng 150 chu kỳ riêng: sau đó chỉ ~20 KB mỗi lần), không phải rò rỉ; không khởi
+    // động thì ngưỡng 10 % trên 20 chu kỳ dao động quanh 9-11 % tuỳ lần chạy.
+    const WARMUP_CYCLES = 8;
+    for (let w = 0; w < WARMUP_CYCLES; w++) {
+      await cdpSend("Runtime.evaluate", { expression: CYCLE_EXPR });
+      await sleep(80);
+    }
+    // Ép buộc dọn rác (GC) trước khi đọc chỉ số ban đầu để kết quả đo heap chính xác
+    await settleHeap();
+    await sleep(300);
+
+    const initial = await readMetrics();
+    console.log(
+      `- Ban đầu: Textures=${initial.textures} (VRAM ${(initial.vramBytes / 1048576).toFixed(2)} MB) | GameObjects=${initial.gameObjects} (Base=${initial.gameObjects - initial.bitmapTexts}, BitmapTexts=${initial.bitmapTexts}) | Heap=${(initial.heapBytes / 1048576).toFixed(1)} MB`,
+    );
+
+    console.log(
+      `- Đang thực hiện ${iterations} chu kỳ mở/đóng modal, tương tác hiệu ứng & dựng lại bản đồ...`,
+    );
+    for (let cycle = 1; cycle <= iterations; cycle++) {
+      await cdpSend("Runtime.evaluate", { expression: CYCLE_EXPR });
       await sleep(120);
     }
 
     // Đợi dọn dẹp các hiệu ứng hoàn tất và ép buộc dọn rác (GC)
     await sleep(500);
-    try {
-      await cdpSend("HeapProfiler.collectGarbage");
-    } catch {
-      // Bỏ qua nếu trình duyệt không hỗ trợ HeapProfiler
-    }
+    await settleHeap();
     await sleep(300);
 
     const final = await readMetrics();
