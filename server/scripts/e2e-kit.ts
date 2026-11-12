@@ -1,12 +1,44 @@
 // Khung dùng chung cho các E2E thật hai tab Chrome (CDP): lớp `Tab` (gom lỗi console, evaluate, chờ điều kiện, ảnh chụp).
 // Tách từ `e2e-pk.ts` cho E2E mới (`e2e-tong-mon.ts`); các E2E cũ giữ bản sao riêng của chúng.
-import { mkdirSync, writeFileSync } from "node:fs";
+import type { ChildProcess } from "node:child_process";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import WebSocket from "ws";
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export const SHOTS = process.env.E2E_SHOTS ? path.resolve(process.env.E2E_SHOTS) : undefined;
 export const TIMEOUT = 15000;
+
+/**
+ * Giết cả NHÓM tiến trình của Chrome (gốc + gpu + renderer...). `spawn` PHẢI có `detached: true` (Chrome làm chủ nhóm riêng); chỉ
+ * `chrome.kill()` thì tiến trình con còn sống và ghi lại thư mục dữ liệu sau khi `rm -rf` đã chạy => sót `/tmp/tien-gioi-e2e-*-chrome-*`.
+ */
+export function killChrome(chrome: ChildProcess | null): void {
+  if (!chrome) return;
+  try {
+    if (chrome.pid) process.kill(-chrome.pid, "SIGKILL");
+    else chrome.kill("SIGKILL");
+  } catch {
+    chrome.kill("SIGKILL");
+  }
+}
+
+/** Xoá thư mục tạm sau khi Chrome đã bị giết: đợi tiến trình con tắt hẳn, xoá, đợi lần nữa rồi xoá lại (bắt phần ghi muộn). */
+export async function removeTmpDirs(...dirs: string[]): Promise<void> {
+  const rm = () => {
+    for (const d of dirs) {
+      try {
+        rmSync(d, { recursive: true, force: true });
+      } catch {
+        /* bỏ qua */
+      }
+    }
+  };
+  await sleep(1200);
+  rm();
+  await sleep(600);
+  rm();
+}
 
 /**
  * Biểu thức JS (chạy trong trang): phần tử `#id` THẤY THẬT. `!e.hidden` không đủ: thuộc tính `hidden` (hay `display: none`) của một

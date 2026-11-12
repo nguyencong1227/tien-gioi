@@ -19,7 +19,7 @@ import express from "express";
 import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { HEARTBEAT_INTERVAL_MS, HEARTBEAT_TIMEOUT_MS, RESUME_TIMEOUT_MS } from "@tien-gioi/shared";
-import { Tab, sleep, shown } from "./e2e-kit";
+import { Tab, sleep, shown, killChrome, removeTmpDirs } from "./e2e-kit";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
@@ -195,7 +195,7 @@ async function main() {
         "--window-size=1280,720",
         "about:blank",
       ],
-      { stdio: "ignore" },
+      { stdio: "ignore", detached: true },
     );
 
     let targets: any[] = [];
@@ -600,22 +600,16 @@ async function main() {
         /* ignore close error */
       }
     }
-    if (chrome) {
-      chrome.kill("SIGKILL");
-    }
+    killChrome(chrome); // cả nhóm tiến trình (detached), không chỉ tiến trình gốc
     await proxy.close();
     await new Promise<void>((r) => httpServer.close(() => r()));
-    await gameServer.gracefullyShutdown();
-    try {
-      execSync(`rm -rf "${dataDir}" "${chromeDir}"`);
-    } catch {
-      /* ignore rm error */
-    }
+    // false: mặc định Colyseus GỌI process.exit ngay trong gracefullyShutdown nên các dòng dọn dẹp phía sau không bao giờ chạy (sót thư mục /tmp/tien-gioi-e2e-*)
+    await gameServer.gracefullyShutdown(false);
+    await removeTmpDirs(dataDir, chromeDir);
   }
 
-  if (failed) {
-    process.exit(1);
-  }
+  // thoát tường minh (cùng chat-luong / dpr): gracefullyShutdown(false) không còn tự thoát, và thoát mã 1 khi đỏ
+  process.exit(failed ? 1 : 0);
 }
 
 main().catch((err) => {
