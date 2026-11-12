@@ -58,7 +58,7 @@ import { isReducedMotion } from "./a11y";
 initDisplay();
 // Chặn cử chỉ mặc định của trình duyệt trên cảm ứng (phóng to hai ngón / chạm đúp, trình đơn nhấn giữ) (#327)
 installTouchGuards();
-initUiScale(); // cỡ chữ nội dung người chơi chọn (Cài đặt -> Cỡ chữ), `--ui-scale`
+initUiScale(); // nối ô Cài đặt -> Cỡ chữ với display.ts (`setUiScale`); PHẢI sau initDisplay()
 
 // Chất lượng đồ hoạ M5 (#323): hồ sơ Thấp / Vừa / Cao, Tự động + bộ điều tốc; SAU initDisplay (cần `form`)
 initQuality(browserQualityEnv(() => getDisplay().form, isReducedMotion));
