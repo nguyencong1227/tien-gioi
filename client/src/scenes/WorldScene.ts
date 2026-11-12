@@ -1,4 +1,6 @@
 import { getDisplay } from "../gfx/display";
+import { createFxSystem, type FxSystem } from "../gfx/fx/fx";
+import { getQuality } from "../gfx/quality";
 import { fitZoom, toCssPoint } from "../gfx/scale";
 import Phaser from "phaser";
 import type { Room } from "colyseus.js";
@@ -123,14 +125,6 @@ interface SwordFxItem {
   start: number;
 }
 
-interface FloatTextItem {
-  t: Phaser.GameObjects.Text;
-  y0: number;
-  start: number;
-  lastText: string;
-  lastStyleKey: number;
-}
-
 interface LootEntity {
   root: Phaser.GameObjects.Container;
   ring: Phaser.GameObjects.Arc;
@@ -205,8 +199,8 @@ export class WorldScene extends Phaser.Scene {
   private activeSlashes: SlashFxItem[] = [];
   private swordPool: Phaser.GameObjects.Image[] = [];
   private activeSwords: SwordFxItem[] = [];
-  private floatPool: FloatTextItem[] = [];
-  private activeFloats: FloatTextItem[] = [];
+  /** Lõi hiệu ứng M5.2 (#325): chữ bay, hạt có ngân sách; B thêm công thức ở #329. */
+  fx!: FxSystem;
 
   // Bảng đo hiệu năng (?perf=1, #71)
   private perfEnabled = false;
@@ -254,6 +248,10 @@ export class WorldScene extends Phaser.Scene {
 
     this.buildMapVisuals();
     ui.setCurrentMapId(this.map.def.id);
+
+    // Lõi hiệu ứng (#325): ngân sách theo hồ sơ chất lượng; đóng cảnh thì giải phóng sạch
+    this.fx = createFxSystem(this, { getProfile: getQuality, depth: () => this.map.worldH });
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.fx.destroy());
 
     // Mũi tên chỉ hướng nhiệm vụ xoay quanh người chơi
     this.createNavArrow();
@@ -367,6 +365,7 @@ export class WorldScene extends Phaser.Scene {
     ) {
       (window as any).__game = this.game;
       (window as any).__scene = this;
+      (window as any).__fx = this.fx;
     }
   }
 
@@ -912,11 +911,7 @@ export class WorldScene extends Phaser.Scene {
     }
     this.activeSwords.length = 0;
 
-    for (const it of this.activeFloats) {
-      it.t.setVisible(false);
-      this.floatPool.push(it);
-    }
-    this.activeFloats.length = 0;
+    this.fx.clear();
 
     this.nearestLootId = null;
     this.closestNpcId = null;
@@ -2238,25 +2233,8 @@ export class WorldScene extends Phaser.Scene {
       }
     }
 
-    // 3. Chữ sát thương bay lên (800ms, Cubic.easeOut; reduced motion: 300ms, trôi nhẹ 8px)
-    const isReduced = isReducedMotion();
-    const floatDuration = isReduced ? 300 : 800;
-    for (let i = this.activeFloats.length - 1; i >= 0; i--) {
-      const it = this.activeFloats[i];
-      const p = (now - it.start) / floatDuration;
-      if (p >= 1) {
-        it.t.setVisible(false);
-        this.floatPool.push(it);
-        const last = this.activeFloats.pop()!;
-        if (i < this.activeFloats.length) this.activeFloats[i] = last;
-      } else if (isReduced) {
-        it.t.setY(it.y0 - 8 * p).setAlpha(1 - p);
-      } else {
-        const inv = 1 - p;
-        const ease = 1 - inv * inv * inv;
-        it.t.setY(it.y0 - 36 * ease).setAlpha(1 - ease);
-      }
-    }
+    // 3. Chữ sát thương bay lên + hạt: lõi hiệu ứng (gfx/fx; giảm chuyển động theo hồ sơ chất lượng)
+    this.fx.update(now);
   }
 
   private onFx(m: FxMsg) {
@@ -2377,38 +2355,11 @@ export class WorldScene extends Phaser.Scene {
 
   private floatText(m: DmgMsg) {
     const text = `${m.crit ? "Bạo! " : ""}${m.amount}`;
-    const styleKey = (m.toPlayer ? 2 : 0) | (m.crit ? 1 : 0);
-    const x = m.x + Phaser.Math.Between(-8, 8);
-    const y0 = m.y;
-
-    let item = this.floatPool.pop();
-    if (!item) {
-      const t = this.add
-        .text(x, y0, text, {
-          fontFamily: '"Noto Serif", Georgia, serif',
-          fontSize: m.crit ? "20px" : "15px",
-          color: m.toPlayer ? "#ff6b5e" : m.crit ? "#ffd34d" : "#ffffff",
-          stroke: "#1d1a16",
-          strokeThickness: 3,
-          fontStyle: "bold",
-        })
-        .setOrigin(0.5)
-        .setDepth(this.map.worldH + 1);
-      item = { t, y0, start: this.time.now, lastText: text, lastStyleKey: styleKey };
-    } else {
-      if (item.lastStyleKey !== styleKey) {
-        item.t.setFontSize(m.crit ? "20px" : "15px");
-        item.t.setColor(m.toPlayer ? "#ff6b5e" : m.crit ? "#ffd34d" : "#ffffff");
-        item.lastStyleKey = styleKey;
-      }
-      if (item.lastText !== text) {
-        item.t.setText(text);
-        item.lastText = text;
-      }
-      item.t.setPosition(x, y0).setAlpha(1).setVisible(true);
-      item.y0 = y0;
-      item.start = this.time.now;
-    }
-    this.activeFloats.push(item);
+    this.fx.floatNumber(text, m.x + Phaser.Math.Between(-8, 8), m.y, {
+      color: m.toPlayer ? 0xff6b5e : m.crit ? 0xffd34d : 0xffffff,
+      size: m.crit ? 20 : 15,
+      // Mình bị đánh = ưu tiên 2 (không bao giờ bị bỏ khi đông); sát thương khác = 1 (DmgMsg không có người đánh)
+      priority: m.target === this.sid ? 2 : 1,
+    });
   }
 }
