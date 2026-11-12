@@ -3,8 +3,15 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import { evaluatePerfResults, formatSummary, parseOverlayCounts } from "./perf-gate.mjs";
+import {
+  OWN_OVERSHOOT,
+  evaluatePerfResults,
+  formatSummary,
+  parseOverlayCounts,
+} from "./perf-gate.mjs";
+import { MIN_FX_PLAYED } from "./fx-driver.mjs";
 import { formatPerfLines } from "../src/gfx/perf-overlay";
+import { OWN_OVERSHOOT as REAL_OWN_OVERSHOOT } from "../src/gfx/fx/budget";
 
 const repo = path.resolve(__dirname, "../..");
 const budget = JSON.parse(fs.readFileSync(path.join(repo, "client/perf-budget.json"), "utf8"));
@@ -141,6 +148,139 @@ describe("M5.1 #330: perf-gate (cổng ngân sách cho perf:mobile)", () => {
       const cap = budget.runtime.tiers.low.drawCalls as number;
       const over = ok("a", "low", { drawCallsP95: cap + 1 });
       expect(evaluatePerfResults([over], budget, { timeSlack: 3 }).ok).toBe(false);
+    });
+  });
+
+  describe("hiệu ứng bắn THẬT (#400): cổng chặn trên ĐỈNH trong cả cửa sổ lấy mẫu", () => {
+    // kịch bản có bắn hiệu ứng thật (đúng hình dạng measure-mobile-perf.mjs): hạt / emitter / chữ bay là ĐỈNH
+    const okFx = (id: string, tier: "low" | "mid" | "high", over: Record<string, unknown> = {}) =>
+      ok(id, tier, {
+        fxPlan: "combat",
+        fxPlayed: 60,
+        fxDropped: 8,
+        particlesPeak: 40,
+        emittersPeak: 3,
+        floatsPeak: 5,
+        ...over,
+      });
+
+    it("hằng OWN_OVERSHOOT của cổng TRÙNG hằng thật trong budget.ts (ưu tiên 2 vượt trần tới gấp đôi); MIN_FX_PLAYED hợp lý", () => {
+      expect(OWN_OVERSHOOT).toBe(REAL_OWN_OVERSHOOT);
+      expect(MIN_FX_PLAYED).toBeGreaterThanOrEqual(5);
+    });
+
+    it("đỉnh vượt trần DANH NGHĨA nhưng trong trần CỨNG (trần x OWN_OVERSHOOT) -> XANH (thiết kế: ưu tiên 2); vượt trần cứng -> ĐỎ", () => {
+      const t = budget.runtime.tiers.low;
+      // số thật đo được ở bậc Thấp: hạt 68-80 / 60, emitter 8 / 4 (docs 7.1: ưu tiên 2 tới gấp đôi)
+      const real = okFx("a", "low", { particlesPeak: 80, emittersPeak: 8, floatsPeak: 8 });
+      expect(evaluatePerfResults([real], budget).ok).toBe(true);
+      const hard = okFx("a", "low", {
+        particlesPeak: t.peakParticles * OWN_OVERSHOOT,
+        emittersPeak: t.emitterBudget * OWN_OVERSHOOT,
+        floatsPeak: t.damageNumbers,
+      });
+      expect(evaluatePerfResults([hard], budget).ok).toBe(true);
+      const over = okFx("a", "low", {
+        particlesPeak: t.peakParticles * OWN_OVERSHOOT + 1,
+        emittersPeak: t.emitterBudget * OWN_OVERSHOOT + 1,
+        floatsPeak: t.damageNumbers + 1,
+      });
+      const ev = evaluatePerfResults([over], budget);
+      expect(ev.ok).toBe(false);
+      expect(ev.violations.map((v) => v.metric)).toEqual([
+        "đỉnh hạt (fx)",
+        "đỉnh emitter (fx)",
+        "đỉnh chữ bay (fx)",
+      ]);
+    });
+
+    it("kịch bản bắn hiệu ứng KHÔNG bị chặn bởi số hạt SỐNG lúc lớp phủ vẽ cuối (có thể > trần danh nghĩa); kịch bản không bắn thì vẫn chặn như cũ", () => {
+      const t = budget.runtime.tiers.low;
+      expect(
+        evaluatePerfResults(
+          [okFx("a", "low", { particles: t.peakParticles + 30, emitters: t.emitterBudget + 3 })],
+          budget,
+        ).ok,
+      ).toBe(true);
+      const plain = ok("b", "low", { particles: t.peakParticles + 1 });
+      expect(evaluatePerfResults([plain], budget).ok).toBe(false);
+    });
+
+    it("đột biến: không bắn được (fxPlayed null / thiếu / < MIN_FX_PLAYED) -> ĐỎ, không xanh giả", () => {
+      for (const played of [null, undefined, NaN, -1, 0, MIN_FX_PLAYED - 1, "60"]) {
+        const ev = evaluatePerfResults([okFx("a", "mid", { fxPlayed: played })], budget);
+        expect(ev.ok, `fxPlayed=${String(played)}`).toBe(false);
+        expect(ev.violations.map((v) => v.metric)).toEqual(["số hiệu ứng bắn thật phát được"]);
+      }
+      expect(evaluatePerfResults([okFx("a", "mid", { fxPlayed: MIN_FX_PLAYED })], budget).ok).toBe(
+        true,
+      );
+    });
+
+    it("đột biến: tắt việc bắn (mọi số đỉnh null do báo cáo không đọc được) -> ĐỎ 'thiếu số đo' cho cả hạt / emitter / chữ bay", () => {
+      const off = okFx("a", "high", {
+        fxPlayed: null,
+        particlesPeak: null,
+        emittersPeak: null,
+        floatsPeak: null,
+      });
+      const ev = evaluatePerfResults([off], budget);
+      expect(ev.ok).toBe(false);
+      expect(ev.violations.map((v) => v.metric)).toEqual(
+        expect.arrayContaining([
+          "đỉnh hạt (fx)",
+          "đỉnh emitter (fx)",
+          "đỉnh chữ bay (fx)",
+          "số hiệu ứng bắn thật phát được",
+        ]),
+      );
+    });
+
+    it("đã phát đủ hiệu ứng mà đỉnh = 0 (bộ đọc đỉnh hỏng) -> ĐỎ riêng từng chỉ số", () => {
+      const ev = evaluatePerfResults(
+        [okFx("a", "mid", { particlesPeak: 0, emittersPeak: 0, floatsPeak: 0 })],
+        budget,
+      );
+      expect(ev.violations.map((v) => v.metric)).toEqual([
+        "đỉnh hạt (fx)",
+        "đỉnh emitter (fx)",
+        "đỉnh chữ bay (fx)",
+      ]);
+      expect(ev.violations.every((v) => v.actual === 0)).toBe(true);
+    });
+
+    it("ngân sách thiếu khoá `damageNumbers` / `peakParticles` -> ĐỎ (không so với undefined)", () => {
+      const b = JSON.parse(JSON.stringify(budget));
+      delete b.runtime.tiers.mid.damageNumbers;
+      delete b.runtime.tiers.high.peakParticles;
+      const ev = evaluatePerfResults([okFx("m", "mid"), okFx("h", "high")], b);
+      expect(ev.violations.map((v) => `${v.id}: ${v.metric}`)).toEqual([
+        "m: ngân sách của đỉnh chữ bay (fx)",
+        "h: ngân sách của đỉnh hạt (fx)",
+      ]);
+    });
+
+    it("bản tóm tắt có cột 'Hiệu ứng bắn thật' (kế hoạch, phát / bỏ, đỉnh / trần cứng); kịch bản không bắn ghi '-'", () => {
+      const ev = evaluatePerfResults(
+        [
+          okFx("burst", "low", {
+            fxPlan: "burst",
+            fxPlayed: 85,
+            fxDropped: 53,
+            particlesPeak: 80,
+            emittersPeak: 8,
+            floatsPeak: 8,
+            particleLimit: 60,
+            emitterLimit: 4,
+          }),
+          ok("solo", "low"),
+        ],
+        budget,
+      );
+      const md = formatSummary(ev);
+      expect(md).toContain("Hiệu ứng bắn thật");
+      expect(md).toContain("burst: 85 / 53; 80/120 · 8/8 · 8/8");
+      expect(md).toMatch(/`solo`\).*\| - \|/);
     });
   });
 
