@@ -1056,19 +1056,8 @@ button {
 
 /* Bảng túi đồ (6x4 ô) */
 #inv-modal {
-  position: fixed;
+  --sheet-w: 430px;
   z-index: 14;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: min(94vw, 430px);
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  background: rgba(24, 21, 18, 0.94);
-  border: 1px solid var(--gold);
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65);
 }
 .inv-head {
   display: flex;
@@ -1378,9 +1367,7 @@ body.low-fx #btn-talk {
 
 /* Bảng nhân vật & Trang bị (Phím C - #31) */
 #char-modal {
-  width: min(95vw, 460px);
-  max-height: 92dvh;
-  overflow-y: auto;
+  --sheet-w: 460px;
 }
 .char-body {
   display: flex;
@@ -1803,7 +1790,7 @@ body.low-fx #btn-talk {
     height: 48px;
   }
   /* Điện thoại: các modal mở toàn màn hình, nút tối thiểu 44 px */
-  .modal-box {
+  .modal-box:not(.sheet) {
     inset: 0;
     top: 0;
     left: 0;
@@ -1896,7 +1883,7 @@ body.low-fx #btn-talk {
     width: 76px;
     height: 76px;
   }
-  .modal-box {
+  .modal-box:not(.sheet) {
     overflow-y: auto;
     justify-content: flex-start;
   }
