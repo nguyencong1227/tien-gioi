@@ -32,6 +32,7 @@ import { setupNativeApp, getOutdatedUiConfig, getAppUpdateUrl } from "./native-a
 import { HeartbeatController } from "./heartbeat";
 import { sound } from "./audio";
 import { initDisplay } from "./gfx/display";
+import { installTouchGuards } from "./touch";
 import { getDisplay, onDisplayChange, setRenderScale } from "./gfx/display";
 import {
   browserQualityEnv,
@@ -54,6 +55,8 @@ import { isReducedMotion } from "./a11y";
 
 // Lõi hiển thị M5 (#322): đặt data-form / data-orient / data-input và --safe-*, --vw, --vh lên <html> SỚM, trước khi dựng giao diện.
 initDisplay();
+// Chặn cử chỉ mặc định của trình duyệt trên cảm ứng (phóng to hai ngón / chạm đúp, trình đơn nhấn giữ) (#327)
+installTouchGuards();
 
 // Chất lượng đồ hoạ M5 (#323): hồ sơ Thấp / Vừa / Cao, Tự động + bộ điều tốc; SAU initDisplay (cần `form`)
 initQuality(browserQualityEnv(() => getDisplay().form, isReducedMotion));
