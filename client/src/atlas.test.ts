@@ -62,4 +62,29 @@ describe("atlas.json / atlas.png (sinh bằng gen-assets.mjs)", () => {
       }
     }
   });
+
+  it("5 bộ người chơi (me, other, 3 pháp bào) đủ khung bị đánh 4 hướng và gục 4 khung cùng kích thước khung đứng", () => {
+    for (const who of [
+      "me",
+      "other",
+      "robe-tho_nhung_bao",
+      "robe-hac_ho_bao",
+      "robe-xich_lan_bao",
+    ]) {
+      const idle = atlas.frames[`${who}-idle-down`];
+      expect(idle, `${who}-idle-down`).toBeDefined();
+      for (const d of ["down", "up", "left", "right"]) {
+        const f = atlas.frames[`${who}-hurt-${d}`];
+        expect(f, `${who}-hurt-${d}`).toBeDefined();
+        expect(f.frame.w).toBe(idle.frame.w);
+        expect(f.frame.h).toBe(idle.frame.h);
+      }
+      for (let i = 0; i < 4; i++) {
+        const f = atlas.frames[`${who}-die-${i}`];
+        expect(f, `${who}-die-${i}`).toBeDefined();
+        expect(f.frame.w).toBe(idle.frame.w);
+        expect(f.frame.h).toBe(idle.frame.h);
+      }
+    }
+  });
 });

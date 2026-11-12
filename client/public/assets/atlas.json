@@ -20,9 +20,109 @@
         "h": 40
       }
     },
-    "me-idle-down": {
+    "me-die-0": {
       "frame": {
         "x": 36,
+        "y": 2,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "me-die-1": {
+      "frame": {
+        "x": 70,
+        "y": 2,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "me-die-2": {
+      "frame": {
+        "x": 104,
+        "y": 2,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "me-die-3": {
+      "frame": {
+        "x": 138,
+        "y": 2,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "me-hurt-down": {
+      "frame": {
+        "x": 172,
+        "y": 2,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "me-idle-down": {
+      "frame": {
+        "x": 206,
         "y": 2,
         "w": 32,
         "h": 40
@@ -42,7 +142,7 @@
     },
     "me-walk-down-0": {
       "frame": {
-        "x": 70,
+        "x": 240,
         "y": 2,
         "w": 32,
         "h": 40
@@ -62,7 +162,7 @@
     },
     "me-walk-down-1": {
       "frame": {
-        "x": 104,
+        "x": 274,
         "y": 2,
         "w": 32,
         "h": 40
@@ -82,7 +182,7 @@
     },
     "me-walk-down-2": {
       "frame": {
-        "x": 138,
+        "x": 308,
         "y": 2,
         "w": 32,
         "h": 40
@@ -102,7 +202,7 @@
     },
     "me-walk-down-3": {
       "frame": {
-        "x": 172,
+        "x": 342,
         "y": 2,
         "w": 32,
         "h": 40
@@ -122,7 +222,7 @@
     },
     "me-slash-down-0": {
       "frame": {
-        "x": 206,
+        "x": 376,
         "y": 2,
         "w": 32,
         "h": 40
@@ -142,7 +242,7 @@
     },
     "me-slash-down-1": {
       "frame": {
-        "x": 240,
+        "x": 410,
         "y": 2,
         "w": 32,
         "h": 40
@@ -162,7 +262,27 @@
     },
     "me-slash-down-2": {
       "frame": {
-        "x": 274,
+        "x": 444,
+        "y": 2,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "me-hurt-up": {
+      "frame": {
+        "x": 478,
         "y": 2,
         "w": 32,
         "h": 40
@@ -182,7 +302,7 @@
     },
     "me-idle-up": {
       "frame": {
-        "x": 308,
+        "x": 512,
         "y": 2,
         "w": 32,
         "h": 40
@@ -202,7 +322,7 @@
     },
     "me-walk-up-0": {
       "frame": {
-        "x": 342,
+        "x": 546,
         "y": 2,
         "w": 32,
         "h": 40
@@ -222,7 +342,7 @@
     },
     "me-walk-up-1": {
       "frame": {
-        "x": 376,
+        "x": 580,
         "y": 2,
         "w": 32,
         "h": 40
@@ -242,8 +362,8 @@
     },
     "me-walk-up-2": {
       "frame": {
-        "x": 410,
-        "y": 2,
+        "x": 2,
+        "y": 44,
         "w": 32,
         "h": 40
       },
@@ -262,8 +382,8 @@
     },
     "me-walk-up-3": {
       "frame": {
-        "x": 444,
-        "y": 2,
+        "x": 36,
+        "y": 44,
         "w": 32,
         "h": 40
       },
@@ -282,8 +402,8 @@
     },
     "me-slash-up-0": {
       "frame": {
-        "x": 478,
-        "y": 2,
+        "x": 70,
+        "y": 44,
         "w": 32,
         "h": 40
       },
@@ -302,8 +422,8 @@
     },
     "me-slash-up-1": {
       "frame": {
-        "x": 512,
-        "y": 2,
+        "x": 104,
+        "y": 44,
         "w": 32,
         "h": 40
       },
@@ -322,8 +442,28 @@
     },
     "me-slash-up-2": {
       "frame": {
-        "x": 546,
-        "y": 2,
+        "x": 138,
+        "y": 44,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "me-hurt-left": {
+      "frame": {
+        "x": 172,
+        "y": 44,
         "w": 32,
         "h": 40
       },
@@ -342,8 +482,8 @@
     },
     "me-idle-left": {
       "frame": {
-        "x": 580,
-        "y": 2,
+        "x": 206,
+        "y": 44,
         "w": 32,
         "h": 40
       },
@@ -362,7 +502,7 @@
     },
     "me-walk-left-0": {
       "frame": {
-        "x": 2,
+        "x": 240,
         "y": 44,
         "w": 32,
         "h": 40
@@ -382,7 +522,7 @@
     },
     "me-walk-left-1": {
       "frame": {
-        "x": 36,
+        "x": 274,
         "y": 44,
         "w": 32,
         "h": 40
@@ -402,7 +542,7 @@
     },
     "me-walk-left-2": {
       "frame": {
-        "x": 70,
+        "x": 308,
         "y": 44,
         "w": 32,
         "h": 40
@@ -422,7 +562,7 @@
     },
     "me-walk-left-3": {
       "frame": {
-        "x": 104,
+        "x": 342,
         "y": 44,
         "w": 32,
         "h": 40
@@ -442,7 +582,7 @@
     },
     "me-slash-left-0": {
       "frame": {
-        "x": 138,
+        "x": 376,
         "y": 44,
         "w": 32,
         "h": 40
@@ -462,7 +602,7 @@
     },
     "me-slash-left-1": {
       "frame": {
-        "x": 172,
+        "x": 410,
         "y": 44,
         "w": 32,
         "h": 40
@@ -482,7 +622,27 @@
     },
     "me-slash-left-2": {
       "frame": {
-        "x": 206,
+        "x": 444,
+        "y": 44,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "me-hurt-right": {
+      "frame": {
+        "x": 478,
         "y": 44,
         "w": 32,
         "h": 40
@@ -502,7 +662,7 @@
     },
     "me-idle-right": {
       "frame": {
-        "x": 240,
+        "x": 512,
         "y": 44,
         "w": 32,
         "h": 40
@@ -522,7 +682,7 @@
     },
     "me-walk-right-0": {
       "frame": {
-        "x": 274,
+        "x": 546,
         "y": 44,
         "w": 32,
         "h": 40
@@ -542,7 +702,7 @@
     },
     "me-walk-right-1": {
       "frame": {
-        "x": 308,
+        "x": 580,
         "y": 44,
         "w": 32,
         "h": 40
@@ -562,8 +722,8 @@
     },
     "me-walk-right-2": {
       "frame": {
-        "x": 342,
-        "y": 44,
+        "x": 2,
+        "y": 86,
         "w": 32,
         "h": 40
       },
@@ -582,8 +742,8 @@
     },
     "me-walk-right-3": {
       "frame": {
-        "x": 376,
-        "y": 44,
+        "x": 36,
+        "y": 86,
         "w": 32,
         "h": 40
       },
@@ -602,8 +762,8 @@
     },
     "me-slash-right-0": {
       "frame": {
-        "x": 410,
-        "y": 44,
+        "x": 70,
+        "y": 86,
         "w": 32,
         "h": 40
       },
@@ -622,8 +782,8 @@
     },
     "me-slash-right-1": {
       "frame": {
-        "x": 444,
-        "y": 44,
+        "x": 104,
+        "y": 86,
         "w": 32,
         "h": 40
       },
@@ -642,8 +802,8 @@
     },
     "me-slash-right-2": {
       "frame": {
-        "x": 478,
-        "y": 44,
+        "x": 138,
+        "y": 86,
         "w": 32,
         "h": 40
       },
@@ -662,8 +822,108 @@
     },
     "other": {
       "frame": {
-        "x": 512,
-        "y": 44,
+        "x": 172,
+        "y": 86,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "other-die-0": {
+      "frame": {
+        "x": 206,
+        "y": 86,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "other-die-1": {
+      "frame": {
+        "x": 240,
+        "y": 86,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "other-die-2": {
+      "frame": {
+        "x": 274,
+        "y": 86,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "other-die-3": {
+      "frame": {
+        "x": 308,
+        "y": 86,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "other-hurt-down": {
+      "frame": {
+        "x": 342,
+        "y": 86,
         "w": 32,
         "h": 40
       },
@@ -682,8 +942,8 @@
     },
     "other-idle-down": {
       "frame": {
-        "x": 546,
-        "y": 44,
+        "x": 376,
+        "y": 86,
         "w": 32,
         "h": 40
       },
@@ -702,8 +962,8 @@
     },
     "other-walk-down-0": {
       "frame": {
-        "x": 580,
-        "y": 44,
+        "x": 410,
+        "y": 86,
         "w": 32,
         "h": 40
       },
@@ -722,7 +982,7 @@
     },
     "other-walk-down-1": {
       "frame": {
-        "x": 2,
+        "x": 444,
         "y": 86,
         "w": 32,
         "h": 40
@@ -742,7 +1002,7 @@
     },
     "other-walk-down-2": {
       "frame": {
-        "x": 36,
+        "x": 478,
         "y": 86,
         "w": 32,
         "h": 40
@@ -762,7 +1022,7 @@
     },
     "other-walk-down-3": {
       "frame": {
-        "x": 70,
+        "x": 512,
         "y": 86,
         "w": 32,
         "h": 40
@@ -782,7 +1042,7 @@
     },
     "other-slash-down-0": {
       "frame": {
-        "x": 104,
+        "x": 546,
         "y": 86,
         "w": 32,
         "h": 40
@@ -802,7 +1062,7 @@
     },
     "other-slash-down-1": {
       "frame": {
-        "x": 138,
+        "x": 580,
         "y": 86,
         "w": 32,
         "h": 40
@@ -822,8 +1082,28 @@
     },
     "other-slash-down-2": {
       "frame": {
-        "x": 172,
-        "y": 86,
+        "x": 2,
+        "y": 128,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "other-hurt-up": {
+      "frame": {
+        "x": 36,
+        "y": 128,
         "w": 32,
         "h": 40
       },
@@ -842,8 +1122,8 @@
     },
     "other-idle-up": {
       "frame": {
-        "x": 206,
-        "y": 86,
+        "x": 70,
+        "y": 128,
         "w": 32,
         "h": 40
       },
@@ -862,8 +1142,8 @@
     },
     "other-walk-up-0": {
       "frame": {
-        "x": 240,
-        "y": 86,
+        "x": 104,
+        "y": 128,
         "w": 32,
         "h": 40
       },
@@ -882,8 +1162,8 @@
     },
     "other-walk-up-1": {
       "frame": {
-        "x": 274,
-        "y": 86,
+        "x": 138,
+        "y": 128,
         "w": 32,
         "h": 40
       },
@@ -902,8 +1182,8 @@
     },
     "other-walk-up-2": {
       "frame": {
-        "x": 308,
-        "y": 86,
+        "x": 172,
+        "y": 128,
         "w": 32,
         "h": 40
       },
@@ -922,8 +1202,8 @@
     },
     "other-walk-up-3": {
       "frame": {
-        "x": 342,
-        "y": 86,
+        "x": 206,
+        "y": 128,
         "w": 32,
         "h": 40
       },
@@ -942,8 +1222,8 @@
     },
     "other-slash-up-0": {
       "frame": {
-        "x": 376,
-        "y": 86,
+        "x": 240,
+        "y": 128,
         "w": 32,
         "h": 40
       },
@@ -962,8 +1242,8 @@
     },
     "other-slash-up-1": {
       "frame": {
-        "x": 410,
-        "y": 86,
+        "x": 274,
+        "y": 128,
         "w": 32,
         "h": 40
       },
@@ -982,8 +1262,28 @@
     },
     "other-slash-up-2": {
       "frame": {
-        "x": 444,
-        "y": 86,
+        "x": 308,
+        "y": 128,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "other-hurt-left": {
+      "frame": {
+        "x": 342,
+        "y": 128,
         "w": 32,
         "h": 40
       },
@@ -1002,8 +1302,8 @@
     },
     "other-idle-left": {
       "frame": {
-        "x": 478,
-        "y": 86,
+        "x": 376,
+        "y": 128,
         "w": 32,
         "h": 40
       },
@@ -1022,8 +1322,8 @@
     },
     "other-walk-left-0": {
       "frame": {
-        "x": 512,
-        "y": 86,
+        "x": 410,
+        "y": 128,
         "w": 32,
         "h": 40
       },
@@ -1042,8 +1342,8 @@
     },
     "other-walk-left-1": {
       "frame": {
-        "x": 546,
-        "y": 86,
+        "x": 444,
+        "y": 128,
         "w": 32,
         "h": 40
       },
@@ -1062,8 +1362,8 @@
     },
     "other-walk-left-2": {
       "frame": {
-        "x": 580,
-        "y": 86,
+        "x": 478,
+        "y": 128,
         "w": 32,
         "h": 40
       },
@@ -1082,7 +1382,7 @@
     },
     "other-walk-left-3": {
       "frame": {
-        "x": 2,
+        "x": 512,
         "y": 128,
         "w": 32,
         "h": 40
@@ -1102,7 +1402,7 @@
     },
     "other-slash-left-0": {
       "frame": {
-        "x": 36,
+        "x": 546,
         "y": 128,
         "w": 32,
         "h": 40
@@ -1122,7 +1422,7 @@
     },
     "other-slash-left-1": {
       "frame": {
-        "x": 70,
+        "x": 580,
         "y": 128,
         "w": 32,
         "h": 40
@@ -1142,8 +1442,28 @@
     },
     "other-slash-left-2": {
       "frame": {
-        "x": 104,
-        "y": 128,
+        "x": 2,
+        "y": 170,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "other-hurt-right": {
+      "frame": {
+        "x": 36,
+        "y": 170,
         "w": 32,
         "h": 40
       },
@@ -1162,8 +1482,8 @@
     },
     "other-idle-right": {
       "frame": {
-        "x": 138,
-        "y": 128,
+        "x": 70,
+        "y": 170,
         "w": 32,
         "h": 40
       },
@@ -1182,8 +1502,8 @@
     },
     "other-walk-right-0": {
       "frame": {
-        "x": 172,
-        "y": 128,
+        "x": 104,
+        "y": 170,
         "w": 32,
         "h": 40
       },
@@ -1202,8 +1522,8 @@
     },
     "other-walk-right-1": {
       "frame": {
-        "x": 206,
-        "y": 128,
+        "x": 138,
+        "y": 170,
         "w": 32,
         "h": 40
       },
@@ -1222,8 +1542,8 @@
     },
     "other-walk-right-2": {
       "frame": {
-        "x": 240,
-        "y": 128,
+        "x": 172,
+        "y": 170,
         "w": 32,
         "h": 40
       },
@@ -1242,8 +1562,8 @@
     },
     "other-walk-right-3": {
       "frame": {
-        "x": 274,
-        "y": 128,
+        "x": 206,
+        "y": 170,
         "w": 32,
         "h": 40
       },
@@ -1262,8 +1582,8 @@
     },
     "other-slash-right-0": {
       "frame": {
-        "x": 308,
-        "y": 128,
+        "x": 240,
+        "y": 170,
         "w": 32,
         "h": 40
       },
@@ -1282,8 +1602,8 @@
     },
     "other-slash-right-1": {
       "frame": {
-        "x": 342,
-        "y": 128,
+        "x": 274,
+        "y": 170,
         "w": 32,
         "h": 40
       },
@@ -1302,8 +1622,8 @@
     },
     "other-slash-right-2": {
       "frame": {
-        "x": 376,
-        "y": 128,
+        "x": 308,
+        "y": 170,
         "w": 32,
         "h": 40
       },
@@ -1322,8 +1642,108 @@
     },
     "robe-tho_nhung_bao": {
       "frame": {
+        "x": 342,
+        "y": 170,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-tho_nhung_bao-die-0": {
+      "frame": {
+        "x": 376,
+        "y": 170,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-tho_nhung_bao-die-1": {
+      "frame": {
         "x": 410,
-        "y": 128,
+        "y": 170,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-tho_nhung_bao-die-2": {
+      "frame": {
+        "x": 444,
+        "y": 170,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-tho_nhung_bao-die-3": {
+      "frame": {
+        "x": 478,
+        "y": 170,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-tho_nhung_bao-hurt-down": {
+      "frame": {
+        "x": 512,
+        "y": 170,
         "w": 32,
         "h": 40
       },
@@ -1342,8 +1762,8 @@
     },
     "robe-tho_nhung_bao-idle-down": {
       "frame": {
-        "x": 444,
-        "y": 128,
+        "x": 546,
+        "y": 170,
         "w": 32,
         "h": 40
       },
@@ -1362,8 +1782,8 @@
     },
     "robe-tho_nhung_bao-walk-down-0": {
       "frame": {
-        "x": 478,
-        "y": 128,
+        "x": 580,
+        "y": 170,
         "w": 32,
         "h": 40
       },
@@ -1382,8 +1802,8 @@
     },
     "robe-tho_nhung_bao-walk-down-1": {
       "frame": {
-        "x": 512,
-        "y": 128,
+        "x": 2,
+        "y": 212,
         "w": 32,
         "h": 40
       },
@@ -1402,8 +1822,8 @@
     },
     "robe-tho_nhung_bao-walk-down-2": {
       "frame": {
-        "x": 546,
-        "y": 128,
+        "x": 36,
+        "y": 212,
         "w": 32,
         "h": 40
       },
@@ -1422,8 +1842,8 @@
     },
     "robe-tho_nhung_bao-walk-down-3": {
       "frame": {
-        "x": 580,
-        "y": 128,
+        "x": 70,
+        "y": 212,
         "w": 32,
         "h": 40
       },
@@ -1442,8 +1862,8 @@
     },
     "robe-tho_nhung_bao-slash-down-0": {
       "frame": {
-        "x": 2,
-        "y": 170,
+        "x": 104,
+        "y": 212,
         "w": 32,
         "h": 40
       },
@@ -1462,8 +1882,8 @@
     },
     "robe-tho_nhung_bao-slash-down-1": {
       "frame": {
-        "x": 36,
-        "y": 170,
+        "x": 138,
+        "y": 212,
         "w": 32,
         "h": 40
       },
@@ -1482,8 +1902,28 @@
     },
     "robe-tho_nhung_bao-slash-down-2": {
       "frame": {
-        "x": 70,
-        "y": 170,
+        "x": 172,
+        "y": 212,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-tho_nhung_bao-hurt-up": {
+      "frame": {
+        "x": 206,
+        "y": 212,
         "w": 32,
         "h": 40
       },
@@ -1502,8 +1942,8 @@
     },
     "robe-tho_nhung_bao-idle-up": {
       "frame": {
-        "x": 104,
-        "y": 170,
+        "x": 240,
+        "y": 212,
         "w": 32,
         "h": 40
       },
@@ -1522,8 +1962,8 @@
     },
     "robe-tho_nhung_bao-walk-up-0": {
       "frame": {
-        "x": 138,
-        "y": 170,
+        "x": 274,
+        "y": 212,
         "w": 32,
         "h": 40
       },
@@ -1542,8 +1982,8 @@
     },
     "robe-tho_nhung_bao-walk-up-1": {
       "frame": {
-        "x": 172,
-        "y": 170,
+        "x": 308,
+        "y": 212,
         "w": 32,
         "h": 40
       },
@@ -1562,8 +2002,8 @@
     },
     "robe-tho_nhung_bao-walk-up-2": {
       "frame": {
-        "x": 206,
-        "y": 170,
+        "x": 342,
+        "y": 212,
         "w": 32,
         "h": 40
       },
@@ -1582,8 +2022,8 @@
     },
     "robe-tho_nhung_bao-walk-up-3": {
       "frame": {
-        "x": 240,
-        "y": 170,
+        "x": 376,
+        "y": 212,
         "w": 32,
         "h": 40
       },
@@ -1602,8 +2042,8 @@
     },
     "robe-tho_nhung_bao-slash-up-0": {
       "frame": {
-        "x": 274,
-        "y": 170,
+        "x": 410,
+        "y": 212,
         "w": 32,
         "h": 40
       },
@@ -1622,8 +2062,8 @@
     },
     "robe-tho_nhung_bao-slash-up-1": {
       "frame": {
-        "x": 308,
-        "y": 170,
+        "x": 444,
+        "y": 212,
         "w": 32,
         "h": 40
       },
@@ -1642,8 +2082,28 @@
     },
     "robe-tho_nhung_bao-slash-up-2": {
       "frame": {
-        "x": 342,
-        "y": 170,
+        "x": 478,
+        "y": 212,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-tho_nhung_bao-hurt-left": {
+      "frame": {
+        "x": 512,
+        "y": 212,
         "w": 32,
         "h": 40
       },
@@ -1662,8 +2122,8 @@
     },
     "robe-tho_nhung_bao-idle-left": {
       "frame": {
-        "x": 376,
-        "y": 170,
+        "x": 546,
+        "y": 212,
         "w": 32,
         "h": 40
       },
@@ -1682,8 +2142,8 @@
     },
     "robe-tho_nhung_bao-walk-left-0": {
       "frame": {
-        "x": 410,
-        "y": 170,
+        "x": 580,
+        "y": 212,
         "w": 32,
         "h": 40
       },
@@ -1702,8 +2162,8 @@
     },
     "robe-tho_nhung_bao-walk-left-1": {
       "frame": {
-        "x": 444,
-        "y": 170,
+        "x": 2,
+        "y": 254,
         "w": 32,
         "h": 40
       },
@@ -1722,8 +2182,8 @@
     },
     "robe-tho_nhung_bao-walk-left-2": {
       "frame": {
-        "x": 478,
-        "y": 170,
+        "x": 36,
+        "y": 254,
         "w": 32,
         "h": 40
       },
@@ -1742,8 +2202,8 @@
     },
     "robe-tho_nhung_bao-walk-left-3": {
       "frame": {
-        "x": 512,
-        "y": 170,
+        "x": 70,
+        "y": 254,
         "w": 32,
         "h": 40
       },
@@ -1762,8 +2222,8 @@
     },
     "robe-tho_nhung_bao-slash-left-0": {
       "frame": {
-        "x": 546,
-        "y": 170,
+        "x": 104,
+        "y": 254,
         "w": 32,
         "h": 40
       },
@@ -1782,8 +2242,8 @@
     },
     "robe-tho_nhung_bao-slash-left-1": {
       "frame": {
-        "x": 580,
-        "y": 170,
+        "x": 138,
+        "y": 254,
         "w": 32,
         "h": 40
       },
@@ -1802,8 +2262,28 @@
     },
     "robe-tho_nhung_bao-slash-left-2": {
       "frame": {
-        "x": 2,
-        "y": 212,
+        "x": 172,
+        "y": 254,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-tho_nhung_bao-hurt-right": {
+      "frame": {
+        "x": 206,
+        "y": 254,
         "w": 32,
         "h": 40
       },
@@ -1822,8 +2302,8 @@
     },
     "robe-tho_nhung_bao-idle-right": {
       "frame": {
-        "x": 36,
-        "y": 212,
+        "x": 240,
+        "y": 254,
         "w": 32,
         "h": 40
       },
@@ -1842,8 +2322,8 @@
     },
     "robe-tho_nhung_bao-walk-right-0": {
       "frame": {
-        "x": 70,
-        "y": 212,
+        "x": 274,
+        "y": 254,
         "w": 32,
         "h": 40
       },
@@ -1862,8 +2342,8 @@
     },
     "robe-tho_nhung_bao-walk-right-1": {
       "frame": {
-        "x": 104,
-        "y": 212,
+        "x": 308,
+        "y": 254,
         "w": 32,
         "h": 40
       },
@@ -1882,8 +2362,8 @@
     },
     "robe-tho_nhung_bao-walk-right-2": {
       "frame": {
-        "x": 138,
-        "y": 212,
+        "x": 342,
+        "y": 254,
         "w": 32,
         "h": 40
       },
@@ -1902,8 +2382,8 @@
     },
     "robe-tho_nhung_bao-walk-right-3": {
       "frame": {
-        "x": 172,
-        "y": 212,
+        "x": 376,
+        "y": 254,
         "w": 32,
         "h": 40
       },
@@ -1922,8 +2402,8 @@
     },
     "robe-tho_nhung_bao-slash-right-0": {
       "frame": {
-        "x": 206,
-        "y": 212,
+        "x": 410,
+        "y": 254,
         "w": 32,
         "h": 40
       },
@@ -1942,8 +2422,8 @@
     },
     "robe-tho_nhung_bao-slash-right-1": {
       "frame": {
-        "x": 240,
-        "y": 212,
+        "x": 444,
+        "y": 254,
         "w": 32,
         "h": 40
       },
@@ -1962,8 +2442,8 @@
     },
     "robe-tho_nhung_bao-slash-right-2": {
       "frame": {
-        "x": 274,
-        "y": 212,
+        "x": 478,
+        "y": 254,
         "w": 32,
         "h": 40
       },
@@ -1982,8 +2462,108 @@
     },
     "robe-hac_ho_bao": {
       "frame": {
-        "x": 308,
-        "y": 212,
+        "x": 512,
+        "y": 254,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-die-0": {
+      "frame": {
+        "x": 546,
+        "y": 254,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-die-1": {
+      "frame": {
+        "x": 580,
+        "y": 254,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-die-2": {
+      "frame": {
+        "x": 2,
+        "y": 296,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-die-3": {
+      "frame": {
+        "x": 36,
+        "y": 296,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-hurt-down": {
+      "frame": {
+        "x": 70,
+        "y": 296,
         "w": 32,
         "h": 40
       },
@@ -2002,8 +2582,8 @@
     },
     "robe-hac_ho_bao-idle-down": {
       "frame": {
-        "x": 342,
-        "y": 212,
+        "x": 104,
+        "y": 296,
         "w": 32,
         "h": 40
       },
@@ -2022,8 +2602,8 @@
     },
     "robe-hac_ho_bao-walk-down-0": {
       "frame": {
-        "x": 376,
-        "y": 212,
+        "x": 138,
+        "y": 296,
         "w": 32,
         "h": 40
       },
@@ -2042,8 +2622,8 @@
     },
     "robe-hac_ho_bao-walk-down-1": {
       "frame": {
-        "x": 410,
-        "y": 212,
+        "x": 172,
+        "y": 296,
         "w": 32,
         "h": 40
       },
@@ -2062,8 +2642,8 @@
     },
     "robe-hac_ho_bao-walk-down-2": {
       "frame": {
-        "x": 444,
-        "y": 212,
+        "x": 206,
+        "y": 296,
         "w": 32,
         "h": 40
       },
@@ -2082,8 +2662,8 @@
     },
     "robe-hac_ho_bao-walk-down-3": {
       "frame": {
-        "x": 478,
-        "y": 212,
+        "x": 240,
+        "y": 296,
         "w": 32,
         "h": 40
       },
@@ -2102,8 +2682,8 @@
     },
     "robe-hac_ho_bao-slash-down-0": {
       "frame": {
-        "x": 512,
-        "y": 212,
+        "x": 274,
+        "y": 296,
         "w": 32,
         "h": 40
       },
@@ -2122,8 +2702,8 @@
     },
     "robe-hac_ho_bao-slash-down-1": {
       "frame": {
-        "x": 546,
-        "y": 212,
+        "x": 308,
+        "y": 296,
         "w": 32,
         "h": 40
       },
@@ -2142,8 +2722,28 @@
     },
     "robe-hac_ho_bao-slash-down-2": {
       "frame": {
-        "x": 580,
-        "y": 212,
+        "x": 342,
+        "y": 296,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-hurt-up": {
+      "frame": {
+        "x": 376,
+        "y": 296,
         "w": 32,
         "h": 40
       },
@@ -2162,8 +2762,8 @@
     },
     "robe-hac_ho_bao-idle-up": {
       "frame": {
-        "x": 2,
-        "y": 254,
+        "x": 410,
+        "y": 296,
         "w": 32,
         "h": 40
       },
@@ -2182,8 +2782,8 @@
     },
     "robe-hac_ho_bao-walk-up-0": {
       "frame": {
-        "x": 36,
-        "y": 254,
+        "x": 444,
+        "y": 296,
         "w": 32,
         "h": 40
       },
@@ -2202,8 +2802,8 @@
     },
     "robe-hac_ho_bao-walk-up-1": {
       "frame": {
-        "x": 70,
-        "y": 254,
+        "x": 478,
+        "y": 296,
         "w": 32,
         "h": 40
       },
@@ -2222,8 +2822,8 @@
     },
     "robe-hac_ho_bao-walk-up-2": {
       "frame": {
-        "x": 104,
-        "y": 254,
+        "x": 512,
+        "y": 296,
         "w": 32,
         "h": 40
       },
@@ -2242,8 +2842,8 @@
     },
     "robe-hac_ho_bao-walk-up-3": {
       "frame": {
-        "x": 138,
-        "y": 254,
+        "x": 546,
+        "y": 296,
         "w": 32,
         "h": 40
       },
@@ -2262,8 +2862,8 @@
     },
     "robe-hac_ho_bao-slash-up-0": {
       "frame": {
-        "x": 172,
-        "y": 254,
+        "x": 580,
+        "y": 296,
         "w": 32,
         "h": 40
       },
@@ -2282,8 +2882,8 @@
     },
     "robe-hac_ho_bao-slash-up-1": {
       "frame": {
-        "x": 206,
-        "y": 254,
+        "x": 2,
+        "y": 338,
         "w": 32,
         "h": 40
       },
@@ -2302,8 +2902,28 @@
     },
     "robe-hac_ho_bao-slash-up-2": {
       "frame": {
-        "x": 240,
-        "y": 254,
+        "x": 36,
+        "y": 338,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-hurt-left": {
+      "frame": {
+        "x": 70,
+        "y": 338,
         "w": 32,
         "h": 40
       },
@@ -2322,8 +2942,8 @@
     },
     "robe-hac_ho_bao-idle-left": {
       "frame": {
-        "x": 274,
-        "y": 254,
+        "x": 104,
+        "y": 338,
         "w": 32,
         "h": 40
       },
@@ -2342,8 +2962,8 @@
     },
     "robe-hac_ho_bao-walk-left-0": {
       "frame": {
-        "x": 308,
-        "y": 254,
+        "x": 138,
+        "y": 338,
         "w": 32,
         "h": 40
       },
@@ -2362,8 +2982,8 @@
     },
     "robe-hac_ho_bao-walk-left-1": {
       "frame": {
-        "x": 342,
-        "y": 254,
+        "x": 172,
+        "y": 338,
         "w": 32,
         "h": 40
       },
@@ -2382,8 +3002,8 @@
     },
     "robe-hac_ho_bao-walk-left-2": {
       "frame": {
-        "x": 376,
-        "y": 254,
+        "x": 206,
+        "y": 338,
         "w": 32,
         "h": 40
       },
@@ -2402,8 +3022,8 @@
     },
     "robe-hac_ho_bao-walk-left-3": {
       "frame": {
-        "x": 410,
-        "y": 254,
+        "x": 240,
+        "y": 338,
         "w": 32,
         "h": 40
       },
@@ -2422,8 +3042,8 @@
     },
     "robe-hac_ho_bao-slash-left-0": {
       "frame": {
-        "x": 444,
-        "y": 254,
+        "x": 274,
+        "y": 338,
         "w": 32,
         "h": 40
       },
@@ -2442,8 +3062,8 @@
     },
     "robe-hac_ho_bao-slash-left-1": {
       "frame": {
-        "x": 478,
-        "y": 254,
+        "x": 308,
+        "y": 338,
         "w": 32,
         "h": 40
       },
@@ -2462,8 +3082,28 @@
     },
     "robe-hac_ho_bao-slash-left-2": {
       "frame": {
-        "x": 512,
-        "y": 254,
+        "x": 342,
+        "y": 338,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-hac_ho_bao-hurt-right": {
+      "frame": {
+        "x": 376,
+        "y": 338,
         "w": 32,
         "h": 40
       },
@@ -2482,8 +3122,8 @@
     },
     "robe-hac_ho_bao-idle-right": {
       "frame": {
-        "x": 546,
-        "y": 254,
+        "x": 410,
+        "y": 338,
         "w": 32,
         "h": 40
       },
@@ -2502,8 +3142,8 @@
     },
     "robe-hac_ho_bao-walk-right-0": {
       "frame": {
-        "x": 580,
-        "y": 254,
+        "x": 444,
+        "y": 338,
         "w": 32,
         "h": 40
       },
@@ -2522,8 +3162,8 @@
     },
     "robe-hac_ho_bao-walk-right-1": {
       "frame": {
-        "x": 2,
-        "y": 296,
+        "x": 478,
+        "y": 338,
         "w": 32,
         "h": 40
       },
@@ -2542,8 +3182,8 @@
     },
     "robe-hac_ho_bao-walk-right-2": {
       "frame": {
-        "x": 36,
-        "y": 296,
+        "x": 512,
+        "y": 338,
         "w": 32,
         "h": 40
       },
@@ -2562,8 +3202,8 @@
     },
     "robe-hac_ho_bao-walk-right-3": {
       "frame": {
-        "x": 70,
-        "y": 296,
+        "x": 546,
+        "y": 338,
         "w": 32,
         "h": 40
       },
@@ -2582,8 +3222,8 @@
     },
     "robe-hac_ho_bao-slash-right-0": {
       "frame": {
-        "x": 104,
-        "y": 296,
+        "x": 580,
+        "y": 338,
         "w": 32,
         "h": 40
       },
@@ -2602,8 +3242,8 @@
     },
     "robe-hac_ho_bao-slash-right-1": {
       "frame": {
-        "x": 138,
-        "y": 296,
+        "x": 2,
+        "y": 380,
         "w": 32,
         "h": 40
       },
@@ -2622,8 +3262,8 @@
     },
     "robe-hac_ho_bao-slash-right-2": {
       "frame": {
-        "x": 172,
-        "y": 296,
+        "x": 36,
+        "y": 380,
         "w": 32,
         "h": 40
       },
@@ -2642,8 +3282,108 @@
     },
     "robe-xich_lan_bao": {
       "frame": {
+        "x": 70,
+        "y": 380,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-die-0": {
+      "frame": {
+        "x": 104,
+        "y": 380,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-die-1": {
+      "frame": {
+        "x": 138,
+        "y": 380,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-die-2": {
+      "frame": {
+        "x": 172,
+        "y": 380,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-die-3": {
+      "frame": {
         "x": 206,
-        "y": 296,
+        "y": 380,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-hurt-down": {
+      "frame": {
+        "x": 240,
+        "y": 380,
         "w": 32,
         "h": 40
       },
@@ -2662,8 +3402,8 @@
     },
     "robe-xich_lan_bao-idle-down": {
       "frame": {
-        "x": 240,
-        "y": 296,
+        "x": 274,
+        "y": 380,
         "w": 32,
         "h": 40
       },
@@ -2682,8 +3422,8 @@
     },
     "robe-xich_lan_bao-walk-down-0": {
       "frame": {
-        "x": 274,
-        "y": 296,
+        "x": 308,
+        "y": 380,
         "w": 32,
         "h": 40
       },
@@ -2702,8 +3442,8 @@
     },
     "robe-xich_lan_bao-walk-down-1": {
       "frame": {
-        "x": 308,
-        "y": 296,
+        "x": 342,
+        "y": 380,
         "w": 32,
         "h": 40
       },
@@ -2722,8 +3462,8 @@
     },
     "robe-xich_lan_bao-walk-down-2": {
       "frame": {
-        "x": 342,
-        "y": 296,
+        "x": 376,
+        "y": 380,
         "w": 32,
         "h": 40
       },
@@ -2742,8 +3482,8 @@
     },
     "robe-xich_lan_bao-walk-down-3": {
       "frame": {
-        "x": 376,
-        "y": 296,
+        "x": 410,
+        "y": 380,
         "w": 32,
         "h": 40
       },
@@ -2762,8 +3502,8 @@
     },
     "robe-xich_lan_bao-slash-down-0": {
       "frame": {
-        "x": 410,
-        "y": 296,
+        "x": 444,
+        "y": 380,
         "w": 32,
         "h": 40
       },
@@ -2782,8 +3522,8 @@
     },
     "robe-xich_lan_bao-slash-down-1": {
       "frame": {
-        "x": 444,
-        "y": 296,
+        "x": 478,
+        "y": 380,
         "w": 32,
         "h": 40
       },
@@ -2802,8 +3542,28 @@
     },
     "robe-xich_lan_bao-slash-down-2": {
       "frame": {
-        "x": 478,
-        "y": 296,
+        "x": 512,
+        "y": 380,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-hurt-up": {
+      "frame": {
+        "x": 546,
+        "y": 380,
         "w": 32,
         "h": 40
       },
@@ -2822,8 +3582,8 @@
     },
     "robe-xich_lan_bao-idle-up": {
       "frame": {
-        "x": 512,
-        "y": 296,
+        "x": 580,
+        "y": 380,
         "w": 32,
         "h": 40
       },
@@ -2842,8 +3602,8 @@
     },
     "robe-xich_lan_bao-walk-up-0": {
       "frame": {
-        "x": 546,
-        "y": 296,
+        "x": 2,
+        "y": 422,
         "w": 32,
         "h": 40
       },
@@ -2862,8 +3622,8 @@
     },
     "robe-xich_lan_bao-walk-up-1": {
       "frame": {
-        "x": 580,
-        "y": 296,
+        "x": 36,
+        "y": 422,
         "w": 32,
         "h": 40
       },
@@ -2882,8 +3642,8 @@
     },
     "robe-xich_lan_bao-walk-up-2": {
       "frame": {
-        "x": 2,
-        "y": 338,
+        "x": 70,
+        "y": 422,
         "w": 32,
         "h": 40
       },
@@ -2902,8 +3662,8 @@
     },
     "robe-xich_lan_bao-walk-up-3": {
       "frame": {
-        "x": 36,
-        "y": 338,
+        "x": 104,
+        "y": 422,
         "w": 32,
         "h": 40
       },
@@ -2922,8 +3682,8 @@
     },
     "robe-xich_lan_bao-slash-up-0": {
       "frame": {
-        "x": 70,
-        "y": 338,
+        "x": 138,
+        "y": 422,
         "w": 32,
         "h": 40
       },
@@ -2942,8 +3702,8 @@
     },
     "robe-xich_lan_bao-slash-up-1": {
       "frame": {
-        "x": 104,
-        "y": 338,
+        "x": 172,
+        "y": 422,
         "w": 32,
         "h": 40
       },
@@ -2962,8 +3722,28 @@
     },
     "robe-xich_lan_bao-slash-up-2": {
       "frame": {
-        "x": 138,
-        "y": 338,
+        "x": 206,
+        "y": 422,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-hurt-left": {
+      "frame": {
+        "x": 240,
+        "y": 422,
         "w": 32,
         "h": 40
       },
@@ -2982,8 +3762,8 @@
     },
     "robe-xich_lan_bao-idle-left": {
       "frame": {
-        "x": 172,
-        "y": 338,
+        "x": 274,
+        "y": 422,
         "w": 32,
         "h": 40
       },
@@ -3002,8 +3782,8 @@
     },
     "robe-xich_lan_bao-walk-left-0": {
       "frame": {
-        "x": 206,
-        "y": 338,
+        "x": 308,
+        "y": 422,
         "w": 32,
         "h": 40
       },
@@ -3022,8 +3802,8 @@
     },
     "robe-xich_lan_bao-walk-left-1": {
       "frame": {
-        "x": 240,
-        "y": 338,
+        "x": 342,
+        "y": 422,
         "w": 32,
         "h": 40
       },
@@ -3042,8 +3822,8 @@
     },
     "robe-xich_lan_bao-walk-left-2": {
       "frame": {
-        "x": 274,
-        "y": 338,
+        "x": 376,
+        "y": 422,
         "w": 32,
         "h": 40
       },
@@ -3062,8 +3842,8 @@
     },
     "robe-xich_lan_bao-walk-left-3": {
       "frame": {
-        "x": 308,
-        "y": 338,
+        "x": 410,
+        "y": 422,
         "w": 32,
         "h": 40
       },
@@ -3082,8 +3862,8 @@
     },
     "robe-xich_lan_bao-slash-left-0": {
       "frame": {
-        "x": 342,
-        "y": 338,
+        "x": 444,
+        "y": 422,
         "w": 32,
         "h": 40
       },
@@ -3102,8 +3882,8 @@
     },
     "robe-xich_lan_bao-slash-left-1": {
       "frame": {
-        "x": 376,
-        "y": 338,
+        "x": 478,
+        "y": 422,
         "w": 32,
         "h": 40
       },
@@ -3122,8 +3902,28 @@
     },
     "robe-xich_lan_bao-slash-left-2": {
       "frame": {
-        "x": 410,
-        "y": 338,
+        "x": 512,
+        "y": 422,
+        "w": 32,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 40
+      }
+    },
+    "robe-xich_lan_bao-hurt-right": {
+      "frame": {
+        "x": 546,
+        "y": 422,
         "w": 32,
         "h": 40
       },
@@ -3142,8 +3942,8 @@
     },
     "robe-xich_lan_bao-idle-right": {
       "frame": {
-        "x": 444,
-        "y": 338,
+        "x": 580,
+        "y": 422,
         "w": 32,
         "h": 40
       },
@@ -3162,8 +3962,8 @@
     },
     "robe-xich_lan_bao-walk-right-0": {
       "frame": {
-        "x": 478,
-        "y": 338,
+        "x": 2,
+        "y": 464,
         "w": 32,
         "h": 40
       },
@@ -3182,8 +3982,8 @@
     },
     "robe-xich_lan_bao-walk-right-1": {
       "frame": {
-        "x": 512,
-        "y": 338,
+        "x": 36,
+        "y": 464,
         "w": 32,
         "h": 40
       },
@@ -3202,8 +4002,8 @@
     },
     "robe-xich_lan_bao-walk-right-2": {
       "frame": {
-        "x": 546,
-        "y": 338,
+        "x": 70,
+        "y": 464,
         "w": 32,
         "h": 40
       },
@@ -3222,8 +4022,8 @@
     },
     "robe-xich_lan_bao-walk-right-3": {
       "frame": {
-        "x": 580,
-        "y": 338,
+        "x": 104,
+        "y": 464,
         "w": 32,
         "h": 40
       },
@@ -3242,8 +4042,8 @@
     },
     "robe-xich_lan_bao-slash-right-0": {
       "frame": {
-        "x": 2,
-        "y": 380,
+        "x": 138,
+        "y": 464,
         "w": 32,
         "h": 40
       },
@@ -3262,8 +4062,8 @@
     },
     "robe-xich_lan_bao-slash-right-1": {
       "frame": {
-        "x": 36,
-        "y": 380,
+        "x": 172,
+        "y": 464,
         "w": 32,
         "h": 40
       },
@@ -3282,8 +4082,8 @@
     },
     "robe-xich_lan_bao-slash-right-2": {
       "frame": {
-        "x": 70,
-        "y": 380,
+        "x": 206,
+        "y": 464,
         "w": 32,
         "h": 40
       },
@@ -3302,8 +4102,8 @@
     },
     "mon-tho": {
       "frame": {
-        "x": 104,
-        "y": 380,
+        "x": 240,
+        "y": 464,
         "w": 32,
         "h": 32
       },
@@ -3322,8 +4122,8 @@
     },
     "mon-tho-0": {
       "frame": {
-        "x": 138,
-        "y": 380,
+        "x": 274,
+        "y": 464,
         "w": 32,
         "h": 32
       },
@@ -3342,8 +4142,8 @@
     },
     "mon-tho-1": {
       "frame": {
-        "x": 172,
-        "y": 380,
+        "x": 308,
+        "y": 464,
         "w": 32,
         "h": 32
       },
@@ -3362,8 +4162,8 @@
     },
     "mon-tho-atk-0": {
       "frame": {
-        "x": 206,
-        "y": 380,
+        "x": 342,
+        "y": 464,
         "w": 32,
         "h": 32
       },
@@ -3382,8 +4182,8 @@
     },
     "mon-tho-atk-1": {
       "frame": {
-        "x": 240,
-        "y": 380,
+        "x": 376,
+        "y": 464,
         "w": 32,
         "h": 32
       },
@@ -3402,8 +4202,8 @@
     },
     "mon-tho-hurt": {
       "frame": {
-        "x": 274,
-        "y": 380,
+        "x": 410,
+        "y": 464,
         "w": 32,
         "h": 32
       },
@@ -3422,8 +4222,8 @@
     },
     "mon-tho-die-0": {
       "frame": {
-        "x": 308,
-        "y": 380,
+        "x": 444,
+        "y": 464,
         "w": 32,
         "h": 32
       },
@@ -3442,8 +4242,8 @@
     },
     "mon-tho-die-1": {
       "frame": {
-        "x": 342,
-        "y": 380,
+        "x": 478,
+        "y": 464,
         "w": 32,
         "h": 32
       },
@@ -3462,8 +4262,8 @@
     },
     "mon-tho-die-2": {
       "frame": {
-        "x": 376,
-        "y": 380,
+        "x": 512,
+        "y": 464,
         "w": 32,
         "h": 32
       },
@@ -3482,8 +4282,8 @@
     },
     "mon-tho-die-3": {
       "frame": {
-        "x": 410,
-        "y": 380,
+        "x": 546,
+        "y": 464,
         "w": 32,
         "h": 32
       },
@@ -3502,8 +4302,8 @@
     },
     "mon-lang": {
       "frame": {
-        "x": 444,
-        "y": 380,
+        "x": 580,
+        "y": 464,
         "w": 40,
         "h": 40
       },
@@ -3522,8 +4322,8 @@
     },
     "mon-lang-0": {
       "frame": {
-        "x": 486,
-        "y": 380,
+        "x": 2,
+        "y": 506,
         "w": 40,
         "h": 40
       },
@@ -3542,8 +4342,8 @@
     },
     "mon-lang-1": {
       "frame": {
-        "x": 528,
-        "y": 380,
+        "x": 44,
+        "y": 506,
         "w": 40,
         "h": 40
       },
@@ -3562,8 +4362,8 @@
     },
     "mon-lang-atk-0": {
       "frame": {
-        "x": 570,
-        "y": 380,
+        "x": 86,
+        "y": 506,
         "w": 40,
         "h": 40
       },
@@ -3582,8 +4382,8 @@
     },
     "mon-lang-atk-1": {
       "frame": {
-        "x": 2,
-        "y": 422,
+        "x": 128,
+        "y": 506,
         "w": 40,
         "h": 40
       },
@@ -3602,8 +4402,8 @@
     },
     "mon-lang-hurt": {
       "frame": {
-        "x": 44,
-        "y": 422,
+        "x": 170,
+        "y": 506,
         "w": 40,
         "h": 40
       },
@@ -3622,8 +4422,8 @@
     },
     "mon-lang-die-0": {
       "frame": {
-        "x": 86,
-        "y": 422,
+        "x": 212,
+        "y": 506,
         "w": 40,
         "h": 40
       },
@@ -3642,8 +4442,8 @@
     },
     "mon-lang-die-1": {
       "frame": {
-        "x": 128,
-        "y": 422,
+        "x": 254,
+        "y": 506,
         "w": 40,
         "h": 40
       },
@@ -3662,8 +4462,8 @@
     },
     "mon-lang-die-2": {
       "frame": {
-        "x": 170,
-        "y": 422,
+        "x": 296,
+        "y": 506,
         "w": 40,
         "h": 40
       },
@@ -3682,8 +4482,8 @@
     },
     "mon-lang-die-3": {
       "frame": {
-        "x": 212,
-        "y": 422,
+        "x": 338,
+        "y": 506,
         "w": 40,
         "h": 40
       },
@@ -3702,8 +4502,8 @@
     },
     "mon-ho": {
       "frame": {
-        "x": 254,
-        "y": 422,
+        "x": 380,
+        "y": 506,
         "w": 48,
         "h": 48
       },
@@ -3722,8 +4522,8 @@
     },
     "mon-ho-0": {
       "frame": {
-        "x": 304,
-        "y": 422,
+        "x": 430,
+        "y": 506,
         "w": 48,
         "h": 48
       },
@@ -3742,8 +4542,8 @@
     },
     "mon-ho-1": {
       "frame": {
-        "x": 354,
-        "y": 422,
+        "x": 480,
+        "y": 506,
         "w": 48,
         "h": 48
       },
@@ -3762,8 +4562,8 @@
     },
     "mon-ho-atk-0": {
       "frame": {
-        "x": 404,
-        "y": 422,
+        "x": 530,
+        "y": 506,
         "w": 48,
         "h": 48
       },
@@ -3782,8 +4582,8 @@
     },
     "mon-ho-atk-1": {
       "frame": {
-        "x": 454,
-        "y": 422,
+        "x": 580,
+        "y": 506,
         "w": 48,
         "h": 48
       },
@@ -3802,8 +4602,8 @@
     },
     "mon-ho-hurt": {
       "frame": {
-        "x": 504,
-        "y": 422,
+        "x": 2,
+        "y": 556,
         "w": 48,
         "h": 48
       },
@@ -3822,8 +4622,8 @@
     },
     "mon-ho-die-0": {
       "frame": {
-        "x": 554,
-        "y": 422,
+        "x": 52,
+        "y": 556,
         "w": 48,
         "h": 48
       },
@@ -3842,8 +4642,8 @@
     },
     "mon-ho-die-1": {
       "frame": {
-        "x": 2,
-        "y": 472,
+        "x": 102,
+        "y": 556,
         "w": 48,
         "h": 48
       },
@@ -3862,8 +4662,8 @@
     },
     "mon-ho-die-2": {
       "frame": {
-        "x": 52,
-        "y": 472,
+        "x": 152,
+        "y": 556,
         "w": 48,
         "h": 48
       },
@@ -3882,8 +4682,8 @@
     },
     "mon-ho-die-3": {
       "frame": {
-        "x": 102,
-        "y": 472,
+        "x": 202,
+        "y": 556,
         "w": 48,
         "h": 48
       },
@@ -3902,8 +4702,8 @@
     },
     "mon-mang": {
       "frame": {
-        "x": 152,
-        "y": 472,
+        "x": 252,
+        "y": 556,
         "w": 64,
         "h": 64
       },
@@ -3922,8 +4722,8 @@
     },
     "mon-mang-0": {
       "frame": {
-        "x": 218,
-        "y": 472,
+        "x": 318,
+        "y": 556,
         "w": 64,
         "h": 64
       },
@@ -3942,8 +4742,8 @@
     },
     "mon-mang-1": {
       "frame": {
-        "x": 284,
-        "y": 472,
+        "x": 384,
+        "y": 556,
         "w": 64,
         "h": 64
       },
@@ -3962,8 +4762,8 @@
     },
     "mon-mang-atk-0": {
       "frame": {
-        "x": 350,
-        "y": 472,
+        "x": 450,
+        "y": 556,
         "w": 64,
         "h": 64
       },
@@ -3982,8 +4782,8 @@
     },
     "mon-mang-atk-1": {
       "frame": {
-        "x": 416,
-        "y": 472,
+        "x": 516,
+        "y": 556,
         "w": 64,
         "h": 64
       },
@@ -4002,8 +4802,8 @@
     },
     "mon-mang-hurt": {
       "frame": {
-        "x": 482,
-        "y": 472,
+        "x": 2,
+        "y": 622,
         "w": 64,
         "h": 64
       },
@@ -4022,8 +4822,8 @@
     },
     "mon-mang-die-0": {
       "frame": {
-        "x": 548,
-        "y": 472,
+        "x": 68,
+        "y": 622,
         "w": 64,
         "h": 64
       },
@@ -4042,8 +4842,8 @@
     },
     "mon-mang-die-1": {
       "frame": {
-        "x": 2,
-        "y": 538,
+        "x": 134,
+        "y": 622,
         "w": 64,
         "h": 64
       },
@@ -4062,8 +4862,8 @@
     },
     "mon-mang-die-2": {
       "frame": {
-        "x": 68,
-        "y": 538,
+        "x": 200,
+        "y": 622,
         "w": 64,
         "h": 64
       },
@@ -4082,8 +4882,8 @@
     },
     "mon-mang-die-3": {
       "frame": {
-        "x": 134,
-        "y": 538,
+        "x": 266,
+        "y": 622,
         "w": 64,
         "h": 64
       },
@@ -4102,8 +4902,8 @@
     },
     "npc-truong_tran": {
       "frame": {
-        "x": 200,
-        "y": 538,
+        "x": 332,
+        "y": 622,
         "w": 36,
         "h": 42
       },
@@ -4122,8 +4922,8 @@
     },
     "npc-duoc_su": {
       "frame": {
-        "x": 238,
-        "y": 538,
+        "x": 370,
+        "y": 622,
         "w": 36,
         "h": 42
       },
@@ -4142,8 +4942,8 @@
     },
     "npc-tho_ren": {
       "frame": {
-        "x": 276,
-        "y": 538,
+        "x": 408,
+        "y": 622,
         "w": 36,
         "h": 42
       },
@@ -4162,8 +4962,8 @@
     },
     "npc-cao_thi": {
       "frame": {
-        "x": 314,
-        "y": 538,
+        "x": 446,
+        "y": 622,
         "w": 36,
         "h": 42
       },
@@ -4182,8 +4982,8 @@
     },
     "item-hoi_huyet_dan": {
       "frame": {
-        "x": 352,
-        "y": 538,
+        "x": 484,
+        "y": 622,
         "w": 24,
         "h": 24
       },
@@ -4202,8 +5002,8 @@
     },
     "item-hoi_linh_dan": {
       "frame": {
-        "x": 378,
-        "y": 538,
+        "x": 510,
+        "y": 622,
         "w": 24,
         "h": 24
       },
@@ -4222,8 +5022,8 @@
     },
     "item-tu_khi_dan": {
       "frame": {
-        "x": 404,
-        "y": 538,
+        "x": 536,
+        "y": 622,
         "w": 24,
         "h": 24
       },
@@ -4242,8 +5042,8 @@
     },
     "item-long_tho": {
       "frame": {
-        "x": 430,
-        "y": 538,
+        "x": 562,
+        "y": 622,
         "w": 24,
         "h": 24
       },
@@ -4262,8 +5062,8 @@
     },
     "item-nanh_soi": {
       "frame": {
-        "x": 456,
-        "y": 538,
+        "x": 588,
+        "y": 622,
         "w": 24,
         "h": 24
       },
@@ -4282,8 +5082,8 @@
     },
     "item-da_ho": {
       "frame": {
-        "x": 482,
-        "y": 538,
+        "x": 614,
+        "y": 622,
         "w": 24,
         "h": 24
       },
@@ -4302,8 +5102,8 @@
     },
     "item-vay_mang": {
       "frame": {
-        "x": 508,
-        "y": 538,
+        "x": 2,
+        "y": 688,
         "w": 24,
         "h": 24
       },
@@ -4322,8 +5122,8 @@
     },
     "item-lang_nha_kiem": {
       "frame": {
-        "x": 534,
-        "y": 538,
+        "x": 28,
+        "y": 688,
         "w": 24,
         "h": 24
       },
@@ -4342,8 +5142,8 @@
     },
     "item-tho_nhung_bao": {
       "frame": {
-        "x": 560,
-        "y": 538,
+        "x": 54,
+        "y": 688,
         "w": 24,
         "h": 24
       },
@@ -4362,8 +5162,8 @@
     },
     "item-lang_nha_phu": {
       "frame": {
-        "x": 586,
-        "y": 538,
+        "x": 80,
+        "y": 688,
         "w": 24,
         "h": 24
       },
@@ -4382,8 +5182,8 @@
     },
     "item-hac_ho_kiem": {
       "frame": {
-        "x": 612,
-        "y": 538,
+        "x": 106,
+        "y": 688,
         "w": 24,
         "h": 24
       },
@@ -4402,8 +5202,8 @@
     },
     "item-hac_ho_bao": {
       "frame": {
-        "x": 2,
-        "y": 604,
+        "x": 132,
+        "y": 688,
         "w": 24,
         "h": 24
       },
@@ -4422,8 +5222,8 @@
     },
     "item-ho_hon_phu": {
       "frame": {
-        "x": 28,
-        "y": 604,
+        "x": 158,
+        "y": 688,
         "w": 24,
         "h": 24
       },
@@ -4442,8 +5242,8 @@
     },
     "item-xich_mang_kiem": {
       "frame": {
-        "x": 54,
-        "y": 604,
+        "x": 184,
+        "y": 688,
         "w": 24,
         "h": 24
       },
@@ -4462,8 +5262,8 @@
     },
     "item-xich_lan_bao": {
       "frame": {
-        "x": 80,
-        "y": 604,
+        "x": 210,
+        "y": 688,
         "w": 24,
         "h": 24
       },
@@ -4482,8 +5282,8 @@
     },
     "item-mang_dam_phu": {
       "frame": {
-        "x": 106,
-        "y": 604,
+        "x": 236,
+        "y": 688,
         "w": 24,
         "h": 24
       },
@@ -4502,8 +5302,8 @@
     },
     "swordbeam": {
       "frame": {
-        "x": 132,
-        "y": 604,
+        "x": 262,
+        "y": 688,
         "w": 48,
         "h": 16
       },
@@ -4522,8 +5322,8 @@
     },
     "dot": {
       "frame": {
-        "x": 182,
-        "y": 604,
+        "x": 312,
+        "y": 688,
         "w": 16,
         "h": 16
       },
@@ -4548,7 +5348,7 @@
     "format": "RGBA8888",
     "size": {
       "w": 640,
-      "h": 640
+      "h": 720
     },
     "scale": "1"
   }

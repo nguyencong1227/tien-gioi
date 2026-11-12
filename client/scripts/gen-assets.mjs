@@ -384,6 +384,38 @@ function drawCultivatorFrame(robe, trim, hair, dir, mode, step) {
   return s;
 }
 
+/**
+ * Tư thế bị đánh / gục của tu sĩ (M5.2 #328 phần 2), suy từ khung ĐỨNG bằng biến đổi + màu (như yêu thú, atlas không phình):
+ *   hurt-<hướng>: giật lùi ngược hướng nhìn + chớp trắng (1 khung mỗi hướng);
+ *   die-0..3 (không hướng, từ khung nhìn xuống): ngã lùi chớp trắng -> khuỵu -> nằm -> nằm xám tối. Xác người chơi
+ *   nằm ~5 giây rồi mờ (client), hồi sinh thì quay về đứng, nên không tan thành điểm sáng như quái.
+ */
+function drawCultivatorPose(robe, trim, hair, dir, pose) {
+  const base = drawCultivatorFrame(
+    robe,
+    trim,
+    hair,
+    pose.startsWith("die") ? "down" : dir,
+    "idle",
+    0,
+  );
+  const recoil = dir === "right" ? -2 : dir === "left" ? 2 : 0;
+  switch (pose) {
+    case "hurt":
+      return base.warp({ sx: 0.94, sy: 1.04, dx: recoil }).recolor({ white: 0.55 });
+    case "die-0":
+      return base.warp({ sx: 0.96, sy: 1.02, dx: -2 }).recolor({ white: 0.55 });
+    case "die-1":
+      return base.warp({ sx: 1.12, sy: 0.72, dx: -3 }).recolor({ gray: 0.25 });
+    case "die-2":
+      return base.warp({ sx: 1.28, sy: 0.42, dx: -3 }).recolor({ gray: 0.35, dark: 0.15 });
+    case "die-3":
+      return base.warp({ sx: 1.34, sy: 0.3, dx: -3 }).recolor({ gray: 0.45, dark: 0.25 });
+    default:
+      throw new Error(`Tư thế tu sĩ lạ: ${pose}`);
+  }
+}
+
 // ---------------- 3. Vẽ 4 loại yêu thú (2 frame hoạt ảnh mỗi loại) ----------------
 
 function drawMonsterFrame(id, step) {
@@ -725,7 +757,10 @@ function buildAtlas() {
   for (const p of personas) {
     const baseIdle = drawCultivatorFrame(p.robe, p.trim, p.hair, "down", "idle", 0);
     push(p.key, baseIdle);
+    for (let f = 0; f < 4; f++)
+      push(`${p.key}-die-${f}`, drawCultivatorPose(p.robe, p.trim, p.hair, "down", `die-${f}`));
     for (const d of dirs) {
+      push(`${p.key}-hurt-${d}`, drawCultivatorPose(p.robe, p.trim, p.hair, d, "hurt"));
       push(`${p.key}-idle-${d}`, drawCultivatorFrame(p.robe, p.trim, p.hair, d, "idle", 0));
       for (let f = 0; f < 4; f++) {
         push(`${p.key}-walk-${d}-${f}`, drawCultivatorFrame(p.robe, p.trim, p.hair, d, "walk", f));
