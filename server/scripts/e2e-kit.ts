@@ -1,6 +1,7 @@
 // Khung dùng chung cho các E2E thật hai tab Chrome (CDP): lớp `Tab` (gom lỗi console, evaluate, chờ điều kiện, ảnh chụp).
 // Tách từ `e2e-pk.ts` cho E2E mới (`e2e-tong-mon.ts`); các E2E cũ giữ bản sao riêng của chúng.
 import type { ChildProcess } from "node:child_process";
+import type http from "node:http";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import WebSocket from "ws";
@@ -156,4 +157,36 @@ export class Tab {
       /* bỏ qua */
     }
   }
+}
+
+/**
+ * `server.listen(port)` mà LỖI được trả về (reject) thay vì chìm: `new Promise((r) => server.listen(port, r))` không bao giờ resolve khi cổng
+ * bận (Colyseus transport chỉ in lỗi), vòng sự kiện cạn và E2E thoát mã 0 không in PASS / THẤT BẠI (false green) và sót thư mục tạm.
+ * Cổng do người chạy chỉ định (`explicit`) thì lỗi bận trả thẳng; cổng NGẪU NHIÊN thì thử lại với cổng mới (`pick`) tối đa `attempts` lần.
+ * Trả về cổng thực sự đang nghe.
+ */
+export function listenWithRetry(
+  server: http.Server,
+  port: number,
+  opts: { explicit: boolean; pick: () => number; attempts?: number },
+): Promise<number> {
+  const attempts = opts.attempts ?? 6;
+  return new Promise<number>((resolve, reject) => {
+    const tryListen = (p: number, left: number) => {
+      const onError = (err: NodeJS.ErrnoException) => {
+        server.off("listening", onListening);
+        if (err.code === "EADDRINUSE" && !opts.explicit && left > 1)
+          tryListen(opts.pick(), left - 1);
+        else reject(err);
+      };
+      const onListening = () => {
+        server.off("error", onError);
+        resolve(p);
+      };
+      server.once("error", onError);
+      server.once("listening", onListening);
+      server.listen(p);
+    };
+    tryListen(port, attempts);
+  });
 }

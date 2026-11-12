@@ -19,7 +19,7 @@ import { WebSocketTransport } from "@colyseus/ws-transport";
 import { type SavedPlayer } from "../src/store.js";
 import { DEFAULT_MAP_ID, type Soul } from "@tien-gioi/shared";
 import { assertNotProd } from "./assert-not-prod.js";
-import { killChrome, removeTmpDirs } from "./e2e-kit.js";
+import { killChrome, listenWithRetry, removeTmpDirs } from "./e2e-kit.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
@@ -38,6 +38,8 @@ interface E2eArgs {
   screenshotDir?: string;
   timeoutMs: number;
   allowEarlyDrops: boolean;
+  /** Cổng do người chạy chỉ định bằng --port= (bận thì báo lỗi, không đổi cổng); mặc định là cổng ngẫu nhiên (bận thì thử lại cổng khác). */
+  portExplicit: boolean;
 }
 
 function parseCliArgs(args: string[]): E2eArgs {
@@ -47,6 +49,7 @@ function parseCliArgs(args: string[]): E2eArgs {
   let screenshotDir: string | undefined;
   let timeoutMs = 12000;
   let allowEarlyDrops = false;
+  let portExplicit = false;
 
   for (const arg of args) {
     if (arg.startsWith("--scenario=")) {
@@ -54,6 +57,7 @@ function parseCliArgs(args: string[]): E2eArgs {
       if (val === "limbo" || val === "normal" || val === "auto") scenario = val;
     } else if (arg.startsWith("--port=")) {
       port = Number(arg.slice("--port=".length)) || port;
+      portExplicit = true;
       assertNotProd(port, "e2e");
     } else if (arg.startsWith("--chrome-port=")) {
       chromePort = Number(arg.slice("--chrome-port=".length)) || chromePort;
@@ -66,7 +70,7 @@ function parseCliArgs(args: string[]): E2eArgs {
     }
   }
 
-  return { scenario, port, chromePort, screenshotDir, timeoutMs, allowEarlyDrops };
+  return { scenario, port, chromePort, screenshotDir, timeoutMs, allowEarlyDrops, portExplicit };
 }
 
 /** Gieo dữ liệu nhân vật và chân linh mẫu cho kịch bản E2E. */
@@ -190,7 +194,18 @@ async function runE2e() {
   const gameServer = new Server({ transport: new WebSocketTransport({ server: httpServer }) });
   defineRooms(gameServer);
 
-  await new Promise<void>((resolve) => httpServer.listen(cliArgs.port, resolve));
+  // Lỗi `listen` (cổng bận) phải thành lỗi THẬT: trước đây Promise không bao giờ resolve, E2E thoát mã 0 không in gì và sót thư mục tạm.
+  // Cổng ngẫu nhiên bận thì thử cổng khác; cổng người chạy chỉ định bận thì báo lỗi. Lỗi ở đây xảy ra TRƯỚC khối try / finally dọn dẹp
+  // bên dưới nên tự dọn thư mục tạm rồi ném tiếp.
+  try {
+    cliArgs.port = await listenWithRetry(httpServer, cliArgs.port, {
+      explicit: cliArgs.portExplicit,
+      pick: () => 36000 + Math.floor(Math.random() * 4000),
+    });
+  } catch (err) {
+    await removeTmpDirs(tmpDataDir, tmpChromeDir);
+    throw err;
+  }
   console.log(`- Server E2E đã sẵn sàng tại http://127.0.0.1:${cliArgs.port}`);
 
   // 4. Khởi động Chrome headless
@@ -508,5 +523,11 @@ async function runE2e() {
 }
 
 if (process.argv[1]?.endsWith("e2e.ts") || process.argv[1]?.endsWith("e2e.js")) {
-  runE2e();
+  // Lỗi dựng (cổng bận, build hỏng...) phải ra mã thoát 1 và dòng THẤT BẠI: không để Promise bị bỏ rơi (thoát mã 0 = false green)
+  runE2e().catch((err) => {
+    console.error(
+      `✗ THẤT BẠI (E2E không dựng được): ${err instanceof Error ? err.message : String(err)}`,
+    );
+    process.exitCode = 1;
+  });
 }
