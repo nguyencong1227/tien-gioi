@@ -229,8 +229,8 @@ let loadFailures = 0;
 
 try {
   let versionData = null;
-  // 15 s (không phải 4 s): lần mở Chrome đầu tiên trên runner CI lạnh có thể chậm
-  for (let i = 0; i < 150; i++) {
+  // 30 s (không phải 4 s): lần mở Chrome đầu tiên trên runner CI lạnh có thể chậm (run đầu của #398 đỏ vì 15 s không đủ)
+  for (let i = 0; i < 300; i++) {
     try {
       const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json/version`);
       if (res.ok) {
@@ -243,7 +243,7 @@ try {
     await sleep(100);
   }
 
-  if (!versionData) throw new Error("Chrome headless không khởi động kịp sau 15 giây.");
+  if (!versionData) throw new Error("Chrome headless không khởi động kịp sau 30 giây.");
 
   for (const sc of scenariosToRun) {
     const targetUrl = `http://127.0.0.1:${HTTP_PORT}/?${sc.query}`;
