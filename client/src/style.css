@@ -5368,6 +5368,17 @@ html[data-input="touch"] #joyzone {
 html[data-input="touch"] #help {
   display: none;
 }
+/* Joystick nổi (nửa trái, 65 % chiều cao phía dưới) KHÔNG được bị thân các bảng của cột HUD trái nuốt chạm (#326; phát hiện ở điện thoại ngang
+   844x390: chạm vào thân bảng Nhiệm vụ / HUD không khởi động joystick). Thân bảng (và khoảng hở giữa các ô của thanh nhanh) trong suốt với chạm, chỉ phần tử tương tác (nút, mục
+   nhiệm vụ để chỉ đường) bắt chạm. Kiểu D-pad không có vùng joystick nên giữ nguyên. */
+html[data-input="touch"]:not([data-touch-scheme="dpad"]) :is(#hud-col-left > *, #quickbar) {
+  pointer-events: none;
+}
+html[data-input="touch"]:not([data-touch-scheme="dpad"])
+  :is(#hud-col-left, #quickbar)
+  :is(button, .qt-item) {
+  pointer-events: auto;
+}
 /* Nút điều khiển: không bôi sáng khi chạm, không trình đơn / chọn chữ khi nhấn giữ (iOS), vuốt không cuộn / phóng to */
 #joyzone,
 #skills,
