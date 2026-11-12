@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import {
   auditAssets,
+  auditHashes,
   isAssetCredited,
   matchExactToken,
   scanFiles,
+  sha256File,
 } from "../scripts/check-credits.mjs";
 
 describe("Rà soát tài sản và giấy phép (check-credits)", () => {
@@ -69,5 +73,71 @@ describe("Rà soát tài sản và giấy phép (check-credits)", () => {
     const files = scanFiles(iconsDir);
     expect(files).toContain("client/public/icons/icon.svg");
     expect(files).toContain("client/public/icons/icon-192.png");
+  });
+
+  it("auditAssets mặc định rà cả client/public/fonts (phông tự lưu, #331)", () => {
+    const { scanned, missing } = auditAssets(creditsPath);
+    expect(
+      scanned.filter((f) => f.startsWith("client/public/fonts/")).length,
+    ).toBeGreaterThanOrEqual(5);
+    expect(missing).toEqual([]);
+  });
+});
+
+describe("SHA-256 của tài sản bên thứ ba (check-credits, #331)", () => {
+  const rootDir = path.resolve(__dirname, "../..");
+  const fontsDir = path.resolve(rootDir, "client/public/fonts");
+
+  it("mọi tệp trong client/public/fonts có băm thật cùng dòng với tên tệp trong CREDITS.md", () => {
+    const { hashed, wrongHash } = auditHashes();
+    expect(hashed).toContain("client/public/fonts/noto-serif-latin-wght-normal.woff2");
+    expect(hashed).toContain("client/public/fonts/OFL.txt");
+    expect(wrongHash).toEqual([]);
+  });
+
+  // Thư mục phông giả + CREDITS.md giả nằm ở HAI thư mục tạm riêng (CREDITS.md không được tính là tệp cần băm)
+  function withTempFont(content: Buffer, creditsLine: (name: string, sha: string) => string) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-credits-fonts-"));
+    const docDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-credits-doc-"));
+    try {
+      const file = path.join(dir, "demo.woff2");
+      fs.writeFileSync(file, content);
+      const credits = path.join(docDir, "CREDITS.md");
+      fs.writeFileSync(credits, creditsLine("demo.woff2", sha256File(file)) + "\n");
+      return auditHashes(credits, [dir]);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(docDir, { recursive: true, force: true });
+    }
+  }
+
+  it("băm đúng cùng dòng với tên tệp thì qua", () => {
+    const r = withTempFont(
+      Buffer.from("noi dung phong"),
+      (n, h) => `| \`${n}\` | nguồn | tác giả | OFL | ngày | \`${h}\` |`,
+    );
+    expect(r.wrongHash).toEqual([]);
+    expect(r.hashed.length).toBe(1);
+  });
+
+  it("đột biến: thiếu băm, băm cũ (tệp đã đổi), băm nằm ở dòng khác, băm của tệp khác -> đỏ", () => {
+    // thiếu băm
+    expect(
+      withTempFont(Buffer.from("a"), (n) => `| \`${n}\` | nguồn | tác giả | OFL | ngày |`)
+        .wrongHash,
+    ).toHaveLength(1);
+    // băm cũ: ghi băm của nội dung khác
+    const stale = sha256File(path.join(fontsDir, "OFL.txt"));
+    expect(
+      withTempFont(
+        Buffer.from("b"),
+        (n) => `| \`${n}\` | nguồn | tác giả | OFL | ngày | \`${stale}\` |`,
+      ).wrongHash,
+    ).toHaveLength(1);
+    // băm đúng nhưng ở dòng KHÁC với tên tệp
+    expect(
+      withTempFont(Buffer.from("c"), (n, h) => `| \`${n}\` | nguồn |\n| tệp khác | \`${h}\` |`)
+        .wrongHash,
+    ).toHaveLength(1);
   });
 });
