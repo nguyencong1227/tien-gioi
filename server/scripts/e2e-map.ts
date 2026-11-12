@@ -469,6 +469,25 @@ async function main() {
     ok(
       `sương: ${moved}/8 mảng trôi, làm sáng cảnh ${(lift * 100).toFixed(2)} % (đối chứng ${(noise * 100).toFixed(2)} %)`,
     );
+    // Draw call: bật / tắt toàn bộ mảng sương (cùng bậc, cùng cảnh)
+    const drawsWithFog = (on: boolean) =>
+      ev(`new Promise((resolve) => { const s = window.__scene, g = s.game, gl = g.renderer.gl;
+        if (!gl) return resolve(-1); s.fogImages.forEach((im) => im.setVisible(${on}));
+        let draws = 0, f = 0; const de = gl.drawElements, da = gl.drawArrays;
+        gl.drawElements = function () { draws++; return de.apply(this, arguments); };
+        gl.drawArrays = function () { draws++; return da.apply(this, arguments); };
+        const on2 = () => { if (++f > 30) { g.events.off('postrender', on2); gl.drawElements = de; gl.drawArrays = da; resolve(draws / 30); } };
+        g.events.on('postrender', on2); })`) as Promise<number>;
+    const fOff = Number(await drawsWithFog(false));
+    const fOn = Number(await drawsWithFog(true));
+    must(fOff >= 0, "renderer là WebGL");
+    must(
+      fOn - fOff <= 2.01,
+      `8 mảng sương thêm <= 2 draw call mỗi khung (tắt ${fOff.toFixed(1)}, bật ${fOn.toFixed(1)})`,
+    );
+    ok(
+      `draw call mỗi khung: tắt ${fOff.toFixed(1)} -> bật ${fOn.toFixed(1)} (+${(fOn - fOff).toFixed(1)})`,
+    );
     // Bậc Vừa: 4 mảng; bậc Thấp: không có
     await setQuality("mid");
     await sleep(500);
