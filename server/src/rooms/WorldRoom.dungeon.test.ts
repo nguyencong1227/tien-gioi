@@ -155,8 +155,13 @@ async function spawn(
   const p = serverState(room).players.get(room.sessionId)!;
   p.realm = 1;
   p.tier = 8; // stepOf(1, 8) = minStep của Linh Hư
-  p.x = gate.x;
-  p.y = gate.y;
+  // Chỉ dịch tới Thủ môn khi đang ở Lạc Hà (toạ độ `gate` là của bản đồ Lạc Hà). Ở bản đồ khác (`spawnIn`) GIỮ chỗ đứng trong
+  // file lưu (giữa trấn, khu an toàn): trước đây ép toạ độ cổng Lạc Hà vào Hắc Phong Cốc đặt người chơi ra giữa vùng quái,
+  // quái đánh trúng thì `enterDungeon` từ chối ("Đang giao chiến", `TRAVEL_COMBAT_LOCK_MS`) và test đỏ chập chờn (~3 %).
+  if (roomName === roomNameOf(DEFAULT_MAP_ID)) {
+    p.x = gate.x;
+    p.y = gate.y;
+  }
   return h;
 }
 
@@ -297,6 +302,9 @@ describe("mở và vào bí cảnh", () => {
     const a = await spawn();
     const b = await spawnIn(HAC_PHONG_ID);
     expect(serverRoom(b.room).mapId).toBe(HAC_PHONG_ID);
+    // Tiền điều kiện của ca: B đứng trong khu an toàn của Hắc Phong Cốc (quái không đánh tới), không phải chỗ ngẫu nhiên
+    const bp = serverState(b.room).players.get(b.room.sessionId)!;
+    expect(getMap(HAC_PHONG_ID)!.inSafe(bp.x, bp.y)).toBe(true);
     await party(a, b);
     const run = await openRun(a, b);
     b.room.send(DUNGEON_MSG.enter, { runId: run.id });
