@@ -128,8 +128,38 @@ try {
       return 1;
     })()`);
 
+  /** Chụp canvas WebGL (điểm ảnh thật) vào window[name]. */
+  const snap = (name) =>
+    evalJs(`new Promise((resolve) => {
+      const s = window.__scene, r = s.game.canvas.getBoundingClientRect();
+      s.game.renderer.snapshotArea(0, 0, Math.round(r.width), Math.round(r.height), (img) => {
+        const c = document.createElement("canvas"); c.width = img.width; c.height = img.height;
+        const x = c.getContext("2d"); x.drawImage(img, 0, 0);
+        window[${JSON.stringify(name)}] = x.getImageData(0, 0, c.width, c.height).data; resolve(1);
+      });
+    })`);
+  /** Số điểm ảnh trong ảnh chụp thoả điều kiện `cond` (biểu thức JS theo r, g, b). */
+  const count = (name, cond) =>
+    evalJs(`(() => { const D = window[${JSON.stringify(name)}]; let n = 0;
+      for (let i = 0; i < D.length; i += 4) { const r = D[i], g = D[i + 1], b = D[i + 2]; if (${cond}) n++; }
+      return n; })()`);
+  // Màu chữ (chữ vẽ NORMAL nên điểm ảnh giữ đúng màu; nền cỏ ~ (145,175,100) không rơi vào các khoảng này)
+  const GOLD = "r > 200 && g > 150 && g < 235 && b < 130 && r - b > 110"; // 0xffd34d: "Bạo!" chí mạng
+  const RED = "r > 200 && g < 150 && b < 140 && r - g > 70"; // 0xff6b5e: mình bị đánh
+  const GREEN = "g > 200 && r < 175 && b > 125 && g - r > 60"; // 0x7dffa0: hồi máu
+
   await settle();
   check((await alive()) === 0 && (await floats()) === 0, "ban đầu không hạt, không chữ bay");
+  await snap("base");
+  // Ảnh nền có sẵn vài điểm ảnh gần các màu này (nhân vật, cây): đo phần TĂNG so với nền
+  const base0 = {
+    gold: await count("base", GOLD),
+    red: await count("base", RED),
+    green: await count("base", GREEN),
+  };
+
+  const WHITE = "r > 235 && g > 215 && b > 150"; // tia lửa (ADD) và chữ trắng chồng lên cỏ thành rất sáng
+  const white0 = await count("base", WHITE);
 
   // 1) Mình đánh thường: tia lửa + chữ, KHÔNG rung
   await dmg({ target: "quai-1", amount: 12 }, true);
@@ -138,6 +168,12 @@ try {
   check(n > 0 && n <= 8, `đòn thường: ${n} hạt sống (hit-spark 8)`);
   check(!(await shaking()), "đòn thường không rung màn hình");
   check((await floats()) === 1, "đòn thường: một chữ bay");
+  await snap("s1");
+  const white1 = await count("s1", WHITE);
+  check(
+    white1 - white0 > 20,
+    `đòn thường: điểm ảnh trắng sáng ${white0} -> ${white1} (tia lửa + chữ thật sự được vẽ)`,
+  );
   await settle();
 
   // 2) Mình chí mạng: nhiều hạt hơn + rung nhẹ (ưu tiên 2, hồ sơ Cao cho rung)
@@ -146,6 +182,12 @@ try {
   n = await alive();
   check(n > 8 && n <= 16, `chí mạng của mình: ${n} hạt (hit-heavy 16)`);
   check(Boolean(await shaking()), "chí mạng của mình: màn hình rung nhẹ");
+  await snap("s2");
+  let c = (await count("s2", GOLD)) - base0.gold;
+  check(
+    c > 40,
+    `chí mạng: ${c} điểm ảnh vàng TĂNG so với nền, đúng màu chữ "Bạo!" trên canvas (> 40)`,
+  );
   await settle();
 
   // 3) Người khác chí mạng gần mình: có hạt nhưng KHÔNG rung màn hình của mình
@@ -160,6 +202,12 @@ try {
   await dmg({ target: "mock-session-01", amount: 500, toPlayer: true }, false);
   await sleep(60);
   check(Boolean(await shaking()), "bị đòn nặng (500 / 2500): màn hình rung");
+  await snap("s4");
+  c = (await count("s4", RED)) - base0.red;
+  check(
+    c > 30,
+    `bị đòn nặng: ${c} điểm ảnh đỏ TĂNG so với nền, đúng màu chữ sát thương trên canvas (> 30)`,
+  );
   await settle();
   await dmg({ target: "mock-session-01", amount: 30, toPlayer: true }, false);
   await sleep(60);
@@ -182,6 +230,12 @@ try {
   );
   check(/\+597/.test(txt ?? ""), `hồi máu lớn: chữ "+597" (${txt})`);
   check((await alive()) > 0, "hồi máu lớn: có hạt heal-glow");
+  await snap("s5");
+  c = (await count("s5", GREEN)) - base0.green;
+  check(
+    c > 30,
+    `hồi máu: ${c} điểm ảnh xanh TĂNG so với nền, đúng màu chữ "+597" trên canvas (> 30)`,
+  );
   await settle();
 
   // 6) Quái biến khỏi state ngay trong màn hình: tan thành điểm sáng
@@ -192,10 +246,18 @@ try {
   })()`);
   await sleep(400);
   check((await alive()) === 0, "quái đang đứng yên: chưa có hạt");
+  await snap("pre");
+  const whitePre = await count("pre", WHITE);
   await evalJs(`window.__scene.state.monsters.delete("t-quai"); 0`);
   await sleep(120);
   n = await alive();
   check(n > 0 && n <= 12, `quái gục trong màn hình: ${n} hạt tan (mon-vanish 12)`);
+  await snap("post");
+  const whitePost = await count("post", WHITE);
+  check(
+    whitePost - whitePre > 15,
+    `quái tan: điểm ảnh trắng sáng ${whitePre} -> ${whitePost} (hạt thật sự được vẽ)`,
+  );
   await settle();
   // ...còn quái ở xa ngoài khung camera rồi mới biến (rời vùng nhìn) thì KHÔNG nổ hạt
   await evalJs(`(() => {
