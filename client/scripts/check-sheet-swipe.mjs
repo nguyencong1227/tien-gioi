@@ -287,6 +287,26 @@ try {
       s = await state(id);
       check(s.hidden, `${tag}: vuốt chậm qua 30 % kích thước đóng tấm`);
       if (!s.hidden) await open(toggle, false);
+
+      // D. Ngưỡng 30 % (SWIPE_CLOSE_FRAC) phải tách bạch với vuốt nhanh (flick): hai ca dưới đều đi RẤT CHẬM
+      // (20 bước cách 40 ms, ~0,2-0,4 px/ms, dưới SWIPE_FLICK_V = 0,6) nên chỉ ngưỡng quãng đường quyết định.
+      // (Ca "vuốt chậm" phía trên thật ra ~1 px/ms nên đóng nhờ flick, không chứng minh được ngưỡng.)
+      await open(toggle, true);
+      await swipe(hp.x, hp.y, repeat(20, dir[0] * 0.2 * size, dir[1] * 0.2 * size), 40);
+      await sleep(450);
+      s = await state(id);
+      check(
+        !s.hidden && s.transform === "" && s.transition === "" && atRest(s, vp.orient),
+        `${tag}: thả CHẬM ở 20 % kích thước thì trả về (không đóng), dọn kiểu inline`,
+      );
+      await swipe(hp.x, hp.y, repeat(20, dir[0] * 0.4 * size, dir[1] * 0.4 * size), 40);
+      await sleep(450);
+      s = await state(id);
+      check(
+        s.hidden,
+        `${tag}: thả CHẬM ở 40 % kích thước thì đóng (đủ ngưỡng 30 %, không phải flick)`,
+      );
+      if (!s.hidden) await open(toggle, false);
     }
     if (vp.name === "390x844") {
       // Giảm chuyển động: đóng ngay, không trượt
