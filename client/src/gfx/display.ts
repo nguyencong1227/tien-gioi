@@ -92,7 +92,13 @@ function safeInset(v: unknown): number {
   return Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
 }
 
-export type DisplayEventType = "resize" | "orientationchange" | "viewport" | "pointerdown";
+export type DisplayEventType =
+  | "resize"
+  | "orientationchange"
+  | "viewport"
+  | "pointerdown"
+  /** `(pointer: coarse)` đổi (máy lai gắn / tháo bàn phím, chế độ tablet) mà không có `resize`. */
+  | "pointermedia";
 
 /** Phần tối thiểu của môi trường mà lõi hiển thị cần (tiêm vào để test không cần DOM). */
 export interface DisplayEnv {
@@ -111,6 +117,8 @@ export interface DisplayEnv {
     setProperty(name: string, value: string): void;
   };
   storage?: { get(key: string): string | null; set(key: string, value: string): void };
+  /** Dọn tài nguyên môi trường tạo ra (vd phần tử dò vùng an toàn). */
+  dispose?(): void;
 }
 
 export interface DisplayController {
@@ -145,6 +153,13 @@ export function createDisplay(env: DisplayEnv): DisplayController {
   const listeners = new Set<(d: DisplayInfo) => void>();
   let touch = env.coarsePrimary();
   let renderScale = 1;
+  // Chiều cao ỔN ĐỊNH dùng để phân loại `form` / `orient`: bàn phím ảo làm khung nhìn thấp đi (360x640 -> 360x340)
+  // mà máy không xoay; nếu phân loại theo chiều cao thật thì `orient` lật sang landscape (và tablet thành phone)
+  // đúng lúc người chơi gõ chữ, làm tấm toàn màn hình biến thành ngăn kéo. Trên cảm ứng: chiều cao chỉ GIẢM mà
+  // bề rộng không đổi thì giữ chiều cao lớn nhất đã thấy ở bề rộng này; bề rộng đổi (xoay máy, đổi cỡ cửa sổ) thì
+  // đặt lại. Trên máy tính (chuột) thay đổi chiều cao là thật nên theo sát.
+  let lastW = -1;
+  let stableH = 0;
   let uiScale: UiScale = clampUiScale(env.storage?.get(UI_SCALE_STORAGE_KEY));
 
   const read = (): DisplayInfo => {
@@ -152,13 +167,19 @@ export function createDisplay(env: DisplayEnv): DisplayController {
     const cssW = Math.max(1, Math.round(safeNumber(sz.w, 1)));
     const cssH = Math.max(1, Math.round(safeNumber(sz.h, 1)));
     const s = env.safe();
+    if (cssW !== lastW) {
+      lastW = cssW;
+      stableH = cssH;
+    } else {
+      stableH = touch ? Math.max(stableH, cssH) : cssH;
+    }
     return {
       cssW,
       cssH,
       dpr: safeNumber(env.dpr(), 1),
       renderScale,
-      form: classifyForm(cssW, cssH, env.coarsePrimary()),
-      orient: classifyOrient(cssW, cssH),
+      form: classifyForm(cssW, stableH, env.coarsePrimary()),
+      orient: classifyOrient(cssW, stableH),
       touch,
       safe: { t: safeInset(s.t), r: safeInset(s.r), b: safeInset(s.b), l: safeInset(s.l) },
     };
@@ -185,7 +206,14 @@ export function createDisplay(env: DisplayEnv): DisplayController {
     if (sameInfo(info, next)) return;
     info = next;
     write(info);
-    for (const cb of [...listeners]) cb(info);
+    for (const cb of [...listeners]) {
+      // Một người nghe lỗi không được chặn những người nghe khác (và không làm hỏng việc cập nhật)
+      try {
+        cb(info);
+      } catch (e) {
+        console.error("[display] người nghe onChange ném lỗi:", e);
+      }
+    }
   };
 
   let cancelTimer: (() => void) | null = null;
@@ -201,6 +229,7 @@ export function createDisplay(env: DisplayEnv): DisplayController {
     env.listen("resize", schedule),
     env.listen("orientationchange", schedule),
     env.listen("viewport", schedule),
+    env.listen("pointermedia", schedule),
     env.listen("pointerdown", (e) => {
       const t = e?.pointerType;
       // Chỉ đổi theo loại con trỏ đã biết; loại lạ không làm nhảy chế độ.
@@ -240,6 +269,7 @@ export function createDisplay(env: DisplayEnv): DisplayController {
       cancelTimer = null;
       for (const u of unsub) u();
       listeners.clear();
+      env.dispose?.();
     },
   };
 }
@@ -280,6 +310,12 @@ export function browserEnv(win: Window = window, doc: Document = document): Disp
         vv.addEventListener("resize", h);
         return () => vv.removeEventListener("resize", h);
       }
+      if (type === "pointermedia") {
+        const mq = win.matchMedia("(pointer: coarse)");
+        const h = () => cb();
+        mq.addEventListener?.("change", h);
+        return () => mq.removeEventListener?.("change", h);
+      }
       if (type === "pointerdown") {
         const h = (e: Event) => cb({ pointerType: (e as PointerEvent).pointerType });
         win.addEventListener("pointerdown", h, { capture: true, passive: true });
@@ -296,6 +332,10 @@ export function browserEnv(win: Window = window, doc: Document = document): Disp
     root: {
       setAttribute: (n, v) => root.setAttribute(n, v),
       setProperty: (n, v) => root.style.setProperty(n, v),
+    },
+    dispose: () => {
+      probe?.remove();
+      probe = null;
     },
     storage: {
       get: (k) => {
