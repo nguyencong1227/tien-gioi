@@ -3,7 +3,7 @@
  *
  * Phía CLIENT, suy từ dữ liệu đã có (không thêm tin nhắn / trường đồng bộ): `p.dead` (gục), tin `dmg` có `toPlayer` và
  * `target` = sessionId (bị đánh), `slashUntil` (đánh, đã có), vận tốc (đi). Hàm thuần, không đụng Phaser.
- * Ưu tiên: gục > bị đánh > đánh > đi > đứng.
+ * Ưu tiên: gục > bị đánh > đánh > đi > đứng; bị đánh GIỮA đòn đánh thì chờ đòn đánh xong rồi mới giật lùi (không cắt khung Chém).
  */
 import { getQuality, hasQuality } from "../quality";
 
@@ -24,15 +24,27 @@ export function playerAnimMs(state: "hurt" | "die"): number {
 
 /** Cờ thời gian (ms theo đồng hồ cảnh `scene.time.now`); 0 = chưa từng. */
 export interface PlayerAnimClock {
+  /** Hoạt ảnh bị đánh bắt đầu từ mốc này (sau đòn đánh đang diễn ra, nếu có). */
+  hurtFrom: number;
   hurtUntil: number;
 }
 
 export function newPlayerAnimClock(): PlayerAnimClock {
-  return { hurtUntil: 0 };
+  return { hurtFrom: 0, hurtUntil: 0 };
 }
 
-export function markPlayerHurt(c: PlayerAnimClock, now: number): void {
-  c.hurtUntil = now + playerAnimMs("hurt");
+/** Đòn đánh còn lại tối đa chừng này thì hoạt ảnh bị đánh mới chịu chờ (số lạ / hỏng thì không chờ quá lâu). */
+export const HURT_MAX_DEFER_MS = 400;
+
+/**
+ * Đánh dấu bị đánh. `slashUntil` = mốc hết đòn đánh đang diễn ra (0 = không đánh): bị đánh giữa đòn thì giật lùi bắt đầu SAU khi
+ * đòn xong (nit của A ở #346: trước đây hoạt ảnh bị đánh cắt ngang khung Chém 167 ms). Phản hồi bị đánh vẫn tức thì ở chữ bay,
+ * hạt, rung; chỉ tư thế chờ.
+ */
+export function markPlayerHurt(c: PlayerAnimClock, now: number, slashUntil = 0): void {
+  const defer = Number.isFinite(slashUntil) ? Math.min(slashUntil, now + HURT_MAX_DEFER_MS) : 0;
+  c.hurtFrom = Math.max(now, defer);
+  c.hurtUntil = c.hurtFrom + playerAnimMs("hurt");
 }
 
 export interface PlayerAnimInput {
@@ -48,7 +60,7 @@ export function playerAnimState(
   i: PlayerAnimInput,
 ): PlayerAnimState {
   if (i.dead) return "die";
-  if (now < c.hurtUntil) return "hurt";
+  if (now >= c.hurtFrom && now < c.hurtUntil) return "hurt";
   if (now < i.slashUntil) return "slash";
   return i.moving ? "walk" : "idle";
 }

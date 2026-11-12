@@ -124,6 +124,7 @@ import {
   type MonAnimState,
 } from "../gfx/anim/mon-anim";
 import {
+  PLAYER_DIE_FRAMES,
   animReducedMotion,
   markPlayerHurt,
   newPlayerAnimClock,
@@ -2027,7 +2028,15 @@ export class WorldScene extends Phaser.Scene {
     e.playerAnimState = state;
     const prefix = e.animPrefix ?? who;
     const animKey = playerAnimKey(prefix, state, dir);
-    if (this.anims.exists(animKey)) {
+    // Giảm chuyển động: gục KHÔNG phát 4 khung đổ xuống, chỉ hiện thẳng khung xác nằm lại (nit của A ở #346)
+    const deadFrame = `${prefix}-die-${PLAYER_DIE_FRAMES - 1}`;
+    if (state === "die" && animReducedMotion() && this.textures.get(ATLAS_KEY).has(deadFrame)) {
+      if (e.sprite.frame.name !== deadFrame) {
+        e.sprite.anims.stop();
+        e.sprite.setFrame(deadFrame);
+      }
+      e.sprite.setFlipX(false);
+    } else if (this.anims.exists(animKey)) {
       if (e.sprite.anims.currentAnim?.key !== animKey) e.sprite.play(animKey, true);
       e.sprite.setFlipX(false);
     } else {
@@ -2570,7 +2579,12 @@ export class WorldScene extends Phaser.Scene {
     if (!animReducedMotion()) {
       if (m.toPlayer) {
         const pe = this.players.get(m.target);
-        if (pe) markPlayerHurt((pe.playerAnim ??= newPlayerAnimClock()), this.time.now);
+        if (pe)
+          markPlayerHurt(
+            (pe.playerAnim ??= newPlayerAnimClock()),
+            this.time.now,
+            pe.slashUntil ?? 0,
+          );
       } else {
         const mon = this.monsters.get(m.target);
         if (mon?.monAnim) markMonHurt(mon.monAnim, this.time.now);
