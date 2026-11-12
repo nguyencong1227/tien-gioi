@@ -22,32 +22,34 @@ Tài liệu này dành cho **người dùng** (có điện thoại Android tầm
 
 (Số draw call và bộ nhớ texture không hiện trên lớp phủ: harness của C đo trong CI.)
 
+> **`?perf=1` hiện HAI khung** (cả hai không bắt chạm): lớp phủ chữ xanh ở **góc trên trái** (các dòng trong bảng trên) và một **bảng đo nhỏ ở nửa phải** màn hình (`FPS`, `Frame TB / p95`, `Thực thể (N/Q/Đ)`, `Tween đang chạy`; hai khung do hai bộ đếm khác nhau nên FPS và p95 có thể lệch chút; lấy dòng của lớp phủ xanh để điền bảng mục 5). Chúng **che HUD trái** (tên, thanh khí huyết / linh lực) và một phần nút Đột phá / Đả tọa / Mục tiêu, nên **mục 4 (kiểm tra bằng mắt) phải làm SAU khi bỏ `?perf=1`**: mở lại `http://<IP>:5173/` không có đuôi.
+
 ## 3. Kịch bản đo (mỗi mục 60 giây, ghi FPS / p95 sau ~30 giây cho ổn định)
 Đặt **Cài đặt -> Chất lượng đồ hoạ** về từng bậc **Thấp (`low`) / Vừa (`mid`) / Cao (`high`)** (chọn tay thì bộ điều tốc tắt), lặp các cảnh dưới đây, điền bảng mục 5.
 - **Cảnh A, đứng yên trong Lạc Hà Trấn** (không thấy quái, có NPC / người chơi khác nếu có).
 - **Cảnh B, đi bộ ra vùng quái và đánh liên tục** (Chém + kỹ năng; có chữ bay, hạt, hoạt ảnh đánh / bị đánh).
-- **Cảnh C, đông người:** nếu có người khác trực tuyến thì tụ lại; nếu không, nhờ Dev C / A chạy bot (`npm run bots -w server -- --bots=50 --duration=120`, nhắm cổng dev 2597, không dùng 2567) lúc bạn đứng trong trấn.
+- **Cảnh C, đông người:** nếu có người khác trực tuyến thì tụ lại; nếu không thì dùng bot. **Công cụ bot (`server/scripts/bots.ts`) TỪ CHỐI cổng 2567 (bản chạy thật), 2577 (Dev B) và 2597 (Dev A)**, nên không bắn được vào server của A mà điện thoại đang nối ở mục 1. Cách làm: ở thư mục **Dev C** (`~/TT/tien-gioi-c`, server cổng 2587, client cổng 5193) bật `npm run dev`, điện thoại mở `http://<IP>:5193/?perf=1` (server khác của C: thư mục đó phải đang ở bản mới nhất của `main` để cùng mã với bản bạn đo ở các cảnh khác), rồi chạy ở đó `npm run bots -w server -- --bots=50 --mode=crowd --duration=300` (`--mode=crowd` = 50 bot tụ trong trấn, đứng / đi lại; không có `--mode` thì bot ra vùng quái chém, KHÔNG đông trong trấn). Dev C hết hạn mức đến khoảng 16/11: bạn có thể tự chạy các lệnh trên trong thư mục đó, hoặc nhờ A.
 - **Cảnh D, Hắc Phong Cốc** (qua cổng truyền tống): thời tiết + sương + mặt nước.
 - **Tự động:** đặt `Tự động (khuyên dùng)`, chơi 3 phút (đi, đánh, qua cổng, mở các tấm), ghi bậc cuối và số lần `hạ`.
-- **Tiết kiệm pin:** bật, ghi FPS (mong đợi ~30) và xem có giật không.
+- **Tiết kiệm pin:** bật ở **Cài đặt -> Tiết kiệm pin (giới hạn khoảng 30 khung hình/giây)** (khác với chế độ tiết kiệm pin của hệ điều hành ở mục 1), ghi FPS (mong đợi ~30) và xem có giật không.
 - **Xoay máy dọc <-> ngang** 3 lần: không tải lại trang, FPS và bố cục không vỡ.
 
 ## 4. Kiểm tra bằng mắt (đánh dấu Đạt / Lỗi, ghi chú lỗi kèm ảnh chụp màn hình)
-Làm ở **cả dọc và ngang**.
+Làm ở **cả dọc và ngang**, **không có `?perf=1`** (mở `http://<IP>:5173/`: hai khung đo của `?perf=1` che HUD trái và nút kỹ năng, xem mục 2).
 1. **Bố cục:** HUD không che quá nửa cảnh; joystick (nửa trái, nửa dưới) kéo được kể cả khi ngón đặt trên bảng Nhiệm vụ / HUD; nút Chém / kỹ năng / Nhặt / Mục tiêu bấm đúng, không dính nhau; không phần tử nào lọt dưới tai thỏ / thanh điều hướng.
    - **Bảng Nhiệm vụ** (cột HUD trái): ở điện thoại ngang và điện thoại dọc thấp (< 700 px) thu gọn sẵn thành một dòng `Nhiệm vụ (n) ▸`; bấm tiêu đề để mở / thu, lựa chọn được nhớ kể cả sau khi tải lại và xoay máy; cột HUD trái nên chiếm khoảng 65-70 % chiều cao ở điện thoại ngang.
    - **Nút HUD** (Nhân vật, Túi, Nhiệm vụ, Tông môn, Âm thanh, Cài đặt) và ô chat: đủ to để chạm bằng ngón cái (>= 44 px), không bấm nhầm nút bên cạnh; ở điện thoại ngang sáu nút xếp lưới 3 cột x 2 hàng, nằm gọn trong bảng HUD, không bị cắt. Khi mở bảng Nhiệm vụ có nhiệm vụ, dòng gợi ý "Chạm vào một nhiệm vụ để chỉ đường" nằm dưới tiêu đề (không phải trong nút thu gọn).
    - **Điều khiển di chuyển:** thử cả hai kiểu ở **Cài đặt -> Điều khiển di chuyển**: *Joystick nổi* (nửa trái, 65 % chiều cao phía dưới) và *Nút hướng cố định* (D-pad 8 hướng, không đè cột HUD trái).
-   - **Nút Mục tiêu:** mờ khi không có quái trong tầm khoá (520 px); bấm khoá con gần nhất, bấm tiếp chuyển sang con xa hơn (vòng lại), vòng đánh dấu hiện trên mục tiêu; Chém xoay về con đang khoá.
+   - **Nút Mục tiêu:** mờ khi không có quái trong tầm khoá (520 px); bấm khoá con gần nhất, bấm tiếp chuyển sang con xa hơn (vòng lại), vòng đánh dấu hiện trên mục tiêu; Chém xoay về con đang khoá. Chỉ còn đúng một con trong tầm mà đang khoá nó thì bấm lần nữa là bỏ khoá; con bị khoá đi ra khỏi tầm 520 px thì tự nhả khoá.
    - **Đa chạm:** vừa đi (joystick / D-pad) vừa bấm Chém và Kiếm khí cùng lúc; chạm đúp / chụm hai ngón KHÔNG làm trang phóng to.
 2. **Tấm bảng** (Nhân vật, Túi, Nhiệm vụ, Bản đồ, Cài đặt, Cửa hàng, Lò rèn, **Tông môn**): mở ra toàn màn hình (dọc) hoặc ngăn kéo bên phải (ngang), cuộn mượt, nút **Đóng** ở góc dưới phải với tới bằng ngón cái; thẻ kết quả (Bí cảnh, Quyết đấu, Chỉ dẫn người mới, Phiên bản cũ nếu gặp) nằm giữa màn hình.
    - **Kéo để đóng:** vuốt TIÊU ĐỀ tấm xuống (dọc) / sang phải (ngang): tấm đi theo ngón tay; thả sớm thì trượt về, kéo qua khoảng 1/3 hoặc vuốt nhanh thì đóng. Vuốt ở thân tấm chỉ cuộn nội dung, không đóng. Có thanh nắm nhỏ ở mép tiêu đề. Bật Giảm chuyển động thì đóng ngay, không trượt.
    - **Tông môn:** cuộn danh sách thành viên rồi bấm Nhường / Trục xuất / Rời: hộp xác nhận phủ kín tấm (không trôi ra ngoài màn hình dù đã cuộn).
-   - **Hộp thoại NPC** (dock đáy màn hình): không che nút Chém, chạm để hiện hết chữ, các lựa chọn bấm được.
+   - **Hộp thoại NPC** (dock đáy màn hình): trong lúc đang nói chuyện hộp **phủ lên nút Chém / kỹ năng và thanh đan dược** (đúng thiết kế, không chạm xuyên qua được; đóng bằng ✕ / lựa chọn "Rời đi" / phím Esc thì các nút hiện lại); chạm vào chữ để hiện hết chữ, mỗi lựa chọn bấm bằng MỘT chạm. Hộp không cao quá màn hình: nhiều lựa chọn thì **vuốt trong hộp để cuộn** (tiêu đề + nút ✕ đứng yên; vuốt không chọn nhầm lựa chọn). Ở điện thoại ngang chữ nằm bên trái, lựa chọn bên phải.
 3. **Chữ:** nội dung bảng đọc được không phải nheo mắt (≥ 14 px); thử **Cài đặt -> Cỡ chữ** Nhỏ / Vừa / Lớn, rồi **xoay máy** (cỡ đã chọn phải được giữ).
-   - Để khỏi báo nhầm: nhãn HUD ≥ 12 px và **KHÔNG đổi theo Cỡ chữ** (đúng thiết kế); trên điện thoại **Nhỏ ≈ Vừa** (sàn 14 px thắng), **Lớn** chỉ nới chữ gốc ≥ 13 px; **tên ô đan dược ở thanh nhanh bị cắt** ("Hồi H…") là hạn chế đã biết (tên đầy đủ ở `title`).
-4. **Hiệu ứng:** chém / kỹ năng có hạt và rung nhẹ, chữ sát thương bay rõ; đột phá cảnh giới, Tam Sinh Thạch, cổng truyền tống (chuyển cảnh mống mắt) hiện đúng; **Giảm chuyển động** của hệ điều hành thì rung / chớp tắt.
-5. **Hoạt ảnh:** người và yêu thú đi / đánh / bị đánh / gục mượt; thực thể ở xa không giật; tween nhẹ (nhấp nhô khi đi, co giãn khi đánh / bị đánh, chân đứng yên một chỗ) và bóng đốm dưới chân. Bật **Giảm chuyển động** của hệ điều hành: gục chỉ hiện khung xác nằm lại, không tween.
+   - Để khỏi báo nhầm: nhãn HUD ≥ 12 px và **KHÔNG đổi theo Cỡ chữ** (đúng thiết kế); trên điện thoại **Nhỏ ≈ Vừa** (sàn 14 px thắng), **Lớn** chỉ nới chữ gốc ≥ 13 px; **tên ô đan dược ở thanh nhanh bị cắt** ("Hồi H…") là hạn chế đã biết (xem tên đầy đủ trong Túi).
+4. **Hiệu ứng:** chém / kỹ năng có hạt và rung nhẹ, chữ sát thương bay rõ; đột phá cảnh giới, Tam Sinh Thạch, cổng truyền tống (chuyển cảnh mống mắt) hiện đúng; **Giảm chuyển động** (**Cài đặt -> Giảm chuyển động**, hoặc chế độ giảm chuyển động của hệ điều hành khi chưa chọn trong game; lựa chọn trong game thắng) thì rung / chớp tắt.
+5. **Hoạt ảnh:** người và yêu thú đi / đánh / bị đánh / gục mượt; thực thể ở xa không giật; tween nhẹ (nhấp nhô khi đi, co giãn khi đánh / bị đánh, chân đứng yên một chỗ) và bóng đốm dưới chân. Bật **Giảm chuyển động** (như mục 4): gục chỉ hiện khung xác nằm lại, không tween; tấm bảng hiện / đóng ngay, không trượt.
 6. **Bản đồ:** thời tiết, sương trôi, nước lấp lánh (trôi ở bậc Vừa / Cao, đứng yên ở bậc Thấp), bóng đốm dưới chân; ở bậc Thấp thì tối giản nhưng không lỗi.
 7. **Mất mạng:** tắt Wi-Fi 10 giây rồi bật lại: game tự nối lại và nhân vật còn nguyên chỗ cũ (server giữ chỗ 20 giây). Thử thêm **tắt > 25 giây**: sau 20 giây server không giữ chỗ nữa nên phải hiện thông báo / nút **Tải lại trang** (không treo im).
 8. **Nóng máy / pin:** sau 15 phút chơi, ghi nhiệt độ cảm nhận (bình thường / ấm / nóng) và % pin đã tụt.
