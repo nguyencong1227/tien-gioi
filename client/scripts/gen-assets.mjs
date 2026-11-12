@@ -125,6 +125,57 @@ class Surface {
       }
     }
   }
+  /**
+   * Biến đổi sang tư thế khác bằng lấy mẫu láng giềng gần nhất (giữ nét pixel-art, tất định, không tệp ngoài):
+   * co / giãn (sx, sy) quanh điểm neo (ax, ay) rồi dịch (dx, dy). Neo ở chân để thân co lại mà bóng vẫn đứng yên.
+   */
+  warp({ sx = 1, sy = 1, dx = 0, dy = 0, ax = this.w / 2, ay = this.h * 0.84 }) {
+    const out = new Surface(this.w, this.h);
+    for (let y = 0; y < this.h; y++) {
+      for (let x = 0; x < this.w; x++) {
+        const sxp = Math.floor((x - dx - ax) / sx + ax + 0.5);
+        const syp = Math.floor((y - dy - ay) / sy + ay + 0.5);
+        if (sxp < 0 || syp < 0 || sxp >= this.w || syp >= this.h) continue;
+        const si = this.idx(sxp, syp);
+        const oi = out.idx(x, y);
+        out.data[oi] = this.data[si];
+        out.data[oi + 1] = this.data[si + 1];
+        out.data[oi + 2] = this.data[si + 2];
+        out.data[oi + 3] = this.data[si + 3];
+      }
+    }
+    return out;
+  }
+  /**
+   * Đổi màu thân (không đụng bóng đổ: điểm đen trong suốt một phần): pha trắng `white` (chớp bị đánh),
+   * giảm bão hoà `gray`, làm tối `dark`, nhân độ trong suốt `alpha`.
+   */
+  recolor({ white = 0, gray = 0, dark = 0, alpha = 1 }) {
+    for (let i = 0; i < this.data.length; i += 4) {
+      const a = this.data[i + 3];
+      if (!a) continue;
+      const r = this.data[i];
+      const g = this.data[i + 1];
+      const b = this.data[i + 2];
+      const isShadow = r === 0 && g === 0 && b === 0 && a < 255;
+      if (isShadow) {
+        this.data[i + 3] = Math.round(a * alpha);
+        continue;
+      }
+      const lum = 0.3 * r + 0.59 * g + 0.11 * b;
+      const mix = (c) => {
+        let v = c + (lum - c) * gray;
+        v *= 1 - dark;
+        v += (255 - v) * white;
+        return Math.max(0, Math.min(255, Math.round(v)));
+      };
+      this.data[i] = mix(r);
+      this.data[i + 1] = mix(g);
+      this.data[i + 2] = mix(b);
+      this.data[i + 3] = Math.round(a * alpha);
+    }
+    return this;
+  }
   toPNG() {
     const raw = Buffer.alloc((this.w * 4 + 1) * this.h);
     for (let y = 0; y < this.h; y++) {
@@ -428,6 +479,58 @@ function drawMonsterFrame(id, step) {
   return s;
 }
 
+/**
+ * Tư thế chiến đấu của yêu thú, suy từ khung `move` (biến thể bằng biến đổi + màu, KHÔNG vẽ lại từng khung để atlas không phình;
+ * thiết kế M5 mục 8). Quái vẽ quay sang PHẢI (client lật khi nhìn trái).
+ *   atk-0 dồn lực (co lại, lùi), atk-1 vồ (giãn ra, lao tới, vệt vuốt);
+ *   hurt chớp trắng + giật lùi (1 khung);
+ *   die-0..3: giật lùi chớp trắng -> đổ bẹp xám -> nằm tối -> tan thành điểm sáng.
+ */
+function drawMonsterPose(id, pose) {
+  const base = drawMonsterFrame(id, 0);
+  const w = base.w;
+  const h = base.h;
+  switch (pose) {
+    case "atk-0":
+      return base.warp({ sx: 0.92, sy: 1.08, dx: -1 });
+    case "atk-1": {
+      const s = base.warp({ sx: 1.18, sy: 0.92, dx: Math.round(w * 0.06) });
+      // Vệt vuốt phía trước
+      const x0 = w - 9;
+      const y0 = Math.round(h * 0.28);
+      for (let i = 0; i < 3; i++)
+        s.line(x0 + i * 2, y0 + i * 3, x0 + 5 + i * 2, y0 + 9 + i * 3, 0xffffff, 1.2, 210);
+      return s;
+    }
+    case "hurt":
+      return base.warp({ sx: 0.94, sy: 1.04, dx: -2 }).recolor({ white: 0.6 });
+    case "die-0":
+      return base.warp({ sx: 0.94, sy: 1.04, dx: -3 }).recolor({ white: 0.6 });
+    case "die-1":
+      return base.warp({ sx: 1.1, sy: 0.7, dx: -3 }).recolor({ gray: 0.5 });
+    case "die-2":
+      return base
+        .warp({ sx: 1.2, sy: 0.35, dx: -3 })
+        .recolor({ gray: 0.6, dark: 0.45, alpha: 0.8 });
+    case "die-3": {
+      // Tan thành điểm sáng: thân mờ gần hết + vài đốm hồn bay lên (vị trí tất định theo id)
+      const s = base
+        .warp({ sx: 1.2, sy: 0.2, dx: -3 })
+        .recolor({ gray: 0.7, dark: 0.5, alpha: 0.25 });
+      const r = rng(id.length * 7919 + id.charCodeAt(0));
+      for (let i = 0; i < 6; i++) {
+        const px = w * 0.2 + r() * w * 0.6;
+        const py = h * 0.78 - r() * h * 0.4;
+        s.circle(px, py, 1 + r() * 1.2, i % 2 ? 0xffffff : 0xbfe8ff, 220 - i * 20);
+      }
+      return s;
+    }
+    default:
+      throw new Error(`Tư thế yêu thú lạ: ${pose}`);
+  }
+}
+const MONSTER_POSES = ["atk-0", "atk-1", "hurt", "die-0", "die-1", "die-2", "die-3"];
+
 // ---------------- 4. Vẽ vật phẩm (24x24) & Hiệu ứng ----------------
 
 function drawItemIcon(id) {
@@ -642,6 +745,7 @@ function buildAtlas() {
     push(`mon-${mId}`, f0);
     push(`mon-${mId}-0`, f0);
     push(`mon-${mId}-1`, f1);
+    for (const pose of MONSTER_POSES) push(`mon-${mId}-${pose}`, drawMonsterPose(mId, pose));
   }
 
   for (const npcId of ["truong_tran", "duoc_su", "tho_ren", "cao_thi"]) {
@@ -675,23 +779,22 @@ function buildAtlas() {
   push("swordbeam", drawSwordBeam());
   push("dot", drawDot());
 
-  // Sắp xếp shelf packing gọn vào atlas 640x640
+  // Sắp xếp shelf packing vào atlas rộng 640, cao vừa đủ (làm tròn 16, trần 2048 theo ngân sách M5 mục 8)
   const W = 640;
-  const H = 640;
-  const atlas = new Surface(W, H);
+  const MAX_H = 2048;
+  const pad = 2;
   const frames = {};
+  const placed = [];
   let cx = 2;
   let cy = 2;
   let rowH = 0;
-  const pad = 2;
-
   for (const { name, surf } of entries) {
     if (cx + surf.w + pad > W) {
       cx = 2;
       cy += rowH + pad;
       rowH = 0;
     }
-    atlas.blit(surf, cx, cy);
+    placed.push({ surf, x: cx, y: cy });
     frames[name] = {
       frame: { x: cx, y: cy, w: surf.w, h: surf.h },
       rotated: false,
@@ -702,6 +805,10 @@ function buildAtlas() {
     cx += surf.w + pad;
     rowH = Math.max(rowH, surf.h);
   }
+  const H = Math.ceil((cy + rowH + pad) / 16) * 16;
+  if (H > MAX_H) throw new Error(`Atlas cao ${H}px vượt trần ${MAX_H}px`);
+  const atlas = new Surface(W, H);
+  for (const p of placed) atlas.blit(p.surf, p.x, p.y);
 
   fs.writeFileSync(path.join(OUT_DIR, "atlas.png"), atlas.toPNG());
   fs.writeFileSync(
