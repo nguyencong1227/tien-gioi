@@ -1,5 +1,6 @@
 import { getDisplay } from "../gfx/display";
 import { createFxSystem, type FxSystem } from "../gfx/fx/fx";
+import { planSlashEdges, planSwordBeam, type FxPoint } from "../gfx/fx/skill-fx";
 import { motePriority, nextMoteAt, planBreakFail, planLevelUp } from "../gfx/fx/cultivation-fx";
 import {
   PORTAL_SWIRL_INTERVAL_MS,
@@ -1008,7 +1009,7 @@ export class WorldScene extends Phaser.Scene {
     if (myEntity) myEntity.slashUntil = this.time.now + 220;
     this.room.send("attack", { angle: a });
     sound.slash();
-    this.fxSlash(this.predX, this.predY, a, this.weaponColorFor(me, 0xffffff));
+    this.fxSlash(this.predX, this.predY, a, this.weaponColorFor(me, 0xffffff), 1, true);
   }
 
   private sword() {
@@ -1025,7 +1026,14 @@ export class WorldScene extends Phaser.Scene {
     if (myEntity) myEntity.slashUntil = this.time.now + 220;
     this.room.send("skill", { id: "sword", angle: a });
     sound.sword();
-    this.fxSword(this.predX, this.predY, a, SKILLS.sword.range, this.weaponColorFor(me, 0xffffff));
+    this.fxSword(
+      this.predX,
+      this.predY,
+      a,
+      SKILLS.sword.range,
+      this.weaponColorFor(me, 0xffffff),
+      true,
+    );
   }
 
   private toggleMeditate() {
@@ -2603,7 +2611,7 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  private fxSlash(x: number, y: number, angle: number, color: number, scale = 1) {
+  private fxSlash(x: number, y: number, angle: number, color: number, scale = 1, mine = false) {
     const g = this.slashPool.pop() ?? this.add.graphics();
     g.clear();
     g.setPosition(x, y - 8)
@@ -2622,9 +2630,35 @@ export class WorldScene extends Phaser.Scene {
     g.arc(0, 0, r, angle - half * 0.8, angle + half * 0.8);
     g.strokePath();
     this.activeSlashes.push({ g, start: this.time.now });
+    // Tia lửa ở hai đầu cung (gfx/fx/skill-fx.ts); đòn của yêu thú (scale < 1) không thêm
+    if (scale >= 1)
+      this.playFxPoints(
+        planSlashEdges(x, y, angle, SKILLS.slash.range, SKILLS.slash.arc, mine, color),
+      );
   }
 
-  private fxSword(x: number, y: number, angle: number, range: number, tint = 0xffffff) {
+  /** Phát các điểm hạt của một kế hoạch (có trễ thì hẹn giờ theo đồng hồ cảnh; đóng cảnh thì tự huỷ). */
+  private playFxPoints(points: FxPoint[]) {
+    for (const p of points) {
+      const play = () =>
+        void this.fx.play(p.recipe, p.x, p.y, {
+          priority: p.priority,
+          tint: p.tint,
+          angle: p.angle,
+        });
+      if (p.delayMs <= 0) play();
+      else this.time.delayedCall(p.delayMs, play);
+    }
+  }
+
+  private fxSword(
+    x: number,
+    y: number,
+    angle: number,
+    range: number,
+    tint = 0xffffff,
+    mine = false,
+  ) {
     const s =
       this.swordPool.pop() ??
       this.add.image(x, y - 10, "swordbeam").setBlendMode(Phaser.BlendModes.ADD);
@@ -2643,6 +2677,8 @@ export class WorldScene extends Phaser.Scene {
       dy: Math.sin(angle) * range,
       start: this.time.now,
     });
+    // Tia sáng rải dọc đường bay + nổ ở mũi (gfx/fx/skill-fx.ts), trễ theo thời gian bay của ảnh kiếm khí
+    this.playFxPoints(planSwordBeam(x, y, angle, range, mine, tint));
   }
 
   private fxLevelUp(x: number, y: number, major: boolean, mine: boolean) {
