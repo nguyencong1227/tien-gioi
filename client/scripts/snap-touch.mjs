@@ -278,6 +278,16 @@ try {
     // --- 3b) Nút hướng cố định (D-pad): chọn trong Cài đặt như người chơi thật ---
     await evalJs("window.__ui.toggleSettingsModal(true);0");
     await sleep(200);
+    const sel = await J(
+      `(() => ["set-quality", "set-touch-scheme"].map((id) => { const el = document.getElementById(id); const b = el.getBoundingClientRect(); return { id, h: b.height, bg: getComputedStyle(el).backgroundColor }; }))()`,
+    );
+    for (const c of sel) {
+      check(c.h >= 44, `ô chọn #${c.id} cao >= 44 px (${Math.round(c.h)} px)`);
+      check(
+        c.bg !== "rgb(255, 255, 255)",
+        `ô chọn #${c.id} theo tông tối, không nền trắng mặc định (${c.bg})`,
+      );
+    }
     const rowShown = await evalJs(
       "getComputedStyle(document.getElementById('set-touch-row')).display !== 'none'",
     );

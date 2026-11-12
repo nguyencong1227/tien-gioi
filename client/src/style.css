@@ -1684,6 +1684,22 @@ body.low-fx #btn-talk {
   min-height: 46px;
   cursor: pointer;
 }
+/* Ô chọn trong Cài đặt (chất lượng đồ hoạ, kiểu điều khiển): theo tông tối của game, cao >= 44 px cho cảm ứng (nit của A ở #343) */
+.set-row select {
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--gold);
+  background: #1d1a16;
+  color: var(--paper);
+  font: inherit;
+  color-scheme: dark;
+}
+.set-row select:focus-visible {
+  outline: 2px solid #ffe08a;
+  outline-offset: 2px;
+}
 .set-row.toggle input[type="checkbox"] {
   width: 22px;
   height: 22px;
