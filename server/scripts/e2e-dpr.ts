@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
-import { Tab, sleep, shown } from "./e2e-kit";
+import { Tab, sleep, shown, killChrome, removeTmpDirs } from "./e2e-kit";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
@@ -61,7 +61,7 @@ async function main() {
         "--window-size=1280,720",
         "about:blank",
       ],
-      { stdio: "ignore" },
+      { stdio: "ignore", detached: true },
     );
     let targets: any[] = [];
     for (const start = Date.now(); Date.now() - start < 8000;) {
@@ -319,14 +319,10 @@ async function main() {
         /* bỏ qua */
       }
     }
-    if (chrome) chrome.kill("SIGKILL");
+    killChrome(chrome);
     await new Promise<void>((r) => httpServer.close(() => r()));
-    await gameServer.gracefullyShutdown();
-    try {
-      execSync(`rm -rf "${dataDir}" "${chromeDir}"`);
-    } catch {
-      /* bỏ qua */
-    }
+    await gameServer.gracefullyShutdown(false);
+    await removeTmpDirs(dataDir, chromeDir);
   }
   if (failed) process.exit(1);
   process.exit(0);

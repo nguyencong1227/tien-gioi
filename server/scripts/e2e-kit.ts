@@ -1,5 +1,6 @@
 // Khung dùng chung cho các E2E thật hai tab Chrome (CDP): lớp `Tab` (gom lỗi console, evaluate, chờ điều kiện, ảnh chụp).
 // Tách từ `e2e-pk.ts` cho E2E mới (`e2e-tong-mon.ts`); các E2E cũ giữ bản sao riêng của chúng.
+import { execSync, type ChildProcess } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import WebSocket from "ws";
@@ -7,6 +8,36 @@ import WebSocket from "ws";
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export const SHOTS = process.env.E2E_SHOTS ? path.resolve(process.env.E2E_SHOTS) : undefined;
 export const TIMEOUT = 15000;
+
+/**
+ * Giết CẢ NHÓM tiến trình của Chrome. Chrome phải được `spawn(..., { detached: true })` để làm chủ một nhóm; giết riêng tiến trình
+ * chính thì tiến trình con (gpu, renderer) còn sống và ghi lại thư mục dữ liệu sau khi ta đã xoá (sót `/tmp/tien-gioi-e2e-*-chrome-*`).
+ */
+export function killChrome(chrome: ChildProcess | null): void {
+  if (!chrome) return;
+  try {
+    if (chrome.pid) process.kill(-chrome.pid, "SIGKILL");
+    else chrome.kill("SIGKILL");
+  } catch {
+    chrome.kill("SIGKILL");
+  }
+}
+
+/**
+ * Dọn thư mục tạm của một lần chạy E2E. Chrome vừa bị SIGKILL còn ghi thư mục dữ liệu thêm một lúc: chờ rồi xoá hai lần.
+ * Gọi SAU `gameServer.gracefullyShutdown(false)`: mặc định (`true`) Colyseus GỌI `process.exit(0)` ngay trong hàm đó, nên mọi dòng
+ * phía sau không bao giờ chạy (sót thư mục) và một E2E đỏ vẫn thoát mã 0.
+ */
+export async function removeTmpDirs(...dirs: string[]): Promise<void> {
+  try {
+    await sleep(1200);
+    execSync(`rm -rf ${dirs.map((d) => `"${d}"`).join(" ")}`);
+    await sleep(600);
+    execSync(`rm -rf "${dirs[dirs.length - 1]}"`);
+  } catch {
+    /* bỏ qua */
+  }
+}
 
 /**
  * Biểu thức JS (chạy trong trang): phần tử `#id` THẤY THẬT. `!e.hidden` không đủ: thuộc tính `hidden` (hay `display: none`) của một

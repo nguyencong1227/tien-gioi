@@ -19,7 +19,7 @@ import express from "express";
 import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { HEARTBEAT_INTERVAL_MS, HEARTBEAT_TIMEOUT_MS, RESUME_TIMEOUT_MS } from "@tien-gioi/shared";
-import { Tab, sleep, shown } from "./e2e-kit";
+import { Tab, sleep, shown, killChrome, removeTmpDirs } from "./e2e-kit";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
@@ -195,7 +195,7 @@ async function main() {
         "--window-size=1280,720",
         "about:blank",
       ],
-      { stdio: "ignore" },
+      { stdio: "ignore", detached: true },
     );
 
     let targets: any[] = [];
@@ -600,22 +600,14 @@ async function main() {
         /* ignore close error */
       }
     }
-    if (chrome) {
-      chrome.kill("SIGKILL");
-    }
+    killChrome(chrome);
     await proxy.close();
     await new Promise<void>((r) => httpServer.close(() => r()));
-    await gameServer.gracefullyShutdown();
-    try {
-      execSync(`rm -rf "${dataDir}" "${chromeDir}"`);
-    } catch {
-      /* ignore rm error */
-    }
+    await gameServer.gracefullyShutdown(false);
+    await removeTmpDirs(dataDir, chromeDir);
   }
 
-  if (failed) {
-    process.exit(1);
-  }
+  process.exit(failed ? 1 : 0);
 }
 
 main().catch((err) => {
