@@ -7,6 +7,7 @@ import {
   WEATHER_MIN_INTERVAL_MS,
   WEATHER_RECIPE,
   planWeather,
+  ambientEnabledByUrl,
   weatherEnabledByUrl,
   weatherIntervalMs,
   weatherRate,
@@ -114,6 +115,15 @@ describe("map-weather (kế hoạch thời tiết)", () => {
       (id) => planWeather(styleOf(id).weather, "full", false, VIEW, 0, undefined)!.recipe,
     );
     expect(new Set(rec).size).toBe(rec.length);
+  });
+
+  it("ambientEnabledByUrl: cùng luật cho từng tên (weather / water), tên khác không ảnh hưởng nhau", () => {
+    expect(ambientEnabledByUrl("?debug=1", "water")).toBe(false);
+    expect(ambientEnabledByUrl("?debug=1&water=1", "water")).toBe(true);
+    expect(ambientEnabledByUrl("?debug=1&weather=1", "water")).toBe(false); // bật thời tiết KHÔNG bật nước
+    expect(ambientEnabledByUrl("?debug=1&water=1", "weather")).toBe(false);
+    expect(ambientEnabledByUrl("?water=off", "water")).toBe(false);
+    expect(ambientEnabledByUrl("", "water")).toBe(true);
   });
 
   it("weatherEnabledByUrl: mặc định BẬT, nhưng ?debug thì TẮT trừ khi ?weather=1; ?weather=0 luôn tắt", () => {

@@ -6,6 +6,8 @@ import {
   QI_Y_OFFSET,
   planSlashEdges,
   planSwordBeam,
+  qiPointsFor,
+  slashEdgesFor,
 } from "./skill-fx";
 import { getRecipe, recipeCost, validateRecipe } from "./recipes";
 import { SKILL_RECIPES } from "./recipes-skill";
@@ -87,5 +89,48 @@ describe("gfx/fx: planSlashEdges", () => {
     expect(pts[0].y + 8).toBeCloseTo(-(pts[1].y + 8), 6);
     expect(planSlashEdges(0, 0, 0, 64, arc, false, 0)[0].priority).toBe(1);
     expect(planSlashEdges(0, 0, 0, 0, arc, true, 0)).toEqual([]);
+  });
+});
+
+describe("gfx/fx: ngân sách emitter theo hồ sơ chất lượng (nit A ở #356)", () => {
+  it("qiPointsFor: Thấp (4) -> 1, Vừa (10) -> 3, Cao (24) -> 5 (trần); giá trị hỏng -> 1", () => {
+    expect(qiPointsFor(4)).toBe(1);
+    expect(qiPointsFor(10)).toBe(3);
+    expect(qiPointsFor(24)).toBe(QI_MAX_POINTS);
+    expect(qiPointsFor(1000)).toBe(QI_MAX_POINTS);
+    expect(qiPointsFor(0)).toBe(1);
+    expect(qiPointsFor(Number.NaN)).toBe(1);
+  });
+
+  it("một đòn kiếm khí của mình dùng <= 1/3 + 1 emitter ngân sách ở mọi bậc (chừa chỗ cho người khác)", () => {
+    for (const budget of [4, 10, 24]) {
+      const pts = planSwordBeam(0, 0, 0, 260, true, 0, qiPointsFor(budget));
+      expect(pts.length).toBeLessThanOrEqual(Math.floor(budget / 3) + 1);
+      expect(pts.filter((p) => p.recipe === "sword-tip").length).toBe(1); // mũi luôn có
+    }
+    // bậc Thấp: 1 điểm qi + mũi, điểm qi vẫn nằm giữa đường bay
+    const low = planSwordBeam(0, 0, 0, 260, true, 0, qiPointsFor(4));
+    expect(low.length).toBe(2);
+    expect(low[0].x).toBeGreaterThan(0);
+    expect(low[0].x).toBeLessThan(260);
+  });
+
+  it("planSwordBeam: maxQi mặc định = trần cũ (không đổi hành vi); maxQi 0 / âm / NaN kẹp về 1", () => {
+    expect(planSwordBeam(0, 0, 0, 260, true, 0).length).toBe(
+      planSwordBeam(0, 0, 0, 260, true, 0, QI_MAX_POINTS).length,
+    );
+    expect(planSwordBeam(0, 0, 0, 260, true, 0, 0).length).toBe(2);
+    expect(planSwordBeam(0, 0, 0, 260, true, 0, -3).length).toBe(2);
+    expect(planSwordBeam(0, 0, 0, 5000, true, 0, 99).length).toBe(QI_MAX_POINTS + 1);
+  });
+
+  it("slashEdgesFor: bậc Thấp (<= 4) một đầu cung, còn lại hai; planSlashEdges theo số đầu", () => {
+    expect(slashEdgesFor(4)).toBe(1);
+    expect(slashEdgesFor(10)).toBe(2);
+    expect(slashEdgesFor(24)).toBe(2);
+    expect(slashEdgesFor(Number.NaN)).toBe(2);
+    expect(planSlashEdges(0, 0, 0, 64, 1, true, 0, 1).length).toBe(1);
+    expect(planSlashEdges(0, 0, 0, 64, 1, true, 0, 2).length).toBe(2);
+    expect(planSlashEdges(0, 0, 0, 64, 1, true, 0).length).toBe(2);
   });
 });
