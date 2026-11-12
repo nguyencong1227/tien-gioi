@@ -14,6 +14,8 @@
  *   - phone ngang: ngăn kéo sát cạnh phải, trượt từ phải sang.
  *   - phone: nút đóng tròn ở góc dưới phải (vùng với tay), luôn nhìn thấy kể cả khi nội dung cuộn.
  *
+ * Kéo để đóng (điện thoại): vuốt tiêu đề `.inv-head` xuống (dọc) / sang phải (ngang), xem gfx/sheet-swipe.ts.
+ *
  * Biến thể THẺ (`.sheet.sheet-card`): hộp thoại kết quả / chỉ dẫn / cảnh báo có nút hành động riêng (Bí cảnh, Quyết đấu, Chỉ dẫn người mới, Phiên bản cũ).
  * Là cửa sổ nổi giữa màn hình Ở MỌI DẠNG MÁY (kể cả điện thoại: không toàn màn hình, không nút Đóng cố định góc dưới phải); nội dung dài thì
  * thẻ tự cuộn (`max-height` theo `--vh`). Vẫn đặt bề rộng bằng `--sheet-w`; `z-index` / viền / nền riêng của từng thẻ giữ ở CSS của thẻ đó.
@@ -88,6 +90,33 @@ html[data-form="phone"] .sheet:not(.sheet-card) .modal-close {
 html[data-form="phone"] .sheet:not(.sheet-card) .modal-close::after {
   content: " Đóng";
   font-size: var(--fs-14);
+}
+
+/* Kéo để đóng (gfx/sheet-swipe.ts): vùng kéo là tiêu đề của tấm. `touch-action: none` để trình duyệt không cướp cử chỉ làm cuộn tấm;
+   thanh nắm ở mép tiêu đề báo cho người chơi biết vuốt được (dọc: thanh ngang phía trên; ngang: thanh dọc ở mép trái ngăn kéo) */
+html[data-form="phone"] .sheet:not(.sheet-card) > .inv-head {
+  position: relative;
+  touch-action: none;
+  min-height: 48px;
+}
+html[data-form="phone"] .sheet:not(.sheet-card) > .inv-head::before {
+  content: "";
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  width: 40px;
+  height: 4px;
+  margin-left: -20px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.28);
+  pointer-events: none;
+}
+html[data-form="phone"][data-orient="landscape"] .sheet:not(.sheet-card) > .inv-head::before {
+  top: 50%;
+  left: -9px;
+  width: 4px;
+  height: 28px;
+  margin: -14px 0 0;
 }
 
 @keyframes sheet-in-up {

@@ -32,6 +32,7 @@ import { setupNativeApp, getOutdatedUiConfig, getAppUpdateUrl } from "./native-a
 import { HeartbeatController } from "./heartbeat";
 import { sound } from "./audio";
 import { initDisplay } from "./gfx/display";
+import { initSheetSwipe } from "./gfx/sheet-swipe";
 import { installTouchGuards } from "./touch";
 import { initUiScale } from "./ui-scale";
 import { getDisplay, onDisplayChange, setRenderScale } from "./gfx/display";
@@ -59,6 +60,7 @@ initDisplay();
 // Chặn cử chỉ mặc định của trình duyệt trên cảm ứng (phóng to hai ngón / chạm đúp, trình đơn nhấn giữ) (#327)
 installTouchGuards();
 initUiScale(); // nối ô Cài đặt -> Cỡ chữ với display.ts (`setUiScale`); PHẢI sau initDisplay()
+initSheetSwipe(); // vuốt tiêu đề tấm để đóng (điện thoại)
 
 // Chất lượng đồ hoạ M5 (#323): hồ sơ Thấp / Vừa / Cao, Tự động + bộ điều tốc; SAU initDisplay (cần `form`)
 initQuality(browserQualityEnv(() => getDisplay().form, isReducedMotion));
