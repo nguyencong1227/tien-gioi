@@ -420,6 +420,89 @@ async function main() {
     await setCheck("set-reduced-motion", false);
     await ev(`window.__scene.weatherPaused = true; 1`);
 
+    // ---------------- Ca 7: sương trôi ----------------
+    out("\n--- Ca 7: sương trôi (số mảng theo bậc, trôi thật, điểm ảnh, giảm chuyển động) ---");
+    const gameMs = async () => Number(await ev(`window.__scene.time.now`));
+    const waitGame = async (ms: number, label: string) =>
+      T.waitFor(`window.__scene.time.now > ${(await gameMs()) + ms}`, label);
+    const fogXs = () => ev(`window.__scene.fogImages.map((im) => im.x)`) as Promise<number[]>;
+    /** Độ sáng trung bình CẢ khung canvas WebGL THẬT (sương làm sáng nhẹ toàn cảnh). */
+    const meanLuma = () =>
+      ev(`new Promise((resolve) => { const g = window.__scene.game, w = g.canvas.width, h = g.canvas.height;
+        setTimeout(() => g.renderer.snapshotArea(0, 0, w, h, (img) => {
+          const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+          const x = c.getContext('2d'); x.drawImage(img, 0, 0);
+          const d = x.getImageData(0, 0, c.width, c.height).data; let sum = 0;
+          for (let i = 0; i < d.length; i += 4) sum += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+          resolve(sum / (d.length / 4)); }), 200); })`) as Promise<number>;
+    await setQuality("high");
+    await sleep(500);
+    const nHigh = Number(await ev(`window.__scene.fogImages.length`));
+    must(nHigh === 8, `bậc Cao: 8 mảng sương (${nHigh})`);
+    must(
+      Boolean(await ev(`window.__scene.fogImages.every((im) => im.visible && im.alpha > 0)`)),
+      "mọi mảng sương hiện và có độ đậm",
+    );
+    const xs0 = await fogXs();
+    await waitGame(2500, "2,5 s đồng hồ trò chơi");
+    const xs1 = await fogXs();
+    const moved = xs1.filter((x, i) => Math.abs(x - xs0[i]) > 3).length;
+    must(moved >= 6, `sương TRÔI thật: ${moved}/8 mảng dời > 3 px sau 2,5 s (đồng hồ trò chơi)`);
+    // Điểm ảnh: bật / tắt toàn bộ mảng sương, có đối chứng
+    const lumaOn1 = await meanLuma();
+    const lumaOn2 = await meanLuma();
+    await T.shot("map-fog-bat");
+    await ev(`window.__scene.fogImages.forEach((im) => im.setVisible(false)); 1`);
+    const lumaOff = await meanLuma();
+    await T.shot("map-fog-tat");
+    await ev(`window.__scene.fogImages.forEach((im) => im.setVisible(true)); 1`);
+    const lift = lumaOn1 / lumaOff - 1;
+    const noise = Math.abs(lumaOn1 / lumaOn2 - 1);
+    must(
+      noise < 0.005,
+      `đối chứng: hai ảnh cùng trạng thái khác ${(noise * 100).toFixed(2)} % (< 0,5 %)`,
+    );
+    must(
+      lift > 0.01 && lift > noise * 3,
+      `sương ĐƯỢC VẼ: làm sáng cảnh ${(lift * 100).toFixed(2)} % (đối chứng ${(noise * 100).toFixed(2)} %; cần > 1 % và gấp 3 lần)`,
+    );
+    ok(
+      `sương: ${moved}/8 mảng trôi, làm sáng cảnh ${(lift * 100).toFixed(2)} % (đối chứng ${(noise * 100).toFixed(2)} %)`,
+    );
+    // Bậc Vừa: 4 mảng; bậc Thấp: không có
+    await setQuality("mid");
+    await sleep(500);
+    must(Number(await ev(`window.__scene.fogImages.length`)) === 4, "bậc Vừa: 4 mảng sương");
+    await setQuality("low");
+    await sleep(500);
+    must(Number(await ev(`window.__scene.fogImages.length`)) === 0, "bậc Thấp: không có sương");
+    ok("bậc Vừa 4 mảng, bậc Thấp 0 mảng");
+    // Giảm chuyển động: sương CÒN NHƯNG đứng yên
+    await setQuality("high");
+    await sleep(500);
+    await setCheck("set-reduced-motion", true);
+    await sleep(500);
+    const still0 = await fogXs();
+    must(still0.length === 8, "giảm chuyển động: sương vẫn hiện (8 mảng)");
+    await waitGame(2500, "2,5 s đồng hồ trò chơi");
+    const still1 = await fogXs();
+    const stillMoved = still1.filter((x, i) => Math.abs(x - still0[i]) > 0.01).length;
+    must(stillMoved === 0, `giảm chuyển động: sương đứng yên (${stillMoved} mảng còn dời)`);
+    await setCheck("set-reduced-motion", false);
+    ok("giảm chuyển động: sương hiện nhưng đứng yên");
+    // Đổi bản đồ (dựng lại): số mảng không đổi, không rò đối tượng
+    const kidsBefore = Number(await ev(`window.__scene.children.list.length`));
+    await ev(
+      `(() => { for (let i = 0; i < 20; i++) window.__scene.buildMapVisuals(); return 1; })()`,
+    );
+    const kidsAfter = Number(await ev(`window.__scene.children.list.length`));
+    must(
+      kidsAfter === kidsBefore,
+      `dựng lại 20 lần: số đối tượng không đổi (${kidsBefore} -> ${kidsAfter})`,
+    );
+    must(Number(await ev(`window.__scene.fogImages.length`)) === 8, "dựng lại: vẫn 8 mảng sương");
+    ok("dựng lại bản đồ 20 lần: không rò mảng sương");
+
     must(T.errors.length === 0, `0 lỗi console / exception (${T.errors.slice(0, 2).join(" | ")})`);
     ok("0 lỗi console / exception");
     out("\n=== E2E LỚP TRANG TRÍ ĐẠT ===");

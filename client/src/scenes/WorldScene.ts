@@ -28,6 +28,15 @@ import { styleOf } from "../gfx/map-style";
 import { decorTilesetKey, ensureDecorTileset } from "../gfx/decor-tileset";
 import { planWeather, weatherEnabledByUrl } from "../gfx/map-weather";
 import {
+  FOG_KEY,
+  advanceU,
+  ensureFogTexture,
+  fogPatchLayout,
+  fogRect,
+  planFog,
+  type FogPatch,
+} from "../gfx/map-fog";
+import {
   LIGHT_WHITE_KEY,
   VIGNETTE_KEY,
   ensureLightTextures,
@@ -292,6 +301,11 @@ export class WorldScene extends Phaser.Scene {
    * e2e bật / tắt lúc chạy bằng thuộc tính này.
    */
   weatherPaused = false;
+  /** Sương trôi (M5.3 #332 bước 2d): các ảnh mảng sương (cố định theo màn hình) + bố cục theo tỉ lệ khung nhìn. */
+  fogImages: Phaser.GameObjects.Image[] = [];
+  private fogPatches: FogPatch[] = [];
+  private fogSpeed = 0;
+  private fogLastNow = 0;
   private weatherNextAt: number | undefined;
   private townVisuals: Phaser.GameObjects.GameObject[] = [];
   private portalVisuals: Phaser.GameObjects.GameObject[] = [];
@@ -326,7 +340,10 @@ export class WorldScene extends Phaser.Scene {
     this.fx = createFxSystem(this, { getProfile: getQuality, depth: () => this.map.worldH });
     this.weatherPaused =
       typeof window !== "undefined" && !weatherEnabledByUrl(window.location.search);
-    const offQuality = onQualityChange(() => this.applyLight());
+    const offQuality = onQualityChange(() => {
+      this.applyLight();
+      this.applyFog();
+    });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       offQuality();
       this.fx.destroy();
@@ -479,6 +496,44 @@ export class WorldScene extends Phaser.Scene {
     this.lightLayoutKey = ""; // đặt lại kích thước ở khung kế
   }
 
+  /** Dựng lại các mảng sương theo kiểu bản đồ + hồ sơ chất lượng (số mảng 0 / không sương thì chỉ dọn). */
+  private applyFog() {
+    for (const im of this.fogImages) im.destroy();
+    this.fogImages = [];
+    this.fogPatches = [];
+    const plan = planFog(styleOf(this.map.def.id).fog, getQuality());
+    if (!plan) return;
+    ensureFogTexture(this);
+    this.fogPatches = fogPatchLayout(plan.count, this.map.def.seed);
+    this.fogSpeed = plan.speed;
+    for (let i = 0; i < plan.count; i++)
+      this.fogImages.push(
+        this.add
+          .image(0, 0, FOG_KEY)
+          .setScrollFactor(0)
+          .setOrigin(0.5)
+          .setDepth(this.map.worldH + 150) // trên thực thể và hạt, dưới ánh sáng + vignette (+200)
+          .setTint(plan.color)
+          .setAlpha(plan.alpha),
+      );
+    this.fogLastNow = 0;
+  }
+
+  /** Mỗi khung: trôi các mảng sương (đứng yên khi giảm chuyển động) và đặt chỗ theo khung nhìn hiện tại. */
+  private stepFog(now: number) {
+    if (this.fogImages.length === 0) return;
+    const cam = this.cameras.main;
+    const dt = this.fogLastNow ? Math.min(100, now - this.fogLastNow) : 0;
+    this.fogLastNow = now;
+    const still = getQuality().reducedMotion;
+    for (let i = 0; i < this.fogImages.length; i++) {
+      const p = this.fogPatches[i];
+      if (!still) p.u = advanceU(p.u, dt, this.fogSpeed, p.speed, cam.displayWidth, p.size);
+      const r = fogRect(p, cam.width, cam.height, cam.displayWidth, cam.displayHeight);
+      if (r) this.fogImages[i].setPosition(r.x, r.y).setDisplaySize(r.w, r.h);
+    }
+  }
+
   /** Thời tiết: mỗi nhịp một lần phát phủ khung nhìn (kế hoạch thuần ở gfx/map-weather.ts; hồ sơ chất lượng quyết định tốc độ). */
   private emitWeather(now: number) {
     if (this.weatherPaused) return;
@@ -559,6 +614,7 @@ export class WorldScene extends Phaser.Scene {
 
     // 2c. Ánh sáng môi trường + vignette theo kiểu bản đồ (hiện theo hồ sơ chất lượng)
     this.applyLight();
+    this.applyFog();
     this.weatherNextAt = undefined; // đổi bản đồ: thời tiết của bản đồ mới phát ngay
 
     // 3. Dựng nhãn và vòng an toàn của trấn / trạm (nếu có trấn)
@@ -2559,6 +2615,7 @@ export class WorldScene extends Phaser.Scene {
     this.fx.update(now);
     this.layoutLight();
     this.emitWeather(now);
+    this.stepFog(now);
   }
 
   /** Tin `dmg`: chữ bay + âm thanh, và đánh dấu "bị đánh" cho quái / người chơi bị trúng (hoạt ảnh bị đánh, M5.2 #328). */
