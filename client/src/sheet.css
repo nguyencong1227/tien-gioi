@@ -8,7 +8,7 @@
  * Bố cục chọn theo thuộc tính trên <html> do gfx/display.ts cập nhật (không dùng @media rải rác):
  *   data-form   = phone | tablet | desktop
  *   data-orient = portrait | landscape
- * và biến --safe-t/r/b/l (vùng an toàn), --vh (1 vh thật, px).
+ * và biến --safe-t/r/b/l (vùng an toàn), --vh (CHIỀU CAO khung nhìn thật, px; không phải 1%: dùng var(--vh) thay cho 100vh).
  *   - tablet / desktop: cửa sổ nổi giữa màn hình (như trước).
  *   - phone dọc:  tấm toàn màn hình, trượt từ dưới lên.
  *   - phone ngang: ngăn kéo sát cạnh phải, trượt từ phải sang.
@@ -24,7 +24,7 @@
   left: 50%;
   transform: translate(-50%, -50%);
   width: min(94vw, var(--sheet-w, 440px));
-  max-height: calc(var(--vh, 1dvh) * 100 - 24px);
+  max-height: calc(var(--vh, 100dvh) - 24px);
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 14px;
@@ -41,7 +41,7 @@
 html[data-form="phone"] .sheet {
   inset: 0;
   width: 100%;
-  height: calc(var(--vh, 1dvh) * 100);
+  height: var(--vh, 100dvh);
   max-height: none;
   border: 0;
   border-radius: 0;

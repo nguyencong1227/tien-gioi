@@ -2,7 +2,7 @@
 // Chụp ảnh + khẳng định bố cục cho tấm chung (.sheet, M5.1 #326) ở nhiều khung nhìn.
 // Cần client đang chạy (npm run dev -w client hoặc vite preview). Dùng chế độ mock (?duel=mock&debug=1) nên KHÔNG cần server.
 //   node client/scripts/snap-sheet.mjs [--url http://127.0.0.1:5183] [--out docs/screenshots] [--no-shot]
-// Thuộc tính <html data-form|orient> do gfx/display.ts (A) cập nhật; script đặt TAY theo từng khung để thử CSS độc lập.
+// Thuộc tính <html data-form|orient> và --vh do gfx/display.ts (A, #322) đặt; script KHẲNG ĐỊNH chúng đúng với từng khung nhìn.
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -23,11 +23,12 @@ const NO_SHOT = process.argv.includes("--no-shot");
 
 // Khung nhìn theo bảng phân loại mục 4.1 của THIET_KE_GIAO_DIEN_DO_HOA.md
 const VIEWPORTS = [
+  // desktop (con trỏ chuột) phải đứng đầu: xem ghi chú ở vòng lặp bên dưới
+  { name: "1280x720", w: 1280, h: 720, form: "desktop", orient: "landscape" },
   { name: "360x640", w: 360, h: 640, form: "phone", orient: "portrait" },
   { name: "390x844", w: 390, h: 844, form: "phone", orient: "portrait" },
   { name: "844x390", w: 844, h: 390, form: "phone", orient: "landscape" },
   { name: "768x1024", w: 768, h: 1024, form: "tablet", orient: "portrait" },
-  { name: "1280x720", w: 1280, h: 720, form: "desktop", orient: "landscape" },
 ];
 // Bảng đã chuyển sang tấm chung: [id bảng, tên hàm mở, tên hàm đóng]
 const PANELS = [
@@ -134,15 +135,33 @@ try {
   if (!NO_SHOT) fs.mkdirSync(OUT_DIR, { recursive: true });
 
   for (const vp of VIEWPORTS) {
+    // phone / tablet = cảm ứng (con trỏ chính coarse), desktop = chuột
+    const touch = vp.form !== "desktop";
+    // Con trỏ chính cảm ứng (coarse): chỉ BẬT được, Chrome không trả về chuột trong cùng phiên
+    // (setEmulatedMedia không hỗ trợ `pointer`), nên desktop phải đứng ĐẦU danh sách VIEWPORTS.
+    if (touch)
+      await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
     await send("Emulation.setDeviceMetricsOverride", {
       width: vp.w,
       height: vp.h,
       deviceScaleFactor: 1,
-      mobile: vp.form === "phone",
+      mobile: touch,
     });
-    await evalJs(
-      `document.documentElement.dataset.form=${JSON.stringify(vp.form)};document.documentElement.dataset.orient=${JSON.stringify(vp.orient)};0`,
+    await sleep(400); // display.ts gom sự kiện đổi kích thước ~100 ms
+    const dd = JSON.parse(
+      await evalJs(`JSON.stringify({
+        form: document.documentElement.dataset.form,
+        orient: document.documentElement.dataset.orient,
+        vh: document.documentElement.style.getPropertyValue("--vh"),
+        ih: innerHeight,
+      })`),
     );
+    console.log(`\n[${vp.name}] display.ts: form=${dd.form} orient=${dd.orient} --vh=${dd.vh}`);
+    check(
+      dd.form === vp.form && dd.orient === vp.orient,
+      `display.ts phân loại ${vp.form}/${vp.orient}`,
+    );
+    check(dd.vh === `${dd.ih}px`, "--vh bằng chiều cao khung nhìn (px)");
     for (const [id, toggle] of PANELS) {
       console.log(`\n[${vp.name} ${vp.form}/${vp.orient}] ${id}`);
       await evalJs(`window.__ui.${toggle}(true);0`);
