@@ -115,7 +115,17 @@ try {
   const flashing = () => evalJs("window.__scene.cameras.main.flashEffect.isRunning");
   const settle = async () => {
     await evalJs("window.__scene.cameras.main.resetFX(); 0");
-    await sleep(1700);
+    // Chờ hạt tan HẾT (thăm dò, tối đa 12 s): đồng hồ trò chơi chậm lại khi máy bận nên chờ cố định không đủ
+    for (let k = 0; k < 120; k++) {
+      await sleep(100);
+      if (
+        (await evalJs(
+          `window.__scene.children.list.filter((c) => c.type === 'ParticleEmitter').reduce((n, e) => n + e.getAliveParticleCount(), 0)`,
+        )) === 0 &&
+        k >= 15
+      )
+        break;
+    }
   };
   /** Chụp canvas WebGL (điểm ảnh thật) vào window[name]. */
   const snap = (name) =>
@@ -142,6 +152,26 @@ try {
       return 1;
     })()`);
 
+  /**
+   * Chạy `js` TRONG trang, chờ 150 ms THỜI GIAN TRÒ CHƠI (hạt đã nở ra, không phụ thuộc máy bận hay rảnh) rồi chụp ở khung hình kế tiếp.
+   */
+  const act = (js, name) =>
+    evalJs(`new Promise((resolve) => {
+      const sc = window.__scene, r = sc.game.canvas.getBoundingClientRect(), t0 = sc.time.now;
+      ${js};
+      const shoot = () => {
+        if (sc.time.now - t0 < 150) return void requestAnimationFrame(shoot);
+        sc.game.renderer.snapshotArea(0, 0, Math.round(r.width), Math.round(r.height), (img) => {
+          const c = document.createElement("canvas"); c.width = img.width; c.height = img.height;
+          const x = c.getContext("2d"); x.drawImage(img, 0, 0);
+          window[${JSON.stringify(name)}] = x.getImageData(0, 0, c.width, c.height).data; resolve(1);
+        });
+      };
+      shoot();
+    })`);
+  const fxJs = (o) =>
+    `{ const o = ${JSON.stringify(o)}; if (o.by === "me") o.by = sc.sid; sc.onFx(Object.assign({ x: sc.predX, y: sc.predY }, o)); }`;
+
   await settle();
   await snap("base");
   check((await alive()) === 0, "ban đầu không hạt");
@@ -152,25 +182,22 @@ try {
   console.log(`    (nhiễu nền giữa hai ảnh không hiệu ứng: ${noise} điểm ảnh)`);
 
   // 1) Đột phá của mình: vòng nổ + cột sáng + chớp nhẹ, vẽ ra điểm ảnh thật
-  await fxMsg({ kind: "levelup", by: "me", major: true });
-  await sleep(120);
+  await act(fxJs({ kind: "levelup", by: "me", major: true }), "a");
   let n = await alive();
   check(n > 0 && n <= 31, `đột phá của mình: ${n} hạt sống (3 vòng + 28 cột sáng)`);
   check(Boolean(await flashing()), "đột phá của mình: chớp nhẹ toàn màn hình");
-  await snap("a");
   let d = await diff("base", "a");
   check(d > 300, `đột phá: ${d} điểm ảnh thật khác nền (gồm cả chớp toàn màn hình)`);
   await settle();
 
   // 2) Lên cấp thường của mình: có hạt, KHÔNG chớp
-  await fxMsg({ kind: "levelup", by: "me", major: false });
-  await sleep(120);
+  await snap("pre");
+  await act(fxJs({ kind: "levelup", by: "me", major: false }), "m");
   n = await alive();
   check(n > 0 && n <= 12, `lên cấp thường: ${n} hạt`);
   check(!(await flashing()), "lên cấp thường không chớp");
   // Không có chớp che: điểm ảnh khác nền chính là hạt vẽ ra thật (bài học #348: đếm đối tượng không chứng minh được có vẽ)
-  await snap("m");
-  d = await diff("base", "m");
+  d = await diff("pre", "m");
   check(
     d - noise > 200,
     `lên cấp thường: ${d} điểm ảnh khác nền (nhiễu ${noise}; hạt thật sự được vẽ, vượt > 200)`,
@@ -186,12 +213,11 @@ try {
   await settle();
 
   // 4) Đột phá thất bại: khói tím vẽ ra thật
-  await fxMsg({ kind: "breakfail", by: "me" });
-  await sleep(150);
+  await snap("pre");
+  await act(fxJs({ kind: "breakfail", by: "me" }), "b");
   n = await alive();
   check(n > 0 && n <= 10, `đột phá thất bại: ${n} hạt khói`);
-  await snap("b");
-  d = await diff("base", "b");
+  d = await diff("pre", "b");
   check(
     d - noise > 150,
     `khói đột phá thất bại: ${d} điểm ảnh khác nền (nhiễu ${noise}; vượt > 150)`,

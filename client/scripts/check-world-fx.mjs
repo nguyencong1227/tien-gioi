@@ -135,7 +135,17 @@ try {
   const delLoot = (id) => evalJs(`window.__scene.state.loot.delete(${JSON.stringify(id)}); 1`);
   const clearFx = async () => {
     await evalJs("window.__fx.clear(); 0");
-    await sleep(1700);
+    // Chờ hạt tan HẾT (thăm dò, tối đa 12 s): đồng hồ trò chơi chậm lại khi máy bận nên chờ cố định không đủ
+    for (let k = 0; k < 120; k++) {
+      await sleep(100);
+      if (
+        (await evalJs(
+          `window.__scene.children.list.filter((c) => c.type === 'ParticleEmitter').reduce((n, e) => n + e.getAliveParticleCount(), 0)`,
+        )) === 0 &&
+        k >= 15
+      )
+        break;
+    }
   };
 
   // Đồ có sẵn lúc vào cảnh không nổ hạt "xuất hiện" (lần đồng bộ đầu): đã qua giai đoạn đó, nhưng kiểm lại bên dưới bằng đồ mới

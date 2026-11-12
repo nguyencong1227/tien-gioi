@@ -117,7 +117,17 @@ try {
   /** Chờ rung cũ tắt và hạt cũ tan để mỗi ca đo độc lập. */
   const settle = async () => {
     await evalJs("window.__scene.cameras.main.resetFX(); 0");
-    await sleep(1100);
+    // Chờ hạt tan HẾT (thăm dò, tối đa 12 s): đồng hồ trò chơi chậm lại khi máy bận nên chờ cố định không đủ
+    for (let k = 0; k < 120; k++) {
+      await sleep(100);
+      if (
+        (await evalJs(
+          `window.__scene.children.list.filter((c) => c.type === 'ParticleEmitter').reduce((n, e) => n + e.getAliveParticleCount(), 0)`,
+        )) === 0 &&
+        k >= 9
+      )
+        break;
+    }
   };
   /** Phát tin dmg như server gửi (đi qua đúng đường onHitFx), `mine` bằng cách giả lập một đòn vừa ra. */
   const dmg = (o, mine) =>
@@ -138,6 +148,22 @@ try {
         window[${JSON.stringify(name)}] = x.getImageData(0, 0, c.width, c.height).data; resolve(1);
       });
     })`);
+  /**
+   * Chạy `js` TRONG trang rồi chụp ở khung hình KẾ TIẾP (snapshotArea chạy sau lần vẽ tới): đo theo khung hình chứ không theo
+   * đồng hồ tường nên không lệch khi máy bận (chữ bay mờ dần theo thời gian thật, mà vòng CDP có thể chậm hàng trăm ms).
+   */
+  const act = (js, name) =>
+    evalJs(`new Promise((resolve) => {
+      const sc = window.__scene, r = sc.game.canvas.getBoundingClientRect();
+      ${js};
+      sc.game.renderer.snapshotArea(0, 0, Math.round(r.width), Math.round(r.height), (img) => {
+        const c = document.createElement("canvas"); c.width = img.width; c.height = img.height;
+        const x = c.getContext("2d"); x.drawImage(img, 0, 0);
+        window[${JSON.stringify(name)}] = x.getImageData(0, 0, c.width, c.height).data; resolve(1);
+      });
+    })`);
+  const dmgJs = (o, mine) =>
+    `sc.lastAttack = ${mine ? "{ at: sc.time.now, range: 64 }" : "null"}; sc.onHitFx(Object.assign({ x: sc.predX + 30, y: sc.predY }, ${JSON.stringify(o)}))`;
   /** Số điểm ảnh trong ảnh chụp thoả điều kiện `cond` (biểu thức JS theo r, g, b). */
   const count = (name, cond) =>
     evalJs(`(() => { const D = window[${JSON.stringify(name)}]; let n = 0;
@@ -162,13 +188,11 @@ try {
   const white0 = await count("base", WHITE);
 
   // 1) Mình đánh thường: tia lửa + chữ, KHÔNG rung
-  await dmg({ target: "quai-1", amount: 12 }, true);
-  await sleep(60);
+  await act(dmgJs({ target: "quai-1", amount: 12 }, true), "s1");
   let n = await alive();
   check(n > 0 && n <= 8, `đòn thường: ${n} hạt sống (hit-spark 8)`);
   check(!(await shaking()), "đòn thường không rung màn hình");
   check((await floats()) === 1, "đòn thường: một chữ bay");
-  await snap("s1");
   const white1 = await count("s1", WHITE);
   check(
     white1 - white0 > 20,
@@ -177,12 +201,10 @@ try {
   await settle();
 
   // 2) Mình chí mạng: nhiều hạt hơn + rung nhẹ (ưu tiên 2, hồ sơ Cao cho rung)
-  await dmg({ target: "quai-1", amount: 40, crit: true }, true);
-  await sleep(60);
+  await act(dmgJs({ target: "quai-1", amount: 40, crit: true }, true), "s2");
   n = await alive();
   check(n > 8 && n <= 16, `chí mạng của mình: ${n} hạt (hit-heavy 16)`);
   check(Boolean(await shaking()), "chí mạng của mình: màn hình rung nhẹ");
-  await snap("s2");
   let c = (await count("s2", GOLD)) - base0.gold;
   check(
     c > 40,
@@ -199,10 +221,8 @@ try {
   await settle();
 
   // 4) Mình bị đánh nặng (>= 15 % khí huyết tối đa 2500): hạt đỏ + rung; bị đánh nhẹ: không rung
-  await dmg({ target: "mock-session-01", amount: 500, toPlayer: true }, false);
-  await sleep(60);
+  await act(dmgJs({ target: "mock-session-01", amount: 500, toPlayer: true }, false), "s4");
   check(Boolean(await shaking()), "bị đòn nặng (500 / 2500): màn hình rung");
-  await snap("s4");
   c = (await count("s4", RED)) - base0.red;
   check(
     c > 30,
@@ -223,14 +243,12 @@ try {
   await evalJs(`(() => { window.__scene.state.players.get(window.__scene.sid).hp = 1003; 0; })()`);
   await sleep(150);
   check((await floats()) === before, "hồi tự nhiên (+3) không có chữ bay");
-  await evalJs(`(() => { window.__scene.state.players.get(window.__scene.sid).hp = 1600; 0; })()`);
-  await sleep(150);
+  await act("sc.state.players.get(sc.sid).hp = 1600", "s5");
   const txt = await evalJs(
     `window.__scene.children.list.filter((c) => c.type === 'BitmapText' && c.visible).map((c) => c.text).join('|')`,
   );
   check(/\+597/.test(txt ?? ""), `hồi máu lớn: chữ "+597" (${txt})`);
   check((await alive()) > 0, "hồi máu lớn: có hạt heal-glow");
-  await snap("s5");
   c = (await count("s5", GREEN)) - base0.green;
   check(
     c > 30,
@@ -248,11 +266,9 @@ try {
   check((await alive()) === 0, "quái đang đứng yên: chưa có hạt");
   await snap("pre");
   const whitePre = await count("pre", WHITE);
-  await evalJs(`window.__scene.state.monsters.delete("t-quai"); 0`);
-  await sleep(120);
+  await act(`sc.state.monsters.delete("t-quai")`, "post");
   n = await alive();
   check(n > 0 && n <= 12, `quái gục trong màn hình: ${n} hạt tan (mon-vanish 12)`);
-  await snap("post");
   const whitePost = await count("post", WHITE);
   check(
     whitePost - whitePre > 15,
@@ -315,16 +331,17 @@ try {
   // 7) Cảnh đông: 120 đòn của người khác (nửa chí mạng) trong ~1 giây không vượt ngân sách hạt / chữ bay của hồ sơ
   await settle();
   const lim = await J("window.__fx.stats()");
-  let peak = 0;
-  let peakFloats = 0;
-  for (let k = 0; k < 120; k++) {
-    await dmg({ target: "quai-" + (k % 7), amount: 10 + k, crit: k % 2 === 0 }, false);
-    if (k % 6 === 5) {
-      peak = Math.max(peak, await alive());
-      peakFloats = Math.max(peakFloats, await floats());
-      await sleep(50);
-    }
-  }
+  // 120 đòn trong MỘT khung hình (vòng lặp đồng bộ trong trang): kết quả không phụ thuộc máy bận hay rảnh
+  await evalJs(`(() => {
+    const sc = window.__scene;
+    sc.lastAttack = null;
+    for (let k = 0; k < 120; k++)
+      sc.onHitFx({ target: "quai-" + (k % 7), amount: 10 + k, crit: k % 2 === 0, x: sc.predX + 30, y: sc.predY });
+    return 1;
+  })()`);
+  await sleep(40);
+  const peak = await alive();
+  const peakFloats = await floats();
   const st = await J("window.__fx.stats()");
   console.log(
     `    (số đo: đỉnh ${peak} hạt sống / trần ${lim.particleLimit}; đỉnh ${peakFloats} chữ bay; bỏ ${st.dropped} hiệu ứng, ${st.floatsDropped} chữ)`,
