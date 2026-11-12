@@ -2519,22 +2519,65 @@ body.reconnecting #btn-pickup {
   font-style: italic;
 }
 
-/* Màn hình chuyển cảnh mờ dần */
+/*
+ * Màn hình chuyển cảnh khi qua cổng / vào-ra bí cảnh (M5.2 #329): MỐNG MẮT khép 400 ms (lỗ tròn quanh nhân vật thu nhỏ về 0), mở lại
+ * khi tới nơi. Thời lượng khớp gfx/scene-transition.ts (IRIS_MS / FADE_MS). `@property` cho phép chuyển động mượt bán kính; trình
+ * duyệt cũ không có thì nhảy thẳng (vẫn đúng, chỉ không mượt). Bấm / gõ phím để bỏ qua phần chờ (ui.transitionHold).
+ */
+@property --iris-r {
+  syntax: "<length-percentage>";
+  inherits: false;
+  initial-value: 150vmax;
+}
 .transition-overlay {
+  --iris-r: 150vmax;
   position: fixed;
   inset: 0;
   z-index: 9999;
-  background: #000000;
-  opacity: 0;
-  transition: opacity 0.35s ease-in-out;
+  background: radial-gradient(
+    circle at 50% 50%,
+    transparent calc(var(--iris-r) - 2px),
+    #000000 var(--iris-r)
+  );
+  transition: --iris-r 0.4s ease-in-out;
   display: flex;
   align-items: center;
   justify-content: center;
   pointer-events: none;
 }
 .transition-overlay.active {
-  opacity: 1;
+  --iris-r: 0px;
   pointer-events: auto;
+}
+/* Tên bản đồ hiện khi mống mắt đã gần khép */
+.transition-content {
+  opacity: 0;
+  transition: opacity 0.2s ease-out 0.25s;
+}
+.transition-overlay.active .transition-content {
+  opacity: 1;
+}
+/* Giảm chuyển động: KHÔNG mống mắt, chỉ mờ dần 300 ms (ghi đè quy tắc toàn cục 0,01 ms vì mờ dần là chuyển động dịu, và ghi đè cả
+   var(--iris-r) bằng nền đặc để không có lỗ tròn) */
+html[data-reduce-motion="1"] .transition-overlay,
+body.reduced-motion .transition-overlay {
+  background: #000000;
+  opacity: 0;
+  transition: opacity 0.3s ease-in-out !important;
+}
+html[data-reduce-motion="1"] .transition-overlay.active,
+body.reduced-motion .transition-overlay.active {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  body:not(.motion-ok) .transition-overlay {
+    background: #000000;
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out !important;
+  }
+  body:not(.motion-ok) .transition-overlay.active {
+    opacity: 1;
+  }
 }
 .transition-content {
   text-align: center;
