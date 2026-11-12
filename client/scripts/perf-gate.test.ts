@@ -20,6 +20,9 @@ const ok = (id: string, tier: "low" | "mid" | "high", over: Record<string, unkno
   updateP95Ms: 2,
   particles: 0,
   emitters: 0,
+  drawCallsAvg: 3,
+  drawCallsP95: 4,
+  drawCallFrames: 120,
   ...over,
 });
 
@@ -90,12 +93,67 @@ describe("M5.1 #330: perf-gate (cổng ngân sách cho perf:mobile)", () => {
     expect(() => evaluatePerfResults([slow], budget, { timeSlack: 0.5 })).toThrow(/time-slack/);
   });
 
-  it("bản tóm tắt Markdown nêu kịch bản vi phạm và ghi rõ không chặn FPS / drawCalls", () => {
+  describe("draw call (#397): số ĐO THẬT bằng bộ đếm tiêm vào WebGL, cổng bật", () => {
+    it("draw call p95 vượt trần bậc -> đỏ đúng chỉ số; đúng bằng trần thì còn xanh; mỗi bậc một trần", () => {
+      for (const tier of ["low", "mid", "high"] as const) {
+        const cap = budget.runtime.tiers[tier].drawCalls as number;
+        expect(evaluatePerfResults([ok("a", tier, { drawCallsP95: cap })], budget).ok).toBe(true);
+        const ev = evaluatePerfResults([ok("a", tier, { drawCallsP95: cap + 1 })], budget);
+        expect(ev.ok, tier).toBe(false);
+        expect(ev.violations).toEqual([
+          { id: "a", metric: "draw call p95 mỗi khung", actual: cap + 1, limit: cap },
+        ]);
+      }
+    });
+
+    it("thiếu / sai kiểu số đo draw call (null = bộ đếm không bắt được, undefined, NaN, âm, chuỗi) -> ĐỎ, không bao giờ xanh giả", () => {
+      for (const bad of [null, undefined, NaN, -1, "4", Infinity]) {
+        const ev = evaluatePerfResults([ok("a", "mid", { drawCallsP95: bad })], budget);
+        expect(ev.ok, `drawCallsP95=${String(bad)}`).toBe(false);
+        expect(ev.violations.map((v) => v.metric)).toEqual(["draw call p95 mỗi khung"]);
+      }
+      // kết quả CŨ (trước #397) chỉ có `drawCalls` gán cứng: không đủ, phải đỏ
+      const old = ok("a", "low", { drawCallsP95: undefined, drawCalls: 3 });
+      expect(evaluatePerfResults([old], budget).ok).toBe(false);
+    });
+
+    it("ngân sách thiếu khoá `drawCalls` / sai kiểu -> đỏ (không so với undefined)", () => {
+      const b = JSON.parse(JSON.stringify(budget));
+      delete b.runtime.tiers.mid.drawCalls;
+      b.runtime.tiers.high.drawCalls = "160";
+      const ev = evaluatePerfResults([ok("m", "mid"), ok("h", "high")], b);
+      expect(ev.violations.map((v) => `${v.id}: ${v.metric}`)).toEqual([
+        "m: ngân sách của draw call p95 mỗi khung",
+        "h: ngân sách của draw call p95 mỗi khung",
+      ]);
+    });
+
+    it("mẫu quá ít (số khung có vẽ < 10, hoặc thiếu) -> đỏ dù p95 nằm trong trần", () => {
+      for (const frames of [0, 9, undefined, null, NaN]) {
+        const ev = evaluatePerfResults([ok("a", "low", { drawCallFrames: frames })], budget);
+        expect(ev.ok, `drawCallFrames=${String(frames)}`).toBe(false);
+        expect(ev.violations.map((v) => v.metric)).toEqual(["số khung có vẽ trong cửa sổ lấy mẫu"]);
+      }
+      expect(evaluatePerfResults([ok("a", "low", { drawCallFrames: 10 })], budget).ok).toBe(true);
+    });
+
+    it("time-slack KHÔNG nới draw call (số đếm tất định)", () => {
+      const cap = budget.runtime.tiers.low.drawCalls as number;
+      const over = ok("a", "low", { drawCallsP95: cap + 1 });
+      expect(evaluatePerfResults([over], budget, { timeSlack: 3 }).ok).toBe(false);
+    });
+  });
+
+  it("bản tóm tắt Markdown nêu kịch bản vi phạm, có cột draw call, và ghi rõ chỉ không chặn FPS", () => {
     const ev = evaluatePerfResults([ok("a", "low", { updateP95Ms: 20 })], budget);
     const md = formatSummary(ev, { timeSlack: 1 });
     expect(md).toContain("❌ 1 chỉ số vượt ngân sách");
     expect(md).toContain("`a`: JS update p95 (ms) = 20");
-    expect(md).toContain("drawCalls");
+    expect(md).toContain("Draw call p95");
+    expect(md).toContain("4 / 60 (3)"); // p95 / trần (trung bình)
+    expect(md).not.toMatch(/KHÔNG chặn.*drawCalls|không chặn trên FPS[^.]*drawCalls/i);
+    expect(md).not.toContain("gán cứng");
+    expect(md).toContain("Không chặn trên FPS");
     expect(formatSummary(evaluatePerfResults([ok("a", "low")], budget))).toContain(
       "✅ Mọi kịch bản",
     );
