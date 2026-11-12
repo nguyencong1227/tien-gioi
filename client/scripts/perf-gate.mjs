@@ -21,6 +21,27 @@ const REPO = path.resolve(path.dirname(__filename), "../..");
 const isNum = (v) => typeof v === "number" && Number.isFinite(v) && v >= 0;
 
 /**
+ * Đọc số hạt / emitter từ văn bản lớp phủ `?perf=1` (`gfx/perf-overlay.ts`: `formatPerfLines` in `${tên} ${giá trị}`,
+ * KHÔNG có dấu hai chấm: "hạt 30/520", "emitter 10/24"; `gfx/fx/fx.ts` đăng ký hai chỉ số này). Cho phép dấu hai chấm để
+ * không vỡ nếu định dạng đổi nhẹ. Không tìm thấy thì trả `null` (KHÔNG mặc định 0: số 0 giả làm cổng xanh giả).
+ * Đây là số SỐNG tại lúc lớp phủ vẽ lần cuối (cập nhật ~4 lần / giây), không phải đỉnh trong cả cửa sổ lấy mẫu.
+ * @param {unknown} text
+ * @returns {{ particles: number | null, particleLimit: number | null, emitters: number | null, emitterLimit: number | null }}
+ */
+export function parseOverlayCounts(text) {
+  const src = String(text ?? "");
+  const grab = (name) => {
+    const m = new RegExp(`(?:^|\\n)[ \\t]*${name}:?[ \\t]*(\\d+)[ \\t]*/[ \\t]*(\\d+)`, "u").exec(
+      src,
+    );
+    return m ? [Number(m[1]), Number(m[2])] : [null, null];
+  };
+  const [particles, particleLimit] = grab("hạt");
+  const [emitters, emitterLimit] = grab("emitter");
+  return { particles, particleLimit, emitters, emitterLimit };
+}
+
+/**
  * @param {any[]} results mảng kết quả của measure-mobile-perf.mjs
  * @param {any} budget nội dung client/perf-budget.json
  * @param {{ timeSlack?: number }} [opts]
@@ -29,9 +50,10 @@ const isNum = (v) => typeof v === "number" && Number.isFinite(v) && v >= 0;
 export function evaluatePerfResults(results, budget, { timeSlack = 1 } = {}) {
   const violations = [];
   const rows = [];
+  const warnings = [];
   if (!Array.isArray(results) || results.length === 0) {
     violations.push({ id: "(tất cả)", metric: "kết quả", actual: "rỗng", limit: ">= 1 kịch bản" });
-    return { ok: false, violations, rows };
+    return { ok: false, violations, rows, warnings };
   }
   if (!(timeSlack >= 1)) throw new Error(`time-slack phải >= 1 (nhận ${timeSlack})`);
   for (const r of results) {
@@ -61,7 +83,16 @@ export function evaluatePerfResults(results, budget, { timeSlack = 1 } = {}) {
     row.emitters = r.emitters;
     row.emitterLimit = tier.emitterBudget;
     for (const [metric, actual, limit] of checks) {
-      if (!isNum(actual)) {
+      // Ngân sách thiếu khoá / sai kiểu (đổi tên khoá trong perf-budget.json): so `actual > undefined` luôn false => xanh giả
+      if (!isNum(limit)) {
+        violations.push({
+          id,
+          metric: `ngân sách của ${metric}`,
+          actual: String(limit),
+          limit: "số >= 0",
+        });
+        row.bad.push(`ngân sách ${metric}`);
+      } else if (!isNum(actual)) {
         violations.push({ id, metric, actual: String(actual), limit: `số <= ${limit}` });
         row.bad.push(metric);
       } else if (actual > limit) {
@@ -69,8 +100,25 @@ export function evaluatePerfResults(results, budget, { timeSlack = 1 } = {}) {
         row.bad.push(metric);
       }
     }
+    // Trần mà harness đọc từ lớp phủ (hồ sơ chất lượng trong mã) phải khớp perf-budget.json, nếu không ngân sách bị trôi khỏi mã
+    for (const [metric, shown, budgeted] of [
+      ["trần hạt của hồ sơ", r.particleLimit, tier.peakParticles],
+      ["trần emitter của hồ sơ", r.emitterLimit, tier.emitterBudget],
+    ]) {
+      if (isNum(shown) && isNum(budgeted) && shown !== budgeted) {
+        violations.push({ id, metric, actual: shown, limit: `${budgeted} (perf-budget.json)` });
+        row.bad.push(metric);
+      }
+    }
   }
-  return { ok: violations.length === 0, violations, rows };
+  // Bậc Vừa / Cao mà MỌI kịch bản đều 0 hạt + 0 emitter thì số đo hạt gần như chắc chắn không đọc được (đừng tin cổng hạt)
+  const rich = rows.filter((x) => x.tier === "mid" || x.tier === "high");
+  if (rich.length > 0 && rich.every((x) => x.particles === 0 && x.emitters === 0)) {
+    warnings.push(
+      "Mọi kịch bản bậc Vừa / Cao đều 0 hạt + 0 emitter: nhiều khả năng harness không đọc được số hạt từ lớp phủ (cổng hạt / emitter KHÔNG có tác dụng).",
+    );
+  }
+  return { ok: violations.length === 0, violations, rows, warnings };
 }
 
 /** Bản tóm tắt Markdown (job summary của GitHub Actions). */
@@ -91,6 +139,7 @@ export function formatSummary(evaluation, { timeSlack = 1 } = {}) {
       `| ${f(r.scenario ?? r.id)} (\`${r.id}\`) | ${f(r.tier)} | ${f(r.cpu)} | ${f(r.p95)} / ${f(r.p95Limit)} ms | ${f(r.particles)} / ${f(r.particleLimit)} | ${f(r.emitters)} / ${f(r.emitterLimit)} | ${f(r.fps)} | ${r.bad.length ? "❌ " + r.bad.join(", ") : "✅"} |`,
     );
   }
+  for (const w of evaluation.warnings ?? []) lines.push("", `⚠️ ${w}`);
   if (!evaluation.ok) {
     lines.push("", "**Vi phạm:**");
     for (const v of evaluation.violations) {
@@ -101,6 +150,7 @@ export function formatSummary(evaluation, { timeSlack = 1 } = {}) {
     "",
     `Ngân sách thời gian nhân hệ số \`time-slack\` = ${timeSlack} (bù runner CI chậm hơn máy dev); số hạt / emitter không nới.`,
     "Không chặn trên FPS (SwiftShader không phản ánh GPU thật) và `drawCalls` (harness đang gán cứng theo tên kịch bản, chưa đo thật).",
+    "Số hạt / emitter là số SỐNG lúc lớp phủ vẽ lần cuối (không phải đỉnh trong cả cửa sổ lấy mẫu); kịch bản duel / dungeon giả lập không phát hạt đúng lúc lấy mẫu nên 0 là bình thường, chỉ `crowd-mid` / `crowd-high` thật sự kiểm hạt.",
   );
   return lines.join("\n") + "\n";
 }
@@ -132,6 +182,7 @@ if (process.argv[1] === __filename) {
     const evaluation = evaluatePerfResults(results, budget, { timeSlack });
     const md = formatSummary(evaluation, { timeSlack });
     console.log(md);
+    for (const w of evaluation.warnings) console.log(`::warning::${w}`);
     if (summaryPath) fs.appendFileSync(summaryPath, md, "utf8");
     if (!evaluation.ok) {
       for (const v of evaluation.violations) {

@@ -85,7 +85,11 @@ jobs:
 
       - name: Đo ma trận kịch bản x bậc đồ hoạ x CPU (thoát mã 1 nếu có kịch bản không đo được)
         id: perf
-        run: npm run perf:mobile
+        # Xoá tệp kết quả CŨ đã commit trong repo (3 dòng, định dạng cũ): nếu bước đo đỏ trước khi ghi tệp mới thì perf-gate
+        # báo thẳng "không đọc được kết quả" thay vì đọc nhầm số cũ
+        run: |
+          rm -f docs/perf-mobile-results.json
+          npm run perf:mobile
 
       - name: So với client/perf-budget.json (đỏ nếu vượt) và ghi job summary
         if: ${{ !cancelled() && steps.perf.outcome != 'skipped' }}

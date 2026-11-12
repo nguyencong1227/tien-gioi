@@ -3,7 +3,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import { evaluatePerfResults, formatSummary } from "./perf-gate.mjs";
+import { evaluatePerfResults, formatSummary, parseOverlayCounts } from "./perf-gate.mjs";
+import { formatPerfLines } from "../src/gfx/perf-overlay";
 
 const repo = path.resolve(__dirname, "../..");
 const budget = JSON.parse(fs.readFileSync(path.join(repo, "client/perf-budget.json"), "utf8"));
@@ -98,6 +99,127 @@ describe("M5.1 #330: perf-gate (cổng ngân sách cho perf:mobile)", () => {
     expect(formatSummary(evaluatePerfResults([ok("a", "low")], budget))).toContain(
       "✅ Mọi kịch bản",
     );
+  });
+
+  describe("parseOverlayCounts: hợp đồng với lớp phủ ?perf=1 (bài học #390: regex có dấu hai chấm không bao giờ khớp)", () => {
+    const snap = (extras: Array<[string, string]>) => ({
+      fps: 60,
+      p95Ms: 16,
+      tier: "high",
+      mode: "auto",
+      cssW: 390,
+      cssH: 844,
+      dpr: 2,
+      renderScale: 1,
+      heapMb: 30,
+      governor: { downshifts: 0, badStreak: 0, goodStreak: 3 },
+      extras,
+    });
+
+    it("đọc đúng chuỗi do CHÍNH formatPerfLines dựng ('hạt 30/520', 'emitter 10/24')", () => {
+      const text = formatPerfLines(
+        snap([
+          ["hạt", "30/520"],
+          ["emitter", "10/24"],
+          ["fx bỏ", "0 (chữ 0)"],
+        ]),
+      ).join("\n");
+      expect(parseOverlayCounts(text)).toEqual({
+        particles: 30,
+        particleLimit: 520,
+        emitters: 10,
+        emitterLimit: 24,
+      });
+    });
+
+    it("chịu được dấu hai chấm / khoảng trắng; không tìm thấy thì null (KHÔNG mặc định 0)", () => {
+      expect(parseOverlayCounts("hạt: 5 / 60\nemitter:1/4")).toMatchObject({
+        particles: 5,
+        particleLimit: 60,
+        emitters: 1,
+        emitterLimit: 4,
+      });
+      const none = { particles: null, particleLimit: null, emitters: null, emitterLimit: null };
+      expect(parseOverlayCounts("")).toEqual(none);
+      expect(parseOverlayCounts(undefined)).toEqual(none);
+      expect(parseOverlayCounts("FPS 60  p95 16 ms\nheap 30 MB")).toEqual(none);
+      // chữ "hạt" nằm giữa dòng khác không được tính
+      expect(parseOverlayCounts("chất lượng hạt 3/4")).toEqual(none);
+    });
+
+    it("fx.ts đăng ký đúng hai khoá 'hạt' / 'emitter' với giá trị dạng `<số>/<trần>` (đổi tên là test đỏ)", () => {
+      const src = fs.readFileSync(path.join(repo, "client/src/gfx/fx/fx.ts"), "utf8");
+      expect(src).toMatch(/registerPerfStat\("hạt",[\s\S]*?\$\{l\.particles\}\/\$\{/);
+      expect(src).toMatch(/registerPerfStat\("emitter",[\s\S]*?\$\{l\.emitters\}\/\$\{/);
+    });
+
+    it("harness dùng parseOverlayCounts, không còn regex tự chế đọc lớp phủ", () => {
+      const src = fs.readFileSync(
+        path.join(repo, "client/scripts/measure-mobile-perf.mjs"),
+        "utf8",
+      );
+      expect(src).toContain("parseOverlayCounts(overlayText)");
+      expect(src).not.toMatch(/overlayText\.match\(/);
+    });
+  });
+
+  describe("ngân sách thiếu khoá, trần lệch mã, số đo hạt vắng", () => {
+    it("đột biến: xoá / đổi tên khoá ngân sách -> ĐỎ (trước đây 9999 hạt vẫn xanh vì so với undefined)", () => {
+      const broken = JSON.parse(JSON.stringify(budget));
+      delete broken.runtime.tiers.mid.peakParticles;
+      broken.runtime.tiers.mid.emitterBudget = "10";
+      const ev = evaluatePerfResults([ok("a", "mid", { particles: 9999, emitters: 5 })], broken);
+      expect(ev.ok).toBe(false);
+      expect(ev.violations.map((v) => v.metric)).toEqual([
+        "ngân sách của số hạt sống",
+        "ngân sách của số emitter",
+      ]);
+    });
+
+    it("trần hạt / emitter harness đọc từ lớp phủ phải khớp perf-budget.json (hồ sơ trong mã không được trôi khỏi ngân sách)", () => {
+      const t = budget.runtime.tiers.mid;
+      const same = ok("a", "mid", {
+        particleLimit: t.peakParticles,
+        emitterLimit: t.emitterBudget,
+      });
+      expect(evaluatePerfResults([same], budget).ok).toBe(true);
+      const ev = evaluatePerfResults(
+        [
+          ok("a", "mid", {
+            particleLimit: t.peakParticles + 10,
+            emitterLimit: t.emitterBudget + 1,
+          }),
+        ],
+        budget,
+      );
+      expect(ev.violations.map((v) => v.metric)).toEqual([
+        "trần hạt của hồ sơ",
+        "trần emitter của hồ sơ",
+      ]);
+    });
+
+    it("số hạt null (không đọc được lớp phủ) -> ĐỎ thiếu số đo, không coi là 0", () => {
+      const ev = evaluatePerfResults([ok("a", "low", { particles: null, emitters: null })], budget);
+      expect(ev.ok).toBe(false);
+      expect(ev.violations.map((v) => v.metric)).toEqual(["số hạt sống", "số emitter"]);
+    });
+
+    it("cảnh báo (không đỏ) khi MỌI kịch bản Vừa / Cao đều 0 hạt + 0 emitter; có một ca > 0 thì hết cảnh báo", () => {
+      const allZero = evaluatePerfResults(
+        [ok("l", "low"), ok("m", "mid"), ok("h", "high")],
+        budget,
+      );
+      expect(allZero.ok).toBe(true);
+      expect(allZero.warnings).toHaveLength(1);
+      expect(formatSummary(allZero)).toContain("⚠️");
+      const some = evaluatePerfResults(
+        [ok("m", "mid"), ok("h", "high", { particles: 30 })],
+        budget,
+      );
+      expect(some.warnings).toEqual([]);
+      // chỉ có bậc Thấp (tắt hạt) thì không cảnh báo
+      expect(evaluatePerfResults([ok("l", "low")], budget).warnings).toEqual([]);
+    });
   });
 
   describe("CLI (mã thoát)", () => {
