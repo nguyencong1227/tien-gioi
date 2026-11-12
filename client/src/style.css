@@ -623,8 +623,24 @@ html[data-input="touch"] .qt-head {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  /* Không cao quá khung nhìn (điện thoại ngang chỉ cao ~375 px): tiêu đề + nút đóng đứng yên, chữ + lựa chọn cuộn trong .dlg-scroll */
+  max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  overflow: hidden;
+}
+.dlg-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* Phần tử con KHÔNG co: nếu không, chữ và danh sách lựa chọn bị ép nhỏ lại và chồng lên nhau thay vì làm vùng cuộn dài ra */
+.dlg-scroll > * {
+  flex: none;
 }
 .dlg-head {
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -685,6 +701,11 @@ html[data-input="touch"] .qt-head {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+/* `<small>` mặc định co theo cha (`smaller`): ghi cỡ rõ ràng để theo --fs-N như phần còn lại */
+.dlg-opt-btn small {
+  flex: none;
+  font-size: var(--fs-11);
 }
 .dlg-opt-btn:not(:disabled):hover {
   background: rgba(201, 162, 74, 0.38);
@@ -1874,6 +1895,18 @@ body.low-fx #btn-talk {
 
 /* Hỗ trợ màn hình ngang trên điện thoại (Landscape Safe Area - #34) */
 @media (orientation: landscape) and (max-height: 540px) {
+  /* Hộp thoại NPC: chữ bên trái, lựa chọn bên phải (một cột sẽ cao hơn cả khung nhìn) */
+  #dialog-modal {
+    width: min(96vw, 720px);
+    bottom: max(10px, env(safe-area-inset-bottom));
+    padding: 8px 12px;
+  }
+  .dlg-scroll {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+  }
   #hud-col-left {
     top: max(6px, env(safe-area-inset-top));
     left: max(6px, env(safe-area-inset-left));
