@@ -5,6 +5,8 @@ import {
   SCENARIOS,
   computeImageHash,
   checkDuplicateScreenshots,
+  assertOnlyModalsOpen,
+  PRELOAD_SCRIPT,
 } from "./capture-viewports.mjs";
 
 describe("capture-viewports", () => {
@@ -115,5 +117,36 @@ describe("capture-viewports", () => {
       expect(() => checkDuplicateScreenshots(mutantRecordsLong)).toThrow(/03-game-hud/);
       expect(() => checkDuplicateScreenshots(mutantRecordsLong)).toThrow(/06-game-settings/);
     });
+  });
+
+  describe("assertOnlyModalsOpen (bảng lạ che ảnh)", () => {
+    /** CDP giả: trả về danh sách id bảng đang mở */
+    const fakeCdp = (open: unknown) => async () => ({ result: { result: { value: open } } });
+
+    it("chấp nhận khi chỉ có bảng đích mở, hoặc không bảng nào khi chụp HUD", async () => {
+      await expect(
+        assertOnlyModalsOpen(fakeCdp(["char-modal"]), ["char-modal"]),
+      ).resolves.toBeUndefined();
+      await expect(assertOnlyModalsOpen(fakeCdp([]), [])).resolves.toBeUndefined();
+      await expect(assertOnlyModalsOpen(fakeCdp([]), ["char-modal"])).resolves.toBeUndefined();
+    });
+
+    it("ĐỘT BIẾN ĐỎ 3: bảng chỉ dẫn mở đè lên bảng đích thì phải ném lỗi (tái hiện ảnh 04/06/07 bị che)", async () => {
+      await expect(
+        assertOnlyModalsOpen(fakeCdp(["char-modal", "newbie-guide-modal"]), ["char-modal"]),
+      ).rejects.toThrow(/#newbie-guide-modal/);
+      await expect(assertOnlyModalsOpen(fakeCdp(["newbie-guide-modal"]), [])).rejects.toThrow(
+        /không bảng nào/,
+      );
+    });
+
+    it("ném lỗi khi CDP trả kết quả không đọc được (không im lặng cho qua)", async () => {
+      await expect(assertOnlyModalsOpen(fakeCdp(undefined), [])).rejects.toThrow(/không hợp lệ/);
+    });
+  });
+
+  it("PRELOAD_SCRIPT đặt đúng khoá đã đọc chỉ dẫn mà client dùng", async () => {
+    const { NEWBIE_GUIDE_STORAGE_KEY } = await import("../src/a11y");
+    expect(PRELOAD_SCRIPT).toContain(`'${NEWBIE_GUIDE_STORAGE_KEY}','1'`);
   });
 });

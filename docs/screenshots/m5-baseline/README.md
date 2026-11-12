@@ -1,10 +1,10 @@
 # Bộ Ảnh Mốc Đa Viewport M5 (Baseline Multi-Viewport Screenshots)
 
-> Thư mục chứa bộ ảnh chụp màn hình làm mốc đối chiếu trước khi thực hiện các cải tiến giao diện đa thiết bị & đồ hoạ Phaser tiếp theo trong Milestone M5.
-> Bộ ảnh được chụp trên nền code `main` mới nhất (commit `0c17203`, đã tích hợp tấm chung `.sheet` #336, điều khiển cảm ứng #341, hoạt ảnh quái #340, tỉ lệ scale/DPR #342).
+> Thư mục chứa bộ ảnh chụp màn hình làm mốc đối chiếu trước khi thực hiện các cải tiến giao diện đa thiết bị & đồ hoạ Phaser trong Milestone M5.
 > Được sinh tự động bởi `client/scripts/capture-viewports.mjs` (`npm run capture:viewports` hoặc `npm run chup-viewport`).
 > Định dạng: **WebP (quality 75)**, tự động kiểm tra chống trùng lặp băm sha256 giữa các kịch bản.
-> Tổng dung lượng: **2.43 MB** (49 tệp WebP).
+> Thời điểm chụp mốc: `2026-11-12T03:16:39.117Z`.
+> Tổng dung lượng: **3.84 MB** (49 tệp WebP).
 
 ## 1. Danh sách Viewport đo đạc
 

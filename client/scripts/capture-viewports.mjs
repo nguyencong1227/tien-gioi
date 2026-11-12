@@ -88,6 +88,48 @@ export async function assertElementVisible(cdpSend, selector, timeoutMs = 4000) 
   );
 }
 
+/**
+ * Script chạy TRƯỚC mọi mã của trang (Page.addScriptToEvaluateOnNewDocument): đánh dấu đã đọc
+ * bảng "Chỉ dẫn" của người mới. Không có dòng này, bảng chỉ dẫn tự mở lúc vào game và che
+ * lên mọi bảng khác trong ảnh mốc (lỗi đã gặp ở bản đầu: ảnh 04, 06, 07 đều bị che).
+ * Khoá lấy từ client/src/a11y.ts (NEWBIE_GUIDE_STORAGE_KEY).
+ */
+export const PRELOAD_SCRIPT =
+  "try{localStorage.setItem('tg_newbie_guide_dismissed','1')}catch(e){}";
+
+/**
+ * Khẳng định đúng tập bảng (section.modal-box) đang mở: không bảng lạ nào được che ảnh.
+ * assertElementVisible chỉ chứng minh bảng đích hiển thị, KHÔNG chứng minh nó không bị bảng
+ * khác che; hàm này lấp chỗ đó. allowedIds = id các bảng được phép mở (thường 0 hoặc 1).
+ */
+export async function assertOnlyModalsOpen(cdpSend, allowedIds = []) {
+  const res = await cdpSend("Runtime.evaluate", {
+    expression: `
+      Array.from(document.querySelectorAll("section.modal-box"))
+        .filter((el) => {
+          if (el.hidden) return false;
+          const st = window.getComputedStyle(el);
+          const r = el.getBoundingClientRect();
+          return st.display !== "none" && st.visibility !== "hidden" && r.width > 0 && r.height > 0;
+        })
+        .map((el) => el.id)
+    `,
+    returnByValue: true,
+  });
+  const open = res?.result?.result?.value;
+  if (!Array.isArray(open)) {
+    throw new Error("Không đọc được danh sách bảng đang mở (kết quả CDP không hợp lệ).");
+  }
+  const stray = open.filter((id) => !allowedIds.includes(id));
+  if (stray.length > 0) {
+    throw new Error(
+      `Có bảng lạ đang mở che ảnh: ${stray.map((id) => "#" + id).join(", ")} (chỉ cho phép: ${
+        allowedIds.length ? allowedIds.map((id) => "#" + id).join(", ") : "không bảng nào"
+      }).`,
+    );
+  }
+}
+
 // Danh sách các viewport tiêu chuẩn cho đa thiết bị (Milestone M5 Mục 12)
 export const VIEWPORTS = [
   {
@@ -485,6 +527,9 @@ async function main() {
           targetUrl = `http://127.0.0.1:${HTTP_PORT}/?dungeon=mock&debug=1`;
         }
 
+        // Đánh dấu đã đọc chỉ dẫn người mới TRƯỚC khi trang chạy (xem PRELOAD_SCRIPT)
+        await cdpSend("Page.addScriptToEvaluateOnNewDocument", { source: PRELOAD_SCRIPT });
+
         // Điều hướng tới URL
         await cdpSend("Page.navigate", { url: targetUrl });
 
@@ -520,6 +565,18 @@ async function main() {
         if (sc.targetSelector) {
           await assertElementVisible(cdpSend, sc.targetSelector);
         }
+
+        // Khẳng định không bảng nào khác đang mở che ảnh (chỉ bảng đích, nếu đích là một bảng)
+        const targetId = sc.targetSelector?.startsWith("#") ? sc.targetSelector.slice(1) : "";
+        await assertOnlyModalsOpen(cdpSend, targetId.endsWith("-modal") ? [targetId] : []);
+
+        // Ẩn huy hiệu "giả lập" của chế độ mock ngay trước khi chụp (UI bật lại nó muộn): nó đè lên tiêu đề bảng, mà bản thật không có
+        await cdpSend("Runtime.evaluate", {
+          expression: `["dungeon-mock-badge", "duel-mock-badge", "auth-mock-badge"].forEach((id) => {
+            const el = document.getElementById(id);
+            if (el) el.hidden = true;
+          })`,
+        });
 
         // Đợi render và animation CSS ổn định trước khi chụp
         await sleep(300);
