@@ -145,6 +145,11 @@ try {
   await settle();
   await snap("base");
   check((await alive()) === 0, "ban đầu không hạt");
+  // Đối chứng: hai ảnh chụp liên tiếp KHÔNG hiệu ứng khác nhau bao nhiêu (hoạt ảnh nền); mọi phép so ảnh phải vượt mức này
+  await sleep(80);
+  await snap("ctl");
+  const noise = await diff("base", "ctl");
+  console.log(`    (nhiễu nền giữa hai ảnh không hiệu ứng: ${noise} điểm ảnh)`);
 
   // 1) Đột phá của mình: vòng nổ + cột sáng + chớp nhẹ, vẽ ra điểm ảnh thật
   await fxMsg({ kind: "levelup", by: "me", major: true });
@@ -166,7 +171,10 @@ try {
   // Không có chớp che: điểm ảnh khác nền chính là hạt vẽ ra thật (bài học #348: đếm đối tượng không chứng minh được có vẽ)
   await snap("m");
   d = await diff("base", "m");
-  check(d > 200, `lên cấp thường: ${d} điểm ảnh khác nền (hạt thật sự được vẽ, > 200)`);
+  check(
+    d - noise > 200,
+    `lên cấp thường: ${d} điểm ảnh khác nền (nhiễu ${noise}; hạt thật sự được vẽ, vượt > 200)`,
+  );
   await settle();
 
   // 3) Người khác đột phá gần mình: có hạt nhưng KHÔNG chớp màn hình của mình
@@ -184,7 +192,10 @@ try {
   check(n > 0 && n <= 10, `đột phá thất bại: ${n} hạt khói`);
   await snap("b");
   d = await diff("base", "b");
-  check(d > 150, `khói đột phá thất bại: ${d} điểm ảnh khác nền (> 150)`);
+  check(
+    d - noise > 150,
+    `khói đột phá thất bại: ${d} điểm ảnh khác nền (nhiễu ${noise}; vượt > 150)`,
+  );
   await settle();
 
   // 5) Đả tọa: đốm sáng tự phát định kỳ khi đang thiền, ngừng khi thôi
