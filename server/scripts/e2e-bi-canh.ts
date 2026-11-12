@@ -294,7 +294,7 @@ async function main() {
     );
     await ta.shot("1-dialog");
     await ta.ev(
-      `[...document.querySelectorAll('#dlg-options .dlg-opt-btn')].find(b => b.textContent.includes('Linh Hư Bí Cảnh')).dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true })); 1`,
+      `[...document.querySelectorAll('#dlg-options .dlg-opt-btn')].find(b => b.textContent.includes('Linh Hư Bí Cảnh')).click(); 1`,
     );
     out("  ✓ [3/8] Hộp thoại Thủ môn có nút mở bí cảnh (đội đủ điều kiện), đã bấm");
 
