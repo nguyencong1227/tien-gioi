@@ -3,6 +3,7 @@
  * trong `WorldScene`. Lõi (`fx.ts`) biết cách phát một công thức; B (#329) viết các công thức cụ thể.
  */
 import type { FxPriority } from "./budget";
+import { COMBAT_RECIPES } from "./recipes-combat";
 
 /** Tên khung hình trong atlas hạt (`atlas.ts`). */
 export type FxFrame = "dot" | "spark" | "ring" | "smoke" | "petal" | "ember";
@@ -113,6 +114,9 @@ registerRecipe({
     tint: 0xffe9a8,
   },
 });
+// --- Công thức theo nhóm (B, #329): mảng dữ liệu ở `recipes-*.ts`, đăng ký ở đây ---
+for (const r of COMBAT_RECIPES) registerRecipe(r);
+
 registerRecipe({
   id: "ambient-glimmer",
   priority: 0,
