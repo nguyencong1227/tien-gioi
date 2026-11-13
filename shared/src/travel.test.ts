@@ -8,7 +8,7 @@ import {
   roomNameOf,
   wrongMapMessage,
 } from "./travel";
-import { DEFAULT_MAP_ID, HAC_PHONG_ID, MAPS } from "./map";
+import { AM_SUONG_ID, DEFAULT_MAP_ID, HAC_PHONG_ID, MAPS } from "./map";
 import { ROOM_NAME } from "./game";
 import { NPCS, npcsOfMap } from "./npcs";
 
@@ -51,7 +51,7 @@ describe("chuyển bản đồ: hợp đồng (M3 bước 1)", () => {
     expect(TRAVEL_JOIN_TIMEOUT_MS).toBeGreaterThan(TRAVEL_COOLDOWN_MS);
   });
 
-  it("npcsOfMap: NPC không ghi mapId thuộc Lạc Hà; Hắc Phong Cốc có đúng lái buôn Thanh Lộ; id lạ rỗng", () => {
+  it("npcsOfMap: NPC không ghi mapId thuộc Lạc Hà; Hắc Phong Cốc có đúng lái buôn Thanh Lộ; Âm Sương Trạch có ba NPC Vọng Sương; id lạ rỗng", () => {
     expect(npcsOfMap(DEFAULT_MAP_ID)).toEqual(NPCS.filter((n) => n.mapId === undefined));
     expect(npcsOfMap(DEFAULT_MAP_ID).map((n) => n.id)).toEqual([
       "truong_tran",
@@ -61,8 +61,17 @@ describe("chuyển bản đồ: hợp đồng (M3 bước 1)", () => {
       "thu_mon",
     ]);
     expect(npcsOfMap(HAC_PHONG_ID).map((n) => n.id)).toEqual(["lai_buon"]);
+    expect(npcsOfMap(AM_SUONG_ID).map((n) => n.id)).toEqual([
+      "tram_truong",
+      "lai_buon_suong",
+      "tho_ren_suong",
+    ]);
     // mọi NPC thuộc đúng một bản đồ có thật
-    expect(npcsOfMap(DEFAULT_MAP_ID).length + npcsOfMap(HAC_PHONG_ID).length).toBe(NPCS.length);
+    expect(
+      npcsOfMap(DEFAULT_MAP_ID).length +
+        npcsOfMap(HAC_PHONG_ID).length +
+        npcsOfMap(AM_SUONG_ID).length,
+    ).toBe(NPCS.length);
     expect(npcsOfMap("constructor")).toEqual([]);
   });
 });

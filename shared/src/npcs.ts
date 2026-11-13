@@ -1,5 +1,5 @@
 // NPC trong Lạc Hà Trấn và giao dịch đổi đồ: hợp đồng giữa client và server (Sprint 2).
-import { DEFAULT_MAP_ID, HAC_PHONG_ID, TOWN_PX } from "./map";
+import { AM_SUONG_ID, DEFAULT_MAP_ID, HAC_PHONG_ID, TOWN_PX } from "./map";
 
 export interface NpcDef {
   id: string;
@@ -76,6 +76,46 @@ export const NPCS: NpcDef[] = [
       "Thu được gì cứ bán cho ta, đỡ phải gánh về trấn dưới. Đan dược ta cũng có sẵn.",
     ],
     color: 0x6b4f8a,
+  },
+  // Vọng Sương Trạm (Âm Sương Trạch, M6 #404): tâm trấn (2048, 3136); ba NPC quanh tâm, cách nhau > 64 px, đứng trên nền đá của trạm
+  {
+    id: "tram_truong",
+    mapId: AM_SUONG_ID,
+    name: "Tống Vân Hạc",
+    title: "Trạm trưởng Vọng Sương",
+    x: 2048,
+    y: 3051,
+    dialog: [
+      "Vọng Sương Trạm dựng giữa đầm, đèn đêm nào cũng thắp để kẻ lạc đường tìm về. Ra khỏi vòng đèn là sương nuốt tiếng bước chân.",
+      "Kim Đan mới dám đi sâu. Đầm này nuôi sương hồ, rùa đá, cóc độc, và ở nơi sâu nhất là Hắc Giao. Có việc thì nói với ta.",
+    ],
+    color: 0x4a6b78,
+  },
+  {
+    id: "lai_buon_suong",
+    mapId: AM_SUONG_ID,
+    name: "Phó Quang",
+    title: "Lái buôn Vọng Sương",
+    x: 1953,
+    y: 3161,
+    dialog: [
+      "Thu được gì từ đầm cứ bán cho ta, đỡ phải gánh ngược qua Hắc Phong Cốc. Đại hồi đan ta cũng có sẵn.",
+      "Đan hồi phục quý hơn vàng khi ngươi đứng trước cóc độc. Mua đủ rồi hẵng vào sâu.",
+    ],
+    color: 0x7a5f8c,
+  },
+  {
+    id: "tho_ren_suong",
+    mapId: AM_SUONG_ID,
+    name: "Hồ Thiết",
+    title: "Thợ rèn Vọng Sương",
+    x: 2143,
+    y: 3161,
+    dialog: [
+      "Mai rùa, lông sương, vảy giao: nguyên liệu trong đầm này rèn ra đồ ra hồn nhất. Mang tới đây, thêm chút Linh thạch tiền than.",
+      "Đồ tốt kén người: chưa tới Kim Đan thì mặc vào cũng chẳng chịu nổi.",
+    ],
+    color: 0x9a4a30,
   },
   {
     // Cổng vào bí cảnh (docs/THIET_KE_BI_CANH.md): chỉ đội trưởng mở được, nút do server dựng theo điều kiện của đội

@@ -47,7 +47,8 @@ export interface QuestDef {
 export const MAIN_QUEST_START = "nhap_the";
 
 /**
- * Chuỗi nhiệm vụ chính: Phàm Nhân → Luyện Khí tầng 9, mỗi nhiệm vụ dạy thêm một thứ
+ * Chuỗi nhiệm vụ chính: Phàm Nhân → Luyện Khí tầng 9 (dạy từng thứ), rồi Trúc Cơ (2 nhiệm vụ nối sang Hắc Phong Cốc, cộng 1 việc phụ hạ Xích Mãng theo đội: chuỗi chính KHÔNG bắt đội, trừ nhiệm vụ cuối) và Kim Đan (6 nhiệm vụ ở
+ * Vọng Sương Trạm, M6 #404). Chặng đầu: mỗi nhiệm vụ dạy thêm một thứ
  * (đánh quái, nhặt đồ, đột phá, đả tọa, đổi đồ, đan dược). Sau đó là nhiệm vụ lặp ở Bảng cáo thị.
  * Thế giới: Lạc Hà Trấn dưới chân Vân Mộng Sơn; yêu thú càng xa trấn càng mạnh.
  */
@@ -220,6 +221,7 @@ export const QUESTS: QuestDef[] = [
     giver: "truong_tran",
     desc: "Đạt Luyện Khí tầng 9.",
     steps: [{ kind: "reachRealm", realm: 1, tier: 8 }],
+    next: "truc_co_nhap_mon",
     rewards: {
       exp: 150,
       items: [
@@ -236,6 +238,237 @@ export const QUESTS: QuestDef[] = [
       complete: [
         "Luyện Khí tầng chín… Năm xưa ta cũng dừng chân ở đây suốt mười năm.",
         "Muốn Trúc Cơ phải có cơ duyên. Người ta đồn trong hang sâu nhất của Vân Mộng Sơn có Xích Mãng canh giữ linh mạch. Khi nào đủ sức, ngươi hãy tự mình đi xem.",
+      ],
+    },
+  },
+
+  // ---------- Chuỗi Trúc Cơ (M6, #404): nối Lạc Hà -> Hắc Phong Cốc ----------
+  {
+    id: "truc_co_nhap_mon",
+    title: "Trúc Cơ nhập môn",
+    giver: "truong_tran",
+    desc: "Đột phá lên Trúc Cơ.",
+    steps: [{ kind: "reachRealm", realm: 2, tier: 0 }],
+    rewards: { exp: 100, items: [{ itemId: "hoi_linh_dan", qty: 3 }] },
+    minRealm: { realm: 1, tier: 8 },
+    next: "thanh_lo_tram",
+    talk: {
+      offer: [
+        "Tầng chín viên mãn rồi thì chỉ còn một cửa: Đột phá. Bấm B khi thanh tu vi đầy; hỏng thì mất ba phần tu vi, đừng nản.",
+        "Trúc Cơ xong hãy quay lại, trấn này còn việc cho ngươi.",
+      ],
+      progress: ["Chưa Trúc Cơ. Đả tọa cho thanh tu vi đầy rồi bấm Đột phá."],
+      complete: [
+        "Trúc Cơ! Nền đã vững, giờ mới thật sự là tu sĩ.",
+        "Phía bắc có Bắc Môn Quan sang Hắc Phong Cốc, ghé Thanh Lộ Trạm trước. Còn Xích Mãng trong hang sâu thì chưa ai hạ nổi một mình: muốn thử cùng đồng đội, cứ tới nói với ta.",
+      ],
+    },
+  },
+  {
+    id: "mang_hoan",
+    title: "Mãng hoạn",
+    giver: "truong_tran",
+    desc: "Việc phụ (không bắt buộc): hạ 1 Xích Mãng (nên đi theo đội) và mang về 2 vảy mãng.",
+    steps: [
+      { kind: "kill", monster: "mang", count: 1 },
+      { kind: "collect", itemId: "vay_mang", count: 2 },
+    ],
+    rewards: {
+      exp: 300,
+      items: [
+        { itemId: "tu_khi_dan", qty: 1 },
+        { itemId: "hoi_huyet_dan", qty: 5 },
+      ],
+    },
+    minRealm: { realm: 2, tier: 0 },
+    talk: {
+      offer: [
+        "Xích Mãng canh linh mạch đã quá lâu, đêm đêm nó ra bìa núi phun độc. Một mình thì đừng liều: rủ đồng đội, lập đội rồi hẵng đi.",
+        "Mang về hai chiếc vảy để ta biết nó đã ngã xuống.",
+      ],
+      progress: ["Xích Mãng đòn rất nặng. Đi đội, mang đủ Hồi Huyết Đan."],
+      complete: [
+        "Vảy đỏ thẫm, đúng là Xích Mãng. Linh mạch yên rồi.",
+        "Cả trấn chưa ai dám làm việc này. Ngươi và đồng đội xứng đáng được nhớ tên.",
+      ],
+    },
+  },
+  {
+    id: "thanh_lo_tram",
+    title: "Thanh Lộ Trạm",
+    giver: "truong_tran",
+    desc: "Qua Bắc Môn Quan, tới Thanh Lộ Trạm (Hắc Phong Cốc) và nói chuyện với lái buôn Mạc Thông.",
+    steps: [{ kind: "talk", npcId: "lai_buon" }],
+    rewards: { exp: 100, items: [{ itemId: "hoi_huyet_dan", qty: 5 }] },
+    minRealm: { realm: 2, tier: 0 },
+    next: "vong_suong",
+    talk: {
+      offer: [
+        "Phía bắc Lạc Hà có Bắc Môn Quan, qua đó là Hắc Phong Cốc, gió rát và thú dữ hơn Vân Mộng Sơn nhiều.",
+        "Dừng chân ở Thanh Lộ Trạm sát cổng, nói chuyện với lái buôn Mạc Thông. Ông ấy biết đường đi tiếp.",
+      ],
+      progress: ["Chưa gặp Mạc Thông ở Thanh Lộ Trạm. Cổng nằm sát rìa phía bắc Lạc Hà."],
+      complete: [
+        "Mạc Thông gửi lời hỏi thăm ngươi. Ông ấy nói tận cùng phía bắc Hắc Phong Cốc có Vọng Trạch Quan, qua đó là đầm Âm Sương.",
+        "Đầm ấy dành cho Kim Đan. Tới trạm Vọng Sương rồi gặp trạm trưởng Tống Vân Hạc.",
+      ],
+    },
+  },
+
+  // ---------- Chuỗi Kim Đan ở Vọng Sương Trạm (M6, #404) ----------
+  {
+    id: "vong_suong",
+    title: "Vọng Sương",
+    giver: "tram_truong",
+    desc: "Đột phá lên Kim Đan.",
+    steps: [{ kind: "reachRealm", realm: 3, tier: 0 }],
+    rewards: { exp: 600, items: [{ itemId: "dai_hoi_huyet_dan", qty: 3 }] },
+    minRealm: { realm: 2, tier: 2 },
+    next: "suong_ho_hoan",
+    talk: {
+      offer: [
+        "Ngươi từ Hắc Phong Cốc qua à? Vọng Sương Trạm mở cửa cho mọi người, nhưng đầm ngoài kia thì chỉ Kim Đan mới sống nổi.",
+        "Trúc Cơ hậu kỳ đã đủ tư cách thử Đột phá. Lên Kim Đan rồi quay lại tìm ta, đừng ra khỏi vòng đèn trước đó.",
+      ],
+      progress: ["Chưa Kim Đan. Ở trong vòng đèn đả tọa, chờ thanh tu vi đầy rồi Đột phá."],
+      complete: [
+        "Kim Đan thành, khí đan chuyển động quanh người ngươi rõ như đèn. Giờ đầm là của ngươi.",
+        "Việc đầu tiên: bầy sương hồ ở ngoài rìa, chúng quấy nhiễu khách đi đường.",
+      ],
+    },
+  },
+  {
+    id: "suong_ho_hoan",
+    title: "Sương Hồ hoạn",
+    giver: "tram_truong",
+    desc: "Hạ 25 Sương Hồ và mang về 12 sương mao.",
+    steps: [
+      { kind: "kill", monster: "suong_ho", count: 25 },
+      { kind: "collect", itemId: "suong_mao", count: 12 },
+    ],
+    rewards: {
+      exp: 1200,
+      items: [
+        { itemId: "hoi_huyet_dan", qty: 5 },
+        { itemId: "dai_hoi_huyet_dan", qty: 2 },
+      ],
+    },
+    minRealm: { realm: 3, tier: 0 },
+    next: "thach_quy_giap",
+    talk: {
+      offer: [
+        "Sương hồ nhanh và đi thành đàn. Chúng mất mạng nhưng để lại sương mao rất nhẹ, thợ rèn Hồ Thiết cần để làm bộ đầu tiên.",
+        "Hạ hai mươi lăm con, gom mười hai nhúm sương mao.",
+      ],
+      progress: [
+        "Sương hồ ở rìa ngoài đầm, gần trạm nhất. Đánh một con rồi lùi, đừng để cả đàn vây.",
+      ],
+      complete: [
+        "Sương mao nhẹ thật. Hồ Thiết sẽ mừng. Cầm lấy ít đan.",
+        "Tiếp theo là thạch quy: chậm, dày, nhưng mai của chúng làm bộ giáp tốt nhất vùng này.",
+      ],
+    },
+  },
+  {
+    id: "thach_quy_giap",
+    title: "Mai rùa",
+    giver: "tram_truong",
+    desc: "Hạ 15 Thạch Quy và mang về 10 quy giáp.",
+    steps: [
+      { kind: "kill", monster: "thach_quy", count: 15 },
+      { kind: "collect", itemId: "quy_giap", count: 10 },
+    ],
+    rewards: { exp: 1200, items: [{ itemId: "dai_hoi_linh_dan", qty: 3 }] },
+    minRealm: { realm: 3, tier: 0 },
+    next: "doc_thiem_nang",
+    talk: {
+      offer: [
+        "Thạch quy đánh không đau nhưng máu dày như núi, hạ một con mất khá lâu. Kiên nhẫn là việc chính.",
+        "Mười lăm con, gom mười tấm quy giáp.",
+      ],
+      progress: [
+        "Thạch quy lười chạy, cứ đánh đều tay. Đừng đứng giữa bãi lâu quá, sương dày lên sẽ khó thấy.",
+      ],
+      complete: ["Quy giáp dày thật. Hồ Thiết sẽ rèn được cả bộ cho ngươi."],
+    },
+  },
+  {
+    id: "doc_thiem_nang",
+    title: "Độc nang",
+    giver: "tram_truong",
+    desc: "Đạt Kim Đan trung kỳ, hạ 12 Độc Thiềm và mang về 8 độc nang.",
+    steps: [
+      { kind: "reachRealm", realm: 3, tier: 1 },
+      { kind: "kill", monster: "doc_thiem", count: 12 },
+      { kind: "collect", itemId: "doc_nang", count: 8 },
+    ],
+    rewards: {
+      exp: 1500,
+      items: [
+        { itemId: "dai_hoi_huyet_dan", qty: 4 },
+        { itemId: "tu_khi_dan", qty: 1 },
+      ],
+    },
+    minRealm: { realm: 3, tier: 0 },
+    next: "kim_dan_hau_ky",
+    talk: {
+      offer: [
+        "Độc thiềm nằm sâu hơn, đòn nặng nhưng máu mỏng: trúng hai ba cú là ngã, ngươi phải đánh nhanh và biết lùi. Sơ kỳ thì đừng thử.",
+        "Đạt Kim Đan trung kỳ rồi hạ mười hai con, lấy tám túi độc.",
+      ],
+      progress: [
+        "Độc thiềm đòn cực nặng. Mang đủ Đại Hồi Huyết Đan, uống trước khi khí huyết xuống nửa.",
+      ],
+      complete: [
+        "Độc nang còn nguyên, không vỡ. Ngươi làm việc cẩn thận.",
+        "Cóc độc đã xong, còn lại là cửa ải cuối: Hắc Giao trong hang sâu nhất.",
+      ],
+    },
+  },
+  {
+    id: "kim_dan_hau_ky",
+    title: "Kim Đan hậu kỳ",
+    giver: "tram_truong",
+    desc: "Đạt Kim Đan hậu kỳ.",
+    steps: [{ kind: "reachRealm", realm: 3, tier: 2 }],
+    rewards: { exp: 800, items: [{ itemId: "dai_hoi_linh_dan", qty: 4 }] },
+    minRealm: { realm: 3, tier: 1 },
+    next: "giao_hoan",
+    talk: {
+      offer: [
+        "Hắc Giao không phải thứ một người, thậm chí hai người, đối phó nổi. Ít nhất là ba, và phải là Kim Đan trung kỳ trở lên.",
+        "Ngươi lên Kim Đan hậu kỳ cho vững rồi hẵng lập đội.",
+      ],
+      progress: ["Chưa tới hậu kỳ. Đừng vội: Hắc Giao không chạy mất."],
+      complete: ["Hậu kỳ rồi. Hắc Giao còn đó, vẫn đợi."],
+    },
+  },
+  {
+    id: "giao_hoan",
+    title: "Giao hoạn",
+    giver: "tram_truong",
+    desc: "Hạ Hắc Giao (đội 3-4 người) và mang về 3 giao lân.",
+    steps: [
+      { kind: "kill", monster: "hac_giao", count: 1 },
+      { kind: "collect", itemId: "giao_lan", count: 3 },
+    ],
+    rewards: {
+      exp: 2500,
+      items: [
+        { itemId: "tu_khi_dan", qty: 1 },
+        { itemId: "dai_hoi_huyet_dan", qty: 5 },
+      ],
+    },
+    minRealm: { realm: 3, tier: 1 },
+    talk: {
+      offer: [
+        "Hắc Giao ở hang sâu nhất phía bắc đầm, nơi sương đặc nhất. Hạ nó phải đội ba bốn người đồng tâm, ai cũng mang đủ đan.",
+        "Giao lân là nguyên liệu của bộ cuối. Mang về ba chiếc làm bằng chứng.",
+      ],
+      progress: ["Hắc Giao đánh chậm mà rất đau. Chia nhau chịu đòn, đừng để một người đứng mũi."],
+      complete: [
+        "Hắc Giao đã ngã. Cả Vọng Sương Trạm sẽ nhớ tên đội ngươi.",
+        "Ra khỏi đầm này còn là Nguyên Anh: đường còn dài. Nhưng đó là chuyện của ngày khác.",
       ],
     },
   },
@@ -286,6 +519,52 @@ export const QUESTS: QuestDef[] = [
       ],
       progress: ["Hắc Hổ đánh rất đau. Mang theo Hồi Huyết Đan."],
       complete: ["Ba con Hắc Hổ trong một ngày. Người trong trấn sẽ còn nhắc tên ngươi."],
+    },
+  },
+  // ---------- Nhiệm vụ lặp ở Vọng Sương Trạm (M6, #404) ----------
+  {
+    id: "suong_ho_quay",
+    title: "Sương Hồ quấy nhiễu",
+    giver: "tram_truong",
+    desc: "Hạ 20 Sương Hồ.",
+    steps: [{ kind: "kill", monster: "suong_ho", count: 20 }],
+    rewards: { exp: 700, items: [{ itemId: "hoi_huyet_dan", qty: 3 }] },
+    minRealm: { realm: 3, tier: 0 },
+    daily: true,
+    talk: {
+      offer: ["Trạm cần thêm sương mao dự trữ. Hạ hai mươi sương hồ ở rìa đầm, trạm hậu tạ."],
+      progress: ["Sương hồ ở rìa ngoài đầm."],
+      complete: ["Hai mươi con trong ngày. Trạm ghi công ngươi."],
+    },
+  },
+  {
+    id: "thach_quy_phien",
+    title: "Thạch Quy chắn đường",
+    giver: "tram_truong",
+    desc: "Hạ 10 Thạch Quy.",
+    steps: [{ kind: "kill", monster: "thach_quy", count: 10 }],
+    rewards: { exp: 800, items: [{ itemId: "hoi_linh_dan", qty: 3 }] },
+    minRealm: { realm: 3, tier: 0 },
+    daily: true,
+    talk: {
+      offer: ["Bầy thạch quy chắn lối vận chuyển hàng. Dọn đường giúp trạm, mười con là đủ."],
+      progress: ["Thạch quy ở vùng giữa đầm, máu dày."],
+      complete: ["Đường thông rồi. Lái buôn Phó Quang cảm ơn ngươi."],
+    },
+  },
+  {
+    id: "doc_nang_nop",
+    title: "Độc nang cho dược sư",
+    giver: "tram_truong",
+    desc: "Nộp 6 độc nang.",
+    steps: [{ kind: "collect", itemId: "doc_nang", count: 6 }],
+    rewards: { exp: 900 },
+    minRealm: { realm: 3, tier: 1 },
+    daily: true,
+    talk: {
+      offer: ["Dược sư các trạm thu độc nang mỗi ngày, sáu túi một lần."],
+      progress: ["Chưa đủ sáu túi độc nang."],
+      complete: ["Độc nang còn tươi, tốt lắm."],
     },
   },
 ];
