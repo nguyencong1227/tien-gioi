@@ -258,7 +258,7 @@ Trang chính sách quyền riêng tư (`client/public/privacy.html`, #314) cam k
 > Trợ lý AI **tuyệt đối KHÔNG tự ý chạy công cụ này trên bản chạy thật** khi không có yêu cầu cụ thể từ người dùng. Thao tác này chỉ do Dev A hoặc Người dùng trực tiếp thực hiện.
 
 > [!NOTE]
-> Lệnh `xoa-tai-khoan` trong `prod.sh` chỉ khả dụng trên bản chạy thật sau khi triển khai phiên bản mới (thẻ phiên bản phát hành sau PR #320 / Issue #321). Bản chạy thật hiện tại (`0.1.0`) chưa chứa lệnh này.
+> Công cụ xoá (`scripts/tai-khoan.ts xoa`) nằm trong ảnh Docker từ `0.1.1` (bản chạy thật đã ở `0.1.1` từ 13/11/2026). Nhưng lệnh `xoa-tai-khoan` của `prod.sh` chỉ có trong bản `deploy/prod.sh` của repo; bản `~/TT/tien-gioi-prod/prod.sh` do `init` chép lúc dựng bản chạy thật (11/11/2026) CHƯA có. Muốn dùng: chạy `./deploy/prod.sh init` từ repo (chép lại `prod.sh` / `restore-test.sh` / compose, giữ nguyên bí mật và dữ liệu), rồi mới gọi `~/TT/tien-gioi-prod/prod.sh xoa-tai-khoan`. Đây là thay đổi cấu hình bản chạy thật nên do người vận hành quyết.
 
 ### 8.1. Quy trình thực hiện qua `prod.sh`
 Toàn bộ quy trình an toàn đã được tích hợp trong lệnh `~/TT/tien-gioi-prod/prod.sh xoa-tai-khoan`:
