@@ -136,7 +136,8 @@ import { clientCanChallenge } from "../duel";
 import { replayEarlyMessages } from "../early-messages";
 import { sound } from "../audio";
 import { joystick, setupJoystick } from "../joystick";
-import { keepLock, pickNextTarget } from "../target-lock";
+import { keepLock, pickNextTarget, pickPrevTarget } from "../target-lock";
+import { ACTION_BY_ID, actionOfEvent, getLookup, type ActionId } from "../keybinds";
 import { isTypingElement, isReducedMotion } from "../a11y";
 import {
   markMonAttack,
@@ -441,6 +442,12 @@ export class WorldScene extends Phaser.Scene {
         !this.isReconnecting &&
         this.room.send("dropItem", qty !== undefined ? { slot, qty } : { slot }),
       onPickup: () => !this.isReconnecting && this.pickupNearest(),
+      // Esc khi không còn bảng nào để đóng: bỏ chọn mục tiêu (QUYET_DINH_M3 mục 13, #462)
+      onClearTarget: () => {
+        if (this.lockedTargetId === null) return false;
+        this.setLockedTarget(null);
+        return true;
+      },
       onTalk: () => !this.isReconnecting && this.talkClosestNpc(),
       onDialogAction: (action) => {
         if (this.isReconnecting) return;
@@ -934,35 +941,14 @@ export class WorldScene extends Phaser.Scene {
   // ---------------- Input ----------------
 
   private setupInput() {
-    // enableCapture = false: để còn gõ được chữ vào ô chat
-    this.keys = this.input.keyboard!.addKeys(
-      "W,A,S,D,UP,DOWN,LEFT,RIGHT,J,K,L,B,C,I,Q,M,N,O,F,ONE,TWO,ESC,SPACE,ENTER",
-      false,
-    ) as any;
-    const typing = () => isTypingElement(document.activeElement);
-    const kb = this.input.keyboard!;
-
-    kb.on("keydown-J", () => !typing() && this.slash());
-    kb.on("keydown-SPACE", () => !typing() && this.slash());
-    kb.on("keydown-K", () => !typing() && this.sword());
-    kb.on("keydown-L", () => !typing() && this.toggleMeditate());
-    kb.on("keydown-B", () => !typing() && !this.isReconnecting && this.room.send("breakthrough"));
-    kb.on("keydown-C", () => !typing() && ui.toggleCharModal());
-    kb.on("keydown-I", () => !typing() && ui.toggleInventory());
-    kb.on("keydown-Q", () => !typing() && ui.toggleQuestModal());
-    kb.on("keydown-M", () => !typing() && ui.toggleMapModal());
-    kb.on("keydown-G", () => !typing() && ui.toggleSectModal());
-    kb.on("keydown-N", () => !typing() && sound.toggleMute());
-    kb.on("keydown-O", () => !typing() && ui.toggleSettingsModal());
-    // Esc do `ui.ts` xử lý ở `window` (một chỗ duy nhất): đăng ký thêm ở đây làm MỖI lần Esc chạy hai lần (đóng hai tầng)
-    kb.on("keydown-F", () => !typing() && this.interactOrPickup());
-    kb.on("keydown-T", () => !typing() && this.toggleLockTarget());
-    kb.on("keydown-ONE", () => !typing() && ui.useQuick(1));
-    kb.on("keydown-TWO", () => !typing() && ui.useQuick(2));
-    kb.on("keydown-ENTER", () => {
-      if (!typing())
-        setTimeout(() => (document.getElementById("chat-input") as HTMLInputElement).focus(), 0);
-    });
+    // Chỉ phím DI CHUYỂN do Phaser giữ (isDown mỗi khung). enableCapture = false: để còn gõ được chữ vào ô chat.
+    // Mọi phím HÀNH ĐỘNG đi qua bảng phím `keybinds.ts` (đổi được, HUD đọc nhãn từ đó) ở `onKeyDown`.
+    this.keys = this.input.keyboard!.addKeys("W,A,S,D,UP,DOWN,LEFT,RIGHT", false) as any;
+    window.addEventListener("keydown", this.onKeyDown);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () =>
+      window.removeEventListener("keydown", this.onKeyDown),
+    );
+    // Esc do `ui.ts` xử lý ở `window` (một chỗ duy nhất, kể cả bỏ chọn mục tiêu qua `onClearTarget`): đăng ký thêm ở đây làm MỖI lần Esc chạy hai lần
 
     // Chuột / chạm: bấm vào người chơi khác để mở menu tổ đội, hoặc chém về phía con trỏ
     this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
@@ -1010,6 +996,95 @@ export class WorldScene extends Phaser.Scene {
     });
   }
 
+  /**
+   * Phím HÀNH ĐỘNG của máy tính (QUYET_DINH_M3 mục 13, #462). Phím đã bị nút / bảng xử lý (`preventDefault`) thì bỏ qua như Phaser trước đây;
+   * đang gõ chữ thì bỏ qua; hành động của THẾ GIỚI (đánh, kỹ năng, đan, mục tiêu, tương tác, mở chat) không chạy khi bảng / hộp thoại
+   * đang mở (phím thuộc về bảng); mở / đóng bảng và bật / tắt âm thanh vẫn chạy.
+   */
+  private onKeyDown = (e: KeyboardEvent) => {
+    if (e.defaultPrevented || isTypingElement(document.activeElement)) return;
+    const action = actionOfEvent(e, getLookup());
+    if (!action) return;
+    const def = ACTION_BY_ID[action];
+    if (def.world && ui.isKeyboardCaptured()) return;
+    // phím đã nhận: chặn hành vi mặc định (Tab đổi focus, Space cuộn / bấm nút...) kể cả khi giữ phím lặp
+    e.preventDefault();
+    if (e.repeat && !def.repeat) return;
+    this.runAction(action);
+  };
+
+  private runAction(action: ActionId) {
+    switch (action) {
+      case "attack":
+        this.autoLockNearest();
+        this.slash();
+        break;
+      case "skill.sword":
+        this.autoLockNearest();
+        this.sword();
+        break;
+      case "skill.meditate":
+        this.toggleMeditate();
+        break;
+      case "skill.breakthrough":
+        if (!this.isReconnecting) this.room.send("breakthrough");
+        break;
+      case "quick.1":
+        ui.useQuick(1);
+        break;
+      case "quick.2":
+        ui.useQuick(2);
+        break;
+      case "interact":
+        this.interactOrPickup();
+        break;
+      case "target.next":
+        this.toggleLockTarget(1);
+        break;
+      case "target.prev":
+        this.toggleLockTarget(-1);
+        break;
+      case "panel.inventory":
+        ui.toggleInventory();
+        break;
+      case "panel.char":
+        ui.toggleCharModal();
+        break;
+      case "panel.quest":
+        ui.toggleQuestModal();
+        break;
+      case "panel.sect":
+        ui.toggleSectModal();
+        break;
+      case "panel.map":
+        ui.toggleMapModal();
+        break;
+      case "panel.settings":
+        ui.toggleSettingsModal();
+        break;
+      case "sound.mute":
+        sound.toggleMute();
+        break;
+      case "chat.open":
+        // setTimeout để phím Enter vừa bấm không rơi vào ô chat vừa lấy focus
+        setTimeout(() => (document.getElementById("chat-input") as HTMLInputElement).focus(), 0);
+        break;
+    }
+  }
+
+  /** Bấm đánh bằng bàn phím mà chưa có mục tiêu: tự khoá con quái gần nhất trong tầm (vòng đánh dấu hiện ra, kỹ năng quay về phía nó). */
+  private autoLockNearest() {
+    if (this.lockedTargetId !== null || this.isReconnecting || ui.isLimboOpen()) return;
+    const me = this.me();
+    if (!me || me.dead) return;
+    const cands: Array<{ id: string; dist: number }> = [];
+    this.monsters.forEach((m, id) => {
+      cands.push({ id, dist: Math.hypot(m.tx - this.predX, m.ty - this.predY) });
+    });
+    const id = pickNextTarget(cands, null);
+    if (id) this.setLockedTarget(id);
+  }
+
   private moveDir() {
     if (document.activeElement instanceof HTMLInputElement) return { dx: 0, dy: 0 };
     const k = this.keys;
@@ -1047,14 +1122,18 @@ export class WorldScene extends Phaser.Scene {
     return angle;
   }
 
-  /** Bấm nút / phím T: khoá con quái gần nhất, bấm tiếp chuyển sang con xa hơn, hết vòng hoặc chỉ còn một con thì nhả khoá. */
-  private toggleLockTarget() {
+  /**
+   * Bấm nút / phím Tab hoặc T: khoá con quái gần nhất, bấm tiếp chuyển sang con xa hơn, hết vòng hoặc chỉ còn một con thì nhả khoá.
+   * `step` = -1 (Shift+Tab): đi ngược xa -> gần.
+   */
+  private toggleLockTarget(step: 1 | -1 = 1) {
     if (this.isReconnecting || ui.isLimboOpen()) return;
     const cands: Array<{ id: string; dist: number }> = [];
     this.monsters.forEach((m, id) => {
       cands.push({ id, dist: Math.hypot(m.tx - this.predX, m.ty - this.predY) });
     });
-    this.setLockedTarget(pickNextTarget(cands, this.lockedTargetId));
+    const pick = step === 1 ? pickNextTarget : pickPrevTarget;
+    this.setLockedTarget(pick(cands, this.lockedTargetId));
   }
 
   private setLockedTarget(id: string | null) {

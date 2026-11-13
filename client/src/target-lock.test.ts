@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { LOCK_RANGE, keepLock, pickNextTarget } from "./target-lock";
+import { LOCK_RANGE, keepLock, pickNextTarget, pickPrevTarget } from "./target-lock";
 
 const c = (id: string, dist: number) => ({ id, dist });
 
@@ -48,5 +48,34 @@ describe("target-lock: keepLock", () => {
     expect(keepLock(LOCK_RANGE + 1)).toBe(false);
     expect(keepLock(null)).toBe(false);
     expect(keepLock(NaN)).toBe(false);
+  });
+});
+
+describe("target-lock: pickPrevTarget (Shift+Tab)", () => {
+  const list = [c("a", 50), c("b", 120), c("c", 300)];
+
+  it("chưa khoá: con gần nhất (như Tab); không có quái trong tầm: null", () => {
+    expect(pickPrevTarget(list, null)).toBe("a");
+    expect(pickPrevTarget([], null)).toBeNull();
+    expect(pickPrevTarget([c("xa", LOCK_RANGE + 1)], null)).toBeNull();
+  });
+
+  it("đang khoá: đi ngược xa -> gần rồi vòng về con xa nhất", () => {
+    expect(pickPrevTarget(list, "c")).toBe("b");
+    expect(pickPrevTarget(list, "b")).toBe("a");
+    expect(pickPrevTarget(list, "a")).toBe("c");
+  });
+
+  it("Tab rồi Shift+Tab quay lại đúng con cũ", () => {
+    for (const id of ["a", "b", "c"]) {
+      const next = pickNextTarget(list, id)!;
+      expect(pickPrevTarget(list, next)).toBe(id);
+    }
+  });
+
+  it("chỉ còn đúng con đang khoá: nhả khoá; mục tiêu cũ đã mất: con gần nhất; bỏ qua quái ngoài tầm", () => {
+    expect(pickPrevTarget([c("a", 50)], "a")).toBeNull();
+    expect(pickPrevTarget(list, "da-mat")).toBe("a");
+    expect(pickPrevTarget([...list, c("xa", LOCK_RANGE + 50)], "a")).toBe("c");
   });
 });

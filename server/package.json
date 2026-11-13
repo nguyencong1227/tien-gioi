@@ -19,6 +19,7 @@
     "e2e:bi-canh-nga": "tsx scripts/e2e-bi-canh-nga.ts",
     "e2e:phien-ban": "tsx scripts/e2e-phien-ban.ts",
     "e2e:tro-nang": "tsx scripts/e2e-tro-nang.ts",
+    "e2e:ban-phim": "tsx scripts/e2e-ban-phim.ts",
     "e2e:noi-lai": "tsx scripts/e2e-noi-lai.ts",
     "e2e:nhip-tim": "tsx scripts/e2e-nhip-tim.ts",
     "e2e:chat-luong": "tsx scripts/e2e-chat-luong.ts",

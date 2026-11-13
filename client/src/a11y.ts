@@ -22,6 +22,8 @@ export interface EscapeHandlers {
   closeDungeonEndModal?: () => boolean;
   closeTopModal?: () => boolean;
   closeInviteBox?: () => boolean;
+  /** Bước CUỐI (không còn gì để đóng): bỏ chọn mục tiêu (QUYET_DINH_M3 mục 13, #462) */
+  clearTarget?: () => boolean;
 }
 
 /**
@@ -203,6 +205,7 @@ export function trapTabKey(container: HTMLElement, e: KeyboardEvent): boolean {
  * 4. Modal kết quả PK / Bí cảnh.
  * 5. Modal chính trên cùng (ModalStack) -> đóng modal đó và trả focus về trigger.
  * 6. Lời mời tổ đội / bí cảnh / thách đấu / tông môn.
+ * 7. Không còn gì để đóng: bỏ chọn mục tiêu (nếu có).
  */
 export function processEscapeKey(handlers: EscapeHandlers): boolean {
   // 1. Nếu đang nhập liệu trong ô chat: blur ô chat
@@ -234,6 +237,9 @@ export function processEscapeKey(handlers: EscapeHandlers): boolean {
 
   // 7. Lời mời
   if (handlers.closeInviteBox?.()) return true;
+
+  // 8. Không còn gì để đóng: Esc bỏ chọn mục tiêu đang khoá
+  if (handlers.clearTarget?.()) return true;
 
   return false;
 }
