@@ -3,6 +3,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { MAPS, getMap, isDungeonMap } from "@tien-gioi/shared";
+import { mockStartMapId } from "../src/mock-map";
 import {
   OWN_OVERSHOOT,
   evaluatePerfResults,
@@ -462,5 +464,33 @@ describe("M5.1 #330: perf-gate (cổng ngân sách cho perf:mobile)", () => {
       });
       expect(r.status).toBe(1);
     });
+  });
+});
+
+describe("M6 #408 bước 4: harness đo cả bản đồ ngoài với sương + thời tiết + nước bật", () => {
+  const src = fs.readFileSync(path.join(repo, "client/scripts/measure-mobile-perf.mjs"), "utf8");
+
+  it("có kịch bản Âm Sương ở đủ ba bậc Thấp / Vừa / Cao (CPU 4x) và hai bản đồ mốc so sánh", () => {
+    expect(src).toContain("id: `am-suong-${tier}-4x`");
+    expect(src).toContain('["low", "mid", "high"].map((tier)');
+    expect(src).toContain('AMBIENT_QUERY("am_suong")');
+    expect(src).toContain('AMBIENT_QUERY("hac_phong")');
+    expect(src).toContain('AMBIENT_QUERY("lac_ha")');
+  });
+
+  it("AMBIENT_QUERY bật sương + thời tiết + nước và chọn bản đồ qua ?map= mà client mock nhận đúng", () => {
+    const m = /const AMBIENT_QUERY = \(mapId\) =>\s*`([^`]+)`;/.exec(src);
+    expect(m, "không tìm thấy AMBIENT_QUERY").not.toBeNull();
+    const q = new URLSearchParams(m![1].replace("${mapId}", "am_suong"));
+    for (const k of ["weather", "fog", "water"]) expect(q.get(k), k).toBe("1"); // ?debug tắt mặc định cả ba
+    expect(q.get("perf")).toBe("1"); // lớp phủ hạt / emitter cho cổng ngân sách
+    expect(mockStartMapId(`?${q.toString()}`, false)).toBe("am_suong");
+  });
+
+  it("mọi bản đồ ngoài của shared đều có kịch bản đo (thêm bản đồ ngoài mới mà quên thì đỏ)", () => {
+    for (const d of MAPS.filter((x) => !isDungeonMap(x.id))) {
+      expect(getMap(d.id)).toBeDefined();
+      expect(src, `thiếu kịch bản đo cho ${d.id}`).toContain(`AMBIENT_QUERY("${d.id}")`);
+    }
   });
 });

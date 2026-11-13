@@ -535,6 +535,8 @@ export class WorldScene extends Phaser.Scene {
       (window as any).__game = this.game;
       (window as any).__scene = this;
       (window as any).__fx = this.fx;
+      // Cho `leak:test` (client/scripts/leak-test.mjs) dựng lại hình ảnh của từng bản đồ ngay trong trang (#408 bước 4)
+      (window as any).__getMap = getMap;
     }
   }
 

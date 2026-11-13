@@ -11,7 +11,7 @@
  *
  * Chạy:
  *   npm run perf:mobile
- *   node client/scripts/measure-mobile-perf.mjs [--quick] [--tier low|mid|high] [--cpu 1|4|6]
+ *   node client/scripts/measure-mobile-perf.mjs [--quick] [--tier low|mid|high] [--cpu 1|4|6] [--only id1,id2]
  */
 
 import http from "node:http";
@@ -61,6 +61,8 @@ function getArg(flag) {
 const isQuick = args.includes("--quick");
 const filterTier = getArg("tier");
 const filterCpu = getArg("cpu");
+// `--only a,b`: chỉ đo các kịch bản có id này (đo nhanh một nhóm; không ghi đè docs trừ khi có --write)
+const filterOnly = getArg("only");
 const forceWrite = args.includes("--write");
 
 // Đọc ngân sách nếu có
@@ -108,6 +110,9 @@ const chromeProcess = spawn("google-chrome", [
   "--disable-dev-shm-usage",
   "about:blank",
 ]);
+
+/** Địa chỉ của kịch bản "bản đồ ngoài, hiệu ứng môi trường bật": `?debug` tắt sương / thời tiết / nước nên phải bật lại bằng `=1`. */
+const AMBIENT_QUERY = (mapId) => `map=${mapId}&crowd=20&debug=1&perf=1&weather=1&fog=1&water=1`;
 
 // Danh sách các kịch bản chuẩn
 export const ALL_SCENARIOS = [
@@ -197,6 +202,31 @@ export const ALL_SCENARIOS = [
     cpuRate: 4,
     fx: "burst",
   },
+  // Bản đồ ngoài với sương + thời tiết + nước BẬT (#408 bước 4). Mọi kịch bản khác chạy `?debug=1` nên ba hiệu ứng môi trường này mặc định TẮT
+  // (`ambientEnabledByUrl`): chưa kịch bản nào đo chi phí của chúng. `map=<id>` (client/src/mock-map.ts) cho mock khởi đầu ở bản đồ đó, đứng giữa
+  // trấn; `crowd=20` thêm 20 đạo hữu quanh người chơi. Âm Sương (sương dày nhất, thời tiết + nước riêng) đo ở cả ba bậc; Lạc Hà / Hắc Phong
+  // chỉ đo bậc Cao (đắt nhất) làm mốc so sánh: Âm Sương không được nặng hơn hẳn hai bản đồ kia.
+  ...["low", "mid", "high"].map((tier) => ({
+    id: `am-suong-${tier}-4x`,
+    name: "Âm Sương Trạch (sương + thời tiết + nước)",
+    query: AMBIENT_QUERY("am_suong"),
+    tier,
+    cpuRate: 4,
+  })),
+  {
+    id: "hac-phong-high-4x",
+    name: "Hắc Phong Cốc (sương + thời tiết + nước)",
+    query: AMBIENT_QUERY("hac_phong"),
+    tier: "high",
+    cpuRate: 4,
+  },
+  {
+    id: "lac-ha-high-4x",
+    name: "Lạc Hà Trấn (sương + thời tiết + nước)",
+    query: AMBIENT_QUERY("lac_ha"),
+    tier: "high",
+    cpuRate: 4,
+  },
   // Chế độ bí cảnh (dungeon)
   {
     id: "dungeon-mid-4x",
@@ -221,6 +251,23 @@ if (filterTier) {
 }
 if (filterCpu) {
   scenariosToRun = scenariosToRun.filter((s) => s.cpuRate === Number(filterCpu));
+}
+if (filterOnly) {
+  const wanted = new Set(
+    filterOnly
+      .split(",")
+      .map((x) => x.trim())
+      .filter(Boolean),
+  );
+  const known = new Set(ALL_SCENARIOS.map((s) => s.id));
+  const unknown = [...wanted].filter((id) => !known.has(id));
+  if (unknown.length > 0) {
+    console.error(
+      `--only: không có kịch bản "${unknown.join('", "')}" (có: ${[...known].join(", ")})`,
+    );
+    process.exit(2);
+  }
+  scenariosToRun = scenariosToRun.filter((s) => wanted.has(s.id));
 }
 
 const results = [];
@@ -510,7 +557,7 @@ console.table(
   })),
 );
 
-const isFiltered = isQuick || Boolean(filterTier) || Boolean(filterCpu);
+const isFiltered = isQuick || Boolean(filterTier) || Boolean(filterCpu) || Boolean(filterOnly);
 const shouldWriteDocs = !isFiltered || forceWrite;
 
 if (shouldWriteDocs) {

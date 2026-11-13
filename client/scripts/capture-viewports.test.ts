@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { Buffer } from "node:buffer";
+import { getMap, isDungeonMap } from "@tien-gioi/shared";
+import { mockStartMapId } from "../src/mock-map";
 import {
   VIEWPORTS,
   SCENARIOS,
+  MAP_SCENARIOS,
+  MAP_VIEWPORT_IDS,
   computeImageHash,
   checkDuplicateScreenshots,
   assertOnlyModalsOpen,
@@ -55,6 +59,40 @@ describe("capture-viewports", () => {
       expect(typeof sc.targetSelector).toBe("string");
       expect(sc.targetSelector.length).toBeGreaterThan(0);
     }
+  });
+
+  describe("kịch bản bản đồ ngoài (--maps, #408 bước 4)", () => {
+    it("chụp Hắc Phong (mốc) và Âm Sương, KHÔNG lẫn vào bộ ảnh mốc M5", () => {
+      expect(MAP_SCENARIOS.map((s) => s.id)).toEqual(["08-map-hac-phong", "09-map-am-suong"]);
+      const m5 = new Set(SCENARIOS.map((s) => s.id));
+      for (const sc of MAP_SCENARIOS) expect(m5.has(sc.id)).toBe(false);
+    });
+
+    it("địa chỉ trỏ đúng bản đồ có thật (client mock nhận đúng id), bật sương + thời tiết + nước", () => {
+      const want: Record<string, string> = {
+        "08-map-hac-phong": "hac_phong",
+        "09-map-am-suong": "am_suong",
+      };
+      for (const sc of MAP_SCENARIOS) {
+        expect(sc.mode).toBe("map");
+        expect(typeof sc.action).toBe("function");
+        const q = new URLSearchParams(sc.query);
+        expect(q.get("map")).toBe(want[sc.id]);
+        expect(getMap(want[sc.id])).toBeDefined();
+        expect(isDungeonMap(want[sc.id])).toBe(false);
+        // đúng thứ mà `mock-map` trên client chọn khi mở địa chỉ này (id gõ sai sẽ lặng lẽ quay về Lạc Hà)
+        expect(mockStartMapId(`?${sc.query}`, false)).toBe(want[sc.id]);
+        // ?debug tắt ba hiệu ứng môi trường: phải bật lại, nếu không ảnh chụp là bản đồ trơ
+        for (const k of ["weather", "fog", "water"]) expect(q.get(k)).toBe("1");
+        expect(q.get("crowd")).not.toBeNull();
+      }
+    });
+
+    it("năm khung nhìn đại diện đều có trong VIEWPORTS (desktop trước cảm ứng nhờ thứ tự VIEWPORTS)", () => {
+      expect(MAP_VIEWPORT_IDS).toHaveLength(5);
+      const known = new Set(VIEWPORTS.map((v) => v.id));
+      for (const id of MAP_VIEWPORT_IDS) expect(known.has(id)).toBe(true);
+    });
   });
 
   describe("computeImageHash", () => {

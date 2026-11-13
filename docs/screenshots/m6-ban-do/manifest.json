@@ -1,0 +1,180 @@
+{
+  "capturedAt": "2026-11-13T07:10:28.059Z",
+  "format": "webp",
+  "quality": 75,
+  "maps": true,
+  "viewports": [
+    {
+      "id": "desktop-hd",
+      "name": "Máy tính Laptop / HD (1280x720)",
+      "width": 1280,
+      "height": 720,
+      "dpr": 1,
+      "mobile": false
+    },
+    {
+      "id": "tablet-p",
+      "name": "Máy tính bảng dọc (iPad Portrait)",
+      "width": 768,
+      "height": 1024,
+      "dpr": 2,
+      "mobile": true
+    },
+    {
+      "id": "mobile-l",
+      "name": "Điện thoại ngang (Gaming landscape)",
+      "width": 844,
+      "height": 390,
+      "dpr": 2,
+      "mobile": true
+    },
+    {
+      "id": "mobile-p",
+      "name": "Điện thoại dọc (iPhone / Android chuẩn)",
+      "width": 390,
+      "height": 844,
+      "dpr": 2,
+      "mobile": true
+    },
+    {
+      "id": "mobile-sm",
+      "name": "Điện thoại nhỏ (Compact 360x640)",
+      "width": 360,
+      "height": 640,
+      "dpr": 2,
+      "mobile": true
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "08-map-hac-phong",
+      "name": "Hắc Phong Cốc (mốc so sánh: sương + thời tiết + nước)"
+    },
+    {
+      "id": "09-map-am-suong",
+      "name": "Âm Sương Trạch (sương + thời tiết + nước)"
+    }
+  ],
+  "images": [
+    {
+      "viewportId": "desktop-hd",
+      "viewportName": "Máy tính Laptop / HD (1280x720)",
+      "width": 1280,
+      "height": 720,
+      "dpr": 1,
+      "scenarioId": "08-map-hac-phong",
+      "scenarioName": "Hắc Phong Cốc (mốc so sánh: sương + thời tiết + nước)",
+      "fileName": "desktop-hd__08-map-hac-phong.webp",
+      "sizeKb": 73.1,
+      "sha256": "fa59f867edf40b009bd0a3e101e374e140007362bc6199c55b06780c78013e1b"
+    },
+    {
+      "viewportId": "desktop-hd",
+      "viewportName": "Máy tính Laptop / HD (1280x720)",
+      "width": 1280,
+      "height": 720,
+      "dpr": 1,
+      "scenarioId": "09-map-am-suong",
+      "scenarioName": "Âm Sương Trạch (sương + thời tiết + nước)",
+      "fileName": "desktop-hd__09-map-am-suong.webp",
+      "sizeKb": 73.5,
+      "sha256": "f4fe580e7ea77ba03889ac97116e937f82812fb59ac4716a1c6341a5eb5f204a"
+    },
+    {
+      "viewportId": "tablet-p",
+      "viewportName": "Máy tính bảng dọc (iPad Portrait)",
+      "width": 768,
+      "height": 1024,
+      "dpr": 2,
+      "scenarioId": "08-map-hac-phong",
+      "scenarioName": "Hắc Phong Cốc (mốc so sánh: sương + thời tiết + nước)",
+      "fileName": "tablet-p__08-map-hac-phong.webp",
+      "sizeKb": 225.6,
+      "sha256": "cbea69a178459a02083002c592e539fba6b792eea785d213a9333d5339886756"
+    },
+    {
+      "viewportId": "tablet-p",
+      "viewportName": "Máy tính bảng dọc (iPad Portrait)",
+      "width": 768,
+      "height": 1024,
+      "dpr": 2,
+      "scenarioId": "09-map-am-suong",
+      "scenarioName": "Âm Sương Trạch (sương + thời tiết + nước)",
+      "fileName": "tablet-p__09-map-am-suong.webp",
+      "sizeKb": 217.3,
+      "sha256": "8e2da39850d392713a90e0f2008b5906705afda0b8c830b861b5b276e4624b45"
+    },
+    {
+      "viewportId": "mobile-l",
+      "viewportName": "Điện thoại ngang (Gaming landscape)",
+      "width": 844,
+      "height": 390,
+      "dpr": 2,
+      "scenarioId": "08-map-hac-phong",
+      "scenarioName": "Hắc Phong Cốc (mốc so sánh: sương + thời tiết + nước)",
+      "fileName": "mobile-l__08-map-hac-phong.webp",
+      "sizeKb": 109.2,
+      "sha256": "8ffa261ca4ff5899e458d267df4716e0f6f428d895d70fabb0cf6061d39652d9"
+    },
+    {
+      "viewportId": "mobile-l",
+      "viewportName": "Điện thoại ngang (Gaming landscape)",
+      "width": 844,
+      "height": 390,
+      "dpr": 2,
+      "scenarioId": "09-map-am-suong",
+      "scenarioName": "Âm Sương Trạch (sương + thời tiết + nước)",
+      "fileName": "mobile-l__09-map-am-suong.webp",
+      "sizeKb": 106.7,
+      "sha256": "47483416d5f30760aae41f5a324b83958b34efd9ad9f03494d6fc626a12ec696"
+    },
+    {
+      "viewportId": "mobile-p",
+      "viewportName": "Điện thoại dọc (iPhone / Android chuẩn)",
+      "width": 390,
+      "height": 844,
+      "dpr": 2,
+      "scenarioId": "08-map-hac-phong",
+      "scenarioName": "Hắc Phong Cốc (mốc so sánh: sương + thời tiết + nước)",
+      "fileName": "mobile-p__08-map-hac-phong.webp",
+      "sizeKb": 123.8,
+      "sha256": "01ac9206f1deda9f59b8d37ad9f58b801b19ef9cbfcbad7338e5f54bb53f3076"
+    },
+    {
+      "viewportId": "mobile-p",
+      "viewportName": "Điện thoại dọc (iPhone / Android chuẩn)",
+      "width": 390,
+      "height": 844,
+      "dpr": 2,
+      "scenarioId": "09-map-am-suong",
+      "scenarioName": "Âm Sương Trạch (sương + thời tiết + nước)",
+      "fileName": "mobile-p__09-map-am-suong.webp",
+      "sizeKb": 117.9,
+      "sha256": "b4b68f04fe2f43058912ca36ccbcd498aa450e97014219a52ce6f339c7c3faa2"
+    },
+    {
+      "viewportId": "mobile-sm",
+      "viewportName": "Điện thoại nhỏ (Compact 360x640)",
+      "width": 360,
+      "height": 640,
+      "dpr": 2,
+      "scenarioId": "08-map-hac-phong",
+      "scenarioName": "Hắc Phong Cốc (mốc so sánh: sương + thời tiết + nước)",
+      "fileName": "mobile-sm__08-map-hac-phong.webp",
+      "sizeKb": 76.5,
+      "sha256": "eb0622a6bd3aeca64bec292b85bf4bdb31edbc58f0f59a984cb29c5c95d33027"
+    },
+    {
+      "viewportId": "mobile-sm",
+      "viewportName": "Điện thoại nhỏ (Compact 360x640)",
+      "width": 360,
+      "height": 640,
+      "dpr": 2,
+      "scenarioId": "09-map-am-suong",
+      "scenarioName": "Âm Sương Trạch (sương + thời tiết + nước)",
+      "fileName": "mobile-sm__09-map-am-suong.webp",
+      "sizeKb": 72,
+      "sha256": "36a8841866de5c10e69f26a7a5828e123adddf9c502a212775537e5ca1af323d"
+    }
+  ]
+}
