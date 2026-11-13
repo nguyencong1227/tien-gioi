@@ -7,10 +7,14 @@ import {
   formatSectMembersSummary,
   sortSectMembers,
   mergeMemberPresence,
+  mapLabelOf,
+  sectMemberStatusText,
+  UNKNOWN_MAP_LABEL,
   sectConfirmText,
   isMockSectEnabled,
   MOCK_SECT_SAMPLES,
 } from "./sect";
+import { MAPS, DUNGEON_MAPS, realmLabel } from "@tien-gioi/shared";
 import type { SectMember, SectPresenceMsg, SectLogEntry } from "@tien-gioi/shared";
 
 describe("sectConfirmText (hộp xác nhận trong game, #246)", () => {
@@ -182,5 +186,41 @@ describe("client sect pure logic", () => {
     expect(fmt(null as any)).toBe("0");
     expect(fmt(Infinity)).toBe("0");
     expect(fmt(-100)).toBe("0");
+  });
+});
+
+describe("nhãn bản đồ trong bảng tổ đội / tông môn (M6 #409): tên người chơi đọc được, không bao giờ là id thô", () => {
+  it("mapLabelOf: mọi bản đồ của game (kể cả bí cảnh, và Âm Sương Trạch khi #404 vào) hiện `MapDef.name`", () => {
+    for (const def of [...MAPS, ...DUNGEON_MAPS]) {
+      const label = mapLabelOf(def.id);
+      expect(label, def.id).toBe(def.name);
+      expect(label, def.id).not.toBe(def.id);
+    }
+  });
+
+  it("mapLabelOf: id lạ / id độc không ném lỗi và không lộ id thô", () => {
+    for (const id of ["", "khong_co", "constructor", "__proto__", "toString", "am_suong_2"])
+      expect(mapLabelOf(id), id).toBe(UNKNOWN_MAP_LABEL);
+  });
+
+  it("sectMemberStatusText: Offline / Online đủ phần / Online thiếu cảnh giới hoặc bản đồ (không còn dấu '·' treo)", () => {
+    const base = { name: "A", rank: "de_tu", joinedAt: 1 } as const;
+    expect(sectMemberStatusText({ ...base, online: false })).toBe("Offline");
+    const full = sectMemberStatusText({
+      ...base,
+      online: true,
+      realm: 2,
+      tier: 1,
+      mapId: "hac_phong",
+    });
+    expect(full).toBe(`Online · ${realmLabel(2, 1)} · ${mapLabelOf("hac_phong")}`);
+    expect(full).not.toContain("hac_phong");
+    expect(sectMemberStatusText({ ...base, online: true, mapId: "lac_ha" })).toBe(
+      `Online · ${mapLabelOf("lac_ha")}`,
+    );
+    expect(sectMemberStatusText({ ...base, online: true })).toBe("Online");
+    expect(sectMemberStatusText({ ...base, online: true, realm: 0, tier: 3 }).endsWith("·")).toBe(
+      false,
+    );
   });
 });
