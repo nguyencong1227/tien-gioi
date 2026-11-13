@@ -138,6 +138,8 @@ export function kimDanBo(): BoGear[] {
 /**
  * Linh thạch kiếm được TRƯỚC Kim Đan trong cùng kiếp (Phàm Nhân tới hết Trúc Cơ, bán hết đồ rơi): ví chỉ đặt lại lúc đầu thai và
  * Luyện Khí / Trúc Cơ gần như không có chỗ tiêu, nên số này còn nguyên khi vào Kim Đan và trả được phí rèn (nit của B ở #440).
+ * Bán HẾT đồ rơi, kể cả nguyên liệu chín công thức cũ (Lang Nha / Hắc Hổ / Xích Mãng) mà người chơi cần giữ để rèn: bán thay vì giữ
+ * được ~915 Linh thạch (8,6%); rèn đủ ba bộ cũ thì số mang vào ~9.700 (không đổi kết luận: nit của B ở #442).
  */
 export function preKimDanCoin(rows: ReturnType<typeof simulate>): number {
   let coin = 0;
@@ -396,7 +398,7 @@ Tổng phí rèn ba bộ **${n0(totalFee)}** Linh thạch so với **${n0(last.c
 
 **Qua kiếp.** Bảng trên là kiếp 1 (không Dư âm tu hành). Khi kiếp nào cũng cày tới hết Kim Đan và nâng Dư âm tu hành (mục 4), bậc ngắn lại theo hệ số tốc độ nhưng Linh thạch theo số quái hạ nên KHÔNG tăng, còn \`applyRebirth\` đưa ví về tối đa \`coinCarryCap\` (${n0(CARRY_CAP_MAX)} khi đủ Kim nang) và túi rỗng:
 
-| Kiếp | Dư âm tu hành | Phút cả kiếp | Linh thạch kiếm được | Rèn đủ phí | Cày nguyên liệu bộ III so với Hậu kỳ |
+| Kiếp | Dư âm tu hành | Phút cả kiếp | Linh thạch có được | Rèn đủ phí | Cày nguyên liệu bộ III so với Hậu kỳ |
 |---|---:|---:|---:|---|---:|
 ${lifeRows.join("\n")}
 

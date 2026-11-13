@@ -461,7 +461,7 @@ Tổng phí rèn ba bộ **78,500** Linh thạch so với **62,314** có đượ
 
 **Qua kiếp.** Bảng trên là kiếp 1 (không Dư âm tu hành). Khi kiếp nào cũng cày tới hết Kim Đan và nâng Dư âm tu hành (mục 4), bậc ngắn lại theo hệ số tốc độ nhưng Linh thạch theo số quái hạ nên KHÔNG tăng, còn `applyRebirth` đưa ví về tối đa `coinCarryCap` (400 khi đủ Kim nang) và túi rỗng:
 
-| Kiếp | Dư âm tu hành | Phút cả kiếp | Linh thạch kiếm được | Rèn đủ phí | Cày nguyên liệu bộ III so với Hậu kỳ |
+| Kiếp | Dư âm tu hành | Phút cả kiếp | Linh thạch có được | Rèn đủ phí | Cày nguyên liệu bộ III so với Hậu kỳ |
 |---|---:|---:|---:|---|---:|
 | 1 | Nấc 5 | 485 | 62,314 | bộ I + II | 54% |
 | 2 | Nấc 7 | 326 | 38,794 | bộ I + II | 81% |
