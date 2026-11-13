@@ -389,3 +389,48 @@ Mục tiêu: không bãi nào cho tu vi / giờ vượt ~1,5x bãi mới tốt n
 | Kim Đan Sơ kỳ | 48,000 | Xích Mãng | 89.6 | Thạch Quy | 116.2 |
 | Kim Đan Trung kỳ | 55,200 | Độc Thiềm | 99.5 | Độc Thiềm | 99.5 |
 | Kim Đan Hậu kỳ | 63,480 | Độc Thiềm | 124.4 | Độc Thiềm | 124.4 |
+
+### 4. Luân hồi khi cày tới hết Kim Đan (#406)
+
+Cùng mô hình với mục "Luân hồi & Điểm Duyên" (Duyên theo `calcDuyen`, thời gian là nhịp ở mục 3, bãi tốt nhất, hạ 2 trùm; mốc "hết" hạ 3 trùm). `duyenPerStep(3)` được hạ từ **60 xuống 40** (PR shared riêng): ở 60, Duyên / giờ (0 trùm) ở Kim Đan hậu kỳ lên 31.4 (gấp 1.40x Luyện Khí tầng 5, vượt ngưỡng 1.3x); thanh Kim Đan dài ~5 giờ chứ không 5 lần Trúc Cơ (~2 giờ) nên 12 x 5 trả quá tay.
+
+| Chết ngay khi vừa đạt | Phút | Duyên (0 trùm) | Duyên / giờ (0 trùm) | Duyên (hạ trùm) | Duyên / giờ (hạ trùm) |
+|---|---:|---:|---:|---:|---:|
+| Luyện Khí tầng 5 | 29 | 11 | 22.5 | 17 | **34.8** |
+| Luyện Khí tầng 9 | 48 | 21 | 26.3 | 27 | **33.9** |
+| Trúc Cơ sơ kỳ | 53 | 23 | 26.2 | 29 | **33.0** |
+| Trúc Cơ trung kỳ | 84 | 39 | 27.7 | 45 | **32.0** |
+| Trúc Cơ hậu kỳ | 120 | 55 | 27.6 | 61 | **30.6** |
+| Hết Trúc Cơ (thanh đầy) | 172 | 69 | 24.1 | 78 | **27.3** |
+| Kim Đan sơ kỳ | 172 | 69 | 24.1 | 75 | **26.2** |
+| Kim Đan trung kỳ | 261 | 109 | 25.0 | 115 | **26.4** |
+| Kim Đan hậu kỳ | 361 | 149 | 24.8 | 155 | **25.8** |
+| Hết Kim Đan (thanh đầy) | 485 | 189 | 23.4 | 198 | **24.5** |
+
+Từ Luyện Khí tầng 5 tới hết Kim Đan, Duyên / giờ (0 trùm) nhỏ nhất **22.5** (Luyện Khí tầng 5), lớn nhất **27.7** (Trúc Cơ trung kỳ): tỉ lệ **1.23x** (ngưỡng 1.3x, đạt). Mọi mốc Kim Đan nằm trong dải của Luyện Khí / Trúc Cơ nên không có điểm dừng nào đáng cố ý chết.
+
+Tiến trình qua kiếp khi KIẾP NÀO CŨNG cày trọn tới hết Kim Đan (hạ 2 trùm) và dồn Duyên vào Dư âm tu hành:
+
+| Kiếp | Dư âm tu hành | Tốc độ tu luyện | Thời gian chơi (phút) | Duyên nhận | Duyên còn lại | Duyên / giờ | So với kiếp 1 | Hành động tại Tam Sinh Thạch |
+|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| 1 | Nấc 5 | +50% | 485 | +195 | 46 | **24.1** | 1.00x | Lên nấc 5 (+50%) |
+| 2 | Nấc 7 | +70% | 326 | +195 | 46 | **35.9** | 1.49x | Lên nấc 7 (+70%) |
+| 3 | Nấc 8 | +80% | 289 | +195 | 76 | **40.5** | 1.68x | Lên nấc 8 (+80%) |
+| 4 | Nấc 9 | +90% | 273 | +195 | 36 | **42.8** | 1.78x | Lên nấc 9 (+90%) |
+| 5 | Nấc 9 | +90% | 259 | +195 | 231 | **45.1** | 1.87x | Chờ đủ 335 Duyên |
+| 6 | Nấc 10 | +100% | 259 | +195 | 91 | **45.1** | 1.87x | Lên nấc 10 (+100%) |
+| 7 | Nấc 10 | +100% | 247 | +195 | 286 | **47.4** | 1.97x | Đã đạt tối đa (+100%) |
+
+Duyên / giờ tăng từ **24.1** (kiếp 1) lên **47.4** khi đạt tối đa: **1.97x** (ngưỡng ~2.0x, đạt). Một kiếp tới hết Kim Đan nhận 195 Duyên (so với 75 khi chỉ tới hết Trúc Cơ) vì dài 2.8 lần: cùng Duyên / giờ. Mô hình BỎ QUA nhiệm vụ lặp và phí rèn (không đổi Duyên). Giữ nguyên luật luân hồi đã chốt.
+
+### 5. Đi theo đội ở Kim Đan (#406; KHÔNG đổi quy tắc chia tu vi)
+
+Cùng mô hình với mục "Đi theo đội" (tu vi / giờ MỖI thành viên so với săn solo tốt nhất; trong ngoặc là quái tốt nhất mà đội đủ an toàn đánh, kể cả trùm Hắc Giao).
+
+| Bậc | Một mình săn | Đội 2 | Đội 3 | Đội 4 |
+|---|---|---:|---:|---:|
+| Kim Đan Sơ kỳ | Xích Mãng | 0.80x (Độc Thiềm) | 0.69x (Độc Thiềm) | 1.08x (Hắc Giao) |
+| Kim Đan Trung kỳ | Độc Thiềm | 0.82x (Độc Thiềm) | 1.18x (Hắc Giao) | 1.09x (Hắc Giao) |
+| Kim Đan Hậu kỳ | Độc Thiềm | 0.77x (Độc Thiềm) | 1.12x (Hắc Giao) | 1.02x (Hắc Giao) |
+
+Cao nhất **1.18x**, thấp nhất **0.69x**: ở Kim Đan đội 3-4 hạ Hắc Giao được ~1.0-1.2x săn solo (dưới ngưỡng 1.5x của #74, khác Trúc Cơ tới 2.5x), còn đội 2 chậm hơn solo (~0.8x: chưa đủ người hạ trùm, chia tu vi, thời gian tìm quái không rút ngắn). Đây là số đo, câu hỏi chia tu vi của người dùng vẫn chờ.

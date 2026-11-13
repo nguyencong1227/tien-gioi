@@ -321,6 +321,26 @@ export function simulateReincarnationMilestones(
     },
   ];
 
+  // M6 (#406): khi bảng có Kim Đan (`simulate(3)` kèm quái mới, xem `withKimDan`) thì thêm bốn mốc Kim Đan. Mốc "vừa đạt" dùng
+  // thời gian tới hết bậc trước, như các mốc trên.
+  const kd = [0, 1, 2].map((t) => baseRows.find((r) => r.realm === 3 && r.tier === t));
+  if (kd.every((r) => r !== undefined)) {
+    const [kd0, kd1, kd2] = kd as Row[];
+    rawMilestones.push(
+      { label: "Kim Đan sơ kỳ", realm: 3, tier: 0, exp: 0, minutes: tc2.total, bossKills: 2 },
+      { label: "Kim Đan trung kỳ", realm: 3, tier: 1, exp: 0, minutes: kd0.total, bossKills: 2 },
+      { label: "Kim Đan hậu kỳ", realm: 3, tier: 2, exp: 0, minutes: kd1.total, bossKills: 2 },
+      {
+        label: "Hết Kim Đan (thanh đầy)",
+        realm: 3,
+        tier: 2,
+        exp: kd2.bar,
+        minutes: kd2.total,
+        bossKills: 3,
+      },
+    );
+  }
+
   return rawMilestones.map((m) => {
     const duyenZero = calcDuyen({
       realm: m.realm,
@@ -355,7 +375,11 @@ export function simulateReincarnationMilestones(
  * và ưu tiên dùng Duyên mở khóa dần 'Dư âm tu hành' (du_am) từ nấc 1 đến nấc 10 (+100%).
  * Đo số kiếp, thời gian và tốc độ Duyên / giờ qua từng kiếp.
  */
-export function simulateReincarnationProgression(maxLives = 20): ReincarnationLifeRow[] {
+export function simulateReincarnationProgression(
+  maxLives = 20,
+  /** Cảnh giới cuối mỗi kiếp cày tới (2 = hết Trúc Cơ như bản đầu; 3 = hết Kim Đan: gọi trong `withKimDan`) */
+  lastRealm = 2,
+): ReincarnationLifeRow[] {
   const duAmCosts = UNLOCK_BY_ID.du_am.costs;
   let currentDuAmLevel = 0;
   let accumulatedDuyen = 0;
@@ -364,14 +388,14 @@ export function simulateReincarnationProgression(maxLives = 20): ReincarnationLi
 
   for (let kiep = 1; kiep <= maxLives; kiep++) {
     const expMult = 1 + 0.1 * currentDuAmLevel;
-    const rows = simulate(2, expMult);
+    const rows = simulate(lastRealm, expMult);
     const lastRow = rows.at(-1)!;
     const minutes = lastRow.total;
 
-    // Giả định hạ 2 trùm trong kiếp chơi trọn vẹn tới hết Trúc Cơ
+    // Giả định hạ 2 trùm trong kiếp chơi trọn vẹn tới hết cảnh giới cuối
     const duyenEarned = calcDuyen({
-      realm: 2,
-      tier: 2,
+      realm: lastRow.realm,
+      tier: lastRow.tier,
       exp: lastRow.bar,
       playMs: minutes * 60_000,
       bossKills: 2,

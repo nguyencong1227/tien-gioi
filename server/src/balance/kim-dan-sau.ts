@@ -12,7 +12,16 @@ import {
   statsFor,
   type MonsterKind,
 } from "@tien-gioi/shared";
-import { ASSUME, bestGear, huntRate, monsterEconomy, simulate } from "./simulate";
+import {
+  ASSUME,
+  bestGear,
+  huntRate,
+  monsterEconomy,
+  partyRatio,
+  simulate,
+  simulateReincarnationMilestones,
+  simulateReincarnationProgression,
+} from "./simulate";
 
 const KD = 3;
 export const KIM_DAN_MONSTER_IDS = ["suong_ho", "thach_quy", "doc_thiem"] as const;
@@ -39,10 +48,16 @@ export function rateWithPills(m: MonsterKind, tier: number): number | null {
   return h.rate * 3600 + (3600 / h.secPerKill) * perKill;
 }
 
-/** Chạy `fn` với quái Kim Đan được thêm vào danh sách săn của mô hình (và bỏ Xích Mãng nếu `noMang`), rồi khôi phục. */
-export function withKimDan<T>(fn: () => T, noMang = false): T {
+/**
+ * Chạy `fn` với quái Kim Đan được thêm vào danh sách săn của mô hình (và bỏ Xích Mãng nếu `noMang`, và thêm trùm Hắc Giao nếu
+ * `withBoss`: dùng cho bảng đội, vì trùm chỉ đánh được theo đội), rồi khôi phục.
+ */
+export function withKimDan<T>(fn: () => T, noMang = false, withBoss = false): T {
   const saved = [...WILD_MONSTERS];
-  for (const id of KIM_DAN_MONSTER_IDS)
+  const ids: string[] = withBoss
+    ? [...KIM_DAN_MONSTER_IDS, KIM_DAN_BOSS_ID]
+    : [...KIM_DAN_MONSTER_IDS];
+  for (const id of ids)
     if (!WILD_MONSTERS.includes(MONSTER_BY_ID[id])) WILD_MONSTERS.push(MONSTER_BY_ID[id]);
   if (noMang) {
     const keep = WILD_MONSTERS.filter((m) => m.id !== "mang");
@@ -55,6 +70,32 @@ export function withKimDan<T>(fn: () => T, noMang = false): T {
     WILD_MONSTERS.length = 0;
     WILD_MONSTERS.push(...saved);
   }
+}
+
+/** Luân hồi khi cày tới hết Kim Đan (#406 mục 4): các mốc dừng và tiến trình qua kiếp, tính SỐNG từ `shared/` + mô hình. */
+export function kimDanReincarnation(maxLives = 40) {
+  const milestones = withKimDan(() => simulateReincarnationMilestones(simulate(KD, 1.0)));
+  // Từ Luyện Khí tầng 5 (bỏ giai đoạn mới vào game), cùng tiêu chí với mục "Luân hồi & Điểm Duyên" mục 3
+  const viable = milestones.filter((m) => m.realm > 1 || m.tier >= 4);
+  const lo = viable.reduce((a, b) => (b.duyenPerHourZeroBoss < a.duyenPerHourZeroBoss ? b : a));
+  const hi = viable.reduce((a, b) => (b.duyenPerHourZeroBoss > a.duyenPerHourZeroBoss ? b : a));
+  const progression = withKimDan(() => simulateReincarnationProgression(maxLives, KD));
+  return {
+    milestones,
+    lo,
+    hi,
+    ratio: hi.duyenPerHourZeroBoss / lo.duyenPerHourZeroBoss,
+    progression,
+  };
+}
+
+/** Bảng "Đi theo đội" ở Kim Đan: tu vi / giờ mỗi người so với săn solo tốt nhất (đội được thêm trùm Hắc Giao). */
+export function kimDanPartyRows() {
+  return REALMS[KD].tiers.map((name, tier) => ({
+    label: `${REALMS[KD].name} ${name}`,
+    tier,
+    cells: [2, 3, 4].map((n) => ({ n, ...withKimDan(() => partyRatio(KD, tier, n), false, true) })),
+  }));
 }
 
 const n0 = (x: number) => Math.round(x).toLocaleString("en-US");
@@ -107,6 +148,27 @@ export function renderKimDanSau(): string {
     const b = rowOf(designed, t.tier);
     return `| ${t.label} | ${n0(t.bar)} | ${MONSTER_BY_ID[a.source]?.name ?? a.source} | ${n1(a.minutes)} | ${MONSTER_BY_ID[b.source]?.name ?? b.source} | ${n1(b.minutes)} |`;
   });
+  const rein = kimDanReincarnation();
+  const reinMilestones = rein.milestones
+    .filter((m) => m.realm > 1 || m.tier >= 4)
+    .map(
+      (m) =>
+        `| ${m.label} | ${n0(m.minutes)} | ${m.duyenZeroBoss} | ${n1(m.duyenPerHourZeroBoss)} | ${m.duyenWithBoss} | **${n1(m.duyenPerHourWithBoss)}** |`,
+    );
+  const reinLives = rein.progression.map(
+    (p) =>
+      `| ${p.kiep} | Nấc ${p.duAmLevel} | +${p.duAmLevel * 10}% | ${n0(p.minutes)} | +${p.duyenEarned} | ${p.duyenRemaining} | **${n1(p.duyenPerHour)}** | ${p.ratioToFirstLife.toFixed(2)}x | ${p.upgradeNote} |`,
+  );
+  const reinFinal = rein.progression.at(-1)!;
+  const reinFirst = rein.progression[0];
+  const tcFirst = simulateReincarnationProgression(1, 2)[0];
+  const partyRows = kimDanPartyRows().map(
+    (r) =>
+      `| ${r.label} | ${MONSTER_BY_ID[r.cells[0].solo]?.name ?? r.cells[0].solo} | ${r.cells
+        .map((c) => `${c.ratio.toFixed(2)}x (${MONSTER_BY_ID[c.party]?.name ?? c.party})`)
+        .join(" | ")} |`,
+  );
+  const partyAll = kimDanPartyRows().flatMap((r) => r.cells.map((c) => c.ratio));
   return `## Kim Đan sau nội dung (M6, #403)
 
 Tính SỐNG từ \`shared/\` bằng mô hình ở trên (khác mục "Kim Đan trước M6": đó là ảnh chụp cố định). Quái mới: Sương Hồ (cấp 13, nhanh, đàn), Thạch Quy (cấp 14, dày, đòn nhẹ), Độc Thiềm (cấp 15, đòn nặng, máu thấp), trùm Hắc Giao (cấp 18, đội 3-4 người).
@@ -133,5 +195,33 @@ ${bossRows.join("\n")}
 | Bậc | Thanh | Tối ưu: nguồn | phút | Bãi mới: nguồn | phút |
 |---|---:|---|---:|---|---:|
 ${pacing.join("\n")}
+
+### 4. Luân hồi khi cày tới hết Kim Đan (#406)
+
+Cùng mô hình với mục "Luân hồi & Điểm Duyên" (Duyên theo \`calcDuyen\`, thời gian là nhịp ở mục 3, bãi tốt nhất, hạ 2 trùm; mốc "hết" hạ 3 trùm). \`duyenPerStep(3)\` được hạ từ **60 xuống 40** (PR shared riêng): ở 60, Duyên / giờ (0 trùm) ở Kim Đan hậu kỳ lên 31.4 (gấp 1.40x Luyện Khí tầng 5, vượt ngưỡng 1.3x); thanh Kim Đan dài ~5 giờ chứ không 5 lần Trúc Cơ (~2 giờ) nên 12 x 5 trả quá tay.
+
+| Chết ngay khi vừa đạt | Phút | Duyên (0 trùm) | Duyên / giờ (0 trùm) | Duyên (hạ trùm) | Duyên / giờ (hạ trùm) |
+|---|---:|---:|---:|---:|---:|
+${reinMilestones.join("\n")}
+
+Từ Luyện Khí tầng 5 tới hết Kim Đan, Duyên / giờ (0 trùm) nhỏ nhất **${n1(rein.lo.duyenPerHourZeroBoss)}** (${rein.lo.label}), lớn nhất **${n1(rein.hi.duyenPerHourZeroBoss)}** (${rein.hi.label}): tỉ lệ **${rein.ratio.toFixed(2)}x** (ngưỡng 1.3x${rein.ratio <= 1.3 ? ", đạt" : ", VƯỢT"}). Mọi mốc Kim Đan nằm trong dải của Luyện Khí / Trúc Cơ nên không có điểm dừng nào đáng cố ý chết.
+
+Tiến trình qua kiếp khi KIẾP NÀO CŨNG cày trọn tới hết Kim Đan (hạ 2 trùm) và dồn Duyên vào Dư âm tu hành:
+
+| Kiếp | Dư âm tu hành | Tốc độ tu luyện | Thời gian chơi (phút) | Duyên nhận | Duyên còn lại | Duyên / giờ | So với kiếp 1 | Hành động tại Tam Sinh Thạch |
+|---:|---:|---:|---:|---:|---:|---:|---:|---|
+${reinLives.join("\n")}
+
+Duyên / giờ tăng từ **${n1(reinFirst.duyenPerHour)}** (kiếp 1) lên **${n1(reinFinal.duyenPerHour)}** khi đạt tối đa: **${reinFinal.ratioToFirstLife.toFixed(2)}x** (ngưỡng ~2.0x${reinFinal.ratioToFirstLife <= 2 ? ", đạt" : ", VƯỢT"}). Một kiếp tới hết Kim Đan nhận ${reinFirst.duyenEarned} Duyên (so với ${tcFirst.duyenEarned} khi chỉ tới hết Trúc Cơ) vì dài ${n1(reinFirst.minutes / tcFirst.minutes)} lần: cùng Duyên / giờ. Mô hình BỎ QUA nhiệm vụ lặp và phí rèn (không đổi Duyên). Giữ nguyên luật luân hồi đã chốt.
+
+### 5. Đi theo đội ở Kim Đan (#406; KHÔNG đổi quy tắc chia tu vi)
+
+Cùng mô hình với mục "Đi theo đội" (tu vi / giờ MỖI thành viên so với săn solo tốt nhất; trong ngoặc là quái tốt nhất mà đội đủ an toàn đánh, kể cả trùm Hắc Giao).
+
+| Bậc | Một mình săn | Đội 2 | Đội 3 | Đội 4 |
+|---|---|---:|---:|---:|
+${partyRows.join("\n")}
+
+Cao nhất **${Math.max(...partyAll).toFixed(2)}x**, thấp nhất **${Math.min(...partyAll).toFixed(2)}x**: ở Kim Đan đội 3-4 hạ Hắc Giao được ~1.0-1.2x săn solo (dưới ngưỡng 1.5x của #74, khác Trúc Cơ tới 2.5x), còn đội 2 chậm hơn solo (~0.8x: chưa đủ người hạ trùm, chia tu vi, thời gian tìm quái không rút ngắn). Đây là số đo, câu hỏi chia tu vi của người dùng vẫn chờ.
 `;
 }
