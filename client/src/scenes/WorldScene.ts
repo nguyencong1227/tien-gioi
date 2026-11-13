@@ -1039,10 +1039,10 @@ export class WorldScene extends Phaser.Scene {
         this.interactOrPickup();
         break;
       case "target.next":
-        this.toggleLockTarget(1);
+        this.toggleLockTarget(1, true);
         break;
       case "target.prev":
-        this.toggleLockTarget(-1);
+        this.toggleLockTarget(-1, true);
         break;
       case "panel.inventory":
         ui.toggleInventory();
@@ -1077,16 +1077,28 @@ export class WorldScene extends Phaser.Scene {
     if (this.lockedTargetId !== null || this.isReconnecting || ui.isLimboOpen()) return;
     const me = this.me();
     if (!me || me.dead) return;
+    const id = pickNextTarget(this.targetCandidates(true), null);
+    if (id) this.setLockedTarget(id);
+  }
+
+  /**
+   * Ứng viên khoá mục tiêu. `onScreenOnly` (bàn phím, góp ý của A ở #465): chỉ quái ĐANG THẤY trên màn hình (trong khung camera), không phải cả
+   * tầm khoá 520 px (khung máy tính cao chỉ ~640 px nên quái ở 450 px phía trên nằm ngoài màn hình). Nút cảm ứng giữ nguyên (mọi quái trong tầm).
+   */
+  private targetCandidates(onScreenOnly: boolean): Array<{ id: string; dist: number }> {
+    const view = this.cameras.main.worldView;
     const cands: Array<{ id: string; dist: number }> = [];
     this.monsters.forEach((m, id) => {
+      if (onScreenOnly && !view.contains(m.tx, m.ty)) return;
       cands.push({ id, dist: Math.hypot(m.tx - this.predX, m.ty - this.predY) });
     });
-    const id = pickNextTarget(cands, null);
-    if (id) this.setLockedTarget(id);
+    return cands;
   }
 
   private moveDir() {
     if (document.activeElement instanceof HTMLInputElement) return { dx: 0, dy: 0 };
+    // bảng / hộp thoại đang mở: mũi tên điều hướng bảng, nhân vật đứng yên (#463)
+    if (ui.isKeyboardCaptured()) return { dx: 0, dy: 0 };
     const k = this.keys;
     let dx = (k.D.isDown || k.RIGHT.isDown ? 1 : 0) - (k.A.isDown || k.LEFT.isDown ? 1 : 0);
     let dy = (k.S.isDown || k.DOWN.isDown ? 1 : 0) - (k.W.isDown || k.UP.isDown ? 1 : 0);
@@ -1124,16 +1136,12 @@ export class WorldScene extends Phaser.Scene {
 
   /**
    * Bấm nút / phím Tab hoặc T: khoá con quái gần nhất, bấm tiếp chuyển sang con xa hơn, hết vòng hoặc chỉ còn một con thì nhả khoá.
-   * `step` = -1 (Shift+Tab): đi ngược xa -> gần.
+   * `step` = -1 (Shift+Tab): đi ngược xa -> gần. `onScreenOnly`: chỉ quái đang thấy trên màn hình (phím Tab; xem `targetCandidates`).
    */
-  private toggleLockTarget(step: 1 | -1 = 1) {
+  private toggleLockTarget(step: 1 | -1 = 1, onScreenOnly = false) {
     if (this.isReconnecting || ui.isLimboOpen()) return;
-    const cands: Array<{ id: string; dist: number }> = [];
-    this.monsters.forEach((m, id) => {
-      cands.push({ id, dist: Math.hypot(m.tx - this.predX, m.ty - this.predY) });
-    });
     const pick = step === 1 ? pickNextTarget : pickPrevTarget;
-    this.setLockedTarget(pick(cands, this.lockedTargetId));
+    this.setLockedTarget(pick(this.targetCandidates(onScreenOnly), this.lockedTargetId));
   }
 
   private setLockedTarget(id: string | null) {

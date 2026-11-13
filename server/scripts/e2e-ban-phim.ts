@@ -7,6 +7,10 @@
 //  5. I / C / J / G / M / O mở đúng bảng, Esc đóng bảng trên cùng; J là sổ nhiệm vụ (không còn là chém).
 //  6. Bảng đang mở: Tab KHÔNG đổi mục tiêu, Space KHÔNG chém (phím thuộc về bảng).
 //  7. Enter mở ô chat, gõ chữ thì phím I không mở túi, Enter gửi (server nhận), Esc rời ô chat.
+//  8. Bảng mở thì mũi tên KHÔNG làm nhân vật đi (đo vị trí phía server); đóng bảng thì đi lại được.
+//  9. Túi đồ: mũi tên chuyển ô (focus = chọn ô), Enter dùng đan (máu hồi, server xác nhận), Esc đóng.
+// 10. Nói chuyện NPC chỉ bằng phím: F mở hộp thoại, Enter tua chữ, mũi tên vào dòng lựa chọn, phím số chọn dòng (nhận nhiệm vụ).
+// 11. Cửa hàng chỉ bằng phím: phím số mở "Cửa hàng", mũi tên tới nút +, Enter tăng số lượng (focus KHÔNG rơi khi bảng vẽ lại), Enter Mua (Linh thạch giảm, túi tăng).
 // Chạy: `npm run build && npm run e2e:ban-phim -w server`.
 import { spawn, execSync, type ChildProcess } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
@@ -17,7 +21,7 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
-import { DEFAULT_MAP, DEFAULT_MAP_ID, roomNameOf } from "@tien-gioi/shared";
+import { DEFAULT_MAP, DEFAULT_MAP_ID, NPC_BY_ID, roomNameOf } from "@tien-gioi/shared";
 import { Tab, sleep, shown, listenWithRetry, removeTmpDirs } from "./e2e-kit";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -51,6 +55,12 @@ const K = {
   o: { key: "o", code: "KeyO", vk: 79, text: "o" },
   a: { key: "a", code: "KeyA", vk: 65, text: "a" },
   x: { key: "x", code: "KeyX", vk: 88, text: "x" },
+  f: { key: "f", code: "KeyF", vk: 70, text: "f" },
+  d1: { key: "1", code: "Digit1", vk: 49, text: "1" },
+  right: { key: "ArrowRight", code: "ArrowRight", vk: 39 },
+  left: { key: "ArrowLeft", code: "ArrowLeft", vk: 37 },
+  up: { key: "ArrowUp", code: "ArrowUp", vk: 38 },
+  down: { key: "ArrowDown", code: "ArrowDown", vk: 40 },
 } satisfies Record<string, Key>;
 
 /** Phím thật qua CDP: nhấn rồi nhả (`shift` cho Shift+Tab). */
@@ -69,6 +79,40 @@ async function press(tab: Tab, k: Key, shift = false) {
   });
   await tab.send("Input.dispatchKeyEvent", { ...base, type: "keyUp" });
   await sleep(140); // cho Phaser / DOM xử lý xong
+}
+
+/** Giữ một phím `ms` mili giây (di chuyển bằng Phaser cần phím GIỮ: isDown theo từng khung). */
+async function hold(tab: Tab, k: Key, ms: number) {
+  const base = {
+    key: k.key,
+    code: k.code,
+    windowsVirtualKeyCode: k.vk,
+    nativeVirtualKeyCode: k.vk,
+    modifiers: 0,
+  };
+  await tab.send("Input.dispatchKeyEvent", { ...base, type: "rawKeyDown" });
+  await sleep(ms);
+  await tab.send("Input.dispatchKeyEvent", { ...base, type: "keyUp" });
+  await sleep(150);
+}
+
+/**
+ * Đi tới phần tử `selector` chỉ bằng MŨI TÊN như người chơi: mỗi bước nhìn xem đích nằm hướng nào so với phần tử đang focus rồi bấm mũi tên
+ * theo trục lệch nhiều hơn. `true` nếu tới nơi trong `max` bước.
+ */
+async function arrowTo(tab: Tab, selector: string, max = 20): Promise<boolean> {
+  const keys = { up: K.up, down: K.down, left: K.left, right: K.right } as const;
+  for (let n = 0; n < max; n++) {
+    const d = String(
+      await tab.ev(
+        `(() => { const t = document.querySelector(${JSON.stringify(selector)}); const a = document.activeElement; if (!t) return 'missing'; if (t === a) return 'here'; if (!a || a === document.body) return 'down'; const tr = t.getBoundingClientRect(), ar = a.getBoundingClientRect(); const dx = (tr.left + tr.right) / 2 - (ar.left + ar.right) / 2, dy = (tr.top + tr.bottom) / 2 - (ar.top + ar.bottom) / 2; return Math.abs(dy) >= Math.abs(dx) ? (dy > 0 ? 'down' : 'up') : (dx > 0 ? 'right' : 'left'); })()`,
+      ),
+    );
+    if (d === "here") return true;
+    if (d === "missing") return false;
+    await press(tab, keys[d as keyof typeof keys]);
+  }
+  return false;
 }
 
 /** Gõ một chuỗi chữ thường (không dấu cách) vào ô đang focus */
@@ -90,6 +134,8 @@ async function main() {
   process.env.DATA_DIR = dataDir;
   const { defineRooms } = await import("../src/rooms/WorldRoom.js");
   const { addMonster } = await import("../src/systems/test-helpers.js");
+  const { giveItem } = await import("../src/systems/inventory.js");
+  const { changeCoin } = await import("../src/systems/wallet.js");
 
   const app = express();
   app.get("/health", (_req, res) => res.json({ ok: true }));
@@ -211,12 +257,14 @@ async function main() {
     const [nearId, midId, farId] = [40, 150, 300].map(
       (dx) => addMonster(world, "tho", me.x + dx, me.y).id,
     ) as string[];
+    // quái thứ tư nằm TRONG tầm khoá 520 px nhưng NGOÀI màn hình (khung cao ~640 px): Tab / Space không được chọn nó (góp ý của A ở #465)
+    const offId = addMonster(world, "tho", me.x + 20, me.y - 460).id;
     world.ctrl.get(sid).lastHitAt = 0;
     // quái đứng yên: không để chúng đuổi / làm máu người chơi dao động
-    for (const id of [nearId, midId, farId]) world.mctrl.get(id).nextWander = Infinity;
+    for (const id of [nearId, midId, farId, offId]) world.mctrl.get(id).nextWander = Infinity;
     await t.waitFor(
-      `window.__scene.monsters.size === 3 && Math.abs((window.__scene.predX ?? 0) - ${Math.round(me.x)}) < 200`,
-      "cảnh có ba quái và người chơi ở chỗ mới",
+      `window.__scene.monsters.size === 4 && Math.abs((window.__scene.predX ?? 0) - ${Math.round(me.x)}) < 200`,
+      "cảnh có bốn quái và người chơi ở chỗ mới",
     );
     await sleep(300);
     const lock = () => ev(`window.__scene.lockedTargetId`);
@@ -244,6 +292,15 @@ async function main() {
       "Tab lần bốn: vòng về con gần nhất",
       (await lock()) === nearId,
       `${await lock()} != ${nearId}`,
+    );
+    const offId_ = JSON.stringify(offId);
+    check(
+      "Quái ngoài màn hình (trong tầm 520 px) KHÔNG bị Tab chọn: vòng Tab chỉ có ba con thấy được",
+      (await lock()) !== offId &&
+        !!(await ev(
+          `(() => { const m = window.__scene.monsters.get(${offId_}); return !!m && !window.__scene.cameras.main.worldView.contains(m.tx, m.ty); })()`,
+        )),
+      `khoá=${await lock()}`,
     );
     await press(t, K.tab, true);
     check(
@@ -283,6 +340,9 @@ async function main() {
     await press(t, K.esc);
 
     // ---- 4. Phím 3 (Kiếm khí) và 4 (Đả tọa) ----
+    // dọn quái: quái đánh trúng người chơi sẽ ngắt đả tọa làm kiểm đả tọa chập chờn
+    world.state.monsters.clear();
+    world.mctrl.clear();
     const mpBefore = me.mp;
     await press(t, K.d3);
     await sleep(300);
@@ -371,6 +431,234 @@ async function main() {
       (await ev(`document.activeElement && document.activeElement.id`)) !== "chat-input",
       String(await ev(`document.activeElement && document.activeElement.id`)),
     );
+
+    // ---- 8. Bảng mở thì mũi tên không làm nhân vật đi ----
+    world.state.monsters.clear();
+    world.mctrl.clear();
+    await ev(
+      `document.activeElement && document.activeElement.blur && document.activeElement.blur(); 1`,
+    );
+    await press(t, K.i);
+    check("Mở túi để thử đi bộ", !!(await ev(shown("inv-modal"))), "inv-modal không hiện");
+    const x0 = me.x;
+    await hold(t, K.right, 700);
+    check(
+      "Túi mở: giữ mũi tên phải 0,7 giây, nhân vật ĐỨNG YÊN (server)",
+      Math.abs(me.x - x0) < 1,
+      `${x0} -> ${me.x}`,
+    );
+    await press(t, K.esc);
+    const x1 = me.x;
+    await hold(t, K.right, 700);
+    check(
+      "Đóng túi: giữ mũi tên phải thì nhân vật đi sang phải (server)",
+      me.x - x1 > 30,
+      `${x1} -> ${me.x}`,
+    );
+
+    // ---- 9. Túi đồ: mũi tên chuyển ô, Enter dùng đan ----
+    // về giữa trấn (khu an toàn: quái không đánh, không hồi sinh quái): máu thấp mà gặp quái hồi sinh gần đó thì chết, kiểm chập chờn
+    me.x = DEFAULT_MAP.townPx.x;
+    me.y = DEFAULT_MAP.townPx.y + 150;
+    giveItem(world, sid, "hoi_huyet_dan", 3);
+    me.hp = 30;
+    await sleep(400);
+    await press(t, K.i);
+    const slotInfo = await ev(
+      `(() => { const s = [...document.querySelectorAll('.inv-slot')]; const idx = s.findIndex(e => e.querySelector('.slot-name')?.textContent === 'Hồi Huyết Đan'); const top0 = s[0].getBoundingClientRect().top; const cols = s.filter(e => Math.abs(e.getBoundingClientRect().top - top0) < 2).length; return JSON.stringify({ idx, cols }); })()`,
+    );
+    const { idx: pillIdx, cols } = JSON.parse(String(slotInfo)) as { idx: number; cols: number };
+    check("Túi có Hồi Huyết Đan ở một ô", pillIdx >= 0 && cols > 1, String(slotInfo));
+    // mũi tên đầu tiên đưa focus từ nút đóng xuống lưới ô
+    const focusedSlot = () =>
+      ev(
+        `[...document.querySelectorAll('.inv-slot')].indexOf(document.activeElement)`,
+      ) as Promise<number>;
+    for (let n = 0; n < 8 && (await focusedSlot()) < 0; n++) await press(t, K.down);
+    let cur = await focusedSlot();
+    check("Mũi tên Xuống đưa focus từ nút đóng vào lưới ô", cur >= 0, `ô=${cur}`);
+    // đi tới ô chứa đan bằng mũi tên (hàng rồi cột)
+    for (let n = 0; n < 30 && cur !== pillIdx; n++) {
+      const dr = Math.floor(pillIdx / cols) - Math.floor(cur / cols);
+      const dc = (pillIdx % cols) - (cur % cols);
+      await press(t, dr > 0 ? K.down : dr < 0 ? K.up : dc > 0 ? K.right : K.left);
+      cur = await focusedSlot();
+    }
+    check("Mũi tên đưa focus tới đúng ô chứa đan", cur === pillIdx, `ô=${cur}, cần ${pillIdx}`);
+    check(
+      "Focus vào ô = chọn ô (ô được tô sáng, chi tiết hiện)",
+      !!(await ev(`document.activeElement.classList.contains('selected')`)) &&
+        String(await ev(`document.getElementById('inv-item-name').textContent`)).includes(
+          "Hồi Huyết",
+        ),
+      String(await ev(`document.getElementById('inv-item-name').textContent`)),
+    );
+    const hp0 = me.hp;
+    await press(t, K.enter);
+    await sleep(400);
+    check("Enter trên ô đan: dùng đan, máu hồi (server)", me.hp > hp0, `${hp0} -> ${me.hp}`);
+    check(
+      "Enter dùng đan không mở chat",
+      (await ev(`document.activeElement && document.activeElement.id`)) !== "chat-input",
+      "chat mở",
+    );
+    await press(t, K.esc);
+    check("Esc đóng túi", !(await ev(shown("inv-modal"))), "inv-modal vẫn mở");
+
+    // ---- 10. Nói chuyện NPC chỉ bằng phím ----
+    const npc = NPC_BY_ID["truong_tran"];
+    me.x = npc.x;
+    me.y = npc.y + 50;
+    world.ctrl.get(sid).lastHitAt = 0;
+    await t.waitFor(
+      `Math.abs(window.__scene.predX - ${Math.round(npc.x)}) < 40 && Math.abs(window.__scene.predY - ${Math.round(npc.y + 50)}) < 40 && window.__scene.closestNpcId === 'truong_tran'`,
+      "đứng cạnh Trưởng trấn",
+    );
+    await press(t, K.f);
+    await t.waitFor(
+      `!!document.getElementById('dialog-modal') && !document.getElementById('dialog-modal').hidden`,
+      "hộp thoại NPC mở bằng F",
+    );
+    check(
+      "F mở hộp thoại; focus ở thân hộp (Enter / Cách tua chữ, không đóng hộp)",
+      (await ev(`document.activeElement && document.activeElement.id`)) === "dlg-body",
+      String(await ev(`document.activeElement && document.activeElement.id`)),
+    );
+    await press(t, K.enter);
+    await t.waitFor(
+      `document.querySelectorAll('#dlg-options .dlg-opt-btn').length > 0`,
+      "lựa chọn hội thoại hiện sau khi tua chữ",
+    );
+    check(
+      "Enter tua chữ: hộp thoại VẪN mở",
+      !!(await ev(shown("dialog-modal"))),
+      "hộp thoại đã đóng",
+    );
+    const optLabels = String(
+      await ev(
+        `[...document.querySelectorAll('#dlg-options .dlg-opt-btn')].map(b => b.textContent).join(' | ')`,
+      ),
+    );
+    out(`  (lựa chọn: ${optLabels})`);
+    check(
+      "Mỗi dòng lựa chọn có nhãn số (1, 2, ...)",
+      !!(await ev(
+        `[...document.querySelectorAll('#dlg-options .dlg-opt-btn .opt-key')].map(k => k.textContent).join(',').startsWith('1,')`,
+      )) ||
+        !!(await ev(
+          `document.querySelectorAll('#dlg-options .dlg-opt-btn .opt-key').length === 1`,
+        )),
+      optLabels,
+    );
+    await press(t, K.down);
+    check(
+      "Mũi tên Xuống: focus vào dòng lựa chọn đầu",
+      !!(await ev(
+        `document.activeElement && document.activeElement.classList.contains('dlg-opt-btn')`,
+      )),
+      String(await ev(`document.activeElement && document.activeElement.className`)),
+    );
+    const before = await ev(`window.__ui.getQuestLog().active.length`);
+    await press(t, K.d1);
+    await sleep(500);
+    check(
+      "Phím số 1 chọn dòng 1: hộp thoại đóng",
+      !(await ev(shown("dialog-modal"))),
+      "hộp thoại vẫn mở",
+    );
+    check(
+      "Dòng 1 là Nhận việc: sổ nhiệm vụ có thêm một nhiệm vụ (server)",
+      (await ev(`window.__ui.getQuestLog().active.length`)) === Number(before) + 1,
+      `${before} -> ${await ev(`window.__ui.getQuestLog().active.length`)}`,
+    );
+
+    // ---- 11. Cửa hàng chỉ bằng phím ----
+    const duoc = NPC_BY_ID["duoc_su"];
+    changeCoin(world, sid, 500);
+    me.x = duoc.x;
+    me.y = duoc.y + 50;
+    await t.waitFor(
+      `Math.abs(window.__scene.predX - ${Math.round(duoc.x)}) < 40 && Math.abs(window.__scene.predY - ${Math.round(duoc.y + 50)}) < 40 && window.__scene.closestNpcId === 'duoc_su'`,
+      "đứng cạnh Lão Dược Sư",
+    );
+    await press(t, K.f);
+    await t.waitFor(
+      `document.querySelectorAll('#dlg-options .dlg-opt-btn').length > 0 || !!document.getElementById('dlg-skip-hint')?.hidden`,
+      "hộp thoại Dược Sư",
+    );
+    await press(t, K.enter); // tua chữ nếu còn đang gõ
+    await t.waitFor(
+      `document.querySelectorAll('#dlg-options .dlg-opt-btn').length > 0`,
+      "lựa chọn của Dược Sư",
+    );
+    const shopOpt = Number(
+      await ev(
+        `[...document.querySelectorAll('#dlg-options .dlg-opt-btn')].findIndex(b => b.textContent.includes('Cửa hàng')) + 1`,
+      ),
+    );
+    check('Dược Sư có dòng "Cửa hàng"', shopOpt >= 1, String(shopOpt));
+    await press(t, {
+      key: String(shopOpt),
+      code: `Digit${shopOpt}`,
+      vk: 48 + shopOpt,
+      text: String(shopOpt),
+    });
+    await t.waitFor(
+      `!!document.getElementById('shop-modal') && !document.getElementById('shop-modal').hidden`,
+      "cửa hàng mở",
+    );
+    check(
+      "Phím số chọn dòng Cửa hàng: bảng cửa hàng mở",
+      !!(await ev(shown("shop-modal"))),
+      "shop-modal không hiện",
+    );
+    const navKey = () =>
+      ev(
+        `document.activeElement && document.activeElement.dataset && document.activeElement.dataset.nav || ''`,
+      );
+    await arrowTo(t, '[data-nav="buy:hoi_huyet_dan:plus"]');
+    check(
+      "Mũi tên đưa focus tới nút + của Hồi Huyết Đan",
+      (await navKey()) === "buy:hoi_huyet_dan:plus",
+      String(await navKey()),
+    );
+    const qtyText = () =>
+      ev(
+        `document.querySelector('#shop-modal [data-nav="buy:hoi_huyet_dan:plus"]').parentElement.querySelector('.shop-qty-val').textContent`,
+      );
+    const q0 = Number(await qtyText());
+    await press(t, K.enter);
+    check(
+      "Enter trên nút +: số lượng tăng 1",
+      Number(await qtyText()) === q0 + 1,
+      `${q0} -> ${await qtyText()}`,
+    );
+    check(
+      "Bảng vẽ lại nhưng focus VẪN ở nút + (không rơi về đầu bảng)",
+      (await navKey()) === "buy:hoi_huyet_dan:plus",
+      String(await navKey()),
+    );
+    await press(t, K.enter);
+    check(
+      "Enter lần nữa: số lượng tăng tiếp",
+      Number(await qtyText()) === q0 + 2,
+      `${await qtyText()}`,
+    );
+    await press(t, K.right);
+    check(
+      "Mũi tên Phải: focus sang nút Mua cùng hàng",
+      !!(await ev(`document.activeElement && document.activeElement.classList.contains('buy')`)),
+      String(await ev(`document.activeElement && document.activeElement.className`)),
+    );
+    await press(t, K.enter);
+    await sleep(500);
+    check(
+      "Enter trên nút Mua: túi có Hồi Huyết Đan mua thêm (server)",
+      Number(await ev(`window.__ui.getCurrentCoin()`)) < 500,
+      `Linh thạch=${await ev(`window.__ui.getCurrentCoin()`)}`,
+    );
+    await press(t, K.esc);
+    check("Esc đóng cửa hàng", !(await ev(shown("shop-modal"))), "shop-modal vẫn mở");
 
     check("0 lỗi console / exception", t.errors.length === 0, t.errors.slice(0, 3).join(" | "));
   } catch (e) {

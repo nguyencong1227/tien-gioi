@@ -116,6 +116,7 @@ import {
 } from "./sect";
 import { sound } from "./audio";
 import { initKeyLabels } from "./keybinds-dom";
+import { dirOfArrowKey, moveFocus, ownsArrowKeys, withFocusKept } from "./panel-nav";
 import { transitionMs, waitOrSkip } from "./gfx/scene-transition";
 import { getDisplay, onDisplayChange } from "./gfx/display";
 import { TRACKER_PREF_KEY, parseTrackerPref, trackerOpen } from "./gfx/hud-compact";
@@ -441,10 +442,7 @@ function renderPartyPanel() {
       kickBtn.className = "pmem-kick-btn";
       kickBtn.textContent = "✕";
       kickBtn.title = `Mời ${m.name} ra khỏi đội`;
-      kickBtn.addEventListener("pointerdown", (e) => {
-        e.preventDefault();
-        callbacks?.onPartyKick?.(m.name);
-      });
+      onPress(kickBtn, () => callbacks?.onPartyKick?.(m.name));
       info.append(kickBtn);
     }
 
@@ -624,6 +622,23 @@ function renderSlotDetail() {
   actionsEl.hidden = false;
   useBtn.hidden = !def.effect;
   drop1Btn.hidden = s.qty <= 1;
+}
+
+/**
+ * Gắn hành động bấm cho nút tạo động: chuột / chạm = `pointerdown` (nhanh, giữ hành vi cũ), bàn phím = Enter / Cách (#463).
+ * Nút `<button>` chỉ nhận `click` khi bấm phím nên các nút chỉ nghe `pointerdown` không dùng được bằng bàn phím.
+ */
+function onPress(el: HTMLElement, fn: () => void, stop = false) {
+  el.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    if (stop) e.stopPropagation();
+    fn();
+  });
+  el.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    if (!e.repeat) fn();
+  });
 }
 
 function renderInventory() {
@@ -844,6 +859,10 @@ function renderQuestTracker() {
 // ---------- Sổ nhiệm vụ (Quest Log Modal - Phím Q) ----------
 
 function renderQuestModal() {
+  withFocusKept($("quest-modal"), renderQuestModalImpl);
+}
+
+function renderQuestModalImpl() {
   $("quest-count").textContent = `${questLog.active.length} / 8 đang làm`;
   const container = $("quest-list");
   container.replaceChildren();
@@ -944,6 +963,10 @@ function renderQuestModal() {
 // ---------- Bảng nhân vật & Trang bị (Phím C - #31) ----------
 
 function renderCharModal() {
+  withFocusKept($("char-modal"), renderCharModalImpl);
+}
+
+function renderCharModalImpl() {
   const slotsBox = $("char-equip-slots");
   slotsBox.replaceChildren();
 
@@ -984,8 +1007,8 @@ function renderCharModal() {
 
     btn.append(slotLabel, icon, itemName, hint);
     if (def) {
-      btn.addEventListener("pointerdown", (e) => {
-        e.preventDefault();
+      btn.dataset.nav = `eq:${slot}`;
+      onPress(btn, () => {
         sound.equip();
         callbacks?.onUnequip(slot);
       });
@@ -1161,13 +1184,16 @@ function renderCharModal() {
     equipBtn.className = "char-equip-btn";
     equipBtn.disabled = !ok;
     equipBtn.textContent = ok ? "Mặc" : `Cần ${reqText}`;
-    equipBtn.addEventListener("pointerdown", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (!ok) return;
-      sound.equip();
-      callbacks?.onEquip(i);
-    });
+    equipBtn.dataset.nav = `bag:${i}`;
+    onPress(
+      equipBtn,
+      () => {
+        if (!ok) return;
+        sound.equip();
+        callbacks?.onEquip(i);
+      },
+      true,
+    );
 
     row.addEventListener("pointerenter", (e) => {
       if (e.pointerType === "mouse" && previewEquipItemId !== def.id) {
@@ -1200,6 +1226,10 @@ function renderCharModal() {
 // ---------- Giao diện rèn đồ ở Thợ rèn (#32) ----------
 
 function renderForgeModal() {
+  withFocusKept($("forge-modal"), renderForgeModalImpl);
+}
+
+function renderForgeModalImpl() {
   const npc = NPC_BY_ID[forgeNpcId];
   $("forge-title").textContent = npc ? `Lò Rèn · ${npc.name}` : "Lò Rèn Thiết Ngưu";
   const list = $("forge-list");
@@ -1316,6 +1346,10 @@ function renderShopModal() {
 }
 
 function renderShopBuy() {
+  withFocusKept($("shop-modal"), renderShopBuyImpl);
+}
+
+function renderShopBuyImpl() {
   const list = $("shop-buy-list");
   list.replaceChildren();
 
@@ -1385,15 +1419,18 @@ function renderShopBuy() {
     btnMinus.className = "shop-qty-btn";
     btnMinus.textContent = "−";
     btnMinus.title = "Giảm số lượng";
+    btnMinus.dataset.nav = `buy:${itemId}:minus`;
     btnMinus.disabled = qty <= 1;
-    btnMinus.addEventListener("pointerdown", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (qty > 1) {
-        shopBuyQuantities[itemId] = qty - 1;
-        renderShopBuy();
-      }
-    });
+    onPress(
+      btnMinus,
+      () => {
+        if (qty > 1) {
+          shopBuyQuantities[itemId] = qty - 1;
+          renderShopBuy();
+        }
+      },
+      true,
+    );
 
     const qtyVal = document.createElement("span");
     qtyVal.className = "shop-qty-val";
@@ -1404,15 +1441,18 @@ function renderShopBuy() {
     btnPlus.className = "shop-qty-btn";
     btnPlus.textContent = "+";
     btnPlus.title = "Tăng số lượng";
+    btnPlus.dataset.nav = `buy:${itemId}:plus`;
     btnPlus.disabled = qty >= SHOP_MAX_QTY;
-    btnPlus.addEventListener("pointerdown", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (qty < SHOP_MAX_QTY) {
-        shopBuyQuantities[itemId] = qty + 1;
-        renderShopBuy();
-      }
-    });
+    onPress(
+      btnPlus,
+      () => {
+        if (qty < SHOP_MAX_QTY) {
+          shopBuyQuantities[itemId] = qty + 1;
+          renderShopBuy();
+        }
+      },
+      true,
+    );
 
     qtyBox.append(btnMinus, qtyVal, btnPlus);
 
@@ -1442,6 +1482,10 @@ function renderShopBuy() {
 }
 
 function renderShopSell() {
+  withFocusKept($("shop-modal"), renderShopSellImpl);
+}
+
+function renderShopSellImpl() {
   const list = $("shop-sell-list");
   list.replaceChildren();
 
@@ -1512,15 +1556,18 @@ function renderShopSell() {
       btnMinus.className = "shop-qty-btn";
       btnMinus.textContent = "−";
       btnMinus.title = "Giảm số lượng";
+      btnMinus.dataset.nav = `sell:${i}:minus`;
       btnMinus.disabled = qty <= 1;
-      btnMinus.addEventListener("pointerdown", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (qty > 1) {
-          shopSellQuantities[i] = qty - 1;
-          renderShopSell();
-        }
-      });
+      onPress(
+        btnMinus,
+        () => {
+          if (qty > 1) {
+            shopSellQuantities[i] = qty - 1;
+            renderShopSell();
+          }
+        },
+        true,
+      );
 
       const qtyVal = document.createElement("span");
       qtyVal.className = "shop-qty-val";
@@ -1531,15 +1578,18 @@ function renderShopSell() {
       btnPlus.className = "shop-qty-btn";
       btnPlus.textContent = "+";
       btnPlus.title = "Tăng số lượng";
+      btnPlus.dataset.nav = `sell:${i}:plus`;
       btnPlus.disabled = qty >= maxQty;
-      btnPlus.addEventListener("pointerdown", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (qty < maxQty) {
-          shopSellQuantities[i] = qty + 1;
-          renderShopSell();
-        }
-      });
+      onPress(
+        btnPlus,
+        () => {
+          if (qty < maxQty) {
+            shopSellQuantities[i] = qty + 1;
+            renderShopSell();
+          }
+        },
+        true,
+      );
 
       qtyBox.append(btnMinus, qtyVal, btnPlus);
 
@@ -1600,7 +1650,9 @@ function renderDialogOptions() {
   optBox.replaceChildren();
   if (!currentDialog) return;
 
+  let idxOpt = -1;
   for (const opt of currentDialog.options) {
+    idxOpt++;
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "dlg-opt-btn";
@@ -1617,6 +1669,14 @@ function renderDialogOptions() {
 
     const labelSpan = document.createElement("span");
     labelSpan.textContent = opt.label;
+    // nhãn số (máy tính, CSS ẩn trên cảm ứng): phím 1-9 chọn dòng này
+    if (idxOpt < 9) {
+      const key = document.createElement("kbd");
+      key.className = "opt-key";
+      key.setAttribute("aria-hidden", "true");
+      key.textContent = String(idxOpt + 1);
+      btn.append(key);
+    }
     btn.append(labelSpan);
 
     if (opt.action.kind === "turnIn") {
@@ -2101,6 +2161,10 @@ function renderSectTreasuryTab() {
 }
 
 function renderSectModal() {
+  withFocusKept($("sect-modal"), renderSectModalImpl);
+}
+
+function renderSectModalImpl() {
   const modal = $("sect-modal");
   if (!sectModalOpen) {
     modal.hidden = true;
@@ -2211,7 +2275,8 @@ export const ui = {
         selectedSlot = i;
         renderInventory();
       });
-      btn.addEventListener("dblclick", () => {
+      // dùng / mặc vật phẩm của ô (nhấp đúp bằng chuột, Enter bằng bàn phím)
+      const activate = () => {
         const s = invSlots[i];
         if (!s) return;
         const def = ITEM_BY_ID[s.itemId];
@@ -2221,6 +2286,19 @@ export const ui = {
           sound.equip();
           callbacks?.onEquip(i);
         }
+      };
+      btn.addEventListener("dblclick", activate);
+      // bàn phím (#463): focus vào ô = chọn ô (hiện chi tiết như rê chuột), Enter = dùng / mặc
+      btn.addEventListener("focus", () => {
+        if (selectedSlot !== i) {
+          selectedSlot = i;
+          renderInventory();
+        }
+      });
+      btn.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        if (!e.repeat) activate();
       });
 
       slotEls.push(btn);
@@ -2705,6 +2783,8 @@ export const ui = {
             trapTabKey(modalEl, e);
           }
         }
+      } else if (!e.defaultPrevented && this.handlePanelKey(e)) {
+        e.preventDefault();
       }
     });
   },
@@ -3124,6 +3204,45 @@ export const ui = {
   },
 
   /**
+   * Phím điều hướng khi bảng / hộp thoại đang mở (QUYET_DINH_M3 mục 13, #463). Trả `true` nếu đã xử lý (để chặn mặc định):
+   *  - mũi tên chuyển focus sang phần tử lân cận theo hình học (`panel-nav.ts`); ô nhập chữ / thanh trượt / select giữ mũi tên của chính nó;
+   *  - hộp thoại NPC: Enter / Cách tua nhanh chữ đang gõ; phím số 1-9 (và số bên phải) chọn dòng; mũi tên đầu tiên vào dòng đầu.
+   * Phím Enter / Cách trên nút do chính nút xử lý (`bindTap` hoặc `click` mặc định).
+   */
+  handlePanelKey(e: KeyboardEvent): boolean {
+    if (e.ctrlKey || e.altKey || e.metaKey) return false;
+    const top = modalStack.peek();
+    const container = top ? $(top.id) : null;
+    if (!top || !container || container.hidden) return false;
+    const active = document.activeElement;
+    if (top.id === "dialog-modal") {
+      if (dlgTypeTimer !== null && (e.key === "Enter" || e.key === " ")) {
+        finishTypewriter();
+        return true;
+      }
+      const opts = Array.from(
+        $("dlg-options").querySelectorAll<HTMLButtonElement>("button.dlg-opt-btn"),
+      );
+      const n = /^(?:Digit|Numpad)([1-9])$/.exec(e.code)?.[1];
+      if (n !== undefined && !isTypingElement(active)) {
+        const b = opts[Number(n) - 1];
+        if (b && !b.disabled) b.click();
+        return opts.length > 0;
+      }
+      if (dirOfArrowKey(e.key) && opts.length > 0 && !opts.some((b) => b === active)) {
+        (opts.find((b) => !b.disabled) ?? opts[0]).focus();
+        return true;
+      }
+    }
+    const dir = dirOfArrowKey(e.key);
+    if (dir) {
+      if (ownsArrowKeys(active)) return false;
+      return moveFocus(container, dir);
+    }
+    return false;
+  },
+
+  /**
    * Có bảng / hộp thoại / menu đang mở không (#463): khi có, phím của THẾ GIỚI (đánh, kỹ năng, đan, mục tiêu, tương tác) không chạy để
    * Space / Enter / mũi tên thuộc về bảng; phím mở / đóng bảng, chat, âm thanh vẫn chạy.
    */
@@ -3248,6 +3367,8 @@ export const ui = {
     $("dlg-skip-hint").hidden = false;
     modalStack.push("dialog-modal");
     focusModal($("dialog-modal"));
+    // focus vào THÂN hộp thoại, không để ở nút đóng: Enter / Cách tua nhanh chữ chứ không đóng hộp (#463)
+    $("dlg-body").focus();
 
     dlgFullText = m.lines.join("\n\n");
     dlgTypedLen = 0;

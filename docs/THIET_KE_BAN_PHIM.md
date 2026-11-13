@@ -45,14 +45,24 @@ Phím được ghi theo `KeyboardEvent.code` (vị trí vật lý): bật bộ g
 
 `keybinds.ts` đã có sẵn lưu / đọc (`localStorage` khoá `tg_keymap`, chỉ lưu phần KHÁC mặc định), `rebind(hành động, phím)` (gán phím đang của hành động khác thì hoán đổi, không bao giờ để hành động nào mất sạch phím, không có phím trùng, từ chối phím cố định WASD / mũi tên / Esc) và `onKeymapChange` (HUD vẽ lại nhãn). Giao diện đổi phím nằm trong màn "Phím tắt" ở Cài đặt (bước sau).
 
+## 4b. Điều hướng trong bảng và hộp thoại (bước 2)
+
+- **Mũi tên chuyển focus sang phần tử lân cận THEO HÌNH HỌC** (`client/src/panel-nav.ts`, `pickNeighbor` thuần + test): một mẫu duy nhất phủ túi (lưới), cửa hàng / lò rèn (thẻ có hàng nút), hội thoại (dãy lựa chọn), tông môn, nhiệm vụ, cài đặt, không viết riêng từng bảng. Ưu tiên phần tử cùng hàng / cột gần nhất; ở mép bảng thì đứng yên (KHÔNG vòng lại; lối thoát là Esc). Chưa có focus trong bảng thì mũi tên đầu tiên vào phần tử đầu. Ô nhập chữ, thanh trượt, select giữ mũi tên của chính nó.
+- **Bảng / hộp thoại mở thì nhân vật đứng yên:** WASD / mũi tên chỉ còn điều hướng bảng (`ui.isKeyboardCaptured()`); đóng bảng (Esc) là đi lại được.
+- **Enter / Cách kích hoạt phần tử đang focus.** Nút `<button>` chỉ nhận `click` khi bấm phím, nên các nút trước đây chỉ nghe `pointerdown` (tháo / mặc trang bị, nút +/- cửa hàng, đuổi khỏi đội) nay đi qua `onPress` (chuột / chạm vẫn `pointerdown` như cũ, bàn phím Enter / Cách).
+- **Vẽ lại bảng không làm rơi focus** (`withFocusKept`): bảng nhân vật, lò rèn, cửa hàng (mua / bán), sổ nhiệm vụ, tông môn vẽ lại cả danh sách khi dữ liệu đổi; focus được trả về đúng phần tử (theo `data-nav`, không có thì theo thứ tự).
+- **Túi đồ:** focus vào ô = chọn ô (hiện chi tiết như rê chuột), Enter = dùng / mặc (như nhấp đúp); mũi tên Xuống từ nút đóng vào lưới, tới nút Dùng / Mặc / Vứt như mọi nút khác.
+- **Hộp thoại NPC:** F mở, focus ở THÂN hộp (không ở nút đóng nên Enter không đóng hộp); Enter / Cách tua nhanh chữ đang hiện dần; **phím số 1-9 chọn dòng lựa chọn** (nhãn số hiện trước mỗi dòng, chỉ máy tính); mũi tên Xuống / Lên vào dòng đầu rồi đi giữa các dòng, Enter chọn. Esc đóng.
+- **Tab / Space chỉ khoá quái ĐANG THẤY trên màn hình** (khung camera), không phải cả tầm khoá 520 px (góp ý của A ở #465); nút Mục tiêu cảm ứng giữ nguyên.
+
 ## 5. Kiểm thử
 
-- Test đơn vị: `keybinds.test.ts` (bảng mặc định, tra phím, nhãn, làm sạch dữ liệu lưu, đổi phím / hoán đổi), `keybinds-dom.test.ts` (nhãn HUD, dòng gợi ý), `target-lock.test.ts` (Tab / Shift+Tab).
-- E2E thật `npm run build && npm run e2e:ban-phim -w server`: Chrome headless + server Colyseus thật, phím gửi bằng CDP (`isTrusted`), KHÔNG click chuột. Chrome headless không có chuột nên script giả lập `pointer: fine` bằng `--blink-settings` (nếu không nhãn phím bị ẩn).
+- Test đơn vị: `keybinds.test.ts` (bảng mặc định, tra phím, nhãn, làm sạch dữ liệu lưu, đổi phím / hoán đổi), `keybinds-dom.test.ts` (nhãn HUD, dòng gợi ý), `target-lock.test.ts` (Tab / Shift+Tab), `panel-nav.test.ts` (chọn phần tử lân cận: lưới, hàng nút, dãy dọc, mép).
+- E2E thật `npm run build && npm run e2e:ban-phim -w server`: Chrome headless + server Colyseus thật, phím gửi bằng CDP (`isTrusted`), KHÔNG click chuột. Phủ: nhãn phím, Tab / Shift+Tab / Esc, Space tự khoá + chém, phím 3 / 4, mở / đóng 6 bảng, bảng mở thì Tab / Space / mũi tên không điều khiển thế giới (đo vị trí phía server), chat, túi bằng mũi tên + Enter dùng đan, nói chuyện NPC (F, Enter, mũi tên, phím số) nhận nhiệm vụ, cửa hàng (+ rồi Mua, focus giữ nguyên khi bảng vẽ lại). Đột biến thử (vô hiệu một chức năng thì script đỏ) đã chạy: không chặn đi bộ khi bảng mở, vô hiệu phím số hội thoại, vô hiệu mũi tên bảng, bảng vẽ lại làm rơi focus, `onPress` bỏ Enter, bỏ lọc quái trên màn hình. Chrome headless không có chuột nên script giả lập `pointer: fine` bằng `--blink-settings` (nếu không nhãn phím bị ẩn).
 - `npm run e2e:tro-nang -w server` (trợ năng bàn phím có sẵn) phải còn PASS.
 
 ## 6. Việc kế tiếp (cùng issue #463)
 
-1. Điều hướng bảng bằng mũi tên + Enter (túi đồ, cửa hàng, lò rèn, hội thoại NPC, tông môn...), mũi tên không còn làm nhân vật đi khi bảng mở.
-2. Màn "Phím tắt" trong Cài đặt (danh sách + đổi phím) và gợi ý phím lần đầu chơi.
-3. E2E chỉ-bàn-phím cho cả màn chơi (nói chuyện NPC, nhặt đồ, qua cổng), `CHANGELOG`, phát hành v0.1.3 (Dev A).
+1. Màn "Phím tắt" trong Cài đặt (danh sách + đổi phím dùng `rebind` / `resetKeymap`) và gợi ý phím lần đầu chơi.
+2. Lối bàn phím còn thiếu: trả lời lời mời (tổ đội / bí cảnh / thách đấu / tông môn), nút HUD của bí cảnh / quyết đấu (rời, nhận thua) và hộp xác nhận của chúng, mở menu người chơi khác (mời đội / thách đấu) không cần chuột, màn Hoàng Tuyền / luân hồi.
+3. E2E chỉ-bàn-phím cho phần còn lại (lò rèn, nhặt đồ, qua cổng), `CHANGELOG` `[Chưa phát hành]` của nhánh phát hành.
