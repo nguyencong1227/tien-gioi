@@ -305,7 +305,7 @@ ${pillRows.join("\n")}
 
 Mô hình chưa tính: thời gian tập hợp, chết, Xích Mãng bị người khác hạ trước (một bản đồ nhiều người tranh 2-6 con). Nhưng chiều hướng rõ: đan không phải phần thưởng hiếm ở Kim Đan mà là nguồn tu vi chính.
 
-### 4. Bí cảnh Linh Hư (ngưỡng bậc ${LINH_HU.minStep}, không có trần bậc) với đội Kim Đan
+### 4. Bí cảnh Linh Hư (ngưỡng bậc ${LINH_HU.minStep}; TRƯỚC M6 chưa có trần bậc, nay trần bậc ${LINH_HU.maxStep}) với đội Kim Đan
 
 Mô phỏng bằng mã server thật (\`fightBoss\`, ca khó: đứng yên, không né), 20 trận mỗi dòng. Mục tiêu thiết kế ở bậc ngưỡng: một người không hạ nổi; đội 2 người không kịp giờ (${LINH_HU.timeLimitMs / 60_000} phút); đội 3 người 5-8 phút.
 

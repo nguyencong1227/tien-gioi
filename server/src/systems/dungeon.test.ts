@@ -215,6 +215,12 @@ describe("mở bí cảnh (dungeonOpen)", () => {
     expect(lastToast(t.lh)).toBe(dungeonOpenFailMessage("member_low", MEMBER));
     expect(lastToast(t.lh)).toContain(MEMBER);
 
+    // vượt cảnh giới của bí cảnh (M6: từ Kim Đan trở lên quá dễ): báo tên người, không mở được, không tốn lượt
+    t = setup({ memberRealm: 3, memberTier: 0 });
+    refuse(t, { dungeonId: LINH_HU_ID });
+    expect(lastToast(t.lh)).toBe(dungeonOpenFailMessage("member_high", MEMBER));
+    expect(lastToast(t.lh)).toContain(MEMBER);
+
     // ngoại tuyến
     t = setup();
     t.hp.w.state.players.delete(MEMBER);

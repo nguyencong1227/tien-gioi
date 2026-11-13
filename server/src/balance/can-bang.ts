@@ -226,7 +226,7 @@ const dungeonSection = `## Bí cảnh Linh Hư (M3.4, 4c-2, #203)
 
 Mô phỏng ở \`server/src/balance/dungeon.ts\`; test \`dungeon.test.ts\` giữ các mục tiêu bên dưới. **Số liệu đang dùng:** trùm \`${dunBoss.id}\`
 ${dunBoss.hp} máu, đòn ${dunBoss.atk} mỗi ${dunBoss.attackCd / 1000} giây, ${dunBoss.exp} tu vi; thưởng hoàn thành ${LINH_HU.reward.coin} Linh thạch + đồ;
-ngưỡng bậc ${LINH_HU.minStep} (Luyện Khí tầng ${dun.tier + 1}); giới hạn ${dunLimit} phút; đội ${LINH_HU.partyMin}-${LINH_HU.partyMax} người.
+ngưỡng bậc ${LINH_HU.minStep} (Luyện Khí tầng ${dun.tier + 1}), trần bậc ${LINH_HU.maxStep} (hết Trúc Cơ; Kim Đan trở lên quá dễ, xem mục Kim Đan trước M6); giới hạn ${dunLimit} phút; đội ${LINH_HU.partyMin}-${LINH_HU.partyMax} người.
 
 **Mục tiêu (thiết kế):** đội 3 người ở đúng ngưỡng hạ trùm trong 5-8 phút và không ai chết; đội 2 người không kịp giờ; một người không
 hạ nổi; một lượt thưởng bằng khoảng 15-20 phút săn quái tốt nhất cùng bậc. Trùm là một **bao máu**: đòn nhẹ nhưng trận dài, nên cần đan

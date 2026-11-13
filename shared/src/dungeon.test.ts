@@ -85,10 +85,92 @@ describe("dữ liệu bí cảnh nhất quán", () => {
       expect(d.minStep, d.id).toBeGreaterThanOrEqual(0);
       expect(d.minStep, d.id).toBeLessThanOrEqual(maxStep);
       expect(d.timeLimitMs, d.id).toBeGreaterThan(60_000);
+      if (d.maxStep !== undefined) {
+        expect(Number.isInteger(d.maxStep), d.id).toBe(true);
+        expect(d.maxStep, d.id).toBeGreaterThanOrEqual(d.minStep);
+        expect(d.maxStep, d.id).toBeLessThanOrEqual(maxStep);
+      }
     }
     // bản đầu: Linh Hư cần cuối Luyện Khí, đội 2-4
     const lh = dungeonOf(LINH_HU_ID)!;
     expect([lh.partyMin, lh.partyMax, lh.minStep]).toEqual([2, 4, stepOf(1, 8)]);
+    // M6 (#405): trần bậc = hết Trúc Cơ; Kim Đan trở lên bị từ chối (docs/CAN_BANG.md: đội Kim Đan thắng 100%, 0 chết, 3,5-9 phút)
+    expect(lh.maxStep).toBe(stepOf(2, 2));
+    expect(
+      canOpenDungeon({
+        def: lh,
+        isLeader: true,
+        runsOpen: 0,
+        cooldownLeftMs: 0,
+        members: [
+          {
+            name: "A",
+            online: true,
+            reconnecting: false,
+            alive: true,
+            inRun: false,
+            step: stepOf(2, 2),
+          },
+          {
+            name: "B",
+            online: true,
+            reconnecting: false,
+            alive: true,
+            inRun: false,
+            step: stepOf(2, 2),
+          },
+        ],
+      }),
+    ).toEqual({ ok: true });
+    expect(
+      canOpenDungeon({
+        def: lh,
+        isLeader: true,
+        runsOpen: 0,
+        cooldownLeftMs: 0,
+        members: [
+          {
+            name: "A",
+            online: true,
+            reconnecting: false,
+            alive: true,
+            inRun: false,
+            step: stepOf(3, 0),
+          },
+          {
+            name: "B",
+            online: true,
+            reconnecting: false,
+            alive: true,
+            inRun: false,
+            step: stepOf(2, 0),
+          },
+        ],
+      }),
+    ).toEqual({ ok: false, reason: "member_high", who: "A" });
+  });
+
+  it("bí cảnh KHÔNG có maxStep thì không giới hạn trên (tương thích bí cảnh tự dựng)", () => {
+    const lh = dungeonOf(LINH_HU_ID)!;
+    const open = { ...lh } as { -readonly [K in keyof typeof lh]: (typeof lh)[K] };
+    delete open.maxStep;
+    const m = (step: number) => ({
+      name: "A",
+      online: true,
+      reconnecting: false,
+      alive: true,
+      inRun: false,
+      step,
+    });
+    expect(
+      canOpenDungeon({
+        def: open,
+        isLeader: true,
+        runsOpen: 0,
+        cooldownLeftMs: 0,
+        members: [m(33), m(33)],
+      }),
+    ).toEqual({ ok: true });
   });
 
   it("thưởng: vật phẩm có thật, số lượng nguyên dương không vượt `stack`, xác suất trong (0, 1], tiền nguyên không âm", () => {
@@ -341,6 +423,8 @@ describe("canOpenDungeon", () => {
       [{ members: [ok("A"), ok("B", { inRun: true })] }, "member_in_run", "B"],
       [{ members: [ok("A"), ok("B", { step: def.minStep - 1 })] }, "member_low", "B"],
       [{ members: [ok("A"), ok("B", { step: Number.NaN })] }, "member_low", "B"],
+      [{ members: [ok("A"), ok("B", { step: def.maxStep! + 1 })] }, "member_high", "B"],
+      [{ members: [ok("A"), ok("B", { step: Infinity })] }, "member_high", "B"],
       [{ runsOpen: MAX_DUNGEON_RUNS }, "full", undefined],
       [{ runsOpen: MAX_DUNGEON_RUNS + 5 }, "full", undefined],
       [{ cooldownLeftMs: 1 }, "cooldown", undefined],
@@ -378,6 +462,7 @@ describe("canOpenDungeon", () => {
       "member_reconnecting",
       "member_in_run",
       "member_low",
+      "member_high",
       "full",
       "cooldown",
     ];
@@ -390,6 +475,7 @@ describe("canOpenDungeon", () => {
       "member_reconnecting",
       "member_in_run",
       "member_low",
+      "member_high",
     ] as const)
       expect(dungeonOpenFailMessage(r, "Lâm Thanh")).toContain("Lâm Thanh");
   });

@@ -18,6 +18,38 @@ const fight = (party: number, o: Partial<Parameters<typeof fightBoss>[2]> = {}) 
   summarizeFights(LINH_HU, party, { realm, tier, ...o }, RUNS);
 const limitMin = LINH_HU.timeLimitMs / 60_000;
 
+describe("dải bậc của bí cảnh (minStep..maxStep, M6 #405)", () => {
+  it("mọi bậc trong dải: đội 3 và đội 4 hạ trùm, không ai chết, trong thời hạn; một người không hạ nổi ở các bậc thấp của dải", () => {
+    for (let step = LINH_HU.minStep; step <= LINH_HU.maxStep!; step++) {
+      const { realm: r, tier: t } = realmTierOfStep(step);
+      for (const party of [3, 4]) {
+        const f = summarizeFights(LINH_HU, party, { realm: r, tier: t }, RUNS);
+        expect(f.winRate, `bậc ${step} đội ${party}`).toBe(1);
+        expect(f.deathsPerRun, `bậc ${step} đội ${party}`).toBe(0);
+        expect(
+          runMinutes(LINH_HU, party, r, t, f.simSeconds!),
+          `bậc ${step} đội ${party}`,
+        ).toBeLessThan(limitMin);
+      }
+    }
+    for (const step of [LINH_HU.minStep, LINH_HU.minStep + 1, LINH_HU.minStep + 2]) {
+      const { realm: r, tier: t } = realmTierOfStep(step);
+      expect(
+        summarizeFights(LINH_HU, 1, { realm: r, tier: t }, RUNS).winRate,
+        `bậc ${step} một người`,
+      ).toBe(0);
+    }
+  });
+
+  it("lý do có `maxStep`: ngay trên dải (Kim Đan sơ kỳ) đội 2 người thắng 100%, 0 người chết, trong nửa thời hạn: mục tiêu 'đội 2 không kịp giờ' bị phá", () => {
+    const { realm: r, tier: t } = realmTierOfStep(LINH_HU.maxStep! + 1);
+    const f = summarizeFights(LINH_HU, 2, { realm: r, tier: t }, RUNS);
+    expect(f.winRate).toBe(1);
+    expect(f.deathsPerRun).toBe(0);
+    expect(runMinutes(LINH_HU, 2, r, t, f.simSeconds!)).toBeLessThan(limitMin / 2);
+  });
+});
+
 describe("ngưỡng vào bí cảnh", () => {
   it("`minStep` là Luyện Khí tầng 9; cả đội ở đúng ngưỡng (ca khó nhất mà luật cho phép vào)", () => {
     expect({ realm, tier }).toEqual({ realm: 1, tier: 8 });
