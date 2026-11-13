@@ -436,7 +436,7 @@ Cùng mô hình với mục "Đi theo đội" (tu vi / giờ MỖI thành viên 
 | Kim Đan Trung kỳ | Độc Thiềm | 0.82x (Độc Thiềm) | 1.18x (Hắc Giao) | 1.09x (Hắc Giao) |
 | Kim Đan Hậu kỳ | Độc Thiềm | 0.77x (Độc Thiềm) | 1.12x (Hắc Giao) | 1.02x (Hắc Giao) |
 
-Cao nhất **1.18x**, thấp nhất **0.69x**: ở Kim Đan đội 3-4 hạ Hắc Giao được ~1.0-1.2x săn solo (dưới ngưỡng 1.5x của #74, khác Trúc Cơ tới 2.5x), còn đội 2 chậm hơn solo (~0.8x: chưa đủ người hạ trùm, chia tu vi, thời gian tìm quái không rút ngắn). Đây là số đo, câu hỏi chia tu vi của người dùng vẫn chờ; test khoá cận dưới ~0.65x (đội nhỏ chậm hơn solo ở Sơ kỳ là hiện trạng, giống Luyện Khí bậc 6-9, không được xấu thêm).
+Cao nhất **1.18x**, thấp nhất **0.69x**: ở Kim Đan đội 3-4 hạ Hắc Giao được ~1.0-1.2x săn solo (dưới ngưỡng 1.5x của #74, khác Trúc Cơ tới 2.5x), còn đội 2 chậm hơn solo (~0.8x: chưa đủ người hạ trùm, chia tu vi, thời gian tìm quái không rút ngắn). Mô hình này KHÔNG tính đan: mục 9 (mã server thật, có Đại Hồi Huyết Đan) cho thấy đội 2 và cả một người ở Hậu kỳ cũng hạ được trùm. Đây là số đo, câu hỏi chia tu vi của người dùng vẫn chờ; test khoá cận dưới ~0.65x (đội nhỏ chậm hơn solo ở Sơ kỳ là hiện trạng, giống Luyện Khí bậc 6-9, không được xấu thêm).
 
 ### 6. Kinh tế Kim Đan: chỗ tiêu Linh thạch so với thu nhập (#406)
 
@@ -518,3 +518,47 @@ Cùng bậc nhưng KHÁC bộ: bên mặc bộ cao hơn thắng 100% số trận
 | Kim Đan Hậu kỳ | bộ III thách không bộ Kim Đan nào | 100% | 28.8 |
 
 **Bí cảnh Linh Hư.** Không bị nội dung M6 làm đổi: bí cảnh có trần bậc 12 (hết Trúc Cơ, PR #428) và người Kim Đan bắt đầu từ bậc 13 nên KHÔNG vào được (`member_high`); bảng "Bí cảnh Linh Hư" ở trên (bậc 9-12) vẫn đúng nguyên. Phân tích đội Kim Đan phá bí cảnh (trước khi có trần) ở mục "Kim Đan trước M6", phần 4.
+
+### 9. Đối chiếu mô hình với mã server thật (#406 mục 7)
+
+Độc lập với số đo bằng bot của C (#410): dựng `World` thật (`hunt-check.ts`), người chơi mặc trang bị tốt nhất đứng cạnh quái, đánh thường mỗi lần hồi chiêu, quái dùng AI thật; **không né, không di chuyển** (ca khó, như mục "PK" và "Bí cảnh"). Không kiểm thời gian tìm quái, mật độ quái và người chơi thật (cần bot).
+
+**Săn quái thường (solo, 12 trận mỗi dòng).** Thời gian trận theo mô hình = máu / (công x hệ số chém x bạo kích trung bình / hồi chiêu); khí huyết mất theo mô hình đã nhân tỉ lệ trúng 0.8 (giả định người chơi né ~20%), nên cột cuối so mã thật (không né) với mô hình chia 0.8.
+
+| Bậc | Quái | Giây (mô hình) | Giây (thật) | Tỉ lệ | Khí huyết mất (mô hình) | Khí huyết mất (thật, không né) | Thật / mô hình không né |
+|---|---|---:|---:|---:|---:|---:|---:|
+| Luyện Khí Tầng 5 | Hôi Lang | 1.8 | 1.7 | 0.92x | 18 | 28 (9%) | 1.23x |
+| Trúc Cơ Hậu kỳ | Hắc Hổ | 2.1 | 2.1 | 0.96x | 55 | 83 (7%) | 1.20x |
+| Kim Đan Sơ kỳ | Xích Mãng | 10.3 | 10.1 | 0.98x | 720 | 999 (62%) | 1.11x |
+| Kim Đan Sơ kỳ | Sương Hồ | 4.1 | 4.0 | 0.98x | 494 | 709 (44%) | 1.15x |
+| Kim Đan Sơ kỳ | Thạch Quy | 16.7 | 16.5 | 0.98x | 520 | 707 (44%) | 1.09x |
+| Kim Đan Sơ kỳ | Độc Thiềm | 6.7 | 6.8 | 1.02x | 1,034 | 1,446 (90%) | 1.12x |
+| Kim Đan Trung kỳ | Xích Mãng | 8.8 | 8.8 | 1.01x | 614 | 855 (45%) | 1.11x |
+| Kim Đan Trung kỳ | Sương Hồ | 3.5 | 3.2 | 0.93x | 421 | 581 (31%) | 1.10x |
+| Kim Đan Trung kỳ | Thạch Quy | 14.2 | 14.1 | 0.99x | 443 | 587 (31%) | 1.06x |
+| Kim Đan Trung kỳ | Độc Thiềm | 5.7 | 5.6 | 0.99x | 881 | 1,199 (63%) | 1.09x |
+| Kim Đan Hậu kỳ | Xích Mãng | 7.5 | 7.6 | 1.02x | 526 | 722 (32%) | 1.10x |
+| Kim Đan Hậu kỳ | Sương Hồ | 3.0 | 2.8 | 0.95x | 361 | 455 (20%) | 1.01x |
+| Kim Đan Hậu kỳ | Thạch Quy | 12.2 | 12.1 | 0.99x | 380 | 493 (22%) | 1.04x |
+| Kim Đan Hậu kỳ | Độc Thiềm | 4.9 | 4.8 | 0.99x | 756 | 1,171 (52%) | 1.24x |
+
+Thời gian hạ quái khớp mô hình trong **0.92x - 1.02x** (mục tiêu lệch <= ~25%): tốc độ tu vi / giờ và Linh thạch / giờ của mục 1 (phụ thuộc thời gian trận) đáng tin ở phần này. Khí huyết mất của mã thật bằng **1.01x - 1.24x** mô hình không né (mô hình giả định né 20%, nên mã thật không né mất nhiều hơn mô hình 26-55%; phần dư ngoài hệ số né là làm tròn: quái đánh phát đầu ngay khi vào tầm nên số đòn là làm tròn LÊN, rõ nhất ở trận ngắn). Hệ quả: tiêu chí "an toàn" (mất <= 50% khí huyết mỗi trận) dựa trên giả định né; người KHÔNG né mất nhiều hơn số ở mục 1, vd Kim Đan Hậu kỳ Độc Thiềm: **52%** thay vì 34%; vẫn sống (đả tọa / đan hồi giữa các trận) nhưng sát ngưỡng khi gặp hai con cùng lúc.
+
+**Trùm Hắc Giao theo đội, mã thật.** Mô hình mục 2 chia sát thương đều cho cả đội (`/ n`); mã thật thì trùm CHỈ đánh một mục tiêu (người nó đã nhắm), nên người bị nhắm chịu gần hết sát thương (cột "Không đan": có người chết ở đội 3 - 4); Đại Hồi Huyết Đan (hồi 70%, hồi chiêu 10 giây, 120 Linh thạch) cứu được. Chính sách như `dungeon.ts`: đứng đánh liên tục, uống đan khi khí huyết dưới 50%, mỗi người mang 8 viên. 6 trận mỗi ô.
+
+| Bậc | Đội | Không đan | Có Đại Hồi Huyết Đan (8 viên / người) |
+|---|---:|---|---|
+| Sơ kỳ | 1 | không hạ được (1.0 chết / trận) | không hạ được (1.0 chết / trận) |
+| Sơ kỳ | 2 | không hạ được (2.0 chết / trận) | 100% hạ, 64 giây, 0.0 chết / trận, 6.0 đan |
+| Sơ kỳ | 3 | không hạ được (3.0 chết / trận) | 100% hạ, 42 giây, 0.0 chết / trận, 4.0 đan |
+| Sơ kỳ | 4 | 100% hạ, 40 giây, 2.0 chết / trận | 100% hạ, 32 giây, 0.0 chết / trận, 3.0 đan |
+| Trung kỳ | 1 | không hạ được (1.0 chết / trận) | 17% hạ, 109 giây, 0.8 chết / trận, 8.0 đan |
+| Trung kỳ | 2 | không hạ được (2.0 chết / trận) | 100% hạ, 55 giây, 0.0 chết / trận, 4.8 đan |
+| Trung kỳ | 3 | 100% hạ, 49 giây, 2.0 chết / trận | 100% hạ, 36 giây, 0.0 chết / trận, 3.0 đan |
+| Trung kỳ | 4 | 100% hạ, 30 giây, 1.0 chết / trận | 100% hạ, 27 giây, 0.0 chết / trận, 2.0 đan |
+| Hậu kỳ | 1 | không hạ được (1.0 chết / trận) | 100% hạ, 94 giây, 0.0 chết / trận, 7.0 đan |
+| Hậu kỳ | 2 | không hạ được (2.0 chết / trận) | 100% hạ, 47 giây, 0.0 chết / trận, 3.0 đan |
+| Hậu kỳ | 3 | 100% hạ, 35 giây, 1.0 chết / trận | 100% hạ, 31 giây, 0.0 chết / trận, 2.0 đan |
+| Hậu kỳ | 4 | 100% hạ, 24 giây, 0.8 chết / trận | 100% hạ, 23 giây, 0.0 chết / trận, 1.0 đan |
+
+**Nhận định.** Mục tiêu M6 "đội 3-4 người hạ được, không ai chết; một người không hạ nổi" (`PHAN_CONG_M6.md` mục 4): đội 3-4 hạ được và không ai chết khi có đan; **một người cũng hạ được trùm ở Hậu kỳ** (94 giây, 7.0 Đại Hồi Huyết Đan ~ 840 Linh thạch, 0.0 chết) vì đan hồi 70% mỗi 10 giây (7.0% khí huyết / giây) nhiều hơn sát thương trùm lên một người (4.2% / giây, trúng 100%): mục tiêu "một người không hạ nổi" chỉ đạt một nửa. Đội vẫn đáng đi: nhanh hơn 4.0 lần và ít đan hơn. Chốt cho người dùng (`questions.md`): giữ nguyên (trùm là thử thách tốn đan, đội rẻ hơn) hay tăng công trùm / giảm hiệu lực đan để bắt buộc đội.
