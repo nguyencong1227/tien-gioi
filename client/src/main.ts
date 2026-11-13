@@ -6,7 +6,10 @@ import {
   TRAVEL_JOIN_TIMEOUT_MS,
   JOIN_BAD_TOKEN,
   JOIN_NEED_CHARACTER,
+  NPCS,
   QUESTS,
+  RECIPES,
+  SHOPS,
   getMap,
   isDungeonMap,
   type TravelToMsg,
@@ -580,6 +583,18 @@ async function start(room: Room, mapId: string) {
   ) {
     (window as any).__ui = ui;
     // Cho `check-quest-log.mjs` (#409): id mọi nhiệm vụ chính tuyến / lặp THẬT của game để nạp vào sổ nhiệm vụ
+    // Cho `check-forge-shop.mjs` (#409): công thức rèn + cửa hàng THẬT của game (nguyên liệu, phí) để nạp túi / ví đúng ca "đủ" / "thiếu"
+    (window as any).__catalog = () => ({
+      recipes: RECIPES.map((r) => ({
+        id: r.id,
+        npcId: r.npcId,
+        inputs: r.inputs,
+        coin: r.coin ?? 0,
+      })),
+      shops: SHOPS.map((sh) => ({ npcId: sh.npcId, itemIds: sh.itemIds })),
+      // Toạ độ NPC: bảng Rèn / Cửa hàng TỰ ĐÓNG khi không có NPC nào trong tầm nói chuyện (WorldScene), nên script phải đứng cạnh NPC
+      npcs: NPCS.map((n) => ({ id: n.id, x: n.x, y: n.y, mapId: n.mapId ?? DEFAULT_MAP_ID })),
+    });
     (window as any).__questIds = () => ({
       main: QUESTS.filter((q) => !q.daily).map((q) => q.id),
       daily: QUESTS.filter((q) => q.daily).map((q) => q.id),
