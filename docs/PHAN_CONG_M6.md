@@ -36,7 +36,7 @@
 | Nhịp Kim Đan (solo, kể cả chuỗi nhiệm vụ) | **~5-7 giờ** cho cả cảnh giới | thanh tổng 6× Trúc Cơ; hiện cảnh giới sau lâu hơn cảnh giới trước (53 phút -> ~2 giờ) |
 | Không có đường tắt | tu vi / giờ của bất kỳ bãi nào ≤ ~1,5× bãi Kim Đan "đúng bậc"; Linh thạch / giờ không lệch quá ~2× | tiêu chí đã dùng ở `CAN_BANG.md` (Thỏ / Sói) |
 | Trang bị | mỗi bộ cộng ~30% chỉ số gốc ở bậc đầu mặc được (đo từ ba bộ hiện có); ba bộ tăng đều | `items.ts` |
-| Trùm `hac_giao` | đội 3-4 người hạ được, không ai chết ở ca mô phỏng khó (như bí cảnh); một người không hạ nổi | mục tiêu bí cảnh `CAN_BANG.md` |
+| Trùm `hac_giao` | đội 3-4 người hạ được, không ai chết ở ca mô phỏng khó (như bí cảnh); một người không hạ nổi | mục tiêu bí cảnh `CAN_BANG.md`. **Đo bằng mã server thật (`CAN_BANG.md` mục 9): đội 3-4 đạt; "một người không hạ nổi" KHÔNG đạt** (đan hồi 7% khí huyết / giây > sát thương trùm 4-6% / giây nên một người hạ được ở mọi bậc nếu đủ đan; đội chỉ ít đan hơn ~7 lần): câu hỏi cho người dùng, `questions.md` câu 3 |
 | Luân hồi | Duyên / giờ mọi mốc trong 1,3×; tăng qua kiếp ≤ ~2,0× kiếp 1 | mục tiêu cũ `THIET_KE_LUAN_HOI.md` mục 5 |
 | Kinh tế | có chỗ tiêu tương xứng thu nhập (phí rèn, đan cấp 2); không dư hàng vạn Linh thạch không chỗ tiêu | cảnh báo `CAN_BANG.md` |
 | Hiệu năng | tổng `monsterCap` bản đồ mới ≤ ~70 (Hắc Phong 62), tick < 10 ms, byte/tick trong ngân sách; Android tầm trung ≥ 50 FPS ở cả ba bậc chất lượng | `perf.test.ts`, `perf-budget.json` |

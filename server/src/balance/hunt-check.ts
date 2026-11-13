@@ -6,6 +6,9 @@
 // Không kiểm: thời gian tìm quái, mật độ quái, người chơi thật (cần bot: #410).
 import {
   AM_SUONG_ID,
+  DROP_TABLES,
+  KIM_DAN_RECIPES,
+  buyPrice,
   ITEM_BY_ID,
   MONSTER_BY_ID,
   REALMS,
@@ -21,6 +24,7 @@ import { tickMonsters } from "../systems/monsters";
 import { applyStats } from "../systems/progression";
 import { addMonster, addPlayer, makeWorld } from "../systems/test-helpers";
 import { ASSUME, bestGear } from "./simulate";
+import { ASSUME_DUNGEON } from "./dungeon";
 import { KIM_DAN_BOSS_ID, KIM_DAN_MONSTER_IDS } from "./kim-dan-sau";
 
 const KD = 3;
@@ -167,7 +171,7 @@ export interface BossOptions {
  */
 export function bossFight(o: BossOptions): BossFight {
   const realm = o.realm ?? KD;
-  const potionsEach = o.potions ?? 8;
+  const potionsEach = o.potions ?? ASSUME_DUNGEON.potions;
   const saved = Math.random;
   Math.random = seeded(o.seed ?? 1);
   try {
@@ -203,7 +207,7 @@ export function bossFight(o: BossOptions): BossFight {
         if (p.dead) return;
         const c = w.ctrl.get(sid)!;
         if (
-          p.hp < p.maxHp * 0.5 &&
+          p.hp < p.maxHp * ASSUME_DUNGEON.potionBelow &&
           (c.inv[0]?.qty ?? 0) > 0 &&
           w.now >= (c.itemCd.get("dai_hoi_huyet_dan") ?? 0)
         ) {
@@ -243,7 +247,7 @@ export interface BossSummary {
 export function bossSummary(
   tier: number,
   party: number,
-  potionsEach = 8,
+  potionsEach: number = ASSUME_DUNGEON.potions,
   runs = BOSS_RUNS,
 ): BossSummary {
   const fights = Array.from({ length: runs }, (_, i) =>
@@ -262,6 +266,88 @@ export function bossSummary(
       : null,
     deathsPerRun: fights.reduce((n, f) => n + f.deaths, 0) / runs,
   };
+}
+
+/** Số đan mỗi người mang khi "đủ đan" (đan xếp chồng 20 / ô): đủ để không phải là giới hạn, dùng để tách luật khỏi trần mang. */
+export const POTIONS_PLENTY = 30;
+
+/** Sát thương trùm lên MỘT người mỗi giây, tỉ lệ khí huyết tối đa (trúng 100%, không né) ở bậc Kim Đan `tier` (mặc trang bị tốt nhất). */
+export function bossDpsFrac(tier: number): number {
+  const b = MONSTER_BY_ID[KIM_DAN_BOSS_ID];
+  return b.atk / (b.attackCd / 1000) / statsFor(KD, tier, bestGear(KD, tier)).maxHp;
+}
+
+/** Tốc độ hồi của Đại Hồi Huyết Đan: tỉ lệ khí huyết tối đa mỗi giây (70% / 10 giây = 7%). */
+export function potionHealFrac(): number {
+  const d = ITEM_BY_ID.dai_hoi_huyet_dan;
+  return (d.effect as { pct: number }).pct / (d.cooldown! / 1000);
+}
+
+export interface PerPersonRow {
+  tier: number;
+  party: number;
+  /** Giây một trận, số trận cả đội cần, phút MỖI NGƯỜI, đan MỖI NGƯỜI và Linh thạch tương ứng, số chết trung bình */
+  secondsPerKill: number;
+  kills: number;
+  minutes: number;
+  potions: number;
+  coin: number;
+  deathsPerRun: number;
+}
+
+/**
+ * Chi phí MỖI NGƯỜI để có đủ Giao Lân của MỘT bộ III (`KIM_DAN_RECIPES`: 19) khi cả đội `party` người cùng hạ trùm. Đồ rơi của trùm
+ * là MỘT chủ (cùng giả định mục 6): cả đội cần `party x 19`, mỗi trận rơi trung bình 3, nên số trận tăng theo cỡ đội và thời gian
+ * mỗi người gần như KHÔNG đổi (mỗi trận ngắn lại tương ứng); cái đổi là số đan mỗi người. Mỗi người mang đủ đan (`POTIONS_PLENTY`).
+ */
+export function bossPerPerson(tier: number, party: number, runs = BOSS_RUNS): PerPersonRow | null {
+  const sum = bossSummary(tier, party, POTIONS_PLENTY, runs);
+  if (sum.seconds === null || sum.potionsPerKill === null) return null;
+  const need = KIM_DAN_RECIPES.reduce(
+    (n, r) => n + (r.inputs.find((i) => i.itemId === "giao_lan")?.qty ?? 0),
+    0,
+  );
+  const row = DROP_TABLES[KIM_DAN_BOSS_ID].find((d) => d.itemId === "giao_lan")!;
+  const perKill = row.chance * ((row.min + row.max) / 2);
+  const kills = (need * party) / perKill;
+  return {
+    tier,
+    party,
+    secondsPerKill: sum.seconds,
+    kills,
+    minutes: (kills * sum.seconds) / 60,
+    potions: (kills * sum.potionsPerKill) / party,
+    coin: ((kills * sum.potionsPerKill) / party) * buyPrice("dai_hoi_huyet_dan"),
+    deathsPerRun: sum.deathsPerRun,
+  };
+}
+
+export interface AtkSweepRow {
+  mult: number;
+  hauSolo: BossSummary;
+  hauParty3: BossSummary;
+  hauParty4: BossSummary;
+  soParty4: BossSummary;
+}
+
+/** Nhân công trùm với từng hệ số (đủ đan): có hệ số chung nào vừa chặn solo ở Hậu kỳ vừa giữ đội 4 ở Sơ kỳ không chết? Khôi phục công trùm sau khi đo. */
+export function bossAtkSweep(mults = [1, 1.4, 1.7, 2, 2.5], runs = 4): AtkSweepRow[] {
+  const boss = MONSTER_BY_ID[KIM_DAN_BOSS_ID];
+  const saved = boss.atk;
+  try {
+    return mults.map((mult) => {
+      boss.atk = saved * mult;
+      return {
+        mult,
+        hauSolo: bossSummary(2, 1, POTIONS_PLENTY, runs),
+        hauParty3: bossSummary(2, 3, POTIONS_PLENTY, runs),
+        hauParty4: bossSummary(2, 4, POTIONS_PLENTY, runs),
+        soParty4: bossSummary(0, 4, POTIONS_PLENTY, runs),
+      };
+    });
+  } finally {
+    boss.atk = saved;
+  }
 }
 
 const n0 = (x: number) => Math.round(x).toLocaleString("en-US");
@@ -287,27 +373,45 @@ export function renderHuntCheck(): string {
       tier,
       party,
       none: bossSummary(tier, party, 0),
-      pots: bossSummary(tier, party, 8),
+      eight: bossSummary(tier, party, ASSUME_DUNGEON.potions),
+      plenty: bossSummary(tier, party, POTIONS_PLENTY),
     })),
   );
-  const bossLines = boss.map((b) => {
-    const cell = (s: BossSummary) =>
-      s.killRate === 0
-        ? `không hạ được (${n1(s.deathsPerRun)} chết / trận)`
-        : `${n0(s.killRate * 100)}% hạ, ${n0(s.seconds!)} giây, ${n1(s.deathsPerRun)} chết / trận${s.potionsPerKill ? `, ${n1(s.potionsPerKill)} đan` : ""}`;
-    return `| ${REALMS[KD].tiers[b.tier]} | ${b.party} | ${cell(b.none)} | ${cell(b.pots)} |`;
-  });
-  const solo = boss.find((b) => b.tier === 2 && b.party === 1)!.pots;
-  const soloKills = solo.killRate > 0;
+  const cell = (s: BossSummary) =>
+    s.killRate === 0
+      ? `không hạ được (${n1(s.deathsPerRun)} chết / trận)`
+      : `${n0(s.killRate * 100)}% hạ, ${n0(s.seconds!)} giây, ${n1(s.deathsPerRun)} chết / trận${s.potionsPerKill ? `, ${n1(s.potionsPerKill)} đan` : ""}`;
+  const bossLines = boss.map(
+    (b) =>
+      `| ${REALMS[KD].tiers[b.tier]} | ${b.party} | ${cell(b.none)} | ${cell(b.eight)} | ${cell(b.plenty)} |`,
+  );
   const partyOk = boss
     .filter((b) => b.party >= 3)
-    .every((b) => b.pots.killRate === 1 && b.pots.deathsPerRun === 0);
-  const bossDef = MONSTER_BY_ID[KIM_DAN_BOSS_ID];
-  const bossDpsFrac =
-    bossDef.atk / (bossDef.attackCd / 1000) / statsFor(KD, 2, bestGear(KD, 2)).maxHp;
-  const healFrac =
-    (ITEM_BY_ID.dai_hoi_huyet_dan.effect as { pct: number }).pct /
-    (ITEM_BY_ID.dai_hoi_huyet_dan.cooldown! / 1000);
+    .every((b) => b.eight.killRate === 1 && b.eight.deathsPerRun === 0);
+  const soloEnough = boss
+    .filter((b) => b.party === 1)
+    .every((b) => b.plenty.killRate === 1 && b.plenty.deathsPerRun === 0);
+  const heal = potionHealFrac();
+  const dps = tiers.map((t) => bossDpsFrac(t));
+  const perPerson = tiers.flatMap((t) => [1, 2, 3, 4].map((party) => bossPerPerson(t, party)));
+  const ppLines = perPerson.map((r) =>
+    r
+      ? `| ${REALMS[KD].tiers[r.tier]} | ${r.party} | ${n0(r.secondsPerKill)} | ${n1(r.kills)} | ${n1(r.minutes)} | ${n1(r.potions)} (${n0(r.coin)} Linh thạch) |`
+      : "",
+  );
+  const ppHau = (party: number) => perPerson.find((r) => r?.tier === 2 && r.party === party)!;
+  const sweep = bossAtkSweep();
+  const sweepLine = (s: BossSummary) =>
+    s.killRate === 0
+      ? `0% (${n1(s.deathsPerRun)} chết)`
+      : `${n0(s.killRate * 100)}%, ${n1(s.deathsPerRun)} chết`;
+  const sweepLines = sweep.map(
+    (r) =>
+      `| x${r.mult} (${n0(MONSTER_BY_ID[KIM_DAN_BOSS_ID].atk * r.mult)}) | ${sweepLine(r.hauSolo)} | ${sweepLine(r.hauParty3)} | ${sweepLine(r.hauParty4)} | ${sweepLine(r.soParty4)} |`,
+  );
+  const noCommonFactor = !sweep.some(
+    (r) => r.hauSolo.killRate === 0 && r.soParty4.deathsPerRun === 0,
+  );
   return `### 9. Đối chiếu mô hình với mã server thật (#406 mục 7)
 
 Độc lập với số đo bằng bot của C (#410): dựng \`World\` thật (\`hunt-check.ts\`), người chơi mặc trang bị tốt nhất đứng cạnh quái, đánh thường mỗi lần hồi chiêu, quái dùng AI thật; **không né, không di chuyển** (ca khó, như mục "PK" và "Bí cảnh"). Không kiểm thời gian tìm quái, mật độ quái và người chơi thật (cần bot).
@@ -320,12 +424,26 @@ ${rowLines.join("\n")}
 
 Thời gian hạ quái khớp mô hình trong **${n2(tMin)}x - ${n2(tMax)}x** (mục tiêu lệch <= ~25%): tốc độ tu vi / giờ và Linh thạch / giờ của mục 1 (phụ thuộc thời gian trận) đáng tin ở phần này. Khí huyết mất của mã thật bằng **${n2(lMin)}x - ${n2(lMax)}x** mô hình không né (mô hình giả định né ${n0((1 - ASSUME.hitTaken) * 100)}%, nên mã thật không né mất nhiều hơn mô hình ${n0((lMin / ASSUME.hitTaken - 1) * 100)}-${n0((lMax / ASSUME.hitTaken - 1) * 100)}%; phần dư ngoài hệ số né là làm tròn: quái đánh phát đầu ngay khi vào tầm nên số đòn là làm tròn LÊN, rõ nhất ở trận ngắn). Hệ quả: tiêu chí "an toàn" (mất <= 50% khí huyết mỗi trận) dựa trên giả định né; người KHÔNG né mất nhiều hơn số ở mục 1, vd ${hauDoc.label} ${hauDoc.monsterName}: **${n0((hauDoc.realLost / hauDoc.maxHp) * 100)}%** thay vì ${n0((hauDoc.modelLost / hauDoc.maxHp) * 100)}%; vẫn sống (đả tọa / đan hồi giữa các trận) nhưng sát ngưỡng khi gặp hai con cùng lúc.
 
-**Trùm Hắc Giao theo đội, mã thật.** Mô hình mục 2 chia sát thương đều cho cả đội (\`/ n\`); mã thật thì trùm CHỈ đánh một mục tiêu (người nó đã nhắm), nên người bị nhắm chịu gần hết sát thương (cột "Không đan": có người chết ở đội 3 - 4); Đại Hồi Huyết Đan (hồi 70%, hồi chiêu 10 giây, 120 Linh thạch) cứu được. Chính sách như \`dungeon.ts\`: đứng đánh liên tục, uống đan khi khí huyết dưới 50%, mỗi người mang 8 viên. ${BOSS_RUNS} trận mỗi ô.
+**Trùm Hắc Giao theo đội, mã thật.** Mô hình mục 2 chia sát thương đều cho cả đội (\`/ n\`); mã thật thì trùm CHỈ đánh một mục tiêu (người nó đã nhắm), nên người bị nhắm chịu gần hết sát thương (cột "Không đan": có người chết ở đội 3 - 4); Đại Hồi Huyết Đan (hồi ${n0((ITEM_BY_ID.dai_hoi_huyet_dan.effect as { pct: number }).pct * 100)}%, hồi chiêu ${n0(ITEM_BY_ID.dai_hoi_huyet_dan.cooldown! / 1000)} giây, ${n0(buyPrice("dai_hoi_huyet_dan"))} Linh thạch) cứu được. Chính sách như \`dungeon.ts\` (\`ASSUME_DUNGEON\`): đứng đánh liên tục, uống đan khi khí huyết dưới ${n0(ASSUME_DUNGEON.potionBelow * 100)}%. Hai cột đan: mang ${ASSUME_DUNGEON.potions} viên (chính sách của bí cảnh) và đủ đan (${POTIONS_PLENTY} viên, không còn là giới hạn). ${BOSS_RUNS} trận mỗi ô.
 
-| Bậc | Đội | Không đan | Có Đại Hồi Huyết Đan (8 viên / người) |
-|---|---:|---|---|
+| Bậc | Đội | Không đan | ${ASSUME_DUNGEON.potions} viên / người | Đủ đan (${POTIONS_PLENTY} viên / người) |
+|---|---:|---|---|---|
 ${bossLines.join("\n")}
 
-**Nhận định.** Mục tiêu M6 "đội 3-4 người hạ được, không ai chết; một người không hạ nổi" (\`PHAN_CONG_M6.md\` mục 4): ${partyOk ? "đội 3-4 hạ được và không ai chết khi có đan" : "đội 3-4 CHƯA đạt (xem bảng)"}; ${soloKills ? `**một người cũng hạ được trùm ở Hậu kỳ** (${n0(solo.seconds ?? 0)} giây, ${n1(solo.potionsPerKill ?? 0)} Đại Hồi Huyết Đan ~ ${n0((solo.potionsPerKill ?? 0) * 120)} Linh thạch, ${n1(solo.deathsPerRun)} chết) vì đan hồi ${n0((ITEM_BY_ID.dai_hoi_huyet_dan.effect as { pct: number }).pct * 100)}% mỗi ${n0(ITEM_BY_ID.dai_hoi_huyet_dan.cooldown! / 1000)} giây (${n1(healFrac * 100)}% khí huyết / giây) nhiều hơn sát thương trùm lên một người (${n1(bossDpsFrac * 100)}% / giây, trúng 100%): mục tiêu "một người không hạ nổi" chỉ đạt một nửa. Đội vẫn đáng đi: nhanh hơn ${n1((solo.seconds ?? 0) / (boss.find((b) => b.tier === 2 && b.party === 4)!.pots.seconds ?? 1))} lần và ít đan hơn. Chốt cho người dùng (\`questions.md\`): giữ nguyên (trùm là thử thách tốn đan, đội rẻ hơn) hay tăng công trùm / giảm hiệu lực đan để bắt buộc đội.` : "một người không hạ nổi ở Hậu kỳ: đạt."}
+**Vì sao một người hạ được.** Sát thương trùm lên MỘT người (trúng 100%, không né) là **${dps.map((d) => n1(d * 100)).join("% / ")}%** khí huyết mỗi giây ở Sơ / Trung / Hậu kỳ, còn đan hồi **${n1(heal * 100)}%** mỗi giây: ở CẢ BA bậc sát thương < tốc độ hồi nên một người bền vững nếu đủ đan. Trần ${ASSUME_DUNGEON.potions} viên chỉ là giới hạn mang, không phải của luật: ở cột "${ASSUME_DUNGEON.potions} viên" solo Sơ kỳ không hạ được và Trung kỳ hạ được ít, ${soloEnough ? "nhưng đủ đan thì hạ được 100%, 0 chết ở mọi bậc" : "xem cột đủ đan"}.
+
+**Chi phí MỖI NGƯỜI để có 19 Giao Lân (một bộ III).** Đồ rơi của trùm là MỘT chủ (cùng giả định mục 6), nên cả đội cần \`số người x 19\`, mỗi trận rơi trung bình 3: số trận tăng theo cỡ đội và mỗi trận ngắn lại tương ứng nên **thời gian mỗi người gần như KHÔNG đổi theo cỡ đội**; cái đổi là **số đan** (đủ đan, mỗi người mang theo):
+
+| Bậc | Đội | Giây / trận | Số trận cả đội | Phút mỗi người | Đan mỗi người |
+|---|---:|---:|---:|---:|---:|
+${ppLines.join("\n")}
+
+**Hệ số công trùm: không có hệ số chung nào vừa chặn solo vừa giữ đội an toàn.** Nhân công trùm (đủ đan, ${4} trận mỗi ô) để bắt buộc đội:
+
+| Công trùm | Hậu kỳ, một người | Hậu kỳ, đội 3 | Hậu kỳ, đội 4 | Sơ kỳ, đội 4 |
+|---|---|---|---|---|
+${sweepLines.join("\n")}
+
+**Nhận định.** Mục tiêu M6 "đội 3-4 người hạ được, không ai chết; một người không hạ nổi" (\`PHAN_CONG_M6.md\` mục 4): ${partyOk ? "đội 3-4 hạ được và không ai chết khi có đan (đạt)" : "đội 3-4 CHƯA đạt (xem bảng)"}; ${soloEnough ? `"một người không hạ nổi" **không đạt**: một người hạ được ở mọi bậc nếu đủ đan (Hậu kỳ solo ${n0(ppHau(1).potions)} đan ~ ${n0(ppHau(1).coin)} Linh thạch cho 19 Giao Lân). Đội KHÔNG nhanh hơn theo người (${n1(ppHau(1).minutes)} phút solo so với ${n1(ppHau(4).minutes)} phút đội 4 ở Hậu kỳ); lợi thế của đội là **ít đan hơn ~${n1(ppHau(1).potions / ppHau(4).potions)} lần** (${n0(ppHau(4).potions)} so với ${n0(ppHau(1).potions)} viên mỗi người), tức ${n0(ppHau(1).coin - ppHau(4).coin)} Linh thạch chênh mỗi bộ III.` : "một người không hạ nổi ở mọi bậc (đạt)."} ${noCommonFactor ? "Tăng công trùm KHÔNG giải được: hệ số đủ chặn solo Hậu kỳ thì đội 4 Sơ kỳ đã có người chết (bảng trên)." : ""} Chốt cho người dùng (\`questions.md\` câu 3): giữ nguyên (đội là cách RẺ đan, không phải cách duy nhất), hoặc giảm hiệu lực / kéo dài hồi chiêu Đại Hồi Huyết Đan (đụng cả bí cảnh và PK), hoặc công trùm theo cỡ đội (cần mã mới).
 `;
 }

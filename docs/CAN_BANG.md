@@ -544,21 +544,50 @@ Cùng bậc nhưng KHÁC bộ: bên mặc bộ cao hơn thắng 100% số trận
 
 Thời gian hạ quái khớp mô hình trong **0.92x - 1.02x** (mục tiêu lệch <= ~25%): tốc độ tu vi / giờ và Linh thạch / giờ của mục 1 (phụ thuộc thời gian trận) đáng tin ở phần này. Khí huyết mất của mã thật bằng **1.01x - 1.24x** mô hình không né (mô hình giả định né 20%, nên mã thật không né mất nhiều hơn mô hình 26-55%; phần dư ngoài hệ số né là làm tròn: quái đánh phát đầu ngay khi vào tầm nên số đòn là làm tròn LÊN, rõ nhất ở trận ngắn). Hệ quả: tiêu chí "an toàn" (mất <= 50% khí huyết mỗi trận) dựa trên giả định né; người KHÔNG né mất nhiều hơn số ở mục 1, vd Kim Đan Hậu kỳ Độc Thiềm: **52%** thay vì 34%; vẫn sống (đả tọa / đan hồi giữa các trận) nhưng sát ngưỡng khi gặp hai con cùng lúc.
 
-**Trùm Hắc Giao theo đội, mã thật.** Mô hình mục 2 chia sát thương đều cho cả đội (`/ n`); mã thật thì trùm CHỈ đánh một mục tiêu (người nó đã nhắm), nên người bị nhắm chịu gần hết sát thương (cột "Không đan": có người chết ở đội 3 - 4); Đại Hồi Huyết Đan (hồi 70%, hồi chiêu 10 giây, 120 Linh thạch) cứu được. Chính sách như `dungeon.ts`: đứng đánh liên tục, uống đan khi khí huyết dưới 50%, mỗi người mang 8 viên. 6 trận mỗi ô.
+**Trùm Hắc Giao theo đội, mã thật.** Mô hình mục 2 chia sát thương đều cho cả đội (`/ n`); mã thật thì trùm CHỈ đánh một mục tiêu (người nó đã nhắm), nên người bị nhắm chịu gần hết sát thương (cột "Không đan": có người chết ở đội 3 - 4); Đại Hồi Huyết Đan (hồi 70%, hồi chiêu 10 giây, 120 Linh thạch) cứu được. Chính sách như `dungeon.ts` (`ASSUME_DUNGEON`): đứng đánh liên tục, uống đan khi khí huyết dưới 50%. Hai cột đan: mang 8 viên (chính sách của bí cảnh) và đủ đan (30 viên, không còn là giới hạn). 6 trận mỗi ô.
 
-| Bậc | Đội | Không đan | Có Đại Hồi Huyết Đan (8 viên / người) |
-|---|---:|---|---|
-| Sơ kỳ | 1 | không hạ được (1.0 chết / trận) | không hạ được (1.0 chết / trận) |
-| Sơ kỳ | 2 | không hạ được (2.0 chết / trận) | 100% hạ, 64 giây, 0.0 chết / trận, 6.0 đan |
-| Sơ kỳ | 3 | không hạ được (3.0 chết / trận) | 100% hạ, 42 giây, 0.0 chết / trận, 4.0 đan |
-| Sơ kỳ | 4 | 100% hạ, 40 giây, 2.0 chết / trận | 100% hạ, 32 giây, 0.0 chết / trận, 3.0 đan |
-| Trung kỳ | 1 | không hạ được (1.0 chết / trận) | 17% hạ, 109 giây, 0.8 chết / trận, 8.0 đan |
-| Trung kỳ | 2 | không hạ được (2.0 chết / trận) | 100% hạ, 55 giây, 0.0 chết / trận, 4.8 đan |
-| Trung kỳ | 3 | 100% hạ, 49 giây, 2.0 chết / trận | 100% hạ, 36 giây, 0.0 chết / trận, 3.0 đan |
-| Trung kỳ | 4 | 100% hạ, 30 giây, 1.0 chết / trận | 100% hạ, 27 giây, 0.0 chết / trận, 2.0 đan |
-| Hậu kỳ | 1 | không hạ được (1.0 chết / trận) | 100% hạ, 94 giây, 0.0 chết / trận, 7.0 đan |
-| Hậu kỳ | 2 | không hạ được (2.0 chết / trận) | 100% hạ, 47 giây, 0.0 chết / trận, 3.0 đan |
-| Hậu kỳ | 3 | 100% hạ, 35 giây, 1.0 chết / trận | 100% hạ, 31 giây, 0.0 chết / trận, 2.0 đan |
-| Hậu kỳ | 4 | 100% hạ, 24 giây, 0.8 chết / trận | 100% hạ, 23 giây, 0.0 chết / trận, 1.0 đan |
+| Bậc | Đội | Không đan | 8 viên / người | Đủ đan (30 viên / người) |
+|---|---:|---|---|---|
+| Sơ kỳ | 1 | không hạ được (1.0 chết / trận) | không hạ được (1.0 chết / trận) | 100% hạ, 128 giây, 0.0 chết / trận, 12.7 đan |
+| Sơ kỳ | 2 | không hạ được (2.0 chết / trận) | 100% hạ, 64 giây, 0.0 chết / trận, 6.0 đan | 100% hạ, 64 giây, 0.0 chết / trận, 6.0 đan |
+| Sơ kỳ | 3 | không hạ được (3.0 chết / trận) | 100% hạ, 42 giây, 0.0 chết / trận, 4.0 đan | 100% hạ, 42 giây, 0.0 chết / trận, 4.0 đan |
+| Sơ kỳ | 4 | 100% hạ, 40 giây, 2.0 chết / trận | 100% hạ, 32 giây, 0.0 chết / trận, 3.0 đan | 100% hạ, 32 giây, 0.0 chết / trận, 3.0 đan |
+| Trung kỳ | 1 | không hạ được (1.0 chết / trận) | 17% hạ, 109 giây, 0.8 chết / trận, 8.0 đan | 100% hạ, 109 giây, 0.0 chết / trận, 9.3 đan |
+| Trung kỳ | 2 | không hạ được (2.0 chết / trận) | 100% hạ, 55 giây, 0.0 chết / trận, 4.8 đan | 100% hạ, 55 giây, 0.0 chết / trận, 4.8 đan |
+| Trung kỳ | 3 | 100% hạ, 49 giây, 2.0 chết / trận | 100% hạ, 36 giây, 0.0 chết / trận, 3.0 đan | 100% hạ, 36 giây, 0.0 chết / trận, 3.0 đan |
+| Trung kỳ | 4 | 100% hạ, 30 giây, 1.0 chết / trận | 100% hạ, 27 giây, 0.0 chết / trận, 2.0 đan | 100% hạ, 27 giây, 0.0 chết / trận, 2.0 đan |
+| Hậu kỳ | 1 | không hạ được (1.0 chết / trận) | 100% hạ, 94 giây, 0.0 chết / trận, 7.0 đan | 100% hạ, 94 giây, 0.0 chết / trận, 7.0 đan |
+| Hậu kỳ | 2 | không hạ được (2.0 chết / trận) | 100% hạ, 47 giây, 0.0 chết / trận, 3.0 đan | 100% hạ, 47 giây, 0.0 chết / trận, 3.0 đan |
+| Hậu kỳ | 3 | 100% hạ, 35 giây, 1.0 chết / trận | 100% hạ, 31 giây, 0.0 chết / trận, 2.0 đan | 100% hạ, 31 giây, 0.0 chết / trận, 2.0 đan |
+| Hậu kỳ | 4 | 100% hạ, 24 giây, 0.8 chết / trận | 100% hạ, 23 giây, 0.0 chết / trận, 1.0 đan | 100% hạ, 23 giây, 0.0 chết / trận, 1.0 đan |
 
-**Nhận định.** Mục tiêu M6 "đội 3-4 người hạ được, không ai chết; một người không hạ nổi" (`PHAN_CONG_M6.md` mục 4): đội 3-4 hạ được và không ai chết khi có đan; **một người cũng hạ được trùm ở Hậu kỳ** (94 giây, 7.0 Đại Hồi Huyết Đan ~ 840 Linh thạch, 0.0 chết) vì đan hồi 70% mỗi 10 giây (7.0% khí huyết / giây) nhiều hơn sát thương trùm lên một người (4.2% / giây, trúng 100%): mục tiêu "một người không hạ nổi" chỉ đạt một nửa. Đội vẫn đáng đi: nhanh hơn 4.0 lần và ít đan hơn. Chốt cho người dùng (`questions.md`): giữ nguyên (trùm là thử thách tốn đan, đội rẻ hơn) hay tăng công trùm / giảm hiệu lực đan để bắt buộc đội.
+**Vì sao một người hạ được.** Sát thương trùm lên MỘT người (trúng 100%, không né) là **5.8% / 4.9% / 4.2%** khí huyết mỗi giây ở Sơ / Trung / Hậu kỳ, còn đan hồi **7.0%** mỗi giây: ở CẢ BA bậc sát thương < tốc độ hồi nên một người bền vững nếu đủ đan. Trần 8 viên chỉ là giới hạn mang, không phải của luật: ở cột "8 viên" solo Sơ kỳ không hạ được và Trung kỳ hạ được ít, nhưng đủ đan thì hạ được 100%, 0 chết ở mọi bậc.
+
+**Chi phí MỖI NGƯỜI để có 19 Giao Lân (một bộ III).** Đồ rơi của trùm là MỘT chủ (cùng giả định mục 6), nên cả đội cần `số người x 19`, mỗi trận rơi trung bình 3: số trận tăng theo cỡ đội và mỗi trận ngắn lại tương ứng nên **thời gian mỗi người gần như KHÔNG đổi theo cỡ đội**; cái đổi là **số đan** (đủ đan, mỗi người mang theo):
+
+| Bậc | Đội | Giây / trận | Số trận cả đội | Phút mỗi người | Đan mỗi người |
+|---|---:|---:|---:|---:|---:|
+| Sơ kỳ | 1 | 128 | 6.3 | 13.6 | 80.2 (9,627 Linh thạch) |
+| Sơ kỳ | 2 | 64 | 12.7 | 13.5 | 38.0 (4,560 Linh thạch) |
+| Sơ kỳ | 3 | 42 | 19.0 | 13.4 | 25.3 (3,040 Linh thạch) |
+| Sơ kỳ | 4 | 32 | 25.3 | 13.5 | 19.0 (2,280 Linh thạch) |
+| Trung kỳ | 1 | 109 | 6.3 | 11.5 | 59.1 (7,093 Linh thạch) |
+| Trung kỳ | 2 | 55 | 12.7 | 11.6 | 30.6 (3,673 Linh thạch) |
+| Trung kỳ | 3 | 36 | 19.0 | 11.4 | 19.0 (2,280 Linh thạch) |
+| Trung kỳ | 4 | 27 | 25.3 | 11.5 | 12.7 (1,520 Linh thạch) |
+| Hậu kỳ | 1 | 94 | 6.3 | 9.9 | 44.3 (5,320 Linh thạch) |
+| Hậu kỳ | 2 | 47 | 12.7 | 9.9 | 19.0 (2,280 Linh thạch) |
+| Hậu kỳ | 3 | 31 | 19.0 | 9.8 | 12.7 (1,520 Linh thạch) |
+| Hậu kỳ | 4 | 23 | 25.3 | 9.8 | 6.3 (760 Linh thạch) |
+
+**Hệ số công trùm: không có hệ số chung nào vừa chặn solo vừa giữ đội an toàn.** Nhân công trùm (đủ đan, 4 trận mỗi ô) để bắt buộc đội:
+
+| Công trùm | Hậu kỳ, một người | Hậu kỳ, đội 3 | Hậu kỳ, đội 4 | Sơ kỳ, đội 4 |
+|---|---|---|---|---|
+| x1 (150) | 100%, 0.0 chết | 100%, 0.0 chết | 100%, 0.0 chết | 100%, 0.0 chết |
+| x1.4 (210) | 100%, 0.0 chết | 100%, 0.0 chết | 100%, 0.0 chết | 100%, 0.0 chết |
+| x1.7 (255) | 100%, 0.0 chết | 100%, 0.0 chết | 100%, 0.0 chết | 100%, 1.0 chết |
+| x2 (300) | 0% (1.0 chết) | 100%, 0.0 chết | 100%, 0.0 chết | 100%, 3.0 chết |
+| x2.5 (375) | 0% (1.0 chết) | 75%, 2.0 chết | 100%, 1.0 chết | 0% (4.0 chết) |
+
+**Nhận định.** Mục tiêu M6 "đội 3-4 người hạ được, không ai chết; một người không hạ nổi" (`PHAN_CONG_M6.md` mục 4): đội 3-4 hạ được và không ai chết khi có đan (đạt); "một người không hạ nổi" **không đạt**: một người hạ được ở mọi bậc nếu đủ đan (Hậu kỳ solo 44 đan ~ 5,320 Linh thạch cho 19 Giao Lân). Đội KHÔNG nhanh hơn theo người (9.9 phút solo so với 9.8 phút đội 4 ở Hậu kỳ); lợi thế của đội là **ít đan hơn ~7.0 lần** (6 so với 44 viên mỗi người), tức 4,560 Linh thạch chênh mỗi bộ III. Tăng công trùm KHÔNG giải được: hệ số đủ chặn solo Hậu kỳ thì đội 4 Sơ kỳ đã có người chết (bảng trên). Chốt cho người dùng (`questions.md` câu 3): giữ nguyên (đội là cách RẺ đan, không phải cách duy nhất), hoặc giảm hiệu lực / kéo dài hồi chiêu Đại Hồi Huyết Đan (đụng cả bí cảnh và PK), hoặc công trùm theo cỡ đội (cần mã mới).
