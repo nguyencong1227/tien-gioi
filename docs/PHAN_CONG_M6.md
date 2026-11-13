@@ -26,7 +26,7 @@
 ## 3. Phạm vi M6
 **Trong phạm vi:** cảnh giới **Kim Đan** trọn vẹn (bậc 13-15) + lấp khoảng trống **chuỗi nhiệm vụ Trúc Cơ**; bản đồ **Âm Sương Trạch**; 4 loài quái; nguyên liệu, 9 trang bị, đan cấp 2; công thức rèn có phí Linh thạch; 3 NPC; ~9 nhiệm vụ chính + nhiệm vụ lặp; đồ hoạ + hiệu ứng + giao diện cho tất cả; cân bằng lại; đo bằng bot.
 
-**Ngoài phạm vi (đề xuất M7 hoặc hỏi người dùng):** Nguyên Anh trở lên (thanh tu vi 158400, chưa có số đo nào); bí cảnh thứ hai; loại bước nhiệm vụ mới; AI quái tầm xa / kỹ năng quái; chợ / đấu giá người chơi; iOS; mọi việc phát hành.
+**Ngoài phạm vi (đề xuất M7 hoặc hỏi người dùng):** Nguyên Anh trở lên (thanh tu vi 288000 sau khi Kim Đan là 48000, chưa có số đo nào); bí cảnh thứ hai; loại bước nhiệm vụ mới; AI quái tầm xa / kỹ năng quái; chợ / đấu giá người chơi; iOS; mọi việc phát hành.
 
 **Lý do chỉ Kim Đan:** mỗi cảnh giới thêm vào cần cả bản đồ + quái + đồ + cân bằng + đồ hoạ; làm cho Kim Đan thật đúng (và có số đo thật) tốt hơn trải mỏng nhiều cảnh giới chưa kiểm. Nguyên Anh để M7 dựa trên số đo của M6.
 
