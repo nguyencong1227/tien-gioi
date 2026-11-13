@@ -65,18 +65,20 @@ Cùng cơ chế cận chiến hiện có, **không thêm AI mới**: mỗi loài
 **Phiên bản giao thức:** `PROTOCOL_VERSION` 1 -> 2 trong PR hợp đồng #404 (client cũ không biết bản đồ / loài quái mới). Không đổi `MIN_PROTOCOL_VERSION`; nâng nó trên bản chạy thật là quyết định lúc phát hành, ngoài M6.
 
 ## 6. Chia việc (đã tạo issue, milestone "M6: Nội dung + cân bằng")
-| Mã | Việc | Ai | Issue | Phụ thuộc |
-|---|---|---|---|---|
-| M6.1 | Mô hình cân bằng tới Kim Đan + đo "trước" + kiểm hai đường tắt + chốt mục tiêu | A | #402 | không |
-| M6.2 | Hợp đồng nội dung 1 (`shared/`): quái, vật phẩm, trang bị, công thức (`coin`), rơi, giá | A (B review) | #403 | #402 |
-| M6.3 | Hợp đồng nội dung 2 (`shared/`): bản đồ + cổng + NPC + nhiệm vụ + `PROTOCOL_VERSION` 2 | A (B review) | #404 | song song #403 |
-| M6.4 | Server: rèn có phí, nhiệm vụ, ba bản đồ, trùm mới, test + đột biến | A | #405 | #403, #404 |
-| M6.5 | Cân bằng sau nội dung, viết lại `CAN_BANG.md` | A | #406 | #405 (+ số đo #410) |
-| M6.6 | Đồ hoạ nội dung: quái + hoạt ảnh, biểu tượng đồ, NPC, atlas | A | #407 | #403 |
-| M6.7 | Bản đồ thứ ba thị giác: `map-style`, chuyển cảnh, cổng, đo harness | B | #408 | bắt đầu ngay; merge sau #404 |
-| M6.8 | Hiệu ứng quái / trùm, bảng rèn có phí, cửa hàng, nhật ký nhiệm vụ trên điện thoại | B | #409 | #403 |
-| M6.9 | Bot + đo thật: săn Kim Đan, đội hạ trùm, bench + thử tải 3 bản đồ, soak | C (~16/11) | #410 | #405, #407 |
-| M6.10 | Kiểm hồi quy: E2E chuyển cảnh liên tiếp, `kiem-save`, perf-gate / leak, tài sản | C (~16/11) | #411 | #405, #407-#409 |
+| Mã | Việc | Ai | Issue | Phụ thuộc | Trạng thái (13/11/2026) |
+|---|---|---|---|---|---|
+| M6.1 | Mô hình cân bằng tới Kim Đan + đo "trước" + kiểm hai đường tắt + chốt mục tiêu | A | #402 | không | **Xong** (#416) |
+| M6.2 | Hợp đồng nội dung 1 (`shared/`): quái, vật phẩm, trang bị, công thức (`coin`), rơi, giá | A (B review) | #403 | #402 | **Xong** (#425) |
+| M6.3 | Hợp đồng nội dung 2 (`shared/`): bản đồ + cổng + NPC + nhiệm vụ + `PROTOCOL_VERSION` 2 | A (B review) | #404 | song song #403 | **Xong** (#426; `mang_hoan` thành việc phụ để người chơi một mình tới được Kim Đan) |
+| M6.4 | Server: rèn có phí, nhiệm vụ, ba bản đồ, trùm mới, test + đột biến | A | #405 | #403, #404 | **Xong** (#427 rèn có phí, #428 trần bậc bí cảnh, #429 / #433 / #435 test ba bản đồ + rèn thật; red-team 2744/2744 sạch) |
+| M6.5 | Cân bằng sau nội dung, viết lại `CAN_BANG.md` | A | #406 | #405 (+ số đo #410) | **Gần xong**: nhịp / trùm / luân hồi / tổ đội / kinh tế / trang bị / PK (#425, #436, #437, #439; #440 chờ review). Còn đối chiếu số đo thật của C (#410) |
+| M6.6 | Đồ hoạ nội dung: quái + hoạt ảnh, biểu tượng đồ, NPC, atlas | A | #407 | #403 | **Xong** (#431) |
+| M6.7 | Bản đồ thứ ba thị giác: `map-style`, chuyển cảnh, cổng, đo harness | B | #408 | bắt đầu ngay; merge sau #404 | **Đang làm**: `MAP_STYLES.am_suong` (#414), chữ hồi sinh theo trấn (#424), chỉ đường nhiệm vụ qua cổng (#430), nút Qua cổng không bị che (#438). Còn chuyển cảnh / va chạm / đo trên bản đồ thật |
+| M6.8 | Hiệu ứng quái / trùm, bảng rèn có phí, cửa hàng, nhật ký nhiệm vụ trên điện thoại | B | #409 | #403 | **Đang làm**: bảng rèn hiện phí (#432, #434). Còn cửa hàng đan cấp 2, nhật ký nhiệm vụ 20+ mục, hiệu ứng quái / trùm |
+| M6.9 | Bot + đo thật: săn Kim Đan, đội hạ trùm, bench + thử tải 3 bản đồ, soak | C (~16/11) | #410 | #405, #407 | Chờ C quay lại |
+| M6.10 | Kiểm hồi quy: E2E chuyển cảnh liên tiếp, `kiem-save`, perf-gate / leak, tài sản | C (~16/11) | #411 | #405, #407-#409 | Chờ C quay lại |
+
+**Phát hành:** KHÔNG tự phát hành. Khi #406 / #408 / #409 / #410 / #411 xong, A báo người dùng ở `questions.md` kèm kế hoạch (`MIN_PROTOCOL_VERSION=2` để client v0.1.2 không vào nhầm, nâng 0.2.0, CHANGELOG, thẻ, `prod.sh backup` rồi `up`, APK) và chờ đồng ý.
 
 **Thứ tự gợi ý:** A: #402 -> (#403 và #404 song song, B review) -> #407 và #405 -> #406 (lặp với số đo của C). B: #408 bắt đầu ngay rồi #409 sau #403. C: khi quay lại, #410 rồi #411.
 
