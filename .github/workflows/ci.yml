@@ -72,13 +72,19 @@ jobs:
           grep -q '"ok":true' /tmp/health.json
           # 3. /metrics: tắt khi không token, bật với token
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:2567/metrics)" = "401"
-          curl -fsS -H "Authorization: Bearer ci-metrics-token-0123456789" "http://127.0.0.1:2567/metrics?format=json" | grep -q '"players"'
+          # KHÔNG viết `curl ... | grep -q ...` ở các bước dưới: với `pipefail`, `grep -q` thoát ngay khi thấy khớp, curl ghi tiếp vào
+          # ống đã đóng thì thoát mã 23 ("Failure writing output to destination"). Chỉ đỏ khi thân trả về đủ lớn: `client/index.html`
+          # 62 KB -> 67 KB (thêm biểu tượng SVG, #421) làm bước 4 đỏ 11/20 lần khi chạy đúng ảnh đó (ảnh vẫn chạy đúng). Ghi ra tệp rồi grep.
+          curl -fsS -H "Authorization: Bearer ci-metrics-token-0123456789" "http://127.0.0.1:2567/metrics?format=json" -o /tmp/metrics.json
+          grep -q '"players"' /tmp/metrics.json
           # 4. Phục vụ client đã build
-          curl -fsS http://127.0.0.1:2567/ | grep -qi "<html"
+          curl -fsS http://127.0.0.1:2567/ -o /tmp/index.html
+          grep -qi "<html" /tmp/index.html
           # 5. Vào phòng thật qua matchmaking (tạo phòng Lạc Hà trong ảnh)
           curl -fsS -X POST http://127.0.0.1:2567/matchmake/joinOrCreate/world \
             -H 'Content-Type: application/json' \
-            -d '{"name":"CI Chay Thu","secret":"ci_chay_thu_secret_0123456789","v":1}' | grep -q '"sessionId"'
+            -d '{"name":"CI Chay Thu","secret":"ci_chay_thu_secret_0123456789","v":1}' -o /tmp/matchmake.json
+          grep -q '"sessionId"' /tmp/matchmake.json
           # 6. Tắt êm THẬT: một người chơi đang nối (tiến trình riêng TRONG container, dùng colyseus.js có sẵn) rồi `docker stop`:
           #    SIGTERM phải tới server để nó lưu nhân vật (mã thoát 143 / thoát tức thì cũng có thể là bị giết mà KHÔNG lưu: chỉ tệp
           #    hồ sơ trên đĩa mới chứng minh được)
