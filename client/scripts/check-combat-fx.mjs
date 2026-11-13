@@ -8,11 +8,12 @@ import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import WebSocket from "ws";
+import { freePort } from "./free-port.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const i = process.argv.indexOf("--url");
 const BASE_URL = i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : "http://127.0.0.1:5183";
-const CDP_PORT = 39800 + Math.floor(Math.random() * 300);
+const CDP_PORT = await freePort();
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-combat-fx-"));
 const chrome = spawn(
   "google-chrome",
