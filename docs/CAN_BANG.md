@@ -197,7 +197,7 @@ Giả định người chơi kiếp nào cũng cày trọn vẹn đến hết Tr
 
 Mô phỏng ở `server/src/balance/dungeon.ts`; test `dungeon.test.ts` giữ các mục tiêu bên dưới. **Số liệu đang dùng:** trùm `yeu_vuong`
 100000 máu, đòn 16 mỗi 1.5 giây, 4500 tu vi; thưởng hoàn thành 700 Linh thạch + đồ;
-ngưỡng bậc 9 (Luyện Khí tầng 9); giới hạn 12 phút; đội 2-4 người.
+ngưỡng bậc 9 (Luyện Khí tầng 9), trần bậc 12 (hết Trúc Cơ; Kim Đan trở lên quá dễ, xem mục Kim Đan trước M6); giới hạn 12 phút; đội 2-4 người.
 
 **Mục tiêu (thiết kế):** đội 3 người ở đúng ngưỡng hạ trùm trong 5-8 phút và không ai chết; đội 2 người không kịp giờ; một người không
 hạ nổi; một lượt thưởng bằng khoảng 15-20 phút săn quái tốt nhất cùng bậc. Trùm là một **bao máu**: đòn nhẹ nhưng trận dài, nên cần đan
@@ -319,7 +319,7 @@ Tụ Khí Đan cộng **5% `expMax`** mỗi viên (hồi chiêu 60 giây = tối
 
 Mô hình chưa tính: thời gian tập hợp, chết, Xích Mãng bị người khác hạ trước (một bản đồ nhiều người tranh 2-6 con). Nhưng chiều hướng rõ: đan không phải phần thưởng hiếm ở Kim Đan mà là nguồn tu vi chính.
 
-### 4. Bí cảnh Linh Hư (ngưỡng bậc 9, không có trần bậc) với đội Kim Đan
+### 4. Bí cảnh Linh Hư (ngưỡng bậc 9; TRƯỚC M6 chưa có trần bậc, nay trần bậc 12) với đội Kim Đan
 
 Mô phỏng bằng mã server thật (`fightBoss`, ca khó: đứng yên, không né), 20 trận mỗi dòng. Mục tiêu thiết kế ở bậc ngưỡng: một người không hạ nổi; đội 2 người không kịp giờ (12 phút); đội 3 người 5-8 phút.
 

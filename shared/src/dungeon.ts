@@ -75,6 +75,12 @@ export interface DungeonDef {
   readonly partyMax: number;
   /** Bậc tu (`stepOf(realm, tier)`) tối thiểu của MỌI thành viên */
   readonly minStep: number;
+  /**
+   * Bậc tu tối đa của MỌI thành viên (tuỳ chọn; thiếu = không giới hạn). Bí cảnh cân bằng cho một dải bậc: người vượt dải hạ trùm
+   * quá dễ (docs/CAN_BANG.md mục "Bí cảnh Linh Hư": đội Kim Đan thắng 100%, 0 người chết, 3,5-9 phút, thưởng 3 lượt / ngày) nên bị
+   * từ chối bằng `member_high`.
+   */
+  readonly maxStep?: number;
   /** Đồng hồ chạy từ lúc người đầu tiên vào phòng */
   readonly timeLimitMs: number;
   /** `MonsterKind.id` của trùm (đúng một con, `MapDef.monsterCap` của bản đồ bí cảnh khai báo) */
@@ -98,6 +104,8 @@ export const DUNGEONS: readonly DungeonDef[] = [
     partyMin: 2,
     partyMax: 4,
     minStep: 9, // `stepOf(1, 8)` = Luyện Khí Tầng 9 (Phàm Nhân chiếm bậc 0): ngưỡng mà mô phỏng 4c-2 dùng
+    // `stepOf(2, 2)` = Trúc Cơ hậu kỳ (M6, #405): hết Trúc Cơ. Từ Kim Đan trở lên bí cảnh này quá dễ (một bí cảnh Kim Đan là việc của M7)
+    maxStep: 12,
     timeLimitMs: 12 * 60_000,
     boss: "yeu_vuong",
     reward: {
@@ -281,6 +289,7 @@ export type DungeonOpenFail =
   | "member_reconnecting"
   | "member_in_run"
   | "member_low"
+  | "member_high"
   | "full"
   | "cooldown";
 
@@ -313,6 +322,8 @@ export function canOpenDungeon(i: DungeonOpenInput): DungeonOpenCheck {
     if (!m.alive) return { ok: false, reason: "member_dead", who: m.name };
     if (m.inRun) return { ok: false, reason: "member_in_run", who: m.name };
     if (!(m.step >= d.minStep)) return { ok: false, reason: "member_low", who: m.name };
+    if (d.maxStep !== undefined && m.step > d.maxStep)
+      return { ok: false, reason: "member_high", who: m.name };
   }
   if (!(i.runsOpen < MAX_DUNGEON_RUNS)) return { ok: false, reason: "full" };
   if (i.cooldownLeftMs > 0) return { ok: false, reason: "cooldown" };
@@ -341,6 +352,8 @@ export function dungeonOpenFailMessage(reason: DungeonOpenFail, who?: string): s
       return `Có thành viên đang ở trong một bí cảnh khác${w}.`;
     case "member_low":
       return `Có thành viên chưa đủ cảnh giới${w}.`;
+    case "member_high":
+      return `Có thành viên đã vượt cảnh giới của bí cảnh này${w}.`;
     case "full":
       return "Bí cảnh đang đông người, hãy thử lại sau.";
     case "cooldown":
