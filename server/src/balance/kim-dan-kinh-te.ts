@@ -135,6 +135,23 @@ export function kimDanBo(): BoGear[] {
   });
 }
 
+/**
+ * Linh thạch kiếm được TRƯỚC Kim Đan trong cùng kiếp (Phàm Nhân tới hết Trúc Cơ, bán hết đồ rơi): ví chỉ đặt lại lúc đầu thai và
+ * Luyện Khí / Trúc Cơ gần như không có chỗ tiêu, nên số này còn nguyên khi vào Kim Đan và trả được phí rèn (nit của B ở #440).
+ * Bán HẾT đồ rơi, kể cả nguyên liệu chín công thức cũ (Lang Nha / Hắc Hổ / Xích Mãng) mà người chơi cần giữ để rèn: bán thay vì giữ
+ * được ~915 Linh thạch (8,6%); rèn đủ ba bộ cũ thì số mang vào ~9.700 (không đổi kết luận: nit của B ở #442).
+ */
+export function preKimDanCoin(rows: ReturnType<typeof simulate>): number {
+  let coin = 0;
+  for (const r of rows) {
+    if (r.realm >= KD) continue;
+    const m = MONSTER_BY_ID[r.source];
+    const e = m ? monsterEconomy(m, r.realm, r.tier) : null;
+    if (e) coin += (r.minutes / 60) * e.totalCoinPerHour;
+  }
+  return coin;
+}
+
 export interface EconomyTier {
   tier: number;
   label: string;
@@ -144,7 +161,7 @@ export interface EconomyTier {
   coinPerHour: number;
   /** Linh thạch kiếm được trong bậc (tiền rơi + bán đồ thừa) */
   earned: number;
-  /** Cộng dồn tới hết bậc, đã trừ phần hụt do săn trùm theo đội lấy Giao Lân (bộ III) */
+  /** Cộng dồn tới hết bậc: Linh thạch mang vào từ Luyện Khí / Trúc Cơ + kiếm ở Kim Đan, đã trừ phần hụt do săn trùm theo đội (bộ III) */
   cumulative: number;
   /** Phí rèn cộng dồn của các bộ tới bộ `tier + 1` (bộ mặc được từ bậc kế) */
   feeCumulative: number;
@@ -161,11 +178,14 @@ export function kimDanEconomy(expMult = 1): {
   tiers: EconomyTier[];
   bo: BoGear[];
   bossCoinPerHour: number;
+  /** Linh thạch kiếm trước Kim Đan, đã nằm trong `cumulative` của bậc đầu */
+  preKimDan: number;
 } {
   // `expMult` > 1 (Dư âm tu hành): bậc ngắn lại nhưng tiền rơi theo số quái hạ nên KHÔNG tăng theo tốc độ tu vi
   const designed = withKimDan(() => simulate(KD, expMult), true);
   const bo = kimDanBo();
-  let cumulative = 0;
+  const preKimDan = preKimDanCoin(designed);
+  let cumulative = preKimDan;
   let feeCumulative = 0;
   const tiers = [0, 1, 2].map((tier) => {
     const row = designed.find((r) => r.realm === KD && r.tier === tier)!;
@@ -188,7 +208,7 @@ export function kimDanEconomy(expMult = 1): {
       surplus: cumulative - feeCumulative,
     };
   });
-  return { tiers, bo, bossCoinPerHour: bossCoinPerHourOf(2) };
+  return { tiers, bo, bossCoinPerHour: bossCoinPerHourOf(2), preKimDan };
 }
 
 export interface EconomyLife {
@@ -361,7 +381,7 @@ export function renderKimDanKinhTe(): string {
 
   return `### 6. Kinh tế Kim Đan: chỗ tiêu Linh thạch so với thu nhập (#406)
 
-Thu nhập theo nhịp "bãi mới" ở mục 3 (săn solo, mỗi bậc một loài tốt nhất): tiền rơi cộng bán đồ rơi, TRỪ nguyên liệu của ba bộ (người chơi giữ lại để rèn). Chi: phí rèn \`RecipeDef.coin\` (mỗi bộ rèn được từ bậc ghi ở cột đầu, tiền trả khi rèn). Cột "Cộng dồn / Phí cộng dồn" so sánh tiền kiếm được tới hết bậc với phí cộng dồn của các bộ mặc được tới bậc kế; bộ III chỉ mặc được ở Hậu kỳ nên phí của nó tính vào cuối Hậu kỳ. Săn trùm theo đội lấy Giao Lân kiếm ít tiền hơn solo (tiền rơi của trùm chia ${BOSS_PARTY} người: ~${n0(eco.bossCoinPerHour)} Linh thạch / giờ mỗi người): phần hụt đã trừ vào thu nhập Hậu kỳ.
+Thu nhập theo nhịp "bãi mới" ở mục 3 (săn solo, mỗi bậc một loài tốt nhất): tiền rơi cộng bán đồ rơi, TRỪ nguyên liệu của ba bộ (người chơi giữ lại để rèn). Chi: phí rèn \`RecipeDef.coin\` (mỗi bộ rèn được từ bậc ghi ở cột đầu, tiền trả khi rèn). Cột "Cộng dồn / Phí cộng dồn" so sánh tiền có được tới hết bậc với phí cộng dồn của các bộ mặc được tới bậc kế; tiền có được gồm cả **${n0(eco.preKimDan)}** Linh thạch kiếm ở Luyện Khí / Trúc Cơ CÙNG kiếp (ví chỉ đặt lại lúc đầu thai và ở đó gần như không có chỗ tiêu); bộ III chỉ mặc được ở Hậu kỳ nên phí của nó tính vào cuối Hậu kỳ. Săn trùm theo đội lấy Giao Lân kiếm ít tiền hơn solo (tiền rơi của trùm chia ${BOSS_PARTY} người: ~${n0(eco.bossCoinPerHour)} Linh thạch / giờ mỗi người): phần hụt đã trừ vào thu nhập Hậu kỳ.
 
 | Bậc | Nguồn | Phút | Linh thạch / giờ (khả dụng) | Kiếm trong bậc | Cộng dồn | Phí rèn cộng dồn | Dư / thiếu |
 |---|---|---:|---:|---:|---:|---:|---:|
@@ -373,12 +393,12 @@ Chi cho từng bộ (nguyên liệu tính MỖI NGƯỜI; trùm đi theo đội 
 |---|---:|---:|---|---:|---:|---:|
 ${boRows.join("\n")}
 
-Tổng phí rèn ba bộ **${n0(totalFee)}** Linh thạch so với **${n0(last.cumulative)}** kiếm được trong cả Kim Đan: ${last.surplus >= 0 ? `dư ${n0(last.surplus)}` : `thiếu ${n0(-last.surplus)} (~${n1(shortfallHours(eco))} giờ săn Hậu kỳ sau khi hết Kim Đan)`}. Bộ I mua đủ trong Sơ kỳ (${eco.tiers[0].surplus >= 0 ? "dư" : "thiếu"} ${n0(Math.abs(eco.tiers[0].surplus))} cuối bậc) và bộ II trong Trung kỳ (${eco.tiers[1].surplus >= 0 ? "dư" : "thiếu"} ${n0(Math.abs(eco.tiers[1].surplus))}); bộ III (${n0(eco.bo[2].fee)}, ${n0((eco.bo[2].fee / totalFee) * 100)}% tổng phí) là mục tiêu cuối game: người chơi KHÔNG dư hàng vạn Linh thạch không có chỗ tiêu như cảnh báo cũ của mục "Kinh tế Linh thạch", và cũng không bị chặn (thiếu chừng ${n1(shortfallHours(eco))} giờ). Cột cuối: cày nguyên liệu chiếm tối đa ${n0(Math.max(...eco.tiers.map((t) => materialShare(eco, t.tier))) * 100)}% thời gian bậc và các giờ đó vẫn kiếm tu vi, nên nguyên liệu không phải nút cổ chai, tiền mới là.
+Tổng phí rèn ba bộ **${n0(totalFee)}** Linh thạch so với **${n0(last.cumulative)}** có được từ đầu kiếp tới hết Kim Đan: ${last.surplus >= 0 ? `dư ${n0(last.surplus)}` : `thiếu ${n0(-last.surplus)} (~${n1(shortfallHours(eco))} giờ săn Hậu kỳ sau khi hết Kim Đan)`}. Bộ I mua đủ trong Sơ kỳ (${eco.tiers[0].surplus >= 0 ? "dư" : "thiếu"} ${n0(Math.abs(eco.tiers[0].surplus))} cuối bậc) và bộ II trong Trung kỳ (${eco.tiers[1].surplus >= 0 ? "dư" : "thiếu"} ${n0(Math.abs(eco.tiers[1].surplus))}); bộ III (${n0(eco.bo[2].fee)}, ${n0((eco.bo[2].fee / totalFee) * 100)}% tổng phí) là mục tiêu cuối game: người chơi KHÔNG dư hàng vạn Linh thạch không có chỗ tiêu như cảnh báo cũ của mục "Kinh tế Linh thạch", và cũng không bị chặn (thiếu chừng ${n1(shortfallHours(eco))} giờ). Cột cuối: cày nguyên liệu chiếm tối đa ${n0(Math.max(...eco.tiers.map((t) => materialShare(eco, t.tier))) * 100)}% thời gian bậc và các giờ đó vẫn kiếm tu vi, nên nguyên liệu không phải nút cổ chai, tiền mới là.
 Đan cấp 2 (\`dai_hoi_huyet_dan\` / \`dai_hoi_linh_dan\`, ${n0(pillPrice)} Linh thạch / viên ở Lái buôn Vọng Sương) là chỗ xả TUỲ CHỌN thêm vào: mô hình không tính vì không giả định người chơi uống đan (đả tọa hồi khí huyết). Mô hình cũng bỏ qua nhiệm vụ lặp và phí rèn ở nhịp tu luyện (mục 3), phần Linh thạch / đồ thưởng của nhiệm vụ.
 
 **Qua kiếp.** Bảng trên là kiếp 1 (không Dư âm tu hành). Khi kiếp nào cũng cày tới hết Kim Đan và nâng Dư âm tu hành (mục 4), bậc ngắn lại theo hệ số tốc độ nhưng Linh thạch theo số quái hạ nên KHÔNG tăng, còn \`applyRebirth\` đưa ví về tối đa \`coinCarryCap\` (${n0(CARRY_CAP_MAX)} khi đủ Kim nang) và túi rỗng:
 
-| Kiếp | Dư âm tu hành | Phút cả kiếp | Linh thạch kiếm được | Rèn đủ phí | Cày nguyên liệu bộ III so với Hậu kỳ |
+| Kiếp | Dư âm tu hành | Phút cả kiếp | Linh thạch có được | Rèn đủ phí | Cày nguyên liệu bộ III so với Hậu kỳ |
 |---|---:|---:|---:|---|---:|
 ${lifeRows.join("\n")}
 

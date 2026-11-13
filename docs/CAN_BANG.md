@@ -440,13 +440,13 @@ Cao nhất **1.18x**, thấp nhất **0.69x**: ở Kim Đan đội 3-4 hạ Hắ
 
 ### 6. Kinh tế Kim Đan: chỗ tiêu Linh thạch so với thu nhập (#406)
 
-Thu nhập theo nhịp "bãi mới" ở mục 3 (săn solo, mỗi bậc một loài tốt nhất): tiền rơi cộng bán đồ rơi, TRỪ nguyên liệu của ba bộ (người chơi giữ lại để rèn). Chi: phí rèn `RecipeDef.coin` (mỗi bộ rèn được từ bậc ghi ở cột đầu, tiền trả khi rèn). Cột "Cộng dồn / Phí cộng dồn" so sánh tiền kiếm được tới hết bậc với phí cộng dồn của các bộ mặc được tới bậc kế; bộ III chỉ mặc được ở Hậu kỳ nên phí của nó tính vào cuối Hậu kỳ. Săn trùm theo đội lấy Giao Lân kiếm ít tiền hơn solo (tiền rơi của trùm chia 4 người: ~3,044 Linh thạch / giờ mỗi người): phần hụt đã trừ vào thu nhập Hậu kỳ.
+Thu nhập theo nhịp "bãi mới" ở mục 3 (săn solo, mỗi bậc một loài tốt nhất): tiền rơi cộng bán đồ rơi, TRỪ nguyên liệu của ba bộ (người chơi giữ lại để rèn). Chi: phí rèn `RecipeDef.coin` (mỗi bộ rèn được từ bậc ghi ở cột đầu, tiền trả khi rèn). Cột "Cộng dồn / Phí cộng dồn" so sánh tiền có được tới hết bậc với phí cộng dồn của các bộ mặc được tới bậc kế; tiền có được gồm cả **10,612** Linh thạch kiếm ở Luyện Khí / Trúc Cơ CÙNG kiếp (ví chỉ đặt lại lúc đầu thai và ở đó gần như không có chỗ tiêu); bộ III chỉ mặc được ở Hậu kỳ nên phí của nó tính vào cuối Hậu kỳ. Săn trùm theo đội lấy Giao Lân kiếm ít tiền hơn solo (tiền rơi của trùm chia 4 người: ~3,044 Linh thạch / giờ mỗi người): phần hụt đã trừ vào thu nhập Hậu kỳ.
 
 | Bậc | Nguồn | Phút | Linh thạch / giờ (khả dụng) | Kiếm trong bậc | Cộng dồn | Phí rèn cộng dồn | Dư / thiếu |
 |---|---|---:|---:|---:|---:|---:|---:|
-| Kim Đan Sơ kỳ | Thạch Quy | 116 | 6,944 | 13,445 | 13,445 | 9,500 | +3,945 |
-| Kim Đan Trung kỳ | Độc Thiềm | 99 | 11,687 | 19,376 | 32,821 | 31,500 | +1,321 |
-| Kim Đan Hậu kỳ | Độc Thiềm | 124 | 13,080 | 18,882 | 51,702 | 78,500 | -26,798 |
+| Kim Đan Sơ kỳ | Thạch Quy | 116 | 6,944 | 13,445 | 24,057 | 9,500 | +14,557 |
+| Kim Đan Trung kỳ | Độc Thiềm | 99 | 11,687 | 19,376 | 43,433 | 31,500 | +11,933 |
+| Kim Đan Hậu kỳ | Độc Thiềm | 124 | 13,080 | 18,882 | 62,314 | 78,500 | -16,186 |
 
 Chi cho từng bộ (nguyên liệu tính MỖI NGƯỜI; trùm đi theo đội 4 người, mỗi mảnh rơi chung nên cả đội cần 4 lần số lượng):
 
@@ -456,22 +456,22 @@ Chi cho từng bộ (nguyên liệu tính MỖI NGƯỜI; trùm đi theo đội 
 | Bộ II (từ Trung kỳ) | 3 | 22,000 | 48 Quy giáp, 20 Độc nang | 45.7 | 0.0 | 46% |
 | Bộ III (từ Hậu kỳ) | 3 | 47,000 | 19 Giao lân, 30 Độc nang | 18.2 | 49.3 | 54% |
 
-Tổng phí rèn ba bộ **78,500** Linh thạch so với **51,702** kiếm được trong cả Kim Đan: thiếu 26,798 (~2.0 giờ săn Hậu kỳ sau khi hết Kim Đan). Bộ I mua đủ trong Sơ kỳ (dư 3,945 cuối bậc) và bộ II trong Trung kỳ (dư 1,321); bộ III (47,000, 60% tổng phí) là mục tiêu cuối game: người chơi KHÔNG dư hàng vạn Linh thạch không có chỗ tiêu như cảnh báo cũ của mục "Kinh tế Linh thạch", và cũng không bị chặn (thiếu chừng 2.0 giờ). Cột cuối: cày nguyên liệu chiếm tối đa 54% thời gian bậc và các giờ đó vẫn kiếm tu vi, nên nguyên liệu không phải nút cổ chai, tiền mới là.
+Tổng phí rèn ba bộ **78,500** Linh thạch so với **62,314** có được từ đầu kiếp tới hết Kim Đan: thiếu 16,186 (~1.2 giờ săn Hậu kỳ sau khi hết Kim Đan). Bộ I mua đủ trong Sơ kỳ (dư 14,557 cuối bậc) và bộ II trong Trung kỳ (dư 11,933); bộ III (47,000, 60% tổng phí) là mục tiêu cuối game: người chơi KHÔNG dư hàng vạn Linh thạch không có chỗ tiêu như cảnh báo cũ của mục "Kinh tế Linh thạch", và cũng không bị chặn (thiếu chừng 1.2 giờ). Cột cuối: cày nguyên liệu chiếm tối đa 54% thời gian bậc và các giờ đó vẫn kiếm tu vi, nên nguyên liệu không phải nút cổ chai, tiền mới là.
 Đan cấp 2 (`dai_hoi_huyet_dan` / `dai_hoi_linh_dan`, 120 Linh thạch / viên ở Lái buôn Vọng Sương) là chỗ xả TUỲ CHỌN thêm vào: mô hình không tính vì không giả định người chơi uống đan (đả tọa hồi khí huyết). Mô hình cũng bỏ qua nhiệm vụ lặp và phí rèn ở nhịp tu luyện (mục 3), phần Linh thạch / đồ thưởng của nhiệm vụ.
 
 **Qua kiếp.** Bảng trên là kiếp 1 (không Dư âm tu hành). Khi kiếp nào cũng cày tới hết Kim Đan và nâng Dư âm tu hành (mục 4), bậc ngắn lại theo hệ số tốc độ nhưng Linh thạch theo số quái hạ nên KHÔNG tăng, còn `applyRebirth` đưa ví về tối đa `coinCarryCap` (400 khi đủ Kim nang) và túi rỗng:
 
-| Kiếp | Dư âm tu hành | Phút cả kiếp | Linh thạch kiếm được | Rèn đủ phí | Cày nguyên liệu bộ III so với Hậu kỳ |
+| Kiếp | Dư âm tu hành | Phút cả kiếp | Linh thạch có được | Rèn đủ phí | Cày nguyên liệu bộ III so với Hậu kỳ |
 |---|---:|---:|---:|---|---:|
-| 1 | Nấc 5 | 485 | 51,702 | bộ I + II | 54% |
-| 2 | Nấc 7 | 326 | 31,719 | bộ I + II | 81% |
-| 3 | Nấc 8 | 289 | 27,017 | bộ I | 92% |
-| 4 | Nấc 9 | 273 | 25,058 | bộ I | 98% |
-| 5 | Nấc 9 | 259 | 23,305 | bộ I | 103% |
-| 6 | Nấc 10 | 259 | 23,305 | bộ I | 103% |
-| 7 | Nấc 10 | 247 | 21,727 | bộ I | 108% |
+| 1 | Nấc 5 | 485 | 62,314 | bộ I + II | 54% |
+| 2 | Nấc 7 | 326 | 38,794 | bộ I + II | 81% |
+| 3 | Nấc 8 | 289 | 33,259 | bộ I + II | 92% |
+| 4 | Nấc 9 | 273 | 30,953 | bộ I | 98% |
+| 5 | Nấc 9 | 259 | 28,890 | bộ I | 103% |
+| 6 | Nấc 10 | 259 | 28,890 | bộ I | 103% |
+| 7 | Nấc 10 | 247 | 27,033 | bộ I | 108% |
 
-Không kiếp nào trả đủ cả ba bộ (kiếp 1 chỉ tới bộ I + II); từ kiếp 3 trở đi chỉ trả đủ bộ I (kiếp 7: 21,727 Linh thạch, cày nguyên liệu bộ III chiếm 108% Hậu kỳ nên không kịp trong bậc). Đây là CHỦ Ý hay không là câu hỏi cho người dùng (ghi ở `questions.md`): đường giữ đồ là **Ký vật** (3 nấc, tổng 225 Duyên ~ 1.2 kiếp Kim Đan; nấc 3 giữ lại cả ba món đang mặc), nên bộ rèn ở kiếp trước đi theo sang kiếp sau và Linh thạch chỉ cần cho phần còn thiếu; Linh thạch KHÔNG tích lũy qua kiếp (ví về tối đa 400) nên "dư hàng vạn" ở kiếp sau không thành vấn đề tích tụ. Mô hình chưa tính người chơi kiếp sau rèn lại từ đầu (không Ký vật).
+Không kiếp nào trả đủ cả ba bộ (kiếp 1 chỉ tới bộ I + II); từ kiếp 4 trở đi chỉ trả đủ bộ I (kiếp 7: 27,033 Linh thạch, cày nguyên liệu bộ III chiếm 108% Hậu kỳ nên không kịp trong bậc). Đây là CHỦ Ý hay không là câu hỏi cho người dùng (ghi ở `questions.md`): đường giữ đồ là **Ký vật** (3 nấc, tổng 225 Duyên ~ 1.2 kiếp Kim Đan; nấc 3 giữ lại cả ba món đang mặc), nên bộ rèn ở kiếp trước đi theo sang kiếp sau và Linh thạch chỉ cần cho phần còn thiếu; Linh thạch KHÔNG tích lũy qua kiếp (ví về tối đa 400) nên "dư hàng vạn" ở kiếp sau không thành vấn đề tích tụ. Mô hình chưa tính người chơi kiếp sau rèn lại từ đầu (không Ký vật).
 
 ### 7. Trang bị: ba bộ tăng sức mạnh đều, không bộ nào bắt buộc hay vô dụng (#406)
 
@@ -507,7 +507,7 @@ Sức mạnh gốc mỗi bộ (kiếm +công, bào +khí huyết, phù +linh l�
 | Kim Đan Hậu kỳ | bộ II | 33.2 | 32.0 - 34.8 |
 | Kim Đan Hậu kỳ | bộ III | 33.2 | 32.0 - 34.8 |
 
-Cùng bậc nhưng KHÁC bộ: bên mặc bộ cao hơn thắng 100-100% số trận (như chênh một tầng ở mục "Chênh bậc"), trận ngắn hơn một chút. Linh thạch (phí rèn bộ III ~47.000, mục 6) mua được lợi thế PK quyết định so với người cùng bậc chưa rèn; PK là thách đấu hai bên đồng ý (người yếu hơn từ chối được), và câu hỏi chuẩn hoá chỉ số về bậc / bộ thấp hơn vẫn chờ người dùng (câu hỏi 4 ở `questions.md`).
+Cùng bậc nhưng KHÁC bộ: bên mặc bộ cao hơn thắng 100% số trận (như chênh một tầng ở mục "Chênh bậc"), trận ngắn hơn một chút. Linh thạch (phí rèn bộ III ~47.000, mục 6) mua được lợi thế PK quyết định so với người cùng bậc chưa rèn; PK là thách đấu hai bên đồng ý (người yếu hơn từ chối được), và câu hỏi chuẩn hoá chỉ số về bậc / bộ thấp hơn vẫn chờ người dùng (câu hỏi 4 ở `questions.md`).
 
 | Bậc | Trận | Bên mạnh thắng | Giây đánh (trung vị) |
 |---|---|---:|---:|
