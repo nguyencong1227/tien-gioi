@@ -842,6 +842,56 @@ html[data-input="touch"] .qt-head {
   opacity: 0.9;
 }
 
+/* Tab "Đã hoàn thành" của Sổ nhiệm vụ (#409): mỗi nhiệm vụ MỘT hàng gọn >= 44 px, bấm mới mở mô tả (chuỗi ~20 nhiệm vụ không dài hàng chục màn hình) */
+.q-done-summary {
+  margin: 0 0 2px;
+  font-size: var(--fs-12);
+  color: var(--gold);
+  opacity: 0.9;
+}
+.q-row {
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--line);
+  border-left: 3px solid #ffb74d;
+}
+.q-row-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 10px;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.q-row-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--fs-13);
+  font-weight: 700;
+  color: #fff6dc;
+  overflow-wrap: anywhere;
+}
+.q-row-chev {
+  flex: 0 0 auto;
+  color: var(--gold);
+  transition: transform 0.15s;
+}
+.q-row.open .q-row-chev {
+  transform: rotate(90deg);
+}
+.q-row-desc {
+  padding: 0 10px 8px;
+  font-size: var(--fs-12);
+  opacity: 0.85;
+  line-height: 1.4;
+}
+
 /* Bản đồ lớn toàn thế giới (M) */
 #map-modal {
   --sheet-w: 420px;
