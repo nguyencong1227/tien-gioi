@@ -94,6 +94,6 @@ Cùng bậc nhưng KHÁC bộ: bên mặc bộ cao hơn thắng ${Math.round(Mat
 |---|---|---:|---:|
 ${gapRows.join("\n")}
 
-**Bí cảnh Linh Hư.** Không bị nội dung M6 làm đổi: bí cảnh có trần bậc ${LINH_HU.maxStep} (hết Trúc Cơ, PR #428) và người Kim Đan bắt đầu từ bậc ${minStep} nên ${minStep > (LINH_HU.maxStep ?? Infinity) ? "KHÔNG vào được (\`member_high\`)" : "vào được (cần xem lại bảng bí cảnh)"}; bảng "Bí cảnh Linh Hư" ở trên (bậc ${LINH_HU.minStep}-${LINH_HU.maxStep}) vẫn đúng nguyên. Phân tích đội Kim Đan phá bí cảnh (trước khi có trần) ở mục "Kim Đan trước M6", phần 4.
+**Bí cảnh Linh Hư.** Không bị nội dung M6 làm đổi: bí cảnh có trần bậc ${LINH_HU.maxStep} (hết Trúc Cơ, PR #428) và người Kim Đan bắt đầu từ bậc ${minStep} nên ${minStep > (LINH_HU.maxStep ?? Infinity) ? "KHÔNG vào được (`member_high`)" : "vào được (cần xem lại bảng bí cảnh)"}; bảng "Bí cảnh Linh Hư" ở trên (bậc ${LINH_HU.minStep}-${LINH_HU.maxStep}) vẫn đúng nguyên. Phân tích đội Kim Đan phá bí cảnh (trước khi có trần) ở mục "Kim Đan trước M6", phần 4.
 `;
 }

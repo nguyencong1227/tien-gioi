@@ -353,7 +353,6 @@ export function renderKimDanKinhTe(): string {
   );
   const kyVat = UNLOCK_BY_ID.ky_vat.costs;
   const kyVatTotal = kyVat.reduce((n, c) => n + c, 0);
-  const firstFull = lives.find((l) => l.affordableBo === 3);
   const lastLife = lives.at(-1)!;
   const duyenPerLife = kimDanReincarnation().progression[0].duyenEarned;
   const firstShort = lives.find((l) => l.affordableBo < 3);
