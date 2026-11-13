@@ -13,10 +13,12 @@ import {
   newGrid,
   planPath,
   searchCases,
+  breakEvenMangSec,
   searchCalibrated,
   searchCheck,
   searchRun,
   searchSensitivity,
+  slackOf,
   viewOfScreen,
   type SearchRow,
 } from "./search-check";
@@ -206,18 +208,72 @@ describe("bảng đối chiếu thời gian tìm quái", () => {
     }
   }, 60_000);
 
-  it("hiệu chỉnh: hệ số vụng > 1 (mô hình chừa chỗ cho người thật), chỉ trùm bị thay giả định, ASSUME.searchSec được KHÔI PHỤC", () => {
+  it("độ vụng: trung vị của các dòng loài THƯỜNG (trùm không góp), nhân và cộng; chỉ trùm bị thay giả định (bản đồ chậm hơn); ASSUME.searchSec được KHÔI PHỤC", () => {
+    // dòng giả: giữ cho phép tính kiểm được bằng tay (bảng thật kiểm ở can-bang-sync.test.ts)
+    const row = (
+      monsterId: string,
+      assumed: number,
+      mean: number,
+      mapId = "lac_ha",
+    ): SearchRow => ({
+      mapId,
+      mapName: mapId,
+      monsterId,
+      cap: 1,
+      assumed,
+      mean,
+      median: mean,
+      p90: mean,
+      n: 1,
+      ratio: mean / assumed,
+    });
+    const rows = [
+      row("tho", 6, 1.5), // nhân 4, cộng 4.5
+      row("lang", 8, 4), // nhân 2, cộng 4
+      row("ho", 12, 3), // nhân 4, cộng 9
+      row("mang", 90, 20), // trùm: không góp vào độ vụng
+      row("mang", 90, 25, "hac_phong"),
+      row("hac_giao", 90, 30, "am_suong"),
+    ];
     const before = { ...ASSUME.searchSec };
-    const pc = cases.map((c) => searchCheck(c, SEARCH_VIEWS.pc));
-    const cal = searchCalibrated(pc);
+    expect(slackOf(rows, "nhan")).toBe(4);
+    expect(slackOf(rows, "cong")).toBe(4.5);
+    const nhan = searchCalibrated(rows, 4, "nhan");
+    expect(nhan.searchSec).toEqual({ mang: 100, hac_giao: 120 });
+    const cong = searchCalibrated(rows, 4.5, "cong");
+    expect(cong.searchSec).toEqual({ mang: 29.5, hac_giao: 34.5 });
+    expect(cong.pace.mangRatio).toHaveLength(3);
+    // Xích Mãng tìm nhanh hơn (29,5 so với 100 giây) thì sinh lợi hơn bãi mới
+    expect(Math.max(...cong.pace.mangRatio)).toBeGreaterThan(Math.max(...nhan.pace.mangRatio));
     expect({ ...ASSUME.searchSec }).toEqual(before);
-    expect(cal.factor).toBeGreaterThan(1);
-    expect(Object.keys(cal.searchSec).sort()).toEqual(["hac_giao", "mang"]);
-    for (const id of ["mang", "hac_giao"]) {
-      const slowest = Math.max(...pc.filter((r) => r.monsterId === id).map((r) => r.mean));
-      expect(cal.searchSec[id]).toBeCloseTo(slowest * cal.factor, 9);
-    }
-    expect(cal.pace.mangRatio).toHaveLength(3);
+  });
+
+  it("độ vụng trên số đo thật (ba cỡ gộp): nhân > 1 và cộng > 0, nghĩa là mô hình chừa chỗ cho người thật", () => {
+    const pooled = [SEARCH_VIEWS.pc, SEARCH_VIEWS.phonePortrait].flatMap((v) =>
+      cases.filter((c) => !MONSTER_BY_ID[c.monsterId].boss).map((c) => searchCheck(c, v)),
+    );
+    expect(slackOf(pooled, "nhan")).toBeGreaterThan(1);
+    expect(slackOf(pooled, "cong")).toBeGreaterThan(0);
+  }, 60_000);
+
+  it("ngưỡng hoà vốn của Xích Mãng: mô hình (90 giây) đạt nên ngưỡng không cao hơn; đạt ở ngưỡng, KHÔNG đạt ngay dưới ngưỡng; khôi phục ASSUME.searchSec", () => {
+    const before = { ...ASSUME.searchSec };
+    const be = breakEvenMangSec();
+    expect(be).toBeGreaterThan(1);
+    expect(be).toBeLessThanOrEqual(ASSUME.searchSec.mang);
+    expect({ ...ASSUME.searchSec }).toEqual(before);
+    const ratioAt = (t: number) => {
+      ASSUME.searchSec.mang = t;
+      try {
+        return Math.max(...searchSensitivity([]).model.mangRatio);
+      } finally {
+        Object.assign(ASSUME.searchSec, before);
+      }
+    };
+    expect(ratioAt(be + 0.01)).toBeLessThanOrEqual(1.5);
+    expect(ratioAt(be - 1)).toBeGreaterThan(1.5);
+    // giới hạn khác thì ngưỡng khác: chặt hơn (1,2x) cần thời gian tìm dài hơn
+    expect(breakEvenMangSec(1.2)).toBeGreaterThan(be);
   }, 60_000);
 
   it("độ nhạy: thay giả định bằng số đo rồi KHÔI PHỤC ASSUME.searchSec; số đo nhanh hơn thì nhịp nhanh hơn", () => {
