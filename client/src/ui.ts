@@ -115,6 +115,7 @@ import {
   type SectConfirmKind,
 } from "./sect";
 import { canAffordFee, feeChipText, recipeFee } from "./forge-fee";
+import { portalBtnText } from "./portal-btn";
 import { sound } from "./audio";
 import { transitionMs, waitOrSkip } from "./gfx/scene-transition";
 import { getDisplay, onDisplayChange } from "./gfx/display";
@@ -3284,7 +3285,11 @@ export const ui = {
     const btn = $("btn-portal");
     btn.hidden = label === null;
     if (label !== null) {
-      $("portal-label").textContent = `${label} (F)`;
+      // Nhãn trong nút cố định ngắn (không bị cắt); tên cổng đi vào title / aria-label
+      const t = portalBtnText(label);
+      $("portal-label").textContent = t.label;
+      btn.title = t.title;
+      btn.setAttribute("aria-label", t.aria);
       if (onTravel) portalCallback = onTravel;
     } else {
       portalCallback = null;

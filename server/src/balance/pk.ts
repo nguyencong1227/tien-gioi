@@ -11,10 +11,16 @@ import { setEquipment } from "../systems/equipment";
 import { applyStats } from "../systems/progression";
 import { addPlayer, makeWorld } from "../systems/test-helpers";
 import { bestGear } from "./simulate";
+import { withGearUpTo } from "./kim-dan-kinh-te";
 
 export interface Level {
   realm: number;
   tier: number;
+  /**
+   * Chỉ có trang bị Kim Đan tới bộ `gearUpTo` (0 = không có bộ Kim Đan nào, 1 = bộ I, ...; xem `withGearUpTo`); thiếu = trang
+   * bị tốt nhất đủ bậc như mọi ca khác. Dùng để so hai người CÙNG bậc khác bộ trang bị (M6, #406).
+   */
+  gearUpTo?: number;
 }
 
 export interface DuelOutcome {
@@ -49,7 +55,12 @@ export function duelOnce(a: Level, b: Level, seed = 1): DuelOutcome {
       [pa, a],
       [pb, b],
     ] as const) {
-      setEquipment(r.p, bestGear(l.realm, l.tier));
+      setEquipment(
+        r.p,
+        l.gearUpTo === undefined
+          ? bestGear(l.realm, l.tier)
+          : withGearUpTo(l.gearUpTo, () => bestGear(l.realm, l.tier)),
+      );
       applyStats(r.p, true);
     }
     pb.p.x = pa.p.x + 45; // trong tầm chém

@@ -7,6 +7,7 @@ import {
   PARTY_SNAPSHOT_MS,
   getMap,
   NO_PARTY,
+  partyExpShare,
 } from "@tien-gioi/shared";
 import { Hub } from "../hub";
 import {
@@ -202,6 +203,6 @@ describe("đội khác bản đồ", () => {
     expect([...shares.keys()].sort()).toEqual([A, C].sort()); // B ở Hắc Phong Cốc: không có mặt
     // 2 người có mặt (không phải 3): hệ số partyExpShare(2) / người, cả A và C bằng nhau
     expect(shares.get(A)).toBeCloseTo(shares.get(C)!, 10);
-    expect(shares.get(A)).toBeCloseTo((1 + 0.15) / 2, 10);
+    expect(shares.get(A)).toBeCloseTo(partyExpShare(2), 10);
   });
 });
