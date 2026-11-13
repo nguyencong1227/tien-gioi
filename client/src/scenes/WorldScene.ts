@@ -26,6 +26,7 @@ import {
   isMyHit,
   planHitFx,
   planHitNumber,
+  planMonsterDeath,
   type HitInput,
   type MyAttack,
 } from "../gfx/fx/combat-fx";
@@ -2576,8 +2577,14 @@ export class WorldScene extends Phaser.Scene {
       if (e.root.visible) {
         // Quái biến khỏi state khi đang hiện trong màn hình = gục: tan thành điểm sáng (ngoài camera thì root ẩn, không vào đây)
         // Chỉ khi còn gần mình: quái rời vùng nhìn của server (xa hơn 1100 px) cũng biến khỏi state nhưng KHÔNG gục
-        if (isMonsterDeath(Math.hypot(e.root.x - this.predX, e.root.y - this.predY)))
-          this.fx.play("mon-vanish", e.root.x, e.root.y - 8);
+        if (isMonsterDeath(Math.hypot(e.root.x - this.predX, e.root.y - this.predY))) {
+          // Trùm nổ lớn hơn, quái Kim Đan đổi màu hạt, quái cũ như trước (gfx/fx/combat-fx.ts `planMonsterDeath`)
+          const death = planMonsterDeath(e.monKind);
+          this.fx.play(death.recipe, e.root.x, e.root.y - 8, {
+            priority: death.priority,
+            tint: death.tint,
+          });
+        }
         const dieKey = e.monKind ? monAnimKey(e.monKind, "die") : "";
         if (dieKey && e.monAnim && !animReducedMotion() && this.anims.exists(dieKey)) {
           // Gục: 4 khung (đổ bẹp, tan thành điểm sáng) rồi mờ dần; thanh máu ẩn ngay
@@ -3059,7 +3066,7 @@ export class WorldScene extends Phaser.Scene {
   private onHitFx(m: DmgMsg) {
     const input = this.hitInput(m);
     const plan = planHitFx(input);
-    this.fx.play(plan.recipe, m.x, m.y - 8, { priority: plan.priority });
+    this.fx.play(plan.recipe, m.x, m.y - 8, { priority: plan.priority, tint: plan.tint });
     const n = planHitNumber(input);
     this.fx.floatNumber(
       n.text,
@@ -3071,16 +3078,20 @@ export class WorldScene extends Phaser.Scene {
 
   private hitInput(m: DmgMsg): HitInput {
     const targetIsMe = m.target === this.sid;
-    const maxHp = targetIsMe
-      ? (this.me()?.maxHp ?? 0)
-      : ((m.toPlayer ? this.state?.players?.get(m.target) : this.state?.monsters?.get(m.target))
-          ?.maxHp ?? 0);
+    const target = targetIsMe
+      ? this.me()
+      : m.toPlayer
+        ? this.state?.players?.get(m.target)
+        : this.state?.monsters?.get(m.target);
+    const maxHp = target?.maxHp ?? 0;
     return {
       amount: m.amount,
       crit: Boolean(m.crit),
       toPlayer: Boolean(m.toPlayer),
       targetIsMe,
       targetMaxHp: maxHp,
+      // Loại quái bị đánh (từ state; `planHitFx` tự bỏ id lạ): trùm / quái Kim Đan có hiệu ứng riêng
+      kind: m.toPlayer ? undefined : (target as { kind?: string } | undefined)?.kind,
       mine:
         !targetIsMe &&
         !m.toPlayer &&

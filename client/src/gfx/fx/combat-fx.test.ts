@@ -1,6 +1,10 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { MONSTERS, MONSTER_BY_ID } from "@tien-gioi/shared";
+import { FxBudget } from "./budget";
 import {
+  MONSTER_FX_TINT,
+  planMonsterDeath,
   HEAL_JUMP_FRAC,
   FloatLanes,
   HEAVY_HIT_FRAC,
@@ -22,7 +26,7 @@ import {
 } from "./combat-fx";
 import { missingGlyphs } from "./glyphs";
 import { getRecipe, recipeCost, validateRecipe } from "./recipes";
-import { COMBAT_RECIPES } from "./recipes-combat";
+import { COMBAT_RECIPES, FX_COLOR } from "./recipes-combat";
 
 const base: HitInput = {
   amount: 10,
@@ -215,5 +219,147 @@ describe("gfx/fx: FloatLanes (chữ bay không đè nhau khi dồn đòn)", () =
     expect(l.size()).toBeLessThanOrEqual(LANE_PRUNE_AT + 2);
     l.clear();
     expect(l.size()).toBe(0);
+  });
+});
+
+describe("gfx/fx: trùm và quái Kim Đan (M6 #409)", () => {
+  const BOSSES = MONSTERS.filter((m) => m.boss).map((m) => m.id);
+  const OLD_KINDS = ["tho", "lang", "ho"];
+
+  it("có đủ trùm trong game để kiểm (mang, hac_giao, yeu_vuong)", () => {
+    expect(BOSSES.sort()).toEqual(["hac_giao", "mang", "yeu_vuong"]);
+  });
+
+  it("boss-hit / boss-vanish hợp lệ, đã đăng ký, RẺ: không rung, <= 20 hạt, <= 1 s, boss-hit không đắt hơn hit-heavy", () => {
+    for (const id of ["boss-hit", "boss-vanish"]) {
+      const r = getRecipe(id)!;
+      expect(r, id).toBeDefined();
+      expect(COMBAT_RECIPES).toContain(r);
+      validateRecipe(r);
+      expect(r.shake, `${id} không rung`).toBeUndefined();
+      expect(r.flash, `${id} không chớp`).toBeUndefined();
+      const c = recipeCost(r);
+      expect(c.particles).toBeLessThanOrEqual(20);
+      expect(c.ms).toBeLessThanOrEqual(1000);
+    }
+    expect(recipeCost(getRecipe("boss-hit")!).particles).toBeLessThanOrEqual(
+      recipeCost(getRecipe("hit-heavy")!).particles,
+    );
+    // nổi hơn quái thường: hơn hit-spark / mon-vanish về số hạt
+    expect(recipeCost(getRecipe("boss-hit")!).particles).toBeGreaterThan(
+      recipeCost(getRecipe("hit-spark")!).particles,
+    );
+    expect(recipeCost(getRecipe("boss-vanish")!).particles).toBeGreaterThan(
+      recipeCost(getRecipe("mon-vanish")!).particles,
+    );
+  });
+
+  it("đòn THƯỜNG lên mọi trùm dùng boss-hit; đòn nặng / chí mạng vẫn hit-heavy (đọc ra là đòn mạnh)", () => {
+    for (const kind of BOSSES) {
+      expect(planHitFx(hit({ kind })).recipe, kind).toBe("boss-hit");
+      expect(planHitFx(hit({ kind, crit: true })).recipe, kind).toBe("hit-heavy");
+      expect(planHitFx(hit({ kind, amount: 200 * HEAVY_HIT_FRAC })).recipe, kind).toBe("hit-heavy");
+      // ưu tiên như mọi đòn: mình đánh 2, người khác 1
+      expect(planHitFx(hit({ kind, mine: true })).priority).toBe(2);
+      expect(planHitFx(hit({ kind })).priority).toBe(1);
+    }
+  });
+
+  it("quái cũ y như trước (hit-spark, không đổi màu); đánh người chơi / mình bị đánh không bị loại quái chi phối", () => {
+    for (const kind of OLD_KINDS) {
+      const p = planHitFx(hit({ kind }));
+      expect(p).toEqual({ recipe: "hit-spark", priority: 1, heavy: false });
+      expect("tint" in p).toBe(false);
+    }
+    expect(planHitFx(hit({ kind: "hac_giao", toPlayer: true }))).toEqual({
+      recipe: "hit-spark",
+      priority: 1,
+      heavy: false,
+    });
+    expect(planHitFx(hit({ kind: "hac_giao", targetIsMe: true, toPlayer: true }))).toEqual({
+      recipe: "hurt-self",
+      priority: 2,
+      heavy: false,
+    });
+  });
+
+  it("quái Kim Đan đổi màu hạt đòn thường (suong_ho, thach_quy, doc_thiem); đòn nặng giữ vàng chung", () => {
+    for (const kind of ["suong_ho", "thach_quy", "doc_thiem"]) {
+      expect(planHitFx(hit({ kind })).tint, kind).toBe(MONSTER_FX_TINT[kind]);
+      expect(planHitFx(hit({ kind, crit: true })).tint, kind).toBeUndefined();
+    }
+    expect(planHitFx(hit({ kind: "hac_giao" })).tint).toBe(MONSTER_FX_TINT.hac_giao);
+  });
+
+  it("id lạ / độc / sai kiểu: coi như quái thường, không ném lỗi", () => {
+    for (const kind of [
+      undefined,
+      "",
+      "khong_co",
+      "constructor",
+      "__proto__",
+      "toString",
+      7 as unknown as string,
+    ]) {
+      expect(planHitFx(hit({ kind })), String(kind)).toEqual({
+        recipe: "hit-spark",
+        priority: 1,
+        heavy: false,
+      });
+      expect(planMonsterDeath(kind), String(kind)).toEqual({ recipe: "mon-vanish" });
+    }
+  });
+
+  it("gục: trùm nổ boss-vanish ưu tiên 2; quái cũ mon-vanish y như trước; quái Kim Đan mon-vanish đổi màu", () => {
+    for (const kind of BOSSES) {
+      expect(planMonsterDeath(kind), kind).toMatchObject({ recipe: "boss-vanish", priority: 2 });
+    }
+    expect(planMonsterDeath("hac_giao").tint).toBe(MONSTER_FX_TINT.hac_giao);
+    expect(planMonsterDeath("mang").tint).toBeUndefined(); // trùm cũ: màu mặc định của công thức
+    for (const kind of OLD_KINDS) expect(planMonsterDeath(kind)).toEqual({ recipe: "mon-vanish" });
+    for (const kind of ["suong_ho", "thach_quy", "doc_thiem"]) {
+      expect(planMonsterDeath(kind)).toEqual({ recipe: "mon-vanish", tint: MONSTER_FX_TINT[kind] });
+    }
+  });
+
+  it("mọi công thức được chọn đều có trong sổ (gõ sai tên sẽ đỏ)", () => {
+    for (const m of MONSTERS) {
+      expect(getRecipe(planMonsterDeath(m.id).recipe), m.id).toBeDefined();
+      expect(getRecipe(planHitFx(hit({ kind: m.id })).recipe), m.id).toBeDefined();
+    }
+  });
+
+  it("MONSTER_FX_TINT chỉ gồm loài CÓ trong game; mỗi màu khác màu chung (đòn / chí mạng / bị đánh / hồi máu / tan) và khác nhau", () => {
+    const common = [FX_COLOR.hit, FX_COLOR.crit, FX_COLOR.hurt, FX_COLOR.heal, FX_COLOR.vanish];
+    const seen = new Set<number>();
+    for (const [kind, c] of Object.entries(MONSTER_FX_TINT)) {
+      expect(MONSTER_BY_ID[kind], kind).toBeDefined();
+      expect(common, kind).not.toContain(c);
+      expect(seen.has(c), `${kind} trùng màu loài khác`).toBe(false);
+      seen.add(c);
+    }
+  });
+
+  it("ngân sách: trùm gục (ưu tiên 2) vẫn phát được khi ngân sách bậc Thấp đã đầy tới trần ưu tiên 1; mon-vanish thường thì bị bỏ", () => {
+    const LOW = { particles: 60, emitters: 4 }; // hồ sơ bậc Thấp
+    const t = 0;
+    const full = () => {
+      const b = new FxBudget(
+        () => LOW,
+        () => t,
+      );
+      expect(b.tryAcquire({ particles: 58, emitters: 1, ms: 1000 }, 1)).toBe(true);
+      return b;
+    };
+    const boss = recipeCost(getRecipe("boss-vanish")!);
+    expect(full().tryAcquire(boss, 2)).toBe(true);
+    expect(full().tryAcquire(boss, 1)).toBe(false);
+    // ...nhưng không vượt trần cứng (x2): đã đầy tới trần ưu tiên 2 thì bị bỏ, perf-gate không bao giờ thấy vượt
+    const b = new FxBudget(
+      () => LOW,
+      () => t,
+    );
+    expect(b.tryAcquire({ particles: 110, emitters: 1, ms: 1000 }, 2)).toBe(true);
+    expect(b.tryAcquire(boss, 2)).toBe(false);
   });
 });
