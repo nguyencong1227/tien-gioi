@@ -717,7 +717,7 @@ const SWORDS = {
   lang_nha_kiem: [0xdce6ef, 0xffffff, 0x7a6548, 3.2],
   hac_ho_kiem: [0x564b40, 0xe8a838, 0x2b221b, 3.2],
   xich_mang_kiem: [0xe04838, 0xffd34d, 0x781818, 3.2],
-  suong_vu_kiem: [0xa9cfdc, 0xeaf6fa, 0x4a6b78, 2.4], // mỏng như sương
+  suong_vu_kiem: [0x5d8fa5, 0xeaf6fa, 0x2c4a5a, 2.4], // mỏng như sương; thân đậm hơn màu nền ô túi (def.color 0xa9cfdc) để không chìm
   huyen_quy_kiem: [0x56674a, 0xc9d36a, 0x2f3a28, 4.4], // dày nặng
   hac_giao_kiem: [0x24465f, 0x6fc3e6, 0x16222f, 3.4],
 };
@@ -725,7 +725,7 @@ const ROBES = {
   tho_nhung_bao: [0xe9e1cf, 0x4ba368],
   hac_ho_bao: [0x3a3028, 0xe8a838],
   xich_lan_bao: [0xa32a22, 0xffd34d],
-  suong_ho_bao: [0xd9e7ec, 0x8fb4c4],
+  suong_ho_bao: [0x7fa6b8, 0x2f5f78], // vải đậm hơn màu nền ô túi (def.color 0xd9e7ec)
   quy_giap_bao: [0x49573f, 0xc9d36a],
   giao_lan_bao: [0x1d3550, 0x6fc3e6],
 };
