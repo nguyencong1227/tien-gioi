@@ -1880,6 +1880,15 @@ body.low-fx #btn-talk {
     width: 58px;
     height: 58px;
   }
+  /* Điện thoại dọc THẤP (360x640, 375x667): ô thứ ba của cột nút ngữ cảnh (cổng, đỉnh ở cách đáy ~266 px) chui xuống dưới thanh Nhiệm vụ
+     của cột HUD trái (cao tới ~418 px), nên chạm giữa nút lại trúng nút bật / tắt nhiệm vụ. Dời nút cổng sang cột thứ hai ngay bên trái,
+     ngang hàng nút nói chuyện: cột một rộng 58 px, cách 8 px nên không chồng. Điện thoại cao hơn (đỉnh nút cổng > 418 px) giữ nguyên. */
+  @media (orientation: portrait) and (max-height: 700px) {
+    #btn-portal {
+      right: calc(max(14px, env(safe-area-inset-right)) + 168px + 58px + 8px);
+      bottom: calc(max(14px, env(safe-area-inset-bottom)) + 128px);
+    }
+  }
   #quickbar {
     right: calc(max(14px, env(safe-area-inset-right)) + 168px);
     bottom: max(14px, env(safe-area-inset-bottom));

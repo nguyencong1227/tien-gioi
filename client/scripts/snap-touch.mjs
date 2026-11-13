@@ -28,6 +28,8 @@ const DPR = Number(arg("dpr", "1"));
 const VIEWPORTS = [
   { name: "390x844", w: 390, h: 844 },
   { name: "844x390", w: 844, h: 390 },
+  // Điện thoại dọc THẤP nhất được hỗ trợ (mục 4.1): nút cổng (ô thứ ba của cột nút ngữ cảnh) từng nằm dưới thanh Nhiệm vụ của cột HUD trái
+  { name: "360x640", w: 360, h: 640 },
 ];
 const CDP_PORT = 39300 + Math.floor(Math.random() * 400);
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-snap-touch-"));
@@ -227,6 +229,37 @@ try {
     check(
       worstGap >= 8,
       `khoảng cách nhỏ nhất giữa các nút >= 8 px (${Math.round(worstGap)} px: ${worstPair})`,
+    );
+    // Không nút ngữ cảnh nào bị phần tử khác đè lên: năm điểm (tâm + bốn hướng ở 1/4) của mỗi nút phải trúng chính nút đó. Ở 360x640 nút cổng
+    // từng nằm dưới thanh Nhiệm vụ của cột HUD trái: tâm nút trúng nút bật / tắt nhiệm vụ nên chạm vào nút cổng lại mở / đóng nhiệm vụ.
+    const covered = await J(`(() => {
+      const out = [];
+      for (const s of ['#btn-pickup', '#btn-talk', '#btn-portal']) {
+        const e = document.querySelector(s);
+        const r = e.getBoundingClientRect();
+        for (const [fx, fy] of [[0.5, 0.5], [0.5, 0.25], [0.5, 0.75], [0.25, 0.5], [0.75, 0.5]]) {
+          const t = document.elementFromPoint(r.x + r.width * fx, r.y + r.height * fy);
+          if (!(t && (t === e || e.contains(t)))) {
+            out.push(s + " bị " + (t ? (t.id ? "#" + t.id : t.tagName.toLowerCase() + "." + String(t.className?.baseVal ?? t.className).split(" ")[0]) : "không gì") + " che ở (" + fx + "," + fy + ")");
+            break;
+          }
+        }
+      }
+      return out;
+    })()`);
+    check(
+      covered.length === 0,
+      `không nút ngữ cảnh nào bị che (${covered.length ? covered.join("; ") : "5 điểm mỗi nút đều trúng nút"})`,
+    );
+    // Nhãn nút cổng không bị cắt (tên cổng thật dài nhất ~15 ký tự không được lọt vào nhãn; nó nằm ở title / aria-label)
+    await evalJs("window.__ui.portalPrompt('Vọng Trạch Quan', () => {});0");
+    const lab = await J(
+      `(() => { const s = document.getElementById('portal-label'); const b = document.getElementById('btn-portal'); return { t: s.textContent, cut: s.scrollWidth > s.clientWidth, title: b.title, aria: b.getAttribute('aria-label') }; })()`,
+    );
+    check(!lab.cut, `nhãn nút cổng "${lab.t}" không bị cắt`);
+    check(
+      lab.title.includes("Vọng Trạch Quan") && lab.aria.includes("Vọng Trạch Quan"),
+      `tên cổng nằm ở title / aria-label ("${lab.title}")`,
     );
     if (!NO_SHOT) {
       const shot = await send("Page.captureScreenshot", { format: "png" });
@@ -525,7 +558,8 @@ try {
     v = await vec();
     check(!v.active && v.x === 0 && v.y === 0, "thả ngón: D-pad về nghỉ");
     // Vùng chạm cũ của joystick nổi không còn tác dụng ở chế độ D-pad (chạm giữa màn hình bên trái không khởi động joystick)
-    await touchDown(1, jx + 90, jy - 60);
+    // Điểm thử nằm TRÊN D-pad (ở 360x640, jy - 60 = 484 rơi vào chính D-pad cao 152 px nên khởi động D-pad chứ không phải joystick nổi)
+    await touchDown(1, jx + 90, Math.min(jy - 60, Math.round(padBox.y - 30)));
     v = await vec();
     await touchUp(1);
     check(!v.active, "chế độ D-pad: chạm vùng joystick nổi cũ không đi");
