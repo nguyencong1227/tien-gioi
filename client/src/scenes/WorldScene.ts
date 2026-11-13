@@ -137,7 +137,13 @@ import { replayEarlyMessages } from "../early-messages";
 import { sound } from "../audio";
 import { joystick, setupJoystick } from "../joystick";
 import { keepLock, pickNextTarget, pickPrevTarget } from "../target-lock";
-import { ACTION_BY_ID, actionOfEvent, getLookup, type ActionId } from "../keybinds";
+import {
+  ACTION_BY_ID,
+  actionOfEvent,
+  getLookup,
+  primaryKeyLabel,
+  type ActionId,
+} from "../keybinds";
 import { isTypingElement, isReducedMotion } from "../a11y";
 import {
   markMonAttack,
@@ -1499,7 +1505,7 @@ export class WorldScene extends Phaser.Scene {
     if (isInitial) {
       ui.chat({
         from: "",
-        text: "Chào mừng đạo hữu tới Tiên Giới. Nhận nhiệm vụ ở Trưởng trấn (F), mở sổ nhiệm vụ (Q) và xem bản đồ (M).",
+        text: `Chào mừng đạo hữu tới Tiên Giới. Nhận nhiệm vụ ở Trưởng trấn (${primaryKeyLabel("interact")}), mở sổ nhiệm vụ (${primaryKeyLabel("panel.quest")}) và xem bản đồ (${primaryKeyLabel("panel.map")}).`,
         sys: true,
       });
     }
@@ -1790,7 +1796,8 @@ export class WorldScene extends Phaser.Scene {
     this.closestNpcId = bestNpc ? bestNpc.id : null;
     if (bestNpc) {
       const npcDef = NPC_BY_ID[bestNpc.id];
-      ui.talkPrompt(npcDef ? `Nói chuyện · ${npcDef.name} (F)` : "Nói chuyện (F)");
+      const key = primaryKeyLabel("interact");
+      ui.talkPrompt(npcDef ? `Nói chuyện · ${npcDef.name} (${key})` : `Nói chuyện (${key})`);
     } else {
       ui.talkPrompt(null);
       if (ui.isForgeModalOpen()) ui.toggleForgeModal(false);
@@ -2732,7 +2739,7 @@ export class WorldScene extends Phaser.Scene {
         if (d <= bestDist) {
           bestDist = d;
           bestId = id;
-          bestLabel = def ? `Nhặt ${def.name}` : "Nhặt (F)";
+          bestLabel = def ? `Nhặt ${def.name}` : `Nhặt (${primaryKeyLabel("interact")})`;
         }
       }
 

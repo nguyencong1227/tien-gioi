@@ -116,6 +116,17 @@ import {
 } from "./sect";
 import { sound } from "./audio";
 import { initKeyLabels } from "./keybinds-dom";
+import {
+  ACTION_BY_ID,
+  FIXED_KEYS,
+  getKeymap,
+  onKeymapChange,
+  primaryKeyLabel,
+  rebind,
+  resetKeymap,
+  type ActionId,
+} from "./keybinds";
+import { captureOutcome, keysScreenModel } from "./keys-screen";
 import { dirOfArrowKey, moveFocus, ownsArrowKeys, withFocusKept } from "./panel-nav";
 import { transitionMs, waitOrSkip } from "./gfx/scene-transition";
 import { getDisplay, onDisplayChange } from "./gfx/display";
@@ -853,6 +864,110 @@ function renderQuestTracker() {
     });
 
     list.append(div);
+  }
+}
+
+// ---------- Màn Phím tắt trong Cài đặt (QUYET_DINH_M3 mục 13, #463) ----------
+
+let keysModalOpen = false;
+/** Hành động đang chờ người chơi bấm phím mới; `null` = không chờ. */
+let keyCaptureFor: ActionId | null = null;
+
+function setKeysStatus(msg: string) {
+  $("keys-status").textContent = msg;
+}
+
+function renderKeysModal() {
+  withFocusKept($("keys-modal"), renderKeysModalImpl);
+}
+
+/** Vẽ danh sách phím từ bảng phím (`keysScreenModel`): mỗi hành động một dòng "tên / các phím / nút Đổi phím". */
+function renderKeysModalImpl() {
+  const list = $("keys-list");
+  list.replaceChildren();
+  for (const g of keysScreenModel(getKeymap())) {
+    const sec = document.createElement("section");
+    sec.className = "keys-group";
+    const h = document.createElement("h3");
+    h.textContent = g.title;
+    sec.append(h);
+    for (const r of g.rows) {
+      const row = document.createElement("div");
+      row.className = r.custom ? "keys-row custom" : "keys-row";
+      const name = document.createElement("span");
+      name.className = "keys-name";
+      name.textContent = r.label;
+      const caps = document.createElement("span");
+      caps.className = "keys-caps";
+      for (const k of r.keys) {
+        const kbd = document.createElement("kbd");
+        kbd.className = "key-chip";
+        kbd.textContent = k;
+        caps.append(kbd);
+      }
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "keys-change";
+      btn.dataset.action = r.id;
+      btn.dataset.nav = `key:${r.id}`;
+      const waiting = keyCaptureFor === r.id;
+      btn.classList.toggle("waiting", waiting);
+      btn.textContent = waiting ? "Bấm phím mới..." : "Đổi phím";
+      btn.setAttribute(
+        "aria-label",
+        waiting
+          ? `${r.label}: đang chờ phím mới, bấm phím muốn gán hoặc Esc để huỷ`
+          : `Đổi phím ${r.label} (hiện là ${r.keys.join(" hoặc ")})`,
+      );
+      row.append(name, caps, btn);
+      sec.append(row);
+    }
+    list.append(sec);
+  }
+  const fixed = $("keys-fixed-list");
+  fixed.replaceChildren();
+  for (const f of FIXED_KEYS) {
+    const li = document.createElement("li");
+    const kbd = document.createElement("kbd");
+    kbd.className = "key-chip";
+    kbd.textContent = f.keys;
+    li.append(kbd, ` ${f.what}`);
+    fixed.append(li);
+  }
+}
+
+function startKeyCapture(id: ActionId) {
+  keyCaptureFor = id;
+  setKeysStatus(`Đang đổi phím "${ACTION_BY_ID[id].label}": bấm phím muốn gán (Esc để huỷ).`);
+  renderKeysModal();
+}
+
+/**
+ * Bắt phím lúc đang chờ gán, gắn ở pha CAPTURE của `window` nên chạy TRƯỚC mọi bộ lắng nghe khác (Esc đóng bảng, phím hành động của thế giới,
+ * Phaser): phím bấm để gán không được làm gì khác. Quyết định ở `captureOutcome` (thuần, có test); chỗ này chỉ áp dụng kết quả.
+ */
+function onKeyCaptureKeydown(e: KeyboardEvent) {
+  const id = keyCaptureFor;
+  if (id === null) return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  const out = captureOutcome(id, e, getKeymap());
+  switch (out.kind) {
+    case "ignore":
+      return;
+    case "reject":
+      setKeysStatus(out.message);
+      return;
+    case "cancel":
+      keyCaptureFor = null;
+      setKeysStatus(out.message);
+      renderKeysModal();
+      return;
+    case "bind":
+      keyCaptureFor = null; // trước rebind: rebind báo `onKeymapChange` để vẽ lại
+      rebind(id, out.token);
+      setKeysStatus(out.message);
+      return;
   }
 }
 
@@ -2738,6 +2853,30 @@ export const ui = {
     // Bảng chỉ dẫn người mới (#269)
     bindTap("newbie-close", () => this.dismissNewbieGuide());
     bindTap("newbie-btn-dismiss", () => this.dismissNewbieGuide());
+    bindTap("newbie-btn-keys", () => this.toggleKeysModal(true, $("newbie-btn-keys")));
+
+    // Màn Phím tắt (#463): mở từ Cài đặt / chỉ dẫn; đổi phím bằng bàn phím (xem onKeyCaptureKeydown)
+    bindTap("set-open-keys", () => this.toggleKeysModal(true, $("set-open-keys")));
+    bindTap("keys-close", () => this.toggleKeysModal(false));
+    bindTap("keys-reset", () => {
+      keyCaptureFor = null;
+      resetKeymap();
+      setKeysStatus("Đã khôi phục phím mặc định.");
+    });
+    $("keys-list").addEventListener("click", (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>("button.keys-change");
+      const id = btn?.dataset.action as ActionId | undefined;
+      if (!id || !Object.prototype.hasOwnProperty.call(ACTION_BY_ID, id)) return;
+      if (keyCaptureFor === id) {
+        keyCaptureFor = null; // bấm lại nút đang chờ = huỷ
+        setKeysStatus("Đã huỷ, giữ nguyên phím cũ.");
+        renderKeysModal();
+      } else startKeyCapture(id);
+    });
+    window.addEventListener("keydown", onKeyCaptureKeydown, true);
+    onKeymapChange(() => {
+      if (keysModalOpen) renderKeysModal();
+    });
     bindTap("help", () => this.showNewbieGuide(true));
 
     // Âm thanh
@@ -2830,6 +2969,30 @@ export const ui = {
 
   isSettingsModalOpen() {
     return settingsModalOpen;
+  },
+
+  /** Màn Phím tắt (#463). `trigger` = nút đã mở nó, để trả focus lại đúng chỗ khi đóng. */
+  toggleKeysModal(force?: boolean, trigger?: HTMLElement) {
+    const open = force ?? !keysModalOpen;
+    if (open === keysModalOpen) return;
+    keysModalOpen = open;
+    keyCaptureFor = null; // đóng / mở đều thôi chờ phím
+    $("keys-modal").hidden = !open;
+    if (open) {
+      setKeysStatus("");
+      renderKeysModal();
+      modalStack.push("keys-modal", trigger ?? null);
+      focusModal($("keys-modal"));
+    } else {
+      const top = modalStack.peek();
+      const back = top?.id === "keys-modal" ? top.triggerEl : null;
+      modalStack.remove("keys-modal");
+      returnFocus(back);
+    }
+  },
+
+  isKeysModalOpen() {
+    return keysModalOpen;
   },
 
   isHideNames() {
@@ -3003,6 +3166,10 @@ export const ui = {
       this.toggleMapModal(false);
       closedAny = true;
     }
+    if (keysModalOpen) {
+      this.toggleKeysModal(false);
+      closedAny = true;
+    }
     if (settingsModalOpen) {
       this.toggleSettingsModal(false);
       closedAny = true;
@@ -3044,6 +3211,9 @@ export const ui = {
         return true;
       case "settings-modal":
         this.toggleSettingsModal(false);
+        return true;
+      case "keys-modal":
+        this.toggleKeysModal(false);
         return true;
       case "sect-modal":
         this.toggleSectModal(false);
@@ -3236,7 +3406,7 @@ export const ui = {
     }
     const dir = dirOfArrowKey(e.key);
     if (dir) {
-      if (ownsArrowKeys(active)) return false;
+      if (ownsArrowKeys(active, dir)) return false;
       return moveFocus(container, dir);
     }
     return false;
@@ -3402,7 +3572,7 @@ export const ui = {
     const btn = $("btn-portal");
     btn.hidden = label === null;
     if (label !== null) {
-      $("portal-label").textContent = `${label} (F)`;
+      $("portal-label").textContent = `${label} (${primaryKeyLabel("interact")})`;
       if (onTravel) portalCallback = onTravel;
     } else {
       portalCallback = null;

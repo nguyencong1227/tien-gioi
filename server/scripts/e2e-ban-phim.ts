@@ -54,6 +54,7 @@ const K = {
   m: { key: "m", code: "KeyM", vk: 77, text: "m" },
   o: { key: "o", code: "KeyO", vk: 79, text: "o" },
   a: { key: "a", code: "KeyA", vk: 65, text: "a" },
+  w: { key: "w", code: "KeyW", vk: 87, text: "w" },
   x: { key: "x", code: "KeyX", vk: 88, text: "x" },
   f: { key: "f", code: "KeyF", vk: 70, text: "f" },
   d1: { key: "1", code: "Digit1", vk: 49, text: "1" },
@@ -659,6 +660,151 @@ async function main() {
     );
     await press(t, K.esc);
     check("Esc đóng cửa hàng", !(await ev(shown("shop-modal"))), "shop-modal vẫn mở");
+
+    // ---- 11. Màn Phím tắt: mở từ Cài đặt, đổi phím, hoán đổi, khôi phục, tất cả bằng bàn phím ----
+    const textOf = (sel: string) =>
+      ev(
+        `(() => { const e = document.querySelector(${JSON.stringify(sel)}); return e ? e.textContent : null; })()`,
+      );
+    const swordBtn = '#keys-list button[data-action="skill.sword"]';
+    const medBtn = '#keys-list button[data-action="skill.meditate"]';
+    const rowChips = (action: string) =>
+      ev(
+        `(() => { const b = document.querySelector('#keys-list button[data-action="${action}"]'); return b ? [...b.closest('.keys-row').querySelectorAll('.key-chip')].map((c) => c.textContent).join(',') : null; })()`,
+      );
+    const openKeys = async () => {
+      await press(t, K.o);
+      await arrowTo(t, "#set-open-keys", 12);
+      await press(t, K.enter);
+    };
+    await openKeys();
+    check(
+      "O mở Cài đặt, mũi tên + Enter trên 'Xem và đổi phím tắt' mở màn Phím tắt",
+      !!(await ev(shown("keys-modal"))) && !!(await ev(shown("settings-modal"))),
+      `keys=${await ev(shown("keys-modal"))} settings=${await ev(shown("settings-modal"))}`,
+    );
+    check(
+      "Màn Phím tắt liệt kê đủ hành động (>= 15 dòng) và phím cố định",
+      Number(await ev(`document.querySelectorAll('#keys-list .keys-row').length`)) >= 15 &&
+        Number(await ev(`document.querySelectorAll('#keys-fixed-list li').length`)) >= 4,
+      String(await ev(`document.querySelectorAll('#keys-list .keys-row').length`)),
+    );
+    check(
+      "Dòng Kiếm khí ghi phím 3 và K",
+      (await rowChips("skill.sword")) === "3,K",
+      String(await rowChips("skill.sword")),
+    );
+    check(
+      "Mũi tên tới nút 'Đổi phím' của Kiếm khí",
+      await arrowTo(t, swordBtn, 40),
+      String(await ev(`document.activeElement && document.activeElement.outerHTML.slice(0, 80)`)),
+    );
+    await press(t, K.enter);
+    check(
+      "Enter: nút chuyển sang 'Bấm phím mới...' và dòng trạng thái báo đang chờ",
+      !!(await ev(
+        `document.querySelector(${JSON.stringify(swordBtn)}).classList.contains('waiting')`,
+      )) && String(await textOf("#keys-status")).includes("Đang đổi phím"),
+      String(await textOf("#keys-status")),
+    );
+    await t.shot("ban-phim-phim-tat-cho.png");
+    await press(t, K.w);
+    check(
+      "Bấm W (phím cố định): bị từ chối, vẫn chờ, không đổi phím nào",
+      String(await textOf("#keys-status")).includes("cố định") &&
+        !!(await ev(
+          `document.querySelector(${JSON.stringify(swordBtn)}).classList.contains('waiting')`,
+        )) &&
+        (await rowChips("skill.sword")) === "3,K",
+      `${await textOf("#keys-status")} | ${await rowChips("skill.sword")}`,
+    );
+    await press(t, K.esc);
+    check(
+      "Esc khi đang chờ phím: chỉ huỷ việc đổi, màn Phím tắt VẪN mở",
+      !!(await ev(shown("keys-modal"))) &&
+        !(await ev(
+          `document.querySelector(${JSON.stringify(swordBtn)}).classList.contains('waiting')`,
+        )) &&
+        (await rowChips("skill.sword")) === "3,K",
+      `keys=${await ev(shown("keys-modal"))}`,
+    );
+    check(
+      "Sau khi huỷ, focus vẫn ở nút 'Đổi phím' của Kiếm khí",
+      (await ev(`document.activeElement && document.activeElement.dataset.action`)) ===
+        "skill.sword",
+      String(await ev(`document.activeElement && document.activeElement.dataset.action`)),
+    );
+    await press(t, K.enter);
+    await press(t, K.x);
+    check(
+      "Bấm X: Kiếm khí đổi sang X (giữ 3 và K làm phím phụ)",
+      (await rowChips("skill.sword")) === "X,3,K" &&
+        String(await textOf("#keys-status")).includes("Kiếm khí: X"),
+      `${await rowChips("skill.sword")} | ${await textOf("#keys-status")}`,
+    );
+    check(
+      "Nhãn phím trên nút Kiếm khí đổi theo thành X; lưu vào localStorage",
+      (await cap("sk-sword")) === "X" &&
+        String(await ev(`localStorage.getItem('tg_keymap')`)).includes("KeyX"),
+      `${await cap("sk-sword")} | ${await ev(`localStorage.getItem('tg_keymap')`)}`,
+    );
+    await t.shot("ban-phim-phim-tat-da-doi.png");
+    check(
+      "Chữ hướng dẫn tĩnh (bảng chỉ dẫn người mới, Cài đặt) đổi theo phím mới",
+      (await textOf('#newbie-guide-modal [data-key-action="skill.sword"]')) === "X",
+      String(await textOf('#newbie-guide-modal [data-key-action="skill.sword"]')),
+    );
+    // lấy phím DUY NHẤT của đan ô 1 (phím 1) cho Đả tọa: hai hành động đổi chỗ, không ai mất phím
+    await arrowTo(t, medBtn, 40);
+    await press(t, K.enter);
+    await press(t, K.d1);
+    check(
+      "Đả tọa lấy phím 1: HOÁN ĐỔI, đan ô 1 nhận phím 4 (không hành động nào mất phím)",
+      (await cap("sk-med")) === "1" &&
+        (await ev(`document.querySelector('#quick-1 .qkey').textContent`)) === "4" &&
+        String(await textOf("#keys-status")).includes("đổi sang 4"),
+      `${await cap("sk-med")} | ${await ev(`document.querySelector('#quick-1 .qkey').textContent`)} | ${await textOf("#keys-status")}`,
+    );
+    await press(t, K.esc);
+    check(
+      "Esc đóng riêng màn Phím tắt, Cài đặt vẫn mở, focus về nút mở màn Phím tắt",
+      !(await ev(shown("keys-modal"))) &&
+        !!(await ev(shown("settings-modal"))) &&
+        (await ev(`document.activeElement && document.activeElement.id`)) === "set-open-keys",
+      `keys=${await ev(shown("keys-modal"))} settings=${await ev(shown("settings-modal"))} focus=${await ev(`document.activeElement && document.activeElement.id`)}`,
+    );
+    await press(t, K.esc);
+    check("Esc đóng Cài đặt", !(await ev(shown("settings-modal"))), "settings-modal vẫn mở");
+    // phím mới có tác dụng trong game: X phóng Kiếm khí (server trừ linh lực)
+    me.mp = me.maxMp;
+    const mpX = me.mp;
+    await press(t, K.x);
+    await sleep(300);
+    check("Phím X mới: phóng Kiếm khí (server trừ linh lực)", me.mp < mpX, `${mpX} -> ${me.mp}`);
+    // khôi phục mặc định
+    await openKeys();
+    await arrowTo(t, "#keys-reset", 40);
+    await press(t, K.enter);
+    check(
+      "'Khôi phục phím mặc định': Kiếm khí về 3 / K, Đả tọa về 4, đan ô 1 về 1, xoá khỏi localStorage",
+      (await rowChips("skill.sword")) === "3,K" &&
+        (await cap("sk-sword")) === "3" &&
+        (await cap("sk-med")) === "4" &&
+        (await ev(`document.querySelector('#quick-1 .qkey').textContent`)) === "1" &&
+        (await ev(`localStorage.getItem('tg_keymap')`)) === null,
+      `${await rowChips("skill.sword")} | ${await cap("sk-sword")} | ${await cap("sk-med")} | ${await ev(`localStorage.getItem('tg_keymap')`)}`,
+    );
+    await press(t, K.esc);
+    await press(t, K.esc);
+    me.mp = me.maxMp;
+    const mpFull = me.mp;
+    await press(t, K.x);
+    await sleep(300);
+    check(
+      "Sau khi khôi phục: phím X không còn phóng Kiếm khí",
+      me.mp === mpFull,
+      `${mpFull} -> ${me.mp}`,
+    );
 
     check("0 lỗi console / exception", t.errors.length === 0, t.errors.slice(0, 3).join(" | "));
   } catch (e) {

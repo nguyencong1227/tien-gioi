@@ -920,9 +920,13 @@
             </div>
           </label>
           <label class="set-row toggle">
-            <span>Tắt toàn bộ âm thanh (Phím N)</span>
+            <span>Tắt toàn bộ âm thanh (Phím <b data-key-action="sound.mute">N</b>)</span>
             <input type="checkbox" id="set-mute" />
           </label>
+          <div class="set-row" id="set-keys-row">
+            <span>Phím tắt trên bàn phím</span>
+            <button type="button" id="set-open-keys" class="act-btn">Xem và đổi phím tắt</button>
+          </div>
           <label class="set-row toggle">
             <span>Ẩn tên đồng đạo (đỡ rối khi đông người)</span>
             <input type="checkbox" id="set-hide-names" />
@@ -963,6 +967,44 @@
             <span id="set-account-info">Tài khoản: <b id="set-account-username">-</b></span>
             <button type="button" id="btn-logout" class="btn-logout">Đăng Xuất</button>
           </div>
+        </div>
+      </section>
+
+      <!-- Màn Phím tắt (QUYET_DINH_M3 mục 13, #463): vẽ từ bảng phím keybinds.ts, đổi phím bằng bàn phím -->
+      <section
+        id="keys-modal"
+        class="panel modal-box sheet"
+        hidden
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="keys-title"
+        tabindex="-1"
+      >
+        <header class="inv-head">
+          <div>
+            <h2 id="keys-title">Phím Tắt</h2>
+            <small
+              >Chọn "Đổi phím" rồi bấm phím mới (Esc để huỷ). Tự động lưu trên thiết bị này</small
+            >
+          </div>
+          <button
+            type="button"
+            id="keys-close"
+            class="modal-close"
+            title="Đóng (Esc)"
+            aria-label="Đóng phím tắt (Phím Esc)"
+          >
+            ✕
+          </button>
+        </header>
+        <div class="keys-body">
+          <p id="keys-status" class="keys-status" role="status" aria-live="polite"></p>
+          <div id="keys-list"></div>
+          <div class="keys-fixed">
+            <h3>Phím cố định</h3>
+            <ul id="keys-fixed-list"></ul>
+          </div>
+          <button type="button" id="keys-reset" class="act-btn">Khôi phục phím mặc định</button>
         </div>
       </section>
 
@@ -1675,9 +1717,13 @@
             <div class="newbie-info">
               <b>Chiến Đấu & Trừ Yêu</b>
               <p>
-                Phím <b>Space</b> chém kiếm thường (tự nhắm con quái gần nhất), <b>Tab</b> chọn và
-                đổi mục tiêu (<b>Shift+Tab</b> đi ngược, <b>Esc</b> bỏ chọn), <b>3</b> phóng Kiếm
-                khí tầm xa tiêu hao Linh lực.
+                Phím <b data-key-action="attack">Cách</b> chém kiếm thường (tự nhắm con quái gần
+                nhất), <b data-key-action="target.next">Tab</b> chọn và đổi mục tiêu (<b
+                  data-key-action="target.prev"
+                  >Shift+Tab</b
+                >
+                đi ngược, <b>Esc</b> bỏ chọn), <b data-key-action="skill.sword">3</b> phóng Kiếm khí
+                tầm xa tiêu hao Linh lực.
               </p>
             </div>
           </div>
@@ -1686,8 +1732,10 @@
             <div class="newbie-info">
               <b>Tu Luyện & Hồi Phục</b>
               <p>
-                Phím <b>4</b> đả tọa hồi Sinh lực và Linh lực, <b>B</b> đột phá. Phím <b>1</b> và
-                <b>2</b> cắn nhanh Đan dược trong lúc nguy cấp.
+                Phím <b data-key-action="skill.meditate">4</b> đả tọa hồi Sinh lực và Linh lực,
+                <b data-key-action="skill.breakthrough">B</b> đột phá. Phím
+                <b data-key-action="quick.1">1</b> và <b data-key-action="quick.2">2</b> cắn nhanh
+                Đan dược trong lúc nguy cấp.
               </p>
             </div>
           </div>
@@ -1696,14 +1744,18 @@
             <div class="newbie-info">
               <b>Tương Tác & Hành Trang</b>
               <p>
-                Phím <b>F</b> để nhặt vật phẩm rơi, đối thoại NPC hoặc qua Cổng truyền tống. Phím
-                <b>I</b> mở Túi đồ, <b>C</b> xem Đạo thể trang bị, <b>J</b> xem Sổ nhiệm vụ,
-                <b>M</b> xem Sơn Hà Đồ, <b>Enter</b> để chat, <b>Esc</b> đóng bảng.
+                Phím <b data-key-action="interact">F</b> để nhặt vật phẩm rơi, đối thoại NPC hoặc
+                qua Cổng truyền tống. Phím <b data-key-action="panel.inventory">I</b> mở Túi đồ,
+                <b data-key-action="panel.char">C</b> xem Đạo thể trang bị,
+                <b data-key-action="panel.quest">J</b> xem Sổ nhiệm vụ,
+                <b data-key-action="panel.map">M</b> xem Sơn Hà Đồ,
+                <b data-key-action="chat.open">Enter</b> để chat, <b>Esc</b> đóng bảng.
               </p>
             </div>
           </div>
         </div>
         <footer class="newbie-footer">
+          <button type="button" id="newbie-btn-keys" class="act-btn">Xem tất cả phím tắt</button>
           <button type="button" id="newbie-btn-dismiss" class="auth-btn-primary">
             Đã Hiểu (Phím Cách hoặc Esc)
           </button>

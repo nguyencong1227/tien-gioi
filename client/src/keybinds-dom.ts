@@ -13,6 +13,9 @@ import {
   type Keymap,
 } from "./keybinds";
 
+/** Phần tử HTML có thuộc tính này (`data-key-action="attack"`) được điền nhãn phím CHÍNH của hành động đó: chữ hướng dẫn tĩnh trong `index.html` không lệch phím thật khi đổi phím. */
+export const KEY_ACTION_ATTR = "data-key-action";
+
 interface HudKey {
   /** id phần tử HTML */
   id: string;
@@ -37,11 +40,16 @@ export const HUD_KEYS: readonly HudKey[] = [
   { id: "btn-sect", action: "panel.sect", name: "Tông môn", keycap: "kbd" },
   { id: "btn-mute", action: "sound.mute", name: "Bật hoặc tắt âm thanh", keycap: "none" },
   { id: "btn-settings", action: "panel.settings", name: "Cài đặt và phím tắt", keycap: "none" },
+  { id: "minimap-wrap", action: "panel.map", name: "Bản đồ thế giới", keycap: "none" },
+  { id: "btn-pickup", action: "interact", name: "Nhặt vật phẩm rơi", keycap: "none" },
+  { id: "btn-talk", action: "interact", name: "Nói chuyện với NPC", keycap: "none" },
+  { id: "btn-portal", action: "interact", name: "Đi qua cổng truyền tống", keycap: "none" },
 ];
 
 /** Phần tử tối thiểu mà `applyKeyLabels` cần (để test bằng đối tượng giả, không cần jsdom). */
 export interface KeyLabelEl {
   setAttribute(name: string, value: string): void;
+  getAttribute(name: string): string | null;
   querySelector(sel: string): KeyLabelEl | null;
   append(...nodes: KeyLabelEl[]): void;
   textContent: string | null;
@@ -49,6 +57,8 @@ export interface KeyLabelEl {
 }
 export interface KeyLabelDoc {
   getElementById(id: string): KeyLabelEl | null;
+  /** Tuỳ chọn (đối tượng giả trong test có thể bỏ): tìm phần tử theo bộ chọn CSS */
+  querySelectorAll?(sel: string): ArrayLike<KeyLabelEl>;
   createElement(tag: string): KeyLabelEl;
 }
 
@@ -78,6 +88,15 @@ export function applyKeyLabels(doc: KeyLabelDoc = document as unknown as KeyLabe
   const map = getKeymap();
   const help = doc.getElementById("help");
   if (help) help.textContent = helpStripText(map);
+  // chữ hướng dẫn tĩnh trong HTML (bảng chỉ dẫn người mới, Cài đặt): điền phím chính của hành động
+  const tagged = doc.querySelectorAll?.(`[${KEY_ACTION_ATTR}]`);
+  if (tagged) {
+    for (let i = 0; i < tagged.length; i++) {
+      const id = tagged[i].getAttribute(KEY_ACTION_ATTR) as ActionId | null;
+      if (id && Object.prototype.hasOwnProperty.call(ACTION_BY_ID, id))
+        tagged[i].textContent = keyLabel(map[id][0] ?? "");
+    }
+  }
   for (const k of HUD_KEYS) {
     const el = doc.getElementById(k.id);
     if (!el) continue;

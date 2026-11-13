@@ -111,4 +111,16 @@ describe("dirOfArrowKey / ownsArrowKeys", () => {
     expect(ownsArrowKeys(el("BUTTON"))).toBe(false);
     expect(ownsArrowKeys(null)).toBe(false);
   });
+  it("thanh trượt nằm ngang: chỉ Trái / Phải là của nó, Lên / Xuống vẫn chuyển focus (không bẫy ở Cài đặt)", () => {
+    const range = el("INPUT", "range");
+    expect(ownsArrowKeys(range, "left")).toBe(true);
+    expect(ownsArrowKeys(range, "right")).toBe(true);
+    expect(ownsArrowKeys(range, "up")).toBe(false);
+    expect(ownsArrowKeys(range, "down")).toBe(false);
+    // ô chọn và ô chữ giữ cả bốn phím
+    for (const d of ["up", "down", "left", "right"] as const) {
+      expect(ownsArrowKeys(el("SELECT"), d)).toBe(true);
+      expect(ownsArrowKeys(el("INPUT", "text"), d)).toBe(true);
+    }
+  });
 });

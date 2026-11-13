@@ -71,13 +71,18 @@ export function pickNeighbor(rects: readonly NavRect[], from: number, dir: NavDi
   return pick >= 0 ? pick : null;
 }
 
-/** Phần tử mà mũi tên là của CHÍNH nó (chỉnh thanh trượt, đổi lựa chọn, di chuyển con trỏ chữ): không cướp mũi tên. */
-export function ownsArrowKeys(el: Element | null): boolean {
+/**
+ * Phần tử mà mũi tên là của CHÍNH nó (chỉnh thanh trượt, đổi lựa chọn, di chuyển con trỏ chữ): không cướp mũi tên.
+ * Thanh trượt nằm NGANG: chỉ Trái / Phải là của nó khi biết `dir`; Lên / Xuống vẫn chuyển focus, nếu không người chơi đứng ở thanh âm lượng
+ * đầu Cài đặt sẽ không đi tiếp xuống được bằng mũi tên (chỉ còn Tab). Ô chọn (select) và ô chữ giữ mọi mũi tên (Tab là lối thoát).
+ */
+export function ownsArrowKeys(el: Element | null, dir?: NavDir): boolean {
   if (!el) return false;
   const tag = el.tagName?.toLowerCase();
   if (tag === "select" || tag === "textarea") return true;
   if (tag === "input") {
     const type = (el as HTMLInputElement).type?.toLowerCase();
+    if (type === "range" && dir) return dir === "left" || dir === "right";
     return !(type === "checkbox" || type === "button" || type === "submit");
   }
   return Boolean((el as HTMLElement).isContentEditable);
