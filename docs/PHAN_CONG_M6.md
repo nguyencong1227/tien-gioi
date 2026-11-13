@@ -8,7 +8,7 @@
 | Hướng | M6 = **bản đồ thứ ba** + **quái / vật phẩm / trang bị / nhiệm vụ cho cảnh giới cao hơn** + **chỉnh `CAN_BANG.md` theo số đo thật** (mô phỏng / bot) |
 | Đồ hoạ nội dung mới | **A + B** (quái, bản đồ, hiệu ứng). C **không** làm đồ hoạ |
 | C | nghỉ hạn mức tới ~16/11; nhận bot / mô phỏng cân bằng / thử tải / đo hiệu năng bản đồ mới khi quay lại |
-| Phát hành | **Không** gắn `v0.1.1`, **không** đụng bản chạy thật (`~/TT/tien-gioi-prod/`, cổng 2567). Người dùng còn phải thử M5 trên điện thoại thật và đưa thông tin liên hệ cho `privacy.html` |
+| Phát hành | **`v0.1.1` = M5 đã lên bản chạy thật** (13/11/2026 ~10:15, người dùng đồng ý, `QUYET_DINH_M3.md` mục 11; `main` lúc gắn thẻ không có code M6, `PROTOCOL_VERSION` giữ 1). Code M6 chỉ merge SAU thẻ đó. **Phát hành bản có nội dung M6 lên bản chạy thật cần người dùng đồng ý riêng** (không tự gắn thẻ / `prod.sh up`) |
 | Giữ nguyên | Ràng buộc M5 (Android tầm trung ≥ 50 FPS, ngân sách CI, tài sản tự vẽ bằng mã hoặc giấy phép rõ ràng), luật luân hồi / bí cảnh / PK đã chốt, "server quyết định mọi kết quả" |
 | Dùng được trên mọi thiết bị | Nội dung mới đi qua bố cục M5 (điện thoại dọc / ngang, máy tính bảng, máy tính): mục bấm ≥ 44 px, không tràn chữ |
 
