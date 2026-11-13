@@ -55,11 +55,20 @@ describe("kinh tế Kim Đan: chi (phí rèn) cân với thu nhập", () => {
     const last = eco.tiers.at(-1)!;
     expect(last.surplus).toBeLessThan(10_000);
     expect(shortfallHours(eco)).toBeLessThanOrEqual(3);
-    // cộng dồn đúng: tổng kiếm từng bậc
+    // cộng dồn đúng: Linh thạch mang vào từ Luyện Khí / Trúc Cơ + tổng kiếm từng bậc Kim Đan
     expect(last.cumulative).toBeCloseTo(
-      eco.tiers.reduce((n, t) => n + t.earned, 0),
+      eco.preKimDan + eco.tiers.reduce((n, t) => n + t.earned, 0),
       6,
     );
+  });
+
+  it("thu nhập TRƯỚC Kim Đan được tính (nit của B ở #440): ~10.600 ở kiếp 1, giảm khi tu nhanh, nhỏ hơn thu nhập Kim Đan", () => {
+    expect(eco.preKimDan).toBeGreaterThan(9_000);
+    expect(eco.preKimDan).toBeLessThan(12_500);
+    expect(eco.preKimDan).toBeLessThan(eco.tiers.reduce((n, t) => n + t.earned, 0));
+    expect(kimDanEconomy(2).preKimDan).toBeLessThan(eco.preKimDan); // ít quái hạ hơn trước Kim Đan
+    // bậc đầu bắt đầu từ số đã mang vào, không phải 0
+    expect(eco.tiers[0].cumulative).toBeCloseTo(eco.preKimDan + eco.tiers[0].earned, 6);
   });
 
   it("cày nguyên liệu không phải nút cổ chai: chiếm <= 60% thời gian của bậc", () => {
@@ -121,6 +130,7 @@ describe("kinh tế QUA KIẾP (câu hỏi của B ở #439): tu nhanh thì Linh
 
   it("khoá hiện trạng: không kiếp nào trả đủ cả ba bộ; kiếp cuối chỉ bộ I (ghi chủ ý cho người dùng, Ký vật giữ đồ qua kiếp)", () => {
     expect(lives.every((l) => l.affordableBo < 3)).toBe(true);
+    expect(lives[1].affordableBo).toBe(2); // kiếp 2 còn dư ~7.000 so với phí bộ I + II
     expect(lives.at(-1)!.affordableBo).toBe(1);
     // đường giữ đồ có thật và rẻ: Ký vật nấc cuối giữ 3 món, tổng Duyên <= 2 kiếp Kim Đan
     const duyen = kimDanReincarnation().progression[0].duyenEarned;

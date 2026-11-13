@@ -80,6 +80,11 @@ export function renderKimDanPkBiCanh(): string {
     (m) => m.summary.min >= PK_TARGET_SECONDS.min && m.summary.max <= PK_TARGET_SECONDS.max,
   );
   const minStep = stepOf(KD, 0);
+  const wins = gaps.map((g) => Math.round(g.summary.winRate * 100));
+  const winRange =
+    Math.min(...wins) === Math.max(...wins)
+      ? `${wins[0]}%`
+      : `${Math.min(...wins)}-${Math.max(...wins)}%`;
   return `### 8. PK và bí cảnh ở Kim Đan (#406)
 
 **PK.** Cùng mô hình với mục "PK thách đấu" (\`duelOnce\`: mã server thật, đánh thường liên tục, ${RUNS} trận mỗi dòng). Hai người CÙNG bậc Kim Đan mặc CÙNG bộ trang bị: trận ${allInTarget ? "đều nằm trong" : "CÓ trận ngoài"} mục tiêu ${PK_TARGET_SECONDS.min}-${PK_TARGET_SECONDS.max} giây ở mọi bậc và mọi bộ.
@@ -88,7 +93,7 @@ export function renderKimDanPkBiCanh(): string {
 |---|---|---:|---:|
 ${mirrorRows.join("\n")}
 
-Cùng bậc nhưng KHÁC bộ: bên mặc bộ cao hơn thắng ${Math.round(Math.min(...gaps.map((g) => g.summary.winRate)) * 100)}-${Math.round(Math.max(...gaps.map((g) => g.summary.winRate)) * 100)}% số trận (như chênh một tầng ở mục "Chênh bậc"), trận ngắn hơn một chút. Linh thạch (phí rèn bộ III ~47.000, mục 6) mua được lợi thế PK quyết định so với người cùng bậc chưa rèn; PK là thách đấu hai bên đồng ý (người yếu hơn từ chối được), và câu hỏi chuẩn hoá chỉ số về bậc / bộ thấp hơn vẫn chờ người dùng (câu hỏi 4 ở \`questions.md\`).
+Cùng bậc nhưng KHÁC bộ: bên mặc bộ cao hơn thắng ${winRange} số trận (như chênh một tầng ở mục "Chênh bậc"), trận ngắn hơn một chút. Linh thạch (phí rèn bộ III ~47.000, mục 6) mua được lợi thế PK quyết định so với người cùng bậc chưa rèn; PK là thách đấu hai bên đồng ý (người yếu hơn từ chối được), và câu hỏi chuẩn hoá chỉ số về bậc / bộ thấp hơn vẫn chờ người dùng (câu hỏi 4 ở \`questions.md\`).
 
 | Bậc | Trận | Bên mạnh thắng | Giây đánh (trung vị) |
 |---|---|---:|---:|

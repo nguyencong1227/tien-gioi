@@ -389,7 +389,12 @@ if (process.argv.includes("--stdout")) {
   );
 } else {
   const here = path.dirname(fileURLToPath(import.meta.url));
-  const out = path.resolve(here, "../../../docs/CAN_BANG.md");
+  // `--out <đường dẫn>`: ghi ra chỗ khác (test `can-bang-sync.test.ts` so bản sinh với `docs/CAN_BANG.md`); mặc định ghi đè tài liệu
+  const outArg = process.argv.indexOf("--out");
+  const out =
+    outArg >= 0 && process.argv[outArg + 1]
+      ? path.resolve(process.argv[outArg + 1])
+      : path.resolve(here, "../../../docs/CAN_BANG.md");
   writeFileSync(
     out,
     `# Cân bằng tu luyện (bảng tính)
