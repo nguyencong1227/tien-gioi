@@ -114,6 +114,7 @@ import {
   sectConfirmText,
   type SectConfirmKind,
 } from "./sect";
+import { feeChipText, recipeFee } from "./forge-fee";
 import { sound } from "./audio";
 import { transitionMs, waitOrSkip } from "./gfx/scene-transition";
 import { getDisplay, onDisplayChange } from "./gfx/display";
@@ -1261,11 +1262,24 @@ function renderForgeModal() {
       matsRow.append(chip);
     }
 
+    // Phí Linh thạch (M6): chip "Linh thạch có/cần" như nguyên liệu; thiếu tiền thì nút Rèn tắt (server cũng từ chối)
+    const fee = recipeFee(rec.coin);
+    if (fee > 0) {
+      const enoughCoin = currentCoin >= fee;
+      if (!enoughCoin) canCraft = false;
+      const feeChip = document.createElement("span");
+      feeChip.className = `forge-mat forge-fee ${enoughCoin ? "ok" : "missing"}`;
+      feeChip.textContent = feeChipText(fee, currentCoin);
+      feeChip.title = `Phí rèn: ${fee.toLocaleString("vi-VN")} ${CURRENCY_NAME}`;
+      matsRow.append(feeChip);
+    }
+
     const forgeBtn = document.createElement("button");
     forgeBtn.type = "button";
     forgeBtn.className = "forge-btn";
     forgeBtn.disabled = !canCraft;
     forgeBtn.textContent = "Rèn";
+    if (fee > 0) forgeBtn.title = `Rèn: tốn ${fee.toLocaleString("vi-VN")} ${CURRENCY_NAME}`;
     forgeBtn.addEventListener("click", (e) => {
       e.preventDefault();
       if (!canCraft) return;
@@ -3195,6 +3209,9 @@ export const ui = {
     if (m.gained !== undefined && m.gained !== 0) {
       showCoinGainFeed(m.gained);
     }
+
+    // Phí rèn so với số dư: bảng Lò Rèn đang mở thì vẽ lại chip phí và nút Rèn
+    if (forgeModalOpen) renderForgeModal();
 
     if (shopModalOpen) {
       renderShopModal();
