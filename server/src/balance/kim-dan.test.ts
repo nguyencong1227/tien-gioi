@@ -3,8 +3,9 @@
 //  - các kết luận trên ẢNH CHỤP cố định `kim-dan-truoc.json` (mốc "trước M6" để #406 so trước / sau).
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { ITEM_BY_ID } from "@tien-gioi/shared";
+import { DROP_TABLES, ITEM_BY_ID } from "@tien-gioi/shared";
 import { BASELINE_IDS, measureKimDan, renderKimDan, type KimDanReport } from "./kim-dan";
+import { simulate } from "./simulate";
 
 const truoc = JSON.parse(
   readFileSync(new URL("./kim-dan-truoc.json", import.meta.url), "utf-8"),
@@ -39,6 +40,76 @@ describe("measureKimDan (dữ liệu sống)", () => {
     expect(seen).toBeGreaterThan(0);
   });
 
+  // ----- Quan hệ độc lập (không khoá con số): bắt các đột biến mà kiểm tự nhất quán bỏ sót -----
+  it("kỳ vọng đan mỗi con = chance x (min + max) / 2 của bảng rơi thật (DROP_TABLES)", () => {
+    for (const t of r.tiers) {
+      for (const p of [t.pill, t.pillFastSearch]) {
+        if (!p) continue;
+        const e = DROP_TABLES[p.monsterId].find((d) => d.itemId === "tu_khi_dan")!;
+        expect(p.pillsPerKill).toBeCloseTo(e.chance * ((e.min + e.max) / 2), 12);
+      }
+    }
+  });
+
+  it("nguồn tu vi tốt nhất = loài an toàn có tu vi / giờ lớn nhất; loài không an toàn thì không có số", () => {
+    for (const t of r.tiers) {
+      const safe = t.hunts.filter((h) => h.safe);
+      for (const h of t.hunts) {
+        expect(h.expPerHour === null, h.id).toBe(!h.safe);
+        expect(h.coinPerHour === null, h.id).toBe(!h.safe);
+      }
+      const max = Math.max(...safe.map((h) => h.expPerHour!));
+      expect(t.best!.expPerHour).toBe(max);
+      expect(safe.find((h) => h.id === t.best!.id)!.expPerHour).toBe(max);
+    }
+  });
+
+  it("nguồn đan = loài an toàn cho NHIỀU đan nhất mỗi giờ (con / giờ x đan / con), không phải loài săn nhanh nhất", () => {
+    for (const t of r.tiers) {
+      const cand = t.hunts
+        .filter((h) => h.safe)
+        .map((h) => {
+          const e = DROP_TABLES[h.id].find((d) => d.itemId === "tu_khi_dan");
+          return {
+            id: h.id,
+            supply: e ? (3600 / h.secPerKill!) * e.chance * ((e.min + e.max) / 2) : 0,
+          };
+        })
+        .filter((c) => c.supply > 0);
+      const bestSupply = Math.max(...cand.map((c) => c.supply));
+      expect(t.pill!.supplyPerHour).toBeCloseTo(bestSupply, 9);
+      expect(cand.find((c) => c.id === t.pill!.monsterId)!.supply).toBeCloseTo(bestSupply, 9);
+    }
+  });
+
+  it("tổng thời gian Kim Đan = tổng phút ba bậc Kim Đan của simulate() (độc lập với kim-dan.ts)", () => {
+    const sum = simulate(3)
+      .filter((row) => row.realm === 3)
+      .reduce((a, row) => a + row.minutes, 0);
+    expect(r.simulateMinutes).toBeCloseTo(sum, 6);
+  });
+
+  it("độ nhạy hitTaken: an toàn khi mọi đòn trúng thì phải an toàn ở ca thường (đơn điệu); ASSUME.hitTaken được khôi phục", async () => {
+    const { ASSUME } = await import("./simulate");
+    expect(ASSUME.hitTaken).toBeLessThan(1);
+    // Tính lại độc lập: đặt hitTaken = 1 rồi hỏi mô hình an toàn solo (khôi phục ngay)
+    const { huntRate } = await import("./simulate");
+    const { MONSTER_BY_ID } = await import("@tien-gioi/shared");
+    const saved = ASSUME.hitTaken;
+    try {
+      ASSUME.hitTaken = 1;
+      for (const t of r.tiers)
+        for (const h of t.hunts)
+          expect(h.safeIfAllHit, `${t.label} ${h.id}`).toBe(
+            !!huntRate(MONSTER_BY_ID[h.id], 3, t.tier),
+          );
+    } finally {
+      ASSUME.hitTaken = saved;
+    }
+    for (const t of r.tiers)
+      for (const h of t.hunts) if (h.safeIfAllHit) expect(h.safe, h.id).toBe(true);
+  });
+
   it("ca 'tìm nhanh' không làm lệch giả định toàn cục (khôi phục ASSUME.searchSec.mang)", async () => {
     const { ASSUME } = await import("./simulate");
     expect(ASSUME.searchSec.mang).toBe(r.mangSearch);
@@ -64,6 +135,13 @@ describe("kim-dan-truoc.json: mốc trước M6 (nội dung chỉ có bốn loà
     }
     expect(truoc.tiers[0].best!.id).toBe("ho");
     expect(truoc.tiers[1].best!.id).toBe("mang");
+  });
+
+  it("độ nhạy (B, #416): nếu mọi đòn trúng thì Xích Mãng chỉ an toàn solo từ Hậu kỳ; Trung kỳ sát ngưỡng", () => {
+    const m = (ti: number) => truoc.tiers[ti].hunts.find((h) => h.id === "mang")!;
+    expect([m(0).safeIfAllHit, m(1).safeIfAllHit, m(2).safeIfAllHit]).toEqual([false, false, true]);
+    expect(m(1).safe).toBe(true);
+    expect(renderKimDan(truoc)).toContain("sát ngưỡng");
   });
 
   it("Tụ Khí Đan là nguồn tu vi chính ở Kim Đan: có đan rút ngắn một thanh Xích Mãng quá một nửa", () => {

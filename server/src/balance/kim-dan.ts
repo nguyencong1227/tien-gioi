@@ -25,6 +25,8 @@ export interface HuntRow {
   name: string;
   /** Solo an toàn (mỗi trận mất không quá `ASSUME.maxHpLossPerKill` khí huyết) */
   safe: boolean;
+  /** Vẫn an toàn solo nếu MỌI đòn của quái đều trúng (`ASSUME.hitTaken` = 1): ca xấu nhất, để biết bậc nào sát ngưỡng */
+  safeIfAllHit: boolean;
   expPerHour: number | null;
   secPerKill: number | null;
   coinPerHour: number | null;
@@ -130,10 +132,19 @@ export function measureKimDan(
     const hunts: HuntRow[] = mons.map((m) => {
       const h = huntRate(m, KIM_DAN, tier);
       const e = monsterEconomy(m, KIM_DAN, tier);
+      const savedHit = ASSUME.hitTaken;
+      ASSUME.hitTaken = 1;
+      let safeIfAllHit: boolean;
+      try {
+        safeIfAllHit = !!huntRate(m, KIM_DAN, tier);
+      } finally {
+        ASSUME.hitTaken = savedHit;
+      }
       return {
         id: m.id,
         name: m.name,
         safe: !!h,
+        safeIfAllHit,
         expPerHour: h ? h.rate * 3600 : null,
         secPerKill: h ? h.secPerKill : null,
         coinPerHour: e ? e.totalCoinPerHour : null,
@@ -250,6 +261,17 @@ export function renderKimDan(r: KimDanReport): string {
     return d.winRate >= 0.5 && (d.realMinutes ?? Infinity) <= LINH_HU.timeLimitMs / 60_000;
   });
   const soloWins = r.tiers.every((t) => t.dungeon.find((d) => d.party === 1)?.winRate === 1);
+  // Bậc mà Xích Mãng "an toàn solo" chỉ nhờ giả định né được một phần đòn (hitTaken 0.8): nếu mọi đòn trúng thì không còn an toàn
+  const edgeTiers = r.tiers.filter((t) => {
+    const h = t.hunts.find((x) => x.id === "mang");
+    return !!h && h.safe && !h.safeIfAllHit;
+  });
+  const firstSafeAllHit = r.tiers.find(
+    (t) => t.hunts.find((x) => x.id === "mang")?.safeIfAllHit,
+  )?.label;
+  const edge = edgeTiers.length
+    ? ` **Độ nhạy:** "an toàn" dựa trên giả định người chơi né được một phần đòn; nếu mọi đòn của Xích Mãng đều trúng thì ${edgeTiers.map((t) => t.label).join(", ")} sát ngưỡng (không còn an toàn solo) và đường tắt chỉ bắt đầu từ ${firstSafeAllHit ?? "bậc sau Kim Đan"}.`
+    : "";
   const dMin = r.tiers.map((t) => t.dungeon.find((d) => d.party === LINH_HU.partyMin)!);
   return `## Kim Đan trước M6 (#402)
 
@@ -265,7 +287,7 @@ Theo \`simulate()\` (có chuỗi nhiệm vụ, có đột phá thất bại), Ki
 |---|---:|---|---:|
 ${r.tiers.map((t) => `| ${t.label} | ${n0(t.bar)} | ${t.best ? names[t.best.id] : "đả tọa"} | ${t.best ? n0(t.best.expPerHour) : "–"} |`).join("\n")}
 
-Sơ kỳ phải cày Hắc Hổ rất lâu; từ ${t1.label} Xích Mãng (cấp 12, 4000 máu) thành an toàn khi solo (mô hình: mất ≤ 50% khí huyết mỗi trận) và cho **${n0(mangRate)} tu vi / giờ, gấp ${n1(mangRate / hoRate)} lần Hắc Hổ** (${n0(hoRate)}): mục tiêu "tu vi / giờ không quá ~1,5× bãi đúng bậc" bị vượt xa. \`KILL_EXP_FREE_GAP\` chưa trừ gì vì Xích Mãng chỉ thấp hơn người chơi 1-3 bậc.
+Sơ kỳ phải cày Hắc Hổ rất lâu; từ ${t1.label} Xích Mãng (cấp 12, 4000 máu) thành an toàn khi solo (mô hình: mất ≤ 50% khí huyết mỗi trận) và cho **${n0(mangRate)} tu vi / giờ, gấp ${n1(mangRate / hoRate)} lần Hắc Hổ** (${n0(hoRate)}): mục tiêu "tu vi / giờ không quá ~1,5× bãi đúng bậc" bị vượt xa. \`KILL_EXP_FREE_GAP\` chưa trừ gì vì Xích Mãng chỉ thấp hơn người chơi 1-3 bậc.${edge}
 
 ### 2. Mỗi loài (solo)
 

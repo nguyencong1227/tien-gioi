@@ -286,7 +286,7 @@ Theo `simulate()` (có chuỗi nhiệm vụ, có đột phá thất bại), Kim 
 | Kim Đan Trung kỳ | 30,360 | Xích Mãng | 30,510 |
 | Kim Đan Hậu kỳ | 34,914 | Xích Mãng | 31,364 |
 
-Sơ kỳ phải cày Hắc Hổ rất lâu; từ Kim Đan Trung kỳ Xích Mãng (cấp 12, 4000 máu) thành an toàn khi solo (mô hình: mất ≤ 50% khí huyết mỗi trận) và cho **30,510 tu vi / giờ, gấp 6.1 lần Hắc Hổ** (5,014): mục tiêu "tu vi / giờ không quá ~1,5× bãi đúng bậc" bị vượt xa. `KILL_EXP_FREE_GAP` chưa trừ gì vì Xích Mãng chỉ thấp hơn người chơi 1-3 bậc.
+Sơ kỳ phải cày Hắc Hổ rất lâu; từ Kim Đan Trung kỳ Xích Mãng (cấp 12, 4000 máu) thành an toàn khi solo (mô hình: mất ≤ 50% khí huyết mỗi trận) và cho **30,510 tu vi / giờ, gấp 6.1 lần Hắc Hổ** (5,014): mục tiêu "tu vi / giờ không quá ~1,5× bãi đúng bậc" bị vượt xa. `KILL_EXP_FREE_GAP` chưa trừ gì vì Xích Mãng chỉ thấp hơn người chơi 1-3 bậc. **Độ nhạy:** "an toàn" dựa trên giả định người chơi né được một phần đòn; nếu mọi đòn của Xích Mãng đều trúng thì Kim Đan Trung kỳ sát ngưỡng (không còn an toàn solo) và đường tắt chỉ bắt đầu từ Kim Đan Hậu kỳ.
 
 ### 2. Mỗi loài (solo)
 
