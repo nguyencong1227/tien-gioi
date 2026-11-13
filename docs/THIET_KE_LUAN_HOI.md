@@ -90,7 +90,7 @@ Mục tiêu: (a) chết sớm gần như không có Duyên, nên không lợi d�
 Duyên = floor( stepPts + timePts + bossPts )
 stepPts = tổng điểm các bậc ĐÃ VƯỢT QUA + điểm bậc hiện tại × (tu vi / thanh tu vi)
           (bậc hiện tại CHƯA vượt qua: đứng ở Trúc Cơ sơ kỳ với 0% tu vi thì mới có điểm của 9 bậc Luyện Khí, chưa có điểm Trúc Cơ nào)
-          điểm mỗi bậc theo cảnh giới nơi công sức được bỏ ra: Luyện Khí: 2 / bậc;  Trúc Cơ: 12 / bậc;  Kim Đan: 60 / bậc (chưa có nội dung); Phàm Nhân: 0
+          điểm mỗi bậc theo cảnh giới nơi công sức được bỏ ra: Luyện Khí: 2 / bậc;  Trúc Cơ: 12 / bậc;  Kim Đan: 40 / bậc (M6, #406: bản đầu 60 = 12 x 5 làm Duyên / giờ ở Kim Đan hậu kỳ gấp ~1,4 lần Luyện Khí tầng 5; cảnh giới sau gấp 5 lần cảnh giới trước); Phàm Nhân: 0
 timePts = min( 15, floor(phút chơi / 9) )     // phút chơi = thời gian nhân vật thật sự ở trong game (không tính ghost, Hoàng Tuyền)
 bossPts = min( 15, 3 × số trùm đã hạ )
 ```
