@@ -711,30 +711,62 @@ export function searchSensitivity(rows: readonly SearchRow[]): SearchSensitivity
   return { model, measured: withSearchSec(searchSec, finishMinutes), searchSec };
 }
 
+/** Dạng của độ "vụng" (người chơi chậm hơn thợ săn): NHÂN (chậm gấp k lần ở mọi nơi) hay CỘNG (mất thêm b giây cố định mỗi lần tìm). */
+export type SlackMode = "nhan" | "cong";
+
+/**
+ * Độ vụng ước lượng từ các loài THƯỜNG (mô hình đã cho chúng thời gian tìm lớn hơn số đo): nhân = trung vị (giả định / đo), cộng = trung vị
+ * (giả định - đo). Truyền số đo của MỌI cỡ màn hình một lượt: số đo thô của trùm gần y hệt giữa ba cỡ (Xích Mãng Lạc Hà 21,2 / 22,1 / 22,8 giây)
+ * nên một hệ số riêng từng cỡ chỉ thêm nhiễu của loài thường (review của B ở #460). Hai dạng là hai GIẢ THUYẾT chưa kiểm chứng; số đo của bot / người (#410) phân xử.
+ */
+export function slackOf(rows: readonly SearchRow[], mode: SlackMode): number {
+  const xs = rows
+    .filter((r) => !MONSTER_BY_ID[r.monsterId].boss)
+    .map((r) => (mode === "nhan" ? r.assumed / r.mean : r.assumed - r.mean))
+    .sort((x, y) => x - y);
+  return xs[Math.floor(xs.length / 2)];
+}
+
 export interface SearchCalibrated {
-  /**
-   * Hệ số "vụng" của người chơi so với thợ săn: trung vị của (giả định / đo) trên các loài THƯỜNG. Mô hình đã cho mỗi loài thường
-   * một khoảng thời gian tìm lớn hơn thợ săn chừng này lần (người thật do dự, đả tọa, nhặt đồ, tranh quái), nên cùng hệ số đó
-   * áp cho trùm mới là so công bằng với phần còn lại của mô hình.
-   */
-  factor: number;
-  /** Giây tìm thay vào cho từng trùm: số đo (bản đồ chậm hơn) x `factor`; loài thường giữ giả định của mô hình */
+  mode: SlackMode;
+  /** Hệ số (nhân) hoặc số giây (cộng) đã dùng */
+  slack: number;
+  /** Giây tìm thay vào cho từng trùm: số đo (bản đồ chậm hơn) nhân / cộng `slack`; loài thường giữ giả định của mô hình */
   searchSec: Record<string, number>;
   pace: SearchPace;
 }
 
-/** Nhịp tu luyện khi loài thường giữ giả định mô hình còn trùm lấy số đo nhân hệ số vụng của loài thường (so công bằng). */
-export function searchCalibrated(rows: readonly SearchRow[]): SearchCalibrated {
-  const ratios = rows
-    .filter((r) => !MONSTER_BY_ID[r.monsterId].boss)
-    .map((r) => r.assumed / r.mean)
-    .sort((a, b) => a - b);
-  const factor = ratios[Math.floor(ratios.length / 2)];
+/** Nhịp tu luyện khi loài thường giữ giả định mô hình còn trùm lấy số đo cộng độ vụng `slack` (so công bằng với phần còn lại của mô hình). */
+export function searchCalibrated(
+  rows: readonly SearchRow[],
+  slack: number,
+  mode: SlackMode,
+): SearchCalibrated {
   const searchSec: Record<string, number> = {};
   for (const r of rows)
-    if (MONSTER_BY_ID[r.monsterId].boss)
-      searchSec[r.monsterId] = Math.max(searchSec[r.monsterId] ?? 0, r.mean * factor);
-  return { factor, searchSec, pace: withSearchSec(searchSec, finishMinutes) };
+    if (MONSTER_BY_ID[r.monsterId].boss) {
+      const v = mode === "nhan" ? r.mean * slack : r.mean + slack;
+      searchSec[r.monsterId] = Math.max(searchSec[r.monsterId] ?? 0, v);
+    }
+  return { mode, slack, searchSec, pace: withSearchSec(searchSec, finishMinutes) };
+}
+
+/**
+ * Số giây giữa hai lần hạ Xích Mãng NHỎ NHẤT mà tiêu chí #406 mục 1 (không nguồn nào vượt `limit` lần bãi mới tốt nhất cùng bậc) còn đạt
+ * (chia đôi; tỉ lệ giảm khi thời gian tìm tăng). 0 nếu đạt ở mọi giá trị, Infinity nếu không bao giờ đạt. Đây là ngưỡng để so với số đo của bot (#410).
+ */
+export function breakEvenMangSec(limit = 1.5): number {
+  const worst = (t: number) => Math.max(...withSearchSec({ mang: t }, finishMinutes).mangRatio);
+  let lo = 1,
+    hi = 600;
+  if (worst(hi) > limit) return Infinity;
+  if (worst(lo) <= limit) return 0;
+  for (let i = 0; i < 30; i++) {
+    const mid = (lo + hi) / 2;
+    if (worst(mid) > limit) lo = mid;
+    else hi = mid;
+  }
+  return hi;
 }
 
 // --- Mục 10 của CAN_BANG.md -----------------------------------------------------------------------------------------
@@ -778,18 +810,46 @@ export function renderSearchCheck(): string {
     `| ${name} | ${n0(p.luyenKhi)} | ${n0(p.trucCo)} | ${n0(p.kimDan)} (${gio(p.kimDan)} giờ) | ${n0(p.kimDanNoMang)} (${gio(p.kimDanNoMang)} giờ) | ${src(p)} | ${p.mangRatio.map((r) => r.toFixed(2)).join(" / ")} |`;
   const model = sens.all.model;
   const worstMang = (p: SearchPace) => Math.max(...p.mangRatio);
-  const cal = Object.fromEntries(real.map((k) => [k, searchCalibrated(byView[k])])) as Record<
-    Exclude<ViewKey, "all">,
-    SearchCalibrated
-  >;
-  const calRows = real.map((k) => {
-    const c = cal[k];
+  // độ vụng: MỘT hệ số chung cho mọi cỡ màn hình (xem `slackOf`), hai dạng giả thuyết
+  const pooled = real.flatMap((k) => byView[k]);
+  const modes: SlackMode[] = ["nhan", "cong"];
+  const slack = { nhan: slackOf(pooled, "nhan"), cong: slackOf(pooled, "cong") };
+  const modeName = {
+    nhan: `Nhân (người chậm gấp ${slack.nhan.toFixed(1)}x)`,
+    cong: `Cộng (người mất thêm ${n0(slack.cong)} giây)`,
+  };
+  const cal = modes.flatMap((mode) =>
+    real.map((k) => ({ mode, view: k, c: searchCalibrated(byView[k], slack[mode], mode) })),
+  );
+  const calRows = cal.map(({ mode, view, c }) => {
     const p = c.pace;
-    return `| ${label(k)} | ${c.factor.toFixed(1)}x | ${n0(c.searchSec.mang)} | ${n0(c.searchSec.hac_giao)} | ${n0(p.kimDan)} (${gio(p.kimDan)} giờ) | ${n0(p.kimDanNoMang)} (${gio(p.kimDanNoMang)} giờ) | ${p.mangRatio.map((r) => r.toFixed(2)).join(" / ")} |`;
+    return `| ${modeName[mode]} | ${label(view)} | ${n0(c.searchSec.mang)} | ${n0(c.searchSec.hac_giao)} | ${n0(p.kimDan)} (${gio(p.kimDan)} giờ) | ${n0(p.kimDanNoMang)} (${gio(p.kimDanNoMang)} giờ) | ${p.mangRatio.map((r) => r.toFixed(2)).join(" / ")} |`;
   });
-  const calFail = real.filter((k) => worstMang(cal[k].pace) > 1.5);
-  const calWorst = Math.max(...real.map((k) => worstMang(cal[k].pace)));
-  const calMang = real.map((k) => cal[k].searchSec.mang);
+  const calVerdict = (mode: SlackMode) =>
+    cal
+      .filter((x) => x.mode === mode)
+      .map(
+        (x) =>
+          `${SEARCH_VIEW_LABELS[x.view].toLowerCase()} ${worstMang(x.c.pace).toFixed(2)}x ${worstMang(x.c.pace) <= 1.5 ? "ĐẠT" : "KHÔNG ĐẠT"}`,
+      )
+      .join("; ");
+  const calPace = (mode: SlackMode) => cal.filter((x) => x.mode === mode).map((x) => x.c.pace);
+  const range1 = (xs: number[], f: (x: number) => string) => {
+    const lo = f(Math.min(...xs)),
+      hi = f(Math.max(...xs));
+    return lo === hi ? lo : `${lo}-${hi}`;
+  };
+  const calMangSec = (mode: SlackMode) =>
+    range1(
+      cal.filter((x) => x.mode === mode).map((x) => x.c.searchSec.mang),
+      n0,
+    );
+  const calKimDan = (mode: SlackMode) =>
+    range1(
+      calPace(mode).map((p) => p.kimDan),
+      gio,
+    );
+  const breakEven = breakEvenMangSec();
   const verdict = (name: string, p: SearchPace) =>
     `${name} ${worstMang(p) <= 1.5 ? "ĐẠT" : "KHÔNG ĐẠT"} (tối đa ${worstMang(p).toFixed(2)}x)`;
   const criterion = [
@@ -833,14 +893,22 @@ ${keys.map((k) => paceRow(label(k), sens[k].measured)).join("\n")}
 
 Tiêu chí #406 mục 1 ("không nguồn nào vượt ~1,5x bãi mới tốt nhất cùng bậc", cột cuối): ${criterion}.
 
-**So công bằng: hiệu chỉnh theo độ vụng của loài thường.** Thợ săn là thuật toán (biết loài sống ở vùng nào, đường đi hoàn hảo, không bao giờ dừng), nên mọi số đo ở trên đều nhanh hơn giả định của mô hình; cột "giả định / đo" của loài thường cho thấy mô hình đã chừa cho người chơi thật một khoảng thời gian tìm quái lớn hơn thợ săn vài lần (do dự, đả tọa, nhặt đồ, tranh quái). So Xích Mãng / Hắc Giao với số đo THÔ là so không công bằng (mô hình cho chúng 90 giây, không chừa tỉ lệ ấy). Nên bảng dưới giữ giả định mô hình cho loài thường và đặt Xích Mãng / Hắc Giao = số đo (bản đồ chậm hơn) x hệ số vụng (trung vị của giả định / đo trên các loài thường ở cùng mức nhìn):
+**So công bằng: hiệu chỉnh theo độ vụng của loài thường.** Thợ săn là thuật toán (biết loài sống ở vùng nào, đường đi hoàn hảo, không bao giờ dừng), nên mọi số đo ở trên đều nhanh hơn giả định của mô hình; mô hình đã chừa cho người chơi thật một khoảng thời gian tìm quái lớn hơn thợ săn (do dự, đả tọa, nhặt đồ, tranh quái). So Xích Mãng / Hắc Giao với số đo THÔ là so không công bằng (mô hình cho chúng 90 giây, không chừa khoảng ấy). Bảng dưới giữ giả định mô hình cho loài thường và đặt Xích Mãng / Hắc Giao = số đo (bản đồ chậm hơn) cộng độ vụng. Độ vụng chỉ ước lượng được từ các loài thường (trung vị trên ${pooled.filter((r) => !MONSTER_BY_ID[r.monsterId].boss).length} dòng: 8 loài x ${real.length} cỡ màn hình, ${SEARCH_SEEDS} hạt giống) và **dạng của nó là giả thuyết chưa kiểm chứng**, nên cho hai dạng: NHÂN (người chậm gấp k lần thợ săn ở mọi nơi) và CỘNG (người mất thêm b giây cố định mỗi lần tìm). Một hệ số CHUNG cho cả ba cỡ màn hình, vì số đo thô của trùm gần y hệt giữa ba cỡ (Xích Mãng Lạc Hà ${real.map((k) => n1(byView[k].find((r) => r.monsterId === "mang" && r.mapId === "lac_ha")!.mean)).join(" / ")} giây) nên hệ số riêng từng cỡ chỉ thêm nhiễu của loài thường. Thật nằm đâu đó giữa hai dạng; **số đo của bot / người (#410) mới phân xử được**.
 
-| Mức nhìn | Hệ số vụng | Xích Mãng (s, giả định 90) | Hắc Giao (s, giả định 90) | Riêng Kim Đan (tối ưu) | Riêng Kim Đan (bãi mới) | Xích Mãng / bãi mới tốt nhất (Sơ / Trung / Hậu) |
-|---|---:|---:|---:|---:|---:|---:|
+| Giả thuyết độ vụng | Mức nhìn | Xích Mãng (s, giả định 90) | Hắc Giao (s, giả định 90) | Riêng Kim Đan (tối ưu) | Riêng Kim Đan (bãi mới) | Xích Mãng / bãi mới tốt nhất (Sơ / Trung / Hậu) |
+|---|---|---:|---:|---:|---:|---:|
 ${calRows.join("\n")}
 
-Tiêu chí #406 mục 1 sau hiệu chỉnh: ${real.map((k) => `${SEARCH_VIEW_LABELS[k].toLowerCase()} ${worstMang(cal[k].pace) <= 1.5 ? "ĐẠT" : "KHÔNG ĐẠT"} (tối đa ${worstMang(cal[k].pace).toFixed(2)}x)`).join("; ")}. ${calFail.length === 0 ? `Xích Mãng không vượt ~1,5x ở cả ${real.length} cỡ màn hình khi người chơi vụng như mô hình đã giả định cho loài thường: giả định ${ASSUME.searchSec.mang} giây cho Xích Mãng nằm ở phía thận trọng (hiệu chỉnh ra ${n0(Math.min(...calMang))}-${n0(Math.max(...calMang))} giây), không phải chỗ hỏng.` : `Xích Mãng vượt ~1,5x ở ${calFail.map((k) => SEARCH_VIEW_LABELS[k].toLowerCase()).join(", ")} (tối đa ${calWorst.toFixed(2)}x): nếu người chơi thật vụng như mô hình đã giả định cho loài thường thì họ tìm Xích Mãng mỗi ${n0(Math.min(...calMang))}-${n0(Math.max(...calMang))} giây chứ không phải ${ASSUME.searchSec.mang}; nhịp Kim Đan "tối ưu" ra ${gio(Math.min(...real.map((k) => cal[k].pace.kimDan)))}-${gio(Math.max(...real.map((k) => cal[k].pace.kimDan)))} giờ (mục tiêu 5-7). Vượt ngưỡng chủ yếu ở Sơ kỳ (cột đầu của ba số cuối), sát ngưỡng chứ không vượt xa; hệ số vụng dao động ${Math.min(...real.map((k) => cal[k].factor)).toFixed(1)}x-${Math.max(...real.map((k) => cal[k].factor)).toFixed(1)}x giữa các cỡ màn hình vì loài thường chỉ có ${SEARCH_SEEDS} hạt giống, nên đây là một khoảng, không phải một con số.`}
+Tiêu chí #406 mục 1 sau hiệu chỉnh (tối đa của ba bậc; ĐẠT khi <= 1,5x), nhân: ${calVerdict("nhan")}. Cộng: ${calVerdict("cong")}. Xích Mãng tìm mỗi ${calMangSec("nhan")} giây (nhân) hoặc ${calMangSec("cong")} giây (cộng) chứ không phải ${ASSUME.searchSec.mang}; nhịp Kim Đan "tối ưu" ra ${calKimDan("nhan")} giờ (nhân) hoặc ${calKimDan("cong")} giờ (cộng), mục tiêu 5-7. ${cal.every((x) => worstMang(x.c.pace) > 1.5) ? `Cả hai giả thuyết ở cả ${real.length} cỡ màn hình đều KHÔNG ĐẠT (ít nhất một bậc vượt 1,5x; từng bậc ở cột cuối của bảng).` : "Có dòng ĐẠT, có dòng KHÔNG ĐẠT: xem từng dòng ở cột cuối."} Lấy bản đồ CHẬM hơn của Xích Mãng (Lạc Hà Trấn, 2 con) là cách nghiêng về phía mô hình: người chơi chọn Hắc Phong Cốc (6 con) sẽ tìm nhanh hơn (số đo thô ${range1(
+    real.map((k) => byView[k].find((r) => r.monsterId === "mang" && r.mapId === "hac_phong")!.mean),
+    n1,
+  )} giây so với ${range1(
+    real.map((k) => byView[k].find((r) => r.monsterId === "mang" && r.mapId === "lac_ha")!.mean),
+    n1,
+  )} giây).
 
-Đọc bảng: nhịp Kim Đan là hàm của giả định tìm quái. Mô hình ra ${gio(model.kimDan)} giờ (tối ưu) / ${gio(model.kimDanNoMang)} giờ (bãi mới); thợ săn ${hours}; biết hết bản đồ ${gio(sens.all.measured.kimDan)} / ${gio(sens.all.measured.kimDanNoMang)} giờ. Phần lớn chênh lệch tới từ Xích Mãng (nguồn nhanh nhất của cả ba bậc ở kịch bản tối ưu: ${src(model)}): giả định ${ASSUME.searchSec.mang} giây cho nó là một con số đoán và là cái quyết định nhịp "tối ưu". **Không sửa \`ASSUME.searchSec\` trong PR này**: số đo là thợ săn thuật toán, không phải người; con số quyết định là thời gian giữa hai lần hạ Xích Mãng của người chơi / bot thật (#410: bot chỉ nên biết quái trong vùng nhìn CHỮ NHẬT theo \`fitZoom\` như các cột trên, không đọc \`state.monsters\` của cả bản đồ). ${calFail.length === 0 ? "" : `Khi số đo của bot (#410) có: nếu thời gian giữa hai lần hạ Xích Mãng ngắn hơn ~${n0(Math.min(...calMang))}-${n0(Math.max(...calMang))} giây thì chọn giữa (a) giảm mật độ / kéo dài hồi sinh Xích Mãng (\`shared/\`, PR riêng) và (b) chấp nhận đường tắt Xích Mãng (đã có ca "tìm nhanh" 30 giây trong \`kim-dan.ts\`); nếu dài hơn thì sửa \`ASSUME.searchSec.mang\` cho khớp. `}Số hạt giống nhiều hơn (${SEARCH_SEEDS_BOSS} cho trùm) và thợ săn khoá mục tiêu / quét vòng đã loại các lần kẹt hàng nghìn giây mô phỏng của bản đầu (#459).
+**Ngưỡng hoà vốn cho #410.** Chạy \`simulate\` với \`ASSUME.searchSec.mang\` = T, tiêu chí #406 mục 1 đạt khi T >= **${Number.isFinite(breakEven) ? n0(breakEven) : "(không xác định)"} giây** giữa hai lần hạ Xích Mãng (mô hình hiện tại: ${ASSUME.searchSec.mang} giây, tối đa ${Math.max(...model.mangRatio).toFixed(2)}x). Bot (#410) là thuật toán như thợ săn ở đây, nên so số đo của bot với ngưỡng đó phải trừ độ vụng: bot đo NGẮN hơn ~${Number.isFinite(breakEven) ? n0(breakEven / slack.nhan) : "?"} giây (giả thuyết nhân) hoặc ~${Number.isFinite(breakEven) ? n0(Math.max(0, breakEven - slack.cong)) : "?"} giây (giả thuyết cộng) thì Xích Mãng nhanh quá mức tiêu chí; dài hơn thì đạt.
+
+Đọc bảng: nhịp Kim Đan là hàm của giả định tìm quái. Mô hình ra ${gio(model.kimDan)} giờ (tối ưu) / ${gio(model.kimDanNoMang)} giờ (bãi mới); thợ săn ${hours}; biết hết bản đồ ${gio(sens.all.measured.kimDan)} / ${gio(sens.all.measured.kimDanNoMang)} giờ. Phần lớn chênh lệch tới từ Xích Mãng (nguồn nhanh nhất của cả ba bậc ở kịch bản tối ưu: ${src(model)}): giả định ${ASSUME.searchSec.mang} giây cho nó là một con số đoán và là cái quyết định nhịp "tối ưu". **Không sửa \`ASSUME.searchSec\` trong PR này**: số đo là thợ săn thuật toán, không phải người; con số quyết định là thời gian giữa hai lần hạ Xích Mãng của người chơi / bot thật (#410: bot chỉ nên biết quái trong vùng nhìn CHỮ NHẬT theo \`fitZoom\` như các cột trên, không đọc \`state.monsters\` của cả bản đồ). Khi bot (#410) có số đo, chọn giữa (a) giảm mật độ / kéo dài hồi sinh Xích Mãng (\`shared/\`, PR riêng) và (b) chấp nhận đường tắt Xích Mãng (đã có ca "tìm nhanh" 30 giây trong \`kim-dan.ts\`), hoặc sửa \`ASSUME.searchSec.mang\` cho khớp nếu số đo cao hơn ngưỡng hoà vốn. Số hạt giống nhiều hơn (${SEARCH_SEEDS_BOSS} cho trùm) và thợ săn khoá mục tiêu / quét vòng đã loại các lần kẹt hàng nghìn giây mô phỏng của bản đầu (#459).
 `;
 }
