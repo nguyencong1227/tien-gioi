@@ -25,11 +25,12 @@ const r = (id: string, output: string, inputs: [string, number][]): RecipeDef =>
   output: { itemId: output, qty: 1 },
 });
 
-// Ba bộ Kim Đan (M6, #403). TẠM rèn ở `tho_ren` (Lạc Hà) vì NPC thợ rèn Vọng Sương thuộc #404 (bản đồ + NPC); #404 đổi `npcId` sang NPC đó.
+// Ba bộ Kim Đan (M6, #403 / #404): rèn ở thợ rèn Vọng Sương (`tho_ren_suong`, Âm Sương Trạch), người chơi không phải về Lạc Hà.
 // Nguyên liệu theo vùng săn: bộ I Sương Hồ + Thạch Quy, bộ II Thạch Quy + Độc Thiềm, bộ III Hắc Giao (trùm, đội 3-4 người) + Độc Thiềm.
 // Phí Linh thạch (`coin`) là chỗ xả tiền: tổng ba bộ ~78.500 ~ 5 giờ thu nhập solo (docs/CAN_BANG.md), luôn cao hơn giá bán thành phẩm (`ITEM_VALUE` / 2).
 const rc = (id: string, output: string, coin: number, inputs: [string, number][]): RecipeDef => ({
   ...r(id, output, inputs),
+  npcId: "tho_ren_suong",
   coin,
 });
 export const KIM_DAN_RECIPES: RecipeDef[] = [

@@ -10,6 +10,8 @@ import {
   ITEM_BY_ID,
   stepOf,
   type QuestDef,
+  DEFAULT_MAP_ID,
+  npcsOfMap,
 } from "@tien-gioi/shared";
 import { makeWorld, addPlayer, addMonster } from "./test-helpers";
 import { giveItem } from "./inventory";
@@ -323,8 +325,12 @@ describe("chuỗi nhiệm vụ chính (#19)", () => {
     const { w, toasts } = makeWorld();
     const { p, c } = addPlayer(w, "a");
     const order: string[] = [];
+    // Phòng thử là Lạc Hà: chuỗi tiếp tục sang Hắc Phong Cốc / Âm Sương Trạch (M6) cần NPC ở phòng khác, nên dừng ở nhiệm vụ đầu tiên có
+    // người giao hoặc bước `talk` nằm ngoài Lạc Hà (phần còn lại kiểm bằng world theo từng bản đồ ở test ba bản đồ, #405)
+    const inHere = (npcId: string) => npcsOfMap(DEFAULT_MAP_ID).some((n) => n.id === npcId);
     for (let id: string | undefined = MAIN_QUEST_START; id; id = QUEST_BY_ID[id].next) {
       const def = QUEST_BY_ID[id];
+      if (!inHere(def.giver) || def.steps.some((s) => s.kind === "talk" && !inHere(s.npcId))) break;
       standAt(p, def.giver);
       acceptQuest(w, "a", id);
       expect(
@@ -361,6 +367,8 @@ describe("chuỗi nhiệm vụ chính (#19)", () => {
       order.push(id);
     }
     expect(order.length).toBeGreaterThanOrEqual(6);
+    // đã đi qua cả chuỗi Trúc Cơ ở Lạc Hà (đột phá, hạ Xích Mãng) và dừng đúng ở `thanh_lo_tram` (NPC ở Hắc Phong Cốc)
+    expect(order.slice(-3)).toEqual(["dinh_luyen_khi", "truc_co_nhap_mon", "mang_hoan"]);
     expect(c.quests.active).toHaveLength(0);
     expect(stepOf(p.realm, p.tier)).toBeGreaterThanOrEqual(stepOf(1, 8));
     // Nguyên liệu nộp nhiệm vụ đã bị trừ hết, chỉ còn đồ thưởng

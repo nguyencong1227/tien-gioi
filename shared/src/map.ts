@@ -387,6 +387,8 @@ export class GameMap {
 export const DEFAULT_MAP_ID = "lac_ha";
 /** Bản đồ thứ hai: khu săn mạnh hơn, nối với Lạc Hà Trấn bằng cổng ở rìa phía bắc / nam. */
 export const HAC_PHONG_ID = "hac_phong";
+/** Bản đồ thứ ba (M6, #404): đầm lầy sương cho Kim Đan, nối với Hắc Phong Cốc bằng cổng ở rìa bắc / nam. */
+export const AM_SUONG_ID = "am_suong";
 
 /**
  * Danh sách bản đồ của game (docs/THIET_KE_NHIEU_BAN_DO.md). Toạ độ cổng (px) đã đối chiếu với ô sinh từ seed:
@@ -438,9 +440,50 @@ export const MAPS: readonly MapDef[] = [
         toMap: DEFAULT_MAP_ID,
         toPortal: "lac_ha_bac",
       },
+      // Cổng bắc (M6, #404): đầu mút đường đất phía bắc (ô 64-65, hàng 2-3), tâm ở giữa hai ô đường; tên khác "Bắc Môn Quan" của Lạc Hà
+      {
+        id: "hac_phong_bac",
+        name: "Vọng Trạch Quan",
+        x: 2080,
+        y: 112,
+        r: 64,
+        safeR: 192,
+        spawn: { x: 2080, y: 240 },
+        toMap: AM_SUONG_ID,
+        toPortal: "am_suong_nam",
+      },
     ],
     // Tạm dùng các loại quái hiện có (không có Linh Thố); loại quái riêng của bản đồ thêm ở PR nội dung
     monsterCap: { lang: 20, ho: 36, mang: 6 },
+  },
+  {
+    id: AM_SUONG_ID,
+    name: "Âm Sương Trạch",
+    // Seed chọn bằng cách quét 400 seed (server/src/balance/zz-scan, đã bỏ): đường nam tới sát rìa, liên thông 96% từ trạm, đủ chỗ cho từng loài
+    // theo vùng nguy hiểm (sức chứa >= 300 lần số quái), nước + cát 20% (nhiều nhất bộ sinh ô cho phép)
+    seed: 20261974,
+    w: 128,
+    h: 112,
+    // Trạm an toàn ở phía nam, cách cổng ~10 ô: người mới tới thấy trạm trước, càng đi lên bắc càng nguy hiểm (như Hắc Phong Cốc)
+    town: { cx: 64, cy: 98, r: 5 },
+    townName: "Vọng Sương Trạm",
+    wildName: "Âm Sương Trạch",
+    portals: [
+      {
+        id: "am_suong_nam",
+        name: "Hồi Phong Quan",
+        // Đầu mút đường đất phía nam (ô 61-62, hàng 108), tâm ở giữa hai ô đường
+        x: 1984,
+        y: 3472,
+        r: 64,
+        safeR: 192,
+        spawn: { x: 1984, y: 3344 },
+        toMap: HAC_PHONG_ID,
+        toPortal: "hac_phong_bac",
+      },
+    ],
+    // Tổng 62 (Hắc Phong Cốc 62; trần ~70 để tick < 10 ms): số liệu quái ở game.ts (#403), vùng sinh theo `minDanger` của từng loài
+    monsterCap: { suong_ho: 24, thach_quy: 18, doc_thiem: 18, hac_giao: 2 },
   },
 ];
 

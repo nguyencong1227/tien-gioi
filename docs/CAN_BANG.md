@@ -6,7 +6,7 @@
 ## Kết quả
 
 - Hết Luyện Khí (sẵn sàng Trúc Cơ): **53 phút** (mục tiêu ~1 giờ)
-- Hết Trúc Cơ (sẵn sàng Kim Đan): **2 giờ 55 phút** (mục tiêu ~3 giờ)
+- Hết Trúc Cơ (sẵn sàng Kim Đan): **2 giờ 52 phút** (mục tiêu ~3 giờ)
 
 | Bậc | Thanh tu vi | Săn gì | Số quái | Phút ở bậc này | Cộng dồn |
 |---|---:|---|---:|---:|---:|
@@ -20,9 +20,9 @@
 | Luyện Khí Tầng 7 | 496 | ho | 11 | 4.1 | 44 phút |
 | Luyện Khí Tầng 8 | 546 | ho | 13 | 4.3 | 48 phút |
 | Luyện Khí Tầng 9 | 600 | ho | 16 | 4.9 | 53 phút |
-| Trúc Cơ Sơ kỳ | 4400 | ho | 122 | 32.9 | 1 giờ 26 phút |
-| Trúc Cơ Trung kỳ | 5060 | ho | 141 | 36.4 | 2 giờ 2 phút |
-| Trúc Cơ Hậu kỳ | 5819 | ho | 215 | 53.4 | 2 giờ 55 phút |
+| Trúc Cơ Sơ kỳ | 4400 | ho | 118 | 31.6 | 1 giờ 24 phút |
+| Trúc Cơ Trung kỳ | 5060 | ho | 136 | 35.2 | 2 giờ 0 phút |
+| Trúc Cơ Hậu kỳ | 5819 | ho | 209 | 52.1 | 2 giờ 52 phút |
 
 ## Giả định
 
@@ -150,11 +150,11 @@ Mô phỏng cân bằng hệ thống Luân hồi theo thiết kế tại `docs/T
 | Luyện Khí tầng 5 | 29 | 11 | 22.5 | 17 | **34.8** |
 | Luyện Khí tầng 9 | 48 | 21 | 26.3 | 27 | **33.9** |
 | Trúc Cơ sơ kỳ | 53 | 23 | 26.2 | 29 | **33.0** |
-| Trúc Cơ trung kỳ | 86 | 39 | 27.3 | 45 | **31.5** |
-| Trúc Cơ hậu kỳ | 122 | 55 | 27.0 | 61 | **30.0** |
-| Hết Trúc Cơ (thanh đầy) | 175 | 69 | 23.6 | 78 | **26.7** |
+| Trúc Cơ trung kỳ | 84 | 39 | 27.7 | 45 | **32.0** |
+| Trúc Cơ hậu kỳ | 120 | 55 | 27.6 | 61 | **30.6** |
+| Hết Trúc Cơ (thanh đầy) | 172 | 69 | 24.1 | 78 | **27.3** |
 
-Đọc bảng: Tính từ Luyện Khí tầng 5 trở đi (bỏ qua giai đoạn mới vào game), Duyên / giờ (0 trùm) nhỏ nhất là **22.5** (Luyện Khí tầng 5), lớn nhất là **27.3** (Trúc Cơ trung kỳ), tỷ lệ lớn / nhỏ là **1.21×**. Đỉnh Duyên / giờ rơi vào Trúc Cơ trung kỳ (~27.3 Duyên/h, gấp ~1.16× so với cày hết Trúc Cơ).
+Đọc bảng: Tính từ Luyện Khí tầng 5 trở đi (bỏ qua giai đoạn mới vào game), Duyên / giờ (0 trùm) nhỏ nhất là **22.5** (Luyện Khí tầng 5), lớn nhất là **27.7** (Trúc Cơ trung kỳ), tỷ lệ lớn / nhỏ là **1.23×**. Đỉnh Duyên / giờ rơi vào Trúc Cơ trung kỳ (~27.7 Duyên/h, gấp ~1.15× so với cày hết Trúc Cơ).
 
 ### 2. Tiến trình luân hồi qua chuỗi kiếp (1..N) khi mở dần "Dư âm tu hành"
 
@@ -162,35 +162,35 @@ Giả định người chơi kiếp nào cũng cày trọn vẹn đến hết Tr
 
 | Kiếp | Dư âm tu hành | Tốc độ tu luyện | Thời gian chơi | Duyên nhận | Duyên còn lại | Duyên / giờ | So với kiếp 1 | Hành động tại Tam Sinh Thạch |
 |---:|---:|---:|---:|---:|---:|---:|---:|---|
-| 1 | Nấc 3 | +30% | 2 giờ 55 phút | +75 | 19 | **25.6** | 1.00× | Lên nấc 3 (+30%) |
-| 2 | Nấc 5 | +50% | 2 giờ 17 phút | +75 | 1 | **32.9** | 1.28× | Lên nấc 5 (+50%) |
-| 3 | Nấc 5 | +50% | 2 giờ 0 phút | +73 | 74 | **36.6** | 1.43× | Chờ đủ 80 Duyên |
-| 4 | Nấc 6 | +60% | 2 giờ 0 phút | +73 | 67 | **36.6** | 1.43× | Lên nấc 6 (+60%) |
-| 5 | Nấc 7 | +70% | 1 giờ 53 phút | +72 | 24 | **38.3** | 1.50× | Lên nấc 7 (+70%) |
-| 6 | Nấc 7 | +70% | 1 giờ 47 phút | +71 | 95 | **40.0** | 1.56× | Chờ đủ 165 Duyên |
-| 7 | Nấc 8 | +80% | 1 giờ 47 phút | +71 | 1 | **40.0** | 1.56× | Lên nấc 8 (+80%) |
-| 8 | Nấc 8 | +80% | 1 giờ 41 phút | +71 | 72 | **42.2** | 1.64× | Chờ đủ 235 Duyên |
-| 9 | Nấc 8 | +80% | 1 giờ 41 phút | +71 | 143 | **42.2** | 1.64× | Chờ đủ 235 Duyên |
-| 10 | Nấc 8 | +80% | 1 giờ 41 phút | +71 | 214 | **42.2** | 1.64× | Chờ đủ 235 Duyên |
-| 11 | Nấc 9 | +90% | 1 giờ 41 phút | +71 | 50 | **42.2** | 1.64× | Lên nấc 9 (+90%) |
-| 12 | Nấc 9 | +90% | 1 giờ 36 phút | +70 | 120 | **43.7** | 1.70× | Chờ đủ 335 Duyên |
-| 13 | Nấc 9 | +90% | 1 giờ 36 phút | +70 | 190 | **43.7** | 1.70× | Chờ đủ 335 Duyên |
-| 14 | Nấc 9 | +90% | 1 giờ 36 phút | +70 | 260 | **43.7** | 1.70× | Chờ đủ 335 Duyên |
-| 15 | Nấc 9 | +90% | 1 giờ 36 phút | +70 | 330 | **43.7** | 1.70× | Chờ đủ 335 Duyên |
-| 16 | Nấc 10 | +100% | 1 giờ 36 phút | +70 | 65 | **43.7** | 1.70× | Lên nấc 10 (+100%) |
-| 17 | Nấc 10 | +100% | 1 giờ 32 phút | +70 | 135 | **45.8** | 1.79× | Đã đạt tối đa (+100%) |
+| 1 | Nấc 3 | +30% | 2 giờ 52 phút | +75 | 19 | **26.2** | 1.00× | Lên nấc 3 (+30%) |
+| 2 | Nấc 5 | +50% | 2 giờ 14 phút | +74 | 0 | **33.2** | 1.26× | Lên nấc 5 (+50%) |
+| 3 | Nấc 5 | +50% | 1 giờ 57 phút | +73 | 73 | **37.4** | 1.43× | Chờ đủ 80 Duyên |
+| 4 | Nấc 6 | +60% | 1 giờ 57 phút | +73 | 66 | **37.4** | 1.43× | Lên nấc 6 (+60%) |
+| 5 | Nấc 7 | +70% | 1 giờ 50 phút | +72 | 23 | **39.2** | 1.49× | Lên nấc 7 (+70%) |
+| 6 | Nấc 7 | +70% | 1 giờ 44 phút | +71 | 94 | **40.9** | 1.56× | Chờ đủ 165 Duyên |
+| 7 | Nấc 8 | +80% | 1 giờ 44 phút | +71 | 0 | **40.9** | 1.56× | Lên nấc 8 (+80%) |
+| 8 | Nấc 8 | +80% | 1 giờ 39 phút | +70 | 70 | **42.5** | 1.62× | Chờ đủ 235 Duyên |
+| 9 | Nấc 8 | +80% | 1 giờ 39 phút | +70 | 140 | **42.5** | 1.62× | Chờ đủ 235 Duyên |
+| 10 | Nấc 8 | +80% | 1 giờ 39 phút | +70 | 210 | **42.5** | 1.62× | Chờ đủ 235 Duyên |
+| 11 | Nấc 9 | +90% | 1 giờ 39 phút | +70 | 45 | **42.5** | 1.62× | Lên nấc 9 (+90%) |
+| 12 | Nấc 9 | +90% | 1 giờ 34 phút | +70 | 115 | **44.6** | 1.70× | Chờ đủ 335 Duyên |
+| 13 | Nấc 9 | +90% | 1 giờ 34 phút | +70 | 185 | **44.6** | 1.70× | Chờ đủ 335 Duyên |
+| 14 | Nấc 9 | +90% | 1 giờ 34 phút | +70 | 255 | **44.6** | 1.70× | Chờ đủ 335 Duyên |
+| 15 | Nấc 9 | +90% | 1 giờ 34 phút | +70 | 325 | **44.6** | 1.70× | Chờ đủ 335 Duyên |
+| 16 | Nấc 10 | +100% | 1 giờ 34 phút | +70 | 60 | **44.6** | 1.70× | Lên nấc 10 (+100%) |
+| 17 | Nấc 10 | +100% | 1 giờ 30 phút | +69 | 129 | **46.1** | 1.76× | Đã đạt tối đa (+100%) |
 
 ### 3. Nhận xét & Đánh giá cân bằng luân hồi
 
 - **Tính chất ngang bằng giữa các cách chơi (chết ở bậc nào):**
   - Người chơi cày chay chết ở Luyện Khí tầng 5 (29 phút): **22.5 Duyên/h** (0 trùm) / **34.8 Duyên/h** (hạ trùm).
   - Người chơi cày tới Trúc Cơ sơ kỳ (53 phút): đạt đỉnh **26.2 Duyên/h** (0 trùm) / **33.0 Duyên/h** (hạ trùm).
-  - Người chơi cày hết Trúc Cơ (175 phút): **23.6 Duyên/h** (0 trùm) / **26.7 Duyên/h** (hạ trùm).
-  - **Đánh giá:** Mục tiêu thiết kế ("mọi cách chơi tương đương", mục 5 của docs/THIET_KE_LUAN_HOI.md) **đạt**: từ Luyện Khí tầng 5 trở đi mọi mốc nằm trong 22.5–27.3 Duyên/h (chênh 1.21×, ngưỡng 1.3×), không có bậc nào đáng để cố ý chết sớm; chết ở Luyện Khí tầng 1 (9 phút) chỉ nhận 1 Duyên.
+  - Người chơi cày hết Trúc Cơ (172 phút): **24.1 Duyên/h** (0 trùm) / **27.3 Duyên/h** (hạ trùm).
+  - **Đánh giá:** Mục tiêu thiết kế ("mọi cách chơi tương đương", mục 5 của docs/THIET_KE_LUAN_HOI.md) **đạt**: từ Luyện Khí tầng 5 trở đi mọi mốc nằm trong 22.5–27.7 Duyên/h (chênh 1.23×, ngưỡng 1.3×), không có bậc nào đáng để cố ý chết sớm; chết ở Luyện Khí tầng 1 (9 phút) chỉ nhận 1 Duyên.
 - **Tiến trình tăng trưởng qua các kiếp (Progression pacing):**
   - Cần **16 kiếp** trọn vẹn để đạt tối đa nấc 10 Dư âm tu hành (+100% tốc độ tu luyện). Tổng thời gian chơi khoảng **~29 giờ**.
-  - Tốc độ Duyên mỗi giờ tăng từ **25.6 Duyên/h** (kiếp 1) lên **45.8 Duyên/h** (khi max Dư âm tu hành), tương đương tỷ lệ **1.79×**.
-  - **Đánh giá:** Tỷ lệ tăng trưởng **1.79×** nằm trong mục tiêu thiết kế (không vượt quá ~2.0× so với kiếp đầu), đem lại cảm giác nhân vật chuyển kiếp ngày càng mạnh mẽ và tu luyện thần tốc, nhưng kiểm soát tốt không gây lạm phát hay phá vỡ chiều sâu lối chơi.
+  - Tốc độ Duyên mỗi giờ tăng từ **26.2 Duyên/h** (kiếp 1) lên **46.1 Duyên/h** (khi max Dư âm tu hành), tương đương tỷ lệ **1.76×**.
+  - **Đánh giá:** Tỷ lệ tăng trưởng **1.76×** nằm trong mục tiêu thiết kế (không vượt quá ~2.0× so với kiếp đầu), đem lại cảm giác nhân vật chuyển kiếp ngày càng mạnh mẽ và tu luyện thần tốc, nhưng kiểm soát tốt không gây lạm phát hay phá vỡ chiều sâu lối chơi.
 
 
 ## Bí cảnh Linh Hư (M3.4, 4c-2, #203)
@@ -355,7 +355,7 @@ Trang bị mỗi bộ ~29% chỉ số gốc ở bậc đầu mặc được. **T
 
 ### 1. Săn solo (tu vi / giờ kể cả đan rơi, Linh thạch / giờ, con / giờ, khí huyết mất / trận)
 
-Mục tiêu: không bãi nào cho tu vi / giờ vượt ~1,5x bãi mới tốt nhất cùng bậc, Linh thạch / giờ không vượt ~2x. Quái mới KHÔNG an toàn cho người Trúc Cơ hậu kỳ (mất > 50% khí huyết / trận) nên nhịp Luyện Khí / Trúc Cơ giữ nguyên (53 phút, 2 giờ 55 phút cộng dồn).
+Mục tiêu: không bãi nào cho tu vi / giờ vượt ~1,5x bãi mới tốt nhất cùng bậc, Linh thạch / giờ không vượt ~2x. Quái mới KHÔNG an toàn cho người Trúc Cơ hậu kỳ (mất > 50% khí huyết / trận) nên quái mới không làm đổi nhịp Luyện Khí / Trúc Cơ (hết Luyện Khí 53 phút, hết Trúc Cơ 2 giờ 52 phút cộng dồn).
 
 | Bậc | Loài | Tu vi / giờ | Linh thạch / giờ | Con / giờ | Khí huyết mất |
 |---|---|---:|---:|---:|---:|
@@ -382,10 +382,10 @@ Mục tiêu: không bãi nào cho tu vi / giờ vượt ~1,5x bãi mới tốt n
 
 ### 3. Nhịp cả cảnh giới Kim Đan (phút; có chuỗi nhiệm vụ hiện có, có đột phá thất bại)
 
-"Tối ưu" = người chơi săn bãi tốt nhất kể cả Xích Mãng; "bãi mới" = không đụng Xích Mãng. Tổng: **5.5 giờ** (tối ưu), **5.9 giờ** (bãi mới); mục tiêu 5-7 giờ. Trước M6: 6.4 giờ nhưng nhờ đường tắt (Sơ kỳ 4,1 giờ rồi hai bậc sau ~2,3 giờ).
+"Tối ưu" = người chơi săn bãi tốt nhất kể cả Xích Mãng; "bãi mới" = không đụng Xích Mãng. Tổng: **5.2 giờ** (tối ưu), **5.7 giờ** (bãi mới); mục tiêu 5-7 giờ. Trước M6: 6.4 giờ nhưng nhờ đường tắt (Sơ kỳ 4,1 giờ rồi hai bậc sau ~2,3 giờ).
 
 | Bậc | Thanh | Tối ưu: nguồn | phút | Bãi mới: nguồn | phút |
 |---|---:|---|---:|---|---:|
-| Kim Đan Sơ kỳ | 48,000 | Xích Mãng | 94.7 | Thạch Quy | 122.8 |
-| Kim Đan Trung kỳ | 55,200 | Độc Thiềm | 104.4 | Độc Thiềm | 104.4 |
-| Kim Đan Hậu kỳ | 63,480 | Độc Thiềm | 128.9 | Độc Thiềm | 128.9 |
+| Kim Đan Sơ kỳ | 48,000 | Xích Mãng | 89.6 | Thạch Quy | 116.2 |
+| Kim Đan Trung kỳ | 55,200 | Độc Thiềm | 99.5 | Độc Thiềm | 99.5 |
+| Kim Đan Hậu kỳ | 63,480 | Độc Thiềm | 124.4 | Độc Thiềm | 124.4 |

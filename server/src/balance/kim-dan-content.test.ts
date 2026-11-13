@@ -78,11 +78,13 @@ describe("nhịp tu luyện (mô hình simulate, có nội dung mới)", () => {
   const minutes = (rows: ReturnType<typeof simulate>, realm: number) =>
     rows.filter((r) => r.realm === realm).reduce((a, r) => a + r.minutes, 0);
 
-  it("Luyện Khí và Trúc Cơ GIỮ NGUYÊN nhịp (quái Kim Đan không phá): 53 phút và 2 giờ 55 phút cộng dồn", () => {
+  it("quái Kim Đan KHÔNG phá nhịp Luyện Khí / Trúc Cơ; Trúc Cơ cộng dồn 2 giờ 52 phút (chuỗi nhiệm vụ Trúc Cơ mới thưởng 500 tu vi, mục tiêu ~3 giờ)", () => {
     const before = simulate(2);
     const after = withKimDan(() => simulate(2));
     expect(after.map((r) => r.minutes)).toEqual(before.map((r) => r.minutes));
-    expect(Math.round(after.at(-1)!.total)).toBe(175);
+    expect(Math.round(after.at(-1)!.total)).toBe(172);
+    // Luyện Khí không đổi: 53 phút cộng dồn
+    expect(Math.round(after.filter((r) => r.realm <= 1).at(-1)!.total)).toBe(53);
   });
 
   it("Kim Đan ~5-7 giờ (mục tiêu M6): người tối ưu (cả Xích Mãng) và người chỉ săn bãi mới", () => {

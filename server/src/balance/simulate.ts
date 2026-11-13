@@ -146,7 +146,8 @@ function questExpByRealm(): Map<number, number> {
   for (const q of QUESTS) {
     if (q.daily || !q.rewards.exp) continue;
     const r = [...q.steps].reverse().find((s) => s.kind === "reachRealm");
-    const realm = r?.kind === "reachRealm" ? r.realm : 1;
+    // Không có bước reachRealm thì tính theo cảnh giới tối thiểu để nhận (M6: chuỗi Trúc Cơ / Kim Đan), mặc định Luyện Khí như cũ
+    const realm = r?.kind === "reachRealm" ? r.realm : (q.minRealm?.realm ?? 1);
     out.set(realm, (out.get(realm) ?? 0) + q.rewards.exp);
   }
   return out;

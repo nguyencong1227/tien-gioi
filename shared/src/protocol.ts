@@ -23,8 +23,12 @@
 // Đây là cổng LỊCH SỰ, không phải biện pháp bảo mật: client gian vẫn gửi số tuỳ ý. Mọi kiểm tra khác của server (kiểu, giá trị
 // hữu hạn, khoảng cách, hồi chiêu, mã nhân vật) giữ nguyên và không dựa vào `v`.
 
-/** Phiên bản giao thức hiện tại của bản `shared/` này (số nguyên không âm; bản trước M4 = 0, không gửi). */
-export const PROTOCOL_VERSION = 1;
+/**
+ * Phiên bản giao thức hiện tại của bản `shared/` này (số nguyên không âm; bản trước M4 = 0, không gửi).
+ * 2 (M6, #404): bản đồ `am_suong` + quái Kim Đan + nhiều vật phẩm mới: client cũ không biết id bản đồ / loài quái / vật phẩm mới nên
+ * hiểu sai (travelTo tới bản đồ lạ, quái không có ảnh). `MIN_PROTOCOL_VERSION` KHÔNG đổi: nâng nó là quyết định lúc phát hành.
+ */
+export const PROTOCOL_VERSION = 2;
 
 /** Phiên bản thấp nhất server còn nhận. 0 = nhận cả client chưa biết tới `v`. */
 export const MIN_PROTOCOL_VERSION = 0;

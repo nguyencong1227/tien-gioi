@@ -182,13 +182,26 @@ describe("nội dung nhiệm vụ (#19)", () => {
     return out;
   };
 
-  it("chuỗi chính 6–8 nhiệm vụ, gồm mọi nhiệm vụ không lặp, kết thúc ở Luyện Khí tầng 9", () => {
+  it("chuỗi chính: Luyện Khí (8 nhiệm vụ) -> Trúc Cơ (3) -> Kim Đan (6), gồm mọi nhiệm vụ không lặp, Luyện Khí kết thúc ở tầng 9", () => {
     const ids = chain();
-    expect(ids.length).toBeGreaterThanOrEqual(6);
-    expect(ids.length).toBeLessThanOrEqual(8);
+    expect(ids).toHaveLength(17);
     expect(new Set(ids)).toEqual(new Set(QUESTS.filter((q) => !q.daily).map((q) => q.id)));
-    const last = QUEST_BY_ID[ids.at(-1)!].steps.at(-1)!;
-    expect(last).toEqual({ kind: "reachRealm", realm: 1, tier: 8 });
+    const i = ids.indexOf("dinh_luyen_khi");
+    expect(i).toBe(7); // nhiệm vụ Luyện Khí cuối cùng
+    expect(QUEST_BY_ID.dinh_luyen_khi.steps.at(-1)).toEqual({
+      kind: "reachRealm",
+      realm: 1,
+      tier: 8,
+    });
+    expect(ids.slice(i + 1, i + 4)).toEqual(["truc_co_nhap_mon", "mang_hoan", "thanh_lo_tram"]);
+    expect(ids.slice(i + 4)).toEqual([
+      "vong_suong",
+      "suong_ho_hoan",
+      "thach_quy_giap",
+      "doc_thiem_nang",
+      "kim_dan_hau_ky",
+      "giao_hoan",
+    ]);
   });
 
   it("mốc cảnh giới trong chuỗi chỉ tăng dần", () => {
@@ -203,10 +216,13 @@ describe("nội dung nhiệm vụ (#19)", () => {
     }
   });
 
-  it("3 nhiệm vụ lặp ở Bảng cáo thị", () => {
+  it("3 nhiệm vụ lặp ở Bảng cáo thị (Lạc Hà) và 3 ở Vọng Sương Trạm (Kim Đan, M6)", () => {
     const daily = QUESTS.filter((q) => q.daily);
-    expect(daily).toHaveLength(3);
-    expect(daily.every((q) => q.giver === "cao_thi")).toBe(true);
+    expect(daily).toHaveLength(6);
+    expect(daily.filter((q) => q.giver === "cao_thi")).toHaveLength(3);
+    const vs = daily.filter((q) => q.giver === "tram_truong");
+    expect(vs).toHaveLength(3);
+    for (const q of vs) expect(q.minRealm, q.id).toEqual(expect.objectContaining({ realm: 3 }));
   });
 
   it("người chơi mới thấy '!' ở Trưởng trấn ngay khi vào game", () => {

@@ -93,6 +93,8 @@ export function renderKimDanSau(): string {
     const p3 = huntRate(boss, KD, t.tier, 3);
     return `| ${t.label} | ${cells.join(" | ")} | ${p3 ? n1((p3.rate * 3600) / best) + "x" : "–"} |`;
   });
+  const tcRows = withKimDan(() => simulate(KD - 1));
+  const tc = [0, tcRows.filter((r) => r.realm <= 1).at(-1)!.total, tcRows.at(-1)!.total];
   const optimal = withKimDan(() => simulate(KD));
   const designed = withKimDan(() => simulate(KD), true);
   const rowOf = (rows: ReturnType<typeof simulate>, tier: number) =>
@@ -112,7 +114,7 @@ Trang bị mỗi bộ ~29% chỉ số gốc ở bậc đầu mặc được. **T
 
 ### 1. Săn solo (tu vi / giờ kể cả đan rơi, Linh thạch / giờ, con / giờ, khí huyết mất / trận)
 
-Mục tiêu: không bãi nào cho tu vi / giờ vượt ~1,5x bãi mới tốt nhất cùng bậc, Linh thạch / giờ không vượt ~2x. Quái mới KHÔNG an toàn cho người Trúc Cơ hậu kỳ (mất > 50% khí huyết / trận) nên nhịp Luyện Khí / Trúc Cơ giữ nguyên (53 phút, 2 giờ 55 phút cộng dồn).
+Mục tiêu: không bãi nào cho tu vi / giờ vượt ~1,5x bãi mới tốt nhất cùng bậc, Linh thạch / giờ không vượt ~2x. Quái mới KHÔNG an toàn cho người Trúc Cơ hậu kỳ (mất > 50% khí huyết / trận) nên quái mới không làm đổi nhịp Luyện Khí / Trúc Cơ (hết Luyện Khí ${n0(tc[1])} phút, hết Trúc Cơ ${Math.floor(tc[2] / 60)} giờ ${Math.round(tc[2] % 60)} phút cộng dồn).
 
 | Bậc | Loài | Tu vi / giờ | Linh thạch / giờ | Con / giờ | Khí huyết mất |
 |---|---|---:|---:|---:|---:|
