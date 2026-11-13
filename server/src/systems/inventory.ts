@@ -5,6 +5,7 @@ import {
   ITEM_BY_ID,
   addToInventory,
   emptyInventory,
+  expPillGain,
   type Inventory,
   type InvSlot,
 } from "@tien-gioi/shared";
@@ -126,7 +127,8 @@ export function useItem(w: World, sid: string, slot: unknown) {
     case "exp":
       if (p.exp >= p.expMax)
         return w.events.toast(sid, { text: "Tu vi đã đầy, hãy đột phá trước.", tone: "info" });
-      gainExp(w, sid, p, Math.round(p.expMax * e.pct));
+      // Có trần tuyệt đối (`maxExp`, M6): thanh tu vi lớn dần theo cảnh giới nên "5% thanh" không thể cứ nhân lên (shared/items.ts `expPillGain`)
+      gainExp(w, sid, p, expPillGain(e, p.expMax));
       break;
   }
   takeFromSlot(c.inv, i, 1);

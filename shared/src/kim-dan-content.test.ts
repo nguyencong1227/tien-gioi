@@ -1,6 +1,7 @@
 // Nội dung Kim Đan (M6, #403): bất biến của dữ liệu. Số đo cân bằng (nhịp, đường tắt, an toàn) ở server/src/balance/kim-dan-content.test.ts.
 import { describe, expect, it } from "vitest";
 import {
+  COIN_CAP,
   COIN_DROPS,
   DROP_TABLES,
   EQUIP_SLOTS,
@@ -101,6 +102,7 @@ describe("trang bị Kim Đan: ba bộ x ba ô", () => {
         expect(rs, id).toHaveLength(1);
         expect(rs[0].coin ?? 0, id).toBeGreaterThan(0);
         expect(Number.isInteger(rs[0].coin), id).toBe(true);
+        expect(rs[0].coin!, id).toBeLessThanOrEqual(COIN_CAP); // phí vượt trần ví thì không bao giờ rèn được
         for (const i of rs[0].inputs)
           expect(mats.has(i.itemId), `${id} cần ${i.itemId}`).toBe(true);
       }

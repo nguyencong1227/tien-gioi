@@ -192,7 +192,7 @@ export const ITEMS: ItemDef[] = [
   // Nguyên liệu Kim Đan (M6, #403): mỗi loài một thứ, trùm Hắc Giao rơi Giao Lân
   {
     id: "suong_mao",
-    name: "Sương Mao",
+    name: "Sương mao",
     type: "material",
     stack: 99,
     rarity: 2,
@@ -201,7 +201,7 @@ export const ITEMS: ItemDef[] = [
   },
   {
     id: "quy_giap",
-    name: "Quy Giáp",
+    name: "Quy giáp",
     type: "material",
     stack: 99,
     rarity: 2,
@@ -210,7 +210,7 @@ export const ITEMS: ItemDef[] = [
   },
   {
     id: "doc_nang",
-    name: "Độc Nang",
+    name: "Độc nang",
     type: "material",
     stack: 99,
     rarity: 3,
@@ -219,7 +219,7 @@ export const ITEMS: ItemDef[] = [
   },
   {
     id: "giao_lan",
-    name: "Giao Lân",
+    name: "Giao lân",
     type: "material",
     stack: 99,
     rarity: 3,
