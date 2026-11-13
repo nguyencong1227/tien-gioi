@@ -1,7 +1,15 @@
 // Nội dung Kim Đan (M6, #403) đo bằng mô hình cân bằng: an toàn theo bậc, không đường tắt, nhịp. Mục tiêu ở docs/PHAN_CONG_M6.md mục 4.
 import { describe, expect, it } from "vitest";
-import { MONSTER_BY_ID, WILD_MONSTERS, type MonsterKind } from "@tien-gioi/shared";
+import {
+  MAIN_QUEST_START,
+  MONSTER_BY_ID,
+  QUEST_BY_ID,
+  WILD_MONSTERS,
+  stepOf,
+  type MonsterKind,
+} from "@tien-gioi/shared";
 import { huntRate, monsterEconomy, simulate } from "./simulate";
+import { realmTierOfStep } from "./dungeon";
 import { dangerFraction, rateWithPills, renderKimDanSau, withKimDan } from "./kim-dan-sau";
 
 const KD = 3;
@@ -146,5 +154,40 @@ describe("kim-dan-sau: kết xuất và độ nguy hiểm", () => {
     ])
       expect(md).toContain(w);
     expect(md).not.toMatch(/NaN|undefined|Infinity/);
+  });
+});
+
+describe("chuỗi nhiệm vụ chính làm được MỘT MÌNH (không chặn người chơi không có đội)", () => {
+  it("mọi bước kill của chuỗi chính, trừ nhiệm vụ cuối (trùm theo đội), là loài an toàn solo ở bậc người chơi đang có", () => {
+    const chain: string[] = [];
+    for (let id: string | undefined = MAIN_QUEST_START; id; id = QUEST_BY_ID[id].next)
+      chain.push(id);
+    expect(chain.length).toBeGreaterThan(10);
+    let cur = 0; // bậc người chơi đang có khi tới từng bước (nhiệm vụ minRealm / reachRealm đẩy bậc lên)
+    for (const id of chain.slice(0, -1)) {
+      const q = QUEST_BY_ID[id];
+      if (q.minRealm) cur = Math.max(cur, stepOf(q.minRealm.realm, q.minRealm.tier));
+      for (const st of q.steps) {
+        if (st.kind === "reachRealm") cur = Math.max(cur, stepOf(st.realm, st.tier));
+        if (st.kind !== "kill") continue;
+        const { realm: r, tier: t } = realmTierOfStep(cur);
+        expect(
+          huntRate(MONSTER_BY_ID[st.monster], r, t),
+          `${id}: hạ ${st.monster} ở bậc ${cur} phải làm được solo`,
+        ).not.toBeNull();
+      }
+    }
+    // nhiệm vụ cuối là trùm theo đội (Hắc Giao): solo không an toàn ở mọi bậc Kim Đan, đúng thiết kế
+    const last = QUEST_BY_ID[chain.at(-1)!];
+    expect(last.steps.some((st) => st.kind === "kill" && st.monster === "hac_giao")).toBe(true);
+    expect(huntRate(BOSS, KD, 2)).toBeNull();
+  });
+
+  it("Xích Mãng không an toàn solo ở Trúc Cơ: nên mang_hoan (hạ Xích Mãng) KHÔNG được nằm trong chuỗi chính", () => {
+    expect(huntRate(MONSTER_BY_ID.mang, 2, 2)).toBeNull();
+    const chain: string[] = [];
+    for (let id: string | undefined = MAIN_QUEST_START; id; id = QUEST_BY_ID[id].next)
+      chain.push(id);
+    expect(chain).not.toContain("mang_hoan");
   });
 });

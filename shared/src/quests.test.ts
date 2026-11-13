@@ -5,6 +5,7 @@ import {
   TRADES,
   QUESTS,
   QUEST_BY_ID,
+  QUEST_PREV,
   MONSTER_BY_ID,
   ITEM_BY_ID,
   PLAYER_RADIUS,
@@ -182,10 +183,16 @@ describe("nội dung nhiệm vụ (#19)", () => {
     return out;
   };
 
-  it("chuỗi chính: Luyện Khí (8 nhiệm vụ) -> Trúc Cơ (3) -> Kim Đan (6), gồm mọi nhiệm vụ không lặp, Luyện Khí kết thúc ở tầng 9", () => {
+  it("chuỗi chính: Luyện Khí (8 nhiệm vụ) -> Trúc Cơ (2) -> Kim Đan (6); mọi nhiệm vụ không lặp nằm trong chuỗi, trừ việc phụ mang_hoan; Luyện Khí kết thúc ở tầng 9", () => {
     const ids = chain();
-    expect(ids).toHaveLength(17);
-    expect(new Set(ids)).toEqual(new Set(QUESTS.filter((q) => !q.daily).map((q) => q.id)));
+    expect(ids).toHaveLength(16);
+    // Việc phụ không có người đứng trước và không nằm trong chuỗi: hạ Xích Mãng (không an toàn khi solo) KHÔNG được chặn chuỗi chính
+    expect(new Set([...ids, "mang_hoan"])).toEqual(
+      new Set(QUESTS.filter((q) => !q.daily).map((q) => q.id)),
+    );
+    expect(ids).not.toContain("mang_hoan");
+    expect(QUEST_PREV.mang_hoan).toBeUndefined();
+    expect(QUEST_BY_ID.mang_hoan.next).toBeUndefined();
     const i = ids.indexOf("dinh_luyen_khi");
     expect(i).toBe(7); // nhiệm vụ Luyện Khí cuối cùng
     expect(QUEST_BY_ID.dinh_luyen_khi.steps.at(-1)).toEqual({
@@ -193,8 +200,8 @@ describe("nội dung nhiệm vụ (#19)", () => {
       realm: 1,
       tier: 8,
     });
-    expect(ids.slice(i + 1, i + 4)).toEqual(["truc_co_nhap_mon", "mang_hoan", "thanh_lo_tram"]);
-    expect(ids.slice(i + 4)).toEqual([
+    expect(ids.slice(i + 1, i + 3)).toEqual(["truc_co_nhap_mon", "thanh_lo_tram"]);
+    expect(ids.slice(i + 3)).toEqual([
       "vong_suong",
       "suong_ho_hoan",
       "thach_quy_giap",

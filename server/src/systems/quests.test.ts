@@ -5,6 +5,7 @@ import {
   NPC_RANGE,
   QUESTS,
   QUEST_BY_ID,
+  QUEST_PREV,
   countItem,
   MAIN_QUEST_START,
   ITEM_BY_ID,
@@ -320,6 +321,31 @@ describe("đọc sổ nhiệm vụ từ file lưu", () => {
   });
 });
 
+describe("việc phụ Mãng hoạn (M6, không nằm trong chuỗi chính)", () => {
+  it("nhận được từ Trúc Cơ sơ kỳ mà KHÔNG cần làm nhiệm vụ nào trước; làm xong nhận thưởng; không chặn chuỗi chính", () => {
+    const { w } = makeWorld();
+    const { p, c } = addPlayer(w, "a", 2, 0);
+    standAt(p, "truong_tran");
+    acceptQuest(w, "a", "mang_hoan");
+    expect(c.quests.active.map((a) => a.id)).toContain("mang_hoan");
+    onMonsterKilled(w, "a", "mang");
+    giveItem(w, "a", "vay_mang", 2);
+    standAt(p, "truong_tran");
+    turnInQuest(w, "a", "mang_hoan");
+    expect(c.quests.done).toContain("mang_hoan");
+    // chuỗi chính vẫn mở ở nhiệm vụ kế của chuỗi (thanh_lo_tram cần truc_co_nhap_mon xong, không cần mang_hoan)
+    expect(QUEST_PREV.thanh_lo_tram).toBe("truc_co_nhap_mon");
+  });
+
+  it("chưa tới Trúc Cơ thì chưa nhận được (minRealm)", () => {
+    const { w } = makeWorld();
+    const { p, c } = addPlayer(w, "a", 1, 8);
+    standAt(p, "truong_tran");
+    acceptQuest(w, "a", "mang_hoan");
+    expect(c.quests.active.map((a) => a.id)).not.toContain("mang_hoan");
+  });
+});
+
 describe("chuỗi nhiệm vụ chính (#19)", () => {
   it("người chơi mới làm được hết chuỗi từ Trưởng trấn tới Luyện Khí tầng 9", () => {
     const { w, toasts } = makeWorld();
@@ -367,8 +393,8 @@ describe("chuỗi nhiệm vụ chính (#19)", () => {
       order.push(id);
     }
     expect(order.length).toBeGreaterThanOrEqual(6);
-    // đã đi qua cả chuỗi Trúc Cơ ở Lạc Hà (đột phá, hạ Xích Mãng) và dừng đúng ở `thanh_lo_tram` (NPC ở Hắc Phong Cốc)
-    expect(order.slice(-3)).toEqual(["dinh_luyen_khi", "truc_co_nhap_mon", "mang_hoan"]);
+    // đã đi qua nhiệm vụ đột phá Trúc Cơ ở Lạc Hà và dừng đúng ở `thanh_lo_tram` (NPC ở Hắc Phong Cốc)
+    expect(order.slice(-2)).toEqual(["dinh_luyen_khi", "truc_co_nhap_mon"]);
     expect(c.quests.active).toHaveLength(0);
     expect(stepOf(p.realm, p.tier)).toBeGreaterThanOrEqual(stepOf(1, 8));
     // Nguyên liệu nộp nhiệm vụ đã bị trừ hết, chỉ còn đồ thưởng

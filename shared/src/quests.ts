@@ -47,7 +47,7 @@ export interface QuestDef {
 export const MAIN_QUEST_START = "nhap_the";
 
 /**
- * Chuỗi nhiệm vụ chính: Phàm Nhân → Luyện Khí tầng 9 (dạy từng thứ), rồi Trúc Cơ (3 nhiệm vụ nối sang Hắc Phong Cốc) và Kim Đan (6 nhiệm vụ ở
+ * Chuỗi nhiệm vụ chính: Phàm Nhân → Luyện Khí tầng 9 (dạy từng thứ), rồi Trúc Cơ (2 nhiệm vụ nối sang Hắc Phong Cốc, cộng 1 việc phụ hạ Xích Mãng theo đội: chuỗi chính KHÔNG bắt đội, trừ nhiệm vụ cuối) và Kim Đan (6 nhiệm vụ ở
  * Vọng Sương Trạm, M6 #404). Chặng đầu: mỗi nhiệm vụ dạy thêm một thứ
  * (đánh quái, nhặt đồ, đột phá, đả tọa, đổi đồ, đan dược). Sau đó là nhiệm vụ lặp ở Bảng cáo thị.
  * Thế giới: Lạc Hà Trấn dưới chân Vân Mộng Sơn; yêu thú càng xa trấn càng mạnh.
@@ -251,7 +251,7 @@ export const QUESTS: QuestDef[] = [
     steps: [{ kind: "reachRealm", realm: 2, tier: 0 }],
     rewards: { exp: 100, items: [{ itemId: "hoi_linh_dan", qty: 3 }] },
     minRealm: { realm: 1, tier: 8 },
-    next: "mang_hoan",
+    next: "thanh_lo_tram",
     talk: {
       offer: [
         "Tầng chín viên mãn rồi thì chỉ còn một cửa: Đột phá. Bấm B khi thanh tu vi đầy; hỏng thì mất ba phần tu vi, đừng nản.",
@@ -260,7 +260,7 @@ export const QUESTS: QuestDef[] = [
       progress: ["Chưa Trúc Cơ. Đả tọa cho thanh tu vi đầy rồi bấm Đột phá."],
       complete: [
         "Trúc Cơ! Nền đã vững, giờ mới thật sự là tu sĩ.",
-        "Xích Mãng trong hang sâu vẫn chưa ai hạ nổi một mình. Tìm vài người đồng hành.",
+        "Phía bắc có Bắc Môn Quan sang Hắc Phong Cốc, ghé Thanh Lộ Trạm trước. Còn Xích Mãng trong hang sâu thì chưa ai hạ nổi một mình: muốn thử cùng đồng đội, cứ tới nói với ta.",
       ],
     },
   },
@@ -268,7 +268,7 @@ export const QUESTS: QuestDef[] = [
     id: "mang_hoan",
     title: "Mãng hoạn",
     giver: "truong_tran",
-    desc: "Hạ 1 Xích Mãng (nên đi theo đội) và mang về 2 vảy mãng.",
+    desc: "Việc phụ (không bắt buộc): hạ 1 Xích Mãng (nên đi theo đội) và mang về 2 vảy mãng.",
     steps: [
       { kind: "kill", monster: "mang", count: 1 },
       { kind: "collect", itemId: "vay_mang", count: 2 },
@@ -281,7 +281,6 @@ export const QUESTS: QuestDef[] = [
       ],
     },
     minRealm: { realm: 2, tier: 0 },
-    next: "thanh_lo_tram",
     talk: {
       offer: [
         "Xích Mãng canh linh mạch đã quá lâu, đêm đêm nó ra bìa núi phun độc. Một mình thì đừng liều: rủ đồng đội, lập đội rồi hẵng đi.",
@@ -290,7 +289,7 @@ export const QUESTS: QuestDef[] = [
       progress: ["Xích Mãng đòn rất nặng. Đi đội, mang đủ Hồi Huyết Đan."],
       complete: [
         "Vảy đỏ thẫm, đúng là Xích Mãng. Linh mạch yên rồi.",
-        "Giờ ngươi đủ sức vượt Bắc Môn Quan sang Hắc Phong Cốc. Thanh Lộ Trạm có lái buôn tên Mạc Thông, ghé chào ông ấy.",
+        "Cả trấn chưa ai dám làm việc này. Ngươi và đồng đội xứng đáng được nhớ tên.",
       ],
     },
   },
