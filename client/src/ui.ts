@@ -109,6 +109,8 @@ import {
   formatSectLog,
   formatSectMembersSummary,
   mergeMemberPresence,
+  mapLabelOf,
+  sectMemberStatusText,
   sectConfirmText,
   type SectConfirmKind,
 } from "./sect";
@@ -421,10 +423,9 @@ function renderPartyPanel() {
     nameWrap.append(realmSpan);
 
     if (m.mapId && m.mapId !== currentMapId) {
-      const mapDef = getMap(m.mapId);
       const mapSpan = document.createElement("span");
       mapSpan.className = "pmem-map";
-      mapSpan.textContent = `(${mapDef?.def.name ?? m.mapId})`;
+      mapSpan.textContent = `(${mapLabelOf(m.mapId)})`;
       nameWrap.append(mapSpan);
     }
 
@@ -1996,13 +1997,7 @@ function renderSectMembersTab() {
 
     const statusRow = document.createElement("div");
     statusRow.className = `sect-member-status${m.online ? " online" : ""}`;
-    if (m.online && m.realm !== undefined && m.tier !== undefined) {
-      statusRow.textContent = `Online · ${realmLabel(m.realm, m.tier)} · ${m.mapId ?? ""}`;
-    } else if (m.online) {
-      statusRow.textContent = `Online · ${m.mapId ?? ""}`;
-    } else {
-      statusRow.textContent = "Offline";
-    }
+    statusRow.textContent = sectMemberStatusText(m);
 
     info.append(titleRow, statusRow);
     item.append(info);
