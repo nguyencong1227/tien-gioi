@@ -107,6 +107,7 @@ Khi cần kết nối máy thật tới server dev nội bộ trên mạng WiFi:
 ## 7. Trang Quyền Riêng Tư (Privacy Policy)
 
 - Tệp tĩnh `client/public/privacy.html` chứa nội dung chính sách quyền riêng tư bằng tiếng Việt theo yêu cầu của Google Play Store (mục đích dữ liệu, lưu trữ mã hóa scrypt, quyền xóa tài khoản và thông tin liên hệ).
+- Kênh liên hệ trong trang (13/11/2026, người dùng cung cấp): trang Facebook của nhà phát triển `https://www.facebook.com/CongKudo.a/` (mục 4, nhận cả yêu cầu xóa dữ liệu). `client/src/privacy.test.ts` chặn phát hành lại với chỗ trống chưa điền hoặc mục liên hệ không có liên kết. Lưu ý khi lên Google Play: Play Console còn yêu cầu một địa chỉ email liên hệ của nhà phát triển (nhập trong Console, tách khỏi trang chính sách; không lưu vào repo).
 
 ---
 
