@@ -144,6 +144,7 @@ import {
   primaryKeyLabel,
   type ActionId,
 } from "../keybinds";
+import { moveVector } from "../move-input";
 import { isTypingElement, isReducedMotion } from "../a11y";
 import {
   markMonAttack,
@@ -1103,21 +1104,16 @@ export class WorldScene extends Phaser.Scene {
 
   private moveDir() {
     if (document.activeElement instanceof HTMLInputElement) return { dx: 0, dy: 0 };
-    // bảng / hộp thoại đang mở: mũi tên điều hướng bảng, nhân vật đứng yên (#463)
-    if (ui.isKeyboardCaptured()) return { dx: 0, dy: 0 };
     const k = this.keys;
-    let dx = (k.D.isDown || k.RIGHT.isDown ? 1 : 0) - (k.A.isDown || k.LEFT.isDown ? 1 : 0);
-    let dy = (k.S.isDown || k.DOWN.isDown ? 1 : 0) - (k.W.isDown || k.UP.isDown ? 1 : 0);
-    if (joystick.active) {
-      dx = joystick.x;
-      dy = joystick.y;
-    }
-    const len = Math.hypot(dx, dy);
-    if (len > 1) {
-      dx /= len;
-      dy /= len;
-    }
-    return { dx, dy };
+    return moveVector({
+      left: k.A.isDown || k.LEFT.isDown,
+      right: k.D.isDown || k.RIGHT.isDown,
+      up: k.W.isDown || k.UP.isDown,
+      down: k.S.isDown || k.DOWN.isDown,
+      // bảng / hộp thoại đang mở: mũi tên điều hướng bảng, BÀN PHÍM không đi (#463); cần điều khiển ảo giữ nguyên hành vi cảm ứng
+      keyboardBlocked: ui.isKeyboardCaptured(),
+      joystick,
+    });
   }
 
   /** Tự ngắm con quái gần nhất trong tầm, không có thì đánh theo hướng đang nhìn. */
