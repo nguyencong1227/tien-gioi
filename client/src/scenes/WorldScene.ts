@@ -729,7 +729,8 @@ export class WorldScene extends Phaser.Scene {
     for (const obj of this.townVisuals) obj.destroy();
     this.townVisuals = [];
     if (this.map.townPx.r > 0) {
-      const townLabel = this.map.def.id === DEFAULT_MAP_ID ? "落霞鎮" : this.map.townName;
+      // Tên trấn bằng tiếng Việt (không chữ Hán, QUYET_DINH_M3 mục 12); Lạc Hà Trấn lấy từ `MapDef.townName` như mọi bản đồ
+      const townLabel = this.map.townName;
       const t1 = this.add
         .text(this.map.townPx.x, this.map.townPx.y - 40, townLabel, {
           fontFamily: '"Noto Serif", Georgia, serif',

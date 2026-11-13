@@ -206,7 +206,6 @@ const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512
   <rect x="248" y="308" width="16" height="68" rx="5" fill="#5a3022" />
   <circle cx="256" cy="384" r="14" fill="#c9a24a" />
   <circle cx="256" cy="384" r="7" fill="#3f7fa6" />
-  <text x="256" y="248" text-anchor="middle" font-family="Noto Serif, Georgia, serif" font-size="112" font-weight="bold" fill="#ffe08a" fill-opacity="0.28">仙</text>
 </svg>
 `;
 

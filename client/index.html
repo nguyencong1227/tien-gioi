@@ -36,10 +36,85 @@
     <link rel="stylesheet" href="/src/text-scale.css" />
   </head>
   <body>
+    <!-- Biểu tượng nút HUD / hành động: vẽ bằng SVG (thay chữ Hán, QUYET_DINH_M3 mục 12). Dùng <use href="#i-...">; màu / nét do CSS (.ico svg). -->
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="0"
+      height="0"
+      style="position: absolute"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <defs>
+        <symbol id="i-char" viewBox="0 0 24 24">
+          <circle cx="12" cy="8" r="3.6" />
+          <path d="M4.5 20.5c0-4.2 3.4-7 7.5-7s7.5 2.8 7.5 7z" />
+        </symbol>
+        <symbol id="i-bag" viewBox="0 0 24 24">
+          <path d="M9 3.5h6l-1.2 3h-3.6z" />
+          <path
+            d="M10.2 6.5C6 9 4.5 12.5 4.5 15.5c0 3.2 2.8 5.5 7.5 5.5s7.5-2.3 7.5-5.5c0-3-1.5-6.5-5.7-9"
+          />
+          <path d="M12 12v4M10 14h4" />
+        </symbol>
+        <symbol id="i-quest" viewBox="0 0 24 24">
+          <path d="M7 3.5h11a1.5 1.5 0 0 1 1.5 1.5v2.5H17V5" />
+          <path d="M17 20.5H8a3 3 0 0 1-3-3V16h12z" />
+          <path d="M7 3.5a2 2 0 0 0-2 2V16" />
+          <path d="M17 8v12.5" />
+          <path d="M8.5 9h5M8.5 12h5" />
+        </symbol>
+        <symbol id="i-sect" viewBox="0 0 24 24">
+          <path d="M5.5 21.5V3" />
+          <path d="M5.5 4.5h13l-3.2 4 3.2 4h-13" />
+        </symbol>
+        <symbol id="i-pickup" viewBox="0 0 24 24">
+          <path d="M12 3.5v10" />
+          <path d="M7.5 9.5l4.5 4.5 4.5-4.5" />
+          <path d="M4.5 14.5v4a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-4" />
+        </symbol>
+        <symbol id="i-talk" viewBox="0 0 24 24">
+          <path
+            d="M4.5 5h15a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H11l-4.5 4v-4h-2a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z"
+          />
+          <path d="M8.5 10.5h.01M12 10.5h.01M15.5 10.5h.01" stroke-width="2.6" />
+        </symbol>
+        <symbol id="i-portal" viewBox="0 0 24 24">
+          <path d="M4.5 21V10.5a7.5 7.5 0 0 1 15 0V21" />
+          <path d="M2.5 21h19" />
+          <path d="M8.5 21v-7.5a3.5 3.5 0 0 1 7 0V21" />
+        </symbol>
+        <symbol id="i-target" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="6.5" />
+          <circle cx="12" cy="12" r="1.3" />
+          <path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4" />
+        </symbol>
+        <symbol id="i-break" viewBox="0 0 24 24">
+          <path d="M6 11.5l6-6 6 6" />
+          <path d="M6 18.5l6-6 6 6" />
+        </symbol>
+        <symbol id="i-med" viewBox="0 0 24 24">
+          <circle cx="12" cy="5.3" r="2.3" />
+          <path d="M12 8v5.5" />
+          <path d="M6.8 12.6c1.6-1.3 3.3-1.8 5.2-1.8s3.6.5 5.2 1.8" />
+          <path d="M3.5 19.5c1.2-2.4 4.3-4 8.5-4s7.3 1.6 8.5 4c-2 1.3-5 2-8.5 2s-6.5-.7-8.5-2z" />
+        </symbol>
+        <symbol id="i-aura" viewBox="0 0 24 24">
+          <path d="M3.5 20A17 17 0 0 1 20.5 3.5 12.5 12.5 0 0 0 3.5 20z" />
+          <path d="M14 20.5l6-6M17.5 21l3.5-3.5" />
+        </symbol>
+        <symbol id="i-sword" viewBox="0 0 24 24">
+          <path d="M19.5 4.5 11 13" stroke-width="3.4" />
+          <path d="M7.5 10.5l6 6" stroke-width="2.2" />
+          <path d="M10.2 13.8 5.2 18.8" stroke-width="2.6" />
+          <path d="M4.2 20.2h.01" stroke-width="3.2" />
+        </symbol>
+      </defs>
+    </svg>
     <div id="game"></div>
 
     <section id="login" class="panel">
-      <div class="seal">仙</div>
+      <div class="seal">Tiên</div>
       <h1>Tiên Giới</h1>
       <p class="sub">Vạn người cùng tu, một con đường thành tiên.</p>
       <div id="auth-mock-badge" class="auth-mock-badge" hidden>
@@ -405,7 +480,9 @@
                 aria-label="Bảng nhân vật & Trang bị (Phím C)"
                 aria-expanded="false"
               >
-                <span>身</span><small>Nhân vật</small>
+                <span class="ico"
+                  ><svg aria-hidden="true" focusable="false"><use href="#i-char" /></svg></span
+                ><small>Nhân vật</small>
               </button>
               <button
                 type="button"
@@ -415,7 +492,9 @@
                 aria-label="Túi đồ (Phím I)"
                 aria-expanded="false"
               >
-                <span>袋</span><small>Túi</small>
+                <span class="ico"
+                  ><svg aria-hidden="true" focusable="false"><use href="#i-bag" /></svg></span
+                ><small>Túi</small>
               </button>
               <button
                 type="button"
@@ -425,7 +504,9 @@
                 aria-label="Sổ nhiệm vụ (Phím Q)"
                 aria-expanded="false"
               >
-                <span>卷</span><small>Nhiệm vụ</small>
+                <span class="ico"
+                  ><svg aria-hidden="true" focusable="false"><use href="#i-quest" /></svg></span
+                ><small>Nhiệm vụ</small>
               </button>
               <button
                 type="button"
@@ -435,7 +516,9 @@
                 aria-label="Tông môn (Phím G)"
                 aria-expanded="false"
               >
-                <span>宗</span><small>Tông môn</small>
+                <span class="ico"
+                  ><svg aria-hidden="true" focusable="false"><use href="#i-sect" /></svg></span
+                ><small>Tông môn</small>
               </button>
               <button
                 type="button"
@@ -548,7 +631,9 @@
         title="Nhặt vật phẩm (F)"
         aria-label="Nhặt vật phẩm rơi (Phím F)"
       >
-        <span>拾</span><small id="pickup-label">Nhặt (F)</small>
+        <span class="ico"
+          ><svg aria-hidden="true" focusable="false"><use href="#i-pickup" /></svg></span
+        ><small id="pickup-label">Nhặt (F)</small>
       </button>
 
       <button
@@ -559,7 +644,9 @@
         title="Nói chuyện với NPC (F)"
         aria-label="Nói chuyện với NPC (Phím F)"
       >
-        <span>話</span><small id="talk-label">Nói chuyện</small>
+        <span class="ico"
+          ><svg aria-hidden="true" focusable="false"><use href="#i-talk" /></svg></span
+        ><small id="talk-label">Nói chuyện</small>
       </button>
 
       <button
@@ -570,7 +657,9 @@
         title="Đi qua cổng (F)"
         aria-label="Đi qua cổng truyền tống (Phím F)"
       >
-        <span>門</span><small id="portal-label">Qua cổng (F)</small>
+        <span class="ico"
+          ><svg aria-hidden="true" focusable="false"><use href="#i-portal" /></svg></span
+        ><small id="portal-label">Qua cổng (F)</small>
       </button>
 
       <div id="quickbar">
@@ -610,7 +699,9 @@
         aria-label="Khoá hoặc chuyển mục tiêu gần nhất (Phím T)"
         aria-pressed="false"
       >
-        <span>標</span><small id="btn-target-label">Mục tiêu</small>
+        <span class="ico"
+          ><svg aria-hidden="true" focusable="false"><use href="#i-target" /></svg></span
+        ><small id="btn-target-label">Mục tiêu</small>
       </button>
 
       <div id="skills">
@@ -620,13 +711,19 @@
           title="Đột phá (B)"
           aria-label="Đột phá cảnh giới (Phím B)"
         >
-          <span>破</span><small>Đột phá</small>
+          <span class="ico"
+            ><svg aria-hidden="true" focusable="false"><use href="#i-break" /></svg></span
+          ><small>Đột phá</small>
         </button>
         <button class="sk" id="sk-med" title="Đả tọa (L)" aria-label="Đả tọa hồi phục (Phím L)">
-          <span>坐</span><small>Đả tọa</small>
+          <span class="ico"
+            ><svg aria-hidden="true" focusable="false"><use href="#i-med" /></svg></span
+          ><small>Đả tọa</small>
         </button>
         <button class="sk" id="sk-sword" title="Kiếm khí (K)" aria-label="Phóng kiếm khí (Phím K)">
-          <span>氣</span><small>Kiếm khí</small><em class="cd"></em>
+          <span class="ico"
+            ><svg aria-hidden="true" focusable="false"><use href="#i-aura" /></svg></span
+          ><small>Kiếm khí</small><em class="cd"></em>
         </button>
         <button
           class="sk big"
@@ -634,7 +731,9 @@
           title="Kiếm chém (J / Space)"
           aria-label="Kiếm chém tấn công (Phím J hoặc Phím Cách)"
         >
-          <span>劍</span><small>Chém</small><em class="cd"></em>
+          <span class="ico"
+            ><svg aria-hidden="true" focusable="false"><use href="#i-sword" /></svg></span
+          ><small>Chém</small><em class="cd"></em>
         </button>
       </div>
 
@@ -1323,7 +1422,7 @@
         tabindex="-1"
       >
         <header class="dend-header">
-          <div id="dend-seal" class="dend-seal won">勝</div>
+          <div id="dend-seal" class="dend-seal won">Thắng</div>
           <h2 id="dend-title" class="dend-title">BÍ CẢNH ĐẠI THẮNG</h2>
           <p id="dend-reason" class="dend-reason">
             Toàn đội đã hợp lực tru diệt Linh Hư Yêu Vương!
@@ -1472,7 +1571,7 @@
       >
         <div class="limbo-box">
           <header class="limbo-header">
-            <div class="limbo-seal">輪迴</div>
+            <div class="limbo-seal">Luân Hồi</div>
             <h1 id="limbo-title" class="limbo-title">HOÀNG TUYỀN · Bến Vong Xuyên</h1>
             <p id="limbo-kiep-sub" class="limbo-sub">Kiếp thứ 1 khép lại</p>
             <div class="limbo-summary">
@@ -1646,7 +1745,7 @@
         </div>
       </header>
       <div class="outdated-body">
-        <div class="outdated-icon">仙</div>
+        <div class="outdated-icon">Tiên</div>
         <p id="outdated-msg" class="outdated-desc">
           Máy chủ đã nâng cấp phiên bản giao thức mới. Vui lòng tải lại trang để nạp bản cập nhật
           mới nhất.
