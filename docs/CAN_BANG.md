@@ -392,7 +392,7 @@ Mục tiêu: không bãi nào cho tu vi / giờ vượt ~1,5x bãi mới tốt n
 
 ### 4. Luân hồi khi cày tới hết Kim Đan (#406)
 
-Cùng mô hình với mục "Luân hồi & Điểm Duyên" (Duyên theo `calcDuyen`, thời gian là nhịp ở mục 3, bãi tốt nhất, hạ 2 trùm; mốc "hết" hạ 3 trùm). `duyenPerStep(3)` được hạ từ **60 xuống 40** (PR shared riêng): ở 60, Duyên / giờ (0 trùm) ở Kim Đan hậu kỳ lên 31.4 (gấp 1.40x Luyện Khí tầng 5, vượt ngưỡng 1.3x); thanh Kim Đan dài ~5 giờ chứ không 5 lần Trúc Cơ (~2 giờ) nên 12 x 5 trả quá tay.
+Cùng mô hình với mục "Luân hồi & Điểm Duyên" (Duyên theo `calcDuyen`, thời gian là nhịp ở mục 3, bãi tốt nhất, hạ 2 trùm; mốc "hết" hạ 3 trùm). `duyenPerStep(3)` được hạ từ **60 xuống 40** (PR shared riêng): ở 60, Duyên / giờ (0 trùm) ở Kim Đan hậu kỳ lên 31.4 (gấp ~1.4x Luyện Khí tầng 5, vượt ngưỡng 1.3x); thanh Kim Đan dài ~5 giờ chứ không 5 lần Trúc Cơ (~2 giờ) nên 12 x 5 trả quá tay.
 
 | Chết ngay khi vừa đạt | Phút | Duyên (0 trùm) | Duyên / giờ (0 trùm) | Duyên (hạ trùm) | Duyên / giờ (hạ trùm) |
 |---|---:|---:|---:|---:|---:|
@@ -433,4 +433,43 @@ Cùng mô hình với mục "Đi theo đội" (tu vi / giờ MỖI thành viên 
 | Kim Đan Trung kỳ | Độc Thiềm | 0.82x (Độc Thiềm) | 1.18x (Hắc Giao) | 1.09x (Hắc Giao) |
 | Kim Đan Hậu kỳ | Độc Thiềm | 0.77x (Độc Thiềm) | 1.12x (Hắc Giao) | 1.02x (Hắc Giao) |
 
-Cao nhất **1.18x**, thấp nhất **0.69x**: ở Kim Đan đội 3-4 hạ Hắc Giao được ~1.0-1.2x săn solo (dưới ngưỡng 1.5x của #74, khác Trúc Cơ tới 2.5x), còn đội 2 chậm hơn solo (~0.8x: chưa đủ người hạ trùm, chia tu vi, thời gian tìm quái không rút ngắn). Đây là số đo, câu hỏi chia tu vi của người dùng vẫn chờ.
+Cao nhất **1.18x**, thấp nhất **0.69x**: ở Kim Đan đội 3-4 hạ Hắc Giao được ~1.0-1.2x săn solo (dưới ngưỡng 1.5x của #74, khác Trúc Cơ tới 2.5x), còn đội 2 chậm hơn solo (~0.8x: chưa đủ người hạ trùm, chia tu vi, thời gian tìm quái không rút ngắn). Đây là số đo, câu hỏi chia tu vi của người dùng vẫn chờ; test khoá cận dưới ~0.65x (đội nhỏ chậm hơn solo ở Sơ kỳ là hiện trạng, giống Luyện Khí bậc 6-9, không được xấu thêm).
+
+### 6. Kinh tế Kim Đan: chỗ tiêu Linh thạch so với thu nhập (#406)
+
+Thu nhập theo nhịp "bãi mới" ở mục 3 (săn solo, mỗi bậc một loài tốt nhất): tiền rơi cộng bán đồ rơi, TRỪ nguyên liệu của ba bộ (người chơi giữ lại để rèn). Chi: phí rèn `RecipeDef.coin` (mỗi bộ rèn được từ bậc ghi ở cột đầu, tiền trả khi rèn). Cột "Cộng dồn / Phí cộng dồn" so sánh tiền kiếm được tới hết bậc với phí cộng dồn của các bộ mặc được tới bậc kế; bộ III chỉ mặc được ở Hậu kỳ nên phí của nó tính vào cuối Hậu kỳ. Săn trùm theo đội lấy Giao Lân kiếm ít tiền hơn solo (tiền rơi của trùm chia 4 người: ~3,044 Linh thạch / giờ mỗi người): phần hụt đã trừ vào thu nhập Hậu kỳ.
+
+| Bậc | Nguồn | Phút | Linh thạch / giờ (khả dụng) | Kiếm trong bậc | Cộng dồn | Phí rèn cộng dồn | Dư / thiếu |
+|---|---|---:|---:|---:|---:|---:|---:|
+| Kim Đan Sơ kỳ | Thạch Quy | 116 | 6,944 | 13,445 | 13,445 | 9,500 | +3,945 |
+| Kim Đan Trung kỳ | Độc Thiềm | 99 | 11,687 | 19,376 | 32,821 | 31,500 | +1,321 |
+| Kim Đan Hậu kỳ | Độc Thiềm | 124 | 13,080 | 18,882 | 51,702 | 78,500 | -26,798 |
+
+Chi cho từng bộ (nguyên liệu tính MỖI NGƯỜI; trùm đi theo đội 4 người, mỗi mảnh rơi chung nên cả đội cần 4 lần số lượng):
+
+| Bộ | Món | Phí rèn | Nguyên liệu | Phút cày solo | Phút săn trùm theo đội | So với thời gian ở bậc |
+|---|---:|---:|---|---:|---:|---:|
+| Bộ I (từ Sơ kỳ) | 3 | 9,500 | 42 Sương mao, 20 Quy giáp | 33.1 | 0.0 | 29% |
+| Bộ II (từ Trung kỳ) | 3 | 22,000 | 48 Quy giáp, 20 Độc nang | 45.7 | 0.0 | 46% |
+| Bộ III (từ Hậu kỳ) | 3 | 47,000 | 19 Giao lân, 30 Độc nang | 18.2 | 49.3 | 54% |
+
+Tổng phí rèn ba bộ **78,500** Linh thạch so với **51,702** kiếm được trong cả Kim Đan: thiếu 26,798 (~2.0 giờ săn Hậu kỳ sau khi hết Kim Đan). Bộ I mua đủ trong Sơ kỳ (dư 3,945 cuối bậc) và bộ II trong Trung kỳ (dư 1,321); bộ III (47,000, 60% tổng phí) là mục tiêu cuối game: người chơi KHÔNG dư hàng vạn Linh thạch không có chỗ tiêu như cảnh báo cũ của mục "Kinh tế Linh thạch", và cũng không bị chặn (thiếu chừng 2.0 giờ). Cột cuối: cày nguyên liệu chiếm tối đa 54% thời gian bậc và các giờ đó vẫn kiếm tu vi, nên nguyên liệu không phải nút cổ chai, tiền mới là.
+Đan cấp 2 (`dai_hoi_huyet_dan` / `dai_hoi_linh_dan`, 120 Linh thạch / viên ở Lái buôn Vọng Sương) là chỗ xả TUỲ CHỌN thêm vào: mô hình không tính vì không giả định người chơi uống đan (đả tọa hồi khí huyết). Mô hình cũng bỏ qua nhiệm vụ lặp và phí rèn ở nhịp tu luyện (mục 3), phần Linh thạch / đồ thưởng của nhiệm vụ.
+
+### 7. Trang bị: ba bộ tăng sức mạnh đều, không bộ nào bắt buộc hay vô dụng (#406)
+
+Sức mạnh gốc mỗi bộ (kiếm +công, bào +khí huyết, phù +linh lực / tốc): bộ I: công 32, khí huyết 360; bộ II: công 38, khí huyết 425; bộ III: công 44, khí huyết 500. Bảng dưới: tu vi / giờ solo tốt nhất và khí huyết mất mỗi trận khi solo Độc Thiềm (loài đòn nặng nhất) nếu người chơi chỉ có trang bị tới từng bộ.
+
+| Bậc | Trang bị | Tu vi / giờ (loài tốt nhất) | Khí huyết mất / trận (Độc Thiềm) |
+|---|---|---:|---:|
+| Sơ kỳ | không bộ Kim Đan nào | 21,689 (Thạch Quy) | 79% |
+| Sơ kỳ | tới bộ I | 30,400 (Xích Mãng) | 64% |
+| Trung kỳ | không bộ Kim Đan nào | 30,672 (Xích Mãng) | 60% |
+| Trung kỳ | tới bộ I | 31,197 (Xích Mãng) | 50% |
+| Trung kỳ | tới bộ II | 31,728 (Độc Thiềm) | 46% |
+| Hậu kỳ | không bộ Kim Đan nào | 32,275 (Độc Thiềm) | 45% |
+| Hậu kỳ | tới bộ I | 33,922 (Độc Thiềm) | 38% |
+| Hậu kỳ | tới bộ II | 34,570 (Độc Thiềm) | 36% |
+| Hậu kỳ | tới bộ III | 35,222 (Độc Thiềm) | 34% |
+
+Đọc bảng: tỉ lệ tu vi / giờ giữa không có bộ nào và đủ bộ mặc được là 71% ở Sơ kỳ (92% nếu chỉ săn bãi mới), 97% ở Trung kỳ (76% nếu chỉ săn bãi mới), 92% ở Hậu kỳ (92% nếu chỉ săn bãi mới): không bộ nào BẮT BUỘC cho nhịp (luôn còn loài an toàn, thấp nhất 71%: một số loài chỉ an toàn khi đã có bộ đầu, Xích Mãng ở Sơ kỳ và Độc Thiềm ở Trung kỳ), nhưng mỗi bộ đều làm nhanh hơn và bớt nguy hiểm (khí huyết mất / trận giảm ở mọi hàng): không bộ nào VÔ DỤNG. Ở Hậu kỳ đủ ba bộ nhanh hơn không có bộ nào **9.1%** và bớt ~11 điểm phần trăm khí huyết mất. Bộ III đắt nhất (60% tổng phí) nhưng chỉ thêm ~1.9% tu vi / giờ so với bộ II: giá trị của nó nằm ở sức mạnh (công 44 so với 38, PK và trùm), cố ý là chỗ xả Linh thạch cuối game. Công / khí huyết gốc tăng đều giữa các bộ (+19% / +16% công, +18% / +18% khí huyết).

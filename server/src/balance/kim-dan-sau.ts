@@ -198,7 +198,7 @@ ${pacing.join("\n")}
 
 ### 4. Luân hồi khi cày tới hết Kim Đan (#406)
 
-Cùng mô hình với mục "Luân hồi & Điểm Duyên" (Duyên theo \`calcDuyen\`, thời gian là nhịp ở mục 3, bãi tốt nhất, hạ 2 trùm; mốc "hết" hạ 3 trùm). \`duyenPerStep(3)\` được hạ từ **60 xuống 40** (PR shared riêng): ở 60, Duyên / giờ (0 trùm) ở Kim Đan hậu kỳ lên 31.4 (gấp 1.40x Luyện Khí tầng 5, vượt ngưỡng 1.3x); thanh Kim Đan dài ~5 giờ chứ không 5 lần Trúc Cơ (~2 giờ) nên 12 x 5 trả quá tay.
+Cùng mô hình với mục "Luân hồi & Điểm Duyên" (Duyên theo \`calcDuyen\`, thời gian là nhịp ở mục 3, bãi tốt nhất, hạ 2 trùm; mốc "hết" hạ 3 trùm). \`duyenPerStep(3)\` được hạ từ **60 xuống 40** (PR shared riêng): ở 60, Duyên / giờ (0 trùm) ở Kim Đan hậu kỳ lên 31.4 (gấp ~1.4x Luyện Khí tầng 5, vượt ngưỡng 1.3x); thanh Kim Đan dài ~5 giờ chứ không 5 lần Trúc Cơ (~2 giờ) nên 12 x 5 trả quá tay.
 
 | Chết ngay khi vừa đạt | Phút | Duyên (0 trùm) | Duyên / giờ (0 trùm) | Duyên (hạ trùm) | Duyên / giờ (hạ trùm) |
 |---|---:|---:|---:|---:|---:|
@@ -222,6 +222,6 @@ Cùng mô hình với mục "Đi theo đội" (tu vi / giờ MỖI thành viên 
 |---|---|---:|---:|---:|
 ${partyRows.join("\n")}
 
-Cao nhất **${Math.max(...partyAll).toFixed(2)}x**, thấp nhất **${Math.min(...partyAll).toFixed(2)}x**: ở Kim Đan đội 3-4 hạ Hắc Giao được ~1.0-1.2x săn solo (dưới ngưỡng 1.5x của #74, khác Trúc Cơ tới 2.5x), còn đội 2 chậm hơn solo (~0.8x: chưa đủ người hạ trùm, chia tu vi, thời gian tìm quái không rút ngắn). Đây là số đo, câu hỏi chia tu vi của người dùng vẫn chờ.
+Cao nhất **${Math.max(...partyAll).toFixed(2)}x**, thấp nhất **${Math.min(...partyAll).toFixed(2)}x**: ở Kim Đan đội 3-4 hạ Hắc Giao được ~1.0-1.2x săn solo (dưới ngưỡng 1.5x của #74, khác Trúc Cơ tới 2.5x), còn đội 2 chậm hơn solo (~0.8x: chưa đủ người hạ trùm, chia tu vi, thời gian tìm quái không rút ngắn). Đây là số đo, câu hỏi chia tu vi của người dùng vẫn chờ; test khoá cận dưới ~0.65x (đội nhỏ chậm hơn solo ở Sơ kỳ là hiện trạng, giống Luyện Khí bậc 6-9, không được xấu thêm).
 `;
 }

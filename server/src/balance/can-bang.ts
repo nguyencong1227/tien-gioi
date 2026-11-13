@@ -14,6 +14,7 @@ import {
 } from "@tien-gioi/shared";
 import { renderKimDan, type KimDanReport } from "./kim-dan";
 import { renderKimDanSau } from "./kim-dan-sau";
+import { renderKimDanKinhTe } from "./kim-dan-kinh-te";
 import { PK_TARGET_SECONDS, representativeLevels, summarizeDuels } from "./pk";
 import {
   ASSUME_DUNGEON,
@@ -435,7 +436,8 @@ ${pkSection}
 
 ${kimDanTruocSection}
 
-${renderKimDanSau()}`,
+${renderKimDanSau()}
+${renderKimDanKinhTe()}`,
   );
   console.log(`Đã ghi ${out}\n\n${summary}`);
 }
