@@ -73,8 +73,10 @@ jobs:
           # 3. /metrics: tắt khi không token, bật với token
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:2567/metrics)" = "401"
           curl -fsS -H "Authorization: Bearer ci-metrics-token-0123456789" "http://127.0.0.1:2567/metrics?format=json" | grep -q '"players"'
-          # 4. Phục vụ client đã build
-          curl -fsS http://127.0.0.1:2567/ | grep -qi "<html"
+          # 4. Phục vụ client đã build. Ghi ra tệp rồi mới grep: `curl | grep -q` với `pipefail` đỏ giả (curl mã 23 "Failed writing body")
+          #    khi trang lớn hơn bộ đệm ống 64 KiB, vì grep -q thoát ngay khi thấy khớp còn curl vẫn đang ghi (index.html vượt 64 KiB ở v0.1.2).
+          curl -fsS http://127.0.0.1:2567/ -o /tmp/index.html
+          grep -qi "<html" /tmp/index.html
           # 5. Vào phòng thật qua matchmaking (tạo phòng Lạc Hà trong ảnh)
           curl -fsS -X POST http://127.0.0.1:2567/matchmake/joinOrCreate/world \
             -H 'Content-Type: application/json' \
