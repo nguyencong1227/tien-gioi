@@ -141,3 +141,39 @@ describe("SHA-256 của tài sản bên thứ ba (check-credits, #331)", () => {
     ).toHaveLength(1);
   });
 });
+
+describe("Tài liệu rà soát khớp số tệp thật (M6, #411)", () => {
+  const rootDir = path.resolve(__dirname, "../..");
+  const { scanned } = auditAssets(path.resolve(rootDir, "CREDITS.md"));
+  const doc = (rel: string) => fs.readFileSync(path.resolve(rootDir, rel), "utf8");
+
+  it("CREDITS.md mục 4 và docs/RA_SOAT_TAI_SAN.md ghi ĐÚNG số tệp tĩnh quét được (thêm tài sản mà quên cập nhật tài liệu thì đỏ)", () => {
+    expect(doc("CREDITS.md")).toContain(
+      `quét qua script tự động (\`npm run check:credits\`):** ${scanned.length} tệp`,
+    );
+    expect(doc("docs/RA_SOAT_TAI_SAN.md")).toContain(`(${scanned.length} tệp tĩnh =`);
+    expect(doc("docs/RA_SOAT_TAI_SAN.md")).toContain(`**${scanned.length} tệp**`);
+  });
+
+  it("số tệp theo thư mục khớp tài liệu: assets 34, icons 5, fonts 5; icon vật phẩm 31 = số vật phẩm của game", () => {
+    const under = (d: string) =>
+      scanned.filter((f) => f.replace(/\\/g, "/").includes(`client/public/${d}/`));
+    const items = under("assets").filter((f) => f.replace(/\\/g, "/").includes("/items/"));
+    expect(under("assets")).toHaveLength(34);
+    expect(under("icons")).toHaveLength(5);
+    expect(under("fonts")).toHaveLength(5);
+    expect(items).toHaveLength(31);
+    const credits = doc("CREDITS.md");
+    expect(credits).toContain("`client/public/assets/`: 34 tệp");
+    expect(credits).toContain("31 biểu tượng vật phẩm");
+  });
+
+  it("mọi icon vật phẩm có một hàng trong bảng của docs/RA_SOAT_TAI_SAN.md (thiếu hàng thì đỏ)", () => {
+    const text = doc("docs/RA_SOAT_TAI_SAN.md");
+    const icons = scanned
+      .map((f) => f.replace(/\\/g, "/"))
+      .filter((f) => f.includes("client/public/assets/items/"));
+    const missing = icons.filter((f) => !text.includes(`\`${f}\``));
+    expect(missing).toEqual([]);
+  });
+});

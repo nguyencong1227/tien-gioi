@@ -24,6 +24,7 @@ import { Buffer } from "node:buffer";
 import { spawn, execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
+import { freePort } from "./free-port.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -545,12 +546,12 @@ async function main() {
     }
   });
 
-  const HTTP_PORT = 39880 + Math.floor(Math.random() * 80);
+  const HTTP_PORT = await freePort();
   await new Promise((resolve) => server.listen(HTTP_PORT, "127.0.0.1", resolve));
   console.log(`- Web server sẵn sàng tại: http://127.0.0.1:${HTTP_PORT}`);
 
   // 3. Khởi động Chrome headless
-  const CDP_PORT = 39980 + Math.floor(Math.random() * 80);
+  const CDP_PORT = await freePort();
   const tmpChromeDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-capture-viewports-"));
 
   const chromeProcess = spawn("google-chrome", [

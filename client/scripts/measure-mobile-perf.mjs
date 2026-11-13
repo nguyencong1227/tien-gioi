@@ -25,6 +25,7 @@ import WebSocket from "ws";
 import { parseOverlayCounts } from "./perf-gate.mjs";
 import { DRAW_COUNTER_SOURCE, parseDrawCounterSnapshot } from "./draw-counter.mjs";
 import { FX_DRIVER_SOURCE, parseFxDriverReport } from "./fx-driver.mjs";
+import { freePort } from "./free-port.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const __filename = fileURLToPath(import.meta.url);
@@ -94,11 +95,11 @@ const server = http.createServer((req, res) => {
   }
 });
 
-const HTTP_PORT = 39860 + Math.floor(Math.random() * 80);
+const HTTP_PORT = await freePort();
 await new Promise((resolve) => server.listen(HTTP_PORT, "127.0.0.1", resolve));
 console.log(`- Web server tạm: http://127.0.0.1:${HTTP_PORT}`);
 
-const CDP_PORT = 39960 + Math.floor(Math.random() * 80);
+const CDP_PORT = await freePort();
 const tmpChromeDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-perf-mobile-"));
 
 const chromeProcess = spawn("google-chrome", [

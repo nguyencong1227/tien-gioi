@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { DEFAULT_MAP_ID, DUNGEON_MAPS, getMap } from "@tien-gioi/shared";
+import { DEFAULT_MAP_ID, DUNGEON_MAPS, MAPS, getMap } from "@tien-gioi/shared";
 import type { SavedPlayer } from "./store";
 
 const dir = mkdtempSync(path.join(tmpdir(), "tien-gioi-store-"));
@@ -120,7 +120,11 @@ describe("sanitizeLife: không tin bộ đếm trong file", () => {
 
 describe("mapIdOf: chỗ ở của nhân vật là bản đồ thường", () => {
   it("bản đồ thường giữ nguyên; thiếu, lạ, sai kiểu, khoá nguyên mẫu về Lạc Hà", () => {
-    for (const id of ["lac_ha", "hac_phong"]) expect(store.mapIdOf({ mapId: id })).toBe(id);
+    // Mọi bản đồ thường đang có (kể cả Âm Sương Trạch, M6 #411): thêm bản đồ mới mà quên đăng ký thì đỏ ở đây
+    expect(MAPS.map((m) => m.id)).toEqual(
+      expect.arrayContaining(["lac_ha", "hac_phong", "am_suong"]),
+    );
+    for (const { id } of MAPS) expect(store.mapIdOf({ mapId: id }), id).toBe(id);
     for (const bad of [undefined, "", "khong_co", "constructor", "__proto__", 7, null, {}])
       expect(store.mapIdOf({ mapId: bad as never }), String(bad)).toBe("lac_ha");
   });
