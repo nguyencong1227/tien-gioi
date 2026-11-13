@@ -24,6 +24,27 @@ export function pickNextTarget(
   currentId: string | null,
   range: number = LOCK_RANGE,
 ): string | null {
+  return pickTarget(candidates, currentId, 1, range);
+}
+
+/**
+ * Shift+Tab (bàn phím, #463): như `pickNextTarget` nhưng đi NGƯỢC (xa -> gần, vòng lại). Chưa khoá thì cũng lấy con GẦN nhất
+ * (bấm Tab hay Shift+Tab lúc chưa có mục tiêu đều ra con gần nhất); đang khoá con gần nhất thì quay về con xa nhất.
+ */
+export function pickPrevTarget(
+  candidates: readonly LockCandidate[],
+  currentId: string | null,
+  range: number = LOCK_RANGE,
+): string | null {
+  return pickTarget(candidates, currentId, -1, range);
+}
+
+function pickTarget(
+  candidates: readonly LockCandidate[],
+  currentId: string | null,
+  step: 1 | -1,
+  range: number,
+): string | null {
   const list = candidates
     .filter((c) => Number.isFinite(c.dist) && c.dist <= range)
     .sort((a, b) => a.dist - b.dist || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
@@ -32,7 +53,7 @@ export function pickNextTarget(
   const i = list.findIndex((c) => c.id === currentId);
   if (i < 0) return list[0].id; // mục tiêu cũ đã mất / ra khỏi tầm: lấy con gần nhất
   if (list.length === 1) return null; // chỉ còn chính nó: nhả khoá
-  return list[(i + 1) % list.length].id;
+  return list[(i + step + list.length) % list.length].id;
 }
 
 /** Khoá còn hiệu lực không: quái còn đó (`dist` hữu hạn) và trong tầm. */
