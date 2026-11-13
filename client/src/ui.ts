@@ -118,6 +118,7 @@ import { canAffordFee, feeChipText, recipeFee } from "./forge-fee";
 import { doneRows, doneSummary } from "./quest-log";
 import { pickupBtnText, portalBtnText, talkBtnText } from "./ctx-btn";
 import { sound } from "./audio";
+import { initKeyLabels } from "./keybinds-dom";
 import { transitionMs, waitOrSkip } from "./gfx/scene-transition";
 import { getDisplay, onDisplayChange } from "./gfx/display";
 import { TRACKER_PREF_KEY, parseTrackerPref, trackerOpen } from "./gfx/hud-compact";
@@ -174,6 +175,8 @@ export interface UiCallbacks {
   onPickup: () => void;
   onTalk: () => void;
   onDialogAction: (action: DialogAction) => void;
+  /** Esc khi không còn gì để đóng: bỏ chọn mục tiêu; trả true nếu đã bỏ (#462) */
+  onClearTarget?: () => boolean;
   onTrackQuest?: (questId: string | null) => void;
   onPartyLeave?: () => void;
   onPartyKick?: (name: string) => void;
@@ -2700,6 +2703,8 @@ export const ui = {
     });
     sound.onChange((m) => this.updateMuteIcon(m));
     this.updateMuteIcon(sound.isMuted());
+    // Nhãn phím trên nút HUD (máy tính): đọc từ bảng phím nên đổi phím thì nhãn đổi theo (#462)
+    initKeyLabels();
 
     // Hộp thoại NPC
     bindTap("dlg-close", () => this.closeDialog());
@@ -3148,7 +3153,16 @@ export const ui = {
       closeDungeonEndModal: () => this.closeDungeonEndModal(),
       closeTopModal: () => this.closeTopModal(),
       closeInviteBox: () => this.closeInviteBox(),
+      clearTarget: () => callbacks?.onClearTarget?.() ?? false,
     });
+  },
+
+  /**
+   * Có bảng / hộp thoại / menu đang mở không (#462): khi có, phím của THẾ GIỚI (đánh, kỹ năng, đan, mục tiêu, tương tác) không chạy để
+   * Space / Enter / mũi tên thuộc về bảng; phím mở / đóng bảng, chat, âm thanh vẫn chạy.
+   */
+  isKeyboardCaptured() {
+    return modalStack.size() > 0 || this.isDialogOpen() || this.isPlayerMenuOpen();
   },
 
   showNewbieGuide(force = false) {

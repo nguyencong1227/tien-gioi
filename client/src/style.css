@@ -1139,6 +1139,44 @@ html[data-input="touch"] .qt-head {
   text-shadow: 0 1px 2px #000;
 }
 
+/* Nhãn phím trên nút (QUYET_DINH_M3 mục 13, #462): chỉ máy tính (con trỏ chính xác, màn rộng); cảm ứng / điện thoại ẩn hẳn */
+.keycap {
+  display: none;
+}
+@media (pointer: fine) and (min-width: 641px) {
+  .keycap {
+    display: block;
+    position: absolute;
+    top: 3px;
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: 14px;
+    padding: 0 3px;
+    border-radius: 3px;
+    border: 1px solid rgba(243, 220, 160, 0.6);
+    background: rgba(0, 0, 0, 0.62);
+    color: #ffe9b0;
+    font-family: inherit;
+    font-size: var(--fs-9);
+    font-weight: 700;
+    line-height: 1.35;
+    text-align: center;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .sk.big .keycap {
+    top: 9px;
+  }
+  /* nút HUD góc phải: nhãn nằm ở góc trên phải, không che chữ */
+  .hud-btn .keycap {
+    top: -7px;
+    right: -3px;
+    left: auto;
+    transform: none;
+  }
+}
+
 /* Thông báo nhận đồ góc phải ("+1 Nanh sói") */
 #gain-feed {
   position: fixed;
