@@ -11,6 +11,7 @@ import {
   INVENTORY_SLOTS,
   ITEM_BY_ID,
   LINH_HU_MAP_ID,
+  MAPS,
   REALMS,
   getMap,
   SECT_COIN_CAP,
@@ -317,6 +318,35 @@ describe("audit-saves (Issue #112)", () => {
       expect(errsBlocked.find((e) => e.code === "pos_blocked")!.message).toContain(
         hacPhong.def.name,
       );
+    });
+
+    it("mọi bản đồ ngoài hoang (kể cả Âm Sương Trạch, M6 #405): chỗ xuất hiện của mọi cổng là toạ độ lưu hợp lệ; ngoài biên và ô chặn của chính bản đồ đó thì báo", () => {
+      const codes = (o: object) => {
+        const raw = JSON.stringify({ ...validPlayer, ...o });
+        return auditPlayerSaveData(raw, raw.length).map((e) => e.code);
+      };
+      for (const def of MAPS) {
+        const m = getMap(def.id)!;
+        for (const portal of def.portals ?? []) {
+          const got = codes({ mapId: def.id, x: portal.spawn.x, y: portal.spawn.y });
+          expect(got, `${def.id}: chỗ xuất hiện của ${portal.id}`).not.toContain("invalid_map_id");
+          expect(got, `${def.id}: ${portal.id}`).not.toContain("pos_out_of_bounds");
+          expect(got, `${def.id}: ${portal.id}`).not.toContain("pos_blocked");
+        }
+        expect(
+          codes({ mapId: def.id, x: m.worldW + 200, y: 1500 }),
+          `${def.id}: ngoài biên`,
+        ).toContain("pos_out_of_bounds");
+        expect(codes({ mapId: def.id, x: 0, y: 0 }), `${def.id}: vách đá góc`).toContain(
+          "pos_blocked",
+        );
+      }
+      // Cùng một toạ độ, khác bản đồ: (1984, 3344) là chỗ xuất hiện ở Âm Sương nhưng vượt chiều cao Hắc Phong Cốc (3072 px)
+      const amSuong = getMap("am_suong")!;
+      const spawn = amSuong.portal("am_suong_nam")!.spawn;
+      expect(spawn.y).toBeGreaterThan(getMap("hac_phong")!.worldH);
+      expect(codes({ mapId: "am_suong", ...spawn })).not.toContain("pos_out_of_bounds");
+      expect(codes({ mapId: "hac_phong", ...spawn })).toContain("pos_out_of_bounds");
     });
 
     it("ngày tháng createdAt/updatedAt hỏng -> invalid_date", () => {

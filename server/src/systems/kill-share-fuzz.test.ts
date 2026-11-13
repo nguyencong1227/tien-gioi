@@ -9,7 +9,14 @@
 //  3. **Tu vi:** hữu hạn, không giảm; người không đủ điều kiện không tăng.
 // `Math.random` được thay bằng bộ sinh có hạt (và ghi lại dãy giá trị) để biết ĐÚNG số tiền đã tung và tái hiện được mọi lỗi.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { COIN_DROPS, DROP_TABLES, PARTY_MAX, PARTY_SHARE_RANGE, rollCoin } from "@tien-gioi/shared";
+import {
+  COIN_DROPS,
+  DROP_TABLES,
+  MONSTERS,
+  PARTY_MAX,
+  PARTY_SHARE_RANGE,
+  rollCoin,
+} from "@tien-gioi/shared";
 import { killMonster } from "./combat";
 import { addMonster, addPlayer, makeWorld } from "./test-helpers";
 
@@ -230,6 +237,10 @@ describe("chia thưởng khi hạ quái: tổng Linh thạch đúng số tung, �
       expect(Number.isFinite(e) && e >= 0, `${s.label}: tu vi ${sid} đổi ${e}`).toBe(true);
       if (!s.alive.has(sid)) expect(e, `${s.label}: ${sid} (ngã / rời phòng) tăng tu vi`).toBe(0);
     }
+  });
+
+  it("phủ MỌI loài quái của game (kể cả quái Kim Đan và trùm hac_giao, M6 #405): mỗi loài có bảng tiền + bảng rơi nên đều vào mô phỏng", () => {
+    expect([...KINDS].sort()).toEqual(MONSTERS.map((m) => m.id).sort());
   });
 
   it("độ phủ: các nhánh quan trọng đều xảy ra (đội chia tiền, tiền mất vì không ai đủ điều kiện, người ngã bị bỏ qua, đồ có chủ)", () => {
