@@ -45,10 +45,11 @@ Khi bổ sung thêm sprite, biểu tượng hoặc hiệu ứng từ thư viện
 
 ## 4. Kết quả rà soát tài sản (M4-sớm, Issue #257)
 
-- **Tổng số tệp tài nguyên tĩnh quét qua script tự động (`npm run check:credits`):** 24 tệp.
-  - `client/public/assets/`: 19 tệp (1 tileset, 2 atlas, 16 biểu tượng vật phẩm).
+- **Tổng số tệp tài nguyên tĩnh quét qua script tự động (`npm run check:credits`):** 44 tệp (cập nhật M6, 13/11/2026; lúc M4-sớm là 24 tệp, chi tiết ở `docs/RA_SOAT_TAI_SAN.md`).
+  - `client/public/assets/`: 34 tệp (1 tileset, 2 atlas, 31 biểu tượng vật phẩm).
   - `client/public/icons/`: 5 tệp (1 svg, 4 png icon PWA / favicon).
-- **Tài nguyên tự sinh runtime:** 2 mô-đun (`client/src/textures.ts` vẽ canvas, `client/src/audio.ts` phát Web Audio).
+  - `client/public/fonts/`: 5 tệp (4 `woff2` + `OFL.txt`, có SHA-256 ở mục 6).
+- **Tài nguyên tự sinh runtime (không có tệp ảnh, ngoài phạm vi quét):** `client/src/textures.ts` (vẽ canvas), `client/src/audio.ts` (Web Audio) và các mô-đun đồ hoạ M5-M6 `client/src/gfx/` (tileset trang trí, ánh sáng, sương, nước, atlas hạt + phông bit-map, bóng đốm): danh sách ở `docs/RA_SOAT_TAI_SAN.md` mục 2c.
 - **Số tệp thiếu nguồn / không rõ tác giả:** **0 tệp**.
 - **Số tài sản vi phạm bản quyền / sao chép từ game khác:** **0 tệp**.
 - **Công cụ kiểm tra tự động:** `client/scripts/check-credits.mjs` (kiểm tra tự động trong CI).
