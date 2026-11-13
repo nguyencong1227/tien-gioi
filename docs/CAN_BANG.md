@@ -268,3 +268,81 @@ Mô phỏng ở `server/src/balance/pk.ts`; test `pk.test.ts` giữ mục tiêu.
 | 3 tầng | 100% | 17.6 |
 
 Không có hiệu chỉnh chênh lệch: bên mạnh hơn hầu như luôn thắng và nhanh hơn (trận này không có né / đan / kỹ năng nên ít bất ngờ); người yếu hơn có quyền từ chối lời thách. Hai người cùng bậc: bên **đánh trước** trong cùng một tick thắng thường hơn (đòn hạ khí huyết về 0 kết thúc trận ngay), nên tỉ lệ thắng của người thứ nhất ở dòng "cùng bậc" trên 50% là hiệu ứng thứ tự xử lý, không phải lợi thế bậc. Nếu muốn trận công bằng giữa người chênh bậc thì cần chuẩn hoá chỉ số về bậc thấp hơn: việc riêng, chờ người dùng quyết (câu hỏi 4 ở `questions.md`).
+
+
+## Kim Đan trước M6 (#402)
+
+Số đo bằng đúng mô hình và mã server ở trên, với **nội dung hiện có** (Linh Thố, Hôi Lang, Hắc Hổ, Xích Mãng; chưa có quái / đồ / nhiệm vụ cho Kim Đan).
+Ảnh chụp cố định ở `server/src/balance/kim-dan-truoc.json` (sinh bằng `npm run can-bang:kim-dan-truoc -w server`): không đổi khi M6 thêm nội dung,
+để #406 so "trước / sau". Giả định thời gian tìm Xích Mãng 90 giây là của mô hình (bản đồ chỉ có 2 con); Hắc Phong Cốc có 6 con.
+
+### 1. Cả cảnh giới: đúng mục tiêu nhưng hình dạng sai
+
+Theo `simulate()` (có chuỗi nhiệm vụ, có đột phá thất bại), Kim Đan mất **6.4 giờ**. Con số này nằm trong mục tiêu đề xuất (5-7 giờ) **chỉ nhờ một đường tắt**:
+
+| Bậc | Thanh | Săn tốt nhất (solo, an toàn) | Tu vi / giờ |
+|---|---:|---|---:|
+| Kim Đan Sơ kỳ | 26,400 | Hắc Hổ | 6,424 |
+| Kim Đan Trung kỳ | 30,360 | Xích Mãng | 30,510 |
+| Kim Đan Hậu kỳ | 34,914 | Xích Mãng | 31,364 |
+
+Sơ kỳ phải cày Hắc Hổ rất lâu; từ Kim Đan Trung kỳ Xích Mãng (cấp 12, 4000 máu) thành an toàn khi solo (mô hình: mất ≤ 50% khí huyết mỗi trận) và cho **30,510 tu vi / giờ, gấp 6.1 lần Hắc Hổ** (5,014): mục tiêu "tu vi / giờ không quá ~1,5× bãi đúng bậc" bị vượt xa. `KILL_EXP_FREE_GAP` chưa trừ gì vì Xích Mãng chỉ thấp hơn người chơi 1-3 bậc.
+
+### 2. Mỗi loài (solo)
+
+| Bậc | Loài | Tu vi / giờ | Linh thạch / giờ | Con / giờ |
+|---|---|---:|---:|---:|
+| Kim Đan Sơ kỳ | Linh Thố | 590 | 1,430 | 588 |
+| Kim Đan Sơ kỳ | Hôi Lang | 1,293 | 2,280 | 426 |
+| Kim Đan Sơ kỳ | Hắc Hổ | 6,424 | 4,887 | 253 |
+| Kim Đan Sơ kỳ | Xích Mãng | không an toàn solo | – | – |
+| Kim Đan Trung kỳ | Linh Thố | 591 | 1,434 | 590 |
+| Kim Đan Trung kỳ | Hôi Lang | 1,301 | 2,297 | 429 |
+| Kim Đan Trung kỳ | Hắc Hổ | 5,014 | 5,007 | 259 |
+| Kim Đan Trung kỳ | Xích Mãng | 30,510 | 15,510 | 34 |
+| Kim Đan Hậu kỳ | Linh Thố | 592 | 1,437 | 591 |
+| Kim Đan Hậu kỳ | Hôi Lang | 1,308 | 2,312 | 432 |
+| Kim Đan Hậu kỳ | Hắc Hổ | 3,783 | 5,113 | 265 |
+| Kim Đan Hậu kỳ | Xích Mãng | 31,364 | 15,958 | 35 |
+
+### 3. Đường tắt Tụ Khí Đan
+
+Tụ Khí Đan cộng **5% `expMax`** mỗi viên (hồi chiêu 60 giây = tối đa 60 viên / giờ). Ở Kim Đan, mỗi viên đáng 1,320-1,746 tu vi, trong khi Xích Mãng cho 900 tu vi và rơi 60% x 1-2 viên. Cột "nguồn cung / dùng" là số viên mỗi giờ (rơi / thực dùng sau giới hạn hồi chiêu); cột cuối là thời gian đầy MỘT thanh nếu chỉ săn loài đó.
+
+| Bậc | Loài săn | Con / giờ | Đan: nguồn cung / dùng | Tu vi / viên | Tu vi / giờ (săn + đan) | Một thanh (không đan → có đan) |
+|---|---|---:|---|---:|---:|---|
+| Kim Đan Sơ kỳ | Hắc Hổ | 253 | 2.5 / 2.5 | 1,320 | 9,767 | 4.1 giờ → 2.7 giờ |
+| Kim Đan Trung kỳ | Xích Mãng (tìm 90 s) | 34 | 30.3 / 30.3 | 1,518 | 76,525 | 60 phút → 24 phút |
+| Kim Đan Trung kỳ | Xích Mãng (tìm 30 s) | 77 | 69.1 / 60.0 | 1,518 | 160,635 | 26 phút → 11 phút |
+| Kim Đan Hậu kỳ | Xích Mãng (tìm 90 s) | 35 | 31.2 / 31.2 | 1,746 | 85,810 | 67 phút → 24 phút |
+| Kim Đan Hậu kỳ | Xích Mãng (tìm 30 s) | 82 | 73.8 / 60.0 | 1,746 | 178,988 | 28 phút → 12 phút |
+
+Mô hình chưa tính: thời gian tập hợp, chết, Xích Mãng bị người khác hạ trước (một bản đồ nhiều người tranh 2-6 con). Nhưng chiều hướng rõ: đan không phải phần thưởng hiếm ở Kim Đan mà là nguồn tu vi chính.
+
+### 4. Bí cảnh Linh Hư (ngưỡng bậc 9, không có trần bậc) với đội Kim Đan
+
+Mô phỏng bằng mã server thật (`fightBoss`, ca khó: đứng yên, không né), 20 trận mỗi dòng. Mục tiêu thiết kế ở bậc ngưỡng: một người không hạ nổi; đội 2 người không kịp giờ (12 phút); đội 3 người 5-8 phút.
+
+| Bậc | Đội | Hạ được trùm | Phút thật | Người chết / trận |
+|---|---:|---:|---:|---:|
+| Kim Đan Sơ kỳ | 1 | 100% | 7.9 | 0.0 |
+| Kim Đan Sơ kỳ | 2 | 100% | 4.0 | 0.0 |
+| Kim Đan Sơ kỳ | 3 | 100% | 2.6 | 0.0 |
+| Kim Đan Sơ kỳ | 4 | 100% | 2.0 | 0.0 |
+| Kim Đan Trung kỳ | 1 | 100% | 6.9 | 0.0 |
+| Kim Đan Trung kỳ | 2 | 100% | 3.5 | 0.0 |
+| Kim Đan Trung kỳ | 3 | 100% | 2.3 | 0.0 |
+| Kim Đan Trung kỳ | 4 | 100% | 1.7 | 0.0 |
+| Kim Đan Hậu kỳ | 1 | 100% | 6.0 | 0.0 |
+| Kim Đan Hậu kỳ | 2 | 100% | 3.0 | 0.0 |
+| Kim Đan Hậu kỳ | 3 | 100% | 2.0 | 0.0 |
+| Kim Đan Hậu kỳ | 4 | 100% | 1.5 | 0.0 |
+
+Đội nhỏ nhất mở được (2 người) hạ trùm 100% số trận trong 3.0-4.0 phút, 0.0 người chết: mục tiêu "đội 2 người không kịp giờ" bị phá ở mọi bậc Kim Đan (và một người Kim Đan cũng thắng, chỉ bị luật cỡ đội chặn). Phần Linh thạch của một lượt thưởng (700) chỉ bằng ~2.7 phút săn Xích Mãng ở Kim Đan Trung kỳ, nhưng lượt thưởng còn 2 Tụ Khí Đan chắc chắn (mục 3).
+
+### 5. Kết luận và hướng xử lý (đề xuất, chốt ở #403 / #405 / #406)
+
+1. **Nhịp tổng đúng nhưng hình dạng sai:** Sơ kỳ rất chậm, rồi Xích Mãng + Tụ Khí Đan làm hai bậc sau trôi qua trong vài chục phút. Nội dung Kim Đan mới (Sương Hồ / Thạch Quy / Độc Thiềm / Hắc Giao) phải tạo bãi đúng bậc cho CẢ ba bậc và làm Xích Mãng hết là đường tắt.
+2. **Tụ Khí Đan tính theo % thanh là bẫy khi thanh nhảy ×6:** cách xử lý ứng viên (đo ở #406): (a) bảng rơi quái cũ (nhất là Xích Mãng 60%) giảm mạnh hoặc bỏ `tu_khi_dan`; (b) đan cộng một lượng cố định theo cảnh giới của đan (đan mới cho Kim Đan, đan cũ chỉ cộng % thanh của bậc Luyện Khí / Trúc Cơ); (c) hạ `pct` còn ~1%. Cần ghi rõ lý do trong PR hợp đồng #403.
+3. **Bí cảnh Linh Hư cần trần bậc (`maxStep`, tuỳ chọn trong `DungeonDef`) hoặc chỉ số trùm theo bậc đội:** nếu không, người Kim Đan quay lại hạ trùm trong vài phút (3 lượt thưởng / ngày). Chốt ở #405 (PR `shared/` riêng, B review).
+4. Số trên là mô hình (chưa kiểm bằng người chơi thật): bot của C (#410) kiểm lại hai đường tắt bằng đo thật.

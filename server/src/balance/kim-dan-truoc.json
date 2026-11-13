@@ -1,0 +1,279 @@
+{
+  "ids": ["tho", "lang", "ho", "mang"],
+  "mangSearch": 90,
+  "mangSearchFast": 30,
+  "simulateMinutes": 385.8681017536825,
+  "tiers": [
+    {
+      "tier": 0,
+      "step": 13,
+      "label": "Kim Đan Sơ kỳ",
+      "bar": 26400,
+      "hunts": [
+        {
+          "id": "tho",
+          "name": "Linh Thố",
+          "safe": true,
+          "expPerHour": 589.9900433989366,
+          "secPerKill": 6.117460386215665,
+          "coinPerHour": 1430.0051733414848
+        },
+        {
+          "id": "lang",
+          "name": "Hôi Lang",
+          "safe": true,
+          "expPerHour": 1293.3885164403894,
+          "secPerKill": 8.445636764457312,
+          "coinPerHour": 2280.467481274348
+        },
+        {
+          "id": "ho",
+          "name": "Hắc Hổ",
+          "safe": true,
+          "expPerHour": 6424.364305142735,
+          "secPerKill": 14.218287445016486,
+          "coinPerHour": 4886.664464246203
+        },
+        {
+          "id": "mang",
+          "name": "Xích Mãng",
+          "safe": false,
+          "expPerHour": null,
+          "secPerKill": null,
+          "coinPerHour": null
+        }
+      ],
+      "best": {
+        "id": "ho",
+        "expPerHour": 6424.364305142735
+      },
+      "pill": {
+        "monsterId": "ho",
+        "killsPerHour": 253.19504996094315,
+        "pillsPerKill": 0.01,
+        "supplyPerHour": 2.5319504996094317,
+        "usedPerHour": 2.5319504996094317,
+        "expEach": 1320,
+        "pillExpPerHour": 3342.17465948445,
+        "totalExpPerHour": 9766.538964627185,
+        "minutesNoPill": 246.5613599670866,
+        "minutesWithPill": 162.1864209764575
+      },
+      "pillFastSearch": null,
+      "dungeon": [
+        {
+          "party": 1,
+          "winRate": 1,
+          "realMinutes": 7.900833333334177,
+          "deathsPerRun": 0
+        },
+        {
+          "party": 2,
+          "winRate": 1,
+          "realMinutes": 3.964166666666616,
+          "deathsPerRun": 0
+        },
+        {
+          "party": 3,
+          "winRate": 1,
+          "realMinutes": 2.628611111111022,
+          "deathsPerRun": 0
+        },
+        {
+          "party": 4,
+          "winRate": 1,
+          "realMinutes": 1.9752777777777248,
+          "deathsPerRun": 0
+        }
+      ]
+    },
+    {
+      "tier": 1,
+      "step": 14,
+      "label": "Kim Đan Trung kỳ",
+      "bar": 30360,
+      "hunts": [
+        {
+          "id": "tho",
+          "name": "Linh Thố",
+          "safe": true,
+          "expPerHour": 591.279215798568,
+          "secPerKill": 6.102072832526226,
+          "coinPerHour": 1433.6112072229023
+        },
+        {
+          "id": "lang",
+          "name": "Hôi Lang",
+          "safe": true,
+          "expPerHour": 1301.0679296884334,
+          "secPerKill": 8.383339745829486,
+          "coinPerHour": 2297.41374964332
+        },
+        {
+          "id": "ho",
+          "name": "Hắc Hổ",
+          "safe": true,
+          "expPerHour": 5013.531894692742,
+          "secPerKill": 13.875900493856225,
+          "coinPerHour": 5007.242595229288
+        },
+        {
+          "id": "mang",
+          "name": "Xích Mãng",
+          "safe": true,
+          "expPerHour": 30510.202839387435,
+          "secPerKill": 106.88475982827447,
+          "coinPerHour": 15510.162558848342
+        }
+      ],
+      "best": {
+        "id": "mang",
+        "expPerHour": 30510.202839387435
+      },
+      "pill": {
+        "monsterId": "mang",
+        "killsPerHour": 33.681134764057205,
+        "pillsPerKill": 0.8999999999999999,
+        "supplyPerHour": 30.31302128765148,
+        "usedPerHour": 30.31302128765148,
+        "expEach": 1518,
+        "pillExpPerHour": 46015.16631465495,
+        "totalExpPerHour": 76525.36915404239,
+        "minutesNoPill": 59.70461781553246,
+        "minutesWithPill": 23.803870796535392
+      },
+      "pillFastSearch": {
+        "monsterId": "mang",
+        "killsPerHour": 76.78401282603932,
+        "pillsPerKill": 0.8999999999999999,
+        "supplyPerHour": 69.10561154343537,
+        "usedPerHour": 60,
+        "expEach": 1518,
+        "pillExpPerHour": 91080,
+        "totalExpPerHour": 160635.1329417972,
+        "minutesNoPill": 26.189296504174468,
+        "minutesWithPill": 11.339985012245227
+      },
+      "dungeon": [
+        {
+          "party": 1,
+          "winRate": 1,
+          "realMinutes": 6.894166666667283,
+          "deathsPerRun": 0
+        },
+        {
+          "party": 2,
+          "winRate": 1,
+          "realMinutes": 3.456944444444308,
+          "deathsPerRun": 0
+        },
+        {
+          "party": 3,
+          "winRate": 1,
+          "realMinutes": 2.2947222222221515,
+          "deathsPerRun": 0
+        },
+        {
+          "party": 4,
+          "winRate": 1,
+          "realMinutes": 1.7236111111110726,
+          "deathsPerRun": 0
+        }
+      ]
+    },
+    {
+      "tier": 2,
+      "step": 15,
+      "label": "Kim Đan Hậu kỳ",
+      "bar": 34914,
+      "hunts": [
+        {
+          "id": "tho",
+          "name": "Linh Thố",
+          "safe": true,
+          "expPerHour": 592.406970641763,
+          "secPerKill": 6.088625240731095,
+          "coinPerHour": 1436.7775407621536
+        },
+        {
+          "id": "lang",
+          "name": "Hôi Lang",
+          "safe": true,
+          "expPerHour": 1307.689209242942,
+          "secPerKill": 8.329806097208994,
+          "coinPerHour": 2312.1786720165433
+        },
+        {
+          "id": "ho",
+          "name": "Hắc Hổ",
+          "safe": true,
+          "expPerHour": 3783.2577926107124,
+          "secPerKill": 13.588700153293455,
+          "coinPerHour": 5113.071832934685
+        },
+        {
+          "id": "mang",
+          "name": "Xích Mãng",
+          "safe": true,
+          "expPerHour": 31363.951811580195,
+          "secPerKill": 103.8844884547525,
+          "coinPerHour": 15958.10909462258
+        }
+      ],
+      "best": {
+        "id": "mang",
+        "expPerHour": 31363.951811580195
+      },
+      "pill": {
+        "monsterId": "mang",
+        "killsPerHour": 34.653874255423624,
+        "pillsPerKill": 0.8999999999999999,
+        "supplyPerHour": 31.18848682988126,
+        "usedPerHour": 31.18848682988126,
+        "expEach": 1745.7,
+        "pillExpPerHour": 54445.741458923716,
+        "totalExpPerHour": 85809.6932705039,
+        "minutesNoPill": 66.79132822881533,
+        "minutesWithPill": 24.412626594483786
+      },
+      "pillFastSearch": {
+        "monsterId": "mang",
+        "killsPerHour": 82.03354138927271,
+        "pillsPerKill": 0.8999999999999999,
+        "supplyPerHour": 73.83018725034543,
+        "usedPerHour": 60,
+        "expEach": 1745.7,
+        "pillExpPerHour": 104742,
+        "totalExpPerHour": 178987.5524626872,
+        "minutesNoPill": 28.21502339891379,
+        "minutesWithPill": 11.703830636137129
+      },
+      "dungeon": [
+        {
+          "party": 1,
+          "winRate": 1,
+          "realMinutes": 6.012500000000414,
+          "deathsPerRun": 0
+        },
+        {
+          "party": 2,
+          "winRate": 1,
+          "realMinutes": 3.010277777777666,
+          "deathsPerRun": 0
+        },
+        {
+          "party": 3,
+          "winRate": 1,
+          "realMinutes": 1.996944444444391,
+          "deathsPerRun": 0
+        },
+        {
+          "party": 4,
+          "winRate": 1,
+          "realMinutes": 1.4997222222221962,
+          "deathsPerRun": 0
+        }
+      ]
+    }
+  ]
+}
