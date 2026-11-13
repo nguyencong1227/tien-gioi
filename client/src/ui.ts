@@ -115,7 +115,7 @@ import {
   type SectConfirmKind,
 } from "./sect";
 import { canAffordFee, feeChipText, recipeFee } from "./forge-fee";
-import { portalBtnText } from "./portal-btn";
+import { pickupBtnText, portalBtnText, talkBtnText } from "./ctx-btn";
 import { sound } from "./audio";
 import { transitionMs, waitOrSkip } from "./gfx/scene-transition";
 import { getDisplay, onDisplayChange } from "./gfx/display";
@@ -3275,10 +3275,16 @@ export const ui = {
     }
   },
 
-  talkPrompt(label: string | null) {
+  /** `npcName`: tên NPC đứng gần ("" = không rõ tên); `null` = ẩn nút. Nhãn trong nút cố định ngắn, tên đi vào title / aria-label. */
+  talkPrompt(npcName: string | null) {
     const btn = $("btn-talk");
-    btn.hidden = label === null;
-    if (label !== null) $("talk-label").textContent = label;
+    btn.hidden = npcName === null;
+    if (npcName !== null) {
+      const t = talkBtnText(npcName);
+      $("talk-label").textContent = t.label;
+      btn.title = t.title;
+      btn.setAttribute("aria-label", t.aria);
+    }
   },
 
   portalPrompt(label: string | null, onTravel?: () => void) {
@@ -3296,10 +3302,16 @@ export const ui = {
     }
   },
 
-  pickupPrompt(label: string | null) {
+  /** `itemName`: tên món đồ rơi gần nhất ("" = không rõ tên); `null` = ẩn nút. Nhãn trong nút cố định ngắn, tên đi vào title / aria-label. */
+  pickupPrompt(itemName: string | null) {
     const btn = $("btn-pickup");
-    btn.hidden = label === null;
-    if (label !== null) $("pickup-label").textContent = label;
+    btn.hidden = itemName === null;
+    if (itemName !== null) {
+      const t = pickupBtnText(itemName);
+      $("pickup-label").textContent = t.label;
+      btn.title = t.title;
+      btn.setAttribute("aria-label", t.aria);
+    }
   },
 
   setCurrentMapId(mapId: string) {
