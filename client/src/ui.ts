@@ -114,7 +114,7 @@ import {
   sectConfirmText,
   type SectConfirmKind,
 } from "./sect";
-import { feeChipText, recipeFee } from "./forge-fee";
+import { canAffordFee, feeChipText, recipeFee } from "./forge-fee";
 import { sound } from "./audio";
 import { transitionMs, waitOrSkip } from "./gfx/scene-transition";
 import { getDisplay, onDisplayChange } from "./gfx/display";
@@ -1265,7 +1265,7 @@ function renderForgeModal() {
     // Phí Linh thạch (M6): chip "Linh thạch có/cần" như nguyên liệu; thiếu tiền thì nút Rèn tắt (server cũng từ chối)
     const fee = recipeFee(rec.coin);
     if (fee > 0) {
-      const enoughCoin = currentCoin >= fee;
+      const enoughCoin = canAffordFee(fee, currentCoin);
       if (!enoughCoin) canCraft = false;
       const feeChip = document.createElement("span");
       feeChip.className = `forge-mat forge-fee ${enoughCoin ? "ok" : "missing"}`;

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { COIN_CAP, CURRENCY_NAME, KIM_DAN_RECIPES, RECIPES } from "@tien-gioi/shared";
-import { feeChipText, recipeFee } from "./forge-fee";
+import { canAffordFee, feeChipText, recipeFee } from "./forge-fee";
 
 describe("recipeFee (khớp luật craftFee của server)", () => {
   it("số nguyên dương là có phí; vượt trần bị kẹp ở COIN_CAP", () => {
@@ -28,6 +28,35 @@ describe("recipeFee (khớp luật craftFee của server)", () => {
   });
 });
 
+describe("canAffordFee (biên có == cần)", () => {
+  it("có == cần là ĐỦ; thiếu 1 là THIẾU; thừa 1 là đủ", () => {
+    expect(canAffordFee(3000, 3000)).toBe(true);
+    expect(canAffordFee(3000, 2999)).toBe(false);
+    expect(canAffordFee(3000, 3001)).toBe(true);
+    expect(canAffordFee(COIN_CAP, COIN_CAP)).toBe(true);
+    expect(canAffordFee(1, 0)).toBe(false);
+  });
+
+  it("phí 0 (miễn phí) luôn đủ, kể cả ví trống hoặc hỏng", () => {
+    expect(canAffordFee(0, 0)).toBe(true);
+    expect(canAffordFee(0, Number.NaN)).toBe(true);
+    expect(canAffordFee(0, -5)).toBe(true);
+  });
+
+  it("số dư hỏng (NaN, vô hạn, âm, sai kiểu) với phí dương: KHÔNG đủ, không ném lỗi", () => {
+    for (const bad of [Number.NaN, Infinity, -Infinity, -1, undefined, null, "9999", {}])
+      expect(canAffordFee(500, bad as unknown as number), String(bad)).toBe(false);
+  });
+
+  it("khớp luật server trên dữ liệu thật: mỗi công thức Kim Đan, ví == phí rèn được, ví == phí - 1 thì không", () => {
+    for (const r of KIM_DAN_RECIPES) {
+      const fee = recipeFee(r.coin);
+      expect(canAffordFee(fee, fee), r.id).toBe(true);
+      expect(canAffordFee(fee, fee - 1), r.id).toBe(false);
+    }
+  });
+});
+
 describe("feeChipText", () => {
   it("'Linh thạch có/cần' với dấu chấm nghìn kiểu Việt, cùng kiểu chip nguyên liệu", () => {
     expect(feeChipText(3000, 700)).toBe(`${CURRENCY_NAME} 700/3.000`);
@@ -46,6 +75,9 @@ describe("ui.ts dùng phí rèn", () => {
   it("bảng Lò Rèn tính phí bằng recipeFee, tắt nút Rèn khi thiếu tiền và vẽ lại khi ví đổi", () => {
     expect(ui).toContain("recipeFee(rec.coin)");
     expect(ui).toContain("feeChipText(fee, currentCoin)");
+    // phép so ví / phí đi qua hàm thuần đã test biên, KHÔNG so thẳng trong ui.ts
+    expect(ui).toContain("canAffordFee(fee, currentCoin)");
+    expect(ui).not.toMatch(/currentCoin\s*>=?\s*fee\b/);
     expect(ui).toMatch(/if \(!enoughCoin\) canCraft = false;/);
     // onWallet vẽ lại bảng rèn khi đang mở
     const wallet = ui.slice(ui.indexOf("onWallet(m: WalletMsg)"));

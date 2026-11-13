@@ -10,6 +10,15 @@ export function recipeFee(coin: unknown): number {
     : 0;
 }
 
+/**
+ * Ví có đủ trả phí không (khớp `r.c.coin < fee` ở server: có == cần là ĐỦ, thiếu 1 là THIẾU). Phí 0 luôn đủ; số dư hỏng
+ * (NaN, vô hạn, sai kiểu) coi là KHÔNG đủ để nút Rèn không sáng khi chưa chắc server nhận.
+ */
+export function canAffordFee(fee: number, have: number): boolean {
+  if (!(fee > 0)) return true;
+  return typeof have === "number" && Number.isFinite(have) && have >= fee;
+}
+
 const fmt = (n: number) =>
   Math.max(0, Math.floor(Number.isFinite(n) ? n : 0)).toLocaleString("vi-VN");
 
