@@ -3,7 +3,7 @@
 // khí huyết mất = công quái / chu kỳ x thời gian trận x tỉ lệ trúng (0,8: người chơi né ~20%), đội `n` người thì mỗi người chịu 1/n.
 // Ở đây dựng một `World` thật (như `pk.ts` / `dungeon.ts`): người chơi đứng cạnh quái, đánh thường mỗi lần hồi chiêu, quái dùng AI
 // thật (`tickMonsters`); đo thời gian hạ quái và khí huyết mất rồi so với công thức. Không né, không di chuyển (ca khó).
-// Không kiểm: thời gian tìm quái, mật độ quái, người chơi thật (cần bot: #410).
+// Không kiểm: người chơi thật (cần bot: #410). Thời gian tìm quái + mật độ quái: `search-check.ts`.
 import {
   AM_SUONG_ID,
   DROP_TABLES,
@@ -32,7 +32,7 @@ const MAX_SECONDS = 300;
 /** Số trận mỗi ô của bảng trùm theo đội (hạt giống 1..N) */
 export const BOSS_RUNS = 6;
 
-function seeded(seed: number) {
+export function seeded(seed: number) {
   let s = seed | 0;
   return () => {
     s = (s + 0x6d2b79f5) | 0;
@@ -42,7 +42,7 @@ function seeded(seed: number) {
   };
 }
 
-const median = (a: number[]) => a.slice().sort((x, y) => x - y)[Math.floor(a.length / 2)];
+export const median = (a: number[]) => a.slice().sort((x, y) => x - y)[Math.floor(a.length / 2)];
 
 export interface HuntFight {
   /** Giây từ lúc vào trận tới lúc quái chết (MAX_SECONDS nếu không hạ được) */
@@ -414,7 +414,7 @@ export function renderHuntCheck(): string {
   );
   return `### 9. Đối chiếu mô hình với mã server thật (#406 mục 7)
 
-Độc lập với số đo bằng bot của C (#410): dựng \`World\` thật (\`hunt-check.ts\`), người chơi mặc trang bị tốt nhất đứng cạnh quái, đánh thường mỗi lần hồi chiêu, quái dùng AI thật; **không né, không di chuyển** (ca khó, như mục "PK" và "Bí cảnh"). Không kiểm thời gian tìm quái, mật độ quái và người chơi thật (cần bot).
+Độc lập với số đo bằng bot của C (#410): dựng \`World\` thật (\`hunt-check.ts\`), người chơi mặc trang bị tốt nhất đứng cạnh quái, đánh thường mỗi lần hồi chiêu, quái dùng AI thật; **không né, không di chuyển** (ca khó, như mục "PK" và "Bí cảnh"). Thời gian tìm quái đo riêng ở mục 10 (\`search-check.ts\`); không kiểm người chơi thật (cần bot).
 
 **Săn quái thường (solo, 12 trận mỗi dòng).** Thời gian trận theo mô hình = máu / (công x hệ số chém x bạo kích trung bình / hồi chiêu); khí huyết mất theo mô hình đã nhân tỉ lệ trúng ${ASSUME.hitTaken} (giả định người chơi né ~20%), nên cột cuối so mã thật (không né) với mô hình chia ${ASSUME.hitTaken}.
 
