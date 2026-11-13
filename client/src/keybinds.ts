@@ -18,6 +18,9 @@ export type ActionId =
   | "quick.1"
   | "quick.2"
   | "interact"
+  | "prompt.yes"
+  | "prompt.no"
+  | "exit.fight"
   | "panel.inventory"
   | "panel.char"
   | "panel.quest"
@@ -93,6 +96,27 @@ export const ACTIONS: readonly ActionDef[] = [
     label: "Nhặt / nói chuyện / qua cổng",
     group: "interact",
     defaults: ["KeyF"],
+    world: true,
+  },
+  {
+    id: "prompt.yes",
+    label: "Nhận lời mời (tổ đội, bí cảnh, thách đấu, tông môn) / đồng ý",
+    group: "interact",
+    defaults: ["KeyY"],
+    world: false,
+  },
+  {
+    id: "prompt.no",
+    label: "Từ chối lời mời / huỷ xác nhận",
+    group: "interact",
+    defaults: ["KeyX"],
+    world: false,
+  },
+  {
+    id: "exit.fight",
+    label: "Rời bí cảnh / đầu hàng quyết đấu (hỏi xác nhận)",
+    group: "interact",
+    defaults: ["KeyR"],
     world: true,
   },
   { id: "panel.inventory", label: "Túi đồ", group: "panel", defaults: ["KeyI"], world: false },

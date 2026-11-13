@@ -101,9 +101,9 @@ describe("nhãn phím HUD (#463)", () => {
     const { doc, els } = makeDoc(HUD_KEYS.map((k) => k.id));
     const off = initKeyLabels(doc);
     expect(els.get("sk-sword")!.querySelector(".keycap")!.textContent).toBe("3");
-    rebind("skill.sword", "KeyX");
-    expect(els.get("sk-sword")!.querySelector(".keycap")!.textContent).toBe("X");
-    expect(els.get("sk-sword")!.attrs.title).toBe("Phóng kiếm khí (X / 3 / K)");
+    rebind("skill.sword", "KeyV");
+    expect(els.get("sk-sword")!.querySelector(".keycap")!.textContent).toBe("V");
+    expect(els.get("sk-sword")!.attrs.title).toBe("Phóng kiếm khí (V / 3 / K)");
     resetKeymap();
     expect(els.get("sk-sword")!.querySelector(".keycap")!.textContent).toBe("3");
     off();
@@ -135,8 +135,8 @@ describe("nhãn phím HUD (#463)", () => {
     expect(a.textContent).toBe("Cách");
     expect(b.textContent).toBe("J");
     expect(bad.textContent).toBe("giữ");
-    rebind("attack", "KeyX");
-    expect(a.textContent).toBe("X");
+    rebind("attack", "KeyV");
+    expect(a.textContent).toBe("V");
     resetKeymap();
     expect(a.textContent).toBe("Cách");
   });
@@ -161,7 +161,7 @@ describe("nhãn phím HUD (#463)", () => {
     const { doc, els } = makeDoc(["help", "sk-slash"]);
     initKeyLabels(doc);
     expect(els.get("help")!.textContent).toContain("Cách chém");
-    rebind("attack", "KeyX");
-    expect(els.get("help")!.textContent).toContain("X chém");
+    rebind("attack", "KeyV");
+    expect(els.get("help")!.textContent).toContain("V chém");
   });
 });

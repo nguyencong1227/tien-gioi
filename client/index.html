@@ -402,15 +402,18 @@
         <div id="dhud-members" class="dhud-members" aria-label="Thành viên bí cảnh"></div>
 
         <div class="dhud-actions">
-          <button type="button" id="dhud-btn-leave" class="dhud-btn-leave">Rời Bí Cảnh</button>
+          <button type="button" id="dhud-btn-leave" class="dhud-btn-leave">
+            Rời Bí Cảnh <kbd class="btn-key" aria-hidden="true" data-key-action="exit.fight">R</kbd>
+          </button>
           <div id="dhud-leave-confirm" class="dhud-leave-confirm" hidden>
             <span class="dhud-confirm-label">Xác nhận rời bí cảnh về Lạc Hà?</span>
             <div class="dhud-confirm-btns">
               <button type="button" id="dhud-btn-leave-yes" class="dhud-btn-confirm yes">
                 Rời ngay
+                <kbd class="btn-key" aria-hidden="true" data-key-action="prompt.yes">Y</kbd>
               </button>
               <button type="button" id="dhud-btn-leave-no" class="dhud-btn-confirm no">
-                Ở lại
+                Ở lại <kbd class="btn-key" aria-hidden="true" data-key-action="prompt.no">X</kbd>
               </button>
             </div>
           </div>
@@ -441,15 +444,19 @@
         </div>
 
         <div class="duel-hud-actions">
-          <button type="button" id="duel-btn-yield" class="duel-btn-yield">Đầu Hàng</button>
+          <button type="button" id="duel-btn-yield" class="duel-btn-yield">
+            Đầu Hàng <kbd class="btn-key" aria-hidden="true" data-key-action="exit.fight">R</kbd>
+          </button>
           <div id="duel-yield-confirm" class="duel-yield-confirm" hidden>
             <span class="duel-confirm-label">Xác nhận nhận thua và đầu hàng?</span>
             <div class="duel-confirm-btns">
               <button type="button" id="duel-btn-yield-yes" class="duel-btn-confirm yes">
                 Đầu Hàng
+                <kbd class="btn-key" aria-hidden="true" data-key-action="prompt.yes">Y</kbd>
               </button>
               <button type="button" id="duel-btn-yield-no" class="duel-btn-confirm no">
                 Đánh Tiếp
+                <kbd class="btn-key" aria-hidden="true" data-key-action="prompt.no">X</kbd>
               </button>
             </div>
           </div>
@@ -1365,8 +1372,12 @@
           <p id="pib-msg"><b>Đạo hữu</b> mời bạn gia nhập tổ đội</p>
           <div class="pib-timer"><i id="pib-timer-bar"></i></div>
           <div class="pib-actions">
-            <button type="button" id="pib-btn-accept" class="pib-btn accept">Nhận</button>
-            <button type="button" id="pib-btn-decline" class="pib-btn decline">Từ chối</button>
+            <button type="button" id="pib-btn-accept" class="pib-btn accept">
+              Nhận <kbd class="btn-key" aria-hidden="true" data-key-action="prompt.yes">Y</kbd>
+            </button>
+            <button type="button" id="pib-btn-decline" class="pib-btn decline">
+              Từ chối <kbd class="btn-key" aria-hidden="true" data-key-action="prompt.no">X</kbd>
+            </button>
           </div>
         </div>
       </div>
@@ -1394,8 +1405,12 @@
         </small>
         <div class="dib-timer"><i id="dib-timer-bar"></i></div>
         <div class="dib-actions">
-          <button type="button" id="dib-btn-enter" class="dib-btn enter">Vào Bí Cảnh</button>
-          <button type="button" id="dib-btn-decline" class="dib-btn decline">Từ Chối</button>
+          <button type="button" id="dib-btn-enter" class="dib-btn enter">
+            Vào Bí Cảnh <kbd class="btn-key" aria-hidden="true" data-key-action="prompt.yes">Y</kbd>
+          </button>
+          <button type="button" id="dib-btn-decline" class="dib-btn decline">
+            Từ Chối <kbd class="btn-key" aria-hidden="true" data-key-action="prompt.no">X</kbd>
+          </button>
         </div>
       </div>
 
@@ -1416,8 +1431,12 @@
         <p id="duib-msg" class="duib-msg"><b>Đạo hữu</b> muốn cùng bạn luận bàn võ nghệ.</p>
         <div class="duib-timer"><i id="duib-timer-bar"></i></div>
         <div class="duib-actions">
-          <button type="button" id="duib-btn-accept" class="duib-btn accept">Nhận Lời</button>
-          <button type="button" id="duib-btn-decline" class="duib-btn decline">Từ Chối</button>
+          <button type="button" id="duib-btn-accept" class="duib-btn accept">
+            Nhận Lời <kbd class="btn-key" aria-hidden="true" data-key-action="prompt.yes">Y</kbd>
+          </button>
+          <button type="button" id="duib-btn-decline" class="duib-btn decline">
+            Từ Chối <kbd class="btn-key" aria-hidden="true" data-key-action="prompt.no">X</kbd>
+          </button>
         </div>
       </div>
 
@@ -1439,8 +1458,12 @@
         <p id="sib-msg" class="sib-msg">Đạo hữu mời bạn gia nhập tông môn.</p>
         <div class="sib-timer"><i id="sib-timer-bar"></i></div>
         <div class="sib-actions">
-          <button type="button" id="sib-btn-accept" class="sib-btn accept">Gia Nhập</button>
-          <button type="button" id="sib-btn-decline" class="sib-btn decline">Từ Chối</button>
+          <button type="button" id="sib-btn-accept" class="sib-btn accept">
+            Gia Nhập <kbd class="btn-key" aria-hidden="true" data-key-action="prompt.yes">Y</kbd>
+          </button>
+          <button type="button" id="sib-btn-decline" class="sib-btn decline">
+            Từ Chối <kbd class="btn-key" aria-hidden="true" data-key-action="prompt.no">X</kbd>
+          </button>
         </div>
       </div>
 
@@ -1749,7 +1772,9 @@
                 <b data-key-action="panel.char">C</b> xem Đạo thể trang bị,
                 <b data-key-action="panel.quest">J</b> xem Sổ nhiệm vụ,
                 <b data-key-action="panel.map">M</b> xem Sơn Hà Đồ,
-                <b data-key-action="chat.open">Enter</b> để chat, <b>Esc</b> đóng bảng.
+                <b data-key-action="chat.open">Enter</b> để chat,
+                <b data-key-action="prompt.yes">Y</b> nhận lời mời,
+                <b data-key-action="prompt.no">X</b> từ chối, <b>Esc</b> đóng bảng.
               </p>
             </div>
           </div>

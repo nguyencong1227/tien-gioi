@@ -176,10 +176,10 @@ describe("isValidToken / sanitizeKeymap", () => {
 
   it("giữ phím hợp lệ, bỏ phím sai, hành động lạ bị bỏ, tối đa 3 phím mỗi hành động", () => {
     const m = sanitizeKeymap({
-      attack: ["KeyX", "KeyW", "Bad Key", "KeyX", "KeyY", "KeyU", "KeyV"],
+      attack: ["KeyV", "KeyW", "Bad Key", "KeyV", "KeyY", "KeyU", "KeyV"],
       hack: ["KeyZ"],
     });
-    expect(m.attack).toEqual(["KeyX", "KeyY", "KeyU"]);
+    expect(m.attack).toEqual(["KeyV", "KeyY", "KeyU"]);
     expect((m as Record<string, unknown>).hack).toBeUndefined();
     expect(m.interact).toEqual(DEFAULT_KEYMAP.interact);
   });
@@ -224,10 +224,10 @@ describe("lưu / đổi phím", () => {
   });
 
   it("đổi phím chính: phím mới chạy, phím cũ của hành động đó vẫn là phím phụ, bảng được lưu", () => {
-    expect(rebind("attack", "KeyX")).toBe(true);
-    expect(getKeymap().attack).toEqual(["KeyX", "Space"]);
-    expect(actionOfEvent(ev("KeyX"), getLookup())).toBe("attack");
-    expect(JSON.parse(store.get(KEYMAP_STORAGE_KEY)!)).toEqual({ attack: ["KeyX", "Space"] });
+    expect(rebind("attack", "KeyV")).toBe(true);
+    expect(getKeymap().attack).toEqual(["KeyV", "Space"]);
+    expect(actionOfEvent(ev("KeyV"), getLookup())).toBe("attack");
+    expect(JSON.parse(store.get(KEYMAP_STORAGE_KEY)!)).toEqual({ attack: ["KeyV", "Space"] });
   });
 
   it("gán phím DUY NHẤT của hành động khác: hoán đổi, hành động kia nhận phím chính cũ, không ai mất sạch phím", () => {
@@ -269,7 +269,7 @@ describe("lưu / đổi phím", () => {
   it("resetKeymap xoá kho và báo cho người nghe; onKeymapChange gỡ được", () => {
     const fn = vi.fn();
     const off = onKeymapChange(fn);
-    rebind("attack", "KeyX");
+    rebind("attack", "KeyV");
     expect(fn).toHaveBeenCalledTimes(1);
     resetKeymap();
     expect(fn).toHaveBeenCalledTimes(2);
@@ -298,7 +298,7 @@ describe("lưu / đổi phím", () => {
     });
     _resetKeymapCache();
     expect(getKeymap()).toEqual(DEFAULT_KEYMAP);
-    expect(rebind("attack", "KeyX")).toBe(true);
-    expect(getKeymap().attack[0]).toBe("KeyX");
+    expect(rebind("attack", "KeyV")).toBe(true);
+    expect(getKeymap().attack[0]).toBe("KeyV");
   });
 });

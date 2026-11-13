@@ -1117,6 +1117,28 @@ html[data-input="touch"] .qt-head {
   }
 }
 
+/* Chip phím trong nút chữ (lời mời, rời bí cảnh, đầu hàng: "Nhận Y" / "Từ chối X"): chỉ máy tính, cảm ứng ẩn */
+.btn-key {
+  display: none;
+}
+@media (pointer: fine) and (min-width: 641px) {
+  .btn-key {
+    display: inline-block;
+    margin-left: 6px;
+    min-width: 16px;
+    padding: 0 4px;
+    border-radius: 3px;
+    border: 1px solid rgba(243, 220, 160, 0.6);
+    background: rgba(0, 0, 0, 0.45);
+    color: #ffe9b0;
+    font-family: inherit;
+    font-size: var(--fs-11, 11px);
+    font-weight: 700;
+    text-align: center;
+    vertical-align: middle;
+  }
+}
+
 /* Nhãn phím trên nút (QUYET_DINH_M3 mục 13, #463): chỉ máy tính (con trỏ chính xác, màn rộng); cảm ứng / điện thoại ẩn hẳn */
 .keycap {
   display: none;
@@ -1901,8 +1923,9 @@ body.low-fx #btn-talk {
   font-size: var(--fs-13);
   color: #d1d5db;
 }
-/* Cảm ứng không có bàn phím: ẩn dòng mở màn Phím tắt trong Cài đặt (không đổi hành vi điện thoại) */
-html[data-input="touch"] #set-keys-row {
+/* Cảm ứng không có bàn phím: ẩn dòng mở màn Phím tắt trong Cài đặt và nút "Xem tất cả phím tắt" ở bảng chỉ dẫn (không đổi hành vi điện thoại) */
+html[data-input="touch"] #set-keys-row,
+html[data-input="touch"] #newbie-btn-keys {
   display: none;
 }
 .newbie-footer {

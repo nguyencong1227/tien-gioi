@@ -127,6 +127,7 @@ import {
   type ActionId,
 } from "./keybinds";
 import { captureOutcome, keysScreenModel } from "./keys-screen";
+import { LEAVE_BUTTONS, pickPromptButton, pickVisible, type PromptAnswer } from "./prompts";
 import { dirOfArrowKey, moveFocus, ownsArrowKeys, withFocusKept } from "./panel-nav";
 import { transitionMs, waitOrSkip } from "./gfx/scene-transition";
 import { getDisplay, onDisplayChange } from "./gfx/display";
@@ -870,6 +871,33 @@ function renderQuestTracker() {
 // ---------- Màn Phím tắt trong Cài đặt (QUYET_DINH_M3 mục 13, #463) ----------
 
 let keysModalOpen = false;
+
+/**
+ * Tấm kết quả (bí cảnh, quyết đấu) được bật / tắt bằng thuộc tính `hidden` ở nhiều chỗ nên không đi qua `toggle...`: theo dõi thuộc tính để tấm
+ * vào / ra `modalStack` (phím của thế giới không chạy phía sau, Esc đóng đúng tầng) và đưa focus vào nút của tấm (#463).
+ */
+function watchModalHidden(id: string) {
+  const el = document.getElementById(id);
+  if (!el || typeof MutationObserver === "undefined") return;
+  const sync = () => {
+    if (!el.hidden) {
+      if (!modalStack.getEntries().some((m) => m.id === id)) {
+        modalStack.push(id, null);
+        focusModal(el);
+      }
+    } else if (modalStack.remove(id)) {
+      returnFocus(null);
+    }
+  };
+  new MutationObserver(sync).observe(el, { attributes: true, attributeFilter: ["hidden"] });
+  sync(); // tấm đã hiện sẵn lúc gắn
+}
+
+/** Nút đang hiện: không có tổ tiên nào bị `hidden` (hộp lời mời, HUD bí cảnh / quyết đấu, hộp xác nhận ẩn bằng thuộc tính `hidden` của hộp chứa). */
+function buttonShown(id: string): boolean {
+  const el = document.getElementById(id);
+  return el !== null && el.closest("[hidden]") === null;
+}
 /** Hành động đang chờ người chơi bấm phím mới; `null` = không chờ. */
 let keyCaptureFor: ActionId | null = null;
 
@@ -2900,6 +2928,9 @@ export const ui = {
     renderQuestTracker();
     setupQuestTrackerToggle(bindTap);
 
+    watchModalHidden("dungeon-end-modal");
+    watchModalHidden("duel-end-modal");
+
     // Bảng đo hiệu năng chỉ hiện khi mở bằng ?perf=1 (#71)
     if (
       typeof window !== "undefined" &&
@@ -2993,6 +3024,25 @@ export const ui = {
 
   isKeysModalOpen() {
     return keysModalOpen;
+  },
+
+  /**
+   * Trả lời lời mời / hộp xác nhận bằng phím (`prompt.yes` / `prompt.no`, xem `prompts.ts`): bấm nút đầu tiên đang hiện theo thứ tự ưu tiên.
+   * `click()` đi qua đúng đường của chuột / chạm (`bindTap`) nên dọn đồng hồ, gửi tin và chuyển sang lời mời kế đều như cũ. `true` nếu có hộp để trả lời.
+   */
+  answerPrompt(answer: PromptAnswer): boolean {
+    const id = pickPromptButton(answer, buttonShown);
+    if (!id) return false;
+    $(id).click();
+    return true;
+  },
+
+  /** Phím `exit.fight`: mở hộp xác nhận rời bí cảnh / đầu hàng (nút tương ứng đang hiện). Xác nhận bằng `prompt.yes`, huỷ bằng `prompt.no` / Esc. */
+  askLeaveFight(): boolean {
+    const id = pickVisible(LEAVE_BUTTONS, buttonShown);
+    if (!id) return false;
+    $(id).click();
+    return true;
   },
 
   isHideNames() {

@@ -32,7 +32,7 @@ afterEach(() => {
 
 describe("tokenOfEvent: phím bấm lúc chờ gán (#463)", () => {
   it("phím thường -> mã vị trí vật lý, không phụ thuộc bộ gõ", () => {
-    expect(tokenOfEvent(ev("KeyX"))).toBe("KeyX");
+    expect(tokenOfEvent(ev("KeyV"))).toBe("KeyV");
     expect(tokenOfEvent(ev("Digit7"))).toBe("Digit7");
     expect(tokenOfEvent(ev("Space"))).toBe("Space");
     expect(tokenOfEvent(ev("F5"))).toBe("F5");
@@ -61,7 +61,7 @@ describe("holderOf / primaryKeyLabel", () => {
     expect(holderOf("Digit3")).toBe("skill.sword");
     expect(holderOf("KeyK")).toBe("skill.sword");
     expect(holderOf("Shift+Tab")).toBe("target.prev");
-    expect(holderOf("KeyX")).toBeNull();
+    expect(holderOf("KeyV")).toBeNull();
   });
   it("primaryKeyLabel đổi theo bảng phím hiện hành (chữ gợi ý trong game không lệch phím thật)", () => {
     expect(primaryKeyLabel("interact")).toBe("F");
@@ -94,10 +94,10 @@ describe("keysScreenModel", () => {
     expect(quest?.keys).toEqual(["J", "Q"]);
   });
   it("sau khi đổi phím: dòng đó 'custom', dòng khác không", () => {
-    rebind("skill.sword", "KeyX");
+    rebind("skill.sword", "KeyV");
     const rows = keysScreenModel(getKeymap()).flatMap((g) => g.rows);
     expect(rows.find((r) => r.id === "skill.sword")).toMatchObject({
-      keys: ["X", "3", "K"],
+      keys: ["V", "3", "K"],
       custom: true,
     });
     expect(rows.filter((r) => r.custom).map((r) => r.id)).toEqual(["skill.sword"]);
@@ -130,11 +130,11 @@ describe("captureOutcome: quyết định khi bấm phím lúc chờ gán", () =
     }
   });
   it("phím tự do -> bind, lời nhắn có tên hành động và phím", () => {
-    const r = captureOutcome("skill.sword", ev("KeyX"), map());
+    const r = captureOutcome("skill.sword", ev("KeyV"), map());
     expect(r).toEqual({
       kind: "bind",
-      token: "KeyX",
-      message: "Kiếm khí: X.",
+      token: "KeyV",
+      message: "Kiếm khí: V.",
     });
   });
   it("lấy phím DUY NHẤT của hành động khác: báo hoán đổi, đúng như rebind làm", () => {
