@@ -43,6 +43,26 @@ const MIMES = {
 };
 
 /**
+ * Các bản đồ ngoài mà mỗi chu kỳ dựng lại hình ảnh lần lượt (#408 bước 4): lớp ô, trang trí, nước, sương, thời tiết, ánh sáng của MỖI bản đồ
+ * đều phải dỡ sạch khi rời đi (trước đây chỉ Lạc Hà). Phần tử đầu là bản đồ "gốc": hai lần đọc chỉ số (đầu / cuối) đều đọc khi đang ở đó,
+ * nếu không số đối tượng khác nhau giữa các bản đồ bị tính nhầm là rò rỉ.
+ */
+export const LEAK_MAP_IDS = ["lac_ha", "hac_phong", "am_suong"];
+
+/** Biểu thức chạy trong trang: đổi `scene.map` sang bản đồ `id` (qua `window.__getMap`) và dựng lại hình ảnh; ném lỗi nếu id không tra được. */
+export function rebuildMapExpr(id) {
+  return `
+    (() => {
+      const sc = window.__scene;
+      const m = window.__getMap && window.__getMap(${JSON.stringify(id)});
+      if (!sc || !m) throw new Error("không tra được bản đồ " + ${JSON.stringify(id)});
+      sc.map = m;
+      sc.buildMapVisuals();
+    })()
+  `;
+}
+
+/**
  * Đánh giá kết quả rò rỉ (hàm thuần logic, dễ test)
  * @param {{ initial: any, final: any, maxHeapGrowthPercent: number, maxDamageNumbers?: number }} params
  * @returns {{ ok: boolean, heapGrowthPercent: number, errors: string[] }}
@@ -210,7 +230,8 @@ async function runLeakTest() {
     });
 
     await cdpSend("Page.navigate", {
-      url: `http://127.0.0.1:${HTTP_PORT}/?dungeon=mock&debug=1&perf=1`,
+      // Sương + thời tiết + nước BẬT (`?debug` mặc định tắt cả ba): cũng là thứ cần kiểm có rò rỉ khi chạy liên tục
+      url: `http://127.0.0.1:${HTTP_PORT}/?dungeon=mock&debug=1&perf=1&weather=1&fog=1&water=1`,
     });
 
     // Chờ Scene sẵn sàng
@@ -224,6 +245,17 @@ async function runLeakTest() {
     }
 
     await sleep(1000);
+
+    // Mọi bản đồ trong LEAK_MAP_IDS phải tra được ngay trong trang, nếu không cả phép lặp bản đồ là vô nghĩa (đỏ rõ, không xanh giả)
+    for (const id of LEAK_MAP_IDS) {
+      const probe = await cdpSend("Runtime.evaluate", {
+        expression: `Boolean(window.__getMap && window.__getMap(${JSON.stringify(id)}))`,
+        returnByValue: true,
+      });
+      if (probe?.result?.result?.value !== true) {
+        throw new Error(`Trang không tra được bản đồ "${id}" bằng window.__getMap (cần ?debug).`);
+      }
+    }
 
     // Thu thập trạng thái ban đầu
     const readMetrics = async () => {
@@ -265,7 +297,7 @@ async function runLeakTest() {
       }
     };
     // Một chu kỳ của phép đo (modal + hiệu ứng + dựng lại bản đồ). Dùng chung cho giai đoạn khởi động và giai đoạn đo.
-    const CYCLE_EXPR = `
+    const cycleExpr = (i) => `
           if (window.__ui) {
             window.__ui.toggleCharModal(true);
             window.__ui.toggleInventory(true);
@@ -277,20 +309,22 @@ async function runLeakTest() {
               window.__scene.fx.play("hit-spark", 100, 100, { priority: 2 });
               window.__scene.fx.floatNumber("+99", 100, 100, { color: 0x44ff44, size: 16 });
             }
-            if (typeof window.__scene.buildMapVisuals === "function") {
-              window.__scene.buildMapVisuals();
-            }
           }
+          ${rebuildMapExpr(LEAK_MAP_IDS[i % LEAK_MAP_IDS.length])};
         `;
+    // Về bản đồ gốc rồi mới đọc chỉ số (xem LEAK_MAP_IDS)
+    const settleMap = () =>
+      cdpSend("Runtime.evaluate", { expression: rebuildMapExpr(LEAK_MAP_IDS[0]) });
     // Khởi động: vài chu kỳ ĐẦY ĐỦ (cả dựng lại bản đồ) trước khi đọc chỉ số ban đầu. Lần dựng lại đầu tiên làm V8 / Phaser
     // nạp bộ nhớ đệm một lần (~2 MB heap, đo bằng 150 chu kỳ riêng: sau đó chỉ ~20 KB mỗi lần), không phải rò rỉ; không khởi
     // động thì ngưỡng 10 % trên 20 chu kỳ dao động quanh 9-11 % tuỳ lần chạy.
     const WARMUP_CYCLES = 8;
     for (let w = 0; w < WARMUP_CYCLES; w++) {
-      await cdpSend("Runtime.evaluate", { expression: CYCLE_EXPR });
+      await cdpSend("Runtime.evaluate", { expression: cycleExpr(w) });
       await sleep(80);
     }
     // Ép buộc dọn rác (GC) trước khi đọc chỉ số ban đầu để kết quả đo heap chính xác
+    await settleMap();
     await settleHeap();
     await sleep(300);
 
@@ -303,12 +337,13 @@ async function runLeakTest() {
       `- Đang thực hiện ${iterations} chu kỳ mở/đóng modal, tương tác hiệu ứng & dựng lại bản đồ...`,
     );
     for (let cycle = 1; cycle <= iterations; cycle++) {
-      await cdpSend("Runtime.evaluate", { expression: CYCLE_EXPR });
+      await cdpSend("Runtime.evaluate", { expression: cycleExpr(WARMUP_CYCLES + cycle) });
       await sleep(120);
     }
 
     // Đợi dọn dẹp các hiệu ứng hoàn tất và ép buộc dọn rác (GC)
     await sleep(500);
+    await settleMap();
     await settleHeap();
     await sleep(300);
 

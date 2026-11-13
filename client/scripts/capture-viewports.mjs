@@ -12,6 +12,7 @@
 //   npm run chup-viewport
 //   node client/scripts/capture-viewports.mjs --out-dir=docs/screenshots/m5-baseline
 //   node client/scripts/capture-viewports.mjs --viewports=mobile-p,desktop-hd --scenarios=hud,char
+//   node client/scripts/capture-viewports.mjs --maps    (Hắc Phong / Âm Sương x 5 khung, ghi vào docs/screenshots/m6-ban-do)
 
 import process from "node:process";
 import http from "node:http";
@@ -439,6 +440,35 @@ export const SCENARIOS = [
   },
 ];
 
+/**
+ * Kịch bản "bản đồ ngoài" (#408 bước 4): cùng một đám đạo hữu đứng giữa trấn, sương + thời tiết + nước BẬT (`?debug` mặc định tắt cả ba),
+ * để so Âm Sương Trạch với Hắc Phong Cốc (bản đồ liền kề) ở nhiều khung nhìn. KHÔNG nằm trong `SCENARIOS` (bộ ảnh mốc M5 giữ nguyên):
+ * chỉ chạy với cờ `--maps` (mặc định ghi vào `docs/screenshots/m6-ban-do`, chỉ `MAP_VIEWPORT_IDS`).
+ */
+const mapScenario = (id, name, mapId) => ({
+  id,
+  name,
+  mode: "map",
+  query: `map=${mapId}&crowd=12&debug=1&weather=1&fog=1&water=1`,
+  targetSelector: "#hud",
+  action: async (send) => {
+    await send("Runtime.evaluate", { expression: `if (window.__ui) window.__ui.closeAllModals()` });
+    // Chờ sương trôi / hạt thời tiết đã phủ khung nhìn (ảnh chụp ngay khi vào cảnh còn trống)
+    await sleep(2500);
+  },
+});
+export const MAP_SCENARIOS = [
+  mapScenario(
+    "08-map-hac-phong",
+    "Hắc Phong Cốc (mốc so sánh: sương + thời tiết + nước)",
+    "hac_phong",
+  ),
+  mapScenario("09-map-am-suong", "Âm Sương Trạch (sương + thời tiết + nước)", "am_suong"),
+];
+
+/** Năm khung nhìn đại diện cho ảnh bản đồ: máy tính HD, tablet dọc, điện thoại ngang / dọc / nhỏ. */
+export const MAP_VIEWPORT_IDS = ["desktop-hd", "tablet-p", "mobile-l", "mobile-p", "mobile-sm"];
+
 const MIMES = {
   ".html": "text/html; charset=utf-8",
   ".js": "application/javascript; charset=utf-8",
@@ -455,9 +485,12 @@ function parseArgs() {
   let outDir = path.join(REPO, "docs/screenshots/m5-baseline");
   let filterViewports = null;
   let filterScenarios = null;
+  let outDirGiven = false;
+  const maps = args.includes("--maps");
 
   for (const arg of args) {
     if (arg.startsWith("--out-dir=")) {
+      outDirGiven = true;
       outDir = path.resolve(arg.slice("--out-dir=".length));
     } else if (arg.startsWith("--viewports=")) {
       filterViewports = arg
@@ -472,11 +505,15 @@ function parseArgs() {
     }
   }
 
-  return { outDir, filterViewports, filterScenarios };
+  if (maps) {
+    if (!outDirGiven) outDir = path.join(REPO, "docs/screenshots/m6-ban-do");
+    if (!filterViewports) filterViewports = MAP_VIEWPORT_IDS;
+  }
+  return { outDir, filterViewports, filterScenarios, maps };
 }
 
 async function main() {
-  const { outDir, filterViewports, filterScenarios } = parseArgs();
+  const { outDir, filterViewports, filterScenarios, maps } = parseArgs();
 
   console.log("=== Bắt đầu công cụ E2E chụp ảnh đa viewport (M5 Baseline - WebP) ===");
   console.log(`- Thư mục lưu ảnh: ${outDir}`);
@@ -533,9 +570,10 @@ async function main() {
     );
   }
 
-  let activeScenarios = SCENARIOS;
+  const scenarioPool = maps ? MAP_SCENARIOS : SCENARIOS;
+  let activeScenarios = scenarioPool;
   if (filterScenarios && filterScenarios.length > 0) {
-    activeScenarios = SCENARIOS.filter(
+    activeScenarios = scenarioPool.filter(
       (s) => filterScenarios.includes(s.id) || filterScenarios.some((f) => s.id.includes(f)),
     );
   }
@@ -544,6 +582,7 @@ async function main() {
     capturedAt: new Date().toISOString(),
     format: "webp",
     quality: 75,
+    maps,
     viewports: activeViewports,
     scenarios: activeScenarios.map((s) => ({ id: s.id, name: s.name })),
     images: [],
@@ -625,6 +664,8 @@ async function main() {
           targetUrl = `http://127.0.0.1:${HTTP_PORT}/?auth=mock&debug=1`;
         } else if (sc.mode === "crowd") {
           targetUrl = `http://127.0.0.1:${HTTP_PORT}/?crowd=30&debug=1`;
+        } else if (sc.mode === "map") {
+          targetUrl = `http://127.0.0.1:${HTTP_PORT}/?${sc.query}`;
         } else {
           targetUrl = `http://127.0.0.1:${HTTP_PORT}/?dungeon=mock&debug=1`;
         }
@@ -843,8 +884,11 @@ function generateGalleryHtml(manifest) {
 
 function generateReadmeMd(manifest) {
   const totalSizeKb = manifest.images.reduce((sum, img) => sum + img.sizeKb, 0);
+  const mapNote = manifest.maps
+    ? "\n> **Bộ ảnh bản đồ ngoài** (`--maps`, #408 bước 4): Hắc Phong Cốc (mốc so sánh) và Âm Sương Trạch (bản đồ mới) ở năm khung nhìn; sương + thời tiết + nước BẬT, 12 đạo hữu đứng giữa trấn. Bộ ảnh mốc M5 nằm ở `docs/screenshots/m5-baseline` và không bị đụng tới.\n"
+    : "";
   return `# Bộ Ảnh Mốc Đa Viewport M5 (Baseline Multi-Viewport Screenshots)
-
+${mapNote}
 > Thư mục chứa bộ ảnh chụp màn hình làm mốc đối chiếu trước khi thực hiện các cải tiến giao diện đa thiết bị & đồ hoạ Phaser trong Milestone M5.
 > Được sinh tự động bởi \`client/scripts/capture-viewports.mjs\` (\`npm run capture:viewports\` hoặc \`npm run chup-viewport\`).
 > Định dạng: **WebP (quality 75)**, tự động kiểm tra chống trùng lặp băm sha256 giữa các kịch bản.
@@ -862,7 +906,7 @@ ${manifest.viewports.map((v) => `| \`${v.id}\` | ${v.name} | ${v.width} × ${v.h
 
 | Mã kịch bản | Tên kịch bản | Phần tử hiển thị yêu cầu | Mô tả kiểm tra |
 |---|---|---|---|
-${manifest.scenarios.map((s) => `| \`${s.id}\` | ${s.name} | \`${SCENARIOS.find((sc) => sc.id === s.id)?.targetSelector || ""}\` | Ảnh mốc hiển thị |`).join("\n")}
+${manifest.scenarios.map((s) => `| \`${s.id}\` | ${s.name} | \`${[...SCENARIOS, ...MAP_SCENARIOS].find((sc) => sc.id === s.id)?.targetSelector || ""}\` | Ảnh mốc hiển thị |`).join("\n")}
 
 ## 3. Tổng hợp ảnh chụp mốc (${manifest.images.length} ảnh WebP)
 

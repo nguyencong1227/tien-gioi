@@ -23,6 +23,7 @@ import {
 } from "./dungeon";
 import { isMockDuelEnabled, MOCK_DUEL_SAMPLES } from "./duel";
 import { isMockSectEnabled, MOCK_SECT_SAMPLES } from "./sect";
+import { mockSpawnOf, mockStartMapId, mockSyncsState } from "./mock-map";
 import { captureEarlyMessages } from "./early-messages";
 import { joinWithRedirect, isClientOutdatedError } from "./connection";
 import { clearToken, getToken } from "./auth";
@@ -75,7 +76,11 @@ if (typeof window.matchMedia === "function") {
 const NAME_KEY = "tien-gioi:name";
 const SECRET_KEY = "tien-gioi:secret";
 
-function createMockDungeonRoom(dead = false): any {
+function createMockDungeonRoom(
+  dead = false,
+  spawn = mockSpawnOf(DEFAULT_MAP_ID),
+  syncState = false,
+): any {
   const handlers = new Map<string, ((msg: any) => void)[]>();
   return {
     sessionId: "mock-session-01",
@@ -91,7 +96,10 @@ function createMockDungeonRoom(dead = false): any {
         }
       };
     },
-    onStateChange: () => {},
+    // Máy chủ thật gọi lại ngay khi có state: cảnh lấy vị trí người chơi làm gốc (reconcile). Mock chỉ làm vậy khi `syncState` (xem mockSyncsState)
+    onStateChange: (fn: () => void) => {
+      if (syncState) setTimeout(fn, 0);
+    },
     onLeave: () => {},
     send: (type: string, data: any) => {
       if (import.meta.env.DEV) console.log("[mock-dungeon-send]", type, data);
@@ -112,8 +120,8 @@ function createMockDungeonRoom(dead = false): any {
               maxMp: 1200,
               exp: 8000,
               expMax: 10000,
-              x: 512,
-              y: 896,
+              x: spawn.x,
+              y: spawn.y,
               lastSeq: 0,
               dead,
               meditating: false,
@@ -126,8 +134,8 @@ function createMockDungeonRoom(dead = false): any {
           for (let i = 1; i <= count; i++) {
             const angle = (i / count) * Math.PI * 2;
             const r = 30 + (i % 6) * 22;
-            const px = Math.round(512 + Math.cos(angle) * r);
-            const py = Math.round(896 + Math.sin(angle) * r);
+            const px = Math.round(spawn.x + Math.cos(angle) * r);
+            const py = Math.round(spawn.y + Math.sin(angle) * r);
             pMap.set(`mock-bot-${i}`, {
               name: `Đạo Hữu ${i}`,
               realm: (i % 4) + 1,
@@ -322,8 +330,14 @@ if (
     new URLSearchParams(location.search).has("crowd"))
 ) {
   const isFallen = isMockDungeonFallen();
-  const mockRoom = createMockDungeonRoom(isFallen);
-  const startMapId = isFallen ? LINH_HU_MAP_ID : DEFAULT_MAP_ID;
+  // `?map=<id>` (chỉ ở DEV / ?debug): mock khởi đầu ở bản đồ khác để harness đo đi qua Hắc Phong / Âm Sương (#408 bước 4)
+  const startMapId = isFallen ? LINH_HU_MAP_ID : mockStartMapId();
+  // Bí cảnh "gục" giữ điểm đứng cũ (ảnh chụp sẵn có); các bản đồ ngoài đứng giữa trấn của bản đồ đó
+  const mockRoom = createMockDungeonRoom(
+    isFallen,
+    mockSpawnOf(isFallen ? DEFAULT_MAP_ID : startMapId),
+    !isFallen && mockSyncsState(),
+  );
   start(mockRoom, startMapId)
     .then(() => {
       if (isFallen) {
