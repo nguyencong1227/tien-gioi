@@ -426,6 +426,11 @@ describe("Ba bản đồ: dữ liệu nguyên vẹn sau MỖI lần qua cổng, 
   // Hồ sơ mẫu có MỌI loại dữ liệu cần giữ: tu vi, Linh thạch, túi đồ, sổ nhiệm vụ (đang làm dở một nhiệm vụ diệt quái, đã xong một nhiệm vụ)
   const EXP = 42;
   const COIN = 12345;
+  // Cảnh giới KHÁC mặc định (Luyện Khí tầng 3), có đồ đang mặc và mã kiếp: nếu lưu lúc qua cổng làm rơi các trường này thì đỏ
+  const REALM = 1;
+  const TIER = 2;
+  const LIFE_ID = "kiep-thu-nghiem-0123";
+  const equipment = { weapon: "lang_nha_kiem", robe: "tho_nhung_bao", talisman: "lang_nha_phu" };
   const killQuest = QUESTS.find(
     (q) => !q.daily && q.steps[0]?.kind === "kill" && (q.steps[0] as { count: number }).count >= 3,
   )!;
@@ -447,12 +452,14 @@ describe("Ba bản đồ: dữ liệu nguyên vẹn sau MỖI lần qua cổng, 
     await savePlayer({
       name,
       secretHash: hashSecret(secretOf(name)),
-      realm: 0,
-      tier: 0,
+      realm: REALM,
+      tier: TIER,
       exp: EXP,
       coin: COIN,
       inventory,
       quests,
+      equipment,
+      lifeId: LIFE_ID,
       mapId,
       ...(spawn ? { x: spawn.x, y: spawn.y } : {}),
       createdAt: new Date().toISOString(),
@@ -463,11 +470,21 @@ describe("Ba bản đồ: dữ liệu nguyên vẹn sau MỖI lần qua cổng, 
   /** Hồ sơ trên đĩa VÀ trạng thái sống ở phòng hiện tại đều khớp hồ sơ mẫu. */
   async function expectIntact(cur: Conn, name: string, where: string) {
     const f = fileOf(name);
+    expect(f.realm, `${where}: cảnh giới trên đĩa`).toBe(REALM);
+    expect(f.tier, `${where}: tầng trên đĩa`).toBe(TIER);
     expect(f.exp, `${where}: tu vi trên đĩa`).toBe(EXP);
+    expect(f.equipment, `${where}: đồ đang mặc trên đĩa`).toEqual(equipment);
+    expect(f.lifeId, `${where}: mã kiếp trên đĩa`).toBe(LIFE_ID);
     expect(f.coin, `${where}: Linh thạch trên đĩa`).toBe(COIN);
     expect(items(f.inventory), `${where}: túi đồ trên đĩa`).toEqual(items(inventory));
     expect(f.quests, `${where}: sổ nhiệm vụ trên đĩa`).toEqual(quests);
     expect(cur.me().exp, `${where}: tu vi đang chơi`).toBe(EXP);
+    expect(cur.me().realm, `${where}: cảnh giới đang chơi`).toBe(REALM);
+    expect(cur.me().tier, `${where}: tầng đang chơi`).toBe(TIER);
+    expect(
+      { weapon: cur.me().weapon, robe: cur.me().robe, talisman: cur.me().talisman },
+      `${where}: đồ đang mặc đang chơi`,
+    ).toEqual(equipment);
     await waitFor(() => cur.wallets.at(-1)?.coin === COIN);
     await waitFor(() => cur.invs.at(-1) && items(cur.invs.at(-1)!.slots).length === 2);
     expect(items(cur.invs.at(-1)!.slots), `${where}: túi đồ đang chơi`).toEqual(items(inventory));
@@ -645,12 +662,14 @@ describe("Ba bản đồ: dữ liệu nguyên vẹn sau MỖI lần qua cổng, 
       await savePlayer({
         name,
         secretHash: hashSecret(secretOf(name)),
-        realm: 0,
-        tier: 0,
+        realm: REALM,
+        tier: TIER,
         exp: EXP,
         coin: COIN,
         inventory,
         quests,
+        equipment,
+        lifeId: LIFE_ID,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         ...extra,
