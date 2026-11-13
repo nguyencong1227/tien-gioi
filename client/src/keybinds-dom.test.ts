@@ -18,6 +18,9 @@ class El implements KeyLabelEl {
   setAttribute(name: string, value: string) {
     this.attrs[name] = value;
   }
+  getAttribute(name: string) {
+    return this.attrs[name] ?? null;
+  }
   querySelector(sel: string) {
     const cls = sel.replace(".", "");
     return this.kids.find((k) => k.className === cls) ?? null;
@@ -27,7 +30,7 @@ class El implements KeyLabelEl {
   }
 }
 
-function makeDoc(withIds: readonly string[]) {
+function makeDoc(withIds: readonly string[], tagged: readonly El[] = []) {
   const els = new Map<string, El>();
   for (const id of withIds) {
     const e = new El("button");
@@ -42,6 +45,7 @@ function makeDoc(withIds: readonly string[]) {
   const doc: KeyLabelDoc = {
     getElementById: (id) => els.get(id) ?? null,
     createElement: (tag) => new El(tag),
+    querySelectorAll: (sel) => (sel === "[data-key-action]" ? tagged : []),
   };
   return { doc, els };
 }
@@ -105,6 +109,36 @@ describe("nhãn phím HUD (#463)", () => {
     off();
     rebind("skill.sword", "KeyY");
     expect(els.get("sk-sword")!.querySelector(".keycap")!.textContent).toBe("3");
+  });
+
+  it("nút nhặt / nói chuyện / qua cổng / bản đồ ghi đúng phím tương tác và phím bản đồ (đổi phím thì đổi theo)", () => {
+    const { doc, els } = makeDoc(["btn-pickup", "btn-talk", "btn-portal", "minimap-wrap"]);
+    initKeyLabels(doc);
+    expect(els.get("btn-pickup")!.attrs["aria-label"]).toBe("Nhặt vật phẩm rơi (Phím F)");
+    expect(els.get("btn-portal")!.attrs.title).toBe("Đi qua cổng truyền tống (F)");
+    expect(els.get("minimap-wrap")!.attrs.title).toBe("Bản đồ thế giới (M)");
+    rebind("interact", "KeyE");
+    expect(els.get("btn-talk")!.attrs["aria-label"]).toBe("Nói chuyện với NPC (Phím E hoặc F)");
+    expect(els.get("btn-talk")!.attrs.title).toBe("Nói chuyện với NPC (E / F)");
+  });
+
+  it("phần tử gắn data-key-action (chữ hướng dẫn tĩnh trong HTML) được điền phím CHÍNH và đổi theo", () => {
+    const a = new El("b");
+    a.attrs["data-key-action"] = "attack";
+    const b = new El("b");
+    b.attrs["data-key-action"] = "panel.quest";
+    const bad = new El("b");
+    bad.attrs["data-key-action"] = "constructor"; // id lạ: không điền, không văng lỗi
+    bad.textContent = "giữ";
+    const { doc } = makeDoc([], [a, b, bad]);
+    initKeyLabels(doc);
+    expect(a.textContent).toBe("Cách");
+    expect(b.textContent).toBe("J");
+    expect(bad.textContent).toBe("giữ");
+    rebind("attack", "KeyX");
+    expect(a.textContent).toBe("X");
+    resetKeymap();
+    expect(a.textContent).toBe("Cách");
   });
 
   it("mọi nút HUD trỏ tới một hành động có thật", () => {

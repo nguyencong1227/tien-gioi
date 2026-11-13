@@ -43,7 +43,17 @@ Phím được ghi theo `KeyboardEvent.code` (vị trí vật lý): bật bộ g
 
 ## 4. Đổi phím
 
-`keybinds.ts` đã có sẵn lưu / đọc (`localStorage` khoá `tg_keymap`, chỉ lưu phần KHÁC mặc định), `rebind(hành động, phím)` (gán phím đang của hành động khác thì hoán đổi, không bao giờ để hành động nào mất sạch phím, không có phím trùng, từ chối phím cố định WASD / mũi tên / Esc) và `onKeymapChange` (HUD vẽ lại nhãn). Giao diện đổi phím nằm trong màn "Phím tắt" ở Cài đặt (bước sau).
+`keybinds.ts` đã có sẵn lưu / đọc (`localStorage` khoá `tg_keymap`, chỉ lưu phần KHÁC mặc định), `rebind(hành động, phím)` (gán phím đang của hành động khác thì hoán đổi, không bao giờ để hành động nào mất sạch phím, không có phím trùng, từ chối phím cố định WASD / mũi tên / Esc) và `onKeymapChange` (HUD vẽ lại nhãn). Giao diện đổi phím là màn "Phím tắt" (bước 3a, xem 4a).
+
+## 4a. Màn "Phím tắt" (bước 3a)
+
+- **Mở:** Cài đặt (O) -> "Xem và đổi phím tắt" (mũi tên + Enter), hoặc nút "Xem tất cả phím tắt" ở bảng chỉ dẫn người mới (lần đầu vào game, cờ đã xem lưu ở `tg_newbie_guide_dismissed`). Ẩn dòng mở trong Cài đặt khi đang dùng cảm ứng (`html[data-input="touch"]`). Màn mở CHỒNG lên bảng đang mở (Esc đóng riêng màn này, trả focus về nút đã mở nó).
+- **Danh sách** vẽ từ `ACTIONS` (`keysScreenModel`, thuần): nhóm Chiến đấu / Tương tác / Bảng và cửa sổ / Khác; mỗi dòng "tên, các phím (phím chính trước), nút Đổi phím"; dòng đã đổi khỏi mặc định có viền vàng; dưới là các **phím cố định** (`FIXED_KEYS`: WASD / mũi tên, Esc, Enter / Cách, 1-9 chọn dòng hội thoại, Tab / Shift+Tab trong bảng) và nút "Khôi phục phím mặc định" (`resetKeymap`).
+- **Đổi phím chỉ bằng bàn phím:** Enter trên "Đổi phím" -> nút thành "Bấm phím mới..." và dòng trạng thái (`aria-live`) báo đang chờ -> bấm phím muốn gán (`captureOutcome`, thuần): Esc huỷ (CHỈ huỷ việc đổi, màn vẫn mở), W A S D / mũi tên bị từ chối kèm lời giải thích và vẫn chờ, chỉ bấm Shift / Ctrl... hoặc giữ phím lặp (Enter vừa bấm để bắt đầu) thì bỏ qua, Ctrl / Alt / Meta đi kèm không tính. Shift chỉ được giữ cho Tab (`Shift+Tab`); phím khác kèm Shift là phím thường (khỏi gán nhầm "Shift+R" chỉ chạy khi đang giữ Shift).
+- **Phím mới trở thành phím CHÍNH, phím cũ giữ làm phím phụ** (tối đa 3 phím mỗi hành động, `sanitizeKeymap`). Lấy phím DUY NHẤT của hành động khác thì hai hành động đổi chỗ (lời nhắn nói rõ: `"Đan dược ô 1" đổi sang 4.`); lấy phím phụ của hành động khác thì hành động kia chỉ mất phím đó.
+- **Bắt phím ở pha CAPTURE của `window`** (`onKeyCaptureKeydown` trong `ui.ts`, `preventDefault` + `stopImmediatePropagation`): chạy TRƯỚC Esc đóng bảng, phím hành động của thế giới và Phaser, nên phím bấm để gán không làm gì khác. Đóng màn hoặc bấm lại nút đang chờ thì thôi chờ.
+- **Chữ hướng dẫn không lệch phím thật khi đổi phím:** `keybinds-dom.ts` điền nhãn cho nút HUD (thêm nhặt / nói chuyện / qua cổng / minimap), và mọi phần tử có `data-key-action="<id hành động>"` (bảng chỉ dẫn người mới, dòng tắt âm trong Cài đặt) bằng phím chính; chữ "Nhặt (F)" / "Nói chuyện (F)" / "Qua cổng (F)" và lời chào đầu game đọc `primaryKeyLabel`. Còn tĩnh: tên phím ở `aria-label` của nút đóng từng bảng ("Đóng túi đồ (Phím I hoặc Esc)").
+- **Thanh trượt không còn bẫy mũi tên:** Trái / Phải chỉnh giá trị, Lên / Xuống vẫn chuyển focus (`ownsArrowKeys(el, dir)`); trước đó đứng ở thanh âm lượng đầu Cài đặt thì chỉ còn Tab để đi tiếp. Ô chọn (select) và ô chữ vẫn giữ cả bốn mũi tên (Tab là lối thoát).
 
 ## 4b. Điều hướng trong bảng và hộp thoại (bước 2)
 
@@ -57,12 +67,12 @@ Phím được ghi theo `KeyboardEvent.code` (vị trí vật lý): bật bộ g
 
 ## 5. Kiểm thử
 
-- Test đơn vị: `keybinds.test.ts` (bảng mặc định, tra phím, nhãn, làm sạch dữ liệu lưu, đổi phím / hoán đổi), `keybinds-dom.test.ts` (nhãn HUD, dòng gợi ý), `target-lock.test.ts` (Tab / Shift+Tab), `panel-nav.test.ts` (chọn phần tử lân cận: lưới, hàng nút, dãy dọc, mép).
-- E2E thật `npm run build && npm run e2e:ban-phim -w server`: Chrome headless + server Colyseus thật, phím gửi bằng CDP (`isTrusted`), KHÔNG click chuột. Phủ: nhãn phím, Tab / Shift+Tab / Esc, Space tự khoá + chém, phím 3 / 4, mở / đóng 6 bảng, bảng mở thì Tab / Space / mũi tên không điều khiển thế giới (đo vị trí phía server), chat, túi bằng mũi tên + Enter dùng đan, nói chuyện NPC (F, Enter, mũi tên, phím số) nhận nhiệm vụ, cửa hàng (+ rồi Mua, focus giữ nguyên khi bảng vẽ lại). Đột biến thử (vô hiệu một chức năng thì script đỏ) đã chạy: không chặn đi bộ khi bảng mở, vô hiệu phím số hội thoại, vô hiệu mũi tên bảng, bảng vẽ lại làm rơi focus, `onPress` bỏ Enter, bỏ lọc quái trên màn hình. Chrome headless không có chuột nên script giả lập `pointer: fine` bằng `--blink-settings` (nếu không nhãn phím bị ẩn).
+- Test đơn vị: `keybinds.test.ts` (bảng mặc định, tra phím, nhãn, làm sạch dữ liệu lưu, đổi phím / hoán đổi), `keybinds-dom.test.ts` (nhãn HUD, dòng gợi ý, chữ `data-key-action`), `keys-screen.test.ts` (mô hình danh sách, bắt phím lúc đổi, hoán đổi, phím cố định), `target-lock.test.ts` (Tab / Shift+Tab), `panel-nav.test.ts` (chọn phần tử lân cận: lưới, hàng nút, dãy dọc, mép).
+- E2E thật `npm run build && npm run e2e:ban-phim -w server`: Chrome headless + server Colyseus thật, phím gửi bằng CDP (`isTrusted`), KHÔNG click chuột. Phủ: nhãn phím, Tab / Shift+Tab / Esc, Space tự khoá + chém, phím 3 / 4, mở / đóng 6 bảng, bảng mở thì Tab / Space / mũi tên không điều khiển thế giới (đo vị trí phía server), chat, túi bằng mũi tên + Enter dùng đan, nói chuyện NPC (F, Enter, mũi tên, phím số) nhận nhiệm vụ, cửa hàng (+ rồi Mua, focus giữ nguyên khi bảng vẽ lại), màn Phím tắt (mở từ Cài đặt bằng mũi tên + Enter, W bị từ chối, Esc chỉ huỷ việc đổi, đổi Kiếm khí sang X và X phóng kiếm thật phía server, hoán đổi 1 / 4, nhãn HUD và chữ chỉ dẫn đổi theo, khôi phục mặc định). Đột biến thử (vô hiệu một chức năng thì script đỏ) đã chạy (bước 3a: bỏ `stopImmediatePropagation` khi bắt phím, bỏ `rebind` khi gán, trả `ownsArrowKeys` về bản cũ làm thanh trượt nuốt mũi tên Lên / Xuống, bỏ điền `data-key-action`; cả bốn đều làm script đỏ): không chặn đi bộ khi bảng mở, vô hiệu phím số hội thoại, vô hiệu mũi tên bảng, bảng vẽ lại làm rơi focus, `onPress` bỏ Enter, bỏ lọc quái trên màn hình. Chrome headless không có chuột nên script giả lập `pointer: fine` bằng `--blink-settings` (nếu không nhãn phím bị ẩn).
 - `npm run e2e:tro-nang -w server` (trợ năng bàn phím có sẵn) phải còn PASS.
 
 ## 6. Việc kế tiếp (cùng issue #463)
 
-1. Màn "Phím tắt" trong Cài đặt (danh sách + đổi phím dùng `rebind` / `resetKeymap`) và gợi ý phím lần đầu chơi.
+1. (Xong ở bước 3a: màn "Phím tắt" + chữ hướng dẫn đọc từ bảng phím + gợi ý lần đầu.)
 2. Lối bàn phím còn thiếu: trả lời lời mời (tổ đội / bí cảnh / thách đấu / tông môn), nút HUD của bí cảnh / quyết đấu (rời, nhận thua) và hộp xác nhận của chúng, mở menu người chơi khác (mời đội / thách đấu) không cần chuột, màn Hoàng Tuyền / luân hồi.
-3. E2E chỉ-bàn-phím cho phần còn lại (lò rèn, nhặt đồ, qua cổng), `CHANGELOG` `[Chưa phát hành]` của nhánh phát hành.
+3. E2E chỉ-bàn-phim cho phần còn lại (lò rèn, nhặt đồ, qua cổng), `CHANGELOG` `[Chưa phát hành]` của nhánh phát hành.

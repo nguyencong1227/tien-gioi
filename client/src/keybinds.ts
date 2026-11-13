@@ -258,6 +258,58 @@ export function keyLabels(map: Keymap, id: ActionId): string[] {
   return map[id].map(keyLabel);
 }
 
+/** Nhãn phím CHÍNH của một hành động theo bảng phím hiện hành (cho chữ gợi ý trong game: "Nhặt (F)"); hành động hết phím thì chuỗi rỗng. */
+export function primaryKeyLabel(id: ActionId, map: Keymap = getKeymap()): string {
+  const t = map[id][0];
+  return t === undefined ? "" : keyLabel(t);
+}
+
+/** Phím chỉ là phím bổ trợ (Shift / Ctrl / Alt / Meta / CapsLock...): đứng một mình không phải phím để gán. */
+const MODIFIER_CODES: ReadonlySet<string> = new Set([
+  "ShiftLeft",
+  "ShiftRight",
+  "ControlLeft",
+  "ControlRight",
+  "AltLeft",
+  "AltRight",
+  "MetaLeft",
+  "MetaRight",
+  "OS",
+  "CapsLock",
+  "NumLock",
+  "ScrollLock",
+  "Fn",
+  "FnLock",
+  "ContextMenu",
+]);
+
+/**
+ * Phím vừa bấm ở màn "Phím tắt" khi đang chờ gán -> token để `rebind`, hoặc `null` nếu chưa phải phím gán được (chỉ bấm Shift / Ctrl..., hoặc có
+ * Ctrl / Alt / Meta = phím tắt của trình duyệt). Shift chỉ được giữ lại cho Tab (`Shift+Tab`, đối xứng với `target.prev`); phím khác bấm kèm Shift
+ * thì coi như phím thường để khỏi gán nhầm "Shift+R" chỉ chạy khi đang giữ Shift. Phím cố định (WASD, mũi tên, Esc) vẫn trả token để chỗ gọi
+ * báo "phím cố định" cho người chơi thay vì lờ đi (`isValidToken` loại chúng khỏi `rebind`).
+ */
+export function tokenOfEvent(e: KeyEventLike): string | null {
+  if (e.ctrlKey || e.altKey || e.metaKey) return null;
+  if (!e.code || MODIFIER_CODES.has(e.code)) return null;
+  return e.shiftKey && e.code === "Tab" ? "Shift+Tab" : e.code;
+}
+
+/** Hành động đang giữ `token` (để báo "phím này đang là của X, sẽ đổi chỗ"), hoặc `null`. */
+export function holderOf(token: string, map: Keymap = getKeymap()): ActionId | null {
+  for (const a of ACTIONS) if (map[a.id].includes(token)) return a.id;
+  return null;
+}
+
+/** Phím CỐ ĐỊNH (không đổi được) hiện ở màn "Phím tắt": mô tả luật chung, không nằm trong bảng `ACTIONS`. */
+export const FIXED_KEYS: ReadonlyArray<{ keys: string; what: string }> = [
+  { keys: "W A S D / ← ↑ ↓ →", what: "Đi bộ (khi bảng đang mở: mũi tên chuyển nút trong bảng)" },
+  { keys: "Esc", what: "Đóng bảng trên cùng, bỏ chọn mục tiêu, thoát ô chat" },
+  { keys: "Enter / Cách", what: "Bấm nút đang chọn trong bảng; tua nhanh chữ hội thoại" },
+  { keys: "1 - 9", what: "Chọn dòng trả lời khi đang nói chuyện với NPC" },
+  { keys: "Tab / Shift+Tab", what: "Trong bảng: sang nút kế / nút trước" },
+];
+
 // ---------- Lưu / đọc ----------
 
 export const KEYMAP_STORAGE_KEY = "tg_keymap";
