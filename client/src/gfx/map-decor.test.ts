@@ -35,6 +35,32 @@ describe("map-style (dữ liệu kiểu theo bản đồ)", () => {
     }
   });
 
+  it("kiểu KHÔNG mồ côi: mọi kiểu trong MAP_STYLES là của một bản đồ có thật (trừ danh sách chờ hợp đồng)", () => {
+    // `am_suong` (M6 #408) vào TRƯỚC bản đồ của nó (#404, `shared/`): ghi ở đây để không đỏ trong lúc chờ. Danh sách chờ TỰ DỌN:
+    // khi #404 vào `main`, `getMap("am_suong")` có thật nên phép kiểm thứ hai đỏ, nhắc xoá mục này.
+    const CHO_HOP_DONG = ["am_suong"];
+    for (const id of Object.keys(MAP_STYLES)) {
+      if (CHO_HOP_DONG.includes(id)) continue;
+      expect(getMap(id), `kiểu "${id}" không có bản đồ`).toBeDefined();
+    }
+    for (const id of CHO_HOP_DONG)
+      expect(getMap(id), `"${id}" đã có bản đồ: xoá khỏi CHO_HOP_DONG`).toBeUndefined();
+  });
+
+  it("Âm Sương Trạch: sương dày nhất, thời tiết ma trơi riêng, màu môi trường lục khác ba bản đồ kia", () => {
+    const am = MAP_STYLES.am_suong;
+    expect(am).toBeDefined();
+    expect(validateStyle(am)).toEqual([]);
+    expect(am.weather.kind).toBe("wisp");
+    const others = Object.entries(MAP_STYLES).filter(([id]) => id !== "am_suong");
+    expect(others.length).toBeGreaterThanOrEqual(3);
+    for (const [id, s] of others) {
+      expect(am.fog.alpha, `sương dày hơn ${id}`).toBeGreaterThan(s.fog.alpha);
+      expect(am.ambient.color, `màu môi trường khác ${id}`).not.toBe(s.ambient.color);
+      expect(am.weather.kind, `thời tiết khác ${id}`).not.toBe(s.weather.kind);
+    }
+  });
+
   it("mỗi bản đồ có phong cách khác nhau (không chép một kiểu cho tất cả)", () => {
     const kinds = new Set(ALL_IDS.map((id) => styleOf(id).weather.kind));
     expect(kinds.size).toBe(ALL_IDS.length);
