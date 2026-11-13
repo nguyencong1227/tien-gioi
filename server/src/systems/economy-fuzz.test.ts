@@ -475,11 +475,15 @@ function makeFuzz(seed: number) {
       const items: Counts = {};
       for (const g of r.inputs) bump(items, g.itemId, -g.qty);
       bump(items, r.output.itemId, r.output.qty);
+      const fee = r.coin ?? 0; // phí Linh thạch (M6): rèn được thì ví giảm ĐÚNG phí, không hơn không kém
       return {
         label: `${sid} rèn ${JSON.stringify(id)} (${near ? "gần" : "xa"})`,
         run: () => craft(w, sid, id),
         verify: (d) =>
-          oneOf(d, ...(near && id === r.id ? [{ name: "rèn", want: effect(sid, 0, items) }] : [])),
+          oneOf(
+            d,
+            ...(near && id === r.id ? [{ name: "rèn", want: effect(sid, -fee, items) }] : []),
+          ),
       };
     },
     // ----- nhiệm vụ -----
