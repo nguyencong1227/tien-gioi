@@ -688,6 +688,18 @@ async function main() {
       await arrowTo(t, "#set-open-keys", 12);
       await press(t, K.enter);
     };
+    // cảm ứng không đổi: nút / dòng mở màn Phím tắt ẩn khi đang dùng cảm ứng (data-input="touch"), hiện khi dùng chuột / bàn phím
+    const keysUiDisplay = (input: string) =>
+      ev(
+        `(() => { const old = document.documentElement.dataset.input; document.documentElement.dataset.input = ${JSON.stringify(input)}; const r = ['set-keys-row', 'newbie-btn-keys'].map((id) => getComputedStyle(document.getElementById(id)).display).join(','); if (old === undefined) delete document.documentElement.dataset.input; else document.documentElement.dataset.input = old; return r; })()`,
+      );
+    const touchDisplay = String(await keysUiDisplay("touch"));
+    const mouseDisplay = String(await keysUiDisplay("mouse"));
+    check(
+      "Cảm ứng: dòng mở Phím tắt (Cài đặt) và nút 'Xem tất cả phím tắt' (chỉ dẫn) ẨN; chuột / bàn phím thì hiện",
+      touchDisplay === "none,none" && !mouseDisplay.includes("none"),
+      `touch=${touchDisplay} mouse=${mouseDisplay}`,
+    );
     await openKeys();
     check(
       "O mở Cài đặt, mũi tên + Enter trên 'Xem và đổi phím tắt' mở màn Phím tắt",

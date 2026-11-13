@@ -1923,8 +1923,9 @@ body.low-fx #btn-talk {
   font-size: var(--fs-13);
   color: #d1d5db;
 }
-/* Cảm ứng không có bàn phím: ẩn dòng mở màn Phím tắt trong Cài đặt (không đổi hành vi điện thoại) */
-html[data-input="touch"] #set-keys-row {
+/* Cảm ứng không có bàn phím: ẩn dòng mở màn Phím tắt trong Cài đặt và nút "Xem tất cả phím tắt" ở bảng chỉ dẫn (không đổi hành vi điện thoại) */
+html[data-input="touch"] #set-keys-row,
+html[data-input="touch"] #newbie-btn-keys {
   display: none;
 }
 .newbie-footer {
