@@ -12,6 +12,7 @@ import {
   HAC_PHONG_ID,
   PARTY_SNAPSHOT_MS,
   getMap,
+  partyExpShare,
 } from "@tien-gioi/shared";
 import { Hub } from "../hub";
 import { FileSectStore } from "../sect-store";
@@ -167,7 +168,7 @@ describe("đội xuyên ba phòng", () => {
     expect([...shares.keys()].sort()).toEqual([C, "Dora"].sort()); // A (Lạc Hà), B (Hắc Phong): không có mặt
     expect(shares.get(C)).toBeCloseTo(shares.get("Dora")!, 10);
     // đội có 4 người nhưng chỉ 2 có mặt: hệ số theo 2 người, mỗi người một nửa
-    expect(shares.get(C)).toBeCloseTo((1 + 0.15) / 2, 10);
+    expect(shares.get(C)).toBeCloseTo(partyExpShare(2), 10);
     expect(sameParty(as.w, C, "Dora")).toBe(true);
     expect(sameParty(as.w, C, A)).toBe(false); // khác phòng
   });

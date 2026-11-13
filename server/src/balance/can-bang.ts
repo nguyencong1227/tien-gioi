@@ -13,8 +13,9 @@ import {
   sellPrice,
 } from "@tien-gioi/shared";
 import { renderKimDan, type KimDanReport } from "./kim-dan";
-import { renderKimDanSau } from "./kim-dan-sau";
+import { renderKimDanSau, withKimDan } from "./kim-dan-sau";
 import { renderKimDanKinhTe } from "./kim-dan-kinh-te";
+import { renderKimDanPkBiCanh } from "./kim-dan-pk";
 import { PK_TARGET_SECONDS, representativeLevels, summarizeDuels } from "./pk";
 import {
   ASSUME_DUNGEON,
@@ -79,9 +80,15 @@ const partyTable = [
     return `| ${REALMS[r.realm].name} bậc ${r.tier + 1} | ${partyRatio(r.realm, r.tier, 2).solo} | ${cells.join(" | ")} |`;
   }),
 ].join("\n");
+// Kim Đan (M6): bảng trên dừng ở hết Trúc Cơ (nội dung gốc); cả cảnh giới Kim Đan tính với quái / đồ mới ở "Kim Đan sau nội dung"
+const kdOptimal = withKimDan(() => simulate(3));
+const kdDesigned = withKimDan(() => simulate(3), true);
+const kdHours = (r: ReturnType<typeof simulate>) =>
+  (minutesToFinish(r, 3) - minutesToFinish(r, 2)) / 60;
 const summary = [
   `- Hết Luyện Khí (sẵn sàng Trúc Cơ): **${fmt(minutesToFinish(rows, 1))}** (mục tiêu ~1 giờ)`,
   `- Hết Trúc Cơ (sẵn sàng Kim Đan): **${fmt(minutesToFinish(rows, 2))}** (mục tiêu ~3 giờ)`,
+  `- Cả Kim Đan (sau nội dung M6, bảng ở mục "Kim Đan sau nội dung"): **${kdHours(kdDesigned).toFixed(1)} giờ** săn bãi mới, **${kdHours(kdOptimal).toFixed(1)} giờ** tối ưu (mục tiêu 5-7 giờ); kinh tế, trang bị và PK ở mục 6-8 của mục đó`,
 ].join("\n");
 
 // ---------- Kinh tế Linh thạch (#102) ----------
@@ -396,6 +403,8 @@ ${summary}
 
 ${table}
 
+Bảng trên dừng ở hết Trúc Cơ (quái và đồ gốc: Linh Thố, Hôi Lang, Hắc Hổ, Xích Mãng). Cảnh giới Kim Đan (ba bậc, ba quái mới, trùm Hắc Giao, ba bộ trang bị, phí rèn) ở mục "Kim Đan sau nội dung (M6)" cuối tệp: săn solo, trùm theo đội, nhịp, luân hồi, tổ đội, kinh tế, trang bị, PK và bí cảnh.
+
 ## Giả định
 
 - Mỗi bậc, người chơi chọn nguồn tu vi nhanh nhất mà an toàn: săn một loại quái, hoặc chỉ đả tọa.
@@ -437,7 +446,8 @@ ${pkSection}
 ${kimDanTruocSection}
 
 ${renderKimDanSau()}
-${renderKimDanKinhTe()}`,
+${renderKimDanKinhTe()}
+${renderKimDanPkBiCanh()}`,
   );
   console.log(`Đã ghi ${out}\n\n${summary}`);
 }
