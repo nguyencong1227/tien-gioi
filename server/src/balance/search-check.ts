@@ -26,7 +26,7 @@ import { safeSpot, syncPublicPos } from "../systems/movement";
 import { tickMonsters, spawnInitial, topUpMonsters } from "../systems/monsters";
 import { applyStats } from "../systems/progression";
 import { addPlayer, makeWorld } from "../systems/test-helpers";
-import { ASSUME, bestGear, minutesToFinish, simulate } from "./simulate";
+import { ASSUME, bestGear, huntRate, minutesToFinish, simulate } from "./simulate";
 import { median, seeded } from "./hunt-check";
 import { KIM_DAN_MONSTER_IDS, rateWithPills, withKimDan } from "./kim-dan-sau";
 
@@ -752,8 +752,9 @@ export function searchCalibrated(
 }
 
 /**
- * Số giây giữa hai lần hạ Xích Mãng NHỎ NHẤT mà tiêu chí #406 mục 1 (không nguồn nào vượt `limit` lần bãi mới tốt nhất cùng bậc) còn đạt
- * (chia đôi; tỉ lệ giảm khi thời gian tìm tăng). 0 nếu đạt ở mọi giá trị, Infinity nếu không bao giờ đạt. Đây là ngưỡng để so với số đo của bot (#410).
+ * Thời gian TÌM Xích Mãng (`ASSUME.searchSec.mang`: từ lúc hạ con trước tới lúc chạm con kế, KHÔNG gồm trận và đả tọa hồi sức) NHỎ NHẤT mà tiêu chí
+ * #406 mục 1 (không nguồn nào vượt `limit` lần bãi mới tốt nhất cùng bậc) còn đạt (chia đôi; tỉ lệ giảm khi thời gian tìm tăng). 0 nếu đạt ở mọi giá trị,
+ * Infinity nếu không bao giờ đạt. Đây là ngưỡng để so với số đo thời gian tìm của bot (#410); đo từ lúc hạ tới lúc hạ con kế thì phải cộng trận + hồi sức.
  */
 export function breakEvenMangSec(limit = 1.5): number {
   const worst = (t: number) => Math.max(...withSearchSec({ mang: t }, finishMinutes).mangRatio);
@@ -850,6 +851,10 @@ export function renderSearchCheck(): string {
       gio,
     );
   const breakEven = breakEvenMangSec();
+  // trận + đả tọa hồi sức của Xích Mãng ở Kim Đan (chu kỳ mô hình trừ thời gian tìm), mỗi bậc
+  const mangFightRest = [0, 1, 2].map(
+    (tier) => (huntRate(MONSTER_BY_ID.mang, 3, tier)?.secPerKill ?? NaN) - ASSUME.searchSec.mang,
+  );
   const verdict = (name: string, p: SearchPace) =>
     `${name} ${worstMang(p) <= 1.5 ? "ĐẠT" : "KHÔNG ĐẠT"} (tối đa ${worstMang(p).toFixed(2)}x)`;
   const criterion = [
@@ -907,8 +912,8 @@ Tiêu chí #406 mục 1 sau hiệu chỉnh (tối đa của ba bậc; ĐẠT khi
     n1,
   )} giây).
 
-**Ngưỡng hoà vốn cho #410.** Chạy \`simulate\` với \`ASSUME.searchSec.mang\` = T, tiêu chí #406 mục 1 đạt khi T >= **${Number.isFinite(breakEven) ? n0(breakEven) : "(không xác định)"} giây** giữa hai lần hạ Xích Mãng (mô hình hiện tại: ${ASSUME.searchSec.mang} giây, tối đa ${Math.max(...model.mangRatio).toFixed(2)}x). Bot (#410) là thuật toán như thợ săn ở đây, nên so số đo của bot với ngưỡng đó phải trừ độ vụng: bot đo NGẮN hơn ~${Number.isFinite(breakEven) ? n0(breakEven / slack.nhan) : "?"} giây (giả thuyết nhân) hoặc ~${Number.isFinite(breakEven) ? n0(Math.max(0, breakEven - slack.cong)) : "?"} giây (giả thuyết cộng) thì Xích Mãng nhanh quá mức tiêu chí; dài hơn thì đạt.
+**Ngưỡng hoà vốn cho #410.** Chạy \`simulate\` với \`ASSUME.searchSec.mang\` = T (thời gian TÌM: từ lúc hạ con trước tới lúc chạm con kế, KHÔNG gồm trận và đả tọa hồi sức), tiêu chí #406 mục 1 đạt khi T >= **${Number.isFinite(breakEven) ? n0(breakEven) : "(không xác định)"} giây** (mô hình hiện tại: ${ASSUME.searchSec.mang} giây, tối đa ${Math.max(...model.mangRatio).toFixed(2)}x). Trận + đả tọa hồi sức của Xích Mãng theo mô hình thêm ${mangFightRest.map((x) => n1(x)).join(" / ")} giây mỗi con (Sơ / Trung / Hậu kỳ), nên nếu bot đo từ lúc hạ tới lúc hạ con kế (kill-to-kill) thì phải trừ khoảng đó trước khi so với ngưỡng (khoảng ${Number.isFinite(breakEven) ? mangFightRest.map((x) => n0(breakEven + x)).join(" / ") : "?"} giây kill-to-kill ở ba bậc). Bot (#410) là thuật toán như thợ săn ở đây, nên so số đo THỜI GIAN TÌM của bot với ngưỡng đó phải trừ độ vụng: bot đo NGẮN hơn ~${Number.isFinite(breakEven) ? n0(breakEven / slack.nhan) : "?"} giây (giả thuyết nhân) hoặc ~${Number.isFinite(breakEven) ? n0(Math.max(0, breakEven - slack.cong)) : "?"} giây (giả thuyết cộng) thì Xích Mãng nhanh quá mức tiêu chí; dài hơn thì đạt.
 
-Đọc bảng: nhịp Kim Đan là hàm của giả định tìm quái. Mô hình ra ${gio(model.kimDan)} giờ (tối ưu) / ${gio(model.kimDanNoMang)} giờ (bãi mới); thợ săn ${hours}; biết hết bản đồ ${gio(sens.all.measured.kimDan)} / ${gio(sens.all.measured.kimDanNoMang)} giờ. Phần lớn chênh lệch tới từ Xích Mãng (nguồn nhanh nhất của cả ba bậc ở kịch bản tối ưu: ${src(model)}): giả định ${ASSUME.searchSec.mang} giây cho nó là một con số đoán và là cái quyết định nhịp "tối ưu". **Không sửa \`ASSUME.searchSec\` trong PR này**: số đo là thợ săn thuật toán, không phải người; con số quyết định là thời gian giữa hai lần hạ Xích Mãng của người chơi / bot thật (#410: bot chỉ nên biết quái trong vùng nhìn CHỮ NHẬT theo \`fitZoom\` như các cột trên, không đọc \`state.monsters\` của cả bản đồ). Khi bot (#410) có số đo, chọn giữa (a) giảm mật độ / kéo dài hồi sinh Xích Mãng (\`shared/\`, PR riêng) và (b) chấp nhận đường tắt Xích Mãng (đã có ca "tìm nhanh" 30 giây trong \`kim-dan.ts\`), hoặc sửa \`ASSUME.searchSec.mang\` cho khớp nếu số đo cao hơn ngưỡng hoà vốn. Số hạt giống nhiều hơn (${SEARCH_SEEDS_BOSS} cho trùm) và thợ săn khoá mục tiêu / quét vòng đã loại các lần kẹt hàng nghìn giây mô phỏng của bản đầu (#459).
+Đọc bảng: nhịp Kim Đan là hàm của giả định tìm quái. Mô hình ra ${gio(model.kimDan)} giờ (tối ưu) / ${gio(model.kimDanNoMang)} giờ (bãi mới); thợ săn ${hours}; biết hết bản đồ ${gio(sens.all.measured.kimDan)} / ${gio(sens.all.measured.kimDanNoMang)} giờ. Phần lớn chênh lệch tới từ Xích Mãng (nguồn nhanh nhất của cả ba bậc ở kịch bản tối ưu: ${src(model)}): giả định ${ASSUME.searchSec.mang} giây cho nó là một con số đoán và là cái quyết định nhịp "tối ưu". **Không sửa \`ASSUME.searchSec\` trong PR này**: số đo là thợ săn thuật toán, không phải người; con số quyết định là thời gian TÌM Xích Mãng của người chơi / bot thật (từ lúc hạ con trước tới lúc chạm con kế, không gồm trận và hồi sức) (#410: bot chỉ nên biết quái trong vùng nhìn CHỮ NHẬT theo \`fitZoom\` như các cột trên, không đọc \`state.monsters\` của cả bản đồ). Khi bot (#410) có số đo, chọn giữa (a) giảm mật độ / kéo dài hồi sinh Xích Mãng (\`shared/\`, PR riêng) và (b) chấp nhận đường tắt Xích Mãng (đã có ca "tìm nhanh" 30 giây trong \`kim-dan.ts\`), hoặc sửa \`ASSUME.searchSec.mang\` cho khớp nếu số đo cao hơn ngưỡng hoà vốn. Số hạt giống nhiều hơn (${SEARCH_SEEDS_BOSS} cho trùm) và thợ săn khoá mục tiêu / quét vòng đã loại các lần kẹt hàng nghìn giây mô phỏng của bản đầu (#459).
 `;
 }
