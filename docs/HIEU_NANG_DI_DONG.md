@@ -21,23 +21,25 @@
 <!-- PERF-MATRIX:START -->
 | Kịch bản | Bậc đồ hoạ | CPU Throttling | FPS | JS Update p95 | Ngân sách JS | Draw call TB / p95 / Trần | Hạt / Trần | Emitters | Chữ bay đỉnh / Trần | JS Heap | Trạng thái |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| Một mình (Trấn vắng) | LOW | 1x | 60 | 0.3 ms | <= 9 ms | 2 / 2 / 60 | 0 / 60 | 0 / 4 | - | 29.5 MB | ✓ ĐẠT |
-| Một mình (Trấn vắng) | LOW | 4x | 60 | 1 ms | <= 9 ms | 2 / 2 / 60 | 0 / 60 | 0 / 4 | - | 28.9 MB | ✓ ĐẠT |
-| Trấn đông (50 bot) | LOW | 4x | 60 | 1.1 ms | <= 9 ms | 2 / 2 / 60 | 0 / 60 | 0 / 4 | - | 31.8 MB | ✓ ĐẠT |
-| Trấn đông (50 bot) | MID | 4x | 48.9 | 1.5 ms | <= 11 ms | 4 / 4 / 100 | 18 / 220 | 6 / 10 | - | 30.5 MB | ✓ ĐẠT |
-| Trấn đông (50 bot) | HIGH | 4x | 40 | 1.7 ms | <= 13 ms | 4 / 4 / 160 | 30 / 520 | 10 / 24 | - | 30.7 MB | ✓ ĐẠT |
-| Trấn đông (50 bot) | HIGH | 1x | 44.5 | 0.4 ms | <= 13 ms | 4 / 4 / 160 | 33 / 520 | 11 / 24 | - | 29.1 MB | ✓ ĐẠT |
-| Trấn đông (50 bot) - Máy rất yếu | LOW | 6x | 60 | 1.7 ms | <= 9 ms | 2 / 2 / 60 | 0 / 60 | 0 / 4 | - | 32.8 MB | ✓ ĐẠT |
+| Một mình (Trấn vắng) | LOW | 1x | 60 | 0.3 ms | <= 9 ms | 2 / 2 / 60 | 0 / 60 | 0 / 4 | - | 30 MB | ✓ ĐẠT |
+| Một mình (Trấn vắng) | LOW | 4x | 60 | 1.1 ms | <= 9 ms | 2 / 2 / 60 | 0 / 60 | 0 / 4 | - | 28.1 MB | ✓ ĐẠT |
+| Trấn đông (50 bot) | LOW | 4x | 60 | 1 ms | <= 9 ms | 2 / 2 / 60 | 0 / 60 | 0 / 4 | - | 30.2 MB | ✓ ĐẠT |
+| Trấn đông (50 bot) | MID | 4x | 49.1 | 1.6 ms | <= 11 ms | 4 / 4 / 100 | 15 / 220 | 5 / 10 | - | 30 MB | ✓ ĐẠT |
+| Trấn đông (50 bot) | HIGH | 4x | 40.2 | 1.6 ms | <= 13 ms | 4 / 4 / 160 | 33 / 520 | 11 / 24 | - | 30.7 MB | ✓ ĐẠT |
+| Trấn đông (50 bot) | HIGH | 1x | 44.9 | 0.4 ms | <= 13 ms | 4 / 4 / 160 | 27 / 520 | 9 / 24 | - | 30.6 MB | ✓ ĐẠT |
+| Trấn đông (50 bot) - Máy rất yếu | LOW | 6x | 60 | 1.5 ms | <= 9 ms | 2 / 2 / 60 | 0 / 60 | 0 / 4 | - | 29.9 MB | ✓ ĐẠT |
 | Chiến đấu có hiệu ứng hạt | LOW | 4x | 60 | 1.1 ms | <= 9 ms | 4 / 4 / 60 | 68 đỉnh / 60 | 8 đỉnh / 4 | 8 đỉnh / 8 | 29.2 MB | ✓ ĐẠT |
-| Chiến đấu có hiệu ứng hạt | HIGH | 4x | 39.5 | 1.5 ms | <= 13 ms | 4 / 4 / 160 | 76 đỉnh / 520 | 10 đỉnh / 24 | 9 đỉnh / 28 | 31.9 MB | ✓ ĐẠT |
-| Nhiều chiêu liên tục | LOW | 4x | 60 | 1 ms | <= 9 ms | 4 / 4 / 60 | 68 đỉnh / 60 | 8 đỉnh / 4 | 8 đỉnh / 8 | 30.8 MB | ✓ ĐẠT |
-| Nhiều chiêu liên tục | HIGH | 4x | 38.7 | 1.4 ms | <= 13 ms | 4 / 4 / 160 | 108 đỉnh / 520 | 13 đỉnh / 24 | 16 đỉnh / 28 | 28.7 MB | ✓ ĐẠT |
-| Âm Sương Trạch (sương + thời tiết + nước) | LOW | 4x | 60 | 0.7 ms | <= 9 ms | 3 / 3 / 60 | 0 / 60 | 0 / 4 | - | 33.8 MB | ✓ ĐẠT |
-| Âm Sương Trạch (sương + thời tiết + nước) | MID | 4x | 49.4 | 1.1 ms | <= 11 ms | 5 / 5 / 100 | 18 / 220 | 6 / 10 | - | 40.7 MB | ✓ ĐẠT |
-| Âm Sương Trạch (sương + thời tiết + nước) | HIGH | 4x | 40.1 | 1.4 ms | <= 13 ms | 5 / 5 / 160 | 63 / 520 | 12 / 24 | - | 31.9 MB | ✓ ĐẠT |
-| Hắc Phong Cốc (sương + thời tiết + nước) | HIGH | 4x | 40.4 | 1.3 ms | <= 13 ms | 5 / 5 / 160 | 66 / 520 | 13 / 24 | - | 33.8 MB | ✓ ĐẠT |
-| Lạc Hà Trấn (sương + thời tiết + nước) | HIGH | 4x | 40.3 | 1.6 ms | <= 13 ms | 6 / 6 / 160 | 48 / 520 | 10 / 24 | - | 28.2 MB | ✓ ĐẠT |
-| Bí cảnh | MID | 4x | 52.6 | 1.1 ms | <= 11 ms | 4 / 4 / 100 | 76 đỉnh / 220 | 10 đỉnh / 10 | 9 đỉnh / 16 | 30.4 MB | ✓ ĐẠT |
+| Chiến đấu có hiệu ứng hạt | HIGH | 4x | 38.8 | 1.4 ms | <= 13 ms | 4 / 4 / 160 | 76 đỉnh / 520 | 10 đỉnh / 24 | 9 đỉnh / 28 | 25.6 MB | ✓ ĐẠT |
+| Nhiều chiêu liên tục | LOW | 4x | 60 | 1 ms | <= 9 ms | 4 / 4 / 60 | 78 đỉnh / 60 | 8 đỉnh / 4 | 8 đỉnh / 8 | 31.2 MB | ✓ ĐẠT |
+| Nhiều chiêu liên tục | HIGH | 4x | 38.9 | 1.5 ms | <= 13 ms | 4 / 4 / 160 | 124 đỉnh / 520 | 13 đỉnh / 24 | 17 đỉnh / 28 | 30.5 MB | ✓ ĐẠT |
+| Âm Sương Trạch (sương + thời tiết + nước) | LOW | 4x | 60 | 0.8 ms | <= 9 ms | 3 / 3 / 60 | 0 / 60 | 0 / 4 | - | 32.7 MB | ✓ ĐẠT |
+| Âm Sương Trạch (sương + thời tiết + nước) | MID | 4x | 49 | 1.2 ms | <= 11 ms | 5 / 5 / 100 | 18 / 220 | 6 / 10 | - | 35.1 MB | ✓ ĐẠT |
+| Âm Sương Trạch (sương + thời tiết + nước) | HIGH | 4x | 40.3 | 1.5 ms | <= 13 ms | 5 / 5 / 160 | 69 / 520 | 14 / 24 | - | 35.3 MB | ✓ ĐẠT |
+| Hắc Phong Cốc (sương + thời tiết + nước) | HIGH | 4x | 40.2 | 1.4 ms | <= 13 ms | 5 / 5 / 160 | 51 / 520 | 11 / 24 | - | 35.6 MB | ✓ ĐẠT |
+| Lạc Hà Trấn (sương + thời tiết + nước) | HIGH | 4x | 40.5 | 1.8 ms | <= 13 ms | 6 / 6 / 160 | 48 / 520 | 10 / 24 | - | 31.9 MB | ✓ ĐẠT |
+| Đánh trùm (đòn dồn dập + trùm gục) | LOW | 4x | 60 | 1 ms | <= 9 ms | 4 / 4 / 60 | 98 đỉnh / 60 | 8 đỉnh / 4 | 8 đỉnh / 8 | 26 MB | ✓ ĐẠT |
+| Đánh trùm (đòn dồn dập + trùm gục) | HIGH | 4x | 38.8 | 1.4 ms | <= 13 ms | 4 / 4 / 160 | 148 đỉnh / 520 | 14 đỉnh / 24 | 16 đỉnh / 28 | 32.6 MB | ✓ ĐẠT |
+| Bí cảnh | MID | 4x | 52.6 | 1.2 ms | <= 11 ms | 4 / 4 / 100 | 76 đỉnh / 220 | 10 đỉnh / 10 | 9 đỉnh / 16 | 29.8 MB | ✓ ĐẠT |
 <!-- PERF-MATRIX:END -->
 
 ## 3. Nhận xét và đánh giá
@@ -88,5 +90,6 @@ Job `client-perf` trong `.github/workflows/bench.yml` (lịch 04:00 giờ Việt
 - **Bản đồ ngoài với sương + thời tiết + nước BẬT (#408 bước 4):** mọi kịch bản trên chạy `?debug=1`, nên sương / thời tiết / nước mặc định TẮT (`ambientEnabledByUrl`) và camera đứng ở góc trên-trái bản đồ Lạc Hà (chế độ mock không chạy `reconcile`, `predX` / `predY` = 0): chưa kịch bản nào đo chi phí của ba hiệu ứng môi trường, cũng không nhìn thấy trấn. Nay có `?map=<id>` cho chế độ mock (`client/src/mock-map.ts`, chỉ DEV / `?debug`): mock khởi đầu ở bản đồ đó, người chơi đứng giữa trấn, phòng mock đồng bộ vị trí cho cảnh (không có `?map=` thì hành vi cũ giữ nguyên). Kịch bản `am-suong-{low,mid,high}-4x` (Âm Sương Trạch) + `hac-phong-high-4x` + `lac-ha-high-4x` (mốc so sánh) dùng `?map=<id>&crowd=20&debug=1&perf=1&weather=1&fog=1&water=1`. **Số đo** (CPU 4x, 20 đạo hữu quanh người chơi, JS p95 / draw call p95 / hạt sống / emitter sống): Âm Sương Thấp 0,7 ms / 3 / 0 / 0, Vừa 1,1 ms / 5 / 18 / 6, Cao 1,4 ms / 5 / 63 / 12; mốc ở bậc Cao: Hắc Phong 1,3 ms / 5 / 66 / 13, Lạc Hà 1,6 ms / 6 / 48 / 10 (ngân sách bậc Cao 13 ms / 160 / 520 / 24): Âm Sương không nặng hơn hai bản đồ kia ở cùng bậc. FPS (SwiftShader, không chặn) 60 / 49,4 / 40,1 so với kịch bản `crowd-*` không có môi trường 60 / 48,9 / 40,0: chi phí vẽ do SwiftShader, không do sương / nước. `perf-gate` chặn như mọi kịch bản; test `perf-gate.test.ts` đỏ nếu thêm bản đồ ngoài vào `shared/` mà harness không có kịch bản đo.
 - **`leak:test` đi qua ba bản đồ ngoài (#408 bước 4):** mỗi chu kỳ dựng lại hình ảnh của bản đồ kế tiếp trong `LEAK_MAP_IDS` (Lạc Hà, Hắc Phong, Âm Sương; lớp ô, trang trí, nước, sương, thời tiết, ánh sáng) với sương + thời tiết + nước bật (trước đây chỉ Lạc Hà, môi trường tắt); hai lần đọc chỉ số (đầu / cuối) đều đọc khi đang ở bản đồ gốc. Số đo: Textures 93 -> 93, GameObjects 39 -> 39, heap +1,8 % (ngân sách 10 %). Đột biến "mỗi lần dựng Âm Sương sót một đối tượng" -> `Rò rỉ GameObjects cơ sở: tăng từ 33 lên 39 (+6)`, thoát mã 1 (kiểm Lạc Hà một mình không thấy).
 - **Ảnh 5 khung nhìn** (`npm run capture:viewports -- --maps` hoặc `node client/scripts/capture-viewports.mjs --maps`): Hắc Phong Cốc (mốc) và Âm Sương Trạch ở 1280x720, 768x1024, 844x390, 390x844, 360x640 vào `docs/screenshots/m6-ban-do/` (10 ảnh WebP, 1,2 MB; bộ ảnh mốc M5 không bị đụng tới).
+- **Đánh trùm (M6 #409, nit của A ở #450):** `combat-*` / `burst-*` dùng `fx-driver` công thức quái thường nên KHÔNG bắn `boss-hit` / `boss-vanish`; chi phí hai công thức trùm trước đó chỉ được giữ bằng test `FxBudget` + trần mỗi công thức (<= 20 hạt, <= 1 s). Nay kế hoạch `boss` của `fx-driver` (nhịp `burst`, cờ `boss: true`: đòn thường của mình / người khác -> `boss-hit`, đòn nặng / chí mạng vẫn `hit-heavy` / `hit-crit`, trùm gục -> `boss-vanish` ưu tiên 2 mỗi 1,2 s: ca xấu nhất, thực tế chỉ một lần mỗi trận) có kịch bản `boss-low-4x` / `boss-high-4x`. **Số đo** (CPU 4x; đỉnh hạt / trần cứng, đỉnh emitter / trần cứng): bậc Thấp 98-106 / 120 (hai lần chạy; 82-88 % trần cứng), 8 / 8; bậc Cao 148 / 1040, 14 / 48; JS p95 1,0 / 1,4 ms, draw call p95 4; so với `burst` cùng lần chạy (78 / 120 và 124 / 1040). Bậc Thấp sát trần cứng hơn `burst` (trùm gục 20 hạt ưu tiên 2 chồng lên đòn dồn dập) nhưng KHÔNG vượt. **Cổng không bắt "công thức trùm nặng hơn":** thử `boss-vanish` 90 hạt thì đỉnh chỉ 90 / 120 (`FxBudget` bỏ bớt nên `fxDropped` tăng, đỉnh không vượt trần cứng) và `perf-gate` vẫn xanh; kịch bản này đo đỉnh THẬT (đỏ nếu `FxBudget` hỏng làm đỉnh vượt trần cứng, hoặc bộ bắn phát quá ít) chứ không thay test trần mỗi công thức (<= 20 hạt) trong `combat-fx.test.ts`.
 - **Không chặn trên FPS** (SwiftShader không phản ánh GPU thật, mục 5).
 - Chạy tay: `npm run build && npm run perf:mobile && node client/scripts/perf-gate.mjs` (thêm `--time-slack 1.5` nếu máy chậm).

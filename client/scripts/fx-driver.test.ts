@@ -93,13 +93,17 @@ const plays = (calls: Call[], id: string) => calls.filter((c) => c.kind === "pla
 describe("M5.1 #400: bộ bắn hiệu ứng thật (fx-driver) tiêm vào trang", () => {
   it("mọi id công thức nó dùng CÓ trong sổ công thức thật; không bịa tên", () => {
     for (const id of FX_DRIVER_RECIPES) expect(getRecipe(id), id).toBeDefined();
-    const page = makePage();
-    page.inject();
-    expect(page.sandbox.__tgFxDriver.start("burst")).toEqual({ ok: true });
-    page.advance(3000);
-    const used = new Set(page.calls.filter((c) => c.kind === "play").map((c) => c.id));
+    // Hợp của hai kế hoạch dồn dập: `burst` (quái thường) và `boss` (trùm: boss-hit / boss-vanish)
+    const used = new Set<string | undefined>();
+    for (const plan of ["burst", "boss"]) {
+      const page = makePage();
+      page.inject();
+      expect(page.sandbox.__tgFxDriver.start(plan)).toEqual({ ok: true });
+      page.advance(3000);
+      for (const c of page.calls) if (c.kind === "play") used.add(c.id);
+    }
     for (const id of used) expect(FX_DRIVER_RECIPES, `id ${id} dùng ngoài danh sách`).toContain(id);
-    // và danh sách không thừa: mọi id khai báo đều được dùng ít nhất một lần trong kế hoạch dồn dập
+    // và danh sách không thừa: mọi id khai báo đều được dùng ít nhất một lần trong các kế hoạch dồn dập
     for (const id of FX_DRIVER_RECIPES)
       expect(used.has(id), `id ${id} khai báo mà không dùng`).toBe(true);
   });
@@ -271,6 +275,74 @@ describe("M5.1 #400: kịch bản của harness dùng đúng tên kế hoạch",
     for (const name of used) expect(Object.keys(FX_PLANS), name).toContain(name);
     // cả hai kế hoạch đều được dùng
     expect(new Set(used)).toEqual(new Set(Object.keys(FX_PLANS)));
+  });
+});
+
+describe("M6 #409: kế hoạch `boss` (đòn thường -> boss-hit, trùm gục -> boss-vanish)", () => {
+  const BOSS_IDS = ["boss-hit", "boss-vanish"];
+  const run = (plan: string, ms = 3000) => {
+    const page = makePage();
+    page.inject();
+    expect(page.sandbox.__tgFxDriver.start(plan)).toEqual({ ok: true });
+    page.advance(ms);
+    return page;
+  };
+
+  it("`boss`: đòn thường của mình (ưu tiên 2) và của người khác (ưu tiên 1) là boss-hit, KHÔNG còn hit-spark; trùm gục là boss-vanish ưu tiên 2, KHÔNG còn mon-vanish", () => {
+    const { calls } = run("boss");
+    expect(plays(calls, "hit-spark")).toHaveLength(0);
+    expect(plays(calls, "mon-vanish")).toHaveLength(0);
+    const mine = plays(calls, "boss-hit").filter((c) => c.opts?.priority === 2);
+    const others = plays(calls, "boss-hit").filter((c) => c.opts?.priority === 1);
+    expect(mine.length).toBeGreaterThanOrEqual(15);
+    expect(others.length).toBeGreaterThanOrEqual(15);
+    const dead = plays(calls, "boss-vanish");
+    expect(dead.length).toBeGreaterThanOrEqual(2);
+    expect(dead.every((c) => c.opts?.priority === 2)).toBe(true);
+  });
+
+  it("`boss`: đòn nặng / chí mạng vẫn là hit-heavy / hit-crit (đúng như game: đòn mạnh lên trùm không đổi công thức), chữ 'Bạo!' chỉ đi cùng hai loại đó", () => {
+    const { calls } = run("boss", 6000);
+    const crits = plays(calls, "hit-heavy").length + plays(calls, "hit-crit").length;
+    expect(crits).toBeGreaterThan(3);
+    const bang = calls.filter((c) => c.kind === "num" && /^Bạo! /.test(c.text!));
+    // mỗi đòn của mình kèm đúng một chữ; chữ "Bạo!" (+ chữ công pháp lớn) không thể ít hơn số đòn nặng / chí mạng
+    expect(bang.length).toBeGreaterThanOrEqual(crits);
+  });
+
+  it("`combat` và `burst` KHÔNG đổi: không bao giờ bắn công thức trùm (đo cũ giữ nguyên)", () => {
+    for (const plan of ["combat", "burst"]) {
+      const { calls } = run(plan);
+      for (const id of BOSS_IDS) expect(plays(calls, id), `${plan} / ${id}`).toHaveLength(0);
+      expect(plays(calls, "hit-spark").length).toBeGreaterThan(0);
+      expect(plays(calls, "mon-vanish").length).toBeGreaterThan(0);
+    }
+  });
+
+  it("`boss` có nhịp của `burst` (ca xấu nhất) và cờ `boss`; chỉ kế hoạch `boss` có cờ", () => {
+    for (const k of ["hitMs", "otherMs", "hurtMs", "skillMs", "killMs"] as const)
+      expect(FX_PLANS.boss[k], k).toBe(FX_PLANS.burst[k]);
+    expect(FX_PLANS.boss.boss).toBe(true);
+    expect((FX_PLANS.combat as Record<string, unknown>).boss).toBeUndefined();
+    expect((FX_PLANS.burst as Record<string, unknown>).boss).toBeUndefined();
+  });
+
+  it("cả hai công thức trùm có trong sổ thật và chi phí khai báo nằm trong trần mỗi công thức (<= 20 hạt)", () => {
+    for (const id of BOSS_IDS) {
+      const r = getRecipe(id);
+      expect(r, id).toBeDefined();
+      expect(r!.particles!.count, id).toBeLessThanOrEqual(20);
+    }
+  });
+
+  it("ĐỘT BIẾN: nếu bộ bắn `boss` quay về công thức quái thường thì test đỏ (bắt hồi quy ở chính đoạn tiêm)", () => {
+    const broken = FX_DRIVER_SOURCE.replace(/"boss-hit"/g, '"hit-spark"');
+    expect(broken).not.toBe(FX_DRIVER_SOURCE);
+    const page = makePage();
+    page.inject(broken);
+    page.sandbox.__tgFxDriver.start("boss");
+    page.advance(3000);
+    expect(plays(page.calls, "boss-hit")).toHaveLength(0); // thấy ngay: không còn boss-hit nào
   });
 });
 
