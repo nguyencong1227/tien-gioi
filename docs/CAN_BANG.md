@@ -7,6 +7,7 @@
 
 - Hết Luyện Khí (sẵn sàng Trúc Cơ): **53 phút** (mục tiêu ~1 giờ)
 - Hết Trúc Cơ (sẵn sàng Kim Đan): **2 giờ 52 phút** (mục tiêu ~3 giờ)
+- Cả Kim Đan (sau nội dung M6, bảng ở mục "Kim Đan sau nội dung"): **5.7 giờ** săn bãi mới, **5.2 giờ** tối ưu (mục tiêu 5-7 giờ); kinh tế, trang bị và PK ở mục 6-8 của mục đó
 
 | Bậc | Thanh tu vi | Săn gì | Số quái | Phút ở bậc này | Cộng dồn |
 |---|---:|---|---:|---:|---:|
@@ -23,6 +24,8 @@
 | Trúc Cơ Sơ kỳ | 4400 | ho | 118 | 31.6 | 1 giờ 24 phút |
 | Trúc Cơ Trung kỳ | 5060 | ho | 136 | 35.2 | 2 giờ 0 phút |
 | Trúc Cơ Hậu kỳ | 5819 | ho | 209 | 52.1 | 2 giờ 52 phút |
+
+Bảng trên dừng ở hết Trúc Cơ (quái và đồ gốc: Linh Thố, Hôi Lang, Hắc Hổ, Xích Mãng). Cảnh giới Kim Đan (ba bậc, ba quái mới, trùm Hắc Giao, ba bộ trang bị, phí rèn) ở mục "Kim Đan sau nội dung (M6)" cuối tệp: săn solo, trùm theo đội, nhịp, luân hồi, tổ đội, kinh tế, trang bị, PK và bí cảnh.
 
 ## Giả định
 
@@ -456,6 +459,20 @@ Chi cho từng bộ (nguyên liệu tính MỖI NGƯỜI; trùm đi theo đội 
 Tổng phí rèn ba bộ **78,500** Linh thạch so với **51,702** kiếm được trong cả Kim Đan: thiếu 26,798 (~2.0 giờ săn Hậu kỳ sau khi hết Kim Đan). Bộ I mua đủ trong Sơ kỳ (dư 3,945 cuối bậc) và bộ II trong Trung kỳ (dư 1,321); bộ III (47,000, 60% tổng phí) là mục tiêu cuối game: người chơi KHÔNG dư hàng vạn Linh thạch không có chỗ tiêu như cảnh báo cũ của mục "Kinh tế Linh thạch", và cũng không bị chặn (thiếu chừng 2.0 giờ). Cột cuối: cày nguyên liệu chiếm tối đa 54% thời gian bậc và các giờ đó vẫn kiếm tu vi, nên nguyên liệu không phải nút cổ chai, tiền mới là.
 Đan cấp 2 (`dai_hoi_huyet_dan` / `dai_hoi_linh_dan`, 120 Linh thạch / viên ở Lái buôn Vọng Sương) là chỗ xả TUỲ CHỌN thêm vào: mô hình không tính vì không giả định người chơi uống đan (đả tọa hồi khí huyết). Mô hình cũng bỏ qua nhiệm vụ lặp và phí rèn ở nhịp tu luyện (mục 3), phần Linh thạch / đồ thưởng của nhiệm vụ.
 
+**Qua kiếp.** Bảng trên là kiếp 1 (không Dư âm tu hành). Khi kiếp nào cũng cày tới hết Kim Đan và nâng Dư âm tu hành (mục 4), bậc ngắn lại theo hệ số tốc độ nhưng Linh thạch theo số quái hạ nên KHÔNG tăng, còn `applyRebirth` đưa ví về tối đa `coinCarryCap` (400 khi đủ Kim nang) và túi rỗng:
+
+| Kiếp | Dư âm tu hành | Phút cả kiếp | Linh thạch kiếm được | Rèn đủ phí | Cày nguyên liệu bộ III so với Hậu kỳ |
+|---|---:|---:|---:|---|---:|
+| 1 | Nấc 5 | 485 | 51,702 | bộ I + II | 54% |
+| 2 | Nấc 7 | 326 | 31,719 | bộ I + II | 81% |
+| 3 | Nấc 8 | 289 | 27,017 | bộ I | 92% |
+| 4 | Nấc 9 | 273 | 25,058 | bộ I | 98% |
+| 5 | Nấc 9 | 259 | 23,305 | bộ I | 103% |
+| 6 | Nấc 10 | 259 | 23,305 | bộ I | 103% |
+| 7 | Nấc 10 | 247 | 21,727 | bộ I | 108% |
+
+Không kiếp nào trả đủ cả ba bộ (kiếp 1 chỉ tới bộ I + II); từ kiếp 3 trở đi chỉ trả đủ bộ I (kiếp 7: 21,727 Linh thạch, cày nguyên liệu bộ III chiếm 108% Hậu kỳ nên không kịp trong bậc). Đây là CHỦ Ý hay không là câu hỏi cho người dùng (ghi ở `questions.md`): đường giữ đồ là **Ký vật** (3 nấc, tổng 225 Duyên ~ 1.2 kiếp Kim Đan; nấc 3 giữ lại cả ba món đang mặc), nên bộ rèn ở kiếp trước đi theo sang kiếp sau và Linh thạch chỉ cần cho phần còn thiếu; Linh thạch KHÔNG tích lũy qua kiếp (ví về tối đa 400) nên "dư hàng vạn" ở kiếp sau không thành vấn đề tích tụ. Mô hình chưa tính người chơi kiếp sau rèn lại từ đầu (không Ký vật).
+
 ### 7. Trang bị: ba bộ tăng sức mạnh đều, không bộ nào bắt buộc hay vô dụng (#406)
 
 Sức mạnh gốc mỗi bộ (kiếm +công, bào +khí huyết, phù +linh lực / tốc): bộ I: công 32, khí huyết 360; bộ II: công 38, khí huyết 425; bộ III: công 44, khí huyết 500. Bảng dưới: tu vi / giờ solo tốt nhất và khí huyết mất mỗi trận khi solo Độc Thiềm (loài đòn nặng nhất) nếu người chơi chỉ có trang bị tới từng bộ.
@@ -473,3 +490,31 @@ Sức mạnh gốc mỗi bộ (kiếm +công, bào +khí huyết, phù +linh l�
 | Hậu kỳ | tới bộ III | 35,222 (Độc Thiềm) | 34% |
 
 Đọc bảng: tỉ lệ tu vi / giờ giữa không có bộ nào và đủ bộ mặc được là 71% ở Sơ kỳ (92% nếu chỉ săn bãi mới), 97% ở Trung kỳ (76% nếu chỉ săn bãi mới), 92% ở Hậu kỳ (92% nếu chỉ săn bãi mới): không bộ nào BẮT BUỘC cho nhịp (luôn còn loài an toàn, thấp nhất 71%: một số loài chỉ an toàn khi đã có bộ đầu, Xích Mãng ở Sơ kỳ và Độc Thiềm ở Trung kỳ), nhưng mỗi bộ đều làm nhanh hơn và bớt nguy hiểm (khí huyết mất / trận giảm ở mọi hàng): không bộ nào VÔ DỤNG. Ở Hậu kỳ đủ ba bộ nhanh hơn không có bộ nào **9.1%** và bớt ~11 điểm phần trăm khí huyết mất. Bộ III đắt nhất (60% tổng phí) nhưng chỉ thêm ~1.9% tu vi / giờ so với bộ II: giá trị của nó nằm ở sức mạnh (công 44 so với 38, PK và trùm), cố ý là chỗ xả Linh thạch cuối game. Công / khí huyết gốc tăng đều giữa các bộ (+19% / +16% công, +18% / +18% khí huyết).
+
+### 8. PK và bí cảnh ở Kim Đan (#406)
+
+**PK.** Cùng mô hình với mục "PK thách đấu" (`duelOnce`: mã server thật, đánh thường liên tục, 20 trận mỗi dòng). Hai người CÙNG bậc Kim Đan mặc CÙNG bộ trang bị: trận đều nằm trong mục tiêu 25-45 giây ở mọi bậc và mọi bộ.
+
+| Bậc | Trang bị (cả hai) | Giây đánh (trung vị) | Nhỏ nhất - lớn nhất |
+|---|---|---:|---:|
+| Kim Đan Sơ kỳ | không bộ Kim Đan nào | 32.4 | 31.2 - 34.0 |
+| Kim Đan Sơ kỳ | bộ I | 32.8 | 31.2 - 34.4 |
+| Kim Đan Trung kỳ | không bộ Kim Đan nào | 32.8 | 31.6 - 34.4 |
+| Kim Đan Trung kỳ | bộ I | 32.8 | 31.6 - 34.4 |
+| Kim Đan Trung kỳ | bộ II | 32.8 | 31.6 - 34.4 |
+| Kim Đan Hậu kỳ | không bộ Kim Đan nào | 33.2 | 32.0 - 34.8 |
+| Kim Đan Hậu kỳ | bộ I | 33.2 | 32.0 - 34.8 |
+| Kim Đan Hậu kỳ | bộ II | 33.2 | 32.0 - 34.8 |
+| Kim Đan Hậu kỳ | bộ III | 33.2 | 32.0 - 34.8 |
+
+Cùng bậc nhưng KHÁC bộ: bên mặc bộ cao hơn thắng 100-100% số trận (như chênh một tầng ở mục "Chênh bậc"), trận ngắn hơn một chút. Linh thạch (phí rèn bộ III ~47.000, mục 6) mua được lợi thế PK quyết định so với người cùng bậc chưa rèn; PK là thách đấu hai bên đồng ý (người yếu hơn từ chối được), và câu hỏi chuẩn hoá chỉ số về bậc / bộ thấp hơn vẫn chờ người dùng (câu hỏi 4 ở `questions.md`).
+
+| Bậc | Trận | Bên mạnh thắng | Giây đánh (trung vị) |
+|---|---|---:|---:|
+| Kim Đan Sơ kỳ | bộ I thách không bộ Kim Đan nào | 100% | 29.6 |
+| Kim Đan Trung kỳ | bộ II thách bộ I | 100% | 32.0 |
+| Kim Đan Trung kỳ | bộ II thách không bộ Kim Đan nào | 100% | 29.2 |
+| Kim Đan Hậu kỳ | bộ III thách bộ II | 100% | 32.4 |
+| Kim Đan Hậu kỳ | bộ III thách không bộ Kim Đan nào | 100% | 28.8 |
+
+**Bí cảnh Linh Hư.** Không bị nội dung M6 làm đổi: bí cảnh có trần bậc 12 (hết Trúc Cơ, PR #428) và người Kim Đan bắt đầu từ bậc 13 nên KHÔNG vào được (`member_high`); bảng "Bí cảnh Linh Hư" ở trên (bậc 9-12) vẫn đúng nguyên. Phân tích đội Kim Đan phá bí cảnh (trước khi có trần) ở mục "Kim Đan trước M6", phần 4.

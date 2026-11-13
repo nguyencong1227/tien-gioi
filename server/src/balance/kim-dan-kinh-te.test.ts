@@ -1,8 +1,9 @@
 // Kinh tế và trang bị Kim Đan (M6, #406 mục 2 và 3), đo bằng mô hình cân bằng: chỗ tiêu Linh thạch cân với thu nhập, ba bộ tăng đều,
 // không bộ nào bắt buộc hay vô dụng. Mục tiêu ở docs/PHAN_CONG_M6.md và issue #406.
 import { describe, expect, it } from "vitest";
-import { ITEMS, KIM_DAN_RECIPES, MONSTER_BY_ID } from "@tien-gioi/shared";
+import { ITEMS, KIM_DAN_RECIPES, MONSTER_BY_ID, UNLOCK_BY_ID } from "@tien-gioi/shared";
 import { bestGear, monsterEconomy } from "./simulate";
+import { kimDanReincarnation } from "./kim-dan-sau";
 import {
   BOSS_PARTY,
   KIM_DAN_MATERIALS,
@@ -10,6 +11,7 @@ import {
   bossCoinPerHourOf,
   boStat,
   kimDanEconomy,
+  kimDanEconomyByLife,
   kimDanGearEffect,
   materialShare,
   minGearRatio,
@@ -72,6 +74,21 @@ describe("kinh tế Kim Đan: chi (phí rèn) cân với thu nhập", () => {
     expect(BOSS_PARTY).toBe(4);
   });
 
+  it("khoản trừ săn trùm theo đội ĐƯỢC áp: thu nhập Hậu kỳ nhỏ hơn thời gian x Linh thạch / giờ đúng bằng phần hụt (Sơ / Trung kỳ không có trùm nên bằng nhau)", () => {
+    for (const t of eco.tiers.slice(0, 2))
+      expect(t.earned, t.label).toBeCloseTo((t.minutes / 60) * t.coinPerHour, 6);
+    const hau = eco.tiers[2];
+    const loss = eco.bo[2].bossHours * (hau.coinPerHour - bossCoinPerHourOf(2));
+    expect(hau.earned).toBeCloseTo((hau.minutes / 60) * hau.coinPerHour - loss, 6);
+    expect(loss).toBeGreaterThan(0);
+  });
+
+  it("cày nguyên liệu tính cả giờ săn trùm: bộ III cao hơn phần chỉ-cày-solo và >= 40% Hậu kỳ (khoá hiện trạng ~54%)", () => {
+    const soloOnly = (eco.bo[2].soloHours * 60) / eco.tiers[2].minutes;
+    expect(materialShare(eco, 2)).toBeGreaterThan(soloOnly);
+    expect(materialShare(eco, 2)).toBeGreaterThanOrEqual(0.4);
+  });
+
   it("thu nhập khả dụng: không tính nguyên liệu giữ lại, thấp hơn tổng tiền theo mô hình cũ; quái không an toàn thì null", () => {
     expect(spendableCoinPerHour("doc_thiem", 0)).toBeNull(); // Độc Thiềm chưa an toàn solo ở Sơ kỳ
     for (const t of eco.tiers) expect(t.coinPerHour).toBeGreaterThan(0);
@@ -80,6 +97,36 @@ describe("kinh tế Kim Đan: chi (phí rèn) cân với thu nhập", () => {
     const spend = spendableCoinPerHour("thach_quy", 1)!;
     expect(spend).toBeGreaterThan(e.coinDropPerHour);
     expect(spend).toBeLessThan(e.totalCoinPerHour);
+  });
+});
+
+describe("kinh tế QUA KIẾP (câu hỏi của B ở #439): tu nhanh thì Linh thạch mỗi kiếp ít đi", () => {
+  const lives = kimDanEconomyByLife(kimDanReincarnation().progression);
+
+  it("kiếp 1 khớp bảng kiếp đơn (cùng thu nhập, trả đủ bộ I + II); số kiếp khớp bảng luân hồi", () => {
+    expect(lives[0].earned).toBeCloseTo(eco.tiers.at(-1)!.cumulative, 6);
+    expect(lives[0].affordableBo).toBe(2);
+    expect(lives).toHaveLength(kimDanReincarnation().progression.length);
+  });
+
+  it("Linh thạch mỗi kiếp KHÔNG tăng khi tu nhanh hơn (không tăng theo Dư âm tu hành), số bộ trả đủ không tăng, phần cày bộ III không giảm", () => {
+    for (let i = 1; i < lives.length; i++) {
+      expect(lives[i].earned, `kiếp ${lives[i].kiep}`).toBeLessThanOrEqual(
+        lives[i - 1].earned + 1e-6,
+      );
+      expect(lives[i].affordableBo).toBeLessThanOrEqual(lives[i - 1].affordableBo);
+      expect(lives[i].boIIIShare).toBeGreaterThanOrEqual(lives[i - 1].boIIIShare - 1e-9);
+    }
+  });
+
+  it("khoá hiện trạng: không kiếp nào trả đủ cả ba bộ; kiếp cuối chỉ bộ I (ghi chủ ý cho người dùng, Ký vật giữ đồ qua kiếp)", () => {
+    expect(lives.every((l) => l.affordableBo < 3)).toBe(true);
+    expect(lives.at(-1)!.affordableBo).toBe(1);
+    // đường giữ đồ có thật và rẻ: Ký vật nấc cuối giữ 3 món, tổng Duyên <= 2 kiếp Kim Đan
+    const duyen = kimDanReincarnation().progression[0].duyenEarned;
+    const costs = UNLOCK_BY_ID.ky_vat.costs;
+    expect(costs.reduce((n, c) => n + c, 0)).toBeLessThanOrEqual(2 * duyen);
+    expect(costs).toHaveLength(3);
   });
 });
 
