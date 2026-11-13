@@ -31,6 +31,13 @@ export const ITEM_VALUE: Record<string, number> = {
   nanh_soi: 4,
   da_ho: 18,
   vay_mang: 120,
+  // Đan cấp 2 và nguyên liệu Kim Đan (M6, #403)
+  dai_hoi_huyet_dan: 60,
+  dai_hoi_linh_dan: 60,
+  suong_mao: 45,
+  quy_giap: 60,
+  doc_nang: 90,
+  giao_lan: 600,
   // Trang bị (theo bậc: phàm 30, linh 120, bảo 500)
   lang_nha_kiem: 30,
   tho_nhung_bao: 30,
@@ -41,6 +48,16 @@ export const ITEM_VALUE: Record<string, number> = {
   xich_mang_kiem: 500,
   xich_lan_bao: 500,
   mang_dam_phu: 500,
+  // Ba bộ Kim Đan (tiên phẩm 2000, tiên phẩm 4500, thần phẩm 10000): luôn thấp hơn phí rèn (nguyên liệu + `RecipeDef.coin`), nên rèn rồi bán không lời
+  suong_vu_kiem: 2000,
+  suong_ho_bao: 2000,
+  ho_tam_phu: 2000,
+  huyen_quy_kiem: 4500,
+  quy_giap_bao: 4500,
+  quy_tuc_phu: 4500,
+  hac_giao_kiem: 10000,
+  giao_lan_bao: 10000,
+  giao_long_phu: 10000,
 };
 
 /** NPC thu mua trả bằng phần trăm này của giá trị gốc (làm tròn xuống, tối thiểu 1 nếu giá trị > 0). */
@@ -106,6 +123,11 @@ export const COIN_DROPS: Record<string, CoinDrop> = {
   mang: { chance: 1, min: 150, max: 300 },
   // Trùm bí cảnh (đã tính vào cân bằng 4c-2: `server/src/balance/dungeon.ts`); thưởng hoàn thành là `DUNGEONS[].reward.coin`, riêng với tiền rơi này
   yeu_vuong: { chance: 1, min: 300, max: 500 },
+  // Quái Kim Đan (M6, #403): thu nhập 8-17k Linh thạch / giờ solo, gần Xích Mãng (~15k) nhưng không vượt 2x (docs/CAN_BANG.md)
+  suong_ho: { chance: 0.8, min: 25, max: 55 },
+  thach_quy: { chance: 0.8, min: 50, max: 110 },
+  doc_thiem: { chance: 0.9, min: 60, max: 130 },
+  hac_giao: { chance: 1, min: 300, max: 490 }, // trùm: chia cho đội; thấp hơn trùm bí cảnh (400) vì exp thấp hơn (test giữ thứ tự theo exp)
 };
 
 /** Tung rơi tiền. rng trả về số trong [0, 1) (truyền vào để test được). Quái không có bảng thì 0. */

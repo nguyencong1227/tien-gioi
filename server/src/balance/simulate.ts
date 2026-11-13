@@ -31,7 +31,17 @@ import {
 /** Giả định về lối chơi. Đổi ở đây nếu thấy không giống người chơi thật. */
 export const ASSUME = {
   /** Thời gian tìm và tới con quái kế tiếp (giây) */
-  searchSec: { tho: 6, lang: 8, ho: 12, mang: 90 } as Record<string, number>,
+  searchSec: {
+    tho: 6,
+    lang: 8,
+    ho: 12,
+    mang: 90,
+    // Quái Kim Đan (M6, #403): đàn dày, vùng hẹp hơn ngoài hoang; trùm như Xích Mãng
+    suong_ho: 10,
+    thach_quy: 12,
+    doc_thiem: 14,
+    hac_giao: 90,
+  } as Record<string, number>,
   /** Tỉ lệ đòn của quái thực sự trúng (người chơi né / lùi được một phần) */
   hitTaken: 0.8,
   /** Không đánh loại quái mà một trận làm mất quá tỉ lệ khí huyết này */

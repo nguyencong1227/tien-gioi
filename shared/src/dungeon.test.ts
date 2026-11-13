@@ -188,8 +188,11 @@ describe("bản đồ và quái của bí cảnh", () => {
     expect(DEFAULT_MAP.monsterCapOf("yeu_vuong")).toBe(0);
     expect(getMap(HAC_PHONG_ID)!.monsterCapOf("yeu_vuong")).toBe(0);
     expect(WILD_MONSTERS.map((m) => m.id)).not.toContain("yeu_vuong");
-    expect(WILD_MONSTERS.length).toBe(MONSTERS.length - 1);
+    // Bản đồ mặc định chỉ sinh bốn loài cổ điển; quái Kim Đan (M6) có `MONSTER_CAP` = 0 và chỉ sinh ở bản đồ khai báo riêng
+    expect(WILD_MONSTERS.map((m) => m.id)).toEqual(["tho", "lang", "ho", "mang"]);
     for (const m of WILD_MONSTERS) expect(DEFAULT_MAP.monsterCapOf(m.id)).toBeGreaterThan(0);
+    for (const m of MONSTERS)
+      if (!WILD_MONSTERS.includes(m)) expect(DEFAULT_MAP.monsterCapOf(m.id), m.id).toBe(0);
   });
 
   it("bản đồ bí cảnh dựng được: cổng vào (khu an toàn) đi lại được ở phía nam, không có cổng chuyển bản đồ, có chỗ cho trùm xa cổng vào", () => {

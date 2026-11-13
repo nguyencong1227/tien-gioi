@@ -101,13 +101,13 @@ describe("rơi Linh thạch", () => {
     }
   });
 
-  it("quái mạnh hơn rơi trung bình nhiều tiền hơn (theo máu quái)", () => {
+  it("quái cho nhiều tu vi hơn rơi trung bình nhiều tiền hơn (theo `exp` của quái)", () => {
     const avg = (k: string) => {
       const d = COIN_DROPS[k]!;
       return d.chance * ((d.min + d.max) / 2);
     };
     const kinds = Object.keys(COIN_DROPS).sort(
-      (a, b) => MONSTER_BY_ID[a]!.hp - MONSTER_BY_ID[b]!.hp,
+      (a, b) => MONSTER_BY_ID[a]!.exp - MONSTER_BY_ID[b]!.exp,
     );
     for (let i = 1; i < kinds.length; i++)
       expect(avg(kinds[i]!)).toBeGreaterThan(avg(kinds[i - 1]!));
@@ -151,10 +151,17 @@ describe("rèn và đổi đồ không thành vòng sinh tiền (docs/CAN_BANG.m
       const inSell = sellTotal(r.inputs);
       const outSell = sellTotal([r.output]);
       expect(inSell, `${r.id}: nguyên liệu phải bán được`).toBeGreaterThan(0);
-      expect(outSell, `${r.id}: ${outSell} / ${inSell}`).toBeLessThanOrEqual(
-        inSell * RECIPE_MAX_GAIN,
-      );
+      // Phí Linh thạch (`RecipeDef.coin`, M6) là một phần chi phí rèn
+      const cost = inSell + (r.coin ?? 0);
+      expect(outSell, `${r.id}: ${outSell} / ${cost}`).toBeLessThanOrEqual(cost * RECIPE_MAX_GAIN);
     }
+  });
+
+  it("rèn có phí Linh thạch: thành phẩm bán lại luôn thấp hơn nguyên liệu + phí (chỗ xả tiền, không sinh tiền)", () => {
+    const withFee = RECIPES.filter((r) => (r.coin ?? 0) > 0);
+    expect(withFee.length).toBeGreaterThanOrEqual(9); // ba bộ Kim Đan (M6, #403)
+    for (const r of withFee)
+      expect(sellTotal([r.output]), r.id).toBeLessThan(sellTotal(r.inputs) + r.coin!);
   });
 
   it("đổi đồ: nhận về không lời quá TRADE_MAX_GAIN lần so với bán thứ nộp", () => {
