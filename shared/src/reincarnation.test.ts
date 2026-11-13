@@ -83,8 +83,16 @@ describe("calcDuyen: bảng ước tính của docs/THIET_KE_LUAN_HOI.md mục 5
     expect(calcDuyen({ ...l, bossKills: 3 })).toBe(78);
   });
 
-  it("điểm mỗi bậc: Phàm Nhân 0, Luyện Khí 2, Trúc Cơ 12, mỗi cảnh giới sau gấp 5; id lạ là 0", () => {
-    expect([0, 1, 2, 3, 4].map(duyenPerStep)).toEqual([0, 2, 12, 60, 300]);
+  it("Kim Đan (M6, #406): vừa đạt sơ kỳ sau 172 phút = 69 Duyên (như hết Trúc Cơ); hết Kim Đan, thanh đầy, 485 phút = 189 (hạ 5 trùm: 204)", () => {
+    const kdFirst = { ...atStep(13), exp: 0, playMs: min(172), bossKills: 0 };
+    expect(calcDuyen(kdFirst)).toBe(69);
+    const kdFull = { ...atStep(15), exp: expToNext(3, 2), playMs: min(485), bossKills: 0 };
+    expect(calcDuyen(kdFull)).toBe(18 + 36 + 3 * 40 + 15); // Luyện Khí 18, Trúc Cơ 36, Kim Đan 3 bậc x 40, thời gian (trần 15)
+    expect(calcDuyen({ ...kdFull, bossKills: 5 })).toBe(189 + 15);
+  });
+
+  it("điểm mỗi bậc: Phàm Nhân 0, Luyện Khí 2, Trúc Cơ 12, Kim Đan 40, từ đó mỗi cảnh giới gấp 5; id lạ là 0", () => {
+    expect([0, 1, 2, 3, 4].map(duyenPerStep)).toEqual([0, 2, 12, 40, 200]);
     for (const bad of [-1, 1.5, Number.NaN, Infinity, "2" as unknown as number])
       expect(duyenPerStep(bad)).toBe(0);
   });

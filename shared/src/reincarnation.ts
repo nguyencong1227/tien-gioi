@@ -26,10 +26,17 @@ export const HISTORY_MAX = 20;
 export const DUYEN_CAP = 1_000_000_000;
 export const KIEP_CAP = 1_000_000;
 
-/** Điểm mỗi bậc nhỏ của cảnh giới `realm`: Phàm Nhân 0; Luyện Khí 2; Trúc Cơ 12; mỗi cảnh giới sau gấp 5 lần. */
+/**
+ * Điểm mỗi bậc nhỏ của cảnh giới `realm`: Phàm Nhân 0; Luyện Khí 2; Trúc Cơ 12; Kim Đan 40; từ Kim Đan trở đi mỗi cảnh giới gấp 5 lần
+ * cảnh giới trước. Kim Đan là 40 chứ không phải 60 (= 12 x 5, bản đầu khi chưa có nội dung): thanh Kim Đan sau M6 dài ~5 giờ chứ
+ * không 5 lần Trúc Cơ, nên 60 làm Duyên / giờ ở Kim Đan hậu kỳ vọt lên ~1,4 lần Luyện Khí tầng 5 (phá mục tiêu "mọi cách chơi
+ * tương đương" ~1,3 lần); 40 giữ dải 22-28 Duyên / giờ (`docs/CAN_BANG.md`, mục "Luân hồi khi cày tới Kim Đan").
+ */
 export function duyenPerStep(realm: number): number {
   if (!Number.isInteger(realm) || realm < 1) return 0;
-  return realm === 1 ? 2 : 12 * Math.pow(5, realm - 2);
+  if (realm === 1) return 2;
+  if (realm === 2) return 12;
+  return 40 * Math.pow(5, realm - 3);
 }
 
 /** Thành tựu của một kiếp, đầu vào của `calcDuyen`. Mọi trường được làm sạch (số rác coi như 0). */
