@@ -69,7 +69,6 @@ import {
   SKILLS,
   MONSTER_BY_ID,
   ITEM_BY_ID,
-  DROP_TABLES,
   RARITY_COLORS,
   PICKUP_RANGE,
   NPC_BY_ID,
@@ -133,6 +132,7 @@ import {
   MOCK_DUNGEON_SAMPLES,
 } from "../dungeon";
 import { respawnDeathText } from "../death-text";
+import { dropSourceIn, hopLabel, nextHop, questGoal, type NavHop } from "../quest-nav";
 import { clientCanChallenge } from "../duel";
 import { replayEarlyMessages } from "../early-messages";
 import { sound } from "../audio";
@@ -313,6 +313,9 @@ export class WorldScene extends Phaser.Scene {
 
   // Mũi tên chỉ đường nhiệm vụ
   private navArrow!: Phaser.GameObjects.Container;
+  /** Chữ cạnh mũi tên khi đang chỉ tới CỔNG (đích ở bản đồ khác), vd "Qua Vọng Trạch Quan" */
+  private navLabel!: Phaser.GameObjects.Text;
+  private navLabelText = "";
   private lastMapDraw = 0;
 
   // Tái sử dụng Set và hồ đối tượng (object pool) để giảm cấp phát mỗi frame (#71)
@@ -930,6 +933,22 @@ export class WorldScene extends Phaser.Scene {
     }
 
     this.navArrow.add([aura, arrowG]);
+    this.navLabel = this.add
+      .text(0, 0, "", {
+        fontFamily: '"Noto Serif", Georgia, serif',
+        fontSize: "13px",
+        color: "#ffe08a",
+        stroke: "#1d1a16",
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5, 0)
+      .setDepth(this.map.worldH + 5)
+      .setVisible(false);
+  }
+
+  private hideNav() {
+    this.navArrow.setVisible(false);
+    this.navLabel.setVisible(false);
   }
 
   // ---------------- Input ----------------
@@ -1754,13 +1773,20 @@ export class WorldScene extends Phaser.Scene {
     };
   }
 
-  private resolveQuestTarget(questId: string): { x: number; y: number } | null {
+  private resolveQuestTarget(questId: string): { x: number; y: number; hop?: NavHop } | null {
     const def = QUEST_BY_ID[questId];
     if (!def) return null;
     const qLog = ui.getQuestLog();
     const prog = qLog.active.find((a) => a.id === questId);
     if (!prog) return null;
     const ctx = ui.getQuestContext();
+
+    // Đích ở BẢN ĐỒ KHÁC: toạ độ của đích vô nghĩa ở bản đồ này, chỉ tới cổng kế tiếp trên đường tới đó (quest-nav.ts)
+    const goal = questGoal(def, prog, ctx);
+    if (goal?.kind === "maps" && !goal.mapIds.includes(this.map.def.id)) {
+      const hop = nextHop(this.map.def.id, goal.mapIds);
+      return hop ? { x: hop.portal.x, y: hop.portal.y, hop } : null;
+    }
 
     // Nếu đã hoàn thành hoặc sẵn sàng trả thì chỉ tới NPC giao
     if (questReady(def, prog, ctx)) {
@@ -1799,17 +1825,8 @@ export class WorldScene extends Phaser.Scene {
       });
       if (nearestLoot) return nearestLoot;
 
-      // Tra từ DROP_TABLES xem loại quái nào rơi nguyên liệu này
-      let bestMon: string | null = null;
-      let bestChance = 0;
-      for (const [monId, entries] of Object.entries(DROP_TABLES)) {
-        for (const e of entries) {
-          if (e.itemId === step.itemId && e.chance > bestChance) {
-            bestChance = e.chance;
-            bestMon = monId;
-          }
-        }
-      }
+      // Loài quái SINH Ở BẢN ĐỒ NÀY rơi nguyên liệu (ưu tiên quái thường hơn trùm), không phải loài rơi cao nhất toàn game
+      const bestMon = dropSourceIn(step.itemId, this.map.def.id);
       if (bestMon) return this.monsterTargetPos(bestMon);
     }
 
@@ -1824,12 +1841,12 @@ export class WorldScene extends Phaser.Scene {
   private syncQuestNav() {
     const trackId = ui.getTrackingQuestId();
     if (!trackId) {
-      this.navArrow.setVisible(false);
+      this.hideNav();
       return;
     }
     const target = this.resolveQuestTarget(trackId);
     if (!target) {
-      this.navArrow.setVisible(false);
+      this.hideNav();
       return;
     }
 
@@ -1839,7 +1856,7 @@ export class WorldScene extends Phaser.Scene {
 
     // Khi ở quá gần mục tiêu (dưới 95 px) thì ẩn mũi tên để không rối mắt
     if (dist <= 95) {
-      this.navArrow.setVisible(false);
+      this.hideNav();
       return;
     }
 
@@ -1850,6 +1867,17 @@ export class WorldScene extends Phaser.Scene {
     );
     this.navArrow.setRotation(angle);
     this.navArrow.setVisible(true);
+    if (target.hop) {
+      const text = hopLabel(target.hop);
+      if (text !== this.navLabelText) {
+        this.navLabel.setText(text);
+        this.navLabelText = text;
+      }
+      // Dưới mũi tên (phía trên là tên nhân vật, dễ chồng chữ)
+      this.navLabel.setPosition(this.navArrow.x, this.navArrow.y + 16).setVisible(true);
+    } else {
+      this.navLabel.setVisible(false);
+    }
   }
 
   // ---------------- Bản đồ nhỏ & Bản đồ lớn ----------------
