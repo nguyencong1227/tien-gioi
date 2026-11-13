@@ -1,5 +1,5 @@
 /**
- * Công thức THỜI TIẾT (M5.3, #332): cánh hoa đào (Lạc Hà), tro (Hắc Phong), linh khí (bí cảnh). CHỈ là dữ liệu.
+ * Công thức THỜI TIẾT (M5.3, #332): cánh hoa đào (Lạc Hà), tro (Hắc Phong), linh khí (bí cảnh), ma trơi (Âm Sương Trạch, M6 #408). CHỈ là dữ liệu.
  *
  * Mỗi lần phát rải `count` (12) hạt ở điểm ngẫu nhiên trong `zone` (`opts.area` ghi đè theo khung nhìn), sống tới ~3,5 s; ưu tiên 0
  * (môi trường: tới 60 % trần, bị bỏ trước mọi hiệu ứng khác). Nhịp phát do `map-weather.ts` tính (số hạt / tốc độ) để một
@@ -61,6 +61,24 @@ export const WEATHER_RECIPES: readonly FxRecipe[] = [
       tint: 0x8ff0ff,
       blend: "add",
       gravityY: -6,
+      zone: { w: 1200, h: 700 },
+    },
+  },
+  {
+    // Ma trơi vàng lục lơ lửng trên đầm, trôi chậm ngang rồi tan (cộng sáng nhẹ): cùng chi phí với linh khí (12 hạt, <= 3,8 s)
+    id: "weather-wisp",
+    priority: 0,
+    particles: {
+      frames: ["dot", "spark"],
+      count: WEATHER_COUNT,
+      lifespan: { min: 2800, max: 3800 },
+      speed: { min: 6, max: 20 },
+      angle: { min: -170, max: -10 },
+      scale: { start: 0.42, end: 0.12 },
+      alpha: { start: 0.75, end: 0 },
+      tint: 0xd2e68a,
+      blend: "add",
+      gravityY: -3,
       zone: { w: 1200, h: 700 },
     },
   },

@@ -132,6 +132,7 @@ import {
   isMockDungeonEnabled,
   MOCK_DUNGEON_SAMPLES,
 } from "../dungeon";
+import { respawnDeathText } from "../death-text";
 import { clientCanChallenge } from "../duel";
 import { replayEarlyMessages } from "../early-messages";
 import { sound } from "../audio";
@@ -2363,11 +2364,11 @@ export class WorldScene extends Phaser.Scene {
             dungeonFallenSubText(),
           );
         } else {
-          ui.death(
-            p.dead
-              ? Math.max(0, Math.ceil(5 - (this.time.now - (e as any).deadSince) / 1000))
-              : null,
-          );
+          // Chết thường: nêu trấn của bản đồ HIỆN TẠI (server hồi sinh ở đó), không chép cứng tên trấn
+          const left = p.dead
+            ? Math.max(0, Math.ceil(5 - (this.time.now - (e as any).deadSince) / 1000))
+            : null;
+          ui.death(left, left === null ? undefined : respawnDeathText(this.map.townName, left));
         }
         if (p.dead && !(e as any).deadSince) (e as any).deadSince = this.time.now;
         if (!p.dead) {

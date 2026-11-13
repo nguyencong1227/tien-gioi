@@ -18,7 +18,7 @@ export const DECOR_VARIANTS = 2;
 export const DECOR_FRAMES = DECOR_KINDS.length * DECOR_VARIANTS;
 
 /** Thời tiết bằng hạt (chỉ khi hồ sơ chất lượng `weather != "off"`). */
-export type WeatherKind = "none" | "petals" | "ash" | "spirit";
+export type WeatherKind = "none" | "petals" | "ash" | "spirit" | "wisp";
 
 export interface MapStyle {
   /** Nhãn cho log / doc. */
@@ -129,6 +129,27 @@ export const MAP_STYLES: Readonly<Record<string, MapStyle>> = {
         pebble: [0x8fb4b8, 0x6f9498],
         mushroom: [0x7fe3c6, 0x62c4e8], // nấm phát sáng
         bush: [0x3d8f7a, 0x2f7565],
+      },
+    },
+  },
+  // Âm Sương Trạch (M6, #408): đầm lầy sương, lục xám ẩm, sương DÀY nhất ba bản đồ, ma trơi vàng lục lơ lửng.
+  // Khác Lạc Hà (ấm, hoa đào), Hắc Phong (tối xám xanh, tro) và bí cảnh (lam ngọc, linh khí): bù lại bằng sương dày (không
+  // vượt trần 0.4), nước đục (alpha cao, cuộn chậm) và nấm / sen đầm thay cho hoa cỏ.
+  am_suong: {
+    label: "Âm Sương Trạch (đầm lầy sương)",
+    ambient: { color: 0x7c9a76, alpha: 0.2 },
+    vignette: { color: 0x0a150e, strength: 0.52 },
+    fog: { color: 0xb4c9b6, alpha: 0.34, speed: 9 },
+    weather: { kind: "wisp", rate: 8 },
+    water: { shimmer: 0xa9c58f, alpha: 0.36, speed: 6 },
+    decor: {
+      density: { tuft: 0.05, flower: 0.01, pebble: 0.02, mushroom: 0.06, bush: 0.045 },
+      palette: {
+        tuft: [0x4d6b3c, 0x3f5a32], // cói đầm lục sẫm
+        flower: [0xe6d6f0, 0xb4e0c6], // sen đầm tím nhạt + bạc hà
+        pebble: [0x6f7a72, 0x56615a], // đá phủ rêu
+        mushroom: [0xc9d36a, 0x8fa84a], // nấm vàng lục ẩm
+        bush: [0x35502f, 0x2a4126], // bụi lau sậy sẫm
       },
     },
   },

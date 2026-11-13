@@ -3227,7 +3227,7 @@ export const ui = {
     currentDialog = m;
     const npc = NPC_BY_ID[m.npcId];
     $("dlg-npc-name").textContent = npc?.name ?? "Kỳ nhân";
-    $("dlg-npc-title").textContent = npc?.title ?? "Lạc Hà Trấn";
+    $("dlg-npc-title").textContent = npc?.title ?? "";
 
     $("dialog-modal").hidden = false;
     $("dlg-options").replaceChildren();
@@ -3622,7 +3622,7 @@ export const ui = {
     const box = $("death");
     box.hidden = secondsLeft === null;
     if (secondsLeft !== null) {
-      $("death-t").textContent = text ?? `Hồi sinh tại Lạc Hà Trấn sau ${secondsLeft}s`;
+      $("death-t").textContent = text ?? `Hồi sinh sau ${secondsLeft}s`;
       const sub = $("death-sub") as HTMLElement | null;
       if (sub) {
         sub.hidden = !subText;
