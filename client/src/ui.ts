@@ -3911,7 +3911,7 @@ export const ui = {
     const isWon = msg.result === "won";
     const sealEl = $("dend-seal");
     if (sealEl) {
-      sealEl.textContent = isWon ? "勝" : "敗";
+      sealEl.textContent = isWon ? "Thắng" : "Bại";
       sealEl.className = `dend-seal ${isWon ? "won" : "lost"}`;
     }
 
