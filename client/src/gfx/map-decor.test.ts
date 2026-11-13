@@ -35,16 +35,10 @@ describe("map-style (dữ liệu kiểu theo bản đồ)", () => {
     }
   });
 
-  it("kiểu KHÔNG mồ côi: mọi kiểu trong MAP_STYLES là của một bản đồ có thật (trừ danh sách chờ hợp đồng)", () => {
-    // `am_suong` (M6 #408) vào TRƯỚC bản đồ của nó (#404, `shared/`): ghi ở đây để không đỏ trong lúc chờ. Danh sách chờ TỰ DỌN:
-    // khi #404 vào `main`, `getMap("am_suong")` có thật nên phép kiểm thứ hai đỏ, nhắc xoá mục này.
-    const CHO_HOP_DONG = ["am_suong"];
-    for (const id of Object.keys(MAP_STYLES)) {
-      if (CHO_HOP_DONG.includes(id)) continue;
+  it("kiểu KHÔNG mồ côi: mọi kiểu trong MAP_STYLES là của một bản đồ có thật", () => {
+    // `am_suong` (M6 #408) từng chờ ở đây trước bản đồ của nó; #404 (shared) đã đưa bản đồ vào nên danh sách chờ đã được dọn
+    for (const id of Object.keys(MAP_STYLES))
       expect(getMap(id), `kiểu "${id}" không có bản đồ`).toBeDefined();
-    }
-    for (const id of CHO_HOP_DONG)
-      expect(getMap(id), `"${id}" đã có bản đồ: xoá khỏi CHO_HOP_DONG`).toBeUndefined();
   });
 
   it("Âm Sương Trạch: sương dày nhất, thời tiết ma trơi riêng, màu môi trường lục khác ba bản đồ kia", () => {
