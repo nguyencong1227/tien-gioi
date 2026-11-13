@@ -9,7 +9,9 @@
  *   - đòn của người khác (ưu tiên 1) kèm chữ;
  *   - mình bị đánh (`hurt-self`, ưu tiên 2) kèm chữ đỏ;
  *   - công pháp lớn: kiếm khí (`sword-qi` rải dọc đường bay + `sword-tip` ở mũi) và `slash-edge`;
- *   - quái gục (`mon-vanish`).
+ *   - quái gục (`mon-vanish`);
+ *   - kế hoạch `boss` (M6 #409, nit của A ở #450): đòn thường lên TRÙM là `boss-hit` (thay `hit-spark`) và trùm gục nổ `boss-vanish` (ưu tiên 2
+ *     như `planMonsterDeath`), đo bằng số thật chứ không chỉ bằng test `FxBudget`.
  * Vị trí quanh TÂM KHUNG NHÌN của camera (không phụ thuộc chế độ mock không đối chiếu vị trí). Dùng bộ sinh số giả ngẫu nhiên có hạt giống cố định
  * nên mỗi lần chạy cùng một chuỗi hiệu ứng.
  *
@@ -36,15 +38,20 @@ export const FX_DRIVER_RECIPES = [
   "sword-tip",
   "slash-edge",
   "mon-vanish",
+  "boss-hit",
+  "boss-vanish",
 ];
 
 /**
  * Kế hoạch (ms giữa hai lần): `hitMs` đòn của mình, `otherMs` đòn của người khác, `hurtMs` mình bị đánh, `skillMs` công pháp lớn,
- * `killMs` quái gục. `combat` = nhịp người chơi thường; `burst` = "nhiều chiêu liên tục" (đòn dồn dập + công pháp liên tiếp).
+ * `killMs` quái gục. `combat` = nhịp người chơi thường; `burst` = "nhiều chiêu liên tục" (đòn dồn dập + công pháp liên tiếp);
+ * `boss` = nhịp `burst` nhưng đánh TRÙM (`boss: true`: đòn thường -> `boss-hit`, gục -> `boss-vanish`): ca xấu nhất của hai công thức trùm
+ * (cả đội dồn đòn, trùm "gục" mỗi 1,2 s: thực tế chỉ một lần mỗi trận).
  */
 export const FX_PLANS = {
   combat: { hitMs: 200, otherMs: 350, hurtMs: 1200, skillMs: 1500, killMs: 3000 },
   burst: { hitMs: 100, otherMs: 160, hurtMs: 500, skillMs: 600, killMs: 1200 },
+  boss: { hitMs: 100, otherMs: 160, hurtMs: 500, skillMs: 600, killMs: 1200, boss: true },
 };
 
 export const FX_DRIVER_SOURCE = `(() => {
@@ -111,15 +118,15 @@ export const FX_DRIVER_SOURCE = `(() => {
         if (now >= r.next.hit) {
           r.next.hit = now + plan.hitMs;
           const p = near(70); const roll = rand();
-          const id = roll < 0.06 ? "hit-heavy" : roll < 0.18 ? "hit-crit" : "hit-spark";
+          const id = roll < 0.06 ? "hit-heavy" : roll < 0.18 ? "hit-crit" : plan.boss ? "boss-hit" : "hit-spark";
           play(id, p.x, p.y, { priority: 2 });
-          const crit = id !== "hit-spark";
+          const crit = id === "hit-heavy" || id === "hit-crit";
           num((crit ? "Bạo! " : "") + Math.round(20 + rand() * 180), p.x, p.y - 8, crit ? COLOR.crit : COLOR.hit, crit ? 20 : 15, 2);
         }
         if (now >= r.next.other) {
           r.next.other = now + plan.otherMs;
           const p = near(130);
-          play("hit-spark", p.x, p.y, { priority: 1 });
+          play(plan.boss ? "boss-hit" : "hit-spark", p.x, p.y, { priority: 1 });
           num(String(Math.round(10 + rand() * 90)), p.x, p.y - 8, COLOR.hit, 15, 1);
         }
         if (now >= r.next.hurt) {
@@ -144,7 +151,8 @@ export const FX_DRIVER_SOURCE = `(() => {
         if (now >= r.next.kill) {
           r.next.kill = now + plan.killMs;
           const p = near(110);
-          play("mon-vanish", p.x, p.y);
+          if (plan.boss) play("boss-vanish", p.x, p.y, { priority: 2 });
+          else play("mon-vanish", p.x, p.y);
         }
       };
       tick();

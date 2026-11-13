@@ -227,6 +227,24 @@ export const ALL_SCENARIOS = [
     tier: "high",
     cpuRate: 4,
   },
+  // Đánh TRÙM (M6 #409, nit của A ở #450): đòn thường -> boss-hit, trùm gục -> boss-vanish (ưu tiên 2) theo nhịp dồn dập; bậc Thấp (trần chặt
+  // nhất) và Cao. Trước đây hai công thức trùm chỉ được giữ bằng test FxBudget + trần mỗi công thức, chưa bằng số đo của perf-gate.
+  {
+    id: "boss-low-4x",
+    name: "Đánh trùm (đòn dồn dập + trùm gục)",
+    query: "duel=mock&debug=1&perf=1",
+    tier: "low",
+    cpuRate: 4,
+    fx: "boss",
+  },
+  {
+    id: "boss-high-4x",
+    name: "Đánh trùm (đòn dồn dập + trùm gục)",
+    query: "duel=mock&debug=1&perf=1",
+    tier: "high",
+    cpuRate: 4,
+    fx: "boss",
+  },
   // Chế độ bí cảnh (dungeon)
   {
     id: "dungeon-mid-4x",
