@@ -17,6 +17,7 @@ import { renderKimDanSau, withKimDan } from "./kim-dan-sau";
 import { renderKimDanKinhTe } from "./kim-dan-kinh-te";
 import { renderKimDanPkBiCanh } from "./kim-dan-pk";
 import { renderHuntCheck } from "./hunt-check";
+import { renderSearchCheck } from "./search-check";
 import { PK_TARGET_SECONDS, representativeLevels, summarizeDuels } from "./pk";
 import {
   ASSUME_DUNGEON,
@@ -454,7 +455,8 @@ ${kimDanTruocSection}
 ${renderKimDanSau()}
 ${renderKimDanKinhTe()}
 ${renderKimDanPkBiCanh()}
-${renderHuntCheck()}`,
+${renderHuntCheck()}
+${renderSearchCheck()}`,
   );
   console.log(`Đã ghi ${out}\n\n${summary}`);
 }

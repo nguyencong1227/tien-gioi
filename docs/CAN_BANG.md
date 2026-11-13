@@ -521,7 +521,7 @@ Cùng bậc nhưng KHÁC bộ: bên mặc bộ cao hơn thắng 100% số trận
 
 ### 9. Đối chiếu mô hình với mã server thật (#406 mục 7)
 
-Độc lập với số đo bằng bot của C (#410): dựng `World` thật (`hunt-check.ts`), người chơi mặc trang bị tốt nhất đứng cạnh quái, đánh thường mỗi lần hồi chiêu, quái dùng AI thật; **không né, không di chuyển** (ca khó, như mục "PK" và "Bí cảnh"). Không kiểm thời gian tìm quái, mật độ quái và người chơi thật (cần bot).
+Độc lập với số đo bằng bot của C (#410): dựng `World` thật (`hunt-check.ts`), người chơi mặc trang bị tốt nhất đứng cạnh quái, đánh thường mỗi lần hồi chiêu, quái dùng AI thật; **không né, không di chuyển** (ca khó, như mục "PK" và "Bí cảnh"). Thời gian tìm quái đo riêng ở mục 10 (`search-check.ts`); không kiểm người chơi thật (cần bot).
 
 **Săn quái thường (solo, 12 trận mỗi dòng).** Thời gian trận theo mô hình = máu / (công x hệ số chém x bạo kích trung bình / hồi chiêu); khí huyết mất theo mô hình đã nhân tỉ lệ trúng 0.8 (giả định người chơi né ~20%), nên cột cuối so mã thật (không né) với mô hình chia 0.8.
 
@@ -591,3 +591,40 @@ Thời gian hạ quái khớp mô hình trong **0.92x - 1.02x** (mục tiêu l�
 | x2.5 (375) | 0% (1.0 chết) | 75%, 2.0 chết | 100%, 1.0 chết | 0% (4.0 chết) |
 
 **Nhận định.** Mục tiêu M6 "đội 3-4 người hạ được, không ai chết; một người không hạ nổi" (`PHAN_CONG_M6.md` mục 4): đội 3-4 hạ được và không ai chết khi có đan (đạt); "một người không hạ nổi" **không đạt**: một người hạ được ở mọi bậc nếu đủ đan (Hậu kỳ solo 44 đan ~ 5,320 Linh thạch cho 19 Giao Lân). Đội KHÔNG nhanh hơn theo người (9.9 phút solo so với 9.8 phút đội 4 ở Hậu kỳ); lợi thế của đội là **ít đan hơn ~7.0 lần** (6 so với 44 viên mỗi người), tức 4,560 Linh thạch chênh mỗi bộ III. Tăng công trùm KHÔNG giải được: hệ số đủ chặn solo Hậu kỳ thì đội 4 Sơ kỳ đã có người chết (bảng trên). Chốt cho người dùng (`questions.md` câu 3): giữ nguyên (đội là cách RẺ đan, không phải cách duy nhất), hoặc giảm hiệu lực / kéo dài hồi chiêu Đại Hồi Huyết Đan (đụng cả bí cảnh và PK), hoặc công trùm theo cỡ đội (cần mã mới).
+
+### 10. Thời gian tìm quái (#406 mục 7)
+
+Phần mục 9 không kiểm. `ASSUME.searchSec` (giây từ lúc hạ con này tới lúc chạm con kế tiếp) quyết định tu vi / giờ của MỌI bãi, nhưng trước đây chỉ là con số đoán. Đây là số đo bằng mã server thật (`search-check.ts`): dựng `World` của từng bản đồ (quái sinh bằng `spawnInitial`, hồi sinh bằng `topUpMonsters` mỗi 10 giây, AI quái thật gồm phát hiện + đuổi), một thợ săn bất tử săn đúng một loài: tới con GẦN NHẤT THEO ĐƯỜNG ĐI (Dijkstra trên lưới ô, tránh tường và nước), tới tầm thì đánh `slash` thật. Thời gian tìm = các giây không có con nào trong tầm đánh, tính từ lúc hạ con trước (bỏ 2 lần hạ đầu: đi từ trấn ra bãi). 3 cách rải quái (hạt giống) x 12 lần hạ (trùm: 6).
+
+Ba mức hiểu biết của thợ săn (đo càng thật thì càng chậm): **biết hết bản đồ** (cận dưới tuyệt đối: vị trí mọi con luôn hiện ra), **tầm nhìn 640 px** (nửa chiều rộng màn hình máy tính 1280 px), **tầm nhìn 320 px** (nửa chiều rộng điện thoại ngang). Hai mức sau chỉ thấy con trong bán kính đó; không thấy con nào thì đi tới một điểm ngẫu nhiên cách 320-640 px trở lên để khám phá (cách khám phá ngây thơ hơn người thật, người thật nhớ chỗ quái hay đứng). Mỗi ô: trung bình giây (trung vị).
+
+| Bản đồ | Loài | Số con | Giả định (s) | Biết hết bản đồ | Tầm nhìn 640 px | Tầm nhìn 320 px |
+|---|---|---:|---:|---:|---:|---:|
+| Lạc Hà Trấn | Linh Thố | 40 | 6 | 0.9 (0.5) | 0.9 (0.5) | 2.5 (0.4) |
+| Lạc Hà Trấn | Hôi Lang | 30 | 8 | 2.5 (2.0) | 3.1 (2.2) | 8.8 (2.3) |
+| Lạc Hà Trấn | Hắc Hổ | 16 | 12 | 2.7 (1.6) | 4.1 (1.8) | 16.0 (2.8) |
+| Lạc Hà Trấn | Xích Mãng | 2 | 90 | 9.5 (9.5) | 30.5 (20.0) | 90.4 (66.0) |
+| Hắc Phong Cốc | Hôi Lang | 20 | 8 | 2.9 (2.7) | 4.7 (2.5) | 17.6 (9.4) |
+| Hắc Phong Cốc | Hắc Hổ | 36 | 12 | 1.6 (1.1) | 1.7 (1.5) | 5.2 (1.2) |
+| Hắc Phong Cốc | Xích Mãng | 6 | 90 | 3.7 (2.9) | 13.5 (6.3) | 33.9 (24.0) |
+| Âm Sương Trạch | Sương Hồ | 24 | 10 | 3.0 (2.7) | 4.2 (2.3) | 14.8 (4.6) |
+| Âm Sương Trạch | Thạch Quy | 18 | 12 | 3.6 (2.3) | 6.6 (2.2) | 14.1 (3.5) |
+| Âm Sương Trạch | Độc Thiềm | 18 | 14 | 3.0 (2.0) | 7.0 (2.1) | 16.8 (6.4) |
+| Âm Sương Trạch | Hắc Giao | 2 | 90 | 9.1 (6.9) | 77.9 (38.5) | 305.5 (235.3) |
+
+- **Mô hình KHÔNG lạc quan:** thợ săn biết hết bản đồ (cận dưới) đo tối đa **0.36x** giả định (ngưỡng #406: mô hình lạc quan nếu > 1.25x). `search-check.test.ts` giữ điều này: ai hạ `ASSUME.searchSec` xuống dưới cận dưới thì test đỏ.
+- **Loài thường: giả định nằm giữa hai mức nhìn.** Đo / giả định 0.14x - 0.59x ở tầm nhìn 640 px và 0.41x - 2.21x ở 320 px (điện thoại, khám phá ngẫu nhiên: thô hơn người thật). Không sửa số nào.
+- **Xích Mãng (giả định 90 giây) và Hắc Giao (90 giây) là chỗ nhạy:** Xích Mãng đo 14 - 30 giây ở 640 px và 34 - 90 giây ở 320 px (quái thưa: 2 con ở Lạc Hà Trấn, 6 con ở Hắc Phong Cốc); Hắc Giao (2 con) 78 giây ở 640 px.
+
+**Nhịp tu luyện nhạy với giả định này.** Cùng `simulate(3)` như mục "Kim Đan sau nội dung" (một người, quái an toàn nhanh nhất mỗi bậc; "tối ưu" kể cả Xích Mãng, "bãi mới" không đụng Xích Mãng), thay `ASSUME.searchSec` bằng số đo từng mức nhìn (loài ở nhiều bản đồ: lấy bản đồ chậm hơn). Phút cộng dồn tới hết Luyện Khí và Trúc Cơ, rồi phút RIÊNG cảnh giới Kim Đan (mục tiêu: 5-7 giờ):
+
+| Giả định tìm quái | Hết Luyện Khí (cộng dồn) | Hết Trúc Cơ (cộng dồn) | Riêng Kim Đan (tối ưu) | Riêng Kim Đan (bãi mới) | Nguồn nhanh nhất ở Kim Đan (tối ưu) | Xích Mãng / bãi mới tốt nhất (Sơ / Trung / Hậu) |
+|---|---:|---:|---:|---:|---|---:|
+| Mô hình (giả định hiện tại) | 53 | 172 | 314 (5.2 giờ) | 340 (5.7 giờ) | Xích Mãng, Độc Thiềm | 1.42 / 1.09 / 1.00 |
+| Biết hết bản đồ (cận dưới) | 29 | 76 | 74 (1.2 giờ) | 207 (3.5 giờ) | Xích Mãng | 3.83 / 2.88 / 2.69 |
+| Tầm nhìn 640 px | 30 | 88 | 140 (2.3 giờ) | 250 (4.2 giờ) | Xích Mãng | 2.38 / 1.89 / 1.74 |
+| Tầm nhìn 320 px | 50 | 199 | 328 (5.5 giờ) | 372 (6.2 giờ) | Xích Mãng | 1.51 / 1.20 / 1.12 |
+
+Tiêu chí #406 mục 1 ("không nguồn nào vượt ~1,5x bãi mới tốt nhất cùng bậc", cột cuối): mô hình ĐẠT (tối đa 1.42x); tầm nhìn 640 px KHÔNG ĐẠT (tối đa 2.38x); tầm nhìn 320 px KHÔNG ĐẠT (tối đa 1.51x); biết hết bản đồ KHÔNG ĐẠT (tối đa 3.83x).
+
+Đọc bảng: nhịp Kim Đan là hàm của giả định tìm quái. Mô hình ra 5.2 giờ (tối ưu) / 5.7 giờ (bãi mới); thợ săn nhìn rộng ra 2.3 / 4.2 giờ, nhìn hẹp ra 5.5 / 6.2 giờ, biết hết bản đồ 1.2 / 3.5 giờ. Phần lớn chênh lệch tới từ Xích Mãng (nguồn nhanh nhất của cả ba bậc ở kịch bản tối ưu: Xích Mãng, Độc Thiềm): giả định 90 giây cho nó là một con số đoán và là cái quyết định nhịp "tối ưu". **Không sửa `ASSUME.searchSec`**: số đo là thợ săn thuật toán, không phải người; con số quyết định là thời gian giữa hai lần hạ Xích Mãng của người chơi / bot thật (#410: bot chỉ nên biết quái trong tầm nhìn như hai cột tầm nhìn ở đây, không đọc `state.monsters` của cả bản đồ). Xích Mãng đo nhanh hơn giả định ở tầm nhìn máy tính nên người chơi máy tính có thể qua Kim Đan nhanh hơn mục tiêu (2.3 giờ so với 5-7) bằng đường Xích Mãng; `kim-dan.ts` đã có ca "tìm nhanh" 30 giây cho đường tắt đan.
