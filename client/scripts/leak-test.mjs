@@ -23,6 +23,7 @@ import process from "node:process";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
+import { freePort } from "./free-port.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const __filename = fileURLToPath(import.meta.url);
@@ -156,10 +157,10 @@ async function runLeakTest() {
     }
   });
 
-  const HTTP_PORT = 39870 + Math.floor(Math.random() * 80);
+  const HTTP_PORT = await freePort();
   await new Promise((resolve) => server.listen(HTTP_PORT, "127.0.0.1", resolve));
 
-  const CDP_PORT = 39970 + Math.floor(Math.random() * 80);
+  const CDP_PORT = await freePort();
   const tmpChromeDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-leak-test-"));
 
   const chromeProcess = spawn("google-chrome", [

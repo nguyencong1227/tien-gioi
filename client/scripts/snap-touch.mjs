@@ -11,6 +11,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
+import { freePort } from "./free-port.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -31,7 +32,7 @@ const VIEWPORTS = [
   // Điện thoại dọc THẤP nhất được hỗ trợ (mục 4.1): nút cổng (ô thứ ba của cột nút ngữ cảnh) từng nằm dưới thanh Nhiệm vụ của cột HUD trái
   { name: "360x640", w: 360, h: 640 },
 ];
-const CDP_PORT = 39300 + Math.floor(Math.random() * 400);
+const CDP_PORT = await freePort();
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-snap-touch-"));
 const chrome = spawn(
   "google-chrome",

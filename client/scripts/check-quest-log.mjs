@@ -17,6 +17,7 @@ import process from "node:process";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
+import { freePort } from "./free-port.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const __filename = fileURLToPath(import.meta.url);
@@ -94,9 +95,9 @@ async function main() {
       res.end();
     }
   });
-  const HTTP_PORT = 39800 + Math.floor(Math.random() * 90);
+  const HTTP_PORT = await freePort();
   await new Promise((r) => server.listen(HTTP_PORT, "127.0.0.1", r));
-  const CDP_PORT = 39700 + Math.floor(Math.random() * 90);
+  const CDP_PORT = await freePort();
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-quest-log-"));
   const chrome = spawn(
     "google-chrome",
