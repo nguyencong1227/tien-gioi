@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
-import { MONSTERS } from "@tien-gioi/shared";
+import { ITEMS, MONSTERS, NPCS } from "@tien-gioi/shared";
 import { MON_ONE_SHOT } from "./gfx/anim/mon-anim";
 
 // Atlas do `client/scripts/gen-assets.mjs` sinh (tất định, không tệp ngoài). Test này giữ hợp đồng giữa script sinh,
@@ -45,12 +45,13 @@ describe("atlas.json / atlas.png (sinh bằng gen-assets.mjs)", () => {
     }
   });
 
-  it("4 yêu thú có tranh trong atlas: đủ khung đi, đánh, bị đánh, gục cùng kích thước với khung đi", () => {
-    // Quái chưa có tranh trong atlas (vd boss bí cảnh) dùng ảnh dự phòng vẽ bằng mã trong textures.ts và rơi về hiệu ứng mờ dần cũ
-    const inAtlas = MONSTERS.filter((m) => atlas.frames[`mon-${m.id}-0`]);
-    expect(inAtlas.map((m) => m.id)).toEqual(expect.arrayContaining(["tho", "lang", "ho", "mang"]));
-    for (const m of inAtlas) {
+  it("MỌI yêu thú có tranh trong atlas (kể cả quái Kim Đan và trùm bí cảnh): đủ khung đi, đánh, bị đánh, gục cùng kích thước khung đi", () => {
+    // M6 #407: không còn quái nào rơi về ảnh dự phòng vẽ bằng mã (textures.ts) vì thiếu khung trong atlas
+    expect(MONSTERS.length).toBeGreaterThanOrEqual(9);
+    for (const m of MONSTERS) {
       const base = atlas.frames[`mon-${m.id}-0`];
+      expect(base, `mon-${m.id}-0`).toBeDefined();
+      expect(atlas.frames[`mon-${m.id}`], `mon-${m.id}`).toBeDefined();
       expect(atlas.frames[`mon-${m.id}-1`], `mon-${m.id}-1`).toBeDefined();
       for (const shot of Object.values(MON_ONE_SHOT)) {
         for (const n of shot.frames) {
@@ -61,6 +62,26 @@ describe("atlas.json / atlas.png (sinh bằng gen-assets.mjs)", () => {
         }
       }
     }
+  });
+
+  it("MỌI NPC và MỌI vật phẩm có tranh: khung npc-<id>, item-<id> trong atlas và tệp items/<id>.png", () => {
+    for (const n of NPCS) expect(atlas.frames[`npc-${n.id}`], `npc-${n.id}`).toBeDefined();
+    for (const it of ITEMS) {
+      expect(atlas.frames[`item-${it.id}`], `item-${it.id}`).toBeDefined();
+      expect(
+        fs.existsSync(new URL(`../public/assets/items/${it.id}.png`, import.meta.url)),
+        `items/${it.id}.png`,
+      ).toBe(true);
+    }
+  });
+
+  it("bốn loài Kim Đan và trùm bí cảnh khác nhau về kích thước / hình: trùm lớn hơn quái thường (đọc được ở màn hình nhỏ)", () => {
+    const area = (id: string) =>
+      atlas.frames[`mon-${id}-0`].frame.w * atlas.frames[`mon-${id}-0`].frame.h;
+    for (const boss of ["mang", "hac_giao", "yeu_vuong"])
+      for (const small of ["tho", "lang", "ho", "suong_ho", "thach_quy", "doc_thiem"])
+        expect(area(boss), `${boss} lớn hơn ${small}`).toBeGreaterThan(area(small));
+    expect(area("hac_giao")).toBeGreaterThan(area("mang"));
   });
 
   it("5 bộ người chơi (me, other, 3 pháp bào) đủ khung bị đánh 4 hướng và gục 4 khung cùng kích thước khung đứng", () => {
