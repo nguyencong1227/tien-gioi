@@ -1723,7 +1723,7 @@ export class WorldScene extends Phaser.Scene {
     this.closestNpcId = bestNpc ? bestNpc.id : null;
     if (bestNpc) {
       const npcDef = NPC_BY_ID[bestNpc.id];
-      ui.talkPrompt(npcDef ? `Nói chuyện · ${npcDef.name} (F)` : "Nói chuyện (F)");
+      ui.talkPrompt(npcDef?.name ?? "");
     } else {
       ui.talkPrompt(null);
       if (ui.isForgeModalOpen()) ui.toggleForgeModal(false);
@@ -2674,7 +2674,7 @@ export class WorldScene extends Phaser.Scene {
         if (d <= bestDist) {
           bestDist = d;
           bestId = id;
-          bestLabel = def ? `Nhặt ${def.name}` : "Nhặt (F)";
+          bestLabel = def?.name ?? "";
         }
       }
 

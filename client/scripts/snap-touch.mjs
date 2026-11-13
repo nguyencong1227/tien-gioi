@@ -251,16 +251,25 @@ try {
       covered.length === 0,
       `không nút ngữ cảnh nào bị che (${covered.length ? covered.join("; ") : "5 điểm mỗi nút đều trúng nút"})`,
     );
-    // Nhãn nút cổng không bị cắt (tên cổng thật dài nhất ~15 ký tự không được lọt vào nhãn; nó nằm ở title / aria-label)
-    await evalJs("window.__ui.portalPrompt('Vọng Trạch Quan', () => {});0");
-    const lab = await J(
-      `(() => { const s = document.getElementById('portal-label'); const b = document.getElementById('btn-portal'); return { t: s.textContent, cut: s.scrollWidth > s.clientWidth, title: b.title, aria: b.getAttribute('aria-label') }; })()`,
-    );
-    check(!lab.cut, `nhãn nút cổng "${lab.t}" không bị cắt`);
-    check(
-      lab.title.includes("Vọng Trạch Quan") && lab.aria.includes("Vọng Trạch Quan"),
-      `tên cổng nằm ở title / aria-label ("${lab.title}")`,
-    );
+    // Nhãn ba nút ngữ cảnh không bị cắt: tên dài (cổng, NPC, món đồ) không được lọt vào nhãn mà nằm ở title / aria-label. Cảnh ẩn / đặt lại nhãn
+    // nút Nói chuyện và Nhặt mỗi khung nên đặt rồi đo TRONG MỘT lần chạy đồng bộ.
+    const labels = await J(`(() => {
+      const cases = [
+        ["btn-portal", "portal-label", () => window.__ui.portalPrompt("Vọng Trạch Quan", () => {}), "Vọng Trạch Quan"],
+        ["btn-talk", "talk-label", () => window.__ui.talkPrompt("Tống Vân Hạc Trưởng Lão"), "Tống Vân Hạc Trưởng Lão"],
+        ["btn-pickup", "pickup-label", () => window.__ui.pickupPrompt("Đại Hồi Huyết Đan Thượng Phẩm"), "Đại Hồi Huyết Đan Thượng Phẩm"],
+      ];
+      return cases.map(([id, lid, set, name]) => {
+        set();
+        const b = document.getElementById(id);
+        const l = document.getElementById(lid);
+        return { id, t: l.textContent, cut: l.scrollWidth > l.clientWidth, named: b.title.includes(name) && b.getAttribute("aria-label").includes(name), title: b.title };
+      });
+    })()`);
+    for (const l of labels) {
+      check(!l.cut, `nhãn #${l.id} "${l.t}" không bị cắt`);
+      check(l.named, `tên nằm ở title / aria-label của #${l.id} ("${l.title}")`);
+    }
     if (!NO_SHOT) {
       const shot = await send("Page.captureScreenshot", { format: "png" });
       fs.writeFileSync(
