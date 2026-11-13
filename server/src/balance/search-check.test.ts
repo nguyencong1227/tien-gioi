@@ -7,14 +7,17 @@ import {
   SEARCH_KILLS_BOSS,
   SEARCH_OPTIMISM_LIMIT,
   SEARCH_SEEDS,
+  SEARCH_SEEDS_BOSS,
   SEARCH_VIEWS,
   gridOf,
   newGrid,
   planPath,
   searchCases,
+  searchCalibrated,
   searchCheck,
   searchRun,
   searchSensitivity,
+  viewOfScreen,
   type SearchRow,
 } from "./search-check";
 
@@ -98,6 +101,31 @@ describe("planPath: đường đi ngắn nhất trên lưới ô", () => {
   });
 });
 
+describe("vùng nhìn theo fitZoom của client (B, review #459)", () => {
+  it("ba cỡ màn hình chuẩn: máy tính 1280x720 nhìn 1138x640, điện thoại ngang 844x390 nhìn 1125x520, dọc 390x844 nhìn 508x1100", () => {
+    const size = (v: { hw: number; hh: number }) => [Math.round(v.hw * 2), Math.round(v.hh * 2)];
+    expect(size(SEARCH_VIEWS.pc)).toEqual([1138, 640]);
+    expect(size(SEARCH_VIEWS.phone)).toEqual([1125, 520]);
+    expect(size(SEARCH_VIEWS.phonePortrait)).toEqual([508, 1100]);
+    expect(SEARCH_VIEWS.all.hw).toBe(Infinity);
+  });
+
+  it("không bao giờ vượt vùng nhìn của server (1900 x 1100 px): màn hình rất lớn cũng bị kẹp", () => {
+    for (const [w, h] of [
+      [1280, 720],
+      [1920, 1080],
+      [3840, 2160],
+      [844, 390],
+      [390, 844],
+      [320, 568],
+    ]) {
+      const v = viewOfScreen(w, h);
+      expect(v.hw * 2, `${w}x${h}`).toBeLessThanOrEqual(1900 + 1e-6);
+      expect(v.hh * 2, `${w}x${h}`).toBeLessThanOrEqual(1100 + 1e-6);
+    }
+  });
+});
+
 describe("searchRun: thợ săn bất tử trong World thật", () => {
   it("cùng hạt giống cho đúng cùng kết quả; hạt giống khác cho kết quả khác", () => {
     const a = searchRun("am_suong", "suong_ho", 3, 0, 6, 1);
@@ -120,13 +148,23 @@ describe("searchRun: thợ săn bất tử trong World thật", () => {
     }
   });
 
+  it("không kẹt: trùm thưa ở Âm Sương (hạt giống từng làm thợ săn đứng ì tới giới hạn 3 giờ vì đích không tới được / dao động giữa hai con) hạ đủ 6 lần trong vài phút mô phỏng", () => {
+    for (const seed of [2, 3, 5, 10])
+      for (const view of [SEARCH_VIEWS.pc, SEARCH_VIEWS.phone]) {
+        const r = searchRun("am_suong", "hac_giao", 3, 0, 6, seed, view);
+        expect(r.searches, `seed ${seed}`).toHaveLength(6);
+        expect(r.simSeconds, `seed ${seed}`).toBeLessThan(1800);
+      }
+  });
+
   it("biết hết bản đồ không bao giờ chậm hơn nhìn hẹp ở loài thưa (cùng hạt giống)", () => {
     const mean = (x: number[]) => x.reduce((s, v) => s + v, 0) / x.length;
-    const all = mean(searchRun("lac_ha", "mang", 3, 0, 6, 1, SEARCH_VIEWS.all).searches);
-    const pc = mean(searchRun("lac_ha", "mang", 3, 0, 6, 1, SEARCH_VIEWS.pc).searches);
-    const phone = mean(searchRun("lac_ha", "mang", 3, 0, 6, 1, SEARCH_VIEWS.phone).searches);
-    expect(all).toBeLessThan(pc);
-    expect(pc).toBeLessThan(phone);
+    const of = (v: (typeof SEARCH_VIEWS)[keyof typeof SEARCH_VIEWS]) =>
+      mean(searchRun("lac_ha", "mang", 3, 0, 6, 1, v).searches);
+    const all = of(SEARCH_VIEWS.all);
+    expect(all).toBeLessThan(of(SEARCH_VIEWS.pc));
+    expect(all).toBeLessThan(of(SEARCH_VIEWS.phone));
+    expect(all).toBeLessThan(of(SEARCH_VIEWS.phonePortrait));
   });
 });
 
@@ -160,10 +198,26 @@ describe("bảng đối chiếu thời gian tìm quái", () => {
       expect(r.mean, `${r.mapId} ${r.monsterId}`).toBeGreaterThanOrEqual(0);
       expect(Number.isFinite(r.mean)).toBe(true);
       expect(r.n).toBe(
-        SEARCH_SEEDS * (MONSTER_BY_ID[r.monsterId].boss ? SEARCH_KILLS_BOSS : SEARCH_KILLS),
+        MONSTER_BY_ID[r.monsterId].boss
+          ? SEARCH_SEEDS_BOSS * SEARCH_KILLS_BOSS
+          : SEARCH_SEEDS * SEARCH_KILLS,
       );
       expect(r.assumed).toBe(ASSUME.searchSec[r.monsterId]);
     }
+  }, 60_000);
+
+  it("hiệu chỉnh: hệ số vụng > 1 (mô hình chừa chỗ cho người thật), chỉ trùm bị thay giả định, ASSUME.searchSec được KHÔI PHỤC", () => {
+    const before = { ...ASSUME.searchSec };
+    const pc = cases.map((c) => searchCheck(c, SEARCH_VIEWS.pc));
+    const cal = searchCalibrated(pc);
+    expect({ ...ASSUME.searchSec }).toEqual(before);
+    expect(cal.factor).toBeGreaterThan(1);
+    expect(Object.keys(cal.searchSec).sort()).toEqual(["hac_giao", "mang"]);
+    for (const id of ["mang", "hac_giao"]) {
+      const slowest = Math.max(...pc.filter((r) => r.monsterId === id).map((r) => r.mean));
+      expect(cal.searchSec[id]).toBeCloseTo(slowest * cal.factor, 9);
+    }
+    expect(cal.pace.mangRatio).toHaveLength(3);
   }, 60_000);
 
   it("độ nhạy: thay giả định bằng số đo rồi KHÔI PHỤC ASSUME.searchSec; số đo nhanh hơn thì nhịp nhanh hơn", () => {
