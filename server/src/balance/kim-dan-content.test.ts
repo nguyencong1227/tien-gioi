@@ -210,13 +210,15 @@ describe("luân hồi khi cày tới Kim Đan (#406 mục 4): mọi cách chơi 
 describe("đi theo đội ở Kim Đan (#406 mục 5): số đo, không đổi quy tắc chia tu vi", () => {
   const rows = kimDanPartyRows();
 
-  it("ba bậc x ba cỡ đội; không ô nào vượt 1,5x (mục tiêu #74), mọi số hữu hạn dương", () => {
+  it("ba bậc x ba cỡ đội; không ô nào vượt 1,5x (mục tiêu #74) hay dưới 0,65x (khoá hiện trạng), mọi số hữu hạn dương", () => {
     expect(rows).toHaveLength(3);
     for (const row of rows) {
       expect(row.cells.map((c) => c.n)).toEqual([2, 3, 4]);
       for (const c of row.cells) {
         expect(Number.isFinite(c.ratio) && c.ratio > 0, `${row.label} đội ${c.n}`).toBe(true);
         expect(c.ratio, `${row.label} đội ${c.n}`).toBeLessThanOrEqual(1.5);
+        // cận dưới: khoá hiện trạng (đội 3 ở Sơ kỳ 0,69x), đi đội không được xấu thêm mà test vẫn xanh (nit của B ở #437)
+        expect(c.ratio, `${row.label} đội ${c.n}`).toBeGreaterThanOrEqual(0.65);
       }
     }
   });
