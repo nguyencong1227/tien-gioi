@@ -234,8 +234,7 @@ describe("gfx/fx: glyph của phông bit-map", () => {
 
   it("ký tự thiếu được báo ra (emoji, chữ Hán), khoảng trắng thì không", () => {
     expect(missingGlyphs("12 34")).toEqual([]);
-    // Chữ Hán viết bằng mã thoát (no-cjk.test.ts cấm ký tự CJK nằm thẳng trong mã nguồn)
-    expect(missingGlyphs("A😀B\u843d")).toEqual(["😀", "\u843d"]);
+    expect(missingGlyphs("A😀B落")).toEqual(["😀", "落"]);
   });
 
   it("FX_CHARS không trùng ký tự và không quá lớn (bộ nhớ texture trong ngân sách)", () => {

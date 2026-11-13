@@ -67,7 +67,7 @@ Hai người cùng sở hữu **hợp đồng `shared/`**. Mỗi tính năng đi
 - [ ] **Thay ảnh tạm bằng asset thật:** tileset, người chơi (hoạt ảnh đi 4 hướng + đứng yên + chém), 4 loại quái, hiệu ứng chém/kiếm khí.
   - Giữ đúng key texture hiện tại để `WorldScene` không phải sửa nhiều.
   - Tối ưu: gộp ảnh thành atlas (TexturePacker bản free hoặc `free-tex-packer`).
-- [ ] **Bảng túi đồ** (phím `I`, nút Túi trên điện thoại):
+- [ ] **Bảng túi đồ** (phím `I`, nút 袋 trên điện thoại):
   - Lưới 6×4 ô, chạm/rê chuột vào ô thì hiện tên, mô tả, độ hiếm (màu viền theo `rarity`).
   - Nút **Dùng** / **Vứt**.
   - Điện thoại: bảng mở toàn màn hình, nút to tối thiểu 44 px.

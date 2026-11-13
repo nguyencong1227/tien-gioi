@@ -119,10 +119,8 @@ describe("tên và biệt hiệu", () => {
     expect(cleanSectName("a".repeat(SECT_NAME_MAX + 1))).toBeNull();
     expect(cleanSectName(" a ")).toBeNull(); // cắt xong còn 1 ký tự
     // chữ ngoài mặt phẳng cơ bản tính là MỘT ký tự (16 ký tự = 32 đơn vị UTF-16)
-    expect(cleanSectName("\u{20000}".repeat(SECT_NAME_MAX))).toBe(
-      "\u{20000}".repeat(SECT_NAME_MAX),
-    );
-    expect(cleanSectName("\u{20000}".repeat(SECT_NAME_MAX + 1))).toBeNull();
+    expect(cleanSectName("𠀀".repeat(SECT_NAME_MAX))).toBe("𠀀".repeat(SECT_NAME_MAX));
+    expect(cleanSectName("𠀀".repeat(SECT_NAME_MAX + 1))).toBeNull();
   });
 
   it("cleanSectName: từ chối ký tự lạ, ký tự điều khiển / vô hình / dấu rời, kiểu sai", () => {
@@ -182,9 +180,7 @@ describe("cleanMotd", () => {
   it("cắt còn SECT_MOTD_MAX ký tự Unicode (không chặt đôi cặp thay thế), không từ chối", () => {
     expect(cleanMotd("a".repeat(SECT_MOTD_MAX))).toBe("a".repeat(SECT_MOTD_MAX));
     expect(cleanMotd("a".repeat(SECT_MOTD_MAX + 50))).toBe("a".repeat(SECT_MOTD_MAX));
-    expect(cleanMotd("\u{20000}".repeat(SECT_MOTD_MAX + 5))).toBe(
-      "\u{20000}".repeat(SECT_MOTD_MAX),
-    );
+    expect(cleanMotd("𠀀".repeat(SECT_MOTD_MAX + 5))).toBe("𠀀".repeat(SECT_MOTD_MAX));
     // cắt xong không còn dấu cách thừa ở đuôi
     expect(cleanMotd("a".repeat(SECT_MOTD_MAX - 1) + " bbb")).toBe("a".repeat(SECT_MOTD_MAX - 1));
   });
