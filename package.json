@@ -32,6 +32,7 @@
     "soak": "npm run soak -w server --",
     "check:pwa": "node client/scripts/check-pwa.mjs",
     "check:credits": "node client/scripts/check-credits.mjs",
+    "check:cjk": "node client/scripts/check-cjk.mjs",
     "perf:mobile": "node client/scripts/measure-mobile-perf.mjs",
     "capture:viewports": "node client/scripts/capture-viewports.mjs",
     "chup-viewport": "node client/scripts/capture-viewports.mjs",

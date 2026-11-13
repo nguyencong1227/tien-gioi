@@ -33,6 +33,10 @@ jobs:
       - name: Kiểm tra định dạng
         run: npx prettier --check .
 
+      # Mọi chữ người chơi thấy phải là tiếng Việt: đỏ nếu còn chữ Hán / CJK (kể cả dạng thoát) trong tệp văn bản (QUYET_DINH_M3 mục 12)
+      - name: Kiểm tra không có chữ Hán / CJK
+        run: npm run check:cjk
+
       - name: Test
         run: npm run test --if-present
 

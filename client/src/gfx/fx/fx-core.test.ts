@@ -234,7 +234,8 @@ describe("gfx/fx: glyph của phông bit-map", () => {
 
   it("ký tự thiếu được báo ra (emoji, chữ Hán), khoảng trắng thì không", () => {
     expect(missingGlyphs("12 34")).toEqual([]);
-    expect(missingGlyphs("A😀B落")).toEqual(["😀", "落"]);
+    const han = String.fromCodePoint(0x843d); // chữ Hán dựng bằng điểm mã: mã nguồn không chứa chữ Hán (check:cjk)
+    expect(missingGlyphs(`A😀B${han}`)).toEqual(["😀", han]);
   });
 
   it("FX_CHARS không trùng ký tự và không quá lớn (bộ nhớ texture trong ngân sách)", () => {
