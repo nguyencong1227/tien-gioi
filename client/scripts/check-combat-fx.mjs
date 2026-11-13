@@ -388,6 +388,88 @@ try {
   );
   await settle();
 
+  // 7) Trùm và quái Kim Đan (M6 #409): đúng công thức + màu + ưu tiên đi qua đường THẬT (onHitFx đọc loại quái từ state; quái biến khỏi state
+  // thì tan). Bọc `fx.play` để ghi lại (id, màu, ưu tiên) và đo số hạt SỐNG THẬT của Phaser.
+  await evalJs(
+    `(() => { const f = window.__fx, o = f.play.bind(f); window.__plays = []; f.play = (id, x, y, op) => { window.__plays.push({ id, tint: op && op.tint, priority: op && op.priority }); return o(id, x, y, op); }; return 1; })()`,
+  );
+  const lastPlay = () => J(`window.__plays[window.__plays.length - 1] || null`);
+  const addMon = (id, kind, maxHp) =>
+    evalJs(
+      `(() => { const sc = window.__scene; sc.state.monsters.set(${JSON.stringify(id)}, { kind: ${JSON.stringify(kind)}, x: sc.predX + 30, y: sc.predY, hp: ${maxHp}, maxHp: ${maxHp}, angle: 0 }); return 1; })()`,
+    );
+  await addMon("t-boss", "hac_giao", 50000);
+  await sleep(400);
+  await settle();
+  await act(dmgJs({ target: "t-boss", amount: 12 }, true), "b1");
+  let lp = await lastPlay();
+  n = await alive();
+  check(
+    lp?.id === "boss-hit" && lp?.priority === 2,
+    `đòn thường lên trùm Hắc Giao: phát ${lp?.id} (ưu tiên ${lp?.priority})`,
+  );
+  check(n > 8 && n <= 12, `đòn thường lên trùm: ${n} hạt sống (boss-hit 12, nổi hơn hit-spark 8)`);
+  check(!(await shaking()), "đòn thường lên trùm không rung màn hình");
+  await settle();
+  await act(dmgJs({ target: "t-boss", amount: 12, crit: true }, true), "b2");
+  lp = await lastPlay();
+  check(
+    lp?.id === "hit-heavy" && (await shaking()),
+    "chí mạng lên trùm: vẫn hit-heavy và rung (đòn mạnh đọc ra ngay)",
+  );
+  await settle();
+
+  await addMon("t-doc", "doc_thiem", 2600);
+  await sleep(300);
+  await act(dmgJs({ target: "t-doc", amount: 12 }, true), "k1");
+  lp = await lastPlay();
+  check(
+    lp?.id === "hit-spark" && lp?.tint === 0xc4f24a,
+    `đòn thường lên Độc Thiềm: ${lp?.id}, màu hạt 0x${(lp?.tint ?? 0).toString(16)} (độc vàng lục 0xc4f24a)`,
+  );
+  await settle();
+  // khí huyết lớn để nhát 12 KHÔNG thành đòn nặng (>= 15 % khí huyết tối đa): cần đòn THƯỜNG để thấy hit-spark
+  await addMon("t-tho", "tho", 400);
+  await sleep(300);
+  await act(dmgJs({ target: "t-tho", amount: 12 }, true), "k2");
+  lp = await lastPlay();
+  check(
+    lp?.id === "hit-spark" && lp?.tint === undefined,
+    "đòn thường lên quái cũ (Linh Thố): hit-spark, KHÔNG đổi màu",
+  );
+  await settle();
+
+  // Gục: trùm nổ lớn (boss-vanish, ưu tiên 2, xanh nước sâu), quái Kim Đan tan đổi màu, quái cũ như trước
+  await act(`sc.state.monsters.delete("t-boss")`, "d1");
+  lp = await lastPlay();
+  n = await alive();
+  check(
+    lp?.id === "boss-vanish" && lp?.priority === 2 && lp?.tint === 0x8fd0ff,
+    `trùm gục: ${lp?.id} ưu tiên ${lp?.priority} màu 0x${(lp?.tint ?? 0).toString(16)} (0x8fd0ff)`,
+  );
+  check(n > 12 && n <= 20, `trùm gục: ${n} hạt sống (boss-vanish 20, nổi hơn mon-vanish 12)`);
+  await settle();
+  await addMon("t-suong", "suong_ho", 1600);
+  await sleep(300);
+  await act(`sc.state.monsters.delete("t-suong")`, "d2");
+  lp = await lastPlay();
+  n = await alive();
+  check(
+    lp?.id === "mon-vanish" && lp?.tint === 0xdff3ff && n > 0 && n <= 12,
+    `Sương Hồ gục: ${lp?.id} màu 0x${(lp?.tint ?? 0).toString(16)}, ${n} hạt (mon-vanish 12, trắng băng 0xdff3ff)`,
+  );
+  await settle();
+  await act(`sc.state.monsters.delete("t-tho")`, "d3");
+  lp = await lastPlay();
+  check(
+    lp?.id === "mon-vanish" && lp?.tint === undefined,
+    "Linh Thố gục: mon-vanish như trước, KHÔNG đổi màu",
+  );
+  await evalJs(
+    `(() => { const sc = window.__scene; for (const id of ["t-doc"]) sc.state.monsters.delete(id); return 1; })()`,
+  );
+  await settle();
+
   // Ảnh chụp (tuỳ chọn --shot <tệp.webp>): chí mạng + bị đòn nặng + hồi máu cùng lúc, phóng to quanh nhân vật
   const si = process.argv.indexOf("--shot");
   if (si >= 0 && process.argv[si + 1]) {
@@ -427,6 +509,55 @@ try {
     );
     fs.writeFileSync(process.argv[si + 1], Buffer.from(shot.result.data, "base64"));
     console.log(`    (đã chụp ${process.argv[si + 1]})`);
+    await settle();
+  }
+
+  // Ảnh trùm (tuỳ chọn --shot-boss <tệp.webp>, M6 #409): đòn thường lên trùm (boss-hit) + đòn lên Độc Thiềm (hạt vàng lục) + Sương Hồ gục
+  // (trắng băng) + trùm gục (boss-vanish) cùng một khung hình, phóng to quanh nhân vật
+  const bi = process.argv.indexOf("--shot-boss");
+  if (bi >= 0 && process.argv[bi + 1]) {
+    await settle();
+    await evalJs(`(() => {
+      const sc = window.__scene, X = sc.predX, Y = sc.predY;
+      sc.lastAttack = { at: sc.time.now, range: 400 };
+      const put = (id, kind, dx, dy, hp) => sc.state.monsters.set(id, { kind, x: X + dx, y: Y + dy, hp, maxHp: hp, angle: 0 });
+      put("s-boss-a", "hac_giao", -70, -10, 50000);
+      put("s-boss-b", "hac_giao", 70, -40, 50000);
+      put("s-doc", "doc_thiem", 0, 50, 2600);
+      put("s-suong", "suong_ho", 60, 40, 1600);
+      return 1;
+    })()`);
+    await sleep(500);
+    await evalJs(`(() => {
+      const sc = window.__scene, X = sc.predX, Y = sc.predY;
+      sc.onHitFx({ target: "s-boss-b", amount: 40, x: X + 70, y: Y - 40 });
+      sc.onHitFx({ target: "s-doc", amount: 30, x: X, y: Y + 50 });
+      sc.state.monsters.delete("s-boss-a");
+      sc.state.monsters.delete("s-suong");
+      return 1;
+    })()`);
+    await sleep(140);
+    const bp = await J(`(() => {
+      const sc = window.__scene, cam = sc.cameras.main, r = sc.game.canvas.getBoundingClientRect();
+      const sx = r.width / sc.scale.width, sy = r.height / sc.scale.height;
+      return { x: r.left + (sc.predX - cam.worldView.x) * cam.zoom * sx, y: r.top + (sc.predY - cam.worldView.y) * cam.zoom * sy };
+    })()`);
+    const bshot = await send("Page.captureScreenshot", {
+      format: "webp",
+      quality: 90,
+      clip: {
+        x: Math.max(0, bp.x - 150),
+        y: Math.max(0, bp.y - 110),
+        width: 300,
+        height: 220,
+        scale: 2.5,
+      },
+    });
+    fs.writeFileSync(process.argv[bi + 1], Buffer.from(bshot.result.data, "base64"));
+    console.log(`    (đã chụp ${process.argv[bi + 1]})`);
+    await evalJs(
+      `(() => { const sc = window.__scene; for (const id of ["s-boss-b", "s-doc"]) sc.state.monsters.delete(id); return 1; })()`,
+    );
     await settle();
   }
 

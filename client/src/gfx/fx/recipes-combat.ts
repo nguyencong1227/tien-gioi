@@ -15,6 +15,8 @@ export const FX_COLOR = {
   hurt: 0xff6b5e,
   heal: 0x7dffa0,
   vanish: 0xcfeaff,
+  /** Đòn trúng / gục của TRÙM (mặc định; từng trùm / quái Kim Đan có màu riêng ở `MONSTER_FX_TINT`, `combat-fx.ts`). */
+  boss: 0xa8dcff,
 } as const;
 
 export const COMBAT_RECIPES: readonly FxRecipe[] = [
@@ -86,6 +88,36 @@ export const COMBAT_RECIPES: readonly FxRecipe[] = [
       alpha: { start: 0.9, end: 0 },
       tint: FX_COLOR.heal,
       gravityY: -20,
+    },
+  },
+  // Trùm (M6 #409): đòn thường lên trùm nổi hơn quái thường (12 hạt + vòng, không rung: đòn nặng / chí mạng vẫn dùng hit-heavy / hit-crit),
+  // gục thì nổ lớn hơn mon-vanish (20 hạt, ưu tiên 2 vì là sự kiện quan trọng). CỐ Ý không rung / không chớp: trùm bị đánh liên tục bởi
+  // cả đội, rung mỗi nhát sẽ khó chịu; chi phí vẫn nằm trong trần mỗi công thức (<= 20 hạt, <= 1 s) như mọi công thức chiến đấu.
+  {
+    id: "boss-hit",
+    priority: 1,
+    particles: {
+      frames: ["spark", "ring", "ember"],
+      count: 12,
+      lifespan: { min: 240, max: 440 },
+      speed: { min: 80, max: 200 },
+      scale: { start: 0.8, end: 0 },
+      alpha: { start: 1, end: 0 },
+      tint: FX_COLOR.boss,
+    },
+  },
+  {
+    id: "boss-vanish",
+    priority: 2,
+    particles: {
+      frames: ["dot", "ember", "ring"],
+      count: 20,
+      lifespan: { min: 650, max: 1000 },
+      speed: { min: 20, max: 110 },
+      scale: { start: 0.7, end: 0 },
+      alpha: { start: 0.95, end: 0 },
+      tint: FX_COLOR.boss,
+      gravityY: -26,
     },
   },
   {

@@ -6,6 +6,7 @@
  * mình vừa ra đòn trong `MY_HIT_WINDOW_MS` và chỗ trúng nằm trong tầm đòn đó. Suy sai (người khác đánh cùng con quái, cùng
  * lúc) chỉ khiến hiệu ứng được ưu tiên 2 / rung nhẹ, không ảnh hưởng kết quả (server vẫn quyết định mọi thứ).
  */
+import { MONSTER_BY_ID } from "@tien-gioi/shared";
 import type { FxPriority } from "./budget";
 import { FX_COLOR } from "./recipes-combat";
 
@@ -29,6 +30,8 @@ export interface HitInput {
   targetMaxHp: number;
   /** Mình là người ra đòn (suy từ `isMyHit`). */
   mine: boolean;
+  /** Loại quái bị đánh (`MonsterDef.id`, từ state: KHÔNG tin, có thể lạ); không có khi mục tiêu là người chơi. */
+  kind?: string;
 }
 
 export interface HitPlan {
@@ -36,6 +39,33 @@ export interface HitPlan {
   /** Ưu tiên ngân sách của hạt (và của rung: chỉ ưu tiên 2 mới rung). */
   priority: FxPriority;
   heavy: boolean;
+  /** Ghi đè màu hạt (chỉ đòn thường lên quái có màu riêng); thiếu = màu của công thức. */
+  tint?: number;
+}
+
+/**
+ * Màu hạt riêng của quái Kim Đan và trùm (M6 #409): đòn thường và lúc gục. Quái cũ KHÔNG có mục ở đây (giữ nguyên màu chung).
+ * Đòn nặng / chí mạng luôn vàng (đọc ra ngay là đòn mạnh), không đổi theo loài.
+ */
+export const MONSTER_FX_TINT: Readonly<Record<string, number>> = {
+  suong_ho: 0xdff3ff, // trắng băng
+  thach_quy: 0xd5cba8, // bụi đá
+  doc_thiem: 0xc4f24a, // độc vàng lục (khác xanh mint của hồi máu 0x7dffa0)
+  hac_giao: 0x8fd0ff, // xanh nước sâu
+  yeu_vuong: 0xd6a8ff, // tím linh khí
+};
+
+/** Quái `kind` trong sổ game; id lạ / độc ("constructor", "__proto__") là `undefined` (state do server gửi, không tin). */
+function monsterDef(kind: string | undefined) {
+  return typeof kind === "string" && Object.prototype.hasOwnProperty.call(MONSTER_BY_ID, kind)
+    ? MONSTER_BY_ID[kind]
+    : undefined;
+}
+
+function tintOf(kind: string | undefined): number | undefined {
+  return typeof kind === "string" && Object.prototype.hasOwnProperty.call(MONSTER_FX_TINT, kind)
+    ? MONSTER_FX_TINT[kind]
+    : undefined;
 }
 
 export interface NumberPlan {
@@ -59,7 +89,29 @@ export function planHitFx(i: HitInput): HitPlan {
   // Mình đánh: ưu tiên 2 (không bị bỏ khi đông; đòn nặng được rung). Người khác: ưu tiên 1, KHÔNG rung màn hình của mình.
   const priority: FxPriority = i.mine ? 2 : 1;
   if (heavy) return { recipe: "hit-heavy", priority, heavy };
-  return { recipe: i.crit ? "hit-crit" : "hit-spark", priority, heavy };
+  if (i.crit) return { recipe: "hit-crit", priority, heavy };
+  // Đòn thường: trùm có công thức riêng (nổi hơn), quái Kim Đan đổi màu hạt; quái cũ y như trước
+  const tint = i.toPlayer ? undefined : tintOf(i.kind);
+  const recipe = !i.toPlayer && monsterDef(i.kind)?.boss ? "boss-hit" : "hit-spark";
+  return tint === undefined ? { recipe, priority, heavy } : { recipe, priority, heavy, tint };
+}
+
+export interface DeathPlan {
+  recipe: string;
+  /** Ưu tiên ghi đè (thiếu = ưu tiên mặc định của công thức). */
+  priority?: FxPriority;
+  tint?: number;
+}
+
+/** Hiệu ứng quái GỤC: trùm nổ lớn (`boss-vanish`, ưu tiên 2), quái còn lại tan như cũ, quái Kim Đan đổi màu. */
+export function planMonsterDeath(kind: string | undefined): DeathPlan {
+  const tint = tintOf(kind);
+  if (monsterDef(kind)?.boss) {
+    return tint === undefined
+      ? { recipe: "boss-vanish", priority: 2 }
+      : { recipe: "boss-vanish", priority: 2, tint };
+  }
+  return tint === undefined ? { recipe: "mon-vanish" } : { recipe: "mon-vanish", tint };
 }
 
 /** Chữ sát thương bay (màu / cỡ / ưu tiên). Giữ đúng kiểu cũ: mình bị đánh đỏ, chí mạng vàng lớn hơn. */
