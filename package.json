@@ -23,6 +23,7 @@
     "e2e:pk": "npm run e2e:pk -w server --",
     "e2e:phien-ban": "npm run e2e:phien-ban -w server --",
     "e2e:tro-nang": "npm run e2e:tro-nang -w server --",
+    "e2e:ban-phim": "npm run e2e:ban-phim -w server --",
     "e2e:noi-lai": "npm run e2e:noi-lai -w server --",
     "e2e:nhip-tim": "npm run e2e:nhip-tim -w server --",
     "tai-khoan": "npm run tai-khoan -w server --",
