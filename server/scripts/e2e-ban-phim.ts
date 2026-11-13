@@ -21,7 +21,15 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
-import { DEFAULT_MAP, DEFAULT_MAP_ID, NPC_BY_ID, roomNameOf } from "@tien-gioi/shared";
+import {
+  DEFAULT_MAP,
+  DEFAULT_MAP_ID,
+  DUEL_MSG,
+  DUNGEON_MSG,
+  NPC_BY_ID,
+  SECT_MSG,
+  roomNameOf,
+} from "@tien-gioi/shared";
 import { Tab, sleep, shown, listenWithRetry, removeTmpDirs } from "./e2e-kit";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -56,6 +64,9 @@ const K = {
   a: { key: "a", code: "KeyA", vk: 65, text: "a" },
   w: { key: "w", code: "KeyW", vk: 87, text: "w" },
   x: { key: "x", code: "KeyX", vk: 88, text: "x" },
+  y: { key: "y", code: "KeyY", vk: 89, text: "y" },
+  r: { key: "r", code: "KeyR", vk: 82, text: "r" },
+  v: { key: "v", code: "KeyV", vk: 86, text: "v" },
   f: { key: "f", code: "KeyF", vk: 70, text: "f" },
   d1: { key: "1", code: "Digit1", vk: 49, text: "1" },
   right: { key: "ArrowRight", code: "ArrowRight", vk: 39 },
@@ -735,23 +746,23 @@ async function main() {
       String(await ev(`document.activeElement && document.activeElement.dataset.action`)),
     );
     await press(t, K.enter);
-    await press(t, K.x);
+    await press(t, K.v);
     check(
-      "Bấm X: Kiếm khí đổi sang X (giữ 3 và K làm phím phụ)",
-      (await rowChips("skill.sword")) === "X,3,K" &&
-        String(await textOf("#keys-status")).includes("Kiếm khí: X"),
+      "Bấm V: Kiếm khí đổi sang V (giữ 3 và K làm phím phụ)",
+      (await rowChips("skill.sword")) === "V,3,K" &&
+        String(await textOf("#keys-status")).includes("Kiếm khí: V"),
       `${await rowChips("skill.sword")} | ${await textOf("#keys-status")}`,
     );
     check(
-      "Nhãn phím trên nút Kiếm khí đổi theo thành X; lưu vào localStorage",
-      (await cap("sk-sword")) === "X" &&
-        String(await ev(`localStorage.getItem('tg_keymap')`)).includes("KeyX"),
+      "Nhãn phím trên nút Kiếm khí đổi theo thành V; lưu vào localStorage",
+      (await cap("sk-sword")) === "V" &&
+        String(await ev(`localStorage.getItem('tg_keymap')`)).includes("KeyV"),
       `${await cap("sk-sword")} | ${await ev(`localStorage.getItem('tg_keymap')`)}`,
     );
     await t.shot("ban-phim-phim-tat-da-doi.png");
     check(
       "Chữ hướng dẫn tĩnh (bảng chỉ dẫn người mới, Cài đặt) đổi theo phím mới",
-      (await textOf('#newbie-guide-modal [data-key-action="skill.sword"]')) === "X",
+      (await textOf('#newbie-guide-modal [data-key-action="skill.sword"]')) === "V",
       String(await textOf('#newbie-guide-modal [data-key-action="skill.sword"]')),
     );
     // lấy phím DUY NHẤT của đan ô 1 (phím 1) cho Đả tọa: hai hành động đổi chỗ, không ai mất phím
@@ -775,12 +786,12 @@ async function main() {
     );
     await press(t, K.esc);
     check("Esc đóng Cài đặt", !(await ev(shown("settings-modal"))), "settings-modal vẫn mở");
-    // phím mới có tác dụng trong game: X phóng Kiếm khí (server trừ linh lực)
+    // phím mới có tác dụng trong game: V phóng Kiếm khí (server trừ linh lực)
     me.mp = me.maxMp;
     const mpX = me.mp;
-    await press(t, K.x);
+    await press(t, K.v);
     await sleep(300);
-    check("Phím X mới: phóng Kiếm khí (server trừ linh lực)", me.mp < mpX, `${mpX} -> ${me.mp}`);
+    check("Phím V mới: phóng Kiếm khí (server trừ linh lực)", me.mp < mpX, `${mpX} -> ${me.mp}`);
     // khôi phục mặc định
     await openKeys();
     await arrowTo(t, "#keys-reset", 40);
@@ -798,12 +809,201 @@ async function main() {
     await press(t, K.esc);
     me.mp = me.maxMp;
     const mpFull = me.mp;
-    await press(t, K.x);
+    await press(t, K.v);
     await sleep(300);
     check(
-      "Sau khi khôi phục: phím X không còn phóng Kiếm khí",
+      "Sau khi khôi phục: phím V không còn phóng Kiếm khí",
       me.mp === mpFull,
       `${mpFull} -> ${me.mp}`,
+    );
+
+    // ---- 12. Lời mời, xác nhận rời / đầu hàng, tấm kết quả: chỉ bằng phím (Y nhận, X từ chối, R rời) ----
+    // Chặn room.send để ghi lại tin gửi server (lời mời giả lập phía client, server không có lời mời thật nên bỏ qua tin).
+    await ev(
+      `(() => { const r = window.__scene.room; window.__sent = []; const o = r.send.bind(r); r.send = (t, m) => { window.__sent.push([t, m]); return o(t, m); }; return 1; })()`,
+    );
+    const sentList = async (): Promise<Array<[string, any]>> =>
+      (
+        JSON.parse(String(await ev(`JSON.stringify(window.__sent)`))) as Array<[string, any]>
+      ).filter(
+        ([ty]) => ty !== "ping", // nhịp tim tự gửi, không phải tin do phím
+      );
+    const clearSent = () => ev(`window.__sent.length = 0; 1`);
+    const vis = async (id: string) =>
+      !!(await ev(
+        `(() => { const e = document.getElementById('${id}'); return !!e && !e.closest('[hidden]'); })()`,
+      ));
+    const sentHas = async (type: string, payload: unknown) =>
+      (await sentList()).some(
+        ([ty, m]) => ty === type && JSON.stringify(m) === JSON.stringify(payload),
+      );
+    await press(t, K.esc); // bỏ focus / bảng còn sót
+
+    await ev(`window.__ui.onPartyInvited({ from: 'Dao Huu A', ttlMs: 30000 }); 1`);
+    check("Lời mời tổ đội hiện (nút Nhận có chip phím Y)", await vis("pib-btn-accept"), "hộp ẩn");
+    check(
+      "Chip phím trên nút Nhận / Từ chối là Y / X",
+      (await textOf("#pib-btn-accept .btn-key")) === "Y" &&
+        (await textOf("#pib-btn-decline .btn-key")) === "X",
+      `${await textOf("#pib-btn-accept .btn-key")} / ${await textOf("#pib-btn-decline .btn-key")}`,
+    );
+    await press(t, K.y);
+    check(
+      "Y: nhận lời mời tổ đội (gửi partyAccept, hộp ẩn)",
+      (await sentHas("partyAccept", { from: "Dao Huu A" })) && !(await vis("pib-btn-accept")),
+      JSON.stringify(await sentList()),
+    );
+    await clearSent();
+    await ev(`window.__ui.onPartyInvited({ from: 'Dao Huu B', ttlMs: 30000 }); 1`);
+    await press(t, K.x);
+    check(
+      "X: từ chối lời mời tổ đội (gửi partyDecline, hộp ẩn)",
+      (await sentHas("partyDecline", { from: "Dao Huu B" })) && !(await vis("pib-btn-accept")),
+      JSON.stringify(await sentList()),
+    );
+    await clearSent();
+
+    // hai lời mời cùng lúc: thách đấu (gấp hơn) được trả lời trước, rồi mới tới tổ đội
+    await ev(
+      `window.__ui.onPartyInvited({ from: 'Dao Huu C', ttlMs: 30000 }); window.__ui.onDuelInvited({ from: 'Dao Huu D', ttlMs: 30000 }); 1`,
+    );
+    check(
+      "Thách đấu + tổ đội cùng hiện",
+      (await vis("duib-btn-accept")) && (await vis("pib-btn-accept")),
+      `${await vis("duib-btn-accept")} ${await vis("pib-btn-accept")}`,
+    );
+    await t.shot("ban-phim-loi-moi.png");
+    await press(t, K.y);
+    check(
+      "Y khi có hai lời mời: nhận THÁCH ĐẤU trước (gấp hơn), tổ đội vẫn chờ",
+      (await sentHas(DUEL_MSG.accept, { from: "Dao Huu D" })) &&
+        !(await sentHas("partyAccept", { from: "Dao Huu C" })) &&
+        !(await vis("duib-btn-accept")) &&
+        (await vis("pib-btn-accept")),
+      JSON.stringify(await sentList()),
+    );
+    await press(t, K.x);
+    check(
+      "X kế tiếp: từ chối lời mời tổ đội còn lại",
+      (await sentHas("partyDecline", { from: "Dao Huu C" })) && !(await vis("pib-btn-accept")),
+      JSON.stringify(await sentList()),
+    );
+    await clearSent();
+
+    await ev(
+      `window.__ui.onDungeonInvite({ runId: 'run1', dungeonId: 'linh_hu', from: 'Doi Truong', expiresInMs: 30000, rewardsLeft: 3 }); 1`,
+    );
+    await press(t, K.y);
+    check(
+      "Y: vào bí cảnh (gửi dungeonEnter)",
+      (await sentHas(DUNGEON_MSG.enter, { runId: "run1" })) && !(await vis("dib-btn-enter")),
+      JSON.stringify(await sentList()),
+    );
+    await ev(
+      `window.__ui.onDungeonInvite({ runId: 'run2', dungeonId: 'linh_hu', from: 'Doi Truong', expiresInMs: 30000, rewardsLeft: 3 }); 1`,
+    );
+    await press(t, K.x);
+    check(
+      "X: từ chối bí cảnh (gửi dungeonDecline)",
+      (await sentHas(DUNGEON_MSG.decline, { runId: "run2" })) && !(await vis("dib-btn-decline")),
+      JSON.stringify(await sentList()),
+    );
+    await ev(
+      `window.__ui.onSectInvited({ from: 'Dao Huu E', sect: 'Thanh Van', tag: 'TV', ttlMs: 30000 }); 1`,
+    );
+    await press(t, K.y);
+    check(
+      "Y: gia nhập tông môn (gửi sectAccept)",
+      (await sentHas(SECT_MSG.accept, { from: "Dao Huu E" })) && !(await vis("sib-btn-accept")),
+      JSON.stringify(await sentList()),
+    );
+    await clearSent();
+    check(
+      "Không có hộp nào: Y / X không làm gì (không gửi tin)",
+      await (async () => {
+        await press(t, K.y);
+        await press(t, K.x);
+        return (await sentList()).length === 0;
+      })(),
+      JSON.stringify(await sentList()),
+    );
+
+    // rời bí cảnh: R mở xác nhận, X huỷ, R rồi Y rời thật
+    await ev(`document.getElementById('dungeon-hud').hidden = false; 1`);
+    await press(t, K.r);
+    check(
+      "R: hiện hộp xác nhận rời bí cảnh (chưa gửi gì)",
+      (await vis("dhud-btn-leave-yes")) &&
+        !(await vis("dhud-btn-leave")) &&
+        (await sentList()).length === 0,
+      JSON.stringify(await sentList()),
+    );
+    await press(t, K.x);
+    check(
+      "X: huỷ xác nhận, nút 'Rời Bí Cảnh' hiện lại, chưa gửi gì",
+      !(await vis("dhud-btn-leave-yes")) &&
+        (await vis("dhud-btn-leave")) &&
+        (await sentList()).length === 0,
+      JSON.stringify(await sentList()),
+    );
+    await press(t, K.r);
+    await press(t, K.y);
+    check(
+      "R rồi Y: rời bí cảnh (gửi dungeonLeave)",
+      (await sentHas(DUNGEON_MSG.leave, {})) && !(await vis("dhud-btn-leave-yes")),
+      JSON.stringify(await sentList()),
+    );
+    await ev(`document.getElementById('dungeon-hud').hidden = true; 1`);
+    await clearSent();
+
+    // đầu hàng quyết đấu: cùng một mẫu
+    await ev(`document.getElementById('duel-hud').hidden = false; 1`);
+    await press(t, K.r);
+    check("R: hiện hộp xác nhận đầu hàng", await vis("duel-btn-yield-yes"), "hộp ẩn");
+    await press(t, K.y);
+    check(
+      "Y: đầu hàng (gửi duelYield)",
+      (await sentHas(DUEL_MSG.yield, {})) && !(await vis("duel-btn-yield-yes")),
+      JSON.stringify(await sentList()),
+    );
+    await ev(`document.getElementById('duel-hud').hidden = true; 1`);
+
+    // tấm kết quả: nhận focus, giữ phím thế giới lại, Esc / Enter đóng được
+    const slashMark = await ev(`window.__scene.nextSlash`);
+    await ev(`document.getElementById('dungeon-end-modal').hidden = false; 1`);
+    await sleep(150);
+    check(
+      "Tấm kết quả bí cảnh hiện: focus vào nút của tấm, phím thế giới bị giữ",
+      (await ev(
+        `document.activeElement && document.activeElement.closest('#dungeon-end-modal') !== null`,
+      )) && !!(await ev(`window.__ui.isKeyboardCaptured()`)),
+      String(await ev(`document.activeElement && document.activeElement.id`)),
+    );
+    await ev(`document.activeElement.blur(); 1`);
+    await press(t, K.space);
+    check(
+      "Tấm kết quả mở: Space KHÔNG chém phía sau",
+      (await ev(`window.__scene.nextSlash`)) === slashMark,
+      `${slashMark} -> ${await ev(`window.__scene.nextSlash`)}`,
+    );
+    await press(t, K.esc);
+    check(
+      "Esc đóng tấm kết quả, phím thế giới chạy lại",
+      !(await ev(shown("dungeon-end-modal"))) && !(await ev(`window.__ui.isKeyboardCaptured()`)),
+      `captured=${await ev(`window.__ui.isKeyboardCaptured()`)}`,
+    );
+    await ev(`document.getElementById('duel-end-modal').hidden = false; 1`);
+    await sleep(150);
+    check(
+      "Tấm kết quả quyết đấu hiện: focus ở nút Đóng; Enter đóng",
+      (await ev(`document.activeElement && document.activeElement.id`)) === "duend-btn-close",
+      String(await ev(`document.activeElement && document.activeElement.id`)),
+    );
+    await press(t, K.enter);
+    check(
+      "Enter trên nút Đóng: tấm biến mất, thế giới nhận phím lại",
+      !(await ev(shown("duel-end-modal"))) && !(await ev(`window.__ui.isKeyboardCaptured()`)),
+      `captured=${await ev(`window.__ui.isKeyboardCaptured()`)}`,
     );
 
     check("0 lỗi console / exception", t.errors.length === 0, t.errors.slice(0, 3).join(" | "));

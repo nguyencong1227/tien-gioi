@@ -1051,6 +1051,15 @@ export class WorldScene extends Phaser.Scene {
       case "target.prev":
         this.toggleLockTarget(-1, true);
         break;
+      case "prompt.yes":
+        ui.answerPrompt("yes");
+        break;
+      case "prompt.no":
+        ui.answerPrompt("no");
+        break;
+      case "exit.fight":
+        ui.askLeaveFight();
+        break;
       case "panel.inventory":
         ui.toggleInventory();
         break;
