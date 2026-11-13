@@ -10,6 +10,12 @@ export interface RecipeDef {
   inputs: { itemId: string; qty: number }[];
   /** Vật phẩm nhận được (trang bị luôn qty 1) */
   output: { itemId: string; qty: number };
+  /**
+   * Phí Linh thạch (M6, #403): số nguyên 0..COIN_CAP, thiếu = 0 (miễn phí như trước). Là chỗ xả tiền cho người Kim Đan
+   * (docs/CAN_BANG.md: từ Luyện Khí hậu kỳ gần như không có chỗ tiêu). Server (#405) trừ ví theo thứ tự "chỉ được MẤT":
+   * kiểm đủ tiền + nguyên liệu + chỗ túi TRƯỚC, rồi trừ tiền, rồi trừ nguyên liệu và đưa đồ; thiếu gì thì từ chối trọn vẹn.
+   */
+  coin?: number;
 }
 
 const r = (id: string, output: string, inputs: [string, number][]): RecipeDef => ({
@@ -18,6 +24,52 @@ const r = (id: string, output: string, inputs: [string, number][]): RecipeDef =>
   inputs: inputs.map(([itemId, qty]) => ({ itemId, qty })),
   output: { itemId: output, qty: 1 },
 });
+
+// Ba bộ Kim Đan (M6, #403). TẠM rèn ở `tho_ren` (Lạc Hà) vì NPC thợ rèn Vọng Sương thuộc #404 (bản đồ + NPC); #404 đổi `npcId` sang NPC đó.
+// Nguyên liệu theo vùng săn: bộ I Sương Hồ + Thạch Quy, bộ II Thạch Quy + Độc Thiềm, bộ III Hắc Giao (trùm, đội 3-4 người) + Độc Thiềm.
+// Phí Linh thạch (`coin`) là chỗ xả tiền: tổng ba bộ ~78.500 ~ 5 giờ thu nhập solo (docs/CAN_BANG.md), luôn cao hơn giá bán thành phẩm (`ITEM_VALUE` / 2).
+const rc = (id: string, output: string, coin: number, inputs: [string, number][]): RecipeDef => ({
+  ...r(id, output, inputs),
+  coin,
+});
+export const KIM_DAN_RECIPES: RecipeDef[] = [
+  rc("ren_suong_vu_kiem", "suong_vu_kiem", 3000, [
+    ["suong_mao", 14],
+    ["quy_giap", 6],
+  ]),
+  rc("ren_suong_ho_bao", "suong_ho_bao", 4000, [
+    ["suong_mao", 18],
+    ["quy_giap", 8],
+  ]),
+  rc("ren_ho_tam_phu", "ho_tam_phu", 2500, [
+    ["suong_mao", 10],
+    ["quy_giap", 6],
+  ]),
+  rc("ren_huyen_quy_kiem", "huyen_quy_kiem", 7000, [
+    ["quy_giap", 16],
+    ["doc_nang", 6],
+  ]),
+  rc("ren_quy_giap_bao", "quy_giap_bao", 9000, [
+    ["quy_giap", 20],
+    ["doc_nang", 8],
+  ]),
+  rc("ren_quy_tuc_phu", "quy_tuc_phu", 6000, [
+    ["quy_giap", 12],
+    ["doc_nang", 6],
+  ]),
+  rc("ren_hac_giao_kiem", "hac_giao_kiem", 15000, [
+    ["giao_lan", 6],
+    ["doc_nang", 10],
+  ]),
+  rc("ren_giao_lan_bao", "giao_lan_bao", 20000, [
+    ["giao_lan", 8],
+    ["doc_nang", 12],
+  ]),
+  rc("ren_giao_long_phu", "giao_long_phu", 12000, [
+    ["giao_lan", 5],
+    ["doc_nang", 8],
+  ]),
+];
 
 /**
  * Ba bộ theo ba vùng săn: Hôi Lang (Luyện Khí đầu), Hắc Hổ (Luyện Khí tầng 7+), Xích Mãng (Trúc Cơ).
@@ -57,6 +109,7 @@ export const RECIPES: RecipeDef[] = [
     ["vay_mang", 2],
     ["da_ho", 4],
   ]),
+  ...KIM_DAN_RECIPES,
 ];
 
 export const RECIPE_BY_ID: Record<string, RecipeDef> = Object.fromEntries(

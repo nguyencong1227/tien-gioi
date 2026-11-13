@@ -29,7 +29,7 @@
 - Mỗi bậc, người chơi chọn nguồn tu vi nhanh nhất mà an toàn: săn một loại quái, hoặc chỉ đả tọa.
 - Săn quái: chỉ dùng Kiếm chém (có tính bạo kích trung bình ×1.08), quái đánh trúng 80% số đòn,
   bỏ qua loại quái mà mỗi trận mất quá 50% khí huyết. Sau mỗi trận đả tọa hồi khí huyết (vẫn được tu vi đả tọa).
-- Thời gian tìm quái kế tiếp: tho 6s, lang 8s, ho 12s, mang 90s.
+- Thời gian tìm quái kế tiếp: tho 6s, lang 8s, ho 12s, mang 90s, suong_ho 10s, thach_quy 12s, doc_thiem 14s, hac_giao 90s.
 - Thưởng tu vi của chuỗi nhiệm vụ chính chia đều cho các bậc của cảnh giới tương ứng; đi lại + nói chuyện cả chuỗi: 8 phút.
 - Đột phá thất bại mất 30% thanh tu vi, tính theo số lần thất bại kỳ vọng.
 - Trang bị: mặc món tốt nhất đủ cảnh giới ở mỗi ô (giả định đã rèn kịp; nguyên liệu rơi trong lúc săn, không tính thời gian đi rèn). Không mặc gì thì chậm hơn khoảng 10%.
@@ -77,7 +77,7 @@ Mô hình kinh tế dựa trên hợp đồng `shared/src/currency.ts`: tiền r
 | Linh Thố (`tho`) | 0 | 40 | 1.20 | 1.23 | **2.43** | Lông thỏ (1 LT), Hồi huyết đan (6 LT) |
 | Hôi Lang (`lang`) | 1 | 140 | 2.80 | 2.55 | **5.35** | Nanh sói (2 LT), Hồi huyết đan (6 LT), Hồi linh đan (6 LT) |
 | Hắc Hổ (`ho`) | 7 | 600 | 11.20 | 8.10 | **19.30** | Da hổ (9 LT), Đan hồi phục (6 LT), Tụ khí đan (45 LT) |
-| Xích Mãng (`mang`) | 12 | 4000 | 225.00 | 235.50 | **460.50** | Vảy mãng (60 LT), Tụ khí đan (45 LT), Hồi huyết đan (6 LT) |
+| Xích Mãng (`mang`) | 12 | 4000 | 225.00 | 208.50 | **433.50** | Vảy mãng (60 LT), Tụ khí đan (45 LT), Hồi huyết đan (6 LT) |
 
 ### 2. Thu nhập Linh thạch mỗi giờ khi săn một loại quái
 
@@ -130,7 +130,7 @@ Giả định người chơi đánh đơn lẻ (solo), dùng Kiếm chém, đả
   - **Đánh giá:** Đường đổi nguyên liệu (6.7 con thỏ) **rẻ hơn đáng kể** (~1.5× – 1.8×) so với mua thẳng bằng tiền (10–12 con thỏ). Đây là thiết kế cố ý: đổi đồ là đường rẻ nhất cho người mới bắt đầu và người chịu khó gom nguyên liệu; cửa hàng tiền tệ đóng vai trò tiện lợi, xả tiền tích lũy khi không muốn gom nguyên liệu.
 - **Quái cấp cao & Thiếu hụt chỗ tiêu tiền (Linh thạch sink):**
   - Hắc Hổ (cấp 2, an toàn từ Luyện Khí Tầng 6): thu nhập tăng mạnh từ ~2,570 LT/h lên ~4,650 LT/h ở Trúc Cơ.
-  - Xích Mãng (trùm cấp 3): cho kỳ vọng tới 460.5 LT/con nhưng không an toàn khi solo trước Kim Đan; thích hợp đi săn theo tổ đội (xem mục "Đi theo đội" ở trên).
+  - Xích Mãng (trùm cấp 3): cho kỳ vọng tới 433.5 LT/con nhưng không an toàn khi solo trước Kim Đan; thích hợp đi săn theo tổ đội (xem mục "Đi theo đội" ở trên).
   - **Lưu ý cân bằng:** Hiện tại cửa hàng Lão dược sư chỉ bán 2 loại đan hồi phục cơ bản (24 LT/viên), trang bị chỉ rèn qua nguyên liệu rơi mà không tốn tiền. Người chơi từ Luyện Khí hậu kỳ đến Trúc Cơ sẽ nhanh chóng tích lũy hàng ngàn đến hàng vạn Linh thạch mà **gần như không có chỗ tiêu** từ giữa game. Cần bổ sung các chỗ xả tiền lớn (mua bí kíp, phí nâng cấp/rèn trang bị cao cấp, phí dịch chuyển, vào bí cảnh hoặc đấu giá) trong các sprint tiếp theo của M3.
 
 
@@ -247,11 +247,11 @@ Mô phỏng ở `server/src/balance/pk.ts`; test `pk.test.ts` giữ mục tiêu.
 | Phàm Nhân tầng 1 (bậc 0) | 35.6 | 34.4 - 37.6 |
 | Luyện Khí tầng 1 (bậc 1) | 31.6 | 30.0 - 33.2 |
 | Trúc Cơ tầng 1 (bậc 10) | 32.0 | 30.8 - 33.6 |
-| Kim Đan tầng 1 (bậc 13) | 32.4 | 31.2 - 34.0 |
+| Kim Đan tầng 1 (bậc 13) | 32.8 | 31.2 - 34.4 |
 | Nguyên Anh tầng 1 (bậc 16) | 33.6 | 32.4 - 35.2 |
 | Hóa Thần tầng 1 (bậc 19) | 34.4 | 33.2 - 35.6 |
 | Luyện Hư tầng 1 (bậc 22) | 35.2 | 34.4 - 36.8 |
-| Hợp Thể tầng 1 (bậc 25) | 36.4 | 34.8 - 37.6 |
+| Hợp Thể tầng 1 (bậc 25) | 36.0 | 34.8 - 37.6 |
 | Đại Thừa tầng 1 (bậc 28) | 37.2 | 35.6 - 38.4 |
 | Độ Kiếp tầng 1 (bậc 31) | 38.0 | 36.8 - 39.2 |
 | Độ Kiếp tầng 3 (bậc 33) | 38.8 | 37.2 - 40.0 |
@@ -346,3 +346,46 @@ Mô phỏng bằng mã server thật (`fightBoss`, ca khó: đứng yên, không
 2. **Tụ Khí Đan tính theo % thanh là bẫy khi thanh nhảy ×6:** cách xử lý ứng viên (đo ở #406): (a) bảng rơi quái cũ (nhất là Xích Mãng 60%) giảm mạnh hoặc bỏ `tu_khi_dan`; (b) đan cộng một lượng cố định theo cảnh giới của đan (đan mới cho Kim Đan, đan cũ chỉ cộng % thanh của bậc Luyện Khí / Trúc Cơ); (c) hạ `pct` còn ~1%. Cần ghi rõ lý do trong PR hợp đồng #403.
 3. **Bí cảnh Linh Hư cần trần bậc (`maxStep`, tuỳ chọn trong `DungeonDef`) hoặc chỉ số trùm theo bậc đội:** nếu không, người Kim Đan quay lại hạ trùm trong vài phút (3 lượt thưởng / ngày). Chốt ở #405 (PR `shared/` riêng, B review).
 4. Số trên là mô hình (chưa kiểm bằng người chơi thật): bot của C (#410) kiểm lại hai đường tắt bằng đo thật.
+
+
+## Kim Đan sau nội dung (M6, #403)
+
+Tính SỐNG từ `shared/` bằng mô hình ở trên (khác mục "Kim Đan trước M6": đó là ảnh chụp cố định). Quái mới: Sương Hồ (cấp 13, nhanh, đàn), Thạch Quy (cấp 14, dày, đòn nhẹ), Độc Thiềm (cấp 15, đòn nặng, máu thấp), trùm Hắc Giao (cấp 18, đội 3-4 người).
+Trang bị mỗi bộ ~29% chỉ số gốc ở bậc đầu mặc được. **Thanh Kim Đan 48000 / 55200 / 63480** (trước M6: 26400 / 30360 / 34914). **Tụ Khí Đan có trần 300 tu vi mỗi viên** và Xích Mãng rơi 0.3 x 1 (trước: 0.6 x 1-2): ba thay đổi này thay cho "đường tắt" ở "Kim Đan trước M6" (mục 3 và 5).
+
+### 1. Săn solo (tu vi / giờ kể cả đan rơi, Linh thạch / giờ, con / giờ, khí huyết mất / trận)
+
+Mục tiêu: không bãi nào cho tu vi / giờ vượt ~1,5x bãi mới tốt nhất cùng bậc, Linh thạch / giờ không vượt ~2x. Quái mới KHÔNG an toàn cho người Trúc Cơ hậu kỳ (mất > 50% khí huyết / trận) nên nhịp Luyện Khí / Trúc Cơ giữ nguyên (53 phút, 2 giờ 55 phút cộng dồn).
+
+| Bậc | Loài | Tu vi / giờ | Linh thạch / giờ | Con / giờ | Khí huyết mất |
+|---|---|---:|---:|---:|---:|
+| Kim Đan Sơ kỳ | Xích Mãng | 33,407 | 14,483 | 33 | 45% |
+| Kim Đan Sơ kỳ | Sương Hồ | 21,863 | 9,413 | 187 | 31% |
+| Kim Đan Sơ kỳ | Thạch Quy | 23,449 | 9,319 | 106 | 32% |
+| Kim Đan Sơ kỳ | Độc Thiềm | không an toàn solo (64% khí huyết / trận) | – | – | – |
+| Kim Đan Trung kỳ | Xích Mãng | 34,502 | 14,983 | 35 | 32% |
+| Kim Đan Trung kỳ | Sương Hồ | 24,203 | 10,525 | 209 | 22% |
+| Kim Đan Trung kỳ | Thạch Quy | 26,393 | 10,547 | 119 | 23% |
+| Kim Đan Trung kỳ | Độc Thiềm | 31,728 | 15,672 | 131 | 46% |
+| Kim Đan Hậu kỳ | Xích Mãng | 35,378 | 15,384 | 35 | 24% |
+| Kim Đan Hậu kỳ | Sương Hồ | 26,313 | 11,535 | 229 | 16% |
+| Kim Đan Hậu kỳ | Thạch Quy | 29,274 | 11,750 | 133 | 17% |
+| Kim Đan Hậu kỳ | Độc Thiềm | 35,222 | 17,539 | 147 | 34% |
+
+### 2. Trùm Hắc Giao theo cỡ đội (tu vi / giờ MỖI người, trong ngoặc khí huyết mất / trận)
+
+| Bậc | 1 người | Đội 2 | Đội 3 | Đội 4 | Đội 3 so với săn solo tốt nhất |
+|---|---:|---:|---:|---:|---:|
+| Kim Đan Sơ kỳ | không an toàn (600%) | không an toàn (150%) | không an toàn (67%) | 32,757 (38%) | – |
+| Kim Đan Trung kỳ | không an toàn (433%) | không an toàn (108%) | 37,430 (48%) | 34,459 (27%) | 1.2x |
+| Kim Đan Hậu kỳ | không an toàn (315%) | không an toàn (79%) | 39,545 (35%) | 35,937 (20%) | 1.1x |
+
+### 3. Nhịp cả cảnh giới Kim Đan (phút; có chuỗi nhiệm vụ hiện có, có đột phá thất bại)
+
+"Tối ưu" = người chơi săn bãi tốt nhất kể cả Xích Mãng; "bãi mới" = không đụng Xích Mãng. Tổng: **5.5 giờ** (tối ưu), **5.9 giờ** (bãi mới); mục tiêu 5-7 giờ. Trước M6: 6.4 giờ nhưng nhờ đường tắt (Sơ kỳ 4,1 giờ rồi hai bậc sau ~2,3 giờ).
+
+| Bậc | Thanh | Tối ưu: nguồn | phút | Bãi mới: nguồn | phút |
+|---|---:|---|---:|---|---:|
+| Kim Đan Sơ kỳ | 48,000 | Xích Mãng | 94.7 | Thạch Quy | 122.8 |
+| Kim Đan Trung kỳ | 55,200 | Độc Thiềm | 104.4 | Độc Thiềm | 104.4 |
+| Kim Đan Hậu kỳ | 63,480 | Độc Thiềm | 128.9 | Độc Thiềm | 128.9 |

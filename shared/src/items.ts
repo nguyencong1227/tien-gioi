@@ -15,9 +15,26 @@ export const RARITY_NAMES = [
 /** Màu gợi ý cho viền ô / hiệu ứng nhấp nháy đồ rơi */
 export const RARITY_COLORS = [0xc9c4b8, 0x6fcf73, 0x4fa3ff, 0xc277ff, 0xffb23f] as const;
 
-/** Hiệu ứng khi dùng. pct tính theo giá trị tối đa (khí huyết, linh lực, thanh tu vi của bậc hiện tại). */
+/**
+ * Hiệu ứng khi dùng. pct tính theo giá trị tối đa (khí huyết, linh lực, thanh tu vi của bậc hiện tại).
+ * `maxExp` (chỉ đan tu vi): trần tuyệt đối số tu vi mỗi viên. Thanh tu vi lớn dần theo cảnh giới (Kim Đan 48000 so với Trúc Cơ ~5000),
+ * nên "5% thanh" tăng theo mà tu vi từ quái không tăng kịp: không có trần thì Tụ Khí Đan thành đường tắt ở Kim Đan
+ * (docs/CAN_BANG.md mục "Kim Đan trước M6": một thanh Xích Mãng 60 -> 24 phút). Dùng `expPillGain` để tính, không tự nhân `pct`.
+ */
 export type ItemEffect =
-  { kind: "healHp"; pct: number } | { kind: "healMp"; pct: number } | { kind: "exp"; pct: number };
+  | { kind: "healHp"; pct: number }
+  | { kind: "healMp"; pct: number }
+  | { kind: "exp"; pct: number; maxExp?: number };
+
+/** Tu vi một viên đan tu vi cho khi thanh tu vi tối đa là `expMax`: `round(expMax * pct)`, cắt ở `maxExp` nếu có; luôn số nguyên >= 0. */
+export function expPillGain(effect: { pct: number; maxExp?: number }, expMax: number): number {
+  const raw = Number.isFinite(expMax) && expMax > 0 ? Math.round(expMax * effect.pct) : 0;
+  const cap =
+    effect.maxExp !== undefined && Number.isFinite(effect.maxExp)
+      ? Math.max(0, Math.floor(effect.maxExp))
+      : Infinity;
+  return Math.max(0, Math.min(raw, cap));
+}
 
 // ---------- Trang bị (Sprint 3) ----------
 
@@ -106,11 +123,34 @@ export const ITEMS: ItemDef[] = [
     type: "consumable",
     stack: 10,
     rarity: 1,
-    desc: "Tăng 5% thanh tu vi của bậc hiện tại.",
-    // Hiếm: chỉ rơi từ Hắc Hổ / Xích Mãng và thưởng nhiệm vụ (xem docs/CAN_BANG.md)
-    effect: { kind: "exp", pct: 0.05 },
+    desc: "Tăng 5% thanh tu vi của bậc hiện tại (tối đa 300 tu vi mỗi viên).",
+    // Hiếm: chỉ rơi từ Hắc Hổ / Xích Mãng và thưởng nhiệm vụ (xem docs/CAN_BANG.md). Trần 300: bằng ~mức lớn nhất 5% thanh cho tới
+    // hết Trúc Cơ (5819 x 5% = 291) nên KHÔNG đổi gì ở Luyện Khí / Trúc Cơ; từ Kim Đan thanh lớn hơn nhiều, trần giữ đan không thành đường tắt
+    effect: { kind: "exp", pct: 0.05, maxExp: 300 },
     cooldown: 60_000,
     color: 0xe8c547,
+  },
+  {
+    id: "dai_hoi_huyet_dan",
+    name: "Đại Hồi Huyết Đan",
+    type: "consumable",
+    stack: 20,
+    rarity: 2,
+    desc: "Hồi 70% khí huyết.",
+    effect: { kind: "healHp", pct: 0.7 },
+    cooldown: 10_000,
+    color: 0xe0554d,
+  },
+  {
+    id: "dai_hoi_linh_dan",
+    name: "Đại Hồi Linh Đan",
+    type: "consumable",
+    stack: 20,
+    rarity: 2,
+    desc: "Hồi 70% linh lực.",
+    effect: { kind: "healMp", pct: 0.7 },
+    cooldown: 10_000,
+    color: 0x4f8fe6,
   },
   // ---------- Nguyên liệu ----------
   {
@@ -148,6 +188,43 @@ export const ITEMS: ItemDef[] = [
     rarity: 2,
     desc: "Vảy đỏ thẫm của Xích Mãng.",
     color: 0xb3262a,
+  },
+  // Nguyên liệu Kim Đan (M6, #403): mỗi loài một thứ, trùm Hắc Giao rơi Giao Lân
+  {
+    id: "suong_mao",
+    name: "Sương Mao",
+    type: "material",
+    stack: 99,
+    rarity: 2,
+    desc: "Lông mảnh như sương của Sương Hồ, lạnh và nhẹ.",
+    color: 0xcfe3ea,
+  },
+  {
+    id: "quy_giap",
+    name: "Quy Giáp",
+    type: "material",
+    stack: 99,
+    rarity: 2,
+    desc: "Mai cứng của Thạch Quy, phủ rêu xanh.",
+    color: 0x6e8060,
+  },
+  {
+    id: "doc_nang",
+    name: "Độc Nang",
+    type: "material",
+    stack: 99,
+    rarity: 3,
+    desc: "Túi độc của Độc Thiềm, chớ làm vỡ.",
+    color: 0x7a5fa0,
+  },
+  {
+    id: "giao_lan",
+    name: "Giao Lân",
+    type: "material",
+    stack: 99,
+    rarity: 3,
+    desc: "Vảy đen biếc của Hắc Giao, cứng hơn cả vảy mãng.",
+    color: 0x1f3a52,
   },
   // ---------- Trang bị (rèn ở Thợ rèn, xem recipes.ts) ----------
   {
@@ -240,6 +317,97 @@ export const ITEMS: ItemDef[] = [
     equip: { slot: "talisman", stats: { mp: 70, speed: 14 }, reqRealm: 2, reqTier: 0 },
     color: 0xd2553f,
   },
+  // Ba bộ Kim Đan (M6, #403): mỗi bộ cộng ~29% chỉ số gốc ở bậc đầu mặc được (như ba bộ trước); rèn ở NPC thợ rèn Vọng Sương (#404)
+  {
+    id: "suong_vu_kiem",
+    name: "Sương Vũ Kiếm",
+    type: "equip",
+    stack: 1,
+    rarity: 3,
+    desc: "Kiếm mỏng như làn sương, lạnh buốt nơi lưỡi.",
+    equip: { slot: "weapon", stats: { atk: 32 }, reqRealm: 3, reqTier: 0 },
+    color: 0xa9cfdc,
+  },
+  {
+    id: "suong_ho_bao",
+    name: "Sương Hồ Bào",
+    type: "equip",
+    stack: 1,
+    rarity: 3,
+    desc: "Áo dệt lông Sương Hồ, nhẹ như khói.",
+    equip: { slot: "robe", stats: { hp: 360 }, reqRealm: 3, reqTier: 0 },
+    color: 0xd9e7ec,
+  },
+  {
+    id: "ho_tam_phu",
+    name: "Hồ Tâm Phù",
+    type: "equip",
+    stack: 1,
+    rarity: 3,
+    desc: "Bùa kết từ sương, bước chân nhẹ như hồ ly.",
+    equip: { slot: "talisman", stats: { mp: 110, speed: 18 }, reqRealm: 3, reqTier: 0 },
+    color: 0x8fb4c4,
+  },
+  {
+    id: "huyen_quy_kiem",
+    name: "Huyền Quy Kiếm",
+    type: "equip",
+    stack: 1,
+    rarity: 3,
+    desc: "Kiếm nặng rèn từ mai rùa, chắc tay từng nhát chém.",
+    equip: { slot: "weapon", stats: { atk: 38 }, reqRealm: 3, reqTier: 1 },
+    color: 0x56674a,
+  },
+  {
+    id: "quy_giap_bao",
+    name: "Quy Giáp Bào",
+    type: "equip",
+    stack: 1,
+    rarity: 3,
+    desc: "Áo ghép mai Thạch Quy, đỡ đòn như vách đá.",
+    equip: { slot: "robe", stats: { hp: 425 }, reqRealm: 3, reqTier: 1 },
+    color: 0x49573f,
+  },
+  {
+    id: "quy_tuc_phu",
+    name: "Quy Tức Phù",
+    type: "equip",
+    stack: 1,
+    rarity: 3,
+    desc: "Bùa mang hơi thở chậm rãi của rùa già.",
+    equip: { slot: "talisman", stats: { mp: 125, speed: 22 }, reqRealm: 3, reqTier: 1 },
+    color: 0x6e8060,
+  },
+  {
+    id: "hac_giao_kiem",
+    name: "Hắc Giao Kiếm",
+    type: "equip",
+    stack: 1,
+    rarity: 4,
+    desc: "Kiếm rèn từ vảy Hắc Giao, khí lạnh như nước sâu.",
+    equip: { slot: "weapon", stats: { atk: 44 }, reqRealm: 3, reqTier: 2 },
+    color: 0x24465f,
+  },
+  {
+    id: "giao_lan_bao",
+    name: "Giao Lân Bào",
+    type: "equip",
+    stack: 1,
+    rarity: 4,
+    desc: "Áo kết vảy giao, thủy hỏa khó xâm.",
+    equip: { slot: "robe", stats: { hp: 500 }, reqRealm: 3, reqTier: 2 },
+    color: 0x1d3550,
+  },
+  {
+    id: "giao_long_phu",
+    name: "Giao Long Phù",
+    type: "equip",
+    stack: 1,
+    rarity: 4,
+    desc: "Bùa luyện tinh huyết giao long.",
+    equip: { slot: "talisman", stats: { mp: 140, speed: 26 }, reqRealm: 3, reqTier: 2 },
+    color: 0x2e5a7a,
+  },
 ];
 
 export const ITEM_BY_ID: Record<string, ItemDef> = Object.fromEntries(ITEMS.map((i) => [i.id, i]));
@@ -288,8 +456,32 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
   ],
   mang: [
     { itemId: "vay_mang", chance: 1, min: 2, max: 4 },
-    { itemId: "tu_khi_dan", chance: 0.6, min: 1, max: 2 },
+    // 0.6 x 1-2 -> 0.3 x 1 (M6, #403): đan là phần thưởng hiếm, không phải nguồn tu vi chính của người Kim Đan săn Xích Mãng
+    { itemId: "tu_khi_dan", chance: 0.3, min: 1, max: 1 },
     { itemId: "hoi_huyet_dan", chance: 1, min: 2, max: 3 },
+  ],
+  // Quái Kim Đan (M6, #403; số đo ở docs/CAN_BANG.md): mỗi loài rơi nguyên liệu của mình + chút đan
+  suong_ho: [
+    { itemId: "suong_mao", chance: 0.5, min: 1, max: 2 },
+    { itemId: "hoi_huyet_dan", chance: 0.1, min: 1, max: 1 },
+    { itemId: "dai_hoi_huyet_dan", chance: 0.04, min: 1, max: 1 },
+  ],
+  thach_quy: [
+    { itemId: "quy_giap", chance: 0.5, min: 1, max: 2 },
+    { itemId: "hoi_linh_dan", chance: 0.1, min: 1, max: 1 },
+    { itemId: "dai_hoi_linh_dan", chance: 0.04, min: 1, max: 1 },
+  ],
+  doc_thiem: [
+    { itemId: "doc_nang", chance: 0.45, min: 1, max: 2 },
+    { itemId: "dai_hoi_huyet_dan", chance: 0.06, min: 1, max: 1 },
+    { itemId: "dai_hoi_linh_dan", chance: 0.06, min: 1, max: 1 },
+  ],
+  // Trùm Kim Đan: bãi của đội 3-4 người; Giao Lân là nguyên liệu bộ III
+  hac_giao: [
+    { itemId: "giao_lan", chance: 1, min: 2, max: 4 },
+    { itemId: "doc_nang", chance: 0.8, min: 1, max: 2 },
+    { itemId: "dai_hoi_huyet_dan", chance: 1, min: 1, max: 2 },
+    { itemId: "tu_khi_dan", chance: 0.5, min: 1, max: 1 },
   ],
   // Trùm bí cảnh (docs/THIET_KE_BI_CANH.md): đồ rơi như quái thường (chủ đồ theo đội); thưởng hoàn thành riêng ở `DUNGEONS`.
   // Đã tính vào cân bằng 4c-2 (`server/src/balance/dungeon.ts`).
