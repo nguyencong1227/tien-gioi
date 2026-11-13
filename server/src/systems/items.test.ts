@@ -113,6 +113,26 @@ describe("dùng đan dược", () => {
     expect(p.expMax).toBe(expToNext(1, 1));
   });
 
+  it("Tụ Khí Đan có trần 300 tu vi (M6): Kim Đan cộng đúng 300 thay vì 5% thanh (2400), Trúc Cơ vẫn 5% thanh", () => {
+    {
+      const { w } = makeWorld();
+      const { p } = addPlayer(w, "a", 3, 0); // Kim Đan sơ kỳ: thanh 48000, 5% = 2400
+      giveItem(w, "a", "tu_khi_dan", 1);
+      p.exp = 0;
+      useItem(w, "a", 0);
+      expect(p.exp).toBe(300);
+    }
+    {
+      const { w } = makeWorld();
+      const { p } = addPlayer(w, "a", 2, 2); // Trúc Cơ hậu kỳ: thanh 5819, 5% = 291 < trần: KHÔNG đổi so với trước M6
+      giveItem(w, "a", "tu_khi_dan", 1);
+      p.exp = 0;
+      useItem(w, "a", 0);
+      expect(p.exp).toBe(Math.round(expToNext(2, 2) * 0.05));
+      expect(p.exp).toBe(291);
+    }
+  });
+
   it("đã trọng thương thì không dùng được", () => {
     const { w } = makeWorld();
     const { p, c } = addPlayer(w, "a");

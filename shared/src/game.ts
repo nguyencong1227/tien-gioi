@@ -116,6 +116,71 @@ export const MONSTERS: MonsterKind[] = [
     color: 0xb3262a,
     boss: true,
   },
+  // Quái Kim Đan của Âm Sương Trạch (M6, #403; docs/PHAN_CONG_M6.md). Số đo bằng mô hình ở docs/CAN_BANG.md: bãi "đúng bậc" ~20-35k tu vi / giờ
+  // solo (gần Xích Mãng ~30k, không vượt 1,5x), KHÔNG an toàn cho người Trúc Cơ hậu kỳ (mất > 50% khí huyết / trận: không cày sớm được).
+  // Chỉ sinh ở bản đồ khai báo trong `MapDef.monsterCap` (`MONSTER_CAP` = 0 ở bản đồ mặc định). Cùng cơ chế cận chiến, khác nhau ở chỉ số.
+  {
+    id: "suong_ho",
+    name: "Sương Hồ",
+    minDanger: 0.25,
+    hp: 1600,
+    atk: 150,
+    speed: 150,
+    radius: 13,
+    aggro: 280,
+    attackRange: 34,
+    attackCd: 1000,
+    exp: 110,
+    level: 13,
+    color: 0xbfd7e0,
+  },
+  {
+    id: "thach_quy",
+    name: "Thạch Quy",
+    minDanger: 0.45,
+    hp: 6500,
+    atk: 70,
+    speed: 70,
+    radius: 20,
+    aggro: 150,
+    attackRange: 40,
+    attackCd: 1800,
+    exp: 215,
+    level: 14,
+    color: 0x6f7f5e,
+  },
+  {
+    id: "doc_thiem",
+    name: "Độc Thiềm",
+    minDanger: 0.65,
+    hp: 2600,
+    atk: 290,
+    speed: 110,
+    radius: 15,
+    aggro: 220,
+    attackRange: 42,
+    attackCd: 1500,
+    exp: 230,
+    level: 15,
+    color: 0x7a5fa0,
+  },
+  // Trùm Kim Đan: một người và đội 2 người không an toàn, đội 3 từ Trung kỳ, đội 4 từ Sơ kỳ; đội 3 nhanh hơn săn solo ~1,15-1,2x
+  {
+    id: "hac_giao",
+    name: "Hắc Giao",
+    minDanger: 0.85,
+    hp: 50000,
+    atk: 150,
+    speed: 105,
+    radius: 28,
+    aggro: 300,
+    attackRange: 56,
+    attackCd: 1600,
+    exp: 3200,
+    level: 18,
+    color: 0x1d2a3a,
+    boss: true,
+  },
   // Trùm của bí cảnh Linh Hư (docs/THIET_KE_BI_CANH.md). Không sinh ngoài hoang: `MONSTER_CAP.yeu_vuong = 0` và các bản đồ
   // thường không khai báo loại này. Số liệu cân bằng ở 4c-2 (`server/src/balance/dungeon.ts`, docs/CAN_BANG.md mục "Bí cảnh"):
   // đội 3 người ở ngưỡng `minStep` hạ trùm trong ~6 phút (không ai chết ở ca mô phỏng khó: đứng yên, không né), đội 2 người
@@ -163,6 +228,11 @@ export const MONSTER_CAP: Record<string, number> = {
   ho: 16,
   mang: 2,
   yeu_vuong: 0, // trùm bí cảnh: không sinh ở bản đồ thường
+  // Quái Kim Đan: không sinh ở bản đồ mặc định; Âm Sương Trạch khai báo số lượng riêng (`MapDef.monsterCap`, #404)
+  suong_ho: 0,
+  thach_quy: 0,
+  doc_thiem: 0,
+  hac_giao: 0,
 };
 export const MONSTER_RESPAWN_MS = 10000;
 

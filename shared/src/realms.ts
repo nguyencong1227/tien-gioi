@@ -48,10 +48,13 @@ export function isPeak(realm: number, tier: number): boolean {
 /**
  * Thanh tu vi của bậc đầu mỗi cảnh giới. Trong một cảnh giới thanh tăng chậm (REALM_TIER_GROWTH),
  * qua cảnh giới mới thì nhảy vọt: quái mới mạnh hơn nhưng không bù kịp, nên mỗi cảnh giới lâu hơn hẳn.
- * Số liệu chọn theo bảng tính docs/CAN_BANG.md (Luyện Khí ~1 giờ, Trúc Cơ ~3 giờ).
+ * Số liệu chọn theo bảng tính docs/CAN_BANG.md (Luyện Khí ~1 giờ, Trúc Cơ ~3 giờ, Kim Đan ~5-6 giờ).
+ * Kim Đan (M6, #403) là 48000, không phải 6x Trúc Cơ (26400) như công thức cũ: Xích Mãng (cấp 12) là loài cao nhất trước M6 và cho
+ * ~30.000 tu vi / giờ cho người Kim Đan solo (docs/CAN_BANG.md mục "Kim Đan trước M6"), nên bãi Kim Đan "đúng bậc" phải ở cùng mức
+ * (20.000-35.000 / giờ) và thanh phải lớn tương ứng để cả cảnh giới vẫn ~5-6 giờ. Chưa ai chơi tới Kim Đan nên đổi số này không mất gì.
  */
-export const REALM_EXP_BASE = [40, 280, 4400];
-/** Từ Kim Đan trở đi (chưa có nội dung): mỗi cảnh giới gấp ngần này lần cảnh giới trước */
+export const REALM_EXP_BASE = [40, 280, 4400, 48000];
+/** Từ Nguyên Anh trở đi (chưa có nội dung): mỗi cảnh giới gấp ngần này lần cảnh giới trước (tính từ phần tử cuối của REALM_EXP_BASE) */
 export const REALM_EXP_MULT_AFTER = 6;
 export const REALM_TIER_GROWTH = [1, 1.1, 1.15];
 

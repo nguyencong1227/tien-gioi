@@ -13,6 +13,8 @@ import {
   type SectPresenceEntry,
   type SectInvitedMsg,
   compareSectMembers,
+  getMap,
+  realmLabel,
 } from "@tien-gioi/shared";
 
 /** Định dạng đếm ngược lời mời tông môn (ví dụ: "30s", "5s") */
@@ -114,6 +116,27 @@ export function mergeMemberPresence(
       online: false,
     };
   });
+}
+
+/** Nhãn khi `mapId` không phải bản đồ client biết (bản cũ gặp bản đồ mới): không hiện id thô cho người chơi. */
+export const UNKNOWN_MAP_LABEL = "vùng lạ";
+
+/**
+ * Tên bản đồ cho người chơi (`MapDef.name`), KHÔNG bao giờ là id thô ("hac_phong"). Dùng chung cho bảng tổ đội và
+ * tông môn (M6 #409): bản đồ mới (Âm Sương Trạch) tự hiện đúng tên mà không phải chép cứng chuỗi nào ở client.
+ * `getMap` tra theo bảng nên id độc ("constructor", "__proto__") trả `undefined` chứ không ném lỗi.
+ */
+export function mapLabelOf(mapId: string): string {
+  return getMap(mapId)?.def.name ?? UNKNOWN_MAP_LABEL;
+}
+
+/** Dòng trạng thái của một thành viên tông môn: "Offline", hoặc "Online · <cảnh giới> · <tên bản đồ>" (bỏ phần thiếu). */
+export function sectMemberStatusText(m: MergedSectMember): string {
+  if (!m.online) return "Offline";
+  const parts = ["Online"];
+  if (m.realm !== undefined && m.tier !== undefined) parts.push(realmLabel(m.realm, m.tier));
+  if (m.mapId) parts.push(mapLabelOf(m.mapId));
+  return parts.join(" · ");
 }
 
 /** Kiểm tra chế độ giả lập tông môn: chỉ bật khi DEV hoặc có cờ debug / test */

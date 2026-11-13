@@ -1,5 +1,5 @@
 // In bảng mô phỏng cân bằng ra docs/CAN_BANG.md (hoặc stdout với --stdout).
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -12,6 +12,8 @@ import {
   buyPrice,
   sellPrice,
 } from "@tien-gioi/shared";
+import { renderKimDan, type KimDanReport } from "./kim-dan";
+import { renderKimDanSau } from "./kim-dan-sau";
 import { PK_TARGET_SECONDS, representativeLevels, summarizeDuels } from "./pk";
 import {
   ASSUME_DUNGEON,
@@ -34,6 +36,12 @@ import {
   simulateReincarnationProgression,
 } from "./simulate";
 
+// Mốc "trước M6" chụp cố định (kim-dan-truoc.ts): không đổi theo nội dung mới, để #406 so trước / sau
+const kimDanTruocSection = renderKimDan(
+  JSON.parse(
+    readFileSync(new URL("./kim-dan-truoc.json", import.meta.url), "utf-8"),
+  ) as KimDanReport,
+);
 const rows = simulate();
 const fmt = (m: number) => {
   const totalMin = Math.round(m);
@@ -423,7 +431,11 @@ ${reincarnationSection}
 
 ${dungeonSection}
 
-${pkSection}`,
+${pkSection}
+
+${kimDanTruocSection}
+
+${renderKimDanSau()}`,
   );
   console.log(`Đã ghi ${out}\n\n${summary}`);
 }
