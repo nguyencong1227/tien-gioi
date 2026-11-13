@@ -5,6 +5,7 @@
 // 3. Nhân vật mới chỉ tạo ở Lạc Hà Trấn: client kết nối vào bản đồ khác bị từ chối wrong_map
 // 4. Người đang chờ nối lại ở phòng này mà vào phòng khác -> nhận wrong_map, vào lại đúng phòng dọn ghost sạch ngay lập tức
 // 5. Giải phóng tài nguyên và không rò rỉ: khi rời hết phòng, online và players về 0, ghosts và ctrl được dọn sạch.
+// 6. Ba bản đồ (M6, #405): đi trọn Lạc Hà <-> Hắc Phong Cốc <-> Âm Sương Trạch, nhân vật lưu ở Âm Sương chỉ vào được phòng Âm Sương.
 
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
@@ -14,6 +15,7 @@ import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { Client, type Room } from "colyseus.js";
 import {
+  AM_SUONG_ID,
   DEFAULT_MAP_ID,
   HAC_PHONG_ID,
   TRAVEL_COOLDOWN_MS,
@@ -317,5 +319,103 @@ describe("Thử tải & độ tin cậy chuyển bản đồ qua cổng (Issue #
     expect(sr2.ghosts.size).toBe(0);
     expect(sr1.world.ctrl.size).toBe(0);
     expect(sr2.world.ctrl.size).toBe(0);
+  });
+});
+
+describe("Ba bản đồ: Lạc Hà <-> Hắc Phong Cốc <-> Âm Sương Trạch (M6, #405)", () => {
+  type Conn = Awaited<ReturnType<typeof joinRoom>>;
+
+  /** Đứng ở cổng `portalId` của bản đồ `fromMapId`, qua cổng, nối vào phòng đích; trả kết nối mới. */
+  async function hop(cur: Conn, name: string, fromMapId: string, portalId: string): Promise<Conn> {
+    const portal = getMap(fromMapId)!.portal(portalId)!;
+    standAt(cur.room, portal);
+    // Hồi chiêu cổng đã có test riêng (planTravel); ở đây xoá để không phải chờ 3 giây mỗi chặng
+    serverRoom(cur.room).world.ctrl.get(cur.room.sessionId).save.travelAt = 0;
+    cur.room.send("travel", { portalId } satisfies TravelMsg);
+    await waitFor(() => cur.travelTos.length > 0);
+    expect(cur.travelTos.at(-1)).toEqual({ mapId: portal.toMap });
+    await waitFor(() => !cur.room.connection.isOpen);
+    // Vào được phòng đích mà không bị wrong_map nghĩa là bản ghi đích đã được lưu TRƯỚC khi gửi travelTo
+    const next = await joinRoom(name, secretOf(name), portal.toMap);
+    expect(serverRoom(next.room).mapId).toBe(portal.toMap);
+    expect(fileOf(name).mapId).toBe(portal.toMap);
+    return next;
+  }
+
+  it("đi hết một vòng khứ hồi bốn chặng: tới đúng chỗ xuất hiện của cổng đích, trong khu an toàn, dữ liệu nguyên vẹn", async () => {
+    const name = `Bot Ba Ban Do ${++nameSeq}`;
+    let cur = await joinRoom(name, secretOf(name), DEFAULT_MAP_ID);
+    cur.room.send("chat", { text: "/give nanh_soi 5" });
+    await waitFor(() => cur.invs.some((m) => m.gained));
+    serverRoom(cur.room).state.players.get(cur.room.sessionId)!.exp = 42;
+
+    const route: [string, string][] = [
+      [DEFAULT_MAP_ID, "lac_ha_bac"],
+      [HAC_PHONG_ID, "hac_phong_bac"],
+      [AM_SUONG_ID, "am_suong_nam"],
+      [HAC_PHONG_ID, "hac_phong_nam"],
+    ];
+    const visited: string[] = [DEFAULT_MAP_ID];
+    for (const [fromMapId, portalId] of route) {
+      cur = await hop(cur, name, fromMapId, portalId);
+      const portal = getMap(fromMapId)!.portal(portalId)!;
+      const dest = getMap(portal.toMap)!;
+      const spawn = dest.portal(portal.toPortal)!.spawn;
+      const me = cur.me();
+      expect(Math.hypot(me.x - spawn.x, me.y - spawn.y), `tới ${portal.toMap}`).toBeLessThan(2);
+      expect(dest.inSafe(me.x, me.y), `${portal.toMap}: chỗ xuất hiện nằm trong khu an toàn`).toBe(
+        true,
+      );
+      expect(dest.isBlockedPx(me.x, me.y), `${portal.toMap}: không đứng trong ô chặn`).toBe(false);
+      visited.push(portal.toMap);
+    }
+    expect(visited).toEqual([
+      DEFAULT_MAP_ID,
+      HAC_PHONG_ID,
+      AM_SUONG_ID,
+      HAC_PHONG_ID,
+      DEFAULT_MAP_ID,
+    ]);
+
+    const saved = fileOf(name);
+    expect(saved.mapId).toBe(DEFAULT_MAP_ID);
+    expect(saved.exp).toBe(42);
+    expect(saved.inventory?.find((s: any) => s?.itemId === "nanh_soi")?.qty).toBe(5);
+    expect(cur.me().exp).toBe(42);
+  }, 30_000);
+
+  it("nhân vật lưu ở Âm Sương: phòng Lạc Hà và Hắc Phong trả wrong_map:am_suong, phòng Âm Sương nhận, có quái và đúng bản đồ", async () => {
+    const name = `Bot Am Suong ${++nameSeq}`;
+    const to = getMap(HAC_PHONG_ID)!.portal("hac_phong_bac")!;
+    const spawn = getMap(to.toMap)!.portal(to.toPortal)!.spawn;
+    await savePlayer({
+      name,
+      secretHash: hashSecret(secretOf(name)),
+      realm: 4,
+      tier: 0,
+      exp: 0,
+      mapId: AM_SUONG_ID,
+      x: spawn.x,
+      y: spawn.y,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    for (const wrong of [DEFAULT_MAP_ID, HAC_PHONG_ID]) {
+      const client = new Client(`ws://localhost:${PORT}`);
+      let err: any = null;
+      try {
+        rooms.push(await client.joinOrCreate(roomNameOf(wrong), { name, secret: secretOf(name) }));
+      } catch (e: any) {
+        err = e;
+      }
+      expect(err, `vào nhầm ${wrong}`).not.toBeNull();
+      expect(parseWrongMap(err.code, err.message)).toBe(AM_SUONG_ID);
+    }
+    const ok = await joinRoom(name, secretOf(name), AM_SUONG_ID);
+    const sr = serverRoom(ok.room);
+    expect(sr.mapId).toBe(AM_SUONG_ID);
+    expect(sr.state.monsters.size).toBeGreaterThan(0);
+    expect(ok.me().x).toBeCloseTo(spawn.x, 0);
+    expect(ok.me().y).toBeCloseTo(spawn.y, 0);
   });
 });
