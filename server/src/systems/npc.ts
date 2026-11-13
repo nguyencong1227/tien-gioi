@@ -1,6 +1,8 @@
 // Tương tác NPC: nói chuyện, nhận / trả / bỏ nhiệm vụ, đổi đồ.
 // Mọi thao tác đều kiểm tra lại ở server: còn sống, đứng gần NPC, đủ điều kiện.
 import {
+  COIN_CAP,
+  CURRENCY_NAME,
   QUESTS,
   QUEST_BY_ID,
   TRADES,
@@ -21,6 +23,7 @@ import {
 import type { Player } from "../schema";
 import type { World, PlayerCtrl } from "../world";
 import { exchangeItems, sendInv } from "./inventory";
+import { changeCoin } from "./wallet";
 import { gainExp } from "./progression";
 import { onTalked, questCtx, questsView, sendQuests } from "./quests";
 import { byId } from "./lookup";
@@ -168,18 +171,40 @@ export function trade(w: World, sid: string, tradeId: unknown) {
   w.events.dialog(sid, buildDialog(w, r.p, r.c, r.npc));
 }
 
-/** Rèn đồ theo công thức: đứng gần NPC rèn, đủ nguyên liệu; trừ nguyên liệu và thêm đồ cùng lúc. */
+/**
+ * Phí Linh thạch của một công thức (`RecipeDef.coin`, M6): số nguyên dương trong 1..COIN_CAP, còn lại (thiếu, âm, lẻ, NaN) coi là
+ * miễn phí. Dữ liệu `shared/` đã được test giữ, đây chỉ là hàng rào thứ hai: một công thức hỏng không được làm tiền chảy lung tung.
+ */
+function craftFee(coin: unknown): number {
+  return typeof coin === "number" && Number.isInteger(coin) && coin > 0
+    ? Math.min(coin, COIN_CAP)
+    : 0;
+}
+
+/**
+ * Rèn đồ theo công thức: đứng gần NPC rèn, đủ Linh thạch (nếu có phí) và nguyên liệu, túi còn chỗ. TRỌN VẸN HOẶC KHÔNG GÌ CẢ:
+ * kiểm hết điều kiện trước, `exchangeItems` (làm trên bản sao, túi đầy thì không trừ gì) rồi mới trừ phí. Mọi thứ chạy đồng bộ trong
+ * một lượt nên không có chỗ nào để mất tiền mà không được đồ, hay được đồ mà không mất tiền; tiền chỉ có thể MẤT, không bao giờ tăng.
+ */
 export function craft(w: World, sid: string, recipeId: unknown) {
   const rc = byId(RECIPE_BY_ID, recipeId);
   const r = rc && nearNpc(w, sid, rc.npcId);
   if (!rc || !r) return;
+  const fee = craftFee(rc.coin);
+  if (r.c.coin < fee) {
+    return w.events.toast(sid, {
+      text: `Không đủ ${CURRENCY_NAME} (cần ${fee.toLocaleString("vi-VN")}).`,
+      tone: "bad",
+    });
+  }
   if (!rc.inputs.every((g) => countItem(r.c.inv, g.itemId) >= g.qty)) {
     return w.events.toast(sid, { text: "Không đủ nguyên liệu.", tone: "bad" });
   }
-  // exchangeItems làm trên bản sao: túi đầy thì không trừ gì, không mất nguyên liệu
+  // exchangeItems làm trên bản sao: túi đầy thì không trừ gì, không mất nguyên liệu (cũng chưa trừ phí)
   if (!exchangeItems(r.c.inv, rc.inputs, [rc.output])) {
     return w.events.toast(sid, { text: "Túi đồ đã đầy.", tone: "bad" });
   }
+  if (fee > 0) changeCoin(w, sid, -fee);
   w.events.toast(sid, { text: `Rèn thành công ${itemName(rc.output.itemId)}.`, tone: "good" });
   sendInv(w, sid, [{ ...rc.output }]);
 }
