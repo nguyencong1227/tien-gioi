@@ -93,10 +93,19 @@ try {
     mobile: false,
   });
   await send("Page.navigate", { url: `${BASE_URL}/?duel=mock&debug=1` });
-  for (let k = 0; k < 40; k++) {
+  let sceneReady = false;
+  for (let k = 0; k < 40 && !sceneReady; k++) {
     await sleep(300);
-    if (await evalJs("Boolean(window.__scene && window.__scene.me && window.__scene.me())")) break;
+    sceneReady = Boolean(
+      await evalJs("Boolean(window.__scene && window.__scene.me && window.__scene.me())"),
+    );
   }
+  // Báo RÕ khi không có client ở địa chỉ này (mặc định là cổng dev của B; cây khác truyền --url): trước đây script đi tiếp và chết
+  // ở lần dùng `window.__scene` đầu tiên bằng "Cannot read properties of undefined (reading 'me')" (nit của A ở #450)
+  if (!sceneReady)
+    throw new Error(
+      `Cảnh không sẵn sàng sau 12 giây ở ${BASE_URL}: cần client đang chạy (\`npm run dev -w client\`; cổng dev của B là 5183, cây khác truyền --url http://127.0.0.1:<cổng>) và chế độ mock ?duel=mock&debug=1`,
+    );
   await sleep(600);
 
   // Chế độ mock không chạy đối chiếu máy chủ: đặt vị trí đoán trước tại chỗ nhân vật và đưa camera về đó
