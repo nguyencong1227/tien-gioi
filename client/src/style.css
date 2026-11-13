@@ -1089,6 +1089,34 @@ html[data-input="touch"] .qt-head {
   text-shadow: 0 1px 2px #000;
 }
 
+/* Số thứ tự dòng hội thoại (máy tính): phím 1-9 chọn dòng; cảm ứng ẩn */
+.dlg-opt-btn .opt-key {
+  display: none;
+}
+@media (pointer: fine) and (min-width: 641px) {
+  .dlg-opt-btn .opt-key {
+    display: inline-block;
+    flex: none;
+    min-width: 16px;
+    padding: 0 4px;
+    border-radius: 3px;
+    border: 1px solid rgba(243, 220, 160, 0.6);
+    background: rgba(0, 0, 0, 0.45);
+    color: #ffe9b0;
+    font-family: inherit;
+    font-size: var(--fs-11, 11px);
+    font-weight: 700;
+    text-align: center;
+  }
+  .dlg-opt-btn:focus-visible,
+  .inv-slot:focus-visible,
+  .shop-qty-btn:focus-visible,
+  .act-btn:focus-visible {
+    outline: 2px solid #ffe08a;
+    outline-offset: 2px;
+  }
+}
+
 /* Nhãn phím trên nút (QUYET_DINH_M3 mục 13, #463): chỉ máy tính (con trỏ chính xác, màn rộng); cảm ứng / điện thoại ẩn hẳn */
 .keycap {
   display: none;
@@ -5634,4 +5662,9 @@ html[data-input="touch"][data-touch-scheme="dpad"][data-orient="portrait"] #btn-
 }
 html[data-input="touch"][data-touch-scheme="dpad"][data-orient="portrait"] #btn-portal {
   bottom: calc(max(14px, var(--safe-b, env(safe-area-inset-bottom, 0px))) + 370px);
+}
+
+/* thân hộp thoại nhận focus bằng mã (Enter / Cách tua chữ): không vẽ viền */
+#dlg-body:focus {
+  outline: none;
 }
