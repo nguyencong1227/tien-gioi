@@ -6,6 +6,7 @@ import {
   TRAVEL_JOIN_TIMEOUT_MS,
   JOIN_BAD_TOKEN,
   JOIN_NEED_CHARACTER,
+  QUESTS,
   getMap,
   isDungeonMap,
   type TravelToMsg,
@@ -578,6 +579,11 @@ async function start(room: Room, mapId: string) {
     (import.meta.env.DEV || new URLSearchParams(location.search).has("debug"))
   ) {
     (window as any).__ui = ui;
+    // Cho `check-quest-log.mjs` (#409): id mọi nhiệm vụ chính tuyến / lặp THẬT của game để nạp vào sổ nhiệm vụ
+    (window as any).__questIds = () => ({
+      main: QUESTS.filter((q) => !q.daily).map((q) => q.id),
+      daily: QUESTS.filter((q) => q.daily).map((q) => q.id),
+    });
     (window as any).__scene = activeScene;
     (window as any).__debugLimbo = (mockData?: LimboMsg) => {
       const mock: LimboMsg = mockData || {

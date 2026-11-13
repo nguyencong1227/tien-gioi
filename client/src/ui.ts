@@ -115,6 +115,7 @@ import {
   type SectConfirmKind,
 } from "./sect";
 import { canAffordFee, feeChipText, recipeFee } from "./forge-fee";
+import { doneRows, doneSummary } from "./quest-log";
 import { pickupBtnText, portalBtnText, talkBtnText } from "./ctx-btn";
 import { sound } from "./audio";
 import { transitionMs, waitOrSkip } from "./gfx/scene-transition";
@@ -903,9 +904,9 @@ function renderQuestModal() {
       container.append(card);
     }
   } else {
-    // Tab "Đã hoàn thành"
-    const finishedIds = [...questLog.done, ...questLog.dailyDone];
-    if (!finishedIds.length) {
+    // Tab "Đã hoàn thành": mỗi nhiệm vụ MỘT hàng gọn (bấm mới mở mô tả) để chuỗi ~20 nhiệm vụ không dài hàng chục màn hình (M6 #409)
+    const rows = doneRows(questLog.done, questLog.dailyDone);
+    if (!rows.length) {
       const p = document.createElement("p");
       p.style.opacity = "0.7";
       p.style.padding = "16px";
@@ -914,28 +915,45 @@ function renderQuestModal() {
       container.append(p);
       return;
     }
-    for (const qId of finishedIds) {
-      const def = QUEST_BY_ID[qId];
-      if (!def) continue;
-      const card = document.createElement("div");
-      card.className = "q-card";
+    const summary = document.createElement("p");
+    summary.className = "q-done-summary";
+    summary.textContent = doneSummary(rows);
+    container.append(summary);
+    for (const row of rows) {
+      const box = document.createElement("div");
+      box.className = "q-row";
 
-      const head = document.createElement("div");
-      head.className = "q-card-head";
-      const title = document.createElement("b");
-      title.className = "q-card-title";
-      title.textContent = def.title;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "q-row-btn";
+      btn.setAttribute("aria-expanded", "false");
+
+      const title = document.createElement("span");
+      title.className = "q-row-title";
+      title.textContent = row.title;
       const badge = document.createElement("span");
       badge.className = "qt-badge";
-      badge.textContent = questLog.dailyDone.includes(qId) ? "Đã xong hôm nay" : "Đã hoàn thành";
-      head.append(title, badge);
+      badge.textContent = row.daily ? "Xong hôm nay" : "Đã xong";
+      const chev = document.createElement("span");
+      chev.className = "q-row-chev";
+      chev.setAttribute("aria-hidden", "true");
+      chev.textContent = "▸";
+      btn.append(title, badge, chev);
 
       const desc = document.createElement("div");
-      desc.className = "q-card-desc";
-      desc.textContent = def.desc;
+      desc.className = "q-row-desc";
+      desc.textContent = row.desc;
+      desc.hidden = true;
 
-      card.append(head, desc);
-      container.append(card);
+      btn.addEventListener("click", () => {
+        const open = desc.hidden;
+        desc.hidden = !open;
+        box.classList.toggle("open", open);
+        btn.setAttribute("aria-expanded", open ? "true" : "false");
+      });
+
+      box.append(btn, desc);
+      container.append(box);
     }
   }
 }
@@ -2246,7 +2264,8 @@ export const ui = {
     const bindTap = (id: string, fn: () => void) => {
       const el = $(id);
       if (!el) return;
-      let lastTap = 0;
+      // -Infinity (không phải 0): với 0, mọi `click` trong 300 ms đầu sau khi tải trang bị coi là trùng với một lần chạm và bỏ qua
+      let lastTap = -Infinity;
       el.addEventListener("pointerdown", (e) => {
         e.preventDefault();
         lastTap = performance.now();
