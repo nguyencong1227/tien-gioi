@@ -17,7 +17,7 @@
 
 ### Giao thức và dữ liệu lưu
 - **`PROTOCOL_VERSION` 1 -> 2:** client cũ không biết bản đồ và loài quái mới. `MIN_PROTOCOL_VERSION` KHÔNG đổi trong M6; có nâng nó trên bản chạy thật hay không là quyết định lúc phát hành.
-- Tệp lưu cũ vẫn nạp được; nhân vật ở Âm Sương lưu và qua cổng đủ tu vi, Linh thạch, túi đồ, nhiệm vụ (test Colyseus thật khứ hồi ba bản đồ, #429, #435).
+- Tệp lưu cũ vẫn nạp được. Test Colyseus thật ba bản đồ: khứ hồi Lạc Hà - Hắc Phong - Âm Sương kiểm tu vi và túi đồ ở cuối vòng (#429, #435); và kiểm tu vi, Linh thạch, túi đồ, sổ nhiệm vụ, cảnh giới, đồ đang mặc, mã kiếp SAU MỖI lần qua cổng, rớt mạng rồi nối lại, hai tab đua nhau, tệp lưu cũ (#454).
 
 ### Cân bằng (`docs/CAN_BANG.md`, mô phỏng bằng mã server thật)
 - Nhịp cả Kim Đan: **5,7 giờ** (săn bãi mới) / **5,2 giờ** (tối ưu), trong mục tiêu 5-7 giờ; hết Trúc Cơ ở 2 giờ 52 phút.
@@ -34,7 +34,7 @@
 ### Đo và kiểm
 - `perf:mobile` có kịch bản Âm Sương Trạch ba bậc, Hắc Phong và Lạc Hà (sương + thời tiết + nước BẬT) và đánh trùm; `leak:test` qua ba bản đồ; ảnh năm khung nhìn `capture-viewports --maps` (#448, #453).
 - **Số đo FPS:** đo bằng Chrome headless (SwiftShader) nên **không chặn trên FPS**; Âm Sương Thấp / Vừa / Cao JS p95 0,7 / 1,1 / 1,4 ms, draw call 3 / 5 / 5, không nặng hơn Hắc Phong và Lạc Hà ở cùng bậc. **"Android tầm trung >= 50 FPS" CHƯA đo trên máy thật** (đo máy thật M5.4 còn mở).
-- Kiểm tự động thêm: `e2e:doc-duoc` (ô chặn đọc ra được trên ba bản đồ, #447), `check-quest-log`, `check-forge-shop`, `check-combat-fx` mục trùm, `docs/RA_SOAT_TAI_SAN.md` cập nhật tài sản M6 (#449, #450, #451).
+- Kiểm tự động thêm: `e2e:doc-duoc` (ô chặn đọc ra được trên ba bản đồ, #447), `check-quest-log`, `check-forge-shop`, `check-combat-fx` mục trùm (#449, #450, #451, #452), cổng trống do hệ điều hành cấp cho các script Chrome (#455), `docs/RA_SOAT_TAI_SAN.md` cập nhật tài sản M6 (#456).
 - Sửa kèm: `bindTap` bỏ qua mọi `click` trong 300 ms đầu sau khi tải trang (#449).
 
 ### Cần biết khi phát hành
