@@ -924,6 +924,37 @@ describe("sát thương THEO GIÂY lên người chơi (M7.3, #504: độc / b�
     expect(dotsOf(dmgs, "a")).toHaveLength(before);
   });
 
+  it("khu an toàn QUANH CỔNG (ngoài trấn, trong `safeR`) cũng thanh tẩy; ngay ngoài `safeR` thì không (review B ở #575: `inTown` thay `inSafe` từng sống)", () => {
+    const { w } = makeWorld();
+    // Cổng có vùng an toàn nằm hẳn ngoài trấn: điểm cách tâm cổng (safeR - 6) px
+    const portal = w.map.portals.find((p) => {
+      const x = p.x + (p.safeR - 6);
+      return w.map.inSafe(x, p.y) && !w.map.inTown(x, p.y);
+    });
+    expect(portal).toBeDefined();
+    const inside = { x: portal!.x + (portal!.safeR - 6), y: portal!.y };
+    const outside = { x: portal!.x + (portal!.safeR + 40), y: portal!.y };
+    expect(w.map.inSafe(outside.x, outside.y)).toBe(false);
+
+    const a = addPlayer(w, "a");
+    a.p.x = inside.x;
+    a.p.y = inside.y;
+    w.now = 10_000;
+    const hp0 = a.p.hp;
+    applyPlayerStatus(w, "a", eff("poison", 6000, 0.2), 100, "");
+    run(w, 10_000, 13_000);
+    expect(a.p.hp).toBe(hp0);
+    expect(w.statusP.has("a")).toBe(false);
+
+    // Ngay ngoài vùng an toàn của cổng: vẫn dính (chưa bị thanh tẩy)
+    a.p.x = outside.x;
+    a.p.y = outside.y;
+    w.now = 20_000;
+    applyPlayerStatus(w, "a", eff("poison", 6000, 0.2), 100, "");
+    run(w, 20_000, 22_000);
+    expect(a.p.hp).toBeLessThan(hp0);
+  });
+
   it("gắn độc lúc đang đứng trong khu an toàn (vd từ người khác): tick đầu tiên gỡ ngay, không trừ khí huyết nào", () => {
     const { w, dmgs } = makeWorld();
     const a = addPlayer(w, "a");
