@@ -54,6 +54,9 @@ import {
   DEFAULT_ORIGIN,
   ORIGIN_BUY_PREFIX,
   levelOf,
+  skillOf,
+  SKILL_MAX_LEVEL,
+  type SkillSlot,
   keepSlotsOf,
   nextCost,
   type LimboMsg,
@@ -132,6 +135,9 @@ import {
 import { captureOutcome, keysScreenModel } from "./keys-screen";
 import { LEAVE_BUTTONS, pickPromptButton, pickVisible, type PromptAnswer } from "./prompts";
 import { dirOfArrowKey, moveFocus, ownsArrowKeys, withFocusKept } from "./panel-nav";
+import { skillIconSvg } from "./skill-icon";
+import { elementColor } from "./skill-bar";
+import { type SkillRow, type SkillsPanelModel } from "./skills-panel";
 import { transitionMs, waitOrSkip } from "./gfx/scene-transition";
 import { getDisplay, onDisplayChange } from "./gfx/display";
 import {
@@ -227,6 +233,10 @@ export interface UiCallbacks {
   onSectMotd?: (motd: string) => void;
   onSectDeposit?: (amount: number) => void;
   onSectWithdraw?: (amount: number) => void;
+  /** Bảng Công pháp: gắn chiêu vào ô 2-5 (`skillId` "" = gỡ); máy chủ trả `skills` (sổ đúng) */
+  onSkillSlot?: (slot: SkillSlot, skillId: string) => void;
+  /** Bảng Công pháp vừa mở: cảnh dựng mô hình mới từ sổ chiêu hiện tại (`ui.setSkillsModel`) */
+  onSkillsOpen?: () => void;
 }
 
 export const fmt = (n: number) =>
@@ -253,6 +263,8 @@ let forgeNpcId = "tho_ren";
 let lastForgedItemId: string | null = null;
 let previewEquipItemId: string | null = null;
 let questModalOpen = false;
+let skillsModalOpen = false;
+let skillsModel: SkillsPanelModel | null = null;
 let mapModalOpen = false;
 let settingsModalOpen = false;
 let hideOtherNames = false;
@@ -2011,6 +2023,143 @@ const cachedBarPct: Record<string, number> = {};
 const cachedBarText: Record<string, string> = {};
 const cachedCooldownFrac: Record<string, number> = {};
 
+// ---------- Bảng Công pháp (M7.6, #507) ----------
+
+function renderSkillsModal() {
+  withFocusKept($("skills-modal"), renderSkillsModalImpl);
+}
+
+/** Một hàng chiêu: tên + tầng + hệ, số thật, hiệu ứng, mô tả, kinh quyển, và hàng nút gắn ô / gỡ (mũi tên + Enter đi theo hình học, `panel-nav.ts`). */
+function skillRowEl(row: SkillRow): HTMLElement {
+  const el = document.createElement("div");
+  el.className = `sk-row${row.slotNow !== null ? " equipped" : ""}`;
+  el.dataset.skill = row.id;
+
+  const head = document.createElement("div");
+  head.className = "sk-row-head";
+  const def = skillOf(row.id);
+  const ico = document.createElement("span");
+  ico.className = "sk-row-ico skico";
+  ico.setAttribute("aria-hidden", "true");
+  if (def) {
+    ico.innerHTML = skillIconSvg(def);
+    ico.style.setProperty("--si-c", elementColor(def.element));
+  }
+  const name = document.createElement("b");
+  name.className = "sk-row-name";
+  name.textContent = row.name;
+  const pips = document.createElement("span");
+  pips.className = "sk-row-pips";
+  pips.textContent = row.pips;
+  pips.setAttribute("aria-label", `Tầng ${row.level} trên ${SKILL_MAX_LEVEL}`);
+  const tag = document.createElement("small");
+  tag.className = "sk-row-tag";
+  tag.textContent = `${row.element} · ${row.shape}`;
+  head.append(ico, name, pips, tag);
+  if (row.slotNow !== null) {
+    const here = document.createElement("span");
+    here.className = "sk-row-badge";
+    here.textContent = `Đang ở ô ${row.slotNow}`;
+    head.append(here);
+  }
+  if (row.need) {
+    const need = document.createElement("span");
+    need.className = "sk-row-badge need";
+    need.textContent = row.need;
+    head.append(need);
+  }
+  el.append(head);
+
+  const lines = document.createElement("ul");
+  lines.className = "sk-row-stats";
+  for (const t of [...row.stats, ...row.effects]) {
+    const li = document.createElement("li");
+    li.textContent = t;
+    lines.append(li);
+  }
+  el.append(lines);
+
+  const desc = document.createElement("p");
+  desc.className = "sk-row-desc";
+  desc.textContent = row.desc;
+  const book = document.createElement("small");
+  book.className = "sk-row-book";
+  book.textContent = `Kinh quyển: ${row.book}`;
+  el.append(desc, book);
+
+  const actions = document.createElement("div");
+  actions.className = "sk-row-actions";
+  actions.setAttribute("role", "group");
+  actions.setAttribute("aria-label", `Gắn ${row.name} vào ô chiêu thức`);
+  for (const s of row.slots) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = `sk-slot-btn${s.here ? " here" : ""}${s.open ? "" : " locked"}`;
+    b.textContent = s.label;
+    b.title = s.aria;
+    b.setAttribute("aria-label", s.aria);
+    b.setAttribute("aria-pressed", String(s.here));
+    if (!s.open) b.setAttribute("aria-disabled", "true"); // vẫn focus được để nghe lý do; bấm chỉ báo, không gửi
+    b.dataset.nav = `skillslot:${row.id}:${s.slot}`;
+    b.addEventListener("click", () => {
+      if (s.blocked) {
+        ui.toast({ text: s.blocked, tone: "info" });
+        return;
+      }
+      if (s.here) return;
+      callbacks?.onSkillSlot?.(s.slot, row.id);
+    });
+    actions.append(b);
+  }
+  if (row.unequip !== null) {
+    const slot = row.slotNow!;
+    const u = document.createElement("button");
+    u.type = "button";
+    u.className = "sk-slot-btn unequip";
+    u.textContent = "Gỡ";
+    u.title = row.unequip;
+    u.setAttribute("aria-label", `${row.unequip} (Phím Delete)`);
+    u.dataset.nav = `skillunequip:${row.id}`;
+    u.addEventListener("click", () => callbacks?.onSkillSlot?.(slot, ""));
+    actions.append(u);
+  }
+  el.append(actions);
+  // Delete / Backspace trên bất kỳ nút nào của hàng: gỡ chiêu khỏi ô đang giữ (bàn phím, không cần tìm nút Gỡ)
+  el.addEventListener("keydown", (e) => {
+    if ((e.key !== "Delete" && e.key !== "Backspace") || e.repeat || row.slotNow === null) return;
+    e.preventDefault();
+    callbacks?.onSkillSlot?.(row.slotNow, "");
+  });
+  return el;
+}
+
+function renderSkillsModalImpl() {
+  const list = $("skills-list");
+  const emptyEl = $("skills-empty");
+  const countEl = $("skills-count");
+  if (!list || !skillsModel) return;
+  if (countEl) countEl.textContent = skillsModel.count;
+  if (emptyEl) {
+    emptyEl.hidden = skillsModel.empty === null;
+    if (skillsModel.empty !== null) emptyEl.textContent = skillsModel.empty;
+  }
+  list.replaceChildren();
+  if (skillsModel.empty !== null) {
+    const bag = document.createElement("button");
+    bag.type = "button";
+    bag.className = "sk-slot-btn";
+    bag.textContent = "Mở Túi đồ";
+    bag.dataset.nav = "skills:bag";
+    bag.addEventListener("click", () => {
+      ui.toggleSkillsModal(false);
+      ui.toggleInventory(true);
+    });
+    list.append(bag);
+    return;
+  }
+  for (const row of skillsModel.rows) list.append(skillRowEl(row));
+}
+
 // ---------- Luân hồi (M3.2) ----------
 let activeLimboMsg: LimboMsg | null = null;
 let activeSoulView: SoulView | null = null;
@@ -2947,6 +3096,8 @@ export const ui = {
     // Sổ nhiệm vụ
     bindTap("btn-quest", () => this.toggleQuestModal());
     bindTap("quest-close", () => this.toggleQuestModal(false));
+    bindTap("btn-skills", () => this.toggleSkillsModal());
+    bindTap("skills-close", () => this.toggleSkillsModal(false));
     bindTap("tab-q-active", () => {
       questTab = "active";
       $("tab-q-active").classList.add("active");
@@ -3379,6 +3530,33 @@ export const ui = {
     return questModalOpen;
   },
 
+  /** Bảng Công pháp (M7.6, #507): Shift+K / nút HUD; Esc đóng. Mô hình do cảnh dựng (`setSkillsModel`) vì sổ chiêu nằm ở cảnh. */
+  toggleSkillsModal(force?: boolean) {
+    skillsModalOpen = force ?? !skillsModalOpen;
+    $("skills-modal").hidden = !skillsModalOpen;
+    $("btn-skills").classList.toggle("active", skillsModalOpen);
+    $("btn-skills").setAttribute("aria-expanded", String(skillsModalOpen));
+    if (skillsModalOpen) {
+      modalStack.push("skills-modal", $("btn-skills"));
+      focusModal($("skills-modal"));
+      callbacks?.onSkillsOpen?.(); // cảnh dựng mô hình mới ngay (setSkillsModel) rồi vẽ ở dưới
+      renderSkillsModal();
+    } else {
+      modalStack.remove("skills-modal");
+      returnFocus($("btn-skills"));
+    }
+  },
+
+  isSkillsModalOpen() {
+    return skillsModalOpen;
+  },
+
+  /** Cảnh đưa mô hình bảng Công pháp (sổ chiêu đổi / vừa mở): đang mở thì vẽ lại, giữ focus bàn phím. */
+  setSkillsModel(m: SkillsPanelModel) {
+    skillsModel = m;
+    if (skillsModalOpen) renderSkillsModal();
+  },
+
   toggleMapModal(force?: boolean) {
     mapModalOpen = force ?? !mapModalOpen;
     $("map-modal").hidden = !mapModalOpen;
@@ -3449,6 +3627,10 @@ export const ui = {
       this.toggleQuestModal(false);
       closedAny = true;
     }
+    if (skillsModalOpen) {
+      this.toggleSkillsModal(false);
+      closedAny = true;
+    }
     if (mapModalOpen) {
       this.toggleMapModal(false);
       closedAny = true;
@@ -3494,6 +3676,9 @@ export const ui = {
         return true;
       case "quest-modal":
         this.toggleQuestModal(false);
+        return true;
+      case "skills-modal":
+        this.toggleSkillsModal(false);
         return true;
       case "map-modal":
         this.toggleMapModal(false);

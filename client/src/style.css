@@ -1737,6 +1737,112 @@ html[data-input="touch"] #skill-slots .sk.slot .keycap {
   display: none;
 }
 
+/* ---------- Bảng Công pháp (M7.6, #507) ---------- */
+.skills-hint {
+  margin: 2px 0 8px;
+  font-size: var(--fs-12);
+  opacity: 0.8;
+}
+.skills-list {
+  max-height: 440px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-right: 2px;
+}
+.sk-row {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 10px 12px;
+}
+.sk-row.equipped {
+  border-color: rgba(255, 224, 138, 0.7);
+}
+.sk-row-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+.sk-row-ico,
+.sk-row-ico svg {
+  width: 28px;
+  height: 28px;
+  display: inline-block;
+}
+.sk-row-name {
+  font-size: var(--fs-15);
+}
+.sk-row-pips {
+  color: #ffe08a;
+  letter-spacing: 1px;
+}
+.sk-row-tag {
+  opacity: 0.8;
+  font-size: var(--fs-12);
+}
+.sk-row-badge {
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: rgba(255, 224, 138, 0.18);
+  font-size: var(--fs-12);
+}
+.sk-row-badge.need {
+  background: rgba(200, 90, 60, 0.28);
+  color: #ffb4a0;
+}
+.sk-row-stats {
+  margin: 6px 0 2px;
+  padding-left: 18px;
+  font-size: var(--fs-12);
+}
+.sk-row-desc {
+  margin: 4px 0 2px;
+  font-size: var(--fs-12);
+  opacity: 0.85;
+}
+.sk-row-book {
+  display: block;
+  opacity: 0.7;
+  font-size: var(--fs-12);
+}
+.sk-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.sk-slot-btn {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--paper);
+  font: inherit;
+  font-size: var(--fs-13);
+  cursor: pointer;
+}
+.sk-slot-btn.here {
+  border-color: #ffe08a;
+  background: rgba(201, 162, 74, 0.35);
+}
+.sk-slot-btn.locked {
+  opacity: 0.45;
+  border-style: dashed;
+  cursor: not-allowed;
+}
+.sk-slot-btn.unequip {
+  border-color: #c0605a;
+}
+.sk-slot-btn:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+
 /* Thông báo nhận đồ góc phải ("+1 Nanh sói") */
 #gain-feed {
   position: fixed;

@@ -88,6 +88,8 @@ export interface SlotButton {
   /** Nhãn trên nút ("Ô 2") và mô tả đầy đủ cho `aria-label` / `title` */
   label: string;
   aria: string;
+  /** Thông báo khi bấm ô CHƯA MỞ (không gửi gì), null nếu ô mở */
+  blocked: string | null;
 }
 
 export interface SkillRow {
@@ -176,7 +178,7 @@ export function buildSkillsPanel(skills: SkillTracker, me: SlotMe): SkillsPanelM
       if (!open) aria = `Ô ${slot} chưa mở: ${unlockText(slot)}`;
       else if (here) aria = `${def.name} đang ở ô ${slot}`;
       else aria = `Gắn ${def.name} vào ô ${slot}${occupant ? `, thay ${occupant}` : ""}`;
-      return { slot, here, open, occupant, label, aria };
+      return { slot, here, open, occupant, label, aria, blocked: lockedSlotToast(slot, me) };
     });
     rows.push({
       id: def.id,

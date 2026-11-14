@@ -152,6 +152,8 @@ describe("buildSkillsPanel: mô hình bảng", () => {
     expect(hoa.slots[0].aria).toBe("Hỏa Vân Kiếm đang ở ô 2");
     expect(hoa.slots[1].aria).toBe("Gắn Hỏa Vân Kiếm vào ô 3");
     expect(hoa.slots[3].aria).toBe("Ô 5 chưa mở: Mở ở Nguyên Anh");
+    expect(hoa.slots[3].blocked).toBe("Ô chiêu thức 5 chưa mở: Mở ở Nguyên Anh.");
+    expect(hoa.slots[1].blocked).toBeNull();
     const bang = m.rows[1];
     expect(bang.slotNow).toBeNull();
     expect(bang.unequip).toBeNull();

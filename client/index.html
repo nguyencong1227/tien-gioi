@@ -57,6 +57,11 @@
           />
           <path d="M12 12v4M10 14h4" />
         </symbol>
+        <symbol id="i-skills" viewBox="0 0 24 24">
+          <path d="M5 4.5h11a2.5 2.5 0 0 1 2.5 2.5v13H7.5A2.5 2.5 0 0 1 5 17.5z" />
+          <path d="M5 17.5A2.5 2.5 0 0 1 7.5 15h11" />
+          <path d="M9 8.5h6M9 11.5h4" />
+        </symbol>
         <symbol id="i-quest" viewBox="0 0 24 24">
           <path d="M7 3.5h11a1.5 1.5 0 0 1 1.5 1.5v2.5H17V5" />
           <path d="M17 20.5H8a3 3 0 0 1-3-3V16h12z" />
@@ -565,6 +570,18 @@
               <span class="ico"
                 ><svg aria-hidden="true" focusable="false"><use href="#i-char" /></svg></span
               ><small>Nhân vật</small>
+            </button>
+            <button
+              type="button"
+              id="btn-skills"
+              class="hud-btn"
+              title="Công pháp (Shift+K)"
+              aria-label="Công pháp: gắn chiêu vào ô (Phím Shift+K)"
+              aria-expanded="false"
+            >
+              <span class="ico"
+                ><svg aria-hidden="true" focusable="false"><use href="#i-skills" /></svg></span
+              ><small>Công pháp</small>
             </button>
             <button
               type="button"
@@ -1195,6 +1212,38 @@
           <button type="button" id="tab-q-done" class="q-tab">Đã hoàn thành</button>
         </div>
         <div id="quest-list"></div>
+      </section>
+
+      <section
+        id="skills-modal"
+        class="panel modal-box sheet"
+        hidden
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="skills-title"
+        tabindex="-1"
+      >
+        <header class="inv-head">
+          <div>
+            <h2 id="skills-title">Công Pháp</h2>
+            <small id="skills-count">0 chiêu đã học</small>
+          </div>
+          <button
+            type="button"
+            id="skills-close"
+            class="modal-close"
+            title="Đóng (Shift+K / Esc)"
+            aria-label="Đóng bảng công pháp (Phím Shift+K hoặc Esc)"
+          >
+            ✕
+          </button>
+        </header>
+        <p class="skills-hint">
+          Chọn ô để gắn chiêu (mũi tên + Enter), <b>Delete</b> gỡ khỏi ô. Chiêu mới học ở kinh quyển
+          trong Túi đồ.
+        </p>
+        <p id="skills-empty" class="lrelic-empty" hidden></p>
+        <div id="skills-list" class="skills-list"></div>
       </section>
 
       <section
