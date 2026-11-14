@@ -29,6 +29,9 @@ import {
   type SoulMsg,
   type RebornMsg,
   type SkillsMsg,
+  type StatusMsg,
+  moveSpeedMul,
+  sanitizeStatusList,
   PARTY_INVITE_TTL_MS,
   PARTY_SNAPSHOT_MS,
   NPC_BY_ID,
@@ -46,6 +49,7 @@ import {
   type TravelToMsg,
 } from "@tien-gioi/shared";
 import { changeCoin } from "../systems/wallet";
+import { applyPlayerStatus } from "../systems/status";
 import type { WorldRoom } from "./WorldRoom";
 import type { WorldState } from "../schema";
 
@@ -214,9 +218,13 @@ describe("rớt mạng và nối lại (#116)", () => {
     const invs: InvMsg[] = [];
     const wallets: WalletMsg[] = [];
     const quests: QuestsMsg[] = [];
+    const skills: SkillsMsg[] = [];
+    const statuses: StatusMsg[] = [];
     room.onMessage("inv", (m: InvMsg) => invs.push(m));
     room.onMessage("wallet", (m: WalletMsg) => wallets.push(m));
     room.onMessage("quests", (m: QuestsMsg) => quests.push(m));
+    room.onMessage("skills", (m: SkillsMsg) => skills.push(m));
+    room.onMessage("status", (m: StatusMsg) => statuses.push(m));
     for (const t of ["chat", "toast", "fx", "dmg", "party", "partyInvited", "dialog"])
       room.onMessage(t, () => {});
     rooms.push(room);
@@ -226,6 +234,8 @@ describe("rớt mạng và nối lại (#116)", () => {
       invs,
       wallets,
       quests,
+      skills,
+      statuses,
       me: () => (room.state as any).players.get(room.sessionId),
     };
   }
@@ -271,6 +281,28 @@ describe("rớt mạng và nối lại (#116)", () => {
     // Người khác vẫn thấy một nhân vật duy nhất
     expect(serverState(a.room).players.size).toBe(before);
     expect((serverRoom(a.room) as any).ghosts.size).toBe(0);
+  });
+
+  it("nối lại: nhận lại sổ chiêu và danh sách trạng thái (kèm cường độ tăng tốc) để client dự đoán đúng, không bị kéo giật (M7.2b)", async () => {
+    const a = await join("Noi Trang Thai");
+    const sid = a.room.sessionId;
+    const world = (serverRoom(a.room) as any).world;
+    expect(
+      applyPlayerStatus(world, sid, { status: "haste", ms: 8000, ratio: 0.35, chance: 1 }, 0, sid),
+    ).toBe("added");
+    dropConnection(a.room);
+    await waitFor(() => !a.room.connection.isOpen);
+    await sleep(200);
+    const r2 = await reconnectTo(a.room);
+    const sk = await waitFor(() => r2.skills[0]);
+    expect(sk.slots).toEqual(["", "", "", ""]);
+    const st = await waitFor(() => r2.statuses[0]);
+    const haste = st.list.find((e) => e[0] === "haste");
+    expect(haste).toBeTruthy();
+    expect(haste![2]).toBeCloseTo(0.35, 9);
+    expect(haste![1]).toBeGreaterThan(0);
+    // hệ số client suy ra từ tin khớp hệ số server đang dùng
+    expect(moveSpeedMul(sanitizeStatusList(st.list))).toBeCloseTo(world.ctrl.get(sid).moveMul, 9);
   });
 
   it("hết thời gian chờ thì dọn như rời phòng, đã lưu, token cũ vô hiệu", async () => {

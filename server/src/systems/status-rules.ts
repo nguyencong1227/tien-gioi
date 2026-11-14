@@ -5,6 +5,7 @@
 import {
   MAX_STATUSES,
   STUN_IMMUNE_MS,
+  statusCarriesRatio,
   statusMask,
   statusOf,
   type SkillEffect,
@@ -172,10 +173,16 @@ export function maskOf(box: StatusBox, now: number): number {
   return statusMask(box.list.filter((s) => s.until > now).map((s) => s.id));
 }
 
-/** Danh sách `[id, msLeft]` còn hiệu lực gửi cho chủ (`StatusMsg.list`): thời gian còn lại nguyên, >= 1. */
+/**
+ * Danh sách `[id, msLeft, ratio?]` còn hiệu lực gửi cho chủ (`StatusMsg.list`): thời gian còn lại nguyên, >= 1; `ratio` CHỈ cho tăng tốc / tê cóng
+ * (client cần để đoán trước di chuyển bằng `moveSpeedMul`). Cũng là đầu vào của `moveSpeedMul` ở server: cùng hàm với client.
+ */
 export function entriesOf(box: StatusBox, now: number): StatusEntry[] {
   const out: StatusEntry[] = [];
-  for (const s of box.list)
-    if (s.until > now) out.push([s.id, Math.max(1, Math.ceil(s.until - now))]);
+  for (const s of box.list) {
+    if (s.until <= now) continue;
+    const ms = Math.max(1, Math.ceil(s.until - now));
+    out.push(statusCarriesRatio(s.id) ? [s.id, ms, s.ratio] : [s.id, ms]);
+  }
   return out;
 }
