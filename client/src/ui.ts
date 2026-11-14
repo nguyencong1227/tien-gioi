@@ -136,8 +136,10 @@ import { transitionMs, waitOrSkip } from "./gfx/scene-transition";
 import { getDisplay, onDisplayChange } from "./gfx/display";
 import {
   CHAT_PREF_KEY,
+  MINIMAP_PREF_KEY,
   PARTY_PREF_KEY,
   TRACKER_PREF_KEY,
+  minimapOpen,
   panelOpen,
   parseTrackerPref,
 } from "./gfx/hud-compact";
@@ -252,6 +254,8 @@ let questModalOpen = false;
 let mapModalOpen = false;
 let settingsModalOpen = false;
 let hideOtherNames = false;
+/** Bản đồ nhỏ đang hiện (false = thu gọn thành nhãn tên khu, vẫn bấm được để mở bản đồ lớn). */
+let minimapVisible = true;
 let questTab: "active" | "done" = "active";
 let trackingQuestId: string | null = null;
 let currentName = "";
@@ -485,6 +489,7 @@ function loadSettings() {
   } catch {
     hideOtherNames = false;
   }
+  minimapVisible = minimapOpen(parseTrackerPref(readPref(MINIMAP_PREF_KEY)));
   // Chất lượng đồ hoạ (và class body.low-fx tương thích) do gfx/quality.ts quản lý (#323): một nguồn duy nhất
 }
 
@@ -819,6 +824,13 @@ interface PanelPrefHandle {
  * hẹp thu gọn, máy tính rộng mở), đã chọn thì lựa chọn của người chơi thắng ở mọi máy. `apply` vẽ trạng thái; nút `toggleId` đổi trạng thái.
  * `legacyCollapsedKey`: khoá cũ (1 = thu gọn) của bản trước, chỉ đọc khi chưa có khoá mới.
  */
+/** Vẽ trạng thái bản đồ nhỏ: `#minimap-wrap.collapsed` ẩn canvas (CSS), công tắc trong Cài đặt khớp. */
+function applyMinimap() {
+  document.getElementById("minimap-wrap")?.classList.toggle("collapsed", !minimapVisible);
+  const chk = document.getElementById("set-minimap") as HTMLInputElement | null;
+  if (chk) chk.checked = minimapVisible;
+}
+
 function setupPanelPref(
   opts: {
     key: string;
@@ -2961,6 +2973,7 @@ export const ui = {
     const sfxVal = $("set-sfx-val");
     const muteChk = $("set-mute") as HTMLInputElement;
     const hideNamesChk = $("set-hide-names") as HTMLInputElement;
+    const minimapChk = $("set-minimap") as HTMLInputElement;
     const qualitySel = $("set-quality") as HTMLSelectElement;
     const qualityNow = $("set-quality-now");
     const batterySaverChk = $("set-battery-saver") as HTMLInputElement;
@@ -2975,6 +2988,7 @@ export const ui = {
       sfxVal.textContent = `${sPct}%`;
       muteChk.checked = sound.isMuted();
       hideNamesChk.checked = hideOtherNames;
+      minimapChk.checked = minimapVisible;
       const q = getQuality();
       qualitySel.value = q.mode;
       qualityNow.textContent = `Đang dùng: ${TIER_NAME[q.tier]}`;
@@ -3003,6 +3017,8 @@ export const ui = {
         // Bỏ qua nếu trình duyệt chặn localStorage
       }
     });
+    minimapChk.addEventListener("change", () => this.toggleMinimap(minimapChk.checked));
+    applyMinimap();
     qualitySel.addEventListener("change", () => {
       setQualityMode(qualitySel.value as QualityMode);
     });
@@ -3357,6 +3373,18 @@ export const ui = {
 
   isMapModalOpen() {
     return mapModalOpen;
+  },
+
+  /** Bản đồ nhỏ đang hiện (không phải thu gọn thành nhãn). */
+  isMinimapOpen() {
+    return minimapVisible;
+  },
+
+  /** Hiện / thu gọn bản đồ nhỏ (phím Shift+M, Cài đặt): lựa chọn được nhớ (`tg_minimap_open`); thu gọn vẫn còn nhãn tên khu để bấm mở bản đồ lớn. */
+  toggleMinimap(force?: boolean) {
+    minimapVisible = force ?? !minimapVisible;
+    writePref(MINIMAP_PREF_KEY, minimapVisible ? "1" : "0");
+    applyMinimap();
   },
 
   isDialogOpen() {

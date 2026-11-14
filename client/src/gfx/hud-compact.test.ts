@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   CHAT_PREF_KEY,
   COMPACT_MAX_WIDTH,
+  MINIMAP_PREF_KEY,
   PARTY_PREF_KEY,
   isCompactHud,
+  minimapOpen,
   panelOpen,
   TRACKER_PREF_KEY,
   parseTrackerPref,
@@ -74,5 +76,20 @@ describe("hud-compact: panelOpen và khoá lưu", () => {
   });
   it("ba khoá lưu khác nhau", () => {
     expect(new Set([TRACKER_PREF_KEY, PARTY_PREF_KEY, CHAT_PREF_KEY]).size).toBe(3);
+  });
+});
+
+describe("hud-compact: bản đồ nhỏ hiện / thu gọn (QUYET_DINH_M3 mục 17.2)", () => {
+  it("chưa chọn thì HIỆN ở mọi màn (khác Tổ đội / Chat); đã chọn thì lựa chọn của người chơi thắng", () => {
+    expect(minimapOpen(null)).toBe(true);
+    expect(minimapOpen(true)).toBe(true);
+    expect(minimapOpen(false)).toBe(false);
+  });
+  it("khoá lưu riêng, đọc bằng parseTrackerPref: '1' hiện, '0' thu gọn, rác = chưa chọn (hiện)", () => {
+    expect(MINIMAP_PREF_KEY).toBe("tg_minimap_open");
+    expect(minimapOpen(parseTrackerPref("0"))).toBe(false);
+    expect(minimapOpen(parseTrackerPref("1"))).toBe(true);
+    for (const raw of [null, undefined, "", "x", 0, "true"])
+      expect(minimapOpen(parseTrackerPref(raw))).toBe(true);
   });
 });

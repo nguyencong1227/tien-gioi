@@ -99,6 +99,15 @@ describe("bảng phím mặc định (QUYET_DINH_M3 mục 13)", () => {
     expect(SKILL_SLOTS).toEqual([2, 3, 4, 5]);
   });
 
+  it("Shift+M bật / tắt bản đồ nhỏ, M vẫn mở bản đồ lớn (QUYET_DINH_M3 mục 17.2): không đụng chữ cái nào", () => {
+    const l = lookup();
+    expect(actionOfEvent(ev("KeyM", { shiftKey: true }), l)).toBe("panel.minimap");
+    expect(actionOfEvent(ev("KeyM"), l)).toBe("panel.map");
+    expect(DEFAULT_KEYMAP["panel.minimap"]).toEqual(["Shift+KeyM"]);
+    expect(keyLabels(DEFAULT_KEYMAP, "panel.minimap")).toEqual(["Shift+M"]);
+    expect(ACTION_BY_ID["panel.minimap"].world).toBe(false); // chạy cả khi bảng đang mở, như M
+  });
+
   it("không có phím nào gán cho hai hành động, và không phím mặc định nào là phím cố định (WASD, mũi tên, Esc)", () => {
     const seen = new Map<string, ActionId>();
     for (const a of ACTIONS)
