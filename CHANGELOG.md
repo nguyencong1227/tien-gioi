@@ -27,12 +27,12 @@
 
 ### Giao diện và đồ hoạ
 - **Giao diện gọn, không che màn chơi (bước 1/3, QUYET_DINH_M3 mục 15):** thẻ nhân vật chỉ còn tên, huy hiệu Kiếp, cảnh giới, ba thanh mảnh và một dòng chip (Linh thạch, đạo hữu trực tuyến) không bao giờ xuống dòng (cao 110 px thay vì 215 trên máy tính, 129 thay vì 350 trên điện thoại dọc). Sáu nút Nhân vật / Túi / Nhiệm vụ / Tông môn / Âm thanh / Cài đặt thành MỘT hàng biểu tượng cùng cỡ dưới bản đồ nhỏ (chú thích khi rê chuột, nhãn phím như cũ); màn dưới 480 px gộp vào nút ☰. `docs/THIET_KE_GIAO_DIEN_GON.md`, `npm run shot:layout` / `npm run e2e:giao-dien -w server`.
-- Nút Nhặt / Nói chuyện / Qua cổng hiện lại nhãn phím **F** ở góc nút trên máy tính (nhãn chữ trong nút chỉ còn tên ngắn từ M6, nên phím nằm ở chip `.keycap` như các nút kỹ năng; cảm ứng không hiện; đổi phím ở màn Phím tắt thì nhãn đổi theo).
 - Thị giác Âm Sương Trạch: bảng màu lục xám, sương dày nhất ba bản đồ, ma trơi, nước; chuyển cảnh Hắc Phong <-> Âm Sương; nước / đá / cây đọc ra được ở cả ba bậc chất lượng (#414, #447).
 - Quái và NPC mới có hoạt ảnh đầy đủ (đứng, đi, đánh, bị đánh, gục), 15 biểu tượng đồ mới, atlas 337 khung (#431).
 - **Hiệu ứng trùm:** đòn thường lên trùm nổi hơn (`boss-hit`), trùm gục nổ lớn (`boss-vanish`); màu hạt riêng từng loài Kim Đan; KHÔNG tăng trần hạt / emitter (#450).
 - Mũi tên chỉ đường nhiệm vụ biết sang bản đồ khác (chỉ tới cổng kế tiếp, #430); nhãn nút ngữ cảnh cố định (#443); nút Qua cổng không bị che (#438); chữ hồi sinh theo tên trấn (#424).
 - Bảng Lò Rèn hiện phí Linh thạch, tắt nút Rèn khi thiếu tiền (#432, #434); Sổ nhiệm vụ gọn khi chuỗi dài (tab "Đã hoàn thành" mỗi nhiệm vụ một hàng, #449).
+- Nút Nhặt / Nói chuyện / Qua cổng hiện lại nhãn phím **F** ở góc nút trên máy tính (nhãn chữ trong nút chỉ còn tên ngắn từ M6, nên phím nằm ở chip `.keycap` như các nút kỹ năng; cảm ứng không hiện; đổi phím ở màn Phím tắt thì nhãn đổi theo).
 
 ### Đo và kiểm
 - `perf:mobile` có kịch bản Âm Sương Trạch ba bậc, Hắc Phong và Lạc Hà (sương + thời tiết + nước BẬT) và đánh trùm; `leak:test` qua ba bản đồ; ảnh năm khung nhìn `capture-viewports --maps` (#448, #453).
