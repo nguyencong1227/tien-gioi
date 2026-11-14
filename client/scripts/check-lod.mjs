@@ -1,3 +1,4 @@
+import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 /* global console, setTimeout, fetch, process, Buffer */
 // Kiểm mức chi tiết thực thể theo hồ sơ chất lượng (hoạt ảnh ở xa theo farAnimHz, bóng đốm, bán kính nhãn tên) trong Chrome thật (M5.2 #329). Cần client đang chạy
 // (`npm run dev -w client`, cổng của dev B là 5183). Dùng chế độ mock (?duel=mock&debug=1&crowd=6) nên KHÔNG cần server.
@@ -20,7 +21,7 @@ const chrome = spawn(
   [
     "--headless=new",
     "--no-sandbox",
-    "--disable-gpu",
+    ...getChromeGpuFlags(),
     `--remote-debugging-port=${CDP_PORT}`,
     `--user-data-dir=${tmpDir}`,
     "about:blank",

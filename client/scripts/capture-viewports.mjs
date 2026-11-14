@@ -25,6 +25,7 @@ import { spawn, execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -559,8 +560,8 @@ async function main() {
     `--remote-debugging-port=${CDP_PORT}`,
     `--user-data-dir=${tmpChromeDir}`,
     "--no-sandbox",
-    "--disable-gpu",
     "--disable-dev-shm-usage",
+    ...getChromeGpuFlags(),
     "about:blank",
   ]);
 

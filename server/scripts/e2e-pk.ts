@@ -27,7 +27,7 @@ import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import WebSocket from "ws";
 import { DEFAULT_MAP, DEFAULT_MAP_ID, roomNameOf } from "@tien-gioi/shared";
-import { shown, listenWithRetry, removeTmpDirs } from "./e2e-kit";
+import { shown, listenWithRetry, removeTmpDirs, getChromeGpuFlags } from "./e2e-kit";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -212,7 +212,7 @@ async function main() {
       [
         "--headless=new",
         "--no-sandbox",
-        "--disable-gpu",
+        ...getChromeGpuFlags(),
         `--remote-debugging-port=${CDP}`,
         `--user-data-dir=${chromeDir}`,
         "--window-size=1280,720",

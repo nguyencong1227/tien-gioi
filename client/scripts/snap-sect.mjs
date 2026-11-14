@@ -1,3 +1,4 @@
+import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 /* global console, setTimeout, fetch, Buffer */
 import http from "node:http";
 import fs from "node:fs";
@@ -63,7 +64,7 @@ for (const sz of SIZES) {
     [
       "--headless=new",
       "--no-sandbox",
-      "--disable-gpu",
+      ...getChromeGpuFlags(),
       `--remote-debugging-port=${CDP_PORT}`,
       `--user-data-dir=${tmpChromeDir}`,
       `--window-size=${sz.w},${sz.h}`,

@@ -19,7 +19,15 @@ import express from "express";
 import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { HEARTBEAT_INTERVAL_MS, HEARTBEAT_TIMEOUT_MS, RESUME_TIMEOUT_MS } from "@tien-gioi/shared";
-import { Tab, sleep, shown, killChrome, removeTmpDirs, listenWithRetry } from "./e2e-kit";
+import {
+  Tab,
+  sleep,
+  shown,
+  killChrome,
+  removeTmpDirs,
+  listenWithRetry,
+  getChromeGpuFlags,
+} from "./e2e-kit";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
@@ -213,7 +221,7 @@ async function main() {
       [
         "--headless=new",
         "--no-sandbox",
-        "--disable-gpu",
+        ...getChromeGpuFlags(),
         `--remote-debugging-port=${CDP}`,
         `--user-data-dir=${chromeDir}`,
         "--window-size=1280,720",

@@ -1,3 +1,4 @@
+import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 /* global console, setTimeout, fetch, Buffer, process */
 // Kiểm điều khiển cảm ứng (M5.1 #327) trong Chrome thật bằng CHẠM THẬT nhiều điểm (CDP Input.dispatchTouchEvent).
 // Cần client đang chạy (npm run dev -w client). Dùng chế độ mock (?duel=mock&debug=1) nên KHÔNG cần server.
@@ -39,7 +40,7 @@ const chrome = spawn(
   [
     "--headless=new",
     "--no-sandbox",
-    "--disable-gpu",
+    ...getChromeGpuFlags(),
     `--remote-debugging-port=${CDP_PORT}`,
     `--user-data-dir=${tmpDir}`,
     "about:blank",

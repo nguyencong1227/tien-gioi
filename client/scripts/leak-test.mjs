@@ -24,6 +24,7 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const __filename = fileURLToPath(import.meta.url);
@@ -169,8 +170,8 @@ async function runLeakTest() {
     "--enable-precise-memory-info", // không có cờ này performance.memory bị làm nhiễu / lượng tử hoá (±2 MB), phép đo heap dao động
     `--user-data-dir=${tmpChromeDir}`,
     "--no-sandbox",
-    "--disable-gpu",
     "--disable-dev-shm-usage",
+    ...getChromeGpuFlags(),
     "about:blank",
   ]);
 

@@ -1,3 +1,4 @@
+import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 /* global console, setTimeout, fetch, Buffer */
 /**
  * Kiểm Sổ nhiệm vụ khi chuỗi dài (M6 #409 mục 2 và 4): tab "Đã hoàn thành" với MỌI nhiệm vụ chính tuyến + nhiệm vụ lặp đã xong,
@@ -104,7 +105,7 @@ async function main() {
     [
       "--headless=new",
       "--no-sandbox",
-      "--disable-gpu",
+      ...getChromeGpuFlags(),
       `--remote-debugging-port=${CDP_PORT}`,
       `--user-data-dir=${tmp}`,
       "about:blank",

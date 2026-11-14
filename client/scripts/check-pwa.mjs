@@ -1,3 +1,4 @@
+import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 /* global console, setTimeout, fetch, process */
 // Script kiểm tra PWA hoàn chỉnh theo Issue #251:
 // 1. Manifest đầy đủ trường (name, short_name, start_url, display: standalone, theme_color, background_color, icons 192/512 + maskable).
@@ -209,7 +210,7 @@ const chromeProcess = spawn("google-chrome", [
   `--remote-debugging-port=${CDP_PORT}`,
   `--user-data-dir=${tmpChromeDir}`,
   "--no-sandbox",
-  "--disable-gpu",
+  ...getChromeGpuFlags(),
   "--disable-dev-shm-usage",
   "about:blank",
 ]);
