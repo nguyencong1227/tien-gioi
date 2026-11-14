@@ -9,28 +9,37 @@ import { describe, expect, it } from "vitest";
  * không tăng nghiêm ngặt).
  *
  * Quy ước phát hành (PR phát hành do Dev A làm, tăng đồng loạt MỘT lần mỗi bản):
- *  - mọi `package.json` / khoá của app Android cùng một số phiên bản `X.Y.Z`;
+ *  - mọi `package.json` / khoá (kể cả mục workspace trong `package-lock.json`) và app Android cùng một
+ *    số phiên bản `X.Y.Z`;
  *  - `versionName` trong `app/android/app/build.gradle` = số đó;
- *  - mục đầu tiên của `CHANGELOG.md` là bản `X.Y.Z` đó (bỏ qua mục `[Unreleased]` nếu có);
- *  - `versionCode` = số bản phát hành đã có trong CHANGELOG (0.1.0 = 1, 0.1.1 = 2, ..., 0.2.0 = 5;
- *    mỗi bản tăng đúng 1). Bản vá 0.2.1 phải thêm mục CHANGELOG VÀ tăng versionCode lên 6.
+ *  - mục phát hành đầu tiên của `CHANGELOG.md` là bản `X.Y.Z` đó (chỉ tính mục có số phiên bản: mục
+ *    `## [Chưa phát hành]` mà PR tính năng ghi giữa hai bản KHÔNG được tính);
+ *  - `versionCode` >= số bản phát hành đã có trong CHANGELOG (0.1.0 = 1, 0.1.1 = 2, ..., 0.2.0 = 5, mỗi
+ *    bản phát hành tăng 1). Bản vá 0.2.1 phải thêm mục CHANGELOG VÀ tăng versionCode lên >= 6.
+ *    Cố ý dùng `>=` chứ không phải `===`: Google Play đòi versionCode tăng so với MỌI lần tải lên trước,
+ *    kể cả tải lại cùng một phiên bản (đổi khoá ký, sửa khai báo), lúc đó versionCode dư so với CHANGELOG.
  */
 const here = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(here, "..", "..");
+
+type Lock = { version?: string; packages?: Record<string, { version?: string }> };
 
 function read(rel: string): string {
   return readFileSync(path.join(rootDir, rel), "utf8");
 }
 
-function readJson(rel: string): Record<string, unknown> & { version?: string } {
-  return JSON.parse(read(rel)) as Record<string, unknown> & { version?: string };
+function readJson<T extends { version?: string }>(rel: string): T {
+  return JSON.parse(read(rel)) as T;
 }
 
-/** Các mục phát hành trong CHANGELOG theo thứ tự xuất hiện (mới nhất trước). */
+/**
+ * Các mục phát hành trong CHANGELOG theo thứ tự xuất hiện (mới nhất trước). Chỉ tính mục có số phiên bản
+ * `X.Y.Z`: `## [Chưa phát hành]` (quy ước của repo) hay `## [Unreleased]` đều bị bỏ.
+ */
 function changelogReleases(md: string): string[] {
   const out: string[] = [];
   for (const m of md.matchAll(/^## \[([^\]]+)\]/gm)) {
-    if (/^unreleased$/i.test(m[1])) continue;
+    if (!/^\d+\.\d+\.\d+$/.test(m[1])) continue;
     out.push(m[1]);
   }
   return out;
@@ -44,7 +53,7 @@ function parseGradle(gradle: string): { code: number; name: string } {
   return { code: Number(code[1]), name: name[1] };
 }
 
-const VERSION = readJson("package.json").version as string;
+const VERSION = readJson<{ version?: string }>("package.json").version as string;
 const GRADLE = parseGradle(read("app/android/app/build.gradle"));
 const RELEASES = changelogReleases(read("CHANGELOG.md"));
 
@@ -59,18 +68,22 @@ describe("số phiên bản phát hành khớp nhau", () => {
     "shared/package.json",
     "app/package.json",
   ])("%s cùng số phiên bản với root", (rel) => {
-    expect(readJson(rel).version).toBe(VERSION);
+    expect(readJson<{ version?: string }>(rel).version).toBe(VERSION);
   });
 
   it.each(["package-lock.json", "app/package-lock.json"])(
     "%s (đầu tệp và khoá gốc) cùng số phiên bản với root",
     (rel) => {
-      const lock = readJson(rel) as {
-        version?: string;
-        packages?: Record<string, { version?: string }>;
-      };
+      const lock = readJson<Lock>(rel);
       expect(lock.version).toBe(VERSION);
       expect(lock.packages?.[""]?.version).toBe(VERSION);
+    },
+  );
+
+  it.each(["client", "server", "shared"])(
+    "package-lock.json: mục workspace %s cùng số phiên bản với root",
+    (ws) => {
+      expect(readJson<Lock>("package-lock.json").packages?.[ws]?.version).toBe(VERSION);
     },
   );
 
@@ -82,16 +95,16 @@ describe("số phiên bản phát hành khớp nhau", () => {
     expect(RELEASES[0]).toBe(VERSION);
   });
 
-  it("versionCode = số bản phát hành trong CHANGELOG (tăng đúng 1 mỗi bản)", () => {
+  it("versionCode >= số bản phát hành trong CHANGELOG (bắt quên tăng; cho phép tăng dư)", () => {
     expect(new Set(RELEASES).size, "CHANGELOG có mục trùng số phiên bản").toBe(RELEASES.length);
-    expect(GRADLE.code).toBe(RELEASES.length);
+    expect(GRADLE.code).toBeGreaterThanOrEqual(RELEASES.length);
   });
 });
 
 describe("hàm đọc của kiểm phiên bản", () => {
-  it("changelogReleases bỏ [Unreleased], giữ thứ tự", () => {
+  it("changelogReleases chỉ tính mục có số phiên bản, giữ thứ tự", () => {
     const md =
-      "# Nhật ký\n\n## [Unreleased]\n- x\n\n## [0.2.1] — a\n\n## [0.2.0] — b\n\n## [0.1.0] — c\n";
+      "# Nhật ký\n\n## [Unreleased]\n- x\n\n## [Chưa phát hành] — M7\n- y\n\n## [0.2.1] — a\n\n## [0.2.0] — b\n\n## [0.1.0] — c\n";
     expect(changelogReleases(md)).toEqual(["0.2.1", "0.2.0", "0.1.0"]);
   });
 
