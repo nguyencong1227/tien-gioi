@@ -10,9 +10,9 @@ import { ROOM_NAME } from "@tien-gioi/shared";
 import { setAuditSink } from "../audit";
 
 const dataDir = mkdtempSync(path.join(tmpdir(), "tien-gioi-audit-room-"));
-import { freePort } from "../test-port";
+import { listenWithRetry } from "../test-port";
 
-// cổng do hệ điều hành cấp ở beforeAll (`freePort`): cổng ngẫu nhiên trong khoảng chồng nhau từng gây EADDRINUSE giữa các tệp chạy song song
+// cổng do hệ điều hành cấp ở beforeAll (`listenWithRetry`): tự động thử lại nếu gặp EADDRINUSE giữa các tệp chạy song song
 let PORT = 0;
 let server: Server;
 const rooms: Room[] = [];
@@ -24,8 +24,7 @@ beforeAll(async () => {
   const { defineRooms } = await import("./WorldRoom");
   server = new Server({ transport: new WebSocketTransport(), gracefullyShutdown: false });
   defineRooms(server);
-  PORT = await freePort();
-  await server.listen(PORT);
+  PORT = await listenWithRetry(server);
 });
 afterEach(async () => {
   setAuditSink(null);
