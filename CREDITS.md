@@ -67,6 +67,16 @@ Các thư viện mã nguồn mở dùng để đóng gói ứng dụng di độn
 | `@capacitor/android` | 8.6.0 | Ionic / Max Lynch ([github.com/ionic-team/capacitor](https://github.com/ionic-team/capacitor)) | **MIT** |
 | `@capacitor/app` | 8.1.2 | Ionic / Max Lynch ([github.com/ionic-team/capacitor-plugins](https://github.com/ionic-team/capacitor-plugins)) | **MIT** |
 
+### 5b. Thư viện chạy trong trình duyệt (đóng gói vào gói JavaScript của client)
+
+Giấy phép MIT yêu cầu giữ thông báo bản quyền và nội dung giấy phép trong bản phân phối: toàn văn nằm ở `client/public/notices.html` (được phát hành cùng game, đưa vào bộ nhớ đệm PWA và APK) và được liên kết từ Cài đặt, mục "Giới thiệu và ghi công" (`#set-credit-libs`). `client/src/credits-ui.test.ts` giữ ba nơi (CREDITS.md, `notices.html`, Cài đặt) khớp nhau và khớp phiên bản ở `client/package.json`.
+
+| Gói | Phiên bản | Tác giả / Nguồn | Giấy phép |
+|---|---|---|---|
+| `phaser` | 3.90.0 | Richard Davey, Phaser Studio Inc. ([phaser.io](https://phaser.io)); bản production dùng `phaser-arcade-physics.min.js` (#565) | **MIT** |
+| `colyseus.js` | 0.16.22 | Endel Dreyer ([colyseus.io](https://colyseus.io)) | **MIT** |
+| `@colyseus/schema` | đi kèm `colyseus.js` | Endel Dreyer | **MIT** |
+
 ---
 
 ## 6. Tài sản bên thứ ba có tệp trong repo (nguồn, tác giả, giấy phép, ngày, SHA-256)

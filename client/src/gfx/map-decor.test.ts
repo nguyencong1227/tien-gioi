@@ -13,6 +13,8 @@ import {
   validateStyle,
   type MapStyle,
   styleIdFor,
+  MAX_TILE_TINT_ALPHA,
+  planTileTint,
 } from "./map-style";
 import { NO_DECOR, buildDecorGrid, decorAtTile, decorCounts, hash01, hashId } from "./map-decor";
 
@@ -364,5 +366,43 @@ describe("Hàn Vân Lĩnh: kiểu băng nguyên (M7.8 #509) và xem trước ?de
     expect(styleIdFor("lac_ha", "?debug=1&style=__proto__")).toBe("lac_ha");
     expect(styleIdFor("lac_ha", "?debug=1")).toBe("lac_ha");
     expect(styleIdFor("lac_ha", "")).toBe("lac_ha");
+  });
+});
+
+describe("Màu phủ nền (tileTint): tuyết phủ ở Hàn Vân Lĩnh (M7.8 #509)", () => {
+  it("chỉ Hàn Vân Lĩnh khai báo; màu sáng và LẠNH, độ đậm trong trần (không xoá mất kiểu ô)", () => {
+    const hv = MAP_STYLES.han_van;
+    expect(hv.tileTint).toBeDefined();
+    expect(validateStyle(hv)).toEqual([]);
+    const t = hv.tileTint!;
+    const [r, g, b] = [(t.color >> 16) & 255, (t.color >> 8) & 255, t.color & 255];
+    expect(b).toBeGreaterThan(r); // lạnh
+    expect(Math.min(r, g, b)).toBeGreaterThan(200); // sáng (trắng xanh), không phải màu tối
+    expect(t.alpha).toBeGreaterThan(0.2);
+    expect(t.alpha).toBeLessThanOrEqual(MAX_TILE_TINT_ALPHA);
+    for (const [id, st] of Object.entries(MAP_STYLES))
+      if (id !== "han_van") expect(st.tileTint, id).toBeUndefined();
+  });
+
+  it("validateStyle: độ đậm ngoài trần / màu hỏng bị bắt; planTileTint: vắng hoặc 0 => null, quá trần thì kẹp", () => {
+    const base = MAP_STYLES.han_van;
+    expect(
+      validateStyle({
+        ...base,
+        tileTint: { color: 0xffffff, alpha: MAX_TILE_TINT_ALPHA + 0.01 },
+      }).join(),
+    ).toContain("tileTint.alpha");
+    expect(validateStyle({ ...base, tileTint: { color: 0xffffff, alpha: -0.1 } }).join()).toContain(
+      "tileTint.alpha",
+    );
+    expect(validateStyle({ ...base, tileTint: { color: 0x1000000, alpha: 0.2 } }).join()).toContain(
+      "tileTint.color",
+    );
+    expect(planTileTint(MAP_STYLES.lac_ha)).toBeNull();
+    expect(planTileTint({ ...base, tileTint: { color: 0xffffff, alpha: 0 } })).toBeNull();
+    expect(planTileTint(base)).toEqual(base.tileTint);
+    expect(planTileTint({ ...base, tileTint: { color: 0xffffff, alpha: 5 } })!.alpha).toBe(
+      MAX_TILE_TINT_ALPHA,
+    );
   });
 });

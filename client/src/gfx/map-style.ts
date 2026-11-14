@@ -25,6 +25,12 @@ export interface MapStyle {
   readonly label: string;
   /** Màu môi trường phủ lên cảnh (một sprite gradient, chỉ khi `ambient`); `alpha` 0..1. */
   readonly ambient: { readonly color: number; readonly alpha: number };
+  /**
+   * Màu phủ lên NỀN ô (một hình chữ nhật phủ cả bản đồ, trên lớp ô + dưới trang trí / nước / thực thể; không thêm ảnh, không thêm loại ô): làm nền sáng / lạnh theo
+   * vùng (tuyết phủ ở Hàn Vân Lĩnh) khi bộ ô dùng chung chỉ có cỏ xanh. Không nhân màu (nhuộm kiểu nhân chỉ làm tối): phủ thường nên kéo màu cỏ về phía `color`.
+   * Vắng = không phủ (chi phí 0). `alpha` 0..`MAX_TILE_TINT_ALPHA`.
+   */
+  readonly tileTint?: { readonly color: number; readonly alpha: number };
   /** Vignette (tối dần ra mép màn hình, chỉ khi `vignette`); `strength` 0..1. */
   readonly vignette: { readonly color: number; readonly strength: number };
   /** Sương (số mảng lấy từ hồ sơ `fogPatches`); `speed` px/giây trôi ngang. */
@@ -48,6 +54,8 @@ export interface MapStyle {
 
 /** Trần tổng mật độ trang trí mỗi ô: quá dày thì thành nhiễu, và `buildDecorGrid` cần tổng * 2 (hệ số đám hoa lớn nhất) <= 1. */
 export const MAX_DECOR_DENSITY = 0.5;
+/** Trần độ đậm của màu phủ nền: quá đậm thì xoá mất kiểu ô (đường, cát, nước phải còn phân biệt được). */
+export const MAX_TILE_TINT_ALPHA = 0.45;
 /** Trần hạt thời tiết mỗi giây: dưới trần hạt sống của bậc Cao (520) nhân tuổi thọ ngắn của hạt. */
 export const MAX_WEATHER_RATE = 40;
 
@@ -163,6 +171,8 @@ export const MAP_STYLES: Readonly<Record<string, MapStyle>> = {
     fog: { color: 0xe4f0fb, alpha: 0.3, speed: 7 },
     weather: { kind: "snow", rate: 11 },
     water: { shimmer: 0xe8f6ff, alpha: 0.4, speed: 4 },
+    // Tuyết phủ nền: kéo cỏ xanh của bộ ô dùng chung về trắng xanh (bộ ô không đổi, không thêm ảnh)
+    tileTint: { color: 0xe6f0fa, alpha: 0.36 },
     decor: {
       density: { tuft: 0.03, flower: 0.02, pebble: 0.045, mushroom: 0.008, bush: 0.04 },
       palette: {
@@ -209,6 +219,7 @@ export function validateStyle(s: MapStyle): string[] {
     ["vignette.color", s.vignette.color],
     ["fog.color", s.fog.color],
     ["water.shimmer", s.water.shimmer],
+    ...(s.tileTint ? ([["tileTint.color", s.tileTint.color]] as Array<[string, number]>) : []),
   ];
   for (const [k, c] of colors) if (!isColor(c)) errs.push(`${k} không phải màu 0..0xffffff`);
   if (!inRange(s.ambient.alpha, 0, 0.4))
@@ -218,6 +229,8 @@ export function validateStyle(s: MapStyle): string[] {
   if (!inRange(s.fog.speed, 0, 40)) errs.push("fog.speed ngoài 0..40 px/s");
   if (!inRange(s.water.alpha, 0, 0.5)) errs.push("water.alpha ngoài 0..0.5");
   if (!inRange(s.water.speed, 0, 40)) errs.push("water.speed ngoài 0..40 px/s");
+  if (s.tileTint && !inRange(s.tileTint.alpha, 0, MAX_TILE_TINT_ALPHA))
+    errs.push(`tileTint.alpha ngoài 0..${MAX_TILE_TINT_ALPHA} (phủ nền quá đậm)`);
   if (!inRange(s.weather.rate, 0, MAX_WEATHER_RATE))
     errs.push(`weather.rate ngoài 0..${MAX_WEATHER_RATE}`);
   if (s.weather.kind === "none" && s.weather.rate !== 0) errs.push("weather none mà rate != 0");
@@ -237,4 +250,11 @@ export function validateStyle(s: MapStyle): string[] {
       errs.push(`decor.palette.${k} phải đủ ${DECOR_VARIANTS} màu hợp lệ`);
   }
   return errs;
+}
+
+/** Màu phủ nền cần vẽ cho kiểu này, hoặc `null` (không khai báo / độ đậm 0: không tốn một hình chữ nhật phủ cả bản đồ). */
+export function planTileTint(s: MapStyle): { color: number; alpha: number } | null {
+  const t = s.tileTint;
+  if (!t || !(t.alpha > 0)) return null;
+  return { color: t.color, alpha: Math.min(MAX_TILE_TINT_ALPHA, t.alpha) };
 }
