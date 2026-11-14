@@ -592,10 +592,6 @@ export type LearnResult =
   | { ok: false; reason: "unknown" | "realm" | "maxed" };
 
 /**
- * Học chiêu từ kinh quyển (hoặc lên tầng nếu đã học). Kiểm: chiêu có trong bảng, đủ cảnh giới (`reqRealm` / `reqTier`), chưa đạt tầng tối đa.
- * Trả sổ MỚI (không sửa sổ cũ). Server gọi hàm này rồi mới trừ kinh quyển khỏi túi (trọn vẹn hoặc không gì cả).
- */
-/**
  * Đã đủ cảnh giới / bậc để học HOẶC DÙNG chiêu `def`? (`realm` cao hơn thì đủ bất kể bậc; cùng `reqRealm` thì cần `tier >= reqTier`). MỘT hàm cho
  * server (`learnSkill`, `cast`) và client (hiện "chưa đủ cảnh giới" ở bảng Công pháp / ô chiêu): kiếp mới có thể giữ chiêu đã khắc cần cảnh giới
  * cao hơn lúc mới tu (`rebirthSkills` không xét), nên lúc DÙNG phải kiểm lại. Cảnh giới / bậc không hữu hạn: chưa đủ.
@@ -609,6 +605,10 @@ export function skillReqMet(
   return realm > def.reqRealm || (realm === def.reqRealm && tier >= def.reqTier);
 }
 
+/**
+ * Học chiêu từ kinh quyển (hoặc lên tầng nếu đã học). Kiểm: chiêu có trong bảng, đủ cảnh giới (`reqRealm` / `reqTier`), chưa đạt tầng tối đa.
+ * Trả sổ MỚI (không sửa sổ cũ). Server gọi hàm này rồi mới trừ kinh quyển khỏi túi (trọn vẹn hoặc không gì cả).
+ */
 export function learnSkill(
   book: SkillBook,
   skillId: unknown,
