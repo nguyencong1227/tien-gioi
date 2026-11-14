@@ -1,17 +1,27 @@
 // Quái Nguyên Anh ở Hàn Vân Lĩnh (M7.5b, #506): chỉ sinh ở bản đồ thứ tư, số liệu suy từ loài Kim Đan cùng vai, hành vi và đạn hợp lệ.
 import { describe, expect, it } from "vitest";
 import {
+  BLOCKING,
   DROP_TABLES,
   COIN_DROPS,
   HAN_VAN_ID,
   ITEM_BY_ID,
+  ITEM_VALUE,
   MAPS,
   MONSTERS,
   MONSTER_BY_ID,
   MONSTER_CAP,
+  NGUYEN_ANH_RECIPES,
+  NPC_BY_ID,
+  PLAYER_RADIUS,
+  RECIPES,
+  SHOP_BY_NPC,
+  buyPrice,
   expToNext,
   getMap,
+  npcsOfMap,
   phaseOf,
+  sellPrice,
   stepOf,
   statsFor,
 } from "./index";
@@ -128,5 +138,134 @@ describe("Hàn Vân Lĩnh: quái Nguyên Anh (M7.5b)", () => {
       expect(COIN_DROPS[id], `${id} tiền`).toBeDefined();
     }
     expect(els.size).toBeGreaterThanOrEqual(3);
+  });
+});
+
+const NA_MATERIALS = [
+  "han_lang_mao",
+  "phong_nha_vu",
+  "tuong_cot",
+  "doc_tuoc_nang",
+  "thien_han_chau",
+];
+const NA_GEAR = ["han_vu_kiem", "han_lang_bao", "phong_nha_phu", "tuyet_hanh_ngoa", "han_tinh_boi"];
+const NA_PILLS = ["thuong_hoi_huyet_dan", "thuong_hoi_linh_dan"];
+
+describe("Nguyên Anh: vật phẩm, rèn, cửa hàng (M7.5c)", () => {
+  it("mười hai vật phẩm có thật, đúng loại; nguyên liệu mỗi loài một thứ và rơi đúng loài (trùm rơi Thiên Hàn châu)", () => {
+    for (const id of [...NA_MATERIALS, ...NA_GEAR, ...NA_PILLS])
+      expect(ITEM_BY_ID[id], id).toBeDefined();
+    for (const id of NA_MATERIALS) expect(ITEM_BY_ID[id].type, id).toBe("material");
+    for (const id of NA_GEAR) expect(ITEM_BY_ID[id].type, id).toBe("equip");
+    for (const id of NA_PILLS) expect(ITEM_BY_ID[id].type, id).toBe("consumable");
+    const OWN: Record<string, string> = {
+      han_lang: "han_lang_mao",
+      phong_nha: "phong_nha_vu",
+      cot_tuong: "tuong_cot",
+      doc_tuoc: "doc_tuoc_nang",
+      thien_han_vuong: "thien_han_chau",
+    };
+    for (const [monster, mat] of Object.entries(OWN)) {
+      expect(
+        DROP_TABLES[monster].some((d) => d.itemId === mat),
+        `${monster} rơi ${mat}`,
+      ).toBe(true);
+      // nguyên liệu của loài này không rơi từ loài khác (trừ Độc Tước nang rơi thêm từ trùm, như Độc nang ở Hắc Giao)
+      for (const [other, ot] of Object.entries(DROP_TABLES))
+        if (other !== monster && NA.includes(other) && mat !== "doc_tuoc_nang")
+          expect(
+            ot.some((d) => d.itemId === mat),
+            `${other} KHÔNG rơi ${mat}`,
+          ).toBe(false);
+    }
+    expect(DROP_TABLES.thien_han_vuong.find((d) => d.itemId === "thien_han_chau")!.chance).toBe(1);
+  });
+
+  it("bộ IV: mặc được từ Nguyên Anh sơ kỳ, độ hiếm 4, chỉ số vừa ~29 % chỉ số gốc ở bậc đầu (không vượt 40 %) và cao hơn mọi món Kim Đan cùng ô", () => {
+    const base = statsFor(4, 0);
+    for (const id of NA_GEAR) {
+      const it = ITEM_BY_ID[id];
+      expect(it.equip!.reqRealm, id).toBe(4);
+      expect(it.equip!.reqTier, id).toBe(0);
+      expect(it.rarity, id).toBe(4);
+    }
+    expect(ITEM_BY_ID.han_vu_kiem.equip!.stats.atk! / base.atk).toBeGreaterThan(0.25);
+    expect(ITEM_BY_ID.han_vu_kiem.equip!.stats.atk! / base.atk).toBeLessThan(0.4);
+    expect(ITEM_BY_ID.han_lang_bao.equip!.stats.hp! / base.maxHp).toBeGreaterThan(0.25);
+    expect(ITEM_BY_ID.han_lang_bao.equip!.stats.hp! / base.maxHp).toBeLessThan(0.4);
+    // cao hơn đồ Kim Đan hậu kỳ cùng ô (bộ III / hài / ngọc bội giao)
+    expect(ITEM_BY_ID.han_vu_kiem.equip!.stats.atk!).toBeGreaterThan(
+      ITEM_BY_ID.hac_giao_kiem.equip!.stats.atk!,
+    );
+    expect(ITEM_BY_ID.han_lang_bao.equip!.stats.hp!).toBeGreaterThan(
+      ITEM_BY_ID.giao_lan_bao.equip!.stats.hp!,
+    );
+    expect(ITEM_BY_ID.phong_nha_phu.equip!.stats.speed!).toBeGreaterThan(
+      ITEM_BY_ID.giao_long_phu.equip!.stats.speed!,
+    );
+    expect(ITEM_BY_ID.tuyet_hanh_ngoa.equip!.stats.speed!).toBeGreaterThan(
+      ITEM_BY_ID.giao_anh_ngoa.equip!.stats.speed!,
+    );
+    expect(ITEM_BY_ID.han_tinh_boi.equip!.stats.hp!).toBeGreaterThan(
+      ITEM_BY_ID.giao_chau_boi.equip!.stats.hp!,
+    );
+  });
+
+  it("rèn: đúng năm công thức ở thợ rèn Hàn Vân, mỗi món bộ IV một công thức, CÓ phí, cao hơn giá bán thành phẩm, nguyên liệu kiếm được ở Hàn Vân", () => {
+    expect(NGUYEN_ANH_RECIPES).toHaveLength(5);
+    expect(RECIPES.filter((r) => r.npcId === "tho_ren_han")).toEqual(NGUYEN_ANH_RECIPES);
+    expect(NGUYEN_ANH_RECIPES.map((r) => r.output.itemId).sort()).toEqual([...NA_GEAR].sort());
+    const dropped = new Set(NA.flatMap((m) => DROP_TABLES[m].map((d) => d.itemId)));
+    for (const r of NGUYEN_ANH_RECIPES) {
+      expect(r.coin ?? 0, r.id).toBeGreaterThan(0);
+      let mats = 0;
+      for (const i of r.inputs) {
+        expect(
+          NA_MATERIALS.includes(i.itemId),
+          `${r.id}: ${i.itemId} là nguyên liệu Nguyên Anh`,
+        ).toBe(true);
+        expect(dropped.has(i.itemId), `${r.id}: ${i.itemId} rơi được ở Hàn Vân`).toBe(true);
+        expect(i.qty, r.id).toBeLessThanOrEqual(ITEM_BY_ID[i.itemId].stack);
+        mats += (ITEM_VALUE[i.itemId] ?? 0) * i.qty;
+      }
+      expect(sellPrice(r.output.itemId), r.id).toBeLessThan(mats + r.coin!);
+    }
+    // chỉ vũ khí cần Thiên Hàn châu (trùm đội 3-4 người)
+    expect(
+      NGUYEN_ANH_RECIPES.filter((r) => r.inputs.some((i) => i.itemId === "thien_han_chau")).map(
+        (r) => r.output.itemId,
+      ),
+    ).toEqual(["han_vu_kiem"]);
+  });
+
+  it("cửa hàng lái buôn Hàn Vân: đan cấp 1-3 (6 hàng), KHÔNG bán Tụ Khí Đan hay trang bị; mua rồi bán lại luôn lỗ; đan cấp 3 hồi nhiều hơn cấp 2", () => {
+    const shop = SHOP_BY_NPC.lai_buon_han;
+    expect(shop.itemIds).toHaveLength(6);
+    for (const id of shop.itemIds) {
+      expect(ITEM_BY_ID[id].type, id).toBe("consumable");
+      expect(buyPrice(id), id).toBeGreaterThan(sellPrice(id));
+    }
+    expect(shop.itemIds).not.toContain("tu_khi_dan");
+    const pct = (id: string) => (ITEM_BY_ID[id].effect as { pct: number }).pct;
+    expect(pct("thuong_hoi_huyet_dan")).toBeGreaterThan(pct("dai_hoi_huyet_dan"));
+    expect(pct("thuong_hoi_linh_dan")).toBeGreaterThan(pct("dai_hoi_linh_dan"));
+    for (const id of NA_PILLS) expect(shop.itemIds, id).toContain(id);
+  });
+
+  it("ba NPC Hàn Vân đứng trong trạm, trên ô đi lại được, cách nhau > 64 px, có lời thoại; thợ rèn và lái buôn dùng được", () => {
+    const hv = getMap(HAN_VAN_ID)!;
+    const npcs = npcsOfMap(HAN_VAN_ID);
+    expect(npcs.map((n) => n.id)).toEqual(["tram_truong_han", "lai_buon_han", "tho_ren_han"]);
+    for (const n of npcs) {
+      expect(hv.inTown(n.x, n.y), n.id).toBe(true);
+      expect(hv.circleBlocked(n.x, n.y, PLAYER_RADIUS), n.id).toBe(false);
+      expect(BLOCKING.has(hv.tileAt(Math.floor(n.x / 32), Math.floor(n.y / 32))), n.id).toBe(false);
+      expect(n.dialog.length, n.id).toBeGreaterThanOrEqual(2);
+    }
+    for (let i = 0; i < npcs.length; i++)
+      for (let j = i + 1; j < npcs.length; j++)
+        expect(Math.hypot(npcs[i].x - npcs[j].x, npcs[i].y - npcs[j].y)).toBeGreaterThan(64);
+    expect(SHOP_BY_NPC.lai_buon_han).toBeDefined();
+    expect(NPC_BY_ID.tho_ren_han && RECIPES.some((r) => r.npcId === "tho_ren_han")).toBe(true);
   });
 });
