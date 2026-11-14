@@ -125,7 +125,7 @@ describe("tickBolts", () => {
   });
 
   it("đạn nhanh không xuyên qua người (kiểm theo ĐOẠN bay, không theo điểm cuối)", () => {
-    const t = setup(200, { boltSpeed: 4000, boltRange: 400 });
+    const t = setup(170, { boltSpeed: 4000, boltRange: 400 }); // một tick bay 200 px: điểm cuối nằm 30 px SAU người chơi (ngoài bán kính trúng)
     fireBolt(t.w, t.mon.m, MONSTER_BY_ID[XA], 0);
     const hp0 = t.p.hp;
     tickBolts(t.w, 0.05); // 200 px một tick, bước qua người chơi
