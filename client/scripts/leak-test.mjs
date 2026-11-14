@@ -338,6 +338,20 @@ async function runLeakTest() {
             const sc2 = window.__scene;
             sc2.room.emit("fx", { kind: "cast", by: "leak-bot", skill: castIds[${i} % castIds.length], x: sc2.predX, y: sc2.predY, angle: (${i} % 8) * 0.785, range: 150 });
           }
+          // Báo trước đòn + đạn của quái (#508 bước 2): mỗi chu kỳ một vùng (xoay tròn / quạt / dải) và một đạn (xoay hệ) qua đúng đường tin nhắn; chúng tự hết hạn (ms + mờ) và Graphics về pool, nên cả vòng pool nằm trong chuỗi kiểm rò. Không dùng dấu huyền.
+          if (window.__scene && window.__scene.room && window.__scene.room.emit && window.__scene.telegraphs) {
+            const sc3 = window.__scene;
+            const shapes = ["circle", "cone", "line"];
+            const elems = [undefined, "hoa", "thuy", "moc", "bang"];
+            // Chu kỳ đầu (nằm trong khởi động): dội 40 vùng + 80 đạn để Graphics của pool lên TỚI TRẦN của bậc chất lượng ngay (vượt trần thì tái dùng); từ đó số đối tượng cơ sở không thể tăng thêm dù nhịp chu kỳ nhanh chậm khác nhau.
+            if (${i} === 0)
+              for (let k = 0; k < 80; k++) {
+                if (k < 40) sc3.room.emit("fx", { kind: "warn", shape: shapes[k % 3], x: sc3.predX, y: sc3.predY, r: 80, ms: 200 });
+                sc3.room.emit("fx", { kind: "bolt", x: sc3.predX, y: sc3.predY, angle: k * 0.3, speed: 800, range: 150 });
+              }
+            sc3.room.emit("fx", { kind: "warn", shape: shapes[${i} % 3], x: sc3.predX + 60, y: sc3.predY, r: 120, angle: (${i} % 8) * 0.785, arc: 1.2, w: 40, ms: 300 });
+            sc3.room.emit("fx", { kind: "bolt", x: sc3.predX, y: sc3.predY, angle: (${i} % 8) * 0.785, speed: 500, range: 250, element: elems[${i} % elems.length] });
+          }
           if (window.__scene) {
             if (window.__scene.fx) {
               window.__scene.fx.play("hit-spark", 100, 100, { priority: 2 });
