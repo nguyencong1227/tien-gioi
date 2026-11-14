@@ -733,7 +733,7 @@ describe("bot tránh đạn tầm xa: fx bolt (M7.10 #511)", () => {
     expect(zSH).not.toBeNull();
     expect(zSH!.shape).toBe("line");
     expect(zSH!.r).toBe(300);
-    expect(zSH!.w).toBe(24);
+    expect(zSH!.w).toBe(12); // 2 * BOLT_RADIUS (BOLT_RADIUS = 6 px)
     expect(zSH!.expiresAt).toBeCloseTo(realNow + (300 / 280) * 1000, 1);
 
     // Đạn Độc Thiềm: speed 220, range 260
@@ -750,7 +750,7 @@ describe("bot tránh đạn tầm xa: fx bolt (M7.10 #511)", () => {
     expect(zDT).not.toBeNull();
     expect(zDT!.shape).toBe("line");
     expect(zDT!.r).toBe(260);
-    expect(zDT!.w).toBe(24);
+    expect(zDT!.w).toBe(12); // 2 * BOLT_RADIUS (BOLT_RADIUS = 6 px)
     expect(zDT!.expiresAt).toBeCloseTo(realNow + (260 / 220) * 1000, 1);
   });
 
@@ -768,7 +768,7 @@ describe("bot tránh đạn tầm xa: fx bolt (M7.10 #511)", () => {
     const zone = parseWarnZoneFromFx(boltMsg, realNow)!;
     zone.targeted = true;
 
-    // Bot đang đứng ở (200, 205) - nằm ngay trên đường đạn
+    // Bot đang đứng ở (200, 205) - nằm ngay trên đường đạn (khoảng cách 5 px <= reach = 6 + 14 + buffer)
     const fakeBot = {
       predX: 200,
       predY: 205,
@@ -786,7 +786,7 @@ describe("bot tránh đạn tầm xa: fx bolt (M7.10 #511)", () => {
     expect(vec!.dy).toBeCloseTo(1, 2);
 
     // Bot bước né 5 tick (mỗi tick 7 px = 35 px theo phương y)
-    fakeBot.predY += 35; // y nay là 240 px, cách đường đạn 40 px > bán kính va chạm 24 px
+    fakeBot.predY += 35; // y nay là 240 px, cách đường đạn 40 px > bán kính va chạm reach (BOLT_RADIUS 6 + PLAYER_RADIUS 14)
     expect(isPointInWarnZone(fakeBot.predX, fakeBot.predY, zone, 0)).toBe(false);
 
     // Khi đạn bay qua hết tầm (t = realNow + 1300 ms)
