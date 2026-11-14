@@ -2,6 +2,28 @@
 
 Định dạng theo từng bản phát hành (thẻ `vX.Y.Z`). Số `#` là PR / issue trên GitHub.
 
+## [Chưa phát hành]: bản vá chơi hoàn toàn bằng bàn phím
+
+Người dùng chơi thử v0.1.2 thấy "thao tác trên bàn phím chưa hợp lý, phải dùng cả chuột". Bản vá làm cho máy tính chơi được TOÀN BỘ chỉ bằng bàn phím, chuột là tuỳ chọn (#463). **Không đổi luật chơi, dữ liệu nhân vật hay giao thức** (`PROTOCOL_VERSION` giữ 1, server không đổi). Cảm ứng / điện thoại giữ nguyên (nhãn phím và dòng mở màn Phím tắt chỉ hiện khi dùng chuột / bàn phím).
+
+### Thêm
+- **Bảng phím đổi được** (`client/src/keybinds.ts`, lưu ở `localStorage` khoá `tg_keymap`) và **màn "Phím tắt"** trong Cài đặt: liệt kê mọi phím, đổi phím chỉ bằng bàn phím (bấm "Đổi phím" rồi bấm phím mới, Esc huỷ, lấy phím của hành động khác thì hai bên đổi chỗ), khôi phục mặc định. Nhãn phím hiện trên nút kỹ năng / HUD (máy tính) và chữ hướng dẫn trong game đọc từ bảng phím nên không lệch khi đổi (#465, #469).
+- **Chọn mục tiêu không cần chuột:** Tab chọn mục tiêu gần nhất rồi đi xa dần, Shift+Tab ngược lại, Esc bỏ chọn; Cách (chém) và Kiếm khí tự khoá quái gần nhất đang thấy trên màn hình (#465, #468).
+- **Mũi tên + Enter trong mọi bảng** (túi đồ, nhân vật, cửa hàng, lò rèn, nhiệm vụ, tông môn, cài đặt, menu người chơi): mũi tên chuyển giữa các nút theo vị trí, Enter bấm, Esc đóng tầng trên cùng; vẽ lại bảng không làm mất vị trí đang chọn. Hộp thoại NPC chọn dòng bằng phím số 1-9 (#468).
+- **Y nhận / X từ chối lời mời** (tổ đội, bí cảnh, thách đấu, tông môn), **R** mở xác nhận rời bí cảnh / đầu hàng quyết đấu (Y xác nhận, X huỷ), **P** mở menu đồng đạo gần nhất (mời đội, thách đấu, mời tông môn); tấm kết quả bí cảnh / quyết đấu nhận focus (#470, #471).
+- **Màn Hoàng Tuyền chơi được bằng phím:** mũi tên + Enter chọn xuất thân, tích ký vật, mở Tam Sinh Thạch, đầu thai. Màn nhận focus ở khung (không ở nút nào) nên đang nhấn Cách / Enter lúc vừa gục không mua hay đầu thai nhầm; Esc không đóng màn (#471).
+
+### Đổi
+- Phím mặc định: Cách = chém (trước đây J cũng chém), **J = Sổ nhiệm vụ** (Q vẫn dùng được), 3 = Kiếm khí, 4 = Đả tọa (K / L vẫn dùng được), 1 / 2 vẫn là đan dược. Khi bảng hoặc hộp thoại đang mở, phím của thế giới (chém, kỹ năng, mục tiêu...) và WASD / mũi tên không điều khiển nhân vật (mũi tên dành cho điều hướng bảng); cần điều khiển ảo của cảm ứng không bị chặn (#465, #468).
+
+### Sửa
+- Thanh trượt âm lượng ở đầu Cài đặt không còn nuốt mũi tên Lên / Xuống (trước đó chỉ còn Tab để đi tiếp) (#469).
+- Bấm nút trong menu người chơi (mời đội, thách đấu, mời tông môn, ✕) bằng chuột không còn làm WASD và phím thế giới ngừng chạy cho tới khi bấm Esc (#471).
+- Y / X bỏ qua nút đang bị vô hiệu thay vì nuốt phím (#471).
+
+### Công cụ
+- E2E thật `npm run e2e:ban-phim -w server` (Chrome + server Colyseus thật, phím gửi bằng CDP, KHÔNG click chuột, hai người chơi cho mục mời đội / thách đấu): đổi phím, Tab / Shift+Tab / Esc, chém, kỹ năng, mở / đóng bảng, chat, túi, hội thoại NPC, cửa hàng, lò rèn, nhặt đồ, lời mời, rời bí cảnh, menu đồng đạo, Hoàng Tuyền, qua cổng. Mỗi PR có đột biến (vô hiệu một chức năng thì script đỏ). Thiết kế: `docs/THIET_KE_BAN_PHIM.md`.
+
 ## [0.1.2] — 13/11/2026: bản vá, bỏ chữ Hán khỏi giao diện
 
 Người dùng thấy chữ Hán trong game; bản vá đổi hết sang tiếng Việt hoặc biểu tượng vẽ. **Không đổi luật chơi, dữ liệu lưu hay giao thức** (`PROTOCOL_VERSION` giữ 1; `shared/src` không đổi logic).

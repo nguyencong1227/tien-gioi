@@ -150,6 +150,7 @@ async function main() {
   const { defineRooms } = await import("../src/rooms/WorldRoom.js");
   const { addMonster } = await import("../src/systems/test-helpers.js");
   const { giveItem } = await import("../src/systems/inventory.js");
+  const { spawnLoot } = await import("../src/systems/loot.js");
   const { changeCoin } = await import("../src/systems/wallet.js");
 
   const app = express();
@@ -1045,7 +1046,8 @@ async function main() {
     await tb.send("Page.addScriptToEvaluateOnNewDocument", {
       source: `localStorage.setItem("tg_newbie_guide_dismissed", "1"); localStorage.setItem("tien-gioi:name", ${JSON.stringify(NAME_B)}); localStorage.setItem("tien-gioi:secret", ${JSON.stringify(SECRET_B)});`,
     });
-    await tb.send("Page.navigate", { url: `http://127.0.0.1:${PORT}/?debug` });
+    // origin khác (localhost, không phải 127.0.0.1) để localStorage của B không đè tên / mã của A (A còn dùng khi qua cổng ở mục 16)
+    await tb.send("Page.navigate", { url: `http://localhost:${PORT}/?debug` });
     await tb.waitFor(
       `typeof window.__switchAuthView === 'function' && !!document.getElementById('login-form')`,
       "form đăng nhập của người chơi thứ hai",
@@ -1293,6 +1295,112 @@ async function main() {
       "Hết Hoàng Tuyền: thế giới nhận phím lại",
       !(await ev(shown("limbo-overlay"))) && !(await ev(`window.__ui.isKeyboardCaptured()`)),
       `captured=${await ev(`window.__ui.isKeyboardCaptured()`)} dialog=${await ev(`window.__ui.isDialogOpen()`)} menu=${await ev(`window.__ui.isPlayerMenuOpen()`)} focus=${await ev(`document.activeElement && (document.activeElement.id || document.activeElement.tagName)`)} open=${await ev(`[...document.querySelectorAll('[role=dialog]')].filter((e) => !e.hidden).map((e) => e.id).join(',')`)}`,
+    );
+
+    // ---- 15. Nhặt đồ rơi, lò rèn: chỉ bằng phím ----
+    const invCount = (itemId: string): number =>
+      (world.ctrl.get(sid).inv as Array<{ itemId: string; qty: number } | null>).reduce(
+        (n, slot) => n + (slot && slot.itemId === itemId ? slot.qty : 0),
+        0,
+      );
+    const digitKey = (n: number): Key => ({
+      key: String(n),
+      code: `Digit${n}`,
+      vk: 48 + n,
+      text: String(n),
+    });
+    // đang đứng ngoài trấn (không có NPC / cổng gần): F nhặt món đồ nằm cạnh
+    calmWorld();
+    const nanhBefore = invCount("nanh_soi");
+    const lootId = spawnLoot(world, "nanh_soi", 2, me.x + 30, me.y, "");
+    await t.waitFor(
+      `!!window.__scene.nearestLootId && window.__scene.state.loot.has(${JSON.stringify(lootId)})`,
+      "đồ rơi hiện ở máy A và là món gần nhất",
+    );
+    await press(t, K.f);
+    await sleep(500);
+    check(
+      "F nhặt đồ rơi: túi có thêm 2 Nanh Sói (server), món đồ biến khỏi đất",
+      invCount("nanh_soi") === nanhBefore + 2 && !world.state.loot.has(lootId),
+      `${nanhBefore} -> ${invCount("nanh_soi")}, còn trên đất=${world.state.loot.has(lootId)}`,
+    );
+    // lò rèn: F nói chuyện Thợ rèn, phím số chọn dòng "Lò rèn", mũi tên + Enter rèn
+    giveItem(world, sid, "long_tho", 12);
+    const longBefore = invCount("long_tho");
+    const baoBefore = invCount("tho_nhung_bao");
+    const smith = NPC_BY_ID["tho_ren"];
+    me.x = smith.x;
+    me.y = smith.y + 50;
+    world.ctrl.get(sid).lastHitAt = 0;
+    await t.waitFor(
+      `Math.abs(window.__scene.predX - ${Math.round(smith.x)}) < 40 && Math.abs(window.__scene.predY - ${Math.round(smith.y + 50)}) < 40 && window.__scene.closestNpcId === 'tho_ren'`,
+      "đứng cạnh Thợ rèn",
+    );
+    await press(t, K.f);
+    await t.waitFor(
+      `!!document.getElementById('dialog-modal') && !document.getElementById('dialog-modal').hidden`,
+      "hộp thoại Thợ rèn mở bằng F",
+    );
+    await press(t, K.enter); // tua chữ
+    await t.waitFor(
+      `document.querySelectorAll('#dlg-options .dlg-opt-btn').length > 0`,
+      "lựa chọn của Thợ rèn hiện",
+    );
+    const forgeOpt = Number(
+      await ev(
+        `[...document.querySelectorAll('#dlg-options .dlg-opt-btn')].findIndex((b) => /rèn/i.test(b.textContent))`,
+      ),
+    );
+    check('Thợ rèn có dòng "Lò rèn"', forgeOpt >= 0, String(forgeOpt));
+    await press(t, digitKey(forgeOpt + 1));
+    await t.waitFor(
+      `!!document.getElementById('forge-modal') && !document.getElementById('forge-modal').hidden`,
+      "lò rèn mở bằng phím số",
+    );
+    check(
+      "Phím số chọn dòng Lò rèn: bảng lò rèn mở",
+      !!(await ev(shown("forge-modal"))),
+      "không mở",
+    );
+    check(
+      "Mũi tên tới nút Rèn đầu tiên dùng được (Thổ Nhung Bào, đủ 12 Lông Thỏ)",
+      await arrowTo(t, "#forge-list .forge-btn:not(:disabled)", 30),
+      String(
+        await ev(
+          `document.activeElement && (document.activeElement.className || document.activeElement.tagName)`,
+        ),
+      ),
+    );
+    await press(t, K.enter);
+    await sleep(600);
+    check(
+      "Enter trên nút Rèn: trừ 12 Lông Thỏ và có thêm Thổ Nhung Bào (server)",
+      invCount("long_tho") === longBefore - 12 && invCount("tho_nhung_bao") === baoBefore + 1,
+      `lông ${longBefore} -> ${invCount("long_tho")}, áo ${baoBefore} -> ${invCount("tho_nhung_bao")}`,
+    );
+    await press(t, K.esc);
+    check("Esc đóng lò rèn", !(await ev(shown("forge-modal"))), "forge-modal vẫn mở");
+
+    // ---- 16. Qua cổng bằng phím F (CUỐI CÙNG: người chơi sang phòng khác) ----
+    const portal = DEFAULT_MAP.portals[0];
+    me.x = portal.x;
+    me.y = portal.y + 30;
+    world.ctrl.get(sid).lastHitAt = 0;
+    await t.waitFor(
+      `!!window.__scene.nearPortal && Math.hypot(window.__scene.predX - ${portal.x}, window.__scene.predY - ${portal.y}) < 80`,
+      "đứng trong vùng cổng",
+    );
+    await sleep(700); // vị trí thật của server đuổi kịp (server kiểm khoảng cách tới cổng)
+    await press(t, K.f);
+    await t.waitFor(
+      `window.__scene && window.__scene.map && window.__scene.map.def.id === ${JSON.stringify(portal.toMap)}`,
+      "sang bản đồ đích",
+      30000,
+    );
+    check(
+      `F ở ${portal.name}: sang bản đồ ${portal.toMap}`,
+      (await ev(`window.__scene.map.def.id`)) === portal.toMap,
+      String(await ev(`window.__scene.map.def.id`)),
     );
 
     check("0 lỗi console / exception", t.errors.length === 0, t.errors.slice(0, 3).join(" | "));
