@@ -1,26 +1,29 @@
 /**
- * HUD gọn trên điện thoại (M5.1, #326, `docs/THIET_KE_GIAO_DIEN_DO_HOA.md` mục 4.2): cột HUD trái (HUD + Tổ đội + Nhiệm vụ) cao 318 px =
- * 82-88 % chiều cao ở điện thoại NGANG (844x390 / 667x375 / 640x360) và 73 % ở điện thoại dọc thấp (360x640). Bảng Nhiệm vụ là phần có
- * thể thu gọn mà vẫn đủ thông tin (còn tiêu đề + số nhiệm vụ): mặc định THU GỌN ở máy "gọn", người chơi bấm tiêu đề để mở / thu và
- * lựa chọn được nhớ (`tg_qt_open`). Hàm thuần, test không cần DOM.
+ * HUD gọn (M5.1, #326, `docs/THIET_KE_GIAO_DIEN_DO_HOA.md` mục 4.2; QUYET_DINH_M3 mục 15, `docs/THIET_KE_GIAO_DIEN_GON.md`): trên màn hẹp các bảng nổi
+ * (Tổ đội, Nhiệm vụ, Chat) MẶC ĐỊNH THU GỌN để không che màn chơi; người chơi bấm tiêu đề để mở / thu và lựa chọn được nhớ (`tg_qt_open`,
+ * `tg_party_open`, `tg_chat_open`). Hàm thuần, test không cần DOM.
  */
 
 export const TRACKER_PREF_KEY = "tg_qt_open";
 
-/** Chiều cao khung nhìn (CSS px) dưới mức này thì điện thoại DỌC cũng coi là gọn (360x640 cao 640). */
-export const COMPACT_MAX_HEIGHT = 700;
+/** Chiều rộng khung nhìn (CSS px) dưới mức này thì coi là màn hẹp (cửa sổ trình duyệt nhỏ, máy tính bảng dọc nhỏ) dù không phải điện thoại. */
+export const COMPACT_MAX_WIDTH = 700;
 
 export interface HudDisplay {
   form: string;
   orient: string;
   cssH: number;
+  /** Chiều rộng khung nhìn; thiếu / hỏng thì chỉ xét `form` */
+  cssW?: number;
 }
 
-/** Điện thoại ngang, hoặc điện thoại dọc thấp: HUD phải gọn. Tablet / máy tính không bao giờ gọn. */
+/**
+ * Màn hẹp: MỌI điện thoại (dọc lẫn ngang, cao bao nhiêu cũng vậy) hoặc cửa sổ rộng dưới `COMPACT_MAX_WIDTH`. Máy tính / máy tính bảng đủ rộng thì không.
+ * (Trước đây điện thoại dọc cao >= 700 px được coi là thoáng: cửa sổ ~550x900 bị xếp ba bảng chồng lên nhau che nửa màn.)
+ */
 export function isCompactHud(d: HudDisplay): boolean {
-  if (d.form !== "phone") return false;
-  if (d.orient === "landscape") return true;
-  return Number.isFinite(d.cssH) && d.cssH < COMPACT_MAX_HEIGHT;
+  if (d.form === "phone") return true;
+  return typeof d.cssW === "number" && Number.isFinite(d.cssW) && d.cssW < COMPACT_MAX_WIDTH;
 }
 
 /** Lựa chọn đã lưu: "1" = mở, "0" = thu gọn, còn lại (chưa có / hỏng) = chưa chọn (null). */
@@ -28,7 +31,14 @@ export function parseTrackerPref(raw: unknown): boolean | null {
   return raw === "1" ? true : raw === "0" ? false : null;
 }
 
-/** Bảng Nhiệm vụ đang mở không: lựa chọn của người chơi thắng, chưa chọn thì mở trừ khi HUD gọn. */
-export function trackerOpen(pref: boolean | null, d: HudDisplay): boolean {
+/** Một bảng nổi đang mở không: lựa chọn của người chơi thắng, chưa chọn thì mở trừ khi màn hẹp. */
+export function panelOpen(pref: boolean | null, d: HudDisplay): boolean {
   return pref ?? !isCompactHud(d);
 }
+
+/** Bảng Nhiệm vụ (giữ tên cũ cho chỗ gọi và test có sẵn). */
+export const trackerOpen = panelOpen;
+
+/** Khoá lưu trạng thái mở / thu của Tổ đội và Chat ("1" = mở, "0" = thu gọn; cùng quy ước với `TRACKER_PREF_KEY`). */
+export const PARTY_PREF_KEY = "tg_party_open";
+export const CHAT_PREF_KEY = "tg_chat_open";

@@ -1,6 +1,6 @@
 /* global console, setTimeout, fetch, process */
-// Kiểm HUD gọn trên điện thoại (M5.1 #326): bảng Nhiệm vụ thu gọn mặc định ở điện thoại NGANG / dọc thấp, mở ở dọc cao / tablet / máy tính; bấm tiêu đề
-// để mở / thu, lựa chọn được nhớ (`tg_qt_open`) và thắng mặc định kể cả khi xoay máy; cột HUD trái cao <= 72 % chiều cao khi thu gọn. Chrome thật, chạm
+// Kiểm HUD gọn trên điện thoại (M5.1 #326; quy tắc mới ở QUYET_DINH_M3 mục 15): bảng Nhiệm vụ thu gọn mặc định ở MỌI điện thoại (dọc lẫn ngang) và cửa sổ hẹp
+// (< 700 px), mở ở tablet / máy tính đủ rộng; bấm tiêu đề để mở / thu, lựa chọn được nhớ (`tg_qt_open`) và thắng mặc định kể cả khi xoay máy; cột HUD trái cao <= 72 % chiều cao khi thu gọn. Chrome thật, chạm
 // thật (CDP). Cần client đang chạy (`npm run dev -w client`, cổng của dev B là 5183). Dùng chế độ mock (?duel=mock&debug=1) nên KHÔNG cần server.
 //   node client/scripts/check-hud.mjs [--url http://127.0.0.1:5183]
 import fs from "node:fs";
@@ -196,8 +196,8 @@ try {
   );
   s = await fresh(390, 844, true);
   check(
-    !s.collapsed && s.aria === "true" && s.listShown,
-    `điện thoại dọc cao 390x844: MỞ mặc định (cột ${s.colPct} %)`,
+    s.collapsed && s.aria === "false" && !s.listShown,
+    `điện thoại dọc cao 390x844: THU GỌN mặc định (mọi điện thoại thu gọn; cột ${s.colPct} %)`,
   );
   s = await fresh(768, 1024, true);
   check(!s.collapsed, "tablet 768x1024: mở mặc định");
@@ -206,6 +206,12 @@ try {
 
   // 2) Bấm tiêu đề mở / thu, nhớ lựa chọn, qua nạp lại trang
   s = await fresh(844, 390, true);
+  // có nhiệm vụ thì mở / thu mới đổi chiều cao (không có nhiệm vụ: bảng chỉ còn tiêu đề một dòng, QUYET_DINH_M3 mục 15)
+  await evalJs(
+    `window.__ui.onQuests({ active: [{ id: "nhap_the", step: 0, count: 0 }, { id: "tru_tho", step: 0, count: 3 }], done: [], dailyDone: [] });0`,
+  );
+  await sleep(150);
+  s = await state();
   const before = s.colH;
   await tap();
   s = await state();
@@ -231,17 +237,17 @@ try {
   check(s.collapsed && s.pref === "0", "nạp lại trang: lựa chọn THU GỌN được nhớ");
 
   // 3) Xoay máy: chưa chọn thì tự đổi theo độ gọn; đã chọn thì giữ
-  s = await fresh(390, 844, true);
-  check(!s.collapsed, "bắt đầu ở dọc cao, chưa chọn: mở");
-  await metrics(844, 390, true);
+  s = await fresh(768, 1024, true);
+  check(!s.collapsed, "bắt đầu ở tablet dọc 768x1024, chưa chọn: mở");
+  await metrics(390, 844, true);
   s = await state();
   check(
     s.collapsed && s.pref === null,
-    "xoay sang ngang (chưa chọn): tự THU GỌN, không ghi lựa chọn",
+    "đổi sang cỡ điện thoại 390x844 (chưa chọn): tự THU GỌN, không ghi lựa chọn",
   );
-  await metrics(390, 844, true);
+  await metrics(768, 1024, true);
   s = await state();
-  check(!s.collapsed && s.pref === null, "xoay lại dọc (chưa chọn): tự MỞ lại");
+  check(!s.collapsed && s.pref === null, "trở lại tablet 768x1024 (chưa chọn): tự MỞ lại");
   await metrics(844, 390, true);
   await tap(); // chọn MỞ ở ngang
   await metrics(360, 640, true); // dọc thấp, mặc định sẽ thu gọn
@@ -260,7 +266,7 @@ try {
       return JSON.stringify({ inButton: t.contains(h), btnText: t.textContent, shown: getComputedStyle(h).display !== "none" && !h.hidden,
         below: hr.top >= tr.bottom - 1, text: h.textContent });
     })()`).then((v) => JSON.parse(v));
-  await fresh(390, 844, true); // mở mặc định
+  await fresh(768, 1024, true); // tablet đủ rộng: mở mặc định (điện thoại thu gọn mặc định nên không dùng 390x844)
   let hs = await hintState();
   check(
     !hs.inButton && !/chỉ đường/i.test(hs.btnText),

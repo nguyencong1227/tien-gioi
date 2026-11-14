@@ -1109,7 +1109,7 @@ export class WorldScene extends Phaser.Scene {
         break;
       case "chat.open":
         // setTimeout để phím Enter vừa bấm không rơi vào ô chat vừa lấy focus
-        setTimeout(() => (document.getElementById("chat-input") as HTMLInputElement).focus(), 0);
+        setTimeout(() => ui.focusChat(), 0); // chat thu gọn: hiện ô nhập tạm rồi đưa con trỏ vào (ui.focusChat)
         break;
     }
   }
