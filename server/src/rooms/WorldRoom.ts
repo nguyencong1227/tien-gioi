@@ -232,6 +232,7 @@ export class WorldRoom extends Room<WorldState> {
         inv: (sid, msg) => this.sendTo(sid, "inv", msg),
         quests: (sid, msg) => this.sendTo(sid, "quests", msg),
         skills: (sid, msg) => this.sendTo(sid, SKILL_MSG.skills, msg),
+        status: (sid, msg) => this.sendTo(sid, SKILL_MSG.status, msg),
         dialog: (sid, msg) => this.sendTo(sid, "dialog", msg),
         party: (sid, msg) => this.sendTo(sid, "party", msg),
         partyInvited: (sid, msg) => this.sendTo(sid, "partyInvited", msg),

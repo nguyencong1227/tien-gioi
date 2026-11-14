@@ -9,6 +9,7 @@ import { tickParty } from "./party";
 import { tickDungeonRun, tickDungeons } from "./dungeon";
 import { tickDuels } from "./duel";
 import { tickSect } from "./sect";
+import { tickStatuses } from "./status";
 
 export function tickWorld(w: World, dtMs: number) {
   const dt = dtMs / 1000;
@@ -23,6 +24,7 @@ export function tickWorld(w: World, dtMs: number) {
     if ((w.tick + c.posPhase) % POS_SYNC_EVERY_TICKS === 0) syncPublicPos(p);
     if (!w.duels.has(sid)) tickRecovery(w, sid, p, c, dt); // trong trận thách đấu: không hồi khí huyết / linh lực, không đả tọa
   });
+  tickStatuses(w, dt); // trước quái: quái chết vì sát thương theo giây thì không còn bị cập nhật
   tickMonsters(w, dt);
   tickLoot(w);
   tickParty(w);
