@@ -20,6 +20,7 @@ import {
   planWarn,
   telegraphLimits,
   warnAlive,
+  warnCovers,
   warnArcSteps,
   warnFillAlpha,
   warnOutlineAlpha,
@@ -274,5 +275,63 @@ describe("telegraph: trần theo bậc chất lượng", () => {
     expect(boltTrailCount(telegraphLimits(4))).toBe(0);
     expect(boltTrailCount(telegraphLimits(10))).toBe(3);
     expect(boltTrailCount(telegraphLimits(24))).toBe(4);
+  });
+});
+
+describe("telegraph: warnCovers (mình có đang trong vùng báo không)", () => {
+  const P = (o: Partial<WarnMsg>) => planWarn(warn(o))!;
+  it("circle: trong bán kính + bề dày thân; sát mép tính là trong, ngay ngoài thì không", () => {
+    const c = P({ shape: "circle", x: 100, y: 100, r: 60 });
+    expect(warnCovers(c, 100, 100)).toBe(true);
+    expect(warnCovers(c, 160, 100)).toBe(true); // đúng mép
+    expect(warnCovers(c, 160.5, 100)).toBe(false);
+    expect(warnCovers(c, 175, 100, 16)).toBe(true); // thân bán kính 16 chạm vào vùng
+    expect(warnCovers(c, 177, 100, 16)).toBe(false);
+  });
+
+  it("line: hình viên thuốc quanh đoạn lao (nửa bề rộng + thân); phía sau điểm xuất phát chỉ trong đầu tròn", () => {
+    const l = P({ shape: "line", x: 0, y: 0, r: 280, w: 56, angle: 0 });
+    expect(warnCovers(l, 140, 0)).toBe(true);
+    expect(warnCovers(l, 140, 28)).toBe(true); // mép bên
+    expect(warnCovers(l, 140, 29)).toBe(false);
+    expect(warnCovers(l, 140, 40, 14)).toBe(true); // thân 14 chạm mép
+    expect(warnCovers(l, 140, 43, 14)).toBe(false);
+    expect(warnCovers(l, 280, 0)).toBe(true); // đúng đầu mút
+    expect(warnCovers(l, 281, 0)).toBe(true); // đầu tròn (28 px quanh đầu mút)
+    expect(warnCovers(l, 310, 0)).toBe(false);
+    expect(warnCovers(l, -20, 0)).toBe(true); // đầu tròn sau lưng quái
+    expect(warnCovers(l, -40, 0)).toBe(false);
+    // hướng khác: xuống (pi/2)
+    const down = P({ shape: "line", x: 0, y: 0, r: 280, w: 56, angle: Math.PI / 2 });
+    expect(warnCovers(down, 0, 200)).toBe(true);
+    expect(warnCovers(down, 200, 0)).toBe(false);
+  });
+
+  it("cone: trong bán kính và trong góc mở quanh hướng; thân rộng thì nới góc; sát tâm luôn trong", () => {
+    const c = P({ shape: "cone", x: 0, y: 0, r: 100, angle: 0, arc: Math.PI / 2 }); // +-45 độ
+    expect(warnCovers(c, 50, 0)).toBe(true);
+    expect(warnCovers(c, 50, 49)).toBe(true); // ~44,4 độ
+    expect(warnCovers(c, 50, 52)).toBe(false); // ~46,1 độ
+    expect(warnCovers(c, 50, 52, 10)).toBe(true); // thân 10 nới thêm góc
+    expect(warnCovers(c, 101, 0)).toBe(false);
+    expect(warnCovers(c, -50, 0)).toBe(false); // sau lưng
+    expect(warnCovers(c, -5, 0, 10)).toBe(true); // thân chạm tâm quạt
+    // hướng quanh góc +-pi: người ở phía trái, quạt hướng trái (angle = pi)
+    const left = P({ shape: "cone", x: 0, y: 0, r: 100, angle: Math.PI, arc: 1 });
+    expect(warnCovers(left, -50, 5)).toBe(true);
+    expect(warnCovers(left, -50, -5)).toBe(true); // vắt qua điểm nhảy +-pi
+    expect(warnCovers(left, 50, 0)).toBe(false);
+    // góc hướng ngoài [-pi, pi] (nhiều vòng): vẫn so đúng hướng, không "nhầm" phía đối diện thành cùng hướng
+    const wound = P({ shape: "cone", x: 0, y: 0, r: 100, angle: 4 * Math.PI + 1, arc: 1 });
+    expect(warnCovers(wound, Math.cos(1) * 50, Math.sin(1) * 50)).toBe(true);
+    expect(warnCovers(wound, -Math.cos(1) * 50, -Math.sin(1) * 50)).toBe(false);
+  });
+
+  it("số không hữu hạn: không bao giờ 'trong'", () => {
+    const c = P({ shape: "circle", x: 0, y: 0, r: 60 });
+    expect(warnCovers(c, NaN, 0)).toBe(false);
+    expect(warnCovers(c, 0, Infinity)).toBe(false);
+    expect(warnCovers(c, 0, 0, NaN)).toBe(false);
+    expect(warnCovers(c, 0, 0, -50)).toBe(true); // bề dày âm coi như 0
   });
 });
