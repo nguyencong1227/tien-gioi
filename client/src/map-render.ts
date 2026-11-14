@@ -58,6 +58,143 @@ export function canvasPixelSize(
   };
 }
 
+// ---------------------------------------------------------------- Camera (phóng to / kéo bản đồ lớn)
+
+/** Camera của bản đồ lớn: `zoom` (1 = vừa trọn bản đồ) và tâm nhìn (px thế giới). */
+export interface MapCamera {
+  readonly zoom: number;
+  readonly cx: number;
+  readonly cy: number;
+}
+
+export const MAP_MIN_ZOOM = 1;
+export const MAP_MAX_ZOOM = 8;
+/** Một nấc phóng (nút +/-, phím +/-, một vạch lăn chuột). */
+export const MAP_ZOOM_STEP = 1.25;
+
+/** Kích thước khung nhìn cho các hàm camera (điểm ảnh canvas): canvas `cw x ch`, lề `pad`, bản đồ `worldW x worldH` px thế giới. */
+export interface CameraBox {
+  readonly worldW: number;
+  readonly worldH: number;
+  readonly cw: number;
+  readonly ch: number;
+  readonly pad: number;
+}
+
+/** Camera vừa trọn bản đồ ở giữa (`zoom` 1). */
+export function fitCamera(box: Pick<CameraBox, "worldW" | "worldH">): MapCamera {
+  return { zoom: MAP_MIN_ZOOM, cx: box.worldW / 2, cy: box.worldH / 2 };
+}
+
+/** Khung nhìn (`MapView`) của camera: tỉ lệ = tỉ lệ vừa trọn x `zoom`, tâm nhìn nằm giữa canvas. */
+export function cameraView(box: CameraBox, cam: MapCamera): MapView {
+  const fit = fitView(box.worldW, box.worldH, box.cw, box.ch, box.pad);
+  const scale = fit.scale * cam.zoom;
+  return { scale, ox: box.cw / 2 - cam.cx * scale, oy: box.ch / 2 - cam.cy * scale };
+}
+
+function finiteOr(v: number, fallback: number): number {
+  return Number.isFinite(v) ? v : fallback;
+}
+
+/**
+ * Kẹp camera: `zoom` trong [`MAP_MIN_ZOOM`, `MAP_MAX_ZOOM`]; tâm nhìn sao cho khung nhìn không trượt ra ngoài bản đồ quá `pad` điểm ảnh
+ * (bản đồ nhỏ hơn khung ở chiều nào thì căn giữa chiều đó). Giá trị không hữu hạn rơi về camera vừa trọn. Luôn trả camera hợp lệ.
+ */
+export function clampCamera(box: CameraBox, cam: MapCamera): MapCamera {
+  const zoom = Math.min(MAP_MAX_ZOOM, Math.max(MAP_MIN_ZOOM, finiteOr(cam.zoom, MAP_MIN_ZOOM)));
+  const fit = fitView(box.worldW, box.worldH, box.cw, box.ch, box.pad);
+  const scale = fit.scale * zoom;
+  const axis = (c: number, world: number, view: number): number => {
+    const half = view / 2 / scale;
+    const lo = half - box.pad / scale;
+    const hi = world - half + box.pad / scale;
+    if (lo >= hi) return world / 2;
+    return Math.min(hi, Math.max(lo, finiteOr(c, world / 2)));
+  };
+  return { zoom, cx: axis(cam.cx, box.worldW, box.cw), cy: axis(cam.cy, box.worldH, box.ch) };
+}
+
+/** Điểm canvas (x, y) -> toạ độ thế giới (px) theo khung nhìn `v`. */
+export function canvasToWorld(v: MapView, x: number, y: number): { x: number; y: number } {
+  return { x: (x - v.ox) / v.scale, y: (y - v.oy) / v.scale };
+}
+
+/** Phóng / thu `factor` lần quanh điểm canvas (ax, ay): điểm thế giới dưới con trỏ đứng yên. Kết quả đã kẹp. */
+export function zoomCamera(
+  box: CameraBox,
+  cam: MapCamera,
+  factor: number,
+  ax: number,
+  ay: number,
+): MapCamera {
+  const f = finiteOr(factor, 1);
+  const before = clampCamera(box, cam);
+  const w = canvasToWorld(cameraView(box, before), ax, ay);
+  const zoom = Math.min(MAP_MAX_ZOOM, Math.max(MAP_MIN_ZOOM, before.zoom * (f > 0 ? f : 1)));
+  const scale = fitView(box.worldW, box.worldH, box.cw, box.ch, box.pad).scale * zoom;
+  return clampCamera(box, {
+    zoom,
+    cx: w.x - (ax - box.cw / 2) / scale,
+    cy: w.y - (ay - box.ch / 2) / scale,
+  });
+}
+
+/** Kéo bản đồ theo (dx, dy) điểm ảnh canvas (kéo sang phải thì bản đồ trượt sang phải). Kết quả đã kẹp. */
+export function panCamera(box: CameraBox, cam: MapCamera, dx: number, dy: number): MapCamera {
+  const before = clampCamera(box, cam);
+  const scale = cameraView(box, before).scale;
+  return clampCamera(box, {
+    zoom: before.zoom,
+    cx: before.cx - finiteOr(dx, 0) / scale,
+    cy: before.cy - finiteOr(dy, 0) / scale,
+  });
+}
+
+/** Đặt tâm nhìn vào điểm thế giới (x, y), giữ `zoom`. Kết quả đã kẹp. */
+export function centerCamera(box: CameraBox, cam: MapCamera, x: number, y: number): MapCamera {
+  return clampCamera(box, { zoom: cam.zoom, cx: x, cy: y });
+}
+
+/**
+ * Chụm hai ngón: từ cặp điểm (a0, b0) sang (a1, b1) -> phóng theo tỉ lệ khoảng cách quanh điểm giữa cũ rồi kéo theo dịch chuyển của điểm giữa.
+ * Hai ngón trùng nhau (khoảng cách 0) thì chỉ kéo. Kết quả đã kẹp.
+ */
+export function pinchCamera(
+  box: CameraBox,
+  cam: MapCamera,
+  a0: { x: number; y: number },
+  b0: { x: number; y: number },
+  a1: { x: number; y: number },
+  b1: { x: number; y: number },
+): MapCamera {
+  const d0 = Math.hypot(b0.x - a0.x, b0.y - a0.y);
+  const d1 = Math.hypot(b1.x - a1.x, b1.y - a1.y);
+  const m0 = { x: (a0.x + b0.x) / 2, y: (a0.y + b0.y) / 2 };
+  const m1 = { x: (a1.x + b1.x) / 2, y: (a1.y + b1.y) / 2 };
+  const zoomed =
+    d0 > 0 && d1 > 0 ? zoomCamera(box, cam, d1 / d0, m0.x, m0.y) : clampCamera(box, cam);
+  return panCamera(box, zoomed, m1.x - m0.x, m1.y - m0.y);
+}
+
+/** Khối ô nhìn thấy trong khung nhìn `v` (chỉ số ô, nửa mở `[x0, x1) x [y0, y1)`, kẹp trong bản đồ `w x h` ô): để chỉ vẽ phần cần. */
+export function visibleTiles(
+  v: MapView,
+  w: number,
+  h: number,
+  cw: number,
+  ch: number,
+): { x0: number; y0: number; x1: number; y1: number } {
+  const ppt = v.scale * TILE;
+  const clamp = (n: number, max: number) => Math.min(max, Math.max(0, n));
+  return {
+    x0: clamp(Math.floor(-v.ox / ppt), w),
+    y0: clamp(Math.floor(-v.oy / ppt), h),
+    x1: clamp(Math.ceil((cw - v.ox) / ppt), w),
+    y1: clamp(Math.ceil((ch - v.oy) / ppt), h),
+  };
+}
+
 // ---------------------------------------------------------------- Khu quái -> màu
 
 const ZONE_LOW: Rgb = [96, 200, 96];
@@ -242,9 +379,45 @@ export function terrainCanvas(
   return c;
 }
 
+const tileCache = new Map<string, HTMLCanvasElement>();
+
+/**
+ * Ảnh địa hình ở độ phân giải Ô THẬT (`ov.w x ov.h`, một điểm ảnh một ô), kèm lớp khu quái nếu `withZones`. Dùng khi mỗi ô được vẽ ra >= 1
+ * điểm ảnh (không ô nào bị mất): phóng bằng `drawImage` tắt làm mịn nên ranh giới ô sắc ở mọi mức phóng mà KHÔNG phải dựng ảnh khổng lồ.
+ */
+export function tileCanvas(ov: MapOverview, withZones: boolean): HTMLCanvasElement {
+  const key = `${ov.mapId}|${withZones ? "z" : "t"}`;
+  const hit = tileCache.get(key);
+  if (hit) return hit;
+  const c = document.createElement("canvas");
+  c.width = ov.w;
+  c.height = ov.h;
+  const ctx = c.getContext("2d");
+  if (ctx) {
+    ctx.putImageData(toImageData(terrainRGBA(ov, ov.w, ov.h), ov.w, ov.h), 0, 0);
+    if (withZones) {
+      const z = document.createElement("canvas");
+      z.width = ov.w;
+      z.height = ov.h;
+      const zctx = z.getContext("2d");
+      if (zctx) {
+        zctx.putImageData(toImageData(zoneRGBA(ov, ov.w, ov.h), ov.w, ov.h), 0, 0);
+        ctx.drawImage(z, 0, 0);
+      }
+    }
+  }
+  if (tileCache.size >= TERRAIN_CACHE_MAX) {
+    const oldest = tileCache.keys().next().value;
+    if (oldest !== undefined) tileCache.delete(oldest);
+  }
+  tileCache.set(key, c);
+  return c;
+}
+
 /** Quên mọi ảnh địa hình đã dựng (đổi cỡ canvas hàng loạt, hoặc test). */
 export function clearTerrainCache(): void {
   terrainCache.clear();
+  tileCache.clear();
 }
 
 /** Màu các lớp động / biểu tượng: giữ khớp chú giải trong `index.html` (`.lg.*`). */
@@ -321,8 +494,30 @@ export function drawMapBase(
   ctx.clearRect(0, 0, cw, ch);
   ctx.fillStyle = "#12170f";
   ctx.fillRect(0, 0, cw, ch);
-  const img = terrainCanvas(ov, Math.max(1, Math.round(mw)), Math.max(1, Math.round(mh)), big);
-  ctx.drawImage(img, v.ox, v.oy, mw, mh);
+  const ppt = v.scale * TILE;
+  if (ppt >= 1) {
+    // mỗi ô >= 1 điểm ảnh: vẽ ô thật, tắt làm mịn (ranh giới sắc, phóng bao nhiêu cũng không dựng ảnh lớn), chỉ phần đang nhìn thấy
+    const t = visibleTiles(v, ov.w, ov.h, cw, ch);
+    if (t.x1 > t.x0 && t.y1 > t.y0) {
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(
+        tileCanvas(ov, big),
+        t.x0,
+        t.y0,
+        t.x1 - t.x0,
+        t.y1 - t.y0,
+        v.ox + t.x0 * ppt,
+        v.oy + t.y0 * ppt,
+        (t.x1 - t.x0) * ppt,
+        (t.y1 - t.y0) * ppt,
+      );
+      ctx.imageSmoothingEnabled = true;
+    }
+  } else {
+    // thu nhỏ dưới 1 điểm ảnh một ô (bản đồ nhỏ trên màn thấp): ảnh hạ mẫu theo ưu tiên để nước / đường đất không mất
+    const img = terrainCanvas(ov, Math.max(1, Math.round(mw)), Math.max(1, Math.round(mh)), big);
+    ctx.drawImage(img, v.ox, v.oy, mw, mh);
+  }
   ctx.lineWidth = u;
   ctx.strokeStyle = "rgba(246, 239, 220, 0.35)";
   ctx.strokeRect(v.ox, v.oy, mw, mh);

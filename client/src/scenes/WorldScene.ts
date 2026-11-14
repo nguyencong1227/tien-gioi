@@ -146,9 +146,11 @@ import {
   type ActionId,
 } from "../keybinds";
 import { getMapOverview, type MapOverview } from "../map-overview";
+import { MapCameraControl, attachMapInput } from "../map-input";
 import {
   COMPACT_CANVAS_CSS_PX,
   MAP_COLORS,
+  cameraView,
   canvasPixelSize,
   drawDot,
   drawHaloText,
@@ -336,6 +338,10 @@ export class WorldScene extends Phaser.Scene {
   private navLabel!: Phaser.GameObjects.Text;
   private navLabelText = "";
   private lastMapDraw = 0;
+  /** Camera của bản đồ lớn (phóng / kéo, bám theo mình) và các cờ vẽ lại */
+  private readonly mapCtl = new MapCameraControl();
+  private mapWasOpen = false;
+  private mapRedrawPending = false;
 
   // Tái sử dụng Set và hồ đối tượng (object pool) để giảm cấp phát mỗi frame (#71)
   private seenIds = new Set<string>();
@@ -1026,6 +1032,18 @@ export class WorldScene extends Phaser.Scene {
     bind("sk-break", () => !this.isReconnecting && this.room.send("breakthrough"));
     for (const n of [2, 3, 4, 5] as const)
       bind(`sk-slot${n}`, () => this.runAction(`skill.slot${n}`));
+
+    // Bản đồ lớn: phóng / thu / kéo (chuột, cảm ứng, bàn phím, nút); mỗi thay đổi vẽ lại ngay (gộp theo khung hình)
+    const worldmap = document.getElementById("worldmap") as HTMLCanvasElement | null;
+    if (worldmap) {
+      this.mapCtl.onChange = () => this.redrawBigMap();
+      attachMapInput(this.mapCtl, {
+        canvas: worldmap,
+        zoomIn: document.getElementById("map-zoom-in"),
+        zoomOut: document.getElementById("map-zoom-out"),
+        recenter: document.getElementById("map-recenter"),
+      });
+    }
 
     const chatForm = document.getElementById("chat-form") as HTMLFormElement;
     const chatInput = document.getElementById("chat-input") as HTMLInputElement;
@@ -2063,7 +2081,24 @@ export class WorldScene extends Phaser.Scene {
     const ov = getMapOverview(this.map.def.id);
     if (!ov) return;
     if (ui.isMinimapOpen()) this.drawMapCanvas("minimap", ov, false);
-    if (ui.isMapModalOpen()) this.drawMapCanvas("worldmap", ov, true);
+    const open = ui.isMapModalOpen();
+    // mỗi lần MỞ bản đồ lớn: zoom 1, bám theo mình (đổi bản đồ lúc đang đóng cũng về mặc định)
+    if (open && !this.mapWasOpen)
+      this.mapCtl.reset({ worldW: this.map.worldW, worldH: this.map.worldH });
+    this.mapWasOpen = open;
+    if (open) this.drawMapCanvas("worldmap", ov, true);
+  }
+
+  /** Vẽ lại bản đồ lớn ngay (sau phóng / kéo), gộp nhiều sự kiện trong một khung hình. */
+  private redrawBigMap() {
+    if (this.mapRedrawPending) return;
+    this.mapRedrawPending = true;
+    requestAnimationFrame(() => {
+      this.mapRedrawPending = false;
+      if (!ui.isMapModalOpen()) return;
+      const ov = getMapOverview(this.map.def.id);
+      if (ov) this.drawMapCanvas("worldmap", ov, true);
+    });
   }
 
   /**
@@ -2087,13 +2122,22 @@ export class WorldScene extends Phaser.Scene {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     const { u } = size;
-    const v = fitView(this.map.worldW, this.map.worldH, size.w, size.h, (big ? 6 : 2) * u);
+    const pad = (big ? 6 : 2) * u;
+    let v = fitView(this.map.worldW, this.map.worldH, size.w, size.h, pad);
+    let zoomedIn = false;
+    if (big) {
+      // bản đồ lớn có camera: bám theo mình (đã phóng thì mình ở giữa) hoặc theo tay kéo
+      const box = { worldW: this.map.worldW, worldH: this.map.worldH, cw: size.w, ch: size.h, pad };
+      const cam = this.mapCtl.effective(box, this.predX, this.predY);
+      v = cameraView(box, cam);
+      zoomedIn = cam.zoom >= 2;
+    }
     const qLog = big ? ui.getQuestLog() : null;
     const qCtx = big ? ui.getQuestContext() : null;
     drawMapBase(ctx, ov, v, size.w, size.h, {
       u,
       big,
-      compact: big && canvas.clientWidth < COMPACT_CANVAS_CSS_PX,
+      compact: big && canvas.clientWidth < COMPACT_CANVAS_CSS_PX && !zoomedIn,
       markerOf: qLog && qCtx ? (npcId) => npcMarker(npcId, qLog, qCtx) : undefined,
     });
 
