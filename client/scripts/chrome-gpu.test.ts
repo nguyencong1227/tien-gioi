@@ -36,6 +36,33 @@ describe("chrome-gpu: phát hiện và cấu hình tăng tốc phần cứng GPU
     }
   });
 
+  it("detectGpu: tự động nhường GPU và lùi về phần mềm khi ComfyUI đang chạy (file lock tg-comfy.lock)", () => {
+    const lockPath = "/tmp/tg-comfy.lock";
+    const hadLockBefore = fs.existsSync(lockPath);
+    const origEnv = { ...process.env };
+    try {
+      delete process.env.DISABLE_GPU;
+      delete process.env.FORCE_SWIFTSHADER;
+      delete process.env.CI;
+      process.env.FORCE_GPU = "1";
+
+      fs.writeFileSync(lockPath, "pid=9999\n");
+      const res = detectGpu();
+      expect(res.hasGpu).toBe(false);
+      expect(res.reason).toBe("comfy_running");
+      expect(getChromeGpuFlags()).toEqual(["--disable-gpu"]);
+    } finally {
+      process.env = origEnv;
+      if (!hadLockBefore && fs.existsSync(lockPath)) {
+        try {
+          fs.unlinkSync(lockPath);
+        } catch {
+          // bỏ qua
+        }
+      }
+    }
+  });
+
   it("getChromeGpuFlags: sinh cờ phù hợp cho GPU hoặc fallback phần mềm", () => {
     const origEnv = { ...process.env };
     try {

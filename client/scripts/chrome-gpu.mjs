@@ -18,6 +18,16 @@ export function detectGpu() {
     return { hasGpu: false, reason: "ci_environment" };
   }
 
+  // Khóa GPU tự động khi dây chuyền ComfyUI + SDXL đang chạy (Mục 16.2 & Kế hoạch đồ họa AI G1)
+  const comfyLockPath = "/tmp/tg-comfy.lock";
+  const userRuntimeLock = process.env.XDG_RUNTIME_DIR
+    ? `${process.env.XDG_RUNTIME_DIR}/tg-comfy.lock`
+    : `/run/user/${process.getuid ? process.getuid() : 1000}/tg-comfy.lock`;
+
+  if (fs.existsSync(comfyLockPath) || fs.existsSync(userRuntimeLock)) {
+    return { hasGpu: false, reason: "comfy_running" };
+  }
+
   try {
     const hasNvidiaDevice = fs.existsSync("/dev/nvidia0");
     const hasNvidiaVulkan =
