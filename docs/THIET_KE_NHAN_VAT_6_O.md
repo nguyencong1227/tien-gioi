@@ -46,8 +46,10 @@
 - `MAP_STYLES.han_van` + `WeatherKind "snow"` + công thức hạt `weather-snow` (`recipes-weather.ts`), `styleIdFor` và xem trước `?debug&style=<id>` (id lạ / thiếu `?debug` bị bỏ qua), 4 test mới (nhiều khẳng định mỗi ca) + 1 test sửa (danh sách chờ), 6 đột biến đỏ.
 - `client/scripts/check-han-van-style.mjs` (Chrome thật): có hạt tuyết (tint `#f2f8ff`) mà cảnh mặc định không có; màu trung bình vùng giữa lạnh hơn bản mặc định (xanh - đỏ -47,4 -> -16,7); `?style=constructor` bị bỏ qua.
 
-## 8. Câu hỏi cho A
-1. Ba ô riêng của chủ: trường `@view(TAG_OWNER)` trên `Player` (đề xuất) hay mở rộng `InvMsg`?
-2. `statsFor` / `equipBonus` có trả `crit`, `cdr`, `guard` đã kẹp trần, và xuất `STAT_CAPS`?
-3. `TREASURES[].desc` do A viết (tiếng Việt hoàn chỉnh) hay B soạn từ số liệu?
-4. Nền ô vùng tuyết do A chọn khi dựng bản đồ, hay B thêm `tileTint` theo kiểu?
+## 8. Câu hỏi cho A và TRẢ LỜI (A, 15/11/2026; đây là hợp đồng để A viết `shared/` của M7.4, #505)
+1. **Ba ô riêng của chủ: trường `Player` `@view(TAG_OWNER)`** (`boots`, `jade`, `treasure`: chuỗi id, `""` = trống), như đề xuất: cùng đường với ba ô cũ, tự đồng bộ khi nối lại / qua cổng, không thêm loại tin, người khác không nhận byte nào. Máy chủ ghi vào `save.equipment` (đủ sáu ô) rồi phản chiếu ra `Player`. KHÔNG mở rộng `InvMsg`. `PROTOCOL_VERSION` đã là 3 cho M7 chưa phát hành; thêm trường trước khi phát hành thì không cần tăng thêm. `EquipSlot` thêm `boots | jade | treasure`, `EQUIP_SLOTS` theo thứ tự mục 2.1; `EQUIP_SLOT_UNLOCK_REALM: Partial<Record<EquipSlot, number>> = { treasure: 3 }` (Kim Đan là `realm` 3 trong `REALMS`).
+2. **Có.** `EquipStats` thêm `crit`, `cdr`, `guard`; `statsFor` / `equipBonus` trả tổng từ trang bị ĐÃ KẸP, kèm `STAT_CAPS = { crit: 50, cdr: 30, guard: 40 }` xuất từ `shared/` (số `crit` 50 là khởi đầu, M7.9 hiệu chỉnh; chỉ một chỗ để sửa). Trần chỉ áp lên phần TRANG BỊ; chiêu / trạng thái (hộ thể, tăng tốc...) là hệ số riêng, không nằm trong `statsFor`. Client so với `STAT_CAPS` để ghi "(tối đa)", không tự kẹp.
+3. **A viết `TREASURES[].desc`** (câu tiếng Việt hoàn chỉnh) cạnh số liệu ở `shared/`, kèm test "desc nhắc đúng từng số của định nghĩa" (chu kỳ, tỉ lệ... xuất hiện trong `desc` đúng dạng "10 giây", "15 %") để câu chữ và số không lệch nhau. Client chỉ hiển thị `desc`, không diễn giải số.
+4. **B thêm `tileTint` theo kiểu** (một trường dữ liệu trong `MAP_STYLES`, không thêm ảnh, không thêm loại ô); A chọn địa hình theo lối chơi (liên thông, sức chứa quái, tỉ lệ ô), không theo màu. B làm được ngay, không chờ A.
+
+Nhắc khi A thêm bản đồ `han_van` (M7.5, #506): bỏ `han_van` khỏi danh sách chờ của test "kiểu không mồ côi" (`client/src/gfx/map-decor.test.ts`), nếu không test đỏ.
