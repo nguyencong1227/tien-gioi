@@ -85,7 +85,7 @@ Chỉ dùng tập con `latin` + `vietnamese` (đủ cho tiếng Việt); không 
 
 ### Mẫu mục cho tài sản bên thứ ba (CC0 / CC-BY / OFL) để B / C dùng về sau
 
-1. Chỉ lấy tài sản CC0, CC-BY hoặc OFL (xem mục 3); KHÔNG lấy gì của game khác.
+1. Chỉ lấy tài sản CC0, CC-BY hoặc OFL (xem mục 3); KHÔNG lấy gì của game khác, trừ nội dung / hình / âm của Vạn Kiếp Tu Tiên đã được tác giả cho phép (ghi từng tệp ở `docs/NGUON_NOI_DUNG.md`, tệp nằm dưới thư mục có đoạn `vktt/`, và vẫn thêm dòng ở đây: `check:credits` kiểm hai chiều) và ảnh AI SDXL base (ghi model / prompt / seed / ngày / người chỉnh).
 2. Bỏ tệp vào `client/public/<thư mục>/` rồi thêm dòng vào bảng mục 6 theo mẫu dưới. Với CC-BY, cột "Tác giả" phải đúng tên người ghi công và cột "Nguồn" là đường dẫn trang gốc; kèm tệp giấy phép nếu giấy phép yêu cầu (như `OFL.txt`).
 3. Chạy `sha256sum client/public/<thư mục>/<tệp>` và dán băm VÀO ĐÚNG DÒNG CÓ TÊN TỆP; thêm thư mục mới vào `hashDirs` của `auditHashes` (`client/scripts/check-credits.mjs`) nếu chưa có.
 4. `npm run check:credits` phải xanh.

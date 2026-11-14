@@ -189,7 +189,7 @@ Ngoài mã: để lên Google Play còn cần trang chính sách quyền riêng 
 
 ## 8. Giấy phép Tài nguyên & Biểu tượng (Licensing & Assets)
 
-- **Tuân thủ bản quyền:** Toàn bộ ảnh tileset, sprite quái, trang bị và âm thanh của game đều là tài sản CC0 hoặc CC-BY được ghi danh rõ ràng trong `CREDITS.md`. Trò chơi không sử dụng bất kỳ tài nguyên vi phạm bản quyền hay tài sản từ game khác (`npm run check:credits` kiểm tra tự động).
+- **Tuân thủ bản quyền:** Tài sản của game là CC0 / CC-BY được ghi danh rõ ràng trong `CREDITS.md`, cộng (từ M7) ảnh do AI sinh bằng SDXL base và nội dung / hình / âm của Vạn Kiếp Tu Tiên dùng với sự cho phép của tác giả (từng tệp ghi ở `docs/NGUON_NOI_DUNG.md` + `CREDITS.md`; xem `AGENTS.md` mục Asset). Trò chơi không sử dụng tài nguyên không rõ nguồn hay tài sản của game khác ngoài hai nguồn đó (`npm run check:credits` kiểm tra tự động). **Trước khi nộp bản có ảnh AI hoặc tài sản Vạn Kiếp Tu Tiên lên Google Play:** khai báo nội dung AI theo mẫu của cửa hàng và giữ bản gốc sự cho phép của tác giả (`docs/NGUON_NOI_DUNG.md` mục 1).
 - **Biểu tượng ứng dụng (App Icons) & Splash Screen:**
   - Bộ icon gốc tiêu chuẩn tại `client/public/icons/`:
     - `icon-192.png`: 192x192 px.
