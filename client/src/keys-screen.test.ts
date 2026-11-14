@@ -10,6 +10,7 @@ import {
   primaryKeyLabel,
   rebind,
   resetKeymap,
+  sanitizeKeymap,
   tokenOfEvent,
 } from "./keybinds";
 import { GROUP_TITLE, captureOutcome, keysScreenModel } from "./keys-screen";
@@ -61,13 +62,15 @@ describe("holderOf / primaryKeyLabel", () => {
     expect(holderOf("Digit3")).toBe("skill.sword");
     expect(holderOf("KeyK")).toBe("skill.sword");
     expect(holderOf("Shift+Tab")).toBe("target.prev");
-    expect(holderOf("KeyV")).toBeNull();
+    expect(holderOf("KeyK")).toBe("skill.sword");
+    expect(holderOf("KeyI")).toBe("skill.slot4");
+    expect(holderOf("Digit9")).toBeNull();
   });
   it("primaryKeyLabel đổi theo bảng phím hiện hành (chữ gợi ý trong game không lệch phím thật)", () => {
     expect(primaryKeyLabel("interact")).toBe("F");
-    expect(primaryKeyLabel("attack")).toBe("Cách");
-    rebind("interact", "KeyE");
-    expect(primaryKeyLabel("interact")).toBe("E");
+    expect(primaryKeyLabel("attack")).toBe("J");
+    rebind("interact", "Digit9");
+    expect(primaryKeyLabel("interact")).toBe("9");
     resetKeymap();
     expect(primaryKeyLabel("interact")).toBe("F");
   });
@@ -89,18 +92,38 @@ describe("keysScreenModel", () => {
     const rows = keysScreenModel(DEFAULT_KEYMAP).flatMap((g) => g.rows);
     expect(rows.every((r) => r.keys.length > 0 && !r.custom)).toBe(true);
     const sword = rows.find((r) => r.id === "skill.sword");
-    expect(sword?.keys).toEqual(["3", "K"]);
+    expect(sword?.keys).toEqual(["K", "3"]);
     const quest = rows.find((r) => r.id === "panel.quest");
-    expect(quest?.keys).toEqual(["J", "Q"]);
+    expect(quest?.keys).toEqual(["N", "Q"]);
+    const slot4 = rows.find((r) => r.id === "skill.slot4");
+    expect(slot4?.keys).toEqual(["I"]);
   });
   it("sau khi đổi phím: dòng đó 'custom', dòng khác không", () => {
-    rebind("skill.sword", "KeyV");
+    rebind("skill.sword", "Digit9");
     const rows = keysScreenModel(getKeymap()).flatMap((g) => g.rows);
     expect(rows.find((r) => r.id === "skill.sword")).toMatchObject({
-      keys: ["V", "3", "K"],
+      keys: ["9", "K", "3"],
       custom: true,
     });
     expect(rows.filter((r) => r.custom).map((r) => r.id)).toEqual(["skill.sword"]);
+  });
+  it("hành động mất hết phím (mặc định bị phím người chơi đã đổi chiếm): dòng 'unbound', không dòng nào khác", () => {
+    // người chơi từ trước đã gán Túi đồ = I; I nay là ô chiêu 4 mặc định: người chơi thắng, ô chiêu 4 hiện "chưa gán"
+    const m = sanitizeKeymap({ "panel.inventory": ["KeyI"] });
+    const rows = keysScreenModel(m).flatMap((g) => g.rows);
+    expect(rows.find((r) => r.id === "panel.inventory")).toMatchObject({
+      keys: ["I"],
+      unbound: false,
+      custom: true,
+    });
+    expect(rows.find((r) => r.id === "skill.slot4")).toMatchObject({ keys: [], unbound: true });
+    expect(rows.filter((r) => r.unbound).map((r) => r.id)).toEqual(["skill.slot4"]);
+    // bảng mặc định: không dòng nào unbound
+    expect(
+      keysScreenModel(DEFAULT_KEYMAP)
+        .flatMap((g) => g.rows)
+        .some((r) => r.unbound),
+    ).toBe(false);
   });
   it("phím cố định có mô tả và nhắc cả mũi tên lẫn WASD, Esc, phím số hội thoại", () => {
     const all = FIXED_KEYS.map((k) => k.keys + " " + k.what).join(" | ");
@@ -130,26 +153,26 @@ describe("captureOutcome: quyết định khi bấm phím lúc chờ gán", () =
     }
   });
   it("phím tự do -> bind, lời nhắn có tên hành động và phím", () => {
-    const r = captureOutcome("skill.sword", ev("KeyV"), map());
+    const r = captureOutcome("skill.sword", ev("Digit9"), map());
     expect(r).toEqual({
       kind: "bind",
-      token: "KeyV",
-      message: "Kiếm khí: V.",
+      token: "Digit9",
+      message: "Kiếm khí: 9.",
     });
   });
   it("lấy phím DUY NHẤT của hành động khác: báo hoán đổi, đúng như rebind làm", () => {
-    // Digit1 là phím duy nhất của đan ô 1; Kiếm khí đang giữ 3
+    // Digit1 là phím duy nhất của đan ô 1; Kiếm khí đang giữ K (chính) và 3
     const r = captureOutcome("skill.sword", ev("Digit1"), map());
     expect(r.kind).toBe("bind");
     if (r.kind !== "bind") return;
     expect(r.message).toContain("Đan dược ô 1");
-    expect(r.message).toContain("đổi sang 3");
+    expect(r.message).toContain("đổi sang K");
     expect(rebind("skill.sword", r.token)).toBe(true);
-    expect(getKeymap()["quick.1"]).toEqual(["Digit3"]); // đúng như lời nhắn: đan ô 1 nhận phím 3
+    expect(getKeymap()["quick.1"]).toEqual(["KeyK"]); // đúng như lời nhắn: đan ô 1 nhận phím chính cũ của Kiếm khí (K)
     expect(getKeymap()["skill.sword"][0]).toBe("Digit1");
   });
   it("lấy phím PHỤ của hành động khác (hành động đó còn phím khác): báo 'mất phím này'", () => {
-    // KeyQ là phím phụ của Sổ nhiệm vụ (còn J)
+    // KeyQ là phím phụ của Sổ nhiệm vụ (còn N)
     const r = captureOutcome("attack", ev("KeyQ"), map());
     expect(r.kind).toBe("bind");
     if (r.kind === "bind") expect(r.message).toContain("mất phím này");

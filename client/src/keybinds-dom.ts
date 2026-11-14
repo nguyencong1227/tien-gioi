@@ -29,6 +29,12 @@ interface HudKey {
 export const HUD_KEYS: readonly HudKey[] = [
   { id: "sk-slash", action: "attack", name: "Kiếm chém tấn công", keycap: "kbd" },
   { id: "sk-sword", action: "skill.sword", name: "Phóng kiếm khí", keycap: "kbd" },
+  ...([2, 3, 4, 5] as const).map((n): HudKey => ({
+    id: `sk-slot${n}`,
+    action: `skill.slot${n}`,
+    name: `Ô chiêu thức ${n}, chưa có chiêu`,
+    keycap: "kbd",
+  })),
   { id: "sk-med", action: "skill.meditate", name: "Đả tọa hồi phục", keycap: "kbd" },
   { id: "sk-break", action: "skill.breakthrough", name: "Đột phá cảnh giới", keycap: "kbd" },
   { id: "btn-target", action: "target.next", name: "Khoá hoặc chuyển mục tiêu", keycap: "kbd" },

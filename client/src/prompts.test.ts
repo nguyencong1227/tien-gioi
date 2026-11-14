@@ -65,11 +65,11 @@ describe("pickPromptButton: Y / X trả lời hộp đang hiện (#463)", () => 
 
 describe("phím mặc định của lời mời / rời trận", () => {
   const lookup = buildLookup(DEFAULT_KEYMAP);
-  it("Y = nhận, X = từ chối, R = rời / đầu hàng; N vẫn là tắt tiếng (không đè)", () => {
+  it("Y = nhận, X = từ chối, R = rời / đầu hàng; 0 là tắt tiếng (N nay là Sổ nhiệm vụ, không đè lời mời)", () => {
     expect(actionOfEvent({ code: "KeyY" }, lookup)).toBe("prompt.yes");
     expect(actionOfEvent({ code: "KeyX" }, lookup)).toBe("prompt.no");
     expect(actionOfEvent({ code: "KeyR" }, lookup)).toBe("exit.fight");
-    expect(actionOfEvent({ code: "KeyN" }, lookup)).toBe("sound.mute");
+    expect(actionOfEvent({ code: "Digit0" }, lookup)).toBe("sound.mute");
     expect(actionOfEvent({ code: "KeyP" }, lookup)).toBe("player.menu");
   });
   it("trả lời lời mời chạy được cả khi bảng đang mở (hộp lời mời không chặn điều khiển); mở xác nhận rời thì là của thế giới", () => {

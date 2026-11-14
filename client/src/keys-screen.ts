@@ -30,6 +30,8 @@ export interface KeysRow {
   keys: string[];
   /** Khác mặc định (người chơi đã đổi) */
   custom: boolean;
+  /** Hành động không còn phím nào (phím mặc định của nó đã bị phím người chơi tự đổi chiếm): màn "Phím tắt" phải nói rõ "chưa gán" */
+  unbound: boolean;
 }
 
 export interface KeysGroup {
@@ -52,6 +54,7 @@ export function keysScreenModel(map: Keymap): KeysGroup[] {
       id: a.id,
       label: a.label,
       keys: cur.map(keyLabel),
+      unbound: cur.length === 0,
       custom: cur.length !== a.defaults.length || cur.some((t, i) => t !== a.defaults[i]),
     });
   }

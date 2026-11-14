@@ -2,6 +2,12 @@
 
 Định dạng theo từng bản phát hành (thẻ `vX.Y.Z`). Số `#` là PR / issue trên GitHub.
 
+## [Chưa phát hành] — bản vá v0.2.1 (QUYET_DINH_M3 mục 17)
+
+### Giao diện
+- **Phím đánh / chiêu ở cụm J K L U I O (mục 17.1, #495):** J = Kiếm chém (Cách vẫn là phím phụ), K = Kiếm khí (3 vẫn là phím phụ), L / U / I / O = bốn ô chiêu thức 2-5 để sẵn cho chiêu M7 (hiện mờ ở HUD máy tính, bấm chỉ báo "ô còn trống"; cảm ứng không hiện). Các phím bị chiếm được dời: **Túi đồ I -> B**, **Sổ nhiệm vụ J -> N** (Q vẫn mở), **Đả tọa L -> Z** (4 vẫn là phím phụ). Ba hành động còn lại mất phím cũ nên được đặt phím mới (đổi được ở màn Phím tắt): **Đột phá B -> V**, **Cài đặt O -> E**, **Bật / tắt âm thanh N -> 0**. Mọi chữ, nhãn trên nút, bảng chỉ dẫn người mới, câu chào đầu game và dòng gợi ý đầu màn hình đọc từ cùng bảng phím nên đổi theo.
+- **Người đã tự đổi phím được giữ nguyên:** phím người chơi đã chọn luôn thắng phím mặc định mới của hành động khác (trước đây hành động đứng trước trong bảng luôn thắng). Hành động bị lấy mất phím mặc định (ví dụ người đã gán Túi = I thì ô chiêu 4 hết I) hiện **"chưa gán phím"** ở màn Phím tắt, không im lặng.
+
 ## [0.2.0] — 14/11/2026: M6, Kim Đan + Âm Sương Trạch (nội dung và cân bằng) + giao diện gọn
 
 Bản phát hành M6 (`QUYET_DINH_M3.md` mục 10, 14: người dùng đồng ý phát hành khi #406 / #410 / #411 xong, sau v0.1.3): cảnh giới Kim Đan trọn vẹn, bản đồ thứ ba Âm Sương Trạch, bốn loài quái mới và trùm Hắc Giao, chín trang bị Kim Đan, rèn có phí, chuỗi nhiệm vụ nối Trúc Cơ sang Kim Đan, cân bằng lại, cùng giao diện gọn không che màn chơi (mục 15: thẻ nhân vật gọn, thanh menu riêng, Tổ đội / Nhiệm vụ / Chat thu gọn được, phím H ẩn toàn bộ giao diện). **`PROTOCOL_VERSION` 1 -> 2: client / APK `v0.1.x` KHÔNG vào được bản chạy thật nữa, sẽ nhận thông báo "có bản mới" (xem "Cần biết khi phát hành").** Kế hoạch: `docs/PHAN_CONG_M6.md`.
