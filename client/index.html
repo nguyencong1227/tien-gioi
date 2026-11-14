@@ -969,6 +969,13 @@
             <button type="button" id="set-open-keys" class="act-btn">Xem và đổi phím tắt</button>
           </div>
           <label class="set-row toggle">
+            <span
+              >Hiện bản đồ nhỏ (Phím <b data-key-action="panel.minimap">Shift+M</b>; tắt thì còn
+              nhãn tên khu, bấm vẫn mở bản đồ lớn)</span
+            >
+            <input type="checkbox" id="set-minimap" checked />
+          </label>
+          <label class="set-row toggle">
             <span>Ẩn tên đồng đạo (đỡ rối khi đông người)</span>
             <input type="checkbox" id="set-hide-names" />
           </label>
@@ -1125,7 +1132,9 @@
         <header class="inv-head">
           <div>
             <h2 id="map-title">Sơn Hà Đồ · Vân Mộng Sơn</h2>
-            <small id="map-coords">Chạm vào bản đồ để đặt hướng chỉ đường</small>
+            <small id="map-coords"
+              >Mũi tên xanh là chỗ đạo hữu đang đứng, đầu nhọn chỉ hướng đang nhìn</small
+            >
           </div>
           <button
             type="button"
@@ -1146,6 +1155,8 @@
             <span><i class="lg other"></i> Đồng đạo</span>
             <span><i class="lg mon"></i> Yêu thú</span>
             <span><i class="lg town"></i> Khu an toàn</span>
+            <span><i class="lg portal"></i> Cổng (ghi nơi đến)</span>
+            <span><i class="lg zone"></i> Khu yêu thú (xanh nhẹ → đỏ nặng)</span>
           </div>
         </div>
       </section>

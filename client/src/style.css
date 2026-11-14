@@ -999,6 +999,12 @@ html[data-input="touch"] .qt-head {
 #map-modal {
   --sheet-w: 420px;
 }
+/* Máy tính (chuột + màn rộng): bản đồ lớn đủ rộng để đọc nhãn (tên cổng + nơi đến, NPC, khu quái); thấp hơn thì vừa chiều cao còn lại */
+@media (pointer: fine) and (min-width: 900px) {
+  #map-modal {
+    --sheet-w: min(92vw, 700px);
+  }
+}
 .map-body {
   display: flex;
   flex-direction: column;
@@ -1011,6 +1017,12 @@ html[data-input="touch"] .qt-head {
   border-radius: 8px;
   border: 1px solid rgba(201, 162, 74, 0.6);
   background: #1d1a16;
+}
+@media (pointer: fine) and (min-width: 900px) {
+  #worldmap {
+    width: min(92vw, 640px, calc(var(--vh, 100dvh) - 240px));
+    height: min(92vw, 640px, calc(var(--vh, 100dvh) - 240px));
+  }
 }
 .map-legend {
   display: flex;
@@ -1046,6 +1058,19 @@ html[data-input="touch"] .qt-head {
 .lg.town {
   border: 2px solid #a31d1d;
   background: transparent;
+}
+.lg.portal {
+  background: #a8ff78;
+  border: 1px solid #fff;
+}
+.lg.zone {
+  width: 22px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #60c860, #eccc46, #e25446);
+}
+.lg.me {
+  border-radius: 0;
+  clip-path: polygon(100% 50%, 15% 100%, 35% 50%, 15% 0);
 }
 
 /* Chat */
@@ -6066,4 +6091,26 @@ body.ui-hidden
     #perf-panel
   ) {
   display: none !important;
+}
+
+/* Bản đồ nhỏ THU GỌN (Cài đặt / Shift+M, QUYET_DINH_M3 mục 17.2): ẩn canvas, còn nhãn tên khu + phím; vẫn bấm được để mở bản đồ lớn (cảm ứng không có phím M) */
+#minimap-wrap.collapsed {
+  width: auto;
+  min-width: 96px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 2px 8px;
+}
+#minimap-wrap.collapsed #minimap {
+  display: none;
+}
+#minimap-wrap.collapsed .mm-foot {
+  flex: 1;
+  margin-top: 0;
+  gap: 8px;
+  font-size: var(--fs-12);
+}
+#minimap-wrap.collapsed #minimap-zone {
+  max-width: 130px;
 }
