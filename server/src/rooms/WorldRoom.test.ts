@@ -2403,7 +2403,7 @@ describe("luân hồi: chết thật, Hoàng Tuyền, đầu thai (M3 bước 2)
     const soul = await waitFor(() => b.souls[0]);
     expect(soul).toMatchObject({ kiep: 4, duyen: 7, unlocks: { du_am: 2 }, origins: [] });
     expect(b.souls).toHaveLength(1); // chỉ một tin lúc vào, không lặp
-    expect(Object.keys(soul).sort()).toEqual(["duyen", "kiep", "origins", "unlocks"]); // SoulView, không lộ lịch sử / mã kiếp
+    expect(Object.keys(soul).sort()).toEqual(["duyen", "engraved", "kiep", "origins", "unlocks"]); // SoulView, không lộ lịch sử / mã kiếp
   });
 
   it("hồ sơ Hoàng Tuyền hỏng trong file (kiểu sai, id vật phẩm lạ) được làm sạch khi vào game", async () => {

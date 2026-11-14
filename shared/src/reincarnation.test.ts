@@ -16,6 +16,7 @@ import {
   coinCarryCap,
   countsAsKiep,
   duyenPerStep,
+  engraveSlotsOf,
   expMultOf,
   keepSlotsOf,
   levelOf,
@@ -31,6 +32,7 @@ import {
   type Soul,
 } from "./reincarnation";
 import { ITEM_BY_ID } from "./items";
+import { ENGRAVE_COSTS, ENGRAVE_MAX } from "./skills";
 import { REALMS, stepOf, statsFor, expToNext } from "./realms";
 
 const min = (m: number) => m * 60_000;
@@ -171,7 +173,7 @@ describe("calcDuyen: bảng ước tính của docs/THIET_KE_LUAN_HOI.md mục 5
 });
 
 describe("Tam Sinh Thạch: bảng mở khóa", () => {
-  it("id duy nhất, giá tăng dần, mỗi nấc có mô tả, tổng chi phí cỡ 1700 Duyên", () => {
+  it("id duy nhất, giá tăng dần, mỗi nấc có mô tả, tổng chi phí cỡ 2050 Duyên (gồm Khắc chân linh 360)", () => {
     expect(new Set(UNLOCKS.map((u) => u.id)).size).toBe(UNLOCKS.length);
     for (const u of UNLOCKS) {
       expect(u.effects).toHaveLength(u.costs.length);
@@ -180,8 +182,8 @@ describe("Tam Sinh Thạch: bảng mở khóa", () => {
     const total =
       UNLOCKS.reduce((a, u) => a + u.costs.reduce((x, y) => x + y, 0), 0) +
       ORIGINS.reduce((a, o) => a + o.cost, 0);
-    expect(total).toBeGreaterThan(1600);
-    expect(total).toBeLessThan(1800);
+    expect(total).toBeGreaterThan(1950);
+    expect(total).toBeLessThan(2150);
   });
 
   it("Dư âm tu hành: 10 nấc, mỗi nấc +10%, tối đa đúng +100%, tổng 1079 Duyên", () => {
@@ -370,14 +372,28 @@ describe("sanitizeSoul: không tin file lưu", () => {
     expect(sanitizeSoul(JSON.parse(JSON.stringify(ok)))).toEqual(ok);
   });
 
-  it("soulView chỉ gồm kiếp, Duyên, nấc, xuất thân và là bản sao", () => {
-    const s: Soul = { ...newSoul("a", "t"), duyen: 5, unlocks: { du_am: 1 }, origins: ["the_tu"] };
+  it("soulView chỉ gồm kiếp, Duyên, nấc, xuất thân, chiêu đã khắc và là bản sao", () => {
+    const s: Soul = {
+      ...newSoul("a", "t"),
+      duyen: 5,
+      unlocks: { du_am: 1, khac: 1 },
+      origins: ["the_tu"],
+      engraved: ["hoa_van_kiem"],
+    };
     const v = soulView(s);
-    expect(v).toEqual({ kiep: 1, duyen: 5, unlocks: { du_am: 1 }, origins: ["the_tu"] });
+    expect(v).toEqual({
+      kiep: 1,
+      duyen: 5,
+      unlocks: { du_am: 1, khac: 1 },
+      origins: ["the_tu"],
+      engraved: ["hoa_van_kiem"],
+    });
     v.unlocks.du_am = 9;
     v.origins.push("x");
+    v.engraved!.push("y");
     expect(s.unlocks.du_am).toBe(1);
     expect(s.origins).toEqual(["the_tu"]);
+    expect(s.engraved).toEqual(["hoa_van_kiem"]);
   });
 });
 
@@ -425,5 +441,89 @@ describe("validateRebirth", () => {
     expect(
       validateRebirth({ unlocks: {}, origins: [] }, { keep: ["hac_ho_kiem"] }, keepable),
     ).toBeNull(); // chưa mở Ký vật
+  });
+});
+
+describe("khắc chân linh (M7): nấc, làm sạch, đầu thai", () => {
+  const SK = ["hoa_van_kiem", "bon_thach_quyen", "ung_trao"];
+
+  it("mục `khac` có giá = ENGRAVE_COSTS, 3 nấc có mô tả; mua theo `buyUnlock` như mục khác", () => {
+    const k = UNLOCK_BY_ID.khac;
+    expect(k.costs).toEqual(ENGRAVE_COSTS);
+    expect(k.effects).toHaveLength(ENGRAVE_MAX);
+    let s: Soul = { ...newSoul("a", "t"), duyen: 40 };
+    expect(nextCost(s, "khac")).toBe(40);
+    const r = buyUnlock(s, "khac");
+    expect(r.ok && r.cost).toBe(40);
+    if (r.ok) s = r.soul;
+    expect(engraveSlotsOf(s.unlocks)).toBe(1);
+    expect(buyUnlock(s, "khac")).toMatchObject({ ok: false, reason: "poor" }); // nấc 2 giá 100
+  });
+
+  it("engraveSlotsOf: 0..ENGRAVE_MAX, giá trị rác coi như chưa mở", () => {
+    expect([0, 1, 2, 3, 4, 99].map((n) => engraveSlotsOf({ khac: n }))).toEqual([0, 1, 2, 3, 3, 3]);
+    expect(engraveSlotsOf({})).toBe(0);
+    expect(engraveSlotsOf({ khac: -2 })).toBe(0);
+    expect(engraveSlotsOf({ khac: Number.NaN })).toBe(0);
+  });
+
+  it("sanitizeSoul: chiêu khắc không vượt nấc `khac` đã mở (file sửa tay), id lạ / trùng bị bỏ", () => {
+    const raw = (khac: number) => ({
+      ...newSoul("a", "t"),
+      unlocks: khac > 0 ? { khac } : {},
+      engraved: [...SK, "constructor", SK[0]],
+    });
+    expect(sanitizeSoul(raw(0))!.engraved).toEqual([]);
+    expect(sanitizeSoul(raw(1))!.engraved).toEqual([SK[0]]);
+    expect(sanitizeSoul(raw(2))!.engraved).toEqual([SK[0], SK[1]]);
+    expect(sanitizeSoul(raw(3))!.engraved).toEqual(SK);
+  });
+
+  describe("validateRebirth với `engrave`", () => {
+    const soul = { unlocks: { khac: 2 }, origins: [] as string[] };
+    const ok = (engrave: unknown) =>
+      validateRebirth(soul, { keep: [], engrave }, [], SK) as ReturnType<typeof validateRebirth>;
+
+    it("không gửi `engrave`: kết quả KHÔNG có khoá `engrave` (giữ nguyên chân linh)", () => {
+      const r = validateRebirth(soul, { keep: [] }, [], SK)!;
+      expect(r).toEqual({ origin: DEFAULT_ORIGIN, keep: [] });
+      expect("engrave" in r).toBe(false);
+    });
+
+    it("hợp lệ: trong số nấc, mỗi id nằm trong `engravable`, không trùng; mảng rỗng = xoá hết khắc", () => {
+      expect(ok([SK[0], SK[2]])!.engrave).toEqual([SK[0], SK[2]]);
+      expect(ok([SK[1]])!.engrave).toEqual([SK[1]]);
+      expect(ok([])!.engrave).toEqual([]);
+    });
+
+    it("từ chối: quá nấc, trùng, chiêu không có trong `engravable`, id lạ / độc, sai kiểu", () => {
+      expect(ok(SK)).toBeNull(); // 3 > nấc 2
+      expect(ok([SK[0], SK[0]])).toBeNull();
+      expect(validateRebirth(soul, { keep: [], engrave: ["huyen_bang_chi"] }, [], SK)).toBeNull();
+      for (const bad of ["constructor", "__proto__", "", 5, null, {}])
+        expect(ok([bad]), String(bad)).toBeNull();
+      for (const bad of ["hoa_van_kiem", 5, null, {}, true])
+        expect(ok(bad), String(bad)).toBeNull();
+      // chưa mở nấc nào: không khắc được dù chiêu hợp lệ
+      expect(
+        validateRebirth({ unlocks: {}, origins: [] }, { keep: [], engrave: [SK[0]] }, [], SK),
+      ).toBeNull();
+      // `engravable` mặc định rỗng
+      expect(validateRebirth(soul, { keep: [], engrave: [SK[0]] }, [])).toBeNull();
+      // phòng thủ nhiều lớp: id không phải chiêu thật bị từ chối kể cả khi danh sách `engravable` (do nơi gọi dựng) lỡ chứa nó
+      expect(
+        validateRebirth(soul, { keep: [], engrave: ["khong_co_chieu"] }, [], ["khong_co_chieu"]),
+      ).toBeNull();
+    });
+
+    it("đầu vào cũ (xuất thân + giữ đồ) không đổi hành vi", () => {
+      expect(
+        validateRebirth(
+          { unlocks: { ky_vat: 1 }, origins: ["kiem_khach"] },
+          { origin: "kiem_khach", keep: ["a"] },
+          ["a"],
+        ),
+      ).toEqual({ origin: "kiem_khach", keep: ["a"] });
+    });
   });
 });
