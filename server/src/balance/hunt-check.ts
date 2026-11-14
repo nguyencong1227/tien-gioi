@@ -11,6 +11,7 @@ import {
   buyPrice,
   ITEM_BY_ID,
   MONSTER_BY_ID,
+  PLAYER_RADIUS,
   REALMS,
   SKILLS,
   TICK_MS,
@@ -21,6 +22,8 @@ import { slash } from "../systems/combat";
 import { setEquipment } from "../systems/equipment";
 import { useItem } from "../systems/inventory";
 import { tickMonsters } from "../systems/monsters";
+import { tickBolts } from "../systems/bolt";
+import { tickStatuses } from "../systems/status";
 import { applyStats } from "../systems/progression";
 import { addMonster, addPlayer, makeWorld } from "../systems/test-helpers";
 import { ASSUME, bestGear } from "./simulate";
@@ -68,14 +71,35 @@ export function huntFight(realm: number, tier: number, kind: string, seed = 1): 
     w.now = 1_000_000;
     const dt = TICK_MS / 1000;
     let t = 0;
+    const speed = statsFor(realm, tier, bestGear(realm, tier)).speed;
     while (t < MAX_SECONDS && w.state.monsters.has(id) && !p.dead) {
       w.now += TICK_MS;
       t += dt;
       w.tick++;
+      tickStatuses(w, dt);
       tickMonsters(w, dt);
+      tickBolts(w, dt);
       const m = w.state.monsters.get(id);
       if (!m) break;
-      slash(w, "A", Math.atan2(m.y - p.y, m.x - p.x));
+      const dx = m.x - p.x;
+      const dy = m.y - p.y;
+      const d = Math.hypot(dx, dy);
+      const aim = Math.atan2(dy, dx);
+      const def = MONSTER_BY_ID[m.kind];
+      const reach = SKILLS.slash.range + def.radius;
+      if (d > reach && d > 0) {
+        const step = speed * dt;
+        const next = w.map.moveWithCollision(
+          p.x,
+          p.y,
+          (dx / d) * step,
+          (dy / d) * step,
+          PLAYER_RADIUS,
+        );
+        p.x = next.x;
+        p.y = next.y;
+      }
+      slash(w, "A", aim);
     }
     return {
       seconds: t,
