@@ -343,9 +343,10 @@ describe("ngân sách băng thông và CPU (benchmark có seed, kết quả cố
   it("fx / dmg chỉ gửi cho người trong vùng nhìn: ít hơn một nửa so với broadcast cả phòng", () => {
     const r = runBench(100, 10);
     // Đo lúc viết: ~7.7 KB/s mỗi client nếu broadcast, ~2.3 KB/s khi cắt theo vùng nhìn (ước lượng bằng JSON).
+    // M7.3: Hắc Hổ chảy máu sau đòn lao (mỗi nhịp dot của người bị thương là một `dmg` gửi gần): 100 người, 10 s, 3,79 -> 4,05 KB/s; trần 4 -> 5 (vẫn dưới một nửa broadcast ~12,3).
     expect(r.eventKbBroadcast).toBeGreaterThan(1);
     expect(r.eventKbNear).toBeLessThan(r.eventKbBroadcast / 2);
-    expect(r.eventKbNear).toBeLessThan(4);
+    expect(r.eventKbNear).toBeLessThan(5);
   });
 
   it("tin tổ đội (PartyMsg) cho một client dưới ngân sách < 1 KB/s (#76)", () => {
