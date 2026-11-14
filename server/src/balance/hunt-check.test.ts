@@ -45,6 +45,37 @@ describe("săn quái thường: mô hình khớp mã server thật", () => {
     expect(huntFight(3, 1, "suong_ho", 5)).toEqual(huntFight(3, 1, "suong_ho", 5));
     expect(Math.random).toBe(random);
   });
+
+  it("quái tầm xa: người chơi áp sát và đạn bay (World.bolts), hạ được quái (M7.9 #510)", () => {
+    const orig = MONSTER_BY_ID.suong_ho;
+    const origDoc = MONSTER_BY_ID.doc_thiem;
+    try {
+      (MONSTER_BY_ID as any).suong_ho = {
+        ...orig,
+        behavior: "ranged",
+        boltRange: 300,
+        boltSpeed: 240,
+      };
+      const r = huntCheck(3, 0, "suong_ho", 8);
+      expect(r.killedAll).toBe(true);
+      expect(r.timeRatio).toBeGreaterThanOrEqual(0.85);
+      expect(r.timeRatio).toBeLessThanOrEqual(1.25);
+
+      (MONSTER_BY_ID as any).doc_thiem = {
+        ...origDoc,
+        behavior: "poisoner",
+        boltRange: 300,
+        boltSpeed: 220,
+      };
+      const r2 = huntCheck(3, 0, "doc_thiem", 8);
+      expect(r2.killedAll).toBe(true);
+      expect(r2.timeRatio).toBeGreaterThanOrEqual(0.85);
+      expect(r2.timeRatio).toBeLessThanOrEqual(1.25);
+    } finally {
+      (MONSTER_BY_ID as any).suong_ho = orig;
+      (MONSTER_BY_ID as any).doc_thiem = origDoc;
+    }
+  });
 });
 
 describe("trùm Hắc Giao theo đội, mã thật (đứng đánh liên tục, uống Đại Hồi Huyết Đan khi dưới 50%)", () => {

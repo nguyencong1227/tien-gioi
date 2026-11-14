@@ -10,6 +10,7 @@ import {
   WARN_MAX_ARC_STEPS,
   boltAlive,
   boltAlpha,
+  clipBoltToWall,
   boltPosition,
   boltTrailCount,
   boltTravelled,
@@ -58,6 +59,11 @@ export interface TelegraphDeps {
   player?: () => { x: number; y: number; r: number } | null;
   /** Gọi đúng một lần cho mỗi vùng báo lúc mình lần đầu bị nó bao (và đòn chưa đáp), để phát tiếng báo. */
   onDanger?: (plan: WarnPlan) => void;
+  /**
+   * Điểm (x, y) có phải ô chặn không (`map.isBlockedPx`): máy chủ dừng đạn ở ô chặn nên hình cũng cắt tầm bay ở đó (không vẽ đạn xuyên tường). Bỏ trống thì đạn bay hết
+   * tầm như tin báo.
+   */
+  isBlocked?: (x: number, y: number) => boolean;
 }
 
 interface WarnItem {
@@ -169,11 +175,12 @@ export class TelegraphLayer {
 
   /** Nhận tin `bolt`. `false` khi tin không hợp lệ. */
   bolt(m: BoltMsg, now: number): boolean {
-    const plan = planBolt(m);
-    if (!plan) {
+    const planned = planBolt(m);
+    if (!planned) {
       this.rejected++;
       return false;
     }
+    const plan = clipBoltToWall(planned, this.deps.isBlocked);
     const cap = telegraphLimits(this.deps.emitterBudget()).bolts;
     let item: BoltItem;
     if (this.bolts.length >= cap) {
