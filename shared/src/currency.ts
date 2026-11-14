@@ -7,6 +7,7 @@
 // quyết định cân bằng cuối. Test trong `currency.test.ts` giữ các bất biến để chỉnh số không làm hỏng kinh tế
 // (không có vòng mua rồi bán lại có lời, mọi vật phẩm / quái được nhắc đều có thật).
 
+import { OWNER_GEAR_VALUE } from "./owner-gear";
 export const CURRENCY_NAME = "Linh thạch";
 
 /** Trần số Linh thạch giữ được (vừa số nguyên 32 bit có dấu). Nhận thêm vượt trần thì bị cắt, không báo lỗi. */
@@ -58,6 +59,8 @@ export const ITEM_VALUE: Record<string, number> = {
   hac_giao_kiem: 10000,
   giao_lan_bao: 10000,
   giao_long_phu: 10000,
+  // Đồ ba ô riêng của chủ (M7.4, `owner-gear.ts`)
+  ...OWNER_GEAR_VALUE,
 };
 
 /** NPC thu mua trả bằng phần trăm này của giá trị gốc (làm tròn xuống, tối thiểu 1 nếu giá trị > 0). */

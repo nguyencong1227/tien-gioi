@@ -14,6 +14,7 @@ import {
   MIN_PROTOCOL_VERSION,
   QUESTS,
   QUEST_BY_ID,
+  KIM_DAN_RECIPES,
   RECIPES,
   SHOP_BY_NPC,
   TILE,
@@ -119,7 +120,9 @@ describe("Âm Sương Trạch: bản đồ thứ ba", () => {
     );
     expect(SHOP_BY_NPC.lai_buon_suong.itemIds).not.toContain("tu_khi_dan");
     const forge = RECIPES.filter((r) => r.npcId === "tho_ren_suong");
-    expect(forge).toHaveLength(9);
+    // Chín món ba bộ Kim Đan (M6) + mười món hài / ngọc bội / pháp bảo bậc Kim Đan (M7.4)
+    expect(forge).toHaveLength(9 + 10);
+    expect(forge.filter((r) => KIM_DAN_RECIPES.includes(r))).toHaveLength(9);
     expect(RECIPES.filter((r) => r.npcId === "tho_ren").every((r) => r.coin === undefined)).toBe(
       true,
     ); // Lạc Hà: công thức cũ, miễn phí

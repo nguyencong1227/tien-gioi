@@ -2,6 +2,7 @@
 // Server quyết định mọi thứ (rơi gì, nhặt được không, dùng được không); client chỉ hiển thị.
 
 import type { Element } from "./skills";
+import { OWNER_GEAR_ITEMS } from "./owner-gear";
 
 export type ItemType = "consumable" | "material" | "equip" | "book";
 /** 0 phàm phẩm, 1 linh phẩm, 2 bảo phẩm, 3 tiên phẩm, 4 thần phẩm */
@@ -456,6 +457,8 @@ export const ITEMS: ItemDef[] = [
     equip: { slot: "talisman", stats: { mp: 140, speed: 26 }, reqRealm: 3, reqTier: 2 },
     color: 0x2e5a7a,
   },
+  // Đồ cho ba ô riêng của chủ (M7.4): hài, ngọc bội, pháp bảo (`owner-gear.ts`)
+  ...OWNER_GEAR_ITEMS,
 ];
 
 export const ITEM_BY_ID: Record<string, ItemDef> = Object.fromEntries(ITEMS.map((i) => [i.id, i]));

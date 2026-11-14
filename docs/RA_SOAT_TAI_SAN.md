@@ -3,6 +3,8 @@
 > Thực hiện theo kế hoạch M4-sớm (Issue #257, `docs/PHAN_CONG_M4.md` mục 4.4).
 > Người thực hiện: **Dev B (Client & Trải nghiệm)**.
 > Ngày thực hiện: **11/11/2026**.
+> **Cập nhật M7.4 (15/11/2026, #505, Dev A):** thêm 14 icon cho đồ ba ô riêng (hài, ngọc bội, pháp bảo) sinh bằng `gen-assets.mjs` (hàng 43-56, mục 2), atlas 351 khung (mục 2b), tổng 58 tệp tĩnh.
+>
 > **Cập nhật M6 (13/11/2026, Issue #411 mục 4 phần tài sản, Dev B):** thêm 15 icon Kim Đan, khung atlas M6, các mô-đun đồ hoạ vẽ bằng mã của M5-M6, ảnh chụp trong `docs/`, danh xưng M6 (mục 2, 2b-2d, 3, 6). Các số liệu M4 đã cũ được sửa tại chỗ; mốc M4 giữ trong `git log`.
 
 ---
@@ -16,7 +18,7 @@
 
 ---
 
-## 2. Bảng thống kê chi tiết tài sản (44 tệp tĩnh = 24 của M4 + 5 phông (#331) + 15 icon Kim Đan (M6); các mô-đun vẽ bằng mã ở mục 2c)
+## 2. Bảng thống kê chi tiết tài sản (58 tệp tĩnh = 24 của M4 + 5 phông (#331) + 15 icon Kim Đan (M6) + 14 icon ba ô riêng (M7.4 #505); các mô-đun vẽ bằng mã ở mục 2c)
 
 | STT | Đường dẫn tệp | Loại tài nguyên | Nguồn gốc / Tác giả | Giấy phép | Tình trạng |
 |:---:|---|---|---|:---:|:---:|
@@ -62,10 +64,24 @@
 | 40 | `client/public/assets/items/hac_giao_kiem.png` | Icon vũ khí Hắc Giao Kiếm (M6 #407) | Do nhóm Tiên Giới (Dev B) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
 | 41 | `client/public/assets/items/giao_lan_bao.png` | Icon pháp bào Giao Lân Bào (M6 #407) | Do nhóm Tiên Giới (Dev B) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
 | 42 | `client/public/assets/items/giao_long_phu.png` | Icon pháp bảo Giao Long Phù (M6 #407) | Do nhóm Tiên Giới (Dev B) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
+| 43 | `client/public/assets/items/ho_bo_ngoa.png` | Icon hài Hổ Bộ Ngoa (M7.4 #505) | Do nhóm Tiên Giới (Dev A) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
+| 44 | `client/public/assets/items/mang_hanh_ngoa.png` | Icon hài Mãng Hành Ngoa (M7.4 #505) | Do nhóm Tiên Giới (Dev A) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
+| 45 | `client/public/assets/items/suong_van_ngoa.png` | Icon hài Sương Vân Ngoa (M7.4 #505) | Do nhóm Tiên Giới (Dev A) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
+| 46 | `client/public/assets/items/giao_anh_ngoa.png` | Icon hài Giao Ảnh Ngoa (M7.4 #505) | Do nhóm Tiên Giới (Dev A) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
+| 47 | `client/public/assets/items/tho_nguyet_boi.png` | Icon ngọc bội Thố Nguyệt Bội (M7.4 #505) | Do nhóm Tiên Giới (Dev A) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
+| 48 | `client/public/assets/items/mang_tinh_boi.png` | Icon ngọc bội Mãng Tinh Bội (M7.4 #505) | Do nhóm Tiên Giới (Dev A) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
+| 49 | `client/public/assets/items/suong_linh_boi.png` | Icon ngọc bội Sương Linh Bội (M7.4 #505) | Do nhóm Tiên Giới (Dev A) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
+| 50 | `client/public/assets/items/giao_chau_boi.png` | Icon ngọc bội Giao Châu Bội (M7.4 #505) | Do nhóm Tiên Giới (Dev A) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
+| 51 | `client/public/assets/items/ho_than_an.png` | Icon pháp bảo Hộ Thân Ấn (M7.4 #505) | Do nhóm Tiên Giới (Dev A) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
+| 52 | `client/public/assets/items/hap_linh_chau.png` | Icon pháp bảo Hấp Linh Châu (M7.4 #505) | Do nhóm Tiên Giới (Dev A) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
+| 53 | `client/public/assets/items/xich_diem_an.png` | Icon pháp bảo Xích Diễm Ấn (M7.4 #505) | Do nhóm Tiên Giới (Dev A) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
+| 54 | `client/public/assets/items/han_bang_an.png` | Icon pháp bảo Hàn Băng Ấn (M7.4 #505) | Do nhóm Tiên Giới (Dev A) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
+| 55 | `client/public/assets/items/dinh_tam_chung.png` | Icon pháp bảo Định Tâm Chung (M7.4 #505) | Do nhóm Tiên Giới (Dev A) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
+| 56 | `client/public/assets/items/phong_hanh_boi.png` | Icon pháp bảo Phong Hành Bội (M7.4 #505) | Do nhóm Tiên Giới (Dev A) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
 
-> Hàng 2-3 (atlas) nay có **337 khung** (xem 2b). Hàng 4-19 và 28-42 cộng lại là **31 icon** (khớp 31 mặt hàng trong `ITEMS` của `shared/`: mọi vật phẩm đều có icon riêng, không món nào dùng ảnh thay thế).
+> Hàng 2-3 (atlas) nay có **351 khung** (xem 2b). Hàng 4-19 và 28-56 cộng lại là **45 icon** (khớp 45 mặt hàng trong `ITEMS` của `shared/`: mọi vật phẩm đều có icon riêng, không món nào dùng ảnh thay thế).
 
-### 2b. Khung atlas (tệp 2-3) sau M6: 337 khung, toàn bộ sinh bằng `gen-assets.mjs`
+### 2b. Khung atlas (tệp 2-3) sau M7.4: 351 khung (337 sau M6 + 14 icon ba ô riêng), toàn bộ sinh bằng `gen-assets.mjs`
 
 | Nhóm khung | Số khung | Nội dung |
 |---|:---:|---|
@@ -73,7 +89,7 @@
 | `robe-*` | 123 | Ba bộ pháp bào `tho_nhung_bao`, `hac_ho_bao`, `xich_lan_bao` (3 x 41 khung như trên) |
 | `mon-*` | 90 | **9 yêu thú x 10 khung** (đứng, đi 0-1, đánh `atk-0..1`, bị đánh `hurt`, gục `die-0..3`): `tho`, `lang`, `ho`, `mang` và **M6 #407** `suong_ho`, `thach_quy`, `doc_thiem`, `hac_giao`, `yeu_vuong` |
 | `npc-*` | 9 | `truong_tran`, `duoc_su`, `tho_ren`, `cao_thi`, `lai_buon`, `thu_mon` và **M6** `tram_truong`, `lai_buon_suong`, `tho_ren_suong` |
-| `item-*` | 31 | Biểu tượng vật phẩm trong thế giới (rơi trên đất), một khung cho mỗi icon ở bảng trên |
+| `item-*` | 45 | Biểu tượng vật phẩm trong thế giới (rơi trên đất), một khung cho mỗi icon ở bảng trên |
 | `swordbeam`, `dot` | 1 + 1 | Kiếm khí, chấm nhỏ dùng chung |
 
 Tư thế đánh / bị đánh / gục của yêu thú và nhân vật suy từ khung đi / đứng bằng biến đổi + đổi màu NGAY trong script (không có ảnh ngoài).
@@ -139,7 +155,7 @@ Danh sách HIỆN HÀNH, lấy từ dữ liệu của `shared/` (bản M4 ghi id
 
 | Hạng mục | Kết quả |
 |---|---|
-| Tệp tĩnh quét (`client/public/assets`, `icons`, `fonts`) | **44 tệp** (3 trong `assets/` + 31 icon + 5 icon PWA + 5 phông), **0 tệp thiếu nguồn / tác giả / giấy phép** |
+| Tệp tĩnh quét (`client/public/assets`, `icons`, `fonts`) | **58 tệp** (3 trong `assets/` + 45 icon + 5 icon PWA + 5 phông), **0 tệp thiếu nguồn / tác giả / giấy phép** |
 | Tài sản bên thứ ba có SHA-256 khớp `CREDITS.md` mục 6 | 5 / 5 (4 tệp `woff2` + `OFL.txt`) |
 | Giấy phép | CC0 1.0 (Tiên Giới tự tạo) cho 39 tệp; SIL OFL 1.1 cho 5 tệp phông (Noto Serif); không có CC-BY mới |
 | Mô-đun đồ hoạ / âm thanh vẽ bằng mã | 7 dòng (mô-đun hoặc nhóm mô-đun) ở 2c, không có tài sản ngoài |

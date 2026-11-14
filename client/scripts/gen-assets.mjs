@@ -738,6 +738,28 @@ const TALISMANS = {
   giao_long_phu: [0x2e5a7a, 0x6fc3e6],
 };
 
+// Đồ ba ô RIÊNG của chủ (M7.4, shared/src/owner-gear.ts): hài, ngọc bội, pháp bảo: [màu chính, màu phụ]. Hình tạm vẽ bằng code, đổi màu theo bậc.
+const BOOTS = {
+  ho_bo_ngoa: [0xc99636, 0x6e5a2a],
+  mang_hanh_ngoa: [0x4f7a3c, 0x2f4a24],
+  suong_van_ngoa: [0xa9c6d8, 0xeaf6fa],
+  giao_anh_ngoa: [0x2e5a7a, 0x6fc3e6],
+};
+const JADES = {
+  tho_nguyet_boi: [0xe6e0cc, 0xb8b09a],
+  mang_tinh_boi: [0x6fa05a, 0x3c5e2c],
+  suong_linh_boi: [0xa4c4d8, 0xe6f1f5],
+  giao_chau_boi: [0x3a6e92, 0x7fd0f0],
+};
+const TREASURE_ICONS = {
+  ho_than_an: [0x6a8caf, 0xd8e6f2],
+  hap_linh_chau: [0x7a6ac8, 0xd6ccff],
+  xich_diem_an: [0xc8503a, 0xffb08a],
+  han_bang_an: [0x7ab8e0, 0xe6f6ff],
+  dinh_tam_chung: [0xc9a24a, 0xfff0b0],
+  phong_hanh_boi: [0x9ad0b8, 0xe6fff4],
+};
+
 function drawItemIcon(id) {
   const s = new Surface(24, 24);
   s.ellipse(12, 21, 7, 2, 0x000000, 65);
@@ -896,6 +918,31 @@ function drawItemIcon(id) {
     // Tua rua bên dưới
     s.line(10, 18, 9, 21, 0xa31d1d, 1.2);
     s.line(14, 18, 15, 21, 0xa31d1d, 1.2);
+  } else if (BOOTS[id]) {
+    // Hài (M7.4): ống hài + mũi hài nhìn nghiêng, đế và miệng hài màu phụ
+    const [main, accent] = BOOTS[id];
+    s.rect(8, 5, 6, 11, main);
+    s.rect(8, 4, 6, 2, accent);
+    s.rect(8, 15, 12, 4, main);
+    s.ellipse(19, 17, 3, 2.5, main);
+    s.rect(7, 18, 14, 2, accent);
+    s.line(9, 8, 13, 8, accent, 1);
+  } else if (JADES[id]) {
+    // Ngọc bội (M7.4): đĩa ngọc có lỗ giữa, dây đỏ treo, điểm sáng
+    const [main, accent] = JADES[id];
+    s.line(12, 1, 12, 5, 0xa31d1d, 1.5);
+    s.circle(12, 13, 8, accent);
+    s.circle(12, 13, 7, main);
+    s.circle(12, 13, 2.6, 0x1c1814);
+    s.circle(9, 10, 1.6, 0xffffff, 210);
+  } else if (TREASURE_ICONS[id]) {
+    // Pháp bảo (M7.4): ấn vuông có núm, vòng linh khí quanh, vạch linh văn
+    const [main, accent] = TREASURE_ICONS[id];
+    s.ring(12, 12, 10, 1, accent, 120);
+    s.rect(6, 11, 12, 9, main);
+    s.rect(9, 6, 6, 6, accent);
+    s.circle(12, 6, 2.4, accent);
+    s.line(8, 16, 16, 16, accent, 1.4);
   }
   return s;
 }
@@ -1117,6 +1164,10 @@ function buildAtlas() {
     "hac_giao_kiem",
     "giao_lan_bao",
     "giao_long_phu",
+    // Đồ ba ô riêng của chủ (M7.4): hài, ngọc bội, pháp bảo
+    ...Object.keys(BOOTS),
+    ...Object.keys(JADES),
+    ...Object.keys(TREASURE_ICONS),
   ];
   for (const id of itemIds) {
     const icon = drawItemIcon(id);
