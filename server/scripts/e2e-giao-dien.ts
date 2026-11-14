@@ -55,6 +55,7 @@ const MEASURE = `(() => {
     partyCollapsed: cls('party-panel').includes('collapsed'),
     questCollapsed: cls('quest-tracker').includes('collapsed'),
     chatCollapsed: cls('chat').includes('collapsed'),
+    chatToggleShown: shown(byId('chat')) && shown(byId('chat-toggle')),
   };
 })()`;
 
@@ -82,6 +83,7 @@ interface Measure {
   partyCollapsed: boolean;
   questCollapsed: boolean;
   chatCollapsed: boolean;
+  chatToggleShown: boolean;
 }
 
 const overlap = (a: Rect, b: Rect) =>
@@ -268,6 +270,12 @@ async function main() {
         m.partyCollapsed === narrow && m.questCollapsed === narrow && m.chatCollapsed === narrow,
         JSON.stringify({ party: m.partyCollapsed, quest: m.questCollapsed, chat: m.chatCollapsed }),
       );
+      // ---- khung chat và nút 💬 hiện ở MỌI cỡ (điện thoại ngang trước đây ẩn hẳn chat; nit của A ở #479) ----
+      check(
+        `${tag}: khung chat và nút 💬 hiện ra`,
+        m.chatToggleShown,
+        JSON.stringify(m.chatToggleShown),
+      );
       // ---- ngân sách diện tích và vùng giữa trống ----
       const area = (r: Rect) => r.w * r.h;
       const total = ps.reduce((a, p) => a + area(p), 0) / (m.W * m.H);
@@ -346,11 +354,13 @@ async function main() {
       String(await cls("chat")),
     );
     // Enter thật (qua CDP): hiện ô nhập tạm rồi đưa con trỏ vào; Esc thu lại
-    const key = async (type: "enter" | "esc") => {
+    const key = async (type: "enter" | "esc" | "h") => {
       const k =
         type === "enter"
           ? { key: "Enter", code: "Enter", vk: 13, text: "\r" }
-          : { key: "Escape", code: "Escape", vk: 27, text: "" };
+          : type === "h"
+            ? { key: "h", code: "KeyH", vk: 72, text: "h" }
+            : { key: "Escape", code: "Escape", vk: 27, text: "" };
       const base = {
         key: k.key,
         code: k.code,
@@ -404,6 +414,93 @@ async function main() {
         ) > 0.9,
       String(await cls("chat")),
     );
+
+    // ---- Phím H ẩn / hiện TOÀN BỘ giao diện (màn chơi sạch) ----
+    const bodyCls = () => T.ev(`document.body.className`);
+    const HUD_IDS = [
+      "hud",
+      "hud-menu",
+      "minimap-wrap",
+      "party-panel",
+      "quest-tracker",
+      "chat",
+      "skills",
+      "quickbar",
+    ];
+    const visibleIds = async () =>
+      JSON.parse(
+        String(
+          await T.ev(
+            `JSON.stringify(${JSON.stringify(HUD_IDS)}.filter((id) => { const e = document.getElementById(id); return !!e && !e.hidden && e.getClientRects().length > 0; }))`,
+          ),
+        ),
+      ) as string[];
+    // đang gõ chữ (ô chat) thì H là chữ "h", không ẩn giao diện
+    await T.ev(`window.__ui.focusChat(); 1`);
+    await sleep(150);
+    await key("h");
+    check(
+      "Đang gõ trong ô chat: H là chữ 'h', giao diện KHÔNG bị ẩn",
+      !String(await bodyCls()).includes("ui-hidden") &&
+        (await T.ev(`document.getElementById('chat-input').value`)) === "h",
+      `${await bodyCls()} / ${await T.ev(`document.getElementById('chat-input').value`)}`,
+    );
+    await T.ev(
+      `document.getElementById('chat-input').value = ''; document.activeElement.blur(); 1`,
+    );
+    await sleep(150);
+    const before = await visibleIds();
+    check(
+      "Trước khi ẩn: đủ 8 phần giao diện đang hiện",
+      before.length === HUD_IDS.length,
+      before.join(","),
+    );
+    await key("h");
+    const hiddenNow = await visibleIds();
+    check(
+      "Bấm H: ẩn TOÀN BỘ giao diện (thẻ, menu, bản đồ nhỏ, tổ đội, nhiệm vụ, chat, nút kỹ năng, thanh đan)",
+      String(await bodyCls()).includes("ui-hidden") && hiddenNow.length === 0,
+      `${await bodyCls()} / còn hiện: ${hiddenNow.join(",")}`,
+    );
+    check(
+      "Có thông báo hướng dẫn cách hiện lại",
+      String(await T.ev(`document.getElementById('toast').textContent`)).includes(
+        "Bấm H để hiện lại",
+      ),
+      String(await T.ev(`document.getElementById('toast').textContent`)),
+    );
+    await T.ev(`window.__ui.toggleSettingsModal(true); 1`);
+    await sleep(200);
+    check(
+      "Đang ẩn giao diện: bảng mở ra (Cài đặt) VẪN hiện bình thường",
+      !!(await rectOf("#settings-modal")) &&
+        (await rectOf("#settings-modal"))!.h > 100 &&
+        (await rectOf("#settings-modal"))!.d !== "none",
+      JSON.stringify(await rectOf("#settings-modal")),
+    );
+    await T.ev(`window.__ui.toggleSettingsModal(false); 1`);
+    await sleep(150);
+    await key("h");
+    const backNow = await visibleIds();
+    check(
+      "Bấm H lần nữa: hiện lại đủ giao diện như trước",
+      !String(await bodyCls()).includes("ui-hidden") && backNow.join(",") === before.join(","),
+      `${await bodyCls()} / ${backNow.join(",")}`,
+    );
+    // phím nằm trong màn Phím tắt (cùng bảng phím với mọi hành động)
+    await T.ev(`window.__ui.toggleKeysModal(true); 1`);
+    await sleep(250);
+    check(
+      "Màn Phím tắt có dòng 'Ẩn / hiện toàn bộ giao diện' với phím H",
+      (await T.ev(
+        `(() => { const b = document.querySelector('#keys-list button[data-action="ui.toggle"]'); return b ? [...b.closest('.keys-row').querySelectorAll('.key-chip')].map((c) => c.textContent).join(',') : null; })()`,
+      )) === "H",
+      String(
+        await T.ev(`document.querySelector('#keys-list button[data-action="ui.toggle"]') !== null`),
+      ),
+    );
+    await T.ev(`window.__ui.toggleKeysModal(false); 1`);
+    await sleep(150);
 
     // nhiệm vụ trống: chỉ còn tiêu đề một dòng
     await T.ev(`window.__ui.onQuests({ active: [], done: [], dailyDone: [] }); 1`);

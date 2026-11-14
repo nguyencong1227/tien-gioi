@@ -2421,8 +2421,15 @@ html[data-input="touch"] #newbie-btn-keys {
     width: 185px;
     padding: 5px 7px;
   }
+  /* Chat điện thoại NGANG: trước đây ẩn hẳn. Nay hiện thu gọn MỘT dòng ở GIỮA mép trên (khoảng trống giữa cột trái và cột phải; góc phải dưới thanh menu
+     đã bị nút Mục tiêu / kỹ năng che), nút 💬 / chạm dòng tin / Enter để mở; mở ra vẫn nằm trên vùng giữa màn (QUYET_DINH_M3 mục 15; nit của A ở #479). */
   #chat {
-    display: none;
+    left: 50%;
+    right: auto;
+    top: max(6px, env(safe-area-inset-top));
+    bottom: auto;
+    transform: translateX(-50%);
+    width: min(340px, 34vw);
   }
   #minimap-wrap {
     width: 82px;
@@ -6038,4 +6045,25 @@ html[data-input="touch"] .chat-toggle {
 /* thân hộp thoại nhận focus bằng mã (Enter / Cách tua chữ): không vẽ viền */
 #dlg-body:focus {
   outline: none;
+}
+
+/* Phím ẩn toàn bộ giao diện (QUYET_DINH_M3 mục 15, `ui.toggle`): màn chơi sạch. Bảng đang mở, hộp thoại, lời mời, #toast, #death và biểu ngữ nối lại
+   KHÔNG bị ẩn (người chơi vẫn nhận được thông báo quan trọng). */
+body.ui-hidden
+  :is(
+    #hud-col-left,
+    #hud-col-right,
+    #chat,
+    #help,
+    #skills,
+    #quickbar,
+    #btn-pickup,
+    #btn-talk,
+    #btn-portal,
+    #dungeon-hud,
+    #duel-hud,
+    #gain-feed,
+    #perf-panel
+  ) {
+  display: none !important;
 }
