@@ -20,13 +20,14 @@ import express from "express";
 import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { Tab, sleep, listenWithRetry, removeTmpDirs, getChromeGpuFlags } from "./e2e-kit";
+import { freePort } from "../src/test-port.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
 const clientDist = path.resolve(repoRoot, "client/dist");
 const pickPort = () => 38000 + Math.floor(Math.random() * 2000);
 let PORT = pickPort();
-const CDP = 9800 + Math.floor(Math.random() * 300);
+let CDP = 0; // cổng do hệ điều hành cấp lúc vào `main` (Math.random có thể trùng Chrome của dev khác)
 const out = (m: string) => console.log(m);
 
 /** Mỗi yêu cầu tệp gói đã tới máy chủ giả. */
@@ -39,6 +40,8 @@ interface PackReq {
 }
 
 async function main() {
+  CDP = await freePort();
+  PORT = await freePort();
   out("=== E2E THẬT gói tải theo nhu cầu lúc qua cổng: server Colyseus thật + Chrome headless ===");
   if (!existsSync(path.join(clientDist, "index.html"))) {
     execSync("npm run build -w client", { cwd: repoRoot, stdio: "inherit" });
@@ -172,6 +175,12 @@ async function main() {
       scriptId = String(r.result?.identifier ?? "");
     };
     const login = async () => {
+      // Chrome (và Service Worker) sống suốt cả lần chạy, mà từ #548 Service Worker lưu gói `/packs/**?v=` theo kiểu cache-first: gói đã tải ở pha trước
+      // nằm sẵn trong Cache Storage nên pha sau (đúng hành vi mới) KHÔNG gửi yêu cầu nữa và các ca "tải trước" không thấy gì. Xoá kho trước mỗi lần đăng nhập
+      // (trang `about:blank` lần đầu chưa có `caches`: bỏ qua).
+      await ev(
+        `typeof caches === 'undefined' ? 0 : caches.keys().then((ks) => Promise.all(ks.map((k) => caches.delete(k)))).then(() => 1)`,
+      );
       await T.send("Page.navigate", { url: `http://127.0.0.1:${PORT}/?debug=1` });
       await T.waitFor(
         `typeof window.__switchAuthView === 'function' && !!document.getElementById('login-form')`,
