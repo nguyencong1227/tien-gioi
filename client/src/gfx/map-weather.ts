@@ -13,6 +13,7 @@ export const WEATHER_RECIPE: Readonly<Record<Exclude<WeatherKind, "none">, strin
   ash: "weather-ash",
   spirit: "weather-spirit",
   wisp: "weather-wisp",
+  snow: "weather-snow",
 };
 
 /** Cận dưới của nhịp phát (ms): tốc độ rất cao cũng không phát dày hơn mức này. */

@@ -8,7 +8,7 @@
 - **Hệ điều hành & Phần cứng**: Linux x86_64, NVIDIA GeForce RTX 5060 8 GB (Driver: `615.71.09`, CUDA UMD: `13.4`), RAM hệ thống: 14 GB.
 - **Thư mục cài đặt**: `/mnt/data/comfyui` (phân vùng riêng 56 GB, trống ~39 GB; liên kết tượng trưng `~/TT/comfyui`). Phân vùng gốc `/` trống ~28 GB.
 - **Môi trường Python & Thư viện**: Python 3.12.16 (Conda venv tại `/mnt/data/comfyui/env`), PyTorch `2.14.1+cu130`, ComfyUI `v0.43.2`.
-- **Model Checkpoint**: `sd_xl_base_1.0.safetensors` (6.5 GB, SHA256: `31e35c80fc4829d14f90153f4c74cd59c90b779f6afe05a74cd6120b893f7e5b`).
+- **Model Checkpoint**: `sd_xl_base_1.0.safetensors` (6.5 GB, SHA256: `31e35c80fc4829d14f90153f4c74cd59c90b779f6afe05a74cd6120b893f7e5b`, đã tính lại bằng `sha256sum` ở M7.12 #513: bản cũ ghi thiếu / sai ký tự và không khớp công bố của model).
 - **Cờ khởi động**: `--listen 127.0.0.1 --port 8188 --disable-auto-launch --offline --disable-all-custom-nodes --disable-metadata`.
 - **Mạng**: Chỉ lắng nghe cục bộ tại `127.0.0.1:8188`, hoàn toàn ngắt kết nối ra ngoài (`HF_HUB_OFFLINE=1`).
 

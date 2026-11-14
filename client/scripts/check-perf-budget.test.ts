@@ -10,6 +10,8 @@ import {
   checkWorstCaseTextureMemoryByTier,
   checkBundleGzip,
   checkAtlasTileset,
+  checkAiAssets,
+  DEFAULT_AI_LIMITS,
   calculateStaticTextureMemory,
   calculateEffectiveFileSize,
   checkPacksBudget,
@@ -542,5 +544,136 @@ describe("M5.1: check-perf-budget (Kiểm tra ngân sách hiệu năng tĩnh)", 
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("M7.12 #513: trần dung lượng ảnh do AI sinh (checkAiAssets, perf-budget.json static.aiAssets)", () => {
+  const KB = 1024;
+  const mk = (files: Record<string, number>) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-ai-budget-"));
+    for (const [name, kb] of Object.entries(files)) {
+      const full = path.join(dir, name);
+      fs.mkdirSync(path.dirname(full), { recursive: true });
+      fs.writeFileSync(full, Buffer.alloc(Math.round(kb * KB), 1));
+    }
+    return dir;
+  };
+  const limits = { maxFileKb: 150, totalKb: 300 };
+
+  it("ngân sách thật: mỗi ảnh <= 150 KB, tổng <= 300 KB (số của docs/KE_HOACH_DO_HOA_AI.md mục 9.4 (c))", () => {
+    const budget = JSON.parse(
+      fs.readFileSync(path.resolve(__dirname, "../perf-budget.json"), "utf8"),
+    );
+    expect(budget.static.aiAssets).toEqual({ maxFileKb: 150, totalKb: 300 });
+  });
+
+  it("thư mục không tồn tại hoặc rỗng: hợp lệ (chưa có ảnh AI nào)", () => {
+    const none = checkAiAssets(path.join(os.tmpdir(), "tg-khong-co-thu-muc-ai"), limits);
+    expect(none).toMatchObject({ ok: true, totalBytes: 0, files: [], errors: [] });
+    expect(checkAiAssets(mk({}), limits).ok).toBe(true);
+  });
+
+  it("trong trần thì qua; đúng bằng trần thì qua (<=); đo cả thư mục con", () => {
+    const r = checkAiAssets(mk({ "a.webp": 150, "b.webp": 100, "sub/c.webp": 50 }), limits);
+    expect(r.ok).toBe(true);
+    expect(r.totalKb).toBe(300);
+    expect(r.files.map((f) => f.file)).toEqual(["a.webp", "b.webp", "sub/c.webp"]);
+  });
+
+  it("ĐỘT BIẾN: một ảnh vượt trần mỗi ảnh => đỏ, nêu tên ảnh", () => {
+    const r = checkAiAssets(mk({ "nang.webp": 150.5, "nho.webp": 10 }), limits);
+    expect(r.ok).toBe(false);
+    expect(r.errors.join("\n")).toContain("nang.webp");
+    expect(r.files.find((f) => f.file === "nang.webp")?.over).toBe(true);
+    expect(r.files.find((f) => f.file === "nho.webp")?.over).toBe(false);
+  });
+
+  it("ĐỘT BIẾN: tổng vượt trần (mỗi ảnh đều nhỏ) => đỏ", () => {
+    const r = checkAiAssets(
+      mk({ "a.webp": 100, "b.webp": 100, "c.webp": 100, "d.webp": 1 }),
+      limits,
+    );
+    expect(r.ok).toBe(false);
+    expect(r.errors.join("\n")).toContain("Tổng dung lượng ảnh AI");
+    expect(r.files.every((f) => !f.over)).toBe(true);
+  });
+
+  /**
+   * Môi trường GIẢ trọn vẹn cho `checkPerfBudget` (dist + assets + packs + ngân sách trong thư mục tạm): KHÔNG đụng `client/dist` thật (ở CI bước Test chạy TRƯỚC Build nên
+   * thư mục đó chưa có: test phụ thuộc nó xanh ở máy dev và đỏ ở CI).
+   */
+  const fakeEnv = (aiFiles: Record<string, number>, budgetStatic: Record<string, unknown> = {}) => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "tg-ai-env-"));
+    const distDir = path.join(tmp, "dist");
+    const assetsDir = path.join(tmp, "assets");
+    const packsDir = path.join(tmp, "packs");
+    fs.mkdirSync(path.join(distDir, "assets"), { recursive: true });
+    fs.mkdirSync(assetsDir, { recursive: true });
+    fs.writeFileSync(path.join(distDir, "assets/index-sample.js"), Buffer.alloc(5000, "x"));
+    fs.writeFileSync(path.join(assetsDir, "atlas.png"), Buffer.alloc(5000));
+    for (const [name, kb] of Object.entries(aiFiles)) {
+      fs.mkdirSync(path.join(assetsDir, "ai"), { recursive: true });
+      fs.writeFileSync(path.join(assetsDir, "ai", name), Buffer.alloc(Math.round(kb * KB), 1));
+    }
+    const budgetPath = path.join(tmp, "perf-budget.json");
+    fs.writeFileSync(
+      budgetPath,
+      JSON.stringify({
+        static: {
+          bundleGzipKb: 520,
+          atlasTilesetKb: 1024,
+          textureMemoryMb: { low: 48, mid: 80, high: 128 },
+          ...budgetStatic,
+        },
+        packs: {
+          core: { maxKb: 2048 },
+          map: { maxKb: 2048 },
+          icons: { maxKb: 3072 },
+          audio: { maxKb: 5120 },
+          hdMaxFactor: 3,
+        },
+      }),
+    );
+    return {
+      budgetPath,
+      distDir,
+      assetsDir,
+      packsDir,
+      manifestPath: path.join(packsDir, "manifest.json"),
+    };
+  };
+
+  it("checkPerfBudget có `aiAssets` và đọc đúng thư mục ai (assets/ai của môi trường giả)", () => {
+    const aiLimits = { aiAssets: { maxFileKb: 150, totalKb: 300 } };
+    const bad = checkPerfBudget(fakeEnv({ "x.webp": 151 }, aiLimits));
+    expect(bad.aiAssets.ok).toBe(false);
+    expect(bad.ok).toBe(false);
+    expect(bad.errors.join("\n")).toContain("x.webp");
+    const good = checkPerfBudget(fakeEnv({ "y.webp": 100 }, aiLimits));
+    expect(good.aiAssets.ok).toBe(true);
+    expect(good.aiAssets.files.map((f: { file: string }) => f.file)).toEqual(["y.webp"]);
+    expect(good.ok).toBe(true);
+    // chưa có ảnh nào (không có cả thư mục ai): hợp lệ
+    expect(checkPerfBudget(fakeEnv({}, aiLimits)).aiAssets.files).toEqual([]);
+  });
+
+  it("ảnh AI THẬT của repo: chưa có ảnh nào, và nằm trong trần của perf-budget.json thật", () => {
+    const budget = JSON.parse(
+      fs.readFileSync(path.resolve(__dirname, "../perf-budget.json"), "utf8"),
+    );
+    const real = checkAiAssets(
+      path.resolve(__dirname, "../public/assets/ai"),
+      budget.static.aiAssets,
+    );
+    expect(real.ok).toBe(true);
+    expect(real.files).toEqual([]);
+  });
+
+  it("ngân sách thiếu `static.aiAssets`: dùng trần mặc định 150 / 300 KB (không lặng lẽ bỏ kiểm tra)", () => {
+    expect(DEFAULT_AI_LIMITS).toEqual({ maxFileKb: 150, totalKb: 300 });
+    const res = checkPerfBudget(fakeEnv({ "x.webp": 151 })); // ngân sách giả KHÔNG có aiAssets
+    expect(res.aiAssets.limits).toEqual({ maxFileKb: 150, totalKb: 300 });
+    expect(res.aiAssets.ok).toBe(false);
+    expect(res.ok).toBe(false);
   });
 });
