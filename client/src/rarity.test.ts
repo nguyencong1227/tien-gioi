@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { ITEMS, RARITY_COLORS, RARITY_NAMES } from "@tien-gioi/shared";
 import { contrast, parseHex } from "./contrast";
 import {
+  itemAria,
   RARITY_MARKS,
   applyRarityBadge,
   applyRarityText,
@@ -201,5 +202,36 @@ describe("rarity: mọi chỗ hiển thị đi qua một hàm (không còn màu 
     expect(rules).not.toMatch(/white-space\s*:\s*nowrap/);
     expect(rules).not.toMatch(/max-width\s*:\s*\d+px/);
     expect(rules).toMatch(/white-space\s*:\s*normal/);
+  });
+});
+
+describe("rarity: itemAria (câu cho trình đọc màn hình: tên + bậc + số lượng; dấu ◆ ★ bị giấu)", () => {
+  it("ghi tên và TÊN BẬC của cả năm bậc", () => {
+    const names = ["Phàm phẩm", "Linh phẩm", "Bảo phẩm", "Tiên phẩm", "Thần phẩm"];
+    for (let r = 0; r < 5; r++)
+      expect(itemAria({ name: "Món", rarity: r })).toBe(`Món, ${names[r]}`);
+  });
+
+  it("số lượng chỉ ghi khi gộp nhiều (số nguyên > 1); 1, 0, âm, lẻ, NaN, Infinity thì bỏ", () => {
+    expect(itemAria({ name: "Đan", rarity: 0 }, 3)).toBe("Đan, Phàm phẩm, số lượng 3");
+    for (const q of [1, 0, -2, 2.5, Number.NaN, Number.POSITIVE_INFINITY, undefined]) {
+      expect(itemAria({ name: "Đan", rarity: 0 }, q as number), String(q)).toBe("Đan, Phàm phẩm");
+    }
+  });
+
+  it("bậc lạ / thiếu / rác về Phàm phẩm, không in 'undefined'", () => {
+    for (const r of [undefined, -1, 9, "2", null, Number.NaN]) {
+      expect(itemAria({ name: "Món", rarity: r }), String(r)).toBe("Món, Phàm phẩm");
+    }
+  });
+
+  it("không có dấu phụ trong câu (chỉ chữ: trình đọc không phải đọc ký tự hình)", () => {
+    for (let r = 0; r < 5; r++) expect(itemAria({ name: "Món", rarity: r }, 2)).not.toMatch(/[◆★]/);
+  });
+
+  it("ui.ts đặt aria-label cho ô túi (có đồ: itemAria; trống: Ô trống)", () => {
+    const ui = fs.readFileSync(path.join(ROOT, "client/src/ui.ts"), "utf8");
+    expect(ui).toMatch(/btn\.setAttribute\("aria-label", itemAria\(def, s\.qty\)\)/);
+    expect(ui).toMatch(/btn\.setAttribute\("aria-label", "Ô trống"\)/);
   });
 });

@@ -136,6 +136,7 @@ import {
   applyRarityText,
   clearRarityBadge,
   clearRarityText,
+  itemAria,
   rarityStyle,
 } from "./rarity";
 import { initKeyLabels } from "./keybinds-dom";
@@ -735,12 +736,14 @@ function renderInventory() {
       btn.style.borderColor = rarityStyle(def.rarity).color;
       applyItemVisual(slotIconEls[i], def);
       slotNameEls[i].textContent = def.name;
+      btn.setAttribute("aria-label", itemAria(def, s.qty)); // tên + bậc (+ số lượng): dấu ◆ ★ bị giấu khỏi trình đọc
       applyRarityBadge(btn, def.rarity);
       slotQtyEls[i].textContent = s.qty > 1 ? `${s.qty}` : "";
     } else {
       btn.style.borderColor = "rgba(243, 220, 160, 0.22)";
       applyItemVisual(slotIconEls[i], undefined);
       slotNameEls[i].textContent = "";
+      btn.setAttribute("aria-label", "Ô trống");
       clearRarityBadge(btn);
       slotQtyEls[i].textContent = "";
       slotCdEls[i].style.transform = "scaleY(0)";
