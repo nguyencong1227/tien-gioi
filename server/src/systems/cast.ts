@@ -7,9 +7,11 @@ import {
   SKILL_BY_ID,
   elementMult,
   parseCast,
+  realmLabel,
   skillCooldownMs,
   skillDamageMult,
   skillMpCost,
+  skillReqMet,
   slotOpen,
   statsFor,
   statusOf,
@@ -126,6 +128,14 @@ export function cast(w: World, sid: string, raw: unknown) {
   const level = def ? c.skills.learned[def.id] : undefined;
   if (!def || !level) {
     w.events.toast(sid, { text: "Ô chiêu thức này còn trống.", tone: "bad" });
+    return;
+  }
+  // Kiếp mới giữ chiêu đã khắc ở tầng 1 mà `rebirthSkills` không xét cảnh giới (và file lưu cũ): kiểm lại LÚC DÙNG bằng CÙNG hàm với client
+  if (!skillReqMet(def, p.realm, p.tier)) {
+    w.events.toast(sid, {
+      text: `Cần đạt ${realmLabel(def.reqRealm, def.reqTier)} mới dùng được ${def.name}.`,
+      tone: "bad",
+    });
     return;
   }
   if (w.now < c.skillCd[idx]) return; // client tự hiện hồi chiêu (cdMax): im lặng, không tốn tin
