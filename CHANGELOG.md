@@ -4,7 +4,7 @@
 
 ## [0.2.0] — 14/11/2026: M6, Kim Đan + Âm Sương Trạch (nội dung và cân bằng) + giao diện gọn
 
-Bản phát hành M6 (`QUYET_DINH_M3.md` mục 10, 14: người dùng đồng ý phát hành khi #406 / #410 / #411 xong, sau v0.1.3): cảnh giới Kim Đan trọn vẹn, bản đồ thứ ba Âm Sương Trạch, bốn loài quái mới và trùm Hắc Giao, chín trang bị Kim Đan, rèn có phí, chuỗi nhiệm vụ nối Trúc Cơ sang Kim Đan, cân bằng lại, cùng giao diện gọn không che màn chơi (mục 15, bước 1-2 trên 3). **`PROTOCOL_VERSION` 1 -> 2: client / APK `v0.1.x` KHÔNG vào được bản chạy thật nữa, sẽ nhận thông báo "có bản mới" (xem "Cần biết khi phát hành").** Kế hoạch: `docs/PHAN_CONG_M6.md`.
+Bản phát hành M6 (`QUYET_DINH_M3.md` mục 10, 14: người dùng đồng ý phát hành khi #406 / #410 / #411 xong, sau v0.1.3): cảnh giới Kim Đan trọn vẹn, bản đồ thứ ba Âm Sương Trạch, bốn loài quái mới và trùm Hắc Giao, chín trang bị Kim Đan, rèn có phí, chuỗi nhiệm vụ nối Trúc Cơ sang Kim Đan, cân bằng lại, cùng giao diện gọn không che màn chơi (mục 15: thẻ nhân vật gọn, thanh menu riêng, Tổ đội / Nhiệm vụ / Chat thu gọn được, phím H ẩn toàn bộ giao diện). **`PROTOCOL_VERSION` 1 -> 2: client / APK `v0.1.x` KHÔNG vào được bản chạy thật nữa, sẽ nhận thông báo "có bản mới" (xem "Cần biết khi phát hành").** Kế hoạch: `docs/PHAN_CONG_M6.md`.
 
 ### Nội dung mới
 - **Cảnh giới Kim Đan trọn vẹn (bậc 13-15):** thanh tu vi 48000 / 55200 / 63480 (trước: 26400 / 30360 / 34914); Tụ Khí Đan có trần 300 tu vi mỗi viên và Xích Mãng rơi ít hơn (0,3 x 1, trước 0,6 x 1-2) để hết "đường tắt" (#403, #425).
