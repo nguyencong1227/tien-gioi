@@ -1011,6 +1011,31 @@ html[data-input="touch"] .qt-head {
   align-items: center;
   gap: 10px;
 }
+/* Công cụ phóng / thu / về chỗ mình (mục bấm >= 44 px) */
+.map-tools {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.map-tools .act-btn {
+  flex: none;
+  width: auto;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 14px;
+  font-size: var(--fs-16);
+  font-weight: 700;
+  white-space: nowrap;
+}
+/* Bản đồ lớn tự xử lý kéo / chụm (không để trình duyệt cuộn trang), có thể nhận focus để dùng bàn phím */
+#worldmap {
+  touch-action: none;
+  cursor: grab;
+}
+#worldmap:active {
+  cursor: grabbing;
+}
 #worldmap {
   width: min(88vw, 384px);
   height: min(88vw, 384px);
@@ -1020,8 +1045,8 @@ html[data-input="touch"] .qt-head {
 }
 @media (pointer: fine) and (min-width: 900px) {
   #worldmap {
-    width: min(92vw, 640px, calc(var(--vh, 100dvh) - 240px));
-    height: min(92vw, 640px, calc(var(--vh, 100dvh) - 240px));
+    width: min(92vw, 640px, calc(var(--vh, 100dvh) - 310px));
+    height: min(92vw, 640px, calc(var(--vh, 100dvh) - 310px));
   }
 }
 .map-legend {

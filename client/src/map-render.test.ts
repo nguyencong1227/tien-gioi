@@ -2,10 +2,23 @@ import { describe, expect, it } from "vitest";
 import { MAPS, TILE } from "@tien-gioi/shared";
 import { getMapOverview } from "./map-overview";
 import {
+  MAP_MAX_ZOOM,
+  MAP_MIN_ZOOM,
+  MAP_ZOOM_STEP,
   MAX_DPR,
   ZONE_ALPHA,
   canvasPixelSize,
+  cameraView,
+  canvasToWorld,
+  centerCamera,
+  clampCamera,
+  fitCamera,
   fitView,
+  panCamera,
+  pinchCamera,
+  visibleTiles,
+  zoomCamera,
+  type CameraBox,
   placeLabels,
   zoneColor,
   zoneRGBA,
@@ -237,5 +250,128 @@ describe("map-render: placeLabels", () => {
       const prios = out.map((p) => byKey.get(p.key)!.prio);
       for (let i = 1; i < prios.length; i++) expect(prios[i]).toBeLessThanOrEqual(prios[i - 1]);
     }
+  });
+});
+
+describe("map-render: camera phóng to / kéo", () => {
+  const box: CameraBox = { worldW: 128 * TILE, worldH: 96 * TILE, cw: 640, ch: 640, pad: 12 };
+  const fit = fitCamera(box);
+  const near = (a: number, b: number, eps = 1e-6) => expect(Math.abs(a - b)).toBeLessThan(eps);
+
+  it("zoom 1 ở giữa = đúng khung nhìn vừa trọn (`fitView`)", () => {
+    const v = cameraView(box, fit);
+    const f = fitView(box.worldW, box.worldH, box.cw, box.ch, box.pad);
+    near(v.scale, f.scale);
+    near(v.ox, f.ox);
+    near(v.oy, f.oy);
+  });
+
+  it("kẹp: zoom trong [min, max]; zoom 1 khoá tâm giữa bản đồ (kéo không đi đâu); giá trị rác rơi về vừa trọn", () => {
+    expect(clampCamera(box, { zoom: 99, cx: 0, cy: 0 }).zoom).toBe(MAP_MAX_ZOOM);
+    expect(clampCamera(box, { zoom: 0.1, cx: 0, cy: 0 }).zoom).toBe(MAP_MIN_ZOOM);
+    const locked = clampCamera(box, { zoom: 1, cx: 9999, cy: -9999 });
+    near(locked.cx, box.worldW / 2);
+    near(locked.cy, box.worldH / 2);
+    const bad = clampCamera(box, { zoom: Number.NaN, cx: Number.NaN, cy: Infinity });
+    expect(bad).toEqual(fit);
+  });
+
+  it("phóng to rồi kéo quá xa: khung nhìn không trượt ra ngoài bản đồ quá `pad`", () => {
+    let cam = zoomCamera(box, fit, 4, 320, 320);
+    for (const [dx, dy] of [
+      [5000, 5000],
+      [-9000, 0],
+      [0, -9000],
+    ] as const) {
+      cam = panCamera(box, cam, dx, dy);
+      const v = cameraView(box, cam);
+      // mép trái / phải / trên / dưới của bản đồ không để lộ quá `pad` khoảng trống ở phía nào bản đồ lớn hơn khung
+      expect(v.ox).toBeLessThanOrEqual(box.pad + 1e-6);
+      expect(v.oy).toBeLessThanOrEqual(box.pad + 1e-6);
+      expect(v.ox + box.worldW * v.scale).toBeGreaterThanOrEqual(box.cw - box.pad - 1e-6);
+      expect(v.oy + box.worldH * v.scale).toBeGreaterThanOrEqual(box.ch - box.pad - 1e-6);
+    }
+  });
+
+  it("phóng quanh điểm canvas: điểm thế giới dưới con trỏ đứng yên (khi không chạm biên)", () => {
+    const base = zoomCamera(box, fit, 3, 320, 320); // đã phóng 3 lần, tâm giữa
+    const ax = 380;
+    const ay = 290;
+    const w0 = canvasToWorld(cameraView(box, base), ax, ay);
+    const z = zoomCamera(box, base, MAP_ZOOM_STEP, ax, ay);
+    const w1 = canvasToWorld(cameraView(box, z), ax, ay);
+    expect(z.zoom).toBeCloseTo(base.zoom * MAP_ZOOM_STEP, 9);
+    near(w1.x, w0.x, 1e-4);
+    near(w1.y, w0.y, 1e-4);
+  });
+
+  it("phóng ở zoom tối đa / thu ở zoom 1 không đổi gì; hệ số xấu (0, âm, NaN) coi như 1", () => {
+    const max = zoomCamera(box, fit, 1000, 100, 100);
+    expect(max.zoom).toBe(MAP_MAX_ZOOM);
+    expect(zoomCamera(box, max, 2, 100, 100)).toEqual(max);
+    expect(zoomCamera(box, fit, 0.5, 100, 100)).toEqual(fit);
+    for (const f of [0, -2, Number.NaN]) expect(zoomCamera(box, max, f, 50, 50)).toEqual(max);
+  });
+
+  it("kéo sang phải thì bản đồ trượt sang phải (tâm nhìn đi sang trái) đúng dx / tỉ lệ", () => {
+    const z = zoomCamera(box, fit, 4, 320, 320);
+    const v = cameraView(box, z);
+    const p = panCamera(box, z, 40, 0);
+    near(p.cx, z.cx - 40 / v.scale, 1e-6);
+    near(p.cy, z.cy, 1e-9);
+    // kéo qua lại thì về chỗ cũ (khi không chạm biên)
+    const back = panCamera(box, p, -40, 0);
+    near(back.cx, z.cx, 1e-6);
+  });
+
+  it("centerCamera đưa tâm vào điểm thế giới (đã kẹp): đặt vào góc bản đồ thì tâm nằm trong biên cho phép", () => {
+    const z = zoomCamera(box, fit, 4, 320, 320);
+    const c = centerCamera(box, z, 0, 0);
+    expect(c.zoom).toBe(z.zoom);
+    expect(c).toEqual(clampCamera(box, c)); // đã hợp lệ
+    expect(c.cx).toBeGreaterThan(0);
+    const mid = centerCamera(box, z, box.worldW / 2, box.worldH / 2);
+    near(mid.cx, box.worldW / 2);
+  });
+
+  it("chụm hai ngón: tỉ lệ khoảng cách = hệ số phóng; hai ngón trùng nhau chỉ kéo", () => {
+    const a0 = { x: 280, y: 320 };
+    const b0 = { x: 360, y: 320 };
+    const p = pinchCamera(box, fit, a0, b0, { x: 240, y: 320 }, { x: 400, y: 320 }); // khoảng cách x2
+    expect(p.zoom).toBeCloseTo(2, 9);
+    const still = pinchCamera(box, p, a0, a0, { x: 300, y: 320 }, { x: 300, y: 320 });
+    expect(still.zoom).toBe(p.zoom);
+  });
+
+  it("thao tác bất kỳ nào cũng ra camera hợp lệ (ngẫu nhiên có hạt giống): kẹp là luỹ đẳng và khung nhìn luôn phủ khung trong biên", () => {
+    let seed = 987654321;
+    const rnd = () => (seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296;
+    let cam = fit;
+    for (let i = 0; i < 400; i++) {
+      const r = rnd();
+      if (r < 0.4) cam = zoomCamera(box, cam, 0.5 + rnd() * 2, rnd() * 640, rnd() * 640);
+      else if (r < 0.8) cam = panCamera(box, cam, (rnd() - 0.5) * 900, (rnd() - 0.5) * 900);
+      else cam = centerCamera(box, cam, rnd() * box.worldW, rnd() * box.worldH);
+      expect(clampCamera(box, cam)).toEqual(cam);
+      expect(cam.zoom).toBeGreaterThanOrEqual(MAP_MIN_ZOOM);
+      expect(cam.zoom).toBeLessThanOrEqual(MAP_MAX_ZOOM);
+      const v = cameraView(box, cam);
+      expect(Number.isFinite(v.scale) && Number.isFinite(v.ox) && Number.isFinite(v.oy)).toBe(true);
+    }
+  });
+
+  it("visibleTiles: zoom 1 thấy cả bản đồ; phóng 4 lần thấy một khối nhỏ nằm trong bản đồ và phủ canvas", () => {
+    const all = visibleTiles(cameraView(box, fit), 128, 96, box.cw, box.ch);
+    expect(all).toEqual({ x0: 0, y0: 0, x1: 128, y1: 96 });
+    const z = zoomCamera(box, fit, 4, 320, 320);
+    const v = cameraView(box, z);
+    const t = visibleTiles(v, 128, 96, box.cw, box.ch);
+    expect(t.x1 - t.x0).toBeLessThan(128 / 2);
+    expect(t.x0).toBeGreaterThanOrEqual(0);
+    expect(t.x1).toBeLessThanOrEqual(128);
+    // khối ô nhìn thấy phủ kín canvas (mép trái / phải của khối vẽ ra bao quanh canvas)
+    const ppt = v.scale * TILE;
+    expect(v.ox + t.x0 * ppt).toBeLessThanOrEqual(0 + 1e-6);
+    expect(v.ox + t.x1 * ppt).toBeGreaterThanOrEqual(box.cw - 1e-6);
   });
 });
