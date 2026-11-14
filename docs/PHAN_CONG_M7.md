@@ -1,14 +1,15 @@
 # Phân công M7: CHIỀU SÂU CHIẾN ĐẤU + ĐỒ ĐẠC + NGUYÊN ANH + BẢN ĐỒ THỨ TƯ (người dùng duyệt 14/11/2026)
 
-> Quyết định gốc: `~/TT/orchestra/QUYET_DINH_M3.md` mục **17.1 / 17.4 / 18** (người dùng duyệt hướng, không cần duyệt lại). Dựa trên `main` `942b843` (sau v0.2.0) và `docs/CAN_BANG.md`. Mọi con số trong tài liệu này là **đề xuất của Dev A**; số cuối cùng do mô hình cân bằng (M7.9) quyết và ghi vào `docs/CAN_BANG.md`. Tên chiêu / quái / đồ là **gợi ý**, được đổi trước khi vào `main` (đổi tên sau khi vào tệp lưu thì đắt).
+> Quyết định gốc: `~/TT/orchestra/QUYET_DINH_M3.md` mục **17.1 / 17.4 / 18 / 19 / 20 / 21** (người dùng duyệt hướng, không cần duyệt lại; mục 19-21 mở nguồn nội dung / hình / âm của Vạn Kiếp Tu Tiên và nới ngân sách tài sản theo gói). Dựa trên `main` `942b843` (sau v0.2.0) và `docs/CAN_BANG.md`. Mọi con số trong tài liệu này là **đề xuất của Dev A**; số cuối cùng do mô hình cân bằng (M7.9) quyết và ghi vào `docs/CAN_BANG.md`. Tên chiêu / quái / đồ là **gợi ý**, được đổi trước khi vào `main` (đổi tên sau khi vào tệp lưu thì đắt).
 
 ## 1. Quyết định đã chốt và ràng buộc
 | Điều | Quyết định |
 |---|---|
 | Hướng | M7 = **chiều sâu chiến đấu** (chiêu thức học được, quái có hành vi khác nhau) + **đồ đạc** (ô trang bị mới, pháp bảo, độ hiếm) + **cảnh giới Nguyên Anh** + **bản đồ thứ tư** (phương án A: một phòng Colyseus, cổng từ bản đồ thứ ba) |
 | Trước M7 | **v0.2.1** (đã được đồng ý phát hành): phím J K L U I O + bản đồ lớn / nhỏ làm lại (issue #495, #496, milestone "v0.2.1"). L U I O để TRỐNG chờ M7 |
-| Nguồn ý tưởng | Game "Vạn Kiếp Tu Tiên" (bản clone chỉ đọc `~/TT/van-kiep-tu-tien-clone`). **Chỉ lấy ý tưởng và cơ chế** (mục 4); tự đặt tên, tự viết mô tả; **không chép chữ, tên, số liệu, hình, âm thanh** (AGENTS.md mục Asset + `QUYET_DINH_M3.md` mục 8.4). Có bước kiểm trùng (mục 4) |
-| Ảnh AI | **SDXL base được đưa vào game** (mục 18.3), ghi nguồn từng ảnh (model, prompt, seed, ngày, ai chỉnh); không model / LoRA khác; chỉ 127.0.0.1, giới hạn RAM, tự tắt, tệp trên `/mnt/data`; không chữ Hán / chữ lạ; không bắt chước phong cách hay nhân vật của game khác. Cần sửa mục Asset của `AGENTS.md` (M7.12) |
+| Nguồn nội dung | Game "Vạn Kiếp Tu Tiên" (bản clone chỉ đọc `~/TT/van-kiep-tu-tien-clone`): **người phát triển đã cho phép, theo xác nhận của người dùng 14/11/2026** (mục 19-20). **ĐƯỢC dùng NGUYÊN VĂN** chữ và dữ liệu (tên, mô tả công pháp / chiêu thức / vật phẩm / trang bị / pháp bảo / nguyên liệu / nghề / cảnh giới), chỉnh SỐ cho cân bằng của game mình (nhiều người chơi, thời gian thực); **ĐƯỢC dùng hình ảnh và âm thanh khi phù hợp** (mục 4). Ghi nguồn từng thứ trong `docs/NGUON_NOI_DUNG.md` + dòng ghi công trong game. Tiếng Việt, KHÔNG chữ Hán. Chỉ lấy từ bản clone trên máy, không tải thêm từ Internet |
+| Ảnh AI | **SDXL base được đưa vào game** (mục 18.3), ghi nguồn từng ảnh (model, prompt, seed, ngày, ai chỉnh); không model / LoRA khác; chỉ 127.0.0.1, giới hạn RAM, tự tắt, tệp trên `/mnt/data`; không chữ Hán / chữ lạ; không bắt chước phong cách hay nhân vật của game khác (nay có thêm nguồn hình / âm của Vạn Kiếp Tu Tiên, mục 4). Cần sửa mục Asset của `AGENTS.md` (M7.12, PR riêng) |
+| Ngân sách tài sản (mục 21) | Thay "một ngân sách tĩnh" bằng **gói tải theo nhu cầu**: lõi ≤ 2 MB (vào game), mỗi bản đồ ≤ 2 MB (tải khi vào / trước khi qua cổng), biểu tượng ≤ 3 MB (khi mở túi / bảng công pháp lần đầu), âm thanh ≤ 5 MB (tải dần, không chặn màn tải). Texture: Thấp 48 / Vừa 80 giữ, **Cao 256 MB**, thêm **"Rất cao"** (chỉ máy tính GPU mạnh, không bao giờ tự chọn trên điện thoại): texture 512 MB, hạt ~1000 / emitter ~40 / chữ sát thương ~40 / draw call ~300, gói ảnh 2x riêng (≤ 3 lần gói thường). **Giữ cứng:** Android tầm trung ≥ 50 FPS, bundle JS gzip 520 KB, kiểm rò rỉ, băng thông mạng; thời gian từ mở trang tới vào được thế giới đo trên 4G giả lập và ghi vào ngân sách CI. Nới thêm: hỏi người dùng. Việc: M7.15 |
 | Người làm | **A + B** đồ hoạ / client; **C** bot / mô phỏng / thử tải / hiệu năng / cân bằng bằng số. **Phát hành M7 (v0.3.0): hỏi người dùng khi xong** |
 | Giữ nguyên | "Server quyết định mọi kết quả"; luật luân hồi / bí cảnh / PK / tông môn đã chốt; ràng buộc M5-M6 (Android tầm trung ≥ 50 FPS, ngân sách CI, tick < 10 ms, byte / tick mỗi client < 520, bố cục điện thoại / máy tính, mục bấm ≥ 44 px, KHÔNG chữ Hán); chơi hoàn toàn bằng bàn phím (mục 13) |
 | Hợp đồng `shared/` | PR RIÊNG, chỉ sửa `shared/`, người khác review; `PROTOCOL_VERSION` 2 -> **3** ở PR hợp đồng đầu tiên đổi giao thức; `MIN_PROTOCOL_VERSION=3` lúc phát hành (client / APK 0.2.x nhận "có bản mới") |
@@ -29,29 +30,40 @@
 
 **Ngoài phạm vi (M8 hoặc hỏi người dùng):** Hoá Thần trở lên; bí cảnh thứ hai; dòng phụ ngẫu nhiên theo từng món đồ (cần túi đồ lưu thể hiện riêng từng món, đổi định dạng túi / loot / lưu); trận pháp; ngự thú; chợ / đấu giá; iOS; mọi việc phát hành ngoài mục 1.
 
-## 4. Nguồn ý tưởng và ranh giới
-**Đã đọc** (chỉ cấu trúc, không chép): bản clone tổ chức nội dung thành công pháp theo phẩm cấp và hệ ngũ hành, mỗi công pháp / pháp khí dạy một "chiêu" có kiểu, uy lực, hồi chiêu; quái có danh sách chiêu riêng và hệ; nghề chế tạo gồm luyện đan, luyện khí (bảo), chế phù, trận pháp có công thức và dụng cụ; đồ chia theo phẩm cấp 1-8. Đó là **ý tưởng chung của thể loại tu tiên**, tự viết lại theo luật Tiên Giới.
+## 4. Nguồn nội dung, hình, âm và cách ghi nguồn
+**Quyết định (mục 19-20):** người phát triển Vạn Kiếp Tu Tiên đã cho phép (theo xác nhận của người dùng 14/11/2026; minh chứng do người dùng giữ, không nằm trong repo). Phần lớn là thuật ngữ / thiết lập chung của cộng đồng truyện tu tiên. Bản clone (`NOTES.md`) ghi tác giả "Hải Quân · Bắc Team" và "không có LICENSE, mặc định bảo lưu mọi quyền", nên việc dùng DỰA HẲN vào sự cho phép trên: mọi thứ lấy vào repo phải ghi nguồn đầy đủ, và dòng ghi công trong game nêu cả nội dung, hình và âm.
 
-**Ý tưởng lấy (và cách Tiên Giới làm khác, của riêng mình):**
+**Cấu trúc nguồn (đã đọc, `site/assets/content-ClG6Ha-i.json`, bản tiếng Việt; KHÔNG dùng `content-zh-*.json`):** công pháp theo phẩm cấp 1-8 và hệ (ngũ hành + âm), mỗi công pháp / pháp khí có `chieu` (dạng, uy lực, hồi); quái có hệ, địa hình, danh sách chiêu, rơi; nghề luyện đan / luyện bảo / chế phù / trận pháp có công thức, dụng cụ, phẩm cấp; đan dược, linh dược, phù lục, trận bàn, yêu tài; cảnh giới, thể chất, linh căn. Hình: `site/img/` ~2075 ảnh WebP (`vat` ~1069 biểu tượng vật phẩm ~8 KB mỗi ảnh, `chieu` 168 ảnh chiêu ~7 KB, `dich` 555 ảnh quái / địch ~63 KB, `nguoi` 52 nhân vật, `canh` 102 cảnh nền ~160 KB, `node` 84, `man` / `map` / `ui` / `icon`); âm thanh `site/audio/` (`sfx` 17 tệp ~364 KB, `amb` 1 tệp, `bgm` 5 bài ~14 MB mp3).
+
+**Được làm:**
+- Lấy **nguyên văn** tên + mô tả + dữ liệu công pháp / chiêu / vật phẩm / trang bị / pháp bảo / nguyên liệu / nghề làm điểm khởi đầu, rồi **chỉnh số** (sát thương, hồi chiêu, giá, tỉ lệ rơi) theo mô hình cân bằng M7.9. Nguồn là trò chơi theo lượt / đọc chữ: **cơ chế phải dịch sang thời gian thực** (không bê nguyên bảng chiêu theo lượt); thông số `uy` / `hoi` của nguồn chỉ là gợi ý thứ tự độ mạnh.
+- Dùng hình và âm khi **phù hợp**: hợp phong cách và kích thước Tiên Giới (2D, Phaser), được cắt / đổi cỡ / đổi màu; **không còn chữ Hán** trên hình (xoá chữ, thay chữ Việt, hoặc không dùng; kiểm CJK trong CI vẫn xanh: mở rộng kiểm sang ảnh nếu cần); giữ ngân sách mục 1 (gói tải); nén ảnh / âm hợp lý (bgm 14 MB phải nén hoặc chọn bài để vào ≤ 5 MB âm thanh).
+- Chỉ lấy từ bản clone trên máy; KHÔNG tải thêm từ Internet; KHÔNG sao chép cả kho (chỉ tệp thật sự dùng).
+
+**Ghi nguồn (bắt buộc, mỗi PR có nội dung / hình / âm lấy từ nguồn):**
+1. `docs/NGUON_NOI_DUNG.md` (A tạo ở PR kế hoạch này): câu cho phép, ngày, và bảng "tệp / mục gốc -> tệp / mục trong repo, ngày, đã chỉnh gì" (mỗi tệp hình / âm một dòng; dữ liệu theo cụm: file nguồn + id nguồn -> id trong `shared/`).
+2. Hình / âm: thêm dòng tương ứng vào tài liệu giấy phép tài sản hiện có (`CREDITS.md`, `docs/RA_SOAT_TAI_SAN.md`), `credits.test.ts` đếm đúng số tệp.
+3. Dòng ghi công trong game (màn Giới thiệu / Cài đặt, B làm): nêu Vạn Kiếp Tu Tiên (tác giả Hải Quân · Bắc Team) và rằng nội dung, hình, âm lấy theo sự cho phép của tác giả.
+4. Mỗi PR nội dung nêu số mục lấy từ nguồn so với số mục tự làm trong mô tả PR.
+
+**Ý tưởng cơ chế và cách Tiên Giới dùng (thiết kế vẫn của Tiên Giới, nội dung có thể lấy từ nguồn):**
 | Ý tưởng | Cách làm ở Tiên Giới |
 |---|---|
-| Công pháp theo hệ, dạy chiêu | **Kinh quyển** (vật phẩm sách) dạy MỘT chiêu có hệ; học bằng cách dùng sách; học thêm quyển trùng thì tăng "tầng" (tối đa 3). Chiêu gắn vào ô L U I O (chiến đấu thời gian thực, không theo lượt) |
-| Hệ khắc nhau | Ngũ hành tương khắc (kim > mộc > thổ > thủy > hỏa > kim) làm hệ số sát thương x1,3 / x0,8 giữa chiêu và quái (ngũ hành là kiến thức chung, không phải của riêng game nào) |
-| Quái có chiêu riêng | Mỗi loài có HÀNH VI (tầm xa, lao tới, độc, tinh anh, đòn báo trước) hiện được trên màn chơi, thay vì chỉ bảng chiêu |
-| Pháp khí / pháp bảo | Ô **pháp bảo** có nội tại đặc biệt (không phải thêm ô kỹ năng) |
-| Nghề Đan / Khí / Phù | Giữ "rèn" hiện có; thêm luyện đan và chế phù ở mức nhỏ (M7.13, cuối) |
-| Phẩm cấp đồ | Dùng `Rarity` 0-4 đã có (phàm / linh / bảo / tiên / thần), không chép thang 8 bậc |
+| Công pháp theo hệ, dạy chiêu | **Kinh quyển** (vật phẩm sách) dạy MỘT chiêu có hệ; học bằng cách dùng sách; học thêm quyển trùng thì tăng "tầng" (tối đa 3). Chiêu gắn vào ô L U I O (chiến đấu thời gian thực, không theo lượt). Danh sách công pháp / tên chiêu lấy từ nguồn rồi chọn những cái dịch được sang thời gian thực |
+| Hệ khắc nhau | Ngũ hành tương khắc (kim > mộc > thổ > thủy > hỏa > kim) làm hệ số sát thương x1,3 / x0,8 giữa chiêu và quái |
+| Quái có chiêu riêng | Mỗi loài có HÀNH VI (tầm xa, lao tới, độc, tinh anh, đòn báo trước) hiện được trên màn chơi |
+| Pháp khí / pháp bảo | Ô **pháp bảo** có nội tại đặc biệt (không phải thêm ô kỹ năng); tên / mô tả pháp khí lấy từ nguồn |
+| Nghề Đan / Khí / Phù | Giữ "rèn" hiện có; thêm luyện đan và chế phù ở mức nhỏ (M7.13, cuối); công thức lấy từ nguồn rồi chỉnh |
+| Phẩm cấp đồ | Dùng `Rarity` 0-4 đã có (phàm / linh / bảo / tiên / thần); nguồn có 8 phẩm cấp: ánh xạ 8 -> 5 trong `NGUON_NOI_DUNG.md` |
 
-**Quy tắc đặt tên (bắt buộc):** tên chiêu, quái, đồ, NPC, địa danh do Dev A / B / C TỰ ĐẶT theo thế giới Tiên Giới (Lạc Hà, Hắc Phong, Âm Sương, ...); mô tả TỰ VIẾT; không dùng tên riêng, số liệu, hay câu chữ từ bản clone (kể cả tên chiêu / vật phẩm nghe quen). **Kiểm trùng:** trước khi merge PR nội dung, A chạy một lệnh kiểm chuỗi tên / mô tả mới có trùng nguyên văn (4 từ liên tiếp trở lên, hoặc cả tên) với `~/TT/van-kiep-tu-tien-clone/site/assets/content-*.json` hay không (chỉ đọc, đường dẫn đặt bằng biến môi trường, KHÔNG chạy trong CI vì máy CI không có thư mục đó; kết quả ghi vào mô tả PR). Trùng thì đổi tên. Không ảnh / âm thanh / phông của bản clone, kể cả để tham khảo trong repo.
-
-**Kiểm trùng đợt 1 (A, 14/11, trên 5044 tên trong `content-*.json`):** 24 tên gợi ý của tài liệu này (chiêu, bản đồ, quái, trùm, tên loại đồ); 1 trùng cụm "Hồi Xuân" (đã đổi thành Dưỡng Mộc Quyết); các thuật ngữ chung của thể loại (pháp bảo, ngọc bội) giữ vì là từ vựng thường, không phải tên riêng của game nào. Mọi tên mới thêm sau này phải qua bước này.
+**Phạm vi cần cẩn thận:** tên riêng của quốc gia / nhân vật / tông phái trong nguồn gắn với thế giới của game đó: dùng tên chung (công pháp, vật phẩm, nguyên liệu) nhưng KHÔNG lấy cốt truyện / nhân vật của game đó làm nhân vật Tiên Giới (thế giới, địa danh, nhân vật vẫn của Tiên Giới: mục Asset của `AGENTS.md` giữ phần này). Mọi tên có chữ Hán / phiên âm Hán-Việt lạ phải đọc được tiếng Việt.
 
 ## 5. Thiết kế chiến đấu
 
 ### 5.1 Ô chiêu và công pháp
-- **Ô:** J = ô 1 Kiếm chém, K = ô 2 Kiếm khí (cố định, ai cũng có), **L U I O = ô 3-6 học được**. Ô mở theo cảnh giới (đề xuất, cân bằng kiểm): L từ Luyện Khí, U từ Trúc Cơ, I từ Kim Đan, O từ Nguyên Anh. Ô chưa mở hiện khoá + ghi cảnh giới mở.
+- **Ô:** J = ô 1 Kiếm chém, K = Kiếm khí (đứng riêng, cố định, ai cũng có), **L U I O = ô 2-5 học được** (cách gọi của người dùng, khớp hành động `skill.slot2..5` của v0.2.1). Ô mở theo cảnh giới (đề xuất, cân bằng kiểm): L từ Luyện Khí, U từ Trúc Cơ, I từ Kim Đan, O từ Nguyên Anh. Ô chưa mở hiện khoá + ghi cảnh giới mở.
 - **Kinh quyển** (`ItemType` mới `"book"`, `ItemDef.teaches: skillId`): dùng quyển = học chiêu (quyển mất đi). Đã học rồi mà dùng quyển trùng = +1 tầng (tối đa 3: +15% sát thương và -8% hồi chiêu mỗi tầng, đề xuất). Yêu cầu cảnh giới tối thiểu ghi trên quyển. Nguồn quyển: rơi từ quái (hiếm), bán ở NPC (chiêu cơ bản, tốn Linh thạch), thưởng nhiệm vụ, rơi trùm (cao cấp).
-- **Gắn ô:** `skillSlot {slot, skillId}` (client đề nghị, server kiểm đã học + ô đã mở). Mỗi chiêu một ô. Bấm L / U / I / O (hoặc nút cảm ứng) gửi `cast {slot, angle}`; server kiểm hồi chiêu, linh lực, đang ở trạng thái cho phép (không đang chết, đang đả tọa thì ngắt đả tọa như Kiếm khí hiện nay).
+- **Gắn ô:** `skillSlot {slot: 2..5, skillId}` (client đề nghị, server kiểm đã học + ô đã mở). Mỗi chiêu một ô. Bấm L / U / I / O (hoặc nút cảm ứng) gửi `cast {slot: 2..5, angle}`; server kiểm hồi chiêu, linh lực, đang ở trạng thái cho phép (không đang chết, đang đả tọa thì ngắt đả tọa như Kiếm khí hiện nay).
 - **Dữ liệu riêng** (chỉ gửi cho chủ, không vào state chung): chiêu đã học + tầng, gắn ô, hồi chiêu còn lại. Lưu trong hồ sơ nhân vật (`Character.skills`), nạp qua hàm làm sạch (`sanitizeSkills`: id lạ bỏ, tầng kẹp 1-3, ô chưa mở bị gỡ).
 - **Khắc chân linh:** ở Hoàng Tuyền, tốn Duyên, **giữ lại 1 / 2 / 3 công pháp qua kiếp** (nấc mở bằng `Soul.unlocks.khac`, giá là đề xuất 40 / 100 / 220 Duyên, cân bằng chốt ở M7.9). Kiếp mới bắt đầu với chiêu đã khắc (tầng giữ nguyên), vẫn phải đủ cảnh giới / mở ô mới dùng được. `Soul` chừa chỗ lưu danh sách khắc (`Soul.engraved`), nạp qua hàm làm sạch.
 
@@ -106,7 +118,7 @@ Sáu trạng thái: `burn` (đốt: sát thương theo giây), `poison` (độc:
 - **Bí cảnh Linh Hư**: trần bậc 12 (từ M6) giữ nguyên; bí cảnh thứ hai ngoài phạm vi.
 
 ## 9. Đồ hoạ (A + B)
-- **Chia:** A sinh bằng mã (`client/scripts/gen-assets.mjs`, CC0 tự vẽ) sprite quái mới + tinh anh + trùm, biểu tượng đồ / quyển / ô trang bị, atlas; **B** làm hiệu ứng (FX từng chiêu, báo trước đòn, đạn, biểu tượng trạng thái, rung / làm mờ), thanh chiêu 6 ô, bảng Công pháp, bảng nhân vật 6 ô, bản đồ thứ tư (`MAP_STYLES.han_van`, chuyển cảnh, bản đồ nhỏ / lớn đã làm ở v0.2.1).
+- **Chia:** nguồn hình / âm của Vạn Kiếp Tu Tiên (mục 4) nay dùng được: **A** chọn + chỉnh (cắt, đổi cỡ, đổi màu, xoá chữ Hán, nén) biểu tượng vật phẩm / quyển / chiêu (`img/vat`, `img/chieu`), ảnh quái (`img/dich`) và dựng gói tải theo bản đồ / theo nhu cầu (M7.15); thứ không có sẵn thì A sinh bằng mã (`client/scripts/gen-assets.mjs`, CC0 tự vẽ) như cũ; mọi sprite phải khớp phong cách nhân vật / quái hiện có (kiểm bằng ảnh nhìn bằng mắt: khung 32 px, bảng màu `MAP_STYLES`); **B** làm hiệu ứng (FX từng chiêu, báo trước đòn, đạn, biểu tượng trạng thái, rung / làm mờ), thanh chiêu 6 ô, bảng Công pháp, bảng nhân vật 6 ô, bản đồ thứ tư (`MAP_STYLES.han_van`, chuyển cảnh, bản đồ nhỏ / lớn đã làm ở v0.2.1), dòng ghi công trong game; âm thanh (`sfx` / `bgm`): **B** chọn + nén cho vào ≤ 5 MB (tải dần), A ghi nguồn.
 - **Giao diện:** thanh chiêu = 6 ô J K L U I O (mở / khoá / trống mờ / hồi chiêu quét), bố cục điện thoại: nút chiêu cảm ứng chỉ cho chiêu ĐÃ gắn (giữ giao diện gọn mục 15), bảng **Công pháp** (học, gắn ô, khắc chân linh; dùng được bằng bàn phím: mũi tên + Enter), mô tả chiêu có hệ + số thật server tính.
 - **Ảnh AI (M7.12):** SDXL base (mục 18.3): minh hoạ lớn (nền đăng nhập, ảnh tải, ảnh mở đầu bản đồ thứ tư), KHÔNG làm sprite / icon (SDXL không giữ nét pixel nhỏ). Mỗi ảnh ghi nguồn trong `docs/art/nguon/<tên>.json` + `CREDITS.md`; WebP sạch siêu dữ liệu ≤ 150 KB mỗi ảnh, tổng ≤ 300 KB; `check:credits` và `check-perf-budget` mở rộng bắt ảnh thiếu nguồn / quá nặng TRƯỚC khi có ảnh nào vào `client/public/` (kế hoạch `docs/KE_HOACH_DO_HOA_AI.md` mục 9). `AGENTS.md` mục Asset sửa theo mục 18.3 (PR riêng, B review).
 
@@ -118,7 +130,7 @@ Sáu trạng thái: `burn` (đốt: sát thương theo giây), `poison` (độc:
 | Nhịp Nguyên Anh | cả cảnh giới **~6-9 giờ** (solo, kể cả nhiệm vụ), không bãi nào > ~1,5x bãi đúng bậc; Linh thạch / giờ không lệch quá ~2x | tiêu chí M6 (`CAN_BANG.md` mục 10) |
 | Trùm Thiên Hàn Vương | đội 3-4 người hạ được, không ai chết ở ca mô phỏng khó; một người vẫn khó hơn rõ rệt (có chiêu / đan thì được, không bị khoá cứng) | `CAN_BANG.md` mục 9 |
 | Quái mới | thời gian hạ một con ở cấp đúng bậc 6-15 giây (có chiêu); tinh anh ~3-4x | đo bằng thợ săn trong `World` thật |
-| Hiệu năng | tick < 10 ms ở 150 người trên 4 bản đồ; byte / tick mỗi client < 520 (săn), crowd < 600; đạn / trạng thái không thêm trường state nào đổi mỗi tick; Android tầm trung ≥ 50 FPS | `perf.test.ts`, `perf-budget.json` |
+| Hiệu năng | tick < 10 ms ở 150 người trên 4 bản đồ; byte / tick mỗi client < 520 (săn), crowd < 600; đạn / trạng thái không thêm trường state nào đổi mỗi tick; Android tầm trung ≥ 50 FPS ở mọi mức; bundle JS gzip ≤ 520 KB; gói tải theo mục 1 (lõi ≤ 2 MB, bản đồ ≤ 2 MB, biểu tượng ≤ 3 MB, âm thanh ≤ 5 MB); vào được thế giới trên 4G giả lập trong ngân sách CI | `perf.test.ts`, `perf-budget.json`, `check-perf-budget.mjs` |
 | Mô hình vs thật | lệch giữa mô hình và bot ≤ ~25% | công cụ của C |
 | Luân hồi | Duyên / giờ không lệch quá 1,3x giữa các mốc; khắc chân linh không làm kiếp 2 vượt ~2,0x kiếp 1 | `THIET_KE_LUAN_HOI.md` mục 5 |
 
@@ -127,7 +139,7 @@ Mã M7.x; issue được tạo theo bảng (số issue ghi ở cột Issue sau k
 
 | Mã | Việc | Ai | Phụ thuộc |
 |---|---|---|---|
-| M7.0 | Kế hoạch này + issue + kiểm trùng | A | — |
+| M7.0 | Kế hoạch này + issue + `docs/NGUON_NOI_DUNG.md` | A | — |
 | M7.1 | **Hợp đồng 1 (`shared/`)**: `skills.ts` (`SkillDef`, `Element`, `elementMult`, `StatusDef`), `ItemDef.teaches` + `ItemType` "book", tin `skillSlot` / `cast` / `skills`, `MonsterKind.behavior / element / elite`, `Character.skills` + `sanitizeSkills`, `Soul.engraved`, `PROTOCOL_VERSION` 3 | A (B review) | v0.2.1 không cần; có thể bắt đầu ngay |
 | M7.2 | Server chiến đấu: `systems/skills.ts` (học, ô, cast, hình, linh lực, hồi chiêu, hệ), `systems/status.ts`, khắc chân linh (`soulBuy` thêm mục), test + đột biến + red-team, bench | A | M7.1 |
 | M7.3 | Server quái hành vi: ranged / charger / poisoner / tinh anh + báo trước đòn + đạn (`World.bolts`), áp lên quái cũ; hiệu năng | A | M7.1 |
@@ -141,13 +153,15 @@ Mã M7.x; issue được tạo theo bảng (số issue ghi ở cột Issue sau k
 | M7.11 | Hồi quy: E2E chiến đấu (cast, hồi chiêu, trạng thái), E2E qua cổng ba -> bốn, `kiem-save`, perf-gate / leak | A + B + C | M7.2-M7.8 |
 | M7.12 | Ảnh AI SDXL: sửa `AGENTS.md` mục Asset (PR riêng, B review) + kiểm tự động (`check-credits`, `check-perf-budget`) + ảnh đầu tiên (nền đăng nhập) + ảnh bản đồ thứ tư | B (+ C lô ảnh, A review) | #497 (ComfyUI G1-G2) |
 | M7.13 | Nghề mức nhỏ (luyện đan, chế phù) — chỉ nếu hết việc hơn | A + B | M7.4 |
+| M7.15 | **Gói tải theo nhu cầu + ngân sách mới + mức "Rất cao"** (mục 21): `client/perf-budget.json` + `check-perf-budget.mjs` theo gói (lõi / bản đồ / biểu tượng / âm thanh / gói 2x), nạp gói theo bản đồ (tải trước khi qua cổng, màn chờ ngắn) và theo nhu cầu (biểu tượng khi mở túi / bảng công pháp), mức chất lượng "Rất cao" chỉ máy tính GPU mạnh (không tự chọn trên điện thoại) + gói ảnh 2x, đo vào được thế giới trên 4G giả lập; sửa `docs/THIET_KE_GIAO_DIEN_DO_HOA.md` mục 10 | A (lõi) + C (kiểm CI) + B (màn chờ, tuỳ chọn Rất cao ở Cài đặt) | không (làm TRƯỚC khi hình / âm nguồn vào `client/public/`) |
+| M7.16 | **Nguồn nội dung**: `docs/NGUON_NOI_DUNG.md` (A, ở PR kế hoạch), sửa mục Asset của `AGENTS.md` (A, PR riêng, B review), dòng ghi công trong game (B), kiểm CJK mở rộng sang ảnh (C), mỗi PR nội dung / hình / âm ghi dòng nguồn | A + B + C | không |
 | M7.14 | Phát hành v0.3.0 (hỏi người dùng khi xong): `MIN_PROTOCOL_VERSION=3`, CHANGELOG, thẻ, `prod.sh backup` rồi `up` | A | tất cả |
 
-**Issue (milestone "M7: Chiều sâu chiến đấu + Nguyên Anh"):** M7.1 #502, M7.2 #503, M7.3 #504, M7.4 #505, M7.5 #506, M7.6 #507, M7.7 #508, M7.8 #509, M7.9 #510, M7.10 #511, M7.11 #512, M7.12 #513, M7.13 #514, M7.14 #515. Trước M7: v0.2.1 = #495 (phím), #496 (bản đồ lớn / nhỏ; bước 1 là PR #498); ComfyUI G1-G2 = #497 (PR #499).
+**Issue (milestone "M7: Chiều sâu chiến đấu + Nguyên Anh"):** M7.1 #502, M7.2 #503, M7.3 #504, M7.4 #505, M7.5 #506, M7.6 #507, M7.7 #508, M7.8 #509, M7.9 #510, M7.10 #511, M7.11 #512, M7.12 #513, M7.13 #514, M7.14 #515, M7.15 và M7.16: issue tạo kèm PR này (số ghi ở mô tả PR). Trước M7: v0.2.1 = #495 (phím), #496 (bản đồ lớn / nhỏ; bước 1 là PR #498); ComfyUI G1-G2 = #497 (PR #499).
 
-**Thứ tự gợi ý:** v0.2.1 (B: #495 phím rồi #496 bản đồ bước 2-3; A: #498 xong; C: ComfyUI #497 và hỗ trợ E2E) -> A: M7.1 (PR hợp đồng) song song B bắt đầu thiết kế giao diện 6 ô (chưa cần server) và C bắt đầu mô hình chiêu trong `balance/` -> A: M7.2 và M7.3 (server), M7.4 (hợp đồng 2) -> M7.6-M7.8 (client) -> M7.5 (nội dung Nguyên Anh) -> M7.9-M7.11 (cân bằng / đo / hồi quy) -> M7.12 xen kẽ -> M7.14.
+**Thứ tự gợi ý:** (mục 21 và 20 đi TRƯỚC khi có tài sản lớn vào repo: M7.15, M7.16) v0.2.1 (B: #495 phím rồi #496 bản đồ bước 2-3; A: #498 xong; C: ComfyUI #497 và hỗ trợ E2E) -> A: M7.1 (PR hợp đồng) song song B bắt đầu thiết kế giao diện 6 ô (chưa cần server) và C bắt đầu mô hình chiêu trong `balance/` -> A: M7.2 và M7.3 (server), M7.4 (hợp đồng 2) -> M7.6-M7.8 (client) -> M7.5 (nội dung Nguyên Anh) -> M7.9-M7.11 (cân bằng / đo / hồi quy) -> M7.12 xen kẽ -> M7.14.
 
-**Quy tắc chung:** đổi `shared/` ở PR riêng, B review; thêm tính năng server thì thêm test (đột biến cho luật quan trọng); mọi tài sản mới sinh bằng mã (CC0) hoặc ảnh AI theo mục 18.3, ghi `CREDITS.md`; đo trước / sau bằng số (bench, `perf:mobile`, `npm run can-bang -w server`); mỗi PR ghi `Closes #<số>` / `Refs #<số>`; mỗi PR nội dung kèm kết quả kiểm trùng (mục 4).
+**Quy tắc chung:** đổi `shared/` ở PR riêng, B review; thêm tính năng server thì thêm test (đột biến cho luật quan trọng); mọi tài sản mới sinh bằng mã (CC0), ảnh AI SDXL (mục 18.3) hoặc lấy từ Vạn Kiếp Tu Tiên (mục 4), ghi `CREDITS.md` và `docs/NGUON_NOI_DUNG.md`; đo trước / sau bằng số (bench, `perf:mobile`, `npm run can-bang -w server`); mỗi PR ghi `Closes #<số>` / `Refs #<số>`; mỗi PR nội dung / hình / âm ghi số mục lấy từ nguồn (mục 4).
 
 ## 12. Rủi ro và câu hỏi cho người dùng (không chặn; mặc định ghi sẵn)
 | Câu hỏi / rủi ro | Mặc định A làm |
@@ -158,4 +172,4 @@ Mã M7.x; issue được tạo theo bảng (số issue ghi ở cột Issue sau k
 | Dòng phụ ngẫu nhiên từng món đồ (cần đổi định dạng túi) | KHÔNG làm ở M7 |
 | Tên bản đồ thứ tư "Hàn Vân Lĩnh" / các loài quái | theo mục 8; đổi tên rẻ trước khi PR hợp đồng vào `main`, đắt sau |
 | Nghề chế tạo | chỉ M7.13, sau cùng |
-| **Rủi ro lớn nhất:** (1) nổ cân bằng (chiêu x hệ x trang bị x trạng thái): giảm bằng mô hình M7.9 trước khi chốt số, mỗi chiêu có trần sức mạnh; (2) hiệu năng (đạn / trạng thái / báo trước đòn): đạn không là state, tin `fx` chỉ `sendNear`, bench từng bước; (3) PROTOCOL 3: client / APK 0.2.x bị từ chối lúc phát hành, nhận thông báo "có bản mới" (như 0.1.x -> 0.2.0); (4) giao diện điện thoại chật: nút chiêu chỉ cho chiêu đã gắn; (5) sao chép từ nguồn tham khảo: quy tắc đặt tên + kiểm trùng mục 4; (6) khối lượng nội dung bản đồ thứ tư: đo thời gian từng bước, M7.13 là việc đầu tiên bị cắt | |
+| **Rủi ro lớn nhất:** (1) nổ cân bằng (chiêu x hệ x trang bị x trạng thái): giảm bằng mô hình M7.9 trước khi chốt số, mỗi chiêu có trần sức mạnh; (2) hiệu năng (đạn / trạng thái / báo trước đòn): đạn không là state, tin `fx` chỉ `sendNear`, bench từng bước; (3) PROTOCOL 3: client / APK 0.2.x bị từ chối lúc phát hành, nhận thông báo "có bản mới" (như 0.1.x -> 0.2.0); (4) giao diện điện thoại chật: nút chiêu chỉ cho chiêu đã gắn; (5) nguồn nội dung / hình / âm: dựa hoàn toàn vào sự cho phép người dùng xác nhận (bản clone ghi 'bảo lưu mọi quyền'): ghi nguồn từng thứ, giữ minh chứng ngoài repo, dòng ghi công trong game, KHÔNG lấy nhân vật / cốt truyện làm của Tiên Giới, KHÔNG chữ Hán; nguồn là trò chơi theo lượt nên phải dịch cơ chế sang thời gian thực; (5b) ngân sách tài sản mới (mục 1): gói tải theo nhu cầu, đo 4G giả lập, Android ≥ 50 FPS giữ nguyên; (6) khối lượng nội dung bản đồ thứ tư: đo thời gian từng bước, M7.13 là việc đầu tiên bị cắt | |
