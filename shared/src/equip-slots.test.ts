@@ -163,7 +163,7 @@ describe("pháp bảo (TREASURES)", () => {
     }
   });
 
-  it("`desc` nhắc ĐÚNG từng số của `params` (tỉ lệ -> `N %`, giây -> `N giây`, `ms` -> giây), để câu chữ và số không lệch nhau", () => {
+  it("`desc` nhắc ĐÚNG từng số của `params` (tỉ lệ -> `N%`, giây -> `N giây`, `ms` -> giây), để câu chữ và số không lệch nhau", () => {
     for (const t of TREASURES) {
       const entries = Object.entries(t.params);
       expect(entries.length, t.id).toBeGreaterThan(0);
@@ -174,7 +174,7 @@ describe("pháp bảo (TREASURES)", () => {
             ? `${v / 1000} giây`
             : /S$/.test(k) && !/Ratio/.test(k)
               ? `${v} giây`
-              : `${Math.round(v * 100)} %`;
+              : `${Math.round(v * 100)}%`;
         expect(t.desc, `${t.id}.${k} = ${v} => "${shown}"`).toContain(shown);
       }
     }
