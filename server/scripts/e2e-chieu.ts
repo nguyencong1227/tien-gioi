@@ -38,13 +38,13 @@ import {
   killChrome,
   shown,
 } from "./e2e-kit";
+import { freePort } from "../src/test-port.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
 const clientDist = path.resolve(repoRoot, "client/dist");
 const pickPort = () => 40000 + Math.floor(Math.random() * 2000);
 let PORT = pickPort();
-const CDP = 10100 + Math.floor(Math.random() * 300);
 const out = (m: string) => console.log(m);
 
 /** Phím thật qua CDP (nhấn rồi nhả). */
@@ -90,6 +90,9 @@ interface Case {
 }
 
 async function main() {
+  // Cổng do hệ điều hành cấp (không `Math.random`): cổng CDP trùng Chrome của dev khác thì ta điều khiển nhầm trình duyệt của họ (review B ở #549)
+  const CDP = await freePort();
+  PORT = await freePort();
   out(
     "=== E2E THẬT chiêu thức (khắc chân linh + bảng Công pháp): server Colyseus thật + Chrome headless ===",
   );
