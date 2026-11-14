@@ -135,14 +135,14 @@ export const STUN_IMMUNE_MS = 3000;
 
 export const STATUSES: readonly StatusDef[] = [
   { id: "burn", name: "Bỏng", kind: "dot", harmful: true, maxMs: 8000, maxRatio: 0.5 },
-  { id: "poison", name: "Trúng độc", kind: "dot", harmful: true, maxMs: 10000, maxRatio: 0.5 },
+  { id: "poison", name: "Độc", kind: "dot", harmful: true, maxMs: 10000, maxRatio: 0.5 },
   { id: "bleed", name: "Chảy máu", kind: "dot", harmful: true, maxMs: 8000, maxRatio: 0.5 },
   { id: "chill", name: "Tê cóng", kind: "slow", harmful: true, maxMs: 6000, maxRatio: 0.6 },
   { id: "sunder", name: "Vỡ giáp", kind: "vuln", harmful: true, maxMs: 6000, maxRatio: 0.4 },
   { id: "stun", name: "Choáng", kind: "stun", harmful: true, maxMs: STUN_MAX_MS, maxRatio: 0 },
   { id: "shield", name: "Hộ thể", kind: "shield", harmful: false, maxMs: 8000, maxRatio: 0.5 },
   { id: "haste", name: "Tăng tốc", kind: "haste", harmful: false, maxMs: 8000, maxRatio: 0.6 },
-  { id: "regen", name: "Hồi xuân", kind: "regen", harmful: false, maxMs: 8000, maxRatio: 0.15 },
+  { id: "regen", name: "Hồi phục", kind: "regen", harmful: false, maxMs: 8000, maxRatio: 0.15 },
 ];
 
 export const STATUS_BY_ID: Readonly<Record<string, StatusDef>> = Object.fromEntries(
@@ -163,6 +163,26 @@ export function statusOf(id: unknown): StatusDef | undefined {
  * Hình của chiêu: `cone` quạt trước mặt; `line` tia thẳng; `fan` nhiều tia toả (`count`, `spread`); `nova` vòng quanh mình;
  * `ground` vùng tròn đặt cách mình `reach` px theo hướng đánh; `dash` lao theo hướng đánh (`reach` px, có thể né); `self` tác dụng lên bản thân.
  */
+/**
+ * Kiểu hiệu ứng client của từng chiêu (`SkillDef.fx`): danh sách ĐÓNG để client có bảng `id -> hàm vẽ` phủ kín (M7.7, #508) và test bắt
+ * gõ sai. Thêm chiêu mới mà cần kiểu hiệu ứng mới thì thêm id ở đây (client bắt buộc có hàm vẽ tương ứng).
+ */
+export const SKILL_FX_IDS = [
+  "slash_fire",
+  "punch_earth",
+  "claw_metal",
+  "slash_earth",
+  "bolt_ice",
+  "aura_metal",
+  "aura_water",
+  "dash_wind",
+  "needle_wood",
+  "fan_ice",
+  "ground_earth",
+  "aura_wind",
+] as const;
+export type SkillFxId = (typeof SKILL_FX_IDS)[number];
+
 export type SkillShape = "cone" | "line" | "fan" | "nova" | "ground" | "dash" | "self";
 
 export interface SkillEffect {
@@ -211,8 +231,8 @@ export interface SkillDef {
   rarity: 0 | 1 | 2 | 3 | 4;
   /** Giá bán / mua cơ sở của kinh quyển (Linh thạch, theo nguồn; M7.4 / M7.9 chỉnh) */
   price: number;
-  /** Kiểu hiệu ứng client (`FxMsg` `cast`); ghép với hệ để chọn màu */
-  fx: string;
+  /** Kiểu hiệu ứng client (`FxMsg` `cast`, `SKILL_FX_IDS`); ghép với hệ để chọn màu */
+  fx: SkillFxId;
 }
 
 const fx = (status: StatusId, turns: number, ratio: number, chance: number): SkillEffect => ({
@@ -469,6 +489,24 @@ export function skillOf(id: unknown): SkillDef | undefined {
     : undefined;
 }
 
+/** Giảm hồi chiêu tối đa từ trang bị (`EquipStats.cdr`, M7.4): 30%. */
+export const CDR_CAP = 0.3;
+
+/** Linh lực một lần dùng chiêu = `ceil(mpPct x linh lực tối đa)`, ít nhất 1. MỘT hàm: server trừ, client tô xám ô khi thiếu và in "Linh lực: N". */
+export function skillMpCost(def: Pick<SkillDef, "mpPct">, maxMp: number): number {
+  if (!Number.isFinite(maxMp) || maxMp <= 0) return 1;
+  return Math.max(1, Math.ceil(def.mpPct * maxMp));
+}
+
+/**
+ * Hồi chiêu (ms) của chiêu `def` ở tầng `level` với giảm hồi chiêu `cdr` (0..`CDR_CAP`, kẹp): `cooldown x (1 - 8% mỗi tầng trên 1) x (1 - cdr)`.
+ * Server dùng để đặt `skillCd`, và gửi tổng này (`SkillsMsg.cdMax`) để client vẽ vòng hồi chiêu (client không biết `cdr`).
+ */
+export function skillCooldownMs(def: Pick<SkillDef, "cooldown">, level: number, cdr = 0): number {
+  const c = Number.isFinite(cdr) ? Math.min(CDR_CAP, Math.max(0, cdr)) : 0;
+  return Math.max(0, Math.round(def.cooldown * skillCooldownMult(level) * (1 - c)));
+}
+
 // ---------------------------------------------------------------------------------------------------------------
 // Tầng, ô chiêu, sổ chiêu của nhân vật
 // ---------------------------------------------------------------------------------------------------------------
@@ -624,12 +662,75 @@ export interface SkillSlotMsg {
   skillId: string;
 }
 
-/** Server -> chủ (không vào state chung): sổ chiêu + hồi chiêu còn lại (ms) của bốn ô. Gửi khi đổi và định kỳ, không mỗi tick. */
+/** Tên các tin nhắn của chiêu thức (MỘT nơi, như `DUEL_MSG` / `DUNGEON_MSG` / `SECT_MSG`): client và server không tự gõ chuỗi. */
+export const SKILL_MSG = {
+  /** client -> server: dùng chiêu (`CastMsg`) */
+  cast: "cast",
+  /** client -> server: gắn chiêu vào ô (`SkillSlotMsg`) */
+  slot: "skillSlot",
+  /** server -> chủ: sổ chiêu + hồi chiêu (`SkillsMsg`) */
+  skills: "skills",
+  /** server -> chủ: trạng thái của CHÍNH MÌNH (`StatusMsg`) */
+  status: "status",
+} as const;
+
+/**
+ * Server -> chủ (không vào state chung): sổ chiêu + hồi chiêu của bốn ô 2-5. Gửi khi đổi và định kỳ, không mỗi tick; client tự đếm lùi `cd`
+ * giữa hai lần gửi.
+ */
 export interface SkillsMsg {
   learned: Record<string, number>;
   slots: [string, string, string, string];
   /** Hồi chiêu còn lại của ô 2-5 (ms, >= 0) */
   cd: [number, number, number, number];
+  /**
+   * TỔNG hồi chiêu của ô 2-5 (ms; 0 = ô trống) sau tầng chiêu và giảm hồi chiêu của trang bị (`skillCooldownMs`): client chia `cd / cdMax`
+   * để vẽ vòng hồi chiêu mà không cần biết `cdr`.
+   */
+  cdMax: [number, number, number, number];
+}
+
+/** Một trạng thái đang có trên chính mình: id và thời gian còn lại (ms) lúc gửi. */
+export type StatusEntry = [id: StatusId, msLeft: number];
+
+/**
+ * Server -> chủ: danh sách trạng thái của CHÍNH MÌNH (huy hiệu + thời gian còn lại, kể cả buff). Gửi khi có trạng thái thêm / mất (không mỗi tick);
+ * client tự đếm lùi. Người khác / quái KHÔNG nhận tin này: quái chỉ có byte công khai `Monster.fx` (`statusMask`).
+ */
+export interface StatusMsg {
+  list: StatusEntry[];
+}
+
+/**
+ * Bit của các trạng thái CÓ HẠI trong byte công khai `Monster.fx` (M7.3; client vẽ biểu tượng lên đầu quái). Thứ tự bit là hằng của hợp đồng
+ * để hai phía không tự đánh số; buff (`shield`, `haste`, `regen`) không lên quái nên không có bit (6 bit: vừa một byte).
+ */
+export const STATUS_BIT: Readonly<Partial<Record<StatusId, number>>> = {
+  burn: 1,
+  poison: 2,
+  bleed: 4,
+  chill: 8,
+  sunder: 16,
+  stun: 32,
+};
+
+/** Mặt nạ bit (số nguyên 0..63) của các trạng thái có hại trong `ids`; id lạ và buff bị bỏ. */
+export function statusMask(ids: Iterable<unknown>): number {
+  let m = 0;
+  for (const id of ids) {
+    if (typeof id === "string" && Object.prototype.hasOwnProperty.call(STATUS_BIT, id))
+      m |= STATUS_BIT[id as StatusId]!;
+  }
+  return m;
+}
+
+/** Ngược lại: các trạng thái có hại được bật trong `mask` (theo thứ tự bit tăng dần; bit lạ bị bỏ). */
+export function statusesOfMask(mask: unknown): StatusId[] {
+  if (typeof mask !== "number" || !Number.isInteger(mask) || mask <= 0) return [];
+  const out: StatusId[] = [];
+  for (const [id, bit] of Object.entries(STATUS_BIT) as [StatusId, number][])
+    if (mask & bit) out.push(id);
+  return out;
 }
 
 const SKILL_ID_MAX = 40;

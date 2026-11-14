@@ -294,7 +294,7 @@ export type FxMsg =
   | { kind: "breakfail"; by: string; x: number; y: number }
   /** Người chơi dùng chiêu `skill` (id `SkillDef`, client tra `fx` + hệ để vẽ) tại (x, y) theo hướng `angle`; `range` là tầm thật server tính (px) */
   | { kind: "cast"; by: string; skill: string; x: number; y: number; angle: number; range: number }
-  /** Báo trước đòn của quái (telegraph): vùng `circle` (bán kính `r`), `cone` (`r`, `angle`, `arc`) hoặc `line` (`r` dài, `angle`) tồn tại `ms`, rồi mới đáp đòn */
+  /** Báo trước đòn của quái (telegraph): vùng `circle` (bán kính `r`), `cone` (`r`, `angle`, `arc`) hoặc `line` (`r` dài, `w` rộng, `angle`) tồn tại `ms`, rồi mới đáp đòn */
   | {
       kind: "warn";
       shape: "circle" | "cone" | "line";
@@ -303,6 +303,8 @@ export type FxMsg =
       r: number;
       angle?: number;
       arc?: number;
+      /** Bề rộng vùng báo (px), CHỈ dùng với `line`: bằng đúng bề rộng server tính khi đáp đòn */
+      w?: number;
       ms: number;
     }
   /** Đạn tầm xa bắn ra lúc này: bay thẳng từ (x, y) theo `angle` với `speed` (px/giây) tối đa `range` px; client tự vẽ, server tự kiểm trúng */

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ELEMENTS,
   ELEMENT_ADVANTAGE_MULT,
+  CDR_CAP,
   ELEMENT_DISADVANTAGE_MULT,
   ENGRAVE_COSTS,
   ENGRAVE_MAX,
@@ -9,6 +10,9 @@ import {
   MAX_STATUSES,
   PHASE_BEATS,
   SKILLS_M7,
+  SKILL_FX_IDS,
+  SKILL_MSG,
+  STATUS_BIT,
   SKILL_BY_ID,
   SKILL_MAX_LEVEL,
   SLOT_UNLOCK_REALM,
@@ -27,11 +31,15 @@ import {
   phaseOf,
   sanitizeEngraved,
   sanitizeSkillBook,
+  skillCooldownMs,
   skillCooldownMult,
+  skillMpCost,
   skillDamageMult,
   skillOf,
   slotOpen,
+  statusMask,
   statusOf,
+  statusesOfMask,
   type Phase,
   type SkillBook,
 } from "./skills";
@@ -529,5 +537,96 @@ describe("hằng quái (M7.3)", () => {
     expect(ELITE_MULT.atk).toBeGreaterThan(1);
     expect(ELITE_MULT.exp).toBeGreaterThan(1);
     expect(MAX_ELITES).toBeGreaterThan(0);
+  });
+});
+
+describe("tên tin nhắn (SKILL_MSG)", () => {
+  it("ghim giá trị: client và server dùng chung, đổi là phải đổi cả hai phía", () => {
+    expect(SKILL_MSG).toEqual({
+      cast: "cast",
+      slot: "skillSlot",
+      skills: "skills",
+      status: "status",
+    });
+  });
+});
+
+describe("tính số dùng chung: linh lực và hồi chiêu", () => {
+  it("skillMpCost = ceil(mpPct x linh lực tối đa), ít nhất 1, đầu vào xấu -> 1", () => {
+    expect(skillMpCost({ mpPct: 0.08 }, 100)).toBe(8);
+    expect(skillMpCost({ mpPct: 0.08 }, 101)).toBe(9); // làm tròn LÊN
+    expect(skillMpCost({ mpPct: 0.001 }, 10)).toBe(1);
+    for (const bad of [0, -5, Number.NaN, Infinity])
+      expect(skillMpCost({ mpPct: 0.5 }, bad)).toBe(1);
+    // mọi chiêu thật: chi phí hợp lý ở linh lực tối đa của Luyện Khí tầng 1 (~63) và của Kim Đan (~300+)
+    for (const def of SKILLS_M7) {
+      const lo = skillMpCost(def, 63);
+      expect(lo).toBeGreaterThanOrEqual(1);
+      expect(lo).toBeLessThanOrEqual(32);
+    }
+  });
+
+  it("skillCooldownMs: tầng 1 không đổi, tầng 3 -16%, cdr kẹp 0..30%, NaN -> 0, không âm", () => {
+    const d = { cooldown: 3000 };
+    expect(skillCooldownMs(d, 1)).toBe(3000);
+    expect(skillCooldownMs(d, 2)).toBe(2760);
+    expect(skillCooldownMs(d, 3)).toBe(2520);
+    expect(skillCooldownMs(d, 1, 0.2)).toBe(2400);
+    expect(skillCooldownMs(d, 1, 0.99)).toBe(Math.round(3000 * (1 - CDR_CAP)));
+    expect(skillCooldownMs(d, 1, -1)).toBe(3000);
+    expect(skillCooldownMs(d, 1, Number.NaN)).toBe(3000);
+    expect(skillCooldownMs(d, 99, 0.3)).toBe(Math.round(3000 * 0.84 * 0.7));
+    expect(CDR_CAP).toBe(0.3);
+    for (const bad of [0, -3, Number.NaN]) expect(skillCooldownMs(d, bad)).toBeGreaterThan(0);
+  });
+});
+
+describe("kiểu hiệu ứng (SKILL_FX_IDS)", () => {
+  it("danh sách duy nhất; mọi chiêu dùng id trong danh sách; mọi id trong danh sách có ít nhất một chiêu dùng", () => {
+    expect(new Set(SKILL_FX_IDS).size).toBe(SKILL_FX_IDS.length);
+    const used = new Set<string>(SKILLS_M7.map((s) => s.fx));
+    for (const s of SKILLS_M7) expect(SKILL_FX_IDS as readonly string[], s.id).toContain(s.fx);
+    for (const id of SKILL_FX_IDS)
+      expect(used.has(id), `id hiệu ứng không chiêu nào dùng: ${id}`).toBe(true);
+  });
+});
+
+describe("trạng thái trên quái: mặt nạ bit (STATUS_BIT)", () => {
+  it("chỉ trạng thái CÓ HẠI có bit; bit là luỹ thừa của 2, không trùng, vừa một byte", () => {
+    const harmful = STATUSES.filter((st) => st.harmful).map((st) => st.id);
+    expect(Object.keys(STATUS_BIT).sort()).toEqual([...harmful].sort());
+    for (const st of STATUSES.filter((x) => !x.harmful)) expect(STATUS_BIT[st.id]).toBeUndefined();
+    const bits = Object.values(STATUS_BIT) as number[];
+    expect(new Set(bits).size).toBe(bits.length);
+    for (const b of bits) expect(Number.isInteger(Math.log2(b))).toBe(true);
+    expect(bits.reduce((a, b) => a | b, 0)).toBeLessThanOrEqual(255);
+  });
+
+  it("statusMask / statusesOfMask khứ hồi; buff, id lạ và id độc bị bỏ", () => {
+    const all = Object.keys(STATUS_BIT) as Array<keyof typeof STATUS_BIT>;
+    expect(statusMask([])).toBe(0);
+    expect(statusMask(["burn"])).toBe(1);
+    expect(statusMask(["burn", "stun", "burn"])).toBe(33);
+    expect(statusMask(all)).toBe(63);
+    expect(statusesOfMask(63)).toEqual(all);
+    expect(statusesOfMask(statusMask(["chill", "poison"]))).toEqual(["poison", "chill"]);
+    expect(statusMask(["shield", "haste", "regen", "constructor", "__proto__", "x", 5, null])).toBe(
+      0,
+    );
+  });
+
+  it("statusesOfMask: đầu vào xấu / bit lạ", () => {
+    for (const bad of [0, -1, 1.5, Number.NaN, Infinity, "3", null, undefined, {}, []])
+      expect(statusesOfMask(bad as unknown)).toEqual([]);
+    expect(statusesOfMask(64 | 1)).toEqual(["burn"]); // bit 64 không thuộc trạng thái nào
+  });
+});
+
+describe("tên trạng thái", () => {
+  it("duy nhất và không trùng tên chiêu (huy hiệu trên đầu không gây nhầm với tên chiêu)", () => {
+    const names = STATUSES.map((st) => st.name.toLowerCase());
+    expect(new Set(names).size).toBe(names.length);
+    const skillNames = new Set(SKILLS_M7.map((k) => k.name.toLowerCase()));
+    for (const n of names) expect(skillNames.has(n), n).toBe(false);
   });
 });
