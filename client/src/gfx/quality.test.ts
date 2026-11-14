@@ -697,6 +697,46 @@ describe("gfx/quality: bậc Rất cao (ultra)", () => {
     expect(q.get().hdPacks).toBe(false);
   });
 
+  it("khoá 'không nâng lại Rất cao' KHÔNG bị lách bằng chọn tay rồi về Tự động (review B ở #538)", () => {
+    const f = fakeEnv({ signals: BIG_DESKTOP, form: "desktop" });
+    const q = createQuality(f.env, FAST);
+    feed(q, 400, 30); // bị hạ khỏi Rất cao: khoá
+    expect(q.get().tier).toBe("high");
+    q.setMode("high");
+    q.setMode("auto");
+    // trước khi sửa: autoTier chọn lại từ thiết bị = ultra (hdPacks bật) trong khi trần vẫn là Cao
+    expect(q.get()).toMatchObject({ tier: "high", mode: "auto", hdPacks: false });
+    expect(q.ceiling()).toBe("high");
+    feed(q, 3000, 12);
+    expect(q.get().tier).toBe("high");
+    // chọn tay "Rất cao" vẫn là quyền của người chơi (khoá chỉ chặn việc TỰ nâng)
+    q.setMode("ultra");
+    expect(q.get()).toMatchObject({ tier: "ultra", hdPacks: true });
+    // về Tự động từ chọn tay Rất cao: vẫn bị khoá ở Cao
+    q.setMode("auto");
+    expect(q.get()).toMatchObject({ tier: "high", hdPacks: false });
+  });
+
+  it("chưa từng bị hạ khỏi Rất cao thì về Tự động vẫn lên Rất cao (khoá không chặn oan)", () => {
+    const f = fakeEnv({ signals: BIG_DESKTOP, form: "desktop" });
+    const q = createQuality(f.env, FAST);
+    q.setMode("high");
+    q.setMode("auto");
+    expect(q.get()).toMatchObject({ tier: "ultra", hdPacks: true });
+  });
+
+  it("tiết kiệm pin: hdPacks TẮT ở Rất cao (30 FPS, không nạp / giữ gói hd:*), bật lại khi tắt tiết kiệm pin", () => {
+    expect(buildProfile("ultra", ctx({ batterySaver: true })).hdPacks).toBe(false);
+    expect(buildProfile("ultra", ctx({ batterySaver: false })).hdPacks).toBe(true);
+    const f = fakeEnv({ signals: BIG_DESKTOP, form: "desktop" });
+    const q = createQuality(f.env);
+    expect(q.get()).toMatchObject({ tier: "ultra", hdPacks: true });
+    q.setBatterySaver(true);
+    expect(q.get()).toMatchObject({ tier: "ultra", targetFps: 30, hdPacks: false });
+    q.setBatterySaver(false);
+    expect(q.get()).toMatchObject({ tier: "ultra", targetFps: 60, hdPacks: true });
+  });
+
   it("máy tính thường (không đủ điều kiện): trần vẫn Cao, không bao giờ lên Rất cao dù khung rất tốt", () => {
     const f = fakeEnv({
       signals: { ...BIG_DESKTOP, gpu: "Intel(R) UHD Graphics" },
