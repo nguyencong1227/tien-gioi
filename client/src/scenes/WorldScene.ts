@@ -1014,6 +1014,8 @@ export class WorldScene extends Phaser.Scene {
     bind("sk-sword", () => this.sword());
     bind("sk-med", () => this.toggleMeditate());
     bind("sk-break", () => !this.isReconnecting && this.room.send("breakthrough"));
+    for (const n of [2, 3, 4, 5] as const)
+      bind(`sk-slot${n}`, () => this.runAction(`skill.slot${n}`));
 
     const chatForm = document.getElementById("chat-form") as HTMLFormElement;
     const chatInput = document.getElementById("chat-input") as HTMLInputElement;
@@ -1052,6 +1054,13 @@ export class WorldScene extends Phaser.Scene {
       case "skill.sword":
         this.autoLockNearest();
         this.sword();
+        break;
+      case "skill.slot2":
+      case "skill.slot3":
+      case "skill.slot4":
+      case "skill.slot5":
+        // ô chiêu chưa có chiêu (M7 mới lấp): báo nhẹ, không gửi gì lên server
+        ui.toast({ text: `Ô chiêu thức ${action.slice(-1)} còn trống.`, tone: "info" });
         break;
       case "skill.meditate":
         this.toggleMeditate();

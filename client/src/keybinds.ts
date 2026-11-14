@@ -13,6 +13,10 @@ export type ActionId =
   | "target.next"
   | "target.prev"
   | "skill.sword"
+  | "skill.slot2"
+  | "skill.slot3"
+  | "skill.slot4"
+  | "skill.slot5"
   | "skill.meditate"
   | "skill.breakthrough"
   | "quick.1"
@@ -49,15 +53,23 @@ export interface ActionDef {
 
 /**
  * Bảng hành động. THỨ TỰ = thứ tự ở màn "Phím tắt".
- * Quyết định: 1 / 2 giữ đan dược như v0.1.2 (người đã quen, bấm nhầm kỹ năng lúc cần uống đan là nguy hiểm), 3 = Kiếm khí, 4 = Đả tọa;
- * K / L / B giữ nguyên làm phím phụ. J = Sổ nhiệm vụ (trước đây J là chém, nay chém chỉ còn Space) và Q vẫn mở sổ nhiệm vụ.
+ * QUYET_DINH_M3 mục 17.1: cụm phải bàn phím J K L U I O dành cho chiến đấu (tay phải trên bàn phím, tay trái giữ WASD):
+ * J = Kiếm chém (Cách là phím phụ), K = Kiếm khí, L / U / I / O = ô chiêu thức 2-5 (chưa có chiêu: ô trống, để sẵn cho M7).
+ * Phím số cũ giữ làm phím phụ: 3 = Kiếm khí, 4 = Đả tọa; 1 / 2 vẫn là đan dược (bấm nhầm kỹ năng lúc cần uống đan là nguy hiểm).
+ * Các phím bị cụm này chiếm được dời: Túi I -> B, Sổ nhiệm vụ J -> N (Q vẫn là phím phụ), Đả tọa L -> Z.
+ * Ba hành động mất phím cũ mà người dùng chưa chỉ định phím mới (cả ba đổi được ở màn "Phím tắt"): Đột phá B -> V (V = "vượt" cảnh giới,
+ * xa cụm WASD nên khó bấm nhầm một thao tác có thể thất bại), Cài đặt O -> E, Bật / tắt âm thanh N -> 0.
  */
+/** Số thứ tự các ô chiêu thức ngoài Kiếm chém (ô 1) và Kiếm khí (đứng riêng): ô 2-5, phím mặc định L U I O. */
+export const SKILL_SLOTS = [2, 3, 4, 5] as const;
+const SLOT_KEYS = ["KeyL", "KeyU", "KeyI", "KeyO"] as const;
+
 export const ACTIONS: readonly ActionDef[] = [
   {
     id: "attack",
     label: "Kiếm chém",
     group: "combat",
-    defaults: ["Space"],
+    defaults: ["KeyJ", "Space"],
     repeat: true,
     world: true,
   },
@@ -79,18 +91,25 @@ export const ACTIONS: readonly ActionDef[] = [
     id: "skill.sword",
     label: "Kiếm khí",
     group: "combat",
-    defaults: ["Digit3", "KeyK"],
+    defaults: ["KeyK", "Digit3"],
     repeat: true,
     world: true,
   },
+  ...SKILL_SLOTS.map((n, i): ActionDef => ({
+    id: `skill.slot${n}` as ActionId,
+    label: `Ô chiêu thức ${n} (chưa có chiêu)`,
+    group: "combat",
+    defaults: [SLOT_KEYS[i]],
+    world: true,
+  })),
   {
     id: "skill.meditate",
     label: "Đả tọa",
     group: "combat",
-    defaults: ["Digit4", "KeyL"],
+    defaults: ["KeyZ", "Digit4"],
     world: true,
   },
-  { id: "skill.breakthrough", label: "Đột phá", group: "combat", defaults: ["KeyB"], world: true },
+  { id: "skill.breakthrough", label: "Đột phá", group: "combat", defaults: ["KeyV"], world: true },
   { id: "quick.1", label: "Đan dược ô 1", group: "combat", defaults: ["Digit1"], world: true },
   { id: "quick.2", label: "Đan dược ô 2", group: "combat", defaults: ["Digit2"], world: true },
   {
@@ -128,7 +147,7 @@ export const ACTIONS: readonly ActionDef[] = [
     defaults: ["KeyP"],
     world: true,
   },
-  { id: "panel.inventory", label: "Túi đồ", group: "panel", defaults: ["KeyI"], world: false },
+  { id: "panel.inventory", label: "Túi đồ", group: "panel", defaults: ["KeyB"], world: false },
   {
     id: "panel.char",
     label: "Nhân vật và trang bị",
@@ -140,7 +159,7 @@ export const ACTIONS: readonly ActionDef[] = [
     id: "panel.quest",
     label: "Sổ nhiệm vụ",
     group: "panel",
-    defaults: ["KeyJ", "KeyQ"],
+    defaults: ["KeyN", "KeyQ"],
     world: false,
   },
   { id: "panel.sect", label: "Tông môn", group: "panel", defaults: ["KeyG"], world: false },
@@ -149,7 +168,7 @@ export const ACTIONS: readonly ActionDef[] = [
     id: "panel.settings",
     label: "Cài đặt và phím tắt",
     group: "panel",
-    defaults: ["KeyO"],
+    defaults: ["KeyE"],
     world: false,
   },
   {
@@ -163,7 +182,7 @@ export const ACTIONS: readonly ActionDef[] = [
     id: "sound.mute",
     label: "Bật / tắt âm thanh",
     group: "other",
-    defaults: ["KeyN"],
+    defaults: ["Digit0"],
     world: false,
   },
   {
@@ -206,27 +225,36 @@ export function isValidToken(token: unknown): token is string {
   return !RESERVED_CODES.has(token.replace(/^Shift\+/, ""));
 }
 
-/** Làm sạch bảng phím đọc từ kho lưu: hành động lạ / phím sai bị bỏ, hành động thiếu lấy mặc định, phím trùng giữ ở hành động đứng trước. */
+/**
+ * Làm sạch bảng phím đọc từ kho lưu: hành động lạ / phím sai bị bỏ, phím trùng giữ ở hành động đứng trước.
+ * Phím NGƯỜI CHƠI ĐÃ TỰ ĐỔI được ưu tiên hơn phím MẶC ĐỊNH của hành động khác (QUYET_DINH_M3 mục 17.1: đổi mặc định ở bản sau không được
+ * lấy mất phím người chơi đã chọn): lượt 1 cấp phím cho các hành động có danh sách tự đổi hợp lệ, lượt 2 cấp phím mặc định (trừ phím đã bị
+ * chiếm) cho các hành động còn lại.
+ */
 export function sanitizeKeymap(raw: unknown): Keymap {
   const out: Record<string, string[]> = {};
   const used = new Set<string>();
   const src = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   for (const a of ACTIONS) {
     const v = src[a.id];
-    let list: string[] | null = null;
-    if (Array.isArray(v)) {
-      list = [];
-      for (const t of v) {
-        if (list.length >= 3) break;
-        if (isValidToken(t) && !used.has(t) && !list.includes(t)) list.push(t);
-      }
-      if (list.length === 0) list = null;
+    if (!Array.isArray(v)) continue;
+    const list: string[] = [];
+    for (const t of v) {
+      if (list.length >= 3) break;
+      if (isValidToken(t) && !used.has(t) && !list.includes(t)) list.push(t);
     }
-    const final = list ?? a.defaults.filter((t) => !used.has(t));
+    if (list.length === 0) continue;
+    for (const t of list) used.add(t);
+    out[a.id] = list;
+  }
+  for (const a of ACTIONS) {
+    if (out[a.id]) continue;
+    const final = a.defaults.filter((t) => !used.has(t));
     for (const t of final) used.add(t);
     out[a.id] = final;
   }
-  return out as unknown as Keymap;
+  // giữ thứ tự khoá theo bảng hành động (màn "Phím tắt", `diffFromDefault`)
+  return Object.fromEntries(ACTIONS.map((a) => [a.id, out[a.id]])) as unknown as Keymap;
 }
 
 /** Bảng ngược: phím -> hành động (dùng khi gõ phím). */

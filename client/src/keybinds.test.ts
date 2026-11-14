@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ACTIONS,
   ACTION_BY_ID,
+  SKILL_SLOTS,
   DEFAULT_KEYMAP,
   KEYMAP_STORAGE_KEY,
   RESERVED_CODES,
@@ -34,38 +35,68 @@ describe("phím ẩn toàn bộ giao diện (QUYET_DINH_M3 mục 15)", () => {
 });
 
 describe("bảng phím mặc định (QUYET_DINH_M3 mục 13)", () => {
-  it("mọi phím của người dùng đều có hành động: Space, Tab, Shift+Tab, 1-4, F, I / C / J / G / M, Enter", () => {
+  it("cụm phải J K L U I O (QUYET_DINH_M3 mục 17.1): J chém, K kiếm khí, L U I O = ô chiêu 2-5", () => {
     const l = lookup();
-    expect(actionOfEvent(ev("Space"), l)).toBe("attack");
+    expect(actionOfEvent(ev("KeyJ"), l)).toBe("attack");
+    expect(actionOfEvent(ev("KeyK"), l)).toBe("skill.sword");
+    expect(actionOfEvent(ev("KeyL"), l)).toBe("skill.slot2");
+    expect(actionOfEvent(ev("KeyU"), l)).toBe("skill.slot3");
+    expect(actionOfEvent(ev("KeyI"), l)).toBe("skill.slot4");
+    expect(actionOfEvent(ev("KeyO"), l)).toBe("skill.slot5");
+    expect(DEFAULT_KEYMAP.attack).toEqual(["KeyJ", "Space"]); // J là phím chính (hiện trên nút), Cách vẫn là phím phụ
+    expect(DEFAULT_KEYMAP["skill.sword"]).toEqual(["KeyK", "Digit3"]);
+  });
+
+  it("các phím bị cụm J K L U I O chiếm đã dời: Túi -> B, Nhiệm vụ -> N (Q vẫn dùng được), Đả tọa -> Z (4 vẫn dùng được)", () => {
+    const l = lookup();
+    expect(actionOfEvent(ev("KeyB"), l)).toBe("panel.inventory");
+    expect(actionOfEvent(ev("KeyN"), l)).toBe("panel.quest");
+    expect(actionOfEvent(ev("KeyQ"), l)).toBe("panel.quest");
+    expect(actionOfEvent(ev("KeyZ"), l)).toBe("skill.meditate");
+    expect(actionOfEvent(ev("Digit4"), l)).toBe("skill.meditate");
+    expect(DEFAULT_KEYMAP["panel.inventory"]).toEqual(["KeyB"]);
+    expect(DEFAULT_KEYMAP["panel.quest"]).toEqual(["KeyN", "KeyQ"]);
+    expect(DEFAULT_KEYMAP["skill.meditate"]).toEqual(["KeyZ", "Digit4"]);
+  });
+
+  it("ba hành động mất phím cũ được đặt phím mới tự do: Đột phá V, Cài đặt E, Âm thanh 0", () => {
+    const l = lookup();
+    expect(actionOfEvent(ev("KeyV"), l)).toBe("skill.breakthrough");
+    expect(actionOfEvent(ev("KeyE"), l)).toBe("panel.settings");
+    expect(actionOfEvent(ev("Digit0"), l)).toBe("sound.mute");
+  });
+
+  it("các phím còn lại giữ nguyên: Tab / Shift+Tab / T mục tiêu, 1-2 đan, 3 kiếm khí, F tương tác, C, G, M, H, Enter, Y, X, R, P", () => {
+    const l = lookup();
     expect(actionOfEvent(ev("Tab"), l)).toBe("target.next");
+    expect(actionOfEvent(ev("KeyT"), l)).toBe("target.next");
     expect(actionOfEvent(ev("Tab", { shiftKey: true }), l)).toBe("target.prev");
     expect(actionOfEvent(ev("Digit1"), l)).toBe("quick.1");
     expect(actionOfEvent(ev("Digit2"), l)).toBe("quick.2");
     expect(actionOfEvent(ev("Digit3"), l)).toBe("skill.sword");
-    expect(actionOfEvent(ev("Digit4"), l)).toBe("skill.meditate");
-    expect(actionOfEvent(ev("KeyB"), l)).toBe("skill.breakthrough");
+    expect(actionOfEvent(ev("Space"), l)).toBe("attack");
     expect(actionOfEvent(ev("KeyF"), l)).toBe("interact");
-    expect(actionOfEvent(ev("KeyI"), l)).toBe("panel.inventory");
     expect(actionOfEvent(ev("KeyC"), l)).toBe("panel.char");
-    expect(actionOfEvent(ev("KeyJ"), l)).toBe("panel.quest");
     expect(actionOfEvent(ev("KeyG"), l)).toBe("panel.sect");
     expect(actionOfEvent(ev("KeyM"), l)).toBe("panel.map");
+    expect(actionOfEvent(ev("KeyH"), l)).toBe("ui.toggle");
     expect(actionOfEvent(ev("Enter"), l)).toBe("chat.open");
+    expect(actionOfEvent(ev("KeyY"), l)).toBe("prompt.yes");
+    expect(actionOfEvent(ev("KeyX"), l)).toBe("prompt.no");
+    expect(actionOfEvent(ev("KeyR"), l)).toBe("exit.fight");
+    expect(actionOfEvent(ev("KeyP"), l)).toBe("player.menu");
   });
 
-  it("phím cũ của v0.1.2 vẫn dùng được: T (khoá mục tiêu), K (Kiếm khí), L (Đả tọa), Q (nhiệm vụ), O, N", () => {
-    const l = lookup();
-    expect(actionOfEvent(ev("KeyT"), l)).toBe("target.next");
-    expect(actionOfEvent(ev("KeyK"), l)).toBe("skill.sword");
-    expect(actionOfEvent(ev("KeyL"), l)).toBe("skill.meditate");
-    expect(actionOfEvent(ev("KeyQ"), l)).toBe("panel.quest");
-    expect(actionOfEvent(ev("KeyO"), l)).toBe("panel.settings");
-    expect(actionOfEvent(ev("KeyN"), l)).toBe("sound.mute");
-  });
-
-  it("J không còn là chém: chém chỉ còn Space", () => {
-    expect(actionOfEvent(ev("KeyJ"), lookup())).not.toBe("attack");
-    expect(DEFAULT_KEYMAP.attack).toEqual(["Space"]);
+  it("bốn ô chiêu 2-5 là hành động của thế giới (bị chặn khi bảng mở), không lặp khi giữ phím, có tên nói rõ chưa có chiêu", () => {
+    for (const n of SKILL_SLOTS) {
+      const def = ACTION_BY_ID[`skill.slot${n}` as ActionId];
+      expect(def.world).toBe(true);
+      expect(def.repeat).toBeUndefined();
+      expect(def.group).toBe("combat");
+      expect(def.label).toContain(`${n}`);
+      expect(def.label).toContain("chưa có chiêu");
+    }
+    expect(SKILL_SLOTS).toEqual([2, 3, 4, 5]);
   });
 
   it("không có phím nào gán cho hai hành động, và không phím mặc định nào là phím cố định (WASD, mũi tên, Esc)", () => {
@@ -94,6 +125,10 @@ describe("bảng phím mặc định (QUYET_DINH_M3 mục 13)", () => {
       "target.next",
       "target.prev",
       "skill.sword",
+      "skill.slot2",
+      "skill.slot3",
+      "skill.slot4",
+      "skill.slot5",
       "skill.meditate",
       "skill.breakthrough",
       "quick.1",
@@ -114,7 +149,7 @@ describe("bảng phím mặc định (QUYET_DINH_M3 mục 13)", () => {
       expect(ACTION_BY_ID[id].world, id).toBe(false);
   });
 
-  it("chỉ Space và kỹ năng đánh được lặp khi giữ phím", () => {
+  it("chỉ đánh thường (J / Cách) và Kiếm khí được lặp khi giữ phím", () => {
     const rep = ACTIONS.filter((a) => a.repeat).map((a) => a.id);
     expect(rep.sort()).toEqual(["attack", "skill.sword"]);
   });
@@ -129,13 +164,13 @@ describe("actionOfEvent", () => {
   });
 
   it("giữ Shift mà không có phím Shift+ tương ứng thì coi như phím thường (vừa chạy vừa mở túi)", () => {
-    expect(actionOfEvent(ev("KeyI", { shiftKey: true }), lookup())).toBe("panel.inventory");
+    expect(actionOfEvent(ev("KeyB", { shiftKey: true }), lookup())).toBe("panel.inventory");
     expect(actionOfEvent(ev("Space", { shiftKey: true }), lookup())).toBe("attack");
   });
 
   it("phím không gán, phím di chuyển và Esc: null", () => {
     const l = lookup();
-    for (const c of ["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "Escape", "KeyZ", "F5"])
+    for (const c of ["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "Escape", "Digit9", "F5"])
       expect(actionOfEvent(ev(c), l), c).toBeNull();
   });
 });
@@ -155,7 +190,8 @@ describe("keyLabel", () => {
 
   it("keyLabels: phím chính đứng đầu", () => {
     expect(keyLabels(DEFAULT_KEYMAP, "target.next")).toEqual(["Tab", "T"]);
-    expect(keyLabels(DEFAULT_KEYMAP, "panel.quest")).toEqual(["J", "Q"]);
+    expect(keyLabels(DEFAULT_KEYMAP, "panel.quest")).toEqual(["N", "Q"]);
+    expect(keyLabels(DEFAULT_KEYMAP, "attack")).toEqual(["J", "Cách"]);
   });
 });
 
@@ -185,10 +221,10 @@ describe("isValidToken / sanitizeKeymap", () => {
 
   it("giữ phím hợp lệ, bỏ phím sai, hành động lạ bị bỏ, tối đa 3 phím mỗi hành động", () => {
     const m = sanitizeKeymap({
-      attack: ["KeyV", "KeyW", "Bad Key", "KeyV", "KeyY", "KeyU", "KeyV"],
+      attack: ["Digit9", "KeyW", "Bad Key", "Digit9", "Digit8", "Digit7", "Digit9"],
       hack: ["KeyZ"],
     });
-    expect(m.attack).toEqual(["KeyV", "KeyY", "KeyU"]);
+    expect(m.attack).toEqual(["Digit9", "Digit8", "Digit7"]);
     expect((m as Record<string, unknown>).hack).toBeUndefined();
     expect(m.interact).toEqual(DEFAULT_KEYMAP.interact);
   });
@@ -203,6 +239,57 @@ describe("isValidToken / sanitizeKeymap", () => {
         expect(seen.has(t), t).toBe(false);
         seen.add(t);
       }
+  });
+
+  it("phím NGƯỜI CHƠI ĐÃ ĐỔI thắng phím mặc định của hành động đứng trước (đổi mặc định ở bản sau không lấy mất phím họ chọn)", () => {
+    // Nhân vật đổi sang J từ trước khi J thành phím chém mặc định: giữ J cho Bảng nhân vật; chém còn Cách
+    const m = sanitizeKeymap({ "panel.char": ["KeyJ"] });
+    expect(m["panel.char"]).toEqual(["KeyJ"]);
+    expect(m.attack).toEqual(["Space"]);
+    expect(actionOfEvent(ev("KeyJ"), buildLookup(m))).toBe("panel.char");
+    // phím đã đổi của hai hành động trùng nhau: vẫn giữ ở hành động đứng trước
+    const dup = sanitizeKeymap({ "panel.char": ["KeyJ"], attack: ["KeyJ"] });
+    expect(dup.attack).toEqual(["KeyJ"]);
+    expect(dup["panel.char"]).toEqual(["KeyC"]);
+  });
+
+  it("ba ca giao nhau với cụm mới (issue #495): Túi = U, Chém = B, Túi = I: người chơi giữ phím đã chọn, không phím trùng", () => {
+    const noDup = (m: ReturnType<typeof sanitizeKeymap>) => {
+      const seen = new Set<string>();
+      for (const a of ACTIONS)
+        for (const t of m[a.id]) {
+          expect(seen.has(t), `${t} trùng`).toBe(false);
+          seen.add(t);
+        }
+    };
+    // Túi = U (U là ô chiêu 3): Túi giữ U; ô chiêu 3 hết phím; B (mặc định của Túi) thành phím của Chém
+    const u = sanitizeKeymap({ "panel.inventory": ["KeyU"] });
+    expect(u["panel.inventory"]).toEqual(["KeyU"]);
+    expect(u["skill.slot3"]).toEqual([]);
+    noDup(u);
+    // Chém = B (B là Túi): Chém giữ B (kèm phím phụ nếu họ có), Túi hết phím
+    const b = sanitizeKeymap({ attack: ["KeyB", "Space"] });
+    expect(b.attack).toEqual(["KeyB", "Space"]);
+    expect(b["panel.inventory"]).toEqual([]);
+    expect(actionOfEvent(ev("KeyB"), buildLookup(b))).toBe("attack");
+    expect(actionOfEvent(ev("KeyJ"), buildLookup(b))).toBeNull(); // J không còn là chém: người chơi đã bỏ nó
+    noDup(b);
+    // Túi = I (I là ô chiêu 4): Túi giữ I; ô chiêu 4 hết phím
+    const i = sanitizeKeymap({ "panel.inventory": ["KeyI"] });
+    expect(actionOfEvent(ev("KeyI"), buildLookup(i))).toBe("panel.inventory");
+    expect(i["skill.slot4"]).toEqual([]);
+    noDup(i);
+  });
+
+  it("bản lưu cũ chỉ chứa phần đã đổi: phần chưa đổi nhận mặc định MỚI, phần đã đổi giữ nguyên", () => {
+    // người chơi v0.2.0 chỉ đổi Bản đồ sang P (và Nhân vật sang Digit9); không đụng gì khác
+    const m = sanitizeKeymap({ "panel.map": ["KeyP", "KeyM"], "panel.char": ["Digit9"] });
+    expect(m["panel.map"]).toEqual(["KeyP", "KeyM"]);
+    expect(m["panel.char"]).toEqual(["Digit9"]);
+    expect(m["panel.inventory"]).toEqual(["KeyB"]);
+    expect(m.attack).toEqual(["KeyJ", "Space"]);
+    expect(m["skill.slot4"]).toEqual(["KeyI"]);
+    expect(m["player.menu"]).toEqual([]); // P bị Bản đồ của người chơi chiếm: không hành động nào có hai phím giống nhau
   });
 });
 
@@ -224,7 +311,7 @@ describe("lưu / đổi phím", () => {
 
   it("chưa lưu gì: bảng mặc định", () => {
     expect(getKeymap()).toEqual(DEFAULT_KEYMAP);
-    expect(actionOfEvent(ev("KeyI"), getLookup())).toBe("panel.inventory");
+    expect(actionOfEvent(ev("KeyB"), getLookup())).toBe("panel.inventory");
   });
 
   it("kho hỏng (JSON sai) không làm lỗi: dùng mặc định", () => {
@@ -233,24 +320,27 @@ describe("lưu / đổi phím", () => {
   });
 
   it("đổi phím chính: phím mới chạy, phím cũ của hành động đó vẫn là phím phụ, bảng được lưu", () => {
-    expect(rebind("attack", "KeyV")).toBe(true);
-    expect(getKeymap().attack).toEqual(["KeyV", "Space"]);
-    expect(actionOfEvent(ev("KeyV"), getLookup())).toBe("attack");
-    expect(JSON.parse(store.get(KEYMAP_STORAGE_KEY)!)).toEqual({ attack: ["KeyV", "Space"] });
+    expect(rebind("attack", "Digit9")).toBe(true);
+    expect(getKeymap().attack).toEqual(["Digit9", "KeyJ", "Space"]);
+    expect(actionOfEvent(ev("Digit9"), getLookup())).toBe("attack");
+    expect(actionOfEvent(ev("KeyJ"), getLookup())).toBe("attack");
+    expect(JSON.parse(store.get(KEYMAP_STORAGE_KEY)!)).toEqual({
+      attack: ["Digit9", "KeyJ", "Space"],
+    });
   });
 
   it("gán phím DUY NHẤT của hành động khác: hoán đổi, hành động kia nhận phím chính cũ, không ai mất sạch phím", () => {
     expect(rebind("attack", "KeyF")).toBe(true);
-    expect(getKeymap().attack).toEqual(["KeyF"]);
-    expect(getKeymap().interact).toEqual(["Space"]);
+    expect(getKeymap().attack).toEqual(["KeyF", "Space"]);
+    expect(getKeymap().interact).toEqual(["KeyJ"]);
     expect(actionOfEvent(ev("KeyF"), getLookup())).toBe("attack");
-    expect(actionOfEvent(ev("Space"), getLookup())).toBe("interact");
+    expect(actionOfEvent(ev("KeyJ"), getLookup())).toBe("interact");
     for (const a of ACTIONS) expect(getKeymap()[a.id].length, a.id).toBeGreaterThan(0);
   });
 
   it("gán phím PHỤ của hành động khác: hành động kia chỉ mất phím phụ đó, giữ phím chính; không phím trùng", () => {
     expect(rebind("attack", "KeyT")).toBe(true); // T là phím phụ của target.next (Tab là chính)
-    expect(getKeymap().attack).toEqual(["KeyT", "Space"]);
+    expect(getKeymap().attack).toEqual(["KeyT", "KeyJ", "Space"]);
     expect(getKeymap()["target.next"]).toEqual(["Tab"]);
     const seen = new Set<string>();
     for (const a of ACTIONS)
@@ -278,14 +368,14 @@ describe("lưu / đổi phím", () => {
   it("resetKeymap xoá kho và báo cho người nghe; onKeymapChange gỡ được", () => {
     const fn = vi.fn();
     const off = onKeymapChange(fn);
-    rebind("attack", "KeyV");
+    rebind("attack", "Digit9");
     expect(fn).toHaveBeenCalledTimes(1);
     resetKeymap();
     expect(fn).toHaveBeenCalledTimes(2);
     expect(getKeymap()).toEqual(DEFAULT_KEYMAP);
     expect(store.has(KEYMAP_STORAGE_KEY)).toBe(false);
     off();
-    rebind("attack", "KeyY");
+    rebind("attack", "Digit8");
     expect(fn).toHaveBeenCalledTimes(2);
   });
 

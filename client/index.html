@@ -570,8 +570,8 @@
               type="button"
               id="btn-bag"
               class="hud-btn"
-              title="Túi đồ (I)"
-              aria-label="Túi đồ (Phím I)"
+              title="Túi đồ (B)"
+              aria-label="Túi đồ (Phím B)"
               aria-expanded="false"
             >
               <span class="ico"
@@ -582,8 +582,8 @@
               type="button"
               id="btn-quest"
               class="hud-btn"
-              title="Sổ nhiệm vụ (Q)"
-              aria-label="Sổ nhiệm vụ (Phím Q)"
+              title="Sổ nhiệm vụ (N / Q)"
+              aria-label="Sổ nhiệm vụ (Phím N hoặc Q)"
               aria-expanded="false"
             >
               <span class="ico"
@@ -606,8 +606,8 @@
               type="button"
               id="btn-mute"
               class="hud-btn icon-only"
-              title="Bật/tắt âm thanh (N)"
-              aria-label="Bật hoặc tắt âm thanh (Phím N)"
+              title="Bật/tắt âm thanh (0)"
+              aria-label="Bật hoặc tắt âm thanh (Phím 0)"
               aria-pressed="false"
             >
               <span id="mute-icon">🔊</span>
@@ -616,8 +616,8 @@
               type="button"
               id="btn-settings"
               class="hud-btn icon-only"
-              title="Cài đặt (O)"
-              aria-label="Màn hình cài đặt (Phím O)"
+              title="Cài đặt (E)"
+              aria-label="Màn hình cài đặt (Phím E)"
               aria-expanded="false"
             >
               <span>⚙</span>
@@ -746,22 +746,75 @@
       </button>
 
       <div id="skills">
+        <!-- Ô chiêu thức 2-5 (QUYET_DINH_M3 mục 17.1): chỉ hiện trên máy tính, mờ vì chưa có chiêu (M7 mới lấp) -->
+        <div id="skill-slots" role="group" aria-label="Ô chiêu thức 2 đến 5, chưa có chiêu">
+          <button
+            type="button"
+            class="sk slot"
+            id="sk-slot2"
+            aria-disabled="true"
+            title="Ô chiêu thức 2, chưa có chiêu (L)"
+            aria-label="Ô chiêu thức 2, chưa có chiêu (Phím L)"
+          >
+            <small>2</small>
+          </button>
+          <button
+            type="button"
+            class="sk slot"
+            id="sk-slot3"
+            aria-disabled="true"
+            title="Ô chiêu thức 3, chưa có chiêu (U)"
+            aria-label="Ô chiêu thức 3, chưa có chiêu (Phím U)"
+          >
+            <small>3</small>
+          </button>
+          <button
+            type="button"
+            class="sk slot"
+            id="sk-slot4"
+            aria-disabled="true"
+            title="Ô chiêu thức 4, chưa có chiêu (I)"
+            aria-label="Ô chiêu thức 4, chưa có chiêu (Phím I)"
+          >
+            <small>4</small>
+          </button>
+          <button
+            type="button"
+            class="sk slot"
+            id="sk-slot5"
+            aria-disabled="true"
+            title="Ô chiêu thức 5, chưa có chiêu (O)"
+            aria-label="Ô chiêu thức 5, chưa có chiêu (Phím O)"
+          >
+            <small>5</small>
+          </button>
+        </div>
         <button
           class="sk"
           id="sk-break"
-          title="Đột phá (B)"
-          aria-label="Đột phá cảnh giới (Phím B)"
+          title="Đột phá (V)"
+          aria-label="Đột phá cảnh giới (Phím V)"
         >
           <span class="ico"
             ><svg aria-hidden="true" focusable="false"><use href="#i-break" /></svg></span
           ><small>Đột phá</small>
         </button>
-        <button class="sk" id="sk-med" title="Đả tọa (L)" aria-label="Đả tọa hồi phục (Phím L)">
+        <button
+          class="sk"
+          id="sk-med"
+          title="Đả tọa (Z / 4)"
+          aria-label="Đả tọa hồi phục (Phím Z hoặc 4)"
+        >
           <span class="ico"
             ><svg aria-hidden="true" focusable="false"><use href="#i-med" /></svg></span
           ><small>Đả tọa</small>
         </button>
-        <button class="sk" id="sk-sword" title="Kiếm khí (K)" aria-label="Phóng kiếm khí (Phím K)">
+        <button
+          class="sk"
+          id="sk-sword"
+          title="Kiếm khí (K / 3)"
+          aria-label="Phóng kiếm khí (Phím K hoặc 3)"
+        >
           <span class="ico"
             ><svg aria-hidden="true" focusable="false"><use href="#i-aura" /></svg></span
           ><small>Kiếm khí</small><em class="cd"></em>
@@ -769,8 +822,8 @@
         <button
           class="sk big"
           id="sk-slash"
-          title="Kiếm chém (J / Space)"
-          aria-label="Kiếm chém tấn công (Phím J hoặc Phím Cách)"
+          title="Kiếm chém (J / Cách)"
+          aria-label="Kiếm chém tấn công (Phím J hoặc Cách)"
         >
           <span class="ico"
             ><svg aria-hidden="true" focusable="false"><use href="#i-sword" /></svg></span
@@ -796,8 +849,8 @@
             type="button"
             id="inv-close"
             class="modal-close"
-            title="Đóng (I / Esc)"
-            aria-label="Đóng túi đồ (Phím I hoặc Esc)"
+            title="Đóng (B / Esc)"
+            aria-label="Đóng túi đồ (Phím B hoặc Esc)"
           >
             ✕
           </button>
@@ -939,8 +992,8 @@
             type="button"
             id="settings-close"
             class="modal-close"
-            title="Đóng (O / Esc)"
-            aria-label="Đóng cài đặt (Phím O hoặc Esc)"
+            title="Đóng (E / Esc)"
+            aria-label="Đóng cài đặt (Phím E hoặc Esc)"
           >
             ✕
           </button>
@@ -961,7 +1014,7 @@
             </div>
           </label>
           <label class="set-row toggle">
-            <span>Tắt toàn bộ âm thanh (Phím <b data-key-action="sound.mute">N</b>)</span>
+            <span>Tắt toàn bộ âm thanh (Phím <b data-key-action="sound.mute">0</b>)</span>
             <input type="checkbox" id="set-mute" />
           </label>
           <div class="set-row" id="set-keys-row">
@@ -1100,8 +1153,8 @@
             type="button"
             id="quest-close"
             class="modal-close"
-            title="Đóng (Q / Esc)"
-            aria-label="Đóng sổ nhiệm vụ (Phím Q hoặc Esc)"
+            title="Đóng (N / Esc)"
+            aria-label="Đóng sổ nhiệm vụ (Phím N hoặc Esc)"
           >
             ✕
           </button>
@@ -1646,8 +1699,8 @@
         aria-label="Chỉ dẫn phím tắt và luật chơi Tiên Giới"
         title="Nhấn để xem chỉ dẫn chi tiết"
       >
-        WASD / mũi tên đi · Cách chém · Tab mục tiêu · 3 kiếm khí · 4 đả tọa · 1/2 đan · F
-        nhặt/nói/cổng · I túi · C nhân vật · J nhiệm vụ · G tông môn · M bản đồ · O cài đặt · Enter
+        WASD / mũi tên đi · J chém · Tab mục tiêu · K kiếm khí · Z đả tọa · 1/2 đan · F
+        nhặt/nói/cổng · B túi · C nhân vật · N nhiệm vụ · G tông môn · M bản đồ · E cài đặt · Enter
         chat
       </div>
 
@@ -1779,12 +1832,12 @@
             <div class="newbie-info">
               <b>Chiến Đấu & Trừ Yêu</b>
               <p>
-                Phím <b data-key-action="attack">Cách</b> chém kiếm thường (tự nhắm con quái gần
-                nhất), <b data-key-action="target.next">Tab</b> chọn và đổi mục tiêu (<b
+                Phím <b data-key-action="attack">J</b> chém kiếm thường (tự nhắm con quái gần nhất),
+                <b data-key-action="target.next">Tab</b> chọn và đổi mục tiêu (<b
                   data-key-action="target.prev"
                   >Shift+Tab</b
                 >
-                đi ngược, <b>Esc</b> bỏ chọn), <b data-key-action="skill.sword">3</b> phóng Kiếm khí
+                đi ngược, <b>Esc</b> bỏ chọn), <b data-key-action="skill.sword">K</b> phóng Kiếm khí
                 tầm xa tiêu hao Linh lực.
               </p>
             </div>
@@ -1794,8 +1847,8 @@
             <div class="newbie-info">
               <b>Tu Luyện & Hồi Phục</b>
               <p>
-                Phím <b data-key-action="skill.meditate">4</b> đả tọa hồi Sinh lực và Linh lực,
-                <b data-key-action="skill.breakthrough">B</b> đột phá. Phím
+                Phím <b data-key-action="skill.meditate">Z</b> đả tọa hồi Sinh lực và Linh lực,
+                <b data-key-action="skill.breakthrough">V</b> đột phá. Phím
                 <b data-key-action="quick.1">1</b> và <b data-key-action="quick.2">2</b> cắn nhanh
                 Đan dược trong lúc nguy cấp.
               </p>
@@ -1807,9 +1860,9 @@
               <b>Tương Tác & Hành Trang</b>
               <p>
                 Phím <b data-key-action="interact">F</b> để nhặt vật phẩm rơi, đối thoại NPC hoặc
-                qua Cổng truyền tống. Phím <b data-key-action="panel.inventory">I</b> mở Túi đồ,
+                qua Cổng truyền tống. Phím <b data-key-action="panel.inventory">B</b> mở Túi đồ,
                 <b data-key-action="panel.char">C</b> xem Đạo thể trang bị,
-                <b data-key-action="panel.quest">J</b> xem Sổ nhiệm vụ,
+                <b data-key-action="panel.quest">N</b> xem Sổ nhiệm vụ,
                 <b data-key-action="panel.map">M</b> xem Sơn Hà Đồ,
                 <b data-key-action="chat.open">Enter</b> để chat,
                 <b data-key-action="prompt.yes">Y</b> nhận lời mời,
