@@ -4,8 +4,8 @@ import {
   COIN_CAP,
   COIN_DROPS,
   DROP_TABLES,
-  EQUIP_SLOTS,
   ITEM_BY_ID,
+  PUBLIC_EQUIP_SLOTS,
   MONSTER_BY_ID,
   MONSTER_CAP,
   RECIPES,
@@ -14,12 +14,12 @@ import {
   expToNext,
   stepOf,
   statsFor,
-  type EquipSlot,
+  type PublicEquipSlot,
 } from "./index";
 
 const NEW_MONSTERS = ["suong_ho", "thach_quy", "doc_thiem", "hac_giao"];
 /** Ba bộ trang bị Kim Đan theo bậc đầu mặc được (tier 0 / 1 / 2). */
-const SETS: Record<EquipSlot, string[]>[] = [
+const SETS: Record<PublicEquipSlot, string[]>[] = [
   { weapon: ["suong_vu_kiem"], robe: ["suong_ho_bao"], talisman: ["ho_tam_phu"] },
   { weapon: ["huyen_quy_kiem"], robe: ["quy_giap_bao"], talisman: ["quy_tuc_phu"] },
   { weapon: ["hac_giao_kiem"], robe: ["giao_lan_bao"], talisman: ["giao_long_phu"] },
@@ -63,7 +63,7 @@ describe("Tụ Khí Đan: trần tu vi mỗi viên (expPillGain)", () => {
 describe("trang bị Kim Đan: ba bộ x ba ô", () => {
   it("yêu cầu Kim Đan Sơ / Trung / Hậu kỳ; độ hiếm không giảm; chỉ số tăng đều giữa các bộ", () => {
     SETS.forEach((set, tier) => {
-      for (const slot of EQUIP_SLOTS) {
+      for (const slot of PUBLIC_EQUIP_SLOTS) {
         const [id] = set[slot];
         const e = ITEM_BY_ID[id].equip!;
         expect(e.slot, id).toBe(slot);
@@ -96,7 +96,7 @@ describe("trang bị Kim Đan: ba bộ x ba ô", () => {
     const mats = new Set<string>();
     for (const m of NEW_MONSTERS) for (const d of DROP_TABLES[m]) mats.add(d.itemId);
     for (const set of SETS)
-      for (const slot of EQUIP_SLOTS) {
+      for (const slot of PUBLIC_EQUIP_SLOTS) {
         const id = set[slot][0];
         const rs = RECIPES.filter((r) => r.output.itemId === id);
         expect(rs, id).toHaveLength(1);
@@ -110,7 +110,7 @@ describe("trang bị Kim Đan: ba bộ x ba ô", () => {
 
   it("phí rèn tăng theo bộ (I < II < III)", () => {
     const fee = (id: string) => RECIPES.find((r) => r.output.itemId === id)!.coin!;
-    for (const slot of EQUIP_SLOTS) {
+    for (const slot of PUBLIC_EQUIP_SLOTS) {
       expect(fee(SETS[0][slot][0])).toBeLessThan(fee(SETS[1][slot][0]));
       expect(fee(SETS[1][slot][0])).toBeLessThan(fee(SETS[2][slot][0]));
     }

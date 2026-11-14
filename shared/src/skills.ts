@@ -26,6 +26,8 @@
 // Hệ (ngũ hành)
 // ---------------------------------------------------------------------------------------------------------------
 
+import { STAT_CAPS } from "./items";
+
 /** Pha ngũ hành dùng để tính khắc: kim, mộc, thủy, hỏa, thổ; `none` = vô sắc (không khắc, không bị khắc). */
 export type Phase = "kim" | "moc" | "thuy" | "hoa" | "tho" | "none";
 
@@ -489,8 +491,8 @@ export function skillOf(id: unknown): SkillDef | undefined {
     : undefined;
 }
 
-/** Giảm hồi chiêu tối đa từ trang bị (`EquipStats.cdr`, M7.4): 30%. */
-export const CDR_CAP = 0.3;
+/** Giảm hồi chiêu tối đa từ trang bị (`EquipStats.cdr`, M7.4) dạng PHÂN SỐ: 30% = `STAT_CAPS.cdr / 100` (MỘT nguồn ở `items.ts`). */
+export const CDR_CAP = STAT_CAPS.cdr / 100;
 
 /** Linh lực một lần dùng chiêu = `ceil(mpPct x linh lực tối đa)`, ít nhất 1. MỘT hàm: server trừ, client tô xám ô khi thiếu và in "Linh lực: N". */
 export function skillMpCost(def: Pick<SkillDef, "mpPct">, maxMp: number): number {

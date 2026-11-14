@@ -69,7 +69,15 @@ describe("tu vi và chỉ số", () => {
   });
 
   it("Phàm Nhân khởi đầu với chỉ số như thiết kế", () => {
-    expect(statsFor(0, 0)).toEqual({ maxHp: 100, maxMp: 50, atk: 10, speed: 150 });
+    expect(statsFor(0, 0)).toEqual({
+      maxHp: 100,
+      maxMp: 50,
+      atk: 10,
+      speed: 150,
+      crit: 0,
+      cdr: 0,
+      guard: 0,
+    });
     expect(expToNext(0, 0)).toBe(40);
   });
 });
