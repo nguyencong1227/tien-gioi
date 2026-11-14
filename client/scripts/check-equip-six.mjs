@@ -246,6 +246,10 @@ try {
       "chưa mặc gì: cả ba là 0%",
     );
     check(p.guard.label === "Giáp (giảm sát thương)", `nhãn giáp: "${p.guard.label}"`);
+    check(
+      p.crit.label === "Bạo kích (từ trang bị)",
+      `nhãn bạo kích ghi rõ chỉ là phần từ trang bị: "${p.crit.label}"`,
+    );
     await pointer("#char-equip-slots .equip-slot-card", 5);
     await sleep(150);
     check(
