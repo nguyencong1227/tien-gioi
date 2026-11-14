@@ -67,6 +67,21 @@ function isControl(id: StatusId): boolean {
   return kind === "stun" || kind === "vuln";
 }
 
+/**
+ * Gỡ MỌI trạng thái sát thương theo giây (độc / bỏng / chảy máu) khỏi hộp, giữ nguyên loại khác (tê cóng, choáng, tăng ích...). Dùng khi người chơi
+ * vào khu an toàn (quyết định A 15/11/2026, docs/PHAN_CONG_M7.md 5.4): trấn / cổng thanh tẩy sát thương theo giây. Trả `true` nếu có cái bị gỡ.
+ */
+export function stripDots(box: StatusBox): boolean {
+  let removed = false;
+  for (let i = box.list.length - 1; i >= 0; i--) {
+    if (statusOf(box.list[i].id)?.kind === "dot") {
+      box.list.splice(i, 1);
+      removed = true;
+    }
+  }
+  return removed;
+}
+
 /** Xoá trạng thái đã hết hạn. Trả `true` nếu có cái bị xoá. */
 export function pruneStatuses(box: StatusBox, now: number): boolean {
   let removed = false;

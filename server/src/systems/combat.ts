@@ -169,20 +169,22 @@ export function hurtPlayer(w: World, sid: string, p: Player, dmg: number, from: 
 
 /**
  * Sát thương THEO GIÂY (độc / bỏng / chảy máu, `systems/status.ts`) lên người chơi. Khác `hurtPlayer`: không phải một ĐÒN nên chiêu né (`dodgeUntil`) KHÔNG
- * tránh được; vẫn bất tử khi hồn lìa xác / đang thách đấu; khiên hộ thể vẫn đỡ trước; ngắt đả tọa; chết thì đi cùng đường với đòn quái (bí cảnh: ngã, không mất
- * kiếp; còn lại luân hồi). `statusName` chỉ để viết thông báo ("Bị Độc hành hạ ...").
+ * tránh được; vẫn bất tử khi hồn lìa xác / đang thách đấu; khiên hộ thể vẫn đỡ trước; ngắt đả tọa. **KHÔNG BAO GIỜ GIẾT** (quyết định A 15/11/2026, theo
+ * nhận xét của B ở #567): chết thật là mất kiếp, không để một vết thương nhỏ lấy kiếp sau khi người chơi đã sống sót qua đòn chính; khí huyết dừng ở 1,
+ * đòn kế tiếp của quái mới là đòn kết liễu. Nên không có đường gục / Hoàng Tuyền / bí cảnh ngã từ đây.
  */
-export function hurtPlayerDot(w: World, sid: string, p: Player, dmg: number, statusName: string) {
+export function hurtPlayerDot(w: World, sid: string, p: Player, dmg: number) {
   const c = w.ctrl.get(sid);
   if (!c || p.dead) return;
   if (w.ghosts.has(sid)) return;
   if (w.duels.has(sid)) return;
-  damagePlayer(w, sid, p, c, dmg, `Bị ${statusName} hành hạ, tạm ngã xuống.`);
+  damagePlayer(w, sid, p, c, dmg, null);
 }
 
 /**
  * Phần CHUNG của mọi sát thương lên người chơi (đòn quái, sát thương theo giây): khiên hộ thể hấp thụ trước, phần còn lại trừ khí huyết, gửi số sát thương, và xử lý gục
- * (bí cảnh -> `dungeonFall`; chết thật -> Hoàng Tuyền; còn lại nằm chờ hồi sinh với thông báo `fallText`). Người gọi đã kiểm bất tử / né.
+ * (bí cảnh -> `dungeonFall`; chết thật -> Hoàng Tuyền; còn lại nằm chờ hồi sinh với thông báo `fallText`). `fallText = null`: sát thương KHÔNG gây chết (khí huyết
+ * dừng ở 1, chỉ gửi phần thật sự trừ). Người gọi đã kiểm bất tử / né.
  */
 function damagePlayer(
   w: World,
@@ -190,7 +192,7 @@ function damagePlayer(
   p: Player,
   c: PlayerCtrl,
   dmg: number,
-  fallText: string,
+  fallText: string | null,
 ) {
   if (c.st && c.st.list.length > 0) {
     // Hộ thể: khiên hấp thụ trước, phần còn lại mới trừ khí huyết (đòn trúng khiên vẫn ngắt đả tọa và hồi phục)
@@ -203,10 +205,12 @@ function damagePlayer(
       return;
     }
   }
+  if (fallText === null) dmg = Math.min(dmg, Math.max(0, p.hp - 1)); // không giết: chừa lại 1 khí huyết (người đang 1 khí huyết thì không mất thêm)
   p.hp = Math.max(0, p.hp - dmg);
   p.meditating = false;
   c.lastHitAt = w.now;
-  w.events.dmg({ target: sid, amount: dmg, x: p.x, y: p.y - 20, toPlayer: true });
+  if (dmg > 0) w.events.dmg({ target: sid, amount: dmg, x: p.x, y: p.y - 20, toPlayer: true });
+  if (fallText === null) return;
   if (p.hp <= 0) {
     // Trong phòng bí cảnh: gục KHÔNG mất kiếp (bị đẩy ra, mất lượt; quyết định 11/11/2026, systems/dungeon.ts `dungeonFall`)
     if (dungeonFall(w, sid, p, c)) return;

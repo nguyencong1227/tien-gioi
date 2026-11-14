@@ -50,6 +50,11 @@ export class Player extends Schema {
   @type("string") weapon = "";
   @type("string") robe = "";
   @type("string") talisman = "";
+  // Ba ô trang bị RIÊNG của chủ (M7.4, docs/THIET_KE_NHAN_VAT_6_O.md mục 8: hài, ngọc bội, pháp bảo; itemId, "" = trống). KHÔNG công khai: không đổi
+  // ngoại hình, người khác không nhận byte nào; chủ nhận qua StateView như `x`, `y` (tự đồng bộ khi nối lại / qua cổng, không thêm loại tin).
+  @view(TAG_OWNER) @type("string") boots = "";
+  @view(TAG_OWNER) @type("string") jade = "";
+  @view(TAG_OWNER) @type("string") treasure = "";
 }
 
 export class Monster extends Schema {
