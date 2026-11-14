@@ -54,4 +54,6 @@
 
 Nhắc khi A thêm bản đồ `han_van` (M7.5, #506): bỏ `han_van` khỏi danh sách chờ của test "kiểu không mồ côi" (`client/src/gfx/map-decor.test.ts`), nếu không test đỏ.
 
-**Thứ tự thực hiện (A, 15/11):** (1) PR #580: trường `Player` `@view(TAG_OWNER)`; (2) PR `shared/`-only mở `EquipSlot` / `EQUIP_SLOTS` / `Equipment` lên 6 ô + `EquipStats` + `STAT_CAPS` + `TREASURES` (xanh nhờ (1): mở `EquipSlot` trước khi `Player` có trường làm `tsc` đỏ ở `equipment.ts`); (3) PR server (ghi / đọc sáu ô, `systems/treasure.ts`, đồ, rơi); (4) client của B.
+**Thứ tự thực hiện (A, 15/11):** (1) PR #580 (ĐÃ vào main): trường `Player` `@view(TAG_OWNER)`; (2) PR #585, `shared/`-only: mở `EquipSlot` / `EQUIP_SLOTS` lên 6 ô + `EquipStats` + `STAT_CAPS` + `TREASURES` (mở `EquipSlot` trước khi `Player` có trường làm `tsc` đỏ ở `equipment.ts`); (3) PR server (ghi / đọc sáu ô, `systems/treasure.ts`, đồ, rơi); (4) client của B.
+
+**Điều chỉnh kiểu `Equipment` (A, #585):** ba ô riêng là TUỲ CHỌN trong kiểu (`Partial`) và `emptyEquipment()` vẫn trả ba khoá công khai; ô vắng hoặc `""` = trống. Bắt buộc đủ sáu khoá làm `tsc` đỏ ở mã dựng `Equipment` ba khoá (server `equipmentOf`, hai test, client `ui.ts`) mà PR `shared/` chỉ được sửa `shared/`. Client đọc ô riêng bằng `currentEquip[slot] || ""`; mã mới duyệt `EQUIP_SLOTS` (sáu ô). `equipBonus(eq, realm?)` bỏ qua ô chưa mở khi truyền `realm`.
