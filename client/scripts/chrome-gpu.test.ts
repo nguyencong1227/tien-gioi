@@ -36,7 +36,7 @@ describe("chrome-gpu: phát hiện và cấu hình tăng tốc phần cứng GPU
     }
   });
 
-  it("detectGpu: tự động nhường GPU và lùi về phần mềm khi ComfyUI đang chạy (file lock tg-comfy.lock)", () => {
+  it("detectGpu: khóa mồ côi (stale lock khi tg-comfy inactive) KHÔNG chặn GPU của Chrome", () => {
     const lockPath = "/tmp/tg-comfy.lock";
     const hadLockBefore = fs.existsSync(lockPath);
     const origEnv = { ...process.env };
@@ -46,11 +46,93 @@ describe("chrome-gpu: phát hiện và cấu hình tăng tốc phần cứng GPU
       delete process.env.CI;
       process.env.FORCE_GPU = "1";
 
-      fs.writeFileSync(lockPath, "pid=9999\n");
+      // Tạo tệp khóa giả mồ côi khi dịch vụ tg-comfy không chạy (inactive)
+      fs.writeFileSync(lockPath, "2026-11-14T18:00:00Z\n");
+      const res = detectGpu();
+
+      if (fs.existsSync("/dev/nvidia0")) {
+        // Trên máy chủ có phần cứng NVIDIA: khóa mồ côi không được phép làm Chrome lùi về phần mềm
+        expect(res.hasGpu).toBe(true);
+        expect(res.reason).toBe("nvidia_rtx");
+      }
+    } finally {
+      process.env = origEnv;
+      if (!hadLockBefore && fs.existsSync(lockPath)) {
+        try {
+          fs.unlinkSync(lockPath);
+        } catch {
+          // bỏ qua
+        }
+      }
+    }
+  });
+
+  it("detectGpu: tự động nhường GPU và lùi về phần mềm khi ComfyUI thực sự đang chạy (khóa + tg-comfy active)", () => {
+    const lockPath = "/tmp/tg-comfy.lock";
+    const hadLockBefore = fs.existsSync(lockPath);
+    const origEnv = { ...process.env };
+
+    // Tạo thư mục stub chứa lệnh systemctl giả lập trả về "active"
+    const stubDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-stub-systemctl-"));
+    const stubBin = path.join(stubDir, "systemctl");
+    fs.writeFileSync(
+      stubBin,
+      `#!/bin/sh
+if [ "$1" = "--user" ] && [ "$2" = "is-active" ] && [ "$3" = "tg-comfy" ]; then
+  echo "active"
+  exit 0
+fi
+exit 3
+`,
+      { mode: 0o755 },
+    );
+
+    try {
+      delete process.env.DISABLE_GPU;
+      delete process.env.FORCE_SWIFTSHADER;
+      delete process.env.CI;
+      process.env.FORCE_GPU = "1";
+      process.env.PATH = `${stubDir}:${process.env.PATH}`;
+
+      fs.writeFileSync(lockPath, "2026-11-14T18:30:00Z\n");
       const res = detectGpu();
       expect(res.hasGpu).toBe(false);
       expect(res.reason).toBe("comfy_running");
       expect(getChromeGpuFlags()).toEqual(["--disable-gpu"]);
+    } finally {
+      process.env = origEnv;
+      if (!hadLockBefore && fs.existsSync(lockPath)) {
+        try {
+          fs.unlinkSync(lockPath);
+        } catch {
+          // bỏ qua
+        }
+      }
+      fs.rmSync(stubDir, { recursive: true, force: true });
+    }
+  });
+
+  it("detectGpu: khóa cũ hơn 31 phút tự động bị bỏ qua ngay cả khi có stub active", () => {
+    const lockPath = "/tmp/tg-comfy.lock";
+    const hadLockBefore = fs.existsSync(lockPath);
+    const origEnv = { ...process.env };
+
+    try {
+      delete process.env.DISABLE_GPU;
+      delete process.env.FORCE_SWIFTSHADER;
+      delete process.env.CI;
+      process.env.FORCE_GPU = "1";
+
+      fs.writeFileSync(lockPath, "old-lock\n");
+      // Đặt thời gian sửa đổi (mtime) lùi về 40 phút trước (> 31 phút)
+      const pastTime = (Date.now() - 40 * 60 * 1000) / 1000;
+      fs.utimesSync(lockPath, pastTime, pastTime);
+
+      const res = detectGpu();
+      if (fs.existsSync("/dev/nvidia0")) {
+        expect(res.hasGpu).toBe(true);
+        expect(res.reason).toBe("nvidia_rtx");
+      }
     } finally {
       process.env = origEnv;
       if (!hadLockBefore && fs.existsSync(lockPath)) {

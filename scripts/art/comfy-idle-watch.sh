@@ -4,15 +4,25 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PORT="${COMFY_PORT:-8188}"
+LOCK_FILE="${COMFY_LOCK_FILE:-${XDG_RUNTIME_DIR:-/tmp}/tg-comfy.lock}"
+IDLE_PID_FILE="${COMFY_IDLE_PID_FILE:-${XDG_RUNTIME_DIR:-/tmp}/tg-comfy-idle.pid}"
 IDLE_LIMIT_SEC=300 # 5 phút
 CHECK_INTERVAL_SEC=15
 IDLE_COUNT=0
 
+# Ghi PID và thiết lập trap tự dọn khi tiến trình kết thúc
+echo "$$" > "$IDLE_PID_FILE"
+cleanup_idle() {
+  rm -f "$IDLE_PID_FILE" 2>/dev/null || true
+}
+trap cleanup_idle EXIT INT TERM
+
 while true; do
   sleep "$CHECK_INTERVAL_SEC"
 
-  # Nếu đơn vị tg-comfy không còn chạy thì tự thoát
+  # Nếu đơn vị tg-comfy không còn chạy: dọn khóa để giải phóng GPU và thoát
   if ! systemctl --user is-active tg-comfy >/dev/null 2>&1; then
+    rm -f "$LOCK_FILE" /tmp/tg-comfy.lock "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/tg-comfy.lock" 2>/dev/null || true
     break
   fi
 

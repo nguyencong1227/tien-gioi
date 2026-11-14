@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -105,16 +105,93 @@ describe("Dây chuyền đồ họa nháp ComfyUI + SDXL (Mục 16.2 & 17.3 QUYE
     expect(fs.existsSync(tmpLockPath)).toBe(false);
   });
 
-  it("tích hợp chrome-gpu: detectGpu tự động nhường GPU khi có khóa tg-comfy.lock", () => {
+  it("comfy-down.sh: KHÔNG giết các tiến trình khác chứa chuỗi ComfyUI/main.py trên dòng lệnh", () => {
+    // Khởi động một tiến trình giả lập có chuỗi "ComfyUI/main.py" trên dòng lệnh (Review PR #499)
+    const dummy = spawn("bash", ["-c", 'exec -a "test ComfyUI/main.py" sleep 60'], {
+      stdio: "ignore",
+    });
+    const dummyPid = dummy.pid!;
+    expect(dummyPid).toBeGreaterThan(0);
+
+    try {
+      execFileSync(comfyDownScript, [], {
+        encoding: "utf-8",
+        cwd: repoRoot,
+        env: {
+          ...process.env,
+          COMFY_DIR: tmpTestDir,
+          COMFY_LOCK_FILE: tmpLockPath,
+        },
+      });
+
+      // Tiến trình giả lập vẫn phải còn sống (không bị pkill -f giết nhầm)
+      let isAlive = false;
+      try {
+        process.kill(dummyPid, 0);
+        isAlive = true;
+      } catch {
+        isAlive = false;
+      }
+      expect(isAlive).toBe(true);
+    } finally {
+      try {
+        dummy.kill();
+      } catch {
+        // bỏ qua
+      }
+    }
+  });
+
+  it("comfy-up.sh: trap tự động dọn sạch tệp khóa khi xảy ra lỗi khởi động giữa chừng", () => {
+    const errorLockPath = path.join(tmpTestDir, "tg-comfy-error.lock");
+    const nonExistentDir = path.join(tmpTestDir, "missing-dir");
+    let failed = false;
+    try {
+      execFileSync(comfyUpScript, [], {
+        encoding: "utf-8",
+        cwd: repoRoot,
+        env: {
+          ...process.env,
+          COMFY_DIR: nonExistentDir,
+          COMFY_LOCK_FILE: errorLockPath,
+          TEST_MIN_FREE_KB: "100",
+        },
+        stdio: "pipe",
+      });
+    } catch {
+      failed = true;
+    }
+    expect(failed).toBe(true);
+    // Tệp khóa phải được trap dọn dẹp sạch sẽ, không để lại khóa mồ côi
+    expect(fs.existsSync(errorLockPath)).toBe(false);
+  });
+
+  it("tích hợp chrome-gpu: detectGpu tự động nhường GPU khi có khóa và tg-comfy active", () => {
     const tmpLock = "/tmp/tg-comfy.lock";
     const hadLock = fs.existsSync(tmpLock);
     const origEnv = { ...process.env };
+
+    const stubDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-stub-comfy-"));
+    const stubBin = path.join(stubDir, "systemctl");
+    fs.writeFileSync(
+      stubBin,
+      `#!/bin/sh
+if [ "$1" = "--user" ] && [ "$2" = "is-active" ] && [ "$3" = "tg-comfy" ]; then
+  echo "active"
+  exit 0
+fi
+exit 3
+`,
+      { mode: 0o755 },
+    );
+
     try {
       delete process.env.DISABLE_GPU;
       delete process.env.CI;
       process.env.FORCE_GPU = "1";
+      process.env.PATH = `${stubDir}:${process.env.PATH}`;
 
-      fs.writeFileSync(tmpLock, "pid=8888\n");
+      fs.writeFileSync(tmpLock, "2026-11-14T18:30:00Z\n");
       const gpu = detectGpu();
       expect(gpu.hasGpu).toBe(false);
       expect(gpu.reason).toBe("comfy_running");
@@ -128,6 +205,7 @@ describe("Dây chuyền đồ họa nháp ComfyUI + SDXL (Mục 16.2 & 17.3 QUYE
           // bỏ qua
         }
       }
+      fs.rmSync(stubDir, { recursive: true, force: true });
     }
   });
 });

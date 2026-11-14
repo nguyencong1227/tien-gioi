@@ -8,8 +8,15 @@ COMFY_DIR="${COMFY_DIR:-/mnt/data/comfyui}"
 OUTPUT_DIR="${OUTPUT_DIR:-$COMFY_DIR/output}"
 TEMP_DIR="${TEMP_DIR:-$COMFY_DIR/temp}"
 PORT="${COMFY_PORT:-8188}"
-LOCK_FILE="${COMFY_LOCK_FILE:-/tmp/tg-comfy.lock}"
+LOCK_FILE="${COMFY_LOCK_FILE:-${XDG_RUNTIME_DIR:-/tmp}/tg-comfy.lock}"
+IDLE_PID_FILE="${COMFY_IDLE_PID_FILE:-${XDG_RUNTIME_DIR:-/tmp}/tg-comfy-idle.pid}"
 MIN_FREE_KB="${TEST_MIN_FREE_KB:-$((10 * 1024 * 1024))}" # Mặc định tối thiểu 10 GB trống
+
+# Trap dọn dẹp khóa nếu comfy-up.sh gặp lỗi giữa chừng
+cleanup_on_failure() {
+  rm -f "$LOCK_FILE" "$IDLE_PID_FILE" 2>/dev/null || true
+}
+trap cleanup_on_failure ERR INT TERM
 
 DRY_RUN=0
 for arg in "$@"; do
@@ -52,7 +59,9 @@ fi
 # 3. Kiểm tra trạng thái đã chạy
 if systemctl --user is-active tg-comfy >/dev/null 2>&1; then
   echo "ComfyUI (tg-comfy) đang chạy sẵn ở cổng $PORT."
-  touch "$LOCK_FILE"
+  date -u +"%Y-%m-%dT%H:%M:%SZ" > "$LOCK_FILE"
+  chmod 600 "$LOCK_FILE" 2>/dev/null || true
+  trap - ERR INT TERM
   exit 0
 fi
 
@@ -62,11 +71,13 @@ if [ -d "$OUTPUT_DIR" ]; then
 fi
 
 # 5. Ghi file lock để Chrome test tự động lùi về CPU (software fallback)
-echo "$$" > "$LOCK_FILE"
+date -u +"%Y-%m-%dT%H:%M:%SZ" > "$LOCK_FILE"
+chmod 600 "$LOCK_FILE" 2>/dev/null || true
 
 if [ "$DRY_RUN" = "1" ]; then
   rm -f "$LOCK_FILE"
   echo "Kiểm tra điều kiện khởi động ComfyUI thành công (chế độ --dry-run)."
+  trap - ERR INT TERM
   exit 0
 fi
 
@@ -125,4 +136,6 @@ if [ -x "$SCRIPT_DIR/comfy-idle-watch.sh" ]; then
   nohup "$SCRIPT_DIR/comfy-idle-watch.sh" >/dev/null 2>&1 &
 fi
 
+# Gỡ bỏ trap lỗi khi khởi động hoàn tất thành công
+trap - ERR INT TERM
 echo "ComfyUI đã khởi động thành công (đơn vị tg-comfy, cổng $PORT, giới hạn RAM 7 GB, tự tắt sau 30 phút hoặc 5 phút rảnh)."
