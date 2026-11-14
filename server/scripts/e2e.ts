@@ -108,6 +108,7 @@ function seedTestData(dataDir: string, scenario: "limbo" | "normal", name: strin
           gain: 25,
         },
         keepable: ["lang_nha_kiem"],
+        engravable: [],
         coinAtDeath: 500,
         counts: true,
         credited: false,
