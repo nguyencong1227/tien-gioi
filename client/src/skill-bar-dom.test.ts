@@ -191,7 +191,7 @@ describe("SkillBarDom: vẽ ô, chỉ ghi khi đổi", () => {
     const icoBefore = el.parts[".ico"].innerHTML;
     dom.render(slotView(2, next, ME, false, 0), ["K"]);
     expect(el.parts[".ico"].innerHTML).not.toBe(icoBefore);
-    expect(el.parts[".nm"].textContent).toBe("Huyền");
+    expect(el.parts[".nm"].textContent).toBe("Huyền Băng");
     dom.invalidate();
     const s = el.sets;
     dom.render(slotView(2, next, ME, false, 0), ["K"]);

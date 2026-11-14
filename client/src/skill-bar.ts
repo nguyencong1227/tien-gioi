@@ -245,10 +245,10 @@ export function slotAriaLabel(v: SlotView, keys: readonly string[]): string {
 }
 
 /**
- * Tên viết tắt dưới ô (<= `max` ký tự): lấy các TỪ đầu vừa chỗ ("Hỏa Vân Kiếm" -> "Hỏa Vân"); từ đầu đã quá dài thì cắt và thêm "…". Chỉ là gợi nhớ
+ * Tên viết tắt dưới ô (<= `max` ký tự, mặc định 10: vừa ô 58 px ở cỡ chữ 9 px): lấy các TỪ đầu vừa chỗ ("Hỏa Vân Kiếm" -> "Hỏa Vân"); từ đầu đã quá dài thì cắt và thêm "…". Chỉ là gợi nhớ
  * (biểu tượng + chấm tầng mới là nhận dạng chính); tên đầy đủ nằm ở `aria-label` / `title`.
  */
-export function shortName(name: string, max = 7): string {
+export function shortName(name: string, max = 10): string {
   const s = name.normalize("NFC").trim().replace(/\s+/g, " ");
   if (s.length <= max) return s;
   const words = s.split(" ");

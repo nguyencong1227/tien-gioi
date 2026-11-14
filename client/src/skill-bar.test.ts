@@ -302,16 +302,19 @@ describe("chữ hiển thị: aria-label, toast, tên viết tắt", () => {
     );
   });
 
-  it("tên viết tắt <= 7 ký tự: lấy từ đầu vừa chỗ, từ đầu quá dài thì cắt thêm …", () => {
+  it("tên viết tắt <= 10 ký tự: lấy từ đầu vừa chỗ, từ đầu quá dài thì cắt thêm …", () => {
     expect(shortName("Hỏa Vân Kiếm")).toBe("Hỏa Vân");
-    expect(shortName("Hồi Xuân")).toBe("Hồi");
+    expect(shortName("Bôn Thạch Quyền")).toBe("Bôn Thạch");
+    expect(shortName("Trọng Nhạc Trảm")).toBe("Trọng Nhạc");
+    expect(shortName("Hồi Xuân")).toBe("Hồi Xuân");
     expect(shortName("Kim")).toBe("Kim");
     expect(shortName("  Kim  ")).toBe("Kim");
-    expect(shortName("Nguyenabcdef")).toBe("Nguyen…");
+    expect(shortName("Nguyenabcdefgh")).toBe("Nguyenabc…");
+    expect(shortName("Phiêu Phong Bộ", 7)).toBe("Phiêu");
     for (const d of SKILLS_M7) {
       const s = shortName(d.name);
       expect(s.length).toBeGreaterThan(0);
-      expect(s.length).toBeLessThanOrEqual(7);
+      expect(s.length).toBeLessThanOrEqual(10);
     }
   });
 

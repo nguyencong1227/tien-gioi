@@ -1583,8 +1583,10 @@ html[data-input="touch"] .qt-head {
     gap: 8px;
   }
   .sk.slot {
-    width: 52px;
-    height: 52px;
+    width: 58px;
+    height: 58px;
+    /* ô vuông bo góc (không tròn như nút kỹ năng): chỗ cho tên viết tắt dưới biểu tượng, không bị góc tròn cắt chữ */
+    border-radius: 12px;
     border-width: 2px;
     cursor: pointer;
     place-content: center;
@@ -1592,20 +1594,20 @@ html[data-input="touch"] .qt-head {
     row-gap: 0;
   }
   .sk.slot .ico {
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
     font-size: 1px;
-    margin-top: 8px;
+    margin-top: 12px; /* chừa chỗ cho nhãn phím ở mép trên */
   }
   .sk.slot .ico svg {
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
   }
   .sk.slot .nm {
-    max-width: 46px;
-    margin-top: 0;
-    font-size: var(--fs-10);
-    line-height: 1.1;
+    max-width: 54px;
+    margin-top: 1px;
+    font-size: var(--fs-9);
+    line-height: 1.15;
     white-space: nowrap;
     overflow: hidden;
   }
@@ -1624,7 +1626,7 @@ html[data-input="touch"] .qt-head {
   .sk.slot .cdv {
     position: absolute;
     inset: 0;
-    border-radius: 50%;
+    border-radius: inherit;
     background: conic-gradient(rgba(0, 0, 0, 0.66) calc(var(--cd, 0) * 1turn), transparent 0);
     pointer-events: none;
   }
