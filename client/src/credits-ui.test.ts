@@ -76,3 +76,63 @@ describe("Ghi công trong game (Giới thiệu và ghi công ở Cài đặt)", 
     expect(uiSrc).toContain("__APP_VERSION__");
   });
 });
+
+describe("Thông báo giấy phép MIT của thư viện bên thứ ba (Phaser, colyseus.js, @colyseus/schema)", () => {
+  const notices = fs.readFileSync(path.join(ROOT, "client/public/notices.html"), "utf-8");
+  const credits = fs.readFileSync(path.join(ROOT, "CREDITS.md"), "utf-8");
+  const clientPkg = JSON.parse(fs.readFileSync(path.join(ROOT, "client/package.json"), "utf-8"));
+  /** Dòng "Copyright (c) ..." trong tệp giấy phép CỦA GÓI ĐANG CÀI (đổi gói / đổi năm thì notices.html phải theo). */
+  const copyrightOf = (pkg: string, file: string) => {
+    const t = fs.readFileSync(path.join(ROOT, "node_modules", pkg, file), "utf-8");
+    const m = t.match(/^Copyright \(c\).*$/m);
+    if (!m) throw new Error(`không thấy dòng Copyright ở ${pkg}/${file}`);
+    return m[0].trim();
+  };
+
+  it("notices.html giữ NGUYÊN dòng bản quyền và đoạn cấp phép MIT của từng gói (lấy từ tệp giấy phép thật trong node_modules)", () => {
+    for (const [pkg, file] of [
+      ["phaser", "LICENSE.md"],
+      ["colyseus.js", "LICENSE"],
+      ["@colyseus/schema", "LICENSE"],
+    ] as const) {
+      expect(notices, pkg).toContain(copyrightOf(pkg, file));
+    }
+    // đoạn bắt buộc của MIT ("The above copyright notice ... shall be included") có đủ ba lần
+    const must = "The above copyright notice and this permission notice shall be included";
+    expect(notices.split(must).length - 1).toBe(3);
+    expect(notices).toContain('THE SOFTWARE IS PROVIDED "AS IS"');
+  });
+
+  it("Cài đặt nêu Phaser, colyseus.js, MIT và liên kết tới notices.html (mở được trong tab mới, không lộ window.opener)", () => {
+    const section = aboutSection();
+    const t = text(section);
+    for (const must of ["Phaser 3", "Richard Davey", "colyseus.js", "Endel Dreyer", "MIT"])
+      expect(t, must).toContain(must);
+    const flat = section.replace(/\s+/g, " "); // prettier có thể xuống dòng giữa các thuộc tính
+    expect(flat).toMatch(/<a href="notices\.html" target="_blank" rel="noopener" ?>/);
+    expect(section).toContain('id="set-credit-libs"');
+  });
+
+  it("CREDITS.md mục 5b liệt kê ba gói với giấy phép MIT và khớp phiên bản ở client/package.json", () => {
+    expect(credits).toContain("### 5b. Thư viện chạy trong trình duyệt");
+    const sec = credits.slice(credits.indexOf("### 5b."));
+    const row = (pkg: string) => sec.split("\n").find((l) => l.startsWith(`| \`${pkg}\``)) ?? "";
+    expect(row("phaser")).toContain(clientPkg.dependencies.phaser);
+    expect(row("phaser")).toContain("**MIT**");
+    expect(row("colyseus.js")).toContain(clientPkg.dependencies["colyseus.js"]);
+    expect(row("colyseus.js")).toContain("**MIT**");
+    expect(row("@colyseus/schema")).toContain("**MIT**");
+    expect(sec).toContain("client/public/notices.html");
+  });
+
+  it("notices.html ghi đúng phiên bản của Phaser và colyseus.js trong tiêu đề mục", () => {
+    expect(notices).toContain(`phaser@${clientPkg.dependencies.phaser}`);
+    expect(notices).toContain(`colyseus.js@${clientPkg.dependencies["colyseus.js"]}`);
+  });
+
+  it("không chữ Hán / CJK trong notices.html", () => {
+    expect(notices).not.toMatch(
+      /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Bopomofo}]/u,
+    );
+  });
+});
