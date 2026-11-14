@@ -70,6 +70,9 @@ describe("học chiêu từ kinh quyển (useItem)", () => {
     expect(t.invs.length).toBeGreaterThan(0);
     expect(t.toasts.at(-1)!.msg.tone).toBe("good");
     expect(t.toasts.at(-1)!.msg.text).toContain("Hỏa Vân Kiếm");
+    // không nêu số ô: phím L U I O đổi được ở màn Phím tắt, server không biết người chơi đã gán phím nào
+    expect(t.toasts.at(-1)!.msg.text).not.toMatch(/ô \d|ô [LUIO]\b/);
+    expect(t.toasts.at(-1)!.msg.text).toContain("gắn vào ô chiêu thức");
   });
 
   it("quyển trùng: +1 tầng (không gắn lại), tối đa tầng 3, sau đó quyển còn nguyên và báo đã tối đa", () => {

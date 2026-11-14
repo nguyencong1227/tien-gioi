@@ -103,11 +103,10 @@ export function learnFromBook(w: World, sid: string, def: ItemDef): boolean {
   sendSkills(w, sid);
   w.events.toast(sid, {
     text: first
-      ? `Đã học ${skill.name}${slotted ? ` (ô ${slotted})` : ""}.`
+      ? `Đã học ${skill.name}${slotted ? " và gắn vào ô chiêu thức" : ""}.`
       : `${skill.name} lên tầng ${res.level}.`,
     tone: "good",
   });
-  w.audit?.("skill.learn", { name: p.name, skill: skill.id, level: res.level, book: def.id });
   return true;
 }
 

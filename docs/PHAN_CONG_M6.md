@@ -43,7 +43,7 @@
 | Mô hình vs thật | lệch giữa mô hình và bot ≤ ~25% | công cụ của C (#410) |
 
 ## 5. Nội dung đề xuất
-Tên là gợi ý (thế giới, địa danh, nhân vật phải là của Tiên Giới: không dùng tên / hình / chữ của game khác).
+Tên là gợi ý (thế giới, địa danh, nhân vật phải là của Tiên Giới; chữ / tên / hình của game khác chỉ dùng được trong phạm vi `AGENTS.md` mục Asset, tức Vạn Kiếp Tu Tiên theo `docs/NGUON_NOI_DUNG.md`).
 
 **Bản đồ `am_suong` "Âm Sương Trạch"** (đầm lầy sương), trạm an toàn "Vọng Sương Trạm" sát cổng nam; cặp cổng `hac_phong_bac` <-> `am_suong_nam` (chuỗi Lạc Hà <-> Hắc Phong <-> Âm Sương). ~128x112 ô, `monsterCap` tổng ≤ ~70.
 
