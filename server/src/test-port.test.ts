@@ -2,29 +2,51 @@ import net from "node:net";
 import { describe, expect, it, vi } from "vitest";
 import { freePort, listenWithRetry } from "./test-port";
 
-describe("freePort", () => {
-  it("trả về cổng hợp lệ mà bind lại được ngay trên host mặc định (::)", async () => {
-    const port = await freePort();
+/**
+ * Bind thử `port` trên `host` rồi đóng ngay: `true` nếu bind được, `false` nếu EADDRINUSE (lỗi khác thì ném).
+ * Giữa lúc `freePort` đóng cổng và lúc test bind lại, một tệp vitest KHÁC chạy song song có thể xin đúng cổng đó (đúng cái đua mà `listenWithRetry` sinh ra để chịu):
+ * nên "cổng freePort trả về bind lại được" chỉ kiểm bằng nhiều lần thử, không bằng đúng một lần (đỏ chập chờn do máy chạy song song, B báo ở #614 15/11/2026).
+ */
+function tryBind(port: number, host: string): Promise<boolean> {
+  return new Promise((resolve, reject) => {
+    const srv = net.createServer();
+    srv.once("error", (err: NodeJS.ErrnoException) =>
+      err.code === "EADDRINUSE" ? resolve(false) : reject(err),
+    );
+    srv.listen(port, host, () => srv.close(() => resolve(true)));
+  });
+}
+
+/** Xin `freePort` và bind lại được trong tối đa `tries` lần (mỗi lần xin cổng MỚI); trả về cổng đã bind được, hoặc ném lỗi nếu cả `tries` lần đều EADDRINUSE. */
+async function bindableWithin(host: string | undefined, tries = 5): Promise<number> {
+  for (let i = 0; i < tries; i++) {
+    const port = await freePort(host);
     expect(Number.isInteger(port)).toBe(true);
     expect(port).toBeGreaterThan(1023);
     expect(port).toBeLessThan(65536);
-    await new Promise<void>((resolve, reject) => {
-      const srv = net.createServer();
-      srv.once("error", reject);
-      srv.listen(port, "::", () => srv.close(() => resolve()));
-    });
+    if (await tryBind(port, host ?? "::")) return port;
+  }
+  throw new Error(`freePort(${host ?? "mặc định"}) không cho cổng bind lại được sau ${tries} lần`);
+}
+
+describe("freePort", () => {
+  it("trả về cổng hợp lệ mà bind lại được ngay trên host mặc định (::), chịu được cổng bị tệp song song giành mất (thử lại tối đa 5 lần)", async () => {
+    await bindableWithin(undefined);
   });
 
-  it("hỗ trợ chỉ định host cụ thể 127.0.0.1", async () => {
-    const port = await freePort("127.0.0.1");
-    expect(Number.isInteger(port)).toBe(true);
-    expect(port).toBeGreaterThan(1023);
-    expect(port).toBeLessThan(65536);
-    await new Promise<void>((resolve, reject) => {
-      const srv = net.createServer();
-      srv.once("error", reject);
-      srv.listen(port, "127.0.0.1", () => srv.close(() => resolve()));
-    });
+  it("hỗ trợ chỉ định host cụ thể 127.0.0.1 (cũng thử lại khi cổng bị giành mất)", async () => {
+    await bindableWithin("127.0.0.1");
+  });
+
+  it("tryBind: cổng đang bận trả `false` (kiểm công cụ kiểm tra, không để các ca trên xanh giả)", async () => {
+    const held = net.createServer();
+    await new Promise<void>((resolve) => held.listen(0, "127.0.0.1", () => resolve()));
+    const port = (held.address() as net.AddressInfo).port;
+    try {
+      await expect(tryBind(port, "127.0.0.1")).resolves.toBe(false);
+    } finally {
+      await new Promise<void>((resolve) => held.close(() => resolve()));
+    }
   });
 
   it("nhiều lần gọi song song cho cổng khác nhau", async () => {
