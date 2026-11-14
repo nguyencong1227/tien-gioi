@@ -434,3 +434,84 @@ describe("quái `poisoner`: độc đi kèm đòn / đạn TRÚNG (M7.3)", () =>
     expect(hurtPlayer(t.w, "a", t.p, 1, m.m)).toBe(false);
   });
 });
+
+describe("áp lên quái cũ: Sương Hồ `ranged`, Độc Thiềm `poisoner` có đạn (M7.3, số khởi đầu)", () => {
+  const SH = MONSTER_BY_ID.suong_ho;
+  const DT = MONSTER_BY_ID.doc_thiem;
+  const poisonOf = (c: { st?: { list: { id: string }[] } }) =>
+    c.st?.list.find((s) => s.id === "poison");
+
+  it("dữ liệu: Sương Hồ `ranged`, Độc Thiềm `poisoner` + đạn (nên là tầm xa và gắn độc); Thạch Quy, Linh Thố, Hắc Giao chưa là tầm xa", () => {
+    expect(SH.behavior).toBe("ranged");
+    expect(isRanged(SH)).toBe(true);
+    expect(DT.behavior).toBe("poisoner");
+    expect(isRanged(DT)).toBe(true);
+    expect(onHitEffectOf(DT)).toBe(POISON_EFFECT);
+    expect(onHitEffectOf(SH)).toBeUndefined();
+    for (const id of ["thach_quy", "tho", "hac_giao"])
+      expect(isRanged(MONSTER_BY_ID[id]), id).toBe(false);
+    expect(MONSTER_BY_ID.thach_quy.behavior ?? "melee").toBe("melee");
+  });
+
+  it("đạn của quái thật né được và không xuyên tường: tốc độ <= 640 px/s, bay mất >= 0,8 s hết tầm, tầm xa hơn tầm đánh gần và không quá 400 px", () => {
+    for (const d of [SH, DT]) {
+      const speed = boltSpeedOf(d);
+      const range = boltRangeOf(d);
+      expect(speed, d.id).toBeGreaterThan(0);
+      expect(speed, d.id).toBeLessThanOrEqual(640);
+      expect(range / speed, d.id).toBeGreaterThanOrEqual(0.8);
+      expect(range, d.id).toBeGreaterThan(d.attackRange * 3);
+      expect(range, d.id).toBeLessThanOrEqual(400);
+    }
+  });
+
+  it("Sương Hồ THẬT đứng xa bắn: có `fx bolt`, mất khí huyết, KHÔNG áp sát đánh gần (giữ cách xa hơn tầm đánh gần nhiều)", () => {
+    const t = makeWorld();
+    const { p } = addPlayer(t.w, "a", 5, 0);
+    const m = addMonster(t.w, "suong_ho", p.x - 200, p.y);
+    m.mc.homeX = m.m.x;
+    m.mc.homeY = m.m.y;
+    t.w.now = 10_000;
+    for (let i = 0; i < 100; i++) {
+      t.w.now += 50;
+      tickWorld(t.w, 50);
+    }
+    expect(t.fx.filter((f) => f.kind === "bolt").length).toBeGreaterThanOrEqual(2);
+    expect(p.hp).toBeLessThan(p.maxHp);
+    expect(Math.hypot(m.m.x - p.x, m.m.y - p.y)).toBeGreaterThan(
+      SH.attackRange + PLAYER_RADIUS + 40,
+    );
+  });
+
+  it("Độc Thiềm THẬT bắn đạn độc: người đứng yên bị trúng thì dính độc", () => {
+    const t = makeWorld();
+    const { p, c } = addPlayer(t.w, "a", 5, 0);
+    const m = addMonster(t.w, "doc_thiem", p.x - 180, p.y);
+    m.mc.homeX = m.m.x;
+    m.mc.homeY = m.m.y;
+    t.w.now = 10_000;
+    for (let i = 0; i < 100 && poisonOf(c) === undefined; i++) {
+      t.w.now += 50;
+      tickWorld(t.w, 50);
+    }
+    expect(poisonOf(c)).toBeDefined();
+    expect(p.hp).toBeLessThan(p.maxHp);
+  });
+
+  it("Độc Thiềm THẬT bắn người đang né: đạn không trúng nên KHÔNG dính độc (đối chứng của ca trên)", () => {
+    const t = makeWorld();
+    const { p, c } = addPlayer(t.w, "a", 5, 0);
+    const m = addMonster(t.w, "doc_thiem", p.x - 180, p.y);
+    m.mc.homeX = m.m.x;
+    m.mc.homeY = m.m.y;
+    t.w.now = 10_000;
+    c.dodgeUntil = t.w.now + 60_000;
+    for (let i = 0; i < 100; i++) {
+      t.w.now += 50;
+      tickWorld(t.w, 50);
+    }
+    expect(t.fx.filter((f) => f.kind === "bolt").length).toBeGreaterThanOrEqual(2); // đã bắn
+    expect(p.hp).toBe(p.maxHp);
+    expect(poisonOf(c)).toBeUndefined();
+  });
+});
