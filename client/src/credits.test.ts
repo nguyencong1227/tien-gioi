@@ -498,7 +498,7 @@ describe("Nguồn nội dung, hình ảnh và âm thanh bên ngoài (M7.16 #517,
     }
   });
 
-  it("isUnderVktt: nhận diện đúng đoạn đường dẫn vktt độc lập", () => {
+  it("isUnderVktt: nhận diện đúng đoạn đường dẫn vktt độc lập và chống lọt path traversal", () => {
     expect(isUnderVktt("client/public/assets/vktt/items/sword.png")).toBe(true);
     expect(isUnderVktt("assets/vktt/sword.png")).toBe(true);
     expect(isUnderVktt("client/public/audio/vktt/skill.mp3")).toBe(true);
@@ -508,5 +508,88 @@ describe("Nguồn nội dung, hình ảnh và âm thanh bên ngoài (M7.16 #517,
     expect(isUnderVktt("client/public/assets/vktt_item/sword.png")).toBe(false);
     expect(isUnderVktt("client/public/assets/my_vktt/sword.png")).toBe(false);
     expect(isUnderVktt("client/public/assets/items/sword.png")).toBe(false);
+
+    // Chống lọt path traversal (tệp thực chất nằm ngoài vktt/)
+    expect(isUnderVktt("client/public/assets/vktt/../items/sword.png")).toBe(false);
+  });
+
+  it("isAssetCredited: tệp vktt trùng tên với tệp Tiên Giới không được qua mặt kiểm CREDITS", () => {
+    // CREDITS chỉ có dòng ghi nhận cho tệp hoi_huyet_dan.png của Tiên Giới (Dev B, CC0)
+    const mockCredits = `
+| Items | client/public/assets/items/hoi_huyet_dan.png | Dev B | CC0 |
+`;
+
+    // Tệp của Tiên Giới khớp bình thường
+    expect(isAssetCredited("client/public/assets/items/hoi_huyet_dan.png", mockCredits)).toBe(true);
+
+    // Tệp cùng tên của Vạn Kiếp Tu Tiên (dưới vktt/) KHÔNG ĐƯỢC coi là đã ghi nhận nếu chưa có dòng riêng cho nó
+    expect(isAssetCredited("client/public/assets/vktt/items/hoi_huyet_dan.png", mockCredits)).toBe(
+      false,
+    );
+
+    // Nếu CREDITS có ghi nhận đúng đường dẫn (đầy đủ hoặc ngắn có vktt/) thì mới qua
+    const mockCreditsVktt = `
+| Items | client/public/assets/items/hoi_huyet_dan.png | Dev B | CC0 |
+| VKTT Items | assets/vktt/items/hoi_huyet_dan.png | Vạn Kiếp Tu Tiên | phép |
+`;
+    expect(
+      isAssetCredited("client/public/assets/vktt/items/hoi_huyet_dan.png", mockCreditsVktt),
+    ).toBe(true);
+  });
+
+  it("parseContentSourceTable: dòng bảng có ghi chú chứa cụm 'chưa có tệp nào' vẫn được đọc bình thường", () => {
+    const tmpDocDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-content-phrase-"));
+    const tmpDocFile = path.join(tmpDocDir, "NGUON_NOI_DUNG.md");
+
+    const sampleDoc = `
+## 3. Bảng nguồn
+| Loại | Nguồn | Trong repo | Ngày | PR | Đã duyệt chữ Hán | Đã chỉnh gì |
+|---|---|---|---|---|---|---|
+| hinh_anh | site/img/sword.png | client/public/assets/vktt/sword.png | 14/11/2026 | #501 | KHONG_CHU | chưa có tệp nào đẹp bằng |
+`;
+    try {
+      fs.writeFileSync(tmpDocFile, sampleDoc);
+      const entries = parseContentSourceTable(tmpDocFile);
+      expect(entries).toHaveLength(1);
+      expect(entries[0].notes).toBe("chưa có tệp nào đẹp bằng");
+    } finally {
+      fs.rmSync(tmpDocDir, { recursive: true, force: true });
+    }
+  });
+
+  it("parseContentSourceTable: tự động bóc backtick bọc quanh ô markdown và ném lỗi khi trùng đường dẫn", () => {
+    const tmpDocDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-content-ticks-"));
+    const tmpDocFile = path.join(tmpDocDir, "NGUON_NOI_DUNG.md");
+
+    // Thử bảng có backtick bọc quanh các ô
+    const docWithTicks = `
+## 3. Bảng nguồn
+| Loại | Nguồn | Trong repo | Ngày | PR | Đã duyệt chữ Hán | Đã chỉnh gì |
+|---|---|---|---|---|---|---|
+| \`hinh_anh\` | \`src/a.png\` | \`client/public/assets/vktt/a.png\` | 14/11/2026 | #501 | \`KHONG_CHU\` | nén |
+`;
+
+    // Thử bảng có 2 dòng trùng nhau đường dẫn 'Trong repo'
+    const docWithDups = `
+## 3. Bảng nguồn
+| Loại | Nguồn | Trong repo | Ngày | PR | Đã duyệt chữ Hán | Đã chỉnh gì |
+|---|---|---|---|---|---|---|
+| hinh_anh | src/a.png | client/public/assets/vktt/dup.png | 14/11/2026 | #501 | KHONG_CHU | nén 1 |
+| hinh_anh | src/b.png | client/public/assets/vktt/dup.png | 14/11/2026 | #501 | KHONG_CHU | nén 2 |
+`;
+
+    try {
+      fs.writeFileSync(tmpDocFile, docWithTicks);
+      const entries = parseContentSourceTable(tmpDocFile);
+      expect(entries).toHaveLength(1);
+      expect(entries[0].type).toBe("hinh_anh");
+      expect(entries[0].inRepo).toBe("client/public/assets/vktt/a.png");
+      expect(entries[0].cjkChecked).toBe("KHONG_CHU");
+
+      fs.writeFileSync(tmpDocFile, docWithDups);
+      expect(() => parseContentSourceTable(tmpDocFile)).toThrow(/Trùng đường dẫn 'Trong repo'/);
+    } finally {
+      fs.rmSync(tmpDocDir, { recursive: true, force: true });
+    }
   });
 });

@@ -114,20 +114,23 @@ export function isAssetCredited(filePath, creditsContent) {
   // 2. Khớp trọn token đường dẫn ngắn (bỏ client/public/)
   if (matchExactToken(creditsContent, shortPath)) return true;
 
-  // 3. Khớp trọn token tên tệp đơn lẻ
-  if (matchExactToken(creditsContent, fileName)) return true;
+  // 3. Khớp trọn token tên tệp đơn lẻ: CHỈ áp dụng cho tài sản thông thường của Tiên Giới.
+  // Với tài sản lấy từ nguồn Vạn Kiếp Tu Tiên (nằm dưới vktt/), BẮT BUỘC phải ghi rõ đường dẫn đầy đủ
+  // hoặc đường dẫn ngắn (có vktt/) để tránh trường hợp tệp vktt trùng tên (như hoi_huyet_dan.png)
+  // lọt qua kiểm tra vì CREDITS.md đã có tên tệp của Tiên Giới.
+  if (!isUnderVktt(filePath) && matchExactToken(creditsContent, fileName)) return true;
 
   return false;
 }
 
 /**
- * Kiểm tra xem đường dẫn có nằm dưới đoạn thư mục vktt/ không
+ * Kiểm tra xem đường dẫn có nằm dưới đoạn thư mục vktt/ không (chống lọt path traversal như vktt/../x)
  * @param {string} filePath
  * @returns {boolean}
  */
 export function isUnderVktt(filePath) {
   if (!filePath) return false;
-  const norm = filePath.replace(/\\/g, "/");
+  const norm = path.posix.normalize(filePath.replace(/\\/g, "/"));
   const segments = norm.split("/");
   return segments.includes("vktt");
 }
@@ -230,6 +233,7 @@ export function parseContentSourceTable(contentSourcePath = CONTENT_SOURCE_FILE)
   const lines = content.split("\n");
 
   const entries = [];
+  const seenInRepo = new Map();
   let inTableSection = false;
 
   const separatorRegex = /^\|[\s:|-]+\|$/;
@@ -257,24 +261,20 @@ export function parseContentSourceTable(contentSourcePath = CONTENT_SOURCE_FILE)
 
     // Tách cột bằng |
     const rawCols = line.split("|");
-    // Bỏ phần tử rỗng ở trước | đầu tiên và sau | cuối cùng
-    const cols = rawCols.slice(1, -1).map((c) => c.trim());
+    // Bỏ phần tử rỗng ở trước | đầu tiên và sau | cuối cùng; loại bỏ backtick bọc quanh cell (nếu có)
+    const cols = rawCols.slice(1, -1).map((c) => c.trim().replace(/^`+|`+$/g, ""));
 
     if (cols.length === 0) continue;
 
-    const firstCell = cols[0].replace(/[*_`]/g, "").trim();
+    const firstCell = cols[0].replace(/[*_`]/g, "").trim().toLowerCase();
 
     // 2. Dòng tiêu đề của bảng (ô đầu tiên là "Loại")
-    if (firstCell.toLowerCase() === "loại") {
+    if (firstCell === "loại") {
       continue;
     }
 
-    // 3. Dòng giữ chỗ khi chưa có tệp
-    if (
-      firstCell.toLowerCase().startsWith("(chưa có") ||
-      line.includes("chưa có tệp nào") ||
-      firstCell.startsWith("_(")
-    ) {
+    // 3. Dòng giữ chỗ khi chưa có tệp (chỉ xét ô đầu tiên)
+    if (firstCell.startsWith("(chưa có") || firstCell.startsWith("chưa có")) {
       continue;
     }
 
@@ -301,6 +301,14 @@ export function parseContentSourceTable(contentSourcePath = CONTENT_SOURCE_FILE)
         `[NGUON_NOI_DUNG.md] Dòng ${lineNum}: Cột 'Trong repo' không được để trống hoặc '-'`,
       );
     }
+
+    // 7. Bắt buộc mỗi tệp chỉ có đúng một dòng trong bảng (chống trùng lặp)
+    if (seenInRepo.has(inRepo)) {
+      throw new Error(
+        `[NGUON_NOI_DUNG.md] Dòng ${lineNum}: Trùng đường dẫn 'Trong repo' (${inRepo}) đã khai báo ở dòng ${seenInRepo.get(inRepo)}`,
+      );
+    }
+    seenInRepo.set(inRepo, lineNum);
 
     entries.push({
       type,
