@@ -99,6 +99,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: npm run leak:test
 
+      - name: Đo thời gian vào thế giới 4G (Fast 4G, Slow 4G, Lạnh & Ấm)
+        if: ${{ !cancelled() }}
+        run: npm run perf:4g -- --runs=3
+
       - name: Lưu artifact kết quả hiệu năng client
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
