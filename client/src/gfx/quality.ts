@@ -59,7 +59,7 @@ export interface QualityProfile {
   targetFps: 30 | 60;
   reducedMotion: boolean;
   batterySaver: boolean;
-  /** Nạp gói ảnh độ phân giải cao 2x (`hd:*`, `docs/THIET_KE_GIAO_DIEN_DO_HOA.md` mục 10.1): CHỈ bậc Rất cao. */
+  /** Nạp gói ảnh độ phân giải cao 2x (`hd:*`, `docs/THIET_KE_GIAO_DIEN_DO_HOA.md` mục 10.1): CHỈ bậc Rất cao và không bật tiết kiệm pin. */
   hdPacks: boolean;
 }
 
@@ -185,7 +185,8 @@ export function buildProfile(tier: Tier, ctx: ProfileContext): QualityProfile {
     targetFps: ctx.batterySaver ? 30 : 60,
     reducedMotion: rm,
     batterySaver: ctx.batterySaver,
-    hdPacks: tier === "ultra",
+    // Gói `hd:*` chỉ ở Rất cao và KHÔNG khi tiết kiệm pin (30 FPS, tiết kiệm dữ liệu / điện: không nạp, và hạ thì giải phóng; review B ở #538)
+    hdPacks: tier === "ultra" && !ctx.batterySaver,
   };
 }
 
@@ -532,9 +533,10 @@ export function createQuality(
       mode = m;
       env.storage.set(QUALITY_STORAGE_KEY, m);
       if (m === "auto") {
-        // Quay lại Tự động: chọn lại từ thiết bị (không giữ bậc cũ của lần chọn tay)
+        // Quay lại Tự động: chọn lại từ thiết bị (không giữ bậc cũ của lần chọn tay), nhưng đã bị hạ khỏi Rất cao trong phiên thì vẫn bị khoá
+        // ở trần hiện hành (Cao): không để đổi chế độ qua lại lách khoá và nạp / giải phóng gói `hd:*` lặp (review B ở #538)
         initial = pickInitialTier(env.signals());
-        autoTier = initial.tier;
+        autoTier = initial.tier === "ultra" && ultraLocked ? "high" : initial.tier;
       }
       gov.resetWindow();
       apply();
