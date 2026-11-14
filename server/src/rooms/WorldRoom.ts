@@ -110,6 +110,7 @@ import { chat } from "../systems/chat";
 import { sanitizeInventory, sendInv, useItem } from "../systems/inventory";
 import { dropItem, pickup, releaseLootOwner } from "../systems/loot";
 import { sanitizeQuests, sendQuests } from "../systems/quests";
+import { cast } from "../systems/cast";
 import { sendSkills, skillSlot } from "../systems/skills";
 import { sendStatus } from "../systems/status";
 import { sendWallet } from "../systems/wallet";
@@ -349,6 +350,7 @@ export class WorldRoom extends Room<WorldState> {
     });
     this.on<MeditateMsg>("meditate", (sid, m) => setMeditating(w, sid, m?.on === true));
     this.on("breakthrough", (sid) => breakthrough(w, sid));
+    this.on(SKILL_MSG.cast, (sid, m) => cast(w, sid, m));
     this.on(SKILL_MSG.slot, (sid, m) => skillSlot(w, sid, m));
     this.on<ChatMsg>("chat", (sid, m) => chat(w, sid, m?.text));
     this.on<UseItemMsg>("useItem", (sid, m) => useItem(w, sid, m?.slot));
