@@ -2978,6 +2978,8 @@ export const ui = {
     const qualitySel = $("set-quality") as HTMLSelectElement;
     const qualityNow = $("set-quality-now");
     const batterySaverChk = $("set-battery-saver") as HTMLInputElement;
+    // Số phiên bản của bản dựng (Giới thiệu và ghi công); chạy ngoài vite (test) thì ghi "dev"
+    $("set-version").textContent = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "dev";
     const TIER_NAME = { low: "Thấp", mid: "Vừa", high: "Cao" } as const;
 
     const syncSettingsDom = () => {

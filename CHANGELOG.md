@@ -2,6 +2,11 @@
 
 Định dạng theo từng bản phát hành (thẻ `vX.Y.Z`). Số `#` là PR / issue trên GitHub.
 
+## [Chưa phát hành] — M7 (Chiều sâu chiến đấu + Nguyên Anh)
+
+### Giao diện
+- **Giới thiệu và ghi công ở Cài đặt (M7.16, #517):** khối cuối bảng Cài đặt nêu số phiên bản (lấy từ `package.json` gốc lúc dựng), câu ghi công **"Một phần nội dung, hình ảnh và âm thanh trong Tiên Giới lấy từ Vạn Kiếp Tu Tiên (tác giả Hải Quân · Bắc Team), dùng với sự cho phép của tác giả"** (đúng câu đã chốt ở `docs/NGUON_NOI_DUNG.md` mục 1; `credits-ui.test.ts` giữ hai nơi khớp nhau và không chữ Hán) và phông Noto Serif (OFL); đọc được ở máy tính, điện thoại dọc và ngang.
+
 ## [0.2.1] — 14/11/2026: bản vá giao diện (phím cụm J K L U I O + bản đồ làm lại, QUYET_DINH_M3 mục 17)
 
 **Bản vá chỉ phía client** (không đổi `shared/`, không đổi máy chủ đang chạy, `PROTOCOL_VERSION` vẫn 2): người chơi dùng bản web chỉ cần tải lại trang; **APK `v0.2.0` nhận thông báo "có bản mới" và nên cài lại** (`release.yml` dựng `tien-gioi-v0.2.1-debug.apk` khi gắn thẻ). Dữ liệu nhân vật không đổi. Quay lại bản trước bằng `prod.sh rollback` (không phải đổi `MIN_PROTOCOL_VERSION`). Đã kiểm trước khi phát hành: toàn bộ test, `check-map-zoom.mjs` (Chrome thật, gồm qua cổng đổi bản đồ), `e2e:ban-phim`, `e2e:tro-nang`, `leak:test` (heap +1,2%), `perf:mobile --quick` (ĐẠT).
