@@ -291,6 +291,32 @@ describe("gfx/fx: trùm và quái Kim Đan (M6 #409)", () => {
     expect(planHitFx(hit({ kind: "hac_giao" })).tint).toBe(MONSTER_FX_TINT.hac_giao);
   });
 
+  it("quái Nguyên Anh của Hàn Vân Lĩnh (M7.5b) đổi màu hạt đòn thường và lúc gục; đòn nặng giữ vàng chung; trùm Thiên Hàn Vương vẫn nổ boss-vanish", () => {
+    for (const kind of ["han_lang", "phong_nha", "cot_tuong", "doc_tuoc", "thien_han_vuong"]) {
+      expect(MONSTER_BY_ID[kind], kind).toBeDefined();
+      expect(MONSTER_FX_TINT[kind], `${kind} có màu riêng`).toBeDefined();
+      expect(planHitFx(hit({ kind })).tint, kind).toBe(MONSTER_FX_TINT[kind]);
+      expect(planHitFx(hit({ kind, crit: true })).tint, kind).toBeUndefined();
+      expect(planMonsterDeath(kind).tint, kind).toBe(MONSTER_FX_TINT[kind]);
+    }
+    expect(planMonsterDeath("thien_han_vuong")).toMatchObject({
+      recipe: "boss-vanish",
+      priority: 2,
+    });
+    for (const kind of ["han_lang", "phong_nha", "cot_tuong", "doc_tuoc"])
+      expect(planMonsterDeath(kind).recipe, kind).toBe("mon-vanish");
+  });
+
+  it("MỌI quái cấp >= 13 (Kim Đan trở lên) và mọi trùm có màu hạt riêng: thêm loài mới mà quên màu sẽ đỏ", () => {
+    for (const m of MONSTERS) {
+      if (m.level >= 13 || m.boss) {
+        // trùm cũ của Luyện Khí / Trúc Cơ (mang) giữ màu mặc định theo thiết kế M6
+        if (m.id === "mang") continue;
+        expect(MONSTER_FX_TINT[m.id], `${m.id} chưa có màu hạt riêng`).toBeDefined();
+      }
+    }
+  });
+
   it("id lạ / độc / sai kiểu: coi như quái thường, không ném lỗi", () => {
     for (const kind of [
       undefined,
