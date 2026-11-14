@@ -172,6 +172,7 @@ export const MONSTERS: MonsterKind[] = [
     behavior: "ranged",
     boltSpeed: 280,
     boltRange: 300,
+    boltElement: "bang", // chỉ tô màu đạn (băng); `element` của quái vẫn trống nên `elementMult` lên Sương Hồ không đổi
   },
   {
     id: "thach_quy",
@@ -206,6 +207,7 @@ export const MONSTERS: MonsterKind[] = [
     behavior: "poisoner",
     boltSpeed: 220,
     boltRange: 260,
+    boltElement: "am", // đạn độc màu tím: tách khỏi nền cỏ và khỏi đạn băng (đạn `moc` xanh lá tương phản thấp, B đã chụp Chrome thật)
   },
   // Trùm Kim Đan: một người và đội 2 người không an toàn, đội 3 từ Trung kỳ, đội 4 từ Sơ kỳ; đội 3 nhanh hơn săn solo ~1,15-1,2x
   {
