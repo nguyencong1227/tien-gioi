@@ -1018,4 +1018,79 @@ npx tsx --tsconfig server/tsconfig.json server/scripts/bot-kim-dan.ts --portal
 npx tsx --tsconfig server/tsconfig.json server/scripts/bot-kim-dan.ts --party
 ```
 
+## 23. Ba bản đồ cùng một tiến trình: bench nhiều bản đồ + soak 30 phút 100 bot (M6.9, Issue #410 mục 3 + 4)
 
+Đo bằng công cụ sẵn có (A làm, 14/11/2026, máy dùng chung, Node 22): phần "bot săn Kim Đan / đội hạ trùm" của #410 là mục 22 (C); thời gian tìm quái đo bằng thợ săn trong `World` thật ở `CAN_BANG.md` mục 10.
+
+### 23.1. Bench ba bản đồ trong MỘT tiến trình
+
+`bench.ts --multi` chỉ có Lạc Hà + Hắc Phong; thêm `--maps=<id,id,...>` (mặc định vẫn hai bản đồ đầu nên số của mốc cũ không đổi) và `--per-map N` (mặc định 50). Dựng một `World` mỗi bản đồ, tick lần lượt trong cùng tiến trình, ca săn quái, seed 1, 20 giây (400 tick):
+
+```bash
+npm run bench -w server -- --multi --maps=lac_ha,hac_phong,am_suong --per-map 33 --seconds 20
+```
+
+| Người mỗi bản đồ | Tổng người | Tổng quái | Tick TB (ms) | p95 (ms) | Max (ms) | KB/s mỗi client (Lạc Hà / Hắc Phong / Âm Sương) |
+|---:|---:|---:|---:|---:|---:|---|
+| 10 | 30 | 180 | 0,335 | 0,723 | 2,54 | 1,6 / 1,2 / 0,8 |
+| 33 | 99 | 160 | 1,014 | 2,068 | 7,18 | 1,9 / 2,1 / 1,8 |
+| 50 | 150 | 142 | 1,492 | 2,573 | 11,32 | 2,3 / 2,4 / 2,3 |
+
+Ngân sách tick tổng (< 10 ms) tính theo TB và p95: đạt ở cả ba mức (150 người trên ba bản đồ: TB 1,5 ms, p95 2,6 ms). **Max** là một nhịp đơn lẻ và dao động giữa các lần chạy (ở 150 người: 6,9 ms và 11,3 ms trong hai lần chạy 20 giây; máy dùng chung, bộ gom rác): đáng theo dõi nhưng 20 tick/giây có hạn 50 ms nên một nhịp 11 ms không làm trễ; `soak` ở 23.3 đếm nhịp quá hạn thật (0). Hai bản đồ mặc định, 100 người: TB 1,015 ms, p95 1,894 ms, max 7,62 ms.
+
+Âm Sương riêng (`--map=am_suong`, 20 giây, 61 - 62 quái; Hắc Giao 2 con nằm trong số đó):
+
+| Người | Ca | Tick TB (ms) | p95 (ms) | Max (ms) | Patch TB (byte / tick mỗi client) | KB/s mỗi client |
+|---:|---|---:|---:|---:|---:|---:|
+| 0 | săn | 0,014 | 0,019 | 0,49 | 0 | 0,0 |
+| 10 | săn | 0,118 | 0,279 | 1,48 | 42 | 0,8 |
+| 50 | săn | 0,496 | 0,865 | 3,66 | 108 | 2,1 |
+| 100 | săn | 1,262 | 1,968 | 3,66 | 169 | 3,3 |
+| 10 | đám đông tụ trong trấn | 0,098 | 0,225 | 1,09 | 46 | 0,9 |
+| 50 | đám đông tụ trong trấn | 0,472 | 0,676 | 1,30 | 205 | 4,0 |
+| 100 | đám đông tụ trong trấn | 1,300 | 1,854 | 3,04 | 375 | 7,3 |
+
+Trong ngân sách của `perf.test.ts` (< 520 byte / tick mỗi client ở 100 người ca săn, < 600 ở ca đám đông; tick < 10 ms). Âm Sương không nặng hơn hai bản đồ cũ ở cùng số người.
+
+### 23.2. Soak chưa từng qua cổng: tìm ra và sửa
+
+Soak M4 (mục 20) có vai bot "Cổng" (10 % số bot) nhưng trên mã trước khi sửa **không qua được cổng nào** (đo: 0 lượt): bot dừng cách cổng Bắc ~33 px vì `isPositionSafe` loại mọi điểm có `y < 150` (cổng Bắc của Lạc Hà ở `y = 112`) và ngưỡng "tới cổng" là 30 px. Số "lượt qua cổng" không được báo cáo nên không ai thấy. Sửa trong `server/scripts/soak.ts`:
+
+- vai Cổng bỏ kiểm vùng an toàn, coi là tới cổng ở 0,75 bán kính cổng (server chấp nhận trong `portal.r + PORTAL_SLACK`), chọn cổng GẦN NHẤT;
+- Âm Sương: cổng ở ngay phía nam điểm hiện (`am_suong_nam`, cách 128 px) nhưng có chướng ngại chắn đường thẳng (đã dựng BFS: có đường vòng, 84 ô lưới 16 px), nên bot đi theo đường BFS (`pathToPortal`, dùng đúng `circleBlocked` của server) thay vì thẳng tới cổng;
+- bot Cổng mang số chẵn xuất phát ở Hắc Phong Cốc sát cổng Bắc (đi bộ từ cổng Nam lên Bắc ~2700 px qua vùng quái nguy hiểm, bot Luyện Khí không tới nổi), nên có lượt Hắc Phong <-> Âm Sương thật;
+- chặn một ca đua lúc mới vào phòng (state chưa giải mã) làm soak sập ở nhịp đầu;
+- báo cáo và JSON thêm dòng "Lượt qua cổng vào từng bản đồ".
+
+### 23.3. Soak 30 phút, 100 bot, ba bản đồ
+
+```bash
+npm run soak -w server -- --bots=100 --minutes=30
+```
+
+Server THẬT trong tiến trình con (cổng ngẫu nhiên, thư mục dữ liệu tạm), bot trộn các kịch bản (săn quái 30, trấn / shop 20, qua cổng 10, bí cảnh 16, PK 12, tông môn 12). Kết quả (PASS; bot là Luyện Khí tầng 5, bot bí cảnh tầng 9, KHÔNG phải Kim Đan: soak đo độ ổn định, không đo cân bằng):
+
+| Chỉ số | Kết quả | Ngưỡng |
+|---|---|---|
+| Bot | 100 khởi tạo, 100 kết thúc (rớt 0) | không rớt |
+| RSS máy chủ | 151,45 MB lúc đầu; 158,27 MB sau khởi động 5 phút; 159,62 MB lúc kết thúc (+1,35 MB sau warmup) | tăng <= 50 MB |
+| Dốc RSS nửa sau (OLS) | +0,059 MB / phút | <= 1,00 MB / phút |
+| Tick p95 phòng tệ nhất (`/metrics`) | TB 3,06 ms, max 4,65 ms | <= 10 ms |
+| Nhịp quá hạn (> 50 ms) | 0 | 0 |
+| CPU luồng chính / tick | TB 5 ms | |
+| Độ trễ vòng lặp sự kiện p99 | 27,9 ms | <= 100 ms |
+| Hàng đợi ghi nhân vật | tối đa 1 đang chờ, tuổi tối đa 0,0 s, 0 lỗi | 0 lỗi |
+| Băng thông nhận mỗi bot | TB 294 byte / tick (p95 352), 5,75 KB / s | <= 600 byte / tick |
+| Cảnh báo giám sát / lỗi log / lỗi `/metrics` | 0 / 0 / 0 | 0 |
+| `kiem-save` sau soak | 100 nhân vật, 100 chân linh, 4 tông môn: 0 lỗi | 0 lỗi |
+| Tệp hỏng (`*.hong-*`) | 0 | 0 |
+| Bảo toàn Linh thạch | đạt (ban đầu 29.600 + thả ra 10.485, ví + kho cuối 25.855, lệch ví bot 0) | đạt |
+| Lượt qua cổng vào từng bản đồ | Hắc Phong 1585, Âm Sương 790, Lạc Hà 800 | ba bản đồ đều có lưu lượng |
+
+(Mục 20, lúc soak chưa qua cổng được: RSS +0,37 MB, tick p95 2,5 ms. Không so trực tiếp: lần này có ba phòng bản đồ cùng tiến trình và hơn 3000 lượt đổi phòng.)
+
+### 23.4. Còn lại / giới hạn
+
+- Soak không đo thời gian tìm quái hay cân bằng (xem `CAN_BANG.md` mục 10 và mục 22 của C).
+- Bot ở Âm Sương (Luyện Khí tầng 5) chỉ đi qua lại giữa hai cổng trong vùng an toàn; chưa có bot Kim Đan săn thật trong soak (công cụ riêng của C ở mục 22).
+- Chưa thử trên điện thoại thật (như các bản trước).

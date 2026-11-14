@@ -24,7 +24,6 @@ import { fileURLToPath } from "node:url";
 import { Client, type Room } from "colyseus.js";
 import {
   DEFAULT_MAP,
-  DEFAULT_MAP_ID,
   DUEL_COOLDOWN_MS,
   DUEL_MSG,
   DUEL_RANGE,
@@ -202,7 +201,70 @@ function isPositionSafe(map: GameMap, x: number, y: number, safePadding = 32): b
   return true;
 }
 
+/**
+ * Đường đi bộ (BFS 4 hướng trên lưới 16 px, dùng đúng `circleBlocked` của server) từ (x, y) tới vùng cổng; trả các điểm đặt cách nhau ~48 px,
+ * điểm cuối nằm trong 0,6 bán kính cổng. Âm Sương: cổng nằm sau chướng ngại ngay phía nam điểm hiện nên đi thẳng thì kẹt (có đường vòng, 84 ô);
+ * bot "travel" đi theo các điểm này thay vì thẳng tới cổng. `null` nếu không có đường (bot đi thẳng như cũ).
+ */
+function pathToPortal(
+  map: GameMap,
+  x: number,
+  y: number,
+  portal: { x: number; y: number; r: number },
+): Array<{ x: number; y: number }> | null {
+  const S = 16;
+  const W = Math.ceil(map.worldW / S);
+  const H = Math.ceil(map.worldH / S);
+  const prev = new Int32Array(W * H).fill(-2);
+  const start = Math.round(y / S) * W + Math.round(x / S);
+  const queue: number[] = [start];
+  prev[start] = -1;
+  let goal = -1;
+  for (let qi = 0; qi < queue.length && goal < 0; qi++) {
+    const c = queue[qi];
+    const cx = c % W;
+    const cy = (c - cx) / W;
+    if (Math.hypot(portal.x - cx * S, portal.y - cy * S) <= portal.r * 0.6) {
+      goal = c;
+      break;
+    }
+    for (const [ax, ay] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ]) {
+      const nx = cx + ax;
+      const ny = cy + ay;
+      if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+      const n = ny * W + nx;
+      if (prev[n] !== -2 || map.circleBlocked(nx * S, ny * S, PLAYER_RADIUS)) continue;
+      prev[n] = c;
+      queue.push(n);
+    }
+  }
+  if (goal < 0) return null;
+  const cells: number[] = [];
+  for (let c = goal; c >= 0; c = prev[c]) cells.push(c);
+  cells.reverse();
+  const pts: Array<{ x: number; y: number }> = [];
+  for (let i = 3; i < cells.length; i += 3) {
+    pts.push({ x: (cells[i] % W) * S, y: Math.floor(cells[i] / W) * S });
+  }
+  const last = cells[cells.length - 1];
+  pts.push({ x: (last % W) * S, y: Math.floor(last / W) * S });
+  return pts;
+}
+
 type BotRole = "hunt" | "crowd" | "travel" | "dungeon" | "duel" | "sect";
+
+/**
+ * Bản đồ xuất phát của bot. Mọi vai đều ở Lạc Hà, trừ các bot "travel" mang số chẵn: xuất phát ở Hắc Phong Cốc sát cổng Bắc (đi bộ từ cổng Nam
+ * lên Bắc dài ~2700 px qua vùng quái nguy hiểm, bot Luyện Khí không tới nổi) để soak có người qua lại giữa Hắc Phong và Âm Sương thật (M6, #410).
+ */
+function startMapOf(role: BotRole, index: number): GameMap {
+  return role === "travel" && index % 2 === 0 ? (getMap("hac_phong") ?? DEFAULT_MAP) : DEFAULT_MAP;
+}
 
 interface BotState {
   index: number;
@@ -233,6 +295,8 @@ interface BotState {
   shopping: boolean;
   isTravelling: boolean;
   nextTravelAt: number;
+  /** Các điểm đi bộ tới cổng (xem `pathToPortal`) của bản đồ hiện tại; `null` = chưa tính, đổi bản đồ thì tính lại */
+  travelPath: Array<{ x: number; y: number }> | null;
   myParty: PartyMsg | null;
   dungeonOpenSentAt: number;
   dungeonLastEndAt: number;
@@ -375,7 +439,8 @@ export async function main(): Promise<number> {
       cx = DEFAULT_MAP.townPx.x + Math.cos(angle) * r;
       cy = DEFAULT_MAP.townPx.y + Math.sin(angle) * r;
     } else if (role === "travel") {
-      const portal = DEFAULT_MAP.portals[0];
+      // sát cổng cuối danh sách của bản đồ xuất phát: Lạc Hà chỉ có một cổng, Hắc Phong thì cổng Bắc (sang Âm Sương)
+      const portal = startMapOf(role, i).portals.at(-1);
       cx = portal ? portal.spawn.x : DEFAULT_MAP.townPx.x;
       cy = portal ? portal.spawn.y : DEFAULT_MAP.townPx.y;
     } else if (role === "dungeon") {
@@ -393,9 +458,13 @@ export async function main(): Promise<number> {
       cy = DEFAULT_MAP.townPx.y + Math.sin(angle) * (DEFAULT_MAP.townPx.r + 100);
     }
 
-    const pos = findUnblockedPosition(DEFAULT_MAP, cx, cy);
-    cx = pos.x;
-    cy = pos.y;
+    const startMap = startMapOf(role, i);
+    // Điểm hiện của cổng là chỗ hợp lệ theo thiết kế (người qua cổng rơi vào đó); `findUnblockedPosition` đòi xa quái nên kéo bot Hắc Phong về trạm phía nam
+    if (role !== "travel") {
+      const pos = findUnblockedPosition(startMap, cx, cy);
+      cx = pos.x;
+      cy = pos.y;
+    }
     initialPositions.set(i, { x: cx, y: cy });
 
     seedBotSaveFile(
@@ -405,7 +474,7 @@ export async function main(): Promise<number> {
       cy,
       role === "dungeon" ? 1 : 1,
       role === "dungeon" ? 8 : 4,
-      DEFAULT_MAP_ID,
+      startMap.def.id,
       undefined,
       initialCoin,
       tempDir,
@@ -494,6 +563,8 @@ export async function main(): Promise<number> {
 
   // 4. Kết nối các bot và thiết lập sự kiện
   const bots: BotState[] = [];
+  /** Số lần bot vào phòng của từng bản đồ qua cổng (kiểm ba bản đồ đều được ghé; M6, #410) */
+  const mapVisits = new Map<string, number>();
   const wsUrl = `ws://localhost:${port}`;
 
   const bindBotEvents = (b: BotState, room: Room) => {
@@ -549,6 +620,8 @@ export async function main(): Promise<number> {
             ? await targetClient.joinById(msg.roomId, nextOpts)
             : await targetClient.joinOrCreate(roomNameOf(nextMap.def.id), nextOpts);
           b.map = nextMap;
+          b.travelPath = null;
+          mapVisits.set(nextMap.def.id, (mapVisits.get(nextMap.def.id) ?? 0) + 1);
           bindBotEvents(b, nextRoom);
           b.isTravelling = false;
           b.nextTravelAt = performance.now() + TRAVEL_COOLDOWN_MS + 2000;
@@ -639,7 +712,8 @@ export async function main(): Promise<number> {
     const name = `Bot ${String(i).padStart(3, "0")}`;
     const secret = `bot_secret_tien_gioi_${String(i).padStart(3, "0")}_soak`;
     const client = new Client(wsUrl);
-    const room = await client.joinOrCreate(roomNameOf(DEFAULT_MAP_ID), {
+    const startMap = startMapOf(role, i);
+    const room = await client.joinOrCreate(roomNameOf(startMap.def.id), {
       name,
       secret,
       v: PROTOCOL_VERSION,
@@ -656,7 +730,7 @@ export async function main(): Promise<number> {
       role,
       client,
       room,
-      map: DEFAULT_MAP,
+      map: startMap,
       seq: 0,
       predX: initPos.x,
       predY: initPos.y,
@@ -677,6 +751,7 @@ export async function main(): Promise<number> {
       nextShopAt: performance.now() + 2000 + Math.random() * 5000,
       shopping: false,
       isTravelling: false,
+      travelPath: null,
       nextTravelAt: performance.now() + 5000 + Math.random() * 5000,
       myParty: null,
       dungeonOpenSentAt: 0,
@@ -704,7 +779,10 @@ export async function main(): Promise<number> {
   const stepBot = (b: BotState, now: number) => {
     if (!b.room || !b.room.connection?.isOpen) return;
 
-    const me = b.room.state.players.get(b.room.sessionId);
+    // state có thể chưa giải mã xong ngay sau khi vào phòng (hoặc vừa qua cổng): bỏ qua nhịp này
+    const players = b.room.state?.players;
+    if (!players) return;
+    const me = players.get(b.room.sessionId);
     if (me) {
       b.predX = me.x;
       b.predY = me.y;
@@ -786,14 +864,30 @@ export async function main(): Promise<number> {
         if (!b.isTravelling && now >= b.nextTravelAt) {
           const portals = b.map.portals;
           if (portals.length > 0) {
-            const p = portals[0];
+            // Cổng GẦN NHẤT: Hắc Phong có hai cổng cách nhau ~2700 px (về Lạc Hà / sang Âm Sương), bot đi thẳng tới cổng gần nên mỗi bot qua lại giữa một cặp bản đồ
+            let p = portals[0];
+            for (const q of portals) {
+              if (
+                Math.hypot(q.x - b.predX, q.y - b.predY) < Math.hypot(p.x - b.predX, p.y - b.predY)
+              )
+                p = q;
+            }
             const dist = Math.hypot(p.x - b.predX, p.y - b.predY);
-            if (dist > 30) {
-              const a = Math.atan2(p.y - b.predY, p.x - b.predX);
+            // Server chấp nhận trong `portal.r + PORTAL_SLACK`; ngưỡng cũ 30 px không đạt được (`isPositionSafe` loại y < 150 nên bot đứng im cách cổng Bắc ~33 px: soak chưa từng qua cổng)
+            if (dist > p.r * 0.75) {
+              b.travelPath ??= pathToPortal(b.map, b.predX, b.predY, p) ?? [];
+              while (
+                b.travelPath.length > 1 &&
+                Math.hypot(b.travelPath[0].x - b.predX, b.travelPath[0].y - b.predY) < 24
+              )
+                b.travelPath.shift();
+              const wp = b.travelPath[0] ?? p;
+              const a = Math.atan2(wp.y - b.predY, wp.x - b.predX);
               dx = Math.cos(a);
               dy = Math.sin(a);
             } else {
               b.isTravelling = true;
+              b.travelPath = null;
               b.room.send("travel", { portalId: p.id });
               b.nextTravelAt = now + TRAVEL_COOLDOWN_MS + 2000;
             }
@@ -948,7 +1042,8 @@ export async function main(): Promise<number> {
       const stepPx = 150 * (TICK_MS / 1000);
       const testX = Math.round(b.predX + dx * stepPx);
       const testY = Math.round(b.predY + dy * stepPx);
-      if (!isPositionSafe(b.map, testX, testY, 32)) {
+      // bot "travel" đi thẳng tới cổng nên bỏ kiểm này: cổng Bắc nằm sát mép bản đồ (y = 112 < 150) nên `isPositionSafe` luôn từ chối và bot đứng im
+      if (b.role !== "travel" && !isPositionSafe(b.map, testX, testY, 32)) {
         b.wanderAngle += Math.PI * 0.75 + (Math.random() - 0.5) * 0.5;
         b.avoidUntil = now + 600;
         dx = 0;
@@ -1195,6 +1290,14 @@ export async function main(): Promise<number> {
 
   const formattedTable = formatSoakTable(analysis);
   console.log("\n" + formattedTable);
+  const mapVisitsObj = Object.fromEntries(mapVisits);
+  console.log(
+    `- Lượt qua cổng vào từng bản đồ: ${
+      mapVisits.size === 0
+        ? "(không có)"
+        : [...mapVisits].map(([id, n]) => `${id} ${n}`).join(" | ")
+    }`,
+  );
 
   // Ghi kết quả tổng hợp vào cuối tệp JSON
   const finalOutput = {
@@ -1204,6 +1307,7 @@ export async function main(): Promise<number> {
       durationSec: args.durationSec,
       port,
       dataDir: tempDir,
+      mapVisits: mapVisitsObj,
     },
     analysis,
     samples,
