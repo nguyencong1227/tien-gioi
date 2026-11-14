@@ -131,7 +131,7 @@ import { canAffordFee, feeChipText, recipeFee } from "./forge-fee";
 import { doneRows, doneSummary } from "./quest-log";
 import { pickupBtnText, portalBtnText, talkBtnText } from "./ctx-btn";
 import { sound } from "./audio";
-import { useLabelOf } from "./item-use";
+import { bookTeach, useLabelOf } from "./item-use";
 import {
   applyRarityBadge,
   applyRarityText,
@@ -653,6 +653,21 @@ function fillEquipComparison(box: HTMLElement, candidate: ItemDef) {
   box.append(reqSpan);
 }
 
+/** Kinh quyển (M7.4): dòng "Dạy: <chiêu> · Cần <cảnh giới>" ở khung chi tiết túi (tái dùng khung so sánh trang bị); món khác ẩn khung. */
+function fillBookTeach(box: HTMLElement, def: ItemDef) {
+  const info = bookTeach(def, currentRealm, currentTier);
+  if (!info) {
+    box.hidden = true;
+    return;
+  }
+  box.replaceChildren();
+  const line = document.createElement("span");
+  line.className = info.ok ? "req-ok" : "req-warn";
+  line.textContent = info.text;
+  box.append(line);
+  box.hidden = false;
+}
+
 function renderSlotDetail() {
   const s = invSlots[selectedSlot];
   const def = s ? ITEM_BY_ID[s.itemId] : undefined;
@@ -697,7 +712,7 @@ function renderSlotDetail() {
       ? "Mặc"
       : (slotLock ?? `Cần ${realmLabel(def.equip.reqRealm, def.equip.reqTier)}`);
   } else {
-    cmpEl.hidden = true;
+    fillBookTeach(cmpEl, def);
     equipBtn.hidden = true;
   }
 
@@ -2872,8 +2887,8 @@ export const ui = {
         const s = invSlots[i];
         if (!s) return;
         const def = ITEM_BY_ID[s.itemId];
-        if (def?.effect) {
-          callbacks?.onUse(i);
+        if (useLabelOf(def) !== null) {
+          callbacks?.onUse(i); // đan dược "Dùng", kinh quyển "Học" (M7.4: cùng điều kiện với nút ở chi tiết)
         } else if (def?.type === "equip" && canEquip(def.id, currentRealm, currentTier)) {
           sound.equip();
           callbacks?.onEquip(i);
