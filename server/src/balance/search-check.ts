@@ -251,7 +251,7 @@ export function planPath(
 /** Cạnh ô thô của bản đồ quét (ô lưới): 8 ô = 256 px, cỡ một nửa chiều cao vùng nhìn máy tính */
 const SWEEP_CELL = 8;
 
-interface Sweep {
+export interface Sweep {
   cw: number;
   /** Với mỗi ô thô: chỉ số ô lưới đi được nằm trong vùng loài này sinh ra (độ nguy hiểm đủ, ngoài khu an toàn), gần tâm ô thô nhất; -1 nếu không có */
   goal: Int32Array;
@@ -263,7 +263,7 @@ interface Sweep {
 const sweeps = new WeakMap<GameMap, Map<string, Sweep>>();
 
 /** Các ô thô của bản đồ mà loài `def` có thể sinh ra (cùng điều kiện với `spawnMonster`: người chơi biết quái ở vùng nào). */
-function sweepOf(map: GameMap, def: (typeof MONSTERS)[number]): Sweep {
+export function sweepOf(map: GameMap, def: (typeof MONSTERS)[number]): Sweep {
   let byKind = sweeps.get(map);
   if (!byKind) sweeps.set(map, (byKind = new Map()));
   let sw = byKind.get(def.id);

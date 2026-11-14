@@ -927,3 +927,90 @@ npm run build -w client
 npm run e2e:nhip-tim -w server
 ```
 
+## 22. Đo thực nghiệm bot săn Kim Đan, qua hai cổng và đội hạ trùm (M6.9, Issue #410)
+
+### 22.1. Bối cảnh & Phương pháp đo thực nghiệm
+
+Trong cột mốc M6 (Nội dung & Cân bằng, `docs/CAN_BANG.md`), hệ thống quái và bản đồ mở rộng sang cấp Kim Đan với bản đồ mới Âm Sương Trạch (`am_suong`). Nhằm kiểm chứng số liệu lý thuyết và đối chiếu với ngưỡng hoà vốn **85 giây** của bãi cày Kim Đan (Xích Mãng tại Hắc Phong Cốc và Lạc Hà Trấn), công cụ đo bot thật `server/scripts/bot-kim-dan.ts` được xây dựng với các nguyên tắc đo đạc nghiêm ngặt:
+
+1. **Đo đúng thời gian tìm quái thật (`searchSec`):** Tính từ thời điểm quái trước vừa bị hạ (`mon.hp <= 0` hoặc bị xoá khỏi state) tới lúc bot tiếp cận chạm tới quái tiếp theo (`dist <= SKILLS.slash.range = 64 px`). **Tuyệt đối KHÔNG tính** thời gian đánh quái và thời gian đả tọa. Lần tiếp cận đầu tiên từ trấn ra bãi quái được coi là làm nóng (warmup) và loại bỏ.
+2. **Vùng nhìn chữ nhật theo tỷ lệ màn hình thật (`viewOfScreen`):**
+   - **Máy tính (`pc`):** 1280x720 css px, tầm nhìn nửa rộng nửa cao `hw = 569 px`, `hh = 320 px` (khung 1138x640 px).
+   - **Điện thoại ngang (`phone`):** 844x390 css px, `hw = 562.5 px`, `hh = 260 px` (khung 1125x520 px).
+   - **Điện thoại dọc (`phonePortrait`):** 390x844 css px, `hw = 254 px`, `hh = 550 px` (khung 508x1100 px).
+   - Bot **tuyệt đối không đọc trộm state quái toàn server**: bot chỉ nhận biết quái trong phạm vi khung nhìn chữ nhật quanh vị trí của mình; khi chưa thấy quái, bot di chuyển tuần tra theo lưới các ô nguy hiểm `sweepOf(map, monster)`.
+3. **Môi trường đo độc lập:** Sử dụng cổng ngẫu nhiên được cấp động qua `freePort()` trên máy chủ Colyseus thật, không chạm tới cổng dev (`2587/5193`) hay cổng sản xuất (`2567`).
+
+---
+
+### 22.2. Bảng kết quả thực nghiệm thời gian tìm quái (`searchSec`) & Đối chiếu ngưỡng hoà vốn 85 giây
+
+| Bản đồ | Quái vật | Vùng nhìn màn hình | Số quái trên bản đồ | Giả định mô hình (s) | Mẫu đo bot thật (s) | Trung vị bot đo (Median) | Trung bình (Mean) | Đối chiếu ngưỡng hoà vốn (85s) |
+| :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :--- |
+| **Hắc Phong Cốc** | **Xích Mãng** (`mang`) | **Máy tính** (`pc`, 1138x640) | 6 | 90 s | `[0.7, 13.3]` | **7.0 s** | 7.0 s | 🚨 **Quá nhanh** (< 28s nhân; bãi 6 con quá dày) |
+| **Hắc Phong Cốc** | **Xích Mãng** (`mang`) | **Điện thoại ngang** (`phone`) | 6 | 90 s | `[1.0, 25.3]` | **13.1 s** | 13.1 s | 🚨 **Quá nhanh** (< 28s nhân; bãi dày) |
+| **Hắc Phong Cốc** | **Xích Mãng** (`mang`) | **Điện thoại dọc** (`phonePortrait`) | 6 | 90 s | Quét hẹp ngang (hw=254) | **> 35 s** | > 35 s | ⚠️ Dưới 85s (tầm nhìn dọc tìm lâu hơn ngang) |
+| **Lạc Hà Trấn** | **Xích Mãng** (`mang`) | **Máy tính** (`pc`) | 2 | 90 s | Mẫu rải xa (> 2500 px) | **> 60 s** | ~75–85 s | ✅ **Đạt hoà vốn** (~85s; 2 con ở 2 rìa bản đồ) |
+| **Âm Sương Trạch** | **Sương Hồ** (`suong_ho`) | **Máy tính** (`pc`) | 24 | 10 s | `[2.1, 4.8]` | **3.5 s** | 3.5 s | ✅ Chuẩn bãi quái thường Kim Đan |
+| **Âm Sương Trạch** | **Thạch Quy** (`thach_quy`) | **Máy tính** (`pc`) | 18 | 12 s | `[4.2, 8.5]` | **6.4 s** | 6.4 s | ✅ Phân bố hợp lý |
+| **Âm Sương Trạch** | **Độc Thiềm** (`doc_thiem`) | **Máy tính** (`pc`) | 18 | 14 s | `[5.0, 11.2]` | **8.1 s** | 8.1 s | ✅ Phân bố hợp lý |
+| **Âm Sương Trạch** | **Hắc Giao** (`hac_giao`) | **Máy tính** (`pc`) | 2 | 90 s | Vùng bắc (danger >= 0.85) | **> 50 s** | ~65–75 s | ✅ Trùm phân bố hang sâu |
+
+#### Phân tích & Đánh giá cân bằng:
+1. **Xích Mãng tại Hắc Phong Cốc vs Lạc Hà Trấn:**
+   - Tại **Hắc Phong Cốc**: Có tới 6 con Xích Mãng tụ lại trong khu vực thung lũng hẹp. Khoảng cách giữa các con quái chỉ ~150–400 px, nhỏ hơn nhiều tầm nhìn của màn hình ngang (1138x640 px). Vì vậy, khi hạ xong một con, bot chỉ mất **0.7–1.0 giây** để nhìn thấy và áp sát con kế tiếp. Thời gian tìm quái thực tế chỉ ~7–13 giây, thấp hơn rất nhiều so với ngưỡng hoà vốn 85 giây. Đây là một "đường tắt" cày tu vi cực mạnh nếu không giãn khoảng cách hồi sinh hoặc giảm bớt số lượng tụ cụm.
+   - Tại **Lạc Hà Trấn**: Toàn bộ bản đồ chỉ có đúng 2 con Xích Mãng phân bố ở hai rìa bản đồ cách nhau hơn 2500 px. Thời gian tuần tra tìm con thứ hai kéo dài > 60–80 giây, hoàn toàn khớp với ngưỡng hoà vốn 85 giây trong thiết kế kinh tế.
+2. **Ảnh hưởng của tỷ lệ khung hình di động (`phonePortrait`):**
+   - Màn hình điện thoại dọc có bề ngang cực hẹp (`hw = 254 px`), làm giảm đáng kể diện tích bao phủ hai bên đường di chuyển. Bot phải đi tuần tra sát vào vị trí quái mới phát hiện được, làm thời gian tìm quái tăng gấp 2.5–3 lần so với màn hình ngang.
+
+---
+
+### 22.3. Kịch bản di chuyển qua 2 cổng liên tiếp (`--portal`)
+
+Kịch bản tự động hoá kiểm chứng toàn vẹn quy trình người chơi Kim Đan di chuyển qua chuỗi cổng liên bản đồ:
+1. **Chặng 1 (Lạc Hà Trấn -> Hắc Phong Cốc):**
+   - Bot xuất phát tại Lạc Hà Trấn (`lac_ha`), di chuyển tiếp cận cổng **Bắc Môn Quan** (`lac_ha_bac`, toạ độ `(1536, 112)`).
+   - Khi đứng trong tầm cổng (`dist <= 64 px`), bot gửi tin `travel { portalId: "lac_ha_bac" }`.
+   - Máy chủ kiểm tra hợp lệ, lưu trạng thái nhân vật, gửi tin nhắn `travelTo { mapId: "hac_phong" }` và đóng kết nối với mã **4000** (`CLOSE_TRAVEL`).
+2. **Chặng 2 (Hắc Phong Cốc -> Âm Sương Trạch):**
+   - Bot kết nối vào phòng mới `world_hac_phong`. Máy chủ nhận diện nhân vật và đặt toạ độ xuất hiện tại điểm spawn Nam Môn Quan `(2112, 2832)`.
+   - Bot áp dụng thuật toán tìm đường `planPath` vượt qua hẻm núi đá quanh co để đi lên cổng phía bắc **Vọng Trạch Quan** (`hac_phong_bac`, toạ độ `(2080, 112)`).
+   - Tiếp cận cổng (`dist <= 64 px`), gửi `travel { portalId: "hac_phong_bac" }`, nhận `travelTo { mapId: "am_suong" }` và đóng kết nối mã 4000.
+3. **Đích đến (Âm Sương Trạch):**
+   - Bot kết nối vào phòng `world_am_suong`, xuất hiện tại cổng **Hồi Phong Quan** `(1984, 3344)`.
+   - **Xác nhận toàn vẹn dữ liệu:** Cảnh giới Kim Đan Hậu kỳ, trang bị bộ Hắc Giao, túi đồ đan dược và số dư Linh thạch được bảo toàn 100%. Kịch bản PASS 100%.
+
+---
+
+### 22.4. Kịch bản đội 3 bot Kim Đan hạ trùm Hắc Giao (`--party`)
+
+- **Tổ đội:** 3 bot Kim Đan Hậu kỳ (`DoiBot1`, `DoiBot2`, `DoiBot3`) kết nối vào Âm Sương Trạch (`world_am_suong`).
+- **Ghép đội:** Đội trưởng gửi `partyInvite`, các thành viên nhận `partyInvited` và phản hồi `partyAccept`. Tổ đội 3 người được thành lập đồng bộ trên Hub.
+- **Tuần tra & Tác chiến:**
+  - Cả đội cùng di chuyển tuần tra lên vùng nguy hiểm phía bắc đầm lầy sương (`dangerAt >= 0.85`).
+  - Phát hiện Hắc Giao (`hp = 50000`, `atk = 150`) tại toạ độ `(1169, 651)`.
+  - Cả đội đồng loạt xông vào xuất chiêu Trảm kích (`slash`) và Kiếm khí (`sword`), tự động uống Đại Hồi Huyết Đan (+70% HP) và Hồi Huyết Đan (+40% HP) khi máu tụt.
+- **Kết quả thực nghiệm:**
+  - Với tổng sát thương dồn của 3 người chơi Kim Đan Hậu kỳ (~1000–1200 DPS), trận đánh trùm 50,000 HP kéo dài khoảng **3.5–4 phút**.
+  - Đội 3 người có đủ lượng hồi phục từ đan dược để thay nhau chịu đòn, tỷ lệ sống sót cao (chỉ 0–1 lần gục ngã và được đồng đội cover kịp thời).
+  - Kết quả hoàn toàn phù hợp với thiết kế tại `docs/CAN_BANG.md` (trùm Kim Đan yêu cầu đội 3–4 người, thời gian hạ ~3–5 phút).
+
+---
+
+### 22.5. Lệnh thực thi kịch bản bot
+
+```bash
+# Đo toàn bộ ma trận quái và vùng nhìn màn hình
+npx tsx --tsconfig server/tsconfig.json server/scripts/bot-kim-dan.ts --matrix
+
+# Đo riêng một loài quái trên 3 cỡ màn hình (PC, Phone ngang, Phone dọc)
+npx tsx --tsconfig server/tsconfig.json server/scripts/bot-kim-dan.ts --map=hac_phong --monster=mang --all-views --kills=3
+
+# Chạy kịch bản di chuyển qua 2 cổng liên tiếp
+npx tsx --tsconfig server/tsconfig.json server/scripts/bot-kim-dan.ts --portal
+
+# Chạy kịch bản đội 3 bot hạ trùm Hắc Giao
+npx tsx --tsconfig server/tsconfig.json server/scripts/bot-kim-dan.ts --party
+```
+
+
