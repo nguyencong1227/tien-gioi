@@ -1,16 +1,89 @@
 // Kiểm thử tính năng bot tránh vùng báo trước (M7.10 #511): segDist, isPointInWarnZone, computeEvadeVector, updateBotWarns, đo tỉ lệ né bãi Hôi Lang
 import { describe, expect, it } from "vitest";
+import { performance } from "node:perf_hooks";
 import {
   type ActiveWarnZone,
   type BotState,
   computeEvadeVector,
   isPointInWarnZone,
+  parseWarnZoneFromFx,
   segDist,
   updateBotWarns,
 } from "./bots";
 import { DEFAULT_MAP } from "@tien-gioi/shared";
 import { addMonster, addPlayer, makeWorld } from "../src/systems/test-helpers";
 import { tickMonsters } from "../src/systems/monsters";
+
+describe("bot tránh báo trước: parseWarnZoneFromFx & đồng hồ thời gian (M7.10 #511)", () => {
+  it("trả về null nếu tin nhắn không phải warn hoặc thiếu shape", () => {
+    expect(parseWarnZoneFromFx(undefined)).toBeNull();
+    expect(parseWarnZoneFromFx({ kind: "cast" } as any)).toBeNull();
+    expect(parseWarnZoneFromFx({ kind: "warn" } as any)).toBeNull();
+  });
+
+  it("trích xuất chính xác vùng cảnh báo và tính expiresAt khớp performance.now() thật", () => {
+    const realNow = performance.now();
+    const msg = {
+      kind: "warn" as const,
+      shape: "line" as const,
+      x: 150,
+      y: 250,
+      r: 280,
+      w: 56,
+      angle: Math.PI / 4,
+      arc: 0,
+      ms: 700,
+    };
+    const z = parseWarnZoneFromFx(msg, realNow);
+    expect(z).not.toBeNull();
+    expect(z!.shape).toBe("line");
+    expect(z!.x).toBe(150);
+    expect(z!.y).toBe(250);
+    expect(z!.r).toBe(280);
+    expect(z!.w).toBe(56);
+    expect(z!.angle).toBeCloseTo(Math.PI / 4, 3);
+    // expiresAt phải là performance.now() + ms (khoảng vài trăm..vài nghìn), KHÔNG phải Unix timestamp Date.now() ~1.7e12
+    expect(z!.expiresAt).toBe(realNow + 700);
+    expect(z!.expiresAt).toBeLessThan(1e9); // Kiểm tra chống nhầm lẫn với Date.now()
+  });
+
+  it("updateBotWarns giải quyết kết quả trúng/né và dọn dẹp đúng thời điểm với performance.now() thật", () => {
+    const realNow = performance.now();
+    const msg = {
+      kind: "warn" as const,
+      shape: "line" as const,
+      x: 100,
+      y: 100,
+      r: 280,
+      w: 56,
+      angle: 0,
+      ms: 700,
+    };
+    const zone = parseWarnZoneFromFx(msg, realNow)!;
+    zone.targeted = true;
+
+    // Bot đang đứng ở toạ độ né an toàn (y = 100 + 50 = 150 px > 42 px)
+    const fakeBot = {
+      predX: 200,
+      predY: 150,
+      warns: [zone],
+      warnsHitCount: 0,
+      warnsEvadedCount: 0,
+    } as unknown as BotState;
+
+    // Khi thời gian chưa tới hạn đáp (t = realNow + 500 ms): cảnh báo vẫn còn
+    updateBotWarns(fakeBot, realNow + 500, true);
+    expect(fakeBot.warns.length).toBe(1);
+    expect(fakeBot.warnsEvadedCount).toBe(0);
+    expect(fakeBot.warnsHitCount).toBe(0);
+
+    // Khi đòn đáp xuống (t = realNow + 700 ms): phân định né thành công và dọn dẹp cảnh báo
+    updateBotWarns(fakeBot, realNow + 700, true);
+    expect(fakeBot.warns.length).toBe(0);
+    expect(fakeBot.warnsEvadedCount).toBe(1);
+    expect(fakeBot.warnsHitCount).toBe(0);
+  });
+});
 
 describe("bot tránh báo trước: segDist (M7.10 #511)", () => {
   it("tính chính xác khoảng cách và vector thoát ly với đoạn thẳng ngang", () => {
@@ -386,7 +459,7 @@ describe("bot theo dõi cảnh báo: updateBotWarns (M7.10 #511)", () => {
   });
 });
 
-describe("thực nghiệm bãi Hôi Lang: tỉ lệ né đòn và cơ sở chốt windupMs 700 ms (M7.9 / M7.10 #511)", () => {
+describe("mô hình động học bãi Hôi Lang: tỉ lệ né đòn và cơ sở đánh giá windupMs phù hợp (M7.9 / M7.10 #511)", () => {
   const HOI_LANG_WINDUP = 700; // ms
   const CHARGE_LEN = 280; // px
   const CHARGE_WIDTH = 56; // px
@@ -401,7 +474,7 @@ describe("thực nghiệm bãi Hôi Lang: tỉ lệ né đòn và cơ sở chố
     return { dist, offset };
   });
 
-  it("đối chứng: bot KHÔNG né (--evade = false) có tỉ lệ né 0% và dính 100% đòn lao", () => {
+  it("đối chứng: bot đứng yên không né (--evade = false) có tỉ lệ né 0% (hiển nhiên do vị trí đặt trong vùng nguy hiểm)", () => {
     let hits = 0;
     let evades = 0;
 

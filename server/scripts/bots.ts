@@ -1268,6 +1268,33 @@ export interface ActiveWarnZone {
 }
 
 /**
+ * Trích xuất vùng báo trước nguy hiểm từ tin nhắn fx (M7.10 #511).
+ * Lưu ý: expiresAt phải tính theo cùng đồng hồ với vòng lặp bot (performance.now()),
+ * không dùng Date.now() để tránh lệch thang đo thời gian.
+ */
+export function parseWarnZoneFromFx(
+  msg?: FxMsg,
+  now: number = performance.now(),
+): ActiveWarnZone | null {
+  if (!msg || msg.kind !== "warn" || !msg.shape) return null;
+  const r = typeof msg.r === "number" && msg.r > 0 ? msg.r : 280;
+  const w = typeof msg.w === "number" && msg.w > 0 ? msg.w : 56;
+  const angle = typeof msg.angle === "number" ? msg.angle : 0;
+  const arc = typeof msg.arc === "number" ? msg.arc : Math.PI / 2;
+  const ms = typeof msg.ms === "number" && msg.ms > 0 ? msg.ms : 800;
+  return {
+    shape: msg.shape,
+    x: msg.x,
+    y: msg.y,
+    r,
+    w,
+    angle,
+    arc,
+    expiresAt: now + ms,
+  };
+}
+
+/**
  * Cập nhật trạng thái các vùng báo trước: giải quyết kết quả trúng/né khi đòn đáp xuống
  * và dọn dẹp các cảnh báo đã hết hạn (M7.10 #511).
  */
@@ -1454,22 +1481,8 @@ function bindRoomEvents(
 
   room.onMessage("fx", (msg?: FxMsg) => {
     if (isMeasuring()) b.fxCount++;
-    if (msg && msg.kind === "warn" && msg.shape) {
-      const r = typeof msg.r === "number" && msg.r > 0 ? msg.r : 280;
-      const w = typeof msg.w === "number" && msg.w > 0 ? msg.w : 56;
-      const angle = typeof msg.angle === "number" ? msg.angle : 0;
-      const arc = typeof msg.arc === "number" ? msg.arc : Math.PI / 2;
-      const ms = typeof msg.ms === "number" && msg.ms > 0 ? msg.ms : 800;
-      const zone: ActiveWarnZone = {
-        shape: msg.shape,
-        x: msg.x,
-        y: msg.y,
-        r,
-        w,
-        angle,
-        arc,
-        expiresAt: Date.now() + ms,
-      };
+    const zone = parseWarnZoneFromFx(msg, performance.now());
+    if (zone) {
       if (isPointInWarnZone(b.predX, b.predY, zone, 0)) {
         zone.targeted = true;
         if (isMeasuring()) b.warnsTargetedCount++;
