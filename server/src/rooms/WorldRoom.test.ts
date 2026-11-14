@@ -2561,3 +2561,52 @@ describe("sổ chiêu: lưu, nạp lại, gắn ô qua tin nhắn (M7.2a)", () =
     expect(m2.learned).toEqual({});
   });
 });
+
+describe("dùng chiêu thức qua server thật (M7.2b)", () => {
+  it("tin `cast`: tốn linh lực, đặt hồi chiêu, chủ nhận `skills` (cd), người ở gần nhận `fx cast`; tin rác không làm gì", async () => {
+    const a = await join("Dung Chieu");
+    const b = await join("Nguoi Gan Chieu");
+    const sid = a.room.sessionId;
+    const world = (serverRoom(a.room) as any).world;
+    const p = world.state.players.get(sid);
+    const c = world.ctrl.get(sid);
+    p.realm = 4; // đủ cảnh giới để cả bốn ô chiêu đã mở
+    p.mp = p.maxMp;
+    c.skills.learned.bon_thach_quyen = 1;
+    c.skills.slots[0] = "bon_thach_quyen";
+    const skills: SkillsMsg[] = [];
+    a.room.onMessage("skills", (m: SkillsMsg) => skills.push(m));
+    const fxA: any[] = [];
+    const fxB: any[] = [];
+    a.room.onMessage("fx", (m: any) => fxA.push(m));
+    b.room.onMessage("fx", (m: any) => fxB.push(m));
+
+    // tin rác: không tốn gì
+    for (const bad of [
+      "x",
+      null,
+      { slot: 99, angle: 0 },
+      { slot: 2, angle: "0" },
+      { slot: 3, angle: 0 },
+    ])
+      a.room.send("cast", bad);
+    await sleep(250);
+    expect(p.mp).toBe(p.maxMp);
+    expect(c.skillCd).toEqual([0, 0, 0, 0]);
+
+    a.room.send("cast", { slot: 2, angle: 0 });
+    const sk = await waitFor(() => skills.find((m) => m.cd[0] > 0));
+    expect(sk.cdMax[0]).toBeGreaterThan(0);
+    expect(p.mp).toBeLessThan(p.maxMp);
+    expect(c.skillCd[0]).toBeGreaterThan(0);
+    const cast = await waitFor(() => fxB.find((m) => m.kind === "cast"));
+    expect(cast).toMatchObject({ kind: "cast", by: sid, skill: "bon_thach_quyen" });
+    expect(fxA.some((m) => m.kind === "cast")).toBe(true);
+
+    // đang hồi chiêu: gửi lại ngay không tốn thêm
+    const mp = p.mp;
+    a.room.send("cast", { slot: 2, angle: 0 });
+    await sleep(250);
+    expect(p.mp).toBeGreaterThanOrEqual(mp);
+  });
+});

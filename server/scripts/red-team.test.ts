@@ -1,7 +1,7 @@
 // Test đối kháng (Red Team) từng tin nhắn phía server (M4-sớm, Issue #252, docs/PHAN_CONG_M4.md mục 2.1).
 // Kiểm tra chống hồi quy trong CI:
-// 1. Tự động phát hiện 49 loại tin nhắn đăng ký của WorldRoom, so khớp tập hợp với EXPECTED_MESSAGE_TYPES.
-// 2. 50 loại tin nhắn (49 tin đăng ký + 1 tin lạ handler '*') an toàn 100% trước 26 biến thể payload xấu
+// 1. Tự động phát hiện 50 loại tin nhắn đăng ký của WorldRoom, so khớp tập hợp với EXPECTED_MESSAGE_TYPES.
+// 2. 51 loại tin nhắn (50 tin đăng ký + 1 tin lạ handler '*') an toàn 100% trước 26 biến thể payload xấu
 //    khi gửi từ CẢ HAI đối tượng người gửi: Poor Attacker (hồ sơ mới) và Rich Attacker (đầy tiền, đồ, cạnh NPC, có đội, có tông môn).
 // 3. Không ném ngoại lệ [lỗi] trong handler (bắt qua console.error & onUncaughtException).
 // 4. Không làm crash server, không unhandledRejection / uncaughtException.
@@ -12,8 +12,8 @@ import { describe, expect, it } from "vitest";
 import { EXPECTED_MESSAGE_TYPES, buildBadPayloads, runRedTeam } from "./red-team";
 
 describe("Red Team Server Messages (#252)", () => {
-  it("danh sách EXPECTED_MESSAGE_TYPES bao phủ đủ 49 loại tin nhắn hợp lệ của WorldRoom", () => {
-    expect(EXPECTED_MESSAGE_TYPES.length).toBe(49);
+  it("danh sách EXPECTED_MESSAGE_TYPES bao phủ đủ 50 loại tin nhắn hợp lệ của WorldRoom", () => {
+    expect(EXPECTED_MESSAGE_TYPES.length).toBe(50);
   });
 
   it("tập payload xấu buildBadPayloads phủ đủ các nhóm nguy hiểm", () => {

@@ -39,6 +39,7 @@ export const EXPECTED_MESSAGE_TYPES = [
   "input",
   "attack",
   "skill",
+  "cast", // dùng chiêu thức ở ô L U I O (M7.2b)
   "skillSlot", // gắn chiêu vào ô L U I O (M7.2)
   "meditate",
   "breakthrough",
