@@ -77,6 +77,13 @@
     },
     "hdMaxFactor": 3,
     "mapLoadTimeoutMs": 8000,
-    "dungeonLoadTimeoutMs": 3000
+    "dungeonLoadTimeoutMs": 3000,
+    "timeToWorld4gMs": {
+      "_ghiChu": "Ngân sách thời gian vào thế giới đo trên 4G giả lập (p50, ms; mock ?duel=mock&debug=1; THIET_KE_GIAO_DIEN_DO_HOA.md mục 10.4). Thực đo ngày 15/11/2026: Fast 4G Lạnh 2408 ms / Ấm 199 ms; Slow 4G Lạnh 11278 ms / Ấm 224 ms.",
+      "fast4gCold": 3500,
+      "fast4gWarm": 500,
+      "slow4gCold": 14000,
+      "slow4gWarm": 500
+    }
   }
 }
