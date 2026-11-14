@@ -10,6 +10,7 @@ import {
   countsAsKiep,
   emptyEquipment,
   emptyInventory,
+  SKILL_BY_ID,
   emptySkillBook,
   originMult,
   stepOf,
@@ -25,6 +26,7 @@ import { equipmentOf, setEquipment } from "./equipment";
 import { safeSpot, syncPublicPos } from "./movement";
 import { sendInv } from "./inventory";
 import { sendQuests } from "./quests";
+import { byId } from "./lookup";
 import { rebirthSkills, sendSkills } from "./skills";
 import { sendWallet } from "./wallet";
 
@@ -35,6 +37,19 @@ export function keepableOf(p: Player, c: PlayerCtrl): string[] {
   for (const s of c.inv)
     if (s && ITEM_BY_ID[s.itemId]?.type === "equip")
       for (let i = 0; i < s.qty; i++) out.push(s.itemId);
+  return out;
+}
+
+/**
+ * Công pháp có thể khắc vào chân linh lúc đầu thai: chiêu đã học ở kiếp sắp kết thúc cộng chiêu đang khắc (để đổi ý giữ lại), id có trong bảng chiêu,
+ * không trùng; chiêu đang khắc đứng trước.
+ */
+function engravableOf(c: PlayerCtrl): string[] {
+  const out: string[] = [];
+  for (const id of [...c.soul.engraved, ...Object.keys(c.skills.learned)]) {
+    const def = byId(SKILL_BY_ID, id);
+    if (def && !out.includes(def.id)) out.push(def.id);
+  }
   return out;
 }
 
@@ -66,6 +81,7 @@ export function beginLimbo(w: World, sid: string, p: Player, c: PlayerCtrl) {
       gain: calcDuyen(life),
     },
     keepable: keepableOf(p, c),
+    engravable: engravableOf(c), // chụp TRƯỚC khi đặt lại sổ chiêu bên dưới
     coinAtDeath: c.coin,
     counts,
     credited: false,
@@ -155,6 +171,7 @@ export function applyRebirth(
     coin: c.coin,
     coinAtDeath: limbo.coinAtDeath,
     kept: choice.keep.length,
+    engraved: c.soul.engraved.length, // số chiêu đang khắc vào chân linh sau lần đầu thai này (M7.2c)
   });
   c.origin = choice.origin;
   c.mult = originMult(choice.origin);

@@ -257,7 +257,7 @@ Mỗi sự kiện nhạy cảm là MỘT dòng JSON trên stdout (`{"t":"<ISO>",
 | Vào phòng | `join.denied` (`bad_secret` / `bad_token`), `room.spam_kick` | sai mã / token; bị ngắt vì gửi quá nhiều tin |
 | Ví | `wallet.big` | một giao dịch >= `AUDIT_COIN_THRESHOLD` |
 | Tông môn | `sect.create`, `sect.kick`, `sect.transfer`, `sect.disband`, `sect.deposit`, `sect.withdraw` | thay đổi quan trọng / tiền vào ra kho |
-| Luân hồi | `soul.limbo`, `soul.rebirth` | chết thật (kèm Linh thạch, cảnh giới, kiếp, Duyên) / đầu thai (kiếp mới, xuất thân, Linh thạch mang theo và lúc chết) |
+| Luân hồi | `soul.limbo`, `soul.rebirth` | chết thật (kèm Linh thạch, cảnh giới, kiếp, Duyên) / đầu thai (kiếp mới, xuất thân, Linh thạch mang theo và lúc chết, số món giữ, số chiêu đang khắc vào chân linh) |
 | PK | `duel.start`, `duel.end` | nhận lời thách đấu / hết trận (người thắng hoặc `null` nếu hoà, lý do) |
 | Bí cảnh | `dungeon.reward`, `dungeon.end` | phát thưởng cho từng người (Linh thạch, số món) / run kết thúc (thắng thua, lý do) |
 | Cảnh báo | `alert.spam_kicks`, `alert.auth_flood`, `alert.join_guess` | xem dưới |

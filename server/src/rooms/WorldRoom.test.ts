@@ -2288,6 +2288,86 @@ describe("luân hồi: chết thật, Hoàng Tuyền, đầu thai (M3 bước 2)
     expect(soulOf(name)).toMatchObject({ kiep: 2, duyen: gain - 12, unlocks: { du_am: 1 } });
   });
 
+  it("khắc chân linh (M7.2c): LimboMsg có `engravable`; đầu thai kèm `engrave` ghi vào chân linh, kiếp mới có chiêu tầng 1 ô trống; lựa chọn xấu bị từ chối; hai tin cùng lúc chỉ một lần đầu thai", async () => {
+    const name = "Khac Chan Linh";
+    const a = await join(name);
+    const sr0 = serverRoom(a.room) as any;
+    const sid0 = a.room.sessionId;
+    const c0 = sr0.world.ctrl.get(sid0);
+    // đã học ba chiêu (hai ô đầu gắn); chân linh mở nấc khắc 2 trước khi chết (qua kho chân linh thật)
+    c0.skills = {
+      learned: { hoa_van_kiem: 2, me_tung_bo: 1, ung_trao: 1 },
+      slots: ["hoa_van_kiem", "me_tung_bo", "", ""],
+    };
+    c0.soul = await sr0.souls.update(c0.identity.soulKey, (x: any) => ({
+      ...x,
+      duyen: 500,
+      duyenTotal: 500,
+      unlocks: { khac: 2 },
+    }));
+    await playAndDie(a);
+    const limbo = await waitFor(() => a.limbos[0]);
+    expect(limbo.engravable).toEqual(["hoa_van_kiem", "me_tung_bo", "ung_trao"]);
+    expect(limbo.soul.engraved ?? []).toEqual([]);
+    expect(playerOf(name).limbo.engravable).toEqual(["hoa_van_kiem", "me_tung_bo", "ung_trao"]); // lưu cùng hồ sơ
+
+    // lựa chọn xấu: quá nấc (3 > 2), chiêu không có trong engravable, trùng, sai kiểu: toast, VẪN ở Hoàng Tuyền, chân linh không đổi
+    for (const bad of [
+      ["hoa_van_kiem", "me_tung_bo", "ung_trao"],
+      ["huyen_bang_chi"],
+      ["me_tung_bo", "me_tung_bo"],
+      "me_tung_bo",
+      [5],
+      ["constructor"],
+    ]) {
+      const n = a.toasts.length;
+      a.room.send("rebirth", { keep: [], engrave: bad });
+      await waitFor(() => a.toasts.slice(n).some((t) => /không hợp lệ/.test(t.text)));
+    }
+    expect(a.reborns).toHaveLength(0);
+    expect(soulOf(name).engraved).toEqual([]);
+    expect(sr0.world.ctrl.get(sid0).limbo).toBeDefined();
+
+    // hợp lệ, gửi hai tin cùng lúc: chỉ MỘT lần đầu thai, chân linh khắc đúng hai chiêu
+    const skills: SkillsMsg[] = [];
+    a.room.onMessage("skills", (m: SkillsMsg) => skills.push(m));
+    a.room.send("rebirth", { keep: [], engrave: ["me_tung_bo", "hoa_van_kiem"] });
+    a.room.send("rebirth", { keep: [], engrave: ["ung_trao"] }); // tin thứ hai KHÁC: không được ghi đè chân linh sau khi đã đầu thai
+    const reborn = await waitFor(() => a.reborns[0]);
+    expect(reborn.kiep).toBe(2);
+    await sleep(300);
+    expect(a.reborns).toHaveLength(1);
+    expect(soulOf(name).engraved).toEqual(["me_tung_bo", "hoa_van_kiem"]);
+    const book = sr0.world.ctrl.get(sid0).skills;
+    expect(book.learned).toEqual({ me_tung_bo: 1, hoa_van_kiem: 1 }); // tầng 1, ung_trao không khắc nên mất
+    expect(book.slots).toEqual(["", "", "", ""]);
+    const sk = await waitFor(() => skills.find((m) => m.learned.me_tung_bo === 1));
+    expect(sk.slots).toEqual(["", "", "", ""]);
+    expect(playerOf(name).limbo).toBeUndefined();
+    expect(playerOf(name).skills.learned).toEqual({ me_tung_bo: 1, hoa_van_kiem: 1 });
+  });
+
+  it("đầu thai KHÔNG gửi `engrave`: giữ nguyên chiêu đã khắc từ trước (client cũ / không đổi ý)", async () => {
+    const name = "Khac Giu Nguyen";
+    const a = await join(name);
+    const sr = serverRoom(a.room) as any;
+    const sid = a.room.sessionId;
+    const c = sr.world.ctrl.get(sid);
+    c.soul = await sr.souls.update(c.identity.soulKey, (x: any) => ({
+      ...x,
+      unlocks: { khac: 1 },
+      engraved: ["me_tung_bo"],
+    }));
+    await playAndDie(a);
+    const limbo = await waitFor(() => a.limbos[0]);
+    expect(limbo.engravable).toEqual(["me_tung_bo"]); // chiêu đang khắc luôn nằm trong danh sách để đổi ý
+    a.room.send("rebirth", { keep: [] });
+    await waitFor(() => a.reborns[0]);
+    expect(soulOf(name).engraved).toEqual(["me_tung_bo"]);
+    expect(sr.world.ctrl.get(sid).skills.learned).toEqual({ me_tung_bo: 1 });
+    // gửi `engrave: []` ở lần sau thì xoá hết khắc (kiểm ở test đơn vị của validateRebirth)
+  });
+
   it("thoát giữa lúc ở Hoàng Tuyền rồi vào lại: nhận lại màn hình Hoàng Tuyền, Duyên KHÔNG bị cộng hai lần", async () => {
     const name = "Luan Hoi Hai";
     const a = await join(name);
