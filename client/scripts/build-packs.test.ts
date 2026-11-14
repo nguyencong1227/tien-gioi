@@ -9,6 +9,10 @@ import {
   verifyPacksManifest,
   parsePackDir,
   toPosixPath,
+  validatePackFilePath,
+  PACK_ID_RE,
+  MAX_PACKS,
+  MAX_FILES_PER_PACK,
 } from "./build-packs.mjs";
 
 describe("M7.15: build-packs (Trình tạo và kiểm tra manifest các gói tải theo nhu cầu)", () => {
@@ -164,5 +168,80 @@ describe("M7.15: build-packs (Trình tạo và kiểm tra manifest các gói t�
 
   it("toPosixPath: chuyển đường dẫn Windows ngược thành POSIX '/'", () => {
     expect(toPosixPath("a/b/c")).toBe("a/b/c");
+  });
+
+  it("buildPacksManifest: đảm bảo tính tất định bằng cách sắp xếp thứ tự gói và tệp tăng dần bất kể thứ tự tạo trên đĩa (N4)", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-packs-order-"));
+    try {
+      // Tạo các thư mục theo thứ tự ngược: map-zzz, map-aaa, icons, core
+      const mapZ = path.join(tmpDir, "map-zzz");
+      const mapA = path.join(tmpDir, "map-aaa");
+      const icons = path.join(tmpDir, "icons");
+      const core = path.join(tmpDir, "core");
+
+      fs.mkdirSync(mapZ, { recursive: true });
+      fs.mkdirSync(mapA, { recursive: true });
+      fs.mkdirSync(icons, { recursive: true });
+      fs.mkdirSync(core, { recursive: true });
+
+      // Trong core: tạo file z.png trước a.png
+      fs.writeFileSync(path.join(core, "z.png"), "z");
+      fs.writeFileSync(path.join(core, "a.png"), "a");
+      fs.writeFileSync(path.join(core, "m.png"), "m");
+
+      fs.writeFileSync(path.join(mapZ, "tile.png"), "tile");
+      fs.writeFileSync(path.join(mapA, "tile.png"), "tile");
+      fs.writeFileSync(path.join(icons, "icon.png"), "icon");
+
+      const manifest = buildPacksManifest(tmpDir);
+
+      // Thứ tự các gói phải sắp xếp tăng dần theo ID: core, icons, map:aaa, map:zzz
+      expect(manifest.packs.map((p) => p.id)).toEqual(["core", "icons", "map:aaa", "map:zzz"]);
+
+      // Thứ tự tệp trong gói core phải sắp xếp tăng dần: a.png, m.png, z.png
+      const corePack = manifest.packs.find((p) => p.id === "core")!;
+      expect(corePack.files.map((f) => f.path)).toEqual(["core/a.png", "core/m.png", "core/z.png"]);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("validatePackFilePath và buildPacksManifest: ném lỗi khi gặp vi phạm quy ước N1", () => {
+    // 1. validatePackFilePath
+    expect(() => validatePackFilePath("")).toThrow(/rỗng/);
+    expect(() => validatePackFilePath("/root/file.png")).toThrow(/ký tự cấm/);
+    expect(() => validatePackFilePath("dir\\file.png")).toThrow(/ký tự cấm/);
+    expect(() => validatePackFilePath("dir/file.png?v=1")).toThrow(/ký tự cấm/);
+    expect(() => validatePackFilePath("dir/file.png#tag")).toThrow(/ký tự cấm/);
+    expect(() => validatePackFilePath("dir/../file.png")).toThrow(/không hợp lệ/);
+    expect(() => validatePackFilePath("dir/./file.png")).toThrow(/không hợp lệ/);
+    expect(() => validatePackFilePath("dir//file.png")).toThrow(/không hợp lệ/);
+    expect(() => validatePackFilePath("a".repeat(201))).toThrow(/vượt quá giới hạn tối đa 200/);
+
+    // 2. buildPacksManifest ném lỗi khi tệp trong gói vi phạm đường dẫn
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-packs-bad-file-"));
+    try {
+      const coreDir = path.join(tmpDir, "core");
+      fs.mkdirSync(coreDir, { recursive: true });
+      // Thư mục con có tên chứa khoảng trắng hoặc ký tự đặc biệt
+      const subDir = path.join(coreDir, "sub?bad");
+      fs.mkdirSync(subDir, { recursive: true });
+      fs.writeFileSync(path.join(subDir, "test.png"), "bad");
+
+      expect(() => buildPacksManifest(tmpDir)).toThrow(/chứa ký tự cấm/);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("PACK_ID_RE, MAX_PACKS, MAX_FILES_PER_PACK: các hằng số cấu hình khớp client", () => {
+    expect(PACK_ID_RE.test("core")).toBe(true);
+    expect(PACK_ID_RE.test("map:hac_phong")).toBe(true);
+    expect(PACK_ID_RE.test("hd:map:hac_phong")).toBe(true);
+    expect(PACK_ID_RE.test("invalid@id")).toBe(false);
+    expect(PACK_ID_RE.test("")).toBe(false);
+
+    expect(MAX_PACKS).toBe(64);
+    expect(MAX_FILES_PER_PACK).toBe(512);
   });
 });

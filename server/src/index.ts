@@ -70,7 +70,19 @@ async function main() {
   // Production: phục vụ luôn bản build của client (client/dist) từ cùng server
   const dist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../client/dist");
   if (existsSync(dist)) {
-    app.use(express.static(dist));
+    app.use(
+      express.static(dist, {
+        setHeaders(res, filePath) {
+          // M7.15: Tệp gói tải trong /packs/** có gắn băm (trừ manifest.json) được cache immutable
+          const rel = path.relative(dist, filePath).split(path.sep).join("/");
+          if (rel.startsWith("packs/") && !rel.endsWith("manifest.json")) {
+            res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+          } else if (rel === "packs/manifest.json") {
+            res.setHeader("Cache-Control", "no-cache");
+          }
+        },
+      }),
+    );
     app.get("*", (_req, res) => res.sendFile(path.join(dist, "index.html")));
   }
 

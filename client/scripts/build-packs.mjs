@@ -32,6 +32,44 @@ const CLIENT_DIR = path.resolve(REPO_ROOT, "client");
 export const DEFAULT_PACKS_DIR = path.resolve(CLIENT_DIR, "public/packs");
 export const DEFAULT_MANIFEST_PATH = path.resolve(DEFAULT_PACKS_DIR, "manifest.json");
 
+/** Các giới hạn khớp chính xác bộ nạp client (client/src/gfx/packs.ts) */
+export const PACK_ID_RE = /^[a-z0-9_:.-]{1,64}$/i;
+export const MAX_PACKS = 64;
+export const MAX_FILES_PER_PACK = 512;
+export const MAX_PATH_LENGTH = 200;
+
+/**
+ * Kiểm tra tính hợp lệ của đường dẫn tệp theo đúng luật của client cleanPath (client/src/gfx/packs.ts)
+ * @param {string} relPath
+ * @throws {Error} nếu đường dẫn không hợp lệ
+ */
+export function validatePackFilePath(relPath) {
+  if (typeof relPath !== "string" || relPath.length === 0) {
+    throw new Error("Đường dẫn tệp trong gói rỗng!");
+  }
+  if (relPath.length > MAX_PATH_LENGTH) {
+    throw new Error(
+      `Đường dẫn tệp '${relPath}' dài ${relPath.length} ký tự, vượt quá giới hạn tối đa ${MAX_PATH_LENGTH} ký tự!`,
+    );
+  }
+  if (
+    relPath.startsWith("/") ||
+    relPath.includes("\\") ||
+    relPath.includes("?") ||
+    relPath.includes("#")
+  ) {
+    throw new Error(
+      `Đường dẫn tệp '${relPath}' chứa ký tự cấm (?, #, \\ hoặc bắt đầu bằng /) mà bộ nạp client sẽ loại bỏ!`,
+    );
+  }
+  const segments = relPath.split("/");
+  if (segments.some((seg) => seg === ".." || seg === "." || seg === "")) {
+    throw new Error(
+      `Đường dẫn tệp '${relPath}' chứa đoạn không hợp lệ ('.' hoặc '..' hoặc '//') mà bộ nạp client sẽ loại bỏ!`,
+    );
+  }
+}
+
 /**
  * Thu thập đệ quy tất cả các tệp trong một thư mục, bỏ qua tệp ẩn và manifest.json
  * @param {string} dir
@@ -173,6 +211,12 @@ export function buildPacksManifest(packsDir = DEFAULT_PACKS_DIR) {
     if (pack) packs.push(pack);
   }
 
+  if (packs.length > MAX_PACKS) {
+    throw new Error(
+      `Tổng số gói (${packs.length}) vượt quá giới hạn tối đa ${MAX_PACKS} gói mà client hỗ trợ!`,
+    );
+  }
+
   // Sắp xếp danh sách gói theo id tăng dần để đảm bảo tính tất định
   packs.sort((a, b) => a.id.localeCompare(b.id));
 
@@ -186,11 +230,19 @@ export function buildPacksManifest(packsDir = DEFAULT_PACKS_DIR) {
  * @param {{ id: string, kind: string, mapId?: string }} packInfo
  */
 function processPackDirectory(packsDir, packDir, packInfo) {
+  if (!PACK_ID_RE.test(packInfo.id)) {
+    throw new Error(`Id gói '${packInfo.id}' không hợp lệ! Phải khớp /^[a-z0-9_:.-]{1,64}$/i.`);
+  }
+  if (packInfo.mapId && !PACK_ID_RE.test(packInfo.mapId)) {
+    throw new Error(`mapId '${packInfo.mapId}' trong gói '${packInfo.id}' không hợp lệ!`);
+  }
+
   const filePaths = collectFilesRecursively(packDir);
   const files = [];
 
   for (const absPath of filePaths) {
     const relToPacks = toPosixPath(path.relative(packsDir, absPath));
+    validatePackFilePath(relToPacks);
     const stat = fs.statSync(absPath);
     const sha256 = computeFileSha256(absPath);
     files.push({
@@ -198,6 +250,12 @@ function processPackDirectory(packsDir, packDir, packInfo) {
       bytes: stat.size,
       sha256,
     });
+  }
+
+  if (files.length > MAX_FILES_PER_PACK) {
+    throw new Error(
+      `Gói '${packInfo.id}' chứa ${files.length} tệp, vượt quá giới hạn tối đa ${MAX_FILES_PER_PACK} tệp/gói mà client hỗ trợ!`,
+    );
   }
 
   // Sắp xếp file theo path tăng dần
