@@ -786,17 +786,16 @@ export function auditPlayerSaveData(rawText: string, byteLength: number): AuditE
             if (slotId === "") continue; // Ô trống hợp lệ
 
             const def = byId(SKILL_BY_ID, slotId);
+            const learnedObj =
+              learned && typeof learned === "object" && !Array.isArray(learned)
+                ? (learned as Record<string, unknown>)
+                : {};
             if (!def) {
               errors.push({
                 code: "unknown_skill",
                 message: `Ô chiêu thứ ${i + 2} chứa chiêu thức không tồn tại: ${show(slotId)}`,
               });
-            } else if (
-              learned &&
-              typeof learned === "object" &&
-              !Array.isArray(learned) &&
-              !Object.prototype.hasOwnProperty.call(learned, slotId)
-            ) {
+            } else if (!Object.prototype.hasOwnProperty.call(learnedObj, slotId)) {
               errors.push({
                 code: "unlearned_skill_in_slot",
                 message: `Ô chiêu thứ ${i + 2} chứa chiêu chưa học: ${show(slotId)}`,
