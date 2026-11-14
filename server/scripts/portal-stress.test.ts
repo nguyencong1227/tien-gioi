@@ -33,9 +33,9 @@ import {
 const dataDir = mkdtempSync(path.join(tmpdir(), "tien-gioi-portal-test-"));
 process.env.DATA_DIR = dataDir;
 
-import { freePort } from "../src/test-port";
+import { listenWithRetry } from "../src/test-port";
 
-// cổng do hệ điều hành cấp ở beforeAll (`freePort`): cổng ngẫu nhiên trong khoảng chồng nhau từng gây EADDRINUSE giữa các tệp chạy song song
+// cổng do hệ điều hành cấp ở beforeAll (`listenWithRetry`): tự động thử lại nếu gặp EADDRINUSE giữa các tệp chạy song song
 let PORT = 0;
 let server: Server;
 let savePlayer: typeof import("../src/store").savePlayer;
@@ -50,8 +50,7 @@ beforeAll(async () => {
   WorldRoom.reconnectGraceS = 5; // Đủ dài để phân biệt ghost bị huỷ do đăng nhập lại vs hết hạn tự nhiên
   server = new Server({ transport: new WebSocketTransport(), gracefullyShutdown: false });
   defineRooms(server);
-  PORT = await freePort();
-  await server.listen(PORT);
+  PORT = await listenWithRetry(server);
 });
 
 afterEach(async () => {

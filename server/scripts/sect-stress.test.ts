@@ -36,9 +36,9 @@ import type { WorldState } from "../src/schema";
 import type { Sect } from "../src/sect-store";
 import { auditSavesDirectory } from "./audit-saves";
 
-import { freePort } from "../src/test-port";
+import { listenWithRetry } from "../src/test-port";
 
-// cổng do hệ điều hành cấp ở beforeAll (`freePort`): cổng ngẫu nhiên trong khoảng chồng nhau từng gây EADDRINUSE giữa các tệp chạy song song
+// cổng do hệ điều hành cấp ở beforeAll (`listenWithRetry`): tự động thử lại nếu gặp EADDRINUSE giữa các tệp chạy song song
 let PORT = 0;
 let server: Server;
 let WorldRoomClass: typeof WorldRoom;
@@ -54,8 +54,7 @@ beforeAll(async () => {
   WorldRoomClass.reconnectGraceS = 5;
   server = new Server({ transport: new WebSocketTransport(), gracefullyShutdown: false });
   defineRooms(server);
-  PORT = await freePort();
-  await server.listen(PORT);
+  PORT = await listenWithRetry(server);
 });
 
 afterEach(async () => {
