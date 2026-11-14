@@ -17,6 +17,10 @@ import {
   PLAYER_RADIUS,
   QUEST_BY_ID,
   REALMS,
+  SKILL_BY_ID,
+  SKILL_MAX_LEVEL,
+  LEARNABLE_SLOTS,
+  slotOpen,
   getMap,
   isDungeonMap,
   UNLOCK_BY_ID,
@@ -643,6 +647,32 @@ export function auditPlayerSaveData(rawText: string, byteLength: number): AuditE
         }
       }
 
+      if (data.limbo.engravable !== undefined) {
+        if (!Array.isArray(data.limbo.engravable)) {
+          errors.push({
+            code: "invalid_limbo_engravable",
+            message: "limbo.engravable phải là mảng id chiêu thức",
+          });
+        } else {
+          const seen = new Set<string>();
+          for (const sId of data.limbo.engravable) {
+            if (typeof sId !== "string" || !byId(SKILL_BY_ID, sId)) {
+              errors.push({
+                code: "unknown_limbo_engravable_skill",
+                message: `limbo.engravable chứa chiêu thức không tồn tại: ${show(sId)}`,
+              });
+            } else if (seen.has(sId)) {
+              errors.push({
+                code: "duplicate_limbo_engravable",
+                message: `Chiêu ${show(sId)} bị trùng lặp trong limbo.engravable`,
+              });
+            } else {
+              seen.add(sId);
+            }
+          }
+        }
+      }
+
       if (typeof counts !== "boolean") {
         errors.push({
           code: "invalid_limbo_counts",
@@ -688,6 +718,109 @@ export function auditPlayerSaveData(rawText: string, byteLength: number): AuditE
           code: "invalid_dungeon_daily_rewards",
           message: `dungeonDaily.rewards (${typeof rewards === "string" ? `<chuỗi ${rewards.length} ký tự>` : show(rewards)}) phải là số nguyên trong khoảng [0, ${DUNGEON_DAILY_REWARDS}]`,
         });
+      }
+    }
+  }
+
+  // 13. Sổ chiêu (skills, M7.2, #503)
+  if (data.skills !== undefined) {
+    if (typeof data.skills !== "object" || data.skills === null || Array.isArray(data.skills)) {
+      errors.push({
+        code: "invalid_skills_book",
+        message: "skills phải là một JSON Object { learned, slots }",
+      });
+    } else {
+      const { learned, slots } = data.skills;
+      if (learned !== undefined) {
+        if (typeof learned !== "object" || learned === null || Array.isArray(learned)) {
+          errors.push({
+            code: "invalid_skills_learned",
+            message: "skills.learned phải là một JSON Object",
+          });
+        } else {
+          for (const [sId, rawLv] of Object.entries(learned)) {
+            const def = byId(SKILL_BY_ID, sId);
+            if (!def) {
+              errors.push({
+                code: "unknown_skill",
+                message: `Chiêu thức không tồn tại trong game: ${show(sId)}`,
+              });
+            }
+            if (
+              !Number.isInteger(rawLv) ||
+              typeof rawLv !== "number" ||
+              rawLv < 1 ||
+              rawLv > SKILL_MAX_LEVEL
+            ) {
+              errors.push({
+                code: "invalid_skill_level",
+                message: `Tầng của chiêu ${show(sId)} (${show(rawLv)}) phải là số nguyên [1, ${SKILL_MAX_LEVEL}]`,
+              });
+            }
+          }
+        }
+      }
+
+      if (slots !== undefined) {
+        if (!Array.isArray(slots)) {
+          errors.push({
+            code: "invalid_skills_slots",
+            message: "skills.slots phải là một mảng ô chiêu",
+          });
+        } else if (slots.length !== LEARNABLE_SLOTS.length) {
+          errors.push({
+            code: "invalid_skills_slots_length",
+            message: `skills.slots phải có đúng ${LEARNABLE_SLOTS.length} ô (hiện có ${slots.length})`,
+          });
+        } else {
+          const used = new Set<string>();
+          for (let i = 0; i < slots.length; i++) {
+            const slotId = slots[i];
+            if (typeof slotId !== "string") {
+              errors.push({
+                code: "invalid_skills_slot_item",
+                message: `Ô chiêu thứ ${i + 2} phải là chuỗi skillId hoặc chuỗi rỗng`,
+              });
+              continue;
+            }
+            if (slotId === "") continue; // Ô trống hợp lệ
+
+            const def = byId(SKILL_BY_ID, slotId);
+            if (!def) {
+              errors.push({
+                code: "unknown_skill",
+                message: `Ô chiêu thứ ${i + 2} chứa chiêu thức không tồn tại: ${show(slotId)}`,
+              });
+            } else if (
+              learned &&
+              typeof learned === "object" &&
+              !Array.isArray(learned) &&
+              !Object.prototype.hasOwnProperty.call(learned, slotId)
+            ) {
+              errors.push({
+                code: "unlearned_skill_in_slot",
+                message: `Ô chiêu thứ ${i + 2} chứa chiêu chưa học: ${show(slotId)}`,
+              });
+            }
+
+            if (used.has(slotId)) {
+              errors.push({
+                code: "duplicate_skill_in_slots",
+                message: `Chiêu ${show(slotId)} bị gắn lặp lại ở nhiều ô chiêu`,
+              });
+            } else {
+              used.add(slotId);
+            }
+
+            const slotNum = LEARNABLE_SLOTS[i];
+            if (isRealmValid && !slotOpen(slotNum, realm)) {
+              errors.push({
+                code: "slot_not_open",
+                message: `Ô chiêu ${slotNum} chưa mở ở cảnh giới ${REALMS[realm].name}`,
+              });
+            }
+          }
+        }
       }
     }
   }
@@ -929,6 +1062,45 @@ export function auditSoulSaveData(rawText: string, byteLength: number): AuditErr
               message: `entry.gain (${show(entry.gain)}) phải là số nguyên không âm`,
             });
           }
+        }
+      }
+    }
+  }
+
+  // 10. engraved (M7.2c, #503)
+  if (data.engraved !== undefined) {
+    if (!Array.isArray(data.engraved)) {
+      errors.push({
+        code: "invalid_soul_engraved",
+        message: "engraved phải là một mảng chuỗi id chiêu thức",
+      });
+    } else {
+      const maxSlots =
+        typeof data.unlocks === "object" &&
+        data.unlocks !== null &&
+        Number.isInteger(data.unlocks.khac)
+          ? data.unlocks.khac
+          : 0;
+      if (data.engraved.length > maxSlots) {
+        errors.push({
+          code: "engraved_exceeds_slots",
+          message: `Số chiêu đã khắc (${data.engraved.length}) vượt quá số chỗ mở khóa (${maxSlots})`,
+        });
+      }
+      const seen = new Set<string>();
+      for (const sId of data.engraved) {
+        if (typeof sId !== "string" || !byId(SKILL_BY_ID, sId)) {
+          errors.push({
+            code: "unknown_soul_engraved_skill",
+            message: `Chiêu đã khắc không tồn tại trong game: ${show(sId)}`,
+          });
+        } else if (seen.has(sId)) {
+          errors.push({
+            code: "duplicate_soul_engraved",
+            message: `Chiêu ${show(sId)} bị lặp lại trong engraved`,
+          });
+        } else {
+          seen.add(sId);
         }
       }
     }

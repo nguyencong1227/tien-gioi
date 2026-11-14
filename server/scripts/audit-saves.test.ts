@@ -1372,4 +1372,333 @@ describe("audit-saves (Issue #112)", () => {
       expect(report.errorsByCode.member_in_multiple_sects).toBe(1);
     });
   });
+
+  describe("M7.11 / #512: audit sổ chiêu (skills) & khắc chân linh (engraved)", () => {
+    it("hồ sơ có skills hợp lệ -> 0 lỗi", () => {
+      // Nhân vật Trúc Cơ (realm 2): mở ô 2 và ô 3
+      const playerWithSkills = {
+        ...validPlayer,
+        realm: 2,
+        tier: 0,
+        skills: {
+          learned: { ung_trao: 1, hoa_van_kiem: 2, bon_thach_quyen: 3 },
+          slots: ["hoa_van_kiem", "ung_trao", "", ""],
+        },
+      };
+      const errors = auditPlayerSaveData(JSON.stringify(playerWithSkills), 500);
+      expect(errors).toEqual([]);
+    });
+
+    it("phát hiện skills không phải JSON object -> invalid_skills_book", () => {
+      for (const bad of ["abc", 123, true, []]) {
+        const raw = JSON.stringify({ ...validPlayer, skills: bad });
+        const errors = auditPlayerSaveData(raw, raw.length);
+        expect(errors.some((e) => e.code === "invalid_skills_book")).toBe(true);
+      }
+    });
+
+    it("phát hiện skills.learned không phải object -> invalid_skills_learned", () => {
+      const raw = JSON.stringify({ ...validPlayer, skills: { learned: ["ung_trao"] } });
+      const errors = auditPlayerSaveData(raw, raw.length);
+      expect(errors.some((e) => e.code === "invalid_skills_learned")).toBe(true);
+    });
+
+    it("phát hiện chiêu lạ trong skills.learned -> unknown_skill", () => {
+      const raw = JSON.stringify({
+        ...validPlayer,
+        skills: { learned: { chieu_la_khong_ton_tai: 1 } },
+      });
+      const errors = auditPlayerSaveData(raw, raw.length);
+      expect(errors.some((e) => e.code === "unknown_skill")).toBe(true);
+    });
+
+    it("phát hiện tầng chiêu không hợp lệ trong skills.learned -> invalid_skill_level", () => {
+      for (const badLv of [0, -1, 4, 1.5, "2"]) {
+        const raw = JSON.stringify({
+          ...validPlayer,
+          skills: { learned: { ung_trao: badLv } },
+        });
+        const errors = auditPlayerSaveData(raw, raw.length);
+        expect(errors.some((e) => e.code === "invalid_skill_level")).toBe(true);
+      }
+    });
+
+    it("phát hiện skills.slots sai định dạng (không phải mảng hoặc sai độ dài) -> invalid_skills_slots / length", () => {
+      const rawNotArr = JSON.stringify({ ...validPlayer, skills: { slots: "ung_trao" } });
+      expect(
+        auditPlayerSaveData(rawNotArr, rawNotArr.length).some(
+          (e) => e.code === "invalid_skills_slots",
+        ),
+      ).toBe(true);
+
+      const rawWrongLen = JSON.stringify({ ...validPlayer, skills: { slots: ["ung_trao", ""] } });
+      expect(
+        auditPlayerSaveData(rawWrongLen, rawWrongLen.length).some(
+          (e) => e.code === "invalid_skills_slots_length",
+        ),
+      ).toBe(true);
+    });
+
+    it("phát hiện ô chiêu chứa phần tử không phải chuỗi -> invalid_skills_slot_item", () => {
+      const raw = JSON.stringify({
+        ...validPlayer,
+        skills: { slots: [123, "", "", ""] },
+      });
+      const errors = auditPlayerSaveData(raw, raw.length);
+      expect(errors.some((e) => e.code === "invalid_skills_slot_item")).toBe(true);
+    });
+
+    it("phát hiện ô chiêu chứa chiêu lạ -> unknown_skill", () => {
+      const raw = JSON.stringify({
+        ...validPlayer,
+        skills: { slots: ["chieu_la_999", "", "", ""] },
+      });
+      const errors = auditPlayerSaveData(raw, raw.length);
+      expect(errors.some((e) => e.code === "unknown_skill")).toBe(true);
+    });
+
+    it("phát hiện ô chiêu chứa chiêu chưa học -> unlearned_skill_in_slot", () => {
+      const raw = JSON.stringify({
+        ...validPlayer,
+        realm: 2,
+        skills: {
+          learned: { ung_trao: 1 },
+          slots: ["hoa_van_kiem", "", "", ""],
+        },
+      });
+      const errors = auditPlayerSaveData(raw, raw.length);
+      expect(errors.some((e) => e.code === "unlearned_skill_in_slot")).toBe(true);
+    });
+
+    it("phát hiện chiêu bị trùng lặp ở nhiều ô -> duplicate_skill_in_slots", () => {
+      const raw = JSON.stringify({
+        ...validPlayer,
+        realm: 2,
+        skills: {
+          learned: { ung_trao: 1 },
+          slots: ["ung_trao", "ung_trao", "", ""],
+        },
+      });
+      const errors = auditPlayerSaveData(raw, raw.length);
+      expect(errors.some((e) => e.code === "duplicate_skill_in_slots")).toBe(true);
+    });
+
+    it("phát hiện ô chiêu chưa mở theo cảnh giới -> slot_not_open", () => {
+      // Luyện Khí (realm 1) chỉ mở ô 2 (slot index 0). Gán vào ô 3 (slot index 1) hoặc ô 4, 5 phải báo lỗi.
+      const raw = JSON.stringify({
+        ...validPlayer,
+        realm: 1,
+        skills: {
+          learned: { ung_trao: 1, hoa_van_kiem: 1 },
+          slots: ["ung_trao", "hoa_van_kiem", "", ""],
+        },
+      });
+      const errors = auditPlayerSaveData(raw, raw.length);
+      expect(errors.some((e) => e.code === "slot_not_open")).toBe(true);
+    });
+
+    it("kiểm tra limbo.engravable: hợp lệ, không phải mảng, chiêu lạ, trùng lặp", () => {
+      // Hợp lệ
+      const good = JSON.stringify({
+        ...validPlayer,
+        limbo: {
+          endedLifeId: "life-12345678",
+          summary: {
+            kiep: 1,
+            realm: 1,
+            tier: 0,
+            minutes: 10,
+            kills: 5,
+            bossKills: 0,
+            gain: 10,
+          },
+          keepable: [],
+          engravable: ["ung_trao", "hoa_van_kiem"],
+          counts: true,
+          credited: true,
+        },
+      });
+      expect(auditPlayerSaveData(good, good.length)).toEqual([]);
+
+      // Không phải mảng
+      const notArr = JSON.stringify({
+        ...validPlayer,
+        limbo: {
+          endedLifeId: "life-12345678",
+          summary: {
+            kiep: 1,
+            realm: 1,
+            tier: 0,
+            minutes: 10,
+            kills: 5,
+            bossKills: 0,
+            gain: 10,
+          },
+          keepable: [],
+          engravable: "ung_trao",
+          counts: true,
+          credited: true,
+        },
+      });
+      expect(
+        auditPlayerSaveData(notArr, notArr.length).some(
+          (e) => e.code === "invalid_limbo_engravable",
+        ),
+      ).toBe(true);
+
+      // Chiêu lạ
+      const unknown = JSON.stringify({
+        ...validPlayer,
+        limbo: {
+          endedLifeId: "life-12345678",
+          summary: {
+            kiep: 1,
+            realm: 1,
+            tier: 0,
+            minutes: 10,
+            kills: 5,
+            bossKills: 0,
+            gain: 10,
+          },
+          keepable: [],
+          engravable: ["chieu_ma_quai"],
+          counts: true,
+          credited: true,
+        },
+      });
+      expect(
+        auditPlayerSaveData(unknown, unknown.length).some(
+          (e) => e.code === "unknown_limbo_engravable_skill",
+        ),
+      ).toBe(true);
+
+      // Trùng lặp
+      const dup = JSON.stringify({
+        ...validPlayer,
+        limbo: {
+          endedLifeId: "life-12345678",
+          summary: {
+            kiep: 1,
+            realm: 1,
+            tier: 0,
+            minutes: 10,
+            kills: 5,
+            bossKills: 0,
+            gain: 10,
+          },
+          keepable: [],
+          engravable: ["ung_trao", "ung_trao"],
+          counts: true,
+          credited: true,
+        },
+      });
+      expect(
+        auditPlayerSaveData(dup, dup.length).some((e) => e.code === "duplicate_limbo_engravable"),
+      ).toBe(true);
+    });
+
+    it("auditSoulSaveData: kiểm tra engraved hợp lệ, vượt nấc mở khóa, chiêu lạ, trùng lặp", () => {
+      const baseSoul = {
+        v: 1,
+        id: "dao_huu",
+        kiep: 2,
+        duyen: 10,
+        duyenTotal: 50,
+        unlocks: { khac: 2 },
+        origins: [],
+        best: { step: 9, realm: 1, tier: 8 },
+        createdAt: "2026-11-10T00:00:00.000Z",
+        updatedAt: "2026-11-10T00:00:00.000Z",
+      };
+
+      // Hợp lệ: mở 2 nấc, có 2 chiêu
+      const good = JSON.stringify({ ...baseSoul, engraved: ["ung_trao", "hoa_van_kiem"] });
+      expect(auditSoulSaveData(good, good.length)).toEqual([]);
+
+      // Không phải mảng
+      const notArr = JSON.stringify({ ...baseSoul, engraved: "ung_trao" });
+      expect(
+        auditSoulSaveData(notArr, notArr.length).some((e) => e.code === "invalid_soul_engraved"),
+      ).toBe(true);
+
+      // Vượt nấc mở khóa: unlocks.khac = 1 nhưng engraved có 2 chiêu
+      const exceeds = JSON.stringify({
+        ...baseSoul,
+        unlocks: { khac: 1 },
+        engraved: ["ung_trao", "hoa_van_kiem"],
+      });
+      expect(
+        auditSoulSaveData(exceeds, exceeds.length).some((e) => e.code === "engraved_exceeds_slots"),
+      ).toBe(true);
+
+      // Chưa mở khóa khac (unlocks không có khac) nhưng có chiêu khắc
+      const unUnlocked = JSON.stringify({
+        ...baseSoul,
+        unlocks: {},
+        engraved: ["ung_trao"],
+      });
+      expect(
+        auditSoulSaveData(unUnlocked, unUnlocked.length).some(
+          (e) => e.code === "engraved_exceeds_slots",
+        ),
+      ).toBe(true);
+
+      // Chiêu lạ
+      const unknown = JSON.stringify({ ...baseSoul, engraved: ["chieu_bi_truyen_la"] });
+      expect(
+        auditSoulSaveData(unknown, unknown.length).some(
+          (e) => e.code === "unknown_soul_engraved_skill",
+        ),
+      ).toBe(true);
+
+      // Trùng lặp
+      const dup = JSON.stringify({ ...baseSoul, engraved: ["ung_trao", "ung_trao"] });
+      expect(
+        auditSoulSaveData(dup, dup.length).some((e) => e.code === "duplicate_soul_engraved"),
+      ).toBe(true);
+    });
+
+    it("đột biến: nới lỏng kiểm tra slotOpen hoặc engraved_exceeds_slots thì test bắt buộc phát hiện", () => {
+      // 1. Dữ liệu gán ô vượt cảnh giới: Luyện Khí (realm 1) gán vào ô 3 (slot index 1)
+      const slotMutantData = JSON.stringify({
+        ...validPlayer,
+        realm: 1,
+        skills: {
+          learned: { ung_trao: 1, hoa_van_kiem: 1 },
+          slots: ["ung_trao", "hoa_van_kiem", "", ""],
+        },
+      });
+      const errorsSlot = auditPlayerSaveData(slotMutantData, slotMutantData.length);
+      expect(errorsSlot.some((e) => e.code === "slot_not_open")).toBe(true);
+
+      // Nếu đột biến nới lỏng: không kiểm tra slotOpen
+      const relaxedSlotCheck = (errs: typeof errorsSlot) =>
+        errs.filter((e) => e.code !== "slot_not_open");
+      expect(relaxedSlotCheck(errorsSlot).some((e) => e.code === "slot_not_open")).toBe(false);
+
+      // 2. Dữ liệu khắc vượt nấc mở khóa: unlocks.khac = 1 nhưng khắc 2 chiêu
+      const engraveMutantData = JSON.stringify({
+        v: 1,
+        id: "dao_huu",
+        kiep: 2,
+        duyen: 10,
+        duyenTotal: 50,
+        unlocks: { khac: 1 },
+        origins: [],
+        best: { step: 9, realm: 1, tier: 8 },
+        engraved: ["ung_trao", "hoa_van_kiem"],
+        createdAt: "2026-11-10T00:00:00.000Z",
+        updatedAt: "2026-11-10T00:00:00.000Z",
+      });
+      const errorsEngrave = auditSoulSaveData(engraveMutantData, engraveMutantData.length);
+      expect(errorsEngrave.some((e) => e.code === "engraved_exceeds_slots")).toBe(true);
+
+      // Nếu đột biến nới lỏng: không so sánh với unlocks.khac
+      const relaxedEngraveCheck = (errs: typeof errorsEngrave) =>
+        errs.filter((e) => e.code !== "engraved_exceeds_slots");
+      expect(
+        relaxedEngraveCheck(errorsEngrave).some((e) => e.code === "engraved_exceeds_slots"),
+      ).toBe(false);
+    });
+  });
 });

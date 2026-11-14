@@ -1,5 +1,5 @@
 /**
- * Công thức THỜI TIẾT (M5.3, #332): cánh hoa đào (Lạc Hà), tro (Hắc Phong), linh khí (bí cảnh), ma trơi (Âm Sương Trạch, M6 #408). CHỈ là dữ liệu.
+ * Công thức THỜI TIẾT (M5.3, #332): cánh hoa đào (Lạc Hà), tro (Hắc Phong), linh khí (bí cảnh), ma trơi (Âm Sương Trạch, M6 #408), tuyết (Hàn Vân Lĩnh, M7.8 #509). CHỈ là dữ liệu.
  *
  * Mỗi lần phát rải `count` (12) hạt ở điểm ngẫu nhiên trong `zone` (`opts.area` ghi đè theo khung nhìn), sống tới ~3,5 s; ưu tiên 0
  * (môi trường: tới 60 % trần, bị bỏ trước mọi hiệu ứng khác). Nhịp phát do `map-weather.ts` tính (số hạt / tốc độ) để một
@@ -79,6 +79,24 @@ export const WEATHER_RECIPES: readonly FxRecipe[] = [
       tint: 0xd2e68a,
       blend: "add",
       gravityY: -3,
+      zone: { w: 1200, h: 700 },
+    },
+  },
+  {
+    // Tuyết rơi chậm chếch sang trái (gió bắc), trắng ngà, không cộng sáng; cùng chi phí với các loại khác (12 hạt, <= 3,8 s)
+    id: "weather-snow",
+    priority: 0,
+    particles: {
+      frames: ["dot"],
+      count: WEATHER_COUNT,
+      lifespan: { min: 2800, max: 3800 },
+      speed: { min: 12, max: 34 },
+      angle: { min: 70, max: 125 },
+      scale: { start: 0.4, end: 0.25 },
+      alpha: { start: 0.9, end: 0 },
+      tint: 0xf2f8ff,
+      blend: "normal",
+      gravityY: 16,
       zone: { w: 1200, h: 700 },
     },
   },

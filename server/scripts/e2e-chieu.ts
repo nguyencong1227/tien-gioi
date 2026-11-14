@@ -11,6 +11,9 @@
 //     "Ô N" gắn chiêu qua `skillSlot` THẬT (thanh chiêu chỉ đổi khi máy chủ gửi lại `skills`: client không đoán trước); gắn vào ô đang có chiêu khác thì
 //     THAY, chiêu đang ở ô khác thì ĐỔI chỗ (ô cũ trống), Delete gỡ, ô chưa mở (ô 4 ở Trúc Cơ) không gửi gì; bấm L dùng chiêu thật (máy chủ đặt hồi chiêu,
 //     phát `fx cast`, client vẽ hiệu ứng dùng chiêu #552); rời phòng chủ động rồi đọc hồ sơ trên đĩa.
+//  5. HUY HIỆU TRẠNG THÁI TRÊN ĐẦU QUÁI (M7.7 #508, `Monster.fx` #559): máy chủ gắn bỏng rồi choáng lên Linh Thố bằng `applyMonsterStatus` TRONG TIẾN TRÌNH;
+//     client (qua schema + `StateView`) vẽ đúng 1 rồi 2 chấm, tắt từng cái khi hết hạn và về 0 (huy hiệu cuối được dọn).
+//  6. QUÁI LAO CÓ BÁO TRƯỚC (M7.3 #504): Hôi Lang THẬT (số liệu `MONSTERS`, không ép) thấy người thì gồng, client nhận `fx warn` thật, người đứng yên bị trúng đòn lao.
 // Chạy: `npm run build -w client && npm run e2e:chieu -w server` (cần google-chrome).
 import { spawn, execSync, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -20,7 +23,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
-import { Server } from "colyseus";
+import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import {
   DEFAULT_MAP_ID,
@@ -533,6 +536,193 @@ async function main() {
     );
     ok(`đĩa: ô = ${JSON.stringify(saved4.skills.slots)}, chiêu đã học và tầng nguyên vẹn`);
     must(T.errors.length === 0, `lỗi console ở ca 4: ${JSON.stringify(T.errors)}`);
+
+    // ---------------------------------------------------------------------------------------------------------------
+    // Ca 5 và 6: quái hành vi (M7.3, #504 / M7.7, #508): đường máy chủ -> mạng -> client với MÁY CHỦ THẬT trong tiến trình
+    // ---------------------------------------------------------------------------------------------------------------
+    const { applyMonsterStatus } = await import("../src/systems/status.js");
+    const { syncPublicPos } = await import("../src/systems/movement.js");
+    const QN = "Quai Hanh Vi";
+    const seedQuai = async (name: string) =>
+      savePlayer({
+        name,
+        secretHash: hashSecret(SECRET),
+        realm: 3, // khí huyết dày: ca này đứng yên chịu đòn
+        tier: 0,
+        exp: 0,
+        coin: 0,
+        mapId: DEFAULT_MAP_ID,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    /** Phòng thật của máy chủ trong tiến trình (qua `roomId` mà client đang giữ) */
+    const worldOf = async () => {
+      const roomId = (await ev(`window.__scene.room.roomId`)) as string;
+      const room = matchMaker.getLocalRoomById(roomId) as any;
+      must(!!room?.world, "lấy được World của phòng thật qua matchMaker");
+      return room.world as import("../src/world.js").World;
+    };
+    /** Dời nhân vật (máy chủ và dự đoán của client) tới (x, y): ca này kiểm tin của quái, không kiểm di chuyển */
+    const teleport = async (
+      w: import("../src/world.js").World,
+      sid: string,
+      x: number,
+      y: number,
+    ) => {
+      const p = w.state.players.get(sid)!;
+      p.x = x;
+      p.y = y;
+      syncPublicPos(p);
+      await ev(`(() => { const s = window.__scene; s.predX = ${x}; s.predY = ${y}; return 1; })()`);
+    };
+    const pips = (id: string) =>
+      ev(`JSON.stringify(window.__scene.monsterPips(${JSON.stringify(id)}))`).then((v) =>
+        typeof v === "string" ? JSON.parse(v) : null,
+      ) as Promise<{ n: number; text: string; visible: boolean; draws: number } | null>;
+
+    out(
+      "\n--- Ca 5: huy hiệu trạng thái trên đầu quái: Monster.fx đồng bộ THẬT (máy chủ gắn / hết hạn -> client vẽ / xoá) ---",
+    );
+    await seedQuai(QN);
+    await login(QN);
+    await T.waitFor(
+      `!document.getElementById('ui')?.hidden && !!window.__scene?.room`,
+      "vào game thành công",
+      20000,
+    );
+    const w5 = await worldOf();
+    const sidQ = (await ev(`window.__scene.room.sessionId`)) as string;
+    // Linh Thố (quái hiền, aggro 0): đứng cạnh nó mà không bị đánh
+    let thoId = "";
+    let thoXY = { x: 0, y: 0 };
+    w5.state.monsters.forEach((m, id) => {
+      if (!thoId && m.kind === "tho") {
+        thoId = id;
+        thoXY = { x: m.x, y: m.y };
+      }
+    });
+    must(thoId !== "", "có Linh Thố trong phòng");
+    await teleport(w5, sidQ, thoXY.x - 90, thoXY.y);
+    await T.waitFor(
+      `!!window.__scene.monsterPips(${JSON.stringify(thoId)})`,
+      "client thấy Linh Thố (vùng nhìn đã cập nhật)",
+      15000,
+    );
+    must((await pips(thoId))!.n === 0, "chưa dính trạng thái: không chấm");
+    applyMonsterStatus(w5, thoId, { status: "burn", ms: 4000, ratio: 0.01, chance: 1 }, 1, "");
+    await T.waitFor(
+      `(window.__scene.monsterPips(${JSON.stringify(thoId)})?.n ?? 0) === 1`,
+      "client vẽ MỘT chấm sau khi máy chủ gắn bỏng (Monster.fx = 1 đồng bộ qua schema)",
+    );
+    must(
+      (await pips(thoId))!.text.includes("Bỏng"),
+      `chấm là Bỏng: ${JSON.stringify(await pips(thoId))}`,
+    );
+    applyMonsterStatus(w5, thoId, { status: "stun", ms: 1000, ratio: 0, chance: 1 }, 0, "");
+    await T.waitFor(
+      `(window.__scene.monsterPips(${JSON.stringify(thoId)})?.n ?? 0) === 2`,
+      "choáng gắn thêm: HAI chấm",
+    );
+    ok(
+      "máy chủ gắn bỏng rồi choáng lên quái thật: client vẽ đúng 1 rồi 2 chấm (Monster.fx qua StateView)",
+    );
+    await T.waitFor(
+      `(window.__scene.monsterPips(${JSON.stringify(thoId)})?.n ?? 0) === 1`,
+      "choáng hết hạn (1 giây): còn MỘT chấm (bỏ bit choáng, không mất bỏng)",
+      8000,
+    );
+    await T.waitFor(
+      `(window.__scene.monsterPips(${JSON.stringify(thoId)})?.n ?? 0) === 0`,
+      "bỏng hết hạn (4 giây): hết chấm (huy hiệu cuối được dọn)",
+      10000,
+    );
+    ok("trạng thái hết hạn: chấm tắt đúng từng cái, về 0 khi hết sạch");
+    must(T.errors.length === 0, `lỗi console ở ca 5: ${JSON.stringify(T.errors)}`);
+
+    out(
+      "\n--- Ca 6: Hôi Lang THẬT gồng báo trước rồi lao: client nhận fx warn thật, người đứng yên bị trúng đòn lao ---",
+    );
+    const LN = "Quai Goi Gong";
+    await seedQuai(LN);
+    await login(LN);
+    await T.waitFor(
+      `!document.getElementById('ui')?.hidden && !!window.__scene?.room`,
+      "vào game thành công",
+      20000,
+    );
+    const w6 = await worldOf();
+    const sidL = (await ev(`window.__scene.room.sessionId`)) as string;
+    // Chọn một Hôi Lang và chỗ đứng cách nó 120 px (trong aggro 170, ngoài tầm đánh thường) sao cho: chỗ đứng thoáng, KHÔNG nằm trong khu an toàn (quái bỏ
+    // qua người ở đó) và đoạn từ quái tới người thoáng (cú lao không bị tường chặn): nếu không ca này phụ thuộc may rủi vị trí sinh quái ngẫu nhiên.
+    let langId = "";
+    let standXY = { x: 0, y: 0 };
+    const mapW = w6.map;
+    const lr = 13; // bán kính Hôi Lang
+    const clearBetween = (x0: number, y0: number, x1: number, y1: number): boolean => {
+      const n = Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 8);
+      for (let k = 0; k <= n; k++) {
+        const x = x0 + ((x1 - x0) * k) / n;
+        const y = y0 + ((y1 - y0) * k) / n;
+        if (mapW.circleBlocked(x, y, lr + 3) || mapW.inSafe(x, y, 40)) return false;
+      }
+      return true;
+    };
+    w6.state.monsters.forEach((m, id) => {
+      if (langId || m.kind !== "lang") return;
+      for (const [dx, dy] of [
+        [-1, 0],
+        [1, 0],
+        [0, -1],
+        [0, 1],
+      ]) {
+        const sx = m.x + dx * 120;
+        const sy = m.y + dy * 120;
+        if (clearBetween(m.x, m.y, sx + dx * 40, sy + dy * 40)) {
+          langId = id;
+          standXY = { x: sx, y: sy };
+          return;
+        }
+      }
+    });
+    must(langId !== "", "có Hôi Lang với chỗ đứng thoáng cách 120 px");
+    // Cô lập cảnh: quái KHÁC quanh chỗ đứng (trong 500 px) không được nhắm người này (aggro 0, bỏ mục tiêu), để lần mất khí huyết đầu tiên là đòn lao của ĐÚNG con này
+    w6.state.monsters.forEach((o, oid) => {
+      if (oid === langId || Math.hypot(o.x - standXY.x, o.y - standXY.y) > 500) return;
+      const oc = w6.mctrl.get(oid);
+      if (oc) {
+        oc.def = { ...oc.def, aggro: 0 };
+        oc.target = null;
+      }
+    });
+    must(
+      w6.mctrl.get(langId)?.def.behavior === "charger",
+      "Hôi Lang THẬT là charger (số liệu trong MONSTERS, không ép def)",
+    );
+    const pL = w6.state.players.get(sidL)!;
+    await T.waitFor(
+      `!!window.__scene?.telegraphs && typeof window.__scene.telegraphs.stats === 'function'`,
+      "lớp báo trước đòn của cảnh đã dựng",
+      15000,
+    );
+    const warns0 = (await ev(`window.__scene.telegraphs.stats().spawnedWarns`)) as number;
+    pL.hp = pL.maxHp;
+    // đứng cách 120 px (trong aggro 170, ngoài tầm đánh thường), không di chuyển
+    await teleport(w6, sidL, standXY.x, standXY.y);
+    await T.waitFor(
+      `window.__scene.telegraphs.stats().spawnedWarns > ${warns0}`,
+      "client nhận fx `warn` từ máy chủ thật khi Hôi Lang bắt đầu gồng",
+      15000,
+    );
+    ok("Hôi Lang thấy người thì gồng: client nhận tin `warn` thật (đường lao báo trước)");
+    await until(() => (pL.hp < pL.maxHp ? true : false), "người đứng yên bị trúng đòn lao", 6000);
+    // Lần mất khí huyết ĐẦU TIÊN phải đúng đòn LAO (atk x 1,5 = 21), không phải đòn thường (atk x 0,85-1,15 = 12-16) tới sau khi quái đã lao sát người
+    const firstDrop = pL.maxHp - pL.hp;
+    must(
+      firstDrop === Math.round(14 * 1.5),
+      `lần trúng đầu tiên là đòn lao: ${Math.round(14 * 1.5)}, thực tế ${firstDrop}`,
+    );
+    ok(`đứng yên trong vùng báo trước: lần trúng đầu là đòn lao (khí huyết -${firstDrop})`);
+    must(T.errors.length === 0, `lỗi console ở ca 6: ${JSON.stringify(T.errors)}`);
     ok("0 lỗi console / exception");
   } catch (err) {
     failed = err instanceof Error ? err.message : String(err);

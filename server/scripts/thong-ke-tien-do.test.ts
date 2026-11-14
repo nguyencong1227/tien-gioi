@@ -132,6 +132,26 @@ describe("thong-ke-tien-do: sanitizeRecord & quyền riêng tư", () => {
     expect((rec as any).slots).toBeUndefined();
   });
 
+  it("bỏ qua chiêu tầng 0 và kẹp tầng tối đa 3 khi thống kê (diệt đột biến N4, N5)", () => {
+    const raw = {
+      name: "Tán Tu",
+      realm: 1,
+      skills: {
+        learned: {
+          chieu_chua_hoc: 0,
+          chieu_am: -1,
+          chieu_tang_cao: 7,
+          chieu_hop_le: 2,
+        },
+      },
+    };
+    const rec = sanitizeRecord(raw)!;
+    // Chỉ đếm chieu_tang_cao và chieu_hop_le (tầng 0 và âm bị bỏ qua)
+    expect(rec.skillsCount).toBe(2);
+    // chieu_tang_cao kẹp về 3; chieu_hop_le là 2 -> tổng là 3 + 2 = 5
+    expect(rec.skillsTotalLevels).toBe(5);
+  });
+
   it("kẹp realm và tier trong giới hạn hợp lệ", () => {
     const raw = {
       realm: 999,

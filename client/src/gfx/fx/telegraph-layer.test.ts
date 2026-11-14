@@ -62,6 +62,8 @@ class FakeG {
 }
 
 function make(budget = 24, view = { value: true }) {
+  const me = { value: null as { x: number; y: number; r: number } | null };
+  const dangers: number[] = [];
   const made: FakeG[] = [];
   const scene = {
     add: {
@@ -78,8 +80,10 @@ function make(budget = 24, view = { value: true }) {
     emitterBudget: () => b.value,
     reduced: () => reduced.value,
     inView: () => view.value,
+    player: () => me.value,
+    onDanger: () => void dangers.push(1),
   });
-  return { layer, made, budget: b, reduced, view };
+  return { layer, made, budget: b, reduced, view, me, dangers };
 }
 
 const warn = (o: Partial<WarnMsg> = {}): WarnMsg =>
@@ -287,5 +291,72 @@ describe("TelegraphLayer: dọn", () => {
     expect(made.length).toBe(s.graphics);
     expect(s.graphics).toBeLessThanOrEqual(s.peakWarns + s.peakBolts);
     expect(s.graphics).toBeLessThan(20);
+  });
+});
+
+describe("TelegraphLayer: báo động khi mình đứng trong vùng", () => {
+  it("vào vùng thì báo MỘT lần (không lặp mỗi khung), snapshot đánh dấu danger", () => {
+    const { layer, me, dangers } = make();
+    me.value = { x: 100, y: 200, r: 14 };
+    layer.warn(warn({ shape: "circle", x: 100, y: 200, r: 60, ms: 800 }), 0);
+    layer.update(100);
+    layer.update(150);
+    layer.update(200);
+    expect(dangers).toHaveLength(1);
+    expect(layer.stats().dangerAlerts).toBe(1);
+    expect(layer.snapshot(200).warns[0].danger).toBe(true);
+  });
+
+  it("ngoài vùng: không báo, danger false; bước vào giữa chừng thì báo lúc đó; bước ra thì danger tắt nhưng không báo lại khi vào lần nữa", () => {
+    const { layer, me, dangers } = make();
+    me.value = { x: 1000, y: 1000, r: 14 };
+    layer.warn(warn({ shape: "circle", x: 100, y: 200, r: 60, ms: 800 }), 0);
+    layer.update(100);
+    expect(dangers).toHaveLength(0);
+    expect(layer.snapshot(100).warns[0].danger).toBe(false);
+    me.value = { x: 110, y: 200, r: 14 };
+    layer.update(300);
+    expect(dangers).toHaveLength(1);
+    me.value = { x: 1000, y: 1000, r: 14 };
+    layer.update(400);
+    expect(layer.snapshot(400).warns[0].danger).toBe(false);
+    me.value = { x: 110, y: 200, r: 14 };
+    layer.update(500);
+    expect(dangers).toHaveLength(1); // đã báo cho vùng này rồi
+  });
+
+  it("đòn đã đáp (hết ms) thì KHÔNG báo nữa: lúc đó vô nghĩa", () => {
+    const { layer, me, dangers } = make();
+    me.value = { x: 1000, y: 1000, r: 14 };
+    layer.warn(warn({ shape: "circle", x: 100, y: 200, r: 60, ms: 500 }), 0);
+    layer.update(100);
+    me.value = { x: 100, y: 200, r: 14 };
+    layer.update(520); // trong khoảng mờ sau ms
+    expect(dangers).toHaveLength(0);
+    expect(layer.snapshot(520).warns[0].danger).toBe(false);
+  });
+
+  it("mỗi vùng báo một lần: hai vùng bao lấy mình thì hai lần; vùng mới tái dùng Graphics báo lại từ đầu", () => {
+    const { layer, me, dangers } = make(4); // trần 4 vùng
+    me.value = { x: 100, y: 200, r: 14 };
+    layer.warn(warn({ x: 100, y: 200, r: 60, ms: 3000 }), 0);
+    layer.warn(warn({ x: 110, y: 200, r: 60, ms: 3000 }), 0);
+    layer.update(50);
+    expect(dangers).toHaveLength(2);
+    for (let i = 0; i < 4; i++) layer.warn(warn({ x: 105, y: 200, r: 60, ms: 3000 }), 60 + i);
+    layer.update(100);
+    expect(dangers).toHaveLength(6); // 2 vùng đầu + 4 vùng mới (hai trong số đó TÁI DÙNG Graphics của vùng cũ) đều báo
+    expect(layer.stats().dangerAlerts).toBe(dangers.length);
+  });
+
+  it("không có người chơi (null) hoặc ngoài khung nhìn: không báo", () => {
+    const { layer, me, dangers, view } = make();
+    layer.warn(warn({ x: 100, y: 200, r: 60 }), 0);
+    layer.update(100); // me null
+    expect(dangers).toHaveLength(0);
+    me.value = { x: 100, y: 200, r: 14 };
+    view.value = false;
+    layer.update(200); // không vẽ nên không đánh giá
+    expect(dangers).toHaveLength(0);
   });
 });
