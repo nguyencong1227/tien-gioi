@@ -1,4 +1,4 @@
-// Hàn Vân Lĩnh (M7.5, #506): bản đồ thứ tư, đi qua cổng hai chiều với Âm Sương Trạch; chưa có quái (loài Nguyên Anh thêm ở M7.5b).
+// Hàn Vân Lĩnh (M7.5, #506): bản đồ thứ tư, đi qua cổng hai chiều với Âm Sương Trạch; quái Nguyên Anh sinh đúng chỗ / đúng số (M7.5b).
 import { describe, expect, it } from "vitest";
 import {
   AM_SUONG_ID,
