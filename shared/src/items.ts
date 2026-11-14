@@ -1,6 +1,8 @@
 // Vật phẩm, bảng rơi đồ, túi đồ: hợp đồng giữa client và server (Sprint 1).
 // Server quyết định mọi thứ (rơi gì, nhặt được không, dùng được không); client chỉ hiển thị.
 
+import type { Element } from "./skills";
+
 export type ItemType = "consumable" | "material" | "equip" | "book";
 /** 0 phàm phẩm, 1 linh phẩm, 2 bảo phẩm, 3 tiên phẩm, 4 thần phẩm */
 export type Rarity = 0 | 1 | 2 | 3 | 4;
@@ -38,14 +40,43 @@ export function expPillGain(effect: { pct: number; maxExp?: number }, expMax: nu
 
 // ---------- Trang bị (Sprint 3) ----------
 
-export type EquipSlot = "weapon" | "robe" | "talisman";
-/** Thứ tự hiển thị trong bảng nhân vật */
-export const EQUIP_SLOTS: EquipSlot[] = ["weapon", "robe", "talisman"];
+/**
+ * Sáu ô trang bị (M7.4, #505; hợp đồng ở `docs/THIET_KE_NHAN_VAT_6_O.md` mục 8). Ba ô đầu CÔNG KHAI (ai cũng thấy để vẽ ngoại hình, trường `Player.weapon / robe /
+ * talisman`); ba ô sau (hài, ngọc bội, pháp bảo) là RIÊNG của chủ (`Player.boots / jade / treasure` với `@view(TAG_OWNER)`: không đổi ngoại hình, người khác không nhận byte nào).
+ */
+export type PublicEquipSlot = "weapon" | "robe" | "talisman";
+export type OwnerEquipSlot = "boots" | "jade" | "treasure";
+export type EquipSlot = PublicEquipSlot | OwnerEquipSlot;
+/** Thứ tự hiển thị trong bảng nhân vật (lưới 3 x 2: ba ô công khai trên, ba ô riêng dưới) */
+export const EQUIP_SLOTS: EquipSlot[] = ["weapon", "robe", "talisman", "boots", "jade", "treasure"];
+/** Ô CÔNG KHAI (có trong state cho mọi người) */
+export const PUBLIC_EQUIP_SLOTS: readonly PublicEquipSlot[] = ["weapon", "robe", "talisman"];
+/** Ô RIÊNG của chủ (chỉ chủ nhận, qua `StateView`) */
+export const OWNER_EQUIP_SLOTS: readonly OwnerEquipSlot[] = ["boots", "jade", "treasure"];
 export const EQUIP_SLOT_NAMES: Record<EquipSlot, string> = {
   weapon: "Vũ khí",
   robe: "Pháp bào",
   talisman: "Hộ phù",
+  boots: "Hài",
+  jade: "Ngọc bội",
+  treasure: "Pháp bảo",
 };
+
+/**
+ * Cảnh giới (`realm`) tối thiểu để dùng một ô; ô vắng khỏi bảng = mở từ đầu. Pháp bảo mở từ Kim Đan (`realm` 3). MỘT bảng cho server (từ chối mặc, bỏ qua chỉ số của ô
+ * chưa mở trong `equipBonus` khi truyền `realm`) và client (ghi "Mở ở Kim Đan", khoá thẻ).
+ */
+export const EQUIP_SLOT_UNLOCK_REALM: Readonly<Partial<Record<EquipSlot, number>>> = {
+  treasure: 3,
+};
+
+/** Ô `slot` đã mở ở cảnh giới `realm`? Ô lạ / `realm` không hữu hạn: chưa mở. */
+export function equipSlotOpen(slot: unknown, realm: number): boolean {
+  if (typeof slot !== "string" || !(EQUIP_SLOTS as string[]).includes(slot)) return false;
+  if (!Number.isFinite(realm)) return false;
+  const need = EQUIP_SLOT_UNLOCK_REALM[slot as EquipSlot];
+  return need === undefined || realm >= need;
+}
 
 /** Chỉ số cộng thêm (cộng thẳng vào chỉ số gốc, không nhân) */
 export interface EquipStats {
@@ -54,7 +85,19 @@ export interface EquipStats {
   mp?: number;
   /** px/giây */
   speed?: number;
+  /** Điểm bạo kích (%, M7.4): tổng từ trang bị kẹp theo `STAT_CAPS.crit` */
+  crit?: number;
+  /** Giảm hồi chiêu (%, M7.4): tổng từ trang bị kẹp theo `STAT_CAPS.cdr` */
+  cdr?: number;
+  /** Giảm sát thương nhận (%, M7.4): tổng từ trang bị kẹp theo `STAT_CAPS.guard` */
+  guard?: number;
 }
+
+/**
+ * Trần của ba chỉ số phần trăm cộng từ TRANG BỊ (điểm %, M7.4): `equipBonus` / `statsFor` trả tổng ĐÃ KẸP theo bảng này; client so với nó để ghi "(tối đa)", không tự kẹp.
+ * Chiêu / trạng thái (hộ thể, tăng tốc...) là hệ số riêng, không nằm trong tổng này. `crit` 40 theo issue #505; số khởi đầu, M7.9 hiệu chỉnh (một chỗ để sửa).
+ */
+export const STAT_CAPS = { crit: 40, cdr: 30, guard: 40 } as const;
 
 export interface EquipDef {
   slot: EquipSlot;
@@ -62,14 +105,17 @@ export interface EquipDef {
   /** Cảnh giới tối thiểu để mặc: realm + tier (so theo stepOf) */
   reqRealm: number;
   reqTier: number;
+  /** Chỉ có ở món của ô `treasure` (pháp bảo, M7.4): nội tại đặc biệt, tra bằng `treasureOf`; server thực thi (`systems/treasure.ts`) */
+  treasure?: TreasureId;
 }
 
 /**
- * Đồ đang mặc: itemId theo từng ô, "" = trống.
- * Công khai (ai cũng thấy để vẽ ngoại hình): server đặt ba trường `weapon`, `robe`, `talisman`
- * thẳng trên Player trong state, nên client đọc được Equipment từ chính player trong state.
+ * Đồ đang mặc: itemId theo từng ô, "" = trống. Ba ô công khai (`weapon`, `robe`, `talisman`) server đặt thẳng trên Player trong state nên client đọc từ chính player;
+ * ba ô riêng (`boots`, `jade`, `treasure`) cũng nằm trên Player nhưng CHỈ CHỦ nhận (`@view(TAG_OWNER)`): client chỉ đọc được của chính mình. Trong KIỂU, ba ô riêng
+ * là TUỲ CHỌN trong kiểu và trong `emptyEquipment()` (vắng hoặc `""` = trống): mã dựng `Equipment` ba khoá, file lưu cũ và test cũ vẫn nguyên; mọi hàm đọc (`equipBonus`,
+ * `sanitizeEquipment`...) coi ô vắng là trống, và duyệt cả sáu ô bằng `EQUIP_SLOTS`.
  */
-export type Equipment = Record<EquipSlot, string>;
+export type Equipment = Record<PublicEquipSlot, string> & Partial<Record<OwnerEquipSlot, string>>;
 
 export function emptyEquipment(): Equipment {
   return { weapon: "", robe: "", talisman: "" };
@@ -414,19 +460,120 @@ export const ITEMS: ItemDef[] = [
 
 export const ITEM_BY_ID: Record<string, ItemDef> = Object.fromEntries(ITEMS.map((i) => [i.id, i]));
 
-/** Tổng chỉ số cộng thêm từ đồ đang mặc. Bỏ qua id lạ hoặc món mặc sai ô. */
-export function equipBonus(eq: Partial<Equipment> | undefined): Required<EquipStats> {
-  const out = { atk: 0, hp: 0, mp: 0, speed: 0 };
+/** Kẹp tổng một chỉ số phần trăm về [0, trần]; số không hữu hạn coi như 0. */
+function capPct(sum: number, cap: number): number {
+  return Number.isFinite(sum) ? Math.min(cap, Math.max(0, sum)) : 0;
+}
+
+/**
+ * Tổng chỉ số cộng thêm từ đồ đang mặc. Bỏ qua id lạ hoặc món mặc sai ô. `crit` / `cdr` / `guard` trả ĐÃ KẸP theo `STAT_CAPS`. Truyền `realm` thì bỏ qua cả ô CHƯA MỞ
+ * ở cảnh giới đó (`equipSlotOpen`: file lưu sửa tay đặt pháp bảo ở người chưa tới Kim Đan thì không có tác dụng); bỏ trống `realm` = không xét.
+ */
+export function equipBonus(
+  eq: Partial<Equipment> | undefined,
+  realm?: number,
+): Required<EquipStats> {
+  const out = { atk: 0, hp: 0, mp: 0, speed: 0, crit: 0, cdr: 0, guard: 0 };
   if (!eq) return out;
   for (const slot of EQUIP_SLOTS) {
     const e = ITEM_BY_ID[eq[slot] ?? ""]?.equip;
     if (!e || e.slot !== slot) continue;
+    if (realm !== undefined && !equipSlotOpen(slot, realm)) continue;
     out.atk += e.stats.atk ?? 0;
     out.hp += e.stats.hp ?? 0;
     out.mp += e.stats.mp ?? 0;
     out.speed += e.stats.speed ?? 0;
+    out.crit += e.stats.crit ?? 0;
+    out.cdr += e.stats.cdr ?? 0;
+    out.guard += e.stats.guard ?? 0;
   }
+  out.crit = capPct(out.crit, STAT_CAPS.crit);
+  out.cdr = capPct(out.cdr, STAT_CAPS.cdr);
+  out.guard = capPct(out.guard, STAT_CAPS.guard);
   return out;
+}
+
+// ---------- Pháp bảo (M7.4, #505) ----------
+
+/** Nội tại của pháp bảo (ô `treasure`, mở từ Kim Đan). Sáu loại khởi đầu; số cuối do M7.9. */
+export type TreasureId =
+  | "ho_than_an"
+  | "hap_linh_chau"
+  | "xich_diem_an"
+  | "han_bang_an"
+  | "dinh_tam_chung"
+  | "phong_hanh_boi";
+
+export interface TreasureDef {
+  id: TreasureId;
+  name: string;
+  /** Câu tiếng Việt HOÀN CHỈNH nêu nội tại cùng các con số: client chỉ hiển thị, không tự diễn giải số */
+  desc: string;
+  /** Số liệu để server thi hành (`systems/treasure.ts`); `desc` nhắc đúng từng số ở đây (test) */
+  params: Readonly<Record<string, number>>;
+  /** Hệ được tăng sát thương (chỉ pháp bảo kiểu "tăng sát thương một hệ") */
+  element?: Element;
+}
+
+const pct = (ratio: number) => `${Math.round(ratio * 100)} %`;
+
+const HO_THAN = { intervalS: 10, shieldRatio: 0.15 } as const;
+const HAP_LINH = { mpRatio: 0.03 } as const;
+const XICH_DIEM = { dmgRatio: 0.15 } as const;
+const HAN_BANG = { dmgRatio: 0.15 } as const;
+const DINH_TAM = { hpRatioPerS: 0.01, stillS: 1 } as const;
+const PHONG_HANH = { speedRatio: 0.1, ms: 4000 } as const;
+
+export const TREASURES: readonly TreasureDef[] = [
+  {
+    id: "ho_than_an",
+    name: "Hộ Thân Ấn",
+    params: HO_THAN,
+    desc: `Mỗi ${HO_THAN.intervalS} giây tự dựng một lớp khiên bằng ${pct(HO_THAN.shieldRatio)} khí huyết tối đa.`,
+  },
+  {
+    id: "hap_linh_chau",
+    name: "Hấp Linh Châu",
+    params: HAP_LINH,
+    desc: `Mỗi lần hạ một con quái, hồi ${pct(HAP_LINH.mpRatio)} linh lực tối đa.`,
+  },
+  {
+    id: "xich_diem_an",
+    name: "Xích Diễm Ấn",
+    params: XICH_DIEM,
+    element: "hoa",
+    desc: `Chiêu hệ Hỏa gây thêm ${pct(XICH_DIEM.dmgRatio)} sát thương.`,
+  },
+  {
+    id: "han_bang_an",
+    name: "Hàn Băng Ấn",
+    params: HAN_BANG,
+    element: "bang",
+    desc: `Chiêu hệ Băng gây thêm ${pct(HAN_BANG.dmgRatio)} sát thương.`,
+  },
+  {
+    id: "dinh_tam_chung",
+    name: "Định Tâm Chung",
+    params: DINH_TAM,
+    desc: `Đứng yên từ ${DINH_TAM.stillS} giây trở đi, mỗi giây hồi ${pct(DINH_TAM.hpRatioPerS)} khí huyết tối đa.`,
+  },
+  {
+    id: "phong_hanh_boi",
+    name: "Phong Hành Bội",
+    params: PHONG_HANH,
+    desc: `Sau khi hạ một con quái, tăng ${pct(PHONG_HANH.speedRatio)} tốc độ di chuyển trong ${PHONG_HANH.ms / 1000} giây.`,
+  },
+];
+
+export const TREASURE_BY_ID: Readonly<Record<string, TreasureDef>> = Object.fromEntries(
+  TREASURES.map((t) => [t.id, t]),
+);
+
+/** Tra pháp bảo theo id không tin được (tin nhắn client, file lưu): id lạ / độc (kể cả "constructor") -> `undefined`. */
+export function treasureOf(id: unknown): TreasureDef | undefined {
+  return typeof id === "string" && Object.prototype.hasOwnProperty.call(TREASURE_BY_ID, id)
+    ? TREASURE_BY_ID[id]
+    : undefined;
 }
 
 // ---------- Rơi đồ ----------

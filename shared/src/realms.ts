@@ -74,6 +74,12 @@ export interface Stats {
   maxMp: number;
   atk: number;
   speed: number; // px/giây
+  /** Điểm bạo kích (%) từ trang bị, đã kẹp theo `STAT_CAPS.crit` (M7.4) */
+  crit: number;
+  /** Giảm hồi chiêu (%) từ trang bị, đã kẹp theo `STAT_CAPS.cdr` (M7.4) */
+  cdr: number;
+  /** Giảm sát thương nhận (%) từ trang bị, đã kẹp theo `STAT_CAPS.guard` (M7.4) */
+  guard: number;
 }
 
 /**
@@ -91,12 +97,15 @@ export function statsFor(
   const s = stepOf(realm, tier);
   // Qua cảnh giới lớn có thêm thưởng để đột phá có cảm giác "nhảy vọt"
   const realmBonus = 1 + realm * 0.15;
-  const b = equipBonus(equipment);
+  const b = equipBonus(equipment, realm); // ô chưa mở ở `realm` không có tác dụng (pháp bảo trước Kim Đan)
   return {
     maxHp: Math.round(100 * Math.pow(1.18, s) * realmBonus * (mult?.maxHp ?? 1)) + b.hp,
     maxMp: Math.round(50 * Math.pow(1.12, s) * realmBonus * (mult?.maxMp ?? 1)) + b.mp,
     atk: Math.round(10 * Math.pow(1.17, s) * realmBonus * (mult?.atk ?? 1)) + b.atk,
     speed: 150 + Math.min(realm, 6) * 8 + b.speed,
+    crit: b.crit,
+    cdr: b.cdr,
+    guard: b.guard,
   };
 }
 

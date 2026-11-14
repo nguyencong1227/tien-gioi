@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   DROP_TABLES,
   EQUIP_SLOTS,
+  PUBLIC_EQUIP_SLOTS,
   ITEMS,
   ITEM_BY_ID,
   NPC_BY_ID,
@@ -27,7 +28,9 @@ describe("dữ liệu trang bị", () => {
   });
 
   it("mỗi ô có ít nhất 1 món, mỗi món có chỉ số dương", () => {
-    for (const slot of EQUIP_SLOTS) expect(gear.some((g) => g.equip!.slot === slot)).toBe(true);
+    // Ba ô CÔNG KHAI phải có đồ; ba ô riêng (hài, ngọc bội, pháp bảo) có đồ từ PR server M7.4 (khi đó đổi sang `EQUIP_SLOTS`)
+    for (const slot of PUBLIC_EQUIP_SLOTS)
+      expect(gear.some((g) => g.equip!.slot === slot)).toBe(true);
     for (const g of gear) {
       const v = Object.values(g.equip!.stats);
       expect(v.length).toBeGreaterThan(0);
@@ -76,6 +79,9 @@ describe("statsFor với trang bị", () => {
       maxHp: base.maxHp + 110,
       maxMp: base.maxMp + 40,
       speed: base.speed + 10,
+      crit: 0,
+      cdr: 0,
+      guard: 0,
     });
   });
 
@@ -86,6 +92,9 @@ describe("statsFor với trang bị", () => {
         hp: 0,
         mp: 0,
         speed: 0,
+        crit: 0,
+        cdr: 0,
+        guard: 0,
       },
     );
   });
