@@ -407,10 +407,19 @@ try {
     );
     await sleep(500);
   };
+  // đang xem Âm Sương rồi ĐÓNG bản đồ lớn và qua cổng: chưa mở lại mà trạng thái đã về bản đồ mình vừa tới (không còn dấu "đang xem" cũ)
+  await click('#map-graph .mg-node[data-map-id="am_suong"]');
+  let gs = await graphState();
+  check(gs.view === "am_suong", `tiền điều kiện: đang xem Âm Sương (${gs.view})`);
   await close();
   await goMap("hac_phong");
+  gs = await graphState();
+  check(
+    gs.view === null && gs.pressed.length === 1 && gs.pressed[0] === "hac_phong",
+    `đóng khi đang xem Âm Sương rồi qua cổng: chưa mở lại đã xem bản đồ mình (${gs.view}, ${JSON.stringify(gs.pressed)})`,
+  );
   await open();
-  let gs = await graphState();
+  gs = await graphState();
   check(
     !gs.hidden && gs.current.length === 1 && gs.current[0] === "hac_phong",
     `sau khi qua cổng sang Hắc Phong: 'đang đứng' (aria-current) ở hac_phong (${JSON.stringify(gs.current)})`,
@@ -421,6 +430,10 @@ try {
   );
   // đang xem bản đồ khác (Âm Sương) với bản đồ lớn MỞ rồi qua cổng: về xem bản đồ mình đứng, camera / tiêu đề theo bản đồ mới
   await click('#map-graph .mg-node[data-map-id="am_suong"]');
+  check(
+    (await graphState()).view === "am_suong",
+    "tiền điều kiện: đang xem Âm Sương, bản đồ lớn mở",
+  );
   await goMap("lac_ha");
   gs = await graphState();
   check(
