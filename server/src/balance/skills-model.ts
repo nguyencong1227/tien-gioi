@@ -14,8 +14,17 @@ import {
   STATUS_BY_ID,
   type Stats,
   ENGRAVE_COSTS,
+  SKILL_BY_ID,
+  statsFor,
+  TICK_MS,
 } from "@tien-gioi/shared";
 import { ASSUME } from "./simulate";
+import { makeWorld, addPlayer, addMonster } from "../systems/test-helpers";
+import { cast } from "../systems/cast";
+import { slash } from "../systems/combat";
+import { tickStatuses } from "../systems/status";
+import { applyStats } from "../systems/progression";
+import { seeded } from "./hunt-check";
 
 /**
  * DPS cơ bản khi chỉ chém thường (baseline: SKILLS.slash)
@@ -352,4 +361,90 @@ export function simulateEngraveImpact(engravedCount: number): {
     // Mục tiêu mục 10: không làm kiếp 2 vượt ~2.0x kiếp 1
     withinTargetLimit: overallSpeedupRatio <= 2.0,
   };
+}
+
+/**
+ * Kết quả đối chiếu mô hình cân bằng chiêu thức (computeSkillCombo) với mã server thật (cast.ts + combat.ts + status.ts).
+ */
+export interface SkillVerifyResult {
+  skillId: string;
+  modelDps: number;
+  realDps: number;
+  diffPercent: number;
+  match: boolean; // tiêu chí issue #510: độ lệch <= 25%
+}
+
+/**
+ * Mô phỏng trận đấu trong World thật bằng mã server thật để đối chiếu với mô hình lý thuyết.
+ * Người chơi cast chiêu thức mỗi khi hồi chiêu và đủ linh lực, xen kẽ chém thường (slash).
+ */
+export function simulateSkillFight(
+  skillId: string,
+  realm = 2,
+  tier = 0,
+  durationSec = 25,
+  seed = 42,
+): SkillVerifyResult {
+  const saved = Math.random;
+  Math.random = seeded(seed);
+  try {
+    const { w } = makeWorld();
+    const { p, c } = addPlayer(w, "tester", realm, tier);
+    applyStats(p, true);
+    p.mp = p.maxMp;
+
+    const def = SKILL_BY_ID[skillId];
+    if (!def) throw new Error("Không tìm thấy chiêu: " + skillId);
+
+    // Gắn chiêu vào ô 2 (chỉ số m.slot = 2, idx = 0)
+    c.skills.learned[skillId] = 1;
+    c.skills.slots[0] = skillId;
+
+    // Thêm quái thử nghiệm đứng ngay trước mặt (cách 30px)
+    const mon = addMonster(w, "mang", p.x + 30, p.y);
+    mon.m.hp = 2_000_000;
+    mon.m.maxHp = 2_000_000;
+    // Tắt aggro và đòn đánh của quái để đo thuần sát thương người chơi gây ra
+    mon.mc.def = { ...mon.mc.def, aggro: 0, attackCd: 999_999 };
+
+    w.now = 1_000_000;
+    const dt = TICK_MS / 1000;
+    let t = 0;
+    const hp0 = mon.m.hp;
+
+    while (t < durationSec) {
+      w.now += TICK_MS;
+      t += dt;
+      w.tick++;
+
+      // Tự hồi phục một lượng linh lực để không bị kẹt khi test chiêu tốn MP
+      p.mp = Math.min(p.maxMp, p.mp + 20 * dt);
+
+      const cost = skillMpCost(def, p.maxMp);
+      if (w.now >= c.skillCd[0] && p.mp >= cost) {
+        cast(w, "tester", { slot: 2, angle: 0 });
+      } else {
+        slash(w, "tester", 0);
+      }
+
+      tickStatuses(w, dt);
+    }
+
+    const totalLost = hp0 - mon.m.hp;
+    const realDps = totalLost / t;
+
+    const stats = statsFor(realm, tier, p, c.mult);
+    const model = computeSkillCombo(def, stats.atk, stats.maxMp, "none");
+    const diffPercent = (Math.abs(realDps - model.comboDps) / model.comboDps) * 100;
+
+    return {
+      skillId,
+      modelDps: model.comboDps,
+      realDps,
+      diffPercent,
+      match: diffPercent <= 25,
+    };
+  } finally {
+    Math.random = saved;
+  }
 }
