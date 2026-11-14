@@ -17,6 +17,7 @@ import {
   STATUS_BIT,
   moveSpeedMul,
   sanitizeStatusList,
+  skillReqMet,
   statusCarriesRatio,
   type StatusEntry,
   SKILL_BY_ID,
@@ -743,5 +744,34 @@ describe("tốc độ di chuyển theo trạng thái (moveSpeedMul, StatusEntry.
     expect(many).toHaveLength(MAX_STATUSES);
     // luôn dùng được cho moveSpeedMul
     expect(Number.isFinite(moveSpeedMul(sanitizeStatusList([["haste", 1000, 5]])))).toBe(true);
+  });
+});
+
+describe("đủ cảnh giới để học / dùng chiêu (skillReqMet)", () => {
+  const def = { reqRealm: 2, reqTier: 3 };
+
+  it("realm cao hơn thì đủ bất kể bậc; cùng realm cần bậc >= yêu cầu; realm thấp hơn thì chưa", () => {
+    expect(skillReqMet(def, 2, 3)).toBe(true);
+    expect(skillReqMet(def, 2, 8)).toBe(true);
+    expect(skillReqMet(def, 2, 2)).toBe(false);
+    expect(skillReqMet(def, 3, 0)).toBe(true); // bậc thấp không kéo realm cao xuống
+    expect(skillReqMet(def, 1, 99)).toBe(false); // bậc cao không bù realm thấp
+    expect(skillReqMet({ reqRealm: 0, reqTier: 0 }, 0, 0)).toBe(true);
+  });
+
+  it("cảnh giới / bậc không hữu hạn: chưa đủ", () => {
+    for (const bad of [Number.NaN, Infinity, -Infinity])
+      expect(skillReqMet(def, bad, 3), String(bad)).toBe(false);
+    expect(skillReqMet(def, 2, Number.NaN)).toBe(false);
+    expect(skillReqMet(def, 5, Number.NaN)).toBe(false);
+  });
+
+  it("khớp `learnSkill` ở mọi chiêu x mọi (realm, bậc): học được về cảnh giới <=> skillReqMet", () => {
+    for (const k of SKILLS_M7)
+      for (let realm = 0; realm <= 6; realm++)
+        for (let tier = 0; tier <= 9; tier++) {
+          const r = learnSkill(emptySkillBook(), k.id, realm, tier);
+          expect(r.ok, `${k.id} ${realm}/${tier}`).toBe(skillReqMet(k, realm, tier));
+        }
   });
 });
