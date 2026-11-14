@@ -169,6 +169,16 @@ try {
     "chọn sẵn đúng chiêu ĐÃ khắc (ung_trao)",
   );
   check(st.hint === "Tối đa 1 chiêu (đã chọn 1/1)", `gợi ý: "${st.hint}"`);
+  const colors = await J(
+    "Object.fromEntries([...document.querySelectorAll('#limbo-engrave-list .engrave-item')].map((el) => [el.querySelector('input').dataset.nav.slice(8), getComputedStyle(el.querySelector('.engrave-name')).color]))",
+  );
+  // Ưng Trảo hệ Kim (#e0c25a: đủ sáng, giữ nguyên); Hỏa Vân Kiếm hệ Hỏa (#e8573a gốc chỉ ~3,5:1: được sáng thêm); Mê Tung Bộ hệ Phong: mỗi hệ MỘT màu khác nhau
+  check(
+    colors.ung_trao === "rgb(224, 194, 90)" &&
+      colors.hoa_van_kiem !== "rgb(232, 87, 58)" &&
+      new Set(Object.values(colors)).size === 3,
+    `tên chiêu tô màu theo hệ (Kim giữ nguyên, Hỏa sáng thêm, ba hệ ba màu): ${JSON.stringify(colors)}`,
+  );
   check(
     st.items.filter((i) => !i.checked).every((i) => i.disabled),
     "hết chỗ (nấc 1): hai chiêu còn lại bị khoá, không chọn thêm được",
@@ -345,6 +355,59 @@ try {
   );
   rc = await rebirth();
   check(!("engrave" in rc[0]), "dữ liệu lạ + chưa đụng: vẫn KHÔNG gửi engrave");
+
+  console.log("--- tương phản chữ màu hệ >= 4,5:1 trên nền mục ĐÃ CHỌN, cả 12 chiêu (a11y) ---");
+  const ALL12 = [
+    "hoa_van_kiem",
+    "bon_thach_quyen",
+    "ung_trao",
+    "trong_nhac_tram",
+    "huyen_bang_chi",
+    "kim_chung_trao",
+    "bich_thuy_hoi_xuan",
+    "phieu_phong_bo",
+    "thanh_tung_phi_cham",
+    "lac_tuyet_phan_phi",
+    "cuu_cung_khon_sat",
+    "me_tung_bo",
+  ];
+  await showLimbo({
+    summary: { kiep: 1, realm: 1, tier: 4, minutes: 42, kills: 68, bossKills: 1, gain: 16 },
+    soul: { kiep: 1, duyen: 500, unlocks: { khac: 3 }, origins: [], engraved: ["ung_trao"] },
+    keepable: [],
+    engravable: ALL12,
+  });
+  const lay = await J(`(() => {
+    const px = (c) => c.match(/[\\d.]+/g).map(Number);
+    const box = getComputedStyle(document.querySelector('.limbo-box')).backgroundColor;
+    const checked = document.querySelector('#limbo-engrave-list .engrave-item.checked');
+    return { box, itemBg: getComputedStyle(checked).backgroundColor,
+      names: Object.fromEntries([...document.querySelectorAll('#limbo-engrave-list .engrave-item')].map((el) => [el.querySelector('input').dataset.nav.slice(8), getComputedStyle(el.querySelector('.engrave-name')).color])) };
+  })()`);
+  const nums = (c) => c.match(/[\d.]+/g).map(Number);
+  const layerOver = (fg, bg) =>
+    [0, 1, 2].map((i) => fg[i] * (fg[3] ?? 1) + bg[i] * (1 - (fg[3] ?? 1)));
+  const lum = (c) => {
+    const f = (v) => {
+      const x = v / 255;
+      return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+    };
+    return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]);
+  };
+  const ratio = (a, b) => (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05);
+  // nền thật: lớp mục đã chọn (trong suốt) trên hộp Hoàng Tuyền (gần đặc) trên nền tối: lấy đen làm nền dưới cùng (không làm tương phản đẹp hơn quá ~8 %)
+  const bgReal = layerOver(nums(lay.itemBg), layerOver(nums(lay.box), [0, 0, 0]));
+  const bad = Object.entries(lay.names)
+    .filter(([, c]) => ratio(nums(c), bgReal) < 4.5)
+    .map(([id, c]) => `${id} ${ratio(nums(c), bgReal).toFixed(2)}`);
+  check(
+    Object.keys(lay.names).length === 12 && bad.length === 0,
+    `12 chiêu, mọi tên >= 4,5:1 trên nền đã chọn (nền ~ rgb(${bgReal.map(Math.round)})${bad.length ? "; dưới ngưỡng: " + bad.join(", ") : ""})`,
+  );
+  check(
+    new Set(Object.values(lay.names)).size >= 6,
+    `màu vẫn phân biệt theo hệ (${new Set(Object.values(lay.names)).size} màu khác nhau)`,
+  );
 
   console.log("--- 360x640: không tràn ngang, mục bấm >= 44 px ---");
   await open(360, 640);

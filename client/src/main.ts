@@ -89,6 +89,15 @@ bindHdGate(
   getQuality().hdPacks,
   (cb) => onQualityChange((p) => cb(p.hdPacks)),
   () => packs().releaseKind("hd"),
+  {
+    // tab ẩn thì không đếm thời gian ổn định (như bộ điều tốc: `setQualityActive(!document.hidden)` bên dưới)
+    initial: !document.hidden,
+    subscribe: (cb) => {
+      const onVis = (): void => cb(!document.hidden);
+      document.addEventListener("visibilitychange", onVis);
+      return () => document.removeEventListener("visibilitychange", onVis);
+    },
+  },
 );
 initPacks(browserPacksEnv({ isNative: isNativeApp, hdAllowed: () => hdGate.allowed() }));
 document.addEventListener("visibilitychange", () => setQualityActive(!document.hidden));

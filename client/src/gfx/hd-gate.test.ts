@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { bindHdGate, createHdGate } from "./hd-gate";
 import { HD_STABLE_MS } from "./packs";
 
@@ -151,5 +151,177 @@ describe("gfx/hd-gate: bindHdGate nối cổng với hồ sơ chất lượng", 
     expect(src.count()).toBe(1);
     off();
     expect(src.count()).toBe(0);
+  });
+});
+
+describe("gfx/hd-gate: thời gian tab ẨN không tính là ổn định (review B ở #547)", () => {
+  it("ẩn tab dừng đếm, hiện lại đếm tiếp: 30 s hiện + 5 phút ẩn + 30 s hiện = đủ 60 s", () => {
+    const c = clock();
+    const g = createHdGate(c.now);
+    g.update(true);
+    c.advance(HD_STABLE_MS / 2);
+    g.setVisible(false);
+    c.advance(5 * 60_000);
+    expect(g.allowed()).toBe(false);
+    expect(g.msUntilAllowed()).toBe(HD_STABLE_MS / 2);
+    g.setVisible(true);
+    c.advance(HD_STABLE_MS / 2 - 1);
+    expect(g.allowed()).toBe(false);
+    c.advance(1);
+    expect(g.allowed()).toBe(true);
+  });
+
+  it("mở trang ở tab ẩn: hdPacks bật nhưng chưa đếm; hiện tab mới bắt đầu", () => {
+    const c = clock();
+    const g = createHdGate(c.now);
+    g.setVisible(false);
+    g.update(true);
+    c.advance(10 * HD_STABLE_MS);
+    expect(g.allowed()).toBe(false);
+    expect(g.msUntilAllowed()).toBe(HD_STABLE_MS);
+    g.setVisible(true);
+    c.advance(HD_STABLE_MS);
+    expect(g.allowed()).toBe(true);
+  });
+
+  it("đã đủ ổn định rồi thì ẩn tab KHÔNG đóng cổng", () => {
+    const c = clock();
+    const g = createHdGate(c.now);
+    g.update(true);
+    c.advance(HD_STABLE_MS);
+    expect(g.allowed()).toBe(true);
+    g.setVisible(false);
+    expect(g.allowed()).toBe(true);
+    c.advance(HD_STABLE_MS);
+    g.setVisible(true);
+    expect(g.allowed()).toBe(true);
+  });
+
+  it("hdPacks tắt trong lúc tab ẩn vẫn xoá phần đã đếm; bật lại đếm từ 0", () => {
+    const c = clock();
+    const g = createHdGate(c.now);
+    g.update(true);
+    c.advance(HD_STABLE_MS - 1000);
+    g.setVisible(false);
+    g.update(false);
+    g.setVisible(true);
+    g.update(true);
+    c.advance(1000);
+    expect(g.allowed()).toBe(false);
+    c.advance(HD_STABLE_MS - 1000);
+    expect(g.allowed()).toBe(true);
+  });
+
+  it("báo hdPacks=true lặp lại LÚC ĐANG ẨN không xoá phần đã đếm", () => {
+    const c = clock();
+    const g = createHdGate(c.now);
+    g.update(true);
+    c.advance(HD_STABLE_MS / 2);
+    g.setVisible(false);
+    g.update(true); // hồ sơ đổi vì lý do khác trong lúc ẩn
+    g.update(true);
+    g.setVisible(true);
+    c.advance(HD_STABLE_MS / 2);
+    expect(g.allowed()).toBe(true);
+  });
+
+  it("báo hiện / ẩn lặp lại cùng giá trị không đặt lại và không đếm trùng", () => {
+    const c = clock();
+    const g = createHdGate(c.now);
+    g.update(true);
+    g.setVisible(true);
+    c.advance(HD_STABLE_MS / 2);
+    g.setVisible(true);
+    g.setVisible(false);
+    g.setVisible(false);
+    c.advance(HD_STABLE_MS);
+    expect(g.msUntilAllowed()).toBe(HD_STABLE_MS / 2);
+  });
+
+  it("msUntilAllowed không âm khi đã quá mốc", () => {
+    const c = clock();
+    const g = createHdGate(c.now);
+    g.update(true);
+    c.advance(HD_STABLE_MS + 12345);
+    expect(g.msUntilAllowed()).toBe(0);
+  });
+});
+
+describe("gfx/hd-gate: đồng hồ mặc định đơn điệu (performance.now), không theo giờ hệ thống", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("giờ hệ thống nhảy tiến 1 giờ (đồng bộ giờ / chỉnh tay) KHÔNG làm cổng mở sớm", () => {
+    // `Date.now` bị giả TRƯỚC khi tạo cổng: nếu đồng hồ mặc định là `Date.now` thì cổng bắt đúng bản giả này và nhìn thấy cú nhảy
+    const spy = vi.spyOn(Date, "now");
+    const real = Date.now();
+    spy.mockReturnValue(real);
+    const g = createHdGate();
+    g.update(true);
+    spy.mockReturnValue(real + 3_600_000);
+    expect(g.allowed()).toBe(false);
+    expect(g.msUntilAllowed()).toBeGreaterThan(HD_STABLE_MS - 5000);
+  });
+});
+
+describe("gfx/hd-gate: bindHdGate nối cả hiện / ẩn tab", () => {
+  function visSource(initial: boolean) {
+    const listeners = new Set<(v: boolean) => void>();
+    return {
+      initial,
+      subscribe: (cb: (v: boolean) => void) => {
+        listeners.add(cb);
+        return () => listeners.delete(cb);
+      },
+      emit: (v: boolean) => listeners.forEach((cb) => cb(v)),
+      count: () => listeners.size,
+    };
+  }
+  /** Nguồn `hdPacks` không bao giờ phát gì */
+  const noHd = () => (_cb: (hd: boolean) => void) => () => undefined;
+
+  it("khởi động ở tab ẨN: hdPacks bật không bắt đầu đếm", () => {
+    const c = clock();
+    const g = createHdGate(c.now);
+    const vis = visSource(false);
+    bindHdGate(g, true, noHd(), () => undefined, vis);
+    c.advance(10 * HD_STABLE_MS);
+    expect(g.allowed()).toBe(false);
+    vis.emit(true);
+    c.advance(HD_STABLE_MS);
+    expect(g.allowed()).toBe(true);
+  });
+
+  it("sự kiện hiện / ẩn đi vào cổng; hàm gỡ nối gỡ CẢ HAI nguồn", () => {
+    const c = clock();
+    const g = createHdGate(c.now);
+    const vis = visSource(true);
+    let hdListeners = 0;
+    const off = bindHdGate(
+      g,
+      true,
+      () => {
+        hdListeners++;
+        return () => hdListeners--;
+      },
+      () => undefined,
+      vis,
+    );
+    c.advance(HD_STABLE_MS / 2);
+    vis.emit(false);
+    c.advance(HD_STABLE_MS);
+    expect(g.msUntilAllowed()).toBe(HD_STABLE_MS / 2);
+    expect(vis.count()).toBe(1);
+    expect(hdListeners).toBe(1);
+    off();
+    expect(vis.count()).toBe(0);
+    expect(hdListeners).toBe(0);
+  });
+
+  it("không truyền nguồn hiện / ẩn thì chạy như trước (luôn hiện)", () => {
+    const c = clock();
+    const g = createHdGate(c.now);
+    bindHdGate(g, true, noHd(), () => undefined);
+    c.advance(HD_STABLE_MS);
+    expect(g.allowed()).toBe(true);
   });
 });
