@@ -377,9 +377,12 @@ try {
   console.error(err);
   failures++;
 } finally {
+  // Chờ Chrome thoát hẳn rồi mới xoá thư mục hồ sơ (xoá khi còn ghi thì để lại rác trong /tmp)
+  const exited = new Promise((res) => chrome.once("exit", res));
   chrome.kill();
+  await Promise.race([exited, sleep(3000)]);
   try {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(tmpDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   } catch {
     /* bỏ qua */
   }
