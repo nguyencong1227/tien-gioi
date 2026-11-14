@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { detectGpu, getChromeGpuFlags } from "./chrome-gpu.mjs";
@@ -12,6 +13,9 @@ const comfyDownScript = path.join(repoRoot, "scripts/art/comfy-down.sh");
 const comfyIdleScript = path.join(repoRoot, "scripts/art/comfy-idle-watch.sh");
 
 describe("Dây chuyền đồ họa nháp ComfyUI + SDXL (Mục 16.2 & 17.3 QUYET_DINH_M3, G1 #486)", () => {
+  const tmpTestDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-comfy-test-"));
+  const tmpLockPath = path.join(tmpTestDir, "tg-comfy.lock");
+
   it("các script quản lý vòng đời ComfyUI tồn tại và có quyền thực thi", () => {
     expect(fs.existsSync(comfyUpScript)).toBe(true);
     expect(fs.existsSync(comfyDownScript)).toBe(true);
@@ -31,6 +35,11 @@ describe("Dây chuyền đồ họa nháp ComfyUI + SDXL (Mục 16.2 & 17.3 QUYE
     const stdout = execFileSync(comfyUpScript, ["--dry-run"], {
       encoding: "utf-8",
       cwd: repoRoot,
+      env: {
+        ...process.env,
+        COMFY_DIR: tmpTestDir,
+        COMFY_LOCK_FILE: tmpLockPath,
+      },
     });
     expect(stdout).toContain("Kiểm tra điều kiện khởi động ComfyUI thành công (chế độ --dry-run)");
   });
@@ -44,6 +53,8 @@ describe("Dây chuyền đồ họa nháp ComfyUI + SDXL (Mục 16.2 & 17.3 QUYE
         cwd: repoRoot,
         env: {
           ...process.env,
+          COMFY_DIR: tmpTestDir,
+          COMFY_LOCK_FILE: tmpLockPath,
           TEST_MIN_FREE_KB: "999999999999", // Giả lập ngưỡng yêu cầu 1000 TB
         },
       });
@@ -64,6 +75,8 @@ describe("Dây chuyền đồ họa nháp ComfyUI + SDXL (Mục 16.2 & 17.3 QUYE
         cwd: repoRoot,
         env: {
           ...process.env,
+          COMFY_DIR: tmpTestDir,
+          COMFY_LOCK_FILE: tmpLockPath,
           TEST_GPU_BUSY: "1",
         },
       });
@@ -76,16 +89,20 @@ describe("Dây chuyền đồ họa nháp ComfyUI + SDXL (Mục 16.2 & 17.3 QUYE
   });
 
   it("comfy-down.sh: dọn dẹp file lock và thoát an toàn", () => {
-    const tmpLock = "/tmp/tg-comfy.lock";
-    fs.writeFileSync(tmpLock, "test-lock\n");
-    expect(fs.existsSync(tmpLock)).toBe(true);
+    fs.writeFileSync(tmpLockPath, "test-lock\n");
+    expect(fs.existsSync(tmpLockPath)).toBe(true);
 
     const stdout = execFileSync(comfyDownScript, [], {
       encoding: "utf-8",
       cwd: repoRoot,
+      env: {
+        ...process.env,
+        COMFY_DIR: tmpTestDir,
+        COMFY_LOCK_FILE: tmpLockPath,
+      },
     });
     expect(stdout).toContain("Đã tắt dây chuyền ComfyUI và giải phóng tài nguyên");
-    expect(fs.existsSync(tmpLock)).toBe(false);
+    expect(fs.existsSync(tmpLockPath)).toBe(false);
   });
 
   it("tích hợp chrome-gpu: detectGpu tự động nhường GPU khi có khóa tg-comfy.lock", () => {

@@ -61,10 +61,7 @@ if [ -d "$OUTPUT_DIR" ]; then
   find "$OUTPUT_DIR" -type f -mtime +14 -not -path '*/chosen/*' -delete 2>/dev/null || true
 fi
 
-# 5. Đảm bảo thư mục đầu ra và tạm tồn tại trên /mnt/data
-mkdir -p "$OUTPUT_DIR" "$TEMP_DIR"
-
-# 6. Ghi file lock để Chrome test tự động lùi về CPU (software fallback)
+# 5. Ghi file lock để Chrome test tự động lùi về CPU (software fallback)
 echo "$$" > "$LOCK_FILE"
 
 if [ "$DRY_RUN" = "1" ]; then
@@ -72,6 +69,9 @@ if [ "$DRY_RUN" = "1" ]; then
   echo "Kiểm tra điều kiện khởi động ComfyUI thành công (chế độ --dry-run)."
   exit 0
 fi
+
+# 6. Đảm bảo thư mục đầu ra và tạm tồn tại trên /mnt/data
+mkdir -p "$OUTPUT_DIR" "$TEMP_DIR"
 
 # 7. Kiểm tra tệp thực thi Python và mã nguồn ComfyUI
 PYTHON_BIN="$COMFY_DIR/env/bin/python"
