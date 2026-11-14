@@ -89,3 +89,27 @@ declare module "*check-credits.mjs" {
     unrecordedCreditsVktt: string[];
   };
 }
+
+declare module "*gen-notices.mjs" {
+  export const ROOT: string;
+  export const NOTICES_FILE: string;
+  export interface RuntimePackage {
+    name: string;
+    version: string;
+    license: string;
+    dir: string;
+    text: string;
+  }
+  export function runtimeClosure(root?: string): RuntimePackage[];
+  export const PHASER_EMBEDDED: Array<{
+    file: string;
+    name: string;
+    license: string;
+    start: string;
+  }>;
+  export function embeddedNotice(
+    root: string,
+    spec: { file: string; name: string; license: string; start: string },
+  ): string;
+  export function buildNotices(root?: string): string;
+}
