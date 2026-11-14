@@ -3,6 +3,7 @@
 // Quy ước tin `rebirth`: VẮNG `engrave` = giữ nguyên các chiêu đã khắc; mảng (kể cả rỗng) = THAY đúng bằng mảng đó. Nên client chỉ gửi `engrave` khi người
 // chơi đã ĐỔI tập chiêu khắc (không gửi lại đúng thứ máy chủ đã có: bớt một ca máy chủ phải ghi chân linh).
 import { elementOf, skillOf, type SkillDef } from "@tien-gioi/shared";
+import { compositeOver, type Rgb } from "./contrast";
 
 /** Lọc `ids` còn nằm trong `engravable`, bỏ trùng, cắt `cap` (giữ thứ tự). Không phải mảng thì rỗng. */
 export function clampEngrave(
@@ -87,3 +88,10 @@ export function engraveItem(id: string): EngraveItem {
     element: def ? (elementOf(def.element)?.name ?? "") : "",
   };
 }
+
+/**
+ * Nền THẬT của một mục khắc ĐÃ CHỌN: `.relic-item.checked` (style.css) THAY nền cơ sở của `.relic-item` (cùng thuộc tính `background`, không xếp chồng) bằng lớp xanh trong
+ * suốt đặt trên `.limbo-box`. Đây là nền SÁNG NHẤT của mọi trạng thái (mục chưa chọn là lớp tối `rgba(26, 22, 36, 0.7)` nên chữ còn tương phản hơn), vì vậy tính màu
+ * chữ theo nền này là đủ cho cả hai. Phải khớp CSS: `contrast.test.ts` đọc style.css và đỏ nếu lệch.
+ */
+export const ENGRAVE_CHECKED_BG: Rgb = compositeOver([56, 189, 248, 0.2], [28, 24, 38]);
