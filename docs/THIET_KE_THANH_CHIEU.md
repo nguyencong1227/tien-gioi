@@ -65,3 +65,9 @@ Chỉ hiện chiêu ĐÃ GẮN (giữ gọn, mục 15); ô khoá / trống khôn
 2. Chấp nhận phương án A (cụm chiêu thích nghi, luôn hiện) làm mặc định, B / khay làm dự phòng?
 3. `Shift+K` cho bảng Công pháp: có phím nào A đã định dùng ở M7 (Nguyên Anh, nghề) mà đụng không?
 4. Bảng Công pháp có hiện cả chiêu CHƯA học (mờ, kèm tên kinh quyển và nơi lấy) để người chơi biết có gì để săn, hay chỉ chiêu đã học? B nghiêng về chỉ đã học ở bước này (chưa có nơi bán / rơi kinh quyển: M7.4).
+
+## 9. Tiến độ làm (cập nhật khi mở PR)
+- **Bước 1 (PR `b/thanh-chieu`):** `skill-bar.ts` (`SkillTracker`, `slotView` bảy trạng thái, chữ, `aimMode`, dữ liệu giả), `skill-icon.ts` (biểu tượng vẽ bằng mã), `skill-bar-dom.ts` (vẽ DOM, chỉ ghi khi đổi), nối vào `WorldScene` (nhận `skills`, `castSlot`, hướng đánh theo con trỏ), `?skills=mock&n=&realm=`, `client/scripts/check-skill-bar.mjs` (CDP thật). Thanh MÁY TÍNH: ô vuông bo góc 58 px (to hơn đề xuất 52 px: tên viết tắt <= 10 ký tự ở cỡ chữ 9 px cần chỗ; ô tròn cắt chữ ở góc).
+- **Trả lời của A (#536):** chuột theo con trỏ (dash theo hướng di chuyển, ground chỉ lấy hướng); phương án A (cụm thích nghi) mặc định, B dự phòng; `Shift+K` không đụng; bảng chỉ hiện chiêu ĐÃ học, chừa chỗ khắc chân linh.
+- **Còn lại:** cụm chiêu cảm ứng (phương án A, `?skillui=cum|khay` + ảnh 5 khung), bảng Công pháp (`#skills-modal`, `panel.skills` = Shift+K, bàn phím trọn vẹn), bộ chọn khắc chân linh ở Hoàng Tuyền (bỏ khối 'Sắp có' ở `ui.ts`), E2E bàn phím + leak-test.
+- **Ảnh bước 1 (máy tính 1280x720, `?skills=mock`):** `docs/screenshots/thanh-chieu-b1-n4-hoi-chieu.png` (ô L, U đang hồi chiêu, I, O sẵn sàng), `-n4-choang.png` (choáng), `-n4-thieu-linh-luc.png`, `-n2-khoa.png` (Trúc Cơ: ô I, O khoá), `-n0-trong.png` (chưa gắn chiêu).
