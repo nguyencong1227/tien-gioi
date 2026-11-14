@@ -947,21 +947,22 @@ Trong cột mốc M6 (Nội dung & Cân bằng, `docs/CAN_BANG.md`), hệ thốn
 
 | Bản đồ | Quái vật | Vùng nhìn màn hình | Số quái trên bản đồ | Giả định mô hình (s) | Mẫu đo bot thật (s) | Trung vị bot đo (Median) | Trung bình (Mean) | Đối chiếu ngưỡng hoà vốn (85s) |
 | :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :--- |
-| **Hắc Phong Cốc** | **Xích Mãng** (`mang`) | **Máy tính** (`pc`, 1138x640) | 6 | 90 s | `[0.7, 13.3]` | **7.0 s** | 7.0 s | 🚨 **Quá nhanh** (< 28s nhân; bãi 6 con quá dày) |
-| **Hắc Phong Cốc** | **Xích Mãng** (`mang`) | **Điện thoại ngang** (`phone`) | 6 | 90 s | `[1.0, 25.3]` | **13.1 s** | 13.1 s | 🚨 **Quá nhanh** (< 28s nhân; bãi dày) |
-| **Hắc Phong Cốc** | **Xích Mãng** (`mang`) | **Điện thoại dọc** (`phonePortrait`) | 6 | 90 s | Quét hẹp ngang (hw=254) | **> 35 s** | > 35 s | ⚠️ Dưới 85s (tầm nhìn dọc tìm lâu hơn ngang) |
-| **Lạc Hà Trấn** | **Xích Mãng** (`mang`) | **Máy tính** (`pc`) | 2 | 90 s | Mẫu rải xa (> 2500 px) | **> 60 s** | ~75–85 s | ✅ **Đạt hoà vốn** (~85s; 2 con ở 2 rìa bản đồ) |
-| **Âm Sương Trạch** | **Sương Hồ** (`suong_ho`) | **Máy tính** (`pc`) | 24 | 10 s | `[2.1, 4.8]` | **3.5 s** | 3.5 s | ✅ Chuẩn bãi quái thường Kim Đan |
-| **Âm Sương Trạch** | **Thạch Quy** (`thach_quy`) | **Máy tính** (`pc`) | 18 | 12 s | `[4.2, 8.5]` | **6.4 s** | 6.4 s | ✅ Phân bố hợp lý |
-| **Âm Sương Trạch** | **Độc Thiềm** (`doc_thiem`) | **Máy tính** (`pc`) | 18 | 14 s | `[5.0, 11.2]` | **8.1 s** | 8.1 s | ✅ Phân bố hợp lý |
-| **Âm Sương Trạch** | **Hắc Giao** (`hac_giao`) | **Máy tính** (`pc`) | 2 | 90 s | Vùng bắc (danger >= 0.85) | **> 50 s** | ~65–75 s | ✅ Trùm phân bố hang sâu |
+| **Hắc Phong Cốc** | **Xích Mãng** (`mang`) | **Máy tính** (`pc`, 1138x640) | 6 | 90 s | `[18.6, 2.9, 1.7, 5.2, 24.1]` (5 mẫu, 6 lần hạ) | **5.2 s** | 10.5 s | 🚨 **Quá nhanh** (trung vị 5.2s < 28s nhân; min 1.7s khi có quái gần, max 24.1s khi chờ hồi sinh) |
+| **Hắc Phong Cốc** | **Xích Mãng** (`mang`) | **Điện thoại ngang** (`phone`) | 6 | 90 s | *chưa đo* | *chưa đo* | *chưa đo* | — |
+| **Hắc Phong Cốc** | **Xích Mãng** (`mang`) | **Điện thoại dọc** (`phonePortrait`) | 6 | 90 s | *chưa đo* | *chưa đo* | *chưa đo* | — |
+| **Lạc Hà Trấn** | **Xích Mãng** (`mang`) | **Máy tính** (`pc`) | 2 | 90 s | *chưa đo* | *chưa đo* | *chưa đo* | — |
+| **Âm Sương Trạch** | **Sương Hồ** (`suong_ho`) | **Máy tính** (`pc`) | 24 | 10 s | `[1.6, 2.6, 2.9, 4.0, 2.2]` (5 mẫu, 6 lần hạ) | **2.6 s** | 2.7 s | ✅ Chuẩn bãi quái thường Kim Đan (24 con, tìm cực nhanh quanh 2.6s) |
+| **Âm Sương Trạch** | **Thạch Quy** (`thach_quy`) | **Máy tính** (`pc`) | 18 | 12 s | *chưa đo* | *chưa đo* | *chưa đo* | — |
+| **Âm Sương Trạch** | **Độc Thiềm** (`doc_thiem`) | **Máy tính** (`pc`) | 18 | 14 s | *chưa đo* | *chưa đo* | *chưa đo* | — |
+| **Âm Sương Trạch** | **Hắc Giao** (`hac_giao`) | **Máy tính** (`pc`) | 2 | 90 s | *chưa đo* | *chưa đo* | *chưa đo* | — |
 
 #### Phân tích & Đánh giá cân bằng:
-1. **Xích Mãng tại Hắc Phong Cốc vs Lạc Hà Trấn:**
-   - Tại **Hắc Phong Cốc**: Có tới 6 con Xích Mãng tụ lại trong khu vực thung lũng hẹp. Khoảng cách giữa các con quái chỉ ~150–400 px, nhỏ hơn nhiều tầm nhìn của màn hình ngang (1138x640 px). Vì vậy, khi hạ xong một con, bot chỉ mất **0.7–1.0 giây** để nhìn thấy và áp sát con kế tiếp. Thời gian tìm quái thực tế chỉ ~7–13 giây, thấp hơn rất nhiều so với ngưỡng hoà vốn 85 giây. Đây là một "đường tắt" cày tu vi cực mạnh nếu không giãn khoảng cách hồi sinh hoặc giảm bớt số lượng tụ cụm.
-   - Tại **Lạc Hà Trấn**: Toàn bộ bản đồ chỉ có đúng 2 con Xích Mãng phân bố ở hai rìa bản đồ cách nhau hơn 2500 px. Thời gian tuần tra tìm con thứ hai kéo dài > 60–80 giây, hoàn toàn khớp với ngưỡng hoà vốn 85 giây trong thiết kế kinh tế.
-2. **Ảnh hưởng của tỷ lệ khung hình di động (`phonePortrait`):**
-   - Màn hình điện thoại dọc có bề ngang cực hẹp (`hw = 254 px`), làm giảm đáng kể diện tích bao phủ hai bên đường di chuyển. Bot phải đi tuần tra sát vào vị trí quái mới phát hiện được, làm thời gian tìm quái tăng gấp 2.5–3 lần so với màn hình ngang.
+1. **Xích Mãng tại Hắc Phong Cốc (Đo thật 5 mẫu trên bãi 6 con):**
+   - Tại **Hắc Phong Cốc**: Có 6 con Xích Mãng tụ trong thung lũng hẹp. Khi bãi còn quái, bot phát hiện và tiếp cận quái tiếp theo chỉ mất **1.7–5.2 giây**. Khi bãi cạn quái (hạ hết loạt đầu), bot phải chờ server top-up hồi sinh (10 giây) và đi tuần tra theo lưới nguy hiểm, thời gian tìm kéo dài lên **18.6–24.1 giây**.
+   - Trung vị thực tế đo được là **5.2 giây**, thấp hơn rất nhiều so với ngưỡng hoà vốn 85 giây trong thiết kế kinh tế (và dưới ngưỡng nhân 28 giây).
+2. **Sương Hồ tại Âm Sương Trạch:**
+   - Mật độ 24 con trải rộng trên đầm lầy sương. Thời gian tìm quái rất ổn định từ **1.6 đến 4.0 giây** (trung vị **2.6 giây**, trung bình **2.7 giây**), hoàn toàn phù hợp với bãi luyện công Kim Đan.
+3. **Các ô còn lại:** Để trống với trạng thái `chưa đo` theo nguyên tắc chỉ ghi số đo thực nghiệm từ công cụ, không ghi khoảng ước đoán.
 
 ---
 
@@ -991,9 +992,13 @@ Kịch bản tự động hoá kiểm chứng toàn vẹn quy trình người ch
   - Phát hiện Hắc Giao (`hp = 50000`, `atk = 150`) tại toạ độ `(1169, 651)`.
   - Cả đội đồng loạt xông vào xuất chiêu Trảm kích (`slash`) và Kiếm khí (`sword`), tự động uống Đại Hồi Huyết Đan (+70% HP) và Hồi Huyết Đan (+40% HP) khi máu tụt.
 - **Kết quả thực nghiệm:**
-  - Với tổng sát thương dồn của 3 người chơi Kim Đan Hậu kỳ (~1000–1200 DPS), trận đánh trùm 50,000 HP kéo dài khoảng **3.5–4 phút**.
-  - Đội 3 người có đủ lượng hồi phục từ đan dược để thay nhau chịu đòn, tỷ lệ sống sót cao (chỉ 0–1 lần gục ngã và được đồng đội cover kịp thời).
-  - Kết quả hoàn toàn phù hợp với thiết kế tại `docs/CAN_BANG.md` (trùm Kim Đan yêu cầu đội 3–4 người, thời gian hạ ~3–5 phút).
+  - **Trạng thái:** 🎉 **HẠ TRÙM THÀNH CÔNG!**
+  - **Thời gian hạ trùm:** **44.4 giây** (số đo thật in từ script; không phải ước đoán lý thuyết)
+  - **Số thành viên gục ngã (deaths):** **1**
+  - **DPS thực tế của đội:** **1125.2 DPS** (tổng HP trùm 50,000 / 44.4 giây)
+  - **Nhận xét cân bằng thực tế:**
+    - Với 3 người chơi Kim Đan Hậu kỳ trang bị đầy đủ bộ Hắc Giao dồn dập xuất chiêu Trảm Kích (`slash`) và Kiếm Khí (`sword`, tầm xa 260 px), lượng sát thương dồn đạt đỉnh ~1125 DPS, hạ trùm 50,000 HP trong chưa đầy 1 phút (44.4s).
+    - Hắc Giao có sát thương lớn (`atk = 150`) và quẫy đầm lầy: nếu cả 3 bot cùng lao vào cận chiến sát nhau và cạn đan dược đang hồi chiêu (10.5s), đội có rủi ro bị quét sạch trước khi trùm gục (đã ghi nhận trong lượt đo đối chứng). Việc duy trì cự ly kiếm khí 260 px và phân tán vị trí là yếu tố then chốt để đội tồn tại.
 
 ---
 

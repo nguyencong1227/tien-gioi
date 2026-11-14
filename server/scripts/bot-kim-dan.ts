@@ -4,7 +4,8 @@
 // 2. Đo đúng THỜI GIAN TÌM (searchSec): tính từ lúc quái trước bị hạ tới lúc bot chạm quái kế tiếp (dist <= range),
 //    KHÔNG gồm thời gian đánh quái và KHÔNG gồm thời gian đả tọa.
 // 3. Khởi động server nội bộ qua freePort() để chạy độc lập không phụ thuộc cổng dev, tự dọn dẹp khi kết thúc.
-import { existsSync, mkdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
@@ -84,10 +85,8 @@ export async function measureSearchTime(options: MeasureOptions): Promise<Measur
     viewKey,
     killsTarget,
     warmupKills = 1,
-    timeoutSec = 180,
-    dataDir = path.resolve(
-      `/tmp/tg-bot-measure-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    ),
+    timeoutSec = 240,
+    dataDir = mkdtempSync(path.join(os.tmpdir(), "tien-gioi-bot-measure-")),
   } = options;
 
   const map = getMap(mapId);
@@ -435,6 +434,10 @@ export async function runPortalScenario(): Promise<{ success: boolean; log: stri
   logMsg(
     "Bắt đầu kịch bản bot đi qua 2 cổng liên tiếp: Lạc Hà Trấn -> Hắc Phong Cốc -> Âm Sương Trạch...",
   );
+  const dataDir = mkdtempSync(path.join(os.tmpdir(), "tien-gioi-bot-portal-"));
+  mkdirSync(path.join(dataDir, "players"), { recursive: true });
+  process.env.DATA_DIR = path.join(dataDir, "players");
+
   const server = new Server();
   defineRooms(server);
   const port = await freePort();
@@ -632,7 +635,16 @@ export async function runPortalScenario(): Promise<{ success: boolean; log: stri
     logMsg(`❌ Lỗi trong kịch bản qua cổng: ${err}`);
     throw err;
   } finally {
-    await server.gracefullyShutdown();
+    try {
+      await server.gracefullyShutdown();
+    } catch {
+      /* bỏ qua */
+    }
+    try {
+      rmSync(dataDir, { recursive: true, force: true });
+    } catch {
+      /* bỏ qua */
+    }
   }
 }
 
@@ -644,8 +656,13 @@ export async function runPartyBossScenario(partySize: number = 3): Promise<{
   bossKilled: boolean;
   durationSec: number;
   deaths: number;
+  dps: number;
 }> {
   console.log(`\n=== BẮT ĐẦU KỊCH BẢN ĐỘI ${partySize} BOT HẠ TRÙM HẮC GIAO (M6.9 #410) ===`);
+  const dataDir = mkdtempSync(path.join(os.tmpdir(), "tien-gioi-bot-party-"));
+  mkdirSync(path.join(dataDir, "players"), { recursive: true });
+  process.env.DATA_DIR = path.join(dataDir, "players");
+
   const server = new Server();
   defineRooms(server);
   const port = await freePort();
@@ -808,7 +825,7 @@ export async function runPartyBossScenario(partySize: number = 3): Promise<{
       const timeout = setTimeout(() => {
         clearInterval(combatTimer);
         resolve();
-      }, 120000); // Tối đa 120 giây (Hắc Giao 50k HP)
+      }, 300000); // Tối đa 300 giây (Hắc Giao 50k HP)
 
       const combatTimer = setInterval(() => {
         pSeq++;
@@ -822,6 +839,11 @@ export async function runPartyBossScenario(partySize: number = 3): Promise<{
             clearTimeout(timeout);
             resolve();
             return;
+          }
+          if (pSeq % 40 === 0) {
+            console.log(
+              `  [Trận đánh] Hắc Giao HP: ${boss.hp}/${boss.maxHp} (${((boss.hp / boss.maxHp) * 100).toFixed(1)}%)`,
+            );
           }
           bossX = boss.x;
           bossY = boss.y;
@@ -890,38 +912,67 @@ export async function runPartyBossScenario(partySize: number = 3): Promise<{
           const dist = Math.hypot(bossX - me.x, bossY - me.y);
           const angle = Math.atan2(bossY - me.y, bossX - me.x);
 
+          // Nếu trong tầm kiếm khí (260 px), luôn xuất kiếm khí khi hồi chiêu
+          if (dist <= SKILLS.sword.range && now >= b.nextSwordAt && me.mp >= SKILLS.sword.mp) {
+            r.send("skill", { id: "sword", angle });
+            b.nextSwordAt = now + SKILLS.sword.cooldown + 50;
+          }
+
           if (dist <= SKILLS.slash.range) {
             r.send("input", { seq: pSeq, dx: 0, dy: 0 });
             if (now >= b.nextSlashAt) {
               r.send("attack", { angle });
               b.nextSlashAt = now + SKILLS.slash.cooldown + 20;
             }
-            if (now >= b.nextSwordAt) {
-              r.send("skill", { id: "sword", angle });
-              b.nextSwordAt = now + SKILLS.sword.cooldown + 50;
-            }
           } else {
-            r.send("input", { seq: pSeq, dx: Math.cos(angle), dy: Math.sin(angle) });
+            // Dùng planPath để đi vòng qua chướng ngại vật tiếp cận trùm
+            const targetTileX = Math.floor(bossX / TILE);
+            const targetTileY = Math.floor(bossY / TILE);
+            const targetCell = targetTileY * gridAmSuong.w + targetTileX;
+            const goals = new Set<number>([targetCell]);
+            const pathResult = planPath(gridAmSuong, me.x, me.y, goals);
+            if (pathResult && pathResult.cells.length > 1) {
+              const nextCell = pathResult.cells[1];
+              const nx = ((nextCell % gridAmSuong.w) + 0.5) * TILE;
+              const ny = (Math.floor(nextCell / gridAmSuong.w) + 0.5) * TILE;
+              const moveAngle = Math.atan2(ny - me.y, nx - me.x);
+              r.send("input", { seq: pSeq, dx: Math.cos(moveAngle), dy: Math.sin(moveAngle) });
+            } else {
+              r.send("input", { seq: pSeq, dx: Math.cos(angle), dy: Math.sin(angle) });
+            }
           }
         }
       }, 50);
     });
 
     const durationSec = (Date.now() - startTime) / 1000;
+    const dps = bossKilled && durationSec > 0 ? 50000 / durationSec : 0;
     console.log(`\n✓ Kết quả trận đánh Hắc Giao:`);
     console.log(
       `  - Trạng thái: ${bossKilled ? "🎉 HẠ TRÙM THÀNH CÔNG!" : "⏱️ Hết thời gian thử nghiệm"}`,
     );
     console.log(`  - Thời gian: ${durationSec.toFixed(1)} giây`);
     console.log(`  - Số thành viên gục ngã (deaths): ${deaths}`);
+    console.log(
+      `  - DPS thực tế của đội: ${dps.toFixed(1)} DPS (tổng HP trùm 50000 / ${durationSec.toFixed(1)}s)`,
+    );
 
     for (const b of bots) {
       if (b.room?.connection.isOpen) await b.room.leave(true);
     }
 
-    return { success: true, bossKilled, durationSec, deaths };
+    return { success: true, bossKilled, durationSec, deaths, dps };
   } finally {
-    await server.gracefullyShutdown();
+    try {
+      await server.gracefullyShutdown();
+    } catch {
+      /* bỏ qua */
+    }
+    try {
+      rmSync(dataDir, { recursive: true, force: true });
+    } catch {
+      /* bỏ qua */
+    }
   }
 }
 
