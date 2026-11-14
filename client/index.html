@@ -1201,6 +1201,12 @@
           </button>
         </header>
         <div class="map-body">
+          <nav
+            id="map-graph"
+            class="map-graph"
+            aria-label="Sơ đồ nối các bản đồ: chọn một bản đồ để xem"
+            hidden
+          ></nav>
           <div class="map-tools" role="group" aria-label="Phóng to, thu nhỏ bản đồ">
             <button
               type="button"
@@ -1238,7 +1244,16 @@
             role="img"
             aria-label="Bản đồ khu vực. Bấm vào bản đồ rồi dùng mũi tên để kéo, phím cộng và trừ để phóng to, thu nhỏ, phím Home để về chỗ đạo hữu"
           ></canvas>
-          <div class="map-legend">
+          <button
+            type="button"
+            id="map-legend-toggle"
+            class="act-btn map-legend-toggle"
+            aria-expanded="true"
+            aria-controls="map-legend"
+          >
+            Chú giải
+          </button>
+          <div class="map-legend" id="map-legend">
             <span><i class="lg me"></i> Đạo hữu</span>
             <span><i class="lg party"></i> Đồng đội</span>
             <span><i class="lg npc"></i> NPC (!/?)</span>

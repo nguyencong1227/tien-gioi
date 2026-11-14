@@ -145,7 +145,7 @@ import {
   primaryKeyLabel,
   type ActionId,
 } from "../keybinds";
-import { getMapOverview, type MapOverview } from "../map-overview";
+import { getMapOverview, mapGraph, type MapOverview } from "../map-overview";
 import { MapCameraControl, attachMapInput } from "../map-input";
 import {
   COMPACT_CANVAS_CSS_PX,
@@ -341,6 +341,8 @@ export class WorldScene extends Phaser.Scene {
   /** Camera của bản đồ lớn (phóng / kéo, bám theo mình) và các cờ vẽ lại */
   private readonly mapCtl = new MapCameraControl();
   private mapWasOpen = false;
+  /** Bản đồ đang XEM ở bản đồ lớn (`null` = bản đồ mình đang đứng); chọn ở sơ đồ nối */
+  private mapViewId: string | null = null;
   private mapRedrawPending = false;
 
   // Tái sử dụng Set và hồ đối tượng (object pool) để giảm cấp phát mỗi frame (#71)
@@ -1037,6 +1039,13 @@ export class WorldScene extends Phaser.Scene {
     const worldmap = document.getElementById("worldmap") as HTMLCanvasElement | null;
     if (worldmap) {
       this.mapCtl.onChange = () => this.redrawBigMap();
+      // "Về chỗ mình" khi đang xem bản đồ khác: quay về bản đồ mình đứng
+      this.mapCtl.onRecenter = () => {
+        if (this.mapViewId === null) return false;
+        this.setMapView(null);
+        return true;
+      };
+      this.buildMapGraphNav();
       attachMapInput(this.mapCtl, {
         canvas: worldmap,
         zoomIn: document.getElementById("map-zoom-in"),
@@ -2082,11 +2091,103 @@ export class WorldScene extends Phaser.Scene {
     if (!ov) return;
     if (ui.isMinimapOpen()) this.drawMapCanvas("minimap", ov, false);
     const open = ui.isMapModalOpen();
-    // mỗi lần MỞ bản đồ lớn: zoom 1, bám theo mình (đổi bản đồ lúc đang đóng cũng về mặc định)
-    if (open && !this.mapWasOpen)
-      this.mapCtl.reset({ worldW: this.map.worldW, worldH: this.map.worldH });
+    // mỗi lần MỞ bản đồ lớn: xem bản đồ mình đứng, zoom 1, bám theo mình
+    if (open && !this.mapWasOpen) this.setMapView(null, false);
     this.mapWasOpen = open;
-    if (open) this.drawMapCanvas("worldmap", ov, true);
+    if (open) {
+      const bigOv = getMapOverview(this.mapViewId ?? this.map.def.id);
+      if (bigOv) this.drawMapCanvas("worldmap", bigOv, true);
+    }
+  }
+
+  /**
+   * Chọn bản đồ XEM ở bản đồ lớn (`null` hoặc chính bản đồ mình đứng = bản đồ của mình): camera về zoom 1 (bám theo mình chỉ khi xem bản đồ
+   * của mình), cập nhật tiêu đề, phụ đề, nút sơ đồ nối. Bản đồ khác chỉ có địa hình, cổng, NPC, khu quái và đồng đội đang đứng ở đó (vị trí mình / người
+   * khác / quái chỉ biết ở bản đồ hiện tại).
+   */
+  private setMapView(id: string | null, redraw = true) {
+    const viewId = id === null || id === this.map.def.id ? null : id;
+    const ov = getMapOverview(viewId ?? this.map.def.id);
+    if (!ov) return;
+    this.mapViewId = viewId;
+    this.mapCtl.reset({ worldW: ov.w * TILE, worldH: ov.h * TILE }, viewId === null);
+    const title = document.getElementById("map-title");
+    if (title) title.textContent = `Sơn Hà Đồ · ${ov.name}`;
+    const sub = document.getElementById("map-coords");
+    if (sub) {
+      sub.textContent =
+        viewId === null
+          ? "Mũi tên xanh là đạo hữu, đầu nhọn chỉ hướng nhìn. Lăn chuột hoặc chụm hai ngón để phóng to, kéo để di chuyển"
+          : `Đang xem bản đồ khác. Đạo hữu đang đứng ở ${this.map.def.name}: bấm "Về chỗ mình" để quay lại`;
+    }
+    this.updateMapGraphNav();
+    if (redraw) this.redrawBigMap();
+  }
+
+  /** Dựng sơ đồ nối các bản đồ (nút theo toạ độ lưới của `mapGraph()`, Bắc ở trên); ẩn khi đang ở bí cảnh (không thuộc sơ đồ). */
+  private buildMapGraphNav() {
+    const nav = document.getElementById("map-graph");
+    if (!nav) return;
+    nav.replaceChildren();
+    const g = mapGraph();
+    if (g.nodes.length < 2 || !g.nodes.some((n) => n.mapId === this.map.def.id)) {
+      nav.hidden = true;
+      return;
+    }
+    nav.hidden = false;
+    const minX = Math.min(...g.nodes.map((n) => n.gx));
+    const minY = Math.min(...g.nodes.map((n) => n.gy));
+    // lưới gấp đôi: nút ở ô lẻ, nhãn cổng ở ô chẵn giữa hai nút kề nhau
+    const cell = (n: { gx: number; gy: number }) => ({
+      col: 2 * (n.gx - minX) + 1,
+      row: 2 * (n.gy - minY) + 1,
+    });
+    const sorted = [...g.nodes].sort((a, b) => a.gy - b.gy || a.gx - b.gx);
+    for (const n of sorted) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "mg-node";
+      btn.dataset.mapId = n.mapId;
+      const c = cell(n);
+      btn.style.gridColumn = String(c.col);
+      btn.style.gridRow = String(c.row);
+      btn.textContent = n.name;
+      if (n.mapId === this.map.def.id) {
+        btn.setAttribute("aria-current", "location");
+        const here = document.createElement("small");
+        here.textContent = "đang đứng";
+        btn.append(here);
+      }
+      btn.addEventListener("click", () => this.setMapView(n.mapId));
+      nav.append(btn);
+    }
+    const seen = new Set<string>();
+    for (const e of g.edges) {
+      const key = [e.fromMapId, e.toMapId].sort().join("|");
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const a = g.nodes.find((n) => n.mapId === e.fromMapId);
+      const b = g.nodes.find((n) => n.mapId === e.toMapId);
+      if (!a || !b) continue;
+      const ca = cell(a);
+      const cb = cell(b);
+      if (Math.abs(ca.col - cb.col) + Math.abs(ca.row - cb.row) !== 2) continue; // chỉ nút KỀ nhau có chỗ cho nhãn
+      const span = document.createElement("span");
+      span.className = "mg-edge";
+      span.textContent = `${e.fromPortalName} ⇄ ${e.toPortalName}`;
+      span.style.gridColumn = String((ca.col + cb.col) / 2);
+      span.style.gridRow = String((ca.row + cb.row) / 2);
+      nav.append(span);
+    }
+    this.updateMapGraphNav();
+  }
+
+  /** Nút sơ đồ nối: bản đồ đang xem được đánh dấu (`aria-pressed`). */
+  private updateMapGraphNav() {
+    const viewed = this.mapViewId ?? this.map.def.id;
+    document.querySelectorAll<HTMLElement>("#map-graph .mg-node").forEach((b) => {
+      b.setAttribute("aria-pressed", String(b.dataset.mapId === viewed));
+    });
   }
 
   /** Vẽ lại bản đồ lớn ngay (sau phóng / kéo), gộp nhiều sự kiện trong một khung hình. */
@@ -2096,7 +2197,7 @@ export class WorldScene extends Phaser.Scene {
     requestAnimationFrame(() => {
       this.mapRedrawPending = false;
       if (!ui.isMapModalOpen()) return;
-      const ov = getMapOverview(this.map.def.id);
+      const ov = getMapOverview(this.mapViewId ?? this.map.def.id);
       if (ov) this.drawMapCanvas("worldmap", ov, true);
     });
   }
@@ -2123,11 +2224,15 @@ export class WorldScene extends Phaser.Scene {
     if (!ctx) return;
     const { u } = size;
     const pad = (big ? 6 : 2) * u;
-    let v = fitView(this.map.worldW, this.map.worldH, size.w, size.h, pad);
+    // bản đồ đang vẽ có thể KHÁC bản đồ mình đứng (xem qua sơ đồ nối): chỉ bản đồ của mình có mình / quái / người chơi khác / mục tiêu nhiệm vụ
+    const here = ov.mapId === this.map.def.id;
+    const worldW = ov.w * TILE;
+    const worldH = ov.h * TILE;
+    let v = fitView(worldW, worldH, size.w, size.h, pad);
     let zoomedIn = false;
     if (big) {
       // bản đồ lớn có camera: bám theo mình (đã phóng thì mình ở giữa) hoặc theo tay kéo
-      const box = { worldW: this.map.worldW, worldH: this.map.worldH, cw: size.w, ch: size.h, pad };
+      const box = { worldW, worldH, cw: size.w, ch: size.h, pad };
       const cam = this.mapCtl.effective(box, this.predX, this.predY);
       v = cameraView(box, cam);
       zoomedIn = cam.zoom >= 2;
@@ -2137,46 +2242,54 @@ export class WorldScene extends Phaser.Scene {
     const myName = this.me()?.name;
     const partyMems = ui.getParty().members.filter((m) => m.name !== myName);
     const partyNames = new Set(partyMems.map((m) => m.name));
-    // CHỈ vẽ đồng đội ở CÙNG bản đồ (đồng đội ở bản đồ khác không có toạ độ trên bản đồ này)
-    const sameMapParty = partyMems.filter((m) => !m.mapId || m.mapId === this.map.def.id);
+    // Đồng đội đang đứng ở bản đồ ĐANG VẼ (toạ độ của đồng đội là trong bản đồ của họ: `PartyMember.mapId`; thiếu = bản đồ của mình)
+    const sameMapParty = partyMems.filter((m) => (m.mapId ? m.mapId === ov.mapId : here));
     // Nhãn nền không được đè lên mình, đồng đội và đích nhiệm vụ (chỉ bản đồ lớn có nhãn)
     const avoid: { x: number; y: number; r: number }[] = [];
+    const pins: { x: number; y: number; text: string }[] = [];
     let questTarget: { x: number; y: number } | null = null;
     if (big) {
-      avoid.push({ x: this.predX, y: this.predY, r: 10 * u });
+      if (here) avoid.push({ x: this.predX, y: this.predY, r: 10 * u });
       for (const pm of sameMapParty) avoid.push({ x: pm.x, y: pm.y, r: 8 * u });
       const trackId = ui.getTrackingQuestId();
-      questTarget = trackId ? this.resolveQuestTarget(trackId) : null;
-      if (questTarget) avoid.push({ x: questTarget.x, y: questTarget.y, r: 8 * u });
+      const target = here && trackId ? this.resolveQuestTarget(trackId) : null;
+      if (target) {
+        questTarget = target;
+        // ghim đích nhiệm vụ: ở bản đồ KHÁC thì đích là cổng kế tiếp trên đường tới đó ("Qua <cổng>")
+        const name = QUEST_BY_ID[trackId ?? ""]?.title ?? "Nhiệm vụ";
+        pins.push({ x: target.x, y: target.y, text: target.hop ? hopLabel(target.hop) : name });
+      }
     }
     drawMapBase(ctx, ov, v, size.w, size.h, {
       u,
       big,
       avoid,
+      pins,
       compact: big && canvas.clientWidth < COMPACT_CANVAS_CSS_PX && !zoomedIn,
       markerOf: qLog && qCtx ? (npcId) => npcMarker(npcId, qLog, qCtx) : undefined,
     });
 
-    // Quái đang sống trong tầm nhìn (chấm đỏ)
-    ctx.fillStyle = MAP_COLORS.monster;
-    const mr = (big ? 1.5 : 1) * u;
-    this.monsters.forEach((m) => {
-      ctx.fillRect(v.ox + m.tx * v.scale - mr, v.oy + m.ty * v.scale - mr, 2 * mr, 2 * mr);
-    });
-
-    // Người chơi khác (chấm lam, trừ đồng đội)
-    this.players.forEach((p, pid) => {
-      if (pid === this.sid) return;
-      const sp = this.state.players.get(pid);
-      if (sp && partyNames.has(sp.name)) return;
-      drawDot(
-        ctx,
-        v.ox + p.tx * v.scale,
-        v.oy + p.ty * v.scale,
-        (big ? 3.5 : 1.8) * u,
-        MAP_COLORS.other,
-      );
-    });
+    // Quái đang sống và người chơi khác trong tầm nhìn: chỉ biết ở bản đồ mình đang đứng
+    if (here) {
+      ctx.fillStyle = MAP_COLORS.monster;
+      const mr = (big ? 1.5 : 1) * u;
+      this.monsters.forEach((m) => {
+        ctx.fillRect(v.ox + m.tx * v.scale - mr, v.oy + m.ty * v.scale - mr, 2 * mr, 2 * mr);
+      });
+      // Người chơi khác (chấm lam, trừ đồng đội)
+      this.players.forEach((p, pid) => {
+        if (pid === this.sid) return;
+        const sp = this.state.players.get(pid);
+        if (sp && partyNames.has(sp.name)) return;
+        drawDot(
+          ctx,
+          v.ox + p.tx * v.scale,
+          v.oy + p.ty * v.scale,
+          (big ? 3.5 : 1.8) * u,
+          MAP_COLORS.other,
+        );
+      });
+    }
 
     // Đồng đội: chấm xanh lá viền trắng; bản đồ lớn ghi tên
     for (const pm of sameMapParty) {
@@ -2186,8 +2299,8 @@ export class WorldScene extends Phaser.Scene {
       if (big) drawHaloText(ctx, pm.name, x, y - 8 * u, MAP_COLORS.party, u);
     }
 
-    // Mục tiêu nhiệm vụ đang theo dõi (bản đồ lớn): đường nét đứt từ mình tới đích
-    if (big) {
+    // Mục tiêu nhiệm vụ đang theo dõi (bản đồ lớn): đường nét đứt từ mình tới đích (ghim đã vẽ cùng nhãn nền)
+    if (big && here) {
       const t = questTarget;
       if (t) {
         ctx.strokeStyle = MAP_COLORS.npc;
@@ -2201,14 +2314,15 @@ export class WorldScene extends Phaser.Scene {
       }
     }
 
-    // Chính mình: mũi tên theo hướng nhìn
-    drawMarkerMe(
-      ctx,
-      v.ox + this.predX * v.scale,
-      v.oy + this.predY * v.scale,
-      this.facing,
-      (big ? 6 : 3.5) * u,
-    );
+    // Chính mình: mũi tên theo hướng nhìn (chỉ trên bản đồ mình đứng)
+    if (here)
+      drawMarkerMe(
+        ctx,
+        v.ox + this.predX * v.scale,
+        v.oy + this.predY * v.scale,
+        this.facing,
+        (big ? 6 : 3.5) * u,
+      );
   }
 
   private updatePlayerAnim(

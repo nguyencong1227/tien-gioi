@@ -136,6 +136,7 @@ import { transitionMs, waitOrSkip } from "./gfx/scene-transition";
 import { getDisplay, onDisplayChange } from "./gfx/display";
 import {
   CHAT_PREF_KEY,
+  MAP_LEGEND_PREF_KEY,
   MINIMAP_PREF_KEY,
   PARTY_PREF_KEY,
   TRACKER_PREF_KEY,
@@ -3039,6 +3040,19 @@ export const ui = {
         refreshQuality(); // hồ sơ chất lượng đọc lại giảm chuyển động (tắt rung, giảm hạt...)
       });
     }
+
+    // Chú giải bản đồ lớn bấm mở / đóng (QUYET_DINH_M3 mục 17.2): nhớ lựa chọn; chưa chọn thì mở ở màn rộng, đóng ở màn hẹp (điện thoại ngang không phải cuộn)
+    setupPanelPref(
+      {
+        key: MAP_LEGEND_PREF_KEY,
+        toggleId: "map-legend-toggle",
+        apply: (open) => {
+          $("map-legend").hidden = !open;
+          $("map-legend-toggle").setAttribute("aria-expanded", String(open));
+        },
+      },
+      bindTap,
+    );
 
     // Khung chat (QUYET_DINH_M3 mục 15): thu gọn còn 1 dòng, nhớ `tg_chat_open`, mặc định thu gọn ở màn hẹp, tự mờ khi không dùng
     const chatEl = $("chat");

@@ -1011,6 +1011,64 @@ html[data-input="touch"] .qt-head {
   align-items: center;
   gap: 10px;
 }
+/* Sơ đồ nối các bản đồ (bước 3b): lưới theo toạ độ của `mapGraph()` (Bắc ở trên), nút = bản đồ, nhãn nhỏ giữa hai nút = cặp cổng nối */
+.map-graph {
+  display: grid;
+  gap: 2px 10px;
+  justify-content: center;
+  align-items: center;
+}
+.map-graph[hidden] {
+  display: none;
+}
+.mg-node {
+  min-height: 44px;
+  min-width: 120px;
+  padding: 4px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(201, 162, 74, 0.5);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--paper);
+  font: inherit;
+  font-size: var(--fs-13);
+  font-weight: 600;
+  cursor: pointer;
+}
+.mg-node small {
+  display: block;
+  font-size: var(--fs-11);
+  font-weight: 400;
+  color: #9ae59a;
+}
+.mg-node[aria-pressed="true"] {
+  border-color: var(--gold);
+  background: rgba(201, 162, 74, 0.28);
+  box-shadow: 0 0 0 1px var(--gold) inset;
+}
+.mg-edge {
+  font-size: var(--fs-11);
+  text-align: center;
+  opacity: 0.85;
+  color: #a8ff78;
+}
+/* Điện thoại ngang / cửa sổ thấp: sơ đồ thành MỘT HÀNG nút (Bắc -> Nam theo thứ tự), bỏ nhãn cổng (có trong chú giải của nút) để không chiếm chiều cao */
+@media (max-height: 520px) {
+  .map-graph {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .mg-edge {
+    display: none;
+  }
+}
+.map-legend[hidden] {
+  display: none;
+}
+.map-legend-toggle {
+  min-height: 44px;
+  align-self: center;
+}
 /* Công cụ phóng / thu / về chỗ mình (mục bấm >= 44 px) */
 .map-tools {
   display: flex;

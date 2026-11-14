@@ -50,3 +50,6 @@ export const MINIMAP_PREF_KEY = "tg_minimap_open";
 export function minimapOpen(pref: boolean | null): boolean {
   return pref ?? true;
 }
+
+/** Khoá lưu việc mở / đóng chú giải của bản đồ lớn ("1" mở, "0" đóng; chưa chọn: mở ở màn rộng, đóng ở màn hẹp như `panelOpen`). */
+export const MAP_LEGEND_PREF_KEY = "tg_map_legend_open";

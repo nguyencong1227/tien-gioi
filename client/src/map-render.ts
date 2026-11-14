@@ -447,6 +447,11 @@ export interface DrawBaseOptions {
    */
   readonly avoid?: readonly { readonly x: number; readonly y: number; readonly r: number }[];
   /**
+   * Ghim có chữ (đích nhiệm vụ đang theo dõi...): toạ độ THẾ GIỚI (px), chữ và màu; vẽ kim cương viền + nhãn ưu tiên cao, chỉ bản đồ lớn.
+   * Nhãn đi qua `placeLabels` cùng nhãn nền nên không chồng chữ khác.
+   */
+  readonly pins?: readonly { readonly x: number; readonly y: number; readonly text: string }[];
+  /**
    * Bản đồ lớn trên canvas NHỎ (điện thoại ngang): chỉ ghi tên trấn, cổng (kèm nơi đến) và dấu nhiệm vụ; bỏ tên NPC và tên khu quái vì chữ
    * 12 px trên canvas ~200 px phủ kín bản đồ (chi tiết xem khi phóng to, bước 3).
    */
@@ -645,6 +650,28 @@ export function drawMapBase(
         m === "?" ? "#9ae59a" : m ? "#ff8a8a" : MAP_COLORS.text,
       );
     }
+  }
+
+  // Ghim: kim cương vàng viền trắng (khác chấm tròn của NPC / cổng); nhãn ưu tiên cao
+  if (big) {
+    const pinR = 6 * u;
+    (o.pins ?? []).forEach((p, i) => {
+      const px = v.ox + p.x * v.scale;
+      const py = v.oy + p.y * v.scale;
+      ctx.beginPath();
+      ctx.moveTo(px, py - pinR);
+      ctx.lineTo(px + pinR, py);
+      ctx.lineTo(px, py + pinR);
+      ctx.lineTo(px - pinR, py);
+      ctx.closePath();
+      ctx.fillStyle = MAP_COLORS.npc;
+      ctx.fill();
+      ctx.lineWidth = 1.5 * u;
+      ctx.strokeStyle = "#ffffff";
+      ctx.stroke();
+      obstacles.push({ x: px - pinR, y: py - pinR, w: 2 * pinR, h: 2 * pinR });
+      label(`pin:${i}`, p.text, px, py, pinR, 95, MAP_COLORS.npc);
+    });
   }
 
   // Khu quái: tên loài mạnh nhất + cấp, chỉ bản đồ lớn (bỏ ở canvas nhỏ: chữ che hết bản đồ)

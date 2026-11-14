@@ -33,12 +33,17 @@ export class MapCameraControl {
   box: CameraBox | null = null;
   /** Gọi sau mỗi thay đổi camera do người chơi */
   onChange: (() => void) | null = null;
+  /**
+   * "Về chỗ mình" khi đang xem bản đồ KHÁC bản đồ mình đứng: chỗ vẽ chuyển về bản đồ của mình và trả `true` (đã xử lý, không cần bám lại).
+   * Trả `false` / không đặt: chỉ bám lại trên bản đồ đang xem.
+   */
+  onRecenter: (() => boolean) | null = null;
 
   /** Mở bản đồ lớn: zoom 1, ở giữa, bám theo mình. */
-  reset(box?: Pick<CameraBox, "worldW" | "worldH">): void {
+  reset(box?: Pick<CameraBox, "worldW" | "worldH">, follow = true): void {
     const b = box ?? this.box;
     this.cam = b ? fitCamera(b) : { zoom: 1, cx: 0, cy: 0 };
-    this.follow = true;
+    this.follow = follow;
   }
 
   /** Camera để vẽ: đang bám thì tâm nhìn là vị trí (meX, meY) (đã kẹp); luôn ghi lại `cam` và `box`. */
@@ -83,7 +88,7 @@ export class MapCameraControl {
 
   /** "Về chỗ mình": bám lại, giữ mức phóng. */
   recenter(): void {
-    this.follow = true;
+    if (!this.onRecenter?.()) this.follow = true;
     this.onChange?.();
   }
 
