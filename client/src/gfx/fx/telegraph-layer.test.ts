@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { TelegraphLayer, WARN_DEPTH, BOLT_DEPTH_OFFSET } from "./telegraph-layer";
+import {
+  TelegraphLayer,
+  WARN_DEPTH,
+  BOLT_DEPTH_OFFSET,
+  BOLT_OUTLINE_COLOR,
+  BOLT_OUTLINE_WIDTH,
+} from "./telegraph-layer";
 import { WARN_FADE_MS, BOLT_FADE_MS, type BoltMsg, type WarnMsg } from "./telegraph";
 
 /** Graphics giả: ghi lại trạng thái và số lệnh vẽ, dây chuyền như Phaser. */
@@ -263,8 +269,27 @@ describe("TelegraphLayer: đạn", () => {
       m.layer.update(1000); // đã bay 100 px: vệt đuôi có chỗ
     }
     const circles = (g: FakeG) => g.calls.filter((c) => c === "fillCircle").length;
-    expect(circles(lo.made[0])).toBe(2); // lõi + chấm trắng
+    expect(circles(lo.made[0])).toBe(3); // viền tối + lõi + chấm trắng (bậc thấp vẫn có viền: đạn phải thấy rõ ở mọi bậc)
     expect(circles(hi.made[0])).toBeGreaterThan(circles(lo.made[0]));
+  });
+
+  it("mọi bậc đều vẽ VIỀN TỐI dưới lõi: viền lớn hơn lõi, lõi + viền không nhỏ hơn bán kính trúng của máy chủ", () => {
+    // đọc bán kính các lệnh fillCircle theo thứ tự vẽ (bậc Thấp: không quầng, không vệt đuôi => viền, lõi, chấm trắng)
+    expect(BOLT_OUTLINE_WIDTH).toBeGreaterThan(0);
+    expect(BOLT_OUTLINE_COLOR).toBeLessThan(0x404040); // tối
+    const radii: number[] = [];
+    const lo = make(4);
+    const g = lo.made;
+    lo.layer.bolt(bolt({ speed: 100 }), 0);
+    const orig = g[0].fillCircle.bind(g[0]);
+    g[0].fillCircle = ((_x: number, _y: number, r?: number) => {
+      radii.push(r as number);
+      return orig();
+    }) as never;
+    lo.layer.update(500);
+    expect(radii).toHaveLength(3);
+    expect(radii[0]).toBeGreaterThan(radii[1]); // viền > lõi
+    expect(radii[0]).toBeGreaterThanOrEqual(5.5); // ~ BOLT_RADIUS (6) của máy chủ
   });
 
   it("ngoài khung nhìn: ẩn, không vẽ", () => {
