@@ -999,11 +999,124 @@ html[data-input="touch"] .qt-head {
 #map-modal {
   --sheet-w: 420px;
 }
+/* Máy tính (chuột + màn rộng): bản đồ lớn đủ rộng để đọc nhãn (tên cổng + nơi đến, NPC, khu quái); thấp hơn thì vừa chiều cao còn lại */
+@media (pointer: fine) and (min-width: 900px) {
+  #map-modal {
+    --sheet-w: min(92vw, 840px);
+  }
+}
 .map-body {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 10px;
+}
+/* Sơ đồ nối các bản đồ (bước 3b): lưới theo toạ độ của `mapGraph()` (Bắc ở trên), nút = bản đồ, nhãn nhỏ giữa hai nút = cặp cổng nối */
+.map-graph {
+  display: grid;
+  gap: 2px 10px;
+  justify-content: center;
+  align-items: center;
+}
+.map-graph[hidden] {
+  display: none;
+}
+.mg-node {
+  min-height: 44px;
+  min-width: 120px;
+  padding: 4px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(201, 162, 74, 0.5);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--paper);
+  font: inherit;
+  font-size: var(--fs-13);
+  font-weight: 600;
+  cursor: pointer;
+}
+.mg-node small {
+  display: block;
+  font-size: var(--fs-11);
+  font-weight: 400;
+  color: #9ae59a;
+}
+.mg-node[aria-pressed="true"] {
+  border-color: var(--gold);
+  background: rgba(201, 162, 74, 0.28);
+  box-shadow: 0 0 0 1px var(--gold) inset;
+}
+.mg-edge {
+  font-size: var(--fs-11);
+  text-align: center;
+  opacity: 0.85;
+  color: #a8ff78;
+}
+/* Điện thoại ngang / cửa sổ thấp: sơ đồ thành MỘT HÀNG nút (Bắc -> Nam theo thứ tự), bỏ nhãn cổng (có trong chú giải của nút) để không chiếm chiều cao */
+@media (max-height: 520px) {
+  .map-graph {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .mg-edge {
+    display: none;
+  }
+}
+.map-legend[hidden] {
+  display: none;
+}
+/* Phần chính (công cụ + bản đồ + chú giải) tách khỏi sơ đồ nối để máy tính xếp sơ đồ ở CỘT TRÁI, bản đồ không bị đẩy xuống phải cuộn */
+.map-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+@media (pointer: fine) and (min-width: 900px) {
+  .map-body {
+    display: grid;
+    grid-template-columns: minmax(150px, 176px) minmax(0, 1fr);
+    align-items: start;
+    gap: 14px;
+  }
+  .map-graph {
+    display: grid;
+    justify-content: stretch;
+    grid-template-columns: 1fr;
+  }
+  .map-graph .mg-node {
+    min-width: 0;
+  }
+}
+.map-legend-toggle {
+  min-height: 44px;
+  align-self: center;
+}
+/* Công cụ phóng / thu / về chỗ mình (mục bấm >= 44 px) */
+.map-tools {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.map-tools .act-btn {
+  flex: none;
+  width: auto;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 14px;
+  font-size: var(--fs-16);
+  font-weight: 700;
+  white-space: nowrap;
+}
+/* Bản đồ lớn tự xử lý kéo / chụm (không để trình duyệt cuộn trang), có thể nhận focus để dùng bàn phím */
+#worldmap {
+  touch-action: none;
+  cursor: grab;
+}
+#worldmap:active {
+  cursor: grabbing;
 }
 #worldmap {
   width: min(88vw, 384px);
@@ -1011,6 +1124,12 @@ html[data-input="touch"] .qt-head {
   border-radius: 8px;
   border: 1px solid rgba(201, 162, 74, 0.6);
   background: #1d1a16;
+}
+@media (pointer: fine) and (min-width: 900px) {
+  #worldmap {
+    width: min(100%, 640px, calc(var(--vh, 100dvh) - 310px));
+    height: min(100%, 640px, calc(var(--vh, 100dvh) - 310px));
+  }
 }
 .map-legend {
   display: flex;
@@ -1046,6 +1165,27 @@ html[data-input="touch"] .qt-head {
 .lg.town {
   border: 2px solid #a31d1d;
   background: transparent;
+}
+.lg.portal {
+  background: #a8ff78;
+  border: 1px solid #fff;
+}
+.lg.pin {
+  width: 9px;
+  height: 9px;
+  border-radius: 1px;
+  background: #ffd74a;
+  border: 1px solid #fff;
+  transform: rotate(45deg);
+}
+.lg.zone {
+  width: 22px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #60c860, #eccc46, #e25446);
+}
+.lg.me {
+  border-radius: 0;
+  clip-path: polygon(100% 50%, 15% 100%, 35% 50%, 15% 0);
 }
 
 /* Chat */
@@ -6107,4 +6247,26 @@ body.ui-hidden
     #perf-panel
   ) {
   display: none !important;
+}
+
+/* Bản đồ nhỏ THU GỌN (Cài đặt / Shift+M, QUYET_DINH_M3 mục 17.2): ẩn canvas, còn nhãn tên khu + phím; vẫn bấm được để mở bản đồ lớn (cảm ứng không có phím M) */
+#minimap-wrap.collapsed {
+  width: auto;
+  min-width: 96px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 2px 8px;
+}
+#minimap-wrap.collapsed #minimap {
+  display: none;
+}
+#minimap-wrap.collapsed .mm-foot {
+  flex: 1;
+  margin-top: 0;
+  gap: 8px;
+  font-size: var(--fs-12);
+}
+#minimap-wrap.collapsed #minimap-zone {
+  max-width: 130px;
 }

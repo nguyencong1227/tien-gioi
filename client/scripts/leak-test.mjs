@@ -304,6 +304,18 @@ async function runLeakTest() {
             window.__ui.toggleCharModal(true);
             window.__ui.toggleInventory(true);
             window.__ui.toggleSettingsModal(true);
+            // Bản đồ lớn (#496 bước 3): mở, xem hai bản đồ khác qua sơ đồ nối, phóng + kéo, vẽ NGAY (không chờ nhịp 250 ms), rồi đóng
+            window.__ui.toggleMapModal(true);
+            const sc = window.__scene;
+            if (sc && sc.setMapView && sc.mapCtl) {
+              for (const mid of ["hac_phong", "am_suong", null]) {
+                sc.setMapView(mid, false);
+                sc.mapCtl.zoomBy(2);
+                sc.mapCtl.pan(-30, -30);
+                sc.lastMapDraw = 0;
+                sc.syncMaps();
+              }
+            }
             window.__ui.closeAllModals();
           }
           if (window.__scene) {
