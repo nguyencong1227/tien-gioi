@@ -3,8 +3,6 @@
 import {
   INVENTORY_SLOTS,
   ITEM_BY_ID,
-  RARITY_COLORS,
-  RARITY_NAMES,
   EQUIP_SLOTS,
   EQUIP_SLOT_NAMES,
   emptyEquipment,
@@ -122,6 +120,13 @@ import { canAffordFee, feeChipText, recipeFee } from "./forge-fee";
 import { doneRows, doneSummary } from "./quest-log";
 import { pickupBtnText, portalBtnText, talkBtnText } from "./ctx-btn";
 import { sound } from "./audio";
+import {
+  applyRarityBadge,
+  applyRarityText,
+  clearRarityBadge,
+  clearRarityText,
+  rarityStyle,
+} from "./rarity";
 import { initKeyLabels } from "./keybinds-dom";
 import {
   ACTION_BY_ID,
@@ -642,7 +647,7 @@ function renderSlotDetail() {
 
   if (!s || !def) {
     nameEl.textContent = "Ô trống";
-    nameEl.style.color = "";
+    clearRarityText(nameEl);
     rarityEl.textContent = "";
     rarityEl.style.color = "";
     descEl.textContent = "Chạm hoặc rê chuột vào một ô có vật phẩm để xem mô tả, dùng hoặc vứt.";
@@ -651,10 +656,10 @@ function renderSlotDetail() {
     return;
   }
 
-  const rColor = hexColor(RARITY_COLORS[def.rarity]);
   nameEl.textContent = s.qty > 1 ? `${def.name} (×${s.qty})` : def.name;
-  nameEl.style.color = rColor;
-  rarityEl.textContent = RARITY_NAMES[def.rarity];
+  applyRarityText(nameEl, def.rarity);
+  const rColor = rarityStyle(def.rarity).color;
+  rarityEl.textContent = rarityStyle(def.rarity).name;
   rarityEl.style.color = rColor;
   const cdSec = def.cooldown ? ` · Hồi chiêu ${Math.round(def.cooldown / 1000)}s` : "";
   const eqStatsText = def.equip ? ` · ${describeEquipStats(def.equip.stats)}` : "";
@@ -703,14 +708,16 @@ function renderInventory() {
     btn.classList.toggle("selected", i === selectedSlot);
     if (s && def) {
       used++;
-      btn.style.borderColor = hexColor(RARITY_COLORS[def.rarity]);
+      btn.style.borderColor = rarityStyle(def.rarity).color;
       applyItemVisual(slotIconEls[i], def);
       slotNameEls[i].textContent = def.name;
+      applyRarityBadge(btn, def.rarity);
       slotQtyEls[i].textContent = s.qty > 1 ? `${s.qty}` : "";
     } else {
       btn.style.borderColor = "rgba(243, 220, 160, 0.22)";
       applyItemVisual(slotIconEls[i], undefined);
       slotNameEls[i].textContent = "";
+      clearRarityBadge(btn);
       slotQtyEls[i].textContent = "";
       slotCdEls[i].style.transform = "scaleY(0)";
     }
@@ -736,7 +743,7 @@ function renderQuickbar() {
     btn.dataset.itemId = itemId;
     btn.classList.toggle("empty", total === 0);
     btn.style.borderColor =
-      total > 0 && def ? hexColor(RARITY_COLORS[def.rarity]) : "rgba(201, 162, 74, 0.45)";
+      total > 0 && def ? rarityStyle(def.rarity).color : "rgba(201, 162, 74, 0.45)";
     applyItemVisual($(`quick-${idx}-icon`), def);
     $(`quick-${idx}-name`).textContent = def ? def.name.replace(" Đan", "") : `Đan ${idx}`;
     $(`quick-${idx}-qty`).textContent = total > 0 ? `${total}` : "0";
@@ -749,9 +756,8 @@ function showGainFeed(itemId: string, qty: number) {
   const feed = $("gain-feed");
   const item = document.createElement("div");
   item.className = "gain-item";
-  const rColor = hexColor(RARITY_COLORS[def.rarity]);
-  item.style.borderLeftColor = rColor;
-  item.style.color = rColor;
+  item.style.borderLeftColor = rarityStyle(def.rarity).color;
+  applyRarityText(item, def.rarity);
 
   const icon = document.createElement("i");
   applyItemVisual(icon, def);
@@ -1262,7 +1268,8 @@ function renderCharModalImpl() {
     btn.type = "button";
     btn.className = `equip-slot-card${def ? " filled" : ""}`;
     if (def) {
-      btn.style.borderColor = hexColor(RARITY_COLORS[def.rarity]);
+      btn.style.borderColor = rarityStyle(def.rarity).color;
+      applyRarityBadge(btn, def.rarity);
     }
 
     const slotLabel = document.createElement("span");
@@ -1277,7 +1284,7 @@ function renderCharModalImpl() {
     itemName.className = "slot-item-name";
     if (def) {
       itemName.textContent = def.name;
-      itemName.style.color = hexColor(RARITY_COLORS[def.rarity]);
+      itemName.style.color = rarityStyle(def.rarity).color;
     } else {
       itemName.textContent = "Trống";
       itemName.style.opacity = "0.5";
@@ -1420,7 +1427,7 @@ function renderCharModalImpl() {
 
     const nameEl = document.createElement("b");
     nameEl.textContent = `${def.name} · ${EQUIP_SLOT_NAMES[eq.slot]}`;
-    nameEl.style.color = hexColor(RARITY_COLORS[def.rarity]);
+    applyRarityText(nameEl, def.rarity);
 
     const cmpLine = document.createElement("small");
     const nextStats = statsFor(currentRealm, currentTier, {
@@ -1542,7 +1549,7 @@ function renderForgeModalImpl() {
 
     const nameEl = document.createElement("b");
     nameEl.textContent = outDef.name;
-    nameEl.style.color = hexColor(RARITY_COLORS[outDef.rarity]);
+    applyRarityText(nameEl, outDef.rarity);
 
     const statLine = document.createElement("small");
     if (outDef.equip) {
@@ -1688,8 +1695,8 @@ function renderShopBuyImpl() {
 
     const name = document.createElement("b");
     name.className = "shop-item-name";
-    name.style.color = hexColor(RARITY_COLORS[def.rarity]);
     name.textContent = def.name;
+    applyRarityText(name, def.rarity);
 
     const priceTag = document.createElement("span");
     priceTag.className = "shop-price-tag";
@@ -1822,8 +1829,8 @@ function renderShopSellImpl() {
 
     const name = document.createElement("b");
     name.className = "shop-item-name";
-    name.style.color = hexColor(RARITY_COLORS[def.rarity]);
     name.textContent = `${def.name} ×${slot.qty}`;
+    applyRarityText(name, def.rarity);
 
     const priceTag = document.createElement("span");
     priceTag.className = "shop-price-tag";
@@ -2418,7 +2425,7 @@ function renderLimboRelicsImpl() {
     const nameSpan = document.createElement("span");
     nameSpan.textContent = itemName;
     if (itemDef?.rarity) {
-      nameSpan.style.color = hexColor(RARITY_COLORS[itemDef.rarity]);
+      applyRarityText(nameSpan, itemDef.rarity);
     }
     item.append(nameSpan);
 
