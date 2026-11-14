@@ -116,10 +116,11 @@ if (!match) {
   let missingCount = 0;
   for (const url of precacheUrls) {
     let filePath;
-    if (url === "/" || url === "/index.html") {
+    const cleanUrl = url.split("?")[0];
+    if (cleanUrl === "/" || cleanUrl === "/index.html") {
       filePath = path.join(DIST, "index.html");
     } else {
-      filePath = path.join(DIST, url.replace(/^\//, ""));
+      filePath = path.join(DIST, cleanUrl.replace(/^\//, ""));
     }
 
     if (!fs.existsSync(filePath)) {
@@ -128,12 +129,33 @@ if (!match) {
     }
   }
 
-  if (missingCount === 0) {
+  // Kiểm tra quy tắc M7.15 (#516, THIET_KE_GIAO_DIEN_DO_HOA.md mục 10.1): chỉ gói core mới được đưa vào PRECACHE_URLS (kèm gắn băm ?v=)
+  let illegalPackCount = 0;
+  for (const url of precacheUrls) {
+    const cleanUrl = url.split("?")[0];
+    if (cleanUrl.startsWith("/packs/")) {
+      if (!cleanUrl.startsWith("/packs/core/")) {
+        console.error(`  ✗ Phát hiện gói không phải 'core' trong PRECACHE_URLS: ${url}`);
+        illegalPackCount++;
+      } else if (!/\?v=[0-9a-f]{12}$/i.test(url)) {
+        console.error(`  ✗ Tệp gói core trong PRECACHE_URLS thiếu gắn băm '?v=': ${url}`);
+        illegalPackCount++;
+      }
+    }
+  }
+  if (illegalPackCount > 0) {
+    errors.push(
+      `Có ${illegalPackCount} URL gói tải vi phạm trong PRECACHE_URLS (chỉ gói core có ?v= mới được precache).`,
+    );
+  }
+
+  if (missingCount === 0 && illegalPackCount === 0) {
     console.log(
-      `  ✓ Toàn bộ ${precacheUrls.length}/${precacheUrls.length} file tĩnh trong PRECACHE_URLS đều tồn tại 100%.`,
+      `  ✓ Toàn bộ ${precacheUrls.length}/${precacheUrls.length} file tĩnh trong PRECACHE_URLS đều tồn tại 100% và tuân thủ quy tắc gói tải.`,
     );
   } else {
-    errors.push(`Có ${missingCount} file trong PRECACHE_URLS bị thiếu trên đĩa.`);
+    if (missingCount > 0)
+      errors.push(`Có ${missingCount} file trong PRECACHE_URLS bị thiếu trên đĩa.`);
   }
 
   // Phông tự lưu (#331): mọi /fonts/*.woff2 mà CSS bản build tham chiếu phải nằm trong PRECACHE_URLS,
