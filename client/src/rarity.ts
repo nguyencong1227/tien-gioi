@@ -98,3 +98,14 @@ export function clearRarityText(el: RarityEl): void {
     delete el.dataset.rarityTitle;
   }
 }
+
+/**
+ * Câu cho TRÌNH ĐỌC MÀN HÌNH của một món: "Hồi Huyết Đan, Phàm phẩm" (+ ", số lượng 3" nếu gộp nhiều). Dấu phụ ◆ ★ bị giấu khỏi trình đọc (CSS `/ ""`) và `title`
+ * không đáng tin (nhiều trình đọc bỏ qua), nên tên bậc phải nằm ở `aria-label` của ô / thẻ (nit của A ở #584). `qty` không phải số nguyên > 1 thì bỏ phần số lượng.
+ */
+export function itemAria(def: { name: string; rarity?: unknown }, qty?: number): string {
+  const base = `${def.name}, ${rarityStyle(def.rarity).name}`;
+  return typeof qty === "number" && Number.isInteger(qty) && qty > 1
+    ? `${base}, số lượng ${qty}`
+    : base;
+}

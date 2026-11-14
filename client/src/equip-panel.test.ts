@@ -162,7 +162,7 @@ describe("slotLockText / slotViews: ô pháp bảo khoá tới Kim Đan", () => 
     });
     const v = slotViews(eq, 0);
     expect(v[3].def?.id).toBe("t_boots");
-    expect(v[3].aria).toBe("Hài: Món t_boots, chạm để tháo");
+    expect(v[3].aria).toBe("Hài: Món t_boots, Linh phẩm, chạm để tháo"); // tên + BẬC (dấu ◆ ★ bị giấu khỏi trình đọc)
     expect(v[4].def, "hài đặt nhầm vào ngọc bội").toBeUndefined();
     expect(v[0].def, "constructor").toBeUndefined();
     expect(v[1].def, "id lạ").toBeUndefined();
