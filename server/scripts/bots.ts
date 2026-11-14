@@ -36,8 +36,16 @@ import {
   TRAVEL_COOLDOWN_MS,
   SECT_MSG,
   PROTOCOL_VERSION,
+  LEARNABLE_SLOTS,
+  SKILL_MSG,
+  elementMult,
+  skillMpCost,
+  skillOf,
+  skillReqMet,
+  slotOpen,
   type AttackMsg,
   type BuyMsg,
+  type CastMsg,
   type DuelEndMsg,
   type DuelInvitedMsg,
   type DuelStateMsg,
@@ -58,7 +66,11 @@ import {
   type SectInvitedMsg,
   type SectMsg,
   type SellMsg,
+  type SkillBook,
   type SkillMsg,
+  type SkillSlot,
+  type SkillSlotMsg,
+  type SkillsMsg,
   type SoulBuyMsg,
   type TravelMsg,
   type TravelToMsg,
@@ -121,6 +133,7 @@ interface CliArgs {
   dungeonFallRate: number;
   duel: boolean;
   sect: boolean;
+  skills: boolean;
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -156,6 +169,7 @@ function parseArgs(argv: string[]): CliArgs {
   let dungeonFallRate = 0;
   let duel = false;
   let sect = false;
+  let skills = false;
 
   for (const arg of argv) {
     if (arg.startsWith("--bots=")) bots = Math.max(0, Number(arg.slice(7)));
@@ -164,6 +178,7 @@ function parseArgs(argv: string[]): CliArgs {
     else if (arg.startsWith("--map=")) map = arg.slice(6);
     else if (arg === "--travel" || arg === "--portal") travel = true;
     else if (arg === "--die") die = true;
+    else if (arg === "--skills") skills = true;
     else if (arg === "--dungeon") dungeon = true;
     else if (arg === "--dungeon-fall") {
       dungeon = true;
@@ -281,6 +296,7 @@ function parseArgs(argv: string[]): CliArgs {
     dungeonFallRate,
     duel,
     sect,
+    skills,
   };
 }
 
@@ -293,6 +309,52 @@ function seededPrng(seed: number) {
     let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Mẫu sổ chiêu (SkillBook) hợp lệ theo từng cảnh giới cho bot thử tải (M7.10 #511).
+ * Đảm bảo chiêu đã học và gắn vào các ô mở theo đúng luật của shared/skills.ts.
+ */
+export function sampleSkillsForRealm(realm: number): SkillBook {
+  if (realm <= 0) {
+    return { learned: {}, slots: ["", "", "", ""] };
+  }
+  if (realm === 1) {
+    // Luyện Khí: ô 2 mở
+    return {
+      learned: { hoa_van_kiem: 1, bon_thach_quyen: 1 },
+      slots: ["hoa_van_kiem", "", "", ""],
+    };
+  }
+  if (realm === 2) {
+    // Trúc Cơ: ô 2, 3 mở
+    return {
+      learned: { hoa_van_kiem: 2, thanh_tung_phi_cham: 1, ung_trao: 1 },
+      slots: ["hoa_van_kiem", "thanh_tung_phi_cham", "", ""],
+    };
+  }
+  if (realm === 3) {
+    // Kim Đan: ô 2, 3, 4 mở
+    return {
+      learned: {
+        hoa_van_kiem: 3,
+        thanh_tung_phi_cham: 2,
+        cuu_cung_khon_sat: 1,
+        trong_nhac_tram: 1,
+      },
+      slots: ["hoa_van_kiem", "thanh_tung_phi_cham", "cuu_cung_khon_sat", ""],
+    };
+  }
+  // Nguyên Anh trở lên: cả 4 ô mở
+  return {
+    learned: {
+      hoa_van_kiem: 3,
+      thanh_tung_phi_cham: 3,
+      cuu_cung_khon_sat: 2,
+      huyen_bang_chi: 2,
+    },
+    slots: ["hoa_van_kiem", "thanh_tung_phi_cham", "cuu_cung_khon_sat", "huyen_bang_chi"],
   };
 }
 
@@ -312,6 +374,7 @@ export function seedBotSaveFile(
   life?: { playMs: number; kills: number; bossKills: number },
   coinOverride?: number,
   dataDirOverride?: string,
+  skillsOverride?: SkillBook,
 ): void {
   const targetDir = dataDirOverride ? path.resolve(dataDirOverride) : DATA_PLAYERS_DIR;
   mkdirSync(targetDir, { recursive: true });
@@ -333,6 +396,7 @@ export function seedBotSaveFile(
     x: Math.round(x),
     y: Math.round(y),
     life,
+    skills: skillsOverride,
     createdAt: now,
     updatedAt: now,
   };
@@ -808,6 +872,17 @@ interface BotState {
   sectDepositsCount: number;
   sectWithdrawsCount: number;
   sectChatsCount: number;
+  // Các trường cho thử tải chiêu thức (--skills, #511)
+  skills?: boolean;
+  skillsLearned: Record<string, number>;
+  skillsSlots: [string, string, string, string];
+  skillsCd: [number, number, number, number];
+  skillsCdMax: [number, number, number, number];
+  skillsNextCastAt: [number, number, number, number];
+  skillsLastRxAt: number;
+  skillsCastCount: number;
+  skillsMsgsCount: number;
+  skillsSent: number;
 }
 
 export interface LoadTestMetrics {
@@ -930,6 +1005,10 @@ export interface LoadTestMetrics {
   sectDepositsTotal?: number;
   sectWithdrawsTotal?: number;
   sectChatsTotal?: number;
+  /** Các chỉ số thử tải chiêu thức M7 (--skills, #511) */
+  skills?: boolean;
+  castsSent?: number;
+  skillsMsgsReceivedPerBot?: number;
 }
 
 export interface IdleZeroBotMetrics {
@@ -1045,6 +1124,112 @@ async function runIdleZeroBotTest(
   return idle;
 }
 
+/**
+ * Tự động gán chiêu thức đã học vào các ô còn trống (ô 2-5, M7.10 #511).
+ * Khi bot nhận tin nhắn skills hoặc khi cảnh giới thay đổi, hàm này duyệt các ô
+ * mở theo cảnh giới và gửi tin SKILL_MSG.slot để lắp chiêu chưa được trang bị.
+ */
+export function autoAssignBotSkills(b: BotState): void {
+  if (!b.skills) return;
+  const me = b.room.state?.players?.get?.(b.room.sessionId);
+  const realm = typeof me?.realm === "number" ? me.realm : 1;
+  const tier = typeof me?.tier === "number" ? me.tier : 0;
+
+  const usedSkills = new Set<string>();
+  for (const s of b.skillsSlots) {
+    if (s) usedSkills.add(s);
+  }
+
+  for (let i = 0; i < LEARNABLE_SLOTS.length; i++) {
+    const slot = LEARNABLE_SLOTS[i];
+    if (!slotOpen(slot, realm)) continue;
+    if (!b.skillsSlots[i]) {
+      for (const skillId of Object.keys(b.skillsLearned)) {
+        if (!usedSkills.has(skillId)) {
+          const def = skillOf(skillId);
+          if (def && skillReqMet(def, realm, tier)) {
+            const msg: SkillSlotMsg = { slot, skillId };
+            b.room.send(SKILL_MSG.slot, msg);
+            b.skillsSlots[i] = skillId;
+            usedSkills.add(skillId);
+            break;
+          }
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Thử thi triển chiêu thức đã học ở ô 2-5 (M7.10 #511).
+ * Kiểm tra MP, khoảng cách mục tiêu và hồi chiêu.
+ * Ưu tiên chiêu có tương khắc ngũ hành với hệ của quái mục tiêu.
+ */
+export function tryCastLearnedSkill(
+  b: BotState,
+  me: any,
+  targetDist: number,
+  targetAngle: number,
+  now: number,
+  measuring: boolean,
+  targetElement?: string,
+): boolean {
+  if (!b.skills) return false;
+  if (!me || me.mp <= 0) return false;
+
+  let bestSlot: SkillSlot | null = null;
+  let bestIdx = -1;
+  let bestScore = -1;
+  let bestCooldown = 1500;
+
+  for (let i = 0; i < LEARNABLE_SLOTS.length; i++) {
+    const slot = LEARNABLE_SLOTS[i];
+    const skillId = b.skillsSlots[i];
+    if (!skillId) continue;
+
+    if (now < b.skillsNextCastAt[i]) continue;
+
+    const def = skillOf(skillId);
+    if (!def) continue;
+
+    const cost = skillMpCost(def, me.maxMp ?? 100);
+    if (me.mp < cost) continue;
+
+    const maxReach =
+      def.shape === "ground"
+        ? (def.reach ?? 0) + def.range
+        : def.shape === "dash"
+          ? (def.reach ?? 0)
+          : def.shape === "self"
+            ? Infinity
+            : def.range;
+
+    if (def.shape !== "self" && targetDist > maxReach + 20) continue;
+
+    const mult = def.mult > 0 ? def.mult : 1.0;
+    const elemFactor = targetElement ? elementMult(def.element, targetElement) : 1.0;
+    const score = mult * elemFactor;
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestSlot = slot;
+      bestIdx = i;
+      bestCooldown = Math.max(1000, b.skillsCdMax[i] || def.cooldown);
+    }
+  }
+
+  if (bestSlot !== null && bestIdx >= 0) {
+    const msg: CastMsg = { slot: bestSlot, angle: targetAngle };
+    b.room.send(SKILL_MSG.cast, msg);
+    b.skillsCastCount++;
+    b.skillsNextCastAt[bestIdx] = now + bestCooldown;
+    if (measuring) b.skillsSent++;
+    return true;
+  }
+
+  return false;
+}
+
 /** Gắn các trình xử lý tin nhắn, luồng đo băng thông và state change cho room của bot. */
 function bindRoomEvents(
   b: BotState,
@@ -1087,6 +1272,43 @@ function bindRoomEvents(
   room.onMessage("toast", () => {});
   room.onMessage("inv", (msg: InvMsg) => {
     b.invSlots = msg.slots ?? [];
+  });
+  room.onMessage(SKILL_MSG.skills, (msg: SkillsMsg) => {
+    b.rxMsgs++;
+    b.skillsMsgsCount++;
+    if (msg && typeof msg === "object") {
+      b.skillsLearned = msg.learned ?? {};
+      if (Array.isArray(msg.slots)) {
+        b.skillsSlots = [
+          msg.slots[0] ?? "",
+          msg.slots[1] ?? "",
+          msg.slots[2] ?? "",
+          msg.slots[3] ?? "",
+        ];
+      }
+      if (Array.isArray(msg.cd)) {
+        b.skillsCd = [msg.cd[0] ?? 0, msg.cd[1] ?? 0, msg.cd[2] ?? 0, msg.cd[3] ?? 0];
+        const now = performance.now();
+        for (let i = 0; i < 4; i++) {
+          if (b.skillsCd[i] > 0) {
+            b.skillsNextCastAt[i] = Math.max(b.skillsNextCastAt[i], now + b.skillsCd[i]);
+          }
+        }
+      }
+      if (Array.isArray(msg.cdMax)) {
+        b.skillsCdMax = [
+          msg.cdMax[0] ?? 0,
+          msg.cdMax[1] ?? 0,
+          msg.cdMax[2] ?? 0,
+          msg.cdMax[3] ?? 0,
+        ];
+      }
+      b.skillsLastRxAt = performance.now();
+      autoAssignBotSkills(b);
+    }
+  });
+  room.onMessage(SKILL_MSG.status, () => {
+    b.rxMsgs++;
   });
   room.onMessage("quests", () => {});
   room.onMessage("dialog", () => {});
@@ -1308,6 +1530,7 @@ async function runLoadTest(
   dungeonFallRate = 0,
   duel = false,
   sect = false,
+  skills = false,
 ): Promise<LoadTestMetrics> {
   const currentMap = getMap(mapId) ?? DEFAULT_MAP;
   const partySuffix = partySize > 1 ? `, tổ đội ${partySize} người` : "";
@@ -1395,7 +1618,7 @@ async function runLoadTest(
     const secret = `bot_secret_tien_gioi_${numStr}_loadtest`;
 
     // Khởi tạo vị trí (campX, campY) rải đều khắp vùng hoang dã giống bench.ts trước khi joinOrCreate
-    const realm = duel ? 1 : dungeon ? 1 : rnd() < 0.8 ? 1 : 2;
+    const realm = duel ? 1 : dungeon ? 1 : skills ? 2 : rnd() < 0.8 ? 1 : 2;
     const tier = duel ? 4 : dungeon ? 8 : Math.floor(rnd() * REALMS[realm].tiers.length);
     let campX = 0;
     let campY = 0;
@@ -1481,6 +1704,7 @@ async function runLoadTest(
       joinOpts = { token: botToken, v: PROTOCOL_VERSION };
     } else {
       const lifeSeed = die ? { playMs: 48 * 60_000, kills: 30, bossKills: 0 } : undefined;
+      const skillsSeed = skills ? sampleSkillsForRealm(realm) : undefined;
       seedBotSaveFile(
         name,
         secret,
@@ -1491,6 +1715,8 @@ async function runLoadTest(
         currentMap.def.id,
         lifeSeed,
         sect ? 5000 : undefined,
+        undefined,
+        skillsSeed,
       );
     }
 
@@ -1642,6 +1868,16 @@ async function runLoadTest(
       sectDepositsCount: 0,
       sectWithdrawsCount: 0,
       sectChatsCount: 0,
+      skills,
+      skillsLearned: {},
+      skillsSlots: ["", "", "", ""],
+      skillsCd: [0, 0, 0, 0],
+      skillsCdMax: [0, 0, 0, 0],
+      skillsNextCastAt: [0, 0, 0, 0],
+      skillsLastRxAt: 0,
+      skillsCastCount: 0,
+      skillsMsgsCount: 0,
+      skillsSent: 0,
     };
 
     bindRoomEvents(
@@ -1796,7 +2032,16 @@ async function runLoadTest(
               b.nextSlashAt = now + SKILLS.slash.cooldown + 60;
               if (measuring) attacksSent++;
             }
-            if (dist <= SKILLS.sword.range && me.mp >= SKILLS.sword.mp && now >= b.nextSwordAt) {
+            if (
+              b.skills &&
+              tryCastLearnedSkill(b, me, dist, angle, now, measuring, targetMon.def?.element)
+            ) {
+              // Đã thi triển chiêu thức thành công
+            } else if (
+              dist <= SKILLS.sword.range &&
+              me.mp >= SKILLS.sword.mp &&
+              now >= b.nextSwordAt
+            ) {
               b.room.send("skill", { id: "sword", angle });
               b.nextSwordAt = now + SKILLS.sword.cooldown + 100;
               if (measuring) skillsSent++;
@@ -1872,7 +2117,9 @@ async function runLoadTest(
             dx = 0;
             dy = 0;
           }
-          if (dist <= SKILLS.slash.range + 20 && now >= b.nextSlashAt) {
+          if (b.skills && tryCastLearnedSkill(b, me, dist, angle, now, measuring)) {
+            // Đã thi triển chiêu thức thành công trong PK thách đấu
+          } else if (dist <= SKILLS.slash.range + 20 && now >= b.nextSlashAt) {
             b.room.send("attack", { angle });
             b.nextSlashAt = now + SKILLS.slash.cooldown + 50;
             if (measuring) attacksSent++;
@@ -2126,7 +2373,12 @@ async function runLoadTest(
                 dx = 0;
                 dy = 0;
               }
-              if (dist <= SKILLS.slash.range && now >= b.nextSlashAt) {
+              if (
+                b.skills &&
+                tryCastLearnedSkill(b, me, dist, angle, now, measuring, targetMon.def?.element)
+              ) {
+                // Đã thi triển chiêu thức thành công
+              } else if (dist <= SKILLS.slash.range && now >= b.nextSlashAt) {
                 b.room.send("attack", { angle });
                 b.nextSlashAt = now + SKILLS.slash.cooldown + 60;
                 if (measuring) attacksSent++;
@@ -2176,19 +2428,26 @@ async function runLoadTest(
             dy = 0;
           }
 
-          if (dist <= SKILLS.slash.range && now >= b.nextSlashAt) {
-            const msg: AttackMsg = { angle };
-            b.room.send("attack", msg);
-            b.nextSlashAt = now + SKILLS.slash.cooldown + 60;
-            if (measuring) attacksSent++;
-          }
+          if (
+            b.skills &&
+            tryCastLearnedSkill(b, me, dist, angle, now, measuring, targetMon.def?.element)
+          ) {
+            // Đã thi triển chiêu thức thành công
+          } else {
+            if (dist <= SKILLS.slash.range && now >= b.nextSlashAt) {
+              const msg: AttackMsg = { angle };
+              b.room.send("attack", msg);
+              b.nextSlashAt = now + SKILLS.slash.cooldown + 60;
+              if (measuring) attacksSent++;
+            }
 
-          const swordReach = mode === "worst" ? SKILLS.sword.range : SKILLS.slash.range;
-          if (dist <= swordReach && me.mp >= SKILLS.sword.mp && now >= b.nextSwordAt) {
-            const msg: SkillMsg = { id: "sword", angle };
-            b.room.send("skill", msg);
-            b.nextSwordAt = now + SKILLS.sword.cooldown + 100;
-            if (measuring) skillsSent++;
+            const swordReach = mode === "worst" ? SKILLS.sword.range : SKILLS.slash.range;
+            if (dist <= swordReach && me.mp >= SKILLS.sword.mp && now >= b.nextSwordAt) {
+              const msg: SkillMsg = { id: "sword", angle };
+              b.room.send("skill", msg);
+              b.nextSwordAt = now + SKILLS.sword.cooldown + 100;
+              if (measuring) skillsSent++;
+            }
           }
         } else if (mode === "realistic") {
           // Kịch bản thực tế: đi tới bãi săn của mình rồi đứng canh quái hồi (không chạy liên tục khi chưa có quái)
@@ -2716,6 +2975,9 @@ async function runLoadTest(
   const totalSectWithdraws = bots.reduce((s, b) => s + b.sectWithdrawsCount, 0);
   const totalSectChats = bots.reduce((s, b) => s + b.sectChatsCount, 0);
 
+  const totalCasts = bots.reduce((s, b) => s + b.skillsCastCount, 0);
+  const totalSkillsMsgs = bots.reduce((s, b) => s + b.skillsMsgsCount, 0);
+
   const metrics: LoadTestMetrics = {
     commit,
     note,
@@ -2834,6 +3096,12 @@ async function runLoadTest(
     sectDepositsTotal: sect || totalSectDeposits > 0 ? totalSectDeposits : undefined,
     sectWithdrawsTotal: sect || totalSectWithdraws > 0 ? totalSectWithdraws : undefined,
     sectChatsTotal: sect || totalSectChats > 0 ? totalSectChats : undefined,
+    skills: skills ? true : undefined,
+    castsSent: skills || totalCasts > 0 ? totalCasts : undefined,
+    skillsMsgsReceivedPerBot:
+      skills || totalSkillsMsgs > 0
+        ? Number((totalSkillsMsgs / botCount / actualDurationSec).toFixed(1))
+        : undefined,
   };
 
   printMetrics(metrics);
@@ -2890,6 +3158,11 @@ function printMetrics(m: LoadTestMetrics) {
   console.log(
     `- Hoạt động chiến đấu: ${m.inputsSent} bước đi, ${m.attacksSent} đòn chém, ${m.skillsSent} kiếm khí (~${m.fxEventsReceivedPerBot ?? "–"} fx/s, ~${m.dmgEventsReceivedPerBot} dmg/s mỗi client)`,
   );
+  if (m.skills || (m.castsSent !== undefined && m.castsSent > 0)) {
+    console.log(
+      `- Kỹ năng M7: ${m.castsSent ?? 0} lần thi triển chiêu thức (~${m.skillsMsgsReceivedPerBot ?? "–"} tin skills/s mỗi client)`,
+    );
+  }
   if (m.partySize && m.partySize > 1) {
     console.log(
       `- Hoạt động tổ đội (${Math.ceil(m.botCount / m.partySize)} đội ${m.partySize} người): nhận ~${m.partyEventsReceivedPerBot ?? 0} tin party/s mỗi bot (~${m.rxPartyKBpsPerBot ?? 0} KB/s)`,
@@ -3237,6 +3510,7 @@ async function main() {
           args.dungeonFallRate,
           args.duel,
           args.sect,
+          args.skills,
         ),
       );
     }

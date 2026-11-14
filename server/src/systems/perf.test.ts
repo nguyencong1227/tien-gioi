@@ -6,6 +6,7 @@ import { addMonster, addPlayer, makeWorld } from "./test-helpers";
 import { POS_SYNC_EVERY_TICKS, applyInputs, syncPublicPos } from "./movement";
 import { tickWorld } from "./tick";
 import { slash, tickRespawn } from "./combat";
+import { cast } from "./cast";
 import { MONSTER_WAKE_DIST, WANDER_STRIDE, spawnInitial, tickMonsters } from "./monsters";
 import { EXP_FLUSH_MS, tickRecovery } from "./progression";
 import { runBench } from "../perf/bench";
@@ -357,5 +358,71 @@ describe("ngân sách băng thông và CPU (benchmark có seed, kết quả cố
     // Băng thông rất nhỏ nhưng > 0 khi có quái bị hạ, giữ ngân sách < 0.5 KB/s mỗi client.
     expect(r.walletKbPerClient).toBeGreaterThan(0);
     expect(r.walletKbPerClient).toBeLessThan(0.5);
+  });
+});
+
+describe("kịch bản hiệu năng chiêu thức (M7.10 #511)", () => {
+  it("nhiều người chơi liên tục dùng chiêu: tick < 10 ms, fx cast gửi gần, không crash", () => {
+    const { w, fx } = makeWorld();
+    spawnInitial(w);
+
+    // Thêm 30 người chơi Trúc Cơ rải quanh bãi quái
+    const players: string[] = [];
+    for (let i = 0; i < 30; i++) {
+      const sid = `p_${i}`;
+      const { p, c } = addPlayer(w, sid, 2, 5);
+      p.x = w.map.townPx.x + 250 + (i % 6) * 40;
+      p.y = w.map.townPx.y + 250 + Math.floor(i / 6) * 40;
+      p.mp = 500;
+      p.maxMp = 500;
+      syncPublicPos(p);
+      c.skills = {
+        learned: { hoa_van_kiem: 2, thanh_tung_phi_cham: 1 },
+        slots: ["hoa_van_kiem", "thanh_tung_phi_cham", "", ""],
+      };
+      players.push(sid);
+    }
+
+    const startTicks = 40; // 40 ticks = 2.0 giây
+    const tickDurations: number[] = [];
+
+    for (let t = 0; t < startTicks; t++) {
+      w.now += 50;
+      // Mỗi nhịp, người chơi thử cast chiêu vào quái gần nhất
+      for (let i = 0; i < players.length; i++) {
+        const sid = players[i];
+        const p = w.state.players.get(sid)!;
+        p.mp = 500; // giữ đủ mana để test áp lực liên tục
+        let nearestMon: any = null;
+        let minDist = 300;
+        w.state.monsters.forEach((mon) => {
+          const d = Math.hypot(mon.x - p.x, mon.y - p.y);
+          if (d < minDist) {
+            minDist = d;
+            nearestMon = mon;
+          }
+        });
+        if (nearestMon) {
+          const angle = Math.atan2(nearestMon.y - p.y, nearestMon.x - p.x);
+          const slot = (2 + (t % 2)) as 2 | 3;
+          cast(w, sid, { slot, angle });
+        }
+      }
+
+      const t0 = performance.now();
+      tickWorld(w, 0.05);
+      const dt = performance.now() - t0;
+      tickDurations.push(dt);
+    }
+
+    const avgMs = tickDurations.reduce((a, b) => a + b, 0) / tickDurations.length;
+    expect(avgMs).toBeLessThan(10);
+
+    // Có hiệu ứng fx cast được tạo ra
+    const castFxs = fx.filter((f) => f.kind === "cast");
+    expect(castFxs.length).toBeGreaterThan(0);
+
+    // 30 người chơi vẫn tồn tại bình thường
+    expect(w.state.players.size).toBe(30);
   });
 });

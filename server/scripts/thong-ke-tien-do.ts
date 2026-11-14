@@ -21,6 +21,9 @@ export interface PlayerProgressRecord {
   kills: number;
   bossKills: number;
   mapId: string;
+  skillsCount?: number;
+  skillsTotalLevels?: number;
+  equippedSkillsCount?: number;
 }
 
 export function calcStats(numbers: number[]): {
@@ -119,6 +122,33 @@ export function sanitizeRecord(raw: any): PlayerProgressRecord | null {
   const mapId =
     typeof raw.mapId === "string" && raw.mapId.trim().length > 0 ? raw.mapId.trim() : "lac_ha";
 
+  // Thống kê chiêu thức / công pháp đã học (M7.10 #511):
+  // Tuyệt đối không lưu / in tên chiêu cụ thể, chỉ đếm số lượng, tổng tầng và số ô đã gắn.
+  let skillsCount = 0;
+  let skillsTotalLevels = 0;
+  let equippedSkillsCount = 0;
+  if (raw.skills && typeof raw.skills === "object" && !Array.isArray(raw.skills)) {
+    if (
+      raw.skills.learned &&
+      typeof raw.skills.learned === "object" &&
+      !Array.isArray(raw.skills.learned)
+    ) {
+      for (const lvl of Object.values(raw.skills.learned)) {
+        if (typeof lvl === "number" && Number.isFinite(lvl) && lvl > 0) {
+          skillsCount++;
+          skillsTotalLevels += Math.min(3, Math.max(1, Math.floor(lvl)));
+        }
+      }
+    }
+    if (Array.isArray(raw.skills.slots)) {
+      for (const s of raw.skills.slots) {
+        if (typeof s === "string" && s.trim().length > 0) {
+          equippedSkillsCount++;
+        }
+      }
+    }
+  }
+
   return {
     realm: clampedRealm,
     tier: clampedTier,
@@ -126,6 +156,9 @@ export function sanitizeRecord(raw: any): PlayerProgressRecord | null {
     kills,
     bossKills,
     mapId,
+    skillsCount,
+    skillsTotalLevels,
+    equippedSkillsCount,
   };
 }
 
@@ -292,7 +325,34 @@ export interface GroupStat {
   ratioToModel: number | null;
   avgKills: number;
   avgBossKills: number;
+  avgSkills: number;
+  avgEquippedSkills: number;
   mapCounts: Record<string, number>;
+}
+
+export interface SkillsOverviewStat {
+  playersWithSkillsCount: number;
+  percentWithSkills: number;
+  skillsPerPlayer: {
+    min: number;
+    max: number;
+    median: number;
+    mean: number;
+  };
+  distribution: {
+    zero: number;
+    one: number;
+    two: number;
+    threeOrFour: number;
+    fivePlus: number;
+  };
+  equippedDistribution: {
+    zero: number;
+    one: number;
+    two: number;
+    three: number;
+    four: number;
+  };
 }
 
 export interface ProgressReport {
@@ -309,6 +369,7 @@ export interface ProgressReport {
   postKdOptHours: number;
   postKdThresholdHours: number;
   postKdRatio: number | null;
+  skillsOverview: SkillsOverviewStat;
   verdict: string;
 }
 
@@ -344,6 +405,8 @@ export function buildProgressReport(
 
     const totalKills = g.records.reduce((acc, r) => acc + r.kills, 0);
     const totalBossKills = g.records.reduce((acc, r) => acc + r.bossKills, 0);
+    const totalSkills = g.records.reduce((acc, r) => acc + (r.skillsCount || 0), 0);
+    const totalEquippedSkills = g.records.reduce((acc, r) => acc + (r.equippedSkillsCount || 0), 0);
 
     const mapCounts: Record<string, number> = {};
     for (const r of g.records) {
@@ -370,6 +433,8 @@ export function buildProgressReport(
       ratioToModel,
       avgKills: totalKills / count,
       avgBossKills: totalBossKills / count,
+      avgSkills: totalSkills / count,
+      avgEquippedSkills: totalEquippedSkills / count,
       mapCounts,
     });
   }
@@ -432,6 +497,40 @@ export function buildProgressReport(
     verdict = `ℹ️ CHƯA CÓ DỮ LIỆU: Chưa ghi nhận người chơi nào đạt Kim Đan Hậu kỳ hoặc vượt qua Kim Đan trên tập dữ liệu này. Tiếp tục theo dõi các bản sao lưu tiếp theo.`;
   }
 
+  // Thống kê chiêu thức / công pháp đã học (M7.10 #511)
+  const allSkillsCounts = records.map((r) => r.skillsCount || 0);
+  const skillsStats = calcStats(allSkillsCounts);
+  const playersWithSkillsCount = records.filter((r) => (r.skillsCount || 0) > 0).length;
+  const percentWithSkills =
+    records.length > 0 ? (playersWithSkillsCount / records.length) * 100 : 0;
+
+  const distribution = { zero: 0, one: 0, two: 0, threeOrFour: 0, fivePlus: 0 };
+  const equippedDistribution = { zero: 0, one: 0, two: 0, three: 0, four: 0 };
+
+  for (const r of records) {
+    const sc = r.skillsCount || 0;
+    if (sc === 0) distribution.zero++;
+    else if (sc === 1) distribution.one++;
+    else if (sc === 2) distribution.two++;
+    else if (sc === 3 || sc === 4) distribution.threeOrFour++;
+    else distribution.fivePlus++;
+
+    const eq = r.equippedSkillsCount || 0;
+    if (eq === 0) equippedDistribution.zero++;
+    else if (eq === 1) equippedDistribution.one++;
+    else if (eq === 2) equippedDistribution.two++;
+    else if (eq === 3) equippedDistribution.three++;
+    else equippedDistribution.four++;
+  }
+
+  const skillsOverview: SkillsOverviewStat = {
+    playersWithSkillsCount,
+    percentWithSkills,
+    skillsPerPlayer: skillsStats,
+    distribution,
+    equippedDistribution,
+  };
+
   return {
     groups,
     totalPlayers: records.length,
@@ -446,6 +545,7 @@ export function buildProgressReport(
     postKdOptHours: model.kdFinishHours,
     postKdThresholdHours: model.postKdThresholdHours,
     postKdRatio,
+    skillsOverview,
     verdict,
   };
 }
@@ -465,12 +565,12 @@ export function formatMarkdownReport(report: ProgressReport, sourceDesc: string)
   lines.push(`## 1. Bảng phân bố tiến độ theo Cảnh giới - Bậc`);
   lines.push(``);
   lines.push(
-    `| Cảnh giới - Bậc | Số người | Giờ chơi tích luỹ (Min / Med / Max) | Mô hình tới bậc | Trung vị / Mô hình | Quái hạ TB | Trùm hạ TB | Bản đồ |`,
+    `| Cảnh giới - Bậc | Số người | Giờ chơi tích luỹ (Min / Med / Max) | Mô hình tới bậc | Trung vị / Mô hình | Quái hạ TB | Trùm hạ TB | Chiêu / Ô TB | Bản đồ |`,
   );
-  lines.push(`|---|---:|---:|---:|---:|---:|---:|---|`);
+  lines.push(`|---|---:|---:|---:|---:|---:|---:|---:|---|`);
 
   if (report.groups.length === 0) {
-    lines.push(`| *(Không có dữ liệu)* | 0 | - | - | - | - | - | - |`);
+    lines.push(`| *(Không có dữ liệu)* | 0 | - | - | - | - | - | - | - |`);
   } else {
     for (const g of report.groups) {
       const minStr = g.minHours.toFixed(1);
@@ -484,7 +584,7 @@ export function formatMarkdownReport(report: ProgressReport, sourceDesc: string)
         .map(([m, c]) => `${m}: ${c}`)
         .join(", ");
       lines.push(
-        `| ${g.label} | ${g.count} | ${hoursRange} | ${optStr} | ${ratioStr} | ${g.avgKills.toFixed(0)} | ${g.avgBossKills.toFixed(1)} | ${mapsStr} |`,
+        `| ${g.label} | ${g.count} | ${hoursRange} | ${optStr} | ${ratioStr} | ${g.avgKills.toFixed(0)} | ${g.avgBossKills.toFixed(1)} | ${g.avgSkills.toFixed(1)} / ${g.avgEquippedSkills.toFixed(1)} | ${mapsStr} |`,
       );
     }
   }
@@ -510,6 +610,26 @@ export function formatMarkdownReport(report: ProgressReport, sourceDesc: string)
     );
   }
 
+  lines.push(``);
+  lines.push(`## 3. Thống kê chiêu thức / công pháp đã học (M7.10 #511)`);
+  lines.push(``);
+  const so = report.skillsOverview;
+  lines.push(
+    `- **Số nhân vật đã học ít nhất 1 chiêu:** ${so.playersWithSkillsCount} / ${report.totalPlayers} (${so.percentWithSkills.toFixed(1)}%)`,
+  );
+  lines.push(
+    `- **Số chiêu đã học mỗi nhân vật (Min / Med / Max / TB):** ${so.skillsPerPlayer.min} / **${so.skillsPerPlayer.median}** / ${so.skillsPerPlayer.max} / ${so.skillsPerPlayer.mean.toFixed(1)} chiêu`,
+  );
+  lines.push(`- **Phân bố số lượng chiêu đã học:**`);
+  lines.push(`  - 0 chiêu: ${so.distribution.zero} nhân vật`);
+  lines.push(`  - 1 chiêu: ${so.distribution.one} nhân vật`);
+  lines.push(`  - 2 chiêu: ${so.distribution.two} nhân vật`);
+  lines.push(`  - 3–4 chiêu: ${so.distribution.threeOrFour} nhân vật`);
+  lines.push(`  - 5+ chiêu: ${so.distribution.fivePlus} nhân vật`);
+  lines.push(`- **Phân bố số chiêu đang gắn vào ô (ô 2–5):**`);
+  lines.push(
+    `  - 0 ô: ${so.equippedDistribution.zero} | 1 ô: ${so.equippedDistribution.one} | 2 ô: ${so.equippedDistribution.two} | 3 ô: ${so.equippedDistribution.three} | 4 ô: ${so.equippedDistribution.four}`,
+  );
   lines.push(``);
   lines.push(`### Kết luận cân bằng:`);
   lines.push(`> ${report.verdict}`);

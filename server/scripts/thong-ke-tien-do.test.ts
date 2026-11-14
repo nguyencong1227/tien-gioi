@@ -96,12 +96,40 @@ describe("thong-ke-tien-do: sanitizeRecord & quyền riêng tư", () => {
       kills: 120,
       bossKills: 2,
       mapId: "am_suong",
+      skillsCount: 0,
+      skillsTotalLevels: 0,
+      equippedSkillsCount: 0,
     });
 
     // Tuyệt đối không leak name hay secret
     expect((rec as any).name).toBeUndefined();
     expect((rec as any).secretHash).toBeUndefined();
     expect((rec as any).coin).toBeUndefined();
+  });
+
+  it("thống kê chính xác số lượng chiêu và ô gắn nhưng không lưu / leak tên chiêu", () => {
+    const raw = {
+      name: "Kiếm Tu Lạc Hà",
+      realm: 2,
+      tier: 1,
+      skills: {
+        learned: {
+          hoa_van_kiem: 2,
+          bon_thach_quyen: 1,
+          thanh_tung_phi_cham: 3,
+        },
+        slots: ["hoa_van_kiem", "thanh_tung_phi_cham", "", ""],
+      },
+      life: { playMs: 7200000, kills: 80, bossKills: 1 },
+    };
+    const rec = sanitizeRecord(raw)!;
+    expect(rec.skillsCount).toBe(3);
+    expect(rec.skillsTotalLevels).toBe(6); // 2 + 1 + 3 = 6
+    expect(rec.equippedSkillsCount).toBe(2);
+    // Tuyệt đối không leak danh sách tên chiêu hay object learned / slots vào record
+    expect((rec as any).skills).toBeUndefined();
+    expect((rec as any).learned).toBeUndefined();
+    expect((rec as any).slots).toBeUndefined();
   });
 
   it("kẹp realm và tier trong giới hạn hợp lệ", () => {
@@ -464,8 +492,9 @@ describe("thong-ke-tien-do: mô hình tối ưu simulate & buildProgressReport",
     const md = formatMarkdownReport(report, "test-source");
 
     expect(md).toContain(
-      "| Cảnh giới - Bậc | Số người | Giờ chơi tích luỹ (Min / Med / Max) | Mô hình tới bậc | Trung vị / Mô hình | Quái hạ TB | Trùm hạ TB | Bản đồ |",
+      "| Cảnh giới - Bậc | Số người | Giờ chơi tích luỹ (Min / Med / Max) | Mô hình tới bậc | Trung vị / Mô hình | Quái hạ TB | Trùm hạ TB | Chiêu / Ô TB | Bản đồ |",
     );
+    expect(md).toContain("## 3. Thống kê chiêu thức / công pháp đã học (M7.10 #511)");
     expect(md).toContain("Phàm Nhân");
     expect(md).toContain("Kim Đan Sơ kỳ");
     // Nhóm 1 người in gọn `**3.0** h`
