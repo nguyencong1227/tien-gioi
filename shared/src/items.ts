@@ -515,7 +515,7 @@ export interface TreasureDef {
   element?: Element;
 }
 
-const pct = (ratio: number) => `${Math.round(ratio * 100)} %`;
+const pct = (ratio: number) => `${Math.round(ratio * 100)}%`;
 
 const HO_THAN = { intervalS: 10, shieldRatio: 0.15 } as const;
 const HAP_LINH = { mpRatio: 0.03 } as const;
