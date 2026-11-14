@@ -870,6 +870,20 @@ async function main() {
       JSON.stringify(await sentList()),
     );
     await clearSent();
+    // nút ưu tiên cao hơn đang bị vô hiệu (disabled) thì Y bỏ qua nó, sang hộp kế (nit của A ở #470): thách đấu bị khoá, tổ đội còn dùng được
+    await ev(
+      `window.__ui.onDuelInvited({ from: 'Dao Huu D2', ttlMs: 30000 }); document.getElementById('duib-btn-accept').disabled = true; window.__ui.onPartyInvited({ from: 'Dao Huu Z', ttlMs: 30000 }); 1`,
+    );
+    await press(t, K.y);
+    check(
+      "Nút Nhận thách đấu đang disabled: Y bỏ qua, nhận lời mời tổ đội kế tiếp",
+      (await sentHas("partyAccept", { from: "Dao Huu Z" })) &&
+        !(await sentHas(DUEL_MSG.accept, { from: "Dao Huu D2" })),
+      JSON.stringify(await sentList()),
+    );
+    await ev(`document.getElementById('duib-btn-accept').disabled = false; 1`);
+    await press(t, K.x); // từ chối lời thách đấu D2 cho sạch
+    await clearSent();
     await ev(`window.__ui.onPartyInvited({ from: 'Dao Huu B', ttlMs: 30000 }); 1`);
     await press(t, K.x);
     check(
@@ -1061,7 +1075,12 @@ async function main() {
       `window.__scene.players.size >= 2 && Math.abs(window.__scene.predX - ${Math.round(me.x)}) < 100`,
       "A thấy B",
     );
-    await sleep(400);
+    // hình của B phải thật sự nằm trong khung nhìn của A (hình trượt dần tới vị trí mới, lúc mới vào còn ở chỗ cũ)
+    await t.waitFor(
+      `Array.from(window.__scene.players.entries()).some(([id, e]) => id !== window.__scene.sid && window.__scene.cameras.main.worldView.contains(e.root.x, e.root.y) && !!window.__scene.state.players.get(id))`,
+      "hình của B nằm trong khung nhìn của A",
+    );
+    await sleep(300);
     await press(t, K.p);
     check(
       "P: menu đồng đạo mở, đúng người gần nhất",
@@ -1273,7 +1292,7 @@ async function main() {
     check(
       "Hết Hoàng Tuyền: thế giới nhận phím lại",
       !(await ev(shown("limbo-overlay"))) && !(await ev(`window.__ui.isKeyboardCaptured()`)),
-      `captured=${await ev(`window.__ui.isKeyboardCaptured()`)}`,
+      `captured=${await ev(`window.__ui.isKeyboardCaptured()`)} dialog=${await ev(`window.__ui.isDialogOpen()`)} menu=${await ev(`window.__ui.isPlayerMenuOpen()`)} focus=${await ev(`document.activeElement && (document.activeElement.id || document.activeElement.tagName)`)} open=${await ev(`[...document.querySelectorAll('[role=dialog]')].filter((e) => !e.hidden).map((e) => e.id).join(',')`)}`,
     );
 
     check("0 lỗi console / exception", t.errors.length === 0, t.errors.slice(0, 3).join(" | "));

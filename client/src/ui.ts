@@ -893,10 +893,10 @@ function watchModalHidden(id: string) {
   sync(); // tấm đã hiện sẵn lúc gắn
 }
 
-/** Nút đang hiện: không có tổ tiên nào bị `hidden` (hộp lời mời, HUD bí cảnh / quyết đấu, hộp xác nhận ẩn bằng thuộc tính `hidden` của hộp chứa). */
+/** Nút đang hiện và bấm được (không `disabled`; nit của A ở #470): không có tổ tiên nào bị `hidden` (hộp lời mời, HUD bí cảnh / quyết đấu, hộp xác nhận ẩn bằng thuộc tính `hidden` của hộp chứa). */
 function buttonShown(id: string): boolean {
   const el = document.getElementById(id);
-  return el !== null && el.closest("[hidden]") === null;
+  return el !== null && el.closest("[hidden]") === null && !(el as HTMLButtonElement).disabled;
 }
 /** Hành động đang chờ người chơi bấm phím mới; `null` = không chờ. */
 let keyCaptureFor: ActionId | null = null;
