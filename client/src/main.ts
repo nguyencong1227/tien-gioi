@@ -38,6 +38,7 @@ import {
   mockSkillsMsg,
 } from "./skill-bar";
 import { mockSpawnOf, mockStartMapId, mockSyncsState } from "./mock-map";
+import { parseMockStatus } from "./status-badges";
 import { captureEarlyMessages } from "./early-messages";
 import { joinWithRedirect, isClientOutdatedError } from "./connection";
 import { clearToken, getToken } from "./auth";
@@ -245,6 +246,12 @@ function installMockSkills(room: any) {
   // gửi sau khi cảnh đã đăng ký xong các handler (`start` dựng cảnh bất đồng bộ)
   setTimeout(() => room.emit("skills", cur), 400);
   (window as any).__mockSkills = { emit: () => room.emit("skills", cur) };
+  // Huy hiệu trạng thái (M7.7 bước 3a, #508): `&status=burn:5,haste:8:0.3` (id:giây[:cường độ]) gửi tin `status` như máy chủ; script kiểm bơm danh sách khác qua `__mockStatus`
+  const st = parseMockStatus(location.search);
+  if (st.length > 0) setTimeout(() => room.emit("status", { list: st }), 500);
+  (window as any).__mockStatus = {
+    emit: (list: unknown) => room.emit("status", { list }),
+  };
 }
 
 function serverUrl() {

@@ -387,6 +387,41 @@ button {
   font-size: var(--fs-11);
   line-height: 1.5;
 }
+/* Huy hiệu trạng thái của mình (M7.7 bước 3a, #508): ô "tên + số giây", màu theo có hại / có lợi; hàng rỗng thì [hidden] (quy tắc `[hidden]` toàn cục ở đầu tệp: không chiếm chỗ) */
+.hud-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+  min-width: 0;
+}
+.st-badge {
+  flex: none;
+  padding: 1px 7px;
+  border-radius: 10px;
+  border: 1px solid var(--st-border, #888);
+  background: var(--st-bg, #222);
+  color: var(--st-fg, #fff);
+  font-size: var(--fs-11);
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.st-badge.urgent {
+  animation: st-badge-blink 0.7s steps(2, jump-none) infinite;
+}
+@keyframes st-badge-blink {
+  50% {
+    opacity: 0.45;
+  }
+}
+body.reduced-motion .st-badge.urgent {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  body:not(.motion-ok) .st-badge.urgent {
+    animation: none;
+  }
+}
 .hud-chip b {
   font-weight: 700;
 }
