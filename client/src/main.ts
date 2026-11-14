@@ -10,10 +10,12 @@ import {
   QUESTS,
   RECIPES,
   SHOPS,
+  SKILLS_M7,
   getMap,
   isDungeonMap,
   type TravelToMsg,
   type LimboMsg,
+  type SkillsMsg,
 } from "@tien-gioi/shared";
 import { WorldScene } from "./scenes/WorldScene";
 import { ui } from "./ui";
@@ -27,6 +29,13 @@ import {
 } from "./dungeon";
 import { isMockDuelEnabled, MOCK_DUEL_SAMPLES } from "./duel";
 import { isMockSectEnabled, MOCK_SECT_SAMPLES } from "./sect";
+import {
+  isMockSkillsEnabled,
+  mockCast,
+  mockRealm,
+  mockSkillCount,
+  mockSkillsMsg,
+} from "./skill-bar";
 import { mockSpawnOf, mockStartMapId, mockSyncsState } from "./mock-map";
 import { captureEarlyMessages } from "./early-messages";
 import { joinWithRedirect, isClientOutdatedError } from "./connection";
@@ -87,6 +96,7 @@ function createMockDungeonRoom(
   dead = false,
   spawn = mockSpawnOf(DEFAULT_MAP_ID),
   syncState = false,
+  realm = 1,
 ): any {
   const handlers = new Map<string, ((msg: any) => void)[]>();
   return {
@@ -123,7 +133,7 @@ function createMockDungeonRoom(
             "mock-session-01",
             {
               name: "Trương Tiểu Phàm",
-              realm: 1,
+              realm,
               tier: 8,
               hp: dead ? 0 : 2500,
               maxHp: 2500,
@@ -178,6 +188,35 @@ function createMockDungeonRoom(
       loot: new Map(),
     },
   };
+}
+
+/**
+ * `?skills=mock&n=0|1|2|4[&realm=N]` (M7.6, #507): máy chủ giả gửi `skills` mẫu (chiêu thật từ `SKILLS_M7`, ô đầu đang hồi chiêu 3 giây) và đáp `cast` bằng hồi chiêu
+ * giả để thấy đủ trạng thái ô chiêu không cần máy chủ thật. Không đoán gì ngoài hồi chiêu: không trừ linh lực, không gây sát thương.
+ */
+function installMockSkills(room: any) {
+  const n = mockSkillCount(location.search);
+  const ids = SKILLS_M7.slice(0, 5).map((d) => d.id);
+  let cur = mockSkillsMsg(ids, n, n > 0 ? 3000 : 0);
+  /** mốc (performance.now) hết hồi chiêu của từng ô 2-5 */
+  const until: Record<number, number> = { 2: performance.now() + cur.cd[0], 3: 0, 4: 0, 5: 0 };
+  const origSend = room.send;
+  room.send = (type: string, data: any) => {
+    origSend(type, data);
+    if (type !== "cast" || typeof data?.slot !== "number") return;
+    const left = Math.max(0, (until[data.slot] ?? 0) - performance.now());
+    const next = mockCast(cur, data.slot, left);
+    if (!next) return;
+    const now = performance.now();
+    until[data.slot] = now + next.cd[data.slot - 2];
+    // hồi chiêu của MỌI ô tính lại từ mốc hết hạn (ô khác đang hồi không bị xoá)
+    const cd = [2, 3, 4, 5].map((s) => Math.max(0, until[s] - now)) as SkillsMsg["cd"];
+    cur = { ...next, cd };
+    room.emit("skills", cur);
+  };
+  // gửi sau khi cảnh đã đăng ký xong các handler (`start` dựng cảnh bất đồng bộ)
+  setTimeout(() => room.emit("skills", cur), 400);
+  (window as any).__mockSkills = { emit: () => room.emit("skills", cur) };
 }
 
 function serverUrl() {
@@ -338,6 +377,7 @@ if (
     isMockDungeonFallen() ||
     isMockDuelEnabled() ||
     isMockSectEnabled() ||
+    isMockSkillsEnabled() ||
     new URLSearchParams(location.search).has("crowd"))
 ) {
   const isFallen = isMockDungeonFallen();
@@ -348,7 +388,9 @@ if (
     isFallen,
     mockSpawnOf(isFallen ? DEFAULT_MAP_ID : startMapId),
     !isFallen && mockSyncsState(),
+    isMockSkillsEnabled() ? mockRealm(location.search, mockSkillCount(location.search)) : 1,
   );
+  if (isMockSkillsEnabled()) installMockSkills(mockRoom);
   start(mockRoom, startMapId)
     .then(() => {
       if (isFallen) {

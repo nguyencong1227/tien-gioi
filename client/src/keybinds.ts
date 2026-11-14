@@ -55,7 +55,7 @@ export interface ActionDef {
 /**
  * Bảng hành động. THỨ TỰ = thứ tự ở màn "Phím tắt".
  * QUYET_DINH_M3 mục 17.1: cụm phải bàn phím J K L U I O dành cho chiến đấu (tay phải trên bàn phím, tay trái giữ WASD):
- * J = Kiếm chém (Cách là phím phụ), K = Kiếm khí, L / U / I / O = ô chiêu thức 2-5 (chưa có chiêu: ô trống, để sẵn cho M7).
+ * J = Kiếm chém (Cách là phím phụ), K = Kiếm khí, L / U / I / O = ô chiêu thức 2-5 (M7.6: gắn chiêu ở bảng Công pháp; ô chưa mở / còn trống thì báo lý do, không gửi gì).
  * Phím số cũ giữ làm phím phụ: 3 = Kiếm khí, 4 = Đả tọa; 1 / 2 vẫn là đan dược (bấm nhầm kỹ năng lúc cần uống đan là nguy hiểm).
  * Các phím bị cụm này chiếm được dời: Túi I -> B, Sổ nhiệm vụ J -> N (Q vẫn là phím phụ), Đả tọa L -> Z.
  * Ba hành động mất phím cũ mà người dùng chưa chỉ định phím mới (cả ba đổi được ở màn "Phím tắt"): Đột phá B -> V (V = "vượt" cảnh giới,
@@ -98,7 +98,7 @@ export const ACTIONS: readonly ActionDef[] = [
   },
   ...SKILL_SLOTS.map((n, i): ActionDef => ({
     id: `skill.slot${n}` as ActionId,
-    label: `Ô chiêu thức ${n} (chưa có chiêu)`,
+    label: `Ô chiêu thức ${n}`,
     group: "combat",
     defaults: [SLOT_KEYS[i]],
     world: true,

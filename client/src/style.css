@@ -1560,9 +1560,17 @@ html[data-input="touch"] .qt-head {
   }
 }
 
-/* Ô chiêu thức 2-5 (QUYET_DINH_M3 mục 17.1): hàng nhỏ phía trên cụm nút kỹ năng, chỉ máy tính (có nhãn phím L U I O); mờ vì chưa có chiêu (M7 mới lấp) */
+/* Ô chiêu thức 2-5 (QUYET_DINH_M3 mục 17.1, M7.6 / #507): hàng nhỏ phía trên cụm nút kỹ năng, chỉ máy tính (có nhãn phím L U I O); cảm ứng: cụm chiêu thích nghi
+   (bước kế). Bảy trạng thái do skill-bar-dom.ts đặt lớp `k-<trạng thái>` (docs/THIET_KE_THANH_CHIEU.md mục 2). */
 #skill-slots {
   display: none;
+}
+/* màu hệ của biểu tượng vẽ bằng mã (skill-icon.ts): `--si-c` do mã đặt trên .skico; CSS của .ico svg (fill none) không đè được thuộc tính nên đặt lại ở đây */
+.skico svg {
+  fill: var(--si-c, #b9b3a6);
+  fill-opacity: 0.35;
+  stroke: var(--si-c, #b9b3a6);
+  stroke-width: 1.6;
 }
 @media (pointer: fine) and (min-width: 641px) {
   /* nằm NGOÀI luồng lưới (#skills là khối cố định): hàng rộng hơn cụm nút nên nếu là một ô lưới sẽ nới cột và đẩy các nút kỹ năng sang trái */
@@ -1575,19 +1583,104 @@ html[data-input="touch"] .qt-head {
     gap: 8px;
   }
   .sk.slot {
-    width: 44px;
-    height: 44px;
-    border-style: dashed;
-    border-width: 1px;
-    opacity: 0.45;
-    cursor: default;
+    width: 58px;
+    height: 58px;
+    /* ô vuông bo góc (không tròn như nút kỹ năng): chỗ cho tên viết tắt dưới biểu tượng, không bị góc tròn cắt chữ */
+    border-radius: 12px;
+    border-width: 2px;
+    cursor: pointer;
+    place-content: center;
+    justify-items: center;
+    row-gap: 0;
   }
-  .sk.slot small {
-    margin-top: 10px;
-    font-size: var(--fs-10);
+  .sk.slot .ico {
+    width: 22px;
+    height: 22px;
+    font-size: 1px;
+    margin-top: 12px; /* chừa chỗ cho nhãn phím ở mép trên */
+  }
+  .sk.slot .ico svg {
+    width: 22px;
+    height: 22px;
+  }
+  .sk.slot .nm {
+    max-width: 54px;
+    margin-top: 1px;
+    font-size: var(--fs-9);
+    line-height: 1.15;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .sk.slot .pips {
+    font-size: 7px;
+    font-style: normal;
+    line-height: 1;
+    letter-spacing: 1px;
+    color: #ffe08a;
+    min-height: 7px;
   }
   .sk.slot .keycap {
     top: 2px;
+  }
+  /* vòng quét hồi chiêu: phần còn lại (--cd 0..1) tối dần theo chiều kim đồng hồ, số giây ở giữa */
+  .sk.slot .cdv {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: conic-gradient(rgba(0, 0, 0, 0.66) calc(var(--cd, 0) * 1turn), transparent 0);
+    pointer-events: none;
+  }
+  .sk.slot .cdn {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    font-size: var(--fs-16);
+    font-weight: 700;
+    text-shadow: 0 1px 3px #000;
+    pointer-events: none;
+  }
+  /* 1 khoá / 2 trống: mờ, nét đứt (chưa dùng được) */
+  .sk.slot.k-locked {
+    border-style: dashed;
+    border-width: 1px;
+    opacity: 0.42;
+    cursor: default;
+  }
+  .sk.slot.k-empty {
+    border-style: dashed;
+    border-width: 1px;
+    opacity: 0.5;
+  }
+  .sk.slot.k-locked .ico,
+  .sk.slot.k-needRealm .ico {
+    color: var(--paper);
+  }
+  /* 3 thiếu cảnh giới: chiêu mờ + ổ khoá */
+  .sk.slot.k-needRealm {
+    opacity: 0.6;
+    border-color: #8a6a3a;
+    cursor: not-allowed;
+  }
+  /* 4 choáng: cả ô xám */
+  .sk.slot.k-stunned {
+    filter: grayscale(1);
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+  /* 5 hồi chiêu */
+  .sk.slot.k-cooldown {
+    cursor: default;
+  }
+  /* 6 thiếu linh lực: tối + viền xanh nhạt */
+  .sk.slot.k-noMp {
+    border-color: #6fa8e8;
+    filter: brightness(0.62);
+    cursor: not-allowed;
+  }
+  /* 7 sẵn sàng: sáng */
+  .sk.slot.k-ready {
+    box-shadow: 0 0 8px rgba(255, 224, 138, 0.45);
   }
 }
 
