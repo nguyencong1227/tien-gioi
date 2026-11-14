@@ -2328,6 +2328,49 @@ body.low-fx #btn-talk {
   font-size: var(--fs-10);
   opacity: 0.7;
 }
+/* Sáu ô trang bị (M7.4): ô trống viền nét đứt, ô khoá mờ nền (KHÔNG hạ opacity cả thẻ để chữ giữ độ tương phản) + ổ khoá */
+.equip-slot-card.empty {
+  border-style: dashed;
+}
+.equip-slot-card.locked {
+  border-style: dashed;
+  background: rgba(0, 0, 0, 0.28);
+  color: #d8cfb4;
+}
+.equip-slot-card.locked .slot-icon {
+  display: grid;
+  place-items: center;
+  background: none;
+  color: var(--gold);
+}
+.equip-slot-card.locked .slot-icon svg {
+  width: 22px;
+  height: 22px;
+}
+.equip-slot-card.locked .slot-item-name {
+  font-weight: 600;
+}
+/* Ba dòng chỉ số % (bạo kích, giảm hồi chiêu, giáp): nhãn dài nên chiếm cả hàng */
+.stat-row.pct {
+  grid-column: 1 / -1;
+}
+.stat-val.at-cap {
+  color: #ffe08a;
+}
+.stat-diff.maxed {
+  color: rgba(243, 236, 218, 0.78);
+  font-weight: 600;
+}
+/* So sánh cùng ô: "Đang mặc: cũ -> mới" và câu nội tại hai pháp bảo chiếm cả hàng */
+.cmp-swap {
+  flex-basis: 100%;
+  font-weight: 600;
+}
+.cmp-desc {
+  flex-basis: 100%;
+  font-size: var(--fs-11);
+  opacity: 0.88;
+}
 .char-stats-box {
   padding: 10px 12px;
   border-radius: 7px;

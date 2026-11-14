@@ -1,11 +1,23 @@
 // Lớp giao diện DOM (HUD, chat, kỹ năng, túi đồ, nhiệm vụ, hộp thoại NPC, minimap, âm thanh).
 // Tuyệt đối không dùng innerHTML để phòng chống XSS theo chuẩn bảo mật SecureCoder.
 import {
+  NO_STATS_TEXT,
+  deltaText,
+  describeEquipStats,
+  equipDiffers,
+  equipmentOf,
+  pctRows,
+  slotLockText,
+  slotViews,
+  statDeltas,
+  swapInfo,
+  type FullEquip,
+} from "./equip-panel";
+import { lockIconSvg } from "./skill-icon";
+import {
   INVENTORY_SLOTS,
   ITEM_BY_ID,
-  EQUIP_SLOTS,
   EQUIP_SLOT_NAMES,
-  emptyEquipment,
   equipBonus,
   RECIPES,
   QUEST_BY_ID,
@@ -28,7 +40,6 @@ import {
   type ItemDef,
   type Equipment,
   type EquipSlot,
-  type EquipStats,
   type QuestsMsg,
   type QuestProgress,
   type QuestDef,
@@ -210,6 +221,10 @@ export interface HudPlayer {
   weapon?: string;
   robe?: string;
   talisman?: string;
+  /** Ba ô riêng (M7.4): chỉ chủ nhận; vắng / "" = trống */
+  boots?: string;
+  jade?: string;
+  treasure?: string;
 }
 
 export interface UiCallbacks {
@@ -292,7 +307,7 @@ let trackingQuestId: string | null = null;
 let currentName = "";
 let currentRealm = 0;
 let currentTier = 0;
-let currentEquip: Equipment = emptyEquipment();
+let currentEquip: FullEquip = equipmentOf(null);
 let questLog: QuestsMsg = { active: [], done: [], dailyDone: [] };
 
 // ---------- Tổ đội (M3, #75) ----------
@@ -573,16 +588,6 @@ function resolveQuickItems(): [string, string] {
   return [q1, q2];
 }
 
-/** Chuỗi tóm tắt chỉ số cộng thêm của một món trang bị. */
-function describeEquipStats(stats: EquipStats): string {
-  const parts: string[] = [];
-  if (stats.atk) parts.push(`+${stats.atk} Công`);
-  if (stats.hp) parts.push(`+${stats.hp} Khí huyết`);
-  if (stats.mp) parts.push(`+${stats.mp} Linh lực`);
-  if (stats.speed) parts.push(`+${stats.speed} Tốc độ`);
-  return parts.join(" · ") || "Không cộng chỉ số";
-}
-
 /** Điền so sánh statsFor khi mặc thử món `candidate` so với trang bị hiện tại vào phần tử DOM. */
 function fillEquipComparison(box: HTMLElement, candidate: ItemDef) {
   box.replaceChildren();
@@ -597,28 +602,40 @@ function fillEquipComparison(box: HTMLElement, candidate: ItemDef) {
   const nextEquip: Equipment = { ...currentEquip, [eq.slot]: candidate.id };
   const nextStats = statsFor(currentRealm, currentTier, nextEquip);
 
-  const diffs: Array<{ label: string; d: number }> = [
-    { label: "Công", d: nextStats.atk - nowStats.atk },
-    { label: "Khí huyết", d: nextStats.maxHp - nowStats.maxHp },
-    { label: "Linh lực", d: nextStats.maxMp - nowStats.maxMp },
-    { label: "Tốc độ", d: nextStats.speed - nowStats.speed },
-  ];
-
   const slotTag = document.createElement("span");
   slotTag.textContent = `[${EQUIP_SLOT_NAMES[eq.slot]}]`;
   slotTag.style.opacity = "0.8";
   box.append(slotTag);
 
-  let anyDiff = false;
-  for (const { label, d } of diffs) {
-    if (d === 0) continue;
-    anyDiff = true;
+  // "Đang mặc: cũ -> mới" cùng ô: người chơi không phải nhớ món đang mặc (pháp bảo so bằng hai câu mô tả vì không có số để trừ)
+  const swap = swapInfo(currentEquip, candidate);
+  if (swap) {
+    const line = document.createElement("span");
+    line.className = "cmp-swap";
+    line.textContent = `Đang mặc: ${swap.fromName} → ${swap.toName}`;
+    box.append(line);
+    if (swap.fromDesc || swap.toDesc) {
+      for (const [tag, desc] of [
+        ["Cũ", swap.fromDesc],
+        ["Mới", swap.toDesc],
+      ] as const) {
+        if (!desc) continue;
+        const d = document.createElement("span");
+        d.className = "cmp-desc";
+        d.textContent = `${tag}: ${desc}`;
+        box.append(d);
+      }
+    }
+  }
+
+  const deltas = statDeltas(nowStats, nextStats);
+  for (const x of deltas) {
     const chip = document.createElement("span");
-    chip.className = `cmp-chip ${d > 0 ? "cmp-up" : "cmp-down"}`;
-    chip.textContent = `${label} ${d > 0 ? `+${d}` : `${d}`}`;
+    chip.className = `cmp-chip ${x.d > 0 ? "cmp-up" : "cmp-down"}`;
+    chip.textContent = `${x.d > 0 ? "▲" : "▼"} ${deltaText(x)}`;
     box.append(chip);
   }
-  if (!anyDiff) {
+  if (deltas.length === 0) {
     const same = document.createElement("span");
     same.className = "cmp-eq";
     same.textContent = "Chỉ số ngang bằng món đang mặc";
@@ -627,9 +644,10 @@ function fillEquipComparison(box: HTMLElement, candidate: ItemDef) {
 
   const reqSpan = document.createElement("span");
   const reqText = realmLabel(eq.reqRealm, eq.reqTier);
-  const ok = canEquip(candidate.id, currentRealm, currentTier);
+  const slotLock = slotLockText(eq.slot, currentRealm);
+  const ok = canEquip(candidate.id, currentRealm, currentTier) && !slotLock;
   reqSpan.className = ok ? "req-ok" : "req-warn";
-  reqSpan.textContent = ok ? `Đủ cảnh giới (${reqText})` : `Cần ${reqText}`;
+  reqSpan.textContent = ok ? `Đủ cảnh giới (${reqText})` : (slotLock ?? `Cần ${reqText}`);
   box.append(reqSpan);
 }
 
@@ -662,15 +680,20 @@ function renderSlotDetail() {
   rarityEl.textContent = rarityStyle(def.rarity).name;
   rarityEl.style.color = rColor;
   const cdSec = def.cooldown ? ` · Hồi chiêu ${Math.round(def.cooldown / 1000)}s` : "";
-  const eqStatsText = def.equip ? ` · ${describeEquipStats(def.equip.stats)}` : "";
+  const eqStatsText = def.equip
+    ? ` · ${describeEquipStats(def.equip.stats, def.equip.treasure)}`
+    : "";
   descEl.textContent = `${def.desc}${eqStatsText}${cdSec}`;
 
   if (def.type === "equip" && def.equip) {
     fillEquipComparison(cmpEl, def);
     equipBtn.hidden = false;
-    const ok = canEquip(def.id, currentRealm, currentTier);
+    const slotLock = slotLockText(def.equip.slot, currentRealm);
+    const ok = canEquip(def.id, currentRealm, currentTier) && !slotLock;
     equipBtn.disabled = !ok;
-    equipBtn.textContent = ok ? "Mặc" : `Cần ${realmLabel(def.equip.reqRealm, def.equip.reqTier)}`;
+    equipBtn.textContent = ok
+      ? "Mặc"
+      : (slotLock ?? `Cần ${realmLabel(def.equip.reqRealm, def.equip.reqTier)}`);
   } else {
     cmpEl.hidden = true;
     equipBtn.hidden = true;
@@ -1252,6 +1275,19 @@ function renderQuestModalImpl() {
 
 // ---------- Bảng nhân vật & Trang bị (Phím C - #31) ----------
 
+/** Bấm ô TRỐNG: nhảy tới món hợp ô đó trong danh sách túi (cuộn + focus nút Mặc), không có thì nói rõ để khỏi mò. */
+function focusBagItemFor(slot: EquipSlot) {
+  const btn = $("char-bag-equips").querySelector<HTMLElement>(
+    `.char-bag-item[data-slot="${slot}"] .char-equip-btn`,
+  );
+  if (btn) {
+    btn.scrollIntoView({ block: "nearest" });
+    btn.focus();
+    return;
+  }
+  ui.toast({ text: `Trong túi chưa có đồ cho ô ${EQUIP_SLOT_NAMES[slot]}`, tone: "info" });
+}
+
 function renderCharModal() {
   withFocusKept($("char-modal"), renderCharModalImpl);
 }
@@ -1260,13 +1296,13 @@ function renderCharModalImpl() {
   const slotsBox = $("char-equip-slots");
   slotsBox.replaceChildren();
 
-  for (const slot of EQUIP_SLOTS) {
-    const itemId = currentEquip[slot] || "";
-    const def = itemId ? ITEM_BY_ID[itemId] : undefined;
+  for (const v of slotViews(currentEquip, currentRealm)) {
+    const { slot, def } = v;
 
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = `equip-slot-card${def ? " filled" : ""}`;
+    btn.className = `equip-slot-card${def ? " filled" : v.locked ? " locked" : " empty"}`;
+    btn.setAttribute("aria-label", v.aria);
     if (def) {
       btn.style.borderColor = rarityStyle(def.rarity).color;
       applyRarityBadge(btn, def.rarity);
@@ -1274,11 +1310,13 @@ function renderCharModalImpl() {
 
     const slotLabel = document.createElement("span");
     slotLabel.className = "slot-label";
-    slotLabel.textContent = EQUIP_SLOT_NAMES[slot];
+    slotLabel.textContent = v.label;
 
     const icon = document.createElement("i");
     icon.className = "slot-icon";
-    applyItemVisual(icon, def);
+    if (v.locked)
+      icon.innerHTML = lockIconSvg(); // SVG tĩnh của mình (không có dữ liệu người dùng)
+    else applyItemVisual(icon, def);
 
     const itemName = document.createElement("span");
     itemName.className = "slot-item-name";
@@ -1286,24 +1324,37 @@ function renderCharModalImpl() {
       itemName.textContent = def.name;
       itemName.style.color = rarityStyle(def.rarity).color;
     } else {
-      itemName.textContent = "Trống";
+      itemName.textContent = v.locked ? "Đã khoá" : "Trống";
       itemName.style.opacity = "0.5";
     }
 
     const hint = document.createElement("span");
     hint.className = "slot-hint";
-    hint.textContent = def?.equip
-      ? `${describeEquipStats(def.equip.stats)} · Chạm tháo`
-      : "Chưa trang bị";
+    if (def?.equip) {
+      const statsText = describeEquipStats(def.equip.stats);
+      // Pháp bảo không có chỉ số: thẻ nhỏ không chứa nổi câu nội tại, đặt đầy đủ ở `title` / aria
+      hint.textContent = `${def.equip.treasure && statsText === NO_STATS_TEXT ? "Có nội tại" : statsText} · Chạm tháo`;
+      const full = describeEquipStats(def.equip.stats, def.equip.treasure);
+      btn.title = `${def.name}: ${full}`;
+      btn.setAttribute("aria-label", `${v.aria}. ${full}`);
+    } else {
+      hint.textContent = v.lockText ?? "Chưa trang bị";
+    }
 
     btn.append(slotLabel, icon, itemName, hint);
-    if (def) {
-      btn.dataset.nav = `eq:${slot}`;
-      onPress(btn, () => {
+    // Khoá: vẫn focus được (là <button>, không `disabled`) để người dùng bàn phím / đọc màn hình nghe lý do; `aria-disabled` báo rõ chưa dùng được
+    if (v.locked) btn.setAttribute("aria-disabled", "true");
+    btn.dataset.nav = `eq:${slot}`;
+    onPress(btn, () => {
+      if (def) {
         sound.equip();
         callbacks?.onUnequip(slot);
-      });
-    }
+      } else if (v.locked) {
+        ui.toast({ text: v.lockText ?? "Ô này chưa mở", tone: "info" });
+      } else {
+        focusBagItemFor(slot);
+      }
+    });
     slotsBox.append(btn);
   }
 
@@ -1312,7 +1363,7 @@ function renderCharModalImpl() {
   statsBox.replaceChildren();
 
   const curStats = statsFor(currentRealm, currentTier, currentEquip);
-  const bonus = equipBonus(currentEquip);
+  const bonus = equipBonus(currentEquip, currentRealm); // ô chưa mở không cộng (khớp statsFor)
 
   const previewDef = previewEquipItemId ? ITEM_BY_ID[previewEquipItemId] : undefined;
   const previewStats = previewDef?.equip
@@ -1399,6 +1450,28 @@ function renderCharModalImpl() {
     statsBox.append(row);
   }
 
+  // Ba chỉ số % mới (M7.4): số lấy từ statsFor (đã kẹp), trần từ STAT_CAPS; mũi tên ▲ / ▼ kèm số, không chỉ màu
+  for (const r of pctRows(curStats, previewStats, previewDef?.equip?.stats)) {
+    const row = document.createElement("div");
+    row.className = "stat-row pct";
+    row.dataset.stat = r.key;
+    row.setAttribute("aria-label", r.aria);
+    const lbl = document.createElement("span");
+    lbl.className = "stat-label";
+    lbl.textContent = r.label;
+    const valWrap = document.createElement("span");
+    valWrap.className = `stat-val${r.atCap ? " at-cap" : ""}`;
+    valWrap.textContent = r.valueText;
+    if (r.diffText) {
+      const d = document.createElement("span");
+      d.className = `stat-diff ${r.maxed ? "maxed" : (r.diff ?? 0) > 0 ? "up" : "down"}`;
+      d.textContent = r.diffText;
+      valWrap.append(d);
+    }
+    row.append(lbl, valWrap);
+    statsBox.append(row);
+  }
+
   // Danh sách trang bị trong túi để so sánh & mặc một chạm
   const bagList = $("char-bag-equips");
   bagList.replaceChildren();
@@ -1414,6 +1487,7 @@ function renderCharModalImpl() {
     const eq = def.equip;
     const row = document.createElement("div");
     row.className = `char-bag-item${previewEquipItemId === def.id ? " previewing" : ""}`;
+    row.dataset.slot = eq.slot;
 
     const left = document.createElement("div");
     left.className = "char-bag-left";
@@ -1434,36 +1508,29 @@ function renderCharModalImpl() {
       ...currentEquip,
       [eq.slot]: def.id,
     });
-    const deltas: Array<{ k: string; d: number }> = [
-      { k: "Công", d: nextStats.atk - curStats.atk },
-      { k: "Khí huyết", d: nextStats.maxHp - curStats.maxHp },
-      { k: "Linh lực", d: nextStats.maxMp - curStats.maxMp },
-      { k: "Tốc độ", d: nextStats.speed - curStats.speed },
-    ];
-    let hasDelta = false;
-    for (const { k, d } of deltas) {
-      if (d === 0) continue;
-      if (hasDelta) cmpLine.append(document.createTextNode(" · "));
-      hasDelta = true;
+    const deltas = statDeltas(curStats, nextStats);
+    for (const x of deltas) {
+      if (cmpLine.childNodes.length > 0) cmpLine.append(document.createTextNode(" · "));
       const sp = document.createElement("span");
-      sp.className = d > 0 ? "cmp-up" : "cmp-down";
-      sp.textContent = `${k} ${d > 0 ? `+${d}` : `${d}`}`;
+      sp.className = x.d > 0 ? "cmp-up" : "cmp-down";
+      sp.textContent = `${x.d > 0 ? "▲" : "▼"} ${deltaText(x)}`;
       cmpLine.append(sp);
     }
-    if (!hasDelta) {
+    if (deltas.length === 0) {
       const sp = document.createElement("span");
       sp.className = "cmp-eq";
       sp.textContent = "Ngang bằng món đang mặc";
       cmpLine.append(sp);
     }
 
-    const ok = canEquip(def.id, currentRealm, currentTier);
-    const reqText = realmLabel(eq.reqRealm, eq.reqTier);
+    const slotLock = slotLockText(eq.slot, currentRealm);
+    const ok = canEquip(def.id, currentRealm, currentTier) && !slotLock;
+    const reqText = slotLock ?? `Cần ${realmLabel(eq.reqRealm, eq.reqTier)}`;
     if (!ok) {
       cmpLine.append(document.createTextNode(" · "));
       const reqWarn = document.createElement("span");
       reqWarn.className = "req-warn";
-      reqWarn.textContent = `Cần ${reqText}`;
+      reqWarn.textContent = reqText;
       cmpLine.append(reqWarn);
     }
 
@@ -1474,7 +1541,7 @@ function renderCharModalImpl() {
     equipBtn.type = "button";
     equipBtn.className = "char-equip-btn";
     equipBtn.disabled = !ok;
-    equipBtn.textContent = ok ? "Mặc" : `Cần ${reqText}`;
+    equipBtn.textContent = ok ? "Mặc" : reqText;
     equipBtn.dataset.nav = `bag:${i}`;
     onPress(
       equipBtn,
@@ -1554,7 +1621,7 @@ function renderForgeModalImpl() {
     const statLine = document.createElement("small");
     if (outDef.equip) {
       const slotName = EQUIP_SLOT_NAMES[outDef.equip.slot];
-      const statsStr = describeEquipStats(outDef.equip.stats);
+      const statsStr = describeEquipStats(outDef.equip.stats, outDef.equip.treasure);
       const reqStr = realmLabel(outDef.equip.reqRealm, outDef.equip.reqTier);
       const okRealm = canEquip(outDef.id, currentRealm, currentTier);
       statLine.textContent = `${slotName} · ${statsStr} · `;
@@ -4262,20 +4329,14 @@ export const ui = {
   },
 
   hud(p: HudPlayer, online: number) {
-    const nextW = p.weapon ?? "";
-    const nextR = p.robe ?? "";
-    const nextT = p.talisman ?? "";
+    // Sáu ô (ba ô riêng chỉ chủ nhận, vắng = trống); so tại chỗ, chỉ dựng bộ mới khi đổi (hud chạy mỗi khung)
     const equipOrRealmChanged =
-      p.realm !== currentRealm ||
-      p.tier !== currentTier ||
-      nextW !== currentEquip.weapon ||
-      nextR !== currentEquip.robe ||
-      nextT !== currentEquip.talisman;
+      p.realm !== currentRealm || p.tier !== currentTier || equipDiffers(p, currentEquip);
 
     currentName = p.name;
     currentRealm = p.realm;
     currentTier = p.tier;
-    currentEquip = { weapon: nextW, robe: nextR, talisman: nextT };
+    if (equipOrRealmChanged) currentEquip = equipmentOf(p);
 
     if (equipOrRealmChanged) {
       if (charModalOpen) renderCharModal();
