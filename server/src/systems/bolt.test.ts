@@ -1,6 +1,13 @@
 // Quái tầm xa và đạn (M7.3, #504): `fireBolt`, `rangedStep`, `tickBolts` (docs/PHAN_CONG_M7.md mục 6). Loài quái thử `t_xa` chèn vào `MONSTER_BY_ID` rồi dọn.
 import { afterEach, describe, expect, it } from "vitest";
-import { MAX_BOLTS, MONSTER_BY_ID, PLAYER_RADIUS, TILE, type MonsterKind } from "@tien-gioi/shared";
+import {
+  MAX_BOLTS,
+  MONSTER_BY_ID,
+  PLAYER_RADIUS,
+  TILE,
+  elementMult,
+  type MonsterKind,
+} from "@tien-gioi/shared";
 import { fxReachOf } from "../rooms/WorldRoom";
 import {
   BOLT_HOLD_MAX,
@@ -91,6 +98,35 @@ describe("fireBolt", () => {
     expect(fxReachOf({ kind: "bolt", x: 0, y: 0, angle: 0, speed: 240, range: 280 })).toBe(280);
     expect(isRanged(def)).toBe(true);
     expect(isRanged(MONSTER_BY_ID.lang)).toBe(false);
+  });
+});
+
+describe("fireBolt: màu đạn theo `boltElement` (hệ HIỂN THỊ, không đổi cân bằng)", () => {
+  it("fx `bolt` gửi `boltElement ?? element`: Sương Hồ băng, Độc Thiềm âm; quái không khai thì theo `element`, rồi bỏ trống", () => {
+    const t = setup(200);
+    const m = t.mon.m;
+    fireBolt(t.w, m, { ...MONSTER_BY_ID[XA], boltElement: "bang" }, 0);
+    fireBolt(t.w, m, { ...MONSTER_BY_ID[XA], element: "hoa" }, 0);
+    fireBolt(t.w, m, { ...MONSTER_BY_ID[XA], element: "hoa", boltElement: "am" }, 0);
+    fireBolt(t.w, m, MONSTER_BY_ID[XA], 0);
+    expect(boltFx(t).map((f) => (f as { element?: string }).element)).toEqual([
+      "bang",
+      "hoa",
+      "am",
+      undefined,
+    ]);
+  });
+
+  it("Sương Hồ / Độc Thiềm THẬT: đạn băng / âm; `element` của quái vẫn trống nên `elementMult` lên chúng KHÔNG đổi (x1)", () => {
+    const t = setup(200);
+    fireBolt(t.w, t.mon.m, MONSTER_BY_ID.suong_ho, 0);
+    fireBolt(t.w, t.mon.m, MONSTER_BY_ID.doc_thiem, 0);
+    expect(boltFx(t).map((f) => (f as { element?: string }).element)).toEqual(["bang", "am"]);
+    for (const id of ["suong_ho", "doc_thiem"]) {
+      expect(MONSTER_BY_ID[id].element, id).toBeUndefined();
+      for (const e of ["kim", "moc", "thuy", "hoa", "tho", "bang", "phong", "loi", "am"])
+        expect(elementMult(e, MONSTER_BY_ID[id].element ?? "none"), `${id} / ${e}`).toBe(1);
+    }
   });
 });
 
