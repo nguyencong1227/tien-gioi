@@ -67,6 +67,21 @@ function isControl(id: StatusId): boolean {
   return kind === "stun" || kind === "vuln";
 }
 
+/**
+ * Gỡ MỌI trạng thái sát thương theo giây (độc / bỏng / chảy máu) khỏi hộp, giữ nguyên loại khác (tê cóng, choáng, tăng ích...). Dùng khi người chơi
+ * vào khu an toàn (quyết định A 15/11/2026, docs/PHAN_CONG_M7.md 5.4): trấn / cổng thanh tẩy sát thương theo giây. Trả `true` nếu có cái bị gỡ.
+ */
+export function stripDots(box: StatusBox): boolean {
+  let removed = false;
+  for (let i = box.list.length - 1; i >= 0; i--) {
+    if (statusOf(box.list[i].id)?.kind === "dot") {
+      box.list.splice(i, 1);
+      removed = true;
+    }
+  }
+  return removed;
+}
+
 /** Xoá trạng thái đã hết hạn. Trả `true` nếu có cái bị xoá. */
 export function pruneStatuses(box: StatusBox, now: number): boolean {
   let removed = false;
@@ -179,6 +194,32 @@ export function absorbShield(
     }
   }
   return { left, changed };
+}
+
+/** Sát thương theo giây dồn lại rồi tính mỗi chừng này ms (ít tin `dmg` hơn mỗi tick; lúc hết hạn tính nốt phần lẻ). */
+export const DOT_TICK_MS = 1000;
+
+/**
+ * Sát thương THEO GIÂY (`dot`) của MỘT trạng thái cần gây ngay bây giờ (số nguyên >= 0), đồng thời đẩy mốc `last` cho khớp. Dùng chung cho quái và người chơi.
+ * Làm tròn KHÔNG mất / thừa phần lẻ: mỗi lần tính chỉ lấy phần NGUYÊN (`floor`) của sát thương dồn tới nay và chỉ đẩy `last` đúng khoảng thời gian phần nguyên đó
+ * tương ứng (`n x 1000 / dps` ms), nên phần dư vẫn nằm trong khoảng `last..now` cho lần sau; lúc HẾT HẠN mới làm tròn phần dư cuối (`round`) và chốt `last = until`.
+ * Tổng sát thương cả đời trạng thái = `round(dps x thời lượng)` bất kể dps nhỏ cỡ nào (trước đây `round` mỗi giây lệch tới +-30-100 % với dps 0,4 - 1,5).
+ * Chưa tới nhịp (`DOT_TICK_MS` kể từ `last`, trừ khi đã hết hạn) hoặc chưa đủ 1 đơn vị: trả 0 và KHÔNG đổi `last`. `now` kẹp ở `until` (tick trễ không tính quá hạn).
+ */
+export function takeDotDamage(s: StatusInst, now: number): number {
+  if (!(s.dps > 0)) return 0;
+  const expired = now >= s.until;
+  if (!expired && now < s.last + DOT_TICK_MS) return 0;
+  const end = Math.min(now, s.until);
+  const exact = (s.dps * (end - s.last)) / 1000;
+  if (expired) {
+    s.last = end;
+    return Math.max(0, Math.round(exact));
+  }
+  const whole = Math.floor(exact);
+  if (whole < 1) return 0;
+  s.last += (whole * 1000) / s.dps;
+  return whole;
 }
 
 /** Mặt nạ bit công khai (`Monster.fx`, M7.3) của các trạng thái CÓ HẠI còn hiệu lực. */

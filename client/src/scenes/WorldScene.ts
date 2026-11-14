@@ -37,7 +37,7 @@ import {
 import { getQuality, onQualityChange } from "../gfx/quality";
 import { buildDecorGrid } from "../gfx/map-decor";
 import { mapPackId, mapsNearPortals, neighborMapIds, packs } from "../gfx/packs";
-import { styleIdFor, styleOf } from "../gfx/map-style";
+import { planTileTint, styleIdFor, styleOf } from "../gfx/map-style";
 import { decorTilesetKey, ensureDecorTileset } from "../gfx/decor-tileset";
 import { ambientEnabledByUrl, planWeather, weatherEnabledByUrl } from "../gfx/map-weather";
 import {
@@ -425,6 +425,9 @@ export class WorldScene extends Phaser.Scene {
   public map: GameMap;
   private mapTilemap?: Phaser.Tilemaps.Tilemap;
   private mapLayer?: Phaser.Tilemaps.TilemapLayer;
+  /** Màu phủ nền của kiểu bản đồ (`MapStyle.tileTint`); chỉ có khi kiểu khai báo. Công khai cho script kiểm `?debug`. */
+  groundWash?: Phaser.GameObjects.Rectangle;
+  private styleMemo?: { mapId: string; id: string };
   /** Lớp trang trí tất định (M5.3 #332): tilemap thứ hai, tileset vẽ bằng mã theo kiểu bản đồ. */
   private decorTilemap?: Phaser.Tilemaps.Tilemap;
   decorLayer?: Phaser.Tilemaps.TilemapLayer;
@@ -641,9 +644,15 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  /** Id kiểu thị giác đang dùng: `mapId`, hoặc kiểu xem trước `?debug&style=<id>` (`styleIdFor`). */
+  /** Id kiểu thị giác đang dùng: `mapId`, hoặc kiểu xem trước `?debug&style=<id>` (`styleIdFor`). Chốt MỘT lần cho mỗi bản đồ: được gọi mỗi khung (thời tiết, nước), không tạo đối tượng. */
   private styleId(): string {
-    return styleIdFor(this.map.def.id, typeof window === "undefined" ? "" : window.location.search);
+    const mapId = this.map.def.id;
+    if (this.styleMemo?.mapId !== mapId)
+      this.styleMemo = {
+        mapId,
+        id: styleIdFor(mapId, typeof window === "undefined" ? "" : window.location.search),
+      };
+    return this.styleMemo.id;
   }
 
   /** Dựng / cập nhật hai ảnh phủ ánh sáng theo kiểu bản đồ hiện tại và hồ sơ chất lượng (gọi lại khi đổi bản đồ / chất lượng). */
@@ -757,6 +766,8 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private buildMapVisuals() {
+    this.groundWash?.destroy();
+    this.groundWash = undefined;
     // 1. Hủy lớp ô cũ nếu có
     if (this.mapLayer) {
       this.mapLayer.destroy();
@@ -793,6 +804,13 @@ export class WorldScene extends Phaser.Scene {
     const ts = this.mapTilemap.addTilesetImage("tiles", TILESET_KEY, TILE, TILE, 0, 0)!;
     this.mapLayer = this.mapTilemap.createLayer(0, ts, 0, 0)!;
     this.mapLayer.setDepth(-10);
+    // 1b. Màu phủ nền theo kiểu bản đồ (tuyết phủ ở Hàn Vân Lĩnh): một hình chữ nhật phủ cả bản đồ NGAY TRÊN lớp ô, dưới trang trí / nước / thực thể
+    const wash = planTileTint(styleOf(this.styleId()));
+    if (wash)
+      this.groundWash = this.add
+        .rectangle(0, 0, this.map.worldW, this.map.worldH, wash.color, wash.alpha)
+        .setOrigin(0, 0)
+        .setDepth(-9.8);
 
     // 2b. Lớp trang trí tất định (cỏ, hoa, đá, nấm, bụi): thuần thị giác, sinh từ seed + mapId nên mọi người thấy giống nhau
     const style = styleOf(this.styleId());

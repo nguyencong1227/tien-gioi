@@ -18,6 +18,7 @@ import {
   SECT_ELDERS_MAX,
   SECT_LOG_MAX,
   SECT_MAX_MEMBERS,
+  sanitizeSkillBook,
 } from "@tien-gioi/shared";
 import {
   auditAccountSaveData,
@@ -1699,6 +1700,58 @@ describe("audit-saves (Issue #112)", () => {
       expect(
         relaxedEngraveCheck(errorsEngrave).some((e) => e.code === "engraved_exceeds_slots"),
       ).toBe(false);
+    });
+
+    it("phát hiện skills.slots có chiêu khi skills.learned vắng -> unlearned_skill_in_slot", () => {
+      const raw = JSON.stringify({
+        ...validPlayer,
+        realm: 2,
+        skills: {
+          slots: ["ung_trao", "", "", ""],
+        },
+      });
+      const errors = auditPlayerSaveData(raw, raw.length);
+      expect(errors.some((e) => e.code === "unlearned_skill_in_slot")).toBe(true);
+    });
+
+    it("đối chiếu loader: đầu ra sanitizeSkillBook với mọi dữ liệu rác luôn vượt qua auditPlayerSaveData", () => {
+      const garbageInputs: unknown[] = [
+        null,
+        undefined,
+        "string",
+        12345,
+        true,
+        [],
+        {},
+        { learned: null, slots: null },
+        { learned: "not-an-object", slots: ["ung_trao", "ung_trao"] },
+        {
+          learned: { unknown_skill: 1, ung_trao: 0, hoa_van_kiem: 99 },
+          slots: ["unknown_skill", "ung_trao"],
+        },
+        {
+          learned: { ung_trao: 2.5, hoa_van_kiem: -5 },
+          slots: ["ung_trao", "ung_trao", "hoa_van_kiem", "ung_trao", "extra"],
+        },
+        {
+          learned: { ung_trao: 1, hoa_van_kiem: 2 },
+          slots: ["ung_trao", "hoa_van_kiem", "ung_trao", ""],
+        },
+      ];
+
+      for (const realm of [0, 1, 2, 3, 4]) {
+        for (const bad of garbageInputs) {
+          const sanitized = sanitizeSkillBook(bad, realm);
+          const raw = JSON.stringify({
+            ...validPlayer,
+            realm,
+            skills: sanitized,
+          });
+          const errors = auditPlayerSaveData(raw, raw.length);
+          const skillErrors = errors.filter((e) => e.code.includes("skill"));
+          expect(skillErrors).toEqual([]);
+        }
+      }
     });
   });
 });

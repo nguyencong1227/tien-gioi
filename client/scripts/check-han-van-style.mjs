@@ -142,7 +142,17 @@ try {
         Buffer.from(png.result.data, "base64"),
       );
     }
-    return { seen, color: JSON.parse(shot) };
+    const wash = JSON.parse(
+      await evalJs(`(() => { const sc = window.__scene, g = sc.groundWash; const decor = sc.decorLayer;
+        return JSON.stringify(g ? { depth: g.depth, alpha: g.fillAlpha, color: g.fillColor, w: g.width, h: g.height, worldW: sc.map.worldW, worldH: sc.map.worldH, decorDepth: decor ? decor.depth : null, mapDepth: sc.mapLayer ? sc.mapLayer.depth : null } : null); })()`),
+    );
+    // dựng lại hình bản đồ (như khi đổi bản đồ / nối lại): lớp phủ nền cũ phải bị huỷ, không tích luỹ
+    const rebuilt = JSON.parse(
+      await evalJs(`(() => { const sc = window.__scene; const old = sc.groundWash; sc.buildMapVisuals();
+        const rects = sc.children.list.filter((o) => o.type === "Rectangle" && o.depth === -9.8).length;
+        return JSON.stringify({ hadWash: !!old, oldGone: !old || !old.scene || old.active === false, replaced: sc.groundWash !== old, rects }); })()`),
+    );
+    return { seen, color: JSON.parse(shot), wash, rebuilt };
   };
   const count = (seen, tint) =>
     Object.entries(seen).reduce(
@@ -168,6 +178,35 @@ try {
   const coldBase = base.color.b - base.color.r;
   const coldHv = hv.color.b - hv.color.r;
   check(
+    base.wash === null,
+    "cảnh mặc định KHÔNG có lớp phủ nền (kiểu Lạc Hà không khai báo tileTint: chi phí 0)",
+  );
+  check(
+    !!hv.wash &&
+      hv.wash.w === hv.wash.worldW &&
+      hv.wash.h === hv.wash.worldH &&
+      hv.wash.depth > hv.wash.mapDepth &&
+      hv.wash.depth < hv.wash.decorDepth,
+    `lớp phủ nền của Hàn Vân phủ cả bản đồ (${hv.wash?.w}x${hv.wash?.h}), nằm NGAY TRÊN lớp ô (${hv.wash?.mapDepth}) và DƯỚI trang trí (${hv.wash?.decorDepth}): độ sâu ${hv.wash?.depth}`,
+  );
+  check(
+    !!hv.wash && hv.wash.color === 0xe6f0fa && Math.abs(hv.wash.alpha - 0.36) < 1e-6,
+    `màu / độ đậm đúng kiểu (#${hv.wash?.color?.toString(16)}, ${hv.wash?.alpha})`,
+  );
+  check(
+    hv.rebuilt.hadWash && hv.rebuilt.oldGone && hv.rebuilt.replaced && hv.rebuilt.rects === 1,
+    `dựng lại hình bản đồ: lớp phủ cũ bị huỷ, chỉ còn MỘT lớp (${JSON.stringify(hv.rebuilt)})`,
+  );
+  check(
+    !base.rebuilt.hadWash && base.rebuilt.rects === 0,
+    "cảnh mặc định dựng lại: vẫn không có lớp phủ nào",
+  );
+  const lumOf = (c) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+  check(
+    lumOf(hv.color) - lumOf(base.color) >= 8,
+    `nền SÁNG hơn bản mặc định (tuyết phủ): độ sáng trung bình ${lumOf(base.color).toFixed(1)} -> ${lumOf(hv.color).toFixed(1)}`,
+  );
+  check(
     coldHv - coldBase >= 8,
     `màu trung bình vùng giữa LẠNH hơn: xanh - đỏ ${coldBase.toFixed(1)} (mặc định) -> ${coldHv.toFixed(1)} (băng nguyên)`,
   );
@@ -187,7 +226,7 @@ try {
   void noDebug;
   const proto = await measure("constructor", "&style=constructor");
   check(
-    count(proto.seen, SNOW_TINT) === 0 && count(proto.seen, PETAL_TINT) > 0,
+    count(proto.seen, SNOW_TINT) === 0 && count(proto.seen, PETAL_TINT) > 0 && proto.wash === null,
     "?style=constructor bị bỏ qua: vẫn là cảnh Lạc Hà (cánh hoa, không tuyết)",
   );
   check(pageErrors === 0, `không có lỗi JS trên trang (${pageErrors})`);
