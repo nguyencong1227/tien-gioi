@@ -8,15 +8,22 @@ import {
   ENGRAVE_MAX,
   LEARNABLE_SLOTS,
   MAX_STATUSES,
+  MOVE_SPEED_MUL_MAX,
+  MOVE_SPEED_MUL_MIN,
   PHASE_BEATS,
   SKILLS_M7,
   SKILL_FX_IDS,
   SKILL_MSG,
   STATUS_BIT,
+  moveSpeedMul,
+  sanitizeStatusList,
+  statusCarriesRatio,
+  type StatusEntry,
   SKILL_BY_ID,
   SKILL_MAX_LEVEL,
   SLOT_UNLOCK_REALM,
   STATUSES,
+  STATUS_BY_ID,
   STUN_IMMUNE_MS,
   STUN_MAX_MS,
   TURN_MS,
@@ -628,5 +635,113 @@ describe("tên trạng thái", () => {
     expect(new Set(names).size).toBe(names.length);
     const skillNames = new Set(SKILLS_M7.map((k) => k.name.toLowerCase()));
     for (const n of names) expect(skillNames.has(n), n).toBe(false);
+  });
+});
+
+describe("tốc độ di chuyển theo trạng thái (moveSpeedMul, StatusEntry.ratio)", () => {
+  it("chỉ tăng tốc / tê cóng ghi ratio; loại khác không", () => {
+    const ratioIds = STATUSES.filter((st) => st.kind === "haste" || st.kind === "slow").map(
+      (st) => st.id,
+    );
+    expect(ratioIds.sort()).toEqual(["chill", "haste"]);
+    for (const st of STATUSES) expect(statusCarriesRatio(st.id)).toBe(ratioIds.includes(st.id));
+    for (const bad of ["constructor", "__proto__", "", 3, null, undefined])
+      expect(statusCarriesRatio(bad)).toBe(false);
+  });
+
+  it("(1 + tăng tốc) x (1 - tê cóng); không có gì thì 1; mục hết hạn / không liên quan bị bỏ", () => {
+    expect(moveSpeedMul([])).toBe(1);
+    expect(moveSpeedMul([["haste", 3000, 0.4]])).toBeCloseTo(1.4, 12);
+    expect(moveSpeedMul([["chill", 3000, 0.3]])).toBeCloseTo(0.7, 12);
+    expect(
+      moveSpeedMul([
+        ["haste", 3000, 0.4],
+        ["chill", 2000, 0.3],
+      ]),
+    ).toBeCloseTo(1.4 * 0.7, 12);
+    expect(moveSpeedMul([["haste", 0, 0.4]])).toBe(1); // hết hạn (client đếm lùi tới 0)
+    expect(moveSpeedMul([["haste", -5, 0.4]])).toBe(1);
+    const others: StatusEntry[] = [
+      ["burn", 3000],
+      ["shield", 3000, 0.5],
+      ["regen", 3000, 0.1],
+      ["stun", 500],
+    ];
+    expect(moveSpeedMul(others)).toBe(1); // shield có ratio nhưng KHÔNG đổi tốc độ
+  });
+
+  it("ratio kẹp bằng maxRatio của trạng thái, thiếu / rác coi 0, kết quả kẹp [MIN, MAX]", () => {
+    const hasteMax = STATUS_BY_ID.haste.maxRatio;
+    const chillMax = STATUS_BY_ID.chill.maxRatio;
+    expect(moveSpeedMul([["haste", 1000, 99]])).toBeCloseTo(1 + hasteMax, 12);
+    expect(moveSpeedMul([["chill", 1000, 99]])).toBeCloseTo(1 - chillMax, 12);
+    expect(moveSpeedMul([["haste", 1000, -3]])).toBe(1);
+    expect(moveSpeedMul([["haste", 1000]])).toBe(1); // thiếu ratio
+    expect(moveSpeedMul([["haste", 1000, Number.NaN]])).toBe(1);
+    // kẹp cuối: tê cóng tối đa không tới 0
+    expect(moveSpeedMul([["chill", 1000, chillMax]])).toBeGreaterThanOrEqual(MOVE_SPEED_MUL_MIN);
+    expect(MOVE_SPEED_MUL_MIN).toBeGreaterThan(0);
+    expect(MOVE_SPEED_MUL_MAX).toBeGreaterThan(1);
+    expect((1 + hasteMax) * 1).toBeLessThanOrEqual(MOVE_SPEED_MUL_MAX); // trần tăng tốc nằm trong khoảng kẹp
+    // dữ liệu rác không ném lỗi, không NaN
+    const junk = [null, 5, "x", [], ["x", 1, 1], ["haste", "1000", 0.4], ["haste", Infinity, NaN]];
+    const v = moveSpeedMul(junk as unknown as StatusEntry[]);
+    expect(Number.isFinite(v)).toBe(true);
+  });
+
+  it("kẹp ratio theo từng trạng thái TRƯỚC khi nhân (kết hợp tăng tốc + tê cóng), và kẹp cuối [MIN, MAX] nếu sau này maxRatio được nâng", () => {
+    // ratio rác kẹp về maxRatio rồi mới nhân với trạng thái kia
+    expect(
+      moveSpeedMul([
+        ["haste", 1000, 99],
+        ["chill", 1000, 0.3],
+      ]),
+    ).toBeCloseTo((1 + STATUS_BY_ID.haste.maxRatio) * 0.7, 12);
+    expect(
+      moveSpeedMul([
+        ["chill", 1000, 99],
+        ["haste", 1000, 0.4],
+      ]),
+    ).toBeCloseTo((1 - STATUS_BY_ID.chill.maxRatio) * 1.4, 12);
+    // lớp kẹp cuối là chốt chặn khi bảng trạng thái đổi (trần tăng tốc / tê cóng nâng lên): thử bằng cách nâng tạm maxRatio
+    const h = STATUS_BY_ID.haste as { maxRatio: number };
+    const c = STATUS_BY_ID.chill as { maxRatio: number };
+    const [h0, c0] = [h.maxRatio, c.maxRatio];
+    try {
+      h.maxRatio = 5;
+      c.maxRatio = 5;
+      expect(moveSpeedMul([["haste", 1000, 4]])).toBe(MOVE_SPEED_MUL_MAX);
+      expect(moveSpeedMul([["chill", 1000, 4]])).toBe(MOVE_SPEED_MUL_MIN);
+    } finally {
+      h.maxRatio = h0;
+      c.maxRatio = c0;
+    }
+  });
+
+  it("sanitizeStatusList: giữ mục hợp lệ, kẹp thời gian / ratio, bỏ id lạ / trùng / rác, tối đa MAX_STATUSES", () => {
+    expect(sanitizeStatusList(null)).toEqual([]);
+    expect(sanitizeStatusList("x")).toEqual([]);
+    expect(sanitizeStatusList({})).toEqual([]);
+    const out = sanitizeStatusList([
+      ["haste", 999999, 99], // kẹp thời gian và ratio
+      ["burn", 2000, 0.4], // burn không mang ratio: bỏ phần tử thứ ba
+      ["chill", 1000], // thiếu ratio -> 0
+      ["haste", 500, 0.1], // trùng id: bỏ
+      ["constructor", 1000, 1],
+      ["stun", 0], // hết hạn
+      ["stun", Number.NaN],
+      "bậy",
+      ["regen", 1500],
+    ]);
+    expect(out).toEqual([
+      ["haste", STATUS_BY_ID.haste.maxMs, STATUS_BY_ID.haste.maxRatio],
+      ["burn", 2000],
+      ["chill", 1000, 0],
+      ["regen", 1500],
+    ]);
+    const many = sanitizeStatusList(STATUSES.map((st) => [st.id, 1000, 0.1]));
+    expect(many).toHaveLength(MAX_STATUSES);
+    // luôn dùng được cho moveSpeedMul
+    expect(Number.isFinite(moveSpeedMul(sanitizeStatusList([["haste", 1000, 5]])))).toBe(true);
   });
 });
