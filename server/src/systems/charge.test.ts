@@ -4,7 +4,16 @@ import { MONSTER_BY_ID, PLAYER_RADIUS, type FxMsg, type MonsterKind } from "@tie
 import { addMonster, addPlayer, makeWorld } from "./test-helpers";
 import { tickMonsters } from "./monsters";
 import { applyMonsterStatus } from "./status";
-import { CHARGE_LEN, CHARGE_MULT, CHARGE_RECOVER_MS, CHARGE_TRIGGER, CHARGE_WIDTH } from "./charge";
+import {
+  CHARGE_BLEED,
+  CHARGE_LEN,
+  CHARGE_MULT,
+  CHARGE_RECOVER_MS,
+  CHARGE_TRIGGER,
+  CHARGE_WIDTH,
+  chargeEffectOf,
+} from "./charge";
+import { tickWorld } from "./tick";
 import type { World } from "../world";
 
 const TICK_MS = 50;
@@ -335,5 +344,112 @@ describe("charger: áp lên quái cũ (M7.3, số khởi đầu)", () => {
     expect(warn).toHaveLength(1);
     expect(warn[0]).toMatchObject({ shape: "line", ms: 700, r: CHARGE_LEN });
     expect(p.hp).toBeLessThan(p.maxHp);
+  });
+});
+
+describe("charger: Hắc Hổ chảy máu nhẹ sau đòn lao TRÚNG (M7.3)", () => {
+  const HO = MONSTER_BY_ID.ho;
+  const bleedOf = (c: { st?: { list: { id: string; dps: number }[] } }) =>
+    c.st?.list.find((s) => s.id === "bleed");
+  /** Số tick tới sát lúc đáp đòn của Hắc Hổ (gồng 900 ms). */
+  const HO_TICKS = Math.ceil((HO.windupMs ?? 0) / TICK_MS) + 1;
+  /** Cảnh có Hắc Hổ THẬT (số liệu `MONSTERS`, không ép) thay cho Hôi Lang. */
+  function hoScene(gap = 150) {
+    const t = scene(gap);
+    t.mon.mc.def = HO;
+    return t;
+  }
+
+  it("chargeEffectOf: chỉ Hắc Hổ có hiệu ứng (chảy máu); Hôi Lang, loài khác, id lạ (`constructor`) không", () => {
+    expect(chargeEffectOf(HO)).toBe(CHARGE_BLEED);
+    expect(CHARGE_BLEED.status).toBe("bleed");
+    expect(CHARGE_BLEED.ms).toBeGreaterThan(0);
+    expect(CHARGE_BLEED.ratio).toBeGreaterThan(0);
+    expect(chargeEffectOf(MONSTER_BY_ID.lang)).toBeUndefined();
+    expect(chargeEffectOf(MONSTER_BY_ID.mang)).toBeUndefined();
+    expect(chargeEffectOf({ ...HO, id: "constructor" })).toBeUndefined();
+    expect(chargeEffectOf({ ...HO, id: "__proto__" })).toBeUndefined();
+  });
+
+  it("Hắc Hổ THẬT lao trúng người đứng yên: mất round(atk x 1,5) VÀ dính chảy máu, dps = ratio x sát thương đòn lao; chủ nhận danh sách trạng thái", () => {
+    const { h, p, c, tick } = hoScene();
+    expect(HO.behavior).toBe("charger");
+    tick(HO_TICKS);
+    const dmg = Math.round(HO.atk * 1.5);
+    expect(p.maxHp - p.hp).toBe(dmg);
+    const s = bleedOf(c)!;
+    expect(s).toBeDefined();
+    expect(s.dps).toBeCloseTo(CHARGE_BLEED.ratio * dmg, 6);
+    const last = h.statusMsgs.at(-1)!;
+    expect(last.sid).toBe("a");
+    expect(last.msg.list.some(([id]) => id === "bleed")).toBe(true);
+  });
+
+  it("chảy máu NHẸ và hết hạn: cả đợt lấy ít hơn một phần mười khí huyết tối đa của người cấp 3, không giết người, rồi gỡ", () => {
+    const { w, p, c, tick } = hoScene();
+    tick(HO_TICKS);
+    expect(bleedOf(c)).toBeDefined();
+    const hpAfterHit = p.hp;
+    w.state.monsters.clear(); // quái biến mất: chỉ còn vết chảy máu
+    w.mctrl.clear();
+    for (let i = 0; i < Math.ceil((CHARGE_BLEED.ms + 1500) / TICK_MS); i++) {
+      w.now += TICK_MS;
+      tickWorld(w, TICK_MS);
+    }
+    expect(bleedOf(c)).toBeUndefined(); // đã hết hạn
+    const lost = hpAfterHit - p.hp;
+    expect(lost).toBeGreaterThan(0); // có chảy máu thật
+    expect(lost).toBeLessThan(p.maxHp * 0.1); // nhẹ
+    expect(p.dead).toBe(false);
+  });
+
+  it("Hôi Lang lao trúng thì chỉ mất máu, KHÔNG chảy máu (đối chứng: hiệu ứng theo loài)", () => {
+    const { p, c, tick } = scene();
+    tick(WINDUP_TICKS + 1);
+    expect(p.hp).toBeLessThan(p.maxHp);
+    expect(bleedOf(c)).toBeUndefined();
+  });
+
+  it("NÉ: đi ngang ra khỏi đường lao trong lúc gồng thì không trúng nên KHÔNG chảy máu", () => {
+    const { p, c, tick } = hoScene();
+    tick(4);
+    p.y += CHARGE_WIDTH / 2 + PLAYER_RADIUS + 20; // ra ngoài mép đường lao
+    tick(HO_TICKS);
+    expect(p.hp).toBe(p.maxHp);
+    expect(bleedOf(c)).toBeUndefined();
+  });
+
+  it("đang né (`dodgeUntil`): đòn lao đi qua người, hp không đổi và KHÔNG dính chảy máu (chỉ đòn TRÚNG mới gắn)", () => {
+    const { w, p, c, tick } = hoScene();
+    c.dodgeUntil = w.now + 60_000;
+    tick(HO_TICKS);
+    expect(p.hp).toBe(p.maxHp);
+    expect(bleedOf(c)).toBeUndefined();
+  });
+
+  it("trúng cả người KHÁC nằm trên đường lao thì mỗi người trúng đều dính; người chết và người trong khu an toàn thì không", () => {
+    const { w, c, tick, spot } = hoScene();
+    const other = addPlayer(w, "b", 3, 0);
+    other.p.x = spot.x - 60;
+    other.p.y = spot.y;
+    other.p.hp = other.p.maxHp;
+    const dead = addPlayer(w, "dead", 3, 0);
+    dead.p.x = spot.x - 90;
+    dead.p.y = spot.y;
+    dead.p.dead = true;
+    tick(HO_TICKS);
+    expect(bleedOf(c)).toBeDefined();
+    expect(bleedOf(other.c)).toBeDefined();
+    expect(other.p.hp).toBeLessThan(other.p.maxHp);
+    expect(dead.c.st?.list.length ?? 0).toBe(0);
+    expect(dead.p.hp).toBe(dead.p.maxHp);
+  });
+
+  it("đòn lao hạ gục người: không gắn chảy máu lên người đã chết (không lỗi)", () => {
+    const { p, c, tick } = hoScene();
+    p.hp = 1;
+    tick(HO_TICKS);
+    expect(p.dead).toBe(true); // bị đòn lao hạ gục (luân hồi tắt trong test đơn vị)
+    expect(bleedOf(c)).toBeUndefined();
   });
 });

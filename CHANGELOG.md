@@ -5,6 +5,7 @@
 ## [Chưa phát hành] — M7 (Chiều sâu chiến đấu + Nguyên Anh)
 
 ### Máy chủ
+- **Hắc Hổ chảy máu nhẹ sau đòn lao (M7.3 bước 4d, #504):** người trúng đòn lao của Hắc Hổ chảy máu 3 giây (~11 khí huyết, không bao giờ giết, làm mới chứ không cộng dồn, khu an toàn thanh tẩy); người né thì không bị. Hôi Lang vẫn lao thuần. Số dot gửi gần nên băng thông sự kiện vùng nhìn ở 100 người nhích 3,79 -> 4,05 KB/s (trần test 4 -> 5).
 - **Sương Hồ bắn đạn băng, Độc Thiềm nhổ đạn độc (M7.3 bước 4e, #504):** hai loài ở Âm Sương Trạch không còn xông vào đánh gần: Sương Hồ đứng xa bắn (đạn 280 px/s, tầm 300 px), Độc Thiềm nhổ đạn độc chậm hơn (220 px/s, tầm 260 px) gắn độc cho người trúng; áp sát thì chúng lùi và vẫn bắn, đi ngang là né được. Số khởi đầu, M7.9 hiệu chỉnh.
 - **Sát thương theo giây chính xác hơn (M7.3, #504; review của B):** độc / bỏng / chảy máu (lên quái và người chơi) nay không mất / thừa phần lẻ: tổng cả đời trạng thái đúng `round(sát thương mỗi giây x thời lượng)`; trước đó làm tròn từng giây lệch tới +-30-100 % khi sát thương mỗi giây chỉ cỡ 0,4 - 1,5.
 - **Sát thương theo giây lên người chơi (M7.3 bước 3, #504):** độc / bỏng / chảy máu gắn lên người nay thật sự trừ khí huyết mỗi giây (trước đó huy hiệu hiện nhưng máy chủ chưa trừ). Chiêu né không tránh được, hộ thể đỡ trước, ngắt đả tọa, hồn lìa xác và thách đấu bất tử, gục thì như bị quái đánh (bí cảnh ngã không mất kiếp, nơi khác luân hồi; thông báo nêu tên trạng thái). Chưa quái nào gắn dot lên người (bước sau).
