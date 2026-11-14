@@ -26,7 +26,7 @@
 // Hệ (ngũ hành)
 // ---------------------------------------------------------------------------------------------------------------
 
-import { STAT_CAPS } from "./items";
+import { STAT_CAPS } from "./stat-caps";
 
 /** Pha ngũ hành dùng để tính khắc: kim, mộc, thủy, hỏa, thổ; `none` = vô sắc (không khắc, không bị khắc). */
 export type Phase = "kim" | "moc" | "thuy" | "hoa" | "tho" | "none";
