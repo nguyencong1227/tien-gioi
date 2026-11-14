@@ -9,6 +9,7 @@
     "build:packs": "node scripts/build-packs.mjs",
     "check:packs": "node scripts/build-packs.mjs --check",
     "check:budget": "node scripts/check-perf-budget.mjs",
+    "analyze": "node scripts/analyze-bundle.mjs",
     "build:native": "vite build --mode native",
     "check:pwa": "node scripts/check-pwa.mjs",
     "check:credits": "node scripts/check-credits.mjs",
