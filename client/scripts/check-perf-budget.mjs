@@ -223,6 +223,47 @@ export function checkAtlasTileset(assetsDir, limitKb) {
   };
 }
 
+/** Trần mặc định của ảnh AI khi `perf-budget.json` thiếu `static.aiAssets` (docs/KE_HOACH_DO_HOA_AI.md mục 9.4 (c)). */
+export const DEFAULT_AI_LIMITS = { maxFileKb: 150, totalKb: 300 };
+
+/**
+ * Trần dung lượng ảnh do AI sinh (`client/public/assets/ai/`, docs/KE_HOACH_DO_HOA_AI.md mục 9.4 (c)): mỗi ảnh <= `maxFileKb`, tổng <= `totalKb`. Ảnh được
+ * precache cho MỌI người chơi web ở lần mở đầu (`stamp-sw.mjs` đưa mọi tệp của `dist/` vào `PRECACHE_URLS`, `cache.addAll` là tất cả hoặc không gì) và vào cả APK,
+ * nên trần chặt. Thư mục không tồn tại = chưa có ảnh nào = hợp lệ. Bộ nhớ texture của ảnh đã được `calculateStaticTextureMemory` quét đệ quy tính vào.
+ * @param {string} aiDir
+ * @param {{ maxFileKb: number, totalKb: number }} limits
+ * @returns {{ files: Array<{ file: string, bytes: number, kb: number, over: boolean }>, totalBytes: number, totalKb: number, limits: { maxFileKb: number, totalKb: number }, ok: boolean, errors: string[] }}
+ */
+export function checkAiAssets(aiDir, limits) {
+  const files = [];
+  const errors = [];
+  let totalBytes = 0;
+  const walk = (dir) => {
+    if (!fs.existsSync(dir)) return;
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) walk(full);
+      else if (e.isFile()) {
+        const bytes = fs.statSync(full).size;
+        totalBytes += bytes;
+        const kb = Number((bytes / 1024).toFixed(2));
+        const over = kb > limits.maxFileKb;
+        files.push({ file: path.relative(aiDir, full).replace(/\\/g, "/"), bytes, kb, over });
+        if (over)
+          errors.push(
+            `Ảnh AI ${path.relative(aiDir, full)} ${kb} KB vượt trần mỗi ảnh ${limits.maxFileKb} KB!`,
+          );
+      }
+    }
+  };
+  walk(aiDir);
+  files.sort((a, b) => a.file.localeCompare(b.file));
+  const totalKb = Number((totalBytes / 1024).toFixed(2));
+  if (totalKb > limits.totalKb)
+    errors.push(`Tổng dung lượng ảnh AI ${totalKb} KB vượt trần ${limits.totalKb} KB!`);
+  return { files, totalBytes, totalKb, limits, ok: errors.length === 0, errors };
+}
+
 /**
  * Tính toán bộ nhớ texture tĩnh (ảnh PNG tải từ assets + texture sinh bằng mã)
  * Mỗi điểm ảnh RGBA chiếm 4 bytes trong bộ nhớ VRAM.
@@ -700,6 +741,7 @@ export function checkPerfBudget(opts = {}) {
   const assetsDir = opts.assetsDir || ASSETS_DIR;
   const packsDir = opts.packsDir || DEFAULT_PACKS_DIR;
   const manifestPath = opts.manifestPath || DEFAULT_MANIFEST_PATH;
+  const aiDir = opts.aiDir || path.join(assetsDir, "ai");
 
   if (!fs.existsSync(budgetPath)) {
     throw new Error(`Tệp cấu hình ngân sách không tồn tại: ${budgetPath}`);
@@ -723,6 +765,11 @@ export function checkPerfBudget(opts = {}) {
       `Tổng dung lượng atlas + tileset ${atlas.totalKb} KB vượt ngân sách ${atlas.limitKb} KB!`,
     );
   }
+
+  // 2b. Ảnh do AI sinh: trần mỗi ảnh + tổng (M7.12 #513). Ngân sách thiếu khai báo thì dùng trần mặc định (không lặng lẽ bỏ kiểm tra).
+  const aiLimits = budget.static.aiAssets ?? DEFAULT_AI_LIMITS;
+  const aiAssets = checkAiAssets(aiDir, aiLimits);
+  errors.push(...aiAssets.errors);
 
   // 3. Kiểm tra Texture Memory tĩnh (so với bậc Thấp)
   const texture = calculateStaticTextureMemory(assetsDir);
@@ -766,6 +813,7 @@ export function checkPerfBudget(opts = {}) {
     ok: errors.length === 0,
     bundle,
     atlas,
+    aiAssets,
     texture: { ...texture, limitMb: textureLimitMb, ok: textureOk },
     packs,
     worstCaseTexture,
@@ -791,6 +839,20 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     console.log(
       `   ${res.atlas.ok ? "✓" : "✗"} Tổng: ${res.atlas.totalKb} KB / Ngân sách: <= ${res.atlas.limitKb} KB`,
     );
+
+    console.log(`\n2b. Ảnh do AI sinh (assets/ai/):`);
+    if (res.aiAssets.files.length === 0) {
+      console.log(`   ✓ Chưa có ảnh AI nào (thư mục trống hoặc chưa tạo là hợp lệ).`);
+    } else {
+      for (const f of res.aiAssets.files) {
+        console.log(
+          `   ${f.over ? "✗" : "✓"} ${f.file}: ${f.kb} KB / Trần mỗi ảnh: <= ${res.aiAssets.limits.maxFileKb} KB`,
+        );
+      }
+      console.log(
+        `   ${res.aiAssets.totalKb <= res.aiAssets.limits.totalKb ? "✓" : "✗"} Tổng: ${res.aiAssets.totalKb} KB / Trần: <= ${res.aiAssets.limits.totalKb} KB`,
+      );
+    }
 
     console.log(`\n3. Bộ nhớ Texture tĩnh (VRAM RGBA):`);
     for (const it of res.texture.items) {

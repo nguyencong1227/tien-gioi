@@ -5,6 +5,10 @@
   "static": {
     "bundleGzipKb": 520,
     "atlasTilesetKb": 1024,
+    "aiAssets": {
+      "maxFileKb": 150,
+      "totalKb": 300
+    },
     "textureMemoryMb": {
       "low": 48,
       "mid": 80,

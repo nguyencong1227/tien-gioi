@@ -30,6 +30,7 @@ class SoundEngine {
   private stepIdx = 0;
   private bgmTimer: number | null = null;
   private lastBlipAt = 0;
+  private lastWarnAt = -1;
   private listeners: Array<(muted: boolean) => void> = [];
 
   constructor() {
@@ -322,6 +323,32 @@ class SoundEngine {
     g.connect(this.sfxGain);
     osc.start(now);
     osc.stop(now + 0.13);
+  }
+
+  /**
+   * Tiếng báo "bạn đang đứng trong vùng báo trước đòn của quái" (M7.7, #508): hai nhịp ngắn hạ giọng (730 -> 520 Hz, sóng tam giác), đủ nổi giữa tiếng chém nhưng ngắn
+   * (0,3 giây). Chống dồn: nhiều vùng cùng bao lấy mình trong 0,25 giây chỉ kêu một lần.
+   */
+  warn() {
+    if (!this.ready() || !this.ctx || !this.sfxGain) return;
+    const now = this.ctx.currentTime;
+    if (this.lastWarnAt >= 0 && now - this.lastWarnAt < 0.25) return;
+    this.lastWarnAt = now;
+    for (let i = 0; i < 2; i++) {
+      const t = now + i * 0.13;
+      const osc = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(730, t);
+      osc.frequency.exponentialRampToValueAtTime(520, t + 0.09);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.3, t + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+      osc.connect(g);
+      g.connect(this.sfxGain);
+      osc.start(t);
+      osc.stop(t + 0.11);
+    }
   }
 
   /** Tiếng nhặt linh vật / đan dược */

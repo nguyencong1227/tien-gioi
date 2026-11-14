@@ -12,6 +12,7 @@ import {
   styleOf,
   validateStyle,
   type MapStyle,
+  styleIdFor,
 } from "./map-style";
 import { NO_DECOR, buildDecorGrid, decorAtTile, decorCounts, hash01, hashId } from "./map-decor";
 
@@ -35,10 +36,19 @@ describe("map-style (dữ liệu kiểu theo bản đồ)", () => {
     }
   });
 
-  it("kiểu KHÔNG mồ côi: mọi kiểu trong MAP_STYLES là của một bản đồ có thật", () => {
-    // `am_suong` (M6 #408) từng chờ ở đây trước bản đồ của nó; #404 (shared) đã đưa bản đồ vào nên danh sách chờ đã được dọn
-    for (const id of Object.keys(MAP_STYLES))
+  it("kiểu KHÔNG mồ côi: mọi kiểu trong MAP_STYLES là của một bản đồ có thật (trừ danh sách chờ, và danh sách chờ không được để cũ)", () => {
+    // `am_suong` (M6 #408) từng chờ ở đây trước bản đồ của nó; #404 (shared) đã đưa bản đồ vào nên danh sách chờ đã được dọn.
+    // `han_van` (M7.8 #509) có kiểu TRƯỚC bản đồ: bản đồ thứ tư do A thêm ở M7.5 (#506); xem trước bằng `?debug&style=han_van`.
+    const waiting = ["han_van"];
+    for (const id of Object.keys(MAP_STYLES)) {
+      if (waiting.includes(id)) continue;
       expect(getMap(id), `kiểu "${id}" không có bản đồ`).toBeDefined();
+    }
+    // Có bản đồ rồi thì phải RỜI danh sách chờ (để bài kiểm trên lại giữ kiểu này về sau)
+    for (const id of waiting) {
+      expect(MAP_STYLES[id], `"${id}" trong danh sách chờ nhưng không có kiểu`).toBeDefined();
+      expect(getMap(id), `"${id}" đã có bản đồ: bỏ khỏi danh sách chờ`).toBeUndefined();
+    }
   });
 
   it("Âm Sương Trạch: sương dày nhất, thời tiết ma trơi riêng, màu môi trường lục khác ba bản đồ kia", () => {
@@ -312,5 +322,47 @@ describe("map-decor (sinh trang trí tất định)", () => {
     const t0 = performance.now();
     buildDecorGrid(biggest, styleOf(biggest.def.id));
     expect(performance.now() - t0).toBeLessThan(50);
+  });
+});
+
+describe("Hàn Vân Lĩnh: kiểu băng nguyên (M7.8 #509) và xem trước ?debug&style=", () => {
+  const hv = MAP_STYLES.han_van;
+
+  it("hợp lệ, tuyết rơi, sương dày vừa dưới trần, màu LẠNH (xanh trội đỏ) khác ba bản đồ ngoài và bí cảnh", () => {
+    expect(hv).toBeDefined();
+    expect(validateStyle(hv)).toEqual([]);
+    expect(hv.weather.kind).toBe("snow");
+    expect(hv.fog.alpha).toBeGreaterThan(MAP_STYLES.lac_ha.fog.alpha);
+    expect(hv.fog.alpha).toBeLessThanOrEqual(0.4);
+    const rgb = (c: number) => [(c >> 16) & 255, (c >> 8) & 255, c & 255];
+    for (const c of [hv.ambient.color, hv.fog.color, hv.water.shimmer]) {
+      const [r, , b] = rgb(c);
+      expect(b, `#${c.toString(16)}`).toBeGreaterThan(r); // lạnh
+    }
+    // thời tiết RIÊNG (không chép của bản đồ khác) và ánh sáng khác nhau
+    const others = Object.entries(MAP_STYLES).filter(([id]) => id !== "han_van");
+    for (const [id, o] of others) {
+      expect(o.weather.kind, id).not.toBe("snow");
+      expect(o.ambient.color, id).not.toBe(hv.ambient.color);
+    }
+  });
+
+  it("trang trí thưa hơn Lạc Hà (tuyết phủ), đủ năm loại, bảng màu không trùng bản đồ khác", () => {
+    const sum = (d: Record<string, number | undefined>) =>
+      Object.values(d).reduce((a: number, v) => a + (v ?? 0), 0);
+    expect(sum(hv.decor.density)).toBeLessThan(sum(MAP_STYLES.lac_ha.decor.density));
+    const sig = (id: string) => JSON.stringify(MAP_STYLES[id].decor.palette);
+    for (const id of Object.keys(MAP_STYLES))
+      if (id !== "han_van") expect(sig(id)).not.toBe(sig("han_van"));
+  });
+
+  it("styleIdFor: chỉ ?debug mới xem trước được kiểu khác; id lạ / độc / thiếu ?debug giữ mapId", () => {
+    expect(styleIdFor("lac_ha", "?debug=1&style=han_van")).toBe("han_van");
+    expect(styleIdFor("lac_ha", "?style=han_van")).toBe("lac_ha"); // bản phát hành: không đổi được diện mạo
+    expect(styleIdFor("lac_ha", "?debug=1&style=khong_co")).toBe("lac_ha");
+    expect(styleIdFor("lac_ha", "?debug=1&style=constructor")).toBe("lac_ha");
+    expect(styleIdFor("lac_ha", "?debug=1&style=__proto__")).toBe("lac_ha");
+    expect(styleIdFor("lac_ha", "?debug=1")).toBe("lac_ha");
+    expect(styleIdFor("lac_ha", "")).toBe("lac_ha");
   });
 });
