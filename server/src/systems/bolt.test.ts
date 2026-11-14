@@ -1,6 +1,6 @@
 // Quái tầm xa và đạn (M7.3, #504): `fireBolt`, `rangedStep`, `tickBolts` (docs/PHAN_CONG_M7.md mục 6). Loài quái thử `t_xa` chèn vào `MONSTER_BY_ID` rồi dọn.
 import { afterEach, describe, expect, it } from "vitest";
-import { MAX_BOLTS, MONSTER_BY_ID, PLAYER_RADIUS, type MonsterKind } from "@tien-gioi/shared";
+import { MAX_BOLTS, MONSTER_BY_ID, PLAYER_RADIUS, TILE, type MonsterKind } from "@tien-gioi/shared";
 import { fxReachOf } from "../rooms/WorldRoom";
 import {
   BOLT_HOLD_MAX,
@@ -9,13 +9,16 @@ import {
   BOLT_RETREAT_MULT,
   DEFAULT_BOLT_RANGE,
   DEFAULT_BOLT_SPEED,
+  POISON_EFFECT,
   boltRangeOf,
   boltSpeedOf,
   fireBolt,
   isRanged,
+  onHitEffectOf,
   rangedStep,
   tickBolts,
 } from "./bolt";
+import { hurtPlayer } from "./combat";
 import { tickWorld } from "./tick";
 import { addMonster, addPlayer, makeWorld } from "./test-helpers";
 
@@ -192,6 +195,88 @@ describe("tickBolts", () => {
     expect(t.p.hp).toBe(hp0);
   });
 
+  /** Tường MỎNG nhất theo hàng ngang (dải chặn <= một ô, hai bên thoáng 80 px): [x đầu, x cuối] của dải và hàng y. Bản đồ sinh theo hạt giống nên tất định. */
+  function thinWall(t: ReturnType<typeof setup>) {
+    for (let y = 64; y < t.w.map.worldH - 64; y += 16) {
+      for (let x = 64; x < t.w.map.worldW - 200; x += 4) {
+        if (t.w.map.isBlockedPx(x, y) || !t.w.map.isBlockedPx(x + 4, y)) continue;
+        let x1 = x + 4;
+        while (t.w.map.isBlockedPx(x1, y)) x1 += 4;
+        let clear = true;
+        for (let k = 1; k <= 20; k++)
+          if (t.w.map.isBlockedPx(x - k * 4, y) || t.w.map.isBlockedPx(x1 + k * 4, y))
+            clear = false;
+        if (clear && x1 - (x + 4) <= TILE) return { x0: x + 4, x1, y };
+      }
+    }
+    return null;
+  }
+
+  it("đạn NHANH (> một ô mỗi tick) không nhảy qua tường mỏng: người đứng ngay sau tường không bị trúng (hồi quy #599 review B)", () => {
+    const t = setup(200);
+    const wall = thinWall(t);
+    expect(wall, "bản đồ phải có tường mỏng một ô").not.toBeNull();
+    const speed = 1200; // 60 px mỗi tick > TILE (32)
+    t.p.x = wall!.x1 + 12; // ngay sau tường, nằm trong bước nhảy của đạn
+    t.p.y = wall!.y;
+    t.w.bolts.push({
+      x: wall!.x0 - 2,
+      y: wall!.y,
+      ux: 1,
+      uy: 0,
+      speed,
+      left: 600,
+      dmg: 20,
+      kind: XA,
+    });
+    const hp0 = t.p.hp;
+    for (let i = 0; i < 10; i++) tickBolts(t.w, 0.05);
+    expect(t.w.bolts).toHaveLength(0);
+    expect(t.p.hp).toBe(hp0);
+  });
+
+  it("người đứng ngay TRƯỚC tường vẫn bị trúng ở tick đạn chạm tường (không mất đòn vì điểm cuối nằm trong tường)", () => {
+    const t = setup(200);
+    const wall = thinWall(t);
+    expect(wall).not.toBeNull();
+    t.p.x = wall!.x0 - 12;
+    t.p.y = wall!.y;
+    t.w.bolts.push({
+      x: wall!.x0 - 44,
+      y: wall!.y,
+      ux: 1,
+      uy: 0,
+      speed: 1200,
+      left: 600,
+      dmg: 20,
+      kind: XA,
+    });
+    const hp0 = t.p.hp;
+    tickBolts(t.w, 0.05);
+    expect(t.w.bolts).toHaveLength(0);
+    expect(t.p.hp).toBeLessThan(hp0);
+  });
+
+  it("tốc độ không dương / không phải số: đạn bị bỏ, không treo vòng quét", () => {
+    const t = setup(200);
+    for (const speed of [0, -5, Number.NaN]) {
+      t.w.bolts.push({
+        x: t.p.x - 100,
+        y: t.p.y,
+        ux: 1,
+        uy: 0,
+        speed,
+        left: 300,
+        dmg: 20,
+        kind: XA,
+      });
+    }
+    const hp0 = t.p.hp;
+    expect(() => tickBolts(t.w, 0.05)).not.toThrow();
+    expect(t.w.bolts).toHaveLength(0);
+    expect(t.p.hp).toBe(hp0);
+  });
+
   it("danh sách rỗng thì không tốn gì và không ném lỗi", () => {
     const t = setup(200);
     expect(() => tickBolts(t.w, 0.05)).not.toThrow();
@@ -263,5 +348,89 @@ describe("nối vào vòng tick: quái thật bắn người chơi", () => {
     }
     expect(boltFx(dodge).length).toBeGreaterThanOrEqual(2);
     expect(dodge.p.hp).toBeGreaterThanOrEqual(hit.p.hp); // né giỏi hơn đứng yên
+  });
+});
+
+describe("quái `poisoner`: độc đi kèm đòn / đạn TRÚNG (M7.3)", () => {
+  const poisonOf = (c: { st?: { list: { id: string; dps: number }[] } }) =>
+    c.st?.list.find((s) => s.id === "poison");
+
+  it("onHitEffectOf: chỉ `poisoner` có hiệu ứng (độc); `isRanged`: `ranged` luôn, `poisoner` chỉ khi có `boltRange`", () => {
+    const doc = ranged({ behavior: "poisoner" });
+    expect(onHitEffectOf(doc)).toBe(POISON_EFFECT);
+    expect(onHitEffectOf(ranged({ behavior: "ranged" }))).toBeUndefined();
+    expect(onHitEffectOf(MONSTER_BY_ID.lang)).toBeUndefined();
+    expect(isRanged(doc)).toBe(true); // có boltRange
+    expect(isRanged(ranged({ behavior: "poisoner", boltRange: undefined }))).toBe(false);
+    expect(isRanged(ranged({ behavior: "ranged" }))).toBe(true);
+    expect(isRanged(MONSTER_BY_ID.lang)).toBe(false);
+  });
+
+  it("đạn của `poisoner` trúng: trừ atk VÀ gắn độc (dps = ratio x atk); đạn của `ranged` thường trúng thì không gắn gì", () => {
+    const t = setup(200, { behavior: "poisoner" });
+    fireBolt(t.w, t.mon.m, MONSTER_BY_ID[XA], 0);
+    for (let i = 0; i < 20 && t.w.bolts.length > 0; i++) tickBolts(t.w, 0.05);
+    const s = poisonOf(t.c)!;
+    expect(s).toBeDefined();
+    expect(s.dps).toBeCloseTo(POISON_EFFECT.ratio * 20, 6); // atk thử = 20
+    expect(t.statusMsgs.length).toBeGreaterThan(0); // chủ nhận danh sách trạng thái mới
+
+    const plain = setup(200);
+    fireBolt(plain.w, plain.mon.m, MONSTER_BY_ID[XA], 0);
+    for (let i = 0; i < 20 && plain.w.bolts.length > 0; i++) tickBolts(plain.w, 0.05);
+    expect(plain.p.hp).toBeLessThan(plain.p.maxHp); // vẫn bị trừ
+    expect(poisonOf(plain.c)).toBeUndefined();
+  });
+
+  it("đạn độc bị né (`dodgeUntil`) hoặc người đang thách đấu: KHÔNG trúng nên KHÔNG dính độc", () => {
+    const t = setup(200, { behavior: "poisoner" });
+    t.c.dodgeUntil = t.w.now + 5000; // đang né
+    fireBolt(t.w, t.mon.m, MONSTER_BY_ID[XA], 0);
+    const hp0 = t.p.hp;
+    for (let i = 0; i < 20; i++) tickBolts(t.w, 0.05);
+    expect(t.p.hp).toBe(hp0);
+    expect(poisonOf(t.c)).toBeUndefined();
+  });
+
+  it("đòn GẦN của `poisoner` (không `boltRange`) trúng thì gắn độc; độc một mình không giết người (khí huyết dừng ở 1)", () => {
+    const t = setup(30, {
+      behavior: "poisoner",
+      boltRange: undefined,
+      boltSpeed: undefined,
+      atk: 40,
+    });
+    t.w.now = 10_000;
+    for (let i = 0; i < 60 && poisonOf(t.c) === undefined; i++) {
+      t.w.now += 50;
+      tickWorld(t.w, 50);
+    }
+    expect(poisonOf(t.c)).toBeDefined();
+    expect(t.p.hp).toBeLessThan(t.p.maxHp);
+    // Quái biến mất (không còn đòn nào nữa): chỉ còn độc, khí huyết rất thấp
+    t.w.state.monsters.clear();
+    t.w.mctrl.clear();
+    t.p.hp = 5;
+    for (let i = 0; i < 120; i++) {
+      t.w.now += 50;
+      tickWorld(t.w, 50);
+    }
+    expect(t.p.dead).toBe(false);
+    expect(t.c.limbo).toBeUndefined();
+    expect(t.p.hp).toBeGreaterThanOrEqual(1);
+    expect(poisonOf(t.c)).toBeUndefined(); // độc đã hết hạn
+  });
+
+  it("hurtPlayer trả true khi đòn trúng (kể cả khiên đỡ hết) và false khi người chết / hồn lìa xác / đang né", () => {
+    const t = setup(200);
+    const m = addMonster(t.w, "lang", 0, 0);
+    expect(hurtPlayer(t.w, "a", t.p, 1, m.m)).toBe(true);
+    t.c.dodgeUntil = t.w.now + 5000;
+    expect(hurtPlayer(t.w, "a", t.p, 1, m.m)).toBe(false);
+    t.c.dodgeUntil = undefined;
+    t.w.ghosts.add("a");
+    expect(hurtPlayer(t.w, "a", t.p, 1, m.m)).toBe(false);
+    t.w.ghosts.delete("a");
+    t.p.dead = true;
+    expect(hurtPlayer(t.w, "a", t.p, 1, m.m)).toBe(false);
   });
 });

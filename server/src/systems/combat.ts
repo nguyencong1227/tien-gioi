@@ -154,18 +154,22 @@ function dropCoin(w: World, mc: MonsterCtrl, x: number, y: number) {
   for (const [sid, n] of splitCoin(coin, weights)) changeCoin(w, sid, n);
 }
 
+/**
+ * Quái đánh người chơi (một ĐÒN). Trả `true` nếu đòn ĐÃ TRÚNG (qua hết các luật bất tử / né: người chết, hồn lìa xác, đang thách đấu, đang né đều trả `false`), để
+ * người gọi gắn thêm hiệu ứng đi kèm đòn (độc của `poisoner`) chỉ khi đòn trúng; khiên hộ thể đỡ hết sát thương vẫn tính là TRÚNG.
+ */
 export function hurtPlayer(
   w: World,
   sid: string,
   p: Player,
   dmg: number,
   from: Pick<Monster, "kind">,
-) {
+): boolean {
   const c = w.ctrl.get(sid);
-  if (!c || p.dead) return;
-  if (w.ghosts.has(sid)) return; // rớt mạng, đang chờ nối lại: bất tử
-  if (w.duels.has(sid)) return; // đang thách đấu: bất tử trước quái (không để một con hổ đi ngang giết người thật)
-  if (c.dodgeUntil !== undefined && w.now < c.dodgeUntil) return; // đang né (chiêu bộ pháp): đòn trượt, không ngắt đả tọa / hồi phục
+  if (!c || p.dead) return false;
+  if (w.ghosts.has(sid)) return false; // rớt mạng, đang chờ nối lại: bất tử
+  if (w.duels.has(sid)) return false; // đang thách đấu: bất tử trước quái (không để một con hổ đi ngang giết người thật)
+  if (c.dodgeUntil !== undefined && w.now < c.dodgeUntil) return false; // đang né (chiêu bộ pháp): đòn trượt, không ngắt đả tọa / hồi phục
   damagePlayer(
     w,
     sid,
@@ -174,6 +178,7 @@ export function hurtPlayer(
     dmg,
     `Bị ${MONSTER_BY_ID[from.kind].name} đánh trọng thương, tạm ngã xuống.`,
   );
+  return true;
 }
 
 /**

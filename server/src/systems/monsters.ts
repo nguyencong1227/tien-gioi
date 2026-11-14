@@ -4,7 +4,8 @@ import { Monster } from "../schema";
 import { rand, quantAngle, takeWhole, type World, type MonsterCtrl } from "../world";
 import { hurtPlayer } from "./combat";
 import { chargerStep } from "./charge";
-import { isRanged, rangedStep } from "./bolt";
+import { isRanged, onHitEffectOf, rangedStep } from "./bolt";
+import { applyPlayerStatus } from "./status";
 import { isStunned, speedMult } from "./status-rules";
 
 const LEASH_DIST = 520; // kéo quá xa nhà thì bỏ mục tiêu
@@ -172,7 +173,11 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
       if (!stunned && w.now >= mc.nextAttack) {
         mc.nextAttack = w.now + def.attackCd;
         w.events.fx({ kind: "mslash", by: id, x: m.x, y: m.y, angle: aim });
-        hurtPlayer(w, mc.target!, target, Math.round(def.atk * rand(0.85, 1.15)), m);
+        const dmg = Math.round(def.atk * rand(0.85, 1.15));
+        const eff = onHitEffectOf(def);
+        // Đòn gần của `poisoner` (M7.3): trúng thì gắn thêm độc; quái thường không đụng tới `status`
+        if (hurtPlayer(w, mc.target!, target, dmg, m) && eff)
+          applyPlayerStatus(w, mc.target!, eff, dmg, "");
       }
     }
   } else {
