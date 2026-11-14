@@ -8,11 +8,14 @@ import {
 } from "@tien-gioi/shared";
 import {
   BAR_SLOTS,
+  aimMode,
   SkillTracker,
   blockedToast,
   elementColor,
   isMockSkillsEnabled,
   levelPips,
+  mockCast,
+  mockRealm,
   mockSkillCount,
   mockSkillsMsg,
   needText,
@@ -353,5 +356,43 @@ describe("dữ liệu giả ?skills=mock", () => {
     const t = new SkillTracker();
     t.set(mockSkillsMsg(ids, 2), 0);
     expect(t.cdLeft(2, 0)).toBe(0);
+  });
+});
+
+describe("aimMode: hướng đánh theo hình chiêu (A xác nhận ở #536)", () => {
+  it("bộ pháp lao theo hướng di chuyển; vòng nổ / hộ thể theo hướng nhìn; còn lại nhắm mục tiêu", () => {
+    expect(aimMode("dash")).toBe("move");
+    expect(aimMode("nova")).toBe("facing");
+    expect(aimMode("self")).toBe("facing");
+    for (const s of ["cone", "line", "fan", "ground"] as const) expect(aimMode(s)).toBe("target");
+  });
+  it("mọi chiêu thật có một cách chọn hướng; Phiêu Phong Bộ (dash) KHÔNG nhắm quái", () => {
+    for (const d of SKILLS_M7) expect(["move", "facing", "target"]).toContain(aimMode(d.shape));
+    expect(aimMode(skillOf("phieu_phong_bo")!.shape)).toBe("move");
+    expect(aimMode(skillOf("cuu_cung_khon_sat")!.shape)).toBe("target");
+  });
+});
+
+describe("máy chủ giả: cảnh giới và cast", () => {
+  it("`?realm=N` thắng; không có thì đủ mở số ô cần thấy", () => {
+    expect(mockRealm("?realm=3", 4)).toBe(3);
+    expect(mockRealm("?realm=0", 4)).toBe(0);
+    expect(mockRealm("?realm=99", 4)).toBe(4); // không phải một chữ số -> bỏ qua
+    expect(mockRealm("?realm=-1", 2)).toBe(2);
+    expect(mockRealm("", 4)).toBe(4);
+    expect(mockRealm("", 2)).toBe(2);
+    expect(mockRealm("", 1)).toBe(1);
+    expect(mockRealm("", 0)).toBe(2);
+  });
+
+  it("mockCast: đặt hồi chiêu đúng cdMax cho ô vừa dùng, im lặng khi ô trống hoặc đang hồi", () => {
+    const ids = SKILLS_M7.slice(0, 5).map((d) => d.id);
+    const m = mockSkillsMsg(ids, 2);
+    const next = mockCast(m, 3, 0)!;
+    expect(next.cd).toEqual([0, m.cdMax[1], 0, 0]);
+    expect(next.slots).toEqual(m.slots);
+    expect(mockCast(m, 3, 100)).toBeNull(); // đang hồi
+    expect(mockCast(m, 4, 0)).toBeNull(); // ô trống
+    expect(m.cd).toEqual([0, 0, 0, 0]); // không sửa tin cũ
   });
 });

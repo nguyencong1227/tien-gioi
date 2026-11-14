@@ -86,6 +86,10 @@ import {
   type InputMsg,
   type StatusMsg,
   SKILL_MSG,
+  type CastMsg,
+  type SkillDef,
+  type SkillSlot,
+  type SkillsMsg,
   type FxMsg,
   type DmgMsg,
   type ChatOut,
@@ -127,6 +131,8 @@ import {
 import { preloadAssets, makeTextures, dirFromAngle, TILESET_KEY, ATLAS_KEY } from "../textures";
 import { ui } from "../ui";
 import { StatusTracker } from "../status-track";
+import { BAR_SLOTS, SkillTracker, aimMode, blockedToast, slotView } from "../skill-bar";
+import { SkillBarDom } from "../skill-bar-dom";
 import {
   buildMockThuMonDialog,
   dungeonFallenDeathText,
@@ -144,7 +150,10 @@ import { keepLock, pickNextPlayer, pickNextTarget, pickPrevTarget } from "../tar
 import {
   ACTION_BY_ID,
   actionOfEvent,
+  getKeymap,
   getLookup,
+  keyLabels,
+  onKeymapChange,
   primaryKeyLabel,
   type ActionId,
 } from "../keybinds";
@@ -300,6 +309,13 @@ export class WorldScene extends Phaser.Scene {
   private pending: InputMsg[] = [];
   /** Trạng thái của CHÍNH MÌNH (M7.2b): hệ số tốc độ để đoán trước di chuyển như server, và choáng (không đoán trước / không gửi input) */
   private status = new StatusTracker();
+  /** Sổ chiêu + hồi chiêu của CHÍNH MÌNH (M7.6, #507): thanh chiêu L U I O vẽ từ đây; client không đoán trước kết quả `cast` */
+  private skills = new SkillTracker();
+  private skillBar = new SkillBarDom(document);
+  private nextSkillBarAt = 0;
+  private slotKeys: Record<SkillSlot, string[]> = { 2: [], 3: [], 4: [], 5: [] };
+  /** Con trỏ CHUỘT đang ở trong canvas (chạm / bút thì không): chiêu nhắm theo con trỏ khi đúng */
+  private mouseIn = false;
   private predX = 0;
   private predY = 0;
   private hasMe = false;
@@ -1000,9 +1016,26 @@ export class WorldScene extends Phaser.Scene {
     // Mọi phím HÀNH ĐỘNG đi qua bảng phím `keybinds.ts` (đổi được, HUD đọc nhãn từ đó) ở `onKeyDown`.
     this.keys = this.input.keyboard!.addKeys("W,A,S,D,UP,DOWN,LEFT,RIGHT", false) as any;
     window.addEventListener("keydown", this.onKeyDown);
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () =>
-      window.removeEventListener("keydown", this.onKeyDown),
-    );
+    // Con trỏ chuột trong canvas (chiêu nhắm theo con trỏ): chạm / bút không tính. `pointerleave` cũng bắn khi con trỏ rời sang nút HUD phủ trên canvas.
+    const canvas = this.game.canvas;
+    const onMove = (e: PointerEvent) => {
+      this.mouseIn = e.pointerType === "mouse";
+    };
+    const onLeave = () => {
+      this.mouseIn = false;
+    };
+    canvas.addEventListener("pointermove", onMove);
+    canvas.addEventListener("pointerdown", onMove);
+    canvas.addEventListener("pointerleave", onLeave);
+    this.syncSlotKeys();
+    const offKeymap = onKeymapChange(() => this.syncSlotKeys());
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      window.removeEventListener("keydown", this.onKeyDown);
+      canvas.removeEventListener("pointermove", onMove);
+      canvas.removeEventListener("pointerdown", onMove);
+      canvas.removeEventListener("pointerleave", onLeave);
+      offKeymap();
+    });
     // Esc do `ui.ts` xử lý ở `window` (một chỗ duy nhất, kể cả bỏ chọn mục tiêu qua `onClearTarget`): đăng ký thêm ở đây làm MỖI lần Esc chạy hai lần
 
     // Chuột / chạm: bấm vào người chơi khác để mở menu tổ đội, hoặc chém về phía con trỏ
@@ -1103,8 +1136,7 @@ export class WorldScene extends Phaser.Scene {
       case "skill.slot3":
       case "skill.slot4":
       case "skill.slot5":
-        // ô chiêu chưa có chiêu (M7 mới lấp): báo nhẹ, không gửi gì lên server
-        ui.toast({ text: `Ô chiêu thức ${action.slice(-1)} còn trống.`, tone: "info" });
+        this.castSlot(Number(action.slice(-1)) as SkillSlot);
         break;
       case "skill.meditate":
         this.toggleMeditate();
@@ -1536,6 +1568,8 @@ export class WorldScene extends Phaser.Scene {
     this.pending.length = 0;
     // Trạng thái của Room cũ không còn đúng (qua cổng = phòng mới; nối lại = server gửi lại danh sách ngay sau đó): xoá để không đoán trước theo hệ số cũ
     this.status.clear();
+    this.skills.clear();
+    this.nextSkillBarAt = 0;
     // Giữ seq tăng liên tục, không đặt lại 0: sau khi nối lại state.lastSeq vẫn là giá trị cũ
     // cho tới khi server xử lý input đầu tiên, reconcile() lọc pending bằng seq > lastSeq
     // nên seq bắt đầu lại từ 1 sẽ bị coi là đã xác nhận và nhân vật giật lùi.
@@ -1587,6 +1621,95 @@ export class WorldScene extends Phaser.Scene {
     this.status.set(m?.list, performance.now());
   }
 
+  /** Nhận sổ chiêu + hồi chiêu của chính mình (server gửi khi đổi và định kỳ). Công khai để script kiểm giả lập (`?debug`) bơm tin. */
+  public onSkills(m: SkillsMsg) {
+    this.skills.set(m, performance.now());
+    this.nextSkillBarAt = 0; // vẽ lại ngay khung hình sau
+  }
+
+  /** Vẽ bốn ô chiêu (~16 lần/giây; `SkillBarDom` chỉ ghi DOM khi dấu hiệu của ô đổi). */
+  private updateSkillBar(me: { realm: number; tier: number; mp: number; maxMp: number }) {
+    const now = performance.now();
+    if (now < this.nextSkillBarAt) return;
+    this.nextSkillBarAt = now + 60;
+    const stunned = this.status.stunned(now);
+    let filled = 0;
+    for (const slot of BAR_SLOTS) {
+      const v = slotView(slot, this.skills, me, stunned, now);
+      if (v.def) filled++;
+      this.skillBar.render(v, this.slotKeys[slot]);
+    }
+    this.skillBar.renderGroup(filled);
+  }
+
+  /** Nhãn phím của L U I O theo bảng phím hiện tại (đổi phím thì vẽ lại ô). */
+  private syncSlotKeys() {
+    const map = getKeymap();
+    for (const slot of BAR_SLOTS)
+      this.slotKeys[slot] = keyLabels(map, `skill.slot${slot}` as ActionId);
+    this.skillBar.invalidate();
+    this.nextSkillBarAt = 0;
+  }
+
+  /** Góc từ nhân vật tới con trỏ chuột (rad); `null` khi không có chuột trong canvas. */
+  private cursorAngle(): number | null {
+    if (!this.mouseIn) return null;
+    const p = this.input.activePointer;
+    if (p.wasTouch) return null;
+    const w = p.positionToCamera(this.cameras.main) as Phaser.Math.Vector2;
+    return Math.atan2(w.y - this.predY, w.x - this.predX);
+  }
+
+  /** Hướng đánh của chiêu theo hình (`aimMode`, A xác nhận ở #536). */
+  private skillAngle(def: SkillDef): number {
+    switch (aimMode(def.shape)) {
+      case "move": {
+        const { dx, dy } = this.moveDir();
+        return dx !== 0 || dy !== 0 ? Math.atan2(dy, dx) : this.facing;
+      }
+      case "facing":
+        return this.facing;
+      case "target":
+        return this.cursorAngle() ?? this.aim((def.reach ?? 0) + def.range);
+    }
+  }
+
+  /** Bấm ô chiêu (phím L U I O hoặc chạm): chỉ gửi `cast` khi ô SẴN SÀNG; ca chắc chắn bị từ chối thì báo lý do tại chỗ, không gửi. */
+  private castSlot(slot: SkillSlot) {
+    if (this.isReconnecting || ui.isLimboOpen()) return;
+    const me = this.me();
+    if (!me || me.dead) return;
+    const now = performance.now();
+    const v = slotView(slot, this.skills, me, this.status.stunned(now), now);
+    if (!v.canCast || !v.def) {
+      const text = blockedToast(v);
+      if (text) ui.toast({ text, tone: v.kind === "noMp" ? "bad" : "info" });
+      this.shakeSlot(slot);
+      return;
+    }
+    // bàn phím không chuột: tự khoá quái gần nhất như Kiếm khí (vòng đánh dấu hiện ra)
+    if (this.cursorAngle() === null && aimMode(v.def.shape) === "target") this.autoLockNearest();
+    const angle = this.skillAngle(v.def);
+    this.facing = angle;
+    const msg: CastMsg = { slot, angle };
+    this.room.send(SKILL_MSG.cast, msg);
+  }
+
+  /** Rung nhẹ ô vừa bấm mà không dùng được (không rung khi người dùng bật giảm chuyển động). */
+  private shakeSlot(slot: SkillSlot) {
+    const el = document.getElementById(`sk-slot${slot}`);
+    if (!el || isReducedMotion() || typeof el.animate !== "function") return;
+    el.animate(
+      [
+        { transform: "translateX(0)" },
+        { transform: "translateX(-3px)" },
+        { transform: "translateX(3px)" },
+        { transform: "translateX(0)" },
+      ],
+      { duration: 160, iterations: 1 },
+    );
+  }
+
   private onLimbo(m: LimboMsg) {
     ui.setKiep(m.soul.kiep);
     ui.showLimbo(m, {
@@ -1620,6 +1743,7 @@ export class WorldScene extends Phaser.Scene {
     reg("partyInvited", (m: PartyInvitedMsg) => ui.onPartyInvited(m));
     reg("wallet", (m: WalletMsg) => ui.onWallet(m));
     reg(SKILL_MSG.status, (m: StatusMsg) => this.onStatus(m));
+    reg(SKILL_MSG.skills, (m: SkillsMsg) => this.onSkills(m));
     reg("limbo", (m: LimboMsg) => this.onLimbo(m));
     reg("soul", (m: SoulMsg) => {
       ui.updateSoul(m);
@@ -1788,6 +1912,7 @@ export class WorldScene extends Phaser.Scene {
       ui.cooldown("sk-slash", (this.nextSlash - now) / SKILLS.slash.cooldown);
       ui.cooldown("sk-sword", (this.nextSword - now) / SKILLS.sword.cooldown);
       ui.tickItemCooldowns();
+      this.updateSkillBar(me);
     }
 
     if (this.perfEnabled) {

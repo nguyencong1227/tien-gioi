@@ -16,6 +16,7 @@ import {
   elementOf,
   type SkillBook,
   type SkillDef,
+  type SkillShape,
   type SkillSlot,
   type SkillsMsg,
 } from "@tien-gioi/shared";
@@ -261,6 +262,27 @@ export function shortName(name: string, max = 7): string {
   return `${words[0].slice(0, max - 1)}…`;
 }
 
+/**
+ * Cách chọn HƯỚNG đánh theo hình chiêu (A xác nhận ở #536): `move` = bộ pháp lao: hướng ĐANG DI CHUYỂN, không có input thì hướng nhìn, KHÔNG quay về quái
+ * gần nhất (sẽ lao vào quái); `facing` = vòng nổ / hộ thể: không cần hướng (gửi hướng nhìn); `target` = đánh về phía con trỏ (máy tính có chuột trong canvas)
+ * hoặc `aim` (khoá / quái gần / hướng nhìn). Chiêu `ground` chỉ lấy HƯỚNG (server đặt vùng cách mình đúng `reach`, không theo khoảng cách tới con trỏ).
+ */
+export type AimMode = "move" | "facing" | "target";
+export function aimMode(shape: SkillShape): AimMode {
+  switch (shape) {
+    case "dash":
+      return "move";
+    case "nova":
+    case "self":
+      return "facing";
+    case "cone":
+    case "line":
+    case "fan":
+    case "ground":
+      return "target";
+  }
+}
+
 /** Màu theo hệ cho biểu tượng vẽ bằng mã (chưa có hình nguồn, M7.8 / #509); hệ lạ -> xám. */
 export const ELEMENT_COLOR: Readonly<Record<string, string>> = {
   kim: "#e0c25a",
@@ -330,4 +352,23 @@ export function mockSkillsMsg(ids: readonly string[], n: 0 | 1 | 2 | 4, cdMs = 0
   }
   if (n > 0) cd[0] = Math.min(cdMs, cdMax[0]);
   return { learned, slots, cd, cdMax };
+}
+
+/** Cảnh giới của người chơi giả: `?realm=N` (0..8) nếu có, không thì đủ để mở số ô cần thấy (4 chiêu -> Nguyên Anh mở cả bốn ô; 0 / 1 / 2 chiêu -> mở vừa đủ ô). */
+export function mockRealm(search: string, n: 0 | 1 | 2 | 4): number {
+  const raw = new URLSearchParams(search).get("realm");
+  if (raw !== null && /^\d$/.test(raw)) return Number(raw);
+  return n === 4 ? 4 : n === 2 ? 2 : n === 1 ? 1 : 2;
+}
+
+/**
+ * Máy chủ giả: gắn hồi chiêu cho ô vừa dùng (đúng `cdMax` của ô). Trả `null` khi ô trống hoặc đang hồi (máy chủ thật cũng im lặng). `cdLeftMs` = hồi chiêu
+ * còn lại của ô lúc này (người gọi tự đếm theo đồng hồ).
+ */
+export function mockCast(msg: SkillsMsg, slot: SkillSlot, cdLeftMs: number): SkillsMsg | null {
+  const i = indexOfSlot(slot);
+  if (msg.slots[i] === "" || cdLeftMs > 0) return null;
+  const cd: [number, number, number, number] = [0, 0, 0, 0];
+  cd[i] = msg.cdMax[i];
+  return { ...msg, cd };
 }

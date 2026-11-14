@@ -87,14 +87,13 @@ describe("bảng phím mặc định (QUYET_DINH_M3 mục 13)", () => {
     expect(actionOfEvent(ev("KeyP"), l)).toBe("player.menu");
   });
 
-  it("bốn ô chiêu 2-5 là hành động của thế giới (bị chặn khi bảng mở), không lặp khi giữ phím, có tên nói rõ chưa có chiêu", () => {
+  it("bốn ô chiêu 2-5 là hành động của thế giới (bị chặn khi bảng mở), không lặp khi giữ phím, tên nêu số ô", () => {
     for (const n of SKILL_SLOTS) {
       const def = ACTION_BY_ID[`skill.slot${n}` as ActionId];
       expect(def.world).toBe(true);
       expect(def.repeat).toBeUndefined();
       expect(def.group).toBe("combat");
-      expect(def.label).toContain(`${n}`);
-      expect(def.label).toContain("chưa có chiêu");
+      expect(def.label).toBe(`Ô chiêu thức ${n}`);
     }
     expect(SKILL_SLOTS).toEqual([2, 3, 4, 5]);
   });

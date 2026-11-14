@@ -746,47 +746,55 @@
       </button>
 
       <div id="skills">
-        <!-- Ô chiêu thức 2-5 (QUYET_DINH_M3 mục 17.1): chỉ hiện trên máy tính, mờ vì chưa có chiêu (M7 mới lấp) -->
+        <!-- Ô chiêu thức 2-5 (QUYET_DINH_M3 mục 17.1, M7.6 / #507): vẽ bởi skill-bar-dom.ts theo `skills` của máy chủ (7 trạng thái: khoá / trống / thiếu cảnh giới / choáng / hồi chiêu / thiếu linh lực / sẵn sàng); nhãn ban đầu là ô trống -->
         <div id="skill-slots" role="group" aria-label="Ô chiêu thức 2 đến 5, chưa có chiêu">
           <button
             type="button"
-            class="sk slot"
+            class="sk slot k-empty"
             id="sk-slot2"
             aria-disabled="true"
             title="Ô chiêu thức 2, chưa có chiêu (L)"
             aria-label="Ô chiêu thức 2, chưa có chiêu (Phím L)"
           >
-            <small>2</small>
+            <span class="ico skico" aria-hidden="true"></span><small class="nm">2</small
+            ><i class="pips" aria-hidden="true"></i><em class="cdv" aria-hidden="true"></em
+            ><b class="cdn" aria-hidden="true"></b>
           </button>
           <button
             type="button"
-            class="sk slot"
+            class="sk slot k-empty"
             id="sk-slot3"
             aria-disabled="true"
             title="Ô chiêu thức 3, chưa có chiêu (U)"
             aria-label="Ô chiêu thức 3, chưa có chiêu (Phím U)"
           >
-            <small>3</small>
+            <span class="ico skico" aria-hidden="true"></span><small class="nm">3</small
+            ><i class="pips" aria-hidden="true"></i><em class="cdv" aria-hidden="true"></em
+            ><b class="cdn" aria-hidden="true"></b>
           </button>
           <button
             type="button"
-            class="sk slot"
+            class="sk slot k-empty"
             id="sk-slot4"
             aria-disabled="true"
             title="Ô chiêu thức 4, chưa có chiêu (I)"
             aria-label="Ô chiêu thức 4, chưa có chiêu (Phím I)"
           >
-            <small>4</small>
+            <span class="ico skico" aria-hidden="true"></span><small class="nm">4</small
+            ><i class="pips" aria-hidden="true"></i><em class="cdv" aria-hidden="true"></em
+            ><b class="cdn" aria-hidden="true"></b>
           </button>
           <button
             type="button"
-            class="sk slot"
+            class="sk slot k-empty"
             id="sk-slot5"
             aria-disabled="true"
             title="Ô chiêu thức 5, chưa có chiêu (O)"
             aria-label="Ô chiêu thức 5, chưa có chiêu (Phím O)"
           >
-            <small>5</small>
+            <span class="ico skico" aria-hidden="true"></span><small class="nm">5</small
+            ><i class="pips" aria-hidden="true"></i><em class="cdv" aria-hidden="true"></em
+            ><b class="cdn" aria-hidden="true"></b>
           </button>
         </div>
         <button

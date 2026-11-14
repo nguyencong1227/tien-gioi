@@ -424,7 +424,8 @@ async function main() {
     await press(t, K.d4);
     await sleep(300);
     check("Phím phụ 4 lần nữa: tắt đả tọa", me.meditating === false, String(me.meditating));
-    // L U I O: ô chiêu chưa có chiêu, chỉ báo "còn trống"; I KHÔNG còn mở túi, O KHÔNG còn mở cài đặt
+    // L U I O (M7.6): ô chưa có chiêu thì báo lý do tại chỗ ("chưa mở" nếu cảnh giới chưa tới, "còn trống" nếu mở rồi mà chưa gắn), KHÔNG gửi gì;
+    // I KHÔNG còn mở túi, O KHÔNG còn mở cài đặt
     const toastText = () => ev(`document.getElementById('toast').textContent`);
     for (const [key, n] of [
       [K.l, 2],
@@ -435,8 +436,8 @@ async function main() {
       await press(t, key);
       await sleep(150);
       check(
-        `Phím ${key.code.slice(3)}: báo "Ô chiêu thức ${n} còn trống", không mở bảng nào`,
-        String(await toastText()).includes(`Ô chiêu thức ${n} còn trống`) &&
+        `Phím ${key.code.slice(3)}: báo "Ô chiêu thức ${n} chưa mở / còn trống", không mở bảng nào`,
+        new RegExp(`Ô chiêu thức ${n} (chưa mở|còn trống)`).test(String(await toastText())) &&
           !(await ev(shown("inv-modal"))) &&
           !(await ev(shown("settings-modal"))),
         String(await toastText()),
