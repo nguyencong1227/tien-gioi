@@ -65,6 +65,23 @@ describe("statLines: số THẬT của máy chủ", () => {
     expect(l1[2]).toBe(`Hồi chiêu: ${fmtNum(skillCooldownMs(def, 1, 0) / 1000, 1)} giây`);
     expect(l3[2]).not.toBe(l1[2]);
   });
+  it("dòng Tầm / Vùng / Lao theo ĐƠN VỊ Ô (px / TILE), có số cụ thể (đột biến bỏ chia TILE phải đỏ)", () => {
+    // Hỏa Vân Kiếm: tầm 90 px = 2,8125 ô -> "2,8"
+    expect(statLines(skillOf("hoa_van_kiem")!, 1, 1000)).toContain("Tầm: 2,8 ô");
+    // Lạc Tuyết Phân Phi (toả tia): tầm 200 px = 6,25 ô, 5 tia
+    expect(statLines(skillOf("lac_tuyet_phan_phi")!, 1, 1000)).toContain("Tầm: 6,3 ô, 5 tia");
+    // Cửu Cung Khốn Sát (vùng): bán kính 110 px = 3,4375 ô, đặt cách 140 px = 4,375 ô
+    expect(statLines(skillOf("cuu_cung_khon_sat")!, 1, 1000)).toContain(
+      "Vùng: bán kính 3,4 ô, đặt cách 4,4 ô",
+    );
+    // Phiêu Phong Bộ (bộ pháp): lao 150 px = 4,6875 ô
+    expect(statLines(skillOf("phieu_phong_bo")!, 1, 1000)).toContain("Lao: 4,7 ô");
+    // chiêu hộ thể / vòng nổ: không có dòng tầm nào sai kiểu
+    for (const d of SKILLS_M7)
+      for (const l of statLines(d, 1, 1000))
+        if (/^(Tầm|Vùng|Lao):/.test(l)) expect(l).not.toMatch(/\d{3,}/); // không bao giờ in px (>= 100) như thể là ô
+  });
+
   it("chiêu không gây sát thương, chiêu toả tia, vùng đặt đất, bộ pháp có dòng riêng", () => {
     for (const d of SKILLS_M7) {
       const lines = statLines(d, 1, 1000);

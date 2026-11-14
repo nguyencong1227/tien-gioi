@@ -136,6 +136,8 @@ export function statLines(def: SkillDef, level: number, maxMp: number): string[]
     out.push("Không gây sát thương");
   }
   out.push(`Linh lực: ${skillMpCost(def, maxMp)} (${pct(def.mpPct)}% tối đa)`);
+  // Hồi chiêu GỐC theo tầng: `cdr = 0` = chưa tính giảm hồi chiêu từ trang bị (máy chủ tính `cdrOf` rồi gửi tổng `SkillsMsg.cdMax`, client không biết `cdr`);
+  // vòng quét trên thanh chiêu dùng `cdMax` thật nên đúng với trang bị đang mặc, còn bảng này nêu số gốc của chiêu.
   out.push(`Hồi chiêu: ${seconds(skillCooldownMs(def, level, 0))} giây`);
   const tiles = (px: number): string => fmtNum(px / TILE, 1);
   switch (def.shape) {
