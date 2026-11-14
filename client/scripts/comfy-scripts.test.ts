@@ -16,6 +16,22 @@ describe("Dây chuyền đồ họa nháp ComfyUI + SDXL (Mục 16.2 & 17.3 QUYE
   const tmpTestDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-comfy-test-"));
   const tmpLockPath = path.join(tmpTestDir, "tg-comfy.lock");
 
+  // Stub nvidia-smi cô lập: mặc định in rỗng để không bị ảnh hưởng khi dev khác đang chạy e2e dùng GPU
+  const stubNvidiaDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-stub-nvidia-"));
+  const stubNvidiaBin = path.join(stubNvidiaDir, "nvidia-smi");
+  fs.writeFileSync(
+    stubNvidiaBin,
+    `#!/bin/sh
+if [ "\${TEST_STUB_CHROME:-0}" = "1" ]; then
+  echo "99999, /opt/google/chrome/chrome"
+  exit 0
+fi
+exit 0
+`,
+    { mode: 0o755 },
+  );
+  const isolatedPath = `${stubNvidiaDir}:${process.env.PATH}`;
+
   it("các script quản lý vòng đời ComfyUI tồn tại và có quyền thực thi", () => {
     expect(fs.existsSync(comfyUpScript)).toBe(true);
     expect(fs.existsSync(comfyDownScript)).toBe(true);
@@ -31,12 +47,13 @@ describe("Dây chuyền đồ họa nháp ComfyUI + SDXL (Mục 16.2 & 17.3 QUYE
     expect(modeIdle & 0o111).toBeTruthy();
   });
 
-  it("comfy-up.sh: chạy kiểm tra điều kiện thành công với cờ --dry-run", () => {
+  it("comfy-up.sh: chạy kiểm tra điều kiện thành công với cờ --dry-run (cô lập với GPU)", () => {
     const stdout = execFileSync(comfyUpScript, ["--dry-run"], {
       encoding: "utf-8",
       cwd: repoRoot,
       env: {
         ...process.env,
+        PATH: isolatedPath,
         COMFY_DIR: tmpTestDir,
         COMFY_LOCK_FILE: tmpLockPath,
       },
@@ -53,6 +70,7 @@ describe("Dây chuyền đồ họa nháp ComfyUI + SDXL (Mục 16.2 & 17.3 QUYE
         cwd: repoRoot,
         env: {
           ...process.env,
+          PATH: isolatedPath,
           COMFY_DIR: tmpTestDir,
           COMFY_LOCK_FILE: tmpLockPath,
           TEST_MIN_FREE_KB: "999999999999", // Giả lập ngưỡng yêu cầu 1000 TB
@@ -66,7 +84,7 @@ describe("Dây chuyền đồ họa nháp ComfyUI + SDXL (Mục 16.2 & 17.3 QUYE
     expect(errorOutput).toMatch(/LỖI: Ổ gốc \(\/\) còn ít hơn 10 GB trống/);
   });
 
-  it("comfy-up.sh: từ chối khởi động khi Chrome đang chạy test sử dụng GPU", () => {
+  it("comfy-up.sh: từ chối khởi động khi Chrome đang chạy test sử dụng GPU (qua biến TEST_GPU_BUSY)", () => {
     let failed = false;
     let errorOutput = "";
     try {
@@ -75,6 +93,7 @@ describe("Dây chuyền đồ họa nháp ComfyUI + SDXL (Mục 16.2 & 17.3 QUYE
         cwd: repoRoot,
         env: {
           ...process.env,
+          PATH: isolatedPath,
           COMFY_DIR: tmpTestDir,
           COMFY_LOCK_FILE: tmpLockPath,
           TEST_GPU_BUSY: "1",
@@ -86,6 +105,46 @@ describe("Dây chuyền đồ họa nháp ComfyUI + SDXL (Mục 16.2 & 17.3 QUYE
     }
     expect(failed).toBe(true);
     expect(errorOutput).toMatch(/Phát hiện bài test Chrome đang sử dụng GPU/);
+  });
+
+  it("comfy-up.sh: từ chối khởi động khi nvidia-smi phát hiện Chrome headless đang chiếm GPU (test đột biến với stub nvidia-smi)", () => {
+    let failed = false;
+    let errorOutput = "";
+    try {
+      execFileSync(comfyUpScript, ["--dry-run"], {
+        encoding: "utf-8",
+        cwd: repoRoot,
+        env: {
+          ...process.env,
+          PATH: isolatedPath,
+          COMFY_DIR: tmpTestDir,
+          COMFY_LOCK_FILE: tmpLockPath,
+          TEST_STUB_CHROME: "1", // Stub nvidia-smi in ra tiến trình Chrome
+        },
+      });
+    } catch (err: any) {
+      failed = true;
+      errorOutput = (err.stderr || "") + (err.stdout || "");
+    }
+    expect(failed).toBe(true);
+    expect(errorOutput).toMatch(/LỖI: Chrome headless đang chiếm tài nguyên tính toán GPU/);
+    expect(errorOutput).toContain("99999, /opt/google/chrome/chrome");
+  });
+
+  it("comfy-up.sh: bỏ qua kiểm tra GPU khi có cờ TEST_SKIP_GPU_PROBE=1 kể cả khi Chrome bận", () => {
+    const stdout = execFileSync(comfyUpScript, ["--dry-run"], {
+      encoding: "utf-8",
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        PATH: isolatedPath,
+        COMFY_DIR: tmpTestDir,
+        COMFY_LOCK_FILE: tmpLockPath,
+        TEST_STUB_CHROME: "1",
+        TEST_SKIP_GPU_PROBE: "1", // Bỏ qua kiểm tra GPU
+      },
+    });
+    expect(stdout).toContain("Kiểm tra điều kiện khởi động ComfyUI thành công (chế độ --dry-run)");
   });
 
   it("comfy-down.sh: dọn dẹp file lock và thoát an toàn", () => {
@@ -152,6 +211,7 @@ describe("Dây chuyền đồ họa nháp ComfyUI + SDXL (Mục 16.2 & 17.3 QUYE
         cwd: repoRoot,
         env: {
           ...process.env,
+          PATH: isolatedPath,
           COMFY_DIR: nonExistentDir,
           COMFY_LOCK_FILE: errorLockPath,
           TEST_MIN_FREE_KB: "100",

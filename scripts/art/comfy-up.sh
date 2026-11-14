@@ -47,7 +47,7 @@ if [ "${TEST_GPU_BUSY:-0}" = "1" ]; then
   exit 1
 fi
 
-if command -v nvidia-smi >/dev/null 2>&1; then
+if [ "${TEST_SKIP_GPU_PROBE:-0}" != "1" ] && command -v nvidia-smi >/dev/null 2>&1; then
   CHROME_COMPUTE=$(nvidia-smi --query-compute-apps=pid,process_name --format=csv,noheader 2>/dev/null | grep -iE 'chrome|chromium' || true)
   if [ -n "$CHROME_COMPUTE" ]; then
     echo "LỖI: Chrome headless đang chiếm tài nguyên tính toán GPU ($CHROME_COMPUTE)." >&2
