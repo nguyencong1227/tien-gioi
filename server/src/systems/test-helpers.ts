@@ -30,6 +30,7 @@ import {
   type DuelStateMsg,
   type DuelEndMsg,
   type SkillsMsg,
+  type StatusMsg,
   emptySkillBook,
   originMult,
 } from "@tien-gioi/shared";
@@ -47,6 +48,7 @@ export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
   const invs: { sid: string; msg: InvMsg }[] = [];
   const quests: { sid: string; msg: QuestsMsg }[] = [];
   const skillMsgs: { sid: string; msg: SkillsMsg }[] = [];
+  const statusMsgs: { sid: string; msg: StatusMsg }[] = [];
   const wallets: { sid: string; msg: WalletMsg }[] = [];
   const dialogs: { sid: string; msg: DialogMsg }[] = [];
   const parties: { sid: string; msg: PartyMsg }[] = [];
@@ -77,6 +79,7 @@ export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
       inv: (sid, msg) => invs.push({ sid, msg }),
       quests: (sid, msg) => quests.push({ sid, msg }),
       skills: (sid, msg) => skillMsgs.push({ sid, msg }),
+      status: (sid, msg) => statusMsgs.push({ sid, msg }),
       wallet: (sid, msg) => wallets.push({ sid, msg }),
       dialog: (sid, msg) => dialogs.push({ sid, msg }),
       party: (sid, msg) => parties.push({ sid, msg }),
@@ -108,6 +111,7 @@ export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
     invs,
     quests,
     skillMsgs,
+    statusMsgs,
     wallets,
     dialogs,
     parties,

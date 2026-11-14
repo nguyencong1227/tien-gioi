@@ -111,6 +111,7 @@ import { sanitizeInventory, sendInv, useItem } from "../systems/inventory";
 import { dropItem, pickup, releaseLootOwner } from "../systems/loot";
 import { sanitizeQuests, sendQuests } from "../systems/quests";
 import { sendSkills, skillSlot } from "../systems/skills";
+import { sendStatus } from "../systems/status";
 import { sendWallet } from "../systems/wallet";
 import { buy, sell } from "../systems/shop";
 import { abandonQuest, acceptQuest, craft, talk, trade, turnInQuest } from "../systems/npc";
@@ -232,6 +233,7 @@ export class WorldRoom extends Room<WorldState> {
         inv: (sid, msg) => this.sendTo(sid, "inv", msg),
         quests: (sid, msg) => this.sendTo(sid, "quests", msg),
         skills: (sid, msg) => this.sendTo(sid, SKILL_MSG.skills, msg),
+        status: (sid, msg) => this.sendTo(sid, SKILL_MSG.status, msg),
         dialog: (sid, msg) => this.sendTo(sid, "dialog", msg),
         party: (sid, msg) => this.sendTo(sid, "party", msg),
         partyInvited: (sid, msg) => this.sendTo(sid, "partyInvited", msg),
@@ -661,6 +663,8 @@ export class WorldRoom extends Room<WorldState> {
         this.world.ghosts.delete(sid);
         sendInv(this.world, sid);
         sendQuests(this.world, sid);
+        sendSkills(this.world, sid);
+        sendStatus(this.world, sid); // client mất hệ số tốc độ sau rớt mạng sẽ bị kéo giật nếu không gửi lại
         sendWallet(this.world, sid);
         resolveDone();
         return;

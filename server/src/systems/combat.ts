@@ -21,6 +21,7 @@ import { beginLimbo } from "./reincarnation";
 import { rollDamage } from "./damage";
 import { duelBeam, duelSlash, reviveInPlace } from "./duel";
 import { changeCoin, splitCoin } from "./wallet";
+import { absorbShield, entriesOf, takenMult } from "./status-rules";
 
 /** Kiếm chém: hình quạt trước mặt. */
 export function slash(w: World, sid: string, angle: unknown) {
@@ -81,10 +82,29 @@ export function hitMonster(
 ) {
   const atk = statsFor(p.realm, p.tier, p, w.ctrl.get(by)?.mult).atk; // gồm vũ khí và hệ số xuất thân
   const { dmg, crit } = rollDamage(atk, mult);
+  dealMonsterDamage(w, id, mon, by, dmg, crit);
+}
+
+/**
+ * Trừ khí huyết quái `dmg` (đã tung) do `by` gây: vỡ giáp nhân sát thương nhận, ghi công cho `by`, hiện số, hạ quái nếu hết khí huyết.
+ * `aggro` = false cho sát thương theo giây (`status.ts`): ghi công nhưng không kéo quái đổi mục tiêu sang người gây từ xa.
+ * Không có trạng thái nào thì y hệt đòn thường (không đổi chuỗi `Math.random`, không đổi sát thương: bench có hạt giống giữ nguyên).
+ */
+export function dealMonsterDamage(
+  w: World,
+  id: string,
+  mon: Monster,
+  by: string,
+  dmg: number,
+  crit: boolean,
+  aggro = true,
+) {
+  const mc = w.mctrl.get(id);
+  if (!mc) return;
+  if (mc.st && mc.st.list.length > 0) dmg = Math.max(1, Math.round(dmg * takenMult(mc.st, w.now)));
   mon.hp = Math.max(0, mon.hp - dmg);
-  const mc = w.mctrl.get(id)!;
-  mc.damageBy.set(by, (mc.damageBy.get(by) ?? 0) + dmg);
-  mc.target = by;
+  if (by) mc.damageBy.set(by, (mc.damageBy.get(by) ?? 0) + dmg);
+  if (aggro && by) mc.target = by;
   w.events.dmg({ target: id, amount: dmg, x: mon.x, y: mon.y - 18, crit });
   if (mon.hp <= 0) killMonster(w, id, mc);
 }
@@ -136,6 +156,17 @@ export function hurtPlayer(w: World, sid: string, p: Player, dmg: number, from: 
   if (!c || p.dead) return;
   if (w.ghosts.has(sid)) return; // rớt mạng, đang chờ nối lại: bất tử
   if (w.duels.has(sid)) return; // đang thách đấu: bất tử trước quái (không để một con hổ đi ngang giết người thật)
+  if (c.st && c.st.list.length > 0) {
+    // Hộ thể: khiên hấp thụ trước, phần còn lại mới trừ khí huyết (đòn trúng khiên vẫn ngắt đả tọa và hồi phục)
+    const a = absorbShield(c.st, dmg, w.now);
+    if (a.changed) w.events.status(sid, { list: entriesOf(c.st, w.now) });
+    dmg = a.left;
+    if (dmg <= 0) {
+      p.meditating = false;
+      c.lastHitAt = w.now;
+      return;
+    }
+  }
   p.hp = Math.max(0, p.hp - dmg);
   p.meditating = false;
   c.lastHitAt = w.now;
