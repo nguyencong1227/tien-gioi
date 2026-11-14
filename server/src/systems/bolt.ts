@@ -49,6 +49,9 @@ export const BOLT_HOLD_MAX = 0.85;
 /** Tốc độ lùi so với tốc độ đuổi. */
 export const BOLT_RETREAT_MULT = 0.6;
 
+/** Đạn kiểm ô chặn mỗi `BOLT_WALL_SAMPLE` px dọc đoạn bay (nhỏ hơn `TILE` = 32): đạn nhanh (> 32 px mỗi tick, tức `boltSpeed` > 640) không nhảy qua tường mỏng một ô. */
+export const BOLT_WALL_SAMPLE = 16;
+
 /** Khoảng cách từ điểm (px, py) tới đoạn (ax, ay)-(bx, by). */
 function segDist(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
   const dx = bx - ax;
@@ -140,11 +143,24 @@ export function tickBolts(w: World, dt: number) {
   let keep = 0;
   for (let i = 0; i < w.bolts.length; i++) {
     const b = w.bolts[i];
-    const step = Math.min(b.left, b.speed * dt);
+    let step = Math.min(b.left, b.speed * dt);
+    // Quét ô chặn theo ĐOẠN (không chỉ điểm cuối): gặp ô chặn thì đạn dừng ngay trước nó và vẫn trúng người đứng trước tường trong đoạn còn lại
+    let wall = false;
+    if (step > 0) {
+      for (let s = BOLT_WALL_SAMPLE; ; s += BOLT_WALL_SAMPLE) {
+        const d = Math.min(s, step);
+        if (w.map.isBlockedPx(b.x + b.ux * d, b.y + b.uy * d)) {
+          step = Math.max(0, d - BOLT_WALL_SAMPLE);
+          wall = true;
+          break;
+        }
+        if (d >= step) break;
+      }
+    } else step = 0; // tốc độ / dt không dương hoặc không phải số: đạn không bay, bỏ (không treo vòng quét)
     const nx = b.x + b.ux * step;
     const ny = b.y + b.uy * step;
-    let dead = step <= 0 || w.map.isBlockedPx(nx, ny);
-    if (!dead) {
+    let dead = wall || step <= 0;
+    if (step > 0) {
       let hitSid: string | null = null;
       let hitD = Infinity;
       w.state.players.forEach((p, sid) => {
