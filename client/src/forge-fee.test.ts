@@ -22,8 +22,11 @@ describe("recipeFee (khớp luật craftFee của server)", () => {
       expect(recipeFee(r.coin), r.id).toBeGreaterThan(0);
       expect(recipeFee(r.coin), r.id).toBeLessThanOrEqual(COIN_CAP);
     }
-    const old = RECIPES.filter((r) => !KIM_DAN_RECIPES.includes(r));
+    // Công thức của thợ rèn Lạc Hà (gốc + hài / ngọc bội bậc thấp, M7.4) miễn phí; ở Vọng Sương mọi công thức có phí
+    const old = RECIPES.filter((r) => r.npcId === "tho_ren");
     expect(old.length).toBeGreaterThanOrEqual(9);
+    for (const r of RECIPES.filter((x) => x.npcId === "tho_ren_suong"))
+      expect(recipeFee(r.coin), r.id).toBeGreaterThan(0);
     for (const r of old) expect(recipeFee(r.coin), r.id).toBe(0);
   });
 });
