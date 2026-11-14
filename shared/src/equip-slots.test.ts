@@ -59,12 +59,13 @@ describe("sáu ô trang bị", () => {
     ]);
   });
 
-  it("emptyEquipment: đủ sáu khoá, đều rỗng, mỗi lần một đối tượng mới", () => {
+  it("emptyEquipment: ba ô công khai rỗng, ba ô riêng VẮNG (= trống, giữ nguyên file lưu / mã cũ), mỗi lần một đối tượng mới", () => {
     const a = emptyEquipment();
-    expect(Object.keys(a).sort()).toEqual([...EQUIP_SLOTS].sort());
-    for (const s of EQUIP_SLOTS) expect(a[s]).toBe("");
+    expect(a).toEqual({ weapon: "", robe: "", talisman: "" });
+    for (const s of OWNER_EQUIP_SLOTS) expect(s in a).toBe(false);
     a.boots = "x";
-    expect(emptyEquipment().boots).toBe("");
+    a.weapon = "y";
+    expect(emptyEquipment()).toEqual({ weapon: "", robe: "", talisman: "" });
   });
 
   it("ô mở theo cảnh giới: pháp bảo từ Kim Đan (realm 3), các ô khác luôn mở; ô lạ / realm rác thì chưa", () => {

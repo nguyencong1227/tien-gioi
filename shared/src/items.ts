@@ -112,13 +112,13 @@ export interface EquipDef {
 /**
  * Đồ đang mặc: itemId theo từng ô, "" = trống. Ba ô công khai (`weapon`, `robe`, `talisman`) server đặt thẳng trên Player trong state nên client đọc từ chính player;
  * ba ô riêng (`boots`, `jade`, `treasure`) cũng nằm trên Player nhưng CHỈ CHỦ nhận (`@view(TAG_OWNER)`): client chỉ đọc được của chính mình. Trong KIỂU, ba ô riêng
- * là tuỳ chọn (`Partial`) để mã cũ dựng `Equipment` ba khoá còn biên dịch trong lúc chuyển (server / client sẽ dựng đủ sáu); `emptyEquipment()` luôn trả đủ sáu ô, mọi hàm
- * đọc (`equipBonus`...) coi ô vắng là trống.
+ * là TUỲ CHỌN trong kiểu và trong `emptyEquipment()` (vắng hoặc `""` = trống): mã dựng `Equipment` ba khoá, file lưu cũ và test cũ vẫn nguyên; mọi hàm đọc (`equipBonus`,
+ * `sanitizeEquipment`...) coi ô vắng là trống, và duyệt cả sáu ô bằng `EQUIP_SLOTS`.
  */
 export type Equipment = Record<PublicEquipSlot, string> & Partial<Record<OwnerEquipSlot, string>>;
 
 export function emptyEquipment(): Equipment {
-  return { weapon: "", robe: "", talisman: "", boots: "", jade: "", treasure: "" };
+  return { weapon: "", robe: "", talisman: "" };
 }
 
 export interface ItemDef {
