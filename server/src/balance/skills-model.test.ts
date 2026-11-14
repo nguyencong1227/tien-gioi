@@ -131,5 +131,14 @@ describe("Mô hình cân bằng chiêu thức, hệ và trạng thái (M7.9, iss
       expect(res.match).toBe(true);
       expect(res.diffPercent).toBeLessThanOrEqual(25);
     }
+
+    // Chiêu không truyền cảnh giới: tự dùng cảnh giới yêu cầu (def.reqRealm)
+    const autoRealmRes = simulateSkillFight("cuu_cung_khon_sat", undefined, undefined, 30, 100);
+    expect(autoRealmRes.match).toBe(true);
+
+    // Cảnh giới không đủ: ném lỗi rõ ràng thay vì im lặng từ chối
+    expect(() => simulateSkillFight("cuu_cung_khon_sat", 1, 0)).toThrow(
+      /không đủ để dùng chiêu cuu_cung_khon_sat/,
+    );
   });
 });

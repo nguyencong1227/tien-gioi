@@ -17,6 +17,7 @@ import {
   SKILL_BY_ID,
   statsFor,
   TICK_MS,
+  skillReqMet,
 } from "@tien-gioi/shared";
 import { ASSUME } from "./simulate";
 import { makeWorld, addPlayer, addMonster } from "../systems/test-helpers";
@@ -28,7 +29,7 @@ import { seeded } from "./hunt-check";
 
 /**
  * DPS cơ bản khi chỉ chém thường (baseline: SKILLS.slash)
- * Cooldown 500ms, hệ số 1.0, có tính bạo kích trung bình ASSUME.critAvg.
+ * Cooldown 400ms, hệ số 1.0, có tính bạo kích trung bình ASSUME.critAvg.
  */
 export function baselineDps(playerAtk: number): number {
   return (playerAtk * SKILLS.slash.mult * ASSUME.critAvg) / (SKILLS.slash.cooldown / 1000);
@@ -377,24 +378,33 @@ export interface SkillVerifyResult {
 /**
  * Mô phỏng trận đấu trong World thật bằng mã server thật để đối chiếu với mô hình lý thuyết.
  * Người chơi cast chiêu thức mỗi khi hồi chiêu và đủ linh lực, xen kẽ chém thường (slash).
+ * Mặc định cảnh giới (realm/tier) đủ dùng chiêu thức (theo def.reqRealm / def.reqTier).
  */
 export function simulateSkillFight(
   skillId: string,
-  realm = 2,
-  tier = 0,
+  realm?: number,
+  tier?: number,
   durationSec = 25,
   seed = 42,
 ): SkillVerifyResult {
+  const def = SKILL_BY_ID[skillId];
+  if (!def) throw new Error("Không tìm thấy chiêu: " + skillId);
+
+  const actualRealm = realm !== undefined ? realm : def.reqRealm;
+  const actualTier = tier !== undefined ? tier : def.reqTier;
+  if (!skillReqMet(def, actualRealm, actualTier)) {
+    throw new Error(
+      `Cảnh giới (realm=${actualRealm}, tier=${actualTier}) không đủ để dùng chiêu ${skillId} (yêu cầu realm=${def.reqRealm}, tier=${def.reqTier})`,
+    );
+  }
+
   const saved = Math.random;
   Math.random = seeded(seed);
   try {
     const { w } = makeWorld();
-    const { p, c } = addPlayer(w, "tester", realm, tier);
+    const { p, c } = addPlayer(w, "tester", actualRealm, actualTier);
     applyStats(p, true);
     p.mp = p.maxMp;
-
-    const def = SKILL_BY_ID[skillId];
-    if (!def) throw new Error("Không tìm thấy chiêu: " + skillId);
 
     // Gắn chiêu vào ô 2 (chỉ số m.slot = 2, idx = 0)
     c.skills.learned[skillId] = 1;
@@ -433,7 +443,7 @@ export function simulateSkillFight(
     const totalLost = hp0 - mon.m.hp;
     const realDps = totalLost / t;
 
-    const stats = statsFor(realm, tier, p, c.mult);
+    const stats = statsFor(actualRealm, actualTier, p, c.mult);
     const model = computeSkillCombo(def, stats.atk, stats.maxMp, "none");
     const diffPercent = (Math.abs(realDps - model.comboDps) / model.comboDps) * 100;
 
