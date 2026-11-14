@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
   BATTERY_SAVER_STORAGE_KEY,
@@ -6,9 +8,12 @@ import {
   FrameGovernor,
   LEGACY_LOW_FX_KEY,
   QUALITY_STORAGE_KEY,
+  STRONG_GPU,
   TIER_BASE,
+  TIERS,
   buildProfile,
   createQuality,
+  isUltraCapable,
   loadMode,
   pickInitialTier,
   type DeviceSignals,
@@ -138,9 +143,10 @@ function memStore(init: Record<string, string> = {}) {
 
 describe("gfx/quality: chế độ đã lưu + di cư tg_low_fx", () => {
   it("giá trị hợp lệ được giữ; rác thì Tự động", () => {
-    for (const v of ["auto", "low", "mid", "high"] as const)
+    for (const v of ["auto", "low", "mid", "high", "ultra"] as const)
       expect(loadMode(memStore({ [QUALITY_STORAGE_KEY]: v }))).toBe(v);
-    expect(loadMode(memStore({ [QUALITY_STORAGE_KEY]: "ultra" }))).toBe("auto");
+    for (const junk of ["extreme", "", "HIGH", "__proto__", "1"])
+      expect(loadMode(memStore({ [QUALITY_STORAGE_KEY]: junk })), junk).toBe("auto");
     expect(loadMode(memStore())).toBe("auto");
   });
   it("tg_low_fx=1 mà chưa chọn chất lượng -> low và lưu lại; đã chọn thì không ghi đè", () => {
@@ -524,5 +530,259 @@ describe("gfx/quality: đọc chuỗi GPU (browserQualityEnv)", () => {
     expect(env.signals().gpu).toBeUndefined();
     expect(env.signals().gpu).toBeUndefined();
     expect(tries).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------- Bậc "Rất cao" (M7.15, mục 10.3)
+
+/** Máy tính mạnh: chuỗi ANGLE thật của RTX 5060 trên Chrome Linux. */
+const BIG_DESKTOP: DeviceSignals = {
+  form: "desktop",
+  cores: 16,
+  memoryGb: 8,
+  gpu: "ANGLE (NVIDIA, NVIDIA GeForce RTX 5060 (0x00002D05) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  mobile: false,
+};
+
+describe("gfx/quality: bậc Rất cao (ultra)", () => {
+  it("số liệu: mọi trần của Rất cao >= Cao (không có trường nào tụt), nâng cả maxPixels / renderScaleMax; hdPacks CHỈ ở Rất cao", () => {
+    const hi = TIER_BASE.high;
+    const ul = TIER_BASE.ultra;
+    expect(TIERS).toEqual(["low", "mid", "high", "ultra"]);
+    for (const k of [
+      "renderScaleMax",
+      "maxPixels",
+      "particleBudget",
+      "emitterBudget",
+      "damageNumbers",
+      "fogPatches",
+      "farAnimHz",
+      "nameLabelRadius",
+    ] as const)
+      expect(ul[k], k).toBeGreaterThanOrEqual(hi[k]);
+    expect(ul.maxPixels).toBeGreaterThan(hi.maxPixels); // không thì ảnh 2x vô dụng (canvas bị kẹp)
+    expect(ul).toMatchObject({ particleBudget: 1000, emitterBudget: 40, damageNumbers: 40 });
+    for (const t of TIERS) expect(buildProfile(t, ctx()).hdPacks, t).toBe(t === "ultra");
+    // bloom vẫn chỉ trên máy tính (kể cả ở Rất cao)
+    expect(buildProfile("ultra", ctx({ form: "tablet" })).bloom).toBe(false);
+    expect(buildProfile("ultra", ctx({ form: "desktop" })).bloom).toBe(true);
+  });
+
+  it("isUltraCapable: DƯƠNG (RTX 5060, GTX 1660, Radeon RX 7800, Radeon PRO W7800, Apple M2, Arc A770 có (TM)) và ÂM (iGPU, di động, thiếu lõi / RAM, phần mềm, rỗng)", () => {
+    const withGpu = (
+      gpu: string | undefined,
+      over: Partial<DeviceSignals> = {},
+    ): DeviceSignals => ({
+      ...BIG_DESKTOP,
+      gpu,
+      ...over,
+    });
+    for (const g of [
+      "ANGLE (NVIDIA, NVIDIA GeForce RTX 5060 Direct3D11)",
+      "ANGLE (NVIDIA, NVIDIA GeForce GTX 1660 SUPER)",
+      "ANGLE (AMD, AMD Radeon RX 7800 XT Direct3D11)",
+      "ANGLE (AMD, AMD Radeon PRO W7800 Direct3D11)",
+      "ANGLE (Apple, ANGLE Metal Renderer: Apple M2, Unspecified Version)",
+      "ANGLE (Intel, Intel(R) Arc(TM) A770 Graphics Direct3D11)",
+    ])
+      expect(isUltraCapable(withGpu(g)), g).toBe(true);
+    for (const g of [
+      "ANGLE (AMD, AMD Radeon(TM) Graphics Direct3D11)",
+      "ANGLE (Intel, Intel(R) UHD Graphics 770 Direct3D11)",
+      "Mali-G78",
+      "Adreno (TM) 740",
+      "Apple GPU",
+      "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device))",
+      "",
+      undefined,
+    ])
+      expect(isUltraCapable(withGpu(g)), String(g)).toBe(false);
+    // GPU mạnh nhưng chuỗi lẫn phần mềm: phần mềm thắng
+    expect(isUltraCapable(withGpu("NVIDIA llvmpipe (LLVM)"))).toBe(false);
+    // thiết bị di động / hình thức khác máy tính: không bao giờ, kể cả chip Apple M (iPad Pro)
+    expect(isUltraCapable({ ...BIG_DESKTOP, mobile: true })).toBe(false);
+    expect(isUltraCapable({ ...BIG_DESKTOP, form: "tablet" })).toBe(false);
+    expect(isUltraCapable({ ...BIG_DESKTOP, form: "phone" })).toBe(false);
+    expect(
+      isUltraCapable({
+        ...BIG_DESKTOP,
+        form: "tablet",
+        gpu: "ANGLE (Apple, Apple M2)",
+        mobile: true,
+      }),
+    ).toBe(false);
+    // lõi / RAM: < 8 lõi không; RAM báo < 8 không; RAM không rõ thì được
+    expect(isUltraCapable({ ...BIG_DESKTOP, cores: 7 })).toBe(false);
+    expect(isUltraCapable({ ...BIG_DESKTOP, cores: undefined })).toBe(false);
+    expect(isUltraCapable({ ...BIG_DESKTOP, memoryGb: 4 })).toBe(false);
+    expect(isUltraCapable({ ...BIG_DESKTOP, memoryGb: undefined })).toBe(true);
+    expect(STRONG_GPU.test("NVIDIA")).toBe(true);
+  });
+
+  it("pickInitialTier: máy tính mạnh khởi đầu Rất cao (trần Rất cao); máy tính thường vẫn Cao trần Cao; điện thoại mạnh trần Cao trở xuống", () => {
+    expect(pickInitialTier(BIG_DESKTOP)).toEqual({ tier: "ultra", ceiling: "ultra" });
+    expect(
+      pickInitialTier({ ...BIG_DESKTOP, gpu: "ANGLE (Intel, Intel(R) UHD Graphics)" }),
+    ).toEqual({
+      tier: "high",
+      ceiling: "high",
+    });
+    expect(pickInitialTier({ ...BIG_DESKTOP, cores: 4, gpu: "GeForce GTX 1050" })).toEqual({
+      tier: "high",
+      ceiling: "high",
+    });
+    const phone = pickInitialTier({
+      form: "phone",
+      cores: 16,
+      memoryGb: 8,
+      gpu: BIG_DESKTOP.gpu,
+      mobile: true,
+    });
+    expect(TIERS.indexOf(phone.ceiling)).toBeLessThanOrEqual(TIERS.indexOf("high"));
+    expect(TIERS.indexOf(phone.tier)).toBeLessThanOrEqual(TIERS.indexOf("mid"));
+  });
+
+  it("loadMode: `ultra` đã lưu bị BỎ (quay về Tự động và ghi đè giá trị lưu) nếu thiết bị không đủ điều kiện; giữ nếu đủ", () => {
+    const s = memStore({ [QUALITY_STORAGE_KEY]: "ultra" });
+    expect(loadMode(s, false)).toBe("auto");
+    expect(s.m[QUALITY_STORAGE_KEY]).toBe("auto");
+    expect(loadMode(memStore({ [QUALITY_STORAGE_KEY]: "ultra" }), true)).toBe("ultra");
+    // các chế độ khác không bị ảnh hưởng bởi cờ
+    expect(loadMode(memStore({ [QUALITY_STORAGE_KEY]: "high" }), false)).toBe("high");
+  });
+
+  it("bộ điều khiển: máy mạnh khởi đầu Rất cao + hdPacks; chọn tay Rất cao được lưu; ultraAvailable đúng", () => {
+    const f = fakeEnv({ signals: BIG_DESKTOP, form: "desktop" });
+    const q = createQuality(f.env);
+    expect(q.ultraAvailable()).toBe(true);
+    expect(q.get()).toMatchObject({ tier: "ultra", mode: "auto", hdPacks: true });
+    expect(q.ceiling()).toBe("ultra");
+    q.setMode("high");
+    expect(q.get()).toMatchObject({ tier: "high", hdPacks: false });
+    q.setMode("ultra");
+    expect(q.get()).toMatchObject({ tier: "ultra", mode: "ultra", hdPacks: true });
+    expect(f.store.m[QUALITY_STORAGE_KEY]).toBe("ultra");
+  });
+
+  it("điện thoại / máy yếu: KHÔNG chọn được Rất cao dù bị gọi thẳng; giá trị lưu cũ bị gỡ", () => {
+    const f = fakeEnv(); // phone, 8 lõi, 8 GB, không có GPU rời
+    const q = createQuality(f.env);
+    expect(q.ultraAvailable()).toBe(false);
+    q.setMode("ultra");
+    expect(q.get().mode).toBe("auto");
+    expect(f.store.m[QUALITY_STORAGE_KEY]).toBeUndefined();
+    // đã từng lưu `ultra` (đổi máy / sửa tay): vào game tự về Tự động
+    const g = fakeEnv({ store: { [QUALITY_STORAGE_KEY]: "ultra" } });
+    const q2 = createQuality(g.env);
+    expect(q2.get().mode).toBe("auto");
+    expect(q2.get().tier).not.toBe("ultra");
+    expect(g.store.m[QUALITY_STORAGE_KEY]).toBe("auto");
+  });
+
+  it("bộ điều tốc: hạ khỏi Rất cao thì KHÔNG nâng lại trong phiên (trần thành Cao); hạ từ Cao xuống Vừa vẫn nâng lại được tới Cao", () => {
+    const f = fakeEnv({ signals: BIG_DESKTOP, form: "desktop" });
+    const q = createQuality(f.env, FAST);
+    expect(q.get().tier).toBe("ultra");
+    feed(q, 400, 30); // khung xấu (30 ms): hạ một bậc
+    expect(q.get().tier).toBe("high");
+    expect(q.ceiling()).toBe("high");
+    feed(q, 2000, 12); // khung tốt dài (p95 12 ms < 14 ms của FAST): đủ điều kiện nâng, nhưng trần đã thành Cao
+    expect(q.get().tier).toBe("high");
+    expect(q.get().hdPacks).toBe(false);
+    // hạ tiếp xuống Vừa rồi nâng lại: tới Cao, không tới Rất cao
+    feed(q, 400, 30);
+    expect(q.get().tier).toBe("mid");
+    feed(q, 3000, 12);
+    expect(q.get().tier).toBe("high");
+    expect(q.get().hdPacks).toBe(false);
+  });
+
+  it("máy tính thường (không đủ điều kiện): trần vẫn Cao, không bao giờ lên Rất cao dù khung rất tốt", () => {
+    const f = fakeEnv({
+      signals: { ...BIG_DESKTOP, gpu: "Intel(R) UHD Graphics" },
+      form: "desktop",
+    });
+    const q = createQuality(f.env, FAST);
+    expect(q.ceiling()).toBe("high");
+    feed(q, 5000, 12);
+    expect(q.get().tier).toBe("high");
+  });
+});
+
+describe("gfx/quality: nhận diện thiết bị di động (browserQualityEnv.signals().mobile)", () => {
+  const sig = (nav: Record<string, unknown>) => {
+    const doc = {
+      createElement: () => ({ getContext: () => null }),
+      documentElement: { setAttribute: () => {} },
+      body: null,
+    };
+    const win = {
+      navigator: { hardwareConcurrency: 8, deviceMemory: 8, userAgent: "", ...nav },
+      localStorage: { getItem: () => null, setItem: () => {} },
+    };
+    return browserQualityEnv(
+      () => "desktop",
+      () => false,
+      win as never,
+      doc as never,
+    ).signals();
+  };
+
+  it("di động khi userAgentData.mobile, UA Android / iPhone / iPad / iPod, hoặc iPadOS giả Macintosh có cảm ứng nhiều điểm", () => {
+    expect(sig({ userAgentData: { mobile: true } }).mobile).toBe(true);
+    for (const ua of [
+      "Mozilla/5.0 (Linux; Android 14; Pixel 8)",
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0)",
+      "Mozilla/5.0 (iPad; CPU OS 17_0)",
+      "Mozilla/5.0 (iPod touch)",
+    ])
+      expect(sig({ userAgent: ua }).mobile, ua).toBe(true);
+    expect(
+      sig({ userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15)", maxTouchPoints: 5 }).mobile,
+    ).toBe(true);
+  });
+
+  it("không phải di động: Chrome Linux / Windows, Mac thật (không cảm ứng), userAgentData.mobile = false", () => {
+    expect(sig({ userAgent: "Mozilla/5.0 (X11; Linux x86_64) Chrome/130" }).mobile).toBe(false);
+    expect(sig({ userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" }).mobile).toBe(false);
+    expect(
+      sig({ userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15)", maxTouchPoints: 0 }).mobile,
+    ).toBe(false);
+    expect(sig({ userAgentData: { mobile: false } }).mobile).toBe(false);
+  });
+});
+
+describe("gfx/quality: khớp ngân sách perf-budget.json (M7.15)", () => {
+  const budget = JSON.parse(
+    fs.readFileSync(path.resolve(__dirname, "../../perf-budget.json"), "utf-8"),
+  );
+
+  it("mỗi bậc trong TIERS có mục ngân sách; hạt / emitter / chữ sát thương khớp TIER_BASE; bộ nhớ texture tăng dần", () => {
+    let prevTex = 0;
+    for (const t of TIERS) {
+      const b = budget.runtime.tiers[t];
+      expect(b, t).toBeDefined();
+      expect(b.peakParticles, `${t} hạt`).toBe(TIER_BASE[t].particleBudget);
+      expect(b.emitterBudget, `${t} emitter`).toBe(TIER_BASE[t].emitterBudget);
+      expect(b.damageNumbers, `${t} chữ`).toBe(TIER_BASE[t].damageNumbers);
+      expect(b.maxTextureMemoryMb, `${t} texture`).toBeGreaterThan(prevTex);
+      prevTex = b.maxTextureMemoryMb;
+      expect(budget.static.textureMemoryMb[t]).toBe(b.maxTextureMemoryMb);
+    }
+    // mục 10 / QUYET_DINH_M3 mục 21: Cao 256 MB, Rất cao 512 MB, draw call Rất cao ~300
+    expect(budget.runtime.tiers.high.maxTextureMemoryMb).toBe(256);
+    expect(budget.runtime.tiers.ultra).toMatchObject({ maxTextureMemoryMb: 512, drawCalls: 300 });
+  });
+
+  it("khối `packs` giữ đúng ngân sách theo gói của QUYET_DINH_M3 mục 21 (2 / 2 / 3 / 5 MB, hd <= 3 lần, chờ 8 s / 3 s)", () => {
+    expect(budget.packs).toMatchObject({
+      core: { maxKb: 2048 },
+      map: { maxKb: 2048 },
+      icons: { maxKb: 3072 },
+      audio: { maxKb: 5120 },
+      hdMaxFactor: 3,
+      mapLoadTimeoutMs: 8000,
+      dungeonLoadTimeoutMs: 3000,
+    });
   });
 });

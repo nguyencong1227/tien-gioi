@@ -9,6 +9,7 @@ import {
   getMap,
   isDungeonMap,
   originOf,
+  skillOf,
   type DungeonDaily,
   type Equipment,
   type Inventory,
@@ -71,6 +72,11 @@ export interface LimboRecord {
   summary: LifeSummary;
   /** Trang bị có thể giữ lại (id vật phẩm, lặp lại nếu có nhiều món cùng loại), chụp lúc chết */
   keepable: string[];
+  /**
+   * Công pháp có thể KHẮC vào chân linh khi đầu thai (M7.2c): chiêu đã học ở kiếp vừa kết thúc cộng chiêu đang khắc, id `SkillDef`, không trùng,
+   * chụp lúc chết (sổ chiêu bị đặt lại ngay sau đó). Hồ sơ cũ không có trường này = [] (chưa có gì để khắc).
+   */
+  engravable: string[];
   /** Linh thạch lúc chết (mang theo tới `coinCarryCap`) */
   coinAtDeath: number;
   /** Kiếp này có được tính (tăng bộ đếm kiếp) hay không */
@@ -83,6 +89,19 @@ const LIFE_CAP = 1_000_000_000_000;
 
 const int = (v: unknown, max = LIFE_CAP): number =>
   typeof v === "number" && Number.isFinite(v) ? Math.min(max, Math.max(0, Math.floor(v))) : 0;
+
+/** Danh sách chiêu có thể khắc đọc từ file lưu: id có trong bảng chiêu, không trùng, tối đa `ENGRAVABLE_MAX`; không phải mảng thì rỗng. */
+const ENGRAVABLE_MAX = 64;
+function sanitizeEngravable(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  for (const id of raw) {
+    if (out.length >= ENGRAVABLE_MAX) break;
+    const def = skillOf(id);
+    if (def && !out.includes(def.id)) out.push(def.id);
+  }
+  return out;
+}
 
 /** Đọc bản ghi Hoàng Tuyền từ file lưu: không tin file. Không phải object hợp lệ thì `undefined` (coi như không ở Hoàng Tuyền). */
 export function sanitizeLimbo(raw: unknown): LimboRecord | undefined {
@@ -108,6 +127,7 @@ export function sanitizeLimbo(raw: unknown): LimboRecord | undefined {
       gain: int(s.gain, 1_000_000_000),
     },
     keepable,
+    engravable: sanitizeEngravable(r.engravable),
     coinAtDeath: int(r.coinAtDeath, 1_000_000_000),
     counts: r.counts === true,
     credited: r.credited === true,

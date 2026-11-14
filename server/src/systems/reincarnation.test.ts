@@ -54,6 +54,7 @@ describe("beginLimbo: chết thật", () => {
       endedLifeId: t.lifeBefore,
       summary: { kiep: 1, realm: 1, tier: 8, minutes: 48, kills: 30, bossKills: 0, gain: expected },
       keepable: ["lang_nha_kiem", "hac_ho_kiem"],
+      engravable: [],
       coinAtDeath: 250,
       counts: true,
       credited: false,
@@ -127,6 +128,7 @@ describe("creditSoul: cộng Duyên idempotent", () => {
     endedLifeId: "life-1",
     summary: { kiep: 1, realm: 1, tier: 8, minutes: 48, kills: 30, bossKills: 0, gain: 22 },
     keepable: [],
+    engravable: [],
     coinAtDeath: 0,
     counts: true,
     credited: false,
@@ -183,6 +185,45 @@ describe("creditSoul: cộng Duyên idempotent", () => {
     expect(s.history).toHaveLength(HISTORY_MAX);
     expect(s.history.at(-1)!.kiep).toBe(39);
     expect(s.kiep).toBe(40);
+  });
+});
+
+describe("beginLimbo: chiêu có thể khắc (M7.2c)", () => {
+  it("chụp chiêu đã học ở kiếp vừa kết thúc cộng chiêu đang khắc (đang khắc đứng trước, không trùng, id lạ bị bỏ), TRƯỚC khi đặt lại sổ chiêu", () => {
+    const t = setup();
+    t.c.soul = { ...t.c.soul, engraved: ["ung_trao"] };
+    t.c.skills = {
+      learned: {
+        hoa_van_kiem: 2,
+        me_tung_bo: 1,
+        ung_trao: 1,
+        constructor: 1,
+        __proto__: 1,
+      } as never,
+      slots: ["hoa_van_kiem", "", "", ""],
+    };
+    kill(t);
+    expect(t.c.limbo!.engravable).toEqual(["ung_trao", "hoa_van_kiem", "me_tung_bo"]);
+    expect(t.c.skills).toEqual({ learned: {}, slots: ["", "", "", ""] }); // sổ chiêu đã đặt lại
+  });
+
+  it("chưa học chiêu nào và chưa khắc: danh sách rỗng", () => {
+    const t = setup();
+    kill(t);
+    expect(t.c.limbo!.engravable).toEqual([]);
+  });
+
+  it("audit `soul.rebirth` ghi số chiêu đang khắc; kiếp mới dựng từ `Soul.engraved` ở tầng 1, ô trống", () => {
+    const t = setup();
+    const events: Array<{ ev: string; f: Record<string, unknown> }> = [];
+    t.w.audit = (ev, f) => events.push({ ev, f: f as Record<string, unknown> });
+    kill(t);
+    t.c.soul = creditSoul(t.c.soul, { ...t.c.limbo!, credited: true }, "n");
+    t.c.soul = { ...t.c.soul, unlocks: { khac: 2 }, engraved: ["hoa_van_kiem", "me_tung_bo"] };
+    applyRebirth(t.w, "a", t.p, t.c, { origin: "pham_gia", keep: [] });
+    expect(t.c.skills.learned).toEqual({ hoa_van_kiem: 1, me_tung_bo: 1 });
+    expect(t.c.skills.slots).toEqual(["", "", "", ""]);
+    expect(events.find((e) => e.ev === "soul.rebirth")!.f.engraved).toBe(2);
   });
 });
 
@@ -309,7 +350,15 @@ describe("nhật ký kiểm toán: chết thật và đầu thai (M4 2.4, lát 3
     expect(log).toHaveLength(1);
     expect(log[0]).toEqual({
       ev: "soul.rebirth",
-      f: { name: "a", kiep: 2, origin: "pham_gia", coin: 0, coinAtDeath: 250, kept: 0 },
+      f: {
+        name: "a",
+        kiep: 2,
+        origin: "pham_gia",
+        coin: 0,
+        coinAtDeath: 250,
+        kept: 0,
+        engraved: 0,
+      },
     });
   });
 
