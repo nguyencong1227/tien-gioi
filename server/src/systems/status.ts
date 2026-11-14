@@ -13,6 +13,7 @@ import {
   newStatusBox,
   takeDotDamage,
   pruneStatuses,
+  stripDots,
   type AddResult,
   type StatusBox,
 } from "./status-rules";
@@ -172,18 +173,19 @@ function tickPlayerStatuses(w: World, dt: number) {
       const add = takeWhole(c.frac, "hp", s.ratio * p.maxHp * dt);
       if (add) p.hp = Math.min(p.maxHp, p.hp + add);
     }
+    // Khu an toàn (trấn, quanh cổng) THANH TẨY sát thương theo giây: gỡ khỏi hộp, không gây thêm (quyết định A 15/11/2026: chạy về trấn là cách thoát độc /
+    // bỏng / chảy máu; khu an toàn là nơi quái không đánh nên cũng không để vết thương cũ trừ máu ở đó). Loại khác (tê cóng, choáng...) giữ nguyên tới hết hạn.
+    const cleansed = w.map.inSafe(p.x, p.y) && stripDots(box);
     // Sát thương THEO GIÂY lên người (độc / bỏng / chảy máu do quái hoặc chiêu gây ra): cộng dồn rồi tính mỗi DOT_TICK_MS như ở quái (ít tin `dmg`, lúc hết hạn
-    // tính nốt phần lẻ). Hồn lìa xác / thách đấu bất tử (`hurtPlayerDot`); người gục vì nó thì dừng (`clearPlayerStatus` dọn ở tick sau).
+    // tính nốt phần lẻ). KHÔNG BAO GIỜ GIẾT (kẹp còn 1 khí huyết, `hurtPlayerDot`): chỉ đòn thật của quái mới lấy kiếp; hồn lìa xác / thách đấu vẫn bất tử.
     for (const s of box.list) {
       const def = statusOf(s.id);
       if (def?.kind !== "dot") continue;
       const dmg = takeDotDamage(s, now);
       if (dmg < 1) continue;
-      hurtPlayerDot(w, sid, p, dmg, def.name);
-      if (p.dead || c.limbo || w.ctrl.get(sid) !== c) break; // gục / luân hồi / rời phòng: dừng, không đụng hộp trạng thái đã đặt lại
+      hurtPlayerDot(w, sid, p, dmg); // không giết, không đổi `p.dead` / `c.limbo` / hộp trạng thái: không cần thoát vòng sớm
     }
-    if (p.dead || c.limbo) continue; // tick sau `clearPlayerStatus` dọn
-    if (pruneStatuses(box, now)) {
+    if (pruneStatuses(box, now) || cleansed) {
       refreshMoveCache(c, now);
       sendStatus(w, sid);
     }
