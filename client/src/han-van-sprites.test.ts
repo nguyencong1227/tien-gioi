@@ -139,3 +139,98 @@ describe("tranh quái Hàn Vân Lĩnh trong atlas", () => {
       }
   });
 });
+
+// ---------------------------------------------------------------------------------------------------------------------------------------
+// Biểu tượng và NPC Hàn Vân Lĩnh (M7.5c, #506): 12 icon + 3 NPC vẽ TRƯỚC vật phẩm / NPC trong `shared/` (id chốt ở #618)
+// ---------------------------------------------------------------------------------------------------------------------------------------
+const HV_ITEMS = [
+  "han_lang_mao",
+  "phong_nha_vu",
+  "tuong_cot",
+  "doc_tuoc_nang",
+  "thien_han_chau",
+  "han_vu_kiem",
+  "han_lang_bao",
+  "phong_nha_phu",
+  "tuyet_hanh_ngoa",
+  "han_tinh_boi",
+  "thuong_hoi_huyet_dan",
+  "thuong_hoi_linh_dan",
+];
+const HV_NPCS = ["tram_truong_han", "lai_buon_han", "tho_ren_han"];
+const iconFiles = fs
+  .readdirSync(new URL("../public/assets/items/", import.meta.url))
+  .filter((f) => f.endsWith(".png"))
+  .map((f) => f.replace(/\.png$/, ""));
+const iconPixels = (id: string) => {
+  const d = decode(read(`items/${id}.png`));
+  return { w: d.w, h: d.h, data: d.px };
+};
+
+describe("biểu tượng vật phẩm và NPC Hàn Vân Lĩnh", () => {
+  it("mỗi icon có tệp items/<id>.png 24 x 24 và khung item-<id> trong atlas, thân đủ điểm đặc", () => {
+    for (const id of HV_ITEMS) {
+      expect(iconFiles, `${id}.png`).toContain(id);
+      const p = iconPixels(id);
+      expect([p.w, p.h], id).toEqual([24, 24]);
+      expect(opaqueCount(p), `${id} điểm đặc`).toBeGreaterThan(60);
+      const f = atlas.frames[`item-${id}`];
+      expect(f, `item-${id}`).toBeDefined();
+      expect([f.frame.w, f.frame.h], `item-${id}`).toEqual([24, 24]);
+    }
+  });
+
+  it("không icon nào trùng pixel với icon khác (kể cả đan cấp 2 và đồ Kim Đan): không chép nhầm hình", () => {
+    const all = iconFiles.map((id) => ({ id, p: iconPixels(id) }));
+    const mine = all.filter((x) => HV_ITEMS.includes(x.id));
+    for (const a of mine)
+      for (const b of all) {
+        if (a.id === b.id) continue;
+        expect(same(a.p, b.p), `${a.id} / ${b.id}`).toBe(false);
+      }
+  });
+
+  it("đan cấp 3 khác đan cấp 2 về HÌNH (quầng ngoài + tia chéo), không chỉ khác màu: nhiều điểm sáng hơn", () => {
+    for (const k of ["huyet", "linh"]) {
+      const lo = iconPixels(`dai_hoi_${k}_dan`);
+      const hi = iconPixels(`thuong_hoi_${k}_dan`);
+      expect(opaqueCount(hi), k).toBeGreaterThan(opaqueCount(lo));
+    }
+  });
+
+  it("ngọc bội Hàn Tinh không giống con mắt: không có lỗ đen lớn (chỉ lỗ xỏ dây)", () => {
+    const p = iconPixels("han_tinh_boi");
+    let dark = 0;
+    for (let k = 0; k < p.w * p.h; k++) {
+      const o = k * 4;
+      if (p.data[o + 3] >= 200 && Math.max(p.data[o], p.data[o + 1], p.data[o + 2]) < 0x30) dark++;
+    }
+    expect(dark).toBeLessThanOrEqual(8);
+  });
+
+  it("ba NPC Hàn Vân Trạm có khung npc-<id>, cùng kích thước NPC cũ, khác nhau và khác mọi NPC cũ", () => {
+    const OLD_NPC = [
+      "truong_tran",
+      "duoc_su",
+      "tho_ren",
+      "cao_thi",
+      "lai_buon",
+      "thu_mon",
+      "tram_truong",
+      "lai_buon_suong",
+      "tho_ren_suong",
+    ];
+    const base = atlas.frames["npc-tram_truong"].frame;
+    for (const id of HV_NPCS) {
+      const f = atlas.frames[`npc-${id}`];
+      expect(f, `npc-${id}`).toBeDefined();
+      expect([f.frame.w, f.frame.h], `npc-${id}`).toEqual([base.w, base.h]);
+    }
+    const all = [...OLD_NPC, ...HV_NPCS].map((id) => ({ id, p: pixelsOf(`npc-${id}`) }));
+    for (const a of all.filter((x) => HV_NPCS.includes(x.id)))
+      for (const b of all) {
+        if (a.id === b.id) continue;
+        expect(same(a.p, b.p), `${a.id} / ${b.id}`).toBe(false);
+      }
+  });
+});
