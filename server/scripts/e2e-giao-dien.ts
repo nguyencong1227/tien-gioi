@@ -55,6 +55,7 @@ const MEASURE = `(() => {
     partyCollapsed: cls('party-panel').includes('collapsed'),
     questCollapsed: cls('quest-tracker').includes('collapsed'),
     chatCollapsed: cls('chat').includes('collapsed'),
+    chatToggleShown: shown(byId('chat')) && shown(byId('chat-toggle')),
   };
 })()`;
 
@@ -82,6 +83,7 @@ interface Measure {
   partyCollapsed: boolean;
   questCollapsed: boolean;
   chatCollapsed: boolean;
+  chatToggleShown: boolean;
 }
 
 const overlap = (a: Rect, b: Rect) =>
@@ -267,6 +269,12 @@ async function main() {
         `${tag}: Tổ đội, Nhiệm vụ, Chat mặc định ${expect}`,
         m.partyCollapsed === narrow && m.questCollapsed === narrow && m.chatCollapsed === narrow,
         JSON.stringify({ party: m.partyCollapsed, quest: m.questCollapsed, chat: m.chatCollapsed }),
+      );
+      // ---- khung chat và nút 💬 hiện ở MỌI cỡ (điện thoại ngang trước đây ẩn hẳn chat; nit của A ở #479) ----
+      check(
+        `${tag}: khung chat và nút 💬 hiện ra`,
+        m.chatToggleShown,
+        JSON.stringify(m.chatToggleShown),
       );
       // ---- ngân sách diện tích và vùng giữa trống ----
       const area = (r: Rect) => r.w * r.h;

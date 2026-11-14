@@ -2421,8 +2421,15 @@ html[data-input="touch"] #newbie-btn-keys {
     width: 185px;
     padding: 5px 7px;
   }
+  /* Chat điện thoại NGANG: trước đây ẩn hẳn. Nay hiện thu gọn MỘT dòng ở GIỮA mép trên (khoảng trống giữa cột trái và cột phải; góc phải dưới thanh menu
+     đã bị nút Mục tiêu / kỹ năng che), nút 💬 / chạm dòng tin / Enter để mở; mở ra vẫn nằm trên vùng giữa màn (QUYET_DINH_M3 mục 15; nit của A ở #479). */
   #chat {
-    display: none;
+    left: 50%;
+    right: auto;
+    top: max(6px, env(safe-area-inset-top));
+    bottom: auto;
+    transform: translateX(-50%);
+    width: min(340px, 34vw);
   }
   #minimap-wrap {
     width: 82px;
