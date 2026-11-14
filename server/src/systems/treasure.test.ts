@@ -322,19 +322,19 @@ describe("trong trận thách đấu: pháp bảo KHÔNG chạy (review B ở #5
   /** Hai người Kim Đan, A (mặc `tid` hoặc không) thách B, qua đếm ngược. Máu A = 623 / 1000. */
   function duelSetup(tid: TreasureId | null) {
     const t = makeWorld(DEFAULT_MAP, new Hub());
-    const a = addPlayer(t.w, "A", 3, 0);
-    const b = addPlayer(t.w, "B", 3, 0);
+    const a = addPlayer(t.w, "Alpha", 3, 0);
+    const b = addPlayer(t.w, "Bravo", 3, 0);
     b.p.x = a.p.x + 45;
     b.p.y = a.p.y;
     if (tid) a.p.treasure = treasureItem(tid);
     a.p.maxHp = 1000;
     a.p.hp = 623;
     t.w.now = 10_000;
-    duelChallenge(t.w, "A", { name: "B" });
-    duelAnswer(t.w, "B", { from: "A" }, true);
+    duelChallenge(t.w, "Alpha", { name: "Bravo" });
+    duelAnswer(t.w, "Bravo", { from: "Alpha" }, true);
     t.w.now += DUEL_COUNTDOWN_MS + 1;
     tickDuels(t.w);
-    expect(t.w.duels.has("A")).toBe(true);
+    expect(t.w.duels.has("Alpha")).toBe(true);
     return { ...t, a };
   }
   /** 100 tick (5 giây) đứng yên bằng `tickWorld` thật. */
@@ -357,7 +357,7 @@ describe("trong trận thách đấu: pháp bảo KHÔNG chạy (review B ở #5
 
     // Ngoài trận: cùng cảnh nhưng không thách đấu, có hồi
     const t = makeWorld();
-    const a = addPlayer(t.w, "A", 3, 0);
+    const a = addPlayer(t.w, "Alpha", 3, 0);
     a.p.treasure = treasureItem("dinh_tam_chung");
     a.p.maxHp = 1000;
     a.p.hp = 623;
