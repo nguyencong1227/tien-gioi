@@ -29,7 +29,8 @@ export type ActionId =
   | "panel.map"
   | "panel.settings"
   | "chat.open"
-  | "sound.mute";
+  | "sound.mute"
+  | "ui.toggle";
 
 export type ActionGroup = "combat" | "interact" | "panel" | "other";
 
@@ -163,6 +164,13 @@ export const ACTIONS: readonly ActionDef[] = [
     label: "Bật / tắt âm thanh",
     group: "other",
     defaults: ["KeyN"],
+    world: false,
+  },
+  {
+    id: "ui.toggle",
+    label: "Ẩn / hiện toàn bộ giao diện (màn chơi sạch)",
+    group: "other",
+    defaults: ["KeyH"],
     world: false,
   },
 ];

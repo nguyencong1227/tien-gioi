@@ -24,6 +24,15 @@ import {
 const ev = (code: string, extra: Record<string, boolean> = {}) => ({ code, ...extra });
 const lookup = () => buildLookup(DEFAULT_KEYMAP);
 
+describe("phím ẩn toàn bộ giao diện (QUYET_DINH_M3 mục 15)", () => {
+  it("H = ui.toggle, chạy cả khi bảng đang mở (không phải hành động của thế giới), nằm ở màn Phím tắt (ACTIONS)", () => {
+    expect(actionOfEvent(ev("KeyH"), lookup())).toBe("ui.toggle");
+    expect(ACTION_BY_ID["ui.toggle"].world).toBe(false);
+    expect(ACTION_BY_ID["ui.toggle"].label).toMatch(/giao diện/);
+    expect(ACTIONS.map((a) => a.id)).toContain("ui.toggle");
+  });
+});
+
 describe("bảng phím mặc định (QUYET_DINH_M3 mục 13)", () => {
   it("mọi phím của người dùng đều có hành động: Space, Tab, Shift+Tab, 1-4, F, I / C / J / G / M, Enter", () => {
     const l = lookup();

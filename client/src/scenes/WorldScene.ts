@@ -1107,6 +1107,9 @@ export class WorldScene extends Phaser.Scene {
       case "sound.mute":
         sound.toggleMute();
         break;
+      case "ui.toggle":
+        ui.toggleHidden();
+        break;
       case "chat.open":
         // setTimeout để phím Enter vừa bấm không rơi vào ô chat vừa lấy focus
         setTimeout(() => ui.focusChat(), 0); // chat thu gọn: hiện ô nhập tạm rồi đưa con trỏ vào (ui.focusChat)

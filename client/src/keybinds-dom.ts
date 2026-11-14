@@ -41,9 +41,9 @@ export const HUD_KEYS: readonly HudKey[] = [
   { id: "btn-mute", action: "sound.mute", name: "Bật hoặc tắt âm thanh", keycap: "none" },
   { id: "btn-settings", action: "panel.settings", name: "Cài đặt và phím tắt", keycap: "none" },
   { id: "minimap-wrap", action: "panel.map", name: "Bản đồ thế giới", keycap: "none" },
-  { id: "btn-pickup", action: "interact", name: "Nhặt vật phẩm rơi", keycap: "none" },
-  { id: "btn-talk", action: "interact", name: "Nói chuyện với NPC", keycap: "none" },
-  { id: "btn-portal", action: "interact", name: "Đi qua cổng truyền tống", keycap: "none" },
+  { id: "btn-pickup", action: "interact", name: "Nhặt vật phẩm rơi", keycap: "kbd" },
+  { id: "btn-talk", action: "interact", name: "Nói chuyện với NPC", keycap: "kbd" },
+  { id: "btn-portal", action: "interact", name: "Đi qua cổng truyền tống", keycap: "kbd" },
 ];
 
 /** Phần tử tối thiểu mà `applyKeyLabels` cần (để test bằng đối tượng giả, không cần jsdom). */

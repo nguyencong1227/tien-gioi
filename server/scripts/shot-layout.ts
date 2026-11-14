@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
-import { Tab, sleep, listenWithRetry, removeTmpDirs } from "./e2e-kit";
+import { Tab, sleep, listenWithRetry, removeTmpDirs, getChromeGpuFlags } from "./e2e-kit";
 import { PANELS, VIEWPORTS, applyViewport, crowdHud } from "./layout-kit";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -60,7 +60,7 @@ async function main() {
       [
         "--headless=new",
         "--no-sandbox",
-        "--disable-gpu",
+        ...getChromeGpuFlags(),
         `--remote-debugging-port=${CDP}`,
         `--user-data-dir=${chromeDir}`,
         "--window-size=1280,720",
@@ -133,6 +133,17 @@ async function main() {
         `| ${v.w}x${v.h} | ${info.form}/${info.orient}/${info.input} | ${colTxt} | ${part("hud")} · ${part("party-panel")} · ${part("quest-tracker")} · ${part("chat")} |`,
       );
       out(`  chụp ${path.basename(file)} (${v.note}): cột trái ${colTxt}`);
+    }
+    // Màn chơi sạch (phím ẩn giao diện `ui.toggle`, `body.ui-hidden`): chụp ở cửa sổ hẹp và máy tính
+    for (const v of [VIEWPORTS[3], VIEWPORTS[4]]) {
+      await applyViewport(T, v);
+      await T.ev(`document.body.classList.add('ui-hidden'); 1`);
+      await sleep(300);
+      const file = path.join(outDir, `${tag}-an-${v.w}x${v.h}.png`);
+      const r = await T.send("Page.captureScreenshot", { format: "png" });
+      writeFileSync(file, Buffer.from(r.result.data, "base64"));
+      await T.ev(`document.body.classList.remove('ui-hidden'); 1`);
+      out(`  chụp ${path.basename(file)} (giao diện ẩn hết)`);
     }
     out(
       "\n| Khung nhìn | form / hướng / nhập | Cột trái (HUD + đội + nhiệm vụ) | Kích thước từng bảng (px) |",
