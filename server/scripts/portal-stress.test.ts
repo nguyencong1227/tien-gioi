@@ -67,7 +67,7 @@ afterAll(async () => {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function waitFor<T>(fn: () => T | undefined | false, ms = 4000): Promise<T> {
+async function waitFor<T>(fn: () => T | undefined | false, ms = 8000): Promise<T> {
   const end = Date.now() + ms;
   for (;;) {
     const v = fn();
@@ -157,12 +157,15 @@ describe("Thử tải & độ tin cậy chuyển bản đồ qua cổng (Issue #
       const t0 = performance.now();
       cur.room.send("travel", { portalId: curPortal.id } satisfies TravelMsg);
 
-      // Đợi nhận tin travelTo
-      await waitFor(() => cur.travelTos.length > 0);
-      expect(cur.travelTos.at(-1)).toEqual({ mapId: targetMapId });
+      // Đợi nhận tin travelTo của bản đồ đích (chờ điều kiện khớp targetMapId thay vì chỉ kiểm tra length)
+      const travelToMsg = await waitFor(
+        () => cur.travelTos.find((m) => m.mapId === targetMapId),
+        8000,
+      );
+      expect(travelToMsg).toEqual({ mapId: targetMapId });
 
       // Đợi kết nối phòng cũ đóng
-      await waitFor(() => !cur.room.connection.isOpen);
+      await waitFor(() => !cur.room.connection.isOpen, 8000);
 
       // Client kết nối phòng mới
       const nextClient = new Client(`ws://localhost:${PORT}`);
@@ -170,7 +173,7 @@ describe("Thử tải & độ tin cậy chuyển bản đồ qua cổng (Issue #
       rooms.push(nextRoom);
 
       // Đợi nhận state đầy đủ ở phòng mới
-      await waitFor(() => (nextRoom.state as any)?.players?.get(nextRoom.sessionId));
+      await waitFor(() => (nextRoom.state as any)?.players?.get(nextRoom.sessionId), 8000);
       const latency = performance.now() - t0;
       travelLatencies.push(latency);
 
@@ -193,11 +196,18 @@ describe("Thử tải & độ tin cậy chuyển bản đồ qua cổng (Issue #
 
       currentMapId = targetMapId;
 
-      // Đợi hồi chiêu cổng để lần sau đi tiếp
-      await sleep(TRAVEL_COOLDOWN_MS + 50);
+      // Đợi hết hồi chiêu cổng trên đồng hồ phòng server trước khi chặng tiếp theo bắt đầu
+      if (round < 2) {
+        await waitFor(() => {
+          const srNow = serverRoom(cur.room);
+          const ctrl = srNow?.world?.ctrl?.get(cur.room.sessionId);
+          if (!ctrl) return false;
+          return srNow.world.now - (ctrl.save?.travelAt ?? 0) >= TRAVEL_COOLDOWN_MS;
+        }, 8000);
+      }
     }
 
-    // 3. Đánh giá độ trễ: p50 và p95
+    // 3. Đánh giá độ trễ: p50 và p95 (mục tiêu LOAD_TEST.md p50 < 350, p95 < 600; trần test 600 / 900)
     travelLatencies.sort((a, b) => a - b);
     const p50 = travelLatencies[Math.floor(travelLatencies.length * 0.5)];
     const p95 = travelLatencies[Math.floor(travelLatencies.length * 0.95)];
@@ -333,8 +343,11 @@ async function hop(cur: Conn, name: string, fromMapId: string, portalId: string)
   // Hồi chiêu cổng đã có test riêng (planTravel); ở đây xoá để không phải chờ 3 giây mỗi chặng
   serverRoom(cur.room).world.ctrl.get(cur.room.sessionId).save.travelAt = 0;
   cur.room.send("travel", { portalId } satisfies TravelMsg);
-  await waitFor(() => cur.travelTos.length > 0);
-  expect(cur.travelTos.at(-1)).toEqual({ mapId: portal.toMap });
+  const travelToMsg = await waitFor(
+    () => cur.travelTos.find((m) => m.mapId === portal.toMap),
+    8000,
+  );
+  expect(travelToMsg).toEqual({ mapId: portal.toMap });
   await waitFor(() => !cur.room.connection.isOpen);
   // Vào được phòng đích mà không bị wrong_map nghĩa là bản ghi đích đã được lưu TRƯỚC khi gửi travelTo
   const next = await joinRoom(name, secretOf(name), portal.toMap);

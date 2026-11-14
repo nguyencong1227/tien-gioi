@@ -18,6 +18,7 @@ import path from "node:path";
 import zlib from "node:zlib";
 import crypto from "node:crypto";
 import process from "node:process";
+import { Buffer } from "node:buffer";
 import { fileURLToPath } from "node:url";
 import {
   DEFAULT_PACKS_DIR,
@@ -40,7 +41,7 @@ const BUDGET_FILE = path.resolve(CLIENT_DIR, "perf-budget.json");
  * @returns {{ width: number, height: number } | null}
  */
 export function readPngDimensions(buffer) {
-  if (!buffer || buffer.length < 24) return null;
+  if (!buffer || !Buffer.isBuffer(buffer) || buffer.length < 24) return null;
   if (
     buffer[0] !== 0x89 ||
     buffer[1] !== 0x50 ||
@@ -53,9 +54,90 @@ export function readPngDimensions(buffer) {
   ) {
     return null;
   }
+  const ihdrType = buffer.toString("ascii", 12, 16);
+  if (ihdrType !== "IHDR") return null;
+
   const width = buffer.readUInt32BE(16);
   const height = buffer.readUInt32BE(20);
   return { width, height };
+}
+
+/**
+ * Đọc kích thước (width, height) từ header của tệp WebP (VP8, VP8L hoặc VP8X)
+ * @param {Buffer} buffer
+ * @returns {{ width: number, height: number } | null}
+ */
+export function readWebpDimensions(buffer) {
+  if (!buffer || !Buffer.isBuffer(buffer) || buffer.length < 16) return null;
+
+  // RIFF header: 'RIFF' (offset 0..3) và 'WEBP' (offset 8..11)
+  if (
+    buffer[0] !== 0x52 || // 'R'
+    buffer[1] !== 0x49 || // 'I'
+    buffer[2] !== 0x46 || // 'F'
+    buffer[3] !== 0x46 || // 'F'
+    buffer[8] !== 0x57 || // 'W'
+    buffer[9] !== 0x45 || // 'E'
+    buffer[10] !== 0x42 || // 'B'
+    buffer[11] !== 0x50 // 'P'
+  ) {
+    return null;
+  }
+
+  const format = buffer.toString("ascii", 12, 16);
+
+  // 1. Extended WebP (VP8X)
+  if (format === "VP8X") {
+    if (buffer.length < 30) return null;
+    // Canvas width: 24-bit LE tại byte 24 + 1
+    const width = 1 + (buffer[24] | (buffer[25] << 8) | (buffer[26] << 16));
+    // Canvas height: 24-bit LE tại byte 27 + 1
+    const height = 1 + (buffer[27] | (buffer[28] << 8) | (buffer[29] << 16));
+    return { width, height };
+  }
+
+  // 2. Lossless WebP (VP8L)
+  if (format === "VP8L") {
+    if (buffer.length < 25) return null;
+    // Byte 20 phải là 0x2F (signature)
+    if (buffer[20] !== 0x2f) return null;
+    const bits = buffer.readUInt32LE(21);
+    const width = (bits & 0x3fff) + 1;
+    const height = ((bits >> 14) & 0x3fff) + 1;
+    return { width, height };
+  }
+
+  // 3. Lossy WebP (VP8 )
+  if (format === "VP8 ") {
+    if (buffer.length < 30) return null;
+    // VP8 sync code: 0x9D 0x01 0x2A tại offset 23..25
+    if (buffer[23] !== 0x9d || buffer[24] !== 0x01 || buffer[25] !== 0x2a) {
+      return null;
+    }
+    const width = buffer.readUInt16LE(26) & 0x3fff;
+    const height = buffer.readUInt16LE(28) & 0x3fff;
+    return { width, height };
+  }
+
+  return null;
+}
+
+/**
+ * Đọc kích thước ảnh từ buffer theo định dạng PNG hoặc WebP
+ * @param {Buffer} buffer
+ * @param {string} [ext]
+ * @returns {{ width: number, height: number } | null}
+ */
+export function readImageDimensions(buffer, ext = "") {
+  if (!buffer || !Buffer.isBuffer(buffer)) return null;
+  const normalized = ext.toLowerCase();
+  if (normalized === ".png") {
+    return readPngDimensions(buffer);
+  }
+  if (normalized === ".webp") {
+    return readWebpDimensions(buffer);
+  }
+  return readPngDimensions(buffer) || readWebpDimensions(buffer);
 }
 
 /**
@@ -151,34 +233,37 @@ export function calculateStaticTextureMemory(assetsDir) {
   const items = [];
   let totalBytes = 0;
 
-  // 1. Quét đệ quy tất cả các tệp .png trong assets
-  function scanPngs(dir) {
+  // 1. Quét đệ quy tất cả các tệp .png và .webp trong assets
+  function scanTextures(dir) {
     if (!fs.existsSync(dir)) return;
     const entries = fs.readdirSync(dir, { withFileTypes: true });
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        scanPngs(fullPath);
-      } else if (entry.isFile() && entry.name.endsWith(".png")) {
-        const buf = fs.readFileSync(fullPath);
-        const dim = readPngDimensions(buf);
-        if (dim && dim.width > 0 && dim.height > 0) {
-          const vramBytes = dim.width * dim.height * 4;
-          totalBytes += vramBytes;
-          const relName = path.relative(assetsDir, fullPath);
-          items.push({
-            name: relName,
-            width: dim.width,
-            height: dim.height,
-            bytes: vramBytes,
-            mb: Number((vramBytes / (1024 * 1024)).toFixed(3)),
-          });
+        scanTextures(fullPath);
+      } else if (entry.isFile()) {
+        const ext = path.extname(entry.name).toLowerCase();
+        if (ext === ".png" || ext === ".webp") {
+          const buf = fs.readFileSync(fullPath);
+          const dim = readImageDimensions(buf, ext);
+          if (dim && dim.width > 0 && dim.height > 0) {
+            const vramBytes = dim.width * dim.height * 4;
+            totalBytes += vramBytes;
+            const relName = path.relative(assetsDir, fullPath);
+            items.push({
+              name: relName,
+              width: dim.width,
+              height: dim.height,
+              bytes: vramBytes,
+              mb: Number((vramBytes / (1024 * 1024)).toFixed(3)),
+            });
+          }
         }
       }
     }
   }
 
-  scanPngs(assetsDir);
+  scanTextures(assetsDir);
 
   // 2. Texture sinh bằng mã lúc chạy (từ gfx/fx và gfx/decor-tileset)
   const codeGenerated = [
@@ -240,6 +325,39 @@ export function calculateEffectiveFileSize(filePath) {
   return stat.size;
 }
 
+/** Các giới hạn khớp bộ nạp client (client/src/gfx/packs.ts) */
+export const PACK_ID_RE = /^[a-z0-9_:.-]{1,64}$/i;
+export const MAX_PACKS = 64;
+export const MAX_FILES_PER_PACK = 512;
+export const MAX_PATH_LENGTH = 200;
+
+/**
+ * Kiểm tra tính hợp lệ của đường dẫn tệp trong gói
+ * @param {string} relPath
+ * @returns {string | null} Lỗi phát hiện hoặc null nếu hợp lệ
+ */
+export function validatePackFilePath(relPath) {
+  if (typeof relPath !== "string" || relPath.length === 0) {
+    return "Đường dẫn tệp trong gói rỗng!";
+  }
+  if (relPath.length > MAX_PATH_LENGTH) {
+    return `Đường dẫn tệp '${relPath}' dài ${relPath.length} ký tự, vượt quá giới hạn tối đa ${MAX_PATH_LENGTH} ký tự!`;
+  }
+  if (
+    relPath.startsWith("/") ||
+    relPath.includes("\\") ||
+    relPath.includes("?") ||
+    relPath.includes("#")
+  ) {
+    return `Đường dẫn tệp '${relPath}' chứa ký tự cấm (?, #, \\ hoặc bắt đầu bằng /)!`;
+  }
+  const segments = relPath.split("/");
+  if (segments.some((seg) => seg === ".." || seg === "." || seg === "")) {
+    return `Đường dẫn tệp '${relPath}' chứa đoạn không hợp lệ ('.' hoặc '..' hoặc '//')!`;
+  }
+  return null;
+}
+
 /**
  * Kiểm tra ngân sách cho các gói tải theo nhu cầu (M7.15, #516; THIET_KE_GIAO_DIEN_DO_HOA.md mục 10.1)
  * @param {{
@@ -250,7 +368,7 @@ export function calculateEffectiveFileSize(filePath) {
  * @returns {{
  *   ok: boolean,
  *   manifestFound: boolean,
- *   packs: Array<{ id: string, kind: string, mapId?: string, fileCount: number, rawKb: number, compressedKb: number, limitKb: number, ok: boolean }>,
+ *   packs: Array<{ id: string, kind: string, mapId?: string, fileCount: number, rawKb: number, compressedKb: number, limitKb: number, vramBytes: number, vramMb: number, ok: boolean }>,
  *   errors: string[]
  * }}
  */
@@ -297,6 +415,13 @@ export function checkPacksBudget(opts = {}) {
   if (!manifest || typeof manifest !== "object" || !Array.isArray(manifest.packs)) {
     errors.push(`Cấu trúc manifest tại ${manifestPath} không hợp lệ (thiếu mảng 'packs').`);
     return { ok: false, manifestFound: true, packs: [], errors };
+  }
+
+  // N1: Kiểm tra số lượng gói tối đa
+  if (manifest.packs.length > MAX_PACKS) {
+    errors.push(
+      `Tổng số gói (${manifest.packs.length}) vượt quá giới hạn tối đa ${MAX_PACKS} gói mà client hỗ trợ!`,
+    );
   }
 
   // 1. Kiểm tra tính toàn vẹn 2 chiều giữa đĩa và manifest (nếu thư mục packs tồn tại)
@@ -357,25 +482,69 @@ export function checkPacksBudget(opts = {}) {
   const packMap = new Map();
 
   for (const p of manifest.packs) {
+    // N1: Kiểm tra định dạng ID gói
+    if (!PACK_ID_RE.test(p.id)) {
+      errors.push(`Id gói '${p.id}' không hợp lệ! Phải khớp /^[a-z0-9_:.-]{1,64}$/i.`);
+    }
+    if (p.mapId && !PACK_ID_RE.test(p.mapId)) {
+      errors.push(`mapId '${p.mapId}' trong gói '${p.id}' không hợp lệ!`);
+    }
+
     let totalRawBytes = 0;
     let totalCompressedBytes = 0;
+    let totalVramBytes = 0;
 
-    if (Array.isArray(p.files)) {
+    if (!Array.isArray(p.files)) {
+      errors.push(`Gói '${p.id}' thiếu mảng 'files'!`);
+    } else {
+      if (p.files.length > MAX_FILES_PER_PACK) {
+        errors.push(
+          `Gói '${p.id}' chứa ${p.files.length} tệp, vượt quá giới hạn tối đa ${MAX_FILES_PER_PACK} tệp/gói!`,
+        );
+      }
+
       for (const f of p.files) {
+        // N1: Kiểm tra đường dẫn tệp trong gói
+        const pathErr = validatePackFilePath(f.path);
+        if (pathErr) {
+          errors.push(`Gói '${p.id}': ${pathErr}`);
+        }
+
         totalRawBytes += f.bytes || 0;
         let compBytes = f.bytes || 0;
+        let fileVramBytes = 0;
+
+        const ext = path.extname(f.path || "").toLowerCase();
+        const isTexture = ext === ".png" || ext === ".webp";
+
         if (packsDirExists) {
           const abs = path.join(packsDir, f.path);
           if (fs.existsSync(abs)) {
             compBytes = calculateEffectiveFileSize(abs);
+            if (isTexture) {
+              const buf = fs.readFileSync(abs);
+              const dim = readImageDimensions(buf, ext);
+              if (dim && dim.width > 0 && dim.height > 0) {
+                fileVramBytes = dim.width * dim.height * 4;
+              }
+            }
           }
         }
+
+        // Hỗ trợ mock vramBytes trong unit test nếu không có file thật trên đĩa
+        if (fileVramBytes === 0 && typeof f.vramBytes === "number") {
+          fileVramBytes = f.vramBytes;
+        }
+
         totalCompressedBytes += compBytes;
+        totalVramBytes += fileVramBytes;
       }
     }
 
     const rawKb = Number((totalRawBytes / 1024).toFixed(2));
     const compressedKb = Number((totalCompressedBytes / 1024).toFixed(2));
+    const vramMb = Number((totalVramBytes / (1024 * 1024)).toFixed(3));
+
     const packRecord = {
       id: p.id,
       kind: p.kind,
@@ -385,6 +554,8 @@ export function checkPacksBudget(opts = {}) {
       rawKb,
       compressedBytes: totalCompressedBytes,
       compressedKb,
+      vramBytes: totalVramBytes,
+      vramMb,
       limitKb: 0,
       ok: true,
     };
@@ -438,9 +609,90 @@ export function checkPacksBudget(opts = {}) {
 }
 
 /**
+ * Kiểm tra bộ nhớ texture ca xấu nhất lúc chạy (Worst-case Texture Memory) theo từng bậc đồ hoạ:
+ * - Các bậc Thấp (low), Vừa (mid), Cao (high): static textures + core + icons + max(map)
+ * - Bậc Rất cao (ultra): static textures + (hd:core ?? core) + (hd:icons ?? icons) + max(hd:map ?? map)
+ * @param {{
+ *   staticTextureBytes: number,
+ *   packs: Array<{ id: string, kind: string, mapId?: string, vramBytes?: number }>,
+ *   tierLimits?: { low?: number, mid?: number, high?: number, ultra?: number }
+ * }} params
+ * @returns {{
+ *   ok: boolean,
+ *   tiers: Record<string, { tier: string, staticMb: number, packMb: number, totalMb: number, limitMb: number, ok: boolean }>,
+ *   errors: string[]
+ * }}
+ */
+export function checkWorstCaseTextureMemoryByTier({
+  staticTextureBytes = 0,
+  packs = [],
+  tierLimits = { low: 48, mid: 80, high: 256, ultra: 512 },
+}) {
+  const packMap = new Map();
+  for (const p of packs) {
+    packMap.set(p.id, p);
+  }
+
+  const corePack = packMap.get("core");
+  const iconsPack = packMap.get("icons");
+  const mapPacks = packs.filter((p) => p.kind === "map");
+  const maxMapVram = mapPacks.length > 0 ? Math.max(...mapPacks.map((p) => p.vramBytes || 0)) : 0;
+
+  const normalWorstPackVram = (corePack?.vramBytes || 0) + (iconsPack?.vramBytes || 0) + maxMapVram;
+
+  // Ultra: dùng HD nếu có
+  const hdCorePack = packMap.get("hd:core");
+  const hdIconsPack = packMap.get("hd:icons");
+  const ultraCoreVram = (hdCorePack?.vramBytes ?? corePack?.vramBytes) || 0;
+  const ultraIconsVram = (hdIconsPack?.vramBytes ?? iconsPack?.vramBytes) || 0;
+
+  let maxUltraMapVram = 0;
+  if (mapPacks.length > 0) {
+    for (const m of mapPacks) {
+      const hdMap = packMap.get(`hd:${m.id}`);
+      const v = (hdMap?.vramBytes ?? m.vramBytes) || 0;
+      if (v > maxUltraMapVram) maxUltraMapVram = v;
+    }
+  }
+
+  const ultraWorstPackVram = ultraCoreVram + ultraIconsVram + maxUltraMapVram;
+
+  const results = {};
+  const tiers = ["low", "mid", "high", "ultra"];
+  const errors = [];
+
+  for (const tier of tiers) {
+    const packVram = tier === "ultra" ? ultraWorstPackVram : normalWorstPackVram;
+    const totalBytes = staticTextureBytes + packVram;
+    const totalMb = Number((totalBytes / (1024 * 1024)).toFixed(2));
+    const limitMb = tierLimits[tier] ?? (tier === "ultra" ? 512 : 48);
+    const ok = totalMb <= limitMb;
+    if (!ok) {
+      errors.push(
+        `Bộ nhớ texture ca xấu nhất ở bậc ${tier} (${totalMb} MB) vượt ngân sách ${limitMb} MB!`,
+      );
+    }
+    results[tier] = {
+      tier,
+      staticMb: Number((staticTextureBytes / (1024 * 1024)).toFixed(2)),
+      packMb: Number((packVram / (1024 * 1024)).toFixed(2)),
+      totalMb,
+      limitMb,
+      ok,
+    };
+  }
+
+  return {
+    ok: errors.length === 0,
+    tiers: results,
+    errors,
+  };
+}
+
+/**
  * Kiểm tra toàn bộ ngân sách tĩnh so với perf-budget.json
  * @param {{ budgetPath?: string, distDir?: string, assetsDir?: string, packsDir?: string, manifestPath?: string }} [opts]
- * @returns {{ ok: boolean, bundle: any, atlas: any, texture: any, packs: any, errors: string[] }}
+ * @returns {{ ok: boolean, bundle: any, atlas: any, texture: any, packs: any, worstCaseTexture: any, errors: string[] }}
  */
 export function checkPerfBudget(opts = {}) {
   const budgetPath = opts.budgetPath || BUDGET_FILE;
@@ -492,12 +744,31 @@ export function checkPerfBudget(opts = {}) {
     errors.push(...packs.errors);
   }
 
+  // 5. Kiểm tra Bộ nhớ texture ca xấu nhất theo từng bậc (M7.15, N3)
+  const staticLimits = budget.static?.textureMemoryMb || {};
+  const runtimeTiers = budget.runtime?.tiers || {};
+  const tierLimits = {
+    low: staticLimits.low ?? runtimeTiers.low?.maxTextureMemoryMb ?? 48,
+    mid: staticLimits.mid ?? runtimeTiers.mid?.maxTextureMemoryMb ?? 80,
+    high: staticLimits.high ?? runtimeTiers.high?.maxTextureMemoryMb ?? 256,
+    ultra: staticLimits.ultra ?? runtimeTiers.ultra?.maxTextureMemoryMb ?? 512,
+  };
+  const worstCaseTexture = checkWorstCaseTextureMemoryByTier({
+    staticTextureBytes: texture.totalBytes,
+    packs: packs.packs,
+    tierLimits,
+  });
+  if (!worstCaseTexture.ok) {
+    errors.push(...worstCaseTexture.errors);
+  }
+
   return {
     ok: errors.length === 0,
     bundle,
     atlas,
     texture: { ...texture, limitMb: textureLimitMb, ok: textureOk },
     packs,
+    worstCaseTexture,
     errors,
   };
 }
@@ -538,6 +809,13 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
           `   ${p.ok ? "✓" : "✗"} Gói ${p.id} (${p.kind}): ${p.compressedKb} KB / Ngân sách: <= ${p.limitKb} KB (${p.fileCount} tệp)`,
         );
       }
+    }
+
+    console.log(`\n5. Bộ nhớ Texture ca xấu nhất theo bậc đồ hoạ (Worst-case VRAM):`);
+    for (const [tier, r] of Object.entries(res.worstCaseTexture.tiers)) {
+      console.log(
+        `   ${r.ok ? "✓" : "✗"} Bậc ${tier}: ${r.totalMb} MB (Tĩnh: ${r.staticMb} MB + Gói: ${r.packMb} MB) / Ngân sách: <= ${r.limitMb} MB`,
+      );
     }
 
     if (!res.ok) {
