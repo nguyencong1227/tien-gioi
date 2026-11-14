@@ -1,6 +1,7 @@
 import { getDisplay } from "../gfx/display";
 import { createFxSystem, type FxSystem } from "../gfx/fx/fx";
 import { planCastFx } from "../gfx/fx/cast-fx";
+import { drawPips, pipsLabel, pipsOf } from "../monster-status";
 import { TelegraphLayer } from "../gfx/fx/telegraph-layer";
 import {
   planSlashEdges,
@@ -229,6 +230,13 @@ interface Entity {
   animPrefix?: string;
   lastEquipKey?: string;
   lastBarKey?: number;
+  /** Huy hiệu trạng thái có hại trên đầu quái (M7.7 bước 3b, #508): Graphics dựng lười, mặt nạ `Monster.fx` đã vẽ và số chấm */
+  statusG?: Phaser.GameObjects.Graphics;
+  lastFx?: number;
+  pipCount?: number;
+  pipText?: string;
+  /** Số lần vẽ lại hàng chấm (script kiểm: chỉ tăng khi mặt nạ đổi) */
+  pipDraws?: number;
   tx: number; // vị trí đích (từ server) để nội suy
   ty: number;
   lastLabel?: string;
@@ -2885,6 +2893,7 @@ export class WorldScene extends Phaser.Scene {
         Math.max(24, def.radius * 2),
         m.hp < m.maxHp,
       );
+      this.syncMonsterStatus(e, m.fx, def.radius, !!def.boss);
     });
     for (const [id, e] of this.monsters) {
       if (seen.has(id)) continue;
@@ -3161,6 +3170,44 @@ export class WorldScene extends Phaser.Scene {
       root.add([e.shadow, sprite, bar]);
     }
     return e;
+  }
+
+  /**
+   * Huy hiệu trạng thái có hại trên đầu quái từ `Monster.fx` (mặt nạ bit công khai, #559): chỉ vẽ lại khi mặt nạ ĐỔI (hiếm), Graphics dựng lười ở lần đầu cần.
+   * Máy chủ cũ chưa có `fx` (undefined) hoặc giá trị rác thì coi như 0. Trùm có tên ở -radius-22 nên hàng chấm nằm cao hơn một nấc.
+   */
+  private syncMonsterStatus(e: Entity, fx: unknown, radius: number, boss: boolean) {
+    const mask = typeof fx === "number" && Number.isInteger(fx) && fx > 0 ? fx : 0;
+    if (mask === (e.lastFx ?? 0)) return;
+    e.lastFx = mask;
+    const pips = pipsOf(mask);
+    e.pipCount = pips.length;
+    e.pipText = pipsLabel(pips);
+    if (pips.length === 0) {
+      e.statusG?.clear().setVisible(false);
+      return;
+    }
+    if (!e.statusG) {
+      e.statusG = this.add.graphics();
+      e.root.add(e.statusG);
+    }
+    e.statusG.setVisible(true);
+    drawPips(e.statusG, pips, -radius - (boss ? 36 : 21));
+    e.pipDraws = (e.pipDraws ?? 0) + 1;
+  }
+
+  /** Cho script kiểm (`?debug`): huy hiệu đang hiện trên đầu một con quái. */
+  public monsterPips(
+    id: string,
+  ): { n: number; text: string; visible: boolean; draws: number } | null {
+    const e = this.monsters.get(id);
+    if (!e) return null;
+    return {
+      n: e.pipCount ?? 0,
+      text: e.pipText ?? "",
+      visible: !!e.statusG?.visible,
+      draws: e.pipDraws ?? 0,
+    };
   }
 
   private drawBar(e: Entity, frac: number, color: number, y: number, w: number, visible: boolean) {
