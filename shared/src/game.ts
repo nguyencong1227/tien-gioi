@@ -162,6 +162,10 @@ export const MONSTERS: MonsterKind[] = [
     exp: 110,
     level: 13,
     color: 0xbfd7e0,
+    // M7.3 (#504): hồ tuyết đứng xa bắn đạn băng (đứng bắn cách 0,3-0,85 tầm, lùi khi bị áp sát). Số khởi đầu, M7.9 hiệu chỉnh.
+    behavior: "ranged",
+    boltSpeed: 280,
+    boltRange: 300,
   },
   {
     id: "thach_quy",
@@ -192,6 +196,10 @@ export const MONSTERS: MonsterKind[] = [
     exp: 230,
     level: 15,
     color: 0x7a5fa0,
+    // M7.3 (#504): cóc độc nhổ đạn độc (chậm, dễ né): đạn TRÚNG thì gắn độc (`POISON_EFFECT`, không giết người). Số khởi đầu, M7.9 hiệu chỉnh.
+    behavior: "poisoner",
+    boltSpeed: 220,
+    boltRange: 260,
   },
   // Trùm Kim Đan: một người và đội 2 người không an toàn, đội 3 từ Trung kỳ, đội 4 từ Sơ kỳ; đội 3 nhanh hơn săn solo ~1,15-1,2x
   {
