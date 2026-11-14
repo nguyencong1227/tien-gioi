@@ -52,13 +52,20 @@ export interface AddOpts {
 }
 
 /**
- * `added`: thêm mới (kể cả đẩy ra trạng thái yếu nhất khi đã đủ `MAX_STATUSES`); `refreshed`: cùng loại nên làm mới (KHÔNG cộng dồn);
- * `resisted`: choáng bị chặn (trùm / đang miễn); `full`: đủ trạng thái và không cái nào yếu hơn cái mới; `ignored`: id lạ, thời gian <= 0.
+ * `added`: thêm mới (kể cả đẩy ra trạng thái yếu nhất khi đã đủ `MAX_STATUSES`; khống chế luôn vào được); `refreshed`: cùng loại nên làm mới
+ * (KHÔNG cộng dồn); `resisted`: choáng bị chặn (trùm / đang miễn); `full`: đủ trạng thái và trạng thái thường mới không sống lâu hơn cái yếu nhất
+ * (không phải khống chế); `ignored`: id lạ, thời gian <= 0.
  */
 export type AddResult = "added" | "refreshed" | "resisted" | "full" | "ignored";
 
 const finite = (n: unknown, fallback: number): number =>
   typeof n === "number" && Number.isFinite(n) ? n : fallback;
+
+/** Khống chế: choáng và vỡ giáp (luôn vào được khi đủ chỗ, không bị trạng thái khác đẩy ra). */
+function isControl(id: StatusId): boolean {
+  const kind = statusOf(id)?.kind;
+  return kind === "stun" || kind === "vuln";
+}
 
 /** Xoá trạng thái đã hết hạn. Trả `true` nếu có cái bị xoá. */
 export function pruneStatuses(box: StatusBox, now: number): boolean {
@@ -107,11 +114,17 @@ export function addStatus(
     return "refreshed";
   }
   if (box.list.length >= MAX_STATUSES) {
-    let weakest = 0;
-    for (let i = 1; i < box.list.length; i++)
-      if (box.list[i].until < box.list[weakest].until) weakest = i;
-    if (box.list[weakest].until >= until) return "full";
-    box.list.splice(weakest, 1);
+    // Chỗ trống: khống chế (choáng, vỡ giáp) luôn VÀO được và không bao giờ bị trạng thái khác đẩy ra (choáng ngắn nhất nên nếu so thời gian thì
+    // "ba buff + một trạng thái" thành miễn choáng); nạn nhân luôn là trạng thái KHÔNG phải khống chế có hạn hết sớm nhất. Trạng thái thường
+    // chỉ vào khi sống lâu hơn nạn nhân.
+    let victim = -1;
+    for (let i = 0; i < box.list.length; i++) {
+      if (isControl(box.list[i].id)) continue;
+      if (victim < 0 || box.list[i].until < box.list[victim].until) victim = i;
+    }
+    if (victim < 0) return "full"; // toàn khống chế (không xảy ra: chỉ có hai loại khống chế nên tối đa hai mục)
+    if (!isControl(def.id) && box.list[victim].until >= until) return "full";
+    box.list.splice(victim, 1);
   }
   box.list.push({ id: def.id, until, ratio, dps, pool, last: now, src });
   if (stun) box.stunImmuneUntil = until + STUN_IMMUNE_MS;
