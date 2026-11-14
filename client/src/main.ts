@@ -69,6 +69,7 @@ import {
 } from "./gfx/scale";
 import { mountPerfOverlay } from "./gfx/perf-overlay";
 import { browserPacksEnv, initPacks, packs } from "./gfx/packs";
+import { bindHdGate, createHdGate } from "./gfx/hd-gate";
 import { isReducedMotion } from "./a11y";
 
 // Lõi hiển thị M5 (#322): đặt data-form / data-orient / data-input và --safe-*, --vw, --vh lên <html> SỚM, trước khi dựng giao diện.
@@ -80,8 +81,16 @@ initSheetSwipe(); // vuốt tiêu đề tấm để đóng (điện thoại)
 
 // Chất lượng đồ hoạ M5 (#323): hồ sơ Thấp / Vừa / Cao, Tự động + bộ điều tốc; SAU initDisplay (cần `form`)
 initQuality(browserQualityEnv(() => getDisplay().form, isReducedMotion));
-// Gói tải theo nhu cầu (#516): chỉ BỔ SUNG, thiếu gói trò chơi vẫn chạy. Gói `hd:*` bật khi bậc "Rất cao" ổn định (nối khi #538 vào main).
-initPacks(browserPacksEnv({ isNative: isNativeApp, hdAllowed: () => false }));
+// Gói tải theo nhu cầu (#516): chỉ BỔ SUNG, thiếu gói trò chơi vẫn chạy. Gói `hd:*` (ảnh 2x) chỉ nạp khi `hdPacks` (bậc "Rất cao", không tiết kiệm pin)
+// đã bật liên tục >= HD_STABLE_MS (`hd-gate.ts`); `hdPacks` tắt (hạ bậc, tiết kiệm pin) thì giải phóng mọi gói `hd:*` ngay (thiết kế mục 10.3).
+const hdGate = createHdGate();
+bindHdGate(
+  hdGate,
+  getQuality().hdPacks,
+  (cb) => onQualityChange((p) => cb(p.hdPacks)),
+  () => packs().releaseKind("hd"),
+);
+initPacks(browserPacksEnv({ isNative: isNativeApp, hdAllowed: () => hdGate.allowed() }));
 document.addEventListener("visibilitychange", () => setQualityActive(!document.hidden));
 if (typeof window.matchMedia === "function") {
   // Hệ điều hành đổi "giảm chuyển động" lúc đang chơi

@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DUNGEON_MAPS } from "@tien-gioi/shared";
 import {
@@ -704,5 +706,22 @@ describe("gfx/packs: chọn bản đồ để tải trước", () => {
     p.release("map:lac_ha");
     p.prefetch("map:lac_ha");
     expect(log.idle).toHaveLength(1);
+  });
+});
+
+describe("gfx/packs: thời gian chờ ở màn chuyển cảnh khớp ngân sách perf-budget.json (M7.15, #516)", () => {
+  const budget = JSON.parse(
+    fs.readFileSync(path.resolve(__dirname, "../../perf-budget.json"), "utf-8"),
+  );
+
+  it("MAP_PACK_TIMEOUT_MS / DUNGEON_PACK_TIMEOUT_MS bằng `packs.mapLoadTimeoutMs` / `dungeonLoadTimeoutMs` (sửa một nơi thì phải sửa nơi kia)", () => {
+    expect(MAP_PACK_TIMEOUT_MS).toBe(budget.packs.mapLoadTimeoutMs);
+    expect(DUNGEON_PACK_TIMEOUT_MS).toBe(budget.packs.dungeonLoadTimeoutMs);
+  });
+
+  it("`mapPackTimeoutMs` chọn đúng số theo loại bản đồ; bí cảnh chờ ngắn hơn bản đồ thường", () => {
+    expect(mapPackTimeoutMs(false)).toBe(budget.packs.mapLoadTimeoutMs);
+    expect(mapPackTimeoutMs(true)).toBe(budget.packs.dungeonLoadTimeoutMs);
+    expect(budget.packs.dungeonLoadTimeoutMs).toBeLessThan(budget.packs.mapLoadTimeoutMs);
   });
 });
