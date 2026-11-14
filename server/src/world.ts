@@ -28,7 +28,15 @@ import type {
 } from "@tien-gioi/shared";
 import type { WorldState, Player } from "./schema";
 import type { SavedPlayer, QuestSave, LifeCounters, LimboRecord } from "./store";
-import type { LimboMsg, RebornMsg, Soul, SoulMsg, StatMult } from "@tien-gioi/shared";
+import type {
+  LimboMsg,
+  RebornMsg,
+  SkillBook,
+  SkillsMsg,
+  Soul,
+  SoulMsg,
+  StatMult,
+} from "@tien-gioi/shared";
 import { Interest } from "./systems/interest";
 import type { SectService } from "./sect-service";
 import type { AuditFn } from "./audit";
@@ -76,6 +84,10 @@ export interface PlayerCtrl {
   itemCd: Map<string, number>;
   /** Sổ nhiệm vụ: chỉ gửi cho chủ qua tin nhắn `quests` */
   quests: QuestSave;
+  /** Sổ chiêu (M7.2): chiêu đã học + gắn ô L U I O; chỉ gửi cho chủ qua tin nhắn `skills`, không vào state chung */
+  skills: SkillBook;
+  /** Thời điểm (ms, `w.now`) mỗi ô chiêu 2-5 dùng lại được */
+  skillCd: [number, number, number, number];
   /** Định danh kiếp hiện tại và bộ đếm thành tựu của kiếp (lưu cùng nhân vật; không vào state chung) */
   lifeId: string;
   life: LifeCounters;
@@ -134,6 +146,8 @@ export interface WorldEvents {
   inv(sessionId: string, msg: InvMsg): void;
   /** Gửi sổ nhiệm vụ cho đúng người. */
   quests(sessionId: string, msg: QuestsMsg): void;
+  /** Gửi sổ chiêu + hồi chiêu còn lại cho đúng chủ (không vào state chung; khi đổi và định kỳ, không mỗi tick). */
+  skills(sessionId: string, msg: SkillsMsg): void;
   /** Gửi số Linh thạch cho đúng chủ (không vào state chung). */
   wallet(sessionId: string, msg: WalletMsg): void;
   /** Mở hộp thoại NPC cho đúng người. */

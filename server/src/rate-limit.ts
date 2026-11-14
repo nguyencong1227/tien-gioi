@@ -2,6 +2,8 @@
 // Client bình thường không bao giờ chạm giới hạn; vượt thì tin nhắn bị bỏ qua.
 // Bỏ qua quá nhiều trong thời gian ngắn (spam có chủ đích) thì báo để phòng ngắt kết nối.
 
+import { SKILL_MSG } from "@tien-gioi/shared";
+
 export interface Limit {
   /** Số tin nhắn hồi lại mỗi giây */
   perSec: number;
@@ -17,6 +19,8 @@ export const MESSAGE_LIMITS: Record<string, Limit> = {
   input: { perSec: 30, burst: 40 },
   attack: { perSec: 10, burst: 10 },
   skill: { perSec: 10, burst: 10 },
+  // Gắn chiêu vào ô (M7.2): thao tác bảng, hiếm; cast (M7.2b) sẽ có giới hạn riêng như `skill`
+  [SKILL_MSG.slot]: { perSec: 4, burst: 8 },
   chat: { perSec: 2, burst: 5 },
   // Nhịp tim: client gửi 1 lần / 5 giây (+ 1 lần lúc quay lại tiền cảnh); chặn chặt vì mỗi ping tốn một tin trả lời
   ping: { perSec: 1, burst: 3 },

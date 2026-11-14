@@ -29,6 +29,8 @@ import {
   type DuelInvitedMsg,
   type DuelStateMsg,
   type DuelEndMsg,
+  type SkillsMsg,
+  emptySkillBook,
   originMult,
 } from "@tien-gioi/shared";
 import { WorldState, Player, Monster } from "../schema";
@@ -44,6 +46,7 @@ export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
   const chats: { from: string; text: string }[] = [];
   const invs: { sid: string; msg: InvMsg }[] = [];
   const quests: { sid: string; msg: QuestsMsg }[] = [];
+  const skillMsgs: { sid: string; msg: SkillsMsg }[] = [];
   const wallets: { sid: string; msg: WalletMsg }[] = [];
   const dialogs: { sid: string; msg: DialogMsg }[] = [];
   const parties: { sid: string; msg: PartyMsg }[] = [];
@@ -73,6 +76,7 @@ export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
       toast: (sid, msg) => toasts.push({ sid, msg }),
       inv: (sid, msg) => invs.push({ sid, msg }),
       quests: (sid, msg) => quests.push({ sid, msg }),
+      skills: (sid, msg) => skillMsgs.push({ sid, msg }),
       wallet: (sid, msg) => wallets.push({ sid, msg }),
       dialog: (sid, msg) => dialogs.push({ sid, msg }),
       party: (sid, msg) => parties.push({ sid, msg }),
@@ -103,6 +107,7 @@ export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
     chats,
     invs,
     quests,
+    skillMsgs,
     wallets,
     dialogs,
     parties,
@@ -149,6 +154,8 @@ export function addPlayer(w: World, sid: string, realm = 0, tier = 0) {
     inv: emptyInventory(),
     itemCd: new Map(),
     quests: { active: [], done: [], daily: {} },
+    skills: emptySkillBook(),
+    skillCd: [0, 0, 0, 0],
     origin: "pham_gia",
     mult: originMult("pham_gia"),
     lifeId: `life-${sid}`,
