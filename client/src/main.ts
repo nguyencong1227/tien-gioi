@@ -31,6 +31,7 @@ import { isMockDuelEnabled, MOCK_DUEL_SAMPLES } from "./duel";
 import { isMockSectEnabled, MOCK_SECT_SAMPLES } from "./sect";
 import {
   isMockSkillsEnabled,
+  mockAssign,
   mockCast,
   mockRealm,
   mockSkillCount,
@@ -68,6 +69,7 @@ import {
 } from "./gfx/scale";
 import { mountPerfOverlay } from "./gfx/perf-overlay";
 import { browserPacksEnv, initPacks, packs } from "./gfx/packs";
+import { bindHdGate, createHdGate } from "./gfx/hd-gate";
 import { isReducedMotion } from "./a11y";
 
 // Lõi hiển thị M5 (#322): đặt data-form / data-orient / data-input và --safe-*, --vw, --vh lên <html> SỚM, trước khi dựng giao diện.
@@ -79,8 +81,16 @@ initSheetSwipe(); // vuốt tiêu đề tấm để đóng (điện thoại)
 
 // Chất lượng đồ hoạ M5 (#323): hồ sơ Thấp / Vừa / Cao, Tự động + bộ điều tốc; SAU initDisplay (cần `form`)
 initQuality(browserQualityEnv(() => getDisplay().form, isReducedMotion));
-// Gói tải theo nhu cầu (#516): chỉ BỔ SUNG, thiếu gói trò chơi vẫn chạy. Gói `hd:*` bật khi bậc "Rất cao" ổn định (nối khi #538 vào main).
-initPacks(browserPacksEnv({ isNative: isNativeApp, hdAllowed: () => false }));
+// Gói tải theo nhu cầu (#516): chỉ BỔ SUNG, thiếu gói trò chơi vẫn chạy. Gói `hd:*` (ảnh 2x) chỉ nạp khi `hdPacks` (bậc "Rất cao", không tiết kiệm pin)
+// đã bật liên tục >= HD_STABLE_MS (`hd-gate.ts`); `hdPacks` tắt (hạ bậc, tiết kiệm pin) thì giải phóng mọi gói `hd:*` ngay (thiết kế mục 10.3).
+const hdGate = createHdGate();
+bindHdGate(
+  hdGate,
+  getQuality().hdPacks,
+  (cb) => onQualityChange((p) => cb(p.hdPacks)),
+  () => packs().releaseKind("hd"),
+);
+initPacks(browserPacksEnv({ isNative: isNativeApp, hdAllowed: () => hdGate.allowed() }));
 document.addEventListener("visibilitychange", () => setQualityActive(!document.hidden));
 if (typeof window.matchMedia === "function") {
   // Hệ điều hành đổi "giảm chuyển động" lúc đang chơi
@@ -197,12 +207,21 @@ function createMockDungeonRoom(
 function installMockSkills(room: any) {
   const n = mockSkillCount(location.search);
   const ids = SKILLS_M7.slice(0, 5).map((d) => d.id);
+  const realm = mockRealm(location.search, n);
   let cur = mockSkillsMsg(ids, n, n > 0 ? 3000 : 0);
   /** mốc (performance.now) hết hồi chiêu của từng ô 2-5 */
   const until: Record<number, number> = { 2: performance.now() + cur.cd[0], 3: 0, 4: 0, 5: 0 };
   const origSend = room.send;
   room.send = (type: string, data: any) => {
     origSend(type, data);
+    if (type === "skillSlot") {
+      // gắn / gỡ ô bằng đúng `assignSlot` của shared; từ chối thì gửi lại sổ đúng + toast như máy chủ thật
+      const next = mockAssign(cur, data?.slot, data?.skillId, realm);
+      if (next) cur = next;
+      else room.emit("toast", { text: "Không gắn được chiêu vào ô này.", tone: "bad" });
+      room.emit("skills", cur);
+      return;
+    }
     if (type !== "cast" || typeof data?.slot !== "number") return;
     const left = Math.max(0, (until[data.slot] ?? 0) - performance.now());
     const next = mockCast(cur, data.slot, left);

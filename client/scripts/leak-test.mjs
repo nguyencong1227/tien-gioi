@@ -4,7 +4,7 @@
  * M5.1, Issue #330, THIET_KE_GIAO_DIEN_DO_HOA.md mục 10 & 12.
  *
  * Kiểm tra:
- * - Ra / vào bí cảnh / bản đồ và mở / đóng modal 20 lần liên tục
+ * - Ra / vào bí cảnh / bản đồ và mở / đóng modal (kể cả bảng Công pháp nhận sổ chiêu mới mỗi chu kỳ) 20 lần liên tục
  * - Đo lường các chỉ số:
  *   1. Số lượng textures trong Scene Textures Cache
  *   2. Số lượng GameObjects trong Scene Children List
@@ -315,6 +315,20 @@ async function runLeakTest() {
                 sc.lastMapDraw = 0;
                 sc.syncMaps();
               }
+            }
+            // Bảng Công pháp (#507 bước 3): mở rồi nhận sổ chiêu MỚI mỗi chu kỳ (đổi ô gắn + hồi chiêu) để dựng lại hàng chiêu, biểu tượng SVG và thanh chiêu
+            if (sc && sc.onSkills) {
+              window.__ui.toggleSkillsModal(true);
+              const ids = ["hoa_van_kiem", "bon_thach_quyen", "ung_trao", "trong_nhac_tram", "huyen_bang_chi"];
+              const slots = ["", "", "", ""];
+              slots[0] = ids[${i} % ids.length];
+              slots[1] = ids[(${i} + 2) % ids.length];
+              sc.onSkills({
+                learned: { hoa_van_kiem: 2, bon_thach_quyen: 1, ung_trao: 3, trong_nhac_tram: 1, huyen_bang_chi: 2 },
+                slots,
+                cd: [(${i} % 3) * 500, 0, 0, 0],
+                cdMax: [3000, 3000, 0, 0],
+              });
             }
             window.__ui.closeAllModals();
           }

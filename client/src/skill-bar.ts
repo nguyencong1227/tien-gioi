@@ -4,6 +4,8 @@
 // Client không tin tin nhắn: `skills` đi qua `sanitizeSkillBook` + kẹp thời gian, id lạ / độc bị bỏ.
 import {
   LEARNABLE_SLOTS,
+  assignSlot,
+  skillCooldownMs,
   SKILL_MAX_LEVEL,
   SLOT_UNLOCK_REALM,
   REALMS,
@@ -371,4 +373,24 @@ export function mockCast(msg: SkillsMsg, slot: SkillSlot, cdLeftMs: number): Ski
   const cd: [number, number, number, number] = [0, 0, 0, 0];
   cd[i] = msg.cdMax[i];
   return { ...msg, cd };
+}
+
+/**
+ * Máy chủ giả: gắn / gỡ chiêu bằng ĐÚNG `assignSlot` của shared (cùng luật máy chủ thật: ô đã mở, chiêu đã học, chiêu đang ở ô khác thì đổi chỗ), tính lại `cdMax`
+ * của từng ô theo tầng (`skillCooldownMs`). Từ chối -> `null` (máy chủ thật gửi lại sổ đúng + toast). Hồi chiêu đang chạy (`cd`) giữ nguyên.
+ */
+export function mockAssign(
+  msg: SkillsMsg,
+  slot: unknown,
+  skillId: unknown,
+  realm: number,
+): SkillsMsg | null {
+  const r = assignSlot({ learned: msg.learned, slots: msg.slots }, slot, skillId, realm);
+  if (!r.ok) return null;
+  const cdMax = r.book.slots.map((id) => {
+    const def = id === "" ? undefined : skillOf(id);
+    return def ? skillCooldownMs(def, r.book.learned[def.id] ?? 1, 0) : 0;
+  }) as SkillsMsg["cdMax"];
+  const cd = msg.cd.map((v, i) => (r.book.slots[i] === "" ? 0 : v)) as SkillsMsg["cd"];
+  return { learned: { ...r.book.learned }, slots: r.book.slots, cd, cdMax };
 }

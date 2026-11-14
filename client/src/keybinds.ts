@@ -30,6 +30,7 @@ export type ActionId =
   | "panel.char"
   | "panel.quest"
   | "panel.sect"
+  | "panel.skills"
   | "panel.map"
   | "panel.minimap"
   | "panel.settings"
@@ -164,6 +165,14 @@ export const ACTIONS: readonly ActionDef[] = [
     world: false,
   },
   { id: "panel.sect", label: "Tông môn", group: "panel", defaults: ["KeyG"], world: false },
+  // Bảng Công pháp (M7.6, #507): gắn / gỡ chiêu vào ô 2-5. Shift+K (K là Kiếm khí; A xác nhận không đụng phím M7 nào ở #536)
+  {
+    id: "panel.skills",
+    label: "Công pháp (gắn chiêu vào ô)",
+    group: "panel",
+    defaults: ["Shift+KeyK"],
+    world: false,
+  },
   { id: "panel.map", label: "Bản đồ lớn", group: "panel", defaults: ["KeyM"], world: false },
   {
     id: "panel.minimap",

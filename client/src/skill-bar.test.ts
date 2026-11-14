@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   SKILLS_M7,
   SLOT_UNLOCK_REALM,
+  skillCooldownMs,
   skillMpCost,
   skillOf,
   type SkillsMsg,
@@ -14,6 +15,7 @@ import {
   elementColor,
   isMockSkillsEnabled,
   levelPips,
+  mockAssign,
   mockCast,
   mockRealm,
   mockSkillCount,
@@ -397,5 +399,31 @@ describe("máy chủ giả: cảnh giới và cast", () => {
     expect(mockCast(m, 3, 100)).toBeNull(); // đang hồi
     expect(mockCast(m, 4, 0)).toBeNull(); // ô trống
     expect(m.cd).toEqual([0, 0, 0, 0]); // không sửa tin cũ
+  });
+});
+
+describe("máy chủ giả: mockAssign dùng đúng luật assignSlot của shared", () => {
+  const ids = SKILLS_M7.slice(0, 5).map((d) => d.id);
+  it("gắn vào ô mở: slots đổi, cdMax tính lại theo tầng; chiêu đang ở ô khác thì ĐỔI chỗ (ô cũ trống)", () => {
+    const m = mockSkillsMsg(ids, 2); // ô 2, 3 gắn ids[0], ids[1]
+    const next = mockAssign(m, 4, ids[0], 4)!;
+    expect(next.slots).toEqual(["", ids[1], ids[0], ""]);
+    expect(next.cdMax[2]).toBe(skillCooldownMs(skillOf(ids[0])!, next.learned[ids[0]], 0));
+    expect(next.cdMax[0]).toBe(0);
+    expect(m.slots).toEqual([ids[0], ids[1], "", ""]); // không sửa tin cũ
+  });
+  it("gỡ ('') và từ chối: ô chưa mở, chiêu chưa học, ô lạ", () => {
+    const m = mockSkillsMsg(ids, 2);
+    expect(mockAssign(m, 2, "", 4)!.slots).toEqual(["", ids[1], "", ""]);
+    expect(mockAssign(m, 5, ids[0], 3)).toBeNull(); // ô 5 khoá ở Kim Đan
+    expect(mockAssign(m, 4, "khong_co", 4)).toBeNull();
+    expect(mockAssign(m, 9, ids[0], 4)).toBeNull();
+    expect(mockAssign(m, 4, SKILLS_M7[9].id, 4)).toBeNull(); // chiêu thật nhưng CHƯA học (mock chỉ học 5 chiêu đầu)
+  });
+  it("hồi chiêu đang chạy của ô còn chiêu được giữ, ô trống về 0", () => {
+    const m = { ...mockSkillsMsg(ids, 2, 2000) };
+    const next = mockAssign(m, 4, ids[1], 4)!; // ids[1] chuyển sang ô 4, ô 3 trống
+    expect(next.cd[0]).toBe(2000);
+    expect(next.cd[1]).toBe(0);
   });
 });

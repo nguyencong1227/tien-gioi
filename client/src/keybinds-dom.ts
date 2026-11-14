@@ -41,6 +41,7 @@ export const HUD_KEYS: readonly HudKey[] = [
   { id: "quick-1", action: "quick.1", name: "Đan dược ô 1", keycap: "qkey" },
   { id: "quick-2", action: "quick.2", name: "Đan dược ô 2", keycap: "qkey" },
   { id: "btn-char", action: "panel.char", name: "Bảng nhân vật và trang bị", keycap: "kbd" },
+  { id: "btn-skills", action: "panel.skills", name: "Công pháp", keycap: "none" },
   { id: "btn-bag", action: "panel.inventory", name: "Túi đồ", keycap: "kbd" },
   { id: "btn-quest", action: "panel.quest", name: "Sổ nhiệm vụ", keycap: "kbd" },
   { id: "btn-sect", action: "panel.sect", name: "Tông môn", keycap: "kbd" },
