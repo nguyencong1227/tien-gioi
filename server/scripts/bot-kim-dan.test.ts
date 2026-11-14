@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { calcStats } from "./bot-kim-dan";
-import { viewOfScreen, SEARCH_VIEWS } from "../src/balance/search-check";
+import { SEARCH_VIEWS } from "../src/balance/search-check";
 
 describe("bot-kim-dan: tiện ích đo tìm quái M6 (Issue #410)", () => {
   it("calcStats: tính đúng mean, median, min, max, stdDev", () => {

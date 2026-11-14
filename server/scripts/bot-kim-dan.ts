@@ -4,8 +4,7 @@
 // 2. Đo đúng THỜI GIAN TÌM (searchSec): tính từ lúc quái trước bị hạ tới lúc bot chạm quái kế tiếp (dist <= range),
 //    KHÔNG gồm thời gian đánh quái và KHÔNG gồm thời gian đả tọa.
 // 3. Khởi động server nội bộ qua freePort() để chạy độc lập không phụ thuộc cổng dev, tự dọn dẹp khi kết thúc.
-import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
 import path from "node:path";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
@@ -16,14 +15,12 @@ import {
   DEFAULT_MAP_ID,
   HAC_PHONG_ID,
   MONSTER_BY_ID,
-  MONSTERS,
   PROTOCOL_VERSION,
   SKILLS,
   TICK_MS,
   TILE,
   getMap,
   roomNameOf,
-  type GameMap,
 } from "@tien-gioi/shared";
 import { defineRooms } from "../src/rooms/WorldRoom";
 import { freePort } from "../src/test-port";
@@ -31,7 +28,6 @@ import {
   gridOf,
   planPath,
   sweepOf,
-  viewOfScreen,
   SEARCH_VIEWS,
   SEARCH_VIEW_LABELS,
   type SearchView,
@@ -111,7 +107,6 @@ export async function measureSearchTime(options: MeasureOptions): Promise<Measur
   process.env.DATA_DIR = path.join(dataDir, "players");
 
   // Khởi tạo máy chủ Colyseus tạm trên cổng ngẫu nhiên do OS cấp
-  const { WorldRoom, defineRooms } = await import("../src/rooms/WorldRoom");
   const server = new Server({ transport: new WebSocketTransport(), gracefullyShutdown: false });
   defineRooms(server);
   const port = await freePort();
@@ -165,12 +160,11 @@ export async function measureSearchTime(options: MeasureOptions): Promise<Measur
     );
   }
 
-  let client: Client | null = null;
   let room: Room | null = null;
   let timer: NodeJS.Timeout | null = null;
 
   try {
-    client = new Client(`ws://127.0.0.1:${port}`);
+    const client = new Client(`ws://127.0.0.1:${port}`);
     room = await client.joinOrCreate(roomNameOf(mapId), {
       name: botName,
       secret: botSecret,
@@ -244,7 +238,7 @@ export async function measureSearchTime(options: MeasureOptions): Promise<Measur
         }
 
         // 1. Quét tìm quái trong VÙNG NHÌN CHỮ NHẬT
-        let visibleMonsters: { id: string; x: number; y: number; dist: number }[] = [];
+        const visibleMonsters: { id: string; x: number; y: number; dist: number }[] = [];
         if (room.state.monsters) {
           room.state.monsters.forEach((m: any, id: string) => {
             if (!m || m.kind !== monsterId || m.hp <= 0) return;
