@@ -1512,6 +1512,11 @@ export class WorldScene extends Phaser.Scene {
     ui.death(null);
     ui.hideDuelHud();
     this.map = newMap;
+    // Qua cổng KHÔNG tạo lại scene: dựng lại sơ đồ nối (nút "đang đứng", ẩn trong bí cảnh) và đưa bản đồ lớn về xem bản đồ mình đứng.
+    // `mapWasOpen = false` để nếu bản đồ lớn đang mở thì khung hình sau đặt lại camera / tiêu đề theo bản đồ mới.
+    this.mapViewId = null;
+    this.mapWasOpen = false;
+    this.buildMapGraphNav();
     this.buildMapVisuals();
     ui.setCurrentMapId(newMap.def.id);
     this.attachRoom(room);

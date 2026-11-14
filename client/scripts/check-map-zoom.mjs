@@ -392,6 +392,60 @@ try {
     `kéo một ngón sang phải: tâm nhìn đi sang trái (cx ${c.cx} -> ${dragged.cx})`,
   );
 
+  console.log("\n--- Qua cổng (changeMap trên CÙNG scene) cập nhật sơ đồ nối ---");
+  // main.ts khi qua cổng gọi activeScene.changeMap(newRoom, finalMap) chứ không tạo lại scene; mock dùng lại chính room hiện tại
+  const graphState = () =>
+    evalJs(`JSON.stringify({
+      hidden: document.getElementById("map-graph").hidden,
+      current: [...document.querySelectorAll("#map-graph .mg-node[aria-current]")].map((b) => b.dataset.mapId),
+      pressed: [...document.querySelectorAll("#map-graph .mg-node[aria-pressed=true]")].map((b) => b.dataset.mapId),
+      title: document.getElementById("map-title").textContent,
+      view: window.__scene.mapViewId })`).then(JSON.parse);
+  const goMap = async (id) => {
+    await evalJs(
+      `(() => { const sc = window.__scene; sc.changeMap(sc.room, window.__getMap(${JSON.stringify(id)})); return 1; })()`,
+    );
+    await sleep(500);
+  };
+  await close();
+  await goMap("hac_phong");
+  await open();
+  let gs = await graphState();
+  check(
+    !gs.hidden && gs.current.length === 1 && gs.current[0] === "hac_phong",
+    `sau khi qua cổng sang Hắc Phong: 'đang đứng' (aria-current) ở hac_phong (${JSON.stringify(gs.current)})`,
+  );
+  check(
+    gs.pressed.length === 1 && gs.pressed[0] === "hac_phong" && gs.title.includes("Hắc Phong Cốc"),
+    `đang xem bản đồ mình vừa tới (${JSON.stringify(gs.pressed)}, ${gs.title})`,
+  );
+  // đang xem bản đồ khác (Âm Sương) với bản đồ lớn MỞ rồi qua cổng: về xem bản đồ mình đứng, camera / tiêu đề theo bản đồ mới
+  await click('#map-graph .mg-node[data-map-id="am_suong"]');
+  await goMap("lac_ha");
+  gs = await graphState();
+  check(
+    gs.view === null && gs.title.includes("Lạc Hà") && gs.current[0] === "lac_ha",
+    `qua cổng khi đang xem Âm Sương (bản đồ lớn mở): về xem Lạc Hà (${gs.view}, ${gs.title}, ${JSON.stringify(gs.current)})`,
+  );
+  c = await cam();
+  check(
+    c.follow && c.zoom === 1,
+    `camera bản đồ lớn đặt lại sau khi qua cổng (${JSON.stringify(c)})`,
+  );
+  await close();
+  await goMap("bi_canh_linh_hu");
+  await open();
+  gs = await graphState();
+  check(gs.hidden === true, `vào bí cảnh (không thuộc sơ đồ): sơ đồ nối ẨN (hidden=${gs.hidden})`);
+  await close();
+  await goMap("lac_ha");
+  await open();
+  gs = await graphState();
+  check(
+    !gs.hidden && gs.current.length === 1 && gs.current[0] === "lac_ha",
+    `ra khỏi bí cảnh về Lạc Hà: sơ đồ hiện lại, 'đang đứng' ở lac_ha (${gs.hidden}, ${JSON.stringify(gs.current)})`,
+  );
+
   check(pageErrors === 0, `0 lỗi console / exception (${pageErrors})`);
   ws.close();
 } finally {
