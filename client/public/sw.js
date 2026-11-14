@@ -40,17 +40,31 @@ self.addEventListener("activate", (event) => {
 
 /** Kiểm tra xem URL có phải tài nguyên tĩnh được phép cache hay không. */
 function isStaticAsset(pathname) {
-  if (pathname.startsWith("/assets/") || pathname.startsWith("/icons/")) return true;
-  return /\.(?:js|css|png|svg|webp|json|webmanifest|woff2?)$/i.test(pathname);
+  if (
+    pathname.startsWith("/assets/") ||
+    pathname.startsWith("/icons/") ||
+    pathname.startsWith("/packs/")
+  )
+    return true;
+  return /\.(?:js|css|png|svg|webp|json|webmanifest|woff2?|ogg|mp3)$/i.test(pathname);
 }
 
 /**
- * Kiểm tra xem đường dẫn có phải bundle JS/CSS đã gắn hash nội dung của Vite hay không.
- * Các file không có hash (như `/assets/atlas.png`, `/assets/atlas.json`, `/assets/tileset.png`)
- * cần ưu tiên lấy từ mạng trước để không bị lệch sprite khi cập nhật bản build mới.
+ * Kiểm tra xem tài nguyên có gắn hash nội dung bất biến hay không:
+ * - Bundle JS/CSS của Vite (/assets/*-[hash].js/css)
+ * - Tệp trong gói tải (/packs/**) có gắn băm tham số query ?v=<12 ký tự hex> (M7.15, #516).
+ *   Lưu ý: /packs/manifest.json KHÔNG bao giờ có hash và phải ưu tiên mạng (network-first).
  */
-function isHashedImmutableAsset(pathname) {
-  return /^\/assets\/.+-[A-Za-z0-9_-]{8,}\.(?:js|css|woff2?)$/i.test(pathname);
+function isHashedImmutableAsset(url) {
+  if (/^\/assets\/.+-[A-Za-z0-9_-]{8,}\.(?:js|css|woff2?)$/i.test(url.pathname)) return true;
+  if (
+    url.pathname.startsWith("/packs/") &&
+    url.pathname !== "/packs/manifest.json" &&
+    /^[0-9a-f]{12}$/i.test(url.searchParams.get("v") || "")
+  ) {
+    return true;
+  }
+  return false;
 }
 
 self.addEventListener("fetch", (event) => {
@@ -89,8 +103,8 @@ self.addEventListener("fetch", (event) => {
 
   if (!isStaticAsset(url.pathname)) return;
 
-  // Bundle có gắn hash của Vite: ưu tiên cache (cache-first) vì đổi nội dung là đổi tên file
-  if (isHashedImmutableAsset(url.pathname)) {
+  // Bundle hoặc gói có gắn hash: ưu tiên cache (cache-first) vì đổi nội dung là đổi băm / tên file
+  if (isHashedImmutableAsset(url)) {
     event.respondWith(
       caches.open(CACHE_NAME).then((cache) =>
         cache.match(req).then((cached) => {

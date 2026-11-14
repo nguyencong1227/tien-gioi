@@ -14,6 +14,7 @@ import { mountAuth } from "./auth-http";
 import { mountCors } from "./cors";
 import { createStores } from "./stores";
 import { Monitor, mountMetrics, thresholdsOf } from "./metrics";
+import { applyStaticHeaders } from "./static-headers";
 
 // Đọc .env.local ở gốc repo (cổng riêng cho từng dev). Không có file thì dùng mặc định.
 const envFile = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../.env.local");
@@ -70,7 +71,14 @@ async function main() {
   // Production: phục vụ luôn bản build của client (client/dist) từ cùng server
   const dist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../client/dist");
   if (existsSync(dist)) {
-    app.use(express.static(dist));
+    app.use(
+      express.static(dist, {
+        setHeaders(res, filePath) {
+          // M7.15: Cache-Control cho tệp tĩnh (/packs/** có ?v= thì immutable, còn lại no-cache)
+          applyStaticHeaders(res, filePath, dist);
+        },
+      }),
+    );
     app.get("*", (_req, res) => res.sendFile(path.join(dist, "index.html")));
   }
 
