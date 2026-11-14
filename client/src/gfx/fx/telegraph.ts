@@ -106,6 +106,42 @@ export function warnAlive(elapsed: number, ms: number): boolean {
   return elapsed < ms + WARN_FADE_MS;
 }
 
+/** Khoảng cách từ điểm (px, py) tới đoạn (ax, ay)-(bx, by). */
+function segDist(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const len2 = dx * dx + dy * dy;
+  const t = len2 === 0 ? 0 : clamp(((px - ax) * dx + (py - ay) * dy) / len2, 0, 1);
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+
+/** Hiệu hai góc, chuẩn về [0, pi]. */
+function angleDiff(a: number, b: number): number {
+  const d = Math.abs(a - b) % (Math.PI * 2);
+  return d > Math.PI ? Math.PI * 2 - d : d;
+}
+
+/**
+ * Người chơi (tâm (px, py), bán kính thân `pad`) có đang đứng TRONG vùng báo không: đúng ý nghĩa vùng máy chủ kiểm trúng (thân chạm vào vùng là trúng), dùng để cảnh báo
+ * "bạn đang trong vùng nguy hiểm" (viền sáng + tiếng báo). `line`: khoảng cách tới đoạn dài `r` <= nửa bề rộng + `pad` (hình viên thuốc, như `charge.ts`); `circle`: khoảng cách
+ * tâm <= `r` + `pad`; `cone`: trong bán kính `r` + `pad` và lệch hướng không quá nửa góc mở (nới thêm `asin(pad / d)` vì thân có bề rộng). Số không hữu hạn thì `false`.
+ */
+export function warnCovers(plan: WarnPlan, px: number, py: number, pad = 0): boolean {
+  if (!finite(px, py, pad)) return false;
+  const p = Math.max(0, pad);
+  if (plan.shape === "circle") return Math.hypot(px - plan.x, py - plan.y) <= plan.r + p;
+  if (plan.shape === "line") {
+    const bx = plan.x + Math.cos(plan.angle) * plan.r;
+    const by = plan.y + Math.sin(plan.angle) * plan.r;
+    return segDist(px, py, plan.x, plan.y, bx, by) <= plan.w / 2 + p;
+  }
+  const d = Math.hypot(px - plan.x, py - plan.y);
+  if (d > plan.r + p) return false;
+  if (d <= p) return true; // thân đã chạm tâm quạt
+  const slack = Math.asin(Math.min(1, p / d));
+  return angleDiff(Math.atan2(py - plan.y, px - plan.x), plan.angle) <= plan.arc / 2 + slack;
+}
+
 export interface Pt {
   x: number;
   y: number;

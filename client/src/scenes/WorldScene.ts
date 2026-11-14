@@ -3,6 +3,7 @@ import { createFxSystem, type FxSystem } from "../gfx/fx/fx";
 import { planCastFx } from "../gfx/fx/cast-fx";
 import { drawPips, pipsLabel, pipsOf } from "../monster-status";
 import { TelegraphLayer } from "../gfx/fx/telegraph-layer";
+import { recipeIds } from "../gfx/fx/recipes";
 import {
   planSlashEdges,
   planSwordBeam,
@@ -403,6 +404,8 @@ export class WorldScene extends Phaser.Scene {
   fx!: FxSystem;
   /** Báo trước đòn + đạn tầm xa của quái (M7.7, #508): Graphics từ pool, không tốn ngân sách hạt */
   telegraphs!: TelegraphLayer;
+  /** Số tiếng báo "đang trong vùng nguy hiểm" đã phát (script kiểm `?debug`) */
+  dangerCues = 0;
 
   // Bảng đo hiệu năng (?perf=1, #71)
   private perfEnabled = false;
@@ -484,6 +487,12 @@ export class WorldScene extends Phaser.Scene {
       emitterBudget: () => getQuality().emitterBudget,
       reduced: () => getQuality().reducedMotion,
       inView: (x, y, pad) => this.inView(x, y, pad),
+      // Mình đứng trong vùng báo trước đòn: viền trắng dày + một tiếng báo cho vùng đó (nhìn vị trí đoán trước, đúng chỗ thân mình đang hiện)
+      player: () => (this.hasMe ? { x: this.predX, y: this.predY, r: PLAYER_RADIUS } : null),
+      onDanger: () => {
+        this.dangerCues++;
+        sound.warn();
+      },
     });
     ensureShadowTexture(this);
     this.weatherPaused =
@@ -625,6 +634,8 @@ export class WorldScene extends Phaser.Scene {
       (window as any).__game = this.game;
       (window as any).__scene = this;
       (window as any).__fx = this.fx;
+      // Cho `leak:test`: danh sách mọi công thức hạt đã đăng ký, để khởi động phát MỖI công thức một lần (mỗi công thức tạo MỘT emitter ở lần phát đầu, `fx.ts` emitterFor)
+      (window as any).__fxRecipeIds = recipeIds;
       // Cho `leak:test` (client/scripts/leak-test.mjs) dựng lại hình ảnh của từng bản đồ ngay trong trang (#408 bước 4)
       (window as any).__getMap = getMap;
     }

@@ -117,7 +117,7 @@ try {
     await sleep(1200);
     // Chế độ mock không chạy đối chiếu (predX / predY = 0): đặt người chơi vào giữa trấn thoáng, camera nhìn vào đó và đứng yên
     await evalJs(`(() => { const sc = window.__scene, me = sc.me(), t = sc.map.townPx;
-      me.x = t.x; me.y = t.y; sc.predX = me.x; sc.predY = me.y; sc.pending.length = 0;
+      me.x = t.x; me.y = t.y; sc.predX = me.x; sc.predY = me.y; sc.hasMe = true; sc.pending.length = 0;
       sc.cameras.main.stopFollow(); sc.cameras.main.centerOn(me.x, me.y); return 1; })()`);
     await sleep(700);
   };
@@ -144,7 +144,7 @@ try {
       const ok = await evalJs(`(() => { const sc = window.__scene, me = sc.me(), t = sc.map.townPx;
         const x = t.x + ${ox}, y = t.y + ${oy};
         if (x < 420 || y < 320 || x > sc.map.worldW - 420 || y > sc.map.worldH - 320) return false;
-        me.x = x; me.y = y; sc.predX = x; sc.predY = y; sc.cameras.main.centerOn(x, y); return true; })()`);
+        me.x = x; me.y = y; sc.predX = x; sc.predY = y; sc.hasMe = true; sc.cameras.main.centerOn(x, y); return true; })()`);
       if (!ok) continue;
       await sleep(600);
       await act("", "calmA");
@@ -385,6 +385,65 @@ try {
     await waitScene(f0, 500 + 90 + 150);
     await evalJs("window.__scene.telegraphs.update(window.__scene.time.now); 0");
     check((await stats()).bolts === 0, "bay hết tầm (400 px / 800 px/s) rồi mờ thì biến mất");
+
+    // ---- Báo động khi mình đứng TRONG vùng: viền trắng dày + một tiếng báo cho mỗi vùng; ngoài vùng thì không ----
+    await clear();
+    const cues0 = await evalJs("window.__scene.dangerCues");
+    await act("window.__scene.telegraphs.clear()", "dangerbase");
+    // vùng A bao lấy mình (tâm lệch 20 px, r = 90); vùng B cách xa 420 px (không bao)
+    const dInfo = await act(
+      `${emit({ kind: "warn", shape: "circle", x: "__X1__", y: "__Y__", r: 90, ms: 6000 })};
+       ${emit({ kind: "warn", shape: "circle", x: "__X2__", y: "__Y__", r: 90, ms: 6000 })}`
+        .replaceAll('"__X1__"', "sc.predX + 20")
+        .replaceAll('"__X2__"', "sc.predX + 420")
+        .replaceAll('"__Y__"', "sc.predY"),
+      "dangerpost",
+    );
+    await sleep(250);
+    const dW = (await J("window.__scene.telegraphs.snapshot(window.__scene.time.now).warns")).sort(
+      (a, b) => a.x - b.x,
+    );
+    check(
+      dW.length === 2 && dW[0].danger === true && dW[1].danger === false,
+      `vùng bao lấy mình: danger = true; vùng cách xa: danger = false (${dW.map((w) => w.danger).join(", ")})`,
+    );
+    check(
+      (await evalJs("window.__scene.dangerCues")) === cues0 + 1,
+      `đúng MỘT tiếng báo cho vùng bao lấy mình (${(await evalJs("window.__scene.dangerCues")) - cues0})`,
+    );
+    await sleep(500);
+    check(
+      (await evalJs("window.__scene.dangerCues")) === cues0 + 1,
+      "đứng yên trong vùng thêm 0,5 giây: KHÔNG báo lặp lại",
+    );
+    // điểm ảnh: viền của vùng bao mình là TRẮNG, viền vùng xa là màu cam nhạt (cạnh trái của mỗi vùng)
+    const dInfo2 = await act("0", "dangerpost2");
+    const k2 = dInfo2.w / dInfo2.wvw;
+    const edge = (w) => toPx(dInfo2, w.x - w.r, w.y);
+    const eA = edge(dW[0]);
+    const eB = edge(dW[1]);
+    const whiteA =
+      (await nearColor("dangerpost2", dInfo2.w, eA.x, eA.y, 4 * k2, [255, 255, 255], 30)) -
+      (await nearColor("dangerbase", dInfo2.w, eA.x, eA.y, 4 * k2, [255, 255, 255], 30));
+    const whiteB =
+      (await nearColor("dangerpost2", dInfo2.w, eB.x, eB.y, 4 * k2, [255, 255, 255], 30)) -
+      (await nearColor("dangerbase", dInfo2.w, eB.x, eB.y, 4 * k2, [255, 255, 255], 30));
+    check(
+      whiteA >= 12 && whiteB <= 3,
+      `viền vùng bao mình trắng (+${whiteA} điểm ảnh trắng ở cạnh trái), viền vùng xa không (+${whiteB})`,
+    );
+    void dInfo;
+    // bước ra khỏi vùng: danger tắt, không báo thêm
+    await evalJs("(() => { const sc = window.__scene; sc.predX += 300; return 1; })()");
+    await sleep(250);
+    const out = await J("window.__scene.telegraphs.snapshot(window.__scene.time.now).warns");
+    check(
+      out.every((w) => w.danger === false) &&
+        (await evalJs("window.__scene.dangerCues")) === cues0 + 1,
+      "bước ra ngoài (cách 280 px): danger tắt, không báo thêm",
+    );
+    await evalJs("(() => { const sc = window.__scene; sc.predX -= 300; return 1; })()");
+    await clear();
 
     // ---- Trần theo bậc, tái dùng, không rò, tin hỏng ----
     await clear();

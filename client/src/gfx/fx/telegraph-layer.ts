@@ -21,6 +21,7 @@ import {
   warnFillAlpha,
   warnOutlineAlpha,
   warnPolygon,
+  warnCovers,
   warnProgress,
   type BoltMsg,
   type BoltPlan,
@@ -50,12 +51,22 @@ export interface TelegraphDeps {
   reduced: () => boolean;
   /** Điểm (x, y) cách khung nhìn quá `pad` px thì không cần vẽ. */
   inView: (x: number, y: number, pad: number) => boolean;
+  /**
+   * Vị trí + bán kính thân của CHÍNH MÌNH (px thế giới): vùng báo đang bao lấy mình thì nét viền sáng trắng dày hơn và gọi `onDanger` MỘT lần cho vùng đó
+   * ("bạn đang trong vùng nguy hiểm"). Bỏ trống thì không phân biệt (mọi vùng như nhau).
+   */
+  player?: () => { x: number; y: number; r: number } | null;
+  /** Gọi đúng một lần cho mỗi vùng báo lúc mình lần đầu bị nó bao (và đòn chưa đáp), để phát tiếng báo. */
+  onDanger?: (plan: WarnPlan) => void;
 }
 
 interface WarnItem {
   g: Phaser.GameObjects.Graphics;
   plan: WarnPlan;
   start: number;
+  /** Mình đang đứng trong vùng này (cập nhật mỗi khung) và đã báo động cho vùng này chưa */
+  danger: boolean;
+  alerted: boolean;
 }
 interface BoltItem {
   g: Phaser.GameObjects.Graphics;
@@ -74,6 +85,8 @@ export interface TelegraphStats {
   spawnedBolts: number;
   recycledWarns: number;
   recycledBolts: number;
+  /** Số lần báo động "mình đang trong vùng báo" (mỗi vùng tối đa một lần) */
+  dangerAlerts: number;
   rejected: number;
   peakWarns: number;
   peakBolts: number;
@@ -96,6 +109,7 @@ export class TelegraphLayer {
   private recycledWarns = 0;
   private recycledBolts = 0;
   private rejected = 0;
+  private dangerAlerts = 0;
   private peakWarns = 0;
   private peakBolts = 0;
   private drawnWarns = 0;
@@ -139,11 +153,11 @@ export class TelegraphLayer {
           k = i;
         }
       }
-      item = { g: this.warns[k].g, plan, start: now };
+      item = { g: this.warns[k].g, plan, start: now, danger: false, alerted: false };
       this.warns[k] = item;
       this.recycledWarns++;
     } else {
-      item = { g: this.take(), plan, start: now };
+      item = { g: this.take(), plan, start: now, danger: false, alerted: false };
       this.warns.push(item);
     }
     item.g.setPosition(plan.x, plan.y).setDepth(WARN_DEPTH).setAlpha(1).setVisible(true);
@@ -225,9 +239,17 @@ export class TelegraphLayer {
     const limits = telegraphLimits(this.deps.emitterBudget());
     const reduced = this.deps.reduced();
     const p = warnProgress(elapsed, plan.ms);
+    // Mình đang đứng trong vùng (chỉ tính tới lúc đòn đáp): viền sáng trắng dày hơn + báo động MỘT lần cho vùng này
+    const me = elapsed < plan.ms ? this.deps.player?.() : null;
+    it.danger = !!me && warnCovers(plan, me.x, me.y, me.r);
+    if (it.danger && !it.alerted) {
+      it.alerted = true;
+      this.dangerAlerts++;
+      this.deps.onDanger?.(plan);
+    }
     g.setVisible(true).clear();
     // vùng tô đặc lớn dần: hết `ms` là đầy tới viền = lúc đòn đáp xuống (và mờ đi trong WARN_FADE_MS)
-    g.fillStyle(WARN_FILL, warnFillAlpha(elapsed, plan.ms));
+    g.fillStyle(WARN_FILL, Math.min(0.6, warnFillAlpha(elapsed, plan.ms) * (it.danger ? 1.4 : 1)));
     const steps = warnArcSteps(this.deps.emitterBudget());
     if (plan.shape === "circle") {
       g.fillCircle(0, 0, plan.r * p);
@@ -238,7 +260,8 @@ export class TelegraphLayer {
     // nét viền: ranh giới thật của vùng; bậc thấp vẽ nét đứng yên một lớp
     const a = limits.detail ? warnOutlineAlpha(elapsed, plan.ms, reduced) : 0.8;
     const fade = elapsed <= plan.ms ? 1 : Math.max(0, 1 - (elapsed - plan.ms) / 140);
-    g.lineStyle(2, WARN_LINE, a * fade);
+    if (it.danger) g.lineStyle(3, 0xffffff, Math.max(0.9, a) * fade);
+    else g.lineStyle(2, WARN_LINE, a * fade);
     if (plan.shape === "circle") {
       g.strokeCircle(0, 0, plan.r);
     } else {
@@ -307,6 +330,7 @@ export class TelegraphLayer {
       spawnedBolts: this.spawnedBolts,
       recycledWarns: this.recycledWarns,
       recycledBolts: this.recycledBolts,
+      dangerAlerts: this.dangerAlerts,
       rejected: this.rejected,
       peakWarns: this.peakWarns,
       peakBolts: this.peakBolts,
@@ -324,6 +348,7 @@ export class TelegraphLayer {
       ms: number;
       elapsed: number;
       progress: number;
+      danger: boolean;
       visible: boolean;
     }>;
     bolts: Array<{
@@ -344,6 +369,7 @@ export class TelegraphLayer {
         ms: it.plan.ms,
         elapsed: now - it.start,
         progress: warnProgress(now - it.start, it.plan.ms),
+        danger: it.danger,
         visible: it.g.visible,
       })),
       bolts: this.bolts.map((it) => ({

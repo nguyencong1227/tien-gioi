@@ -157,6 +157,41 @@ export function hurtPlayer(w: World, sid: string, p: Player, dmg: number, from: 
   if (w.ghosts.has(sid)) return; // rớt mạng, đang chờ nối lại: bất tử
   if (w.duels.has(sid)) return; // đang thách đấu: bất tử trước quái (không để một con hổ đi ngang giết người thật)
   if (c.dodgeUntil !== undefined && w.now < c.dodgeUntil) return; // đang né (chiêu bộ pháp): đòn trượt, không ngắt đả tọa / hồi phục
+  damagePlayer(
+    w,
+    sid,
+    p,
+    c,
+    dmg,
+    `Bị ${MONSTER_BY_ID[from.kind].name} đánh trọng thương, tạm ngã xuống.`,
+  );
+}
+
+/**
+ * Sát thương THEO GIÂY (độc / bỏng / chảy máu, `systems/status.ts`) lên người chơi. Khác `hurtPlayer`: không phải một ĐÒN nên chiêu né (`dodgeUntil`) KHÔNG
+ * tránh được; vẫn bất tử khi hồn lìa xác / đang thách đấu; khiên hộ thể vẫn đỡ trước; ngắt đả tọa; chết thì đi cùng đường với đòn quái (bí cảnh: ngã, không mất
+ * kiếp; còn lại luân hồi). `statusName` chỉ để viết thông báo ("Bị Độc hành hạ ...").
+ */
+export function hurtPlayerDot(w: World, sid: string, p: Player, dmg: number, statusName: string) {
+  const c = w.ctrl.get(sid);
+  if (!c || p.dead) return;
+  if (w.ghosts.has(sid)) return;
+  if (w.duels.has(sid)) return;
+  damagePlayer(w, sid, p, c, dmg, `Bị ${statusName} hành hạ, tạm ngã xuống.`);
+}
+
+/**
+ * Phần CHUNG của mọi sát thương lên người chơi (đòn quái, sát thương theo giây): khiên hộ thể hấp thụ trước, phần còn lại trừ khí huyết, gửi số sát thương, và xử lý gục
+ * (bí cảnh -> `dungeonFall`; chết thật -> Hoàng Tuyền; còn lại nằm chờ hồi sinh với thông báo `fallText`). Người gọi đã kiểm bất tử / né.
+ */
+function damagePlayer(
+  w: World,
+  sid: string,
+  p: Player,
+  c: PlayerCtrl,
+  dmg: number,
+  fallText: string,
+) {
   if (c.st && c.st.list.length > 0) {
     // Hộ thể: khiên hấp thụ trước, phần còn lại mới trừ khí huyết (đòn trúng khiên vẫn ngắt đả tọa và hồi phục)
     const a = absorbShield(c.st, dmg, w.now);
@@ -181,10 +216,7 @@ export function hurtPlayer(w: World, sid: string, p: Player, dmg: number, from: 
     p.dead = true;
     c.deadAt = w.now;
     c.inputs.length = 0;
-    w.events.toast(sid, {
-      text: `Bị ${MONSTER_BY_ID[from.kind].name} đánh trọng thương, tạm ngã xuống.`,
-      tone: "bad",
-    });
+    w.events.toast(sid, { text: fallText, tone: "bad" });
     for (const m of w.mctrl.values()) if (m.target === sid) m.target = null;
   }
 }

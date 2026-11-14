@@ -124,6 +124,26 @@ describe("bot dùng chiêu thức: autoAssignBotSkills", () => {
     expect(b.skillsSlots[1]).toBe("");
   });
 
+  it("cảnh giới 1 mở ô 2 nhưng học cả 2 chiêu: chỉ gán đúng ô 2, không gán ô 3 (diệt đột biến N1)", () => {
+    const b = makeMockBot(1); // Luyện Khí chỉ mở ô 2
+    b.skillsLearned = {
+      hoa_van_kiem: 1,
+      thanh_tung_phi_cham: 1,
+    };
+    b.skillsSlots = ["", "", "", ""]; // Tất cả ô đang trống
+
+    autoAssignBotSkills(b);
+
+    // Chỉ gửi duy nhất 1 tin gán cho ô 2, ô 3 chưa mở nên tuyệt đối không được gán
+    expect(b._sent.length).toBe(1);
+    expect(b._sent[0]).toEqual({
+      type: SKILL_MSG.slot,
+      data: { slot: 2, skillId: "hoa_van_kiem" },
+    });
+    expect(b.skillsSlots[0]).toBe("hoa_van_kiem");
+    expect(b.skillsSlots[1]).toBe("");
+  });
+
   it("gán đúng vào ô mở tiếp theo khi lên cảnh giới cao hơn", () => {
     const b = makeMockBot(2); // Trúc Cơ mở ô 2 và ô 3
     b.skillsLearned = {
@@ -173,6 +193,15 @@ describe("bot dùng chiêu thức: tryCastLearnedSkill", () => {
     expect(b._sent.length).toBe(0);
   });
 
+  it("trả về false nếu me có MP > 0 nhưng nhỏ hơn MP cần của chiêu (diệt đột biến N2)", () => {
+    const b = makeMockCombatBot();
+    // hoa_van_kiem cần ceil(0.08 * 100) = 8 MP, thanh_tung_phi_cham cần ceil(0.10 * 100) = 10 MP
+    const me = { mp: 5, maxMp: 100 };
+    const res = tryCastLearnedSkill(b, me, 80, 0, 1000, true);
+    expect(res).toBe(false);
+    expect(b._sent.length).toBe(0);
+  });
+
   it("trả về false nếu tất cả chiêu đang trong thời gian hồi chiêu", () => {
     const b = makeMockCombatBot();
     const me = { mp: 100, maxMp: 100 };
@@ -211,19 +240,22 @@ describe("bot dùng chiêu thức: tryCastLearnedSkill", () => {
     expect(b.skillsSent).toBe(1);
   });
 
-  it("ưu tiên chiêu có khắc ngũ hành lên hệ của quái", () => {
+  it("ưu tiên chiêu có khắc ngũ hành lên hệ của quái dù mult cơ bản nhỏ hơn (diệt đột biến N3)", () => {
     const b = makeMockCombatBot();
     const me = { mp: 100, maxMp: 100 };
     const now = 1000;
 
-    // hoa_van_kiem là hệ Hỏa (khắc Kim)
-    // thanh_tung_phi_cham là hệ Mộc (khắc Thổ)
-    // Quái hệ Kim: chiêu hệ Hỏa (ô 2) được hưởng lợi khắc x1.3, nên phải được ưu tiên!
-    expect(elementMult("hoa", "kim")).toBeGreaterThan(1);
-    expect(elementMult("moc", "kim")).toBeLessThanOrEqual(1);
+    // hoa_van_kiem (ô 2): hệ Hỏa, mult = 1.6
+    // thanh_tung_phi_cham (ô 3): hệ Mộc, mult = 1.5
+    // Đánh quái hệ Thổ (tho):
+    // - Hỏa lên Thổ: không khắc, factor = 1.0 -> score = 1.6 * 1.0 = 1.6
+    // - Mộc khắc Thổ: factor = 1.3 -> score = 1.5 * 1.3 = 1.95 (> 1.6)
+    // Dù thanh_tung_phi_cham có mult nhỏ hơn (1.5 < 1.6), nhưng nhờ hệ khắc nên được ưu tiên chọn!
+    expect(elementMult("hoa", "tho")).toBeLessThanOrEqual(1);
+    expect(elementMult("moc", "tho")).toBeGreaterThan(1);
 
-    const res = tryCastLearnedSkill(b, me, 80, 0, now, true, "kim");
+    const res = tryCastLearnedSkill(b, me, 80, 0, now, true, "tho");
     expect(res).toBe(true);
-    expect(b._sent[0].data.slot).toBe(2 as SkillSlot); // Ô 2 = hoa_van_kiem
+    expect(b._sent[0].data.slot).toBe(3 as SkillSlot); // Phải chọn ô 3 (thanh_tung_phi_cham)
   });
 });

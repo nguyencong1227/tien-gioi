@@ -722,3 +722,134 @@ describe("Monster.fx: mặt nạ bit trạng thái có hại công khai (M7.3, #
     expect(b.m.fx).toBe(0);
   });
 });
+
+describe("sát thương THEO GIÂY lên người chơi (M7.3, #504: độc / bỏng / chảy máu)", () => {
+  /** Chạy `tickStatuses` mỗi 50 ms từ `from` tới `to` (ms, `w.now`). */
+  function run(w: ReturnType<typeof makeWorld>["w"], from: number, to: number) {
+    for (let t = from; t <= to; t += 50) {
+      w.now = t;
+      tickStatuses(w, 0.05);
+    }
+  }
+  const dotsOf = (dmgs: ReturnType<typeof makeWorld>["dmgs"], sid: string) =>
+    dmgs.filter((d) => d.target === sid && d.toPlayer).map((d) => d.amount);
+
+  it("độc 3 giây x 20 sát thương/giây: ba lần 20 (gửi `dmg` cho người), khí huyết giảm 60, rồi gỡ trạng thái và gửi danh sách rỗng", () => {
+    const { w, dmgs, statusMsgs } = makeWorld();
+    const { p } = addPlayer(w, "a");
+    w.now = 10_000;
+    const hp0 = p.hp;
+    expect(applyPlayerStatus(w, "a", eff("poison", 3000, 0.2), 100, "")).toBe("added"); // dps 20
+    run(w, 10_000, 14_000);
+    expect(dotsOf(dmgs, "a")).toEqual([20, 20, 20]);
+    expect(p.hp).toBe(hp0 - 60);
+    expect(w.statusP.has("a")).toBe(false);
+    expect(statusMsgs.at(-1)!.msg.list).toEqual([]);
+  });
+
+  it("bỏng và chảy máu cùng lúc cộng sát thương; tê cóng (không phải sát thương theo giây) KHÔNG làm mất khí huyết", () => {
+    const { w } = makeWorld();
+    const { p } = addPlayer(w, "a");
+    w.now = 10_000;
+    const hp0 = p.hp;
+    applyPlayerStatus(w, "a", eff("burn", 2000, 0.1), 100, ""); // 10 / giây
+    applyPlayerStatus(w, "a", eff("bleed", 2000, 0.3), 100, ""); // 30 / giây
+    applyPlayerStatus(w, "a", eff("chill", 2000, 0.3), 100, "");
+    run(w, 10_000, 13_000);
+    expect(p.hp).toBe(hp0 - 80); // (10 + 30) x 2 giây
+  });
+
+  it("phần lẻ dồn lại: 0,4 sát thương/giây x 2,5 giây vẫn gây sát thương (không bị làm tròn xuống 0 mỗi giây)", () => {
+    const { w, dmgs } = makeWorld();
+    const { p } = addPlayer(w, "a");
+    w.now = 10_000;
+    const hp0 = p.hp;
+    applyPlayerStatus(w, "a", eff("poison", 2500, 0.004), 100, ""); // dps 0,4
+    run(w, 10_000, 13_000);
+    // phần lẻ dưới 1 KHÔNG bị làm tròn xuống 0 mãi (mỗi giây 0,4 -> 0): dồn tới khi làm tròn ra >= 1; chỉ vài lần 1, không phải mỗi giây một lần
+    const hits = dotsOf(dmgs, "a");
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    expect(hits.length).toBeLessThanOrEqual(2);
+    expect(hits.every((x) => x === 1)).toBe(true);
+    expect(p.hp).toBe(hp0 - hits.length);
+  });
+
+  it("tick bị trễ (server lag) vẫn không tính quá hạn: độc 1,5 giây x 20/giây gây đúng 30 dù tick kế tới muộn 10 giây", () => {
+    const { w, dmgs } = makeWorld();
+    const { p } = addPlayer(w, "a");
+    w.now = 10_000;
+    const hp0 = p.hp;
+    applyPlayerStatus(w, "a", eff("poison", 1500, 0.2), 100, "");
+    w.now = 20_000; // một tick duy nhất, muộn xa quá hạn
+    tickStatuses(w, 0.05);
+    expect(dotsOf(dmgs, "a")).toEqual([30]);
+    expect(p.hp).toBe(hp0 - 30);
+  });
+
+  it("chiêu né (`dodgeUntil`) KHÔNG tránh được: sát thương theo giây không phải một đòn", () => {
+    const { w } = makeWorld();
+    const { p, c } = addPlayer(w, "a");
+    w.now = 10_000;
+    c.dodgeUntil = 99_000;
+    const hp0 = p.hp;
+    applyPlayerStatus(w, "a", eff("poison", 2000, 0.2), 100, "");
+    run(w, 10_000, 12_500);
+    expect(p.hp).toBeLessThan(hp0);
+  });
+
+  it("hộ thể đỡ sát thương theo giây trước khí huyết; hồn lìa xác bất tử", () => {
+    const shielded = makeWorld();
+    const a = addPlayer(shielded.w, "a");
+    shielded.w.now = 10_000;
+    const hp0 = a.p.hp;
+    applyPlayerStatus(shielded.w, "a", eff("shield", 8000, 0.5), 0, ""); // khiên 50 % khí huyết tối đa (50, đúng trần) > 40 sát thương
+    applyPlayerStatus(shielded.w, "a", eff("poison", 2000, 0.2), 100, ""); // 2 giây x 20 = 40
+    run(shielded.w, 10_000, 14_000);
+    expect(a.p.hp).toBe(hp0); // khiên đỡ hết 40
+
+    const ghostly = makeWorld();
+    const g = addPlayer(ghostly.w, "g");
+    ghostly.w.now = 10_000;
+    const hpg = g.p.hp;
+    applyPlayerStatus(ghostly.w, "g", eff("poison", 3000, 0.2), 100, "");
+    ghostly.w.ghosts.add("g");
+    run(ghostly.w, 10_000, 14_000);
+    expect(g.p.hp).toBe(hpg);
+  });
+
+  it("ngắt đả tọa và đặt mốc bị đánh (như một đòn)", () => {
+    const { w } = makeWorld();
+    const { p, c } = addPlayer(w, "a");
+    w.now = 10_000;
+    applyPlayerStatus(w, "a", eff("burn", 3000, 0.2), 100, "");
+    p.meditating = true;
+    c.lastHitAt = 0;
+    run(w, 10_000, 11_100);
+    expect(p.meditating).toBe(false);
+    expect(c.lastHitAt).toBeGreaterThan(10_000);
+  });
+
+  it("chết vì sát thương theo giây: ngoài luân hồi thì ngã với thông báo nêu tên trạng thái, dọn trạng thái ở tick sau; trong luân hồi thì vào Hoàng Tuyền", () => {
+    const down = makeWorld();
+    const a = addPlayer(down.w, "a");
+    down.w.now = 10_000;
+    a.p.hp = 15;
+    applyPlayerStatus(down.w, "a", eff("poison", 5000, 0.2), 100, ""); // 20 / giây
+    run(down.w, 10_000, 11_100);
+    expect(a.p.hp).toBe(0);
+    expect(a.p.dead).toBe(true);
+    expect(down.toasts.some((t) => t.sid === "a" && t.msg.text.includes("Độc"))).toBe(true);
+    run(down.w, 11_150, 11_300);
+    expect(down.w.statusP.has("a")).toBe(false); // người gục: trạng thái được dọn, không tiếp tục trừ
+    expect(down.dmgs.filter((d) => d.target === "a" && d.toPlayer)).toHaveLength(1);
+
+    const limbo = makeWorld();
+    limbo.w.reincarnate = true;
+    const b = addPlayer(limbo.w, "b");
+    limbo.w.now = 10_000;
+    b.p.hp = 15;
+    applyPlayerStatus(limbo.w, "b", eff("burn", 5000, 0.2), 100, "");
+    run(limbo.w, 10_000, 11_100);
+    expect(b.c.limbo).toBeDefined(); // chết thật = Hoàng Tuyền (cùng đường với đòn quái)
+  });
+});
