@@ -189,7 +189,7 @@ describe("pctRows: ba dòng chỉ số với trần STAT_CAPS", () => {
     const rows = pctRows(zero, null);
     expect(rows.map((r) => r.key)).toEqual(["crit", "cdr", "guard"]);
     expect(rows.map((r) => r.label)).toEqual([
-      "Bạo kích",
+      "Bạo kích (từ trang bị)",
       "Giảm hồi chiêu",
       "Giáp (giảm sát thương)",
     ]);
