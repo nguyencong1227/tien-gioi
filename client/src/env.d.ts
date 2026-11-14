@@ -3,6 +3,11 @@ declare const __SERVER_PORT__: string;
 /** Số phiên bản của bản dựng (package.json gốc), vite `define`; hiện ở Cài đặt */
 declare const __APP_VERSION__: string;
 
+interface Window {
+  /** Chế độ giả lập Hoàng Tuyền (`?debug`, `window.__debugLimbo`): các lựa chọn đầu thai đã gửi, để script kiểm đọc (`engrave` vắng = giữ nguyên chiêu đã khắc) */
+  __rebirthChoices?: import("@tien-gioi/shared").RebirthChoice[];
+}
+
 declare module "*check-credits.mjs" {
   export const CONTENT_SOURCE_FILE: string;
   export const CJK_REGEX: RegExp;

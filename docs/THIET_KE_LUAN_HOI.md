@@ -123,6 +123,8 @@ Mỗi mục có nhiều **nấc**; mua nấc kế bằng Duyên, vĩnh viễn, c
 
 **Khắc chân linh** (giữ một công pháp / nghề qua kiếp): chưa làm vì game **chưa có công pháp hay nghề học được** (hai kỹ năng đang có ai cũng có; công thức rèn ai cũng rèn). `Soul` chừa chỗ (`unlocks.khac`), bảng ghi "sắp có". Khi có hệ công pháp thì thêm mục, không đổi dữ liệu.
 
+> **Cập nhật M7.2c (#503, đã làm):** hệ công pháp đã có (M7.1) nên khắc chân linh chạy thật. Mục `khac` (3 nấc, 40 / 100 / 220 Duyên) tự hiện ở Tam Sinh Thạch từ `UNLOCKS` (không còn dòng "sắp có"); mục "Khắc chân linh" ở khối Đầu thai liệt kê `LimboMsg.engravable` (chiêu đã học ở kiếp vừa rồi + chiêu đang khắc), chọn sẵn chiêu ĐÃ khắc, tối đa `engraveSlotsOf(unlocks)`; tin `rebirth` chỉ kèm `engrave` khi người chơi đổi tập chiêu (vắng = giữ nguyên, `[]` = xoá hết). Kiếp mới có chiêu tầng 1, ô trống (tự gắn lại), cần đủ cảnh giới mới dùng được. Client: `client/src/engrave.ts` (thuần) + `client/scripts/check-limbo-engrave.mjs`.
+
 `soulBuy { id }` kiểm: đang ở Hoàng Tuyền, `id` có trong bảng (tra bằng `byId`), chưa tối đa, đủ Duyên, rồi `SoulStore.update` trừ Duyên + tăng nấc trong **một** thao tác (không bao giờ trừ mà không tăng). Giá và hiệu lực nằm trong `shared/` để client hiển thị đúng số server tính.
 
 **Kiếp mới** (`rebirth`) dựng: Phàm Nhân, tu vi 0, khí huyết / linh lực đầy; túi = Lễ Mạnh Bà + đồ Ký vật; trang bị trống; `coin` như trên; nhiệm vụ trắng (kể cả nhiệm vụ lặp ngày); `lifeId` mới, `life` trắng, `soul.kiep + 1`; đội giữ nguyên.

@@ -3912,6 +3912,17 @@ body.in-limbo #chat-log {
   cursor: not-allowed;
 }
 
+/* khắc chân linh: tên chiêu tô màu hệ + nhãn hệ nhỏ bên phải */
+.engrave-item .engrave-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+}
+.engrave-item .engrave-elem {
+  font-size: var(--fs-10);
+  opacity: 0.75;
+}
+
 .limbo-actions {
   margin-top: 18px;
 }
