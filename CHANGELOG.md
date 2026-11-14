@@ -26,6 +26,7 @@
 - Thời gian tìm quái đo bằng thợ săn trong `World` thật, vùng nhìn chữ nhật theo `fitZoom` của client (`CAN_BANG.md` mục 10, #459, #460): mô hình không lạc quan (cận dưới 0,39x giả định). **Chưa kết luận:** Xích Mãng là nguồn nhạy; tiêu chí "không nguồn nào vượt ~1,5x bãi mới tốt nhất" chỉ đạt khi thời gian TÌM Xích Mãng (từ lúc hạ con trước tới lúc chạm con kế, không gồm trận và hồi sức) >= ~85 giây (mô hình giả định 90, sát ngưỡng), và thợ săn hiệu chỉnh theo độ vụng của loài thường cho 27-69 giây; chờ số đo bot (#410).
 
 ### Giao diện và đồ hoạ
+- Nút Nhặt / Nói chuyện / Qua cổng hiện lại nhãn phím **F** ở góc nút trên máy tính (nhãn chữ trong nút chỉ còn tên ngắn từ M6, nên phím nằm ở chip `.keycap` như các nút kỹ năng; cảm ứng không hiện; đổi phím ở màn Phím tắt thì nhãn đổi theo).
 - Thị giác Âm Sương Trạch: bảng màu lục xám, sương dày nhất ba bản đồ, ma trơi, nước; chuyển cảnh Hắc Phong <-> Âm Sương; nước / đá / cây đọc ra được ở cả ba bậc chất lượng (#414, #447).
 - Quái và NPC mới có hoạt ảnh đầy đủ (đứng, đi, đánh, bị đánh, gục), 15 biểu tượng đồ mới, atlas 337 khung (#431).
 - **Hiệu ứng trùm:** đòn thường lên trùm nổi hơn (`boss-hit`), trùm gục nổ lớn (`boss-vanish`); màu hạt riêng từng loài Kim Đan; KHÔNG tăng trần hạt / emitter (#450).

@@ -531,6 +531,17 @@ async function main() {
       `Math.abs(window.__scene.predX - ${Math.round(npc.x)}) < 40 && Math.abs(window.__scene.predY - ${Math.round(npc.y + 50)}) < 40 && window.__scene.closestNpcId === 'truong_tran'`,
       "đứng cạnh Trưởng trấn",
     );
+    await t.waitFor(
+      `!document.getElementById('btn-talk').hidden`,
+      "nút Nói chuyện hiện khi đứng cạnh NPC",
+    );
+    await sleep(150);
+    check(
+      "Nút Nói chuyện (nhãn M6 chỉ còn tên ngắn) có nhãn phím F ở góc nút",
+      (await cap("btn-talk")) === "F",
+      String(await cap("btn-talk")),
+    );
+    await t.shot("ban-phim-nut-noi-chuyen.png");
     await press(t, K.f);
     await t.waitFor(
       `!!document.getElementById('dialog-modal') && !document.getElementById('dialog-modal').hidden`,
@@ -1317,6 +1328,14 @@ async function main() {
       `!!window.__scene.nearestLootId && window.__scene.state.loot.has(${JSON.stringify(lootId)})`,
       "đồ rơi hiện ở máy A và là món gần nhất",
     );
+    await t.waitFor(`!document.getElementById('btn-pickup').hidden`, "nút Nhặt hiện");
+    await sleep(150);
+    check(
+      "Nút Nhặt có nhãn phím F ở góc nút",
+      (await cap("btn-pickup")) === "F",
+      String(await cap("btn-pickup")),
+    );
+    await t.shot("ban-phim-nut-nhat.png");
     await press(t, K.f);
     await sleep(500);
     check(
@@ -1391,6 +1410,12 @@ async function main() {
       "đứng trong vùng cổng",
     );
     await sleep(700); // vị trí thật của server đuổi kịp (server kiểm khoảng cách tới cổng)
+    check(
+      "Nút Qua cổng có nhãn phím F ở góc nút",
+      (await cap("btn-portal")) === "F",
+      String(await cap("btn-portal")),
+    );
+    await t.shot("ban-phim-nut-qua-cong.png");
     await press(t, K.f);
     await t.waitFor(
       `window.__scene && window.__scene.map && window.__scene.map.def.id === ${JSON.stringify(portal.toMap)}`,
