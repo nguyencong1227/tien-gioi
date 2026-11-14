@@ -30,8 +30,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const REPO = path.resolve(__dirname, "../..");
 const DIST = path.join(REPO, "client/dist");
-const DOC_PATH = path.join(REPO, "docs/HIEU_NANG_DI_DONG.md");
-const BUDGET_PATH = path.join(REPO, "client/perf-budget.json");
 
 const MIMES = {
   ".html": "text/html; charset=utf-8",
@@ -150,7 +148,9 @@ export async function run4gBenchmark(options = {}) {
           versionData = await res.json();
           break;
         }
-      } catch {}
+      } catch {
+        void 0;
+      }
       await sleep(100);
     }
 
@@ -366,11 +366,15 @@ export async function run4gBenchmark(options = {}) {
   } finally {
     try {
       chromeProcess.kill("SIGKILL");
-    } catch {}
+    } catch {
+      void 0;
+    }
     server.close();
     try {
       fs.rmSync(tmpChromeDir, { recursive: true, force: true });
-    } catch {}
+    } catch {
+      void 0;
+    }
   }
 
   const summary = {
