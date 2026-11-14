@@ -76,6 +76,67 @@ export const KIM_DAN_RECIPES: RecipeDef[] = [
  * Ba bộ theo ba vùng săn: Hôi Lang (Luyện Khí đầu), Hắc Hổ (Luyện Khí tầng 7+), Xích Mãng (Trúc Cơ).
  * Rèn được trước khi đủ cảnh giới mặc (để dành), mặc thì mới kiểm tra cảnh giới.
  */
+// Rèn đồ ba ô riêng (M7.4, `owner-gear.ts`): bậc Luyện Khí / Trúc Cơ ở Thợ rèn Lạc Hà (miễn phí như đồ cùng bậc), bậc Kim Đan và pháp bảo ở Thợ rèn Vọng Sương
+// với phí Linh thạch (chỗ xả tiền cho người Kim Đan; luôn cao hơn giá bán thành phẩm, test giữ).
+const OWNER_GEAR_RECIPES: RecipeDef[] = [
+  r("ren_ho_bo_ngoa", "ho_bo_ngoa", [
+    ["da_ho", 4],
+    ["long_tho", 6],
+  ]),
+  r("ren_tho_nguyet_boi", "tho_nguyet_boi", [
+    ["nanh_soi", 8],
+    ["long_tho", 6],
+  ]),
+  r("ren_mang_hanh_ngoa", "mang_hanh_ngoa", [
+    ["vay_mang", 2],
+    ["da_ho", 4],
+  ]),
+  r("ren_mang_tinh_boi", "mang_tinh_boi", [
+    ["vay_mang", 2],
+    ["da_ho", 3],
+  ]),
+  rc("ren_suong_van_ngoa", "suong_van_ngoa", 2500, [
+    ["suong_mao", 10],
+    ["quy_giap", 5],
+  ]),
+  rc("ren_suong_linh_boi", "suong_linh_boi", 3000, [
+    ["suong_mao", 8],
+    ["quy_giap", 6],
+  ]),
+  rc("ren_giao_anh_ngoa", "giao_anh_ngoa", 12000, [
+    ["giao_lan", 4],
+    ["doc_nang", 6],
+  ]),
+  rc("ren_giao_chau_boi", "giao_chau_boi", 14000, [
+    ["giao_lan", 4],
+    ["doc_nang", 8],
+  ]),
+  rc("ren_ho_than_an", "ho_than_an", 5000, [
+    ["quy_giap", 10],
+    ["doc_nang", 4],
+  ]),
+  rc("ren_hap_linh_chau", "hap_linh_chau", 4500, [
+    ["suong_mao", 12],
+    ["quy_giap", 8],
+  ]),
+  rc("ren_xich_diem_an", "xich_diem_an", 9000, [
+    ["quy_giap", 14],
+    ["doc_nang", 8],
+  ]),
+  rc("ren_han_bang_an", "han_bang_an", 9000, [
+    ["quy_giap", 14],
+    ["doc_nang", 8],
+  ]),
+  rc("ren_dinh_tam_chung", "dinh_tam_chung", 16000, [
+    ["giao_lan", 6],
+    ["doc_nang", 8],
+  ]),
+  rc("ren_phong_hanh_boi", "phong_hanh_boi", 16000, [
+    ["giao_lan", 6],
+    ["doc_nang", 8],
+  ]),
+];
+
 export const RECIPES: RecipeDef[] = [
   r("ren_lang_nha_kiem", "lang_nha_kiem", [
     ["nanh_soi", 8],
@@ -111,6 +172,7 @@ export const RECIPES: RecipeDef[] = [
     ["da_ho", 4],
   ]),
   ...KIM_DAN_RECIPES,
+  ...OWNER_GEAR_RECIPES,
 ];
 
 export const RECIPE_BY_ID: Record<string, RecipeDef> = Object.fromEntries(
