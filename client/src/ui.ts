@@ -3365,7 +3365,7 @@ export const ui = {
     if (mapModalOpen) {
       modalStack.push("map-modal", $("minimap-wrap"));
       focusModal($("map-modal"));
-      // focus vào bản đồ để mũi tên / + / - / Home dùng được ngay (bản đồ tự giữ mũi tên: `data-owns-arrows`); Esc vẫn đóng bảng
+      // focus vào bản đồ để mũi tên / + / - / Home dùng được ngay (bản đồ tự xử lý rồi `preventDefault`, bảng bỏ qua); Esc vẫn đóng bảng
       ($("worldmap") as HTMLElement).focus({ preventScroll: true });
     } else {
       modalStack.remove("map-modal");

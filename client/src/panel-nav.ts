@@ -78,8 +78,6 @@ export function pickNeighbor(rects: readonly NavRect[], from: number, dir: NavDi
  */
 export function ownsArrowKeys(el: Element | null, dir?: NavDir): boolean {
   if (!el) return false;
-  // phần tử tự khai báo giữ mũi tên (bản đồ lớn: kéo bản đồ): `data-owns-arrows`
-  if ((el as HTMLElement).dataset?.ownsArrows !== undefined) return true;
   const tag = el.tagName?.toLowerCase();
   if (tag === "select" || tag === "textarea") return true;
   if (tag === "input") {
