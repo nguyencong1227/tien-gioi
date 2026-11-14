@@ -1,6 +1,6 @@
 // Quái tầm xa và đạn (M7.3, #504): `fireBolt`, `rangedStep`, `tickBolts` (docs/PHAN_CONG_M7.md mục 6). Loài quái thử `t_xa` chèn vào `MONSTER_BY_ID` rồi dọn.
 import { afterEach, describe, expect, it } from "vitest";
-import { MAX_BOLTS, MONSTER_BY_ID, PLAYER_RADIUS, type MonsterKind } from "@tien-gioi/shared";
+import { MAX_BOLTS, MONSTER_BY_ID, PLAYER_RADIUS, TILE, type MonsterKind } from "@tien-gioi/shared";
 import { fxReachOf } from "../rooms/WorldRoom";
 import {
   BOLT_HOLD_MAX,
@@ -188,6 +188,88 @@ describe("tickBolts", () => {
     t.p.x = wallX + 200;
     const hp0 = t.p.hp;
     for (let i = 0; i < 20; i++) tickBolts(t.w, 0.05);
+    expect(t.w.bolts).toHaveLength(0);
+    expect(t.p.hp).toBe(hp0);
+  });
+
+  /** Tường MỎNG nhất theo hàng ngang (dải chặn <= một ô, hai bên thoáng 80 px): [x đầu, x cuối] của dải và hàng y. Bản đồ sinh theo hạt giống nên tất định. */
+  function thinWall(t: ReturnType<typeof setup>) {
+    for (let y = 64; y < t.w.map.worldH - 64; y += 16) {
+      for (let x = 64; x < t.w.map.worldW - 200; x += 4) {
+        if (t.w.map.isBlockedPx(x, y) || !t.w.map.isBlockedPx(x + 4, y)) continue;
+        let x1 = x + 4;
+        while (t.w.map.isBlockedPx(x1, y)) x1 += 4;
+        let clear = true;
+        for (let k = 1; k <= 20; k++)
+          if (t.w.map.isBlockedPx(x - k * 4, y) || t.w.map.isBlockedPx(x1 + k * 4, y))
+            clear = false;
+        if (clear && x1 - (x + 4) <= TILE) return { x0: x + 4, x1, y };
+      }
+    }
+    return null;
+  }
+
+  it("đạn NHANH (> một ô mỗi tick) không nhảy qua tường mỏng: người đứng ngay sau tường không bị trúng (hồi quy #599 review B)", () => {
+    const t = setup(200);
+    const wall = thinWall(t);
+    expect(wall, "bản đồ phải có tường mỏng một ô").not.toBeNull();
+    const speed = 1200; // 60 px mỗi tick > TILE (32)
+    t.p.x = wall!.x1 + 12; // ngay sau tường, nằm trong bước nhảy của đạn
+    t.p.y = wall!.y;
+    t.w.bolts.push({
+      x: wall!.x0 - 2,
+      y: wall!.y,
+      ux: 1,
+      uy: 0,
+      speed,
+      left: 600,
+      dmg: 20,
+      kind: XA,
+    });
+    const hp0 = t.p.hp;
+    for (let i = 0; i < 10; i++) tickBolts(t.w, 0.05);
+    expect(t.w.bolts).toHaveLength(0);
+    expect(t.p.hp).toBe(hp0);
+  });
+
+  it("người đứng ngay TRƯỚC tường vẫn bị trúng ở tick đạn chạm tường (không mất đòn vì điểm cuối nằm trong tường)", () => {
+    const t = setup(200);
+    const wall = thinWall(t);
+    expect(wall).not.toBeNull();
+    t.p.x = wall!.x0 - 12;
+    t.p.y = wall!.y;
+    t.w.bolts.push({
+      x: wall!.x0 - 44,
+      y: wall!.y,
+      ux: 1,
+      uy: 0,
+      speed: 1200,
+      left: 600,
+      dmg: 20,
+      kind: XA,
+    });
+    const hp0 = t.p.hp;
+    tickBolts(t.w, 0.05);
+    expect(t.w.bolts).toHaveLength(0);
+    expect(t.p.hp).toBeLessThan(hp0);
+  });
+
+  it("tốc độ không dương / không phải số: đạn bị bỏ, không treo vòng quét", () => {
+    const t = setup(200);
+    for (const speed of [0, -5, Number.NaN]) {
+      t.w.bolts.push({
+        x: t.p.x - 100,
+        y: t.p.y,
+        ux: 1,
+        uy: 0,
+        speed,
+        left: 300,
+        dmg: 20,
+        kind: XA,
+      });
+    }
+    const hp0 = t.p.hp;
+    expect(() => tickBolts(t.w, 0.05)).not.toThrow();
     expect(t.w.bolts).toHaveLength(0);
     expect(t.p.hp).toBe(hp0);
   });
