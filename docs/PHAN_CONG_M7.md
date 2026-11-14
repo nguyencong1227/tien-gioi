@@ -143,6 +143,8 @@ Mã M7.x; issue được tạo theo bảng (số issue ghi ở cột Issue sau k
 | M7.13 | Nghề mức nhỏ (luyện đan, chế phù) — chỉ nếu hết việc hơn | A + B | M7.4 |
 | M7.14 | Phát hành v0.3.0 (hỏi người dùng khi xong): `MIN_PROTOCOL_VERSION=3`, CHANGELOG, thẻ, `prod.sh backup` rồi `up` | A | tất cả |
 
+**Issue (milestone "M7: Chiều sâu chiến đấu + Nguyên Anh"):** M7.1 #502, M7.2 #503, M7.3 #504, M7.4 #505, M7.5 #506, M7.6 #507, M7.7 #508, M7.8 #509, M7.9 #510, M7.10 #511, M7.11 #512, M7.12 #513, M7.13 #514, M7.14 #515. Trước M7: v0.2.1 = #495 (phím), #496 (bản đồ lớn / nhỏ; bước 1 là PR #498); ComfyUI G1-G2 = #497 (PR #499).
+
 **Thứ tự gợi ý:** v0.2.1 (B: #495 phím rồi #496 bản đồ bước 2-3; A: #498 xong; C: ComfyUI #497 và hỗ trợ E2E) -> A: M7.1 (PR hợp đồng) song song B bắt đầu thiết kế giao diện 6 ô (chưa cần server) và C bắt đầu mô hình chiêu trong `balance/` -> A: M7.2 và M7.3 (server), M7.4 (hợp đồng 2) -> M7.6-M7.8 (client) -> M7.5 (nội dung Nguyên Anh) -> M7.9-M7.11 (cân bằng / đo / hồi quy) -> M7.12 xen kẽ -> M7.14.
 
 **Quy tắc chung:** đổi `shared/` ở PR riêng, B review; thêm tính năng server thì thêm test (đột biến cho luật quan trọng); mọi tài sản mới sinh bằng mã (CC0) hoặc ảnh AI theo mục 18.3, ghi `CREDITS.md`; đo trước / sau bằng số (bench, `perf:mobile`, `npm run can-bang -w server`); mỗi PR ghi `Closes #<số>` / `Refs #<số>`; mỗi PR nội dung kèm kết quả kiểm trùng (mục 4).
