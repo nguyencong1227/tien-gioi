@@ -168,6 +168,11 @@ export interface MonsterAi {
 export interface WorldEvents {
   fx(msg: FxMsg): void;
   dmg(msg: DmgMsg): void;
+  /**
+   * Số sát thương gửi RIÊNG cho chủ (`sendTo`), không cho người đứng gần: dùng cho sát thương THEO GIÂY lên người (độc / bỏng / chảy máu). Client xử lý mỗi `dmg` trong
+   * tầm nhìn bằng tiếng đánh + giật mình + chữ bay, nên nhịp dot của một người không được hiện thành "vừa bị đánh" ở màn hình người khác (và đỡ băng thông).
+   */
+  dmgTo(sessionId: string, msg: DmgMsg): void;
   /** Thông báo hệ thống cho toàn server (kênh chat). */
   sys(text: string): void;
   chat(from: string, text: string): void;

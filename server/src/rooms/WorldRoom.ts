@@ -240,6 +240,7 @@ export class WorldRoom extends Room<WorldState> {
         // Hiệu ứng và số sát thương có vị trí: chỉ gửi cho người ở trong vùng nhìn (#62), không broadcast cả phòng
         fx: (msg) => this.sendNear(msg.x, msg.y, fxReachOf(msg), "fx", msg),
         dmg: (msg) => this.sendNear(msg.x, msg.y, 0, "dmg", msg),
+        dmgTo: (sid, msg) => this.sendTo(sid, "dmg", msg),
         sys: (text) =>
           this.broadcast("chat", { from: "Thiên Đạo", text, sys: true } satisfies ChatOut),
         // Chat người chơi là của CẢ SERVER (mọi bản đồ / phòng); thông báo hệ thống (`sys`) chỉ trong phòng
