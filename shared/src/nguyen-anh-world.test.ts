@@ -113,7 +113,7 @@ describe("Hàn Vân Lĩnh: quái Nguyên Anh (M7.5b)", () => {
     expect(slowest).toBe("cot_tuong");
   });
 
-  it("đạn của quái Nguyên Anh né được và không xuyên tường: tốc độ <= 640 px/s, bay >= 0,8 s hết tầm, tầm > 3 lần tầm đánh gần, <= 400 px; không khai `boltElement` thừa", () => {
+  it("đạn của quái Nguyên Anh né được và không xuyên tường: tốc độ <= 640 px/s, bay >= 0,8 s hết tầm, tầm > 3 lần tầm đánh gần, <= 400 px; đạn độc luôn tím (`boltElement` am)", () => {
     for (const id of ["phong_nha", "doc_tuoc"]) {
       const m = MONSTER_BY_ID[id];
       expect(m.boltSpeed, id).toBeGreaterThan(0);
@@ -121,8 +121,12 @@ describe("Hàn Vân Lĩnh: quái Nguyên Anh (M7.5b)", () => {
       expect(m.boltRange! / m.boltSpeed!, id).toBeGreaterThanOrEqual(0.8);
       expect(m.boltRange!, id).toBeGreaterThan(m.attackRange * 3);
       expect(m.boltRange!, id).toBeLessThanOrEqual(400);
-      expect(m.boltElement, `${id}: màu đạn theo element của quái`).toBeUndefined();
     }
+    // Màu đạn: Phong Nha theo `element` kim (vàng); đạn ĐỘC luôn tím (`am`) ở cả Độc Thiềm và Độc Tước dù `element` của Độc Tước là mộc ("tím = độc")
+    expect(MONSTER_BY_ID.phong_nha.boltElement).toBeUndefined();
+    expect(MONSTER_BY_ID.doc_tuoc.boltElement).toBe("am");
+    expect(MONSTER_BY_ID.doc_thiem.boltElement).toBe("am");
+    expect(MONSTER_BY_ID.doc_tuoc.element).toBe("moc"); // khắc / bị khắc vẫn theo mộc, không đổi vì màu đạn
   });
 
   it("mỗi loài có hệ thật (không `none`), năm loài đủ ba hệ khác nhau trở lên; bảng rơi và tiền đủ", () => {
