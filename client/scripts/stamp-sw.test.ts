@@ -11,24 +11,31 @@ describe("M7.15: stamp-sw (Đóng dấu Service Worker và chỉ precache gói c
       const packsDir = path.join(tmpDir, "packs");
       fs.mkdirSync(packsDir, { recursive: true });
 
-      // Manifest có core, map:hac_phong, icons, audio, hd:core
-      const shaCore = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
+      // Manifest có audio, map:hac_phong, core, icons (core KHÔNG đứng đầu mảng để kiểm tra tìm kiếm chính xác)
+      const shaAudio = "8888888888888888888888888888888888888888888888888888888888888888";
       const shaMap = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
+      const shaCore = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
       const shaIcons = "9999999999999999999999999999999999999999999999999999999999999999";
 
       const manifest = {
         packs: [
           {
-            id: "core",
-            kind: "core",
-            files: [{ path: "core/ui.png", bytes: 1000, sha256: shaCore }],
-            bytes: 1000,
+            id: "audio",
+            kind: "audio",
+            files: [{ path: "audio/bgm.ogg", bytes: 3000, sha256: shaAudio }],
+            bytes: 3000,
           },
           {
             id: "map:hac_phong",
             kind: "map",
             files: [{ path: "map-hac_phong/tileset.webp", bytes: 2000, sha256: shaMap }],
             bytes: 2000,
+          },
+          {
+            id: "core",
+            kind: "core",
+            files: [{ path: "core/ui.png", bytes: 1000, sha256: shaCore }],
+            bytes: 1000,
           },
           {
             id: "icons",
@@ -45,8 +52,9 @@ describe("M7.15: stamp-sw (Đóng dấu Service Worker và chỉ precache gói c
         "/index.html",
         "/assets/index-abc.js",
         "/packs/manifest.json",
-        "/packs/core/ui.png",
+        "/packs/audio/bgm.ogg",
         "/packs/map-hac_phong/tileset.webp",
+        "/packs/core/ui.png",
         "/packs/icons/sword.webp",
       ];
 
