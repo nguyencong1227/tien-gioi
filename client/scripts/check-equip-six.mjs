@@ -374,12 +374,16 @@ try {
     await sleep(200);
     const btns =
       await J(`[...document.querySelectorAll('#char-bag-equips .char-bag-item')].map((row) => ({ slot: row.dataset.slot,
-      btn: row.querySelector('.char-equip-btn').textContent, disabled: row.querySelector('.char-equip-btn').disabled }))`);
+      btn: row.querySelector('.char-equip-btn').textContent, disabled: row.querySelector('.char-equip-btn').disabled, cmp: row.querySelector('small')?.textContent ?? '' }))`);
     check(
       btns[2].slot === "treasure" && btns[2].btn === "Mở ở Kim Đan" && btns[2].disabled,
       `nút Mặc pháp bảo trước Kim Đan: "${btns[2].btn}", disabled=${btns[2].disabled}`,
     );
     check(btns[0].btn === "Mặc" && !btns[0].disabled, "nút Mặc hài vẫn dùng được");
+    check(
+      !/ngang bằng/i.test(btns[2].cmp) && btns[2].cmp.trim() === "Mở ở Kim Đan",
+      `dòng so sánh pháp bảo khoá trong túi: "${btns[2].cmp}" (không "ngang bằng", có lý do khoá)`,
+    );
     // ô Ngọc bội trống + túi có ngọc -> bấm thẻ thì focus nút Mặc của ngọc
     await pointer("#char-equip-slots .equip-slot-card", 4);
     await sleep(200);
@@ -420,6 +424,10 @@ try {
       "hộp so sánh cũng ghi 'Mở ở Kim Đan' (không ghi 'Đủ cảnh giới')",
     );
     check(!eb.cmp.includes("Đủ cảnh giới"), "hộp so sánh KHÔNG nói 'Đủ cảnh giới' khi ô còn khoá");
+    check(
+      !/ngang bằng/i.test(eb.cmp),
+      "hộp so sánh KHÔNG nói 'ngang bằng' cho ô còn khoá (không có món nào đang mặc ở đó)",
+    );
     await setMe({ realm: 3 });
     await evalJs(`window.__ui.onInv({ slots: [{ itemId: 'zz_tre', qty: 1 }], cd: {} }); 0`);
     await sleep(200);
