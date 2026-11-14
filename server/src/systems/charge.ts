@@ -6,11 +6,14 @@
 //  - Lao dừng ở ô chặn (`moveWithCollision` dùng chung) và không lao vào khu an toàn; vùng báo trước luôn vẽ đủ tầm (an toàn cho người xem: hơi thừa).
 //  - Choáng (`stun`) NGẮT cú gồng (không đáp đòn) và phạt chờ lâu hơn: phần thưởng cho chiêu khống chế (M7.2b).
 //  - Đòn lao mạnh hơn đòn thường (`CHARGE_MULT`), không dùng `Math.random` (giữ nguyên chuỗi của bench có seed).
+//  - Một số loài lao còn gây CHẢY MÁU nhẹ (`chargeEffectOf`: Hắc Hổ): chỉ gắn lên người mà đòn THẬT SỰ trúng (`hurtPlayer` trả `true`), không gắn lên người né / bất tử.
 // Mô-đun chỉ biết `World`; `monsters.ts` gọi `chargerStep` mỗi tick cho quái có mục tiêu và `behavior === "charger"`.
-import { PLAYER_RADIUS, type MonsterKind } from "@tien-gioi/shared";
+import { PLAYER_RADIUS, type MonsterKind, type SkillEffect } from "@tien-gioi/shared";
 import type { Monster } from "../schema";
 import { quantAngle, type World, type MonsterCtrl } from "../world";
 import { hurtPlayer } from "./combat";
+import { byId } from "./lookup";
+import { applyPlayerStatus } from "./status";
 
 /** Quãng lao (px) và bề rộng đường lao / vùng báo trước (px). */
 export const CHARGE_LEN = 280;
@@ -25,6 +28,20 @@ export const CHARGE_RECOVER_MS = 700;
 const CHARGE_STEP = 16;
 /** Thời gian gồng mặc định (ms) khi `MonsterKind.windupMs` bỏ trống. */
 export const DEFAULT_WINDUP_MS = 800;
+
+/**
+ * Chảy máu nhẹ sau đòn lao của Hắc Hổ (M7.3): mỗi giây `ratio` x sát thương của đòn lao trong `ms` (Hắc Hổ: 63 x 0,06 ~ 3,8 / giây, ~11 khí huyết cả đợt). Số khởi đầu,
+ * M7.9 hiệu chỉnh. Cùng loại thì làm mới chứ không cộng dồn; dot không giết người và khu an toàn thanh tẩy (xem `status.ts`).
+ */
+export const CHARGE_BLEED: SkillEffect = { status: "bleed", ms: 3000, ratio: 0.06, chance: 1 };
+
+/** Loài lao có hiệu ứng đi kèm đòn lao (khoá theo id loài). Hôi Lang lao thuần, không có hiệu ứng. */
+const CHARGE_EFFECT_BY_KIND: Readonly<Record<string, SkillEffect>> = { ho: CHARGE_BLEED };
+
+/** Hiệu ứng gắn lên người trúng đòn lao của loài `def` (không có thì `undefined`). */
+export function chargeEffectOf(def: MonsterKind): SkillEffect | undefined {
+  return byId(CHARGE_EFFECT_BY_KIND, def.id);
+}
 
 /** Khoảng cách từ điểm (px, py) tới đoạn (ax, ay)-(bx, by). */
 function segDist(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
@@ -72,9 +89,11 @@ function strike(w: World, id: string, m: Monster, mc: MonsterCtrl, angle: number
     if (inSafeZone(w, p.x, p.y)) return;
     if (segDist(p.x, p.y, x0, y0, m.x, m.y) <= reach) hit.push(sid);
   });
+  const eff = chargeEffectOf(def);
   for (const sid of hit) {
     const p = w.state.players.get(sid);
-    if (p) hurtPlayer(w, sid, p, dmg, m);
+    // Chỉ khi đòn TRÚNG (không phải né / bất tử): rồi mới gắn chảy máu. Người vừa gục: `applyPlayerStatus` bỏ qua.
+    if (p && hurtPlayer(w, sid, p, dmg, m) && eff) applyPlayerStatus(w, sid, eff, dmg, "");
   }
 }
 
