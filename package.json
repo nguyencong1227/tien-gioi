@@ -37,6 +37,8 @@
     "capture:viewports": "node client/scripts/capture-viewports.mjs",
     "chup-viewport": "node client/scripts/capture-viewports.mjs",
     "check:budget": "node client/scripts/check-perf-budget.mjs",
+    "build:packs": "npm run build:packs -w client",
+    "check:packs": "npm run check:packs -w client",
     "leak:test": "node client/scripts/leak-test.mjs"
   },
   "devDependencies": {
