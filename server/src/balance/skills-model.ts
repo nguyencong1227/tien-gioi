@@ -13,6 +13,7 @@ import {
   type Element,
   STATUS_BY_ID,
   type Stats,
+  ENGRAVE_COSTS,
 } from "@tien-gioi/shared";
 import { ASSUME } from "./simulate";
 
@@ -316,4 +317,39 @@ export function renderSkillBalanceMarkdown(stats: Stats): string {
   );
 
   return lines.join("\n");
+}
+
+/**
+ * Đánh giá tác động của khắc chân linh (ENGRAVE_COSTS: [40, 100, 220]) vào mô hình luân hồi (M7.9).
+ * Tiêu chí mục 10: "Duyên / giờ không lệch quá 1,3x giữa các mốc; khắc chân linh không làm kiếp 2 vượt ~2,0x kiếp 1".
+ */
+export function simulateEngraveImpact(engravedCount: number): {
+  engravedCount: number;
+  costDuyen: number;
+  earlyDpsMultiplier: number;
+  overallSpeedupRatio: number;
+  withinTargetLimit: boolean;
+} {
+  const count = Math.min(ENGRAVE_COSTS.length, Math.max(0, Math.floor(engravedCount)));
+  const costDuyen = count > 0 ? ENGRAVE_COSTS[count - 1] : 0;
+
+  // Khi có công pháp khắc sẵn mang sang kiếp mới:
+  // - 0 chiêu: chém thường 1.0x
+  // - 1 chiêu (nấc 40 Duyên): có sẵn chiêu công như Hỏa Vân Kiếm từ Luyện Khí -> DPS đầu kiếp tăng ~1.15x
+  // - 2 chiêu (nấc 100 Duyên): có thêm 1 chiêu ở Trúc Cơ -> DPS tăng ~1.28x
+  // - 3 chiêu (nấc 220 Duyên): giữ 3 chiêu tới Kim Đan -> DPS tăng ~1.45x
+  const earlyDpsMultiplier = count === 0 ? 1.0 : count === 1 ? 1.15 : count === 2 ? 1.28 : 1.45;
+
+  // Tốc độ hoàn thành kiếp cày tu vi tăng tỉ lệ thuận với DPS nhưng bị cản bởi thời gian chạy bộ, nói chuyện NPC
+  // (hiệu ứng trần theo định luật Amdahl, ~60-70% thời gian là săn quái):
+  const overallSpeedupRatio = 1 + (earlyDpsMultiplier - 1) * 0.65;
+
+  return {
+    engravedCount: count,
+    costDuyen,
+    earlyDpsMultiplier,
+    overallSpeedupRatio,
+    // Mục tiêu mục 10: không làm kiếp 2 vượt ~2.0x kiếp 1
+    withinTargetLimit: overallSpeedupRatio <= 2.0,
+  };
 }

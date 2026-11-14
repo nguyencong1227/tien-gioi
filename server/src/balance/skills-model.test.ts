@@ -6,6 +6,7 @@ import {
   evaluateBuildRotation,
   generateSkillBalanceReport,
   renderSkillBalanceMarkdown,
+  simulateEngraveImpact,
 } from "./skills-model";
 
 describe("Mô hình cân bằng chiêu thức, hệ và trạng thái (M7.9, issue #510)", () => {
@@ -98,5 +99,22 @@ describe("Mô hình cân bằng chiêu thức, hệ và trạng thái (M7.9, iss
     expect(md).toContain("Đánh giá tiêu chuẩn mục 10");
     expect(md).toContain("Hỏa Vân Kiếm");
     expect(md).toContain("Cửu Cung Khốn Sát");
+  });
+
+  it("simulateEngraveImpact: khắc chân linh mang lại lợi thế nhưng không làm kiếp 2 vượt 2.0x kiếp 1", () => {
+    const impact0 = simulateEngraveImpact(0);
+    const impact1 = simulateEngraveImpact(1);
+    const impact2 = simulateEngraveImpact(2);
+    const impact3 = simulateEngraveImpact(3);
+
+    expect(impact0.costDuyen).toBe(0);
+    expect(impact1.costDuyen).toBe(40);
+    expect(impact2.costDuyen).toBe(100);
+    expect(impact3.costDuyen).toBe(220);
+
+    expect(impact1.overallSpeedupRatio).toBeGreaterThan(1.0);
+    expect(impact1.withinTargetLimit).toBe(true);
+    expect(impact3.overallSpeedupRatio).toBeLessThanOrEqual(2.0);
+    expect(impact3.withinTargetLimit).toBe(true);
   });
 });
