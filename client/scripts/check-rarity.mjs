@@ -132,7 +132,7 @@ try {
     await sleep(300);
     const cards = await J(`[...document.querySelectorAll('#inv-grid .inv-slot')].map((el) => {
       const b = getComputedStyle(el, '::before');
-      return { text: el.querySelector('.slot-name').textContent, badge: el.dataset.rbadge ?? null, rar: el.style.getPropertyValue('--rar'),
+      return { text: el.querySelector('.slot-name').textContent, aria: el.getAttribute('aria-label'), badge: el.dataset.rbadge ?? null, rar: el.style.getPropertyValue('--rar'),
         before: b.content, bcolor: b.color, bpos: b.position, border: getComputedStyle(el).borderTopColor };
     })`);
     const filled = cards.filter((n) => n.text);
@@ -159,6 +159,19 @@ try {
     check(
       ok,
       `mỗi ô đúng huy hiệu, màu viền / huy hiệu, ::before THẬT ở góc (${detail.join(" | ")})`,
+    );
+    // trình đọc màn hình: dấu ◆ ★ bị giấu (CSS `/ ""`) và `title` không đáng tin, nên tên + BẬC nằm ở aria-label của ô (nit của A ở #584)
+    check(
+      filled.every((n, i) => n.aria === `${n.text}, ${NAMES[tiers[i]]}`),
+      `aria-label mỗi ô = "tên, tên bậc" (${filled.map((n) => n.aria).join(" | ")})`,
+    );
+    check(
+      filled.every((n) => !/[◆★]/.test(n.aria)),
+      "aria-label không chứa dấu phụ (chỉ chữ)",
+    );
+    check(
+      cards.find((n) => !n.text)?.aria === "Ô trống",
+      `ô trống có aria-label "Ô trống" (${cards.find((n) => !n.text)?.aria})`,
     );
     check(
       new Set(filled.map((n) => n.badge ?? "")).size === 5,
@@ -191,10 +204,31 @@ try {
       first.badge === "★" && first.rar === COLORS[4],
       `đổi Phàm -> Thần phẩm: huy hiệu "★" (${JSON.stringify(first)})`,
     );
+    // số lượng gộp: ghi "số lượng N"; 1 thì không ghi
+    await evalJs(
+      `window.__ui.onInv({ slots: [{ itemId: ${JSON.stringify(BY_TIER[0])}, qty: 3 }, { itemId: ${JSON.stringify(BY_TIER[0])}, qty: 1 }], cd: {} }); 0`,
+    );
+    await sleep(150);
+    const qtyAria = await J(
+      `[...document.querySelectorAll('#inv-grid .inv-slot')].slice(0, 2).map((el) => el.getAttribute('aria-label'))`,
+    );
+    check(
+      qtyAria[0].endsWith(`, ${NAMES[0]}, số lượng 3`) &&
+        qtyAria[1].endsWith(`, ${NAMES[0]}`) &&
+        !qtyAria[1].includes("số lượng"),
+      `aria-label ghi số lượng khi gộp, bỏ khi 1 (${qtyAria.join(" | ")})`,
+    );
     await evalJs(`window.__ui.onInv({ slots: [null], cd: {} }); 0`);
     await sleep(150);
     const gone = await J(
       `(() => { const el = document.querySelector('#inv-grid .inv-slot'); return { badge: el.dataset.rbadge ?? null, rar: el.style.getPropertyValue('--rar'), text: el.querySelector('.slot-name').textContent }; })()`,
+    );
+    const goneAria = await J(
+      `document.querySelector('#inv-grid .inv-slot').getAttribute('aria-label')`,
+    );
+    check(
+      goneAria === "Ô trống",
+      `về ô trống: aria-label về "Ô trống", không dính tên cũ (${goneAria})`,
     );
     check(
       gone.badge === null && gone.rar === "" && gone.text === "",

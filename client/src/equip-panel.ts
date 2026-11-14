@@ -17,6 +17,7 @@ import {
   type ItemDef,
   type Stats,
 } from "@tien-gioi/shared";
+import { itemAria } from "./rarity";
 
 /** Đủ sáu ô (ô trống = ""). */
 export type FullEquip = Record<EquipSlot, string>;
@@ -100,7 +101,7 @@ export function slotViews(eq: FullEquip, realm: number): SlotView[] {
     const aria = locked
       ? `${label}: khoá${lockText ? `, ${lockText}` : ""}`
       : def
-        ? `${label}: ${def.name}, chạm để tháo`
+        ? `${label}: ${itemAria(def)}, chạm để tháo`
         : `${label}: trống`;
     return { slot, label, itemId: eq[slot], def, locked, lockText, aria };
   });
