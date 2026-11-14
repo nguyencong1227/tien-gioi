@@ -2,7 +2,9 @@
 
 Định dạng theo từng bản phát hành (thẻ `vX.Y.Z`). Số `#` là PR / issue trên GitHub.
 
-## [Chưa phát hành] — bản vá v0.2.1 (QUYET_DINH_M3 mục 17)
+## [0.2.1] — 14/11/2026: bản vá giao diện (phím cụm J K L U I O + bản đồ làm lại, QUYET_DINH_M3 mục 17)
+
+**Bản vá chỉ phía client** (không đổi `shared/`, không đổi máy chủ đang chạy, `PROTOCOL_VERSION` vẫn 2): người chơi dùng bản web chỉ cần tải lại trang; **APK `v0.2.0` nhận thông báo "có bản mới" và nên cài lại** (`release.yml` dựng `tien-gioi-v0.2.1-debug.apk` khi gắn thẻ). Dữ liệu nhân vật không đổi. Quay lại bản trước bằng `prod.sh rollback` (không phải đổi `MIN_PROTOCOL_VERSION`). Đã kiểm trước khi phát hành: toàn bộ test, `check-map-zoom.mjs` (Chrome thật, gồm qua cổng đổi bản đồ), `e2e:ban-phim`, `e2e:tro-nang`, `leak:test` (heap +1,2%), `perf:mobile --quick` (ĐẠT).
 
 ### Giao diện
 - **Phím đánh / chiêu ở cụm J K L U I O (mục 17.1, #495):** J = Kiếm chém (Cách vẫn là phím phụ), K = Kiếm khí (3 vẫn là phím phụ), L / U / I / O = bốn ô chiêu thức 2-5 để sẵn cho chiêu M7 (hiện mờ ở HUD máy tính, bấm chỉ báo "ô còn trống"; cảm ứng không hiện). Các phím bị chiếm được dời: **Túi đồ I -> B**, **Sổ nhiệm vụ J -> N** (Q vẫn mở), **Đả tọa L -> Z** (4 vẫn là phím phụ). Ba hành động còn lại mất phím cũ nên được đặt phím mới (đổi được ở màn Phím tắt): **Đột phá B -> V**, **Cài đặt O -> E**, **Bật / tắt âm thanh N -> 0**. Mọi chữ, nhãn trên nút, bảng chỉ dẫn người mới, câu chào đầu game và dòng gợi ý đầu màn hình đọc từ cùng bảng phím nên đổi theo.
