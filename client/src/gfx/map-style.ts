@@ -18,7 +18,7 @@ export const DECOR_VARIANTS = 2;
 export const DECOR_FRAMES = DECOR_KINDS.length * DECOR_VARIANTS;
 
 /** Thời tiết bằng hạt (chỉ khi hồ sơ chất lượng `weather != "off"`). */
-export type WeatherKind = "none" | "petals" | "ash" | "spirit" | "wisp";
+export type WeatherKind = "none" | "petals" | "ash" | "spirit" | "wisp" | "snow";
 
 export interface MapStyle {
   /** Nhãn cho log / doc. */
@@ -153,6 +153,27 @@ export const MAP_STYLES: Readonly<Record<string, MapStyle>> = {
       },
     },
   },
+  // Hàn Vân Lĩnh (M7.8, #509; bản đồ thứ tư, `docs/PHAN_CONG_M7.md` mục 8): băng nguyên. Lạnh trắng xanh, sương dày vừa (dưới trần 0,4) trôi chậm, tuyết rơi nhẹ chéo,
+  // băng phản chiếu chậm, trang trí thưa (tuyết phủ): cỏ khô, hoa tuyết, đá, nhũ băng thay nấm, tùng sẫm. Khác ba bản đồ ngoài bằng màu (xanh băng, không ấm / xám tro /
+  // lục đầm) và bằng loại thời tiết riêng (`snow`).
+  han_van: {
+    label: "Hàn Vân Lĩnh (băng nguyên)",
+    ambient: { color: 0xbcd6f2, alpha: 0.17 },
+    vignette: { color: 0x0a1220, strength: 0.48 },
+    fog: { color: 0xe4f0fb, alpha: 0.3, speed: 7 },
+    weather: { kind: "snow", rate: 11 },
+    water: { shimmer: 0xe8f6ff, alpha: 0.4, speed: 4 },
+    decor: {
+      density: { tuft: 0.03, flower: 0.02, pebble: 0.045, mushroom: 0.008, bush: 0.04 },
+      palette: {
+        tuft: [0xa7b6a0, 0x8b9b87], // cỏ khô phủ sương giá
+        flower: [0xf4faff, 0xcfe2f1], // hoa tuyết trắng + lam nhạt
+        pebble: [0xb2bac4, 0x8c95a1], // đá xám lạnh
+        mushroom: [0xa8c8e6, 0x7ea3c9], // nhũ băng / nấm băng lam
+        bush: [0x39574f, 0x2b4640], // tùng sẫm
+      },
+    },
+  },
 };
 
 /** Bản đồ này có kiểu RIÊNG (không phải mặc định)? Dùng `Object.hasOwn` nên "constructor" / "__proto__" không lọt. */
@@ -166,6 +187,16 @@ export function styleOf(mapId: string): MapStyle {
 }
 
 export const DEFAULT_MAP_STYLE: MapStyle = DEFAULT_STYLE;
+
+/**
+ * Id kiểu để vẽ: bình thường là `mapId`; riêng ở chế độ gỡ lỗi (`?debug`) có thể xem trước kiểu của bản đồ KHÁC bằng `?style=<id>` (vd `han_van` khi bản đồ thứ tư
+ * chưa có phòng). Id lạ (kể cả "constructor") hoặc thiếu `?debug` thì bỏ qua, giữ `mapId`: không ai đổi được diện mạo bản đồ thật của mình trên bản phát hành.
+ */
+export function styleIdFor(mapId: string, search: string): string {
+  const q = new URLSearchParams(search);
+  const want = q.get("style");
+  return q.has("debug") && want !== null && hasOwnStyle(want) ? want : mapId;
+}
 
 const isColor = (c: number) => Number.isInteger(c) && c >= 0 && c <= 0xffffff;
 const inRange = (v: number, lo: number, hi: number) => Number.isFinite(v) && v >= lo && v <= hi;

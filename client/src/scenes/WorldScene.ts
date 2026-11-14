@@ -37,7 +37,7 @@ import {
 import { getQuality, onQualityChange } from "../gfx/quality";
 import { buildDecorGrid } from "../gfx/map-decor";
 import { mapPackId, mapsNearPortals, neighborMapIds, packs } from "../gfx/packs";
-import { styleOf } from "../gfx/map-style";
+import { styleIdFor, styleOf } from "../gfx/map-style";
 import { decorTilesetKey, ensureDecorTileset } from "../gfx/decor-tileset";
 import { ambientEnabledByUrl, planWeather, weatherEnabledByUrl } from "../gfx/map-weather";
 import {
@@ -641,6 +641,11 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
+  /** Id kiểu thị giác đang dùng: `mapId`, hoặc kiểu xem trước `?debug&style=<id>` (`styleIdFor`). */
+  private styleId(): string {
+    return styleIdFor(this.map.def.id, typeof window === "undefined" ? "" : window.location.search);
+  }
+
   /** Dựng / cập nhật hai ảnh phủ ánh sáng theo kiểu bản đồ hiện tại và hồ sơ chất lượng (gọi lại khi đổi bản đồ / chất lượng). */
   private applyLight() {
     ensureLightTextures(this);
@@ -659,7 +664,7 @@ export class WorldScene extends Phaser.Scene {
         .setVisible(false);
     this.lightAmbient.setDepth(depth);
     this.lightVignette.setDepth(depth + 1);
-    const plan = planLight(styleOf(this.map.def.id), getQuality());
+    const plan = planLight(styleOf(this.styleId()), getQuality());
     if (plan.ambient)
       this.lightAmbient.setTint(plan.ambient.color).setAlpha(plan.ambient.alpha).setVisible(true);
     else this.lightAmbient.setVisible(false);
@@ -677,7 +682,7 @@ export class WorldScene extends Phaser.Scene {
     for (const im of this.fogImages) im.destroy();
     this.fogImages = [];
     this.fogPatches = [];
-    const plan = planFog(styleOf(this.map.def.id).fog, getQuality());
+    const plan = planFog(styleOf(this.styleId()).fog, getQuality());
     if (!plan) return;
     ensureFogTexture(this);
     this.fogPatches = fogPatchLayout(plan.count, this.map.def.seed);
@@ -719,11 +724,7 @@ export class WorldScene extends Phaser.Scene {
     const key = shimmerPhaseKey(now, still);
     if (key === this.waterPhaseKey) return;
     this.waterPhaseKey = key;
-    drawShimmer(
-      ensureWaterTexture(this),
-      styleOf(this.map.def.id),
-      still ? 0 : key * WATER_STEP_MS,
-    );
+    drawShimmer(ensureWaterTexture(this), styleOf(this.styleId()), still ? 0 : key * WATER_STEP_MS);
   }
 
   /** Thời tiết: mỗi nhịp một lần phát phủ khung nhìn (kế hoạch thuần ở gfx/map-weather.ts; hồ sơ chất lượng quyết định tốc độ). */
@@ -731,7 +732,7 @@ export class WorldScene extends Phaser.Scene {
     if (this.weatherPaused) return;
     const prof = getQuality();
     const plan = planWeather(
-      styleOf(this.map.def.id).weather,
+      styleOf(this.styleId()).weather,
       prof.weather,
       prof.reducedMotion,
       this.cameras.main.worldView,
@@ -794,7 +795,7 @@ export class WorldScene extends Phaser.Scene {
     this.mapLayer.setDepth(-10);
 
     // 2b. Lớp trang trí tất định (cỏ, hoa, đá, nấm, bụi): thuần thị giác, sinh từ seed + mapId nên mọi người thấy giống nhau
-    const style = styleOf(this.map.def.id);
+    const style = styleOf(this.styleId());
     const decorGrid = buildDecorGrid(this.map, style);
     const decorRows: number[][] = [];
     for (let y = 0; y < mh; y++)

@@ -27,6 +27,18 @@ describe("map-weather (kế hoạch thời tiết)", () => {
     }
   });
 
+  it("tuyết: rơi XUỐNG (hướng 60-130 độ), có trọng lực, trắng ngà, không cộng sáng, nhỏ hơn cánh hoa", () => {
+    const r = getRecipe(WEATHER_RECIPE.snow)!.particles!;
+    expect(r.angle!.min).toBeGreaterThanOrEqual(60);
+    expect(r.angle!.max).toBeLessThanOrEqual(130);
+    expect(r.gravityY!).toBeGreaterThan(0);
+    expect(r.blend).toBe("normal");
+    const tint = r.tint!;
+    for (const ch of [(tint >> 16) & 255, (tint >> 8) & 255, tint & 255])
+      expect(ch).toBeGreaterThan(235);
+    expect(r.scale.start).toBeLessThan(getRecipe(WEATHER_RECIPE.petals)!.particles!.scale.start);
+  });
+
   it("mỗi bản đồ có thời tiết khớp công thức; mọi tốc độ nằm trong trần", () => {
     for (const [id, s] of Object.entries(MAP_STYLES)) {
       expect(s.weather.kind, id).not.toBe("none");
