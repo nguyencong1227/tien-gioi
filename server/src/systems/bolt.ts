@@ -88,7 +88,16 @@ export function fireBolt(w: World, m: Monster, def: MonsterKind, angle: number):
     kind: def.id,
     effect: onHitEffectOf(def),
   });
-  w.events.fx({ kind: "bolt", x: m.x, y: m.y, angle, speed, range, element: def.element });
+  // Màu đạn: `boltElement` (chỉ để tô màu, không đổi `elementMult`) rồi tới `element` của quái, rồi màu trung tính
+  w.events.fx({
+    kind: "bolt",
+    x: m.x,
+    y: m.y,
+    angle,
+    speed,
+    range,
+    element: def.boltElement ?? def.element,
+  });
   return true;
 }
 
