@@ -119,15 +119,23 @@ describe("Mô hình cân bằng chiêu thức, hệ và trạng thái (M7.9, iss
     expect(impact3.withinTargetLimit).toBe(true);
   });
 
-  it("Đối chiếu mô hình với mã server thật (cast.ts + combat.ts): độ lệch <= 25%", () => {
-    // Thử nghiệm với các chiêu thức đặc trưng:
-    // - Hỏa Vân Kiếm: sát thương trực tiếp + DOT bỏng
-    // - Bổn Thạch Quyền: thuần sát thương trực tiếp
-    // - Trọng Nhạc Trảm: sát thương trực tiếp cao, hồi chiêu dài
-    const testSkills = ["hoa_van_kiem", "bon_thach_quyen", "trong_nhac_tram"];
+  it("Đối chiếu mô hình với mã server thật (cast.ts + combat.ts): độ lệch <= 25% trên cả 8 chiêu gây sát thương", () => {
+    // Thử nghiệm toàn diện trên cả 8 chiêu thức M7 có mult > 0:
+    // gồm cả chiêu quạt (fan: Lạc Tuyết Phân Phi 5 tia), đòn thẳng (line: Huyền Băng Chỉ, Thanh Tùng Phi Châm),
+    // đòn nón (cone: Hỏa Vân Kiếm, Bổn Thạch Quyền, Ưng Trảo, Trọng Nhạc Trảm) và đòn vùng (ground: Cửu Cung Khốn Sát)
+    const DAMAGE_SKILLS = [
+      "hoa_van_kiem",
+      "bon_thach_quyen",
+      "ung_trao",
+      "trong_nhac_tram",
+      "huyen_bang_chi",
+      "thanh_tung_phi_cham",
+      "lac_tuyet_phan_phi",
+      "cuu_cung_khon_sat",
+    ];
 
-    for (const skillId of testSkills) {
-      const res = simulateSkillFight(skillId, 2, 0, 30, 100);
+    for (const skillId of DAMAGE_SKILLS) {
+      const res = simulateSkillFight(skillId, undefined, undefined, 30, 100);
       expect(res.match).toBe(true);
       expect(res.diffPercent).toBeLessThanOrEqual(25);
     }

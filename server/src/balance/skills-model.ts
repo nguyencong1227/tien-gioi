@@ -18,6 +18,7 @@ import {
   statsFor,
   TICK_MS,
   skillReqMet,
+  emptyEquipment,
 } from "@tien-gioi/shared";
 import { ASSUME } from "./simulate";
 import { makeWorld, addPlayer, addMonster } from "../systems/test-helpers";
@@ -41,6 +42,7 @@ export interface SkillDpsBreakdown {
   element: Element;
   cooldownMs: number;
   mpCost: number;
+  hits: number;
   directDmg: number;
   dotDmg: number;
   totalCycleDmg: number;
@@ -60,6 +62,7 @@ export interface SkillDpsBreakdown {
  * @param targetElement Hệ của quái vật mục tiêu (mặc định "none")
  * @param level Tầng chiêu (1..3)
  * @param cdr Chỉ số giảm hồi chiêu (0..0.3)
+ * @param hits Số tia/đòn trúng (mặc định: với chiêu fan lấy def.count sát người; chiêu khác lấy 1)
  */
 export function computeSkillCombo(
   def: SkillDef,
@@ -68,18 +71,23 @@ export function computeSkillCombo(
   targetElement: unknown = "none",
   level = 1,
   cdr = 0,
+  hits?: number,
 ): SkillDpsBreakdown {
   const cdMs = skillCooldownMs(def, level, cdr);
   const cdSec = cdMs / 1000;
   const mpCost = skillMpCost(def, maxMp);
   const eleMult = elementMult(def.element, targetElement);
 
-  // 1. Sát thương đòn đánh trực tiếp (direct hit)
-  const dmgMult = def.mult * skillDamageMult(level) * eleMult * ASSUME.critAvg;
+  // Số tia / đòn trúng: với chiêu hình quạt (fan), nếu không chỉ định thì mặc định là số tia tối đa (sát người = def.count)
+  const hitCount = hits !== undefined ? hits : def.shape === "fan" ? (def.count ?? 1) : 1;
+
+  // 1. Sát thương đòn đánh trực tiếp (direct hit): nhân với hitCount (mỗi tia trúng tính một lần đòn)
+  const dmgMult = def.mult * hitCount * skillDamageMult(level) * eleMult * ASSUME.critAvg;
   const directDmg = playerAtk * dmgMult;
 
   // 2. Sát thương hiệu ứng trạng thái (DOT: burn, bleed, poison)
-  // Theo status-rules: dps = ratio * baseDmg, kéo dài ms với xác suất chance
+  // Theo status-rules: dps = ratio * baseDmg, kéo dài ms với xác suất chance (tính trên 1 hit sát thương)
+  const firstHitDmg = playerAtk * def.mult * skillDamageMult(level) * eleMult * ASSUME.critAvg;
   let dotDmg = 0;
   let sunderVuln = 0;
 
@@ -89,8 +97,9 @@ export function computeSkillCombo(
 
     if (sDef.kind === "dot") {
       const durSec = eff.ms / 1000;
-      // Tổng sát thương DOT của 1 lần dính: (ratio * directDmg) * durSec
-      const expectedDot = eff.ratio * directDmg * durSec * eff.chance;
+      // DoT không cộng dồn khi làm mới (addStatus ghi đè / làm mới thời gian), kẹp durSec không vượt quá chu kỳ cdSec:
+      const activeDur = Math.min(durSec, cdSec);
+      const expectedDot = eff.ratio * firstHitDmg * activeDur * eff.chance;
       dotDmg += expectedDot;
     } else if (sDef.kind === "vuln") {
       // Vỡ giáp: tăng sát thương nhận trong thời gian hiệu lực
@@ -100,8 +109,8 @@ export function computeSkillCombo(
   }
 
   // 3. Chém thường trong thời gian hồi chiêu còn lại (weaving)
-  // Giả định 1 lần cast chiêu chiếm thời gian tương đương 1 nhịp chém (0.5s)
-  const slashCastTime = 0.5;
+  // Thời gian thi triển 1 chiêu thức chiếm tương đương 1 nhịp chém (SKILLS.slash.cooldown / 1000 = 0.4s)
+  const slashCastTime = SKILLS.slash.cooldown / 1000;
   const remTime = Math.max(0, cdSec - slashCastTime);
   const slashHits = remTime / (SKILLS.slash.cooldown / 1000);
   const slashDmg = slashHits * playerAtk * SKILLS.slash.mult * ASSUME.critAvg;
@@ -117,14 +126,15 @@ export function computeSkillCombo(
   const ratioVsBaseline = comboDps / baseDps;
 
   // 5. So sánh tỉ lệ khi khắc hệ (1.3x) và bị khắc (0.8x)
-  const advDmg =
-    playerAtk * def.mult * skillDamageMult(level) * 1.3 * ASSUME.critAvg +
-    dotDmg * (1.3 / (eleMult || 1)) +
-    slashDmg;
-  const disadvDmg =
-    playerAtk * def.mult * skillDamageMult(level) * 0.8 * ASSUME.critAvg +
-    dotDmg * (0.8 / (eleMult || 1)) +
-    slashDmg;
+  const advDirectDmg =
+    playerAtk * def.mult * hitCount * skillDamageMult(level) * 1.3 * ASSUME.critAvg;
+  const disadvDirectDmg =
+    playerAtk * def.mult * hitCount * skillDamageMult(level) * 0.8 * ASSUME.critAvg;
+  const advDotDmg = dotDmg * (1.3 / (eleMult || 1));
+  const disadvDotDmg = dotDmg * (0.8 / (eleMult || 1));
+
+  const advDmg = advDirectDmg + advDotDmg + slashDmg;
+  const disadvDmg = disadvDirectDmg + disadvDotDmg + slashDmg;
 
   const advantageRatio = (advDmg * (1 + sunderVuln)) / cdSec / baseDps;
   const disadvantageRatio = (disadvDmg * (1 + sunderVuln)) / cdSec / baseDps;
@@ -135,6 +145,7 @@ export function computeSkillCombo(
     element: def.element,
     cooldownMs: cdMs,
     mpCost,
+    hits: hitCount,
     directDmg,
     dotDmg,
     totalCycleDmg,
@@ -184,7 +195,7 @@ export function evaluateBuildRotation(
   for (const def of skills) {
     const breakdown = computeSkillCombo(def, playerAtk, maxMp, targetElement, level, cdr);
     const cdSec = breakdown.cooldownMs / 1000;
-    const slashReplacedDmg = playerAtk * SKILLS.slash.mult * ASSUME.critAvg; // 1 nhịp chém 0.5s
+    const slashReplacedDmg = playerAtk * SKILLS.slash.mult * ASSUME.critAvg; // 1 nhịp chém (SKILLS.slash.cooldown = 400ms)
 
     // Với chiêu thuần hỗ trợ (mult = 0: khiên, hồi máu, bộ pháp)
     if (def.mult === 0) {
@@ -274,8 +285,18 @@ export function renderSkillBalanceMarkdown(stats: Stats): string {
             )
             .join(", ");
 
+    const hitLabel = s.hits > 1 ? ` (${s.hits} tia)` : "";
     lines.push(
-      `| **${s.name}** | ${s.element} | ${(s.cooldownMs / 1000).toFixed(1)}s | ${s.mpCost} | ${def.mult > 0 ? def.mult.toFixed(1) + "×" : "–"} | ${effStr} | ${s.ratioVsBaseline.toFixed(2)}× | ${s.advantageRatio.toFixed(2)}× | ${s.disadvantageRatio.toFixed(2)}× |`,
+      `| **${s.name}${hitLabel}** | ${s.element} | ${(s.cooldownMs / 1000).toFixed(1)}s | ${s.mpCost} | ${def.mult > 0 ? def.mult.toFixed(1) + (s.hits > 1 ? `×${s.hits}` : "×") : "–"} | ${effStr} | ${s.ratioVsBaseline.toFixed(2)}× | ${s.advantageRatio.toFixed(2)}× | ${s.disadvantageRatio.toFixed(2)}× |`,
+    );
+  }
+
+  // Bổ sung thêm dòng trường hợp chiêu fan trúng 1 tia xa để so sánh đầy đủ
+  const fanDef = SKILLS_M7.find((x) => x.shape === "fan");
+  if (fanDef) {
+    const s1 = computeSkillCombo(fanDef, stats.atk, stats.maxMp, "none", 1, 0, 1);
+    lines.push(
+      `| *${s1.name} (1 tia xa)* | ${s1.element} | ${(s1.cooldownMs / 1000).toFixed(1)}s | ${s1.mpCost} | ${fanDef.mult.toFixed(1)}× | tê cóng | ${s1.ratioVsBaseline.toFixed(2)}× | ${s1.advantageRatio.toFixed(2)}× | ${s1.disadvantageRatio.toFixed(2)}× |`,
     );
   }
 
@@ -320,7 +341,7 @@ export function renderSkillBalanceMarkdown(stats: Stats): string {
   lines.push(
     "",
     "### 3. Đánh giá tiêu chuẩn mục 10",
-    `- **Trần sức mạnh chiêu**: Chiêu mạnh nhất đạt tối đa **${report.maxRatioSkill.advantageRatio.toFixed(2)}×** (ngưỡng an toàn < **2,0×**).`,
+    `- **Trần sức mạnh chiêu**: Chiêu mạnh nhất đạt tối đa **${report.maxRatioSkill.advantageRatio.toFixed(2)}×** (kể cả chiêu quạt Lạc Tuyết Phân Phi 5 tia sát người khi khắc hệ, ngưỡng an toàn < **2,0×**).`,
     `- **Sức mạnh chuỗi chiêu khi khắc hệ đúng**: Đạt **${kdRotAdv.powerMultiplier.toFixed(2)}×** (nằm đúng trong dải mục tiêu **1,3 – 1,65×**).`,
     `- **Kinh tế linh lực**: Duy trì **${kdRot.sustainSeconds === Infinity ? "liên tục" : "> " + kdRot.sustainSeconds.toFixed(0) + " giây"}** trước khi cần nghỉ, vượt xa thời lượng trận đấu thông thường (6-15 giây).`,
     "",
@@ -330,37 +351,74 @@ export function renderSkillBalanceMarkdown(stats: Stats): string {
 }
 
 /**
- * Đánh giá tác động của khắc chân linh (ENGRAVE_COSTS: [40, 100, 220]) vào mô hình luân hồi (M7.9).
- * Tiêu chí mục 10: "Duyên / giờ không lệch quá 1,3x giữa các mốc; khắc chân linh không làm kiếp 2 vượt ~2,0x kiếp 1".
+ * Mô phỏng tác động của khắc chân linh (ENGRAVE_COSTS: [40, 100, 220]) vào mô hình luân hồi (M7.9).
+ * Tính toán thực tế dựa trên evaluateBuildRotation với các chiêu được khắc và luật cảnh giới skillReqMet.
+ *
+ * Lưu ý quan trọng theo luật skillReqMet:
+ * Khi bước vào kiếp mới (Luyện Khí sơ kỳ: realm 1, tier 0), người chơi chỉ có thể kích hoạt các chiêu
+ * thoả mãn skillReqMet(def, 1, 0) và trong số ô mở ở Luyện Khí (1 ô: slot 2).
+ * Các chiêu Trúc Cơ (reqRealm 2) hay Kim Đan (reqRealm 3) dù đã khắc vào chân linh nhưng CHƯA ĐỦ CẢNH GIỚI
+ * thì cast sẽ bị từ chối lúc dùng ("Cần đạt Trúc Cơ mới dùng được...").
+ * Lợi ích của việc khắc chiêu cấp cao là giữ sẵn công pháp qua kiếp mà không cần săn lại kinh quyển khi đột phá.
  */
 export function simulateEngraveImpact(engravedCount: number): {
   engravedCount: number;
   costDuyen: number;
   earlyDpsMultiplier: number;
+  tcDpsMultiplier: number;
+  kdDpsMultiplier: number;
   overallSpeedupRatio: number;
   withinTargetLimit: boolean;
 } {
   const count = Math.min(ENGRAVE_COSTS.length, Math.max(0, Math.floor(engravedCount)));
   const costDuyen = count > 0 ? ENGRAVE_COSTS[count - 1] : 0;
 
-  // Khi có công pháp khắc sẵn mang sang kiếp mới:
-  // - 0 chiêu: chém thường 1.0x
-  // - 1 chiêu (nấc 40 Duyên): có sẵn chiêu công như Hỏa Vân Kiếm từ Luyện Khí -> DPS đầu kiếp tăng ~1.15x
-  // - 2 chiêu (nấc 100 Duyên): có thêm 1 chiêu ở Trúc Cơ -> DPS tăng ~1.28x
-  // - 3 chiêu (nấc 220 Duyên): giữ 3 chiêu tới Kim Đan -> DPS tăng ~1.45x
-  const earlyDpsMultiplier = count === 0 ? 1.0 : count === 1 ? 1.15 : count === 2 ? 1.28 : 1.45;
+  // Giả định bộ chiêu người chơi ưu tiên khắc qua kiếp (chọn chiêu tấn công tiêu biểu theo cảnh giới):
+  // Nấc 1: Hỏa Vân Kiếm (Luyện Khí, reqRealm 1)
+  // Nấc 2: Trọng Nhạc Trảm (Trúc Cơ, reqRealm 2)
+  // Nấc 3: Cửu Cung Khốn Sát (Kim Đan, reqRealm 3)
+  const PRIORITY_ENGRAVED: SkillDef[] = [
+    SKILLS_M7.find((s) => s.id === "hoa_van_kiem")!,
+    SKILLS_M7.find((s) => s.id === "trong_nhac_tram")!,
+    SKILLS_M7.find((s) => s.id === "cuu_cung_khon_sat")!,
+  ];
 
-  // Tốc độ hoàn thành kiếp cày tu vi tăng tỉ lệ thuận với DPS nhưng bị cản bởi thời gian chạy bộ, nói chuyện NPC
-  // (hiệu ứng trần theo định luật Amdahl, ~60-70% thời gian là săn quái):
-  const overallSpeedupRatio = 1 + (earlyDpsMultiplier - 1) * 0.65;
+  const chosenSkills = PRIORITY_ENGRAVED.slice(0, count);
+
+  // 1. Ở đầu kiếp (Luyện Khí sơ kỳ: realm 1, tier 0, 1 ô chiêu mở):
+  // Lọc các chiêu dùng được theo skillReqMet
+  const lkUsable = chosenSkills.filter((s) => skillReqMet(s, 1, 0)).slice(0, 1);
+  const lkStats = statsFor(1, 0, emptyEquipment());
+  const lkRot = evaluateBuildRotation(lkUsable, lkStats.atk, lkStats.maxMp);
+  const earlyDpsMultiplier = lkRot.powerMultiplier;
+
+  // 2. Ở Trúc Cơ (Trúc Cơ sơ kỳ: realm 2, tier 0, 2 ô chiêu mở):
+  const tcUsable = chosenSkills.filter((s) => skillReqMet(s, 2, 0)).slice(0, 2);
+  const tcStats = statsFor(2, 0, emptyEquipment());
+  const tcRot = evaluateBuildRotation(tcUsable, tcStats.atk, tcStats.maxMp);
+  const tcDpsMultiplier = tcRot.powerMultiplier;
+
+  // 3. Ở Kim Đan (Kim Đan sơ kỳ: realm 3, tier 0, 3 ô chiêu mở):
+  const kdUsable = chosenSkills.filter((s) => skillReqMet(s, 3, 0)).slice(0, 3);
+  const kdStats = statsFor(3, 0, emptyEquipment());
+  const kdRot = evaluateBuildRotation(kdUsable, kdStats.atk, kdStats.maxMp);
+  const kdDpsMultiplier = kdRot.powerMultiplier;
+
+  // Tốc độ cày tổng thể: trung bình có trọng số theo tiến trình các cảnh giới
+  // (Luyện Khí ~20%, Trúc Cơ ~35%, Kim Đan ~45% thời gian),
+  // kết hợp hiệu ứng Amdahl (~65% thời gian là chiến đấu diệt quái, 35% là chạy bộ/nói chuyện NPC):
+  const avgDpsBoost = earlyDpsMultiplier * 0.2 + tcDpsMultiplier * 0.35 + kdDpsMultiplier * 0.45;
+  const overallSpeedupRatio = 1 + (avgDpsBoost - 1) * 0.65;
 
   return {
     engravedCount: count,
     costDuyen,
     earlyDpsMultiplier,
+    tcDpsMultiplier,
+    kdDpsMultiplier,
     overallSpeedupRatio,
-    // Mục tiêu mục 10: không làm kiếp 2 vượt ~2.0x kiếp 1
-    withinTargetLimit: overallSpeedupRatio <= 2.0,
+    // Mục tiêu mục 10: không làm kiếp 2 vượt ~2.0x kiếp 1 ở bất kỳ giai đoạn nào
+    withinTargetLimit: overallSpeedupRatio <= 2.0 && earlyDpsMultiplier <= 2.0,
   };
 }
 
