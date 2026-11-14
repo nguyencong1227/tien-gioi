@@ -246,6 +246,9 @@ describe("quái lang thang chỉ đổi vị trí mỗi WANDER_STRIDE tick (#80)
     const { w } = makeWorld();
     const x = TOWN_PX.x + TOWN_PX.r + 600;
     const { m, mc } = addMonster(w, "lang", x, TOWN_PX.y);
+    // Bài này đo NHỊP GHI VỊ TRÍ của quái cận chiến đuổi người (WANDER_STRIDE, #80): ép cận chiến tường minh vì Hôi Lang nay là `charger` (M7.3),
+    // đứng gồng thay vì đuổi khi người chơi vào tầm (hành vi riêng ở `charge.test.ts`)
+    mc.def = { ...mc.def, behavior: "melee" };
     mc.wanderX = x + 190;
     mc.wanderY = TOWN_PX.y;
     mc.nextWander = Infinity;

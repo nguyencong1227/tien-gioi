@@ -419,7 +419,8 @@ describe("vỡ giáp, choáng, tê cóng trên quái", () => {
     const run = (chill: boolean) => {
       const { w } = makeWorld();
       const { p } = addPlayer(w, "a");
-      const { id, m } = addMonster(w, "lang", p.x + 150, p.y); // trong tầm gây hấn 170
+      const { id, m, mc } = addMonster(w, "lang", p.x + 150, p.y); // trong tầm gây hấn 170
+      mc.def = { ...mc.def, behavior: "melee" }; // đo tốc độ ĐUỔI: Hôi Lang nay là charger (gồng thay vì đuổi, `charge.test.ts`)
       w.now = 100_000;
       if (chill) applyMonsterStatus(w, id, eff("chill", 5000, 0.5), 0, "a");
       const x0 = m.x;

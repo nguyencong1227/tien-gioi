@@ -118,9 +118,9 @@ describe("charger: gồng báo trước (M7.3)", () => {
     expect(near.p.hp).toBeLessThan(near.p.maxHp); // đòn thường đã trúng
   });
 
-  it("quái KHÔNG phải charger không bao giờ gồng (Hôi Lang gốc: đuổi và đánh gần như trước M7)", () => {
+  it("quái cận chiến (`melee`, mặc định của quái cũ khác) không bao giờ gồng: đuổi và đánh gần như trước M7", () => {
     const { mon, tick, warns } = scene(100);
-    mon.mc.def = MONSTER_BY_ID.lang;
+    mon.mc.def = { ...MONSTER_BY_ID.lang, behavior: "melee" };
     tick(WINDUP_TICKS + 20);
     expect(warns()).toHaveLength(0);
     expect(mon.mc.ai).toBeUndefined();
@@ -298,5 +298,42 @@ describe("charger: choáng ngắt gồng, thở sau khi lao (M7.3)", () => {
     tick(4);
     expect(mon.mc.ai).toBeUndefined();
     expect(mon.mc.nextAttack).toBeGreaterThan(0);
+  });
+});
+
+describe("charger: áp lên quái cũ (M7.3, số khởi đầu)", () => {
+  it("Hôi Lang và Hắc Hổ là charger có thời gian gồng; Linh Thố và Xích Mãng (trùm) chưa đổi hành vi", () => {
+    expect(MONSTER_BY_ID.lang).toMatchObject({ behavior: "charger", windupMs: 700 });
+    expect(MONSTER_BY_ID.ho).toMatchObject({ behavior: "charger", windupMs: 900 });
+    expect(MONSTER_BY_ID.tho.behavior).toBeUndefined();
+    expect(MONSTER_BY_ID.mang.behavior).toBeUndefined();
+  });
+
+  it("thời gian gồng của mọi charger đủ để người chơi tránh (>= 600 ms) và không quá dài (<= 1200 ms): luật mục 6 của kế hoạch M7", () => {
+    for (const d of Object.values(MONSTER_BY_ID))
+      if (d.behavior === "charger") {
+        expect(d.windupMs ?? 0).toBeGreaterThanOrEqual(600);
+        expect(d.windupMs ?? 0).toBeLessThanOrEqual(1200);
+      }
+  });
+
+  it("Hôi Lang THẬT (số liệu trong MONSTERS) gồng khi thấy người rồi lao: đúng MỘT warn dài theo hằng, ms = 700, lao trúng người đứng yên", () => {
+    const h = makeWorld();
+    const { w } = h;
+    w.now = 10_000;
+    const spot = openSpot(w);
+    const { p } = addPlayer(w, "a", 3, 0);
+    p.x = spot.x;
+    p.y = spot.y;
+    p.hp = p.maxHp;
+    addMonster(w, "lang", spot.x - 150, spot.y); // KHÔNG đổi def: dùng đúng số liệu thật
+    for (let i = 0; i < 700 / TICK_MS + 2; i++) {
+      w.now += TICK_MS;
+      tickMonsters(w, TICK_MS / 1000);
+    }
+    const warn = h.fx.filter((f) => f.kind === "warn");
+    expect(warn).toHaveLength(1);
+    expect(warn[0]).toMatchObject({ shape: "line", ms: 700, r: CHARGE_LEN });
+    expect(p.hp).toBeLessThan(p.maxHp);
   });
 });
