@@ -12,6 +12,7 @@ import {
 import type { World } from "../world";
 import { gainExp } from "./progression";
 import { refreshQuests } from "./quests";
+import { learnFromBook } from "./skills";
 import { byId } from "./lookup";
 
 /** Đọc túi từ file lưu: bỏ món không còn tồn tại, ép số lượng về [1, stack], đúng 24 ô. */
@@ -99,6 +100,14 @@ export function useItem(w: World, sid: string, slot: unknown) {
   const { p, c } = r;
   const s = c.inv[i];
   const def = s ? ITEM_BY_ID[s.itemId] : undefined;
+  // Kinh quyển (M7.2): học chiêu rồi mới trừ quyển (lỗi thì quyển còn nguyên)
+  if (def?.type === "book") {
+    if (learnFromBook(w, sid, def)) {
+      takeFromSlot(c.inv, i, 1);
+      sendInv(w, sid);
+    }
+    return;
+  }
   if (!def?.effect) return;
   const ready = c.itemCd.get(def.id) ?? 0;
   if (w.now < ready) {

@@ -10,6 +10,7 @@ import {
   countsAsKiep,
   emptyEquipment,
   emptyInventory,
+  emptySkillBook,
   originMult,
   stepOf,
   startPackOf,
@@ -24,6 +25,7 @@ import { equipmentOf, setEquipment } from "./equipment";
 import { safeSpot, syncPublicPos } from "./movement";
 import { sendInv } from "./inventory";
 import { sendQuests } from "./quests";
+import { rebirthSkills, sendSkills } from "./skills";
 import { sendWallet } from "./wallet";
 
 /** Trang bị có thể giữ lại qua kiếp: đang mặc + trong túi (mỗi món một phần tử; trang bị luôn có số lượng 1). */
@@ -90,6 +92,8 @@ export function beginLimbo(w: World, sid: string, p: Player, c: PlayerCtrl) {
   setEquipment(p, emptyEquipment());
   c.inv = emptyInventory();
   c.quests = { active: [], done: [], daily: {} };
+  c.skills = emptySkillBook(); // chiêu của kiếp cũ mất theo kiếp; chỉ chiêu đã KHẮC vào chân linh trở lại lúc đầu thai (`applyRebirth`)
+  c.skillCd = [0, 0, 0, 0];
   c.coin = 0;
   c.lifeId = newLifeId();
   c.life = { playMs: 0, kills: 0, bossKills: 0 };
@@ -142,6 +146,8 @@ export function applyRebirth(
   for (const it of startPackOf(c.soul.unlocks)) addToInventory(c.inv, it.itemId, it.qty);
   for (const id of choice.keep) addToInventory(c.inv, id, 1);
   c.coin = Math.min(limbo.coinAtDeath, coinCarryCap(c.soul.unlocks));
+  c.skills = rebirthSkills(c.soul.engraved); // chiêu đã khắc vào chân linh (tầng 1, ô trống: tự gắn lại)
+  c.skillCd = [0, 0, 0, 0];
   w.audit?.("soul.rebirth", {
     name: p.name,
     kiep: c.soul.kiep,
@@ -162,6 +168,7 @@ export function applyRebirth(
   applyStats(p, true, c.mult);
   sendInv(w, sid);
   sendQuests(w, sid);
+  sendSkills(w, sid);
   sendWallet(w, sid);
   w.events.reborn(sid, { kiep: c.soul.kiep });
   w.events.sys(`${p.name} luân hồi, bước vào kiếp thứ ${c.soul.kiep}.`);
