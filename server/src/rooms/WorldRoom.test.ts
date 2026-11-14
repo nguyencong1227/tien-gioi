@@ -2368,6 +2368,71 @@ describe("luân hồi: chết thật, Hoàng Tuyền, đầu thai (M3 bước 2)
     // gửi `engrave: []` ở lần sau thì xoá hết khắc (kiểm ở test đơn vị của validateRebirth)
   });
 
+  it("khắc chân linh: người chơi RỜI PHÒNG trong lúc chờ ghi chân linh thì KHÔNG đầu thai ma (hồ sơ vẫn ở Hoàng Tuyền, vào lại chọn tiếp được)", async () => {
+    const name = "Khac Roi Phong";
+    const { FileSoulStore, soulsDir } = await import("../soul");
+    const real = new FileSoulStore(soulsDir());
+    // cổng Promise: lần `update` được "treo" cho tới khi test cho chạy (mô phỏng đĩa chậm); lúc chưa treo thì chạy thẳng
+    let gate: { entered: boolean; release: () => void } | null = null;
+    WorldRoomClass.souls = {
+      get: (id) => real.get(id),
+      create: (id, init) => real.create(id, init),
+      update: (id, fn) => {
+        const g = gate;
+        if (!g) return real.update(id, fn);
+        gate = null;
+        return new Promise((resolve, reject) => {
+          g.entered = true;
+          g.release = () => real.update(id, fn).then(resolve, reject);
+        });
+      },
+      delete: (id) => real.delete(id),
+    };
+    try {
+      const a = await join(name);
+      const sr = serverRoom(a.room) as any;
+      const sid = a.room.sessionId;
+      const c = sr.world.ctrl.get(sid);
+      c.skills = {
+        learned: { hoa_van_kiem: 2, me_tung_bo: 1 },
+        slots: ["hoa_van_kiem", "me_tung_bo", "", ""],
+      };
+      c.soul = await sr.souls.update(c.identity.soulKey, (x: any) => ({
+        ...x,
+        duyen: 500,
+        duyenTotal: 500,
+        unlocks: { khac: 2 },
+      }));
+      await playAndDie(a);
+      await waitFor(() => a.limbos[0]);
+      const kiepBefore = soulOf(name).kiep;
+      // tin `rebirth` có khắc: lần ghi chân linh bị treo
+      const held = { entered: false, release: () => {} };
+      gate = held;
+      a.room.send("rebirth", { keep: [], engrave: ["hoa_van_kiem"] });
+      await waitFor(() => held.entered);
+      // người chơi thoát hẳn trong lúc chờ: nhân vật bị gỡ khỏi phòng, hồ sơ lưu lại vẫn ở Hoàng Tuyền
+      await leave(a);
+      expect(sr.world.ctrl.get(sid)).toBeUndefined();
+      expect(playerOf(name).limbo).toBeDefined();
+      // đĩa xong: chân linh ĐÃ ghi (ghi trước là chủ ý) nhưng KHÔNG dựng kiếp mới cho người đã đi (không `applyRebirth`, không lưu đè hồ sơ)
+      held.release();
+      await sleep(500);
+      expect(soulOf(name).engraved).toEqual(["hoa_van_kiem"]);
+      expect(soulOf(name).kiep).toBe(kiepBefore);
+      expect(playerOf(name).limbo).toBeDefined();
+      // vào lại: vẫn ở Hoàng Tuyền với chiêu khắc đã chọn, đầu thai bình thường
+      const b = await join(name);
+      const limbo = await waitFor(() => b.limbos[0]);
+      expect(limbo.soul.engraved).toEqual(["hoa_van_kiem"]);
+      b.room.send("rebirth", { keep: [] });
+      await waitFor(() => b.reborns[0]);
+      expect(soulOf(name).kiep).toBe(kiepBefore);
+    } finally {
+      WorldRoomClass.souls = null;
+    }
+  });
+
   it("thoát giữa lúc ở Hoàng Tuyền rồi vào lại: nhận lại màn hình Hoàng Tuyền, Duyên KHÔNG bị cộng hai lần", async () => {
     const name = "Luan Hoi Hai";
     const a = await join(name);
