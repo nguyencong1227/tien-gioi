@@ -1,11 +1,12 @@
 /* global console, process */
 
 /**
- * Script kiểm tra tài sản & bản quyền (License & Credits Checker)
- * Đảm bảo 100% tài nguyên tĩnh trong client/public/assets, client/public/icons và client/public/fonts
- * đều được khai báo nguồn gốc, tác giả và giấy phép trong CREDITS.md.
- * Riêng tài sản bên thứ ba (client/public/fonts, #331) còn phải có SHA-256 THẬT của tệp trong CREDITS.md,
- * cùng dòng bảng với tên tệp: đổi / thay tệp mà quên cập nhật nguồn + băm thì đỏ.
+ * Script kiểm tra tài sản, bản quyền và nguồn gốc (License, Credits & Content Source Checker)
+ * 1. Đảm bảo 100% tài nguyên tĩnh trong client/public/assets, client/public/icons và client/public/fonts
+ *    đều được khai báo nguồn gốc, tác giả và giấy phép trong CREDITS.md.
+ * 2. Riêng tài sản bên thứ ba (client/public/fonts, #331) phải có SHA-256 THẬT cùng dòng trong CREDITS.md.
+ * 3. Mọi tài sản hình ảnh/âm thanh từ bên ngoài (Vạn Kiếp Tu Tiên, #517 M7.16) phải được khai báo
+ *    đầy đủ trong docs/NGUON_NOI_DUNG.md kèm cột "Đã duyệt chữ Hán" và đồng bộ với CREDITS.md.
  *
  * Chạy: node client/scripts/check-credits.mjs
  */
@@ -20,6 +21,14 @@ const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.resolve(__dirname, "../..");
 const CLIENT_PUBLIC = path.resolve(ROOT_DIR, "client/public");
 const CREDITS_FILE = path.resolve(ROOT_DIR, "CREDITS.md");
+export const CONTENT_SOURCE_FILE = path.resolve(ROOT_DIR, "docs/NGUON_NOI_DUNG.md");
+
+/**
+ * Regex phát hiện ký tự CJK (chữ Hán, kana, hangul, dấu câu CJK)
+ * Đồng bộ với server/scripts/no-cjk.test.ts
+ */
+export const CJK_REGEX =
+  /[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uffef\u4e00-\u9fff\u3400-\u4dbf\u{20000}-\u{2a6df}\u{2a700}-\u{2b73f}\u{2b740}-\u{2b81f}\u{2b820}-\u{2ceaf}\u{2ceb0}-\u{2ebbf}\u{30000}-\u{3134f}]/u;
 
 /**
  * Quét đệ quy tất cả các tệp trong một thư mục
@@ -70,7 +79,7 @@ export function matchExactToken(content, token) {
  * @returns {boolean}
  */
 export function isAssetCredited(filePath, creditsContent) {
-  // Chuẩn hoá phân cách đường dẫn sang forward-slash
+  if (!filePath || !creditsContent) return false;
   const normPath = filePath.replace(/\\/g, "/");
   const fileName = path.basename(normPath);
   const shortPath = normPath.replace(/^client\/public\//, "");
@@ -88,7 +97,7 @@ export function isAssetCredited(filePath, creditsContent) {
 }
 
 /**
- * Kiểm tra toàn bộ tài sản
+ * Kiểm tra toàn bộ tài sản tĩnh trong client/public/
  * @param {string} creditsPath
  * @param {string[]} targetDirs
  * @returns {{ scanned: string[], missing: string[] }}
@@ -157,6 +166,189 @@ export function auditHashes(
   return { hashed, wrongHash };
 }
 
+/**
+ * Phân tích cú pháp Bảng mục 3 trong docs/NGUON_NOI_DUNG.md
+ * @param {string} contentSourcePath Đường dẫn tới docs/NGUON_NOI_DUNG.md
+ * @returns {Array<{ type: string, source: string, inRepo: string, date: string, pr: string, cjkChecked: string, notes: string, lineNum: number }>}
+ */
+export function parseContentSourceTable(contentSourcePath = CONTENT_SOURCE_FILE) {
+  if (!fs.existsSync(contentSourcePath)) {
+    return [];
+  }
+  const content = fs.readFileSync(contentSourcePath, "utf-8");
+  const lines = content.split("\n");
+
+  const entries = [];
+  let inTableSection = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+
+    if (line.startsWith("## 3. Bảng nguồn")) {
+      inTableSection = true;
+      continue;
+    }
+    if (inTableSection && line.startsWith("## ")) {
+      // Sang phần tiếp theo thì dừng
+      break;
+    }
+
+    if (!inTableSection) continue;
+    if (!line.startsWith("|")) continue;
+
+    // Bỏ qua dòng tiêu đề và phân cách
+    if (line.includes("---") || line.toLowerCase().includes("trong repo")) {
+      continue;
+    }
+    // Bỏ qua dòng ghi chú rỗng khi chưa có tệp
+    if (line.includes("chưa có tệp nào")) {
+      continue;
+    }
+
+    // Tách các cột theo dấu |
+    const cols = line
+      .split("|")
+      .map((c) => c.trim())
+      .filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
+
+    if (cols.length >= 6) {
+      // Hỗ trợ cả bảng 6 cột hoặc 7 cột (có thêm cột Đã duyệt chữ Hán)
+      let type = cols[0];
+      let source = cols[1];
+      let inRepo = cols[2];
+      let date = cols[3];
+      let pr = cols[4];
+      let cjkChecked = "";
+      let notes = "";
+
+      if (cols.length >= 7) {
+        cjkChecked = cols[5];
+        notes = cols[6];
+      } else {
+        notes = cols[5];
+      }
+
+      if (inRepo && inRepo !== "-") {
+        entries.push({
+          type,
+          source,
+          inRepo,
+          date,
+          pr,
+          cjkChecked,
+          notes,
+          lineNum: i + 1,
+        });
+      }
+    }
+  }
+
+  return entries;
+}
+
+/**
+ * Kiểm tra xem tệp ảnh có chứa ký tự CJK trong nội dung XML (.svg) hoặc metadata không.
+ * @param {string} fullPath Đường dẫn tệp tuyệt đối
+ * @returns {{ hasCjk: boolean, match?: string }}
+ */
+export function checkImageFileCjk(fullPath) {
+  if (!fs.existsSync(fullPath)) return { hasCjk: false };
+  const ext = path.extname(fullPath).toLowerCase();
+
+  try {
+    if (ext === ".svg") {
+      const text = fs.readFileSync(fullPath, "utf-8");
+      const match = text.match(CJK_REGEX);
+      if (match) {
+        return { hasCjk: true, match: match[0] };
+      }
+    } else if (ext === ".png" || ext === ".webp") {
+      // Quét chuỗi UTF-8 trong các chunk metadata văn bản của tệp
+      const buf = fs.readFileSync(fullPath);
+      const text = buf.toString("utf-8");
+      const match = text.match(CJK_REGEX);
+      if (match) {
+        return { hasCjk: true, match: match[0] };
+      }
+    }
+  } catch {
+    // Bỏ qua nếu lỗi đọc nhị phân
+  }
+
+  return { hasCjk: false };
+}
+
+/** Giá trị hợp lệ cho cột "Đã duyệt chữ Hán" đối với hình ảnh */
+const VALID_CJK_APPROVALS = new Set([
+  "KHONG_CHU",
+  "KHONG_CO_CHU",
+  "DA_XOA_CHU_HAN",
+  "DA_DUYET",
+  "OK",
+  "KHONG_AP_DUNG",
+]);
+
+/**
+ * Rà soát nguồn nội dung, hình ảnh và âm thanh (M7.16 #517, QUYET_DINH_M3 mục 19-20)
+ * Kiểm tra:
+ * 1. Mọi tệp trong NGUON_NOI_DUNG.md phải được nhắc tới trong CREDITS.md.
+ * 2. Mọi tệp hình ảnh phải có xác nhận đã duyệt chữ Hán (không để trống, không để "-").
+ * 3. Kiểm tra ký tự CJK trong nội dung tệp SVG / metadata ảnh nếu tệp tồn tại trên đĩa.
+ *
+ * @param {string} contentSourcePath
+ * @param {string} creditsPath
+ * @returns {{
+ *   entries: Array<any>,
+ *   missingInCredits: string[],
+ *   missingCjkCheck: string[],
+ *   cjkDetectedInFile: Array<{ file: string, char: string }>
+ * }}
+ */
+export function auditContentSources(
+  contentSourcePath = CONTENT_SOURCE_FILE,
+  creditsPath = CREDITS_FILE,
+) {
+  const entries = parseContentSourceTable(contentSourcePath);
+  const missingInCredits = [];
+  const missingCjkCheck = [];
+  const cjkDetectedInFile = [];
+
+  const creditsContent = fs.existsSync(creditsPath) ? fs.readFileSync(creditsPath, "utf-8") : "";
+
+  for (const entry of entries) {
+    const filePath = entry.inRepo;
+
+    // 1. Phải được ghi nhận trong CREDITS.md
+    if (!isAssetCredited(filePath, creditsContent)) {
+      missingInCredits.push(filePath);
+    }
+
+    // 2. Kiểm tra duyệt chữ Hán cho tệp hình ảnh
+    const isImage = entry.type === "hinh_anh" || /\.(png|jpg|jpeg|webp|svg)$/i.test(filePath);
+
+    if (isImage) {
+      const cjkVal = (entry.cjkChecked || "").toUpperCase().trim();
+      if (!cjkVal || cjkVal === "-" || !VALID_CJK_APPROVALS.has(cjkVal)) {
+        missingCjkCheck.push(filePath);
+      }
+
+      // 3. Kiểm tra trực tiếp tệp trên đĩa nếu tồn tại
+      const fullPath = path.resolve(ROOT_DIR, filePath);
+      const cjkCheck = checkImageFileCjk(fullPath);
+      if (cjkCheck.hasCjk) {
+        cjkDetectedInFile.push({ file: filePath, char: cjkCheck.match });
+      }
+    }
+  }
+
+  return {
+    entries,
+    missingInCredits,
+    missingCjkCheck,
+    cjkDetectedInFile,
+  };
+}
+
 // Chạy trực tiếp qua CLI
 if (process.argv[1] === __filename) {
   try {
@@ -194,7 +386,51 @@ if (process.argv[1] === __filename) {
     }
     console.log(`✓ ${hashed.length} tài sản bên thứ ba có SHA-256 khớp trong CREDITS.md.`);
 
-    console.log(`\n✓ TẤT CẢ ${scanned.length} TỆP TÀI NGUYÊN ĐỀU HỢP LỆ VÀ CÓ NGUỒN GỐC RÕ RÀNG.`);
+    // Rà soát nguồn nội dung bên ngoài (M7.16 #517, QUYET_DINH_M3 mục 19-20)
+    const contentAudit = auditContentSources();
+    if (contentAudit.entries.length > 0) {
+      console.log(
+        `\n[check-credits] Đã rà soát ${contentAudit.entries.length} mục trong docs/NGUON_NOI_DUNG.md:`,
+      );
+
+      if (contentAudit.missingInCredits.length > 0) {
+        console.error(
+          `\n❌ LỖI NGUỒN: Có ${contentAudit.missingInCredits.length} tệp từ NGUON_NOI_DUNG.md chưa được khai báo trong CREDITS.md:`,
+        );
+        for (const m of contentAudit.missingInCredits) {
+          console.error(`  - ${m}`);
+        }
+        process.exit(1);
+      }
+
+      if (contentAudit.missingCjkCheck.length > 0) {
+        console.error(
+          `\n❌ LỖI CHỮ HÁN: Có ${contentAudit.missingCjkCheck.length} tệp hình ảnh thiếu xác nhận duyệt chữ Hán trong NGUON_NOI_DUNG.md:`,
+        );
+        for (const m of contentAudit.missingCjkCheck) {
+          console.error(`  - ${m} (cột 'Đã duyệt chữ Hán' phải là KHONG_CHU hoặc DA_XOA_CHU_HAN)`);
+        }
+        process.exit(1);
+      }
+
+      if (contentAudit.cjkDetectedInFile.length > 0) {
+        console.error(`\n❌ LỖI CJK: Phát hiện ký tự CJK trong nội dung tệp hình ảnh:`);
+        for (const c of contentAudit.cjkDetectedInFile) {
+          console.error(`  - ${c.file}: chứa ký tự '${c.char}'`);
+        }
+        process.exit(1);
+      }
+
+      console.log(
+        `✓ Toàn bộ ${contentAudit.entries.length} mục trong NGUON_NOI_DUNG.md đều hợp lệ, có trong CREDITS.md và đã duyệt chữ Hán.`,
+      );
+    } else {
+      console.log(
+        "\n[check-credits] docs/NGUON_NOI_DUNG.md hợp lệ (chưa có tệp ngoài nào được đưa vào repo).",
+      );
+    }
+
+    console.log(`\n✓ TẤT CẢ TÀI NGUYÊN ĐỀU HỢP LỆ VÀ CÓ NGUỒN GỐC RÕ RÀNG.`);
   } catch (err) {
     console.error("[check-credits] Lỗi khi thực hiện rà soát:", err);
     process.exit(1);
