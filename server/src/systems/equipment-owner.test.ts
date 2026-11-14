@@ -287,6 +287,20 @@ describe("giáp (guard) từ trang bị", () => {
     expect(hp0 - p.hp).toBe(100 - STAT_CAPS.guard);
   });
 
+  it("giáp của ô CHƯA MỞ không giảm sát thương (pháp bảo trước Kim Đan), mở rồi thì giảm", () => {
+    inject("t_treasure", "treasure", { guard: 20 });
+    const t = makeWorld();
+    const { p } = addPlayer(t.w, "a", 2, 0);
+    p.treasure = "t_treasure";
+    const hp0 = p.hp;
+    hit(t, 50);
+    expect(hp0 - p.hp).toBe(50); // ô chưa mở: không giáp
+    p.hp = hp0;
+    p.realm = 3;
+    hit(t, 50);
+    expect(hp0 - p.hp).toBe(40); // đã mở: giảm 20 %
+  });
+
   it("khiên hộ thể đỡ phần ĐÃ giảm giáp (giáp trước, khiên sau); sát thương theo giây cũng được giáp giảm", () => {
     inject("t_jade", "jade", { guard: 40 });
     const t = makeWorld();
