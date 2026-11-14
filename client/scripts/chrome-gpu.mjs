@@ -61,7 +61,6 @@ export function detectGpu() {
   if (process.env.DISABLE_GPU === "1" || process.env.FORCE_SWIFTSHADER === "1") {
     return { hasGpu: false, reason: "disabled_by_env" };
   }
-
   if (process.env.CI && !process.env.FORCE_GPU) {
     return { hasGpu: false, reason: "ci_environment" };
   }
@@ -71,61 +70,55 @@ export function detectGpu() {
     return { hasGpu: false, reason: "comfy_running" };
   }
 
-  const hasNvidiaDev = fs.existsSync("/dev/nvidia0");
-  const hasIcd =
-    fs.existsSync("/usr/share/vulkan/icd.d/nvidia_icd.json") ||
-    fs.existsSync("/etc/vulkan/icd.d/nvidia_icd.json");
+  try {
+    const hasNvidiaDevice = fs.existsSync("/dev/nvidia0");
+    const hasNvidiaVulkan =
+      fs.existsSync("/usr/share/vulkan/icd.d/nvidia_icd.json") ||
+      fs.existsSync("/etc/vulkan/icd.d/nvidia_icd.json");
 
-  if (hasNvidiaDev && hasIcd) {
-    return {
-      hasGpu: true,
-      reason: "nvidia_rtx",
-      device: "/dev/nvidia0",
-      vulkanIcd: "/usr/share/vulkan/icd.d/nvidia_icd.json",
-    };
+    if (hasNvidiaDevice && hasNvidiaVulkan) {
+      return {
+        hasGpu: true,
+        vendor: "nvidia",
+        backend: "vulkan",
+        reason: "nvidia_rtx_available",
+      };
+    }
+  } catch {
+    // An toàn tuyệt đối khi không đọc được hệ thống file
   }
 
-  return {
-    hasGpu: false,
-    reason: hasNvidiaDev ? "missing_vulkan_icd" : "no_nvidia_device",
-  };
+  return { hasGpu: false, reason: "no_nvidia_device" };
 }
 
 /**
- * Sinh danh sách cờ dòng lệnh cho Google Chrome headless.
- * Bật WebGL 2 + ANGLE Vulkan nếu có GPU NVIDIA RTX, hoặc tắt GPU nếu không có.
+ * Trả về danh sách cờ Chrome headless thích hợp cho GPU hoặc fallback phần mềm.
  */
 export function getChromeGpuFlags() {
   const gpu = detectGpu();
   if (gpu.hasGpu) {
-    return [
-      "--enable-gpu",
-      "--use-gl=angle",
-      "--use-angle=vulkan",
-      "--enable-unsafe-webgpu",
-      "--enable-features=Vulkan,UseSkiaRenderer",
-      "--ignore-gpu-blocklist",
-    ];
+    return ["--enable-gpu", "--use-gl=angle", "--use-angle=vulkan"];
   }
   return ["--disable-gpu"];
 }
 
 /**
- * Biểu thức JS đánh giá trong ngữ cảnh Chrome qua DevTools Protocol
- * để trích xuất tên GPU và renderer WebGL không bị che giấu (unmasked renderer).
+ * Đoạn mã JavaScript chạy trong browser context để trích xuất thông tin WebGL Renderer.
  */
-export const WEBGL_RENDERER_EXPR = `
-(() => {
+export const WEBGL_RENDERER_EXPR = `(() => {
   try {
-    const canvas = document.createElement("canvas");
-    const gl = canvas.getContext("webgl2") || canvas.getContext("webgl");
-    if (!gl) return { ok: false, error: "no_webgl" };
-    const dbg = gl.getExtension("WEBGL_debug_renderer_info");
-    const vendor = dbg ? gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL) : gl.getParameter(gl.VENDOR);
-    const renderer = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
-    return { ok: true, vendor, unmaskedRenderer: renderer };
+    const c = document.createElement("canvas");
+    const gl = c.getContext("webgl") || c.getContext("experimental-webgl");
+    if (!gl) return { ok: false, error: "NO_WEBGL" };
+    const debugInfo = gl.getExtension("WEBGL_debug_renderer_info");
+    return {
+      ok: true,
+      unmaskedVendor: debugInfo ? gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) : null,
+      unmaskedRenderer: debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : null,
+      vendor: gl.getParameter(gl.VENDOR),
+      renderer: gl.getParameter(gl.RENDERER)
+    };
   } catch (err) {
     return { ok: false, error: String(err) };
   }
-})()
-`;
+})()`;

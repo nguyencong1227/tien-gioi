@@ -65,12 +65,7 @@ if systemctl --user is-active tg-comfy >/dev/null 2>&1; then
   exit 0
 fi
 
-# 4. Dọn dẹp ảnh nháp cũ hơn 14 ngày (không dọn thư mục chosen/ đã được chọn)
-if [ -d "$OUTPUT_DIR" ]; then
-  find "$OUTPUT_DIR" -type f -mtime +14 -not -path '*/chosen/*' -delete 2>/dev/null || true
-fi
-
-# 5. Ghi file lock để Chrome test tự động lùi về CPU (software fallback)
+# 4. Ghi file lock để Chrome test tự động lùi về CPU (software fallback)
 date -u +"%Y-%m-%dT%H:%M:%SZ" > "$LOCK_FILE"
 chmod 600 "$LOCK_FILE" 2>/dev/null || true
 
@@ -81,8 +76,13 @@ if [ "$DRY_RUN" = "1" ]; then
   exit 0
 fi
 
-# 6. Đảm bảo thư mục đầu ra và tạm tồn tại trên /mnt/data
+# 5. Đảm bảo thư mục đầu ra và tạm tồn tại trên /mnt/data
 mkdir -p "$OUTPUT_DIR" "$TEMP_DIR"
+
+# 6. Dọn dẹp ảnh nháp cũ hơn 14 ngày (không dọn thư mục chosen/ đã được chọn, chỉ chạy khi khởi động thật)
+if [ -d "$OUTPUT_DIR" ]; then
+  find "$OUTPUT_DIR" -type f -mtime +14 -not -path '*/chosen/*' -delete 2>/dev/null || true
+fi
 
 # 7. Kiểm tra tệp thực thi Python và mã nguồn ComfyUI
 PYTHON_BIN="$COMFY_DIR/env/bin/python"

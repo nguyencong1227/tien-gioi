@@ -53,7 +53,7 @@ describe("chrome-gpu: phát hiện và cấu hình tăng tốc phần cứng GPU
       if (fs.existsSync("/dev/nvidia0")) {
         // Trên máy chủ có phần cứng NVIDIA: khóa mồ côi không được phép làm Chrome lùi về phần mềm
         expect(res.hasGpu).toBe(true);
-        expect(res.reason).toBe("nvidia_rtx");
+        expect(res.reason).toBe("nvidia_rtx_available");
       }
     } finally {
       process.env = origEnv;
@@ -131,7 +131,7 @@ exit 3
       const res = detectGpu();
       if (fs.existsSync("/dev/nvidia0")) {
         expect(res.hasGpu).toBe(true);
-        expect(res.reason).toBe("nvidia_rtx");
+        expect(res.reason).toBe("nvidia_rtx_available");
       }
     } finally {
       process.env = origEnv;

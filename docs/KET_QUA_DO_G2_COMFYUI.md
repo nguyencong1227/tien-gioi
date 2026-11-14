@@ -56,4 +56,4 @@ Thử nghiệm chạy trực tiếp qua `comfy-up.sh`, gửi prompt graph SDXL c
 - **Cổng mạng**: Cổng 8188 đóng hoàn toàn.
 - **Tệp khóa**: Tệp khóa `${XDG_RUNTIME_DIR:-/tmp}/tg-comfy.lock` và PID file được dọn sạch sẽ.
 - **Tiến trình**: Không còn tiến trình `tg-comfy` hay tiến trình Python con nào thuộc cgroup.
-- **Khôi phục GPU**: `detectGpu()` trong `chrome-gpu.mjs` trả về `{ hasGpu: true, reason: "nvidia_rtx" }`, sẵn sàng phục vụ các bài test E2E Chrome headless mà không bị nghẽn.
+- **Khôi phục GPU**: `detectGpu()` trong `chrome-gpu.mjs` trả về `{ hasGpu: true, reason: "nvidia_rtx_available" }`, sẵn sàng phục vụ các bài test E2E Chrome headless mà không bị nghẽn.
