@@ -92,10 +92,10 @@ try {
   await send("Runtime.enable");
   await send("Page.enable");
   let scriptId = null;
-  const open = async (quality) => {
+  const open = async (quality, { reduced = false } = {}) => {
     if (scriptId) await send("Page.removeScriptToEvaluateOnNewDocument", { identifier: scriptId });
     const r = await send("Page.addScriptToEvaluateOnNewDocument", {
-      source: `try{localStorage.setItem('tg_newbie_guide_dismissed','1');localStorage.setItem('tg_quality','${quality}');localStorage.removeItem('tg_reduced_motion')}catch(e){}`,
+      source: `try{localStorage.setItem('tg_newbie_guide_dismissed','1');localStorage.setItem('tg_quality','${quality}');${reduced ? "localStorage.setItem('tg_reduced_motion','1')" : "localStorage.removeItem('tg_reduced_motion')"}}catch(e){}`,
     });
     scriptId = String(r.result?.identifier ?? "");
     await send("Emulation.setDeviceMetricsOverride", {
@@ -177,13 +177,13 @@ try {
           bolts: sc.telegraphs.snapshot(sc.time.now).bolts, warns: sc.telegraphs.snapshot(sc.time.now).warns }));
       });
     })`).then((s) => JSON.parse(s));
-  /** Hộp bao + số điểm ảnh "đỏ lên" so với ảnh nền `pre` (điểm ảnh có r - g tăng > 45 và r > 150 (vòng an toàn của trấn nhấp nháy nhẹ nên ngưỡng phải cao hơn nhiễu đó)), trong vùng [x0, x1] x [y0, y1]. */
+  /** Hộp bao + số điểm ảnh "đỏ lên" so với ảnh nền `pre` (điểm ảnh có r - g tăng > 25 và r > 150), trong vùng [x0, x1] x [y0, y1]. Ngưỡng 25 vì nền sáng (đường đất, điểm ảnh nền r - g = +15) làm nét viền chỉ tăng ~42 chứ không ~87 như trên cỏ (nit N1 của A ở #556: ngưỡng 45 làm mất cạnh hình tròn khi nền là đường đất); nhiễu do NPC / nước đã loại bằng `calmSpot`. */
   const redGrowth = (pre, post, box) =>
     evalJs(`(() => { const A = window[${JSON.stringify(pre)}], B = window[${JSON.stringify(post)}];
       const W = ${box.w}; let n = 0, x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1;
       for (let y = ${Math.max(0, Math.floor(box.y0))}; y < ${Math.floor(box.y1)}; y++) for (let x = ${Math.max(0, Math.floor(box.x0))}; x < ${Math.floor(box.x1)}; x++) {
         const i = (y * W + x) * 4;
-        if (B[i] > 150 && (B[i] - B[i + 1]) - (A[i] - A[i + 1]) > 45) { n++; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+        if (B[i] > 150 && (B[i] - B[i + 1]) - (A[i] - A[i + 1]) > 25) { n++; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
       }
       return JSON.stringify({ n, x0, y0, x1, y1 }); })()`).then((s) => JSON.parse(s));
   /** Số điểm ảnh gần màu (r, g, b) trong hình vuông tâm (cx, cy) cạnh 2 * rad */
@@ -226,6 +226,11 @@ try {
     check(Math.abs(ratio - 1) < 0.01, `canvas 1 điểm ảnh = 1 CSS px (tỉ lệ ${ratio})`);
 
     // ---- Hình học trên điểm ảnh thật, ở một chỗ yên tĩnh (không NPC / nước cử động) để hộp bao chỉ do vùng báo tạo ra ----
+    // Đo ở chế độ GIẢM CHUYỂN ĐỘNG: nét viền nhịp thở (độ đậm 0,45 - 0,95) làm điểm ảnh ở cực của hình tròn lúc lên lúc xuống quanh ngưỡng đo nên cạnh trên lệch
+    // tới 8 px tuỳ pha (nit N1 của A ở #556, tái hiện ổn định trên máy A); giảm chuyển động thì viền đứng yên ở 0,8 nên phép đo tất định. Phần còn lại mở lại bình thường.
+    await open(q, { reduced: true });
+    const rmAttr = await evalJs("document.documentElement.getAttribute('data-reduce-motion')");
+    check(rmAttr === "1", `đo hình học ở chế độ giảm chuyển động (data-reduce-motion=${rmAttr})`);
     const calm = await calmSpot();
     check(
       !!calm,
@@ -283,7 +288,7 @@ try {
         y1: p.y + wantPx[3] + 14,
       };
       const g2 = await redGrowth("before", "post", box);
-      const tol = 7;
+      const tol = 4;
       const okBox =
         g2.n > 0 &&
         Math.abs(g2.x0 - (p.x + wantPx[0])) <= tol &&
@@ -314,10 +319,11 @@ try {
       check(st.warns === 0, `${name}: hết ms + mờ thì biến mất (còn ${st.warns})`);
     }
 
-    // ---- Đạn: đúng chỗ theo speed / angle, đúng màu hệ, hết tầm thì biến mất ----
+    // ---- Đạn: đúng chỗ theo speed / angle, đúng màu hệ, hết tầm thì biến mất (mở lại bình thường: có nhịp thở, ngân sách đủ) ----
+    await open(q);
     await clear();
-    const bx = cx - 380;
-    const by = cy + 120;
+    const bx = (await evalJs("window.__scene.predX")) - 380;
+    const by = (await evalJs("window.__scene.predY")) + 120;
     const bolt = { kind: "bolt", x: bx, y: by, angle: 0, speed: 260, range: 640, element: "thuy" };
     await act("window.__scene.telegraphs.clear()", "boltbase");
     const info = await act(emit(bolt), "bolt1");
