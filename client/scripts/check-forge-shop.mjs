@@ -5,8 +5,8 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
  *
  *   npm run build -w client && node client/scripts/check-forge-shop.mjs [--shots <thư mục>] [--probe]
  *
- * Dữ liệu là công thức rèn + cửa hàng THẬT của game (`window.__catalog`, chỉ `?debug`): 18 công thức (9 của Thiết Ngưu `tho_ren`, 9 Kim Đan của
- * thợ rèn Vọng Sương `tho_ren_suong`, có phí Linh thạch) và cửa hàng đan cấp 2 của `lai_buon_suong`. Mỗi bảng thử hai ca:
+ * Dữ liệu là công thức rèn + cửa hàng THẬT của game (`window.__catalog`, chỉ `?debug`): công thức của ba thợ rèn (`tho_ren` Thiết Ngưu, `tho_ren_suong`
+ * Vọng Sương và `tho_ren_han` Hàn Vân Trạm M7.5c, hai thợ sau có phí Linh thạch) và cửa hàng đan của `lai_buon_suong` (cấp 2) và `lai_buon_han` (cấp 1-3). Mỗi bảng thử hai ca:
  *   "thiếu": ví 0, túi rỗng  -> mọi nút Rèn / Mua tắt, chip thiếu hiện đỏ (`.missing`);
  *   "đủ":    ví rất lớn, túi đủ mọi nguyên liệu x 999 -> mọi nút bật, không chip thiếu.
  * Khẳng định (`judgeForgeShop`, hàm thuần có test): đủ thẻ; nút bấm >= 44 px (cảm ứng); không tràn ngang; không cắt tên / chip;
@@ -302,10 +302,11 @@ async function main() {
         }
       };
 
-      // ---- Lò Rèn: hai thợ rèn x hai ca ----
+      // ---- Lò Rèn: ba thợ rèn (Thiết Ngưu, Vọng Sương, Hàn Vân Trạm M7.5c) x hai ca ----
       for (const [npcId, expectFee] of [
         ["tho_ren", false],
         ["tho_ren_suong", true],
+        ["tho_ren_han", true],
       ]) {
         const expectedCards = cat.recipes.filter((r) => r.npcId === npcId).length;
         for (const state of ["thieu", "du"]) {
@@ -328,35 +329,42 @@ async function main() {
           report(`rèn ${npcId} / ${state}`, m, { expectedCards, state, expectFee });
           if (state === "du" && npcId === "tho_ren_suong") await shot("ren-vong-suong");
           if (state === "thieu" && npcId === "tho_ren_suong") await shot("ren-vong-suong-thieu");
+          if (state === "du" && npcId === "tho_ren_han") await shot("ren-han-van");
+          if (state === "thieu" && npcId === "tho_ren_han") await shot("ren-han-van-thieu");
         }
       }
 
-      // ---- Cửa hàng đan cấp 2 của lái buôn Vọng Sương: mua (hai ca) ----
-      const shopItems = cat.shops.find((s) => s.npcId === "lai_buon_suong")?.itemIds ?? [];
-      for (const state of ["thieu", "du"]) {
-        await evalJs(`window.__ui.closeAllModals()`);
-        await setState(state);
-        await standAt("lai_buon_suong");
-        await evalJs(`window.__ui.openShopModal("lai_buon_suong")`);
-        await sleep(300);
-        const m = await evalJs(
-          measure("shop-modal", "shop-buy-list", {
-            card: ".shop-card",
-            tap: ".shop-act-btn, .shop-qty-btn",
-            actionOnly: ".shop-act-btn",
-            text: ".shop-item-name, .shop-price-tag",
-            inner: ".shop-item-name, .shop-price-tag, .shop-act-btn",
-            missing: ".shop-act-btn.buy:disabled",
-            fee: ".never-exists",
-          }),
-        );
-        // Ca "thiếu": nút Mua tắt VÀ hiện "Thiếu N" (chip thiếu = nút Mua tắt); ca "đủ": nút Mua bật
-        report(`cửa hàng lai_buon_suong (mua) / ${state}`, m, {
-          expectedCards: shopItems.length,
-          state,
-          expectFee: false,
-        });
-        if (state === "du") await shot("cua-hang-vong-suong");
+      // ---- Cửa hàng đan: lái buôn Vọng Sương (đan cấp 2) và Hàn Vân Trạm (đan cấp 1-3, M7.5c): mua (hai ca) ----
+      for (const shopNpc of ["lai_buon_suong", "lai_buon_han"]) {
+        const shopItems = cat.shops.find((s) => s.npcId === shopNpc)?.itemIds ?? [];
+        if (shopItems.length === 0) throw new Error(`không có cửa hàng ${shopNpc} trong catalog`);
+        for (const state of ["thieu", "du"]) {
+          await evalJs(`window.__ui.closeAllModals()`);
+          await setState(state);
+          // Như thợ rèn: cảnh mock đứng ở Âm Sương nên NPC Hàn Vân không ở gần; đứng cạnh lái buôn Vọng Sương (có NPC trong tầm nói chuyện) rồi mở theo id truyền vào
+          await standAt("lai_buon_suong");
+          await evalJs(`window.__ui.openShopModal(${JSON.stringify(shopNpc)})`);
+          await sleep(300);
+          const m = await evalJs(
+            measure("shop-modal", "shop-buy-list", {
+              card: ".shop-card",
+              tap: ".shop-act-btn, .shop-qty-btn",
+              actionOnly: ".shop-act-btn",
+              text: ".shop-item-name, .shop-price-tag",
+              inner: ".shop-item-name, .shop-price-tag, .shop-act-btn",
+              missing: ".shop-act-btn.buy:disabled",
+              fee: ".never-exists",
+            }),
+          );
+          // Ca "thiếu": nút Mua tắt VÀ hiện "Thiếu N" (chip thiếu = nút Mua tắt); ca "đủ": nút Mua bật
+          report(`cửa hàng ${shopNpc} (mua) / ${state}`, m, {
+            expectedCards: shopItems.length,
+            state,
+            expectFee: false,
+          });
+          if (state === "du")
+            await shot(shopNpc === "lai_buon_han" ? "cua-hang-han-van" : "cua-hang-vong-suong");
+        }
       }
     }
     ws.close();
