@@ -15,7 +15,7 @@
 - **Nguyên tắc thiết kế:**
   1. Giữ nguyên 100% logic gameplay và kết nối Colyseus hiện có, không chia rẽ mã nguồn giữa web và mobile.
   2. Không cài đặt gói phụ thuộc native vào repo khi chưa có quyết định của Người Dùng.
-  3. Mọi tài nguyên âm thanh, hình ảnh đều tuân thủ giấy phép CC0 / CC-BY và được kiểm duyệt qua `npm run check:credits`.
+  3. Mọi tài nguyên âm thanh, hình ảnh đều tuân thủ `AGENTS.md` mục Asset (CC0 / CC-BY; ảnh AI SDXL base; nội dung Vạn Kiếp Tu Tiên đã được tác giả cho phép) và được kiểm duyệt qua `npm run check:credits`.
 
 ---
 

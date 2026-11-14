@@ -6,7 +6,7 @@ Tiên Giới chỉ sử dụng các bộ tài nguyên (hình ảnh, hiệu ứng
 
 ## 1. Tài nguyên đang đóng gói trong repo (`client/public/` & `client/src/`)
 
-Toàn bộ các file hình ảnh pixel-art, biểu tượng và âm thanh hiện tại trong repo được tạo riêng cho **Tiên Giới** và phát hành theo giấy phép **CC0 1.0 Public Domain**:
+Tính đến 14/11/2026, toàn bộ các file hình ảnh pixel-art, biểu tượng và âm thanh hiện tại trong repo được tạo riêng cho **Tiên Giới** và phát hành theo giấy phép **CC0 1.0 Public Domain** (câu này phải sửa khi tệp `vktt/` hoặc ảnh AI đầu tiên vào repo, theo `AGENTS.md` mục Asset):
 
 | Tài nguyên | File trong repo | Tác giả & Công cụ tạo | Giấy phép |
 |---|---|---|---|
@@ -51,7 +51,7 @@ Khi bổ sung thêm sprite, biểu tượng hoặc hiệu ứng từ thư viện
   - `client/public/fonts/`: 5 tệp (4 `woff2` + `OFL.txt`, có SHA-256 ở mục 6).
 - **Tài nguyên tự sinh runtime (không có tệp ảnh, ngoài phạm vi quét):** `client/src/textures.ts` (vẽ canvas), `client/src/audio.ts` (Web Audio) và các mô-đun đồ hoạ M5-M6 `client/src/gfx/` (tileset trang trí, ánh sáng, sương, nước, atlas hạt + phông bit-map, bóng đốm): danh sách ở `docs/RA_SOAT_TAI_SAN.md` mục 2c.
 - **Số tệp thiếu nguồn / không rõ tác giả:** **0 tệp**.
-- **Số tài sản vi phạm bản quyền / sao chép từ game khác:** **0 tệp**.
+- **Số tài sản vi phạm bản quyền / sao chép từ game khác:** **0 tệp** (tính đến 14/11/2026; tài sản của Vạn Kiếp Tu Tiên dùng với sự cho phép của tác giả được ghi riêng ở `docs/NGUON_NOI_DUNG.md`, không tính là vi phạm).
 - **Công cụ kiểm tra tự động:** `client/scripts/check-credits.mjs` (kiểm tra tự động trong CI).
 
 ---
