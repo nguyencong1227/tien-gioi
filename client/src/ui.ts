@@ -131,7 +131,6 @@ import {
   type ActionId,
 } from "./keybinds";
 import { captureOutcome, keysScreenModel } from "./keys-screen";
-import { elementColor } from "./skill-bar";
 import {
   clampEngrave,
   effectiveEngrave,
@@ -2336,7 +2335,6 @@ function renderLimboEngraveImpl() {
     const nameSpan = document.createElement("span");
     nameSpan.className = "engrave-name";
     nameSpan.textContent = info.name;
-    nameSpan.style.color = elementColor(info.def?.element); // màu theo hệ như biểu tượng ở thanh chiêu
     item.append(nameSpan);
     if (info.element) {
       const tag = document.createElement("small");
