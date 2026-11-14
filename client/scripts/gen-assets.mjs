@@ -776,6 +776,48 @@ const BOOKS = {
   kinh_me_tung_bo: [0x6fbfa0, 0xe6fff4],
 };
 
+/**
+ * Tô theo hàm khoảng cách có dấu `sd(x, y)` (< 0 là bên trong) tại tâm từng điểm ảnh: viền `edge` rộng ~1 px rồi lõi `fill`. Dùng cho ngọc bội và pháp bảo (M7.4),
+ * nơi mỗi món một HÌNH RIÊNG (trước đây ngọc bội đều là đĩa tròn có lỗ đen giữa trông như con mắt, sáu pháp bảo cùng một ấn vuông chỉ khác màu).
+ */
+function sdfShape(s, sd, fill, edge) {
+  for (let y = 0; y < s.h; y++) {
+    for (let x = 0; x < s.w; x++) {
+      const d = sd(x + 0.5, y + 0.5);
+      if (d <= 0) s.set(x, y, d <= -1.1 ? fill : edge);
+    }
+  }
+}
+const sdCircle = (cx, cy, r) => (x, y) => Math.hypot(x - cx, y - cy) - r;
+const sdBox =
+  (cx, cy, hw, hh, rad = 0) =>
+  (x, y) => {
+    const qx = Math.abs(x - cx) - (hw - rad);
+    const qy = Math.abs(y - cy) - (hh - rad);
+    return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - rad;
+  };
+const sdDiamond = (cx, cy, hw, hh) => (x, y) => {
+  // gần đúng khoảng cách tới hình thoi (đủ cho 24 x 24)
+  const k = (Math.abs(x - cx) / hw + Math.abs(y - cy) / hh - 1) * Math.min(hw, hh) * 0.8;
+  return k;
+};
+/** Nét cong: cung tròn tâm (cx, cy) bán kính r từ góc a0 tới a1 (rad, y hướng xuống), vẽ bằng các đoạn thẳng ngắn. */
+function arcStroke(s, cx, cy, r, a0, a1, hex, thickness = 1, a = 255) {
+  const n = Math.max(2, Math.ceil(Math.abs(a1 - a0) / 0.25));
+  let px = cx + Math.cos(a0) * r;
+  let py = cy + Math.sin(a0) * r;
+  for (let i = 1; i <= n; i++) {
+    const t = a0 + ((a1 - a0) * i) / n;
+    const x = cx + Math.cos(t) * r;
+    const y = cy + Math.sin(t) * r;
+    s.line(px, py, x, y, hex, thickness, a);
+    px = x;
+    py = y;
+  }
+}
+const sdUnion = (a, b) => (x, y) => Math.min(a(x, y), b(x, y));
+const sdMinus = (a, b) => (x, y) => Math.max(a(x, y), -b(x, y));
+
 function drawItemIcon(id) {
   const s = new Surface(24, 24);
   s.ellipse(12, 21, 7, 2, 0x000000, 65);
@@ -944,21 +986,115 @@ function drawItemIcon(id) {
     s.rect(7, 18, 14, 2, accent);
     s.line(9, 8, 13, 8, accent, 1);
   } else if (JADES[id]) {
-    // Ngọc bội (M7.4): đĩa ngọc có lỗ giữa, dây đỏ treo, điểm sáng
+    // Ngọc bội (M7.4): MẶT DÂY NGỌC treo dây đỏ qua lỗ nhỏ trên đỉnh, mỗi món một hình (trăng khuyết, bài ngọc, hoa tuyết, giọt châu).
+    // Không còn đĩa tròn có lỗ đen giữa + chấm sáng (trông như con mắt, nit của B ở review #590).
     const [main, accent] = JADES[id];
-    s.line(12, 1, 12, 5, 0xa31d1d, 1.5);
-    s.circle(12, 13, 8, accent);
-    s.circle(12, 13, 7, main);
-    s.circle(12, 13, 2.6, 0x1c1814);
-    s.circle(9, 10, 1.6, 0xffffff, 210);
+    const cord = 0xa31d1d;
+    const hole = (x, y) => {
+      s.circle(x, y, 1.1, 0x1c1814);
+      s.line(x, 0, x, y - 0.5, cord, 1.5); // dây đỏ buông từ trên xuống lỗ
+    };
+    if (id === "tho_nguyet_boi") {
+      // Thố Nguyệt: trăng khuyết, dây xỏ ở sừng trên
+      const moon = sdMinus(sdCircle(12, 13.5, 8), sdCircle(15.5, 11.5, 6.4));
+      sdfShape(s, moon, main, accent);
+      s.set(7, 10, 0xffffff, 230);
+      s.set(7, 11, 0xffffff, 150);
+      hole(9.6, 7.4);
+    } else if (id === "mang_tinh_boi") {
+      // Mãng Tinh: bài ngọc đứng bo góc, một con rắn uốn chữ S khắc trên mặt
+      sdfShape(s, sdBox(12, 13.5, 5.5, 8, 2), main, accent);
+      s.line(9.5, 10, 14.5, 12, accent, 1.5);
+      s.line(14.5, 12, 9.5, 15, accent, 1.5);
+      s.line(9.5, 15, 14.5, 18, accent, 1.5);
+      s.circle(14.5, 18, 1.1, 0xffffff, 220);
+      hole(12, 6.6);
+    } else if (id === "suong_linh_boi") {
+      // Sương Linh: hình thoi, mặt khắc hoa tuyết (chữ thập + hai nét chéo)
+      sdfShape(s, sdDiamond(12, 13.5, 6.5, 8.5), main, accent);
+      s.line(12, 8.5, 12, 18.5, 0xffffff, 1.2, 230);
+      s.line(8, 13.5, 16, 13.5, 0xffffff, 1.2, 230);
+      s.line(9.4, 10.9, 14.6, 16.1, 0xffffff, 1, 160);
+      s.line(14.6, 10.9, 9.4, 16.1, 0xffffff, 1, 160);
+      hole(12, 6.4);
+    } else {
+      // Giao Châu: giọt châu (tròn dưới, nhọn trên) có vòng vảy rồng và vệt sáng
+      const drop = sdUnion(
+        sdCircle(12, 15, 6.6),
+        sdMinus(sdDiamond(12, 10, 4.4, 5.5), sdBox(12, 17, 20, 6)),
+      );
+      sdfShape(s, drop, main, accent);
+      // ba vảy rồng nhỏ (không vòng tròn đồng tâm: tránh giống con mắt) + vệt sáng
+      s.circle(10, 16.5, 1, accent, 220);
+      s.circle(14, 16.5, 1, accent, 220);
+      s.circle(12, 19, 1, accent, 220);
+      s.circle(9.6, 12.8, 1.5, 0xffffff, 210);
+      hole(12, 6.2);
+    }
   } else if (TREASURE_ICONS[id]) {
-    // Pháp bảo (M7.4): ấn vuông có núm, vòng linh khí quanh, vạch linh văn
+    // Pháp bảo (M7.4): vòng linh khí quanh + MỖI MÓN MỘT HÌNH theo công dụng (khiên, châu, ấn lửa, ấn băng, chuông, xoáy gió), không còn cùng một ấn vuông chỉ khác màu
     const [main, accent] = TREASURE_ICONS[id];
-    s.ring(12, 12, 10, 1, accent, 120);
-    s.rect(6, 11, 12, 9, main);
-    s.rect(9, 6, 6, 6, accent);
-    s.circle(12, 6, 2.4, accent);
-    s.line(8, 16, 16, 16, accent, 1.4);
+    s.ring(12, 12, 10, 1, accent, 90);
+    if (id === "ho_than_an") {
+      // Hộ Thân Ấn: tấm khiên (vai vuông, đáy nhọn), gờ giữa
+      const shield = sdUnion(
+        sdBox(12, 10.5, 6.5, 5, 1.2),
+        sdMinus(sdDiamond(12, 13.5, 6.5, 8.5), sdBox(12, 5, 20, 5)),
+      );
+      sdfShape(s, shield, main, accent);
+      s.line(12, 7, 12, 18, accent, 1.4);
+      s.line(8, 11, 16, 11, accent, 1.4);
+    } else if (id === "hap_linh_chau") {
+      // Hấp Linh Châu: viên châu tròn có xoáy hút linh khí và đế nhỏ
+      s.rect(9, 18, 6, 2, accent);
+      sdfShape(s, sdCircle(12, 11.5, 7), main, accent);
+      // xoáy hút linh khí: đường xoắn ốc từ ngoài vào tâm (không vòng đồng tâm + chấm giữa: giống con mắt)
+      let sx = 0;
+      let sy = 0;
+      for (let k = 0; k <= 22; k++) {
+        const t = k * 0.34;
+        const r = 5 - k * 0.2;
+        const nx = 12 + Math.cos(t + 3.4) * r;
+        const ny = 11.5 + Math.sin(t + 3.4) * r;
+        if (k > 0) s.line(sx, sy, nx, ny, accent, 1.2, 235);
+        sx = nx;
+        sy = ny;
+      }
+      s.circle(9, 8.2, 1.3, 0xffffff, 220);
+    } else if (id === "xich_diem_an") {
+      // Xích Diễm Ấn: ấn vuông, mặt khắc ngọn lửa
+      s.rect(9, 5, 6, 3, accent);
+      sdfShape(s, sdBox(12, 13.5, 7, 6.5, 1), main, accent);
+      // ngọn lửa: thân giọt nước lệch, đầu nhọn cong, lõi vàng
+      s.circle(12, 15.4, 3.2, accent);
+      s.tri(8.8, 14.6, 15.2, 14.6, 12.9, 8.2, accent);
+      s.circle(12, 16, 1.7, 0xfff0d0);
+      s.tri(10.6, 15.5, 13.4, 15.5, 12.2, 11.8, 0xfff0d0);
+    } else if (id === "han_bang_an") {
+      // Hàn Băng Ấn: ấn vuông, mặt khắc hoa tuyết sáu cánh
+      s.rect(9, 5, 6, 3, accent);
+      sdfShape(s, sdBox(12, 13.5, 7, 6.5, 1), main, accent);
+      s.line(12, 9, 12, 18, 0xffffff, 1);
+      s.line(7.8, 13.5, 16.2, 13.5, 0xffffff, 1);
+      s.line(9.2, 10.7, 14.8, 16.3, 0xffffff, 1);
+      s.line(14.8, 10.7, 9.2, 16.3, 0xffffff, 1);
+      s.circle(12, 13.5, 1.3, 0xffffff);
+    } else if (id === "dinh_tam_chung") {
+      // Định Tâm Chung: quả chuông (vòm trên, miệng loe), núm treo và quả lắc
+      s.line(12, 3.5, 12, 6, accent, 1.4);
+      const bell = sdUnion(sdBox(12, 12.5, 4.5, 5.5, 2), sdBox(12, 16.5, 7, 2.2, 0.8));
+      sdfShape(s, bell, main, accent);
+      s.circle(12, 19.4, 1.6, accent);
+      s.line(9.5, 9, 9.5, 14, 0xffffff, 1, 150);
+    } else {
+      // Phong Hành Bội: mặt dây tròn khắc hai vệt gió, đầu mỗi vệt cuộn lại thành xoáy
+      sdfShape(s, sdCircle(12, 12, 8), main, accent);
+      s.line(6.4, 9.6, 12, 9.6, 0x2f6a54, 1.3);
+      arcStroke(s, 12, 7.8, 1.8, Math.PI / 2, -Math.PI, 0x2f6a54, 1.3);
+      s.line(8.4, 12.4, 17, 12.4, 0x2f6a54, 1.2);
+      s.line(6.4, 15, 13.6, 15, 0x2f6a54, 1.3);
+      arcStroke(s, 13.6, 16.8, 1.8, -Math.PI / 2, Math.PI, 0x2f6a54, 1.3);
+    }
   } else if (BOOKS[id]) {
     // Kinh quyển (M7.4): sách khép, gáy tối, mép giấy sáng, dấu hệ trên bìa
     const [cover, accent] = BOOKS[id];
