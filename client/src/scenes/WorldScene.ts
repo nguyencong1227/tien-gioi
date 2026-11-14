@@ -2134,18 +2134,28 @@ export class WorldScene extends Phaser.Scene {
     }
     const qLog = big ? ui.getQuestLog() : null;
     const qCtx = big ? ui.getQuestContext() : null;
-    drawMapBase(ctx, ov, v, size.w, size.h, {
-      u,
-      big,
-      compact: big && canvas.clientWidth < COMPACT_CANVAS_CSS_PX && !zoomedIn,
-      markerOf: qLog && qCtx ? (npcId) => npcMarker(npcId, qLog, qCtx) : undefined,
-    });
-
     const myName = this.me()?.name;
     const partyMems = ui.getParty().members.filter((m) => m.name !== myName);
     const partyNames = new Set(partyMems.map((m) => m.name));
     // CHỈ vẽ đồng đội ở CÙNG bản đồ (đồng đội ở bản đồ khác không có toạ độ trên bản đồ này)
     const sameMapParty = partyMems.filter((m) => !m.mapId || m.mapId === this.map.def.id);
+    // Nhãn nền không được đè lên mình, đồng đội và đích nhiệm vụ (chỉ bản đồ lớn có nhãn)
+    const avoid: { x: number; y: number; r: number }[] = [];
+    let questTarget: { x: number; y: number } | null = null;
+    if (big) {
+      avoid.push({ x: this.predX, y: this.predY, r: 10 * u });
+      for (const pm of sameMapParty) avoid.push({ x: pm.x, y: pm.y, r: 8 * u });
+      const trackId = ui.getTrackingQuestId();
+      questTarget = trackId ? this.resolveQuestTarget(trackId) : null;
+      if (questTarget) avoid.push({ x: questTarget.x, y: questTarget.y, r: 8 * u });
+    }
+    drawMapBase(ctx, ov, v, size.w, size.h, {
+      u,
+      big,
+      avoid,
+      compact: big && canvas.clientWidth < COMPACT_CANVAS_CSS_PX && !zoomedIn,
+      markerOf: qLog && qCtx ? (npcId) => npcMarker(npcId, qLog, qCtx) : undefined,
+    });
 
     // Quái đang sống trong tầm nhìn (chấm đỏ)
     ctx.fillStyle = MAP_COLORS.monster;
@@ -2178,8 +2188,7 @@ export class WorldScene extends Phaser.Scene {
 
     // Mục tiêu nhiệm vụ đang theo dõi (bản đồ lớn): đường nét đứt từ mình tới đích
     if (big) {
-      const trackId = ui.getTrackingQuestId();
-      const t = trackId ? this.resolveQuestTarget(trackId) : null;
+      const t = questTarget;
       if (t) {
         ctx.strokeStyle = MAP_COLORS.npc;
         ctx.lineWidth = 1.5 * u;

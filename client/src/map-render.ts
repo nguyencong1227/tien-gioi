@@ -442,6 +442,11 @@ export interface DrawBaseOptions {
   /** Dấu nhiệm vụ trên NPC ("!" nhận được, "?" đang làm): chỉ dùng ở bản đồ lớn */
   readonly markerOf?: (npcId: string) => string | null;
   /**
+   * Điểm CẦN KHÔNG BỊ NHÃN ĐÈ (mình, mục tiêu nhiệm vụ, đồng đội): toạ độ THẾ GIỚI (px) và bán kính chừa (điểm ảnh canvas). Nhãn nền được đặt
+   * né các điểm này như né biểu tượng (nhãn cổng "Nam Môn Quan → ..." không còn đè lên mũi tên của mình khi đứng cạnh cổng lúc mới vào).
+   */
+  readonly avoid?: readonly { readonly x: number; readonly y: number; readonly r: number }[];
+  /**
    * Bản đồ lớn trên canvas NHỎ (điện thoại ngang): chỉ ghi tên trấn, cổng (kèm nơi đến) và dấu nhiệm vụ; bỏ tên NPC và tên khu quái vì chữ
    * 12 px trên canvas ~200 px phủ kín bản đồ (chi tiết xem khi phóng to, bước 3).
    */
@@ -523,6 +528,11 @@ export function drawMapBase(
   ctx.strokeRect(v.ox, v.oy, mw, mh);
 
   const obstacles: Rect[] = [];
+  for (const a of o.avoid ?? []) {
+    const ax = v.ox + a.x * v.scale;
+    const ay = v.oy + a.y * v.scale;
+    obstacles.push({ x: ax - a.r, y: ay - a.r, w: 2 * a.r, h: 2 * a.r });
+  }
   const labels: Array<LabelReq & { text: string; color: string; altTexts?: readonly string[] }> =
     [];
   const fontPx = MIN_FONT_CSS_PX * u;
