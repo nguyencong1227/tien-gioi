@@ -5,6 +5,7 @@ import {
   computeSkillCombo,
   evaluateBuildRotation,
   generateSkillBalanceReport,
+  renderSkillBalanceMarkdown,
 } from "./skills-model";
 
 describe("Mô hình cân bằng chiêu thức, hệ và trạng thái (M7.9, issue #510)", () => {
@@ -87,5 +88,15 @@ describe("Mô hình cân bằng chiêu thức, hệ và trạng thái (M7.9, iss
 
     // Tiêu hao linh lực có hạn, duy trì được >= 20 giây giao tranh liên tục không ngừng
     expect(build.sustainSeconds).toBeGreaterThan(20);
+  });
+
+  it("renderSkillBalanceMarkdown: sinh đúng cấu trúc markdown với đủ 3 mục", () => {
+    const md = renderSkillBalanceMarkdown(kdStats);
+    expect(md).toContain("## Cân bằng chiêu thức, ngũ hành và trạng thái (M7, #510)");
+    expect(md).toContain("Bảng 12 chiêu thức đợt 1");
+    expect(md).toContain("Vòng chiêu mẫu theo cảnh giới");
+    expect(md).toContain("Đánh giá tiêu chuẩn mục 10");
+    expect(md).toContain("Hỏa Vân Kiếm");
+    expect(md).toContain("Cửu Cung Khốn Sát");
   });
 });

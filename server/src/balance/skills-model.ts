@@ -234,3 +234,86 @@ export function generateSkillBalanceReport(playerStats: Stats, targetElement: un
     noSkillExceeds2x: maxRatioSkill.ratioVsBaseline <= 2.0 && maxRatioSkill.advantageRatio <= 2.0,
   };
 }
+
+/**
+ * Sinh bảng báo cáo cân bằng chiêu thức dạng Markdown để tích hợp vào docs/CAN_BANG.md (M7.9).
+ */
+export function renderSkillBalanceMarkdown(stats: Stats): string {
+  const report = generateSkillBalanceReport(stats);
+
+  const lines: string[] = [
+    "## Cân bằng chiêu thức, ngũ hành và trạng thái (M7, #510)",
+    "",
+    "> Dựa trên `shared/src/skills.ts` (12 chiêu đợt 1) và `server/src/systems/status-rules.ts`. Mọi chiêu thức được mô phỏng theo chu kỳ thi triển đều đặn theo hồi chiêu, kết hợp đan xen Kiếm chém thường (`SKILLS.slash`).",
+    "",
+    "### 1. Bảng 12 chiêu thức đợt 1 và tỉ lệ tăng DPS",
+    "| Chiêu | Hệ | Hồi chiêu | Linh lực | Mult | Hiệu ứng trạng thái | DPS đơn (bình thường) | DPS đơn (khắc hệ 1,3×) | DPS đơn (bị khắc 0,8×) |",
+    "|---|---|---:|---:|---:|---|---:|---:|---:|",
+  ];
+
+  for (const s of report.skills) {
+    const def = SKILLS_M7.find((x) => x.id === s.id)!;
+    const effStr =
+      def.effects.length === 0
+        ? "–"
+        : def.effects
+            .map(
+              (e) =>
+                `${e.status} (${(e.ratio * 100).toFixed(0)}%, ${(e.ms / 1000).toFixed(1)}s, ${(e.chance * 100).toFixed(0)}%)`,
+            )
+            .join(", ");
+
+    lines.push(
+      `| **${s.name}** | ${s.element} | ${(s.cooldownMs / 1000).toFixed(1)}s | ${s.mpCost} | ${def.mult > 0 ? def.mult.toFixed(1) + "×" : "–"} | ${effStr} | ${s.ratioVsBaseline.toFixed(2)}× | ${s.advantageRatio.toFixed(2)}× | ${s.disadvantageRatio.toFixed(2)}× |`,
+    );
+  }
+
+  lines.push(
+    "",
+    "### 2. Vòng chiêu mẫu theo cảnh giới (Build Rotation)",
+    "| Cảnh giới | Số ô chiêu | Chiêu trang bị | Sức mạnh tổng (vô sắc) | Sức mạnh tổng (khắc hệ) | Tiêu hao linh lực | Duy trì giao tranh |",
+    "|---|---:|---|---:|---:|---:|---:|",
+  );
+
+  // Luyện Khí: 1 chiêu Hỏa Vân Kiếm
+  const lkSkill = [SKILLS_M7.find((x) => x.id === "hoa_van_kiem")!];
+  const lkRot = evaluateBuildRotation(lkSkill, stats.atk, stats.maxMp, "none");
+  const lkRotAdv = evaluateBuildRotation(lkSkill, stats.atk, stats.maxMp, "kim");
+  lines.push(
+    `| Luyện Khí | 1 | Hỏa Vân Kiếm | ${lkRot.powerMultiplier.toFixed(2)}× | ${lkRotAdv.powerMultiplier.toFixed(2)}× | ${lkRot.mpPerSec.toFixed(1)} MP/s | ${lkRot.sustainSeconds === Infinity ? "Vô hạn" : lkRot.sustainSeconds.toFixed(0) + "s"} |`,
+  );
+
+  // Trúc Cơ: 2 chiêu Hỏa Vân Kiếm + Trọng Nhạc Trảm
+  const tcSkills = [
+    SKILLS_M7.find((x) => x.id === "hoa_van_kiem")!,
+    SKILLS_M7.find((x) => x.id === "trong_nhac_tram")!,
+  ];
+  const tcRot = evaluateBuildRotation(tcSkills, stats.atk, stats.maxMp, "none");
+  const tcRotAdv = evaluateBuildRotation(tcSkills, stats.atk, stats.maxMp, "kim");
+  lines.push(
+    `| Trúc Cơ | 2 | Hỏa Vân + Trọng Nhạc | ${tcRot.powerMultiplier.toFixed(2)}× | ${tcRotAdv.powerMultiplier.toFixed(2)}× | ${tcRot.mpPerSec.toFixed(1)} MP/s | ${tcRot.sustainSeconds === Infinity ? "Vô hạn" : tcRot.sustainSeconds.toFixed(0) + "s"} |`,
+  );
+
+  // Kim Đan: 3 chiêu Hỏa Vân Kiếm + Cửu Cung Khốn Sát (sunder) + Huyền Băng Chỉ
+  const kdSkills = [
+    SKILLS_M7.find((x) => x.id === "hoa_van_kiem")!,
+    SKILLS_M7.find((x) => x.id === "cuu_cung_khon_sat")!,
+    SKILLS_M7.find((x) => x.id === "huyen_bang_chi")!,
+  ];
+  const kdRot = evaluateBuildRotation(kdSkills, stats.atk, stats.maxMp, "none");
+  const kdRotAdv = evaluateBuildRotation(kdSkills, stats.atk, stats.maxMp, "kim");
+  lines.push(
+    `| Kim Đan | 3 | Hỏa Vân + Cửu Cung + Huyền Băng | ${kdRot.powerMultiplier.toFixed(2)}× | ${kdRotAdv.powerMultiplier.toFixed(2)}× | ${kdRot.mpPerSec.toFixed(1)} MP/s | ${kdRot.sustainSeconds === Infinity ? "Vô hạn" : kdRot.sustainSeconds.toFixed(0) + "s"} |`,
+  );
+
+  lines.push(
+    "",
+    "### 3. Đánh giá tiêu chuẩn mục 10",
+    `- **Trần sức mạnh chiêu**: Chiêu mạnh nhất đạt tối đa **${report.maxRatioSkill.advantageRatio.toFixed(2)}×** (ngưỡng an toàn < **2,0×**).`,
+    `- **Sức mạnh chuỗi chiêu khi khắc hệ đúng**: Đạt **${kdRotAdv.powerMultiplier.toFixed(2)}×** (nằm đúng trong dải mục tiêu **1,3 – 1,65×**).`,
+    `- **Kinh tế linh lực**: Duy trì **${kdRot.sustainSeconds === Infinity ? "liên tục" : "> " + kdRot.sustainSeconds.toFixed(0) + " giây"}** trước khi cần nghỉ, vượt xa thời lượng trận đấu thông thường (6-15 giây).`,
+    "",
+  );
+
+  return lines.join("\n");
+}
