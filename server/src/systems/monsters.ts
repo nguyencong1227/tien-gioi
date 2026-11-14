@@ -3,6 +3,7 @@ import { PLAYER_RADIUS, MONSTERS, type MonsterKind } from "@tien-gioi/shared";
 import { Monster } from "../schema";
 import { rand, quantAngle, takeWhole, type World, type MonsterCtrl } from "../world";
 import { hurtPlayer } from "./combat";
+import { chargerStep } from "./charge";
 import { isStunned, speedMult } from "./status-rules";
 
 const LEASH_DIST = 520; // kéo quá xa nhà thì bỏ mục tiêu
@@ -154,7 +155,10 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
     tx = target.x;
     ty = target.y;
     speed = def.speed;
-    if (d <= def.attackRange + PLAYER_RADIUS) {
+    if (def.behavior === "charger" && chargerStep(w, id, m, mc, target, d, stunned)) {
+      // Đang gồng (báo trước) hoặc thở sau khi lao: đứng yên, không đánh thường (M7.3, `charge.ts`)
+      speed = 0;
+    } else if (d <= def.attackRange + PLAYER_RADIUS) {
       speed = 0;
       const aim = Math.atan2(target.y - m.y, target.x - m.x);
       m.angle = quantAngle(aim);
@@ -165,6 +169,7 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
       }
     }
   } else {
+    mc.ai = undefined; // mất mục tiêu giữa lúc gồng / thở: bỏ đòn đang dở
     // Đang đi về nhà hoặc lang thang
     if (Math.hypot(m.x - mc.homeX, m.y - mc.homeY) > RETURN_HOME_DIST) {
       tx = mc.homeX;

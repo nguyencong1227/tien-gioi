@@ -73,6 +73,7 @@ import {
   cleanName,
   sanitizeSkillBook,
   SKILL_MSG,
+  type FxMsg,
 } from "@tien-gioi/shared";
 import { WorldState, Player } from "../schema";
 import {
@@ -180,6 +181,16 @@ interface Ghost {
   done: Promise<void>;
 }
 
+/**
+ * Tầm vươn xa của một `fx` ngoài điểm phát (px), để `sendNear` gửi cho cả người đứng ở đầu kia: kiếm khí / chiêu / đạn có `range`, vùng báo trước đòn của quái
+ * (`warn`) vươn `r` (đường lao dài 280 px; vòng tròn: bán kính), còn lại chỉ ở điểm phát (0).
+ */
+export function fxReachOf(msg: FxMsg): number {
+  if ("range" in msg) return msg.range;
+  if (msg.kind === "warn") return msg.r;
+  return 0;
+}
+
 export class WorldRoom extends Room<WorldState> {
   maxClients = MAX_PLAYERS_PER_ROOM;
   autoDispose = false; // thế giới luôn sống, kể cả khi không có ai
@@ -227,7 +238,7 @@ export class WorldRoom extends Room<WorldState> {
       this.state,
       {
         // Hiệu ứng và số sát thương có vị trí: chỉ gửi cho người ở trong vùng nhìn (#62), không broadcast cả phòng
-        fx: (msg) => this.sendNear(msg.x, msg.y, "range" in msg ? msg.range : 0, "fx", msg),
+        fx: (msg) => this.sendNear(msg.x, msg.y, fxReachOf(msg), "fx", msg),
         dmg: (msg) => this.sendNear(msg.x, msg.y, 0, "dmg", msg),
         sys: (text) =>
           this.broadcast("chat", { from: "Thiên Đạo", text, sys: true } satisfies ChatOut),
