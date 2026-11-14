@@ -633,6 +633,185 @@ function drawMonsterFrame(id, step) {
     s.tri(54, 30 + shift, 56, 35 + shift, 58, 30 + shift, 0xffffff);
     return s;
   }
+  // ---- Quái Nguyên Anh của Hàn Vân Lĩnh (M7.5b #506): tranh vẽ TRƯỚC khi loài vào `shared/` (id chưa có trong MONSTERS thì vô hại) ----
+  if (id === "han_lang") {
+    // Hàn Lang (48x44): sói băng to hơn Hôi Lang, lông xanh nhạt, bờm và gai lưng bằng tinh thể băng, mắt lam phát sáng
+    const s = new Surface(48, 44);
+    s.ellipse(24, 38, 16, 4, 0x000000, 65);
+    // Đuôi
+    s.tri(4, 20 - shift, 13, 24, 10, 31, 0x7ea3bd);
+    s.tri(4, 20 - shift, 8, 14 - shift, 9, 22, 0xe6f6ff);
+    // Chân
+    s.rect(13 + shift, 30, 4, 8, 0x6f93ad);
+    s.rect(19 - shift, 30, 4, 8, 0x86aac4);
+    s.rect(28 + shift, 30, 4, 8, 0x6f93ad);
+    s.rect(33 - shift, 30, 4, 8, 0x86aac4);
+    // Thân, bụng sáng, bờm băng
+    s.ellipse(23, 25, 13, 8, 0x9fc4dc);
+    s.ellipse(24, 28, 9, 4, 0xd6ecf7);
+    s.ellipse(29, 21, 8, 7, 0xbfd9ec);
+    for (let x = 12; x <= 30; x += 6)
+      s.tri(x, 19 + shift * 0.5, x + 3, 10 + shift, x + 6, 19, 0xe6f6ff);
+    // Đầu, mõm, tai
+    s.ellipse(35, 17 + shift * 0.5, 7, 6, 0x9fc4dc);
+    s.tri(37, 15, 46, 19, 37, 21, 0x86aac4);
+    s.tri(30, 12, 32, 4, 36, 12, 0x6f93ad);
+    s.tri(35, 11, 38, 3, 40, 12, 0x6f93ad);
+    // Mắt lam phát sáng + nanh băng
+    s.circle(38, 15, 3, 0x7fe8ff, 70);
+    s.rect(37, 14, 3, 2, 0xdff9ff);
+    s.tri(41, 21, 43, 26, 39, 22, 0xffffff);
+    // Sương lạnh quanh chân
+    s.circle(14, 38, 2.2, 0xffffff, 80);
+    s.circle(30, 39, 2.6, 0xffffff, 70);
+    return s;
+  }
+  if (id === "phong_nha") {
+    // Phong Nha (44x44): chim săn nanh thép, lông bạc xám, cánh dựng như lưỡi dao, mỏ và vuốt vàng kim (hệ kim, bắn đạn)
+    const s = new Surface(44, 44);
+    s.ellipse(22, 38, 14, 4, 0x000000, 65);
+    // Chân vuốt vàng
+    s.rect(18 + shift, 31, 2, 7, 0xe8c25a);
+    s.rect(24 - shift, 31, 2, 7, 0xe8c25a);
+    s.tri(15, 38, 21, 38, 18, 35, 0xe8c25a);
+    s.tri(22, 38, 28, 38, 25, 35, 0xe8c25a);
+    // Đuôi lưỡi
+    s.tri(6, 31 - shift, 15, 26, 14, 34, 0x7b808c);
+    s.tri(9, 36, 16, 30, 17, 35, 0x9aa0ab);
+    // Thân và ngực sáng
+    s.ellipse(22, 25, 11, 9, 0xc9ccd6);
+    s.ellipse(25, 28, 7, 6, 0xeef0f4);
+    // Cánh dựng (hai lớp lưỡi thép)
+    s.tri(10, 24, 7, 6 - shift, 21, 19, 0x9aa0ab);
+    s.tri(15, 22, 14, 3 - shift, 25, 18, 0xb4b9c4);
+    s.tri(20, 20, 22, 4 - shift, 29, 18, 0xc9ccd6);
+    s.line(10, 22, 8, 8 - shift, 0xeef0f4, 1);
+    s.line(15, 20, 14, 5 - shift, 0xeef0f4, 1);
+    // Đầu, mỏ quặp vàng, mắt
+    s.circle(31, 17 + shift * 0.5, 6, 0xc9ccd6);
+    s.tri(34, 14, 43, 19, 34, 21, 0xe8c25a);
+    s.tri(39, 19, 42, 25, 37, 21, 0xb08a2a);
+    s.circle(31, 14, 2.6, 0xffe066, 80);
+    s.rect(30, 14, 2, 2, 0x20202a);
+    s.tri(27, 12, 28, 6, 31, 11, 0x7b808c);
+    return s;
+  }
+  if (id === "cot_tuong") {
+    // Cốt Tượng (56x52): voi xương khổng lồ, chậm và đồ sộ; thân ngà xương, hốc mắt than hồng, hai ngà cong, đất khô bám chân (hệ thổ, đập đất)
+    const s = new Surface(56, 52);
+    s.ellipse(28, 47, 22, 5, 0x000000, 70);
+    // Bốn chân to như cột
+    s.rect(11 + shift, 36, 8, 11, 0x9a8a6a);
+    s.rect(21 - shift, 37, 8, 10, 0xb8aa88);
+    s.rect(32 + shift, 36, 8, 11, 0x9a8a6a);
+    s.rect(41 - shift, 37, 7, 10, 0xb8aa88);
+    s.rect(10, 45, 10, 2, 0x8a6a42);
+    s.rect(31, 45, 10, 2, 0x8a6a42);
+    // Thân xương: khung sườn + cột sống
+    s.ellipse(26, 28, 19, 12, 0xe8dfc8);
+    s.ellipse(26, 31, 14, 7, 0xcdbfa0);
+    for (let x = 14; x <= 38; x += 6) s.line(x, 21, x + 1, 36, 0x5a4630, 1.5);
+    s.line(10, 19 + shift * 0.5, 40, 19 + shift * 0.5, 0x8a6a42, 2);
+    for (let x = 12; x <= 38; x += 6) s.tri(x, 19, x + 3, 13 + shift, x + 6, 19, 0xf4ecd8);
+    // Đuôi xương
+    s.line(7, 26, 3, 36 + shift, 0xcdbfa0, 2);
+    s.circle(3, 37 + shift, 2, 0xe8dfc8);
+    // Đầu sọ voi, vòi xương, hai ngà
+    s.ellipse(42, 22 + shift * 0.5, 10, 9, 0xe8dfc8);
+    s.ellipse(46, 25, 4, 7, 0xcdbfa0);
+    s.line(50, 28, 52, 38, 0xcdbfa0, 3);
+    s.tri(40, 28, 54, 33 + shift * 0.5, 41, 31, 0xfff4d8);
+    s.tri(43, 29, 55, 40, 45, 32, 0xfff4d8);
+    s.ellipse(41, 16 + shift, 5, 4, 0xcdbfa0);
+    // Hốc mắt than hồng
+    s.circle(44, 20 + shift * 0.5, 3.2, 0x3a2a1c);
+    s.rect(43, 19 + shift * 0.5, 2, 2, 0xff5a3a);
+    // Đất khô bám
+    s.circle(16, 44, 2, 0x8a6a42);
+    s.circle(36, 45, 2.4, 0x8a6a42);
+    return s;
+  }
+  if (id === "doc_tuoc") {
+    // Độc Tước (36x36): sẻ độc nhỏ, lông lục thẫm, bụng vàng nhạt, túi độc tím phát sáng ở cổ họng, mỏ cam (hệ mộc, bắn đạn độc)
+    const s = new Surface(36, 36);
+    s.ellipse(18, 31, 11, 3, 0x000000, 60);
+    // Chân mảnh
+    s.rect(15 + shift, 26, 1, 5, 0xe8a33a);
+    s.rect(20 - shift, 26, 1, 5, 0xe8a33a);
+    // Đuôi
+    s.tri(4, 24 - shift, 12, 19, 12, 27, 0x3f6e34);
+    s.tri(6, 27, 12, 22, 13, 28, 0x5f9a4a);
+    // Thân và bụng
+    s.ellipse(18, 20, 10, 8, 0x5f9a4a);
+    s.ellipse(20, 23, 7, 5, 0xd7e89a);
+    // Cánh
+    s.tri(9, 20, 6, 10 - shift, 20, 16, 0x3f6e34);
+    s.tri(13, 18, 13, 8 - shift, 22, 15, 0x4f8640);
+    // Đầu, mỏ cam, mắt đỏ
+    s.circle(26, 14 + shift * 0.5, 5, 0x5f9a4a);
+    s.tri(29, 12, 36, 15, 29, 18, 0xe8a33a);
+    s.circle(26, 12, 2, 0xff4d5a, 70);
+    s.rect(25, 12, 2, 2, 0x20182e);
+    // Túi độc tím ở cổ họng + giọt độc
+    s.circle(27, 20, 2.6, 0x9a5fc8);
+    s.circle(27, 20, 4.2, 0xbf8aff, 60);
+    s.circle(33, 21 + shift, 1.1, 0x8fe35a, 220);
+    return s;
+  }
+  if (id === "thien_han_vuong") {
+    // Thiên Hàn Vương (Boss 88x80): sư tử băng khổng lồ, bờm tinh thể, mão băng, mắt lam phát sáng, quầng hàn khí (hệ thủy, trùm đội 3-4 người)
+    const s = new Surface(88, 80);
+    s.ellipse(44, 72, 34, 8, 0x000000, 85);
+    s.circle(44, 38, 36, 0x6fc3e6, 38);
+    // Đuôi có túm băng
+    s.line(8, 40, 3, 56 + shift, 0x4a86b8, 3);
+    s.tri(2, 52 + shift, 9, 52 + shift, 5, 64 + shift, 0xcfeeff);
+    // Bốn chân vuốt
+    s.rect(18 + shift, 56, 9, 14, 0x24507a);
+    s.rect(32 - shift, 57, 9, 13, 0x2d5f8c);
+    s.rect(50 + shift, 56, 9, 14, 0x24507a);
+    s.rect(63 - shift, 57, 8, 13, 0x2d5f8c);
+    s.tri(17, 70, 28, 70, 22, 66, 0xe6f6ff);
+    s.tri(62, 70, 73, 70, 67, 66, 0xe6f6ff);
+    // Thân đồ sộ + bụng sáng
+    s.ellipse(40, 46, 29, 17, 0x2d5f8c);
+    s.ellipse(42, 52, 20, 9, 0x4a86b8);
+    // Bờm tinh thể: hai hàng gai băng quanh cổ và lưng
+    for (let x = 14; x <= 52; x += 7)
+      s.tri(x, 33 + shift * 0.5, x + 4, 20 + shift, x + 8, 33, 0x8fd0ee);
+    for (let x = 18; x <= 56; x += 7) s.tri(x, 30, x + 3, 22 - shift, x + 6, 30, 0xcfeeff);
+    s.ellipse(58, 30 + shift * 0.5, 17, 15, 0x8fd0ee);
+    for (let a = 0; a < 9; a++) {
+      const ang = -Math.PI * 0.95 + (a * Math.PI * 1.05) / 8;
+      const bx = 58 + Math.cos(ang) * 15;
+      const by = 30 + Math.sin(ang) * 14;
+      s.tri(
+        bx - 3,
+        by,
+        bx + 3,
+        by,
+        bx + Math.cos(ang) * 9,
+        by + Math.sin(ang) * 9 + shift * 0.5,
+        0xcfeeff,
+      );
+    }
+    // Mặt: mõm, mão băng ba mũi, mắt lam, răng nanh
+    s.ellipse(63, 33 + shift * 0.5, 10, 8, 0x4a86b8);
+    s.ellipse(70, 37 + shift * 0.5, 7, 5, 0x6aa0cc);
+    s.tri(54, 18 + shift, 57, 4 + shift, 60, 17 + shift, 0xffffff);
+    s.tri(60, 17 + shift, 64, 1 + shift, 68, 17 + shift, 0xe6f6ff);
+    s.tri(68, 18 + shift, 72, 5 + shift, 74, 19 + shift, 0xffffff);
+    s.circle(64, 28 + shift * 0.5, 5, 0x9ff0ff, 80);
+    s.rect(63, 27 + shift * 0.5, 4, 3, 0xeaffff);
+    s.circle(73, 34 + shift * 0.5, 1.4, 0x20303a);
+    s.line(64, 41 + shift * 0.5, 76, 41 + shift * 0.5, 0x10203a, 1.5);
+    s.tri(66, 41 + shift * 0.5, 68, 47 + shift * 0.5, 70, 41 + shift * 0.5, 0xffffff);
+    s.tri(72, 41 + shift * 0.5, 74, 47 + shift * 0.5, 76, 41 + shift * 0.5, 0xffffff);
+    // Hàn khí quanh chân
+    s.circle(24, 70, 3, 0xffffff, 80);
+    s.circle(52, 72, 3.4, 0xffffff, 70);
+    return s;
+  }
   if (id !== "mang") throw new Error(`Chưa có tranh quái: ${id}`);
   // Xích Mãng (Boss 64x64)
   const s = new Surface(64, 64);
@@ -1270,6 +1449,12 @@ function buildAtlas() {
     "doc_thiem",
     "hac_giao",
     "yeu_vuong",
+    // Quái Nguyên Anh của Hàn Vân Lĩnh (M7.5b #506): tranh có TRƯỚC loài trong `shared/` (A thêm loài + monsterCap sau; atlas.test.ts đòi mỗi loài có khung)
+    "han_lang",
+    "phong_nha",
+    "cot_tuong",
+    "doc_tuoc",
+    "thien_han_vuong",
   ]) {
     const f0 = drawMonsterFrame(mId, 0);
     const f1 = drawMonsterFrame(mId, 1);

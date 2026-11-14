@@ -91,15 +91,15 @@
 | 67 | `client/public/assets/items/kinh_cuu_cung_khon_sat.png` | Icon kinh quyển Cửu Cung Trận Quyết (M7.4 #505) | Do nhóm Tiên Giới (Dev A) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
 | 68 | `client/public/assets/items/kinh_me_tung_bo.png` | Icon kinh quyển Mê Tung Bộ (M7.4 #505) | Do nhóm Tiên Giới (Dev A) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
 
-> Hàng 2-3 (atlas) nay có **363 khung** (xem 2b). Hàng 4-19 và 28-68 cộng lại là **57 icon** (khớp 57 mặt hàng trong `ITEMS` của `shared/`: mọi vật phẩm đều có icon riêng, không món nào dùng ảnh thay thế).
+> Hàng 2-3 (atlas) nay có **413 khung** (xem 2b). Hàng 4-19 và 28-68 cộng lại là **57 icon** (khớp 57 mặt hàng trong `ITEMS` của `shared/`: mọi vật phẩm đều có icon riêng, không món nào dùng ảnh thay thế).
 
-### 2b. Khung atlas (tệp 2-3) sau M7.4: 363 khung (337 sau M6 + 14 icon ba ô riêng + 12 icon kinh quyển), toàn bộ sinh bằng `gen-assets.mjs`
+### 2b. Khung atlas (tệp 2-3) sau M7.5b: 413 khung (337 sau M6 + 14 icon ba ô riêng + 12 icon kinh quyển + 50 khung năm quái Hàn Vân Lĩnh), toàn bộ sinh bằng `gen-assets.mjs`
 
 | Nhóm khung | Số khung | Nội dung |
 |---|:---:|---|
 | `me`, `other` | 41 + 41 | Nhân vật (mình / người khác): 4 hướng x đứng / đi / chém, tư thế bị đánh `-hurt-<hướng>`, gục `-die-0..3` |
 | `robe-*` | 123 | Ba bộ pháp bào `tho_nhung_bao`, `hac_ho_bao`, `xich_lan_bao` (3 x 41 khung như trên) |
-| `mon-*` | 90 | **9 yêu thú x 10 khung** (đứng, đi 0-1, đánh `atk-0..1`, bị đánh `hurt`, gục `die-0..3`): `tho`, `lang`, `ho`, `mang` và **M6 #407** `suong_ho`, `thach_quy`, `doc_thiem`, `hac_giao`, `yeu_vuong` |
+| `mon-*` | 140 | **9 yêu thú x 10 khung** (đứng, đi 0-1, đánh `atk-0..1`, bị đánh `hurt`, gục `die-0..3`): `tho`, `lang`, `ho`, `mang` và **M6 #407** `suong_ho`, `thach_quy`, `doc_thiem`, `hac_giao`, `yeu_vuong` và **M7.5b #506** (B, vẽ TRƯỚC khi loài vào `shared/`) `han_lang` (sói băng), `phong_nha` (chim nanh thép), `cot_tuong` (voi xương), `doc_tuoc` (sẻ độc), `thien_han_vuong` (trùm sư tử băng): **14 loài x 10 khung** (không còn "9 yêu thú x 10") |
 | `npc-*` | 9 | `truong_tran`, `duoc_su`, `tho_ren`, `cao_thi`, `lai_buon`, `thu_mon` và **M6** `tram_truong`, `lai_buon_suong`, `tho_ren_suong` |
 | `item-*` | 57 | Biểu tượng vật phẩm trong thế giới (rơi trên đất), một khung cho mỗi icon ở bảng trên |
 | `swordbeam`, `dot` | 1 + 1 | Kiếm khí, chấm nhỏ dùng chung |
