@@ -4,6 +4,7 @@ import { Monster } from "../schema";
 import { rand, quantAngle, takeWhole, type World, type MonsterCtrl } from "../world";
 import { hurtPlayer } from "./combat";
 import { chargerStep } from "./charge";
+import { isRanged, rangedStep } from "./bolt";
 import { isStunned, speedMult } from "./status-rules";
 
 const LEASH_DIST = 520; // kéo quá xa nhà thì bỏ mục tiêu
@@ -158,6 +159,12 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
     if (def.behavior === "charger" && chargerStep(w, id, m, mc, target, d, stunned)) {
       // Đang gồng (báo trước) hoặc thở sau khi lao: đứng yên, không đánh thường (M7.3, `charge.ts`)
       speed = 0;
+    } else if (isRanged(def)) {
+      // Tầm xa (M7.3, `bolt.ts`): đứng bắn / lùi / đuổi tới tầm bắn; không đánh gần
+      const mv = rangedStep(w, m, mc, target, d, stunned);
+      tx = mv.tx;
+      ty = mv.ty;
+      speed = mv.speed;
     } else if (d <= def.attackRange + PLAYER_RADIUS) {
       speed = 0;
       const aim = Math.atan2(target.y - m.y, target.x - m.x);
