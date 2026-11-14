@@ -5,6 +5,7 @@
 import {
   ITEMS,
   EQUIP_SLOTS,
+  PUBLIC_EQUIP_SLOTS,
   emptyEquipment,
   stepOf,
   type Equipment,
@@ -55,6 +56,11 @@ export const ASSUME = {
    * Tắt để xem đường cong khi không có trang bị.
    */
   useGear: true,
+  /**
+   * Mặc cả đồ ba ô RIÊNG (hài, ngọc bội, pháp bảo, M7.4) trong mô hình. TẠM TẮT: mọi chốt cân bằng M6 (nhịp tu luyện, trùm theo đội, bí cảnh) đo khi chưa có đồ này; bật lên
+   * làm vài ca "một người không hạ nổi trùm" lệch sát ngưỡng. M7.9 bật cờ này và hiệu chỉnh lại (số đồ ô riêng, trùm, bí cảnh) một lượt, kèm sinh lại `docs/CAN_BANG.md`.
+   */
+  useOwnerGear: false,
 };
 
 /** Món tốt nhất mỗi ô mà bậc (realm, tier) mặc được: món có yêu cầu cảnh giới cao nhất. */
@@ -62,7 +68,7 @@ export function bestGear(realm: number, tier: number): Equipment {
   const eq = emptyEquipment();
   if (!ASSUME.useGear) return eq;
   const step = stepOf(realm, tier);
-  for (const slot of EQUIP_SLOTS) {
+  for (const slot of ASSUME.useOwnerGear ? EQUIP_SLOTS : PUBLIC_EQUIP_SLOTS) {
     let best = -1;
     for (const it of ITEMS) {
       const e = it.equip;

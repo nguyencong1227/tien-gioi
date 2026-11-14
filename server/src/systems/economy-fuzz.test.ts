@@ -767,7 +767,7 @@ describe("kinh tế: chuỗi thao tác ngẫu nhiên không sinh thêm / làm m�
 
   it("bộ thao tác thật sự chạm tới các nhánh quan trọng (mua / bán / nhặt / mặc / đổi / rèn / trả nhiệm vụ đều xảy ra)", () => {
     const seen: Record<string, number> = {};
-    for (const seed of SEEDS.slice(0, 8)) {
+    for (const seed of SEEDS.slice(0, 12)) {
       const { w, rand, steps } = makeFuzz(seed);
       for (let i = 0; i < STEPS; i++) {
         const step = steps[Math.floor(rand() * steps.length)]!();
