@@ -56,7 +56,7 @@ describe("rollDamage: xác suất bạo kích = cơ bản + trang bị", () => {
     mockRandom([0.99, 0.5]);
     const norm = rollDamage(100, 1);
     expect(hit.dmg).toBe(Math.round(norm.dmg * CRIT_MULT));
-    for (const bad of [-30, Number.NaN, Number.NEGATIVE_INFINITY]) {
+    for (const bad of [-30, Number.NaN, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY]) {
       // Coi như 0: ngưỡng vẫn là CRIT_CHANCE (dưới ngưỡng => bạo kích, trên ngưỡng => không); số rác không được kéo ngưỡng xuống hay làm nó thành NaN
       mockRandom([CRIT_CHANCE - 0.05, 0.5]);
       expect(rollDamage(100, 1, bad).crit, `${bad} dưới ngưỡng`).toBe(true);
