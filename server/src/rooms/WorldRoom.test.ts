@@ -1442,6 +1442,36 @@ describe("vùng nhìn (StateView)", () => {
     await sleep(120);
     if (again.x !== undefined) expect(again.x).not.toBeCloseTo(TOWN_PX.x + 150, 0);
   });
+
+  it("ba ô trang bị riêng (hài, ngọc bội, pháp bảo, M7.4): chủ nhận, người khác KHÔNG nhận trường nào, kể cả khi đổi sau đó", async () => {
+    const a = await join();
+    const b = await join();
+    await waitFor(() => players(b.room).has(a.room.sessionId));
+    // Người khác không có ba trường ngay từ lần vào tầm đầu
+    for (const k of ["boots", "jade", "treasure"]) {
+      expect(players(b.room).get(a.room.sessionId)[k]).toBeUndefined();
+      expect(a.me()[k] === "" || a.me()[k] === undefined).toBe(true);
+    }
+    const sp = serverState(a.room).players.get(a.room.sessionId)! as any;
+    sp.boots = "giay_thu";
+    sp.jade = "ngoc_thu";
+    sp.treasure = "phap_bao_thu";
+    // Chủ nhận cả ba
+    await waitFor(
+      () =>
+        a.me().boots === "giay_thu" &&
+        a.me().jade === "ngoc_thu" &&
+        a.me().treasure === "phap_bao_thu",
+    );
+    // Chờ một thay đổi công khai tới b (px đổi) để chắc patch đã qua người khác, rồi khẳng định vẫn không có ba trường
+    sp.x = TOWN_PX.x + 77.4;
+    sp.y = TOWN_PX.y + 12.6;
+    await waitFor(() => players(b.room).get(a.room.sessionId).px === Math.round(TOWN_PX.x + 77.4));
+    await sleep(120);
+    for (const k of ["boots", "jade", "treasure"]) {
+      expect(players(b.room).get(a.room.sessionId)[k]).toBeUndefined();
+    }
+  });
 });
 
 describe("tổ đội", () => {
