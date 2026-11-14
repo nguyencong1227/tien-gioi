@@ -234,3 +234,68 @@ describe("biểu tượng vật phẩm và NPC Hàn Vân Lĩnh", () => {
       }
   });
 });
+
+describe("viền tối của icon Hàn Vân nhạt (M7.5c: ô túi nền nhạt làm icon cùng tông chìm)", () => {
+  const OUTLINED = [
+    "han_lang_mao",
+    "phong_nha_vu",
+    "tuong_cot",
+    "doc_tuoc_nang",
+    "han_vu_kiem",
+    "han_lang_bao",
+    "phong_nha_phu",
+    "tuyet_hanh_ngoa",
+    "han_tinh_boi",
+  ];
+  /** Số điểm màu viền (0x2a3340, độ đục 235) của icon. */
+  const outlinePixels = (id: string) => {
+    const p = iconPixels(id);
+    let n = 0;
+    for (let k = 0; k < p.w * p.h; k++) {
+      const o = k * 4;
+      if (
+        p.data[o] === 0x2a &&
+        p.data[o + 1] === 0x33 &&
+        p.data[o + 2] === 0x40 &&
+        p.data[o + 3] === 235
+      )
+        n++;
+    }
+    return n;
+  };
+
+  it("chín icon nhạt có viền tối quanh hình (đủ điểm viền); đan và Thiên Hàn Châu (đã có vòng tối / viền vàng) không thêm viền", () => {
+    for (const id of OUTLINED) expect(outlinePixels(id), id).toBeGreaterThanOrEqual(25);
+    for (const id of ["thuong_hoi_huyet_dan", "thuong_hoi_linh_dan", "thien_han_chau"])
+      expect(outlinePixels(id), id).toBe(0);
+  });
+
+  it("viền chỉ nằm NGOÀI hình: mọi điểm viền kề một điểm đặc, không có điểm viền nào đứng xa hình", () => {
+    for (const id of OUTLINED) {
+      const p = iconPixels(id);
+      const isOutline = (x: number, y: number) => {
+        const o = (y * p.w + x) * 4;
+        return (
+          p.data[o] === 0x2a &&
+          p.data[o + 1] === 0x33 &&
+          p.data[o + 2] === 0x40 &&
+          p.data[o + 3] === 235
+        );
+      };
+      const solid = (x: number, y: number) =>
+        x >= 0 &&
+        y >= 0 &&
+        x < p.w &&
+        y < p.h &&
+        p.data[(y * p.w + x) * 4 + 3] >= 200 &&
+        !isOutline(x, y);
+      for (let y = 0; y < p.h; y++)
+        for (let x = 0; x < p.w; x++)
+          if (isOutline(x, y))
+            expect(
+              solid(x - 1, y) || solid(x + 1, y) || solid(x, y - 1) || solid(x, y + 1),
+              `${id} (${x},${y})`,
+            ).toBe(true);
+    }
+  });
+});
