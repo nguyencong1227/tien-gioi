@@ -87,7 +87,7 @@ describe("M5.1 #330: perf-gate (cổng ngân sách cho perf:mobile)", () => {
   it("kết quả rỗng / không phải mảng / bậc lạ -> đỏ", () => {
     expect(evaluatePerfResults([], budget).ok).toBe(false);
     expect(evaluatePerfResults(null as unknown as unknown[], budget).ok).toBe(false);
-    const ev = evaluatePerfResults([ok("a", "ultra" as "low")], budget);
+    const ev = evaluatePerfResults([ok("a", "extreme" as "low")], budget);
     expect(ev.ok).toBe(false);
     expect(ev.violations[0].metric).toBe("bậc đồ hoạ");
   });
