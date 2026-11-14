@@ -47,6 +47,7 @@ import type { Run } from "./systems/dungeon";
 import type { StatusBox } from "./systems/status-rules";
 import { Duels } from "./systems/duel";
 import { TickStats } from "./metrics";
+import type { Bolt } from "./systems/bolt";
 
 /** Dữ liệu riêng của server cho mỗi người chơi (không gửi xuống client). */
 export interface PlayerCtrl {
@@ -241,6 +242,8 @@ export class World {
   readonly statusP = new Set<string>();
   /** Trận thách đấu và lời mời của phòng này (hai người phải cùng phòng): systems/duel.ts, docs/THIET_KE_PK.md. */
   readonly duels = new Duels();
+  /** Đạn của quái tầm xa đang bay (M7.3, `systems/bolt.ts`): KHÔNG là state, tối đa `MAX_BOLTS`; client chỉ nhận `fx` `bolt` lúc bắn. */
+  readonly bolts: Bolt[] = [];
   monsterSeq = 0;
   lootSeq = 0;
   /** Số tick đã chạy (dùng chia nhịp ghi px, py) */

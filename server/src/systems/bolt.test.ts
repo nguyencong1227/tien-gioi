@@ -1,0 +1,267 @@
+// Quái tầm xa và đạn (M7.3, #504): `fireBolt`, `rangedStep`, `tickBolts` (docs/PHAN_CONG_M7.md mục 6). Loài quái thử `t_xa` chèn vào `MONSTER_BY_ID` rồi dọn.
+import { afterEach, describe, expect, it } from "vitest";
+import { MAX_BOLTS, MONSTER_BY_ID, PLAYER_RADIUS, type MonsterKind } from "@tien-gioi/shared";
+import { fxReachOf } from "../rooms/WorldRoom";
+import {
+  BOLT_HOLD_MAX,
+  BOLT_HOLD_MIN,
+  BOLT_RADIUS,
+  BOLT_RETREAT_MULT,
+  DEFAULT_BOLT_RANGE,
+  DEFAULT_BOLT_SPEED,
+  boltRangeOf,
+  boltSpeedOf,
+  fireBolt,
+  isRanged,
+  rangedStep,
+  tickBolts,
+} from "./bolt";
+import { tickWorld } from "./tick";
+import { addMonster, addPlayer, makeWorld } from "./test-helpers";
+
+const XA = "t_xa";
+const added: string[] = [];
+/** Loài quái tầm xa thử: bắn 300 px / giây, tầm 300 px, 20 sát thương, hồi 1 giây. */
+function ranged(over: Partial<MonsterKind> = {}): MonsterKind {
+  const def: MonsterKind = {
+    ...MONSTER_BY_ID.lang,
+    id: XA,
+    name: "Quái bắn thử",
+    behavior: "ranged",
+    boltSpeed: 300,
+    boltRange: 300,
+    atk: 20,
+    attackCd: 1000,
+    aggro: 500,
+    attackRange: 20,
+    hp: 1e9,
+    ...over,
+  };
+  MONSTER_BY_ID[XA] = def;
+  if (!added.includes(XA)) added.push(XA);
+  return def;
+}
+afterEach(() => {
+  for (const id of added.splice(0)) delete MONSTER_BY_ID[id];
+});
+
+/** Người chơi Luyện Khí đứng ngoài trấn, quái tầm xa đứng cách `gap` px về bên trái. */
+function setup(gap: number, over: Partial<MonsterKind> = {}) {
+  ranged(over);
+  const t = makeWorld();
+  const a = addPlayer(t.w, "a", 1, 0);
+  const m = addMonster(t.w, XA, a.p.x - gap, a.p.y);
+  m.mc.homeX = m.m.x;
+  m.mc.homeY = m.m.y;
+  t.w.now = 10_000;
+  return { ...t, ...a, mon: m };
+}
+const boltFx = (t: ReturnType<typeof setup>) => t.fx.filter((f) => f.kind === "bolt");
+
+describe("fireBolt", () => {
+  it("thêm đúng MỘT đạn (hướng, tốc độ, tầm, sát thương = atk) và gửi đúng MỘT fx `bolt`", () => {
+    const t = setup(200);
+    expect(fireBolt(t.w, t.mon.m, MONSTER_BY_ID[XA], 0)).toBe(true);
+    expect(t.w.bolts).toHaveLength(1);
+    const b = t.w.bolts[0];
+    expect([b.x, b.y]).toEqual([t.mon.m.x, t.mon.m.y]);
+    expect([b.ux, b.uy]).toEqual([1, 0]);
+    expect([b.speed, b.left, b.dmg, b.kind]).toEqual([300, 300, 20, XA]);
+    const fx = boltFx(t);
+    expect(fx).toHaveLength(1);
+    expect(fx[0]).toMatchObject({ kind: "bolt", angle: 0, speed: 300, range: 300 });
+  });
+
+  it("đủ MAX_BOLTS thì bỏ đạn mới (không ném lỗi, không gửi fx)", () => {
+    const t = setup(200);
+    for (let i = 0; i < MAX_BOLTS; i++)
+      expect(fireBolt(t.w, t.mon.m, MONSTER_BY_ID[XA], 0)).toBe(true);
+    t.fx.length = 0;
+    expect(fireBolt(t.w, t.mon.m, MONSTER_BY_ID[XA], 0)).toBe(false);
+    expect(t.w.bolts).toHaveLength(MAX_BOLTS);
+    expect(t.fx).toHaveLength(0);
+  });
+
+  it("mặc định tốc độ / tầm khi dữ liệu bỏ trống; fx `bolt` có tầm nhìn bằng `range`", () => {
+    const def = ranged({ boltSpeed: undefined, boltRange: undefined });
+    expect([boltSpeedOf(def), boltRangeOf(def)]).toEqual([DEFAULT_BOLT_SPEED, DEFAULT_BOLT_RANGE]);
+    expect(fxReachOf({ kind: "bolt", x: 0, y: 0, angle: 0, speed: 240, range: 280 })).toBe(280);
+    expect(isRanged(def)).toBe(true);
+    expect(isRanged(MONSTER_BY_ID.lang)).toBe(false);
+  });
+});
+
+describe("tickBolts", () => {
+  it("bay đúng speed x dt mỗi tick, hết tầm thì biến mất (không bay quá tầm)", () => {
+    const t = setup(200);
+    t.p.x += 5000; // người chơi ở rất xa: không trúng
+    fireBolt(t.w, t.mon.m, MONSTER_BY_ID[XA], 0);
+    const x0 = t.w.bolts[0].x;
+    tickBolts(t.w, 0.05);
+    expect(t.w.bolts[0].x).toBeCloseTo(x0 + 15, 6); // 300 x 0,05
+    expect(t.w.bolts[0].left).toBeCloseTo(285, 6);
+    for (let i = 0; i < 18; i++) tickBolts(t.w, 0.05);
+    expect(t.w.bolts).toHaveLength(1); // còn 15 px
+    tickBolts(t.w, 0.05);
+    expect(t.w.bolts).toHaveLength(0);
+  });
+
+  it("trúng người đứng trên đường bay: trừ đúng atk, mất đạn; bắn trượt (người đứng lệch quá bán kính trúng) thì bay qua", () => {
+    const t = setup(200);
+    fireBolt(t.w, t.mon.m, MONSTER_BY_ID[XA], 0);
+    const hp0 = t.p.hp;
+    for (let i = 0; i < 20 && t.w.bolts.length > 0; i++) tickBolts(t.w, 0.05);
+    expect(t.w.bolts).toHaveLength(0);
+    expect(hp0 - t.p.hp).toBe(20);
+    expect(t.dmgs.some((d) => d.toPlayer && d.amount === 20)).toBe(true);
+
+    const s = setup(200);
+    s.p.y += PLAYER_RADIUS + BOLT_RADIUS + 3; // đi ngang ra khỏi đường đạn
+    fireBolt(s.w, s.mon.m, MONSTER_BY_ID[XA], 0);
+    const hs = s.p.hp;
+    for (let i = 0; i < 20; i++) tickBolts(s.w, 0.05);
+    expect(s.p.hp).toBe(hs);
+    expect(s.w.bolts).toHaveLength(0); // hết tầm
+  });
+
+  it("đạn nhanh không xuyên qua người (kiểm theo ĐOẠN bay, không theo điểm cuối)", () => {
+    const t = setup(200, { boltSpeed: 4000, boltRange: 400 });
+    fireBolt(t.w, t.mon.m, MONSTER_BY_ID[XA], 0);
+    const hp0 = t.p.hp;
+    tickBolts(t.w, 0.05); // 200 px một tick, bước qua người chơi
+    expect(hp0 - t.p.hp).toBe(20);
+    expect(t.w.bolts).toHaveLength(0);
+  });
+
+  it("một đạn một người: hai người xếp hàng trên đường bay thì chỉ người đứng trước trúng", () => {
+    const t = setup(200);
+    const b = addPlayer(t.w, "b", 1, 0);
+    b.p.x = t.p.x + 60;
+    b.p.y = t.p.y;
+    fireBolt(t.w, t.mon.m, MONSTER_BY_ID[XA], 0);
+    const [hpA, hpB] = [t.p.hp, b.p.hp];
+    for (let i = 0; i < 30; i++) tickBolts(t.w, 0.05);
+    expect(t.p.hp).toBeLessThan(hpA);
+    expect(b.p.hp).toBe(hpB);
+  });
+
+  it("không trúng người trong khu an toàn (trấn); người chết không bị trúng", () => {
+    const t = setup(200);
+    t.p.x = t.w.map.townPx.x;
+    t.p.y = t.w.map.townPx.y;
+    t.mon.m.x = t.p.x - 200;
+    t.mon.m.y = t.p.y;
+    fireBolt(t.w, t.mon.m, MONSTER_BY_ID[XA], 0);
+    const hp0 = t.p.hp;
+    for (let i = 0; i < 20; i++) tickBolts(t.w, 0.05);
+    expect(t.p.hp).toBe(hp0);
+
+    const d = setup(200);
+    d.p.dead = true;
+    fireBolt(d.w, d.mon.m, MONSTER_BY_ID[XA], 0);
+    const hd = d.p.hp;
+    for (let i = 0; i < 20; i++) tickBolts(d.w, 0.05);
+    expect(d.p.hp).toBe(hd);
+  });
+
+  it("dừng ở ô chặn: đạn bắn vào tường biến mất, người đứng sau tường không bị trúng", () => {
+    const t = setup(200);
+    // Tìm một điểm chặn gần nhất bên phải người chơi và đặt người chơi sau nó
+    let wallX = -1;
+    for (let x = t.p.x; x < t.p.x + 3000; x += 8) {
+      if (t.w.map.isBlockedPx(x, t.p.y)) {
+        wallX = x;
+        break;
+      }
+    }
+    expect(wallX).toBeGreaterThan(0);
+    t.w.bolts.push({
+      x: wallX - 20,
+      y: t.p.y,
+      ux: 1,
+      uy: 0,
+      speed: 300,
+      left: 300,
+      dmg: 20,
+      kind: XA,
+    });
+    t.p.x = wallX + 200;
+    const hp0 = t.p.hp;
+    for (let i = 0; i < 20; i++) tickBolts(t.w, 0.05);
+    expect(t.w.bolts).toHaveLength(0);
+    expect(t.p.hp).toBe(hp0);
+  });
+
+  it("danh sách rỗng thì không tốn gì và không ném lỗi", () => {
+    const t = setup(200);
+    expect(() => tickBolts(t.w, 0.05)).not.toThrow();
+    expect(t.w.bolts).toHaveLength(0);
+  });
+});
+
+describe("rangedStep: giữ khoảng cách", () => {
+  const range = 300;
+  it("quá xa (> 0,85 tầm): đuổi theo, chưa bắn", () => {
+    const t = setup(range * BOLT_HOLD_MAX + 40);
+    const d = Math.hypot(t.p.x - t.mon.m.x, t.p.y - t.mon.m.y);
+    const mv = rangedStep(t.w, t.mon.m, t.mon.mc, t.p, d, false);
+    expect(mv.speed).toBe(MONSTER_BY_ID[XA].speed);
+    expect([mv.tx, mv.ty]).toEqual([t.p.x, t.p.y]);
+    expect(t.w.bolts).toHaveLength(0);
+  });
+
+  it("trong dải bắn: đứng yên, bắn MỘT đạn rồi chờ `attackCd`; hết hồi thì bắn tiếp", () => {
+    const t = setup(200);
+    const d = 200;
+    const mv = rangedStep(t.w, t.mon.m, t.mon.mc, t.p, d, false);
+    expect(mv.speed).toBe(0);
+    expect(t.w.bolts).toHaveLength(1);
+    expect(t.mon.mc.nextAttack).toBe(t.w.now + 1000);
+    rangedStep(t.w, t.mon.m, t.mon.mc, t.p, d, false);
+    expect(t.w.bolts).toHaveLength(1); // chưa hết hồi
+    t.w.now += 1000;
+    rangedStep(t.w, t.mon.m, t.mon.mc, t.p, d, false);
+    expect(t.w.bolts).toHaveLength(2);
+  });
+
+  it("mục tiêu áp sát (< 0,3 tầm): lùi ra xa (tốc độ x BOLT_RETREAT_MULT) mà vẫn bắn", () => {
+    const gap = range * BOLT_HOLD_MIN - 20;
+    const t = setup(gap);
+    const mv = rangedStep(t.w, t.mon.m, t.mon.mc, t.p, gap, false);
+    expect(mv.speed).toBeCloseTo(MONSTER_BY_ID[XA].speed * BOLT_RETREAT_MULT, 6);
+    expect(mv.tx).toBeLessThan(t.mon.m.x); // người chơi ở bên phải, quái lùi sang trái
+    expect(t.w.bolts).toHaveLength(1);
+  });
+
+  it("choáng thì không bắn", () => {
+    const t = setup(200);
+    rangedStep(t.w, t.mon.m, t.mon.mc, t.p, 200, true);
+    expect(t.w.bolts).toHaveLength(0);
+  });
+});
+
+describe("nối vào vòng tick: quái thật bắn người chơi", () => {
+  it("quái tầm xa thấy người chơi thì đứng ở tầm, bắn đạn bay tới trúng người đứng yên; người đi ngang tránh được", () => {
+    const hit = setup(280);
+    hit.w.now = 10_000;
+    let shots = 0;
+    for (let i = 0; i < 120; i++) {
+      hit.w.now += 50;
+      tickWorld(hit.w, 50);
+      shots = boltFx(hit).length;
+    }
+    expect(shots).toBeGreaterThanOrEqual(2); // hồi 1 giây, ~6 giây mô phỏng
+    expect(hit.p.hp).toBeLessThan(hit.p.maxHp); // đứng yên: dính đạn
+
+    const dodge = setup(280);
+    dodge.w.now = 10_000;
+    for (let i = 0; i < 120; i++) {
+      dodge.w.now += 50;
+      // Người chơi liên tục đi ngang (lên xuống) ra khỏi đường đạn
+      dodge.p.y += i % 40 < 20 ? 6 : -6;
+      tickWorld(dodge.w, 50);
+    }
+    expect(boltFx(dodge).length).toBeGreaterThanOrEqual(2);
+    expect(dodge.p.hp).toBeGreaterThanOrEqual(hit.p.hp); // né giỏi hơn đứng yên
+  });
+});

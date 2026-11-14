@@ -10,6 +10,7 @@ import { tickDungeonRun, tickDungeons } from "./dungeon";
 import { tickDuels } from "./duel";
 import { tickSect } from "./sect";
 import { tickStatuses } from "./status";
+import { tickBolts } from "./bolt";
 
 export function tickWorld(w: World, dtMs: number) {
   const dt = dtMs / 1000;
@@ -26,6 +27,7 @@ export function tickWorld(w: World, dtMs: number) {
   });
   tickStatuses(w, dt); // trước quái: quái chết vì sát thương theo giây thì không còn bị cập nhật
   tickMonsters(w, dt);
+  tickBolts(w, dt); // đạn của quái tầm xa (M7.3): sau quái (quái vừa bắn thì đạn bay ngay tick sau)
   tickLoot(w);
   tickParty(w);
   tickDungeons(w);
