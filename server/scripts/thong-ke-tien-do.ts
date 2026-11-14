@@ -1,11 +1,18 @@
 // Công cụ CHỈ-ĐỌC thống kê tiến độ người chơi (M6.12 - Issue #488).
-// Phục vụ theo dõi cân bằng Kim Đan và bãi Xích Mãng sau phát hành v0.2.0 (ngưỡng ~4 giờ theo #406).
+// Phục vụ theo dõi cân bằng Kim Đan và bãi Xích Mãng sau phát hành v0.2.0 (theo #406 và CAN_BANG mục 10).
 // Tuyệt đối CHỈ ĐỌC: không sửa đổi dữ liệu, không kết nối DB bản chạy thật, không in tên hay dữ liệu nhạy cảm.
 import { existsSync, lstatSync, readdirSync, readFileSync, createReadStream } from "node:fs";
 import zlib from "node:zlib";
 import readline from "node:readline";
 import path from "node:path";
 import { REALMS, realmLabel, stepOf } from "@tien-gioi/shared";
+import { simulate } from "../src/balance/simulate";
+
+export const KD_REALM_INDEX = REALMS.findIndex((r) => r.name.toLowerCase().includes("kim đan"));
+export const KD_REALM = KD_REALM_INDEX >= 0 ? KD_REALM_INDEX : 3;
+export const KD_HAU_KY_TIER = REALMS[KD_REALM]?.tiers.length
+  ? REALMS[KD_REALM].tiers.length - 1
+  : 2;
 
 export interface PlayerProgressRecord {
   realm: number;
@@ -34,6 +41,50 @@ export function calcStats(numbers: number[]): {
   const mid = Math.floor(n / 2);
   const median = n % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
   return { min, max, median, mean };
+}
+
+/**
+ * Giải mã ký tự thoát trong định dạng PostgreSQL COPY (text format).
+ * pg_dump nhân đôi dấu \ (\\\\), thoát nháy kép (\\"), tab (\\t), xuống dòng (\\n), v.v.
+ */
+export function unescapePgCopy(text: string): string {
+  if (text === "\\N") return "";
+  let out = "";
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === "\\" && i + 1 < text.length) {
+      i++;
+      const c = text[i];
+      switch (c) {
+        case "b":
+          out += "\b";
+          break;
+        case "f":
+          out += "\f";
+          break;
+        case "n":
+          out += "\n";
+          break;
+        case "r":
+          out += "\r";
+          break;
+        case "t":
+          out += "\t";
+          break;
+        case "v":
+          out += "\v";
+          break;
+        case "\\":
+          out += "\\";
+          break;
+        default:
+          out += c;
+          break;
+      }
+    } else {
+      out += text[i];
+    }
+  }
+  return out;
 }
 
 /** Làm sạch và trích xuất dữ liệu tiến độ từ record JSON thô. Không lấy tên hoặc trường nhạy cảm. */
@@ -164,7 +215,7 @@ export async function readBackupProgress(backupPath: string): Promise<{
     }
 
     try {
-      const rawJson = parts[dataColumnIndex];
+      const rawJson = unescapePgCopy(parts[dataColumnIndex]);
       const parsed = JSON.parse(rawJson);
       const rec = sanitizeRecord(parsed);
       if (rec) {
@@ -180,6 +231,33 @@ export async function readBackupProgress(backupPath: string): Promise<{
   return { records, corruptedCount, totalRows };
 }
 
+export interface OptimalModelMap {
+  reachHours: Map<number, number>; // stepOf(realm, tier) -> optimal hours to reach
+  finishHours: Map<number, number>; // stepOf(realm, tier) -> optimal hours to finish
+  kdHauKyReachHours: number; // optimal hours to reach Kim Đan Hậu kỳ
+  kdFinishHours: number; // optimal hours to finish all Kim Đan
+}
+
+export function getOptimalModel(): OptimalModelMap {
+  const rows = simulate(KD_REALM);
+  const reachHours = new Map<number, number>();
+  const finishHours = new Map<number, number>();
+
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const s = stepOf(r.realm, r.tier);
+    const reachMins = i === 0 ? 0 : rows[i - 1].total;
+    reachHours.set(s, reachMins / 60);
+    finishHours.set(s, r.total / 60);
+  }
+
+  const kdHauKyStep = stepOf(KD_REALM, KD_HAU_KY_TIER);
+  const kdHauKyReachHours = reachHours.get(kdHauKyStep) ?? 6.0;
+  const kdFinishHours = (rows.at(-1)?.total ?? 498) / 60;
+
+  return { reachHours, finishHours, kdHauKyReachHours, kdFinishHours };
+}
+
 export interface GroupStat {
   realm: number;
   tier: number;
@@ -189,10 +267,11 @@ export interface GroupStat {
   minHours: number;
   medianHours: number;
   maxHours: number;
+  optimalReachHours: number | null;
+  ratioToModel: number | null;
   avgKills: number;
   avgBossKills: number;
   mapCounts: Record<string, number>;
-  estimateStatus: string;
 }
 
 export interface ProgressReport {
@@ -201,8 +280,12 @@ export interface ProgressReport {
   corruptedCount: number;
   kdHauKyCount: number;
   kdHauKyMedianHours: number | null;
+  kdHauKyOptReachHours: number;
+  kdHauKyRatio: number | null;
   postKdCount: number;
   postKdMedianHours: number | null;
+  postKdOptHours: number;
+  postKdRatio: number | null;
   verdict: string;
 }
 
@@ -210,6 +293,7 @@ export function buildProgressReport(
   records: PlayerProgressRecord[],
   corruptedCount: number,
 ): ProgressReport {
+  const model = getOptimalModel();
   const groupsMap = new Map<
     number,
     { records: PlayerProgressRecord[]; realm: number; tier: number }
@@ -244,7 +328,11 @@ export function buildProgressReport(
     }
 
     const label = realmLabel(g.realm, g.tier);
-    const estimateStatus = count >= 5 ? `~${stats.median.toFixed(1)} h` : "chưa đủ mẫu (< 5)";
+    const optimalReachHours =
+      g.realm > KD_REALM ? model.kdFinishHours : (model.reachHours.get(s) ?? null);
+
+    const ratioToModel =
+      optimalReachHours !== null && optimalReachHours > 0 ? stats.median / optimalReachHours : null;
 
     groups.push({
       realm: g.realm,
@@ -255,43 +343,67 @@ export function buildProgressReport(
       minHours: stats.min,
       medianHours: stats.median,
       maxHours: stats.max,
+      optimalReachHours,
+      ratioToModel,
       avgKills: totalKills / count,
       avgBossKills: totalBossKills / count,
       mapCounts,
-      estimateStatus,
     });
   }
 
-  // Kim Đan Hậu kỳ: realm = 3, tier = 2
-  const kdHauKyRecords = records.filter((r) => r.realm === 3 && r.tier === 2);
+  // Kim Đan Hậu kỳ
+  const kdHauKyRecords = records.filter((r) => r.realm === KD_REALM && r.tier === KD_HAU_KY_TIER);
   const kdHauKyCount = kdHauKyRecords.length;
   let kdHauKyMedianHours: number | null = null;
+  let kdHauKyRatio: number | null = null;
   if (kdHauKyCount > 0) {
     const hours = kdHauKyRecords.map((r) => r.playMs / 3600000);
     kdHauKyMedianHours = calcStats(hours).median;
+    if (model.kdHauKyReachHours > 0) {
+      kdHauKyRatio = kdHauKyMedianHours / model.kdHauKyReachHours;
+    }
   }
 
-  // Sau Kim Đan: realm > 3
-  const postKdRecords = records.filter((r) => r.realm > 3);
+  // Sau Kim Đan: realm > KD_REALM
+  const postKdRecords = records.filter((r) => r.realm > KD_REALM);
   const postKdCount = postKdRecords.length;
   let postKdMedianHours: number | null = null;
+  let postKdRatio: number | null = null;
   if (postKdCount > 0) {
     const hours = postKdRecords.map((r) => r.playMs / 3600000);
     postKdMedianHours = calcStats(hours).median;
+    if (model.kdFinishHours > 0) {
+      postKdRatio = postKdMedianHours / model.kdFinishHours;
+    }
   }
 
-  // Đánh giá theo ngưỡng 4 giờ của #406
+  // Đánh giá theo tiêu chí cân bằng (#406, CAN_BANG mục 10)
+  // Ngưỡng cảnh báo: tỉ số giờ chơi tích luỹ / mô hình tối ưu < 0.7x với >= 5 mẫu
   let verdict: string;
-  if (kdHauKyCount >= 5 && kdHauKyMedianHours !== null) {
-    if (kdHauKyMedianHours < 4.0) {
-      verdict = `🚨 CẢNH BÁO: Trung vị thời gian tới Kim Đan Hậu kỳ = ${kdHauKyMedianHours.toFixed(1)}h (< 4.0h). Người chơi tiến cấp nhanh hơn thiết kế, có dấu hiệu đường tắt cày Xích Mãng. Đề xuất điều chỉnh mật độ / hồi sinh Xích Mãng ở bản vá kế tiếp.`;
+  if (postKdCount >= 5 && postKdMedianHours !== null && postKdRatio !== null) {
+    if (postKdRatio < 0.7) {
+      verdict = `🚨 CẢNH BÁO (QUÁ NHANH): Nhóm vượt qua Kim Đan có trung vị giờ chơi tích luỹ = ${postKdMedianHours.toFixed(1)}h (${postKdRatio.toFixed(2)}x mô hình tối ưu ${model.kdFinishHours.toFixed(1)}h, dưới ngưỡng 0.7x). Người chơi vượt qua Kim Đan nhanh hơn thiết kế (>30%), có dấu hiệu đường tắt cày Xích Mãng theo #406. Đề xuất điều chỉnh mật độ / thời gian hồi sinh Xích Mãng ở bản vá kế tiếp.`;
     } else {
-      verdict = `✅ ĐẠT MỤC TIÊU: Trung vị thời gian tới Kim Đan Hậu kỳ = ${kdHauKyMedianHours.toFixed(1)}h (>= 4.0h). Tiến độ nằm trong khung thiết kế cân bằng (4 - 7 giờ).`;
+      verdict = `Trong dự kiến: Nhóm vượt qua Kim Đan có trung vị giờ chơi tích luỹ = ${postKdMedianHours.toFixed(1)}h (${postKdRatio.toFixed(2)}x mô hình tối ưu ${model.kdFinishHours.toFixed(1)}h, cận trên thời gian tới bậc). Chưa có dấu hiệu bất thường.`;
     }
-  } else if (kdHauKyCount > 0 && kdHauKyMedianHours !== null) {
-    verdict = `⚠️ THAM KHẢO: Hiện có ${kdHauKyCount} người chơi đạt Kim Đan Hậu kỳ (< 5 mẫu). Trung vị hiện tại là ${kdHauKyMedianHours.toFixed(1)}h. Chưa đủ mẫu thống kê để kết luận (cần >= 5 mẫu).`;
+  } else if (kdHauKyCount >= 5 && kdHauKyMedianHours !== null && kdHauKyRatio !== null) {
+    if (kdHauKyRatio < 0.7) {
+      verdict = `🚨 CẢNH BÁO (QUÁ NHANH): Trung vị giờ chơi tích luỹ tới Kim Đan Hậu kỳ = ${kdHauKyMedianHours.toFixed(1)}h (${kdHauKyRatio.toFixed(2)}x mô hình tối ưu ${model.kdHauKyReachHours.toFixed(1)}h, dưới ngưỡng 0.7x). Người chơi tiến cấp nhanh hơn thiết kế (>30%), có dấu hiệu đường tắt cày Xích Mãng theo #406. Đề xuất điều chỉnh mật độ / thời gian hồi sinh Xích Mãng ở bản vá kế tiếp.`;
+    } else {
+      verdict = `Trong dự kiến: Trung vị giờ chơi tích luỹ tới Kim Đan Hậu kỳ = ${kdHauKyMedianHours.toFixed(1)}h (${kdHauKyRatio.toFixed(2)}x mô hình tối ưu ${model.kdHauKyReachHours.toFixed(1)}h, cận trên thời gian tới bậc). Chưa có dấu hiệu bất thường.`;
+    }
+  } else if (kdHauKyCount > 0 || postKdCount > 0) {
+    const kdPart =
+      kdHauKyCount > 0
+        ? `${kdHauKyCount} Kim Đan Hậu kỳ (trung vị ${kdHauKyMedianHours!.toFixed(1)}h / mô hình ${model.kdHauKyReachHours.toFixed(1)}h)`
+        : `0 Kim Đan Hậu kỳ`;
+    const postPart =
+      postKdCount > 0
+        ? `${postKdCount} vượt Kim Đan (trung vị ${postKdMedianHours!.toFixed(1)}h / mô hình ${model.kdFinishHours.toFixed(1)}h)`
+        : `0 vượt Kim Đan`;
+    verdict = `⚠️ THAM KHẢO (chưa đủ mẫu): Ghi nhận ${kdPart}, ${postPart}. Cần ít nhất 5 mẫu cùng nhóm để kết luận tin cậy.`;
   } else {
-    verdict = `ℹ️ CHƯA CÓ DỮ LIỆU: Chưa ghi nhận người chơi nào đạt Kim Đan Hậu kỳ trên tập dữ liệu này. Tiếp tục theo dõi các bản sao lưu tiếp theo.`;
+    verdict = `ℹ️ CHƯA CÓ DỮ LIỆU: Chưa ghi nhận người chơi nào đạt Kim Đan Hậu kỳ hoặc vượt qua Kim Đan trên tập dữ liệu này. Tiếp tục theo dõi các bản sao lưu tiếp theo.`;
   }
 
   return {
@@ -300,8 +412,12 @@ export function buildProgressReport(
     corruptedCount,
     kdHauKyCount,
     kdHauKyMedianHours,
+    kdHauKyOptReachHours: model.kdHauKyReachHours,
+    kdHauKyRatio,
     postKdCount,
     postKdMedianHours,
+    postKdOptHours: model.kdFinishHours,
+    postKdRatio,
     verdict,
   };
 }
@@ -321,23 +437,26 @@ export function formatMarkdownReport(report: ProgressReport, sourceDesc: string)
   lines.push(`## 1. Bảng phân bố tiến độ theo Cảnh giới - Bậc`);
   lines.push(``);
   lines.push(
-    `| Cảnh giới - Bậc | Số người | Giờ chơi (Min / Median / Max) | Ước lượng thời gian | Quái hạ TB | Trùm hạ TB | Bản đồ |`,
+    `| Cảnh giới - Bậc | Số người | Giờ chơi tích luỹ (Min / Med / Max) | Mô hình tới bậc | Trung vị / Mô hình | Quái hạ TB | Trùm hạ TB | Bản đồ |`,
   );
-  lines.push(`|---|---:|---:|---:|---:|---:|---|`);
+  lines.push(`|---|---:|---:|---:|---:|---:|---:|---|`);
 
   if (report.groups.length === 0) {
-    lines.push(`| *(Không có dữ liệu)* | 0 | - | - | - | - | - |`);
+    lines.push(`| *(Không có dữ liệu)* | 0 | - | - | - | - | - | - |`);
   } else {
     for (const g of report.groups) {
       const minStr = g.minHours.toFixed(1);
       const medStr = g.medianHours.toFixed(1);
       const maxStr = g.maxHours.toFixed(1);
-      const hoursRange = `${minStr} / **${medStr}** / ${maxStr} h`;
+      const hoursRange =
+        g.count === 1 ? `**${medStr}** h` : `${minStr} / **${medStr}** / ${maxStr} h`;
+      const optStr = g.optimalReachHours !== null ? `${g.optimalReachHours.toFixed(1)} h` : "-";
+      const ratioStr = g.ratioToModel !== null ? `${g.ratioToModel.toFixed(2)}x` : "-";
       const mapsStr = Object.entries(g.mapCounts)
         .map(([m, c]) => `${m}: ${c}`)
         .join(", ");
       lines.push(
-        `| ${g.label} | ${g.count} | ${hoursRange} | ${g.estimateStatus} | ${g.avgKills.toFixed(0)} | ${g.avgBossKills.toFixed(1)} | ${mapsStr} |`,
+        `| ${g.label} | ${g.count} | ${hoursRange} | ${optStr} | ${ratioStr} | ${g.avgKills.toFixed(0)} | ${g.avgBossKills.toFixed(1)} | ${mapsStr} |`,
       );
     }
   }
@@ -346,16 +465,20 @@ export function formatMarkdownReport(report: ProgressReport, sourceDesc: string)
   lines.push(`## 2. Theo dõi cân bằng Kim Đan (#406)`);
   lines.push(``);
   if (report.kdHauKyCount > 0 && report.kdHauKyMedianHours !== null) {
+    const ratioText = report.kdHauKyRatio !== null ? `${report.kdHauKyRatio.toFixed(2)}x` : "-";
     lines.push(
-      `- **Kim Đan Hậu kỳ:** ${report.kdHauKyCount} nhân vật | Trung vị thời gian chơi: **${report.kdHauKyMedianHours.toFixed(1)} giờ**`,
+      `- **Kim Đan Hậu kỳ:** ${report.kdHauKyCount} nhân vật | Trung vị tích luỹ: **${report.kdHauKyMedianHours.toFixed(1)} giờ** (mô hình tối ưu: ~${report.kdHauKyOptReachHours.toFixed(1)} giờ, tỉ số: ${ratioText})`,
     );
   } else {
-    lines.push(`- **Kim Đan Hậu kỳ:** 0 nhân vật`);
+    lines.push(
+      `- **Kim Đan Hậu kỳ:** 0 nhân vật (mô hình tối ưu tới bậc: ~${report.kdHauKyOptReachHours.toFixed(1)} giờ)`,
+    );
   }
 
   if (report.postKdCount > 0 && report.postKdMedianHours !== null) {
+    const ratioText = report.postKdRatio !== null ? `${report.postKdRatio.toFixed(2)}x` : "-";
     lines.push(
-      `- **Vượt qua Kim Đan (Nguyên Anh trở lên):** ${report.postKdCount} nhân vật | Trung vị thời gian chơi: **${report.postKdMedianHours.toFixed(1)} giờ**`,
+      `- **Vượt qua Kim Đan (Nguyên Anh trở lên):** ${report.postKdCount} nhân vật | Trung vị tích luỹ: **${report.postKdMedianHours.toFixed(1)} giờ** (mô hình tối ưu hết KĐ: ~${report.postKdOptHours.toFixed(1)} giờ, tỉ số: ${ratioText})`,
     );
   }
 
@@ -363,6 +486,12 @@ export function formatMarkdownReport(report: ProgressReport, sourceDesc: string)
   lines.push(`### Kết luận cân bằng:`);
   lines.push(`> ${report.verdict}`);
   lines.push(``);
+  lines.push(
+    `*Tiêu chí theo dõi (#406, CAN_BANG mục 10): So sánh giờ chơi tích luỹ với mô hình tối ưu simulate(3). Cảnh báo QUÁ NHANH khi tỉ số < 0.7x với >= 5 mẫu (nhanh hơn mô hình > 30%, có dấu hiệu cày tắt Xích Mãng).*`,
+  );
+  lines.push(
+    `*Lưu ý về kiếp và luân hồi: Thời gian chơi \`life.playMs\` được tính tích luỹ từ đầu kiếp hiện tại (đặt về 0 khi luân hồi). Người chơi ở kiếp >= 2 tu luyện nhanh hơn đáng kể nhờ Dư âm tu hành (không đối chiếu trực tiếp với mô hình tối ưu kiếp 1).*`,
+  );
   lines.push(
     `*Ghi chú bảo vệ quyền riêng tư: Công cụ tuyệt đối không in tên nhân vật, đạo hiệu, token hay thông tin định danh nào.*`,
   );

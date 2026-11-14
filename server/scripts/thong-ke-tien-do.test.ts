@@ -5,11 +5,15 @@ import path from "node:path";
 import zlib from "node:zlib";
 import {
   calcStats,
+  unescapePgCopy,
   sanitizeRecord,
   readDirProgress,
   readBackupProgress,
+  getOptimalModel,
   buildProgressReport,
   formatMarkdownReport,
+  KD_REALM,
+  KD_HAU_KY_TIER,
 } from "./thong-ke-tien-do";
 
 describe("thong-ke-tien-do: calcStats", () => {
@@ -35,6 +39,27 @@ describe("thong-ke-tien-do: calcStats", () => {
     expect(res.max).toBe(10);
     expect(res.median).toBe(6);
     expect(res.mean).toBe(6);
+  });
+});
+
+describe("thong-ke-tien-do: unescapePgCopy", () => {
+  it("giải mã các ký tự thoát PostgreSQL COPY text format", () => {
+    expect(unescapePgCopy("\\N")).toBe("");
+    expect(unescapePgCopy("hello\\tworld")).toBe("hello\tworld");
+    expect(unescapePgCopy("line1\\nline2")).toBe("line1\nline2");
+    expect(unescapePgCopy("line1\\rline2")).toBe("line1\rline2");
+    expect(unescapePgCopy("path\\\\to\\\\file")).toBe("path\\to\\file");
+    expect(unescapePgCopy('quote\\"test\\"')).toBe('quote"test"');
+  });
+
+  it("giải mã đúng JSON chứa dấu ngoặc kép bị pg_dump escape kép", () => {
+    // pg_dump khi xuất cột JSON có chứa nháy kép: {"name": "Lạc Hà \"Trấn\""}
+    // sẽ nhân đôi dấu \ thành: {"name": "Lạc Hà \\\"Trấn\\\""}
+    const dumpedJson = String.raw`{"name": "Lạc Hà \\\"Trấn\\\"", "desc": "Bản đồ \\\\ sơn cốc"}`;
+    const unescaped = unescapePgCopy(dumpedJson);
+    const parsed = JSON.parse(unescaped);
+    expect(parsed.name).toBe('Lạc Hà "Trấn"');
+    expect(parsed.desc).toBe("Bản đồ \\ sơn cốc");
   });
 });
 
@@ -142,17 +167,19 @@ describe("thong-ke-tien-do: đọc thư mục JSON", () => {
 });
 
 describe("thong-ke-tien-do: đọc tệp sao lưu .sql.gz (COPY characters)", () => {
-  it("đọc stream và giải nén tệp .sql.gz, trích xuất dữ liệu JSON từ khối COPY", async () => {
+  it("đọc stream, giải nén và unescape chuỗi JSON từ khối COPY", async () => {
     const tmpDir = mkdtempSync(path.join(os.tmpdir(), "test-thong-ke-backup-"));
     const backupFile = path.join(tmpDir, "test-backup.sql.gz");
     try {
+      const p1Json = String.raw`{"name": "Player \\\"1\\\"", "realm": 3, "tier": 2, "mapId": "am_suong", "life": {"playMs": 18000000, "kills": 200, "bossKills": 3}}`;
+      const p2Json = String.raw`{"name": "Player 2", "realm": 2, "tier": 0, "mapId": "hac_phong", "life": {"playMs": 10800000, "kills": 80, "bossKills": 1}}`;
       const sqlContent = [
         "-- PostgreSQL backup dump",
         "SET statement_timeout = 0;",
         "CREATE TABLE public.characters (name_key text, name text, data jsonb, updated_at timestamp);",
         "COPY public.characters (name_key, name, data, updated_at) FROM stdin;",
-        `player1\tPlayer 1\t{"name": "Player 1", "realm": 3, "tier": 2, "mapId": "am_suong", "life": {"playMs": 18000000, "kills": 200, "bossKills": 3}}\t2026-11-14 12:00:00+00`,
-        `player2\tPlayer 2\t{"name": "Player 2", "realm": 2, "tier": 0, "mapId": "hac_phong", "life": {"playMs": 10800000, "kills": 80, "bossKills": 1}}\t2026-11-14 12:05:00+00`,
+        `player1\tPlayer 1\t${p1Json}\t2026-11-14 12:00:00+00`,
+        `player2\tPlayer 2\t${p2Json}\t2026-11-14 12:05:00+00`,
         `corrupted\tCorrupted\t{ invalid json here\t2026-11-14 12:10:00+00`,
         "\\.",
         "-- Other table",
@@ -184,61 +211,268 @@ describe("thong-ke-tien-do: đọc tệp sao lưu .sql.gz (COPY characters)", ()
   });
 });
 
-describe("thong-ke-tien-do: buildProgressReport & formatMarkdownReport", () => {
-  it("nhóm đúng theo cảnh giới và đưa ra kết luận cân bằng chuẩn xác", () => {
-    // Tạo 5 mẫu Kim Đan Hậu kỳ (realm 3, tier 2) với giờ chơi quanh 3.5h (< 4.0h)
-    const records = [
-      { realm: 3, tier: 2, playMs: 3.0 * 3600000, kills: 100, bossKills: 1, mapId: "am_suong" },
-      { realm: 3, tier: 2, playMs: 3.2 * 3600000, kills: 110, bossKills: 1, mapId: "am_suong" },
-      { realm: 3, tier: 2, playMs: 3.5 * 3600000, kills: 120, bossKills: 2, mapId: "am_suong" },
-      { realm: 3, tier: 2, playMs: 3.8 * 3600000, kills: 130, bossKills: 2, mapId: "am_suong" },
-      { realm: 3, tier: 2, playMs: 4.0 * 3600000, kills: 140, bossKills: 3, mapId: "am_suong" },
-      // 1 mẫu Luyện Khí Tầng 1
-      { realm: 1, tier: 0, playMs: 0.2 * 3600000, kills: 5, bossKills: 0, mapId: "lac_ha" },
-    ];
-
-    const report = buildProgressReport(records, 0);
-    expect(report.totalPlayers).toBe(6);
-    expect(report.groups.length).toBe(2);
-    expect(report.kdHauKyCount).toBe(5);
-    expect(report.kdHauKyMedianHours).toBeCloseTo(3.5);
-    // Đủ 5 mẫu và median 3.5h < 4.0h -> Cảnh báo
-    expect(report.verdict).toContain("🚨 CẢNH BÁO");
-
-    const md = formatMarkdownReport(report, "test source");
-    expect(md).toContain("Kim Đan Hậu kỳ");
-    expect(md).toContain("Luyện Khí Tầng 1");
-    expect(md).toContain("~3.5 h");
-    expect(md).toContain("chưa đủ mẫu (< 5)"); // Luyện Khí chỉ có 1 mẫu
-    expect(md).toContain("🚨 CẢNH BÁO");
-    // Không chứa tên người chơi
-    expect(md).not.toContain("name");
-    expect(md).not.toContain("Đạo Sĩ");
+describe("thong-ke-tien-do: mô hình tối ưu simulate & buildProgressReport", () => {
+  it("getOptimalModel trả về mốc thời gian hợp lý từ simulate", () => {
+    const model = getOptimalModel();
+    expect(model.kdHauKyReachHours).toBeGreaterThan(5.0);
+    expect(model.kdHauKyReachHours).toBeLessThan(7.0);
+    expect(model.kdFinishHours).toBeGreaterThan(7.0);
+    expect(model.kdFinishHours).toBeLessThan(10.0);
   });
 
-  it("báo đạt mục tiêu khi trung vị Kim Đan Hậu kỳ >= 4.0 giờ", () => {
+  it("cảnh báo QUÁ NHANH khi trung vị Kim Đan Hậu kỳ < 0.7x mô hình tối ưu", () => {
+    // Mô hình tới Kim Đan Hậu kỳ là ~6.03h. Tạo 5 mẫu với 3.0h (tỉ số ~0.50x < 0.7x)
     const records = [
-      { realm: 3, tier: 2, playMs: 4.5 * 3600000, kills: 100, bossKills: 1, mapId: "am_suong" },
-      { realm: 3, tier: 2, playMs: 4.8 * 3600000, kills: 110, bossKills: 1, mapId: "am_suong" },
-      { realm: 3, tier: 2, playMs: 5.2 * 3600000, kills: 120, bossKills: 2, mapId: "am_suong" },
-      { realm: 3, tier: 2, playMs: 5.5 * 3600000, kills: 130, bossKills: 2, mapId: "am_suong" },
-      { realm: 3, tier: 2, playMs: 6.0 * 3600000, kills: 140, bossKills: 3, mapId: "am_suong" },
+      {
+        realm: KD_REALM,
+        tier: KD_HAU_KY_TIER,
+        playMs: 2.8 * 3600000,
+        kills: 100,
+        bossKills: 1,
+        mapId: "am_suong",
+      },
+      {
+        realm: KD_REALM,
+        tier: KD_HAU_KY_TIER,
+        playMs: 2.9 * 3600000,
+        kills: 110,
+        bossKills: 1,
+        mapId: "am_suong",
+      },
+      {
+        realm: KD_REALM,
+        tier: KD_HAU_KY_TIER,
+        playMs: 3.0 * 3600000,
+        kills: 120,
+        bossKills: 2,
+        mapId: "am_suong",
+      },
+      {
+        realm: KD_REALM,
+        tier: KD_HAU_KY_TIER,
+        playMs: 3.1 * 3600000,
+        kills: 130,
+        bossKills: 2,
+        mapId: "am_suong",
+      },
+      {
+        realm: KD_REALM,
+        tier: KD_HAU_KY_TIER,
+        playMs: 3.2 * 3600000,
+        kills: 140,
+        bossKills: 3,
+        mapId: "am_suong",
+      },
     ];
 
     const report = buildProgressReport(records, 0);
-    expect(report.kdHauKyMedianHours).toBeCloseTo(5.2);
-    expect(report.verdict).toContain("✅ ĐẠT MỤC TIÊU");
+    expect(report.kdHauKyCount).toBe(5);
+    expect(report.kdHauKyMedianHours).toBeCloseTo(3.0);
+    expect(report.kdHauKyRatio).toBeLessThan(0.7);
+    expect(report.verdict).toContain("🚨 CẢNH BÁO (QUÁ NHANH)");
+    expect(report.verdict).toContain("dưới ngưỡng 0.7x");
+  });
+
+  it("báo 'Trong dự kiến' khi trung vị Kim Đan Hậu kỳ >= 0.7x mô hình tối ưu và KHÔNG in 'ĐẠT MỤC TIÊU'", () => {
+    // 5 mẫu với 6.0h (tỉ số ~1.0x mô hình)
+    const records = [
+      {
+        realm: KD_REALM,
+        tier: KD_HAU_KY_TIER,
+        playMs: 5.5 * 3600000,
+        kills: 100,
+        bossKills: 1,
+        mapId: "am_suong",
+      },
+      {
+        realm: KD_REALM,
+        tier: KD_HAU_KY_TIER,
+        playMs: 5.8 * 3600000,
+        kills: 110,
+        bossKills: 1,
+        mapId: "am_suong",
+      },
+      {
+        realm: KD_REALM,
+        tier: KD_HAU_KY_TIER,
+        playMs: 6.0 * 3600000,
+        kills: 120,
+        bossKills: 2,
+        mapId: "am_suong",
+      },
+      {
+        realm: KD_REALM,
+        tier: KD_HAU_KY_TIER,
+        playMs: 6.2 * 3600000,
+        kills: 130,
+        bossKills: 2,
+        mapId: "am_suong",
+      },
+      {
+        realm: KD_REALM,
+        tier: KD_HAU_KY_TIER,
+        playMs: 6.5 * 3600000,
+        kills: 140,
+        bossKills: 3,
+        mapId: "am_suong",
+      },
+    ];
+
+    const report = buildProgressReport(records, 0);
+    expect(report.kdHauKyMedianHours).toBeCloseTo(6.0);
+    expect(report.kdHauKyRatio).toBeGreaterThanOrEqual(0.7);
+    expect(report.verdict).toContain("Trong dự kiến");
+    // Tuyệt đối không dùng chữ ĐẠT MỤC TIÊU vì đây chỉ là cận trên
+    expect(report.verdict).not.toContain("ĐẠT MỤC TIÊU");
+  });
+
+  it("đánh giá nhóm vượt qua Kim Đan (realm > KD_REALM) với mốc hết Kim Đan", () => {
+    // 5 mẫu ở Nguyên Anh (realm 4) với playMs = 5.0h (< 0.7x của ~8.3h) -> cảnh báo
+    const fastRecords = [
+      {
+        realm: KD_REALM + 1,
+        tier: 0,
+        playMs: 4.8 * 3600000,
+        kills: 200,
+        bossKills: 5,
+        mapId: "am_suong",
+      },
+      {
+        realm: KD_REALM + 1,
+        tier: 0,
+        playMs: 4.9 * 3600000,
+        kills: 210,
+        bossKills: 5,
+        mapId: "am_suong",
+      },
+      {
+        realm: KD_REALM + 1,
+        tier: 0,
+        playMs: 5.0 * 3600000,
+        kills: 220,
+        bossKills: 6,
+        mapId: "am_suong",
+      },
+      {
+        realm: KD_REALM + 1,
+        tier: 0,
+        playMs: 5.1 * 3600000,
+        kills: 230,
+        bossKills: 6,
+        mapId: "am_suong",
+      },
+      {
+        realm: KD_REALM + 1,
+        tier: 0,
+        playMs: 5.2 * 3600000,
+        kills: 240,
+        bossKills: 7,
+        mapId: "am_suong",
+      },
+    ];
+    const fastReport = buildProgressReport(fastRecords, 0);
+    expect(fastReport.postKdCount).toBe(5);
+    expect(fastReport.postKdRatio).toBeLessThan(0.7);
+    expect(fastReport.verdict).toContain("🚨 CẢNH BÁO (QUÁ NHANH)");
+    expect(fastReport.verdict).toContain("Nhóm vượt qua Kim Đan");
+
+    // 5 mẫu ở Nguyên Anh với playMs = 9.0h (>= 0.7x) -> Trong dự kiến
+    const normalRecords = [
+      {
+        realm: KD_REALM + 1,
+        tier: 0,
+        playMs: 8.5 * 3600000,
+        kills: 200,
+        bossKills: 5,
+        mapId: "am_suong",
+      },
+      {
+        realm: KD_REALM + 1,
+        tier: 0,
+        playMs: 8.8 * 3600000,
+        kills: 210,
+        bossKills: 5,
+        mapId: "am_suong",
+      },
+      {
+        realm: KD_REALM + 1,
+        tier: 0,
+        playMs: 9.0 * 3600000,
+        kills: 220,
+        bossKills: 6,
+        mapId: "am_suong",
+      },
+      {
+        realm: KD_REALM + 1,
+        tier: 0,
+        playMs: 9.2 * 3600000,
+        kills: 230,
+        bossKills: 6,
+        mapId: "am_suong",
+      },
+      {
+        realm: KD_REALM + 1,
+        tier: 0,
+        playMs: 9.5 * 3600000,
+        kills: 240,
+        bossKills: 7,
+        mapId: "am_suong",
+      },
+    ];
+    const normalReport = buildProgressReport(normalRecords, 0);
+    expect(normalReport.verdict).toContain("Trong dự kiến");
+    expect(normalReport.verdict).not.toContain("ĐẠT MỤC TIÊU");
   });
 
   it("báo cờ tham khảo khi ít hơn 5 mẫu", () => {
     const records = [
-      { realm: 3, tier: 2, playMs: 2.5 * 3600000, kills: 50, bossKills: 1, mapId: "am_suong" },
-      { realm: 3, tier: 2, playMs: 3.0 * 3600000, kills: 60, bossKills: 1, mapId: "am_suong" },
+      {
+        realm: KD_REALM,
+        tier: KD_HAU_KY_TIER,
+        playMs: 2.5 * 3600000,
+        kills: 50,
+        bossKills: 1,
+        mapId: "am_suong",
+      },
+      {
+        realm: KD_REALM,
+        tier: KD_HAU_KY_TIER,
+        playMs: 3.0 * 3600000,
+        kills: 60,
+        bossKills: 1,
+        mapId: "am_suong",
+      },
     ];
 
     const report = buildProgressReport(records, 0);
     expect(report.kdHauKyCount).toBe(2);
     expect(report.verdict).toContain("⚠️ THAM KHẢO");
-    expect(report.verdict).toContain("< 5 mẫu");
+    expect(report.verdict).toContain("chưa đủ mẫu");
+  });
+
+  it("formatMarkdownReport hiển thị bảng đúng định dạng, xử lý nhóm 1 người gọn gàng và không leak tên", () => {
+    const records = [
+      // 1 người Kim Đan Sơ kỳ
+      { realm: KD_REALM, tier: 0, playMs: 3.0 * 3600000, kills: 50, bossKills: 1, mapId: "lac_ha" },
+      // 2 người Phàm Nhân
+      { realm: 0, tier: 0, playMs: 0.1 * 3600000, kills: 2, bossKills: 0, mapId: "lac_ha" },
+      { realm: 0, tier: 0, playMs: 0.2 * 3600000, kills: 4, bossKills: 0, mapId: "lac_ha" },
+    ];
+
+    const report = buildProgressReport(records, 0);
+    const md = formatMarkdownReport(report, "test-source");
+
+    expect(md).toContain(
+      "| Cảnh giới - Bậc | Số người | Giờ chơi tích luỹ (Min / Med / Max) | Mô hình tới bậc | Trung vị / Mô hình | Quái hạ TB | Trùm hạ TB | Bản đồ |",
+    );
+    expect(md).toContain("Phàm Nhân");
+    expect(md).toContain("Kim Đan Sơ kỳ");
+    // Nhóm 1 người in gọn `**3.0** h`
+    expect(md).toContain("**3.0** h");
+    // Nhóm 2 người in `0.1 / **0.2** / 0.2 h`
+    expect(md).toContain("0.1 / **0.2** / 0.2 h");
+    // Ghi chú về luân hồi và bảo vệ riêng tư
+    expect(md).toContain("Dư âm tu hành");
+    expect(md).toContain("Ghi chú bảo vệ quyền riêng tư");
   });
 });
