@@ -106,7 +106,6 @@ import {
   DUNGEON_MSG,
   DUNGEON_FALL_EXIT_MS,
   LINH_HU_MAP_ID,
-  WILD_MONSTERS,
   type DungeonFallenMsg,
   type DungeonInviteMsg,
   type DungeonStateMsg,
@@ -146,6 +145,19 @@ import {
   primaryKeyLabel,
   type ActionId,
 } from "../keybinds";
+import { getMapOverview, mapGraph, type MapOverview } from "../map-overview";
+import { MapCameraControl, attachMapInput } from "../map-input";
+import {
+  COMPACT_CANVAS_CSS_PX,
+  MAP_COLORS,
+  cameraView,
+  canvasPixelSize,
+  drawDot,
+  drawHaloText,
+  drawMapBase,
+  drawMarkerMe,
+  fitView,
+} from "../map-render";
 import { moveVector } from "../move-input";
 import { isTypingElement, isReducedMotion } from "../a11y";
 import {
@@ -326,6 +338,14 @@ export class WorldScene extends Phaser.Scene {
   private navLabel!: Phaser.GameObjects.Text;
   private navLabelText = "";
   private lastMapDraw = 0;
+  /** Camera của bản đồ lớn (phóng / kéo, bám theo mình) và các cờ vẽ lại */
+  private readonly mapCtl = new MapCameraControl();
+  private mapWasOpen = false;
+  private lastBigMeX = 0;
+  private lastBigMeY = 0;
+  /** Bản đồ đang XEM ở bản đồ lớn (`null` = bản đồ mình đang đứng); chọn ở sơ đồ nối */
+  private mapViewId: string | null = null;
+  private mapRedrawPending = false;
 
   // Tái sử dụng Set và hồ đối tượng (object pool) để giảm cấp phát mỗi frame (#71)
   private seenIds = new Set<string>();
@@ -1017,6 +1037,25 @@ export class WorldScene extends Phaser.Scene {
     for (const n of [2, 3, 4, 5] as const)
       bind(`sk-slot${n}`, () => this.runAction(`skill.slot${n}`));
 
+    // Bản đồ lớn: phóng / thu / kéo (chuột, cảm ứng, bàn phím, nút); mỗi thay đổi vẽ lại ngay (gộp theo khung hình)
+    const worldmap = document.getElementById("worldmap") as HTMLCanvasElement | null;
+    if (worldmap) {
+      this.mapCtl.onChange = () => this.redrawBigMap();
+      // "Về chỗ mình" khi đang xem bản đồ khác: quay về bản đồ mình đứng
+      this.mapCtl.onRecenter = () => {
+        if (this.mapViewId === null) return false;
+        this.setMapView(null);
+        return true;
+      };
+      this.buildMapGraphNav();
+      attachMapInput(this.mapCtl, {
+        canvas: worldmap,
+        zoomIn: document.getElementById("map-zoom-in"),
+        zoomOut: document.getElementById("map-zoom-out"),
+        recenter: document.getElementById("map-recenter"),
+      });
+    }
+
     const chatForm = document.getElementById("chat-form") as HTMLFormElement;
     const chatInput = document.getElementById("chat-input") as HTMLInputElement;
     chatForm.addEventListener("submit", (e) => {
@@ -1109,6 +1148,9 @@ export class WorldScene extends Phaser.Scene {
         break;
       case "panel.map":
         ui.toggleMapModal();
+        break;
+      case "panel.minimap":
+        ui.toggleMinimap();
         break;
       case "panel.settings":
         ui.toggleSettingsModal();
@@ -1470,6 +1512,11 @@ export class WorldScene extends Phaser.Scene {
     ui.death(null);
     ui.hideDuelHud();
     this.map = newMap;
+    // Qua cổng KHÔNG tạo lại scene: dựng lại sơ đồ nối (nút "đang đứng", ẩn trong bí cảnh) và đưa bản đồ lớn về xem bản đồ mình đứng.
+    // `mapWasOpen = false` để nếu bản đồ lớn đang mở thì khung hình sau đặt lại camera / tiêu đề theo bản đồ mới.
+    this.mapViewId = null;
+    this.mapWasOpen = false;
+    this.buildMapGraphNav();
     this.buildMapVisuals();
     ui.setCurrentMapId(newMap.def.id);
     this.attachRoom(room);
@@ -2043,355 +2090,257 @@ export class WorldScene extends Phaser.Scene {
   // ---------------- Bản đồ nhỏ & Bản đồ lớn ----------------
 
   private syncMaps() {
+    // đã phóng và đang bám theo mình: vẽ lại bản đồ lớn NGAY khi mình đi (không chờ nhịp 250 ms, nếu không bản đồ nhảy từng đoạn lớn)
+    if (
+      this.mapWasOpen &&
+      this.mapCtl.follow &&
+      this.mapCtl.cam.zoom > 1 &&
+      (this.predX !== this.lastBigMeX || this.predY !== this.lastBigMeY)
+    ) {
+      this.lastBigMeX = this.predX;
+      this.lastBigMeY = this.predY;
+      this.redrawBigMap();
+    }
     const now = performance.now();
     if (now - this.lastMapDraw < 250) return;
     this.lastMapDraw = now;
 
+    const ov = getMapOverview(this.map.def.id);
+    if (!ov) return;
+    if (ui.isMinimapOpen()) this.drawMapCanvas("minimap", ov, false);
+    const open = ui.isMapModalOpen();
+    // mỗi lần MỞ bản đồ lớn: xem bản đồ mình đứng, zoom 1, bám theo mình
+    if (open && !this.mapWasOpen) this.setMapView(null, false);
+    this.mapWasOpen = open;
+    if (open) {
+      const bigOv = getMapOverview(this.mapViewId ?? this.map.def.id);
+      if (bigOv) this.drawMapCanvas("worldmap", bigOv, true);
+    }
+  }
+
+  /**
+   * Chọn bản đồ XEM ở bản đồ lớn (`null` hoặc chính bản đồ mình đứng = bản đồ của mình): camera về zoom 1 (bám theo mình chỉ khi xem bản đồ
+   * của mình), cập nhật tiêu đề, phụ đề, nút sơ đồ nối. Bản đồ khác chỉ có địa hình, cổng, NPC, khu quái và đồng đội đang đứng ở đó (vị trí mình / người
+   * khác / quái chỉ biết ở bản đồ hiện tại).
+   */
+  private setMapView(id: string | null, redraw = true) {
+    const viewId = id === null || id === this.map.def.id ? null : id;
+    const ov = getMapOverview(viewId ?? this.map.def.id);
+    if (!ov) return;
+    this.mapViewId = viewId;
+    this.mapCtl.reset({ worldW: ov.w * TILE, worldH: ov.h * TILE }, viewId === null);
+    const title = document.getElementById("map-title");
+    if (title) title.textContent = `Sơn Hà Đồ · ${ov.name}`;
+    const sub = document.getElementById("map-coords");
+    if (sub) {
+      sub.textContent =
+        viewId === null
+          ? "Mũi tên xanh là đạo hữu, đầu nhọn chỉ hướng nhìn. Lăn chuột hoặc chụm hai ngón để phóng to, kéo để di chuyển"
+          : `Đang xem bản đồ khác. Đạo hữu đang đứng ở ${this.map.def.name}: bấm "Về chỗ mình" để quay lại`;
+    }
+    this.updateMapGraphNav();
+    if (redraw) this.redrawBigMap();
+  }
+
+  /** Dựng sơ đồ nối các bản đồ (nút theo toạ độ lưới của `mapGraph()`, Bắc ở trên); ẩn khi đang ở bí cảnh (không thuộc sơ đồ). */
+  private buildMapGraphNav() {
+    const nav = document.getElementById("map-graph");
+    if (!nav) return;
+    nav.replaceChildren();
+    const g = mapGraph();
+    if (g.nodes.length < 2 || !g.nodes.some((n) => n.mapId === this.map.def.id)) {
+      nav.hidden = true;
+      return;
+    }
+    nav.hidden = false;
+    const minX = Math.min(...g.nodes.map((n) => n.gx));
+    const minY = Math.min(...g.nodes.map((n) => n.gy));
+    // lưới gấp đôi: nút ở ô lẻ, nhãn cổng ở ô chẵn giữa hai nút kề nhau
+    const cell = (n: { gx: number; gy: number }) => ({
+      col: 2 * (n.gx - minX) + 1,
+      row: 2 * (n.gy - minY) + 1,
+    });
+    const sorted = [...g.nodes].sort((a, b) => a.gy - b.gy || a.gx - b.gx);
+    for (const n of sorted) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "mg-node";
+      btn.dataset.mapId = n.mapId;
+      const c = cell(n);
+      btn.style.gridColumn = String(c.col);
+      btn.style.gridRow = String(c.row);
+      btn.textContent = n.name;
+      if (n.mapId === this.map.def.id) {
+        btn.setAttribute("aria-current", "location");
+        const here = document.createElement("small");
+        here.textContent = "đang đứng";
+        btn.append(here);
+      }
+      btn.addEventListener("click", () => this.setMapView(n.mapId));
+      nav.append(btn);
+    }
+    const seen = new Set<string>();
+    for (const e of g.edges) {
+      const key = [e.fromMapId, e.toMapId].sort().join("|");
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const a = g.nodes.find((n) => n.mapId === e.fromMapId);
+      const b = g.nodes.find((n) => n.mapId === e.toMapId);
+      if (!a || !b) continue;
+      const ca = cell(a);
+      const cb = cell(b);
+      if (Math.abs(ca.col - cb.col) + Math.abs(ca.row - cb.row) !== 2) continue; // chỉ nút KỀ nhau có chỗ cho nhãn
+      const span = document.createElement("span");
+      span.className = "mg-edge";
+      span.textContent = `${e.fromPortalName} ⇄ ${e.toPortalName}`;
+      span.style.gridColumn = String((ca.col + cb.col) / 2);
+      span.style.gridRow = String((ca.row + cb.row) / 2);
+      nav.append(span);
+    }
+    this.updateMapGraphNav();
+  }
+
+  /** Nút sơ đồ nối: bản đồ đang xem được đánh dấu (`aria-pressed`). */
+  private updateMapGraphNav() {
+    const viewed = this.mapViewId ?? this.map.def.id;
+    document.querySelectorAll<HTMLElement>("#map-graph .mg-node").forEach((b) => {
+      b.setAttribute("aria-pressed", String(b.dataset.mapId === viewed));
+    });
+  }
+
+  /** Vẽ lại bản đồ lớn ngay (sau phóng / kéo), gộp nhiều sự kiện trong một khung hình. */
+  private redrawBigMap() {
+    if (this.mapRedrawPending) return;
+    this.mapRedrawPending = true;
+    requestAnimationFrame(() => {
+      this.mapRedrawPending = false;
+      if (!ui.isMapModalOpen()) return;
+      const ov = getMapOverview(this.mapViewId ?? this.map.def.id);
+      if (ov) this.drawMapCanvas("worldmap", ov, true);
+    });
+  }
+
+  /**
+   * Vẽ một bản đồ (nhỏ `#minimap` hoặc lớn `#worldmap`): canvas được đặt ở độ phân giải thật (CSS x `devicePixelRatio`) rồi vẽ lớp nền
+   * (`map-render.ts`: địa hình dựng một lần, trấn, cổng ghi tên nơi đến, NPC, khu quái) và chồng phần ĐỘNG lên: quái, người chơi khác,
+   * đồng đội (cùng bản đồ), mục tiêu nhiệm vụ, và mình (mũi tên theo hướng nhìn). Canvas đang ẩn (kích thước CSS 0) thì bỏ qua.
+   */
+  private drawMapCanvas(id: "minimap" | "worldmap", ov: MapOverview, big: boolean) {
+    const canvas = document.getElementById(id) as HTMLCanvasElement | null;
+    if (!canvas || canvas.clientWidth === 0 || canvas.clientHeight === 0) return;
+    // Bản đồ lớn theo TỈ LỆ bản đồ (Hắc Phong 128x96 không còn viền đen trên / dưới): chiều cao suy ra từ chiều rộng CSS (luật CSS đặt khung vuông)
+    if (big) {
+      const h = `${Math.round((canvas.clientWidth * ov.h) / ov.w)}px`;
+      if (canvas.style.height !== h) canvas.style.height = h;
+    }
+    const size = canvasPixelSize(canvas.clientWidth, canvas.clientHeight, window.devicePixelRatio);
+    if (canvas.width !== size.w || canvas.height !== size.h) {
+      canvas.width = size.w;
+      canvas.height = size.h;
+    }
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const { u } = size;
+    const pad = (big ? 6 : 2) * u;
+    // bản đồ đang vẽ có thể KHÁC bản đồ mình đứng (xem qua sơ đồ nối): chỉ bản đồ của mình có mình / quái / người chơi khác / mục tiêu nhiệm vụ
+    const here = ov.mapId === this.map.def.id;
+    const worldW = ov.w * TILE;
+    const worldH = ov.h * TILE;
+    let v = fitView(worldW, worldH, size.w, size.h, pad);
+    let zoomedIn = false;
+    if (big) {
+      // bản đồ lớn có camera: bám theo mình (đã phóng thì mình ở giữa) hoặc theo tay kéo
+      const box = { worldW, worldH, cw: size.w, ch: size.h, pad };
+      const cam = this.mapCtl.effective(box, this.predX, this.predY);
+      v = cameraView(box, cam);
+      zoomedIn = cam.zoom >= 2;
+    }
+    const qLog = big ? ui.getQuestLog() : null;
+    const qCtx = big ? ui.getQuestContext() : null;
     const myName = this.me()?.name;
-    const party = ui.getParty();
-    const partyMems = party.members.filter((m) => m.name !== myName);
+    const partyMems = ui.getParty().members.filter((m) => m.name !== myName);
     const partyNames = new Set(partyMems.map((m) => m.name));
+    // Đồng đội đang đứng ở bản đồ ĐANG VẼ (toạ độ của đồng đội là trong bản đồ của họ: `PartyMember.mapId`; thiếu = bản đồ của mình)
+    const sameMapParty = partyMems.filter((m) => (m.mapId ? m.mapId === ov.mapId : here));
+    // Nhãn nền không được đè lên mình, đồng đội và đích nhiệm vụ (chỉ bản đồ lớn có nhãn)
+    const avoid: { x: number; y: number; r: number }[] = [];
+    const pins: { x: number; y: number; text: string }[] = [];
+    let questTarget: { x: number; y: number } | null = null;
+    if (big) {
+      if (here) avoid.push({ x: this.predX, y: this.predY, r: 10 * u });
+      for (const pm of sameMapParty) avoid.push({ x: pm.x, y: pm.y, r: 8 * u });
+      const trackId = ui.getTrackingQuestId();
+      const target = here && trackId ? this.resolveQuestTarget(trackId) : null;
+      if (target) {
+        questTarget = target;
+        // ghim đích nhiệm vụ: ở bản đồ KHÁC thì đích là cổng kế tiếp trên đường tới đó ("Qua <cổng>")
+        const name = QUEST_BY_ID[trackId ?? ""]?.title ?? "Nhiệm vụ";
+        pins.push({ x: target.x, y: target.y, text: target.hop ? hopLabel(target.hop) : name });
+      }
+    }
+    drawMapBase(ctx, ov, v, size.w, size.h, {
+      u,
+      big,
+      avoid,
+      pins,
+      compact: big && canvas.clientWidth < COMPACT_CANVAS_CSS_PX && !zoomedIn,
+      markerOf: qLog && qCtx ? (npcId) => npcMarker(npcId, qLog, qCtx) : undefined,
+    });
 
-    // 1. Vẽ Minimap (120x120)
-    const mmCanvas = document.getElementById("minimap") as HTMLCanvasElement | null;
-    if (mmCanvas) {
-      const ctx = mmCanvas.getContext("2d");
-      if (ctx) {
-        const w = mmCanvas.width;
-        const h = mmCanvas.height;
-        ctx.clearRect(0, 0, w, h);
+    // Quái đang sống và người chơi khác trong tầm nhìn: chỉ biết ở bản đồ mình đang đứng
+    if (here) {
+      ctx.fillStyle = MAP_COLORS.monster;
+      const mr = (big ? 1.5 : 1) * u;
+      this.monsters.forEach((m) => {
+        ctx.fillRect(v.ox + m.tx * v.scale - mr, v.oy + m.ty * v.scale - mr, 2 * mr, 2 * mr);
+      });
+      // Người chơi khác (chấm lam, trừ đồng đội)
+      this.players.forEach((p, pid) => {
+        if (pid === this.sid) return;
+        const sp = this.state.players.get(pid);
+        if (sp && partyNames.has(sp.name)) return;
+        drawDot(
+          ctx,
+          v.ox + p.tx * v.scale,
+          v.oy + p.ty * v.scale,
+          (big ? 3.5 : 1.8) * u,
+          MAP_COLORS.other,
+        );
+      });
+    }
 
-        const scale = Math.min(w / this.map.worldW, h / this.map.worldH);
-        const mapW = this.map.worldW * scale;
-        const mapH = this.map.worldH * scale;
-        const ox = (w - mapW) / 2;
-        const oy = (h - mapH) / 2;
+    // Đồng đội: chấm xanh lá viền trắng; bản đồ lớn ghi tên
+    for (const pm of sameMapParty) {
+      const x = v.ox + pm.x * v.scale;
+      const y = v.oy + pm.y * v.scale;
+      drawDot(ctx, x, y, (big ? 5 : 3.2) * u, MAP_COLORS.party, "#ffffff", u);
+      if (big) drawHaloText(ctx, pm.name, x, y - 8 * u, MAP_COLORS.party, u);
+    }
 
-        // Nền đen ngoài bản đồ (khi canvas vuông nhưng bản đồ chữ nhật)
-        ctx.fillStyle = "#161b14";
-        ctx.fillRect(0, 0, w, h);
-
-        // Nền hoang dã của bản đồ
-        ctx.fillStyle = "#273322";
-        ctx.fillRect(ox, oy, mapW, mapH);
-
-        // Vòng Trấn / Trạm (nếu có bán kính trấn > 0)
-        if (this.map.townPx.r > 0) {
-          const tx = ox + this.map.townPx.x * scale;
-          const ty = oy + this.map.townPx.y * scale;
-          const tr = this.map.townPx.r * scale;
-          ctx.fillStyle = "rgba(163, 29, 29, 0.18)";
-          ctx.beginPath();
-          ctx.arc(tx, ty, tr, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.strokeStyle = "rgba(163, 29, 29, 0.65)";
-          ctx.lineWidth = 1.2;
-          ctx.stroke();
-        }
-
-        // Cổng truyền tống (chấm xanh ngọc viền trắng)
-        ctx.fillStyle = "#a8ff78";
-        for (const p of this.map.portals) {
-          ctx.beginPath();
-          ctx.arc(ox + p.x * scale, oy + p.y * scale, 3, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.strokeStyle = "#ffffff";
-          ctx.lineWidth = 0.8;
-          ctx.stroke();
-        }
-
-        // Hang trùm (nếu bản đồ có lairPx như trong bí cảnh)
-        if (this.map.lairPx) {
-          const lx = ox + this.map.lairPx.x * scale;
-          const ly = oy + this.map.lairPx.y * scale;
-          const lr = Math.max(4, this.map.lairPx.r * scale);
-          ctx.fillStyle = "rgba(168, 85, 247, 0.28)";
-          ctx.beginPath();
-          ctx.arc(lx, ly, lr, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.strokeStyle = "#c084fc";
-          ctx.lineWidth = 1.2;
-          ctx.stroke();
-
-          ctx.fillStyle = "#ef4444";
-          ctx.beginPath();
-          ctx.arc(lx, ly, 2.8, 0, Math.PI * 2);
-          ctx.fill();
-        }
-
-        // Quái vật (chấm đỏ nhỏ)
-        ctx.fillStyle = "#e57373";
-        this.monsters.forEach((m) => {
-          ctx.fillRect(ox + m.tx * scale - 1, oy + m.ty * scale - 1, 2, 2);
-        });
-
-        // Người chơi khác (chấm lam, trừ đồng đội)
-        ctx.fillStyle = "#9fd0ea";
-        this.players.forEach((p, id) => {
-          if (id === this.sid) return;
-          const sp = this.state.players.get(id);
-          if (sp && partyNames.has(sp.name)) return;
-          ctx.fillRect(ox + p.tx * scale - 1.5, oy + p.ty * scale - 1.5, 3, 3);
-        });
-
-        // Đồng đội (chấm xanh lá #52c41a, CHỈ VẼ ĐỒNG ĐỘI Ở CÙNG BẢN ĐỒ)
-        const sameMapPartyMems = partyMems.filter((m) => !m.mapId || m.mapId === this.map.def.id);
-        if (sameMapPartyMems.length > 0) {
-          ctx.fillStyle = "#52c41a";
-          for (const pm of sameMapPartyMems) {
-            ctx.beginPath();
-            ctx.arc(ox + pm.x * scale, oy + pm.y * scale, 3.2, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = "#ffffff";
-            ctx.lineWidth = 0.8;
-            ctx.stroke();
-          }
-        }
-
-        // NPC của bản đồ hiện tại (chấm hoàng kim)
-        const mapNpcs = npcsOfMap(this.map.def.id);
-        ctx.fillStyle = "#ffd74a";
-        for (const npc of mapNpcs) {
-          ctx.beginPath();
-          ctx.arc(ox + npc.x * scale, oy + npc.y * scale, 2.8, 0, Math.PI * 2);
-          ctx.fill();
-        }
-
-        // Chính mình (chấm lục bảo sáng + vạch hướng nhìn)
-        const mx = ox + this.predX * scale;
-        const my = oy + this.predY * scale;
-        ctx.fillStyle = "#6ad06a";
+    // Mục tiêu nhiệm vụ đang theo dõi (bản đồ lớn): đường nét đứt từ mình tới đích (ghim đã vẽ cùng nhãn nền)
+    if (big && here) {
+      const t = questTarget;
+      if (t) {
+        ctx.strokeStyle = MAP_COLORS.npc;
+        ctx.lineWidth = 1.5 * u;
+        ctx.setLineDash([3 * u, 3 * u]);
         ctx.beginPath();
-        ctx.arc(mx, my, 3.5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 1;
+        ctx.moveTo(v.ox + this.predX * v.scale, v.oy + this.predY * v.scale);
+        ctx.lineTo(v.ox + t.x * v.scale, v.oy + t.y * v.scale);
         ctx.stroke();
-
-        ctx.strokeStyle = "#6ad06a";
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(mx, my);
-        ctx.lineTo(mx + Math.cos(this.facing) * 7, my + Math.sin(this.facing) * 7);
-        ctx.stroke();
+        ctx.setLineDash([]);
       }
     }
 
-    // 2. Vẽ Bản đồ lớn (384x384) khi mở modal
-    if (ui.isMapModalOpen()) {
-      const wmCanvas = document.getElementById("worldmap") as HTMLCanvasElement | null;
-      if (wmCanvas) {
-        const ctx = wmCanvas.getContext("2d");
-        if (ctx) {
-          const w = wmCanvas.width;
-          const h = wmCanvas.height;
-          ctx.clearRect(0, 0, w, h);
-          const s = Math.min(w / this.map.worldW, h / this.map.worldH);
-          const mapW = this.map.worldW * s;
-          const mapH = this.map.worldH * s;
-          const ox = (w - mapW) / 2;
-          const oy = (h - mapH) / 2;
-
-          // Nền ngoài bản đồ
-          ctx.fillStyle = "#121810";
-          ctx.fillRect(0, 0, w, h);
-
-          // Nền sơn thủy của bản đồ
-          ctx.fillStyle = "#1e291b";
-          ctx.fillRect(ox, oy, mapW, mapH);
-
-          // Khu an toàn Trấn / Trạm (nếu có bán kính trấn > 0)
-          if (this.map.townPx.r > 0) {
-            const tx = ox + this.map.townPx.x * s;
-            const ty = oy + this.map.townPx.y * s;
-            const tr = this.map.townPx.r * s;
-            ctx.fillStyle = "rgba(163, 29, 29, 0.22)";
-            ctx.beginPath();
-            ctx.arc(tx, ty, tr, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = "#a31d1d";
-            ctx.lineWidth = 2;
-            ctx.stroke();
-
-            ctx.fillStyle = "#f3ecda";
-            ctx.font = "bold 12px serif";
-            ctx.textAlign = "center";
-            ctx.fillText(this.map.townName, tx, ty - tr - 6);
-          }
-
-          // Cổng truyền tống (vòng an toàn mờ + điểm cổng + tên)
-          for (const p of this.map.portals) {
-            const px = ox + p.x * s;
-            const py = oy + p.y * s;
-            const pr = p.safeR * s;
-
-            // Vòng an toàn
-            ctx.fillStyle = "rgba(74, 144, 226, 0.15)";
-            ctx.beginPath();
-            ctx.arc(px, py, pr, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = "rgba(74, 144, 226, 0.6)";
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            // Điểm cổng
-            ctx.fillStyle = "#a8ff78";
-            ctx.beginPath();
-            ctx.arc(px, py, 4.5, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = "#ffffff";
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            // Nhãn tên cổng
-            ctx.fillStyle = "#a8ff78";
-            ctx.font = "bold 10px serif";
-            ctx.textAlign = "center";
-            ctx.fillText(p.name, px, py - 7);
-          }
-
-          // Hang trùm (nếu bản đồ có lairPx như trong bí cảnh)
-          if (this.map.lairPx) {
-            const lx = ox + this.map.lairPx.x * s;
-            const ly = oy + this.map.lairPx.y * s;
-            const lr = Math.max(8, this.map.lairPx.r * s);
-
-            ctx.fillStyle = "rgba(168, 85, 247, 0.25)";
-            ctx.beginPath();
-            ctx.arc(lx, ly, lr, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = "#c084fc";
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
-
-            ctx.fillStyle = "#ef4444";
-            ctx.beginPath();
-            ctx.arc(lx, ly, 4.5, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.fillStyle = "#e9d5ff";
-            ctx.font = "bold 11px serif";
-            ctx.textAlign = "center";
-            ctx.fillText("Hang Yêu Vương", lx, ly - lr - 5);
-          }
-
-          // Vòng nguy hiểm (minDanger) tính ngược từ dangerAt(x, y) cho bản đồ ngoài hoang
-          if (this.map.townPx.r > 0 && !this.map.lairPx) {
-            const tx = ox + this.map.townPx.x * s;
-            const ty = oy + this.map.townPx.y * s;
-            for (const m of WILD_MONSTERS) {
-              const rPx =
-                m.minDanger > 0 ? this.dangerRadiusPx(m.minDanger) : this.map.townPx.r + 40;
-              const rCanvas = Math.min(Math.min(w, h) * 0.49, rPx * s);
-              const col = `#${m.color.toString(16).padStart(6, "0")}`;
-              ctx.strokeStyle = col;
-              ctx.lineWidth = 1;
-              ctx.setLineDash([4, 4]);
-              ctx.beginPath();
-              ctx.arc(tx, ty, rCanvas, 0, Math.PI * 2);
-              ctx.stroke();
-              ctx.setLineDash([]);
-              ctx.fillStyle = col;
-              ctx.font = "10px serif";
-              ctx.textAlign = "center";
-              const labelY = Math.max(oy + 11, ty - rCanvas - 3);
-              ctx.fillText(
-                m.minDanger > 0
-                  ? `${m.name} (≥${Math.round(m.minDanger * 100)}%)`
-                  : `${m.name} (ngoài trấn)`,
-                tx,
-                labelY,
-              );
-            }
-          }
-
-          // Quái hiện hành
-          ctx.fillStyle = "#e57373";
-          this.monsters.forEach((m) => {
-            ctx.fillRect(ox + m.tx * s - 1.5, oy + m.ty * s - 1.5, 3, 3);
-          });
-
-          // Người chơi khác (chấm lam, trừ đồng đội)
-          ctx.fillStyle = "#9fd0ea";
-          this.players.forEach((p, id) => {
-            if (id === this.sid) return;
-            const sp = this.state.players.get(id);
-            if (sp && partyNames.has(sp.name)) return;
-            ctx.beginPath();
-            ctx.arc(ox + p.tx * s, oy + p.ty * s, 3.5, 0, Math.PI * 2);
-            ctx.fill();
-          });
-
-          // Đồng đội (CHỈ VẼ ĐỒNG ĐỘI Ở CÙNG BẢN ĐỒ)
-          const sameMapPartyMems = partyMems.filter((m) => !m.mapId || m.mapId === this.map.def.id);
-          if (sameMapPartyMems.length > 0) {
-            ctx.fillStyle = "#52c41a";
-            for (const pm of sameMapPartyMems) {
-              const pmx = ox + pm.x * s;
-              const pmy = oy + pm.y * s;
-              ctx.beginPath();
-              ctx.arc(pmx, pmy, 5, 0, Math.PI * 2);
-              ctx.fill();
-              ctx.strokeStyle = "#ffffff";
-              ctx.lineWidth = 1.2;
-              ctx.stroke();
-
-              ctx.fillStyle = "#52c41a";
-              ctx.font = "bold 10px serif";
-              ctx.textAlign = "center";
-              ctx.fillText(pm.name, pmx, pmy - 7);
-            }
-          }
-
-          // NPC của bản đồ hiện tại
-          const mapNpcs = npcsOfMap(this.map.def.id);
-          const qLog = ui.getQuestLog();
-          const qCtx = ui.getQuestContext();
-          for (const npc of mapNpcs) {
-            const nx = ox + npc.x * s;
-            const ny = oy + npc.y * s;
-            ctx.fillStyle = "#ffd74a";
-            ctx.beginPath();
-            ctx.arc(nx, ny, 4.5, 0, Math.PI * 2);
-            ctx.fill();
-            const marker = npcMarker(npc.id, qLog, qCtx);
-            if (marker) {
-              ctx.fillStyle = marker === "?" ? "#6ad06a" : "#ff4d4d";
-              ctx.font = "bold 11px serif";
-              ctx.textAlign = "center";
-              ctx.fillText(marker, nx, ny - 6);
-            }
-          }
-
-          // Mục tiêu nhiệm vụ
-          const trackId = ui.getTrackingQuestId();
-          if (trackId) {
-            const t = this.resolveQuestTarget(trackId);
-            if (t) {
-              ctx.strokeStyle = "#ffd74a";
-              ctx.lineWidth = 1.5;
-              ctx.setLineDash([3, 3]);
-              ctx.beginPath();
-              ctx.moveTo(ox + this.predX * s, oy + this.predY * s);
-              ctx.lineTo(ox + t.x * s, oy + t.y * s);
-              ctx.stroke();
-              ctx.setLineDash([]);
-            }
-          }
-
-          // Chính mình
-          const px = ox + this.predX * s;
-          const py = oy + this.predY * s;
-          ctx.fillStyle = "#6ad06a";
-          ctx.beginPath();
-          ctx.arc(px, py, 6, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.strokeStyle = "#ffffff";
-          ctx.lineWidth = 2;
-          ctx.stroke();
-        }
-      }
-    }
+    // Chính mình: mũi tên theo hướng nhìn (chỉ trên bản đồ mình đứng)
+    if (here)
+      drawMarkerMe(
+        ctx,
+        v.ox + this.predX * v.scale,
+        v.oy + this.predY * v.scale,
+        this.facing,
+        (big ? 6 : 3.5) * u,
+      );
   }
 
   private updatePlayerAnim(
