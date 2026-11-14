@@ -8,7 +8,7 @@
 - **ĐĨA GỐC: 192 GB, đã dùng 93 %, còn ~15 GB.** Docker ảnh 4,0 GB (1,1 GB thu hồi được), `~/.cache` 9,5 GB (Hugging Face 5,4 GB của dự án khác), sao lưu bản chạy thật, ComfyUI 14 GB. Một lô ảnh nháp, thêm một checkpoint / LoRA (2-7 GB mỗi cái) hay cập nhật PyTorch là hết chỗ: **đĩa là rủi ro số một**, không phải GPU.
 
 ## 2. Mục đích và ranh giới
-- Sinh ảnh **NHÁP** (nền bản đồ thứ tư, ảnh minh hoạ / màn tải, icon vật phẩm nháp) để Dev B chỉnh cho đồng bộ phong cách TRƯỚC khi vào game. **Không** đưa ảnh sinh ra vào repo / game khi chưa qua chỉnh tay và chưa ghi nguồn (mục 5).
+- Sinh ảnh **NHÁP** (nền bản đồ thứ tư, ảnh minh hoạ / màn tải, icon vật phẩm nháp) để Dev B hậu kỳ cho đồng bộ phong cách (bằng script, mục 9.2) TRƯỚC khi vào game. **Không** đưa ảnh sinh ra vào repo / game khi chưa qua hậu kỳ + người duyệt và chưa ghi nguồn (mục 5, 9).
 - **Không bao giờ trên đường của bản chạy thật:** không GPU trong container / compose của bản chạy thật, không trong CI, không trong server game, không mở cổng ra ngoài (tunnel chỉ trỏ tới 2567). Không TTS (mục 16.3 đã bỏ).
 - Nhận định thực tế: SDXL base **không** giỏi pixel-art / sprite sheet nhiều hướng nhiều khung hình nhất quán; sprite nhân vật và quái vẫn sinh bằng mã. Phù hợp hơn: nền, minh hoạ, icon. Pilot hẹp (mục 7, G3).
 
@@ -37,7 +37,7 @@
 | Hết RAM làm bản chạy thật chậm / bị OOM | `MemoryMax=7G`, `RuntimeMaxSec`, canh rảnh; không chạy khi bench / soak đang chạy |
 | Tranh GPU với E2E | Quy tắc `DISABLE_GPU=1` và kiểm `nvidia-smi` ở mục 4 |
 | Giấy phép model / ảnh AI | Mục 3, người dùng quyết trước khi có ảnh nào vào game |
-| Phong cách không đồng bộ, sprite không dùng được | Chỉ pilot nền / icon; B chỉnh; không dùng cho sprite hoạt ảnh |
+| Phong cách không đồng bộ, sprite không dùng được | Chỉ pilot nền / icon; B hậu kỳ + người duyệt; không dùng cho sprite hoạt ảnh |
 | Chuỗi cung ứng (node, model lạ) | Mục 4: không node tuỳ biến, chỉ safetensors, ghim phiên bản |
 
 ## 7. Giai đoạn
