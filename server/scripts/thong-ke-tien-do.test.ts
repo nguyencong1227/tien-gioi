@@ -212,21 +212,24 @@ describe("thong-ke-tien-do: đọc tệp sao lưu .sql.gz (COPY characters)", ()
 });
 
 describe("thong-ke-tien-do: mô hình tối ưu simulate & buildProgressReport", () => {
-  it("getOptimalModel trả về mốc thời gian hợp lý từ simulate", () => {
+  it("getOptimalModel trả về mốc thời gian và ngưỡng cân bằng chuẩn xác", () => {
     const model = getOptimalModel();
-    expect(model.kdHauKyReachHours).toBeGreaterThan(5.0);
-    expect(model.kdHauKyReachHours).toBeLessThan(7.0);
-    expect(model.kdFinishHours).toBeGreaterThan(7.0);
-    expect(model.kdFinishHours).toBeLessThan(10.0);
+    expect(model.preKdFinishHours).toBeCloseTo(2.86, 1);
+    expect(model.kdHauKyReachHours).toBeCloseTo(6.03, 1);
+    expect(model.kdFinishHours).toBeCloseTo(8.3, 1);
+    // Ngưỡng Kim Đan Hậu kỳ = 2.86 + 0.7 * (6.03 - 2.86) ~ 5.08h
+    expect(model.kdHauKyThresholdHours).toBeCloseTo(5.08, 1);
+    // Ngưỡng hết Kim Đan = 2.86 + 4.0 = ~6.86h
+    expect(model.postKdThresholdHours).toBeCloseTo(6.86, 1);
   });
 
-  it("cảnh báo QUÁ NHANH khi trung vị Kim Đan Hậu kỳ < 0.7x mô hình tối ưu", () => {
-    // Mô hình tới Kim Đan Hậu kỳ là ~6.03h. Tạo 5 mẫu với 3.0h (tỉ số ~0.50x < 0.7x)
+  it("cảnh báo QUÁ NHANH khi trung vị Kim Đan Hậu kỳ < ngưỡng ~5.08h", () => {
+    // 5 mẫu với 4.8h (< 5.08h) -> cảnh báo
     const records = [
       {
         realm: KD_REALM,
         tier: KD_HAU_KY_TIER,
-        playMs: 2.8 * 3600000,
+        playMs: 4.5 * 3600000,
         kills: 100,
         bossKills: 1,
         mapId: "am_suong",
@@ -234,7 +237,7 @@ describe("thong-ke-tien-do: mô hình tối ưu simulate & buildProgressReport",
       {
         realm: KD_REALM,
         tier: KD_HAU_KY_TIER,
-        playMs: 2.9 * 3600000,
+        playMs: 4.7 * 3600000,
         kills: 110,
         bossKills: 1,
         mapId: "am_suong",
@@ -242,7 +245,7 @@ describe("thong-ke-tien-do: mô hình tối ưu simulate & buildProgressReport",
       {
         realm: KD_REALM,
         tier: KD_HAU_KY_TIER,
-        playMs: 3.0 * 3600000,
+        playMs: 4.8 * 3600000,
         kills: 120,
         bossKills: 2,
         mapId: "am_suong",
@@ -250,7 +253,7 @@ describe("thong-ke-tien-do: mô hình tối ưu simulate & buildProgressReport",
       {
         realm: KD_REALM,
         tier: KD_HAU_KY_TIER,
-        playMs: 3.1 * 3600000,
+        playMs: 4.9 * 3600000,
         kills: 130,
         bossKills: 2,
         mapId: "am_suong",
@@ -258,7 +261,7 @@ describe("thong-ke-tien-do: mô hình tối ưu simulate & buildProgressReport",
       {
         realm: KD_REALM,
         tier: KD_HAU_KY_TIER,
-        playMs: 3.2 * 3600000,
+        playMs: 5.0 * 3600000,
         kills: 140,
         bossKills: 3,
         mapId: "am_suong",
@@ -267,19 +270,18 @@ describe("thong-ke-tien-do: mô hình tối ưu simulate & buildProgressReport",
 
     const report = buildProgressReport(records, 0);
     expect(report.kdHauKyCount).toBe(5);
-    expect(report.kdHauKyMedianHours).toBeCloseTo(3.0);
-    expect(report.kdHauKyRatio).toBeLessThan(0.7);
+    expect(report.kdHauKyMedianHours).toBeCloseTo(4.8);
     expect(report.verdict).toContain("🚨 CẢNH BÁO (QUÁ NHANH)");
-    expect(report.verdict).toContain("dưới ngưỡng 0.7x");
+    expect(report.verdict).toContain("Trung vị giờ chơi tích luỹ tới Kim Đan Hậu kỳ");
   });
 
-  it("báo 'Trong dự kiến' khi trung vị Kim Đan Hậu kỳ >= 0.7x mô hình tối ưu và KHÔNG in 'ĐẠT MỤC TIÊU'", () => {
-    // 5 mẫu với 6.0h (tỉ số ~1.0x mô hình)
+  it("báo 'Chưa thấy dấu hiệu quá nhanh (cận trên)' khi trung vị Kim Đan Hậu kỳ >= ngưỡng", () => {
+    // 5 mẫu với 5.5h (>= 5.08h)
     const records = [
       {
         realm: KD_REALM,
         tier: KD_HAU_KY_TIER,
-        playMs: 5.5 * 3600000,
+        playMs: 5.2 * 3600000,
         kills: 100,
         bossKills: 1,
         mapId: "am_suong",
@@ -287,7 +289,7 @@ describe("thong-ke-tien-do: mô hình tối ưu simulate & buildProgressReport",
       {
         realm: KD_REALM,
         tier: KD_HAU_KY_TIER,
-        playMs: 5.8 * 3600000,
+        playMs: 5.4 * 3600000,
         kills: 110,
         bossKills: 1,
         mapId: "am_suong",
@@ -295,7 +297,7 @@ describe("thong-ke-tien-do: mô hình tối ưu simulate & buildProgressReport",
       {
         realm: KD_REALM,
         tier: KD_HAU_KY_TIER,
-        playMs: 6.0 * 3600000,
+        playMs: 5.5 * 3600000,
         kills: 120,
         bossKills: 2,
         mapId: "am_suong",
@@ -303,7 +305,7 @@ describe("thong-ke-tien-do: mô hình tối ưu simulate & buildProgressReport",
       {
         realm: KD_REALM,
         tier: KD_HAU_KY_TIER,
-        playMs: 6.2 * 3600000,
+        playMs: 5.8 * 3600000,
         kills: 130,
         bossKills: 2,
         mapId: "am_suong",
@@ -311,7 +313,7 @@ describe("thong-ke-tien-do: mô hình tối ưu simulate & buildProgressReport",
       {
         realm: KD_REALM,
         tier: KD_HAU_KY_TIER,
-        playMs: 6.5 * 3600000,
+        playMs: 6.0 * 3600000,
         kills: 140,
         bossKills: 3,
         mapId: "am_suong",
@@ -319,20 +321,18 @@ describe("thong-ke-tien-do: mô hình tối ưu simulate & buildProgressReport",
     ];
 
     const report = buildProgressReport(records, 0);
-    expect(report.kdHauKyMedianHours).toBeCloseTo(6.0);
-    expect(report.kdHauKyRatio).toBeGreaterThanOrEqual(0.7);
-    expect(report.verdict).toContain("Trong dự kiến");
-    // Tuyệt đối không dùng chữ ĐẠT MỤC TIÊU vì đây chỉ là cận trên
+    expect(report.kdHauKyMedianHours).toBeCloseTo(5.5);
+    expect(report.verdict).toContain("Chưa thấy dấu hiệu quá nhanh (cận trên)");
     expect(report.verdict).not.toContain("ĐẠT MỤC TIÊU");
   });
 
-  it("đánh giá nhóm vượt qua Kim Đan (realm > KD_REALM) với mốc hết Kim Đan", () => {
-    // 5 mẫu ở Nguyên Anh (realm 4) với playMs = 5.0h (< 0.7x của ~8.3h) -> cảnh báo
+  it("đánh giá nhóm vượt qua Kim Đan (realm > KD_REALM) với mốc ~6.86h theo #406", () => {
+    // 5 mẫu ở Nguyên Anh (realm 4) với playMs = 6.5h (< 6.86h, trong Kim Đan chỉ mất ~3.64h < 4h) -> CẢNH BÁO
     const fastRecords = [
       {
         realm: KD_REALM + 1,
         tier: 0,
-        playMs: 4.8 * 3600000,
+        playMs: 6.0 * 3600000,
         kills: 200,
         bossKills: 5,
         mapId: "am_suong",
@@ -340,7 +340,7 @@ describe("thong-ke-tien-do: mô hình tối ưu simulate & buildProgressReport",
       {
         realm: KD_REALM + 1,
         tier: 0,
-        playMs: 4.9 * 3600000,
+        playMs: 6.2 * 3600000,
         kills: 210,
         bossKills: 5,
         mapId: "am_suong",
@@ -348,7 +348,7 @@ describe("thong-ke-tien-do: mô hình tối ưu simulate & buildProgressReport",
       {
         realm: KD_REALM + 1,
         tier: 0,
-        playMs: 5.0 * 3600000,
+        playMs: 6.5 * 3600000,
         kills: 220,
         bossKills: 6,
         mapId: "am_suong",
@@ -356,7 +356,7 @@ describe("thong-ke-tien-do: mô hình tối ưu simulate & buildProgressReport",
       {
         realm: KD_REALM + 1,
         tier: 0,
-        playMs: 5.1 * 3600000,
+        playMs: 6.6 * 3600000,
         kills: 230,
         bossKills: 6,
         mapId: "am_suong",
@@ -364,7 +364,7 @@ describe("thong-ke-tien-do: mô hình tối ưu simulate & buildProgressReport",
       {
         realm: KD_REALM + 1,
         tier: 0,
-        playMs: 5.2 * 3600000,
+        playMs: 6.7 * 3600000,
         kills: 240,
         bossKills: 7,
         mapId: "am_suong",
@@ -372,16 +372,17 @@ describe("thong-ke-tien-do: mô hình tối ưu simulate & buildProgressReport",
     ];
     const fastReport = buildProgressReport(fastRecords, 0);
     expect(fastReport.postKdCount).toBe(5);
-    expect(fastReport.postKdRatio).toBeLessThan(0.7);
+    expect(fastReport.postKdMedianHours).toBeCloseTo(6.5);
     expect(fastReport.verdict).toContain("🚨 CẢNH BÁO (QUÁ NHANH)");
     expect(fastReport.verdict).toContain("Nhóm vượt qua Kim Đan");
+    expect(fastReport.verdict).toContain("dưới ngưỡng 4.0h theo #406");
 
-    // 5 mẫu ở Nguyên Anh với playMs = 9.0h (>= 0.7x) -> Trong dự kiến
+    // 5 mẫu ở Nguyên Anh với playMs = 7.2h (>= 6.86h, trong Kim Đan >= 4h) -> Chưa thấy dấu hiệu quá nhanh
     const normalRecords = [
       {
         realm: KD_REALM + 1,
         tier: 0,
-        playMs: 8.5 * 3600000,
+        playMs: 7.0 * 3600000,
         kills: 200,
         bossKills: 5,
         mapId: "am_suong",
@@ -389,7 +390,7 @@ describe("thong-ke-tien-do: mô hình tối ưu simulate & buildProgressReport",
       {
         realm: KD_REALM + 1,
         tier: 0,
-        playMs: 8.8 * 3600000,
+        playMs: 7.1 * 3600000,
         kills: 210,
         bossKills: 5,
         mapId: "am_suong",
@@ -397,7 +398,7 @@ describe("thong-ke-tien-do: mô hình tối ưu simulate & buildProgressReport",
       {
         realm: KD_REALM + 1,
         tier: 0,
-        playMs: 9.0 * 3600000,
+        playMs: 7.2 * 3600000,
         kills: 220,
         bossKills: 6,
         mapId: "am_suong",
@@ -405,7 +406,7 @@ describe("thong-ke-tien-do: mô hình tối ưu simulate & buildProgressReport",
       {
         realm: KD_REALM + 1,
         tier: 0,
-        playMs: 9.2 * 3600000,
+        playMs: 7.5 * 3600000,
         kills: 230,
         bossKills: 6,
         mapId: "am_suong",
@@ -413,14 +414,14 @@ describe("thong-ke-tien-do: mô hình tối ưu simulate & buildProgressReport",
       {
         realm: KD_REALM + 1,
         tier: 0,
-        playMs: 9.5 * 3600000,
+        playMs: 8.0 * 3600000,
         kills: 240,
         bossKills: 7,
         mapId: "am_suong",
       },
     ];
     const normalReport = buildProgressReport(normalRecords, 0);
-    expect(normalReport.verdict).toContain("Trong dự kiến");
+    expect(normalReport.verdict).toContain("Chưa thấy dấu hiệu quá nhanh (cận trên)");
     expect(normalReport.verdict).not.toContain("ĐẠT MỤC TIÊU");
   });
 
