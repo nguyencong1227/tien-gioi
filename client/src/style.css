@@ -1002,7 +1002,7 @@ html[data-input="touch"] .qt-head {
 /* Máy tính (chuột + màn rộng): bản đồ lớn đủ rộng để đọc nhãn (tên cổng + nơi đến, NPC, khu quái); thấp hơn thì vừa chiều cao còn lại */
 @media (pointer: fine) and (min-width: 900px) {
   #map-modal {
-    --sheet-w: min(92vw, 700px);
+    --sheet-w: min(92vw, 840px);
   }
 }
 .map-body {
@@ -1127,8 +1127,8 @@ html[data-input="touch"] .qt-head {
 }
 @media (pointer: fine) and (min-width: 900px) {
   #worldmap {
-    width: min(92vw, 640px, calc(var(--vh, 100dvh) - 310px));
-    height: min(92vw, 640px, calc(var(--vh, 100dvh) - 310px));
+    width: min(100%, 640px, calc(var(--vh, 100dvh) - 310px));
+    height: min(100%, 640px, calc(var(--vh, 100dvh) - 310px));
   }
 }
 .map-legend {
