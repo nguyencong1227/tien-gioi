@@ -404,6 +404,8 @@ export class WorldScene extends Phaser.Scene {
   fx!: FxSystem;
   /** Báo trước đòn + đạn tầm xa của quái (M7.7, #508): Graphics từ pool, không tốn ngân sách hạt */
   telegraphs!: TelegraphLayer;
+  /** Số tiếng báo "đang trong vùng nguy hiểm" đã phát (script kiểm `?debug`) */
+  dangerCues = 0;
 
   // Bảng đo hiệu năng (?perf=1, #71)
   private perfEnabled = false;
@@ -485,6 +487,12 @@ export class WorldScene extends Phaser.Scene {
       emitterBudget: () => getQuality().emitterBudget,
       reduced: () => getQuality().reducedMotion,
       inView: (x, y, pad) => this.inView(x, y, pad),
+      // Mình đứng trong vùng báo trước đòn: viền trắng dày + một tiếng báo cho vùng đó (nhìn vị trí đoán trước, đúng chỗ thân mình đang hiện)
+      player: () => (this.hasMe ? { x: this.predX, y: this.predY, r: PLAYER_RADIUS } : null),
+      onDanger: () => {
+        this.dangerCues++;
+        sound.warn();
+      },
     });
     ensureShadowTexture(this);
     this.weatherPaused =
