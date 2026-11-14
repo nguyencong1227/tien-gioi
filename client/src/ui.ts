@@ -55,6 +55,7 @@ import {
   ORIGIN_BUY_PREFIX,
   levelOf,
   keepSlotsOf,
+  engraveSlotsOf,
   nextCost,
   type LimboMsg,
   type RebirthChoice,
@@ -130,6 +131,15 @@ import {
   type ActionId,
 } from "./keybinds";
 import { captureOutcome, keysScreenModel } from "./keys-screen";
+import {
+  clampEngrave,
+  effectiveEngrave,
+  engraveEmptyText,
+  engraveHint,
+  engraveItem,
+  engraveToSend,
+  toggleEngrave,
+} from "./engrave";
 import { LEAVE_BUTTONS, pickPromptButton, pickVisible, type PromptAnswer } from "./prompts";
 import { dirOfArrowKey, moveFocus, ownsArrowKeys, withFocusKept } from "./panel-nav";
 import { transitionMs, waitOrSkip } from "./gfx/scene-transition";
@@ -2016,6 +2026,12 @@ let activeLimboMsg: LimboMsg | null = null;
 let activeSoulView: SoulView | null = null;
 let selectedOrigin = DEFAULT_ORIGIN;
 let selectedRelics: string[] = [];
+/** Tập chiêu khắc chân linh người chơi đã chọn; `null` = chưa đụng tới bộ chọn (hiện chiêu đã khắc, KHÔNG gửi `engrave` khi đầu thai) */
+let selectedEngrave: string[] | null = null;
+/** Đã bấm "đầu thai" (đang chờ máy chủ): bỏ qua lần bấm thứ hai trong lúc chờ, máy chủ cũng bỏ tin thứ hai */
+let rebirthBusy = false;
+let rebirthBusyTimer: ReturnType<typeof setTimeout> | null = null;
+const REBIRTH_BUSY_MS = 3000;
 let limboBuyCb: ((id: string) => void) | null = null;
 let limboRebirthCb: ((choice: RebirthChoice) => void) | null = null;
 
@@ -2140,36 +2156,6 @@ function renderLimboStoneListImpl() {
     item.append(btn);
     container.append(item);
   }
-
-  // 3. Khắc chân linh: ghi "(sắp có)"
-  const khacItem = document.createElement("div");
-  khacItem.className = "stone-item";
-  const khacInfo = document.createElement("div");
-  khacInfo.className = "stone-item-info";
-
-  const khacName = document.createElement("div");
-  khacName.className = "stone-item-name";
-  khacName.textContent = "Khắc chân linh";
-  const khacBadge = document.createElement("span");
-  khacBadge.className = "stone-item-level";
-  khacBadge.textContent = "Sắp có";
-  khacName.append(khacBadge);
-  khacInfo.append(khacName);
-
-  const khacDesc = document.createElement("div");
-  khacDesc.className = "stone-item-desc";
-  khacDesc.textContent =
-    "Lưu giữ một môn công pháp hoặc kỳ nghệ tâm đắc qua kiếp (chờ xuất hiện công pháp).";
-  khacInfo.append(khacDesc);
-  khacItem.append(khacInfo);
-
-  const khacBtn = document.createElement("button");
-  khacBtn.type = "button";
-  khacBtn.className = "stone-buy-btn";
-  khacBtn.disabled = true;
-  khacBtn.textContent = "Chưa mở";
-  khacItem.append(khacBtn);
-  container.append(khacItem);
 }
 
 function renderLimboOrigins() {
@@ -2300,6 +2286,73 @@ function renderLimboRelicsImpl() {
   });
 }
 
+function renderLimboEngrave() {
+  withFocusKept($("limbo-overlay"), renderLimboEngraveImpl);
+}
+
+/** Bộ chọn khắc chân linh: tối đa `engraveSlotsOf` chiêu từ `LimboMsg.engravable`; mặc định hiện chiêu ĐÃ khắc (chưa đụng thì không gửi gì). */
+function renderLimboEngraveImpl() {
+  const container = $("limbo-engrave-list");
+  const emptyEl = $("limbo-engrave-empty");
+  const hintEl = $("limbo-engrave-hint");
+  if (!container || !activeSoulView || !activeLimboMsg) return;
+
+  const cap = engraveSlotsOf(activeSoulView.unlocks);
+  const engravable = activeLimboMsg.engravable ?? [];
+  const picked = effectiveEngrave(activeSoulView.engraved, selectedEngrave, engravable, cap);
+  if (hintEl) hintEl.textContent = engraveHint(cap, picked.length);
+
+  const emptyText = engraveEmptyText(cap, engravable.length);
+  container.replaceChildren();
+  if (emptyEl) {
+    emptyEl.hidden = emptyText === null;
+    if (emptyText !== null) emptyEl.textContent = emptyText;
+  }
+  if (emptyText !== null) return;
+
+  for (const id of engravable) {
+    const info = engraveItem(id);
+    const isChecked = picked.includes(id);
+    const canCheck = isChecked || picked.length < cap;
+
+    const item = document.createElement("div");
+    item.className = `relic-item engrave-item${isChecked ? " checked" : ""}${canCheck ? "" : " disabled"}`;
+
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = isChecked;
+    cb.disabled = !canCheck;
+    cb.dataset.nav = `engrave:${id}`;
+    cb.setAttribute("aria-label", info.element ? `${info.name}, hệ ${info.element}` : info.name);
+    // Cách đã bật / tắt ô tích sẵn; thêm Enter cho thống nhất với các thẻ khác (#463)
+    cb.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      if (!e.repeat) cb.click();
+    });
+    item.append(cb);
+
+    const nameSpan = document.createElement("span");
+    nameSpan.className = "engrave-name";
+    nameSpan.textContent = info.name;
+    item.append(nameSpan);
+    if (info.element) {
+      const tag = document.createElement("small");
+      tag.className = "engrave-elem";
+      tag.textContent = info.element;
+      item.append(tag);
+    }
+
+    item.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (!canCheck) return;
+      selectedEngrave = toggleEngrave(picked, id, engravable, cap);
+      renderLimboEngrave();
+    });
+    container.append(item);
+  }
+}
+
 function renderLimboAll() {
   if (!activeLimboMsg || !activeSoulView) return;
   const summary = activeLimboMsg.summary;
@@ -2329,6 +2382,7 @@ function renderLimboAll() {
   renderLimboStoneList();
   renderLimboOrigins();
   renderLimboRelics();
+  renderLimboEngrave();
 }
 
 // ---------- Giao diện Tông môn (M3.6, #230) ----------
@@ -4338,6 +4392,10 @@ export const ui = {
     selectedOrigin =
       msg.soul.origins && msg.soul.origins.length > 0 ? msg.soul.origins[0] : DEFAULT_ORIGIN;
     selectedRelics = [];
+    selectedEngrave = null;
+    rebirthBusy = false;
+    if (rebirthBusyTimer) clearTimeout(rebirthBusyTimer);
+    rebirthBusyTimer = null;
     limboBuyCb = callbacks?.onBuy ?? null;
     limboRebirthCb = callbacks?.onRebirth ?? null;
 
@@ -4360,11 +4418,30 @@ export const ui = {
 
     const rebirthBtn = $("limbo-btn-rebirth");
     if (rebirthBtn) {
+      rebirthBtn.removeAttribute("aria-disabled");
       rebirthBtn.onclick = () => {
-        limboRebirthCb?.({
-          origin: selectedOrigin,
-          keep: selectedRelics,
-        });
+        if (rebirthBusy) return; // đã gửi, đang chờ máy chủ: máy chủ cũng bỏ tin `rebirth` thứ hai
+        const soul = activeSoulView;
+        const choice: RebirthChoice = { origin: selectedOrigin, keep: selectedRelics };
+        // `engrave` CHỈ khi người chơi đã đổi tập chiêu khắc (vắng = giữ nguyên chiêu đã khắc); kẹp lại theo danh sách / nấc hiện hành
+        if (soul && activeLimboMsg) {
+          const cap = engraveSlotsOf(soul.unlocks);
+          const sel =
+            selectedEngrave === null
+              ? null
+              : clampEngrave(selectedEngrave, activeLimboMsg.engravable, cap);
+          const engrave = engraveToSend(soul.engraved, sel);
+          if (engrave !== undefined) choice.engrave = engrave;
+        }
+        rebirthBusy = true;
+        rebirthBtn.setAttribute("aria-disabled", "true");
+        // máy chủ từ chối (toast, vẫn ở Hoàng Tuyền) thì cho bấm lại sau một lát
+        rebirthBusyTimer = setTimeout(() => {
+          rebirthBusy = false;
+          rebirthBusyTimer = null;
+          rebirthBtn.removeAttribute("aria-disabled");
+        }, REBIRTH_BUSY_MS);
+        limboRebirthCb?.(choice);
       };
     }
   },
@@ -4384,6 +4461,10 @@ export const ui = {
     activeSoulView = null;
     limboBuyCb = null;
     limboRebirthCb = null;
+    selectedEngrave = null;
+    rebirthBusy = false;
+    if (rebirthBusyTimer) clearTimeout(rebirthBusyTimer);
+    rebirthBusyTimer = null;
     const overlay = $("limbo-overlay");
     if (overlay) overlay.hidden = true;
     document.body.classList.remove("in-limbo");

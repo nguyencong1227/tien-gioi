@@ -618,10 +618,13 @@ async function start(room: Room, mapId: string) {
         soul: {
           kiep: 1,
           duyen: 28,
-          unlocks: { du_am: 1 },
+          unlocks: { du_am: 1, khac: 1 },
           origins: [],
+          engraved: ["ung_trao"],
         },
         keepable: ["lang_nha_kiem", "tho_nhung_bao", "long_tho"],
+        // M7.2c: chiêu đã học ở kiếp vừa rồi (+ chiêu đang khắc) để thử bộ chọn "Khắc chân linh"
+        engravable: ["ung_trao", "hoa_van_kiem", "me_tung_bo"],
       };
       ui.showLimbo(mock, {
         onBuy: (id) => {
@@ -632,7 +635,9 @@ async function start(room: Room, mapId: string) {
             ui.updateSoul(mock.soul);
           }
         },
-        onRebirth: () => {
+        onRebirth: (choice) => {
+          // script kiểm đọc đúng tin sẽ gửi (`engrave` vắng = giữ nguyên chiêu đã khắc)
+          ((window as any).__rebirthChoices ??= []).push(choice);
           ui.showReborn(mock.summary.kiep + 1);
         },
       });

@@ -1595,7 +1595,9 @@ export class WorldScene extends Phaser.Scene {
         this.room.send("soulBuy", msg);
       },
       onRebirth: (choice: RebirthChoice) => {
+        // `engrave` vắng = giữ nguyên chiêu đã khắc (client chỉ gửi khi người chơi đổi tập chiêu khắc, `engrave.ts`)
         const msg: RebirthMsg = { origin: choice.origin, keep: choice.keep };
+        if (choice.engrave !== undefined) msg.engrave = choice.engrave;
         this.room.send("rebirth", msg);
       },
     });
