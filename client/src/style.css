@@ -284,25 +284,39 @@ button {
   font-size: var(--fs-14);
 }
 
-/* HUD */
+/* HUD: thẻ nhân vật GỌN (QUYET_DINH_M3 mục 15): tên + huy hiệu Kiếp + cảnh giới trên MỘT dòng, ba thanh mảnh (số nằm trong thanh), một dòng chip
+   (Linh thạch, số đạo hữu) không bao giờ xuống dòng. Các nút Nhân vật / Túi / ... nằm ở thanh menu riêng (`#hud-menu`, cột phải). */
 #hud {
-  width: 266px;
-  padding: 8px 10px;
+  width: 260px;
+  padding: 6px 8px;
   font-size: var(--fs-13);
 }
 #hud .row {
   display: flex;
-  justify-content: space-between;
+  align-items: baseline;
   gap: 6px;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
+  min-width: 0;
+  white-space: nowrap;
+}
+#hud-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#hud .hud-kiep-badge {
+  flex: none;
+  margin-left: 0;
 }
 #hud-realm {
+  flex: none;
+  margin-left: auto;
   color: var(--gold);
 }
 .bar {
   position: relative;
-  height: 14px;
-  margin: 4px 0;
+  height: 13px;
+  margin: 3px 0;
   background: rgba(0, 0, 0, 0.45);
   border-radius: 3px;
   overflow: hidden;
@@ -326,41 +340,55 @@ button {
   position: relative;
   display: block;
   text-align: center;
-  font-size: var(--fs-11);
-  line-height: 14px;
+  font-size: var(--fs-10);
+  line-height: 13px;
   text-shadow: 0 1px 2px #000;
 }
-.hud-foot {
+/* Dòng chip: Linh thạch + số đạo hữu; nowrap + ẩn tràn để KHÔNG bao giờ xuống dòng hay lơ lửng */
+.hud-chips {
   display: flex;
+  flex-wrap: nowrap;
   align-items: center;
-  justify-content: space-between;
   gap: 6px;
-  margin-top: 6px;
+  margin-top: 5px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.hud-chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 224, 138, 0.3);
+  background: rgba(0, 0, 0, 0.4);
+  color: #ffe08a;
+  font-size: var(--fs-11);
+  line-height: 1.5;
+}
+.hud-chip b {
+  font-weight: 700;
 }
 #hud-online {
-  font-size: var(--fs-11);
-  opacity: 0.75;
+  color: var(--paper);
+  border-color: rgba(255, 255, 255, 0.22);
 }
-.hud-btns {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 4px;
-}
+
+/* Thanh menu: MỘT hàng nút biểu tượng cùng cỡ, căn đều (cột phải, dưới bản đồ nhỏ). Nhãn chữ ẩn (có chú thích khi rê chuột + nhãn phím) */
 .hud-btn {
   position: relative;
-  min-width: 40px;
-  min-height: 36px;
-  padding: 3px 6px;
+  flex: none;
+  min-width: 38px;
+  min-height: 38px;
+  padding: 3px;
   border-radius: 6px;
   border: 1px solid var(--gold);
-  background: rgba(201, 162, 74, 0.2);
+  background: rgba(24, 21, 18, 0.88);
   color: var(--paper);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 3px;
 }
 /* Biểu tượng vẽ bằng SVG (thay chữ Hán): cỡ theo font-size của khung chứa nên co giãn cùng --ui-scale */
 .ico {
@@ -377,21 +405,63 @@ button {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.hud-btn span {
-  font-size: var(--fs-16);
+.hud-btn .ico {
+  font-size: var(--fs-18, 18px);
+  color: #ffe08a;
+}
+.hud-btn > span:not(.ico) {
+  font-size: var(--fs-18, 18px);
   line-height: 1;
   color: #ffe08a;
 }
 .hud-btn small {
-  font-size: var(--fs-10);
+  display: none;
+}
+.hud-btn:hover {
+  background: rgba(201, 162, 74, 0.28);
+}
+.hud-btn:focus-visible {
+  outline: 2px solid #ffe08a;
+  outline-offset: 2px;
 }
 .hud-btn.active {
   background: rgba(201, 162, 74, 0.48);
   box-shadow: 0 0 10px rgba(255, 224, 138, 0.5);
 }
-.hud-btn.icon-only {
-  min-width: 38px;
+.hud-menu {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+}
+.hud-menu-items {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
   padding: 3px;
+  border-radius: 8px;
+  background: rgba(24, 21, 18, 0.55);
+}
+.menu-toggle {
+  display: none;
+}
+/* Màn rất hẹp (điện thoại dọc: 360 / 412 px): chỉ một nút ☰, bấm mở ra MỘT hàng 6 nút phủ lên dưới nút */
+@media (max-width: 479px) {
+  .menu-toggle {
+    display: inline-flex;
+  }
+  .hud-menu-items {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    z-index: 12;
+    border: 1px solid var(--gold);
+    background: rgba(24, 21, 18, 0.97);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
+  }
+  .hud-menu.open .hud-menu-items {
+    display: flex;
+  }
 }
 
 /* Cột trái HUD: chứa HUD, tổ đội, nhiệm vụ dạng flex không đè nhau (#91) */
@@ -412,6 +482,28 @@ button {
   position: relative !important;
   top: auto !important;
   left: auto !important;
+}
+
+/* Cột phải: bản đồ nhỏ + thanh menu xếp dọc, không đè nhau. Con của cột tự định vị lại (như cột trái) nên mọi quy tắc cũ về vị trí cố định của
+   #minimap-wrap không còn tác dụng. */
+#hud-col-right {
+  position: fixed;
+  z-index: 10;
+  top: max(10px, env(safe-area-inset-top));
+  right: max(10px, env(safe-area-inset-right));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  pointer-events: none;
+}
+#hud-col-right > * {
+  pointer-events: auto;
+  position: relative !important;
+  top: auto !important;
+  right: auto !important;
+  left: auto !important;
+  bottom: auto !important;
 }
 
 /* Theo dõi nhiệm vụ dưới HUD */
@@ -2069,12 +2161,22 @@ html[data-input="touch"] #newbie-btn-keys {
     overflow-x: hidden;
   }
   #hud {
-    width: 200px;
+    width: min(210px, 56vw);
     font-size: var(--fs-11);
-    padding: 6px 8px;
+    padding: 5px 7px;
   }
-  .hud-btn,
-  .hud-btn.icon-only {
+  /* Màn hẹp: tên một dòng riêng (không bị cắt còn vài chữ), huy hiệu Kiếp + cảnh giới ở dòng dưới */
+  #hud .row {
+    flex-wrap: wrap;
+    row-gap: 1px;
+  }
+  #hud-name {
+    flex: 1 1 100%;
+  }
+  #hud-realm {
+    margin-left: 0;
+  }
+  .hud-btn {
     min-width: 44px;
     min-height: 44px;
   }
@@ -2108,7 +2210,7 @@ html[data-input="touch"] #newbie-btn-keys {
     left: auto;
     bottom: auto;
     right: max(8px, env(safe-area-inset-right));
-    top: calc(max(8px, env(safe-area-inset-top)) + 120px);
+    top: calc(max(8px, env(safe-area-inset-top)) + 176px);
     width: min(145px, 39vw);
     font-size: var(--fs-11);
   }
@@ -2210,25 +2312,6 @@ html[data-input="touch"] #newbie-btn-keys {
     padding: 5px 8px;
     font-size: var(--fs-11);
   }
-  /* Dòng chân HUD: cột trái xếp chồng (Đạo hữu trực tuyến, Linh thạch) + lưới nút 3 x 44 px bên phải; xếp ngang thì không đủ 194 px */
-  .hud-foot {
-    display: grid;
-    grid-template-columns: auto 144px;
-    grid-template-areas:
-      "on btns"
-      "coin btns";
-    justify-content: space-between;
-    align-content: center;
-    align-items: start;
-    column-gap: 6px;
-    row-gap: 4px;
-  }
-  #hud-online {
-    grid-area: on;
-  }
-  #hud-coin-badge {
-    grid-area: coin;
-  }
   .bar {
     height: 12px;
     margin: 2px 0;
@@ -2242,14 +2325,6 @@ html[data-input="touch"] #newbie-btn-keys {
     min-width: 44px;
     min-height: 44px;
     padding: 2px 5px;
-  }
-  .hud-btns {
-    grid-area: btns;
-    width: 144px;
-    gap: 6px;
-  }
-  .hud-btn small {
-    display: none;
   }
   #party-panel {
     width: 200px;
@@ -2994,6 +3069,7 @@ body.reduced-motion .transition-overlay.active {
 
 /* Khi đang ở Hoàng Tuyền: ẩn HUD gameplay, chỉ giữ chat thu gọn không che chữ */
 body.in-limbo #hud-col-left,
+body.in-limbo #hud-col-right,
 body.in-limbo #minimap-wrap,
 body.in-limbo #quickbar,
 body.in-limbo #skills,

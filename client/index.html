@@ -473,81 +473,18 @@
           <div class="bar hp"><i id="hp-fill"></i><span id="hp-text"></span></div>
           <div class="bar mp"><i id="mp-fill"></i><span id="mp-text"></span></div>
           <div class="bar exp"><i id="exp-fill"></i><span id="exp-text"></span></div>
-          <div class="hud-foot">
-            <div id="hud-online"></div>
-            <div id="hud-coin-badge" title="Linh thạch">
-              <span class="coin-gem">💎</span><b id="hud-coin">0</b>
-            </div>
-            <div class="hud-btns">
-              <button
-                type="button"
-                id="btn-char"
-                class="hud-btn"
-                title="Bảng nhân vật & Trang bị (C)"
-                aria-label="Bảng nhân vật & Trang bị (Phím C)"
-                aria-expanded="false"
-              >
-                <span class="ico"
-                  ><svg aria-hidden="true" focusable="false"><use href="#i-char" /></svg></span
-                ><small>Nhân vật</small>
-              </button>
-              <button
-                type="button"
-                id="btn-bag"
-                class="hud-btn"
-                title="Túi đồ (I)"
-                aria-label="Túi đồ (Phím I)"
-                aria-expanded="false"
-              >
-                <span class="ico"
-                  ><svg aria-hidden="true" focusable="false"><use href="#i-bag" /></svg></span
-                ><small>Túi</small>
-              </button>
-              <button
-                type="button"
-                id="btn-quest"
-                class="hud-btn"
-                title="Sổ nhiệm vụ (Q)"
-                aria-label="Sổ nhiệm vụ (Phím Q)"
-                aria-expanded="false"
-              >
-                <span class="ico"
-                  ><svg aria-hidden="true" focusable="false"><use href="#i-quest" /></svg></span
-                ><small>Nhiệm vụ</small>
-              </button>
-              <button
-                type="button"
-                id="btn-sect"
-                class="hud-btn"
-                title="Tông môn (G)"
-                aria-label="Tông môn (Phím G)"
-                aria-expanded="false"
-              >
-                <span class="ico"
-                  ><svg aria-hidden="true" focusable="false"><use href="#i-sect" /></svg></span
-                ><small>Tông môn</small>
-              </button>
-              <button
-                type="button"
-                id="btn-mute"
-                class="hud-btn icon-only"
-                title="Bật/tắt âm thanh (N)"
-                aria-label="Bật hoặc tắt âm thanh (Phím N)"
-                aria-pressed="false"
-              >
-                <span id="mute-icon">🔊</span>
-              </button>
-              <button
-                type="button"
-                id="btn-settings"
-                class="hud-btn icon-only"
-                title="Cài đặt (O)"
-                aria-label="Màn hình cài đặt (Phím O)"
-                aria-expanded="false"
-              >
-                <span>⚙</span>
-              </button>
-            </div>
+          <div class="hud-chips">
+            <span id="hud-coin-badge" class="hud-chip" title="Linh thạch">
+              <span class="coin-gem" aria-hidden="true">💎</span><b id="hud-coin">0</b>
+            </span>
+            <span
+              id="hud-online"
+              class="hud-chip"
+              title="Đạo hữu đang trực tuyến"
+              aria-label="Đạo hữu trực tuyến: 0"
+            >
+              <span class="chip-ico" aria-hidden="true">👥</span><b id="hud-online-n">0</b>
+            </span>
           </div>
         </div>
 
@@ -588,19 +525,105 @@
         </aside>
       </div>
 
-      <div
-        id="minimap-wrap"
-        class="panel"
-        title="Bản đồ thế giới (M)"
-        role="button"
-        tabindex="0"
-        aria-label="Mở bản đồ thế giới (Phím M)"
-      >
-        <canvas id="minimap" width="120" height="120"></canvas>
-        <div class="mm-foot">
-          <span id="minimap-zone">Lạc Hà Trấn</span>
-          <small>M</small>
+      <div id="hud-col-right">
+        <div
+          id="minimap-wrap"
+          class="panel"
+          title="Bản đồ thế giới (M)"
+          role="button"
+          tabindex="0"
+          aria-label="Mở bản đồ thế giới (Phím M)"
+        >
+          <canvas id="minimap" width="120" height="120"></canvas>
+          <div class="mm-foot">
+            <span id="minimap-zone">Lạc Hà Trấn</span>
+            <small>M</small>
+          </div>
         </div>
+
+        <nav id="hud-menu" class="hud-menu" aria-label="Menu giao diện">
+          <button
+            type="button"
+            id="btn-menu"
+            class="hud-btn menu-toggle"
+            title="Menu"
+            aria-label="Mở menu"
+            aria-expanded="false"
+            aria-controls="hud-menu-items"
+          >
+            <span aria-hidden="true">☰</span>
+          </button>
+          <div id="hud-menu-items" class="hud-menu-items">
+            <button
+              type="button"
+              id="btn-char"
+              class="hud-btn"
+              title="Bảng nhân vật & Trang bị (C)"
+              aria-label="Bảng nhân vật & Trang bị (Phím C)"
+              aria-expanded="false"
+            >
+              <span class="ico"
+                ><svg aria-hidden="true" focusable="false"><use href="#i-char" /></svg></span
+              ><small>Nhân vật</small>
+            </button>
+            <button
+              type="button"
+              id="btn-bag"
+              class="hud-btn"
+              title="Túi đồ (I)"
+              aria-label="Túi đồ (Phím I)"
+              aria-expanded="false"
+            >
+              <span class="ico"
+                ><svg aria-hidden="true" focusable="false"><use href="#i-bag" /></svg></span
+              ><small>Túi</small>
+            </button>
+            <button
+              type="button"
+              id="btn-quest"
+              class="hud-btn"
+              title="Sổ nhiệm vụ (Q)"
+              aria-label="Sổ nhiệm vụ (Phím Q)"
+              aria-expanded="false"
+            >
+              <span class="ico"
+                ><svg aria-hidden="true" focusable="false"><use href="#i-quest" /></svg></span
+              ><small>Nhiệm vụ</small>
+            </button>
+            <button
+              type="button"
+              id="btn-sect"
+              class="hud-btn"
+              title="Tông môn (G)"
+              aria-label="Tông môn (Phím G)"
+              aria-expanded="false"
+            >
+              <span class="ico"
+                ><svg aria-hidden="true" focusable="false"><use href="#i-sect" /></svg></span
+              ><small>Tông môn</small>
+            </button>
+            <button
+              type="button"
+              id="btn-mute"
+              class="hud-btn icon-only"
+              title="Bật/tắt âm thanh (N)"
+              aria-label="Bật hoặc tắt âm thanh (Phím N)"
+              aria-pressed="false"
+            >
+              <span id="mute-icon">🔊</span>
+            </button>
+            <button
+              type="button"
+              id="btn-settings"
+              class="hud-btn icon-only"
+              title="Cài đặt (O)"
+              aria-label="Màn hình cài đặt (Phím O)"
+              aria-expanded="false"
+            >
+              <span>⚙</span>
+            </button>
+          </div>
+        </nav>
       </div>
 
       <aside id="perf-panel" class="panel" hidden aria-label="Bảng đo hiệu năng">
