@@ -1,6 +1,8 @@
 // Vật phẩm, bảng rơi đồ, túi đồ: hợp đồng giữa client và server (Sprint 1).
 // Server quyết định mọi thứ (rơi gì, nhặt được không, dùng được không); client chỉ hiển thị.
 
+import { SKILL_BOOK_ITEMS, bookIdOf } from "./books";
+import { STAT_CAPS } from "./stat-caps";
 import type { Element } from "./skills";
 import { OWNER_GEAR_ITEMS } from "./owner-gear";
 
@@ -94,11 +96,8 @@ export interface EquipStats {
   guard?: number;
 }
 
-/**
- * Trần của ba chỉ số phần trăm cộng từ TRANG BỊ (điểm %, M7.4): `equipBonus` / `statsFor` trả tổng ĐÃ KẸP theo bảng này; client so với nó để ghi "(tối đa)", không tự kẹp.
- * Chiêu / trạng thái (hộ thể, tăng tốc...) là hệ số riêng, không nằm trong tổng này. `crit` 40 theo issue #505; số khởi đầu, M7.9 hiệu chỉnh (một chỗ để sửa).
- */
-export const STAT_CAPS = { crit: 40, cdr: 30, guard: 40 } as const;
+// Trần ba chỉ số phần trăm của trang bị: định nghĩa ở `stat-caps.ts` (tệp lá, tránh vòng import với `skills.ts`), xuất lại ở đây.
+export { STAT_CAPS };
 
 export interface EquipDef {
   slot: EquipSlot;
@@ -459,6 +458,8 @@ export const ITEMS: ItemDef[] = [
   },
   // Đồ cho ba ô riêng của chủ (M7.4): hài, ngọc bội, pháp bảo (`owner-gear.ts`)
   ...OWNER_GEAR_ITEMS,
+  // Kinh quyển của 12 chiêu (M7.4): dựng từ `SKILLS_M7` (`books.ts`)
+  ...SKILL_BOOK_ITEMS,
 ];
 
 export const ITEM_BY_ID: Record<string, ItemDef> = Object.fromEntries(ITEMS.map((i) => [i.id, i]));
@@ -605,28 +606,38 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: "hoi_huyet_dan", chance: 0.2, min: 1, max: 2 },
     { itemId: "hoi_linh_dan", chance: 0.15, min: 1, max: 2 },
     { itemId: "tu_khi_dan", chance: 0.01, min: 1, max: 1 },
+    // Kinh quyển chiêu cơ bản (M7.4): rơi rất hiếm (ngoài việc mua ở cửa hàng)
+    { itemId: bookIdOf("hoa_van_kiem"), chance: 0.012, min: 1, max: 1 },
+    { itemId: bookIdOf("bon_thach_quyen"), chance: 0.012, min: 1, max: 1 },
   ],
   mang: [
     { itemId: "vay_mang", chance: 1, min: 2, max: 4 },
     // 0.6 x 1-2 -> 0.3 x 1 (M6, #403): đan là phần thưởng hiếm, không phải nguồn tu vi chính của người Kim Đan săn Xích Mãng
     { itemId: "tu_khi_dan", chance: 0.3, min: 1, max: 1 },
     { itemId: "hoi_huyet_dan", chance: 1, min: 2, max: 3 },
+    // Trùm Trúc Cơ rơi kinh quyển chiêu cao cấp (M7.4): phần thưởng của việc hạ trùm
+    { itemId: bookIdOf("thanh_tung_phi_cham"), chance: 0.25, min: 1, max: 1 },
+    { itemId: bookIdOf("cuu_cung_khon_sat"), chance: 0.25, min: 1, max: 1 },
   ],
   // Quái Kim Đan (M6, #403; số đo ở docs/CAN_BANG.md): mỗi loài rơi nguyên liệu của mình + chút đan
   suong_ho: [
     { itemId: "suong_mao", chance: 0.5, min: 1, max: 2 },
     { itemId: "hoi_huyet_dan", chance: 0.1, min: 1, max: 1 },
     { itemId: "dai_hoi_huyet_dan", chance: 0.04, min: 1, max: 1 },
+    { itemId: bookIdOf("lac_tuyet_phan_phi"), chance: 0.02, min: 1, max: 1 }, // kinh quyển hiếm (M7.4)
   ],
   thach_quy: [
     { itemId: "quy_giap", chance: 0.5, min: 1, max: 2 },
     { itemId: "hoi_linh_dan", chance: 0.1, min: 1, max: 1 },
     { itemId: "dai_hoi_linh_dan", chance: 0.04, min: 1, max: 1 },
+    { itemId: bookIdOf("cuu_cung_khon_sat"), chance: 0.02, min: 1, max: 1 }, // kinh quyển hiếm (M7.4)
   ],
   doc_thiem: [
     { itemId: "doc_nang", chance: 0.45, min: 1, max: 2 },
     { itemId: "dai_hoi_huyet_dan", chance: 0.06, min: 1, max: 1 },
     { itemId: "dai_hoi_linh_dan", chance: 0.06, min: 1, max: 1 },
+    { itemId: bookIdOf("me_tung_bo"), chance: 0.02, min: 1, max: 1 }, // kinh quyển hiếm (M7.4)
+    { itemId: bookIdOf("thanh_tung_phi_cham"), chance: 0.02, min: 1, max: 1 },
   ],
   // Trùm Kim Đan: bãi của đội 3-4 người; Giao Lân là nguyên liệu bộ III
   hac_giao: [
@@ -641,6 +652,7 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: "vay_mang", chance: 1, min: 3, max: 5 },
     { itemId: "tu_khi_dan", chance: 0.8, min: 2, max: 3 },
     { itemId: "hoi_huyet_dan", chance: 1, min: 3, max: 4 },
+    { itemId: bookIdOf("lac_tuyet_phan_phi"), chance: 0.3, min: 1, max: 1 }, // trùm bí cảnh rơi kinh quyển cao cấp (M7.4)
   ],
 };
 
