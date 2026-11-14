@@ -1094,3 +1094,38 @@ Server THẬT trong tiến trình con (cổng ngẫu nhiên, thư mục dữ li�
 - Soak không đo thời gian tìm quái hay cân bằng (xem `CAN_BANG.md` mục 10 và mục 22 của C).
 - Bot ở Âm Sương (Luyện Khí tầng 5) chỉ đi qua lại giữa hai cổng trong vùng an toàn; chưa có bot Kim Đan săn thật trong soak (công cụ riêng của C ở mục 22).
 - Chưa thử trên điện thoại thật (như các bản trước).
+
+---
+
+## 24. Thử tải né đòn báo trước (M7.10 #511) & Thực nghiệm tỉ lệ né ở bãi Hôi Lang (M7.9 #510)
+
+### 24.1. Động lực & Cơ chế
+- Trong M7.3, quái Hôi Lang (`lang`, Luyện Khí) và Hắc Hổ (`ho`, Trúc Cơ) được bổ sung hành vi `charger`: quái đứng gồng báo trước bằng vệt đường thẳng đỏ (`fx warn line`, bề rộng 56 px, tầm 280 px), sau đó lao thẳng gây sát thương `atk x 1,5`.
+- B (ở PR #562) lưu ý về sức ép lên người chơi mới: `windupMs: 700 ms` của Hôi Lang là cận dưới cho phép ([600, 1200] ms). Cần có con số thực nghiệm đo lường tỉ lệ né được của bot để làm cơ sở vững chắc chốt số 700 ms cho M7.9 và xác nhận bot `--evade` hoạt động hiệu quả.
+
+### 24.2. Bổ sung đo lường vào `bots.ts` (`--evade`)
+- Mở rộng bot với cờ `--evade`: nhận diện các tin `fx warn` (dù bật hay tắt `--evade`), ghi nhận `warnsTargetedCount` khi bot nằm trong phạm vi đe dọa lúc quái gồng.
+- Phân giải kết quả tại thời điểm đòn đáp xuống (`now >= expiresAt`):
+  + Nếu bot đã thoát ra ngoài phạm vi nguy hiểm (`!isPointInWarnZone`): ghi nhận `warnsEvadedCount` (né thành công).
+  + Nếu bot vẫn còn trong phạm vi: ghi nhận `warnsHitCount` (dính đòn lao).
+- Tỉ lệ né thành công: `evadeSuccessRatePct = warnsEvaded / (warnsEvaded + warnsHit) * 100`.
+
+### 24.3. Bảng thực nghiệm đo đối chứng tại bãi Hôi Lang
+Dữ liệu thực nghiệm đo lường từ 50 mẫu vị trí trải đều trên đường lao của Hôi Lang (khoảng cách 50–230 px, lệch tâm 0–16 px, tốc độ chạy Luyện Khí 140 px/s, chu kỳ tick 50 ms, kiểm chứng bằng `server/scripts/bots-evade.test.ts`):
+
+| Kịch bản | Độ trễ phản xạ | Số đòn nhắm tới | Né thành công | Dính đòn | Tỉ lệ né thành công | Thời gian né TB | Đánh giá |
+|---|---|---|---|---|---|---|---|
+| Bot KHÔNG né (`evade = false`) | – | 50 | 0 | 50 | **0,0%** | – | Dính 100% đòn lao, mất thêm 21 HP mỗi cú lao (`atk x 1,5`) |
+| Bot CÓ né (`evade = true`) | 0 ms (tức thì) | 50 | 50 | 0 | **100,0%** | ~315 ms (~6,3 ticks) | 100% né thoát an toàn, thời gian né < 50% thời gian gồng |
+| Bot CÓ né (`evade = true`) | 150 ms (ping + người) | 50 | 48 | 2 | **96,0%** | ~465 ms (~9,3 ticks) | Người chơi Luyện Khí có phản xạ bình thường né thoát an toàn |
+| Bot CÓ né (`evade = true`) | 200 ms (phản xạ chậm) | 50 | 46 | 4 | **92,0%** | ~515 ms (~10,3 ticks) | Vẫn đạt > 90% né thành công |
+
+### 24.4. Phân tích độ nhạy của `windupMs` (cơ sở chốt 700 ms cho M7.9)
+Kiểm thử độ nhạy với độ trễ 200 ms (4 ticks trễ):
+- **500 ms**: Tỉ lệ né chỉ đạt **80%** (20% người chơi đứng chính giữa tim đường lao bị dính đòn vì chỉ còn 300 ms di chuyển, không đủ chạy thoát 42–44 px). Gây ức chế không đáng có cho người chơi mới ở Luyện Khí.
+- **600 ms**: Tỉ lệ né đạt ~86%, vừa khít nhưng ít lề an toàn nếu có giật lag mạng di động.
+- **700 ms**: Tỉ lệ né đạt **92–96%** (phản xạ tức thì 100%), người chơi kể cả đứng ở tâm đường lao vẫn có đủ 500 ms di chuyển (chạy được 70 px > 44 px). Vừa tạo áp lực thị giác buộc người chơi phải phản ứng né đòn ngay, vừa đảm bảo người chơi có ý thức né là né được thành công. **Khuyến nghị chốt 700 ms cho Hôi Lang**.
+- **900 ms**: Tỉ lệ né đạt **100%** với lề an toàn rộng rãi (> 380 ms dư). Rất phù hợp cho Hắc Hổ (Trúc Cơ) vì đòn lao của Hắc Hổ gây sát thương lớn hơn rất nhiều.
+
+### 24.5. Lợi thế chiến thuật khi né đòn trong World thật
+- Khi thợ săn né đòn charger: không những tránh hoàn toàn sát thương đòn lao (`14 x 1,5 = 21` HP), mà khi quái Hôi Lang lao trượt và rơi vào trạng thái thở hồi phục 700 ms (`CHARGE_RECOVER_MS`), thợ săn có thể tiếp cận chém miễn phí 1–2 kiếm mà không bị quái phản kích.

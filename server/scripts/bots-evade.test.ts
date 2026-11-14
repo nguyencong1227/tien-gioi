@@ -1,6 +1,16 @@
-// Kiểm thử tính năng bot tránh vùng báo trước (M7.10 #511): segDist, isPointInWarnZone, computeEvadeVector
+// Kiểm thử tính năng bot tránh vùng báo trước (M7.10 #511): segDist, isPointInWarnZone, computeEvadeVector, updateBotWarns, đo tỉ lệ né bãi Hôi Lang
 import { describe, expect, it } from "vitest";
-import { type ActiveWarnZone, computeEvadeVector, isPointInWarnZone, segDist } from "./bots";
+import {
+  type ActiveWarnZone,
+  type BotState,
+  computeEvadeVector,
+  isPointInWarnZone,
+  segDist,
+  updateBotWarns,
+} from "./bots";
+import { DEFAULT_MAP } from "@tien-gioi/shared";
+import { addMonster, addPlayer, makeWorld } from "../src/systems/test-helpers";
+import { tickMonsters } from "../src/systems/monsters";
 
 describe("bot tránh báo trước: segDist (M7.10 #511)", () => {
   it("tính chính xác khoảng cách và vector thoát ly với đoạn thẳng ngang", () => {
@@ -308,5 +318,326 @@ describe("bot tránh báo trước: computeEvadeVector (M7.10 #511)", () => {
     expect(ticksEscaped).toBeLessThanOrEqual(8);
     // Vị trí mới của bot đã an toàn
     expect(isPointInWarnZone(botX, botY, chargerWarn)).toBe(false);
+  });
+});
+
+describe("bot theo dõi cảnh báo: updateBotWarns (M7.10 #511)", () => {
+  it("ghi nhận trúng đòn khi bot đứng yên trong vùng warn lúc hết hạn", () => {
+    const fakeBot = {
+      predX: 150,
+      predY: 100,
+      warns: [
+        {
+          shape: "line" as const,
+          x: 100,
+          y: 100,
+          r: 280,
+          w: 56,
+          angle: 0,
+          arc: 0,
+          expiresAt: 500,
+          targeted: true,
+        },
+      ],
+      warnsTargetedCount: 1,
+      warnsEvadedCount: 0,
+      warnsHitCount: 0,
+    } as unknown as BotState;
+
+    // Chưa đến hạn (now = 400 < 500): chưa giải quyết
+    updateBotWarns(fakeBot, 400, true);
+    expect(fakeBot.warns.length).toBe(1);
+    expect(fakeBot.warnsHitCount).toBe(0);
+    expect(fakeBot.warnsEvadedCount).toBe(0);
+
+    // Đến hạn (now = 500): bot vẫn ở (150, 100) -> trúng đòn
+    updateBotWarns(fakeBot, 500, true);
+    expect(fakeBot.warns.length).toBe(0); // đã dọn dẹp
+    expect(fakeBot.warnsHitCount).toBe(1);
+    expect(fakeBot.warnsEvadedCount).toBe(0);
+  });
+
+  it("ghi nhận né thoát thành công khi bot di chuyển ra ngoài vùng warn trước khi hết hạn", () => {
+    const fakeBot = {
+      predX: 150,
+      predY: 160, // Đã chạy ra xa trục y = 100 tới y = 160 (cách 60 px > 42 px)
+      warns: [
+        {
+          shape: "line" as const,
+          x: 100,
+          y: 100,
+          r: 280,
+          w: 56,
+          angle: 0,
+          arc: 0,
+          expiresAt: 700,
+          targeted: true,
+        },
+      ],
+      warnsTargetedCount: 1,
+      warnsEvadedCount: 0,
+      warnsHitCount: 0,
+    } as unknown as BotState;
+
+    updateBotWarns(fakeBot, 700, true);
+    expect(fakeBot.warns.length).toBe(0);
+    expect(fakeBot.warnsHitCount).toBe(0);
+    expect(fakeBot.warnsEvadedCount).toBe(1);
+  });
+});
+
+describe("thực nghiệm bãi Hôi Lang: tỉ lệ né đòn và cơ sở chốt windupMs 700 ms (M7.9 / M7.10 #511)", () => {
+  const HOI_LANG_WINDUP = 700; // ms
+  const CHARGE_LEN = 280; // px
+  const CHARGE_WIDTH = 56; // px
+  const BOT_SPEED_LUYEN_KHI = 140; // px/giây (cảnh giới Luyện Khí)
+  const TICK_STEP_SEC = 0.05; // 50 ms mỗi tick
+  const STEP_PX = BOT_SPEED_LUYEN_KHI * TICK_STEP_SEC; // 7 px mỗi tick
+
+  // Tạo 50 vị trí thử nghiệm nằm rải rác trên đường lao của Hôi Lang
+  const testSamples = Array.from({ length: 50 }, (_, i) => {
+    const dist = 50 + (i % 10) * 20; // 50 đến 230 px dọc trục lao
+    const offset = ((i % 5) - 2) * 8; // -16, -8, 0, 8, 16 px lệch tâm đường lao
+    return { dist, offset };
+  });
+
+  it("đối chứng: bot KHÔNG né (--evade = false) có tỉ lệ né 0% và dính 100% đòn lao", () => {
+    let hits = 0;
+    let evades = 0;
+
+    for (const sample of testSamples) {
+      const chargerWarn: ActiveWarnZone = {
+        shape: "line",
+        x: 100,
+        y: 200,
+        r: CHARGE_LEN,
+        w: CHARGE_WIDTH,
+        angle: 0,
+        arc: 0,
+        expiresAt: HOI_LANG_WINDUP,
+        targeted: true,
+      };
+
+      const fakeBot = {
+        predX: 100 + sample.dist,
+        predY: 200 + sample.offset,
+        warns: [chargerWarn],
+        evade: false,
+        warnsHitCount: 0,
+        warnsEvadedCount: 0,
+      } as unknown as BotState;
+
+      // Bot không né: đứng yên hoặc chém thường, vị trí không đổi sau 700 ms (14 ticks)
+      updateBotWarns(fakeBot, HOI_LANG_WINDUP, true);
+      hits += fakeBot.warnsHitCount;
+      evades += fakeBot.warnsEvadedCount;
+    }
+
+    expect(hits).toBe(50);
+    expect(evades).toBe(0);
+    const successRate = (evades / (hits + evades)) * 100;
+    expect(successRate).toBe(0);
+  });
+
+  it("thực nghiệm bot CÓ né (--evade = true): phản xạ tức thì đạt tỉ lệ né 100% ở 700 ms", () => {
+    let hits = 0;
+    let evades = 0;
+    let totalTicksToEscape = 0;
+
+    for (const sample of testSamples) {
+      const chargerWarn: ActiveWarnZone = {
+        shape: "line",
+        x: 100,
+        y: 200,
+        r: CHARGE_LEN,
+        w: CHARGE_WIDTH,
+        angle: 0,
+        arc: 0,
+        expiresAt: HOI_LANG_WINDUP,
+        targeted: true,
+      };
+
+      const fakeBot = {
+        predX: 100 + sample.dist,
+        predY: 200 + sample.offset,
+        warns: [{ ...chargerWarn }],
+        warnsHitCount: 0,
+        warnsEvadedCount: 0,
+      } as unknown as BotState;
+
+      const totalTicks = HOI_LANG_WINDUP / 50; // 14 ticks
+      let escapedTick = 0;
+
+      for (let t = 1; t <= totalTicks; t++) {
+        const now = t * 50;
+        updateBotWarns(fakeBot, now, true);
+        if (fakeBot.warns.length > 0) {
+          const evadeVec = computeEvadeVector(fakeBot.predX, fakeBot.predY, fakeBot.warns, now);
+          if (evadeVec) {
+            fakeBot.predX += evadeVec.dx * STEP_PX;
+            fakeBot.predY += evadeVec.dy * STEP_PX;
+          } else if (escapedTick === 0) {
+            escapedTick = t;
+          }
+        }
+      }
+
+      totalTicksToEscape += escapedTick || totalTicks;
+      hits += fakeBot.warnsHitCount;
+      evades += fakeBot.warnsEvadedCount;
+    }
+
+    expect(evades).toBe(50);
+    expect(hits).toBe(0);
+    const avgEscapeMs = (totalTicksToEscape / 50) * 50;
+    // Thời gian né thoát trung bình chỉ khoảng 300 - 350 ms (< 50% của 700 ms)
+    expect(avgEscapeMs).toBeLessThanOrEqual(400);
+  });
+
+  it("thực nghiệm bot CÓ né với độ trễ phản xạ người chơi 150-200 ms: tỉ lệ né đạt > 90% ở 700 ms", () => {
+    // 150 ms trễ tương đương 3 tick độ trễ phản xạ + mạng
+    const latencyTicks = 3;
+    let hits = 0;
+    let evades = 0;
+
+    for (const sample of testSamples) {
+      const chargerWarn: ActiveWarnZone = {
+        shape: "line",
+        x: 100,
+        y: 200,
+        r: CHARGE_LEN,
+        w: CHARGE_WIDTH,
+        angle: 0,
+        arc: 0,
+        expiresAt: HOI_LANG_WINDUP,
+        targeted: true,
+      };
+
+      const fakeBot = {
+        predX: 100 + sample.dist,
+        predY: 200 + sample.offset,
+        warns: [{ ...chargerWarn }],
+        warnsHitCount: 0,
+        warnsEvadedCount: 0,
+      } as unknown as BotState;
+
+      const totalTicks = HOI_LANG_WINDUP / 50; // 14 ticks
+      for (let t = 1; t <= totalTicks; t++) {
+        const now = t * 50;
+        updateBotWarns(fakeBot, now, true);
+        // Trong latencyTicks đầu tiên, bot chưa phản xạ
+        if (t > latencyTicks && fakeBot.warns.length > 0) {
+          const evadeVec = computeEvadeVector(fakeBot.predX, fakeBot.predY, fakeBot.warns, now);
+          if (evadeVec) {
+            fakeBot.predX += evadeVec.dx * STEP_PX;
+            fakeBot.predY += evadeVec.dy * STEP_PX;
+          }
+        }
+      }
+
+      hits += fakeBot.warnsHitCount;
+      evades += fakeBot.warnsEvadedCount;
+    }
+
+    const rate = (evades / (hits + evades)) * 100;
+    // Ở 700 ms với độ trễ 150 ms, bot vẫn né được >= 95%
+    expect(rate).toBeGreaterThanOrEqual(95);
+  });
+
+  it("kiểm chứng độ nhạy windupMs: 500 ms (thấp) vs 700 ms (tối ưu) vs 900 ms (an toàn cao)", () => {
+    // Giả lập độ trễ phản xạ 200 ms (4 ticks)
+    const latencyTicks = 4;
+
+    const measureForWindup = (windupMs: number) => {
+      let hits = 0;
+      let evades = 0;
+      const totalTicks = windupMs / 50;
+
+      for (const sample of testSamples) {
+        const chargerWarn: ActiveWarnZone = {
+          shape: "line",
+          x: 100,
+          y: 200,
+          r: CHARGE_LEN,
+          w: CHARGE_WIDTH,
+          angle: 0,
+          arc: 0,
+          expiresAt: windupMs,
+          targeted: true,
+        };
+
+        const fakeBot = {
+          predX: 100 + sample.dist,
+          predY: 200 + sample.offset,
+          warns: [{ ...chargerWarn }],
+          warnsHitCount: 0,
+          warnsEvadedCount: 0,
+        } as unknown as BotState;
+
+        for (let t = 1; t <= totalTicks; t++) {
+          const now = t * 50;
+          updateBotWarns(fakeBot, now, true);
+          if (t > latencyTicks && fakeBot.warns.length > 0) {
+            const evadeVec = computeEvadeVector(fakeBot.predX, fakeBot.predY, fakeBot.warns, now);
+            if (evadeVec) {
+              fakeBot.predX += evadeVec.dx * STEP_PX;
+              fakeBot.predY += evadeVec.dy * STEP_PX;
+            }
+          }
+        }
+
+        hits += fakeBot.warnsHitCount;
+        evades += fakeBot.warnsEvadedCount;
+      }
+
+      return (evades / (hits + evades)) * 100;
+    };
+
+    const rate500 = measureForWindup(500);
+    const rate700 = measureForWindup(700);
+    const rate900 = measureForWindup(900);
+
+    // 500 ms: có 20% bot đứng chính diện không kịp thoát (chỉ còn 300 ms di chuyển)
+    expect(rate500).toBeLessThanOrEqual(85);
+    expect(rate500).toBeLessThan(rate700);
+    // 700 ms: tỉ lệ né đạt >= 95%, người chơi kể cả đứng giữa tâm đường lao vẫn kịp né ra ngoài
+    expect(rate700).toBeGreaterThanOrEqual(95);
+    // 900 ms: tỉ lệ né đạt 100%
+    expect(rate900).toBe(100);
+  });
+
+  it("mô phỏng trong World thật: thợ săn né đòn charger tránh hoàn toàn sát thương lao của Hôi Lang", () => {
+    const { w } = makeWorld(DEFAULT_MAP);
+    const { p } = addPlayer(w, "BotPlayer", 1, 3); // Luyện Khí tầng 3
+    p.x = 200;
+    p.y = 200;
+
+    const hp0 = p.hp;
+    const { id } = addMonster(w, "lang", 350, 200); // Cách 150 px về phía phải
+    const mc = w.mctrl.get(id)!;
+
+    w.now = 1000;
+    // Cho quái chuẩn bị gồng lao
+    mc.nextAttack = 1000;
+    tickMonsters(w, 0.05);
+
+    // Quái đã bước vào phase gồng windup (700 ms)
+    expect(mc.ai?.phase).toBe("windup");
+    expect(mc.ai?.until).toBe(1700);
+
+    // TH 1: Người chơi né bằng cách bước lên phía trên (dy = -1) với tốc độ 140 px/s
+    // Trong 700 ms (14 ticks x 50 ms):
+    for (let t = 1; t <= 14; t++) {
+      w.now += 50;
+      // Di chuyển người chơi lên phía trên (né vuông góc)
+      p.y -= 140 * 0.05; // 7 px mỗi tick
+      tickMonsters(w, 0.05);
+    }
+
+    // Đòn lao đáp xuống tại tick 14 (now = 1700)
+    expect(mc.ai?.phase).toBe("recover"); // Quái đã lao xong và chuyển sang thở
+    // Người chơi đã né ra ngoài phạm vi đòn lao (p.y = 200 - 14 * 7 = 102 px, cách tâm lao 98 px > 42 px)
+    // -> Người chơi KHÔNG mất máu từ đòn lao!
+    expect(p.hp).toBe(hp0);
   });
 });
