@@ -66,6 +66,7 @@ import {
   stepOf,
   buyUnlock,
   originMult,
+  engraveSlotsOf,
   soulView,
   validateRebirth,
   DEFAULT_MAP,
@@ -186,6 +187,8 @@ export class WorldRoom extends Room<WorldState> {
 
   /** Kho chân linh (file JSON; bước 3 thay bằng PostgreSQL). Test ghi đè để cô lập. */
   static players: PlayerStore | null = null; // null: `defaultPlayerStore()` (file JSON)
+  /** Người đang ghi chân linh lúc đầu thai (khắc chiêu): chặn tin `rebirth` thứ hai chen vào giữa lúc chờ ghi */
+  private readonly rebirthing = new Set<string>();
   static souls: SoulStore | null = null; // null: `defaultSoulStore()` (dựng lười, đọc DATA_DIR lúc dùng)
   /**
    * Dịch vụ tài khoản khi chạy `AUTH_MODE=account` (đặt ở `index.ts`): vào phòng bằng `JoinOptions.token`, BỎ QUA `name` /
@@ -881,6 +884,7 @@ export class WorldRoom extends Room<WorldState> {
       summary: limbo.summary,
       soul: soulView(c.soul),
       keepable: limbo.keepable,
+      engravable: limbo.engravable,
     });
   }
 
@@ -940,10 +944,33 @@ export class WorldRoom extends Room<WorldState> {
       });
       return;
     }
-    const choice = validateRebirth(c.soul, msg, c.limbo.keepable);
+    if (this.rebirthing.has(sid)) return; // đang ghi chân linh (khắc chiêu): tin `rebirth` thứ hai bị bỏ, không đầu thai hai lần
+    const choice = validateRebirth(c.soul, msg, c.limbo.keepable, c.limbo.engravable);
     if (!choice) {
       this.world.events.toast(sid, { text: "Lựa chọn đầu thai không hợp lệ.", tone: "bad" });
       return;
+    }
+    if (choice.engrave !== undefined) {
+      // Khắc chiêu: GHI chân linh TRƯỚC (kiếp mới dựng từ `Soul.engraved`). Sập giữa chừng thì còn ở Hoàng Tuyền với chân linh đã khắc và đầu thai lại được.
+      const engrave = choice.engrave;
+      this.rebirthing.add(sid);
+      try {
+        c.soul = await this.souls.update(c.identity.soulKey, (s) => ({
+          ...s,
+          engraved: engrave.slice(0, engraveSlotsOf(s.unlocks)),
+        }));
+      } catch (e) {
+        console.error("[luân hồi] khắc chân linh thất bại", e);
+        this.world.events.toast(sid, {
+          text: "Chưa khắc được chân linh, thử lại sau.",
+          tone: "bad",
+        });
+        return;
+      } finally {
+        this.rebirthing.delete(sid);
+      }
+      // người chơi có thể đã rời phòng / hồ sơ đã đổi trong lúc chờ ghi
+      if (this.world.ctrl.get(sid) !== c || !c.limbo || !this.state.players.get(sid)) return;
     }
     applyRebirth(this.world, sid, p, c, choice); // đồng bộ: tin `rebirth` thứ hai thấy `c.limbo` đã xoá
     if (this.mapId !== DEFAULT_MAP_ID) {

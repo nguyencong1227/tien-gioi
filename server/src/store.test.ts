@@ -4,7 +4,7 @@ import { mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { DEFAULT_MAP_ID, DUNGEON_MAPS, MAPS, getMap } from "@tien-gioi/shared";
-import type { SavedPlayer } from "./store";
+import { sanitizeLimbo, type SavedPlayer } from "./store";
 
 const dir = mkdtempSync(path.join(tmpdir(), "tien-gioi-store-"));
 let store: typeof import("./store");
@@ -134,5 +134,45 @@ describe("mapIdOf: chỗ ở của nhân vật là bản đồ thường", () =>
       expect(getMap(m.id)).toBeDefined(); // chính vì tra được mà mapIdOf phải loại
       expect(store.mapIdOf({ mapId: m.id })).toBe(DEFAULT_MAP_ID);
     }
+  });
+});
+
+describe("sanitizeLimbo: chiêu có thể khắc (M7.2c) không tin file", () => {
+  const base = { endedLifeId: "life-1", summary: {}, keepable: [], coinAtDeath: 0, counts: true };
+
+  it("giữ id chiêu thật, bỏ id lạ / độc / trùng / sai kiểu; thứ tự giữ nguyên", () => {
+    const r = sanitizeLimbo({
+      ...base,
+      engravable: [
+        "hoa_van_kiem",
+        "constructor",
+        "__proto__",
+        "hoa_van_kiem",
+        "me_tung_bo",
+        5,
+        null,
+        {},
+        "",
+      ],
+    })!;
+    expect(r.engravable).toEqual(["hoa_van_kiem", "me_tung_bo"]);
+  });
+
+  it("hồ sơ cũ không có trường, hoặc không phải mảng: rỗng", () => {
+    expect(sanitizeLimbo(base)!.engravable).toEqual([]);
+    for (const bad of ["hoa_van_kiem", 5, null, {}, true])
+      expect(sanitizeLimbo({ ...base, engravable: bad })!.engravable, String(bad)).toEqual([]);
+  });
+
+  it("mảng khổng lồ bị cắt (không tốn bộ nhớ / băng thông)", () => {
+    const r = sanitizeLimbo({
+      ...base,
+      engravable: Array.from({ length: 5000 }, () => "me_tung_bo"),
+    })!;
+    expect(r.engravable).toEqual(["me_tung_bo"]); // trùng nên chỉ còn 1
+    // nhiều id thật khác nhau cũng không vượt trần
+    const ids = ["hoa_van_kiem", "bon_thach_quyen", "ung_trao", "me_tung_bo"];
+    const r2 = sanitizeLimbo({ ...base, engravable: [...ids, ...ids, ...ids] })!;
+    expect(r2.engravable).toEqual(ids);
   });
 });

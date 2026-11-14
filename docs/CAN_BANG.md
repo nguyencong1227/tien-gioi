@@ -644,3 +644,37 @@ Tiêu chí #406 mục 1 sau hiệu chỉnh (tối đa của ba bậc; ĐẠT khi
 **Ngưỡng hoà vốn cho #410.** Chạy `simulate` với `ASSUME.searchSec.mang` = T (thời gian TÌM: từ lúc hạ con trước tới lúc chạm con kế, KHÔNG gồm trận và đả tọa hồi sức), tiêu chí #406 mục 1 đạt khi T >= **85 giây** (mô hình hiện tại: 90 giây, tối đa 1.42x). Trận + đả tọa hồi sức của Xích Mãng theo mô hình thêm 17.8 / 14.2 / 11.4 giây mỗi con (Sơ / Trung / Hậu kỳ), nên nếu bot đo từ lúc hạ tới lúc hạ con kế (kill-to-kill) thì phải trừ khoảng đó trước khi so với ngưỡng (khoảng 102 / 99 / 96 giây kill-to-kill ở ba bậc). Bot (#410) là thuật toán như thợ săn ở đây, nên so số đo THỜI GIAN TÌM của bot với ngưỡng đó phải trừ độ vụng: bot đo NGẮN hơn ~28 giây (giả thuyết nhân) hoặc ~79 giây (giả thuyết cộng) thì Xích Mãng nhanh quá mức tiêu chí; dài hơn thì đạt.
 
 Đọc bảng: nhịp Kim Đan là hàm của giả định tìm quái. Mô hình ra 5.2 giờ (tối ưu) / 5.7 giờ (bãi mới); thợ săn máy tính 1280x720 1.8 / 3.8 giờ, điện thoại ngang 844x390 1.9 / 4.1 giờ, điện thoại dọc 390x844 1.9 / 4.2 giờ; biết hết bản đồ 1.3 / 3.4 giờ. Phần lớn chênh lệch tới từ Xích Mãng (nguồn nhanh nhất của cả ba bậc ở kịch bản tối ưu: Xích Mãng, Độc Thiềm): giả định 90 giây cho nó là một con số đoán và là cái quyết định nhịp "tối ưu". **Kết luận (chốt trước phát hành 0.2.0, #406 mục 7): GIỮ NGUYÊN `ASSUME.searchSec`, mật độ và EXP Xích Mãng; chấp nhận đường tắt Xích Mãng và theo dõi bằng số liệu thật.** Lý do: (1) số đo là thợ săn thuật toán, không phải người, nên chỉ là cận dưới (mô hình không lạc quan); người chơi chậm hơn bao nhiêu thì không ai biết: hai giả thuyết hiệu chỉnh ở trên cho thời gian TÌM Xích Mãng 65-69 giây (nhân) và 27-29 giây (cộng), cả hai dưới ngưỡng hoà vốn, tức tiêu chí 1,5x CHƯA đạt ở bãi Xích Mãng và nhịp Kim Đan "tối ưu" ngắn hơn mục tiêu (cột "Riêng Kim Đan (tối ưu)" ở bảng hiệu chỉnh); nhưng nhịp "bãi mới" (người không cày Xích Mãng) vẫn 5.7 giờ, trong mục tiêu 5-7 giờ. (2) Chỉnh mật độ hay EXP Xích Mãng bây giờ là căn theo MỘT trong hai giả thuyết trái nhau, kéo theo chạy lại mô phỏng luân hồi, nhiệm vụ và trang bị ngay trước phát hành: rủi ro cao hơn lợi ích. Bot (`bots.ts`) cũng không phân xử được vì cũng là thuật toán, nên phần "bot săn Kim Đan" của #410 được thay bằng chính phép đo này (thợ săn trong `World` thật, vùng nhìn chữ nhật như client) cùng `hunt-check` (mục 9). (3) Đường tắt đã biết và đã chặn bớt (Tụ Khí Đan trần 300 tu vi mỗi viên, Xích Mãng rơi ít hơn, #403 / #425; ca "tìm nhanh" 30 giây có trong `kim-dan.ts`). **Sau phát hành:** tệp lưu ghi `life.playMs` cùng cảnh giới / bậc; nếu trung vị người chơi hết Kim Đan trong dưới ~4 giờ thì chỉnh ở bản 0.2.x theo thứ tự (a) giảm mật độ / kéo dài hồi sinh Xích Mãng (`shared/`, PR riêng, B review), (b) chỉnh EXP; KHÔNG sửa `ASSUME.searchSec` cho tới khi có số đo người thật. Số hạt giống nhiều hơn (12 cho trùm) và thợ săn khoá mục tiêu / quét vòng đã loại các lần kẹt hàng nghìn giây mô phỏng của bản đầu (#459).
+
+
+## Cân bằng chiêu thức, ngũ hành và trạng thái (M7, #510)
+
+> Dựa trên `shared/src/skills.ts` (12 chiêu đợt 1) và `server/src/systems/status-rules.ts`. Mọi chiêu thức được mô phỏng theo chu kỳ thi triển đều đặn theo hồi chiêu, kết hợp đan xen Kiếm chém thường (`SKILLS.slash`).
+
+### 1. Bảng 12 chiêu thức đợt 1 và tỉ lệ tăng DPS
+| Chiêu | Hệ | Hồi chiêu | Linh lực | Mult | Hiệu ứng trạng thái | DPS đơn (bình thường) | DPS đơn (khắc hệ 1,3×) | DPS đơn (bị khắc 0,8×) |
+|---|---|---:|---:|---:|---|---:|---:|---:|
+| **Hỏa Vân Kiếm** | hoa | 3.0s | 26 | 1.6× | burn (12%, 3.0s, 40%) | 1.11× | 1.18× | 1.06× |
+| **Bôn Thạch Quyền** | tho | 3.5s | 26 | 1.9× | – | 1.10× | 1.17× | 1.06× |
+| **Ưng Trảo** | kim | 2.5s | 19 | 1.3× | bleed (15%, 3.0s, 40%) | 1.08× | 1.15× | 1.03× |
+| **Trọng Nhạc Trảm** | tho | 3.0s | 26 | 1.6× | bleed (12%, 3.0s, 30%) | 1.10× | 1.17× | 1.06× |
+| **Huyền Băng Chỉ** | bang | 2.5s | 23 | 1.5× | – | 1.08× | 1.15× | 1.03× |
+| **Kim Chung Tráo** | kim | 9.0s | 38 | – | shield (20%, 5.3s, 100%) | 0.96× | 0.96× | 0.96× |
+| **Hồi Xuân** | thuy | 8.0s | 57 | – | regen (6%, 4.0s, 100%) | 0.95× | 0.95× | 0.95× |
+| **Phiêu Phong Bộ** | phong | 3.0s | 16 | – | – | 0.87× | 0.87× | 0.87× |
+| **Thanh Tùng Phi Châm** | moc | 3.0s | 32 | 1.5× | poison (20%, 3.0s, 60%) | 1.14× | 1.22× | 1.08× |
+| **Lạc Tuyết Phân Phi (5 tia)** | bang | 3.5s | 32 | 0.7×5 | chill (30%, 3.0s, 50%) | 1.29× | 1.41× | 1.21× |
+| **Cửu Cung Khốn Sát** | tho | 7.0s | 45 | 1.4× | stun (0%, 1.1s, 70%), sunder (10%, 3.0s, 50%) | 1.04× | 1.07× | 1.03× |
+| **Mê Tung Bộ** | phong | 8.0s | 32 | – | haste (35%, 3.0s, 100%) | 0.95× | 0.95× | 0.95× |
+| *Lạc Tuyết Phân Phi (1 tia xa)* | bang | 3.5s | 32 | 0.7× | tê cóng | 0.97× | 0.99× | 0.95× |
+
+### 2. Vòng chiêu mẫu theo cảnh giới (Build Rotation)
+| Cảnh giới | Số ô chiêu | Chiêu trang bị | Sức mạnh tổng (vô sắc) | Sức mạnh tổng (khắc hệ) | Tiêu hao linh lực | Duy trì giao tranh |
+|---|---:|---|---:|---:|---:|---:|
+| Luyện Khí | 1 | Hỏa Vân Kiếm | 1.11× | 1.18× | 8.7 MP/s | Vô hạn |
+| Trúc Cơ | 2 | Hỏa Vân + Trọng Nhạc | 1.21× | 1.29× | 17.3 MP/s | 39s |
+| Kim Đan | 3 | Hỏa Vân + Cửu Cung + Huyền Băng | 1.24× | 1.31× | 24.3 MP/s | 21s |
+
+### 3. Đánh giá tiêu chuẩn mục 10
+- **Trần sức mạnh chiêu**: Chiêu mạnh nhất đạt tối đa **1.41×** (kể cả chiêu quạt Lạc Tuyết Phân Phi 5 tia sát người khi khắc hệ, ngưỡng an toàn < **2,0×**).
+- **Sức mạnh chuỗi chiêu khi khắc hệ đúng**: Đạt **1.31×** (nằm đúng trong dải mục tiêu **1,3 – 1,65×**).
+- **Kinh tế linh lực**: Duy trì **> 21 giây** trước khi cần nghỉ, vượt xa thời lượng trận đấu thông thường (6-15 giây).
