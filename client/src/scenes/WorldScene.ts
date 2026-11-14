@@ -137,6 +137,7 @@ import { ui } from "../ui";
 import { StatusTracker } from "../status-track";
 import { BAR_SLOTS, SkillTracker, aimMode, blockedToast, slotView } from "../skill-bar";
 import { SkillBarDom } from "../skill-bar-dom";
+import { StatusBadgesDom, badgeViews } from "../status-badges";
 import { buildSkillsPanel, slotMessage } from "../skills-panel";
 import {
   buildMockThuMonDialog,
@@ -317,6 +318,11 @@ export class WorldScene extends Phaser.Scene {
   /** Sổ chiêu + hồi chiêu của CHÍNH MÌNH (M7.6, #507): thanh chiêu L U I O vẽ từ đây; client không đoán trước kết quả `cast` */
   private skills = new SkillTracker();
   private skillBar = new SkillBarDom(document);
+  /** Huy hiệu trạng thái của mình ở HUD (M7.7 bước 3a, #508) */
+  private statusBadges = new StatusBadgesDom<HTMLElement>(
+    document.getElementById("hud-status") as HTMLElement,
+    document,
+  );
   private nextSkillBarAt = 0;
   /** Khoá (cảnh giới|bậc|linh lực tối đa) của lần dựng bảng Công pháp gần nhất: đổi lúc bảng đang mở thì dựng lại */
   private skillsPanelKey = "";
@@ -1606,6 +1612,7 @@ export class WorldScene extends Phaser.Scene {
     this.pending.length = 0;
     // Trạng thái của Room cũ không còn đúng (qua cổng = phòng mới; nối lại = server gửi lại danh sách ngay sau đó): xoá để không đoán trước theo hệ số cũ
     this.status.clear();
+    this.statusBadges.render([]);
     this.skills.clear();
     this.nextSkillBarAt = 0;
     // Giữ seq tăng liên tục, không đặt lại 0: sau khi nối lại state.lastSeq vẫn là giá trị cũ
@@ -1683,6 +1690,8 @@ export class WorldScene extends Phaser.Scene {
     if (ui.isSkillsModalOpen() && this.skillsPanelKey !== `${me.realm}|${me.tier}|${me.maxMp}`)
       this.refreshSkillsPanel();
     const stunned = this.status.stunned(now);
+    // Huy hiệu trạng thái: danh sách rỗng thì `render([])` chỉ so một chuỗi rỗng (không đụng DOM)
+    this.statusBadges.render(badgeViews(this.status.active(now)));
     let filled = 0;
     for (const slot of BAR_SLOTS) {
       const v = slotView(slot, this.skills, me, stunned, now);
