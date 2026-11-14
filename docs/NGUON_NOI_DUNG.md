@@ -6,7 +6,13 @@
 
 **Nguồn:** trò chơi "Vạn Kiếp Tu Tiên", tác giả **Hải Quân · Bắc Team** (theo `NOTES.md` của bản sao lưu trên máy, ngày sao lưu 06-08/11/2026: `~/TT/van-kiep-tu-tien-clone`, chỉ đọc, không nằm trong repo).
 
-**Sự cho phép:** người phát triển Vạn Kiếp Tu Tiên **đã cho phép dùng nội dung, hình ảnh và âm thanh**, theo xác nhận của người dùng ngày **14/11/2026** (`QUYET_DINH_M3.md` mục 19 và 20). Minh chứng sự cho phép do người dùng giữ, không nằm trong repo. Bản sao lưu ghi "không có LICENSE, mặc định bảo lưu mọi quyền", nên mọi việc dùng ở đây dựa vào sự cho phép nói trên và KHÔNG mở rộng ra ngoài nó.
+**Sự cho phép:** người phát triển Vạn Kiếp Tu Tiên **đã cho phép dùng nội dung, hình ảnh và âm thanh**, theo xác nhận của người dùng ngày **14/11/2026** (`QUYET_DINH_M3.md` mục 19 và 20). Minh chứng sự cho phép do người dùng giữ, không nằm trong repo. **Cần ghi (người dùng bổ sung, không dán nội dung riêng tư):** HÌNH THỨC xác nhận (tin nhắn / thư / kênh nào), NGÀY nhận, người xác nhận là ai; và **giữ bản gốc cùng gói phát hành** (nếu bản phát hành lên Google Play bị khiếu nại sở hữu trí tuệ thì cần chứng minh được). Dev A nhắc người dùng ở `questions.md`; mẫu điền ở mục 2b dưới.
+
+### 2b. Mẫu điền (người dùng)
+- Hình thức xác nhận: _(chưa điền)_
+- Ngày nhận: _(chưa điền)_
+- Người xác nhận: _(chưa điền)_
+- Nơi giữ bản gốc: _(chưa điền)_ Bản sao lưu ghi "không có LICENSE, mặc định bảo lưu mọi quyền", nên mọi việc dùng ở đây dựa vào sự cho phép nói trên và KHÔNG mở rộng ra ngoài nó.
 
 **Phạm vi được phép (theo mục 19, 20):**
 - Nội dung chữ và dữ liệu (tên, mô tả, chỉ số làm điểm khởi đầu) của công pháp / kinh văn / chiêu thức, vật phẩm, trang bị, pháp bảo, nguyên liệu, nghề, cảnh giới, sự kiện: dùng **nguyên văn**, chỉnh số cho cân bằng của Tiên Giới.
