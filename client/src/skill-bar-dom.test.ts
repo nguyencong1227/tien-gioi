@@ -204,11 +204,13 @@ describe("SkillBarDom: vẽ ô, chỉ ghi khi đổi", () => {
     expect(els.get("skill-slots")!.attrs["aria-label"]).toBe(
       "Ô chiêu thức 2 đến 5, đã gắn 2 chiêu",
     );
+    expect(els.get("skill-slots")!.attrs["data-filled"]).toBe("2"); // CSS cảm ứng chọn bố cục theo số này
     const s = els.get("skill-slots")!.sets;
     dom.renderGroup(2);
     expect(els.get("skill-slots")!.sets).toBe(s);
     dom.renderGroup(0);
     expect(els.get("skill-slots")!.attrs["aria-label"]).toBe("Ô chiêu thức 2 đến 5, chưa có chiêu");
+    expect(els.get("skill-slots")!.attrs["data-filled"]).toBe("0");
   });
 
   it("phần tử vắng thì bỏ qua, không ném lỗi", () => {

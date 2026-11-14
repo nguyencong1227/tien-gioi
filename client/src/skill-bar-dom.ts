@@ -60,7 +60,10 @@ export class SkillBarDom {
   renderGroup(filled: number): void {
     if (filled === this.groupFilled) return;
     this.groupFilled = filled;
-    this.doc.getElementById("skill-slots")?.setAttribute("aria-label", groupLabel(filled));
+    const g = this.doc.getElementById("skill-slots");
+    g?.setAttribute("aria-label", groupLabel(filled));
+    // cụm cảm ứng chọn bố cục theo số chiêu đã gắn (CSS `[data-filled]`): 1-2 hàng ngang, 3-4 khối 2 x 2
+    g?.setAttribute("data-filled", String(filled));
   }
 
   /** Vẽ một ô. Trả `true` nếu có ghi vào DOM (để test / đo). */
