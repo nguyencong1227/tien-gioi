@@ -520,6 +520,7 @@ describe("khắc chân linh", () => {
     const s = sanitizeSoul(
       {
         id: "a",
+        unlocks: { khac: 3 }, // danh sách khắc bị chặn theo nấc `khac` đã mở
         engraved: [
           "ung_trao",
           "__proto__",

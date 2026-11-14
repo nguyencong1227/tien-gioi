@@ -7,7 +7,7 @@
 //
 // Mọi hàm ở đây là hàm thuần dùng chung cho client (hiển thị đúng số server tính) và server (kết quả thật).
 import { REALMS, expToNext, stepOf } from "./realms";
-import { sanitizeEngraved } from "./skills";
+import { ENGRAVE_COSTS, sanitizeEngraved, skillOf } from "./skills";
 
 // ---------------------------------------------------------------------------------------------------------------
 // Duyên (điểm luân hồi)
@@ -151,6 +151,13 @@ export const UNLOCKS: readonly UnlockDef[] = [
     costs: [25, 60, 140],
     effects: ["Giữ lại 1 món trang bị", "Giữ lại 2 món trang bị", "Giữ lại 3 món trang bị"],
   },
+  {
+    id: "khac",
+    name: "Khắc chân linh",
+    desc: "Khắc công pháp vào chân linh: kiếp sau vẫn còn chiêu đó (tầng 1, tự gắn lại ô; vẫn cần đủ cảnh giới mới dùng được).",
+    costs: ENGRAVE_COSTS,
+    effects: ["Khắc 1 công pháp", "Khắc 2 công pháp", "Khắc 3 công pháp"],
+  },
 ];
 
 export const UNLOCK_BY_ID: Readonly<Record<string, UnlockDef>> = Object.fromEntries(
@@ -241,6 +248,10 @@ export function startPackOf(unlocks: Unlocks): { itemId: string; qty: number }[]
 export function keepSlotsOf(unlocks: Unlocks): number {
   return levelOf(unlocks, "ky_vat");
 }
+/** Số công pháp được khắc vào chân linh (`Soul.engraved`), tối đa `ENGRAVE_MAX`. */
+export function engraveSlotsOf(unlocks: Unlocks): number {
+  return levelOf(unlocks, "khac"); // `levelOf` đã kẹp theo số nấc của mục (= `ENGRAVE_MAX`)
+}
 
 // ---------------------------------------------------------------------------------------------------------------
 // Chân linh (dữ liệu lưu của server) và làm sạch
@@ -326,7 +337,7 @@ export function sanitizeSoul(raw: unknown, now = ""): Soul | null {
   }
   const og = Array.isArray(r.origins) ? r.origins : [];
   for (const o of ORIGINS) if (o.cost > 0 && og.includes(o.id)) soul.origins.push(o.id);
-  soul.engraved = sanitizeEngraved(r.engraved);
+  soul.engraved = sanitizeEngraved(r.engraved).slice(0, engraveSlotsOf(soul.unlocks)); // không vượt nấc đã mở (file sửa tay)
   const b =
     r.best !== null && typeof r.best === "object" ? (r.best as Record<string, unknown>) : {};
   const { realm, tier } = cleanStep(b.realm, b.tier);
@@ -420,6 +431,8 @@ export interface SoulView {
   duyen: number;
   unlocks: Record<string, number>;
   origins: string[];
+  /** Công pháp đã khắc vào chân linh (id `SkillDef`): bảng Hoàng Tuyền hiện và cho đổi khi đầu thai; bỏ trống = chưa khắc gì (client dùng `?? []`) */
+  engraved?: string[];
 }
 
 export function soulView(soul: Soul): SoulView {
@@ -428,6 +441,7 @@ export function soulView(soul: Soul): SoulView {
     duyen: soul.duyen,
     unlocks: { ...soul.unlocks },
     origins: [...soul.origins],
+    engraved: [...soul.engraved],
   };
 }
 
@@ -436,10 +450,15 @@ export function soulView(soul: Soul): SoulView {
 export interface SoulBuyMsg {
   id: string;
 }
-/** Đầu thai: chọn xuất thân (bỏ trống = Phàm gia) và các trang bị giữ lại (id vật phẩm, tối đa `keepSlotsOf`). */
+/**
+ * Đầu thai: chọn xuất thân (bỏ trống = Phàm gia), các trang bị giữ lại (id vật phẩm, tối đa `keepSlotsOf`) và (M7) công pháp KHẮC vào chân linh
+ * (`engrave`: id `SkillDef`, tối đa `engraveSlotsOf`, mỗi id nằm trong `LimboMsg.engravable`). `engrave` bỏ trống = giữ nguyên các chiêu đã khắc;
+ * mảng (kể cả rỗng) = THAY danh sách khắc bằng đúng mảng này.
+ */
 export interface RebirthMsg {
   origin?: string;
   keep: string[];
+  engrave?: string[];
 }
 
 // ---------- server -> client (chỉ gửi cho chủ) ----------
@@ -449,6 +468,11 @@ export interface LimboMsg {
   soul: SoulView;
   /** Trang bị có thể giữ lại (id vật phẩm; một id có thể xuất hiện nhiều lần nếu có nhiều món cùng loại) */
   keepable: string[];
+  /**
+   * Công pháp có thể khắc (M7): chiêu đã học ở kiếp vừa kết thúc cộng chiêu đang khắc, id `SkillDef`, không trùng. Server điền ở bước M7.2c;
+   * bỏ trống = chưa có gì để khắc (client dùng `?? []`).
+   */
+  engravable?: string[];
 }
 /** Chân linh vừa đổi (sau khi mua). */
 export type SoulMsg = SoulView;
@@ -460,19 +484,22 @@ export interface RebornMsg {
 export interface RebirthChoice {
   origin: string;
   keep: string[];
+  /** Danh sách khắc MỚI (đã kiểm); `undefined` = giữ nguyên chân linh hiện tại */
+  engrave?: string[];
 }
 
 /**
- * Kiểm `RebirthMsg` với chân linh và danh sách `keepable` đã chụp lúc chết. Trả lựa chọn đã chuẩn hoá,
- * hoặc `null` nếu không hợp lệ (xuất thân chưa mở / lạ, giữ quá số ô, giữ món không có, sai kiểu).
+ * Kiểm `RebirthMsg` với chân linh và danh sách `keepable` / `engravable` đã chụp lúc chết. Trả lựa chọn đã chuẩn hoá,
+ * hoặc `null` nếu không hợp lệ (xuất thân chưa mở / lạ, giữ quá số ô, giữ món không có, khắc quá nấc đã mở / chiêu không có / trùng, sai kiểu).
  */
 export function validateRebirth(
   soul: Pick<Soul, "unlocks" | "origins">,
   msg: unknown,
   keepable: readonly string[],
+  engravable: readonly string[] = [],
 ): RebirthChoice | null {
   if (msg === null || typeof msg !== "object") return null;
-  const m = msg as { origin?: unknown; keep?: unknown };
+  const m = msg as { origin?: unknown; keep?: unknown; engrave?: unknown };
   let origin = DEFAULT_ORIGIN;
   if (m.origin !== undefined && m.origin !== DEFAULT_ORIGIN) {
     const o = originOf(m.origin);
@@ -486,5 +513,18 @@ export function validateRebirth(
     if (i < 0) return null;
     pool.splice(i, 1);
   }
-  return { origin, keep: [...(m.keep as string[])] };
+  let engrave: string[] | undefined;
+  if (m.engrave !== undefined) {
+    if (!Array.isArray(m.engrave) || m.engrave.length > engraveSlotsOf(soul.unlocks)) return null;
+    const seen = new Set<string>();
+    for (const id of m.engrave) {
+      if (typeof id !== "string" || seen.has(id) || !engravable.includes(id) || !skillOf(id))
+        return null;
+      seen.add(id);
+    }
+    engrave = [...(m.engrave as string[])];
+  }
+  return engrave === undefined
+    ? { origin, keep: [...(m.keep as string[])] }
+    : { origin, keep: [...(m.keep as string[])], engrave };
 }
