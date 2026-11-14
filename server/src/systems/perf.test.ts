@@ -1,5 +1,6 @@
 // Giữ các tối ưu băng thông / CPU của vòng lặp tick (xem AGENTS.md, mục Hiệu năng).
 import { describe, expect, it } from "vitest";
+import { Encoder, StateView } from "@colyseus/schema";
 import { MONSTER_BY_ID, TOWN_PX } from "@tien-gioi/shared";
 import { ANGLE_STEP, quantAngle, takeWhole } from "../world";
 import { addMonster, addPlayer, makeWorld } from "./test-helpers";
@@ -386,8 +387,22 @@ describe("kịch bản hiệu năng chiêu thức (M7.10 #511)", () => {
       players.push(sid);
     }
 
+    // Gắn StateView và Encoder như server thật để đo byte patch mỗi client (M7.10, tiêu chí N6 #511)
+    const views: StateView[] = [];
+    for (const sid of players) {
+      const v = new StateView();
+      w.interest.join(w, sid, v);
+      views.push(v);
+    }
+    const encoder = new Encoder(w.state);
+    encoder.encodeAll();
+    encoder.discardChanges();
+    for (const v of views) encoder.encodeView(v, 1, { offset: 1 });
+    encoder.discardChanges();
+
     const startTicks = 40; // 40 ticks = 2.0 giây
     const tickDurations: number[] = [];
+    const bytesPerTick: number[] = [];
 
     for (let t = 0; t < startTicks; t++) {
       w.now += 50;
@@ -416,10 +431,31 @@ describe("kịch bản hiệu năng chiêu thức (M7.10 #511)", () => {
       tickWorld(w, 0.05);
       const dt = performance.now() - t0;
       tickDurations.push(dt);
+
+      // Đo byte patch thực tế gửi cho từng client theo StateView
+      const it = { offset: 1 };
+      let sharedOffset = 1;
+      const shared = encoder.hasChanges;
+      if (shared) {
+        encoder.encode(it);
+        sharedOffset = it.offset;
+      }
+      let tickBytes = 0;
+      for (const v of views) {
+        if (shared || v.changes.size > 0) {
+          tickBytes += encoder.encodeView(v, sharedOffset, it).byteLength;
+        }
+      }
+      encoder.discardChanges();
+      bytesPerTick.push(tickBytes / players.length);
     }
 
     const avgMs = tickDurations.reduce((a, b) => a + b, 0) / tickDurations.length;
     expect(avgMs).toBeLessThan(10);
+
+    // Tiêu chí #511 & N6: byte / tick mỗi client < 520 (thực tế kịch bản chiêu patch rất nhỏ)
+    const avgPatchBytes = bytesPerTick.reduce((a, b) => a + b, 0) / bytesPerTick.length;
+    expect(avgPatchBytes).toBeLessThan(520);
 
     // Có hiệu ứng fx cast được tạo ra
     const castFxs = fx.filter((f) => f.kind === "cast");
