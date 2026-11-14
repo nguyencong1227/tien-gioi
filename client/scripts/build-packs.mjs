@@ -359,21 +359,26 @@ export function verifyPacksManifest(
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const isCheckMode = process.argv.includes("--check");
 
-  if (isCheckMode) {
-    console.log("=== KIỂM TRA ĐỒNG BỘ MANIFEST CÁC GÓI TẢI (PACKS) ===");
-    const res = verifyPacksManifest();
-    if (!res.ok) {
-      console.error(`❌ ${res.error}`);
-      process.exit(1);
+  try {
+    if (isCheckMode) {
+      console.log("=== KIỂM TRA ĐỒNG BỘ MANIFEST CÁC GÓI TẢI (PACKS) ===");
+      const res = verifyPacksManifest();
+      if (!res.ok) {
+        console.error(`❌ ${res.error}`);
+        process.exit(1);
+      }
+      console.log(
+        `✓ Manifest hợp lệ và đồng bộ (${res.manifest.packs.length} gói, ${res.manifest.packs.reduce((a, p) => a + p.files.length, 0)} tệp).`,
+      );
+    } else {
+      console.log("=== XÂY DỰNG MANIFEST CÁC GÓI TẢI (BUILD PACKS) ===");
+      const res = writePacksManifest();
+      console.log(
+        `✓ Đã tạo manifest thành công tại: ${res.path} (${res.packCount} gói, ${res.fileCount} tệp).`,
+      );
     }
-    console.log(
-      `✓ Manifest hợp lệ và đồng bộ (${res.manifest.packs.length} gói, ${res.manifest.packs.reduce((a, p) => a + p.files.length, 0)} tệp).`,
-    );
-  } else {
-    console.log("=== XÂY DỰNG MANIFEST CÁC GÓI TẢI (BUILD PACKS) ===");
-    const res = writePacksManifest();
-    console.log(
-      `✓ Đã tạo manifest thành công tại: ${res.path} (${res.packCount} gói, ${res.fileCount} tệp).`,
-    );
+  } catch (err) {
+    console.error(`❌ ${err.message}`);
+    process.exit(1);
   }
 }

@@ -14,6 +14,7 @@ import { mountAuth } from "./auth-http";
 import { mountCors } from "./cors";
 import { createStores } from "./stores";
 import { Monitor, mountMetrics, thresholdsOf } from "./metrics";
+import { applyStaticHeaders } from "./static-headers";
 
 // Đọc .env.local ở gốc repo (cổng riêng cho từng dev). Không có file thì dùng mặc định.
 const envFile = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../.env.local");
@@ -73,13 +74,8 @@ async function main() {
     app.use(
       express.static(dist, {
         setHeaders(res, filePath) {
-          // M7.15: Tệp gói tải trong /packs/** có gắn băm (trừ manifest.json) được cache immutable
-          const rel = path.relative(dist, filePath).split(path.sep).join("/");
-          if (rel.startsWith("packs/") && !rel.endsWith("manifest.json")) {
-            res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-          } else if (rel === "packs/manifest.json") {
-            res.setHeader("Cache-Control", "no-cache");
-          }
+          // M7.15: Cache-Control cho tệp tĩnh (/packs/** có ?v= thì immutable, còn lại no-cache)
+          applyStaticHeaders(res, filePath, dist);
         },
       }),
     );
