@@ -234,8 +234,11 @@ export async function readBackupProgress(backupPath: string): Promise<{
 export interface OptimalModelMap {
   reachHours: Map<number, number>; // stepOf(realm, tier) -> optimal hours to reach
   finishHours: Map<number, number>; // stepOf(realm, tier) -> optimal hours to finish
+  preKdFinishHours: number; // optimal hours to finish realm before Kim Đan (Trúc Cơ)
   kdHauKyReachHours: number; // optimal hours to reach Kim Đan Hậu kỳ
   kdFinishHours: number; // optimal hours to finish all Kim Đan
+  kdHauKyThresholdHours: number; // preKdFinishHours + 0.7 * (kdHauKyReachHours - preKdFinishHours)
+  postKdThresholdHours: number; // preKdFinishHours + 4.0 (ngưỡng 4 giờ trong Kim Đan theo #406)
 }
 
 export function getOptimalModel(): OptimalModelMap {
@@ -251,11 +254,29 @@ export function getOptimalModel(): OptimalModelMap {
     finishHours.set(s, r.total / 60);
   }
 
+  // Cảnh giới trước Kim Đan (Trúc Cơ)
+  const preKdRow = rows.filter((r) => r.realm === KD_REALM - 1).at(-1);
+  const preKdFinishHours = (preKdRow?.total ?? 171.67) / 60;
+
   const kdHauKyStep = stepOf(KD_REALM, KD_HAU_KY_TIER);
-  const kdHauKyReachHours = reachHours.get(kdHauKyStep) ?? 6.0;
+  const kdHauKyReachHours = reachHours.get(kdHauKyStep) ?? 6.03;
   const kdFinishHours = (rows.at(-1)?.total ?? 498) / 60;
 
-  return { reachHours, finishHours, kdHauKyReachHours, kdFinishHours };
+  // Ngưỡng theo #406 và CAN_BANG mục 10:
+  // - Hết Kim Đan: preKdFinishHours + 4.0h (~6.86h tích luỹ)
+  // - Tới Kim Đan Hậu kỳ: preKdFinishHours + 0.7 * (kdHauKyReachHours - preKdFinishHours) (~5.08h tích luỹ)
+  const postKdThresholdHours = preKdFinishHours + 4.0;
+  const kdHauKyThresholdHours = preKdFinishHours + 0.7 * (kdHauKyReachHours - preKdFinishHours);
+
+  return {
+    reachHours,
+    finishHours,
+    preKdFinishHours,
+    kdHauKyReachHours,
+    kdFinishHours,
+    kdHauKyThresholdHours,
+    postKdThresholdHours,
+  };
 }
 
 export interface GroupStat {
@@ -281,10 +302,12 @@ export interface ProgressReport {
   kdHauKyCount: number;
   kdHauKyMedianHours: number | null;
   kdHauKyOptReachHours: number;
+  kdHauKyThresholdHours: number;
   kdHauKyRatio: number | null;
   postKdCount: number;
   postKdMedianHours: number | null;
   postKdOptHours: number;
+  postKdThresholdHours: number;
   postKdRatio: number | null;
   verdict: string;
 }
@@ -378,28 +401,31 @@ export function buildProgressReport(
   }
 
   // Đánh giá theo tiêu chí cân bằng (#406, CAN_BANG mục 10)
-  // Ngưỡng cảnh báo: tỉ số giờ chơi tích luỹ / mô hình tối ưu < 0.7x với >= 5 mẫu
+  // - Nhóm vượt qua Kim Đan: cảnh báo khi tích luỹ < postKdThresholdHours (~6.86h, tương ứng < 4.0h trong Kim Đan)
+  // - Nhóm Kim Đan Hậu kỳ: cảnh báo khi tích luỹ < kdHauKyThresholdHours (~5.08h)
   let verdict: string;
-  if (postKdCount >= 5 && postKdMedianHours !== null && postKdRatio !== null) {
-    if (postKdRatio < 0.7) {
-      verdict = `🚨 CẢNH BÁO (QUÁ NHANH): Nhóm vượt qua Kim Đan có trung vị giờ chơi tích luỹ = ${postKdMedianHours.toFixed(1)}h (${postKdRatio.toFixed(2)}x mô hình tối ưu ${model.kdFinishHours.toFixed(1)}h, dưới ngưỡng 0.7x). Người chơi vượt qua Kim Đan nhanh hơn thiết kế (>30%), có dấu hiệu đường tắt cày Xích Mãng theo #406. Đề xuất điều chỉnh mật độ / thời gian hồi sinh Xích Mãng ở bản vá kế tiếp.`;
+  if (postKdCount >= 5 && postKdMedianHours !== null) {
+    if (postKdMedianHours < model.postKdThresholdHours) {
+      const inKdEst = (postKdMedianHours - model.preKdFinishHours).toFixed(1);
+      verdict = `🚨 CẢNH BÁO (QUÁ NHANH): Nhóm vượt qua Kim Đan có trung vị giờ chơi tích luỹ = ${postKdMedianHours.toFixed(1)}h (ước tính ~${inKdEst}h trong Kim Đan, dưới ngưỡng 4.0h theo #406 / mốc tích luỹ ${model.postKdThresholdHours.toFixed(1)}h). Người chơi vượt qua Kim Đan nhanh hơn thiết kế, có dấu hiệu đường tắt cày Xích Mãng. Đề xuất điều chỉnh mật độ / thời gian hồi sinh Xích Mãng ở bản vá kế tiếp.`;
     } else {
-      verdict = `Trong dự kiến: Nhóm vượt qua Kim Đan có trung vị giờ chơi tích luỹ = ${postKdMedianHours.toFixed(1)}h (${postKdRatio.toFixed(2)}x mô hình tối ưu ${model.kdFinishHours.toFixed(1)}h, cận trên thời gian tới bậc). Chưa có dấu hiệu bất thường.`;
+      verdict = `Chưa thấy dấu hiệu quá nhanh (cận trên): Nhóm vượt qua Kim Đan có trung vị giờ chơi tích luỹ = ${postKdMedianHours.toFixed(1)}h (cận trên thời gian tới bậc, mốc cảnh báo < ${model.postKdThresholdHours.toFixed(1)}h). Chưa có dấu hiệu bất thường.`;
     }
-  } else if (kdHauKyCount >= 5 && kdHauKyMedianHours !== null && kdHauKyRatio !== null) {
-    if (kdHauKyRatio < 0.7) {
-      verdict = `🚨 CẢNH BÁO (QUÁ NHANH): Trung vị giờ chơi tích luỹ tới Kim Đan Hậu kỳ = ${kdHauKyMedianHours.toFixed(1)}h (${kdHauKyRatio.toFixed(2)}x mô hình tối ưu ${model.kdHauKyReachHours.toFixed(1)}h, dưới ngưỡng 0.7x). Người chơi tiến cấp nhanh hơn thiết kế (>30%), có dấu hiệu đường tắt cày Xích Mãng theo #406. Đề xuất điều chỉnh mật độ / thời gian hồi sinh Xích Mãng ở bản vá kế tiếp.`;
+  } else if (kdHauKyCount >= 5 && kdHauKyMedianHours !== null) {
+    if (kdHauKyMedianHours < model.kdHauKyThresholdHours) {
+      const inKdEst = (kdHauKyMedianHours - model.preKdFinishHours).toFixed(1);
+      verdict = `🚨 CẢNH BÁO (QUÁ NHANH): Trung vị giờ chơi tích luỹ tới Kim Đan Hậu kỳ = ${kdHauKyMedianHours.toFixed(1)}h (ước tính ~${inKdEst}h trong Kim Đan, dưới ngưỡng mốc tích luỹ ${model.kdHauKyThresholdHours.toFixed(1)}h). Người chơi tiến cấp nhanh hơn thiết kế, có dấu hiệu đường tắt cày Xích Mãng theo #406. Đề xuất điều chỉnh mật độ / thời gian hồi sinh Xích Mãng ở bản vá kế tiếp.`;
     } else {
-      verdict = `Trong dự kiến: Trung vị giờ chơi tích luỹ tới Kim Đan Hậu kỳ = ${kdHauKyMedianHours.toFixed(1)}h (${kdHauKyRatio.toFixed(2)}x mô hình tối ưu ${model.kdHauKyReachHours.toFixed(1)}h, cận trên thời gian tới bậc). Chưa có dấu hiệu bất thường.`;
+      verdict = `Chưa thấy dấu hiệu quá nhanh (cận trên): Trung vị giờ chơi tích luỹ tới Kim Đan Hậu kỳ = ${kdHauKyMedianHours.toFixed(1)}h (cận trên thời gian tới bậc, mốc cảnh báo < ${model.kdHauKyThresholdHours.toFixed(1)}h). Chưa có dấu hiệu bất thường.`;
     }
   } else if (kdHauKyCount > 0 || postKdCount > 0) {
     const kdPart =
       kdHauKyCount > 0
-        ? `${kdHauKyCount} Kim Đan Hậu kỳ (trung vị ${kdHauKyMedianHours!.toFixed(1)}h / mô hình ${model.kdHauKyReachHours.toFixed(1)}h)`
+        ? `${kdHauKyCount} Kim Đan Hậu kỳ (trung vị ${kdHauKyMedianHours!.toFixed(1)}h / mốc cảnh báo < ${model.kdHauKyThresholdHours.toFixed(1)}h)`
         : `0 Kim Đan Hậu kỳ`;
     const postPart =
       postKdCount > 0
-        ? `${postKdCount} vượt Kim Đan (trung vị ${postKdMedianHours!.toFixed(1)}h / mô hình ${model.kdFinishHours.toFixed(1)}h)`
+        ? `${postKdCount} vượt Kim Đan (trung vị ${postKdMedianHours!.toFixed(1)}h / mốc cảnh báo < ${model.postKdThresholdHours.toFixed(1)}h)`
         : `0 vượt Kim Đan`;
     verdict = `⚠️ THAM KHẢO (chưa đủ mẫu): Ghi nhận ${kdPart}, ${postPart}. Cần ít nhất 5 mẫu cùng nhóm để kết luận tin cậy.`;
   } else {
@@ -413,10 +439,12 @@ export function buildProgressReport(
     kdHauKyCount,
     kdHauKyMedianHours,
     kdHauKyOptReachHours: model.kdHauKyReachHours,
+    kdHauKyThresholdHours: model.kdHauKyThresholdHours,
     kdHauKyRatio,
     postKdCount,
     postKdMedianHours,
     postKdOptHours: model.kdFinishHours,
+    postKdThresholdHours: model.postKdThresholdHours,
     postKdRatio,
     verdict,
   };
@@ -467,18 +495,18 @@ export function formatMarkdownReport(report: ProgressReport, sourceDesc: string)
   if (report.kdHauKyCount > 0 && report.kdHauKyMedianHours !== null) {
     const ratioText = report.kdHauKyRatio !== null ? `${report.kdHauKyRatio.toFixed(2)}x` : "-";
     lines.push(
-      `- **Kim Đan Hậu kỳ:** ${report.kdHauKyCount} nhân vật | Trung vị tích luỹ: **${report.kdHauKyMedianHours.toFixed(1)} giờ** (mô hình tối ưu: ~${report.kdHauKyOptReachHours.toFixed(1)} giờ, tỉ số: ${ratioText})`,
+      `- **Kim Đan Hậu kỳ:** ${report.kdHauKyCount} nhân vật | Trung vị tích luỹ: **${report.kdHauKyMedianHours.toFixed(1)} giờ** (mô hình tối ưu: ~${report.kdHauKyOptReachHours.toFixed(1)} giờ, tỉ số: ${ratioText}, mốc cảnh báo < ${report.kdHauKyThresholdHours.toFixed(1)} giờ)`,
     );
   } else {
     lines.push(
-      `- **Kim Đan Hậu kỳ:** 0 nhân vật (mô hình tối ưu tới bậc: ~${report.kdHauKyOptReachHours.toFixed(1)} giờ)`,
+      `- **Kim Đan Hậu kỳ:** 0 nhân vật (mô hình tối ưu tới bậc: ~${report.kdHauKyOptReachHours.toFixed(1)} giờ, mốc cảnh báo < ${report.kdHauKyThresholdHours.toFixed(1)} giờ)`,
     );
   }
 
   if (report.postKdCount > 0 && report.postKdMedianHours !== null) {
     const ratioText = report.postKdRatio !== null ? `${report.postKdRatio.toFixed(2)}x` : "-";
     lines.push(
-      `- **Vượt qua Kim Đan (Nguyên Anh trở lên):** ${report.postKdCount} nhân vật | Trung vị tích luỹ: **${report.postKdMedianHours.toFixed(1)} giờ** (mô hình tối ưu hết KĐ: ~${report.postKdOptHours.toFixed(1)} giờ, tỉ số: ${ratioText})`,
+      `- **Vượt qua Kim Đan (Nguyên Anh trở lên):** ${report.postKdCount} nhân vật | Trung vị tích luỹ: **${report.postKdMedianHours.toFixed(1)} giờ** (mô hình tối ưu hết KĐ: ~${report.postKdOptHours.toFixed(1)} giờ, tỉ số: ${ratioText}, mốc cảnh báo < ${report.postKdThresholdHours.toFixed(1)} giờ)`,
     );
   }
 
@@ -487,7 +515,7 @@ export function formatMarkdownReport(report: ProgressReport, sourceDesc: string)
   lines.push(`> ${report.verdict}`);
   lines.push(``);
   lines.push(
-    `*Tiêu chí theo dõi (#406, CAN_BANG mục 10): So sánh giờ chơi tích luỹ với mô hình tối ưu simulate(3). Cảnh báo QUÁ NHANH khi tỉ số < 0.7x với >= 5 mẫu (nhanh hơn mô hình > 30%, có dấu hiệu cày tắt Xích Mãng).*`,
+    `*Tiêu chí theo dõi (#406, CAN_BANG mục 10): So sánh giờ chơi tích luỹ với mô hình tối ưu simulate(3). Cảnh báo QUÁ NHANH khi vượt Kim Đan trong dưới 4 giờ riêng (mốc tích luỹ < ${report.postKdThresholdHours.toFixed(1)}h) hoặc tới Kim Đan Hậu kỳ < ${report.kdHauKyThresholdHours.toFixed(1)}h tích luỹ với >= 5 mẫu.*`,
   );
   lines.push(
     `*Lưu ý về kiếp và luân hồi: Thời gian chơi \`life.playMs\` được tính tích luỹ từ đầu kiếp hiện tại (đặt về 0 khi luân hồi). Người chơi ở kiếp >= 2 tu luyện nhanh hơn đáng kể nhờ Dư âm tu hành (không đối chiếu trực tiếp với mô hình tối ưu kiếp 1).*`,
