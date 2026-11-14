@@ -97,7 +97,7 @@ describe("status-rules: gắn và làm mới", () => {
     const ids: StatusId[] = ["burn", "poison", "bleed", "chill"];
     ids.forEach((id, i) => addStatus(box, eff(id, 2000 + i * 1000), 0)); // hết lúc 2000, 3000, 4000, 5000
     expect(box.list).toHaveLength(MAX_STATUSES);
-    expect(addStatus(box, eff("sunder", 1500), 0)).toBe("full"); // 1500 < 2000 (yếu nhất)
+    expect(addStatus(box, eff("haste", 1500, 0.2), 0)).toBe("full"); // trạng thái thường 1500 < 2000 (yếu nhất)
     expect(box.list.map((s) => s.id)).toEqual(ids);
     expect(addStatus(box, eff("sunder", 6000), 0)).toBe("added");
     expect(box.list).toHaveLength(MAX_STATUSES);
@@ -146,12 +146,41 @@ describe("status-rules: choáng", () => {
     expect(addStatus(box, eff("burn", 1000), 0, { stunImmune: true, baseDmg: 10 })).toBe("added");
   });
 
-  it("choáng bị đẩy ra vì đủ trạng thái thì KHÔNG khởi động miễn choáng (chưa gắn được)", () => {
+  it("đủ 4 trạng thái dài: choáng và vỡ giáp VẪN vào được (đẩy trạng thái thường hết sớm nhất), không thành miễn choáng thực tế", () => {
     const box = newStatusBox();
-    for (const id of ["burn", "poison", "bleed", "chill"] as StatusId[])
-      addStatus(box, eff(id, 5000), 0);
-    expect(addStatus(box, eff("stun", 1000, 0), 0)).toBe("full");
-    expect(box.stunImmuneUntil).toBe(0);
+    const ids: StatusId[] = ["burn", "poison", "bleed", "chill"];
+    ids.forEach((id, i) => addStatus(box, eff(id, 5000 + i * 100), 0, { baseDmg: 10 })); // burn hết sớm nhất
+    expect(addStatus(box, eff("stun", 1000, 0), 0)).toBe("added"); // 1 giây << 5 giây còn lại của mọi cái
+    expect(isStunned(box, 500)).toBe(true);
+    expect(box.stunImmuneUntil).toBe(1000 + STUN_IMMUNE_MS); // khởi động miễn choáng như mọi lần choáng thành công
+    expect(box.list.map((s) => s.id)).not.toContain("burn");
+    expect(box.list).toHaveLength(MAX_STATUSES);
+    // vỡ giáp cũng vào, đẩy cái thường hết sớm nhất kế tiếp (poison), KHÔNG đẩy choáng
+    expect(addStatus(box, eff("sunder", 1500, 0.3), 0)).toBe("added");
+    const after = box.list.map((s) => s.id).sort();
+    expect(after).toEqual(["bleed", "chill", "stun", "sunder"]);
+  });
+
+  it("trạng thái thường không đẩy được khống chế ra, kể cả khi sống lâu hơn; chỉ đẩy trạng thái thường yếu hơn", () => {
+    const box = newStatusBox();
+    addStatus(box, eff("stun", 1000, 0), 0);
+    addStatus(box, eff("sunder", 1500, 0.3), 0);
+    addStatus(box, eff("burn", 3000), 0, { baseDmg: 10 });
+    addStatus(box, eff("poison", 4000), 0, { baseDmg: 10 });
+    // bleed 8 s dài hơn cả choáng / vỡ giáp, nhưng nạn nhân phải là cái thường yếu nhất (burn 3 s)
+    expect(addStatus(box, eff("bleed", 8000), 0, { baseDmg: 10 })).toBe("added");
+    expect(box.list.map((s) => s.id).sort()).toEqual(["bleed", "poison", "stun", "sunder"]);
+    // chill 2 s ngắn hơn cái thường yếu nhất còn lại (poison 4 s): bị bỏ, khống chế vẫn nguyên
+    expect(addStatus(box, eff("chill", 2000, 0.3), 0)).toBe("full");
+    expect(box.list.map((s) => s.id).sort()).toEqual(["bleed", "poison", "stun", "sunder"]);
+  });
+
+  it("choáng bị chặn (đang miễn) KHÔNG làm gì dù đủ chỗ hay không", () => {
+    const box = newStatusBox();
+    addStatus(box, eff("stun", 500, 0), 0);
+    for (const id of ["burn", "poison", "bleed"] as StatusId[]) addStatus(box, eff(id, 5000), 0);
+    expect(addStatus(box, eff("stun", 500, 0), 600)).toBe("resisted"); // còn trong 3 giây miễn
+    expect(box.list.map((s) => s.id)).toContain("burn");
   });
 });
 
