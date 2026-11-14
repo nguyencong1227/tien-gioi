@@ -21,6 +21,7 @@ export type ActionId =
   | "prompt.yes"
   | "prompt.no"
   | "exit.fight"
+  | "player.menu"
   | "panel.inventory"
   | "panel.char"
   | "panel.quest"
@@ -117,6 +118,13 @@ export const ACTIONS: readonly ActionDef[] = [
     label: "Rời bí cảnh / đầu hàng quyết đấu (hỏi xác nhận)",
     group: "interact",
     defaults: ["KeyR"],
+    world: true,
+  },
+  {
+    id: "player.menu",
+    label: "Menu đồng đạo gần nhất (mời đội, thách đấu, mời tông môn)",
+    group: "interact",
+    defaults: ["KeyP"],
     world: true,
   },
   { id: "panel.inventory", label: "Túi đồ", group: "panel", defaults: ["KeyI"], world: false },

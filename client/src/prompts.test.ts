@@ -70,6 +70,7 @@ describe("phím mặc định của lời mời / rời trận", () => {
     expect(actionOfEvent({ code: "KeyX" }, lookup)).toBe("prompt.no");
     expect(actionOfEvent({ code: "KeyR" }, lookup)).toBe("exit.fight");
     expect(actionOfEvent({ code: "KeyN" }, lookup)).toBe("sound.mute");
+    expect(actionOfEvent({ code: "KeyP" }, lookup)).toBe("player.menu");
   });
   it("trả lời lời mời chạy được cả khi bảng đang mở (hộp lời mời không chặn điều khiển); mở xác nhận rời thì là của thế giới", () => {
     expect(ACTION_BY_ID["prompt.yes"].world).toBe(false);

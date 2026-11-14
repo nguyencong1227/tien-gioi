@@ -136,7 +136,7 @@ import { clientCanChallenge } from "../duel";
 import { replayEarlyMessages } from "../early-messages";
 import { sound } from "../audio";
 import { joystick, setupJoystick } from "../joystick";
-import { keepLock, pickNextTarget, pickPrevTarget } from "../target-lock";
+import { keepLock, pickNextPlayer, pickNextTarget, pickPrevTarget } from "../target-lock";
 import {
   ACTION_BY_ID,
   actionOfEvent,
@@ -1060,6 +1060,9 @@ export class WorldScene extends Phaser.Scene {
       case "exit.fight":
         ui.askLeaveFight();
         break;
+      case "player.menu":
+        this.openNearestPlayerMenu();
+        break;
       case "panel.inventory":
         ui.toggleInventory();
         break;
@@ -1240,38 +1243,82 @@ export class WorldScene extends Phaser.Scene {
         closestId = id;
       }
     });
-    if (closestId) {
-      const sp = this.state.players.get(closestId);
-      if (sp) {
-        const me = this.me();
-        let challengeCheck: DuelChallengeCheck | undefined;
-        if (me) {
-          const spX = sp.px ?? sp.x;
-          const spY = sp.py ?? sp.y;
-          challengeCheck = clientCanChallenge(
-            { name: me.name, dead: me.dead, duel: Boolean((me as any).duel) },
-            { x: me.x, y: me.y },
-            { name: sp.name, dead: sp.dead, duel: Boolean((sp as any).duel) },
-            { x: spX, y: spY },
-            this.map,
-            isDungeonMap(this.map.def.id),
-          );
-        }
-        // Menu là phần tử DOM: toạ độ CSS px, KHÔNG phải điểm ảnh canvas (lệch gấp renderScale lần khi renderScale > 1)
-        const menuAt = toCssPoint(pointer.x, pointer.y, this.scale.displayScale);
-        ui.openPlayerMenu(
-          sp.name,
-          sp.realm,
-          sp.tier,
-          menuAt.x,
-          menuAt.y,
-          challengeCheck,
-          (sp as any).sect,
-        );
-        return true;
-      }
-    }
+    if (closestId) return this.openPlayerMenuFor(closestId, pointer.x, pointer.y, false);
     return false;
+  }
+
+  /**
+   * Mở menu tương tác của người chơi `id` tại điểm ảnh canvas (`canvasX`, `canvasY`). `byKeyboard`: focus nhảy vào nút hành động đầu tiên dùng được
+   * (phím Enter chọn luôn) thay vì nút Đóng. Dùng chung cho bấm chuột / chạm (`tryClickPlayer`) và phím `player.menu`.
+   */
+  private openPlayerMenuFor(
+    id: string,
+    canvasX: number,
+    canvasY: number,
+    byKeyboard: boolean,
+  ): boolean {
+    const sp = this.state.players.get(id);
+    if (!sp) return false;
+    const me = this.me();
+    let challengeCheck: DuelChallengeCheck | undefined;
+    if (me) {
+      const spX = sp.px ?? sp.x;
+      const spY = sp.py ?? sp.y;
+      challengeCheck = clientCanChallenge(
+        { name: me.name, dead: me.dead, duel: Boolean((me as any).duel) },
+        { x: me.x, y: me.y },
+        { name: sp.name, dead: sp.dead, duel: Boolean((sp as any).duel) },
+        { x: spX, y: spY },
+        this.map,
+        isDungeonMap(this.map.def.id),
+      );
+    }
+    // Menu là phần tử DOM: toạ độ CSS px, KHÔNG phải điểm ảnh canvas (lệch gấp renderScale lần khi renderScale > 1)
+    const menuAt = toCssPoint(canvasX, canvasY, this.scale.displayScale);
+    ui.openPlayerMenu(
+      sp.name,
+      sp.realm,
+      sp.tier,
+      menuAt.x,
+      menuAt.y,
+      challengeCheck,
+      (sp as any).sect,
+      byKeyboard,
+    );
+    return true;
+  }
+
+  /** Người chơi vừa mở menu bằng phím (để bấm tiếp thì sang người kế). */
+  private lastMenuPlayerId: string | null = null;
+
+  /**
+   * Phím `player.menu` (#463): mở menu của đồng đạo GẦN nhất đang thấy trên màn hình (khung camera); sau khi Esc, bấm tiếp đi sang người xa hơn rồi vòng
+   * lại (`pickNextPlayer`). Không ai trong tầm nhìn thì báo bằng toast. Menu đặt cạnh người đó trên màn hình.
+   */
+  private openNearestPlayerMenu() {
+    if (this.isReconnecting || ui.isLimboOpen() || !this.me()) return;
+    const cam = this.cameras.main;
+    const view = cam.worldView;
+    const cands: Array<{ id: string; dist: number }> = [];
+    this.players.forEach((e, id) => {
+      if (id === this.sid || !view.contains(e.root.x, e.root.y)) return;
+      cands.push({ id, dist: Math.hypot(e.root.x - this.predX, e.root.y - this.predY) });
+    });
+    const id = pickNextPlayer(cands, this.lastMenuPlayerId);
+    const e = id ? this.players.get(id) : undefined;
+    // `players` (hình vẽ) có thể còn giữ người vừa rời tầm nhìn (đồng đội luôn được giữ, hình đang trượt) trong khi state đã bỏ: coi như không có ai
+    if (!id || !e || !this.state.players.get(id)) {
+      this.lastMenuPlayerId = null;
+      ui.toast({ text: "Không có đồng đạo nào trong tầm nhìn.", tone: "bad" });
+      return;
+    }
+    this.lastMenuPlayerId = id;
+    this.openPlayerMenuFor(
+      id,
+      (e.root.x - view.x) * cam.zoom,
+      (e.root.y - view.y) * cam.zoom,
+      true,
+    );
   }
 
   public me() {

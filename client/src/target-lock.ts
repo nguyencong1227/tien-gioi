@@ -60,3 +60,20 @@ function pickTarget(
 export function keepLock(dist: number | null, range: number = LOCK_RANGE): boolean {
   return dist !== null && Number.isFinite(dist) && dist <= range;
 }
+
+/**
+ * Phím mở menu đồng đạo (`player.menu`, #463): chọn người chơi kế để mở menu (mời đội / thách đấu / mời tông môn). Chưa mở lần nào hoặc người
+ * vừa mở không còn trong danh sách: lấy người GẦN nhất; bấm tiếp (sau khi Esc) đi xa dần rồi vòng lại. Khác `pickNextTarget`: chỉ còn một người
+ * thì vẫn trả người đó (mở lại menu), không nhả. Không ai: `null`. `candidates` do chỗ gọi lọc (đang thấy trên màn hình).
+ */
+export function pickNextPlayer(
+  candidates: readonly LockCandidate[],
+  lastId: string | null,
+): string | null {
+  const list = candidates
+    .filter((c) => Number.isFinite(c.dist))
+    .sort((a, b) => a.dist - b.dist || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  if (list.length === 0) return null;
+  const i = lastId === null ? -1 : list.findIndex((c) => c.id === lastId);
+  return list[(i + 1) % list.length].id; // i = -1 (chưa có / đã mất) -> phần tử đầu
+}

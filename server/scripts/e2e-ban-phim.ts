@@ -41,6 +41,8 @@ const CDP = 9500 + Math.floor(Math.random() * 400);
 const out = (m: string) => console.log(m);
 const NAME = "Cu Ky Ban Phim";
 const SECRET = "e2e_secret_ban_phim_abcdefghij";
+const NAME_B = "Dong Dao Phu";
+const SECRET_B = "e2e_secret_ban_phim_phu_abcdefg";
 
 interface Key {
   key: string;
@@ -66,6 +68,7 @@ const K = {
   x: { key: "x", code: "KeyX", vk: 88, text: "x" },
   y: { key: "y", code: "KeyY", vk: 89, text: "y" },
   r: { key: "r", code: "KeyR", vk: 82, text: "r" },
+  p: { key: "p", code: "KeyP", vk: 80, text: "p" },
   v: { key: "v", code: "KeyV", vk: 86, text: "v" },
   f: { key: "f", code: "KeyF", vk: 70, text: "f" },
   d1: { key: "1", code: "Digit1", vk: 49, text: "1" },
@@ -166,6 +169,7 @@ async function main() {
 
   let chrome: ChildProcess | null = null;
   let tab: Tab | null = null;
+  let tabB: Tab | null = null;
   const failures: string[] = [];
   const check = (name: string, ok: boolean, detail: string) => {
     out(`  ${ok ? "✓" : "✗"} ${name}${ok ? "" : ` (${detail})`}`);
@@ -1018,11 +1022,266 @@ async function main() {
       `captured=${await ev(`window.__ui.isKeyboardCaptured()`)}`,
     );
 
+    // ---- 13. Menu đồng đạo bằng phím P, mời đội / thách đấu thật giữa hai người chơi, trả lời bằng Y / X ----
+    const second = await (
+      await fetch(`http://127.0.0.1:${CDP}/json/new?about:blank`, { method: "PUT" })
+    ).json();
+    const tb = await Tab.open("B", (second as any).webSocketDebuggerUrl);
+    tabB = tb;
+    await tb.send("Page.addScriptToEvaluateOnNewDocument", {
+      source: `localStorage.setItem("tg_newbie_guide_dismissed", "1"); localStorage.setItem("tien-gioi:name", ${JSON.stringify(NAME_B)}); localStorage.setItem("tien-gioi:secret", ${JSON.stringify(SECRET_B)});`,
+    });
+    await tb.send("Page.navigate", { url: `http://127.0.0.1:${PORT}/?debug` });
+    await tb.waitFor(
+      `typeof window.__switchAuthView === 'function' && !!document.getElementById('login-form')`,
+      "form đăng nhập của người chơi thứ hai",
+    );
+    await tb.ev(`document.getElementById('login-form').requestSubmit(); 1`);
+    await tb.waitFor(
+      `!document.getElementById('ui')?.hidden && !!window.__scene?.room && !!document.getElementById('hud-name')?.textContent`,
+      "người chơi thứ hai vào game",
+    );
+    let sidB = "";
+    world.state.players.forEach((p: any, id: string) => {
+      if (p.name === NAME_B) sidB = id;
+    });
+    const pb = world.state.players.get(sidB);
+    const calmWorld = () => {
+      world.state.monsters.clear();
+      world.mctrl.clear();
+      world.ctrl.get(sid).lastHitAt = 0;
+      world.ctrl.get(sidB).lastHitAt = 0;
+    };
+    // hai người đứng ngoài trấn (trong trấn không thách đấu được), cạnh nhau, trong tầm nhìn của nhau
+    me.x = DEFAULT_MAP.townPx.x + DEFAULT_MAP.townPx.r + 500;
+    me.y = pb.y = DEFAULT_MAP.townPx.y;
+    pb.x = me.x + 90;
+    calmWorld();
+    await t.waitFor(
+      `window.__scene.players.size >= 2 && Math.abs(window.__scene.predX - ${Math.round(me.x)}) < 100`,
+      "A thấy B",
+    );
+    await sleep(400);
+    await press(t, K.p);
+    check(
+      "P: menu đồng đạo mở, đúng người gần nhất",
+      !!(await ev(shown("player-menu"))) && (await textOf("#pm-name")) === NAME_B,
+      `${await ev(shown("player-menu"))} / ${await textOf("#pm-name")}`,
+    );
+    check(
+      "Mở bằng phím: focus nhảy vào nút hành động đầu tiên (Mời vào tổ đội), không phải nút Đóng",
+      (await ev(`document.activeElement && document.activeElement.id`)) === "pm-invite-btn",
+      String(await ev(`document.activeElement && document.activeElement.id`)),
+    );
+    await press(t, K.esc);
+    check(
+      "Esc đóng menu đồng đạo, thế giới nhận phím lại",
+      !(await ev(shown("player-menu"))) && !(await ev(`window.__ui.isKeyboardCaptured()`)),
+      `captured=${await ev(`window.__ui.isKeyboardCaptured()`)}`,
+    );
+    await press(t, K.p);
+    check(
+      "Bấm P lần nữa: chỉ còn một người nên mở lại đúng người đó",
+      !!(await ev(shown("player-menu"))) && (await textOf("#pm-name")) === NAME_B,
+      String(await textOf("#pm-name")),
+    );
+    check(
+      "Mũi tên tới nút 'Thách Đấu' (dùng được)",
+      (await arrowTo(t, "#pm-duel-btn", 8)) &&
+        !(await ev(`document.getElementById('pm-duel-btn').disabled`)),
+      `hint=${await textOf("#pm-duel-hint")}`,
+    );
+    // Server từ chối thách đấu khi một trong hai vừa bị đánh (quái hồi sinh gần đó): nếu 5 giây không có lời mời thì dọn quái và thử lại tối đa hai lần
+    // (việc kiểm là luồng bàn phím, không phải luật thách đấu); ghi lại thông báo của A để biết lý do khi vẫn đỏ.
+    let duelSeen = false;
+    for (let attempt = 0; attempt < 3 && !duelSeen; attempt++) {
+      if (attempt > 0) {
+        out(
+          `  (thách đấu lần ${attempt} chưa tới B; toast A: ${await textOf("#toast")}; thử lại sau khi dọn quái)`,
+        );
+        calmWorld();
+        await sleep(300);
+        await press(t, K.p);
+        await arrowTo(t, "#pm-duel-btn", 8);
+      }
+      await press(t, K.enter);
+      try {
+        await tb.waitFor(
+          `!!document.getElementById('duel-invite-box') && !document.getElementById('duel-invite-box').hidden`,
+          "B nhận lời thách đấu",
+          5000,
+        );
+        duelSeen = true;
+      } catch {
+        /* thử lại */
+      }
+    }
+    if (!duelSeen)
+      throw new Error(`B không nhận được lời thách đấu; toast A: ${await textOf("#toast")}`);
+    check(
+      "Enter: lời thách đấu tới người kia (hộp mời hiện ở máy B), menu của A đã đóng",
+      !(await ev(shown("player-menu"))) && !!(await tb.ev(shown("duel-invite-box"))),
+      "hộp mời không hiện",
+    );
+    check(
+      "Bấm nút trong menu xong: modalStack được dọn (phím thế giới của A KHÔNG kẹt)",
+      !(await ev(`window.__ui.isKeyboardCaptured()`)),
+      `captured=${await ev(`window.__ui.isKeyboardCaptured()`)}`,
+    );
+    await press(tb, K.x);
+    await sleep(300);
+    check(
+      "B bấm X: từ chối thách đấu, hộp mời ẩn",
+      !(await tb.ev(shown("duel-invite-box"))),
+      "hộp vẫn hiện",
+    );
+    await sleep(500);
+    await press(t, K.p);
+    await press(t, K.enter); // nút đầu tiên: Mời vào tổ đội
+    await tb.waitFor(
+      `!!document.getElementById('party-invite-box') && !document.getElementById('party-invite-box').hidden`,
+      "B nhận lời mời tổ đội",
+    );
+    await press(tb, K.y);
+    await t.waitFor(
+      `(window.__ui.getParty().members || []).length >= 2`,
+      "A và B vào cùng một tổ đội",
+    );
+    check(
+      "P rồi Enter mời vào tổ đội, B bấm Y nhận: hai người cùng tổ đội (server)",
+      !(await tb.ev(shown("party-invite-box"))),
+      JSON.stringify(await ev(`window.__ui.getParty()`)),
+    );
+    // đồng đạo ra khỏi tầm nhìn: báo bằng toast, không mở menu
+    pb.x = me.x + 1500;
+    await sleep(900);
+    await press(t, K.p);
+    check(
+      "Không có đồng đạo trong tầm nhìn: không mở menu, hiện thông báo",
+      !(await ev(shown("player-menu"))) &&
+        String(await textOf("#toast")).includes("Không có đồng đạo"),
+      `${await ev(shown("player-menu"))} / ${await textOf("#toast")}`,
+    );
+
+    // ---- 14. Màn Hoàng Tuyền (chết) chơi được bằng phím ----
+    await ev(
+      `window.__reborns = 0; window.__ui.showReborn = () => { window.__reborns += 1; }; window.__debugLimbo({ summary: { kiep: 1, realm: 1, tier: 4, minutes: 42, kills: 68, bossKills: 1, gain: 16 }, soul: { kiep: 1, duyen: 28, unlocks: { du_am: 1, ky_vat: 1 }, origins: ['kiem_khach'] }, keepable: ['lang_nha_kiem', 'tho_nhung_bao'] }); 1`,
+    );
+    await sleep(200);
+    check(
+      "Hoàng Tuyền hiện: focus ở KHUNG màn (không ở nút nào), phím thế giới bị giữ",
+      !!(await ev(shown("limbo-overlay"))) &&
+        (await ev(`document.activeElement && document.activeElement.id`)) === "limbo-overlay" &&
+        !!(await ev(`window.__ui.isKeyboardCaptured()`)),
+      String(await ev(`document.activeElement && document.activeElement.id`)),
+    );
+    await press(t, K.space);
+    await press(t, K.enter);
+    check(
+      "Đang nhấn Cách / Enter lúc vừa gục: KHÔNG mua gì, KHÔNG đầu thai",
+      (await textOf("#limbo-duyen-total")) === "28" && (await ev(`window.__reborns`)) === 0,
+      `duyên=${await textOf("#limbo-duyen-total")} đầu thai=${await ev(`window.__reborns`)}`,
+    );
+    await press(t, K.esc);
+    check("Esc KHÔNG đóng màn Hoàng Tuyền", !!(await ev(shown("limbo-overlay"))), "đã đóng");
+    await ev(`window.__ui.closeAllModals(); 1`); // WorldScene gọi mỗi lần cập nhật khi đang chết
+    check(
+      "closeAllModals (WorldScene gọi liên tục khi đang chết): màn vẫn giữ phím thế giới",
+      !!(await ev(`window.__ui.isKeyboardCaptured()`)) && !!(await ev(shown("limbo-overlay"))),
+      `captured=${await ev(`window.__ui.isKeyboardCaptured()`)}`,
+    );
+    const inLimbo = () =>
+      ev(`!!document.activeElement && document.activeElement.closest('#limbo-overlay') !== null`);
+    await press(t, K.tab);
+    await press(t, K.tab);
+    await press(t, K.tab);
+    check(
+      "Tab xoay trong màn Hoàng Tuyền, không thoát ra ngoài",
+      !!(await inLimbo()),
+      "focus ra ngoài",
+    );
+    const nav = (sel: string) => `document.querySelector(${JSON.stringify(sel)})`;
+    check(
+      "Mũi tên tới thẻ xuất thân 'Kiếm khách'",
+      await arrowTo(t, '[data-nav="origin:kiem_khach"]', 40),
+      String(
+        await ev(
+          `document.activeElement && (document.activeElement.dataset.nav || document.activeElement.id || document.activeElement.tagName)`,
+        ),
+      ),
+    );
+    await press(t, K.enter);
+    check(
+      "Enter chọn xuất thân: thẻ được chọn (aria-checked) và vẫn giữ focus",
+      (await ev(`${nav('[data-nav="origin:kiem_khach"]')}.getAttribute('aria-checked')`)) ===
+        "true" &&
+        (await ev(`document.activeElement && document.activeElement.dataset.nav`)) ===
+          "origin:kiem_khach",
+      String(await ev(`document.activeElement && document.activeElement.dataset.nav`)),
+    );
+    check(
+      "Mũi tên tới ô ký vật đầu tiên",
+      await arrowTo(t, '[data-nav="relic:lang_nha_kiem"]', 40),
+      String(
+        await ev(
+          `document.activeElement && (document.activeElement.dataset.nav || document.activeElement.id || document.activeElement.tagName)`,
+        ),
+      ),
+    );
+    await press(t, K.space);
+    check(
+      "Cách tích ký vật (đã chọn 1/1), focus giữ nguyên sau khi vẽ lại",
+      String(await textOf("#limbo-relic-hint")).includes("1/1") &&
+        (await ev(`document.activeElement && document.activeElement.dataset.nav`)) ===
+          "relic:lang_nha_kiem",
+      `${await textOf("#limbo-relic-hint")} / ${await ev(`document.activeElement && document.activeElement.dataset.nav`)}`,
+    );
+    await press(t, K.enter);
+    check(
+      "Enter bỏ tích ký vật (0/1)",
+      String(await textOf("#limbo-relic-hint")).includes("0/1"),
+      String(await textOf("#limbo-relic-hint")),
+    );
+    check(
+      "Mũi tên tới nút mở 'Kim nang' ở Tam Sinh Thạch",
+      await arrowTo(t, '[data-nav="stone:kim_nang"]', 40),
+      String(
+        await ev(
+          `document.activeElement && (document.activeElement.dataset.nav || document.activeElement.id || document.activeElement.tagName)`,
+        ),
+      ),
+    );
+    await press(t, K.enter);
+    await sleep(200);
+    check(
+      "Enter mua Kim nang: Duyên 28 -> 18 và focus vẫn ở màn (không rơi về đầu)",
+      (await textOf("#limbo-duyen-total")) === "18" && !!(await inLimbo()),
+      `duyên=${await textOf("#limbo-duyen-total")} / ${await ev(`document.activeElement && document.activeElement.tagName`)}`,
+    );
+    check(
+      "Mũi tên tới nút đầu thai",
+      await arrowTo(t, "#limbo-btn-rebirth", 60),
+      String(await ev(`document.activeElement && document.activeElement.id`)),
+    );
+    await press(t, K.enter);
+    check(
+      "Enter trên nút đầu thai: gọi đầu thai đúng một lần",
+      (await ev(`window.__reborns`)) === 1,
+      String(await ev(`window.__reborns`)),
+    );
+    await ev(`window.__ui.hideLimbo(); 1`);
+    check(
+      "Hết Hoàng Tuyền: thế giới nhận phím lại",
+      !(await ev(shown("limbo-overlay"))) && !(await ev(`window.__ui.isKeyboardCaptured()`)),
+      `captured=${await ev(`window.__ui.isKeyboardCaptured()`)}`,
+    );
+
     check("0 lỗi console / exception", t.errors.length === 0, t.errors.slice(0, 3).join(" | "));
   } catch (e) {
     fatal = (e as Error).message;
   } finally {
     tab?.close();
+    tabB?.close();
     chrome?.kill();
     await gameServer.gracefullyShutdown(false).catch(() => {});
     httpServer.close();
