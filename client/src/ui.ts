@@ -118,9 +118,28 @@ import { canAffordFee, feeChipText, recipeFee } from "./forge-fee";
 import { doneRows, doneSummary } from "./quest-log";
 import { pickupBtnText, portalBtnText, talkBtnText } from "./ctx-btn";
 import { sound } from "./audio";
+import { initKeyLabels } from "./keybinds-dom";
+import {
+  ACTION_BY_ID,
+  FIXED_KEYS,
+  getKeymap,
+  onKeymapChange,
+  rebind,
+  resetKeymap,
+  type ActionId,
+} from "./keybinds";
+import { captureOutcome, keysScreenModel } from "./keys-screen";
+import { LEAVE_BUTTONS, pickPromptButton, pickVisible, type PromptAnswer } from "./prompts";
+import { dirOfArrowKey, moveFocus, ownsArrowKeys, withFocusKept } from "./panel-nav";
 import { transitionMs, waitOrSkip } from "./gfx/scene-transition";
 import { getDisplay, onDisplayChange } from "./gfx/display";
-import { TRACKER_PREF_KEY, parseTrackerPref, trackerOpen } from "./gfx/hud-compact";
+import {
+  CHAT_PREF_KEY,
+  PARTY_PREF_KEY,
+  TRACKER_PREF_KEY,
+  panelOpen,
+  parseTrackerPref,
+} from "./gfx/hud-compact";
 import {
   getQuality,
   onQualityChange,
@@ -174,6 +193,8 @@ export interface UiCallbacks {
   onPickup: () => void;
   onTalk: () => void;
   onDialogAction: (action: DialogAction) => void;
+  /** Esc khi không còn gì để đóng: bỏ chọn mục tiêu; trả true nếu đã bỏ (#463) */
+  onClearTarget?: () => boolean;
   onTrackQuest?: (questId: string | null) => void;
   onPartyLeave?: () => void;
   onPartyKick?: (name: string) => void;
@@ -441,10 +462,7 @@ function renderPartyPanel() {
       kickBtn.className = "pmem-kick-btn";
       kickBtn.textContent = "✕";
       kickBtn.title = `Mời ${m.name} ra khỏi đội`;
-      kickBtn.addEventListener("pointerdown", (e) => {
-        e.preventDefault();
-        callbacks?.onPartyKick?.(m.name);
-      });
+      onPress(kickBtn, () => callbacks?.onPartyKick?.(m.name));
       info.append(kickBtn);
     }
 
@@ -626,6 +644,23 @@ function renderSlotDetail() {
   drop1Btn.hidden = s.qty <= 1;
 }
 
+/**
+ * Gắn hành động bấm cho nút tạo động: chuột / chạm = `pointerdown` (nhanh, giữ hành vi cũ), bàn phím = Enter / Cách (#463).
+ * Nút `<button>` chỉ nhận `click` khi bấm phím nên các nút chỉ nghe `pointerdown` không dùng được bằng bàn phím.
+ */
+function onPress(el: HTMLElement, fn: () => void, stop = false) {
+  el.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    if (stop) e.stopPropagation();
+    fn();
+  });
+  el.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    if (!e.repeat) fn();
+  });
+}
+
 function renderInventory() {
   let used = 0;
   for (let i = 0; i < INVENTORY_SLOTS; i++) {
@@ -755,31 +790,92 @@ function describeStep(
 }
 
 /** Bảng Nhiệm vụ thu gọn / mở (gfx/hud-compact.ts): lựa chọn của người chơi (`tg_qt_open`) thắng, chưa chọn thì theo độ gọn của máy. */
-function setupQuestTrackerToggle(bindTap: (id: string, fn: () => void) => void) {
-  const tracker = $("quest-tracker");
-  const btn = $("qt-toggle");
-  let pref: boolean | null = null;
+/** Đọc / ghi `localStorage` an toàn (chế độ riêng tư có thể chặn). */
+function readPref(key: string): string | null {
   try {
-    pref = parseTrackerPref(localStorage.getItem(TRACKER_PREF_KEY));
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+function writePref(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
   } catch {
     /* chế độ riêng tư: bỏ qua */
   }
-  const apply = () => {
-    const open = trackerOpen(pref, getDisplay());
-    tracker.classList.toggle("collapsed", !open);
-    btn.setAttribute("aria-expanded", String(open));
-  };
+}
+
+interface PanelPrefHandle {
+  /** Đang mở không (theo lựa chọn đã nhớ, chưa chọn thì theo độ gọn của máy) */
+  isOpen(): boolean;
+  /** Đặt mở / thu gọn như người chơi bấm (có nhớ) */
+  setOpen(open: boolean): void;
+}
+
+/**
+ * Bảng nổi thu gọn được và NHỚ lựa chọn (QUYET_DINH_M3 mục 15): chưa chọn thì mặc định theo độ gọn của máy (`isCompactHud`: điện thoại hoặc cửa sổ
+ * hẹp thu gọn, máy tính rộng mở), đã chọn thì lựa chọn của người chơi thắng ở mọi máy. `apply` vẽ trạng thái; nút `toggleId` đổi trạng thái.
+ * `legacyCollapsedKey`: khoá cũ (1 = thu gọn) của bản trước, chỉ đọc khi chưa có khoá mới.
+ */
+function setupPanelPref(
+  opts: {
+    key: string;
+    toggleId: string;
+    apply: (open: boolean) => void;
+    legacyCollapsedKey?: string;
+  },
+  bindTap: (id: string, fn: () => void) => void,
+): PanelPrefHandle {
+  let pref = parseTrackerPref(readPref(opts.key));
+  if (pref === null && opts.legacyCollapsedKey) {
+    const legacy = readPref(opts.legacyCollapsedKey);
+    pref = legacy === "1" ? false : legacy === "0" ? true : null;
+  }
+  const isOpen = () => panelOpen(pref, getDisplay());
+  const apply = () => opts.apply(isOpen());
   apply();
-  onDisplayChange(apply); // xoay máy: chưa chọn thì tự đổi theo độ gọn mới
-  bindTap("qt-toggle", () => {
-    pref = !trackerOpen(pref, getDisplay());
-    try {
-      localStorage.setItem(TRACKER_PREF_KEY, pref ? "1" : "0");
-    } catch {
-      /* bỏ qua */
-    }
+  onDisplayChange(apply); // xoay máy / đổi cỡ cửa sổ: chưa chọn thì tự đổi theo độ gọn mới
+  const setOpen = (open: boolean) => {
+    pref = open;
+    writePref(opts.key, open ? "1" : "0");
     apply();
-  });
+  };
+  bindTap(opts.toggleId, () => setOpen(!isOpen()));
+  return { isOpen, setOpen };
+}
+
+let chatPanel: PanelPrefHandle | null = null;
+let chatIdleTimer: number | null = null;
+/** Sau chừng này không dùng khung chat thì tự mờ. */
+const CHAT_IDLE_MS = 6000;
+
+/** Khung chat vừa được dùng (tin mới, rê chuột, gõ, mở / thu): sáng lên rồi hẹn giờ mờ lại. */
+function bumpChat() {
+  const chat = document.getElementById("chat");
+  if (!chat) return;
+  chat.classList.remove("idle");
+  if (chatIdleTimer !== null) window.clearTimeout(chatIdleTimer);
+  chatIdleTimer = window.setTimeout(() => {
+    chatIdleTimer = null;
+    chat.classList.add("idle");
+  }, CHAT_IDLE_MS);
+}
+
+function setupQuestTrackerToggle(bindTap: (id: string, fn: () => void) => void) {
+  const tracker = $("quest-tracker");
+  const btn = $("qt-toggle");
+  setupPanelPref(
+    {
+      key: TRACKER_PREF_KEY,
+      toggleId: "qt-toggle",
+      apply: (open) => {
+        tracker.classList.toggle("collapsed", !open);
+        btn.setAttribute("aria-expanded", String(open));
+      },
+    },
+    bindTap,
+  );
 }
 
 function renderQuestTracker() {
@@ -789,6 +885,13 @@ function renderQuestTracker() {
   $("qt-count").textContent = questLog.active.length ? ` (${questLog.active.length})` : "";
   // Gợi ý "chạm nhiệm vụ để chỉ đường" nằm NGOÀI nút thu gọn / mở (nằm trong nút thì người chơi tưởng bấm tiêu đề là chỉ đường); chỉ hiện khi có nhiệm vụ để chạm
   $("qt-hint").hidden = questLog.active.length === 0;
+  // Chưa có nhiệm vụ: bảng chỉ còn tiêu đề một dòng (gợi ý nằm ở `title` của nút), khỏi chiếm chỗ vô ích
+  const trackerEl = $("quest-tracker");
+  trackerEl.classList.toggle("empty", questLog.active.length === 0);
+  $("qt-toggle").title =
+    questLog.active.length === 0
+      ? "Chưa nhận nhiệm vụ: gặp Trưởng trấn hoặc Bảng cáo thị"
+      : "Thu gọn / mở bảng nhiệm vụ";
 
   if (!questLog.active.length) {
     const p = document.createElement("p");
@@ -841,9 +944,144 @@ function renderQuestTracker() {
   }
 }
 
+// ---------- Màn Phím tắt trong Cài đặt (QUYET_DINH_M3 mục 13, #463) ----------
+
+let keysModalOpen = false;
+
+/**
+ * Tấm kết quả (bí cảnh, quyết đấu) được bật / tắt bằng thuộc tính `hidden` ở nhiều chỗ nên không đi qua `toggle...`: theo dõi thuộc tính để tấm
+ * vào / ra `modalStack` (phím của thế giới không chạy phía sau, Esc đóng đúng tầng) và đưa focus vào nút của tấm (#463).
+ */
+function watchModalHidden(id: string) {
+  const el = document.getElementById(id);
+  if (!el || typeof MutationObserver === "undefined") return;
+  const sync = () => {
+    if (!el.hidden) {
+      if (!modalStack.getEntries().some((m) => m.id === id)) {
+        modalStack.push(id, null);
+        focusModal(el);
+      }
+    } else if (modalStack.remove(id)) {
+      returnFocus(null);
+    }
+  };
+  new MutationObserver(sync).observe(el, { attributes: true, attributeFilter: ["hidden"] });
+  sync(); // tấm đã hiện sẵn lúc gắn
+}
+
+/** Nút đang hiện và bấm được (không `disabled`; nit của A ở #470): không có tổ tiên nào bị `hidden` (hộp lời mời, HUD bí cảnh / quyết đấu, hộp xác nhận ẩn bằng thuộc tính `hidden` của hộp chứa). */
+function buttonShown(id: string): boolean {
+  const el = document.getElementById(id);
+  return el !== null && el.closest("[hidden]") === null && !(el as HTMLButtonElement).disabled;
+}
+/** Hành động đang chờ người chơi bấm phím mới; `null` = không chờ. */
+let keyCaptureFor: ActionId | null = null;
+
+function setKeysStatus(msg: string) {
+  $("keys-status").textContent = msg;
+}
+
+function renderKeysModal() {
+  withFocusKept($("keys-modal"), renderKeysModalImpl);
+}
+
+/** Vẽ danh sách phím từ bảng phím (`keysScreenModel`): mỗi hành động một dòng "tên / các phím / nút Đổi phím". */
+function renderKeysModalImpl() {
+  const list = $("keys-list");
+  list.replaceChildren();
+  for (const g of keysScreenModel(getKeymap())) {
+    const sec = document.createElement("section");
+    sec.className = "keys-group";
+    const h = document.createElement("h3");
+    h.textContent = g.title;
+    sec.append(h);
+    for (const r of g.rows) {
+      const row = document.createElement("div");
+      row.className = r.custom ? "keys-row custom" : "keys-row";
+      const name = document.createElement("span");
+      name.className = "keys-name";
+      name.textContent = r.label;
+      const caps = document.createElement("span");
+      caps.className = "keys-caps";
+      for (const k of r.keys) {
+        const kbd = document.createElement("kbd");
+        kbd.className = "key-chip";
+        kbd.textContent = k;
+        caps.append(kbd);
+      }
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "keys-change";
+      btn.dataset.action = r.id;
+      btn.dataset.nav = `key:${r.id}`;
+      const waiting = keyCaptureFor === r.id;
+      btn.classList.toggle("waiting", waiting);
+      btn.textContent = waiting ? "Bấm phím mới..." : "Đổi phím";
+      btn.setAttribute(
+        "aria-label",
+        waiting
+          ? `${r.label}: đang chờ phím mới, bấm phím muốn gán hoặc Esc để huỷ`
+          : `Đổi phím ${r.label} (hiện là ${r.keys.join(" hoặc ")})`,
+      );
+      row.append(name, caps, btn);
+      sec.append(row);
+    }
+    list.append(sec);
+  }
+  const fixed = $("keys-fixed-list");
+  fixed.replaceChildren();
+  for (const f of FIXED_KEYS) {
+    const li = document.createElement("li");
+    const kbd = document.createElement("kbd");
+    kbd.className = "key-chip";
+    kbd.textContent = f.keys;
+    li.append(kbd, ` ${f.what}`);
+    fixed.append(li);
+  }
+}
+
+function startKeyCapture(id: ActionId) {
+  keyCaptureFor = id;
+  setKeysStatus(`Đang đổi phím "${ACTION_BY_ID[id].label}": bấm phím muốn gán (Esc để huỷ).`);
+  renderKeysModal();
+}
+
+/**
+ * Bắt phím lúc đang chờ gán, gắn ở pha CAPTURE của `window` nên chạy TRƯỚC mọi bộ lắng nghe khác (Esc đóng bảng, phím hành động của thế giới,
+ * Phaser): phím bấm để gán không được làm gì khác. Quyết định ở `captureOutcome` (thuần, có test); chỗ này chỉ áp dụng kết quả.
+ */
+function onKeyCaptureKeydown(e: KeyboardEvent) {
+  const id = keyCaptureFor;
+  if (id === null) return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  const out = captureOutcome(id, e, getKeymap());
+  switch (out.kind) {
+    case "ignore":
+      return;
+    case "reject":
+      setKeysStatus(out.message);
+      return;
+    case "cancel":
+      keyCaptureFor = null;
+      setKeysStatus(out.message);
+      renderKeysModal();
+      return;
+    case "bind":
+      keyCaptureFor = null; // trước rebind: rebind báo `onKeymapChange` để vẽ lại
+      rebind(id, out.token);
+      setKeysStatus(out.message);
+      return;
+  }
+}
+
 // ---------- Sổ nhiệm vụ (Quest Log Modal - Phím Q) ----------
 
 function renderQuestModal() {
+  withFocusKept($("quest-modal"), renderQuestModalImpl);
+}
+
+function renderQuestModalImpl() {
   $("quest-count").textContent = `${questLog.active.length} / 8 đang làm`;
   const container = $("quest-list");
   container.replaceChildren();
@@ -961,6 +1199,10 @@ function renderQuestModal() {
 // ---------- Bảng nhân vật & Trang bị (Phím C - #31) ----------
 
 function renderCharModal() {
+  withFocusKept($("char-modal"), renderCharModalImpl);
+}
+
+function renderCharModalImpl() {
   const slotsBox = $("char-equip-slots");
   slotsBox.replaceChildren();
 
@@ -1001,8 +1243,8 @@ function renderCharModal() {
 
     btn.append(slotLabel, icon, itemName, hint);
     if (def) {
-      btn.addEventListener("pointerdown", (e) => {
-        e.preventDefault();
+      btn.dataset.nav = `eq:${slot}`;
+      onPress(btn, () => {
         sound.equip();
         callbacks?.onUnequip(slot);
       });
@@ -1178,13 +1420,16 @@ function renderCharModal() {
     equipBtn.className = "char-equip-btn";
     equipBtn.disabled = !ok;
     equipBtn.textContent = ok ? "Mặc" : `Cần ${reqText}`;
-    equipBtn.addEventListener("pointerdown", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (!ok) return;
-      sound.equip();
-      callbacks?.onEquip(i);
-    });
+    equipBtn.dataset.nav = `bag:${i}`;
+    onPress(
+      equipBtn,
+      () => {
+        if (!ok) return;
+        sound.equip();
+        callbacks?.onEquip(i);
+      },
+      true,
+    );
 
     row.addEventListener("pointerenter", (e) => {
       if (e.pointerType === "mouse" && previewEquipItemId !== def.id) {
@@ -1217,6 +1462,10 @@ function renderCharModal() {
 // ---------- Giao diện rèn đồ ở Thợ rèn (#32) ----------
 
 function renderForgeModal() {
+  withFocusKept($("forge-modal"), renderForgeModalImpl);
+}
+
+function renderForgeModalImpl() {
   const npc = NPC_BY_ID[forgeNpcId];
   $("forge-title").textContent = npc ? `Lò Rèn · ${npc.name}` : "Lò Rèn Thiết Ngưu";
   const list = $("forge-list");
@@ -1346,6 +1595,10 @@ function renderShopModal() {
 }
 
 function renderShopBuy() {
+  withFocusKept($("shop-modal"), renderShopBuyImpl);
+}
+
+function renderShopBuyImpl() {
   const list = $("shop-buy-list");
   list.replaceChildren();
 
@@ -1415,15 +1668,18 @@ function renderShopBuy() {
     btnMinus.className = "shop-qty-btn";
     btnMinus.textContent = "−";
     btnMinus.title = "Giảm số lượng";
+    btnMinus.dataset.nav = `buy:${itemId}:minus`;
     btnMinus.disabled = qty <= 1;
-    btnMinus.addEventListener("pointerdown", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (qty > 1) {
-        shopBuyQuantities[itemId] = qty - 1;
-        renderShopBuy();
-      }
-    });
+    onPress(
+      btnMinus,
+      () => {
+        if (qty > 1) {
+          shopBuyQuantities[itemId] = qty - 1;
+          renderShopBuy();
+        }
+      },
+      true,
+    );
 
     const qtyVal = document.createElement("span");
     qtyVal.className = "shop-qty-val";
@@ -1434,15 +1690,18 @@ function renderShopBuy() {
     btnPlus.className = "shop-qty-btn";
     btnPlus.textContent = "+";
     btnPlus.title = "Tăng số lượng";
+    btnPlus.dataset.nav = `buy:${itemId}:plus`;
     btnPlus.disabled = qty >= SHOP_MAX_QTY;
-    btnPlus.addEventListener("pointerdown", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (qty < SHOP_MAX_QTY) {
-        shopBuyQuantities[itemId] = qty + 1;
-        renderShopBuy();
-      }
-    });
+    onPress(
+      btnPlus,
+      () => {
+        if (qty < SHOP_MAX_QTY) {
+          shopBuyQuantities[itemId] = qty + 1;
+          renderShopBuy();
+        }
+      },
+      true,
+    );
 
     qtyBox.append(btnMinus, qtyVal, btnPlus);
 
@@ -1472,6 +1731,10 @@ function renderShopBuy() {
 }
 
 function renderShopSell() {
+  withFocusKept($("shop-modal"), renderShopSellImpl);
+}
+
+function renderShopSellImpl() {
   const list = $("shop-sell-list");
   list.replaceChildren();
 
@@ -1542,15 +1805,18 @@ function renderShopSell() {
       btnMinus.className = "shop-qty-btn";
       btnMinus.textContent = "−";
       btnMinus.title = "Giảm số lượng";
+      btnMinus.dataset.nav = `sell:${i}:minus`;
       btnMinus.disabled = qty <= 1;
-      btnMinus.addEventListener("pointerdown", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (qty > 1) {
-          shopSellQuantities[i] = qty - 1;
-          renderShopSell();
-        }
-      });
+      onPress(
+        btnMinus,
+        () => {
+          if (qty > 1) {
+            shopSellQuantities[i] = qty - 1;
+            renderShopSell();
+          }
+        },
+        true,
+      );
 
       const qtyVal = document.createElement("span");
       qtyVal.className = "shop-qty-val";
@@ -1561,15 +1827,18 @@ function renderShopSell() {
       btnPlus.className = "shop-qty-btn";
       btnPlus.textContent = "+";
       btnPlus.title = "Tăng số lượng";
+      btnPlus.dataset.nav = `sell:${i}:plus`;
       btnPlus.disabled = qty >= maxQty;
-      btnPlus.addEventListener("pointerdown", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (qty < maxQty) {
-          shopSellQuantities[i] = qty + 1;
-          renderShopSell();
-        }
-      });
+      onPress(
+        btnPlus,
+        () => {
+          if (qty < maxQty) {
+            shopSellQuantities[i] = qty + 1;
+            renderShopSell();
+          }
+        },
+        true,
+      );
 
       qtyBox.append(btnMinus, qtyVal, btnPlus);
 
@@ -1630,7 +1899,9 @@ function renderDialogOptions() {
   optBox.replaceChildren();
   if (!currentDialog) return;
 
+  let idxOpt = -1;
   for (const opt of currentDialog.options) {
+    idxOpt++;
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "dlg-opt-btn";
@@ -1647,6 +1918,14 @@ function renderDialogOptions() {
 
     const labelSpan = document.createElement("span");
     labelSpan.textContent = opt.label;
+    // nhãn số (máy tính, CSS ẩn trên cảm ứng): phím 1-9 chọn dòng này
+    if (idxOpt < 9) {
+      const key = document.createElement("kbd");
+      key.className = "opt-key";
+      key.setAttribute("aria-hidden", "true");
+      key.textContent = String(idxOpt + 1);
+      btn.append(key);
+    }
     btn.append(labelSpan);
 
     if (opt.action.kind === "turnIn") {
@@ -1717,6 +1996,10 @@ let limboBuyCb: ((id: string) => void) | null = null;
 let limboRebirthCb: ((choice: RebirthChoice) => void) | null = null;
 
 function renderLimboStoneList() {
+  withFocusKept($("limbo-overlay"), renderLimboStoneListImpl);
+}
+
+function renderLimboStoneListImpl() {
   const container = $("limbo-stone-list");
   if (!container || !activeSoulView) return;
   container.replaceChildren();
@@ -1762,6 +2045,7 @@ function renderLimboStoneList() {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "stone-buy-btn";
+    btn.dataset.nav = `stone:${def.id}`;
 
     const cost = nextCost(activeSoulView, def.id);
     if (cost === null) {
@@ -1813,6 +2097,7 @@ function renderLimboStoneList() {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "stone-buy-btn";
+    btn.dataset.nav = `origin-buy:${o.id}`;
     if (isUnlocked) {
       btn.disabled = true;
       btn.textContent = "Đã sở hữu";
@@ -1864,6 +2149,10 @@ function renderLimboStoneList() {
 }
 
 function renderLimboOrigins() {
+  withFocusKept($("limbo-overlay"), renderLimboOriginsImpl);
+}
+
+function renderLimboOriginsImpl() {
   const container = $("limbo-origin-list");
   if (!container || !activeSoulView) return;
   container.replaceChildren();
@@ -1890,11 +2179,23 @@ function renderLimboOrigins() {
     desc.textContent = o.desc;
     card.append(desc);
 
+    card.setAttribute("role", "radio");
+    card.setAttribute("aria-checked", String(selectedOrigin === o.id));
     if (isAvailable) {
+      // bàn phím (#463): thẻ là một ô chọn có tiêu điểm; Enter / Cách chọn, mũi tên đi giữa các thẻ (panel-nav)
+      card.tabIndex = 0;
+      card.dataset.nav = `origin:${o.id}`;
       card.addEventListener("click", () => {
         selectedOrigin = o.id;
         renderLimboOrigins();
       });
+      card.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        if (!e.repeat) card.click();
+      });
+    } else {
+      card.setAttribute("aria-disabled", "true");
     }
 
     container.append(card);
@@ -1902,6 +2203,10 @@ function renderLimboOrigins() {
 }
 
 function renderLimboRelics() {
+  withFocusKept($("limbo-overlay"), renderLimboRelicsImpl);
+}
+
+function renderLimboRelicsImpl() {
   const container = $("limbo-relic-list");
   const emptyEl = $("limbo-relic-empty");
   const hintEl = $("limbo-relic-hint");
@@ -1939,6 +2244,14 @@ function renderLimboRelics() {
     cb.type = "checkbox";
     cb.checked = isChecked;
     cb.disabled = !canCheck && !isChecked;
+    cb.dataset.nav = `relic:${itemId}`;
+    cb.setAttribute("aria-label", itemName);
+    // Cách đã bật / tắt ô tích sẵn; thêm Enter cho thống nhất với các thẻ khác (#463)
+    cb.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      if (!e.repeat) cb.click();
+    });
     item.append(cb);
 
     const nameSpan = document.createElement("span");
@@ -2131,6 +2444,10 @@ function renderSectTreasuryTab() {
 }
 
 function renderSectModal() {
+  withFocusKept($("sect-modal"), renderSectModalImpl);
+}
+
+function renderSectModalImpl() {
   const modal = $("sect-modal");
   if (!sectModalOpen) {
     modal.hidden = true;
@@ -2241,7 +2558,8 @@ export const ui = {
         selectedSlot = i;
         renderInventory();
       });
-      btn.addEventListener("dblclick", () => {
+      // dùng / mặc vật phẩm của ô (nhấp đúp bằng chuột, Enter bằng bàn phím)
+      const activate = () => {
         const s = invSlots[i];
         if (!s) return;
         const def = ITEM_BY_ID[s.itemId];
@@ -2251,6 +2569,19 @@ export const ui = {
           sound.equip();
           callbacks?.onEquip(i);
         }
+      };
+      btn.addEventListener("dblclick", activate);
+      // bàn phím (#463): focus vào ô = chọn ô (hiện chi tiết như rê chuột), Enter = dùng / mặc
+      btn.addEventListener("focus", () => {
+        if (selectedSlot !== i) {
+          selectedSlot = i;
+          renderInventory();
+        }
+      });
+      btn.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        if (!e.repeat) activate();
       });
 
       slotEls.push(btn);
@@ -2315,28 +2646,23 @@ export const ui = {
     bindTap("btn-talk", () => callbacks?.onTalk());
     bindTap("btn-portal", () => portalCallback?.());
 
-    // Tổ đội (#75, #91)
-    try {
-      if (localStorage.getItem("tg_party_collapsed") === "1") {
-        $("party-panel").classList.add("collapsed");
-        $("party-btn-toggle").textContent = "▸";
-      }
-    } catch {
-      /* localStorage bị chặn (chế độ riêng tư): bỏ qua */
-    }
+    // Tổ đội (#75, #91): thu gọn được, nhớ lựa chọn (`tg_party_open`; khoá cũ `tg_party_collapsed` chỉ đọc khi chưa có), mặc định thu gọn ở màn hẹp
+    const partyPanelEl = $("party-panel");
+    const partyToggleBtn = $("party-btn-toggle");
+    setupPanelPref(
+      {
+        key: PARTY_PREF_KEY,
+        legacyCollapsedKey: "tg_party_collapsed",
+        toggleId: "party-btn-toggle",
+        apply: (open) => {
+          partyPanelEl.classList.toggle("collapsed", !open);
+          partyToggleBtn.textContent = open ? "▾" : "▸";
+          partyToggleBtn.setAttribute("aria-expanded", String(open));
+        },
+      },
+      bindTap,
+    );
     bindTap("party-btn-leave", () => callbacks?.onPartyLeave?.());
-    bindTap("party-btn-toggle", () => {
-      const panel = $("party-panel");
-      panel.classList.toggle("collapsed");
-      const isCollapsed = panel.classList.contains("collapsed");
-      const btn = $("party-btn-toggle");
-      btn.textContent = isCollapsed ? "▸" : "▾";
-      try {
-        localStorage.setItem("tg_party_collapsed", isCollapsed ? "1" : "0");
-      } catch {
-        /* localStorage bị chặn (chế độ riêng tư): bỏ qua */
-      }
-    });
     bindTap("pib-btn-accept", () => {
       stopInviteTimer();
       $("party-invite-box").hidden = true;
@@ -2349,19 +2675,19 @@ export const ui = {
       if (currentInviteFrom) callbacks?.onPartyDecline?.(currentInviteFrom);
       processNextInvite();
     });
-    bindTap("pm-close", () => {
-      $("player-menu").hidden = true;
-    });
+    // Đóng bằng closePlayerMenu (gỡ khỏi modalStack): ẩn thẳng `hidden = true` để sót mục "player-menu" trong modalStack làm
+    // `isKeyboardCaptured()` kẹt true, WASD / phím thế giới không chạy cho tới khi bấm Esc (lỗi nền của #468, gặp khi dùng chuột bấm nút menu).
+    bindTap("pm-close", () => this.closePlayerMenu());
     bindTap("pm-invite-btn", () => {
-      $("player-menu").hidden = true;
+      this.closePlayerMenu();
       if (selectedPlayerName) callbacks?.onPartyInvite?.(selectedPlayerName);
     });
     bindTap("pm-duel-btn", () => {
-      $("player-menu").hidden = true;
+      this.closePlayerMenu();
       if (selectedPlayerName) callbacks?.onDuelChallenge?.(selectedPlayerName);
     });
     bindTap("pm-sect-btn", () => {
-      $("player-menu").hidden = true;
+      this.closePlayerMenu();
       if (selectedPlayerName) callbacks?.onSectInvite?.(selectedPlayerName);
     });
 
@@ -2688,9 +3014,73 @@ export const ui = {
       });
     }
 
+    // Khung chat (QUYET_DINH_M3 mục 15): thu gọn còn 1 dòng, nhớ `tg_chat_open`, mặc định thu gọn ở màn hẹp, tự mờ khi không dùng
+    const chatEl = $("chat");
+    const chatToggleBtn = $("chat-toggle");
+    chatPanel = setupPanelPref(
+      {
+        key: CHAT_PREF_KEY,
+        toggleId: "chat-toggle",
+        apply: (open) => {
+          chatEl.classList.toggle("collapsed", !open);
+          chatToggleBtn.setAttribute("aria-expanded", String(open));
+          const log = $("chat-log");
+          log.scrollTop = log.scrollHeight;
+        },
+      },
+      bindTap,
+    );
+    // chạm vào dòng tin đang thu gọn = mở khung (đích chạm lớn, nút 💬 nhỏ)
+    $("chat-log").addEventListener("click", () => {
+      if (chatEl.classList.contains("collapsed") && !chatEl.classList.contains("typing"))
+        chatPanel?.setOpen(true);
+    });
+    chatEl.addEventListener("pointerenter", bumpChat);
+    chatEl.addEventListener("focusin", bumpChat);
+    $("chat-input").addEventListener("focusout", () => chatEl.classList.remove("typing"));
+    bumpChat();
+
+    // Thanh menu (QUYET_DINH_M3 mục 15): màn rất hẹp (< 480 px) gộp 6 nút vào một nút ☰ mở ra một hàng nút; chọn một mục hoặc chạm ra ngoài thì đóng
+    const hudMenu = $("hud-menu");
+    const setMenuOpen = (open: boolean) => {
+      hudMenu.classList.toggle("open", open);
+      $("btn-menu").setAttribute("aria-expanded", String(open));
+      $("btn-menu").setAttribute("aria-label", open ? "Đóng menu" : "Mở menu");
+    };
+    bindTap("btn-menu", () => setMenuOpen(!hudMenu.classList.contains("open")));
+    $("hud-menu-items").addEventListener("click", () => setMenuOpen(false));
+    document.addEventListener("pointerdown", (e) => {
+      if (hudMenu.classList.contains("open") && !hudMenu.contains(e.target as Node))
+        setMenuOpen(false);
+    });
+
     // Bảng chỉ dẫn người mới (#269)
     bindTap("newbie-close", () => this.dismissNewbieGuide());
     bindTap("newbie-btn-dismiss", () => this.dismissNewbieGuide());
+    bindTap("newbie-btn-keys", () => this.toggleKeysModal(true, $("newbie-btn-keys")));
+
+    // Màn Phím tắt (#463): mở từ Cài đặt / chỉ dẫn; đổi phím bằng bàn phím (xem onKeyCaptureKeydown)
+    bindTap("set-open-keys", () => this.toggleKeysModal(true, $("set-open-keys")));
+    bindTap("keys-close", () => this.toggleKeysModal(false));
+    bindTap("keys-reset", () => {
+      keyCaptureFor = null;
+      resetKeymap();
+      setKeysStatus("Đã khôi phục phím mặc định.");
+    });
+    $("keys-list").addEventListener("click", (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>("button.keys-change");
+      const id = btn?.dataset.action as ActionId | undefined;
+      if (!id || !Object.prototype.hasOwnProperty.call(ACTION_BY_ID, id)) return;
+      if (keyCaptureFor === id) {
+        keyCaptureFor = null; // bấm lại nút đang chờ = huỷ
+        setKeysStatus("Đã huỷ, giữ nguyên phím cũ.");
+        renderKeysModal();
+      } else startKeyCapture(id);
+    });
+    window.addEventListener("keydown", onKeyCaptureKeydown, true);
+    onKeymapChange(() => {
+      if (keysModalOpen) renderKeysModal();
+    });
     bindTap("help", () => this.showNewbieGuide(true));
 
     // Âm thanh
@@ -2700,6 +3090,8 @@ export const ui = {
     });
     sound.onChange((m) => this.updateMuteIcon(m));
     this.updateMuteIcon(sound.isMuted());
+    // Nhãn phím trên nút HUD (máy tính): đọc từ bảng phím nên đổi phím thì nhãn đổi theo (#463)
+    initKeyLabels();
 
     // Hộp thoại NPC
     bindTap("dlg-close", () => this.closeDialog());
@@ -2711,6 +3103,9 @@ export const ui = {
     renderInventory();
     renderQuestTracker();
     setupQuestTrackerToggle(bindTap);
+
+    watchModalHidden("dungeon-end-modal");
+    watchModalHidden("duel-end-modal");
 
     // Bảng đo hiệu năng chỉ hiện khi mở bằng ?perf=1 (#71)
     if (
@@ -2734,6 +3129,8 @@ export const ui = {
             trapTabKey(modalEl, e);
           }
         }
+      } else if (!e.defaultPrevented && this.handlePanelKey(e)) {
+        e.preventDefault();
       }
     });
   },
@@ -2779,6 +3176,49 @@ export const ui = {
 
   isSettingsModalOpen() {
     return settingsModalOpen;
+  },
+
+  /** Màn Phím tắt (#463). `trigger` = nút đã mở nó, để trả focus lại đúng chỗ khi đóng. */
+  toggleKeysModal(force?: boolean, trigger?: HTMLElement) {
+    const open = force ?? !keysModalOpen;
+    if (open === keysModalOpen) return;
+    keysModalOpen = open;
+    keyCaptureFor = null; // đóng / mở đều thôi chờ phím
+    $("keys-modal").hidden = !open;
+    if (open) {
+      setKeysStatus("");
+      renderKeysModal();
+      modalStack.push("keys-modal", trigger ?? null);
+      focusModal($("keys-modal"));
+    } else {
+      const top = modalStack.peek();
+      const back = top?.id === "keys-modal" ? top.triggerEl : null;
+      modalStack.remove("keys-modal");
+      returnFocus(back);
+    }
+  },
+
+  isKeysModalOpen() {
+    return keysModalOpen;
+  },
+
+  /**
+   * Trả lời lời mời / hộp xác nhận bằng phím (`prompt.yes` / `prompt.no`, xem `prompts.ts`): bấm nút đầu tiên đang hiện theo thứ tự ưu tiên.
+   * `click()` đi qua đúng đường của chuột / chạm (`bindTap`) nên dọn đồng hồ, gửi tin và chuyển sang lời mời kế đều như cũ. `true` nếu có hộp để trả lời.
+   */
+  answerPrompt(answer: PromptAnswer): boolean {
+    const id = pickPromptButton(answer, buttonShown);
+    if (!id) return false;
+    $(id).click();
+    return true;
+  },
+
+  /** Phím `exit.fight`: mở hộp xác nhận rời bí cảnh / đầu hàng (nút tương ứng đang hiện). Xác nhận bằng `prompt.yes`, huỷ bằng `prompt.no` / Esc. */
+  askLeaveFight(): boolean {
+    const id = pickVisible(LEAVE_BUTTONS, buttonShown);
+    if (!id) return false;
+    $(id).click();
+    return true;
   },
 
   isHideNames() {
@@ -2952,6 +3392,10 @@ export const ui = {
       this.toggleMapModal(false);
       closedAny = true;
     }
+    if (keysModalOpen) {
+      this.toggleKeysModal(false);
+      closedAny = true;
+    }
     if (settingsModalOpen) {
       this.toggleSettingsModal(false);
       closedAny = true;
@@ -2965,6 +3409,8 @@ export const ui = {
       closedAny = true;
     }
     modalStack.clear();
+    // WorldScene gọi closeAllModals mỗi lần cập nhật khi đang chết: màn Hoàng Tuyền (không phải "modal" để đóng) phải còn trong modalStack
+    if (this.isLimboOpen()) modalStack.push("limbo-overlay", null);
     return closedAny;
   },
 
@@ -2994,6 +3440,9 @@ export const ui = {
       case "settings-modal":
         this.toggleSettingsModal(false);
         return true;
+      case "keys-modal":
+        this.toggleKeysModal(false);
+        return true;
       case "sect-modal":
         this.toggleSectModal(false);
         return true;
@@ -3006,6 +3455,8 @@ export const ui = {
       case "newbie-guide-modal":
         this.dismissNewbieGuide();
         return true;
+      case "limbo-overlay":
+        return true; // Esc KHÔNG đóng màn Hoàng Tuyền (chỉ đầu thai mới đóng); nuốt phím để không rơi xuống bước "bỏ chọn mục tiêu"
       default: {
         const el = document.getElementById(top.id);
         if (el) {
@@ -3148,7 +3599,55 @@ export const ui = {
       closeDungeonEndModal: () => this.closeDungeonEndModal(),
       closeTopModal: () => this.closeTopModal(),
       closeInviteBox: () => this.closeInviteBox(),
+      clearTarget: () => callbacks?.onClearTarget?.() ?? false,
     });
+  },
+
+  /**
+   * Phím điều hướng khi bảng / hộp thoại đang mở (QUYET_DINH_M3 mục 13, #463). Trả `true` nếu đã xử lý (để chặn mặc định):
+   *  - mũi tên chuyển focus sang phần tử lân cận theo hình học (`panel-nav.ts`); ô nhập chữ / thanh trượt / select giữ mũi tên của chính nó;
+   *  - hộp thoại NPC: Enter / Cách tua nhanh chữ đang gõ; phím số 1-9 (và số bên phải) chọn dòng; mũi tên đầu tiên vào dòng đầu.
+   * Phím Enter / Cách trên nút do chính nút xử lý (`bindTap` hoặc `click` mặc định).
+   */
+  handlePanelKey(e: KeyboardEvent): boolean {
+    if (e.ctrlKey || e.altKey || e.metaKey) return false;
+    const top = modalStack.peek();
+    const container = top ? $(top.id) : null;
+    if (!top || !container || container.hidden) return false;
+    const active = document.activeElement;
+    if (top.id === "dialog-modal") {
+      if (dlgTypeTimer !== null && (e.key === "Enter" || e.key === " ")) {
+        finishTypewriter();
+        return true;
+      }
+      const opts = Array.from(
+        $("dlg-options").querySelectorAll<HTMLButtonElement>("button.dlg-opt-btn"),
+      );
+      const n = /^(?:Digit|Numpad)([1-9])$/.exec(e.code)?.[1];
+      if (n !== undefined && !isTypingElement(active)) {
+        const b = opts[Number(n) - 1];
+        if (b && !b.disabled) b.click();
+        return opts.length > 0;
+      }
+      if (dirOfArrowKey(e.key) && opts.length > 0 && !opts.some((b) => b === active)) {
+        (opts.find((b) => !b.disabled) ?? opts[0]).focus();
+        return true;
+      }
+    }
+    const dir = dirOfArrowKey(e.key);
+    if (dir) {
+      if (ownsArrowKeys(active, dir)) return false;
+      return moveFocus(container, dir);
+    }
+    return false;
+  },
+
+  /**
+   * Có bảng / hộp thoại / menu đang mở không (#463): khi có, phím của THẾ GIỚI (đánh, kỹ năng, đan, mục tiêu, tương tác) không chạy để
+   * Space / Enter / mũi tên thuộc về bảng; phím mở / đóng bảng, chat, âm thanh vẫn chạy.
+   */
+  isKeyboardCaptured() {
+    return modalStack.size() > 0 || this.isDialogOpen() || this.isPlayerMenuOpen();
   },
 
   showNewbieGuide(force = false) {
@@ -3271,6 +3770,8 @@ export const ui = {
     $("dlg-skip-hint").hidden = false;
     modalStack.push("dialog-modal");
     focusModal($("dialog-modal"));
+    // focus vào THÂN hộp thoại, không để ở nút đóng: Enter / Cách tua nhanh chữ chứ không đóng hộp (#463)
+    $("dlg-body").focus();
 
     dlgFullText = m.lines.join("\n\n");
     dlgTypedLen = 0;
@@ -3502,7 +4003,8 @@ export const ui = {
     set("exp", p.exp, validExpMax, "Tu vi");
     if (online !== cachedHudOnline) {
       cachedHudOnline = online;
-      $("hud-online").textContent = `Đạo hữu: ${online}`;
+      $("hud-online-n").textContent = `${online}`;
+      $("hud-online").setAttribute("aria-label", `Đạo hữu trực tuyến: ${online}`);
     }
     if (p.meditating !== cachedMeditating) {
       cachedMeditating = p.meditating;
@@ -3548,6 +4050,14 @@ export const ui = {
     log.append(p);
     while (log.children.length > 60) log.firstChild!.remove();
     if (atBottom) log.scrollTop = log.scrollHeight;
+    bumpChat();
+  },
+
+  /** Phím mở chat (Enter): khung đang thu gọn thì hiện ô nhập tạm (`typing`, thu lại khi rời ô) rồi đưa con trỏ vào. */
+  focusChat() {
+    $("chat").classList.add("typing");
+    bumpChat();
+    ($("chat-input") as HTMLInputElement).focus();
   },
 
   onParty(m: PartyMsg) {
@@ -3570,6 +4080,7 @@ export const ui = {
     y: number,
     challengeCheck?: DuelChallengeCheck,
     targetSect?: string,
+    byKeyboard = false,
   ) {
     if (name === currentName) return;
     selectedPlayerName = name;
@@ -3643,6 +4154,10 @@ export const ui = {
     menu.style.top = `${clampedY}px`;
     modalStack.push("player-menu");
     focusModal(menu);
+    // mở bằng phím: nhảy thẳng vào nút hành động đầu tiên dùng được (mũi tên + Enter chọn), không phải nút Đóng
+    if (byKeyboard) {
+      menu.querySelector<HTMLButtonElement>(".pm-btn:not(:disabled):not([hidden])")?.focus();
+    }
   },
 
   closePlayerMenu() {
@@ -3761,6 +4276,11 @@ export const ui = {
     if (overlay) overlay.hidden = false;
 
     renderLimboAll();
+    // Bàn phím (#463): màn Hoàng Tuyền là hộp thoại chiếm màn hình: vào modalStack (phím thế giới không chạy, Tab xoay trong màn, mũi tên đi giữa
+    // các nút). Focus vào KHUNG chứ không vào nút: người vừa gục có thể còn đang nhấn Cách / Enter, nút mua / đầu thai không được ăn phím đó;
+    // phải bấm mũi tên mới vào nút đầu tiên.
+    modalStack.push("limbo-overlay", null);
+    if (overlay) overlay.focus();
 
     const rebirthBtn = $("limbo-btn-rebirth");
     if (rebirthBtn) {
@@ -3791,6 +4311,7 @@ export const ui = {
     const overlay = $("limbo-overlay");
     if (overlay) overlay.hidden = true;
     document.body.classList.remove("in-limbo");
+    if (modalStack.remove("limbo-overlay")) returnFocus(null);
   },
 
   isLimboOpen(): boolean {

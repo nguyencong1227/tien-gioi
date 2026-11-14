@@ -402,15 +402,18 @@
         <div id="dhud-members" class="dhud-members" aria-label="Thành viên bí cảnh"></div>
 
         <div class="dhud-actions">
-          <button type="button" id="dhud-btn-leave" class="dhud-btn-leave">Rời Bí Cảnh</button>
+          <button type="button" id="dhud-btn-leave" class="dhud-btn-leave">
+            Rời Bí Cảnh <kbd class="btn-key" aria-hidden="true" data-key-action="exit.fight">R</kbd>
+          </button>
           <div id="dhud-leave-confirm" class="dhud-leave-confirm" hidden>
             <span class="dhud-confirm-label">Xác nhận rời bí cảnh về Lạc Hà?</span>
             <div class="dhud-confirm-btns">
               <button type="button" id="dhud-btn-leave-yes" class="dhud-btn-confirm yes">
                 Rời ngay
+                <kbd class="btn-key" aria-hidden="true" data-key-action="prompt.yes">Y</kbd>
               </button>
               <button type="button" id="dhud-btn-leave-no" class="dhud-btn-confirm no">
-                Ở lại
+                Ở lại <kbd class="btn-key" aria-hidden="true" data-key-action="prompt.no">X</kbd>
               </button>
             </div>
           </div>
@@ -441,15 +444,19 @@
         </div>
 
         <div class="duel-hud-actions">
-          <button type="button" id="duel-btn-yield" class="duel-btn-yield">Đầu Hàng</button>
+          <button type="button" id="duel-btn-yield" class="duel-btn-yield">
+            Đầu Hàng <kbd class="btn-key" aria-hidden="true" data-key-action="exit.fight">R</kbd>
+          </button>
           <div id="duel-yield-confirm" class="duel-yield-confirm" hidden>
             <span class="duel-confirm-label">Xác nhận nhận thua và đầu hàng?</span>
             <div class="duel-confirm-btns">
               <button type="button" id="duel-btn-yield-yes" class="duel-btn-confirm yes">
                 Đầu Hàng
+                <kbd class="btn-key" aria-hidden="true" data-key-action="prompt.yes">Y</kbd>
               </button>
               <button type="button" id="duel-btn-yield-no" class="duel-btn-confirm no">
                 Đánh Tiếp
+                <kbd class="btn-key" aria-hidden="true" data-key-action="prompt.no">X</kbd>
               </button>
             </div>
           </div>
@@ -466,81 +473,18 @@
           <div class="bar hp"><i id="hp-fill"></i><span id="hp-text"></span></div>
           <div class="bar mp"><i id="mp-fill"></i><span id="mp-text"></span></div>
           <div class="bar exp"><i id="exp-fill"></i><span id="exp-text"></span></div>
-          <div class="hud-foot">
-            <div id="hud-online"></div>
-            <div id="hud-coin-badge" title="Linh thạch">
-              <span class="coin-gem">💎</span><b id="hud-coin">0</b>
-            </div>
-            <div class="hud-btns">
-              <button
-                type="button"
-                id="btn-char"
-                class="hud-btn"
-                title="Bảng nhân vật & Trang bị (C)"
-                aria-label="Bảng nhân vật & Trang bị (Phím C)"
-                aria-expanded="false"
-              >
-                <span class="ico"
-                  ><svg aria-hidden="true" focusable="false"><use href="#i-char" /></svg></span
-                ><small>Nhân vật</small>
-              </button>
-              <button
-                type="button"
-                id="btn-bag"
-                class="hud-btn"
-                title="Túi đồ (I)"
-                aria-label="Túi đồ (Phím I)"
-                aria-expanded="false"
-              >
-                <span class="ico"
-                  ><svg aria-hidden="true" focusable="false"><use href="#i-bag" /></svg></span
-                ><small>Túi</small>
-              </button>
-              <button
-                type="button"
-                id="btn-quest"
-                class="hud-btn"
-                title="Sổ nhiệm vụ (Q)"
-                aria-label="Sổ nhiệm vụ (Phím Q)"
-                aria-expanded="false"
-              >
-                <span class="ico"
-                  ><svg aria-hidden="true" focusable="false"><use href="#i-quest" /></svg></span
-                ><small>Nhiệm vụ</small>
-              </button>
-              <button
-                type="button"
-                id="btn-sect"
-                class="hud-btn"
-                title="Tông môn (G)"
-                aria-label="Tông môn (Phím G)"
-                aria-expanded="false"
-              >
-                <span class="ico"
-                  ><svg aria-hidden="true" focusable="false"><use href="#i-sect" /></svg></span
-                ><small>Tông môn</small>
-              </button>
-              <button
-                type="button"
-                id="btn-mute"
-                class="hud-btn icon-only"
-                title="Bật/tắt âm thanh (N)"
-                aria-label="Bật hoặc tắt âm thanh (Phím N)"
-                aria-pressed="false"
-              >
-                <span id="mute-icon">🔊</span>
-              </button>
-              <button
-                type="button"
-                id="btn-settings"
-                class="hud-btn icon-only"
-                title="Cài đặt (O)"
-                aria-label="Màn hình cài đặt (Phím O)"
-                aria-expanded="false"
-              >
-                <span>⚙</span>
-              </button>
-            </div>
+          <div class="hud-chips">
+            <span id="hud-coin-badge" class="hud-chip" title="Linh thạch">
+              <span class="coin-gem" aria-hidden="true">💎</span><b id="hud-coin">0</b>
+            </span>
+            <span
+              id="hud-online"
+              class="hud-chip"
+              title="Đạo hữu đang trực tuyến"
+              aria-label="Đạo hữu trực tuyến: 0"
+            >
+              <span class="chip-ico" aria-hidden="true">👥</span><b id="hud-online-n">0</b>
+            </span>
           </div>
         </div>
 
@@ -581,19 +525,105 @@
         </aside>
       </div>
 
-      <div
-        id="minimap-wrap"
-        class="panel"
-        title="Bản đồ thế giới (M)"
-        role="button"
-        tabindex="0"
-        aria-label="Mở bản đồ thế giới (Phím M)"
-      >
-        <canvas id="minimap" width="120" height="120"></canvas>
-        <div class="mm-foot">
-          <span id="minimap-zone">Lạc Hà Trấn</span>
-          <small>M</small>
+      <div id="hud-col-right">
+        <div
+          id="minimap-wrap"
+          class="panel"
+          title="Bản đồ thế giới (M)"
+          role="button"
+          tabindex="0"
+          aria-label="Mở bản đồ thế giới (Phím M)"
+        >
+          <canvas id="minimap" width="120" height="120"></canvas>
+          <div class="mm-foot">
+            <span id="minimap-zone">Lạc Hà Trấn</span>
+            <small>M</small>
+          </div>
         </div>
+
+        <nav id="hud-menu" class="hud-menu" aria-label="Menu giao diện">
+          <button
+            type="button"
+            id="btn-menu"
+            class="hud-btn menu-toggle"
+            title="Menu"
+            aria-label="Mở menu"
+            aria-expanded="false"
+            aria-controls="hud-menu-items"
+          >
+            <span aria-hidden="true">☰</span>
+          </button>
+          <div id="hud-menu-items" class="hud-menu-items">
+            <button
+              type="button"
+              id="btn-char"
+              class="hud-btn"
+              title="Bảng nhân vật & Trang bị (C)"
+              aria-label="Bảng nhân vật & Trang bị (Phím C)"
+              aria-expanded="false"
+            >
+              <span class="ico"
+                ><svg aria-hidden="true" focusable="false"><use href="#i-char" /></svg></span
+              ><small>Nhân vật</small>
+            </button>
+            <button
+              type="button"
+              id="btn-bag"
+              class="hud-btn"
+              title="Túi đồ (I)"
+              aria-label="Túi đồ (Phím I)"
+              aria-expanded="false"
+            >
+              <span class="ico"
+                ><svg aria-hidden="true" focusable="false"><use href="#i-bag" /></svg></span
+              ><small>Túi</small>
+            </button>
+            <button
+              type="button"
+              id="btn-quest"
+              class="hud-btn"
+              title="Sổ nhiệm vụ (Q)"
+              aria-label="Sổ nhiệm vụ (Phím Q)"
+              aria-expanded="false"
+            >
+              <span class="ico"
+                ><svg aria-hidden="true" focusable="false"><use href="#i-quest" /></svg></span
+              ><small>Nhiệm vụ</small>
+            </button>
+            <button
+              type="button"
+              id="btn-sect"
+              class="hud-btn"
+              title="Tông môn (G)"
+              aria-label="Tông môn (Phím G)"
+              aria-expanded="false"
+            >
+              <span class="ico"
+                ><svg aria-hidden="true" focusable="false"><use href="#i-sect" /></svg></span
+              ><small>Tông môn</small>
+            </button>
+            <button
+              type="button"
+              id="btn-mute"
+              class="hud-btn icon-only"
+              title="Bật/tắt âm thanh (N)"
+              aria-label="Bật hoặc tắt âm thanh (Phím N)"
+              aria-pressed="false"
+            >
+              <span id="mute-icon">🔊</span>
+            </button>
+            <button
+              type="button"
+              id="btn-settings"
+              class="hud-btn icon-only"
+              title="Cài đặt (O)"
+              aria-label="Màn hình cài đặt (Phím O)"
+              aria-expanded="false"
+            >
+              <span>⚙</span>
+            </button>
+          </div>
+        </nav>
       </div>
 
       <aside id="perf-panel" class="panel" hidden aria-label="Bảng đo hiệu năng">
@@ -604,6 +634,17 @@
       </aside>
 
       <div id="chat" class="panel">
+        <button
+          type="button"
+          id="chat-toggle"
+          class="chat-toggle"
+          aria-expanded="true"
+          aria-controls="chat-log"
+          title="Thu gọn / mở khung truyền âm"
+          aria-label="Thu gọn hoặc mở khung truyền âm"
+        >
+          <span aria-hidden="true">💬</span><span class="chat-caret" aria-hidden="true">▾</span>
+        </button>
         <div
           id="chat-log"
           role="log"
@@ -920,9 +961,13 @@
             </div>
           </label>
           <label class="set-row toggle">
-            <span>Tắt toàn bộ âm thanh (Phím N)</span>
+            <span>Tắt toàn bộ âm thanh (Phím <b data-key-action="sound.mute">N</b>)</span>
             <input type="checkbox" id="set-mute" />
           </label>
+          <div class="set-row" id="set-keys-row">
+            <span>Phím tắt trên bàn phím</span>
+            <button type="button" id="set-open-keys" class="act-btn">Xem và đổi phím tắt</button>
+          </div>
           <label class="set-row toggle">
             <span>Ẩn tên đồng đạo (đỡ rối khi đông người)</span>
             <input type="checkbox" id="set-hide-names" />
@@ -966,6 +1011,44 @@
         </div>
       </section>
 
+      <!-- Màn Phím tắt (QUYET_DINH_M3 mục 13, #463): vẽ từ bảng phím keybinds.ts, đổi phím bằng bàn phím -->
+      <section
+        id="keys-modal"
+        class="panel modal-box sheet"
+        hidden
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="keys-title"
+        tabindex="-1"
+      >
+        <header class="inv-head">
+          <div>
+            <h2 id="keys-title">Phím Tắt</h2>
+            <small
+              >Chọn "Đổi phím" rồi bấm phím mới (Esc để huỷ). Tự động lưu trên thiết bị này</small
+            >
+          </div>
+          <button
+            type="button"
+            id="keys-close"
+            class="modal-close"
+            title="Đóng (Esc)"
+            aria-label="Đóng phím tắt (Phím Esc)"
+          >
+            ✕
+          </button>
+        </header>
+        <div class="keys-body">
+          <p id="keys-status" class="keys-status" role="status" aria-live="polite"></p>
+          <div id="keys-list"></div>
+          <div class="keys-fixed">
+            <h3>Phím cố định</h3>
+            <ul id="keys-fixed-list"></ul>
+          </div>
+          <button type="button" id="keys-reset" class="act-btn">Khôi phục phím mặc định</button>
+        </div>
+      </section>
+
       <section
         id="dialog-modal"
         class="panel"
@@ -991,7 +1074,7 @@
           </button>
         </header>
         <div class="dlg-scroll">
-          <div id="dlg-body" title="Chạm để tua nhanh chữ">
+          <div id="dlg-body" tabindex="-1" title="Chạm để tua nhanh chữ">
             <p id="dlg-text"></p>
             <small id="dlg-skip-hint">Chạm để hiện hết chữ ▸</small>
           </div>
@@ -1323,8 +1406,12 @@
           <p id="pib-msg"><b>Đạo hữu</b> mời bạn gia nhập tổ đội</p>
           <div class="pib-timer"><i id="pib-timer-bar"></i></div>
           <div class="pib-actions">
-            <button type="button" id="pib-btn-accept" class="pib-btn accept">Nhận</button>
-            <button type="button" id="pib-btn-decline" class="pib-btn decline">Từ chối</button>
+            <button type="button" id="pib-btn-accept" class="pib-btn accept">
+              Nhận <kbd class="btn-key" aria-hidden="true" data-key-action="prompt.yes">Y</kbd>
+            </button>
+            <button type="button" id="pib-btn-decline" class="pib-btn decline">
+              Từ chối <kbd class="btn-key" aria-hidden="true" data-key-action="prompt.no">X</kbd>
+            </button>
           </div>
         </div>
       </div>
@@ -1352,8 +1439,12 @@
         </small>
         <div class="dib-timer"><i id="dib-timer-bar"></i></div>
         <div class="dib-actions">
-          <button type="button" id="dib-btn-enter" class="dib-btn enter">Vào Bí Cảnh</button>
-          <button type="button" id="dib-btn-decline" class="dib-btn decline">Từ Chối</button>
+          <button type="button" id="dib-btn-enter" class="dib-btn enter">
+            Vào Bí Cảnh <kbd class="btn-key" aria-hidden="true" data-key-action="prompt.yes">Y</kbd>
+          </button>
+          <button type="button" id="dib-btn-decline" class="dib-btn decline">
+            Từ Chối <kbd class="btn-key" aria-hidden="true" data-key-action="prompt.no">X</kbd>
+          </button>
         </div>
       </div>
 
@@ -1374,8 +1465,12 @@
         <p id="duib-msg" class="duib-msg"><b>Đạo hữu</b> muốn cùng bạn luận bàn võ nghệ.</p>
         <div class="duib-timer"><i id="duib-timer-bar"></i></div>
         <div class="duib-actions">
-          <button type="button" id="duib-btn-accept" class="duib-btn accept">Nhận Lời</button>
-          <button type="button" id="duib-btn-decline" class="duib-btn decline">Từ Chối</button>
+          <button type="button" id="duib-btn-accept" class="duib-btn accept">
+            Nhận Lời <kbd class="btn-key" aria-hidden="true" data-key-action="prompt.yes">Y</kbd>
+          </button>
+          <button type="button" id="duib-btn-decline" class="duib-btn decline">
+            Từ Chối <kbd class="btn-key" aria-hidden="true" data-key-action="prompt.no">X</kbd>
+          </button>
         </div>
       </div>
 
@@ -1397,8 +1492,12 @@
         <p id="sib-msg" class="sib-msg">Đạo hữu mời bạn gia nhập tông môn.</p>
         <div class="sib-timer"><i id="sib-timer-bar"></i></div>
         <div class="sib-actions">
-          <button type="button" id="sib-btn-accept" class="sib-btn accept">Gia Nhập</button>
-          <button type="button" id="sib-btn-decline" class="sib-btn decline">Từ Chối</button>
+          <button type="button" id="sib-btn-accept" class="sib-btn accept">
+            Gia Nhập <kbd class="btn-key" aria-hidden="true" data-key-action="prompt.yes">Y</kbd>
+          </button>
+          <button type="button" id="sib-btn-decline" class="sib-btn decline">
+            Từ Chối <kbd class="btn-key" aria-hidden="true" data-key-action="prompt.no">X</kbd>
+          </button>
         </div>
       </div>
 
@@ -1547,8 +1646,9 @@
         aria-label="Chỉ dẫn phím tắt và luật chơi Tiên Giới"
         title="Nhấn để xem chỉ dẫn chi tiết"
       >
-        WASD đi · J/Space chém · K kiếm khí · 1/2 đan · F nhặt/nói/cổng · C nhân vật · I túi · Q
-        nhiệm vụ · M bản đồ · G tông môn · O cài đặt · L đả tọa · B đột phá
+        WASD / mũi tên đi · Cách chém · Tab mục tiêu · 3 kiếm khí · 4 đả tọa · 1/2 đan · F
+        nhặt/nói/cổng · I túi · C nhân vật · J nhiệm vụ · G tông môn · M bản đồ · O cài đặt · Enter
+        chat
       </div>
 
       <!-- Màn hình chuyển cảnh bản đồ -->
@@ -1610,7 +1710,12 @@
 
             <div class="limbo-field">
               <div class="lfield-label">Xuất thân kiếp sau:</div>
-              <div id="limbo-origin-list" class="limbo-origin-grid"></div>
+              <div
+                id="limbo-origin-list"
+                class="limbo-origin-grid"
+                role="radiogroup"
+                aria-label="Xuất thân kiếp sau"
+              ></div>
             </div>
 
             <div class="limbo-field">
@@ -1674,8 +1779,13 @@
             <div class="newbie-info">
               <b>Chiến Đấu & Trừ Yêu</b>
               <p>
-                Phím <b>J</b> hoặc <b>Space</b> để chém kiếm thường, <b>K</b> phóng Kiếm khí tầm xa
-                tiêu hao Linh lực.
+                Phím <b data-key-action="attack">Cách</b> chém kiếm thường (tự nhắm con quái gần
+                nhất), <b data-key-action="target.next">Tab</b> chọn và đổi mục tiêu (<b
+                  data-key-action="target.prev"
+                  >Shift+Tab</b
+                >
+                đi ngược, <b>Esc</b> bỏ chọn), <b data-key-action="skill.sword">3</b> phóng Kiếm khí
+                tầm xa tiêu hao Linh lực.
               </p>
             </div>
           </div>
@@ -1684,7 +1794,9 @@
             <div class="newbie-info">
               <b>Tu Luyện & Hồi Phục</b>
               <p>
-                Phím <b>L</b> đả tọa hồi Sinh lực và Linh lực. Phím <b>1</b> và <b>2</b> cắn nhanh
+                Phím <b data-key-action="skill.meditate">4</b> đả tọa hồi Sinh lực và Linh lực,
+                <b data-key-action="skill.breakthrough">B</b> đột phá. Phím
+                <b data-key-action="quick.1">1</b> và <b data-key-action="quick.2">2</b> cắn nhanh
                 Đan dược trong lúc nguy cấp.
               </p>
             </div>
@@ -1694,14 +1806,20 @@
             <div class="newbie-info">
               <b>Tương Tác & Hành Trang</b>
               <p>
-                Phím <b>F</b> để nhặt vật phẩm rơi, đối thoại NPC hoặc qua Cổng truyền tống. Phím
-                <b>I</b> mở Túi đồ, <b>C</b> xem Đạo thể trang bị, <b>Q</b> xem Sổ nhiệm vụ,
-                <b>M</b> xem Sơn Hà Đồ.
+                Phím <b data-key-action="interact">F</b> để nhặt vật phẩm rơi, đối thoại NPC hoặc
+                qua Cổng truyền tống. Phím <b data-key-action="panel.inventory">I</b> mở Túi đồ,
+                <b data-key-action="panel.char">C</b> xem Đạo thể trang bị,
+                <b data-key-action="panel.quest">J</b> xem Sổ nhiệm vụ,
+                <b data-key-action="panel.map">M</b> xem Sơn Hà Đồ,
+                <b data-key-action="chat.open">Enter</b> để chat,
+                <b data-key-action="prompt.yes">Y</b> nhận lời mời,
+                <b data-key-action="prompt.no">X</b> từ chối, <b>Esc</b> đóng bảng.
               </p>
             </div>
           </div>
         </div>
         <footer class="newbie-footer">
+          <button type="button" id="newbie-btn-keys" class="act-btn">Xem tất cả phím tắt</button>
           <button type="button" id="newbie-btn-dismiss" class="auth-btn-primary">
             Đã Hiểu (Phím Cách hoặc Esc)
           </button>

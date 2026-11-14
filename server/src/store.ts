@@ -16,7 +16,7 @@ import {
   type QuestProgress,
 } from "@tien-gioi/shared";
 
-const DIR = path.resolve(process.env.DATA_DIR ?? "data/players");
+const getDir = () => path.resolve(process.env.DATA_DIR ?? "data/players");
 
 export interface SavedPlayer {
   name: string;
@@ -168,7 +168,7 @@ export const hashSecret = (s: string) => createHash("sha256").update(s).digest("
 
 function fileFor(name: string) {
   const key = createHash("sha1").update(name.normalize("NFC").toLowerCase()).digest("hex");
-  return path.join(DIR, `${key}.json`);
+  return path.join(getDir(), `${key}.json`);
 }
 
 export async function loadPlayer(name: string): Promise<SavedPlayer | null> {
@@ -190,7 +190,7 @@ const writing = new Map<string, Promise<unknown>>();
 export function savePlayer(p: SavedPlayer): Promise<void> {
   const file = fileFor(p.name);
   const run = async () => {
-    await fs.mkdir(DIR, { recursive: true });
+    await fs.mkdir(getDir(), { recursive: true });
     const tmp = `${file}.tmp`;
     await fs.writeFile(tmp, JSON.stringify({ ...p, updatedAt: new Date().toISOString() }, null, 1));
     await fs.rename(tmp, file);

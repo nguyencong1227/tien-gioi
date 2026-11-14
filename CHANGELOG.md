@@ -23,9 +23,11 @@
 - Nhịp cả Kim Đan: **5,7 giờ** (săn bãi mới) / **5,2 giờ** (tối ưu), trong mục tiêu 5-7 giờ; hết Trúc Cơ ở 2 giờ 52 phút.
 - Trùm Hắc Giao, đo bằng `fightBoss` của mã server thật (`CAN_BANG.md` mục 9): **không mang đan** thì đội 4 hạ được từ Sơ kỳ và đội 3 từ Trung kỳ (còn chết 1-2 người mỗi trận; có đan thì không ai chết); đội 3 ở Trung / Hậu kỳ cho ~1,1-1,2x tu vi / giờ của săn solo tốt nhất. **Mục tiêu "một người không hạ nổi" KHÔNG đạt:** sát thương trùm lên một người là 4,2-5,8 % khí huyết / giây, nhỏ hơn đan hồi 7,0 % / giây, nên một người mang đủ đan hạ được ở mọi bậc (nhưng cần ~80 đan ở Sơ kỳ cho một bộ III, đội 4 chỉ ~19; thời gian mỗi người gần như không đổi theo cỡ đội, số đan thì giảm mạnh); chưa đổi mã, hướng xử lý ghi ở `CAN_BANG.md`.
 - Luân hồi, kinh tế, trang bị, PK được cân lại cho Kim Đan (#416, #436, #437, #439, #440, #442, #446).
-- Thời gian tìm quái đo bằng thợ săn trong `World` thật, vùng nhìn chữ nhật theo `fitZoom` của client (`CAN_BANG.md` mục 10, #459, #460): mô hình không lạc quan (cận dưới 0,39x giả định). **Chưa kết luận:** Xích Mãng là nguồn nhạy; tiêu chí "không nguồn nào vượt ~1,5x bãi mới tốt nhất" chỉ đạt khi thời gian TÌM Xích Mãng (từ lúc hạ con trước tới lúc chạm con kế, không gồm trận và hồi sức) >= ~85 giây (mô hình giả định 90, sát ngưỡng), và thợ săn hiệu chỉnh theo độ vụng của loài thường cho 27-69 giây; chờ số đo bot (#410).
+- Thời gian tìm quái đo bằng thợ săn trong `World` thật, vùng nhìn chữ nhật theo `fitZoom` của client (`CAN_BANG.md` mục 10, #459, #460): mô hình không lạc quan (cận dưới 0,39x giả định). **Kết luận (chốt trước phát hành, #406):** Xích Mãng là nguồn nhạy; tiêu chí "không nguồn nào vượt ~1,5x bãi mới tốt nhất" chỉ đạt khi thời gian TÌM Xích Mãng (từ lúc hạ con trước tới lúc chạm con kế, không gồm trận và hồi sức) >= ~85 giây (mô hình giả định 90), còn thợ săn hiệu chỉnh theo độ vụng của loài thường cho 27-69 giây, tức tiêu chí CHƯA đạt ở bãi Xích Mãng và người cày Xích Mãng có thể hết Kim Đan trong ~2,2-4,4 giờ (mục tiêu 5-7); người săn bãi mới vẫn 5,7 giờ. GIỮ NGUYÊN số (chỉnh theo một trong hai giả thuyết về độ vụng là đoán, kéo theo chạy lại cả mô hình luân hồi / nhiệm vụ / trang bị) và theo dõi số liệu người chơi thật sau phát hành; nếu trung vị hết Kim Đan dưới ~4 giờ thì chỉnh mật độ / hồi sinh Xích Mãng ở bản 0.2.x.
 
 ### Giao diện và đồ hoạ
+- **Giao diện gọn, không che màn chơi (bước 1/3, QUYET_DINH_M3 mục 15):** thẻ nhân vật chỉ còn tên, huy hiệu Kiếp, cảnh giới, ba thanh mảnh và một dòng chip (Linh thạch, đạo hữu trực tuyến) không bao giờ xuống dòng (cao 110 px thay vì 215 trên máy tính, 129 thay vì 350 trên điện thoại dọc). Sáu nút Nhân vật / Túi / Nhiệm vụ / Tông môn / Âm thanh / Cài đặt thành MỘT hàng biểu tượng cùng cỡ dưới bản đồ nhỏ (chú thích khi rê chuột, nhãn phím như cũ); màn dưới 480 px gộp vào nút ☰. `docs/THIET_KE_GIAO_DIEN_GON.md`, `npm run shot:layout` / `npm run e2e:giao-dien -w server`.
+- **Giao diện gọn, không che màn chơi (bước 2/3):** Tổ đội, Nhiệm vụ và Chat thu gọn được (bấm tiêu đề / nút 💬), nhớ lựa chọn, MẶC ĐỊNH thu gọn trên mọi điện thoại và cửa sổ hẹp (< 700 px; trước đây điện thoại dọc cao vẫn xếp ba bảng chồng nhau). Chat thu gọn còn một dòng tin mới nhất, Enter mở ô nhập, tự mờ sau 6 giây không dùng; nhiệm vụ trống chỉ còn một dòng; hàng thành viên tổ đội một dòng, nút trục xuất là biểu tượng nhỏ. Cột trái chiếm 23% chiều cao ở cửa sổ 550x900 (trước 84%). `docs/THIET_KE_GIAO_DIEN_GON.md` mục 5.
 - Thị giác Âm Sương Trạch: bảng màu lục xám, sương dày nhất ba bản đồ, ma trơi, nước; chuyển cảnh Hắc Phong <-> Âm Sương; nước / đá / cây đọc ra được ở cả ba bậc chất lượng (#414, #447).
 - Quái và NPC mới có hoạt ảnh đầy đủ (đứng, đi, đánh, bị đánh, gục), 15 biểu tượng đồ mới, atlas 337 khung (#431).
 - **Hiệu ứng trùm:** đòn thường lên trùm nổi hơn (`boss-hit`), trùm gục nổ lớn (`boss-vanish`); màu hạt riêng từng loài Kim Đan; KHÔNG tăng trần hạt / emitter (#450).
@@ -41,6 +43,29 @@
 ### Cần biết khi phát hành
 - Client `v0.1.2` không biết bản đồ mới: trên bản chạy thật cần `MIN_PROTOCOL_VERSION=2` để client cũ nhận thông báo "có bản mới" thay vì vào nhầm; sao lưu dữ liệu (`prod.sh backup`) trước khi `up`; APK cần dựng lại (`docs/PHAN_CONG_M6.md` mục 6). Việc phát hành do người dùng quyết, không tự động.
 - Chưa thử trên điện thoại thật (như 0.1.1 và 0.1.2).
+
+## [0.1.3] — 14/11/2026: bản vá, chơi hoàn toàn bằng bàn phím
+
+Người dùng chơi thử v0.1.2 thấy "thao tác trên bàn phím chưa hợp lý, phải dùng cả chuột". Bản vá làm cho máy tính chơi được TOÀN BỘ chỉ bằng bàn phím, chuột là tuỳ chọn (#463). **Không đổi luật chơi, dữ liệu nhân vật hay giao thức** (`PROTOCOL_VERSION` giữ 1, server không đổi). Cảm ứng / điện thoại giữ nguyên (nhãn phím và dòng mở màn Phím tắt chỉ hiện khi dùng chuột / bàn phím).
+
+### Thêm
+- **Bảng phím đổi được** (`client/src/keybinds.ts`, lưu ở `localStorage` khoá `tg_keymap`) và **màn "Phím tắt"** trong Cài đặt: liệt kê mọi phím, đổi phím chỉ bằng bàn phím (bấm "Đổi phím" rồi bấm phím mới, Esc huỷ, lấy phím của hành động khác thì hai bên đổi chỗ), khôi phục mặc định. Nhãn phím hiện trên nút kỹ năng / HUD (máy tính) và chữ hướng dẫn trong game đọc từ bảng phím nên không lệch khi đổi (#465, #469).
+- **Chọn mục tiêu không cần chuột:** Tab chọn mục tiêu gần nhất rồi đi xa dần, Shift+Tab ngược lại, Esc bỏ chọn; Cách (chém) và Kiếm khí tự khoá quái gần nhất đang thấy trên màn hình (#465, #468).
+- **Mũi tên + Enter trong mọi bảng** (túi đồ, nhân vật, cửa hàng, lò rèn, nhiệm vụ, tông môn, cài đặt, menu người chơi): mũi tên chuyển giữa các nút theo vị trí, Enter bấm, Esc đóng tầng trên cùng; vẽ lại bảng không làm mất vị trí đang chọn. Hộp thoại NPC chọn dòng bằng phím số 1-9 (#468).
+- **Y nhận / X từ chối lời mời** (tổ đội, bí cảnh, thách đấu, tông môn), **R** mở xác nhận rời bí cảnh / đầu hàng quyết đấu (Y xác nhận, X huỷ), **P** mở menu đồng đạo gần nhất (mời đội, thách đấu, mời tông môn); tấm kết quả bí cảnh / quyết đấu nhận focus (#470, #471).
+- **Màn Hoàng Tuyền chơi được bằng phím:** mũi tên + Enter chọn xuất thân, tích ký vật, mở Tam Sinh Thạch, đầu thai. Màn nhận focus ở khung (không ở nút nào) nên đang nhấn Cách / Enter lúc vừa gục không mua hay đầu thai nhầm; Esc không đóng màn (#471).
+
+### Đổi
+- Phím mặc định: Cách = chém (trước đây J cũng chém), **J = Sổ nhiệm vụ** (Q vẫn dùng được), 3 = Kiếm khí, 4 = Đả tọa (K / L vẫn dùng được), 1 / 2 vẫn là đan dược. Khi bảng hoặc hộp thoại đang mở, phím của thế giới (chém, kỹ năng, mục tiêu...) và WASD / mũi tên không điều khiển nhân vật (mũi tên dành cho điều hướng bảng); cần điều khiển ảo của cảm ứng không bị chặn (#465, #468).
+
+### Sửa
+- Thanh trượt âm lượng ở đầu Cài đặt không còn nuốt mũi tên Lên / Xuống (trước đó chỉ còn Tab để đi tiếp) (#469).
+- Bấm nút trong menu người chơi (mời đội, thách đấu, mời tông môn, ✕) bằng chuột không còn làm WASD và phím thế giới ngừng chạy cho tới khi bấm Esc (#471).
+- Y / X bỏ qua nút đang bị vô hiệu thay vì nuốt phím (#471).
+
+### Công cụ
+- E2E thật `npm run e2e:ban-phim -w server` (Chrome + server Colyseus thật, phím gửi bằng CDP, KHÔNG click chuột, hai người chơi cho mục mời đội / thách đấu): đổi phím, Tab / Shift+Tab / Esc, chém, kỹ năng, mở / đóng bảng, chat, túi, hội thoại NPC, cửa hàng, lò rèn, nhặt đồ, lời mời, rời bí cảnh, menu đồng đạo, Hoàng Tuyền, qua cổng. Mỗi PR có đột biến (vô hiệu một chức năng thì script đỏ). Thiết kế: `docs/THIET_KE_BAN_PHIM.md`.
+- Android `versionCode` 4, `versionName` 0.1.3.
 
 ## [0.1.2] — 13/11/2026: bản vá, bỏ chữ Hán khỏi giao diện
 

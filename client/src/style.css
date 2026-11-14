@@ -284,25 +284,39 @@ button {
   font-size: var(--fs-14);
 }
 
-/* HUD */
+/* HUD: thẻ nhân vật GỌN (QUYET_DINH_M3 mục 15): tên + huy hiệu Kiếp + cảnh giới trên MỘT dòng, ba thanh mảnh (số nằm trong thanh), một dòng chip
+   (Linh thạch, số đạo hữu) không bao giờ xuống dòng. Các nút Nhân vật / Túi / ... nằm ở thanh menu riêng (`#hud-menu`, cột phải). */
 #hud {
-  width: 266px;
-  padding: 8px 10px;
+  width: 260px;
+  padding: 6px 8px;
   font-size: var(--fs-13);
 }
 #hud .row {
   display: flex;
-  justify-content: space-between;
+  align-items: baseline;
   gap: 6px;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
+  min-width: 0;
+  white-space: nowrap;
+}
+#hud-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#hud .hud-kiep-badge {
+  flex: none;
+  margin-left: 0;
 }
 #hud-realm {
+  flex: none;
+  margin-left: auto;
   color: var(--gold);
 }
 .bar {
   position: relative;
-  height: 14px;
-  margin: 4px 0;
+  height: 13px;
+  margin: 3px 0;
   background: rgba(0, 0, 0, 0.45);
   border-radius: 3px;
   overflow: hidden;
@@ -326,41 +340,55 @@ button {
   position: relative;
   display: block;
   text-align: center;
-  font-size: var(--fs-11);
-  line-height: 14px;
+  font-size: var(--fs-10);
+  line-height: 13px;
   text-shadow: 0 1px 2px #000;
 }
-.hud-foot {
+/* Dòng chip: Linh thạch + số đạo hữu; nowrap + ẩn tràn để KHÔNG bao giờ xuống dòng hay lơ lửng */
+.hud-chips {
   display: flex;
+  flex-wrap: nowrap;
   align-items: center;
-  justify-content: space-between;
   gap: 6px;
-  margin-top: 6px;
+  margin-top: 5px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.hud-chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 224, 138, 0.3);
+  background: rgba(0, 0, 0, 0.4);
+  color: #ffe08a;
+  font-size: var(--fs-11);
+  line-height: 1.5;
+}
+.hud-chip b {
+  font-weight: 700;
 }
 #hud-online {
-  font-size: var(--fs-11);
-  opacity: 0.75;
+  color: var(--paper);
+  border-color: rgba(255, 255, 255, 0.22);
 }
-.hud-btns {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 4px;
-}
+
+/* Thanh menu: MỘT hàng nút biểu tượng cùng cỡ, căn đều (cột phải, dưới bản đồ nhỏ). Nhãn chữ ẩn (có chú thích khi rê chuột + nhãn phím) */
 .hud-btn {
   position: relative;
-  min-width: 40px;
-  min-height: 36px;
-  padding: 3px 6px;
+  flex: none;
+  min-width: 38px;
+  min-height: 38px;
+  padding: 3px;
   border-radius: 6px;
   border: 1px solid var(--gold);
-  background: rgba(201, 162, 74, 0.2);
+  background: rgba(24, 21, 18, 0.88);
   color: var(--paper);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 3px;
 }
 /* Biểu tượng vẽ bằng SVG (thay chữ Hán): cỡ theo font-size của khung chứa nên co giãn cùng --ui-scale */
 .ico {
@@ -377,21 +405,63 @@ button {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.hud-btn span {
-  font-size: var(--fs-16);
+.hud-btn .ico {
+  font-size: var(--fs-18, 18px);
+  color: #ffe08a;
+}
+.hud-btn > span:not(.ico) {
+  font-size: var(--fs-18, 18px);
   line-height: 1;
   color: #ffe08a;
 }
 .hud-btn small {
-  font-size: var(--fs-10);
+  display: none;
+}
+.hud-btn:hover {
+  background: rgba(201, 162, 74, 0.28);
+}
+.hud-btn:focus-visible {
+  outline: 2px solid #ffe08a;
+  outline-offset: 2px;
 }
 .hud-btn.active {
   background: rgba(201, 162, 74, 0.48);
   box-shadow: 0 0 10px rgba(255, 224, 138, 0.5);
 }
-.hud-btn.icon-only {
-  min-width: 38px;
+.hud-menu {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+}
+.hud-menu-items {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
   padding: 3px;
+  border-radius: 8px;
+  background: rgba(24, 21, 18, 0.55);
+}
+.menu-toggle {
+  display: none;
+}
+/* Màn rất hẹp (điện thoại dọc: 360 / 412 px): chỉ một nút ☰, bấm mở ra MỘT hàng 6 nút phủ lên dưới nút */
+@media (max-width: 479px) {
+  .menu-toggle {
+    display: inline-flex;
+  }
+  .hud-menu-items {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    z-index: 12;
+    border: 1px solid var(--gold);
+    background: rgba(24, 21, 18, 0.97);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
+  }
+  .hud-menu.open .hud-menu-items {
+    display: flex;
+  }
 }
 
 /* Cột trái HUD: chứa HUD, tổ đội, nhiệm vụ dạng flex không đè nhau (#91) */
@@ -412,6 +482,28 @@ button {
   position: relative !important;
   top: auto !important;
   left: auto !important;
+}
+
+/* Cột phải: bản đồ nhỏ + thanh menu xếp dọc, không đè nhau. Con của cột tự định vị lại (như cột trái) nên mọi quy tắc cũ về vị trí cố định của
+   #minimap-wrap không còn tác dụng. */
+#hud-col-right {
+  position: fixed;
+  z-index: 10;
+  top: max(10px, env(safe-area-inset-top));
+  right: max(10px, env(safe-area-inset-right));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  pointer-events: none;
+}
+#hud-col-right > * {
+  pointer-events: auto;
+  position: relative !important;
+  top: auto !important;
+  right: auto !important;
+  left: auto !important;
+  bottom: auto !important;
 }
 
 /* Theo dõi nhiệm vụ dưới HUD */
@@ -457,6 +549,17 @@ html[data-input="touch"] .qt-head {
   transition: transform 0.15s;
 }
 /* Thu gọn (tg_qt_open; mặc định ở điện thoại ngang / dọc thấp, gfx/hud-compact.ts): chỉ còn tiêu đề + số nhiệm vụ */
+/* Chưa có nhiệm vụ: chỉ còn tiêu đề một dòng (gợi ý nằm ở `title` của nút) */
+#quest-tracker.empty #quest-tracker-list,
+#quest-tracker.empty .qt-hint,
+#quest-tracker.empty .qt-caret {
+  display: none;
+}
+#quest-tracker.empty .qt-head {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: 0;
+}
 #quest-tracker.collapsed #quest-tracker-list,
 #quest-tracker.collapsed .qt-hint {
   display: none;
@@ -951,9 +1054,67 @@ html[data-input="touch"] .qt-head {
   z-index: 5;
   left: max(10px, env(safe-area-inset-left));
   bottom: max(10px, env(safe-area-inset-bottom));
-  width: min(360px, 46vw);
+  width: min(360px, 30vw);
   padding: 6px;
   font-size: var(--fs-13);
+  transition: opacity 0.3s ease;
+}
+/* Khung chat THU GỌN được (QUYET_DINH_M3 mục 15): nút 💬 ở đầu khung; thu gọn còn đúng MỘT dòng tin mới nhất, ô nhập chỉ hiện khi gõ (Enter);
+   không dùng trong vài giây thì tự mờ (`.idle`), rê chuột / đang gõ / có tin mới thì sáng lại */
+.chat-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 2px auto;
+  min-width: 36px;
+  min-height: 24px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--gold);
+  font-size: var(--fs-12);
+  line-height: 1;
+  cursor: pointer;
+}
+.chat-toggle:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+.chat-toggle:focus-visible {
+  outline: 2px solid #ffe08a;
+  outline-offset: 1px;
+}
+.chat-caret {
+  transition: transform 0.15s;
+}
+#chat.collapsed .chat-caret {
+  transform: rotate(-90deg);
+}
+#chat.idle {
+  opacity: 0.4;
+}
+#chat:hover,
+#chat:focus-within,
+#chat.typing {
+  opacity: 1;
+}
+#chat.collapsed:not(.typing) #chat-log {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  height: calc(1.4em + 4px); /* đúng MỘT dòng + đệm trên / dưới 2 px của #chat-log */
+  overflow: hidden;
+  cursor: pointer;
+}
+#chat.collapsed:not(.typing) #chat-log p {
+  flex: none;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#chat.collapsed:not(.typing) #chat-form {
+  display: none;
 }
 #chat-log {
   height: 130px;
@@ -1137,6 +1298,106 @@ html[data-input="touch"] .qt-head {
   font-size: var(--fs-10);
   color: #ffe08a;
   text-shadow: 0 1px 2px #000;
+}
+
+/* Số thứ tự dòng hội thoại (máy tính): phím 1-9 chọn dòng; cảm ứng ẩn */
+.dlg-opt-btn .opt-key {
+  display: none;
+}
+@media (pointer: fine) and (min-width: 641px) {
+  .dlg-opt-btn .opt-key {
+    display: inline-block;
+    flex: none;
+    min-width: 16px;
+    padding: 0 4px;
+    border-radius: 3px;
+    border: 1px solid rgba(243, 220, 160, 0.6);
+    background: rgba(0, 0, 0, 0.45);
+    color: #ffe9b0;
+    font-family: inherit;
+    font-size: var(--fs-11, 11px);
+    font-weight: 700;
+    text-align: center;
+  }
+  .dlg-opt-btn:focus-visible,
+  .inv-slot:focus-visible,
+  .shop-qty-btn:focus-visible,
+  .act-btn:focus-visible {
+    outline: 2px solid #ffe08a;
+    outline-offset: 2px;
+  }
+}
+
+/* Chip phím trong nút chữ (lời mời, rời bí cảnh, đầu hàng: "Nhận Y" / "Từ chối X"): chỉ máy tính, cảm ứng ẩn */
+.btn-key {
+  display: none;
+}
+@media (pointer: fine) and (min-width: 641px) {
+  .btn-key {
+    display: inline-block;
+    margin-left: 6px;
+    min-width: 16px;
+    padding: 0 4px;
+    border-radius: 3px;
+    border: 1px solid rgba(243, 220, 160, 0.6);
+    background: rgba(0, 0, 0, 0.45);
+    color: #ffe9b0;
+    font-family: inherit;
+    font-size: var(--fs-11, 11px);
+    font-weight: 700;
+    text-align: center;
+    vertical-align: middle;
+  }
+}
+
+/* Màn Hoàng Tuyền chơi bằng phím (#463): vòng tiêu điểm rõ trên nút mua, thẻ xuất thân, ô tích ký vật, nút đầu thai; khung màn nhận focus nhưng không vẽ vòng */
+.stone-buy-btn:focus-visible,
+.origin-card:focus-visible,
+.relic-item input:focus-visible,
+.limbo-btn-rebirth:focus-visible {
+  outline: 2px solid #ffe08a;
+  outline-offset: 2px;
+}
+#limbo-overlay:focus {
+  outline: none;
+}
+
+/* Nhãn phím trên nút (QUYET_DINH_M3 mục 13, #463): chỉ máy tính (con trỏ chính xác, màn rộng); cảm ứng / điện thoại ẩn hẳn */
+.keycap {
+  display: none;
+}
+@media (pointer: fine) and (min-width: 641px) {
+  .keycap {
+    display: block;
+    position: absolute;
+    top: 3px;
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: 14px;
+    padding: 0 3px;
+    border-radius: 3px;
+    border: 1px solid rgba(243, 220, 160, 0.6);
+    background: rgba(0, 0, 0, 0.62);
+    color: #ffe9b0;
+    font-family: inherit;
+    font-size: var(--fs-9);
+    font-weight: 700;
+    line-height: 1.35;
+    text-align: center;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .sk.big .keycap {
+    top: 9px;
+  }
+  /* nút HUD góc phải: nhãn nằm ở góc trên phải, không che chữ */
+  .hud-btn .keycap {
+    top: -7px;
+    right: -3px;
+    left: auto;
+    transform: none;
+  }
 }
 
 /* Thông báo nhận đồ góc phải ("+1 Nanh sói") */
@@ -1789,6 +2050,111 @@ body.low-fx #btn-talk {
   color: var(--paper);
 }
 
+/* Màn Phím tắt (#keys-modal, QUYET_DINH_M3 mục 13, #463): danh sách "tên / các phím / nút Đổi phím" vẽ từ bảng phím */
+#keys-modal {
+  --sheet-w: 520px;
+  /* mở chồng lên Cài đặt / chỉ dẫn (cùng chỗ giữa màn): nền đặc để chữ của bảng bên dưới không lộ xuyên qua */
+  background: rgb(24, 21, 18);
+}
+.keys-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.keys-status {
+  min-height: 1.4em;
+  margin: 0;
+  color: #ffe08a;
+  font-size: var(--fs-13);
+}
+.keys-group h3,
+.keys-fixed h3 {
+  margin: 0 0 6px;
+  color: #ffe08a;
+  font-size: var(--fs-13);
+  letter-spacing: 0.04em;
+}
+.keys-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  min-height: 44px;
+  margin-bottom: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.38);
+  border: 1px solid var(--line);
+  font-size: var(--fs-13);
+}
+.keys-row.custom {
+  border-color: var(--gold);
+}
+.keys-name {
+  flex: 1 1 160px;
+}
+.keys-caps {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.key-chip {
+  display: inline-block;
+  min-width: 22px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid rgba(243, 220, 160, 0.6);
+  background: rgba(0, 0, 0, 0.62);
+  color: #ffe9b0;
+  font-family: inherit;
+  font-size: var(--fs-12);
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+}
+.keys-change {
+  flex: none;
+  min-width: 112px;
+  min-height: 44px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--paper);
+  font-weight: 700;
+  font-size: var(--fs-13);
+}
+.keys-change.waiting {
+  border-color: #ffe08a;
+  background: rgba(201, 162, 74, 0.28);
+  color: #ffe08a;
+}
+.keys-change:focus-visible,
+#keys-reset:focus-visible,
+#set-open-keys:focus-visible,
+#newbie-btn-keys:focus-visible {
+  outline: 2px solid #ffe08a;
+  outline-offset: 2px;
+}
+.keys-fixed ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--fs-13);
+  color: #d1d5db;
+}
+/* Cảm ứng không có bàn phím: ẩn dòng mở màn Phím tắt trong Cài đặt và nút "Xem tất cả phím tắt" ở bảng chỉ dẫn (không đổi hành vi điện thoại) */
+html[data-input="touch"] #set-keys-row,
+html[data-input="touch"] #newbie-btn-keys {
+  display: none;
+}
+.newbie-footer {
+  gap: 10px;
+}
+
 /* Màn hình cài đặt (#settings-modal - #35) */
 #settings-modal {
   --sheet-w: 410px;
@@ -1864,12 +2230,31 @@ body.low-fx #btn-talk {
     overflow-x: hidden;
   }
   #hud {
-    width: 200px;
+    width: min(210px, 56vw);
     font-size: var(--fs-11);
-    padding: 6px 8px;
+    padding: 5px 7px;
   }
-  .hud-btn,
-  .hud-btn.icon-only {
+  /* Màn hẹp: tên một dòng riêng (không bị cắt còn vài chữ), huy hiệu Kiếp + cảnh giới ở dòng dưới */
+  #hud .row {
+    flex-wrap: wrap;
+    row-gap: 1px;
+  }
+  #hud-name {
+    flex: 1 1 100%;
+  }
+  #hud-realm {
+    margin-left: 0;
+  }
+  /* thanh mảnh hơn: giữ vùng giữa màn (quanh nhân vật) trống ở 360x640 */
+  .bar {
+    height: 11px;
+    margin: 2px 0;
+  }
+  .bar span {
+    font-size: var(--fs-10);
+    line-height: 11px;
+  }
+  .hud-btn {
     min-width: 44px;
     min-height: 44px;
   }
@@ -1903,7 +2288,7 @@ body.low-fx #btn-talk {
     left: auto;
     bottom: auto;
     right: max(8px, env(safe-area-inset-right));
-    top: calc(max(8px, env(safe-area-inset-top)) + 120px);
+    top: calc(max(8px, env(safe-area-inset-top)) + 176px);
     width: min(145px, 39vw);
     font-size: var(--fs-11);
   }
@@ -2005,25 +2390,6 @@ body.low-fx #btn-talk {
     padding: 5px 8px;
     font-size: var(--fs-11);
   }
-  /* Dòng chân HUD: cột trái xếp chồng (Đạo hữu trực tuyến, Linh thạch) + lưới nút 3 x 44 px bên phải; xếp ngang thì không đủ 194 px */
-  .hud-foot {
-    display: grid;
-    grid-template-columns: auto 144px;
-    grid-template-areas:
-      "on btns"
-      "coin btns";
-    justify-content: space-between;
-    align-content: center;
-    align-items: start;
-    column-gap: 6px;
-    row-gap: 4px;
-  }
-  #hud-online {
-    grid-area: on;
-  }
-  #hud-coin-badge {
-    grid-area: coin;
-  }
   .bar {
     height: 12px;
     margin: 2px 0;
@@ -2037,14 +2403,6 @@ body.low-fx #btn-talk {
     min-width: 44px;
     min-height: 44px;
     padding: 2px 5px;
-  }
-  .hud-btns {
-    grid-area: btns;
-    width: 144px;
-    gap: 6px;
-  }
-  .hud-btn small {
-    display: none;
   }
   #party-panel {
     width: 200px;
@@ -2138,8 +2496,8 @@ body.low-fx #btn-talk {
   gap: 4px;
 }
 .party-btn-toggle {
-  min-width: 44px;
-  min-height: 44px;
+  min-width: 30px;
+  min-height: 28px;
   background: transparent;
   border: 0;
   color: #95de64;
@@ -2161,9 +2519,9 @@ body.low-fx #btn-talk {
   font-size: var(--fs-12);
 }
 .party-btn-leave {
-  min-width: 44px;
-  min-height: 44px;
-  padding: 2px 8px;
+  min-width: 36px;
+  min-height: 26px;
+  padding: 1px 8px;
   border-radius: 4px;
   background: rgba(163, 29, 29, 0.6);
   border: 1px solid #e57373;
@@ -2180,13 +2538,12 @@ body.low-fx #btn-talk {
 .party-members {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
+/* Hàng thành viên GỌN: một dòng tên + cảnh giới, thanh khí huyết mảnh 3 px sát đáy hàng, nút trục xuất là biểu tượng nhỏ */
 .pmem-row {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 3px 5px;
+  position: relative;
+  padding: 2px 5px 7px;
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.04);
 }
@@ -2229,8 +2586,10 @@ body.low-fx #btn-talk {
   color: var(--gold);
 }
 .pmem-kick-btn {
-  min-width: 44px;
-  min-height: 44px;
+  flex: none;
+  min-width: 22px;
+  min-height: 20px;
+  line-height: 1;
   border: 0;
   border-radius: 4px;
   background: rgba(255, 77, 79, 0.25);
@@ -2247,8 +2606,11 @@ body.low-fx #btn-talk {
   color: #fff;
 }
 .pmem-bar {
-  position: relative;
-  height: 6px;
+  position: absolute;
+  left: 5px;
+  right: 5px;
+  bottom: 2px;
+  height: 3px;
   background: rgba(0, 0, 0, 0.55);
   border-radius: 2px;
   overflow: hidden;
@@ -2789,6 +3151,7 @@ body.reduced-motion .transition-overlay.active {
 
 /* Khi đang ở Hoàng Tuyền: ẩn HUD gameplay, chỉ giữ chat thu gọn không che chữ */
 body.in-limbo #hud-col-left,
+body.in-limbo #hud-col-right,
 body.in-limbo #minimap-wrap,
 body.in-limbo #quickbar,
 body.in-limbo #skills,
@@ -5655,4 +6018,24 @@ html[data-input="touch"][data-touch-scheme="dpad"][data-orient="portrait"] #btn-
 }
 html[data-input="touch"][data-touch-scheme="dpad"][data-orient="portrait"] #btn-portal {
   bottom: calc(max(14px, var(--safe-b, env(safe-area-inset-bottom, 0px))) + 370px);
+}
+
+/* Cảm ứng: nút nhỏ của Tổ đội và Chat vẫn đủ lớn để chạm (>= 40 px) */
+html[data-input="touch"] .party-btn-toggle,
+html[data-input="touch"] .party-btn-leave {
+  min-width: 40px;
+  min-height: 40px;
+}
+html[data-input="touch"] .pmem-kick-btn {
+  min-width: 36px;
+  min-height: 32px;
+}
+html[data-input="touch"] .chat-toggle {
+  min-width: 44px;
+  min-height: 32px;
+}
+
+/* thân hộp thoại nhận focus bằng mã (Enter / Cách tua chữ): không vẽ viền */
+#dlg-body:focus {
+  outline: none;
 }
