@@ -117,7 +117,15 @@ describe("nhãn phím HUD (#463)", () => {
     expect(els.get("btn-pickup")!.attrs["aria-label"]).toBe("Nhặt vật phẩm rơi (Phím F)");
     expect(els.get("btn-portal")!.attrs.title).toBe("Đi qua cổng truyền tống (F)");
     expect(els.get("minimap-wrap")!.attrs.title).toBe("Bản đồ thế giới (M)");
+    // nhãn phím (keycap) trên ba nút ngữ cảnh: nhãn nút M6 chỉ còn tên ngắn nên phím F phải hiện ở góc nút (cảm ứng: CSS ẩn)
+    for (const id of ["btn-pickup", "btn-talk", "btn-portal"])
+      expect(els.get(id)!.querySelector(".keycap")!.textContent, id).toBe("F");
+    expect(els.get("minimap-wrap")!.querySelector(".keycap")).toBeNull();
     rebind("interact", "KeyE");
+    for (const id of ["btn-pickup", "btn-talk", "btn-portal"])
+      expect(els.get(id)!.querySelector(".keycap")!.textContent, id + " sau khi đổi phím").toBe(
+        "E",
+      );
     expect(els.get("btn-talk")!.attrs["aria-label"]).toBe("Nói chuyện với NPC (Phím E hoặc F)");
     expect(els.get("btn-talk")!.attrs.title).toBe("Nói chuyện với NPC (E / F)");
   });
