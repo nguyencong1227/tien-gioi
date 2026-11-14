@@ -2,9 +2,9 @@
 
 Định dạng theo từng bản phát hành (thẻ `vX.Y.Z`). Số `#` là PR / issue trên GitHub.
 
-## [Chưa phát hành] — M6: Kim Đan + Âm Sương Trạch (nội dung và cân bằng)
+## [0.2.0] — 14/11/2026: M6, Kim Đan + Âm Sương Trạch (nội dung và cân bằng) + giao diện gọn
 
-**Chưa phát hành, chưa gắn thẻ.** Số phiên bản và ngày do Dev A chốt lúc phát hành (`QUYET_DINH_M3.md` mục 10); mục này tổng hợp các PR đã vào `main` sau `v0.1.2` và sẽ được đổi tên thành một bản có số khi phát hành. Kế hoạch: `docs/PHAN_CONG_M6.md`.
+Bản phát hành M6 (`QUYET_DINH_M3.md` mục 10, 14: người dùng đồng ý phát hành khi #406 / #410 / #411 xong, sau v0.1.3): cảnh giới Kim Đan trọn vẹn, bản đồ thứ ba Âm Sương Trạch, bốn loài quái mới và trùm Hắc Giao, chín trang bị Kim Đan, rèn có phí, chuỗi nhiệm vụ nối Trúc Cơ sang Kim Đan, cân bằng lại, cùng giao diện gọn không che màn chơi (mục 15: thẻ nhân vật gọn, thanh menu riêng, Tổ đội / Nhiệm vụ / Chat thu gọn được, phím H ẩn toàn bộ giao diện). **`PROTOCOL_VERSION` 1 -> 2: client / APK `v0.1.x` KHÔNG vào được bản chạy thật nữa, sẽ nhận thông báo "có bản mới" (xem "Cần biết khi phát hành").** Kế hoạch: `docs/PHAN_CONG_M6.md`.
 
 ### Nội dung mới
 - **Cảnh giới Kim Đan trọn vẹn (bậc 13-15):** thanh tu vi 48000 / 55200 / 63480 (trước: 26400 / 30360 / 34914); Tụ Khí Đan có trần 300 tu vi mỗi viên và Xích Mãng rơi ít hơn (0,3 x 1, trước 0,6 x 1-2) để hết "đường tắt" (#403, #425).
@@ -16,7 +16,7 @@
 - Bí cảnh Linh Hư có **trần bậc 12**: từ Kim Đan trở lên quá dễ, không vào được (#428).
 
 ### Giao thức và dữ liệu lưu
-- **`PROTOCOL_VERSION` 1 -> 2:** client cũ không biết bản đồ và loài quái mới. `MIN_PROTOCOL_VERSION` KHÔNG đổi trong M6; có nâng nó trên bản chạy thật hay không là quyết định lúc phát hành.
+- **`PROTOCOL_VERSION` 1 -> 2:** client cũ không biết bản đồ và loài quái mới. `shared/` giữ `MIN_PROTOCOL_VERSION` mặc định; trên bản chạy thật đặt `MIN_PROTOCOL_VERSION=2` bằng biến môi trường (`.env.production`) lúc phát hành, nên client / APK `v0.1.x` bị từ chối với mã 426 và hiện thông báo "có bản mới" thay vì vào nhầm và thấy bản đồ / quái lạ.
 - Tệp lưu cũ vẫn nạp được. Test Colyseus thật ba bản đồ: khứ hồi Lạc Hà - Hắc Phong - Âm Sương kiểm tu vi và túi đồ ở cuối vòng (#429, #435); và kiểm tu vi, Linh thạch, túi đồ, sổ nhiệm vụ, cảnh giới, đồ đang mặc, mã kiếp SAU MỖI lần qua cổng, rớt mạng rồi nối lại, hai tab đua nhau, tệp lưu cũ (#454).
 
 ### Cân bằng (`docs/CAN_BANG.md`, mô phỏng bằng mã server thật)
@@ -37,13 +37,15 @@
 - Nút Nhặt / Nói chuyện / Qua cổng hiện lại nhãn phím **F** ở góc nút trên máy tính (nhãn chữ trong nút chỉ còn tên ngắn từ M6, nên phím nằm ở chip `.keycap` như các nút kỹ năng; cảm ứng không hiện; đổi phím ở màn Phím tắt thì nhãn đổi theo).
 
 ### Đo và kiểm
+- **Ba bản đồ cùng một tiến trình** (`docs/LOAD_TEST.md` mục 23, #481): bench 150 người trên ba bản đồ tick TB 1,5 ms, p95 2,6 ms (ngân sách < 10 ms); **soak 30 phút 100 bot PASS** (RSS +1,35 MB, dốc +0,059 MB / phút, tick p95 3,06 ms, 0 nhịp quá hạn, 0 lỗi, `kiem-save` sạch, bảo toàn Linh thạch đạt, 1585 / 790 / 800 lượt qua cổng Hắc Phong / Âm Sương / Lạc Hà). Lộ và sửa lỗi cũ của soak: bot vai "Cổng" chưa từng qua cổng nào.
+- **Bot Kim Đan đo thật** (`docs/LOAD_TEST.md` mục 22, #474): thời gian tìm Xích Mãng ở Hắc Phong trung vị 5,2 s (5 mẫu), Sương Hồ ở Âm Sương 2,6 s, đội 3 hạ Hắc Giao 44,4 s (1 người gục); ô chưa đo ghi rõ "chưa đo". Chrome headless dùng GPU khi có (tự lùi về phần mềm ở CI, #478).
 - `perf:mobile` có kịch bản Âm Sương Trạch ba bậc, Hắc Phong và Lạc Hà (sương + thời tiết + nước BẬT) và đánh trùm; `leak:test` qua ba bản đồ; ảnh năm khung nhìn `capture-viewports --maps` (#448, #453).
 - **Số đo FPS:** đo bằng Chrome headless (SwiftShader) nên **không chặn trên FPS**; Âm Sương Thấp / Vừa / Cao JS p95 0,7 / 1,1 / 1,4 ms, draw call 3 / 5 / 5, không nặng hơn Hắc Phong và Lạc Hà ở cùng bậc. **"Android tầm trung >= 50 FPS" CHƯA đo trên máy thật** (đo máy thật M5.4 còn mở).
 - Kiểm tự động thêm: `e2e:doc-duoc` (ô chặn đọc ra được trên ba bản đồ, #447), `check-quest-log`, `check-forge-shop`, `check-combat-fx` mục trùm (#449, #450, #451, #452), cổng trống do hệ điều hành cấp cho các script Chrome (#455), `docs/RA_SOAT_TAI_SAN.md` cập nhật tài sản M6 (#456).
 - Sửa kèm: `bindTap` bỏ qua mọi `click` trong 300 ms đầu sau khi tải trang (#449).
 
 ### Cần biết khi phát hành
-- Client `v0.1.2` không biết bản đồ mới: trên bản chạy thật cần `MIN_PROTOCOL_VERSION=2` để client cũ nhận thông báo "có bản mới" thay vì vào nhầm; sao lưu dữ liệu (`prod.sh backup`) trước khi `up`; APK cần dựng lại (`docs/PHAN_CONG_M6.md` mục 6). Việc phát hành do người dùng quyết, không tự động.
+- Người chơi dùng bản web chỉ cần tải lại trang. **APK `v0.1.x` phải cài lại:** `release.yml` dựng APK debug `tien-gioi-v0.2.0-debug.apk` khi gắn thẻ (đính kèm ở GitHub Release); APK cũ nhận thông báo "có bản mới" cho tới khi cài bản này. Dữ liệu nhân vật cũ vẫn nạp được (đã kiểm `kiem-save` trên bản sao lưu bản chạy thật 14/11, 7 nhân vật, 0 lỗi); sao lưu (`prod.sh backup`) trước khi `up`; quay lại bản trước bằng `prod.sh rollback` (bỏ `MIN_PROTOCOL_VERSION` nếu quay về `v0.1.3`).
 - Chưa thử trên điện thoại thật (như 0.1.1 và 0.1.2).
 
 ## [0.1.3] — 14/11/2026: bản vá, chơi hoàn toàn bằng bàn phím
