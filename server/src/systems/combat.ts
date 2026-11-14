@@ -20,6 +20,7 @@ import { killShares } from "./party";
 import { dungeonFall } from "./dungeon";
 import { beginLimbo } from "./reincarnation";
 import { rollDamage } from "./damage";
+import { onTreasureKill } from "./treasure";
 import { duelBeam, duelSlash, reviveInPlace } from "./duel";
 import { changeCoin, splitCoin } from "./wallet";
 import { absorbShield, entriesOf, takenMult } from "./status-rules";
@@ -122,6 +123,7 @@ export function killMonster(w: World, id: string, mc: MonsterCtrl) {
     const share = Math.max(1, Math.round(killExp(mc.def, p.realm, p.tier) * frac));
     gainExp(w, sid, p, share, expMultOf(w.ctrl.get(sid)?.soul.unlocks));
     onMonsterKilled(w, sid, mc.def.id); // ai góp sát thương (hoặc cùng đội) cũng được tính cho nhiệm vụ
+    onTreasureKill(w, sid, p); // pháp bảo (M7.4): hồi linh lực / tăng tốc khi hạ quái
     const life = w.ctrl.get(sid)?.life; // và cho thành tựu của kiếp (Duyên khi luân hồi)
     if (life) {
       life.kills++;

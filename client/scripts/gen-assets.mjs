@@ -760,6 +760,22 @@ const TREASURE_ICONS = {
   phong_hanh_boi: [0x9ad0b8, 0xe6fff4],
 };
 
+// Kinh quyển của 12 chiêu (M7.4, shared/src/books.ts: id `kinh_<chiêu>`): [màu bìa theo hệ, màu phụ]. Hình tạm vẽ bằng code.
+const BOOKS = {
+  kinh_hoa_van_kiem: [0xd9433b, 0xffd0a0],
+  kinh_bon_thach_quyen: [0xa8803a, 0xf0d9a0],
+  kinh_ung_trao: [0xc8ccd4, 0x8a93a0],
+  kinh_trong_nhac_tram: [0x8f6a2e, 0xe6c98a],
+  kinh_huyen_bang_chi: [0x9fd0ea, 0xe6f6ff],
+  kinh_kim_chung_trao: [0xb8bcc8, 0xf2e6a0],
+  kinh_bich_thuy_hoi_xuan: [0x3b7bd9, 0xbfe0ff],
+  kinh_phieu_phong_bo: [0x9ad0b8, 0xe6fff4],
+  kinh_thanh_tung_phi_cham: [0x5e9a4a, 0xd0f0b8],
+  kinh_lac_tuyet_phan_phi: [0x7ab8e0, 0xffffff],
+  kinh_cuu_cung_khon_sat: [0x8a6a2a, 0xffd34d],
+  kinh_me_tung_bo: [0x6fbfa0, 0xe6fff4],
+};
+
 function drawItemIcon(id) {
   const s = new Surface(24, 24);
   s.ellipse(12, 21, 7, 2, 0x000000, 65);
@@ -943,6 +959,16 @@ function drawItemIcon(id) {
     s.rect(9, 6, 6, 6, accent);
     s.circle(12, 6, 2.4, accent);
     s.line(8, 16, 16, 16, accent, 1.4);
+  } else if (BOOKS[id]) {
+    // Kinh quyển (M7.4): sách khép, gáy tối, mép giấy sáng, dấu hệ trên bìa
+    const [cover, accent] = BOOKS[id];
+    s.rect(5, 4, 14, 17, cover);
+    s.rect(5, 4, 3, 17, 0x2a2018, 110);
+    s.rect(19, 5, 1, 15, 0xf4ecd0);
+    s.rect(8, 7, 9, 1, accent);
+    s.circle(12, 13, 3, accent);
+    s.circle(12, 13, 1.4, cover);
+    s.rect(8, 18, 9, 1, accent);
   }
   return s;
 }
@@ -1168,6 +1194,8 @@ function buildAtlas() {
     ...Object.keys(BOOTS),
     ...Object.keys(JADES),
     ...Object.keys(TREASURE_ICONS),
+    // Kinh quyển 12 chiêu (M7.4)
+    ...Object.keys(BOOKS),
   ];
   for (const id of itemIds) {
     const icon = drawItemIcon(id);

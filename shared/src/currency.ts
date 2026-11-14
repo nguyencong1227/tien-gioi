@@ -8,6 +8,7 @@
 // (không có vòng mua rồi bán lại có lời, mọi vật phẩm / quái được nhắc đều có thật).
 
 import { OWNER_GEAR_VALUE } from "./owner-gear";
+import { SHOP_BOOK_IDS, SKILL_BOOK_VALUE } from "./books";
 export const CURRENCY_NAME = "Linh thạch";
 
 /** Trần số Linh thạch giữ được (vừa số nguyên 32 bit có dấu). Nhận thêm vượt trần thì bị cắt, không báo lỗi. */
@@ -61,6 +62,8 @@ export const ITEM_VALUE: Record<string, number> = {
   giao_long_phu: 10000,
   // Đồ ba ô riêng của chủ (M7.4, `owner-gear.ts`)
   ...OWNER_GEAR_VALUE,
+  // Kinh quyển 12 chiêu (M7.4, `books.ts`)
+  ...SKILL_BOOK_VALUE,
 };
 
 /** NPC thu mua trả bằng phần trăm này của giá trị gốc (làm tròn xuống, tối thiểu 1 nếu giá trị > 0). */
@@ -96,9 +99,10 @@ export interface ShopDef {
  * NPC nào có trong `SHOPS` thì cũng thu mua mọi vật phẩm bán được (`sellPrice` > 0) của người chơi.
  */
 export const SHOPS: ShopDef[] = [
-  { npcId: "duoc_su", itemIds: ["hoi_huyet_dan", "hoi_linh_dan"] },
+  // + kinh quyển chiêu CƠ BẢN (M7.4, `SHOP_BOOK_IDS`: độ hiếm <= 1, cảnh giới Luyện Khí) để người mới mua ngay ở trấn; chiêu cao cấp chỉ rơi từ quái / trùm
+  { npcId: "duoc_su", itemIds: ["hoi_huyet_dan", "hoi_linh_dan", ...SHOP_BOOK_IDS] },
   // Lái buôn ở Thanh Lộ Trạm (Hắc Phong Cốc): cùng hàng và cùng giá với Lão Dược Sư, để săn xa vẫn mua / bán được tại chỗ
-  { npcId: "lai_buon", itemIds: ["hoi_huyet_dan", "hoi_linh_dan"] },
+  { npcId: "lai_buon", itemIds: ["hoi_huyet_dan", "hoi_linh_dan", ...SHOP_BOOK_IDS] },
   // Lái buôn Vọng Sương (Âm Sương Trạch, M6 #404): thêm đan cấp 2 (chỗ xả Linh thạch cho người Kim Đan); vẫn KHÔNG bán `tu_khi_dan` và trang bị
   {
     npcId: "lai_buon_suong",
