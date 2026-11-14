@@ -7,10 +7,11 @@
 //  - Quái giữ khoảng cách: đứng bắn khi mục tiêu trong tầm, lùi khi mục tiêu áp sát quá, đuổi theo khi mục tiêu ở quá xa. Choáng thì không bắn.
 //  - Sát thương cố định `atk` (không `Math.random`: giữ nguyên chuỗi ngẫu nhiên của bench có hạt giống).
 // Mô-đun chỉ biết `World`; `monsters.ts` gọi `rangedStep` mỗi tick cho quái có mục tiêu, `tickWorld` gọi `tickBolts`.
-import { MAX_BOLTS, PLAYER_RADIUS, type MonsterKind } from "@tien-gioi/shared";
+import { MAX_BOLTS, PLAYER_RADIUS, type MonsterKind, type SkillEffect } from "@tien-gioi/shared";
 import type { Monster } from "../schema";
 import { quantAngle, type World, type MonsterCtrl } from "../world";
 import { hurtPlayer } from "./combat";
+import { applyPlayerStatus } from "./status";
 
 /** Một đạn đang bay (chỉ server). */
 export interface Bolt {
@@ -25,6 +26,16 @@ export interface Bolt {
   dmg: number;
   /** Loài quái bắn (để viết thông báo khi trúng; quái bắn có thể đã chết lúc đạn tới) */
   kind: string;
+  /** Hiệu ứng gắn lên người trúng đạn (`poisoner`: độc), chỉ khi đạn THẬT SỰ trúng (qua luật né / bất tử) */
+  effect?: SkillEffect;
+}
+
+/** Độc của quái `poisoner` (M7.3): mỗi giây `ratio` x sát thương gốc của đòn trong `ms`; số khởi đầu, M7.9 hiệu chỉnh. Không giết người (dot không giết) và khu an toàn thanh tẩy. */
+export const POISON_EFFECT: SkillEffect = { status: "poison", ms: 4000, ratio: 0.08, chance: 1 };
+
+/** Hiệu ứng đi kèm đòn của quái `def` (đòn gần lẫn đạn): độc cho `poisoner`, còn lại không có. */
+export function onHitEffectOf(def: MonsterKind): SkillEffect | undefined {
+  return def.behavior === "poisoner" ? POISON_EFFECT : undefined;
 }
 
 /** Mặc định khi `MonsterKind.boltSpeed` / `boltRange` bỏ trống (px / giây, px). */
@@ -47,9 +58,11 @@ function segDist(px: number, py: number, ax: number, ay: number, bx: number, by:
   return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
 }
 
-/** Quái này có bắn đạn không (`ranged`; `poisoner` đứng riêng là đánh gần gây độc). */
+/**
+ * Quái này có bắn đạn không: `ranged`, hoặc `poisoner` có khai báo `boltRange` (Độc Thiềm: đạn độc). `poisoner` không có tầm bắn thì vẫn đánh gần và gây độc bằng đòn gần.
+ */
 export function isRanged(def: MonsterKind): boolean {
-  return def.behavior === "ranged";
+  return def.behavior === "ranged" || (def.behavior === "poisoner" && def.boltRange !== undefined);
 }
 
 /** Tầm bay của đạn quái `def` (px) và tốc độ đạn (px / giây). */
@@ -70,6 +83,7 @@ export function fireBolt(w: World, m: Monster, def: MonsterKind, angle: number):
     left: range,
     dmg: Math.max(1, Math.round(def.atk)),
     kind: def.id,
+    effect: onHitEffectOf(def),
   });
   w.events.fx({ kind: "bolt", x: m.x, y: m.y, angle, speed, range, element: def.element });
   return true;
@@ -147,7 +161,8 @@ export function tickBolts(w: World, dt: number) {
       });
       if (hitSid !== null) {
         const p = w.state.players.get(hitSid);
-        if (p) hurtPlayer(w, hitSid, p, b.dmg, { kind: b.kind });
+        if (p && hurtPlayer(w, hitSid, p, b.dmg, { kind: b.kind }) && b.effect)
+          applyPlayerStatus(w, hitSid, b.effect, b.dmg, ""); // độc đi kèm đạn trúng (M7.3)
         dead = true;
       }
     }
