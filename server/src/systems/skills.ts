@@ -6,6 +6,7 @@ import {
   SKILL_BY_ID,
   emptySkillBook,
   assignSlot,
+  equipBonus,
   learnSkill,
   parseSkillSlot,
   realmLabel,
@@ -14,6 +15,7 @@ import {
   type SkillBook,
   type SkillsMsg,
 } from "@tien-gioi/shared";
+import type { Player } from "../schema";
 import type { World, PlayerCtrl } from "../world";
 import { byId } from "./lookup";
 
@@ -23,16 +25,15 @@ export function cooldownsLeft(c: PlayerCtrl, now: number): SkillsMsg["cd"] {
 }
 
 /**
- * Giảm hồi chiêu (0..`CDR_CAP`) từ trang bị của người chơi. Chưa có trang bị nào cho `cdr` (ô và chỉ số mới ở M7.4): luôn 0; MỘT chỗ để M7.4 nối
- * vào `equipBonus`, dùng cả cho `cdMax` gửi client lẫn đặt `skillCd` khi dùng chiêu (M7.2b).
+ * Giảm hồi chiêu (0..`CDR_CAP`, phân số) từ trang bị của người chơi: `equipBonus(...).cdr` (điểm %, đã kẹp theo `STAT_CAPS.cdr`; ô chưa mở không tính) chia 100. MỘT chỗ
+ * dùng cả cho `cdMax` gửi client lẫn đặt `skillCd` khi dùng chiêu (M7.2b / M7.4). Đổi trang bị làm `cdr` đổi thì gửi lại sổ chiêu (`equip` / `unequip`).
  */
-export function cdrOf(_c: PlayerCtrl): number {
-  return 0;
+export function cdrOf(p: Player): number {
+  return equipBonus(p, p.realm).cdr / 100;
 }
 
 /** Tổng hồi chiêu (ms) của bốn ô sau tầng chiêu + `cdr`; 0 = ô trống. Client chia `cd / cdMax` để vẽ vòng hồi chiêu. */
-export function cooldownsMax(c: PlayerCtrl): SkillsMsg["cdMax"] {
-  const cdr = cdrOf(c);
+export function cooldownsMax(c: PlayerCtrl, cdr = 0): SkillsMsg["cdMax"] {
   return c.skills.slots.map((id) => {
     const def = byId(SKILL_BY_ID, id);
     return def ? skillCooldownMs(def, c.skills.learned[id] ?? 1, cdr) : 0;
@@ -42,12 +43,13 @@ export function cooldownsMax(c: PlayerCtrl): SkillsMsg["cdMax"] {
 /** Gửi sổ chiêu + hồi chiêu cho chủ. Khi đổi sổ và lúc vào phòng; không gọi mỗi tick. */
 export function sendSkills(w: World, sid: string) {
   const c = w.ctrl.get(sid);
-  if (!c) return;
+  const p = w.state.players.get(sid);
+  if (!c || !p) return;
   const msg: SkillsMsg = {
     learned: { ...c.skills.learned },
     slots: [...c.skills.slots] as SkillsMsg["slots"],
     cd: cooldownsLeft(c, w.now),
-    cdMax: cooldownsMax(c),
+    cdMax: cooldownsMax(c, cdrOf(p)),
   };
   w.events.skills(sid, msg);
 }
