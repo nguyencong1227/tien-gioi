@@ -50,12 +50,17 @@ describe("M7.15: analyze-bundle (Phân tích thành phần gói tải JavaScript
     expect(ids).toContain("quest_modal");
   });
 
-  it("classifyModules phân loại và tính tỷ lệ chính xác", () => {
+  it("classifyModules phân loại và tính tỷ lệ chính xác theo kích thước minified esbuild", () => {
+    // Giả lập: Phaser có mã nguồn thô lớn nhưng sau khi nén thì tỷ lệ giảm
     const mockModules = {
-      "node_modules/phaser/dist/phaser.js": { renderedLength: 80000 },
-      "node_modules/colyseus.js/index.js": { renderedLength: 10000 },
-      "shared/src/items.ts": { renderedLength: 5000 },
-      "client/src/ui.ts": { renderedLength: 5000 },
+      "node_modules/phaser/dist/phaser.js": {
+        renderedLength: 80000,
+        // Giả lập code với comment dài để esbuild minify nén sâu
+        code: "/* " + "A".repeat(50000) + " */ function foo() { return 1; }",
+      },
+      "node_modules/colyseus.js/index.js": { renderedLength: 10000, minBytes: 8000 },
+      "shared/src/items.ts": { renderedLength: 5000, minBytes: 4000 },
+      "client/src/ui.ts": { renderedLength: 5000, minBytes: 3000 },
     };
     const totalGzip = 20000;
 
@@ -67,13 +72,18 @@ describe("M7.15: analyze-bundle (Phân tích thành phần gói tải JavaScript
     const phaserCat = result.categories.find((c) => c.id === "phaser")!;
     expect(phaserCat.rawBytes).toBe(80000);
     expect(phaserCat.rawPct).toBe(80);
-    expect(phaserCat.estGzipBytes).toBe(16000);
+    // esbuild nén comment 50KB đi, chỉ còn vài chục bytes cho hàm foo
+    expect(phaserCat.minBytes).toBeLessThan(100);
+
+    const colyseusCat = result.categories.find((c) => c.id === "colyseus")!;
+    expect(colyseusCat.minBytes).toBe(8000);
 
     const uiCat = result.categories.find((c) => c.id === "dom_ui")!;
     expect(uiCat.rawBytes).toBe(5000);
-    expect(uiCat.rawPct).toBe(5);
+    expect(uiCat.minBytes).toBe(3000);
 
-    expect(result.topModules[0].id).toBe("node_modules/phaser/dist/phaser.js");
+    // Module xếp hạng theo minBytes giảm dần
+    expect(result.topModules[0].id).toBe("node_modules/colyseus.js/index.js");
   });
 
   it("formatConsoleReport và formatMarkdownReport định dạng đầy đủ tiêu đề và bảng", () => {
@@ -91,6 +101,7 @@ describe("M7.15: analyze-bundle (Phân tích thành phần gói tải JavaScript
       remainingBudgetKb: 227.03,
       breakdown: {
         totalRenderedLength: 1000000,
+        totalMinBytes: 500000,
         totalModules: 10,
         categories: [
           {
@@ -100,9 +111,12 @@ describe("M7.15: analyze-bundle (Phân tích thành phần gói tải JavaScript
             rawBytes: 800000,
             rawKb: 781.25,
             rawPct: 80,
-            estGzipBytes: 240000,
-            estGzipKb: 234.38,
-            estGzipPct: 80,
+            minBytes: 300000,
+            minKb: 292.97,
+            minPct: 60,
+            estGzipBytes: 180000,
+            estGzipKb: 175.78,
+            estGzipPct: 60,
             moduleCount: 1,
           },
         ],
@@ -112,8 +126,11 @@ describe("M7.15: analyze-bundle (Phân tích thành phần gói tải JavaScript
             rawBytes: 800000,
             rawKb: 781.25,
             rawPct: 80,
-            estGzipBytes: 240000,
-            estGzipKb: 234.38,
+            minBytes: 300000,
+            minKb: 292.97,
+            minPct: 60,
+            estGzipBytes: 180000,
+            estGzipKb: 175.78,
           },
         ],
       },
@@ -121,11 +138,13 @@ describe("M7.15: analyze-bundle (Phân tích thành phần gói tải JavaScript
       lazyOptimization: {
         totalPanelRawBytes: 60000,
         totalPanelRawKb: 58.59,
-        estGzipSavedBytes: 18000,
-        estGzipSavedKb: 17.58,
-        projectedInitialGzipKb: 275.39,
-        projectedRemainingBudgetKb: 244.61,
-        projectedViteGzipKb: 287,
+        totalPanelMinBytes: 28000,
+        totalPanelMinKb: 27.34,
+        estGzipSavedBytes: 14000,
+        estGzipSavedKb: 13.67,
+        projectedInitialGzipKb: 279.3,
+        projectedRemainingBudgetKb: 240.7,
+        projectedViteGzipKb: 291,
       },
     };
 
@@ -137,6 +156,6 @@ describe("M7.15: analyze-bundle (Phân tích thành phần gói tải JavaScript
     const mdReport = formatMarkdownReport(mockReport);
     expect(mdReport).toContain("# Báo cáo Phân tích Thành phần Gói tải Client");
     expect(mdReport).toContain("## 1. Cơ cấu theo Nhóm thành phần");
-    expect(mdReport).toContain("## 4. Đề xuất Kiến trúc cho Dev A");
+    expect(mdReport).toContain("## 4. Quyết định & Đề xuất Kiến trúc cho Nhóm");
   });
 });

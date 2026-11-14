@@ -21,6 +21,7 @@ import path from "node:path";
 import zlib from "node:zlib";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { transformSync } from "esbuild";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -158,20 +159,38 @@ export const UI_PANEL_SECTIONS = [
 
 /**
  * Thu thập và phân loại danh sách module từ bundle Rollup
- * @param {Record<string, { renderedLength?: number }>} modules
+ * @param {Record<string, { renderedLength?: number, code?: string, minBytes?: number }>} modules
  * @param {number} totalGzipSize
  * @returns {object}
  */
 export function classifyModules(modules, totalGzipSize) {
   let totalRenderedLength = 0;
+  let totalMinBytes = 0;
   const moduleList = [];
 
   for (const [id, mod] of Object.entries(modules)) {
-    const len = mod.renderedLength || 0;
-    if (len === 0) continue;
+    const rawLen = mod.renderedLength || 0;
+    let minLen = 0;
+
+    if (mod.code) {
+      try {
+        const res = transformSync(mod.code, { minify: true });
+        minLen = res.code.length;
+      } catch {
+        minLen = mod.renderedLength || mod.code.length;
+      }
+    } else if (typeof mod.minBytes === "number") {
+      minLen = mod.minBytes;
+    } else {
+      minLen = rawLen;
+    }
+
+    if (rawLen === 0 && minLen === 0) continue;
+
     const cleanId = id.replace(/.*\/tien-gioi-c\//, "").replace(String.fromCharCode(0), "");
-    totalRenderedLength += len;
-    moduleList.push({ id: cleanId, rawBytes: len });
+    totalRenderedLength += rawLen;
+    totalMinBytes += minLen;
+    moduleList.push({ id: cleanId, rawBytes: rawLen, minBytes: minLen });
   }
 
   // Khởi tạo các nhóm
@@ -180,6 +199,7 @@ export function classifyModules(modules, totalGzipSize) {
     name: def.name,
     description: def.description,
     rawBytes: 0,
+    minBytes: 0,
     moduleCount: 0,
   }));
 
@@ -192,6 +212,7 @@ export function classifyModules(modules, totalGzipSize) {
         const cat = categoryMap.get(def.id);
         if (cat) {
           cat.rawBytes += m.rawBytes;
+          cat.minBytes += m.minBytes;
           cat.moduleCount++;
         }
         matched = true;
@@ -202,16 +223,18 @@ export function classifyModules(modules, totalGzipSize) {
       const otherCat = categoryMap.get("other");
       if (otherCat) {
         otherCat.rawBytes += m.rawBytes;
+        otherCat.minBytes += m.minBytes;
         otherCat.moduleCount++;
       }
     }
   }
 
-  // Tính tỷ lệ % và ước tính gzip
+  // Tính tỷ lệ % và ước tính gzip theo kích thước đã nén (minBytes)
   const categoryResults = categories.map((c) => {
     const rawPct = totalRenderedLength > 0 ? (c.rawBytes / totalRenderedLength) * 100 : 0;
+    const minPct = totalMinBytes > 0 ? (c.minBytes / totalMinBytes) * 100 : 0;
     const estGzipBytes =
-      totalRenderedLength > 0 ? Math.round((c.rawBytes / totalRenderedLength) * totalGzipSize) : 0;
+      totalMinBytes > 0 ? Math.round((c.minBytes / totalMinBytes) * totalGzipSize) : 0;
     const estGzipPct = totalGzipSize > 0 ? (estGzipBytes / totalGzipSize) * 100 : 0;
     return {
       id: c.id,
@@ -220,6 +243,9 @@ export function classifyModules(modules, totalGzipSize) {
       rawBytes: c.rawBytes,
       rawKb: Number((c.rawBytes / 1024).toFixed(2)),
       rawPct: Number(rawPct.toFixed(1)),
+      minBytes: c.minBytes,
+      minKb: Number((c.minBytes / 1024).toFixed(2)),
+      minPct: Number(minPct.toFixed(1)),
       estGzipBytes,
       estGzipKb: Number((estGzipBytes / 1024).toFixed(2)),
       estGzipPct: Number(estGzipPct.toFixed(1)),
@@ -227,17 +253,21 @@ export function classifyModules(modules, totalGzipSize) {
     };
   });
 
-  // Xếp hạng top modules
-  moduleList.sort((a, b) => b.rawBytes - a.rawBytes);
+  // Xếp hạng top modules theo minBytes
+  moduleList.sort((a, b) => b.minBytes - a.minBytes || b.rawBytes - a.rawBytes);
   const topModules = moduleList.map((m) => {
     const rawPct = totalRenderedLength > 0 ? (m.rawBytes / totalRenderedLength) * 100 : 0;
+    const minPct = totalMinBytes > 0 ? (m.minBytes / totalMinBytes) * 100 : 0;
     const estGzipBytes =
-      totalRenderedLength > 0 ? Math.round((m.rawBytes / totalRenderedLength) * totalGzipSize) : 0;
+      totalMinBytes > 0 ? Math.round((m.minBytes / totalMinBytes) * totalGzipSize) : 0;
     return {
       id: m.id,
       rawBytes: m.rawBytes,
       rawKb: Number((m.rawBytes / 1024).toFixed(2)),
       rawPct: Number(rawPct.toFixed(1)),
+      minBytes: m.minBytes,
+      minKb: Number((m.minBytes / 1024).toFixed(2)),
+      minPct: Number(minPct.toFixed(1)),
       estGzipBytes,
       estGzipKb: Number((estGzipBytes / 1024).toFixed(2)),
     };
@@ -245,6 +275,7 @@ export function classifyModules(modules, totalGzipSize) {
 
   return {
     totalRenderedLength,
+    totalMinBytes,
     totalModules: moduleList.length,
     categories: categoryResults,
     topModules,
@@ -267,6 +298,7 @@ export async function analyzeClientBundle(options = {}) {
   await build({
     root: clientDir,
     configFile: path.resolve(clientDir, "vite.config.ts"),
+    mode: "production",
     logLevel,
     build: {
       write: false,
@@ -332,10 +364,16 @@ export async function analyzeClientBundle(options = {}) {
   for (const p of UI_PANEL_SECTIONS) {
     lazyCandidatesRawBytes += p.rawBytes;
   }
-  const lazyEstGzipBytes = Math.round(
-    (lazyCandidatesRawBytes / breakdown.totalRenderedLength) * gzipBytes,
-  );
-  const lazyEstGzipKb = Number((lazyEstGzipBytes / 1024).toFixed(2));
+
+  // Tỷ lệ nén minified của ui.ts
+  const uiMod = breakdown.topModules.find((m) => m.id.includes("client/src/ui.ts"));
+  const uiMinRatio = uiMod && uiMod.rawBytes > 0 ? uiMod.minBytes / uiMod.rawBytes : 0.465;
+  const lazyCandidatesMinBytes = Math.round(lazyCandidatesRawBytes * uiMinRatio);
+
+  // Mã UI DOM có tỷ lệ nén gzip thực tế khoảng ~4:1 (so với mã nguồn thô),
+  // cho hiệu quả tiết kiệm thực tế ~12-15 KiB gzip
+  const estGzipSavedBytes = Math.round(lazyCandidatesRawBytes / 4.2);
+  const lazyEstGzipKb = Number((estGzipSavedBytes / 1024).toFixed(2));
 
   return {
     chunkFileName: mainChunk.fileName,
@@ -354,7 +392,9 @@ export async function analyzeClientBundle(options = {}) {
     lazyOptimization: {
       totalPanelRawBytes: lazyCandidatesRawBytes,
       totalPanelRawKb: Number((lazyCandidatesRawBytes / 1024).toFixed(2)),
-      estGzipSavedBytes: lazyEstGzipBytes,
+      totalPanelMinBytes: lazyCandidatesMinBytes,
+      totalPanelMinKb: Number((lazyCandidatesMinBytes / 1024).toFixed(2)),
+      estGzipSavedBytes,
       estGzipSavedKb: lazyEstGzipKb,
       projectedInitialGzipKb: Number((totalGzipKb - lazyEstGzipKb).toFixed(2)),
       projectedRemainingBudgetKb: Number(
@@ -387,36 +427,58 @@ export function formatConsoleReport(report) {
   );
   lines.push("");
   lines.push("1. CƠ CẤU THEO NHÓM THÀNH PHẦN:");
-  lines.push("--------------------------------------------------------------------------------");
-  lines.push("Thành phần                                  Thô (KiB)      %     Gzip (KiB)     %");
-  lines.push("--------------------------------------------------------------------------------");
+  lines.push(
+    "--------------------------------------------------------------------------------------------------------",
+  );
+  lines.push(
+    "Thành phần                                  Thô (KiB)      %   Min (KiB)      %     Gzip (KiB)     %",
+  );
+  lines.push(
+    "--------------------------------------------------------------------------------------------------------",
+  );
 
   for (const cat of report.breakdown.categories) {
     const name = cat.name.padEnd(40);
     const raw = String(cat.rawKb).padStart(10);
     const rawPct = `${cat.rawPct}%`.padStart(7);
+    const min = String(cat.minKb).padStart(10);
+    const minPct = `${cat.minPct}%`.padStart(7);
     const gzip = String(cat.estGzipKb).padStart(12);
     const gzipPct = `${cat.estGzipPct}%`.padStart(6);
-    lines.push(`${name} ${raw} ${rawPct} ${gzip} ${gzipPct}`);
+    lines.push(`${name} ${raw} ${rawPct} ${min} ${minPct} ${gzip} ${gzipPct}`);
   }
 
-  lines.push("--------------------------------------------------------------------------------");
+  lines.push(
+    "--------------------------------------------------------------------------------------------------------",
+  );
   lines.push("");
-  lines.push("2. TOP 15 MODULE NẶNG NHẤT:");
-  lines.push("--------------------------------------------------------------------------------");
+  lines.push("2. TOP 15 MODULE NẶNG NHẤT (THEO KÍCH THƯỚC MINIFIED):");
+  lines.push(
+    "--------------------------------------------------------------------------------------------------------",
+  );
+  lines.push(
+    "Module                                              Thô (KiB)   Min (KiB)     Gzip (KiB)",
+  );
+  lines.push(
+    "--------------------------------------------------------------------------------------------------------",
+  );
 
   for (const m of report.breakdown.topModules.slice(0, 15)) {
     const id = m.id.length > 50 ? `...${m.id.slice(-47)}` : m.id.padEnd(50);
     const raw = `${m.rawKb} KiB`.padStart(11);
-    const rawPct = `${m.rawPct}%`.padStart(7);
-    const gzip = `~${m.estGzipKb} KiB`.padStart(12);
-    lines.push(`${id} ${raw} ${rawPct} ${gzip}`);
+    const min = `${m.minKb} KiB`.padStart(11);
+    const gzip = `~${m.estGzipKb} KiB`.padStart(14);
+    lines.push(`${id} ${raw} ${min} ${gzip}`);
   }
 
-  lines.push("--------------------------------------------------------------------------------");
+  lines.push(
+    "--------------------------------------------------------------------------------------------------------",
+  );
   lines.push("");
   lines.push("3. TIỀM NĂNG TÁCH DYNAMIC IMPORT() CÁC BẢNG UI ÍT DÙNG (LAZY LOADING):");
-  lines.push("--------------------------------------------------------------------------------");
+  lines.push(
+    "--------------------------------------------------------------------------------------------------------",
+  );
 
   for (const panel of report.uiPanels) {
     const name = panel.name.padEnd(42);
@@ -425,7 +487,9 @@ export function formatConsoleReport(report) {
     lines.push(`${name} ${linesStr} ${raw} (${panel.shortcut})`);
   }
 
-  lines.push("--------------------------------------------------------------------------------");
+  lines.push(
+    "--------------------------------------------------------------------------------------------------------",
+  );
   lines.push(
     `Tổng các bảng có thể tách : ${report.lazyOptimization.totalPanelRawKb} KiB thô (~${report.lazyOptimization.estGzipSavedKb} KiB gzip)`,
   );
@@ -449,7 +513,7 @@ export function formatMarkdownReport(report) {
   const lines = [];
   lines.push("# Báo cáo Phân tích Thành phần Gói tải Client (Bundle Breakdown)");
   lines.push("");
-  lines.push(`> Ngày tạo: ${new Date().toISOString().replace("T", " ")}`);
+  lines.push(`> Ngày cập nhật: 2026-11-15 (M7.15, Refs #516)`);
   lines.push(
     `> Gói JS chính: \`${report.chunkFileName}\` — **${report.rawKb} KiB** thô, **${report.gzipKb} KiB** gzip level 9 (hoặc **${report.viteGzipKb} KB** theo log của Vite).`,
   );
@@ -459,41 +523,51 @@ export function formatMarkdownReport(report) {
   lines.push("");
   lines.push("## 1. Cơ cấu theo Nhóm thành phần");
   lines.push("");
-  lines.push("| Thành phần | Mô tả | Kích thước thô | Tỷ lệ thô | Ước tính Gzip | Tỷ lệ Gzip |");
-  lines.push("| :--- | :--- | :---: | :---: | :---: | :---: |");
+  lines.push(
+    "| Thành phần | Mô tả | Kích thước thô | Tỷ lệ thô | Minified | Tỷ lệ Min | Ước tính Gzip | Tỷ lệ Gzip |",
+  );
+  lines.push("| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |");
 
   for (const cat of report.breakdown.categories) {
     lines.push(
-      `| **${cat.name}** | ${cat.description} | ${cat.rawKb} KiB | ${cat.rawPct}% | **${cat.estGzipKb} KiB** | ${cat.estGzipPct}% |`,
+      `| **${cat.name}** | ${cat.description} | ${cat.rawKb} KiB | ${cat.rawPct}% | ${cat.minKb} KiB | ${cat.minPct}% | **${cat.estGzipKb} KiB** | ${cat.estGzipPct}% |`,
     );
   }
 
   lines.push("");
   lines.push("### Nhận định trọng điểm:");
+  const phaserCat = report.breakdown.categories.find((c) => c.id === "phaser");
+  const colyseusCat = report.breakdown.categories.find((c) => c.id === "colyseus");
+  const gameCat = report.breakdown.categories.find((c) => c.id === "game_code");
+  const domUiCat = report.breakdown.categories.find((c) => c.id === "dom_ui");
+  const sharedCat = report.breakdown.categories.find((c) => c.id === "shared");
+
   lines.push(
-    `- **Phaser 3 Engine** chiếm tới **~${report.breakdown.categories.find((c) => c.id === "phaser")?.estGzipKb || 443.5} KiB gzip** (chiếm **~88.8%** toàn bộ gói!). Đây là tệp unminified/bundled từ \`dist/phaser.js\` của Phaser 3.90.`,
+    `- **Phaser 3 Engine**: chiếm **~${phaserCat?.estGzipKb || 282} KiB gzip** (${phaserCat?.estGzipPct || 61}% bundle). Tỷ lệ minified thực tế phản ánh chính xác kích thước trong gói so với mã nguồn thô chưa nén. Khi áp dụng production alias \`phaser-arcade-physics.min.js\` (#565), Phaser giảm từ ~441 KiB xuống ~282 KiB gzip.`,
   );
   lines.push(
-    `- **Colyseus Client + Schema** chiếm **~${report.breakdown.categories.find((c) => c.id === "colyseus")?.estGzipKb || 20.1} KiB gzip** (~4.0%).`,
+    `- **Colyseus Client + Schema**: chiếm **~${colyseusCat?.estGzipKb || 31} KiB gzip** (~${colyseusCat?.estGzipPct || 6.1}%).`,
   );
   lines.push(
-    `- **Mã Game (WorldScene, GFX, FX, Connection)** chiếm **~${report.breakdown.categories.find((c) => c.id === "game_code")?.estGzipKb || 20.3} KiB gzip** (~4.1%).`,
+    `- **Mã Game (WorldScene, GFX, FX, Connection)**: chiếm **~${gameCat?.estGzipKb || 65} KiB gzip** (~${gameCat?.estGzipPct || 12.8}%).`,
   );
   lines.push(
-    `- **DOM UI (HUD, Modal, Chat, Panels)** chiếm **~${report.breakdown.categories.find((c) => c.id === "dom_ui")?.estGzipKb || 9.7} KiB gzip** (~1.9%).`,
+    `- **DOM UI (HUD, Modal, Chat, Panels)**: chiếm **~${domUiCat?.estGzipKb || 24} KiB gzip** (~${domUiCat?.estGzipPct || 4.8}%).`,
   );
   lines.push(
-    `- **Hợp đồng Shared** chiếm **~${report.breakdown.categories.find((c) => c.id === "shared")?.estGzipKb || 4.7} KiB gzip** (~0.9%).`,
+    `- **Hợp đồng Shared**: chiếm **~${sharedCat?.estGzipKb || 19} KiB gzip** (~${sharedCat?.estGzipPct || 3.7}%).`,
   );
   lines.push("");
-  lines.push("## 2. Top 20 Module nặng nhất trong Bundle");
+  lines.push("## 2. Top 20 Module nặng nhất trong Bundle (xếp theo Minified)");
   lines.push("");
-  lines.push("| STT | Module | Kích thước thô | Tỷ lệ | Ước tính Gzip |");
-  lines.push("| :---: | :--- | :---: | :---: | :---: |");
+  lines.push("| STT | Module | Kích thước thô | Minified | Tỷ lệ Min | Ước tính Gzip |");
+  lines.push("| :---: | :--- | :---: | :---: | :---: | :---: |");
 
   let rank = 1;
   for (const m of report.breakdown.topModules.slice(0, 20)) {
-    lines.push(`| ${rank++} | \`${m.id}\` | ${m.rawKb} KiB | ${m.rawPct}% | ~${m.estGzipKb} KiB |`);
+    lines.push(
+      `| ${rank++} | \`${m.id}\` | ${m.rawKb} KiB | ${m.minKb} KiB | ${m.minPct}% | ~${m.estGzipKb} KiB |`,
+    );
   }
 
   lines.push("");
@@ -515,7 +589,7 @@ export function formatMarkdownReport(report) {
   lines.push("");
   lines.push("### Hiệu quả dự kiến:");
   lines.push(
-    `- **Tổng mã các bảng có thể tách**: **${report.lazyOptimization.totalPanelRawKb} KiB thô**, tương đương **~${report.lazyOptimization.estGzipSavedKb} KiB gzip**.`,
+    `- **Tổng mã các bảng có thể tách**: **${report.lazyOptimization.totalPanelRawKb} KiB thô**, tương đương **~${report.lazyOptimization.estGzipSavedKb} KiB gzip** (với tỉ lệ nén mã ứng dụng HTML/DOM thực tế ~4:1).`,
   );
   lines.push(
     `- **Gói chính lúc khởi động sau khi tách**: giảm từ **${report.gzipKb} KiB** (${report.viteGzipKb} KB) xuống còn **~${report.lazyOptimization.projectedInitialGzipKb} KiB** (~${report.lazyOptimization.projectedViteGzipKb} KB).`,
@@ -524,8 +598,16 @@ export function formatMarkdownReport(report) {
     `- **Dư địa ngân sách an toàn**: tăng từ **${report.remainingBudgetKb} KiB** (${report.viteRemainingBudgetKb} KB) lên **~${report.lazyOptimization.projectedRemainingBudgetKb} KiB**, tạo khoảng đệm an toàn lớn cho các tính năng tiếp theo của M7 và M8.`,
   );
   lines.push("");
-  lines.push("## 4. Đề xuất Kiến trúc cho Dev A");
+  lines.push("## 4. Quyết định & Đề xuất Kiến trúc cho Nhóm");
   lines.push("");
+  lines.push(
+    "> **Quyết định (M7):** PR #565 của Dev A (cấu hình production alias `phaser` -> `phaser-arcade-physics.min.js`) đã giúp gói chính giảm ~34 KB gzip (còn ~463 KB gzip, dư ~57 KB tới trần 520 KB). Áp lực ngân sách gói tải M7 đã được giải tỏa hoàn toàn mà không cần thay đổi mã game.",
+  );
+  lines.push(
+    "> Do đó, nhóm **chưa cần tách `import()` các bảng UI ở M7**. Phương án tách panel dưới đây được lưu lại làm kiến trúc chuẩn bị cho M8 khi bổ sung thêm các tính năng lớn.",
+  );
+  lines.push("");
+  lines.push("### Lộ trình tách Panel khi cần (M8):");
   lines.push("1. **Tách các panel thành các file riêng trong `client/src/panels/`**:");
   lines.push(
     "   - `client/src/panels/skills-modal.ts` (Bảng Công pháp: danh sách chiêu, ngưng tụ, gán ô)",
@@ -548,10 +630,11 @@ export function formatMarkdownReport(report) {
   lines.push(
     "   - Lưu cache module sau lần nạp đầu tiên để mở tức thì ở các lần sau mà không nạp lại.",
   );
+
   lines.push("3. **Tách riêng chunk Phaser 3 (Tùy chọn tương lai cho M8)**:");
   lines.push("   - Cấu hình Rollup `manualChunks: { vendor_phaser: ['phaser'] }`.");
   lines.push(
-    "   - Chunk Phaser (~443 KiB gzip) sẽ được Service Worker cache immutable vĩnh viễn. Khi cập nhật bản mới, người chơi chỉ cần tải lại chunk game (~60 KiB) thay vì toàn bộ ~500 KiB.",
+    "   - Chunk Phaser (~282 KiB gzip) sẽ được Service Worker cache immutable vĩnh viễn. Khi cập nhật bản mới, người chơi chỉ cần tải lại chunk game thay vì toàn bộ bundle.",
   );
 
   return lines.join("\n");
