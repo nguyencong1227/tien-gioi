@@ -19,9 +19,9 @@ import {
 import type { WorldRoom as WorldRoomType } from "./WorldRoom";
 
 const dataDir = mkdtempSync(path.join(tmpdir(), "tien-gioi-proto-room-"));
-import { freePort } from "../test-port";
+import { listenWithRetry } from "../test-port";
 
-// cổng do hệ điều hành cấp ở beforeAll (`freePort`): cổng ngẫu nhiên trong khoảng chồng nhau từng gây EADDRINUSE giữa các tệp chạy song song
+// cổng do hệ điều hành cấp ở beforeAll (`listenWithRetry`): tự động thử lại nếu gặp EADDRINUSE giữa các tệp chạy song song
 let PORT = 0;
 let server: Server;
 let WorldRoom: typeof WorldRoomType;
@@ -33,8 +33,7 @@ beforeAll(async () => {
   WorldRoom = mod.WorldRoom;
   server = new Server({ transport: new WebSocketTransport(), gracefullyShutdown: false });
   mod.defineRooms(server);
-  PORT = await freePort();
-  await server.listen(PORT);
+  PORT = await listenWithRetry(server);
 });
 afterEach(async () => {
   WorldRoom.minProtocol = MIN_PROTOCOL_VERSION;

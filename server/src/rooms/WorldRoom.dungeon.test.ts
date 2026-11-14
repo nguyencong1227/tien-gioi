@@ -33,9 +33,9 @@ import type { Run } from "../systems/dungeon";
 import { dayKey } from "@tien-gioi/shared";
 
 const dataDir = mkdtempSync(path.join(tmpdir(), "tien-gioi-dungeon-"));
-import { freePort } from "../test-port";
+import { listenWithRetry } from "../test-port";
 
-// cổng do hệ điều hành cấp ở beforeAll (`freePort`): cổng ngẫu nhiên trong khoảng chồng nhau từng gây EADDRINUSE giữa các tệp chạy song song
+// cổng do hệ điều hành cấp ở beforeAll (`listenWithRetry`): tự động thử lại nếu gặp EADDRINUSE giữa các tệp chạy song song
 let PORT = 0;
 let server: Server;
 let WorldRoomClass: typeof WorldRoom;
@@ -54,8 +54,7 @@ beforeAll(async () => {
   WorldRoomClass = WorldRoom;
   server = new Server({ transport: new WebSocketTransport(), gracefullyShutdown: false });
   defineRooms(server);
-  PORT = await freePort();
-  await server.listen(PORT);
+  PORT = await listenWithRetry(server);
 });
 
 afterEach(async () => {
