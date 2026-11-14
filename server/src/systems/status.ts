@@ -4,7 +4,7 @@
 // Chưa nối vào di chuyển của NGƯỜI CHƠI (tăng tốc / tê cóng): client phải đoán trước cùng hệ số, quyết ở bước `cast` (`speedMult`).
 import { moveSpeedMul, statusOf, type SkillEffect } from "@tien-gioi/shared";
 import { takeWhole, type PlayerCtrl, type World } from "../world";
-import { dealMonsterDamage } from "./combat";
+import { dealMonsterDamage, hurtPlayerDot } from "./combat";
 import {
   addStatus,
   entriesOf,
@@ -177,6 +177,23 @@ function tickPlayerStatuses(w: World, dt: number) {
       const add = takeWhole(c.frac, "hp", s.ratio * p.maxHp * dt);
       if (add) p.hp = Math.min(p.maxHp, p.hp + add);
     }
+    // Sát thương THEO GIÂY lên người (độc / bỏng / chảy máu do quái hoặc chiêu gây ra): cộng dồn rồi tính mỗi DOT_TICK_MS như ở quái (ít tin `dmg`, lúc hết hạn
+    // tính nốt phần lẻ). Hồn lìa xác / thách đấu bất tử (`hurtPlayerDot`); người gục vì nó thì dừng (`clearPlayerStatus` dọn ở tick sau).
+    for (const s of box.list) {
+      const def = statusOf(s.id);
+      if (def?.kind !== "dot" || s.dps <= 0) continue;
+      const end = Math.min(now, s.until);
+      if (now < s.last + DOT_TICK_MS && now < s.until) continue;
+      const dmg = Math.round((s.dps * (end - s.last)) / 1000);
+      if (dmg < 1) {
+        if (now >= s.until) s.last = end; // hết hạn mà phần lẻ chưa đủ 1: bỏ
+        continue;
+      }
+      s.last = end;
+      hurtPlayerDot(w, sid, p, dmg, def.name);
+      if (p.dead || c.limbo || w.ctrl.get(sid) !== c) break; // gục / luân hồi / rời phòng: dừng, không đụng hộp trạng thái đã đặt lại
+    }
+    if (p.dead || c.limbo) continue; // tick sau `clearPlayerStatus` dọn
     if (pruneStatuses(box, now)) {
       refreshMoveCache(c, now);
       sendStatus(w, sid);
