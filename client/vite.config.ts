@@ -38,6 +38,13 @@ export default defineConfig(({ mode }) => {
           }
         : {}),
     },
+    // Cỡ gói (M7): bản production dùng bản dựng ĐÃ NÉN của chính Phaser (`phaser-arcade-physics.min.js`: terser của đội Phaser, không có Matter vì game không dùng vật lý)
+    // thay cho `dist/phaser.js` (mã nguồn không nén 7,8 MB để esbuild tự nén). gzip của gói chính ~497 KB -> ~463 KB (-34 KB); dev vẫn dùng bản đọc được. Cần Matter
+    // (hoặc cần tên `Phaser.Physics.Matter`) thì đổi sang `phaser.min.js` (+33 KB gzip). Xem docs/THIET_KE_GIAO_DIEN_DO_HOA.md mục 10.6.
+    resolve:
+      mode === "production"
+        ? { alias: [{ find: /^phaser$/, replacement: "phaser/dist/phaser-arcade-physics.min.js" }] }
+        : {},
     build: { chunkSizeWarningLimit: 2000 },
   };
 });
