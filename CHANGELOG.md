@@ -2,7 +2,7 @@
 
 Định dạng theo từng bản phát hành (thẻ `vX.Y.Z`). Số `#` là PR / issue trên GitHub.
 
-## [Chưa phát hành]: bản vá chơi hoàn toàn bằng bàn phím
+## [0.1.3] — 14/11/2026: bản vá, chơi hoàn toàn bằng bàn phím
 
 Người dùng chơi thử v0.1.2 thấy "thao tác trên bàn phím chưa hợp lý, phải dùng cả chuột". Bản vá làm cho máy tính chơi được TOÀN BỘ chỉ bằng bàn phím, chuột là tuỳ chọn (#463). **Không đổi luật chơi, dữ liệu nhân vật hay giao thức** (`PROTOCOL_VERSION` giữ 1, server không đổi). Cảm ứng / điện thoại giữ nguyên (nhãn phím và dòng mở màn Phím tắt chỉ hiện khi dùng chuột / bàn phím).
 
@@ -23,6 +23,7 @@ Người dùng chơi thử v0.1.2 thấy "thao tác trên bàn phím chưa hợp
 
 ### Công cụ
 - E2E thật `npm run e2e:ban-phim -w server` (Chrome + server Colyseus thật, phím gửi bằng CDP, KHÔNG click chuột, hai người chơi cho mục mời đội / thách đấu): đổi phím, Tab / Shift+Tab / Esc, chém, kỹ năng, mở / đóng bảng, chat, túi, hội thoại NPC, cửa hàng, lò rèn, nhặt đồ, lời mời, rời bí cảnh, menu đồng đạo, Hoàng Tuyền, qua cổng. Mỗi PR có đột biến (vô hiệu một chức năng thì script đỏ). Thiết kế: `docs/THIET_KE_BAN_PHIM.md`.
+- Android `versionCode` 4, `versionName` 0.1.3.
 
 ## [0.1.2] — 13/11/2026: bản vá, bỏ chữ Hán khỏi giao diện
 
