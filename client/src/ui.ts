@@ -2688,6 +2688,20 @@ export const ui = {
       });
     }
 
+    // Thanh menu (QUYET_DINH_M3 mục 15): màn rất hẹp (< 480 px) gộp 6 nút vào một nút ☰ mở ra một hàng nút; chọn một mục hoặc chạm ra ngoài thì đóng
+    const hudMenu = $("hud-menu");
+    const setMenuOpen = (open: boolean) => {
+      hudMenu.classList.toggle("open", open);
+      $("btn-menu").setAttribute("aria-expanded", String(open));
+      $("btn-menu").setAttribute("aria-label", open ? "Đóng menu" : "Mở menu");
+    };
+    bindTap("btn-menu", () => setMenuOpen(!hudMenu.classList.contains("open")));
+    $("hud-menu-items").addEventListener("click", () => setMenuOpen(false));
+    document.addEventListener("pointerdown", (e) => {
+      if (hudMenu.classList.contains("open") && !hudMenu.contains(e.target as Node))
+        setMenuOpen(false);
+    });
+
     // Bảng chỉ dẫn người mới (#269)
     bindTap("newbie-close", () => this.dismissNewbieGuide());
     bindTap("newbie-btn-dismiss", () => this.dismissNewbieGuide());
@@ -3502,7 +3516,8 @@ export const ui = {
     set("exp", p.exp, validExpMax, "Tu vi");
     if (online !== cachedHudOnline) {
       cachedHudOnline = online;
-      $("hud-online").textContent = `Đạo hữu: ${online}`;
+      $("hud-online-n").textContent = `${online}`;
+      $("hud-online").setAttribute("aria-label", `Đạo hữu trực tuyến: ${online}`);
     }
     if (p.meditating !== cachedMeditating) {
       cachedMeditating = p.meditating;
