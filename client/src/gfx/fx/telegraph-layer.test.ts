@@ -61,7 +61,7 @@ class FakeG {
   }
 }
 
-function make(budget = 24, view = { value: true }) {
+function make(budget = 24, view = { value: true }, isBlocked?: (x: number, y: number) => boolean) {
   const me = { value: null as { x: number; y: number; r: number } | null };
   const dangers: number[] = [];
   const made: FakeG[] = [];
@@ -82,6 +82,7 @@ function make(budget = 24, view = { value: true }) {
     inView: () => view.value,
     player: () => me.value,
     onDanger: () => void dangers.push(1),
+    isBlocked,
   });
   return { layer, made, budget: b, reduced, view, me, dangers };
 }
@@ -200,6 +201,25 @@ describe("TelegraphLayer: đạn", () => {
     layer.update(3500); // hết tầm (1500 ms) -> 450 px
     expect(made[0].x).toBeCloseTo(550);
     expect(layer.snapshot(2500).bolts[0].travelled).toBeCloseTo(150);
+  });
+
+  it("có bản đồ: đạn cắt tầm ở ô chặn (không bay xuyên tường), biến mất sớm hơn; không bản đồ thì bay hết tầm", () => {
+    // tường từ x = 250 (đạn bắn từ x = 100, tầm 450, 300 px/s): chạm tường sau ~0,5 giây thay vì 1,5 giây
+    const walled = make(24, { value: true }, (x) => x >= 250);
+    walled.layer.bolt(bolt({ x: 100, y: 200, angle: 0, speed: 300, range: 450 }), 0);
+    walled.layer.update(500); // hết thời gian bay tới tường (150 px / 300 px/s): đạn dừng ở tường, không phải ở 400 px
+    expect(walled.made[0].x).toBeLessThanOrEqual(250);
+    expect(walled.made[0].x).toBeGreaterThan(248.9);
+    expect(walled.layer.snapshot(500).bolts[0].travelled).toBeLessThanOrEqual(150);
+    walled.layer.update(500 + BOLT_FADE_MS + 5); // đã hết hạn theo tầm đã cắt
+    expect(walled.layer.stats().bolts).toBe(0);
+
+    const open = make(); // không `isBlocked`: như tin báo
+    open.layer.bolt(bolt({ x: 100, y: 200, angle: 0, speed: 300, range: 450 }), 0);
+    open.layer.update(1000);
+    expect(open.made[0].x).toBeCloseTo(400);
+    open.layer.update(500 + BOLT_FADE_MS + 5);
+    expect(open.layer.stats().bolts).toBe(1); // còn bay (tầm 450 = 1500 ms)
   });
 
   it("bay hết tầm rồi mờ trong BOLT_FADE_MS và biến mất; Graphics về pool", () => {

@@ -223,6 +223,42 @@ export function planBolt(m: BoltMsg): BoltPlan | null {
   };
 }
 
+/** Bước lấy mẫu ô chặn dọc đường bay (px): CÙNG giá trị `BOLT_WALL_SAMPLE` của máy chủ (`server/src/systems/bolt.ts`), nhỏ hơn một ô (32 px) nên không lọt qua tường mỏng. */
+export const BOLT_WALL_SAMPLE = 16;
+/** Số lần chia đôi tinh chỉnh chỗ chạm tường trong một bước lấy mẫu (16 px -> ~1 px). */
+const WALL_REFINE_STEPS = 4;
+
+/**
+ * Cắt tầm bay của đạn tại ô chặn đầu tiên dọc đường bay: máy chủ dừng đạn ở ô chặn (tường, đá, nước sâu), nên hình không được vẽ đạn bay xuyên qua. `blocked` là
+ * `map.isBlockedPx` của bản đồ hiện tại; bỏ trống / không gặp ô chặn trong tầm thì trả đúng `plan` cũ (không cấp phát). Trả kế hoạch MỚI (không sửa `plan`) với
+ * `range` / `flightMs` đã cắt; chạm tường ngay trước mặt thì `range` = 0 (đạn tắt ngay tại chỗ).
+ */
+export function clipBoltToWall(
+  plan: BoltPlan,
+  blocked: ((x: number, y: number) => boolean) | undefined,
+): BoltPlan {
+  if (!blocked) return plan;
+  const ux = Math.cos(plan.angle);
+  const uy = Math.sin(plan.angle);
+  let free = 0; // quãng đã biết là thoáng
+  for (;;) {
+    const d = Math.min(plan.range, free + BOLT_WALL_SAMPLE);
+    if (blocked(plan.x + ux * d, plan.y + uy * d)) {
+      // chạm tường trong (free, d]: chia đôi để dừng sát tường
+      let lo = free;
+      let hi = d;
+      for (let i = 0; i < WALL_REFINE_STEPS; i++) {
+        const mid = (lo + hi) / 2;
+        if (blocked(plan.x + ux * mid, plan.y + uy * mid)) hi = mid;
+        else lo = mid;
+      }
+      return { ...plan, range: lo, flightMs: (lo / plan.speed) * 1000 };
+    }
+    if (d >= plan.range) return plan; // hết tầm mà không gặp ô chặn
+    free = d;
+  }
+}
+
 /** Quãng đã bay (px) sau `elapsed` ms: không âm, không vượt tầm. */
 export function boltTravelled(plan: BoltPlan, elapsed: number): number {
   if (!Number.isFinite(elapsed) || elapsed <= 0) return 0;

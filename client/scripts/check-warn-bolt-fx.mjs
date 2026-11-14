@@ -386,6 +386,36 @@ try {
     await evalJs("window.__scene.telegraphs.update(window.__scene.time.now); 0");
     check((await stats()).bolts === 0, "bay hết tầm (400 px / 800 px/s) rồi mờ thì biến mất");
 
+    // ---- Đạn cắt tầm ở ô chặn (máy chủ dừng đạn ở tường nên hình không được bay xuyên): dò ô chặn gần nhất quanh mình trên bản đồ THẬT của cảnh ----
+    await clear();
+    const wall =
+      await J(`(() => { const sc = window.__scene, x = sc.predX, y = sc.predY; let best = null;
+      for (let k = 0; k < 32; k++) { const a = (k * Math.PI) / 16, ux = Math.cos(a), uy = Math.sin(a);
+        for (let d = 8; d <= 500; d += 4) if (sc.map.isBlockedPx(x + ux * d, y + uy * d)) { if (!best || d < best.d) best = { a, d, x, y }; break; } }
+      return best; })()`);
+    if (!wall) {
+      console.log("  (bỏ qua: không có ô chặn trong 500 px quanh chỗ đứng ở cảnh này)");
+    } else {
+      // ngay sau khi phát, đọc quãng bay ở một "bây giờ" rất xa: bằng đúng tầm đã cắt
+      const farTravel = (msg) =>
+        evalJs(
+          `(() => { const sc = window.__scene; sc.telegraphs.clear(); ${emit(msg)}; const b = sc.telegraphs.snapshot(sc.time.now + 60000).bolts[0]; return b ? b.travelled : -1; })()`,
+        );
+      const base = { kind: "bolt", x: wall.x, y: wall.y, angle: wall.a, speed: 800 };
+      const clipped = await farTravel({ ...base, range: 900 });
+      check(
+        clipped > wall.d - 6 && clipped <= wall.d + 0.5,
+        `đạn bắn vào tường cách ${wall.d} px: tầm vẽ bị cắt còn ${clipped.toFixed?.(1) ?? clipped} px (không bay hết 900 px xuyên tường)`,
+      );
+      const shortRange = Math.max(2, wall.d - 12);
+      const unclipped = await farTravel({ ...base, range: shortRange });
+      check(
+        Math.abs(unclipped - shortRange) < 0.01,
+        `tầm ngắn hơn tường (${shortRange} px): giữ nguyên, không bị cắt (${unclipped})`,
+      );
+      await clear();
+    }
+
     // ---- Báo động khi mình đứng TRONG vùng: viền trắng dày + một tiếng báo cho mỗi vùng; ngoài vùng thì không ----
     await clear();
     const cues0 = await evalJs("window.__scene.dangerCues");
