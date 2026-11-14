@@ -5,6 +5,7 @@ import {
   BOLT_MAX_SPEED,
   BOLT_MIN_SPEED,
   BOLT_NEUTRAL_TINT,
+  BOLT_WALL_SAMPLE,
   WARN_FADE_MS,
   WARN_MAX_ARC_STEPS,
   WARN_MAX_MS,
@@ -16,6 +17,7 @@ import {
   boltPosition,
   boltTrailCount,
   boltTravelled,
+  clipBoltToWall,
   planBolt,
   planWarn,
   telegraphLimits,
@@ -257,6 +259,76 @@ describe("telegraph: đạn (bolt)", () => {
     expect(boltAlpha(p, 1500 + BOLT_FADE_MS)).toBe(0);
     expect(boltAlive(p, 1500 + BOLT_FADE_MS - 1)).toBe(true);
     expect(boltAlive(p, 1500 + BOLT_FADE_MS)).toBe(false);
+  });
+});
+
+describe("telegraph: clipBoltToWall (đạn cắt tầm ở ô chặn như máy chủ)", () => {
+  /** Tường thẳng đứng từ x = wallX trở đi (mọi y). */
+  const wallAt = (wallX: number) => (x: number) => x >= wallX;
+
+  it("không có hàm kiểm ô chặn, hoặc tường ở ngoài tầm: trả đúng kế hoạch cũ (không cấp phát)", () => {
+    const p = planBolt(bolt({ x: 0, y: 0, angle: 0, range: 300 }))!;
+    expect(clipBoltToWall(p, undefined)).toBe(p);
+    expect(clipBoltToWall(p, () => false)).toBe(p);
+    expect(clipBoltToWall(p, wallAt(301))).toBe(p);
+  });
+
+  it("tường ở giữa đường bay: tầm cắt sát tường (sai số ~1 px), thời gian bay theo tầm mới, kế hoạch cũ không bị sửa", () => {
+    const p = planBolt(bolt({ x: 0, y: 0, angle: 0, speed: 300, range: 300 }))!;
+    const c = clipBoltToWall(p, wallAt(100));
+    expect(c).not.toBe(p);
+    expect(c.range).toBeLessThanOrEqual(100);
+    expect(c.range).toBeGreaterThan(100 - 1.1);
+    expect(c.flightMs).toBeCloseTo((c.range / 300) * 1000);
+    expect(p.range).toBe(300); // không sửa bản cũ
+    expect(p.flightMs).toBeCloseTo(1000);
+    expect({ ...c, range: 0, flightMs: 0 }).toEqual({ ...p, range: 0, flightMs: 0 }); // chỉ đổi tầm + thời gian
+  });
+
+  it("tường đúng tại mốc lấy mẫu và ngay cạnh: không lọt (tường mỏng một ô 32 px cũng bị bắt)", () => {
+    const p = planBolt(bolt({ x: 0, y: 0, angle: 0, range: 600 }))!;
+    for (const wall of [BOLT_WALL_SAMPLE, BOLT_WALL_SAMPLE + 1, 2 * BOLT_WALL_SAMPLE, 250.5]) {
+      const c = clipBoltToWall(p, wallAt(wall));
+      expect(c.range, `tường ${wall}`).toBeLessThanOrEqual(wall);
+      expect(c.range, `tường ${wall}`).toBeGreaterThan(wall - 1.1);
+    }
+    // tường mỏng 32 px ở 200..232: chắc chắn bị quét thấy
+    const thin = clipBoltToWall(p, (x) => x >= 200 && x < 232);
+    expect(thin.range).toBeLessThanOrEqual(200);
+    expect(thin.range).toBeGreaterThan(198.9);
+  });
+
+  it("chạm tường ngay trước mặt: tầm 0 (đạn tắt tại chỗ), không âm, không NaN", () => {
+    const p = planBolt(bolt({ x: 0, y: 0, angle: 0, speed: 300, range: 300 }))!;
+    const c = clipBoltToWall(p, wallAt(0.5));
+    expect(c.range).toBeGreaterThanOrEqual(0);
+    expect(c.range).toBeLessThan(1);
+    expect(Number.isFinite(c.flightMs)).toBe(true);
+    expect(boltAlive(c, 0)).toBe(true);
+    expect(boltAlive(c, c.flightMs + BOLT_FADE_MS + 1)).toBe(false);
+  });
+
+  it("hướng chéo và ngược: tầm cắt theo khoảng cách dọc đường bay, không theo trục x", () => {
+    // tường nằm ở y >= 50; bay xuống 45 độ từ gốc: chạm khi d*sin45 = 50 => d ~ 70,7
+    const down = planBolt(bolt({ x: 0, y: 0, angle: Math.PI / 4, range: 400 }))!;
+    const c = clipBoltToWall(down, (_x, y) => y >= 50);
+    expect(c.range).toBeLessThanOrEqual(50 / Math.sin(Math.PI / 4));
+    expect(c.range).toBeGreaterThan(50 / Math.sin(Math.PI / 4) - 1.1);
+    // bay sang trái, tường ở x <= -120
+    const left = planBolt(bolt({ x: 0, y: 0, angle: Math.PI, range: 400 }))!;
+    const l = clipBoltToWall(left, (x) => x <= -120);
+    expect(l.range).toBeLessThanOrEqual(120);
+    expect(l.range).toBeGreaterThan(118.9);
+  });
+
+  it("số lần gọi hàm kiểm bị chặn: tối đa ~ range / mẫu + vài lần tinh chỉnh (không vòng lặp vô hạn)", () => {
+    let calls = 0;
+    const p = planBolt(bolt({ x: 0, y: 0, angle: 0, range: BOLT_MAX_RANGE }))!;
+    clipBoltToWall(p, () => (calls++, false));
+    expect(calls).toBeLessThanOrEqual(Math.ceil(BOLT_MAX_RANGE / BOLT_WALL_SAMPLE) + 1);
+    calls = 0;
+    clipBoltToWall(p, (x) => (calls++, x >= 500));
+    expect(calls).toBeLessThanOrEqual(Math.ceil(500 / BOLT_WALL_SAMPLE) + 8);
   });
 });
 
