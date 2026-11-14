@@ -1,12 +1,14 @@
 /* global console */
 /**
  * Script kiểm tra ngân sách hiệu năng tĩnh (Static Performance Budget Checker)
- * M5.1, Issue #330, THIET_KE_GIAO_DIEN_DO_HOA.md mục 10.
+ * M5.1, Issue #330, THIET_KE_GIAO_DIEN_DO_HOA.md mục 10;
+ * M7.15, Issue #516: bổ sung kiểm tra ngân sách theo gói tải (Packs).
  *
  * Kiểm tra các chỉ số tài nguyên tĩnh trước khi merge:
  * 1. Gói JS chính nén gzip (dist/assets/index-*.js) <= 520 KB
  * 2. Bộ tệp atlas + tileset trong client/public/assets/ <= 1024 KB (1 MB)
  * 3. Tổng bộ nhớ texture tĩnh (ảnh PNG + texture sinh bằng mã) <= 48 MB (bậc Thấp)
+ * 4. Ngân sách các gói tải (Packs) theo perf-budget.json (core <= 2MB, map <= 2MB, icons <= 3MB, audio <= 5MB, hd <= 3x)
  *
  * Chạy: node client/scripts/check-perf-budget.mjs
  */
@@ -14,8 +16,15 @@
 import fs from "node:fs";
 import path from "node:path";
 import zlib from "node:zlib";
+import crypto from "node:crypto";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import {
+  DEFAULT_PACKS_DIR,
+  DEFAULT_MANIFEST_PATH,
+  collectFilesRecursively,
+  toPosixPath,
+} from "./build-packs.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -171,7 +180,7 @@ export function calculateStaticTextureMemory(assetsDir) {
 
   scanPngs(assetsDir);
 
-  // 2. Texture sinh bằng mã lúc chạy (từ gfx/fx và gfx/decor-tileset: fx-font 576x1008, fx-atlas 192x32, decor-tileset 320x32, light-vignette 128x128, light-white 4x4, blob-shadow 64x28)
+  // 2. Texture sinh bằng mã lúc chạy (từ gfx/fx và gfx/decor-tileset)
   const codeGenerated = [
     { name: "fx-font (sinh bằng mã)", width: 576, height: 1008 },
     { name: "fx-atlas (sinh bằng mã)", width: 192, height: 32 },
@@ -204,14 +213,241 @@ export function calculateStaticTextureMemory(assetsDir) {
 }
 
 /**
+ * Tính kích thước đã nén hiệu dụng ("byte thật phải tải", THIET_KE_GIAO_DIEN_DO_HOA.md mục 10.1):
+ * - Ảnh (.png, .webp, .jpg) và âm thanh (.ogg, .mp3): byte trên đĩa (định dạng vốn đã nén).
+ * - Văn bản (.json, .svg, .txt, .csv, .xml, .css, .js): gzip level 9.
+ * - Khác: kích thước đĩa.
+ * @param {string} filePath
+ * @returns {number} Số byte hiệu dụng
+ */
+export function calculateEffectiveFileSize(filePath) {
+  const stat = fs.statSync(filePath);
+  const ext = path.extname(filePath).toLowerCase();
+  const uncompressedTextExts = new Set([
+    ".json",
+    ".svg",
+    ".txt",
+    ".csv",
+    ".xml",
+    ".css",
+    ".js",
+    ".html",
+  ]);
+  if (uncompressedTextExts.has(ext)) {
+    const raw = fs.readFileSync(filePath);
+    return zlib.gzipSync(raw, { level: 9 }).length;
+  }
+  return stat.size;
+}
+
+/**
+ * Kiểm tra ngân sách cho các gói tải theo nhu cầu (M7.15, #516; THIET_KE_GIAO_DIEN_DO_HOA.md mục 10.1)
+ * @param {{
+ *   packsDir?: string,
+ *   manifestPath?: string,
+ *   budgetPacks?: any
+ * }} [opts]
+ * @returns {{
+ *   ok: boolean,
+ *   manifestFound: boolean,
+ *   packs: Array<{ id: string, kind: string, mapId?: string, fileCount: number, rawKb: number, compressedKb: number, limitKb: number, ok: boolean }>,
+ *   errors: string[]
+ * }}
+ */
+export function checkPacksBudget(opts = {}) {
+  const packsDir = opts.packsDir || DEFAULT_PACKS_DIR;
+  const manifestPath = opts.manifestPath || DEFAULT_MANIFEST_PATH;
+  const budgetPacks = opts.budgetPacks;
+  const errors = [];
+
+  // Nếu không có cấu hình ngân sách packs: bỏ qua
+  if (!budgetPacks) {
+    return { ok: true, manifestFound: false, packs: [], errors: [] };
+  }
+
+  const manifestExists = fs.existsSync(manifestPath);
+  const packsDirExists = fs.existsSync(packsDir);
+
+  // Không có thư mục packs và không có manifest: hợp lệ (chưa có tài sản gói nào)
+  if (!packsDirExists && !manifestExists) {
+    return { ok: true, manifestFound: false, packs: [], errors: [] };
+  }
+
+  // Có thư mục packs nhưng không có manifest:
+  if (packsDirExists && !manifestExists) {
+    const diskFiles = collectFilesRecursively(packsDir);
+    if (diskFiles.length === 0) {
+      return { ok: true, manifestFound: false, packs: [], errors: [] };
+    }
+    errors.push(
+      `Thư mục packs chứa ${diskFiles.length} tệp nhưng thiếu manifest.json! Hãy chạy 'npm run build:packs'.`,
+    );
+    return { ok: false, manifestFound: false, packs: [], errors };
+  }
+
+  // Đọc manifest
+  let manifest;
+  try {
+    manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  } catch (err) {
+    errors.push(`Lỗi đọc JSON manifest tại ${manifestPath}: ${err.message}`);
+    return { ok: false, manifestFound: true, packs: [], errors };
+  }
+
+  if (!manifest || typeof manifest !== "object" || !Array.isArray(manifest.packs)) {
+    errors.push(`Cấu trúc manifest tại ${manifestPath} không hợp lệ (thiếu mảng 'packs').`);
+    return { ok: false, manifestFound: true, packs: [], errors };
+  }
+
+  // 1. Kiểm tra tính toàn vẹn 2 chiều giữa đĩa và manifest (nếu thư mục packs tồn tại)
+  if (packsDirExists) {
+    const diskFilePaths = collectFilesRecursively(packsDir);
+    const diskMap = new Map();
+    for (const abs of diskFilePaths) {
+      const rel = toPosixPath(path.relative(packsDir, abs));
+      const stat = fs.statSync(abs);
+      const sha256 = crypto
+        .createHash("sha256")
+        .update(fs.readFileSync(abs))
+        .digest("hex")
+        .toLowerCase();
+      diskMap.set(rel, { abs, size: stat.size, sha256 });
+    }
+
+    const manifestMap = new Map();
+    for (const p of manifest.packs) {
+      if (Array.isArray(p.files)) {
+        for (const f of p.files) {
+          manifestMap.set(f.path, { file: f, packId: p.id });
+        }
+      }
+    }
+
+    // Mọi tệp trên đĩa phải có trong manifest
+    for (const [rel] of diskMap) {
+      if (!manifestMap.has(rel)) {
+        errors.push(`Tệp trên đĩa '${rel}' không được khai báo trong manifest.json!`);
+      }
+    }
+
+    // Mọi tệp trong manifest phải có trên đĩa và khớp kích thước / mã băm
+    for (const [rel, { file, packId }] of manifestMap) {
+      const onDisk = diskMap.get(rel);
+      if (!onDisk) {
+        errors.push(
+          `Tệp '${rel}' trong gói '${packId}' được khai báo trong manifest nhưng không tồn tại trên đĩa!`,
+        );
+        continue;
+      }
+      if (onDisk.size !== file.bytes) {
+        errors.push(
+          `Tệp '${rel}' trong gói '${packId}' sai kích thước bytes: trên đĩa ${onDisk.size} != manifest ${file.bytes}`,
+        );
+      }
+      if (onDisk.sha256 !== file.sha256.toLowerCase()) {
+        errors.push(
+          `Tệp '${rel}' trong gói '${packId}' sai mã băm SHA-256: trên đĩa ${onDisk.sha256} != manifest ${file.sha256}`,
+        );
+      }
+    }
+  }
+
+  // 2. Tính toán dung lượng và so sánh với ngân sách từng gói
+  const evaluatedPacks = [];
+  const packMap = new Map();
+
+  for (const p of manifest.packs) {
+    let totalRawBytes = 0;
+    let totalCompressedBytes = 0;
+
+    if (Array.isArray(p.files)) {
+      for (const f of p.files) {
+        totalRawBytes += f.bytes || 0;
+        let compBytes = f.bytes || 0;
+        if (packsDirExists) {
+          const abs = path.join(packsDir, f.path);
+          if (fs.existsSync(abs)) {
+            compBytes = calculateEffectiveFileSize(abs);
+          }
+        }
+        totalCompressedBytes += compBytes;
+      }
+    }
+
+    const rawKb = Number((totalRawBytes / 1024).toFixed(2));
+    const compressedKb = Number((totalCompressedBytes / 1024).toFixed(2));
+    const packRecord = {
+      id: p.id,
+      kind: p.kind,
+      ...(p.mapId ? { mapId: p.mapId } : {}),
+      fileCount: Array.isArray(p.files) ? p.files.length : 0,
+      rawBytes: totalRawBytes,
+      rawKb,
+      compressedBytes: totalCompressedBytes,
+      compressedKb,
+      limitKb: 0,
+      ok: true,
+    };
+    evaluatedPacks.push(packRecord);
+    packMap.set(p.id, packRecord);
+  }
+
+  // Đánh giá hạn mức cho từng gói
+  for (const p of evaluatedPacks) {
+    let limitKb;
+    if (p.kind === "core") {
+      limitKb = budgetPacks.core?.maxKb ?? 2048;
+    } else if (p.kind === "map") {
+      limitKb = budgetPacks.map?.maxKb ?? 2048;
+    } else if (p.kind === "icons") {
+      limitKb = budgetPacks.icons?.maxKb ?? 3072;
+    } else if (p.kind === "audio") {
+      limitKb = budgetPacks.audio?.maxKb ?? 5120;
+    } else if (p.kind === "hd") {
+      const maxFactor = budgetPacks.hdMaxFactor ?? 3;
+      // Tìm gói thường tương ứng (hd:core -> core, hd:map:hac_phong -> map:hac_phong)
+      let baseId = p.id.replace(/^hd:/, "");
+      const basePack = packMap.get(baseId);
+      if (basePack) {
+        limitKb = Number((basePack.compressedKb * maxFactor).toFixed(2));
+      } else {
+        const baseLimit = baseId.startsWith("map:")
+          ? (budgetPacks.map?.maxKb ?? 2048)
+          : (budgetPacks.core?.maxKb ?? 2048);
+        limitKb = baseLimit * maxFactor;
+      }
+    } else {
+      limitKb = budgetPacks.core?.maxKb ?? 2048;
+    }
+
+    p.limitKb = limitKb;
+    if (p.compressedKb > limitKb) {
+      p.ok = false;
+      errors.push(
+        `Gói '${p.id}' (${p.compressedKb} KB đã nén) vượt ngân sách cho phép (${limitKb} KB)!`,
+      );
+    }
+  }
+
+  return {
+    ok: errors.length === 0,
+    manifestFound: true,
+    packs: evaluatedPacks,
+    errors,
+  };
+}
+
+/**
  * Kiểm tra toàn bộ ngân sách tĩnh so với perf-budget.json
- * @param {{ budgetPath?: string, distDir?: string, assetsDir?: string }} [opts]
- * @returns {{ ok: boolean, bundle: any, atlas: any, texture: any, errors: string[] }}
+ * @param {{ budgetPath?: string, distDir?: string, assetsDir?: string, packsDir?: string, manifestPath?: string }} [opts]
+ * @returns {{ ok: boolean, bundle: any, atlas: any, texture: any, packs: any, errors: string[] }}
  */
 export function checkPerfBudget(opts = {}) {
   const budgetPath = opts.budgetPath || BUDGET_FILE;
   const distDir = opts.distDir || DIST_DIR;
   const assetsDir = opts.assetsDir || ASSETS_DIR;
+  const packsDir = opts.packsDir || DEFAULT_PACKS_DIR;
+  const manifestPath = opts.manifestPath || DEFAULT_MANIFEST_PATH;
 
   if (!fs.existsSync(budgetPath)) {
     throw new Error(`Tệp cấu hình ngân sách không tồn tại: ${budgetPath}`);
@@ -246,11 +482,22 @@ export function checkPerfBudget(opts = {}) {
     );
   }
 
+  // 4. Kiểm tra Packs (M7.15, #516)
+  const packs = checkPacksBudget({
+    packsDir,
+    manifestPath,
+    budgetPacks: budget.packs,
+  });
+  if (!packs.ok) {
+    errors.push(...packs.errors);
+  }
+
   return {
     ok: errors.length === 0,
     bundle,
     atlas,
     texture: { ...texture, limitMb: textureLimitMb, ok: textureOk },
+    packs,
     errors,
   };
 }
@@ -281,6 +528,17 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     console.log(
       `   ${res.texture.ok ? "✓" : "✗"} Tổng bộ nhớ texture: ${res.texture.totalMb} MB / Ngân sách bậc Thấp: <= ${res.texture.limitMb} MB`,
     );
+
+    console.log(`\n4. Các gói tài nguyên tải theo nhu cầu (Packs):`);
+    if (res.packs.packs.length === 0) {
+      console.log(`   ✓ Chưa có gói tải nào trong client/public/packs/ (manifest rỗng là hợp lệ).`);
+    } else {
+      for (const p of res.packs.packs) {
+        console.log(
+          `   ${p.ok ? "✓" : "✗"} Gói ${p.id} (${p.kind}): ${p.compressedKb} KB / Ngân sách: <= ${p.limitKb} KB (${p.fileCount} tệp)`,
+        );
+      }
+    }
 
     if (!res.ok) {
       console.error("\n❌ PHÁT HIỆN VI PHẠM NGÂN SÁCH HIỆU NĂNG:");
