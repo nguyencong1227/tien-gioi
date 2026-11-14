@@ -6980,10 +6980,250 @@
         "h": 24
       }
     },
-    "swordbeam": {
+    "item-kinh_hoa_van_kiem": {
       "frame": {
         "x": 496,
         "y": 1060,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-kinh_bon_thach_quyen": {
+      "frame": {
+        "x": 522,
+        "y": 1060,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-kinh_ung_trao": {
+      "frame": {
+        "x": 548,
+        "y": 1060,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-kinh_trong_nhac_tram": {
+      "frame": {
+        "x": 574,
+        "y": 1060,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-kinh_huyen_bang_chi": {
+      "frame": {
+        "x": 600,
+        "y": 1060,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-kinh_kim_chung_trao": {
+      "frame": {
+        "x": 2,
+        "y": 1086,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-kinh_bich_thuy_hoi_xuan": {
+      "frame": {
+        "x": 28,
+        "y": 1086,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-kinh_phieu_phong_bo": {
+      "frame": {
+        "x": 54,
+        "y": 1086,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-kinh_thanh_tung_phi_cham": {
+      "frame": {
+        "x": 80,
+        "y": 1086,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-kinh_lac_tuyet_phan_phi": {
+      "frame": {
+        "x": 106,
+        "y": 1086,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-kinh_cuu_cung_khon_sat": {
+      "frame": {
+        "x": 132,
+        "y": 1086,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-kinh_me_tung_bo": {
+      "frame": {
+        "x": 158,
+        "y": 1086,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "swordbeam": {
+      "frame": {
+        "x": 184,
+        "y": 1086,
         "w": 48,
         "h": 16
       },
@@ -7002,8 +7242,8 @@
     },
     "dot": {
       "frame": {
-        "x": 546,
-        "y": 1060,
+        "x": 234,
+        "y": 1086,
         "w": 16,
         "h": 16
       },
@@ -7028,7 +7268,7 @@
     "format": "RGBA8888",
     "size": {
       "w": 640,
-      "h": 1088
+      "h": 1120
     },
     "scale": "1"
   }

@@ -131,6 +131,7 @@ import { canAffordFee, feeChipText, recipeFee } from "./forge-fee";
 import { doneRows, doneSummary } from "./quest-log";
 import { pickupBtnText, portalBtnText, talkBtnText } from "./ctx-btn";
 import { sound } from "./audio";
+import { useLabelOf } from "./item-use";
 import {
   applyRarityBadge,
   applyRarityText,
@@ -701,7 +702,9 @@ function renderSlotDetail() {
   }
 
   actionsEl.hidden = false;
-  useBtn.hidden = !def.effect;
+  const useLabel = useLabelOf(def); // đan dược "Dùng", kinh quyển "Học" (M7.4)
+  useBtn.hidden = useLabel === null;
+  if (useLabel !== null) useBtn.textContent = useLabel;
   drop1Btn.hidden = s.qty <= 1;
 }
 

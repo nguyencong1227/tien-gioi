@@ -3,6 +3,7 @@ export * from "./map";
 export * from "./game";
 export * from "./items";
 export * from "./skills";
+export * from "./books";
 export * from "./npcs";
 export * from "./quests";
 export * from "./recipes";
