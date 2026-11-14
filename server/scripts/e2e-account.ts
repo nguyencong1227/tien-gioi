@@ -11,7 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
-import { shown } from "./e2e-kit";
+import { shown, getChromeGpuFlags } from "./e2e-kit";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const PORT = 36000 + Math.floor(Math.random() * 4000);
@@ -83,7 +83,7 @@ const chrome = spawn(
   [
     "--headless=new",
     "--no-sandbox",
-    "--disable-gpu",
+    ...getChromeGpuFlags(),
     `--remote-debugging-port=${CDP}`,
     `--user-data-dir=${chromeDir}`,
     "--window-size=1280,720",

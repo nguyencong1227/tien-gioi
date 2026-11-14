@@ -1,3 +1,4 @@
+import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 /* global console, setTimeout, fetch, process */
 // Kiểm HUD gọn trên điện thoại (M5.1 #326; quy tắc mới ở QUYET_DINH_M3 mục 15): bảng Nhiệm vụ thu gọn mặc định ở MỌI điện thoại (dọc lẫn ngang) và cửa sổ hẹp
 // (< 700 px), mở ở tablet / máy tính đủ rộng; bấm tiêu đề để mở / thu, lựa chọn được nhớ (`tg_qt_open`) và thắng mặc định kể cả khi xoay máy; cột HUD trái cao <= 72 % chiều cao khi thu gọn. Chrome thật, chạm
@@ -20,7 +21,7 @@ const chrome = spawn(
   [
     "--headless=new",
     "--no-sandbox",
-    "--disable-gpu",
+    ...getChromeGpuFlags(),
     `--remote-debugging-port=${CDP_PORT}`,
     `--user-data-dir=${tmpDir}`,
     "about:blank",

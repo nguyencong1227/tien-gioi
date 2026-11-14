@@ -1,3 +1,4 @@
+import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 /* global console, setTimeout, fetch, Buffer */
 /**
  * Kiểm bảng Lò Rèn và Cửa hàng ở năm khung nhìn (M6 #409 mục 2 và 4): Chrome thật, chế độ mock (không cần server / Vite).
@@ -121,7 +122,7 @@ async function main() {
     [
       "--headless=new",
       "--no-sandbox",
-      "--disable-gpu",
+      ...getChromeGpuFlags(),
       `--remote-debugging-port=${CDP_PORT}`,
       `--user-data-dir=${tmp}`,
       "about:blank",

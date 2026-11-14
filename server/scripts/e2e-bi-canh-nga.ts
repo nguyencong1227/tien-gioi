@@ -23,7 +23,7 @@ import {
   NPC_BY_ID,
   dayKey,
 } from "@tien-gioi/shared";
-import { Tab, shown, sleep, listenWithRetry, removeTmpDirs } from "./e2e-kit";
+import { Tab, shown, sleep, listenWithRetry, removeTmpDirs, getChromeGpuFlags } from "./e2e-kit";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
@@ -111,7 +111,7 @@ async function main() {
       [
         "--headless=new",
         "--no-sandbox",
-        "--disable-gpu",
+        ...getChromeGpuFlags(),
         `--remote-debugging-port=${CDP}`,
         `--user-data-dir=${chromeDir}`,
         "--window-size=1280,720",

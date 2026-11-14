@@ -26,6 +26,7 @@ import { parseOverlayCounts } from "./perf-gate.mjs";
 import { DRAW_COUNTER_SOURCE, parseDrawCounterSnapshot } from "./draw-counter.mjs";
 import { FX_DRIVER_SOURCE, parseFxDriverReport } from "./fx-driver.mjs";
 import { freePort } from "./free-port.mjs";
+import { detectGpu, getChromeGpuFlags } from "./chrome-gpu.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const __filename = fileURLToPath(import.meta.url);
@@ -102,13 +103,18 @@ console.log(`- Web server tạm: http://127.0.0.1:${HTTP_PORT}`);
 const CDP_PORT = await freePort();
 const tmpChromeDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-perf-mobile-"));
 
+const gpuInfo = detectGpu();
+console.log(
+  `- WebGL Renderer: ${gpuInfo.hasGpu ? "NVIDIA RTX 5060 (Tăng tốc phần cứng GPU)" : "SwiftShader (Phần mềm)"}`,
+);
+
 const chromeProcess = spawn("google-chrome", [
   "--headless=new",
   `--remote-debugging-port=${CDP_PORT}`,
   `--user-data-dir=${tmpChromeDir}`,
   "--no-sandbox",
-  "--disable-gpu",
   "--disable-dev-shm-usage",
+  ...getChromeGpuFlags(),
   "about:blank",
 ]);
 

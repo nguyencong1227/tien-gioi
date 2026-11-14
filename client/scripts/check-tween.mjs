@@ -1,3 +1,4 @@
+import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 /* global console, setTimeout, fetch, process */
 // Kiểm tween nhẹ của người chơi / yêu thú trong Chrome thật (M5.2 #328 phần 2b đợt 3): nhấp nhô khi đi, co giãn khi đánh / bị đánh,
 // chân đứng yên khi co giãn, tắt ở bậc Thấp / giảm chuyển động / thực thể ở xa. Cần client đang chạy (`npm run dev -w client`, cổng
@@ -21,7 +22,7 @@ const chrome = spawn(
   [
     "--headless=new",
     "--no-sandbox",
-    "--disable-gpu",
+    ...getChromeGpuFlags(),
     `--remote-debugging-port=${CDP_PORT}`,
     `--user-data-dir=${tmpDir}`,
     "about:blank",

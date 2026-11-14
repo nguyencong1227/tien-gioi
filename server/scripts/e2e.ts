@@ -1,3 +1,4 @@
+import { getChromeGpuFlags } from "./e2e-kit";
 // Kiểm thử E2E trình duyệt thật bằng Google Chrome Headless + CDP (Chrome DevTools Protocol).
 // Tự động dựng server Colyseus nội bộ phục vụ client/dist + dữ liệu mẫu, điều khiển trình duyệt
 // thực hiện toàn bộ luồng đăng nhập, tương tác UI, đón bắt lỗi và cảnh báo console (M3.2).
@@ -218,7 +219,7 @@ async function runE2e() {
       [
         "--headless=new",
         "--no-sandbox",
-        "--disable-gpu",
+        ...getChromeGpuFlags(),
         `--remote-debugging-port=${cliArgs.chromePort}`,
         `--user-data-dir=${tmpChromeDir}`,
         "--window-size=1280,720",

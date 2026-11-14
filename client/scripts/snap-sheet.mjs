@@ -1,3 +1,4 @@
+import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 /* global console, setTimeout, fetch, Buffer, process */
 // Chụp ảnh + khẳng định bố cục cho tấm chung (.sheet, M5.1 #326) ở nhiều khung nhìn.
 // Cần client đang chạy (npm run dev -w client hoặc vite preview). Dùng chế độ mock (?duel=mock&debug=1) nên KHÔNG cần server.
@@ -83,7 +84,7 @@ const chrome = spawn(
   [
     "--headless=new",
     "--no-sandbox",
-    "--disable-gpu",
+    ...getChromeGpuFlags(),
     `--remote-debugging-port=${CDP_PORT}`,
     `--user-data-dir=${tmpDir}`,
     "about:blank",

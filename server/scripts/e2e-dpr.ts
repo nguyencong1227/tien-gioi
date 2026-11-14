@@ -13,7 +13,15 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
-import { Tab, sleep, shown, killChrome, removeTmpDirs, listenWithRetry } from "./e2e-kit";
+import {
+  Tab,
+  sleep,
+  shown,
+  killChrome,
+  removeTmpDirs,
+  listenWithRetry,
+  getChromeGpuFlags,
+} from "./e2e-kit";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
@@ -63,7 +71,7 @@ async function main() {
       [
         "--headless=new",
         "--no-sandbox",
-        "--disable-gpu",
+        ...getChromeGpuFlags(),
         `--remote-debugging-port=${CDP}`,
         `--user-data-dir=${chromeDir}`,
         "--window-size=1280,720",

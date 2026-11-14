@@ -1,3 +1,4 @@
+import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 /* global console, setTimeout, fetch, process */
 // Kiểm hoạt ảnh người chơi bị đánh / gục trong Chrome thật (M5.2 #328 phần 2). Cần client đang chạy (npm run dev -w client).
 // Dùng chế độ mock (?duel=mock&debug=1) nên KHÔNG cần server: đặt `dead` trên người chơi mock và gọi `scene.onDmg` như tin `dmg`.
@@ -19,7 +20,7 @@ const chrome = spawn(
   [
     "--headless=new",
     "--no-sandbox",
-    "--disable-gpu",
+    ...getChromeGpuFlags(),
     `--remote-debugging-port=${CDP_PORT}`,
     `--user-data-dir=${tmpDir}`,
     "about:blank",

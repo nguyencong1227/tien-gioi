@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { killChrome, listenWithRetry, removeTmpDirs, sleep } from "./e2e-kit";
+import { killChrome, listenWithRetry, removeTmpDirs, sleep, getChromeGpuFlags } from "./e2e-kit";
 
 const alive = (pid: number) => {
   try {
@@ -144,6 +144,32 @@ describe("e2e-kit: listenWithRetry", () => {
       expect(picks).toBe(2);
     } finally {
       await busy.close();
+    }
+  });
+});
+
+describe("e2e-kit: getChromeGpuFlags", () => {
+  it("tôn trọng biến môi trường ép tắt GPU và CI", () => {
+    const origEnv = { ...process.env };
+    try {
+      process.env.DISABLE_GPU = "1";
+      delete process.env.CI;
+      delete process.env.FORCE_GPU;
+      expect(getChromeGpuFlags()).toEqual(["--disable-gpu"]);
+
+      delete process.env.DISABLE_GPU;
+      process.env.CI = "true";
+      expect(getChromeGpuFlags()).toEqual(["--disable-gpu"]);
+
+      process.env.FORCE_GPU = "1";
+      const flags = getChromeGpuFlags();
+      if (existsSync("/dev/nvidia0")) {
+        expect(flags).toContain("--enable-gpu");
+        expect(flags).toContain("--use-gl=angle");
+        expect(flags).toContain("--use-angle=vulkan");
+      }
+    } finally {
+      process.env = origEnv;
     }
   });
 });

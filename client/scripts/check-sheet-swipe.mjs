@@ -1,3 +1,4 @@
+import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 /* global console, setTimeout, fetch, process */
 // Cổng kiểm cử chỉ KÉO ĐỂ ĐÓNG TẤM (M5.1 #326, docs/THIET_KE_GIAO_DIEN_DO_HOA.md mục 4.2 điều 5; client/src/gfx/sheet-swipe.ts) trong Chrome thật,
 // bằng cảm ứng thật qua CDP (`Input.dispatchTouchEvent`): trên điện thoại vuốt TIÊU ĐỀ tấm xuống (dọc) / sang phải (ngang) thì tấm theo ngón tay,
@@ -21,7 +22,7 @@ const chrome = spawn(
   [
     "--headless=new",
     "--no-sandbox",
-    "--disable-gpu",
+    ...getChromeGpuFlags(),
     `--remote-debugging-port=${CDP_PORT}`,
     `--user-data-dir=${tmpDir}`,
     "about:blank",

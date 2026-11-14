@@ -2,13 +2,35 @@
 // Tách từ `e2e-pk.ts` cho E2E mới (`e2e-tong-mon.ts`); các E2E cũ giữ bản sao riêng của chúng.
 import type { ChildProcess } from "node:child_process";
 import type net from "node:net";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import fs, { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import WebSocket from "ws";
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export const SHOTS = process.env.E2E_SHOTS ? path.resolve(process.env.E2E_SHOTS) : undefined;
 export const TIMEOUT = 15000;
+
+/** Trả về cờ tăng tốc GPU NVIDIA RTX hoặc lùi về phần mềm nếu không có GPU / trên CI */
+export function getChromeGpuFlags(): string[] {
+  if (process.env.DISABLE_GPU === "1" || process.env.FORCE_SWIFTSHADER === "1") {
+    return ["--disable-gpu"];
+  }
+  if (process.env.CI && !process.env.FORCE_GPU) {
+    return ["--disable-gpu"];
+  }
+  try {
+    const hasNvidiaDevice = fs.existsSync("/dev/nvidia0");
+    const hasNvidiaVulkan =
+      fs.existsSync("/usr/share/vulkan/icd.d/nvidia_icd.json") ||
+      fs.existsSync("/etc/vulkan/icd.d/nvidia_icd.json");
+    if (hasNvidiaDevice && hasNvidiaVulkan) {
+      return ["--enable-gpu", "--use-gl=angle", "--use-angle=vulkan"];
+    }
+  } catch {
+    /* bỏ qua */
+  }
+  return ["--disable-gpu"];
+}
 
 /**
  * Giết cả NHÓM tiến trình của Chrome (gốc + gpu + renderer...). `spawn` PHẢI có `detached: true` (Chrome làm chủ nhóm riêng); chỉ
