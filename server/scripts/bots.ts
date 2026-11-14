@@ -1276,22 +1276,42 @@ export function parseWarnZoneFromFx(
   msg?: FxMsg,
   now: number = performance.now(),
 ): ActiveWarnZone | null {
-  if (!msg || msg.kind !== "warn" || !msg.shape) return null;
-  const r = typeof msg.r === "number" && msg.r > 0 ? msg.r : 280;
-  const w = typeof msg.w === "number" && msg.w > 0 ? msg.w : 56;
-  const angle = typeof msg.angle === "number" ? msg.angle : 0;
-  const arc = typeof msg.arc === "number" ? msg.arc : Math.PI / 2;
-  const ms = typeof msg.ms === "number" && msg.ms > 0 ? msg.ms : 800;
-  return {
-    shape: msg.shape,
-    x: msg.x,
-    y: msg.y,
-    r,
-    w,
-    angle,
-    arc,
-    expiresAt: now + ms,
-  };
+  if (!msg) return null;
+  if (msg.kind === "warn" && msg.shape) {
+    const r = typeof msg.r === "number" && msg.r > 0 ? msg.r : 280;
+    const w = typeof msg.w === "number" && msg.w > 0 ? msg.w : 56;
+    const angle = typeof msg.angle === "number" ? msg.angle : 0;
+    const arc = typeof msg.arc === "number" ? msg.arc : Math.PI / 2;
+    const ms = typeof msg.ms === "number" && msg.ms > 0 ? msg.ms : 800;
+    return {
+      shape: msg.shape,
+      x: msg.x,
+      y: msg.y,
+      r,
+      w,
+      angle,
+      arc,
+      expiresAt: now + ms,
+    };
+  }
+  if (msg.kind === "bolt") {
+    const r = typeof msg.range === "number" && msg.range > 0 ? msg.range : 300;
+    const speed = typeof msg.speed === "number" && msg.speed > 0 ? msg.speed : 250;
+    const angle = typeof msg.angle === "number" ? msg.angle : 0;
+    const ms = (r / speed) * 1000;
+    // Bán kính va chạm của đạn (12 px) + người chơi (12 px) = 24 px; bề rộng đường đạn w = 24 px
+    return {
+      shape: "line",
+      x: msg.x,
+      y: msg.y,
+      r,
+      w: 24,
+      angle,
+      arc: 0,
+      expiresAt: now + ms,
+    };
+  }
+  return null;
 }
 
 /**

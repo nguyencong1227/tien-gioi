@@ -26,6 +26,7 @@ import {
   getMap,
   HAC_PHONG_ID,
   AM_SUONG_ID,
+  HAN_VAN_ID,
   type MapDef,
   type PortalDef,
 } from "./map";
@@ -413,12 +414,14 @@ function reachableFrom(m: GameMap, tx: number, ty: number): Set<number> {
 describe("nhiều bản đồ: danh sách, cổng, khu an toàn (M3 bước 1)", () => {
   const all = MAPS.map((d) => getMap(d.id)!);
 
-  it("MAPS có Lạc Hà, Hắc Phong Cốc và Âm Sương Trạch; id duy nhất; getMap dựng được từng bản đồ", () => {
-    expect(MAPS.map((m) => m.id)).toEqual([DEFAULT_MAP_ID, HAC_PHONG_ID, AM_SUONG_ID]);
+  it("MAPS có Lạc Hà, Hắc Phong Cốc, Âm Sương Trạch và Hàn Vân Lĩnh; id duy nhất; getMap dựng được từng bản đồ", () => {
+    expect(MAPS.map((m) => m.id)).toEqual([DEFAULT_MAP_ID, HAC_PHONG_ID, AM_SUONG_ID, HAN_VAN_ID]);
     expect(new Set(MAPS.map((m) => m.id)).size).toBe(MAPS.length);
     for (const m of all) expect(m).toBeDefined();
     expect(getMap(HAC_PHONG_ID)!.def.w).toBe(128);
     expect(getMap(AM_SUONG_ID)!.def.w).toBe(128);
+    expect(getMap(HAN_VAN_ID)!.def.w).toBe(128);
+    expect(getMap(HAN_VAN_ID)!.def.h).toBe(128);
     expect(getMap("constructor")).toBeUndefined();
   });
 
@@ -586,5 +589,89 @@ describe("nhiều bản đồ: danh sách, cổng, khu an toàn (M3 bước 1)",
       expect(() => new GameMap({ ...base, monsterCap: {} })).not.toThrow();
       expect(new GameMap({ ...base, monsterCap: {} }).monsterCapOf("ho")).toBe(0);
     });
+  });
+});
+
+describe("Hàn Vân Lĩnh, bản đồ thứ tư (M7.5, #506)", () => {
+  const sha1 = (m: GameMap) => createHash("sha1").update(m.tiles).digest("hex");
+  const hv = getMap(HAN_VAN_ID)!;
+  const as = getMap(AM_SUONG_ID)!;
+
+  it("thêm cổng bắc cho Âm Sương KHÔNG đổi ô của bản đồ nào có sẵn (seed giữ nguyên: tệp lưu vẫn hợp lệ)", () => {
+    // Băm các ô sinh ra, ghi từ main trước M7.5: sửa seed / kích thước / bộ sinh ô thì băm đổi và test này đỏ
+    expect(sha1(getMap(DEFAULT_MAP_ID)!)).toBe("d11034c8cc25a92e1e4a1746cc4e41443dd11633");
+    expect(sha1(getMap(HAC_PHONG_ID)!)).toBe("b9678be84f2a2387112a870b38f8ae957b1aa304");
+    expect(sha1(as)).toBe("efc2225c2ea8f7d9c58a35572626ec04e15b2a43");
+    expect(as.def.seed).toBe(20261974);
+    // Hàn Vân cũng ghim: nội dung M7.5b+ (quái, NPC, trang trí của B) đặt theo toạ độ ô của bản đồ này
+    expect(sha1(hv)).toBe("877c067efe0da7c779eb251e767beb732e4ca59b");
+    expect(hv.def.seed).toBe(20262122);
+  });
+
+  it("cặp cổng Âm Sương <-> Hàn Vân: `am_suong_bac` và `han_van_nam` trỏ ngược nhau, tâm cổng nằm trên ô đường đất", () => {
+    const up = as.portal("am_suong_bac")!;
+    const down = hv.portal("han_van_nam")!;
+    expect(up.toMap).toBe(HAN_VAN_ID);
+    expect(up.toPortal).toBe("han_van_nam");
+    expect(down.toMap).toBe(AM_SUONG_ID);
+    expect(down.toPortal).toBe("am_suong_bac");
+    expect(as.tileAt(Math.floor(up.x / TILE), Math.floor(up.y / TILE))).toBe(T.Dirt);
+    expect(hv.tileAt(Math.floor(down.x / TILE), Math.floor(down.y / TILE))).toBe(T.Dirt);
+    // cổng nằm ở rìa: bắc của Âm Sương (hàng 3), nam của Hàn Vân (hàng 124 trên 128)
+    expect(up.y).toBeLessThan(4 * TILE);
+    expect(down.y).toBeGreaterThan((hv.def.h - 5) * TILE);
+  });
+
+  it("Hàn Vân: trạm an toàn sát cổng nam (cách ~10 ô), tên trạm / vùng hoang đúng, không có hang trùm", () => {
+    expect(hv.def.name).toBe("Hàn Vân Lĩnh");
+    expect(hv.townName).toBe("Hàn Vân Trạm");
+    expect(hv.wildName).toBe("Hàn Vân Lĩnh");
+    expect(hv.def.lair).toBeUndefined();
+    const down = hv.portal("han_van_nam")!;
+    const d = Math.hypot(down.x - hv.townPx.x, down.y - hv.townPx.y) / TILE;
+    expect(d).toBeGreaterThan(8);
+    expect(d).toBeLessThan(14);
+    expect(hv.inSafe(hv.townPx.x, hv.townPx.y)).toBe(true);
+    expect(hv.inSafe(down.x, down.y)).toBe(true);
+  });
+
+  it("chất lượng hạt giống: liên thông >= 95 % từ trạm, nước + cát <= 10 %, hai con đường chính chạm hai rìa", () => {
+    const seen = reachableFrom(hv, hv.def.town.cx, hv.def.town.cy);
+    let walk = 0;
+    let wet = 0;
+    for (let y = 1; y < hv.def.h - 1; y++)
+      for (let x = 1; x < hv.def.w - 1; x++) {
+        const t = hv.tileAt(x, y);
+        if (!BLOCKING.has(t)) walk++;
+        if (t === T.Water || t === T.Sand) wet++;
+      }
+    expect(seen.size / walk).toBeGreaterThanOrEqual(0.95);
+    expect(wet / (hv.def.w * hv.def.h)).toBeLessThanOrEqual(0.1);
+    // đường đất của trạm đi tới sát rìa bắc (hàng 1-3) và rìa nam (hàng 124-126)
+    const dirtRows = new Set<number>();
+    for (let y = 0; y < hv.def.h; y++)
+      for (let x = 0; x < hv.def.w; x++) if (hv.tileAt(x, y) === T.Dirt) dirtRows.add(y);
+    expect(Math.min(...dirtRows)).toBeLessThanOrEqual(3);
+    expect(Math.max(...dirtRows)).toBeGreaterThanOrEqual(hv.def.h - 5);
+  });
+
+  it("monsterCap khai báo toàn loài có thật, tổng <= 70, và MỖI loài có đủ chỗ (>= 300 ô liên thông ngoài khu an toàn mỗi con) theo vùng nguy hiểm của nó", () => {
+    const seen = reachableFrom(hv, hv.def.town.cx, hv.def.town.cy);
+    let total = 0;
+    for (const [id, cap] of Object.entries(hv.monsterCap)) {
+      const def = MONSTERS.find((m) => m.id === id);
+      expect(def, id).toBeDefined();
+      total += cap;
+      let room = 0;
+      for (const i of seen) {
+        const x = (i % hv.def.w) + 0.5;
+        const y = Math.floor(i / hv.def.w) + 0.5;
+        if (!hv.inSafe(x * TILE, y * TILE) && hv.dangerAt(x * TILE, y * TILE) >= def!.minDanger)
+          room++;
+      }
+      expect(room, id).toBeGreaterThanOrEqual(300 * cap);
+    }
+    // Hiện `monsterCap` là {} (bốn loài Nguyên Anh + trùm thêm ở M7.5b): vòng trên chưa chạy lần nào; từ M7.5b nó giữ sức chứa của từng loài
+    expect(total).toBeLessThanOrEqual(70);
   });
 });

@@ -13,6 +13,7 @@ import {
 import { DEFAULT_MAP } from "@tien-gioi/shared";
 import { addMonster, addPlayer, makeWorld } from "../src/systems/test-helpers";
 import { tickMonsters } from "../src/systems/monsters";
+import { tickWorld } from "../src/systems/tick";
 
 describe("bot tránh báo trước: parseWarnZoneFromFx & đồng hồ thời gian (M7.10 #511)", () => {
   it("trả về null nếu tin nhắn không phải warn hoặc thiếu shape", () => {
@@ -712,5 +713,122 @@ describe("mô hình động học bãi Hôi Lang: tỉ lệ né đòn và cơ s�
     // Người chơi đã né ra ngoài phạm vi đòn lao (p.y = 200 - 14 * 7 = 102 px, cách tâm lao 98 px > 42 px)
     // -> Người chơi KHÔNG mất máu từ đòn lao!
     expect(p.hp).toBe(hp0);
+  });
+});
+
+describe("bot tránh đạn tầm xa: fx bolt (M7.10 #511)", () => {
+  it("parseWarnZoneFromFx trích xuất chính xác đường đạn từ fx bolt (Sương Hồ & Độc Thiềm)", () => {
+    const realNow = performance.now();
+    // Đạn Sương Hồ: speed 280, range 300
+    const msgSH = {
+      kind: "bolt" as const,
+      id: 1,
+      x: 100,
+      y: 100,
+      angle: 0,
+      speed: 280,
+      range: 300,
+    };
+    const zSH = parseWarnZoneFromFx(msgSH, realNow);
+    expect(zSH).not.toBeNull();
+    expect(zSH!.shape).toBe("line");
+    expect(zSH!.r).toBe(300);
+    expect(zSH!.w).toBe(24);
+    expect(zSH!.expiresAt).toBeCloseTo(realNow + (300 / 280) * 1000, 1);
+
+    // Đạn Độc Thiềm: speed 220, range 260
+    const msgDT = {
+      kind: "bolt" as const,
+      id: 2,
+      x: 200,
+      y: 200,
+      angle: Math.PI / 2,
+      speed: 220,
+      range: 260,
+    };
+    const zDT = parseWarnZoneFromFx(msgDT, realNow);
+    expect(zDT).not.toBeNull();
+    expect(zDT!.shape).toBe("line");
+    expect(zDT!.r).toBe(260);
+    expect(zDT!.w).toBe(24);
+    expect(zDT!.expiresAt).toBeCloseTo(realNow + (260 / 220) * 1000, 1);
+  });
+
+  it("bot nhận diện đạn nhắm vào mình, né vuông góc và thoát hiểm thành công", () => {
+    const realNow = performance.now();
+    const boltMsg = {
+      kind: "bolt" as const,
+      id: 1,
+      x: 100,
+      y: 200,
+      angle: 0, // đạn bay từ trái sang phải dọc y = 200
+      speed: 250,
+      range: 300,
+    };
+    const zone = parseWarnZoneFromFx(boltMsg, realNow)!;
+    zone.targeted = true;
+
+    // Bot đang đứng ở (200, 205) - nằm ngay trên đường đạn
+    const fakeBot = {
+      predX: 200,
+      predY: 205,
+      warns: [zone],
+      warnsHitCount: 0,
+      warnsEvadedCount: 0,
+    } as unknown as BotState;
+
+    expect(isPointInWarnZone(fakeBot.predX, fakeBot.predY, zone, 0)).toBe(true);
+
+    // Tính vector né: phải đẩy vuông góc khỏi trục y = 200 (ny > 0 vì bot đang ở y = 205)
+    const vec = computeEvadeVector(fakeBot.predX, fakeBot.predY, fakeBot.warns, realNow);
+    expect(vec).not.toBeNull();
+    expect(vec!.dx).toBeCloseTo(0, 2);
+    expect(vec!.dy).toBeCloseTo(1, 2);
+
+    // Bot bước né 5 tick (mỗi tick 7 px = 35 px theo phương y)
+    fakeBot.predY += 35; // y nay là 240 px, cách đường đạn 40 px > bán kính va chạm 24 px
+    expect(isPointInWarnZone(fakeBot.predX, fakeBot.predY, zone, 0)).toBe(false);
+
+    // Khi đạn bay qua hết tầm (t = realNow + 1300 ms)
+    updateBotWarns(fakeBot, realNow + 1300, true);
+    expect(fakeBot.warns.length).toBe(0);
+    expect(fakeBot.warnsEvadedCount).toBe(1);
+    expect(fakeBot.warnsHitCount).toBe(0);
+  });
+
+  it("mô phỏng trong World thật với Độc Thiềm: bot né ngang tránh hoàn toàn đạn độc và không dính độc", () => {
+    // Đối chứng: người chơi đứng yên vs người chơi né ngang khi Độc Thiềm bắn
+    const t = makeWorld(DEFAULT_MAP);
+    const { p: pStand, c: cStand } = addPlayer(t.w, "StandPlayer", 3, 0); // Kim Đan Sơ kỳ
+    const { p: pEvade, c: cEvade } = addPlayer(t.w, "EvadePlayer", 3, 0); // Kim Đan Sơ kỳ
+    pEvade.y = pStand.y + 200; // đặt cách xa 200 px theo trục y để không chung đường đạn
+
+    const monStand = addMonster(t.w, "doc_thiem", pStand.x + 180, pStand.y);
+    monStand.mc.homeX = monStand.m.x;
+    monStand.mc.homeY = monStand.m.y;
+
+    const monEvade = addMonster(t.w, "doc_thiem", pEvade.x + 180, pEvade.y);
+    monEvade.mc.homeX = monEvade.m.x;
+    monEvade.mc.homeY = monEvade.m.y;
+
+    t.w.now = 10_000;
+
+    // Chạy tới khi pStand bị bắn trúng (hoặc tối đa 100 tick = 5.0 giây, dtMs = 50)
+    for (let i = 0; i < 100 && pStand.hp === pStand.maxHp; i++) {
+      t.w.now += 50;
+      // pEvade bước né vuông góc lên trên 5 px mỗi tick (tốc độ 100 px/s)
+      pEvade.y -= 5;
+      tickWorld(t.w, 50);
+    }
+
+    // pStand đứng yên: bị đạn bắn trúng, mất máu và dính độc
+    expect(pStand.hp).toBeLessThan(pStand.maxHp);
+    const hasPoisonStand = cStand.st?.list.some((s) => s.id === "poison");
+    expect(hasPoisonStand).toBe(true);
+
+    // pEvade né ngang: đạn bay qua trượt, máu còn nguyên vẹn 100%, KHÔNG dính độc!
+    expect(pEvade.hp).toBe(pEvade.maxHp);
+    const hasPoisonEvade = cEvade.st?.list.some((s) => s.id === "poison") ?? false;
+    expect(hasPoisonEvade).toBe(false);
   });
 });
