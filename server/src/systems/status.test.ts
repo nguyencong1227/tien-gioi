@@ -733,17 +733,40 @@ describe("sát thương THEO GIÂY lên người chơi (M7.3, #504: độc / b�
       tickStatuses(w, 0.05);
     }
   }
-  const dotsOf = (dmgs: ReturnType<typeof makeWorld>["dmgs"], sid: string) =>
-    dmgs.filter((d) => d.target === sid && d.toPlayer).map((d) => d.amount);
+  // Số sát thương theo giây gửi RIÊNG cho chủ (`dmgTo`), không qua tin gửi gần (`dmg`): client phát tiếng đánh + giật mình cho mỗi `dmg` trong tầm nhìn
+  const dotsOf = (dmgsTo: ReturnType<typeof makeWorld>["dmgsTo"], sid: string) =>
+    dmgsTo
+      .filter((d) => d.sid === sid && d.msg.target === sid && d.msg.toPlayer)
+      .map((d) => d.msg.amount);
 
-  it("độc 3 giây x 20 sát thương/giây: ba lần 20 (gửi `dmg` cho người), khí huyết giảm 60, rồi gỡ trạng thái và gửi danh sách rỗng", () => {
-    const { w, dmgs, statusMsgs } = makeWorld();
+  it("nhịp dot CHỈ gửi cho chủ (`dmgTo`), không qua tin gửi gần (`dmg`); đòn thật của quái vẫn gửi gần, không riêng chủ", () => {
+    const { w, dmgs, dmgsTo } = makeWorld();
+    const { p } = addPlayer(w, "a");
+    const { m } = addMonster(w, "lang", p.x + 30, p.y);
+    w.now = 10_000;
+    applyPlayerStatus(w, "a", eff("poison", 3000, 0.2), 100, "");
+    run(w, 10_000, 14_000);
+    expect(dmgsTo.length).toBe(3);
+    expect(
+      dmgs.filter((d) => d.toPlayer),
+      "người đứng gần không nhận nhịp dot",
+    ).toEqual([]);
+    // đòn thật: hurtPlayer -> tin gửi gần (người đứng gần thấy "bị đánh"), không gửi riêng chủ
+    const before = dmgsTo.length;
+    w.now = 20_000;
+    hurtPlayer(w, "a", p, 30, m);
+    expect(dmgs.filter((d) => d.toPlayer && d.target === "a").map((d) => d.amount)).toEqual([30]);
+    expect(dmgsTo.length).toBe(before);
+  });
+
+  it("độc 3 giây x 20 sát thương/giây: ba lần 20 (gửi `dmg` riêng cho chủ), khí huyết giảm 60, rồi gỡ trạng thái và gửi danh sách rỗng", () => {
+    const { w, dmgsTo, statusMsgs } = makeWorld();
     const { p } = addPlayer(w, "a");
     w.now = 10_000;
     const hp0 = p.hp;
     expect(applyPlayerStatus(w, "a", eff("poison", 3000, 0.2), 100, "")).toBe("added"); // dps 20
     run(w, 10_000, 14_000);
-    expect(dotsOf(dmgs, "a")).toEqual([20, 20, 20]);
+    expect(dotsOf(dmgsTo, "a")).toEqual([20, 20, 20]);
     expect(p.hp).toBe(hp0 - 60);
     expect(w.statusP.has("a")).toBe(false);
     expect(statusMsgs.at(-1)!.msg.list).toEqual([]);
@@ -762,14 +785,14 @@ describe("sát thương THEO GIÂY lên người chơi (M7.3, #504: độc / b�
   });
 
   it("phần lẻ dồn lại: 0,4 sát thương/giây x 2,5 giây gây ĐÚNG 1 (không mất, không thừa)", () => {
-    const { w, dmgs } = makeWorld();
+    const { w, dmgsTo } = makeWorld();
     const { p } = addPlayer(w, "a");
     w.now = 10_000;
     const hp0 = p.hp;
     applyPlayerStatus(w, "a", eff("poison", 2500, 0.004), 100, ""); // dps 0,4
     run(w, 10_000, 13_000);
     // phần lẻ KHÔNG mất / thừa: 0,4 x 2,5 giây = 1 sát thương ĐÚNG MỘT lần (tính nốt lúc hết hạn), không phải mỗi giây một lần
-    const hits = dotsOf(dmgs, "a");
+    const hits = dotsOf(dmgsTo, "a");
     expect(hits).toEqual([1]);
     expect(p.hp).toBe(hp0 - hits.length);
   });
@@ -793,14 +816,14 @@ describe("sát thương THEO GIÂY lên người chơi (M7.3, #504: độc / b�
   });
 
   it("tick bị trễ (server lag) vẫn không tính quá hạn: độc 1,5 giây x 20/giây gây đúng 30 dù tick kế tới muộn 10 giây", () => {
-    const { w, dmgs } = makeWorld();
+    const { w, dmgsTo } = makeWorld();
     const { p } = addPlayer(w, "a");
     w.now = 10_000;
     const hp0 = p.hp;
     applyPlayerStatus(w, "a", eff("poison", 1500, 0.2), 100, "");
     w.now = 20_000; // một tick duy nhất, muộn xa quá hạn
     tickStatuses(w, 0.05);
-    expect(dotsOf(dmgs, "a")).toEqual([30]);
+    expect(dotsOf(dmgsTo, "a")).toEqual([30]);
     expect(p.hp).toBe(hp0 - 30);
   });
 
@@ -857,11 +880,11 @@ describe("sát thương THEO GIÂY lên người chơi (M7.3, #504: độc / b�
     expect(a.p.hp).toBe(1);
     expect(a.p.dead).toBe(false);
     expect(down.toasts.filter((t) => t.sid === "a")).toHaveLength(0); // không có thông báo ngã
-    expect(dotsOf(down.dmgs, "a")).toEqual([14]); // chỉ phần trừ thật (15 -> 1), không phải 20
+    expect(dotsOf(down.dmgsTo, "a")).toEqual([14]); // chỉ phần trừ thật (15 -> 1), không phải 20
     run(down.w, 11_150, 16_000); // độc còn chạy nhiều nhịp nữa
     expect(a.p.hp).toBe(1);
     expect(a.p.dead).toBe(false);
-    expect(dotsOf(down.dmgs, "a")).toEqual([14]); // đang 1 khí huyết: không gửi thêm số sát thương 0
+    expect(dotsOf(down.dmgsTo, "a")).toEqual([14]); // đang 1 khí huyết: không gửi thêm số sát thương 0
     expect(down.w.statusP.has("a")).toBe(false); // hết hạn thì gỡ như thường
 
     // Luân hồi bật: cũng không vào Hoàng Tuyền vì độc
@@ -896,7 +919,7 @@ describe("sát thương THEO GIÂY lên người chơi (M7.3, #504: độc / b�
   });
 
   it("khu an toàn THANH TẨY sát thương theo giây: gỡ độc / bỏng / chảy máu (chủ nhận danh sách mới), giữ tê cóng; rời khu an toàn không mang lại vết thương cũ", () => {
-    const { w, statusMsgs, dmgs } = makeWorld();
+    const { w, statusMsgs, dmgsTo } = makeWorld();
     const a = addPlayer(w, "a");
     w.now = 10_000;
     applyPlayerStatus(w, "a", eff("poison", 6000, 0.2), 100, "");
@@ -905,7 +928,7 @@ describe("sát thương THEO GIÂY lên người chơi (M7.3, #504: độc / b�
     run(w, 10_000, 11_950); // ngoài khu an toàn: dính đòn (nhịp 1 s đã gây ở 11_000; nhịp kế ở 12_000)
     const hpOut = a.p.hp;
     expect(hpOut).toBeLessThan(a.p.maxHp);
-    const before = dotsOf(dmgs, "a").length;
+    const before = dotsOf(dmgsTo, "a").length;
     expect(before).toBeGreaterThan(0);
     // Vào trấn
     a.p.x = w.map.townPx.x;
@@ -915,13 +938,13 @@ describe("sát thương THEO GIÂY lên người chơi (M7.3, #504: độc / b�
     run(w, 12_000, 12_300); // đúng nhịp tính sát thương kế tiếp: phải gỡ TRƯỚC khi tính, không được trừ thêm một lần cuối
     expect(statusMsgs.at(-1)?.msg.list.map((e) => e[0])).toEqual(["chill"]); // chỉ còn tê cóng
     expect(a.c.st!.list.map((x) => x.id)).toEqual(["chill"]);
-    expect(dotsOf(dmgs, "a")).toHaveLength(before); // không trừ thêm trong khu an toàn
+    expect(dotsOf(dmgsTo, "a")).toHaveLength(before); // không trừ thêm trong khu an toàn
     // Ra khỏi trấn trở lại: không còn độc nào để hành hạ nữa
     a.p.x = w.map.townPx.x + w.map.townPx.r + 400;
     a.p.y = w.map.townPx.y;
     run(w, 12_350, 15_000);
     expect(a.p.hp).toBe(hpOut);
-    expect(dotsOf(dmgs, "a")).toHaveLength(before);
+    expect(dotsOf(dmgsTo, "a")).toHaveLength(before);
   });
 
   it("khu an toàn QUANH CỔNG (ngoài trấn, trong `safeR`) cũng thanh tẩy; ngay ngoài `safeR` thì không (review B ở #575: `inTown` thay `inSafe` từng sống)", () => {
@@ -956,7 +979,7 @@ describe("sát thương THEO GIÂY lên người chơi (M7.3, #504: độc / b�
   });
 
   it("gắn độc lúc đang đứng trong khu an toàn (vd từ người khác): tick đầu tiên gỡ ngay, không trừ khí huyết nào", () => {
-    const { w, dmgs } = makeWorld();
+    const { w, dmgsTo } = makeWorld();
     const a = addPlayer(w, "a");
     a.p.x = w.map.townPx.x;
     a.p.y = w.map.townPx.y;
@@ -965,7 +988,7 @@ describe("sát thương THEO GIÂY lên người chơi (M7.3, #504: độc / b�
     applyPlayerStatus(w, "a", eff("burn", 6000, 0.2), 100, "");
     run(w, 10_000, 17_000);
     expect(a.p.hp).toBe(hp0);
-    expect(dotsOf(dmgs, "a")).toEqual([]);
+    expect(dotsOf(dmgsTo, "a")).toEqual([]);
     expect(w.statusP.has("a")).toBe(false);
   });
 });

@@ -143,8 +143,16 @@ describe("Thử tải luân hồi (Issue #151)", () => {
       c.room.send("soulBuy", { id: "du_am" } satisfies SoulBuyMsg);
     }
 
-    // Đợi server xử lý xong các tin trong hàng đợi nguyên tử
-    await sleep(400);
+    // Đợi server xử lý xong các tin trong hàng đợi nguyên tử: chờ tới khi tệp chân linh THẬT SỰ phản ánh lần mua hợp lệ duy nhất (không ngủ cố định 400 ms:
+    // máy tải cao ghi tệp trễ hơn nên đỏ chập chờn), rồi chờ thêm một nhịp để mọi tin soulBuy còn lại (đáng lẽ bị từ chối) kịp hạ cánh trước khi kiểm.
+    await waitFor(() => {
+      try {
+        return soulOf(name).unlocks?.du_am === 1;
+      } catch {
+        return false; // tệp đang được thay
+      }
+    }, 8000);
+    await sleep(300);
 
     const soulData = soulOf(name);
     expect(soulData.duyen).toBeGreaterThanOrEqual(0);
