@@ -1425,6 +1425,37 @@ html[data-input="touch"] .qt-head {
   }
 }
 
+/* Ô chiêu thức 2-5 (QUYET_DINH_M3 mục 17.1): hàng nhỏ phía trên cụm nút kỹ năng, chỉ máy tính (có nhãn phím L U I O); mờ vì chưa có chiêu (M7 mới lấp) */
+#skill-slots {
+  display: none;
+}
+@media (pointer: fine) and (min-width: 641px) {
+  /* nằm NGOÀI luồng lưới (#skills là khối cố định): hàng rộng hơn cụm nút nên nếu là một ô lưới sẽ nới cột và đẩy các nút kỹ năng sang trái */
+  #skill-slots {
+    position: absolute;
+    right: 0;
+    bottom: 100%;
+    margin-bottom: 10px;
+    display: flex;
+    gap: 8px;
+  }
+  .sk.slot {
+    width: 44px;
+    height: 44px;
+    border-style: dashed;
+    border-width: 1px;
+    opacity: 0.45;
+    cursor: default;
+  }
+  .sk.slot small {
+    margin-top: 10px;
+    font-size: var(--fs-10);
+  }
+  .sk.slot .keycap {
+    top: 2px;
+  }
+}
+
 /* Thông báo nhận đồ góc phải ("+1 Nanh sói") */
 #gain-feed {
   position: fixed;
@@ -2135,6 +2166,16 @@ body.low-fx #btn-talk {
   font-size: var(--fs-12);
   font-weight: 700;
   text-align: center;
+  white-space: nowrap;
+}
+/* hành động mất hết phím (phím mặc định bị phím người chơi tự đổi chiếm): nét đứt, màu cảnh báo, không chỉ dựa vào màu (có chữ) */
+.keys-unbound {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px dashed #ff9d8a;
+  color: #ffb3a3;
+  font-size: var(--fs-12);
   white-space: nowrap;
 }
 .keys-change {

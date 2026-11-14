@@ -9,22 +9,23 @@ Một nguồn duy nhất: `client/src/keybinds.ts` (`ACTIONS`). HUD, dòng gợi
 | Hành động | Phím (chính trước) | Ghi chú |
 |---|---|---|
 | Di chuyển | W A S D, mũi tên | CỐ ĐỊNH, không đổi được |
-| Kiếm chém | Space | giữ phím thì chém liên tục; chưa có mục tiêu thì tự khoá con gần nhất |
+| Kiếm chém | J, Space | giữ phím thì chém liên tục; chưa có mục tiêu thì tự khoá con gần nhất. Cụm J K L U I O: xem mục 3 (QUYET_DINH_M3 mục 17.1) |
 | Chọn mục tiêu / mục tiêu kế | Tab, T | gần nhất, bấm tiếp đi xa dần rồi vòng lại; chỉ còn một con thì bấm nữa là nhả |
 | Mục tiêu trước | Shift+Tab | đi ngược xa -> gần |
 | Bỏ chọn mục tiêu | Esc | chỉ khi không còn bảng / hộp thoại nào để đóng |
-| Kiếm khí | 3, K | tự khoá con gần nhất nếu chưa có mục tiêu |
-| Đả tọa | 4, L | bật / tắt |
-| Đột phá | B | |
+| Kiếm khí | K, 3 | tự khoá con gần nhất nếu chưa có mục tiêu |
+| Ô chiêu thức 2 / 3 / 4 / 5 | L / U / I / O | CHƯA có chiêu (M7 mới lấp): hiện mờ ở HUD máy tính, bấm chỉ báo "ô còn trống", không gửi gì lên máy chủ |
+| Đả tọa | Z, 4 | bật / tắt |
+| Đột phá | V | V = "vượt" cảnh giới; xa cụm WASD nên khó bấm nhầm |
 | Đan dược ô 1 / 2 | 1 / 2 | giữ nguyên như v0.1.2 (xem mục 3) |
 | Nhặt / nói chuyện / qua cổng | F | |
 | Nhận lời mời / đồng ý | Y | lời mời tổ đội, bí cảnh, thách đấu, tông môn; xác nhận rời / đầu hàng (xem 4c) |
 | Từ chối lời mời / huỷ xác nhận | X | Esc chỉ TẠM ẨN hộp lời mời (không gửi từ chối) |
 | Menu đồng đạo gần nhất (mời đội / thách đấu / mời tông môn) | P | người chơi đang thấy trên màn hình; Esc rồi P lại thì sang người xa hơn (xem 4d) |
 | Rời bí cảnh / đầu hàng quyết đấu | R | chỉ MỞ hộp xác nhận; Y xác nhận, X huỷ |
-| Túi đồ / Nhân vật / Sổ nhiệm vụ / Tông môn / Bản đồ lớn / Cài đặt | I / C / J (Q) / G / M / O | bấm lại để đóng |
+| Túi đồ / Nhân vật / Sổ nhiệm vụ / Tông môn / Bản đồ lớn / Cài đặt | B / C / N (Q) / G / M / E | bấm lại để đóng |
 | Chat | Enter mở, Enter gửi, Esc thoát | đang gõ chữ thì mọi phím khác không điều khiển nhân vật |
-| Bật / tắt âm thanh | N | |
+| Bật / tắt âm thanh | 0 | |
 | Ẩn / hiện toàn bộ giao diện (màn chơi sạch) | H | chạy cả khi bảng đang mở; xem `THIET_KE_GIAO_DIEN_GON.md` mục 6 |
 | Đóng bảng trên cùng | Esc | một lần một tầng (xác nhận con -> menu / hộp thoại -> bảng chính) |
 
@@ -36,13 +37,15 @@ Phím được ghi theo `KeyboardEvent.code` (vị trí vật lý): bật bộ g
 - **Phím đã bị nút xử lý (`preventDefault`) thì thế giới bỏ qua**, như Phaser trước đây: nút HUD đang giữ focus thì Enter / Space kích hoạt nút, không chém.
 - **Đang gõ chữ** (ô chat, ô nhập trong bảng): mọi phím hành động bị bỏ qua.
 - **Ctrl / Alt / Meta đi kèm = phím tắt của trình duyệt**, bỏ qua. Giữ Shift mà không có phím `Shift+...` tương ứng thì coi như phím thường (vừa chạy vừa mở túi).
-- Chỉ Space và Kiếm khí lặp khi giữ phím; mở / đóng bảng không lặp (khỏi nhấp nháy).
+- Chỉ đánh thường (J / Cách) và Kiếm khí lặp khi giữ phím; mở / đóng bảng không lặp (khỏi nhấp nháy).
 - Nhãn phím trên nút (`<kbd class="keycap">`) chỉ hiện ở máy tính (`pointer: fine` và rộng > 640 px); cảm ứng ẩn hẳn. Nút Mục tiêu vốn chỉ hiện trên cảm ứng.
 
 ## 3. Quyết định đáng chú ý
 
-- **Đan dược giữ 1 / 2, kỹ năng là 3 / 4.** Người đã quen 1 / 2 để uống đan lúc nguy cấp; đổi sang kỹ năng thì bấm nhầm Kiếm khí / đả tọa đúng lúc cần hồi máu là nguy hiểm. Đổi lại cần một dòng trong `ACTIONS` (và test).
-- **J = Sổ nhiệm vụ** (người dùng yêu cầu), Q vẫn mở sổ nhiệm vụ. Trước đây J là chém: nay chém chỉ còn Space.
+- **Đan dược giữ 1 / 2; 3 / 4 là phím phụ của Kiếm khí / Đả tọa** (từ v0.2.1; phím chính là K / Z). Người đã quen 1 / 2 để uống đan lúc nguy cấp; đổi sang kỹ năng thì bấm nhầm Kiếm khí / đả tọa đúng lúc cần hồi máu là nguy hiểm. Đổi lại cần một dòng trong `ACTIONS` (và test).
+- **Cụm J K L U I O cho chiến đấu** (người dùng yêu cầu, QUYET_DINH_M3 mục 17.1; v0.2.1): tay phải ở cụm này, tay trái giữ WASD. J = chém (Cách vẫn là phím phụ), K = Kiếm khí, L / U / I / O = ô chiêu thức 2-5. Lịch sử: v0.1.3 đặt J = Sổ nhiệm vụ và chém chỉ còn Cách; nay J lại là chém và Sổ nhiệm vụ chuyển sang N (Q vẫn mở).
+- **Phím bị cụm J K L U I O chiếm được dời:** Túi I -> B, Sổ nhiệm vụ J -> N, Đả tọa L -> Z. Ba hành động còn lại mất phím cũ mà người dùng không chỉ định phím mới, B chọn: **Đột phá B -> V** (V = "vượt"; xa WASD nên khó bấm nhầm một thao tác có thể thất bại), **Cài đặt O -> E**, **Bật / tắt âm thanh N -> 0**. Cả ba đổi được ở màn "Phím tắt". Sau thay đổi này mọi chữ cái trên bàn phím đều đã có hành động (chỉ còn phím số 5-9 và F1-F12 trống): thêm hành động mới thì chọn phím số hoặc phím chữ có `Shift+`.
+- **Người đã tự đổi phím được giữ nguyên:** kho lưu chỉ chứa phần KHÁC mặc định nên đổi mặc định tới ngay người chưa tự đổi; `sanitizeKeymap` cấp phím cho các hành động đã tự đổi TRƯỚC, rồi mới cấp mặc định (trừ phím đã bị chiếm), nên mặc định mới không bao giờ lấy mất phím người chơi đã chọn (hành động bị lấy phím mặc định có thể chỉ còn phím phụ, hoặc hết phím và phải đặt lại ở màn "Phím tắt"). Trước đây hành động đứng trước trong `ACTIONS` luôn thắng.
 - **Esc bỏ chọn mục tiêu** đi qua chuỗi Esc có sẵn (`processEscapeKey`, bước cuối), nên không bao giờ đóng bảng và bỏ chọn cùng lúc.
 - **Tab**: ngoài bảng, Tab là chọn mục tiêu (trình duyệt không đổi focus); trong bảng Tab vẫn là focus trap có sẵn.
 
@@ -52,7 +55,7 @@ Phím được ghi theo `KeyboardEvent.code` (vị trí vật lý): bật bộ g
 
 ## 4a. Màn "Phím tắt" (bước 3a)
 
-- **Mở:** Cài đặt (O) -> "Xem và đổi phím tắt" (mũi tên + Enter), hoặc nút "Xem tất cả phím tắt" ở bảng chỉ dẫn người mới (lần đầu vào game, cờ đã xem lưu ở `tg_newbie_guide_dismissed`). Ẩn dòng mở trong Cài đặt khi đang dùng cảm ứng (`html[data-input="touch"]`). Màn mở CHỒNG lên bảng đang mở (Esc đóng riêng màn này, trả focus về nút đã mở nó).
+- **Mở:** Cài đặt (E) -> "Xem và đổi phím tắt" (mũi tên + Enter), hoặc nút "Xem tất cả phím tắt" ở bảng chỉ dẫn người mới (lần đầu vào game, cờ đã xem lưu ở `tg_newbie_guide_dismissed`). Ẩn dòng mở trong Cài đặt khi đang dùng cảm ứng (`html[data-input="touch"]`). Màn mở CHỒNG lên bảng đang mở (Esc đóng riêng màn này, trả focus về nút đã mở nó).
 - **Danh sách** vẽ từ `ACTIONS` (`keysScreenModel`, thuần): nhóm Chiến đấu / Tương tác / Bảng và cửa sổ / Khác; mỗi dòng "tên, các phím (phím chính trước), nút Đổi phím"; dòng đã đổi khỏi mặc định có viền vàng; dưới là các **phím cố định** (`FIXED_KEYS`: WASD / mũi tên, Esc, Enter / Cách, 1-9 chọn dòng hội thoại, Tab / Shift+Tab trong bảng) và nút "Khôi phục phím mặc định" (`resetKeymap`).
 - **Đổi phím chỉ bằng bàn phím:** Enter trên "Đổi phím" -> nút thành "Bấm phím mới..." và dòng trạng thái (`aria-live`) báo đang chờ -> bấm phím muốn gán (`captureOutcome`, thuần): Esc huỷ (CHỈ huỷ việc đổi, màn vẫn mở), W A S D / mũi tên bị từ chối kèm lời giải thích và vẫn chờ, chỉ bấm Shift / Ctrl... hoặc giữ phím lặp (Enter vừa bấm để bắt đầu) thì bỏ qua, Ctrl / Alt / Meta đi kèm không tính. Shift chỉ được giữ cho Tab (`Shift+Tab`); phím khác kèm Shift là phím thường (khỏi gán nhầm "Shift+R" chỉ chạy khi đang giữ Shift).
 - **Phím mới trở thành phím CHÍNH, phím cũ giữ làm phím phụ** (tối đa 3 phím mỗi hành động, `sanitizeKeymap`). Lấy phím DUY NHẤT của hành động khác thì hai hành động đổi chỗ (lời nhắn nói rõ: `"Đan dược ô 1" đổi sang 4.`); lấy phím phụ của hành động khác thì hành động kia chỉ mất phím đó.

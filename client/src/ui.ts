@@ -1022,6 +1022,13 @@ function renderKeysModalImpl() {
         kbd.textContent = k;
         caps.append(kbd);
       }
+      if (r.unbound) {
+        // phím mặc định của hành động này đã thuộc phím người chơi tự đổi: không im lặng, báo rõ và để người chơi gán lại
+        const none = document.createElement("span");
+        none.className = "keys-unbound";
+        none.textContent = "chưa gán phím";
+        caps.append(none);
+      }
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "keys-change";
@@ -1034,7 +1041,9 @@ function renderKeysModalImpl() {
         "aria-label",
         waiting
           ? `${r.label}: đang chờ phím mới, bấm phím muốn gán hoặc Esc để huỷ`
-          : `Đổi phím ${r.label} (hiện là ${r.keys.join(" hoặc ")})`,
+          : r.unbound
+            ? `Đổi phím ${r.label} (hiện chưa gán phím)`
+            : `Đổi phím ${r.label} (hiện là ${r.keys.join(" hoặc ")})`,
       );
       row.append(name, caps, btn);
       sec.append(row);

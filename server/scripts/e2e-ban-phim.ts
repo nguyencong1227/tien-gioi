@@ -1,12 +1,12 @@
 // E2E THẬT chơi bằng BÀN PHÍM (QUYET_DINH_M3 mục 13, #463): server Colyseus thật + Chrome headless, phím gửi bằng CDP
 // `Input.dispatchKeyEvent` (phím thật, `isTrusted`), TUYỆT ĐỐI không click chuột và không gọi hàm của UI. Kiểm:
-//  1. Nhãn phím hiện trên nút kỹ năng (máy tính): Cách / 3 / 4 / B / Tab, title ghi đủ phím.
+//  1. Nhãn phím hiện trên nút kỹ năng (máy tính): J / K / Z / V / Tab, title ghi đủ phím; bốn ô chiêu 2-5 mờ có nhãn L U I O.
 //  2. Tab chọn mục tiêu gần nhất, Tab tiếp đi xa dần rồi vòng lại, Shift+Tab đi ngược, Esc bỏ chọn.
-//  3. Space khi chưa có mục tiêu: tự khoá con gần nhất VÀ chém trúng (máu quái giảm, phía server).
-//  4. Phím 3 (Kiếm khí) tốn linh lực + khoá hồi chiêu; phím 4 bật / tắt đả tọa (server xác nhận).
-//  5. I / C / J / G / M / O mở đúng bảng, Esc đóng bảng trên cùng; J là sổ nhiệm vụ (không còn là chém).
+//  3. J (và Cách, phím phụ) khi chưa có mục tiêu: tự khoá con gần nhất VÀ chém trúng (máu quái giảm, phía server).
+//  4. Phím K (Kiếm khí) tốn linh lực + khoá hồi chiêu (3 là phím phụ); phím Z bật / tắt đả tọa (4 là phím phụ; server xác nhận); L U I O báo ô chiêu trống.
+//  5. B / C / N / G / M / E mở đúng bảng, Esc đóng bảng trên cùng; I không còn mở túi (là ô chiêu 4), J là chém (không còn là sổ nhiệm vụ).
 //  6. Bảng đang mở: Tab KHÔNG đổi mục tiêu, Space KHÔNG chém (phím thuộc về bảng).
-//  7. Enter mở ô chat, gõ chữ thì phím I không mở túi, Enter gửi (server nhận), Esc rời ô chat.
+//  7. Enter mở ô chat, gõ chữ thì phím B không mở túi, Enter gửi (server nhận), Esc rời ô chat.
 //  8. Bảng mở thì mũi tên KHÔNG làm nhân vật đi (đo vị trí phía server); đóng bảng thì đi lại được.
 //  9. Túi đồ: mũi tên chuyển ô (focus = chọn ô), Enter dùng đan (máu hồi, server xác nhận), Esc đóng.
 // 10. Nói chuyện NPC chỉ bằng phím: F mở hộp thoại, Enter tua chữ, mũi tên vào dòng lựa chọn, phím số chọn dòng (nhận nhiệm vụ).
@@ -57,6 +57,14 @@ const K = {
   tab: { key: "Tab", code: "Tab", vk: 9 },
   d3: { key: "3", code: "Digit3", vk: 51, text: "3" },
   d4: { key: "4", code: "Digit4", vk: 52, text: "4" },
+  d9: { key: "9", code: "Digit9", vk: 57, text: "9" },
+  k: { key: "k", code: "KeyK", vk: 75, text: "k" },
+  l: { key: "l", code: "KeyL", vk: 76, text: "l" },
+  u: { key: "u", code: "KeyU", vk: 85, text: "u" },
+  z: { key: "z", code: "KeyZ", vk: 90, text: "z" },
+  b: { key: "b", code: "KeyB", vk: 66, text: "b" },
+  n: { key: "n", code: "KeyN", vk: 78, text: "n" },
+  e: { key: "e", code: "KeyE", vk: 69, text: "e" },
   i: { key: "i", code: "KeyI", vk: 73, text: "i" },
   c: { key: "c", code: "KeyC", vk: 67, text: "c" },
   j: { key: "j", code: "KeyJ", vk: 74, text: "j" },
@@ -237,26 +245,39 @@ async function main() {
       ev(
         `(() => { const c = document.querySelector('#${id} .keycap'); return c && c.checkVisibility() ? c.textContent : null; })()`,
       );
+    check("Nhãn phím nút Chém = J", (await cap("sk-slash")) === "J", String(await cap("sk-slash")));
     check(
-      "Nhãn phím nút Chém = Cách",
-      (await cap("sk-slash")) === "Cách",
-      String(await cap("sk-slash")),
-    );
-    check(
-      "Nhãn phím nút Kiếm khí = 3",
-      (await cap("sk-sword")) === "3",
+      "Nhãn phím nút Kiếm khí = K",
+      (await cap("sk-sword")) === "K",
       String(await cap("sk-sword")),
     );
-    check("Nhãn phím nút Đả tọa = 4", (await cap("sk-med")) === "4", String(await cap("sk-med")));
+    check("Nhãn phím nút Đả tọa = Z", (await cap("sk-med")) === "Z", String(await cap("sk-med")));
     check(
-      "Nhãn phím nút Đột phá = B",
-      (await cap("sk-break")) === "B",
+      "Nhãn phím nút Đột phá = V",
+      (await cap("sk-break")) === "V",
       String(await cap("sk-break")),
     );
     check(
       "Nút Kiếm khí: title ghi đủ phím",
-      (await ev(`document.getElementById('sk-sword').title`)) === "Phóng kiếm khí (3 / K)",
+      (await ev(`document.getElementById('sk-sword').title`)) === "Phóng kiếm khí (K / 3)",
       String(await ev(`document.getElementById('sk-sword').title`)),
+    );
+    // QUYET_DINH_M3 mục 17.1: bốn ô chiêu 2-5 mờ (chưa có chiêu) với nhãn L U I O, nằm TRÊN cụm nút kỹ năng
+    const slotCaps = [2, 3, 4, 5].map((n) => cap(`sk-slot${n}`));
+    const slotCapTexts = (await Promise.all(slotCaps)).join(",");
+    check("Bốn ô chiêu 2-5 hiện nhãn L,U,I,O", slotCapTexts === "L,U,I,O", slotCapTexts);
+    const slotLook = String(
+      await ev(
+        `(() => { const s = document.getElementById('sk-slot2'), b = document.getElementById('sk-break'); return JSON.stringify({ op: +getComputedStyle(s).opacity, aria: s.getAttribute('aria-disabled'), above: s.getBoundingClientRect().bottom <= b.getBoundingClientRect().top }); })()`,
+      ),
+    );
+    check(
+      "Ô chiêu trống hiện mờ (opacity < 0.7), aria-disabled, nằm phía trên nút Đột phá",
+      (() => {
+        const o = JSON.parse(slotLook) as { op: number; aria: string; above: boolean };
+        return o.op < 0.7 && o.aria === "true" && o.above;
+      })(),
+      slotLook,
     );
 
     // ---- Dựng cảnh: người chơi ngoài trấn, ba con quái gần ----
@@ -288,10 +309,12 @@ async function main() {
     const helpText = await ev(`document.getElementById('help').textContent`);
     // Nút Mục tiêu chỉ hiện trên cảm ứng (máy tính dùng Tab): dòng gợi ý đầu màn hình phải nhắc Tab
     check(
-      "Dòng gợi ý đầu màn hình ghi phím mới (Cách chém, Tab mục tiêu, 3 kiếm khí, J nhiệm vụ)",
-      ["Cách chém", "Tab mục tiêu", "3 kiếm khí", "J nhiệm vụ"].every((x) =>
+      "Dòng gợi ý đầu màn hình ghi phím mới (J chém, Tab mục tiêu, K kiếm khí, Z đả tọa, B túi, N nhiệm vụ)",
+      ["J chém", "Tab mục tiêu", "K kiếm khí", "Z đả tọa", "B túi", "N nhiệm vụ"].every((x) =>
         String(helpText).includes(x),
-      ) && !String(helpText).includes("J chém"),
+      ) &&
+        !String(helpText).includes("Cách chém") &&
+        !String(helpText).includes("J nhiệm vụ"),
       String(helpText),
     );
     await t.shot("ban-phim-hud.png");
@@ -339,56 +362,95 @@ async function main() {
       String(await lock()),
     );
 
-    // ---- 3. Space tự khoá + chém trúng ----
+    // ---- 3. J tự khoá + chém trúng (Cách là phím phụ) ----
     const hpBefore = world.state.monsters.get(nearId).hp;
-    await press(t, K.space);
+    await press(t, K.j);
     await sleep(300);
     check(
-      "Space khi chưa có mục tiêu: tự khoá con gần nhất",
+      "J khi chưa có mục tiêu: tự khoá con gần nhất",
       (await lock()) === nearId,
       `${await lock()} != ${nearId}`,
     );
     const hpAfter = world.state.monsters.get(nearId)?.hp ?? 0;
+    check("J chém trúng: máu quái giảm (server)", hpAfter < hpBefore, `${hpBefore} -> ${hpAfter}`);
+    await press(t, K.esc);
+    // Cách vẫn chém (phím phụ): hồi chiêu chém ở client được đặt lại sau khi qua hồi chiêu của lần chém bằng J
+    await sleep(700);
+    const slashT0 = Number(await ev(`window.__scene.nextSlash`));
+    await press(t, K.space);
+    await sleep(200);
     check(
-      "Space chém trúng: máu quái giảm (server)",
-      hpAfter < hpBefore,
-      `${hpBefore} -> ${hpAfter}`,
+      "Cách (phím phụ) vẫn chém: hồi chiêu chém ở client tăng",
+      Number(await ev(`window.__scene.nextSlash`)) > slashT0,
+      `${slashT0} -> ${await ev(`window.__scene.nextSlash`)}`,
     );
     await press(t, K.esc);
 
-    // ---- 4. Phím 3 (Kiếm khí) và 4 (Đả tọa) ----
+    // ---- 4. Phím K (Kiếm khí) và Z (Đả tọa); 3 / 4 là phím phụ; L U I O là ô chiêu trống ----
     // dọn quái: quái đánh trúng người chơi sẽ ngắt đả tọa làm kiểm đả tọa chập chờn
     world.state.monsters.clear();
     world.mctrl.clear();
     const mpBefore = me.mp;
-    await press(t, K.d3);
+    await press(t, K.k);
     await sleep(300);
     check(
-      "Phím 3 (Kiếm khí): tốn linh lực (server)",
+      "Phím K (Kiếm khí): tốn linh lực (server)",
       me.mp < mpBefore || me.mp === 0,
       `${mpBefore} -> ${me.mp}`,
     );
     check(
-      "Phím 3: khoá hồi chiêu Kiếm khí ở client",
+      "Phím K: khoá hồi chiêu Kiếm khí ở client",
       !!(await ev(`window.__scene.nextSword > window.__scene.time.now`)),
       "nextSword chưa tăng",
     );
     await press(t, K.esc);
+    // phím phụ 3: chờ hết hồi chiêu Kiếm khí rồi bấm, linh lực phải giảm tiếp
+    await sleep(1500);
+    me.mp = me.maxMp;
+    const mpPhu = me.mp;
+    await press(t, K.d3);
+    await sleep(300);
+    check("Phím phụ 3 vẫn phóng Kiếm khí (server)", me.mp < mpPhu, `${mpPhu} -> ${me.mp}`);
+    await press(t, K.esc);
+    await press(t, K.z);
+    await sleep(300);
+    check("Phím Z: bật đả tọa (server xác nhận)", me.meditating === true, String(me.meditating));
+    await press(t, K.z);
+    await sleep(300);
+    check("Phím Z lần nữa: tắt đả tọa", me.meditating === false, String(me.meditating));
     await press(t, K.d4);
     await sleep(300);
-    check("Phím 4: bật đả tọa (server xác nhận)", me.meditating === true, String(me.meditating));
+    check("Phím phụ 4: bật đả tọa", me.meditating === true, String(me.meditating));
     await press(t, K.d4);
     await sleep(300);
-    check("Phím 4 lần nữa: tắt đả tọa", me.meditating === false, String(me.meditating));
+    check("Phím phụ 4 lần nữa: tắt đả tọa", me.meditating === false, String(me.meditating));
+    // L U I O: ô chiêu chưa có chiêu, chỉ báo "còn trống"; I KHÔNG còn mở túi, O KHÔNG còn mở cài đặt
+    const toastText = () => ev(`document.getElementById('toast').textContent`);
+    for (const [key, n] of [
+      [K.l, 2],
+      [K.u, 3],
+      [K.i, 4],
+      [K.o, 5],
+    ] as Array<[Key, number]>) {
+      await press(t, key);
+      await sleep(150);
+      check(
+        `Phím ${key.code.slice(3)}: báo "Ô chiêu thức ${n} còn trống", không mở bảng nào`,
+        String(await toastText()).includes(`Ô chiêu thức ${n} còn trống`) &&
+          !(await ev(shown("inv-modal"))) &&
+          !(await ev(shown("settings-modal"))),
+        String(await toastText()),
+      );
+    }
 
     // ---- 5. Mở / đóng bảng ----
     const panels: Array<[string, Key, string]> = [
-      ["Túi đồ", K.i, "inv-modal"],
+      ["Túi đồ", K.b, "inv-modal"],
       ["Nhân vật", K.c, "char-modal"],
-      ["Sổ nhiệm vụ (J)", K.j, "quest-modal"],
+      ["Sổ nhiệm vụ (N)", K.n, "quest-modal"],
       ["Tông môn", K.g, "sect-modal"],
       ["Bản đồ lớn", K.m, "map-modal"],
-      ["Cài đặt", K.o, "settings-modal"],
+      ["Cài đặt", K.e, "settings-modal"],
     ];
     for (const [name, key, id] of panels) {
       await press(t, key);
@@ -399,7 +461,7 @@ async function main() {
 
     // ---- 6. Bảng mở thì phím thế giới thuộc về bảng ----
     const slashBefore = await ev(`window.__scene.nextSlash`);
-    await press(t, K.i);
+    await press(t, K.b);
     await press(t, K.tab);
     check("Túi mở: Tab KHÔNG chọn mục tiêu", (await lock()) === null, String(await lock()));
     await ev(
@@ -421,15 +483,15 @@ async function main() {
       (await ev(`document.activeElement && document.activeElement.id`)) === "chat-input",
       String(await ev(`document.activeElement && document.activeElement.id`)),
     );
-    await typeText(t, "ixa");
+    await typeText(t, "bxa");
     check(
-      "Đang gõ chat: phím I KHÔNG mở túi",
+      "Đang gõ chat: phím B KHÔNG mở túi",
       !(await ev(shown("inv-modal"))),
       "inv-modal mở khi đang gõ",
     );
     check(
       "Ô chat nhận đúng chữ đã gõ",
-      (await ev(`document.getElementById('chat-input').value`)) === "ixa",
+      (await ev(`document.getElementById('chat-input').value`)) === "bxa",
       String(await ev(`document.getElementById('chat-input').value`)),
     );
     await press(t, K.enter);
@@ -455,7 +517,7 @@ async function main() {
     await ev(
       `document.activeElement && document.activeElement.blur && document.activeElement.blur(); 1`,
     );
-    await press(t, K.i);
+    await press(t, K.b);
     check("Mở túi để thử đi bộ", !!(await ev(shown("inv-modal"))), "inv-modal không hiện");
     const x0 = me.x;
     await hold(t, K.right, 700);
@@ -480,7 +542,7 @@ async function main() {
     giveItem(world, sid, "hoi_huyet_dan", 3);
     me.hp = 30;
     await sleep(400);
-    await press(t, K.i);
+    await press(t, K.b);
     const slotInfo = await ev(
       `(() => { const s = [...document.querySelectorAll('.inv-slot')]; const idx = s.findIndex(e => e.querySelector('.slot-name')?.textContent === 'Hồi Huyết Đan'); const top0 = s[0].getBoundingClientRect().top; const cols = s.filter(e => Math.abs(e.getBoundingClientRect().top - top0) < 2).length; return JSON.stringify({ idx, cols }); })()`,
     );
@@ -700,7 +762,7 @@ async function main() {
         `(() => { const b = document.querySelector('#keys-list button[data-action="${action}"]'); return b ? [...b.closest('.keys-row').querySelectorAll('.key-chip')].map((c) => c.textContent).join(',') : null; })()`,
       );
     const openKeys = async () => {
-      await press(t, K.o);
+      await press(t, K.e);
       await arrowTo(t, "#set-open-keys", 12);
       await press(t, K.enter);
     };
@@ -718,7 +780,7 @@ async function main() {
     );
     await openKeys();
     check(
-      "O mở Cài đặt, mũi tên + Enter trên 'Xem và đổi phím tắt' mở màn Phím tắt",
+      "E mở Cài đặt, mũi tên + Enter trên 'Xem và đổi phím tắt' mở màn Phím tắt",
       !!(await ev(shown("keys-modal"))) && !!(await ev(shown("settings-modal"))),
       `keys=${await ev(shown("keys-modal"))} settings=${await ev(shown("settings-modal"))}`,
     );
@@ -729,8 +791,8 @@ async function main() {
       String(await ev(`document.querySelectorAll('#keys-list .keys-row').length`)),
     );
     check(
-      "Dòng Kiếm khí ghi phím 3 và K",
-      (await rowChips("skill.sword")) === "3,K",
+      "Dòng Kiếm khí ghi phím K và 3",
+      (await rowChips("skill.sword")) === "K,3",
       String(await rowChips("skill.sword")),
     );
     check(
@@ -754,7 +816,7 @@ async function main() {
         !!(await ev(
           `document.querySelector(${JSON.stringify(swordBtn)}).classList.contains('waiting')`,
         )) &&
-        (await rowChips("skill.sword")) === "3,K",
+        (await rowChips("skill.sword")) === "K,3",
       `${await textOf("#keys-status")} | ${await rowChips("skill.sword")}`,
     );
     await press(t, K.esc);
@@ -764,7 +826,7 @@ async function main() {
         !(await ev(
           `document.querySelector(${JSON.stringify(swordBtn)}).classList.contains('waiting')`,
         )) &&
-        (await rowChips("skill.sword")) === "3,K",
+        (await rowChips("skill.sword")) === "K,3",
       `keys=${await ev(shown("keys-modal"))}`,
     );
     check(
@@ -774,23 +836,23 @@ async function main() {
       String(await ev(`document.activeElement && document.activeElement.dataset.action`)),
     );
     await press(t, K.enter);
-    await press(t, K.v);
+    await press(t, K.d9); // 9 là phím số còn trống (mọi chữ cái đều đã có hành động)
     check(
-      "Bấm V: Kiếm khí đổi sang V (giữ 3 và K làm phím phụ)",
-      (await rowChips("skill.sword")) === "V,3,K" &&
-        String(await textOf("#keys-status")).includes("Kiếm khí: V"),
+      "Bấm 9: Kiếm khí đổi sang 9 (giữ K và 3 làm phím phụ)",
+      (await rowChips("skill.sword")) === "9,K,3" &&
+        String(await textOf("#keys-status")).includes("Kiếm khí: 9"),
       `${await rowChips("skill.sword")} | ${await textOf("#keys-status")}`,
     );
     check(
-      "Nhãn phím trên nút Kiếm khí đổi theo thành V; lưu vào localStorage",
-      (await cap("sk-sword")) === "V" &&
-        String(await ev(`localStorage.getItem('tg_keymap')`)).includes("KeyV"),
+      "Nhãn phím trên nút Kiếm khí đổi theo thành 9; lưu vào localStorage",
+      (await cap("sk-sword")) === "9" &&
+        String(await ev(`localStorage.getItem('tg_keymap')`)).includes("Digit9"),
       `${await cap("sk-sword")} | ${await ev(`localStorage.getItem('tg_keymap')`)}`,
     );
     await t.shot("ban-phim-phim-tat-da-doi.png");
     check(
       "Chữ hướng dẫn tĩnh (bảng chỉ dẫn người mới, Cài đặt) đổi theo phím mới",
-      (await textOf('#newbie-guide-modal [data-key-action="skill.sword"]')) === "V",
+      (await textOf('#newbie-guide-modal [data-key-action="skill.sword"]')) === "9",
       String(await textOf('#newbie-guide-modal [data-key-action="skill.sword"]')),
     );
     // lấy phím DUY NHẤT của đan ô 1 (phím 1) cho Đả tọa: hai hành động đổi chỗ, không ai mất phím
@@ -798,10 +860,10 @@ async function main() {
     await press(t, K.enter);
     await press(t, K.d1);
     check(
-      "Đả tọa lấy phím 1: HOÁN ĐỔI, đan ô 1 nhận phím 4 (không hành động nào mất phím)",
+      "Đả tọa lấy phím 1: HOÁN ĐỔI, đan ô 1 nhận phím chính cũ của Đả tọa (Z) (không hành động nào mất phím)",
       (await cap("sk-med")) === "1" &&
-        (await ev(`document.querySelector('#quick-1 .qkey').textContent`)) === "4" &&
-        String(await textOf("#keys-status")).includes("đổi sang 4"),
+        (await ev(`document.querySelector('#quick-1 .qkey').textContent`)) === "Z" &&
+        String(await textOf("#keys-status")).includes("đổi sang Z"),
       `${await cap("sk-med")} | ${await ev(`document.querySelector('#quick-1 .qkey').textContent`)} | ${await textOf("#keys-status")}`,
     );
     await press(t, K.esc);
@@ -814,21 +876,21 @@ async function main() {
     );
     await press(t, K.esc);
     check("Esc đóng Cài đặt", !(await ev(shown("settings-modal"))), "settings-modal vẫn mở");
-    // phím mới có tác dụng trong game: V phóng Kiếm khí (server trừ linh lực)
+    // phím mới có tác dụng trong game: 9 phóng Kiếm khí (server trừ linh lực)
     me.mp = me.maxMp;
     const mpX = me.mp;
-    await press(t, K.v);
+    await press(t, K.d9);
     await sleep(300);
-    check("Phím V mới: phóng Kiếm khí (server trừ linh lực)", me.mp < mpX, `${mpX} -> ${me.mp}`);
+    check("Phím 9 mới: phóng Kiếm khí (server trừ linh lực)", me.mp < mpX, `${mpX} -> ${me.mp}`);
     // khôi phục mặc định
     await openKeys();
     await arrowTo(t, "#keys-reset", 40);
     await press(t, K.enter);
     check(
-      "'Khôi phục phím mặc định': Kiếm khí về 3 / K, Đả tọa về 4, đan ô 1 về 1, xoá khỏi localStorage",
-      (await rowChips("skill.sword")) === "3,K" &&
-        (await cap("sk-sword")) === "3" &&
-        (await cap("sk-med")) === "4" &&
+      "'Khôi phục phím mặc định': Kiếm khí về K / 3, Đả tọa về Z, đan ô 1 về 1, xoá khỏi localStorage",
+      (await rowChips("skill.sword")) === "K,3" &&
+        (await cap("sk-sword")) === "K" &&
+        (await cap("sk-med")) === "Z" &&
         (await ev(`document.querySelector('#quick-1 .qkey').textContent`)) === "1" &&
         (await ev(`localStorage.getItem('tg_keymap')`)) === null,
       `${await rowChips("skill.sword")} | ${await cap("sk-sword")} | ${await cap("sk-med")} | ${await ev(`localStorage.getItem('tg_keymap')`)}`,
@@ -837,10 +899,10 @@ async function main() {
     await press(t, K.esc);
     me.mp = me.maxMp;
     const mpFull = me.mp;
-    await press(t, K.v);
+    await press(t, K.d9);
     await sleep(300);
     check(
-      "Sau khi khôi phục: phím V không còn phóng Kiếm khí",
+      "Sau khi khôi phục: phím 9 không còn phóng Kiếm khí",
       me.mp === mpFull,
       `${mpFull} -> ${me.mp}`,
     );

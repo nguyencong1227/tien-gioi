@@ -39,7 +39,7 @@ const K = {
   space: { key: " ", code: "Space", vk: 32, text: " " },
   enter: { key: "Enter", code: "Enter", vk: 13, text: "\r" },
   tab: { key: "Tab", code: "Tab", vk: 9 },
-  i: { key: "i", code: "KeyI", vk: 73, text: "i" },
+  b: { key: "b", code: "KeyB", vk: 66, text: "b" }, // Túi đồ (QUYET_DINH_M3 mục 17.1: I nay là ô chiêu 4)
   c: { key: "c", code: "KeyC", vk: 67, text: "c" },
 } satisfies Record<string, Key>;
 
@@ -287,9 +287,9 @@ async function main() {
     await ev(`localStorage.removeItem("tg_reduced_motion"); window.__ui?.syncReducedMotion(); 1`);
 
     // 5. ARIA cơ bản + mở bảng thì focus vào trong bảng
-    await press(t, K.i);
+    await press(t, K.b);
     check(
-      "Mở túi bằng phím I: bảng hiện thật",
+      "Mở túi bằng phím B: bảng hiện thật",
       !!(await ev(shown("inv-modal"))),
       "inv-modal không hiện",
     );
@@ -358,7 +358,7 @@ async function main() {
     if (reopened) await press(t, K.esc);
 
     // 3. Esc khi đang gõ chat: chỉ rời ô chat, không đóng bảng
-    await press(t, K.i);
+    await press(t, K.b);
     await ev(`document.getElementById('chat-input').focus(); 1`);
     check("Focus đang ở ô chat", (await ev(active)) === "chat-input", String(await ev(active)));
     await press(t, K.esc);
