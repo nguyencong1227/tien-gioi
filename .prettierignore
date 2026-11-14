@@ -6,3 +6,5 @@ package-lock.json
 *.md
 app/android/
 
+# Tệp SINH tự động từ node_modules (client/scripts/gen-notices.mjs): định dạng của máy sinh, không qua Prettier (credits-ui.test.ts giữ khớp bản sinh)
+client/public/notices.html
