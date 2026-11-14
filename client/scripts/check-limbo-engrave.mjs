@@ -169,6 +169,14 @@ try {
     "chọn sẵn đúng chiêu ĐÃ khắc (ung_trao)",
   );
   check(st.hint === "Tối đa 1 chiêu (đã chọn 1/1)", `gợi ý: "${st.hint}"`);
+  const colors = await J(
+    "Object.fromEntries([...document.querySelectorAll('#limbo-engrave-list .engrave-item')].map((el) => [el.querySelector('input').dataset.nav.slice(8), getComputedStyle(el.querySelector('.engrave-name')).color]))",
+  );
+  // Ưng Trảo hệ Kim (#e0c25a), Hỏa Vân Kiếm hệ Hỏa (#e8573a): tên chiêu tô màu theo hệ, mỗi hệ một màu
+  check(
+    colors.ung_trao === "rgb(224, 194, 90)" && colors.hoa_van_kiem === "rgb(232, 87, 58)",
+    `tên chiêu tô màu hệ: ${JSON.stringify(colors)}`,
+  );
   check(
     st.items.filter((i) => !i.checked).every((i) => i.disabled),
     "hết chỗ (nấc 1): hai chiêu còn lại bị khoá, không chọn thêm được",
