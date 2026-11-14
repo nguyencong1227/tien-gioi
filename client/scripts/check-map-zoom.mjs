@@ -229,6 +229,18 @@ try {
     `kéo quá xa về phía biên: tâm nhìn bị kẹp trong bản đồ (cx ${c.cx}, cy ${c.cy})`,
   );
 
+  // chuột PHẢI không phải thao tác kéo (menu ngữ cảnh có thể nuốt pointerup và để con trỏ ma)
+  const beforeRight = await cam();
+  await mouse("mousePressed", mx, my, { button: "right", buttons: 2 });
+  for (let s = 1; s <= 4; s++)
+    await mouse("mouseMoved", mx + s * 20, my, { button: "right", buttons: 2 });
+  await mouse("mouseReleased", mx + 80, my, { button: "right", buttons: 0 });
+  await sleep(200);
+  c = await cam();
+  check(
+    c.cx === beforeRight.cx && c.cy === beforeRight.cy && c.zoom === beforeRight.zoom,
+    "chuột phải + di chuyển: KHÔNG kéo bản đồ",
+  );
   await click("#map-recenter");
   c = await cam();
   check(c.follow, "nút 'Về chỗ mình': bám lại, giữ mức phóng");

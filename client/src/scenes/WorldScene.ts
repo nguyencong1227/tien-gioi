@@ -341,6 +341,8 @@ export class WorldScene extends Phaser.Scene {
   /** Camera của bản đồ lớn (phóng / kéo, bám theo mình) và các cờ vẽ lại */
   private readonly mapCtl = new MapCameraControl();
   private mapWasOpen = false;
+  private lastBigMeX = 0;
+  private lastBigMeY = 0;
   /** Bản đồ đang XEM ở bản đồ lớn (`null` = bản đồ mình đang đứng); chọn ở sơ đồ nối */
   private mapViewId: string | null = null;
   private mapRedrawPending = false;
@@ -2083,6 +2085,17 @@ export class WorldScene extends Phaser.Scene {
   // ---------------- Bản đồ nhỏ & Bản đồ lớn ----------------
 
   private syncMaps() {
+    // đã phóng và đang bám theo mình: vẽ lại bản đồ lớn NGAY khi mình đi (không chờ nhịp 250 ms, nếu không bản đồ nhảy từng đoạn lớn)
+    if (
+      this.mapWasOpen &&
+      this.mapCtl.follow &&
+      this.mapCtl.cam.zoom > 1 &&
+      (this.predX !== this.lastBigMeX || this.predY !== this.lastBigMeY)
+    ) {
+      this.lastBigMeX = this.predX;
+      this.lastBigMeY = this.predY;
+      this.redrawBigMap();
+    }
     const now = performance.now();
     if (now - this.lastMapDraw < 250) return;
     this.lastMapDraw = now;

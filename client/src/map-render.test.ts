@@ -254,6 +254,12 @@ describe("map-render: placeLabels", () => {
 });
 
 describe("map-render: camera phóng to / kéo", () => {
+  it("ghim giới hạn phóng: tối đa 8 lần, tối thiểu 1 (CHANGELOG hứa 'tối đa 8 lần'), một nấc 1,25", () => {
+    expect(MAP_MAX_ZOOM).toBe(8);
+    expect(MAP_MIN_ZOOM).toBe(1);
+    expect(MAP_ZOOM_STEP).toBe(1.25);
+  });
+
   const box: CameraBox = { worldW: 128 * TILE, worldH: 96 * TILE, cw: 640, ch: 640, pad: 12 };
   const fit = fitCamera(box);
   const near = (a: number, b: number, eps = 1e-6) => expect(Math.abs(a - b)).toBeLessThan(eps);
