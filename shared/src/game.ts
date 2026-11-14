@@ -1,6 +1,7 @@
 // Hằng số gameplay và giao thức tin nhắn client <-> server.
 // Đây là "hợp đồng" giữa dev client và dev server: đổi gì ở đây thì báo nhau.
 import { expToNext, stepOf } from "./realms";
+import type { Element } from "./skills";
 
 export const TICK_MS = 50; // server 20 tick/giây
 export const PLAYER_RADIUS = 11;
@@ -52,7 +53,29 @@ export interface MonsterKind {
   level: number;
   color: number;
   boss?: boolean;
+  /**
+   * Hành vi (M7.3, docs/PHAN_CONG_M7.md mục 6): bỏ trống = `melee` (đuổi và đánh gần, như trước M7). `ranged` đứng xa bắn đạn (`boltSpeed`,
+   * `boltRange`; đạn KHÔNG là state, chỉ có `fx` `bolt`); `charger` đứng gồng `windupMs` rồi lao thẳng; `poisoner` đòn gây trạng thái độc.
+   */
+  behavior?: MonsterBehavior;
+  /** Hệ (`skills.ts`): chiêu khắc / bị khắc theo `elementMult`; bỏ trống = `none` */
+  element?: Element;
+  /** Thời gian gồng (ms) trước đòn mạnh / lao: người chơi tránh được nhờ `fx` `warn` */
+  windupMs?: number;
+  /** Tầm xa: tốc độ đạn (px/giây) và tầm bay tối đa (px) */
+  boltSpeed?: number;
+  boltRange?: number;
 }
+
+/** Hành vi quái (M7.3). `melee` là mặc định. */
+export type MonsterBehavior = "melee" | "ranged" | "charger" | "poisoner";
+
+/** Đạn của quái tầm xa tối đa mỗi phòng (server giữ danh sách riêng, `World.bolts`; client chỉ nhận `fx` `bolt` lúc bắn). */
+export const MAX_BOLTS = 64;
+/** Tinh anh: xác suất một lần sinh quái thường thành tinh anh, hệ số, trần đồng thời mỗi phòng (M7.3; M7.9 chỉnh). */
+export const ELITE_CHANCE = 0.04;
+export const ELITE_MULT = { hp: 2.5, atk: 1.5, exp: 2 } as const;
+export const MAX_ELITES = 3;
 
 export const MONSTERS: MonsterKind[] = [
   {
@@ -268,7 +291,30 @@ export type FxMsg =
   | { kind: "sword"; by: string; x: number; y: number; angle: number; range: number }
   | { kind: "mslash"; by: string; x: number; y: number; angle: number }
   | { kind: "levelup"; by: string; x: number; y: number; major: boolean }
-  | { kind: "breakfail"; by: string; x: number; y: number };
+  | { kind: "breakfail"; by: string; x: number; y: number }
+  /** Người chơi dùng chiêu `skill` (id `SkillDef`, client tra `fx` + hệ để vẽ) tại (x, y) theo hướng `angle`; `range` là tầm thật server tính (px) */
+  | { kind: "cast"; by: string; skill: string; x: number; y: number; angle: number; range: number }
+  /** Báo trước đòn của quái (telegraph): vùng `circle` (bán kính `r`), `cone` (`r`, `angle`, `arc`) hoặc `line` (`r` dài, `angle`) tồn tại `ms`, rồi mới đáp đòn */
+  | {
+      kind: "warn";
+      shape: "circle" | "cone" | "line";
+      x: number;
+      y: number;
+      r: number;
+      angle?: number;
+      arc?: number;
+      ms: number;
+    }
+  /** Đạn tầm xa bắn ra lúc này: bay thẳng từ (x, y) theo `angle` với `speed` (px/giây) tối đa `range` px; client tự vẽ, server tự kiểm trúng */
+  | {
+      kind: "bolt";
+      x: number;
+      y: number;
+      angle: number;
+      speed: number;
+      range: number;
+      element?: Element;
+    };
 export interface DmgMsg {
   target: string;
   amount: number;

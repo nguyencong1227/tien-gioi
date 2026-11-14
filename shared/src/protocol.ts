@@ -27,8 +27,11 @@
  * Phiên bản giao thức hiện tại của bản `shared/` này (số nguyên không âm; bản trước M4 = 0, không gửi).
  * 2 (M6, #404): bản đồ `am_suong` + quái Kim Đan + nhiều vật phẩm mới: client cũ không biết id bản đồ / loài quái / vật phẩm mới nên
  * hiểu sai (travelTo tới bản đồ lạ, quái không có ảnh). `MIN_PROTOCOL_VERSION` KHÔNG đổi: nâng nó là quyết định lúc phát hành.
+ * 3 (M7.1, #502): chiêu thức học được (`skills.ts`: tin `cast` / `skillSlot` / `skills`, `FxMsg` `cast` / `warn` / `bolt`), hành vi quái
+ * (`Monster.fx` / `Monster.elite`), vật phẩm kinh quyển (`ItemType` "book"), ba ô trang bị mới (M7.4): client cũ không có hộp công
+ * pháp / báo trước đòn, ô trang bị lạ và quái lạ. `MIN_PROTOCOL_VERSION` giữ nguyên tới lúc phát hành v0.3.0 (M7.14).
  */
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 /** Phiên bản thấp nhất server còn nhận. 0 = nhận cả client chưa biết tới `v`. */
 export const MIN_PROTOCOL_VERSION = 0;
