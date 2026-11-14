@@ -588,6 +588,31 @@ describe("Nguồn nội dung, hình ảnh và âm thanh bên ngoài (M7.16 #517,
 
       fs.writeFileSync(tmpDocFile, docWithDups);
       expect(() => parseContentSourceTable(tmpDocFile)).toThrow(/Trùng đường dẫn 'Trong repo'/);
+
+      // Thử bảng trùng đường dẫn tệp hình qua các biến thể (client/public/... vs assets/... vs ./...)
+      const docWithVariantDups = `
+## 3. Bảng nguồn
+| Loại | Nguồn | Trong repo | Ngày | PR | Đã duyệt chữ Hán | Đã chỉnh gì |
+|---|---|---|---|---|---|---|
+| hinh_anh | src/a.png | client/public/assets/vktt/variant.png | 14/11/2026 | #501 | KHONG_CHU | nén 1 |
+| hinh_anh | src/b.png | assets/vktt/variant.png | 14/11/2026 | #501 | KHONG_CHU | nén 2 |
+`;
+      fs.writeFileSync(tmpDocFile, docWithVariantDups);
+      expect(() => parseContentSourceTable(tmpDocFile)).toThrow(/Trùng đường dẫn 'Trong repo'/);
+
+      // Dữ liệu code (cong_phap, du_lieu...) cùng tệp trong repo (shared/src/skills.ts) thì ĐƯỢC qua
+      const docWithDataMulti = `
+## 3. Bảng nguồn
+| Loại | Nguồn | Trong repo | Ngày | PR | Đã duyệt chữ Hán | Đã chỉnh gì |
+|---|---|---|---|---|---|---|
+| cong_phap | /content/a.yaml | shared/src/skills.ts | 14/11/2026 | #518 | KHONG_AP_DUNG | chiêu a |
+| cong_phap | /content/b.yaml | shared/src/skills.ts | 14/11/2026 | #518 | KHONG_AP_DUNG | chiêu b |
+`;
+      fs.writeFileSync(tmpDocFile, docWithDataMulti);
+      const dataEntries = parseContentSourceTable(tmpDocFile);
+      expect(dataEntries).toHaveLength(2);
+      expect(dataEntries[0].inRepo).toBe("shared/src/skills.ts");
+      expect(dataEntries[1].inRepo).toBe("shared/src/skills.ts");
     } finally {
       fs.rmSync(tmpDocDir, { recursive: true, force: true });
     }

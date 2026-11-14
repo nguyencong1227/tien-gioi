@@ -141,8 +141,9 @@ export function isUnderVktt(filePath) {
  * @returns {string}
  */
 export function normalizePublicPath(p) {
-  return p
-    .replace(/\\/g, "/")
+  const clean = path.posix.normalize(p.replace(/\\/g, "/"));
+  return clean
+    .replace(/^\.\//, "")
     .replace(/^\/+/, "")
     .replace(/^client\/public\//, "");
 }
@@ -302,13 +303,17 @@ export function parseContentSourceTable(contentSourcePath = CONTENT_SOURCE_FILE)
       );
     }
 
-    // 7. Bắt buộc mỗi tệp chỉ có đúng một dòng trong bảng (chống trùng lặp)
-    if (seenInRepo.has(inRepo)) {
-      throw new Error(
-        `[NGUON_NOI_DUNG.md] Dòng ${lineNum}: Trùng đường dẫn 'Trong repo' (${inRepo}) đã khai báo ở dòng ${seenInRepo.get(inRepo)}`,
-      );
+    // 7. Bắt buộc mỗi tệp hình ảnh / âm thanh chỉ có đúng một dòng trong bảng (chống trùng lặp tệp thật)
+    // Tài sản dữ liệu (cong_phap, du_lieu, trang_bi...) ghi theo cụm hoặc tệp chung (như shared/src/skills.ts)
+    if (type === "hinh_anh" || type === "am_thanh") {
+      const normKey = normalizePublicPath(inRepo);
+      if (seenInRepo.has(normKey)) {
+        throw new Error(
+          `[NGUON_NOI_DUNG.md] Dòng ${lineNum}: Trùng đường dẫn 'Trong repo' (${inRepo}) đã khai báo ở dòng ${seenInRepo.get(normKey)}`,
+        );
+      }
+      seenInRepo.set(normKey, lineNum);
     }
-    seenInRepo.set(inRepo, lineNum);
 
     entries.push({
       type,
