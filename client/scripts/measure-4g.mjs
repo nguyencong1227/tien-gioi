@@ -19,6 +19,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import process from "node:process";
+import zlib from "node:zlib";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
@@ -41,6 +42,17 @@ const MIMES = {
   ".svg": "image/svg+xml",
   ".webmanifest": "application/manifest+json",
 };
+
+export const COMPRESSIBLE_EXTS = new Set([
+  ".html",
+  ".js",
+  ".css",
+  ".json",
+  ".svg",
+  ".webmanifest",
+  ".txt",
+  ".map",
+]);
 
 // Cấu hình mạng theo THIET_KE_GIAO_DIEN_DO_HOA.md mục 10.4
 export const NETWORK_PROFILES = {
@@ -79,8 +91,82 @@ export function median(arr) {
   return (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
+/**
+ * Đọc cấu hình ngân sách timeToWorld4gMs từ client/perf-budget.json
+ * @returns {object|null}
+ */
+export function readBudgetLimits() {
+  const budgetFile = path.join(REPO, "client/perf-budget.json");
+  if (fs.existsSync(budgetFile)) {
+    try {
+      const budget = JSON.parse(fs.readFileSync(budgetFile, "utf8"));
+      return budget?.packs?.timeToWorld4gMs || null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+/**
+ * So sánh kết quả đo p50 với trần ngân sách trong perf-budget.json (F1)
+ * @param {object} summary - Kết quả đo ({ fast4gColdP50, fast4gWarmP50, slow4gColdP50, slow4gWarmP50 })
+ * @param {object} budgetLimits - Khối packs.timeToWorld4gMs từ perf-budget.json
+ * @returns {{ ok: boolean, violations: Array<{ scenario: string, actual: number, max: number, diff: number }> }}
+ */
+export function check4gBudget(summary, budgetLimits) {
+  if (!budgetLimits) return { ok: true, violations: [] };
+
+  const checks = [
+    {
+      key: "fast4gColdP50",
+      limitKey: "fast4gCold",
+      altKey: "fast4gColdMs",
+      name: "Fast 4G Lạnh (Cold)",
+    },
+    {
+      key: "fast4gWarmP50",
+      limitKey: "fast4gWarm",
+      altKey: "fast4gWarmMs",
+      name: "Fast 4G Ấm (Warm)",
+    },
+    {
+      key: "slow4gColdP50",
+      limitKey: "slow4gCold",
+      altKey: "slow4gColdMs",
+      name: "Slow 4G Lạnh (Cold)",
+    },
+    {
+      key: "slow4gWarmP50",
+      limitKey: "slow4gWarm",
+      altKey: "slow4gWarmMs",
+      name: "Slow 4G Ấm (Warm)",
+    },
+  ];
+
+  const violations = [];
+  for (const c of checks) {
+    const actual = summary[c.key];
+    const max = budgetLimits[c.limitKey] ?? budgetLimits[c.altKey];
+    if (typeof actual === "number" && typeof max === "number" && actual > max) {
+      violations.push({
+        scenario: c.name,
+        actual,
+        max,
+        diff: actual - max,
+      });
+    }
+  }
+
+  return {
+    ok: violations.length === 0,
+    violations,
+  };
+}
+
 export async function run4gBenchmark(options = {}) {
   const runsPerCase = options.runs || 5;
+  const compress = options.noCompress !== true;
 
   // 1. Web server phục vụ client/dist
   if (!fs.existsSync(DIST)) {
@@ -93,7 +179,7 @@ export async function run4gBenchmark(options = {}) {
     if (!fs.existsSync(filePath)) {
       filePath = path.join(DIST, "index.html");
     }
-    const ext = path.extname(filePath);
+    const ext = path.extname(filePath).toLowerCase();
     const mime = MIMES[ext] || "application/octet-stream";
     const headers = {
       "Content-Type": mime,
@@ -103,7 +189,17 @@ export async function run4gBenchmark(options = {}) {
       headers["Service-Worker-Allowed"] = "/";
     }
     try {
-      const data = fs.readFileSync(filePath);
+      let data = fs.readFileSync(filePath);
+      const acceptEncoding = req.headers["accept-encoding"] || "";
+      const shouldGzip = compress && COMPRESSIBLE_EXTS.has(ext) && acceptEncoding.includes("gzip");
+
+      if (shouldGzip) {
+        data = zlib.gzipSync(data);
+        headers["Content-Encoding"] = "gzip";
+        headers["Vary"] = "Accept-Encoding";
+      }
+
+      headers["Content-Length"] = data.length;
       res.writeHead(200, headers);
       res.end(data);
     } catch {
@@ -377,15 +473,31 @@ export async function run4gBenchmark(options = {}) {
     }
   }
 
+  const budgetLimits = options.budgetLimits || readBudgetLimits();
+  const budgetCheck = check4gBudget(
+    {
+      fast4gColdP50: Math.round(median(results.fast4gCold)),
+      fast4gWarmP50: Math.round(median(results.fast4gWarm)),
+      slow4gColdP50: Math.round(median(results.slow4gCold)),
+      slow4gWarmP50: Math.round(median(results.slow4gWarm)),
+    },
+    budgetLimits,
+  );
+
   const summary = {
     fast4gColdP50: Math.round(median(results.fast4gCold)),
     fast4gWarmP50: Math.round(median(results.fast4gWarm)),
     slow4gColdP50: Math.round(median(results.slow4gCold)),
     slow4gWarmP50: Math.round(median(results.slow4gWarm)),
+    compressed: compress,
+    budgetCheck,
     raw: results,
   };
 
   console.log(`\n================ KẾT QUẢ TỔNG HỢP (p50) ================`);
+  console.log(
+    `Chế độ nén Gzip : ${compress ? "BẬT (chuẩn production/Cloudflare)" : "TẮT (thô / ca xấu nhất)"}`,
+  );
   console.log(`Fast 4G Lạnh (Cold): ${summary.fast4gColdP50} ms`);
   console.log(`Fast 4G Ấm   (Warm): ${summary.fast4gWarmP50} ms`);
   console.log(`Slow 4G Lạnh (Cold): ${summary.slow4gColdP50} ms`);
@@ -400,9 +512,28 @@ const isDirectRun = process.argv[1] && path.resolve(process.argv[1]) === path.re
 if (isDirectRun) {
   const runsArg = process.argv.find((a) => a.startsWith("--runs="));
   const runs = runsArg ? parseInt(runsArg.split("=")[1], 10) : 5;
+  const noCompress = process.argv.includes("--no-compress");
+  const noGate = process.argv.includes("--no-gate");
+
   try {
-    await run4gBenchmark({ runs });
-    process.exit(0);
+    const summary = await run4gBenchmark({ runs, noCompress });
+    const { budgetCheck } = summary;
+
+    if (!budgetCheck.ok) {
+      console.error("[ĐỎ] VƯỢT NGÂN SÁCH THỜI GIAN VÀO THẾ GIỚI 4G (timeToWorld4gMs):");
+      for (const v of budgetCheck.violations) {
+        console.error(`  - ${v.scenario}: ${v.actual} ms > trần ${v.max} ms (+${v.diff} ms)`);
+      }
+      if (noGate) {
+        console.warn("\n[CẢNH BÁO] Cờ --no-gate bật: bỏ qua thoát mã 1.");
+        process.exit(0);
+      } else {
+        process.exit(1);
+      }
+    } else {
+      console.log("[XANH] Đạt toàn bộ ngân sách thời gian vào thế giới 4G (timeToWorld4gMs).");
+      process.exit(0);
+    }
   } catch (err) {
     console.error("Lỗi khi đo 4G:", err);
     process.exit(1);
