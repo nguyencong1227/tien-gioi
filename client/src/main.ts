@@ -690,7 +690,7 @@ async function start(room: Room, mapId: string) {
         },
         onRebirth: (choice) => {
           // script kiểm đọc đúng tin sẽ gửi (`engrave` vắng = giữ nguyên chiêu đã khắc)
-          ((window as any).__rebirthChoices ??= []).push(choice);
+          (window.__rebirthChoices ??= []).push(choice);
           ui.showReborn(mock.summary.kiep + 1);
         },
       });
