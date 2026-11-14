@@ -9,7 +9,8 @@
 // lại bị khoá, Enter bật / tắt được; và KHÔNG có lỗi / cảnh báo console.
 //  4. BẢNG CÔNG PHÁP (M7.6, #507, #546): nhân vật Trúc Cơ đã học ba chiêu, Shift+K mở bảng; số hiển thị khớp công thức dùng chung; Enter trên nút
 //     "Ô N" gắn chiêu qua `skillSlot` THẬT (thanh chiêu chỉ đổi khi máy chủ gửi lại `skills`: client không đoán trước); gắn vào ô đang có chiêu khác thì
-//     THAY, chiêu đang ở ô khác thì ĐỔI chỗ (ô cũ trống), Delete gỡ, ô chưa mở (ô 4 ở Trúc Cơ) không gửi gì; ngắt kết nối rồi đọc hồ sơ trên đĩa.
+//     THAY, chiêu đang ở ô khác thì ĐỔI chỗ (ô cũ trống), Delete gỡ, ô chưa mở (ô 4 ở Trúc Cơ) không gửi gì; bấm L dùng chiêu thật (máy chủ đặt hồi chiêu,
+//     phát `fx cast`, client vẽ hiệu ứng dùng chiêu #552); rời phòng chủ động rồi đọc hồ sơ trên đĩa.
 // Chạy: `npm run build -w client && npm run e2e:chieu -w server` (cần google-chrome).
 import { spawn, execSync, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -49,6 +50,8 @@ const out = (m: string) => console.log(m);
 /** Phím thật qua CDP (nhấn rồi nhả). */
 const ENTER = { key: "Enter", code: "Enter", vk: 13, text: "\r" };
 const DELETE = { key: "Delete", code: "Delete", vk: 46 };
+const ESC = { key: "Escape", code: "Escape", vk: 27 };
+const L_KEY = { key: "l", code: "KeyL", vk: 76, text: "l" };
 const SHIFT_K = { key: "K", code: "KeyK", vk: 75, text: "K", modifiers: 8 };
 async function press(
   tab: Tab,
@@ -480,6 +483,33 @@ async function main() {
     await slotBtn(UNG_TRAO, 3);
     await waitBar(3, nameOf(UNG_TRAO), "Ưng Trảo về ô 3");
     await T.shot("chieu-4-cuoi");
+
+    // DÙNG chiêu thật: đóng bảng (phím thế giới bị chặn khi bảng mở) rồi bấm L (ô 2 = Hỏa Vân Kiếm). Máy chủ nhận `cast`, đặt hồi chiêu và phát `fx cast`
+    // tới người ở gần; client vẽ hạt (HIỆU ỨNG DÙNG CHIÊU, #552). `lastAttack.range` chỉ được đặt khi `onFx` nhận tin `cast` của MÌNH, và mang tầm THẬT
+    // máy chủ tính (`def.range` của chiêu cone): bằng chứng tin đi đủ đường máy chủ -> mạng -> client.
+    await press(T, ESC);
+    await T.waitFor(`document.getElementById('skills-modal')?.hidden`, "Esc đóng bảng Công pháp");
+    must(
+      !(await ev(`window.__scene.lastAttack`)),
+      "trước khi dùng chiêu chưa có đòn nào (lastAttack trống)",
+    );
+    const admitted0 = (await ev(`window.__fx.stats().admitted`)) as number;
+    await press(T, L_KEY);
+    await T.waitFor(
+      `(document.getElementById('sk-slot2')?.getAttribute('aria-label') ?? '').includes('hồi chiêu')`,
+      "máy chủ nhận `cast`: ô 2 vào hồi chiêu",
+    );
+    await T.waitFor(
+      `!!window.__scene.lastAttack && window.__scene.lastAttack.range === ${skillOf(HOA_VAN)!.range}`,
+      "client nhận tin `fx cast` của máy chủ thật (lastAttack.range = tầm thật của Hỏa Vân Kiếm)",
+    );
+    must(
+      ((await ev(`window.__fx.stats().admitted`)) as number) > admitted0,
+      "client vẽ hạt cho chiêu vừa dùng (số điểm nhận vào tăng)",
+    );
+    ok(
+      "L: máy chủ đặt hồi chiêu và phát fx cast; client vẽ hiệu ứng dùng chiêu (lastAttack + hạt)",
+    );
     // Rời phòng CHỦ ĐỘNG (consented): máy chủ lưu ngay. Đóng tab / rớt mạng thì nhân vật ở lại `RECONNECT_GRACE_S` giây chờ nối lại rồi mới lưu.
     await ev(`window.__scene.room.leave(true).then(() => 1)`);
     const saved4 = await until(() => {
