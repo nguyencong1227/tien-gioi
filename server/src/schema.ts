@@ -59,6 +59,15 @@ export class Monster extends Schema {
   @type("float32") angle = 0;
   @type("number") hp = 0;
   @type("number") maxHp = 0;
+  /**
+   * Mặt nạ bit CÔNG KHAI các trạng thái CÓ HẠI đang dính (`STATUS_BIT` ở shared: bỏng 1, độc 2, chảy máu 4, tê cóng 8, vỡ giáp 16, choáng 32): client vẽ huy hiệu trên
+   * đầu quái (M7.7 #508). Chỉ đổi khi trạng thái gắn / hết hạn (hiếm); buff không lên quái. 0 = không có gì (không tốn byte).
+   */
+  @type("uint8") fx = 0;
+  /**
+   * Tinh anh (M7.3, #504): 0 = quái thường, 1 = tinh anh. Đặt MỘT lần lúc sinh (không đổi giữa chừng). Hiện mọi quái đều 0: bước tinh anh của M7.3 mới bật.
+   */
+  @type("uint8") elite = 0;
 }
 
 /** Đồ rơi trên đất. Kiểu dùng chung cho client: LootView trong shared/src/items.ts */

@@ -9,6 +9,7 @@ import {
   addStatus,
   entriesOf,
   isStunned,
+  maskOf,
   newStatusBox,
   pruneStatuses,
   type AddResult,
@@ -44,8 +45,19 @@ export function applyMonsterStatus(
   if (!rolls(effect.chance, rng)) return "miss";
   const box = (mc.st ??= newStatusBox());
   const res = addStatus(box, effect, w.now, { baseDmg, src, stunImmune: !!mc.def.boss });
-  if (res === "added" || res === "refreshed") w.statusM.add(id);
+  if (res === "added" || res === "refreshed") {
+    w.statusM.add(id);
+    syncMonsterFx(w, id, box); // huy hiệu trạng thái trên đầu quái (`Monster.fx`)
+  }
   return res;
+}
+
+/** Ghi mặt nạ bit trạng thái có hại vào `Monster.fx` (chỉ khi đổi: schema bỏ qua giá trị y hệt nhưng đỡ tính lại). */
+function syncMonsterFx(w: World, id: string, box: StatusBox) {
+  const mon = w.state.monsters.get(id);
+  if (!mon) return;
+  const mask = maskOf(box, w.now);
+  if (mon.fx !== mask) mon.fx = mask;
 }
 
 /**
@@ -140,6 +152,7 @@ function tickMonsterStatuses(w: World) {
       continue;
     }
     pruneStatuses(box, now);
+    syncMonsterFx(w, id, box); // trạng thái vừa hết hạn thì bỏ huy hiệu (kể cả lần dọn cuối, trước khi rời `statusM`)
     if (box.list.length === 0) w.statusM.delete(id);
   }
 }

@@ -42,6 +42,22 @@
 | Bí cảnh | MID | 4x | 52.6 | 1.2 ms | <= 11 ms | 4 / 4 / 100 | 76 đỉnh / 220 | 10 đỉnh / 10 | 9 đỉnh / 16 | 29.8 MB | ✓ ĐẠT |
 <!-- PERF-MATRIX:END -->
 
+### 2.2 Thời gian vào thế giới trên mạng 4G giả lập (`timeToWorld4gMs`)
+
+> Thực nghiệm đo bằng `node client/scripts/measure-4g.mjs` theo thiết kế M7.15 (Issue #516, `THIET_KE_GIAO_DIEN_DO_HOA.md` mục 10.4).
+> Đo từ `navigationStart` tới khi `window.__scene.me()` có giá trị (mock `?duel=mock&debug=1`, không cần máy chủ). Mỗi ca lấy trung vị (median p50) của 5 lần đo.
+
+| Cấu hình mạng | Trạng thái Cache | Chi tiết 5 lần đo (ms) | Thực đo p50 | Ngân sách trần (`perf-budget.json`) | Đánh giá |
+|---|---|---|---|---|---|
+| **Fast 4G** (~9 Mbps, 170 ms) | **Lạnh** (Cold, cache tắt, storage sạch) | 1114, 1091, 1083, 1114, 1096 | **1096 ms** | $\le$ 2500 ms | ✓ ĐẠT (~1.1 s) |
+| **Fast 4G** (~9 Mbps, 170 ms) | **Ấm** (Warm, cache bật & SW precached) | 198, 188, 190, 208, 196 | **196 ms** | $\le$ 500 ms | ✓ ĐẠT (< 0.2 s) |
+| **Slow 4G** (~1.6 Mbps, 150 ms) | **Lạnh** (Cold, cache tắt, storage sạch) | 3572, 3583, 3572, 3566, 3581 | **3572 ms** | $\le$ 6000 ms | ✓ ĐẠT (~3.6 s) |
+| **Slow 4G** (~1.6 Mbps, 150 ms) | **Ấm** (Warm, cache bật & SW precached) | 205, 197, 192, 216, 197 | **197 ms** | $\le$ 500 ms | ✓ ĐẠT (< 0.2 s) |
+
+- **Nhận xét**:
+  - Khi tải Lạnh lần đầu (chưa cài đặt Service Worker), trình duyệt tải gói JavaScript (~493 KB gzip), CSS và tài nguyên khởi đầu qua máy chủ tĩnh nén gzip (chuẩn Cloudflare / production): trên mạng Fast 4G hoàn tất trong ~1.1 s, trên mạng Slow 4G mất ~3.6 s (hoàn toàn nằm trong ngân sách trần).
+  - Khi tải Ấm (Service Worker đã kích hoạt và precache toàn bộ URL cốt lõi), thời gian vào thế giới giảm xuống chỉ còn ~195–200 ms trên cả Fast 4G lẫn Slow 4G, chứng minh hiệu quả vượt trội của bộ nhớ đệm Cache-First.
+
 ## 3. Nhận xét và đánh giá
 1. **Khả năng duy trì khung hình (FPS & JS Loop)**:
    - Ở CPU 1x (flagship/desktop): Vòng lặp cập nhật JS chỉ tốn ~0.3 ms, duy trì ổn định 60 FPS tuyệt đối.

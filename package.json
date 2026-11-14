@@ -34,6 +34,7 @@
     "check:pwa": "node client/scripts/check-pwa.mjs",
     "check:credits": "node client/scripts/check-credits.mjs",
     "perf:mobile": "node client/scripts/measure-mobile-perf.mjs",
+    "perf:4g": "node client/scripts/measure-4g.mjs",
     "capture:viewports": "node client/scripts/capture-viewports.mjs",
     "chup-viewport": "node client/scripts/capture-viewports.mjs",
     "check:budget": "node client/scripts/check-perf-budget.mjs",

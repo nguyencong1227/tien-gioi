@@ -107,6 +107,9 @@ export const MONSTERS: MonsterKind[] = [
     exp: 10,
     level: 1,
     color: 0x8a8f99,
+    // M7.3 (#504): sói lao tới: đứng gồng 700 ms (báo trước đường lao), rồi lao thẳng. Số khởi đầu, M7.9 hiệu chỉnh.
+    behavior: "charger",
+    windupMs: 700,
   },
   {
     id: "ho",
@@ -122,6 +125,9 @@ export const MONSTERS: MonsterKind[] = [
     exp: 35,
     level: 7,
     color: 0x2e2a30,
+    // M7.3 (#504): hổ lao tới, gồng lâu hơn sói một chút (900 ms) vì đòn nặng hơn. Chảy máu nhẹ sau đòn: bước sau. Số khởi đầu, M7.9 hiệu chỉnh.
+    behavior: "charger",
+    windupMs: 900,
   },
   {
     id: "mang",

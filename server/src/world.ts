@@ -146,6 +146,18 @@ export interface MonsterCtrl {
   strideLeft: number;
   /** Trạng thái đang có (M7.2b, `systems/status.ts`): tạo khi gắn lần đầu, quái không dính trạng thái nào thì không tốn bộ nhớ */
   st?: StatusBox;
+  /**
+   * AI đòn mạnh của quái (M7.3, `systems/charge.ts`): đang GỒNG (đứng báo trước, hướng khoá) hoặc THỞ (sau khi lao). Trống = chạy như quái thường.
+   * Không có mục tiêu thì xoá (`monsters.ts`). Chỉ quái `charger` mới có.
+   */
+  ai?: MonsterAi;
+}
+
+/** Pha của đòn mạnh (`systems/charge.ts`): `windup` đứng gồng tới `until` rồi lao theo `angle`; `recover` đứng thở tới `until`. */
+export interface MonsterAi {
+  phase: "windup" | "recover";
+  until: number;
+  angle: number;
 }
 
 /** Cách các system gửi tin ra ngoài. WorldRoom nối vào broadcast / client.send. */
