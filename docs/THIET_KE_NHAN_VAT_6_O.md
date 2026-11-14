@@ -30,7 +30,7 @@
 
 ## 5. Bản đồ thứ tư (`han_van`)
 - **Kiểu thị giác (ĐÃ làm, mục 7):** `MAP_STYLES.han_van` lạnh trắng xanh (ambient `#bcd6f2`, sương `#e4f0fb` alpha 0,3 trôi 7 px/s, nước băng phản chiếu chậm), thời tiết mới `snow` (hạt trắng ngà rơi chéo nhẹ, 12 hạt mỗi đợt như các loại khác, 11 hạt/giây), trang trí thưa (tuyết phủ): hoa tuyết, đá xám lạnh, nhũ băng thay nấm, tùng sẫm. Không thêm loại ô (đúng `PHAN_CONG_M7.md` mục 8).
-- **Hạn chế đã thấy ở ảnh xem trước** (`docs/screenshots/han-van-xem-truoc.png`, cảnh Lạc Hà ép kiểu): nền ô vẫn xanh cỏ (bộ ô không đổi), nên vẻ băng nguyên chủ yếu do lớp phủ màu + sương + tuyết. Đề xuất (hỏi A): để A khi dựng bản đồ chọn ô nền sáng / cát cho vùng tuyết; B có thể thêm `tileTint` theo kiểu (nhuộm lớp ô, một trường dữ liệu, không thêm ảnh) nếu thấy chưa đủ lạnh.
+- **Nền ô (đã quyết, A 15/11): B thêm `tileTint` theo kiểu, ĐÃ làm.** Ảnh xem trước đầu tiên cho thấy nền ô vẫn xanh cỏ (bộ ô dùng chung), nên vẻ băng nguyên chủ yếu do lớp phủ + sương + tuyết. `MapStyle.tileTint?: { color, alpha }` (trần `MAX_TILE_TINT_ALPHA` 0,45, kiểm bởi `validateStyle`): MỘT hình chữ nhật phủ cả bản đồ ngay TRÊN lớp ô (độ sâu -9,8) và DƯỚI trang trí / nước / thực thể; không thêm ảnh, không thêm loại ô; kiểu vắng khai báo thì chi phí 0. Không dùng `Tile.tint` của Phaser vì nó NHÂN màu (chỉ làm tối): phủ thường kéo cỏ về trắng xanh. `han_van`: `#e6f0fa` alpha 0,36; đo trên Chrome thật: độ sáng trung bình vùng giữa cảnh 173,1 -> 199,3 và xanh - đỏ -47,4 -> -2,0 so với cảnh mặc định (ảnh `docs/screenshots/han-van-xem-truoc.png` đã chụp lại). A chọn địa hình theo lối chơi, không theo màu.
 - **Chuyển cảnh Âm Sương -> Hàn Vân và bản đồ nhỏ / lớn:** dùng `scene-transition.ts` và `map-overview.ts` (#498) như ba bản đồ trước: chỉ thêm mục cho id `han_van` (nhãn, màu nút trên sơ đồ, hướng cổng bắc của Âm Sương). Làm sau khi A đưa `MapDef` + cổng vào `shared/` (M7.5, #506).
 - **Phòng ngừa:** kiểu `han_van` có trước bản đồ nên test "kiểu không mồ côi" có danh sách chờ; khi A thêm bản đồ, test ĐỎ nhắc bỏ `han_van` khỏi danh sách chờ (không để cũ).
 
@@ -46,8 +46,10 @@
 - `MAP_STYLES.han_van` + `WeatherKind "snow"` + công thức hạt `weather-snow` (`recipes-weather.ts`), `styleIdFor` và xem trước `?debug&style=<id>` (id lạ / thiếu `?debug` bị bỏ qua), 4 test mới (nhiều khẳng định mỗi ca) + 1 test sửa (danh sách chờ), 6 đột biến đỏ.
 - `client/scripts/check-han-van-style.mjs` (Chrome thật): có hạt tuyết (tint `#f2f8ff`) mà cảnh mặc định không có; màu trung bình vùng giữa lạnh hơn bản mặc định (xanh - đỏ -47,4 -> -16,7); `?style=constructor` bị bỏ qua.
 
-## 8. Câu hỏi cho A
+## 8. Câu hỏi cho A (A ĐÃ TRẢ LỜI ở #574, 15/11; tóm tắt)
 1. Ba ô riêng của chủ: trường `@view(TAG_OWNER)` trên `Player` (đề xuất) hay mở rộng `InvMsg`?
 2. `statsFor` / `equipBonus` có trả `crit`, `cdr`, `guard` đã kẹp trần, và xuất `STAT_CAPS`?
 3. `TREASURES[].desc` do A viết (tiếng Việt hoàn chỉnh) hay B soạn từ số liệu?
 4. Nền ô vùng tuyết do A chọn khi dựng bản đồ, hay B thêm `tileTint` theo kiểu?
+
+**Trả lời của A (tóm tắt, bản đầy đủ ở comment #574 và PR docs của A):** (1) ba ô mới là trường `Player` `@view(TAG_OWNER)` (`boots`, `jade`, `treasure`), `EQUIP_SLOT_UNLOCK_REALM = { treasure: 3 }`, không mở rộng `InvMsg`; (2) có: `statsFor` / `equipBonus` trả `crit` / `cdr` / `guard` đã kẹp, `STAT_CAPS = { crit: 40, cdr: 30, guard: 40 }`; (3) A viết `TREASURES[].desc` kèm test khớp số; (4) B thêm `tileTint` (đã làm, mục 5).
