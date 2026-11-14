@@ -90,7 +90,8 @@ try {
   await send("Runtime.enable");
   await send("Page.enable");
   await send("Page.addScriptToEvaluateOnNewDocument", {
-    source: "try{localStorage.setItem('tg_newbie_guide_dismissed','1')}catch(e){}",
+    source:
+      "try{localStorage.setItem('tg_newbie_guide_dismissed','1');localStorage.setItem('tg_quality','high')}catch(e){}",
   });
 
   /** Mở trang mock (`query` = phần sau `?`), chờ cảnh có người chơi và đã nhận `skills` (mock gửi sau ~400 ms), đếm tin `cast`. */
