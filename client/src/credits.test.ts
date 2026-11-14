@@ -167,17 +167,17 @@ describe("Tài liệu rà soát khớp số tệp thật (M6, #411)", () => {
     expect(doc("docs/RA_SOAT_TAI_SAN.md")).toContain(`**${scanned.length} tệp**`);
   });
 
-  it("số tệp theo thư mục khớp tài liệu: assets 60, icons 5, fonts 5; icon vật phẩm 57 = số vật phẩm của game", () => {
+  it("số tệp theo thư mục khớp tài liệu: assets 72, icons 5, fonts 5; icon vật phẩm 69 = 57 vật phẩm của game + 12 icon Hàn Vân vẽ trước", () => {
     const under = (d: string) =>
       scanned.filter((f) => f.replace(/\\/g, "/").includes(`client/public/${d}/`));
     const items = under("assets").filter((f) => f.replace(/\\/g, "/").includes("/items/"));
-    expect(under("assets")).toHaveLength(60);
+    expect(under("assets")).toHaveLength(72);
     expect(under("icons")).toHaveLength(5);
     expect(under("fonts")).toHaveLength(5);
-    expect(items).toHaveLength(57);
+    expect(items).toHaveLength(69);
     const credits = doc("CREDITS.md");
-    expect(credits).toContain("`client/public/assets/`: 60 tệp");
-    expect(credits).toContain("57 biểu tượng vật phẩm");
+    expect(credits).toContain("`client/public/assets/`: 72 tệp");
+    expect(credits).toContain("69 biểu tượng vật phẩm");
   });
 
   it("mọi icon vật phẩm có một hàng trong bảng của docs/RA_SOAT_TAI_SAN.md (thiếu hàng thì đỏ)", () => {
