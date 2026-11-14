@@ -1,0 +1,92 @@
+// Hàn Vân Lĩnh (M7.5, #506): bản đồ thứ tư, đi qua cổng hai chiều với Âm Sương Trạch; chưa có quái (loài Nguyên Anh thêm ở M7.5b).
+import { describe, expect, it } from "vitest";
+import { AM_SUONG_ID, HAN_VAN_ID, MAPS, getMap, roomNameOf } from "@tien-gioi/shared";
+import { addPlayer, makeWorld } from "./test-helpers";
+import { spawnInitial } from "./monsters";
+import { planTravel } from "./travel";
+
+const AM_SUONG = getMap(AM_SUONG_ID)!;
+const HAN_VAN = getMap(HAN_VAN_ID)!;
+
+describe("Hàn Vân Lĩnh: cổng với Âm Sương Trạch (M7.5)", () => {
+  it("cổng bắc Âm Sương dẫn tới chỗ xuất hiện của cổng nam Hàn Vân, và ngược lại", () => {
+    const bac = AM_SUONG.portals.find((p) => p.id === "am_suong_bac")!;
+    const nam = HAN_VAN.portals.find((p) => p.id === "han_van_nam")!;
+    {
+      const t = makeWorld(AM_SUONG);
+      const { p } = addPlayer(t.w, "a", 4, 0);
+      p.x = bac.x;
+      p.y = bac.y;
+      expect(planTravel(t.w, "a", bac.id)).toEqual({
+        mapId: HAN_VAN_ID,
+        x: nam.spawn.x,
+        y: nam.spawn.y,
+        portalName: bac.name,
+      });
+    }
+    {
+      const t = makeWorld(HAN_VAN);
+      const { p } = addPlayer(t.w, "a", 4, 0);
+      p.x = nam.x;
+      p.y = nam.y;
+      expect(planTravel(t.w, "a", nam.id)).toEqual({
+        mapId: AM_SUONG_ID,
+        x: bac.spawn.x,
+        y: bac.spawn.y,
+        portalName: nam.name,
+      });
+    }
+  });
+
+  it("xa cổng thì không qua được; cổng của bản đồ khác thì bị từ chối", () => {
+    const t = makeWorld(HAN_VAN);
+    const { p } = addPlayer(t.w, "a", 4, 0);
+    p.x = HAN_VAN.townPx.x;
+    p.y = HAN_VAN.townPx.y - 600; // ngoài tầm cổng
+    expect(planTravel(t.w, "a", "han_van_nam")).toBeNull();
+    const nam = HAN_VAN.portals[0];
+    p.x = nam.x;
+    p.y = nam.y;
+    expect(planTravel(t.w, "a", "am_suong_bac")).toBeNull(); // cổng ở bản đồ khác
+    expect(planTravel(t.w, "a", "hac_phong_bac")).toBeNull();
+  });
+
+  it("cổng Âm Sương cũ không đổi (`am_suong_nam` vẫn ở đầu mảng) và vẫn qua được Hắc Phong", () => {
+    expect(AM_SUONG.portals.map((p) => p.id)).toEqual(["am_suong_nam", "am_suong_bac"]);
+    const nam = AM_SUONG.portals[0];
+    const t = makeWorld(AM_SUONG);
+    const { p } = addPlayer(t.w, "a", 3, 0);
+    p.x = nam.x;
+    p.y = nam.y;
+    expect(planTravel(t.w, "a", "am_suong_nam")?.mapId).toBe("hac_phong");
+  });
+
+  it("chỗ xuất hiện của người vừa qua cổng nằm trong khu an toàn của cổng, không đứng được ngoài trạm bị quái đánh", () => {
+    for (const [map, id] of [
+      [AM_SUONG, "am_suong_bac"],
+      [HAN_VAN, "han_van_nam"],
+    ] as const) {
+      const portal = map.portal(id)!;
+      expect(map.inSafe(portal.spawn.x, portal.spawn.y), id).toBe(true);
+      expect(map.circleBlocked(portal.spawn.x, portal.spawn.y, 14), id).toBe(false);
+    }
+  });
+});
+
+describe("Hàn Vân Lĩnh: phòng riêng, chưa có quái (M7.5 bước 1)", () => {
+  it("có phòng Colyseus riêng (`world_han_van`), tên khác ba phòng kia", () => {
+    expect(roomNameOf(HAN_VAN_ID)).toBe("world_han_van");
+    expect(MAPS.map((m) => roomNameOf(m.id))).toEqual([
+      "world",
+      "world_hac_phong",
+      "world_am_suong",
+      "world_han_van",
+    ]);
+  });
+
+  it("sinh quái ban đầu không tạo con nào (monsterCap rỗng): bản đồ trống chỉ có trạm và cổng", () => {
+    const t = makeWorld(HAN_VAN);
+    spawnInitial(t.w);
+    expect(t.w.state.monsters.size).toBe(0);
+  });
+});
