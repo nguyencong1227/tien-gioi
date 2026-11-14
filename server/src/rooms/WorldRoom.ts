@@ -71,6 +71,7 @@ import {
   DEFAULT_MAP,
   cleanName,
   sanitizeSkillBook,
+  SKILL_MSG,
 } from "@tien-gioi/shared";
 import { WorldState, Player } from "../schema";
 import {
@@ -230,7 +231,7 @@ export class WorldRoom extends Room<WorldState> {
         toast: (sid, msg) => this.sendTo(sid, "toast", msg),
         inv: (sid, msg) => this.sendTo(sid, "inv", msg),
         quests: (sid, msg) => this.sendTo(sid, "quests", msg),
-        skills: (sid, msg) => this.sendTo(sid, "skills", msg),
+        skills: (sid, msg) => this.sendTo(sid, SKILL_MSG.skills, msg),
         dialog: (sid, msg) => this.sendTo(sid, "dialog", msg),
         party: (sid, msg) => this.sendTo(sid, "party", msg),
         partyInvited: (sid, msg) => this.sendTo(sid, "partyInvited", msg),
@@ -346,7 +347,7 @@ export class WorldRoom extends Room<WorldState> {
     });
     this.on<MeditateMsg>("meditate", (sid, m) => setMeditating(w, sid, m?.on === true));
     this.on("breakthrough", (sid) => breakthrough(w, sid));
-    this.on("skillSlot", (sid, m) => skillSlot(w, sid, m));
+    this.on(SKILL_MSG.slot, (sid, m) => skillSlot(w, sid, m));
     this.on<ChatMsg>("chat", (sid, m) => chat(w, sid, m?.text));
     this.on<UseItemMsg>("useItem", (sid, m) => useItem(w, sid, m?.slot));
     this.on<PickupMsg>("pickup", (sid, m) => pickup(w, sid, m?.lootId));

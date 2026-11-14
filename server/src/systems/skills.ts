@@ -9,6 +9,7 @@ import {
   learnSkill,
   parseSkillSlot,
   realmLabel,
+  skillCooldownMs,
   type ItemDef,
   type SkillBook,
   type SkillsMsg,
@@ -21,7 +22,24 @@ export function cooldownsLeft(c: PlayerCtrl, now: number): SkillsMsg["cd"] {
   return c.skillCd.map((t) => Math.max(0, Math.ceil(t - now))) as SkillsMsg["cd"];
 }
 
-/** Gửi sổ chiêu + hồi chiêu còn lại cho chủ. Khi đổi sổ và lúc vào phòng; không gọi mỗi tick. */
+/**
+ * Giảm hồi chiêu (0..`CDR_CAP`) từ trang bị của người chơi. Chưa có trang bị nào cho `cdr` (ô và chỉ số mới ở M7.4): luôn 0; MỘT chỗ để M7.4 nối
+ * vào `equipBonus`, dùng cả cho `cdMax` gửi client lẫn đặt `skillCd` khi dùng chiêu (M7.2b).
+ */
+export function cdrOf(_c: PlayerCtrl): number {
+  return 0;
+}
+
+/** Tổng hồi chiêu (ms) của bốn ô sau tầng chiêu + `cdr`; 0 = ô trống. Client chia `cd / cdMax` để vẽ vòng hồi chiêu. */
+export function cooldownsMax(c: PlayerCtrl): SkillsMsg["cdMax"] {
+  const cdr = cdrOf(c);
+  return c.skills.slots.map((id) => {
+    const def = byId(SKILL_BY_ID, id);
+    return def ? skillCooldownMs(def, c.skills.learned[id] ?? 1, cdr) : 0;
+  }) as SkillsMsg["cdMax"];
+}
+
+/** Gửi sổ chiêu + hồi chiêu cho chủ. Khi đổi sổ và lúc vào phòng; không gọi mỗi tick. */
 export function sendSkills(w: World, sid: string) {
   const c = w.ctrl.get(sid);
   if (!c) return;
@@ -29,6 +47,7 @@ export function sendSkills(w: World, sid: string) {
     learned: { ...c.skills.learned },
     slots: [...c.skills.slots] as SkillsMsg["slots"],
     cd: cooldownsLeft(c, w.now),
+    cdMax: cooldownsMax(c),
   };
   w.events.skills(sid, msg);
 }

@@ -2464,6 +2464,11 @@ describe("sổ chiêu: lưu, nạp lại, gắn ô qua tin nhắn (M7.2a)", () =
     expect(m.slots).toEqual(["hoa_van_kiem", "bon_thach_quyen", "", ""]);
     expect(m.learned).toEqual({ hoa_van_kiem: 2, bon_thach_quyen: 1 });
     expect(m.cd).toEqual([0, 0, 0, 0]);
+    // tổng hồi chiêu: chiêu ở ô 2 (tầng 2) và ô 3 (tầng 1); ô trống = 0
+    expect(m.cdMax[0]).toBeGreaterThan(0);
+    expect(m.cdMax[1]).toBeGreaterThan(0);
+    expect(m.cdMax[2]).toBe(0);
+    expect(m.cdMax[3]).toBe(0);
     // ô 4 (I) mở từ Kim Đan; chiêu chưa học; id độc; tin sai kiểu: không đổi gì
     const n = msgs.length;
     for (const bad of [

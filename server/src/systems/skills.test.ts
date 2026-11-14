@@ -1,10 +1,23 @@
 // Sổ chiêu (M7.2a): học từ kinh quyển, gắn ô L U I O, gửi cho chủ, mất theo kiếp trừ chiêu đã khắc vào chân linh.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { ITEM_BY_ID, SKILL_BY_ID, emptySkillBook, type ItemDef } from "@tien-gioi/shared";
+import {
+  ITEM_BY_ID,
+  SKILL_BY_ID,
+  emptySkillBook,
+  skillCooldownMs,
+  type ItemDef,
+} from "@tien-gioi/shared";
 import { hurtPlayer } from "./combat";
 import { useItem } from "./inventory";
 import { applyRebirth } from "./reincarnation";
-import { cooldownsLeft, learnFromBook, rebirthSkills, sendSkills, skillSlot } from "./skills";
+import {
+  cooldownsLeft,
+  cooldownsMax,
+  learnFromBook,
+  rebirthSkills,
+  sendSkills,
+  skillSlot,
+} from "./skills";
 import { addMonster, addPlayer, makeWorld } from "./test-helpers";
 
 /** Kinh quyển thử: M7.4 mới có sách thật trong `ITEMS`; ở đây thêm tạm vào bảng tra và gỡ sau khi xong. */
@@ -218,6 +231,25 @@ describe("gửi sổ chiêu", () => {
     expect(cooldownsLeft(t.c, t.w.now)).toEqual([0, 1, 2500, 0]);
     sendSkills(t.w, "a");
     expect(t.skillMsgs.at(-1)!.msg.cd).toEqual([0, 1, 2500, 0]);
+  });
+
+  it("cdMax = tổng hồi chiêu sau tầng chiêu (ô trống = 0); client chia cd / cdMax để vẽ vòng hồi chiêu", () => {
+    const t = setup(2, []);
+    t.c.skills = {
+      learned: { hoa_van_kiem: 3, me_tung_bo: 1 },
+      slots: ["hoa_van_kiem", "", "me_tung_bo", ""],
+    };
+    const hoa = SKILL_BY_ID.hoa_van_kiem;
+    const me = SKILL_BY_ID.me_tung_bo;
+    expect(cooldownsMax(t.c)).toEqual([skillCooldownMs(hoa, 3), 0, skillCooldownMs(me, 1), 0]);
+    expect(cooldownsMax(t.c)[0]).toBeLessThan(hoa.cooldown); // tầng 3 hồi nhanh hơn
+    t.w.now = 1000;
+    t.c.skillCd = [1000 + 1000, 0, 0, 0];
+    sendSkills(t.w, "a");
+    const m = t.skillMsgs.at(-1)!.msg;
+    expect(m.cdMax).toEqual([skillCooldownMs(hoa, 3), 0, skillCooldownMs(me, 1), 0]);
+    expect(m.cd[0]).toBe(1000);
+    expect(m.cd[0]).toBeLessThanOrEqual(m.cdMax[0]);
   });
 
   it("bản sao: sửa tin đã gửi không làm hỏng sổ thật", () => {
