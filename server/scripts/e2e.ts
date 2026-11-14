@@ -125,6 +125,7 @@ function seedTestData(dataDir: string, scenario: "limbo" | "normal", name: strin
       duyenTotal: 0,
       unlocks: {},
       origins: ["pham_gia"],
+      engraved: [],
       best: { step: 9, realm: 1, tier: 8 },
       lastCreditedLife: "",
       history: [],

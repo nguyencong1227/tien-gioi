@@ -7,6 +7,7 @@
 //
 // Mọi hàm ở đây là hàm thuần dùng chung cho client (hiển thị đúng số server tính) và server (kết quả thật).
 import { REALMS, expToNext, stepOf } from "./realms";
+import { sanitizeEngraved } from "./skills";
 
 // ---------------------------------------------------------------------------------------------------------------
 // Duyên (điểm luân hồi)
@@ -268,6 +269,11 @@ export interface Soul {
   unlocks: Record<string, number>;
   /** Xuất thân đã mở (không gồm Phàm gia) */
   origins: string[];
+  /**
+   * Công pháp đã KHẮC vào chân linh (M7): giữ qua kiếp (`ENGRAVE_COSTS`, `skills.ts`); id `SkillDef`, không trùng, tối đa `ENGRAVE_MAX`.
+   * Số được khắc tối đa theo nấc `unlocks.khac` do server kiểm khi mua (M7.2, #503); dữ liệu cũ không có trường này = [].
+   */
+  engraved: string[];
   /** Thành tựu cao nhất mọi kiếp */
   best: { step: number; realm: number; tier: number };
   /** lifeId cuối cùng đã cộng Duyên: chống cộng hai lần khi chạy lại sau sập máy */
@@ -286,6 +292,7 @@ export function newSoul(id: string, now: string): Soul {
     duyenTotal: 0,
     unlocks: {},
     origins: [],
+    engraved: [],
     best: { step: 0, realm: 0, tier: 0 },
     lastCreditedLife: "",
     history: [],
@@ -319,6 +326,7 @@ export function sanitizeSoul(raw: unknown, now = ""): Soul | null {
   }
   const og = Array.isArray(r.origins) ? r.origins : [];
   for (const o of ORIGINS) if (o.cost > 0 && og.includes(o.id)) soul.origins.push(o.id);
+  soul.engraved = sanitizeEngraved(r.engraved);
   const b =
     r.best !== null && typeof r.best === "object" ? (r.best as Record<string, unknown>) : {};
   const { realm, tier } = cleanStep(b.realm, b.tier);

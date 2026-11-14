@@ -1,7 +1,7 @@
 // Vật phẩm, bảng rơi đồ, túi đồ: hợp đồng giữa client và server (Sprint 1).
 // Server quyết định mọi thứ (rơi gì, nhặt được không, dùng được không); client chỉ hiển thị.
 
-export type ItemType = "consumable" | "material" | "equip";
+export type ItemType = "consumable" | "material" | "equip" | "book";
 /** 0 phàm phẩm, 1 linh phẩm, 2 bảo phẩm, 3 tiên phẩm, 4 thần phẩm */
 export type Rarity = 0 | 1 | 2 | 3 | 4;
 
@@ -89,6 +89,8 @@ export interface ItemDef {
   cooldown?: number;
   /** Chỉ có ở trang bị (type "equip", stack 1) */
   equip?: EquipDef;
+  /** Chỉ có ở kinh quyển (type "book", M7): id `SkillDef` mà dùng quyển sẽ học (hoặc +1 tầng nếu đã học). Tra bằng `skillOf`. */
+  teaches?: string;
   /** Màu ảnh tạm (trước khi có asset thật) */
   color: number;
 }
