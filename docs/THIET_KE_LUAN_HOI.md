@@ -154,6 +154,7 @@ Màn hình **Hoàng Tuyền** chặn toàn bộ HUD (như màn đăng nhập), c
 - Nút cỡ chạm >= 44 px; giá không đủ thì nút mờ nhưng vẫn đọc được lý do; số Duyên và nút cập nhật ngay theo tin `soul` (server là nguồn sự thật; client không tự trừ).
 - Bấm "đầu thai": màn hình mờ, lời Mạnh Bà (một câu), rồi cảnh Lạc Hà Trấn hiện dần; HUD ghi "kiếp N".
 - Đóng tab / rớt mạng ở Hoàng Tuyền: lần sau vào game thấy lại đúng màn hình (server gửi `limbo` khi đăng nhập).
+- **Kiểm khắc chân linh bằng E2E thật** (`npm run build -w client && npm run e2e:chieu -w server`, Chrome headless + server Colyseus thật, phím gửi bằng CDP): ba ca trên cùng một bộ chọn: ĐỔI tập chiêu (tin `rebirth` kèm `engrave`, chân linh ghi chiêu mới, kiếp mới có đúng chiêu đó ở tầng 1), KHÔNG đụng bộ chọn (tin không có `engrave`, máy chủ giữ nguyên chiêu đã khắc), BỎ HẾT (`engrave: []`, máy chủ xoá hết). Kết quả đọc từ đĩa (`souls/<khoá>.json`, hồ sơ nhân vật), không chỉ từ giao diện. Ca `limbo` của `e2e.ts` không đụng bộ chọn.
 - Lời thoại gợi ý (tự viết, B được sửa cho hợp giọng): *Mạnh Bà múc một muỗng canh, hơi nước bốc lên như khói hương: "Cạn chén này, tên ngươi nhẹ như lá. Còn cái đã ngộ, bia đá giữ hộ."*; khi không đủ Duyên: *"Duyên mỏng, chưa khắc nổi nét này. Kiếp sau."*
 
 ## 8. Hợp đồng `shared/` (PR 2a, chỉ sửa `shared/`)
