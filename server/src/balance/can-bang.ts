@@ -11,6 +11,8 @@ import {
   DROP_TABLES,
   buyPrice,
   sellPrice,
+  statsFor,
+  emptyEquipment,
 } from "@tien-gioi/shared";
 import { renderKimDan, type KimDanReport } from "./kim-dan";
 import { renderKimDanSau, withKimDan } from "./kim-dan-sau";
@@ -18,6 +20,7 @@ import { renderKimDanKinhTe } from "./kim-dan-kinh-te";
 import { renderKimDanPkBiCanh } from "./kim-dan-pk";
 import { renderHuntCheck } from "./hunt-check";
 import { renderSearchCheck } from "./search-check";
+import { renderSkillBalanceMarkdown } from "./skills-model";
 import { PK_TARGET_SECONDS, representativeLevels, summarizeDuels } from "./pk";
 import {
   ASSUME_DUNGEON,
@@ -456,7 +459,9 @@ ${renderKimDanSau()}
 ${renderKimDanKinhTe()}
 ${renderKimDanPkBiCanh()}
 ${renderHuntCheck()}
-${renderSearchCheck()}`,
+${renderSearchCheck()}
+
+${renderSkillBalanceMarkdown(statsFor(3, 0, emptyEquipment()))}`,
   );
   console.log(`Đã ghi ${out}\n\n${summary}`);
 }
