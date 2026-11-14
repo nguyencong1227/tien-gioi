@@ -5,6 +5,7 @@
 ## [Chưa phát hành] — M7 (Chiều sâu chiến đấu + Nguyên Anh)
 
 ### Máy chủ
+- **Sát thương theo giây chính xác hơn (M7.3, #504; review của B):** độc / bỏng / chảy máu (lên quái và người chơi) nay không mất / thừa phần lẻ: tổng cả đời trạng thái đúng `round(sát thương mỗi giây x thời lượng)`; trước đó làm tròn từng giây lệch tới +-30-100 % khi sát thương mỗi giây chỉ cỡ 0,4 - 1,5.
 - **Sát thương theo giây lên người chơi (M7.3 bước 3, #504):** độc / bỏng / chảy máu gắn lên người nay thật sự trừ khí huyết mỗi giây (trước đó huy hiệu hiện nhưng máy chủ chưa trừ). Chiêu né không tránh được, hộ thể đỡ trước, ngắt đả tọa, hồn lìa xác và thách đấu bất tử, gục thì như bị quái đánh (bí cảnh ngã không mất kiếp, nơi khác luân hồi; thông báo nêu tên trạng thái). Chưa quái nào gắn dot lên người (bước sau).
 - **Quái lao tới có báo trước (M7.3 bước 1, #504):** bộ máy quái `charger` (chưa áp lên loài nào): đứng gồng rồi lao thẳng một quãng cố định, vùng báo trước hình đường thẳng gửi cho người ở gần (kể cả người đứng ở đầu kia đường lao); người chơi tránh bằng cách đi ngang ra khỏi đường lao trong lúc gồng, đứng yên hoặc đi dọc thì trúng; choáng ngắt gồng; quái thở sau khi lao. Trúng tính theo vị trí lúc đáp đòn, dừng ở tường và không lao vào khu an toàn.
 - **Hôi Lang và Hắc Hổ giờ lao tới có báo trước (M7.3 bước 2, #504):** thấy người thì đứng gồng (sói 0,7 giây, hổ 0,9 giây) rồi lao thẳng; tránh được bằng cách đi ngang ra khỏi đường lao; choáng ngắt gồng. Số khởi đầu, đợt M7.9 hiệu chỉnh. Thời gian hạ một con ở bãi dài hơn một chút (`docs/CAN_BANG.md` sinh lại).
