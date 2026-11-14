@@ -148,6 +148,26 @@ describe("tickBolts", () => {
     expect(b.p.hp).toBe(hpB);
   });
 
+  it("đạn hạ gục người: thông báo ghi 'bắn trọng thương' (đòn gần vẫn ghi 'đánh trọng thương')", () => {
+    const t = setup(200);
+    t.p.hp = 1;
+    fireBolt(t.w, t.mon.m, MONSTER_BY_ID[XA], 0);
+    for (let i = 0; i < 20 && t.w.bolts.length > 0; i++) tickBolts(t.w, 0.05);
+    expect(t.p.dead).toBe(true);
+    const bolt = t.toasts.filter((x) => x.sid === "a").map((x) => x.msg.text);
+    expect(bolt).toHaveLength(1);
+    expect(bolt[0]).toContain("bắn trọng thương");
+    expect(bolt[0]).not.toContain("đánh trọng thương");
+
+    const melee = setup(200);
+    melee.p.hp = 1;
+    const m = addMonster(melee.w, "lang", 0, 0);
+    expect(hurtPlayer(melee.w, "a", melee.p, 5, m.m)).toBe(true);
+    const text = melee.toasts.filter((x) => x.sid === "a").map((x) => x.msg.text)[0];
+    expect(text).toContain("đánh trọng thương");
+    expect(text).not.toContain("bắn");
+  });
+
   it("không trúng người trong khu an toàn (trấn); người chết không bị trúng", () => {
     const t = setup(200);
     t.p.x = t.w.map.townPx.x;
