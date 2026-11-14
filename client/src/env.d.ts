@@ -52,6 +52,7 @@ declare module "*check-credits.mjs" {
   export const AI_SOURCE_DIR: string;
   export const AI_ALLOWED_EXT: Set<string>;
   export const AI_CREDITS_HEADING_RE: RegExp;
+  export const SDXL_BASE_SHA256: Set<string>;
   export const PNG_FORBIDDEN_CHUNKS: Set<string>;
   export const WEBP_FORBIDDEN_CHUNKS: Set<string>;
   export function pngChunks(buf: Uint8Array): string[];

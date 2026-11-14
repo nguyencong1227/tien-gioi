@@ -17,6 +17,7 @@ import {
   parseContentSourceTable,
   pngChunks,
   scanFiles,
+  SDXL_BASE_SHA256,
   sha256File,
   validateAiSource,
   webpChunks,
@@ -664,11 +665,13 @@ const makeWebp = (extra: string[] = []) => {
 
 const sha = (b: Buffer) => crypto.createHash("sha256").update(b).digest("hex");
 const HEX = "a".repeat(64);
+/** Băm thật của checkpoint SDXL base 1.0 (`SDXL_BASE_SHA256`) */
+const SDXL_SHA = [...SDXL_BASE_SHA256][0];
 const validSource = (asset: string, finalSha: string, over: Record<string, unknown> = {}) => ({
   asset,
   finalSha256: finalSha,
   rawSha256: HEX,
-  model: { name: "sd_xl_base_1.0.safetensors", sha256: HEX },
+  model: { name: "sd_xl_base_1.0.safetensors", sha256: SDXL_SHA },
   lora: [],
   comfyui: { comfyui: "0.3.0", pytorch: "2.5.0", driver: "560.35" },
   workflow: { path: "docs/art/workflow/sdxl-base.json", sha256: HEX },
@@ -839,6 +842,25 @@ describe("Ảnh do AI sinh: nguồn, băm, siêu dữ liệu, dòng CREDITS (che
     expect(bad({ model: { name: "sd_v1-5.safetensors", sha256: HEX } }).join()).toContain(
       "SDXL base",
     );
+    // GHIM BẰNG BĂM, không chỉ bằng tên: tên đúng mà băm của model khác (hoặc băm bừa, hoặc 63 ký tự như bản chép sai ở tài liệu G2) bị từ chối
+    // Băm công bố của SDXL base 1.0 viết LẠI ở đây (không suy từ chính tập hằng): sửa nhầm một ký tự của hằng thì đỏ. Đã đối chiếu `sha256sum` của tệp thật
+    // (`sd_xl_base_1.0.safetensors`, 6.938.078.334 byte) ở M7.12 #513.
+    expect([...SDXL_BASE_SHA256]).toEqual([
+      "31e35c80fc4829d14f90153f4c74cd59c90b779f6afe05a74cd6120b893f7e5b",
+    ]);
+    expect(SDXL_SHA).toMatch(/^[0-9a-f]{64}$/);
+    expect(bad({ model: { name: "sd_xl_base_1.0.safetensors", sha256: HEX } }).join()).toContain(
+      "model.sha256",
+    );
+    expect(
+      bad({ model: { name: "sd_xl_base_1.0.safetensors", sha256: SDXL_SHA.slice(1) } }).join(),
+    ).toContain("model");
+    expect(
+      bad({ model: { name: "sd_xl_base_1.0.safetensors", sha256: SDXL_SHA.toUpperCase() } }).join(),
+    ).toContain("model");
+    expect(bad({ model: { name: "model_la.safetensors", sha256: SDXL_SHA } }).join()).toContain(
+      "SDXL base",
+    );
     expect(bad({ lora: ["style.safetensors"] }).join()).toContain("lora");
     expect(bad({ lora: undefined }).join()).toContain("lora");
     expect(
@@ -860,6 +882,8 @@ describe("Ảnh do AI sinh: nguồn, băm, siêu dữ liệu, dòng CREDITS (che
     expect(bad({ seed: "98765" })).toEqual([]);
     expect(bad({ postProcess: [] }).join()).toContain("postProcess");
     expect(bad({ workflow: { path: "x" } }).join()).toContain("workflow");
+    expect(bad({ workflow: { path: " ", sha256: HEX } }).join()).toContain("workflow");
+    expect(bad({ workflow: { path: "", sha256: HEX } }).join()).toContain("workflow");
     expect(bad({ rawSha256: "abc" }).join()).toContain("rawSha256");
     expect(bad({ date: "" }).join()).toContain("date");
     expect(validateAiSource(null)).toHaveLength(1);

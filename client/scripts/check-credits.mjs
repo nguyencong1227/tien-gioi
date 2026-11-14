@@ -534,6 +534,14 @@ export const PNG_FORBIDDEN_CHUNKS = new Set(["tEXt", "iTXt", "zTXt", "eXIf"]);
 export const WEBP_FORBIDDEN_CHUNKS = new Set(["EXIF", "XMP "]);
 
 const HEX64 = /^[0-9a-f]{64}$/;
+
+/**
+ * SHA-256 của checkpoint SDXL BASE 1.0 (`sd_xl_base_1.0.safetensors`, 6.938.078.334 byte; trùng băm công bố của Stability AI): luật `AGENTS.md` là "chỉ SDXL base", nên
+ * `model.sha256` của mọi tệp nguồn ảnh AI phải thuộc tập này (tên tệp model đổi được, băm thì không). Thêm bản khác (vd `0.9vae`) khi nào thật sự dùng, qua PR có người xem.
+ */
+export const SDXL_BASE_SHA256 = new Set([
+  "31e35c80fc4829d14f90153f4c74cd59c90b779f6afe05a74cd6120b893f7e5b",
+]);
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 /**
@@ -635,13 +643,19 @@ export function validateAiSource(j) {
     !HEX64.test(j.model.sha256 ?? "")
   )
     bad.push("`model` phải có `name` và `sha256` (64 hex)");
-  else if (
-    !/(sd[-_ ]?xl|stable[-_ ]?diffusion[-_ ]?xl)/i.test(j.model.name) ||
-    !/base/i.test(j.model.name)
-  )
-    bad.push(
-      `\`model.name\` "${j.model.name}" không phải SDXL base (chỉ được SDXL base, AGENTS.md)`,
-    );
+  else {
+    if (
+      !/(sd[-_ ]?xl|stable[-_ ]?diffusion[-_ ]?xl)/i.test(j.model.name) ||
+      !/base/i.test(j.model.name)
+    )
+      bad.push(
+        `\`model.name\` "${j.model.name}" không phải SDXL base (chỉ được SDXL base, AGENTS.md)`,
+      );
+    if (!SDXL_BASE_SHA256.has(j.model.sha256))
+      bad.push(
+        "`model.sha256` không phải băm của checkpoint SDXL base 1.0 (chỉ được SDXL base, AGENTS.md; xem `SDXL_BASE_SHA256`)",
+      );
+  }
   if (!Array.isArray(j.lora)) bad.push("`lora` phải là mảng (`[]` nếu không dùng)");
   else if (j.lora.length > 0)
     bad.push("`lora` phải rỗng: không dùng model / LoRA khác nếu chưa hỏi người dùng (AGENTS.md)");
