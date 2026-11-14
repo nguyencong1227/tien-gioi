@@ -5,6 +5,7 @@
 import type { FxPriority } from "./budget";
 import { COMBAT_RECIPES } from "./recipes-combat";
 import { CULTIVATION_RECIPES } from "./recipes-cultivation";
+import { CAST_RECIPES } from "./recipes-cast";
 import { SKILL_RECIPES } from "./recipes-skill";
 import { WORLD_RECIPES } from "./recipes-world";
 import { WEATHER_RECIPES } from "./recipes-weather";
@@ -130,6 +131,7 @@ for (const r of COMBAT_RECIPES) registerRecipe(r);
 for (const r of CULTIVATION_RECIPES) registerRecipe(r);
 for (const r of WORLD_RECIPES) registerRecipe(r);
 for (const r of SKILL_RECIPES) registerRecipe(r);
+for (const r of CAST_RECIPES) registerRecipe(r);
 for (const r of WEATHER_RECIPES) registerRecipe(r);
 
 registerRecipe({

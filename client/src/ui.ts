@@ -134,6 +134,8 @@ import {
   type ActionId,
 } from "./keybinds";
 import { captureOutcome, keysScreenModel } from "./keys-screen";
+import { elementColor } from "./skill-bar";
+import { readableOn } from "./contrast";
 import {
   clampEngrave,
   effectiveEngrave,
@@ -142,11 +144,11 @@ import {
   engraveItem,
   engraveToSend,
   toggleEngrave,
+  ENGRAVE_CHECKED_BG,
 } from "./engrave";
 import { LEAVE_BUTTONS, pickPromptButton, pickVisible, type PromptAnswer } from "./prompts";
 import { dirOfArrowKey, moveFocus, ownsArrowKeys, withFocusKept } from "./panel-nav";
 import { skillIconSvg } from "./skill-icon";
-import { elementColor } from "./skill-bar";
 import { type SkillRow, type SkillsPanelModel } from "./skills-panel";
 import { transitionMs, waitOrSkip } from "./gfx/scene-transition";
 import { getDisplay, onDisplayChange } from "./gfx/display";
@@ -2484,6 +2486,8 @@ function renderLimboEngraveImpl() {
     const nameSpan = document.createElement("span");
     nameSpan.className = "engrave-name";
     nameSpan.textContent = info.name;
+    // màu theo hệ như biểu tượng ở thanh chiêu, sáng thêm tới khi đủ 4,5:1 trên nền mục đã chọn (Âm / Hỏa / Thủy / Thổ gốc chỉ 3,0-4,0; a11y, nit của A ở #550)
+    nameSpan.style.color = readableOn(elementColor(info.def?.element), ENGRAVE_CHECKED_BG);
     item.append(nameSpan);
     if (info.element) {
       const tag = document.createElement("small");

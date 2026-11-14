@@ -1,5 +1,6 @@
 import { getDisplay } from "../gfx/display";
 import { createFxSystem, type FxSystem } from "../gfx/fx/fx";
+import { planCastFx } from "../gfx/fx/cast-fx";
 import {
   planSlashEdges,
   planSwordBeam,
@@ -89,6 +90,7 @@ import {
   SKILL_MSG,
   type CastMsg,
   type SkillDef,
+  skillOf,
   type SkillSlot,
   type SkillsMsg,
   type FxMsg,
@@ -3251,6 +3253,33 @@ export class WorldScene extends Phaser.Scene {
         if (mon?.monAnim && !animReducedMotion()) markMonAttack(mon.monAnim, this.time.now);
         if (!this.inView(m.x, m.y, 96)) return;
         return this.fxSlash(m.x, m.y, m.angle, 0xff6050, 0.6);
+      }
+      case "cast": {
+        // Dùng chiêu (M7.7, #508): hạt theo hình / hệ của chiêu (`cast-fx.ts`); client chỉ vẽ, kết quả đánh do máy chủ quyết định
+        const def = skillOf(m.skill);
+        if (!def) return; // id lạ: bỏ qua
+        const mine = m.by === this.sid;
+        if (mine) {
+          // đòn của mình: số sát thương trúng quái trong tầm được tô như đòn của mình (như chém / kiếm khí)
+          this.lastAttack = { at: this.time.now, range: m.range };
+          const me = this.players.get(this.sid);
+          if (me) me.slashUntil = this.time.now + SLASH_MS;
+        } else {
+          const other = this.players.get(m.by);
+          if (other) other.slashUntil = this.time.now + SLASH_MS;
+        }
+        if (!this.inView(m.x, m.y, m.range + 96)) return;
+        return this.playFxPoints(
+          planCastFx({
+            skill: def,
+            x: m.x,
+            y: m.y,
+            angle: m.angle,
+            range: m.range,
+            mine,
+            emitterBudget: getQuality().emitterBudget,
+          }),
+        );
       }
       case "levelup":
         return this.fxLevelUp(m.x, m.y, m.major, m.by === this.sid);

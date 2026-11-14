@@ -332,6 +332,12 @@ async function runLeakTest() {
             }
             window.__ui.closeAllModals();
           }
+          // Hiệu ứng dùng chiêu (#508): phát tin fx cast qua đúng đường tin nhắn của cảnh, xoay qua cả 12 chiêu (mọi hình: quạt, tia, toả, vòng nổ, vùng đất, bộ pháp, hộ thể). Lưu ý: nằm TRONG chuỗi mẫu, không dùng dấu huyền.
+          if (window.__scene && window.__scene.room && window.__scene.room.emit) {
+            const castIds = ["hoa_van_kiem", "bon_thach_quyen", "ung_trao", "trong_nhac_tram", "huyen_bang_chi", "kim_chung_trao", "bich_thuy_hoi_xuan", "phieu_phong_bo", "thanh_tung_phi_cham", "lac_tuyet_phan_phi", "cuu_cung_khon_sat", "me_tung_bo"];
+            const sc2 = window.__scene;
+            sc2.room.emit("fx", { kind: "cast", by: "leak-bot", skill: castIds[${i} % castIds.length], x: sc2.predX, y: sc2.predY, angle: (${i} % 8) * 0.785, range: 150 });
+          }
           if (window.__scene) {
             if (window.__scene.fx) {
               window.__scene.fx.play("hit-spark", 100, 100, { priority: 2 });
@@ -346,7 +352,9 @@ async function runLeakTest() {
     // Khởi động: vài chu kỳ ĐẦY ĐỦ (cả dựng lại bản đồ) trước khi đọc chỉ số ban đầu. Lần dựng lại đầu tiên làm V8 / Phaser
     // nạp bộ nhớ đệm một lần (~2 MB heap, đo bằng 150 chu kỳ riêng: sau đó chỉ ~20 KB mỗi lần), không phải rò rỉ; không khởi
     // động thì ngưỡng 10 % trên 20 chu kỳ dao động quanh 9-11 % tuỳ lần chạy.
-    const WARMUP_CYCLES = 8;
+    // 12 chu kỳ (không phải 8): mỗi công thức hạt tạo MỘT emitter dùng lại ở lần phát đầu (fx.ts emitterFor); chu kỳ nào cũng phát một chiêu khác trong 12 chiêu, nên khởi động
+    // phải qua đủ 12 để mọi emitter của chiêu đã được tạo TRƯỚC khi đọc chỉ số ban đầu (không thì 4 emitter tạo muộn bị đếm nhầm là rò rỉ GameObjects)
+    const WARMUP_CYCLES = 12;
     for (let w = 0; w < WARMUP_CYCLES; w++) {
       await cdpSend("Runtime.evaluate", { expression: cycleExpr(w) });
       await sleep(80);
