@@ -646,6 +646,34 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: "dai_hoi_huyet_dan", chance: 1, min: 1, max: 2 },
     { itemId: "tu_khi_dan", chance: 0.5, min: 1, max: 1 },
   ],
+  // Quái Nguyên Anh (M7.5b): bảng rơi TẠM chỉ có đan và kinh quyển đã có; nguyên liệu riêng của từng loài (`han_lang_mao`, `phong_nha_vu`, `tuong_cot`, `doc_tuoc_nang`,
+  // `thien_han_chau`) thêm cùng bộ đồ IV ở M7.5c khi có icon (docs/PHAN_CONG_M7.md mục 8)
+  han_lang: [
+    { itemId: "dai_hoi_huyet_dan", chance: 0.1, min: 1, max: 1 },
+    { itemId: "dai_hoi_linh_dan", chance: 0.06, min: 1, max: 1 },
+    { itemId: bookIdOf("lac_tuyet_phan_phi"), chance: 0.02, min: 1, max: 1 },
+  ],
+  phong_nha: [
+    { itemId: "dai_hoi_huyet_dan", chance: 0.08, min: 1, max: 1 },
+    { itemId: "dai_hoi_linh_dan", chance: 0.1, min: 1, max: 1 },
+    { itemId: bookIdOf("thanh_tung_phi_cham"), chance: 0.02, min: 1, max: 1 },
+  ],
+  cot_tuong: [
+    { itemId: "dai_hoi_huyet_dan", chance: 0.12, min: 1, max: 1 },
+    { itemId: "dai_hoi_linh_dan", chance: 0.08, min: 1, max: 1 },
+    { itemId: bookIdOf("cuu_cung_khon_sat"), chance: 0.02, min: 1, max: 1 },
+  ],
+  doc_tuoc: [
+    { itemId: "dai_hoi_huyet_dan", chance: 0.1, min: 1, max: 1 },
+    { itemId: "dai_hoi_linh_dan", chance: 0.1, min: 1, max: 1 },
+    { itemId: bookIdOf("me_tung_bo"), chance: 0.02, min: 1, max: 1 },
+  ],
+  // Trùm Nguyên Anh: bãi của đội 3-4 người; tạm rơi đan và Tụ Khí Đan, nguyên liệu `thien_han_chau` + vũ khí bộ IV thêm ở M7.5c
+  thien_han_vuong: [
+    { itemId: "dai_hoi_huyet_dan", chance: 1, min: 2, max: 3 },
+    { itemId: "dai_hoi_linh_dan", chance: 1, min: 1, max: 2 },
+    { itemId: "tu_khi_dan", chance: 0.6, min: 1, max: 2 },
+  ],
   // Trùm bí cảnh (docs/THIET_KE_BI_CANH.md): đồ rơi như quái thường (chủ đồ theo đội); thưởng hoàn thành riêng ở `DUNGEONS`.
   // Đã tính vào cân bằng 4c-2 (`server/src/balance/dungeon.ts`).
   yeu_vuong: [

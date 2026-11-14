@@ -140,6 +140,13 @@ export const COIN_DROPS: Record<string, CoinDrop> = {
   thach_quy: { chance: 0.8, min: 50, max: 110 },
   doc_thiem: { chance: 0.9, min: 60, max: 130 },
   hac_giao: { chance: 1, min: 300, max: 490 }, // trùm: chia cho đội; thấp hơn trùm bí cảnh (400) vì exp thấp hơn (test giữ thứ tự theo exp)
+  // Quái Nguyên Anh (M7.5b): cao hơn loài Kim Đan cùng vai nhưng PHẢI giữ thứ tự theo `exp` với mọi loài khác (`currency.test.ts`: Xích Mãng exp 900 rơi ~225,
+  // Hắc Giao exp 3200 rơi ~395 nên Cốt Tượng / Độc Tước, exp ~1300, nằm giữa hai mức đó). Số khởi đầu, M7.9 hiệu chỉnh theo `docs/CAN_BANG.md`
+  han_lang: { chance: 0.8, min: 75, max: 165 },
+  phong_nha: { chance: 0.8, min: 85, max: 185 },
+  cot_tuong: { chance: 0.8, min: 200, max: 400 },
+  doc_tuoc: { chance: 0.9, min: 230, max: 430 },
+  thien_han_vuong: { chance: 1, min: 900, max: 1470 }, // trùm: chia cho đội
 };
 
 /** Tung rơi tiền. rng trả về số trong [0, 1) (truyền vào để test được). Quái không có bảng thì 0. */

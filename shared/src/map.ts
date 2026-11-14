@@ -526,9 +526,9 @@ export const MAPS: readonly MapDef[] = [
         toPortal: "am_suong_bac",
       },
     ],
-    // Chưa có loài quái nào: bốn loài Nguyên Anh + trùm Thiên Hàn Vương thêm ở bước nội dung kế (M7.5b, tổng <= ~70). Không mượn loài Kim Đan:
-    // `kim-dan-world.test.ts` giữ "quái Kim Đan CHỈ sinh ở Âm Sương Trạch". Bản đồ trống chỉ có trạm và cổng, chưa phát hành nên không hại ai.
-    monsterCap: {},
+    // Bốn loài Nguyên Anh + trùm Thiên Hàn Vương (M7.5b, #506). Tổng 62 (như Hắc Phong Cốc / Âm Sương Trạch; trần ~70 để tick < 10 ms): số liệu quái ở
+    // game.ts, vùng sinh theo `minDanger` của từng loài (0,2 / 0,4 / 0,55 / 0,7 / 0,85)
+    monsterCap: { han_lang: 20, phong_nha: 16, cot_tuong: 12, doc_tuoc: 12, thien_han_vuong: 2 },
   },
 ];
 
