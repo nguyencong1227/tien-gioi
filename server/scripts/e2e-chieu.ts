@@ -14,6 +14,10 @@
 //  5. HUY HIỆU TRẠNG THÁI TRÊN ĐẦU QUÁI (M7.7 #508, `Monster.fx` #559): máy chủ gắn bỏng rồi choáng lên Linh Thố bằng `applyMonsterStatus` TRONG TIẾN TRÌNH;
 //     client (qua schema + `StateView`) vẽ đúng 1 rồi 2 chấm, tắt từng cái khi hết hạn và về 0 (huy hiệu cuối được dọn).
 //  6. QUÁI LAO CÓ BÁO TRƯỚC (M7.3 #504): Hôi Lang THẬT (số liệu `MONSTERS`, không ép) thấy người thì gồng, client nhận `fx warn` thật, người đứng yên bị trúng đòn lao.
+//  7. QUÁI TẦM XA BẮN ĐẠN (M7.3 #504, #599 / #602 / #607): Sương Hồ THẬT (`ranged` 280 / 300 từ `MONSTERS`, không ép def) thấy người thì đứng cách xa và bắn; client nhận `fx bolt`
+//     thật (lớp báo trước đòn đếm đạn), người đứng yên bị trúng đúng `atk` MỘT lần (đạn, không đánh gần), quái giữ khoảng cách.
+//  8. ĐẠN ĐỘC (M7.3 #504, #601 / #607): Độc Thiềm THẬT (`poisoner` + `boltRange`) bắn đạn độc: trúng thì trừ đúng `atk` VÀ gắn độc (máy chủ + huy hiệu độc ở HUD của người bị bắn), độc
+//     không giết người; chạy về khu an toàn thì độc được THANH TẨY (huy hiệu tắt).
 // Chạy: `npm run build -w client && npm run e2e:chieu -w server` (cần google-chrome).
 import { spawn, execSync, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -723,6 +727,193 @@ async function main() {
     );
     ok(`đứng yên trong vùng báo trước: lần trúng đầu là đòn lao (khí huyết -${firstDrop})`);
     must(T.errors.length === 0, `lỗi console ở ca 6: ${JSON.stringify(T.errors)}`);
+    ok("0 lỗi console / exception");
+
+    // ---------------------------------------------------------------------------------------------------------------
+    // Ca 7 và 8: quái TẦM XA thật bắn đạn (M7.3): đặt quái THẬT (số liệu `MONSTERS`, không ép) vào phòng thật, đường máy chủ -> mạng -> client
+    // ---------------------------------------------------------------------------------------------------------------
+    const { addMonster } = await import("../src/systems/test-helpers.js");
+    /**
+     * Chỗ đứng cho người + chỗ đặt quái cách `gap` px về bên trái, cả hai thoáng (không tường / nước, KHÔNG trong khu an toàn: quái bỏ qua người ở đó), đoạn bắn thoáng;
+     * quét lưới 64 px bắt đầu từ `skip` ô để hai ca không dùng cùng một chỗ (ca 7 không ảnh hưởng ca 8).
+     */
+    const openSpot = (w: import("../src/world.js").World, gap: number, skip: number) => {
+      const r = 22;
+      let seen = 0;
+      for (let y = 300; y < w.map.worldH - 300; y += 64) {
+        for (let x = 300; x < w.map.worldW - 300; x += 64) {
+          let ok2 = true;
+          for (let px = x - gap - 40; px <= x + 60 && ok2; px += 8) {
+            if (w.map.circleBlocked(px, y, r) || w.map.inSafe(px, y, 220)) ok2 = false;
+          }
+          if (ok2 && seen++ >= skip) return { x, y };
+        }
+      }
+      return null;
+    };
+    /** Quái KHÁC quanh chỗ đứng (trong 700 px) không được nhắm người này: để mọi lần mất khí huyết đều là của ĐÚNG con quái tầm xa đặt vào. */
+    const isolate = (
+      w: import("../src/world.js").World,
+      around: { x: number; y: number },
+      keep: string,
+    ) => {
+      w.state.monsters.forEach((o, oid) => {
+        if (oid === keep || Math.hypot(o.x - around.x, o.y - around.y) > 700) return;
+        const oc = w.mctrl.get(oid);
+        if (oc) {
+          oc.def = { ...oc.def, aggro: 0 };
+          oc.target = null;
+        }
+      });
+    };
+
+    out(
+      "\n--- Ca 7: Sương Hồ THẬT (ranged) đứng xa bắn đạn: client nhận fx bolt thật, người đứng yên bị trúng đúng atk MỘT lần ---",
+    );
+    const TXN = "Quai Tam Xa";
+    await seedQuai(TXN);
+    await login(TXN);
+    await T.waitFor(
+      `!document.getElementById('ui')?.hidden && !!window.__scene?.room`,
+      "vào game thành công",
+      20000,
+    );
+    const w7 = await worldOf();
+    const sid7 = (await ev(`window.__scene.room.sessionId`)) as string;
+    const spot7 = openSpot(w7, 180, 0);
+    must(spot7 !== null, "có chỗ thoáng cho người + quái tầm xa cách 180 px");
+    const sh = addMonster(w7, "suong_ho", spot7!.x - 180, spot7!.y);
+    isolate(w7, spot7!, sh.id);
+    must(
+      sh.mc.def.behavior === "ranged" && sh.mc.def.boltSpeed === 280 && sh.mc.def.boltRange === 300,
+      `Sương Hồ THẬT là ranged 280 / 300 (số liệu MONSTERS, không ép def): ${JSON.stringify([sh.mc.def.behavior, sh.mc.def.boltSpeed, sh.mc.def.boltRange])}`,
+    );
+    const p7 = w7.state.players.get(sid7)!;
+    await T.waitFor(
+      `!!window.__scene?.telegraphs && typeof window.__scene.telegraphs.stats === 'function'`,
+      "lớp đạn / báo trước của cảnh đã dựng",
+      15000,
+    );
+    const bolts0 = (await ev(`window.__scene.telegraphs.stats().spawnedBolts`)) as number;
+    p7.hp = p7.maxHp;
+    await teleport(w7, sid7, spot7!.x, spot7!.y);
+    await T.waitFor(
+      `window.__scene.telegraphs.stats().spawnedBolts > ${bolts0}`,
+      "client nhận `fx bolt` từ máy chủ thật khi Sương Hồ bắn",
+      15000,
+    );
+    ok(
+      "Sương Hồ thấy người thì bắn: client nhận tin `bolt` thật (lớp đạn của cảnh đếm thêm một đạn)",
+    );
+    await until(() => (p7.hp < p7.maxHp ? true : false), "người đứng yên bị đạn trúng", 8000);
+    const drop7 = p7.maxHp - p7.hp;
+    must(
+      drop7 === Math.round(sh.mc.def.atk),
+      `lần mất khí huyết đầu tiên là ĐÚNG một viên đạn (atk ${sh.mc.def.atk}), thực tế -${drop7}`,
+    );
+    const dist7 = Math.hypot(sh.m.x - p7.x, sh.m.y - p7.y);
+    must(
+      dist7 > sh.mc.def.attackRange + 40,
+      `quái tầm xa giữ khoảng cách (cách ${dist7.toFixed(0)} px, tầm đánh gần ${sh.mc.def.attackRange})`,
+    );
+    ok(
+      `người đứng yên: trúng đạn (khí huyết -${drop7}), quái giữ khoảng cách ${dist7.toFixed(0)} px, không áp sát đánh gần`,
+    );
+    must(T.errors.length === 0, `lỗi console ở ca 7: ${JSON.stringify(T.errors)}`);
+    // dọn: bỏ quái và đạn còn bay để ca sau không bị ảnh hưởng
+    w7.state.monsters.delete(sh.id);
+    w7.mctrl.delete(sh.id);
+    w7.bolts.length = 0;
+
+    out(
+      "\n--- Ca 8: Độc Thiềm THẬT (poisoner + đạn) bắn đạn độc: trúng thì trừ atk VÀ gắn độc (máy chủ + huy hiệu HUD); khu an toàn thanh tẩy ---",
+    );
+    const DTN = "Quai Doc Thiem";
+    await seedQuai(DTN);
+    await login(DTN);
+    await T.waitFor(
+      `!document.getElementById('ui')?.hidden && !!window.__scene?.room`,
+      "vào game thành công",
+      20000,
+    );
+    const w8 = await worldOf();
+    const sid8 = (await ev(`window.__scene.room.sessionId`)) as string;
+    const spot8 = openSpot(w8, 160, 5);
+    must(spot8 !== null, "có chỗ thoáng thứ hai cho người + quái tầm xa cách 160 px");
+    const dt = addMonster(w8, "doc_thiem", spot8!.x - 160, spot8!.y);
+    isolate(w8, spot8!, dt.id);
+    must(
+      dt.mc.def.behavior === "poisoner" && dt.mc.def.boltRange === 260,
+      `Độc Thiềm THẬT là poisoner có tầm bắn 260 (số liệu MONSTERS): ${JSON.stringify([dt.mc.def.behavior, dt.mc.def.boltRange])}`,
+    );
+    const p8 = w8.state.players.get(sid8)!;
+    const c8 = w8.ctrl.get(sid8)!;
+    await T.waitFor(
+      `!!window.__scene?.telegraphs && typeof window.__scene.telegraphs.stats === 'function'`,
+      "lớp đạn của cảnh đã dựng (sau lần vào game thứ hai)",
+      15000,
+    );
+    const bolts8 = (await ev(`window.__scene.telegraphs.stats().spawnedBolts`)) as number;
+    p8.hp = p8.maxHp;
+    await teleport(w8, sid8, spot8!.x, spot8!.y);
+    await T.waitFor(
+      `window.__scene.telegraphs.stats().spawnedBolts > ${bolts8}`,
+      "client nhận `fx bolt` của Độc Thiềm",
+      15000,
+    );
+    await until(
+      () => (c8.st?.list.some((s) => s.id === "poison") ? true : false),
+      "người đứng yên trúng đạn độc: máy chủ gắn trạng thái độc",
+      10000,
+    );
+    ok("đạn độc trúng: máy chủ gắn độc lên người (trạng thái `poison` trong hộp trạng thái riêng)");
+    await T.waitFor(
+      `!!document.querySelector('[data-status="poison"]')`,
+      "huy hiệu độc hiện ở HUD của người bị bắn (tin `status` gửi riêng chủ)",
+      8000,
+    );
+    ok("client hiện huy hiệu độc ở HUD (tin `status` thật)");
+    // Bỏ quái và đạn còn bay TRƯỚC (đòn thật của quái vẫn giết người: chỉ ĐỘC mới không giết), rồi gắn lại độc lên người chỉ còn 40 khí huyết: tổng độc cả đợt
+    // (~23 / giây x 4 giây) vượt xa 40 nên nếu độc giết được thì ca này đỏ; máy chủ kẹp ở 1 khí huyết.
+    w8.state.monsters.delete(dt.id);
+    w8.mctrl.delete(dt.id);
+    w8.bolts.length = 0;
+    const { POISON_EFFECT } = await import("../src/systems/bolt.js");
+    const { applyPlayerStatus } = await import("../src/systems/status.js");
+    p8.hp = 40;
+    must(
+      applyPlayerStatus(w8, sid8, POISON_EFFECT, 290, "") !== "ignored",
+      "gắn lại độc lên người",
+    );
+    await until(
+      () => (c8.st?.list.some((s) => s.id === "poison") ? false : true),
+      "độc chạy hết 4 giây",
+      9000,
+    );
+    must(
+      !p8.dead && p8.hp === 1,
+      `độc không giết người: kẹp ở 1 khí huyết (khí huyết ${p8.hp}, dead=${p8.dead})`,
+    );
+    ok(
+      "độc cả đợt vượt xa khí huyết còn lại mà người vẫn sống, dừng ở 1 khí huyết (độc không giết)",
+    );
+    // Về khu an toàn: độc được thanh tẩy (gắn độc mới rồi chạy về trấn ngay)
+    p8.hp = p8.maxHp;
+    applyPlayerStatus(w8, sid8, POISON_EFFECT, 290, "");
+    await T.waitFor(
+      `!!document.querySelector('[data-status="poison"]')`,
+      "huy hiệu độc hiện lại sau khi gắn độc mới",
+      8000,
+    );
+    await teleport(w8, sid8, w8.map.townPx.x, w8.map.townPx.y);
+    await T.waitFor(
+      `!document.querySelector('[data-status="poison"]')`,
+      "về khu an toàn: huy hiệu độc tắt (độc được thanh tẩy)",
+      8000,
+    );
+    must(!c8.st?.list.some((s) => s.id === "poison"), "máy chủ đã gỡ độc khỏi hộp trạng thái");
+    ok("về khu an toàn: độc được thanh tẩy (máy chủ gỡ, huy hiệu tắt), người vẫn sống");
+    must(T.errors.length === 0, `lỗi console ở ca 8: ${JSON.stringify(T.errors)}`);
     ok("0 lỗi console / exception");
   } catch (err) {
     failed = err instanceof Error ? err.message : String(err);
