@@ -63,6 +63,11 @@ describe("chrome-gpu: phát hiện và cấu hình tăng tốc phần cứng GPU
   });
 
   it("Khởi động Chrome headless thật: kiểm chứng chuỗi WEBGL renderer", async () => {
+    // Trên GitHub Actions CI: vitest chỉ kiểm tra logic cờ và fallback, tránh khởi động Chrome thật trong luồng song song
+    if (process.env.CI) {
+      return;
+    }
+
     const gpuInfo = detectGpu();
     const flags = getChromeGpuFlags();
     const cdpPort = await freePort();
