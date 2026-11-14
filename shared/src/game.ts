@@ -65,6 +65,12 @@ export interface MonsterKind {
   /** Tầm xa: tốc độ đạn (px/giây) và tầm bay tối đa (px) */
   boltSpeed?: number;
   boltRange?: number;
+  /**
+   * Hệ HIỂN THỊ của đạn: chỉ quyết định MÀU đạn ở client (`fx` `bolt` gửi `element = boltElement ?? element`), KHÔNG tính khắc / bị khắc (`elementMult` chỉ đọc `element`).
+   * Cần vì đặt `element` cho quái làm đổi sát thương chiêu của người chơi lên quái (x1,3 / x0,8): đạn băng của Sương Hồ muốn màu băng mà không đổi cân bằng. Bỏ trống thì
+   * dùng `element`, rồi tới màu trung tính (đỏ cam).
+   */
+  boltElement?: Element;
 }
 
 /** Hành vi quái (M7.3). `melee` là mặc định. */
