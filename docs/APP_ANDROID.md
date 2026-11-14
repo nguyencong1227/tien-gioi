@@ -156,7 +156,7 @@ Sau khi cài đặt APK lên máy Android thật, vui lòng làm theo quy trình
 👉 **[Hướng Dẫn Kiểm Thử Ứng Dụng Android Trên Máy Thật (docs/KIEM_THU_MAY_THAT.md)](KIEM_THU_MAY_THAT.md)**
 
 > [!NOTE]
-> **Cài đè bản cũ:** mỗi lần dựng, bản debug được ký bằng khoá debug do máy chạy Actions tự sinh MỚI, nên không cài đè lên bản debug của lần dựng trước được (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`): gỡ cài đặt rồi cài lại (mất phiên đăng nhập lưu trên máy). Bản release ký bằng khoá của bạn (mục 9) cài đè được. `versionCode` hiện cố định là 1 trong `app/android/app/build.gradle`: cần tăng theo từng bản phát hành trước khi đưa lên Google Play (việc của M4.2d, chưa làm).
+> **Cài đè bản cũ:** mỗi lần dựng, bản debug được ký bằng khoá debug do máy chạy Actions tự sinh MỚI, nên không cài đè lên bản debug của lần dựng trước được (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`): gỡ cài đặt rồi cài lại (mất phiên đăng nhập lưu trên máy). Bản release ký bằng khoá của bạn (mục 9) cài đè được. `versionCode` KHÔNG cố định: Dev A tăng tay, cùng `versionName`, trong `app/android/app/build.gradle` ở PR phát hành mỗi bản (v0.1.1 = 2, v0.1.2 = 3, v0.1.3 = 4, v0.2.0 = 5); Google Play đòi `versionCode` tăng nghiêm ngặt giữa các lần tải lên. Hiện chưa có kiểm tự động nào bắt quên tăng (không test, không bước CI).
 >
 > **Java:** dự án Android do Capacitor 8 sinh ra đòi **Java 21** (`sourceCompatibility JavaVersion.VERSION_21`); workflow dùng Temurin 21. Dựng cục bộ cũng cần JDK 21.
 
