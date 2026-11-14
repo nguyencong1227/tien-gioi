@@ -21,6 +21,7 @@ import { angleDiff, quantAngle, type World } from "../world";
 import { byId } from "./lookup";
 import { dealMonsterDamage } from "./combat";
 import { rollDamage } from "./damage";
+import { treasureElementMult } from "./treasure";
 import { duelHit } from "./duel";
 import { syncPublicPos } from "./movement";
 import { cdrOf, sendSkills } from "./skills";
@@ -183,7 +184,8 @@ export function cast(w: World, sid: string, raw: unknown) {
       const mon = w.state.monsters.get(h.id);
       const mc = w.mctrl.get(h.id);
       if (!mon || !mc) continue;
-      const em = elementMult(def.element, mc.def.element ?? "none");
+      const em =
+        elementMult(def.element, mc.def.element ?? "none") * treasureElementMult(p, def.element); // pháp bảo hệ (M7.4)
       let first = 0;
       for (let k = 0; k < h.n && w.mctrl.has(h.id); k++) {
         const { dmg, crit } = rollDamage(atk, mult * em);

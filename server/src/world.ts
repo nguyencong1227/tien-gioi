@@ -47,6 +47,7 @@ import type { Run } from "./systems/dungeon";
 import type { StatusBox } from "./systems/status-rules";
 import { Duels } from "./systems/duel";
 import { TickStats } from "./metrics";
+import type { TreasureRt } from "./systems/treasure";
 
 /** Dữ liệu riêng của server cho mỗi người chơi (không gửi xuống client). */
 export interface PlayerCtrl {
@@ -117,6 +118,8 @@ export interface PlayerCtrl {
    * đang để dành, ghi vào state mỗi EXP_FLUSH_MS (expAt = lần ghi kế tiếp).
    */
   frac: { hp: number; mp: number; exp: number; expAt: number };
+  /** Dữ liệu chạy của pháp bảo đang mặc (M7.4, `systems/treasure.ts`): đồng hồ khiên, chỗ đứng yên. Chỉ có khi đang có pháp bảo tác dụng. */
+  treasure?: TreasureRt;
 }
 
 /** Dữ liệu riêng của server cho mỗi món đồ rơi. */
