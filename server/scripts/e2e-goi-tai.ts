@@ -3,6 +3,8 @@
 // Kiểm HỢP ĐỒNG, không kiểm hình ảnh:
 //  1. Gói bản đồ đích BẮT ĐẦU TẢI NGAY LÚC GỬI `travel` (không đợi màn chuyển cảnh khép / `travelTo`): yêu cầu tệp tới trong vòng 300 ms.
 //  2. Đang chờ gói thì màn chuyển cảnh vẫn hiện; gói về (2 s) mới ẩn; sang đúng bản đồ, 0 lỗi.
+//     Chờ gói xảy ra TRƯỚC khi vào phòng mới (B review #541, S1): trong lúc chờ, nhân vật KHÔNG ở trong phòng của bản đồ đích (máy chủ không
+//     dựng nhân vật ở điểm xuất hiện để quái đánh trong lúc client ở màn chuyển cảnh, không điều khiển được; chết do quái là mất kiếp).
 //  3. Gói chậm hơn 8 s: VẪN qua cổng (ẩn màn chuyển cảnh trong khoảng 8-11 s, không đợi hết 12 s, không báo lỗi), và việc tải KHÔNG bị huỷ
 //     (tệp vẫn về trọn, yêu cầu không bị đóng giữa chừng).
 //  4. Tải trước, mỗi đường một ca: 4g đứng xa cổng thì tải gói bản đồ kề lúc rảnh; 3g đứng sát cổng thì tải gói bên kia cổng (mỗi gói một lần).
@@ -15,7 +17,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
-import { Server } from "colyseus";
+import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { Tab, sleep, listenWithRetry, removeTmpDirs, getChromeGpuFlags } from "./e2e-kit";
 
@@ -96,6 +98,13 @@ async function main() {
   const must = (cond: boolean, msg: string) => {
     if (!cond) throw new Error(msg);
   };
+  /** Số người đang ở trong (các) phòng Colyseus của bản đồ `mapId`, đọc thẳng từ máy chủ */
+  const clientsIn = async (mapId: string) => {
+    const { roomNameOf } = await import("@tien-gioi/shared");
+    return (await matchMaker.query({ name: roomNameOf(mapId) })).reduce((n, r) => n + r.clients, 0);
+  };
+  /** Sau `ms` kể từ BÂY GIỜ, đếm người trong phòng của `mapId` (chạy song song với `crossPortal`) */
+  const probeClients = (mapId: string, ms: number) => sleep(ms).then(() => clientsIn(mapId));
 
   try {
     chrome = spawn(
@@ -251,7 +260,18 @@ async function main() {
     await walkToPortal("hac_phong_bac");
     must(reqs.length === 0, "đi sát cổng cũng không tải trước khi tiết kiệm dữ liệu");
 
+    const probeA = probeClients("am_suong", 1100); // gói cần 2 s: ở giây thứ 1,1 vẫn đang chờ
     const a = await crossPortal("hac_phong_bac", "am_suong", 20000);
+    const midA = await probeA;
+    must(
+      midA === 0,
+      `đang chờ gói: nhân vật CHƯA ở trong phòng đích (am_suong có ${midA} người; vào phòng trước rồi mới chờ thì quái đánh trong lúc không điều khiển được)`,
+    );
+    ok("đang chờ gói (1,1 s): nhân vật chưa vào phòng am_suong");
+    must(
+      (await clientsIn("am_suong")) === 1,
+      "qua cổng xong thì nhân vật đã ở trong phòng am_suong",
+    );
     const ra = reqs.filter((r) => r.mapId === "am_suong");
     must(ra.length === 1, `gói am_suong được yêu cầu đúng một lần (${ra.length})`);
     must(
@@ -270,7 +290,7 @@ async function main() {
       `chờ SONG SONG, không nối đuôi nhiều bước (${a.hidden - a.t0} ms)`,
     );
     must(ra[0].done && !ra[0].aborted, "gói am_suong về trọn vẹn");
-    // Vào phòng từ lúc đầu chờ gói nên lần đồng bộ state đầu đã xảy ra TRƯỚC khi cảnh gắn phòng: vị trí đoán trước phải theo phòng mới ngay,
+    // Cảnh đối chiếu vị trí một lần ngay khi gắn phòng mới (`setupNetwork(false)` gọi `reconcile()`): vị trí đoán trước phải theo phòng mới ngay,
     // không kẹt ở toạ độ bản đồ cũ (đứng yên không có patch nào để đối chiếu lại)
     const arrive = getMap("hac_phong")!.portal("hac_phong_bac")!;
     const dest = getMap(arrive.toMap)!.portal(arrive.toPortal)!;
@@ -292,7 +312,16 @@ async function main() {
     out("\n--- Gói chậm 12 s (> 8 s): vẫn qua cổng ở ~8 s, việc tải không bị huỷ ---");
     await sleep(900); // đợi cảnh đối chiếu vị trí với phòng mới (predX / predY) trước khi tính đường đi bộ
     await walkToPortal("am_suong_nam");
+    const probeB = probeClients("hac_phong", 4000); // gói cần 12 s, giờ chờ 8 s: ở giây thứ 4 vẫn đang chờ, KHÔNG được ở trong phòng đích
     const b = await crossPortal("am_suong_nam", "hac_phong", 30000);
+    const midB = await probeB;
+    must(
+      midB === 0,
+      `đang chờ gói chậm (4 s): nhân vật CHƯA ở trong phòng hac_phong (có ${midB} người; Hắc Phong Cốc có quái, lúc vào không có bảo hộ)`,
+    );
+    ok(
+      "đang chờ gói chậm (4 s): nhân vật chưa vào phòng hac_phong (không đứng cho quái đánh trên màn chuyển cảnh)",
+    );
     const rb = reqs.filter((r) => r.mapId === "hac_phong");
     must(rb.length >= 1, "gói hac_phong được yêu cầu");
     must(
