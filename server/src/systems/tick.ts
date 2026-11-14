@@ -10,6 +10,7 @@ import { tickDungeonRun, tickDungeons } from "./dungeon";
 import { tickDuels } from "./duel";
 import { tickSect } from "./sect";
 import { tickStatuses } from "./status";
+import { tickTreasure } from "./treasure";
 
 export function tickWorld(w: World, dtMs: number) {
   const dt = dtMs / 1000;
@@ -23,6 +24,9 @@ export function tickWorld(w: World, dtMs: number) {
     applyInputs(w.map, p, c);
     if ((w.tick + c.posPhase) % POS_SYNC_EVERY_TICKS === 0) syncPublicPos(p);
     if (!w.duels.has(sid)) tickRecovery(w, sid, p, c, dt); // trong trận thách đấu: không hồi khí huyết / linh lực, không đả tọa
+    // Pháp bảo (M7.4): khiên tự dựng, hồi khi đứng yên; không mặc thì không tốn gì. Trong trận thách đấu: KHÔNG chạy (cùng nguyên tắc khoá hồi phục của `tickRecovery`;
+    // review B ở #594: Định Tâm Chung từng hồi máu giữa trận). Sau trận khiên dựng lại ngay (`nextShieldAt` đã qua).
+    if ((p.treasure || c.treasure) && !w.duels.has(sid)) tickTreasure(w, sid, p, c, dt);
   });
   tickStatuses(w, dt); // trước quái: quái chết vì sát thương theo giây thì không còn bị cập nhật
   tickMonsters(w, dt);
