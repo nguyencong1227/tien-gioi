@@ -149,6 +149,7 @@ import {
   onQualityChange,
   refreshQuality,
   setBatterySaver,
+  qualityUltraAvailable,
   setQualityMode,
   type QualityMode,
 } from "./gfx/quality";
@@ -2980,7 +2981,11 @@ export const ui = {
     const batterySaverChk = $("set-battery-saver") as HTMLInputElement;
     // Số phiên bản của bản dựng (Giới thiệu và ghi công); chạy ngoài vite (test) thì ghi "dev"
     $("set-version").textContent = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "dev";
-    const TIER_NAME = { low: "Thấp", mid: "Vừa", high: "Cao" } as const;
+    const TIER_NAME = { low: "Thấp", mid: "Vừa", high: "Cao", ultra: "Rất cao" } as const;
+
+    // "Rất cao" CHỈ máy tính đủ điều kiện (docs/THIET_KE_GIAO_DIEN_DO_HOA.md mục 10.3): điện thoại / máy yếu không có lựa chọn này
+    // (gỡ hẳn khỏi danh sách, vì một số trình duyệt bỏ qua `hidden` trên <option>)
+    if (!qualityUltraAvailable()) qualitySel.querySelector('option[value="ultra"]')?.remove();
 
     const syncSettingsDom = () => {
       const bPct = Math.round(sound.getBgmVolume() * 100);

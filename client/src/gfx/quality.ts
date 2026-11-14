@@ -1,7 +1,7 @@
 /**
  * Hệ thống chất lượng đồ hoạ M5 (issue #323, `docs/THIET_KE_GIAO_DIEN_DO_HOA.md` mục 6).
  *
- * MỘT nguồn duy nhất cho mọi quyết định "vẽ bao nhiêu": hồ sơ Thấp / Vừa / Cao (`QualityProfile`), chế độ Tự động
+ * MỘT nguồn duy nhất cho mọi quyết định "vẽ bao nhiêu": hồ sơ Thấp / Vừa / Cao / Rất cao (`QualityProfile`; Rất cao CHỈ máy tính mạnh, mục 10.3), chế độ Tự động
  * (chọn theo thiết bị + bộ điều tốc hạ / nâng bậc theo thời gian khung đo được), giảm chuyển động, tiết kiệm pin.
  * Lớp hiệu ứng, trang trí bản đồ, hoạt ảnh, camera chỉ ĐỌC `getQuality()` và nghe `onQualityChange`; không ai
  * tự đọc `tg_low_fx` / `prefers-reduced-motion` nữa.
@@ -11,12 +11,12 @@
  * khung hợp lệ (không dùng đồng hồ tường) nên tất định.
  */
 
-export type Tier = "low" | "mid" | "high";
+export type Tier = "low" | "mid" | "high" | "ultra";
 export type QualityMode = "auto" | Tier;
 import type { FormFactor } from "./display";
 export type { FormFactor };
 
-export const TIERS: readonly Tier[] = ["low", "mid", "high"] as const;
+export const TIERS: readonly Tier[] = ["low", "mid", "high", "ultra"] as const;
 export const QUALITY_STORAGE_KEY = "tg_quality";
 export const BATTERY_SAVER_STORAGE_KEY = "tg_battery_saver";
 /** Khoá cũ (bool); di cư: `tg_low_fx=1` mà chưa chọn chất lượng thì thành `low`. */
@@ -59,6 +59,8 @@ export interface QualityProfile {
   targetFps: 30 | 60;
   reducedMotion: boolean;
   batterySaver: boolean;
+  /** Nạp gói ảnh độ phân giải cao 2x (`hd:*`, `docs/THIET_KE_GIAO_DIEN_DO_HOA.md` mục 10.1): CHỈ bậc Rất cao. */
+  hdPacks: boolean;
 }
 
 /** Số liệu BAN ĐẦU của mục 6.2 (C đo, A chỉnh; kết quả ghi vào docs/HIEU_NANG_DI_DONG.md). */
@@ -124,6 +126,23 @@ export const TIER_BASE: Record<Tier, TierBase> = {
     farAnimHz: 30,
     nameLabelRadius: 640,
   },
+  // Rất cao (M7.15, QUYET_DINH_M3 mục 21, thiết kế mục 10.3): CHỈ máy tính mạnh. Hạt ~1000, emitter ~40, chữ sát thương ~40; nâng cả `maxPixels` /
+  // `renderScaleMax` (high kẹp canvas ở 4,2 triệu điểm ảnh nên ảnh 2x vô dụng) và các trường dựng hình. Số cuối do C đo (perf-budget.json `tiers.ultra`).
+  ultra: {
+    renderScaleMax: 2,
+    maxPixels: 8_400_000,
+    particleBudget: 1000,
+    emitterBudget: 40,
+    damageNumbers: 40,
+    ambient: true,
+    fogPatches: 12,
+    weather: "full",
+    blobShadows: true,
+    vignette: true,
+    bloom: true,
+    farAnimHz: 30,
+    nameLabelRadius: 800,
+  },
 };
 
 /** Giảm chuyển động giữ lại bấy nhiêu phần ngân sách hạt (giảm 70 %). */
@@ -166,6 +185,7 @@ export function buildProfile(tier: Tier, ctx: ProfileContext): QualityProfile {
     targetFps: ctx.batterySaver ? 30 : 60,
     reducedMotion: rm,
     batterySaver: ctx.batterySaver,
+    hdPacks: tier === "ultra",
   };
 }
 
@@ -177,13 +197,33 @@ export interface DeviceSignals {
   memoryGb?: number;
   /** Chuỗi GPU từ WEBGL_debug_renderer_info nếu đọc được. */
   gpu?: string;
+  /** Thiết bị di động (điện thoại, máy tính bảng kể cả iPad Pro chip M): `userAgentData.mobile`, UA, hoặc iPadOS giả Macintosh. KHÔNG BAO GIỜ lên Rất cao. */
+  mobile?: boolean;
 }
 
 const SOFTWARE_GPU = /swiftshader|llvmpipe|softpipe|software|basic render/i;
+/**
+ * Họ GPU rời / mạnh được phép lên Rất cao. Chuỗi ANGLE thật có dạng `ANGLE (NVIDIA, NVIDIA GeForce RTX 5060 ...)` và `Intel(R) Arc(TM) A770`
+ * (có `(TM)` xen giữa). Chuỗi rỗng / bị che, `Radeon(TM) Graphics`, `Intel(R) UHD`, `Mali`, `Adreno`, Safari "Apple GPU" KHÔNG khớp.
+ */
+export const STRONG_GPU =
+  /nvidia|geforce|rtx|gtx|radeon\s*(rx|pro)|apple\s*m\d|arc\W*(tm\W*)?[ab]\d{3}/i;
+
+/**
+ * Thiết bị đủ điều kiện dùng bậc Rất cao (thuần): máy tính (không di động), không dựng hình bằng phần mềm, >= 8 lõi, RAM báo >= 8 GB (hoặc
+ * không rõ), GPU rời / mạnh. Điện thoại và máy tính bảng không bao giờ đủ điều kiện (người dùng: không tự chọn Rất cao trên điện thoại).
+ */
+export function isUltraCapable(sig: DeviceSignals): boolean {
+  if (sig.form !== "desktop" || sig.mobile === true) return false;
+  if (!sig.gpu || SOFTWARE_GPU.test(sig.gpu) || !STRONG_GPU.test(sig.gpu)) return false;
+  if ((sig.cores ?? 0) < 8) return false;
+  return sig.memoryGb === undefined || sig.memoryGb >= 8;
+}
 
 /**
  * Chọn bậc ban đầu và TRẦN của thiết bị (bộ điều tốc không nâng quá trần). Thuần.
  * - Dựng hình bằng phần mềm: Thấp, trần Thấp.
+ * - Máy tính mạnh (`isUltraCapable`): Rất cao, trần Rất cao.
  * - Máy tính: Cao (Vừa nếu < 4 lõi), trần Cao.
  * - Điện thoại / tablet: Vừa nếu >= 6 lõi và (RAM >= 4 GB hoặc không rõ RAM); còn lại Thấp. Trần Cao chỉ cho máy mạnh
  *   (>= 8 lõi và RAM >= 6 GB), còn lại trần Vừa.
@@ -191,6 +231,7 @@ const SOFTWARE_GPU = /swiftshader|llvmpipe|softpipe|software|basic render/i;
 export function pickInitialTier(sig: DeviceSignals): { tier: Tier; ceiling: Tier } {
   if (sig.gpu && SOFTWARE_GPU.test(sig.gpu)) return { tier: "low", ceiling: "low" };
   const cores = sig.cores ?? 0;
+  if (isUltraCapable(sig)) return { tier: "ultra", ceiling: "ultra" };
   if (sig.form === "desktop") {
     return { tier: cores !== 0 && cores < 4 ? "mid" : "high", ceiling: "high" };
   }
@@ -374,19 +415,28 @@ export interface QualityController {
   frame(dtMs: number): void;
   /** Báo vào nền / về tiền cảnh: bỏ cửa sổ đang đo. */
   setActive(active: boolean): void;
-  /** Trần bậc của thiết bị (cho giao diện / gỡ lỗi). */
+  /** Trần bậc HIỆN HÀNH (cho giao diện / gỡ lỗi); đã hạ khỏi Rất cao thì trần là Cao cho tới hết phiên. */
   ceiling(): Tier;
+  /** Thiết bị có đủ điều kiện dùng bậc Rất cao không (giao diện chỉ hiện lựa chọn "Rất cao" khi đúng). */
+  ultraAvailable(): boolean;
   stats(): { fps: number; p95Ms: number; governor: GovernorSnapshot };
   dispose(): void;
 }
 
 function parseMode(v: string | null): QualityMode | null {
-  return v === "auto" || v === "low" || v === "mid" || v === "high" ? v : null;
+  return v === "auto" || v === "low" || v === "mid" || v === "high" || v === "ultra" ? v : null;
 }
 
-/** Đọc chế độ đã lưu, di cư `tg_low_fx=1` -> `low` khi chưa chọn. */
-export function loadMode(storage: QualityEnv["storage"]): QualityMode {
+/**
+ * Đọc chế độ đã lưu, di cư `tg_low_fx=1` -> `low` khi chưa chọn. `allowUltra` = thiết bị đủ điều kiện (`isUltraCapable`): `ultra` đã lưu mà thiết
+ * bị không đủ (đổi máy, đồng bộ tệp lưu, sửa tay) bị BỎ: quay về Tự động và ghi đè giá trị lưu.
+ */
+export function loadMode(storage: QualityEnv["storage"], allowUltra = true): QualityMode {
   const saved = parseMode(storage.get(QUALITY_STORAGE_KEY));
+  if (saved === "ultra" && !allowUltra) {
+    storage.set(QUALITY_STORAGE_KEY, "auto");
+    return "auto";
+  }
   if (saved) return saved;
   if (storage.get(LEGACY_LOW_FX_KEY) === "1") {
     storage.set(QUALITY_STORAGE_KEY, "low");
@@ -430,11 +480,19 @@ export function createQuality(
   const listeners = new Set<(p: QualityProfile) => void>();
   const gov = new FrameGovernor(governorOpt);
   const meter = new FpsMeter();
-  let mode = loadMode(env.storage);
+  const ultraOk = isUltraCapable(env.signals());
+  let mode = loadMode(env.storage, ultraOk);
   let batterySaver = env.storage.get(BATTERY_SAVER_STORAGE_KEY) === "1";
   let active = true;
+  /**
+   * Đã bị bộ điều tốc hạ khỏi Rất cao: KHÔNG nâng lại trong phiên (tránh nạp / giải phóng gói `hd:*` lặp, thiết kế mục 10.3). Trần hiện hành
+   * thành Cao. Chọn tay "Rất cao" vẫn được giữ (người chơi quyết).
+   */
+  let ultraLocked = false;
 
   let initial = pickInitialTier(env.signals());
+  const ceilingNow = (): Tier =>
+    ultraLocked && initial.ceiling === "ultra" ? "high" : initial.ceiling;
   /** Bậc đang chạy khi `auto` (bộ điều tốc đổi giá trị này). */
   let autoTier: Tier = initial.tier;
 
@@ -470,6 +528,7 @@ export function createQuality(
     },
     setMode(m) {
       if (m === mode) return;
+      if (m === "ultra" && !ultraOk) return; // điện thoại / máy yếu không bao giờ vào Rất cao, kể cả khi bị gọi thẳng
       mode = m;
       env.storage.set(QUALITY_STORAGE_KEY, m);
       if (m === "auto") {
@@ -494,9 +553,11 @@ export function createQuality(
       // Tiết kiệm pin: khung ~33 ms là CHỦ Ý (giới hạn 30 FPS), không phải quá tải: bộ điều tốc nghỉ
       if (mode !== "auto" || !active || profile.targetFps === 30) return;
       const i = tierIndex(autoTier);
-      const d = gov.frame(dtMs, i > 0, i < tierIndex(initial.ceiling));
-      if (d === "down") autoTier = TIERS[i - 1];
-      else if (d === "up") autoTier = TIERS[i + 1];
+      const d = gov.frame(dtMs, i > 0, i < tierIndex(ceilingNow()));
+      if (d === "down") {
+        if (autoTier === "ultra") ultraLocked = true;
+        autoTier = TIERS[i - 1];
+      } else if (d === "up") autoTier = TIERS[i + 1];
       else return;
       apply();
     },
@@ -505,7 +566,8 @@ export function createQuality(
       active = a;
       gov.resetWindow();
     },
-    ceiling: () => initial.ceiling,
+    ceiling: ceilingNow,
+    ultraAvailable: () => ultraOk,
     stats: () => ({ ...meter.read(), governor: gov.snapshot() }),
     dispose() {
       listeners.clear();
@@ -542,12 +604,22 @@ export function browserQualityEnv(
   };
   return {
     signals: () => {
-      const nav = win.navigator as Navigator & { deviceMemory?: number };
+      const nav = win.navigator as Navigator & {
+        deviceMemory?: number;
+        userAgentData?: { mobile?: boolean };
+      };
+      const ua = nav.userAgent ?? "";
+      // iPadOS (Safari "chế độ máy tính") tự xưng Macintosh nhưng có cảm ứng nhiều điểm
+      const mobile =
+        nav.userAgentData?.mobile === true ||
+        /android|iphone|ipad|ipod/i.test(ua) ||
+        (/macintosh/i.test(ua) && (nav.maxTouchPoints ?? 0) > 1);
       return {
         form: getForm(),
         cores: nav.hardwareConcurrency || undefined,
         memoryGb: nav.deviceMemory,
         gpu: gpuString(),
+        mobile,
       };
     },
     form: getForm,
@@ -618,6 +690,10 @@ export function qualityStats(): ReturnType<QualityController["stats"]> {
 }
 export function qualityCeiling(): Tier {
   return ctl().ceiling();
+}
+/** Thiết bị đủ điều kiện dùng "Rất cao"? (giao diện chỉ hiện lựa chọn khi đúng). */
+export function qualityUltraAvailable(): boolean {
+  return ctl().ultraAvailable();
 }
 /** Giảm chuyển động đang bật? (OS + cài đặt; trước khi khởi tạo coi là tắt.) */
 export function reducedMotion(): boolean {

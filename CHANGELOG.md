@@ -5,6 +5,7 @@
 ## [Chưa phát hành] — M7 (Chiều sâu chiến đấu + Nguyên Anh)
 
 ### Giao diện
+- **Mức đồ hoạ "Rất cao" (M7.15, #516; QUYET_DINH_M3 mục 21):** thêm bậc `Rất cao` CHỈ cho máy tính mạnh (không di động, không dựng hình bằng phần mềm, >= 8 lõi, RAM >= 8 GB hoặc không rõ, GPU rời / mạnh): hạt ~1000, emitter ~40, chữ sát thương ~40, canvas tới ~8,4 triệu điểm ảnh, bộ nhớ texture 512 MB (Cao nâng 128 -> 256 MB). **Điện thoại và máy tính bảng không bao giờ tự lên và không có lựa chọn này** (giá trị `Rất cao` đã lưu bị bỏ nếu máy không đủ điều kiện). Chế độ Tự động khởi đầu ở Rất cao trên máy đủ điều kiện; bộ điều tốc hạ khi khung quá chậm và KHÔNG nâng lại trong phiên. Ngân sách theo gói tải ở `client/perf-budget.json` (`packs`); bộ nạp gói `ensurePack` làm ở bước sau.
 - **Giới thiệu và ghi công ở Cài đặt (M7.16, #517):** khối cuối bảng Cài đặt nêu số phiên bản (lấy từ `package.json` gốc lúc dựng), câu ghi công **"Một phần nội dung, hình ảnh và âm thanh trong Tiên Giới lấy từ Vạn Kiếp Tu Tiên (tác giả Hải Quân · Bắc Team), dùng với sự cho phép của tác giả"** (đúng câu đã chốt ở `docs/NGUON_NOI_DUNG.md` mục 1; `credits-ui.test.ts` giữ hai nơi khớp nhau và không chữ Hán) và phông Noto Serif (OFL); đọc được ở máy tính, điện thoại dọc và ngang.
 
 ## [0.2.1] — 14/11/2026: bản vá giao diện (phím cụm J K L U I O + bản đồ làm lại, QUYET_DINH_M3 mục 17)
