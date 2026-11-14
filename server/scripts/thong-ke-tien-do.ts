@@ -151,7 +151,6 @@ export async function readBackupProgress(backupPath: string): Promise<{
 
     // Kết thúc khối COPY
     if (line === "\\." || line.startsWith("\\.")) {
-      inCopyBlock = false;
       break;
     }
 
@@ -282,7 +281,7 @@ export function buildProgressReport(
   }
 
   // Đánh giá theo ngưỡng 4 giờ của #406
-  let verdict = "";
+  let verdict: string;
   if (kdHauKyCount >= 5 && kdHauKyMedianHours !== null) {
     if (kdHauKyMedianHours < 4.0) {
       verdict = `🚨 CẢNH BÁO: Trung vị thời gian tới Kim Đan Hậu kỳ = ${kdHauKyMedianHours.toFixed(1)}h (< 4.0h). Người chơi tiến cấp nhanh hơn thiết kế, có dấu hiệu đường tắt cày Xích Mãng. Đề xuất điều chỉnh mật độ / hồi sinh Xích Mãng ở bản vá kế tiếp.`;
