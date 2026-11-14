@@ -31,6 +31,7 @@ export type ActionId =
   | "panel.quest"
   | "panel.sect"
   | "panel.map"
+  | "panel.minimap"
   | "panel.settings"
   | "chat.open"
   | "sound.mute"
@@ -164,6 +165,13 @@ export const ACTIONS: readonly ActionDef[] = [
   },
   { id: "panel.sect", label: "Tông môn", group: "panel", defaults: ["KeyG"], world: false },
   { id: "panel.map", label: "Bản đồ lớn", group: "panel", defaults: ["KeyM"], world: false },
+  {
+    id: "panel.minimap",
+    label: "Bật / tắt bản đồ nhỏ",
+    group: "panel",
+    defaults: ["Shift+KeyM"],
+    world: false,
+  },
   {
     id: "panel.settings",
     label: "Cài đặt và phím tắt",

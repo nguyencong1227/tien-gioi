@@ -1022,6 +1022,13 @@
             <button type="button" id="set-open-keys" class="act-btn">Xem và đổi phím tắt</button>
           </div>
           <label class="set-row toggle">
+            <span
+              >Hiện bản đồ nhỏ (Phím <b data-key-action="panel.minimap">Shift+M</b>; tắt thì còn
+              nhãn tên khu, bấm vẫn mở bản đồ lớn)</span
+            >
+            <input type="checkbox" id="set-minimap" checked />
+          </label>
+          <label class="set-row toggle">
             <span>Ẩn tên đồng đạo (đỡ rối khi đông người)</span>
             <input type="checkbox" id="set-hide-names" />
           </label>
@@ -1178,7 +1185,10 @@
         <header class="inv-head">
           <div>
             <h2 id="map-title">Sơn Hà Đồ · Vân Mộng Sơn</h2>
-            <small id="map-coords">Chạm vào bản đồ để đặt hướng chỉ đường</small>
+            <small id="map-coords"
+              >Mũi tên xanh là đạo hữu, đầu nhọn chỉ hướng nhìn. Lăn chuột hoặc chụm hai ngón để
+              phóng to, kéo để di chuyển</small
+            >
           </div>
           <button
             type="button"
@@ -1191,14 +1201,70 @@
           </button>
         </header>
         <div class="map-body">
-          <canvas id="worldmap" width="384" height="384"></canvas>
-          <div class="map-legend">
-            <span><i class="lg me"></i> Đạo hữu</span>
-            <span><i class="lg party"></i> Đồng đội</span>
-            <span><i class="lg npc"></i> NPC (!/?)</span>
-            <span><i class="lg other"></i> Đồng đạo</span>
-            <span><i class="lg mon"></i> Yêu thú</span>
-            <span><i class="lg town"></i> Khu an toàn</span>
+          <nav
+            id="map-graph"
+            class="map-graph"
+            aria-label="Sơ đồ nối các bản đồ: chọn một bản đồ để xem"
+            hidden
+          ></nav>
+          <div class="map-main">
+            <div class="map-tools" role="group" aria-label="Phóng to, thu nhỏ bản đồ">
+              <button
+                type="button"
+                id="map-zoom-out"
+                class="act-btn"
+                title="Thu nhỏ (-)"
+                aria-label="Thu nhỏ bản đồ (phím -)"
+              >
+                −
+              </button>
+              <button
+                type="button"
+                id="map-zoom-in"
+                class="act-btn"
+                title="Phóng to (+)"
+                aria-label="Phóng to bản đồ (phím +)"
+              >
+                +
+              </button>
+              <button
+                type="button"
+                id="map-recenter"
+                class="act-btn"
+                title="Về chỗ đạo hữu (Home)"
+                aria-label="Về chỗ đạo hữu đang đứng (phím Home)"
+              >
+                Về chỗ mình
+              </button>
+            </div>
+            <canvas
+              id="worldmap"
+              width="384"
+              height="384"
+              tabindex="0"
+              role="application"
+              aria-label="Bản đồ khu vực. Bấm vào bản đồ rồi dùng mũi tên để kéo, phím cộng và trừ để phóng to, thu nhỏ, phím Home để về chỗ đạo hữu"
+            ></canvas>
+            <button
+              type="button"
+              id="map-legend-toggle"
+              class="act-btn map-legend-toggle"
+              aria-expanded="true"
+              aria-controls="map-legend"
+            >
+              Chú giải
+            </button>
+            <div class="map-legend" id="map-legend">
+              <span><i class="lg me"></i> Đạo hữu</span>
+              <span><i class="lg party"></i> Đồng đội</span>
+              <span><i class="lg npc"></i> NPC (!/?)</span>
+              <span><i class="lg other"></i> Đồng đạo</span>
+              <span><i class="lg mon"></i> Yêu thú</span>
+              <span><i class="lg town"></i> Khu an toàn</span>
+              <span><i class="lg portal"></i> Cổng (ghi nơi đến)</span>
+              <span><i class="lg zone"></i> Khu yêu thú (xanh nhẹ → đỏ nặng)</span>
+              <span><i class="lg pin"></i> Đích nhiệm vụ đang theo dõi</span>
+            </div>
           </div>
         </div>
       </section>

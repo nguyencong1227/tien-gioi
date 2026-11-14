@@ -42,3 +42,14 @@ export const trackerOpen = panelOpen;
 /** Khoá lưu trạng thái mở / thu của Tổ đội và Chat ("1" = mở, "0" = thu gọn; cùng quy ước với `TRACKER_PREF_KEY`). */
 export const PARTY_PREF_KEY = "tg_party_open";
 export const CHAT_PREF_KEY = "tg_chat_open";
+
+/** Khoá lưu việc hiện bản đồ nhỏ ("1" = hiện, "0" = thu gọn thành nhãn tên khu; QUYET_DINH_M3 mục 17.2, #496). */
+export const MINIMAP_PREF_KEY = "tg_minimap_open";
+
+/** Bản đồ nhỏ đang hiện không: lựa chọn của người chơi thắng; CHƯA chọn thì HIỆN ở mọi màn (khác Tổ đội / Chat: bản đồ nhỏ nhỏ sẵn, và là nút mở bản đồ lớn trên cảm ứng). */
+export function minimapOpen(pref: boolean | null): boolean {
+  return pref ?? true;
+}
+
+/** Khoá lưu việc mở / đóng chú giải của bản đồ lớn ("1" mở, "0" đóng; chưa chọn: mở ở màn rộng, đóng ở màn hẹp như `panelOpen`). */
+export const MAP_LEGEND_PREF_KEY = "tg_map_legend_open";

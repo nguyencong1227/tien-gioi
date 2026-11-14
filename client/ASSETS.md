@@ -149,4 +149,4 @@ Thêm phần tử vào mảng `MONSTERS` và `MONSTER_CAP`:
      this.load.image("mon-ho_ly", "/assets/monsters/mon-ho_ly.png");
      ```
    - **Nếu dùng chung Atlas:** bỏ `mon-ho_ly.png` vào `client/assets-src/monsters/` rồi chạy đóng gói lại `atlas.png` + `atlas.json`.
-3. Ghi rõ nguồn và giấy phép (CC0 / CC-BY) của sprite vừa thêm vào `CREDITS.md`.
+3. Ghi rõ nguồn và giấy phép (CC0 / CC-BY, hoặc theo `AGENTS.md` mục Asset: ảnh AI SDXL base, nội dung Vạn Kiếp Tu Tiên đã được tác giả cho phép) của sprite vừa thêm vào `CREDITS.md`.
