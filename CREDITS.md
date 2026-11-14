@@ -69,13 +69,21 @@ Các thư viện mã nguồn mở dùng để đóng gói ứng dụng di độn
 
 ### 5b. Thư viện chạy trong trình duyệt (đóng gói vào gói JavaScript của client)
 
-Giấy phép MIT yêu cầu giữ thông báo bản quyền và nội dung giấy phép trong bản phân phối: toàn văn nằm ở `client/public/notices.html` (được phát hành cùng game, đưa vào bộ nhớ đệm PWA và APK) và được liên kết từ Cài đặt, mục "Giới thiệu và ghi công" (`#set-credit-libs`). `client/src/credits-ui.test.ts` giữ ba nơi (CREDITS.md, `notices.html`, Cài đặt) khớp nhau và khớp phiên bản ở `client/package.json`.
+Giấy phép MIT / ISC / BSD / 0BSD yêu cầu giữ thông báo bản quyền và nội dung giấy phép trong bản phân phối: toàn văn nằm ở `client/public/notices.html` (phát hành cùng game, đưa vào bộ nhớ đệm PWA và APK), liên kết từ Cài đặt, mục "Giới thiệu và ghi công" (`#set-credit-libs`). Trang này **được SINH từ `node_modules`** (`node client/scripts/gen-notices.mjs`; `--check` chỉ kiểm) cho TOÀN BỘ bao đóng phụ thuộc chạy của `client/package.json` (cả gói đi kèm, bắc cầu) và cho mã bên thứ ba nhúng sẵn trong Phaser; `client/src/credits-ui.test.ts` đỏ nếu trang lệch bản sinh (đổi phụ thuộc mà quên chạy lại), thiếu gói, hoặc thiếu mã nhúng.
 
 | Gói | Phiên bản | Tác giả / Nguồn | Giấy phép |
 |---|---|---|---|
 | `phaser` | 3.90.0 | Richard Davey, Phaser Studio Inc. ([phaser.io](https://phaser.io)); bản production dùng `phaser-arcade-physics.min.js` (#565) | **MIT** |
 | `colyseus.js` | 0.16.22 | Endel Dreyer ([colyseus.io](https://colyseus.io)) | **MIT** |
 | `@colyseus/schema` | đi kèm `colyseus.js` | Endel Dreyer | **MIT** |
+| `@colyseus/httpie` | đi kèm `colyseus.js` | Luke Edwards (bản của Colyseus) | **MIT** |
+| `@colyseus/msgpackr` | đi kèm `colyseus.js` | Kris Zyp (bản của Colyseus) | **MIT** |
+| `eventemitter3` | đi kèm `phaser` | Arnout Kazemier | **MIT** |
+| `tslib` | đi kèm `@capacitor/core`, `colyseus.js` | Microsoft | **0BSD** |
+| `@capacitor/core`, `@capacitor/app` | xem mục 5 | Ionic Team / Drifty Co. | **MIT** |
+| `ws` | đi kèm `colyseus.js` (chỉ dùng khi chạy trên Node; liệt kê cho đủ) | Einar Otto Stangvik, Arnout Kazemier và cộng sự | **MIT** |
+| Earcut 2.2.4 (nhúng trong Phaser, `src/geom/polygon/Earcut.js`) | theo `phaser` | Mapbox | **ISC** |
+| Simplify.js (nhúng trong Phaser, `src/geom/polygon/Simplify.js`) | theo `phaser` | Vladimir Agafonkin | **BSD 2 điều khoản** |
 
 ---
 
