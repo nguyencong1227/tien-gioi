@@ -40,8 +40,8 @@ describe("map-style (dữ liệu kiểu theo bản đồ)", () => {
 
   it("kiểu KHÔNG mồ côi: mọi kiểu trong MAP_STYLES là của một bản đồ có thật (trừ danh sách chờ, và danh sách chờ không được để cũ)", () => {
     // `am_suong` (M6 #408) từng chờ ở đây trước bản đồ của nó; #404 (shared) đã đưa bản đồ vào nên danh sách chờ đã được dọn.
-    // `han_van` (M7.8 #509) có kiểu TRƯỚC bản đồ: bản đồ thứ tư do A thêm ở M7.5 (#506); xem trước bằng `?debug&style=han_van`.
-    const waiting = ["han_van"];
+    // `han_van` (M7.8 #509) từng chờ ở đây: có kiểu TRƯỚC bản đồ; M7.5 (#506, `shared/src/map.ts`) đã thêm bản đồ nên danh sách chờ đã được dọn.
+    const waiting: string[] = [];
     for (const id of Object.keys(MAP_STYLES)) {
       if (waiting.includes(id)) continue;
       expect(getMap(id), `kiểu "${id}" không có bản đồ`).toBeDefined();

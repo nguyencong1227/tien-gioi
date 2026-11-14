@@ -234,6 +234,14 @@ export const ALL_SCENARIOS = [
     tier: "high",
     cpuRate: 4,
   },
+  // Hàn Vân Lĩnh (M7.5 #506, kiểu `han_van` của M7.8): băng nguyên có hạt tuyết; bậc Cao làm mốc, B thêm bậc Thấp / Vừa khi đo thật ở M7.8
+  {
+    id: "han-van-high-4x",
+    name: "Hàn Vân Lĩnh (sương + thời tiết + nước)",
+    query: AMBIENT_QUERY("han_van"),
+    tier: "high",
+    cpuRate: 4,
+  },
   // Đánh TRÙM (M6 #409, nit của A ở #450): đòn thường -> boss-hit, trùm gục -> boss-vanish (ưu tiên 2) theo nhịp dồn dập; bậc Thấp (trần chặt
   // nhất) và Cao. Trước đây hai công thức trùm chỉ được giữ bằng test FxBudget + trần mỗi công thức, chưa bằng số đo của perf-gate.
   {
