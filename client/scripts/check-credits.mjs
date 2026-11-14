@@ -14,6 +14,7 @@
  */
 
 import crypto from "node:crypto";
+import { Buffer } from "node:buffer";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -517,6 +518,315 @@ export function auditContentSources(
   };
 }
 
+// ---------------------------------------------------------------------------------------------------------------
+// Ảnh do AI sinh (SDXL base, nhóm tự sinh; docs/KE_HOACH_DO_HOA_AI.md mục 9.3-9.4, M7.12 #513)
+// ---------------------------------------------------------------------------------------------------------------
+
+/** Thư mục RIÊNG của ảnh AI trong gói phát hành, và thư mục tệp nguồn (mỗi ảnh một JSON cùng tên). */
+export const AI_ASSET_DIR = path.join(CLIENT_PUBLIC, "assets/ai");
+export const AI_SOURCE_DIR = path.resolve(ROOT_DIR, "docs/art/nguon");
+/** Định dạng ảnh AI được vào game: đã mã hoá lại sạch (WebP) hoặc PNG đã xoá khối văn bản. */
+export const AI_ALLOWED_EXT = new Set([".webp", ".png"]);
+/** Tiêu đề mục riêng của CREDITS.md cho ảnh AI (mục chứa dòng của từng ảnh). */
+export const AI_CREDITS_HEADING_RE = /^## \d+\. Ảnh do AI sinh/m;
+/** Khối siêu dữ liệu CẤM trong ảnh vào game: ComfyUI nhúng prompt + toàn bộ workflow vào khối văn bản của PNG. */
+export const PNG_FORBIDDEN_CHUNKS = new Set(["tEXt", "iTXt", "zTXt", "eXIf"]);
+export const WEBP_FORBIDDEN_CHUNKS = new Set(["EXIF", "XMP "]);
+
+const HEX64 = /^[0-9a-f]{64}$/;
+
+/**
+ * SHA-256 của checkpoint SDXL BASE 1.0 (`sd_xl_base_1.0.safetensors`, 6.938.078.334 byte; trùng băm công bố của Stability AI): luật `AGENTS.md` là "chỉ SDXL base", nên
+ * `model.sha256` của mọi tệp nguồn ảnh AI phải thuộc tập này (tên tệp model đổi được, băm thì không). Thêm bản khác (vd `0.9vae`) khi nào thật sự dùng, qua PR có người xem.
+ */
+export const SDXL_BASE_SHA256 = new Set([
+  "31e35c80fc4829d14f90153f4c74cd59c90b779f6afe05a74cd6120b893f7e5b",
+]);
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+/**
+ * Danh sách khối của PNG (tên 4 ký tự theo thứ tự), hoặc ném lỗi nếu không phải PNG / bị cắt cụt.
+ * @param {Buffer} buf
+ * @returns {string[]}
+ */
+export function pngChunks(buf) {
+  if (buf.length < 8 || !buf.subarray(0, 8).equals(PNG_SIGNATURE))
+    throw new Error("không phải PNG");
+  const out = [];
+  let off = 8;
+  while (off < buf.length) {
+    if (off + 12 > buf.length) throw new Error("PNG bị cắt cụt (khối dở dang)");
+    const len = buf.readUInt32BE(off);
+    const type = buf.toString("latin1", off + 4, off + 8);
+    if (off + 12 + len > buf.length) throw new Error(`PNG bị cắt cụt (khối ${type})`);
+    out.push(type);
+    off += 12 + len;
+    if (type === "IEND") break;
+  }
+  if (out[out.length - 1] !== "IEND") throw new Error("PNG thiếu khối IEND");
+  if (off !== buf.length)
+    throw new Error("PNG có dữ liệu thừa sau khối IEND (có thể giấu siêu dữ liệu)");
+  return out;
+}
+
+/**
+ * Danh sách khối của WebP (RIFF), hoặc ném lỗi nếu không phải WebP / bị cắt cụt.
+ * @param {Buffer} buf
+ * @returns {string[]}
+ */
+export function webpChunks(buf) {
+  if (
+    buf.length < 12 ||
+    buf.toString("latin1", 0, 4) !== "RIFF" ||
+    buf.toString("latin1", 8, 12) !== "WEBP"
+  )
+    throw new Error("không phải WebP");
+  if (buf.readUInt32LE(4) + 8 !== buf.length)
+    throw new Error("WebP bị cắt cụt hoặc thừa byte sau RIFF");
+  const out = [];
+  let off = 12;
+  while (off < buf.length) {
+    if (off + 8 > buf.length) throw new Error("WebP bị cắt cụt (khối dở dang)");
+    const type = buf.toString("latin1", off, off + 4);
+    const len = buf.readUInt32LE(off + 4);
+    if (off + 8 + len > buf.length) throw new Error(`WebP bị cắt cụt (khối ${type})`);
+    out.push(type);
+    off += 8 + len + (len % 2); // khối căn chẵn
+  }
+  return out;
+}
+
+/**
+ * Siêu dữ liệu CẤM có trong ảnh không: PNG có `tEXt` / `iTXt` / `zTXt` / `eXIf`, WebP có `EXIF` / `XMP `. Ảnh không đọc được / định dạng khác cũng là lỗi.
+ * @param {Buffer} buf
+ * @param {string} ext ".png" | ".webp"
+ * @returns {{ chunks: string[], forbidden: string[], error: string | null }}
+ */
+export function auditImageMetadata(buf, ext) {
+  try {
+    if (ext === ".png") {
+      const chunks = pngChunks(buf);
+      return { chunks, forbidden: chunks.filter((c) => PNG_FORBIDDEN_CHUNKS.has(c)), error: null };
+    }
+    if (ext === ".webp") {
+      const chunks = webpChunks(buf);
+      return { chunks, forbidden: chunks.filter((c) => WEBP_FORBIDDEN_CHUNKS.has(c)), error: null };
+    }
+    return {
+      chunks: [],
+      forbidden: [],
+      error: `định dạng ${ext || "(không đuôi)"} không được phép`,
+    };
+  } catch (err) {
+    return { chunks: [], forbidden: [], error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * Kiểm lược đồ `docs/art/nguon/<tên>.json` (docs/KE_HOACH_DO_HOA_AI.md mục 9.3). Trả danh sách vấn đề (rỗng = hợp lệ).
+ * Quy tắc cứng (AGENTS.md mục Asset, nguồn 2): chỉ SDXL BASE, không LoRA; người duyệt xác nhận không chữ và không giống game khác.
+ * @param {any} j
+ * @returns {string[]}
+ */
+export function validateAiSource(j) {
+  const bad = [];
+  const str = (v) => typeof v === "string" && v.trim().length > 0;
+  if (j === null || typeof j !== "object" || Array.isArray(j)) return ["không phải đối tượng JSON"];
+  if (!str(j.asset)) bad.push("thiếu `asset` (đường dẫn trong repo)");
+  if (!HEX64.test(j.finalSha256 ?? "")) bad.push("`finalSha256` phải là 64 ký tự hex thường");
+  if (!HEX64.test(j.rawSha256 ?? ""))
+    bad.push("`rawSha256` (ảnh thô được chọn) phải là 64 ký tự hex thường");
+  if (
+    !j.model ||
+    typeof j.model !== "object" ||
+    !str(j.model.name) ||
+    !HEX64.test(j.model.sha256 ?? "")
+  )
+    bad.push("`model` phải có `name` và `sha256` (64 hex)");
+  else {
+    if (
+      !/(sd[-_ ]?xl|stable[-_ ]?diffusion[-_ ]?xl)/i.test(j.model.name) ||
+      !/base/i.test(j.model.name)
+    )
+      bad.push(
+        `\`model.name\` "${j.model.name}" không phải SDXL base (chỉ được SDXL base, AGENTS.md)`,
+      );
+    if (!SDXL_BASE_SHA256.has(j.model.sha256))
+      bad.push(
+        "`model.sha256` không phải băm của checkpoint SDXL base 1.0 (chỉ được SDXL base, AGENTS.md; xem `SDXL_BASE_SHA256`)",
+      );
+  }
+  if (!Array.isArray(j.lora)) bad.push("`lora` phải là mảng (`[]` nếu không dùng)");
+  else if (j.lora.length > 0)
+    bad.push("`lora` phải rỗng: không dùng model / LoRA khác nếu chưa hỏi người dùng (AGENTS.md)");
+  if (!(
+    str(j.comfyui) ||
+    (j.comfyui && typeof j.comfyui === "object" && Object.keys(j.comfyui).length > 0)
+  ))
+    bad.push("thiếu `comfyui` (phiên bản ComfyUI, PyTorch, driver)");
+  if (
+    !j.workflow ||
+    typeof j.workflow !== "object" ||
+    !str(j.workflow.path) ||
+    !HEX64.test(j.workflow.sha256 ?? "")
+  )
+    bad.push("`workflow` phải có `path` và `sha256` (64 hex)");
+  if (!str(j.prompt)) bad.push("thiếu `prompt`");
+  if (typeof j.negativePrompt !== "string")
+    bad.push("`negativePrompt` phải là chuỗi (có thể rỗng)");
+  if (!(Number.isInteger(j.seed) || (typeof j.seed === "string" && /^-?\d+$/.test(j.seed))))
+    bad.push("`seed` phải là số nguyên");
+  if (
+    !Array.isArray(j.postProcess) ||
+    j.postProcess.length === 0 ||
+    !j.postProcess.every((x) => x && typeof x === "object" && str(x.script))
+  )
+    bad.push("`postProcess` phải là mảng không rỗng các mục có `script`");
+  if (!j.reviewed || typeof j.reviewed !== "object") bad.push("thiếu `reviewed`");
+  else {
+    if (!str(j.reviewed.by)) bad.push("`reviewed.by` trống");
+    if (!str(j.reviewed.date)) bad.push("`reviewed.date` trống");
+    if (j.reviewed.noText !== true)
+      bad.push("`reviewed.noText` phải là true (người duyệt xác nhận không chữ / ký tự giả)");
+    if (j.reviewed.noOtherGameLikeness !== true)
+      bad.push("`reviewed.noOtherGameLikeness` phải là true (không giống game khác)");
+  }
+  if (!str(j.date)) bad.push("thiếu `date`");
+  if (CJK_REGEX.test(JSON.stringify(j)))
+    bad.push("có ký tự CJK trong tệp nguồn (prompt / ghi chú không được chứa chữ Hán)");
+  return bad;
+}
+
+/**
+ * Rà ảnh AI: nguồn (JSON cùng tên, băm khớp, dòng riêng ở CREDITS.md), siêu dữ liệu sạch, định dạng. Không có ảnh nào thì sạch (cũng báo JSON mồ côi).
+ * @param {{ aiDir?: string, sourceDir?: string, creditsPath?: string, rootDir?: string }} [opts]
+ * @returns {{ files: string[], sources: string[], errors: Array<{ kind: string, file: string, detail: string }> }}
+ */
+export function auditAiImages(opts = {}) {
+  const rootDir = opts.rootDir ?? ROOT_DIR;
+  const aiDir = opts.aiDir ?? AI_ASSET_DIR;
+  const sourceDir = opts.sourceDir ?? AI_SOURCE_DIR;
+  const creditsPath = opts.creditsPath ?? CREDITS_FILE;
+  const errors = [];
+  const err = (kind, file, detail) => errors.push({ kind, file, detail });
+  const rel = (abs) => path.relative(rootDir, abs).replace(/\\/g, "/");
+  const aiPrefix = `${rel(aiDir)}/`;
+
+  const files = scanFiles(aiDir, rootDir).sort();
+  const jsonNames = fs.existsSync(sourceDir)
+    ? fs
+        .readdirSync(sourceDir, { withFileTypes: true })
+        .filter((e) => e.isFile() && e.name.endsWith(".json"))
+        .map((e) => e.name)
+        .sort()
+    : [];
+  const sources = jsonNames.map((n) => rel(path.join(sourceDir, n)));
+
+  let creditsSection = null;
+  if (fs.existsSync(creditsPath)) {
+    const text = fs.readFileSync(creditsPath, "utf8");
+    const m = AI_CREDITS_HEADING_RE.exec(text);
+    if (m) {
+      const rest = text.slice(m.index + m[0].length);
+      const next = rest.search(/^## /m);
+      creditsSection = next < 0 ? rest : rest.slice(0, next);
+    }
+  }
+  if (files.length > 0 && creditsSection === null)
+    err(
+      "credits",
+      "CREDITS.md",
+      "thiếu mục riêng cho ảnh AI (tiêu đề dạng `## N. Ảnh do AI sinh ...`)",
+    );
+
+  // Đọc các JSON nguồn
+  /** @type {Map<string, any>} */
+  const parsed = new Map();
+  for (const n of jsonNames) {
+    const full = path.join(sourceDir, n);
+    try {
+      parsed.set(n, JSON.parse(fs.readFileSync(full, "utf8")));
+    } catch (e) {
+      err(
+        "badJson",
+        rel(full),
+        `không đọc được JSON: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+  }
+
+  // Mỗi JSON phải trỏ tới ảnh có thật, dưới thư mục ảnh AI, đúng tên, băm khớp, lược đồ đủ
+  for (const [n, j] of parsed) {
+    const jsonRel = rel(path.join(sourceDir, n));
+    for (const problem of validateAiSource(j)) err("schema", jsonRel, problem);
+    const asset =
+      typeof j?.asset === "string" ? path.posix.normalize(j.asset.replace(/\\/g, "/")) : "";
+    if (!asset.startsWith(aiPrefix) || asset.includes("..")) {
+      err("assetPath", jsonRel, `\`asset\` "${j?.asset}" phải nằm dưới ${aiPrefix}`);
+      continue;
+    }
+    const stem = path.posix.basename(asset, path.posix.extname(asset));
+    if (`${stem}.json` !== n)
+      err("nameMismatch", jsonRel, `tên JSON phải là ${stem}.json (theo tên ảnh)`);
+    const full = path.resolve(rootDir, asset);
+    if (!fs.existsSync(full)) {
+      err("orphanSource", jsonRel, `trỏ tới ${asset} không tồn tại`);
+      continue;
+    }
+    if (
+      typeof j.finalSha256 === "string" &&
+      HEX64.test(j.finalSha256) &&
+      sha256File(full) !== j.finalSha256
+    )
+      err(
+        "badHash",
+        jsonRel,
+        `\`finalSha256\` không khớp tệp thật ${asset} (thực: ${sha256File(full)})`,
+      );
+  }
+
+  // Mỗi ảnh phải có JSON cùng tên trỏ đúng về nó, dòng riêng ở CREDITS.md, và siêu dữ liệu sạch
+  for (const f of files) {
+    const ext = path.posix.extname(f).toLowerCase();
+    if (!AI_ALLOWED_EXT.has(ext)) {
+      err(
+        "badFormat",
+        f,
+        `định dạng ${ext || "(không đuôi)"} không được phép (chỉ .webp / .png đã xoá siêu dữ liệu)`,
+      );
+      continue;
+    }
+    const stem = path.posix.basename(f, path.posix.extname(f));
+    const j = parsed.get(`${stem}.json`);
+    if (!jsonNames.includes(`${stem}.json`))
+      err("noSource", f, `thiếu docs/art/nguon/${stem}.json`);
+    else if (j && path.posix.normalize(String(j.asset ?? "").replace(/\\/g, "/")) !== f)
+      err(
+        "assetMismatch",
+        f,
+        `docs/art/nguon/${stem}.json trỏ tới "${j.asset}", không phải ảnh này`,
+      );
+    if (creditsSection !== null) {
+      const short = f.replace(/^client\/public\//, "");
+      if (!(
+        matchExactToken(creditsSection, f) ||
+        matchExactToken(creditsSection, short) ||
+        matchExactToken(creditsSection, path.posix.basename(f))
+      ))
+        err("credits", f, "chưa có dòng riêng trong mục ảnh AI của CREDITS.md");
+    }
+    const meta = auditImageMetadata(fs.readFileSync(path.resolve(rootDir, f)), ext);
+    if (meta.error) err("badImage", f, meta.error);
+    else if (meta.forbidden.length > 0)
+      err(
+        "metadata",
+        f,
+        `còn khối siêu dữ liệu: ${[...new Set(meta.forbidden)].join(", ")} (ComfyUI nhúng prompt + workflow ở đây)`,
+      );
+  }
+  return { files, sources, errors };
+}
+
 // Chạy trực tiếp qua CLI
 if (process.argv[1] === __filename) {
   try {
@@ -649,6 +959,19 @@ if (process.argv[1] === __filename) {
         `✓ Toàn bộ ${contentAudit.entries.length} mục trong NGUON_NOI_DUNG.md đều hợp lệ, có trong CREDITS.md, đúng thư mục vktt/ và đã duyệt chữ Hán.`,
       );
     }
+
+    // Ảnh do AI sinh (docs/KE_HOACH_DO_HOA_AI.md mục 9.4 (a), (b))
+    const aiAudit = auditAiImages();
+    if (aiAudit.errors.length > 0) {
+      console.error(
+        `\n❌ LỖI ẢNH AI: ${aiAudit.errors.length} vấn đề với ảnh do AI sinh (client/public/assets/ai/, docs/art/nguon/):`,
+      );
+      for (const e of aiAudit.errors) console.error(`  - [${e.kind}] ${e.file}: ${e.detail}`);
+      process.exit(1);
+    }
+    console.log(
+      `✓ Ảnh AI: ${aiAudit.files.length} ảnh, ${aiAudit.sources.length} tệp nguồn, băm khớp, không siêu dữ liệu, có dòng riêng ở CREDITS.md.`,
+    );
 
     console.log(`\n✓ TẤT CẢ TÀI NGUYÊN ĐỀU HỢP LỆ VÀ CÓ NGUỒN GỐC RÕ RÀNG.`);
   } catch (err) {
