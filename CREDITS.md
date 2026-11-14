@@ -93,3 +93,15 @@ Chỉ dùng tập con `latin` + `vietnamese` (đủ cho tiếng Việt); không 
 ```
 | `ten-tep.ext` (mô tả ngắn) | URL trang gốc hoặc gói + phiên bản | Tên tác giả | CC0 1.0 / CC-BY 4.0 / OFL 1.1 | dd/mm/yyyy | `<64 ký tự hex từ sha256sum>` |
 ```
+
+---
+
+## 7. Ảnh do AI sinh (SDXL base, nhóm Tiên Giới tự sinh)
+
+Ảnh sinh bằng ComfyUI **chỉ với model SDXL base** (không model / LoRA khác nếu chưa hỏi người dùng; `QUYET_DINH_M3.md` mục 18.3, quy trình ở `docs/KE_HOACH_DO_HOA_AI.md`), chạy trên máy của nhóm, hậu kỳ bằng script có tham số ghi lại (không vẽ tay), không chữ Hán / chữ lạ, prompt không nêu tên, nhân vật hay phong cách của game khác. Ảnh vào game nằm RIÊNG ở `client/public/assets/ai/` (chỉ `.webp` hoặc `.png`, đã xoá toàn bộ siêu dữ liệu).
+
+Mỗi ảnh PHẢI có: (1) một dòng ở bảng dưới (tên tệp đầy đủ + mô tả ngắn + ngày); (2) tệp nguồn `docs/art/nguon/<tên>.json` cùng tên với ảnh, đủ các trường ở `docs/KE_HOACH_DO_HOA_AI.md` mục 9.3 (model + sha256, workflow + sha256, prompt, seed, `postProcess`, `reviewed` có `noText` và `noOtherGameLikeness` đều true...) và `finalSha256` KHỚP tệp ảnh thật; (3) không có khối siêu dữ liệu (PNG: `tEXt` / `iTXt` / `zTXt` / `eXIf`; WebP: `EXIF` / `XMP `); (4) dung lượng trong trần ở `client/perf-budget.json` (`static.aiAssets`: mỗi ảnh <= 150 KB, tổng <= 300 KB). `npm run check:credits` (và `client/src/credits.test.ts` trong CI) đỏ nếu thiếu JSON, đổi byte ảnh, sai băm, JSON mồ côi, thiếu dòng ở bảng này hoặc còn siêu dữ liệu; `npm run check:budget` đỏ nếu vượt trần.
+
+| Ảnh | Mô tả | Model | Ngày sinh | Tệp nguồn |
+|---|---|---|---|---|
+| (chưa có ảnh AI nào trong repo) | | | | |

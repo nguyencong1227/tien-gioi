@@ -1,18 +1,25 @@
 import { describe, expect, it } from "vitest";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
+  AI_ASSET_DIR,
+  auditAiImages,
   auditAssets,
   auditContentSources,
+  auditImageMetadata,
   auditHashes,
   checkImageFileCjk,
   isAssetCredited,
   isUnderVktt,
   matchExactToken,
   parseContentSourceTable,
+  pngChunks,
   scanFiles,
   sha256File,
+  validateAiSource,
+  webpChunks,
 } from "../scripts/check-credits.mjs";
 
 describe("Rà soát tài sản và giấy phép (check-credits)", () => {
@@ -616,5 +623,281 @@ describe("Nguồn nội dung, hình ảnh và âm thanh bên ngoài (M7.16 #517,
     } finally {
       fs.rmSync(tmpDocDir, { recursive: true, force: true });
     }
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------------------
+// Ảnh do AI sinh (docs/KE_HOACH_DO_HOA_AI.md mục 9.4 (a), (b), (d); M7.12 #513): kiểm TRƯỚC khi ảnh AI đầu tiên vào client/public/
+// ---------------------------------------------------------------------------------------------------------------
+
+/** Khối PNG / WebP tối thiểu (CRC không được đọc nên để 0): đủ để dò khối, KHÔNG phải ảnh vẽ được. */
+const pngChunk = (type: string, data: Buffer = Buffer.alloc(0)) => {
+  const len = Buffer.alloc(4);
+  len.writeUInt32BE(data.length);
+  return Buffer.concat([len, Buffer.from(type, "latin1"), data, Buffer.alloc(4)]);
+};
+const makePng = (extra: string[] = [], pad = 0) =>
+  Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    pngChunk("IHDR", Buffer.alloc(13)),
+    ...extra.map((t) => pngChunk(t, Buffer.from("prompt: workflow", "latin1"))),
+    pngChunk("IDAT", Buffer.alloc(8 + pad, 7)),
+    pngChunk("IEND"),
+  ]);
+const webpChunk = (type: string, len: number) => {
+  const head = Buffer.alloc(8);
+  head.write(type, 0, "latin1");
+  head.writeUInt32LE(len, 4);
+  return Buffer.concat([head, Buffer.alloc(len + (len % 2), 3)]);
+};
+const makeWebp = (extra: string[] = []) => {
+  const body = Buffer.concat([
+    Buffer.from("WEBP", "latin1"),
+    webpChunk("VP8 ", 10),
+    ...extra.map((t) => webpChunk(t, 5)),
+  ]);
+  const head = Buffer.alloc(8);
+  head.write("RIFF", 0, "latin1");
+  head.writeUInt32LE(body.length, 4);
+  return Buffer.concat([head, body]);
+};
+
+const sha = (b: Buffer) => crypto.createHash("sha256").update(b).digest("hex");
+const HEX = "a".repeat(64);
+const validSource = (asset: string, finalSha: string, over: Record<string, unknown> = {}) => ({
+  asset,
+  finalSha256: finalSha,
+  rawSha256: HEX,
+  model: { name: "sd_xl_base_1.0.safetensors", sha256: HEX },
+  lora: [],
+  comfyui: { comfyui: "0.3.0", pytorch: "2.5.0", driver: "560.35" },
+  workflow: { path: "docs/art/workflow/sdxl-base.json", sha256: HEX },
+  prompt: "misty mountain pass at dawn, ink wash, muted palette",
+  negativePrompt: "text, watermark, letters",
+  seed: 12345,
+  postProcess: [{ script: "client/scripts/art/to-webp.mjs", params: { maxWidth: 512 } }],
+  reviewed: { by: "dev-b", date: "2026-11-15", noText: true, noOtherGameLikeness: true },
+  date: "2026-11-15",
+  ...over,
+});
+
+describe("Ảnh do AI sinh: nguồn, băm, siêu dữ liệu, dòng CREDITS (check-credits, M7.12 #513)", () => {
+  const NAME = "nen-dang-nhap";
+  const ASSET = `client/public/assets/ai/${NAME}.webp`;
+
+  /** Dựng một kho giả có đúng MỘT ảnh AI hợp lệ; trả đường dẫn + hàm sửa. */
+  function fixture(opts: { image?: Buffer; ext?: string } = {}) {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "tg-ai-audit-"));
+    const ext = opts.ext ?? ".webp";
+    const rel = `client/public/assets/ai/${NAME}${ext}`;
+    const img = opts.image ?? makeWebp();
+    fs.mkdirSync(path.join(root, "client/public/assets/ai"), { recursive: true });
+    fs.mkdirSync(path.join(root, "docs/art/nguon"), { recursive: true });
+    fs.writeFileSync(path.join(root, rel), img);
+    fs.writeFileSync(
+      path.join(root, `docs/art/nguon/${NAME}.json`),
+      JSON.stringify(validSource(rel, sha(img))),
+    );
+    fs.writeFileSync(
+      path.join(root, "CREDITS.md"),
+      `# Credits\n\n## 7. Ảnh do AI sinh (SDXL base)\n\n| Ảnh | Mô tả |\n|---|---|\n| \`${rel}\` | nền màn đăng nhập |\n\n## 8. Khác\n`,
+    );
+    const audit = () =>
+      auditAiImages({
+        rootDir: root,
+        aiDir: path.join(root, "client/public/assets/ai"),
+        sourceDir: path.join(root, "docs/art/nguon"),
+        creditsPath: path.join(root, "CREDITS.md"),
+      });
+    const jsonPath = path.join(root, `docs/art/nguon/${NAME}.json`);
+    const imgPath = path.join(root, rel);
+    const kinds = () => audit().errors.map((e) => e.kind);
+    return { root, audit, jsonPath, imgPath, rel, kinds };
+  }
+
+  it("kho thật của repo: sạch (hiện chưa có ảnh AI nào) và thư mục ảnh AI chưa có tệp lạ", () => {
+    expect(auditAiImages().errors).toEqual([]);
+    expect(scanFiles(AI_ASSET_DIR)).toEqual([]);
+  });
+
+  it("một ảnh WebP hợp lệ (JSON cùng tên, băm khớp, có dòng CREDITS, không siêu dữ liệu) thì qua", () => {
+    const f = fixture();
+    const r = f.audit();
+    expect(r.errors).toEqual([]);
+    expect(r.files).toEqual([ASSET]);
+    expect(r.sources).toEqual([`docs/art/nguon/${NAME}.json`]);
+  });
+
+  it("PNG hợp lệ (không khối văn bản) cũng qua", () => {
+    const f = fixture({ image: makePng(), ext: ".png" });
+    expect(f.audit().errors).toEqual([]);
+  });
+
+  it("ĐỘT BIẾN (a): xoá JSON nguồn => noSource", () => {
+    const f = fixture();
+    fs.rmSync(f.jsonPath);
+    expect(f.kinds()).toContain("noSource");
+  });
+
+  it("ĐỘT BIẾN (a): đổi 1 byte của ảnh => badHash", () => {
+    const f = fixture();
+    const img = fs.readFileSync(f.imgPath);
+    img[img.length - 2] ^= 0xff; // byte trong khối VP8 (không phá cấu trúc RIFF)
+    fs.writeFileSync(f.imgPath, img);
+    expect(f.kinds()).toContain("badHash");
+  });
+
+  it("ĐỘT BIẾN (a): sửa băm trong JSON => badHash; băm không phải 64 hex => schema", () => {
+    const f = fixture();
+    const j = JSON.parse(fs.readFileSync(f.jsonPath, "utf8"));
+    fs.writeFileSync(f.jsonPath, JSON.stringify({ ...j, finalSha256: "b".repeat(64) }));
+    expect(f.kinds()).toContain("badHash");
+    fs.writeFileSync(f.jsonPath, JSON.stringify({ ...j, finalSha256: "xyz" }));
+    expect(f.kinds()).toContain("schema");
+  });
+
+  it("ĐỘT BIẾN (a): thêm ảnh KHÔNG có JSON => noSource; JSON mồ côi (xoá ảnh) => orphanSource", () => {
+    const f = fixture();
+    fs.writeFileSync(path.join(f.root, "client/public/assets/ai/la.webp"), makeWebp());
+    type AiErr = { kind: string; file: string; detail: string };
+    const errs = (f.audit().errors as AiErr[]).filter((e) => e.kind === "noSource");
+    expect(errs.map((e) => e.file)).toEqual(["client/public/assets/ai/la.webp"]);
+    const g = fixture();
+    fs.rmSync(g.imgPath);
+    expect(g.kinds()).toContain("orphanSource");
+  });
+
+  it("ĐỘT BIẾN (a): thiếu dòng ở mục ảnh AI của CREDITS.md, hoặc dòng chỉ nằm ở mục khác => credits", () => {
+    const f = fixture();
+    fs.writeFileSync(
+      path.join(f.root, "CREDITS.md"),
+      "# Credits\n\n## 7. Ảnh do AI sinh\n\n(trống)\n",
+    );
+    expect(f.kinds()).toContain("credits");
+    // nhắc tên ảnh ở mục KHÁC (sau tiêu đề mục 8) không tính
+    fs.writeFileSync(
+      path.join(f.root, "CREDITS.md"),
+      `# Credits\n\n## 7. Ảnh do AI sinh\n\n(trống)\n\n## 8. Khác\n\n${f.rel}\n`,
+    );
+    expect(f.kinds()).toContain("credits");
+    // thiếu hẳn mục
+    fs.writeFileSync(path.join(f.root, "CREDITS.md"), `# Credits\n\n${f.rel}\n`);
+    expect(f.kinds()).toContain("credits");
+  });
+
+  it("ĐỘT BIẾN: JSON trỏ sai ảnh / ra ngoài thư mục ảnh AI / sai tên / không đọc được", () => {
+    const f = fixture();
+    const j = JSON.parse(fs.readFileSync(f.jsonPath, "utf8"));
+    fs.writeFileSync(f.jsonPath, JSON.stringify({ ...j, asset: "client/public/assets/atlas.png" }));
+    expect(f.kinds()).toContain("assetPath");
+    fs.writeFileSync(
+      f.jsonPath,
+      JSON.stringify({ ...j, asset: "client/public/assets/ai/../atlas.png" }),
+    );
+    expect(f.kinds()).toContain("assetPath");
+    fs.writeFileSync(
+      f.jsonPath,
+      JSON.stringify({ ...j, asset: "client/public/assets/ai/khac.webp" }),
+    );
+    expect(f.kinds()).toEqual(expect.arrayContaining(["orphanSource", "nameMismatch"]));
+    fs.writeFileSync(f.jsonPath, "{ không phải json");
+    expect(f.kinds()).toContain("badJson");
+  });
+
+  it("ĐỘT BIẾN (b): PNG còn khối tEXt / iTXt / zTXt / eXIf => metadata", () => {
+    for (const chunk of ["tEXt", "iTXt", "zTXt", "eXIf"]) {
+      const f = fixture({ image: makePng([chunk]), ext: ".png" });
+      const e = f.audit().errors.find((x: { kind: string }) => x.kind === "metadata");
+      expect(e, chunk).toBeDefined();
+      expect(e!.detail).toContain(chunk);
+    }
+  });
+
+  it("ĐỘT BIẾN (b): WebP còn khối EXIF / XMP => metadata; ảnh hỏng / cắt cụt => badImage; đuôi lạ => badFormat", () => {
+    for (const chunk of ["EXIF", "XMP "]) {
+      const f = fixture({ image: makeWebp([chunk]) });
+      expect(f.kinds(), chunk).toContain("metadata");
+    }
+    const cut = fixture({ image: makeWebp().subarray(0, 20) });
+    expect(cut.kinds()).toContain("badImage");
+    const fake = fixture({ image: Buffer.from("không phải ảnh") });
+    expect(fake.kinds()).toContain("badImage");
+    const jpg = fixture({ image: makeWebp(), ext: ".jpg" });
+    expect(jpg.kinds()).toContain("badFormat");
+  });
+
+  it("lược đồ nguồn: chỉ SDXL base, không LoRA, người duyệt xác nhận, không chữ Hán, đủ trường", () => {
+    const good = validSource(ASSET, HEX);
+    expect(validateAiSource(good)).toEqual([]);
+    const bad = (over: Record<string, unknown>) => validateAiSource(validSource(ASSET, HEX, over));
+    expect(bad({ model: { name: "dreamshaper_xl.safetensors", sha256: HEX } }).join()).toContain(
+      "SDXL base",
+    );
+    expect(bad({ model: { name: "sd_xl_refiner_1.0.safetensors", sha256: HEX } }).join()).toContain(
+      "SDXL base",
+    );
+    expect(bad({ model: { name: "sd_v1-5.safetensors", sha256: HEX } }).join()).toContain(
+      "SDXL base",
+    );
+    expect(bad({ lora: ["style.safetensors"] }).join()).toContain("lora");
+    expect(bad({ lora: undefined }).join()).toContain("lora");
+    expect(
+      bad({
+        reviewed: { by: "dev-b", date: "x", noText: false, noOtherGameLikeness: true },
+      }).join(),
+    ).toContain("noText");
+    expect(
+      bad({
+        reviewed: { by: "dev-b", date: "x", noText: true, noOtherGameLikeness: false },
+      }).join(),
+    ).toContain("noOtherGameLikeness");
+    expect(
+      bad({ reviewed: { by: "", date: "x", noText: true, noOtherGameLikeness: true } }).join(),
+    ).toContain("reviewed.by");
+    expect(bad({ prompt: "núi non \u5c71\u6c34" }).join()).toContain("CJK");
+    expect(bad({ prompt: "" }).join()).toContain("prompt");
+    expect(bad({ seed: 1.5 }).join()).toContain("seed");
+    expect(bad({ seed: "98765" })).toEqual([]);
+    expect(bad({ postProcess: [] }).join()).toContain("postProcess");
+    expect(bad({ workflow: { path: "x" } }).join()).toContain("workflow");
+    expect(bad({ rawSha256: "abc" }).join()).toContain("rawSha256");
+    expect(bad({ date: "" }).join()).toContain("date");
+    expect(validateAiSource(null)).toHaveLength(1);
+    expect(validateAiSource([])).toHaveLength(1);
+    // đủ mười ba trường bắt buộc: bỏ từng trường thì phải có vấn đề
+    for (const k of Object.keys(good).filter((k) => k !== "negativePrompt" || true)) {
+      const copy: Record<string, unknown> = { ...good };
+      delete copy[k];
+      expect(validateAiSource(copy).length, `thiếu ${k}`).toBeGreaterThan(0);
+    }
+  });
+
+  it("pngChunks / webpChunks / auditImageMetadata đọc đúng khối và từ chối ảnh hỏng", () => {
+    expect(pngChunks(makePng(["tEXt"]))).toEqual(["IHDR", "tEXt", "IDAT", "IEND"]);
+    expect(() => pngChunks(Buffer.from("abc"))).toThrow(/không phải PNG/);
+    expect(() => pngChunks(makePng().subarray(0, 30))).toThrow(/cắt cụt/);
+    expect(webpChunks(makeWebp(["EXIF"]))).toEqual(["VP8 ", "EXIF"]);
+    expect(() => webpChunks(makeWebp().subarray(0, 25))).toThrow();
+    // dữ liệu giấu SAU phần cuối của tệp (sau IEND / sau khối RIFF) cũng bị từ chối
+    expect(() => pngChunks(Buffer.concat([makePng(), Buffer.from("prompt-giau")]))).toThrow(
+      /thừa sau/,
+    );
+    expect(() => webpChunks(Buffer.concat([makeWebp(), Buffer.from("xx")]))).toThrow(/thừa byte/);
+    expect(
+      auditImageMetadata(Buffer.concat([makeWebp(), Buffer.from("xx")]), ".webp").error,
+    ).toContain("thừa");
+    expect(auditImageMetadata(makePng(), ".png").forbidden).toEqual([]);
+    expect(auditImageMetadata(makeWebp(["XMP "]), ".webp").forbidden).toEqual(["XMP "]);
+    expect(auditImageMetadata(makePng(), ".gif").error).toContain("không được phép");
+  });
+
+  it("tài liệu khớp số tệp thật: RA_SOAT_TAI_SAN.md mục 2e và CREDITS.md mục 7 (thêm ảnh AI mà quên cập nhật thì đỏ)", () => {
+    const rootDir = path.resolve(__dirname, "../..");
+    const n = scanFiles(AI_ASSET_DIR).length;
+    const ra = fs.readFileSync(path.resolve(rootDir, "docs/RA_SOAT_TAI_SAN.md"), "utf8");
+    expect(ra).toContain(`Số tệp ảnh AI trong \`client/public/assets/ai/\`: **${n} tệp**`);
+    const credits = fs.readFileSync(path.resolve(rootDir, "CREDITS.md"), "utf8");
+    expect(credits).toMatch(/^## 7\. Ảnh do AI sinh/m);
+    expect(credits).toContain("static.aiAssets");
   });
 });

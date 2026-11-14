@@ -96,6 +96,18 @@ Tư thế đánh / bị đánh / gục của yêu thú và nhân vật suy từ 
 
 ---
 
+### 2e. Tài sản có AI sinh nháp (SDXL base)
+
+- Số tệp ảnh AI trong `client/public/assets/ai/`: **0 tệp** (chưa có ảnh AI nào vào repo; đường kiểm tự động đã sẵn sàng TRƯỚC khi ảnh đầu tiên vào).
+- Mỗi ảnh vào đây phải có: tệp nguồn `docs/art/nguon/<tên>.json` (đủ trường mục 9.3 của `docs/KE_HOACH_DO_HOA_AI.md`, `finalSha256` khớp), một dòng ở `CREDITS.md` mục 7, không siêu dữ liệu (PNG không `tEXt` / `iTXt` / `zTXt` / `eXIf`, WebP không `EXIF` / `XMP `), chỉ model SDXL base và không LoRA, người duyệt xác nhận không chữ và không giống game khác, dung lượng <= trần `static.aiAssets` (mỗi ảnh 150 KB, tổng 300 KB).
+- Bảng ảnh (thêm hàng khi có ảnh; `credits.test.ts` đếm số tệp thật và so với con số "0 tệp" ở trên):
+
+| Ảnh | Tệp nguồn | Ngày | Người duyệt |
+|---|---|---|---|
+| (chưa có) | | | |
+
+---
+
 ## 3. Rà soát danh xưng và cốt truyện (Chống sao chép thương hiệu)
 
 Danh sách HIỆN HÀNH, lấy từ dữ liệu của `shared/` (bản M4 ghi id đã đổi như `tho_rung`, `soi_hoang`, `hac_phong_lam`, `boss_mang_xa`: không còn trong mã):
@@ -119,6 +131,7 @@ Danh sách HIỆN HÀNH, lấy từ dữ liệu của `shared/` (bản M4 ghi id
   2. **Không dùng wildcard thư mục**: Mọi tệp mới (kể cả trong `assets/items/`) đều bắt buộc phải được ghi rõ đích danh tên tệp trong `CREDITS.md`. Thêm bất kỳ tệp nào vào `assets/items/` mà không ghi danh sẽ lập tức bị chặn đỏ.
 - Chức năng: Khi có bất kỳ tệp mới nào được thêm vào `client/public/assets`, `client/public/icons` hoặc `client/public/fonts` mà chưa được khai báo đầy đủ trong `CREDITS.md`, lệnh `npm run check:credits` sẽ báo lỗi và ngăn chặn commit / build CI.
   3. **SHA-256 cho tài sản bên thứ ba (#331)**: mỗi tệp trong `client/public/fonts/` phải có dòng bảng ở `CREDITS.md` mục 6 chứa CẢ tên tệp LẪN SHA-256 thật của nội dung hiện tại (`auditHashes`). Đổi / thay tệp mà quên cập nhật nguồn + băm, thiếu băm, băm của tệp khác hay băm nằm ở dòng khác đều đỏ (3 đột biến trong `credits.test.ts`).
+  4. **Ảnh do AI sinh (M7.12 #513)**: `auditAiImages` kiểm `client/public/assets/ai/` hai chiều với `docs/art/nguon/<tên>.json` (băm, lược đồ, SDXL base, không LoRA, người duyệt xác nhận), dòng riêng ở `CREDITS.md` mục 7 và siêu dữ liệu sạch (mục 2e); trần dung lượng ở `client/perf-budget.json` `static.aiAssets` (`check:budget`).
 
 ---
 

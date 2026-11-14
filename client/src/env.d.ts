@@ -47,6 +47,32 @@ declare module "*check-credits.mjs" {
 
   export function checkImageFileCjk(fullPath: string): { hasCjk: boolean; match?: string };
 
+  // Ảnh do AI sinh (M7.12 #513, docs/KE_HOACH_DO_HOA_AI.md mục 9.4)
+  export const AI_ASSET_DIR: string;
+  export const AI_SOURCE_DIR: string;
+  export const AI_ALLOWED_EXT: Set<string>;
+  export const AI_CREDITS_HEADING_RE: RegExp;
+  export const PNG_FORBIDDEN_CHUNKS: Set<string>;
+  export const WEBP_FORBIDDEN_CHUNKS: Set<string>;
+  export function pngChunks(buf: Uint8Array): string[];
+  export function webpChunks(buf: Uint8Array): string[];
+  export function auditImageMetadata(
+    buf: Uint8Array,
+    ext: string,
+  ): { chunks: string[]; forbidden: string[]; error: string | null };
+  export function validateAiSource(j: unknown): string[];
+  export interface AiAuditError {
+    kind: string;
+    file: string;
+    detail: string;
+  }
+  export function auditAiImages(opts?: {
+    aiDir?: string;
+    sourceDir?: string;
+    creditsPath?: string;
+    rootDir?: string;
+  }): { files: string[]; sources: string[]; errors: AiAuditError[] };
+
   export function auditContentSources(
     contentSourcePath?: string,
     creditsPath?: string,
