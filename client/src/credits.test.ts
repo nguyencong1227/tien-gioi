@@ -7,8 +7,8 @@ import {
   auditContentSources,
   auditHashes,
   checkImageFileCjk,
-  CONTENT_SOURCE_FILE,
   isAssetCredited,
+  isUnderVktt,
   matchExactToken,
   parseContentSourceTable,
   scanFiles,
@@ -187,105 +187,287 @@ describe("Nguồn nội dung, hình ảnh và âm thanh bên ngoài (M7.16 #517,
   const contentSourcePath = path.resolve(rootDir, "docs/NGUON_NOI_DUNG.md");
   const creditsPath = path.resolve(rootDir, "CREDITS.md");
 
-  it("docs/NGUON_NOI_DUNG.md tồn tại và chứa cấu trúc bảng nguồn hợp lệ", () => {
+  it("docs/NGUON_NOI_DUNG.md tồn tại và chứa cấu trúc bảng nguồn hợp lệ (chưa có tệp thì audit sạch)", () => {
     expect(fs.existsSync(contentSourcePath)).toBe(true);
     const content = fs.readFileSync(contentSourcePath, "utf-8");
     expect(content).toContain("## 3. Bảng nguồn");
     expect(content).toContain("Đã duyệt chữ Hán");
 
     // Khi chưa có tệp ngoài nào được đưa vào repo thì kiểm tra không có lỗi
-    const audit = auditContentSources(contentSourcePath, creditsPath);
+    const audit = auditContentSources(contentSourcePath, creditsPath, rootDir);
+    expect(audit.entries).toEqual([]);
     expect(audit.missingInCredits).toEqual([]);
+    expect(audit.missingFiles).toEqual([]);
+    expect(audit.notInVkttDir).toEqual([]);
     expect(audit.missingCjkCheck).toEqual([]);
     expect(audit.cjkDetectedInFile).toEqual([]);
+    expect(audit.unrecordedVkttFiles).toEqual([]);
+    expect(audit.unrecordedCreditsVktt).toEqual([]);
   });
 
-  it("parseContentSourceTable: trích xuất đúng các cột và trường của bảng mục 3", () => {
+  it("checkImageFileCjk: không có dương tính giả trên toàn bộ ảnh thật hiện có trong client/public", () => {
+    const publicDir = path.resolve(rootDir, "client/public");
+    const allFiles = scanFiles(publicDir, rootDir);
+    const imageFiles = allFiles.filter((f) => /\.(png|webp|svg|ico|jpg|jpeg)$/i.test(f));
+
+    expect(imageFiles.length).toBeGreaterThanOrEqual(30);
+
+    const falsePositives: string[] = [];
+    for (const rel of imageFiles) {
+      const full = path.resolve(rootDir, rel);
+      const res = checkImageFileCjk(full);
+      if (res.hasCjk) {
+        falsePositives.push(`${rel} (báo ký tự '${res.match}')`);
+      }
+    }
+
+    // Phép tái hiện từ review: 17/37 ảnh bị báo sai nếu quét binary như UTF-8
+    // Với giải pháp mới: 0 dương tính giả!
+    expect(falsePositives).toEqual([]);
+  });
+
+  it("parseContentSourceTable: trích xuất đúng 7 cột, không bị bỏ lọt dòng có 'trong repo' hoặc '---' ở ghi chú", () => {
     const tmpDocDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-content-source-"));
     const tmpDocFile = path.join(tmpDocDir, "NGUON_NOI_DUNG.md");
 
+    // Tái hiện lỗi từ review: bảng 6 dòng ảnh, ghi chú có chữ "trong repo" hoặc "---" vẫn phải đọc đủ 6 dòng
     const sampleDoc = `
 # Nguồn nội dung
 ## 3. Bảng nguồn
 | Loại | Nguồn | Trong repo | Ngày | PR | Đã duyệt chữ Hán | Đã chỉnh gì |
 |---|---|---|---|---|---|---|
-| hinh_anh | site/img/item1.png | client/public/assets/items/item1.png | 14/11/2026 | #501 | KHONG_CHU | Đổi kích thước 32x32 |
-| am_thanh | site/audio/hit.mp3 | client/public/audio/hit.mp3 | 14/11/2026 | #501 | KHONG_AP_DUNG | Nén 64kbps |
+| hinh_anh | site/img/item1.png | client/public/assets/vktt/item1.png | 14/11/2026 | #501 | KHONG_CHU | Đổi kích thước 32x32 |
+| hinh_anh | site/img/item2.png | client/public/assets/vktt/item2.png | 14/11/2026 | #501 | KHONG_CHU | Tệp đặt trong repo gốc |
+| hinh_anh | site/img/item3.png | client/public/assets/vktt/item3.png | 14/11/2026 | #501 | DA_XOA_CHU_HAN | Cắt viền --- làm mịn |
+| am_thanh | site/audio/hit.mp3 | client/public/audio/vktt/hit.mp3 | 14/11/2026 | #501 | KHONG_AP_DUNG | Nén 64kbps |
+| cong_phap | /content/cong_phap.yaml | shared/src/skills.ts id kiem_khi | 14/11/2026 | #501 | KHONG_AP_DUNG | Giữ nguyên văn, sửa số |
+| du_lieu | /content/items.yaml | shared/src/items.ts id hoa_linh | 14/11/2026 | #501 | KHONG_AP_DUNG | Chỉnh giá trong repo |
 ## 4. Kiểm tự động
 `;
     try {
       fs.writeFileSync(tmpDocFile, sampleDoc);
       const entries = parseContentSourceTable(tmpDocFile);
-      expect(entries).toHaveLength(2);
+      expect(entries).toHaveLength(6);
 
       expect(entries[0].type).toBe("hinh_anh");
-      expect(entries[0].inRepo).toBe("client/public/assets/items/item1.png");
+      expect(entries[0].inRepo).toBe("client/public/assets/vktt/item1.png");
       expect(entries[0].cjkChecked).toBe("KHONG_CHU");
-      expect(entries[0].notes).toBe("Đổi kích thước 32x32");
 
-      expect(entries[1].type).toBe("am_thanh");
-      expect(entries[1].cjkChecked).toBe("KHONG_AP_DUNG");
+      expect(entries[1].notes).toBe("Tệp đặt trong repo gốc");
+      expect(entries[2].notes).toBe("Cắt viền --- làm mịn");
+
+      expect(entries[4].type).toBe("cong_phap");
+      expect(entries[4].inRepo).toBe("shared/src/skills.ts id kiem_khi");
+      expect(entries[4].cjkChecked).toBe("KHONG_AP_DUNG");
     } finally {
       fs.rmSync(tmpDocDir, { recursive: true, force: true });
     }
   });
 
-  it("auditContentSources: xác minh tệp nguồn phải được nhắc tới trong CREDITS.md", () => {
-    const tmpDocDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-content-audit-"));
+  it("parseContentSourceTable: ném lỗi khi dòng dữ liệu sai số cột hoặc sai Loại", () => {
+    const tmpDocDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-content-err-"));
     const tmpDocFile = path.join(tmpDocDir, "NGUON_NOI_DUNG.md");
-    const tmpCreditsFile = path.join(tmpDocDir, "CREDITS.md");
 
     try {
-      // Mock NGUON_NOI_DUNG có 2 tệp: 1 tệp có trong CREDITS, 1 tệp thiếu
-      const sampleDoc = `
+      // Thiếu cột (chỉ có 5 cột)
+      fs.writeFileSync(
+        tmpDocFile,
+        `
+## 3. Bảng nguồn
+| Loại | Nguồn | Trong repo | Ngày | PR |
+|---|---|---|---|---|
+| hinh_anh | src/a.png | client/public/assets/vktt/a.png | 14/11/2026 | #501 |
+`,
+      );
+      expect(() => parseContentSourceTable(tmpDocFile)).toThrow(/phải có đúng 7 cột/);
+
+      // Loại không hợp lệ
+      fs.writeFileSync(
+        tmpDocFile,
+        `
 ## 3. Bảng nguồn
 | Loại | Nguồn | Trong repo | Ngày | PR | Đã duyệt chữ Hán | Đã chỉnh gì |
 |---|---|---|---|---|---|---|
-| hinh_anh | src/a.png | client/public/assets/a.png | 14/11/2026 | #501 | KHONG_CHU | nén |
-| hinh_anh | src/b.png | client/public/assets/b.png | 14/11/2026 | #501 | KHONG_CHU | nén |
-`;
-      // CREDITS chỉ có a.png
-      const sampleCredits = `
-| Asset | client/public/assets/a.png | Vạn Kiếp Tu Tiên | Phép của tác giả |
-`;
-      fs.writeFileSync(tmpDocFile, sampleDoc);
-      fs.writeFileSync(tmpCreditsFile, sampleCredits);
-
-      const audit = auditContentSources(tmpDocFile, tmpCreditsFile);
-      expect(audit.missingInCredits).toEqual(["client/public/assets/b.png"]);
+| loai_la | src/a.png | client/public/assets/vktt/a.png | 14/11/2026 | #501 | KHONG_CHU | n/a |
+`,
+      );
+      expect(() => parseContentSourceTable(tmpDocFile)).toThrow(/Loại 'loai_la' không hợp lệ/);
     } finally {
       fs.rmSync(tmpDocDir, { recursive: true, force: true });
     }
   });
 
-  it("auditContentSources: bắt buộc cột 'Đã duyệt chữ Hán' hợp lệ cho mọi tệp hình ảnh (đột biến thiếu cột hoặc '-')", () => {
-    const tmpDocDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-content-cjk-"));
-    const tmpDocFile = path.join(tmpDocDir, "NGUON_NOI_DUNG.md");
-    const tmpCreditsFile = path.join(tmpDocDir, "CREDITS.md");
+  it("dòng code dữ liệu (cong_phap, trang_bi, du_lieu) không đòi có trong CREDITS.md, không kiểm đĩa", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-data-audit-"));
+    const tmpDoc = path.join(tmpDir, "NGUON_NOI_DUNG.md");
+    const tmpCredits = path.join(tmpDir, "CREDITS.md");
 
     try {
-      // Mock tệp ảnh 1 có duyệt chữ Hán, tệp ảnh 2 để trống hoặc '-'
-      const sampleDoc = `
+      // Dòng cong_phap trỏ vào code, CREDITS.md hoàn toàn không nhắc tới nó
+      fs.writeFileSync(
+        tmpDoc,
+        `
 ## 3. Bảng nguồn
 | Loại | Nguồn | Trong repo | Ngày | PR | Đã duyệt chữ Hán | Đã chỉnh gì |
 |---|---|---|---|---|---|---|
-| hinh_anh | src/ok.png | client/public/assets/ok.png | 14/11/2026 | #501 | DA_XOA_CHU_HAN | xoá chữ |
-| hinh_anh | src/bad.png | client/public/assets/bad.png | 14/11/2026 | #501 | - | chưa duyệt |
-| hinh_anh | src/empty.png | client/public/assets/empty.png | 14/11/2026 | #501 | | quên điền |
-`;
-      const sampleCredits = `
-| Assets | ok.png, bad.png, empty.png | Tác giả | Giấy phép |
-`;
-      fs.writeFileSync(tmpDocFile, sampleDoc);
-      fs.writeFileSync(tmpCreditsFile, sampleCredits);
+| cong_phap | /content/he_hoa.yaml id chem | shared/src/skills.ts id kiem_khi_chem | 14/11/2026 | #518 | KHONG_AP_DUNG | 12 chiêu thức |
+`,
+      );
+      fs.writeFileSync(tmpCredits, "# CREDITS\n");
 
-      const audit = auditContentSources(tmpDocFile, tmpCreditsFile);
+      const audit = auditContentSources(tmpDoc, tmpCredits, tmpDir);
       expect(audit.missingInCredits).toEqual([]);
-      expect(audit.missingCjkCheck).toContain("client/public/assets/bad.png");
-      expect(audit.missingCjkCheck).toContain("client/public/assets/empty.png");
-      expect(audit.missingCjkCheck).not.toContain("client/public/assets/ok.png");
+      expect(audit.missingFiles).toEqual([]);
+      expect(audit.notInVkttDir).toEqual([]);
+      expect(audit.missingCjkCheck).toEqual([]);
     } finally {
-      fs.rmSync(tmpDocDir, { recursive: true, force: true });
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("cột 'Đã duyệt chữ Hán': ảnh CHỈ nhận KHONG_CHU hoặc DA_XOA_CHU_HAN; âm thanh/dữ liệu CHỈ nhận KHONG_AP_DUNG", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-cjk-values-"));
+    const tmpDoc = path.join(tmpDir, "NGUON_NOI_DUNG.md");
+    const tmpCredits = path.join(tmpDir, "CREDITS.md");
+
+    // Tạo các tệp giả trên đĩa trong tmpDir
+    const imgDir = path.join(tmpDir, "client/public/assets/vktt");
+    fs.mkdirSync(imgDir, { recursive: true });
+    fs.writeFileSync(path.join(imgDir, "ok1.png"), "dummy");
+    fs.writeFileSync(path.join(imgDir, "ok2.png"), "dummy");
+    fs.writeFileSync(path.join(imgDir, "bad_ok.png"), "dummy");
+    fs.writeFileSync(path.join(imgDir, "bad_daduyet.png"), "dummy");
+    fs.writeFileSync(path.join(imgDir, "bad_na.png"), "dummy");
+    fs.writeFileSync(path.join(imgDir, "bad_dash.png"), "dummy");
+
+    fs.writeFileSync(
+      tmpDoc,
+      `
+## 3. Bảng nguồn
+| Loại | Nguồn | Trong repo | Ngày | PR | Đã duyệt chữ Hán | Đã chỉnh gì |
+|---|---|---|---|---|---|---|
+| hinh_anh | src/1 | client/public/assets/vktt/ok1.png | 14/11/2026 | #501 | KHONG_CHU | nén |
+| hinh_anh | src/2 | client/public/assets/vktt/ok2.png | 14/11/2026 | #501 | DA_XOA_CHU_HAN | nén |
+| hinh_anh | src/3 | client/public/assets/vktt/bad_ok.png | 14/11/2026 | #501 | OK | nén |
+| hinh_anh | src/4 | client/public/assets/vktt/bad_daduyet.png | 14/11/2026 | #501 | DA_DUYET | nén |
+| hinh_anh | src/5 | client/public/assets/vktt/bad_na.png | 14/11/2026 | #501 | KHONG_AP_DUNG | nén |
+| hinh_anh | src/6 | client/public/assets/vktt/bad_dash.png | 14/11/2026 | #501 | - | nén |
+| cong_phap | src/7 | shared/src/skills.ts id bad_skill | 14/11/2026 | #501 | KHONG_CHU | n/a |
+`,
+    );
+
+    fs.writeFileSync(
+      tmpCredits,
+      `
+| All | ok1.png, ok2.png, bad_ok.png, bad_daduyet.png, bad_na.png, bad_dash.png | Vạn Kiếp | phép |
+`,
+    );
+
+    try {
+      const audit = auditContentSources(tmpDoc, tmpCredits, tmpDir);
+
+      // Ảnh hợp lệ: ok1.png và ok2.png không có trong missingCjkCheck
+      expect(audit.missingCjkCheck).not.toContain("client/public/assets/vktt/ok1.png");
+      expect(audit.missingCjkCheck).not.toContain("client/public/assets/vktt/ok2.png");
+
+      // Ảnh sai giá trị (OK, DA_DUYET, KHONG_AP_DUNG, -): đều BÁO ĐỎ
+      expect(audit.missingCjkCheck).toContain("client/public/assets/vktt/bad_ok.png");
+      expect(audit.missingCjkCheck).toContain("client/public/assets/vktt/bad_daduyet.png");
+      expect(audit.missingCjkCheck).toContain("client/public/assets/vktt/bad_na.png");
+      expect(audit.missingCjkCheck).toContain("client/public/assets/vktt/bad_dash.png");
+
+      // Dữ liệu cong_phap nhưng để KHONG_CHU (thay vì KHONG_AP_DUNG) -> BÁO ĐỎ
+      expect(audit.missingCjkCheck).toContain("shared/src/skills.ts id bad_skill");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("hình/âm bắt buộc phải có trên đĩa, có trong CREDITS.md và nằm dưới thư mục có đoạn vktt/", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-vktt-req-"));
+    const tmpDoc = path.join(tmpDir, "NGUON_NOI_DUNG.md");
+    const tmpCredits = path.join(tmpDir, "CREDITS.md");
+
+    // Tạo 1 file thật nằm SAI thư mục (không có vktt/)
+    const notVkttDir = path.join(tmpDir, "client/public/assets/items");
+    fs.mkdirSync(notVkttDir, { recursive: true });
+    fs.writeFileSync(path.join(notVkttDir, "outside.png"), "dummy");
+
+    fs.writeFileSync(
+      tmpDoc,
+      `
+## 3. Bảng nguồn
+| Loại | Nguồn | Trong repo | Ngày | PR | Đã duyệt chữ Hán | Đã chỉnh gì |
+|---|---|---|---|---|---|---|
+| hinh_anh | src/out | client/public/assets/items/outside.png | 14/11/2026 | #501 | KHONG_CHU | nén |
+| hinh_anh | src/ghost | client/public/assets/vktt/non_existent.png | 14/11/2026 | #501 | KHONG_CHU | nén |
+`,
+    );
+
+    fs.writeFileSync(
+      tmpCredits,
+      `
+| Asset | client/public/assets/items/outside.png | Vạn Kiếp | CC |
+`,
+    );
+
+    try {
+      const audit = auditContentSources(tmpDoc, tmpCredits, tmpDir);
+
+      // outside.png vi phạm thư mục (không có đoạn vktt/)
+      expect(audit.notInVkttDir).toContain("client/public/assets/items/outside.png");
+
+      // non_existent.png vi phạm file thật trên đĩa và thiếu trong CREDITS.md
+      expect(audit.missingFiles).toContain("client/public/assets/vktt/non_existent.png");
+      expect(audit.missingInCredits).toContain("client/public/assets/vktt/non_existent.png");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("chiều ngược: bắt tệp đĩa dưới vktt/ không có dòng trong bảng và CREDITS nhắc Vạn Kiếp thiếu dòng", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-reverse-check-"));
+    const tmpDoc = path.join(tmpDir, "NGUON_NOI_DUNG.md");
+    const tmpCredits = path.join(tmpDir, "CREDITS.md");
+
+    const vkttDir = path.join(tmpDir, "client/public/assets/vktt");
+    fs.mkdirSync(vkttDir, { recursive: true });
+
+    // Tạo 2 tệp trên đĩa: recorded.png (có trong bảng) và stolen.png (bỏ quên không khai báo)
+    fs.writeFileSync(path.join(vkttDir, "recorded.png"), "dummy");
+    fs.writeFileSync(path.join(vkttDir, "stolen.png"), "dummy");
+
+    fs.writeFileSync(
+      tmpDoc,
+      `
+## 3. Bảng nguồn
+| Loại | Nguồn | Trong repo | Ngày | PR | Đã duyệt chữ Hán | Đã chỉnh gì |
+|---|---|---|---|---|---|---|
+| hinh_anh | src/rec | client/public/assets/vktt/recorded.png | 14/11/2026 | #501 | KHONG_CHU | nén |
+`,
+    );
+
+    // CREDITS có recorded.png và một dòng Vạn Kiếp khác không có trong bảng
+    fs.writeFileSync(
+      tmpCredits,
+      `
+| Item | client/public/assets/vktt/recorded.png | Vạn Kiếp Tu Tiên | phép |
+| Forgotten | client/public/audio/vktt/forgotten.mp3 | Vạn Kiếp Tu Tiên | phép |
+`,
+    );
+
+    try {
+      const audit = auditContentSources(tmpDoc, tmpCredits, tmpDir);
+
+      // stolen.png có trên đĩa nhưng KHÔNG có trong bảng -> BÁO ĐỎ
+      expect(audit.unrecordedVkttFiles).toContain("client/public/assets/vktt/stolen.png");
+      expect(audit.unrecordedVkttFiles).not.toContain("client/public/assets/vktt/recorded.png");
+
+      // Dòng forgotten.mp3 trong CREDITS nhắc tới Vạn Kiếp nhưng không có trong bảng -> BÁO ĐỎ
+      expect(audit.unrecordedCreditsVktt.length).toBe(1);
+      expect(audit.unrecordedCreditsVktt[0]).toContain("forgotten.mp3");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
 
@@ -314,5 +496,17 @@ describe("Nguồn nội dung, hình ảnh và âm thanh bên ngoài (M7.16 #517,
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
+  });
+
+  it("isUnderVktt: nhận diện đúng đoạn đường dẫn vktt độc lập", () => {
+    expect(isUnderVktt("client/public/assets/vktt/items/sword.png")).toBe(true);
+    expect(isUnderVktt("assets/vktt/sword.png")).toBe(true);
+    expect(isUnderVktt("client/public/audio/vktt/skill.mp3")).toBe(true);
+    expect(isUnderVktt("vktt/sword.png")).toBe(true);
+
+    // Không được khớp chuỗi con giả
+    expect(isUnderVktt("client/public/assets/vktt_item/sword.png")).toBe(false);
+    expect(isUnderVktt("client/public/assets/my_vktt/sword.png")).toBe(false);
+    expect(isUnderVktt("client/public/assets/items/sword.png")).toBe(false);
   });
 });
