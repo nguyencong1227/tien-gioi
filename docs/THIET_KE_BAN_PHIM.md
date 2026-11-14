@@ -25,6 +25,7 @@ Một nguồn duy nhất: `client/src/keybinds.ts` (`ACTIONS`). HUD, dòng gợi
 | Túi đồ / Nhân vật / Sổ nhiệm vụ / Tông môn / Bản đồ lớn / Cài đặt | I / C / J (Q) / G / M / O | bấm lại để đóng |
 | Chat | Enter mở, Enter gửi, Esc thoát | đang gõ chữ thì mọi phím khác không điều khiển nhân vật |
 | Bật / tắt âm thanh | N | |
+| Ẩn / hiện toàn bộ giao diện (màn chơi sạch) | H | chạy cả khi bảng đang mở; xem `THIET_KE_GIAO_DIEN_GON.md` mục 6 |
 | Đóng bảng trên cùng | Esc | một lần một tầng (xác nhận con -> menu / hộp thoại -> bảng chính) |
 
 Phím được ghi theo `KeyboardEvent.code` (vị trí vật lý): bật bộ gõ tiếng Việt vẫn chạy (khi đó `key` có thể là "Process"). Nhãn hiện ở HUD / gợi ý là tên phím theo QWERTY.

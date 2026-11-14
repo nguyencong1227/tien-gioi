@@ -124,6 +124,7 @@ import {
   FIXED_KEYS,
   getKeymap,
   onKeymapChange,
+  primaryKeyLabel,
   rebind,
   resetKeymap,
   type ActionId,
@@ -4051,6 +4052,21 @@ export const ui = {
     while (log.children.length > 60) log.firstChild!.remove();
     if (atBottom) log.scrollTop = log.scrollHeight;
     bumpChat();
+  },
+
+  /**
+   * Phím ẩn / hiện TOÀN BỘ giao diện (`ui.toggle`, QUYET_DINH_M3 mục 15): `body.ui-hidden` ẩn cột trái, cột phải (bản đồ nhỏ + menu), chat, nút kỹ năng,
+   * thanh đan dược, nút ngữ cảnh, HUD bí cảnh / quyết đấu để có màn chơi sạch; bảng đang mở, hộp thoại, lời mời, thông báo (toast) và biểu ngữ nối lại
+   * VẪN hiện. Chỉ trong phiên (không lưu): vào lại là hiện đủ. Trả `true` nếu giờ đang ẩn.
+   */
+  toggleHidden(): boolean {
+    const hidden = document.body.classList.toggle("ui-hidden");
+    const key = primaryKeyLabel("ui.toggle");
+    this.toast({
+      text: hidden ? `Đã ẩn giao diện. Bấm ${key} để hiện lại.` : "Đã hiện lại giao diện.",
+      tone: "info",
+    });
+    return hidden;
   },
 
   /** Phím mở chat (Enter): khung đang thu gọn thì hiện ô nhập tạm (`typing`, thu lại khi rời ô) rồi đưa con trỏ vào. */

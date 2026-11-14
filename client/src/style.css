@@ -6039,3 +6039,24 @@ html[data-input="touch"] .chat-toggle {
 #dlg-body:focus {
   outline: none;
 }
+
+/* Phím ẩn toàn bộ giao diện (QUYET_DINH_M3 mục 15, `ui.toggle`): màn chơi sạch. Bảng đang mở, hộp thoại, lời mời, #toast, #death và biểu ngữ nối lại
+   KHÔNG bị ẩn (người chơi vẫn nhận được thông báo quan trọng). */
+body.ui-hidden
+  :is(
+    #hud-col-left,
+    #hud-col-right,
+    #chat,
+    #help,
+    #skills,
+    #quickbar,
+    #btn-pickup,
+    #btn-talk,
+    #btn-portal,
+    #dungeon-hud,
+    #duel-hud,
+    #gain-feed,
+    #perf-panel
+  ) {
+  display: none !important;
+}

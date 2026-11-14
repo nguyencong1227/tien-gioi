@@ -16,7 +16,7 @@ Cột trái (thẻ nhân vật + đội + nhiệm vụ) CHIẾM, trước khi s�
 | 2 | Thanh menu riêng: Nhân vật / Túi / Nhiệm vụ / Tông môn / Âm thanh / Cài đặt, một hàng biểu tượng cùng cỡ, có chú thích khi rê chuột + nhãn phím; điện thoại dọc gộp vào một nút menu | `#hud-menu` ở cột phải dưới bản đồ nhỏ (`#hud-col-right`); nút 38 px (44 px khi cảm ứng), nhãn chữ ẩn (`title` + `aria-label` + nhãn phím `.keycap` của #463 giữ nguyên); màn < 480 px chỉ có nút ☰ mở ra đúng MỘT hàng 6 nút, chọn một mục hoặc chạm ra ngoài thì đóng | a |
 | 3 | Tổ đội / Nhiệm vụ / Chat thu gọn được, nhớ trạng thái, mặc định thu gọn trên màn hẹp, chat 1 dòng + tự mờ, nhiệm vụ trống chỉ một dòng, tổ đội hàng gọn | mục 5 (bước b) | b |
 | 4 | Ngân sách diện tích: các bảng nổi không quá ~25-30% chiều rộng, không cao quá màn hình, giữ vùng giữa trống | E2E `e2e:giao-dien` đo ở 6 cỡ | a, b |
-| 5 | Phím ẩn toàn bộ giao diện (ghi vào màn Phím tắt) | xem bước c | c |
+| 5 | Phím ẩn toàn bộ giao diện (ghi vào màn Phím tắt) | mục 6 (bước c) | c |
 | 6 | Giữ phong cách tu tiên, không chữ Hán, tôn trọng bàn phím (#463) và cảm ứng (M5) | giữ biến màu / viền cũ; nút vẫn là `<button>` có `aria-*`; mọi id nút (`btn-char`, `btn-bag`...) giữ nguyên nên `bindTap`, phím tắt và các E2E cũ không đổi | a, b, c |
 
 ## 3. Cấu trúc sau bước a
@@ -42,3 +42,11 @@ Cột trái (thẻ nhân vật + đội + nhiệm vụ) CHIẾM, trước khi s�
 - **Ngân sách (E2E `e2e:giao-dien` đo ở 6 cỡ):** tổng diện tích các bảng nổi <= 25% khung trên máy tính, <= 35% trên màn hẹp; bảng rộng nhất <= 30% (máy tính) / 60% (hẹp) chiều rộng; cột trái cao <= 60% khung; vùng giữa (40%-60% mỗi chiều) không bị bảng nào che; không bảng nào chồng lên nhau.
 - **Kết quả (cột trái trên khung nhìn, trước -> sau b):** 360x640 56%x78% -> 56%x38%; 412x915 53%x83% -> 53%x27%; 915x412 26%x97% -> 26%x59%; **550x900 44%x84% -> 44%x23%**; 1366x768 19%x80% -> 19%x55%; 1920x1080 14%x57% -> 14%x39%. Ảnh: `docs/screenshots/giao-dien-gon/sau-b-<rộng>x<cao>.webp`.
 - **Đột biến (bước b), đều làm E2E đỏ:** không ghi `localStorage`, chat không bao giờ mờ, chat thu gọn không còn một dòng, `isCompactHud` cũ, nhiệm vụ trống vẫn chiếm chỗ, Enter không hiện ô nhập tạm.
+
+## 6. Bước c: phím ẩn toàn bộ giao diện
+
+- **Hành động `ui.toggle`** (`client/src/keybinds.ts`, mặc định **H**, nhóm "Khác", `world: false` nên chạy cả khi bảng đang mở): nằm trong `ACTIONS` nên TỰ có ở màn "Phím tắt" (đổi được như mọi phím), không gõ chữ 'h' khi đang ở ô nhập (chat). `ui.toggleHidden()` bật / tắt `body.ui-hidden` và hiện thông báo "Đã ẩn giao diện. Bấm H để hiện lại." (nhãn phím đọc từ bảng phím).
+- **Ẩn gì:** cột trái (thẻ nhân vật, Tổ đội, Nhiệm vụ), cột phải (bản đồ nhỏ + thanh menu), chat, dòng gợi ý phím, nút kỹ năng, thanh đan dược, nút nhặt / nói chuyện / qua cổng, HUD bí cảnh / quyết đấu, thông báo nhận đồ, bảng đo hiệu năng. **Không ẩn:** bảng đang mở (túi, nhân vật, cài đặt...), hộp thoại NPC, hộp lời mời, `#toast`, "Trọng thương", biểu ngữ nối lại, màn Hoàng Tuyền: người chơi vẫn nhận được thông báo quan trọng. Chỉ trong phiên (không lưu): vào lại là hiện đủ.
+- **Cảm ứng:** không có phím nên không tự vào chế độ này; máy lai có bàn phím ngoài bấm H được và bấm lại để hiện (joystick vẫn dùng được khi ẩn).
+- Ảnh: `docs/screenshots/giao-dien-gon/sau-c-an-550x900.webp`, `sau-c-an-1366x768.webp` (cùng màn chơi "đông" của các ảnh trước, giao diện ẩn hết: chỉ còn thế giới và tên NPC / người chơi).
+- **Kiểm thử:** `e2e:giao-dien` (Chrome + server Colyseus thật): đang gõ trong ô chat thì H là chữ 'h' và giao diện không ẩn; trước khi ẩn đủ 8 phần giao diện đang hiện; bấm H (phím CDP thật) thì cả 8 phần (thẻ, menu, bản đồ nhỏ, tổ đội, nhiệm vụ, chat, nút kỹ năng, thanh đan) không còn vùng hiển thị nào; có thông báo cách hiện lại; mở Cài đặt khi đang ẩn thì bảng vẫn hiện; bấm H lần nữa hiện lại đúng 8 phần; màn Phím tắt có dòng "Ẩn / hiện toàn bộ giao diện" với phím H. Đột biến (phím H không làm gì, chat không bị ẩn, bảng đang mở bị ẩn) đều làm script đỏ. `keybinds.test.ts`: H = `ui.toggle`, `world: false`, có trong `ACTIONS`.
