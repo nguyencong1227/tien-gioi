@@ -299,3 +299,43 @@ Công cụ sẽ từ chối thao tác (mã thoát `1` hoặc `2`) trong các tr�
 - **Tông chủ còn thành viên khác:** Phải chuyển giao chức Tông chủ cho người khác hoặc giải tán tông môn trước khi xoá tài khoản.
 - **Tông môn còn Linh thạch trong kho:** Nếu Tông chủ một mình nhưng kho còn > 0 Linh thạch, phải rút hết Linh thạch ra để tránh làm mồ côi ngân sách tông môn.
 
+---
+
+## 9. Theo dõi Tiến độ Người chơi & Cân bằng Kim Đan (#406, M6.12)
+
+Theo quyết định chốt trước phát hành v0.2.0 (`CAN_BANG.md` mục 10, PR #473), đội ngũ phát triển giữ nguyên thông số Xích Mãng và theo dõi tiến độ của người chơi thật qua thời gian chơi tích luỹ của kiếp (`life.playMs`).
+
+> [!NOTE]
+> `life.playMs` là thời gian chơi tích luỹ của cả kiếp hiện tại (đã bao gồm Phàm Nhân, Luyện Khí ~53 phút, Trúc Cơ ~2 giờ 52 phút, và thời gian nán lại/đả tọa). Do đó, đây là **cận trên** của thời gian cần thiết để đạt tới bậc đó.
+
+Công cụ `server/scripts/thong-ke-tien-do.ts` (`npm run thong-ke-tien-do -w server`) tự động tính toán mô hình tối ưu `simulate(3)` từ `server/src/balance/simulate.ts` (mốc tới Kim Đan Hậu kỳ ~6.0 giờ, mốc hoàn thành Kim Đan ~8.3 giờ) và đối chiếu trung vị giờ chơi tích luỹ thực tế.
+
+### 9.1. An toàn & Bảo mật Dữ liệu
+- **Chỉ đọc trực tiếp từ tệp sao lưu:** Công cụ giải nén luồng bộ nhớ (in-memory stream) từ tệp `tiengioi-*.sql.gz` của `prod.sh backup`, giải mã escape format của khối `COPY public.characters`, **tuyệt đối không kết nối cơ sở dữ liệu production**, không chạy qua cổng 2567, không ghi tệp tạm ra đĩa.
+- **Bảo vệ quyền riêng tư tuyệt đối:** Báo cáo **không bao giờ in tên nhân vật, đạo hiệu hay mã bí mật**. Dữ liệu được nhóm ẩn danh theo `(cảnh giới, bậc)`.
+
+### 9.2. Cách chạy trên bản sao lưu mới nhất
+```bash
+# Tìm bản sao lưu mới nhất trong thư mục backups
+LATEST_BACKUP=$(ls -t ~/TT/tien-gioi-prod/backups/tiengioi-*.sql.gz | head -1)
+
+# Chạy thống kê và in bảng Markdown
+npm run thong-ke-tien-do -w server -- --backup="$LATEST_BACKUP"
+
+# Tuỳ chọn: Xuất định dạng JSON cho hệ thống giám sát
+npm run thong-ke-tien-do -w server -- --backup="$LATEST_BACKUP" --json
+```
+
+Khi chạy trên môi trường phát triển (dữ liệu file JSON cục bộ):
+```bash
+npm run thong-ke-tien-do -w server -- --dir=server/data/players
+```
+
+### 9.3. Tiêu chí Đánh giá Cân bằng
+Báo cáo tự động đối chiếu trung vị giờ chơi tích luỹ (`medianHours`) của người chơi Kim Đan Hậu kỳ hoặc nhóm vượt qua Kim Đan (Nguyên Anh trở lên) với mô hình tối ưu `simulate(3)`:
+- **Cảnh báo QUÁ NHANH (tỉ số < 0.7x với >= 5 mẫu):** Người chơi tiến cấp nhanh hơn thiết kế tối ưu trên 30%, có dấu hiệu đường tắt cày Xích Mãng theo #406. Kích hoạt quy trình giảm mật độ hoặc tăng thời gian hồi sinh quái ở bản vá kế tiếp.
+- **Trong dự kiến (tỉ số >= 0.7x với >= 5 mẫu):** Tiến độ nằm trong khung dự kiến. Do giờ chơi tích luỹ là cận trên (người chơi nán lại hoặc đả tọa cũng làm tăng số đo), hệ thống không kết luận "đạt mục tiêu" tuyệt đối mà chỉ ghi nhận không có dấu hiệu đường tắt bất thường.
+- **Tham khảo (chưa đủ mẫu, < 5 mẫu):** Dán cờ tham khảo, tiếp tục thu thập thêm dữ liệu từ các bản sao lưu kế tiếp.
+- **Lưu ý về kiếp và luân hồi:** `life.playMs` tính trên kiếp hiện tại (đặt về 0 khi luân hồi). Người chơi ở kiếp >= 2 tu luyện nhanh hơn nhờ Dư âm tu hành, không đối chiếu trực tiếp với mô hình tối ưu kiếp 1.
+
+
