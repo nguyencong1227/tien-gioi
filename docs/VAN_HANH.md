@@ -333,8 +333,11 @@ npm run thong-ke-tien-do -w server -- --dir=server/data/players
 
 ### 9.3. Tiêu chí Đánh giá Cân bằng
 Báo cáo tự động đối chiếu trung vị giờ chơi tích luỹ (`medianHours`) của người chơi Kim Đan Hậu kỳ hoặc nhóm vượt qua Kim Đan (Nguyên Anh trở lên) với mô hình tối ưu `simulate(3)`:
-- **Cảnh báo QUÁ NHANH (tỉ số < 0.7x với >= 5 mẫu):** Người chơi tiến cấp nhanh hơn thiết kế tối ưu trên 30%, có dấu hiệu đường tắt cày Xích Mãng theo #406. Kích hoạt quy trình giảm mật độ hoặc tăng thời gian hồi sinh quái ở bản vá kế tiếp.
-- **Trong dự kiến (tỉ số >= 0.7x với >= 5 mẫu):** Tiến độ nằm trong khung dự kiến. Do giờ chơi tích luỹ là cận trên (người chơi nán lại hoặc đả tọa cũng làm tăng số đo), hệ thống không kết luận "đạt mục tiêu" tuyệt đối mà chỉ ghi nhận không có dấu hiệu đường tắt bất thường.
+- **Cảnh báo QUÁ NHANH:**
+  - *Nhóm vượt qua Kim Đan:* Giờ chơi tích luỹ < `hết Trúc Cơ mô hình + 4.0 giờ` (~6.86 giờ với mô hình hiện tại), tương ứng thời gian ở riêng trong Kim Đan < 4.0 giờ theo tiêu chí #406 / CAN_BANG mục 10.
+  - *Nhóm Kim Đan Hậu kỳ:* Giờ chơi tích luỹ < `hết Trúc Cơ mô hình + 70% thời gian mô hình tới Hậu kỳ` (~5.08 giờ với mô hình hiện tại, nhanh hơn thiết kế > 30%).
+  - Kích hoạt quy trình xem xét và điều chỉnh mật độ hoặc thời gian hồi sinh của quái Xích Mãng ở bản vá kế tiếp khi có từ 5 mẫu trở lên.
+- **Chưa thấy dấu hiệu quá nhanh (cận trên, với >= 5 mẫu):** Tiến độ chưa ghi nhận dấu hiệu đường tắt bất thường. Do giờ chơi tích luỹ là cận trên (người chơi nán lại hoặc đả tọa cũng làm tăng số đo), hệ thống không kết luận "đạt mục tiêu" tuyệt đối.
 - **Tham khảo (chưa đủ mẫu, < 5 mẫu):** Dán cờ tham khảo, tiếp tục thu thập thêm dữ liệu từ các bản sao lưu kế tiếp.
 - **Lưu ý về kiếp và luân hồi:** `life.playMs` tính trên kiếp hiện tại (đặt về 0 khi luân hồi). Người chơi ở kiếp >= 2 tu luyện nhanh hơn nhờ Dư âm tu hành, không đối chiếu trực tiếp với mô hình tối ưu kiếp 1.
 
