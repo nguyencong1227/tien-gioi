@@ -113,7 +113,8 @@ export function slotViews(eq: FullEquip, realm: number): SlotView[] {
 export type PctKey = "crit" | "cdr" | "guard";
 
 export const PCT_STATS: ReadonlyArray<{ key: PctKey; label: string }> = [
-  { key: "crit", label: "Bạo kích" },
+  // Máy chủ có bạo kích CƠ BẢN (10 %, `CRIT_CHANCE` ở server) chưa nằm ở `shared/`: bảng chỉ hiện phần TỪ TRANG BỊ (trần `STAT_CAPS.crit` chỉ áp lên phần này), ghi rõ để không lệch với xác suất thật
+  { key: "crit", label: "Bạo kích (từ trang bị)" },
   { key: "cdr", label: "Giảm hồi chiêu" },
   { key: "guard", label: "Giáp (giảm sát thương)" },
 ];

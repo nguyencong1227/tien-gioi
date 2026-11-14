@@ -165,7 +165,8 @@ export function cast(w: World, sid: string, raw: unknown) {
 
   const mult = def.mult * skillDamageMult(level);
   if (mult > 0) {
-    const atk = statsFor(p.realm, p.tier, p, c.mult).atk;
+    const st = statsFor(p.realm, p.tier, p, c.mult);
+    const atk = st.atk;
     // gom mục tiêu trước rồi mới gây sát thương: hạ quái xoá nó khỏi bảng trong lúc duyệt
     const hits: { id: string; n: number }[] = [];
     w.state.monsters.forEach((mon, id) => {
@@ -186,7 +187,7 @@ export function cast(w: World, sid: string, raw: unknown) {
       const em = elementMult(def.element, mc.def.element ?? "none");
       let first = 0;
       for (let k = 0; k < h.n && w.mctrl.has(h.id); k++) {
-        const { dmg, crit } = rollDamage(atk, mult * em);
+        const { dmg, crit } = rollDamage(atk, mult * em, st.crit); // bạo kích cộng thêm từ trang bị (M7.4)
         if (k === 0) first = dmg;
         dealMonsterDamage(w, h.id, mon, sid, dmg, crit);
       }

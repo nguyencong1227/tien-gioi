@@ -630,13 +630,15 @@ function fillEquipComparison(box: HTMLElement, candidate: ItemDef) {
   }
 
   const deltas = statDeltas(nowStats, nextStats);
+  // Ô còn khoá: statsFor không cộng chỉ số của ô đó nên hiệu luôn 0; KHÔNG ghi "ngang bằng" (không có món nào đang mặc ở ô đó, lý do khoá ghi ở dòng yêu cầu)
+  const slotLock = slotLockText(eq.slot, currentRealm);
   for (const x of deltas) {
     const chip = document.createElement("span");
     chip.className = `cmp-chip ${x.d > 0 ? "cmp-up" : "cmp-down"}`;
     chip.textContent = `${x.d > 0 ? "▲" : "▼"} ${deltaText(x)}`;
     box.append(chip);
   }
-  if (deltas.length === 0) {
+  if (deltas.length === 0 && !slotLock) {
     const same = document.createElement("span");
     same.className = "cmp-eq";
     same.textContent = "Chỉ số ngang bằng món đang mặc";
@@ -645,7 +647,6 @@ function fillEquipComparison(box: HTMLElement, candidate: ItemDef) {
 
   const reqSpan = document.createElement("span");
   const reqText = realmLabel(eq.reqRealm, eq.reqTier);
-  const slotLock = slotLockText(eq.slot, currentRealm);
   const ok = canEquip(candidate.id, currentRealm, currentTier) && !slotLock;
   reqSpan.className = ok ? "req-ok" : "req-warn";
   reqSpan.textContent = ok ? `Đủ cảnh giới (${reqText})` : (slotLock ?? `Cần ${reqText}`);
@@ -1512,6 +1513,7 @@ function renderCharModalImpl() {
       [eq.slot]: def.id,
     });
     const deltas = statDeltas(curStats, nextStats);
+    const slotLock = slotLockText(eq.slot, currentRealm);
     for (const x of deltas) {
       if (cmpLine.childNodes.length > 0) cmpLine.append(document.createTextNode(" · "));
       const sp = document.createElement("span");
@@ -1519,18 +1521,17 @@ function renderCharModalImpl() {
       sp.textContent = `${x.d > 0 ? "▲" : "▼"} ${deltaText(x)}`;
       cmpLine.append(sp);
     }
-    if (deltas.length === 0) {
+    if (deltas.length === 0 && !slotLock) {
       const sp = document.createElement("span");
       sp.className = "cmp-eq";
       sp.textContent = "Ngang bằng món đang mặc";
       cmpLine.append(sp);
     }
 
-    const slotLock = slotLockText(eq.slot, currentRealm);
     const ok = canEquip(def.id, currentRealm, currentTier) && !slotLock;
     const reqText = slotLock ?? `Cần ${realmLabel(eq.reqRealm, eq.reqTier)}`;
     if (!ok) {
-      cmpLine.append(document.createTextNode(" · "));
+      if (cmpLine.childNodes.length > 0) cmpLine.append(document.createTextNode(" · "));
       const reqWarn = document.createElement("span");
       reqWarn.className = "req-warn";
       reqWarn.textContent = reqText;
