@@ -135,6 +135,8 @@ export interface LabelReq {
   readonly r: number;
   /** Cao hơn được đặt trước (không đủ chỗ thì nhãn thấp hơn bị bỏ) */
   readonly prio: number;
+  /** Bản NGẮN HƠN của cùng nhãn, thử lần lượt khi bản đầy đủ không còn chỗ nào (ví dụ "→ Hắc Phong Cốc" thay cho "Hồi Phong Quan → Hắc Phong Cốc") */
+  readonly alts?: readonly { readonly w: number }[];
 }
 
 export interface LabelPos {
@@ -142,6 +144,8 @@ export interface LabelPos {
   /** Góc trên-trái của chữ */
   readonly x: number;
   readonly y: number;
+  /** 0 = bản đầy đủ; k >= 1 = bản ngắn `alts[k - 1]` */
+  readonly variant: number;
 }
 
 function overlaps(a: Rect, b: Rect): boolean {
@@ -163,20 +167,26 @@ export function placeLabels(
   const out: LabelPos[] = [];
   const gap = 2;
   for (const { r } of order) {
-    const cx = Math.min(Math.max(r.x - r.w / 2, gap), Math.max(gap, bounds.w - r.w - gap));
-    const candidates: Array<[number, number]> = [
-      [cx, r.y - r.r - r.h - gap], // trên
-      [cx, r.y + r.r + gap], // dưới
-      [r.x + r.r + gap, r.y - r.h / 2], // phải
-      [r.x - r.r - gap - r.w, r.y - r.h / 2], // trái
-    ];
-    for (const [x, y] of candidates) {
-      const box: Rect = { x, y, w: r.w, h: r.h };
-      if (x < 0 || y < 0 || x + r.w > bounds.w || y + r.h > bounds.h) continue;
-      if (taken.some((t) => overlaps(box, t))) continue;
-      taken.push(box);
-      out.push({ key: r.key, x, y });
-      break;
+    const widths = [r.w, ...(r.alts ?? []).map((a) => a.w)];
+    let done = false;
+    for (let variant = 0; variant < widths.length && !done; variant++) {
+      const w = widths[variant];
+      const cx = Math.min(Math.max(r.x - w / 2, gap), Math.max(gap, bounds.w - w - gap));
+      const candidates: Array<[number, number]> = [
+        [cx, r.y - r.r - r.h - gap], // trên
+        [cx, r.y + r.r + gap], // dưới
+        [r.x + r.r + gap, r.y - r.h / 2], // phải
+        [r.x - r.r - gap - w, r.y - r.h / 2], // trái
+      ];
+      for (const [x, y] of candidates) {
+        const box: Rect = { x, y, w, h: r.h };
+        if (x < 0 || y < 0 || x + w > bounds.w || y + r.h > bounds.h) continue;
+        if (taken.some((t) => overlaps(box, t))) continue;
+        taken.push(box);
+        out.push({ key: r.key, x, y, variant });
+        done = true;
+        break;
+      }
     }
   }
   return out;
@@ -318,7 +328,8 @@ export function drawMapBase(
   ctx.strokeRect(v.ox, v.oy, mw, mh);
 
   const obstacles: Rect[] = [];
-  const labels: Array<LabelReq & { text: string; color: string }> = [];
+  const labels: Array<LabelReq & { text: string; color: string; altTexts?: readonly string[] }> =
+    [];
   const fontPx = MIN_FONT_CSS_PX * u;
   if (big) ctx.font = `bold ${fontPx}px ${FONT_FAMILY}`;
   const label = (
@@ -329,11 +340,14 @@ export function drawMapBase(
     r: number,
     prio: number,
     color: string,
+    altTexts?: readonly string[],
   ) => {
     labels.push({
       key,
       text,
       color,
+      altTexts,
+      alts: altTexts?.map((t) => ({ w: ctx.measureText(t).width })),
       x,
       y,
       w: ctx.measureText(text).width,
@@ -388,10 +402,17 @@ export function drawMapBase(
     ctx.stroke();
     obstacles.push({ x: px - portalR, y: py - portalR, w: 2 * portalR, h: 2 * portalR });
     if (big) {
-      // "Tên cổng → bản đồ đích"; canvas hẹp không đủ chỗ thì chỉ ghi "→ bản đồ đích" (người chơi cần biết nhất là đi đâu)
-      const full = `${p.name} → ${p.toMapName}`;
-      const text = ctx.measureText(full).width <= cw - 8 * u ? full : `→ ${p.toMapName}`;
-      label(`portal:${p.id}`, text, px, py, portalR, 100, MAP_COLORS.portal);
+      // "Tên cổng → bản đồ đích"; không đủ chỗ ở bất cứ phía nào của cổng thì chỉ ghi "→ bản đồ đích" (người chơi cần biết nhất là đi đâu)
+      label(
+        `portal:${p.id}`,
+        `${p.name} → ${p.toMapName}`,
+        px,
+        py,
+        portalR,
+        100,
+        MAP_COLORS.portal,
+        [`→ ${p.toMapName}`],
+      );
     }
   }
 
@@ -442,7 +463,15 @@ export function drawMapBase(
     ctx.textAlign = "left";
     for (const p of placed) {
       const l = byKey.get(p.key);
-      if (l) haloText(ctx, l.text, p.x, p.y, l.color, u);
+      if (l)
+        haloText(
+          ctx,
+          p.variant === 0 ? l.text : (l.altTexts?.[p.variant - 1] ?? l.text),
+          p.x,
+          p.y,
+          l.color,
+          u,
+        );
     }
   }
 }

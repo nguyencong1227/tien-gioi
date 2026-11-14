@@ -199,6 +199,22 @@ describe("map-render: placeLabels", () => {
     expect(overlap(box(p, rs[0]), above)).toBe(false);
   });
 
+  it("bản đầy đủ không còn chỗ thì thử bản NGẮN (alts) theo thứ tự; còn chỗ thì dùng bản đầy đủ", () => {
+    // cổng sát đáy khung, vật cản chắn dải phía trên: nhãn rộng 300 không vừa ở phía nào, nhãn ngắn 120 vừa bên phải
+    const bottom = { w: 400, h: 100 };
+    const wall: Rect = { x: 0, y: 60, w: 400, h: 25 };
+    const r: LabelReq = { ...req("p", 150, 92, 9, 300, 14, 5), alts: [{ w: 120 }] };
+    const [p] = placeLabels([r], bottom, [wall]);
+    expect(p.variant).toBe(1);
+    expect(p.x + 120).toBeLessThanOrEqual(400);
+    expect(p.y + 14).toBeLessThanOrEqual(100);
+    // đủ chỗ (không vật cản): bản đầy đủ
+    const [q] = placeLabels([r], bottom);
+    expect(q.variant).toBe(0);
+    // không có bản ngắn: cùng điều kiện thì bỏ nhãn
+    expect(placeLabels([{ ...r, alts: undefined }], bottom, [wall])).toEqual([]);
+  });
+
   it("nhãn rộng hơn cả khung bị bỏ (không ném lỗi, không ra ngoài khung)", () => {
     expect(placeLabels([req("rong", 50, 50, 1, 500)], bounds)).toEqual([]);
   });
