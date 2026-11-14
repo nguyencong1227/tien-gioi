@@ -1,5 +1,5 @@
 import { getChromeGpuFlags } from "./chrome-gpu.mjs";
-/* global console, setTimeout, fetch, process, URLSearchParams */
+/* global console, setTimeout, fetch, process, Buffer */
 // Kiểm thanh chiêu thức L U I O (M7.6, #507) bằng Chrome THẬT qua CDP ở chế độ giả lập `?skills=mock` (KHÔNG cần máy chủ): phím L U I O và chạm nút -> đúng số tin
 // `cast`; ô hồi chiêu / thiếu linh lực / choáng / khoá / trống KHÔNG gửi; lớp trạng thái `k-*` đúng; vòng quét + số giây đếm lùi; hướng đánh theo con trỏ (chuột trong
 // canvas) / theo hình chiêu; đổi số chiêu và cảnh giới (`?n=`, `?realm=`). Có thể chụp ảnh: `--shots <thư mục>`.
