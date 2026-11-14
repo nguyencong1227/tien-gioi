@@ -28,13 +28,23 @@ import type {
 } from "@tien-gioi/shared";
 import type { WorldState, Player } from "./schema";
 import type { SavedPlayer, QuestSave, LifeCounters, LimboRecord } from "./store";
-import type { LimboMsg, RebornMsg, Soul, SoulMsg, StatMult } from "@tien-gioi/shared";
+import type {
+  LimboMsg,
+  RebornMsg,
+  SkillBook,
+  SkillsMsg,
+  Soul,
+  SoulMsg,
+  StatMult,
+  StatusMsg,
+} from "@tien-gioi/shared";
 import { Interest } from "./systems/interest";
 import type { SectService } from "./sect-service";
 import type { AuditFn } from "./audit";
 import { Hub } from "./hub";
 import type { Identity } from "./identity";
 import type { Run } from "./systems/dungeon";
+import type { StatusBox } from "./systems/status-rules";
 import { Duels } from "./systems/duel";
 import { TickStats } from "./metrics";
 
@@ -76,6 +86,18 @@ export interface PlayerCtrl {
   itemCd: Map<string, number>;
   /** Sổ nhiệm vụ: chỉ gửi cho chủ qua tin nhắn `quests` */
   quests: QuestSave;
+  /** Sổ chiêu (M7.2): chiêu đã học + gắn ô L U I O; chỉ gửi cho chủ qua tin nhắn `skills`, không vào state chung */
+  skills: SkillBook;
+  /** Thời điểm (ms, `w.now`) mỗi ô chiêu 2-5 dùng lại được */
+  skillCd: [number, number, number, number];
+  /** Trạng thái đang có (M7.2b, `systems/status.ts`): tạo khi gắn lần đầu; chỉ gửi cho chủ qua tin `status`, không vào state chung */
+  st?: StatusBox;
+  /**
+   * Bản nhớ của trạng thái cho đường nóng `applyInputs` (M7.2b): hệ số tốc độ `moveSpeedMul` (undefined = 1) và đang choáng (undefined = không).
+   * Chỉ `systems/status.ts` ghi (`refreshMoveCache`), mỗi khi trạng thái đổi; không tính lại mỗi tick.
+   */
+  moveMul?: number;
+  stunned?: boolean;
   /** Định danh kiếp hiện tại và bộ đếm thành tựu của kiếp (lưu cùng nhân vật; không vào state chung) */
   lifeId: string;
   life: LifeCounters;
@@ -120,6 +142,8 @@ export interface MonsterCtrl {
    * quái chỉ dịch chuyển mỗi WANDER_STRIDE tick, xem systems/monsters.ts. Có mục tiêu thì luôn 0.
    */
   strideLeft: number;
+  /** Trạng thái đang có (M7.2b, `systems/status.ts`): tạo khi gắn lần đầu, quái không dính trạng thái nào thì không tốn bộ nhớ */
+  st?: StatusBox;
 }
 
 /** Cách các system gửi tin ra ngoài. WorldRoom nối vào broadcast / client.send. */
@@ -134,6 +158,10 @@ export interface WorldEvents {
   inv(sessionId: string, msg: InvMsg): void;
   /** Gửi sổ nhiệm vụ cho đúng người. */
   quests(sessionId: string, msg: QuestsMsg): void;
+  /** Gửi sổ chiêu + hồi chiêu còn lại cho đúng chủ (không vào state chung; khi đổi và định kỳ, không mỗi tick). */
+  skills(sessionId: string, msg: SkillsMsg): void;
+  /** Gửi danh sách trạng thái của CHÍNH chủ (kể cả buff) khi có cái thêm / mất / vơi khiên; không mỗi tick. */
+  status(sessionId: string, msg: StatusMsg): void;
   /** Gửi số Linh thạch cho đúng chủ (không vào state chung). */
   wallet(sessionId: string, msg: WalletMsg): void;
   /** Mở hộp thoại NPC cho đúng người. */
@@ -191,6 +219,12 @@ export class World {
    * chơi chỉ phải tra tập này khi nó khác rỗng (hầu hết thời gian là rỗng).
    */
   readonly ghosts = new Set<string>();
+  /**
+   * Mục tiêu đang có trạng thái (M7.2b): id quái / sessionId người chơi. `tickStatuses` chỉ duyệt hai tập này (thường rỗng) nên không tốn gì khi
+   * không ai dính trạng thái; tự gỡ khi hết trạng thái hoặc mục tiêu biến mất.
+   */
+  readonly statusM = new Set<string>();
+  readonly statusP = new Set<string>();
   /** Trận thách đấu và lời mời của phòng này (hai người phải cùng phòng): systems/duel.ts, docs/THIET_KE_PK.md. */
   readonly duels = new Duels();
   monsterSeq = 0;

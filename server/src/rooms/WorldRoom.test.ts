@@ -28,6 +28,10 @@ import {
   type LimboMsg,
   type SoulMsg,
   type RebornMsg,
+  type SkillsMsg,
+  type StatusMsg,
+  moveSpeedMul,
+  sanitizeStatusList,
   PARTY_INVITE_TTL_MS,
   PARTY_SNAPSHOT_MS,
   NPC_BY_ID,
@@ -45,6 +49,7 @@ import {
   type TravelToMsg,
 } from "@tien-gioi/shared";
 import { changeCoin } from "../systems/wallet";
+import { applyPlayerStatus } from "../systems/status";
 import type { WorldRoom } from "./WorldRoom";
 import type { WorldState } from "../schema";
 
@@ -213,9 +218,13 @@ describe("rớt mạng và nối lại (#116)", () => {
     const invs: InvMsg[] = [];
     const wallets: WalletMsg[] = [];
     const quests: QuestsMsg[] = [];
+    const skills: SkillsMsg[] = [];
+    const statuses: StatusMsg[] = [];
     room.onMessage("inv", (m: InvMsg) => invs.push(m));
     room.onMessage("wallet", (m: WalletMsg) => wallets.push(m));
     room.onMessage("quests", (m: QuestsMsg) => quests.push(m));
+    room.onMessage("skills", (m: SkillsMsg) => skills.push(m));
+    room.onMessage("status", (m: StatusMsg) => statuses.push(m));
     for (const t of ["chat", "toast", "fx", "dmg", "party", "partyInvited", "dialog"])
       room.onMessage(t, () => {});
     rooms.push(room);
@@ -225,6 +234,8 @@ describe("rớt mạng và nối lại (#116)", () => {
       invs,
       wallets,
       quests,
+      skills,
+      statuses,
       me: () => (room.state as any).players.get(room.sessionId),
     };
   }
@@ -270,6 +281,28 @@ describe("rớt mạng và nối lại (#116)", () => {
     // Người khác vẫn thấy một nhân vật duy nhất
     expect(serverState(a.room).players.size).toBe(before);
     expect((serverRoom(a.room) as any).ghosts.size).toBe(0);
+  });
+
+  it("nối lại: nhận lại sổ chiêu và danh sách trạng thái (kèm cường độ tăng tốc) để client dự đoán đúng, không bị kéo giật (M7.2b)", async () => {
+    const a = await join("Noi Trang Thai");
+    const sid = a.room.sessionId;
+    const world = (serverRoom(a.room) as any).world;
+    expect(
+      applyPlayerStatus(world, sid, { status: "haste", ms: 8000, ratio: 0.35, chance: 1 }, 0, sid),
+    ).toBe("added");
+    dropConnection(a.room);
+    await waitFor(() => !a.room.connection.isOpen);
+    await sleep(200);
+    const r2 = await reconnectTo(a.room);
+    const sk = await waitFor(() => r2.skills[0]);
+    expect(sk.slots).toEqual(["", "", "", ""]);
+    const st = await waitFor(() => r2.statuses[0]);
+    const haste = st.list.find((e) => e[0] === "haste");
+    expect(haste).toBeTruthy();
+    expect(haste![2]).toBeCloseTo(0.35, 9);
+    expect(haste![1]).toBeGreaterThan(0);
+    // hệ số client suy ra từ tin khớp hệ số server đang dùng
+    expect(moveSpeedMul(sanitizeStatusList(st.list))).toBeCloseTo(world.ctrl.get(sid).moveMul, 9);
   });
 
   it("hết thời gian chờ thì dọn như rời phòng, đã lưu, token cũ vô hiệu", async () => {
@@ -2413,5 +2446,118 @@ describe("luân hồi: chết thật, Hoàng Tuyền, đầu thai (M3 bước 2)
     await sleep(300);
     expect(c.limbos).toHaveLength(0);
     expect(c.me().dead).toBe(false);
+  });
+});
+
+describe("sổ chiêu: lưu, nạp lại, gắn ô qua tin nhắn (M7.2a)", () => {
+  const playerOf = (name: string) => {
+    const f = readdirSync(dataDir)
+      .filter((x) => x.endsWith(".json"))
+      .find((x) => JSON.parse(readFileSync(path.join(dataDir, x), "utf8")).name === name)!;
+    return JSON.parse(readFileSync(path.join(dataDir, f), "utf8"));
+  };
+  const writePlayer = (name: string, patch: Record<string, unknown>) => {
+    const f = readdirSync(dataDir)
+      .filter((x) => x.endsWith(".json"))
+      .find((x) => JSON.parse(readFileSync(path.join(dataDir, x), "utf8")).name === name)!;
+    const full = path.join(dataDir, f);
+    writeFileSync(full, JSON.stringify({ ...JSON.parse(readFileSync(full, "utf8")), ...patch }));
+  };
+  const leave = async (a: { room: Room }) => {
+    await a.room.leave(true);
+    rooms.splice(rooms.indexOf(a.room), 1);
+    await sleep(250);
+  };
+  /** Nghe tin `skills` TRƯỚC khi gửi `skillSlot` (tin gửi lúc vào phòng tới trước khi client đăng ký được). */
+  const listen = (a: { room: Room }) => {
+    const msgs: SkillsMsg[] = [];
+    a.room.onMessage("skills", (m: SkillsMsg) => msgs.push(m));
+    return msgs;
+  };
+
+  it("hồ sơ có sổ chiêu: nạp đúng, gắn ô qua tin `skillSlot` được lưu lại; ô chưa mở / chiêu chưa học bị từ chối", async () => {
+    const name = "Hoc Chieu Mot";
+    const a0 = await join(name);
+    await leave(a0);
+    // Trúc Cơ sơ kỳ: ô 2 và 3 đã mở (L, U); đã học hai chiêu, mới gắn một
+    writePlayer(name, {
+      realm: 2,
+      tier: 0,
+      skills: {
+        learned: { hoa_van_kiem: 2, bon_thach_quyen: 1 },
+        slots: ["hoa_van_kiem", "", "", ""],
+      },
+    });
+    const a = await join(name);
+    const msgs = listen(a);
+    // gắn chiêu thứ hai vào ô 3
+    a.room.send("skillSlot", { slot: 3, skillId: "bon_thach_quyen" });
+    const m = await waitFor(() => msgs.find((x) => x.slots[1] === "bon_thach_quyen"));
+    expect(m.slots).toEqual(["hoa_van_kiem", "bon_thach_quyen", "", ""]);
+    expect(m.learned).toEqual({ hoa_van_kiem: 2, bon_thach_quyen: 1 });
+    expect(m.cd).toEqual([0, 0, 0, 0]);
+    // tổng hồi chiêu: chiêu ở ô 2 (tầng 2) và ô 3 (tầng 1); ô trống = 0
+    expect(m.cdMax[0]).toBeGreaterThan(0);
+    expect(m.cdMax[1]).toBeGreaterThan(0);
+    expect(m.cdMax[2]).toBe(0);
+    expect(m.cdMax[3]).toBe(0);
+    // ô 4 (I) mở từ Kim Đan; chiêu chưa học; id độc; tin sai kiểu: không đổi gì
+    const n = msgs.length;
+    for (const bad of [
+      { slot: 4, skillId: "hoa_van_kiem" },
+      { slot: 2, skillId: "me_tung_bo" },
+      { slot: 2, skillId: "__proto__" },
+      { slot: 99, skillId: "hoa_van_kiem" },
+      "rác",
+      null,
+    ])
+      a.room.send("skillSlot", bad);
+    await sleep(300);
+    expect(a.toasts.filter((t) => t.tone === "bad").length).toBeGreaterThanOrEqual(3);
+    expect(msgs.slice(n).every((x) => x.slots.join() === "hoa_van_kiem,bon_thach_quyen,,")).toBe(
+      true,
+    );
+    // rời phòng: sổ được LƯU
+    await leave(a);
+    expect(playerOf(name).skills).toEqual({
+      learned: { hoa_van_kiem: 2, bon_thach_quyen: 1 },
+      slots: ["hoa_van_kiem", "bon_thach_quyen", "", ""],
+    });
+    // vào lại: nạp đúng (gỡ một ô để nhận tin và thấy sổ cũ còn nguyên)
+    const b = await join(name);
+    const msgs2 = listen(b);
+    b.room.send("skillSlot", { slot: 2, skillId: "" });
+    const m2 = await waitFor(() => msgs2[0]);
+    expect(m2.slots).toEqual(["", "bon_thach_quyen", "", ""]);
+    expect(m2.learned).toEqual({ hoa_van_kiem: 2, bon_thach_quyen: 1 });
+  });
+
+  it("hồ sơ độc / hỏng không làm hỏng vào phòng: chiêu lạ bị bỏ, tầng bị kẹp, ô chưa mở bị gỡ", async () => {
+    const name = "Hoc Chieu Hai";
+    const a0 = await join(name);
+    await leave(a0);
+    writePlayer(name, {
+      realm: 1, // Luyện Khí: chỉ ô 2 mở
+      skills: JSON.parse(
+        '{"learned":{"__proto__":3,"constructor":9,"khong_co":2,"ung_trao":99,"me_tung_bo":-5},' +
+          '"slots":["constructor","ung_trao","me_tung_bo",7]}',
+      ),
+    });
+    const a = await join(name);
+    const msgs = listen(a);
+    a.room.send("skillSlot", { slot: 2, skillId: "ung_trao" });
+    const m = await waitFor(() => msgs[0]);
+    expect(Object.keys(m.learned).sort()).toEqual(["me_tung_bo", "ung_trao"]);
+    expect(m.learned.ung_trao).toBe(3);
+    expect(m.learned.me_tung_bo).toBe(1);
+    expect(m.slots).toEqual(["ung_trao", "", "", ""]);
+    // hồ sơ hoàn toàn sai kiểu: coi như chưa học gì
+    await leave(a);
+    writePlayer(name, { skills: "rác" });
+    const b = await join(name);
+    const msgs2 = listen(b);
+    b.room.send("skillSlot", { slot: 2, skillId: "" });
+    const m2 = await waitFor(() => msgs2[0]);
+    expect(m2.learned).toEqual({});
   });
 });

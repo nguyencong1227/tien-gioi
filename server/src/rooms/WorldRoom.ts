@@ -70,6 +70,8 @@ import {
   validateRebirth,
   DEFAULT_MAP,
   cleanName,
+  sanitizeSkillBook,
+  SKILL_MSG,
 } from "@tien-gioi/shared";
 import { WorldState, Player } from "../schema";
 import {
@@ -108,6 +110,8 @@ import { chat } from "../systems/chat";
 import { sanitizeInventory, sendInv, useItem } from "../systems/inventory";
 import { dropItem, pickup, releaseLootOwner } from "../systems/loot";
 import { sanitizeQuests, sendQuests } from "../systems/quests";
+import { sendSkills, skillSlot } from "../systems/skills";
+import { sendStatus } from "../systems/status";
 import { sendWallet } from "../systems/wallet";
 import { buy, sell } from "../systems/shop";
 import { abandonQuest, acceptQuest, craft, talk, trade, turnInQuest } from "../systems/npc";
@@ -228,6 +232,8 @@ export class WorldRoom extends Room<WorldState> {
         toast: (sid, msg) => this.sendTo(sid, "toast", msg),
         inv: (sid, msg) => this.sendTo(sid, "inv", msg),
         quests: (sid, msg) => this.sendTo(sid, "quests", msg),
+        skills: (sid, msg) => this.sendTo(sid, SKILL_MSG.skills, msg),
+        status: (sid, msg) => this.sendTo(sid, SKILL_MSG.status, msg),
         dialog: (sid, msg) => this.sendTo(sid, "dialog", msg),
         party: (sid, msg) => this.sendTo(sid, "party", msg),
         partyInvited: (sid, msg) => this.sendTo(sid, "partyInvited", msg),
@@ -343,6 +349,7 @@ export class WorldRoom extends Room<WorldState> {
     });
     this.on<MeditateMsg>("meditate", (sid, m) => setMeditating(w, sid, m?.on === true));
     this.on("breakthrough", (sid) => breakthrough(w, sid));
+    this.on(SKILL_MSG.slot, (sid, m) => skillSlot(w, sid, m));
     this.on<ChatMsg>("chat", (sid, m) => chat(w, sid, m?.text));
     this.on<UseItemMsg>("useItem", (sid, m) => useItem(w, sid, m?.slot));
     this.on<PickupMsg>("pickup", (sid, m) => pickup(w, sid, m?.lootId));
@@ -593,6 +600,8 @@ export class WorldRoom extends Room<WorldState> {
       inv: sanitizeInventory(save.inventory),
       itemCd: new Map(),
       quests: sanitizeQuests(save.quests),
+      skills: sanitizeSkillBook(save.skills, p.realm),
+      skillCd: [0, 0, 0, 0],
       lifeId: sanitizeLifeId(save.lifeId),
       life: sanitizeLife(save.life),
       limbo,
@@ -609,6 +618,7 @@ export class WorldRoom extends Room<WorldState> {
     this.state.online = this.state.players.size;
     sendInv(this.world, client.sessionId);
     sendQuests(this.world, client.sessionId);
+    sendSkills(this.world, client.sessionId);
     sendWallet(this.world, client.sessionId);
     this.world.events.soul(client.sessionId, soulView(soul)); // HUD ghi "Kiếp N" ngay từ lúc vào (không chỉ sau khi mua)
     partyResync(this.world, client.sessionId); // vừa qua cổng từ bản đồ khác: vẫn ở trong đội, nhận đội hình ngay
@@ -653,6 +663,8 @@ export class WorldRoom extends Room<WorldState> {
         this.world.ghosts.delete(sid);
         sendInv(this.world, sid);
         sendQuests(this.world, sid);
+        sendSkills(this.world, sid);
+        sendStatus(this.world, sid); // client mất hệ số tốc độ sau rớt mạng sẽ bị kéo giật nếu không gửi lại
         sendWallet(this.world, sid);
         resolveDone();
         return;
@@ -976,6 +988,7 @@ export class WorldRoom extends Room<WorldState> {
       ...pos,
       inventory: c.inv,
       quests: c.quests,
+      skills: c.skills,
       equipment: equipmentOf(p),
       coin: c.coin,
       lifeId: c.lifeId,

@@ -3,6 +3,7 @@ import { PLAYER_RADIUS, MONSTERS, type MonsterKind } from "@tien-gioi/shared";
 import { Monster } from "../schema";
 import { rand, quantAngle, takeWhole, type World, type MonsterCtrl } from "../world";
 import { hurtPlayer } from "./combat";
+import { isStunned, speedMult } from "./status-rules";
 
 const LEASH_DIST = 520; // kéo quá xa nhà thì bỏ mục tiêu
 const WANDER_RADIUS = 90;
@@ -109,6 +110,9 @@ export function tickMonsters(w: World, dt: number) {
 
 function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: number) {
   const def = mc.def;
+  // Trạng thái (M7.2b): choáng = đứng im và không ra đòn, tê cóng làm chậm. Quái không dính gì thì `mc.st` là undefined (không tốn gì).
+  const st = mc.st !== undefined && mc.st.list.length > 0 ? mc.st : undefined;
+  const stunned = st !== undefined && isStunned(st, w.now);
   let tx = mc.wanderX,
     ty = mc.wanderY,
     speed = def.speed * 0.35;
@@ -154,7 +158,7 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
       speed = 0;
       const aim = Math.atan2(target.y - m.y, target.x - m.x);
       m.angle = quantAngle(aim);
-      if (w.now >= mc.nextAttack) {
+      if (!stunned && w.now >= mc.nextAttack) {
         mc.nextAttack = w.now + def.attackCd;
         w.events.fx({ kind: "mslash", by: id, x: m.x, y: m.y, angle: aim });
         hurtPlayer(w, mc.target!, target, Math.round(def.atk * rand(0.85, 1.15)), m);
@@ -181,6 +185,8 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
       if (add) m.hp = Math.min(m.maxHp, m.hp + add);
     } else mc.hpFrac = 0;
   }
+
+  if (st !== undefined) speed = stunned ? 0 : speed * speedMult(st, w.now);
 
   // Không có mục tiêu: chỉ áp bước di chuyển mỗi WANDER_STRIDE tick (bước dài gấp WANDER_STRIDE lần)
   let stride = 1;

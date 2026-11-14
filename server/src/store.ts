@@ -14,6 +14,7 @@ import {
   type Inventory,
   type LifeSummary,
   type QuestProgress,
+  type SkillBook,
 } from "@tien-gioi/shared";
 
 const getDir = () => path.resolve(process.env.DATA_DIR ?? "data/players");
@@ -30,6 +31,8 @@ export interface SavedPlayer {
   inventory?: Inventory;
   /** Sổ nhiệm vụ; file cũ không có thì coi như chưa làm gì */
   quests?: QuestSave;
+  /** Sổ chiêu (M7.2): chiêu đã học + ô L U I O; file cũ không có thì coi như chưa học gì. Đọc bằng `sanitizeSkillBook`, không tin giá trị trong file. */
+  skills?: SkillBook;
   /** Đồ đang mặc; file cũ không có thì coi như mặc đồ trống */
   equipment?: Equipment;
   /** Linh thạch; file cũ không có thì coi như 0. Nạp qua addCoin: không tin giá trị trong file. */

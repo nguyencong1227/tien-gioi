@@ -103,6 +103,8 @@ export function runBench(
         toast: () => {},
         inv: () => {},
         quests: () => {},
+        skills: () => {},
+        status: () => {},
         dialog: () => {},
         party: (_sid, msg) => {
           partyBytes += JSON.stringify(msg).length + 5 + 4; // "party".length = 5
@@ -362,6 +364,8 @@ export function runMultiMapBench(
           toast: () => {},
           inv: () => {},
           quests: () => {},
+          skills: () => {},
+          status: () => {},
           dialog: () => {},
           party: (_sid, msg) => {
             partyBytes += JSON.stringify(msg).length + 5 + 4;
