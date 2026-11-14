@@ -690,12 +690,73 @@ export interface SkillsMsg {
   cdMax: [number, number, number, number];
 }
 
-/** Một trạng thái đang có trên chính mình: id và thời gian còn lại (ms) lúc gửi. */
-export type StatusEntry = [id: StatusId, msLeft: number];
+/**
+ * Một trạng thái đang có trên chính mình: id, thời gian còn lại (ms) lúc gửi, và `ratio` (KHÔNG bắt buộc) CHỈ cho tăng tốc / tê cóng: hai trạng thái
+ * này đổi tốc độ di chuyển mà client đoán trước, nên client cần cường độ để nhân đúng như server (`moveSpeedMul`). Loại khác bỏ trống phần tử thứ ba
+ * (mã tách `[id, ms]` cũ không vỡ). Nơi nhận không tin tin nhắn: dùng `sanitizeStatusList`.
+ */
+export type StatusEntry = [id: StatusId, msLeft: number, ratio?: number];
+
+/** Trạng thái nào ghi `ratio` trong `StatusEntry`: chỉ những cái đổi tốc độ di chuyển của người chơi. */
+export function statusCarriesRatio(id: unknown): boolean {
+  const def = statusOf(id);
+  return def !== undefined && (def.kind === "haste" || def.kind === "slow");
+}
+
+/** Hệ số tốc độ di chuyển cho phép (kẹp): không bao giờ đứng yên vì tê cóng, không nhanh quá mức tránh được va chạm / xuyên tường. */
+export const MOVE_SPEED_MUL_MIN = 0.4;
+export const MOVE_SPEED_MUL_MAX = 1.6;
 
 /**
- * Server -> chủ: danh sách trạng thái của CHÍNH MÌNH (huy hiệu + thời gian còn lại, kể cả buff). Gửi khi có trạng thái thêm / mất (không mỗi tick);
+ * Hệ số nhân tốc độ di chuyển của người chơi từ danh sách trạng thái của CHÍNH MÌNH: `(1 + tăng tốc) x (1 - tê cóng)`, kẹp
+ * [`MOVE_SPEED_MUL_MIN`, `MOVE_SPEED_MUL_MAX`]. MỘT hàm cho cả hai phía: server (`applyInputs`) và client (`fixedStep`, `reconcile`) đều nhân
+ * `statsFor(...).speed x moveSpeedMul(...)` (như `moveWithCollision` dùng chung), không phía nào tự viết công thức. Bỏ qua mục hết hạn
+ * (`msLeft` <= 0 hoặc không hữu hạn), id lạ, `ratio` thiếu / không hữu hạn (coi 0); `ratio` kẹp bằng `maxRatio` của trạng thái. 1 khi không có gì.
+ */
+export function moveSpeedMul(list: readonly StatusEntry[]): number {
+  let m = 1;
+  for (const e of list) {
+    if (!Array.isArray(e)) continue;
+    const def = statusOf(e[0]);
+    if (!def || typeof e[1] !== "number" || !(e[1] > 0)) continue;
+    if (def.kind !== "haste" && def.kind !== "slow") continue;
+    const r = typeof e[2] === "number" && Number.isFinite(e[2]) ? e[2] : 0;
+    const ratio = Math.min(def.maxRatio, Math.max(0, r));
+    m *= def.kind === "haste" ? 1 + ratio : 1 - ratio;
+  }
+  return Math.min(MOVE_SPEED_MUL_MAX, Math.max(MOVE_SPEED_MUL_MIN, m));
+}
+
+/**
+ * Làm sạch danh sách trạng thái nhận từ server (client không tin tin nhắn, như mọi tin khác): chỉ giữ mục có id trong bảng và `msLeft` hữu hạn > 0
+ * (kẹp `maxMs`), `ratio` chỉ giữ cho tăng tốc / tê cóng (kẹp [0, `maxRatio`], thiếu thì 0); mỗi id một lần; tối đa `MAX_STATUSES` mục.
+ * Không phải mảng thì rỗng.
+ */
+export function sanitizeStatusList(raw: unknown): StatusEntry[] {
+  if (!Array.isArray(raw)) return [];
+  const out: StatusEntry[] = [];
+  for (const e of raw) {
+    if (out.length >= MAX_STATUSES) break;
+    if (!Array.isArray(e)) continue;
+    const def = statusOf(e[0]);
+    if (!def || out.some((x) => x[0] === def.id)) continue;
+    if (typeof e[1] !== "number" || !Number.isFinite(e[1]) || e[1] <= 0) continue;
+    const ms = Math.min(def.maxMs, e[1]);
+    if (statusCarriesRatio(def.id)) {
+      const r = typeof e[2] === "number" && Number.isFinite(e[2]) ? e[2] : 0;
+      out.push([def.id, ms, Math.min(def.maxRatio, Math.max(0, r))]);
+    } else {
+      out.push([def.id, ms]);
+    }
+  }
+  return out;
+}
+
+/**
+ * Server -> chủ: danh sách trạng thái của CHÍNH MÌNH (huy hiệu + thời gian còn lại, kể cả buff). Gửi (cả danh sách, không mỗi tick) khi có trạng thái
+ * thêm / mất / làm mới (kể cả khi `ratio` đổi: chiêu mạnh hơn ghi đè chiêu yếu), khi khiên vơi, và khi NỐI LẠI sau rớt mạng (`Room` mới);
  * client tự đếm lùi. Người khác / quái KHÔNG nhận tin này: quái chỉ có byte công khai `Monster.fx` (`statusMask`).
+ * Choáng: client KHÔNG đoán trước và không gửi `input` khi đang choáng; nếu vẫn có input đến thì server tiêu thụ và tăng `lastSeq` (chỉ không di chuyển).
  */
 export interface StatusMsg {
   list: StatusEntry[];

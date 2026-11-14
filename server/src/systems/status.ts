@@ -2,12 +2,13 @@
 // quái / người chơi (xác suất, trùm miễn choáng), tick sát thương theo giây + hồi phục + hết hạn, gửi danh sách trạng thái cho chủ.
 // Tác dụng lên chiến đấu nằm ở chỗ dùng: `combat.ts` (vỡ giáp nhân sát thương nhận, khiên hấp thụ), `monsters.ts` (choáng / tê cóng).
 // Chưa nối vào di chuyển của NGƯỜI CHƠI (tăng tốc / tê cóng): client phải đoán trước cùng hệ số, quyết ở bước `cast` (`speedMult`).
-import { statusOf, type SkillEffect } from "@tien-gioi/shared";
-import { takeWhole, type World } from "../world";
+import { moveSpeedMul, statusOf, type SkillEffect } from "@tien-gioi/shared";
+import { takeWhole, type PlayerCtrl, type World } from "../world";
 import { dealMonsterDamage } from "./combat";
 import {
   addStatus,
   entriesOf,
+  isStunned,
   newStatusBox,
   pruneStatuses,
   type AddResult,
@@ -67,9 +68,26 @@ export function applyPlayerStatus(
   const res = addStatus(box, effect, w.now, { baseDmg, maxHp: p.maxHp, src });
   if (res === "added" || res === "refreshed") {
     w.statusP.add(sid);
-    sendStatus(w, sid);
+    refreshMoveCache(c, w.now);
+    sendStatus(w, sid); // cả khi làm mới: thời gian và cường độ (chiêu mạnh hơn ghi đè chiêu yếu) có thể đổi
   }
   return res;
+}
+
+/**
+ * Tính lại bản nhớ cho `applyInputs` (`c.moveMul`, `c.stunned`) từ trạng thái hiện có: hệ số bằng ĐÚNG `moveSpeedMul(entriesOf(...))` (hàm dùng chung
+ * với client). Gọi mỗi khi trạng thái của người chơi đổi (gắn, hết hạn, xoá), không mỗi tick; hai trường để undefined khi không có gì.
+ */
+export function refreshMoveCache(c: PlayerCtrl, now: number) {
+  const box = c.st;
+  if (!box || box.list.length === 0) {
+    c.moveMul = undefined;
+    c.stunned = undefined;
+    return;
+  }
+  const m = moveSpeedMul(entriesOf(box, now));
+  c.moveMul = m === 1 ? undefined : m;
+  c.stunned = isStunned(box, now) ? true : undefined;
 }
 
 /** Gửi cho chủ danh sách trạng thái còn hiệu lực của chính mình (rỗng cũng gửi: client xoá huy hiệu). */
@@ -84,6 +102,7 @@ export function clearPlayerStatus(w: World, sid: string) {
   w.statusP.delete(sid);
   if (!c?.st || c.st.list.length === 0) return;
   c.st.list.length = 0;
+  refreshMoveCache(c, w.now);
   sendStatus(w, sid);
 }
 
@@ -139,12 +158,16 @@ function tickPlayerStatuses(w: World, dt: number) {
       clearPlayerStatus(w, sid);
       continue;
     }
+    const ghost = w.ghosts.size > 0 && w.ghosts.has(sid); // hồn lìa xác: không hồi phục
     for (const s of box.list) {
-      if (s.id !== "regen" || s.until <= now || p.hp >= p.maxHp) continue;
+      if (ghost || s.id !== "regen" || s.until <= now || p.hp >= p.maxHp) continue;
       const add = takeWhole(c.frac, "hp", s.ratio * p.maxHp * dt);
       if (add) p.hp = Math.min(p.maxHp, p.hp + add);
     }
-    if (pruneStatuses(box, now)) sendStatus(w, sid);
+    if (pruneStatuses(box, now)) {
+      refreshMoveCache(c, now);
+      sendStatus(w, sid);
+    }
     if (box.list.length === 0) w.statusP.delete(sid);
   }
 }

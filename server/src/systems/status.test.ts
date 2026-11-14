@@ -8,6 +8,9 @@ import {
   STATUSES,
   STUN_IMMUNE_MS,
   STUN_MAX_MS,
+  TICK_MS,
+  moveSpeedMul,
+  sanitizeStatusList,
   statsFor,
   type SkillEffect,
   type StatusId,
@@ -33,6 +36,7 @@ import {
   tickStatuses,
 } from "./status";
 import { tickWorld } from "./tick";
+import { applyInputs, queueInput } from "./movement";
 import { addMonster, addPlayer, makeWorld } from "./test-helpers";
 
 const eff = (status: StatusId, ms: number, ratio = 0.2, chance = 1): SkillEffect => ({
@@ -505,5 +509,126 @@ describe("không tốn gì khi không ai dính trạng thái", () => {
     tickStatuses(w, 0.05);
     expect(mc.st).toBeUndefined();
     expect(MONSTER_BY_ID.lang).toBeDefined();
+  });
+});
+
+describe("tốc độ và choáng của người chơi (khớp hàm dùng chung `moveSpeedMul`)", () => {
+  /** Một bước di chuyển sang phải: gửi `n` input rồi áp; trả quãng đường đi được. */
+  function walk(w: ReturnType<typeof makeWorld>["w"], sid: string, n = 1) {
+    const { p, c } = w.ready(sid)!;
+    const x0 = p.x;
+    for (let i = 1; i <= n; i++) queueInput(w, sid, { seq: p.lastSeq + 1 + i, dx: 1, dy: 0 });
+    c.moveBudget = 4;
+    applyInputs(w.map, p, c);
+    return p.x - x0;
+  }
+
+  it("entriesOf: CHỈ tăng tốc / tê cóng mang ratio (phần tử thứ ba); loại khác chỉ [id, ms]", () => {
+    const box = newStatusBox();
+    addStatus(box, eff("haste", 4000, 0.35), 0);
+    addStatus(box, eff("chill", 4000, 0.3), 0);
+    addStatus(box, eff("shield", 4000, 0.5), 0, { maxHp: 100 });
+    addStatus(box, eff("regen", 4000, 0.1), 0);
+    const e = entriesOf(box, 0);
+    expect(e.find((x) => x[0] === "haste")).toEqual(["haste", 4000, 0.35]);
+    expect(e.find((x) => x[0] === "chill")).toEqual(["chill", 4000, 0.3]);
+    expect(e.find((x) => x[0] === "shield")).toEqual(["shield", 4000]);
+    expect(e.find((x) => x[0] === "regen")).toEqual(["regen", 4000]);
+  });
+
+  it("tin gửi cho chủ có ratio; nhận qua sanitizeStatusList (như client) ra ĐÚNG hệ số server dùng", () => {
+    const { w, statusMsgs } = makeWorld();
+    const { c } = addPlayer(w, "a");
+    w.now = 1000;
+    applyPlayerStatus(w, "a", eff("haste", 5000, 0.4), 0, "a");
+    applyPlayerStatus(w, "a", eff("chill", 3000, 0.3), 0, "a");
+    const list = statusMsgs.at(-1)!.msg.list;
+    expect(list).toContainEqual(["haste", 5000, 0.4]);
+    const clientMul = moveSpeedMul(sanitizeStatusList(JSON.parse(JSON.stringify(list))));
+    expect(c.moveMul).toBeCloseTo(clientMul, 12); // cùng danh sách -> cùng số ở hai phía
+    expect(clientMul).toBeCloseTo(1.4 * 0.7, 12);
+  });
+
+  it("làm mới bằng chiêu MẠNH hơn: gửi lại danh sách với ratio mới và hệ số mới (không chỉ lúc thêm / mất)", () => {
+    const { w, statusMsgs } = makeWorld();
+    const { c } = addPlayer(w, "a");
+    w.now = 0;
+    applyPlayerStatus(w, "a", eff("haste", 4000, 0.2), 0, "a");
+    const n0 = statusMsgs.length;
+    applyPlayerStatus(w, "a", eff("haste", 4000, 0.5), 0, "a");
+    expect(statusMsgs.length).toBe(n0 + 1);
+    expect(statusMsgs.at(-1)!.msg.list).toContainEqual(["haste", 4000, 0.5]);
+    expect(c.moveMul).toBeCloseTo(1.5, 12);
+    // chiêu yếu hơn không kéo cường độ xuống
+    applyPlayerStatus(w, "a", eff("haste", 4000, 0.1), 0, "a");
+    expect(c.moveMul).toBeCloseTo(1.5, 12);
+  });
+
+  it("applyInputs nhân tốc độ: tăng tốc đi xa hơn đúng hệ số, tê cóng chậm hơn, hết hạn thì về bình thường", () => {
+    const { w } = makeWorld();
+    addPlayer(w, "a");
+    const base = walk(w, "a");
+    expect(base).toBeGreaterThan(0);
+    w.now = 0;
+    applyPlayerStatus(w, "a", eff("haste", 2000, 0.5), 0, "a");
+    expect(walk(w, "a")).toBeCloseTo(base * 1.5, 6);
+    applyPlayerStatus(w, "a", eff("chill", 2000, 0.5), 0, "a");
+    expect(walk(w, "a")).toBeCloseTo(base * 1.5 * 0.5, 6);
+    w.now = 2100;
+    tickStatuses(w, 0.05); // hết hạn: dọn, tính lại bản nhớ
+    expect(w.ctrl.get("a")!.moveMul).toBeUndefined();
+    expect(walk(w, "a")).toBeCloseTo(base, 6);
+    expect(TICK_MS).toBeGreaterThan(0);
+  });
+
+  it("choáng: input vẫn được TIÊU THỤ và lastSeq tăng (chỉ không di chuyển); hết choáng thì đi lại", () => {
+    const { w } = makeWorld();
+    const { p, c } = addPlayer(w, "a");
+    w.now = 0;
+    expect(applyPlayerStatus(w, "a", eff("stun", 1000, 0), 0, "a")).toBe("added");
+    expect(c.stunned).toBe(true);
+    const x0 = p.x;
+    for (let i = 1; i <= 3; i++) queueInput(w, "a", { seq: i, dx: 1, dy: 0 });
+    c.moveBudget = 4;
+    applyInputs(w.map, p, c);
+    expect(p.x).toBe(x0); // đứng yên
+    expect(c.inputs.length).toBe(0); // hàng đợi rỗng
+    expect(p.lastSeq).toBe(3); // đã xác nhận
+    w.now = 1100;
+    tickStatuses(w, 0.05);
+    expect(c.stunned).toBeUndefined();
+    queueInput(w, "a", { seq: 4, dx: 1, dy: 0 });
+    c.moveBudget = 4;
+    applyInputs(w.map, p, c);
+    expect(p.x).toBeGreaterThan(x0);
+    expect(p.lastSeq).toBe(4);
+  });
+
+  it("chết hoặc bị xoá trạng thái thì bản nhớ tốc độ / choáng về mặc định", () => {
+    const { w } = makeWorld();
+    const { p, c } = addPlayer(w, "a");
+    w.now = 0;
+    applyPlayerStatus(w, "a", eff("haste", 5000, 0.5), 0, "a");
+    applyPlayerStatus(w, "a", eff("stun", 1000, 0), 0, "a");
+    expect(c.moveMul).toBeCloseTo(1.5, 12);
+    expect(c.stunned).toBe(true);
+    p.dead = true;
+    tickStatuses(w, 0.05);
+    expect(c.moveMul).toBeUndefined();
+    expect(c.stunned).toBeUndefined();
+  });
+
+  it("hồn lìa xác (rớt mạng chờ nối lại) không được hồi phục từ trạng thái hồi phục", () => {
+    const { w } = makeWorld();
+    const { p } = addPlayer(w, "a");
+    p.hp = 10;
+    w.now = 0;
+    applyPlayerStatus(w, "a", eff("regen", 5000, 0.15), 0, "a");
+    w.ghosts.add("a");
+    for (let t = 0; t < 1000; t += 50) {
+      w.now = t;
+      tickStatuses(w, 0.05);
+    }
+    expect(p.hp).toBe(10);
   });
 });

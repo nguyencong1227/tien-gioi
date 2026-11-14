@@ -39,7 +39,8 @@ export function syncPublicPos(p: Player) {
 export function applyInputs(map: GameMap, p: Player, c: PlayerCtrl) {
   const step = TICK_MS / 1000;
   c.moveBudget = Math.min(MAX_MOVE_BUDGET, c.moveBudget + 1);
-  const speed = statsFor(p.realm, p.tier, p).speed; // hộ phù có tốc độ
+  // hộ phù có tốc độ; tăng tốc / tê cóng nhân thêm `moveSpeedMul` (bản nhớ trong `c.moveMul`, client dùng CÙNG hàm để đoán trước)
+  const speed = statsFor(p.realm, p.tier, p).speed * (c.moveMul ?? 1);
   while (c.inputs.length && c.moveBudget >= 1) {
     const inp = c.inputs.shift()!;
     c.moveBudget -= 1;
@@ -49,7 +50,8 @@ export function applyInputs(map: GameMap, p: Player, c: PlayerCtrl) {
       dx /= len;
       dy /= len;
     }
-    if (len > 0.05) {
+    // Choáng: vẫn TIÊU THỤ input và tăng `lastSeq` (chỉ không di chuyển) để hàng đợi dự đoán của client rỗng được, `reconcile` không chạy lại input cũ
+    if (len > 0.05 && !c.stunned) {
       p.meditating = false;
       const next = map.moveWithCollision(
         p.x,

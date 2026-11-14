@@ -92,6 +92,12 @@ export interface PlayerCtrl {
   skillCd: [number, number, number, number];
   /** Trạng thái đang có (M7.2b, `systems/status.ts`): tạo khi gắn lần đầu; chỉ gửi cho chủ qua tin `status`, không vào state chung */
   st?: StatusBox;
+  /**
+   * Bản nhớ của trạng thái cho đường nóng `applyInputs` (M7.2b): hệ số tốc độ `moveSpeedMul` (undefined = 1) và đang choáng (undefined = không).
+   * Chỉ `systems/status.ts` ghi (`refreshMoveCache`), mỗi khi trạng thái đổi; không tính lại mỗi tick.
+   */
+  moveMul?: number;
+  stunned?: boolean;
   /** Định danh kiếp hiện tại và bộ đếm thành tựu của kiếp (lưu cùng nhân vật; không vào state chung) */
   lifeId: string;
   life: LifeCounters;
