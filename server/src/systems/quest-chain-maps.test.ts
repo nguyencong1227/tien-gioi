@@ -1,10 +1,11 @@
-// Chuỗi nhiệm vụ chính đi qua BA bản đồ (M6, #405): mỗi bản đồ một phòng (một World), nhân vật mang theo nhiệm vụ / túi / ví khi qua cổng.
-// Kiểm: người chơi không đội làm được hết chuỗi chính tới Kim Đan, mỗi nhiệm vụ nhận / trả đúng NPC ở đúng phòng.
+// Chuỗi nhiệm vụ chính đi qua BỐN bản đồ (M6, #405; M7.5c thêm Hàn Vân Lĩnh): mỗi bản đồ một phòng (một World), nhân vật mang theo nhiệm vụ / túi / ví khi qua cổng.
+// Kiểm: người chơi không đội làm được hết chuỗi chính tới Nguyên Anh (trừ nhiệm vụ cuối là trùm theo đội, giả lập hạ trùm), mỗi nhiệm vụ nhận / trả đúng NPC ở đúng phòng.
 import { describe, expect, it } from "vitest";
 import {
   AM_SUONG_ID,
   DEFAULT_MAP_ID,
   HAC_PHONG_ID,
+  HAN_VAN_ID,
   MAIN_QUEST_START,
   NPC_BY_ID,
   QUESTS,
@@ -25,8 +26,8 @@ type Room = ReturnType<typeof makeWorld> & {
   c: ReturnType<typeof addPlayer>["c"];
 };
 
-/** Ba phòng, MỘT nhân vật "a" dùng chung nhiệm vụ / túi / ví (như khi qua cổng: lưu rồi nạp ở phòng đích). */
-function threeRooms() {
+/** Bốn phòng, MỘT nhân vật "a" dùng chung nhiệm vụ / túi / ví (như khi qua cổng: lưu rồi nạp ở phòng đích). */
+function fourRooms() {
   const mk = (id: string): Room => {
     const t = makeWorld(getMap(id)!);
     const { p, c } = addPlayer(t.w, "a", 1, 8);
@@ -36,6 +37,7 @@ function threeRooms() {
     [DEFAULT_MAP_ID]: mk(DEFAULT_MAP_ID),
     [HAC_PHONG_ID]: mk(HAC_PHONG_ID),
     [AM_SUONG_ID]: mk(AM_SUONG_ID),
+    [HAN_VAN_ID]: mk(HAN_VAN_ID),
   };
   const all = Object.values(rooms);
   const base = all[0];
@@ -64,9 +66,9 @@ function threeRooms() {
   return { rooms, all, at, sync };
 }
 
-describe("chuỗi nhiệm vụ chính qua ba bản đồ", () => {
-  it("người chơi KHÔNG đội làm được trọn chuỗi chính: từ Trưởng trấn (Lạc Hà) tới Trạm trưởng (Vọng Sương) và nhiệm vụ cuối", () => {
-    const { all, at, sync } = threeRooms();
+describe("chuỗi nhiệm vụ chính qua bốn bản đồ", () => {
+  it("người chơi KHÔNG đội làm được trọn chuỗi chính: từ Trưởng trấn (Lạc Hà) qua Trạm trưởng Vọng Sương tới Trạm trưởng Hàn Vân và nhiệm vụ cuối", () => {
+    const { all, at, sync } = fourRooms();
     const done: string[] = [];
     for (let id: string | undefined = MAIN_QUEST_START; id; id = QUEST_BY_ID[id].next) {
       const def: QuestDef = QUEST_BY_ID[id];
@@ -111,22 +113,32 @@ describe("chuỗi nhiệm vụ chính qua ba bản đồ", () => {
       expect(back.c.quests.done, `${id}: trả ở phòng của ${def.giver}`).toContain(id);
       done.push(id);
     }
-    expect(done).toHaveLength(16);
-    expect(done.slice(-6)).toEqual([
+    expect(done).toHaveLength(23);
+    expect(done.slice(-13)).toEqual([
       "vong_suong",
       "suong_ho_hoan",
       "thach_quy_giap",
       "doc_thiem_nang",
       "kim_dan_hau_ky",
-      "giao_hoan",
+      "lang_han_quan",
+      "han_van_len",
+      "han_lang_hoan",
+      "phong_nha_cham",
+      "cot_tuong_cot",
+      "doc_tuoc_nang_cb",
+      "nguyen_anh_hau_ky",
+      "thien_han_hoan",
     ]);
-    // người chơi cuối chuỗi đã là Kim Đan hậu kỳ (các bước reachRealm đẩy bậc lên đúng thang)
-    expect(stepOf(all[0].p.realm, all[0].p.tier)).toBeGreaterThanOrEqual(stepOf(3, 2));
-    expect(expToNext(3, 2)).toBe(63480);
+    // người chơi cuối chuỗi đã là Nguyên Anh hậu kỳ (các bước reachRealm đẩy bậc lên đúng thang)
+    expect(stepOf(all[0].p.realm, all[0].p.tier)).toBeGreaterThanOrEqual(stepOf(4, 2));
+    expect(expToNext(4, 2)).toBe(Math.round(288000 * Math.pow(1.15, 2)));
+    // nhiệm vụ nối `lang_han_quan` giao ở Âm Sương nhưng bước nói chuyện ở Hàn Vân: hai NPC ở hai phòng khác nhau
+    expect(NPC_BY_ID[QUEST_BY_ID.lang_han_quan.giver].mapId).toBe(AM_SUONG_ID);
+    expect(NPC_BY_ID.tram_truong_han.mapId).toBe(HAN_VAN_ID);
   });
 
   it("nhiệm vụ nào cũng được giao bởi NPC đứng đúng bản đồ có thật; NPC ở phòng khác không nhận được nhầm", () => {
-    const { rooms } = threeRooms();
+    const { rooms } = fourRooms();
     for (const q of QUESTS) {
       const npc = NPC_BY_ID[q.giver];
       expect(npc, q.id).toBeDefined();
@@ -141,10 +153,17 @@ describe("chuỗi nhiệm vụ chính qua ba bản đồ", () => {
     lacHa.p.tier = 0;
     acceptQuest(lacHa.w, "a", "suong_ho_quay");
     expect(lacHa.c.quests.active.map((a) => a.id)).not.toContain("suong_ho_quay");
+    // tương tự với Trạm trưởng Hàn Vân: đứng đúng toạ độ nhưng ở phòng Lạc Hà thì không nhận được nhiệm vụ lặp của Hàn Vân
+    lacHa.p.x = NPC_BY_ID.tram_truong_han.x;
+    lacHa.p.y = NPC_BY_ID.tram_truong_han.y;
+    lacHa.p.realm = 4;
+    lacHa.p.tier = 1;
+    acceptQuest(lacHa.w, "a", "han_lang_quay");
+    expect(lacHa.c.quests.active.map((a) => a.id)).not.toContain("han_lang_quay");
   });
 
   it("việc phụ Mãng hoạn và ba nhiệm vụ lặp ở Vọng Sương nhận / trả được đúng phòng và đúng bậc", () => {
-    const { at, sync, all } = threeRooms();
+    const { at, sync, all } = fourRooms();
     // Trúc Cơ sơ kỳ: nhận việc phụ ở Lạc Hà
     for (const r of all) {
       r.p.realm = 2;

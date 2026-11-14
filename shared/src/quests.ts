@@ -433,7 +433,7 @@ export const QUESTS: QuestDef[] = [
     steps: [{ kind: "reachRealm", realm: 3, tier: 2 }],
     rewards: { exp: 800, items: [{ itemId: "dai_hoi_linh_dan", qty: 4 }] },
     minRealm: { realm: 3, tier: 1 },
-    next: "giao_hoan",
+    next: "lang_han_quan",
     talk: {
       offer: [
         "Hắc Giao không phải thứ một người, thậm chí hai người, đối phó nổi. Ít nhất là ba, và phải là Kim Đan trung kỳ trở lên.",
@@ -469,6 +469,206 @@ export const QUESTS: QuestDef[] = [
       complete: [
         "Hắc Giao đã ngã. Cả Vọng Sương Trạm sẽ nhớ tên đội ngươi.",
         "Ra khỏi đầm này còn là Nguyên Anh: đường còn dài. Nhưng đó là chuyện của ngày khác.",
+      ],
+    },
+  },
+
+  // ---------- Chuỗi Nguyên Anh ở Hàn Vân Trạm (M7.5c, #506): nối sau `giao_hoan` ----------
+  {
+    id: "lang_han_quan",
+    title: "Lăng Hàn Quan",
+    giver: "tram_truong",
+    desc: "Qua Lăng Hàn Quan ở rìa bắc đầm, tới Hàn Vân Trạm và nói chuyện với trạm trưởng Thôi Tuyết Phong.",
+    steps: [{ kind: "talk", npcId: "tram_truong_han" }],
+    rewards: { exp: 500, items: [{ itemId: "dai_hoi_huyet_dan", qty: 3 }] },
+    minRealm: { realm: 3, tier: 2 },
+    next: "han_van_len",
+    talk: {
+      offer: [
+        "Kim Đan hậu kỳ rồi, đầm này không còn gì để dạy ngươi nữa. Phía bắc, nơi đường đất chạm rìa, có Lăng Hàn Quan.",
+        "Qua đó là Hàn Vân Lĩnh, băng nguyên của kẻ sắp thành Nguyên Anh. Tới Hàn Vân Trạm, tìm trạm trưởng Thôi Tuyết Phong.",
+      ],
+      progress: ["Chưa gặp Thôi Tuyết Phong. Lăng Hàn Quan ở tận rìa bắc đầm, theo đường đất lên."],
+      complete: [
+        "Thôi Tuyết Phong gửi lời hỏi thăm ngươi. Ông ấy bảo gió trên đó cắt da, nhưng người Kim Đan hậu kỳ đủ sức thử.",
+        "Giờ thì đó là việc của Hàn Vân Trạm.",
+      ],
+    },
+  },
+  {
+    id: "han_van_len",
+    title: "Hàn Vân",
+    giver: "tram_truong_han",
+    desc: "Đột phá lên Nguyên Anh.",
+    steps: [{ kind: "reachRealm", realm: 4, tier: 0 }],
+    rewards: { exp: 3300, items: [{ itemId: "thuong_hoi_huyet_dan", qty: 3 }] },
+    minRealm: { realm: 3, tier: 2 },
+    next: "han_lang_hoan",
+    talk: {
+      offer: [
+        "Từ Âm Sương lên à? Hàn Vân Trạm mở cửa cho mọi người, nhưng băng nguyên ngoài kia chỉ Nguyên Anh mới sống nổi.",
+        "Kim Đan hậu kỳ đã đủ tư cách thử Đột phá. Lên Nguyên Anh rồi quay lại tìm ta, đừng ra khỏi vòng lửa trước đó.",
+      ],
+      progress: ["Chưa Nguyên Anh. Ở trong vòng lửa đả tọa, chờ thanh tu vi đầy rồi Đột phá."],
+      complete: [
+        "Nguyên Anh thành, hàn khí cũng phải né ngươi ba phần. Giờ băng nguyên là của ngươi.",
+        "Việc đầu tiên: bầy Hàn Lang ở rìa ngoài, chúng quấy nhiễu đoàn buôn.",
+      ],
+    },
+  },
+  {
+    id: "han_lang_hoan",
+    title: "Hàn Lang hoạn",
+    giver: "tram_truong_han",
+    desc: "Hạ 25 Hàn Lang và mang về 12 Hàn Lang mao.",
+    steps: [
+      { kind: "kill", monster: "han_lang", count: 25 },
+      { kind: "collect", itemId: "han_lang_mao", count: 12 },
+    ],
+    rewards: {
+      exp: 6600,
+      items: [
+        { itemId: "dai_hoi_huyet_dan", qty: 5 },
+        { itemId: "thuong_hoi_huyet_dan", qty: 2 },
+      ],
+    },
+    minRealm: { realm: 4, tier: 0 },
+    next: "phong_nha_cham",
+    talk: {
+      offer: [
+        "Hàn Lang gồng một nhịp rồi lao thẳng. Thấy đất dưới chân sáng lên một đường thì bước ngang, đừng đứng im.",
+        "Hạ hai mươi lăm con, gom mười hai nhúm Hàn Lang mao cho thợ rèn Lô Băng Thiết.",
+      ],
+      progress: ["Hàn Lang ở rìa ngoài, gần trạm nhất. Né đường lao rồi mới đánh, đừng đối đầu."],
+      complete: [
+        "Lông Hàn Lang lạnh buốt tay, Lô Băng Thiết sẽ mừng. Cầm lấy ít đan.",
+        "Tiếp theo là Phong Nha: chim nanh thép bắn từ xa, không né thì đau.",
+      ],
+    },
+  },
+  {
+    id: "phong_nha_cham",
+    title: "Phong Nha",
+    giver: "tram_truong_han",
+    desc: "Hạ 20 Phong Nha và mang về 10 Phong Nha vũ.",
+    steps: [
+      { kind: "kill", monster: "phong_nha", count: 20 },
+      { kind: "collect", itemId: "phong_nha_vu", count: 10 },
+    ],
+    rewards: { exp: 6600, items: [{ itemId: "thuong_hoi_linh_dan", qty: 3 }] },
+    minRealm: { realm: 4, tier: 0 },
+    next: "cot_tuong_cot",
+    talk: {
+      offer: [
+        "Phong Nha đứng xa bắn đạn kim, áp sát thì nó lùi mà vẫn bắn. Đạn bay chậm hơn bước chân người: đi ngang là tránh được.",
+        "Hai mươi con, mười chiếc vũ. Lông nó sắc, cẩn thận kẻo cứa tay.",
+      ],
+      progress: ["Phong Nha ở vùng giữa. Đừng đứng yên giữa tầm bắn, cứ vừa đi vừa áp sát."],
+      complete: ["Vũ Phong Nha còn nguyên, ngươi khéo tay. Lô Băng Thiết cần cho phù và hài."],
+    },
+  },
+  {
+    id: "cot_tuong_cot",
+    title: "Tượng cốt",
+    giver: "tram_truong_han",
+    desc: "Hạ 12 Cốt Tượng và mang về 10 Tượng cốt.",
+    steps: [
+      { kind: "kill", monster: "cot_tuong", count: 12 },
+      { kind: "collect", itemId: "tuong_cot", count: 10 },
+    ],
+    rewards: { exp: 6600, items: [{ itemId: "thuong_hoi_linh_dan", qty: 3 }] },
+    minRealm: { realm: 4, tier: 0 },
+    next: "doc_tuoc_nang_cb",
+    talk: {
+      offer: [
+        "Cốt Tượng chậm như núi nhưng máu dày không kém. Đánh không đau, chỉ là mất kiên nhẫn.",
+        "Mười hai con, mười khúc xương. Thợ rèn cần để làm bào và ngọc bội.",
+      ],
+      progress: [
+        "Cốt Tượng lười chạy, cứ đánh đều tay. Đừng để Phong Nha vây khi đang mải đánh nó.",
+      ],
+      complete: ["Xương voi cổ, nặng tay thật. Lô Băng Thiết sẽ rèn được cả bộ cho ngươi."],
+    },
+  },
+  {
+    id: "doc_tuoc_nang_cb",
+    title: "Độc tước",
+    giver: "tram_truong_han",
+    desc: "Đạt Nguyên Anh trung kỳ, hạ 12 Độc Tước và mang về 8 Độc tước nang.",
+    steps: [
+      { kind: "reachRealm", realm: 4, tier: 1 },
+      { kind: "kill", monster: "doc_tuoc", count: 12 },
+      { kind: "collect", itemId: "doc_tuoc_nang", count: 8 },
+    ],
+    rewards: {
+      exp: 8200,
+      items: [
+        { itemId: "thuong_hoi_huyet_dan", qty: 4 },
+        { itemId: "tu_khi_dan", qty: 1 },
+      ],
+    },
+    minRealm: { realm: 4, tier: 0 },
+    next: "nguyen_anh_hau_ky",
+    talk: {
+      offer: [
+        "Độc Tước ở sâu hơn, công cao máu mỏng. Một vết cắn thì còn chịu được, đạn độc trúng liền thì máu cứ chảy mãi. Sơ kỳ thì đừng thử.",
+        "Đạt Nguyên Anh trung kỳ rồi hạ mười hai con, lấy tám túi độc.",
+      ],
+      progress: [
+        "Độc Tước bắn đạn tím, chậm nhưng đau. Né ngang, và mang đủ Thượng Hồi Huyết Đan.",
+      ],
+      complete: [
+        "Túi độc còn nguyên, không vỡ. Ngươi làm việc cẩn thận.",
+        "Còn lại là cửa ải cuối: Thiên Hàn Vương trên đỉnh băng.",
+      ],
+    },
+  },
+  {
+    id: "nguyen_anh_hau_ky",
+    title: "Nguyên Anh hậu kỳ",
+    giver: "tram_truong_han",
+    desc: "Đạt Nguyên Anh hậu kỳ.",
+    steps: [{ kind: "reachRealm", realm: 4, tier: 2 }],
+    rewards: { exp: 4400, items: [{ itemId: "thuong_hoi_linh_dan", qty: 4 }] },
+    minRealm: { realm: 4, tier: 1 },
+    next: "thien_han_hoan",
+    talk: {
+      offer: [
+        "Thiên Hàn Vương không phải thứ một người, thậm chí hai người, đối phó nổi. Ít nhất là ba, và phải là Nguyên Anh trung kỳ trở lên.",
+        "Ngươi lên Nguyên Anh hậu kỳ cho vững rồi hẵng lập đội.",
+      ],
+      progress: ["Chưa tới hậu kỳ. Đừng vội: Thiên Hàn Vương không chạy mất."],
+      complete: ["Hậu kỳ rồi. Thiên Hàn Vương vẫn ngự trên đỉnh băng, vẫn đợi."],
+    },
+  },
+  {
+    id: "thien_han_hoan",
+    title: "Thiên Hàn hoạn",
+    giver: "tram_truong_han",
+    desc: "Hạ Thiên Hàn Vương (đội 3-4 người) và mang về 3 Thiên Hàn châu.",
+    steps: [
+      { kind: "kill", monster: "thien_han_vuong", count: 1 },
+      { kind: "collect", itemId: "thien_han_chau", count: 3 },
+    ],
+    rewards: {
+      exp: 13500,
+      items: [
+        { itemId: "tu_khi_dan", qty: 1 },
+        { itemId: "thuong_hoi_huyet_dan", qty: 5 },
+      ],
+    },
+    minRealm: { realm: 4, tier: 1 },
+    talk: {
+      offer: [
+        "Thiên Hàn Vương ngự nơi cao nhất, hàn khí đặc tới mức thở cũng thành sương. Hạ nó phải đội ba bốn người đồng tâm, ai cũng mang đủ đan.",
+        "Thiên Hàn châu là nguyên liệu của thanh kiếm cuối. Mang về ba viên làm bằng chứng.",
+      ],
+      progress: [
+        "Thiên Hàn Vương gồng rồi lao, đường lao dài hơn Hàn Lang nhiều. Chia nhau chịu đòn, đừng để một người đứng mũi.",
+      ],
+      complete: [
+        "Thiên Hàn Vương đã ngã. Cả Hàn Vân Trạm sẽ nhớ tên đội ngươi.",
+        "Băng nguyên này còn nhiều thứ chưa ai tới. Nhưng đó là chuyện của ngày khác.",
       ],
     },
   },
@@ -565,6 +765,52 @@ export const QUESTS: QuestDef[] = [
       offer: ["Dược sư các trạm thu độc nang mỗi ngày, sáu túi một lần."],
       progress: ["Chưa đủ sáu túi độc nang."],
       complete: ["Độc nang còn tươi, tốt lắm."],
+    },
+  },
+  // ---------- Nhiệm vụ lặp ở Hàn Vân Trạm (M7.5c, #506) ----------
+  {
+    id: "han_lang_quay",
+    title: "Hàn Lang quấy nhiễu",
+    giver: "tram_truong_han",
+    desc: "Hạ 20 Hàn Lang.",
+    steps: [{ kind: "kill", monster: "han_lang", count: 20 }],
+    rewards: { exp: 4200, items: [{ itemId: "dai_hoi_huyet_dan", qty: 3 }] },
+    minRealm: { realm: 4, tier: 0 },
+    daily: true,
+    talk: {
+      offer: ["Đoàn buôn cần đường thông. Hạ hai mươi Hàn Lang ở rìa băng, trạm hậu tạ."],
+      progress: ["Hàn Lang ở rìa ngoài băng nguyên."],
+      complete: ["Hai mươi con trong ngày. Trạm ghi công ngươi."],
+    },
+  },
+  {
+    id: "cot_tuong_phien",
+    title: "Cốt Tượng chắn đường",
+    giver: "tram_truong_han",
+    desc: "Hạ 10 Cốt Tượng.",
+    steps: [{ kind: "kill", monster: "cot_tuong", count: 10 }],
+    rewards: { exp: 4800, items: [{ itemId: "dai_hoi_linh_dan", qty: 3 }] },
+    minRealm: { realm: 4, tier: 0 },
+    daily: true,
+    talk: {
+      offer: ["Bầy Cốt Tượng chắn lối vận chuyển. Dọn đường giúp trạm, mười con là đủ."],
+      progress: ["Cốt Tượng ở vùng giữa băng nguyên, máu dày."],
+      complete: ["Đường thông rồi. Lái buôn Kỳ Thiên Lộc cảm ơn ngươi."],
+    },
+  },
+  {
+    id: "doc_tuoc_nop",
+    title: "Độc tước nang cho dược sư",
+    giver: "tram_truong_han",
+    desc: "Nộp 6 Độc tước nang.",
+    steps: [{ kind: "collect", itemId: "doc_tuoc_nang", count: 6 }],
+    rewards: { exp: 5400 },
+    minRealm: { realm: 4, tier: 1 },
+    daily: true,
+    talk: {
+      offer: ["Dược sư các trạm thu Độc tước nang mỗi ngày, sáu túi một lần."],
+      progress: ["Chưa đủ sáu túi Độc tước nang."],
+      complete: ["Túi độc còn tươi, tốt lắm."],
     },
   },
 ];

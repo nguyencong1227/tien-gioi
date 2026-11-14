@@ -183,16 +183,20 @@ describe("nội dung nhiệm vụ (#19)", () => {
     return out;
   };
 
-  it("chuỗi chính: Luyện Khí (8 nhiệm vụ) -> Trúc Cơ (2) -> Kim Đan (6); mọi nhiệm vụ không lặp nằm trong chuỗi, trừ việc phụ mang_hoan; Luyện Khí kết thúc ở tầng 9", () => {
+  it("chuỗi chính: Luyện Khí (8 nhiệm vụ) -> Trúc Cơ (2) -> Kim Đan (5) -> Nguyên Anh (8); mọi nhiệm vụ không lặp nằm trong chuỗi, trừ hai việc phụ mang_hoan và giao_hoan (trùm theo đội); Luyện Khí kết thúc ở tầng 9", () => {
     const ids = chain();
-    expect(ids).toHaveLength(16);
+    expect(ids).toHaveLength(23);
     // Việc phụ không có người đứng trước và không nằm trong chuỗi: hạ Xích Mãng (không an toàn khi solo) KHÔNG được chặn chuỗi chính
-    expect(new Set([...ids, "mang_hoan"])).toEqual(
+    expect(new Set([...ids, "mang_hoan", "giao_hoan"])).toEqual(
       new Set(QUESTS.filter((q) => !q.daily).map((q) => q.id)),
     );
     expect(ids).not.toContain("mang_hoan");
     expect(QUEST_PREV.mang_hoan).toBeUndefined();
     expect(QUEST_BY_ID.mang_hoan.next).toBeUndefined();
+    // Hắc Giao (trùm theo đội) cũng là việc phụ: chuỗi chính qua Kim Đan sang Nguyên Anh không bắt người chơi một mình phải có đội (M7.5c)
+    expect(ids).not.toContain("giao_hoan");
+    expect(QUEST_PREV.giao_hoan).toBeUndefined();
+    expect(QUEST_BY_ID.giao_hoan.next).toBeUndefined();
     const i = ids.indexOf("dinh_luyen_khi");
     expect(i).toBe(7); // nhiệm vụ Luyện Khí cuối cùng
     expect(QUEST_BY_ID.dinh_luyen_khi.steps.at(-1)).toEqual({
@@ -207,7 +211,14 @@ describe("nội dung nhiệm vụ (#19)", () => {
       "thach_quy_giap",
       "doc_thiem_nang",
       "kim_dan_hau_ky",
-      "giao_hoan",
+      "lang_han_quan",
+      "han_van_len",
+      "han_lang_hoan",
+      "phong_nha_cham",
+      "cot_tuong_cot",
+      "doc_tuoc_nang_cb",
+      "nguyen_anh_hau_ky",
+      "thien_han_hoan",
     ]);
   });
 
@@ -223,13 +234,16 @@ describe("nội dung nhiệm vụ (#19)", () => {
     }
   });
 
-  it("3 nhiệm vụ lặp ở Bảng cáo thị (Lạc Hà) và 3 ở Vọng Sương Trạm (Kim Đan, M6)", () => {
+  it("3 nhiệm vụ lặp ở Bảng cáo thị (Lạc Hà), 3 ở Vọng Sương Trạm (Kim Đan, M6) và 3 ở Hàn Vân Trạm (Nguyên Anh, M7.5c)", () => {
     const daily = QUESTS.filter((q) => q.daily);
-    expect(daily).toHaveLength(6);
+    expect(daily).toHaveLength(9);
     expect(daily.filter((q) => q.giver === "cao_thi")).toHaveLength(3);
     const vs = daily.filter((q) => q.giver === "tram_truong");
     expect(vs).toHaveLength(3);
     for (const q of vs) expect(q.minRealm, q.id).toEqual(expect.objectContaining({ realm: 3 }));
+    const hv = daily.filter((q) => q.giver === "tram_truong_han");
+    expect(hv).toHaveLength(3);
+    for (const q of hv) expect(q.minRealm, q.id).toEqual(expect.objectContaining({ realm: 4 }));
   });
 
   it("người chơi mới thấy '!' ở Trưởng trấn ngay khi vào game", () => {
