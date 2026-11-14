@@ -1,5 +1,7 @@
 /** Cổng server lúc dev, lấy từ PORT trong .env.local ở gốc repo (vite.config.ts). */
 declare const __SERVER_PORT__: string;
+/** Số phiên bản của bản dựng (package.json gốc), vite `define`; hiện ở Cài đặt */
+declare const __APP_VERSION__: string;
 
 declare module "*check-credits.mjs" {
   export const CONTENT_SOURCE_FILE: string;

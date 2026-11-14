@@ -166,6 +166,43 @@ describe("cast: kiểm tin và điều kiện", () => {
     expect(msg.cd[0]).toBe(0);
   });
 
+  it("chưa đủ cảnh giới (chiêu khắc từ kiếp trước, kiếp mới còn thấp): báo cần cảnh giới nào, KHÔNG tốn linh lực / hồi chiêu; đủ đúng mốc thì dùng được", () => {
+    const def = REAL("thanh_tung_phi_cham"); // cần cảnh giới cao hơn Luyện Khí
+    expect(def.reqRealm).toBeGreaterThan(1);
+    const t = setup(1); // Luyện Khí: ô 2 đã mở nhưng chưa đủ cảnh giới cho chiêu
+    equip(t.c, 2, def.id);
+    cast(t.w, "a", { slot: 2, angle: 0 });
+    expect(t.toasts.at(-1)!.msg.text).toContain(def.name);
+    expect(t.toasts.at(-1)!.msg.text).toMatch(/Cần đạt/);
+    expect(t.fx).toEqual([]);
+    expect(t.p.mp).toBe(t.p.maxMp);
+    expect(t.c.skillCd[0]).toBe(0);
+    // cùng cảnh giới nhưng bậc thấp hơn: vẫn chưa
+    t.p.realm = def.reqRealm;
+    t.p.tier = def.reqTier - 1;
+    if (def.reqTier > 0) {
+      cast(t.w, "a", { slot: 2, angle: 0 });
+      expect(t.fx).toEqual([]);
+    }
+    // đúng mốc: dùng được
+    t.p.tier = def.reqTier;
+    cast(t.w, "a", { slot: 2, angle: 0 });
+    expect(t.fx).toHaveLength(1);
+    expect(t.p.mp).toBeLessThan(t.p.maxMp);
+  });
+
+  it("dùng chiêu ngắt đả tọa", () => {
+    const t = setup();
+    equip(t.c, 2, "bon_thach_quyen");
+    t.p.meditating = true;
+    cast(t.w, "a", { slot: 2, angle: 0 });
+    expect(t.p.meditating).toBe(false);
+    // chiêu bị từ chối (ô trống) thì KHÔNG ngắt đả tọa
+    t.p.meditating = true;
+    cast(t.w, "a", { slot: 4, angle: 0 });
+    expect(t.p.meditating).toBe(true);
+  });
+
   it("hồi chiêu: trong thời gian chờ im lặng không tốn gì; hết thì dùng lại được", () => {
     const t = setup();
     equip(t.c, 2, "bon_thach_quyen");

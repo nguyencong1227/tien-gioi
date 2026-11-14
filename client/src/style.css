@@ -251,6 +251,26 @@ button {
 }
 
 /* Mục quản lý tài khoản trong cài đặt */
+/* Giới thiệu và ghi công (M7.16, #517): chữ nhỏ, dễ đọc, không tranh chỗ với các hàng chỉnh */
+.set-about {
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px dashed var(--line);
+  font-size: var(--fs-12);
+  line-height: 1.5;
+  color: var(--paper);
+}
+.set-about h3 {
+  margin: 0 0 4px;
+  font-size: var(--fs-13);
+  color: #ffe08a;
+}
+.set-about p {
+  margin: 0 0 4px;
+}
+.set-about p:last-child {
+  margin-bottom: 0;
+}
 .set-account-box {
   margin-top: 14px;
   padding-top: 12px;

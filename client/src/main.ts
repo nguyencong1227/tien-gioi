@@ -100,6 +100,10 @@ function createMockDungeonRoom(
         }
       };
     },
+    // Giả lập máy chủ gửi tin `type` tới handler đã đăng ký của cảnh (script kiểm ở chế độ ?debug dùng để thử đúng đường tin nhắn, không gọi thẳng hàm)
+    emit: (type: string, msg: unknown) => {
+      for (const fn of handlers.get(type) ?? []) fn(msg);
+    },
     // Máy chủ thật gọi lại ngay khi có state: cảnh lấy vị trí người chơi làm gốc (reconcile). Mock chỉ làm vậy khi `syncState` (xem mockSyncsState)
     onStateChange: (fn: () => void) => {
       if (syncState) setTimeout(fn, 0);
