@@ -24,6 +24,7 @@ Một nguồn duy nhất: `client/src/keybinds.ts` (`ACTIONS`). HUD, dòng gợi
 | Menu đồng đạo gần nhất (mời đội / thách đấu / mời tông môn) | P | người chơi đang thấy trên màn hình; Esc rồi P lại thì sang người xa hơn (xem 4d) |
 | Rời bí cảnh / đầu hàng quyết đấu | R | chỉ MỞ hộp xác nhận; Y xác nhận, X huỷ |
 | Túi đồ / Nhân vật / Sổ nhiệm vụ / Tông môn / Bản đồ lớn / Cài đặt | B / C / N (Q) / G / M / E | bấm lại để đóng |
+| Công pháp (gắn / gỡ chiêu vào ô 2-5, M7.6) | Shift+K | bấm lại hoặc Esc để đóng. Mũi tên đi giữa các ô và các hàng chiêu (hình học, `panel-nav.ts`), Enter gắn chiêu vào ô đang focus, Delete / Backspace gỡ chiêu khỏi ô đang giữ; ô chưa mở vẫn focus được (nghe lý do), bấm chỉ báo "Mở ở ...", không gửi gì |
 | Chat | Enter mở, Enter gửi, Esc thoát | đang gõ chữ thì mọi phím khác không điều khiển nhân vật |
 | Bật / tắt âm thanh | 0 | |
 | Ẩn / hiện toàn bộ giao diện (màn chơi sạch) | H | chạy cả khi bảng đang mở; xem `THIET_KE_GIAO_DIEN_GON.md` mục 6 |

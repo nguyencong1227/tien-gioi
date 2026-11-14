@@ -31,6 +31,7 @@ import { isMockDuelEnabled, MOCK_DUEL_SAMPLES } from "./duel";
 import { isMockSectEnabled, MOCK_SECT_SAMPLES } from "./sect";
 import {
   isMockSkillsEnabled,
+  mockAssign,
   mockCast,
   mockRealm,
   mockSkillCount,
@@ -197,12 +198,21 @@ function createMockDungeonRoom(
 function installMockSkills(room: any) {
   const n = mockSkillCount(location.search);
   const ids = SKILLS_M7.slice(0, 5).map((d) => d.id);
+  const realm = mockRealm(location.search, n);
   let cur = mockSkillsMsg(ids, n, n > 0 ? 3000 : 0);
   /** mốc (performance.now) hết hồi chiêu của từng ô 2-5 */
   const until: Record<number, number> = { 2: performance.now() + cur.cd[0], 3: 0, 4: 0, 5: 0 };
   const origSend = room.send;
   room.send = (type: string, data: any) => {
     origSend(type, data);
+    if (type === "skillSlot") {
+      // gắn / gỡ ô bằng đúng `assignSlot` của shared; từ chối thì gửi lại sổ đúng + toast như máy chủ thật
+      const next = mockAssign(cur, data?.slot, data?.skillId, realm);
+      if (next) cur = next;
+      else room.emit("toast", { text: "Không gắn được chiêu vào ô này.", tone: "bad" });
+      room.emit("skills", cur);
+      return;
+    }
     if (type !== "cast" || typeof data?.slot !== "number") return;
     const left = Math.max(0, (until[data.slot] ?? 0) - performance.now());
     const next = mockCast(cur, data.slot, left);

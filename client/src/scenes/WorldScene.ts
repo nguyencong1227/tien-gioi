@@ -134,6 +134,7 @@ import { ui } from "../ui";
 import { StatusTracker } from "../status-track";
 import { BAR_SLOTS, SkillTracker, aimMode, blockedToast, slotView } from "../skill-bar";
 import { SkillBarDom } from "../skill-bar-dom";
+import { buildSkillsPanel, slotMessage } from "../skills-panel";
 import {
   buildMockThuMonDialog,
   dungeonFallenDeathText,
@@ -314,6 +315,8 @@ export class WorldScene extends Phaser.Scene {
   private skills = new SkillTracker();
   private skillBar = new SkillBarDom(document);
   private nextSkillBarAt = 0;
+  /** Khoá (cảnh giới|bậc|linh lực tối đa) của lần dựng bảng Công pháp gần nhất: đổi lúc bảng đang mở thì dựng lại */
+  private skillsPanelKey = "";
   private slotKeys: Record<SkillSlot, string[]> = { 2: [], 3: [], 4: [], 5: [] };
   /** Con trỏ CHUỘT đang ở trong canvas (chạm / bút thì không): chiêu nhắm theo con trỏ khi đúng */
   private mouseIn = false;
@@ -504,6 +507,10 @@ export class WorldScene extends Phaser.Scene {
         return true;
       },
       onTalk: () => !this.isReconnecting && this.talkClosestNpc(),
+      // Bảng Công pháp (M7.6): gắn / gỡ chiêu; KHÔNG đoán trước kết quả, máy chủ trả `skills` (sổ đúng) hoặc toast khi từ chối
+      onSkillSlot: (slot, skillId) =>
+        !this.isReconnecting && this.room.send(SKILL_MSG.slot, slotMessage(slot, skillId)),
+      onSkillsOpen: () => this.refreshSkillsPanel(),
       onDialogAction: (action) => {
         if (this.isReconnecting) return;
         if (action.kind === "accept") this.room.send("questAccept", { questId: action.questId });
@@ -1050,6 +1057,7 @@ export class WorldScene extends Phaser.Scene {
         ui.isQuestModalOpen() ||
         ui.isMapModalOpen() ||
         ui.isSettingsModalOpen() ||
+        ui.isSkillsModalOpen() ||
         ui.isDialogOpen()
       )
         return;
@@ -1184,6 +1192,9 @@ export class WorldScene extends Phaser.Scene {
         break;
       case "panel.sect":
         ui.toggleSectModal();
+        break;
+      case "panel.skills":
+        ui.toggleSkillsModal();
         break;
       case "panel.map":
         ui.toggleMapModal();
@@ -1641,6 +1652,15 @@ export class WorldScene extends Phaser.Scene {
   public onSkills(m: SkillsMsg) {
     this.skills.set(m, performance.now());
     this.nextSkillBarAt = 0; // vẽ lại ngay khung hình sau
+    this.refreshSkillsPanel();
+  }
+
+  /** Dựng lại mô hình bảng Công pháp từ sổ chiêu + cảnh giới hiện tại (khi nhận `skills`, khi mở bảng, khi cảnh giới / linh lực tối đa đổi lúc đang mở). */
+  private refreshSkillsPanel() {
+    const me = this.me();
+    if (!me) return;
+    ui.setSkillsModel(buildSkillsPanel(this.skills, me));
+    this.skillsPanelKey = `${me.realm}|${me.tier}|${me.maxMp}`;
   }
 
   /** Vẽ bốn ô chiêu (~16 lần/giây; `SkillBarDom` chỉ ghi DOM khi dấu hiệu của ô đổi). */
@@ -1648,6 +1668,8 @@ export class WorldScene extends Phaser.Scene {
     const now = performance.now();
     if (now < this.nextSkillBarAt) return;
     this.nextSkillBarAt = now + 60;
+    if (ui.isSkillsModalOpen() && this.skillsPanelKey !== `${me.realm}|${me.tier}|${me.maxMp}`)
+      this.refreshSkillsPanel();
     const stunned = this.status.stunned(now);
     let filled = 0;
     for (const slot of BAR_SLOTS) {
