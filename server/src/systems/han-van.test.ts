@@ -1,6 +1,13 @@
-// Hàn Vân Lĩnh (M7.5, #506): bản đồ thứ tư, đi qua cổng hai chiều với Âm Sương Trạch; chưa có quái (loài Nguyên Anh thêm ở M7.5b).
+// Hàn Vân Lĩnh (M7.5, #506): bản đồ thứ tư, đi qua cổng hai chiều với Âm Sương Trạch; quái Nguyên Anh sinh đúng chỗ / đúng số (M7.5b).
 import { describe, expect, it } from "vitest";
-import { AM_SUONG_ID, HAN_VAN_ID, MAPS, getMap, roomNameOf } from "@tien-gioi/shared";
+import {
+  AM_SUONG_ID,
+  HAN_VAN_ID,
+  MAPS,
+  MONSTER_BY_ID,
+  getMap,
+  roomNameOf,
+} from "@tien-gioi/shared";
 import { addPlayer, makeWorld } from "./test-helpers";
 import { spawnInitial } from "./monsters";
 import { planTravel } from "./travel";
@@ -73,7 +80,7 @@ describe("Hàn Vân Lĩnh: cổng với Âm Sương Trạch (M7.5)", () => {
   });
 });
 
-describe("Hàn Vân Lĩnh: phòng riêng, chưa có quái (M7.5 bước 1)", () => {
+describe("Hàn Vân Lĩnh: phòng riêng và quái Nguyên Anh (M7.5)", () => {
   it("có phòng Colyseus riêng (`world_han_van`), tên khác ba phòng kia", () => {
     expect(roomNameOf(HAN_VAN_ID)).toBe("world_han_van");
     expect(MAPS.map((m) => roomNameOf(m.id))).toEqual([
@@ -84,9 +91,31 @@ describe("Hàn Vân Lĩnh: phòng riêng, chưa có quái (M7.5 bước 1)", () 
     ]);
   });
 
-  it("sinh quái ban đầu không tạo con nào (monsterCap rỗng): bản đồ trống chỉ có trạm và cổng", () => {
+  it("sinh quái ban đầu đúng `monsterCap` (20 / 16 / 12 / 12 / trùm 2), toàn loài Nguyên Anh, không con nào trong khu an toàn, không loài Kim Đan hay cũ", () => {
     const t = makeWorld(HAN_VAN);
     spawnInitial(t.w);
-    expect(t.w.state.monsters.size).toBe(0);
+    const count: Record<string, number> = {};
+    t.w.state.monsters.forEach((m) => {
+      count[m.kind] = (count[m.kind] ?? 0) + 1;
+      expect(HAN_VAN.inSafe(m.x, m.y, 0), `${m.kind} trong khu an toàn`).toBe(false);
+      expect(HAN_VAN.circleBlocked(m.x, m.y, MONSTER_BY_ID[m.kind].radius), m.kind).toBe(false);
+    });
+    expect(count).toEqual({
+      han_lang: 20,
+      phong_nha: 16,
+      cot_tuong: 12,
+      doc_tuoc: 12,
+      thien_han_vuong: 2,
+    });
+    expect(t.w.state.monsters.size).toBe(62);
+  });
+
+  it("quái sinh đúng vùng nguy hiểm của loài (minDanger): Hàn Lang gần trạm, trùm xa nhất; không loài nào sinh sát trạm", () => {
+    const t = makeWorld(HAN_VAN);
+    spawnInitial(t.w);
+    t.w.state.monsters.forEach((m) => {
+      const def = MONSTER_BY_ID[m.kind];
+      expect(HAN_VAN.dangerAt(m.x, m.y), m.kind).toBeGreaterThanOrEqual(def.minDanger);
+    });
   });
 });
