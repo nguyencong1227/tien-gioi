@@ -1,6 +1,7 @@
 import { getDisplay } from "../gfx/display";
 import { createFxSystem, type FxSystem } from "../gfx/fx/fx";
 import { planCastFx } from "../gfx/fx/cast-fx";
+import { TelegraphLayer } from "../gfx/fx/telegraph-layer";
 import {
   planSlashEdges,
   planSwordBeam,
@@ -386,6 +387,8 @@ export class WorldScene extends Phaser.Scene {
   private activeSwords: SwordFxItem[] = [];
   /** Lõi hiệu ứng M5.2 (#325): chữ bay, hạt có ngân sách; B thêm công thức ở #329. */
   fx!: FxSystem;
+  /** Báo trước đòn + đạn tầm xa của quái (M7.7, #508): Graphics từ pool, không tốn ngân sách hạt */
+  telegraphs!: TelegraphLayer;
 
   // Bảng đo hiệu năng (?perf=1, #71)
   private perfEnabled = false;
@@ -463,6 +466,11 @@ export class WorldScene extends Phaser.Scene {
 
     // Lõi hiệu ứng (#325): ngân sách theo hồ sơ chất lượng; đóng cảnh thì giải phóng sạch
     this.fx = createFxSystem(this, { getProfile: getQuality, depth: () => this.map.worldH });
+    this.telegraphs = new TelegraphLayer(this, {
+      emitterBudget: () => getQuality().emitterBudget,
+      reduced: () => getQuality().reducedMotion,
+      inView: (x, y, pad) => this.inView(x, y, pad),
+    });
     ensureShadowTexture(this);
     this.weatherPaused =
       typeof window !== "undefined" && !weatherEnabledByUrl(window.location.search);
@@ -477,6 +485,7 @@ export class WorldScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       offQuality();
       this.fx.destroy();
+      this.telegraphs.destroy();
     });
 
     // Mũi tên chỉ hướng nhiệm vụ xoay quanh người chơi
@@ -1628,6 +1637,7 @@ export class WorldScene extends Phaser.Scene {
       this.slashPool.push(it.g);
     }
     this.activeSlashes.length = 0;
+    this.telegraphs.clear();
 
     for (const it of this.activeSwords) {
       it.img.setVisible(false);
@@ -3168,6 +3178,9 @@ export class WorldScene extends Phaser.Scene {
   // ---------------- Hiệu ứng ----------------
 
   private stepTransientFx(now: number) {
+    // 0. Báo trước đòn + đạn của quái: vẽ lại theo đồng hồ cảnh (vị trí đạn tính từ lúc bắn, không từ khung)
+    this.telegraphs.update(now);
+
     // 1. Vệt chém (180ms)
     for (let i = this.activeSlashes.length - 1; i >= 0; i--) {
       const it = this.activeSlashes[i];
@@ -3281,6 +3294,14 @@ export class WorldScene extends Phaser.Scene {
           }),
         );
       }
+      case "warn":
+        // Báo trước đòn của quái (M7.7, #508): vùng tô đặc lớn dần tới lúc đòn đáp xuống; client chỉ vẽ, máy chủ quyết định trúng / trượt
+        this.telegraphs.warn(m, this.time.now);
+        return;
+      case "bolt":
+        // Đạn tầm xa của quái: client tự bay theo `speed` / `angle` tới hết `range` (đạn không là state)
+        this.telegraphs.bolt(m, this.time.now);
+        return;
       case "levelup":
         return this.fxLevelUp(m.x, m.y, m.major, m.by === this.sid);
       case "breakfail":
