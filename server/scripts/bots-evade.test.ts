@@ -1,6 +1,5 @@
 // Kiểm thử tính năng bot tránh vùng báo trước (M7.10 #511): segDist, isPointInWarnZone, computeEvadeVector
 import { describe, expect, it } from "vitest";
-import { PLAYER_RADIUS } from "@tien-gioi/shared";
 import { type ActiveWarnZone, computeEvadeVector, isPointInWarnZone, segDist } from "./bots";
 
 describe("bot tránh báo trước: segDist (M7.10 #511)", () => {
@@ -61,7 +60,7 @@ describe("bot tránh báo trước: isPointInWarnZone (M7.10 #511)", () => {
       expiresAt: Date.now() + 800,
     };
     const buffer = 8;
-    const reach = lineWarn.w / 2 + PLAYER_RADIUS + buffer; // 28 + 14 + 8 = 50 px
+    // Bán kính nguy hiểm hiệu dụng: lineWarn.w / 2 + PLAYER_RADIUS + buffer = 28 + 14 + 8 = 50 px
 
     // Điểm nằm ngay trên đường lao
     expect(isPointInWarnZone(200, 100, lineWarn, buffer)).toBe(true);
@@ -93,7 +92,7 @@ describe("bot tránh báo trước: isPointInWarnZone (M7.10 #511)", () => {
       expiresAt: Date.now() + 1000,
     };
     const buffer = 8;
-    const reach = 80 + PLAYER_RADIUS + buffer; // 102 px
+    // Bán kính nguy hiểm hiệu dụng: 80 + PLAYER_RADIUS + buffer = 102 px
 
     expect(isPointInWarnZone(200, 250, circleWarn, buffer)).toBe(true);
     expect(isPointInWarnZone(200, 310, circleWarn, buffer)).toBe(false);
