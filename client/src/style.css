@@ -422,6 +422,41 @@ body.reduced-motion .st-badge.urgent {
     animation: none;
   }
 }
+/* Dấu phụ độ hiếm (rarity.ts, M7.8 #509): tín hiệu thứ hai ngoài màu cho người khó phân biệt màu. Hiện TRƯỚC tên để không bị cắt khi tên dài bị "...";
+   không đọc cho trình đọc màn hình (tên bậc nằm ở `title` và ở bảng chi tiết). */
+[data-mark]::before {
+  content: attr(data-mark) " ";
+  font-size: 0.82em;
+  letter-spacing: 0;
+}
+@supports (content: "a" / "") {
+  [data-mark]::before {
+    content: attr(data-mark) " " / "";
+  }
+}
+/* Huy hiệu độ hiếm ở GÓC ô nhỏ (túi, thẻ trang bị): tên trong ô bị cắt "..." nên dấu phụ không đặt trước tên được. Màu lấy từ biến --rar do rarity.ts đặt. */
+.inv-slot[data-rbadge]::before,
+.equip-slot-card[data-rbadge]::before {
+  content: attr(data-rbadge);
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: -1px;
+  color: var(--rar, currentColor);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+  pointer-events: none;
+}
+@supports (content: "a" / "") {
+  .inv-slot[data-rbadge]::before,
+  .equip-slot-card[data-rbadge]::before {
+    content: attr(data-rbadge) / "";
+  }
+}
+.equip-slot-card {
+  position: relative;
+}
 .hud-chip b {
   font-weight: 700;
 }
