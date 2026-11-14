@@ -84,6 +84,8 @@ import {
   getMap,
   DEFAULT_MAP_ID,
   type InputMsg,
+  type StatusMsg,
+  SKILL_MSG,
   type FxMsg,
   type DmgMsg,
   type ChatOut,
@@ -124,6 +126,7 @@ import {
 } from "@tien-gioi/shared";
 import { preloadAssets, makeTextures, dirFromAngle, TILESET_KEY, ATLAS_KEY } from "../textures";
 import { ui } from "../ui";
+import { StatusTracker } from "../status-track";
 import {
   buildMockThuMonDialog,
   dungeonFallenDeathText,
@@ -295,6 +298,8 @@ export class WorldScene extends Phaser.Scene {
   // Đoán trước di chuyển của chính mình
   private seq = 0;
   private pending: InputMsg[] = [];
+  /** Trạng thái của CHÍNH MÌNH (M7.2b): hệ số tốc độ để đoán trước di chuyển như server, và choáng (không đoán trước / không gửi input) */
+  private status = new StatusTracker();
   private predX = 0;
   private predY = 0;
   private hasMe = false;
@@ -1529,6 +1534,8 @@ export class WorldScene extends Phaser.Scene {
     // hasMe = false: lấy lại vị trí từ state của Room mới ở lần reconcile đầu
     this.hasMe = false;
     this.pending.length = 0;
+    // Trạng thái của Room cũ không còn đúng (qua cổng = phòng mới; nối lại = server gửi lại danh sách ngay sau đó): xoá để không đoán trước theo hệ số cũ
+    this.status.clear();
     // Giữ seq tăng liên tục, không đặt lại 0: sau khi nối lại state.lastSeq vẫn là giá trị cũ
     // cho tới khi server xử lý input đầu tiên, reconcile() lọc pending bằng seq > lastSeq
     // nên seq bắt đầu lại từ 1 sẽ bị coi là đã xác nhận và nhân vật giật lùi.
@@ -1575,6 +1582,11 @@ export class WorldScene extends Phaser.Scene {
     ui.pickupPrompt(null);
   }
 
+  /** Nhận danh sách trạng thái của chính mình (server gửi khi thêm / mất / làm mới, vơi khiên, nối lại). Công khai để script kiểm giả lập (`?debug`) bơm tin. */
+  public onStatus(m: StatusMsg) {
+    this.status.set(m?.list, performance.now());
+  }
+
   private onLimbo(m: LimboMsg) {
     ui.setKiep(m.soul.kiep);
     ui.showLimbo(m, {
@@ -1607,6 +1619,7 @@ export class WorldScene extends Phaser.Scene {
     reg("party", (m: PartyMsg) => ui.onParty(m));
     reg("partyInvited", (m: PartyInvitedMsg) => ui.onPartyInvited(m));
     reg("wallet", (m: WalletMsg) => ui.onWallet(m));
+    reg(SKILL_MSG.status, (m: StatusMsg) => this.onStatus(m));
     reg("limbo", (m: LimboMsg) => this.onLimbo(m));
     reg("soul", (m: SoulMsg) => {
       ui.updateSoul(m);
@@ -1662,11 +1675,15 @@ export class WorldScene extends Phaser.Scene {
       return;
     }
     this.pending = this.pending.filter((i) => i.seq > me.lastSeq);
-    const speed = statsFor(me.realm, me.tier, me).speed * (TICK_MS / 1000);
+    const now = performance.now();
+    // Hệ số tăng tốc / tê cóng nhân vào tốc độ y như server (`moveSpeedMul`); đang choáng thì server tiêu thụ input mà không di chuyển nên không chạy lại chúng
+    const speed =
+      statsFor(me.realm, me.tier, me).speed * this.status.speedMul(now) * (TICK_MS / 1000);
     let x = me.x,
       y = me.y;
-    for (const i of this.pending)
-      ({ x, y } = this.map.moveWithCollision(x, y, i.dx * speed, i.dy * speed, PLAYER_RADIUS));
+    if (!this.status.stunned(now))
+      for (const i of this.pending)
+        ({ x, y } = this.map.moveWithCollision(x, y, i.dx * speed, i.dy * speed, PLAYER_RADIUS));
     this.predX = x;
     this.predY = y;
   }
@@ -1681,6 +1698,12 @@ export class WorldScene extends Phaser.Scene {
       this.moving = false;
       return;
     }
+    const now = performance.now();
+    // Choáng: không đoán trước, không gửi `input` (server nếu vẫn nhận thì tiêu thụ mà không di chuyển)
+    if (this.status.stunned(now)) {
+      this.moving = false;
+      return;
+    }
     const { dx, dy } = this.moveDir();
     if (Math.hypot(dx, dy) < 0.05) {
       this.moving = false;
@@ -1690,7 +1713,9 @@ export class WorldScene extends Phaser.Scene {
     const msg: InputMsg = { seq: ++this.seq, dx, dy };
     this.room.send("input", msg);
     this.pending.push(msg);
-    const speed = statsFor(me.realm, me.tier, me).speed * (TICK_MS / 1000);
+    // Hệ số tăng tốc / tê cóng: CÙNG `moveSpeedMul` với server (`applyInputs`), nên đoán trước khớp
+    const speed =
+      statsFor(me.realm, me.tier, me).speed * this.status.speedMul(now) * (TICK_MS / 1000);
     ({ x: this.predX, y: this.predY } = this.map.moveWithCollision(
       this.predX,
       this.predY,
