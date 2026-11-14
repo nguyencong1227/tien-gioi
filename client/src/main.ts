@@ -68,6 +68,7 @@ import {
   type GameLike,
 } from "./gfx/scale";
 import { mountPerfOverlay } from "./gfx/perf-overlay";
+import { browserPacksEnv, initPacks, packs } from "./gfx/packs";
 import { isReducedMotion } from "./a11y";
 
 // Lõi hiển thị M5 (#322): đặt data-form / data-orient / data-input và --safe-*, --vw, --vh lên <html> SỚM, trước khi dựng giao diện.
@@ -79,6 +80,8 @@ initSheetSwipe(); // vuốt tiêu đề tấm để đóng (điện thoại)
 
 // Chất lượng đồ hoạ M5 (#323): hồ sơ Thấp / Vừa / Cao, Tự động + bộ điều tốc; SAU initDisplay (cần `form`)
 initQuality(browserQualityEnv(() => getDisplay().form, isReducedMotion));
+// Gói tải theo nhu cầu (#516): chỉ BỔ SUNG, thiếu gói trò chơi vẫn chạy. Gói `hd:*` bật khi bậc "Rất cao" ổn định (nối khi #538 vào main).
+initPacks(browserPacksEnv({ isNative: isNativeApp, hdAllowed: () => false }));
 document.addEventListener("visibilitychange", () => setQualityActive(!document.hidden));
 if (typeof window.matchMedia === "function") {
   // Hệ điều hành đổi "giảm chuyển động" lúc đang chơi
@@ -552,6 +555,13 @@ function setupRoomLifecycle(room: Room) {
       // Chủ động rời phòng cũ (không kích hoạt luồng reconnect)
       room.leave(true);
 
+      // Chờ gói bản đồ đích TRƯỚC khi vào phòng mới (B review #541, S1): lúc này nhân vật không ở phòng nào. Nếu chờ SAU khi vào, máy chủ đã dựng
+      // nhân vật ở điểm xuất hiện (nhiều cổng nằm ngoài trấn, vùng nguy hiểm, không có bảo hộ lúc vào) và quái đánh trong tối đa 8 s trong khi
+      // client ở màn chuyển cảnh không điều khiển được: chết do quái là mất kiếp. Gói đã bắt đầu tải từ lúc gửi `travel` (WorldScene.travelPortal),
+      // giờ chờ tính từ đó; `takeMapWait` luôn resolve (quá 8 s / bí cảnh 3 s là `failed`: vẫn qua cổng, việc tải không bị huỷ) và KHÔNG nằm
+      // trong `TRAVEL_JOIN_TIMEOUT_MS`.
+      await packs().takeMapWait(msg.mapId);
+
       const token = getToken();
       const name = nameInput?.value.trim() || (localStorage.getItem(NAME_KEY) ?? "");
       const joinPromise = joinWithRedirect({
@@ -579,6 +589,7 @@ function setupRoomLifecycle(room: Room) {
       } = await Promise.race([joinPromise, timeoutPromise]).finally(() => {
         if (timeoutId) clearTimeout(timeoutId);
       });
+      // NGAY sau khi vào phòng: server gửi inv / quests / skills / wallet / soul... lúc vào, colyseus.js bỏ tin không có handler (early-messages.ts)
       captureEarlyMessages(newRoom);
       const finalMap = getMap(finalMapId)!;
 

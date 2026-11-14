@@ -30,6 +30,7 @@
     "e2e:giao-dien": "tsx scripts/e2e-giao-dien.ts",
     "e2e:map": "tsx scripts/e2e-map.ts",
     "e2e:chuyen-canh": "tsx scripts/e2e-chuyen-canh.ts",
+    "e2e:goi-tai": "tsx scripts/e2e-goi-tai.ts",
     "e2e:doc-duoc": "tsx scripts/e2e-doc-duoc.ts",
     "tai-khoan": "tsx scripts/tai-khoan.ts",
     "chuyen-du-lieu": "tsx scripts/chuyen-du-lieu.ts",
