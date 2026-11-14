@@ -124,7 +124,9 @@ describe("map-render: zoneRGBA", () => {
             inZone++;
           }
         }
-      expect(inZone).toBeGreaterThan(0);
+      // Bản đồ chưa có loài quái nào (Hàn Vân Lĩnh trước M7.5b) không có khu quái: không điểm nào được tô
+      if (ov.zones.length === 0) expect(inZone).toBe(0);
+      else expect(inZone).toBeGreaterThan(0);
       expect(outside).toBeGreaterThan(0); // có trấn / ô chặn / mép không sinh quái
     });
   }

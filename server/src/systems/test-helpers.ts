@@ -68,11 +68,14 @@ export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
   const sectPresences: { sid: string; msg: SectPresenceMsg }[] = [];
   const sectInviteds: { sid: string; msg: SectInvitedMsg }[] = [];
   const dmgs: DmgMsg[] = [];
+  /** Số sát thương gửi RIÊNG cho chủ (sát thương theo giây): tách khỏi `dmgs` (gửi gần). */
+  const dmgsTo: { sid: string; msg: DmgMsg }[] = [];
   const w = new World(
     new WorldState(),
     {
       fx: (m) => fx.push(m),
       dmg: (m) => dmgs.push(m),
+      dmgTo: (sid, msg) => dmgsTo.push({ sid, msg }),
       sys: (t) => sys.push(t),
       chat: (from, text) => chats.push({ from, text }),
       toast: (sid, msg) => toasts.push({ sid, msg }),
@@ -131,6 +134,7 @@ export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
     sectPresences,
     sectInviteds,
     dmgs,
+    dmgsTo,
   };
 }
 

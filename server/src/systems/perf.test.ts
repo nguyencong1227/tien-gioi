@@ -1,7 +1,7 @@
 // Giữ các tối ưu băng thông / CPU của vòng lặp tick (xem AGENTS.md, mục Hiệu năng).
 import { describe, expect, it } from "vitest";
 import { Encoder, StateView } from "@colyseus/schema";
-import { MONSTER_BY_ID, TOWN_PX } from "@tien-gioi/shared";
+import { MONSTER_BY_ID, TOWN_PX, getMap, MAX_BOLTS } from "@tien-gioi/shared";
 import { ANGLE_STEP, quantAngle, takeWhole } from "../world";
 import { addMonster, addPlayer, makeWorld } from "./test-helpers";
 import { POS_SYNC_EVERY_TICKS, applyInputs, syncPublicPos } from "./movement";
@@ -343,10 +343,10 @@ describe("ngân sách băng thông và CPU (benchmark có seed, kết quả cố
   it("fx / dmg chỉ gửi cho người trong vùng nhìn: ít hơn một nửa so với broadcast cả phòng", () => {
     const r = runBench(100, 10);
     // Đo lúc viết: ~7.7 KB/s mỗi client nếu broadcast, ~2.3 KB/s khi cắt theo vùng nhìn (ước lượng bằng JSON).
-    // M7.3: Hắc Hổ chảy máu sau đòn lao (mỗi nhịp dot của người bị thương là một `dmg` gửi gần): 100 người, 10 s, 3,79 -> 4,05 KB/s; trần 4 -> 5 (vẫn dưới một nửa broadcast ~12,3).
+    // M7.3: Hắc Hổ chảy máu sau đòn lao. Nhịp dot (chảy máu / độc / bỏng) CHỈ gửi chủ (`dmgTo`, không `sendNear`): 100 người, 10 s, 3,79 -> 3,80 KB/s (gửi gần thì 4,05 và làm mọi người đứng gần nghe tiếng đánh mỗi nhịp).
     expect(r.eventKbBroadcast).toBeGreaterThan(1);
     expect(r.eventKbNear).toBeLessThan(r.eventKbBroadcast / 2);
-    expect(r.eventKbNear).toBeLessThan(5);
+    expect(r.eventKbNear).toBeLessThan(4);
   });
 
   it("tin tổ đội (PartyMsg) cho một client dưới ngân sách < 1 KB/s (#76)", () => {
@@ -433,7 +433,7 @@ describe("kịch bản hiệu năng chiêu thức (M7.10 #511)", () => {
       }
 
       const t0 = performance.now();
-      tickWorld(w, 0.05);
+      tickWorld(w, 50);
       const dt = performance.now() - t0;
       tickDurations.push(dt);
 
@@ -467,6 +467,139 @@ describe("kịch bản hiệu năng chiêu thức (M7.10 #511)", () => {
     expect(castFxs.length).toBeGreaterThan(0);
 
     // 30 người chơi vẫn tồn tại bình thường
+    expect(w.state.players.size).toBe(30);
+  });
+
+  it("kịch bản hiệu năng đông quái tầm xa + chiêu thức (M7.10 #511): tick < 10 ms, MAX_BOLTS 64, byte/tick < 520 mỗi client, đạn không sinh patch state", () => {
+    const amSuong = getMap("am_suong")!;
+    expect(amSuong).toBeDefined();
+    const t = makeWorld(amSuong);
+    const { w, fx } = t;
+
+    // Sinh 30 người chơi Kim Đan ngoài hoang dã Âm Sương Trạch
+    const players: string[] = [];
+    const centerX = amSuong.townPx.x + 400;
+    const centerY = amSuong.townPx.y + 400;
+
+    for (let i = 0; i < 30; i++) {
+      const sid = `p_ranged_${i}`;
+      const { p, c } = addPlayer(w, sid, 3, 0); // Kim Đan Sơ kỳ
+      p.x = centerX + (i % 6) * 35;
+      p.y = centerY + Math.floor(i / 6) * 35;
+      p.hp = 100_000;
+      p.maxHp = 100_000; // giữ sống suốt bài test để đo tick liên tục
+      p.mp = 500;
+      p.maxMp = 500;
+      syncPublicPos(p);
+      c.skills = {
+        learned: { hoa_van_kiem: 2, thanh_tung_phi_cham: 1 },
+        slots: ["hoa_van_kiem", "thanh_tung_phi_cham", "", ""],
+      };
+      players.push(sid);
+    }
+
+    // Sinh đông quái tầm xa thật (Sương Hồ + Độc Thiềm) bao quanh bãi người chơi ở khoảng cách 150-250 px
+    const monCount = 40;
+    for (let mIdx = 0; mIdx < monCount; mIdx++) {
+      const kind = mIdx % 2 === 0 ? "suong_ho" : "doc_thiem";
+      const rad = (mIdx / monCount) * Math.PI * 2;
+      const dist = 180 + (mIdx % 3) * 30;
+      const mx = centerX + 100 + Math.cos(rad) * dist;
+      const my = centerY + 100 + Math.sin(rad) * dist;
+      const mon = addMonster(w, kind, mx, my);
+      mon.mc.homeX = mx;
+      mon.mc.homeY = my;
+    }
+
+    // Gắn StateView và Encoder như server thật để đo byte patch mỗi client
+    const views: StateView[] = [];
+    for (const sid of players) {
+      const v = new StateView();
+      w.interest.join(w, sid, v);
+      views.push(v);
+    }
+    const encoder = new Encoder(w.state);
+    encoder.encodeAll();
+    encoder.discardChanges();
+    for (const v of views) encoder.encodeView(v, 1, { offset: 1 });
+    encoder.discardChanges();
+
+    const testTicks = 60; // 60 ticks = 3.0 giây mô phỏng
+    const tickDurations: number[] = [];
+    const bytesPerTick: number[] = [];
+    let maxBoltsInFlight = 0;
+
+    for (let tick = 0; tick < testTicks; tick++) {
+      w.now += 50;
+
+      // Mỗi nhịp, người chơi cast chiêu vào quái gần nhất
+      for (let i = 0; i < players.length; i++) {
+        const sid = players[i];
+        const p = w.state.players.get(sid)!;
+        p.mp = 500;
+        let nearestMon: any = null;
+        let minDist = 300;
+        w.state.monsters.forEach((mon) => {
+          const d = Math.hypot(mon.x - p.x, mon.y - p.y);
+          if (d < minDist) {
+            minDist = d;
+            nearestMon = mon;
+          }
+        });
+        if (nearestMon) {
+          const angle = Math.atan2(nearestMon.y - p.y, nearestMon.x - p.x);
+          const slot = (2 + (tick % 2)) as 2 | 3;
+          cast(w, sid, { slot, angle });
+        }
+      }
+
+      const t0 = performance.now();
+      tickWorld(w, 50);
+      const dt = performance.now() - t0;
+      tickDurations.push(dt);
+
+      // Theo dõi đạn tầm xa trong không gian
+      if (w.bolts.length > maxBoltsInFlight) {
+        maxBoltsInFlight = w.bolts.length;
+      }
+      expect(w.bolts.length).toBeLessThanOrEqual(MAX_BOLTS);
+
+      // Đo byte patch gửi cho từng client theo StateView
+      const it = { offset: 1 };
+      let sharedOffset = 1;
+      const shared = encoder.hasChanges;
+      if (shared) {
+        encoder.encode(it);
+        sharedOffset = it.offset;
+      }
+      let tickBytes = 0;
+      for (const v of views) {
+        if (shared || v.changes.size > 0) {
+          tickBytes += encoder.encodeView(v, sharedOffset, it).byteLength;
+        }
+      }
+      encoder.discardChanges();
+      bytesPerTick.push(tickBytes / players.length);
+    }
+
+    const avgMs = tickDurations.reduce((a, b) => a + b, 0) / tickDurations.length;
+    // Tiêu chí M7.10 (#511): tick < 10 ms khi đông quái tầm xa bắn đạn và người chơi dùng chiêu
+    expect(avgMs).toBeLessThan(10);
+
+    // Tiêu chí M7.10 (#511): byte / tick mỗi client < 520 (đạn lưu bộ nhớ server, 0 patch byte)
+    const avgPatchBytes = bytesPerTick.reduce((a, b) => a + b, 0) / bytesPerTick.length;
+    expect(avgPatchBytes).toBeLessThan(520);
+
+    // Bắt buộc đạn tầm xa đã được bắn liên tục trong không gian
+    expect(maxBoltsInFlight).toBeGreaterThan(0);
+    expect(maxBoltsInFlight).toBeLessThanOrEqual(MAX_BOLTS);
+
+    const boltFxs = fx.filter((f) => f.kind === "bolt");
+    expect(boltFxs.length).toBeGreaterThan(0);
+
+    const castFxs = fx.filter((f) => f.kind === "cast");
+    expect(castFxs.length).toBeGreaterThan(0);
+
     expect(w.state.players.size).toBe(30);
   });
 });

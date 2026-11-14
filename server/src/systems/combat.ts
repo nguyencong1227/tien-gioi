@@ -157,6 +157,7 @@ function dropCoin(w: World, mc: MonsterCtrl, x: number, y: number) {
 /**
  * Quái đánh người chơi (một ĐÒN). Trả `true` nếu đòn ĐÃ TRÚNG (qua hết các luật bất tử / né: người chết, hồn lìa xác, đang thách đấu, đang né đều trả `false`), để
  * người gọi gắn thêm hiệu ứng đi kèm đòn (độc của `poisoner`) chỉ khi đòn trúng; khiên hộ thể đỡ hết sát thương vẫn tính là TRÚNG.
+ * `how`: `melee` (mặc định) thì thông báo gục ghi "đánh trọng thương", `bolt` (đạn của quái tầm xa) ghi "bắn trọng thương".
  */
 export function hurtPlayer(
   w: World,
@@ -164,6 +165,7 @@ export function hurtPlayer(
   p: Player,
   dmg: number,
   from: Pick<Monster, "kind">,
+  how: "melee" | "bolt" = "melee",
 ): boolean {
   const c = w.ctrl.get(sid);
   if (!c || p.dead) return false;
@@ -176,7 +178,7 @@ export function hurtPlayer(
     p,
     c,
     dmg,
-    `Bị ${MONSTER_BY_ID[from.kind].name} đánh trọng thương, tạm ngã xuống.`,
+    `Bị ${MONSTER_BY_ID[from.kind].name} ${how === "bolt" ? "bắn" : "đánh"} trọng thương, tạm ngã xuống.`,
   );
   return true;
 }
@@ -226,7 +228,12 @@ function damagePlayer(
   p.hp = Math.max(0, p.hp - dmg);
   p.meditating = false;
   c.lastHitAt = w.now;
-  if (dmg > 0) w.events.dmg({ target: sid, amount: dmg, x: p.x, y: p.y - 20, toPlayer: true });
+  if (dmg > 0) {
+    const msg = { target: sid, amount: dmg, x: p.x, y: p.y - 20, toPlayer: true };
+    // Đòn thật: người đứng gần cũng thấy. Sát thương theo giây (`fallText === null`): chỉ chủ (client phát tiếng đánh + giật mình cho mỗi `dmg` trong tầm nhìn)
+    if (fallText === null) w.events.dmgTo(sid, msg);
+    else w.events.dmg(msg);
+  }
   if (fallText === null) return;
   if (p.hp <= 0) {
     // Trong phòng bí cảnh: gục KHÔNG mất kiếp (bị đẩy ra, mất lượt; quyết định 11/11/2026, systems/dungeon.ts `dungeonFall`)

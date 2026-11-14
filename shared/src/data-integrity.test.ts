@@ -12,6 +12,7 @@ import {
   NPCS,
   NPC_BY_ID,
   PLAYER_RADIUS,
+  phaseOf,
   QUESTS,
   QUEST_BY_ID,
   REALMS,
@@ -26,6 +27,16 @@ import {
 } from "./index";
 
 describe("nhất quán dữ liệu game (Issue #112 - data-integrity)", () => {
+  it("quái có `boltElement` (màu đạn): hệ hợp lệ, và chỉ quái BẮN ĐẠN (ranged, hoặc poisoner có boltRange) mới khai", () => {
+    for (const m of MONSTERS) {
+      if (m.boltElement === undefined) continue;
+      expect(phaseOf(m.boltElement), `${m.id} boltElement`).not.toBe("none");
+      const shoots =
+        m.behavior === "ranged" || (m.behavior === "poisoner" && m.boltRange !== undefined);
+      expect(shoots, `${m.id}: boltElement chỉ có ý nghĩa với quái bắn đạn`).toBe(true);
+    }
+  });
+
   describe("1. Quái vật và bảng rơi đồ / Linh thạch (MONSTERS x DROP_TABLES x COIN_DROPS)", () => {
     it("mọi quái trong MONSTERS đều có bảng rơi đồ và bảng rơi tiền", () => {
       expect(MONSTERS.length).toBeGreaterThan(0);

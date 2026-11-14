@@ -42,6 +42,12 @@ export const WARN_LINE = 0xffb090;
 const TRAIL_STEP = 8;
 const BOLT_CORE = 4;
 const BOLT_GLOW = 9;
+/**
+ * Viền tối quanh lõi đạn: đạn nhạt (băng, trắng) và đạn cùng màu nền (độc xanh trên cỏ) vẫn thấy rõ trên nền sáng; lõi + viền = 5,5 px ~ `BOLT_RADIUS` (6 px) mà máy chủ
+ * dùng để tính trúng, nên hình đạn không nhỏ hơn vùng trúng thật (người chơi né theo hình).
+ */
+export const BOLT_OUTLINE_COLOR = 0x1a1410;
+export const BOLT_OUTLINE_WIDTH = 1.5;
 /** Phần ngoài khung nhìn vẫn được vẽ (đạn / vùng báo to đang trượt vào màn hình). */
 const VIEW_PAD = 160;
 
@@ -310,6 +316,8 @@ export class TelegraphLayer {
       g.fillStyle(plan.tint, 0.3);
       g.fillCircle(0, 0, BOLT_GLOW);
     }
+    g.fillStyle(BOLT_OUTLINE_COLOR, 0.85);
+    g.fillCircle(0, 0, BOLT_CORE + BOLT_OUTLINE_WIDTH);
     g.fillStyle(plan.tint, 1);
     g.fillCircle(0, 0, BOLT_CORE);
     g.fillStyle(0xffffff, 0.9);
