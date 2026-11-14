@@ -262,6 +262,82 @@ try {
   await key("Home", "Home", 36);
   check((await cam()).follow, "phím Home: về chỗ mình");
 
+  console.log("\n--- Sơ đồ nối ba bản đồ, chú giải, xem bản đồ khác ---");
+  const nodes = JSON.parse(
+    await evalJs(
+      `JSON.stringify([...document.querySelectorAll("#map-graph .mg-node")].map((b) => ({ id: b.dataset.mapId, cur: b.getAttribute("aria-current"), pressed: b.getAttribute("aria-pressed"), h: Math.round(b.getBoundingClientRect().height) })))`,
+    ),
+  );
+  check(nodes.length === 3, `sơ đồ nối có 3 nút bản đồ (${nodes.map((n) => n.id).join(", ")})`);
+  const hereNode = nodes.find((n) => n.id === "lac_ha");
+  check(
+    hereNode?.cur === "location" && hereNode?.pressed === "true",
+    "nút bản đồ mình đứng (lac_ha): aria-current='location' và đang được xem",
+  );
+  check(
+    nodes.every((n) => n.h >= 44),
+    "mọi nút sơ đồ cao >= 44 px (mục bấm)",
+  );
+  const legendState = () =>
+    evalJs(
+      `JSON.stringify({ exp: document.getElementById("map-legend-toggle").getAttribute("aria-expanded"), hidden: document.getElementById("map-legend").hidden })`,
+    ).then((x) => JSON.parse(x));
+  let lg = await legendState();
+  check(lg.exp === "true" && !lg.hidden, "chú giải mặc định MỞ ở màn rộng");
+  await click("#map-legend-toggle");
+  lg = await legendState();
+  check(lg.exp === "false" && lg.hidden, "bấm 'Chú giải': đóng (aria-expanded=false, ẩn)");
+  await click("#map-legend-toggle");
+  lg = await legendState();
+  check(lg.exp === "true" && !lg.hidden, "bấm lần nữa: mở lại");
+
+  const hashHere = await canvasHash();
+  await click('#map-graph .mg-node[data-map-id="hac_phong"]');
+  const view = JSON.parse(
+    await evalJs(
+      `JSON.stringify({ id: window.__scene.mapViewId, title: document.getElementById("map-title").textContent, sub: document.getElementById("map-coords").textContent, pressed: document.querySelector('#map-graph .mg-node[data-map-id="hac_phong"]').getAttribute("aria-pressed"), herePressed: document.querySelector('#map-graph .mg-node[data-map-id="lac_ha"]').getAttribute("aria-pressed") })`,
+    ),
+  );
+  check(view.id === "hac_phong", `bấm nút Hắc Phong: đang xem hac_phong (${view.id})`);
+  check(view.title.includes("Hắc Phong Cốc"), `tiêu đề đổi theo bản đồ đang xem (${view.title})`);
+  check(
+    view.sub.includes("Đang xem bản đồ khác"),
+    "phụ đề nói rõ đang xem bản đồ KHÁC bản đồ mình đứng",
+  );
+  check(
+    view.pressed === "true" && view.herePressed === "false",
+    "nút đang xem được đánh dấu (aria-pressed)",
+  );
+  check((await canvasHash()) !== hashHere, "ảnh bản đồ ĐỔI sang bản đồ Hắc Phong");
+  c = await cam();
+  check(
+    c.zoom === 1 && !c.follow,
+    `đổi bản đồ xem: zoom 1, không bám (không có 'mình' ở bản đồ đó) (${JSON.stringify(c)})`,
+  );
+  await click("#map-zoom-in");
+  await click("#map-zoom-in");
+  c = await cam();
+  check(c.zoom > 1.5 && !c.follow, `phóng được ở bản đồ đang xem khác (zoom ${c.zoom})`);
+  await click("#map-recenter");
+  const back = JSON.parse(
+    await evalJs(
+      `JSON.stringify({ id: window.__scene.mapViewId, title: document.getElementById("map-title").textContent })`,
+    ),
+  );
+  check(
+    back.id === null && back.title.includes("Lạc Hà"),
+    `'Về chỗ mình' khi xem bản đồ khác: quay về bản đồ mình đứng (${back.title})`,
+  );
+  c = await cam();
+  check(c.follow && c.zoom === 1, "về bản đồ mình: zoom 1, bám theo mình");
+  await click('#map-graph .mg-node[data-map-id="am_suong"]');
+  await close();
+  await open();
+  check(
+    (await evalJs("window.__scene.mapViewId")) === null,
+    "đang xem Âm Sương rồi đóng / mở lại: về xem bản đồ mình đứng",
+  );
+
   console.log("\n--- Cảm ứng: chụm hai ngón ---");
   await close();
   check(!(await shown()), "Esc đóng bản đồ lớn");

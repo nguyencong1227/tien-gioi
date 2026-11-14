@@ -1065,6 +1065,30 @@ html[data-input="touch"] .qt-head {
 .map-legend[hidden] {
   display: none;
 }
+/* Phần chính (công cụ + bản đồ + chú giải) tách khỏi sơ đồ nối để máy tính xếp sơ đồ ở CỘT TRÁI, bản đồ không bị đẩy xuống phải cuộn */
+.map-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+@media (pointer: fine) and (min-width: 900px) {
+  .map-body {
+    display: grid;
+    grid-template-columns: minmax(150px, 176px) minmax(0, 1fr);
+    align-items: start;
+    gap: 14px;
+  }
+  .map-graph {
+    display: grid;
+    justify-content: stretch;
+    grid-template-columns: 1fr;
+  }
+  .map-graph .mg-node {
+    min-width: 0;
+  }
+}
 .map-legend-toggle {
   min-height: 44px;
   align-self: center;
@@ -1145,6 +1169,14 @@ html[data-input="touch"] .qt-head {
 .lg.portal {
   background: #a8ff78;
   border: 1px solid #fff;
+}
+.lg.pin {
+  width: 9px;
+  height: 9px;
+  border-radius: 1px;
+  background: #ffd74a;
+  border: 1px solid #fff;
+  transform: rotate(45deg);
 }
 .lg.zone {
   width: 22px;
