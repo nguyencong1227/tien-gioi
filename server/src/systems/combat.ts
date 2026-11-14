@@ -157,6 +157,7 @@ function dropCoin(w: World, mc: MonsterCtrl, x: number, y: number) {
 /**
  * Quái đánh người chơi (một ĐÒN). Trả `true` nếu đòn ĐÃ TRÚNG (qua hết các luật bất tử / né: người chết, hồn lìa xác, đang thách đấu, đang né đều trả `false`), để
  * người gọi gắn thêm hiệu ứng đi kèm đòn (độc của `poisoner`) chỉ khi đòn trúng; khiên hộ thể đỡ hết sát thương vẫn tính là TRÚNG.
+ * `how`: `melee` (mặc định) thì thông báo gục ghi "đánh trọng thương", `bolt` (đạn của quái tầm xa) ghi "bắn trọng thương".
  */
 export function hurtPlayer(
   w: World,
@@ -164,6 +165,7 @@ export function hurtPlayer(
   p: Player,
   dmg: number,
   from: Pick<Monster, "kind">,
+  how: "melee" | "bolt" = "melee",
 ): boolean {
   const c = w.ctrl.get(sid);
   if (!c || p.dead) return false;
@@ -176,7 +178,7 @@ export function hurtPlayer(
     p,
     c,
     dmg,
-    `Bị ${MONSTER_BY_ID[from.kind].name} đánh trọng thương, tạm ngã xuống.`,
+    `Bị ${MONSTER_BY_ID[from.kind].name} ${how === "bolt" ? "bắn" : "đánh"} trọng thương, tạm ngã xuống.`,
   );
   return true;
 }

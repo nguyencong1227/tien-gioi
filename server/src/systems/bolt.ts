@@ -177,7 +177,7 @@ export function tickBolts(w: World, dt: number) {
       });
       if (hitSid !== null) {
         const p = w.state.players.get(hitSid);
-        if (p && hurtPlayer(w, hitSid, p, b.dmg, { kind: b.kind }) && b.effect)
+        if (p && hurtPlayer(w, hitSid, p, b.dmg, { kind: b.kind }, "bolt") && b.effect)
           applyPlayerStatus(w, hitSid, b.effect, b.dmg, ""); // độc đi kèm đạn trúng (M7.3)
         dead = true;
       }
