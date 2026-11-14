@@ -366,8 +366,38 @@ async function runLeakTest() {
     // Khởi động: vài chu kỳ ĐẦY ĐỦ (cả dựng lại bản đồ) trước khi đọc chỉ số ban đầu. Lần dựng lại đầu tiên làm V8 / Phaser
     // nạp bộ nhớ đệm một lần (~2 MB heap, đo bằng 150 chu kỳ riêng: sau đó chỉ ~20 KB mỗi lần), không phải rò rỉ; không khởi
     // động thì ngưỡng 10 % trên 20 chu kỳ dao động quanh 9-11 % tuỳ lần chạy.
-    // 12 chu kỳ (không phải 8): mỗi công thức hạt tạo MỘT emitter dùng lại ở lần phát đầu (fx.ts emitterFor); chu kỳ nào cũng phát một chiêu khác trong 12 chiêu, nên khởi động
-    // phải qua đủ 12 để mọi emitter của chiêu đã được tạo TRƯỚC khi đọc chỉ số ban đầu (không thì 4 emitter tạo muộn bị đếm nhầm là rò rỉ GameObjects)
+    // 12 chu kỳ: đủ để V8 / Phaser nạp bộ nhớ đệm và mỗi chu kỳ phát một chiêu khác trong 12 chiêu; việc BẢO ĐẢM mọi emitter đã tạo do khối phát công thức ở trên làm
+    // BẢO ĐẢM (không đoán số chu kỳ): trước khi khởi động theo chu kỳ, phát MỖI công thức hạt đã đăng ký ít nhất một lần (ưu tiên 2: hiếm khi bị ngân sách từ chối; bị từ chối thì
+    // phát lại ở vòng sau) để emitter của mọi công thức đã được tạo TRƯỚC khi đọc mốc đầu. Trước đây mốc "ban đầu" lúc 13 lúc 15 emitter (tạo lười ngay trong pha đo) nên leak-test
+    // đỏ giả ~1/4 số lần (+2 GameObjects cơ sở).
+    {
+      const idsRes = await cdpSend("Runtime.evaluate", {
+        expression: "JSON.stringify(window.__fxRecipeIds ? window.__fxRecipeIds() : [])",
+        returnByValue: true,
+      });
+      const recipeIdList = JSON.parse(idsRes.result?.result?.value ?? "[]");
+      if (recipeIdList.length === 0)
+        throw new Error(
+          "Thiếu window.__fxRecipeIds (khối ?debug của WorldScene): không bảo đảm được emitter đã tạo hết.",
+        );
+      const left = new Set(recipeIdList);
+      for (let round = 0; round < 40 && left.size > 0; round++) {
+        const batch = [...left].slice(0, 6);
+        const played = await cdpSend("Runtime.evaluate", {
+          expression: `JSON.stringify(${JSON.stringify(batch)}.filter((id) => window.__fx.play(id, 100 + Math.random() * 40, 100, { priority: 2 })))`,
+          returnByValue: true,
+        });
+        for (const id of JSON.parse(played.result?.result?.value ?? "[]")) left.delete(id);
+        await sleep(120);
+      }
+      if (left.size > 0)
+        throw new Error(
+          `Không phát được ${left.size} công thức hạt trong khởi động: ${[...left].join(", ")}`,
+        );
+      console.log(
+        `- Khởi động: đã phát đủ ${recipeIdList.length} công thức hạt (mọi emitter đã tạo)`,
+      );
+    }
     const WARMUP_CYCLES = 12;
     for (let w = 0; w < WARMUP_CYCLES; w++) {
       await cdpSend("Runtime.evaluate", { expression: cycleExpr(w) });
