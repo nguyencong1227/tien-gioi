@@ -120,7 +120,13 @@ import { pickupBtnText, portalBtnText, talkBtnText } from "./ctx-btn";
 import { sound } from "./audio";
 import { transitionMs, waitOrSkip } from "./gfx/scene-transition";
 import { getDisplay, onDisplayChange } from "./gfx/display";
-import { TRACKER_PREF_KEY, parseTrackerPref, trackerOpen } from "./gfx/hud-compact";
+import {
+  CHAT_PREF_KEY,
+  PARTY_PREF_KEY,
+  TRACKER_PREF_KEY,
+  panelOpen,
+  parseTrackerPref,
+} from "./gfx/hud-compact";
 import {
   getQuality,
   onQualityChange,
@@ -755,31 +761,92 @@ function describeStep(
 }
 
 /** Bảng Nhiệm vụ thu gọn / mở (gfx/hud-compact.ts): lựa chọn của người chơi (`tg_qt_open`) thắng, chưa chọn thì theo độ gọn của máy. */
-function setupQuestTrackerToggle(bindTap: (id: string, fn: () => void) => void) {
-  const tracker = $("quest-tracker");
-  const btn = $("qt-toggle");
-  let pref: boolean | null = null;
+/** Đọc / ghi `localStorage` an toàn (chế độ riêng tư có thể chặn). */
+function readPref(key: string): string | null {
   try {
-    pref = parseTrackerPref(localStorage.getItem(TRACKER_PREF_KEY));
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+function writePref(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
   } catch {
     /* chế độ riêng tư: bỏ qua */
   }
-  const apply = () => {
-    const open = trackerOpen(pref, getDisplay());
-    tracker.classList.toggle("collapsed", !open);
-    btn.setAttribute("aria-expanded", String(open));
-  };
+}
+
+interface PanelPrefHandle {
+  /** Đang mở không (theo lựa chọn đã nhớ, chưa chọn thì theo độ gọn của máy) */
+  isOpen(): boolean;
+  /** Đặt mở / thu gọn như người chơi bấm (có nhớ) */
+  setOpen(open: boolean): void;
+}
+
+/**
+ * Bảng nổi thu gọn được và NHỚ lựa chọn (QUYET_DINH_M3 mục 15): chưa chọn thì mặc định theo độ gọn của máy (`isCompactHud`: điện thoại hoặc cửa sổ
+ * hẹp thu gọn, máy tính rộng mở), đã chọn thì lựa chọn của người chơi thắng ở mọi máy. `apply` vẽ trạng thái; nút `toggleId` đổi trạng thái.
+ * `legacyCollapsedKey`: khoá cũ (1 = thu gọn) của bản trước, chỉ đọc khi chưa có khoá mới.
+ */
+function setupPanelPref(
+  opts: {
+    key: string;
+    toggleId: string;
+    apply: (open: boolean) => void;
+    legacyCollapsedKey?: string;
+  },
+  bindTap: (id: string, fn: () => void) => void,
+): PanelPrefHandle {
+  let pref = parseTrackerPref(readPref(opts.key));
+  if (pref === null && opts.legacyCollapsedKey) {
+    const legacy = readPref(opts.legacyCollapsedKey);
+    pref = legacy === "1" ? false : legacy === "0" ? true : null;
+  }
+  const isOpen = () => panelOpen(pref, getDisplay());
+  const apply = () => opts.apply(isOpen());
   apply();
-  onDisplayChange(apply); // xoay máy: chưa chọn thì tự đổi theo độ gọn mới
-  bindTap("qt-toggle", () => {
-    pref = !trackerOpen(pref, getDisplay());
-    try {
-      localStorage.setItem(TRACKER_PREF_KEY, pref ? "1" : "0");
-    } catch {
-      /* bỏ qua */
-    }
+  onDisplayChange(apply); // xoay máy / đổi cỡ cửa sổ: chưa chọn thì tự đổi theo độ gọn mới
+  const setOpen = (open: boolean) => {
+    pref = open;
+    writePref(opts.key, open ? "1" : "0");
     apply();
-  });
+  };
+  bindTap(opts.toggleId, () => setOpen(!isOpen()));
+  return { isOpen, setOpen };
+}
+
+let chatPanel: PanelPrefHandle | null = null;
+let chatIdleTimer: number | null = null;
+/** Sau chừng này không dùng khung chat thì tự mờ. */
+const CHAT_IDLE_MS = 6000;
+
+/** Khung chat vừa được dùng (tin mới, rê chuột, gõ, mở / thu): sáng lên rồi hẹn giờ mờ lại. */
+function bumpChat() {
+  const chat = document.getElementById("chat");
+  if (!chat) return;
+  chat.classList.remove("idle");
+  if (chatIdleTimer !== null) window.clearTimeout(chatIdleTimer);
+  chatIdleTimer = window.setTimeout(() => {
+    chatIdleTimer = null;
+    chat.classList.add("idle");
+  }, CHAT_IDLE_MS);
+}
+
+function setupQuestTrackerToggle(bindTap: (id: string, fn: () => void) => void) {
+  const tracker = $("quest-tracker");
+  const btn = $("qt-toggle");
+  setupPanelPref(
+    {
+      key: TRACKER_PREF_KEY,
+      toggleId: "qt-toggle",
+      apply: (open) => {
+        tracker.classList.toggle("collapsed", !open);
+        btn.setAttribute("aria-expanded", String(open));
+      },
+    },
+    bindTap,
+  );
 }
 
 function renderQuestTracker() {
@@ -789,6 +856,13 @@ function renderQuestTracker() {
   $("qt-count").textContent = questLog.active.length ? ` (${questLog.active.length})` : "";
   // Gợi ý "chạm nhiệm vụ để chỉ đường" nằm NGOÀI nút thu gọn / mở (nằm trong nút thì người chơi tưởng bấm tiêu đề là chỉ đường); chỉ hiện khi có nhiệm vụ để chạm
   $("qt-hint").hidden = questLog.active.length === 0;
+  // Chưa có nhiệm vụ: bảng chỉ còn tiêu đề một dòng (gợi ý nằm ở `title` của nút), khỏi chiếm chỗ vô ích
+  const trackerEl = $("quest-tracker");
+  trackerEl.classList.toggle("empty", questLog.active.length === 0);
+  $("qt-toggle").title =
+    questLog.active.length === 0
+      ? "Chưa nhận nhiệm vụ: gặp Trưởng trấn hoặc Bảng cáo thị"
+      : "Thu gọn / mở bảng nhiệm vụ";
 
   if (!questLog.active.length) {
     const p = document.createElement("p");
@@ -2315,28 +2389,23 @@ export const ui = {
     bindTap("btn-talk", () => callbacks?.onTalk());
     bindTap("btn-portal", () => portalCallback?.());
 
-    // Tổ đội (#75, #91)
-    try {
-      if (localStorage.getItem("tg_party_collapsed") === "1") {
-        $("party-panel").classList.add("collapsed");
-        $("party-btn-toggle").textContent = "▸";
-      }
-    } catch {
-      /* localStorage bị chặn (chế độ riêng tư): bỏ qua */
-    }
+    // Tổ đội (#75, #91): thu gọn được, nhớ lựa chọn (`tg_party_open`; khoá cũ `tg_party_collapsed` chỉ đọc khi chưa có), mặc định thu gọn ở màn hẹp
+    const partyPanelEl = $("party-panel");
+    const partyToggleBtn = $("party-btn-toggle");
+    setupPanelPref(
+      {
+        key: PARTY_PREF_KEY,
+        legacyCollapsedKey: "tg_party_collapsed",
+        toggleId: "party-btn-toggle",
+        apply: (open) => {
+          partyPanelEl.classList.toggle("collapsed", !open);
+          partyToggleBtn.textContent = open ? "▾" : "▸";
+          partyToggleBtn.setAttribute("aria-expanded", String(open));
+        },
+      },
+      bindTap,
+    );
     bindTap("party-btn-leave", () => callbacks?.onPartyLeave?.());
-    bindTap("party-btn-toggle", () => {
-      const panel = $("party-panel");
-      panel.classList.toggle("collapsed");
-      const isCollapsed = panel.classList.contains("collapsed");
-      const btn = $("party-btn-toggle");
-      btn.textContent = isCollapsed ? "▸" : "▾";
-      try {
-        localStorage.setItem("tg_party_collapsed", isCollapsed ? "1" : "0");
-      } catch {
-        /* localStorage bị chặn (chế độ riêng tư): bỏ qua */
-      }
-    });
     bindTap("pib-btn-accept", () => {
       stopInviteTimer();
       $("party-invite-box").hidden = true;
@@ -2687,6 +2756,32 @@ export const ui = {
         refreshQuality(); // hồ sơ chất lượng đọc lại giảm chuyển động (tắt rung, giảm hạt...)
       });
     }
+
+    // Khung chat (QUYET_DINH_M3 mục 15): thu gọn còn 1 dòng, nhớ `tg_chat_open`, mặc định thu gọn ở màn hẹp, tự mờ khi không dùng
+    const chatEl = $("chat");
+    const chatToggleBtn = $("chat-toggle");
+    chatPanel = setupPanelPref(
+      {
+        key: CHAT_PREF_KEY,
+        toggleId: "chat-toggle",
+        apply: (open) => {
+          chatEl.classList.toggle("collapsed", !open);
+          chatToggleBtn.setAttribute("aria-expanded", String(open));
+          const log = $("chat-log");
+          log.scrollTop = log.scrollHeight;
+        },
+      },
+      bindTap,
+    );
+    // chạm vào dòng tin đang thu gọn = mở khung (đích chạm lớn, nút 💬 nhỏ)
+    $("chat-log").addEventListener("click", () => {
+      if (chatEl.classList.contains("collapsed") && !chatEl.classList.contains("typing"))
+        chatPanel?.setOpen(true);
+    });
+    chatEl.addEventListener("pointerenter", bumpChat);
+    chatEl.addEventListener("focusin", bumpChat);
+    $("chat-input").addEventListener("focusout", () => chatEl.classList.remove("typing"));
+    bumpChat();
 
     // Thanh menu (QUYET_DINH_M3 mục 15): màn rất hẹp (< 480 px) gộp 6 nút vào một nút ☰ mở ra một hàng nút; chọn một mục hoặc chạm ra ngoài thì đóng
     const hudMenu = $("hud-menu");
@@ -3563,6 +3658,14 @@ export const ui = {
     log.append(p);
     while (log.children.length > 60) log.firstChild!.remove();
     if (atBottom) log.scrollTop = log.scrollHeight;
+    bumpChat();
+  },
+
+  /** Phím mở chat (Enter): khung đang thu gọn thì hiện ô nhập tạm (`typing`, thu lại khi rời ô) rồi đưa con trỏ vào. */
+  focusChat() {
+    $("chat").classList.add("typing");
+    bumpChat();
+    ($("chat-input") as HTMLInputElement).focus();
   },
 
   onParty(m: PartyMsg) {

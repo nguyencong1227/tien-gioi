@@ -983,8 +983,7 @@ export class WorldScene extends Phaser.Scene {
     kb.on("keydown-ONE", () => !typing() && ui.useQuick(1));
     kb.on("keydown-TWO", () => !typing() && ui.useQuick(2));
     kb.on("keydown-ENTER", () => {
-      if (!typing())
-        setTimeout(() => (document.getElementById("chat-input") as HTMLInputElement).focus(), 0);
+      if (!typing()) setTimeout(() => ui.focusChat(), 0);
     });
 
     // Chuột / chạm: bấm vào người chơi khác để mở menu tổ đội, hoặc chém về phía con trỏ

@@ -3,7 +3,8 @@
 // cửa sổ hẹp 550x900, máy tính 1366x768 / 1920x1080), đo bằng getBoundingClientRect trên DOM thật:
 //  - thẻ nhân vật gọn: không có nút, hai chip (Linh thạch, đạo hữu) cùng MỘT hàng và không tràn, thẻ không quá rộng / cao;
 //  - thanh menu: sáu nút cùng cỡ, cùng một hàng, cách đều, nằm trong khung nhìn; màn < 480 px gộp vào nút ☰ mở ra đúng một hàng, chọn mục thì đóng;
-//  - không bảng nổi nào chồng lên nhau (cột trái, cột phải, chat).
+//  - không bảng nổi nào chồng lên nhau (cột trái, cột phải, chat), vùng giữa (quanh nhân vật) trống, ngân sách diện tích;
+//  - Tổ đội / Nhiệm vụ / Chat: mặc định thu gọn ở màn hẹp, mở ở máy tính rộng; chat thu gọn còn đúng một dòng, Enter mở, tự mờ, nhớ trạng thái.
 // Chạy: `npm run build -w client && npm run e2e:giao-dien -w server` (cần google-chrome). Ảnh (tuỳ chọn): đặt E2E_SHOTS=<thư mục>.
 import { spawn, execSync, type ChildProcess } from "node:child_process";
 import { existsSync, mkdtempSync } from "node:fs";
@@ -37,6 +38,8 @@ const MEASURE = `(() => {
   const toggle = byId('btn-menu');
   const panels = ['hud', 'party-panel', 'quest-tracker', 'chat', 'minimap-wrap', 'hud-menu'].filter((id) => shown(byId(id))).map((id) => ({ id, ...rect(byId(id)) }));
   const itemsShown = items.length > 0 && shown(byId('hud-menu-items'));
+  const col = byId('hud-col-left');
+  const cls = (id) => (byId(id) ? [...byId(id).classList] : []);
   return {
     W: innerWidth, H: innerHeight,
     hudButtons: hud.querySelectorAll('button').length,
@@ -48,6 +51,10 @@ const MEASURE = `(() => {
     itemsShown,
     items: itemsShown ? items.map(rect) : [],
     panels,
+    colLeft: shown(col) ? rect(col) : null,
+    partyCollapsed: cls('party-panel').includes('collapsed'),
+    questCollapsed: cls('quest-tracker').includes('collapsed'),
+    chatCollapsed: cls('chat').includes('collapsed'),
   };
 })()`;
 
@@ -71,6 +78,10 @@ interface Measure {
   itemsShown: boolean;
   items: Rect[];
   panels: Array<Rect & { id: string }>;
+  colLeft: Rect | null;
+  partyCollapsed: boolean;
+  questCollapsed: boolean;
+  chatCollapsed: boolean;
 }
 
 const overlap = (a: Rect, b: Rect) =>
@@ -249,8 +260,204 @@ async function main() {
         clashes.length === 0,
         clashes.join("; "),
       );
+      // ---- mặc định thu gọn ở màn hẹp, mở ở máy tính rộng ----
+      const narrow = v.w < 700 || Math.min(v.w, v.h) < 600; // quy tắc của isCompactHud: điện thoại (cạnh ngắn < 600) hoặc cửa sổ hẹp (< 700)
+      const expect = narrow ? "thu gọn" : "mở";
+      check(
+        `${tag}: Tổ đội, Nhiệm vụ, Chat mặc định ${expect}`,
+        m.partyCollapsed === narrow && m.questCollapsed === narrow && m.chatCollapsed === narrow,
+        JSON.stringify({ party: m.partyCollapsed, quest: m.questCollapsed, chat: m.chatCollapsed }),
+      );
+      // ---- ngân sách diện tích và vùng giữa trống ----
+      const area = (r: Rect) => r.w * r.h;
+      const total = ps.reduce((a, p) => a + area(p), 0) / (m.W * m.H);
+      const maxTotal = narrow ? 0.35 : 0.25;
+      check(
+        `${tag}: các bảng nổi chiếm ${(total * 100).toFixed(1)}% diện tích (<= ${maxTotal * 100}%)`,
+        total <= maxTotal,
+        String(total),
+      );
+      const widest = ps.reduce((a, p) => (p.w > a.w ? p : a), ps[0]);
+      const maxW = v.w >= 1000 ? 0.3 : 0.6;
+      check(
+        `${tag}: bảng nổi rộng nhất (${widest.id}) ${Math.round(widest.w)} px, không quá ${maxW * 100}% khung`,
+        widest.w <= maxW * m.W,
+        String(widest.w),
+      );
+      if (m.colLeft)
+        check(
+          `${tag}: cột trái cao ${Math.round(m.colLeft.h)} px, không quá 60% khung (${Math.round(0.6 * m.H)} px)`,
+          m.colLeft.h <= 0.6 * m.H,
+          String(m.colLeft.h),
+        );
+      const centre: Rect = {
+        l: m.W * 0.4,
+        t: m.H * 0.4,
+        r: m.W * 0.6,
+        b: m.H * 0.6,
+        w: m.W * 0.2,
+        h: m.H * 0.2,
+      };
+      const inCentre = ps.filter((p) => overlap(p, centre)).map((p) => p.id);
+      check(
+        `${tag}: vùng giữa (quanh nhân vật) không bị bảng nào che`,
+        inCentre.length === 0,
+        inCentre.join(", "),
+      );
       await T.shot(`giao-dien-${tag}`);
     }
+
+    // ---- Chat thu gọn, tự mờ; Tổ đội / Nhiệm vụ nhớ trạng thái; nhiệm vụ trống ----
+    // máy tính 1366x768: mặc định mở cả ba
+    await applyViewport(T, VIEWPORTS[4]);
+    const st = async () => (await T.ev(MEASURE)) as Measure;
+    const cls = (id: string) => T.ev(`[...document.getElementById('${id}').classList].join(' ')`);
+    const rectOf = (sel: string) =>
+      T.ev(
+        `(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const b = e.getBoundingClientRect(); return { t: b.top, b: b.bottom, h: b.height, d: getComputedStyle(e).display }; })()`,
+      ) as Promise<{ t: number; b: number; h: number; d: string } | null>;
+    check(
+      "máy tính: chat mở sẵn, ô nhập hiện",
+      (await rectOf("#chat-form"))?.d !== "none" &&
+        !String(await cls("chat")).includes("collapsed"),
+      String(await cls("chat")),
+    );
+    await T.ev(`document.getElementById('chat-toggle').click(); 1`);
+    await sleep(250);
+    const logC = await rectOf("#chat-log");
+    const lastP = await rectOf("#chat-log p:last-child");
+    check(
+      "Bấm 💬: chat thu gọn còn MỘT dòng (cao <= 30 px), ô nhập ẩn, dòng cuối nằm trọn trong khung",
+      !!logC &&
+        !!lastP &&
+        logC.h <= 30 &&
+        (await rectOf("#chat-form"))?.d === "none" &&
+        lastP.t >= logC.t - 1 &&
+        lastP.b <= logC.b + 1,
+      JSON.stringify({ logC, lastP }),
+    );
+    await T.ev(`window.__ui.chat({ from: 'Tin Moi', text: 'dong cuoi cung khi dang thu gon' }); 1`);
+    await sleep(150);
+    check(
+      "Tin mới khi đang thu gọn: dòng cuối là tin mới và khung sáng lên (không còn mờ)",
+      String(await T.ev(`document.querySelector('#chat-log p:last-child').textContent`)).includes(
+        "dong cuoi cung",
+      ) && !String(await cls("chat")).includes("idle"),
+      String(await cls("chat")),
+    );
+    // Enter thật (qua CDP): hiện ô nhập tạm rồi đưa con trỏ vào; Esc thu lại
+    const key = async (type: "enter" | "esc") => {
+      const k =
+        type === "enter"
+          ? { key: "Enter", code: "Enter", vk: 13, text: "\r" }
+          : { key: "Escape", code: "Escape", vk: 27, text: "" };
+      const base = {
+        key: k.key,
+        code: k.code,
+        windowsVirtualKeyCode: k.vk,
+        nativeVirtualKeyCode: k.vk,
+        modifiers: 0,
+      };
+      await T.send("Input.dispatchKeyEvent", {
+        ...base,
+        type: k.text ? "keyDown" : "rawKeyDown",
+        ...(k.text ? { text: k.text, unmodifiedText: k.text } : {}),
+      });
+      await T.send("Input.dispatchKeyEvent", { ...base, type: "keyUp" });
+      await sleep(250);
+    };
+    await T.ev(
+      `document.activeElement && document.activeElement.blur && document.activeElement.blur(); 1`,
+    );
+    await key("enter");
+    check(
+      "Enter: chat thu gọn hiện ô nhập tạm (typing) và con trỏ nằm trong ô",
+      String(await cls("chat")).includes("typing") &&
+        (await T.ev(`document.activeElement && document.activeElement.id`)) === "chat-input" &&
+        (await rectOf("#chat-form"))?.d !== "none",
+      `${await cls("chat")} / ${await T.ev(`document.activeElement && document.activeElement.id`)}`,
+    );
+    await key("esc");
+    check(
+      "Esc: rời ô nhập, chat thu lại còn một dòng",
+      !String(await cls("chat")).includes("typing") && (await rectOf("#chat-form"))?.d === "none",
+      String(await cls("chat")),
+    );
+    // tự mờ sau vài giây không dùng, rê chuột thì sáng lại
+    await sleep(6800);
+    const idle = String(await cls("chat")).includes("idle");
+    const opIdle = Number(
+      await T.ev(`parseFloat(getComputedStyle(document.getElementById('chat')).opacity)`),
+    );
+    check(
+      `Không dùng 6 giây: chat tự mờ (opacity ${opIdle.toFixed(2)} <= 0.5)`,
+      idle && opIdle <= 0.5,
+      `${idle} ${opIdle}`,
+    );
+    await T.ev(`document.getElementById('chat').dispatchEvent(new Event('pointerenter')); 1`);
+    await sleep(500);
+    check(
+      "Rê chuột vào chat: sáng lại",
+      !String(await cls("chat")).includes("idle") &&
+        Number(
+          await T.ev(`parseFloat(getComputedStyle(document.getElementById('chat')).opacity)`),
+        ) > 0.9,
+      String(await cls("chat")),
+    );
+
+    // nhiệm vụ trống: chỉ còn tiêu đề một dòng
+    await T.ev(`window.__ui.onQuests({ active: [], done: [], dailyDone: [] }); 1`);
+    await sleep(200);
+    const qEmpty = await rectOf("#quest-tracker");
+    check(
+      "Chưa có nhiệm vụ: bảng nhiệm vụ chỉ còn một dòng (cao <= 44 px), danh sách ẩn",
+      !!qEmpty && qEmpty.h <= 44 && (await rectOf("#quest-tracker-list"))?.d === "none",
+      JSON.stringify(qEmpty),
+    );
+    await crowdHud(T, NAME); // trả lại hai nhiệm vụ
+
+    // nhớ trạng thái: thu gọn Tổ đội + Nhiệm vụ, mở Chat, tải lại trang, vào lại
+    await T.ev(
+      `document.getElementById('party-btn-toggle').click(); document.getElementById('qt-toggle').click(); document.getElementById('chat-toggle').click(); 1`,
+    );
+    await sleep(250);
+    const prefs = JSON.parse(
+      String(
+        await T.ev(
+          `JSON.stringify([localStorage.getItem('tg_party_open'), localStorage.getItem('tg_qt_open'), localStorage.getItem('tg_chat_open')])`,
+        ),
+      ),
+    );
+    check(
+      "Bấm thu / mở: ba bảng ghi lựa chọn vào localStorage (đội 0, nhiệm vụ 0, chat 1)",
+      prefs.join(",") === "0,0,1",
+      prefs.join(","),
+    );
+    await T.send("Page.reload");
+    await T.waitFor(
+      `typeof window.__switchAuthView === 'function' && !!document.getElementById('login-form')`,
+      "form đăng nhập sau khi tải lại",
+    );
+    await T.ev(`document.getElementById('login-form').requestSubmit(); 1`);
+    await T.waitFor(
+      `!document.getElementById('ui')?.hidden && !!window.__scene?.room && !!document.getElementById('hud-name')?.textContent`,
+      "vào lại game",
+    );
+    await sleep(800);
+    await crowdHud(T, NAME);
+    const after = await st();
+    check(
+      "Sau khi tải lại: đúng lựa chọn đã nhớ (Tổ đội thu gọn, Nhiệm vụ thu gọn, Chat mở) dù máy tính mặc định mở cả ba",
+      after.partyCollapsed && after.questCollapsed && !after.chatCollapsed,
+      JSON.stringify({
+        party: after.partyCollapsed,
+        quest: after.questCollapsed,
+        chat: after.chatCollapsed,
+      }),
+    );
+    await T.ev(
+      `localStorage.removeItem('tg_party_open'); localStorage.removeItem('tg_qt_open'); localStorage.removeItem('tg_chat_open'); 1`,
+    );
 
     check("0 lỗi console / exception", T.errors.length === 0, T.errors.slice(0, 3).join(" | "));
   } catch (e) {
