@@ -63,7 +63,9 @@ describe("Ghi công trong game (Giới thiệu và ghi công ở Cài đặt)", 
   });
 
   it("không có chữ Hán / CJK trong khối (quyết định mục 19-20: tiếng Việt, không chữ Hán)", () => {
-    expect(aboutSection()).not.toMatch(/[⺀-鿿가-힯＀-￯]/u);
+    expect(aboutSection()).not.toMatch(
+      /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Bopomofo}]/u,
+    );
   });
 
   it("số phiên bản lấy từ package.json gốc qua vite define, và được ghi vào #set-version", () => {
