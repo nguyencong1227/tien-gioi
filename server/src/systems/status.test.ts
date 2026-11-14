@@ -902,7 +902,7 @@ describe("sát thương THEO GIÂY lên người chơi (M7.3, #504: độc / b�
     applyPlayerStatus(w, "a", eff("poison", 6000, 0.2), 100, "");
     applyPlayerStatus(w, "a", eff("bleed", 6000, 0.2), 100, "");
     applyPlayerStatus(w, "a", eff("chill", 6000, 0.3), 0, "");
-    run(w, 10_000, 11_100); // ngoài khu an toàn: dính đòn
+    run(w, 10_000, 11_950); // ngoài khu an toàn: dính đòn (nhịp 1 s đã gây ở 11_000; nhịp kế ở 12_000)
     const hpOut = a.p.hp;
     expect(hpOut).toBeLessThan(a.p.maxHp);
     const before = dotsOf(dmgs, "a").length;
@@ -912,14 +912,14 @@ describe("sát thương THEO GIÂY lên người chơi (M7.3, #504: độc / b�
     a.p.y = w.map.townPx.y;
     expect(w.map.inSafe(a.p.x, a.p.y)).toBe(true);
     statusMsgs.length = 0;
-    run(w, 11_150, 11_300);
+    run(w, 12_000, 12_300); // đúng nhịp tính sát thương kế tiếp: phải gỡ TRƯỚC khi tính, không được trừ thêm một lần cuối
     expect(statusMsgs.at(-1)?.msg.list.map((e) => e[0])).toEqual(["chill"]); // chỉ còn tê cóng
     expect(a.c.st!.list.map((x) => x.id)).toEqual(["chill"]);
     expect(dotsOf(dmgs, "a")).toHaveLength(before); // không trừ thêm trong khu an toàn
     // Ra khỏi trấn trở lại: không còn độc nào để hành hạ nữa
     a.p.x = w.map.townPx.x + w.map.townPx.r + 400;
     a.p.y = w.map.townPx.y;
-    run(w, 11_350, 14_000);
+    run(w, 12_350, 15_000);
     expect(a.p.hp).toBe(hpOut);
     expect(dotsOf(dmgs, "a")).toHaveLength(before);
   });
