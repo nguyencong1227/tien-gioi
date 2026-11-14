@@ -4,6 +4,7 @@ import {
   RESPAWN_MS,
   MONSTER_BY_ID,
   statsFor,
+  equipBonus,
   killExp,
   rollCoin,
   expMultOf,
@@ -194,6 +195,9 @@ function damagePlayer(
   dmg: number,
   fallText: string | null,
 ) {
+  // Giáp từ trang bị (M7.4, `EquipStats.guard`, điểm %, đã kẹp theo `STAT_CAPS.guard`; ô chưa mở không tính): giảm sát thương nhận TRƯỚC khiên hộ thể, ít nhất 1
+  const guard = equipBonus(p, p.realm).guard;
+  if (guard > 0) dmg = Math.max(1, Math.round(dmg * (1 - guard / 100)));
   if (c.st && c.st.list.length > 0) {
     // Hộ thể: khiên hấp thụ trước, phần còn lại mới trừ khí huyết (đòn trúng khiên vẫn ngắt đả tọa và hồi phục)
     const a = absorbShield(c.st, dmg, w.now);

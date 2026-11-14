@@ -17,6 +17,8 @@ import {
   SKILLS,
   expToNext,
   statsFor,
+  ITEM_BY_ID,
+  type ItemDef,
   type ChatOut,
   type ToastMsg,
   type InvMsg,
@@ -207,6 +209,31 @@ describe("vào game", () => {
   });
 });
 
+/** Món thử cho ô riêng (M7.4): chưa có món thật, chèn vào bảng chung rồi dọn (cùng tiến trình với máy chủ test). */
+const OWNER_TEST_ITEMS: Record<
+  string,
+  { slot: "boots" | "jade" | "treasure"; hp: number; reqRealm: number }
+> = {
+  t_o_boots: { slot: "boots", hp: 37, reqRealm: 0 },
+  t_o_treasure: { slot: "treasure", hp: 50, reqRealm: 0 },
+};
+function injectOwnerItems() {
+  for (const [id, d] of Object.entries(OWNER_TEST_ITEMS))
+    ITEM_BY_ID[id] = {
+      id,
+      name: id,
+      type: "equip",
+      stack: 1,
+      rarity: 2,
+      desc: "thử",
+      equip: { slot: d.slot, stats: { hp: d.hp }, reqRealm: d.reqRealm, reqTier: 0 },
+      color: 0,
+    } as unknown as ItemDef;
+}
+function removeOwnerItems() {
+  for (const id of Object.keys(OWNER_TEST_ITEMS)) delete ITEM_BY_ID[id];
+}
+
 describe("rớt mạng và nối lại (#116)", () => {
   /** Rớt mạng: đóng WebSocket mà không "thoát chủ động" (server thấy mã khác 4000). */
   const dropConnection = (room: Room) => (room.connection.transport as any).ws.close();
@@ -281,6 +308,28 @@ describe("rớt mạng và nối lại (#116)", () => {
     // Người khác vẫn thấy một nhân vật duy nhất
     expect(serverState(a.room).players.size).toBe(before);
     expect((serverRoom(a.room) as any).ghosts.size).toBe(0);
+  });
+
+  it("nối lại: ô trang bị riêng (hài) vẫn là của chủ sau khi nối lại (StateView gửi lại trường có thẻ), chỉ số còn (M7.4, nit của B ở #580)", async () => {
+    injectOwnerItems();
+    try {
+      const a = await join("Noi Lai O Rieng");
+      const sid = a.room.sessionId;
+      const sp = serverState(a.room).players.get(sid)! as any;
+      sp.boots = "t_o_boots";
+      await waitFor(() => a.me().boots === "t_o_boots");
+      dropConnection(a.room);
+      await waitFor(() => !a.room.connection.isOpen);
+      await sleep(200);
+      const r2 = await reconnectTo(a.room);
+      expect(r2.room.sessionId).toBe(sid);
+      await waitFor(() => r2.me().boots === "t_o_boots");
+      // Vẫn đúng sau khi đổi tiếp ở máy chủ
+      sp.jade = "t_o_boots_khac";
+      await waitFor(() => r2.me().jade === "t_o_boots_khac");
+    } finally {
+      removeOwnerItems();
+    }
   });
 
   it("nối lại: nhận lại sổ chiêu và danh sách trạng thái (kèm cường độ tăng tốc) để client dự đoán đúng, không bị kéo giật (M7.2b)", async () => {
@@ -1303,6 +1352,48 @@ describe("trang bị và rèn đồ", () => {
     await sleep(200);
     const again = await join(name);
     expect(again.me().weapon).toBe("lang_nha_kiem");
+  });
+
+  it("ô riêng (M7.4): mặc hài thật qua server, chỉ CHỦ thấy, chỉ số cộng; pháp bảo bị từ chối trước Kim Đan; thoát ra vào lại vẫn mặc (nạp từ file lưu)", async () => {
+    injectOwnerItems();
+    try {
+      const name = "O Rieng Thu";
+      const a = await join(name);
+      const b = await join();
+      await waitFor(() => (b.room.state as any).players.has(a.room.sessionId));
+      const hp0 = a.me().maxHp;
+      a.room.send("chat", { text: "/give t_o_boots 1" });
+      a.room.send("chat", { text: "/give t_o_treasure 1" });
+      await waitFor(() => a.invs.at(-1)?.slots.some((s) => s?.itemId === "t_o_treasure"));
+      const inv = a.invs.at(-1)!;
+      // Pháp bảo trước Kim Đan: từ chối, món vẫn trong túi
+      const tSlot = inv.slots.findIndex((s) => s?.itemId === "t_o_treasure");
+      a.room.send("equip", { slot: tSlot });
+      await waitFor(() =>
+        a.toasts.some((t) => t.text.includes("Pháp bảo") && t.text.includes("Kim Đan")),
+      );
+      expect(a.me().treasure ?? "").toBe("");
+      // Hài: mặc được
+      const bSlot = inv.slots.findIndex((s) => s?.itemId === "t_o_boots");
+      a.room.send("equip", { slot: bSlot });
+      await waitFor(() => a.me().boots === "t_o_boots");
+      await waitFor(() => a.me().maxHp === hp0 + 37);
+      // Người khác KHÔNG nhận ô riêng của chủ (kể cả sau khi đổi)
+      await sleep(150);
+      expect((b.room.state as any).players.get(a.room.sessionId).boots).toBeUndefined();
+      // Ép pháp bảo vào ô CHƯA MỞ (như file sửa tay / lỗi): lưu xong nạp lại thì bị bỏ, hài vẫn còn
+      (serverState(a.room).players.get(a.room.sessionId) as any).treasure = "t_o_treasure";
+      // Thoát ra vào lại: nạp từ file lưu, vẫn mặc và chỉ số còn
+      await a.room.leave(true);
+      rooms.splice(rooms.indexOf(a.room), 1);
+      await sleep(200);
+      const again = await join(name);
+      expect(again.me().boots).toBe("t_o_boots");
+      expect(again.me().maxHp).toBe(hp0 + 37);
+      expect(again.me().treasure ?? "").toBe(""); // ô chưa mở ở cảnh giới này: không nạp, không cộng chỉ số
+    } finally {
+      removeOwnerItems();
+    }
   });
 });
 

@@ -144,7 +144,7 @@ export function cast(w: World, sid: string, raw: unknown) {
     w.events.toast(sid, { text: "Linh lực không đủ.", tone: "bad" });
     return;
   }
-  c.skillCd[idx] = w.now + skillCooldownMs(def, level, cdrOf(c));
+  c.skillCd[idx] = w.now + skillCooldownMs(def, level, cdrOf(p));
   p.mp -= cost;
   p.meditating = false;
   p.angle = quantAngle(m.angle);
