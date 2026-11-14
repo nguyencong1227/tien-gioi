@@ -15,7 +15,7 @@ import {
   type SkillEffect,
   type StatusId,
 } from "@tien-gioi/shared";
-import { hitMonster, hurtPlayer } from "./combat";
+import { hitMonster, hurtPlayer, hurtPlayerDot } from "./combat";
 import { tickMonsters } from "./monsters";
 import {
   addStatus,
@@ -26,7 +26,9 @@ import {
   newStatusBox,
   pruneStatuses,
   speedMult,
+  takeDotDamage,
   takenMult,
+  type StatusInst,
 } from "./status-rules";
 import {
   DOT_TICK_MS,
@@ -759,19 +761,35 @@ describe("sát thương THEO GIÂY lên người chơi (M7.3, #504: độc / b�
     expect(p.hp).toBe(hp0 - 80); // (10 + 30) x 2 giây
   });
 
-  it("phần lẻ dồn lại: 0,4 sát thương/giây x 2,5 giây vẫn gây sát thương (không bị làm tròn xuống 0 mỗi giây)", () => {
+  it("phần lẻ dồn lại: 0,4 sát thương/giây x 2,5 giây gây ĐÚNG 1 (không mất, không thừa)", () => {
     const { w, dmgs } = makeWorld();
     const { p } = addPlayer(w, "a");
     w.now = 10_000;
     const hp0 = p.hp;
     applyPlayerStatus(w, "a", eff("poison", 2500, 0.004), 100, ""); // dps 0,4
     run(w, 10_000, 13_000);
-    // phần lẻ dưới 1 KHÔNG bị làm tròn xuống 0 mãi (mỗi giây 0,4 -> 0): dồn tới khi làm tròn ra >= 1; chỉ vài lần 1, không phải mỗi giây một lần
+    // phần lẻ KHÔNG mất / thừa: 0,4 x 2,5 giây = 1 sát thương ĐÚNG MỘT lần (tính nốt lúc hết hạn), không phải mỗi giây một lần
     const hits = dotsOf(dmgs, "a");
-    expect(hits.length).toBeGreaterThanOrEqual(1);
-    expect(hits.length).toBeLessThanOrEqual(2);
-    expect(hits.every((x) => x === 1)).toBe(true);
+    expect(hits).toEqual([1]);
     expect(p.hp).toBe(hp0 - hits.length);
+  });
+
+  it("thách đấu bất tử trước sát thương theo giây; gọi `hurtPlayerDot` thẳng lên người đã gục không trừ tiếp (review B ở #567)", () => {
+    const duel = makeWorld();
+    const a = addPlayer(duel.w, "a");
+    duel.w.now = 10_000;
+    const hp0 = a.p.hp;
+    applyPlayerStatus(duel.w, "a", eff("poison", 3000, 0.2), 100, "");
+    vi.spyOn(duel.w.duels, "has").mockImplementation((sid: string) => sid === "a");
+    run(duel.w, 10_000, 14_000);
+    expect(a.p.hp).toBe(hp0);
+
+    const dead = makeWorld();
+    const d = addPlayer(dead.w, "d");
+    d.p.dead = true;
+    const hpd = d.p.hp;
+    hurtPlayerDot(dead.w, "d", d.p, 10, "Độc");
+    expect(d.p.hp).toBe(hpd);
   });
 
   it("tick bị trễ (server lag) vẫn không tính quá hạn: độc 1,5 giây x 20/giây gây đúng 30 dù tick kế tới muộn 10 giây", () => {
@@ -851,5 +869,70 @@ describe("sát thương THEO GIÂY lên người chơi (M7.3, #504: độc / b�
     applyPlayerStatus(limbo.w, "b", eff("burn", 5000, 0.2), 100, "");
     run(limbo.w, 10_000, 11_100);
     expect(b.c.limbo).toBeDefined(); // chết thật = Hoàng Tuyền (cùng đường với đòn quái)
+  });
+});
+
+describe("takeDotDamage: sát thương theo giây không mất / thừa phần lẻ (review B ở #567)", () => {
+  const dot = (dps: number, from: number, ms: number): StatusInst => ({
+    id: "poison",
+    until: from + ms,
+    ratio: 0.1,
+    dps,
+    pool: 0,
+    last: from,
+    src: "",
+  });
+
+  /** Chạy mỗi 50 ms tới sau hạn, trả danh sách các lần gây. */
+  function simulate(s: StatusInst, from: number): number[] {
+    const hits: number[] = [];
+    for (let t = from; t <= s.until + 1000; t += 50) {
+      const d = takeDotDamage(s, t);
+      if (d > 0) hits.push(d);
+    }
+    return hits;
+  }
+
+  it("chưa tới nhịp 1 giây hoặc dps <= 0 / rác: 0 và KHÔNG đổi `last`", () => {
+    const s = dot(20, 10_000, 5000);
+    expect(takeDotDamage(s, 10_999)).toBe(0);
+    expect(s.last).toBe(10_000);
+    for (const dps of [0, -3, Number.NaN]) {
+      const z = dot(dps, 10_000, 5000);
+      expect(takeDotDamage(z, 12_000)).toBe(0);
+      expect(z.last).toBe(10_000);
+    }
+  });
+
+  it("tới nhịp thì lấy phần NGUYÊN và đẩy `last` đúng thời gian của phần nguyên đó (dps 1,4: 1 sát thương = 714,3 ms), phần dư ở lại cho lần sau", () => {
+    const s = dot(1.4, 10_000, 10_000);
+    expect(takeDotDamage(s, 11_000)).toBe(1); // dồn 1,4 -> lấy 1
+    expect(s.last).toBeCloseTo(10_000 + 1000 / 1.4, 6); // KHÔNG nhảy tới 11_000: 0,4 phần dư còn trong last..now
+    expect(takeDotDamage(s, 11_100)).toBe(0); // chưa tới nhịp kể từ last mới
+    // không gây TRƯỚC khi dồn đủ: dps 0,6 sau 1 giây mới dồn 0,6 (< 1) nên chưa gây (round sẽ gây sớm 1 và bù trừ về sau)
+    const slow = dot(0.6, 10_000, 10_000);
+    expect(takeDotDamage(slow, 11_000)).toBe(0);
+    expect(slow.last).toBe(10_000);
+    expect(takeDotDamage(slow, 12_000)).toBe(1); // 1,2 dồn -> lấy 1
+  });
+
+  it("TỔNG sát thương cả đời = round(dps x thời lượng) với mọi dps nhỏ (trước đây round mỗi giây lệch tới +-30-100 %)", () => {
+    for (const dps of [0.3, 0.4, 0.7, 1.4, 1.5, 2.6, 7.3, 20, 33.3]) {
+      for (const ms of [800, 1500, 2500, 4000, 7000]) {
+        const s = dot(dps, 50_000, ms);
+        const total = simulate(s, 50_000).reduce((a, b) => a + b, 0);
+        const exact = (dps * ms) / 1000;
+        // nửa đúng (x,5) có thể làm tròn lệch 1 do sai số số thực: bỏ qua các ca sát nửa
+        if (Math.abs(exact - Math.floor(exact) - 0.5) < 1e-6) continue;
+        expect(total, `dps ${dps} x ${ms} ms (chính xác ${exact})`).toBe(Math.round(exact));
+      }
+    }
+  });
+
+  it("tick trễ 10 giây vẫn kẹp ở `until` (không tính quá hạn) và chốt `last = until`", () => {
+    const s = dot(20, 10_000, 1500);
+    expect(takeDotDamage(s, 20_000)).toBe(30);
+    expect(s.last).toBe(11_500);
+    expect(takeDotDamage(s, 21_000)).toBe(0); // đã chốt: không gây lại
   });
 });
