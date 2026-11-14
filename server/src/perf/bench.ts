@@ -612,11 +612,19 @@ if (process.argv[1]?.endsWith("bench.ts")) {
     console.log(
       `Mô phỏng nhiều World đồng thời trong một tiến trình (${seconds}s = ${seconds * 20} tick), ngân sách tổng < 10 ms (#141)\n`,
     );
+    // `--maps=lac_ha,hac_phong,am_suong` chọn các bản đồ (mặc định hai bản đồ đầu: giữ nguyên số của mốc cũ); `--per-map N` người mỗi bản đồ (mặc định 50)
+    const mapsArg = process.argv.find((a) => a.startsWith("--maps="));
+    const multiIds = mapsArg
+      ? mapsArg.slice(7).split(",").filter(Boolean)
+      : ["lac_ha", "hac_phong"];
+    const unknownMap = multiIds.find((id) => !getMap(id));
+    if (unknownMap) {
+      console.error(`Bản đồ lạ: ${unknownMap}`);
+      process.exit(1);
+    }
+    const perMap = arg("per-map", 50);
     const multiRes = runMultiMapBench(
-      [
-        { mapId: "lac_ha", players: 50, mode },
-        { mapId: "hac_phong", players: 50, mode },
-      ],
+      multiIds.map((mapId) => ({ mapId, players: perMap, mode })),
       seconds,
       1,
     );
