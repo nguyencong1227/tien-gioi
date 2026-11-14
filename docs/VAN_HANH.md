@@ -299,3 +299,39 @@ Công cụ sẽ từ chối thao tác (mã thoát `1` hoặc `2`) trong các tr�
 - **Tông chủ còn thành viên khác:** Phải chuyển giao chức Tông chủ cho người khác hoặc giải tán tông môn trước khi xoá tài khoản.
 - **Tông môn còn Linh thạch trong kho:** Nếu Tông chủ một mình nhưng kho còn > 0 Linh thạch, phải rút hết Linh thạch ra để tránh làm mồ côi ngân sách tông môn.
 
+---
+
+## 9. Theo dõi Tiến độ Người chơi & Cân bằng Kim Đan (#406, M6.12)
+
+Theo quyết định chốt trước phát hành v0.2.0 (`CAN_BANG.md` mục 10, PR #473), đội ngũ phát triển giữ nguyên thông số Xích Mãng và theo dõi tiến độ của người chơi thật qua thời gian chơi tích luỹ của kiếp (`life.playMs`). Nếu trung vị thời gian người chơi đạt Kim Đan Hậu kỳ dưới **~4 giờ** (ngắn hơn mục tiêu 5–7 giờ), máy chủ sẽ điều chỉnh mật độ hoặc thời gian hồi sinh của Xích Mãng ở bản vá `0.2.x`.
+
+Công cụ `server/scripts/thong-ke-tien-do.ts` (`npm run thong-ke-tien-do -w server`) được xây dựng để trích xuất số liệu này định kỳ một cách an toàn và bảo mật.
+
+### 9.1. An toàn & Bảo mật Dữ liệu
+- **Chỉ đọc trực tiếp từ tệp sao lưu:** Công cụ giải nén luồng bộ nhớ (in-memory stream) từ tệp `tiengioi-*.sql.gz` của `prod.sh backup`, **tuyệt đối không kết nối cơ sở dữ liệu production**, không chạy qua cổng 2567, không ghi tệp tạm ra đĩa.
+- **Bảo vệ quyền riêng tư tuyệt đối:** Báo cáo **không bao giờ in tên nhân vật, đạo hiệu hay mã bí mật**. Dữ liệu được nhóm ẩn danh theo `(cảnh giới, bậc)`.
+
+### 9.2. Cách chạy trên bản sao lưu mới nhất
+```bash
+# Tìm bản sao lưu mới nhất trong thư mục backups
+LATEST_BACKUP=$(ls -t ~/TT/tien-gioi-prod/backups/tiengioi-*.sql.gz | head -1)
+
+# Chạy thống kê và in bảng Markdown
+npm run thong-ke-tien-do -w server -- --backup="$LATEST_BACKUP"
+
+# Tuỳ chọn: Xuất định dạng JSON cho hệ thống giám sát
+npm run thong-ke-tien-do -w server -- --backup="$LATEST_BACKUP" --json
+```
+
+Khi chạy trên môi trường phát triển (dữ liệu file JSON cục bộ):
+```bash
+npm run thong-ke-tien-do -w server -- --dir=server/data/players
+```
+
+### 9.3. Tiêu chí Đánh giá Cân bằng
+Báo cáo tự động đối chiếu trung vị thời gian chơi (`medianHours`) của người chơi Kim Đan Hậu kỳ:
+- **Đạt mục tiêu (>= 4.0 giờ):** Tiến độ bình thường, bãi luyện công Kim Đan và Xích Mãng phân bổ cân bằng.
+- **Dưới ngưỡng (< 4.0 giờ, với >= 5 mẫu):** Cảnh báo người chơi tiến cấp quá nhanh nhờ đường tắt Xích Mãng. Kích hoạt quy trình giảm mật độ hoặc tăng thời gian hồi sinh quái.
+- **Chưa đủ mẫu (< 5 mẫu):** Dán cờ tham khảo, tiếp tục thu thập thêm dữ liệu từ các bản sao lưu kế tiếp.
+
+

@@ -36,7 +36,8 @@
     "red-team": "tsx scripts/red-team.ts",
     "check:env": "tsx scripts/check-env.ts",
     "khoi-phuc-thu": "tsx scripts/verify-restore.ts",
-    "soak": "tsx scripts/soak.ts"
+    "soak": "tsx scripts/soak.ts",
+    "thong-ke-tien-do": "tsx scripts/thong-ke-tien-do.ts"
   },
   "dependencies": {
     "@colyseus/schema": "3.0.76",
