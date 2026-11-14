@@ -207,12 +207,12 @@ describe("Thử tải & độ tin cậy chuyển bản đồ qua cổng (Issue #
       }
     }
 
-    // 3. Đánh giá độ trễ: p50 và p95 (ngưỡng an toàn khi chạy toàn bộ test suite dưới tải cao)
+    // 3. Đánh giá độ trễ: p50 và p95 (mục tiêu LOAD_TEST.md p50 < 350, p95 < 600; trần test 600 / 900)
     travelLatencies.sort((a, b) => a - b);
     const p50 = travelLatencies[Math.floor(travelLatencies.length * 0.5)];
     const p95 = travelLatencies[Math.floor(travelLatencies.length * 0.95)];
-    expect(p50).toBeLessThan(1200);
-    expect(p95).toBeLessThan(1800);
+    expect(p50).toBeLessThan(600); // Độ trễ chuyển phòng p50 < 600 ms khi chịu tải nền
+    expect(p95).toBeLessThan(900);
 
     // 4. Kiểm tra trọn vẹn dữ liệu: không mất tu vi, không mất túi đồ, file lưu đúng
     const finalCtrl = serverRoom(cur.room).world.ctrl.get(cur.room.sessionId);
