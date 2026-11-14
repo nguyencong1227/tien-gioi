@@ -661,3 +661,63 @@ describe("tốc độ và choáng của người chơi (khớp hàm dùng chung 
     expect(p.hp).toBe(10);
   });
 });
+
+describe("Monster.fx: mặt nạ bit trạng thái có hại công khai (M7.3, #504 / M7.7 #508)", () => {
+  /** Chạy `tickStatuses` mỗi 50 ms từ `from` tới `to` (ms, `w.now`). */
+  function run(w: ReturnType<typeof makeWorld>["w"], from: number, to: number) {
+    for (let t = from; t <= to; t += 50) {
+      w.now = t;
+      tickStatuses(w, 0.05);
+    }
+  }
+
+  it("quái mới sinh: fx = 0, elite = 0 (không tốn byte)", () => {
+    const { w } = makeWorld();
+    const { m } = addMonster(w, "lang", 100, 100);
+    expect(m.fx).toBe(0);
+    expect(m.elite).toBe(0);
+  });
+
+  it("gắn trạng thái có hại thì bật đúng bit (bỏng 1, độc 2, tê cóng 8, choáng 32), gắn thêm thì cộng bit", () => {
+    const { w } = makeWorld();
+    const { id, m } = addMonster(w, "lang", 100, 100);
+    w.now = 10_000;
+    applyMonsterStatus(w, id, eff("burn", 5000, 0.1), 10, "a");
+    expect(m.fx).toBe(1);
+    applyMonsterStatus(w, id, eff("poison", 5000, 0.1), 10, "a");
+    expect(m.fx).toBe(1 | 2);
+    applyMonsterStatus(w, id, eff("chill", 5000, 0.3), 0, "a");
+    applyMonsterStatus(w, id, eff("stun", 1000, 0), 0, "a");
+    expect(m.fx).toBe(1 | 2 | 8 | 32);
+    expect(m.fx).toBe(maskOf(w.mctrl.get(id)!.st!, w.now));
+  });
+
+  it("hết hạn từng trạng thái thì tắt đúng bit đó; hết sạch thì về 0 (kể cả lần dọn cuối trước khi rời tập theo dõi)", () => {
+    const { w } = makeWorld();
+    const { id, m } = addMonster(w, "lang", 100, 100);
+    w.now = 10_000;
+    applyMonsterStatus(w, id, eff("chill", 2000, 0.3), 0, "a"); // bit 8, hết lúc 12_000
+    applyMonsterStatus(w, id, eff("stun", 800, 0), 0, "a"); // bit 32, hết lúc 10_800
+    expect(m.fx).toBe(8 | 32);
+    run(w, 10_000, 11_000);
+    expect(m.fx).toBe(8); // choáng đã hết
+    run(w, 11_050, 12_200);
+    expect(m.fx).toBe(0); // tê cóng hết: huy hiệu cuối cùng được bỏ
+    expect(w.statusM.has(id)).toBe(false);
+  });
+
+  it("làm mới trạng thái không đổi mặt nạ; buff (có lợi) và trùm miễn choáng không lên quái", () => {
+    const { w } = makeWorld();
+    const boss = MONSTERS.find((m) => m.boss)!;
+    const a = addMonster(w, "lang", 100, 100);
+    const b = addMonster(w, boss.id, 400, 100);
+    w.now = 10_000;
+    applyMonsterStatus(w, a.id, eff("burn", 3000, 0.1), 10, "x");
+    applyMonsterStatus(w, a.id, eff("burn", 6000, 0.2), 10, "x");
+    expect(a.m.fx).toBe(1);
+    applyMonsterStatus(w, a.id, eff("haste", 3000, 0.3), 0, "x"); // buff
+    expect(a.m.fx).toBe(1);
+    expect(applyMonsterStatus(w, b.id, eff("stun", 1000, 0), 0, "x")).toBe("resisted");
+    expect(b.m.fx).toBe(0);
+  });
+});

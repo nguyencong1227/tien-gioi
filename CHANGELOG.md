@@ -39,6 +39,7 @@ Bản phát hành M6 (`QUYET_DINH_M3.md` mục 10, 14: người dùng đồng ý
 - Bí cảnh Linh Hư có **trần bậc 12**: từ Kim Đan trở lên quá dễ, không vào được (#428).
 
 ### Giao thức và dữ liệu lưu
+- **Trạng thái trên đầu quái (M7.3, #504):** thêm hai trường công khai của quái ở `schema.ts`: `Monster.fx` (mặt nạ bit trạng thái CÓ HẠI đang dính: bỏng 1, độc 2, chảy máu 4, tê cóng 8, vỡ giáp 16, choáng 32; máy chủ cập nhật khi gắn / hết hạn, buff không lên quái) để client vẽ huy hiệu, và `Monster.elite` (0 thường / 1 tinh anh, hiện luôn 0 cho tới bước tinh anh). Thêm trường nên client cũ bỏ qua được, `PROTOCOL_VERSION` giữ 3. Quái sinh ra không tốn thêm byte (giá trị mặc định 0); bench byte / tick không đổi (+0,1 % ở 100 người).
 - **`PROTOCOL_VERSION` 1 -> 2:** client cũ không biết bản đồ và loài quái mới. `shared/` giữ `MIN_PROTOCOL_VERSION` mặc định; trên bản chạy thật đặt `MIN_PROTOCOL_VERSION=2` bằng biến môi trường (`.env.production`) lúc phát hành, nên client / APK `v0.1.x` bị từ chối với mã 426 và hiện thông báo "có bản mới" thay vì vào nhầm và thấy bản đồ / quái lạ.
 - Tệp lưu cũ vẫn nạp được. Test Colyseus thật ba bản đồ: khứ hồi Lạc Hà - Hắc Phong - Âm Sương kiểm tu vi và túi đồ ở cuối vòng (#429, #435); và kiểm tu vi, Linh thạch, túi đồ, sổ nhiệm vụ, cảnh giới, đồ đang mặc, mã kiếp SAU MỖI lần qua cổng, rớt mạng rồi nối lại, hai tab đua nhau, tệp lưu cũ (#454).
 
