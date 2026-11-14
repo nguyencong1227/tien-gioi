@@ -98,6 +98,8 @@ export interface PlayerCtrl {
    */
   moveMul?: number;
   stunned?: boolean;
+  /** Đang né đòn của quái tới thời điểm này (ms, `w.now`): chiêu bộ pháp (`SkillDef.dodgeMs`, `systems/cast.ts`); `hurtPlayer` bỏ qua sát thương */
+  dodgeUntil?: number;
   /** Định danh kiếp hiện tại và bộ đếm thành tựu của kiếp (lưu cùng nhân vật; không vào state chung) */
   lifeId: string;
   life: LifeCounters;

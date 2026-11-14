@@ -156,6 +156,7 @@ export function hurtPlayer(w: World, sid: string, p: Player, dmg: number, from: 
   if (!c || p.dead) return;
   if (w.ghosts.has(sid)) return; // rớt mạng, đang chờ nối lại: bất tử
   if (w.duels.has(sid)) return; // đang thách đấu: bất tử trước quái (không để một con hổ đi ngang giết người thật)
+  if (c.dodgeUntil !== undefined && w.now < c.dodgeUntil) return; // đang né (chiêu bộ pháp): đòn trượt, không ngắt đả tọa / hồi phục
   if (c.st && c.st.list.length > 0) {
     // Hộ thể: khiên hấp thụ trước, phần còn lại mới trừ khí huyết (đòn trúng khiên vẫn ngắt đả tọa và hồi phục)
     const a = absorbShield(c.st, dmg, w.now);
