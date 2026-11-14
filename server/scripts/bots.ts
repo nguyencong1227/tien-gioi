@@ -79,6 +79,7 @@ import {
 } from "@tien-gioi/shared";
 import { runBench } from "../src/perf/bench";
 import { hashSecret, type SavedPlayer } from "../src/store";
+import { BOLT_RADIUS } from "../src/systems/bolt";
 import { assertNotProd } from "./assert-not-prod";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -1299,13 +1300,14 @@ export function parseWarnZoneFromFx(
     const speed = typeof msg.speed === "number" && msg.speed > 0 ? msg.speed : 250;
     const angle = typeof msg.angle === "number" ? msg.angle : 0;
     const ms = (r / speed) * 1000;
-    // Bán kính va chạm của đạn (12 px) + người chơi (12 px) = 24 px; bề rộng đường đạn w = 24 px
+    // Bán kính đạn BOLT_RADIUS = 6 px, reach = w/2 + PLAYER_RADIUS = 6 + 12 = 18 px khớp va chạm server thật;
+    // bề rộng đường đạn w = 2 * BOLT_RADIUS = 12 px (tránh vùng nguy hiểm bị rộng hơn thực tế ~6 px mỗi bên)
     return {
       shape: "line",
       x: msg.x,
       y: msg.y,
       r,
-      w: 24,
+      w: 2 * BOLT_RADIUS,
       angle,
       arc: 0,
       expiresAt: now + ms,

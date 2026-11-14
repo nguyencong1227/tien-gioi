@@ -726,9 +726,14 @@ function drawMonsterFrame(id, step) {
     // Hốc mắt than hồng
     s.circle(44, 20 + shift * 0.5, 3.2, 0x3a2a1c);
     s.rect(43, 19 + shift * 0.5, 2, 2, 0xff5a3a);
-    // Đất khô bám
+    // Đất khô bám + tuyết phủ lưng và đầu (Hàn Vân Lĩnh: "xương voi phủ tuyết")
     s.circle(16, 44, 2, 0x8a6a42);
     s.circle(36, 45, 2.4, 0x8a6a42);
+    s.ellipse(22, 17 + shift * 0.5, 9, 2.2, 0xffffff, 235);
+    s.ellipse(33, 16 + shift * 0.5, 4, 1.8, 0xf2f9ff, 235);
+    s.ellipse(41, 12 + shift, 4, 1.8, 0xffffff, 235);
+    s.circle(14, 30, 1.6, 0xffffff, 200);
+    s.circle(29, 33, 1.4, 0xffffff, 200);
     return s;
   }
   if (id === "doc_tuoc") {
@@ -899,6 +904,7 @@ const SWORDS = {
   suong_vu_kiem: [0x5d8fa5, 0xeaf6fa, 0x2c4a5a, 2.4], // mỏng như sương; thân đậm hơn màu nền ô túi (def.color 0xa9cfdc) để không chìm
   huyen_quy_kiem: [0x56674a, 0xc9d36a, 0x2f3a28, 4.4], // dày nặng
   hac_giao_kiem: [0x24465f, 0x6fc3e6, 0x16222f, 3.4],
+  han_vu_kiem: [0x6fa9cf, 0xf2fbff, 0x2c4a6a, 2.6], // Nguyên Anh (M7.5c): lưỡi băng mảnh, mép trắng
 };
 const ROBES = {
   tho_nhung_bao: [0xe9e1cf, 0x4ba368],
@@ -907,6 +913,7 @@ const ROBES = {
   suong_ho_bao: [0x7fa6b8, 0x2f5f78], // vải đậm hơn màu nền ô túi (def.color 0xd9e7ec)
   quy_giap_bao: [0x49573f, 0xc9d36a],
   giao_lan_bao: [0x1d3550, 0x6fc3e6],
+  han_lang_bao: [0x7fa6c8, 0x1f4f8f], // Nguyên Anh (M7.5c): vải xanh băng đậm hơn nền ô túi
 };
 const TALISMANS = {
   lang_nha_phu: [0x9c9585, 0x9fd0ea],
@@ -915,6 +922,7 @@ const TALISMANS = {
   ho_tam_phu: [0x8fb4c4, 0xeaf6fa],
   quy_tuc_phu: [0x6e8060, 0xc9d36a],
   giao_long_phu: [0x2e5a7a, 0x6fc3e6],
+  phong_nha_phu: [0x9aa0ab, 0xe8c25a], // Nguyên Anh (M7.5c): phù thép, linh văn vàng kim
 };
 
 // Đồ ba ô RIÊNG của chủ (M7.4, shared/src/owner-gear.ts): hài, ngọc bội, pháp bảo: [màu chính, màu phụ]. Hình tạm vẽ bằng code, đổi màu theo bậc.
@@ -923,12 +931,14 @@ const BOOTS = {
   mang_hanh_ngoa: [0x4f7a3c, 0x2f4a24],
   suong_van_ngoa: [0xa9c6d8, 0xeaf6fa],
   giao_anh_ngoa: [0x2e5a7a, 0x6fc3e6],
+  tuyet_hanh_ngoa: [0xa4c4d8, 0x2f5f9a], // Nguyên Anh (M7.5c): hài tuyết, miệng và đế xanh sẫm
 };
 const JADES = {
   tho_nguyet_boi: [0xe6e0cc, 0xb8b09a],
   mang_tinh_boi: [0x6fa05a, 0x3c5e2c],
   suong_linh_boi: [0xa4c4d8, 0xe6f1f5],
   giao_chau_boi: [0x3a6e92, 0x7fd0f0],
+  han_tinh_boi: [0xbfe4f6, 0x3a86b8], // Nguyên Anh (M7.5c): sao băng sáu cánh
 };
 const TREASURE_ICONS = {
   ho_than_an: [0x6a8caf, 0xd8e6f2],
@@ -1005,24 +1015,15 @@ function drawItemIcon(id) {
     id === "hoi_linh_dan" ||
     id === "tu_khi_dan" ||
     id === "dai_hoi_huyet_dan" ||
-    id === "dai_hoi_linh_dan"
+    id === "dai_hoi_linh_dan" ||
+    id === "thuong_hoi_huyet_dan" ||
+    id === "thuong_hoi_linh_dan"
   ) {
-    const red = id === "hoi_huyet_dan" || id === "dai_hoi_huyet_dan";
-    const main = red
-      ? 0xd9433b
-      : id === "hoi_linh_dan" || id === "dai_hoi_linh_dan"
-        ? 0x3b7bd9
-        : 0xe8c547;
-    const dark = red
-      ? 0x8f221d
-      : id === "hoi_linh_dan" || id === "dai_hoi_linh_dan"
-        ? 0x1f4b8f
-        : 0xa68319;
-    const glow = red
-      ? 0xffb3ad
-      : id === "hoi_linh_dan" || id === "dai_hoi_linh_dan"
-        ? 0xb3d9ff
-        : 0xfff3b0;
+    const red = id.endsWith("hoi_huyet_dan");
+    const blue = id.endsWith("hoi_linh_dan");
+    const main = red ? 0xd9433b : blue ? 0x3b7bd9 : 0xe8c547;
+    const dark = red ? 0x8f221d : blue ? 0x1f4b8f : 0xa68319;
+    const glow = red ? 0xffb3ad : blue ? 0xb3d9ff : 0xfff3b0;
     // Viên linh đan có vân đan đạo và điểm sáng
     s.circle(12, 12, 8.5, dark);
     s.circle(12, 12, 7.2, main);
@@ -1035,6 +1036,23 @@ function drawItemIcon(id) {
       s.set(12, 22, 0xfff3b0);
       s.set(1, 12, 0xfff3b0);
       s.set(22, 12, 0xfff3b0);
+    }
+    // Đan cấp 3 (M7.5c, Nguyên Anh): viền vàng kim + quầng trắng ngoài, bốn tia chéo và đốm sáng thứ hai (khác đan cấp 2 ở quầng và tia chéo)
+    if (id.startsWith("thuong_")) {
+      s.ring(12, 12, 9.4, 1.4, 0xe8c25a);
+      s.ring(12, 12, 11, 0.9, 0xffffff, 150);
+      for (const [x, y] of [
+        [12, 1],
+        [12, 22],
+        [1, 12],
+        [22, 12],
+        [4, 4],
+        [20, 4],
+        [4, 20],
+        [20, 20],
+      ])
+        s.set(x, y, 0xfff3b0);
+      s.circle(15, 15, 1.2, 0xffffff, 200);
     }
   } else if (id === "long_tho") {
     // Chùm lông thỏ trắng mềm
@@ -1080,6 +1098,71 @@ function drawItemIcon(id) {
     s.circle(9, 12, 1.6, 0xd9c6f0, 200);
     s.tri(18, 15, 20, 20, 16, 19, 0x8fe35a);
     s.circle(18, 20, 1.5, 0x8fe35a);
+  } else if (id === "han_lang_mao") {
+    // Hàn Lang Mao (M7.5c): nhúm lông sói băng cứng, đầu lông kết tinh, sao tuyết nhỏ
+    s.line(6, 19, 8, 8, 0x86aac4, 2);
+    s.line(10, 20, 11, 6, 0xbfd9ec, 2.4);
+    s.line(14, 19, 15, 7, 0x86aac4, 2);
+    s.line(18, 18, 18, 9, 0xd6ecf7, 1.8);
+    s.tri(8, 4, 6, 9, 10, 9, 0xe6f6ff);
+    s.tri(11, 2, 9, 8, 13, 8, 0xffffff);
+    s.tri(15, 3, 13, 9, 17, 9, 0xe6f6ff);
+    s.tri(18, 5, 16, 10, 20, 10, 0xe6f6ff);
+    s.circle(12, 4, 4, 0x9fe8ff, 60);
+  } else if (id === "phong_nha_vu") {
+    // Phong Nha Vũ (M7.5c): lông chim thép: phiến lông bầu dục nghiêng 45 độ, sống lông bạc, gai lông, đầu mút vàng kim
+    const feather = (x, y) => {
+      // toạ độ trong hệ lông: u dọc theo sống (lên phải), v vuông góc
+      const dx = x - 12;
+      const dy = y - 12;
+      const u = (dx - dy) * 0.7071;
+      const v = (dx + dy) * 0.7071;
+      return Math.hypot(u / 10, v / 3.6) - 1;
+    };
+    sdfShape(s, (x, y) => feather(x, y) * 3.2, 0x9aa0ab, 0x5f6672);
+    s.line(4.5, 19.5, 19.5, 4.5, 0xeef0f4, 1.2);
+    for (const t of [-4, -1, 2, 5]) {
+      const cx = 12 + t * 0.7071;
+      const cy = 12 - t * 0.7071;
+      s.line(cx, cy, cx - 2.2, cy - 2.2, 0xc9ccd6, 1);
+      s.line(cx, cy, cx + 2.2, cy + 2.2, 0x7b808c, 1);
+    }
+    s.circle(19.5, 4.5, 1.8, 0xe8c25a);
+  } else if (id === "tuong_cot") {
+    // Tượng Cốt (M7.5c): khúc xương voi to, hai đầu khớp tròn, vân nâu, vệt tuyết trắng
+    s.line(7, 17, 17, 7, 0x8a7a5a, 5);
+    s.line(7, 17, 17, 7, 0xe8dfc8, 3.6);
+    s.circle(6, 18, 3.4, 0xe8dfc8);
+    s.circle(4.5, 16.5, 2.4, 0xcdbfa0);
+    s.circle(18, 6, 3.4, 0xe8dfc8);
+    s.circle(19.5, 7.5, 2.4, 0xcdbfa0);
+    s.line(11, 14, 14, 11, 0x5a4630, 1);
+    s.circle(9, 14, 1.6, 0xffffff, 230);
+    s.circle(15, 9, 1.4, 0xffffff, 230);
+  } else if (id === "doc_tuoc_nang") {
+    // Độc Tước Nang (M7.5c): túi độc sẻ nhỏ, bầu tím lục, cuống buộc dây, giọt độc
+    s.rect(10, 4, 4, 3, 0x3f6e34);
+    s.rect(9, 6, 6, 2, 0xc9a24a);
+    s.ellipse(12, 14, 6.5, 6, 0x5f9a4a);
+    s.ellipse(12, 15, 4.6, 4, 0x9a5fc8);
+    s.circle(10, 12, 1.6, 0xe6c8ff, 210);
+    s.tri(18, 16, 20, 21, 16, 20, 0x8fe35a);
+    s.circle(18, 21, 1.4, 0x8fe35a);
+  } else if (id === "thien_han_chau") {
+    // Thiên Hàn Châu (M7.5c, trùm, độ hiếm 4): viên châu băng sáng, vòng hàn khí, tia sao bốn hướng
+    s.circle(12, 12, 10, 0x6fc3e6, 50);
+    s.ring(12, 12, 9.5, 1, 0xcfeeff, 170);
+    s.circle(12, 12, 6.8, 0x2d5f8c);
+    s.circle(12, 12, 5.8, 0x4a86b8);
+    s.circle(12, 12, 3.4, 0x9fe8ff);
+    s.circle(9.4, 9.4, 2, 0xffffff, 235);
+    for (const [x, y, x2, y2] of [
+      [12, 0.5, 12, 3.5],
+      [12, 20.5, 12, 23.5],
+      [0.5, 12, 3.5, 12],
+      [20.5, 12, 23.5, 12],
+    ])
+      s.line(x, y, x2, y2, 0xe6f6ff, 1.2);
   } else if (id === "giao_lan") {
     // Giao lân: vảy giao đen biếc hình thoi, ánh lam
     s.tri(12, 2, 3, 12, 21, 12, 0x2e5a7a);
@@ -1106,6 +1189,11 @@ function drawItemIcon(id) {
     // Chuôi kiếm + quả cầu đầu chuôi
     s.line(4, 20, 8, 16, hilt, 2.4);
     s.circle(4, 20, 1.8, edge);
+    // Hàn Vũ Kiếm (M7.5c): băng tuyết kết dọc lưỡi (hai nhũ băng nhỏ phía dưới)
+    if (id === "han_vu_kiem") {
+      s.tri(11, 13, 13, 13, 12, 17, 0xcfeeff);
+      s.tri(14, 10, 16, 10, 15, 14, 0xcfeeff);
+    }
   } else if (ROBES[id]) {
     // Pháp bào (3 bậc Luyện Khí / Trúc Cơ + 3 bậc Kim Đan, M6)
     const [robe, trim] = ROBES[id];
@@ -1141,6 +1229,15 @@ function drawItemIcon(id) {
         [16, 18],
       ])
         s.circle(x, y, 1.8, 0xffffff, 160);
+    if (id === "han_lang_bao")
+      for (const [x, y] of [
+        [8, 17],
+        [16, 17],
+        [12, 19],
+      ]) {
+        s.line(x - 1.4, y, x + 1.4, y, 0xe6f6ff, 1);
+        s.line(x, y - 1.4, x, y + 1.4, 0xe6f6ff, 1);
+      }
   } else if (TALISMANS[id]) {
     // Hộ phù / Linh phù (3 bậc Luyện Khí / Trúc Cơ + 3 bậc Kim Đan, M6)
     const [body, rune] = TALISMANS[id];
@@ -1196,6 +1293,31 @@ function drawItemIcon(id) {
       s.line(9.4, 10.9, 14.6, 16.1, 0xffffff, 1, 160);
       s.line(14.6, 10.9, 9.4, 16.1, 0xffffff, 1, 160);
       hole(12, 6.4);
+    } else if (id === "han_tinh_boi") {
+      // Hàn Tinh: sao băng sáu cánh (hai tam giác chồng nhau), tâm sáng, dây xỏ ở cánh trên
+      const star = sdUnion(
+        (x, y) => {
+          // tam giác đều hướng lên tâm (12, 13.5), cạnh ~ 17
+          const dx = x - 12;
+          const dy = y - 13.5;
+          return Math.max(
+            dy - 4.4,
+            -0.866 * dx - 0.5 * dy - 4.4 + 0.0,
+            0.866 * dx - 0.5 * dy - 4.4,
+          );
+        },
+        (x, y) => {
+          const dx = x - 12;
+          const dy = y - 13.5;
+          return Math.max(-dy - 4.4, -0.866 * dx + 0.5 * dy - 4.4, 0.866 * dx + 0.5 * dy - 4.4);
+        },
+      );
+      sdfShape(s, star, main, accent);
+      // hoa tuyết nhỏ ở giữa (không vòng tròn + chấm tối: giống con mắt)
+      s.line(12, 10.5, 12, 16.5, 0xffffff, 1);
+      s.line(9.4, 12, 14.6, 15, 0xffffff, 1);
+      s.line(14.6, 12, 9.4, 15, 0xffffff, 1);
+      hole(12, 7.6);
     } else {
       // Giao Châu: giọt châu (tròn dưới, nhọn trên) có vòng vảy rồng và vệt sáng
       const drop = sdUnion(
@@ -1338,6 +1460,16 @@ function drawNpcSprite(id) {
     tram_truong: { robe: 0x4a6b78, trim: 0xd9e7ec, hair: 0xd8d2c5, beard: true, prop: "lantern" },
     lai_buon_suong: { robe: 0x7a5f8c, trim: 0xe8c25a, hair: 0x8a8f99, beard: true, prop: "pack" },
     tho_ren_suong: { robe: 0x9a4a30, trim: 0xc9d36a, hair: 0x4a3f38, beard: true, prop: "hammer" },
+    // Hàn Vân Trạm (Hàn Vân Lĩnh, M7.5c #506): tông xanh băng; tranh có TRƯỚC NPC trong `shared/`
+    tram_truong_han: {
+      robe: 0x3f5f8a,
+      trim: 0xe6f6ff,
+      hair: 0xe6ecf2,
+      beard: true,
+      prop: "lantern",
+    },
+    lai_buon_han: { robe: 0x5d6f9a, trim: 0xf0d27a, hair: 0x4a4f5c, beard: false, prop: "pack" },
+    tho_ren_han: { robe: 0x6a3f4a, trim: 0x9fd0ea, hair: 0x2c3a4a, beard: true, prop: "hammer" },
   }[id];
   if (!cfg) throw new Error(`Chưa có tranh NPC: ${id}`);
 
@@ -1474,6 +1606,9 @@ function buildAtlas() {
     "tram_truong",
     "lai_buon_suong",
     "tho_ren_suong",
+    "tram_truong_han",
+    "lai_buon_han",
+    "tho_ren_han",
   ]) {
     push(`npc-${npcId}`, drawNpcSprite(npcId));
   }
@@ -1517,6 +1652,18 @@ function buildAtlas() {
     ...Object.keys(TREASURE_ICONS),
     // Kinh quyển 12 chiêu (M7.4)
     ...Object.keys(BOOKS),
+    // Hàn Vân Lĩnh (M7.5b / M7.5c, #506): 5 nguyên liệu, 3 món bộ IV vẽ theo bảng SWORDS / ROBES / TALISMANS, 2 đan cấp 3; hài và ngọc bội đã vào BOOTS / JADES ở trên.
+    // Hình có TRƯỚC vật phẩm trong `shared/` (id chưa có trong ITEMS thì vô hại; A thêm dữ liệu sau)
+    "han_lang_mao",
+    "phong_nha_vu",
+    "tuong_cot",
+    "doc_tuoc_nang",
+    "thien_han_chau",
+    "han_vu_kiem",
+    "han_lang_bao",
+    "phong_nha_phu",
+    "thuong_hoi_huyet_dan",
+    "thuong_hoi_linh_dan",
   ];
   for (const id of itemIds) {
     const icon = drawItemIcon(id);
