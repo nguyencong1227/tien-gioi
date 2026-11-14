@@ -81,8 +81,8 @@ export function hitMonster(
   p: Player,
   mult: number,
 ) {
-  const atk = statsFor(p.realm, p.tier, p, w.ctrl.get(by)?.mult).atk; // gồm vũ khí và hệ số xuất thân
-  const { dmg, crit } = rollDamage(atk, mult);
+  const st = statsFor(p.realm, p.tier, p, w.ctrl.get(by)?.mult); // gồm trang bị và hệ số xuất thân
+  const { dmg, crit } = rollDamage(st.atk, mult, st.crit); // bạo kích cộng thêm từ trang bị (M7.4)
   dealMonsterDamage(w, id, mon, by, dmg, crit);
 }
 
