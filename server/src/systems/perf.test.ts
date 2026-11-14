@@ -386,6 +386,10 @@ describe("kịch bản hiệu năng chiêu thức (M7.10 #511)", () => {
       };
       players.push(sid);
     }
+    // Chắc chắn có mục tiêu trong tầm 300 px: quái của `spawnInitial` sinh NGẪU NHIÊN nên đôi khi không con nào rơi gần bãi người chơi => 0 lần cast, 0 `fx cast`
+    // và test đỏ không do mã (CI #575, 15/11/2026). Linh Thố hiền, không đánh người nên không đổi phép đo byte / tick.
+    for (let k = 0; k < 3; k++)
+      addMonster(w, "tho", w.map.townPx.x + 330 + k * 60, w.map.townPx.y + 330);
 
     // Gắn StateView và Encoder như server thật để đo byte patch mỗi client (M7.10, tiêu chí N6 #511)
     const views: StateView[] = [];
