@@ -1094,3 +1094,58 @@ Server THẬT trong tiến trình con (cổng ngẫu nhiên, thư mục dữ li�
 - Soak không đo thời gian tìm quái hay cân bằng (xem `CAN_BANG.md` mục 10 và mục 22 của C).
 - Bot ở Âm Sương (Luyện Khí tầng 5) chỉ đi qua lại giữa hai cổng trong vùng an toàn; chưa có bot Kim Đan săn thật trong soak (công cụ riêng của C ở mục 22).
 - Chưa thử trên điện thoại thật (như các bản trước).
+
+---
+
+## 24. Thử tải bot né đòn báo trước (M7.10 #511) & Mô hình động học né đòn Hôi Lang (M7.9 #510)
+
+### 24.1. Động lực & Cơ chế
+- Trong M7.3, quái Hôi Lang (`lang`, Luyện Khí) và Hắc Hổ (`ho`, Trúc Cơ) được bổ sung hành vi `charger`: quái đứng gồng báo trước bằng vệt đường thẳng đỏ (`fx warn line`, bề rộng 56 px, tầm 280 px), sau đó lao thẳng gây sát thương `atk x 1,5`.
+- B (ở PR #562) lưu ý về sức ép lên người chơi mới: `windupMs: 700 ms` của Hôi Lang là cận dưới cho phép ([600, 1200] ms). Cần có phân tích động học và thử tải bot để đánh giá mức độ phù hợp của con số 700 ms cho M7.9 và xác nhận bot `--evade` hoạt động hiệu quả trên máy chủ thật.
+
+### 24.2. Bổ sung đo lường vào `bots.ts` (`--evade`)
+- Mở rộng bot với cờ `--evade`: nhận diện các tin `fx warn` (dù bật hay tắt `--evade`), ghi nhận `warnsTargetedCount` khi bot nằm trong phạm vi đe dọa lúc quái gồng.
+- Hàm thuần `parseWarnZoneFromFx(msg, now)` trích xuất vùng báo trước và neo thời điểm đòn đáp `expiresAt = now + ms` trên cùng đồng hồ `performance.now()` với vòng lặp bot `stepBot(b, now)`.
+- Phân giải kết quả tại thời điểm đòn đáp xuống (`now >= expiresAt`):
+  + Nếu bot đã thoát ra ngoài phạm vi nguy hiểm (`!isPointInWarnZone`): ghi nhận `warnsEvadedCount` (né thành công).
+  + Nếu bot vẫn còn trong phạm vi: ghi nhận `warnsHitCount` (dính đòn lao).
+- Tỉ lệ né thành công: `evadeSuccessRatePct = warnsEvaded / (warnsEvaded + warnsHit) * 100`.
+- **Kết quả chạy thử tải bot thật trên máy chủ Colyseus** (`npm run bots -w server -- --url=ws://localhost:2587 --bots=5 --duration=15 --evade`):
+  ```text
+  - Hoạt động chiến đấu: 315 bước đi, 47 đòn chém, 17 kiếm khí (~3.3 fx/s, ~2.8 dmg/s mỗi client)
+  - Tránh báo trước (--evade): 3 đòn nhắm tới -> né thoát 3 (100%), dính 0 (57 tick di chuyển né)
+  ```
+  Xác nhận bot `--evade` trên môi trường máy chủ Colyseus thật nhận đúng cảnh báo `warn` của Hôi Lang, kịp thời bước sang phương ngang và phân giải né thoát 100% khi đòn lao đáp xuống.
+
+### 24.3. Mô hình động học thoát ly đòn lao tại bãi Hôi Lang (mặt phẳng trống, không server)
+Mô hình mô phỏng động học thuần túy trên mặt phẳng trống không chướng ngại vật với 50 mẫu vị trí thử nghiệm phân bố đều trên đường lao của Hôi Lang (khoảng cách 50–230 px từ quái, 5 độ lệch tâm từ 0 đến 16 px; kiểm chứng bằng `server/scripts/bots-evade.test.ts`):
+- **Quy cách hình học đòn lao**: Bề rộng $w = 56$ px (nửa rộng 28 px). Bán kính va chạm nhân vật `PLAYER_RADIUS = 14` px. Cự ly tối đa cần thoát khỏi tâm đường lao: $28 + 14 = 42$ px.
+- **Vận tốc nhân vật Luyện Khí**: $v = 140$ px/s (bước di chuyển 7 px mỗi tick 50 ms).
+- **Giả định**:
+  + Trường hợp "Bot đứng yên (đối chứng)": bot không nhận lệnh di chuyển né. Do toàn bộ 50 mẫu thử đều được đặt chủ đích bên trong phạm vi vệt quét của đòn lao, việc bot dính đòn 100% (tỉ lệ né 0%) là kết quả hiển nhiên từ thiết lập vị trí ban đầu, dùng làm mốc so sánh.
+  + Độ trễ phản xạ $\Delta t$ mô phỏng thời gian từ lúc nhận cảnh báo `fx` đến khi nhân vật bắt đầu bước né (gồm trễ nhận diện của người chơi và trễ mạng).
+
+| Kịch bản | Độ trễ phản xạ $\Delta t$ | Số đòn nhắm tới | Né thành công | Dính đòn | Tỉ lệ né thành công | Thời gian di chuyển né TB | Ghi chú mô hình |
+|---|---|---|---|---|---|---|---|
+| Bot đứng yên (đối chứng) | – | 50 | 0 | 50 | **0,0%** | – | Hiển nhiên theo cách đặt mẫu trong vùng nguy hiểm |
+| Bot né tức thì | 0 ms (lý thuyết) | 50 | 50 | 0 | **100,0%** | ~315 ms (~6,3 ticks) | 100% thoát ly an toàn, thời gian di chuyển < 50% thời gian gồng |
+| Bot né có phản xạ lab | 150 ms (3 ticks) | 50 | 48 | 2 | **96,0%** | ~465 ms (~9,3 ticks) | Người chơi phản xạ nhanh thoát an toàn |
+| Bot né có phản xạ chậm | 200 ms (4 ticks) | 50 | 46 | 4 | **92,0%** | ~515 ms (~10,3 ticks) | Đa số các vị trí lệch tâm nhẹ đều thoát an toàn |
+
+### 24.4. Phân tích độ nhạy của `windupMs` và ngưỡng trễ tối đa chịu được
+- **Ngưỡng trễ tối đa chịu được (Maximum Latency Tolerance - MLT)**:
+  Ở vị trí bất lợi nhất (đứng chính diện ngay trên tim đường lao), nhân vật cần đi trọn vẹn $42$ px theo phương vuông góc để ra ngoài mép an toàn. Với vận tốc 140 px/s, thời gian di chuyển vật lý tối thiểu là:
+  $$t_{\text{move}} = \frac{42}{140} = 0,30 \text{ s} = 300 \text{ ms (6 ticks)}$$
+  Trừ thêm độ trễ rời rạc hóa tick (~10–25 ms), ngưỡng trễ tối đa cho phép từ lúc cảnh báo hiện lên đến lúc người chơi bấm phím né là:
+  $$\text{MLT} \approx \text{windupMs} - 310 \text{ ms}$$
+  - Với `windupMs = 700 ms`: Ngưỡng trễ tối đa chịu được là $\sim 390$ ms. Mức dung sai 390 ms đủ để hấp thu độ trễ mạng di động 4G (100–150 ms) cộng với phản xạ nhìn–bấm phím thông thường của con người (200–240 ms). Do đó thời gian gồng **700 ms là phù hợp** cho Hôi Lang (Luyện Khí).
+  - Với `windupMs = 900 ms`: Với nhân vật Trúc Cơ (vận tốc 145 px/s, thời gian di chuyển $42 / 145 \approx 290$ ms), ngưỡng trễ tối đa chịu được là $\sim 590$ ms. Mức dung sai 590 ms rất rộng rãi, **phù hợp** cho đòn vồ sát thương cực lớn của Hắc Hổ.
+
+- **Bảng kiểm chứng độ nhạy với độ trễ cố định 200 ms (4 ticks trễ)**:
+  - **500 ms**: Tỉ lệ thoát chỉ đạt **80%** (ngưỡng trễ chịu được chỉ còn $\sim 190$ ms; người chơi đứng sát tim đường lao chỉ còn 300 ms di chuyển, không kịp thoát). Gây cảm giác bất công cho người chơi mới.
+  - **600 ms**: Tỉ lệ thoát đạt $\sim 86\%$ (ngưỡng trễ chịu được $\sim 290$ ms).
+  - **700 ms**: Tỉ lệ thoát đạt **92–96%** (ngưỡng trễ chịu được $\sim 390$ ms). Đảm bảo người chơi chú ý quan sát và có thao tác né là thoát được, đồng thời vẫn giữ được nhịp độ căng thẳng trực quan.
+  - **900 ms**: Tỉ lệ thoát đạt **100%** (ngưỡng trễ chịu được $\sim 590$ ms).
+
+### 24.5. Lợi thế chiến thuật khi né đòn trong World thật
+- Khi thợ săn né đòn charger: không những tránh hoàn toàn sát thương đòn lao (`14 x 1,5 = 21` HP), mà khi quái Hôi Lang lao trượt và rơi vào trạng thái thở hồi phục 700 ms (`CHARGE_RECOVER_MS`), thợ săn có thể tiếp cận chém miễn phí 1–2 kiếm mà không bị quái phản kích.

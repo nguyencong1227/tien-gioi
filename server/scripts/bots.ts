@@ -777,7 +777,7 @@ function avg(arr: number[]): number {
   return arr.reduce((a, b) => a + b, 0) / arr.length;
 }
 
-interface BotState {
+export interface BotState {
   index: number;
   name: string;
   room: Room;
@@ -892,6 +892,9 @@ interface BotState {
   evade?: boolean;
   warns: ActiveWarnZone[];
   evadeCount: number;
+  warnsTargetedCount: number;
+  warnsEvadedCount: number;
+  warnsHitCount: number;
 }
 
 export interface LoadTestMetrics {
@@ -1021,6 +1024,10 @@ export interface LoadTestMetrics {
   /** Các chỉ số thử tải né đòn báo trước M7 (--evade, #511) */
   evade?: boolean;
   evadeCountTotal?: number;
+  warnsTargetedTotal?: number;
+  warnsEvadedTotal?: number;
+  warnsHitTotal?: number;
+  evadeSuccessRatePct?: number;
 }
 
 export interface IdleZeroBotMetrics {
@@ -1254,6 +1261,62 @@ export interface ActiveWarnZone {
   angle: number;
   arc: number;
   expiresAt: number;
+  /** Bot có nằm trong vùng nguy hiểm của đòn này lúc nhận cảnh báo hay không */
+  targeted?: boolean;
+  /** Đã kiểm tra kết quả né/trúng tại thời điểm đòn đáp xuống hay chưa */
+  resolved?: boolean;
+}
+
+/**
+ * Trích xuất vùng báo trước nguy hiểm từ tin nhắn fx (M7.10 #511).
+ * Lưu ý: expiresAt phải tính theo cùng đồng hồ với vòng lặp bot (performance.now()),
+ * không dùng Date.now() để tránh lệch thang đo thời gian.
+ */
+export function parseWarnZoneFromFx(
+  msg?: FxMsg,
+  now: number = performance.now(),
+): ActiveWarnZone | null {
+  if (!msg || msg.kind !== "warn" || !msg.shape) return null;
+  const r = typeof msg.r === "number" && msg.r > 0 ? msg.r : 280;
+  const w = typeof msg.w === "number" && msg.w > 0 ? msg.w : 56;
+  const angle = typeof msg.angle === "number" ? msg.angle : 0;
+  const arc = typeof msg.arc === "number" ? msg.arc : Math.PI / 2;
+  const ms = typeof msg.ms === "number" && msg.ms > 0 ? msg.ms : 800;
+  return {
+    shape: msg.shape,
+    x: msg.x,
+    y: msg.y,
+    r,
+    w,
+    angle,
+    arc,
+    expiresAt: now + ms,
+  };
+}
+
+/**
+ * Cập nhật trạng thái các vùng báo trước: giải quyết kết quả trúng/né khi đòn đáp xuống
+ * và dọn dẹp các cảnh báo đã hết hạn (M7.10 #511).
+ */
+export function updateBotWarns(b: BotState, now: number, measuring: boolean) {
+  let idx = 0;
+  while (idx < b.warns.length) {
+    const w = b.warns[idx];
+    if (w.expiresAt <= now) {
+      if (w.targeted && !w.resolved) {
+        w.resolved = true;
+        const stillIn = isPointInWarnZone(b.predX, b.predY, w, 0);
+        if (stillIn) {
+          if (measuring) b.warnsHitCount++;
+        } else {
+          if (measuring) b.warnsEvadedCount++;
+        }
+      }
+      b.warns.splice(idx, 1);
+    } else {
+      idx++;
+    }
+  }
 }
 
 /**
@@ -1418,23 +1481,14 @@ function bindRoomEvents(
 
   room.onMessage("fx", (msg?: FxMsg) => {
     if (isMeasuring()) b.fxCount++;
-    if (b.evade && msg && msg.kind === "warn" && msg.shape) {
-      const r = typeof msg.r === "number" && msg.r > 0 ? msg.r : 280;
-      const w = typeof msg.w === "number" && msg.w > 0 ? msg.w : 56;
-      const angle = typeof msg.angle === "number" ? msg.angle : 0;
-      const arc = typeof msg.arc === "number" ? msg.arc : Math.PI / 2;
-      const ms = typeof msg.ms === "number" && msg.ms > 0 ? msg.ms : 800;
-      b.warns.push({
-        shape: msg.shape,
-        x: msg.x,
-        y: msg.y,
-        r,
-        w,
-        angle,
-        arc,
-        expiresAt: Date.now() + ms,
-      });
-      if (b.warns.length > 16) b.warns.shift();
+    const zone = parseWarnZoneFromFx(msg, performance.now());
+    if (zone) {
+      if (isPointInWarnZone(b.predX, b.predY, zone, 0)) {
+        zone.targeted = true;
+        if (isMeasuring()) b.warnsTargetedCount++;
+      }
+      b.warns.push(zone);
+      if (b.warns.length > 32) b.warns.shift();
     }
   });
   room.onMessage("dmg", () => {
@@ -2073,6 +2127,9 @@ async function runLoadTest(
       evade,
       warns: [],
       evadeCount: 0,
+      warnsTargetedCount: 0,
+      warnsEvadedCount: 0,
+      warnsHitCount: 0,
     };
 
     bindRoomEvents(
@@ -2692,6 +2749,9 @@ async function runLoadTest(
       }
     }
 
+    // Cập nhật cảnh báo: giải quyết kết quả trúng/né và dọn dẹp warn hết hạn (M7.10 #511)
+    updateBotWarns(b, now, measuring);
+
     // Nếu bot bật --evade và đang nằm trong vùng nguy hiểm của báo trước: ghi đè dx, dy để thoát hiểm
     if (b.evade && b.warns.length > 0) {
       const evadeVec = computeEvadeVector(b.predX, b.predY, b.warns, now);
@@ -3183,6 +3243,13 @@ async function runLoadTest(
   const totalCasts = bots.reduce((s, b) => s + b.skillsCastCount, 0);
   const totalSkillsMsgs = bots.reduce((s, b) => s + b.skillsMsgsCount, 0);
   const totalEvades = bots.reduce((s, b) => s + b.evadeCount, 0);
+  const totalWarnsTargeted = bots.reduce((s, b) => s + b.warnsTargetedCount, 0);
+  const totalWarnsEvaded = bots.reduce((s, b) => s + b.warnsEvadedCount, 0);
+  const totalWarnsHit = bots.reduce((s, b) => s + b.warnsHitCount, 0);
+  const evadeSuccessRatePct =
+    totalWarnsTargeted > 0
+      ? Number(((totalWarnsEvaded / totalWarnsTargeted) * 100).toFixed(1))
+      : undefined;
 
   const metrics: LoadTestMetrics = {
     commit,
@@ -3310,6 +3377,10 @@ async function runLoadTest(
         : undefined,
     evade: evade ? true : undefined,
     evadeCountTotal: evade || totalEvades > 0 ? totalEvades : undefined,
+    warnsTargetedTotal: totalWarnsTargeted > 0 ? totalWarnsTargeted : undefined,
+    warnsEvadedTotal: totalWarnsEvaded > 0 ? totalWarnsEvaded : undefined,
+    warnsHitTotal: totalWarnsHit > 0 ? totalWarnsHit : undefined,
+    evadeSuccessRatePct,
   };
 
   printMetrics(metrics);
@@ -3371,8 +3442,15 @@ function printMetrics(m: LoadTestMetrics) {
       `- Kỹ năng M7: ${m.castsSent ?? 0} lần thi triển chiêu thức (~${m.skillsMsgsReceivedPerBot ?? "–"} tin skills/s mỗi client)`,
     );
   }
-  if (m.evade || (m.evadeCountTotal !== undefined && m.evadeCountTotal > 0)) {
-    console.log(`- Tránh báo trước (--evade): ${m.evadeCountTotal ?? 0} lần né đòn thành công`);
+  if (
+    m.evade ||
+    (m.evadeCountTotal !== undefined && m.evadeCountTotal > 0) ||
+    (m.warnsTargetedTotal !== undefined && m.warnsTargetedTotal > 0)
+  ) {
+    const rateStr = m.evadeSuccessRatePct !== undefined ? `${m.evadeSuccessRatePct}%` : "–";
+    console.log(
+      `- Tránh báo trước (--evade): ${m.warnsTargetedTotal ?? 0} đòn nhắm tới -> né thoát ${m.warnsEvadedTotal ?? 0} (${rateStr}), dính ${m.warnsHitTotal ?? 0} (${m.evadeCountTotal ?? 0} tick di chuyển né)`,
+    );
   }
   if (m.partySize && m.partySize > 1) {
     console.log(
