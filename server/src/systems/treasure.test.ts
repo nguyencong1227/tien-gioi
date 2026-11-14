@@ -1,7 +1,16 @@
 // Pháp bảo (M7.4, #505): sáu nội tại `TREASURES` do server thi hành (`systems/treasure.ts`). Món thử chèn vào `ITEM_BY_ID` bằng id RIÊNG (`t_tr_*`, trỏ tới nội tại thật
 // qua `equip.treasure`) rồi dọn: không đụng món thật `ho_than_an`... của bước nội dung.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ITEM_BY_ID, TREASURES, type ItemDef, type TreasureId } from "@tien-gioi/shared";
+import {
+  DEFAULT_MAP,
+  DUEL_COUNTDOWN_MS,
+  ITEM_BY_ID,
+  TREASURES,
+  type ItemDef,
+  type TreasureId,
+} from "@tien-gioi/shared";
+import { Hub } from "../hub";
+import { duelAnswer, duelChallenge, tickDuels } from "./duel";
 import { cast } from "./cast";
 import { dealMonsterDamage, hurtPlayer } from "./combat";
 import { tickStatuses } from "./status";
@@ -306,5 +315,67 @@ describe("Xích Diễm Ấn / Hàn Băng Ấn: chiêu đúng hệ gây thêm `dm
       1,
     );
     expect(castDamage("xich_diem_an", "huyen_bang_chi")).toBe(base);
+  });
+});
+
+describe("trong trận thách đấu: pháp bảo KHÔNG chạy (review B ở #594)", () => {
+  /** Hai người Kim Đan, A (mặc `tid` hoặc không) thách B, qua đếm ngược. Máu A = 623 / 1000. */
+  function duelSetup(tid: TreasureId | null) {
+    const t = makeWorld(DEFAULT_MAP, new Hub());
+    const a = addPlayer(t.w, "A", 3, 0);
+    const b = addPlayer(t.w, "B", 3, 0);
+    b.p.x = a.p.x + 45;
+    b.p.y = a.p.y;
+    if (tid) a.p.treasure = treasureItem(tid);
+    a.p.maxHp = 1000;
+    a.p.hp = 623;
+    t.w.now = 10_000;
+    duelChallenge(t.w, "A", { name: "B" });
+    duelAnswer(t.w, "B", { from: "A" }, true);
+    t.w.now += DUEL_COUNTDOWN_MS + 1;
+    tickDuels(t.w);
+    expect(t.w.duels.has("A")).toBe(true);
+    return { ...t, a };
+  }
+  /** 100 tick (5 giây) đứng yên bằng `tickWorld` thật. */
+  const stand = (t: ReturnType<typeof duelSetup>) => {
+    for (let i = 0; i < 100; i++) {
+      t.w.now += 50;
+      tickWorld(t.w, 50);
+    }
+  };
+
+  it("Định Tâm Chung: đứng yên giữa trận KHÔNG hồi máu (đối chứng: không pháp bảo cũng giữ nguyên; ngoài trận thì hồi)", () => {
+    const inDuel = duelSetup("dinh_tam_chung");
+    const hp0 = inDuel.a.p.hp;
+    stand(inDuel);
+    expect(inDuel.a.p.hp).toBe(hp0);
+
+    const none = duelSetup(null);
+    stand(none);
+    expect(none.a.p.hp).toBe(623);
+
+    // Ngoài trận: cùng cảnh nhưng không thách đấu, có hồi
+    const t = makeWorld();
+    const a = addPlayer(t.w, "A", 3, 0);
+    a.p.treasure = treasureItem("dinh_tam_chung");
+    a.p.maxHp = 1000;
+    a.p.hp = 623;
+    t.w.now = 10_000;
+    for (let i = 0; i < 100; i++) {
+      t.w.now += 50;
+      tickWorld(t.w, 50);
+    }
+    expect(a.p.hp).toBeGreaterThan(623);
+  });
+
+  it("Hộ Thân Ấn: không dựng khiên giữa trận; hết trận thì dựng ngay", () => {
+    const t = duelSetup("ho_than_an");
+    stand(t);
+    expect(t.a.c.st?.list.some((s) => s.id === "shield") ?? false).toBe(false);
+    t.w.duels.clear(); // hết trận
+    t.w.now += 50;
+    tickWorld(t.w, 50);
+    expect(t.a.c.st?.list.some((s) => s.id === "shield") ?? false).toBe(true);
   });
 });

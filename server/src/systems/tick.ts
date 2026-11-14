@@ -24,7 +24,9 @@ export function tickWorld(w: World, dtMs: number) {
     applyInputs(w.map, p, c);
     if ((w.tick + c.posPhase) % POS_SYNC_EVERY_TICKS === 0) syncPublicPos(p);
     if (!w.duels.has(sid)) tickRecovery(w, sid, p, c, dt); // trong trận thách đấu: không hồi khí huyết / linh lực, không đả tọa
-    if (p.treasure || c.treasure) tickTreasure(w, sid, p, c, dt); // pháp bảo (M7.4): khiên tự dựng, hồi khi đứng yên; không mặc thì không tốn gì
+    // Pháp bảo (M7.4): khiên tự dựng, hồi khi đứng yên; không mặc thì không tốn gì. Trong trận thách đấu: KHÔNG chạy (cùng nguyên tắc khoá hồi phục của `tickRecovery`;
+    // review B ở #594: Định Tâm Chung từng hồi máu giữa trận). Sau trận khiên dựng lại ngay (`nextShieldAt` đã qua).
+    if ((p.treasure || c.treasure) && !w.duels.has(sid)) tickTreasure(w, sid, p, c, dt);
   });
   tickStatuses(w, dt); // trước quái: quái chết vì sát thương theo giây thì không còn bị cập nhật
   tickMonsters(w, dt);
