@@ -389,6 +389,8 @@ export const DEFAULT_MAP_ID = "lac_ha";
 export const HAC_PHONG_ID = "hac_phong";
 /** Bản đồ thứ ba (M6, #404): đầm lầy sương cho Kim Đan, nối với Hắc Phong Cốc bằng cổng ở rìa bắc / nam. */
 export const AM_SUONG_ID = "am_suong";
+/** Bản đồ thứ tư (M7.5, #506): băng nguyên cho Nguyên Anh, nối với Âm Sương Trạch bằng cổng ở rìa bắc / nam. */
+export const HAN_VAN_ID = "han_van";
 
 /**
  * Danh sách bản đồ của game (docs/THIET_KE_NHIEU_BAN_DO.md). Toạ độ cổng (px) đã đối chiếu với ô sinh từ seed:
@@ -481,9 +483,52 @@ export const MAPS: readonly MapDef[] = [
         toMap: HAC_PHONG_ID,
         toPortal: "hac_phong_bac",
       },
+      // Cổng bắc (M7.5, #506): đầu mút đường đất phía bắc (ô 66-67, hàng 3-4; đường lượn nhẹ nên hàng 2 và 5-7 lệch sang 67-68), tâm ở giữa hai ô đường ở hàng 3. Seed của Âm Sương KHÔNG đổi (ô giữ nguyên, tệp lưu
+      // vẫn hợp lệ); chỉ thêm khu an toàn bán kính 192 px quanh cổng ở rìa bắc, nên quái sinh sau này tránh vùng đó (vị trí sinh ngẫu nhiên khác trước).
+      {
+        id: "am_suong_bac",
+        name: "Lăng Hàn Quan",
+        x: 2144,
+        y: 112,
+        r: 64,
+        safeR: 192,
+        spawn: { x: 2144, y: 240 },
+        toMap: HAN_VAN_ID,
+        toPortal: "han_van_nam",
+      },
     ],
     // Tổng 62 (Hắc Phong Cốc 62; trần ~70 để tick < 10 ms): số liệu quái ở game.ts (#403), vùng sinh theo `minDanger` của từng loài
     monsterCap: { suong_ho: 24, thach_quy: 18, doc_thiem: 18, hac_giao: 2 },
+  },
+  {
+    id: HAN_VAN_ID,
+    name: "Hàn Vân Lĩnh",
+    // Seed chọn bằng cách quét 300 seed (20262000-20262299; công cụ quét tạm, đã bỏ): đường nam tới sát rìa (hai ô đường ở hàng 124), liên thông 97,8 % từ trạm,
+    // nước + cát chỉ ~7,6 % (băng nguyên thoáng, nhiều cỏ và cây), sức chứa quái theo dải nguy hiểm >= 500 lần số quái dự kiến (62 con ở cổng M7.5b)
+    seed: 20262122,
+    w: 128,
+    h: 128,
+    // Trạm an toàn ở phía nam, cách cổng ~10 ô: người mới tới thấy trạm trước, càng đi lên bắc càng nguy hiểm (như Âm Sương Trạch)
+    town: { cx: 64, cy: 114, r: 5 },
+    townName: "Hàn Vân Trạm",
+    wildName: "Hàn Vân Lĩnh",
+    portals: [
+      {
+        id: "han_van_nam",
+        name: "Hồi Sương Quan",
+        // Đầu mút đường đất phía nam (ô 63-64, hàng 124-125), tâm ở giữa hai ô đường
+        x: 2048,
+        y: 3984,
+        r: 64,
+        safeR: 192,
+        spawn: { x: 2048, y: 3856 },
+        toMap: AM_SUONG_ID,
+        toPortal: "am_suong_bac",
+      },
+    ],
+    // Chưa có loài quái nào: bốn loài Nguyên Anh + trùm Thiên Hàn Vương thêm ở bước nội dung kế (M7.5b, tổng <= ~70). Không mượn loài Kim Đan:
+    // `kim-dan-world.test.ts` giữ "quái Kim Đan CHỈ sinh ở Âm Sương Trạch". Bản đồ trống chỉ có trạm và cổng, chưa phát hành nên không hại ai.
+    monsterCap: {},
   },
 ];
 
