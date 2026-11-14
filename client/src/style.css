@@ -3421,10 +3421,11 @@ html[data-input="touch"] #newbie-btn-keys {
 .shop-item-name {
   font-size: var(--fs-13);
   font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 160px;
+  /* Tên món (kèm dấu độ hiếm ◆ ở đầu, #584) có thể dài hơn cột thông tin vì ô số lượng + nút Mua chiếm chỗ: cho xuống dòng thay vì cắt bằng "..."
+     (người mua cần đọc ĐỦ tên; check-forge-shop.mjs đo `scrollWidth > clientWidth` là "chữ bị cắt") */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  max-width: 100%;
 }
 .shop-price-tag {
   font-size: var(--fs-11);

@@ -191,4 +191,15 @@ describe("rarity: mọi chỗ hiển thị đi qua một hàm (không còn màu 
     expect(css).toMatch(/@supports\s*\(content:\s*"a"\s*\/\s*""\)/);
     expect(css).toMatch(/content:\s*attr\(data-mark\)\s*" "\s*\/\s*""/);
   });
+
+  it("tên món ở CỬA HÀNG không bị cắt bằng '...' (dấu ◆ làm tên dài thêm; người mua phải đọc đủ tên): cho xuống dòng", () => {
+    // Hồi quy #584: `white-space: nowrap` + `text-overflow: ellipsis` + `max-width: 160px` cắt "◆◆ Đại Hồi Huyết ..." ở danh sách mua
+    // (check-forge-shop.mjs, Chrome thật, báo "1 chữ bị cắt" ở 1280x720 và 768x1024).
+    const rules = [...css.matchAll(/\.shop-item-name\s*\{([^}]*)\}/g)].map((m) => m[1]).join("\n");
+    expect(rules, "không tìm thấy quy tắc .shop-item-name").not.toBe("");
+    expect(rules).not.toMatch(/text-overflow\s*:/);
+    expect(rules).not.toMatch(/white-space\s*:\s*nowrap/);
+    expect(rules).not.toMatch(/max-width\s*:\s*\d+px/);
+    expect(rules).toMatch(/white-space\s*:\s*normal/);
+  });
 });

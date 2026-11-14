@@ -39,7 +39,8 @@ describe("dữ liệu trang bị", () => {
   });
 
   it("cùng ô, món đòi cảnh giới cao hơn thì chỉ số cao hơn", () => {
-    for (const slot of EQUIP_SLOTS) {
+    // Pháp bảo khác nhau ở NỘI TẠI (`TREASURES`), không theo một dãy chỉ số tăng đều: bỏ khỏi phép kiểm này
+    for (const slot of EQUIP_SLOTS.filter((s) => s !== "treasure")) {
       const list = gear
         .filter((g) => g.equip!.slot === slot)
         .sort(

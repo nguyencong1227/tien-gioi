@@ -82,10 +82,10 @@ describe("judgeForgeShop (kiểm bảng Lò Rèn / Cửa hàng, #409)", () => {
 });
 
 describe("dữ liệu thật mà check-forge-shop dựa vào", () => {
-  it("18 công thức rèn = 9 của thợ rèn Thiết Ngưu + 9 Kim Đan của thợ rèn Vọng Sương (đổi số lượng thì cập nhật kiểm tra)", () => {
-    expect(RECIPES.filter((r) => r.npcId === "tho_ren")).toHaveLength(9);
-    expect(RECIPES.filter((r) => r.npcId === "tho_ren_suong")).toHaveLength(9);
-    expect(RECIPES).toHaveLength(18);
+  it("32 công thức rèn = 13 của thợ rèn Thiết Ngưu (9 gốc + 4 hài / ngọc bội bậc Luyện Khí, Trúc Cơ) + 19 của thợ rèn Vọng Sương (9 Kim Đan + 10 hài / ngọc bội / pháp bảo bậc Kim Đan, M7.4); đổi số lượng thì cập nhật kiểm tra", () => {
+    expect(RECIPES.filter((r) => r.npcId === "tho_ren")).toHaveLength(13);
+    expect(RECIPES.filter((r) => r.npcId === "tho_ren_suong")).toHaveLength(19);
+    expect(RECIPES).toHaveLength(32);
     // bảng có phí = đúng bảng Kim Đan; bảng cũ miễn phí (script kỳ vọng như vậy)
     expect(RECIPES.filter((r) => r.npcId === "tho_ren_suong").every((r) => (r.coin ?? 0) > 0)).toBe(
       true,
