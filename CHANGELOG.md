@@ -5,6 +5,7 @@
 ## [Chưa phát hành] — M7 (Chiều sâu chiến đấu + Nguyên Anh)
 
 ### Máy chủ
+- **Nhịp sát thương theo giây chỉ gửi chủ (M7.3, #504; review của B ở #605):** độc / bỏng / chảy máu lên NGƯỜI CHƠI trước đây gửi mỗi nhịp bằng `dmg` gần (`sendNear`), nên người đứng gần cũng nghe tiếng đánh và thấy người đó giật mình mỗi nhịp (client xử lý mọi `dmg` như nhau). Nay đi qua `events.dmgTo` (gửi riêng chủ); đòn thật của quái / người vẫn gửi gần. Không đổi `shared/`, client không đổi. Băng thông mô phỏng 100 người: tin gửi gần 4,05 -> 3,80 KB/s (trần `perf.test.ts` giữ 4).
 - **Hắc Hổ chảy máu nhẹ sau đòn lao (M7.3 bước 4d, #504):** người trúng đòn lao của Hắc Hổ chảy máu 3 giây (~11 khí huyết, không bao giờ giết, làm mới chứ không cộng dồn, khu an toàn thanh tẩy); người né thì không bị. Hôi Lang vẫn lao thuần. Số dot gửi gần nên băng thông sự kiện vùng nhìn ở 100 người nhích 3,79 -> 4,05 KB/s (trần test 4 -> 5).
 - **Sương Hồ bắn đạn băng, Độc Thiềm nhổ đạn độc (M7.3 bước 4e, #504):** hai loài ở Âm Sương Trạch không còn xông vào đánh gần: Sương Hồ đứng xa bắn (đạn 280 px/s, tầm 300 px), Độc Thiềm nhổ đạn độc chậm hơn (220 px/s, tầm 260 px) gắn độc cho người trúng; áp sát thì chúng lùi và vẫn bắn, đi ngang là né được. Số khởi đầu, M7.9 hiệu chỉnh.
 - **Sát thương theo giây chính xác hơn (M7.3, #504; review của B):** độc / bỏng / chảy máu (lên quái và người chơi) nay không mất / thừa phần lẻ: tổng cả đời trạng thái đúng `round(sát thương mỗi giây x thời lượng)`; trước đó làm tròn từng giây lệch tới +-30-100 % khi sát thương mỗi giây chỉ cỡ 0,4 - 1,5.

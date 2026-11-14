@@ -98,6 +98,12 @@ export function runBench(
       {
         fx: (m) => emit("fx", m.x, m.y, "range" in m ? m.range : 0, m),
         dmg: (m) => emit("dmg", m.x, m.y, 0, m),
+        // gửi riêng cho chủ: một client nhận (so với "cả phòng" là mọi client)
+        dmgTo: (_sid, m) => {
+          const size = JSON.stringify(m).length + "dmg".length + 4;
+          evBroadcast += size * players;
+          evNear += size;
+        },
         sys: () => {},
         chat: () => {},
         toast: () => {},
@@ -359,6 +365,12 @@ export function runMultiMapBench(
         {
           fx: (m) => emit("fx", m.x, m.y, "range" in m ? m.range : 0, m),
           dmg: (m) => emit("dmg", m.x, m.y, 0, m),
+          // gửi riêng cho chủ: một client nhận (so với "cả phòng" là mọi client)
+          dmgTo: (_sid, m) => {
+            const size = JSON.stringify(m).length + "dmg".length + 4;
+            evBroadcast += size * players;
+            evNear += size;
+          },
           sys: () => {},
           chat: () => {},
           toast: () => {},

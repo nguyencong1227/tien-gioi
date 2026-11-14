@@ -228,7 +228,12 @@ function damagePlayer(
   p.hp = Math.max(0, p.hp - dmg);
   p.meditating = false;
   c.lastHitAt = w.now;
-  if (dmg > 0) w.events.dmg({ target: sid, amount: dmg, x: p.x, y: p.y - 20, toPlayer: true });
+  if (dmg > 0) {
+    const msg = { target: sid, amount: dmg, x: p.x, y: p.y - 20, toPlayer: true };
+    // Đòn thật: người đứng gần cũng thấy. Sát thương theo giây (`fallText === null`): chỉ chủ (client phát tiếng đánh + giật mình cho mỗi `dmg` trong tầm nhìn)
+    if (fallText === null) w.events.dmgTo(sid, msg);
+    else w.events.dmg(msg);
+  }
   if (fallText === null) return;
   if (p.hp <= 0) {
     // Trong phòng bí cảnh: gục KHÔNG mất kiếp (bị đẩy ra, mất lượt; quyết định 11/11/2026, systems/dungeon.ts `dungeonFall`)
