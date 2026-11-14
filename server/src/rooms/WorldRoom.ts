@@ -594,7 +594,7 @@ export class WorldRoom extends Room<WorldState> {
     p.x = spot.x;
     p.y = spot.y;
     syncPublicPos(p); // người khác thấy ngay chỗ vào, không phải (0, 0)
-    setEquipment(p, sanitizeEquipment(save.equipment)); // trước applyStats: chỉ số gồm trang bị
+    setEquipment(p, sanitizeEquipment(save.equipment, save.realm)); // trước applyStats: chỉ số gồm trang bị (ô chưa mở ở cảnh giới này bị bỏ)
     const origin = sanitizeOrigin(save.origin);
     const mult = originMult(origin);
     applyStats(p, true, mult);
