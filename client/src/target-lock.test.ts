@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { LOCK_RANGE, keepLock, pickNextTarget, pickPrevTarget } from "./target-lock";
+import {
+  LOCK_RANGE,
+  keepLock,
+  pickNextPlayer,
+  pickNextTarget,
+  pickPrevTarget,
+} from "./target-lock";
 
 const c = (id: string, dist: number) => ({ id, dist });
 
@@ -77,5 +83,31 @@ describe("target-lock: pickPrevTarget (Shift+Tab)", () => {
     expect(pickPrevTarget([c("a", 50)], "a")).toBeNull();
     expect(pickPrevTarget(list, "da-mat")).toBe("a");
     expect(pickPrevTarget([...list, c("xa", LOCK_RANGE + 50)], "a")).toBe("c");
+  });
+});
+
+describe("pickNextPlayer: phím P mở menu đồng đạo (#463)", () => {
+  const three = [c("b", 200), c("a", 100), c("c", 300)];
+  it("không ai thì null", () => {
+    expect(pickNextPlayer([], null)).toBeNull();
+    expect(pickNextPlayer([c("x", Number.NaN)], null)).toBeNull();
+  });
+  it("lần đầu lấy người GẦN nhất, bấm tiếp (sau Esc) đi xa dần rồi vòng lại", () => {
+    expect(pickNextPlayer(three, null)).toBe("a");
+    expect(pickNextPlayer(three, "a")).toBe("b");
+    expect(pickNextPlayer(three, "b")).toBe("c");
+    expect(pickNextPlayer(three, "c")).toBe("a");
+  });
+  it("người vừa mở đã đi khỏi tầm nhìn: quay về người gần nhất", () => {
+    expect(pickNextPlayer(three, "zzz")).toBe("a");
+  });
+  it("chỉ một người: mở lại chính người đó (khác Tab chọn quái, không nhả)", () => {
+    expect(pickNextPlayer([c("a", 50)], "a")).toBe("a");
+    expect(pickNextPlayer([c("a", 50)], null)).toBe("a");
+  });
+  it("hoà khoảng cách: theo id, kết quả ổn định", () => {
+    const tie = [c("m", 100), c("k", 100)];
+    expect(pickNextPlayer(tie, null)).toBe("k");
+    expect(pickNextPlayer(tie, "k")).toBe("m");
   });
 });

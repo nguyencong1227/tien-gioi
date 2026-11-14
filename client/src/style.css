@@ -1139,6 +1139,18 @@ html[data-input="touch"] .qt-head {
   }
 }
 
+/* Màn Hoàng Tuyền chơi bằng phím (#463): vòng tiêu điểm rõ trên nút mua, thẻ xuất thân, ô tích ký vật, nút đầu thai; khung màn nhận focus nhưng không vẽ vòng */
+.stone-buy-btn:focus-visible,
+.origin-card:focus-visible,
+.relic-item input:focus-visible,
+.limbo-btn-rebirth:focus-visible {
+  outline: 2px solid #ffe08a;
+  outline-offset: 2px;
+}
+#limbo-overlay:focus {
+  outline: none;
+}
+
 /* Nhãn phím trên nút (QUYET_DINH_M3 mục 13, #463): chỉ máy tính (con trỏ chính xác, màn rộng); cảm ứng / điện thoại ẩn hẳn */
 .keycap {
   display: none;

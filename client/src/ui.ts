@@ -893,10 +893,10 @@ function watchModalHidden(id: string) {
   sync(); // tấm đã hiện sẵn lúc gắn
 }
 
-/** Nút đang hiện: không có tổ tiên nào bị `hidden` (hộp lời mời, HUD bí cảnh / quyết đấu, hộp xác nhận ẩn bằng thuộc tính `hidden` của hộp chứa). */
+/** Nút đang hiện và bấm được (không `disabled`; nit của A ở #470): không có tổ tiên nào bị `hidden` (hộp lời mời, HUD bí cảnh / quyết đấu, hộp xác nhận ẩn bằng thuộc tính `hidden` của hộp chứa). */
 function buttonShown(id: string): boolean {
   const el = document.getElementById(id);
-  return el !== null && el.closest("[hidden]") === null;
+  return el !== null && el.closest("[hidden]") === null && !(el as HTMLButtonElement).disabled;
 }
 /** Hành động đang chờ người chơi bấm phím mới; `null` = không chờ. */
 let keyCaptureFor: ActionId | null = null;
@@ -1890,6 +1890,10 @@ let limboBuyCb: ((id: string) => void) | null = null;
 let limboRebirthCb: ((choice: RebirthChoice) => void) | null = null;
 
 function renderLimboStoneList() {
+  withFocusKept($("limbo-overlay"), renderLimboStoneListImpl);
+}
+
+function renderLimboStoneListImpl() {
   const container = $("limbo-stone-list");
   if (!container || !activeSoulView) return;
   container.replaceChildren();
@@ -1935,6 +1939,7 @@ function renderLimboStoneList() {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "stone-buy-btn";
+    btn.dataset.nav = `stone:${def.id}`;
 
     const cost = nextCost(activeSoulView, def.id);
     if (cost === null) {
@@ -1986,6 +1991,7 @@ function renderLimboStoneList() {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "stone-buy-btn";
+    btn.dataset.nav = `origin-buy:${o.id}`;
     if (isUnlocked) {
       btn.disabled = true;
       btn.textContent = "Đã sở hữu";
@@ -2037,6 +2043,10 @@ function renderLimboStoneList() {
 }
 
 function renderLimboOrigins() {
+  withFocusKept($("limbo-overlay"), renderLimboOriginsImpl);
+}
+
+function renderLimboOriginsImpl() {
   const container = $("limbo-origin-list");
   if (!container || !activeSoulView) return;
   container.replaceChildren();
@@ -2063,11 +2073,23 @@ function renderLimboOrigins() {
     desc.textContent = o.desc;
     card.append(desc);
 
+    card.setAttribute("role", "radio");
+    card.setAttribute("aria-checked", String(selectedOrigin === o.id));
     if (isAvailable) {
+      // bàn phím (#463): thẻ là một ô chọn có tiêu điểm; Enter / Cách chọn, mũi tên đi giữa các thẻ (panel-nav)
+      card.tabIndex = 0;
+      card.dataset.nav = `origin:${o.id}`;
       card.addEventListener("click", () => {
         selectedOrigin = o.id;
         renderLimboOrigins();
       });
+      card.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        if (!e.repeat) card.click();
+      });
+    } else {
+      card.setAttribute("aria-disabled", "true");
     }
 
     container.append(card);
@@ -2075,6 +2097,10 @@ function renderLimboOrigins() {
 }
 
 function renderLimboRelics() {
+  withFocusKept($("limbo-overlay"), renderLimboRelicsImpl);
+}
+
+function renderLimboRelicsImpl() {
   const container = $("limbo-relic-list");
   const emptyEl = $("limbo-relic-empty");
   const hintEl = $("limbo-relic-hint");
@@ -2112,6 +2138,14 @@ function renderLimboRelics() {
     cb.type = "checkbox";
     cb.checked = isChecked;
     cb.disabled = !canCheck && !isChecked;
+    cb.dataset.nav = `relic:${itemId}`;
+    cb.setAttribute("aria-label", itemName);
+    // Cách đã bật / tắt ô tích sẵn; thêm Enter cho thống nhất với các thẻ khác (#463)
+    cb.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      if (!e.repeat) cb.click();
+    });
     item.append(cb);
 
     const nameSpan = document.createElement("span");
@@ -2539,19 +2573,19 @@ export const ui = {
       if (currentInviteFrom) callbacks?.onPartyDecline?.(currentInviteFrom);
       processNextInvite();
     });
-    bindTap("pm-close", () => {
-      $("player-menu").hidden = true;
-    });
+    // Đóng bằng closePlayerMenu (gỡ khỏi modalStack): ẩn thẳng `hidden = true` để sót mục "player-menu" trong modalStack làm
+    // `isKeyboardCaptured()` kẹt true, WASD / phím thế giới không chạy cho tới khi bấm Esc (lỗi nền của #468, gặp khi dùng chuột bấm nút menu).
+    bindTap("pm-close", () => this.closePlayerMenu());
     bindTap("pm-invite-btn", () => {
-      $("player-menu").hidden = true;
+      this.closePlayerMenu();
       if (selectedPlayerName) callbacks?.onPartyInvite?.(selectedPlayerName);
     });
     bindTap("pm-duel-btn", () => {
-      $("player-menu").hidden = true;
+      this.closePlayerMenu();
       if (selectedPlayerName) callbacks?.onDuelChallenge?.(selectedPlayerName);
     });
     bindTap("pm-sect-btn", () => {
-      $("player-menu").hidden = true;
+      this.closePlayerMenu();
       if (selectedPlayerName) callbacks?.onSectInvite?.(selectedPlayerName);
     });
 
@@ -3233,6 +3267,8 @@ export const ui = {
       closedAny = true;
     }
     modalStack.clear();
+    // WorldScene gọi closeAllModals mỗi lần cập nhật khi đang chết: màn Hoàng Tuyền (không phải "modal" để đóng) phải còn trong modalStack
+    if (this.isLimboOpen()) modalStack.push("limbo-overlay", null);
     return closedAny;
   },
 
@@ -3277,6 +3313,8 @@ export const ui = {
       case "newbie-guide-modal":
         this.dismissNewbieGuide();
         return true;
+      case "limbo-overlay":
+        return true; // Esc KHÔNG đóng màn Hoàng Tuyền (chỉ đầu thai mới đóng); nuốt phím để không rơi xuống bước "bỏ chọn mục tiêu"
       default: {
         const el = document.getElementById(top.id);
         if (el) {
@@ -3872,6 +3910,7 @@ export const ui = {
     y: number,
     challengeCheck?: DuelChallengeCheck,
     targetSect?: string,
+    byKeyboard = false,
   ) {
     if (name === currentName) return;
     selectedPlayerName = name;
@@ -3945,6 +3984,10 @@ export const ui = {
     menu.style.top = `${clampedY}px`;
     modalStack.push("player-menu");
     focusModal(menu);
+    // mở bằng phím: nhảy thẳng vào nút hành động đầu tiên dùng được (mũi tên + Enter chọn), không phải nút Đóng
+    if (byKeyboard) {
+      menu.querySelector<HTMLButtonElement>(".pm-btn:not(:disabled):not([hidden])")?.focus();
+    }
   },
 
   closePlayerMenu() {
@@ -4063,6 +4106,11 @@ export const ui = {
     if (overlay) overlay.hidden = false;
 
     renderLimboAll();
+    // Bàn phím (#463): màn Hoàng Tuyền là hộp thoại chiếm màn hình: vào modalStack (phím thế giới không chạy, Tab xoay trong màn, mũi tên đi giữa
+    // các nút). Focus vào KHUNG chứ không vào nút: người vừa gục có thể còn đang nhấn Cách / Enter, nút mua / đầu thai không được ăn phím đó;
+    // phải bấm mũi tên mới vào nút đầu tiên.
+    modalStack.push("limbo-overlay", null);
+    if (overlay) overlay.focus();
 
     const rebirthBtn = $("limbo-btn-rebirth");
     if (rebirthBtn) {
@@ -4093,6 +4141,7 @@ export const ui = {
     const overlay = $("limbo-overlay");
     if (overlay) overlay.hidden = true;
     document.body.classList.remove("in-limbo");
+    if (modalStack.remove("limbo-overlay")) returnFocus(null);
   },
 
   isLimboOpen(): boolean {
