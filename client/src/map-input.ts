@@ -33,12 +33,17 @@ export class MapCameraControl {
   box: CameraBox | null = null;
   /** Gọi sau mỗi thay đổi camera do người chơi */
   onChange: (() => void) | null = null;
+  /**
+   * "Về chỗ mình" khi đang xem bản đồ KHÁC bản đồ mình đứng: chỗ vẽ chuyển về bản đồ của mình và trả `true` (đã xử lý, không cần bám lại).
+   * Trả `false` / không đặt: chỉ bám lại trên bản đồ đang xem.
+   */
+  onRecenter: (() => boolean) | null = null;
 
   /** Mở bản đồ lớn: zoom 1, ở giữa, bám theo mình. */
-  reset(box?: Pick<CameraBox, "worldW" | "worldH">): void {
+  reset(box?: Pick<CameraBox, "worldW" | "worldH">, follow = true): void {
     const b = box ?? this.box;
     this.cam = b ? fitCamera(b) : { zoom: 1, cx: 0, cy: 0 };
-    this.follow = true;
+    this.follow = follow;
   }
 
   /** Camera để vẽ: đang bám thì tâm nhìn là vị trí (meX, meY) (đã kẹp); luôn ghi lại `cam` và `box`. */
@@ -83,7 +88,7 @@ export class MapCameraControl {
 
   /** "Về chỗ mình": bám lại, giữ mức phóng. */
   recenter(): void {
-    this.follow = true;
+    if (!this.onRecenter?.()) this.follow = true;
     this.onChange?.();
   }
 
@@ -125,6 +130,9 @@ export function attachMapInput(ctl: MapCameraControl, t: MapInputTargets): () =>
   };
 
   const onDown = (e: PointerEvent) => {
+    // chuột phải / giữa không phải thao tác kéo (menu ngữ cảnh có thể nuốt `pointerup` và để lại con trỏ ma làm lần chạm sau bị tính là chụm)
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+
     canvas.setPointerCapture?.(e.pointerId);
     pointers.set(e.pointerId, toCanvas(e));
     if (pointers.size === 1) {
@@ -204,6 +212,8 @@ export function attachMapInput(ctl: MapCameraControl, t: MapInputTargets): () =>
   canvas.addEventListener("pointermove", onMove);
   canvas.addEventListener("pointerup", onUp);
   canvas.addEventListener("pointercancel", onUp);
+  // mất quyền bắt con trỏ (đóng bảng bằng Esc lúc đang kéo, menu ngữ cảnh...): bỏ con trỏ khỏi danh sách
+  canvas.addEventListener("lostpointercapture", onUp);
   canvas.addEventListener("wheel", onWheel, { passive: false });
   canvas.addEventListener("dblclick", onDblClick);
   canvas.addEventListener("keydown", onKey);
@@ -221,6 +231,7 @@ export function attachMapInput(ctl: MapCameraControl, t: MapInputTargets): () =>
     canvas.removeEventListener("pointermove", onMove);
     canvas.removeEventListener("pointerup", onUp);
     canvas.removeEventListener("pointercancel", onUp);
+    canvas.removeEventListener("lostpointercapture", onUp);
     canvas.removeEventListener("wheel", onWheel);
     canvas.removeEventListener("dblclick", onDblClick);
     canvas.removeEventListener("keydown", onKey);

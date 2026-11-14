@@ -229,6 +229,18 @@ try {
     `kéo quá xa về phía biên: tâm nhìn bị kẹp trong bản đồ (cx ${c.cx}, cy ${c.cy})`,
   );
 
+  // chuột PHẢI không phải thao tác kéo (menu ngữ cảnh có thể nuốt pointerup và để con trỏ ma)
+  const beforeRight = await cam();
+  await mouse("mousePressed", mx, my, { button: "right", buttons: 2 });
+  for (let s = 1; s <= 4; s++)
+    await mouse("mouseMoved", mx + s * 20, my, { button: "right", buttons: 2 });
+  await mouse("mouseReleased", mx + 80, my, { button: "right", buttons: 0 });
+  await sleep(200);
+  c = await cam();
+  check(
+    c.cx === beforeRight.cx && c.cy === beforeRight.cy && c.zoom === beforeRight.zoom,
+    "chuột phải + di chuyển: KHÔNG kéo bản đồ",
+  );
   await click("#map-recenter");
   c = await cam();
   check(c.follow, "nút 'Về chỗ mình': bám lại, giữ mức phóng");
@@ -261,6 +273,82 @@ try {
   );
   await key("Home", "Home", 36);
   check((await cam()).follow, "phím Home: về chỗ mình");
+
+  console.log("\n--- Sơ đồ nối ba bản đồ, chú giải, xem bản đồ khác ---");
+  const nodes = JSON.parse(
+    await evalJs(
+      `JSON.stringify([...document.querySelectorAll("#map-graph .mg-node")].map((b) => ({ id: b.dataset.mapId, cur: b.getAttribute("aria-current"), pressed: b.getAttribute("aria-pressed"), h: Math.round(b.getBoundingClientRect().height) })))`,
+    ),
+  );
+  check(nodes.length === 3, `sơ đồ nối có 3 nút bản đồ (${nodes.map((n) => n.id).join(", ")})`);
+  const hereNode = nodes.find((n) => n.id === "lac_ha");
+  check(
+    hereNode?.cur === "location" && hereNode?.pressed === "true",
+    "nút bản đồ mình đứng (lac_ha): aria-current='location' và đang được xem",
+  );
+  check(
+    nodes.every((n) => n.h >= 44),
+    "mọi nút sơ đồ cao >= 44 px (mục bấm)",
+  );
+  const legendState = () =>
+    evalJs(
+      `JSON.stringify({ exp: document.getElementById("map-legend-toggle").getAttribute("aria-expanded"), hidden: document.getElementById("map-legend").hidden })`,
+    ).then((x) => JSON.parse(x));
+  let lg = await legendState();
+  check(lg.exp === "true" && !lg.hidden, "chú giải mặc định MỞ ở màn rộng");
+  await click("#map-legend-toggle");
+  lg = await legendState();
+  check(lg.exp === "false" && lg.hidden, "bấm 'Chú giải': đóng (aria-expanded=false, ẩn)");
+  await click("#map-legend-toggle");
+  lg = await legendState();
+  check(lg.exp === "true" && !lg.hidden, "bấm lần nữa: mở lại");
+
+  const hashHere = await canvasHash();
+  await click('#map-graph .mg-node[data-map-id="hac_phong"]');
+  const view = JSON.parse(
+    await evalJs(
+      `JSON.stringify({ id: window.__scene.mapViewId, title: document.getElementById("map-title").textContent, sub: document.getElementById("map-coords").textContent, pressed: document.querySelector('#map-graph .mg-node[data-map-id="hac_phong"]').getAttribute("aria-pressed"), herePressed: document.querySelector('#map-graph .mg-node[data-map-id="lac_ha"]').getAttribute("aria-pressed") })`,
+    ),
+  );
+  check(view.id === "hac_phong", `bấm nút Hắc Phong: đang xem hac_phong (${view.id})`);
+  check(view.title.includes("Hắc Phong Cốc"), `tiêu đề đổi theo bản đồ đang xem (${view.title})`);
+  check(
+    view.sub.includes("Đang xem bản đồ khác"),
+    "phụ đề nói rõ đang xem bản đồ KHÁC bản đồ mình đứng",
+  );
+  check(
+    view.pressed === "true" && view.herePressed === "false",
+    "nút đang xem được đánh dấu (aria-pressed)",
+  );
+  check((await canvasHash()) !== hashHere, "ảnh bản đồ ĐỔI sang bản đồ Hắc Phong");
+  c = await cam();
+  check(
+    c.zoom === 1 && !c.follow,
+    `đổi bản đồ xem: zoom 1, không bám (không có 'mình' ở bản đồ đó) (${JSON.stringify(c)})`,
+  );
+  await click("#map-zoom-in");
+  await click("#map-zoom-in");
+  c = await cam();
+  check(c.zoom > 1.5 && !c.follow, `phóng được ở bản đồ đang xem khác (zoom ${c.zoom})`);
+  await click("#map-recenter");
+  const back = JSON.parse(
+    await evalJs(
+      `JSON.stringify({ id: window.__scene.mapViewId, title: document.getElementById("map-title").textContent })`,
+    ),
+  );
+  check(
+    back.id === null && back.title.includes("Lạc Hà"),
+    `'Về chỗ mình' khi xem bản đồ khác: quay về bản đồ mình đứng (${back.title})`,
+  );
+  c = await cam();
+  check(c.follow && c.zoom === 1, "về bản đồ mình: zoom 1, bám theo mình");
+  await click('#map-graph .mg-node[data-map-id="am_suong"]');
+  await close();
+  await open();
+  check(
+    (await evalJs("window.__scene.mapViewId")) === null,
+    "đang xem Âm Sương rồi đóng / mở lại: về xem bản đồ mình đứng",
+  );
 
   console.log("\n--- Cảm ứng: chụm hai ngón ---");
   await close();
@@ -302,6 +390,73 @@ try {
   check(
     dragged.cx < c.cx,
     `kéo một ngón sang phải: tâm nhìn đi sang trái (cx ${c.cx} -> ${dragged.cx})`,
+  );
+
+  console.log("\n--- Qua cổng (changeMap trên CÙNG scene) cập nhật sơ đồ nối ---");
+  // main.ts khi qua cổng gọi activeScene.changeMap(newRoom, finalMap) chứ không tạo lại scene; mock dùng lại chính room hiện tại
+  const graphState = () =>
+    evalJs(`JSON.stringify({
+      hidden: document.getElementById("map-graph").hidden,
+      current: [...document.querySelectorAll("#map-graph .mg-node[aria-current]")].map((b) => b.dataset.mapId),
+      pressed: [...document.querySelectorAll("#map-graph .mg-node[aria-pressed=true]")].map((b) => b.dataset.mapId),
+      title: document.getElementById("map-title").textContent,
+      view: window.__scene.mapViewId })`).then(JSON.parse);
+  const goMap = async (id) => {
+    await evalJs(
+      `(() => { const sc = window.__scene; sc.changeMap(sc.room, window.__getMap(${JSON.stringify(id)})); return 1; })()`,
+    );
+    await sleep(500);
+  };
+  // đang xem Âm Sương rồi ĐÓNG bản đồ lớn và qua cổng: chưa mở lại mà trạng thái đã về bản đồ mình vừa tới (không còn dấu "đang xem" cũ)
+  await click('#map-graph .mg-node[data-map-id="am_suong"]');
+  let gs = await graphState();
+  check(gs.view === "am_suong", `tiền điều kiện: đang xem Âm Sương (${gs.view})`);
+  await close();
+  await goMap("hac_phong");
+  gs = await graphState();
+  check(
+    gs.view === null && gs.pressed.length === 1 && gs.pressed[0] === "hac_phong",
+    `đóng khi đang xem Âm Sương rồi qua cổng: chưa mở lại đã xem bản đồ mình (${gs.view}, ${JSON.stringify(gs.pressed)})`,
+  );
+  await open();
+  gs = await graphState();
+  check(
+    !gs.hidden && gs.current.length === 1 && gs.current[0] === "hac_phong",
+    `sau khi qua cổng sang Hắc Phong: 'đang đứng' (aria-current) ở hac_phong (${JSON.stringify(gs.current)})`,
+  );
+  check(
+    gs.pressed.length === 1 && gs.pressed[0] === "hac_phong" && gs.title.includes("Hắc Phong Cốc"),
+    `đang xem bản đồ mình vừa tới (${JSON.stringify(gs.pressed)}, ${gs.title})`,
+  );
+  // đang xem bản đồ khác (Âm Sương) với bản đồ lớn MỞ rồi qua cổng: về xem bản đồ mình đứng, camera / tiêu đề theo bản đồ mới
+  await click('#map-graph .mg-node[data-map-id="am_suong"]');
+  check(
+    (await graphState()).view === "am_suong",
+    "tiền điều kiện: đang xem Âm Sương, bản đồ lớn mở",
+  );
+  await goMap("lac_ha");
+  gs = await graphState();
+  check(
+    gs.view === null && gs.title.includes("Lạc Hà") && gs.current[0] === "lac_ha",
+    `qua cổng khi đang xem Âm Sương (bản đồ lớn mở): về xem Lạc Hà (${gs.view}, ${gs.title}, ${JSON.stringify(gs.current)})`,
+  );
+  c = await cam();
+  check(
+    c.follow && c.zoom === 1,
+    `camera bản đồ lớn đặt lại sau khi qua cổng (${JSON.stringify(c)})`,
+  );
+  await close();
+  await goMap("bi_canh_linh_hu");
+  await open();
+  gs = await graphState();
+  check(gs.hidden === true, `vào bí cảnh (không thuộc sơ đồ): sơ đồ nối ẨN (hidden=${gs.hidden})`);
+  await close();
+  await goMap("lac_ha");
+  await open();
+  gs = await graphState();
+  check(
+    !gs.hidden && gs.current.length === 1 && gs.current[0] === "lac_ha",
+    `ra khỏi bí cảnh về Lạc Hà: sơ đồ hiện lại, 'đang đứng' ở lac_ha (${gs.hidden}, ${JSON.stringify(gs.current)})`,
   );
 
   check(pageErrors === 0, `0 lỗi console / exception (${pageErrors})`);
