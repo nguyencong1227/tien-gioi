@@ -62,6 +62,7 @@ export class MapCameraControl {
   pan(dx: number, dy: number): void {
     const b = this.box;
     if (!b || (dx === 0 && dy === 0)) return;
+    this.follow = false;
     this.cam = panCamera(b, this.cam, dx, dy);
     this.onChange?.();
   }
@@ -157,7 +158,7 @@ export function attachMapInput(ctl: MapCameraControl, t: MapInputTargets): () =>
   const onWheel = (e: WheelEvent) => {
     e.preventDefault();
     const p = toCanvas(e);
-    void p;
+    ctl.zoomBy(wheelZoomFactor(e.deltaY, e.deltaMode), p.x, p.y);
   };
   const onDblClick = (e: MouseEvent) => {
     const p = toCanvas(e);
