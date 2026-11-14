@@ -58,6 +58,7 @@ import {
   type GameLike,
 } from "./gfx/scale";
 import { mountPerfOverlay } from "./gfx/perf-overlay";
+import { browserPacksEnv, initPacks, packs } from "./gfx/packs";
 import { isReducedMotion } from "./a11y";
 
 // Lõi hiển thị M5 (#322): đặt data-form / data-orient / data-input và --safe-*, --vw, --vh lên <html> SỚM, trước khi dựng giao diện.
@@ -69,6 +70,8 @@ initSheetSwipe(); // vuốt tiêu đề tấm để đóng (điện thoại)
 
 // Chất lượng đồ hoạ M5 (#323): hồ sơ Thấp / Vừa / Cao, Tự động + bộ điều tốc; SAU initDisplay (cần `form`)
 initQuality(browserQualityEnv(() => getDisplay().form, isReducedMotion));
+// Gói tải theo nhu cầu (#516): chỉ BỔ SUNG, thiếu gói trò chơi vẫn chạy. Gói `hd:*` bật khi bậc "Rất cao" ổn định (nối khi #538 vào main).
+initPacks(browserPacksEnv({ isNative: isNativeApp, hdAllowed: () => false }));
 document.addEventListener("visibilitychange", () => setQualityActive(!document.hidden));
 if (typeof window.matchMedia === "function") {
   // Hệ điều hành đổi "giảm chuyển động" lúc đang chơi
@@ -520,6 +523,9 @@ function setupRoomLifecycle(room: Room) {
         );
       });
 
+      // Gói bản đồ đích đã bắt đầu tải từ lúc gửi `travel` (WorldScene.travelPortal), chạy SONG SONG với việc vào phòng. `takeMapWait` luôn resolve
+      // (quá 8 s / bí cảnh 3 s là `failed`: vẫn qua cổng, việc tải không bị huỷ) và KHÔNG nằm trong `TRAVEL_JOIN_TIMEOUT_MS`.
+      const packWait = packs().takeMapWait(msg.mapId);
       const {
         room: newRoom,
         mapId: finalMapId,
@@ -527,7 +533,13 @@ function setupRoomLifecycle(room: Room) {
       } = await Promise.race([joinPromise, timeoutPromise]).finally(() => {
         if (timeoutId) clearTimeout(timeoutId);
       });
+      // NGAY sau khi vào phòng, TRƯỚC khi chờ gói: server gửi inv / quests / skills / wallet / soul... lúc vào, colyseus.js bỏ tin không có handler;
+      // chờ gói (tới 8 s) rồi mới bắt thì mất sạch các tin đầu (early-messages.ts)
       captureEarlyMessages(newRoom);
+      await packWait;
+      // Phòng mới có thể đã đứt trong lúc chờ gói (chưa có `onLeave` nào gắn): báo lỗi chuyển bản đồ như khi vào phòng thất bại
+      if (newRoom.connection && newRoom.connection.isOpen === false)
+        throw new Error("Mất kết nối khi chuyển bản đồ.");
       const finalMap = getMap(finalMapId)!;
 
       // Cập nhật scene sang phòng mới và bản đồ mới

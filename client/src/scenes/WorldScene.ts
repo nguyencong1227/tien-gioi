@@ -32,6 +32,7 @@ import {
 } from "../gfx/fx/combat-fx";
 import { getQuality, onQualityChange } from "../gfx/quality";
 import { buildDecorGrid } from "../gfx/map-decor";
+import { mapPackId, mapsNearPortals, neighborMapIds, packs } from "../gfx/packs";
 import { styleOf } from "../gfx/map-style";
 import { decorTilesetKey, ensureDecorTileset } from "../gfx/decor-tileset";
 import { ambientEnabledByUrl, planWeather, weatherEnabledByUrl } from "../gfx/map-weather";
@@ -437,6 +438,7 @@ export class WorldScene extends Phaser.Scene {
 
     this.buildMapVisuals();
     ui.setCurrentMapId(this.map.def.id);
+    this.prefetchPacks();
 
     // Lõi hiệu ứng (#325): ngân sách theo hồ sơ chất lượng; đóng cảnh thì giải phóng sạch
     this.fx = createFxSystem(this, { getProfile: getQuality, depth: () => this.map.worldH });
@@ -1492,7 +1494,18 @@ export class WorldScene extends Phaser.Scene {
 
   public travelPortal(portalId: string) {
     if (this.isReconnecting) return;
+    // Bắt đầu tải gói bản đồ đích NGAY khi gửi `travel`: chạy song song với màn chuyển cảnh và việc vào phòng mới (main.ts `travelTo`),
+    // không nối đuôi sau chúng. Cổng lạ thì không có gì để tải; server vẫn là bên quyết định có cho đi không.
+    const dest = this.map.portals.find((p) => p.id === portalId);
+    if (dest) packs().startMapWait(dest.toMap);
     this.room.send("travel", { portalId } satisfies TravelMsg);
+  }
+
+  /** Lúc rảnh sau khi vào một bản đồ: tải trước gói `icons` và gói các bản đồ kề (chỉ khi mạng 4g, không tiết kiệm dữ liệu; `packs.ts`). */
+  private prefetchPacks() {
+    const p = packs();
+    p.prefetch("icons");
+    p.prefetchNeighbors(neighborMapIds(this.map.portals, this.map.def.id));
   }
 
   // ---------------- Mạng & Tự nối lại (#117) ----------------
@@ -1516,6 +1529,8 @@ export class WorldScene extends Phaser.Scene {
     this.dungeonFallUntil = 0;
     ui.death(null);
     ui.hideDuelHud();
+    // Gói của bản đồ vừa rời không còn cần: giải phóng (nơi giữ texture của gói đó xoá theo `onRelease`); quay lại thì nạp lại từ bộ nhớ đệm
+    packs().release(mapPackId(this.map.def.id));
     this.map = newMap;
     // Qua cổng KHÔNG tạo lại scene: dựng lại sơ đồ nối (nút "đang đứng", ẩn trong bí cảnh) và đưa bản đồ lớn về xem bản đồ mình đứng.
     // `mapWasOpen = false` để nếu bản đồ lớn đang mở thì khung hình sau đặt lại camera / tiêu đề theo bản đồ mới.
@@ -1526,6 +1541,7 @@ export class WorldScene extends Phaser.Scene {
     ui.setCurrentMapId(newMap.def.id);
     this.attachRoom(room);
     this.syncAudioZone();
+    this.prefetchPacks();
   }
 
   public attachRoom(room: Room) {
@@ -1603,6 +1619,10 @@ export class WorldScene extends Phaser.Scene {
 
   private setupNetwork(isInitial = true) {
     this.room.onStateChange(() => this.reconcile());
+    // Phòng đã vào TỪ TRƯỚC khi gắn vào cảnh (qua cổng: đợi gói bản đồ tới 8 s sau khi vào phòng, main.ts `travelTo`): lần đồng bộ state đầu đã xảy ra rồi
+    // và nơi đứng yên (không patch) sẽ không có lần nào nữa, nên `predX` / `predY` kẹt ở toạ độ bản đồ CŨ (camera nhìn sai chỗ, đường đi tính sai).
+    // Đối chiếu ngay một lần; chưa có state / chưa có mình thì `reconcile` tự bỏ qua.
+    if (!isInitial) this.reconcile();
     // Ghi lại handler theo loại để phát lại các tin server gửi ngay lúc vào phòng (xem early-messages.ts)
     const handlers: Record<string, (msg: any) => void> = {};
     const reg = (type: string, fn: (msg: any) => void) => {
@@ -1894,6 +1914,9 @@ export class WorldScene extends Phaser.Scene {
 
   private syncPortals() {
     this.emitPortalSwirls();
+    // Lại gần một cổng (~1200 px, vài giây đi bộ): tải trước gói bản đồ bên kia để qua cổng không phải chờ (chỉ khi mạng cho phép; mỗi gói một lần)
+    for (const id of mapsNearPortals(this.map.portals, this.predX, this.predY))
+      packs().prefetch(mapPackId(id));
     const near = this.map.portalNear(this.predX, this.predY);
     if (near) {
       this.nearPortal = near;
