@@ -1139,6 +1139,106 @@ html[data-input="touch"] .qt-head {
   text-shadow: 0 1px 2px #000;
 }
 
+/* Số thứ tự dòng hội thoại (máy tính): phím 1-9 chọn dòng; cảm ứng ẩn */
+.dlg-opt-btn .opt-key {
+  display: none;
+}
+@media (pointer: fine) and (min-width: 641px) {
+  .dlg-opt-btn .opt-key {
+    display: inline-block;
+    flex: none;
+    min-width: 16px;
+    padding: 0 4px;
+    border-radius: 3px;
+    border: 1px solid rgba(243, 220, 160, 0.6);
+    background: rgba(0, 0, 0, 0.45);
+    color: #ffe9b0;
+    font-family: inherit;
+    font-size: var(--fs-11, 11px);
+    font-weight: 700;
+    text-align: center;
+  }
+  .dlg-opt-btn:focus-visible,
+  .inv-slot:focus-visible,
+  .shop-qty-btn:focus-visible,
+  .act-btn:focus-visible {
+    outline: 2px solid #ffe08a;
+    outline-offset: 2px;
+  }
+}
+
+/* Chip phím trong nút chữ (lời mời, rời bí cảnh, đầu hàng: "Nhận Y" / "Từ chối X"): chỉ máy tính, cảm ứng ẩn */
+.btn-key {
+  display: none;
+}
+@media (pointer: fine) and (min-width: 641px) {
+  .btn-key {
+    display: inline-block;
+    margin-left: 6px;
+    min-width: 16px;
+    padding: 0 4px;
+    border-radius: 3px;
+    border: 1px solid rgba(243, 220, 160, 0.6);
+    background: rgba(0, 0, 0, 0.45);
+    color: #ffe9b0;
+    font-family: inherit;
+    font-size: var(--fs-11, 11px);
+    font-weight: 700;
+    text-align: center;
+    vertical-align: middle;
+  }
+}
+
+/* Màn Hoàng Tuyền chơi bằng phím (#463): vòng tiêu điểm rõ trên nút mua, thẻ xuất thân, ô tích ký vật, nút đầu thai; khung màn nhận focus nhưng không vẽ vòng */
+.stone-buy-btn:focus-visible,
+.origin-card:focus-visible,
+.relic-item input:focus-visible,
+.limbo-btn-rebirth:focus-visible {
+  outline: 2px solid #ffe08a;
+  outline-offset: 2px;
+}
+#limbo-overlay:focus {
+  outline: none;
+}
+
+/* Nhãn phím trên nút (QUYET_DINH_M3 mục 13, #463): chỉ máy tính (con trỏ chính xác, màn rộng); cảm ứng / điện thoại ẩn hẳn */
+.keycap {
+  display: none;
+}
+@media (pointer: fine) and (min-width: 641px) {
+  .keycap {
+    display: block;
+    position: absolute;
+    top: 3px;
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: 14px;
+    padding: 0 3px;
+    border-radius: 3px;
+    border: 1px solid rgba(243, 220, 160, 0.6);
+    background: rgba(0, 0, 0, 0.62);
+    color: #ffe9b0;
+    font-family: inherit;
+    font-size: var(--fs-9);
+    font-weight: 700;
+    line-height: 1.35;
+    text-align: center;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .sk.big .keycap {
+    top: 9px;
+  }
+  /* nút HUD góc phải: nhãn nằm ở góc trên phải, không che chữ */
+  .hud-btn .keycap {
+    top: -7px;
+    right: -3px;
+    left: auto;
+    transform: none;
+  }
+}
+
 /* Thông báo nhận đồ góc phải ("+1 Nanh sói") */
 #gain-feed {
   position: fixed;
@@ -1787,6 +1887,111 @@ body.low-fx #btn-talk {
   background: rgba(80, 70, 60, 0.4);
   border-color: var(--line);
   color: var(--paper);
+}
+
+/* Màn Phím tắt (#keys-modal, QUYET_DINH_M3 mục 13, #463): danh sách "tên / các phím / nút Đổi phím" vẽ từ bảng phím */
+#keys-modal {
+  --sheet-w: 520px;
+  /* mở chồng lên Cài đặt / chỉ dẫn (cùng chỗ giữa màn): nền đặc để chữ của bảng bên dưới không lộ xuyên qua */
+  background: rgb(24, 21, 18);
+}
+.keys-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.keys-status {
+  min-height: 1.4em;
+  margin: 0;
+  color: #ffe08a;
+  font-size: var(--fs-13);
+}
+.keys-group h3,
+.keys-fixed h3 {
+  margin: 0 0 6px;
+  color: #ffe08a;
+  font-size: var(--fs-13);
+  letter-spacing: 0.04em;
+}
+.keys-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  min-height: 44px;
+  margin-bottom: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.38);
+  border: 1px solid var(--line);
+  font-size: var(--fs-13);
+}
+.keys-row.custom {
+  border-color: var(--gold);
+}
+.keys-name {
+  flex: 1 1 160px;
+}
+.keys-caps {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.key-chip {
+  display: inline-block;
+  min-width: 22px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid rgba(243, 220, 160, 0.6);
+  background: rgba(0, 0, 0, 0.62);
+  color: #ffe9b0;
+  font-family: inherit;
+  font-size: var(--fs-12);
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+}
+.keys-change {
+  flex: none;
+  min-width: 112px;
+  min-height: 44px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--paper);
+  font-weight: 700;
+  font-size: var(--fs-13);
+}
+.keys-change.waiting {
+  border-color: #ffe08a;
+  background: rgba(201, 162, 74, 0.28);
+  color: #ffe08a;
+}
+.keys-change:focus-visible,
+#keys-reset:focus-visible,
+#set-open-keys:focus-visible,
+#newbie-btn-keys:focus-visible {
+  outline: 2px solid #ffe08a;
+  outline-offset: 2px;
+}
+.keys-fixed ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--fs-13);
+  color: #d1d5db;
+}
+/* Cảm ứng không có bàn phím: ẩn dòng mở màn Phím tắt trong Cài đặt và nút "Xem tất cả phím tắt" ở bảng chỉ dẫn (không đổi hành vi điện thoại) */
+html[data-input="touch"] #set-keys-row,
+html[data-input="touch"] #newbie-btn-keys {
+  display: none;
+}
+.newbie-footer {
+  gap: 10px;
 }
 
 /* Màn hình cài đặt (#settings-modal - #35) */
@@ -5655,4 +5860,9 @@ html[data-input="touch"][data-touch-scheme="dpad"][data-orient="portrait"] #btn-
 }
 html[data-input="touch"][data-touch-scheme="dpad"][data-orient="portrait"] #btn-portal {
   bottom: calc(max(14px, var(--safe-b, env(safe-area-inset-bottom, 0px))) + 370px);
+}
+
+/* thân hộp thoại nhận focus bằng mã (Enter / Cách tua chữ): không vẽ viền */
+#dlg-body:focus {
+  outline: none;
 }

@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { LOCK_RANGE, keepLock, pickNextTarget } from "./target-lock";
+import {
+  LOCK_RANGE,
+  keepLock,
+  pickNextPlayer,
+  pickNextTarget,
+  pickPrevTarget,
+} from "./target-lock";
 
 const c = (id: string, dist: number) => ({ id, dist });
 
@@ -48,5 +54,60 @@ describe("target-lock: keepLock", () => {
     expect(keepLock(LOCK_RANGE + 1)).toBe(false);
     expect(keepLock(null)).toBe(false);
     expect(keepLock(NaN)).toBe(false);
+  });
+});
+
+describe("target-lock: pickPrevTarget (Shift+Tab)", () => {
+  const list = [c("a", 50), c("b", 120), c("c", 300)];
+
+  it("chưa khoá: con gần nhất (như Tab); không có quái trong tầm: null", () => {
+    expect(pickPrevTarget(list, null)).toBe("a");
+    expect(pickPrevTarget([], null)).toBeNull();
+    expect(pickPrevTarget([c("xa", LOCK_RANGE + 1)], null)).toBeNull();
+  });
+
+  it("đang khoá: đi ngược xa -> gần rồi vòng về con xa nhất", () => {
+    expect(pickPrevTarget(list, "c")).toBe("b");
+    expect(pickPrevTarget(list, "b")).toBe("a");
+    expect(pickPrevTarget(list, "a")).toBe("c");
+  });
+
+  it("Tab rồi Shift+Tab quay lại đúng con cũ", () => {
+    for (const id of ["a", "b", "c"]) {
+      const next = pickNextTarget(list, id)!;
+      expect(pickPrevTarget(list, next)).toBe(id);
+    }
+  });
+
+  it("chỉ còn đúng con đang khoá: nhả khoá; mục tiêu cũ đã mất: con gần nhất; bỏ qua quái ngoài tầm", () => {
+    expect(pickPrevTarget([c("a", 50)], "a")).toBeNull();
+    expect(pickPrevTarget(list, "da-mat")).toBe("a");
+    expect(pickPrevTarget([...list, c("xa", LOCK_RANGE + 50)], "a")).toBe("c");
+  });
+});
+
+describe("pickNextPlayer: phím P mở menu đồng đạo (#463)", () => {
+  const three = [c("b", 200), c("a", 100), c("c", 300)];
+  it("không ai thì null", () => {
+    expect(pickNextPlayer([], null)).toBeNull();
+    expect(pickNextPlayer([c("x", Number.NaN)], null)).toBeNull();
+  });
+  it("lần đầu lấy người GẦN nhất, bấm tiếp (sau Esc) đi xa dần rồi vòng lại", () => {
+    expect(pickNextPlayer(three, null)).toBe("a");
+    expect(pickNextPlayer(three, "a")).toBe("b");
+    expect(pickNextPlayer(three, "b")).toBe("c");
+    expect(pickNextPlayer(three, "c")).toBe("a");
+  });
+  it("người vừa mở đã đi khỏi tầm nhìn: quay về người gần nhất", () => {
+    expect(pickNextPlayer(three, "zzz")).toBe("a");
+  });
+  it("chỉ một người: mở lại chính người đó (khác Tab chọn quái, không nhả)", () => {
+    expect(pickNextPlayer([c("a", 50)], "a")).toBe("a");
+    expect(pickNextPlayer([c("a", 50)], null)).toBe("a");
+  });
+  it("hoà khoảng cách: theo id, kết quả ổn định", () => {
+    const tie = [c("m", 100), c("k", 100)];
+    expect(pickNextPlayer(tie, null)).toBe("k");
+    expect(pickNextPlayer(tie, "k")).toBe("m");
   });
 });
