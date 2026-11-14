@@ -1,51 +1,51 @@
 # Báo cáo Phân tích Thành phần Gói tải Client (Bundle Breakdown)
 
 > Ngày cập nhật: 2026-11-15 (M7.15, Refs #516)
-> Gói JS chính: `assets/index-Dj4xVeKF.js` — **1946.91 KiB** thô, **496.86 KiB** gzip level 9 (hoặc **511.57 KB** theo log của Vite).
-> Ngân sách tối đa: **520 KB** (Khoảng đệm an toàn hiện tại: **23.14 KiB** / **8.43 KB**).
+> Gói JS chính: `assets/index-BKv90fq4.js` — **1564.64 KiB** thô, **456.18 KiB** gzip level 9 (hoặc **469.13 KB** theo log của Vite).
+> Ngân sách tối đa: **520 KB** (Khoảng đệm an toàn hiện tại: **63.82 KiB** / **50.87 KB**).
 
 ## 1. Cơ cấu theo Nhóm thành phần
 
 | Thành phần | Mô tả | Kích thước thô | Tỷ lệ thô | Minified | Tỷ lệ Min | Ước tính Gzip | Tỷ lệ Gzip |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Phaser 3 Engine** | Bộ engine game 2D chính (dist/phaser.js) | 8082.07 KiB | 88.8% | 1447.11 KiB | 71.9% | **357.32 KiB** | 71.9% |
-| **Colyseus Client & Schema** | Kết nối WebSocket, đồng bộ Schema state và msgpackr | 366.06 KiB | 4% | 123.35 KiB | 6.1% | **30.46 KiB** | 6.1% |
-| **Hợp đồng Game (shared/)** | Bản đồ, vật phẩm, công thức, nhiệm vụ, cảnh giới, chiêu thức | 86.15 KiB | 0.9% | 74.09 KiB | 3.7% | **18.29 KiB** | 3.7% |
-| **DOM UI (HUD & Panels)** | Giao diện HTML/DOM: HUD, phím tắt, bảng phím, modal, chat | 177.4 KiB | 1.9% | 119.16 KiB | 5.9% | **29.42 KiB** | 5.9% |
-| **Mã Game (Scenes, GFX, Logic)** | Phaser WorldScene, map-render, VFX, âm thanh, điều khiển | 369.68 KiB | 4.1% | 234.75 KiB | 11.7% | **57.96 KiB** | 11.7% |
-| **Thư viện khác & Polyfills** | Capacitor, tslib, vite/modulepreload-polyfill | 22.01 KiB | 0.2% | 13.74 KiB | 0.7% | **3.39 KiB** | 0.7% |
+| **Phaser 3 Engine** | Bộ engine game 2D chính (dist/phaser.js) | 1072.35 KiB | 51% | 1060.86 KiB | 65% | **296.66 KiB** | 65% |
+| **Colyseus Client & Schema** | Kết nối WebSocket, đồng bộ Schema state và msgpackr | 366.06 KiB | 17.4% | 123.35 KiB | 7.6% | **34.5 KiB** | 7.6% |
+| **Hợp đồng Game (shared/)** | Bản đồ, vật phẩm, công thức, nhiệm vụ, cảnh giới, chiêu thức | 86.82 KiB | 4.1% | 74.38 KiB | 4.6% | **20.8 KiB** | 4.6% |
+| **DOM UI (HUD & Panels)** | Giao diện HTML/DOM: HUD, phím tắt, bảng phím, modal, chat | 177.4 KiB | 8.4% | 119.17 KiB | 7.3% | **33.32 KiB** | 7.3% |
+| **Mã Game (Scenes, GFX, Logic)** | Phaser WorldScene, map-render, VFX, âm thanh, điều khiển | 377.54 KiB | 18% | 239.79 KiB | 14.7% | **67.06 KiB** | 14.7% |
+| **Thư viện khác & Polyfills** | Capacitor, tslib, vite/modulepreload-polyfill | 22.01 KiB | 1% | 13.74 KiB | 0.8% | **3.84 KiB** | 0.8% |
 
 ### Nhận định trọng điểm:
-- **Phaser 3 Engine**: chiếm **~357.32 KiB gzip** (71.9% bundle). Tỷ lệ minified thực tế phản ánh chính xác kích thước trong gói so với mã nguồn thô chưa nén. Khi áp dụng production alias `phaser-arcade-physics.min.js` (#565), Phaser giảm từ ~441 KiB xuống ~282 KiB gzip.
-- **Colyseus Client + Schema**: chiếm **~30.46 KiB gzip** (~6.1%).
-- **Mã Game (WorldScene, GFX, FX, Connection)**: chiếm **~57.96 KiB gzip** (~11.7%).
-- **DOM UI (HUD, Modal, Chat, Panels)**: chiếm **~29.42 KiB gzip** (~5.9%).
-- **Hợp đồng Shared**: chiếm **~18.29 KiB gzip** (~3.7%).
+- **Phaser 3 Engine**: chiếm **~296.66 KiB gzip** (65% bundle). Tỷ lệ minified thực tế phản ánh chính xác kích thước trong gói so với mã nguồn thô chưa nén. Khi áp dụng production alias `phaser-arcade-physics.min.js` (#565), Phaser giảm từ ~441 KiB xuống ~282 KiB gzip.
+- **Colyseus Client + Schema**: chiếm **~34.5 KiB gzip** (~7.6%).
+- **Mã Game (WorldScene, GFX, FX, Connection)**: chiếm **~67.06 KiB gzip** (~14.7%).
+- **DOM UI (HUD, Modal, Chat, Panels)**: chiếm **~33.32 KiB gzip** (~7.3%).
+- **Hợp đồng Shared**: chiếm **~20.8 KiB gzip** (~4.6%).
 
 ## 2. Top 20 Module nặng nhất trong Bundle (xếp theo Minified)
 
 | STT | Module | Kích thước thô | Minified | Tỷ lệ Min | Ước tính Gzip |
 | :---: | :--- | :---: | :---: | :---: | :---: |
-| 1 | `node_modules/phaser/dist/phaser.js` | 8081.94 KiB | 1447 KiB | 71.9% | ~357.29 KiB |
-| 2 | `client/src/ui.ts` | 144.6 KiB | 96.16 KiB | 4.8% | ~23.74 KiB |
-| 3 | `node_modules/@colyseus/schema/build/umd/index.js` | 234.1 KiB | 60.2 KiB | 3% | ~14.86 KiB |
-| 4 | `client/src/scenes/WorldScene.ts` | 99.11 KiB | 59.34 KiB | 2.9% | ~14.65 KiB |
-| 5 | `shared/src/quests.ts` | 20.44 KiB | 24.1 KiB | 1.2% | ~5.95 KiB |
-| 6 | `node_modules/@colyseus/msgpackr/unpack.js` | 33.12 KiB | 18.37 KiB | 0.9% | ~4.54 KiB |
-| 7 | `node_modules/@colyseus/msgpackr/pack.js` | 38.53 KiB | 16.67 KiB | 0.8% | ~4.12 KiB |
-| 8 | `client/src/main.ts` | 23.25 KiB | 15.34 KiB | 0.8% | ~3.79 KiB |
-| 9 | `node_modules/tslib/tslib.es6.mjs` | 17.47 KiB | 10.98 KiB | 0.5% | ~2.71 KiB |
-| 10 | `shared/src/skills.ts` | 12.54 KiB | 10.76 KiB | 0.5% | ~2.66 KiB |
-| 11 | `client/src/map-render.ts` | 14.83 KiB | 9.15 KiB | 0.5% | ~2.26 KiB |
-| 12 | `client/src/auth-ui.ts` | 13.38 KiB | 8.92 KiB | 0.4% | ~2.2 KiB |
-| 13 | `shared/src/items.ts` | 10.98 KiB | 8.68 KiB | 0.4% | ~2.14 KiB |
-| 14 | `client/src/auth.ts` | 10.74 KiB | 8.44 KiB | 0.4% | ~2.08 KiB |
-| 15 | `client/src/gfx/quality.ts` | 12.29 KiB | 7.61 KiB | 0.4% | ~1.88 KiB |
-| 16 | `client/src/audio.ts` | 11.21 KiB | 7.5 KiB | 0.4% | ~1.85 KiB |
-| 17 | `shared/src/map.ts` | 13.36 KiB | 7.38 KiB | 0.4% | ~1.82 KiB |
-| 18 | `client/src/keybinds.ts` | 9.01 KiB | 7.13 KiB | 0.4% | ~1.76 KiB |
-| 19 | `client/src/gfx/packs.ts` | 10.44 KiB | 6.06 KiB | 0.3% | ~1.5 KiB |
-| 20 | `client/src/dungeon.ts` | 6.57 KiB | 5.6 KiB | 0.3% | ~1.38 KiB |
+| 1 | `node_modules/phaser/dist/phaser-arcade-physics.min.js` | 1072.15 KiB | 1060.68 KiB | 65% | ~296.61 KiB |
+| 2 | `client/src/ui.ts` | 144.6 KiB | 96.16 KiB | 5.9% | ~26.89 KiB |
+| 3 | `node_modules/@colyseus/schema/build/umd/index.js` | 234.1 KiB | 60.2 KiB | 3.7% | ~16.83 KiB |
+| 4 | `client/src/scenes/WorldScene.ts` | 100.62 KiB | 60.08 KiB | 3.7% | ~16.8 KiB |
+| 5 | `shared/src/quests.ts` | 20.44 KiB | 24.1 KiB | 1.5% | ~6.74 KiB |
+| 6 | `node_modules/@colyseus/msgpackr/unpack.js` | 33.12 KiB | 18.37 KiB | 1.1% | ~5.14 KiB |
+| 7 | `node_modules/@colyseus/msgpackr/pack.js` | 38.53 KiB | 16.67 KiB | 1% | ~4.66 KiB |
+| 8 | `client/src/main.ts` | 23.45 KiB | 15.49 KiB | 0.9% | ~4.33 KiB |
+| 9 | `shared/src/skills.ts` | 12.87 KiB | 10.99 KiB | 0.7% | ~3.07 KiB |
+| 10 | `node_modules/tslib/tslib.es6.mjs` | 17.47 KiB | 10.98 KiB | 0.7% | ~3.07 KiB |
+| 11 | `client/src/map-render.ts` | 14.83 KiB | 9.15 KiB | 0.6% | ~2.56 KiB |
+| 12 | `client/src/auth-ui.ts` | 13.38 KiB | 8.92 KiB | 0.5% | ~2.5 KiB |
+| 13 | `shared/src/items.ts` | 10.98 KiB | 8.68 KiB | 0.5% | ~2.43 KiB |
+| 14 | `client/src/auth.ts` | 10.74 KiB | 8.44 KiB | 0.5% | ~2.36 KiB |
+| 15 | `client/src/gfx/quality.ts` | 12.29 KiB | 7.61 KiB | 0.5% | ~2.13 KiB |
+| 16 | `client/src/audio.ts` | 11.21 KiB | 7.5 KiB | 0.5% | ~2.1 KiB |
+| 17 | `shared/src/map.ts` | 13.36 KiB | 7.38 KiB | 0.5% | ~2.06 KiB |
+| 18 | `client/src/keybinds.ts` | 9.01 KiB | 7.13 KiB | 0.4% | ~1.99 KiB |
+| 19 | `client/src/gfx/packs.ts` | 10.44 KiB | 6.06 KiB | 0.4% | ~1.69 KiB |
+| 20 | `client/src/dungeon.ts` | 6.57 KiB | 5.6 KiB | 0.3% | ~1.57 KiB |
 
 ## 3. Tiềm năng Tách Dynamic `import()` các Bảng UI ít dùng
 
@@ -64,8 +64,8 @@ Hiện tại, file `client/src/ui.ts` chứa hơn 5.250 dòng lệnh và gom to�
 
 ### Hiệu quả dự kiến:
 - **Tổng mã các bảng có thể tách**: **60.88 KiB thô**, tương đương **~14.5 KiB gzip** (với tỉ lệ nén mã ứng dụng HTML/DOM thực tế ~4:1).
-- **Gói chính lúc khởi động sau khi tách**: giảm từ **496.86 KiB** (511.57 KB) xuống còn **~482.36 KiB** (~496.72 KB).
-- **Dư địa ngân sách an toàn**: tăng từ **23.14 KiB** (8.43 KB) lên **~37.64 KiB**, tạo khoảng đệm an toàn lớn cho các tính năng tiếp theo của M7 và M8.
+- **Gói chính lúc khởi động sau khi tách**: giảm từ **456.18 KiB** (469.13 KB) xuống còn **~441.68 KiB** (~454.28 KB).
+- **Dư địa ngân sách an toàn**: tăng từ **63.82 KiB** (50.87 KB) lên **~78.32 KiB**, tạo khoảng đệm an toàn lớn cho các tính năng tiếp theo của M7 và M8.
 
 ## 4. Quyết định & Đề xuất Kiến trúc cho Nhóm
 

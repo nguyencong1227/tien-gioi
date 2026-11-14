@@ -170,7 +170,7 @@ export function classifyModules(modules, totalGzipSize) {
 
   for (const [id, mod] of Object.entries(modules)) {
     const rawLen = mod.renderedLength || 0;
-    let minLen = 0;
+    let minLen;
 
     if (mod.code) {
       try {
