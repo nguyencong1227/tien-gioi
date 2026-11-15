@@ -346,7 +346,9 @@ describe("ngân sách băng thông và CPU (benchmark có seed, kết quả cố
     // M7.3: Hắc Hổ chảy máu sau đòn lao. Nhịp dot (chảy máu / độc / bỏng) CHỈ gửi chủ (`dmgTo`, không `sendNear`): 100 người, 10 s, 3,79 -> 3,80 KB/s (gửi gần thì 4,05 và làm mọi người đứng gần nghe tiếng đánh mỗi nhịp).
     expect(r.eventKbBroadcast).toBeGreaterThan(1);
     expect(r.eventKbNear).toBeLessThan(r.eventKbBroadcast / 2);
-    expect(r.eventKbNear).toBeLessThan(4);
+    // M7.3 tinh anh: 3,80 -> 4,01 KB/s (100 người tranh ~20 con trong bench; tinh anh x2,5 khí huyết sống lâu hơn nên nhiều đòn trúng / số sát thương hơn). Roll tinh anh KHÔNG
+    // gọi `Math.random` (`eliteHash`): lần đầu dùng `Math.random` nhích tới 4,43 dù xác suất 0 vì lệch chuỗi có hạt giống, không phải do tinh anh.
+    expect(r.eventKbNear).toBeLessThan(4.5);
   });
 
   it("tin tổ đội (PartyMsg) cho một client dưới ngân sách < 1 KB/s (#76)", () => {
