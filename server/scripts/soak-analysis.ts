@@ -158,12 +158,38 @@ export function linearRegression(points: { x: number; y: number }[]): LinearRegr
   return { slope, intercept, r2 };
 }
 
+/** Số đo nội dung M7 của một lượt soak bật `--m7` (kế hoạch ở soak-plan.ts) */
+export interface M7SoakContext {
+  /** Chiêu BẮT BUỘC có ít nhất một lần thi triển (6 chiêu Nguyên Anh đợt 2): thiếu là KHÔNG ĐẠT */
+  requiredSkillIds: readonly string[];
+  /** Mọi chiêu của game: chiêu nào chưa thi triển chỉ được ghi lại, không làm đỏ */
+  allSkillIds: readonly string[];
+  /** Số bot theo cảnh giới lúc gieo (chỉ số `REALMS` -> số bot) */
+  realmCounts: Record<number, number>;
+  /** Số lần thi triển theo id chiêu, đếm từ tin `fx` `cast` MÁY CHỦ gửi về đúng người dùng chiêu (không đếm tin bot gửi đi) */
+  skillCastCounts: Record<string, number>;
+}
+
 export interface ExtraSoakContext {
   serverLogErrors?: number;
   monitorAlerts?: number;
   auditErrorsTotal?: number;
   hongFilesCount?: number;
   currencyConservationPassed?: boolean;
+  /** Chỉ có khi soak chạy với `--m7`; vắng thì không kiểm gì về chiêu (đúng như soak cũ) */
+  m7?: M7SoakContext;
+}
+
+/** Kết quả phần nội dung M7 trong báo cáo (chỉ có khi soak chạy với `--m7`) */
+export interface M7SoakResult {
+  realmCounts: Record<number, number>;
+  skillCastCounts: Record<string, number>;
+  totalSkillCasts: number;
+  requiredSkillIds: string[];
+  /** Chiêu bắt buộc mà không lần thi triển nào được máy chủ xác nhận */
+  missingRequired: string[];
+  /** Chiêu của game chưa lần nào được thi triển (kể cả chiêu không bắt buộc) */
+  notCast: string[];
 }
 
 export interface SoakAnalysisResult {
@@ -199,6 +225,7 @@ export interface SoakAnalysisResult {
   auditErrorsTotal?: number;
   hongFilesCount?: number;
   currencyConservationPassed?: boolean;
+  m7?: M7SoakResult;
   thresholds: Required<SoakThresholds>;
 }
 
@@ -418,6 +445,30 @@ export function analyzeSoak(
     reasons.push("Bảo toàn Linh thạch thất bại: Tổng tiền cuối kỳ vượt tổng ban đầu + phát sinh");
   }
 
+  // 13. Nội dung M7 (chỉ khi bật --m7): phải có bot Nguyên Anh và CẢ 6 chiêu Nguyên Anh đợt 2 đều được thi triển ít nhất một lần
+  let m7: M7SoakResult | undefined;
+  if (extra.m7) {
+    const counts = extra.m7.skillCastCounts;
+    const castOf = (id: string) => counts[id] ?? 0;
+    const missingRequired = extra.m7.requiredSkillIds.filter((id) => castOf(id) <= 0);
+    m7 = {
+      realmCounts: extra.m7.realmCounts,
+      skillCastCounts: counts,
+      totalSkillCasts: Object.values(counts).reduce((sum, n) => sum + n, 0),
+      requiredSkillIds: [...extra.m7.requiredSkillIds],
+      missingRequired,
+      notCast: extra.m7.allSkillIds.filter((id) => castOf(id) <= 0),
+    };
+    if ((extra.m7.realmCounts[4] ?? 0) <= 0) {
+      reasons.push("Chế độ --m7 nhưng không có bot Nguyên Anh nào được gieo (realm 4)");
+    }
+    if (missingRequired.length > 0) {
+      reasons.push(
+        `Chế độ --m7: ${missingRequired.length}/${extra.m7.requiredSkillIds.length} chiêu Nguyên Anh không được thi triển lần nào: ${missingRequired.join(", ")}`,
+      );
+    }
+  }
+
   return {
     pass: reasons.length === 0,
     reasons,
@@ -451,9 +502,18 @@ export function analyzeSoak(
     auditErrorsTotal: extra.auditErrorsTotal,
     hongFilesCount: extra.hongFilesCount,
     currencyConservationPassed: extra.currencyConservationPassed,
+    m7,
     thresholds,
   };
 }
+
+/** Nhãn cảnh giới trong bảng tổng kết (chỉ số `REALMS`; soak chỉ dùng 1..4) */
+const REALM_LABELS: Record<number, string> = {
+  1: "Luyện Khí",
+  2: "Trúc Cơ",
+  3: "Kim Đan",
+  4: "Nguyên Anh",
+};
 
 /**
  * Định dạng bảng tổng kết thử tải dài để in ra màn hình hoặc ghi vào báo cáo Markdown.
@@ -496,8 +556,31 @@ export function formatSoakTable(res: SoakAnalysisResult): string {
     `  - kiem-save sau soak:    ${res.auditErrorsTotal ?? 0} lỗi (yêu cầu: 0)`,
     `  - Tệp hỏng (*.hong-*):   ${res.hongFilesCount ?? 0} (yêu cầu: 0)`,
     `  - Bảo toàn tiền tệ:      ${res.currencyConservationPassed === false ? "KHÔNG ĐẠT" : "ĐẠT"}`,
-    "================================================================================",
   ];
+
+  if (res.m7) {
+    const m = res.m7;
+    const realmLine = Object.entries(m.realmCounts)
+      .map(([r, n]) => [Number(r), n] as const)
+      .sort((a, b) => a[0] - b[0])
+      .map(([r, n]) => `${REALM_LABELS[r] ?? `Cảnh giới ${r}`} ${n}`)
+      .join(" | ");
+    const castLine = Object.entries(m.skillCastCounts)
+      .filter(([, n]) => n > 0)
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([id, n]) => `${id} ${n}`)
+      .join(", ");
+    lines.push(
+      "--------------------------------------------------------------------------------",
+      "NỘI DUNG M7 (--m7: sổ chiêu, Nguyên Anh ở Hàn Vân Lĩnh):",
+      `  - Bot theo cảnh giới:    ${realmLine || "(không có)"}`,
+      `  - Lượt thi triển chiêu:  ${m.totalSkillCasts} (máy chủ xác nhận qua fx cast)`,
+      `  - Chiêu Nguyên Anh:      ${m.requiredSkillIds.length - m.missingRequired.length}/${m.requiredSkillIds.length} có lượt thi triển (yêu cầu: đủ)`,
+      `  - Chiêu chưa thi triển:  ${m.notCast.length === 0 ? "(không có, cả game đều được dùng)" : m.notCast.join(", ")}`,
+      `  - Theo từng chiêu:       ${castLine || "(không có)"}`,
+    );
+  }
+  lines.push("================================================================================");
 
   if (!res.pass) {
     lines.push("LÝ DO KHÔNG ĐẠT:");
