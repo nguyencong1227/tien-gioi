@@ -7,7 +7,7 @@
 //  3. Đủ tu vi, phím V (Đột phá) lên Luyện Khí (ép `Math.random` = 0 đúng lúc bấm để đột phá không thất bại ngẫu nhiên: máy chủ chạy CÙNG tiến trình), Trưởng trấn: "Trả nhiệm vụ: Bước
 //     vào tiên đồ". Lời thoại hoàn thành PHẢI nói đúng nơi học (Túi đồ, nút Học), quyển Hỏa Vân Kiếm Pháp vào túi.
 //  4. Túi (phím B): focus ô quyển (focus = chọn ô), nút ở chi tiết ghi "Học", Enter => máy chủ học: quyển mất khỏi túi, ô chiêu 2 (L) NHẬN chiêu (thanh chiêu chỉ đổi khi máy chủ gửi
-//     `skills`), bảng Công pháp (Shift+K) có đúng một hàng "Hỏa Vân Kiếm" ghi "Ô 2".
+//     `skills`) và toast "Đã học ... và gắn vào ô chiêu thức" hiện, bảng Công pháp (Shift+K) có đúng một hàng "Hỏa Vân Kiếm" ghi "Ô 2".
 //  5. Phím L dùng chiêu thật: máy chủ đặt hồi chiêu, client nhận `fx cast` (tầm thật); rời phòng chủ động rồi đọc hồ sơ trên đĩa: đã học tầng 1, ô 2 giữ chiêu, nhiệm vụ đã ghi xong.
 // Mỗi bước còn kiểm KHÔNG có lỗi / cảnh báo console.
 // Chạy: `npm run build -w client && npm run e2e:nguoi-moi -w server` (cần google-chrome).
@@ -396,6 +396,12 @@ async function main() {
     await T.waitFor(
       `(document.getElementById('sk-slot2')?.getAttribute('aria-label') ?? '').includes('Hỏa Vân')`,
       "máy chủ học chiêu và TỰ GẮN ô 2 (thanh chiêu đổi khi nhận `skills`)",
+    );
+    // thông báo học chiêu (#507 "dùng quyển từ túi hiện thông báo học / lên tầng"): toast của máy chủ hiện trên màn hình
+    await T.waitFor(
+      `/Đã học Hỏa Vân Kiếm và gắn vào ô chiêu thức/.test(document.getElementById('toast')?.textContent ?? '')`,
+      "toast 'Đã học Hỏa Vân Kiếm và gắn vào ô chiêu thức.' hiện sau khi học",
+      4000,
     );
     const sc = world.ctrl.get(sid)!.skills;
     must(
