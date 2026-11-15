@@ -6,6 +6,7 @@
 // Không kiểm: người chơi thật (cần bot: #410). Thời gian tìm quái + mật độ quái: `search-check.ts`.
 import {
   AM_SUONG_ID,
+  HAN_VAN_ID,
   DROP_TABLES,
   KIM_DAN_RECIPES,
   buyPrice,
@@ -194,7 +195,14 @@ export interface BossFight {
   worstLostFrac: number;
 }
 
+/** Cảnh giới Nguyên Anh (bậc trùm Thiên Hàn Vương đánh ở Hàn Vân Lĩnh) */
+const NA_REALM = 4;
+
 export interface BossOptions {
+  /** Trùm đánh (mặc định Hắc Giao); Thiên Hàn Vương (M7.9) thì đặt `bossId`, `realm` 4 và `potionId` thượng hồi đan */
+  bossId?: string;
+  /** Đan hồi huyết mỗi người mang (mặc định Đại Hồi Huyết Đan, hồi 70 %) */
+  potionId?: string;
   realm?: number;
   tier: number;
   party: number;
@@ -211,16 +219,18 @@ export interface BossOptions {
 export function bossFight(o: BossOptions): BossFight {
   const realm = o.realm ?? KD;
   const potionsEach = o.potions ?? ASSUME_DUNGEON.potions;
+  const bossId = o.bossId ?? KIM_DAN_BOSS_ID;
+  const potionId = o.potionId ?? "dai_hoi_huyet_dan";
   const saved = Math.random;
   Math.random = seeded(o.seed ?? 1);
   try {
-    const { w } = makeWorld(getMap(AM_SUONG_ID)!);
+    const { w } = makeWorld(getMap(realm >= NA_REALM ? HAN_VAN_ID : AM_SUONG_ID)!);
     const sids = Array.from({ length: o.party }, (_, i) => `P${i}`);
     const players = sids.map((sid) => {
       const { p, c } = addPlayer(w, sid, realm, o.tier);
       setEquipment(p, bestGear(realm, o.tier));
       applyStats(p, true);
-      if (potionsEach > 0) c.inv[0] = { itemId: "dai_hoi_huyet_dan", qty: potionsEach };
+      if (potionsEach > 0) c.inv[0] = { itemId: potionId, qty: potionsEach };
       return p;
     });
     players.forEach((p, i) => {
@@ -230,7 +240,7 @@ export function bossFight(o: BossOptions): BossFight {
     const hp0 = players.map((p) => p.hp);
     const used = sids.map(() => 0);
     const worst = sids.map(() => 0);
-    const { id } = addMonster(w, KIM_DAN_BOSS_ID, players[0].x + 40, players[0].y);
+    const { id } = addMonster(w, bossId, players[0].x + 40, players[0].y);
     w.now = 1_000_000;
     const dt = TICK_MS / 1000;
     let t = 0;
@@ -248,7 +258,7 @@ export function bossFight(o: BossOptions): BossFight {
         if (
           p.hp < p.maxHp * ASSUME_DUNGEON.potionBelow &&
           (c.inv[0]?.qty ?? 0) > 0 &&
-          w.now >= (c.itemCd.get("dai_hoi_huyet_dan") ?? 0)
+          w.now >= (c.itemCd.get(potionId) ?? 0)
         ) {
           useItem(w, sid, 0);
           used[i]++;
@@ -288,9 +298,11 @@ export function bossSummary(
   party: number,
   potionsEach: number = ASSUME_DUNGEON.potions,
   runs = BOSS_RUNS,
+  /** Trùm khác Hắc Giao (Thiên Hàn Vương: `{ realm: 4, bossId, potionId }`) */
+  boss?: Pick<BossOptions, "realm" | "bossId" | "potionId">,
 ): BossSummary {
   const fights = Array.from({ length: runs }, (_, i) =>
-    bossFight({ tier, party, potions: potionsEach, seed: i + 1 }),
+    bossFight({ ...boss, tier, party, potions: potionsEach, seed: i + 1 }),
   );
   const won = fights.filter((f) => f.killed);
   return {
@@ -424,6 +436,21 @@ export function renderHuntCheck(): string {
     (b) =>
       `| ${REALMS[KD].tiers[b.tier]} | ${b.party} | ${cell(b.none)} | ${cell(b.eight)} | ${cell(b.plenty)} |`,
   );
+  // Trùm Nguyên Anh Thiên Hàn Vương (M7.9): cùng cách đo, đan hồi 90 % (`thuong_hoi_huyet_dan`), bản đồ Hàn Vân
+  const naOpts = { realm: NA_REALM, bossId: "thien_han_vuong", potionId: "thuong_hoi_huyet_dan" };
+  const naBoss = tiers.flatMap((tier) =>
+    [1, 2, 3, 4].map((party) => ({
+      tier,
+      party,
+      none: bossSummary(tier, party, 0, BOSS_RUNS, naOpts),
+      eight: bossSummary(tier, party, ASSUME_DUNGEON.potions, BOSS_RUNS, naOpts),
+      plenty: bossSummary(tier, party, POTIONS_PLENTY, BOSS_RUNS, naOpts),
+    })),
+  );
+  const naLines = naBoss.map(
+    (b) =>
+      `| ${REALMS[NA_REALM].tiers[b.tier]} | ${b.party} | ${cell(b.none)} | ${cell(b.eight)} | ${cell(b.plenty)} |`,
+  );
   const partyOk = boss
     .filter((b) => b.party >= 3)
     .every((b) => b.eight.killRate === 1 && b.eight.deathsPerRun === 0);
@@ -468,6 +495,12 @@ Thời gian hạ quái khớp mô hình trong **${n2(tMin)}x - ${n2(tMax)}x** (m
 | Bậc | Đội | Không đan | ${ASSUME_DUNGEON.potions} viên / người | Đủ đan (${POTIONS_PLENTY} viên / người) |
 |---|---:|---|---|---|
 ${bossLines.join("\n")}
+
+**Trùm Thiên Hàn Vương theo đội, mã thật (Nguyên Anh, M7.9).** Cùng cách đo như Hắc Giao: đội cùng bậc đứng cạnh trùm đánh thường liên tục (KHÔNG né: trùm lao và đập đất vòng 140 px đều trúng), uống Thượng Hồi Huyết Đan (hồi 90 %) khi khí huyết dưới ${ASSUME_DUNGEON.potionBelow * 100}%, ca khó. Kết quả cùng dạng với Hắc Giao: KHÔNG đan thì Sơ kỳ không đội nào hạ được, Trung / Hậu kỳ chỉ đội 4 (và đội 3 Hậu kỳ một nửa số trận) hạ được mà còn người chết, tức cần đan; với ${ASSUME_DUNGEON.potions} viên đội 2 trở lên hạ được, không ai chết ở cả ba bậc; một người cần đủ đan ở Sơ kỳ (Trung / Hậu kỳ hạ được cả với ${ASSUME_DUNGEON.potions} viên, giống Hắc Giao). Số cuối do M7.9 hiệu chỉnh khi có bot thật (C).
+
+| Bậc | Đội | Không đan | ${ASSUME_DUNGEON.potions} viên / người | Đủ đan (${POTIONS_PLENTY} viên / người) |
+|---|---:|---|---|---|
+${naLines.join("\n")}
 
 **Vì sao một người hạ được.** Sát thương trùm lên MỘT người (trúng 100%, không né) là **${dps.map((d) => n1(d * 100)).join("% / ")}%** khí huyết mỗi giây ở Sơ / Trung / Hậu kỳ, còn đan hồi **${n1(heal * 100)}%** mỗi giây: ở CẢ BA bậc sát thương < tốc độ hồi nên một người bền vững nếu đủ đan. Trần ${ASSUME_DUNGEON.potions} viên chỉ là giới hạn mang, không phải của luật: ở cột "${ASSUME_DUNGEON.potions} viên" solo Sơ kỳ không hạ được và Trung kỳ hạ được ít, ${soloEnough ? "nhưng đủ đan thì hạ được 100%, 0 chết ở mọi bậc" : "xem cột đủ đan"}.
 
