@@ -286,11 +286,15 @@ describe("thưởng nhiệm vụ bằng kinh quyển (M7.4)", () => {
     expect(n).toBeGreaterThanOrEqual(1);
   });
 
-  it("'Bước vào tiên đồ' (Phàm Nhân -> Luyện Khí tầng 1) thưởng ĐÚNG MỘT quyển Hỏa Vân Kiếm Pháp, lời thoại nhắc mở bảng Công pháp (Shift+K)", () => {
+  it("'Bước vào tiên đồ' (Phàm Nhân -> Luyện Khí tầng 1) thưởng ĐÚNG MỘT quyển Hỏa Vân Kiếm Pháp, lời thoại chỉ đúng luồng (Túi đồ -> Học) và không nêu tên phím", () => {
     const q = QUEST_BY_ID.buoc_vao_tien_do;
     expect((q.rewards.items ?? []).filter((i) => ITEM_BY_ID[i.itemId]?.type === "book")).toEqual([
       { itemId: "kinh_hoa_van_kiem", qty: 1 },
     ]);
-    expect(q.talk.complete.join(" ")).toContain("Shift+K");
+    // Lời thoại đúng luồng thật (B, #652): học ở TÚI (nút Học), chiêu đầu tự gắn ô; KHÔNG nêu tên phím (đổi được ở màn Phím tắt, màn cảm ứng không có phím)
+    const talk = q.talk.complete.join(" ");
+    expect(talk).toContain("Túi đồ");
+    expect(talk).toContain("Học");
+    expect(talk).not.toMatch(/Shift|Ctrl|Alt|phím/i);
   });
 });

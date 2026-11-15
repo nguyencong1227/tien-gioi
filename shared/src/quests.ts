@@ -117,7 +117,7 @@ export const QUESTS: QuestDef[] = [
       progress: ["Thanh tu vi chưa đầy thì chưa đột phá được. Ra ngoài luyện thêm đi."],
       complete: [
         "Ta cảm nhận được linh lực đang lưu chuyển trong kinh mạch ngươi. Chúc mừng, Luyện Khí tầng một!",
-        "Cầm lấy quyển Hỏa Vân Kiếm Pháp này: mở bảng Công pháp (Shift+K) để học, rồi gắn vào ô chiêu. Có chiêu trong tay, đánh quái sẽ nhanh hơn.",
+        "Cầm lấy quyển Hỏa Vân Kiếm Pháp này: mở Túi đồ, chọn quyển rồi bấm Học, chiêu sẽ tự gắn vào thanh chiêu. Muốn đổi ô thì mở bảng Công pháp. Có chiêu trong tay, đánh quái sẽ nhanh hơn.",
         "Hà lão có chuyện muốn nói với người mới bước vào tiên đồ. Ghé qua đó một chuyến.",
       ],
     },
