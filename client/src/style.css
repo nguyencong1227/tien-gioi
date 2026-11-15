@@ -6522,6 +6522,20 @@ body.low-fx.in-limbo .stone-item {
   flex: 1 1 220px;
   width: auto;
 }
+/* #690: chỉ dẫn mở màn có HAI bản chữ cho mỗi thẻ: bản phím (máy tính) và bản NÚT (cảm ứng, `data-input="touch"`: người chơi điện thoại không có phím J / Tab / Z / B ...) */
+.guide-touch {
+  display: none;
+}
+html[data-input="touch"] p.guide-touch {
+  display: block;
+}
+html[data-input="touch"] .guide-keys {
+  display: none;
+}
+/* ô nhanh Huyết / Linh: số phím 1 / 2 chỉ có nghĩa với bàn phím (thanh chiêu cảm ứng đã ẩn nhãn phím) */
+html[data-input="touch"] .qslot .qkey {
+  display: none;
+}
 
 /* Giảm chuyển động (Accessibility: prefers-reduced-motion, Issue #269, #280) */
 @media (prefers-reduced-motion: reduce) {
