@@ -39,8 +39,12 @@ export interface DisplayInfo {
   safe: SafeInsets;
 }
 
-/** Cạnh ngắn dưới mức này (CSS px) là điện thoại. */
+/** Cạnh ngắn dưới mức này (CSS px) là điện thoại (trừ cửa sổ CHUỘT rộng, xem `classifyForm`). */
 export const PHONE_MAX_SHORT_SIDE = 600;
+/** Cửa sổ CHUỘT có cạnh ngắn < 600 chỉ được coi là máy tính khi RỘNG ít nhất mức này (CSS px): cửa sổ hẹp dọc 500 x 900 vẫn là điện thoại (#676). */
+export const DESKTOP_MIN_WIDTH = 900;
+/** ... VÀ cao ít nhất mức này (CSS px): thấp hơn thì bố cục máy tính không còn đủ chỗ (số đo ở `docs/THIET_KE_GIAO_DIEN_DO_HOA.md` mục 12). */
+export const DESKTOP_MIN_HEIGHT = 500;
 /** Chênh lệch kích thước nhỏ hơn mức này không coi là thay đổi (chống rung khi thanh địa chỉ co giãn). */
 export const RESIZE_EPSILON_PX = 2;
 /** Gom nhiều sự kiện đổi kích thước dồn dập. */
@@ -52,13 +56,18 @@ export const UI_SCALE_STORAGE_KEY = "tg_ui_scale";
 
 /**
  * Loại thiết bị theo kích thước khung nhìn và con trỏ CHÍNH, KHÔNG theo User-Agent:
- * cạnh ngắn < 600 là điện thoại; còn lại là máy tính bảng nếu con trỏ chính là cảm ứng, không thì máy tính.
- * (1280x720 chuột là `desktop`; iPad / máy tính bảng Android là `tablet`; laptop cảm ứng có chuột là `desktop`
- * nhưng `touch` vẫn bật được theo lần nhập gần nhất.)
+ *   cạnh ngắn >= 600                          -> máy tính bảng nếu con trỏ chính là cảm ứng, không thì máy tính;
+ *   cạnh ngắn <  600 và con trỏ cảm ứng       -> điện thoại;
+ *   cạnh ngắn <  600 và con trỏ CHUỘT         -> máy tính nếu rộng >= `DESKTOP_MIN_WIDTH` VÀ cao >= `DESKTOP_MIN_HEIGHT`, không thì điện thoại.
+ * Dòng cuối (#676): trình duyệt máy tính luôn mất ~100-150 px cho thanh tab / địa chỉ, nên màn 720p hay laptop 1366x768 chỉ còn khung nhìn ~ 1280x577 /
+ * 1366x625: người dùng chuột ở đó từng nhận bộ giao diện ĐIỆN THOẠI (tấm toàn màn hình, nút "✕ Đóng" tròn góc dưới phải, chữ >= 14 px). Cửa sổ chuột HẸP
+ * (500 x 900, 767 x 500) vẫn là điện thoại: bố cục máy tính tràn ngang ở đó.
+ * (1280x720 chuột là `desktop`; iPad / máy tính bảng Android là `tablet`; laptop cảm ứng có chuột là `desktop` nhưng `touch` vẫn bật được theo lần nhập gần nhất.)
  */
 export function classifyForm(cssW: number, cssH: number, coarsePrimary: boolean): FormFactor {
-  if (Math.min(cssW, cssH) < PHONE_MAX_SHORT_SIDE) return "phone";
-  return coarsePrimary ? "tablet" : "desktop";
+  if (Math.min(cssW, cssH) >= PHONE_MAX_SHORT_SIDE) return coarsePrimary ? "tablet" : "desktop";
+  if (coarsePrimary) return "phone";
+  return cssW >= DESKTOP_MIN_WIDTH && cssH >= DESKTOP_MIN_HEIGHT ? "desktop" : "phone";
 }
 
 export function classifyOrient(cssW: number, cssH: number): Orient {
