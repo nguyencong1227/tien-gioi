@@ -22,6 +22,7 @@ import { renderHuntCheck } from "./hunt-check";
 import { renderSearchCheck } from "./search-check";
 import { renderNguyenAnhSau } from "./nguyen-anh-kinh-te";
 import { renderOwnerGearSensitivity } from "./do-o-rieng";
+import { renderBotHuntSection } from "./bot-hunt";
 import { renderSkillBalanceMarkdown } from "./skills-model";
 import { PK_TARGET_SECONDS, representativeLevels, summarizeDuels } from "./pk";
 import {
@@ -464,6 +465,7 @@ ${renderHuntCheck()}
 ${renderSearchCheck()}
 ${renderNguyenAnhSau()}
 ${renderOwnerGearSensitivity()}
+${renderBotHuntSection()}
 
 ${renderSkillBalanceMarkdown(statsFor(3, 0, emptyEquipment()))}`,
   );
