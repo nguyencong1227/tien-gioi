@@ -117,6 +117,31 @@ describe("đập đất: trúng theo vị trí LÚC ĐÁP (M7.3)", () => {
     expect(mon.mc.nextSlam).toBeGreaterThan(mon.mc.def.slam!.cdMs); // đã đặt hồi
   });
 
+  it("đáp đòn xong quái KHÔNG đánh thường ngay: chờ đủ attackCd rồi mới đánh (nit của B khi xem trùm thật: -642 = đập 432 + đánh thường ~210 liền sau)", () => {
+    const { p, tick, mon } = scene();
+    tick(WINDUP_TICKS + 1); // tick này đáp đòn
+    expect(p.maxHp - p.hp).toBe(DMG);
+    const landed = mon.mc.nextSlam! - SLAM.cdMs;
+    expect(mon.mc.nextAttack).toBeGreaterThanOrEqual(landed + CT.attackCd);
+    // chưa đủ attackCd kể từ lúc đáp: người vẫn đứng sát (70 px) nhưng KHÔNG mất thêm
+    tick(Math.floor(CT.attackCd / TICK_MS) - 2);
+    expect(p.maxHp - p.hp).toBe(DMG);
+    // quá attackCd: đòn thường tiếp tục (quái KHÔNG bị câm vĩnh viễn)
+    tick(5);
+    expect(p.maxHp - p.hp).toBeGreaterThan(DMG);
+  });
+
+  it("trùm Thiên Hàn Vương cũng vậy (lao + đập): sau cú đập người sát tâm không bị đánh thường trong attackCd", () => {
+    const boss = MONSTER_BY_ID.thien_han_vuong;
+    const { p, tick, mon } = scene(70, boss);
+    const dmg = Math.round(boss.atk * boss.slam!.mult);
+    tick(Math.ceil(boss.slam!.windupMs / TICK_MS) + 1);
+    expect(p.maxHp - p.hp).toBe(dmg);
+    tick(Math.floor(boss.attackCd / TICK_MS) - 2);
+    expect(p.maxHp - p.hp).toBe(dmg);
+    expect(mon.mc.nextAttack).toBeGreaterThan(0);
+  });
+
   it("TRÁNH được: bước ra khỏi vòng trong lúc gồng thì không mất khí huyết", () => {
     const { p, tick, circles } = scene();
     tick(3);

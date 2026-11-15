@@ -144,14 +144,17 @@ export function huntCheck(realm: number, tier: number, monsterId: string, runs =
   const modelSeconds = m.hp / dps;
   let modelLost = (m.atk / (m.attackCd / 1000)) * modelSeconds * ASSUME.hitTaken;
   if (m.slam) {
-    // Đập đất (M7.3, `slam.ts`): mỗi chu kỳ (gồng + hồi) có một lần đập `atk x mult` THAY cho đòn thường trong lúc gồng (quái đứng yên). Lần đầu ngay khi vào vòng.
+    // Đập đất (M7.3, `slam.ts`): mỗi chu kỳ (gồng + hồi) có một lần đập `atk x mult` THAY cho đòn thường trong lúc gồng (quái đứng yên) VÀ thay thêm MỘT đòn thường sau khi
+    // đáp (quái chờ đủ `attackCd` rồi mới đánh, nit của B khi xem trùm thật). Lần đầu ngay khi vào vòng.
     const windup = m.slam.windupMs / 1000;
     const slams = Math.max(
       0,
       Math.floor((modelSeconds - windup) / (windup + m.slam.cdMs / 1000)) + 1,
     );
     modelLost +=
-      slams * (m.atk * m.slam.mult - (m.atk / (m.attackCd / 1000)) * windup) * ASSUME.hitTaken;
+      slams *
+      (m.atk * m.slam.mult - (m.atk / (m.attackCd / 1000)) * windup - m.atk) *
+      ASSUME.hitTaken;
   }
   const fights = Array.from({ length: runs }, (_, i) => huntFight(realm, tier, monsterId, i + 1));
   const realSeconds = median(fights.map((f) => f.seconds));

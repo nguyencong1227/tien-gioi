@@ -1154,6 +1154,11 @@ html[data-input="touch"] .qt-head {
   .mg-edge {
     display: none;
   }
+  /* Bốn bản đồ (M7.5): nút bỏ bề rộng tối thiểu 120 px + lề bớt để cả hàng vẫn nằm trên MỘT dòng ở 844 x 390 (trước đó dòng hai chiếm thêm ~50 px chiều cao quý của bản đồ) */
+  .map-graph .mg-node {
+    min-width: 0;
+    padding: 4px 8px;
+  }
 }
 .map-legend[hidden] {
   display: none;
