@@ -288,6 +288,10 @@ async function main() {
       if (p.name === NAME) sid = id;
     });
     const me = world.state.players.get(sid);
+    // Tắt hồi sinh quái ngẫu nhiên định kỳ (`topUpMonsters` mỗi MONSTER_RESPAWN_MS): trên runner chậm (hoặc `taskset -c 0`)
+    // kịch bản đứng ngoài trấn lâu qua nhiều nhịp hồi sinh, quái chủ động sinh ngay cạnh người chơi làm lệch vòng Tab,
+    // ngắt đả tọa và đánh chết người chơi (bật Hoàng Tuyền -> đóng mọi bảng, chặn di chuyển / dùng đan / nói chuyện NPC, #694).
+    world.map = Object.create(world.map, { monsterCapOf: { value: () => 0 } });
     world.state.monsters.clear();
     world.mctrl.clear();
     me.x = DEFAULT_MAP.townPx.x + DEFAULT_MAP.townPx.r + 500;
@@ -413,16 +417,25 @@ async function main() {
     check("Phím phụ 3 vẫn phóng Kiếm khí (server)", me.mp < mpPhu, `${mpPhu} -> ${me.mp}`);
     await press(t, K.esc);
     await press(t, K.z);
-    await sleep(300);
+    // Chờ patch `meditating` về tới client trước khi bấm tiếp (`toggleMeditate` gửi `!this.me().meditating`: bấm khi client chưa nhận patch sẽ gửi lại giá trị cũ)
+    await t.waitFor(`window.__scene.me()?.meditating === true`, "client đồng bộ bật đả tọa", 5000);
     check("Phím Z: bật đả tọa (server xác nhận)", me.meditating === true, String(me.meditating));
     await press(t, K.z);
-    await sleep(300);
+    await t.waitFor(`window.__scene.me()?.meditating === false`, "client đồng bộ tắt đả tọa", 5000);
     check("Phím Z lần nữa: tắt đả tọa", me.meditating === false, String(me.meditating));
     await press(t, K.d4);
-    await sleep(300);
+    await t.waitFor(
+      `window.__scene.me()?.meditating === true`,
+      "client đồng bộ bật đả tọa (phím 4)",
+      5000,
+    );
     check("Phím phụ 4: bật đả tọa", me.meditating === true, String(me.meditating));
     await press(t, K.d4);
-    await sleep(300);
+    await t.waitFor(
+      `window.__scene.me()?.meditating === false`,
+      "client đồng bộ tắt đả tọa (phím 4)",
+      5000,
+    );
     check("Phím phụ 4 lần nữa: tắt đả tọa", me.meditating === false, String(me.meditating));
     // L U I O (M7.6): ô chưa có chiêu thì báo lý do tại chỗ ("chưa mở" nếu cảnh giới chưa tới, "còn trống" nếu mở rồi mà chưa gắn), KHÔNG gửi gì;
     // I KHÔNG còn mở túi, O KHÔNG còn mở cài đặt
@@ -668,14 +681,15 @@ async function main() {
     changeCoin(world, sid, 500);
     me.x = duoc.x;
     me.y = duoc.y + 50;
+    world.ctrl.get(sid).lastHitAt = 0;
     await t.waitFor(
       `Math.abs(window.__scene.predX - ${Math.round(duoc.x)}) < 40 && Math.abs(window.__scene.predY - ${Math.round(duoc.y + 50)}) < 40 && window.__scene.closestNpcId === 'duoc_su'`,
       "đứng cạnh Lão Dược Sư",
     );
     await press(t, K.f);
     await t.waitFor(
-      `document.querySelectorAll('#dlg-options .dlg-opt-btn').length > 0 || !!document.getElementById('dlg-skip-hint')?.hidden`,
-      "hộp thoại Dược Sư",
+      `!!document.getElementById('dialog-modal') && !document.getElementById('dialog-modal').hidden`,
+      "hộp thoại Dược Sư mở bằng F",
     );
     await press(t, K.enter); // tua chữ nếu còn đang gõ
     await t.waitFor(
@@ -1151,9 +1165,9 @@ async function main() {
       `window.__scene.players.size >= 2 && Math.abs(window.__scene.predX - ${Math.round(me.x)}) < 100`,
       "A thấy B",
     );
-    // hình của B phải thật sự nằm trong khung nhìn của A (hình trượt dần tới vị trí mới, lúc mới vào còn ở chỗ cũ)
+    // hình của B phải thật sự trượt tới vị trí mới ngoài trấn và nằm trong khung nhìn của A (lúc mới đặt toạ độ còn đang ở trong trấn)
     await t.waitFor(
-      `Array.from(window.__scene.players.entries()).some(([id, e]) => id !== window.__scene.sid && window.__scene.cameras.main.worldView.contains(e.root.x, e.root.y) && !!window.__scene.state.players.get(id))`,
+      `Array.from(window.__scene.players.entries()).some(([id, e]) => { const sp = window.__scene.state.players.get(id); return id !== window.__scene.sid && !!sp && Math.abs((sp.px ?? sp.x) - ${Math.round(pb.x)}) < 20 && Math.abs(e.root.x - ${Math.round(pb.x)}) < 60 && window.__scene.cameras.main.worldView.contains(e.root.x, e.root.y); })`,
       "hình của B nằm trong khung nhìn của A",
     );
     await sleep(300);
@@ -1249,7 +1263,10 @@ async function main() {
     );
     // đồng đạo ra khỏi tầm nhìn: báo bằng toast, không mở menu
     pb.x = me.x + 1500;
-    await sleep(900);
+    await t.waitFor(
+      `!Array.from(window.__scene.players.entries()).some(([id, e]) => id !== window.__scene.sid && window.__scene.cameras.main.worldView.contains(e.root.x, e.root.y) && !!window.__scene.state.players.get(id))`,
+      "B ra khỏi tầm nhìn của A",
+    );
     await press(t, K.p);
     check(
       "Không có đồng đạo trong tầm nhìn: không mở menu, hiện thông báo",
