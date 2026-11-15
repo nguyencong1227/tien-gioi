@@ -21,6 +21,7 @@ import {
   listenWithRetry,
   getChromeGpuFlags,
 } from "./e2e-kit";
+import { TIERS } from "../../client/src/gfx/quality.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
@@ -146,7 +147,7 @@ async function main() {
     );
     must(
       // bậc chất lượng của client: `TIERS` ở client/src/gfx/quality.ts (có "ultra" = Rất cao từ M6 / QUYET_DINH mục 17; #683: thiếu bậc này làm ca đỏ trên máy có GPU thật)
-      ["low", "mid", "high", "ultra"].includes(String(await attr("data-quality"))),
+      (TIERS as readonly string[]).includes(String(await attr("data-quality"))),
       "data-quality hợp lệ",
     );
     must((await attr("data-reduce-motion")) === "0", "data-reduce-motion mặc định 0");
@@ -162,7 +163,10 @@ async function main() {
       `FPS trên lớp phủ phải hợp lý (khung THẬT của Phaser), thấy "${ov.split("\n")[0]}"`,
     );
     ok(`lớp phủ nhận khung thật: ${ov.split("\n").slice(0, 2).join(" | ")}`);
-    must(/chất lượng (low|mid|high|ultra) \(auto\)/.test(ov), "lớp phủ ghi bậc + chế độ auto");
+    must(
+      new RegExp(`chất lượng (${TIERS.join("|")}) \\(auto\\)`).test(ov),
+      "lớp phủ ghi bậc + chế độ auto",
+    );
     const lowFxClass = await T.ev(`document.body.classList.contains('low-fx')`);
     must(
       lowFxClass === ((await attr("data-quality")) === "low"),
