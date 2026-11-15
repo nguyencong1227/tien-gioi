@@ -208,6 +208,34 @@ Endpoint `/metrics` yêu cầu xác thực bằng `METRICS_TOKEN` (M4 3.3, Issue
 )
 ```
 
+### 6.1. Ý nghĩa các Số đo và Cảnh báo Giám sát (/metrics)
+
+Hệ thống giám sát vận hành thu thập số đo từ mọi phòng thế giới Colyseus, hàng đợi ghi cơ sở dữ liệu và tài nguyên hệ thống (M4 3.3, M7.10, Issue #276):
+
+| Số đo (Prometheus Metric) | Kiểu | Ý nghĩa & Ngưỡng cảnh báo |
+|---|:---:|---|
+| `tiengioi_uptime_seconds` | Gauge | Thời gian tiến trình máy chủ game đã hoạt động liên tục (giây) |
+| `tiengioi_store_info{kind="..."}` | Gauge | Backend lưu trữ đang kích hoạt (`pg` cho cơ sở dữ liệu hoặc `file`) |
+| `tiengioi_process_rss_bytes` | Gauge | Dung lượng RAM thực tế (Resident Set Size) tiến trình đang chiếm dụng |
+| `tiengioi_process_heap_used_bytes` | Gauge | Dung lượng heap V8 đang dùng |
+| `tiengioi_event_loop_lag_p99_ms` | Gauge | Độ trễ p99 của vòng lặp sự kiện Node.js trong 10 giây qua. Cảnh báo nghẽn khi `> 100 ms` |
+| `tiengioi_players_online` | Gauge | Tổng số người chơi trực tuyến trên toàn bộ máy chủ (bao gồm cả nhân vật đang chờ nối lại) |
+| `tiengioi_rooms` | Gauge | Tổng số phòng đang hoạt động (phòng bản đồ thế giới và phòng bí cảnh tạm) |
+| `tiengioi_room_players{room, map}` | Gauge | Số người chơi đang có mặt trong từng phòng/bản đồ cụ thể (`lac_ha`, `hac_phong`, `am_suong`, `han_van`) |
+| `tiengioi_room_ghosts{room, map}` | Gauge | Số nhân vật đang chờ nối lại (`ghosts`) trong phòng (chờ tối đa 20s khi rớt mạng bất thường) |
+| `tiengioi_room_monsters{room, map}` | Gauge | Số lượng quái vật hiện hữu trong phòng |
+| `tiengioi_tick_p95_worst_ms` | Gauge | p95 thời gian xử lý tick của phòng chậm nhất (cửa sổ ~60s). Cảnh báo khi vượt `TICK_WARN_MS` (mặc định `25 ms`, nhịp chuẩn 50 ms) |
+| `tiengioi_room_tick_ms{room, map, quantile}` | Gauge | Phân vị thời gian xử lý tick (`quantile="0.5"`, `"0.95"`, `"1"`) của từng phòng |
+| `tiengioi_room_tick_overrun_total{room, map}` | Counter | Số tick chạy quá thời gian nhịp chuẩn (> 50 ms) từ khi phòng khởi tạo |
+| `tiengioi_writes_inflight` | Gauge | Số yêu cầu ghi hồ sơ nhân vật đang xếp hàng/đang xử lý. Cảnh báo khi vượt `WRITE_WARN_PENDING` (mặc định `200`) |
+| `tiengioi_writes_oldest_age_seconds` | Gauge | Thời gian chờ của yêu cầu ghi lâu nhất trong hàng đợi. Cảnh báo khi vượt `WRITE_WARN_AGE_S` (mặc định `30s`) |
+| `tiengioi_writes_started_total` | Counter | Tổng số lượt ghi hồ sơ nhân vật bắt đầu thực hiện |
+| `tiengioi_writes_failed_total` | Counter | Tổng số lượt ghi hồ sơ nhân vật thất bại |
+
+**Cảnh báo tự động trong nhật ký (Logs):**
+- Tiến trình tự động kiểm tra định kỳ mỗi 10 giây. Khi có chỉ số vi phạm ngưỡng (`tick`, `writes_pending`, `writes_age`, `loop_lag`), máy chủ sẽ in dòng cảnh báo với tiền tố `[CẢNH BÁO]` và nhắc lại mỗi phút cho đến khi trở lại bình thường (`[ĐÃ ỔN]`).
+- Các biến môi trường tùy chỉnh ngưỡng: `TICK_WARN_MS` (mặc định 25), `WRITE_WARN_PENDING` (mặc định 200), `WRITE_WARN_AGE_S` (mặc định 30). Token giám sát `METRICS_TOKEN` bắt buộc phải có độ dài từ 16 ký tự trở lên để kích hoạt endpoint.
+
 ---
 
 ## 7. Xử lý Sự cố Vận hành (Troubleshooting / Runbook)
@@ -339,6 +367,24 @@ Báo cáo tự động đối chiếu trung vị giờ chơi tích luỹ (`media
   - Kích hoạt quy trình xem xét và điều chỉnh mật độ hoặc thời gian hồi sinh của quái Xích Mãng ở bản vá kế tiếp khi có từ 5 mẫu trở lên.
 - **Chưa thấy dấu hiệu quá nhanh (cận trên, với >= 5 mẫu):** Tiến độ chưa ghi nhận dấu hiệu đường tắt bất thường. Do giờ chơi tích luỹ là cận trên (người chơi nán lại hoặc đả tọa cũng làm tăng số đo), hệ thống không kết luận "đạt mục tiêu" tuyệt đối.
 - **Tham khảo (chưa đủ mẫu, < 5 mẫu):** Dán cờ tham khảo, tiếp tục thu thập thêm dữ liệu từ các bản sao lưu kế tiếp.
-- **Lưu ý về kiếp và luân hồi:** `life.playMs` tính trên kiếp hiện tại (đặt về 0 khi luân hồi). Người chơi ở kiếp >= 2 tu luyện nhanh hơn nhờ Dư âm tu hành, không đối chiếu trực tiếp với mô hình tối ưu kiếp 1.
+
+### 9.4. Thống kê Chiêu thức & Công pháp (M7.10, Issue #511)
+Công cụ `thong-ke-tien-do` theo dõi tỉ lệ người chơi tiếp cận hệ thống võ học tu tiên M7 (chiêu thức, công pháp, ô kỹ năng):
+- **Cột `Chiêu / Ô TB`:** Thể hiện số chiêu thức đã học trung bình và số ô chiêu đã gắn trung bình của từng nhóm cảnh giới.
+- **Tỉ lệ có chiêu (`percentWithSkills`):** Tỉ lệ phần trăm nhân vật đã học ít nhất 1 chiêu thức võ học.
+- **Phân bố số lượng chiêu:** Phân nhóm nhân vật đã học 0, 1, 2, 3–4 hoặc 5+ chiêu thức.
+- **Phân bố số ô chiêu đã gắn (ô 2–5):** Phân nhóm số lượng ô chiêu đã kích hoạt (ô 1 mặc định là đánh thường cố định).
+- **Bảo vệ quyền riêng tư & bí mật chiến thuật:** Công cụ chỉ thống kê số lượng, tổng số tầng lĩnh ngộ và số ô trang bị; **tuyệt đối không in tên chiêu thức, ID chiêu hay build võ học cụ thể** của người chơi.
+
+### 9.5. Ảnh hưởng của Khắc Chân Linh & Luân Hồi qua các Kiếp
+- **Cơ chế thời gian chơi kiếp (`life.playMs`):** Thời gian chơi tích luỹ được tính riêng cho **kiếp hiện tại** (được làm mới về 0 khi luân hồi chuyển kiếp).
+- **Phân biệt Dư âm tu hành và Khắc chân linh:**
+  - **Dư âm tu hành (`du_am`):** Nâng cấp bằng Duyên tại Tam Sinh Thạch (10 nấc, mỗi nấc +10% tốc độ tu luyện từ quái và đả toạ, tối đa +100% ở nấc 10 theo `THIET_KE_LUAN_HOI.md` mục 6).
+  - **Khắc chân linh (`engrave`):** Mở nấc bằng Duyên tại Tam Sinh Thạch (3 nấc 40 / 100 / 220 Duyên) để giữ lại 1–3 chiêu thức qua kiếp.
+  - **Trạng thái chiêu khắc ở kiếp mới:** Chiêu thức truyền kiếp được giữ ở **tầng 1** và ở trạng thái **chưa gắn ô** (báo "Cần đạt Luyện Khí" cho tới khi nhân vật đột phá lên Luyện Khí tầng 1 mới mở ô để gắn). Do đó, việc nhân vật ở Phàm Nhân kiếp >= 2 có chiêu đã học nhưng số ô gắn = 0 (`Chiêu / Ô TB` có dạng `1.0 / 0.0`) là **hoàn toàn bình thường**.
+- **Đánh giá cân bằng đối với kiếp >= 2:**
+  - Khi dồn Duyên vào Dư âm tu hành, thời gian từ đầu kiếp tới hết Kim Đan rút ngắn có lộ trình rõ ràng: từ 484 phút (~8.1 giờ ở kiếp 1) xuống 326 phút (~5.4 giờ ở kiếp 2), 288 phút (~4.8 giờ ở kiếp 3) và 273 phút (~4.55 giờ ở kiếp 4) theo bảng tính `CAN_BANG.md` mục 4.
+  - **Đây là cơ chế thiết kế có chủ đích** của hệ thống Luân Hồi Chân Linh nhằm tạo cảm giác tiến bộ qua các kiếp, **không phải lỗi cày cuốc hay bất thường cân bằng quái**.
+  - Khi xem xét cảnh báo cân bằng từ báo cáo `thong-ke-tien-do`, người vận hành cần lưu ý tách biệt các trường hợp kiếp >= 2 trước khi quyết định điều chỉnh thông số quái vật hay bãi luyện.
 
 
