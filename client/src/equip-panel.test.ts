@@ -132,7 +132,7 @@ describe("slotLockText / slotViews: ô pháp bảo khoá tới Kim Đan", () => 
     ]);
     expect(v.map((x) => x.label)).toEqual([
       "Vũ khí",
-      "Pháp bào",
+      "Áo bào",
       "Hộ phù",
       "Hài",
       "Ngọc bội",
