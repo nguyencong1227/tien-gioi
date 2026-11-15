@@ -216,7 +216,7 @@ Hệ thống giám sát vận hành thu thập số đo từ mọi phòng thế 
 |---|:---:|---|
 | `tiengioi_uptime_seconds` | Gauge | Thời gian tiến trình máy chủ game đã hoạt động liên tục (giây) |
 | `tiengioi_store_info{kind="..."}` | Gauge | Backend lưu trữ đang kích hoạt (`pg` cho cơ sở dữ liệu hoặc `file`) |
-| `tiengioi_process_rss_bytes` | Gauge | Dung lượng RAM thực tế (Resident Set Size) tiến trình đang chiếm dụng. Cảnh báo nếu vượt > 1.2 GB |
+| `tiengioi_process_rss_bytes` | Gauge | Dung lượng RAM thực tế (Resident Set Size) tiến trình đang chiếm dụng |
 | `tiengioi_process_heap_used_bytes` | Gauge | Dung lượng heap V8 đang dùng |
 | `tiengioi_event_loop_lag_p99_ms` | Gauge | Độ trễ p99 của vòng lặp sự kiện Node.js trong 10 giây qua. Cảnh báo nghẽn khi `> 100 ms` |
 | `tiengioi_players_online` | Gauge | Tổng số người chơi trực tuyến trên toàn bộ máy chủ (bao gồm cả nhân vật đang chờ nối lại) |
@@ -233,7 +233,7 @@ Hệ thống giám sát vận hành thu thập số đo từ mọi phòng thế 
 | `tiengioi_writes_failed_total` | Counter | Tổng số lượt ghi hồ sơ nhân vật thất bại |
 
 **Cảnh báo tự động trong nhật ký (Logs):**
-- Tiến trình tự động kiểm tra định kỳ mỗi 10 giây. Khi có chỉ số vi phạm ngưỡng (`tick`, `writes_pending`, `writes_age`, `loop_lag`), máy chủ sẽ in dòng cảnh báo với tiền tố `[CẢNH BÁO GIÁM SÁT]` và nhắc lại mỗi phút cho đến khi trở lại bình thường (`[ĐÃ ỔN]`).
+- Tiến trình tự động kiểm tra định kỳ mỗi 10 giây. Khi có chỉ số vi phạm ngưỡng (`tick`, `writes_pending`, `writes_age`, `loop_lag`), máy chủ sẽ in dòng cảnh báo với tiền tố `[CẢNH BÁO]` và nhắc lại mỗi phút cho đến khi trở lại bình thường (`[ĐÃ ỔN]`).
 - Các biến môi trường tùy chỉnh ngưỡng: `TICK_WARN_MS` (mặc định 25), `WRITE_WARN_PENDING` (mặc định 200), `WRITE_WARN_AGE_S` (mặc định 30). Token giám sát `METRICS_TOKEN` bắt buộc phải có độ dài từ 16 ký tự trở lên để kích hoạt endpoint.
 
 ---
@@ -370,7 +370,7 @@ Báo cáo tự động đối chiếu trung vị giờ chơi tích luỹ (`media
 
 ### 9.4. Thống kê Chiêu thức & Công pháp (M7.10, Issue #511)
 Công cụ `thong-ke-tien-do` theo dõi tỉ lệ người chơi tiếp cận hệ thống võ học tu tiên M7 (chiêu thức, công pháp, ô kỹ năng):
-- **Cột `Chiêu / Ô TB`:** Thể hiện số chiêu thức đã học trung bình và số ô chiêu đã gắn trung bình của từng nhóm cảnh giới (ví dụ Luyện Khí Sơ kỳ thường 0–1 chiêu, Kim Đan/Nguyên Anh đạt 3–4 chiêu).
+- **Cột `Chiêu / Ô TB`:** Thể hiện số chiêu thức đã học trung bình và số ô chiêu đã gắn trung bình của từng nhóm cảnh giới.
 - **Tỉ lệ có chiêu (`percentWithSkills`):** Tỉ lệ phần trăm nhân vật đã học ít nhất 1 chiêu thức võ học.
 - **Phân bố số lượng chiêu:** Phân nhóm nhân vật đã học 0, 1, 2, 3–4 hoặc 5+ chiêu thức.
 - **Phân bố số ô chiêu đã gắn (ô 2–5):** Phân nhóm số lượng ô chiêu đã kích hoạt (ô 1 mặc định là đánh thường cố định).
@@ -378,12 +378,13 @@ Công cụ `thong-ke-tien-do` theo dõi tỉ lệ người chơi tiếp cận h�
 
 ### 9.5. Ảnh hưởng của Khắc Chân Linh & Luân Hồi qua các Kiếp
 - **Cơ chế thời gian chơi kiếp (`life.playMs`):** Thời gian chơi tích luỹ được tính riêng cho **kiếp hiện tại** (được làm mới về 0 khi luân hồi chuyển kiếp).
-- **Khắc chân linh truyền kiếp:** Khi luân hồi, nhân vật được kế thừa các giá trị cốt lõi khắc vào chân linh:
-  - Dư âm tu hành (gia tăng tốc độ hấp thu linh khí và tu vi).
-  - Chiêu thức / võ học đã khắc chân linh (truyền thừa qua các kiếp).
+- **Phân biệt Dư âm tu hành và Khắc chân linh:**
+  - **Dư âm tu hành (`du_am`):** Nâng cấp bằng Duyên tại Tam Sinh Thạch (10 nấc, mỗi nấc +10% tốc độ tu luyện từ quái và đả toạ, tối đa +100% ở nấc 10 theo `THIET_KE_LUAN_HOI.md` mục 6).
+  - **Khắc chân linh (`engrave`):** Mở nấc bằng Duyên tại Tam Sinh Thạch (3 nấc 40 / 100 / 220 Duyên) để giữ lại 1–3 chiêu thức qua kiếp.
+  - **Trạng thái chiêu khắc ở kiếp mới:** Chiêu thức truyền kiếp được giữ ở **tầng 1** và ở trạng thái **chưa gắn ô** (báo "Cần đạt Luyện Khí" cho tới khi nhân vật đột phá lên Luyện Khí tầng 1 mới mở ô để gắn). Do đó, việc nhân vật ở Phàm Nhân kiếp >= 2 có chiêu đã học nhưng số ô gắn = 0 (`Chiêu / Ô TB` có dạng `1.0 / 0.0`) là **hoàn toàn bình thường**.
 - **Đánh giá cân bằng đối với kiếp >= 2:**
-  - Người chơi ở kiếp >= 2 có thể tiến cấp tới Trúc Cơ và Kim Đan nhanh hơn đáng kể so với mô hình tối ưu kiếp 1 (`simulate(3)`), có thể chỉ mất 1–2 giờ thay vì 5–8 giờ.
-  - **Đây là cơ chế thiết kế có chủ đích** của hệ thống Luân Hồi Chân Linh, **không phải lỗi cày cuốc hay bất thường cân bằng quái**.
+  - Khi dồn Duyên vào Dư âm tu hành, thời gian từ đầu kiếp tới hết Kim Đan rút ngắn có lộ trình rõ ràng: từ 484 phút (~8.1 giờ ở kiếp 1) xuống 326 phút (~5.4 giờ ở kiếp 2), 288 phút (~4.8 giờ ở kiếp 3) và 273 phút (~4.55 giờ ở kiếp 4) theo bảng tính `CAN_BANG.md` mục 4.
+  - **Đây là cơ chế thiết kế có chủ đích** của hệ thống Luân Hồi Chân Linh nhằm tạo cảm giác tiến bộ qua các kiếp, **không phải lỗi cày cuốc hay bất thường cân bằng quái**.
   - Khi xem xét cảnh báo cân bằng từ báo cáo `thong-ke-tien-do`, người vận hành cần lưu ý tách biệt các trường hợp kiếp >= 2 trước khi quyết định điều chỉnh thông số quái vật hay bãi luyện.
 
 
