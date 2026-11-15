@@ -31,6 +31,9 @@ import { ASSUME_DUNGEON } from "./dungeon";
 import { KIM_DAN_BOSS_ID, KIM_DAN_MONSTER_IDS } from "./kim-dan-sau";
 
 const KD = 3;
+/** Cảnh giới Nguyên Anh (M7.5) và bốn loài thường ở Hàn Vân Lĩnh (trùm Thiên Hàn Vương theo đội: chưa có mô hình trùm Nguyên Anh, M7.9). */
+const NA = 4;
+export const NGUYEN_ANH_MONSTER_IDS = ["han_lang", "phong_nha", "cot_tuong", "doc_tuoc"] as const;
 const MAX_SECONDS = 300;
 /** Số trận mỗi ô của bảng trùm theo đội (hạt giống 1..N) */
 export const BOSS_RUNS = 6;
@@ -138,7 +141,17 @@ export function huntCheck(realm: number, tier: number, monsterId: string, runs =
   const s = statsFor(realm, tier, bestGear(realm, tier));
   const dps = (s.atk * SKILLS.slash.mult * ASSUME.critAvg) / (SKILLS.slash.cooldown / 1000);
   const modelSeconds = m.hp / dps;
-  const modelLost = (m.atk / (m.attackCd / 1000)) * modelSeconds * ASSUME.hitTaken;
+  let modelLost = (m.atk / (m.attackCd / 1000)) * modelSeconds * ASSUME.hitTaken;
+  if (m.slam) {
+    // Đập đất (M7.3, `slam.ts`): mỗi chu kỳ (gồng + hồi) có một lần đập `atk x mult` THAY cho đòn thường trong lúc gồng (quái đứng yên). Lần đầu ngay khi vào vòng.
+    const windup = m.slam.windupMs / 1000;
+    const slams = Math.max(
+      0,
+      Math.floor((modelSeconds - windup) / (windup + m.slam.cdMs / 1000)) + 1,
+    );
+    modelLost +=
+      slams * (m.atk * m.slam.mult - (m.atk / (m.attackCd / 1000)) * windup) * ASSUME.hitTaken;
+  }
   const fights = Array.from({ length: runs }, (_, i) => huntFight(realm, tier, monsterId, i + 1));
   const realSeconds = median(fights.map((f) => f.seconds));
   const realLost = median(fights.map((f) => f.lost));
@@ -158,7 +171,7 @@ export function huntCheck(realm: number, tier: number, monsterId: string, runs =
   };
 }
 
-/** Các cặp (bậc, quái) đối chiếu: mọi loài Kim Đan (kể cả Xích Mãng) x ba bậc, cộng đại diện Luyện Khí / Trúc Cơ. */
+/** Các cặp (bậc, quái) đối chiếu: mọi loài Kim Đan (kể cả Xích Mãng) x ba bậc, bốn loài thường Nguyên Anh x ba bậc (M7.9), cộng đại diện Luyện Khí / Trúc Cơ. */
 export function huntCheckCases(): [number, number, string][] {
   const out: [number, number, string][] = [
     [1, 4, "lang"],
@@ -166,6 +179,8 @@ export function huntCheckCases(): [number, number, string][] {
   ];
   for (let tier = 0; tier < REALMS[KD].tiers.length; tier++)
     for (const id of ["mang", ...KIM_DAN_MONSTER_IDS]) out.push([KD, tier, id]);
+  for (let tier = 0; tier < REALMS[NA].tiers.length; tier++)
+    for (const id of NGUYEN_ANH_MONSTER_IDS) out.push([NA, tier, id]);
   return out;
 }
 
