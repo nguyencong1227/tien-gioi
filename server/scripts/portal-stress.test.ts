@@ -22,10 +22,12 @@ import {
   QUESTS,
   TRAVEL_COOLDOWN_MS,
   emptyInventory,
+  emptySkillBook,
   getMap,
   parseWrongMap,
   roomNameOf,
   type InvMsg,
+  type SkillBook,
   type SkillsMsg,
   type TravelMsg,
   type TravelToMsg,
@@ -537,7 +539,7 @@ describe("Bốn bản đồ: dữ liệu nguyên vẹn sau MỖI lần qua cổn
     cur: Conn,
     name: string,
     where: string,
-    expectedSkills: typeof skills | null = skills,
+    expectedSkills: SkillBook | null = skills,
   ) {
     const f = fileOf(name);
     expect(f.realm, `${where}: cảnh giới trên đĩa`).toBe(REALM);
@@ -560,11 +562,7 @@ describe("Bốn bản đồ: dữ liệu nguyên vẹn sau MỖI lần qua cổn
     expect(items(cur.invs.at(-1)!.slots), `${where}: túi đồ đang chơi`).toEqual(items(inventory));
     if (expectedSkills) {
       expect(f.skills, `${where}: sổ chiêu trên đĩa`).toEqual(expectedSkills);
-      await waitFor(
-        () =>
-          cur.skillsMsgs.length > 0 &&
-          cur.skillsMsgs.at(-1)?.learned?.hoa_van_kiem === expectedSkills.learned.hoa_van_kiem,
-      );
+      await waitFor(() => cur.skillsMsgs.length > 0);
       const lastSkills = cur.skillsMsgs.at(-1)!;
       expect(lastSkills.learned, `${where}: chiêu đã học đang chơi`).toEqual(
         expectedSkills.learned,
@@ -740,67 +738,100 @@ describe("Bốn bản đồ: dữ liệu nguyên vẹn sau MỖI lần qua cổn
     await expectIntact(a, name, "tab đầu sau khi tab hai bị từ chối ở Hàn Vân");
   }, 30_000);
 
-  it("hai tab đua nhau lúc qua cổng Âm Sương <-> Hàn Vân: tab hai không vào được phòng cũ (409 hoặc wrong_map), chỉ vào được phòng đích, đĩa không bị đè lại", async () => {
-    const name = `BotDua HV ${++nameSeq}`;
-    await seed(name, AM_SUONG_ID, "am_suong_bac");
-    const a = await joinRoom(name, secretOf(name), AM_SUONG_ID);
-    const portal = getMap(AM_SUONG_ID)!.portal("am_suong_bac")!;
-    standAt(a.room, portal);
-    serverRoom(a.room).world.ctrl.get(a.room.sessionId).save.travelAt = 0;
+  it.each([
+    {
+      label: "Hắc Phong <-> Âm Sương",
+      fromMapId: HAC_PHONG_ID,
+      portalId: "hac_phong_bac",
+      targetMapId: AM_SUONG_ID,
+    },
+    {
+      label: "Âm Sương <-> Hàn Vân",
+      fromMapId: AM_SUONG_ID,
+      portalId: "am_suong_bac",
+      targetMapId: HAN_VAN_ID,
+    },
+  ])(
+    "hai tab đua nhau lúc qua cổng ($label): tab hai không vào được phòng cũ (409 hoặc wrong_map), chỉ vào được phòng đích, đĩa không bị đè lại",
+    async ({ fromMapId, portalId, targetMapId }) => {
+      const name = `BotDua ${++nameSeq}`;
+      await seed(name, fromMapId, portalId);
+      const a = await joinRoom(name, secretOf(name), fromMapId);
+      const portal = getMap(fromMapId)!.portal(portalId)!;
+      standAt(a.room, portal);
+      serverRoom(a.room).world.ctrl.get(a.room.sessionId).save.travelAt = 0;
 
-    // Tab A qua cổng ĐỒNG THỜI với tab B vào lại phòng cũ bằng cùng mã nhân vật
-    const joinOld = new Client(`ws://localhost:${PORT}`)
-      .joinOrCreate(roomNameOf(AM_SUONG_ID), { name, secret: secretOf(name) })
-      .then(
-        (r) => {
-          rooms.push(r);
-          return { ok: true as const, err: null };
-        },
-        (err: any) => ({ ok: false as const, err }),
-      );
-    a.room.send("travel", { portalId: "am_suong_bac" } satisfies TravelMsg);
-    const res = await joinOld;
-    expect(res.ok, "không được có hai nhân vật cùng tên ở phòng cũ").toBe(false);
-    const code = res.err?.code;
-    const wrong = parseWrongMap(code, res.err?.message ?? "");
-    expect(code === 409 || wrong === HAN_VAN_ID, `lỗi bất ngờ: ${code} ${res.err?.message}`).toBe(
-      true,
-    );
+      // Tab A qua cổng ĐỒNG THỜI với tab B vào lại phòng cũ bằng cùng mã nhân vật
+      const joinOld = new Client(`ws://localhost:${PORT}`)
+        .joinOrCreate(roomNameOf(fromMapId), { name, secret: secretOf(name) })
+        .then(
+          (r) => {
+            rooms.push(r);
+            return { ok: true as const, err: null };
+          },
+          (err: any) => ({ ok: false as const, err }),
+        );
+      a.room.send("travel", { portalId } satisfies TravelMsg);
+      const res = await joinOld;
+      expect(res.ok, "không được có hai nhân vật cùng tên ở phòng cũ").toBe(false);
+      const code = res.err?.code;
+      const wrong = parseWrongMap(code, res.err?.message ?? "");
+      expect(
+        code === 409 || wrong === targetMapId,
+        `lỗi bất ngờ: ${code} ${res.err?.message}`,
+      ).toBe(true);
 
-    await waitFor(() => a.travelTos.length > 0);
-    await waitFor(() => !a.room.connection.isOpen);
-    const b = await joinRoom(name, secretOf(name), portal.toMap);
-    await expectIntact(b, name, "tab hai ở phòng đích Hàn Vân");
-    // Lưu muộn của phòng cũ không được đè bản ghi mới (savePlayer xếp hàng theo tệp)
-    await sleep(500);
-    expect(fileOf(name).mapId).toBe(portal.toMap);
-    expect(
-      [...serverRoom(b.room).state.players.values()].filter((p: any) => p.name === name).length,
-    ).toBe(1);
-  }, 30_000);
+      await waitFor(() => a.travelTos.length > 0);
+      await waitFor(() => !a.room.connection.isOpen);
+      const b = await joinRoom(name, secretOf(name), portal.toMap);
+      await expectIntact(b, name, `tab hai ở phòng đích ${targetMapId}`);
+      // Lưu muộn của phòng cũ không được đè bản ghi mới (savePlayer xếp hàng theo tệp)
+      await sleep(500);
+      expect(fileOf(name).mapId).toBe(portal.toMap);
+      expect(
+        [...serverRoom(b.room).state.players.values()].filter((p: any) => p.name === name).length,
+      ).toBe(1);
+    },
+    30_000,
+  );
 
-  it("lưu định kỳ chạy ĐÚNG lúc đang qua cổng Âm Sương <-> Hàn Vân không đè bản ghi đích (chốt `travelling` của persist)", async () => {
-    const name = `BotDK HV ${++nameSeq}`;
-    await seed(name, AM_SUONG_ID, "am_suong_bac");
-    const a = await joinRoom(name, secretOf(name), AM_SUONG_ID);
-    const portal = getMap(AM_SUONG_ID)!.portal("am_suong_bac")!;
-    standAt(a.room, portal);
-    const sr = serverRoom(a.room);
-    const sid = a.room.sessionId;
-    const p = sr.state.players.get(sid);
-    const c = sr.world.ctrl.get(sid);
-    c.save.travelAt = 0;
-    a.room.send("travel", { portalId: "am_suong_bac" } satisfies TravelMsg);
-    await waitFor(() => c.travelling);
-    // Lưu định kỳ / lúc rớt mạng chạy sau khi đã bắt đầu qua cổng: phải bị bỏ qua, không ghi lại bản đồ cũ
-    await sr.persist(p, c);
-    await waitFor(() => a.travelTos.length > 0);
-    await waitFor(() => !a.room.connection.isOpen);
-    await sleep(200);
-    expect(fileOf(name).mapId).toBe(portal.toMap);
-    const b = await joinRoom(name, secretOf(name), portal.toMap);
-    await expectIntact(b, name, "đích sau lưu định kỳ chen ngang");
-  }, 30_000);
+  it.each([
+    {
+      label: "Hắc Phong <-> Âm Sương",
+      fromMapId: HAC_PHONG_ID,
+      portalId: "hac_phong_bac",
+    },
+    {
+      label: "Âm Sương <-> Hàn Vân",
+      fromMapId: AM_SUONG_ID,
+      portalId: "am_suong_bac",
+    },
+  ])(
+    "lưu định kỳ chạy ĐÚNG lúc đang qua cổng ($label) không đè bản ghi đích (chốt `travelling` của persist)",
+    async ({ fromMapId, portalId }) => {
+      const name = `BotDK ${++nameSeq}`;
+      await seed(name, fromMapId, portalId);
+      const a = await joinRoom(name, secretOf(name), fromMapId);
+      const portal = getMap(fromMapId)!.portal(portalId)!;
+      standAt(a.room, portal);
+      const sr = serverRoom(a.room);
+      const sid = a.room.sessionId;
+      const p = sr.state.players.get(sid);
+      const c = sr.world.ctrl.get(sid);
+      c.save.travelAt = 0;
+      a.room.send("travel", { portalId } satisfies TravelMsg);
+      await waitFor(() => c.travelling);
+      // Lưu định kỳ / lúc rớt mạng chạy sau khi đã bắt đầu qua cổng: phải bị bỏ qua, không ghi lại bản đồ cũ
+      await sr.persist(p, c);
+      await waitFor(() => a.travelTos.length > 0);
+      await waitFor(() => !a.room.connection.isOpen);
+      await sleep(200);
+      expect(fileOf(name).mapId).toBe(portal.toMap);
+      const b = await joinRoom(name, secretOf(name), portal.toMap);
+      await expectIntact(b, name, "đích sau lưu định kỳ chen ngang");
+    },
+    30_000,
+  );
 
   it("thử tải đồng thời (concurrency stress): 4 bot cùng qua cổng Âm Sương <-> Hàn Vân đồng thời, không lỗi, kiem-save 0 lỗi", async () => {
     const BOTS_COUNT = 4;
@@ -866,6 +897,53 @@ describe("Bốn bản đồ: dữ liệu nguyên vẹn sau MỖI lần qua cổn
     ).toBe(0);
     expect(auditRes.failedFiles.length).toBe(0);
   }, 40_000);
+
+  it("chuỗi qua cổng 4 bản đồ từ tệp lưu CŨ thiếu skills (trước M7): tự khởi tạo sổ chiêu rỗng, không mất dữ liệu, kiem-save 0 lỗi", async () => {
+    const name = `Bot OldM6 ${++nameSeq}`;
+    // Tệp lưu trước M7: hoàn toàn không có trường `skills`, xuất phát ở Lạc Hà
+    await savePlayer({
+      name,
+      secretHash: hashSecret(secretOf(name)),
+      realm: REALM,
+      tier: TIER,
+      exp: EXP,
+      coin: COIN,
+      inventory,
+      quests,
+      equipment,
+      lifeId: LIFE_ID,
+      mapId: DEFAULT_MAP_ID,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    let cur = await joinRoom(name, secretOf(name), DEFAULT_MAP_ID);
+    const emptySkills = emptySkillBook();
+    // Tệp cũ trên đĩa lúc mới vào chưa có skills; client nhận skills rỗng từ server
+    expect(fileOf(name).skills).toBeUndefined();
+    await waitFor(() => cur.skillsMsgs.length > 0);
+    expect(cur.skillsMsgs.at(-1)!.learned).toEqual({});
+    expect(cur.skillsMsgs.at(-1)!.slots).toEqual(["", "", "", ""]);
+
+    // Đi trọn chuỗi 4 bản đồ: Lạc Hà -> Hắc Phong -> Âm Sương -> Hàn Vân
+    const route: [string, string][] = [
+      [DEFAULT_MAP_ID, "lac_ha_bac"],
+      [HAC_PHONG_ID, "hac_phong_bac"],
+      [AM_SUONG_ID, "am_suong_bac"],
+    ];
+    for (const [fromMapId, portalId] of route) {
+      cur = await hop(cur, name, fromMapId, portalId);
+      await expectIntact(cur, name, `tệp cũ sau ${portalId}`, emptySkills);
+    }
+
+    // Kiểm toán thư mục dữ liệu sau khi tệp cũ chuyển qua 4 bản đồ
+    const auditRes = auditSavesDirectory(dataDir);
+    expect(
+      auditRes.errorFiles,
+      `kiem-save sau chuỗi 4 bản đồ tệp cũ: ${JSON.stringify(auditRes.failedFiles)}`,
+    ).toBe(0);
+    expect(auditRes.failedFiles.length).toBe(0);
+  }, 45_000);
 
   it("tệp lưu cũ (thiếu mapId, hoặc mapId của bản đồ không còn / chưa biết): vào được Lạc Hà, phòng khác trả wrong_map:lac_ha", async () => {
     for (const [label, extra] of [
