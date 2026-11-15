@@ -4,6 +4,7 @@ import { Monster } from "../schema";
 import { rand, quantAngle, takeWhole, type World, type MonsterCtrl } from "../world";
 import { hurtPlayer } from "./combat";
 import { chargerStep } from "./charge";
+import { cancelSlam, slamStep } from "./slam";
 import { isRanged, onHitEffectOf, rangedStep } from "./bolt";
 import { applyPlayerStatus } from "./status";
 import { isStunned, speedMult } from "./status-rules";
@@ -157,7 +158,10 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
     tx = target.x;
     ty = target.y;
     speed = def.speed;
-    if (def.behavior === "charger" && chargerStep(w, id, m, mc, target, d, stunned)) {
+    if (def.slam && slamStep(w, id, m, mc, d, stunned)) {
+      // Đang gồng đập đất / vừa đáp đòn (M7.3, `slam.ts`): đứng yên, không đánh thường, không lao
+      speed = 0;
+    } else if (def.behavior === "charger" && chargerStep(w, id, m, mc, target, d, stunned)) {
       // Đang gồng (báo trước) hoặc thở sau khi lao: đứng yên, không đánh thường (M7.3, `charge.ts`)
       speed = 0;
     } else if (isRanged(def)) {
@@ -182,6 +186,7 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
     }
   } else {
     mc.ai = undefined; // mất mục tiêu giữa lúc gồng / thở: bỏ đòn đang dở
+    cancelSlam(mc);
     // Đang đi về nhà hoặc lang thang
     if (Math.hypot(m.x - mc.homeX, m.y - mc.homeY) > RETURN_HOME_DIST) {
       tx = mc.homeX;
