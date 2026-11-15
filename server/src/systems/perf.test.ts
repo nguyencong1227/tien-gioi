@@ -10,7 +10,15 @@ import { slash, tickRespawn } from "./combat";
 import { cast } from "./cast";
 import { MONSTER_WAKE_DIST, WANDER_STRIDE, spawnInitial, tickMonsters } from "./monsters";
 import { EXP_FLUSH_MS, tickRecovery } from "./progression";
-import { runBench, runMultiMapBench, type MultiMapBenchResult } from "../perf/bench";
+import {
+  measureSyncStepMs,
+  runBench,
+  runMultiMapBench,
+  summarizeTickMs,
+  type BenchMode,
+  type BenchResult,
+  type MultiMapBenchResult,
+} from "../perf/bench";
 
 describe("takeWhole", () => {
   it("trả phần nguyên, giữ phần lẻ, cộng dồn qua nhiều lần", () => {
@@ -316,12 +324,37 @@ describe("quái lang thang chỉ đổi vị trí mỗi WANDER_STRIDE tick (#80)
 });
 
 describe("ngân sách băng thông và CPU (benchmark có seed, kết quả cố định)", () => {
+  /**
+   * Lấy min theo từng tick qua `n` lần chạy có seed (cùng nguyên lý với `bestOfMultiMapBench`, #723)
+   * cho các ca khẳng định `avgMs < 10`. Các chỉ số xác định (`patchBytes`, `eventKb*`, `partyKb*`, `walletKb*`)
+   * giống hệt nhau giữa mọi lần chạy cùng seed.
+   */
+  function bestOfBench(
+    players: number,
+    seconds: number,
+    seed = 1,
+    mode: BenchMode = "hunt",
+    n = 2,
+  ): BenchResult {
+    const first = runBench(players, seconds, seed, mode);
+    const minTickMs = [...(first.tickMs ?? [])];
+    for (let i = 1; i < n; i++) {
+      const r = runBench(players, seconds, seed, mode);
+      const ticks = r.tickMs ?? [];
+      for (let t = 0; t < minTickMs.length; t++) {
+        if (ticks[t] < minTickMs[t]) minTickMs[t] = ticks[t];
+      }
+    }
+    const { avgMs, p95Ms, maxMs } = summarizeTickMs(minTickMs);
+    return { ...first, avgMs, p95Ms, maxMs };
+  }
+
   it("không ai chơi thì không gửi gì", () => {
     expect(runBench(0, 5).patchBytes).toBe(0);
   });
 
   it("100 người chơi: patch mỗi client dưới ngân sách, tick dưới 10 ms", () => {
-    const r = runBench(100, 10);
+    const r = bestOfBench(100, 10);
     // Đo lúc viết: ~401 byte/tick mỗi client (≈ 7.8 KB/s) trong 10 giây đầu, quái còn đông.
     // Lịch sử: mỗi client nhận cả thế giới ~1670 byte/tick; StateView (#62) còn ~585; lượng tử hóa
     // góc nhìn (quantAngle) còn ~401. Vượt ngân sách nghĩa là có trường state đổi mỗi tick không cần thiết,
@@ -331,7 +364,7 @@ describe("ngân sách băng thông và CPU (benchmark có seed, kết quả cố
   });
 
   it("ca đông người tụ trong trấn (#80): giữ mức hiện tại (< 600), mục tiêu < 520 byte/tick", () => {
-    const r = runBench(100, 10, 1, "crowd");
+    const r = bestOfBench(100, 10, 1, "crowd");
     // Đo lúc viết (#80): ~1267 byte/tick mỗi client (≈ 25 KB/s) khi 100 người tụ trong trấn, 70% thời gian đi lại.
     // Người khác nhận px, py làm tròn 10 Hz (#89): ~788; quái lang thang chỉ đổi vị trí mỗi WANDER_STRIDE tick (#87):
     // ~974; cả hai: ~484 (≈ 9.5 KB/s). Vùng nhìn không cắt được gì vì ai cũng thấy nhau. Test này CHỈ giữ không
@@ -434,9 +467,7 @@ describe("kịch bản hiệu năng chiêu thức (M7.10 #511)", () => {
         }
       }
 
-      const t0 = performance.now();
-      tickWorld(w, 50);
-      const dt = performance.now() - t0;
+      const dt = measureSyncStepMs(() => tickWorld(w, 50));
       tickDurations.push(dt);
 
       // Đo byte patch thực tế gửi cho từng client theo StateView
@@ -555,9 +586,7 @@ describe("kịch bản hiệu năng chiêu thức (M7.10 #511)", () => {
         }
       }
 
-      const t0 = performance.now();
-      tickWorld(w, 50);
-      const dt = performance.now() - t0;
+      const dt = measureSyncStepMs(() => tickWorld(w, 50));
       tickDurations.push(dt);
 
       // Theo dõi đạn tầm xa trong không gian
@@ -607,10 +636,12 @@ describe("kịch bản hiệu năng chiêu thức (M7.10 #511)", () => {
 });
 
 /**
- * Đo thời gian trên máy dùng chung dễ bị nhiễu: vitest chạy các tệp song song và dev khác chạy Chrome / e2e cùng lúc (lần chạy cả bộ
- * từng đo p95 = 12,4 ms cho ca bốn bản đồ, còn chạy riêng cả ba lần đều < 10 ms). Lấy lần đo NHANH NHẤT trong `n` lần (theo số lớn hơn
- * của trung bình và p95, hai số được khẳng định): nhiễu tạm chỉ làm hỏng một vài lần, còn hồi quy thật làm chậm MỌI lần nên vẫn đỏ.
- * Mọi chỉ số xác định (byte, quái, tinh anh) giống hệt nhau giữa các lần (cùng seed), nên chọn lần nào cũng không đổi các khẳng định đó.
+ * Đo thời gian trên máy dùng chung dễ bị nhiễu (#723): vitest chạy nhiều worker thread song song và dev khác chạy Chrome / e2e cùng lúc.
+ * Mô phỏng có seed nên tick thứ `t` thực hiện công việc GIỐNG HỆT nhau giữa các lần chạy:
+ * 1. Trong mỗi lần chạy, từng tick được đo bằng `measureSyncStepMs` (`min(wallMs, cpuMs)`), loại bỏ thời gian chờ khi tiến trình bị hệ điều hành lấy CPU.
+ * 2. Chạy `n` lần và lấy **min theo từng tick** (`minTickMs[t] = min_k run_k.tickMs[t]`), rồi mới tính `avgTotalMs` / `p95TotalMs` / `maxTotalMs` qua `summarizeTickMs`.
+ *    Nhiễu lịch chạy rải rác ở các tick khác nhau giữa các lần chạy bị triệt tiêu, còn hồi quy thật làm chậm tick `t` ở MỌI lần chạy nên vẫn ĐỎ.
+ * 3. Mọi chỉ số xác định (byte, quái, tinh anh) giống hệt nhau giữa các lần chạy cùng seed.
  */
 function bestOfMultiMapBench(
   rooms: Parameters<typeof runMultiMapBench>[0],
@@ -618,16 +649,50 @@ function bestOfMultiMapBench(
   seed = 1,
   n = 3,
 ): MultiMapBenchResult {
-  const score = (r: MultiMapBenchResult) => Math.max(r.avgTotalMs, r.p95TotalMs);
-  let best = runMultiMapBench(rooms, seconds, seed);
+  const first = runMultiMapBench(rooms, seconds, seed);
+  const minTickMs = [...first.tickMs];
   for (let i = 1; i < n; i++) {
     const r = runMultiMapBench(rooms, seconds, seed);
-    if (score(r) < score(best)) best = r;
+    for (let t = 0; t < minTickMs.length; t++) {
+      if (r.tickMs[t] < minTickMs[t]) minTickMs[t] = r.tickMs[t];
+    }
   }
-  return best;
+  const { avgMs: avgTotalMs, p95Ms: p95TotalMs, maxMs: maxTotalMs } = summarizeTickMs(minTickMs);
+  return {
+    ...first,
+    avgTotalMs,
+    p95TotalMs,
+    maxTotalMs,
+    tickMs: minTickMs,
+  };
 }
 
 describe("benchmark bốn bản đồ chạy đồng thời (M7.10 #511)", () => {
+  it("runMultiMapBench trả mảng tickMs đúng thứ tự từng tick và bestOfMultiMapBench lấy min theo từng tick (#723)", () => {
+    const rooms = [
+      { mapId: "lac_ha", players: 10 },
+      { mapId: "hac_phong", players: 10 },
+    ];
+    const r1 = runMultiMapBench(rooms, 1, 1);
+    const r2 = runMultiMapBench(rooms, 1, 1);
+    expect(r1.tickMs).toHaveLength(r1.ticks);
+    expect(r1.ticks).toBe(20);
+    for (const ms of r1.tickMs) expect(ms).toBeGreaterThanOrEqual(0);
+    const sum1 = summarizeTickMs(r1.tickMs);
+    expect(r1.avgTotalMs).toBeCloseTo(sum1.avgMs, 9);
+    expect(r1.p95TotalMs).toBeCloseTo(sum1.p95Ms, 9);
+    expect(r1.maxTotalMs).toBeCloseTo(sum1.maxMs, 9);
+    // Cùng seed -> các chỉ số xác định giống hệt nhau
+    expect(r1.totalElites).toBe(r2.totalElites);
+    expect(r1.rooms.map((x) => x.patchBytes)).toEqual(r2.rooms.map((x) => x.patchBytes));
+
+    const best = bestOfMultiMapBench(rooms, 1, 1, 2);
+    expect(best.tickMs).toHaveLength(20);
+    const sumBest = summarizeTickMs(best.tickMs);
+    expect(best.avgTotalMs).toBeCloseTo(sumBest.avgMs, 9);
+    expect(best.p95TotalMs).toBeCloseTo(sumBest.p95Ms, 9);
+  });
+
   it("bốn bản đồ (Lạc Hà, Hắc Phong, Âm Sương, Hàn Vân) với tinh anh đang sinh: tick tổng < 10 ms, patch < 520 byte/tick", () => {
     const res = bestOfMultiMapBench(
       [

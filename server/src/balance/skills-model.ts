@@ -239,7 +239,7 @@ export function evaluateBuildRotation(
 }
 
 /**
- * Báo cáo tổng thể cân bằng 12 chiêu thức M7 (dùng để xác minh tiêu chí mục 10).
+ * Báo cáo tổng thể cân bằng 18 chiêu thức M7 (12 đợt 1 + 6 chiêu Nguyên Anh đợt 2, #654; dùng để xác minh tiêu chí mục 10).
  */
 export function generateSkillBalanceReport(playerStats: Stats, targetElement: unknown = "none") {
   const reports = SKILLS_M7.map((def) =>
@@ -266,9 +266,9 @@ export function renderSkillBalanceMarkdown(stats: Stats): string {
   const lines: string[] = [
     "## Cân bằng chiêu thức, ngũ hành và trạng thái (M7, #510)",
     "",
-    "> Dựa trên `shared/src/skills.ts` (12 chiêu đợt 1) và `server/src/systems/status-rules.ts`. Mọi chiêu thức được mô phỏng theo chu kỳ thi triển đều đặn theo hồi chiêu, kết hợp đan xen Kiếm chém thường (`SKILLS.slash`).",
+    "> Dựa trên `shared/src/skills.ts` (18 chiêu: 12 đợt 1 + 6 chiêu Nguyên Anh đợt 2, #654) và `server/src/systems/status-rules.ts`. Mọi chiêu thức được mô phỏng theo chu kỳ thi triển đều đặn theo hồi chiêu, kết hợp đan xen Kiếm chém thường (`SKILLS.slash`).",
     "",
-    "### 1. Bảng 12 chiêu thức đợt 1 và tỉ lệ tăng DPS",
+    "### 1. Bảng 18 chiêu thức và tỉ lệ tăng DPS",
     "| Chiêu | Hệ | Hồi chiêu | Linh lực | Mult | Hiệu ứng trạng thái | DPS đơn (bình thường) | DPS đơn (khắc hệ 1,3×) | DPS đơn (bị khắc 0,8×) |",
     "|---|---|---:|---:|---:|---|---:|---:|---:|",
   ];
