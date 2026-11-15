@@ -122,7 +122,7 @@ async function main() {
     let spawnError: Error | null = null;
     chrome.once("error", (e) => (spawnError = e));
     let targets: any[] = [];
-    for (const start = Date.now(); Date.now() - start < 8000;) {
+    for (const start = Date.now(); Date.now() - start < 30000;) {
       try {
         const res = await fetch(`http://127.0.0.1:${CDP}/json`);
         if (res.ok) {

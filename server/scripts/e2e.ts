@@ -239,7 +239,7 @@ async function runE2e() {
     // Chờ Chrome CDP sẵn sàng
     let targets: any[] = [];
     const waitChromeStart = Date.now();
-    while (Date.now() - waitChromeStart < 6000) {
+    while (Date.now() - waitChromeStart < 30000) {
       try {
         const res = await fetch(`http://127.0.0.1:${cliArgs.chromePort}/json`);
         if (res.ok) {
