@@ -1,9 +1,10 @@
 import { execSync } from "node:child_process";
-import { existsSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  cleanupNewTmpEntries,
   executeScriptOnce,
   extractLastLines,
   filterScripts,
@@ -11,6 +12,7 @@ import {
   formatFailureDetails,
   formatResultTable,
   getE2eScripts,
+  getE2eTmpEntries,
   parseCliArgs,
   runE2eAll,
   type ScriptResult,
@@ -293,6 +295,86 @@ describe("e2e:all - Bộ chạy toàn diện E2E (M7.16, Issue #694)", () => {
         if (existsSync(logFile)) rmSync(logFile);
       } catch {
         // Bỏ qua lỗi dọn file log test
+      }
+    });
+
+    it("khi timeout xảy ra, các thư mục tạm tien-gioi-e2e-* hoặc tg-* mới sinh ra bị tự động xoá sạch", async () => {
+      const marker = `tg_tmp_clean_${Date.now()}`;
+      const logFile = path.join(os.tmpdir(), `${marker}.log`);
+      const testTmpFolder = path.join(os.tmpdir(), `tien-gioi-e2e-timeout-leak-${Date.now()}`);
+
+      // Script tạo thư mục tạm trong os.tmpdir() rồi ngủ để bị timeout
+      const scriptCode = `
+        const fs = require('fs');
+        fs.mkdirSync(${JSON.stringify(testTmpFolder)}, { recursive: true });
+        setInterval(() => {}, 1000);
+      `;
+
+      const result = await executeScriptOnce("mock-timeout-tmp-cleanup", {
+        cwd: process.cwd(),
+        timeoutSec: 0.4,
+        logFile,
+        attempt: 1,
+        command: { cmd: "node", args: ["-e", scriptCode] },
+        graceMs: 100,
+      });
+
+      expect(result.timedOut).toBe(true);
+      expect(result.exitCode).toBe(124);
+      expect(result.log).toContain("[CLEANUP] Đã dọn dẹp");
+
+      // Thư mục testTmpFolder phải được tự động dọn dẹp sạch sẽ
+      expect(existsSync(testTmpFolder)).toBe(false);
+
+      try {
+        if (existsSync(logFile)) rmSync(logFile);
+      } catch {
+        // Bỏ qua lỗi dọn file log test
+      }
+    });
+  });
+
+  describe("getE2eTmpEntries & cleanupNewTmpEntries (Dọn thư mục tạm sót lại sau timeout)", () => {
+    it("chỉ phát hiện và dọn các mục mới sinh ra có tiền tố tien-gioi-e2e- hoặc tg-", () => {
+      const testRoot = path.join(os.tmpdir(), `tg-test-suite-${Date.now()}`);
+      mkdirSync(testRoot, { recursive: true });
+
+      const oldE2e = path.join(testRoot, "tien-gioi-e2e-old-folder");
+      const otherFile = path.join(testRoot, "other-app-file");
+      mkdirSync(oldE2e, { recursive: true });
+      mkdirSync(otherFile, { recursive: true });
+
+      // Chụp snapshot trước khi chạy
+      const before = getE2eTmpEntries(testRoot);
+      expect(before.has("tien-gioi-e2e-old-folder")).toBe(true);
+      expect(before.has("other-app-file")).toBe(false);
+
+      // Sinh mục mới trong lúc chạy
+      const newE2e1 = path.join(testRoot, "tien-gioi-e2e-chrome-leak");
+      const newE2e2 = path.join(testRoot, "tg-data-leak");
+      const newOther = path.join(testRoot, "unrelated-folder");
+      const runnerLog = path.join(testRoot, "tien-gioi-e2e-runner-logs");
+
+      mkdirSync(newE2e1, { recursive: true });
+      mkdirSync(newE2e2, { recursive: true });
+      mkdirSync(newOther, { recursive: true });
+      mkdirSync(runnerLog, { recursive: true });
+
+      // Gọi cleanup với excludeDir là runnerLog
+      const cleaned = cleanupNewTmpEntries(before, runnerLog, testRoot);
+
+      expect(cleaned.sort()).toEqual(["tg-data-leak", "tien-gioi-e2e-chrome-leak"]);
+      expect(existsSync(newE2e1)).toBe(false);
+      expect(existsSync(newE2e2)).toBe(false);
+      expect(existsSync(oldE2e)).toBe(true); // mục cũ không bị xoá
+      expect(existsSync(newOther)).toBe(true); // mục khác không bị xoá
+      expect(existsSync(runnerLog)).toBe(true); // thư mục logs không bị xoá
+
+      // Dọn dẹp testRoot
+      try {
+        rmSync(testRoot, { recursive: true, force: true });
+      } catch {
+        // Bỏ qua
       }
     });
   });

@@ -424,5 +424,13 @@ Toàn bộ nhật ký chi tiết từng kịch bản và bảng tổng kết Mar
 - **FLAKY:** Script thất bại ở lần chạy 1 nhưng vượt qua ở lần chạy thử lại thứ 2. Không làm gián đoạn mã thoát (exit code 0), nhưng được ghi nhận rõ ràng trong bảng báo cáo để theo dõi và gia cố độ ổn định.
 - **ĐỎ (FAIL):** Script thất bại cả 2 lần (hoặc quá thời gian timeout). Tiến trình sẽ in 3–5 dòng cuối cùng của nhật ký lỗi và thoát với mã `1`.
 
+### 10.3. Quy trình Chạy Hằng Đêm trên GitHub Actions (`.github/workflows/e2e.yml`)
+- **Tần suất & Kích hoạt:** Tự động kích hoạt lúc 03:00 AM (giờ Việt Nam, tức `20:00 UTC`) hằng đêm hoặc kích hoạt thủ công qua `workflow_dispatch` (hỗ trợ các tham số `only`, `skip`, `timeout`, `no_retry`).
+- **Không chặn PR:** Workflow chạy độc lập theo lịch định kỳ, không nằm trong luồng kiểm tra của pull request để tiết kiệm thời gian và tài nguyên CI.
+- **Môi trường & GPU:** Chạy trên runner `ubuntu-latest`. Cả 22 kịch bản E2E đều dùng `getChromeGpuFlags()` (`server/scripts/e2e-kit.ts`), tự động lùi về `--disable-gpu` (phần mềm rasterization SwiftShader của Chrome) khi phát hiện biến môi trường `CI=true`. Không cần thiết bị GPU vật lý và không kịch bản nào bị bỏ qua theo mặc định.
+- **Báo cáo & Nhật ký:** Bảng tổng kết kết quả Markdown tự động được xuất ra GitHub Step Summary; toàn bộ file log chi tiết của từng kịch bản được lưu trữ dưới dạng artifact trong vòng 30 ngày.
+- **Dọn dẹp tài nguyên:** Runner tự động tiêu diệt triệt để cây tiến trình Chrome detached và tự động xoá các thư mục dữ liệu tạm `/tmp/tien-gioi-e2e-*` hoặc `/tmp/tg-*` phát sinh khi có kịch bản bị timeout, đảm bảo không để lại tiến trình mồ côi hay rác đĩa trên runner.
+
+
 
 

@@ -1,0 +1,100 @@
+name: E2E hằng đêm
+
+on:
+  schedule:
+    # 20:00 UTC = 03:00 AM giờ Việt Nam (chạy trước bench.yml lúc 04:00 AM)
+    - cron: "0 20 * * *"
+  workflow_dispatch:
+    inputs:
+      only:
+        description: "Danh sách kịch bản cụ thể cần chạy (ngăn cách bởi dấu phẩy, vd: noi-lai,chat-luong)"
+        required: false
+        default: ""
+      skip:
+        description: "Danh sách kịch bản cần bỏ qua (ngăn cách bởi dấu phẩy, vd: map,dpr)"
+        required: false
+        default: ""
+      timeout:
+        description: "Thời gian timeout tối đa cho mỗi kịch bản (giây)"
+        required: false
+        default: "300"
+      no_retry:
+        description: "Tắt cơ chế thử lại (thất bại ở lần 1 là kết luận ĐỎ ngay)"
+        type: boolean
+        required: false
+        default: false
+
+concurrency:
+  group: e2e-nightly
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: Chạy toàn diện 22 kịch bản E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout mã nguồn
+        uses: actions/checkout@v4
+
+      - name: Cài đặt Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Cài đặt dependencies
+        run: npm ci
+
+      - name: Build client (harness phục vụ client/dist)
+        run: npm run build
+
+      - name: Chạy toàn bộ 22 kịch bản E2E tuần tự (e2e:all)
+        id: e2e
+        # Ghi chú về GPU:
+        # Cả 22 kịch bản E2E của Tiên Giới đều dùng getChromeGpuFlags() (server/scripts/e2e-kit.ts).
+        # Khi phát hiện biến môi trường CI=true (có sẵn trên GitHub Actions), hệ thống tự động
+        # thêm cờ --disable-gpu và lùi về phần mềm rasterization SwiftShader của Chrome.
+        # Do đó tất cả kịch bản đều chạy ổn định trên ubuntu-latest mà không cần GPU vật lý.
+        # Nếu trong tương lai có kịch bản đòi hỏi GPU phần cứng chuyên dụng, hãy cấu hình --skip
+        # kèm lý do kỹ thuật rõ ràng ngay tại đây.
+        run: |
+          mkdir -p e2e-logs
+          ARGS="--logs e2e-logs"
+
+          if [ -n "${{ inputs.only }}" ]; then
+            ARGS="$ARGS --only ${{ inputs.only }}"
+          fi
+
+          if [ -n "${{ inputs.skip }}" ]; then
+            ARGS="$ARGS --skip ${{ inputs.skip }}"
+          fi
+
+          if [ -n "${{ inputs.timeout }}" ]; then
+            ARGS="$ARGS --timeout ${{ inputs.timeout }}"
+          fi
+
+          if [ "${{ inputs.no_retry }}" = "true" ]; then
+            ARGS="$ARGS --no-retry"
+          fi
+
+          npm run e2e:all -w server -- $ARGS
+
+      - name: Xuất bảng kết quả E2E vào Job Summary
+        if: always()
+        run: |
+          if [ -f e2e-logs/REPORT.md ]; then
+            cat e2e-logs/REPORT.md >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Lưu artifact toàn bộ nhật ký (logs) E2E
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-logs-${{ github.sha }}
+          path: e2e-logs/
+          retention-days: 30
