@@ -107,7 +107,7 @@ describe("bot-hunt: mô phỏng bot THẬT Nguyên Anh (có độ trễ phản x
       expect(summary.lowestHpFrac).toBeLessThan(0.8); // đáy khí huyết không tụt quá sâu
     }
 
-    // Độc Tước tinh anh (độc tầm xa dồn dập): solo tử vong
+    // Độc Tước tinh anh (độc tầm xa dồn dập): solo tử vong kể cả mang 8 đan (do cd đan 12s)
     const docTuocSolo = botHuntSummary(NA_REALM, 2, "doc_tuoc", {
       elite: true,
       evade: true,
@@ -116,7 +116,16 @@ describe("bot-hunt: mô phỏng bot THẬT Nguyên Anh (có độ trễ phản x
     });
     expect(docTuocSolo.deathsTotal).toBeGreaterThan(0);
 
-    // Độc Tước tinh anh khi đi ĐỘI 2 NGƯỜI: sống sót 100%
+    const docTuocSolo8 = botHuntSummary(NA_REALM, 2, "doc_tuoc", {
+      elite: true,
+      evade: true,
+      useOwnerGear: false,
+      potions: 8,
+      runs: 3,
+    });
+    expect(docTuocSolo8.deathsTotal).toBeGreaterThan(0);
+
+    // Độc Tước tinh anh khi đi ĐỘI 2 NGƯỜI: sống sót 100%, tỷ lệ sống cao hơn hẳn solo
     const docTuocParty = botHuntSummary(NA_REALM, 2, "doc_tuoc", {
       elite: true,
       party: 2,
@@ -126,6 +135,19 @@ describe("bot-hunt: mô phỏng bot THẬT Nguyên Anh (có độ trễ phản x
     });
     expect(docTuocParty.deathsTotal).toBe(0);
     expect(docTuocParty.killedAll).toBe(true);
+    expect(docTuocParty.deathsTotal).toBeLessThanOrEqual(docTuocSolo.deathsTotal);
     expect(docTuocParty.medianSeconds).toBeLessThan(15);
+
+    // Đối chiếu quái thường vs tinh anh: tinh anh nhận nhiều sát thương hơn và thời gian gấp ~2.5x
+    const normalLang = botHuntSummary(NA_REALM, 2, "han_lang", { evade: true, runs: 3 });
+    const eliteLang = botHuntSummary(NA_REALM, 2, "han_lang", {
+      elite: true,
+      evade: true,
+      runs: 3,
+    });
+    expect(eliteLang.medianTotalDmg).toBeGreaterThan(normalLang.medianTotalDmg);
+    const timeRatio = eliteLang.medianSeconds / normalLang.medianSeconds;
+    expect(timeRatio).toBeGreaterThan(2.0);
+    expect(timeRatio).toBeLessThan(3.0);
   });
 });

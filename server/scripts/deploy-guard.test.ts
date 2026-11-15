@@ -187,6 +187,7 @@ describe("Hàng rào bảo vệ môi trường dev và kiểm tra triển khai (
     expect(() => assertNotProd(2587, "test")).not.toThrow(); // Dev C
     expect(() => assertNotProd(2577, "test")).not.toThrow(); // Dev B
     expect(() => assertNotProd(2597, "test")).not.toThrow(); // Dev A
+    expect(() => assertNotProd(2607, "test")).not.toThrow(); // Dev D
     expect(() => assertNotProd(5173, "test")).not.toThrow();
     expect(() => assertNotProd("http://localhost:2587", "test")).not.toThrow();
     expect(() => assertNotProd("/home/nguyencong/TT/tien-gioi-c/data", "test")).not.toThrow();

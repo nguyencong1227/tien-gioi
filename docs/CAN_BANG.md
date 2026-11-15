@@ -798,10 +798,10 @@ Mỗi lần sinh quái thường hiếu chiến (không trùm, không Linh Thố
 
 | Loài Tinh Anh | Solo 3M (s / đan) | Tử vong (solo 3M) | Đáy máu (solo 3M) | Solo 6M (đồ ô riêng) | Tử vong (solo 6M) | Đội 2 người (s / đan) | Tử vong (đội 2) | Nhận xét thực nghiệm |
 |---|---:|---:|---:|---:|---:|---:|---:|---|
-| **Hàn Lang (Tinh Anh)** | 8.0s (1.0 đan) | 0/6 | 54% | 8.0s (52% máu) | 0/6 | 4.0s (0.5 đan) | 0/6 | Solo an toàn nhờ 1 viên đan; đội 2 rất an toàn |
-| **Phong Nha (Tinh Anh)** | 8.0s (1.0 đan) | 0/6 | 61% | 8.0s (59% máu) | 0/6 | 4.0s (0.0 đan) | 0/6 | Solo an toàn nhờ 1 viên đan; đội 2 rất an toàn |
-| **Cốt Tượng (Tinh Anh)** | 79.4s (1.0 đan) | 0/6 | 53% | 74.9s (53% máu) | 0/6 | 21.0s (0.0 đan) | 0/6 | Solo né đập đất liên tục (79s); đội 2 rút ngắn còn 21s |
-| **Độc Tước (Tinh Anh)** | 10.8s (1.0 đan) | 6/6 | 92% | 12.3s (94% máu) | 6/6 | 6.4s (0.5 đan) | 0/6 | Cực hung hiểm: solo tử vong, đi đội 2 người sống sót 100% |
+| **Hàn Lang (Tinh Anh)** | 8.0s (1.0 đan) | 0/6 | 54% | 8.0s (52% máu) | 0/6 | 4.0s (0.5 đan) | 0/6 | Solo an toàn (1.0 đan); đội 2 rất an toàn (4.0s) |
+| **Phong Nha (Tinh Anh)** | 8.0s (1.0 đan) | 0/6 | 61% | 8.0s (59% máu) | 0/6 | 4.0s (0.0 đan) | 0/6 | Solo an toàn (1.0 đan); đội 2 rất an toàn (4.0s) |
+| **Cốt Tượng (Tinh Anh)** | 79.4s (1.0 đan) | 0/6 | 53% | 74.9s (53% máu) | 0/6 | 21.0s (0.0 đan) | 0/6 | Solo né đập đất liên tục (79.4s); đội 2 rút ngắn còn 21.0s |
+| **Độc Tước (Tinh Anh)** | 10.8s (1.0 đan) | 6/6 | 92% | 12.3s (94% máu) | 6/6 | 6.4s (0.5 đan) | 0/6 | Solo tử vong 6/6 (độc dồn nhanh hơn cd đan 12s, mang 8 đan vẫn chết); đội 2 sống sót 100% |
 
 **Đọc bảng & Kết luận thực nghiệm:**
 1. **Né đòn cứu mạng rất rõ rệt:** Ở Cốt Tượng và Thiên Hàn Vương, đòn đập đất hình tròn gây lượng sát thương cực lớn. Nhìn vào đối chiếu cột 'ST đứng yên' và 'ST bot né', bot thật né thoát vòng đập đất giúp giảm 36% sát thương nhận vào từ Cốt Tượng và bảo toàn 100% mạng sống của toàn đội khi đánh Thiên Hàn Vương (0/6 trận có người chết ở cả đội 3 và đội 4 người).
@@ -809,14 +809,14 @@ Mỗi lần sinh quái thường hiếu chiến (không trùm, không Linh Thố
    - Giảm 6% đến 39% sát thương nhận vào mỗi trận.
    - Nâng đáy khí huyết an toàn thêm 5 đến 24 điểm phần trăm.
    - Với trùm Thiên Hàn Vương: đội 4 người mặc đủ 6 món thậm chí **không cần dùng viên đan nào** (0.0 viên/người).
-3. **Quyết định giữ `useOwnerGear = false` cho mô hình cơ sở là hoàn toàn chuẩn xác:** Giữ cờ tắt đảm bảo người mới chưa kịp rèn đồ ô riêng vẫn đủ an toàn theo đúng mục tiêu nhịp; đồ ô riêng là phần thưởng thực tế giúp người chơi tối ưu hóa tốc độ cày và chinh phục nội dung khó hơn.
-4. **Thực nghiệm bot thật đánh TINH ANH (giải đáp câu hỏi sống sót của mục 'Tinh anh'):**
+3. **A chọn giữ `useOwnerGear = false` cho mô hình cơ sở:** Vì đảm bảo người mới chưa kịp rèn đồ ô riêng vẫn đủ an toàn theo đúng mục tiêu nhịp; đồ ô riêng là phần thưởng thực tế giúp người chơi tối ưu hóa tốc độ cày và chinh phục nội dung khó hơn.
+4. **Thực nghiệm bot thật đánh TINH ANH (đối chiếu cận trên mục 'Tinh anh'):**
    - Mô hình lý thuyết ở mục 'Tinh anh' (cận trên đứng yên không né không đan) cho thấy 7/9 loài làm người chơi mất >100% máu và có nguy cơ tử vong.
-   - Thực nghiệm bot thật chứng minh:
-     + **Người chơi solo CÓ NÉ + ĐAN DƯỢC sống sót an toàn (0/6 tử vong)** trước 3/4 loài tinh anh (Hàn Lang, Phong Nha, Cốt Tượng), đáy khí huyết an toàn ~53% và tiêu tốn đúng 1 viên đan hồi phục.
-     + **Độc Tước Tinh Anh là mini-trùm thực thụ:** Do sở hữu đòn đánh tầm xa kèm hiệu ứng độc rút máu nhanh (`poison`), người chơi solo (kể cả mặc đủ 6 món) không thể trụ nổi (tử vong 6/6 trận). **Đây là thiết kế có chủ đích:** người chơi buộc phải tôn trọng quái tinh anh, tránh né khi solo hoặc chạy về khu an toàn.
-     + **Đi theo đội 2 người hóa giải hoàn toàn độ khó:** Khi lập đội 2 người, Độc Tước Tinh Anh bị hạ gục chỉ trong 6.4s mà không có bất kỳ ai tử vong (0/6 trận), đáy khí huyết giữ ở mức 66%. Cốt Tượng Tinh Anh rút ngắn thời gian từ 79.4s xuống 21.0s và hoàn toàn không tốn viên đan nào.
-   - **Kết luận:** Bộ hệ số tinh anh (x2.5 khí huyết, x1.5 công, xác suất 4%) của M7.3 là hoàn toàn cân bằng và chuẩn xác, khuyến khích người chơi tương tác cơ chế (né đòn, dùng dược phẩm, lập tổ đội) mà không gây cảm giác ức chế bất khả thi.
+   - Số đo thực nghiệm bot thật:
+     + **3/4 loài (Hàn Lang, Phong Nha, Cốt Tượng):** người chơi solo **CÓ NÉ + UỐNG ĐAN sống sót an toàn (0/6 tử vong)**, đáy khí huyết an toàn ~53% và tiêu tốn 1 viên đan hồi phục.
+     + **Độc Tước Tinh Anh:** người chơi solo tử vong 6/6 trận (kể cả mặc đủ 6 món hoặc mang 8 đan: tử vong ở ~11s với 6/6 trận chết vì sát thương độc dồn dập nhanh hơn hồi chiêu 12s của đan dược, chỉ kịp dùng 1 viên trước khi hết máu).
+     + **Lập đội 2 người:** Độc Tước Tinh Anh bị hạ gục an toàn trong 6.4s mà không có bất kỳ ai tử vong (0/6 trận, đáy máu 66%). Cốt Tượng Tinh Anh rút ngắn thời gian từ 79.4s xuống 21.0s và hoàn toàn không tốn viên đan nào.
+   - **Ghi nhận:** Bộ hệ số tinh anh (x2.5 khí huyết, x1.5 công, xác suất 4%) của M7.3 hiện là số đo thực nghiệm; rủi ro Độc Tước tinh anh solo chết 100% đã được ghi nhận vào `~/TT/orchestra/questions.md` chờ người dùng quyết định xem có cần điều chỉnh hệ số hay phân loại loài quái.
 
 
 ## Cân bằng chiêu thức, ngũ hành và trạng thái (M7, #510)
