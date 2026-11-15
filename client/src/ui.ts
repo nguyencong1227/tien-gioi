@@ -13,6 +13,7 @@ import {
   swapInfo,
   type FullEquip,
 } from "./equip-panel";
+import { typedLength } from "./dialog-typewriter";
 import { lockIconSvg } from "./skill-icon";
 import {
   INVENTORY_SLOTS,
@@ -4237,11 +4238,14 @@ export const ui = {
       finishTypewriter();
       textEl.textContent = dlgFullText;
     } else {
+      // Số ký tự tính từ THỜI GIAN đã trôi (dialog-typewriter.ts), không cộng cố định mỗi lần timer chạy: khung chậm thì timer chạy thưa
+      const typeStart = performance.now();
       dlgTypeTimer = window.setInterval(() => {
-        dlgTypedLen += 2;
-        if (dlgTypedLen >= dlgFullText.length) {
+        const n = typedLength(performance.now() - typeStart, dlgFullText.length);
+        if (n >= dlgFullText.length) {
           finishTypewriter();
-        } else {
+        } else if (n > dlgTypedLen) {
+          dlgTypedLen = n;
           textEl.textContent = dlgFullText.slice(0, dlgTypedLen);
           sound.typeBlip();
         }
