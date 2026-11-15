@@ -258,6 +258,26 @@ describe("Nguyên Anh: vật phẩm, rèn, cửa hàng (M7.5c)", () => {
     for (const id of NA_PILLS) expect(shop.itemIds, id).toContain(id);
   });
 
+  it("ba cấp đan hồi huyết / hồi linh: độ hiếm, mức hồi, giá trị gốc và thời gian chờ đều TĂNG theo cấp (cấp 3 là tiên phẩm ◆◆◆, phân biệt được với cấp 2 trong túi; nit B)", () => {
+    for (const ladder of [
+      ["hoi_huyet_dan", "dai_hoi_huyet_dan", "thuong_hoi_huyet_dan"],
+      ["hoi_linh_dan", "dai_hoi_linh_dan", "thuong_hoi_linh_dan"],
+    ]) {
+      const it = ladder.map((id) => ITEM_BY_ID[id]);
+      for (let i = 1; i < it.length; i++) {
+        expect(it[i].rarity, `${ladder[i]}: độ hiếm`).toBeGreaterThan(it[i - 1].rarity);
+        expect((it[i].effect as { pct: number }).pct, `${ladder[i]}: mức hồi`).toBeGreaterThan(
+          (it[i - 1].effect as { pct: number }).pct,
+        );
+        expect(ITEM_VALUE[ladder[i]], `${ladder[i]}: giá trị`).toBeGreaterThan(
+          ITEM_VALUE[ladder[i - 1]],
+        );
+        expect(it[i].cooldown!, `${ladder[i]}: chờ`).toBeGreaterThanOrEqual(it[i - 1].cooldown!);
+      }
+      expect(it[2].rarity).toBe(3);
+    }
+  });
+
   it("ba NPC Hàn Vân đứng trong trạm, trên ô đi lại được, cách nhau > 64 px, có lời thoại; thợ rèn và lái buôn dùng được", () => {
     const hv = getMap(HAN_VAN_ID)!;
     const npcs = npcsOfMap(HAN_VAN_ID);
