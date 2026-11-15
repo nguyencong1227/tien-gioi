@@ -1,4 +1,10 @@
-import { MAIN_QUEST_START, QUESTS, QUEST_BY_ID } from "@tien-gioi/shared";
+import {
+  ITEM_BY_ID,
+  MAIN_QUEST_START,
+  QUESTS,
+  QUEST_BY_ID,
+  type QuestReward,
+} from "@tien-gioi/shared";
 
 /**
  * Tab "Đã hoàn thành" của Sổ nhiệm vụ khi chuỗi dài (M6 #409: ~20 nhiệm vụ chính tuyến + nhiệm vụ lặp). Trước đây mỗi nhiệm vụ xong là một
@@ -104,4 +110,38 @@ export function doneSummary(rows: readonly DoneRow[]): string {
   if (side > 0) text += ` · Việc phụ: ${side}`;
   if (daily > 0) text += ` · Lặp hôm nay: ${daily}`;
   return text;
+}
+
+/** Một phần của dòng "Thưởng:" ở thẻ nhiệm vụ: chữ + (nếu là đồ) id để tô màu / dấu theo độ hiếm. */
+export interface RewardPart {
+  text: string;
+  /** Có thì là một món đồ: ui tô màu độ hiếm + dấu phụ lên chính phần này (cùng cách với túi, cửa hàng) */
+  itemId?: string;
+  /** Độ hiếm của món (`ITEM_BY_ID`); id lạ thì bỏ trống (không tô) */
+  rarity?: number;
+}
+
+/**
+ * Các phần thưởng của một nhiệm vụ theo thứ tự hiển thị: tu vi trước, rồi từng món ("<tên> ×<số lượng>"). Trước đây cả dòng là MỘT chuỗi chữ vàng nên quyển / đồ hiếm thưởng
+ * (vd. Hỏa Vân Kiếm Pháp ở "Bước vào tiên đồ", M7.4) không hơn gì món thường; nay mỗi món mang `itemId` + độ hiếm để `ui.ts` tô như mọi bảng khác (#509 "viền / màu độ hiếm đúng
+ * ở mọi bảng"). Số lượng / tu vi lạ (không hữu hạn, <= 0) bị bỏ; id đồ lạ vẫn hiện bằng id (không ném lỗi).
+ */
+export function rewardParts(r: QuestReward | undefined): RewardPart[] {
+  const parts: RewardPart[] = [];
+  if (!r) return parts;
+  if (typeof r.exp === "number" && Number.isFinite(r.exp) && r.exp > 0)
+    parts.push({ text: `${r.exp} tu vi` });
+  for (const it of r.items ?? []) {
+    if (!it || typeof it.qty !== "number" || !Number.isFinite(it.qty) || it.qty <= 0) continue;
+    // `ITEM_BY_ID["constructor"]` là hàm của Object: chỉ nhận khoá riêng của bảng (quy ước `byId` ở AGENTS.md)
+    const def = Object.prototype.hasOwnProperty.call(ITEM_BY_ID, it.itemId)
+      ? ITEM_BY_ID[it.itemId]
+      : undefined;
+    parts.push({
+      text: `${def?.name ?? it.itemId} ×${it.qty}`,
+      itemId: it.itemId,
+      ...(def && typeof def.rarity === "number" ? { rarity: def.rarity } : {}),
+    });
+  }
+  return parts;
 }
