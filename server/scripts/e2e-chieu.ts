@@ -1064,6 +1064,88 @@ async function main() {
     dropStatue(st2.id);
     must(T.errors.length === 0, `lỗi console ở ca 9: ${JSON.stringify(T.errors)}`);
     ok("0 lỗi console / exception");
+
+    out(
+      "\n--- Ca 10: TINH ANH thật (M7.3 bước 6): máy chủ đặt Monster.elite = 1 lúc sinh, client nhận qua schema và vẽ nhãn / vầng sáng / thanh máu; quái thường bên cạnh không đổi ---",
+    );
+    const TAN = "Quai Tinh Anh";
+    await seedQuai(TAN);
+    await login(TAN);
+    await T.waitFor(
+      `!document.getElementById('ui')?.hidden && !!window.__scene?.room`,
+      "vào game thành công",
+      20000,
+    );
+    const w10 = await worldOf();
+    const sid10 = (await ev(`window.__scene.room.sessionId`)) as string;
+    const { placeMonster } = await import("../src/systems/monsters.js");
+    const { MONSTER_BY_ID } = await import("@tien-gioi/shared");
+    // Quái cách người 300 px (ngoài aggro của Hôi Lang): không đánh nhau, chỉ nhìn
+    const spot10 = openSpot(w10, 300, 15);
+    must(spot10 !== null, "có chỗ thoáng cho người + hai Hôi Lang cách 300 px");
+    const lang = MONSTER_BY_ID.lang;
+    const eliteId = placeMonster(w10, lang, spot10!.x - 300, spot10!.y, true);
+    const plainId = placeMonster(w10, lang, spot10!.x - 300, spot10!.y + 90, false);
+    isolate(w10, spot10!, "");
+    const eliteSrv = w10.state.monsters.get(eliteId)!;
+    must(
+      eliteSrv.elite === 1 &&
+        eliteSrv.kind === "lang" &&
+        eliteSrv.maxHp === Math.round(lang.hp * 2.5),
+      `máy chủ: tinh anh elite = 1, kind giữ "lang", khí huyết x2,5 (${eliteSrv.maxHp})`,
+    );
+    const p10 = w10.state.players.get(sid10)!;
+    p10.hp = p10.maxHp;
+    await teleport(w10, sid10, spot10!.x, spot10!.y);
+    await T.waitFor(
+      `!!window.__scene.monsters.get(${JSON.stringify(eliteId)}) && !!window.__scene.monsters.get(${JSON.stringify(plainId)})`,
+      "client dựng cả hai con quái",
+      15000,
+    );
+    const view10 = JSON.parse(
+      (await ev(`JSON.stringify((() => { const sc = window.__scene;
+        const one = (id) => { const e = sc.monsters.get(id), m = sc.state.monsters.get(id);
+          return { elite: m.elite, kind: e.monKind, label: e.label ? e.label.text : null, labelColor: e.label ? e.label.style.color : null,
+            aura: e.eliteAura ? e.eliteAura.visible : null, barShown: e.lastBarKey !== -1 && e.lastBarKey !== undefined, hp: m.hp, maxHp: m.maxHp }; };
+        return { e: one(${JSON.stringify(eliteId)}), n: one(${JSON.stringify(plainId)}) }; })())`)) as string,
+    ) as Record<
+      "e" | "n",
+      {
+        elite: number;
+        kind: string;
+        label: string | null;
+        labelColor: string | null;
+        aura: boolean | null;
+        barShown: boolean;
+        hp: number;
+        maxHp: number;
+      }
+    >;
+    must(
+      view10.e.elite === 1 && view10.n.elite === 0,
+      `client nhận cờ tinh anh qua schema (Monster.elite): ${view10.e.elite} / ${view10.n.elite}`,
+    );
+    must(
+      view10.e.kind === "lang" && view10.n.kind === "lang",
+      "sprite / loài giữ nguyên (kind = lang cho cả hai)",
+    );
+    must(
+      view10.e.label === "★ Hôi Lang tinh anh" &&
+        view10.e.labelColor === "#ffd76a" &&
+        view10.e.aura === true &&
+        view10.e.barShown,
+      `tinh anh thật: nhãn "${view10.e.label}" màu ${view10.e.labelColor}, vầng sáng ${view10.e.aura}, thanh máu luôn hiện ${view10.e.barShown} (khí huyết ${view10.e.hp} / ${view10.e.maxHp})`,
+    );
+    must(
+      view10.n.label === null && view10.n.aura === null && !view10.n.barShown,
+      "quái thường bên cạnh: không nhãn, không vầng sáng, thanh máu ẩn khi đầy máu",
+    );
+    ok(
+      `tinh anh thật: client vẽ nhãn "${view10.e.label}", vầng sáng, thanh máu luôn hiện; quái thường bên cạnh không đổi`,
+    );
+    must(p10.hp === p10.maxHp, "hai Hôi Lang ngoài aggro: người chưa mất khí huyết");
+    must(T.errors.length === 0, `lỗi console ở ca 10: ${JSON.stringify(T.errors)}`);
+    ok("0 lỗi console / exception");
   } catch (err) {
     failed = err instanceof Error ? err.message : String(err);
     console.error(`\n✗ THẤT BẠI: ${failed}`);
