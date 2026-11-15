@@ -963,6 +963,14 @@ const BOOKS = {
   kinh_lac_tuyet_phan_phi: [0x7ab8e0, 0xffffff],
   kinh_cuu_cung_khon_sat: [0x8a6a2a, 0xffd34d],
   kinh_me_tung_bo: [0x6fbfa0, 0xe6fff4],
+  // Đợt 2 (Nguyên Anh, #654): màu bìa theo hệ như đợt 1, nhưng MỖI quyển có dấu riêng giữa bìa (phần tử thứ ba) để không trùng pixel với quyển cùng hệ.
+  // Hình có TRƯỚC vật phẩm trong `shared/` (id chưa có trong ITEMS thì vô hại; Dev D thêm chiêu + quyển sau, atlas.test.ts đòi icon cho mọi vật phẩm).
+  kinh_han_quang_tien: [0x9fd0ea, 0xe6f6ff, "tien"],
+  kinh_bach_kim_trao: [0xc8ccd4, 0x5a626e, "trao"],
+  kinh_van_thach_tran: [0xa8803a, 0xf0d9a0, "tran"],
+  kinh_bang_hoa_loan: [0xa8dcf0, 0xffffff, "hoa"],
+  kinh_liet_hoa_kiem: [0xd9433b, 0xffd0a0, "kiem"],
+  kinh_van_hanh_bo: [0x9ad0b8, 0xe6fff4, "bo"],
 };
 
 /**
@@ -1432,13 +1440,52 @@ function drawItemIcon(id) {
     }
   } else if (BOOKS[id]) {
     // Kinh quyển (M7.4): sách khép, gáy tối, mép giấy sáng, dấu hệ trên bìa
-    const [cover, accent] = BOOKS[id];
+    const [cover, accent, mark] = BOOKS[id];
     s.rect(5, 4, 14, 17, cover);
     s.rect(5, 4, 3, 17, 0x2a2018, 110);
     s.rect(19, 5, 1, 15, 0xf4ecd0);
     s.rect(8, 7, 9, 1, accent);
-    s.circle(12, 13, 3, accent);
-    s.circle(12, 13, 1.4, cover);
+    if (mark === undefined) {
+      // 12 quyển đợt 1: dấu tròn
+      s.circle(12, 13, 3, accent);
+      s.circle(12, 13, 1.4, cover);
+    } else if (mark === "tien") {
+      // Hàn Quang Tiễn: mũi tên xiên, đuôi có hai cánh lông
+      s.line(9.6, 16.2, 15, 10.8, accent, 1.2);
+      s.tri(16.4, 9.4, 12.4, 10.4, 15.4, 13.4, accent);
+      s.line(9.6, 16.2, 9.6, 13.6, accent, 1);
+      s.line(9.6, 16.2, 12.2, 16.2, accent, 1);
+    } else if (mark === "trao") {
+      // Bạch Kim Trảo: ba vệt vuốt song song
+      s.line(9.6, 9.6, 11.8, 16.4, accent, 1.3);
+      s.line(12.2, 9.6, 14.4, 16.4, accent, 1.3);
+      s.line(14.8, 9.6, 17, 16.4, accent, 1.3);
+    } else if (mark === "tran") {
+      // Vạn Thạch Trận: bốn tảng đá xếp ô vuông
+      s.rect(9, 9.6, 3, 3, accent);
+      s.rect(13, 9.6, 3, 3, accent);
+      s.rect(9, 13.8, 3, 3, accent);
+      s.rect(13, 13.8, 3, 3, accent);
+    } else if (mark === "hoa") {
+      // Băng Hoa Loạn: bông tuyết tám nan
+      s.line(12.5, 9, 12.5, 17, accent, 1);
+      s.line(8.5, 13, 16.5, 13, accent, 1);
+      s.line(9.7, 10.2, 15.3, 15.8, accent, 1);
+      s.line(15.3, 10.2, 9.7, 15.8, accent, 1);
+      s.circle(12.5, 13, 1.3, cover);
+    } else if (mark === "kiem") {
+      // Liệt Hỏa Kiếm: thanh kiếm dựng đứng có chắn tay
+      s.line(12.5, 10, 12.5, 16.8, accent, 1.6);
+      s.tri(11.2, 10.2, 13.8, 10.2, 12.5, 8.4, accent);
+      s.line(9.8, 14.2, 15.2, 14.2, accent, 1.4);
+    } else if (mark === "bo") {
+      // Vân Hành Bộ: đám mây (ba cụm tròn trên đáy phẳng) có vệt gió bên dưới
+      s.circle(10.6, 12.8, 2, accent);
+      s.circle(13.2, 11.6, 2.6, accent);
+      s.circle(15.4, 13.2, 1.8, accent);
+      s.rect(10.6, 13, 5.6, 2, accent);
+      s.line(9.6, 16.4, 15.4, 16.4, accent, 0.9);
+    }
     s.rect(8, 18, 9, 1, accent);
   }
   if (OUTLINED_ICONS.has(id)) outlineSurface(s, 0x2a3340);
