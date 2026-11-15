@@ -2183,7 +2183,7 @@ function setSkillsOpen(list: HTMLElement, id: string | null, scroll: boolean) {
  */
 function skillRowEl(row: SkillRow): HTMLElement {
   const el = document.createElement("div");
-  el.className = `sk-row${row.slotNow !== null ? " equipped" : ""}${row.need ? " needs" : ""}`;
+  el.className = `sk-row${row.slotNow !== null ? " equipped" : ""}`;
   el.dataset.skill = row.id;
 
   const detailId = `sk-detail-${row.id}`;
