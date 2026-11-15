@@ -72,7 +72,7 @@ async function main() {
       { stdio: "ignore" },
     );
     let targets: any[] = [];
-    for (const start = Date.now(); Date.now() - start < 8000;) {
+    for (const start = Date.now(); Date.now() - start < 15000;) {
       try {
         const res = await fetch(`http://127.0.0.1:${CDP}/json`);
         if (res.ok) {
@@ -111,8 +111,8 @@ async function main() {
         `const inp = document.getElementById('login-name'); if (inp) inp.value = ${JSON.stringify(NAME)}; document.getElementById('login-form').requestSubmit(); 1`,
       );
       await T.waitFor(
-        `!document.getElementById('ui')?.hidden && !!window.__scene?.room && !!document.getElementById('hud-name')?.textContent`,
-        "vào game thành công",
+        `!document.getElementById('ui')?.hidden && !!window.__scene?.room && !!document.getElementById('hud-name')?.textContent && (window.__scene?.predX > 0 || window.__scene?.hasMe)`,
+        "vào game thành công và nhân vật có toạ độ",
       );
     };
     const setQuality = (v: string) =>
@@ -148,7 +148,10 @@ async function main() {
     out("\n--- Ca 1: atlas hạt + phông chữ bay dựng bằng mã ---");
     await setStorage('localStorage.setItem("tg_quality", "high");');
     await login(`http://127.0.0.1:${PORT}/?debug`);
-    await T.waitFor(`!!window.__fx`, "lõi hiệu ứng (window.__fx) có mặt");
+    await T.waitFor(
+      `!!window.__fx && (window.__scene?.predX > 0 || window.__scene?.hasMe)`,
+      "lõi hiệu ứng (window.__fx) và toạ độ nhân vật có mặt",
+    );
     const tex =
       (await T.ev(`(() => { const t = window.__scene.textures, a = t.get('fx-atlas'), f = t.get('fx-font');
       return { atlas: t.exists('fx-atlas') && a.getFrameNames().filter((n) => n !== '__BASE'), atlasPx: a.source[0].width * a.source[0].height * 4,
@@ -215,6 +218,8 @@ async function main() {
             canvasH: s.game.canvas ? s.game.canvas.height : 0,
             rectW: w,
             rectH: h,
+            predX: s.predX,
+            predY: s.predY,
           });
         } else {
           setTimeout(grab, 120);
@@ -234,6 +239,7 @@ async function main() {
       out(
         `    kích thước canvas: ${paintResult?.canvasW}x${paintResult?.canvasH} (CSS: ${paintResult?.rectW}x${paintResult?.rectH})`,
       );
+      out(`    toạ độ nhân vật: (${paintResult?.predX}, ${paintResult?.predY})`);
       out(`    số lần thử: ${paintResult?.tries}`);
       const shotPath = await T.shot("fx-failure");
       if (shotPath) out(`    đã lưu ảnh chụp: ${shotPath}`);

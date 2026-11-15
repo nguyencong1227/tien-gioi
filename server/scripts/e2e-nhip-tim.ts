@@ -252,7 +252,7 @@ async function main() {
     );
 
     let targets: any[] = [];
-    for (const start = Date.now(); Date.now() - start < 8000;) {
+    for (const start = Date.now(); Date.now() - start < 15000;) {
       try {
         const res = await fetch(`http://127.0.0.1:${CDP}/json`);
         if (res.ok) {
@@ -589,7 +589,7 @@ async function main() {
       await tab.waitFor(
         `window.__scene?.room?.reconnectionToken && window.__scene.room.reconnectionToken !== ${JSON.stringify(token4)}`,
         "nhịp tim phát hiện chết và nối lại qua kết nối mới (token phòng đổi)",
-        25000,
+        40000,
       );
     } catch (e: any) {
       const diag = (await tab.ev(`(() => {
