@@ -3,6 +3,8 @@
 //  - Người chơi trong `radius` và quái đã hết hồi (`nextSlam`) thì quái ĐỨNG GỒNG `windupMs` và gửi MỘT `fx` `warn` hình tròn (tâm = chỗ quái đứng, bán kính `radius`).
 //  - Trúng tính theo VỊ TRÍ người chơi LÚC ĐÁP ĐÒN: bước ra ngoài vòng (bán kính + bán kính người chơi) trong lúc gồng thì KHÔNG trúng.
 //  - Không trúng người trong khu an toàn; người chết / hồn lìa xác / thách đấu / đang né do `hurtPlayer` bỏ qua (một nơi giữ các luật này).
+//  - Đập đất tính như MỘT đòn đánh: đáp xong quái chờ đủ `attackCd` rồi mới đánh thường (trước đây đánh thường NGAY tick sau: người đứng sát trùm mất 432 + ~210 liền một hơi,
+//    nit của B khi xem trùm thật); trùm có thêm khoảng thở này để người cận chiến đánh trả.
 //  - Choáng (`stun`) NGẮT cú gồng (không đáp đòn) và phạt chờ cả `cdMs`: phần thưởng cho chiêu khống chế (M7.2b).
 //  - Không bắt đầu gồng khi quái đang gồng / thở của `charger` (`mc.ai`); đang đập đất thì `charger` không bắt đầu lao (`monsters.ts` kiểm đập đất trước).
 //  - Sát thương cố định `round(atk x mult)`, không dùng `Math.random` (giữ nguyên chuỗi của bench có seed).
@@ -56,6 +58,7 @@ export function slamStep(
     if (w.now >= cur.until) {
       mc.slam = undefined;
       mc.nextSlam = w.now + slam.cdMs;
+      mc.nextAttack = Math.max(mc.nextAttack, w.now + def.attackCd);
       strike(w, id, m, mc, cur.x, cur.y);
     }
     return true;
