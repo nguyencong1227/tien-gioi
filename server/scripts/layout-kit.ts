@@ -15,9 +15,19 @@ export const VIEWPORTS: readonly Viewport[] = [
   { w: 412, h: 915, touch: true, note: "điện thoại dọc lớn" },
   { w: 915, h: 412, touch: true, note: "điện thoại ngang" },
   { w: 550, h: 900, touch: false, note: "cửa sổ hẹp (ảnh người dùng gửi)" },
+  // hai khung sát mốc gộp menu vào ☰ (619 / 620 px, `@media (max-width: 619px)`, #684): hẹp hơn một px là ☰, rộng bằng là hàng bảy nút cạnh bảng Tổ đội
+  { w: 619, h: 900, touch: false, note: "cửa sổ hẹp nhất còn gộp menu vào ☰ (#684)" },
+  { w: 620, h: 900, touch: false, note: "cửa sổ hẹp nhất hiện hàng menu (#684)" },
   { w: 1366, h: 768, touch: false, note: "máy tính xách tay" },
   { w: 1920, h: 1080, touch: false, note: "máy tính để bàn" },
 ];
+
+/** Khung theo bề rộng (không theo chỉ số: chèn thêm khung không làm lệch các ca dùng riêng một khung). */
+export function viewportOf(w: number): Viewport {
+  const v = VIEWPORTS.find((x) => x.w === w);
+  if (!v) throw new Error(`Không có khung ${w} px trong VIEWPORTS`);
+  return v;
+}
 
 /** Các bảng nổi cần đo diện tích (id phần tử). */
 export const PANELS = [
