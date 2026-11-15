@@ -32,7 +32,7 @@ Bản phát hành M7 (`docs/PHAN_CONG_M7.md`; hướng đã được người d�
 - Người chơi web chỉ cần tải lại trang. **APK `v0.2.x` phải cài lại** (`release.yml` dựng APK debug khi gắn thẻ).
 - **Đổi trải nghiệm ban đầu của một nhóm người chơi:** cửa sổ CHUỘT thấp mà rộng (khung nhìn >= 900 x 500, như màn 720p hay laptop 1366x768 sau thanh tab) nay dùng bộ giao diện máy tính nên BẮT ĐẦU ở bậc đồ hoạ máy tính (Cao, có bloom) thay vì bậc điện thoại; bộ điều tốc vẫn hạ bậc nếu khung hình xấu (#676, #682).
 - Thứ tự vận hành (`deploy/prod.sh`, bản dry-run của C ở #515): `backup` -> `up 0.3.0` -> `smoke`; hỏng thì `rollback`, hỏng dữ liệu thì `restore <bản sao lưu>`.
-- **Chưa làm / chưa đo:** nghề nhỏ luyện đan + chế phù (#514, tuỳ), ảnh AI SDXL (#513, chờ người dùng). Bot soak tối đa Trúc Cơ nên soak KHÔNG thi triển chiêu Nguyên Anh (chi phí 6 chiêu mới được đo ở kịch bản `perf.test.ts` riêng, xem mục Đo và kiểm). Âm thanh chiêu CHƯA nghe bằng tai (không loa); **"Android tầm trung >= 50 FPS" và điện thoại thật CHƯA đo / thử** (chỉ Chrome headless).
+- **Chưa làm / chưa đo:** nghề nhỏ luyện đan + chế phù (#514, tuỳ), ảnh AI SDXL (#513, chờ người dùng). Bot soak là Luyện Khí (tầng 5) và không có sổ chiêu nên soak KHÔNG thi triển chiêu Nguyên Anh (chi phí 6 chiêu mới được đo ở kịch bản `perf.test.ts` riêng, xem mục Đo và kiểm). Âm thanh chiêu CHƯA nghe bằng tai (không loa); **"Android tầm trung >= 50 FPS" và điện thoại thật CHƯA đo / thử** (chỉ Chrome headless).
 
 ### Máy chủ
 - **Nhiệm vụ 'Bước vào tiên đồ' thưởng quyển Hỏa Vân Kiếm Pháp (M7.4, #505):** người mới lên Luyện Khí tầng 1 nhận ngay kinh quyển đầu tiên, mở Túi đồ, chọn quyển rồi bấm Học (chiêu tự gắn vào thanh chiêu) mà không phải cày Linh thạch mua ở tiệm.
