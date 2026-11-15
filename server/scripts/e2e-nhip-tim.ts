@@ -52,6 +52,14 @@ class TcpProxy {
   private dropPong = false;
   private holed = new Set<{ client: net.Socket; target: net.Socket }>();
   clientBytes = 0;
+  /** Sổ sự kiện (đo cho chẩn đoán khi đỏ): kết nối mới và dòng yêu cầu HTTP đầu của từng chuỗi byte client -> server, kèm cờ `holed`. */
+  readonly events: string[] = [];
+  private pairSeq = 0;
+  private t0 = Date.now();
+  private note(msg: string) {
+    this.events.push(`+${((Date.now() - this.t0) / 1000).toFixed(1)}s ${msg}`);
+    if (this.events.length > 60) this.events.shift();
+  }
 
   constructor(
     public listenPort: number,
@@ -65,9 +73,20 @@ class TcpProxy {
       const targetSocket = net.connect({ port: this.targetPort, host: "127.0.0.1" });
       const pair = { client: clientSocket, target: targetSocket };
       this.connections.add(pair);
+      const id = ++this.pairSeq;
+      this.note(
+        `kết nối mới #${id}${this.holed.size ? ` (đã có ${this.holed.size} socket nửa mở)` : ""}`,
+      );
 
       clientSocket.on("data", (d: Buffer) => {
         this.clientBytes += d.length;
+        const m = /^(GET|POST|PUT|OPTIONS|DELETE|HEAD) (\S+)/.exec(
+          d.subarray(0, 120).toString("latin1"),
+        );
+        if (m)
+          this.note(
+            `#${id} ${m[1]} ${m[2].split("?")[0].slice(0, 60)}${this.holed.has(pair) ? "  <-- SOCKET NỬA MỞ, byte bị nuốt" : ""}`,
+          );
         if (this.blackhole || this.holed.has(pair)) {
           // Blackhole: giữ socket mở nhưng ngừng chuyển tiếp byte hai chiều
           return;
@@ -589,7 +608,7 @@ async function main() {
       await tab.waitFor(
         `window.__scene?.room?.reconnectionToken && window.__scene.room.reconnectionToken !== ${JSON.stringify(token4)}`,
         "nhịp tim phát hiện chết và nối lại qua kết nối mới (token phòng đổi)",
-        40000,
+        25000,
       );
     } catch (e: any) {
       const diag = (await tab.ev(`(() => {
@@ -615,8 +634,13 @@ async function main() {
       out(
         `    nhật ký server gần nhất:\n      ${serverLogs.slice(-10).join("\n      ") || "(không có)"}`,
       );
+      out(
+        `    sổ proxy (kết nối mới và yêu cầu HTTP, mốc 0 = lúc tạo proxy):\n      ${proxy.events.slice(-25).join("\n      ")}`,
+      );
       throw e;
     }
+    if (process.env.E2E_PROXY_TRACE)
+      out(`  [SỔ PROXY]:\n    ${proxy.events.slice(-25).join("\n    ")}`);
     await tab.waitFor(
       `(() => { const b = document.getElementById('reconnect-banner'); return !b || b.hidden; })()`,
       "banner nối lại ẩn sau khi nối lại",
