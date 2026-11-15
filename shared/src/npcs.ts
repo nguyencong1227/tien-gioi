@@ -27,6 +27,9 @@ export const NPCS: NpcDef[] = [
     dialog: [
       "Lạc Hà Trấn nằm dưới chân Vân Mộng Sơn, linh khí tuy mỏng nhưng đủ cho kẻ có lòng.",
       "Ngoài kia yêu thú mỗi ngày một nhiều. Có việc gì cứ tới tìm ta.",
+      "Tu sĩ trẻ vào trấn đông hơn xưa, ta mừng mà cũng lo, ít ai trụ nổi qua mùa đông đầu.",
+      "Vân Mộng Sơn che chở cho chúng ta bao đời, đổi lại ta phải giữ cho trấn được bình yên.",
+      "Hà lão bên tiệm đan giỏi chữa thương, Thiết Ngưu bên lò rèn giỏi tạo tác, cứ đến mà nhờ.",
     ],
     color: 0x7a5c3e,
   },
@@ -39,6 +42,9 @@ export const NPCS: NpcDef[] = [
     dialog: [
       "Đan dược cứu mạng, nhưng nguyên liệu phải do chính tay ngươi mang về.",
       "Mang da lông yêu thú tới, lão phu luyện cho ngươi vài viên.",
+      "Vào sâu mà không dự phòng đan dược thì đừng trách số mình hẩm hiu.",
+      "Mai rùa từ đầm Âm Sương cho dược liệu bổ huyết tốt nhất, hiếm mà quý.",
+      "Ngươi mà thương nặng thì chạy sang đây gấp, lửa lò lão đang nhóm sẵn.",
     ],
     color: 0x4f8a5b,
   },
@@ -51,6 +57,9 @@ export const NPCS: NpcDef[] = [
     dialog: [
       "Lò đã đỏ lửa. Mang nanh, da, vảy yêu thú tới đây, ta rèn cho ngươi món ra hồn.",
       "Đồ tốt kén người: cảnh giới chưa tới thì mặc vào cũng chẳng chịu nổi.",
+      "Nanh sói, da thú dưới trấn ta rèn được đồ sơ khởi, đủ cho kẻ mới vào đạo.",
+      "Lửa lò ta cháy ngày đêm, than có thừa, thiếu có mỗi nguyên liệu do ngươi mang về.",
+      "Muốn đao kiếm sắc bén thì phải nể lửa, đồ tốt bao giờ cũng đắt công rèn.",
     ],
     color: 0x8c3b2a,
   },
@@ -60,7 +69,13 @@ export const NPCS: NpcDef[] = [
     title: "Việc trong ngày",
     x: TOWN_PX.x,
     y: TOWN_PX.y + 110,
-    dialog: ["Giấy dán chi chít, nhưng hôm nay chẳng còn việc nào chưa có người nhận."],
+    dialog: [
+      "Giấy dán chi chít, nhưng hôm nay chẳng còn việc nào chưa có người nhận.",
+      "Việc hạ yêu thú nơi hoang dã trả hậu hĩnh, đạo hữu dám nhận thì tới bóc giấy.",
+      "Trưởng trấn Lâm Thanh Tùng thường dán lệnh mới lên đây mỗi khi thú dữ quấy phá.",
+      "Ai rảnh tay mà thiếu Linh thạch thì đọc kỹ, phần thưởng luôn xứng với nguy hiểm.",
+      "Chớ bóc giấy rồi bỏ dở, nhận việc là phải làm trọn, kẻo hỏng danh tiếng của trấn.",
+    ],
     color: 0xc9a66b,
   },
   {
@@ -74,6 +89,9 @@ export const NPCS: NpcDef[] = [
     dialog: [
       "Thanh Lộ Trạm dựng sát cổng cho kẻ vượt Hắc Phong Cốc dừng chân. Gió ngoài kia rát, thú cũng dữ hơn dưới Lạc Hà.",
       "Thu được gì cứ bán cho ta, đỡ phải gánh về trấn dưới. Đan dược ta cũng có sẵn.",
+      "Hắc Phong Cốc là con đường duy nhất lên Âm Sương, mà cũng là nơi chôn biết bao kẻ tham lam.",
+      "Gió ở đây cắt da, ngươi lên đường thì mua đủ đan dược phòng thân đã.",
+      "Ta đi buôn qua bao trạm, nhưng thú dữ như dưới Cốc này thì ít nơi nào sánh bằng.",
     ],
     color: 0x6b4f8a,
   },
@@ -88,6 +106,9 @@ export const NPCS: NpcDef[] = [
     dialog: [
       "Vọng Sương Trạm dựng giữa đầm, đèn đêm nào cũng thắp để kẻ lạc đường tìm về. Ra khỏi vòng đèn là sương nuốt tiếng bước chân.",
       "Kim Đan mới dám đi sâu. Đầm này nuôi sương hồ, rùa đá, cóc độc, và ở nơi sâu nhất là Hắc Giao. Có việc thì nói với ta.",
+      "Sương đầm dày đến mức giữa ban ngày cũng tối như đêm, kẻ mất phương cứ theo đèn mà về.",
+      "Hắc Giao là trùm của đầm, to bằng cả cái chòi, một mình mà đụng phải thì chỉ có chuồn.",
+      "Ta giữ trạm này bao năm, thấy bao tu sĩ vào sâu, kẻ trở về mang đồ, kẻ thì không.",
     ],
     color: 0x4a6b78,
   },
@@ -101,6 +122,9 @@ export const NPCS: NpcDef[] = [
     dialog: [
       "Thu được gì từ đầm cứ bán cho ta, đỡ phải gánh ngược qua Hắc Phong Cốc. Đại hồi đan ta cũng có sẵn.",
       "Đan hồi phục quý hơn vàng khi ngươi đứng trước cóc độc. Mua đủ rồi hẵng vào sâu.",
+      "Sương hồ cho lông quý, rùa đá cho mai bổ, bán hết cho ta, ta trả giá công bằng.",
+      "Kẻ buôn như ta chẳng sợ nguy hiểm, chỉ sợ hàng tồn kho, nên cứ bán nhanh cho gọn.",
+      "Lên Hàn Vân thì tìm Kỳ Thiên Lộc, hắn ta mua bán trên băng giỏi không kém ta dưới đầm.",
     ],
     color: 0x7a5f8c,
   },
@@ -114,6 +138,9 @@ export const NPCS: NpcDef[] = [
     dialog: [
       "Mai rùa, lông sương, vảy giao: nguyên liệu trong đầm này rèn ra đồ ra hồn nhất. Mang tới đây, thêm chút Linh thạch tiền than.",
       "Đồ tốt kén người: chưa tới Kim Đan thì mặc vào cũng chẳng chịu nổi.",
+      "Vảy giao long cho ta rèn được giáp chịu đòn, nhưng đòi đội đủ ba bốn người mới hạ nổi con.",
+      "Lửa lò ta nhóm giữa đầm sương, than phải chở từ dưới Lạc Hà lên, đắt mà hiếm.",
+      "Rùa đá già cho mai dày nhất, ngươi vào sâu thì nhớ tìm những con tuổi thọ cao.",
     ],
     color: 0x9a4a30,
   },
@@ -128,6 +155,9 @@ export const NPCS: NpcDef[] = [
     dialog: [
       "Hàn Vân Trạm dựng trên sườn băng, lò than nào cũng nhóm suốt đêm. Ra khỏi vòng lửa là gió tuyết cắt da.",
       "Nguyên Anh mới dám lên đây. Bầy sói băng, chim nanh thép, voi xương, sẻ độc, và ở nơi cao nhất là Thiên Hàn Vương. Có việc thì nói với ta.",
+      "Gió tuyết ở đây lạnh đến mức đan dược cũng đông cứng, ngươi dự trữ đủ rồi hãy lên cao.",
+      "Thiên Hàn Vương là chúa tể băng nguyên, một con đã đủ quét sạch cả một đội tu sĩ.",
+      "Ta giữ trạm trên băng bao mùa đông, kẻ nào thiếu chuẩn bị đều không sống qua đêm đầu.",
     ],
     color: 0x4a7aa8,
   },
@@ -141,6 +171,9 @@ export const NPCS: NpcDef[] = [
     dialog: [
       "Thu được gì trên băng cứ bán cho ta, đỡ phải gánh ngược xuống Âm Sương. Thượng hồi đan ta có sẵn.",
       "Đứng trước độc tước mà hết đan thì hối cũng không kịp. Mua đủ rồi hẵng lên cao.",
+      "Hàn Lang cho lông bền, voi xương cho ngà quý, bán hết cho ta, ta trả giá xứng đáng.",
+      "Buôn trên băng nguy hơn dưới đầm: thú dữ, đường xa, mà giặc cướp cũng thường rình.",
+      "Xuống Âm Sương thì tìm Phó Quang, hắn mua bán dưới đầm giỏi không kém ta trên này.",
     ],
     color: 0x6a8cb8,
   },
@@ -154,6 +187,9 @@ export const NPCS: NpcDef[] = [
     dialog: [
       "Lông Hàn Lang, xương voi, vũ Phong Nha, châu Thiên Hàn: băng nguyên này cho nguyên liệu rèn ra đồ ra hồn nhất. Mang tới đây, thêm chút Linh thạch tiền than.",
       "Đồ tốt kén người: chưa tới Nguyên Anh thì mặc vào cũng chẳng chịu nổi.",
+      "Châu Thiên Hàn là nguyên liệu quý nhất ta từng rèn qua, nhưng đòi cả đội mới lấy được.",
+      "Lửa lò ta phải nhóm mạnh hơn dưới Lạc Hà mới chịu được cái lạnh trên này.",
+      "Vũ Phong Nha chim nanh thép cho ta rèn được phủ sắc lạnh, chém đâu đứt đó.",
     ],
     color: 0x5a3a6a,
   },
@@ -167,6 +203,9 @@ export const NPCS: NpcDef[] = [
     dialog: [
       "Linh Hư Bí Cảnh mở cho đội tu sĩ đồng tâm. Một mình vào đó chỉ là nạp mạng.",
       "Đội trưởng nói một tiếng, ta mở cổng; ai không kịp bước vào trong thời hạn thì lỡ chuyến.",
+      "Bí cảnh chỉ mở cho đội đồng tâm, kẻ đơn thương độc mã vào đó chỉ tổ bỏ mạng.",
+      "Trong đó quái mạnh hơn ngoài kia nhiều, đạo hữu phải cùng đồng đội mà tiến.",
+      "Muốn vào thì tìm đội đủ người, ta đây chỉ mở cổng, chứ không dắt ai vào sinh ra tử.",
     ],
     color: 0x3a6f8f,
   },

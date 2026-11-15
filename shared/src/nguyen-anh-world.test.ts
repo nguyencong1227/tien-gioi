@@ -322,7 +322,8 @@ describe("Nguyên Anh: chuỗi nhiệm vụ (M7.5c bước 2)", () => {
       expect(QUEST_BY_ID[id].giver, id).toBe("tram_truong_han");
       expect(walk, id).not.toContain(id);
     }
-    expect(QUESTS.filter((q) => q.giver === "tram_truong_han")).toHaveLength(7 + 3);
+    // 7 nhiệm vụ chính + 3 nhiệm vụ lặp + 1 việc phụ (lap_uy_bang_nguyen, #725)
+    expect(QUESTS.filter((q) => q.giver === "tram_truong_han")).toHaveLength(7 + 3 + 1);
   });
 
   it("mọi bước trỏ tới thứ kiếm được ở Hàn Vân: quái chỉ sinh ở Hàn Vân, vật phẩm rơi từ quái Nguyên Anh, NPC thật; nhiệm vụ nối nói chuyện với trạm trưởng Hàn Vân", () => {
