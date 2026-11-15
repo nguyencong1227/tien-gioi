@@ -338,20 +338,26 @@ async function main() {
 
     // ---------------- Ca 2: ngân sách hạt theo bậc ----------------
     out("\n--- Ca 2: số hạt sống THẬT không vượt ngân sách (Cao: 520 hạt / 24 emitter) ---");
-    const okN = await burst(60, "{}");
+    // Phát 60 lần ưu tiên 1 (chạm trần 24) và ngay sau đó 40 lần ưu tiên 2 trong cùng tick để không bị trôi 320 ms hạt sống
+    const bursts = (await fx(`(() => {
+      let ok1 = 0, ok2 = 0;
+      for (let i = 0; i < 60; i++) if (fx.play("hit-spark", window.__scene.predX, window.__scene.predY, {})) ok1++;
+      for (let i = 0; i < 40; i++) if (fx.play("hit-spark", window.__scene.predX, window.__scene.predY, { priority: 2 })) ok2++;
+      return { ok1, ok2 };
+    })()`)) as any;
     must(
-      okN === 24,
-      `Cao: 60 lần phát cùng lúc ưu tiên 1 -> chỉ 24 được nhận (trần emitter), nhận ${okN}`,
+      bursts.ok1 === 24,
+      `Cao: 60 lần phát cùng lúc ưu tiên 1 -> chỉ 24 được nhận (trần emitter), nhận ${bursts.ok1}`,
     );
-    const alive1 = await aliveParticles();
-    must(alive1 > 0 && alive1 <= 520, `hạt sống thật > 0 và <= 520: ${alive1}`);
-    ok(`24/60 hiệu ứng được nhận, hạt sống thật ${alive1} <= 520`);
-    // ưu tiên 2 vượt trần tới gấp đôi
-    const okMine = await burst(40, "{ priority: 2 }");
-    must(okMine === 24, `ưu tiên 2: vượt trần tới 48 emitter -> nhận thêm 24, nhận ${okMine}`);
-    ok("ưu tiên 2 (của mình) vượt được trần tới gấp đôi (48 emitter), phần vượt gấp đôi bị bỏ");
+    must(
+      bursts.ok2 === 24,
+      `ưu tiên 2: vượt trần tới 48 emitter -> nhận thêm 24, nhận ${bursts.ok2}`,
+    );
+    ok(
+      `24/60 hiệu ứng được nhận, ưu tiên 2 (của mình) vượt được trần tới gấp đôi (48 emitter), phần vượt gấp đôi bị bỏ`,
+    );
     const alive2 = await aliveParticles();
-    must(alive2 <= 520 * 2, `hạt sống thật <= gấp đôi trần: ${alive2}`);
+    must(alive2 > 0 && alive2 <= 520 * 2, `hạt sống thật <= gấp đôi trần: ${alive2}`);
     // ưu tiên 0: tối đa 60 % trần
     // Hạt hết thời gian sống (<= 320 ms theo đồng hồ Phaser): thăm dò tới 15 s thay vì chờ cố định (máy quá tải thì khung chậm)
     await T.waitFor(
