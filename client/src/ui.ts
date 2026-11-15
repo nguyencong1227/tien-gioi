@@ -3444,7 +3444,7 @@ export const ui = {
     $("chat-input").addEventListener("focusout", () => chatEl.classList.remove("typing"));
     bumpChat();
 
-    // Thanh menu (QUYET_DINH_M3 mục 15): màn rất hẹp (< 480 px) gộp 6 nút vào một nút ☰ mở ra một hàng nút; chọn một mục hoặc chạm ra ngoài thì đóng
+    // Thanh menu (QUYET_DINH_M3 mục 15): màn hẹp (< 620 px, `@media (max-width: 619px)` ở style.css, #684) gộp 7 nút vào một nút ☰ mở ra một hàng nút; chọn một mục hoặc chạm ra ngoài thì đóng
     const hudMenu = $("hud-menu");
     const setMenuOpen = (open: boolean) => {
       hudMenu.classList.toggle("open", open);
