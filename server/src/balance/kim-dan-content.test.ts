@@ -256,9 +256,15 @@ describe("chuỗi nhiệm vụ chính làm được MỘT MÌNH (không chặn n
         ).not.toBeNull();
       }
     }
-    // nhiệm vụ cuối là trùm theo đội (Hắc Giao): solo không an toàn ở mọi bậc Kim Đan, đúng thiết kế
+    // nhiệm vụ cuối là trùm theo đội (từ M7.5c: Thiên Hàn Vương ở Hàn Vân): solo không an toàn ở mọi bậc Nguyên Anh, đúng thiết kế
     const last = QUEST_BY_ID[chain.at(-1)!];
-    expect(last.steps.some((st) => st.kind === "kill" && st.monster === "hac_giao")).toBe(true);
+    expect(last.steps.some((st) => st.kind === "kill" && st.monster === "thien_han_vuong")).toBe(
+      true,
+    );
+    for (const tier of [0, 1, 2])
+      expect(huntRate(MONSTER_BY_ID.thien_han_vuong, 4, tier), `Nguyên Anh bậc ${tier}`).toBeNull();
+    // Hắc Giao (trùm Kim Đan, theo đội) là việc PHỤ `giao_hoan`, không còn nằm trong chuỗi chính: chuỗi không chặn người chơi không có đội
+    expect(chain).not.toContain("giao_hoan");
     expect(huntRate(BOSS, KD, 2)).toBeNull();
   });
 

@@ -14,6 +14,8 @@ import {
   NGUYEN_ANH_RECIPES,
   NPC_BY_ID,
   PLAYER_RADIUS,
+  QUESTS,
+  QUEST_BY_ID,
   RECIPES,
   SHOP_BY_NPC,
   buyPrice,
@@ -271,5 +273,86 @@ describe("Nguyên Anh: vật phẩm, rèn, cửa hàng (M7.5c)", () => {
         expect(Math.hypot(npcs[i].x - npcs[j].x, npcs[i].y - npcs[j].y)).toBeGreaterThan(64);
     expect(SHOP_BY_NPC.lai_buon_han).toBeDefined();
     expect(NPC_BY_ID.tho_ren_han && RECIPES.some((r) => r.npcId === "tho_ren_han")).toBe(true);
+  });
+});
+
+describe("Nguyên Anh: chuỗi nhiệm vụ (M7.5c bước 2)", () => {
+  const CHAIN = [
+    "lang_han_quan",
+    "han_van_len",
+    "han_lang_hoan",
+    "phong_nha_cham",
+    "cot_tuong_cot",
+    "doc_tuoc_nang_cb",
+    "nguyen_anh_hau_ky",
+    "thien_han_hoan",
+  ];
+  const DAILY = ["han_lang_quay", "cot_tuong_phien", "doc_tuoc_nop"];
+  const hv = getMap(HAN_VAN_ID)!;
+
+  it("tám nhiệm vụ chính nối nhau từ `kim_dan_hau_ky` tới trùm; ba nhiệm vụ lặp không nằm trong chuỗi; chuỗi KHÔNG đi qua Hắc Giao (đội) nên làm được một mình", () => {
+    const walk: string[] = [];
+    for (let id: string | undefined = "kim_dan_hau_ky"; id; id = QUEST_BY_ID[id].next)
+      walk.push(id);
+    expect(walk).toEqual(["kim_dan_hau_ky", ...CHAIN]);
+    expect(walk).not.toContain("giao_hoan");
+    for (const id of DAILY) {
+      expect(QUEST_BY_ID[id].daily, id).toBe(true);
+      expect(QUEST_BY_ID[id].next, id).toBeUndefined();
+      expect(QUEST_BY_ID[id].giver, id).toBe("tram_truong_han");
+      expect(walk, id).not.toContain(id);
+    }
+    expect(QUESTS.filter((q) => q.giver === "tram_truong_han")).toHaveLength(7 + 3);
+  });
+
+  it("mọi bước trỏ tới thứ kiếm được ở Hàn Vân: quái chỉ sinh ở Hàn Vân, vật phẩm rơi từ quái Nguyên Anh, NPC thật; nhiệm vụ nối nói chuyện với trạm trưởng Hàn Vân", () => {
+    const dropped = new Set(NA.flatMap((m) => DROP_TABLES[m].map((d) => d.itemId)));
+    for (const id of [...CHAIN, ...DAILY])
+      for (const st of QUEST_BY_ID[id].steps) {
+        if (st.kind === "kill")
+          expect(hv.monsterCapOf(st.monster), `${id}: ${st.monster}`).toBeGreaterThan(0);
+        if (st.kind === "collect") expect(dropped.has(st.itemId), `${id}: ${st.itemId}`).toBe(true);
+        if (st.kind === "talk") expect(NPC_BY_ID[st.npcId], `${id}: ${st.npcId}`).toBeDefined();
+      }
+    expect(QUEST_BY_ID.lang_han_quan.steps).toEqual([{ kind: "talk", npcId: "tram_truong_han" }]);
+  });
+
+  it("độ khó khớp bậc: ba loài đầu nhận từ Sơ kỳ, Độc Tước đòi đạt Trung kỳ TRƯỚC khi hạ, trùm từ Trung kỳ (đội 3-4 người); mốc cảnh giới trong chuỗi chỉ tăng", () => {
+    const min = (id: string) =>
+      stepOf(QUEST_BY_ID[id].minRealm!.realm, QUEST_BY_ID[id].minRealm!.tier);
+    for (const id of ["han_lang_hoan", "phong_nha_cham", "cot_tuong_cot"])
+      expect(min(id), id).toBeGreaterThanOrEqual(stepOf(4, 0));
+    expect(QUEST_BY_ID.doc_tuoc_nang_cb.steps[0]).toEqual({
+      kind: "reachRealm",
+      realm: 4,
+      tier: 1,
+    });
+    expect(min("thien_han_hoan")).toBeGreaterThanOrEqual(stepOf(4, 1));
+    expect(min("doc_tuoc_nop")).toBeGreaterThanOrEqual(stepOf(4, 1));
+    let prev = -1;
+    for (const id of CHAIN)
+      for (const st of QUEST_BY_ID[id].steps)
+        if (st.kind === "reachRealm") {
+          expect(stepOf(st.realm, st.tier), id).toBeGreaterThan(prev);
+          prev = stepOf(st.realm, st.tier);
+        }
+    expect(prev).toBe(stepOf(4, 2));
+  });
+
+  it("thưởng tu vi chuỗi chính Nguyên Anh <= 5 % tổng thanh ba bậc (không biến nhiệm vụ thành đường tắt); nhiệm vụ lặp ~1,4 % thanh mỗi ngày như Kim Đan", () => {
+    const bars = [0, 1, 2].reduce((a, t) => a + expToNext(4, t), 0);
+    let sum = 0;
+    for (const id of CHAIN.slice(1)) sum += QUEST_BY_ID[id].rewards.exp ?? 0;
+    expect(sum / bars).toBeGreaterThan(0.03);
+    expect(sum / bars).toBeLessThanOrEqual(0.05);
+    const daily = DAILY.reduce((a, id) => a + (QUEST_BY_ID[id].rewards.exp ?? 0), 0);
+    expect(daily / bars).toBeLessThan(0.02);
+    expect(daily / bars).toBeGreaterThan(0.01);
+    // phần thưởng chỉ đồ có thật; đan cấp 3 xuất hiện trong thưởng chuỗi (phần thưởng giới thiệu đồ mới)
+    const rewarded = new Set(
+      CHAIN.flatMap((id) => (QUEST_BY_ID[id].rewards.items ?? []).map((i) => i.itemId)),
+    );
+    for (const id of rewarded) expect(ITEM_BY_ID[id], id).toBeDefined();
+    expect(NA_PILLS.some((id) => rewarded.has(id))).toBe(true);
   });
 });

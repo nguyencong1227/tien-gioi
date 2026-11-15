@@ -166,6 +166,20 @@ describe("nhiệm vụ Trúc Cơ / Kim Đan làm được từ đầu tới cu�
       "giao_hoan",
     ])
       expect(QUEST_BY_ID[id].giver, id).toBe("tram_truong");
+    // Chuỗi Nguyên Anh (M7.5c): nối sau `kim_dan_hau_ky`, nhiệm vụ nối giao ở Vọng Sương, phần còn lại ở Hàn Vân Trạm; giao_hoan (Hắc Giao, theo đội) là việc phụ
+    expect(QUEST_BY_ID.kim_dan_hau_ky.next).toBe("lang_han_quan");
+    expect(QUEST_BY_ID.lang_han_quan.giver).toBe("tram_truong");
+    expect(QUEST_BY_ID.lang_han_quan.steps).toEqual([{ kind: "talk", npcId: "tram_truong_han" }]);
+    for (const id of [
+      "han_van_len",
+      "han_lang_hoan",
+      "phong_nha_cham",
+      "cot_tuong_cot",
+      "doc_tuoc_nang_cb",
+      "nguyen_anh_hau_ky",
+      "thien_han_hoan",
+    ])
+      expect(QUEST_BY_ID[id].giver, id).toBe("tram_truong_han");
     expect(QUEST_BY_ID.thanh_lo_tram.next).toBe("vong_suong");
     expect(QUEST_BY_ID.thanh_lo_tram.steps).toEqual([{ kind: "talk", npcId: "lai_buon" }]);
   });
@@ -181,9 +195,18 @@ describe("nhiệm vụ Trúc Cơ / Kim Đan làm được từ đầu tới cu�
     // Độc Thiềm chỉ an toàn từ Trung kỳ: nhiệm vụ đòi đạt Trung kỳ TRƯỚC khi hạ
     expect(QUEST_BY_ID.doc_thiem_nang.steps[0]).toEqual({ kind: "reachRealm", realm: 3, tier: 1 });
     expect(minStep("giao_hoan")).toBeGreaterThanOrEqual(stepOf(3, 1)); // Hắc Giao: đội 3 từ Trung kỳ
+    // Nguyên Anh (M7.5c): ba loài đầu an toàn từ Sơ kỳ; Độc Tước chỉ từ Trung kỳ (nhiệm vụ đòi đạt Trung kỳ TRƯỚC khi hạ); Thiên Hàn Vương đội 3 từ Trung kỳ
+    for (const id of ["han_lang_hoan", "phong_nha_cham", "cot_tuong_cot"])
+      expect(minStep(id), id).toBeGreaterThanOrEqual(stepOf(4, 0));
+    expect(QUEST_BY_ID.doc_tuoc_nang_cb.steps[0]).toEqual({
+      kind: "reachRealm",
+      realm: 4,
+      tier: 1,
+    });
+    expect(minStep("thien_han_hoan")).toBeGreaterThanOrEqual(stepOf(4, 1));
   });
 
-  it("thưởng tu vi chuỗi chính mỗi cảnh giới Trúc Cơ / Kim Đan <= 5% tổng thanh (không biến nhiệm vụ thành đường tắt)", () => {
+  it("thưởng tu vi chuỗi chính mỗi cảnh giới Trúc Cơ / Kim Đan / Nguyên Anh <= 5% tổng thanh (không biến nhiệm vụ thành đường tắt)", () => {
     const sums = new Map<number, number>();
     for (const q of QUESTS) {
       if (q.daily || !q.rewards.exp) continue;
@@ -191,7 +214,7 @@ describe("nhiệm vụ Trúc Cơ / Kim Đan làm được từ đầu tới cu�
       const realm = reach?.kind === "reachRealm" ? reach.realm : (q.minRealm?.realm ?? 1);
       sums.set(realm, (sums.get(realm) ?? 0) + q.rewards.exp);
     }
-    for (const realm of [2, 3]) {
+    for (const realm of [2, 3, 4]) {
       const bars = [0, 1, 2].reduce((a, t) => a + expToNext(realm, t), 0);
       expect(sums.get(realm)!, `cảnh giới ${realm}`).toBeGreaterThan(0);
       expect(sums.get(realm)! / bars, `cảnh giới ${realm}`).toBeLessThanOrEqual(0.05);
