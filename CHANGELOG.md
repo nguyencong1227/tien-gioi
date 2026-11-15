@@ -4,6 +4,32 @@
 
 ## [Chưa phát hành] — M7 (Chiều sâu chiến đấu + Nguyên Anh)
 
+Bản phát hành M7 (`docs/PHAN_CONG_M7.md`; hướng đã được người dùng duyệt ở `QUYET_DINH_M3.md` mục 18-21): chiều sâu chiến đấu (chiêu thức học được theo hệ, trạng thái, quái báo trước đòn, tinh anh) và cảnh giới Nguyên Anh trọn vẹn với bản đồ thứ tư. **CHƯA phát hành: chờ người dùng nói "phát hành v0.3.0" (#515).** Phần dưới là TÓM TẮT cho người quyết định; chi tiết từng PR nằm ở hai mục "Máy chủ" và "Giao diện" kế tiếp.
+
+### Nội dung mới
+- **Chiêu thức học được (M7.1-M7.2, #502, #503):** 12 chiêu gốc theo hệ (ngũ hành và các hệ phụ), học từ kinh quyển trong Túi đồ (nút Học; chiêu tự gắn vào ô trống đầu tiên), dùng bằng thanh chiêu 6 ô (J K L U I O mở dần theo cảnh giới), xem và đổi ô ở bảng Công pháp (Shift+K). **Khắc chân linh** ở Hoàng Tuyền giữ 1-3 chiêu qua kiếp (3 nấc 40 / 100 / 220 Duyên); sang kiếp mới chiêu khắc ở tầng 1 và chưa gắn ô.
+- **Quái có hành vi và trạng thái (M7.3, #504):** lao tới / đập đất / bắn đạn đều có BÁO TRƯỚC trên đất (đi ngang ra khỏi vùng là tránh được); độc, bỏng, chảy máu, tê cóng, vỡ giáp, choáng lên cả quái và người chơi; **tinh anh** (quái thường hiếm, ★ vàng, mạnh hơn, rơi nhiều hơn).
+- **Nguyên Anh trọn vẹn (M7.5, #506):** ba bậc (thanh tu vi 288.000 / 331.200 / 380.880), bản đồ thứ tư **Hàn Vân Lĩnh** (trạm an toàn Hàn Vân Trạm, nối Âm Sương Trạch bằng cổng bắc), bốn loài quái (Hàn Lang, Phong Nha, Cốt Tượng, Độc Tước) và trùm Thiên Hàn Vương (đội 3-4 người), ba NPC, chuỗi tám nhiệm vụ chính + ba nhiệm vụ lặp, **bộ đồ IV** năm món rèn có phí (tổng 43.500 Linh thạch) và đan cấp 3.
+- **Ba ô trang bị mới (M7.4, #505):** hài, ngọc bội, pháp bảo (pháp bảo mở từ Kim Đan); chỉ số mới bạo kích, giảm hồi chiêu, giáp; độ hiếm hiện không chỉ bằng màu (◆ ◆◆ ◆◆◆ ★).
+- **Giao diện và âm thanh:** bảng nhân vật 6 ô, hiệu ứng từng chiêu theo hệ + hình, đạn bay thấy được, âm thanh chiêu / đạn / trạng thái tổng hợp bằng mã (không thêm gói âm thanh); cửa sổ chuột thấp (màn 720p, laptop 1366x768) nay dùng giao diện máy tính; menu 7 nút gộp vào nút ☰ dưới 620 px; chỉ dẫn mở màn nói bằng NÚT cho người chơi cảm ứng.
+
+### Giao thức và dữ liệu lưu
+- **`PROTOCOL_VERSION` 2 -> 3** (`shared/src/protocol.ts`): tin chiêu thức (`cast` / `skillSlot` / `skills` / `status`), hiệu ứng `warn` / `bolt`, kinh quyển, hành vi quái, bản đồ + vật phẩm mới: client cũ không hiểu. `MIN_PROTOCOL_VERSION` mặc định vẫn 0; **lúc phát hành đặt `MIN_PROTOCOL_VERSION=3`** trong `.env.production` để client / APK 0.2.x nhận mã 426 "có bản mới" thay vì chạy sai.
+- Trường công khai mới của quái ở `schema.ts`: `Monster.fx` (mặt nạ trạng thái có hại) và `Monster.elite`. Người chơi KHÔNG có trường trạng thái công khai (chỉ chủ nhận `status`; cố ý, vì băng thông).
+- **Tệp lưu cũ vẫn nạp được:** sổ chiêu thiếu thì thành sổ rỗng, đồ và chân linh nạp qua hàm làm sạch; `kiem-save` chạy bốn bản đồ, test Colyseus thật qua cổng ba -> bốn và ca tệp lưu CŨ thiếu `skills` đi chuỗi bốn bản đồ (0 lỗi, #680). Bản đồ cũ không đổi một ô nào.
+
+### Cân bằng (`docs/CAN_BANG.md`, mô phỏng bằng mã server thật)
+- Nhịp cả cảnh giới Nguyên Anh **6,1 giờ** solo (mục tiêu 6-9 giờ, `docs/PHAN_CONG_M7.md` mục 10); săn solo ~124.000-195.000 tu vi / giờ tuỳ bậc và loài; **Độc Tước không an toàn solo ở Sơ kỳ** (mất ~65 % khí huyết mỗi trận), từ Trung kỳ làm được. Bộ IV 43.500 Linh thạch ~ 2,1 giờ thu nhập Sơ kỳ (mục "Kinh tế Nguyên Anh").
+- Có hai câu hỏi cân bằng CHƯA được người dùng trả lời, A đã chọn mặc định (xem `questions.md`): Linh thạch dư ~168.000 sau khi rèn xong bộ IV, và tinh anh Độc Tước giết người solo.
+
+### Đo và kiểm
+- `npm test` 4244 test qua (238 tệp); `e2e:all` chạy một lệnh 22 kịch bản E2E bằng Chrome thật + máy chủ Colyseus thật (22 / 22 xanh khi C chạy, #696); `perf:mobile` 22 hàng 0 VƯỢT (có Hàn Vân); `leak:test` qua bốn bản đồ; bench bốn bản đồ đồng thời trong ngân sách (tick < 10 ms, patch < 520 byte / tick mỗi client).
+
+### Cần biết khi phát hành
+- Người chơi web chỉ cần tải lại trang. **APK `v0.2.x` phải cài lại** (`release.yml` dựng APK debug khi gắn thẻ).
+- Thứ tự vận hành (`deploy/prod.sh`, bản dry-run của C ở #515): `backup` -> `up 0.3.0` -> `smoke`; hỏng thì `rollback`, hỏng dữ liệu thì `restore <bản sao lưu>`.
+- **Chưa làm / chưa đo:** 6 chiêu Nguyên Anh đợt 2 (#654, Dev D chưa bắt đầu; hiện Nguyên Anh dùng 12 chiêu có sẵn), nghề nhỏ luyện đan + chế phù (#514, tuỳ), ảnh AI SDXL (#513, chờ người dùng). Âm thanh chiêu CHƯA nghe bằng tai (không loa); **"Android tầm trung >= 50 FPS" và điện thoại thật CHƯA đo / thử** (chỉ Chrome headless).
+
 ### Máy chủ
 - **Nhiệm vụ 'Bước vào tiên đồ' thưởng quyển Hỏa Vân Kiếm Pháp (M7.4, #505):** người mới lên Luyện Khí tầng 1 nhận ngay kinh quyển đầu tiên, mở Túi đồ, chọn quyển rồi bấm Học (chiêu tự gắn vào thanh chiêu) mà không phải cày Linh thạch mua ở tiệm.
 - **Tinh anh (M7.3 bước 6, #504):** quái thường hiếu chiến (không trùm, không Linh Thố hiền) ở bản đồ thường hiếm khi (4 %, tối đa 3 con mỗi bản đồ) sinh ra là tinh anh: khí huyết x2,5, công x1,5; hạ được thì tu vi x2, tiền rơi x2 và tung bảng rơi đồ thêm một lần. Từ Kim Đan, tinh anh đủ sức giết người đứng yên (phải né báo trước đòn, uống đan hoặc đi theo đội); client vẽ viền / tên tinh anh ở việc riêng của B.
