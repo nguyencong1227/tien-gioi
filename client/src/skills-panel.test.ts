@@ -14,6 +14,9 @@ import {
   effectText,
   fmtNum,
   lockedSlotToast,
+  nextOpenSkill,
+  resolveOpenSkill,
+  rowAria,
   slotMessage,
   statLines,
 } from "./skills-panel";
@@ -194,6 +197,26 @@ describe("buildSkillsPanel: mô hình bảng", () => {
     expect(buildSkillsPanel(t, { realm: 2, tier: 0, mp: 9, maxMp: 9 }).rows[0].need).toBeNull();
   });
 
+  it("hàng GỌN: nhãn ô ('Ô 2' / 'Chưa gắn'), dòng phụ 'hệ · tầng', aria-label đọc đủ", () => {
+    const m = buildSkillsPanel(tracker(), ME);
+    const [hoa, bang] = m.rows;
+    expect(hoa.slotLabel).toBe("Ô 2");
+    expect(hoa.sub).toBe("Hỏa · tầng 2");
+    expect(hoa.aria).toBe("Hỏa Vân Kiếm, hệ Hỏa, tầng 2 trên 3, đang ở ô 2");
+    expect(bang.slotLabel).toBe("Chưa gắn");
+    expect(bang.sub).toBe("Băng · tầng 1");
+    expect(bang.aria).toBe("Huyền Băng Chỉ, hệ Băng, tầng 1 trên 3, chưa gắn ô");
+  });
+
+  it("hàng gọn của chiêu thiếu cảnh giới: aria nói điều kiện, nhãn ô vẫn đúng", () => {
+    const t = tracker({ learned: { [TUNG]: 1 }, slots: [TUNG, "", "", ""] });
+    const row = buildSkillsPanel(t, { realm: 1, tier: 3, mp: 9, maxMp: 9 }).rows[0];
+    expect(row.slotLabel).toBe("Ô 2");
+    expect(row.aria).toBe(
+      "Thanh Tùng Phi Châm, hệ Mộc, tầng 1 trên 3, đang ở ô 2, cần đạt Trúc Cơ",
+    );
+  });
+
   it("số trong bảng khớp hàm của máy chủ theo tầng của TỪNG chiêu và linh lực tối đa", () => {
     const m = buildSkillsPanel(tracker(), { ...ME, maxMp: 2000 });
     const def = skillOf(HOA)!;
@@ -221,5 +244,30 @@ describe("tin gắn ô và thông báo", () => {
     expect(lockedSlotToast(5, { realm: 3 })).toBe("Ô chiêu thức 5 chưa mở: Mở ở Nguyên Anh.");
     expect(lockedSlotToast(4, { realm: 3 })).toBeNull();
     expect(lockedSlotToast(2, { realm: 0 })).toBe("Ô chiêu thức 2 chưa mở: Mở ở Luyện Khí.");
+  });
+});
+
+describe("hàng gọn: rowAria / mở một chi tiết mỗi lúc", () => {
+  it("rowAria bỏ phần hệ khi thiếu, không lặp dấu phẩy, nhãn đọc được không dùng chấm tầng", () => {
+    expect(rowAria("Chiêu A", "", 3, null, null)).toBe("Chiêu A, tầng 3 trên 3, chưa gắn ô");
+    expect(rowAria("Chiêu A", "Lôi", 1, 4, "Cần đạt Kim Đan")).toBe(
+      "Chiêu A, hệ Lôi, tầng 1 trên 3, đang ở ô 4, cần đạt Kim Đan",
+    );
+    expect(rowAria("Chiêu A", "Lôi", 1, 4, null)).not.toMatch(/[●○]/);
+  });
+
+  it("nextOpenSkill: bấm hàng đang mở thì gập, bấm hàng khác thì chuyển; chỉ một hàng mở", () => {
+    expect(nextOpenSkill(null, HOA)).toBe(HOA);
+    expect(nextOpenSkill(HOA, HOA)).toBeNull();
+    expect(nextOpenSkill(HOA, BANG)).toBe(BANG);
+    expect(nextOpenSkill(nextOpenSkill(null, HOA), BANG)).toBe(BANG);
+  });
+
+  it("resolveOpenSkill: hàng đang mở không còn trong danh sách (sổ chiêu đổi) thì coi như gập", () => {
+    const rows = [{ id: HOA }, { id: BANG }];
+    expect(resolveOpenSkill(HOA, rows)).toBe(HOA);
+    expect(resolveOpenSkill("khong_co", rows)).toBeNull();
+    expect(resolveOpenSkill(null, rows)).toBeNull();
+    expect(resolveOpenSkill(HOA, [])).toBeNull();
   });
 });
