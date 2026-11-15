@@ -401,15 +401,23 @@ npm run e2e:all -w server
 # Chạy có tự động build client trước nếu có thay đổi
 npm run e2e:all -w server -- --build
 
-# Chỉ chạy một số kịch bản cụ thể (--only hoặc -o)
+# Chỉ chạy một số kịch bản cụ thể (--only hoặc -o; ưu tiên khớp chính xác trước khi rơi về chuỗi con)
 npm run e2e:all -w server -- --only noi-lai,chat-luong
 
 # Bỏ qua một số kịch bản (--skip hoặc -s)
 npm run e2e:all -w server -- --skip map,dpr
 
-# Tùy chỉnh timeout (giây) và thư mục lưu nhật ký (logs)
+# Tắt cơ chế thử lại (thất bại là kết luận ĐỎ ngay)
+npm run e2e:all -w server -- --no-retry
+
+# Xem trước danh sách kịch bản sẽ chạy mà không thực thi và không tạo thư mục log
+npm run e2e:all -w server -- --dry-run
+
+# Tùy chỉnh timeout (giây) và thư mục lưu nhật ký (mặc định là $TMPDIR/tien-gioi-e2e-<thời-gian>/)
 npm run e2e:all -w server -- --timeout 180 --logs /tmp/e2e-run
 ```
+
+Toàn bộ nhật ký chi tiết từng kịch bản và bảng tổng kết Markdown được tự động ghi vào tệp `REPORT.md` bên trong thư mục nhật ký.
 
 ### 10.2. Cơ chế Thử lại & Phân loại Kết quả
 - **XANH (PASS):** Script hoàn thành thành công 100% ngay ở lần chạy đầu tiên.

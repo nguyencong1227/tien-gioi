@@ -1,5 +1,6 @@
-// Bộ chạy toàn bộ 23 script E2E của Tiên Giới một lệnh (M7.16, Issue #694).
+// Bộ chạy toàn bộ 22 script E2E của Tiên Giới một lệnh (M7.16, Issue #694).
 // Chạy TUẦN TỰ từng script e2e:* (đọc từ server/package.json), timeout mỗi script,
+// tự động dọn sạch toàn bộ cây tiến trình con cháu (tránh mồ côi Chrome detached),
 // tự động thử lại 1 lần nếu đỏ (xanh ở lần 2 -> FLAKY), in bảng kết quả Markdown,
 // trích dẫn 3-5 dòng log cuối của script đỏ, và ghi log đầy đủ từng script vào thư mục.
 //
@@ -10,6 +11,7 @@
 //   npm run e2e:all -w server -- --timeout 180 --logs /tmp/e2e-run
 //   npm run e2e:all -w server -- --build
 //   npm run e2e:all -w server -- --dry-run
+//   npm run e2e:all -w server -- --no-retry
 import { spawn, execSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import os from "node:os";
@@ -50,16 +52,21 @@ export function getE2eScripts(pkgJson: { scripts?: Record<string, string> }): st
   );
 }
 
-function matchFilter(script: string, filterItem: string): boolean {
-  const cleanFilter = filterItem.trim().toLowerCase();
-  if (!cleanFilter) return false;
+function isExactMatch(script: string, filterItem: string): boolean {
+  const clean = filterItem.trim().toLowerCase();
+  if (!clean) return false;
   const sLower = script.toLowerCase();
-  // Khớp chính xác, chứa trong chuỗi, hoặc khớp phần sau e2e:
   const suffix = sLower.replace(/^e2e:?/, "");
-  return sLower === cleanFilter || sLower.includes(cleanFilter) || suffix === cleanFilter;
+  return sLower === clean || suffix === clean;
 }
 
-/** Lọc danh sách script theo --only và --skip */
+function isSubstringMatch(script: string, filterItem: string): boolean {
+  const clean = filterItem.trim().toLowerCase();
+  if (!clean) return false;
+  return script.toLowerCase().includes(clean);
+}
+
+/** Lọc danh sách script theo --only và --skip (ưu tiên khớp chính xác trước khi rơi về chuỗi con) */
 export function filterScripts(
   allScripts: string[],
   options: { only?: string[]; skip?: string[] },
@@ -69,14 +76,39 @@ export function filterScripts(
 
   let candidates = allScripts;
   if (only.length > 0) {
-    candidates = allScripts.filter((script) => only.some((f) => matchFilter(script, f)));
+    const selectedOnly = new Set<string>();
+    for (const item of only) {
+      // Ưu tiên khớp chính xác trước (tên đầy đủ hoặc phần sau e2e:)
+      const exact = allScripts.filter((s) => isExactMatch(s, item));
+      if (exact.length > 0) {
+        for (const s of exact) selectedOnly.add(s);
+      } else {
+        // Chỉ rơi về chuỗi con khi không có khớp chính xác nào
+        const sub = allScripts.filter((s) => isSubstringMatch(s, item));
+        for (const s of sub) selectedOnly.add(s);
+      }
+    }
+    candidates = allScripts.filter((s) => selectedOnly.has(s));
+  }
+
+  const skipSet = new Set<string>();
+  if (skip.length > 0) {
+    for (const item of skip) {
+      const exact = allScripts.filter((s) => isExactMatch(s, item));
+      if (exact.length > 0) {
+        for (const s of exact) skipSet.add(s);
+      } else {
+        const sub = allScripts.filter((s) => isSubstringMatch(s, item));
+        for (const s of sub) skipSet.add(s);
+      }
+    }
   }
 
   const selected: string[] = [];
   const skipped: string[] = [];
 
   for (const script of candidates) {
-    if (skip.some((f) => matchFilter(script, f))) {
+    if (skipSet.has(script)) {
       skipped.push(script);
     } else {
       selected.push(script);
@@ -264,7 +296,117 @@ export function formatFailureDetails(results: ScriptResult[]): string {
   return sections.join("\n");
 }
 
-/** Chạy một lần script bằng npm run và bắt log + timeout */
+/**
+ * Phân tích đầu ra `ps -eo pid=,ppid=,pgid=` để tìm tất cả các PGID con cháu của một rootPid.
+ * Hàm thuần (pure function) để dễ dàng kiểm thử không phụ thuộc môi trường chạy.
+ */
+export function findDescendantPgids(
+  psOutput: string,
+  rootPid: number,
+  selfPids: Set<number> = new Set(),
+): number[] {
+  const childrenMap = new Map<number, number[]>();
+  const pgidMap = new Map<number, number>();
+
+  const lines = psOutput.split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const parts = trimmed.split(/\s+/);
+    if (parts.length < 3) continue;
+    const pid = Number(parts[0]);
+    const ppid = Number(parts[1]);
+    const pgid = Number(parts[2]);
+    if (!Number.isInteger(pid) || !Number.isInteger(ppid) || !Number.isInteger(pgid)) continue;
+
+    pgidMap.set(pid, pgid);
+    let children = childrenMap.get(ppid);
+    if (!children) {
+      children = [];
+      childrenMap.set(ppid, children);
+    }
+    children.push(pid);
+  }
+
+  // Duyệt BFS tìm toàn bộ con cháu của rootPid
+  const visited = new Set<number>();
+  const queue = [rootPid];
+  const descendantPgids = new Set<number>();
+
+  while (queue.length > 0) {
+    const curr = queue.shift()!;
+    const children = childrenMap.get(curr) ?? [];
+    for (const child of children) {
+      if (!visited.has(child)) {
+        visited.add(child);
+        queue.push(child);
+        const childPgid = pgidMap.get(child);
+        if (childPgid && childPgid !== rootPid && !selfPids.has(childPgid)) {
+          descendantPgids.add(childPgid);
+        }
+      }
+    }
+  }
+
+  return Array.from(descendantPgids);
+}
+
+/**
+ * Tiêu diệt triệt để cây tiến trình của một rootPid (bao gồm cả các tiến trình con spawn detached như Chrome).
+ * Thực hiện SIGKILL ngay lập tức tới các nhóm con cháu để ngăn chặn việc bị reparent về init/systemd.
+ */
+export async function killProcessTree(
+  rootPid: number,
+  options?: { psCommandOutput?: string },
+): Promise<void> {
+  let psOutput = options?.psCommandOutput;
+  if (psOutput === undefined) {
+    try {
+      psOutput = execSync("ps -eo pid=,ppid=,pgid=", { encoding: "utf-8" });
+    } catch {
+      psOutput = "";
+    }
+  }
+
+  const selfPids = new Set<number>();
+  if (process.pid) selfPids.add(process.pid);
+  const getpgrp = (process as unknown as { getpgrp?: () => number }).getpgrp;
+  if (typeof getpgrp === "function") {
+    try {
+      selfPids.add(getpgrp());
+    } catch {
+      // Bỏ qua lỗi đọc process group
+    }
+  }
+
+  const descendantPgids = findDescendantPgids(psOutput, rootPid, selfPids);
+
+  // 1. Tiêu diệt NGAY LẬP TỨC các nhóm tiến trình con cháu (Chrome, sub-workers...) bằng SIGKILL
+  for (const pgid of descendantPgids) {
+    try {
+      process.kill(-pgid, "SIGKILL");
+    } catch {
+      // Bỏ qua lỗi kill nhóm nếu đã thoát
+    }
+  }
+
+  // 2. Tiêu diệt nhóm tiến trình gốc của npm/tsx
+  try {
+    process.kill(-rootPid, "SIGKILL");
+  } catch {
+    // Bỏ qua lỗi kill nhóm gốc
+  }
+  try {
+    process.kill(rootPid, "SIGKILL");
+  } catch {
+    // Bỏ qua lỗi kill rootPid
+  }
+
+  // Chờ ngắn để kernel hoàn tất thu hồi tài nguyên tiến trình
+  await new Promise((r) => setTimeout(r, 100));
+}
+
+/** Chạy một lần script bằng npm run (hoặc command tuỳ chọn) và bắt log + timeout */
 export function executeScriptOnce(
   scriptName: string,
   options: {
@@ -272,20 +414,25 @@ export function executeScriptOnce(
     timeoutSec: number;
     logFile: string;
     attempt: number;
+    command?: { cmd: string; args: string[] };
+    graceMs?: number;
   },
 ): Promise<{ exitCode: number | null; durationSec: number; log: string; timedOut: boolean }> {
   return new Promise((resolve) => {
     const startTime = Date.now();
     let timedOut = false;
     let logBuffer = "";
+    let cleanupPromise: Promise<void> | null = null;
 
-    const cp = spawn("npm", ["run", scriptName, "-w", "server"], {
+    const cmd = options.command?.cmd ?? "npm";
+    const args = options.command?.args ?? ["run", scriptName, "-w", "server"];
+
+    const cp = spawn(cmd, args, {
       cwd: options.cwd,
       stdio: ["ignore", "pipe", "pipe"],
-      detached: true, // tạo process group để kill toàn bộ cây khi timeout
+      detached: true, // tạo process group để quản lý
       env: {
         ...process.env,
-        // Đảm bảo không bị nuốt ANSI nếu cần, nhưng log nên sạch
         FORCE_COLOR: "0",
       },
     });
@@ -300,21 +447,24 @@ export function executeScriptOnce(
 
     const timer = setTimeout(() => {
       timedOut = true;
-      try {
-        if (cp.pid) {
-          // Kill toàn bộ process group (âm pid)
-          process.kill(-cp.pid, "SIGKILL");
-        }
-      } catch {
-        // Bỏ qua lỗi nếu process đã chết
+      if (cp.pid) {
+        cleanupPromise = killProcessTree(cp.pid);
       }
     }, options.timeoutSec * 1000);
 
-    cp.on("close", (code) => {
+    cp.on("close", async (code) => {
       clearTimeout(timer);
+      if (cleanupPromise) {
+        try {
+          await cleanupPromise;
+        } catch {
+          // Bỏ qua lỗi dọn dẹp
+        }
+      }
+
       const durationSec = (Date.now() - startTime) / 1000;
       if (timedOut) {
-        logBuffer += `\n[TIMEOUT] Script chạy quá giới hạn ${options.timeoutSec}s và đã bị dừng.\n`;
+        logBuffer += `\n[TIMEOUT] Script chạy quá giới hạn ${options.timeoutSec}s và đã bị dừng (đã dọn cây tiến trình).\n`;
       }
 
       // Ghi log ra file
@@ -380,6 +530,21 @@ export async function runE2eAll(args: string[] = process.argv.slice(2)): Promise
   }
   out(`Timeout mỗi script: ${options.timeoutSec}s | Thư mục logs: ${options.logsDir}`);
 
+  // Nếu là dry-run, in kế hoạch và kết thúc ngay không tạo thư mục log và không build
+  if (options.dryRun) {
+    out("\n[DRY RUN] Các script sẽ chạy:");
+    for (let i = 0; i < selected.length; i++) {
+      out(`  ${i + 1}. ${selected[i]}`);
+    }
+    if (skipped.length > 0) {
+      out("[DRY RUN] Các script bị bỏ qua:");
+      for (const s of skipped) {
+        out(`  - ${s}`);
+      }
+    }
+    return 0;
+  }
+
   // Kiểm tra client/dist
   const distCheck = checkClientDist(repoRoot);
   if (options.build || distCheck.outdated) {
@@ -397,20 +562,6 @@ export async function runE2eAll(args: string[] = process.argv.slice(2)): Promise
   // Tạo thư mục log
   if (!existsSync(options.logsDir)) {
     mkdirSync(options.logsDir, { recursive: true });
-  }
-
-  if (options.dryRun) {
-    out("\n[DRY RUN] Các script sẽ chạy:");
-    for (let i = 0; i < selected.length; i++) {
-      out(`  ${i + 1}. ${selected[i]}`);
-    }
-    if (skipped.length > 0) {
-      out("[DRY RUN] Các script bị bỏ qua:");
-      for (const s of skipped) {
-        out(`  - ${s}`);
-      }
-    }
-    return 0;
   }
 
   const results: ScriptResult[] = [];
