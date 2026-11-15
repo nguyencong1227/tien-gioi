@@ -16,7 +16,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { MIN_FX_PLAYED } from "./fx-driver.mjs";
+import {
+  FX_PLANS,
+  MIN_CASTS_EMITTED,
+  MIN_CAST_CALLS,
+  MIN_CAST_PLAYED,
+  MIN_FX_PLAYED,
+} from "./fx-driver.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const REPO = path.resolve(path.dirname(__filename), "../..");
@@ -111,6 +117,9 @@ export function evaluatePerfResults(results, budget, { timeSlack = 1 } = {}) {
     row.fxPlan = fx ? String(r.fxPlan) : null;
     row.fxPlayed = r.fxPlayed;
     row.fxDropped = r.fxDropped;
+    row.castsEmitted = r.castsEmitted;
+    row.castPlayed = r.castPlayed;
+    row.castRejected = r.castRejected;
     row.particlesPeak = r.particlesPeak;
     row.emittersPeak = r.emittersPeak;
     row.floatsPeak = r.floatsPeak;
@@ -147,6 +156,22 @@ export function evaluatePerfResults(results, budget, { timeSlack = 1 } = {}) {
         });
         row.bad.push("bắn hiệu ứng quá ít");
       } else {
+        // Kế hoạch `*-cast` (#515): phải CÓ bằng chứng chiêu thật chạy tới hạt (tin cast đã gửi VÀ game thật đã gọi `FxSystem.play` của `cast-*`), nếu không
+        // đường onFx -> planCastFx hỏng hoặc bộ bắn không cast được mà gate vẫn xanh vì đỉnh "đo được" chỉ do Kiếm khí
+        if (FX_PLANS[r.fxPlan]?.castMs) {
+          const calls =
+            isNum(r.castPlayed) && isNum(r.castRejected) ? r.castPlayed + r.castRejected : null;
+          for (const [metric, actual, min] of [
+            ["số tin cast đã gửi", r.castsEmitted, MIN_CASTS_EMITTED],
+            ["số lần game gọi play cho công thức cast-*", calls, MIN_CAST_CALLS],
+            ["số lần game phát được công thức cast-*", r.castPlayed, MIN_CAST_PLAYED],
+          ]) {
+            if (!(isNum(actual) && actual >= min)) {
+              violations.push({ id, metric, actual: String(actual), limit: `số >= ${min}` });
+              row.bad.push(`${metric} quá ít`);
+            }
+          }
+        }
         for (const [metric, peak] of [
           ["đỉnh hạt (fx)", r.particlesPeak],
           ["đỉnh emitter (fx)", r.emittersPeak],
@@ -204,7 +229,10 @@ function fxCell(r) {
   const f = (v) => (v === undefined || v === null ? "?" : String(v));
   const hardP = isNum(r.particleLimit) ? r.particleLimit * OWN_OVERSHOOT : "?";
   const hardE = isNum(r.emitterLimit) ? r.emitterLimit * OWN_OVERSHOOT : "?";
-  return `${r.fxPlan}: ${f(r.fxPlayed)} / ${f(r.fxDropped)}; ${f(r.particlesPeak)}/${f(hardP)} · ${f(r.emittersPeak)}/${f(hardE)} · ${f(r.floatsPeak)}/${f(r.floatsLimit)}`;
+  const cast = FX_PLANS[r.fxPlan]?.castMs
+    ? `; cast ${f(r.castsEmitted)} gửi / ${f(r.castPlayed)} phát / ${f(r.castRejected)} bỏ`
+    : "";
+  return `${r.fxPlan}: ${f(r.fxPlayed)} / ${f(r.fxDropped)}; ${f(r.particlesPeak)}/${f(hardP)} · ${f(r.emittersPeak)}/${f(hardE)} · ${f(r.floatsPeak)}/${f(r.floatsLimit)}${cast}`;
 }
 
 /** Bản tóm tắt Markdown (job summary của GitHub Actions). */

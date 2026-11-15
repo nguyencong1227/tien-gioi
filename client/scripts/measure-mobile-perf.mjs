@@ -260,6 +260,33 @@ export const ALL_SCENARIOS = [
     cpuRate: 4,
     fx: "boss",
   },
+  // 18 chiêu liên tục (#515, đề xuất của B sau #722; A đồng ý): kế hoạch `*-cast` thêm HIỆU ỨNG DÙNG CHIÊU của cả 18 chiêu (cứ 300 ms, hai trong ba lần là của mình) qua đường
+  // thật `fx {kind: "cast"}` -> `onFx` -> `planCastFx` -> `FxSystem.play` (xem fx-driver.mjs). Trước đây `burst` / `boss` chỉ bắn Kiếm khí nên perf-gate không kiểm chiêu M7.
+  // Bậc Thấp (trần chặt nhất: 120 hạt / 8 emitter, ca xấu nhất là trận trùm) và Cao (trùm). Trần gate KHÔNG nới.
+  {
+    id: "burst-cast-low-4x",
+    name: "Đòn dồn dập + 18 chiêu liên tục",
+    query: "duel=mock&debug=1&perf=1",
+    tier: "low",
+    cpuRate: 4,
+    fx: "burst-cast",
+  },
+  {
+    id: "boss-cast-low-4x",
+    name: "Đánh trùm + 18 chiêu liên tục",
+    query: "duel=mock&debug=1&perf=1",
+    tier: "low",
+    cpuRate: 4,
+    fx: "boss-cast",
+  },
+  {
+    id: "boss-cast-high-4x",
+    name: "Đánh trùm + 18 chiêu liên tục",
+    query: "duel=mock&debug=1&perf=1",
+    tier: "high",
+    cpuRate: 4,
+    fx: "boss-cast",
+  },
   // Chế độ bí cảnh (dungeon)
   {
     id: "dungeon-mid-4x",
@@ -523,6 +550,10 @@ try {
         floatsPeak: fxReport?.floatsPeak ?? null,
         fxAdmitted: fxReport?.fxAdmitted ?? null,
         fxDropped: fxReport?.fxDropped ?? null,
+        // Kế hoạch `*-cast`: số tin cast đã gửi, số lần game thật phát / từ chối công thức cast-* (null nếu kế hoạch không cast)
+        castsEmitted: fxReport?.castsEmitted ?? null,
+        castPlayed: fxReport?.castPlayed ?? null,
+        castRejected: fxReport?.castRejected ?? null,
         particles,
         particleLimit,
         emitters,
