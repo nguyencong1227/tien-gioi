@@ -2,12 +2,14 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 /* global console, setTimeout, fetch, process, Buffer */
 // Kiểm BẢNG TRANG BỊ SÁU Ô (M7.4 #505, `client/src/equip-panel.ts` + `ui.ts`) trong Chrome THẬT (`?skills=mock`, không cần máy chủ):
 // đặt `boots / jade / treasure / realm` thẳng lên `__scene.me()` (hud chạy mỗi khung nên ghi đè được ngay) và nhập `ITEM_BY_ID` của chính trang để thêm món thử
-// (chưa có món thật cho ba ô riêng, sẽ vào ở PR server). Đo DOM + kiểu tính toán + toạ độ thật:
+// (các ca A-H dùng món thử `zz_*` để ép trần / dữ liệu lạ; ca I dùng MỌI món THẬT của ba ô riêng có trong `ITEMS`, M7.4 #590 / #594 / #624). Đo DOM + kiểu tính toán + toạ độ thật:
 //  - lưới 3 x 2 đúng thứ tự (Vũ khí, Pháp bào, Hộ phù / Hài, Ngọc bội, Pháp bảo), không tràn khung, mỗi thẻ cao >= 44 px;
 //  - ô trống viền nét đứt; ô pháp bảo KHOÁ trước Kim Đan (ổ khoá, "Mở ở Kim Đan", aria-disabled, vẫn focus được, bấm ra thông báo), mở từ Kim Đan;
 //  - ba dòng chỉ số % (bạo kích, giảm hồi chiêu, giáp) lấy từ statsFor, chạm trần ghi "(tối đa)", xem trước ghi ▲ / ▼ kèm số, đã ở trần ghi "đã tối đa";
 //  - so sánh cùng ô "Đang mặc: cũ → mới"; nút Mặc của pháp bảo trước Kim Đan bị khoá kèm lý do; bấm ô trống nhảy tới món hợp ô trong túi;
-//  - dữ liệu lạ (số, "constructor") không làm vỡ; không dựng lại DOM khi không đổi gì; 0 lỗi JS.
+//  - dữ liệu lạ (số, "constructor") không làm vỡ; không dựng lại DOM khi không đổi gì; 0 lỗi JS;
+//  - ĐỒ THẬT (ca I): mỗi món hài / ngọc bội / pháp bảo trong `ITEMS` mặc vào thẻ đúng ô: tên thẻ = tên món, thẻ "filled" (pháp bảo mở từ Kim Đan), gợi ý chứa ĐỦ từng chỉ số
+//    (số + nhãn), ba dòng % khớp chỉ số của món, pháp bảo mang NGUYÊN VĂN câu nội tại của `TREASURES` ở title + aria, không chữ undefined / NaN, tên không bị cắt, chữ nằm trong thẻ.
 // Có thể chụp ảnh: `--shots <thư mục>`. Cần client đang chạy (`npm run dev -w client`, cổng của dev B là 5183).
 //   node client/scripts/check-equip-six.mjs [--url http://127.0.0.1:5183] [--shots /tmp/tg-b-shots]
 import fs from "node:fs";
@@ -470,6 +472,128 @@ try {
       "id 'constructor' / số / object / '__proto__' về Trống",
     );
     await setMe({ boots: "", jade: "", treasure: "", weapon: "" });
+
+    // ---- I. ĐỒ THẬT: mọi món hài / ngọc bội / pháp bảo trong ITEMS (#590 / #594 / #624) --------------------------------------
+    const real = JSON.parse(
+      await evalJs(`import(${JSON.stringify(SHARED)}).then((m) => JSON.stringify(m.ITEMS.filter((i) => i.equip && ['boots', 'jade', 'treasure'].includes(i.equip.slot)).map((i) => ({
+        id: i.id, name: i.name, slot: i.equip.slot, stats: i.equip.stats, reqRealm: i.equip.reqRealm, reqTier: i.equip.reqTier, treasure: i.equip.treasure ?? null,
+        desc: i.equip.treasure ? (m.treasureOf(i.equip.treasure)?.desc ?? null) : null, rarity: i.rarity }))))`),
+    );
+    check(
+      real.length >= 16 &&
+        real.filter((r) => r.slot === "boots").length >= 5 &&
+        real.filter((r) => r.slot === "jade").length >= 5 &&
+        real.filter((r) => r.slot === "treasure").length >= 6,
+      `có đồ THẬT cho ba ô riêng: ${real.filter((r) => r.slot === "boots").length} hài, ${real.filter((r) => r.slot === "jade").length} ngọc, ${real.filter((r) => r.slot === "treasure").length} pháp bảo`,
+    );
+    const SLOT_IDX = { boots: 3, jade: 4, treasure: 5 };
+    const STAT_TEXT = {
+      atk: ["Công", ""],
+      hp: ["Khí huyết", ""],
+      mp: ["Linh lực", ""],
+      speed: ["Tốc độ", ""],
+      crit: ["Bạo kích", "%"],
+      cdr: ["Giảm hồi chiêu", "%"],
+      guard: ["Giáp", "%"],
+    };
+    const BAD = /undefined|NaN|\[object|null/;
+    let realOk = 0;
+    const realBad = [];
+    for (const it of real) {
+      // đủ cảnh giới của món và từ Kim Đan (realm 3) để pháp bảo mở
+      await setMe({
+        realm: Math.max(it.reqRealm, 3),
+        tier: it.reqTier,
+        boots: "",
+        jade: "",
+        treasure: "",
+        [it.slot]: it.id,
+      });
+      const cs =
+        await J(`[...document.querySelectorAll('#char-equip-slots .equip-slot-card')].map((el) => {
+        const r = el.getBoundingClientRect(); const n = el.querySelector('.slot-item-name'), h = el.querySelector('.slot-hint');
+        const nr = n.getBoundingClientRect(), hr = h.getBoundingClientRect();
+        return { name: n.textContent, hint: h.textContent, cls: el.className, title: el.title, aria: el.getAttribute('aria-label') || '',
+          nameClipped: n.scrollWidth > n.clientWidth + 1, hintClipped: h.scrollHeight > h.clientHeight + 1,
+          inside: nr.left >= r.left - 1 && nr.right <= r.right + 1 && hr.left >= r.left - 1 && hr.right <= r.right + 1 && hr.bottom <= r.bottom + 1 && nr.top >= r.top - 1 };
+      })`);
+      const card = cs[SLOT_IDX[it.slot]];
+      const want = Object.entries(it.stats ?? {})
+        .filter(([, v]) => v > 0)
+        .map(([k, v]) => `+${v}${STAT_TEXT[k][1]} ${STAT_TEXT[k][0]}`);
+      const pp = await pct();
+      const wantPct = ["crit", "cdr", "guard"].map((k) => `${it.stats?.[k] ?? 0}%`);
+      const gotPct = ["crit", "cdr", "guard"].map((k) => pp[k]?.val);
+      const problems = [];
+      if (card.name !== it.name) problems.push(`tên thẻ "${card.name}"`);
+      if (!card.cls.includes("filled") || card.cls.includes("locked"))
+        problems.push("thẻ không filled / bị khoá");
+      for (const w of want)
+        if (!card.hint.includes(w)) problems.push(`gợi ý thiếu "${w}" ("${card.hint}")`);
+      if (it.desc && !(card.title.includes(it.desc) && card.aria.includes(it.desc)))
+        problems.push("title / aria thiếu NGUYÊN VĂN câu nội tại");
+      if (JSON.stringify(gotPct) !== JSON.stringify(wantPct))
+        problems.push(`ba dòng % ${gotPct.join("/")} != ${wantPct.join("/")}`);
+      if (BAD.test(card.name + card.hint + card.title + card.aria))
+        problems.push("có chữ undefined / NaN / null");
+      if (card.nameClipped) problems.push("tên bị cắt (ellipsis)");
+      if (card.hintClipped) problems.push("gợi ý bị cắt");
+      if (!card.inside) problems.push("chữ tràn ra ngoài thẻ");
+      if (problems.length === 0) realOk++;
+      else realBad.push(`${it.id}: ${problems.join("; ")}`);
+    }
+    check(
+      realBad.length === 0,
+      realBad.length === 0
+        ? `${realOk} / ${real.length} món THẬT (hài, ngọc, pháp bảo) hiện đúng thẻ, chỉ số, nội tại, không bị cắt`
+        : `món THẬT hỏng ${realBad.length}: ${realBad.slice(0, 4).join(" | ")}`,
+    );
+    // chi tiết túi của từng món thật: mô tả + so sánh + tên bậc không có chữ lạ
+    const bagBad = [];
+    await setMe({ realm: 3, tier: 0, boots: "", jade: "", treasure: "" });
+    await evalJs("window.__ui.toggleCharModal(false); window.__ui.toggleInventory(true); 0");
+    for (const it of real) {
+      await evalJs(
+        `window.__ui.onInv({ slots: [{ itemId: ${JSON.stringify(it.id)}, qty: 1 }], cd: {} }); 0`,
+      );
+      await sleep(80);
+      await pointer("#inv-grid .inv-slot", 0);
+      await sleep(80);
+      const d =
+        await J(`({ name: document.getElementById('inv-item-name').textContent, desc: document.getElementById('inv-item-desc').textContent,
+        cmp: document.getElementById('inv-equip-cmp').textContent, tag: document.querySelector('.rarity-tag')?.textContent ?? '' })`);
+      if (!d.name.includes(it.name)) bagBad.push(`${it.id}: tên chi tiết "${d.name}"`);
+      else if (BAD.test(d.name + d.desc + d.cmp + d.tag))
+        bagBad.push(`${it.id}: chữ lạ trong chi tiết`);
+      else if (it.desc && !(d.cmp.includes(it.desc) || d.desc.includes(it.desc)))
+        bagBad.push(`${it.id}: chi tiết thiếu câu nội tại`);
+      else if (!d.tag) bagBad.push(`${it.id}: thiếu tên bậc`);
+    }
+    check(
+      bagBad.length === 0,
+      bagBad.length === 0
+        ? `chi tiết túi của ${real.length} món THẬT: tên, mô tả, so sánh, bậc đều đúng (pháp bảo có nguyên văn nội tại)`
+        : `chi tiết túi hỏng ${bagBad.length}: ${bagBad.slice(0, 4).join(" | ")}`,
+    );
+    await evalJs("window.__ui.toggleInventory(false); window.__ui.toggleCharModal(true); 0");
+    // bộ đồ Nguyên Anh THẬT đủ sáu ô (ảnh để nhìn): Hàn Vũ Kiếm, Hàn Lang Bào, Phong Nha Phù, Tuyết Hành Ngoa, Hàn Tinh Bội, Định Tâm Chung
+    await setMe({
+      realm: 4,
+      tier: 0,
+      weapon: "han_vu_kiem",
+      robe: "han_lang_bao",
+      talisman: "phong_nha_phu",
+      boots: "tuyet_hanh_ngoa",
+      jade: "han_tinh_boi",
+      treasure: "dinh_tam_chung",
+    });
+    const full6 = await cards();
+    check(
+      full6.every((x) => x.cls.includes("filled")) && full6.every((x) => x.h >= 44),
+      `bộ đồ Nguyên Anh THẬT đủ sáu ô: cả sáu thẻ filled, cao >= 44 px (${full6.map((x) => x.name).join(", ")})`,
+    );
+    await shot(`equip6-${W}-do-that`);
+    await setMe({ boots: "", jade: "", treasure: "", weapon: "", robe: "", talisman: "" });
 
     // ---- H. không dựng lại DOM khi không đổi gì ---------------------------------------------------------------
     await evalJs(
