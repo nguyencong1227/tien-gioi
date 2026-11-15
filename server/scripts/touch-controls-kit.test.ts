@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   LANDSCAPE_PHONES,
   TOUCH_CONTROLS_SCRIPT,
+  TOUCH_STATES,
   findTouchConflicts,
+  measureInState,
   type TouchControl,
 } from "./touch-controls-kit";
 
@@ -136,5 +138,31 @@ describe("TOUCH_CONTROLS_SCRIPT", () => {
       expect(TOUCH_CONTROLS_SCRIPT).toContain(part);
     // không được chép tay id từng nút (nút mới thêm vào HUD phải tự bị kiểm)
     expect(TOUCH_CONTROLS_SCRIPT).not.toContain("btn-target");
+  });
+});
+
+describe("TOUCH_STATES / measureInState", () => {
+  const CTX = ["btn-pickup", "btn-talk", "btn-portal"];
+
+  it("có trạng thái nền, từng nút ngữ cảnh riêng lẻ, cặp Nói + Nhặt và cả ba nút; id không trùng, chỉ dùng ba nút ngữ cảnh", () => {
+    const ids = TOUCH_STATES.map((s) => s.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    const shows = TOUCH_STATES.map((s) => [...s.show].sort().join(","));
+    expect(shows).toContain(""); // nền
+    for (const id of CTX) expect(shows).toContain(id); // từng nút riêng
+    expect(shows).toContain("btn-pickup,btn-talk"); // cặp
+    expect(shows).toContain([...CTX].sort().join(",")); // cả ba
+    for (const s of TOUCH_STATES) for (const id of s.show) expect(CTX).toContain(id);
+  });
+
+  it("kịch bản đo đặt CẢ BA nút ngữ cảnh theo trạng thái và khôi phục trong CÙNG tác vụ (finally), nên vòng lặp cảnh không kịp đổi giữa chừng", () => {
+    const only = TOUCH_STATES.find((s) => s.show.length === 1 && s.show[0] === "btn-portal")!;
+    const js = measureInState(only);
+    expect(js.startsWith("(() => {")).toBe(true);
+    expect(js.endsWith("})()")).toBe(true);
+    for (const id of CTX) expect(js).toContain(id);
+    expect(js).toContain('["btn-portal"].includes(id)'); // hiện đúng nút của trạng thái
+    expect(js).toContain("finally");
+    expect(js).toContain(TOUCH_CONTROLS_SCRIPT);
   });
 });

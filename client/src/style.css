@@ -1817,12 +1817,15 @@ html[data-input="touch"][data-form="phone"][data-orient="landscape"] {
   /* nút ngữ cảnh: cỡ và bước xếp chồng (cỡ + khe) */
   --ls-ctx: 58px;
   --ls-step: 66px;
+  /* nút Mục tiêu */
+  --ls-tgt: 58px;
 }
-/* Chiều cao < 375 px (740 x 360, 568 x 320): hai nút ngữ cảnh chồng lên nhau (Nói + Nhặt) sẽ chạm thanh menu, nên nút 52 px (vẫn >= 44) khe 6 px */
+/* Chiều cao < 375 px (740 x 360, 568 x 320): hai nút ngữ cảnh chồng lên nhau (Nói + Nhặt), hay ba nút (cổng trên nút Mục tiêu), sẽ chạm thanh menu, nên nút ngữ cảnh và nút Mục tiêu 52 px (vẫn >= 44), khe 6 px */
 @media (max-height: 374px) {
   html[data-input="touch"][data-form="phone"][data-orient="landscape"] {
     --ls-ctx: 52px;
     --ls-step: 58px;
+    --ls-tgt: 52px;
   }
 }
 @media (max-height: 339px) {
@@ -1869,6 +1872,8 @@ html[data-input="touch"][data-form="phone"][data-orient="landscape"] #quickbar {
 html[data-input="touch"][data-form="phone"][data-orient="landscape"] #btn-target {
   right: var(--ls-a);
   bottom: var(--ls-row2);
+  width: var(--ls-tgt);
+  height: var(--ls-tgt);
 }
 html[data-input="touch"][data-form="phone"][data-orient="landscape"]
   :is(#btn-pickup, #btn-talk, #btn-portal) {
@@ -1886,11 +1891,13 @@ html[data-input="touch"][data-form="phone"][data-orient="landscape"]
   ~ #btn-portal {
   bottom: calc(var(--ls-row2) + var(--ls-step));
 }
+/* Ba nút cùng lúc (hiếm): ô thứ ba lên cột A, ngay trên nút Mục tiêu (khe 8), vì cột B xếp ba ô sẽ chạm thanh menu */
 html[data-input="touch"][data-form="phone"][data-orient="landscape"]
   #btn-pickup:not([hidden])
   ~ #btn-talk:not([hidden])
   ~ #btn-portal {
-  bottom: calc(var(--ls-row2) + 2 * var(--ls-step));
+  right: var(--ls-a);
+  bottom: calc(var(--ls-row2) + var(--ls-tgt) + 8px);
 }
 html[data-input="touch"][data-form="phone"][data-orient="landscape"] #skill-slots {
   right: calc(var(--ls-a) + 58px + 8px + 58px + 8px);

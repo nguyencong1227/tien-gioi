@@ -139,7 +139,7 @@ export function findTouchConflicts(
 /** Trạng thái điều khiển cần kiểm: các nút ngữ cảnh (do vòng lặp cảnh bật / tắt MỖI khung) hiện cùng bốn ô chiêu đã gắn (mặc định trên cảm ứng chỉ ô đã gắn mới hiện). */
 export interface TouchState {
   id: string;
-  /** id các nút ngữ cảnh hiện (nút ngữ cảnh khác ẩn). Ba nút cùng lúc (nhặt + nói + cổng) rất hiếm và KHÔNG nằm trong phép đo: ô thứ ba chạm thanh menu ở mọi khung ngang. */
+  /** id các nút ngữ cảnh hiện (nút ngữ cảnh khác ẩn) */
   show: readonly string[];
 }
 
@@ -149,6 +149,10 @@ export const TOUCH_STATES: readonly TouchState[] = [
   { id: "đứng cạnh NPC (nút Nói)", show: ["btn-talk"] },
   { id: "đứng cạnh đồ rơi (nút Nhặt)", show: ["btn-pickup"] },
   { id: "NPC + đồ rơi (Nói + Nhặt)", show: ["btn-talk", "btn-pickup"] },
+  {
+    id: "NPC + đồ rơi + cổng (cả ba nút)",
+    show: ["btn-pickup", "btn-talk", "btn-portal"],
+  },
 ];
 
 /**
