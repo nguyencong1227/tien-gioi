@@ -53,10 +53,28 @@ export function eliteCount(w: World): number {
 }
 
 /**
- * Con quái `def` sinh lúc này có là tinh anh không. `rng` mặc định `Math.random` (tests truyền giá trị cố định). Chỉ gọi `rng` khi loài đủ điều kiện và đang ở bản
- * đồ thường (phòng bí cảnh `w.runId !== null` không có tinh anh), rồi mới đếm số tinh anh hiện có (hiếm nên rẻ).
+ * Giá trị giả ngẫu nhiên XÁC ĐỊNH trong [0, 1) theo (số thứ tự quái, bản đồ): băm số nguyên, KHÔNG gọi `Math.random`. Lý do: thêm một lần gọi `Math.random` mỗi lần sinh quái
+ * làm lệch chuỗi ngẫu nhiên của bench có hạt giống (băng thông sự kiện gần của 100 người nhích 3,80 -> 4,43 KB/s dù `ELITE_CHANCE` = 0, vượt trần 4 của `perf.test.ts`: lệch
+ * chuỗi chứ không phải tinh anh nặng thêm). Người chơi không thấy số thứ tự nên không đoán được con nào là tinh anh.
  */
-export function rollElite(w: World, def: MonsterKind, rng: () => number = Math.random): boolean {
+export function eliteHash(seq: number, mapId: string): number {
+  let x = seq >>> 0;
+  for (let i = 0; i < mapId.length; i++) x = Math.imul(x ^ mapId.charCodeAt(i), 16777619) >>> 0;
+  x = Math.imul(x ^ (x >>> 16), 2246822507) >>> 0;
+  x = Math.imul(x ^ (x >>> 13), 3266489909) >>> 0;
+  x = (x ^ (x >>> 16)) >>> 0;
+  return x / 4294967296;
+}
+
+/**
+ * Con quái `def` sinh lúc này có là tinh anh không. `rng` mặc định là băm xác định theo số thứ tự quái SẮP sinh (`eliteHash`; tests truyền giá trị cố định). Chỉ gọi `rng` khi
+ * loài đủ điều kiện và đang ở bản đồ thường (phòng bí cảnh `w.runId !== null` không có tinh anh), rồi mới đếm số tinh anh hiện có (hiếm nên rẻ).
+ */
+export function rollElite(
+  w: World,
+  def: MonsterKind,
+  rng: () => number = () => eliteHash(w.monsterSeq + 1, w.map.def.id),
+): boolean {
   if (!canBeElite(def) || w.runId !== null) return false;
   if (rng() >= ELITE_CHANCE) return false;
   return eliteCount(w) < ELITE_MAX;
