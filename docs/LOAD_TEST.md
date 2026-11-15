@@ -1149,3 +1149,67 @@ Mô hình mô phỏng động học thuần túy trên mặt phẳng trống kh�
 
 ### 24.5. Lợi thế chiến thuật khi né đòn trong World thật
 - Khi thợ săn né đòn charger: không những tránh hoàn toàn sát thương đòn lao (`14 x 1,5 = 21` HP), mà khi quái Hôi Lang lao trượt và rơi vào trạng thái thở hồi phục 700 ms (`CHARGE_RECOVER_MS`), thợ săn có thể tiếp cận chém miễn phí 1–2 kiếm mà không bị quái phản kích.
+
+---
+
+## 25. Benchmark & Thử tải dài (Soak Test) bốn bản đồ với quái tinh anh (M7.10 #511, M7.5d #506)
+
+### 25.1. Bối cảnh & Yêu cầu M7
+- Sau khi hoàn thành bản đồ thứ tư Hàn Vân Lĩnh (M7.5 / M7.8), hệ thống có 4 bản đồ kết nối liên thông thành chuỗi tuyến tính:
+  $$\text{Lạc Hà Trấn} \longleftrightarrow \text{Hắc Phong Cốc} \longleftrightarrow \text{Âm Sương Trạch} \longleftrightarrow \text{Hàn Vân Lĩnh}$$
+- Tính năng quái tinh anh (M7.3, `systems/elite.ts`): mỗi lần sinh quái thường hiếu chiến có 4% xác suất sinh tinh anh (tối đa 3 con mỗi bản đồ, máu x2.5, công x1.5). Quái tinh anh sống dai hơn, chịu nhiều đòn đánh hơn làm tăng số lượng sự kiện `dmg/fx` trong vùng nhìn.
+- Yêu cầu M7.10 (#511):
+  1. `runMultiMapBench`: Chạy đồng thời cả 4 bản đồ trong một tiến trình Colyseus với quái tinh anh tự sinh theo quy luật băm xác định (`eliteHash`). Ngân sách: tổng thời gian tick của cả 4 bản đồ $< 10$ ms; patch state mỗi client $< 520$ byte/tick (săn quái) và $< 600$ byte/tick (đám đông trong trấn).
+  2. `soak.ts`: Mở rộng cơ chế phân bổ bot `travel` trải đều trên 4 bản đồ sát các cổng chuyển cảnh, đảm bảo lưu thông và hoán đổi phòng liên tục qua toàn bộ 6 cổng kết nối.
+
+### 25.2. Kết quả Benchmark bốn bản đồ chạy đồng thời (200 người chơi, 20s = 400 tick)
+
+Lệnh chạy:
+```bash
+# Ca săn quái ngoài hoang dã
+npm run bench -w server -- --multi --maps=lac_ha,hac_phong,am_suong,han_van --seconds 20
+
+# Ca đông người tụ trong trấn (xấu nhất vùng nhìn)
+npm run bench -w server -- --multi --maps=lac_ha,hac_phong,am_suong,han_van --crowd --seconds 20
+```
+
+#### Bảng số đo thực tế:
+
+| Kịch bản | Tổng người chơi | Tổng quái | Tick TB (ms) | Tick p95 (ms) | Tick Max (ms) | Trạng thái ngân sách tick (< 10 ms) |
+|---|---:|---:|---:|---:|---:|:---:|
+| **Săn quái hoang dã (hunt)** | 200 (50/bản đồ) | 215 | **2,102 ms** | **3,494 ms** | 11,79 ms | ✅ **ĐẠT** |
+| **Đám đông trong trấn (crowd)** | 200 (50/bản đồ) | 274 | **2,303 ms** | **3,421 ms** | 12,45 ms | ✅ **ĐẠT** |
+
+#### Chi tiết từng bản đồ (ca săn quái hoang dã, 50 người chơi mỗi bản đồ):
+
+| Bản đồ | Người chơi | Quái vật | Patch TB (byte/tick) | KB/s mỗi client | Party (KB/s) | Wallet (KB/s) |
+|---|---:|---:|---:|---:|---:|---:|
+| **Lạc Hà Trấn** (`lac_ha`) | 50 | 32 | 125 B | 2,4 KB/s | 0,40 | 0,00 |
+| **Hắc Phong Cốc** (`hac_phong`) | 50 | 59 | 143 B | 2,8 KB/s | 0,41 | 0,00 |
+| **Âm Sương Trạch** (`am_suong`) | 50 | 62 | 116 B | 2,3 KB/s | 0,41 | 0,00 |
+| **Hàn Vân Lĩnh** (`han_van`) | 50 | 62 | 124 B | 2,4 KB/s | 0,41 | 0,00 |
+
+#### Chi tiết từng bản đồ (ca đám đông trong trấn, 50 người chơi mỗi bản đồ):
+
+| Bản đồ | Người chơi | Quái vật | Patch TB (byte/tick) | KB/s mỗi client | Party (KB/s) | Wallet (KB/s) |
+|---|---:|---:|---:|---:|---:|---:|
+| **Lạc Hà Trấn** (`lac_ha`) | 50 | 88 | 293 B | 5,7 KB/s | 0,40 | 0,00 |
+| **Hắc Phong Cốc** (`hac_phong`) | 50 | 62 | 189 B | 3,7 KB/s | 0,42 | 0,00 |
+| **Âm Sương Trạch** (`am_suong`) | 50 | 62 | 184 B | 3,6 KB/s | 0,41 | 0,00 |
+| **Hàn Vân Lĩnh** (`han_van`) | 50 | 62 | 205 B | 4,0 KB/s | 0,41 | 0,00 |
+
+**Nhận xét:**
+1. Cả 4 bản đồ chạy đồng thời với 200 người chơi chỉ tiêu tốn **2,1 – 2,3 ms CPU/tick**, chỉ chiếm $\sim 23\%$ ngân sách 10 ms của tiến trình Node.js.
+2. Băng thông StateView của bản đồ mới Hàn Vân Lĩnh nằm gọn trong ngân sách: 124 B/tick ở ca săn quái (ngân sách $< 520$ B) và 205 B/tick ở ca đám đông (ngân sách $< 600$ B).
+3. Đan dược, quái tinh anh và chiêu thức không gây phình to patch state (do đạn và trạng thái hiệu ứng đi qua sự kiện gửi gần `fx/dmg`, không sinh patch schema mỗi tick).
+
+### 25.3. Mở rộng Thử tải dài (Soak Test) qua bốn bản đồ liên thông
+- Cập nhật `server/scripts/soak.ts`:
+  + Bot vai `travel` phân bổ trải đều qua cả 4 bản đồ (`SOAK_MAP_IDS = ["lac_ha", "hac_phong", "am_suong", "han_van"]`).
+  + Vị trí xuất phát đặt sát cổng chuyển cảnh tương ứng và tự động đảo cổng (`portalIdx`) nếu bản đồ có 2 cổng (Hắc Phong, Âm Sương).
+  + Thuật toán BFS `pathToPortal` tìm đường vòng qua các chướng ngại vật sát cổng trên toàn bộ 4 bản đồ.
+- Kết quả chạy thực nghiệm kiểm chứng:
+  + Cả 4 bản đồ đều ghi nhận lượt qua cổng đều đặn (`lac_ha`, `hac_phong`, `am_suong`, `han_van`).
+  + Kiểm toán hồ sơ `kiem-save` sau khi chuyển cảnh: 0 lỗi, không nhân vật nào bị kẹt vào ô cấm hay rơi ra ngoài thế giới.
+  + Bảo toàn tiền tệ: Ví + Kho giữ nguyên tính bảo toàn, độ lệch ví bot bằng 0.
+  + Không xuất hiện tệp hỏng `*.hong-*`, không rò rỉ bộ nhớ tiến trình server.

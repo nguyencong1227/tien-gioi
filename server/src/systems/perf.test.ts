@@ -10,7 +10,7 @@ import { slash, tickRespawn } from "./combat";
 import { cast } from "./cast";
 import { MONSTER_WAKE_DIST, WANDER_STRIDE, spawnInitial, tickMonsters } from "./monsters";
 import { EXP_FLUSH_MS, tickRecovery } from "./progression";
-import { runBench } from "../perf/bench";
+import { runBench, runMultiMapBench } from "../perf/bench";
 
 describe("takeWhole", () => {
   it("trả phần nguyên, giữ phần lẻ, cộng dồn qua nhiều lần", () => {
@@ -603,5 +603,49 @@ describe("kịch bản hiệu năng chiêu thức (M7.10 #511)", () => {
     expect(castFxs.length).toBeGreaterThan(0);
 
     expect(w.state.players.size).toBe(30);
+  });
+});
+
+describe("benchmark bốn bản đồ chạy đồng thời (M7.10 #511)", () => {
+  it("bốn bản đồ (Lạc Hà, Hắc Phong, Âm Sương, Hàn Vân) với tinh anh đang sinh: tick tổng < 10 ms, patch < 520 byte/tick", () => {
+    const res = runMultiMapBench(
+      [
+        { mapId: "lac_ha", players: 25 },
+        { mapId: "hac_phong", players: 25 },
+        { mapId: "am_suong", players: 25 },
+        { mapId: "han_van", players: 25 },
+      ],
+      6, // 6 giây = 120 ticks
+      1,
+    );
+    expect(res.totalPlayers).toBe(100);
+    expect(res.rooms.length).toBe(4);
+    // Ngân sách tick tổng của cả 4 bản đồ < 10 ms
+    expect(res.avgTotalMs).toBeLessThan(10);
+    expect(res.p95TotalMs).toBeLessThan(10);
+    // Từng bản đồ: patch < 520 byte/tick mỗi client, quái được sinh đầy đủ
+    for (const r of res.rooms) {
+      expect(r.patchBytes).toBeLessThan(520);
+      expect(r.monsters).toBeGreaterThan(0);
+    }
+  });
+
+  it("bốn bản đồ ca đông người tụ trong trấn (crowd): tick tổng < 10 ms, patch < 600 byte/tick", () => {
+    const res = runMultiMapBench(
+      [
+        { mapId: "lac_ha", players: 25, mode: "crowd" },
+        { mapId: "hac_phong", players: 25, mode: "crowd" },
+        { mapId: "am_suong", players: 25, mode: "crowd" },
+        { mapId: "han_van", players: 25, mode: "crowd" },
+      ],
+      6,
+      1,
+    );
+    expect(res.totalPlayers).toBe(100);
+    expect(res.avgTotalMs).toBeLessThan(10);
+    expect(res.p95TotalMs).toBeLessThan(10);
+    for (const r of res.rooms) {
+      expect(r.patchBytes).toBeLessThan(600);
+    }
   });
 });
