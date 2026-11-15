@@ -42,6 +42,8 @@ import {
   sellPrice,
   DEFAULT_MAP_ID,
   HAC_PHONG_ID,
+  AM_SUONG_ID,
+  HAN_VAN_ID,
   JOIN_WRONG_MAP,
   MAPS,
   getMap,
@@ -2029,6 +2031,105 @@ describe("đi qua cổng giữa hai bản đồ (M3 bước 1)", () => {
     c.travelling = false;
     await sr.persist(p, c);
     expect(fileOf(name).mapId).toBe(DEFAULT_MAP_ID);
+  });
+
+  it("M7.5d: đi qua cổng xuyên suốt BỐN phòng Colyseus thật (Lạc Hà -> Hắc Phong -> Âm Sương -> Hàn Vân) và quay về", async () => {
+    const name = "Bon Phong";
+    const amSuong = getMap(AM_SUONG_ID)!;
+    const hanVan = getMap(HAN_VAN_ID)!;
+
+    const portalLacHaBac = lacHa.portals[0]; // lac_ha_bac -> hac_phong_nam
+    const portalHacPhongBac = hacPhong.portals.find((p) => p.id === "hac_phong_bac")!; // hac_phong_bac -> am_suong_nam
+    const portalAmSuongBac = amSuong.portals.find((p) => p.id === "am_suong_bac")!; // am_suong_bac -> han_van_nam
+    const portalHanVanNam = hanVan.portals.find((p) => p.id === "han_van_nam")!; // han_van_nam -> am_suong_bac
+
+    // 1. Vào phòng Lạc Hà Trấn (DEFAULT_MAP_ID)
+    const a = await join(name);
+    expect(serverRoom(a.room).mapId).toBe(DEFAULT_MAP_ID);
+    a.room.send("chat", { text: "/give han_lang_mao 5" });
+    await waitFor(() => a.invs.find((m) => m.gained));
+    const sa = standAt(a.room, portalLacHaBac);
+    sa.exp = 250;
+    const gotA = listenTravel(a.room);
+
+    // Bước 1: Lạc Hà -> Hắc Phong
+    a.room.send("travel", { portalId: portalLacHaBac.id });
+    await waitFor(() => gotA.length === 1);
+    expect(gotA[0]).toEqual({ mapId: HAC_PHONG_ID });
+    await waitFor(() => !a.room.connection.isOpen);
+
+    // 2. Vào phòng Hắc Phong Cốc
+    const b = await join(name, secretOf(name), HAC_PHONG_ID);
+    expect(serverRoom(b.room).mapId).toBe(HAC_PHONG_ID);
+    expect(b.me().exp).toBe(250);
+    const gotB = listenTravel(b.room);
+
+    // Bước 2: Hắc Phong -> Âm Sương (chờ hết hồi chiêu cổng)
+    await sleep(TRAVEL_COOLDOWN_MS + 200);
+    standAt(b.room, portalHacPhongBac);
+    b.room.send("travel", { portalId: portalHacPhongBac.id });
+    await waitFor(() => gotB.length === 1);
+    expect(gotB[0]).toEqual({ mapId: AM_SUONG_ID });
+    await waitFor(() => !b.room.connection.isOpen);
+
+    // 3. Vào phòng Âm Sương Trạch
+    const c = await join(name, secretOf(name), AM_SUONG_ID);
+    expect(serverRoom(c.room).mapId).toBe(AM_SUONG_ID);
+    expect(c.me().exp).toBe(250);
+    const gotC = listenTravel(c.room);
+
+    // Bước 3: Âm Sương -> Hàn Vân Lĩnh (chờ hết hồi chiêu cổng)
+    await sleep(TRAVEL_COOLDOWN_MS + 200);
+    standAt(c.room, portalAmSuongBac);
+    c.room.send("travel", { portalId: portalAmSuongBac.id });
+    await waitFor(() => gotC.length === 1);
+    expect(gotC[0]).toEqual({ mapId: HAN_VAN_ID });
+    await waitFor(() => !c.room.connection.isOpen);
+
+    // 4. Vào phòng Hàn Vân Lĩnh (HAN_VAN_ID)
+    const d = await join(name, secretOf(name), HAN_VAN_ID);
+    expect(serverRoom(d.room).mapId).toBe(HAN_VAN_ID);
+    expect(
+      Math.hypot(d.me().x - portalHanVanNam.spawn.x, d.me().y - portalHanVanNam.spawn.y),
+    ).toBeLessThan(2);
+    expect(d.me().exp).toBe(250);
+    expect(
+      (await waitFor(() => d.invs[0])).slots.find((s) => s?.itemId === "han_lang_mao")?.qty,
+    ).toBe(5);
+    expect(hanVan.inSafe(d.me().x, d.me().y)).toBe(true);
+
+    const savedD = fileOf(name);
+    expect(savedD.mapId).toBe(HAN_VAN_ID);
+
+    // Vào nhầm phòng Lạc Hà từ Hàn Vân: bị từ chối và chỉ sang HAN_VAN_ID
+    const wrong = await (async () => {
+      try {
+        await new Client(`ws://localhost:${PORT}`).joinOrCreate(ROOM_NAME, {
+          name,
+          secret: secretOf(name),
+        });
+      } catch (err: any) {
+        return { code: err.code as number, message: String(err.message) };
+      }
+      throw new Error("đáng ra phải bị chuyển hướng");
+    })();
+    expect(parseWrongMap(wrong.code, wrong.message)).toBe(HAN_VAN_ID);
+
+    // Bước 4: Quay về từ Hàn Vân Lĩnh -> Âm Sương Trạch
+    const gotD = listenTravel(d.room);
+    await sleep(TRAVEL_COOLDOWN_MS + 200);
+    standAt(d.room, portalHanVanNam);
+    d.room.send("travel", { portalId: portalHanVanNam.id });
+    await waitFor(() => gotD.length === 1);
+    expect(gotD[0]).toEqual({ mapId: AM_SUONG_ID });
+    await waitFor(() => !d.room.connection.isOpen);
+
+    const e = await join(name, secretOf(name), AM_SUONG_ID);
+    expect(serverRoom(e.room).mapId).toBe(AM_SUONG_ID);
+    expect(
+      Math.hypot(e.me().x - portalAmSuongBac.spawn.x, e.me().y - portalAmSuongBac.spawn.y),
+    ).toBeLessThan(2);
+    expect(fileOf(name).mapId).toBe(AM_SUONG_ID);
   });
 });
 
