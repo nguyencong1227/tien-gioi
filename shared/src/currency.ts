@@ -40,6 +40,14 @@ export const ITEM_VALUE: Record<string, number> = {
   quy_giap: 60,
   doc_nang: 90,
   giao_lan: 600,
+  // Nguyên liệu Nguyên Anh và đan cấp 3 (M7.5c): ~x3 loài Kim Đan cùng vai
+  han_lang_mao: 135,
+  phong_nha_vu: 180,
+  tuong_cot: 180,
+  doc_tuoc_nang: 270,
+  thien_han_chau: 1800,
+  thuong_hoi_huyet_dan: 180,
+  thuong_hoi_linh_dan: 180,
   // Trang bị (theo bậc: phàm 30, linh 120, bảo 500)
   lang_nha_kiem: 30,
   tho_nhung_bao: 30,
@@ -60,6 +68,10 @@ export const ITEM_VALUE: Record<string, number> = {
   hac_giao_kiem: 10000,
   giao_lan_bao: 10000,
   giao_long_phu: 10000,
+  // Bộ IV Nguyên Anh (M7.5c; hài / ngọc bội ở `OWNER_GEAR_VALUE`): luôn thấp hơn phí rèn
+  han_vu_kiem: 15000,
+  han_lang_bao: 12000,
+  phong_nha_phu: 12000,
   // Đồ ba ô riêng của chủ (M7.4, `owner-gear.ts`)
   ...OWNER_GEAR_VALUE,
   // Kinh quyển 12 chiêu (M7.4, `books.ts`)
@@ -107,6 +119,18 @@ export const SHOPS: ShopDef[] = [
   {
     npcId: "lai_buon_suong",
     itemIds: ["hoi_huyet_dan", "hoi_linh_dan", "dai_hoi_huyet_dan", "dai_hoi_linh_dan"],
+  },
+  // Lái buôn Hàn Vân (M7.5c): thêm đan cấp 3; vẫn KHÔNG bán `tu_khi_dan` và trang bị (kinh quyển Nguyên Anh: chưa có chiêu cho bậc này)
+  {
+    npcId: "lai_buon_han",
+    itemIds: [
+      "hoi_huyet_dan",
+      "hoi_linh_dan",
+      "dai_hoi_huyet_dan",
+      "dai_hoi_linh_dan",
+      "thuong_hoi_huyet_dan",
+      "thuong_hoi_linh_dan",
+    ],
   },
 ];
 

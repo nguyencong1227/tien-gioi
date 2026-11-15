@@ -1,5 +1,5 @@
 // NPC trong Lạc Hà Trấn và giao dịch đổi đồ: hợp đồng giữa client và server (Sprint 2).
-import { AM_SUONG_ID, DEFAULT_MAP_ID, HAC_PHONG_ID, TOWN_PX } from "./map";
+import { AM_SUONG_ID, DEFAULT_MAP_ID, HAC_PHONG_ID, HAN_VAN_ID, TOWN_PX } from "./map";
 
 export interface NpcDef {
   id: string;
@@ -116,6 +116,46 @@ export const NPCS: NpcDef[] = [
       "Đồ tốt kén người: chưa tới Kim Đan thì mặc vào cũng chẳng chịu nổi.",
     ],
     color: 0x9a4a30,
+  },
+  // Hàn Vân Trạm (Hàn Vân Lĩnh, M7.5c #506): tâm trấn (2048, 3648); ba NPC quanh tâm như Vọng Sương Trạm, cách nhau > 64 px, đứng trên nền đá của trạm
+  {
+    id: "tram_truong_han",
+    mapId: HAN_VAN_ID,
+    name: "Thôi Tuyết Phong",
+    title: "Trạm trưởng Hàn Vân",
+    x: 2048,
+    y: 3563,
+    dialog: [
+      "Hàn Vân Trạm dựng trên sườn băng, lò than nào cũng nhóm suốt đêm. Ra khỏi vòng lửa là gió tuyết cắt da.",
+      "Nguyên Anh mới dám lên đây. Bầy sói băng, chim nanh thép, voi xương, sẻ độc, và ở nơi cao nhất là Thiên Hàn Vương. Có việc thì nói với ta.",
+    ],
+    color: 0x4a7aa8,
+  },
+  {
+    id: "lai_buon_han",
+    mapId: HAN_VAN_ID,
+    name: "Kỳ Thiên Lộc",
+    title: "Lái buôn Hàn Vân",
+    x: 1953,
+    y: 3673,
+    dialog: [
+      "Thu được gì trên băng cứ bán cho ta, đỡ phải gánh ngược xuống Âm Sương. Thượng hồi đan ta có sẵn.",
+      "Đứng trước độc tước mà hết đan thì hối cũng không kịp. Mua đủ rồi hẵng lên cao.",
+    ],
+    color: 0x6a8cb8,
+  },
+  {
+    id: "tho_ren_han",
+    mapId: HAN_VAN_ID,
+    name: "Lô Băng Thiết",
+    title: "Thợ rèn Hàn Vân",
+    x: 2143,
+    y: 3673,
+    dialog: [
+      "Lông Hàn Lang, xương voi, vũ Phong Nha, châu Thiên Hàn: băng nguyên này cho nguyên liệu rèn ra đồ ra hồn nhất. Mang tới đây, thêm chút Linh thạch tiền than.",
+      "Đồ tốt kén người: chưa tới Nguyên Anh thì mặc vào cũng chẳng chịu nổi.",
+    ],
+    color: 0x5a3a6a,
   },
   {
     // Cổng vào bí cảnh (docs/THIET_KE_BI_CANH.md): chỉ đội trưởng mở được, nút do server dựng theo điều kiện của đội
