@@ -182,12 +182,15 @@ describe("trùm Thiên Hàn Vương theo đội, mã thật (Nguyên Anh, M7.9: 
       }
   });
 
-  it("KHÔNG đan: Sơ kỳ không đội nào hạ được; một người và đội 2 người không đội nào hạ được ở mọi bậc (đan là điều kiện của luật)", () => {
-    for (const party of [1, 2, 3, 4])
-      expect(sum(0, party, 0).killRate, `Sơ kỳ đội ${party}`).toBe(0);
+  it("KHÔNG đan: một người và đội 2 người không hạ được ở mọi bậc, Sơ kỳ đội 1-3 cũng không; đội đông hạ được thì CHẾT người (không có trận sạch nếu thiếu đan: đan là điều kiện của luật)", () => {
+    for (const party of [1, 2, 3]) expect(sum(0, party, 0).killRate, `Sơ kỳ đội ${party}`).toBe(0);
     for (const tier of [0, 1, 2])
       for (const party of [1, 2])
         expect(sum(tier, party, 0).killRate, `bậc ${tier} đội ${party}`).toBe(0);
+    // Mọi ô không đan: dù hạ được hay không, KHÔNG có trận nào không ai chết (sau khi đập đất có khoảng nghỉ, ca biên Sơ kỳ đội 4 chuyển sang hạ được nhưng mất người)
+    for (const tier of [0, 1, 2])
+      for (const party of [1, 2, 3, 4])
+        expect(sum(tier, party, 0).deathsPerRun, `bậc ${tier} đội ${party}`).toBeGreaterThan(0);
   });
 
   it("một người: Sơ kỳ cần đủ đan (8 viên không hạ được); đủ đan thì hạ được 0 chết ở cả ba bậc; đội đông hạ nhanh hơn người đơn (tỉ lệ ~ 1 / số người)", () => {
