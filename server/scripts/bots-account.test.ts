@@ -20,7 +20,7 @@ import { defineRooms, WorldRoom } from "../src/rooms/WorldRoom";
 import { makeWorld, addPlayer } from "../src/systems/test-helpers";
 import { tickWorld } from "../src/systems/tick";
 import { authBotAccount, runLoginStorm } from "./bots";
-import { freePort } from "../src/test-port";
+import { listenWithRetry } from "../src/test-port";
 
 const rootDir = mkdtempSync(path.join(tmpdir(), "tien-gioi-bots-acc-"));
 afterAll(() => rmSync(rootDir, { recursive: true, force: true }));
@@ -74,14 +74,14 @@ describe("Bot thử tải chế độ tài khoản (--account) & Login Storm (Is
     });
     WorldRoom.auth = auth;
 
-    port = await freePort();
     const httpServer = http.createServer(app);
     gameServer = new Server({
       transport: new WebSocketTransport({ server: httpServer }),
       gracefullyShutdown: false,
     });
     defineRooms(gameServer);
-    await gameServer.listen(port);
+    // Cổng do hệ điều hành cấp, tự thử lại nếu `EADDRINUSE` (tệp vitest chạy song song có thể chiếm đúng cổng vừa tìm: `freePort()` rồi `listen(port)` có khoảng hở)
+    port = await listenWithRetry(gameServer);
     httpBase = `http://127.0.0.1:${port}`;
     wsBase = `ws://127.0.0.1:${port}`;
   });
