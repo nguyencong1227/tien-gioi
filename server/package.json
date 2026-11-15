@@ -32,6 +32,7 @@
     "e2e:chuyen-canh": "tsx scripts/e2e-chuyen-canh.ts",
     "e2e:goi-tai": "tsx scripts/e2e-goi-tai.ts",
     "e2e:chieu": "tsx scripts/e2e-chieu.ts",
+    "e2e:nguoi-moi": "tsx scripts/e2e-nguoi-moi.ts",
     "e2e:doc-duoc": "tsx scripts/e2e-doc-duoc.ts",
     "tai-khoan": "tsx scripts/tai-khoan.ts",
     "chuyen-du-lieu": "tsx scripts/chuyen-du-lieu.ts",

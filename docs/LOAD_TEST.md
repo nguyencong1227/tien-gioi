@@ -1214,3 +1214,42 @@ npm run bench -w server -- --multi --maps=lac_ha,hac_phong,am_suong,han_van --cr
   + Kiểm toán hồ sơ `kiem-save` sau khi chuyển cảnh: 0 lỗi, không nhân vật nào bị kẹt vào ô cấm hay rơi ra ngoài thế giới.
   + Bảo toàn tiền tệ: Ví + Kho giữ nguyên tính bảo toàn, độ lệch ví bot bằng 0.
   + Không xuất hiện tệp hỏng `*.hong-*`, không rò rỉ bộ nhớ tiến trình server.
+
+### 25.4. Kết quả Thử tải dài thật (Soak Test) 30 phút với 100 bot bốn bản đồ (M7.10 #511)
+
+Lệnh thực thi:
+```bash
+npm run soak -w server -- --bots=100 --minutes=30
+```
+
+Kịch bản: 100 bot chia làm 6 nhóm hành vi tự hành (săn quái, trấn/shop mua bán, di chuyển liên tục qua 6 cổng của 4 bản đồ Lạc Hà ↔ Hắc Phong ↔ Âm Sương ↔ Hàn Vân, bí cảnh, PK, tông môn). Server chạy 4 phòng `WorldRoom` đồng thời với quái tinh anh tự sinh băm xác định.
+
+#### Bảng tổng hợp số đo thử tải dài (27,8 phút, 167 mẫu liên tục mỗi 10 giây):
+
+| Hạng mục đo | Kết quả đo thực tế | Ngưỡng / Ngân sách cho phép | Đánh giá |
+|---|---|---|:---:|
+| **Thời lượng & Quy mô** | 27,8 phút (167 mẫu) · 100/100 bot sống suốt thời gian | Tối thiểu 95% bot giữ kết nối (`droppedBots <= 5%`) | ✅ **ĐẠT** (rớt 0) |
+| **Bộ nhớ VmRSS ban đầu** | **156,76 MB** | — | — |
+| **Bộ nhớ VmRSS sau làm nóng (5m)** | **153,97 MB** | — | — |
+| **Bộ nhớ VmRSS kết thúc** | **155,13 MB** | — | — |
+| **Biến thiên VmRSS sau làm nóng** | **+1,16 MB** | $\le 50,0$ MB | ✅ **ĐẠT** |
+| **Dốc OLS nửa sau (tốc độ tăng RSS)**| **+0,056 MB/phút** | $\le 1,00$ MB/phút | ✅ **ĐẠT** |
+| **Thời gian xử lý tick p95 (phòng tệ nhất)** | Trung bình **2,55 ms** · Đỉnh **3,10 ms** | $\le 10,0$ ms (ngân sách khung hình 50 ms) | ✅ **ĐẠT** |
+| **Quá tải tick (tick overruns > 50ms)** | **0 tick** | 0 tick | ✅ **ĐẠT** |
+| **CPU luồng chính server / tick** | Trung bình **4,55 ms/tick** | $\le 10,0$ ms | ✅ **ĐẠT** |
+| **Độ trễ vòng lặp sự kiện p99 (loop lag)** | **27,1 ms** | $\le 100$ ms | ✅ **ĐẠT** |
+| **Hàng đợi lưu nhân vật (write queue)** | Inflight cao nhất **0** · Tuổi thọ cao nhất **0,0 s** · Lỗi **0** | Tuổi $\le 30$ s · Lỗi = 0 | ✅ **ĐẠT** |
+| **Băng thông WebSocket nhận / bot** | Trung bình **277 B/tick** (p95 **329 B/tick**, **5,42 KB/s**) | $\le 600$ B/tick | ✅ **ĐẠT** |
+| **Lưu thông qua cổng bốn bản đồ** | Hoạt động liên tục cả 4 bản đồ (`han_van`, `am_suong`, `hac_phong`, `lac_ha`) | Đảo chiều luân phiên, không kẹt ô cấm | ✅ **ĐẠT** |
+| **Cảnh báo giám sát (/metrics monitor)** | **0 cảnh báo** sau khi sẵn sàng | 0 cảnh báo | ✅ **ĐẠT** |
+| **Lỗi tiến trình & ghi log server** | **0 lỗi** (`[lỗi]`, unhandledRejection, stack trace) | 0 lỗi | ✅ **ĐẠT** |
+| **Lỗi truy vấn số đo (/metrics)** | **0 lỗi** | 0 lỗi | ✅ **ĐẠT** |
+| **Kiểm toán toàn vẹn hồ sơ (kiem-save)** | **0 lỗi** trên toàn bộ thư mục dữ liệu nhân vật & linh hồn | 0 lỗi vi phạm hợp đồng dữ liệu | ✅ **ĐẠT** |
+| **Tệp hỏng cách ly (`*.hong-*`)** | **0 tệp** | 0 tệp | ✅ **ĐẠT** |
+| **Bảo toàn Linh thạch (ví + kho)** | **ĐẠT** (không thất thoát hay tự sinh tiền tệ) | Sai số bảo toàn = 0 | ✅ **ĐẠT** |
+
+#### Nhận xét & Kết luận kỹ thuật:
+1. **Không rò rỉ bộ nhớ (Memory Leak-Free):** Bộ nhớ RSS sau thời gian làm nóng 5 phút gần như đi ngang (chỉ tăng +1,16 MB sau hơn 22 phút tải nặng liên tục), dốc OLS nửa sau chỉ đạt 0,056 MB/phút (thấp hơn 18 lần so với trần 1,00 MB/phút). Điều này khẳng định cơ chế dọn dẹp `StateView`, xoá thực thể ngoài tầm nhìn và quản lý chân linh/hồ sơ không giữ lại tham chiếu mồ côi.
+2. **Khả năng tải của 4 phòng Colyseus:** CPU luồng chính trung bình chỉ 4,55 ms/tick cho cả 100 bot trải rộng khắp 4 bản đồ có quái tinh anh hoạt động. Tick p95 của phòng tải cao nhất duy trì ở mức 2,55 ms (đỉnh 3,10 ms), hoàn toàn cách xa ngưỡng giới hạn 10 ms.
+3. **Chuyển cổng 4 bản đồ ổn định tuyệt đối:** Quá trình qua cổng liên tục giữa Lạc Hà, Hắc Phong, Âm Sương và Hàn Vân không gây ra bất kỳ lỗi giải phóng hay xung đột lưu file nào (`kiem-save` đạt 0 lỗi), bảo toàn 100% tài sản tiền tệ và trang bị của người chơi.
+
