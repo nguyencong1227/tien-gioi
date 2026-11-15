@@ -298,7 +298,9 @@ try {
         if (cs.display === "none" || cs.visibility === "hidden" || cs.pointerEvents === "none") continue;
         const b = el.getBoundingClientRect();
         if (b.width === 0 || b.height === 0 || b.right < 0 || b.bottom < 0 || b.left > innerWidth || b.top > innerHeight) continue;
-        if (b.width < 43.5 || b.height < 43.5)
+        // Ngoại lệ có chủ ý: nút 💬 của chat thu gọn (một dòng cao <= 30 px, "giao diện gọn bước 2/3", QUYET_DINH_M3 mục 15) rộng 44, cao 32 (>= 24 px của WCAG 2.5.8)
+        const minH = el.id === "chat-toggle" ? 31.5 : 43.5;
+        if (b.width < 43.5 || b.height < minH)
           out.push((el.id ? "#" + el.id : el.tagName.toLowerCase() + "." + String(el.className).split(" ")[0]) + " " + Math.round(b.width) + "x" + Math.round(b.height));
       }
       return out;
@@ -307,31 +309,10 @@ try {
       smallTargets.length === 0,
       `mọi mục tiêu chạm đang hiện >= 44x44 (${smallTargets.length} nhỏ hơn${smallTargets.length ? ": " + smallTargets.slice(0, 8).join(", ") : ""})`,
     );
-    const hudGrid = await J(`(() => {
-      const hud = document.getElementById("hud");
-      const h = hud.getBoundingClientRect();
-      const cs = getComputedStyle(hud);
-      const inner = { l: h.left + parseFloat(cs.borderLeftWidth) + parseFloat(cs.paddingLeft), r: h.right - parseFloat(cs.borderRightWidth) - parseFloat(cs.paddingRight),
-        b: h.bottom - parseFloat(cs.borderBottomWidth) - parseFloat(cs.paddingBottom) };
-      const btns = [...hud.querySelectorAll(".hud-btn")].filter((b) => b.getClientRects().length > 0).map((b) => { const q = b.getBoundingClientRect(); return { x: q.x, y: q.y, r: q.right, b: q.bottom }; });
-      let minGap = Infinity;
-      for (let i = 0; i < btns.length; i++)
-        for (let j = i + 1; j < btns.length; j++) {
-          const a = btns[i], c = btns[j];
-          minGap = Math.min(minGap, Math.max(a.x - c.r, c.x - a.r, a.y - c.b, c.y - a.b));
-        }
-      const inside = btns.every((q) => q.x >= inner.l - 0.5 && q.r <= inner.r + 0.5 && q.b <= inner.b + 0.5);
-      return { n: btns.length, minGap, inside };
-    })()`);
-    check(hudGrid.n >= 6, `bảng HUD có ${hudGrid.n} nút (>= 6)`);
-    check(
-      hudGrid.inside,
-      "mọi nút HUD nằm trọn trong vùng nội dung của bảng HUD (không tràn / không bị cắt)",
-    );
-    check(
-      hudGrid.minGap >= 4,
-      `khoảng cách nhỏ nhất giữa các nút HUD >= 4 px (${Math.round(hudGrid.minGap)} px)`,
-    );
+    // Thẻ nhân vật KHÔNG còn nút nào: sáu nút cũ thành thanh menu bảy nút ở cột phải (màn < 620 px gộp vào nút ☰). Bố cục thanh menu (cùng cỡ, cùng một hàng,
+    // cách đều, trong khung nhìn, khoảng cách giữa các nút) do `e2e-giao-dien.ts` đo ở 8 cỡ màn hình (mục "thanh menu"), nên không kiểm lặp ở đây.
+    const hudBtns = await evalJs(`document.querySelectorAll("#hud .hud-btn").length`);
+    check(hudBtns === 0, `thẻ nhân vật không chứa nút nào (${hudBtns})`);
 
     // --- 2b) Vùng joystick không bị thân bảng HUD nuốt chạm (#326; phát hiện ở điện thoại ngang: chạm vào thân bảng Nhiệm vụ không bắt đầu được joystick) ---
     // Mọi điểm lưới trong vùng joystick mà bị phần tử khác che phải thuộc một phần tử TƯƠNG TÁC (nút, mục nhiệm vụ...); thân bảng thì không
@@ -393,8 +374,8 @@ try {
     // Nút HUD vẫn bắt chạm (không bị pointer-events: none lây sang)
     const btnHit = await J(`(() => {
       const out = {};
-      for (const id of ["btn-bag", "btn-char", "btn-quest"]) {
-        const b = document.getElementById(id); if (!b) continue;
+      for (const id of ["btn-menu", "btn-bag", "btn-char", "btn-quest"]) {
+        const b = document.getElementById(id); if (!b || b.getClientRects().length === 0) continue; // màn hẹp: chỉ ☰ hiện, bảy nút kia nằm trong menu đóng
         const r = b.getBoundingClientRect();
         const el = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
         out[id] = Boolean(el && el.closest("button") === b);
@@ -403,7 +384,7 @@ try {
     })()`);
     check(
       Object.values(btnHit).length > 0 && Object.values(btnHit).every(Boolean),
-      `nút HUD vẫn bắt chạm giữa các thân bảng trong suốt (${JSON.stringify(btnHit)})`,
+      `nút menu HUD đang hiện vẫn bắt chạm giữa các thân bảng trong suốt (${JSON.stringify(btnHit)})`,
     );
 
     // --- 3) Đa chạm: joystick (ngón 1) + Chém (ngón 2) + Kiếm khí (ngón 3) cùng lúc ---
@@ -450,7 +431,10 @@ try {
       `(() => ["set-quality", "set-touch-scheme"].map((id) => { const el = document.getElementById(id); const b = el.getBoundingClientRect(); return { id, h: b.height, bg: getComputedStyle(el).backgroundColor }; }))()`,
     );
     for (const c of sel) {
-      check(c.h >= 44, `ô chọn #${c.id} cao >= 44 px (${Math.round(c.h)} px)`);
+      check(
+        c.h >= 43.5,
+        `ô chọn #${c.id} cao >= 44 px, dung sai dưới điểm ảnh (${c.h.toFixed(2)} px)`,
+      );
       check(
         c.bg !== "rgb(255, 255, 255)",
         `ô chọn #${c.id} theo tông tối, không nền trắng mặc định (${c.bg})`,
