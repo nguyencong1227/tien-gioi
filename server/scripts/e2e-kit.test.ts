@@ -158,6 +158,14 @@ describe("e2e-kit: getChromeGpuFlags", () => {
       expect(getChromeGpuFlags()).toEqual(["--disable-gpu"]);
 
       delete process.env.DISABLE_GPU;
+      process.env.FORCE_SWIFTSHADER = "1";
+      expect(getChromeGpuFlags()).toEqual([
+        "--use-gl=angle",
+        "--use-angle=swiftshader",
+        "--enable-unsafe-swiftshader",
+      ]);
+      delete process.env.FORCE_SWIFTSHADER;
+
       process.env.CI = "true";
       expect(getChromeGpuFlags()).toEqual(["--disable-gpu"]);
 

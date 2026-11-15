@@ -8,3 +8,4 @@ soak-*.json
 *.log
 .DS_Store
 .env.local
+e2e-logs*/
