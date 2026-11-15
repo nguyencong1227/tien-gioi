@@ -320,13 +320,13 @@ export const ITEMS: ItemDef[] = [
     desc: "Viên châu băng kết tinh từ hàn khí của Thiên Hàn Vương, lạnh tới tận linh hồn.",
     color: 0x4a9ed8,
   },
-  // Đan cấp 3 (M7.5c): cùng hiệu ứng với đan cấp 2, hồi nhiều hơn (hồi huyết 40 -> 70 -> 90 %)
+  // Đan cấp 3 (M7.5c): cùng hiệu ứng với đan cấp 2, hồi nhiều hơn (hồi huyết 40 -> 70 -> 90 %); độ hiếm 3 (tiên phẩm, ◆◆◆) để phân biệt với đan cấp 2 (bảo phẩm, ◆◆) trong túi (nit B, M7.9)
   {
     id: "thuong_hoi_huyet_dan",
     name: "Thượng Hồi Huyết Đan",
     type: "consumable",
     stack: 20,
-    rarity: 2,
+    rarity: 3,
     desc: "Hồi 90% khí huyết.",
     effect: { kind: "healHp", pct: 0.9 },
     cooldown: 12_000,
@@ -337,7 +337,7 @@ export const ITEMS: ItemDef[] = [
     name: "Thượng Hồi Linh Đan",
     type: "consumable",
     stack: 20,
-    rarity: 2,
+    rarity: 3,
     desc: "Hồi 90% linh lực.",
     effect: { kind: "healMp", pct: 0.9 },
     cooldown: 12_000,
