@@ -998,6 +998,18 @@ async function main() {
       `client nhận ĐÚNG MỘT vùng báo tròn: tâm ở chỗ quái, bán kính ${slam!.radius} px, gồng ${slam!.windupMs} ms`,
     );
     must(p9.hp === p9.maxHp, "đang gồng: quái đứng yên, KHÔNG đánh thường (khí huyết chưa mất)");
+    // Suốt lúc gồng (đọc máy chủ: `mc.slam` còn = chưa đáp, cùng tick với lúc đáp thì xoá): quái KHÔNG nhúc nhích và KHÔNG đánh thường. Lấy mẫu mỗi 30 ms tới khi đáp.
+    let maxMove9 = 0;
+    let minHp9 = p9.hp;
+    for (const end = Date.now() + 5000; st1.mc.slam && Date.now() < end; await sleep(30)) {
+      maxMove9 = Math.max(maxMove9, Math.hypot(st1.m.x - at9.x, st1.m.y - at9.y));
+      minHp9 = Math.min(minHp9, p9.hp);
+    }
+    must(!st1.mc.slam, "cú đập đã đáp (hết gồng)");
+    must(
+      maxMove9 <= 1 && minHp9 === p9.maxHp,
+      `suốt lúc gồng quái đứng yên (nhích tối đa ${maxMove9.toFixed(2)} px) và không đánh thường (khí huyết thấp nhất ${minHp9} / ${p9.maxHp})`,
+    );
     await until(() => (p9.hp < p9.maxHp ? true : false), "người đứng yên trong vòng bị đập", 5000);
     const drop9 = p9.maxHp - p9.hp;
     must(
@@ -1005,12 +1017,14 @@ async function main() {
       `lần mất khí huyết đầu tiên là cú đập đất: round(atk ${st1.mc.def.atk} x ${slam!.mult}) = ${dmg9}, thực tế -${drop9}`,
     );
     must(
-      Math.hypot(st1.m.x - at9.x, st1.m.y - at9.y) <= 1,
-      "quái đứng yên suốt lúc gồng (không áp sát)",
-    );
-    must(
       (await warnsOf()) === warns9 + 1,
       `suốt đợt gồng chỉ MỘT tin báo trước (${(await warnsOf()) - warns9})`,
+    );
+    // #645 (nit của B khi xem trùm thật): đập đất tính như MỘT đòn đánh, quái chờ đủ `attackCd` (Cốt Tượng 1800 ms) rồi mới đánh thường; người đứng sát vẫn chỉ mất đúng một cú đập
+    await sleep(1200);
+    must(
+      p9.maxHp - p9.hp === dmg9,
+      `1,2 s sau cú đập: KHÔNG bị đánh thường liền sau (khí huyết -${p9.maxHp - p9.hp}, mong đợi -${dmg9})`,
     );
     ok(`đứng yên trong vòng: trúng đúng MỘT cú đập đất (khí huyết -${drop9} = ${dmg9})`);
     await T.waitFor(
