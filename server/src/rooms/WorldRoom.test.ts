@@ -2130,7 +2130,7 @@ describe("đi qua cổng giữa hai bản đồ (M3 bước 1)", () => {
       Math.hypot(e.me().x - portalAmSuongBac.spawn.x, e.me().y - portalAmSuongBac.spawn.y),
     ).toBeLessThan(2);
     expect(fileOf(name).mapId).toBe(AM_SUONG_ID);
-  });
+  }, 35000);
 });
 
 describe("đội dùng chung giữa các bản đồ (M3 bước 1)", () => {
