@@ -84,6 +84,19 @@ describe("đập đất: gồng báo trước", () => {
     expect(p.hp).toBe(p.maxHp); // chưa mất gì (không đánh thường lúc gồng)
   });
 
+  it("NGƯỠNG bắt đầu gồng khớp vùng trúng: người chơi ở radius + bán kính người chơi - 2 px (đã chạm vòng) thì quái gồng; radius + bán kính người chơi + 4 px thì chưa (nit B ở #629)", () => {
+    for (const [gap, starts] of [
+      [SLAM.radius + PLAYER_RADIUS - 2, true],
+      [SLAM.radius + 5, true], // đã nằm giữa `radius` và `radius + PLAYER_RADIUS`: vùng trúng đã chạm người, nên phải báo trước
+      [SLAM.radius + PLAYER_RADIUS + 4, false],
+    ] as const) {
+      const { circles, mon, tick } = scene(gap);
+      tick(1);
+      expect(circles().length > 0, `cách ${gap} px`).toBe(starts);
+      expect(mon.mc.slam !== undefined, `cách ${gap} px`).toBe(starts);
+    }
+  });
+
   it("người chơi NGOÀI vòng (radius + bán kính người chơi + 4 px) thì quái chưa gồng, cứ đuổi như quái thường", () => {
     const { mon, tick, circles } = scene(SLAM.radius + PLAYER_RADIUS + 4);
     const x0 = mon.m.x;
