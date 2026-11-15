@@ -1,6 +1,8 @@
 // Hệ thống nhạc nền (trấn / hoang dã chuyển mượt) và âm thanh hiệu ứng bằng Web Audio API.
 // Không cần file âm thanh nặng, tuân thủ chính sách autoplay của trình duyệt và lưu trạng thái tắt tiếng vào localStorage.
 
+import { SFX_MIN_GAP_S, boltSfx, castSfx, statusSfx, type SfxRecipe } from "./sfx-recipes";
+
 export type BgmZone = "town" | "wild";
 
 const MUTE_KEY = "tg_muted";
@@ -31,6 +33,10 @@ class SoundEngine {
   private bgmTimer: number | null = null;
   private lastBlipAt = 0;
   private lastWarnAt = -1;
+  /** Lần phát gần nhất (giây theo đồng hồ Web Audio) của từng loại tiếng chiến đấu M7 ("cast" / "bolt" / "status"): chống dồn (`SFX_MIN_GAP_S`) */
+  private lastSfxAt: Record<string, number> = {};
+  /** Đệm nhiễu trắng dùng chung cho các công thức có nhiễu (dựng lười một lần) */
+  private noiseBuf: AudioBuffer | null = null;
   private listeners: Array<(muted: boolean) => void> = [];
 
   constructor() {
@@ -349,6 +355,81 @@ class SoundEngine {
       osc.start(t);
       osc.stop(t + 0.11);
     }
+  }
+
+  /**
+   * Phát một công thức âm tổng hợp (`sfx-recipes.ts`, #508 (a)): vài dao động trượt tần số + một đợt nhiễu lọc, mỗi cái có đường biên độ lên nhanh xuống mũ. `kind` gom
+   * chống dồn (hai tiếng cùng loại cách nhau < `SFX_MIN_GAP_S` thì bỏ tiếng sau); `volume` 0..1 nhân thêm (tiếng của người khác nhỏ hơn của mình).
+   */
+  private playSfx(r: SfxRecipe, kind: string, volume: number) {
+    if (!this.ready() || !this.ctx || !this.sfxGain) return;
+    const ctx = this.ctx;
+    const now = ctx.currentTime;
+    const last = this.lastSfxAt[kind];
+    if (last !== undefined && now - last < SFX_MIN_GAP_S) return;
+    this.lastSfxAt[kind] = now;
+    const vol = Math.max(0, Math.min(1, volume));
+    for (const q of r.partials) {
+      const t = now + q.at;
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = q.wave;
+      osc.frequency.setValueAtTime(q.f0, t);
+      osc.frequency.exponentialRampToValueAtTime(q.f1, t + q.dur);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(
+        Math.max(0.0002, q.vol * vol),
+        t + Math.min(0.012, q.dur / 3),
+      );
+      g.gain.exponentialRampToValueAtTime(0.0001, t + q.dur);
+      osc.connect(g);
+      g.connect(this.sfxGain);
+      osc.start(t);
+      osc.stop(t + q.dur + 0.02);
+    }
+    if (r.noise) {
+      if (!this.noiseBuf) {
+        const len = Math.floor(ctx.sampleRate * 0.6);
+        const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+        this.noiseBuf = buf;
+      }
+      const t = now + r.noise.at;
+      const src = ctx.createBufferSource();
+      src.buffer = this.noiseBuf;
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.setValueAtTime(r.noise.lp, t);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(
+        Math.max(0.0002, r.noise.vol * vol),
+        t + Math.min(0.012, r.noise.dur / 3),
+      );
+      g.gain.exponentialRampToValueAtTime(0.0001, t + r.noise.dur);
+      src.connect(lp);
+      lp.connect(g);
+      g.connect(this.sfxGain);
+      src.start(t);
+      src.stop(t + r.noise.dur + 0.02);
+    }
+  }
+
+  /** Tiếng DÙNG CHIÊU theo hệ + hình (`castSfx`); `mine` = chiêu của chính mình (to), người khác trong tầm nhìn nhỏ hơn. */
+  cast(element: unknown, shape: unknown, mine: boolean) {
+    this.playSfx(castSfx(element, shape), "cast", mine ? 1 : 0.4);
+  }
+
+  /** Tiếng đạn tầm xa của quái bắn ra (`boltSfx`, hệ của đạn nếu có). */
+  bolt(element?: unknown) {
+    this.playSfx(boltSfx(element), "bolt", 0.8);
+  }
+
+  /** Tiếng khi MÌNH dính một trạng thái mới (`statusSfx`); loại lạ thì im. */
+  status(kind: unknown, harmful: boolean) {
+    const r = statusSfx(kind, harmful);
+    if (r) this.playSfx(r, "status", 0.9);
   }
 
   /** Tiếng nhặt linh vật / đan dược */

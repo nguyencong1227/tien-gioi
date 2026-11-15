@@ -96,6 +96,7 @@ import {
   type CastMsg,
   type SkillDef,
   skillOf,
+  statusOf,
   type SkillSlot,
   type SkillsMsg,
   type FxMsg,
@@ -1724,7 +1725,18 @@ export class WorldScene extends Phaser.Scene {
 
   /** Nhận danh sách trạng thái của chính mình (server gửi khi thêm / mất / làm mới, vơi khiên, nối lại). Công khai để script kiểm giả lập (`?debug`) bơm tin. */
   public onStatus(m: StatusMsg) {
-    this.status.set(m?.list, performance.now());
+    const now = performance.now();
+    const before = new Set(this.status.active(now).map((e) => e[0]));
+    this.status.set(m?.list, now);
+    // tiếng khi dính trạng thái MỚI (một tiếng cho mỗi tin, ưu tiên loại có hại; làm mới trạng thái đã có thì im)
+    let pick: { kind: string; harmful: boolean } | null = null;
+    for (const e of this.status.active(now)) {
+      if (before.has(e[0])) continue;
+      const st = statusOf(e[0]);
+      if (!st) continue;
+      if (!pick || (st.harmful && !pick.harmful)) pick = { kind: st.kind, harmful: st.harmful };
+    }
+    if (pick) sound.status(pick.kind, pick.harmful);
   }
 
   /** Nhận sổ chiêu + hồi chiêu của chính mình (server gửi khi đổi và định kỳ). Công khai để script kiểm giả lập (`?debug`) bơm tin. */
@@ -3475,6 +3487,8 @@ export class WorldScene extends Phaser.Scene {
           const other = this.players.get(m.by);
           if (other) other.slashUntil = this.time.now + SLASH_MS;
         }
+        // Tiếng chiêu (#508 (a), tổng hợp bằng mã): của mình luôn nghe; của người khác chỉ khi trong tầm nhìn (nhỏ hơn)
+        if (mine || this.inView(m.x, m.y, m.range + 96)) sound.cast(def.element, def.shape, mine);
         if (!this.inView(m.x, m.y, m.range + 96)) return;
         return this.playFxPoints(
           planCastFx({
@@ -3495,6 +3509,7 @@ export class WorldScene extends Phaser.Scene {
       case "bolt":
         // Đạn tầm xa của quái: client tự bay theo `speed` / `angle` tới hết `range` (đạn không là state)
         this.telegraphs.bolt(m, this.time.now);
+        if (this.inView(m.x, m.y, 160)) sound.bolt(m.element);
         return;
       case "levelup":
         return this.fxLevelUp(m.x, m.y, m.major, m.by === this.sid);
