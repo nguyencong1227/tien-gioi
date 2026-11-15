@@ -100,7 +100,14 @@ export const QUESTS: QuestDef[] = [
     giver: "truong_tran",
     desc: "Đột phá từ Phàm Nhân lên Luyện Khí.",
     steps: [{ kind: "reachRealm", realm: 1, tier: 0 }],
-    rewards: { exp: 40, items: [{ itemId: "hoi_linh_dan", qty: 2 }] },
+    // M7.4: kinh quyển đầu tiên ngay khi bước vào Luyện Khí (chiêu cơ bản yêu cầu Luyện Khí tầng 1), để người mới học chiêu đầu mà không phải cày Linh thạch mua ở tiệm
+    rewards: {
+      exp: 40,
+      items: [
+        { itemId: "hoi_linh_dan", qty: 2 },
+        { itemId: "kinh_hoa_van_kiem", qty: 1 },
+      ],
+    },
     next: "tinh_toa",
     talk: {
       offer: [
@@ -110,6 +117,7 @@ export const QUESTS: QuestDef[] = [
       progress: ["Thanh tu vi chưa đầy thì chưa đột phá được. Ra ngoài luyện thêm đi."],
       complete: [
         "Ta cảm nhận được linh lực đang lưu chuyển trong kinh mạch ngươi. Chúc mừng, Luyện Khí tầng một!",
+        "Cầm lấy quyển Hỏa Vân Kiếm Pháp này: mở bảng Công pháp (Shift+K) để học, rồi gắn vào ô chiêu. Có chiêu trong tay, đánh quái sẽ nhanh hơn.",
         "Hà lão có chuyện muốn nói với người mới bước vào tiên đồ. Ghé qua đó một chuyến.",
       ],
     },

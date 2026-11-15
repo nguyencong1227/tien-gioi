@@ -5,6 +5,7 @@
 ## [Chưa phát hành] — M7 (Chiều sâu chiến đấu + Nguyên Anh)
 
 ### Máy chủ
+- **Nhiệm vụ 'Bước vào tiên đồ' thưởng quyển Hỏa Vân Kiếm Pháp (M7.4, #505):** người mới lên Luyện Khí tầng 1 nhận ngay kinh quyển đầu tiên, mở bảng Công pháp (Shift+K) để học chiêu mà không phải cày Linh thạch mua ở tiệm.
 - **Tinh anh (M7.3 bước 6, #504):** quái thường hiếu chiến (không trùm, không Linh Thố hiền) ở bản đồ thường hiếm khi (4 %, tối đa 3 con mỗi bản đồ) sinh ra là tinh anh: khí huyết x2,5, công x1,5; hạ được thì tu vi x2, tiền rơi x2 và tung bảng rơi đồ thêm một lần. Từ Kim Đan, tinh anh đủ sức giết người đứng yên (phải né báo trước đòn, uống đan hoặc đi theo đội); client vẽ viền / tên tinh anh ở việc riêng của B.
 - **Chuỗi nhiệm vụ Nguyên Anh ở Hàn Vân Trạm (M7.5c bước 2, #506):** tám nhiệm vụ chính nối sau Kim Đan hậu kỳ (đột phá Nguyên Anh, Hàn Lang, Phong Nha, Cốt Tượng, Độc Tước, hậu kỳ, rồi trùm Thiên Hàn Vương) và ba nhiệm vụ lặp mỗi ngày. Hạ Hắc Giao (đội) chuyển thành việc phụ để chuỗi chính làm được một mình tới Nguyên Anh.
 - **Bộ đồ IV, đan cấp 3 và ba NPC Hàn Vân Trạm (M7.5c bước 1, #506):** năm nguyên liệu mới (mỗi loài ở Hàn Vân một thứ, trùm rơi Thiên Hàn châu), Thượng Hồi Huyết / Linh Đan (hồi 90 %), bộ IV Nguyên Anh sơ kỳ năm món (vũ khí, bào, phù, hài, ngọc bội) rèn ở thợ rèn Hàn Vân có phí Linh thạch; lái buôn Hàn Vân bán đan cấp 1-3. Chuỗi nhiệm vụ Nguyên Anh ở bước kế.
