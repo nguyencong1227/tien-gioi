@@ -19,6 +19,7 @@ import {
   SECT_ELDERS_MAX,
   SECT_LOG_MAX,
   SECT_MAX_MEMBERS,
+  SKILLS_M7,
   sanitizeSkillBook,
 } from "@tien-gioi/shared";
 import {
@@ -1900,6 +1901,55 @@ describe("audit-saves (Issue #112)", () => {
       });
       const errsFake = auditPlayerSaveData(fakeQuest, fakeQuest.length);
       expect(errsFake.map((e) => e.code)).toContain("unknown_quest");
+    });
+
+    it("tệp lưu CŨ thiếu 6 chiêu Nguyên Anh mới và tệp lưu có đủ 18 chiêu + 6 kinh quyển Nguyên Anh đợt 2 (#654/#722) đều 0 lỗi", () => {
+      expect(SKILLS_M7.length).toBe(18);
+      // 1. Tệp lưu cũ chỉ có các chiêu đợt 1 (12 chiêu đầu), thiếu 6 chiêu Nguyên Anh đợt 2
+      const old12Learned = Object.fromEntries(SKILLS_M7.slice(0, 12).map((s) => [s.id, 2]));
+      const oldSaveRaw = JSON.stringify({
+        ...validNguyenAnhPlayer,
+        skills: {
+          learned: old12Learned,
+          slots: ["hoa_van_kiem", "thanh_tung_phi_cham", "cuu_cung_khon_sat", "huyen_bang_chi"],
+        },
+      });
+      expect(auditPlayerSaveData(oldSaveRaw, oldSaveRaw.length)).toEqual([]);
+
+      // 2. Tệp lưu mới có đủ toàn bộ 18 chiêu (kể cả 6 chiêu Nguyên Anh đợt 2) + 6 kinh quyển Nguyên Anh trong túi đồ
+      const all18Learned = Object.fromEntries(SKILLS_M7.map((s) => [s.id, 3]));
+      const full18SaveRaw = JSON.stringify({
+        ...validNguyenAnhPlayer,
+        inventory: [
+          { itemId: "kinh_han_quang_tien", qty: 1 },
+          { itemId: "kinh_bach_kim_trao", qty: 1 },
+          { itemId: "kinh_van_thach_tran", qty: 1 },
+          { itemId: "kinh_bang_hoa_loan", qty: 1 },
+          { itemId: "kinh_liet_hoa_kiem", qty: 1 },
+          { itemId: "kinh_van_hanh_bo", qty: 1 },
+        ],
+        skills: {
+          learned: all18Learned,
+          slots: ["han_quang_tien", "bach_kim_trao", "van_thach_tran", "liet_hoa_kiem"],
+        },
+      });
+      expect(auditPlayerSaveData(full18SaveRaw, full18SaveRaw.length)).toEqual([]);
+
+      // 3. Chân linh khắc chiêu Nguyên Anh đợt 2 -> 0 lỗi
+      const soulRaw = JSON.stringify({
+        v: 1,
+        id: "bang_van",
+        kiep: 3,
+        duyen: 20,
+        duyenTotal: 120,
+        unlocks: { khac: 2 },
+        origins: [],
+        best: { step: 17, realm: 4, tier: 1 },
+        engraved: ["han_quang_tien", "liet_hoa_kiem"],
+        createdAt: "2026-11-10T00:00:00.000Z",
+        updatedAt: "2026-11-15T00:00:00.000Z",
+      });
+      expect(auditSoulSaveData(soulRaw, soulRaw.length)).toEqual([]);
     });
   });
 });
