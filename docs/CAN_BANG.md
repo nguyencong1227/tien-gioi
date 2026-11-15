@@ -676,7 +676,7 @@ Tiêu chí #406 mục 1 sau hiệu chỉnh (tối đa của ba bậc; ĐẠT khi
 
 ## Nguyên Anh sau nội dung (M7.5 / M7.9)
 
-Tính SỐNG từ `shared/` bằng mô hình ở trên. Quái mới ở Hàn Vân: Hàn Lang (cấp 16, gồng lao), Phong Nha (17, bắn đạn), Cốt Tượng (17, dày, đập đất), Độc Tước (18, đòn nặng + độc), trùm Thiên Hàn Vương (21, đội 3-4 người). Thanh Nguyên Anh 288,000 / 331,200 / 380,880. Thời gian tìm quái lấy theo loài Kim Đan cùng vai (`ASSUME.searchSec`): Hàn Vân thưa hơn Âm Sương nên là cận lạc quan, `search-check.ts` chưa đo Hàn Vân. Mô hình KHÔNG tính chiêu / hệ / trạng thái (chỉ Kiếm chém, như mọi mục trên) và không tính đồ ba ô riêng (`ASSUME.useOwnerGear` tắt).
+Tính SỐNG từ `shared/` bằng mô hình ở trên. Quái mới ở Hàn Vân: Hàn Lang (cấp 16, gồng lao), Phong Nha (17, bắn đạn), Cốt Tượng (17, dày, đập đất), Độc Tước (18, đòn nặng + độc), trùm Thiên Hàn Vương (21, đội 3-4 người). Thanh Nguyên Anh 288,000 / 331,200 / 380,880. Thời gian tìm quái lấy theo loài Kim Đan cùng vai (`ASSUME.searchSec`): Hàn Vân thưa hơn Âm Sương nên là cận lạc quan, `search-check.ts` chưa đo Hàn Vân. Mô hình KHÔNG tính chiêu / hệ / trạng thái (chỉ Kiếm chém, như mọi mục trên) và không tính đồ ba ô riêng (`ASSUME.useOwnerGear` tắt; độ nhạy ở mục 5).
 
 ### 1. Săn solo (tu vi / giờ, Linh thạch / giờ gồm bán đồ rơi, con / giờ, khí huyết mất / trận)
 
@@ -730,6 +730,22 @@ Thu nhập theo nhịp mục 3 (săn solo, mỗi bậc nguồn tốt nhất): ti
 Tổng phí rèn bộ IV **43,500** Linh thạch = **2.1 giờ** thu nhập Sơ kỳ (so với Kim Đan: bộ III một mình 47,000 Linh thạch ~ 3.5 giờ thu nhập Hậu kỳ, ba bộ 78,500 ~ 5.9 giờ). Có được 211,439 tới hết Nguyên Anh: dư 167,939. Đan cấp 3 (`thuong_hoi_huyet_dan`, 360 Linh thạch / viên) là chỗ xả TUỲ CHỌN: 58 viên / giờ thu nhập Sơ kỳ.
 
 **Đọc bảng.** Bộ IV trả đủ từ Nguyên Anh Trung kỳ (dư 65,241 cuối bậc; cuối Sơ kỳ còn thiếu 4,090); cày nguyên liệu chiếm tối đa 44% thời gian bậc nên nguyên liệu không phải nút cổ chai, tiền mới là. **CHƯA CHỐT (câu hỏi ở `questions.md`):** vì cả năm món cùng mặc được từ Sơ kỳ (khác Kim Đan: ba bộ rải ba bậc), sau khi rèn xong Linh thạch còn dư **167,939** (3.9x phí bộ IV) tới hết cảnh giới mà chỉ có đan cấp 3 (466 viên) và kho tông môn làm chỗ tiêu: đúng cảnh báo "dư hàng vạn Linh thạch không có chỗ tiêu" của mục "Kinh tế Linh thạch" (Kim Đan thì thiếu 14,942 cuối cảnh giới). Hướng đề xuất: tách bộ IV thành ba bậc (Sơ / Trung / Hậu kỳ, phí tăng dần như Kim Đan) hoặc nâng phí; chưa đổi vì đụng `shared/` (công thức, món đồ, `reqTier`) và phải chờ số đo bot thật của C.
+
+### 5. Độ nhạy với đồ ba ô riêng (`ASSUME.useOwnerGear`)
+
+Mọi mục trên đo với `useOwnerGear = false`: người chơi chỉ mặc ba ô công khai (vũ khí, bào, phù), KHÔNG tính hài, ngọc bội, pháp bảo (M7.4; `OWNER_EQUIP_SLOTS`: hài thêm tốc độ + `guard` giảm sát thương nhận, ngọc bội thêm khí huyết / linh lực / giảm hồi chiêu). Đó là giả định BẢO THỦ (người mới chưa rèn kịp) và là lý do mọi chốt cân bằng cũ vẫn đúng; bật cờ lên làm vài ca "một người không hạ nổi trùm" lệch. Bảng dưới đo SỐNG cả hai cấu hình (mô hình, không tính chiêu / hệ / trạng thái) để thấy mức lệch trước khi quyết có chỉnh số trùm / thanh tu vi hay giữ cờ tắt:
+
+| Chỉ số | Không đồ ô riêng (mặc định) | Có đồ ô riêng |
+|---|---:|---:|
+| Hết Trúc Cơ (phút cộng dồn; mục tiêu ~180) | 172 | 171 |
+| Riêng Kim Đan, bãi mới (giờ; mục tiêu 5-7) | 5.7 | 5.5 |
+| Riêng Nguyên Anh (giờ; mục tiêu 6-9) | 6.1 | 5.9 |
+| Đội nhỏ nhất đánh Hắc Giao an toàn (Sơ / Trung / Hậu kỳ Kim Đan) | 4 / 3 / 3 | 4 / 3 / 3 |
+| Đội nhỏ nhất đánh Thiên Hàn Vương an toàn (Sơ / Trung / Hậu kỳ Nguyên Anh) | 4 / 3 / 3 | 3 / 3 / 3 |
+| Khí huyết mất / trận, solo Độc Thiềm Hậu kỳ Kim Đan (%) | 34 | 28 |
+| Khí huyết mất / trận, solo Độc Tước Hậu kỳ Nguyên Anh (%) | 38 | 33 |
+
+Đọc bảng: có đồ ô riêng thì nhịp nhanh hơn 1 phút (Trúc Cơ), 0.2 giờ (Kim Đan), 0.3 giờ (Nguyên Anh) và solo bớt 6 / 5 điểm phần trăm khí huyết: mô hình lệch NHỎ. Độ lệch nằm ở các ngưỡng cứng. **Thử bật cờ (A, 15/11/2026): 10 ca đỏ**, chia ba nhóm: (1) mô hình: nhịp Nguyên Anh xuống dưới 6 giờ, Thiên Hàn Vương Sơ kỳ đội 3 đã hạ được (test ghim đội 4), Trúc Cơ cộng dồn lệch 1 phút so với số ghim; (2) mã server thật: bí cảnh (một người hạ được trùm ở bậc 11, thêm đan thì đỡ hơn mức test ghim), `hunt-check` trùm theo đội (Hắc Giao, Thiên Hàn Vương); (3) `search-check`: thợ săn seed 2 không hạ được con nào ở Âm Sương khi tốc độ đổi (thợ săn nhạy với tốc độ, chưa phải lỗi của đồ). Vì vậy giữ cờ **TẮT** (giả định bảo thủ: người mới chưa rèn kịp hài / ngọc bội / pháp bảo); bật thì phải chỉnh cùng lúc số trùm (công / máu), dải bậc bí cảnh và ngưỡng nhịp, chưa làm vì cần số đo bot thật của C để biết người chơi thật mặc bao nhiêu đồ ô riêng ở từng bậc.
 
 
 ## Cân bằng chiêu thức, ngũ hành và trạng thái (M7, #510)
