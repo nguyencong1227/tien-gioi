@@ -623,10 +623,13 @@ describe("benchmark bốn bản đồ chạy đồng thời (M7.10 #511)", () =>
     // Ngân sách tick tổng của cả 4 bản đồ < 10 ms
     expect(res.avgTotalMs).toBeLessThan(10);
     expect(res.p95TotalMs).toBeLessThan(10);
-    // Từng bản đồ: patch < 520 byte/tick mỗi client, quái được sinh đầy đủ
+    // Quái tinh anh thực sự được sinh ở cả 4 bản đồ (nit A ở #666)
+    expect(res.totalElites).toBeGreaterThan(0);
+    // Từng bản đồ: patch < 520 byte/tick mỗi client, quái và tinh anh được sinh đầy đủ
     for (const r of res.rooms) {
       expect(r.patchBytes).toBeLessThan(520);
       expect(r.monsters).toBeGreaterThan(0);
+      expect(r.elites).toBeGreaterThan(0);
     }
   });
 

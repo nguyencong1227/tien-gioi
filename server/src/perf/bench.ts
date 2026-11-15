@@ -313,6 +313,7 @@ export interface MultiMapRoomResult {
   mapName: string;
   players: number;
   monsters: number;
+  elites: number;
   patchBytes: number;
   kbPerSecPerClient: number;
   eventKbBroadcast: number;
@@ -326,6 +327,7 @@ export interface MultiMapBenchResult {
   ticks: number;
   totalPlayers: number;
   totalMonsters: number;
+  totalElites: number;
   avgTotalMs: number;
   p95TotalMs: number;
   maxTotalMs: number;
@@ -574,11 +576,16 @@ export function runMultiMapBench(
     const roomResults: MultiMapRoomResult[] = rooms.map((room) => {
       const patchBytes = room.bytes / ticks;
       const p = room.players;
+      let elites = 0;
+      room.w.state.monsters.forEach((mon) => {
+        if (mon.elite >= 1) elites++;
+      });
       return {
         mapId: room.map.def.id,
         mapName: room.map.def.name,
         players: p,
         monsters: room.w.state.monsters.size,
+        elites,
         patchBytes,
         kbPerSecPerClient: (patchBytes * (1000 / TICK_MS)) / 1024,
         eventKbBroadcast: p > 0 ? room.getEvBroadcast() / p / seconds / 1024 : 0,
@@ -593,6 +600,7 @@ export function runMultiMapBench(
       ticks,
       totalPlayers: rooms.reduce((s, r) => s + r.players, 0),
       totalMonsters: rooms.reduce((s, r) => s + r.w.state.monsters.size, 0),
+      totalElites: roomResults.reduce((s, r) => s + r.elites, 0),
       avgTotalMs,
       p95TotalMs,
       maxTotalMs,
@@ -646,18 +654,18 @@ if (process.argv[1]?.endsWith("bench.ts")) {
     );
 
     console.log(
-      `Tổng người chơi: ${multiRes.totalPlayers} | Tổng quái: ${multiRes.totalMonsters} | Tick TB: ${multiRes.avgTotalMs.toFixed(3)} ms | p95: ${multiRes.p95TotalMs.toFixed(3)} ms | Max: ${multiRes.maxTotalMs.toFixed(2)} ms`,
+      `Tổng người chơi: ${multiRes.totalPlayers} | Tổng quái: ${multiRes.totalMonsters} (Tinh anh: ${multiRes.totalElites}) | Tick TB: ${multiRes.avgTotalMs.toFixed(3)} ms | p95: ${multiRes.p95TotalMs.toFixed(3)} ms | Max: ${multiRes.maxTotalMs.toFixed(2)} ms`,
     );
     console.log(
       `Trạng thái ngân sách tick tổng (< 10 ms): ${multiRes.avgTotalMs < 10 && multiRes.p95TotalMs < 10 ? "✅ ĐẠT" : "❌ VƯỢT NGÂN SÁCH"}\n`,
     );
     console.log(
-      "| Bản đồ | Người chơi | Quái | Patch TB (byte) | KB/s mỗi client | Party (KB/s) | Wallet (KB/s) |",
+      "| Bản đồ | Người chơi | Quái | Tinh anh | Patch TB (byte) | KB/s mỗi client | Party (KB/s) | Wallet (KB/s) |",
     );
-    console.log("|---|---:|---:|---:|---:|---:|---:|");
+    console.log("|---|---:|---:|---:|---:|---:|---:|---:|");
     for (const r of multiRes.rooms) {
       console.log(
-        `| ${r.mapName} (${r.mapId}) | ${r.players} | ${r.monsters} | ${Math.round(r.patchBytes)} | ${r.kbPerSecPerClient.toFixed(1)} | ${r.partyKbPerClient.toFixed(2)} | ${r.walletKbPerClient.toFixed(2)} |`,
+        `| ${r.mapName} (${r.mapId}) | ${r.players} | ${r.monsters} | ${r.elites} | ${Math.round(r.patchBytes)} | ${r.kbPerSecPerClient.toFixed(1)} | ${r.partyKbPerClient.toFixed(2)} | ${r.walletKbPerClient.toFixed(2)} |`,
       );
     }
 
