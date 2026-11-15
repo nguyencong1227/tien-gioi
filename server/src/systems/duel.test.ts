@@ -1,6 +1,6 @@
 // PK thách đấu (M3 bước 5b): thách / nhận / từ chối, đếm ngược, sát thương chỉ giữa hai người, gục rồi đứng dậy tại chỗ,
 // bất tử trước quái, khoá hồi phục / đan / đả tọa / qua cổng, mọi cách kết thúc, dọn lời mời và hồi chiêu. World giả.
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_MAP,
   DUEL_COOLDOWN_MS,
@@ -18,11 +18,17 @@ import {
   TICK_MS,
   TRAVEL_COMBAT_LOCK_MS,
   duelChallengeFailMessage,
+  ITEM_BY_ID,
+  emptyEquipment,
   getMap,
   statsFor,
+  type EquipSlot,
+  type EquipStats,
+  type ItemDef,
 } from "@tien-gioi/shared";
 import { Hub } from "../hub";
 import { hurtPlayer, slash, swordQi } from "./combat";
+import { setEquipment } from "./equipment";
 import { duelAnswer, duelChallenge, duelDrop, duelHit, duelYield, tickDuels } from "./duel";
 import { setMeditating } from "./progression";
 import { useItem } from "./inventory";
@@ -651,5 +657,95 @@ describe("nhật ký kiểm toán: PK thách đấu (M4 2.4, lát 3)", () => {
       startDuel(t, A, B);
       duelYield(t.w, B);
     }).not.toThrow();
+  });
+});
+
+describe("PK: trang bị ba ô riêng có tác dụng (M7.4: bạo kích `crit` của người đánh, giáp `guard` của người bị đánh)", () => {
+  const injected: string[] = [];
+  /** Chèn món thử vào `ITEM_BY_ID` (chưa nhờ món thật: số cố định để đo chính xác), dọn sau ca. */
+  function inject(id: string, slot: EquipSlot, stats: EquipStats) {
+    ITEM_BY_ID[id] = {
+      id,
+      name: `Món thử ${id}`,
+      type: "equip",
+      stack: 1,
+      rarity: 2,
+      desc: "thử",
+      equip: { slot, stats, reqRealm: 0, reqTier: 0 },
+      color: 0,
+    } as unknown as ItemDef;
+    injected.push(id);
+  }
+  afterEach(() => {
+    vi.restoreAllMocks();
+    for (const id of injected.splice(0)) delete ITEM_BY_ID[id];
+  });
+  /** Trận Alpha - Bravo ở pha đánh, hai người cùng Kim Đan (mở cả ba ô riêng). */
+  function fight() {
+    const t = makeWorld(DEFAULT_MAP, new Hub());
+    const a = addPlayer(t.w, A, 3, 0);
+    const b = addPlayer(t.w, B, 3, 0);
+    b.p.x = a.p.x + 45;
+    b.p.y = a.p.y;
+    startDuel({ ...t, ps: [a, b] } as unknown as T);
+    toFight({ ...t, ps: [a, b] } as unknown as T);
+    b.p.hp = b.p.maxHp = 1_000_000;
+    return { ...t, a, b };
+  }
+  const hit = (t: ReturnType<typeof fight>, random: number) => {
+    const hp0 = t.b.p.hp;
+    vi.spyOn(Math, "random").mockReturnValue(random);
+    expect(duelHit(t.w, A, B, 1)).toBe(true);
+    vi.restoreAllMocks();
+    return hp0 - t.b.p.hp;
+  };
+
+  it("GIÁP của người bị đánh giảm sát thương PK đúng phần trăm (làm tròn, ít nhất 1); không giáp thì nguyên", () => {
+    inject("t_guard", "boots", { guard: 40 });
+    const base = fight();
+    const noGuard = hit(base, 0.5);
+    expect(noGuard).toBeGreaterThan(10);
+    const t = fight();
+    setEquipment(t.b.p, { ...emptyEquipment(), boots: "t_guard" });
+    const guarded = hit(t, 0.5);
+    expect(guarded).toBe(Math.max(1, Math.round(noGuard * 0.6)));
+    expect(guarded).toBeLessThan(noGuard);
+    // sát thương tối thiểu 1 dù giáp tối đa
+    const tiny = fight();
+    setEquipment(tiny.b.p, { ...emptyEquipment(), boots: "t_guard" });
+    tiny.a.p.weapon = "";
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    const before = tiny.b.p.hp;
+    duelHit(tiny.w, A, B, 0.0001);
+    vi.restoreAllMocks();
+    expect(before - tiny.b.p.hp).toBeGreaterThanOrEqual(1);
+  });
+
+  it("GIÁP của người ĐÁNH không giảm sát thương nó gây; chỉ giáp của người bị đánh mới tính", () => {
+    inject("t_guard", "boots", { guard: 40 });
+    const base = fight();
+    const noGuard = hit(base, 0.5);
+    const t = fight();
+    setEquipment(t.a.p, { ...emptyEquipment(), boots: "t_guard" });
+    expect(hit(t, 0.5)).toBe(noGuard);
+  });
+
+  it("BẠO KÍCH từ trang bị của người đánh cộng vào xác suất bạo kích (ô chưa mở không tính): tung 0,45 không bạo kích khi tay không, bạo kích khi có +40 %", () => {
+    inject("t_crit", "treasure", { crit: 40 });
+    const plain = fight();
+    vi.spyOn(Math, "random").mockReturnValue(0.45);
+    duelHit(plain.w, A, B, 1);
+    vi.restoreAllMocks();
+    const plainDmg = 1_000_000 - plain.b.p.hp;
+
+    const t = fight();
+    setEquipment(t.a.p, { ...emptyEquipment(), treasure: "t_crit" });
+    vi.spyOn(Math, "random").mockReturnValue(0.45);
+    duelHit(t.w, A, B, 1);
+    vi.restoreAllMocks();
+    const critDmg = 1_000_000 - t.b.p.hp;
+    // bạo kích nhân CRIT_MULT (1,8) so với cùng lần tung không bạo kích
+    expect(critDmg).toBeGreaterThan(plainDmg * 1.5);
+    expect(critDmg).toBeLessThan(plainDmg * 2.1);
   });
 });

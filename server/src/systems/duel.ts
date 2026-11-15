@@ -24,6 +24,7 @@ import {
   duelChallengeFailMessage,
   parseDuelAnswer,
   parseDuelChallenge,
+  equipBonus,
   statsFor,
   type DuelEndReason,
   type DuelParty,
@@ -334,8 +335,12 @@ export function duelHit(w: World, attacker: string, target: string, mult: number
   const pa = w.state.players.get(attacker);
   const pt = w.state.players.get(target);
   if (!pa || !pt || pa.dead || pt.dead) return false;
-  const atk = statsFor(pa.realm, pa.tier, pa, w.ctrl.get(attacker)?.mult).atk;
-  const { dmg, crit } = rollDamage(atk, mult * PK_DAMAGE_MULT);
+  const sa = statsFor(pa.realm, pa.tier, pa, w.ctrl.get(attacker)?.mult);
+  // Bạo kích từ trang bị của người đánh (M7.4, `EquipStats.crit`, đã kẹp theo `STAT_CAPS.crit`) cộng vào bạo kích cơ bản như đánh quái
+  const { dmg: raw, crit } = rollDamage(sa.atk, mult * PK_DAMAGE_MULT, sa.crit);
+  // Giáp từ trang bị của người bị đánh (M7.4, `EquipStats.guard`, đã kẹp theo `STAT_CAPS.guard`; ô chưa mở không tính): giảm sát thương nhận, ít nhất 1 (như `damagePlayer` với quái)
+  const guard = equipBonus(pt, pt.realm).guard;
+  const dmg = guard > 0 ? Math.max(1, Math.round(raw * (1 - guard / 100))) : raw;
   pt.hp = Math.max(0, pt.hp - dmg);
   w.events.dmg({ target, amount: dmg, x: pt.x, y: pt.y - 20, crit, toPlayer: true });
   if (pt.hp <= 0) endDuel(w, d, attacker, "ko");
