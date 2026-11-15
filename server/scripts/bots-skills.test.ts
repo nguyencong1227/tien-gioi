@@ -47,15 +47,27 @@ describe("bot dùng chiêu thức: sampleSkillsForRealm (M7.10 #511)", () => {
     expect(s3.slots[2]).toBe("cuu_cung_khon_sat");
     expect(s3.slots[3]).toBe("");
 
-    // Realm 4: Nguyên Anh (mở cả 4 ô 2, 3, 4, 5)
+    // Realm 4: Nguyên Anh (mở cả 4 ô 2, 3, 4, 5, bao gồm 6 chiêu Nguyên Anh đợt 2 #654/#722)
     const s4 = sampleSkillsForRealm(4);
     for (const slot of LEARNABLE_SLOTS) {
       expect(slotOpen(slot, 4)).toBe(true);
     }
-    expect(s4.slots[0]).toBeTruthy();
-    expect(s4.slots[1]).toBeTruthy();
-    expect(s4.slots[2]).toBeTruthy();
-    expect(s4.slots[3]).toBeTruthy();
+    expect(s4.slots).toEqual([
+      "han_quang_tien",
+      "bach_kim_trao",
+      "cuu_cung_khon_sat",
+      "huyen_bang_chi",
+    ]);
+    for (const naSkill of [
+      "han_quang_tien",
+      "bach_kim_trao",
+      "van_thach_tran",
+      "bang_hoa_loan",
+      "liet_hoa_kiem",
+      "van_hanh_bo",
+    ]) {
+      expect(s4.learned[naSkill]).toBeGreaterThanOrEqual(1);
+    }
   });
 });
 

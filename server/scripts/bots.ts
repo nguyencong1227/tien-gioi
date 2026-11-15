@@ -352,15 +352,21 @@ export function sampleSkillsForRealm(realm: number): SkillBook {
       slots: ["hoa_van_kiem", "thanh_tung_phi_cham", "cuu_cung_khon_sat", ""],
     };
   }
-  // Nguyên Anh trở lên: cả 4 ô mở
+  // Nguyên Anh trở lên: cả 4 ô mở, học đủ 6 chiêu Nguyên Anh đợt 2 (#654 / #722)
   return {
     learned: {
       hoa_van_kiem: 3,
       thanh_tung_phi_cham: 3,
       cuu_cung_khon_sat: 2,
       huyen_bang_chi: 2,
+      han_quang_tien: 2,
+      bach_kim_trao: 2,
+      van_thach_tran: 1,
+      bang_hoa_loan: 1,
+      liet_hoa_kiem: 1,
+      van_hanh_bo: 1,
     },
-    slots: ["hoa_van_kiem", "thanh_tung_phi_cham", "cuu_cung_khon_sat", "huyen_bang_chi"],
+    slots: ["han_quang_tien", "bach_kim_trao", "cuu_cung_khon_sat", "huyen_bang_chi"],
   };
 }
 

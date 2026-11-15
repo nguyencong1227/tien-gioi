@@ -1174,35 +1174,37 @@ npm run bench -w server -- --multi --maps=lac_ha,hac_phong,am_suong,han_van --se
 npm run bench -w server -- --multi --maps=lac_ha,hac_phong,am_suong,han_van --crowd --seconds 20
 ```
 
-#### Bảng số đo thực tế:
+#### Bảng số đo thực tế (cập nhật trên `main` sau #722, đo khi máy có tải nền `load average ~17,0` theo `uptime`):
 
-| Kịch bản | Tổng người chơi | Tổng quái | Tick TB (ms) | Tick p95 (ms) | Tick Max (ms) | Trạng thái ngân sách tick (< 10 ms) |
+| Kịch bản | Tổng người chơi | Tổng quái (Tinh anh) | Tick TB (ms) | Tick p95 (ms) | Tick Max (ms) | Trạng thái ngân sách tick (< 10 ms) |
 |---|---:|---:|---:|---:|---:|:---:|
-| **Săn quái hoang dã (hunt)** | 200 (50/bản đồ) | 215 | **2,102 ms** | **3,494 ms** | 11,79 ms | ✅ **ĐẠT** |
-| **Đám đông trong trấn (crowd)** | 200 (50/bản đồ) | 274 | **2,303 ms** | **3,421 ms** | 12,45 ms | ✅ **ĐẠT** |
+| **Săn quái hoang dã (hunt)** | 200 (50/bản đồ) | 215 (8) | **2,907 ms** | **5,074 ms** | 13,04 ms | ✅ **ĐẠT** |
+| **Đám đông trong trấn (crowd)** | 200 (50/bản đồ) | 274 (11) | **3,034 ms** | **4,534 ms** | 14,18 ms | ✅ **ĐẠT** |
 
 #### Chi tiết từng bản đồ (ca săn quái hoang dã, 50 người chơi mỗi bản đồ):
 
-| Bản đồ | Người chơi | Quái vật | Patch TB (byte/tick) | KB/s mỗi client | Party (KB/s) | Wallet (KB/s) |
+| Bản đồ | Người chơi | Quái vật (Tinh anh) | Patch TB (byte/tick) | KB/s mỗi client | Party (KB/s) | Wallet (KB/s) |
 |---|---:|---:|---:|---:|---:|---:|
-| **Lạc Hà Trấn** (`lac_ha`) | 50 | 32 | 125 B | 2,4 KB/s | 0,40 | 0,00 |
-| **Hắc Phong Cốc** (`hac_phong`) | 50 | 59 | 143 B | 2,8 KB/s | 0,41 | 0,00 |
-| **Âm Sương Trạch** (`am_suong`) | 50 | 62 | 116 B | 2,3 KB/s | 0,41 | 0,00 |
-| **Hàn Vân Lĩnh** (`han_van`) | 50 | 62 | 124 B | 2,4 KB/s | 0,41 | 0,00 |
+| **Lạc Hà Trấn** (`lac_ha`) | 50 | 35 (1) | 126 B | 2,5 KB/s | 0,40 | 0,00 |
+| **Hắc Phong Cốc** (`hac_phong`) | 50 | 56 (1) | 138 B | 2,7 KB/s | 0,41 | 0,00 |
+| **Âm Sương Trạch** (`am_suong`) | 50 | 62 (3) | 114 B | 2,2 KB/s | 0,41 | 0,00 |
+| **Hàn Vân Lĩnh** (`han_van`) | 50 | 62 (3) | 125 B | 2,4 KB/s | 0,41 | 0,00 |
 
 #### Chi tiết từng bản đồ (ca đám đông trong trấn, 50 người chơi mỗi bản đồ):
 
-| Bản đồ | Người chơi | Quái vật | Patch TB (byte/tick) | KB/s mỗi client | Party (KB/s) | Wallet (KB/s) |
+| Bản đồ | Người chơi | Quái vật (Tinh anh) | Patch TB (byte/tick) | KB/s mỗi client | Party (KB/s) | Wallet (KB/s) |
 |---|---:|---:|---:|---:|---:|---:|
-| **Lạc Hà Trấn** (`lac_ha`) | 50 | 88 | 293 B | 5,7 KB/s | 0,40 | 0,00 |
-| **Hắc Phong Cốc** (`hac_phong`) | 50 | 62 | 189 B | 3,7 KB/s | 0,42 | 0,00 |
-| **Âm Sương Trạch** (`am_suong`) | 50 | 62 | 184 B | 3,6 KB/s | 0,41 | 0,00 |
-| **Hàn Vân Lĩnh** (`han_van`) | 50 | 62 | 205 B | 4,0 KB/s | 0,41 | 0,00 |
+| **Lạc Hà Trấn** (`lac_ha`) | 50 | 88 (3) | 293 B | 5,7 KB/s | 0,40 | 0,00 |
+| **Hắc Phong Cốc** (`hac_phong`) | 50 | 62 (2) | 189 B | 3,7 KB/s | 0,42 | 0,00 |
+| **Âm Sương Trạch** (`am_suong`) | 50 | 62 (3) | 184 B | 3,6 KB/s | 0,41 | 0,00 |
+| **Hàn Vân Lĩnh** (`han_van`) | 50 | 62 (3) | 205 B | 4,0 KB/s | 0,41 | 0,00 |
 
 **Nhận xét:**
-1. Cả 4 bản đồ chạy đồng thời với 200 người chơi chỉ tiêu tốn **2,1 – 2,3 ms CPU/tick**, chỉ chiếm $\sim 23\%$ ngân sách 10 ms của tiến trình Node.js.
-2. Băng thông StateView của bản đồ mới Hàn Vân Lĩnh nằm gọn trong ngân sách: 124 B/tick ở ca săn quái (ngân sách $< 520$ B) và 205 B/tick ở ca đám đông (ngân sách $< 600$ B).
-3. Đan dược, quái tinh anh và chiêu thức không gây phình to patch state (do đạn và trạng thái hiệu ứng đi qua sự kiện gửi gần `fx/dmg`, không sinh patch schema mỗi tick).
+1. **Thời gian tick & đối chiếu A/B dưới tải nền:** Bảng trên được đo khi máy chủ dùng chung đang chịu tải nền cao (`load average ~17,0` do các tiến trình test/E2E chạy song song), nên thời gian tick tuyệt đối (**2,91 – 3,03 ms/tick**) cao hơn lần đo lúc máy rảnh trước đó (**2,10 – 2,30 ms/tick**) và không so sánh trực tiếp ngang hàng với bảng lúc máy rảnh. Phép đo A/B luân phiên 2 vòng trong cùng điều kiện tải (`load average 14–15`, 20 giây, 4 bản đồ `hunt`, 200 người chơi) xác nhận cả #722 lẫn #728 đều **không** làm tăng thời gian tick:
+   - Trước #722 (`567df0e`): trung bình **2,880 / 2,853 ms**, p95 **5,054 / 5,152 ms** vs sau #722 (`ebac5d6`): trung bình **2,916 / 2,922 ms**, p95 **5,072 / 5,222 ms** (chênh $+0,04\text{–}0,07$ ms, nằm trong nhiễu đo).
+   - Trước #728 (`7696e39`): trung bình **2,946 / 3,155 ms** vs sau #728 (`567df0e`, `min(wallMs, cpuMs)`): trung bình **3,011 / 2,892 ms**.
+2. **Băng thông StateView:** Bản đồ Hàn Vân Lĩnh nằm gọn trong ngân sách: 125 B/tick ở ca săn quái (ngân sách $< 520$ B) và 205 B/tick ở ca đám đông (ngân sách $< 600$ B). Việc bổ sung 6 kinh quyển Nguyên Anh đợt 2 vào bảng rơi đồ (#722) chỉ làm đổi nhẹ quỹ đạo `Math.random` ở ca săn quái ($\pm 1\text{–}5$ B/tick), hoàn toàn không ảnh hưởng băng thông đám đông.
+3. **Cơ chế đồng bộ sự kiện:** Đan dược, quái tinh anh và các chiêu thức không gây phình to patch state (do đạn và trạng thái hiệu ứng đi qua sự kiện gửi gần `fx/dmg`, không sinh patch schema mỗi tick).
 
 ### 25.3. Mở rộng Thử tải dài (Soak Test) qua bốn bản đồ liên thông
 - Cập nhật `server/scripts/soak.ts`:
@@ -1253,6 +1255,42 @@ Kịch bản: 100 bot chia làm 6 nhóm hành vi tự hành (săn quái, trấn/
 2. **Khả năng tải của 4 phòng Colyseus:** CPU luồng chính trung bình chỉ 4,55 ms/tick cho cả 100 bot trải rộng khắp 4 bản đồ có quái tinh anh hoạt động. Tick p95 của phòng tải cao nhất duy trì ở mức 2,55 ms (đỉnh 3,10 ms), hoàn toàn cách xa ngưỡng giới hạn 10 ms.
 3. **Chuyển cổng 4 bản đồ ổn định tuyệt đối:** Quá trình qua cổng liên tục giữa Lạc Hà, Hắc Phong, Âm Sương và Hàn Vân không gây ra bất kỳ lỗi giải phóng hay xung đột lưu file nào (`kiem-save` đạt 0 lỗi), bảo toàn 100% tài sản tiền tệ và trang bị của người chơi.
 
+### 25.5. Kết quả Thử tải dài (Soak Test) 10 phút trên `main` sau #722 (ổn định bộ nhớ, chuyển cổng 4 bản đồ, bảo toàn tiền & `kiem-save`, #515)
+
+Lệnh thực thi trên `main` (`ebac5d6` — đã gồm dữ liệu #722: 18 chiêu thức, bảng rơi đồ & kinh quyển Nguyên Anh đợt 2, tương thích tệp lưu):
+```bash
+npm run soak -w server -- --bots=100 --minutes=10
+```
+
+> **Phạm vi kiểm chứng của `soak` hiện tại:** Lần chạy này xác nhận độ ổn định bộ nhớ (`VmRSS`), ngân sách tick, lưu thông 4 bản đồ qua cổng, `kiem-save` và bảo toàn Linh thạch khi server chạy với toàn bộ bảng dữ liệu #722. Lưu ý rằng các bot trong `soak.ts` khởi tạo ở cảnh giới Luyện Khí (`realm = 1`, chỉ đánh thường `slash`/`sword`), và kịch bản `bots.ts:1889` hiện cũng chỉ gán ngẫu nhiên tối đa tới Trúc Cơ (`realm = 2`), nên `soak` 10 phút này **không** thi triển 6 chiêu Nguyên Anh đợt 2 (`sampleSkillsForRealm(4)` trong `bots.ts` được kiểm qua test đơn vị `bots-skills.test.ts`; việc đo hiệu năng thi triển trực tiếp 6 chiêu Nguyên Anh đợt 2 được kiểm trong `perf.test.ts` riêng).
+
+#### Bảng tổng hợp số đo thử tải dài (10,0 phút, 60 mẫu liên tục mỗi 10 giây, đo khi máy có tải nền `load average ~14–17`):
+
+| Hạng mục đo | Kết quả đo thực tế | Ngưỡng / Ngân sách cho phép | Đánh giá |
+|---|---|---|:---:|
+| **Thời lượng & Quy mô** | 10,0 phút (60 mẫu) · 100/100 bot sống suốt thời gian | Tối thiểu 95% bot giữ kết nối (`droppedBots <= 5%`) | ✅ **ĐẠT** (rớt 0) |
+| **Bộ nhớ VmRSS ban đầu** | **164,89 MB** | — | — |
+| **Bộ nhớ VmRSS sau làm nóng (5m)** | **216,36 MB** | — | — |
+| **Bộ nhớ VmRSS kết thúc** | **217,21 MB** | — | — |
+| **Biến thiên VmRSS sau làm nóng** | **+0,85 MB** | $\le 50,0$ MB | ✅ **ĐẠT** |
+| **Dốc OLS nửa sau (tốc độ tăng RSS)** | **+0,081 MB/phút** | $\le 1,00$ MB/phút | ✅ **ĐẠT** |
+| **Thời gian xử lý tick p95 (phòng tệ nhất)** | Trung bình **4,49 ms** · Đỉnh **8,53 ms** | $\le 10,0$ ms (ngân sách khung hình 50 ms) | ✅ **ĐẠT** |
+| **Quá tải tick (tick overruns > 50ms)** | **0 tick** | 0 tick | ✅ **ĐẠT** |
+| **CPU luồng chính server / tick** | Trung bình **7,33 ms/tick** | $\le 10,0$ ms | ✅ **ĐẠT** |
+| **Độ trễ vòng lặp sự kiện p99 (loop lag)** | **85,3 ms** | $\le 100$ ms | ✅ **ĐẠT** |
+| **Hàng đợi lưu nhân vật (write queue)** | Inflight cao nhất **1** · Tuổi thọ cao nhất **0,0 s** · Lỗi **0** | Tuổi $\le 30$ s · Lỗi = 0 | ✅ **ĐẠT** |
+| **Băng thông WebSocket nhận / bot** | Trung bình **295 B/tick** (p95 **399 B/tick**, **5,75 KB/s**) | $\le 600$ B/tick | ✅ **ĐẠT** |
+| **Lưu thông qua cổng bốn bản đồ** | `hac_phong` 316 · `am_suong` 315 · `lac_ha` 212 · `han_van` 210 lượt | Đảo chiều luân phiên, không kẹt ô cấm | ✅ **ĐẠT** |
+| **Cảnh báo giám sát (/metrics monitor)** | **0 cảnh báo** sau khi sẵn sàng | 0 cảnh báo | ✅ **ĐẠT** |
+| **Lỗi tiến trình & ghi log server** | **0 lỗi** (`[lỗi]`, unhandledRejection, stack trace) | 0 lỗi | ✅ **ĐẠT** |
+| **Lỗi truy vấn số đo (/metrics)** | **0 lỗi** | 0 lỗi | ✅ **ĐẠT** |
+| **Kiểm toán toàn vẹn hồ sơ (kiem-save)** | **0 lỗi** (100 nhân vật, 100 chân linh, 4 tông môn) | 0 lỗi vi phạm hợp đồng dữ liệu | ✅ **ĐẠT** |
+| **Tệp hỏng cách ly (`*.hong-*`)** | **0 tệp** | 0 tệp | ✅ **ĐẠT** |
+| **Bảo toàn Linh thạch (ví + kho)** | **ĐẠT** (Ví 21.245 + Kho 4.580 = 25.825 $\le$ Trần 33.365, lệch ví bot = 0) | Sai số bảo toàn = 0 | ✅ **ĐẠT** |
+
+#### Nhận xét:
+- Các chỉ số thời gian xử lý tick p95 (**4,49 ms**, đỉnh **8,53 ms**), CPU luồng chính (**7,33 ms/tick**) và loop lag p99 (**85,3 ms**) cao hơn lần đo 30 phút ở mục 25.4 (`2,55 / 3,10 ms`, CPU `4,55 ms/tick`, loop lag `27,1 ms`) là do máy chủ đang chịu tải nền cao (`load average ~14–17`) trong suốt 10 phút chạy, **không phải** do thay đổi mã nguồn ở #722; dù dưới tải nền nặng, toàn bộ chỉ số vẫn nằm trong ngân sách cho phép ($\le 10,0$ ms/tick, 0 overrun).
+
 ---
 
 ## 26. Bộ kiểm thử hồi quy M7: Chuyển bản đồ bốn phòng liên thông & Thử tải đồng thời (M7.11 #512)
@@ -1281,8 +1319,9 @@ Kịch bản: 100 bot chia làm 6 nhóm hành vi tự hành (săn quái, trấn/
 | **Chốt `travelling` tránh đè dữ liệu (hai cổng thử)** | 2 | ✅ **ĐẠT (2/2)** | Thử trên 2 cổng `hac_phong_bac` và `am_suong_bac`: lưu định kỳ lúc đang chuyển cảnh bị bỏ qua an toàn |
 | **Thử tải đồng thời (Concurrency Stress)** | 1 | ✅ **ĐẠT (1/1)** | 4 bot cùng chuyển cổng Âm Sương ↔ Hàn Vân đồng thời (257 ms); `auditSavesDirectory` báo 0 lỗi |
 | **Tệp lưu CŨ thiếu skills đi chuỗi 4 bản đồ** | 1 | ✅ **ĐẠT (1/1)** | Tệp trước M7 không có `skills` đi qua 4 bản đồ tự khởi tạo sổ chiêu rỗng, lưu hợp lệ, `kiem-save` 0 lỗi |
+| **Tệp lưu CŨ 12 chiêu & Nguyên Anh 18 chiêu (#722)** | 1 | ✅ **ĐẠT (1/1)** | Tệp cũ chỉ có 12 chiêu đợt 1 và tệp Nguyên Anh đủ 18 chiêu qua cổng Âm Sương ↔ Hàn Vân giữ nguyên sổ chiêu, `kiem-save` 0 lỗi |
 | **Tương thích ngược tệp lưu thiếu/sai mapId** | 2 | ✅ **ĐẠT (2/2)** | Tệp thiếu `mapId` hoặc `mapId` lạ được đưa về Lạc Hà; cả 3 phòng khác đều từ chối wrong_map |
-| **Tổng cộng** | **21** | ✅ **21/21 PASS** | Thời gian chạy: ~9,8 s |
+| **Tổng cộng** | **22** | ✅ **22/22 PASS** | Thời gian chạy: ~9,8 s |
 
 ### 26.3. Kiểm chứng đột biến (Mutation Testing)
 - **Đột biến 1 (Lệch toạ độ spawn):** Cố tình làm lệch toạ độ xuất hiện ở bản đồ đích `x: to.spawn.x + 100` trong `server/src/systems/travel.ts` (`planTravel`).

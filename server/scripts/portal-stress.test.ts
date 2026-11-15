@@ -20,6 +20,7 @@ import {
   HAC_PHONG_ID,
   HAN_VAN_ID,
   QUESTS,
+  SKILLS_M7,
   TRAVEL_COOLDOWN_MS,
   emptyInventory,
   emptySkillBook,
@@ -943,6 +944,79 @@ describe("Bốn bản đồ: dữ liệu nguyên vẹn sau MỖI lần qua cổn
       `kiem-save sau chuỗi 4 bản đồ tệp cũ: ${JSON.stringify(auditRes.failedFiles)}`,
     ).toBe(0);
     expect(auditRes.failedFiles.length).toBe(0);
+  }, 45_000);
+
+  it("tệp lưu CŨ chỉ có 12 chiêu đợt 1 và tệp Nguyên Anh có đủ 18 chiêu (#654/#722) qua cổng Âm Sương <-> Hàn Vân: giữ nguyên sổ chiêu, kiem-save 0 lỗi", async () => {
+    expect(SKILLS_M7.length).toBe(18);
+    // 1. Nhân vật tệp lưu cũ chỉ có 12 chiêu đợt 1 (thiếu 6 chiêu Nguyên Anh đợt 2)
+    const old12Book: SkillBook = {
+      learned: Object.fromEntries(SKILLS_M7.slice(0, 12).map((s) => [s.id, 2])),
+      slots: ["hoa_van_kiem", "thanh_tung_phi_cham", "cuu_cung_khon_sat", ""],
+    };
+    const nameOld = `Bot Old12 ${++nameSeq}`;
+    const spawnAs = getMap(AM_SUONG_ID)!.portal("am_suong_bac")!.spawn;
+    await savePlayer({
+      name: nameOld,
+      secretHash: hashSecret(secretOf(nameOld)),
+      realm: 3,
+      tier: 2,
+      exp: EXP,
+      coin: COIN,
+      inventory,
+      quests,
+      equipment,
+      lifeId: LIFE_ID,
+      skills: old12Book,
+      mapId: AM_SUONG_ID,
+      x: spawnAs.x,
+      y: spawnAs.y,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    let curOld = await joinRoom(nameOld, secretOf(nameOld), AM_SUONG_ID);
+    curOld = await hop(curOld, nameOld, AM_SUONG_ID, "am_suong_bac");
+    expect(fileOf(nameOld).skills).toEqual(old12Book);
+    await waitFor(() => curOld.skillsMsgs.length > 0);
+    expect(curOld.skillsMsgs.at(-1)!.learned).toEqual(old12Book.learned);
+    expect(curOld.skillsMsgs.at(-1)!.slots).toEqual(old12Book.slots);
+
+    // 2. Nhân vật Nguyên Anh có đủ 18 chiêu (gắn 4 chiêu Nguyên Anh đợt 2 vào ô 2..5)
+    const all18Book: SkillBook = {
+      learned: Object.fromEntries(SKILLS_M7.map((s) => [s.id, 3])),
+      slots: ["han_quang_tien", "bach_kim_trao", "van_thach_tran", "liet_hoa_kiem"],
+    };
+    const nameNa = `Bot Full18 ${++nameSeq}`;
+    const spawnHv = getMap(HAN_VAN_ID)!.portal("han_van_nam")!.spawn;
+    await savePlayer({
+      name: nameNa,
+      secretHash: hashSecret(secretOf(nameNa)),
+      realm: 4,
+      tier: 2,
+      exp: EXP,
+      coin: COIN,
+      inventory,
+      quests,
+      equipment,
+      lifeId: LIFE_ID,
+      skills: all18Book,
+      mapId: HAN_VAN_ID,
+      x: spawnHv.x,
+      y: spawnHv.y,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    let curNa = await joinRoom(nameNa, secretOf(nameNa), HAN_VAN_ID);
+    curNa = await hop(curNa, nameNa, HAN_VAN_ID, "han_van_nam");
+    expect(fileOf(nameNa).skills).toEqual(all18Book);
+    await waitFor(() => curNa.skillsMsgs.length > 0);
+    expect(curNa.skillsMsgs.at(-1)!.learned).toEqual(all18Book.learned);
+    expect(curNa.skillsMsgs.at(-1)!.slots).toEqual(all18Book.slots);
+
+    const auditRes = auditSavesDirectory(dataDir);
+    expect(
+      auditRes.errorFiles,
+      `kiem-save 12/18 chiêu: ${JSON.stringify(auditRes.failedFiles)}`,
+    ).toBe(0);
   }, 45_000);
 
   it("tệp lưu cũ (thiếu mapId, hoặc mapId của bản đồ không còn / chưa biết): vào được Lạc Hà, phòng khác trả wrong_map:lac_ha", async () => {

@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import zlib from "node:zlib";
+import { SKILLS_M7 } from "@tien-gioi/shared";
 import {
   calcStats,
   unescapePgCopy,
@@ -130,6 +131,41 @@ describe("thong-ke-tien-do: sanitizeRecord & quyền riêng tư", () => {
     expect((rec as any).skills).toBeUndefined();
     expect((rec as any).learned).toBeUndefined();
     expect((rec as any).slots).toBeUndefined();
+  });
+
+  it("thống kê đầy đủ 18 chiêu (kể cả 6 chiêu Nguyên Anh đợt 2 #654/#722) và tương thích tệp cũ chỉ có 12 chiêu", () => {
+    expect(SKILLS_M7.length).toBe(18);
+    const all18Learned = Object.fromEntries(SKILLS_M7.map((s) => [s.id, 3]));
+    const recFull = sanitizeRecord({
+      name: "Nguyên Anh Chân Nhân",
+      realm: 4,
+      tier: 2,
+      mapId: "han_van",
+      skills: {
+        learned: all18Learned,
+        slots: ["han_quang_tien", "bach_kim_trao", "van_thach_tran", "liet_hoa_kiem"],
+      },
+      life: { playMs: 36_000_000, kills: 500, bossKills: 5 },
+    })!;
+    expect(recFull.skillsCount).toBe(18);
+    expect(recFull.skillsTotalLevels).toBe(54);
+    expect(recFull.equippedSkillsCount).toBe(4);
+
+    const old12Learned = Object.fromEntries(SKILLS_M7.slice(0, 12).map((s) => [s.id, 2]));
+    const recOld = sanitizeRecord({
+      name: "Kim Đan Tán Tu",
+      realm: 3,
+      tier: 2,
+      mapId: "am_suong",
+      skills: {
+        learned: old12Learned,
+        slots: ["hoa_van_kiem", "thanh_tung_phi_cham", "cuu_cung_khon_sat", ""],
+      },
+      life: { playMs: 18_000_000, kills: 200, bossKills: 2 },
+    })!;
+    expect(recOld.skillsCount).toBe(12);
+    expect(recOld.skillsTotalLevels).toBe(24);
+    expect(recOld.equippedSkillsCount).toBe(3);
   });
 
   it("bỏ qua chiêu tầng 0 và kẹp tầng tối đa 3 khi thống kê (diệt đột biến N4, N5)", () => {
