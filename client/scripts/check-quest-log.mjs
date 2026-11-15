@@ -201,7 +201,7 @@ async function main() {
       }
       await evalJs(`(() => {
         const q = window.__questIds();
-        window.__ui.onQuests({ active: [], done: q.main, dailyDone: q.daily });
+        window.__ui.onQuests({ active: [], done: [...q.main, ...q.side], dailyDone: q.daily });
         window.__ui.closeAllModals();
         window.__ui.toggleQuestModal(true);
         document.getElementById("tab-q-done").click();
@@ -228,7 +228,10 @@ async function main() {
         const lastReachable = lr.bottom <= Math.max(mr.bottom, innerHeight) + 1 && lr.top >= -1;
         const overflowX = Math.max(0, document.documentElement.scrollWidth - innerWidth, modal.scrollWidth - modal.clientWidth);
         return {
-          expectedRows: window.__questIds().main.length + window.__questIds().daily.length,
+          expectedRows: window.__questIds().main.length + window.__questIds().side.length + window.__questIds().daily.length,
+          sideRows: rows.filter((r) => r.querySelector(".qt-badge")?.textContent === "Việc phụ").length,
+          expectedSide: window.__questIds().side.length,
+          expectedSummary: "Chính tuyến " + window.__questIds().main.length + " / " + window.__questIds().main.length + (window.__questIds().side.length ? " · Việc phụ: " + window.__questIds().side.length : "") + " · Lặp hôm nay: " + window.__questIds().daily.length,
           rows: rows.length, heights, overflowX, clippedTitles: clipped,
           descHiddenBefore, openedOk, closedOk, lastReachable, touch: ${vp.mobile},
           summary: list.querySelector(".q-done-summary")?.textContent ?? "",
@@ -238,6 +241,11 @@ async function main() {
         `  - ${m.rows} hàng, cao TB ${(m.heights.reduce((a, b) => a + b, 0) / Math.max(1, m.heights.length)).toFixed(1)} px, tóm tắt: ${m.summary}`,
       );
       const errs = judgeQuestLog(m);
+      // Việc phụ (không lặp, ngoài chuỗi chính) có nhãn "Việc phụ" và tóm tắt không tính chúng vào chính tuyến (M7.5c)
+      if (m.sideRows !== m.expectedSide)
+        errs.push(`nhãn "Việc phụ": ${m.sideRows} hàng, cần ${m.expectedSide}`);
+      if (m.summary !== m.expectedSummary)
+        errs.push(`tóm tắt "${m.summary}" khác mong đợi "${m.expectedSummary}"`);
       for (const e of errs) {
         console.log(`  ✗ ${e}`);
         failures++;

@@ -1009,6 +1009,9 @@ html[data-input="touch"] .qt-head {
 .q-card.main-q {
   border-left: 3px solid #ffb74d;
 }
+.q-card.side-q {
+  border-left: 3px solid #9ccc65;
+}
 .q-card-head {
   display: flex;
   align-items: center;
