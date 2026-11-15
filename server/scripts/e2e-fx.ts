@@ -387,17 +387,15 @@ async function main() {
 
     // ---------------- Ca 4: giảm chuyển động ----------------
     out("\n--- Ca 4: giảm chuyển động giảm hạt 70 % ---");
+    await T.waitFor("window.__fx.stats().liveEmitters === 0", "hạt ca trước tan hết");
     await setCheck("set-reduced-motion", true);
-    await T.waitFor(
-      `window.__scene.children.list.filter((c) => c.type === 'ParticleEmitter').reduce((n, e) => n + e.getAliveParticleCount(), 0) === 0`,
-      "hạt ca trước hết sạch",
-      5000,
-    );
+    await sleep(300);
+    const before = await aliveParticles();
+    must(before === 0, `trước khi phát: 0 hạt sống, thấy ${before}`);
     must((await burst(1, "{}")) === 1, "phát được một hiệu ứng khi giảm chuyển động");
     await T.waitFor(
       `window.__scene.children.list.filter((c) => c.type === 'ParticleEmitter').reduce((n, e) => n + e.getAliveParticleCount(), 0) === ${Math.round(8 * 0.3)}`,
       "hạt giảm chuyển động sinh đúng số lượng (8 * 0.3 = 2)",
-      5000,
     );
     const added = await aliveParticles();
     must(
@@ -406,11 +404,7 @@ async function main() {
     );
     ok(`giảm chuyển động: 8 hạt -> ${added} hạt`);
     await setCheck("set-reduced-motion", false);
-    await T.waitFor(
-      `window.__scene.children.list.filter((c) => c.type === 'ParticleEmitter').reduce((n, e) => n + e.getAliveParticleCount(), 0) === 0`,
-      "hạt giảm chuyển động tan hết",
-      5000,
-    );
+    await T.waitFor("window.__fx.stats().liveEmitters === 0", "hạt giảm chuyển động tan hết");
 
     // ---------------- Ca 5: chữ bay ----------------
     out("\n--- Ca 5: chữ bay BitmapText (trần damageNumbers = 28 ở bậc Cao) ---");
