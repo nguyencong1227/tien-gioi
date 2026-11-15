@@ -763,7 +763,7 @@ export const QUESTS: QuestDef[] = [
     talk: {
       offer: [
         "Lướt gió Hàn Vân: Độc Tước vùng sâu bắn đạn độc, nhưng túi nang của chúng ta cần để buôn. Ngươi tới Nguyên Anh hậu kỳ, vào đó an toàn.",
-        "Hạ mười Độc Tước, gom sáu túi Độc tước nang. Bán cho ta, ta trả giá hậu và thưởng ngươi một món.",
+        "Hạ mười Độc Tước, gom sáu túi Độc tước nang. Giao cho ta, ta thưởng ngươi một món.",
       ],
       progress: [
         "Độc Tước đạn tím, trúng rồi máu chảy mãi. Né ngang, uống Thượng Hồi Huyết Đan trước khi nhận đòn.",
