@@ -70,7 +70,7 @@ describe("icon kinh quyển đợt 2 (Nguyên Anh, #654)", () => {
 });
 
 // ---- Hình dấu không đọc ra chữ Hán (quy tắc dự án: không chữ Hán / chữ lạ trên ảnh; review của A trên #719) ----
-// Hai dấu từng bị đọc ra chữ: ba vệt gần thẳng đứng song song ("川") và lưới 2 x 2 ("田"); dấu kiếm thì ra "王". Test giải mã chính tệp PNG (bộ mã hoá của
+// Hai dấu từng bị đọc ra chữ: ba vệt gần thẳng đứng song song (chữ «xuyên», sông) và lưới 2 x 2 (chữ «điền», ruộng); dấu kiếm thì ra chữ «vương». Test giải mã chính tệp PNG (bộ mã hoá của
 // `gen-assets.mjs`: PNG RGBA 8 bit, bộ lọc None) và kiểm HÌNH của dấu (các cụm điểm ảnh cùng màu), không so màu hay hash.
 
 /** Giải mã PNG RGBA 8 bit, bộ lọc None; trả hàm đọc điểm ảnh (r, g, b, a). */
@@ -168,7 +168,7 @@ describe("hình dấu kinh quyển không đọc ra chữ Hán", () => {
     expect(new Set(stones.map((b) => `${b.x0},${b.y0}`)).size).toBe(3);
   });
 
-  it('Băng Hoa Loạn: bông tuyết sáu nhánh, KHÔNG có nhánh ngang (dọc + ngang + hai chéo là tám nan đều, đọc ra chữ Hán "米")', () => {
+  it("Băng Hoa Loạn: bông tuyết sáu nhánh, KHÔNG có nhánh ngang (dọc + ngang + hai chéo là tám nan đều, đọc ra chữ Hán «mễ»)", () => {
     const at = decodeIcon("kinh_bang_hoa_loan");
     const white = (x: number, y: number) => at(x, y).every((v) => v === 255);
     for (let y = 9; y <= 16; y++) {

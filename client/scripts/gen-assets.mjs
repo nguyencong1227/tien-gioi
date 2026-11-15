@@ -1468,7 +1468,7 @@ function drawItemIcon(id) {
       s.line(9.6, 16.2, 12.2, 16.2, accent, 1);
     } else if (mark === "trao") {
       // Bạch Kim Trảo: ba vệt vuốt cào XIÊN 45 độ, đầu dày đuôi thon, đầu và độ dài khác nhau (vệt phải dài nhất, vệt trái vừa, vệt dưới lệch xuống ngắn nhất); ba vệt cách nhau >= 1 điểm ảnh (kể cả chéo).
-      // Ba nét gần thẳng đứng song song đọc ra chữ Hán "川", nên mỗi vệt lệch ngang bằng chiều cao (dx = dy >= dy / 2). Vẽ từng điểm ảnh.
+      // Ba nét gần thẳng đứng song song đọc ra chữ Hán «xuyên» (sông), nên mỗi vệt lệch ngang bằng chiều cao (dx = dy >= dy / 2). Vẽ từng điểm ảnh.
       paintMark(
         [
           "...##..##", //  y 9
@@ -1485,7 +1485,7 @@ function drawItemIcon(id) {
       );
     } else if (mark === "tran") {
       // Vạn Thạch Trận: đống đá ba tảng KHÁC CỠ, mép tròn, so le (nhỏ ở trên lệch trái, vừa bên trái, to bên phải), mỗi tảng cách nhau một điểm nền
-      // và có bóng ở đáy. Bốn ô vuông đều thành lưới 2 x 2 đọc ra chữ Hán "田" (và các tầng đá ngang đọc ra nét ngang), nên không dùng lưới.
+      // và có bóng ở đáy. Bốn ô vuông đều thành lưới 2 x 2 đọc ra chữ Hán «điền» (ruộng) (và các tầng đá ngang đọc ra nét ngang), nên không dùng lưới.
       paintMark(
         [
           "...##....", //  y 9
@@ -1502,7 +1502,7 @@ function drawItemIcon(id) {
       );
     } else if (mark === "hoa") {
       // Băng Hoa Loạn: bông tuyết SÁU nhánh (một nhánh dọc có chạc ở hai đầu, bốn nhánh xiên thoải), không có nhánh ngang: tám nan đều
-      // (dọc + ngang + hai chéo) đọc ra chữ Hán "米". Vẽ từng điểm ảnh.
+      // (dọc + ngang + hai chéo) đọc ra chữ Hán «mễ» (gạo). Vẽ từng điểm ảnh.
       paintMark(
         [
           "....#....", // y 10
@@ -1519,7 +1519,7 @@ function drawItemIcon(id) {
     } else if (mark === "kiem") {
       // Liệt Hỏa Kiếm: thanh kiếm CHÉO (mũi trên trái, chuôi dưới phải: ngược hướng mũi tên của Hàn Quang Tiễn), vẽ từng điểm ảnh cho sắc nét ở 24 px
       // (đường khử răng cưa lem thành hình chim): lưỡi dày 2 điểm ảnh, chắn tay vuông góc với lưỡi, chuôi và núm. Không dựng đứng: kiếm dọc có chắn
-      // tay ngang kẹp giữa hai dải ngang của bìa đọc ra chữ Hán "王" (quy tắc: không chữ Hán trên ảnh); mũi cách dải trên 1 điểm ảnh.
+      // tay ngang kẹp giữa hai dải ngang của bìa đọc ra chữ Hán «vương» (quy tắc: không chữ Hán trên ảnh); mũi cách dải trên 1 điểm ảnh.
       const blade = [
         [10, 9],
         [10, 10],
