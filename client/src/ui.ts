@@ -128,7 +128,14 @@ import {
   type SectConfirmKind,
 } from "./sect";
 import { canAffordFee, feeChipText, recipeFee } from "./forge-fee";
-import { QUEST_KIND_BADGE, QUEST_KIND_LABEL, doneRows, doneSummary, questKind } from "./quest-log";
+import {
+  QUEST_KIND_BADGE,
+  QUEST_KIND_LABEL,
+  doneRows,
+  doneSummary,
+  questKind,
+  rewardParts,
+} from "./quest-log";
 import { pickupBtnText, portalBtnText, talkBtnText } from "./ctx-btn";
 import { sound } from "./audio";
 import { bookTeach, useLabelOf } from "./item-use";
@@ -1229,15 +1236,20 @@ function renderQuestModalImpl() {
 
       const rew = document.createElement("div");
       rew.className = "q-card-rewards";
-      const rewParts: string[] = [];
-      if (def.rewards.exp) rewParts.push(`${def.rewards.exp} tu vi`);
-      if (def.rewards.items) {
-        for (const it of def.rewards.items) {
-          const itName = ITEM_BY_ID[it.itemId]?.name ?? it.itemId;
-          rewParts.push(`${itName} ×${it.qty}`);
+      // Mỗi món thưởng là một <span> tô màu + dấu theo độ hiếm (như túi / cửa hàng); tu vi và dấu phẩy giữ màu vàng của dòng
+      rew.append("Thưởng: ");
+      rewardParts(def.rewards).forEach((part, k) => {
+        if (k > 0) rew.append(", ");
+        if (part.itemId === undefined) {
+          rew.append(part.text);
+          return;
         }
-      }
-      rew.textContent = `Thưởng: ${rewParts.join(", ")}`;
+        const span = document.createElement("span");
+        span.className = "q-reward-item";
+        span.textContent = part.text;
+        applyRarityText(span, part.rarity);
+        rew.append(span);
+      });
 
       card.append(head, desc, progEl, rew);
       container.append(card);

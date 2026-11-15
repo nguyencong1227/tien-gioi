@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { MAIN_QUEST_START, QUESTS, QUEST_BY_ID } from "@tien-gioi/shared";
+import { ITEM_BY_ID, MAIN_QUEST_START, QUESTS, QUEST_BY_ID } from "@tien-gioi/shared";
 import {
   MAIN_QUEST_TOTAL,
   QUEST_KIND_BADGE,
@@ -9,6 +9,7 @@ import {
   doneRows,
   doneSummary,
   questKind,
+  rewardParts,
 } from "./quest-log";
 
 /** Chuỗi chính: đi từ nhiệm vụ đầu theo `next` (tính độc lập với `quest-log.ts`). */
@@ -123,5 +124,53 @@ describe("giao diện dùng đúng loại nhiệm vụ (không gọi việc ph�
     expect(ui).toContain('row.side ? "Việc phụ"');
     expect(ui).not.toMatch(/def\.daily \? "Hằng ngày" : "Chính tuyến"/);
     expect(ui).not.toMatch(/def\.daily \? "Lặp" : "Chính"/);
+  });
+});
+
+describe("rewardParts: các phần của dòng 'Thưởng:' ở thẻ nhiệm vụ", () => {
+  it("tu vi trước, rồi từng món '<tên> ×<số lượng>' kèm id + độ hiếm THẬT của món", () => {
+    const r = rewardParts({
+      exp: 40,
+      items: [
+        { itemId: "hoi_linh_dan", qty: 2 },
+        { itemId: "kinh_hoa_van_kiem", qty: 1 },
+      ],
+    });
+    expect(r.map((p) => p.text)).toEqual([
+      "40 tu vi",
+      `${ITEM_BY_ID.hoi_linh_dan.name} ×2`,
+      `${ITEM_BY_ID.kinh_hoa_van_kiem.name} ×1`,
+    ]);
+    expect(r[0].itemId).toBeUndefined(); // tu vi không phải đồ
+    expect(r[1]).toMatchObject({ itemId: "hoi_linh_dan", rarity: ITEM_BY_ID.hoi_linh_dan.rarity });
+    expect(r[2]).toMatchObject({
+      itemId: "kinh_hoa_van_kiem",
+      rarity: ITEM_BY_ID.kinh_hoa_van_kiem.rarity,
+    });
+    // quyển Hỏa Vân Kiếm Pháp là Linh phẩm (độ hiếm 1) nên KHÁC đan Phàm phẩm: dòng thưởng phải phân biệt được hai món
+    expect(r[2].rarity).not.toBe(r[1].rarity);
+  });
+
+  it("mọi nhiệm vụ trong QUESTS: số phần đúng (tu vi + từng món), mỗi món có độ hiếm số, không chữ undefined / NaN", () => {
+    for (const q of QUESTS) {
+      const parts = rewardParts(q.rewards);
+      const want = (q.rewards.exp ? 1 : 0) + (q.rewards.items?.length ?? 0);
+      expect(parts.length, q.id).toBe(want);
+      for (const p of parts) {
+        expect(p.text, q.id).not.toMatch(/undefined|NaN|null/);
+        if (p.itemId !== undefined) expect(typeof p.rarity, `${q.id}/${p.itemId}`).toBe("number");
+      }
+    }
+  });
+
+  it("dữ liệu lạ: không có phần thưởng, số lượng / tu vi không hợp lệ bị bỏ, id đồ lạ vẫn hiện bằng id (không ném lỗi, không độ hiếm)", () => {
+    expect(rewardParts(undefined)).toEqual([]);
+    expect(rewardParts({})).toEqual([]);
+    expect(rewardParts({ exp: 0 })).toEqual([]);
+    expect(rewardParts({ exp: NaN, items: [{ itemId: "hoi_linh_dan", qty: 0 }] })).toEqual([]);
+    expect(rewardParts({ items: [{ itemId: "hoi_linh_dan", qty: Infinity }] })).toEqual([]);
+    expect(rewardParts({ items: [{ itemId: "constructor", qty: 3 }] })).toEqual([
+      { text: "constructor ×3", itemId: "constructor" },
+    ]);
   });
 });
