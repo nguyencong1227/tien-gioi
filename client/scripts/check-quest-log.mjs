@@ -251,6 +251,60 @@ async function main() {
         failures++;
       }
       if (errs.length === 0) console.log("  ✓ đạt");
+      // Dòng "Thưởng:" của thẻ nhiệm vụ (M7.4, nit khi xem #652): mỗi món thưởng là một <span> tô màu + dấu theo độ hiếm như túi / cửa hàng (trước đây cả dòng là MỘT chuỗi chữ
+      // vàng nên quyển / đồ hiếm không hơn gì đan thường). Kiểm KHÔNG phụ thuộc dữ liệu cụ thể: bày MỌI nhiệm vụ thành "đang làm" rồi đọc mọi <span> thưởng:
+      // mỗi bậc có ĐÚNG một màu + một dấu trên mọi thẻ (nhất quán), có >= 2 bậc khác nhau, Phàm phẩm không dấu, bậc từ Linh phẩm trở lên có dấu thật ở ::before.
+      await evalJs(`(() => {
+        const q = window.__questIds();
+        const ids = [...q.main, ...q.side, ...q.daily];
+        window.__ui.onQuests({ active: ids.map((id) => ({ id, step: 0, count: 0 })), done: [], dailyDone: [] });
+        document.getElementById("tab-q-active").click();
+      })()`);
+      await sleep(400);
+      const rw = await evalJs(`(() => {
+        const cards = [...document.querySelectorAll("#quest-list .q-card")];
+        const spans = cards.flatMap((c) => [...c.querySelectorAll(".q-card-rewards .q-reward-item")]);
+        const rows = spans.map((el) => ({ text: el.textContent, color: getComputedStyle(el).color, mark: el.dataset.mark ?? null, rarity: el.dataset.rarity ?? "", before: getComputedStyle(el, "::before").content }));
+        const lines = cards.map((c) => c.querySelector(".q-card-rewards")?.textContent ?? "");
+        const clipped = cards.filter((c) => { const r = c.querySelector(".q-card-rewards").getBoundingClientRect(), cr = c.getBoundingClientRect(); return r.right > cr.right + 1 || r.left < cr.left - 1; }).length;
+        return { cards: cards.length, rows, lines, clipped, overflowX: Math.max(0, document.documentElement.scrollWidth - innerWidth) };
+      })()`);
+      const rwErrs = [];
+      if (!rw || rw.cards < 10) rwErrs.push(`chỉ ${rw?.cards ?? 0} thẻ nhiệm vụ để kiểm`);
+      else {
+        if (rw.lines.some((l) => !l.startsWith("Thưởng: ") || /undefined|NaN|null/.test(l)))
+          rwErrs.push("có dòng thưởng thiếu 'Thưởng:' hoặc chứa undefined / NaN / null");
+        const byRarity = new Map();
+        for (const r of rw.rows) {
+          const key = r.rarity || "Phàm phẩm";
+          const v = `${r.color}|${r.mark ?? ""}`;
+          if (!byRarity.has(key)) byRarity.set(key, new Set());
+          byRarity.get(key).add(v);
+          if (key === "Phàm phẩm" && r.mark !== null) rwErrs.push(`Phàm phẩm có dấu (${r.text})`);
+          if (key !== "Phàm phẩm" && (!r.mark || !r.before.startsWith(`"${r.mark}`)))
+            rwErrs.push(
+              `${r.text} (${key}) thiếu dấu thật ở ::before (data-mark ${r.mark}, ::before ${r.before})`,
+            );
+        }
+        for (const [k, v] of byRarity)
+          if (v.size !== 1)
+            rwErrs.push(`bậc ${k} có ${v.size} kiểu màu / dấu khác nhau trên các thẻ`);
+        if (byRarity.size < 2)
+          rwErrs.push(
+            `chỉ ${byRarity.size} bậc độ hiếm trong mọi dòng thưởng (cần >= 2 để phân biệt được)`,
+          );
+        const colors = new Set([...byRarity.values()].map((v) => [...v][0].split("|")[0]));
+        if (colors.size !== byRarity.size) rwErrs.push("hai bậc khác nhau dùng CÙNG một màu");
+        if (rw.clipped > 0 || rw.overflowX > 0)
+          rwErrs.push(`dòng thưởng tràn thẻ (${rw.clipped} thẻ) / tràn ngang ${rw.overflowX} px`);
+      }
+      // Tối đa 3 dòng lỗi khác nhau mỗi khung (một lỗi chung lặp trên hàng chục thẻ không được làm ngập đầu ra)
+      for (const e of [...new Set(rwErrs)].slice(0, 3)) console.log(`  ✗ thưởng: ${e}`);
+      if (rwErrs.length > 0) failures++;
+      if (rwErrs.length === 0)
+        console.log(
+          `  ✓ dòng thưởng: ${rw.rows.length} món ở ${rw.cards} thẻ, các bậc [${[...new Set(rw.rows.map((r) => r.rarity || "Phàm phẩm"))].join(", ")}] mỗi bậc một màu + dấu, không tràn`,
+        );
       if (shotsDir) {
         // Huy hiệu "giả lập" của mock đè lên tiêu đề tấm (bản thật không có): ẩn như `capture-viewports.mjs`
         await evalJs(
