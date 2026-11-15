@@ -1260,6 +1260,14 @@ html[data-input="touch"] .qt-head {
 .lg.mon {
   background: #e57373;
 }
+.lg.elite {
+  width: 9px;
+  height: 9px;
+  border-radius: 1px;
+  background: #ff8a2b;
+  border: 1px solid #fff;
+  transform: rotate(45deg);
+}
 .lg.town {
   border: 2px solid #a31d1d;
   background: transparent;

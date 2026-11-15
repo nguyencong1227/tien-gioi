@@ -426,6 +426,8 @@ export const MAP_COLORS = {
   party: "#52c41a",
   other: "#9fd0ea",
   monster: "#e57373",
+  /** Tinh anh (M7.3 bước 6): thoi cam viền trắng, khác chấm đỏ của quái thường và chấm vàng của NPC */
+  elite: "#ff8a2b",
   npc: "#ffd74a",
   portal: "#a8ff78",
   town: "#d94a4a",
@@ -742,6 +744,32 @@ export function drawDot(
   if (stroke) {
     ctx.lineWidth = lineWidth;
     ctx.strokeStyle = stroke;
+    ctx.stroke();
+  }
+}
+
+/** Hình thoi có viền (tinh anh trên bản đồ: nổi hơn chấm vuông của quái thường, không lẫn với chấm tròn của NPC / người chơi). `r` là nửa đường chéo. */
+export function drawDiamond(
+  ctx: Canvas2D,
+  x: number,
+  y: number,
+  r: number,
+  fill: string,
+  stroke?: string,
+  lineWidth = 1,
+): void {
+  ctx.beginPath();
+  ctx.moveTo(x, y - r);
+  ctx.lineTo(x + r, y);
+  ctx.lineTo(x, y + r);
+  ctx.lineTo(x - r, y);
+  ctx.closePath();
+  ctx.fillStyle = fill;
+  ctx.fill();
+  if (stroke) {
+    ctx.lineWidth = lineWidth;
+    ctx.strokeStyle = stroke;
+    ctx.lineJoin = "round";
     ctx.stroke();
   }
 }

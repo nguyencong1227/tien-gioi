@@ -21,6 +21,7 @@ import {
   npcMarker,
   MAIN_QUEST_START,
   stepOf,
+  SKILL_BY_ID,
   type QuestsMsg,
   type QuestCtx,
 } from "./index";
@@ -260,5 +261,40 @@ describe("nội dung nhiệm vụ (#19)", () => {
     expect(NPCS.filter((n) => npcMarker(n.id, log(), ctx()) === "!").map((n) => n.id)).toEqual([
       "truong_tran",
     ]);
+  });
+});
+
+describe("thưởng nhiệm vụ bằng kinh quyển (M7.4)", () => {
+  // Cảnh giới người chơi đã đạt khi nhận thưởng: bước `reachRealm` cao nhất của nhiệm vụ (nhiệm vụ không có bước đó thì coi là Phàm Nhân)
+  const realmAtReward = (q: (typeof QUESTS)[number]) =>
+    Math.max(0, ...q.steps.map((s) => (s.kind === "reachRealm" ? stepOf(s.realm, s.tier) : 0)));
+
+  it("mọi kinh quyển thưởng nhiệm vụ dạy một chiêu CÓ THẬT và học được ngay lúc nhận (đủ cảnh giới), không để quyển nằm trong túi mà chưa học nổi", () => {
+    let n = 0;
+    for (const q of QUESTS)
+      for (const it of q.rewards.items ?? []) {
+        const def = ITEM_BY_ID[it.itemId];
+        if (def?.type !== "book") continue;
+        n++;
+        const skill = SKILL_BY_ID[def.teaches ?? ""];
+        expect(skill, `${q.id}: ${it.itemId} dạy chiêu không tồn tại`).toBeDefined();
+        expect(
+          stepOf(skill.reqRealm, skill.reqTier),
+          `${q.id}: ${it.itemId} cần ${skill.reqRealm}/${skill.reqTier} nhưng nhận ở bước ${realmAtReward(q)}`,
+        ).toBeLessThanOrEqual(realmAtReward(q));
+      }
+    expect(n).toBeGreaterThanOrEqual(1);
+  });
+
+  it("'Bước vào tiên đồ' (Phàm Nhân -> Luyện Khí tầng 1) thưởng ĐÚNG MỘT quyển Hỏa Vân Kiếm Pháp, lời thoại chỉ đúng luồng (Túi đồ -> Học) và không nêu tên phím", () => {
+    const q = QUEST_BY_ID.buoc_vao_tien_do;
+    expect((q.rewards.items ?? []).filter((i) => ITEM_BY_ID[i.itemId]?.type === "book")).toEqual([
+      { itemId: "kinh_hoa_van_kiem", qty: 1 },
+    ]);
+    // Lời thoại đúng luồng thật (B, #652): học ở TÚI (nút Học), chiêu đầu tự gắn ô; KHÔNG nêu tên phím (đổi được ở màn Phím tắt, màn cảm ứng không có phím)
+    const talk = q.talk.complete.join(" ");
+    expect(talk).toContain("Túi đồ");
+    expect(talk).toContain("Học");
+    expect(talk).not.toMatch(/Shift|Ctrl|Alt|phím/i);
   });
 });

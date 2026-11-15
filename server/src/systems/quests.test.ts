@@ -399,7 +399,11 @@ describe("chuỗi nhiệm vụ chính (#19)", () => {
     expect(stepOf(p.realm, p.tier)).toBeGreaterThanOrEqual(stepOf(1, 8));
     // Nguyên liệu nộp nhiệm vụ đã bị trừ hết, chỉ còn đồ thưởng
     for (const s of c.inv) {
-      if (s) expect(ITEM_BY_ID[s.itemId].type, s.itemId).toBe("consumable");
+      if (s) expect(["consumable", "book"], s.itemId).toContain(ITEM_BY_ID[s.itemId].type);
     }
+    // M7.4: nhiệm vụ 'Bước vào tiên đồ' thưởng kinh quyển đầu tiên (Hỏa Vân Kiếm Pháp) nên túi có đúng MỘT quyển
+    expect(
+      c.inv.filter((s) => s && ITEM_BY_ID[s.itemId].type === "book").map((s) => s!.itemId),
+    ).toEqual(["kinh_hoa_van_kiem"]);
   });
 });
