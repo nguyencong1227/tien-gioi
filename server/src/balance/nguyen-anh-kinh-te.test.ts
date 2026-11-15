@@ -166,6 +166,12 @@ describe("kinh tế bộ IV", () => {
     expect(eco.tiers[1].surplus).toBeGreaterThanOrEqual(0);
   });
 
+  it("săn trùm theo đội lấy Thiên Hàn Châu ở Sơ kỳ làm hụt thu nhập bậc đó so với toàn bộ thời gian săn solo", () => {
+    const t = eco.tiers[0];
+    expect(eco.bo[0].bossHours).toBeGreaterThan(0);
+    expect(t.earned).toBeLessThan((t.minutes / 60) * t.coinPerHour);
+  });
+
   it("thu nhập cộng dồn tăng đều theo bậc và Linh thạch / giờ khả dụng tăng theo nguồn tốt hơn", () => {
     for (let i = 1; i < eco.tiers.length; i++) {
       expect(eco.tiers[i].cumulative).toBeGreaterThan(eco.tiers[i - 1].cumulative);
