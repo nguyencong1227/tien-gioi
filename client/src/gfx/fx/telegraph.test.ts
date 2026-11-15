@@ -6,6 +6,8 @@ import {
   BOLT_MIN_SPEED,
   BOLT_NEUTRAL_TINT,
   BOLT_WALL_SAMPLE,
+  WARN_BURST_FLASH,
+  WARN_BURST_GROW,
   WARN_FADE_MS,
   WARN_MAX_ARC_STEPS,
   WARN_MAX_MS,
@@ -24,6 +26,7 @@ import {
   warnAlive,
   warnCovers,
   warnArcSteps,
+  warnBurst,
   warnFillAlpha,
   warnOutlineAlpha,
   warnPolygon,
@@ -112,6 +115,47 @@ describe("telegraph: thời gian của vùng báo", () => {
     expect(warnAlive(0, 800)).toBe(true);
     expect(warnAlive(800 + WARN_FADE_MS - 1, 800)).toBe(true);
     expect(warnAlive(800 + WARN_FADE_MS, 800)).toBe(false);
+  });
+
+  it("warnBurst: chỉ vòng circle, chỉ trong khoảng (ms, ms + WARN_FADE_MS); chưa đáp / đã hết thì null", () => {
+    expect(warnBurst(799, 800, "circle", false)).toBeNull();
+    expect(warnBurst(800, 800, "circle", false)).toBeNull(); // đúng lúc đáp: sóng bắt đầu từ khung kế tiếp
+    expect(warnBurst(801, 800, "circle", false)).not.toBeNull();
+    expect(warnBurst(800 + WARN_FADE_MS - 1, 800, "circle", false)).not.toBeNull();
+    expect(warnBurst(800 + WARN_FADE_MS, 800, "circle", false)).toBeNull();
+    for (const shape of ["cone", "line", "xyz"])
+      expect(warnBurst(850, 800, shape, false)).toBeNull();
+  });
+
+  it("warnBurst: vòng sóng nở từ r tới r * (1 + WARN_BURST_GROW) (không bao giờ nhỏ hơn r), mờ dần về 0; chớp trắng mờ tuyến tính", () => {
+    let prevScale = 1;
+    let prevRing = Infinity;
+    for (let t = 1; t < WARN_FADE_MS; t += 7) {
+      const b = warnBurst(800 + t, 800, "circle", false)!;
+      expect(b.scale).toBeGreaterThanOrEqual(prevScale); // chỉ nở, không co lại
+      expect(b.scale).toBeLessThanOrEqual(1 + WARN_BURST_GROW);
+      expect(b.ring).toBeLessThan(prevRing); // mờ dần
+      expect(b.ring).toBeGreaterThan(0);
+      expect(b.flash).toBeCloseTo(WARN_BURST_FLASH * b.ring, 10);
+      prevScale = b.scale;
+      prevRing = b.ring;
+    }
+    // sớm nở nhanh hơn muộn (easeOut): nửa đầu nở hơn nửa sau
+    const mid = warnBurst(800 + WARN_FADE_MS / 2, 800, "circle", false)!;
+    expect(mid.scale - 1).toBeGreaterThan(WARN_BURST_GROW / 2);
+  });
+
+  it("warnBurst: giảm chuyển động thì KHÔNG nở, KHÔNG chớp (chỉ nét viền trắng mờ dần); số không hợp lệ thì null", () => {
+    for (const t of [1, 40, 100, WARN_FADE_MS - 1]) {
+      const b = warnBurst(800 + t, 800, "circle", true)!;
+      expect(b.scale).toBe(1);
+      expect(b.flash).toBe(0);
+      expect(b.ring).toBeGreaterThan(0);
+    }
+    expect(warnBurst(NaN, 800, "circle", false)).toBeNull();
+    expect(warnBurst(Infinity, 800, "circle", false)).toBeNull();
+    expect(warnBurst(850, NaN, "circle", false)).toBeNull();
+    expect(warnBurst(850, 0, "circle", false)).toBeNull();
   });
 
   it("warnOutlineAlpha: giảm chuyển động thì đứng yên, còn lại luôn trong (0.45, 0.95)", () => {

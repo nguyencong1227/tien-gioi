@@ -21,6 +21,7 @@ import {
   warnArcSteps,
   warnFillAlpha,
   warnOutlineAlpha,
+  warnBurst,
   warnPolygon,
   warnCovers,
   warnProgress,
@@ -38,6 +39,10 @@ export const BOLT_DEPTH_OFFSET = 2;
 /** Màu vùng báo: đỏ cam nóng cho dễ nhận (đạn có màu theo hệ riêng). */
 export const WARN_FILL = 0xff4030;
 export const WARN_LINE = 0xffb090;
+/** Sóng xung kích lúc đòn tròn đáp xuống: chớp vàng nóng phủ vòng, vòng sóng lõi trắng ấm viền đỏ thẫm (đọc rõ cả trên nền nhạt như băng nguyên). */
+export const BURST_FLASH = 0xffd27a;
+export const BURST_CORE = 0xfff4dc;
+export const BURST_EDGE = 0x8a1c10;
 /** Bước vệt đuôi đạn (px) và bán kính lõi / quầng sáng. */
 const TRAIL_STEP = 8;
 const BOLT_CORE = 4;
@@ -280,6 +285,20 @@ export class TelegraphLayer {
     } else {
       const n = warnPolygon(this.scratch, plan, 1, steps);
       g.strokePoints(this.scratch, true, true, n);
+    }
+    // Đòn tròn vừa đáp xuống (đập đất): chớp trắng phủ vòng + vòng sóng nở ra ngoài, trong khoảng mờ sau `ms` (cùng Graphics, không thêm đối tượng)
+    const burst = warnBurst(elapsed, plan.ms, plan.shape, reduced);
+    if (burst) {
+      if (burst.flash > 0) {
+        g.fillStyle(BURST_FLASH, burst.flash);
+        g.fillCircle(0, 0, plan.r);
+      }
+      // vòng sóng hai lớp: nét đỏ thẫm ngoài (đọc được cả trên nền băng nhạt, nơi nét trắng chìm) + lõi trắng ấm
+      const rr = plan.r * burst.scale;
+      g.lineStyle(7, BURST_EDGE, burst.ring * 0.7);
+      g.strokeCircle(0, 0, rr);
+      g.lineStyle(3, BURST_CORE, burst.ring);
+      g.strokeCircle(0, 0, rr);
     }
     return true;
   }
