@@ -1445,6 +1445,17 @@ function drawItemIcon(id) {
     s.rect(5, 4, 3, 17, 0x2a2018, 110);
     s.rect(19, 5, 1, 15, 0xf4ecd0);
     s.rect(8, 7, 9, 1, accent);
+    // Vẽ dấu từ bản đồ điểm ảnh: 9 cột (x = 8..16, giữa hai dải ngang của bìa), hàng đầu ở y0; ký tự không có trong `pal` là nền bìa.
+    const paintMark = (rows, y0, pal) =>
+      rows.forEach((row, j) =>
+        [...row].forEach((c, i) => {
+          if (pal[c] !== undefined) s.rect(8 + i, y0 + j, 1, 1, pal[c]);
+        }),
+      );
+    const shade = (hex) => {
+      const k = (sh) => Math.round(((hex >> sh) & 255) * 0.62);
+      return (k(16) << 16) | (k(8) << 8) | k(0);
+    };
     if (mark === undefined) {
       // 12 quyển đợt 1: dấu tròn
       s.circle(12, 13, 3, accent);
@@ -1456,23 +1467,55 @@ function drawItemIcon(id) {
       s.line(9.6, 16.2, 9.6, 13.6, accent, 1);
       s.line(9.6, 16.2, 12.2, 16.2, accent, 1);
     } else if (mark === "trao") {
-      // Bạch Kim Trảo: ba vệt vuốt song song
-      s.line(9.6, 9.6, 11.8, 16.4, accent, 1.3);
-      s.line(12.2, 9.6, 14.4, 16.4, accent, 1.3);
-      s.line(14.8, 9.6, 17, 16.4, accent, 1.3);
+      // Bạch Kim Trảo: ba vệt vuốt cào XIÊN 45 độ, đầu dày đuôi thon, đầu và độ dài khác nhau (vệt phải dài nhất, vệt trái vừa, vệt dưới lệch xuống ngắn nhất); ba vệt cách nhau >= 1 điểm ảnh (kể cả chéo).
+      // Ba nét gần thẳng đứng song song đọc ra chữ Hán "川", nên mỗi vệt lệch ngang bằng chiều cao (dx = dy >= dy / 2). Vẽ từng điểm ảnh.
+      paintMark(
+        [
+          "...##..##", //  y 9
+          "..##..##.", // y 10
+          ".##..##..", // y 11
+          ".#..##...", // y 12
+          "#..##..##", // y 13
+          "...#..##.", // y 14
+          "..#...#..", // y 15
+          ".....#...", // y 16
+        ],
+        9,
+        { "#": accent },
+      );
     } else if (mark === "tran") {
-      // Vạn Thạch Trận: bốn tảng đá xếp ô vuông
-      s.rect(9, 9.6, 3, 3, accent);
-      s.rect(13, 9.6, 3, 3, accent);
-      s.rect(9, 13.8, 3, 3, accent);
-      s.rect(13, 13.8, 3, 3, accent);
+      // Vạn Thạch Trận: đống đá ba tảng KHÁC CỠ, mép tròn, so le (nhỏ ở trên lệch trái, vừa bên trái, to bên phải), mỗi tảng cách nhau một điểm nền
+      // và có bóng ở đáy. Bốn ô vuông đều thành lưới 2 x 2 đọc ra chữ Hán "田" (và các tầng đá ngang đọc ra nét ngang), nên không dùng lưới.
+      paintMark(
+        [
+          "...##....", //  y 9
+          "..###s...", // y 10
+          "...ss....", // y 11
+          ".....###.", // y 12
+          ".###.####", // y 13
+          ".####.###", // y 14
+          ".###s.##s", // y 15
+          "..ss.sss.", // y 16
+        ],
+        9,
+        { "#": accent, s: shade(cover) },
+      );
     } else if (mark === "hoa") {
-      // Băng Hoa Loạn: bông tuyết tám nan
-      s.line(12.5, 9, 12.5, 17, accent, 1);
-      s.line(8.5, 13, 16.5, 13, accent, 1);
-      s.line(9.7, 10.2, 15.3, 15.8, accent, 1);
-      s.line(15.3, 10.2, 9.7, 15.8, accent, 1);
-      s.circle(12.5, 13, 1.3, cover);
+      // Băng Hoa Loạn: bông tuyết SÁU nhánh (một nhánh dọc có chạc ở hai đầu, bốn nhánh xiên thoải), không có nhánh ngang: tám nan đều
+      // (dọc + ngang + hai chéo) đọc ra chữ Hán "米". Vẽ từng điểm ảnh.
+      paintMark(
+        [
+          "....#....", // y 10
+          "#..###..#", // y 11
+          ".##.#.##.", // y 12
+          "...###...", // y 13
+          ".##.#.##.", // y 14
+          "#..###..#", // y 15
+          "....#....", // y 16
+        ],
+        10,
+        { "#": accent },
+      );
     } else if (mark === "kiem") {
       // Liệt Hỏa Kiếm: thanh kiếm CHÉO (mũi trên trái, chuôi dưới phải: ngược hướng mũi tên của Hàn Quang Tiễn), vẽ từng điểm ảnh cho sắc nét ở 24 px
       // (đường khử răng cưa lem thành hình chim): lưỡi dày 2 điểm ảnh, chắn tay vuông góc với lưỡi, chuôi và núm. Không dựng đứng: kiếm dọc có chắn
