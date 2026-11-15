@@ -534,8 +534,11 @@ body.reduced-motion .st-badge.urgent {
 .menu-toggle {
   display: none;
 }
-/* Màn rất hẹp (điện thoại dọc: 360 / 412 px): chỉ một nút ☰, bấm mở ra MỘT hàng 6 nút phủ lên dưới nút */
-@media (max-width: 479px) {
+/* Màn hẹp (điện thoại dọc: 360 / 412 px; cửa sổ trình duyệt hẹp 480-619 px, #684): chỉ một nút ☰, bấm mở ra MỘT hàng 7 nút phủ lên dưới nút.
+   Mốc 620: hàng 7 nút rộng ~338 px nằm ở cột phải ngay dưới bản đồ nhỏ, cùng hàng với bảng Tổ đội (thu gọn rộng 240 px) của cột trái; cần
+   rộng >= 12 + 240 + 8 + 338 + 12 = 610 px mới đứng cạnh nhau không chồng. Mốc cũ 480 từ lúc menu có 6 nút (290 px): thêm nút Công pháp (M7.6) làm
+   hàng menu đè bảng Tổ đội ở cửa sổ 550x900 (đo: menu rộng 338 px = 61 % khung, chồng `party-panel`). */
+@media (max-width: 619px) {
   .menu-toggle {
     display: inline-flex;
   }
