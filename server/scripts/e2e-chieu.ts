@@ -18,6 +18,9 @@
 //     thật (lớp báo trước đòn đếm đạn), người đứng yên bị trúng đúng `atk` MỘT lần (đạn, không đánh gần), quái giữ khoảng cách.
 //  8. ĐẠN ĐỘC (M7.3 #504, #601 / #607): Độc Thiềm THẬT (`poisoner` + `boltRange`) bắn đạn độc: trúng thì trừ đúng `atk` VÀ gắn độc (máy chủ + huy hiệu độc ở HUD của người bị bắn), độc
 //     không giết người; chạy về khu an toàn thì độc được THANH TẨY (huy hiệu tắt).
+//  9. ĐẬP ĐẤT BÁO TRƯỚC (M7.3 #504, #629): Cốt Tượng THẬT (`slam` 90 px / 1100 ms / x2 công từ `MONSTERS`, không ép def) thấy người trong vòng thì đứng gồng; client nhận ĐÚNG MỘT `fx warn`
+//     hình tròn (tâm ở chỗ quái, bán kính và thời gian đúng số liệu), người đứng yên trúng đúng `round(atk x 2)` MỘT lần (không đánh thường lúc gồng), vùng báo mờ hết sau khi đòn đáp;
+//     người bước ra khỏi vòng trong lúc gồng thì KHÔNG trúng.
 // Chạy: `npm run build -w client && npm run e2e:chieu -w server` (cần google-chrome).
 import { spawn, execSync, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -914,6 +917,138 @@ async function main() {
     must(!c8.st?.list.some((s) => s.id === "poison"), "máy chủ đã gỡ độc khỏi hộp trạng thái");
     ok("về khu an toàn: độc được thanh tẩy (máy chủ gỡ, huy hiệu tắt), người vẫn sống");
     must(T.errors.length === 0, `lỗi console ở ca 8: ${JSON.stringify(T.errors)}`);
+    ok("0 lỗi console / exception");
+
+    out(
+      "\n--- Ca 9: Cốt Tượng THẬT đập đất báo trước: client nhận ĐÚNG MỘT warn tròn đúng tâm / bán kính / thời gian; đứng yên thì trúng round(atk x 2) MỘT lần; ra khỏi vòng lúc gồng thì tránh được ---",
+    );
+    const DDN = "Quai Dap Dat";
+    await seedQuai(DDN);
+    await login(DDN);
+    await T.waitFor(
+      `!document.getElementById('ui')?.hidden && !!window.__scene?.room`,
+      "vào game thành công",
+      20000,
+    );
+    const w9 = await worldOf();
+    const sid9 = (await ev(`window.__scene.room.sessionId`)) as string;
+    // Người đứng cách quái 200 px là NGOÀI vòng đập (90 + 11) và ngoài aggro (150, dư chỗ cho quái lang thang nhích vài chục px): quái chưa nhắm; cách 70 px là TRONG vòng (quái gồng ngay)
+    const GAP9 = 200;
+    const spot9 = openSpot(w9, GAP9, 10);
+    must(spot9 !== null, "có chỗ thoáng thứ ba cho người + Cốt Tượng cách 200 px");
+    const home9 = { x: spot9!.x - GAP9, y: spot9!.y }; // chỗ đặt quái
+    const far9 = { x: spot9!.x, y: spot9!.y }; // cách quái 200 px
+    const near9 = { x: home9.x + 70, y: home9.y }; // cách quái 70 px
+    const p9 = w9.state.players.get(sid9)!;
+    await T.waitFor(
+      `!!window.__scene?.telegraphs && typeof window.__scene.telegraphs.stats === 'function'`,
+      "lớp báo trước đòn của cảnh đã dựng (sau lần vào game thứ ba)",
+      15000,
+    );
+    const warnsOf = () => ev(`window.__scene.telegraphs.stats().spawnedWarns`) as Promise<number>;
+    const putStatue = () => {
+      const s = addMonster(w9, "cot_tuong", home9.x, home9.y);
+      isolate(w9, spot9!, s.id);
+      return s;
+    };
+    const dropStatue = (id: string) => {
+      w9.state.monsters.delete(id);
+      w9.mctrl.delete(id);
+    };
+
+    // --- 9a: đứng yên trong vòng ---
+    const st1 = putStatue();
+    const slam = st1.mc.def.slam;
+    must(
+      !!slam && slam.radius === 90 && slam.windupMs === 1100 && slam.mult === 2,
+      `Cốt Tượng THẬT có đập đất 90 px / 1100 ms / x2 (số liệu MONSTERS, không ép def): ${JSON.stringify(slam)}`,
+    );
+    const dmg9 = Math.round(st1.mc.def.atk * slam!.mult);
+    await teleport(w9, sid9, far9.x, far9.y);
+    p9.hp = p9.maxHp;
+    await sleep(600);
+    must(
+      st1.mc.slam === undefined && p9.hp === p9.maxHp,
+      "người cách 200 px (ngoài vòng, ngoài aggro): quái chưa gồng, chưa mất khí huyết",
+    );
+    const warns9 = await warnsOf();
+    await teleport(w9, sid9, near9.x, near9.y);
+    await T.waitFor(
+      `window.__scene.telegraphs.stats().spawnedWarns > ${warns9}`,
+      "client nhận fx `warn` từ máy chủ thật khi Cốt Tượng gồng đập đất",
+      15000,
+    );
+    // Quái hiền lành lang thang nên chỗ đứng LÚC GỒNG không đúng chỗ đặt: lấy vị trí máy chủ ngay khi gồng (quái đứng yên suốt lúc gồng)
+    const at9 = { x: st1.m.x, y: st1.m.y };
+    const snap9 = JSON.parse(
+      (await ev(
+        `JSON.stringify(window.__scene.telegraphs.snapshot(window.__scene.time.now).warns)`,
+      )) as string,
+    ) as Array<{ shape: string; x: number; y: number; r: number; ms: number }>;
+    must(
+      snap9.length === 1 &&
+        snap9[0].shape === "circle" &&
+        snap9[0].r === slam!.radius &&
+        snap9[0].ms === slam!.windupMs &&
+        Math.abs(snap9[0].x - at9.x) <= 1 &&
+        Math.abs(snap9[0].y - at9.y) <= 1,
+      `vùng báo của client là MỘT hình tròn tâm quái (${at9.x.toFixed(0)}, ${at9.y.toFixed(0)}), r ${slam!.radius}, ${slam!.windupMs} ms: ${JSON.stringify(snap9)}`,
+    );
+    ok(
+      `client nhận ĐÚNG MỘT vùng báo tròn: tâm ở chỗ quái, bán kính ${slam!.radius} px, gồng ${slam!.windupMs} ms`,
+    );
+    must(p9.hp === p9.maxHp, "đang gồng: quái đứng yên, KHÔNG đánh thường (khí huyết chưa mất)");
+    await until(() => (p9.hp < p9.maxHp ? true : false), "người đứng yên trong vòng bị đập", 5000);
+    const drop9 = p9.maxHp - p9.hp;
+    must(
+      drop9 === dmg9,
+      `lần mất khí huyết đầu tiên là cú đập đất: round(atk ${st1.mc.def.atk} x ${slam!.mult}) = ${dmg9}, thực tế -${drop9}`,
+    );
+    must(
+      Math.hypot(st1.m.x - at9.x, st1.m.y - at9.y) <= 1,
+      "quái đứng yên suốt lúc gồng (không áp sát)",
+    );
+    must(
+      (await warnsOf()) === warns9 + 1,
+      `suốt đợt gồng chỉ MỘT tin báo trước (${(await warnsOf()) - warns9})`,
+    );
+    ok(`đứng yên trong vòng: trúng đúng MỘT cú đập đất (khí huyết -${drop9} = ${dmg9})`);
+    await T.waitFor(
+      `window.__scene.telegraphs.stats().warns === 0`,
+      "vùng báo trên client mờ hết sau khi đòn đáp",
+      4000,
+    );
+    ok("sau khi đòn đáp xuống: vùng báo trên client mờ hết");
+    dropStatue(st1.id);
+
+    // --- 9b: bước ra khỏi vòng trong lúc gồng ---
+    await teleport(w9, sid9, far9.x, far9.y);
+    p9.hp = p9.maxHp;
+    const st2 = putStatue();
+    const warns9b = await warnsOf();
+    await sleep(400); // quái mới ở xa (200 px): chưa nhắm
+    must(st2.mc.slam === undefined, "quái mới chưa gồng khi người ở ngoài aggro");
+    await teleport(w9, sid9, near9.x, near9.y);
+    await until(() => (st2.mc.slam ? true : false), "Cốt Tượng mới bắt đầu gồng", 3000);
+    await teleport(w9, sid9, far9.x, far9.y); // ra khỏi vòng NGAY khi quái gồng (còn ~1,1 s)
+    await T.waitFor(
+      `window.__scene.telegraphs.stats().spawnedWarns > ${warns9b}`,
+      "client vẫn nhận vùng báo của lần gồng này",
+      5000,
+    );
+    await until(
+      () => (st2.mc.slam === undefined && st2.mc.nextSlam !== undefined ? true : false),
+      "cú đập đất đáp xuống (quái đặt hồi chiêu)",
+      4000,
+    );
+    await sleep(400); // dư thời gian để mọi sát thương (nếu có) tới
+    must(
+      p9.hp === p9.maxHp && !p9.dead,
+      `bước ra khỏi vòng trong lúc gồng thì tránh được (khí huyết ${p9.hp} / ${p9.maxHp})`,
+    );
+    ok("bước ra khỏi vòng trước lúc đáp: cú đập đất trượt (khí huyết nguyên vẹn)");
+    dropStatue(st2.id);
+    must(T.errors.length === 0, `lỗi console ở ca 9: ${JSON.stringify(T.errors)}`);
     ok("0 lỗi console / exception");
   } catch (err) {
     failed = err instanceof Error ? err.message : String(err);
