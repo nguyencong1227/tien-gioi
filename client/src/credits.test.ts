@@ -202,17 +202,21 @@ describe("Nguồn nội dung, hình ảnh và âm thanh bên ngoài (M7.16 #517,
   const contentSourcePath = path.resolve(rootDir, "docs/NGUON_NOI_DUNG.md");
   const creditsPath = path.resolve(rootDir, "CREDITS.md");
 
-  it("docs/NGUON_NOI_DUNG.md tồn tại, bảng nguồn hợp lệ: 12 dòng `cong_phap` (12 chiêu M7.1), audit sạch, mỗi chiêu của SKILLS_M7 đúng MỘT dòng", () => {
+  it("docs/NGUON_NOI_DUNG.md tồn tại, bảng nguồn hợp lệ: >= 12 dòng `cong_phap` (12 chiêu M7.1), audit sạch, mỗi chiêu của SKILLS_M7 khai báo đúng MỘT nơi", () => {
     expect(fs.existsSync(contentSourcePath)).toBe(true);
     const content = fs.readFileSync(contentSourcePath, "utf-8");
     expect(content).toContain("## 3. Bảng nguồn");
     expect(content).toContain("Đã duyệt chữ Hán");
 
     const audit = auditContentSources(contentSourcePath, creditsPath, rootDir);
-    // Chưa có hình / âm nào lấy từ nguồn: mọi dòng là dữ liệu chiêu thức (`cong_phap`), không cần tệp trên đĩa / dòng CREDITS.md
-    expect(audit.entries.length).toBe(12);
-    expect(audit.entries.every((e) => e.type === "cong_phap")).toBe(true);
-    expect(audit.entries.every((e) => e.cjkChecked === "KHONG_AP_DUNG")).toBe(true);
+    // Bảng đã điền: ít nhất 12 dòng chiêu thức (`cong_phap`, M7.1); dòng sau này (trang bị, hình, âm...) được thêm mà không phải sửa ca này
+    expect(audit.entries.length).toBeGreaterThanOrEqual(12);
+    expect(audit.entries.filter((e) => e.type === "cong_phap").length).toBeGreaterThanOrEqual(12);
+    expect(
+      audit.entries
+        .filter((e) => e.type === "cong_phap")
+        .every((e) => e.cjkChecked === "KHONG_AP_DUNG"),
+    ).toBe(true);
     expect(audit.missingInCredits).toEqual([]);
     expect(audit.missingFiles).toEqual([]);
     expect(audit.notInVkttDir).toEqual([]);
