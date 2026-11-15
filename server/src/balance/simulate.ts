@@ -42,6 +42,13 @@ export const ASSUME = {
     thach_quy: 12,
     doc_thiem: 14,
     hac_giao: 90,
+    // Quái Nguyên Anh (M7.9): lấy theo loài Kim Đan cùng vai (Sương Hồ, Thạch Quy, Độc Thiềm, Hắc Giao). Hàn Vân thưa hơn Âm Sương
+    // (20 / 16 / 12 / 12 con so với 24 / 18 / 18), nên đây là cận lạc quan; `search-check.ts` chưa đo Hàn Vân.
+    han_lang: 10,
+    phong_nha: 10,
+    cot_tuong: 12,
+    doc_tuoc: 14,
+    thien_han_vuong: 90,
   } as Record<string, number>,
   /** Tỉ lệ đòn của quái thực sự trúng (người chơi né / lùi được một phần) */
   hitTaken: 0.8,
