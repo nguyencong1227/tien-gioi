@@ -348,6 +348,12 @@ async function main() {
     const f2 = await stepRate();
     must(f2 < 70, `tắt Tiết kiệm pin: không bị kẹt ở trần 30, đo ${f2.toFixed(1)}`);
     if (fast) must(f2 > 52, `tắt Tiết kiệm pin về ~60 FPS, đo ${f2.toFixed(1)}`);
+    // Vòng lặp còn CHẠY sau khi đổi giới hạn: máy chậm chỉ còn ngưỡng trên nên `setFpsLimit` (stop() rồi start()) làm chết hẳn vòng lặp (FPS = 0)
+    // vẫn qua các `must` trên (review A ở #712; đo dưới một nhân ~9,6 FPS nên ngưỡng 2 còn dư)
+    must(
+      f1 > 2 && f2 > 2,
+      `vòng lặp còn chạy sau khi đổi giới hạn FPS (stop / start không làm chết vòng lặp): ${f1.toFixed(1)} / ${f2.toFixed(1)} FPS`,
+    );
     ok(
       `FPS: mặc định ${f0.toFixed(1)} -> tiết kiệm pin ${f1.toFixed(1)} -> tắt ${f2.toFixed(1)}${fast ? "" : " (máy chậm: kiểm cấu hình fps.limit, không kiểm ngưỡng dưới)"}`,
     );
