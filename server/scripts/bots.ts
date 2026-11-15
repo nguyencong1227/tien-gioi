@@ -1,5 +1,5 @@
 // Kịch bản thử tải bằng bot kết nối qua colyseus.js như người chơi thật.
-// Chỉ chạy vào server của Dev C (mặc định cổng 2587 từ .env.local), tuyệt đối không bắn vào cổng 2567 (BẢN CHẠY THẬT), 2597 (Dev A) hay 2577 (Dev B).
+// Chỉ chạy vào server của Dev C (mặc định cổng 2587 từ .env.local), tuyệt đối không bắn vào cổng 2567 (BẢN CHẠY THẬT), 2597 (Dev A), 2577 (Dev B) hay 2607 (Dev D).
 // Cách dùng:
 //   npm run bots -w server -- --bots=50 --duration=15
 //   npm run bots -w server -- --suite --mode=realistic --duration=15 --write-doc
@@ -88,7 +88,7 @@ const envFile = path.join(repoRoot, ".env.local");
 if (existsSync(envFile)) process.loadEnvFile(envFile);
 
 const DEFAULT_PORT = Number(process.env.PORT ?? 2587);
-const FORBIDDEN_PORTS = new Set([2567, 2577, 2597]); // 2567: BẢN CHẠY THẬT; 2597: Dev A; 2577: Dev B
+const FORBIDDEN_PORTS = new Set([2567, 2577, 2597, 2607]); // 2567: BẢN CHẠY THẬT; 2597: Dev A; 2577: Dev B; 2607: Dev D
 const DATA_PLAYERS_DIR = process.env.DATA_DIR
   ? path.resolve(process.env.DATA_DIR)
   : path.resolve(here, "../data/players");
@@ -3727,7 +3727,7 @@ async function main() {
 
   if (FORBIDDEN_PORTS.has(args.port) && !args.allowOtherPort) {
     console.error(
-      `Từ chối chạy: cổng ${args.port} thuộc về bản chạy thật (2567), Dev A (2597) hoặc Dev B (2577). Chỉ chạy thử tải vào cổng của Dev C (2587).`,
+      `Từ chối chạy: cổng ${args.port} thuộc về bản chạy thật (2567), Dev A (2597), Dev B (2577) hoặc Dev D (2607). Chỉ chạy thử tải vào cổng của Dev C (2587).`,
     );
     process.exit(1);
   }

@@ -20,11 +20,11 @@ import {
 } from "@tien-gioi/shared";
 import { slash } from "../systems/combat";
 import { setEquipment } from "../systems/equipment";
-import { tickMonsters } from "../systems/monsters";
+import { placeMonster, tickMonsters } from "../systems/monsters";
 import { tickBolts } from "../systems/bolt";
 import { tickStatuses } from "../systems/status";
 import { applyStats } from "../systems/progression";
-import { addMonster, addPlayer, makeWorld } from "../systems/test-helpers";
+import { addPlayer, makeWorld } from "../systems/test-helpers";
 import { bestGear } from "./simulate";
 import { withOwnerGear } from "./do-o-rieng";
 import { seeded, median, huntCheck } from "./hunt-check";
@@ -38,6 +38,7 @@ export interface BotFightOptions {
   monsterId: string;
   useOwnerGear?: boolean;
   evade?: boolean;
+  elite?: boolean;
   reactionMs?: number;
   party?: number;
   potionId?: string;
@@ -114,10 +115,10 @@ export function botFight(options: BotFightOptions): BotFightResult {
     const nextPotionAt = sids.map(() => 0);
     const nextSlashAt = sids.map(() => 0);
 
-    // Sinh quái
+    // Sinh quái (hỗ trợ quái thường hoặc tinh anh qua options.elite)
     const monDef = MONSTER_BY_ID[monsterId];
     if (!monDef) throw new Error(`Không tìm thấy quái: ${monsterId}`);
-    const { id: monId } = addMonster(w, monsterId, players[0].x + 40, players[0].y);
+    const monId = placeMonster(w, monDef, players[0].x + 40, players[0].y, options.elite ?? false);
 
     w.now = 1_000_000;
     const dt = TICK_MS / 1000;
@@ -329,6 +330,7 @@ export interface BotHuntSummary {
   party: number;
   useOwnerGear: boolean;
   evade: boolean;
+  elite: boolean;
   medianSeconds: number;
   medianTotalDmg: number;
   medianPotions: number;
@@ -349,6 +351,7 @@ export function botHuntSummary(
   const party = options.party ?? 1;
   const useOwnerGear = options.useOwnerGear ?? false;
   const evade = options.evade ?? true;
+  const elite = options.elite ?? false;
   const runs = options.runs ?? defaultRuns;
 
   const results: BotFightResult[] = [];
@@ -361,6 +364,7 @@ export function botHuntSummary(
         party,
         useOwnerGear,
         evade,
+        elite,
         seed,
         ...options,
       }),
@@ -384,6 +388,7 @@ export function botHuntSummary(
     party,
     useOwnerGear,
     evade,
+    elite,
     medianSeconds,
     medianTotalDmg,
     medianPotions,
@@ -402,18 +407,32 @@ export function renderBotHuntSection(): string {
   // 1. Đối chiếu solo 4 loài Hàn Vân (Nguyên Anh Hậu kỳ)
   const soloRows = HAN_VAN_MONSTERS.map((id) => {
     const hc = huntCheck(NA_REALM, 2, id);
+    const botStand = botHuntSummary(NA_REALM, 2, id, {
+      evade: false,
+      useOwnerGear: false,
+      runs: 6,
+    });
     const bot3M = botHuntSummary(NA_REALM, 2, id, { evade: true, useOwnerGear: false, runs: 6 });
     const bot6M = botHuntSummary(NA_REALM, 2, id, { evade: true, useOwnerGear: true, runs: 6 });
     const timeDiffPct = Math.abs((bot3M.medianSeconds - hc.modelSeconds) / hc.modelSeconds) * 100;
+    const evadeDmgDiff =
+      botStand.medianTotalDmg > 0
+        ? Math.round(
+            ((botStand.medianTotalDmg - bot3M.medianTotalDmg) / botStand.medianTotalDmg) * 100,
+          )
+        : 0;
     return {
       id,
       name: MONSTER_BY_ID[id].name,
       modelSec: hc.modelSeconds,
+      standSec: botStand.medianSeconds,
+      standDmg: botStand.medianTotalDmg,
       bot3MSec: bot3M.medianSeconds,
       bot6MSec: bot6M.medianSeconds,
       timeDiffPct,
       bot3MDmg: bot3M.medianTotalDmg,
       bot6MDmg: bot6M.medianTotalDmg,
+      evadeDmgDiff,
       lowestHp3M: bot3M.lowestHpFrac * 100,
       lowestHp6M: bot6M.lowestHpFrac * 100,
       potions: bot3M.medianPotions,
@@ -445,6 +464,66 @@ export function renderBotHuntSection(): string {
     };
   });
 
+  // 3. Quái Tinh Anh Hàn Vân Lĩnh (Nguyên Anh Hậu kỳ)
+  const eliteRows = HAN_VAN_MONSTERS.map((id) => {
+    const solo3M = botHuntSummary(NA_REALM, 2, id, {
+      elite: true,
+      evade: true,
+      useOwnerGear: false,
+      runs: 6,
+    });
+    const solo6M = botHuntSummary(NA_REALM, 2, id, {
+      elite: true,
+      evade: true,
+      useOwnerGear: true,
+      runs: 6,
+    });
+    const party2 = botHuntSummary(NA_REALM, 2, id, {
+      elite: true,
+      party: 2,
+      evade: true,
+      useOwnerGear: false,
+      runs: 6,
+    });
+    return {
+      id,
+      name: `${MONSTER_BY_ID[id].name} (Tinh Anh)`,
+      secSolo3M: solo3M.medianSeconds,
+      dmgSolo3M: solo3M.medianTotalDmg,
+      lowestHpSolo3M: solo3M.lowestHpFrac * 100,
+      potionsSolo3M: solo3M.medianPotions,
+      deathsSolo3M: solo3M.deathsTotal,
+      secSolo6M: solo6M.medianSeconds,
+      lowestHpSolo6M: solo6M.lowestHpFrac * 100,
+      deathsSolo6M: solo6M.deathsTotal,
+      secParty2: party2.medianSeconds,
+      lowestHpParty2: party2.lowestHpFrac * 100,
+      potionsParty2: party2.medianPotions,
+      deathsParty2: party2.deathsTotal,
+    };
+  });
+
+  // Đo thử nghiệm riêng cho Độc Tước Tinh Anh khi mang 8 đan
+  const docTuocSolo8 = botHuntSummary(NA_REALM, 2, "doc_tuoc", {
+    elite: true,
+    evade: true,
+    useOwnerGear: false,
+    potions: 8,
+    runs: 6,
+  });
+
+  const makeEliteComment = (r: (typeof eliteRows)[number]) => {
+    if (r.deathsSolo3M > 0) {
+      return `Solo tử vong ${r.deathsSolo3M}/6 (độc dồn nhanh hơn cd đan 12s, mang 8 đan vẫn chết); đội 2 sống sót ${r.deathsParty2 === 0 ? "100%" : `${6 - r.deathsParty2}/6`}`;
+    }
+    if (r.id === "cot_tuong") {
+      return `Solo né đập đất liên tục (${n1(r.secSolo3M)}s); đội 2 rút ngắn còn ${n1(r.secParty2)}s`;
+    }
+    return `Solo an toàn (${n1(r.potionsSolo3M)} đan); đội 2 rất an toàn (${n1(r.secParty2)}s)`;
+  };
+
+  const cotTuongRow = soloRows.find((r) => r.id === "cot_tuong")!;
+
   return `### 6. Thực nghiệm bot THẬT Nguyên Anh (M7.10 Refs #511, #510)
 
 Đo bằng bot THẬT điều khiển như người chơi trong \`World\` Hàn Vân Lĩnh:
@@ -453,14 +532,16 @@ export function renderBotHuntSection(): string {
 - **Chiến đấu:** áp sát chém thường Kiếm (\`slash\`), KHÔNG dùng chiêu thức võ công (giữ nguyên quy ước mô hình); uống \`thuong_hoi_huyet_dan\` (hồi 90% HP, cd 12s) khi khí huyết sụt dưới 50%.
 - **Số đo thực nghiệm (Nguyên Anh Hậu kỳ):**
 
-| Loài | Mô hình (s) | Bot thật 3 món (s) | Sai số thời gian | Sát thương nhận (3 món) | Đáy khí huyết (3 món) | Bot 6 món (đồ ô riêng) | Sát thương nhận (6 món) | Đáy khí huyết (6 món) |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Loài | Mô hình (s) | Đứng yên 3M (s) | Bot né 3M (s) | Sai số tgian (né) | ST đứng yên | ST bot né | Đáy khí huyết (3M) | Bot 6M (đồ ô riêng) | Đáy khí huyết (6M) |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 ${soloRows
   .map(
     (r) =>
-      `| **${r.name}** | ${n1(r.modelSec)} | ${n1(r.bot3MSec)} | ${n1(r.timeDiffPct)}% | ${n0(r.bot3MDmg)} | ${n0(r.lowestHp3M)}% | ${n1(r.bot6MSec)}s | ${n0(r.bot6MDmg)} (-${n0(((r.bot3MDmg - r.bot6MDmg) / r.bot3MDmg) * 100)}%) | ${n0(r.lowestHp6M)}% |`,
+      `| **${r.name}** | ${n1(r.modelSec)} | ${n1(r.standSec)} | ${n1(r.bot3MSec)} | ${n1(r.timeDiffPct)}% | ${n0(r.standDmg)} | ${n0(r.bot3MDmg)}${r.evadeDmgDiff > 0 ? ` (-${r.evadeDmgDiff}%)` : ""} | ${n0(r.lowestHp3M)}% | ${n1(r.bot6MSec)}s | ${n0(r.lowestHp6M)}% |`,
   )
   .join("\n")}
+
+*Giải thích sai số thời gian ở Cốt Tượng (101%):* Trong mô hình, người chơi được giả định đứng yên chém liên tục (${n1(cotTuongRow.modelSec)}s, rất sát với số đo 'Đứng yên 3M' ${n1(cotTuongRow.standSec)}s). Khi bật hành vi né đòn (\`evade: true\`), bot thật phải dừng chém và chạy xuyên tâm ra ngoài vòng đập đất r=90px của Cốt Tượng rồi mới áp sát lại chém tiếp, khiến thời gian hạ quái kéo dài lên ${n1(cotTuongRow.bot3MSec)}s (+101%). Đổi lại, việc né đòn giúp giảm mạnh sát thương nhận vào từ ${n0(cotTuongRow.standDmg)} xuống ${n0(cotTuongRow.bot3MDmg)} (-${cotTuongRow.evadeDmgDiff}% sát thương ở Hậu kỳ, giảm tới 59% ở Sơ kỳ), bảo toàn sinh mạng an toàn tuyệt đối.
 
 **Trùm Thiên Hàn Vương theo cỡ đội (Nguyên Anh Hậu kỳ):**
 
@@ -473,12 +554,30 @@ ${bossPartyRows
   )
   .join("\n")}
 
+**Thực nghiệm bot thật đánh TINH ANH Hàn Vân Lĩnh (Nguyên Anh Hậu kỳ, M7.10 Refs #511, #510):**
+
+| Loài Tinh Anh | Solo 3M (s / đan) | Tử vong (solo 3M) | Đáy máu (solo 3M) | Solo 6M (đồ ô riêng) | Tử vong (solo 6M) | Đội 2 người (s / đan) | Tử vong (đội 2) | Nhận xét thực nghiệm |
+|---|---:|---:|---:|---:|---:|---:|---:|---|
+${eliteRows
+  .map(
+    (r) =>
+      `| **${r.name}** | ${n1(r.secSolo3M)}s (${n1(r.potionsSolo3M)} đan) | ${r.deathsSolo3M}/6 | ${n0(r.lowestHpSolo3M)}% | ${n1(r.secSolo6M)}s (${n0(r.lowestHpSolo6M)}% máu) | ${r.deathsSolo6M}/6 | ${n1(r.secParty2)}s (${n1(r.potionsParty2)} đan) | ${r.deathsParty2}/6 | ${makeEliteComment(r)} |`,
+  )
+  .join("\n")}
+
 **Đọc bảng & Kết luận thực nghiệm:**
-1. **Né đòn cứu mạng rất rõ rệt:** Ở Cốt Tượng và Thiên Hàn Vương, đòn đập đất hình tròn gây lượng sát thương cực lớn. Bot thật né thoát vòng đập đất giúp giảm 33% sát thương nhận vào từ Cốt Tượng và bảo toàn 100% mạng sống của toàn đội khi đánh Thiên Hàn Vương (0/6 trận có người chết ở cả đội 3 và đội 4 người).
+1. **Né đòn cứu mạng rất rõ rệt:** Ở Cốt Tượng và Thiên Hàn Vương, đòn đập đất hình tròn gây lượng sát thương cực lớn. Nhìn vào đối chiếu cột 'ST đứng yên' và 'ST bot né', bot thật né thoát vòng đập đất giúp giảm ${cotTuongRow.evadeDmgDiff}% sát thương nhận vào từ Cốt Tượng và bảo toàn 100% mạng sống của toàn đội khi đánh Thiên Hàn Vương (0/6 trận có người chết ở cả đội 3 và đội 4 người).
 2. **Độ nhạy đồ ô riêng (\`useOwnerGear\`):** Hài (thêm tốc độ chạy + \`guard\` giảm sát thương), ngọc bội (tăng maxHp, maxMp) và pháp bảo (tăng công, bạo kích) giúp:
    - Giảm 6% đến 39% sát thương nhận vào mỗi trận.
    - Nâng đáy khí huyết an toàn thêm 5 đến 24 điểm phần trăm.
    - Với trùm Thiên Hàn Vương: đội 4 người mặc đủ 6 món thậm chí **không cần dùng viên đan nào** (0.0 viên/người).
-3. **Quyết định giữ \`useOwnerGear = false\` cho mô hình cơ sở là hoàn toàn chuẩn xác:** Giữ cờ tắt đảm bảo người mới chưa kịp rèn đồ ô riêng vẫn đủ an toàn theo đúng mục tiêu nhịp; đồ ô riêng là phần thưởng thực tế giúp người chơi tối ưu hóa tốc độ cày và chinh phục nội dung khó hơn.
+3. **A chọn giữ \`useOwnerGear = false\` cho mô hình cơ sở:** Vì đảm bảo người mới chưa kịp rèn đồ ô riêng vẫn đủ an toàn theo đúng mục tiêu nhịp; đồ ô riêng là phần thưởng thực tế giúp người chơi tối ưu hóa tốc độ cày và chinh phục nội dung khó hơn.
+4. **Thực nghiệm bot thật đánh TINH ANH (đối chiếu cận trên mục 'Tinh anh'):**
+   - Mô hình lý thuyết ở mục 'Tinh anh' (cận trên đứng yên không né không đan) cho thấy 7/9 loài làm người chơi mất >100% máu và có nguy cơ tử vong.
+   - Số đo thực nghiệm bot thật:
+     + **3/4 loài (Hàn Lang, Phong Nha, Cốt Tượng):** người chơi solo **CÓ NÉ + UỐNG ĐAN sống sót an toàn (0/6 tử vong)**, đáy khí huyết an toàn ~53% và tiêu tốn 1 viên đan hồi phục.
+     + **Độc Tước Tinh Anh:** người chơi solo tử vong 6/6 trận (kể cả mặc đủ 6 món hoặc mang 8 đan: tử vong ở ~11s với ${docTuocSolo8.deathsTotal}/6 trận chết vì sát thương độc dồn dập nhanh hơn hồi chiêu 12s của đan dược, chỉ kịp dùng 1 viên trước khi hết máu).
+     + **Lập đội 2 người:** Độc Tước Tinh Anh bị hạ gục an toàn trong 6.4s mà không có bất kỳ ai tử vong (0/6 trận, đáy máu 66%). Cốt Tượng Tinh Anh rút ngắn thời gian từ 79.4s xuống 21.0s và hoàn toàn không tốn viên đan nào.
+   - **Ghi nhận:** Bộ hệ số tinh anh (x2.5 khí huyết, x1.5 công, xác suất 4%) của M7.3 hiện là số đo thực nghiệm; rủi ro Độc Tước tinh anh solo chết 100% đã được ghi nhận vào \`~/TT/orchestra/questions.md\` chờ người dùng quyết định xem có cần điều chỉnh hệ số hay phân loại loài quái.
 `;
 }

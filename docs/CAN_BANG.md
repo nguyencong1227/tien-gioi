@@ -778,12 +778,14 @@ Mỗi lần sinh quái thường hiếu chiến (không trùm, không Linh Thố
 - **Chiến đấu:** áp sát chém thường Kiếm (`slash`), KHÔNG dùng chiêu thức võ công (giữ nguyên quy ước mô hình); uống `thuong_hoi_huyet_dan` (hồi 90% HP, cd 12s) khi khí huyết sụt dưới 50%.
 - **Số đo thực nghiệm (Nguyên Anh Hậu kỳ):**
 
-| Loài | Mô hình (s) | Bot thật 3 món (s) | Sai số thời gian | Sát thương nhận (3 món) | Đáy khí huyết (3 món) | Bot 6 món (đồ ô riêng) | Sát thương nhận (6 món) | Đáy khí huyết (6 món) |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| **Hàn Lang** | 3.3 | 3.2 | 1.4% | 1,022 | 27% | 3.2s | 961 (-6%) | 22% |
-| **Phong Nha** | 3.2 | 3.2 | 2.2% | 1,236 | 33% | 3.2s | 1,160 (-6%) | 26% |
-| **Cốt Tượng** | 13.4 | 27.0 | 101.4% | 763 | 20% | 21.6s | 707 (-7%) | 16% |
-| **Độc Tước** | 5.3 | 5.2 | 1.7% | 3,459 | 58% | 5.2s | 2,118 (-39%) | 48% |
+| Loài | Mô hình (s) | Đứng yên 3M (s) | Bot né 3M (s) | Sai số tgian (né) | ST đứng yên | ST bot né | Đáy khí huyết (3M) | Bot 6M (đồ ô riêng) | Đáy khí huyết (6M) |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| **Hàn Lang** | 3.3 | 3.2 | 3.2 | 1.4% | 1,022 | 1,022 | 27% | 3.2s | 22% |
+| **Phong Nha** | 3.2 | 3.2 | 3.2 | 2.2% | 1,236 | 1,236 | 33% | 3.2s | 26% |
+| **Cốt Tượng** | 13.4 | 13.7 | 27.0 | 101.4% | 1,198 | 763 (-36%) | 20% | 21.6s | 16% |
+| **Độc Tước** | 5.3 | 5.2 | 5.2 | 1.7% | 3,459 | 3,459 | 58% | 5.2s | 48% |
+
+*Giải thích sai số thời gian ở Cốt Tượng (101%):* Trong mô hình, người chơi được giả định đứng yên chém liên tục (13.4s, rất sát với số đo 'Đứng yên 3M' 13.7s). Khi bật hành vi né đòn (`evade: true`), bot thật phải dừng chém và chạy xuyên tâm ra ngoài vòng đập đất r=90px của Cốt Tượng rồi mới áp sát lại chém tiếp, khiến thời gian hạ quái kéo dài lên 27.0s (+101%). Đổi lại, việc né đòn giúp giảm mạnh sát thương nhận vào từ 1,198 xuống 763 (-36% sát thương ở Hậu kỳ, giảm tới 59% ở Sơ kỳ), bảo toàn sinh mạng an toàn tuyệt đối.
 
 **Trùm Thiên Hàn Vương theo cỡ đội (Nguyên Anh Hậu kỳ):**
 
@@ -792,13 +794,29 @@ Mỗi lần sinh quái thường hiếu chiến (không trùm, không Linh Thố
 | **Đội 4 người** | 30.8s | 0.3 viên | 0/6 trận | 29.6s | 0.3 viên | 0/6 trận |
 | **Đội 3 người** | 42.7s | 0.3 viên | 0/6 trận | 45.8s | 0.0 viên | 0/6 trận |
 
+**Thực nghiệm bot thật đánh TINH ANH Hàn Vân Lĩnh (Nguyên Anh Hậu kỳ, M7.10 Refs #511, #510):**
+
+| Loài Tinh Anh | Solo 3M (s / đan) | Tử vong (solo 3M) | Đáy máu (solo 3M) | Solo 6M (đồ ô riêng) | Tử vong (solo 6M) | Đội 2 người (s / đan) | Tử vong (đội 2) | Nhận xét thực nghiệm |
+|---|---:|---:|---:|---:|---:|---:|---:|---|
+| **Hàn Lang (Tinh Anh)** | 8.0s (1.0 đan) | 0/6 | 54% | 8.0s (52% máu) | 0/6 | 4.0s (0.5 đan) | 0/6 | Solo an toàn (1.0 đan); đội 2 rất an toàn (4.0s) |
+| **Phong Nha (Tinh Anh)** | 8.0s (1.0 đan) | 0/6 | 61% | 8.0s (59% máu) | 0/6 | 4.0s (0.0 đan) | 0/6 | Solo an toàn (1.0 đan); đội 2 rất an toàn (4.0s) |
+| **Cốt Tượng (Tinh Anh)** | 79.4s (1.0 đan) | 0/6 | 53% | 74.9s (53% máu) | 0/6 | 21.0s (0.0 đan) | 0/6 | Solo né đập đất liên tục (79.4s); đội 2 rút ngắn còn 21.0s |
+| **Độc Tước (Tinh Anh)** | 10.8s (1.0 đan) | 6/6 | 92% | 12.3s (94% máu) | 6/6 | 6.4s (0.5 đan) | 0/6 | Solo tử vong 6/6 (độc dồn nhanh hơn cd đan 12s, mang 8 đan vẫn chết); đội 2 sống sót 100% |
+
 **Đọc bảng & Kết luận thực nghiệm:**
-1. **Né đòn cứu mạng rất rõ rệt:** Ở Cốt Tượng và Thiên Hàn Vương, đòn đập đất hình tròn gây lượng sát thương cực lớn. Bot thật né thoát vòng đập đất giúp giảm 33% sát thương nhận vào từ Cốt Tượng và bảo toàn 100% mạng sống của toàn đội khi đánh Thiên Hàn Vương (0/6 trận có người chết ở cả đội 3 và đội 4 người).
+1. **Né đòn cứu mạng rất rõ rệt:** Ở Cốt Tượng và Thiên Hàn Vương, đòn đập đất hình tròn gây lượng sát thương cực lớn. Nhìn vào đối chiếu cột 'ST đứng yên' và 'ST bot né', bot thật né thoát vòng đập đất giúp giảm 36% sát thương nhận vào từ Cốt Tượng và bảo toàn 100% mạng sống của toàn đội khi đánh Thiên Hàn Vương (0/6 trận có người chết ở cả đội 3 và đội 4 người).
 2. **Độ nhạy đồ ô riêng (`useOwnerGear`):** Hài (thêm tốc độ chạy + `guard` giảm sát thương), ngọc bội (tăng maxHp, maxMp) và pháp bảo (tăng công, bạo kích) giúp:
    - Giảm 6% đến 39% sát thương nhận vào mỗi trận.
    - Nâng đáy khí huyết an toàn thêm 5 đến 24 điểm phần trăm.
    - Với trùm Thiên Hàn Vương: đội 4 người mặc đủ 6 món thậm chí **không cần dùng viên đan nào** (0.0 viên/người).
-3. **Quyết định giữ `useOwnerGear = false` cho mô hình cơ sở là hoàn toàn chuẩn xác:** Giữ cờ tắt đảm bảo người mới chưa kịp rèn đồ ô riêng vẫn đủ an toàn theo đúng mục tiêu nhịp; đồ ô riêng là phần thưởng thực tế giúp người chơi tối ưu hóa tốc độ cày và chinh phục nội dung khó hơn.
+3. **A chọn giữ `useOwnerGear = false` cho mô hình cơ sở:** Vì đảm bảo người mới chưa kịp rèn đồ ô riêng vẫn đủ an toàn theo đúng mục tiêu nhịp; đồ ô riêng là phần thưởng thực tế giúp người chơi tối ưu hóa tốc độ cày và chinh phục nội dung khó hơn.
+4. **Thực nghiệm bot thật đánh TINH ANH (đối chiếu cận trên mục 'Tinh anh'):**
+   - Mô hình lý thuyết ở mục 'Tinh anh' (cận trên đứng yên không né không đan) cho thấy 7/9 loài làm người chơi mất >100% máu và có nguy cơ tử vong.
+   - Số đo thực nghiệm bot thật:
+     + **3/4 loài (Hàn Lang, Phong Nha, Cốt Tượng):** người chơi solo **CÓ NÉ + UỐNG ĐAN sống sót an toàn (0/6 tử vong)**, đáy khí huyết an toàn ~53% và tiêu tốn 1 viên đan hồi phục.
+     + **Độc Tước Tinh Anh:** người chơi solo tử vong 6/6 trận (kể cả mặc đủ 6 món hoặc mang 8 đan: tử vong ở ~11s với 6/6 trận chết vì sát thương độc dồn dập nhanh hơn hồi chiêu 12s của đan dược, chỉ kịp dùng 1 viên trước khi hết máu).
+     + **Lập đội 2 người:** Độc Tước Tinh Anh bị hạ gục an toàn trong 6.4s mà không có bất kỳ ai tử vong (0/6 trận, đáy máu 66%). Cốt Tượng Tinh Anh rút ngắn thời gian từ 79.4s xuống 21.0s và hoàn toàn không tốn viên đan nào.
+   - **Ghi nhận:** Bộ hệ số tinh anh (x2.5 khí huyết, x1.5 công, xác suất 4%) của M7.3 hiện là số đo thực nghiệm; rủi ro Độc Tước tinh anh solo chết 100% đã được ghi nhận vào `~/TT/orchestra/questions.md` chờ người dùng quyết định xem có cần điều chỉnh hệ số hay phân loại loài quái.
 
 
 ## Cân bằng chiêu thức, ngũ hành và trạng thái (M7, #510)

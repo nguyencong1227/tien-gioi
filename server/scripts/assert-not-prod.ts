@@ -24,7 +24,7 @@ export function assertNotProd(
   if (typeof target === "number" && target === PROD_PORT) {
     throw new Error(
       `[HÀNG RÀO BẢO VỆ] ${context}: Từ chối kết nối tới cổng ${PROD_PORT} (dành riêng cho bản chạy thật production). ` +
-        "Hãy dùng cổng riêng của dev (2577, 2587...) trong file .env.local.",
+        "Hãy dùng cổng riêng của dev (2577, 2587, 2597, 2607) trong file .env.local.",
     );
   }
 
@@ -32,7 +32,7 @@ export function assertNotProd(
   if (/^\d+$/.test(str) && Number(str) === PROD_PORT) {
     throw new Error(
       `[HÀNG RÀO BẢO VỆ] ${context}: Từ chối kết nối tới cổng ${PROD_PORT} (dành riêng cho bản chạy thật production). ` +
-        "Hãy dùng cổng riêng của dev (2577, 2587...) trong file .env.local.",
+        "Hãy dùng cổng riêng của dev (2577, 2587, 2597, 2607) trong file .env.local.",
     );
   }
 
