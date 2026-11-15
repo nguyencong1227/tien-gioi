@@ -179,16 +179,72 @@ async function main() {
         return ![g.u0, g.v0, g.u1, g.v1].every((v) => Number.isFinite(v) && v >= 0 && v <= 1) || g.u1 < g.u0 || g.v1 < g.v0; });
       return { total: Object.keys(chars).length, bad: bad.length }; })()`)) as any;
     must(uv.bad === 0, `mọi glyph có UV hợp lệ trong [0,1] (${uv.total} glyph, hỏng ${uv.bad})`);
+
+    // Chuẩn bị camera đúng vị trí nhân vật trước khi phát chữ bay
+    await T.ev(`(() => {
+      const s = window.__scene;
+      s.cameras.main.centerOn(s.predX, s.predY);
+    })()`);
+
+    // (a) & (b): Gọi floatNumber, ghi nhận trạng thái BitmapText / fx ngay lập tức và chụp ảnh ngay không chờ
+    const floatImmediate = (await T.ev(`(() => {
+      const s = window.__scene, cam = s.cameras.main;
+      const spawned = s.fx.floatNumber('88', s.predX, s.predY - 40, { color: 0xff00ff, size: 48, priority: 2 });
+      const stats = s.fx.stats();
+      const bms = (s.children?.list ?? [])
+        .filter((c) => c.type === 'BitmapText')
+        .map((t) => ({
+          text: t.text,
+          x: t.x,
+          y: t.y,
+          alpha: t.alpha,
+          visible: t.visible,
+          active: t.active,
+          tint: t.tintTopLeft ?? t.tint,
+          depth: t.depth,
+          scaleX: t.scaleX,
+          scaleY: t.scaleY,
+          fontSize: t.fontSize,
+          originX: t.originX,
+          originY: t.originY,
+          inView: cam.worldView ? cam.worldView.contains(t.x, t.y) : null,
+        }));
+      return {
+        spawned,
+        stats,
+        bms,
+        quality: s.quality ?? localStorage.getItem("tg_quality"),
+        actualFps: Math.round(s.game.loop.actualFps * 10) / 10,
+        predX: s.predX,
+        predY: s.predY,
+        cam: {
+          scrollX: Math.round(cam.scrollX),
+          scrollY: Math.round(cam.scrollY),
+          zoom: cam.zoom,
+          worldView: cam.worldView
+            ? {
+                x: Math.round(cam.worldView.x),
+                y: Math.round(cam.worldView.y),
+                w: Math.round(cam.worldView.width),
+                h: Math.round(cam.worldView.height),
+              }
+            : null,
+        },
+      };
+    })()`)) as any;
+
+    // Chụp ảnh NGAY LẬP TỨC qua CDP, không chờ vòng thăm dò
+    const shotImmediate = await T.shot("fx-immediate");
+
     // Và chữ bay THẬT SỰ ĐƯỢC VẼ: chữ tím (nền cỏ không có màu tím) chụp từ canvas WebGL phải có nhiều điểm ảnh tím
     const paintResult = (await T.ev(`new Promise((resolve) => {
       const s = window.__scene, cam = s.cameras.main;
-      cam.centerOn(s.predX, s.predY);
-      s.fx.floatNumber('88', s.predX, s.predY - 40, { color: 0xff00ff, size: 48, priority: 2 });
       const r = s.game.canvas.getBoundingClientRect();
       const w = Math.round(r.width), h = Math.round(r.height);
       // Màu tím nhạt hơn một chút (g < 130): ánh sáng môi trường + sương (#357, #362) phủ nhẹ lên chữ nên g của 0xff00ff tăng tới ~70-90.
       // Thăm dò tối đa 3 s (máy dùng chung có thể quá tải, khung chậm: chờ cố định 60 ms làm ca kiểm chập chờn); lấy số LỚN NHẤT thấy được
       let best = 0, tries = 0, lastNonBlack = 0, lastTotal = 0;
+      const triesHistory = [];
       const grab = () => s.game.renderer.snapshotArea(0, 0, w, h, (img) => {
         const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
         const x = c.getContext('2d'); x.drawImage(img, 0, 0);
@@ -201,13 +257,28 @@ async function main() {
         if (n > best) best = n;
         lastNonBlack = nonBlack;
         lastTotal = c.width * c.height;
-        if (best > 150 || ++tries >= 25) {
+        tries++;
+
+        const currentBms = (s.children?.list ?? [])
+          .filter((obj) => obj.type === 'BitmapText')
+          .map((t) => ({ text: t.text, x: t.x, y: t.y, a: t.alpha, v: t.visible, inView: cam.worldView ? cam.worldView.contains(t.x, t.y) : null }));
+        if (tries <= 5 || tries % 5 === 0) {
+          triesHistory.push({
+            try: tries,
+            purplePx: n,
+            fps: Math.round(s.game.loop.actualFps * 10) / 10,
+            bms: currentBms,
+          });
+        }
+
+        if (best > 150 || tries >= 25) {
           const renType = s.game.renderer.type === 2 ? 'WEBGL' : (s.game.renderer.type === 1 ? 'CANVAS' : String(s.game.renderer.type));
           const gl = s.game.renderer.gl;
           const isContextLost = gl && typeof gl.isContextLost === 'function' ? gl.isContextLost() : null;
           resolve({
             best,
             tries,
+            triesHistory,
             rendererType: renType,
             actualFps: Math.round(s.game.loop.actualFps * 10) / 10,
             visibilityState: document.visibilityState,
@@ -232,7 +303,9 @@ async function main() {
     if (painted <= 150) {
       out(`  [CHẨN ĐOÁN FX KHI ĐỎ]:`);
       out(`    renderer.type: ${paintResult?.rendererType} (cần WEBGL)`);
-      out(`    actualFps: ${paintResult?.actualFps}`);
+      out(
+        `    actualFps (lúc float -> lúc snapshot cuối): ${floatImmediate?.actualFps} -> ${paintResult?.actualFps}`,
+      );
       out(`    visibilityState: ${paintResult?.visibilityState}`);
       out(`    glContextLost: ${paintResult?.glContextLost}`);
       out(`    điểm ảnh khác đen: ${paintResult?.nonBlackPx}/${paintResult?.totalPx}`);
@@ -240,9 +313,16 @@ async function main() {
         `    kích thước canvas: ${paintResult?.canvasW}x${paintResult?.canvasH} (CSS: ${paintResult?.rectW}x${paintResult?.rectH})`,
       );
       out(`    toạ độ nhân vật: (${paintResult?.predX}, ${paintResult?.predY})`);
-      out(`    số lần thử: ${paintResult?.tries}`);
+      out(`    bậc chất lượng: ${floatImmediate?.quality}`);
+      out(`    camera viewport: ${JSON.stringify(floatImmediate?.cam)}`);
+      out(`    floatNumber kết quả: ${floatImmediate?.spawned}`);
+      out(`    s.fx stats (ngay sau float): ${JSON.stringify(floatImmediate?.stats)}`);
+      out(`    BitmapText list (ngay sau float): ${JSON.stringify(floatImmediate?.bms)}`);
+      out(`    lịch sử thăm dò snapshotArea: ${JSON.stringify(paintResult?.triesHistory)}`);
+      out(`    tổng số lần thử: ${paintResult?.tries}`);
+      if (shotImmediate) out(`    đã lưu ảnh chụp ngay sau float (CDP): ${shotImmediate}`);
       const shotPath = await T.shot("fx-failure");
-      if (shotPath) out(`    đã lưu ảnh chụp: ${shotPath}`);
+      if (shotPath) out(`    đã lưu ảnh chụp khi kết thúc (CDP): ${shotPath}`);
     }
     must(painted > 150, `chữ bay được VẼ thật ra màn hình (điểm ảnh tím: ${painted})`);
     ok(`glyph có UV hợp lệ và chữ bay thật sự được vẽ (${painted} điểm ảnh)`);
