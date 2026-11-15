@@ -14,7 +14,7 @@ import express from "express";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { Tab, sleep, listenWithRetry, removeTmpDirs, getChromeGpuFlags } from "./e2e-kit";
-import { PANELS, VIEWPORTS, applyViewport, crowdHud } from "./layout-kit";
+import { PANELS, VIEWPORTS, applyViewport, crowdHud, viewportOf } from "./layout-kit";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
@@ -135,7 +135,7 @@ async function main() {
       out(`  chụp ${path.basename(file)} (${v.note}): cột trái ${colTxt}`);
     }
     // Màn chơi sạch (phím ẩn giao diện `ui.toggle`, `body.ui-hidden`): chụp ở cửa sổ hẹp và máy tính
-    for (const v of [VIEWPORTS[3], VIEWPORTS[4]]) {
+    for (const v of [viewportOf(550), viewportOf(1366)]) {
       await applyViewport(T, v);
       await T.ev(`document.body.classList.add('ui-hidden'); 1`);
       await sleep(300);

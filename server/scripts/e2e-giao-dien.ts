@@ -1,8 +1,8 @@
 // E2E THẬT bố cục giao diện (QUYET_DINH_M3 mục 15): server Colyseus thật + Chrome headless + client đã build.
-// Dựng màn chơi "đông" (tổ đội 3 người, 2 nhiệm vụ, chat nhiều dòng) rồi, ở 6 cỡ màn hình (điện thoại dọc 360x640 / 412x915, ngang 915x412,
+// Dựng màn chơi "đông" (tổ đội 3 người, 2 nhiệm vụ, chat nhiều dòng) rồi, ở 8 cỡ màn hình (điện thoại dọc 360x640 / 412x915, ngang 915x412, hai cửa sổ sát mốc ☰ 619x900 / 620x900,
 // cửa sổ hẹp 550x900, máy tính 1366x768 / 1920x1080), đo bằng getBoundingClientRect trên DOM thật:
 //  - thẻ nhân vật gọn: không có nút, hai chip (Linh thạch, đạo hữu) cùng MỘT hàng và không tràn, thẻ không quá rộng / cao;
-//  - thanh menu: sáu nút cùng cỡ, cùng một hàng, cách đều, nằm trong khung nhìn; màn < 480 px gộp vào nút ☰ mở ra đúng một hàng, chọn mục thì đóng;
+//  - thanh menu: bảy nút (MENU_BUTTONS) cùng cỡ, cùng một hàng, cách đều, nằm trong khung nhìn; màn < 620 px (MENU_COLLAPSE_BELOW) gộp vào nút ☰ mở ra đúng một hàng, chọn mục thì đóng;
 //  - không bảng nổi nào chồng lên nhau (cột trái, cột phải, chat), vùng giữa (quanh nhân vật) trống, ngân sách diện tích;
 //  - Tổ đội / Nhiệm vụ / Chat: mặc định thu gọn ở màn hẹp, mở ở máy tính rộng; chat thu gọn còn đúng một dòng, Enter mở, tự mờ, nhớ trạng thái.
 // Chạy: `npm run build -w client && npm run e2e:giao-dien -w server` (cần google-chrome). Ảnh (tuỳ chọn): đặt E2E_SHOTS=<thư mục>.
@@ -16,7 +16,7 @@ import express from "express";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { Tab, sleep, listenWithRetry, removeTmpDirs, getChromeGpuFlags } from "./e2e-kit";
-import { VIEWPORTS, applyViewport, crowdHud } from "./layout-kit";
+import { VIEWPORTS, applyViewport, crowdHud, viewportOf } from "./layout-kit";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
@@ -25,6 +25,9 @@ const pickPort = () => 38000 + Math.floor(Math.random() * 2000);
 let PORT = pickPort();
 const CDP = 9800 + Math.floor(Math.random() * 300);
 const out = (m: string) => console.log(m);
+/** Số nút của thanh menu (Nhân vật, Công pháp, Túi, Nhiệm vụ, Tông môn, Âm thanh, Cài đặt) và độ rộng (px) dưới đó menu gộp vào ☰ (`@media (max-width: 619px)` ở style.css, #684) */
+const MENU_BUTTONS = 7;
+const MENU_COLLAPSE_BELOW = 620;
 
 /** Đo bố cục hiện tại trong trang (một lần gọi): toạ độ các phần tử cần kiểm. */
 const MEASURE = `(() => {
@@ -197,7 +200,7 @@ async function main() {
 
       // ---- thanh menu ----
       const equalRow = (rs: Rect[]) => {
-        if (rs.length !== 6) return `có ${rs.length} nút`;
+        if (rs.length !== MENU_BUTTONS) return `có ${rs.length} nút (cần ${MENU_BUTTONS})`;
         const w0 = rs[0].w;
         const h0 = rs[0].h;
         const t0 = rs[0].t;
@@ -213,14 +216,14 @@ async function main() {
           return `nhỏ ${Math.round(w0)}x${Math.round(h0)} < ${minSide}`;
         return "";
       };
-      if (v.w >= 480) {
+      if (v.w >= MENU_COLLAPSE_BELOW) {
         check(
           `${tag}: thanh menu hiện sẵn, không có nút ☰`,
           m.itemsShown && !m.toggleShown,
           JSON.stringify({ items: m.itemsShown, toggle: m.toggleShown }),
         );
         check(
-          `${tag}: sáu nút menu cùng cỡ, một hàng, cách đều, trong khung`,
+          `${tag}: ${MENU_BUTTONS} nút menu cùng cỡ, một hàng, cách đều, trong khung`,
           equalRow(m.items) === "",
           equalRow(m.items),
         );
@@ -234,7 +237,7 @@ async function main() {
         await sleep(250);
         m = (await T.ev(MEASURE)) as Measure;
         check(
-          `${tag}: bấm ☰ mở ra đúng MỘT hàng sáu nút cùng cỡ, cách đều, trong khung`,
+          `${tag}: bấm ☰ mở ra đúng MỘT hàng ${MENU_BUTTONS} nút cùng cỡ, cách đều, trong khung`,
           m.itemsShown && m.toggleExpanded === "true" && equalRow(m.items) === "",
           `${m.itemsShown} ${m.toggleExpanded} ${equalRow(m.items)}`,
         );
@@ -317,7 +320,7 @@ async function main() {
 
     // ---- Chat thu gọn, tự mờ; Tổ đội / Nhiệm vụ nhớ trạng thái; nhiệm vụ trống ----
     // máy tính 1366x768: mặc định mở cả ba
-    await applyViewport(T, VIEWPORTS[4]);
+    await applyViewport(T, viewportOf(1366));
     const st = async () => (await T.ev(MEASURE)) as Measure;
     const cls = (id: string) => T.ev(`[...document.getElementById('${id}').classList].join(' ')`);
     const rectOf = (sel: string) =>
