@@ -6,7 +6,7 @@
 // Chạy: `npm run build && npm run e2e:tai-khoan` (cần google-chrome; client/dist phải là bản build mới).
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, writeFileSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync, readdirSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -59,7 +59,8 @@ writeFileSync(
     updatedAt: now,
   }),
 );
-const filesBefore = readdirSync(path.join(REPO, "server/data/players")).length;
+const playersDir = path.join(REPO, "server/data/players");
+const filesBefore = existsSync(playersDir) ? readdirSync(playersDir).length : 0;
 
 const server = spawn("npx", ["tsx", "src/index.ts"], {
   cwd: REPO + "/server",
@@ -361,7 +362,7 @@ try {
 } finally {
   killAll();
   await sleep(500);
-  const filesAfter = readdirSync(path.join(REPO, "server/data/players")).length;
+  const filesAfter = existsSync(playersDir) ? readdirSync(playersDir).length : 0;
   out(`  server/data/players thật: trước ${filesBefore} sau ${filesAfter}`);
   out("  tệp dữ liệu tạm: " + readdirSync(data).join(", "));
   if (/Error|lỗi nội bộ/i.test(serverLog.replace(/CẢNH BÁO[^\n]*/g, "")))

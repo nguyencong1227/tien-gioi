@@ -185,6 +185,9 @@ export function parseCliArgs(args: string[]): E2eAllOptions {
   if (!options.logsDir) {
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     options.logsDir = path.join(os.tmpdir(), `tien-gioi-e2e-${timestamp}`);
+  } else {
+    const baseCwd = process.env.INIT_CWD ?? process.cwd();
+    options.logsDir = path.resolve(baseCwd, options.logsDir);
   }
 
   return options;
