@@ -18,6 +18,7 @@ import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { Tab, sleep, listenWithRetry, removeTmpDirs, getChromeGpuFlags } from "./e2e-kit";
 import { freePort } from "../src/test-port.js";
+import { getMap, DEFAULT_MAP_ID } from "@tien-gioi/shared";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
@@ -79,7 +80,7 @@ async function main() {
       { stdio: "ignore", detached: true },
     );
     let targets: any[] = [];
-    for (const start = Date.now(); Date.now() - start < 8000;) {
+    for (const start = Date.now(); Date.now() - start < 30000;) {
       try {
         const res = await fetch(`http://127.0.0.1:${CDP}/json`);
         if (res.ok) {
@@ -135,6 +136,23 @@ async function main() {
     };
     const url = `http://127.0.0.1:${PORT}/?debug=1`;
     const ev = (expr: string) => T.ev(expr) as Promise<any>;
+
+    // Lưu sẵn nhân vật 1 cạnh Bắc Môn Quan (như chặng 2 cạnh Vọng Trạch Quan và chặng 3 cạnh Lăng Hàn Quan)
+    // để đi bộ tới cổng chỉ mất vài ô bằng joystick ảo, tránh lội bộ 80 ô từ giữa trấn Lạc Hà gây quá hạn 90s khi FPS thấp trên CI runner
+    const lhBac = getMap(DEFAULT_MAP_ID)!.portals.find((p) => p.id === "lac_ha_bac")!;
+    await savePlayer({
+      name: currentName,
+      secretHash: hashSecret(currentSecret),
+      realm: 2,
+      tier: 0,
+      exp: 0,
+      mapId: DEFAULT_MAP_ID,
+      x: lhBac.spawn.x,
+      y: lhBac.spawn.y,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
     await setStorage("");
     await login(url);
     // Chrome headless không GPU tự rơi vào bậc Thấp (không sương, không ánh sáng): ép bậc Cao để các lớp M5.3 ở bản đồ đích thật sự có mặt
@@ -159,7 +177,10 @@ async function main() {
         let i = 1; window.__walkLen = path.length;
         window.__walkTimer = setInterval(() => { if (Math.hypot(s.predX - p.x, s.predY - p.y) < 30 || i >= path.length) { J.x = 0; J.y = 0; J.active = false; clearInterval(window.__walkTimer); return; }
           const [tx, ty] = path[i], dx = tx - s.predX, dy = ty - s.predY, d = Math.hypot(dx, dy);
-          if (d < 8) { i++; return; } J.x = dx / d; J.y = dy / d; J.active = true; }, 40); return 1; })()`);
+          // Waypoint ĐÃ QUA khi hình chiếu của nhân vật dọc đoạn đường tới nó vượt 1 (hoặc tới sát 8 px): khung chậm (~4-6 FPS, runner CI) nhảy
+          // 27-45 px mỗi khung nên bán kính 8 px không bao giờ trúng, nhân vật quay quanh waypoint tới hết hạn chờ (đo: 90 s ở am_suong_nam khi ghim một nhân)
+          const [bx, by] = path[i - 1], sx = tx - bx, sy = ty - by, along = ((s.predX - bx) * sx + (s.predY - by) * sy) / (sx * sx + sy * sy || 1);
+          if (d < 8 || along >= 1) { i++; return; } J.x = dx / d; J.y = dy / d; J.active = true; }, 40); return 1; })()`);
       must(
         !(await ev(`window.__walkErr`)),
         `có đường đi bộ tới cổng ${id} (${await ev(`window.__walkErr`)})`,
@@ -207,6 +228,21 @@ async function main() {
 
     // Qua cổng `id`: màn chuyển cảnh hiện, bản đồ đích đúng, màn chuyển cảnh ẩn lại (trả về các mẫu bán kính mống mắt)
     const crossPortal = async (id: string, destMapId: string) => {
+      // Ghi mống mắt TRONG TRANG: sự kiện `transitionrun` / `transitionend` của biến --iris-r (transition CSS 0,4 s, thuộc tính đã đăng ký bằng @property)
+      // cộng mẫu mỗi khung vẽ (chỉ để báo cáo). KHÔNG đòi "có mẫu ở giữa": khi một khung đứng > 400 ms (máy tải, runner ~4-6 FPS) giá trị nhảy
+      // thẳng từ đầy sang 0 giữa hai khung dù transition vẫn chạy đúng 0,4 s (đo: [1920, 1920, 1920, 0, 0, 0] khi ghim một nhân CPU)
+      await ev(`(() => { const o = document.getElementById('transition-overlay');
+        if (window.__irisRec) { o.removeEventListener('transitionrun', window.__irisRec); o.removeEventListener('transitionend', window.__irisRec); }
+        if (window.__irisOff) window.__irisOff();
+        const R = (window.__iris = { runs: [], ends: [], frames: [] }); let on = true; window.__irisOff = () => { on = false; };
+        window.__irisRec = (e) => { if (e.propertyName !== '--iris-r') return;
+          // Lúc transition BẮT ĐẦU chạy: đọc thời lượng cấu hình (ms) từ Web Animations (A đo ra 400 ở mọi lần qua cổng)
+          const dur = e.type === 'transitionrun' ? ((o.getAnimations().find((a) => a.transitionProperty === '--iris-r') || {}).effect || { getTiming: () => ({}) }).getTiming().duration : undefined;
+          (e.type === 'transitionrun' ? R.runs : R.ends).push({ t: performance.now(), el: e.elapsedTime, dur }); };
+        o.addEventListener('transitionrun', window.__irisRec); o.addEventListener('transitionend', window.__irisRec);
+        const tick = () => { if (!on) return; if (o.classList.contains('active')) R.frames.push(parseFloat(getComputedStyle(o).getPropertyValue('--iris-r')) || 0); requestAnimationFrame(tick); };
+        requestAnimationFrame(tick); return 1; })()`);
+
       await ev(`window.__scene.travelPortal(${JSON.stringify(id)}); 1`);
       await T.waitFor(
         `document.getElementById('transition-overlay').classList.contains('active') && !document.getElementById('transition-overlay').hidden`,
@@ -214,27 +250,29 @@ async function main() {
         5000,
       );
       ok(`màn chuyển cảnh hiện ngay khi qua cổng ${id}`);
-      // Lấy mẫu bán kính mống mắt trong lúc nó khép: phải có giá trị Ở GIỮA (đang chuyển động thật), không phải nhảy thẳng
-      const radii: number[] = [];
-      for (let i = 0; i < 14; i++) {
-        const r = Number(
-          await ev(
-            `parseFloat(getComputedStyle(document.getElementById('transition-overlay')).getPropertyValue('--iris-r')) || 0`,
-          ),
-        );
-        radii.push(r);
-        if (
-          !(await ev(`document.getElementById('transition-overlay').classList.contains('active')`))
-        )
-          break;
-        await sleep(40);
-      }
-      const mid = radii.filter((r) => r > 20 && r < 1500).length;
-      must(
-        mid >= 1,
-        `mống mắt THẬT SỰ chuyển động: ${mid} mẫu ở giữa (0, đầy) trong ${radii.length} mẫu [${radii.map((r) => r.toFixed(0)).join(", ")}]`,
+
+      // Mống mắt phải CHUYỂN ĐỘNG thật: một transition CSS của --iris-r có thời lượng ~0,4 s BẮT ĐẦU chạy (không phải nhảy thẳng). KHÔNG đòi nó chạy
+      // hết: khi khung đứng (máy tải, runner ~4-6 FPS) transition đóng bị đảo chiều giữa chừng bởi lần mở lại, và `transitionend` đầu tiên là của
+      // transition NGƯỢC đã bị rút ngắn (đo: "kéo dài 0,228 s" khi ghim một nhân CPU)
+      await T.waitFor(
+        `window.__iris.runs.length >= 1`,
+        "mống mắt khép: transition của --iris-r phải chạy (mống mắt nhảy thẳng, không có transition?)",
+        15000,
       );
-      ok(`mống mắt khép dần: ${radii.map((r) => r.toFixed(0)).join(" -> ")} px`);
+      const iris = (await ev(`window.__iris`)) as {
+        runs: Array<{ t: number; el: number; dur?: number }>;
+        ends: Array<{ t: number; el: number }>;
+        frames: number[];
+      };
+      const mid = iris.frames.filter((r) => r > 20 && r < 1500).length;
+      const longest = Math.max(0, ...iris.runs.map((r) => r.dur ?? 0));
+      must(
+        longest >= 350,
+        `mống mắt THẬT SỰ chuyển động: ${iris.runs.length} transition chạy, thời lượng dài nhất ${longest} ms (cần >= 350 ms; ${mid} mẫu ở giữa trong ${iris.frames.length} khung vẽ)`,
+      );
+      ok(
+        `mống mắt khép dần: transition --iris-r ${longest} ms, ${mid} mẫu ở giữa trong ${iris.frames.length} khung vẽ`,
+      );
       await T.waitFor(
         `window.__scene && window.__scene.map && window.__scene.map.def.id === ${JSON.stringify(destMapId)}`,
         `sang bản đồ ${destMapId}`,
@@ -264,7 +302,6 @@ async function main() {
     out(
       "\n--- Ba bản đồ: Hắc Phong Cốc -> Âm Sương Trạch -> Hắc Phong Cốc (cổng thật, nhân vật lưu sẵn cạnh Vọng Trạch Quan) ---",
     );
-    const { getMap } = await import("@tien-gioi/shared");
     const north = getMap("hac_phong")!.portal("hac_phong_bac")!;
     const NAME2 = "Canh Am Suong"; // tên 2-16 ký tự (luật đạo hiệu)
     const SECRET2 = "e2e_secret_cc_2222222222222";

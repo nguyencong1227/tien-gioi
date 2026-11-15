@@ -8320,7 +8320,7 @@
         "h": 24
       }
     },
-    "item-han_lang_mao": {
+    "item-kinh_han_quang_tien": {
       "frame": {
         "x": 54,
         "y": 1402,
@@ -8340,7 +8340,7 @@
         "h": 24
       }
     },
-    "item-phong_nha_vu": {
+    "item-kinh_bach_kim_trao": {
       "frame": {
         "x": 80,
         "y": 1402,
@@ -8360,7 +8360,7 @@
         "h": 24
       }
     },
-    "item-tuong_cot": {
+    "item-kinh_van_thach_tran": {
       "frame": {
         "x": 106,
         "y": 1402,
@@ -8380,7 +8380,7 @@
         "h": 24
       }
     },
-    "item-doc_tuoc_nang": {
+    "item-kinh_bang_hoa_loan": {
       "frame": {
         "x": 132,
         "y": 1402,
@@ -8400,7 +8400,7 @@
         "h": 24
       }
     },
-    "item-thien_han_chau": {
+    "item-kinh_liet_hoa_kiem": {
       "frame": {
         "x": 158,
         "y": 1402,
@@ -8420,7 +8420,7 @@
         "h": 24
       }
     },
-    "item-han_vu_kiem": {
+    "item-kinh_van_hanh_bo": {
       "frame": {
         "x": 184,
         "y": 1402,
@@ -8440,7 +8440,7 @@
         "h": 24
       }
     },
-    "item-han_lang_bao": {
+    "item-han_lang_mao": {
       "frame": {
         "x": 210,
         "y": 1402,
@@ -8460,7 +8460,7 @@
         "h": 24
       }
     },
-    "item-phong_nha_phu": {
+    "item-phong_nha_vu": {
       "frame": {
         "x": 236,
         "y": 1402,
@@ -8480,7 +8480,7 @@
         "h": 24
       }
     },
-    "item-thuong_hoi_huyet_dan": {
+    "item-tuong_cot": {
       "frame": {
         "x": 262,
         "y": 1402,
@@ -8500,7 +8500,7 @@
         "h": 24
       }
     },
-    "item-thuong_hoi_linh_dan": {
+    "item-doc_tuoc_nang": {
       "frame": {
         "x": 288,
         "y": 1402,
@@ -8520,9 +8520,129 @@
         "h": 24
       }
     },
-    "swordbeam": {
+    "item-thien_han_chau": {
       "frame": {
         "x": 314,
+        "y": 1402,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-han_vu_kiem": {
+      "frame": {
+        "x": 340,
+        "y": 1402,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-han_lang_bao": {
+      "frame": {
+        "x": 366,
+        "y": 1402,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-phong_nha_phu": {
+      "frame": {
+        "x": 392,
+        "y": 1402,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-thuong_hoi_huyet_dan": {
+      "frame": {
+        "x": 418,
+        "y": 1402,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-thuong_hoi_linh_dan": {
+      "frame": {
+        "x": 444,
+        "y": 1402,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "swordbeam": {
+      "frame": {
+        "x": 470,
         "y": 1402,
         "w": 48,
         "h": 16
@@ -8542,7 +8662,7 @@
     },
     "dot": {
       "frame": {
-        "x": 364,
+        "x": 520,
         "y": 1402,
         "w": 16,
         "h": 16

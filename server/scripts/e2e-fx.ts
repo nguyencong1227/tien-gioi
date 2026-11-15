@@ -257,7 +257,7 @@ async function main() {
       out(
         `    số khung đã thử: ${paintResult?.tries}; độ đậm (alpha) của chữ ở khung chụp cuối: ${paintResult?.alphaAtSnap}`,
       );
-      const shotPath = await T.shot("fx-failure");
+      const shotPath = await T.shot("fx-failure", { onFailure: true });
       if (shotPath) out(`    đã lưu ảnh chụp: ${shotPath}`);
     }
     must(painted > 150, `chữ bay được VẼ thật ra màn hình (điểm ảnh tím: ${painted})`);

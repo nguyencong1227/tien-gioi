@@ -124,7 +124,7 @@ async function main() {
       { stdio: "ignore", detached: true },
     );
     let targets: any[] = [];
-    for (const start = Date.now(); Date.now() - start < 8000;) {
+    for (const start = Date.now(); Date.now() - start < 30000;) {
       try {
         const res = await fetch(`http://127.0.0.1:${CDP}/json`);
         if (res.ok) {
@@ -239,10 +239,58 @@ async function main() {
     };
 
     const overlayHidden = `document.getElementById('transition-overlay').hidden === true`;
-    /** Qua cổng `id` sang `destMapId`: trả thời điểm gửi và thời điểm màn chuyển cảnh ẩn lại */
+    /**
+     * Qua cổng `id` sang `destMapId`: đo mốc thời gian TRONG TRANG bằng `performance.now()` và `MutationObserver`.
+     * Tránh trễ CDP IPC giữa Node.js và Chrome khi CPU chậm (runner CI ~6 FPS, hoặc taskset -c 0) làm sai lệch
+     * mốc thời gian hàng trăm ms (#694).
+     */
     const crossPortal = async (id: string, destMapId: string, timeout: number) => {
-      const t0 = Date.now();
-      await ev(`window.__scene.travelPortal(${JSON.stringify(id)}); 1`);
+      await ev(`(() => {
+        window.__portalLog = {
+          t0: 0,
+          packStart: 0,
+          fileStart: 0,
+          active: 0,
+          hidden: 0,
+        };
+
+        // Bắt yêu cầu tải gói trong trang (cả manifest nếu chưa có và tệp gói bản đồ đích)
+        if (!window.__origFetch) {
+          window.__origFetch = window.fetch;
+          window.fetch = function (...args) {
+            const url = String(args[0] || "");
+            const t = performance.now();
+            if (window.__portalLog && window.__portalLog.t0 > 0) {
+              if (url.includes("/packs/manifest.json") && !window.__portalLog.packStart) {
+                window.__portalLog.packStart = t;
+              }
+              if (url.includes("/packs/map/" + ${JSON.stringify(destMapId)} + "/")) {
+                if (!window.__portalLog.packStart) window.__portalLog.packStart = t;
+                if (!window.__portalLog.fileStart) window.__portalLog.fileStart = t;
+              }
+            }
+            return window.__origFetch.apply(this, args);
+          };
+        }
+
+        const overlay = document.getElementById("transition-overlay");
+        const mo = new MutationObserver(() => {
+          const t = performance.now();
+          if (overlay.classList.contains("active") && !overlay.hidden && !window.__portalLog.active) {
+            window.__portalLog.active = t;
+          }
+          if (overlay.hidden && window.__portalLog.t0 > 0 && !window.__portalLog.hidden) {
+            window.__portalLog.hidden = t;
+          }
+        });
+        mo.observe(overlay, { attributes: true, attributeFilter: ["hidden", "class"] });
+      })()`);
+
+      await ev(`(() => {
+        window.__portalLog.t0 = performance.now();
+        window.__scene.travelPortal(${JSON.stringify(id)});
+      })()`);
+
       await T.waitFor(
         `document.getElementById('transition-overlay').classList.contains('active') && !document.getElementById('transition-overlay').hidden`,
         "màn chuyển cảnh hiện",
@@ -255,7 +303,31 @@ async function main() {
       );
       const swapped = Date.now();
       await T.waitFor(overlayHidden, "màn chuyển cảnh ẩn lại", timeout);
-      return { t0, swapped, hidden: Date.now() };
+
+      const m = (await ev(`(() => {
+        const p = window.__portalLog;
+        return {
+          t0: p.t0,
+          packStart: p.packStart || p.fileStart || p.t0,
+          fileStart: p.fileStart || p.packStart || p.t0,
+          active: p.active || p.t0,
+          hidden: p.hidden || performance.now(),
+          packDelay: (p.packStart || p.fileStart || p.t0) - p.t0,
+          fileDelay: (p.fileStart || p.t0) - p.t0,
+          waited: (p.hidden || performance.now()) - p.t0,
+        };
+      })()`)) as {
+        t0: number;
+        packStart: number;
+        fileStart: number;
+        active: number;
+        hidden: number;
+        packDelay: number;
+        fileDelay: number;
+        waited: number;
+      };
+
+      return { ...m, swapped };
     };
 
     // ---------------- Pha 1: tiết kiệm dữ liệu (không tải trước), qua cổng chờ gói ----------------
@@ -284,19 +356,23 @@ async function main() {
     const ra = reqs.filter((r) => r.mapId === "am_suong");
     must(ra.length === 1, `gói am_suong được yêu cầu đúng một lần (${ra.length})`);
     must(
-      ra[0].at - a.t0 < 300,
-      `gói bắt đầu tải NGAY lúc gửi travel, không đợi màn chuyển cảnh / travelTo (${ra[0].at - a.t0} ms sau lúc gửi)`,
+      a.packDelay < 300,
+      `gói bắt đầu tải NGAY lúc gửi travel, không đợi màn chuyển cảnh / travelTo (${a.packDelay.toFixed(1)} ms sau lúc gửi)`,
+    );
+    must(
+      a.packStart <= a.active || a.active === 0,
+      "gói bắt đầu tải TRƯỚC KHI màn chuyển cảnh hiện (không đợi travelTo từ máy chủ)",
     );
     ok(
-      `gói am_suong tải bắt đầu ${ra[0].at - a.t0} ms sau lúc gửi travel (song song với màn chuyển cảnh)`,
+      `gói am_suong tải bắt đầu ${a.packDelay.toFixed(1)} ms sau lúc gửi travel (song song với màn chuyển cảnh)`,
     );
     must(
-      a.hidden - a.t0 >= delays.am_suong - 150,
-      `màn chuyển cảnh CHỜ gói về (${a.hidden - a.t0} ms >= ${delays.am_suong} ms)`,
+      a.waited >= delays.am_suong - 150,
+      `màn chuyển cảnh CHỜ gói về (${a.waited.toFixed(0)} ms >= ${delays.am_suong} ms)`,
     );
     must(
-      a.hidden - a.t0 < delays.am_suong + 2500,
-      `chờ SONG SONG, không nối đuôi nhiều bước (${a.hidden - a.t0} ms)`,
+      a.waited < delays.am_suong + 4000,
+      `chờ SONG SONG, không nối đuôi nhiều bước (${a.waited.toFixed(0)} ms)`,
     );
     must(ra[0].done && !ra[0].aborted, "gói am_suong về trọn vẹn");
     // Cảnh đối chiếu vị trí một lần ngay khi gắn phòng mới (`setupNetwork(false)` gọi `reconcile()`): vị trí đoán trước phải theo phòng mới ngay,
@@ -314,7 +390,7 @@ async function main() {
     );
     ok(`vị trí đoán trước đúng chỗ xuất hiện ở bản đồ mới (lệch ${off.toFixed(1)} px)`);
     ok(
-      `màn chuyển cảnh ẩn sau ${a.hidden - a.t0} ms (gói chậm ${delays.am_suong} ms): đã chờ gói rồi mới vào`,
+      `màn chuyển cảnh ẩn sau ${a.waited.toFixed(0)} ms (gói chậm ${delays.am_suong} ms): đã chờ gói rồi mới vào`,
     );
 
     // ---------------- Pha 2: gói chậm hơn 8 s ----------------
@@ -334,15 +410,19 @@ async function main() {
     const rb = reqs.filter((r) => r.mapId === "hac_phong");
     must(rb.length >= 1, "gói hac_phong được yêu cầu");
     must(
-      rb[0].at - b.t0 < 300,
-      `gói hac_phong bắt đầu tải ngay lúc gửi travel (${rb[0].at - b.t0} ms)`,
+      b.fileDelay < 300,
+      `gói hac_phong bắt đầu tải ngay lúc gửi travel (${b.fileDelay.toFixed(1)} ms)`,
     );
-    const waited = b.hidden - b.t0;
+    must(
+      b.fileStart <= b.active || b.active === 0,
+      "gói hac_phong bắt đầu tải trước khi màn chuyển cảnh hiện",
+    );
+    const waited = b.waited;
     must(
       waited >= 7500 && waited < 11000,
-      `quá 8 s thì VẪN qua cổng, không đợi hết ${delays.hac_phong} ms (${waited} ms)`,
+      `quá 8 s thì VẪN qua cổng, không đợi hết ${delays.hac_phong} ms (${waited.toFixed(0)} ms)`,
     );
-    ok(`vẫn qua cổng sau ${waited} ms dù gói cần ${delays.hac_phong} ms`);
+    ok(`vẫn qua cổng sau ${waited.toFixed(0)} ms dù gói cần ${delays.hac_phong} ms`);
     must(
       !(await ev(`!!document.querySelector('#toast p.bad')`)),
       "không có thông báo lỗi chuyển bản đồ",

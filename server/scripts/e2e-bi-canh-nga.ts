@@ -122,7 +122,7 @@ async function main() {
     let spawnError: Error | null = null;
     chrome.once("error", (e) => (spawnError = e));
     let targets: any[] = [];
-    for (const start = Date.now(); Date.now() - start < 8000;) {
+    for (const start = Date.now(); Date.now() - start < 30000;) {
       try {
         const res = await fetch(`http://127.0.0.1:${CDP}/json`);
         if (res.ok) {
@@ -229,7 +229,17 @@ async function main() {
     const soulBefore = JSON.stringify(ctrlOf(A.name).soul);
     const lifeBefore = ctrlOf(A.name).lifeId;
     const pa = playerOf(A.name);
+    // Đo thời gian hiện của lớp phủ NGAY TRONG TRANG (MutationObserver + performance.now), cài TRƯỚC khi gục: `sleep` rồi hỏi qua CDP phụ thuộc
+    // đồng hồ thật, trên runner WebGL phần mềm (hoặc `taskset -c 0`) mỗi lần gọi CDP / ảnh chụp mất cả giây nên tới lúc hỏi thì lớp phủ đã tự tắt
+    // đúng hạn của game (đưa ra khỏi bí cảnh): đỏ giả "biến mất sớm". Đo ngay trong trang thì chậm CDP không còn liên quan (#694).
+    await ta.ev(`window.__deathLog = [];
+      (() => { const d = document.getElementById('death');
+        new MutationObserver(() => window.__deathLog.push({ t: performance.now(), hidden: d.hidden }))
+          .observe(d, { attributes: true, attributeFilter: ['hidden', 'class', 'style'] }); })(); 1`);
     hurtPlayer(world, sids.get(A.name)!, pa, pa.hp + 100000, monster);
+    // Trạng thái phía server NGAY lúc gục (đồng bộ, không qua CDP): về sau A bị đưa ra khỏi bí cảnh đúng hạn (2 s theo đồng hồ thật) nên khi máy chậm
+    // tới các dòng kiểm muộn `ctrlOf(A.name)` có thể đã không còn trong phòng bí cảnh này.
+    if (ctrlOf(A.name)?.limbo) throw new Error("A không được có limbo (ngay lúc gục)");
     await ta.waitFor(shown("death"), "lớp phủ gục của A");
     const death = await ta.ev(`document.getElementById('death-t')?.textContent || ''`);
     const sub = await ta.ev(
@@ -244,10 +254,23 @@ async function main() {
     if (!(await ta.ev(`document.getElementById('limbo-overlay')?.hidden ?? true`)))
       throw new Error("Gục trong bí cảnh KHÔNG được mở màn Hoàng Tuyền");
     await ta.shot("1-gục");
-    // Khung đếm ngược không bị xoá giữa chừng (bài học PK): vẫn hiện sau 1.2 giây
-    await sleep(1200);
-    if (await ta.ev(`document.getElementById('death').hidden`))
-      throw new Error("Lớp phủ gục biến mất sớm (mốc đếm ngược bị xoá giữa khung?)");
+    // Khung đếm ngược không bị xoá giữa chừng (bài học PK): lớp phủ phải hiện ít nhất 1,2 giây (đo theo đồng hồ của TRANG, xem trên)
+    const MIN_SHOWN_MS = 1200;
+    const shownFor = (await ta.ev(`new Promise((resolve) => {
+      const log = window.__deathLog, d = document.getElementById('death');
+      const t0 = (log.find((e) => !e.hidden) || { t: performance.now() }).t;
+      const finish = () => {
+        const t1 = (log.find((e) => e.hidden && e.t > t0) || {}).t;
+        resolve(t1 !== undefined ? t1 - t0 : (d.hidden ? 0 : Infinity));
+      };
+      // Chưa đủ thời gian hiện thì chờ trong trang cho đủ, rồi mới xem có bị tắt sớm không
+      const wait = Math.max(0, ${MIN_SHOWN_MS} - (performance.now() - t0));
+      setTimeout(finish, wait);
+    })`)) as number | null;
+    if (shownFor !== null && shownFor < MIN_SHOWN_MS)
+      throw new Error(
+        `Lớp phủ gục biến mất sớm (hiện ${Math.round(Number(shownFor))} ms < ${MIN_SHOWN_MS} ms; mốc đếm ngược bị xoá giữa khung?)`,
+      );
     // B thấy A "Đã gục" ở HUD đội, run chạy tiếp
     await tb.waitFor(
       `/Đã gục/.test(document.getElementById('dhud-members')?.textContent || '')`,
@@ -256,7 +279,7 @@ async function main() {
     await tb.shot("2-dong-doi-thay");
     if (run.phase !== "running")
       throw new Error(`Run phải chạy tiếp (B còn đứng), thực tế ${run.phase}`);
-    if (ctrlOf(A.name).limbo) throw new Error("A không được có limbo");
+    if (ctrlOf(A.name)?.limbo) throw new Error("A không được có limbo");
     out(
       `  ✓ [3/8] A gục: lớp phủ "${death}" / "${sub}", không Hoàng Tuyền, B thấy A đã gục, run chạy tiếp`,
     );
