@@ -7,7 +7,7 @@
 Bản phát hành M7 (`docs/PHAN_CONG_M7.md`; hướng đã được người dùng duyệt ở `QUYET_DINH_M3.md` mục 18-21): chiều sâu chiến đấu (chiêu thức học được theo hệ, trạng thái, quái báo trước đòn, tinh anh) và cảnh giới Nguyên Anh trọn vẹn với bản đồ thứ tư. **CHƯA phát hành: chờ người dùng nói "phát hành v0.3.0" (#515).** Phần dưới là TÓM TẮT cho người quyết định; chi tiết từng PR nằm ở hai mục "Máy chủ" và "Giao diện" kế tiếp.
 
 ### Nội dung mới
-- **Chiêu thức học được (M7.1-M7.2, #502, #503):** 12 chiêu gốc theo hệ (ngũ hành và các hệ phụ), học từ kinh quyển trong Túi đồ (nút Học; chiêu tự gắn vào ô trống đầu tiên), dùng bằng thanh chiêu 6 ô (J K L U I O mở dần theo cảnh giới), xem và đổi ô ở bảng Công pháp (Shift+K). **Khắc chân linh** ở Hoàng Tuyền giữ 1-3 chiêu qua kiếp (3 nấc 40 / 100 / 220 Duyên); sang kiếp mới chiêu khắc ở tầng 1 và chưa gắn ô.
+- **Chiêu thức học được (M7.1-M7.2, #502, #503):** 12 chiêu gốc theo hệ (ngũ hành và các hệ phụ), học từ kinh quyển trong Túi đồ (nút Học; chiêu tự gắn vào ô trống đầu tiên), dùng bằng thanh chiêu 6 ô (J chém và K kiếm khí là nút cố định; L U I O mở dần theo cảnh giới: Luyện Khí, Trúc Cơ, Kim Đan, Nguyên Anh), xem và đổi ô ở bảng Công pháp (Shift+K). **Khắc chân linh** ở Hoàng Tuyền giữ 1-3 chiêu qua kiếp (3 nấc 40 / 100 / 220 Duyên); sang kiếp mới chiêu khắc ở tầng 1 và chưa gắn ô.
 - **Quái có hành vi và trạng thái (M7.3, #504):** lao tới / đập đất / bắn đạn đều có BÁO TRƯỚC trên đất (đi ngang ra khỏi vùng là tránh được); độc, bỏng, chảy máu, tê cóng, vỡ giáp, choáng lên cả quái và người chơi; **tinh anh** (quái thường hiếm, ★ vàng, mạnh hơn, rơi nhiều hơn).
 - **Nguyên Anh trọn vẹn (M7.5, #506):** ba bậc (thanh tu vi 288.000 / 331.200 / 380.880), bản đồ thứ tư **Hàn Vân Lĩnh** (trạm an toàn Hàn Vân Trạm, nối Âm Sương Trạch bằng cổng bắc), bốn loài quái (Hàn Lang, Phong Nha, Cốt Tượng, Độc Tước) và trùm Thiên Hàn Vương (đội 3-4 người), ba NPC, chuỗi tám nhiệm vụ chính + ba nhiệm vụ lặp, **bộ đồ IV** năm món rèn có phí (tổng 43.500 Linh thạch) và đan cấp 3.
 - **Ba ô trang bị mới (M7.4, #505):** hài, ngọc bội, pháp bảo (pháp bảo mở từ Kim Đan); chỉ số mới bạo kích, giảm hồi chiêu, giáp; độ hiếm hiện không chỉ bằng màu (◆ ◆◆ ◆◆◆ ★).
@@ -23,10 +23,11 @@ Bản phát hành M7 (`docs/PHAN_CONG_M7.md`; hướng đã được người d�
 - Có hai câu hỏi cân bằng CHƯA được người dùng trả lời, A đã chọn mặc định (xem `questions.md`): Linh thạch dư ~168.000 sau khi rèn xong bộ IV, và tinh anh Độc Tước giết người solo.
 
 ### Đo và kiểm
-- `npm test` 4244 test qua (238 tệp); `e2e:all` chạy một lệnh 22 kịch bản E2E bằng Chrome thật + máy chủ Colyseus thật (22 / 22 xanh khi C chạy, #696); `perf:mobile` 22 hàng 0 VƯỢT (có Hàn Vân); `leak:test` qua bốn bản đồ; bench bốn bản đồ đồng thời trong ngân sách (tick < 10 ms, patch < 520 byte / tick mỗi client).
+- `npm test` 4244 test qua (238 tệp); `e2e:all` chạy một lệnh 22 kịch bản E2E bằng Chrome thật + máy chủ Colyseus thật (22 / 22 xanh khi C chạy, #696; `e2e:nhip-tim` ca 4 chập chờn theo tải máy, `e2e:all` thử lại một lần và ghi FLAKY: không phải lỗi sản phẩm); `perf:mobile` 22 hàng 0 VƯỢT (có Hàn Vân); `leak:test` qua bốn bản đồ; bench bốn bản đồ đồng thời trong ngân sách (tick < 10 ms, patch < 520 byte / tick mỗi client).
 
 ### Cần biết khi phát hành
 - Người chơi web chỉ cần tải lại trang. **APK `v0.2.x` phải cài lại** (`release.yml` dựng APK debug khi gắn thẻ).
+- **Đổi trải nghiệm ban đầu của một nhóm người chơi:** cửa sổ CHUỘT thấp mà rộng (khung nhìn >= 900 x 500, như màn 720p hay laptop 1366x768 sau thanh tab) nay dùng bộ giao diện máy tính nên BẮT ĐẦU ở bậc đồ hoạ máy tính (Cao, có bloom) thay vì bậc điện thoại; bộ điều tốc vẫn hạ bậc nếu khung hình xấu (#676, #682).
 - Thứ tự vận hành (`deploy/prod.sh`, bản dry-run của C ở #515): `backup` -> `up 0.3.0` -> `smoke`; hỏng thì `rollback`, hỏng dữ liệu thì `restore <bản sao lưu>`.
 - **Chưa làm / chưa đo:** 6 chiêu Nguyên Anh đợt 2 (#654, Dev D chưa bắt đầu; hiện Nguyên Anh dùng 12 chiêu có sẵn), nghề nhỏ luyện đan + chế phù (#514, tuỳ), ảnh AI SDXL (#513, chờ người dùng). Âm thanh chiêu CHƯA nghe bằng tai (không loa); **"Android tầm trung >= 50 FPS" và điện thoại thật CHƯA đo / thử** (chỉ Chrome headless).
 
