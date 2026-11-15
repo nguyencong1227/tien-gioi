@@ -201,6 +201,21 @@ describe("trùm Thiên Hàn Vương theo đội, mã thật (Nguyên Anh, M7.9: 
     }
   });
 
+  it("đan được dùng đúng loại: Thượng Hồi Huyết Đan (90 %) cần ít viên hơn Đại Hồi Huyết Đan (70 %) để hạ cùng một trùm", () => {
+    const base = {
+      realm: 4,
+      tier: 0,
+      party: 1,
+      potions: POTIONS_PLENTY,
+      bossId: "thien_han_vuong",
+    };
+    const thuong = bossFight({ ...base, potionId: "thuong_hoi_huyet_dan", seed: 1 });
+    const dai = bossFight({ ...base, potionId: "dai_hoi_huyet_dan", seed: 1 });
+    expect(thuong.killed).toBe(true);
+    expect(dai.killed).toBe(true);
+    expect(thuong.potions[0]).toBeLessThan(dai.potions[0]);
+  });
+
   it("trùm Nguyên Anh cùng cỡ Hắc Giao: thời gian đội 3 người Trung kỳ trong 0,7-1,3x của Hắc Giao (mọi thứ chưa lệch xa khi nhân theo tỉ lệ chỉ số)", () => {
     const hg = bossSummary(1, 3, 8, 3);
     const na = sum(1, 3, 8);
