@@ -1151,6 +1151,13 @@ async function main() {
       "client dựng cả hai con quái",
       15000,
     );
+    // CHỜ vòng cập nhật đầu tiên vẽ thanh máu của CẢ HAI con (`lastBarKey` còn `undefined` cho tới lúc đó, và `setMonsterElite` cũng đặt lại nó về `undefined`): lấy mẫu ngay sau khi
+    // sprite vừa dựng làm khẳng định "thanh máu luôn hiện" đỏ chập chờn (~50 %: 2 / 4 lần chạy lại toàn bộ `e2e:*` ở lượt 356 đỏ đúng ở đây, 2 lần xanh)
+    await T.waitFor(
+      `(() => { const m = window.__scene.monsters; const a = m.get(${JSON.stringify(eliteId)}), b = m.get(${JSON.stringify(plainId)}); return !!a && !!b && a.lastBarKey !== undefined && b.lastBarKey !== undefined; })()`,
+      "vòng cập nhật đầu tiên đã vẽ thanh máu của tinh anh và quái thường",
+      5000,
+    );
     const view10 = JSON.parse(
       (await ev(`JSON.stringify((() => { const sc = window.__scene;
         const one = (id) => { const e = sc.monsters.get(id), m = sc.state.monsters.get(id);
