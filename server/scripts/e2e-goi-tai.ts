@@ -241,6 +241,15 @@ async function main() {
     const overlayHidden = `document.getElementById('transition-overlay').hidden === true`;
     /** Qua cổng `id` sang `destMapId`: trả thời điểm gửi và thời điểm màn chuyển cảnh ẩn lại */
     const crossPortal = async (id: string, destMapId: string, timeout: number) => {
+      // Mốc đo TRONG TRANG (`performance.now()`): lúc gửi `travel` và lúc gọi `fetch` ĐẦU TIÊN dưới `packs/` (manifest nếu chưa nạp, ở chế độ tiết
+      // kiệm dữ liệu; tệp gói nếu manifest đã có). `startMapWait` chạy đồng bộ ngay trước `room.send("travel")` và gọi `fetch` trong cùng tác vụ
+      // JS, nên khoảng này chỉ vài ms bất kể tải máy; đo ở phía test (`Date.now()` quanh lệnh CDP + giờ tới của tệp gói ở server) cộng cả độ trễ
+      // CDP + mạng + một lượt manifest: runner CI chậm ra 474 ms (log runner #694), máy tải 15 ra 562 ms, dù tải vẫn bắt đầu ngay.
+      await ev(`(() => { window.__tp = { send: null, fetch: null }; const room = window.__scene.room, osend = room.send.bind(room);
+        room.send = (t, m) => { if (t === 'travel' && window.__tp.send === null) window.__tp.send = performance.now(); return osend(t, m); };
+        const ofetch = window.fetch.bind(window);
+        window.fetch = (...a) => { if (window.__tp.send !== null && window.__tp.fetch === null && String(a[0]).includes('packs/')) window.__tp.fetch = performance.now(); return ofetch(...a); };
+        return 1; })()`);
       const t0 = Date.now();
       await ev(`window.__scene.travelPortal(${JSON.stringify(id)}); 1`);
       await T.waitFor(
@@ -255,7 +264,9 @@ async function main() {
       );
       const swapped = Date.now();
       await T.waitFor(overlayHidden, "màn chuyển cảnh ẩn lại", timeout);
-      return { t0, swapped, hidden: Date.now() };
+      const hiddenAt = Date.now();
+      const tp = (await ev(`window.__tp`)) as { send: number | null; fetch: number | null };
+      return { t0, swapped, hidden: hiddenAt, tp };
     };
 
     // ---------------- Pha 1: tiết kiệm dữ liệu (không tải trước), qua cổng chờ gói ----------------
@@ -284,11 +295,17 @@ async function main() {
     const ra = reqs.filter((r) => r.mapId === "am_suong");
     must(ra.length === 1, `gói am_suong được yêu cầu đúng một lần (${ra.length})`);
     must(
-      ra[0].at - a.t0 < 300,
-      `gói bắt đầu tải NGAY lúc gửi travel, không đợi màn chuyển cảnh / travelTo (${ra[0].at - a.t0} ms sau lúc gửi)`,
+      a.tp.send !== null && a.tp.fetch !== null,
+      `đo được lúc gửi travel và lúc bắt đầu tải gói trong trang (${JSON.stringify(a.tp)})`,
+    );
+    const gapPage = (a.tp.fetch as number) - (a.tp.send as number);
+    // Màn chuyển cảnh giữ 400 ms SAU travelTo: tải đợi nó (bản cũ) thì khoảng này >= 400 ms + độ trễ travelTo; tải ngay lúc gửi thì chỉ vài ms
+    must(
+      gapPage < 300,
+      `gói bắt đầu tải NGAY lúc gửi travel, không đợi màn chuyển cảnh / travelTo (${gapPage.toFixed(0)} ms theo đồng hồ trang)`,
     );
     ok(
-      `gói am_suong tải bắt đầu ${ra[0].at - a.t0} ms sau lúc gửi travel (song song với màn chuyển cảnh)`,
+      `gói am_suong tải bắt đầu ${gapPage.toFixed(0)} ms sau lúc gửi travel (đồng hồ trang; ở server thấy sau ${ra[0].at - a.t0} ms, gồm độ trễ CDP + mạng)`,
     );
     must(
       a.hidden - a.t0 >= delays.am_suong - 150,
