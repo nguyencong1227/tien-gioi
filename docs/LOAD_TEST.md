@@ -1273,20 +1273,37 @@ Kịch bản: 100 bot chia làm 6 nhóm hành vi tự hành (săn quái, trấn/
 | Nhóm kịch bản | Số ca test | Kết quả | Ghi chú & Đột biến kiểm chứng |
 |---|:---:|:---:|---|
 | **Độ trễ & độ tin cậy chuyển phòng cơ bản** | 4 | ✅ **ĐẠT (4/4)** | p50 < 600 ms, p95 < 900 ms; dọn sạch ghost và giải phóng tài nguyên phòng khi bot rời |
-| **Bốn bản đồ liên thông & định tuyến phòng** | 3 | ✅ **ĐẠT (3/3)** | Vòng khứ hồi 6 chặng (418 ms); Lạc Hà / Hắc Phong / Âm Sương từ chối `wrong_map:han_van` |
+| **Bốn bản đồ liên thông & định tuyến phòng** | 3 | ✅ **ĐẠT (3/3)** | Vòng khứ hồi 6 chặng (427 ms); Lạc Hà / Hắc Phong / Âm Sương từ chối `wrong_map:han_van` |
 | **Bảo toàn dữ liệu M7 qua cổng (skills + inv + quest)** | 2 | ✅ **ĐẠT (2/2)** | Vòng 6 chặng giữ nguyên 100% chiêu thức, trang bị, tu vi, tiền và túi đồ |
-| **Rớt mạng & nối lại tại Hàn Vân Lĩnh** | 2 | ✅ **ĐẠT (2/2)** | Nối lại bằng token (216 ms) hoặc đăng nhập lại (175 ms) huỷ ghost thành công, 1 người chơi duy nhất |
-| **Đua kết nối & xung đột 2 tab tại Hàn Vân Lĩnh** | 2 | ✅ **ĐẠT (2/2)** | Tab 2 nhận mã 409 hoặc `wrong_map:han_van`; lưu muộn không đè phòng mới |
-| **Chốt `travelling` tránh đè dữ liệu** | 1 | ✅ **ĐẠT (1/1)** | Lưu định kỳ lúc đang chuyển cảnh bị bỏ qua an toàn |
-| **Thử tải đồng thời (Concurrency Stress)** | 1 | ✅ **ĐẠT (1/1)** | 4 bot cùng chuyển cổng Âm Sương ↔ Hàn Vân đồng thời (252 ms); `auditSavesDirectory` báo 0 lỗi |
-| **Tương thích ngược tệp lưu cũ** | 1 | ✅ **ĐẠT (1/1)** | Tệp thiếu `mapId` hoặc `mapId` lạ được đưa về Lạc Hà; cả 3 phòng khác đều từ chối |
-| **Tổng cộng** | **18** | ✅ **18/18 PASS** | Thời gian chạy: ~8,4 s |
+| **Rớt mạng & nối lại tại Hàn Vân Lĩnh** | 2 | ✅ **ĐẠT (2/2)** | Nối lại bằng token (213 ms) hoặc đăng nhập lại (172 ms) huỷ ghost thành công, 1 người chơi duy nhất |
+| **Hai tab cùng mã nhân vật tại Âm Sương / Hàn Vân** | 2 | ✅ **ĐẠT (2/2)** | Tab 2 nhận mã 409, tab 1 giữ kết nối ổn định không bị ảnh hưởng |
+| **Đua kết nối 2 tab lúc qua cổng (hai cổng thử)** | 2 | ✅ **ĐẠT (2/2)** | Thử trên 2 cổng `hac_phong_bac` và `am_suong_bac`: tab 2 nhận 409 hoặc wrong_map, lưu muộn không đè phòng mới |
+| **Chốt `travelling` tránh đè dữ liệu (hai cổng thử)** | 2 | ✅ **ĐẠT (2/2)** | Thử trên 2 cổng `hac_phong_bac` và `am_suong_bac`: lưu định kỳ lúc đang chuyển cảnh bị bỏ qua an toàn |
+| **Thử tải đồng thời (Concurrency Stress)** | 1 | ✅ **ĐẠT (1/1)** | 4 bot cùng chuyển cổng Âm Sương ↔ Hàn Vân đồng thời (257 ms); `auditSavesDirectory` báo 0 lỗi |
+| **Tệp lưu CŨ thiếu skills đi chuỗi 4 bản đồ** | 1 | ✅ **ĐẠT (1/1)** | Tệp trước M7 không có `skills` đi qua 4 bản đồ tự khởi tạo sổ chiêu rỗng, lưu hợp lệ, `kiem-save` 0 lỗi |
+| **Tương thích ngược tệp lưu thiếu/sai mapId** | 2 | ✅ **ĐẠT (2/2)** | Tệp thiếu `mapId` hoặc `mapId` lạ được đưa về Lạc Hà; cả 3 phòng khác đều từ chối wrong_map |
+| **Tổng cộng** | **21** | ✅ **21/21 PASS** | Thời gian chạy: ~9,8 s |
 
 ### 26.3. Kiểm chứng đột biến (Mutation Testing)
-- **Đột biến thử nghiệm:** Cố tình làm lệch toạ độ xuất hiện ở bản đồ đích `x: to.spawn.x + 100` trong `server/src/systems/travel.ts` (`planTravel`).
-- **Phản ứng của bộ test:** Ngay lập tức bắt được 2 lỗi:
-  1. `AssertionError: tới hac_phong: expected 100 to be less than 2` (phát hiện lệch vị trí xuất hiện cổng).
-  2. `kiem-save sau bão chuyển cổng: Toạ độ (x: 2244, y: 240) nằm đè lên vật cản không thể di chuyển trên bản đồ Âm Sương Trạch` (`auditSavesDirectory` bắt được lỗi vị trí kẹt vật cản).
-- **Kết luận:** Bộ kiểm thử hồi quy 4 bản đồ hoạt động cực kỳ nhạy bén, bảo đảm ngăn chặn mọi hồi quy về toạ độ, trạng thái chuyển phòng và toàn vẹn dữ liệu hồ sơ M7.
+- **Đột biến 1 (Lệch toạ độ spawn):** Cố tình làm lệch toạ độ xuất hiện ở bản đồ đích `x: to.spawn.x + 100` trong `server/src/systems/travel.ts` (`planTravel`).
+  + Phản ứng: Ngay lập tức bắt được 2 lỗi:
+    1. `AssertionError: tới hac_phong: expected 100 to be less than 2` (phát hiện lệch vị trí xuất hiện cổng).
+    2. `kiem-save sau bão chuyển cổng: Toạ độ (x: 2244, y: 240) nằm đè lên vật cản không thể di chuyển trên bản đồ Âm Sương Trạch` (`auditSavesDirectory` bắt được lỗi vị trí kẹt vật cản).
+- **Đột biến 2 (Mất sổ chiêu M7 khi lưu):** Bỏ qua ghi `skills` trong `WorldRoom.ts` (`skills: undefined`).
+  + Phản ứng: Bắt ngay 8/21 ca test ĐỎ với lỗi `sổ chiêu trên đĩa: expected undefined to deeply equal ...`, chứng minh hợp đồng toàn vẹn sổ chiêu M7 đã được khoá chặt.
+
+### 26.4. Xác nhận chốt kiểm soát an toàn & Tài sản M7 (Perf-Gate, Leak, Credits, Budget)
+1. **Kiểm tra rò rỉ client (`leak-test`):**
+   - Hằng số `LEAK_MAP_IDS` trong `client/scripts/leak-test.mjs` đã bao phủ đầy đủ toàn bộ 4 bản đồ ngoài: `["lac_ha", "hac_phong", "am_suong", "han_van"]`.
+   - Toàn bộ 8/8 bài test trong `client/scripts/leak-test.test.ts` đều đạt (PASS), bao gồm các kiểm thử đột biến bắt rò rỉ Textures, GameObjects, BitmapText pool và JS Heap.
+2. **Ngân sách hiệu năng di động (`perf:mobile`):**
+   - Bản đồ Hàn Vân Lĩnh ở cả 3 bậc cấu hình (Thấp, Trung, Cao) đã được đo đạc và nghiệm thu trong PR #670 của Dev B: toàn bộ 22/22 chỉ số đều nằm trong ngân sách (0 VƯỢT).
+3. **Kiểm tra nguồn gốc & bản quyền tài sản (`check:credits`):**
+   - Kiểm tra 82 tệp tài nguyên tĩnh trong `client/public/`, 12 mục tài nguyên từ Vạn Kiếp Tu Tiên, 5 tài sản bên thứ ba: 100% có mã băm SHA-256 trùng khớp trong `CREDITS.md` và `docs/NGUON_NOI_DUNG.md`.
+4. **Kiểm tra ngân sách tải tĩnh (`check:budget`):**
+   - Gói JS chính (gzip): **496,86 KB** (ngân sách $\le 520$ KB).
+   - Tổng Atlas & Tileset: **224,32 KB** (ngân sách $\le 1024$ KB).
+   - Bộ nhớ Texture tĩnh (VRAM RGBA): **6,12 MB** (ngân sách bậc thấp $\le 48$ MB).
+
 
 
