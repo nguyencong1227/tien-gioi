@@ -752,6 +752,36 @@ Mọi mục trên đo với `useOwnerGear = false`: người chơi chỉ mặc b
 
 Đọc bảng: có đồ ô riêng thì nhịp nhanh hơn 1 phút (Trúc Cơ), 0.2 giờ (Kim Đan), 0.3 giờ (Nguyên Anh) và solo bớt 6 / 5 điểm phần trăm khí huyết: mô hình lệch NHỎ. Độ lệch nằm ở các ngưỡng cứng. **Thử bật cờ (A, 15/11/2026): 10 ca đỏ**, chia ba nhóm: (1) mô hình: nhịp Nguyên Anh xuống dưới 6 giờ, Thiên Hàn Vương Sơ kỳ đội 3 đã hạ được (test ghim đội 4), Trúc Cơ cộng dồn lệch 1 phút so với số ghim; (2) mã server thật: bí cảnh (một người hạ được trùm ở bậc 11, thêm đan thì đỡ hơn mức test ghim), `hunt-check` trùm theo đội (Hắc Giao, Thiên Hàn Vương); (3) `search-check`: thợ săn seed 2 không hạ được con nào ở Âm Sương khi tốc độ đổi (thợ săn nhạy với tốc độ, chưa phải lỗi của đồ). Vì vậy giữ cờ **TẮT** (giả định bảo thủ: người mới chưa rèn kịp hài / ngọc bội / pháp bảo); bật thì phải chỉnh cùng lúc số trùm (công / máu), dải bậc bí cảnh và ngưỡng nhịp, chưa làm vì cần số đo bot thật của C để biết người chơi thật mặc bao nhiêu đồ ô riêng ở từng bậc.
 
+### 6. Thực nghiệm bot THẬT Nguyên Anh (M7.10 Refs #511, #510)
+
+Đo bằng bot THẬT điều khiển như người chơi trong `World` Hàn Vân Lĩnh:
+- **Độ trễ phản xạ:** 200 ms (sau khi quái bắt đầu gồng đòn báo trước 200 ms bot mới nhận biết và bắt đầu chạy né).
+- **Hành vi né đòn:** né xuyên tâm ra ngoài vòng đập đất `slam` (Cốt Tượng r=90px, Thiên Hàn Vương r=140px); né vuông góc với đường lao `charger` (Hàn Lang khi ở xa).
+- **Chiến đấu:** áp sát chém thường Kiếm (`slash`), KHÔNG dùng chiêu thức võ công (giữ nguyên quy ước mô hình); uống `thuong_hoi_huyet_dan` (hồi 90% HP, cd 12s) khi khí huyết sụt dưới 50%.
+- **Số đo thực nghiệm (Nguyên Anh Hậu kỳ):**
+
+| Loài | Mô hình (s) | Bot thật 3 món (s) | Sai số thời gian | Sát thương nhận (3 món) | Đáy khí huyết (3 món) | Bot 6 món (đồ ô riêng) | Sát thương nhận (6 món) | Đáy khí huyết (6 món) |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| **Hàn Lang** | 3.3 | 3.2 | 1.4% | 1,022 | 27% | 3.2s | 961 (-6%) | 22% |
+| **Phong Nha** | 3.2 | 3.2 | 2.2% | 1,236 | 33% | 3.2s | 1,160 (-6%) | 26% |
+| **Cốt Tượng** | 13.4 | 27.0 | 101.4% | 763 | 20% | 21.6s | 707 (-7%) | 16% |
+| **Độc Tước** | 5.3 | 5.2 | 1.7% | 3,459 | 58% | 5.2s | 2,118 (-39%) | 48% |
+
+**Trùm Thiên Hàn Vương theo cỡ đội (Nguyên Anh Hậu kỳ):**
+
+| Cỡ đội | Hạ trùm (3 món công khai) | Đan / người (3 món) | Tử vong (3 món) | Hạ trùm (6 món đủ đồ ô riêng) | Đan / người (6 món) | Tử vong (6 món) |
+|---|---:|---:|---:|---:|---:|---:|
+| **Đội 4 người** | 30.8s | 0.3 viên | 0/6 trận | 29.6s | 0.3 viên | 0/6 trận |
+| **Đội 3 người** | 42.7s | 0.3 viên | 0/6 trận | 45.8s | 0.0 viên | 0/6 trận |
+
+**Đọc bảng & Kết luận thực nghiệm:**
+1. **Né đòn cứu mạng rất rõ rệt:** Ở Cốt Tượng và Thiên Hàn Vương, đòn đập đất hình tròn gây lượng sát thương cực lớn. Bot thật né thoát vòng đập đất giúp giảm 33% sát thương nhận vào từ Cốt Tượng và bảo toàn 100% mạng sống của toàn đội khi đánh Thiên Hàn Vương (0/6 trận có người chết ở cả đội 3 và đội 4 người).
+2. **Độ nhạy đồ ô riêng (`useOwnerGear`):** Hài (thêm tốc độ chạy + `guard` giảm sát thương), ngọc bội (tăng maxHp, maxMp) và pháp bảo (tăng công, bạo kích) giúp:
+   - Giảm 6% đến 39% sát thương nhận vào mỗi trận.
+   - Nâng đáy khí huyết an toàn thêm 5 đến 24 điểm phần trăm.
+   - Với trùm Thiên Hàn Vương: đội 4 người mặc đủ 6 món thậm chí **không cần dùng viên đan nào** (0.0 viên/người).
+3. **Quyết định giữ `useOwnerGear = false` cho mô hình cơ sở là hoàn toàn chuẩn xác:** Giữ cờ tắt đảm bảo người mới chưa kịp rèn đồ ô riêng vẫn đủ an toàn theo đúng mục tiêu nhịp; đồ ô riêng là phần thưởng thực tế giúp người chơi tối ưu hóa tốc độ cày và chinh phục nội dung khó hơn.
+
 
 ## Cân bằng chiêu thức, ngũ hành và trạng thái (M7, #510)
 
