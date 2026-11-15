@@ -21,11 +21,11 @@ import { OWNER_GEAR_ITEMS } from "./owner-gear";
 const byIdOf = (id: string) => ITEM_BY_ID[id];
 
 describe("đồ ba ô riêng: dữ liệu", () => {
-  it("mười bốn món, id không trùng với món nào khác, đều là trang bị ở ô RIÊNG, có chỉ số dương", () => {
-    expect(OWNER_GEAR_ITEMS).toHaveLength(14);
+  it("mười sáu món (M7.5c thêm hài và ngọc bội bộ IV), id không trùng với món nào khác, đều là trang bị ở ô RIÊNG, có chỉ số dương", () => {
+    expect(OWNER_GEAR_ITEMS).toHaveLength(16);
     const ids = OWNER_GEAR_ITEMS.map((i) => i.id);
-    expect(new Set(ids).size).toBe(14);
-    expect(ITEMS.filter((i) => ids.includes(i.id))).toHaveLength(14); // có trong ITEMS đúng một lần
+    expect(new Set(ids).size).toBe(16);
+    expect(ITEMS.filter((i) => ids.includes(i.id))).toHaveLength(16); // có trong ITEMS đúng một lần
     expect(Object.keys(ITEM_BY_ID).length).toBe(ITEMS.length); // không món nào bị đè bởi id trùng
     for (const it of OWNER_GEAR_ITEMS) {
       expect(it.type, it.id).toBe("equip");
@@ -61,10 +61,10 @@ describe("đồ ba ô riêng: dữ liệu", () => {
     expect(b.cdr).toBeGreaterThan(0);
   });
 
-  it("hài và ngọc bội: chỉ số tăng đều theo bậc yêu cầu (bốn bậc mỗi loại)", () => {
+  it("hài và ngọc bội: chỉ số tăng đều theo bậc yêu cầu (năm bậc mỗi loại: Luyện Khí, Trúc Cơ, Kim Đan sơ, Kim Đan hậu, Nguyên Anh sơ)", () => {
     for (const slot of ["boots", "jade"] as const) {
       const list = OWNER_GEAR_ITEMS.filter((i) => i.equip!.slot === slot);
-      expect(list).toHaveLength(4);
+      expect(list).toHaveLength(5);
       for (let i = 1; i < list.length; i++) {
         const prev = list[i - 1].equip!;
         const cur = list[i].equip!;
@@ -104,13 +104,14 @@ describe("pháp bảo: món <-> nội tại", () => {
 });
 
 describe("đồ ba ô riêng: công thức rèn và giá", () => {
-  it("mỗi món có đúng MỘT công thức; Lạc Hà (miễn phí) cho bậc Luyện Khí / Trúc Cơ, Vọng Sương (có phí) cho bậc Kim Đan và pháp bảo", () => {
+  it("mỗi món có đúng MỘT công thức; Lạc Hà (miễn phí) cho bậc Luyện Khí / Trúc Cơ, Vọng Sương (có phí) cho bậc Kim Đan và pháp bảo, Hàn Vân (có phí) cho bậc Nguyên Anh", () => {
     for (const it of OWNER_GEAR_ITEMS) {
       const rs = RECIPES.filter((r) => r.output.itemId === it.id);
       expect(rs, it.id).toHaveLength(1);
       const r = rs[0];
       const kimDan = it.equip!.reqRealm >= 3;
-      expect(r.npcId, it.id).toBe(kimDan ? "tho_ren_suong" : "tho_ren");
+      const nguyenAnh = it.equip!.reqRealm >= 4;
+      expect(r.npcId, it.id).toBe(nguyenAnh ? "tho_ren_han" : kimDan ? "tho_ren_suong" : "tho_ren");
       if (kimDan) expect(r.coin ?? 0, it.id).toBeGreaterThan(0);
       else expect(r.coin, it.id).toBeUndefined();
       for (const i of r.inputs) expect(byIdOf(i.itemId), `${it.id} cần ${i.itemId}`).toBeDefined();

@@ -137,6 +137,36 @@ const OWNER_GEAR_RECIPES: RecipeDef[] = [
   ]),
 ];
 
+// Bộ IV Nguyên Anh (M7.5c, #506): rèn ở thợ rèn Hàn Vân (`tho_ren_han`), người chơi không phải về Âm Sương. Nguyên liệu theo vùng săn Hàn Vân; vũ khí cần Thiên Hàn châu
+// (trùm Thiên Hàn Vương, đội 3-4 người). Phí Linh thạch ~x3 bộ I Kim Đan (chỗ xả tiền cho người Nguyên Anh), luôn cao hơn giá bán thành phẩm (`ITEM_VALUE` / 2). Số khởi đầu, M7.9.
+const rn = (id: string, output: string, coin: number, inputs: [string, number][]): RecipeDef => ({
+  ...r(id, output, inputs),
+  npcId: "tho_ren_han",
+  coin,
+});
+export const NGUYEN_ANH_RECIPES: RecipeDef[] = [
+  rn("ren_han_vu_kiem", "han_vu_kiem", 9000, [
+    ["han_lang_mao", 14],
+    ["thien_han_chau", 2],
+  ]),
+  rn("ren_han_lang_bao", "han_lang_bao", 12000, [
+    ["han_lang_mao", 18],
+    ["tuong_cot", 8],
+  ]),
+  rn("ren_phong_nha_phu", "phong_nha_phu", 7500, [
+    ["phong_nha_vu", 10],
+    ["tuong_cot", 6],
+  ]),
+  rn("ren_tuyet_hanh_ngoa", "tuyet_hanh_ngoa", 7500, [
+    ["phong_nha_vu", 8],
+    ["han_lang_mao", 6],
+  ]),
+  rn("ren_han_tinh_boi", "han_tinh_boi", 7500, [
+    ["doc_tuoc_nang", 6],
+    ["tuong_cot", 8],
+  ]),
+];
+
 export const RECIPES: RecipeDef[] = [
   r("ren_lang_nha_kiem", "lang_nha_kiem", [
     ["nanh_soi", 8],
@@ -173,6 +203,7 @@ export const RECIPES: RecipeDef[] = [
   ]),
   ...KIM_DAN_RECIPES,
   ...OWNER_GEAR_RECIPES,
+  ...NGUYEN_ANH_RECIPES,
 ];
 
 export const RECIPE_BY_ID: Record<string, RecipeDef> = Object.fromEntries(
