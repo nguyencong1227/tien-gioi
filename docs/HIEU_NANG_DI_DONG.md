@@ -21,28 +21,31 @@
 <!-- PERF-MATRIX:START -->
 | Kịch bản | Bậc đồ hoạ | CPU Throttling | FPS | JS Update p95 | Ngân sách JS | Draw call TB / p95 / Trần | Hạt / Trần | Emitters | Chữ bay đỉnh / Trần | JS Heap | Trạng thái |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| Một mình (Trấn vắng) | LOW | 1x | 60 | 0.4 ms | <= 9 ms | 2 / 2 / 60 | 0 / 60 | 0 / 4 | - | 28.1 MB | ✓ ĐẠT |
-| Một mình (Trấn vắng) | LOW | 4x | 60 | 1.1 ms | <= 9 ms | 2 / 2 / 60 | 0 / 60 | 0 / 4 | - | 28.6 MB | ✓ ĐẠT |
-| Trấn đông (50 bot) | LOW | 4x | 60 | 1.2 ms | <= 9 ms | 2 / 2 / 60 | 0 / 60 | 0 / 4 | - | 31.7 MB | ✓ ĐẠT |
-| Trấn đông (50 bot) | MID | 4x | 60 | 1.3 ms | <= 11 ms | 4 / 4 / 100 | 15 / 220 | 5 / 10 | - | 29 MB | ✓ ĐẠT |
-| Trấn đông (50 bot) | HIGH | 4x | 60 | 1.2 ms | <= 13 ms | 4 / 4 / 160 | 30 / 520 | 10 / 24 | - | 33 MB | ✓ ĐẠT |
-| Trấn đông (50 bot) | HIGH | 1x | 60 | 0.4 ms | <= 13 ms | 4 / 4 / 160 | 30 / 520 | 10 / 24 | - | 31.9 MB | ✓ ĐẠT |
-| Trấn đông (50 bot) - Máy rất yếu | LOW | 6x | 60 | 1.7 ms | <= 9 ms | 2 / 2 / 60 | 0 / 60 | 0 / 4 | - | 31.6 MB | ✓ ĐẠT |
-| Chiến đấu có hiệu ứng hạt | LOW | 4x | 60 | 1.1 ms | <= 9 ms | 4 / 4 / 60 | 72 đỉnh / 60 | 8 đỉnh / 4 | 8 đỉnh / 8 | 27.9 MB | ✓ ĐẠT |
-| Chiến đấu có hiệu ứng hạt | HIGH | 4x | 60 | 1.1 ms | <= 13 ms | 4 / 4 / 160 | 76 đỉnh / 520 | 10 đỉnh / 24 | 9 đỉnh / 28 | 31.9 MB | ✓ ĐẠT |
-| Nhiều chiêu liên tục | LOW | 4x | 60 | 1.1 ms | <= 9 ms | 4 / 4 / 60 | 70 đỉnh / 60 | 8 đỉnh / 4 | 8 đỉnh / 8 | 30.6 MB | ✓ ĐẠT |
-| Nhiều chiêu liên tục | HIGH | 4x | 60 | 1.1 ms | <= 13 ms | 4 / 4 / 160 | 120 đỉnh / 520 | 13 đỉnh / 24 | 17 đỉnh / 28 | 30.6 MB | ✓ ĐẠT |
-| Âm Sương Trạch (sương + thời tiết + nước) | LOW | 4x | 60 | 0.9 ms | <= 9 ms | 3 / 3 / 60 | 0 / 60 | 0 / 4 | - | 39 MB | ✓ ĐẠT |
-| Âm Sương Trạch (sương + thời tiết + nước) | MID | 4x | 60 | 1.1 ms | <= 11 ms | 5 / 5 / 100 | 15 / 220 | 5 / 10 | - | 37.6 MB | ✓ ĐẠT |
-| Âm Sương Trạch (sương + thời tiết + nước) | HIGH | 4x | 60 | 1.1 ms | <= 13 ms | 5 / 5 / 160 | 54 / 520 | 12 / 24 | - | 32 MB | ✓ ĐẠT |
-| Hắc Phong Cốc (sương + thời tiết + nước) | HIGH | 4x | 60 | 1.3 ms | <= 13 ms | 5 / 5 / 160 | 57 / 520 | 13 / 24 | - | 30 MB | ✓ ĐẠT |
-| Lạc Hà Trấn (sương + thời tiết + nước) | HIGH | 4x | 60 | 1.2 ms | <= 13 ms | 6 / 6 / 160 | 48 / 520 | 10 / 24 | - | 32 MB | ✓ ĐẠT |
-| Hàn Vân Lĩnh (sương + thời tiết + nước) | LOW | 4x | 60 | 0.8 ms | <= 9 ms | 3 / 3 / 60 | 0 / 60 | 0 / 4 | - | 30.9 MB | ✓ ĐẠT |
-| Hàn Vân Lĩnh (sương + thời tiết + nước) | MID | 4x | 60 | 1.2 ms | <= 11 ms | 5 / 5 / 100 | 27 / 220 | 6 / 10 | - | 34.6 MB | ✓ ĐẠT |
-| Hàn Vân Lĩnh (sương + thời tiết + nước) | HIGH | 4x | 60 | 1.1 ms | <= 13 ms | 5 / 5 / 160 | 69 / 520 | 14 / 24 | - | 38.7 MB | ✓ ĐẠT |
-| Đánh trùm (đòn dồn dập + trùm gục) | LOW | 4x | 60 | 1 ms | <= 9 ms | 4 / 4 / 60 | 86 đỉnh / 60 | 8 đỉnh / 4 | 8 đỉnh / 8 | 31.6 MB | ✓ ĐẠT |
-| Đánh trùm (đòn dồn dập + trùm gục) | HIGH | 4x | 60 | 1.1 ms | <= 13 ms | 4 / 4 / 160 | 164 đỉnh / 520 | 15 đỉnh / 24 | 17 đỉnh / 28 | 26.2 MB | ✓ ĐẠT |
-| Bí cảnh | MID | 4x | 60 | 1.1 ms | <= 11 ms | 4 / 4 / 100 | 76 đỉnh / 220 | 10 đỉnh / 10 | 9 đỉnh / 16 | 30.6 MB | ✓ ĐẠT |
+| Một mình (Trấn vắng) | LOW | 1x | 60 | 0.5 ms | <= 9 ms | 2 / 2 / 60 | 0 / 60 | 0 / 4 | - | 28.8 MB | ✓ ĐẠT |
+| Một mình (Trấn vắng) | LOW | 4x | 60 | 1.6 ms | <= 9 ms | 2 / 2 / 60 | 0 / 60 | 0 / 4 | - | 28.5 MB | ✓ ĐẠT |
+| Trấn đông (50 bot) | LOW | 4x | 60 | 1.6 ms | <= 9 ms | 2 / 2 / 60 | 0 / 60 | 0 / 4 | - | 32.2 MB | ✓ ĐẠT |
+| Trấn đông (50 bot) | MID | 4x | 60 | 2 ms | <= 11 ms | 4 / 4 / 100 | 15 / 220 | 5 / 10 | - | 32.3 MB | ✓ ĐẠT |
+| Trấn đông (50 bot) | HIGH | 4x | 60 | 1.9 ms | <= 13 ms | 4 / 4 / 160 | 27 / 520 | 9 / 24 | - | 30 MB | ✓ ĐẠT |
+| Trấn đông (50 bot) | HIGH | 1x | 60 | 0.6 ms | <= 13 ms | 4 / 4 / 160 | 30 / 520 | 10 / 24 | - | 29.7 MB | ✓ ĐẠT |
+| Trấn đông (50 bot) - Máy rất yếu | LOW | 6x | 60 | 2.4 ms | <= 9 ms | 2 / 2 / 60 | 0 / 60 | 0 / 4 | - | 33.3 MB | ✓ ĐẠT |
+| Chiến đấu có hiệu ứng hạt | LOW | 4x | 60 | 1.4 ms | <= 9 ms | 4 / 4 / 60 | 68 đỉnh / 60 | 8 đỉnh / 4 | 8 đỉnh / 8 | 28.7 MB | ✓ ĐẠT |
+| Chiến đấu có hiệu ứng hạt | HIGH | 4x | 60 | 1.9 ms | <= 13 ms | 4 / 4 / 160 | 76 đỉnh / 520 | 10 đỉnh / 24 | 9 đỉnh / 28 | 31.4 MB | ✓ ĐẠT |
+| Nhiều chiêu liên tục | LOW | 4x | 60 | 1.6 ms | <= 9 ms | 4 / 4 / 60 | 80 đỉnh / 60 | 8 đỉnh / 4 | 8 đỉnh / 8 | 30.1 MB | ✓ ĐẠT |
+| Nhiều chiêu liên tục | HIGH | 4x | 60 | 1.7 ms | <= 13 ms | 4 / 4 / 160 | 116 đỉnh / 520 | 13 đỉnh / 24 | 17 đỉnh / 28 | 30 MB | ✓ ĐẠT |
+| Âm Sương Trạch (sương + thời tiết + nước) | LOW | 4x | 60 | 1.4 ms | <= 9 ms | 3 / 3 / 60 | 0 / 60 | 0 / 4 | - | 38.8 MB | ✓ ĐẠT |
+| Âm Sương Trạch (sương + thời tiết + nước) | MID | 4x | 60 | 1.8 ms | <= 11 ms | 5 / 5 / 100 | 18 / 220 | 6 / 10 | - | 29.2 MB | ✓ ĐẠT |
+| Âm Sương Trạch (sương + thời tiết + nước) | HIGH | 4x | 60 | 1.7 ms | <= 13 ms | 5 / 5 / 160 | 54 / 520 | 12 / 24 | - | 32.1 MB | ✓ ĐẠT |
+| Hắc Phong Cốc (sương + thời tiết + nước) | HIGH | 4x | 60 | 1.9 ms | <= 13 ms | 5 / 5 / 160 | 57 / 520 | 13 / 24 | - | 27.2 MB | ✓ ĐẠT |
+| Lạc Hà Trấn (sương + thời tiết + nước) | HIGH | 4x | 60 | 2.3 ms | <= 13 ms | 6 / 6 / 160 | 45 / 520 | 9 / 24 | - | 27.3 MB | ✓ ĐẠT |
+| Hàn Vân Lĩnh (sương + thời tiết + nước) | LOW | 4x | 60 | 1.5 ms | <= 9 ms | 3 / 3 / 60 | 0 / 60 | 0 / 4 | - | 31.1 MB | ✓ ĐẠT |
+| Hàn Vân Lĩnh (sương + thời tiết + nước) | MID | 4x | 60 | 1.9 ms | <= 11 ms | 5 / 5 / 100 | 12 / 220 | 4 / 10 | - | 32.9 MB | ✓ ĐẠT |
+| Hàn Vân Lĩnh (sương + thời tiết + nước) | HIGH | 4x | 60 | 2 ms | <= 13 ms | 5 / 5 / 160 | 60 / 520 | 14 / 24 | - | 37.6 MB | ✓ ĐẠT |
+| Đánh trùm (đòn dồn dập + trùm gục) | LOW | 4x | 60 | 1.7 ms | <= 9 ms | 4 / 4 / 60 | 100 đỉnh / 60 | 8 đỉnh / 4 | 8 đỉnh / 8 | 26.4 MB | ✓ ĐẠT |
+| Đánh trùm (đòn dồn dập + trùm gục) | HIGH | 4x | 60 | 2 ms | <= 13 ms | 4 / 4 / 160 | 164 đỉnh / 520 | 15 đỉnh / 24 | 17 đỉnh / 28 | 26.6 MB | ✓ ĐẠT |
+| Đòn dồn dập + 18 chiêu liên tục | LOW | 4x | 60 | 1.7 ms | <= 9 ms | 4.2 / 5 / 60 | 79 đỉnh / 60 | 8 đỉnh / 4 | 8 đỉnh / 8 | 31.6 MB | ✓ ĐẠT |
+| Đánh trùm + 18 chiêu liên tục | LOW | 4x | 60 | 1.7 ms | <= 9 ms | 4.4 / 5 / 60 | 96 đỉnh / 60 | 8 đỉnh / 4 | 8 đỉnh / 8 | 26.9 MB | ✓ ĐẠT |
+| Đánh trùm + 18 chiêu liên tục | HIGH | 4x | 60 | 1.8 ms | <= 13 ms | 4.6 / 6 / 160 | 301 đỉnh / 520 | 30 đỉnh / 24 | 17 đỉnh / 28 | 32.6 MB | ✓ ĐẠT |
+| Bí cảnh | MID | 4x | 60 | 1.6 ms | <= 11 ms | 4 / 4 / 100 | 76 đỉnh / 220 | 10 đỉnh / 10 | 9 đỉnh / 16 | 30.9 MB | ✓ ĐẠT |
 <!-- PERF-MATRIX:END -->
 
 ### 2.2 Thời gian vào thế giới trên mạng 4G giả lập (`timeToWorld4gMs`)
@@ -99,7 +102,7 @@ node client/scripts/measure-mobile-perf.mjs --only am-suong-low-4x,am-suong-mid-
 ```
 
 ## 7. Chạy hằng đêm trên GitHub Actions (#330) và cổng ngân sách
-Job `client-perf` trong `.github/workflows/bench.yml` (lịch 04:00 giờ Việt Nam + `workflow_dispatch`, có ô nhập `time_slack`) chạy: `npm run build` -> `npm run perf:mobile` (đủ ma trận, ~80 s) -> `node client/scripts/perf-gate.mjs` -> `npm run leak:test` (~10 s) và đưa `docs/perf-mobile-results.json` + `docs/HIEU_NANG_DI_DONG.md` lên artifact `client-perf-results-<sha>` (90 ngày; KHÔNG tự commit vào `main`). PR chỉ chạy phần tĩnh (`check:budget` trong `ci.yml`) để không cạn phút Actions.
+Job `client-perf` trong `.github/workflows/bench.yml` (lịch 04:00 giờ Việt Nam + `workflow_dispatch`, có ô nhập `time_slack`) chạy: `npm run build` -> `npm run perf:mobile` (đủ ma trận 25 kịch bản, ~3 phút 20 giây khi máy tải ~12; 22 kịch bản trước #515 mất ~2 phút 55 giây cùng mức tải) -> `node client/scripts/perf-gate.mjs` -> `npm run leak:test` (~10 s) và đưa `docs/perf-mobile-results.json` + `docs/HIEU_NANG_DI_DONG.md` lên artifact `client-perf-results-<sha>` (90 ngày; KHÔNG tự commit vào `main`). PR chỉ chạy phần tĩnh (`check:budget` trong `ci.yml`) để không cạn phút Actions.
 
 - **Đỏ khi nào:** (1) `perf:mobile` thoát mã 1 nếu có kịch bản không tải được / không có mẫu (không bao giờ xanh giả khi thiếu số đo); (2) `perf-gate.mjs` thoát mã 1 nếu một kịch bản vượt `client/perf-budget.json`: JS update p95 (`runtime.tiers.<bậc>.jsFrameP95Ms` x `time-slack`), số hạt sống (`peakParticles`), số emitter (`emitterBudget`), draw call p95 mỗi khung (`drawCalls`), hay thiếu / sai kiểu số đo (kể cả ngân sách thiếu khoá); (3) `leak:test` thoát mã 1 khi rò texture / GameObject / heap > 10 %. Bảng từng kịch bản nằm trong job summary.
 - **`time-slack`** (mặc định 1,5 trong workflow; biến `PERF_TIME_SLACK` hoặc `--time-slack`) chỉ nới ngân sách THỜI GIAN để bù runner CI chậm hơn máy dev; số hạt / emitter / draw call là số đếm tất định nên không nới. Số đo trên máy dev: JS update p95 0,3-2,2 ms so với ngân sách 9-13 ms (dư 4-30 lần), nên 1,5 là bước khởi đầu thận trọng: chỉnh sau vài đêm dựa vào bảng.
@@ -111,5 +114,6 @@ Job `client-perf` trong `.github/workflows/bench.yml` (lịch 04:00 giờ Việt
 - **`leak:test` đi qua ba bản đồ ngoài (#408 bước 4):** mỗi chu kỳ dựng lại hình ảnh của bản đồ kế tiếp trong `LEAK_MAP_IDS` (Lạc Hà, Hắc Phong, Âm Sương; lớp ô, trang trí, nước, sương, thời tiết, ánh sáng) với sương + thời tiết + nước bật (trước đây chỉ Lạc Hà, môi trường tắt); hai lần đọc chỉ số (đầu / cuối) đều đọc khi đang ở bản đồ gốc. Số đo: Textures 93 -> 93, GameObjects 39 -> 39, heap +1,8 % (ngân sách 10 %). Đột biến "mỗi lần dựng Âm Sương sót một đối tượng" -> `Rò rỉ GameObjects cơ sở: tăng từ 33 lên 39 (+6)`, thoát mã 1 (kiểm Lạc Hà một mình không thấy).
 - **Ảnh 5 khung nhìn** (`npm run capture:viewports -- --maps` hoặc `node client/scripts/capture-viewports.mjs --maps`): Hắc Phong Cốc (mốc) và Âm Sương Trạch ở 1280x720, 768x1024, 844x390, 390x844, 360x640 vào `docs/screenshots/m6-ban-do/` (10 ảnh WebP, 1,2 MB; bộ ảnh mốc M5 không bị đụng tới).
 - **Đánh trùm (M6 #409, nit của A ở #450):** `combat-*` / `burst-*` dùng `fx-driver` công thức quái thường nên KHÔNG bắn `boss-hit` / `boss-vanish`; chi phí hai công thức trùm trước đó chỉ được giữ bằng test `FxBudget` + trần mỗi công thức (<= 20 hạt, <= 1 s). Nay kế hoạch `boss` của `fx-driver` (nhịp `burst`, cờ `boss: true`: đòn thường của mình / người khác -> `boss-hit`, đòn nặng / chí mạng vẫn `hit-heavy` / `hit-crit`, trùm gục -> `boss-vanish` ưu tiên 2 mỗi 1,2 s: ca xấu nhất, thực tế chỉ một lần mỗi trận) có kịch bản `boss-low-4x` / `boss-high-4x`. **Số đo** (CPU 4x; đỉnh hạt / trần cứng, đỉnh emitter / trần cứng): bậc Thấp 98-106 / 120 (hai lần chạy; 82-88 % trần cứng), 8 / 8; bậc Cao 148 / 1040, 14 / 48; JS p95 1,0 / 1,4 ms, draw call p95 4; so với `burst` cùng lần chạy (78 / 120 và 124 / 1040). Bậc Thấp sát trần cứng hơn `burst` (trùm gục 20 hạt ưu tiên 2 chồng lên đòn dồn dập) nhưng KHÔNG vượt. **Cổng không bắt "công thức trùm nặng hơn":** thử `boss-vanish` 90 hạt thì đỉnh chỉ 90 / 120 (`FxBudget` bỏ bớt nên `fxDropped` tăng, đỉnh không vượt trần cứng) và `perf-gate` vẫn xanh; kịch bản này đo đỉnh THẬT (đỏ nếu `FxBudget` hỏng làm đỉnh vượt trần cứng, hoặc bộ bắn phát quá ít) chứ không thay test trần mỗi công thức (<= 20 hạt) trong `combat-fx.test.ts`.
+- **18 chiêu liên tục (M7, #515, đề xuất của B sau #722):** `burst-*` / `boss-*` chỉ bắn Kiếm khí, đòn, gục (`fx-driver`), KHÔNG bắn hiệu ứng DÙNG CHIÊU của 18 chiêu M7 nên `perf-gate` chưa kiểm chúng. Hai kế hoạch mới `burst-cast` / `boss-cast` (`FX_PLANS` có `castMs: 300`) cứ 300 ms phát một lần dùng chiêu, xoay vòng cả 18 chiêu (`FX_CAST_SKILLS`, test đòi trùng đúng `SKILLS` của `shared/`: thêm chiêu mà quên là đỏ), hai trong ba lần là chiêu của MÌNH (ưu tiên 2: ca nặng), một lần của đồng đội; chiêu đi bằng ĐÚNG đường thật `window.__scene.room.emit("fx", {kind: "cast"})` -> `WorldScene.onFx` -> `planCastFx` -> `playFxPoints` -> `FxSystem.play` (có bộ chặn ngân sách emitter của bậc), chuỗi tất định (hạt giống cố định). Ba kịch bản: `burst-cast-low-4x`, `boss-cast-low-4x` (ca xấu nhất bậc Thấp: đỉnh ~94-101 / 120 hạt, 8 / 8 emitter) và `boss-cast-high-4x` (~293-315 / 1040 hạt, 29-31 / 48 emitter). Trần gate KHÔNG nới (cùng `perf-budget.json`: Thấp 120 hạt / 8 emitter, Cao 1040 / 48). Gate đòi thêm BẰNG CHỨNG cast chạy tới hạt (tin cast đã gửi >= 10, game gọi `FxSystem.play` cho `cast-*` >= 10 lần, được ngân sách nhận >= 3; bậc Thấp thật nhận 6-9 trong 17 lần gọi vì trần 8 emitter): đường onFx hỏng thì ĐỎ chứ không xanh giả nhờ đỉnh của Kiếm khí. Giới hạn: `FxBudget` nhận hiệu ứng theo chi phí KHAI BÁO của công thức (`recipeCost`), nên tăng `count` của công thức cast chỉ làm ngân sách bỏ nhiều hơn (đỉnh Thấp không đổi, đỉnh Cao tăng trong trần) chứ KHÔNG làm gate đỏ; gate bắt được việc vượt / bỏ qua bộ chặn ngân sách (bỏ chặn emitter -> đỏ ở cả hai hàng bậc Thấp: 14 và 12 > 8).
 - **Không chặn trên FPS** (SwiftShader không phản ánh GPU thật, mục 5).
 - Chạy tay: `npm run build && npm run perf:mobile && node client/scripts/perf-gate.mjs` (thêm `--time-slack 1.5` nếu máy chậm).
