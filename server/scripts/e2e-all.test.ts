@@ -163,6 +163,14 @@ describe("e2e:all - Bộ chạy toàn diện E2E (M7.16, Issue #694)", () => {
       expect(opts.timeoutSec).toBe(90);
       expect(opts.retry).toBe(false);
     });
+
+    it("resolve đường dẫn tương đối của --logs thành đường dẫn tuyệt đối theo cwd", () => {
+      const opts = parseCliArgs(["--logs", "relative-logs"]);
+      expect(path.isAbsolute(opts.logsDir)).toBe(true);
+      expect(opts.logsDir).toBe(
+        path.resolve(process.env.INIT_CWD ?? process.cwd(), "relative-logs"),
+      );
+    });
   });
 
   describe("dry-run không tạo thư mục logs", () => {

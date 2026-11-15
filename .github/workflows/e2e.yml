@@ -68,8 +68,8 @@ jobs:
           IN_TIMEOUT: ${{ inputs.timeout }}
           IN_NO_RETRY: ${{ inputs.no_retry }}
         run: |
-          mkdir -p e2e-logs
-          args=(--logs e2e-logs)
+          mkdir -p "$GITHUB_WORKSPACE/e2e-logs"
+          args=(--logs "$GITHUB_WORKSPACE/e2e-logs")
 
           if [ -n "$IN_ONLY" ]; then
             if [[ ! "$IN_ONLY" =~ ^[a-z0-9:,_-]*$ ]]; then
@@ -104,8 +104,8 @@ jobs:
       - name: Xuất bảng kết quả E2E vào Job Summary
         if: always()
         run: |
-          if [ -f e2e-logs/REPORT.md ]; then
-            cat e2e-logs/REPORT.md >> $GITHUB_STEP_SUMMARY
+          if [ -f "$GITHUB_WORKSPACE/e2e-logs/REPORT.md" ]; then
+            cat "$GITHUB_WORKSPACE/e2e-logs/REPORT.md" >> $GITHUB_STEP_SUMMARY
           fi
 
       - name: Lưu artifact toàn bộ nhật ký (logs) E2E
@@ -113,5 +113,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: e2e-logs-${{ github.sha }}
-          path: e2e-logs/
+          path: ${{ github.workspace }}/e2e-logs/
+          if-no-files-found: error
           retention-days: 30
