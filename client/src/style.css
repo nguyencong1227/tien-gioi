@@ -6500,12 +6500,24 @@ body.low-fx.in-limbo .stone-item {
   padding: 12px 16px 16px;
   border-top: 1px solid rgba(212, 175, 55, 0.2);
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
 }
 
 .newbie-footer button {
   min-height: 44px;
   padding: 0 20px;
+}
+/* #673: `.auth-btn-primary` rộng 100 % nên trước đây ép nút phím tắt xuống 44 px (chữ vỡ 5 dòng) và kéo nút "Đã Hiểu" cao 97 px. Nút phụ giữ cỡ chữ của nó, nút chính lấp phần còn lại
+   (không đủ chỗ thì xuống hàng riêng, mỗi hàng một nút đầy bề ngang). */
+.newbie-footer #newbie-btn-keys {
+  flex: none;
+  white-space: nowrap;
+}
+.newbie-footer #newbie-btn-dismiss {
+  flex: 1 1 220px;
+  width: auto;
 }
 
 /* Giảm chuyển động (Accessibility: prefers-reduced-motion, Issue #269, #280) */
