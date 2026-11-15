@@ -81,7 +81,7 @@ describe("planPath: đường đi ngắn nhất trên lưới ô", () => {
   });
 
   it("trên bản đồ thật: từ trấn tới một ô trống xa, đường đi hợp lệ và không dài quá 2,5 lần đường chim bay", () => {
-    for (const id of ["lac_ha", "hac_phong", "am_suong"]) {
+    for (const id of ["lac_ha", "hac_phong", "am_suong", "han_van"]) {
       const map = getMap(id)!;
       const g = gridOf(map);
       const sx = map.townPx.x,
@@ -175,8 +175,8 @@ describe("bảng đối chiếu thời gian tìm quái", () => {
   let rows: SearchRow[] | null = null;
   const getRows = () => (rows ??= cases.map((c) => searchCheck(c)));
 
-  it("có đủ 11 dòng: mọi loài có giả định ở mọi bản đồ thường có quái đó, kể cả Kim Đan", () => {
-    expect(cases).toHaveLength(11);
+  it("có đủ 16 dòng: mọi loài có giả định ở mọi bản đồ thường có quái đó, kể cả Kim Đan và Nguyên Anh (M7.10)", () => {
+    expect(cases).toHaveLength(16);
     const key = (c: { mapId: string; monsterId: string }) => `${c.mapId}/${c.monsterId}`;
     for (const k of [
       "lac_ha/tho",
@@ -190,6 +190,11 @@ describe("bảng đối chiếu thời gian tìm quái", () => {
       "am_suong/thach_quy",
       "am_suong/doc_thiem",
       "am_suong/hac_giao",
+      "han_van/han_lang",
+      "han_van/phong_nha",
+      "han_van/cot_tuong",
+      "han_van/doc_tuoc",
+      "han_van/thien_han_vuong",
     ])
       expect(cases.map(key), k).toContain(k);
   });
