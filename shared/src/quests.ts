@@ -447,7 +447,7 @@ export const QUESTS: QuestDef[] = [
     id: "giao_hoan",
     title: "Giao hoạn",
     giver: "tram_truong",
-    desc: "Hạ Hắc Giao (đội 3-4 người) và mang về 3 giao lân.",
+    desc: "Việc phụ (không bắt buộc): hạ Hắc Giao (đội 3-4 người) và mang về 3 giao lân.",
     steps: [
       { kind: "kill", monster: "hac_giao", count: 1 },
       { kind: "collect", itemId: "giao_lan", count: 3 },
@@ -800,9 +800,9 @@ export const QUESTS: QuestDef[] = [
   },
   {
     id: "doc_tuoc_nop",
-    title: "Độc tước nang cho dược sư",
+    title: "Độc tước nang nộp trạm",
     giver: "tram_truong_han",
-    desc: "Nộp 6 Độc tước nang.",
+    desc: "Nộp 6 Độc tước nang cho trạm.",
     steps: [{ kind: "collect", itemId: "doc_tuoc_nang", count: 6 }],
     rewards: { exp: 5400 },
     minRealm: { realm: 4, tier: 1 },
