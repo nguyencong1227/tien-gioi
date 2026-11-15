@@ -155,6 +155,10 @@ export interface MonsterCtrl {
    * Không có mục tiêu thì xoá (`monsters.ts`). Chỉ quái `charger` mới có.
    */
   ai?: MonsterAi;
+  /** Đập đất đang gồng (M7.3, `systems/slam.ts`): đáp đòn lúc `until`, tâm vòng là chỗ quái đứng lúc bắt đầu. Trống = không gồng. Không có mục tiêu thì xoá. */
+  slam?: { until: number; x: number; y: number };
+  /** Thời điểm sớm nhất được đập đất lần kế (ms của `World.now`); trống = đập được ngay. */
+  nextSlam?: number;
 }
 
 /** Pha của đòn mạnh (`systems/charge.ts`): `windup` đứng gồng tới `until` rồi lao theo `angle`; `recover` đứng thở tới `until`. */

@@ -20,8 +20,8 @@ import {
 describe("săn quái thường: mô hình khớp mã server thật", () => {
   const rows = huntCheckCases().map(([realm, tier, id]) => huntCheck(realm, tier, id, 8));
 
-  it("mọi ca (Luyện Khí, Trúc Cơ, 3 bậc x 4 loài Kim Đan) đều hạ được quái; có đủ 14 dòng", () => {
-    expect(rows).toHaveLength(2 + 3 * 4);
+  it("mọi ca (Luyện Khí, Trúc Cơ, 3 bậc x 4 loài Kim Đan, 3 bậc x 4 loài Nguyên Anh) đều hạ được quái; có đủ 26 dòng", () => {
+    expect(rows).toHaveLength(2 + 3 * 4 + 3 * 4);
     for (const r of rows) expect(r.killedAll, `${r.label} ${r.monsterId}`).toBe(true);
   });
 
