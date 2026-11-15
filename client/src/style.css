@@ -1840,50 +1840,105 @@ html[data-input="touch"] #skill-slots .sk.slot .keycap {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   padding-right: 2px;
 }
 .sk-row {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.25);
-  padding: 10px 12px;
+  overflow: hidden;
+  flex: none; /* danh sách là cột flex có max-height: không có dòng này thì hàng (overflow: hidden) bị ÉP thấp lại thay vì cuộn */
 }
 .sk-row.equipped {
   border-color: rgba(255, 224, 138, 0.7);
 }
-.sk-row-head {
+.sk-row.open {
+  background: rgba(0, 0, 0, 0.38);
+}
+/* Hàng gọn: cả hàng là MỘT nút (mở / gập chi tiết), cao >= 44 px */
+.sk-line {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 4px 10px;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 4px 10px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sk-line:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: -2px;
 }
 .sk-row-ico,
 .sk-row-ico svg {
   width: 28px;
   height: 28px;
   display: inline-block;
+  flex: none;
 }
+.sk-line-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* Tên và dòng phụ XUỐNG DÒNG khi hẹp (không cắt "…"): tên chiêu là thứ người chơi dùng để tìm đúng chiêu, hàng cao hơn 48 px thì vẫn đạt */
 .sk-row-name {
   font-size: var(--fs-15);
+  overflow-wrap: anywhere;
 }
-.sk-row-pips {
-  color: #ffe08a;
-  letter-spacing: 1px;
+.sk-line-main .sk-row-tag {
+  overflow-wrap: anywhere;
 }
 .sk-row-tag {
   opacity: 0.8;
   font-size: var(--fs-12);
 }
+.sk-row-need {
+  color: #ffb4a0;
+}
 .sk-row-badge {
+  flex: none;
   padding: 1px 8px;
   border-radius: 10px;
   background: rgba(255, 224, 138, 0.18);
   font-size: var(--fs-12);
+  white-space: nowrap;
 }
-.sk-row-badge.need {
-  background: rgba(200, 90, 60, 0.28);
-  color: #ffb4a0;
+.sk-row-badge.none {
+  background: transparent;
+  opacity: 0.6;
+}
+.sk-line-chev {
+  flex: none;
+  opacity: 0.7;
+  transition: transform 0.15s;
+}
+.sk-row.open .sk-line-chev {
+  transform: rotate(180deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sk-line-chev {
+    transition: none;
+  }
+}
+.sk-detail {
+  padding: 2px 12px 10px;
+  border-top: 1px solid var(--line);
+}
+.sk-row-kind {
+  display: block;
+  margin-top: 6px;
+}
+.sk-row-pips {
+  color: #ffe08a;
+  letter-spacing: 1px;
 }
 .sk-row-stats {
   margin: 6px 0 2px;

@@ -329,6 +329,12 @@ async function runLeakTest() {
                 cd: [(${i} % 3) * 500, 0, 0, 0],
                 cdMax: [3000, 3000, 0, 0],
               });
+              // Bảng gọn (#668): mở chi tiết một hàng xoay vòng rồi gập lại, và để lần vẽ lại sau (sổ chiêu mới) dựng cả danh sách khi đang có hàng mở
+              const lines = document.querySelectorAll('#skills-list .sk-line');
+              if (lines.length > 0) {
+                lines[${i} % lines.length].click();
+                lines[(${i} + 1) % lines.length].click();
+              }
             }
             window.__ui.closeAllModals();
           }
