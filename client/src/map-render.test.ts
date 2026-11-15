@@ -10,8 +10,10 @@ import {
   canvasPixelSize,
   cameraView,
   canvasToWorld,
+  MAP_COLORS,
   centerCamera,
   clampCamera,
+  drawDiamond,
   fitCamera,
   fitView,
   panCamera,
@@ -381,5 +383,55 @@ describe("map-render: camera phóng to / kéo", () => {
     const ppt = v.scale * TILE;
     expect(v.ox + t.x0 * ppt).toBeLessThanOrEqual(0 + 1e-6);
     expect(v.ox + t.x1 * ppt).toBeGreaterThanOrEqual(box.cw - 1e-6);
+  });
+});
+
+describe("map-render: thoi tinh anh (drawDiamond)", () => {
+  /** Canvas2D giả: ghi lại lệnh vẽ theo thứ tự */
+  function fakeCtx() {
+    const log: string[] = [];
+    const ctx = {
+      beginPath: () => log.push("begin"),
+      moveTo: (x: number, y: number) => log.push(`M${x},${y}`),
+      lineTo: (x: number, y: number) => log.push(`L${x},${y}`),
+      closePath: () => log.push("close"),
+      fill: () => log.push("fill"),
+      stroke: () => log.push("stroke"),
+      fillStyle: "",
+      strokeStyle: "",
+      lineWidth: 0,
+      lineJoin: "",
+    };
+    return { ctx: ctx as never, log, raw: ctx };
+  }
+
+  it("bốn đỉnh cách tâm đúng r (trên, phải, dưới, trái), tô rồi mới viền", () => {
+    const { ctx, log, raw } = fakeCtx();
+    drawDiamond(ctx, 10, 20, 4, "#ff8a2b", "#ffffff", 2);
+    expect(log).toEqual([
+      "begin",
+      "M10,16",
+      "L14,20",
+      "L10,24",
+      "L6,20",
+      "close",
+      "fill",
+      "stroke",
+    ]);
+    expect(raw.fillStyle).toBe("#ff8a2b");
+    expect(raw.strokeStyle).toBe("#ffffff");
+    expect(raw.lineWidth).toBe(2);
+  });
+
+  it("không có màu viền thì không viền", () => {
+    const { ctx, log } = fakeCtx();
+    drawDiamond(ctx, 0, 0, 3, "#ff8a2b");
+    expect(log.includes("stroke")).toBe(false);
+    expect(log.at(-1)).toBe("fill");
+  });
+
+  it("màu tinh anh khác màu quái thường và NPC (không lẫn trên bản đồ nhỏ)", () => {
+    expect(MAP_COLORS.elite).not.toBe(MAP_COLORS.monster);
+    expect(MAP_COLORS.elite).not.toBe(MAP_COLORS.npc);
   });
 });
