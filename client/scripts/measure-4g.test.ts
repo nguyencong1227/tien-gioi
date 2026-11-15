@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import http from "node:http";
+import type { AddressInfo } from "node:net";
 import zlib from "node:zlib";
 import { fileURLToPath } from "node:url";
 import {
@@ -11,7 +12,6 @@ import {
   readBudgetLimits,
   COMPRESSIBLE_EXTS,
 } from "./measure-4g.mjs";
-import { freePort } from "./free-port.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -164,7 +164,6 @@ describe("M7.15: measure-4g (Đo thời gian vào thế giới qua 4G giả lậ
     });
 
     it("máy chủ nén gzip khi client gửi Accept-Encoding: gzip", async () => {
-      const port = await freePort();
       const rawText = "Hello Tiên Giới! ".repeat(50);
       const server = http.createServer((req, res) => {
         const accept = req.headers["accept-encoding"] || "";
@@ -186,7 +185,10 @@ describe("M7.15: measure-4g (Đo thời gian vào thế giới qua 4G giả lậ
         }
       });
 
-      await new Promise<void>((resolve) => server.listen(port, "127.0.0.1", () => resolve()));
+      // Cổng 0: hệ điều hành cấp cổng NGAY LÚC nghe (không có khoảng hở giữa 'tìm cổng trống' và 'nghe' như `freePort()` rồi `listen(port)`: tệp vitest chạy
+      // song song có thể chiếm đúng cổng đó, `EADDRINUSE` không có bộ xử lý làm ca treo tới hết 15 s, đỏ ngẫu nhiên trên CI ở #660)
+      await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+      const port = (server.address() as AddressInfo).port;
 
       try {
         // 1. Request có Accept-Encoding: gzip
