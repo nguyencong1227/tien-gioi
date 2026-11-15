@@ -3054,7 +3054,7 @@ html[data-input="touch"] #newbie-btn-keys {
     font-size: var(--fs-10);
     line-height: 12px;
   }
-  /* Nút HUD >= 44x44 (mục 4.2 điều 1). Lưới 3 cột x 2 hàng cho 6 nút (3 x 44 + 2 x 6 = 144 px) thấp hơn 3 hàng x 32 px trước đây */
+  /* Nút HUD >= 44x44 (mục 4.2 điều 1) ở điện thoại ngang thấp. Thanh menu là MỘT hàng 7 nút (7 x 44 + 6 x 4 + đệm ~ 338 px, #684); chú thích cũ nói lưới 3 cột x 2 hàng cho 6 nút (bố cục trước khi có thanh menu) */
   .hud-btn {
     min-width: 44px;
     min-height: 44px;
@@ -6521,6 +6521,20 @@ body.low-fx.in-limbo .stone-item {
 .newbie-footer #newbie-btn-dismiss {
   flex: 1 1 220px;
   width: auto;
+}
+/* #690: chỉ dẫn mở màn có HAI bản chữ cho mỗi thẻ: bản phím (máy tính) và bản NÚT (cảm ứng, `data-input="touch"`: người chơi điện thoại không có phím J / Tab / Z / B ...) */
+.guide-touch {
+  display: none;
+}
+html[data-input="touch"] p.guide-touch {
+  display: block;
+}
+html[data-input="touch"] .guide-keys {
+  display: none;
+}
+/* ô nhanh Huyết / Linh: số phím 1 / 2 chỉ có nghĩa với bàn phím (thanh chiêu cảm ứng đã ẩn nhãn phím) */
+html[data-input="touch"] .qslot .qkey {
+  display: none;
 }
 
 /* Giảm chuyển động (Accessibility: prefers-reduced-motion, Issue #269, #280) */

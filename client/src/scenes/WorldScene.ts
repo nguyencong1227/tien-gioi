@@ -1,4 +1,5 @@
 import { getDisplay } from "../gfx/display";
+import { welcomeText } from "../welcome";
 import { createFxSystem, type FxSystem } from "../gfx/fx/fx";
 import { planCastFx } from "../gfx/fx/cast-fx";
 import { drawPips, pipsLabel, pipsOf } from "../monster-status";
@@ -1900,7 +1901,11 @@ export class WorldScene extends Phaser.Scene {
     if (isInitial) {
       ui.chat({
         from: "",
-        text: `Chào mừng đạo hữu tới Tiên Giới. Nhận nhiệm vụ ở Trưởng trấn (${primaryKeyLabel("interact")}), mở sổ nhiệm vụ (${primaryKeyLabel("panel.quest")}) và xem bản đồ (${primaryKeyLabel("panel.map")}).`,
+        text: welcomeText(getDisplay().touch, {
+          interact: primaryKeyLabel("interact"),
+          quest: primaryKeyLabel("panel.quest"),
+          map: primaryKeyLabel("panel.map"),
+        }),
         sys: true,
       });
     }
