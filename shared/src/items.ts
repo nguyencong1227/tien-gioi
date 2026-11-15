@@ -58,7 +58,8 @@ export const PUBLIC_EQUIP_SLOTS: readonly PublicEquipSlot[] = ["weapon", "robe",
 export const OWNER_EQUIP_SLOTS: readonly OwnerEquipSlot[] = ["boots", "jade", "treasure"];
 export const EQUIP_SLOT_NAMES: Record<EquipSlot, string> = {
   weapon: "Vũ khí",
-  robe: "Pháp bào",
+  // "Áo bào" (không phải "Pháp bào"): nhãn cũ chỉ khác "Pháp bảo" (ô 6) đúng một dấu, thẻ viết hoa "PHÁP BÀO" / "PHÁP BẢO" dễ đọc nhầm (nit của A ở #646)
+  robe: "Áo bào",
   talisman: "Hộ phù",
   boots: "Hài",
   jade: "Ngọc bội",

@@ -51,12 +51,20 @@ describe("sáu ô trang bị", () => {
     expect([...PUBLIC_EQUIP_SLOTS, ...OWNER_EQUIP_SLOTS]).toEqual(EQUIP_SLOTS);
     expect(EQUIP_SLOTS.map((s) => EQUIP_SLOT_NAMES[s])).toEqual([
       "Vũ khí",
-      "Pháp bào",
+      "Áo bào",
       "Hộ phù",
       "Hài",
       "Ngọc bội",
       "Pháp bảo",
     ]);
+  });
+
+  it("không hai nhãn ô nào giống nhau khi BỎ DẤU và viết hoa (thẻ ô viết hoa nên 'Pháp bào' / 'Pháp bảo' chỉ khác một dấu là dễ đọc nhầm)", () => {
+    const fold = (s: string) =>
+      s.normalize("NFD").replace(/\p{M}/gu, "").replace(/đ/gi, "d").toUpperCase();
+    const names = EQUIP_SLOTS.map((s) => EQUIP_SLOT_NAMES[s]);
+    const folded = names.map(fold);
+    expect(new Set(folded).size, folded.join(" | ")).toBe(names.length);
   });
 
   it("emptyEquipment: ba ô công khai rỗng, ba ô riêng VẮNG (= trống, giữ nguyên file lưu / mã cũ), mỗi lần một đối tượng mới", () => {

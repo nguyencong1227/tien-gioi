@@ -3,7 +3,7 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 // Kiểm BẢNG TRANG BỊ SÁU Ô (M7.4 #505, `client/src/equip-panel.ts` + `ui.ts`) trong Chrome THẬT (`?skills=mock`, không cần máy chủ):
 // đặt `boots / jade / treasure / realm` thẳng lên `__scene.me()` (hud chạy mỗi khung nên ghi đè được ngay) và nhập `ITEM_BY_ID` của chính trang để thêm món thử
 // (các ca A-H dùng món thử `zz_*` để ép trần / dữ liệu lạ; ca I dùng MỌI món THẬT của ba ô riêng có trong `ITEMS`, M7.4 #590 / #594 / #624). Đo DOM + kiểu tính toán + toạ độ thật:
-//  - lưới 3 x 2 đúng thứ tự (Vũ khí, Pháp bào, Hộ phù / Hài, Ngọc bội, Pháp bảo), không tràn khung, mỗi thẻ cao >= 44 px;
+//  - lưới 3 x 2 đúng thứ tự (Vũ khí, Áo bào, Hộ phù / Hài, Ngọc bội, Pháp bảo), không tràn khung, mỗi thẻ cao >= 44 px;
 //  - ô trống viền nét đứt; ô pháp bảo KHOÁ trước Kim Đan (ổ khoá, "Mở ở Kim Đan", aria-disabled, vẫn focus được, bấm ra thông báo), mở từ Kim Đan;
 //  - ba dòng chỉ số % (bạo kích, giảm hồi chiêu, giáp) lấy từ statsFor, chạm trần ghi "(tối đa)", xem trước ghi ▲ / ▼ kèm số, đã ở trần ghi "đã tối đa";
 //  - so sánh cùng ô "Đang mặc: cũ → mới"; nút Mặc của pháp bảo trước Kim Đan bị khoá kèm lý do; bấm ô trống nhảy tới món hợp ô trong túi;
@@ -191,7 +191,7 @@ try {
     check(c.length === 6, `đúng sáu thẻ (có ${c.length})`);
     check(
       JSON.stringify(c.map((x) => x.label)) ===
-        JSON.stringify(["Vũ khí", "Pháp bào", "Hộ phù", "Hài", "Ngọc bội", "Pháp bảo"]),
+        JSON.stringify(["Vũ khí", "Áo bào", "Hộ phù", "Hài", "Ngọc bội", "Pháp bảo"]),
       `thứ tự: ${c.map((x) => x.label).join(", ")}`,
     );
     check(
