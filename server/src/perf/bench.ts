@@ -40,6 +40,36 @@ function seeded(seed: number) {
   };
 }
 
+/**
+ * Đo thời gian thực thi (ms) của một bước đồng bộ thuần CPU: lấy `min(wallMs, cpuMs)` (#723).
+ * - `wallMs = T_self + T_preempted >= T_self`: đồng hồ tường bị đội lên khi hệ điều hành tạm lấy CPU giao cho tiến trình khác (máy tải cao).
+ * - `cpuMs = T_self + T_other_threads >= T_self`: `process.cpuUsage` dừng khi tiến trình bị preempt, chỉ bị đội nếu cùng tiến trình có worker thread khác chạy song song trên nhân khác.
+ * Do đó `min(wallMs, cpuMs) = T_self + min(T_preempted, T_other_threads) >= T_self`: không bao giờ nhỏ hơn thời gian CPU thật `T_self` của luồng đang chạy tick (bắt mọi hồi quy thật), đồng thời loại bỏ thời gian chờ lịch chạy khi máy bận.
+ */
+export function measureSyncStepMs(fn: () => void): number {
+  const c0 = process.cpuUsage();
+  const t0 = performance.now();
+  fn();
+  const wallMs = performance.now() - t0;
+  const c1 = process.cpuUsage(c0);
+  const cpuMs = (c1.user + c1.system) / 1000;
+  return Math.min(wallMs, cpuMs);
+}
+
+/** Tính trung bình, p95 và max từ mảng thời gian từng tick (không làm thay đổi mảng đầu vào). */
+export function summarizeTickMs(tickMs: readonly number[]): {
+  avgMs: number;
+  p95Ms: number;
+  maxMs: number;
+} {
+  if (tickMs.length === 0) return { avgMs: 0, p95Ms: 0, maxMs: 0 };
+  const sorted = [...tickMs].sort((a, b) => a - b);
+  const avgMs = sorted.reduce((s, x) => s + x, 0) / sorted.length;
+  const p95Ms = sorted[Math.floor(sorted.length * 0.95)];
+  const maxMs = sorted.at(-1)!;
+  return { avgMs, p95Ms, maxMs };
+}
+
 export interface BenchResult {
   players: number;
   monsters: number;
@@ -47,6 +77,8 @@ export interface BenchResult {
   avgMs: number;
   p95Ms: number;
   maxMs: number;
+  /** Thời gian từng tick theo đúng thứ tự 0..ticks-1 (không enumerable để không đổi JSON của bench-baseline). */
+  readonly tickMs?: readonly number[];
   /** Byte patch trung bình mỗi client mỗi tick (gồm phần chung + phần theo vùng nhìn) */
   patchBytes: number;
   /** KB/giây mỗi client nhận (patch × 20 tick) */
@@ -206,7 +238,7 @@ export function runBench(
     encoder.discardChanges();
 
     const ticks = Math.round((seconds * 1000) / TICK_MS);
-    const times: number[] = [];
+    const tickMs: number[] = [];
     let bytes = 0;
     let nextTopUp = MONSTER_RESPAWN_MS;
 
@@ -255,41 +287,41 @@ export function runBench(
         else if (w.now >= c.nextSlash) intents.push({ sid: b.sid, angle: Math.atan2(dy, dx) });
       }
 
-      const t0 = performance.now();
-      for (const i of intents) slash(w, i.sid, i.angle);
-      tickWorld(w, TICK_MS);
-      if (w.now >= nextTopUp) {
-        topUpMonsters(w);
-        nextTopUp += MONSTER_RESPAWN_MS;
-      }
-      // Như SchemaSerializer.applyPatches: một patch chung, rồi mỗi client một bản theo view của nó
-      const it = { offset: 1 };
-      let sharedOffset = 1;
-      const shared = encoder.hasChanges;
-      if (shared) {
-        encoder.encode(it);
-        sharedOffset = it.offset;
-      }
-      let tickBytes = 0;
-      for (const v of views) {
-        if (shared || v.changes.size > 0)
-          tickBytes += encoder.encodeView(v, sharedOffset, it).byteLength;
-      }
-      encoder.discardChanges();
-      times.push(performance.now() - t0);
-      bytes += players > 0 ? tickBytes / players : 0;
+      const dt = measureSyncStepMs(() => {
+        for (const i of intents) slash(w, i.sid, i.angle);
+        tickWorld(w, TICK_MS);
+        if (w.now >= nextTopUp) {
+          topUpMonsters(w);
+          nextTopUp += MONSTER_RESPAWN_MS;
+        }
+        // Như SchemaSerializer.applyPatches: một patch chung, rồi mỗi client một bản theo view của nó
+        const it = { offset: 1 };
+        let sharedOffset = 1;
+        const shared = encoder.hasChanges;
+        if (shared) {
+          encoder.encode(it);
+          sharedOffset = it.offset;
+        }
+        let tickBytes = 0;
+        for (const v of views) {
+          if (shared || v.changes.size > 0)
+            tickBytes += encoder.encodeView(v, sharedOffset, it).byteLength;
+        }
+        encoder.discardChanges();
+        bytes += players > 0 ? tickBytes / players : 0;
+      });
+      tickMs.push(dt);
     }
 
-    times.sort((a, b) => a - b);
-    const avg = times.reduce((s, x) => s + x, 0) / times.length;
+    const { avgMs, p95Ms, maxMs } = summarizeTickMs(tickMs);
     const patchBytes = bytes / ticks;
-    return {
+    const result: BenchResult = {
       players,
       monsters: w.state.monsters.size,
       ticks,
-      avgMs: avg,
-      p95Ms: times[Math.floor(times.length * 0.95)],
-      maxMs: times.at(-1)!,
+      avgMs,
+      p95Ms,
+      maxMs,
       patchBytes,
       kbPerSecPerClient: (patchBytes * (1000 / TICK_MS)) / 1024,
       eventKbBroadcast: players > 0 ? evBroadcast / players / seconds / 1024 : 0,
@@ -297,6 +329,8 @@ export function runBench(
       partyKbPerClient: players > 0 ? partyBytes / players / seconds / 1024 : 0,
       walletKbPerClient: players > 0 ? walletBytes / players / seconds / 1024 : 0,
     };
+    Object.defineProperty(result, "tickMs", { value: tickMs, enumerable: false });
+    return result;
   } finally {
     Math.random = realRandom;
   }
@@ -331,6 +365,8 @@ export interface MultiMapBenchResult {
   avgTotalMs: number;
   p95TotalMs: number;
   maxTotalMs: number;
+  /** Thời gian xử lý từng tick (ms) theo đúng thứ tự mô phỏng 0..ticks-1 (chưa sắp xếp, #723). */
+  tickMs: number[];
   rooms: MultiMapRoomResult[];
 }
 
@@ -491,7 +527,7 @@ export function runMultiMapBench(
     });
 
     const ticks = Math.round((seconds * 1000) / TICK_MS);
-    const times: number[] = [];
+    const tickMs: number[] = [];
 
     for (let t = 0; t < ticks; t++) {
       const roomIntents: { sid: string; angle: number }[][] = [];
@@ -540,38 +576,36 @@ export function runMultiMapBench(
         roomIntents.push(intents);
       }
 
-      const t0 = performance.now();
-      for (let rIdx = 0; rIdx < rooms.length; rIdx++) {
-        const room = rooms[rIdx];
-        const intents = roomIntents[rIdx];
-        for (const i of intents) slash(room.w, i.sid, i.angle);
-        tickWorld(room.w, TICK_MS);
-        if (room.w.now >= room.nextTopUp) {
-          topUpMonsters(room.w);
-          room.nextTopUp += MONSTER_RESPAWN_MS;
+      const dt = measureSyncStepMs(() => {
+        for (let rIdx = 0; rIdx < rooms.length; rIdx++) {
+          const room = rooms[rIdx];
+          const intents = roomIntents[rIdx];
+          for (const i of intents) slash(room.w, i.sid, i.angle);
+          tickWorld(room.w, TICK_MS);
+          if (room.w.now >= room.nextTopUp) {
+            topUpMonsters(room.w);
+            room.nextTopUp += MONSTER_RESPAWN_MS;
+          }
+          const it = { offset: 1 };
+          let sharedOffset = 1;
+          const shared = room.encoder.hasChanges;
+          if (shared) {
+            room.encoder.encode(it);
+            sharedOffset = it.offset;
+          }
+          let tickBytes = 0;
+          for (const v of room.views) {
+            if (shared || v.changes.size > 0)
+              tickBytes += room.encoder.encodeView(v, sharedOffset, it).byteLength;
+          }
+          room.encoder.discardChanges();
+          room.bytes += room.players > 0 ? tickBytes / room.players : 0;
         }
-        const it = { offset: 1 };
-        let sharedOffset = 1;
-        const shared = room.encoder.hasChanges;
-        if (shared) {
-          room.encoder.encode(it);
-          sharedOffset = it.offset;
-        }
-        let tickBytes = 0;
-        for (const v of room.views) {
-          if (shared || v.changes.size > 0)
-            tickBytes += room.encoder.encodeView(v, sharedOffset, it).byteLength;
-        }
-        room.encoder.discardChanges();
-        room.bytes += room.players > 0 ? tickBytes / room.players : 0;
-      }
-      times.push(performance.now() - t0);
+      });
+      tickMs.push(dt);
     }
 
-    times.sort((a, b) => a - b);
-    const avgTotalMs = times.reduce((s, x) => s + x, 0) / times.length;
-    const p95TotalMs = times[Math.floor(times.length * 0.95)];
-    const maxTotalMs = times.at(-1)!;
+    const { avgMs: avgTotalMs, p95Ms: p95TotalMs, maxMs: maxTotalMs } = summarizeTickMs(tickMs);
 
     const roomResults: MultiMapRoomResult[] = rooms.map((room) => {
       const patchBytes = room.bytes / ticks;
@@ -604,6 +638,7 @@ export function runMultiMapBench(
       avgTotalMs,
       p95TotalMs,
       maxTotalMs,
+      tickMs,
       rooms: roomResults,
     };
   } finally {
