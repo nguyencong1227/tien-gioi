@@ -33,11 +33,16 @@ const out = (m: string) => console.log(m);
 /** Proxy TCP chuyển tiếp byte giữa client Chrome và server Colyseus thật. */
 class TcpProxy {
   private server: net.Server;
-  private connections = new Set<{ client: net.Socket; target: net.Socket }>();
+  private connections = new Set<{ client: net.Socket; target: net.Socket; isWs?: boolean }>();
   private allowNew = true;
-  /** Tổng số byte client đã gửi lên server: sau một lần thoát chủ động mà số này còn tăng nghĩa là client vẫn đang thử nối lại.
-   *  (Không đếm số kết nối TCP: HTTP matchmaking của lần nối lại có thể đi trên socket keep-alive sẵn có nên không tạo kết nối mới.) */
+  /** Tổng số byte client đã gửi lên server (tất cả kết nối, bao gồm cả HTTP tĩnh) */
   clientBytes = 0;
+  /** Tổng số byte client gửi trong luồng game (WebSocket frames + HTTP matchmaking) */
+  gameClientBytes = 0;
+  /** Số yêu cầu HTTP POST /matchmake gửi lên từ client */
+  matchmakeRequests = 0;
+  /** Số yêu cầu nâng cấp kết nối WebSocket (Upgrade: websocket) */
+  wsUpgradeRequests = 0;
 
   constructor(
     public listenPort: number,
@@ -49,10 +54,31 @@ class TcpProxy {
         return;
       }
       const targetSocket = net.connect({ port: this.targetPort, host: "127.0.0.1" });
-      const pair = { client: clientSocket, target: targetSocket };
+      const pair: { client: net.Socket; target: net.Socket; isWs?: boolean } = {
+        client: clientSocket,
+        target: targetSocket,
+        isWs: false,
+      };
       this.connections.add(pair);
 
-      clientSocket.on("data", (d: Buffer) => (this.clientBytes += d.length));
+      clientSocket.on("data", (d: Buffer) => {
+        this.clientBytes += d.length;
+
+        if (pair.isWs) {
+          // Socket đã nâng cấp WebSocket: toàn bộ dữ liệu là khung WebSocket của game
+          this.gameClientBytes += d.length;
+        } else {
+          const head = d.subarray(0, 512).toString("latin1");
+          if (/upgrade:\s*websocket/i.test(head)) {
+            pair.isWs = true;
+            this.wsUpgradeRequests++;
+            this.gameClientBytes += d.length;
+          } else if (/^POST\s+\/matchmake/i.test(head)) {
+            this.matchmakeRequests++;
+            this.gameClientBytes += d.length;
+          }
+        }
+      });
       clientSocket.pipe(targetSocket);
       targetSocket.pipe(clientSocket);
 
@@ -442,7 +468,9 @@ async function main() {
       `typeof window.__switchAuthView === 'function' && !!document.getElementById('login-form')`,
       "form đăng nhập ca 3",
     );
-    await tab.ev(`document.getElementById('login-form').requestSubmit(); 1`);
+    await tab.ev(
+      `const inp = document.getElementById('login-name'); if (inp) inp.value = ${JSON.stringify(NAME_3)}; document.getElementById('login-form').requestSubmit(); 1`,
+    );
     await tab.waitFor(
       `!document.getElementById('ui')?.hidden && !!window.__scene?.room && !!document.getElementById('hud-name')?.textContent`,
       "vào game ca 3",
@@ -464,7 +492,9 @@ async function main() {
     out("  - Gọi chủ động đóng kết nối (mã 4000)...");
     await tab.ev(`window.__scene?.room?.connection?.close(4000); 1`);
     await sleep(300); // khung đóng của chính lần thoát này đã đi qua proxy
-    const bytesBefore = proxy.clientBytes;
+    const gameBytesBefore = proxy.gameClientBytes;
+    const matchmakeBefore = proxy.matchmakeRequests;
+    const wsUpgradesBefore = proxy.wsUpgradeRequests;
     await sleep(3200); // dài hơn hai nhịp thử lại (1,5 giây) của vòng nối lại
 
     const bannerMsgCa3 = String(
@@ -479,16 +509,26 @@ async function main() {
         `Thoát chủ động mà banner từng hiện "đang nối lại": ${JSON.stringify(bannerLog)}`,
       );
     }
-    if (proxy.clientBytes !== bytesBefore) {
+    if (proxy.matchmakeRequests !== matchmakeBefore) {
       throw new Error(
-        `Thoát chủ động mà client vẫn gửi ${proxy.clientBytes - bytesBefore} byte lên server (đang thử nối lại)`,
+        `Thoát chủ động mà client vẫn gửi yêu cầu POST /matchmake (${proxy.matchmakeRequests - matchmakeBefore} lần)`,
+      );
+    }
+    if (proxy.wsUpgradeRequests !== wsUpgradesBefore) {
+      throw new Error(
+        `Thoát chủ động mà client vẫn cố mở kết nối WebSocket mới (${proxy.wsUpgradeRequests - wsUpgradesBefore} lần)`,
+      );
+    }
+    if (proxy.gameClientBytes !== gameBytesBefore) {
+      throw new Error(
+        `Thoát chủ động mà client vẫn gửi ${proxy.gameClientBytes - gameBytesBefore} byte WebSocket lên server (đang thử nối lại)`,
       );
     }
     const room3 = matchMaker.getLocalRoomById(sp3.roomId) as any;
     if (room3?.world?.ghosts?.size)
       throw new Error("Thoát chủ động mà server vẫn giữ ghost chờ nối lại");
     out(
-      `  ✓ Thoát chủ động: banner không từng hiện "đang nối lại", client không gửi thêm byte nào, server không giữ ghost`,
+      `  ✓ Thoát chủ động: banner không từng hiện "đang nối lại", client không gửi thêm dữ liệu game/matchmake/WS, server không giữ ghost`,
     );
   } catch (e) {
     failed = (e as Error).message;
