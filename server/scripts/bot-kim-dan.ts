@@ -34,7 +34,7 @@ import {
   SEARCH_VIEW_LABELS,
   type SearchView,
 } from "../src/balance/search-check";
-import { bestGear } from "../src/balance/simulate";
+import { ASSUME, bestGear } from "../src/balance/simulate";
 import { hashSecret, savePlayer } from "../src/store";
 
 export interface MeasureOptions {
@@ -1080,42 +1080,9 @@ if (process.argv[1]?.endsWith("bot-kim-dan.ts")) {
 
       for (const r of results) {
         const monDef = MONSTER_BY_ID[r.monsterId];
-        const assumeSec =
-          r.monsterId === "mang"
-            ? 90
-            : r.monsterId === "hac_giao"
-              ? 90
-              : r.monsterId === "thien_han_vuong"
-                ? 90
-                : r.monsterId === "han_lang"
-                  ? 10
-                  : r.monsterId === "doc_tuoc"
-                    ? 14
-                    : r.monsterId === "cot_tuong"
-                      ? 14
-                      : r.monsterId === "suong_ho"
-                        ? 10
-                        : r.monsterId === "thach_quy"
-                          ? 12
-                          : 14;
-        const count =
-          r.mapId === "lac_ha" && r.monsterId === "mang"
-            ? 2
-            : r.mapId === "hac_phong" && r.monsterId === "mang"
-              ? 6
-              : r.monsterId === "hac_giao"
-                ? 2
-                : r.monsterId === "thien_han_vuong"
-                  ? 2
-                  : r.monsterId === "han_lang"
-                    ? 28
-                    : r.monsterId === "doc_tuoc"
-                      ? 16
-                      : r.monsterId === "cot_tuong"
-                        ? 16
-                        : r.monsterId === "suong_ho"
-                          ? 24
-                          : 18;
+        // Giả định và số quái ĐỌC từ mô hình / bản đồ thật (trước đây chép tay và lệch: Hàn Lang cap 20 chứ không 28...)
+        const assumeSec = ASSUME.searchSec[r.monsterId] ?? 10;
+        const count = getMap(r.mapId)?.monsterCapOf(r.monsterId) ?? 0;
         let verdict = "-";
         if (r.monsterId === "mang") {
           verdict =
