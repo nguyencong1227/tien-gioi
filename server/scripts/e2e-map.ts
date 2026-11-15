@@ -354,6 +354,9 @@ async function main() {
       T.waitFor(
         `window.__fx.stats().liveEmitters === 0 && window.__scene.children.list.filter((c) => c.type === 'ParticleEmitter').reduce((n, e) => n + e.getAliveParticleCount(), 0) === 0`,
         "hạt thời tiết hết",
+        // Bước chờ, không phải khẳng định: Phaser tính tuổi hạt bằng delta chặn trần (minFps 5), nên khi FPS < 5 (runner CI, `taskset -c 0`) hạt già đi
+        // chậm hơn đồng hồ và cần hơn 15 s mặc định để hết (A đo ở review #712: 15 s hết giờ ở đầu Ca 6)
+        40000,
       );
     // Mặc định ở ?debug: thời tiết TẮT để các script đo khác có cảnh sạch
     must(
@@ -422,12 +425,21 @@ async function main() {
     await sleep(500);
     await setCheck("set-reduced-motion", true);
     await sleep(500);
+    // Giảm chuyển động chỉ chặn phát hạt MỚI; hạt phát trước đó sống nốt đời của chúng. "Chờ 4 s đồng hồ trò chơi" đúng khi khung nhanh, nhưng
+    // Phaser tính tuổi hạt bằng `delta` đã bị chặn trần (minFps 5): trên runner CI (WebGL phần mềm, FPS tụt dưới 5) hạt già đi chậm hơn đồng hồ,
+    // nên sau 4 s vẫn còn hạt cũ (lỗi của phép đo; cục bộ tái hiện bằng `CI=true taskset -c 0`). Chờ hạt cũ hết đời, RỒI mới kiểm không có hạt mới.
+    await T.waitFor(
+      `window.__scene.children.list.filter((c) => c.type === 'ParticleEmitter').reduce((n, e) => n + e.getAliveParticleCount(), 0) === 0`,
+      "hạt thời tiết hết sống (giảm chuyển động phải NGỪNG phát hạt mới; hạt cũ sống nốt đời)",
+      40000,
+    );
+    // Cửa sổ quan sát sau khi đã sạch: nhịp thời tiết ở bậc Cao là vài giây, nên 4 s đồng hồ mà phát lại thì sẽ thấy hạt mới
     await T.waitFor(
       `window.__scene.time.now > ${Number(await ev(`window.__scene.time.now`)) + 4000}`,
       "4 s đồng hồ trò chơi",
     );
     must((await alive()) === 0, "giảm chuyển động: không có hạt thời tiết");
-    ok("giảm chuyển động: 0 hạt thời tiết");
+    ok("giảm chuyển động: 0 hạt thời tiết (hạt cũ hết đời, không phát hạt mới)");
     await setCheck("set-reduced-motion", false);
     await ev(`window.__scene.weatherPaused = true; 1`);
 
