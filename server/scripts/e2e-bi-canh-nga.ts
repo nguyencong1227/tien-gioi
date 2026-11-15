@@ -243,11 +243,19 @@ async function main() {
       throw new Error(`Dòng phụ phải trấn an "Không mất kiếp", thực tế "${sub}"`);
     if (!(await ta.ev(`document.getElementById('limbo-overlay')?.hidden ?? true`)))
       throw new Error("Gục trong bí cảnh KHÔNG được mở màn Hoàng Tuyền");
-    await ta.shot("1-gục");
-    // Khung đếm ngược không bị xoá giữa chừng (bài học PK): vẫn hiện sau 1.2 giây
-    await sleep(1200);
-    if (await ta.ev(`document.getElementById('death').hidden`))
+    // Khung đếm ngược không bị xoá giữa chừng (bài học PK): kiểm tra sau một nhịp đệm ngắn (tránh sleep dài + ta.shot CDP làm trôi quá 3s DUNGEON_FALL_EXIT_MS)
+    await sleep(300);
+    const fallCheck = (await ta.ev(`(() => {
+      const s = window.__scene;
+      const inDungeon = s?.map?.def?.id !== ${JSON.stringify(DEFAULT_MAP_ID)};
+      const notExpired = s?.time?.now < (s?.dungeonFallUntil || 0);
+      const hidden = document.getElementById('death')?.hidden ?? true;
+      return { inDungeon, notExpired, hidden };
+    })()`)) as { inDungeon: boolean; notExpired: boolean; hidden: boolean };
+    if (fallCheck.inDungeon && fallCheck.notExpired && fallCheck.hidden) {
       throw new Error("Lớp phủ gục biến mất sớm (mốc đếm ngược bị xoá giữa khung?)");
+    }
+    await ta.shot("1-gục");
     // B thấy A "Đã gục" ở HUD đội, run chạy tiếp
     await tb.waitFor(
       `/Đã gục/.test(document.getElementById('dhud-members')?.textContent || '')`,
