@@ -194,8 +194,17 @@ describe("Tài liệu rà soát khớp số tệp thật (M6, #411)", () => {
 /**
  * Chiêu GỐC của Tiên Giới (soạn riêng, KHÔNG lấy từ Vạn Kiếp Tu Tiên): id trong `SKILLS_M7` nhưng không có dòng ở bảng nguồn `docs/NGUON_NOI_DUNG.md`. Ai thêm chiêu gốc
  * (Dev D, Dev A...) thêm id vào đây; chiêu lấy từ nguồn thì thêm DÒNG ở bảng nguồn thay vì thêm vào đây.
+ *
+ * 6 chiêu Nguyên Anh đợt 2 (M7.9, #654): do Dev D soạn theo thế giới Tiên Giới, KHÔNG lấy từ nguồn nào.
  */
-const ORIGINAL_SKILL_IDS: string[] = [];
+const ORIGINAL_SKILL_IDS: string[] = [
+  "han_quang_tien",
+  "bach_kim_trao",
+  "van_thach_tran",
+  "bang_hoa_loan",
+  "liet_hoa_kiem",
+  "van_hanh_bo",
+];
 
 describe("Nguồn nội dung, hình ảnh và âm thanh bên ngoài (M7.16 #517, QUYET_DINH_M3 mục 19-20)", () => {
   const rootDir = path.resolve(__dirname, "../..");

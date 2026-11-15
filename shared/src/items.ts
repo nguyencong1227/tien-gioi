@@ -754,24 +754,33 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: "dai_hoi_huyet_dan", chance: 0.08, min: 1, max: 1 },
     { itemId: "thuong_hoi_huyet_dan", chance: 0.03, min: 1, max: 1 },
     { itemId: bookIdOf("lac_tuyet_phan_phi"), chance: 0.02, min: 1, max: 1 },
+    // Kinh quyển 6 chiêu Nguyên Anh đợt 2 (M7.9, #654): rơi hiếm
+    { itemId: bookIdOf("han_quang_tien"), chance: 0.02, min: 1, max: 1 },
+    { itemId: bookIdOf("bach_kim_trao"), chance: 0.015, min: 1, max: 1 },
   ],
   phong_nha: [
     { itemId: "phong_nha_vu", chance: 0.5, min: 1, max: 2 },
     { itemId: "dai_hoi_linh_dan", chance: 0.08, min: 1, max: 1 },
     { itemId: "thuong_hoi_linh_dan", chance: 0.03, min: 1, max: 1 },
     { itemId: bookIdOf("thanh_tung_phi_cham"), chance: 0.02, min: 1, max: 1 },
+    { itemId: bookIdOf("bang_hoa_loan"), chance: 0.02, min: 1, max: 1 },
+    { itemId: bookIdOf("han_quang_tien"), chance: 0.012, min: 1, max: 1 },
   ],
   cot_tuong: [
     { itemId: "tuong_cot", chance: 0.5, min: 1, max: 2 },
     { itemId: "dai_hoi_linh_dan", chance: 0.1, min: 1, max: 1 },
     { itemId: "thuong_hoi_huyet_dan", chance: 0.04, min: 1, max: 1 },
     { itemId: bookIdOf("cuu_cung_khon_sat"), chance: 0.02, min: 1, max: 1 },
+    { itemId: bookIdOf("van_thach_tran"), chance: 0.02, min: 1, max: 1 },
+    { itemId: bookIdOf("van_hanh_bo"), chance: 0.015, min: 1, max: 1 },
   ],
   doc_tuoc: [
     { itemId: "doc_tuoc_nang", chance: 0.45, min: 1, max: 2 },
     { itemId: "thuong_hoi_huyet_dan", chance: 0.05, min: 1, max: 1 },
     { itemId: "thuong_hoi_linh_dan", chance: 0.05, min: 1, max: 1 },
     { itemId: bookIdOf("me_tung_bo"), chance: 0.02, min: 1, max: 1 },
+    { itemId: bookIdOf("liet_hoa_kiem"), chance: 0.018, min: 1, max: 1 },
+    { itemId: bookIdOf("van_hanh_bo"), chance: 0.012, min: 1, max: 1 },
   ],
   // Trùm Nguyên Anh: bãi của đội 3-4 người; Thiên Hàn châu là nguyên liệu vũ khí bộ IV
   thien_han_vuong: [
@@ -780,6 +789,8 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: "thuong_hoi_huyet_dan", chance: 1, min: 1, max: 2 },
     { itemId: "thuong_hoi_linh_dan", chance: 1, min: 1, max: 2 },
     { itemId: "tu_khi_dan", chance: 0.6, min: 1, max: 2 },
+    // Trùm rơi kinh quyển chiêu cao cấp nhất (M7.9, #654): Liệt Hỏa Kiếm, hiếm nhưng là phần thưởng hạ trùm
+    { itemId: bookIdOf("liet_hoa_kiem"), chance: 0.25, min: 1, max: 1 },
   ],
   // Trùm bí cảnh (docs/THIET_KE_BI_CANH.md): đồ rơi như quái thường (chủ đồ theo đội); thưởng hoàn thành riêng ở `DUNGEONS`.
   // Đã tính vào cân bằng 4c-2 (`server/src/balance/dungeon.ts`).

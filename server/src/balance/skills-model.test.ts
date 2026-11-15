@@ -21,7 +21,7 @@ describe("Mô hình cân bằng chiêu thức, hệ và trạng thái (M7.9, iss
     expect(base).toBeCloseTo(lkStats.atk * 2.7, 2);
   });
 
-  it("12 chiêu thức M7: KHÔNG chiêu nào vượt quá trần 2,0x sức mạnh so với chém thường (kể cả khi khắc hệ)", () => {
+  it("18 chiêu thức M7: KHÔNG chiêu nào vượt quá trần 2,0x sức mạnh so với chém thường (kể cả khi khắc hệ)", () => {
     for (const def of SKILLS_M7) {
       const breakdown = computeSkillCombo(def, kdStats.atk, kdStats.maxMp, "none");
       // Sức mạnh thông thường không được > 2.0x
@@ -33,7 +33,7 @@ describe("Mô hình cân bằng chiêu thức, hệ và trạng thái (M7.9, iss
 
   it("generateSkillBalanceReport: báo cáo tổng thể xác nhận bất biến noSkillExceeds2x", () => {
     const report = generateSkillBalanceReport(kdStats);
-    expect(report.skills).toHaveLength(12);
+    expect(report.skills).toHaveLength(18);
     expect(report.noSkillExceeds2x).toBe(true);
     expect(report.maxRatioSkill.ratioVsBaseline).toBeLessThanOrEqual(2.0);
   });
@@ -95,7 +95,7 @@ describe("Mô hình cân bằng chiêu thức, hệ và trạng thái (M7.9, iss
   it("renderSkillBalanceMarkdown: sinh đúng cấu trúc markdown với đủ 3 mục", () => {
     const md = renderSkillBalanceMarkdown(kdStats);
     expect(md).toContain("## Cân bằng chiêu thức, ngũ hành và trạng thái (M7, #510)");
-    expect(md).toContain("Bảng 12 chiêu thức đợt 1");
+    expect(md).toContain("Bảng 18 chiêu thức");
     expect(md).toContain("Vòng chiêu mẫu theo cảnh giới");
     expect(md).toContain("Đánh giá tiêu chuẩn mục 10");
     expect(md).toContain("Hỏa Vân Kiếm");
