@@ -1840,50 +1840,105 @@ html[data-input="touch"] #skill-slots .sk.slot .keycap {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   padding-right: 2px;
 }
 .sk-row {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.25);
-  padding: 10px 12px;
+  overflow: hidden;
+  flex: none; /* danh sách là cột flex có max-height: không có dòng này thì hàng (overflow: hidden) bị ÉP thấp lại thay vì cuộn */
 }
 .sk-row.equipped {
   border-color: rgba(255, 224, 138, 0.7);
 }
-.sk-row-head {
+.sk-row.open {
+  background: rgba(0, 0, 0, 0.38);
+}
+/* Hàng gọn: cả hàng là MỘT nút (mở / gập chi tiết), cao >= 44 px */
+.sk-line {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 4px 10px;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 4px 10px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sk-line:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: -2px;
 }
 .sk-row-ico,
 .sk-row-ico svg {
   width: 28px;
   height: 28px;
   display: inline-block;
+  flex: none;
 }
+.sk-line-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* Tên và dòng phụ XUỐNG DÒNG khi hẹp (không cắt "…"): tên chiêu là thứ người chơi dùng để tìm đúng chiêu, hàng cao hơn 48 px thì vẫn đạt */
 .sk-row-name {
   font-size: var(--fs-15);
+  overflow-wrap: anywhere;
 }
-.sk-row-pips {
-  color: #ffe08a;
-  letter-spacing: 1px;
+.sk-line-main .sk-row-tag {
+  overflow-wrap: anywhere;
 }
 .sk-row-tag {
   opacity: 0.8;
   font-size: var(--fs-12);
 }
+.sk-row-need {
+  color: #ffb4a0;
+}
 .sk-row-badge {
+  flex: none;
   padding: 1px 8px;
   border-radius: 10px;
   background: rgba(255, 224, 138, 0.18);
   font-size: var(--fs-12);
+  white-space: nowrap;
 }
-.sk-row-badge.need {
-  background: rgba(200, 90, 60, 0.28);
-  color: #ffb4a0;
+.sk-row-badge.none {
+  background: transparent;
+  opacity: 0.6;
+}
+.sk-line-chev {
+  flex: none;
+  opacity: 0.7;
+  transition: transform 0.15s;
+}
+.sk-row.open .sk-line-chev {
+  transform: rotate(180deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sk-line-chev {
+    transition: none;
+  }
+}
+.sk-detail {
+  padding: 2px 12px 10px;
+  border-top: 1px solid var(--line);
+}
+.sk-row-kind {
+  display: block;
+  margin-top: 6px;
+}
+.sk-row-pips {
+  color: #ffe08a;
+  letter-spacing: 1px;
 }
 .sk-row-stats {
   margin: 6px 0 2px;
@@ -2057,6 +2112,16 @@ html[data-input="touch"] #skill-slots .sk.slot .keycap {
   white-space: nowrap;
   margin-top: 2px;
   opacity: 0.9;
+}
+/* Điện thoại DỌC: ô túi chỉ ~42-54 px mà chữ nội dung >= 14 px, nên tên chỉ còn 2-3 chữ ("Hồi…", "Th…") và hàng chục món cắt giống hệt nhau (đo cả 69 món: 68 / 69 tên bị cắt ở 390 x 844).
+   Bỏ tên, biểu tượng to hơn; viền + dấu độ hiếm + số lượng vẫn nói thay, chạm ô thì bảng chi tiết ngay dưới lưới ghi tên đầy đủ, `aria-label` vẫn đủ tên (cùng cách thanh chiêu cảm ứng bỏ tên).
+   Điện thoại NGANG giữ tên (ô 80 px, ~7 chữ): ngăn kéo thấp (390 px) nên bảng chi tiết nằm dưới màn hình, tên trong ô là thứ duy nhất thấy ngay. Máy tính bảng / máy tính giữ tên (ô 61 px). */
+html[data-form="phone"][data-orient="portrait"] .inv-slot .slot-name {
+  display: none;
+}
+html[data-form="phone"][data-orient="portrait"] .inv-slot .slot-icon {
+  width: 34px;
+  height: 34px;
 }
 .inv-slot .slot-qty {
   position: absolute;

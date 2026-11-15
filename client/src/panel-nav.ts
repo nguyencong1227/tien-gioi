@@ -72,6 +72,28 @@ export function pickNeighbor(rects: readonly NavRect[], from: number, dir: NavDi
 }
 
 /**
+ * Như `pickNeighbor` nhưng nút CỐ ĐỊNH theo màn hình (`fixed[i]`: nút Đóng tròn góc dưới phải của tấm ở điện thoại) chỉ được chọn khi không còn phần tử nào
+ * khác theo hướng đó. Nút Đóng nằm cố định ở đáy màn hình nên ở danh sách dài đã cuộn nó luôn "gần hơn" hàng kế còn nằm ngoài tầm nhìn: bấm Xuống từ hàng
+ * cuối nhìn thấy nhảy vào nút Đóng thay vì sang hàng kế (và Xuống tiếp thì vòng lên đầu danh sách), người dùng bàn phím không tới được các hàng bên dưới.
+ */
+export function pickNeighborSkipFixed(
+  rects: readonly NavRect[],
+  fixed: readonly boolean[],
+  from: number,
+  dir: NavDir,
+): number | null {
+  if (fixed[from]) return pickNeighbor(rects, from, dir);
+  const keep: number[] = [];
+  for (let i = 0; i < rects.length; i++) if (i === from || !fixed[i]) keep.push(i);
+  const sub = pickNeighbor(
+    keep.map((i) => rects[i]),
+    keep.indexOf(from),
+    dir,
+  );
+  return sub !== null ? keep[sub] : pickNeighbor(rects, from, dir);
+}
+
+/**
  * Phần tử mà mũi tên là của CHÍNH nó (chỉnh thanh trượt, đổi lựa chọn, di chuyển con trỏ chữ): không cướp mũi tên.
  * Thanh trượt nằm NGANG: chỉ Trái / Phải là của nó khi biết `dir`; Lên / Xuống vẫn chuyển focus, nếu không người chơi đứng ở thanh âm lượng
  * đầu Cài đặt sẽ không đi tiếp xuống được bằng mũi tên (chỉ còn Tab). Ô chọn (select) và ô chữ giữ mọi mũi tên (Tab là lối thoát).
@@ -102,8 +124,9 @@ export function moveFocus(container: HTMLElement, dir: NavDir): boolean {
     els[0].focus();
     return true;
   }
-  const next = pickNeighbor(
+  const next = pickNeighborSkipFixed(
     els.map((el) => el.getBoundingClientRect()),
+    els.map((el) => getComputedStyle(el).position === "fixed"),
     from,
     dir,
   );

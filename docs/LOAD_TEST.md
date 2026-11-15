@@ -225,7 +225,8 @@ Theo kiến trúc M3 phương án A (mỗi bản đồ là một phòng Colyseus
 - **Cách chạy:**
   ```bash
   # Chạy mô phỏng đồng thời 2 bản đồ: Lạc Hà (50 bot) + Hắc Phong Cốc (50 bot)
-  npm run bench -w server -- --multi --seconds 20
+  # (từ M7.10, #666, `--multi` không kèm `--maps` chạy cả BỐN bản đồ: số của bốn bản đồ ở mục 25)
+  npm run bench -w server -- --multi --maps=lac_ha,hac_phong --seconds 20
 
   # Hoặc chạy mô phỏng riêng 1 bản đồ chỉ định
   npm run bench -w server -- --map=hac_phong --players 50 --seconds 20
@@ -233,7 +234,7 @@ Theo kiến trúc M3 phương án A (mỗi bản đồ là một phòng Colyseus
 - **Tiêu chuẩn ngân sách:**
   - Tổng thời gian CPU tick của **toàn bộ các phòng** gộp lại trên tiến trình đơn luồng Node.js phải đạt **< 10 ms/tick** (để giữ vững nhịp 20 tick/giây).
   - Băng thông patch của từng client trên mỗi bản đồ phải tuân thủ ngân sách tương đương (< 520 byte/tick).
-- **Kết quả đo thực tế (`--multi --seconds 20`, seed = 1 cố định, 400 tick; Lạc Hà 50 + Hắc Phong Cốc 50 = 100 người chơi):**
+- **Kết quả đo thực tế (`--multi --maps=lac_ha,hac_phong --seconds 20`, seed = 1 cố định, 400 tick; Lạc Hà 50 + Hắc Phong Cốc 50 = 100 người chơi):**
   - **Tổng thời gian tick (2 phòng):** TB **0.99 ms**, p95 **1.87 ms**, cao nhất **7.00 ms** (đạt sâu dưới ngân sách tổng < 10 ms).
   - **Băng thông patch mỗi client:**
     - Lạc Hà Trấn (50 người, 21 quái): TB **117 byte/tick** (~2.3 KB/s)
@@ -1024,7 +1025,7 @@ npx tsx --tsconfig server/tsconfig.json server/scripts/bot-kim-dan.ts --party
 
 ### 23.1. Bench ba bản đồ trong MỘT tiến trình
 
-`bench.ts --multi` chỉ có Lạc Hà + Hắc Phong; thêm `--maps=<id,id,...>` (mặc định vẫn hai bản đồ đầu nên số của mốc cũ không đổi) và `--per-map N` (mặc định 50). Dựng một `World` mỗi bản đồ, tick lần lượt trong cùng tiến trình, ca săn quái, seed 1, 20 giây (400 tick):
+`bench.ts --multi` chỉ có Lạc Hà + Hắc Phong; thêm `--maps=<id,id,...>` (lúc viết mục này mặc định là hai bản đồ đầu; từ M7.10, #666, mặc định là cả bốn bản đồ, muốn lại số cũ thì thêm `--maps=lac_ha,hac_phong`) và `--per-map N` (mặc định 50). Dựng một `World` mỗi bản đồ, tick lần lượt trong cùng tiến trình, ca săn quái, seed 1, 20 giây (400 tick):
 
 ```bash
 npm run bench -w server -- --multi --maps=lac_ha,hac_phong,am_suong --per-map 33 --seconds 20

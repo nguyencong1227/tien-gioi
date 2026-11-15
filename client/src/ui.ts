@@ -175,7 +175,12 @@ import {
 import { LEAVE_BUTTONS, pickPromptButton, pickVisible, type PromptAnswer } from "./prompts";
 import { dirOfArrowKey, moveFocus, ownsArrowKeys, withFocusKept } from "./panel-nav";
 import { skillIconSvg } from "./skill-icon";
-import { type SkillRow, type SkillsPanelModel } from "./skills-panel";
+import {
+  nextOpenSkill,
+  resolveOpenSkill,
+  type SkillRow,
+  type SkillsPanelModel,
+} from "./skills-panel";
 import { transitionMs, waitOrSkip } from "./gfx/scene-transition";
 import { getDisplay, onDisplayChange } from "./gfx/display";
 import {
@@ -2151,14 +2156,44 @@ function renderSkillsModal() {
   withFocusKept($("skills-modal"), renderSkillsModalImpl);
 }
 
-/** Một hàng chiêu: tên + tầng + hệ, số thật, hiệu ứng, mô tả, kinh quyển, và hàng nút gắn ô / gỡ (mũi tên + Enter đi theo hình học, `panel-nav.ts`). */
+/** Chiêu đang mở chi tiết (mỗi lúc một hàng, `null` = gập hết). Đóng bảng thì gập lại để lần mở sau luôn là danh sách gọn. */
+let skillsOpenId: string | null = null;
+
+/** Mở chi tiết hàng `id` (gập hàng khác), `null` = gập hết. Chỉ đổi thuộc tính của các hàng đã vẽ: không dựng lại nên focus bàn phím giữ nguyên. */
+function setSkillsOpen(list: HTMLElement, id: string | null, scroll: boolean) {
+  skillsOpenId = id;
+  for (const r of list.querySelectorAll<HTMLElement>(".sk-row")) {
+    const on = r.dataset.skill === id;
+    r.classList.toggle("open", on);
+    r.querySelector(".sk-line")?.setAttribute("aria-expanded", String(on));
+    const d = r.querySelector<HTMLElement>(".sk-detail");
+    if (d) d.hidden = !on;
+    if (on && scroll) {
+      // đưa hàng vừa mở lên đầu vùng cuộn khi chi tiết bị cắt (hàng dài hơn phần còn thấy bên dưới)
+      const lr = list.getBoundingClientRect();
+      const rr = r.getBoundingClientRect();
+      if (rr.bottom > lr.bottom || rr.top < lr.top) list.scrollTop += rr.top - lr.top;
+    }
+  }
+}
+
+/**
+ * Một chiêu = MỘT hàng gọn (biểu tượng + tên + hệ + ô đang giữ, cao >= 44 px); bấm / Enter mở chi tiết ngay dưới hàng: hàng nút gắn ô / gỡ TRƯỚC (điện thoại ngang
+ * chỉ còn ~180 px cho danh sách: nút phải thấy ngay, không phải cuộn qua số liệu), rồi số thật, hiệu ứng, mô tả, kinh quyển. Mũi tên + Enter đi theo hình học (`panel-nav.ts`), Delete trên bất kỳ nút nào của chiêu gỡ chiêu khỏi ô đang giữ.
+ */
 function skillRowEl(row: SkillRow): HTMLElement {
   const el = document.createElement("div");
-  el.className = `sk-row${row.slotNow !== null ? " equipped" : ""}`;
+  el.className = `sk-row${row.slotNow !== null ? " equipped" : ""}${row.need ? " needs" : ""}`;
   el.dataset.skill = row.id;
 
-  const head = document.createElement("div");
-  head.className = "sk-row-head";
+  const detailId = `sk-detail-${row.id}`;
+  const line = document.createElement("button");
+  line.type = "button";
+  line.className = "sk-line";
+  line.dataset.nav = `skillrow:${row.id}`;
+  line.setAttribute("aria-expanded", "false");
+  line.setAttribute("aria-controls", detailId);
+  line.setAttribute("aria-label", row.aria);
   const def = skillOf(row.id);
   const ico = document.createElement("span");
   ico.className = "sk-row-ico skico";
@@ -2167,47 +2202,49 @@ function skillRowEl(row: SkillRow): HTMLElement {
     ico.innerHTML = skillIconSvg(def);
     ico.style.setProperty("--si-c", elementColor(def.element));
   }
+  const main = document.createElement("span");
+  main.className = "sk-line-main";
   const name = document.createElement("b");
   name.className = "sk-row-name";
   name.textContent = row.name;
-  const pips = document.createElement("span");
-  pips.className = "sk-row-pips";
-  pips.textContent = row.pips;
-  pips.setAttribute("aria-label", `Tầng ${row.level} trên ${SKILL_MAX_LEVEL}`);
-  const tag = document.createElement("small");
-  tag.className = "sk-row-tag";
-  tag.textContent = `${row.element} · ${row.shape}`;
-  head.append(ico, name, pips, tag);
-  if (row.slotNow !== null) {
-    const here = document.createElement("span");
-    here.className = "sk-row-badge";
-    here.textContent = `Đang ở ô ${row.slotNow}`;
-    head.append(here);
-  }
+  const sub = document.createElement("small");
+  sub.className = "sk-row-tag";
+  sub.textContent = row.sub;
   if (row.need) {
     const need = document.createElement("span");
-    need.className = "sk-row-badge need";
-    need.textContent = row.need;
-    head.append(need);
+    need.className = "sk-row-need";
+    need.textContent = ` · ${row.need}`;
+    sub.append(need);
   }
-  el.append(head);
+  main.append(name, sub);
+  const badge = document.createElement("span");
+  badge.className = `sk-row-badge${row.slotNow === null ? " none" : ""}`;
+  badge.textContent = row.slotLabel;
+  const chev = document.createElement("span");
+  chev.className = "sk-line-chev";
+  chev.setAttribute("aria-hidden", "true");
+  chev.textContent = "▾";
+  line.append(ico, main, badge, chev);
+  line.addEventListener("click", () => {
+    const list = el.parentElement;
+    if (list) setSkillsOpen(list, nextOpenSkill(skillsOpenId, row.id), true);
+  });
+  el.append(line);
 
-  const lines = document.createElement("ul");
-  lines.className = "sk-row-stats";
-  for (const t of [...row.stats, ...row.effects]) {
-    const li = document.createElement("li");
-    li.textContent = t;
-    lines.append(li);
-  }
-  el.append(lines);
+  const detail = document.createElement("div");
+  detail.className = "sk-detail";
+  detail.id = detailId;
+  detail.hidden = true;
 
-  const desc = document.createElement("p");
-  desc.className = "sk-row-desc";
-  desc.textContent = row.desc;
-  const book = document.createElement("small");
-  book.className = "sk-row-book";
-  book.textContent = `Kinh quyển: ${row.book}`;
-  el.append(desc, book);
+  const kind = document.createElement("small");
+  kind.className = "sk-row-tag sk-row-kind";
+  kind.textContent = [row.element && `Hệ ${row.element}`, row.shape].filter(Boolean).join(" · ");
+  const pips = document.createElement("span");
+  pips.className = "sk-row-pips";
+  pips.textContent = ` ${row.pips}`;
+  pips.setAttribute("aria-label", `Tầng ${row.level} trên ${SKILL_MAX_LEVEL}`);
+  kind.append(pips);
+  detail.append(kind);
 
   const actions = document.createElement("div");
   actions.className = "sk-row-actions";
@@ -2245,8 +2282,26 @@ function skillRowEl(row: SkillRow): HTMLElement {
     u.addEventListener("click", () => callbacks?.onSkillSlot?.(slot, ""));
     actions.append(u);
   }
-  el.append(actions);
-  // Delete / Backspace trên bất kỳ nút nào của hàng: gỡ chiêu khỏi ô đang giữ (bàn phím, không cần tìm nút Gỡ)
+  detail.append(actions);
+  const lines = document.createElement("ul");
+  lines.className = "sk-row-stats";
+  for (const t of [...row.stats, ...row.effects]) {
+    const li = document.createElement("li");
+    li.textContent = t;
+    lines.append(li);
+  }
+  detail.append(lines);
+
+  const desc = document.createElement("p");
+  desc.className = "sk-row-desc";
+  desc.textContent = row.desc;
+  const book = document.createElement("small");
+  book.className = "sk-row-book";
+  book.textContent = `Kinh quyển: ${row.book}`;
+  detail.append(desc, book);
+
+  el.append(detail);
+  // Delete / Backspace trên hàng hoặc bất kỳ nút nào trong chi tiết: gỡ chiêu khỏi ô đang giữ (bàn phím, không cần mở chi tiết tìm nút Gỡ)
   el.addEventListener("keydown", (e) => {
     if ((e.key !== "Delete" && e.key !== "Backspace") || e.repeat || row.slotNow === null) return;
     e.preventDefault();
@@ -2280,6 +2335,7 @@ function renderSkillsModalImpl() {
     return;
   }
   for (const row of skillsModel.rows) list.append(skillRowEl(row));
+  setSkillsOpen(list, resolveOpenSkill(skillsOpenId, skillsModel.rows), false);
 }
 
 // ---------- Luân hồi (M3.2) ----------
@@ -3710,6 +3766,7 @@ export const ui = {
       callbacks?.onSkillsOpen?.(); // cảnh dựng mô hình mới ngay (setSkillsModel) rồi vẽ ở dưới
       renderSkillsModal();
     } else {
+      skillsOpenId = null; // lần mở sau luôn là danh sách gọn
       modalStack.remove("skills-modal");
       returnFocus($("btn-skills"));
     }

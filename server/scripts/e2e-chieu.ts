@@ -7,7 +7,8 @@
 //  3. BỎ HẾT: bỏ chiêu đã khắc => `engrave: []` => máy chủ XOÁ HẾT (chân linh và kiếp mới đều không còn chiêu).
 // Mỗi ca còn kiểm giao diện: danh sách lấy từ `LimboMsg.engravable` thật (chiêu đang khắc đứng trước), chọn sẵn chiêu đã khắc, hết chỗ thì ô còn
 // lại bị khoá, Enter bật / tắt được; và KHÔNG có lỗi / cảnh báo console.
-//  4. BẢNG CÔNG PHÁP (M7.6, #507, #546): nhân vật Trúc Cơ đã học ba chiêu, Shift+K mở bảng; số hiển thị khớp công thức dùng chung; Enter trên nút
+//  4. BẢNG CÔNG PHÁP (M7.6, #507, #546; danh sách GỌN #668: mỗi chiêu một hàng, bấm / Enter mở chi tiết): nhân vật Trúc Cơ đã học ba chiêu, Shift+K mở bảng
+//     (mọi hàng gập, nhãn "Ô N" / "Chưa gắn" theo máy chủ); số hiển thị khớp công thức dùng chung; mở hàng rồi Enter trên nút
 //     "Ô N" gắn chiêu qua `skillSlot` THẬT (thanh chiêu chỉ đổi khi máy chủ gửi lại `skills`: client không đoán trước); gắn vào ô đang có chiêu khác thì
 //     THAY, chiêu đang ở ô khác thì ĐỔI chỗ (ô cũ trống), Delete gỡ, ô chưa mở (ô 4 ở Trúc Cơ) không gửi gì; bấm L dùng chiêu thật (máy chủ đặt hồi chiêu,
 //     phát `fx cast`, client vẽ hiệu ứng dùng chiêu #552); rời phòng chủ động rồi đọc hồ sơ trên đĩa.
@@ -423,10 +424,24 @@ async function main() {
       ev(
         `(() => { const b = document.querySelector('[data-nav="${nav}"]'); if (!b) return false; b.focus(); return document.activeElement === b; })()`,
       );
+    /** Bảng gọn: nút ô nằm trong chi tiết của hàng, phải MỞ hàng (focus nút hàng + Enter) trước khi focus được nút ô; hàng đã mở thì giữ nguyên */
+    const openRow = async (id: string) => {
+      must(await focusNav(`skillrow:${id}`), `không focus được hàng của ${id}`);
+      const on = (await ev(
+        `document.querySelector('[data-nav="skillrow:${id}"]')?.getAttribute('aria-expanded') === 'true'`,
+      )) as boolean;
+      if (!on) await press(T, ENTER);
+    };
     const slotBtn = async (id: string, slot: number) => {
+      await openRow(id);
       must(await focusNav(`skillslot:${id}:${slot}`), `không focus được nút "Ô ${slot}" của ${id}`);
       await press(T, ENTER);
     };
+    /** nhãn ô trên hàng gọn ("Ô 2" / "Chưa gắn") */
+    const rowBadge = (id: string) =>
+      ev(
+        `document.querySelector('#skills-list .sk-row[data-skill="${id}"] .sk-row-badge')?.textContent ?? ''`,
+      ) as Promise<string>;
 
     await waitBar(2, nameOf(BON), "thanh chiêu nhận `skills` từ máy chủ: ô 2 = Bôn Thạch Quyền");
     await press(T, SHIFT_K);
@@ -458,12 +473,30 @@ async function main() {
       must(text.includes(wantCd), `${id}: thiếu "${wantCd}"`);
     }
     ok("Shift+K mở bảng; ba chiêu đã học; số sát thương / hồi chiêu khớp công thức dùng chung");
+    // danh sách GỌN: mở bảng thì mọi hàng gập (chi tiết ẩn), nhãn ô theo sổ chiêu THẬT của máy chủ (Bôn Thạch Quyền ở ô 2, hai chiêu kia chưa gắn)
+    const collapsed = (await ev(
+      `[...document.querySelectorAll('#skills-list .sk-row')].every((r) => r.querySelector('.sk-line')?.getAttribute('aria-expanded') === 'false' && r.querySelector('.sk-detail')?.hidden === true)`,
+    )) as boolean;
+    must(collapsed, "mở bảng: mọi hàng gập, chi tiết ẩn");
+    must(
+      (await rowBadge(BON)) === "Ô 2" &&
+        (await rowBadge(UNG_TRAO)) === "Chưa gắn" &&
+        (await rowBadge(HOA_VAN)) === "Chưa gắn",
+      `nhãn ô trên hàng gọn: ${await rowBadge(BON)} / ${await rowBadge(UNG_TRAO)} / ${await rowBadge(HOA_VAN)}`,
+    );
+    ok("danh sách gọn: mọi hàng gập; nhãn 'Ô 2' / 'Chưa gắn' đúng sổ chiêu của máy chủ");
     await T.shot("chieu-4-bang");
 
     // gắn vào ô TRỐNG: Ưng Trảo -> ô 3
     await slotBtn(UNG_TRAO, 3);
     await waitBar(3, nameOf(UNG_TRAO), "máy chủ xác nhận Ưng Trảo ở ô 3 (thanh chiêu đổi)");
-    ok("Enter trên 'Ô 3' của Ưng Trảo: máy chủ gắn, thanh chiêu cập nhật");
+    must(
+      (await rowBadge(UNG_TRAO)) === "Ô 3",
+      `nhãn ô của Ưng Trảo sau khi máy chủ gắn: ${await rowBadge(UNG_TRAO)}`,
+    );
+    ok(
+      "mở hàng + Enter trên 'Ô 3' của Ưng Trảo: máy chủ gắn, thanh chiêu và nhãn ô trên hàng cập nhật",
+    );
 
     // gắn vào ô ĐANG CÓ chiêu khác: Hỏa Vân Kiếm -> ô 2 thay Bôn Thạch Quyền
     await slotBtn(HOA_VAN, 2);
@@ -482,6 +515,22 @@ async function main() {
     await press(T, DELETE);
     await waitBar(3, "còn trống", "Delete gỡ Hỏa Vân Kiếm khỏi ô 3");
     ok("Delete trên nút của hàng: máy chủ gỡ chiêu khỏi ô 3");
+
+    // Delete khi CHỈ focus nút hàng ĐANG GẬP (không mở chi tiết): đưa Ưng Trảo vào ô 3 (đang trống) -> gập hàng rồi Delete
+    await slotBtn(UNG_TRAO, 3);
+    await waitBar(3, nameOf(UNG_TRAO), "Ưng Trảo về ô 3 để thử Delete trên hàng gập");
+    must(await focusNav(`skillrow:${UNG_TRAO}`), "focus nút hàng Ưng Trảo");
+    await press(T, ENTER); // đang mở -> gập
+    must(
+      !(await ev(
+        `document.querySelector('[data-nav="skillrow:${UNG_TRAO}"]')?.getAttribute('aria-expanded') === 'true'`,
+      )),
+      "hàng Ưng Trảo đã gập",
+    );
+    await press(T, DELETE);
+    await waitBar(3, "còn trống", "Delete trên hàng gập gỡ Ưng Trảo khỏi ô 3");
+    must((await rowBadge(UNG_TRAO)) === "Chưa gắn", "nhãn ô Ưng Trảo về 'Chưa gắn'");
+    ok("Delete khi chỉ focus hàng gập: gỡ chiêu khỏi ô (không cần mở chi tiết)");
 
     // ô CHƯA MỞ (ô 4 ở Trúc Cơ): không gửi gì, ô giữ nguyên
     await slotBtn(UNG_TRAO, 4);

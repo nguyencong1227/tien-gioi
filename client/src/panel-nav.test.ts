@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { dirOfArrowKey, ownsArrowKeys, pickNeighbor, type NavRect } from "./panel-nav";
+import {
+  dirOfArrowKey,
+  ownsArrowKeys,
+  pickNeighbor,
+  pickNeighborSkipFixed,
+  type NavRect,
+} from "./panel-nav";
 
 const box = (col: number, row: number, w = 40, h = 40, gap = 4): NavRect => ({
   left: col * (w + gap),
@@ -88,6 +94,42 @@ describe("pickNeighbor: dãy lựa chọn xếp dọc (hội thoại) và trư�
     expect(pickNeighbor([], 0, "down")).toBeNull();
     expect(pickNeighbor([box(0, 0)], 0, "down")).toBeNull();
     expect(pickNeighbor(grid(2, 2), 9, "down")).toBeNull();
+  });
+});
+
+describe("pickNeighborSkipFixed: nút Đóng cố định góc dưới phải (điện thoại)", () => {
+  // 4 hàng cuộn được (hàng 3 nằm dưới tầm nhìn nhưng vẫn có hình chữ nhật dưới đáy màn hình 640) + nút Đóng cố định sát đáy
+  const rows = [0, 1, 2, 3].map((r) => ({
+    left: 12,
+    top: 480 + r * 50,
+    right: 348,
+    bottom: 480 + r * 50 + 48,
+  }));
+  const close: NavRect = { left: 270, top: 576, right: 348, bottom: 628 };
+  const all = [...rows, close];
+  const fixed = [false, false, false, false, true];
+
+  it("pickNeighbor thường: Xuống từ hàng gần đáy nhảy vào nút Đóng (gần hơn hàng kế) - lý do phải có hàm này", () => {
+    expect(pickNeighbor(all, 1, "down")).toBe(4);
+  });
+  it("Xuống đi sang HÀNG KẾ, không vào nút Đóng, kể cả hàng kế nằm ngoài tầm nhìn", () => {
+    expect(pickNeighborSkipFixed(all, fixed, 1, "down")).toBe(2);
+    expect(pickNeighborSkipFixed(all, fixed, 2, "down")).toBe(3);
+  });
+  it("hết hàng phía dưới thì mới tới nút Đóng (không mất lối tới nút)", () => {
+    const end = [rows[0], rows[1], close]; // hàng cuối của danh sách nằm trên nút Đóng
+    expect(pickNeighborSkipFixed(end, [false, false, true], 1, "down")).toBe(2);
+  });
+  it("đang đứng ở nút Đóng: đi như bình thường; Lên từ hàng không bị ảnh hưởng", () => {
+    expect(pickNeighborSkipFixed(all, fixed, 4, "up")).toBe(pickNeighbor(all, 4, "up"));
+    expect(pickNeighborSkipFixed(all, fixed, 2, "up")).toBe(1);
+  });
+  it("không có nút cố định nào: y hệt pickNeighbor", () => {
+    const g = grid(3, 3);
+    const none = g.map(() => false);
+    for (let i = 0; i < g.length; i++)
+      for (const d of ["up", "down", "left", "right"] as const)
+        expect(pickNeighborSkipFixed(g, none, i, d)).toBe(pickNeighbor(g, i, d));
   });
 });
 
