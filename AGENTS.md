@@ -1,6 +1,6 @@
 # Tiên Giới
 
-> File này là quy ước chung cho mọi trợ lý AI trong repo: Claude Code đọc qua `CLAUDE.md` (chỉ chứa `@AGENTS.md`), Antigravity CLI đọc thẳng `AGENTS.md`. Sửa quy ước thì sửa ở đây.
+> File này là quy ước chung cho mọi trợ lý AI trong repo: Claude Code đọc qua `CLAUDE.md` (chỉ chứa `@AGENTS.md`), Antigravity CLI đọc thẳng `AGENTS.md`; Dev D (Ornith) nạp tệp này theo cách người dùng cấu hình ở `orchestra@d` (không phải CLI nào ở trên). Sửa quy ước thì sửa ở đây.
 
 MMORPG 2D tu tiên, chiến đấu thời gian thực. Client Phaser 3 + Vite, server Colyseus 0.16, TypeScript, npm workspaces.
 Trả lời người dùng bằng tiếng Việt. Comment trong code viết tiếng Việt.
@@ -8,7 +8,7 @@ Trả lời người dùng bằng tiếng Việt. Comment trong code viết ti�
 ## Nhóm và nơi làm việc
 - 4 dev cùng SSH vào một máy, cùng user Linux `nguyencong`, cùng tài khoản GitHub `nguyencong1227`.
 - **Dev A (Server & Gameplay, giao việc):** `~/TT/tien-gioi-a`, cổng 2597/5173, nhánh `a/...`. Dùng Claude Code.
-- **Dev B (Client & Trải nghiệm):** `~/TT/tien-gioi-b`, cổng 2577/5183, nhánh `b/...`. Dùng Antigravity CLI (`agy`).
+- **Dev B (Client & Trải nghiệm):** `~/TT/tien-gioi-b`, cổng 2577/5183, nhánh `b/...`. Dùng Claude Code (chế độ chạy đêm của orchestra; trước đó Antigravity CLI).
 - **Dev C (Công cụ, Thử tải & Phát hành):** `~/TT/tien-gioi-c`, cổng 2587/5193, nhánh `c/...`. Dùng Antigravity CLI (`agy`).
 - **Dev D (Nội dung & Dữ liệu):** `~/TT/tien-gioi-d`, cổng 2607/5203, nhánh `d/...`. Agent chạy bằng model Ornith qua endpoint riêng do người dùng dựng (khoá và địa chỉ endpoint KHÔNG ghi vào repo, log hay thư). Chỉ soạn NỘI DUNG GỐC của Tiên Giới theo khung dữ liệu có sẵn (chiêu thức / công pháp, vật phẩm, quái, lời thoại nhiệm vụ) kèm test và tài liệu; KHÔNG làm đồ hoạ, phát hành, hạ tầng; mọi PR do Dev A review (đụng `shared/` thì thêm một dev khác xem). Chuyển nội dung từ Vạn Kiếp Tu Tiên chỉ khi người dùng xác nhận RIÊNG cho Dev D (mặc định: không; quy tắc Asset nguồn 3 bên dưới vẫn áp dụng nếu có). Endpoint lỗi kết nối / 502 / 503 nghĩa là máy model đang khởi động lại: chờ rồi thử lại, không tính là hết hạn mức.
 - Thư mục mở lúc khởi động là thư mục của dev đang làm việc với bạn: chỉ làm trong đó. Không sửa, không `git switch`, không chạy server trong thư mục của người khác.
