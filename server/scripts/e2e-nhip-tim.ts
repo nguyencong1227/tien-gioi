@@ -52,6 +52,15 @@ class TcpProxy {
   private dropPong = false;
   private holed = new Set<{ client: net.Socket; target: net.Socket }>();
   clientBytes = 0;
+  /** Sổ sự kiện (đo cho chẩn đoán khi đỏ): kết nối mới và dòng yêu cầu HTTP đầu của từng chuỗi byte client -> server, kèm cờ `holed`. */
+  readonly events: string[] = [];
+  private pairSeq = 0;
+  private swallowReconnect = 0;
+  private t0 = Date.now();
+  private note(msg: string) {
+    this.events.push(`+${((Date.now() - this.t0) / 1000).toFixed(1)}s ${msg}`);
+    if (this.events.length > 60) this.events.shift();
+  }
 
   constructor(
     public listenPort: number,
@@ -65,9 +74,30 @@ class TcpProxy {
       const targetSocket = net.connect({ port: this.targetPort, host: "127.0.0.1" });
       const pair = { client: clientSocket, target: targetSocket };
       this.connections.add(pair);
+      const id = ++this.pairSeq;
+      this.note(
+        `kết nối mới #${id}${this.holed.size ? ` (đã có ${this.holed.size} socket nửa mở)` : ""}`,
+      );
 
       clientSocket.on("data", (d: Buffer) => {
         this.clientBytes += d.length;
+        const m = /^(GET|POST|PUT|OPTIONS|DELETE|HEAD) (\S+)/.exec(
+          d.subarray(0, 120).toString("latin1"),
+        );
+        // Mô phỏng socket keep-alive CHẾT mà Chrome không biết: yêu cầu nối lại đầu tiên bị nuốt, socket vẫn mở, không phản hồi bao giờ
+        if (
+          this.swallowReconnect > 0 &&
+          d.subarray(0, 40).toString("latin1").startsWith("POST /matchmake/reconnect/")
+        ) {
+          this.swallowReconnect--;
+          this.holed.add(pair);
+          this.note(`#${id} POST /matchmake/reconnect  <-- BỊ NUỐT (mô phỏng socket chết)`);
+          return;
+        }
+        if (m)
+          this.note(
+            `#${id} ${m[1]} ${m[2].split("?")[0].slice(0, 60)}${this.holed.has(pair) ? "  <-- SOCKET NỬA MỞ, byte bị nuốt" : ""}`,
+          );
         if (this.blackhole || this.holed.has(pair)) {
           // Blackhole: giữ socket mở nhưng ngừng chuyển tiếp byte hai chiều
           return;
@@ -133,6 +163,11 @@ class TcpProxy {
   /** Socket ĐANG CÓ bị blackhole (nửa mở), nhưng kết nối MỚI vẫn thông: mô phỏng đổi mạng (wifi -> 4G): nối lại được ngay, socket cũ còn treo */
   holeExisting() {
     for (const pair of this.connections) this.holed.add(pair);
+  }
+
+  /** Nuốt `n` yêu cầu `POST /matchmake/reconnect` kế tiếp (trên bất kỳ socket nào): tái hiện lần nối lại treo ở máy nào cũng giống runner. */
+  swallowReconnectPosts(n: number) {
+    this.swallowReconnect = n;
   }
 
   /** Huỷ các socket nửa mở: trình duyệt nhận sự kiện đóng MUỘN (1006) của phòng cũ */
@@ -583,13 +618,16 @@ async function main() {
     await tab.ev(
       `window.__attachCount = 0; const sc = window.__scene; const orig = sc.attachRoom.bind(sc); sc.attachRoom = (r) => { window.__attachCount++; return orig(r); }; 1`,
     );
+    // Lần nối lại ĐẦU bị nuốt (socket keep-alive chết): trên runner CI Chrome dùng lại socket rảnh đã bị blackhole và `client.reconnect()`
+    // treo mãi; vòng nối lại phải mở lần thử song song thay vì kẹt (`client/src/reconnect.ts`). Ép xảy ra để cục bộ cũng đỏ khi hỏng.
+    proxy.swallowReconnectPosts(1);
     proxy.holeExisting();
     // Nối lại qua kết nối mới xong rất nhanh (banner chỉ lóe vài chục ms), nên chờ TOKEN phòng đổi thay vì thăm dò banner
     try {
       await tab.waitFor(
         `window.__scene?.room?.reconnectionToken && window.__scene.room.reconnectionToken !== ${JSON.stringify(token4)}`,
         "nhịp tim phát hiện chết và nối lại qua kết nối mới (token phòng đổi)",
-        40000,
+        25000,
       );
     } catch (e: any) {
       const diag = (await tab.ev(`(() => {
@@ -615,8 +653,13 @@ async function main() {
       out(
         `    nhật ký server gần nhất:\n      ${serverLogs.slice(-10).join("\n      ") || "(không có)"}`,
       );
+      out(
+        `    sổ proxy (kết nối mới và yêu cầu HTTP, mốc 0 = lúc tạo proxy):\n      ${proxy.events.slice(-25).join("\n      ")}`,
+      );
       throw e;
     }
+    if (process.env.E2E_PROXY_TRACE)
+      out(`  [SỔ PROXY]:\n    ${proxy.events.slice(-25).join("\n    ")}`);
     await tab.waitFor(
       `(() => { const b = document.getElementById('reconnect-banner'); return !b || b.hidden; })()`,
       "banner nối lại ẩn sau khi nối lại",

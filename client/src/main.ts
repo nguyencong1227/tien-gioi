@@ -47,6 +47,7 @@ import { initAuthUi, switchAuthView } from "./auth-ui";
 import { setupPwa, canReloadSafely, isNativeApp, type PwaGameState } from "./pwa";
 import { setupNativeApp, getOutdatedUiConfig, getAppUpdateUrl } from "./native-app";
 import { HeartbeatController } from "./heartbeat";
+import { runReconnect } from "./reconnect";
 import { sound } from "./audio";
 import { initDisplay } from "./gfx/display";
 import { initSheetSwipe } from "./gfx/sheet-swipe";
@@ -502,27 +503,27 @@ async function startReconnect(codeOrReason?: number | string) {
   const client = activeClient;
   const GRACE_SECONDS = 20;
   const RETRY_INTERVAL_MS = 1500;
-  const deadline = Date.now() + GRACE_SECONDS * 1000;
+  // Một lần thử chưa có kết quả sau chừng này thì mở thêm lần song song: `client.reconnect()` có thể TREO MÃI khi Chrome dùng lại một
+  // socket keep-alive đã chết (sau đổi mạng / socket nửa mở), `reconnect.ts`. 2 s dư cho nối lại bình thường (một POST + một WebSocket).
+  const STALL_MS = 2000;
 
-  let reconnectedRoom: Room | null = null;
-
-  while (Date.now() < deadline) {
-    const remainingSec = Math.max(1, Math.ceil((deadline - Date.now()) / 1000));
-    ui.showReconnectNotice(`Mất kết nối, đang nối lại... (còn ${remainingSec} giây)`);
-
-    try {
-      reconnectedRoom = await client.reconnect(token);
-      if (reconnectedRoom) break;
-    } catch (err: any) {
+  const reconnectedRoom: Room | null = await runReconnect<Room>({
+    attempt: () => client.reconnect(token),
+    deadlineMs: GRACE_SECONDS * 1000,
+    stallMs: STALL_MS,
+    retryMs: RETRY_INTERVAL_MS,
+    // Dừng sớm nếu server trả lỗi dứt khoát: phòng không tồn tại hoặc token hết hạn
+    isFatal: (err: any) => {
       const msg = String(err?.message ?? "");
-      // Dừng sớm nếu server trả lỗi dứt khoát: phòng không tồn tại hoặc token hết hạn
-      if (msg.includes("not found") || msg.includes("expired") || err?.code === 4212) {
-        break;
-      }
-    }
-
-    await new Promise((r) => setTimeout(r, RETRY_INTERVAL_MS));
-  }
+      return msg.includes("not found") || msg.includes("expired") || err?.code === 4212;
+    },
+    onAttempt: (remainingSec) =>
+      ui.showReconnectNotice(`Mất kết nối, đang nối lại... (còn ${remainingSec} giây)`),
+    // Phòng về muộn khi vòng đã xong (đã có phòng thắng hoặc hết hạn): đóng, không để lại kết nối thừa
+    onLate: (room) => {
+      void room.leave(false).catch(() => {});
+    },
+  });
 
   if (reconnectedRoom) {
     activeToken = reconnectedRoom.reconnectionToken;
