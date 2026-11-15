@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
+import { TIERS } from "../../client/src/gfx/quality";
 import {
   Tab,
   sleep,
@@ -145,8 +146,8 @@ async function main() {
       `data-form phải là desktop (1280x720, chuột), thấy ${await attr("data-form")}`,
     );
     must(
-      ["low", "mid", "high"].includes(String(await attr("data-quality"))),
-      "data-quality hợp lệ",
+      (TIERS as readonly string[]).includes(String(await attr("data-quality"))),
+      `data-quality phải thuộc [${TIERS.join(", ")}], thấy ${await attr("data-quality")}`,
     );
     must((await attr("data-reduce-motion")) === "0", "data-reduce-motion mặc định 0");
     ok(
@@ -161,7 +162,8 @@ async function main() {
       `FPS trên lớp phủ phải hợp lý (khung THẬT của Phaser), thấy "${ov.split("\n")[0]}"`,
     );
     ok(`lớp phủ nhận khung thật: ${ov.split("\n").slice(0, 2).join(" | ")}`);
-    must(/chất lượng (low|mid|high) \(auto\)/.test(ov), "lớp phủ ghi bậc + chế độ auto");
+    const tierPattern = new RegExp(`chất lượng (${TIERS.join("|")}) \\(auto\\)`);
+    must(tierPattern.test(ov), `lớp phủ ghi bậc hợp lệ + chế độ auto, thấy "${ov}"`);
     const lowFxClass = await T.ev(`document.body.classList.contains('low-fx')`);
     must(
       lowFxClass === ((await attr("data-quality")) === "low"),

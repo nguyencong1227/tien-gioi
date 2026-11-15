@@ -380,7 +380,7 @@ Công cụ `thong-ke-tien-do` theo dõi tỉ lệ người chơi tiếp cận h�
 - **Cơ chế thời gian chơi kiếp (`life.playMs`):** Thời gian chơi tích luỹ được tính riêng cho **kiếp hiện tại** (được làm mới về 0 khi luân hồi chuyển kiếp).
 - **Phân biệt Dư âm tu hành và Khắc chân linh:**
   - **Dư âm tu hành (`du_am`):** Nâng cấp bằng Duyên tại Tam Sinh Thạch (10 nấc, mỗi nấc +10% tốc độ tu luyện từ quái và đả toạ, tối đa +100% ở nấc 10 theo `THIET_KE_LUAN_HOI.md` mục 6).
-  - **Khắc chân linh (`engrave`):** Mở nấc bằng Duyên tại Tam Sinh Thạch (3 nấc 40 / 100 / 220 Duyên) để giữ lại 1–3 chiêu thức qua kiếp.
+  - **Khắc chân linh (`khac`):** Mở nấc bằng Duyên tại Tam Sinh Thạch (3 nấc 40 / 100 / 220 Duyên) để giữ lại 1–3 chiêu thức qua kiếp.
   - **Trạng thái chiêu khắc ở kiếp mới:** Chiêu thức truyền kiếp được giữ ở **tầng 1** và ở trạng thái **chưa gắn ô** (báo "Cần đạt Luyện Khí" cho tới khi nhân vật đột phá lên Luyện Khí tầng 1 mới mở ô để gắn). Do đó, việc nhân vật ở Phàm Nhân kiếp >= 2 có chiêu đã học nhưng số ô gắn = 0 (`Chiêu / Ô TB` có dạng `1.0 / 0.0`) là **hoàn toàn bình thường**.
 - **Đánh giá cân bằng đối với kiếp >= 2:**
   - Khi dồn Duyên vào Dư âm tu hành, thời gian từ đầu kiếp tới hết Kim Đan rút ngắn có lộ trình rõ ràng: từ 484 phút (~8.1 giờ ở kiếp 1) xuống 326 phút (~5.4 giờ ở kiếp 2), 288 phút (~4.8 giờ ở kiếp 3) và 273 phút (~4.55 giờ ở kiếp 4) theo bảng tính `CAN_BANG.md` mục 4.
