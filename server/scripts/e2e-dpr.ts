@@ -80,7 +80,7 @@ async function main() {
       { stdio: "ignore", detached: true },
     );
     let targets: any[] = [];
-    for (const start = Date.now(); Date.now() - start < 8000;) {
+    for (const start = Date.now(); Date.now() - start < 30000;) {
       try {
         const res = await fetch(`http://127.0.0.1:${CDP}/json`);
         if (res.ok) {
@@ -312,20 +312,45 @@ async function main() {
     await metrics(480, 270, 1);
     await waitCanvas(480, 270, "khung nhỏ 480x270");
     await sleep(500);
+    // CẤU HÌNH vòng lặp là thứ ca này THẬT SỰ kiểm (fps.limit đổi lúc chạy), đọc thẳng từ Phaser: đúng trên mọi máy. Tốc độ ĐO thì chỉ có nghĩa
+    // khi máy vẽ nhanh hơn trần: runner CI (WebGL phần mềm, 1-2 nhân) chỉ đạt ~27-32 FPS dù ở khung 480x270 nên "mặc định ~60" đỏ vì máy, không
+    // vì mã (log runner #694: "đo 26.8"; cục bộ tái hiện bằng `CI=true taskset -c 0`: 32.0).
+    const loopCfg = async () =>
+      (await T.ev(
+        `(() => { const l = window.__scene.game.loop; return { has: l.hasFpsLimit, limit: l.fpsLimit }; })()`,
+      )) as { has: boolean; limit: number };
+    const cfg0 = await loopCfg();
+    must(cfg0.has === false, `mặc định KHÔNG giới hạn FPS: ${JSON.stringify(cfg0)}`);
     const f0 = await stepRate();
-    must(f0 > 52 && f0 < 70, `mặc định ~60 FPS, đo ${f0.toFixed(1)}`);
+    // Máy đủ nhanh để thấy trần 60: chỉ khi đó mới kiểm được "~60" và "~30" bằng tốc độ đo
+    const fast = f0 > 52;
+    if (fast) must(f0 < 70, `mặc định ~60 FPS, đo ${f0.toFixed(1)}`);
+    else
+      out(
+        `  (máy vẽ chậm: ${f0.toFixed(1)} FPS < 52, bỏ ngưỡng dưới của tốc độ đo, giữ kiểm cấu hình + ngưỡng trên)`,
+      );
     await setCheck("set-battery-saver", true);
     await sleep(600);
-    const f1 = await stepRate();
+    const cfg1 = await loopCfg();
     must(
-      f1 > 26 && f1 < 34,
-      `Tiết kiệm pin ~30 FPS (ngưỡng 30 của Phaser ra ~21), đo ${f1.toFixed(1)}`,
+      cfg1.has === true && cfg1.limit >= 30 && cfg1.limit <= 35,
+      `Tiết kiệm pin đặt fps.limit ~30 (31 để ra ~30, 30 ra ~21): ${JSON.stringify(cfg1)}`,
     );
+    const f1 = await stepRate();
+    // Trần LUÔN đúng (máy chậm thì thấp hơn trần), ngưỡng dưới chỉ khi máy nhanh
+    must(f1 < 34, `Tiết kiệm pin không vượt ~30 FPS, đo ${f1.toFixed(1)}`);
+    if (fast)
+      must(f1 > 26, `Tiết kiệm pin ~30 FPS (ngưỡng 30 của Phaser ra ~21), đo ${f1.toFixed(1)}`);
     await setCheck("set-battery-saver", false);
     await sleep(600);
+    const cfg2 = await loopCfg();
+    must(cfg2.has === false, `tắt Tiết kiệm pin gỡ giới hạn FPS: ${JSON.stringify(cfg2)}`);
     const f2 = await stepRate();
-    must(f2 > 52 && f2 < 70, `tắt Tiết kiệm pin về ~60 FPS, đo ${f2.toFixed(1)}`);
-    ok(`FPS: mặc định ${f0.toFixed(1)} -> tiết kiệm pin ${f1.toFixed(1)} -> tắt ${f2.toFixed(1)}`);
+    must(f2 < 70, `tắt Tiết kiệm pin: không bị kẹt ở trần 30, đo ${f2.toFixed(1)}`);
+    if (fast) must(f2 > 52, `tắt Tiết kiệm pin về ~60 FPS, đo ${f2.toFixed(1)}`);
+    ok(
+      `FPS: mặc định ${f0.toFixed(1)} -> tiết kiệm pin ${f1.toFixed(1)} -> tắt ${f2.toFixed(1)}${fast ? "" : " (máy chậm: kiểm cấu hình fps.limit, không kiểm ngưỡng dưới)"}`,
+    );
 
     must(T.errors.length === 0, `Không được có lỗi console / exception: ${T.errors.join(" | ")}`);
     ok("0 lỗi console / exception trong toàn bộ E2E");
