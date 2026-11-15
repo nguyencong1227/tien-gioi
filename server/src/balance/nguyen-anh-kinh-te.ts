@@ -277,7 +277,7 @@ export function renderNguyenAnhSau(): string {
   const kdTotal = kd.bo.reduce((n, b) => n + b.fee, 0);
   return `## Nguyên Anh sau nội dung (M7.5 / M7.9)
 
-Tính SỐNG từ \`shared/\` bằng mô hình ở trên. Quái mới ở Hàn Vân: Hàn Lang (cấp 16, gồng lao), Phong Nha (17, bắn đạn), Cốt Tượng (17, dày, đập đất), Độc Tước (18, đòn nặng + độc), trùm Thiên Hàn Vương (21, đội 3-4 người). Thanh Nguyên Anh ${REALMS[NA].tiers.map((_, t) => n0(expToNext(NA, t))).join(" / ")}. Thời gian tìm quái lấy theo loài Kim Đan cùng vai (\`ASSUME.searchSec\`): Hàn Vân thưa hơn Âm Sương nên là cận lạc quan, \`search-check.ts\` chưa đo Hàn Vân. Mô hình KHÔNG tính chiêu / hệ / trạng thái (chỉ Kiếm chém, như mọi mục trên) và không tính đồ ba ô riêng (\`ASSUME.useOwnerGear\` tắt).
+Tính SỐNG từ \`shared/\` bằng mô hình ở trên. Quái mới ở Hàn Vân: Hàn Lang (cấp 16, gồng lao), Phong Nha (17, bắn đạn), Cốt Tượng (17, dày, đập đất), Độc Tước (18, đòn nặng + độc), trùm Thiên Hàn Vương (21, đội 3-4 người). Thanh Nguyên Anh ${REALMS[NA].tiers.map((_, t) => n0(expToNext(NA, t))).join(" / ")}. Thời gian tìm quái lấy theo loài Kim Đan cùng vai (\`ASSUME.searchSec\`): Hàn Vân thưa hơn Âm Sương nên là cận lạc quan, \`search-check.ts\` chưa đo Hàn Vân. Mô hình KHÔNG tính chiêu / hệ / trạng thái (chỉ Kiếm chém, như mọi mục trên) và không tính đồ ba ô riêng (\`ASSUME.useOwnerGear\` tắt; độ nhạy ở mục 5).
 
 ### 1. Săn solo (tu vi / giờ, Linh thạch / giờ gồm bán đồ rơi, con / giờ, khí huyết mất / trận)
 
