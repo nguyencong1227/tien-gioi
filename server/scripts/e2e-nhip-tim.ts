@@ -46,29 +46,51 @@ const DETECT_MAX_MS =
 /** Proxy TCP chuyển tiếp byte giữa client Chrome và server Colyseus thật, hỗ trợ BLACKHOLE và DROP PONG. */
 class TcpProxy {
   private server: net.Server;
-  private connections = new Set<{ client: net.Socket; target: net.Socket }>();
+  private connections = new Set<{ id: number; client: net.Socket; target: net.Socket }>();
   private allowNew = true;
   private blackhole = false;
   private dropPong = false;
-  private holed = new Set<{ client: net.Socket; target: net.Socket }>();
+  private holed = new Set<{ id: number; client: net.Socket; target: net.Socket }>();
+  private nextPairId = 0;
   clientBytes = 0;
+  readonly logs: string[] = [];
+
+  log(msg: string) {
+    this.logs.push(`[${new Date().toISOString()}] [proxy] ${msg}`);
+    if (this.logs.length > 50) this.logs.shift();
+  }
 
   constructor(
     public listenPort: number,
     readonly targetPort: number,
   ) {
     this.server = net.createServer((clientSocket) => {
+      const pairId = ++this.nextPairId;
       if (!this.allowNew) {
+        this.log(`reject new conn #${pairId} (allowNew=false)`);
         clientSocket.destroy();
         return;
       }
       const targetSocket = net.connect({ port: this.targetPort, host: "127.0.0.1" });
-      const pair = { client: clientSocket, target: targetSocket };
+      const pair = { id: pairId, client: clientSocket, target: targetSocket };
       this.connections.add(pair);
+      this.log(`new conn #${pairId} from clientPort=${clientSocket.remotePort}`);
 
+      let firstData = true;
       clientSocket.on("data", (d: Buffer) => {
         this.clientBytes += d.length;
-        if (this.blackhole || this.holed.has(pair)) {
+        const isHoled = this.blackhole || this.holed.has(pair);
+        if (firstData) {
+          firstData = false;
+          const text = d.toString("utf8", 0, Math.min(d.length, 200));
+          const firstLine = text.split("\r\n")[0] || text.slice(0, 80);
+          this.log(`data conn #${pairId} (holed=${isHoled}, len=${d.length}): ${firstLine}`);
+        } else if (isHoled && d.toString("utf8", 0, 10).startsWith("POST ")) {
+          const text = d.toString("utf8", 0, Math.min(d.length, 200));
+          const firstLine = text.split("\r\n")[0] || text.slice(0, 80);
+          this.log(`POST on HOLED conn #${pairId} (len=${d.length}): ${firstLine}`);
+        }
+        if (isHoled) {
           // Blackhole: giữ socket mở nhưng ngừng chuyển tiếp byte hai chiều
           return;
         }
@@ -119,6 +141,7 @@ class TcpProxy {
 
   setBlackhole(blackhole: boolean) {
     this.blackhole = blackhole;
+    this.log(`setBlackhole(${blackhole})`);
     if (!blackhole) {
       for (const pair of Array.from(this.connections)) {
         if (pair.client.destroyed || pair.target.destroyed) {
@@ -132,11 +155,13 @@ class TcpProxy {
 
   /** Socket ĐANG CÓ bị blackhole (nửa mở), nhưng kết nối MỚI vẫn thông: mô phỏng đổi mạng (wifi -> 4G): nối lại được ngay, socket cũ còn treo */
   holeExisting() {
+    this.log(`holeExisting() called: holed ${this.connections.size} active pairs`);
     for (const pair of this.connections) this.holed.add(pair);
   }
 
   /** Huỷ các socket nửa mở: trình duyệt nhận sự kiện đóng MUỘN (1006) của phòng cũ */
   destroyHoled() {
+    this.log(`destroyHoled() called: destroying ${this.holed.size} holed pairs`);
     for (const pair of Array.from(this.holed)) {
       pair.client.destroy();
       pair.target.destroy();
@@ -579,9 +604,43 @@ async function main() {
 
     const token4 = String(await tab.ev(`window.__scene?.room?.reconnectionToken ?? ''`));
     out("  - Blackhole CHỈ socket đang có (kết nối mới vẫn thông, như đổi wifi sang 4G)...");
-    // Đếm số lần cảnh bám vào phòng MỚI (mỗi lần nối lại thành công gọi attachRoom một lần): đúng 1 lần là đúng
+    // Đếm số lần cảnh bám vào phòng MỚI (mỗi lần nối lại thành công gọi attachRoom một lần): đúng 1 lần là đúng.
+    // Đồng thời hook window.fetch để theo dõi chi tiết các cuộc gọi reconnect (thời điểm, kết quả, lỗi).
     await tab.ev(
-      `window.__attachCount = 0; const sc = window.__scene; const orig = sc.attachRoom.bind(sc); sc.attachRoom = (r) => { window.__attachCount++; return orig(r); }; 1`,
+      `window.__attachCount = 0;
+      const sc = window.__scene;
+      const orig = sc.attachRoom.bind(sc);
+      sc.attachRoom = (r) => { window.__attachCount++; return orig(r); };
+
+      window.__reconnectAttempts = [];
+      const origFetch = window.fetch;
+      window.fetch = async function(...args) {
+        const url = String(args[0] ?? "");
+        if (url.includes('/matchmake/')) {
+          const t0 = Date.now();
+          try {
+            const res = await origFetch.apply(this, args);
+            window.__reconnectAttempts.push({
+              url,
+              status: res.status,
+              ok: res.ok,
+              ms: Date.now() - t0,
+              at: new Date().toISOString()
+            });
+            return res;
+          } catch (err) {
+            window.__reconnectAttempts.push({
+              url,
+              error: String(err && err.message ? err.message : err),
+              ms: Date.now() - t0,
+              at: new Date().toISOString()
+            });
+            throw err;
+          }
+        }
+        return origFetch.apply(this, args);
+      };
+      1`,
     );
     proxy.holeExisting();
     // Nối lại qua kết nối mới xong rất nhanh (banner chỉ lóe vài chục ms), nên chờ TOKEN phòng đổi thay vì thăm dò banner
@@ -594,26 +653,39 @@ async function main() {
     } catch (e: any) {
       const diag = (await tab.ev(`(() => {
         const b = document.getElementById('reconnect-banner');
+        const bText = document.getElementById('reconnect-banner-text')?.textContent;
         const hb = window.__heartbeat;
         const rm = window.__scene?.room;
         return {
-          banner: b ? { hidden: b.hidden, text: b.textContent, display: window.getComputedStyle(b).display } : null,
-          heartbeat: hb ? { supported: hb.state?.supported ?? hb.supported, stopped: hb.stopped, pendingSince: hb.state?.pendingSince ?? null } : null,
+          banner: b ? { hidden: b.hidden, text: bText || b.textContent, display: window.getComputedStyle(b).display } : null,
+          heartbeat: hb ? {
+            supported: hb.state?.supported ?? hb.supported,
+            stopped: hb.stopped,
+            pendingSince: hb.state?.pendingSince ?? null,
+            lastPong: hb.state?.lastPong ?? null,
+          } : null,
           room: rm ? { isOpen: !!rm.connection?.isOpen, sessionId: rm.sessionId, token: rm.reconnectionToken } : null,
+          isReconnecting: window.__scene?.isReconnecting ?? document.body.classList.contains('reconnecting'),
           attachCount: window.__attachCount,
+          reconnectAttempts: window.__reconnectAttempts ?? [],
         };
       })()`)) as any;
       out(`  [CHẨN ĐOÁN CA 4 HẾT GIỜ]:`);
       out(`    banner: ${JSON.stringify(diag?.banner)}`);
       out(`    heartbeat: ${JSON.stringify(diag?.heartbeat)}`);
       out(`    room: ${JSON.stringify(diag?.room)} (token ban đầu: ${token4})`);
+      out(`    isReconnecting: ${diag?.isReconnecting}`);
       out(`    attachCount: ${diag?.attachCount}`);
+      out(`    reconnectAttempts: ${JSON.stringify(diag?.reconnectAttempts)}`);
       out(
-        `    console tail gần nhất:\n      ${tab.consoleTail.slice(-10).join("\n      ") || "(không có)"}`,
+        `    console tail gần nhất:\n      ${tab.consoleTail.slice(-15).join("\n      ") || "(không có)"}`,
       );
       out(`    console errors:\n      ${tab.errors.slice(-10).join("\n      ") || "(không có)"}`);
       out(
-        `    nhật ký server gần nhất:\n      ${serverLogs.slice(-10).join("\n      ") || "(không có)"}`,
+        `    nhật ký server gần nhất:\n      ${serverLogs.slice(-15).join("\n      ") || "(không có)"}`,
+      );
+      out(
+        `    nhật ký proxy gần nhất:\n      ${proxy.logs.slice(-15).join("\n      ") || "(không có)"}`,
       );
       throw e;
     }
@@ -671,6 +743,8 @@ async function main() {
           out(`  [CONSOLE TAIL]:\n    ${tab.consoleTail.slice(-10).join("\n    ")}`);
         if (tab.errors.length) out(`  [TAB ERRORS]:\n    ${tab.errors.join("\n    ")}`);
         if (serverLogs.length) out(`  [SERVER LOGS]:\n    ${serverLogs.slice(-10).join("\n    ")}`);
+        if (proxy?.logs?.length)
+          out(`  [PROXY LOGS]:\n    ${proxy.logs.slice(-10).join("\n    ")}`);
       } catch (e) {
         out(`  [CANNOT GET TAB INFO]: ${e}`);
       }
