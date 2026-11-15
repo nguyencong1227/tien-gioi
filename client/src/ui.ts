@@ -140,6 +140,7 @@ import {
   itemAria,
   rarityStyle,
 } from "./rarity";
+import { quickLabel } from "./quick-label";
 import { initKeyLabels } from "./keybinds-dom";
 import {
   ACTION_BY_ID,
@@ -790,7 +791,7 @@ function renderQuickbar() {
     btn.style.borderColor =
       total > 0 && def ? rarityStyle(def.rarity).color : "rgba(201, 162, 74, 0.45)";
     applyItemVisual($(`quick-${idx}-icon`), def);
-    $(`quick-${idx}-name`).textContent = def ? def.name.replace(" Đan", "") : `Đan ${idx}`;
+    $(`quick-${idx}-name`).textContent = def ? quickLabel(def.name) : `Đan ${idx}`;
     $(`quick-${idx}-qty`).textContent = total > 0 ? `${total}` : "0";
   }
 }
