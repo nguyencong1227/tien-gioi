@@ -1174,7 +1174,7 @@ npm run bench -w server -- --multi --maps=lac_ha,hac_phong,am_suong,han_van --se
 npm run bench -w server -- --multi --maps=lac_ha,hac_phong,am_suong,han_van --crowd --seconds 20
 ```
 
-#### Bảng số đo thực tế (cập nhật sau #722 — 18 chiêu / 6 chiêu Nguyên Anh đợt 2 + kinh quyển rơi, và #728 `min(wallMs, cpuMs)`):
+#### Bảng số đo thực tế (cập nhật trên `main` sau #722, đo khi máy có tải nền `load average ~17,0` theo `uptime`):
 
 | Kịch bản | Tổng người chơi | Tổng quái (Tinh anh) | Tick TB (ms) | Tick p95 (ms) | Tick Max (ms) | Trạng thái ngân sách tick (< 10 ms) |
 |---|---:|---:|---:|---:|---:|:---:|
@@ -1200,9 +1200,11 @@ npm run bench -w server -- --multi --maps=lac_ha,hac_phong,am_suong,han_van --cr
 | **Hàn Vân Lĩnh** (`han_van`) | 50 | 62 (3) | 205 B | 4,0 KB/s | 0,41 | 0,00 |
 
 **Nhận xét:**
-1. Cả 4 bản đồ chạy đồng thời với 200 người chơi tiêu tốn **2,91 – 3,03 ms/tick** (đo theo `min(wallMs, cpuMs)` từ #728), chỉ chiếm $\sim 30\%$ ngân sách 10 ms của tiến trình Node.js.
-2. Băng thông StateView của bản đồ mới Hàn Vân Lĩnh nằm gọn trong ngân sách: 125 B/tick ở ca săn quái (ngân sách $< 520$ B) và 205 B/tick ở ca đám đông (ngân sách $< 600$ B). Việc bổ sung 6 kinh quyển Nguyên Anh đợt 2 vào bảng rơi đồ (#722) chỉ làm đổi nhẹ quỹ đạo `Math.random` ở ca săn quái ($\pm 1\text{–}5$ B/tick), hoàn toàn không ảnh hưởng băng thông đám đông.
-3. Đan dược, quái tinh anh và 18 chiêu thức không gây phình to patch state (do đạn và trạng thái hiệu ứng đi qua sự kiện gửi gần `fx/dmg`, không sinh patch schema mỗi tick).
+1. **Thời gian tick & đối chiếu A/B dưới tải nền:** Bảng trên được đo khi máy chủ dùng chung đang chịu tải nền cao (`load average ~17,0` do các tiến trình test/E2E chạy song song), nên thời gian tick tuyệt đối (**2,91 – 3,03 ms/tick**) cao hơn lần đo lúc máy rảnh trước đó (**2,10 – 2,30 ms/tick**) và không so sánh trực tiếp ngang hàng với bảng lúc máy rảnh. Phép đo A/B luân phiên 2 vòng trong cùng điều kiện tải (`load average 14–15`, 20 giây, 4 bản đồ `hunt`, 200 người chơi) xác nhận cả #722 lẫn #728 đều **không** làm tăng thời gian tick:
+   - Trước #722 (`567df0e`): trung bình **2,880 / 2,853 ms**, p95 **5,054 / 5,152 ms** vs sau #722 (`ebac5d6`): trung bình **2,916 / 2,922 ms**, p95 **5,072 / 5,222 ms** (chênh $+0,04\text{–}0,07$ ms, nằm trong nhiễu đo).
+   - Trước #728 (`7696e39`): trung bình **2,946 / 3,155 ms** vs sau #728 (`567df0e`, `min(wallMs, cpuMs)`): trung bình **3,011 / 2,892 ms**.
+2. **Băng thông StateView:** Bản đồ Hàn Vân Lĩnh nằm gọn trong ngân sách: 125 B/tick ở ca săn quái (ngân sách $< 520$ B) và 205 B/tick ở ca đám đông (ngân sách $< 600$ B). Việc bổ sung 6 kinh quyển Nguyên Anh đợt 2 vào bảng rơi đồ (#722) chỉ làm đổi nhẹ quỹ đạo `Math.random` ở ca săn quái ($\pm 1\text{–}5$ B/tick), hoàn toàn không ảnh hưởng băng thông đám đông.
+3. **Cơ chế đồng bộ sự kiện:** Đan dược, quái tinh anh và các chiêu thức không gây phình to patch state (do đạn và trạng thái hiệu ứng đi qua sự kiện gửi gần `fx/dmg`, không sinh patch schema mỗi tick).
 
 ### 25.3. Mở rộng Thử tải dài (Soak Test) qua bốn bản đồ liên thông
 - Cập nhật `server/scripts/soak.ts`:
@@ -1253,14 +1255,16 @@ Kịch bản: 100 bot chia làm 6 nhóm hành vi tự hành (săn quái, trấn/
 2. **Khả năng tải của 4 phòng Colyseus:** CPU luồng chính trung bình chỉ 4,55 ms/tick cho cả 100 bot trải rộng khắp 4 bản đồ có quái tinh anh hoạt động. Tick p95 của phòng tải cao nhất duy trì ở mức 2,55 ms (đỉnh 3,10 ms), hoàn toàn cách xa ngưỡng giới hạn 10 ms.
 3. **Chuyển cổng 4 bản đồ ổn định tuyệt đối:** Quá trình qua cổng liên tục giữa Lạc Hà, Hắc Phong, Âm Sương và Hàn Vân không gây ra bất kỳ lỗi giải phóng hay xung đột lưu file nào (`kiem-save` đạt 0 lỗi), bảo toàn 100% tài sản tiền tệ và trang bị của người chơi.
 
-### 25.5. Kết quả Thử tải dài (Soak Test) 10 phút sau khi hoàn thiện 18 chiêu Nguyên Anh đợt 2 (#722, #515)
+### 25.5. Kết quả Thử tải dài (Soak Test) 10 phút trên `main` sau #722 (ổn định bộ nhớ, chuyển cổng 4 bản đồ, bảo toàn tiền & `kiem-save`, #515)
 
-Lệnh thực thi trên `main` (`ebac5d6` — đã gồm 18 chiêu thức / 6 chiêu Nguyên Anh đợt 2 + kinh quyển rơi và #728):
+Lệnh thực thi trên `main` (`ebac5d6` — đã gồm dữ liệu #722: 18 chiêu thức, bảng rơi đồ & kinh quyển Nguyên Anh đợt 2, tương thích tệp lưu):
 ```bash
 npm run soak -w server -- --bots=100 --minutes=10
 ```
 
-#### Bảng tổng hợp số đo thử tải dài (10,0 phút, 60 mẫu liên tục mỗi 10 giây):
+> **Phạm vi kiểm chứng của `soak` hiện tại:** Lần chạy này xác nhận độ ổn định bộ nhớ (`VmRSS`), ngân sách tick, lưu thông 4 bản đồ qua cổng, `kiem-save` và bảo toàn Linh thạch khi server chạy với toàn bộ bảng dữ liệu #722. Lưu ý rằng các bot trong `soak.ts` khởi tạo ở cảnh giới Luyện Khí (`realm = 1`, chỉ đánh thường `slash`/`sword`), và kịch bản `bots.ts:1889` hiện cũng chỉ gán ngẫu nhiên tối đa tới Trúc Cơ (`realm = 2`), nên `soak` 10 phút này **không** thi triển 6 chiêu Nguyên Anh đợt 2 (`sampleSkillsForRealm(4)` trong `bots.ts` được kiểm qua test đơn vị `bots-skills.test.ts`; việc đo hiệu năng thi triển trực tiếp 6 chiêu Nguyên Anh đợt 2 được kiểm trong `perf.test.ts` riêng).
+
+#### Bảng tổng hợp số đo thử tải dài (10,0 phút, 60 mẫu liên tục mỗi 10 giây, đo khi máy có tải nền `load average ~14–17`):
 
 | Hạng mục đo | Kết quả đo thực tế | Ngưỡng / Ngân sách cho phép | Đánh giá |
 |---|---|---|:---:|
@@ -1283,6 +1287,9 @@ npm run soak -w server -- --bots=100 --minutes=10
 | **Kiểm toán toàn vẹn hồ sơ (kiem-save)** | **0 lỗi** (100 nhân vật, 100 chân linh, 4 tông môn) | 0 lỗi vi phạm hợp đồng dữ liệu | ✅ **ĐẠT** |
 | **Tệp hỏng cách ly (`*.hong-*`)** | **0 tệp** | 0 tệp | ✅ **ĐẠT** |
 | **Bảo toàn Linh thạch (ví + kho)** | **ĐẠT** (Ví 21.245 + Kho 4.580 = 25.825 $\le$ Trần 33.365, lệch ví bot = 0) | Sai số bảo toàn = 0 | ✅ **ĐẠT** |
+
+#### Nhận xét:
+- Các chỉ số thời gian xử lý tick p95 (**4,49 ms**, đỉnh **8,53 ms**), CPU luồng chính (**7,33 ms/tick**) và loop lag p99 (**85,3 ms**) cao hơn lần đo 30 phút ở mục 25.4 (`2,55 / 3,10 ms`, CPU `4,55 ms/tick`, loop lag `27,1 ms`) là do máy chủ đang chịu tải nền cao (`load average ~14–17`) trong suốt 10 phút chạy, **không phải** do thay đổi mã nguồn ở #722; dù dưới tải nền nặng, toàn bộ chỉ số vẫn nằm trong ngân sách cho phép ($\le 10,0$ ms/tick, 0 overrun).
 
 ---
 
