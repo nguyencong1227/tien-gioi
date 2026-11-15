@@ -20,6 +20,7 @@ import { renderKimDanKinhTe } from "./kim-dan-kinh-te";
 import { renderKimDanPkBiCanh } from "./kim-dan-pk";
 import { renderHuntCheck } from "./hunt-check";
 import { renderSearchCheck } from "./search-check";
+import { renderNguyenAnhSau } from "./nguyen-anh-kinh-te";
 import { renderSkillBalanceMarkdown } from "./skills-model";
 import { PK_TARGET_SECONDS, representativeLevels, summarizeDuels } from "./pk";
 import {
@@ -413,7 +414,7 @@ ${summary}
 
 ${table}
 
-Bảng trên dừng ở hết Trúc Cơ (quái và đồ gốc: Linh Thố, Hôi Lang, Hắc Hổ, Xích Mãng). Cảnh giới Kim Đan (ba bậc, ba quái mới, trùm Hắc Giao, ba bộ trang bị, phí rèn) ở mục "Kim Đan sau nội dung (M6)" cuối tệp: săn solo, trùm theo đội, nhịp, luân hồi, tổ đội, kinh tế, trang bị, PK và bí cảnh.
+Bảng trên dừng ở hết Trúc Cơ (quái và đồ gốc: Linh Thố, Hôi Lang, Hắc Hổ, Xích Mãng). Cảnh giới Kim Đan (ba bậc, ba quái mới, trùm Hắc Giao, ba bộ trang bị, phí rèn) ở mục "Kim Đan sau nội dung (M6)" cuối tệp: săn solo, trùm theo đội, nhịp, luân hồi, tổ đội, kinh tế, trang bị, PK và bí cảnh. Cảnh giới Nguyên Anh (bốn quái Hàn Vân, trùm Thiên Hàn Vương, bộ IV, phí rèn) ở mục "Nguyên Anh sau nội dung (M7.5 / M7.9)".
 
 ## Giả định
 
@@ -460,6 +461,7 @@ ${renderKimDanKinhTe()}
 ${renderKimDanPkBiCanh()}
 ${renderHuntCheck()}
 ${renderSearchCheck()}
+${renderNguyenAnhSau()}
 
 ${renderSkillBalanceMarkdown(statsFor(3, 0, emptyEquipment()))}`,
   );
