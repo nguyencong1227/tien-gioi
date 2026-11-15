@@ -2,7 +2,7 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 /* global console, setTimeout, fetch, process, Buffer */
 // Kiểm CHỈ DẪN NGƯỜI MỚI (#673, #674) trong Chrome THẬT (`?skills=mock`, không cần máy chủ; KHÔNG đặt cờ bỏ qua nên hộp tự mở lần đầu như người mới thật):
 //  - hai nút ở chân hộp ("Xem tất cả phím tắt" / "Đã Hiểu") đều >= 44 px, KHÔNG vỡ chữ (một dòng: chiều cao nhỏ hơn 2 dòng chữ + đệm) và không tràn; nút phím tắt không bị ép hẹp hơn chữ của nó
-//    (trước đây `.auth-btn-primary` rộng 100 % ép nó còn 44 x 97 px, chữ xuống 5 dòng, nút "Đã Hiểu" cao 97 px); ở cảm ứng nút phím tắt ẩn (không bàn phím) và "Đã Hiểu" chiếm cả hàng;
+//    (trước đây `.auth-btn-primary` rộng 100 % ép nó còn 44 x 97 px, chữ xuống 5 dòng, nút "Đã Hiểu" cao 97 px); ở cảm ứng THẬT (`data-input="touch"`) nút phím tắt bị CSS ẩn và "Đã Hiểu" chiếm cả hàng; Chrome không đầu chỉ GIẢ khung (`mobile`) mà con trỏ vẫn là chuột nên ở bốn khung này nút phím tắt vẫn HIỆN và được đo như mọi khung;
 //  - có thẻ "Chiêu Thức" nói quyển học ở Túi đồ (nút Học), phím L U I O và bảng Công pháp, nhãn phím theo phím ĐANG GÁN (đổi phím thì chữ đổi theo);
 //  - Esc / Cách đóng hộp.
 // Ở bốn khung nhìn (1280x720, 844x390, 390x844, 360x640). Có thể chụp ảnh: `--shots <thư mục>`. Cần client đang chạy (`npm run dev -w client`, cổng của dev B là 5183).

@@ -90,11 +90,11 @@ export interface FxOpts { priority?: 0 | 1 | 2; angle?: number; scale?: number; 
 ### 4.1 Phân loại thiết bị (theo kích thước khung nhìn và hướng, KHÔNG theo User-Agent)
 | `form` | Điều kiện (CSS px; `s` = cạnh ngắn) | Ví dụ |
 |---|---|---|
-| `phone` | `s < 600` (kể cả cửa sổ trình duyệt hẹp trên máy tính) | 360×640, 390×844, 412×915, 844×390 |
+| `phone` | `s < 600` và con trỏ cảm ứng; HOẶC `s < 600` với con trỏ CHUỘT mà hẹp (`w < 900`) hoặc thấp (`h < 500`) (#676) | 360×640, 390×844, 412×915, 844×390; chuột: 500×900, 767×500, 1280×480 |
 | `tablet` | `s ≥ 600` và con trỏ CHÍNH là cảm ứng (`pointer: coarse`) | iPad / máy tính bảng Android: 768×1024, 1024×768 |
-| `desktop` | `s ≥ 600` và con trỏ chính là chuột (`pointer: fine`) | 1280×720, 1920×1080, 2560×1440, laptop cảm ứng có chuột |
+| `desktop` | `s ≥ 600` và con trỏ chính là chuột (`pointer: fine`); HOẶC `s < 600`, chuột, `w ≥ 900` và `h ≥ 500` (#676) | 1280×720, 1920×1080, 2560×1440, laptop cảm ứng có chuột; chuột thấp: 1280×577, 1366×625, 1280×500 |
 
-Cài trong `client/src/gfx/display.ts` (`classifyForm`, có test ma trận).
+Cài trong `client/src/gfx/display.ts` (`classifyForm`, `DESKTOP_MIN_WIDTH` = 900, `DESKTOP_MIN_HEIGHT` = 500, có test ma trận). **Cửa sổ chuột thấp (#676):** trình duyệt máy tính luôn mất ~100-150 px cho thanh tab / địa chỉ, nên màn 720p hay laptop 1366×768 chỉ còn khung nhìn ~1280×577 / 1366×625; trước đây `s < 600` là `phone` BẤT KỂ con trỏ nên người chơi chuột ở đó nhận bộ giao diện điện thoại (tấm toàn màn hình, nút "✕ Đóng" tròn góc dưới phải, chữ ≥ 14 px). Nay chuột + rộng ≥ 900 + cao ≥ 500 là `desktop`; cửa sổ chuột hẹp (500×900, 767×500: bố cục máy tính tràn ngang) và thấp hơn 500 vẫn là `phone`. Mốc 500 là SỐ ĐO (mục 12.7), không đoán.
 
 **Chiều cao ổn định (bàn phím ảo):** `form` và `orient` được tính theo chiều cao ỔN ĐỊNH, không theo chiều cao thật: trên cảm ứng, nếu bề rộng không đổi mà chiều cao chỉ giảm (bàn phím ảo mở: 360×640 -> 360×340) thì giữ chiều cao lớn nhất đã thấy ở bề rộng này; bề rộng đổi (xoay máy, đổi cỡ cửa sổ) thì đặt lại. Nhờ đó tấm toàn màn hình không biến thành ngăn kéo cạnh phải lúc người chơi đang gõ chữ, và máy tính bảng 768×1024 + bàn phím không thành `phone`. `cssH` và `--vh` vẫn là chiều cao thật (tấm co theo chỗ còn lại). Trên máy tính (chuột) đổi chiều cao cửa sổ là thật nên theo sát. `(pointer: coarse)` đổi mà không có `resize` (máy lai gắn / tháo bàn phím) cũng được nghe.
 
@@ -320,6 +320,17 @@ Các chỉ số ngân sách trên đã được lưu vào khối `packs.timeToWo
 4. **Rò rỉ:** vào / ra bản đồ và bí cảnh 20 lần, đo số texture, số `GameObject`, listener, heap.
 5. **DPR / nhập liệu:** E2E toạ độ chạm đúng ở DPR 1 / 2 / 3 (mục 5).
 6. Mỗi tính năng có **đột biến đỏ**. `npm run e2e*` và bot hiện có phải vẫn xanh.
+7. **Cửa sổ chuột thấp (#676, B đo; `client/scripts/check-chuot-thap.mjs`):** chọn `DESKTOP_MIN_HEIGHT` bằng số đo. Chuột (cờ Chrome `pointer: fine`), `?skills=mock&n=4&realm=4`, ép bộ giao diện máy tính ở từng chiều cao (mốc tạm 0), mỗi khung kiểm HUD (không tràn trang, không ra ngoài khung, không chồng nhau: khung trái, nhiệm vụ, chat, bản đồ nhỏ, hàng nút HUD, ô chiêu, Chém / Kiếm khí / Đả tọa / Đột phá, Nói, ô nhanh) rồi mở túi (có đồ, ô đầu được chọn để hiện nút Dùng / Vứt), nhân vật, nhiệm vụ, công pháp, bản đồ lớn, cài đặt, hộp thoại NPC, chỉ dẫn (bảng nằm trong khung, không tràn ngang, nút Đóng trong khung, nút ≥ 44 px, nút không bị CẮT ra ngoài phần nhìn thấy của bảng):
+
+| Khung chuột | Cỡ chữ 100 % | Cỡ chữ "Lớn" (1,15) |
+|---|---|---|
+| 1280×720, 1366×768, 1280×577, 1366×625, 1280×520, 1280×500 | không vấn đề | không vấn đề |
+| 1280×490 | (chưa đo riêng) | không vấn đề (túi tự cuộn +11 px, nút Dùng / Vứt còn thấy) |
+| 1280×480 | túi tự cuộn +17 px: **nút Dùng / Vứt 1 / Vứt hết BỊ CẮT** | túi +21 px: nút bị cắt |
+| 1280×450 | túi +47 px: nút bị cắt | (chưa đo) |
+| 1280×400 | hàng nút HUD **chồng** ô chiêu 12 px; túi +97 px: nút bị cắt | (chưa đo) |
+
+  Mốc thấp nhất đạt là 490 (cả hai cỡ chữ), thấp hơn 480 bắt đầu hỏng: chọn **500** (dư 10 px). Bảng Cài đặt tự cuộn từ 1280×720 (thiết kế: danh sách dài), không tính là lỗi. Khung dưới 500 giữ bộ điện thoại (hành vi cũ: tấm tự cuộn, nút Đóng cố định); ở đó HUD 1280×400 vẫn có chồng nhẹ hàng nút / ô chiêu như trước #676, không thuộc phạm vi. Ảnh: `docs/screenshots/chuot-thap-1280x577-tui.png` (bộ máy tính ở khung nhìn 1280×577 thật của màn 720p). Đột biến: `DESKTOP_MIN_HEIGHT = 0` -> 1280×480 thành `desktop` (đỏ), bỏ điều kiện rộng -> 899×577 và 767×500 thành `desktop` (đỏ), luật cũ (luôn `phone`) -> 1280×577 đỏ.
 
 ## 13. Giai đoạn và chia việc
 
