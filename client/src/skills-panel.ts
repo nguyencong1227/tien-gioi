@@ -109,6 +109,10 @@ export interface SkillRow {
   book: string;
   /** Ô đang gắn (2-5) hoặc null */
   slotNow: SkillSlot | null;
+  /** Hàng GỌN (một hàng mỗi chiêu): nhãn ô ("Ô 3" hoặc "Chưa gắn"), dòng phụ ("Hỏa · tầng 2") và `aria-label` của nút hàng (mở chi tiết) */
+  slotLabel: string;
+  sub: string;
+  aria: string;
   slots: SlotButton[];
   /** Nhãn nút gỡ ("Gỡ khỏi ô 3") khi đang gắn, không thì null */
   unequip: string | null;
@@ -182,19 +186,25 @@ export function buildSkillsPanel(skills: SkillTracker, me: SlotMe): SkillsPanelM
       else aria = `Gắn ${def.name} vào ô ${slot}${occupant ? `, thay ${occupant}` : ""}`;
       return { slot, here, open, occupant, label, aria, blocked: lockedSlotToast(slot, me) };
     });
+    const element = elementOf(def.element)?.name ?? "";
+    const need = skillReqMet(def, me.realm, me.tier) ? null : needText(def);
+    const slotLabel = slotNow === null ? "Chưa gắn" : `Ô ${slotNow}`;
     rows.push({
       id: def.id,
       name: def.name,
       level,
       pips: pipsText(Math.min(level, SKILL_MAX_LEVEL)),
-      element: elementOf(def.element)?.name ?? "",
+      element,
       shape: SHAPE_LABEL[def.shape] ?? "",
       stats: statLines(def, level, me.maxMp),
       effects: def.effects.map(effectText).filter((t) => t !== ""),
-      need: skillReqMet(def, me.realm, me.tier) ? null : needText(def),
+      need,
       desc: def.desc,
       book: def.bookName,
       slotNow,
+      slotLabel,
+      sub: [element, `tầng ${level}`].filter((t) => t !== "").join(" · "),
+      aria: rowAria(def.name, element, level, slotNow, need),
       slots,
       unequip: slotNow === null ? null : `Gỡ khỏi ô ${slotNow}`,
     });
@@ -205,6 +215,36 @@ export function buildSkillsPanel(skills: SkillTracker, me: SlotMe): SkillsPanelM
     empty:
       rows.length === 0 ? "Chưa học chiêu nào. Đọc kinh quyển trong Túi đồ để học chiêu." : null,
   };
+}
+
+/** `aria-label` của nút hàng gọn: đọc đủ tên, hệ, tầng, ô đang giữ (chấm tầng "●●○" đọc không ra tiếng), và điều kiện cảnh giới nếu thiếu. */
+export function rowAria(
+  name: string,
+  element: string,
+  level: number,
+  slotNow: SkillSlot | null,
+  need: string | null,
+): string {
+  const parts = [name];
+  if (element) parts.push(`hệ ${element}`);
+  parts.push(`tầng ${level} trên ${SKILL_MAX_LEVEL}`);
+  parts.push(slotNow === null ? "chưa gắn ô" : `đang ở ô ${slotNow}`);
+  if (need) parts.push(need.charAt(0).toLowerCase() + need.slice(1));
+  return parts.join(", ");
+}
+
+/**
+ * Bảng gọn chỉ mở MỘT chi tiết mỗi lúc (kiểu rèm gập): bấm hàng đang mở thì gập, bấm hàng khác thì chuyển sang hàng đó.
+ * Hàng đang mở mà không còn trong danh sách (sổ chiêu đổi lúc đang mở) thì coi như đã gập.
+ */
+export function nextOpenSkill(current: string | null, clicked: string): string | null {
+  return current === clicked ? null : clicked;
+}
+export function resolveOpenSkill(
+  current: string | null,
+  rows: readonly Pick<SkillRow, "id">[],
+): string | null {
+  return current !== null && rows.some((r) => r.id === current) ? current : null;
 }
 
 /** Tin gắn ô gửi máy chủ: `skillId` "" = gỡ. */
