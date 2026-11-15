@@ -388,18 +388,29 @@ async function main() {
     // ---------------- Ca 4: giảm chuyển động ----------------
     out("\n--- Ca 4: giảm chuyển động giảm hạt 70 % ---");
     await setCheck("set-reduced-motion", true);
-    await sleep(300);
-    const before = await aliveParticles();
+    await T.waitFor(
+      `window.__scene.children.list.filter((c) => c.type === 'ParticleEmitter').reduce((n, e) => n + e.getAliveParticleCount(), 0) === 0`,
+      "hạt ca trước hết sạch",
+      5000,
+    );
     must((await burst(1, "{}")) === 1, "phát được một hiệu ứng khi giảm chuyển động");
-    await sleep(60);
-    const added = (await aliveParticles()) - before;
+    await T.waitFor(
+      `window.__scene.children.list.filter((c) => c.type === 'ParticleEmitter').reduce((n, e) => n + e.getAliveParticleCount(), 0) === ${Math.round(8 * 0.3)}`,
+      "hạt giảm chuyển động sinh đúng số lượng (8 * 0.3 = 2)",
+      5000,
+    );
+    const added = await aliveParticles();
     must(
       added === Math.round(8 * 0.3),
       `giảm chuyển động: 8 hạt -> ${Math.round(8 * 0.3)} hạt, thấy ${added}`,
     );
     ok(`giảm chuyển động: 8 hạt -> ${added} hạt`);
     await setCheck("set-reduced-motion", false);
-    await sleep(800);
+    await T.waitFor(
+      `window.__scene.children.list.filter((c) => c.type === 'ParticleEmitter').reduce((n, e) => n + e.getAliveParticleCount(), 0) === 0`,
+      "hạt giảm chuyển động tan hết",
+      5000,
+    );
 
     // ---------------- Ca 5: chữ bay ----------------
     out("\n--- Ca 5: chữ bay BitmapText (trần damageNumbers = 28 ở bậc Cao) ---");
@@ -416,14 +427,17 @@ async function main() {
       `đang bay 28, bỏ 72: ${JSON.stringify(st)}`,
     );
     ok(`100 chữ -> 28 bay, 72 bị bỏ, chỉ tạo ${bt} đối tượng BitmapText`);
-    await sleep(1100);
-    must((await fx(`fx.stats().floatsActive`)) === 0, "hết 800 ms: không còn chữ nào bay");
+    await T.waitFor(
+      `window.__fx.stats().floatsActive === 0`,
+      "hết 800 ms: không còn chữ nào bay",
+      5000,
+    );
     const created1 = await fx(`fx.stats().floatsCreated`);
     for (let r = 0; r < 5; r++) {
       await fx(
         `(() => { for (let i = 0; i < 28; i++) fx.floatNumber('9', window.__scene.predX, window.__scene.predY, { color: 0xffd34d, size: 20 }); return 1; })()`,
       );
-      await sleep(900);
+      await T.waitFor(`window.__fx.stats().floatsActive === 0`, "chữ đợt trước tan hết", 5000);
     }
     must(
       (await fx(`fx.stats().floatsCreated`)) === created1,
@@ -452,7 +466,7 @@ async function main() {
     );
     must(label === "Bạo! 77", `nhãn chí mạng in đủ glyph tiếng Việt: ${label}`);
     ok(`nhãn chí mạng: "${label}"`);
-    await sleep(1000);
+    await T.waitFor(`window.__fx.stats().floatsActive === 0`, "chữ chí mạng tan hết", 5000);
 
     // ---------------- Ca 6: giải phóng sạch ----------------
     out("\n--- Ca 6: đóng lõi hiệu ứng giải phóng sạch ---");
