@@ -175,7 +175,7 @@ describe("tinh anh: phần thưởng", () => {
 });
 
 describe("tinh anh: đọc mc.def (đòn dùng công đã nhân)", () => {
-  it("quái đứng cạnh người chơi đánh bằng công đã nhân: tinh anh gây ~ELITE_ATK_MULT lần quái thường", () => {
+  it("quái đứng cạnh người chơi đánh bằng công đã nhân: tinh anh gây đúng round(atk x ELITE_ATK_MULT) (ngẫu nhiên ±15% của đòn cố định ở 1,0)", () => {
     const melee = { ...LANG, behavior: "melee" as const };
     const dmgOf = (elite: boolean) => {
       const t = makeWorld();
@@ -184,14 +184,16 @@ describe("tinh anh: đọc mc.def (đòn dùng công đã nhân)", () => {
       const id = placeMonster(t.w, melee, p.x + 20, p.y, elite);
       t.w.mctrl.get(id)!.target = "A";
       t.w.now = 10_000;
+      // `rand(0.85, 1.15)` của đòn đánh: 0,5 -> hệ số đúng 1,0 (không còn dao động)
+      vi.spyOn(Math, "random").mockReturnValue(0.5);
       tickMonsters(t.w, 0.05);
+      vi.restoreAllMocks();
       return p.maxHp - p.hp;
     };
     const base = dmgOf(false);
     const eli = dmgOf(true);
     expect(base).toBeGreaterThan(0);
-    // sát thương người nhận còn qua giáp / làm tròn nên so theo tỉ lệ quanh hệ số, không so bằng tuyệt đối
-    expect(eli / base).toBeGreaterThan(ELITE_ATK_MULT - 0.2);
-    expect(eli / base).toBeLessThan(ELITE_ATK_MULT + 0.2);
+    expect(base).toBe(Math.round(melee.atk));
+    expect(eli).toBe(Math.round(Math.round(melee.atk * ELITE_ATK_MULT)));
   });
 });
