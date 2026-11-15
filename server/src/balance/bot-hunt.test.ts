@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { botFight, botHuntSummary, HAN_VAN_MONSTERS } from "./bot-hunt";
-import { MONSTER_BY_ID } from "@tien-gioi/shared";
 
 const NA_REALM = 4;
 

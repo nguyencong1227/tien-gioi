@@ -14,7 +14,6 @@ import {
   ITEM_BY_ID,
   MONSTER_BY_ID,
   PLAYER_RADIUS,
-  REALMS,
   SKILLS,
   TICK_MS,
   getMap,
@@ -146,8 +145,6 @@ export function botFight(options: BotFightOptions): BotFightResult {
       resolved: boolean;
       targetSids: string[];
     } | null = null;
-
-    let prevSlamRemaining = 0;
 
     while (t < maxSeconds && w.state.monsters.has(monId) && players.some((p) => !p.dead)) {
       w.now += TICK_MS;
