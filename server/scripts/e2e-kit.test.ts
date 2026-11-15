@@ -6,7 +6,7 @@ import net from "node:net";
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { killChrome, listenWithRetry, removeTmpDirs, sleep, getChromeGpuFlags } from "./e2e-kit";
 
 const alive = (pid: number) => {
@@ -179,5 +179,44 @@ describe("e2e-kit: getChromeGpuFlags", () => {
     } finally {
       process.env = origEnv;
     }
+  });
+});
+
+describe("e2e-kit: ảnh chụp thường lệ KHÔNG bật theo E2E_LOG_DIR (hồi quy #704, #694)", () => {
+  // `SHOTS` / `FAILURE_SHOTS` tính một lần lúc nạp mô-đun nên nạp lại với môi trường mong muốn
+  const load = async (env: Record<string, string | undefined>) => {
+    const keys = ["E2E_SHOTS", "E2E_LOG_DIR"];
+    const saved = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
+    for (const k of keys) {
+      if (env[k] === undefined) delete process.env[k];
+      else process.env[k] = env[k];
+    }
+    try {
+      vi.resetModules();
+      return await import("./e2e-kit");
+    } finally {
+      for (const k of keys) {
+        if (saved[k] === undefined) delete process.env[k];
+        else process.env[k] = saved[k];
+      }
+    }
+  };
+
+  it("chỉ có E2E_LOG_DIR (e2e:all): ảnh thường lệ TẮT, ảnh chẩn đoán khi đỏ vào thư mục log", async () => {
+    const kit = await load({ E2E_LOG_DIR: "/tmp/tg-log" });
+    expect(kit.SHOTS).toBeUndefined();
+    expect(kit.FAILURE_SHOTS).toBe(path.resolve("/tmp/tg-log"));
+  });
+
+  it("có E2E_SHOTS: cả hai trỏ vào E2E_SHOTS (dev xin chụp ảnh)", async () => {
+    const kit = await load({ E2E_SHOTS: "/tmp/tg-shots", E2E_LOG_DIR: "/tmp/tg-log" });
+    expect(kit.SHOTS).toBe(path.resolve("/tmp/tg-shots"));
+    expect(kit.FAILURE_SHOTS).toBe(path.resolve("/tmp/tg-shots"));
+  });
+
+  it("không có biến nào: không chụp gì", async () => {
+    const kit = await load({});
+    expect(kit.SHOTS).toBeUndefined();
+    expect(kit.FAILURE_SHOTS).toBeUndefined();
   });
 });
