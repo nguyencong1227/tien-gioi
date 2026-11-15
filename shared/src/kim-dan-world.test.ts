@@ -210,6 +210,9 @@ describe("nhiệm vụ Trúc Cơ / Kim Đan làm được từ đầu tới cu�
     const sums = new Map<number, number>();
     for (const q of QUESTS) {
       if (q.daily || !q.rewards.exp) continue;
+      // Chỉ tính chuỗi chính: việc phụ (không bắt buộc) là thưởng cho công sức săn quái thêm, KHÔNG bị chặn cùng ngưỡng
+      // (M7.9, #725: ba việc phụ Hàn Vân thưởng kinh quyển + exp theo khung của A; nếu tính vào sẽ vượt 5% ở Nguyên Anh).
+      if (q.desc.startsWith("Việc phụ")) continue;
       const reach = [...q.steps].reverse().find((s) => s.kind === "reachRealm");
       const realm = reach?.kind === "reachRealm" ? reach.realm : (q.minRealm?.realm ?? 1);
       sums.set(realm, (sums.get(realm) ?? 0) + q.rewards.exp);

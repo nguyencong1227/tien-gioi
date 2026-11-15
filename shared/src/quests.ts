@@ -681,6 +681,100 @@ export const QUESTS: QuestDef[] = [
     },
   },
 
+  // ---------- Việc phụ ở Hàn Vân Trạm (M7.9, #725): gắn kinh quyển Nguyên Anh đợt 2 (rarity 2) ----------
+  // Ba việc phụ không lặp, không thuộc chuỗi chính; mỗi việc một tầng cảnh giới (0/1/2) và một NPC Hàn Vân khác nhau.
+  {
+    id: "lap_uy_bang_nguyen",
+    title: "Lập uy băng nguyên",
+    giver: "tram_truong_han",
+    desc: "Việc phụ (không bắt buộc): hạ 15 Hàn Lang và mang về 8 Hàn Lang mao để mở đường cho đoàn buôn.",
+    steps: [
+      { kind: "kill", monster: "han_lang", count: 15 },
+      { kind: "collect", itemId: "han_lang_mao", count: 8 },
+    ],
+    rewards: {
+      exp: 5000,
+      items: [
+        { itemId: "thuong_hoi_huyet_dan", qty: 3 },
+        { itemId: "kinh_han_quang_tien", qty: 1 },
+      ],
+    },
+    minRealm: { realm: 4, tier: 0 },
+    talk: {
+      offer: [
+        "Lập uy băng nguyên: bầy Hàn Lang gần trạm ngày một đông, chặn cả đoàn buôn lên xuống. Ngươi đã là Nguyên Anh, ra tay dọn chúng giúp trạm.",
+        "Hạ mười lăm con, gom tám nhúm Hàn Lang mao mang về. Đứng gần mà nhặt, đừng để cả bầy vây.",
+      ],
+      progress: [
+        "Hàn Lang gồng một nhịp rồi lao. Thấy đất sáng lên thì bước ngang, né rồi mới đánh.",
+      ],
+      complete: [
+        "Lông lạnh buốt, đúng là Hàn Lang. Từ hôm nay đoàn buôn thông đường.",
+        "Ta có quyển Hàn Quang Tiễn Quyết hiếm: kiếm tu rút tiễn từ hàn khí, bắn từ xa. Cầm lấy, mở Túi đồ rồi bấm Học.",
+      ],
+    },
+  },
+  {
+    id: "ren_trao_bach_kim",
+    title: "Rèn trảo bạch kim",
+    giver: "tho_ren_han",
+    desc: "Việc phụ (không bắt buộc): hạ 10 Cốt Tượng và mang về 8 Tượng cốt cho lò rèn Hàn Vân.",
+    steps: [
+      { kind: "kill", monster: "cot_tuong", count: 10 },
+      { kind: "collect", itemId: "tuong_cot", count: 8 },
+    ],
+    rewards: {
+      exp: 6500,
+      items: [
+        { itemId: "thuong_hoi_linh_dan", qty: 3 },
+        { itemId: "kinh_bach_kim_trao", qty: 1 },
+      ],
+    },
+    minRealm: { realm: 4, tier: 1 },
+    talk: {
+      offer: [
+        "Cốt Tượng là nguyên liệu rèn tốt nhất băng nguyên, nhưng máu dày, hạ một con mất kiên nhẫn. Ngươi đạt Nguyên Anh trung kỳ rồi, vào sâu mà làm.",
+        "Hạ mười con, gom tám khúc Tượng cốt mang tới đây, ta rèn cho ngươi thứ ra hồn.",
+      ],
+      progress: ["Cốt Tượng chậm mà dai. Đánh đều tay, đừng đứng giữa khi Phong Nha đang bắn đạn."],
+      complete: [
+        "Xương voi cổ, nặng tay. Lò ta đủ lửa rèn cả bộ rồi.",
+        "Làm việc cẩn thận, ta thưởng quyển Bạch Kim Trảo: dồn kim khí thành vuốt, chộp trúng là hở máu không liền. Đọc ở Túi đồ để học.",
+      ],
+    },
+  },
+  {
+    id: "luet_gio_han_van",
+    title: "Lướt gió Hàn Vân",
+    giver: "lai_buon_han",
+    desc: "Việc phụ (không bắt buộc): hạ 10 Độc Tước và mang về 6 Độc tước nang cho lái buôn Hàn Vân.",
+    steps: [
+      { kind: "kill", monster: "doc_tuoc", count: 10 },
+      { kind: "collect", itemId: "doc_tuoc_nang", count: 6 },
+    ],
+    rewards: {
+      exp: 8000,
+      items: [
+        { itemId: "thuong_hoi_huyet_dan", qty: 4 },
+        { itemId: "kinh_van_hanh_bo", qty: 1 },
+      ],
+    },
+    minRealm: { realm: 4, tier: 2 },
+    talk: {
+      offer: [
+        "Lướt gió Hàn Vân: Độc Tước vùng sâu bắn đạn độc, nhưng túi nang của chúng ta cần để buôn. Ngươi tới Nguyên Anh hậu kỳ, vào đó an toàn.",
+        "Hạ mười Độc Tước, gom sáu túi Độc tước nang. Bán cho ta, ta trả giá hậu và thưởng ngươi một món.",
+      ],
+      progress: [
+        "Độc Tước đạn tím, trúng rồi máu chảy mãi. Né ngang, uống Thượng Hồi Huyết Đan trước khi nhận đòn.",
+      ],
+      complete: [
+        "Nang còn nguyên, không vỡ. Hàng hoá đến nơi an toàn, ta mừng.",
+        "Ta có quyển Vân Hành Bộ hiếm, bộ pháp phong hệ lướt nhanh như gió. Đọc ở Túi đồ để học, truy sát hay rút lui đều tiện.",
+      ],
+    },
+  },
+
   // ---------- Nhiệm vụ lặp ở Bảng cáo thị ----------
   {
     id: "lang_hai",

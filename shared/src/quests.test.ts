@@ -184,13 +184,20 @@ describe("nội dung nhiệm vụ (#19)", () => {
     return out;
   };
 
-  it("chuỗi chính: Luyện Khí (8 nhiệm vụ) -> Trúc Cơ (2) -> Kim Đan (5) -> Nguyên Anh (8); mọi nhiệm vụ không lặp nằm trong chuỗi, trừ hai việc phụ mang_hoan và giao_hoan (trùm theo đội); Luyện Khí kết thúc ở tầng 9", () => {
+  it("chuỗi chính: Luyện Khí (8 nhiệm vụ) -> Trúc Cơ (2) -> Kim Đan (5) -> Nguyên Anh (8); mọi nhiệm vụ không lặp nằm trong chuỗi, trừ các việc phụ mang_hoan, giao_hoan (trùm theo đội) và ba việc phụ ở Hàn Vân (#725); Luyện Khí kết thúc ở tầng 9", () => {
     const ids = chain();
     expect(ids).toHaveLength(23);
     // Việc phụ không có người đứng trước và không nằm trong chuỗi: hạ Xích Mãng (không an toàn khi solo) KHÔNG được chặn chuỗi chính
-    expect(new Set([...ids, "mang_hoan", "giao_hoan"])).toEqual(
-      new Set(QUESTS.filter((q) => !q.daily).map((q) => q.id)),
-    );
+    expect(
+      new Set([
+        ...ids,
+        "mang_hoan",
+        "giao_hoan",
+        "lap_uy_bang_nguyen",
+        "ren_trao_bach_kim",
+        "luet_gio_han_van",
+      ]),
+    ).toEqual(new Set(QUESTS.filter((q) => !q.daily).map((q) => q.id)));
     expect(ids).not.toContain("mang_hoan");
     expect(QUEST_PREV.mang_hoan).toBeUndefined();
     expect(QUEST_BY_ID.mang_hoan.next).toBeUndefined();
@@ -226,7 +233,13 @@ describe("nội dung nhiệm vụ (#19)", () => {
   it("việc phụ (không lặp, không thuộc chuỗi chính) ghi 'Việc phụ (không bắt buộc)' ở đầu mô tả; nhiệm vụ trong chuỗi chính và nhiệm vụ lặp thì không", () => {
     const inChain = new Set(chain());
     const side = QUESTS.filter((q) => !q.daily && !inChain.has(q.id));
-    expect(side.map((q) => q.id).sort()).toEqual(["giao_hoan", "mang_hoan"]);
+    expect(side.map((q) => q.id).sort()).toEqual([
+      "giao_hoan",
+      "lap_uy_bang_nguyen",
+      "luet_gio_han_van",
+      "mang_hoan",
+      "ren_trao_bach_kim",
+    ]);
     for (const q of side) expect(q.desc.startsWith("Việc phụ (không bắt buộc)"), q.id).toBe(true);
     for (const q of QUESTS)
       if (q.daily || inChain.has(q.id)) expect(q.desc.startsWith("Việc phụ"), q.id).toBe(false);
@@ -265,9 +278,14 @@ describe("nội dung nhiệm vụ (#19)", () => {
 });
 
 describe("thưởng nhiệm vụ bằng kinh quyển (M7.4)", () => {
-  // Cảnh giới người chơi đã đạt khi nhận thưởng: bước `reachRealm` cao nhất của nhiệm vụ (nhiệm vụ không có bước đó thì coi là Phàm Nhân)
+  // Cảnh giới người chơi đã đạt khi nhận thưởng: cao hơn trong (bước `reachRealm` cao nhất của nhiệm vụ, `minRealm` để nhận).
+  // Người chơi phải đạt `minRealm` mới nhận được, và đạt bước `reachRealm` mới hoàn tất -> thưởng ở mức cao hơn cả hai (#725: việc phụ Hàn Vân thưởng kinh quyển, bước chỉ kill/collect/talk nên lấy minRealm).
   const realmAtReward = (q: (typeof QUESTS)[number]) =>
-    Math.max(0, ...q.steps.map((s) => (s.kind === "reachRealm" ? stepOf(s.realm, s.tier) : 0)));
+    Math.max(
+      0,
+      ...q.steps.map((s) => (s.kind === "reachRealm" ? stepOf(s.realm, s.tier) : 0)),
+      q.minRealm ? stepOf(q.minRealm.realm, q.minRealm.tier) : 0,
+    );
 
   it("mọi kinh quyển thưởng nhiệm vụ dạy một chiêu CÓ THẬT và học được ngay lúc nhận (đủ cảnh giới), không để quyển nằm trong túi mà chưa học nổi", () => {
     let n = 0;
