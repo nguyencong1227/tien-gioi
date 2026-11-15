@@ -108,7 +108,7 @@ async function main() {
         "form đăng nhập",
       );
       await T.ev(
-        `const inp = document.getElementById('login-name'); if (inp) inp.value = ${JSON.stringify(NAME)}; document.getElementById('login-form').requestSubmit(); 1`,
+        `(() => { const inp = document.getElementById('login-name'); if (inp) inp.value = ${JSON.stringify(NAME)}; document.getElementById('login-form')?.requestSubmit(); })(); 1`,
       );
       await T.waitFor(
         `!document.getElementById('ui')?.hidden && !!window.__scene?.room && !!document.getElementById('hud-name')?.textContent && (window.__scene?.predX > 0 || window.__scene?.hasMe)`,
@@ -190,6 +190,11 @@ async function main() {
     const floatImmediate = (await T.ev(`(() => {
       const s = window.__scene, cam = s.cameras.main;
       const spawned = s.fx.floatNumber('88', s.predX, s.predY - 40, { color: 0xff00ff, size: 48, priority: 2 });
+      // GHIM chữ ở tư thế vừa sinh trong lúc đo: chữ bay sống FLOAT_MS = 800 ms theo đồng hồ Phaser, mà trên runner CI (WebGL phần mềm) khung hình
+      // tụt 47 -> 4 FPS nên ảnh chụp đầu tiên tới SAU khi chữ đã hết đời và bị ẩn (log runner #694: lần thăm dò 1 đã alpha 0,016 / visible false).
+      // Ca này kiểm "chữ được vẽ ra canvas" (UV phông), không kiểm chuyển động (float-set.test.ts lo), nên đo độc lập với tốc độ khung.
+      window.__fxUpdateOrig = s.fx.update;
+      s.fx.update = () => {};
       const stats = s.fx.stats();
       const bms = (s.children?.list ?? [])
         .filter((c) => c.type === 'BitmapText')
@@ -324,9 +329,12 @@ async function main() {
       const shotPath = await T.shot("fx-failure");
       if (shotPath) out(`    đã lưu ảnh chụp khi kết thúc (CDP): ${shotPath}`);
     }
+    // Trả lại chuyển động rồi dọn chữ ghim
+    await T.ev(
+      `(() => { if (window.__fxUpdateOrig && window.__scene?.fx) window.__scene.fx.update = window.__fxUpdateOrig; window.__fx?.clear(); })()`,
+    );
     must(painted > 150, `chữ bay được VẼ thật ra màn hình (điểm ảnh tím: ${painted})`);
     ok(`glyph có UV hợp lệ và chữ bay thật sự được vẽ (${painted} điểm ảnh)`);
-    await T.ev(`window.__fx.clear(); 1`);
 
     // ---------------- Ca 2: ngân sách hạt theo bậc ----------------
     out("\n--- Ca 2: số hạt sống THẬT không vượt ngân sách (Cao: 520 hạt / 24 emitter) ---");
