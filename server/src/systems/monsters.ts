@@ -3,6 +3,7 @@ import { PLAYER_RADIUS, MONSTERS, type MonsterKind } from "@tien-gioi/shared";
 import { Monster } from "../schema";
 import { rand, quantAngle, takeWhole, type World, type MonsterCtrl } from "../world";
 import { hurtPlayer } from "./combat";
+import { eliteDefOf, rollElite } from "./elite";
 import { chargerStep } from "./charge";
 import { cancelSlam, slamStep } from "./slam";
 import { isRanged, onHitEffectOf, rangedStep } from "./bolt";
@@ -29,10 +30,12 @@ export const MONSTER_WAKE_DIST = 900;
 export const WANDER_STRIDE = 4;
 
 /** Dựng một con quái `def` ở (x, y): vào state và dữ liệu riêng. Không kiểm vị trí (người gọi lo). */
-function placeMonster(w: World, def: MonsterKind, x: number, y: number) {
+export function placeMonster(w: World, def: MonsterKind, x: number, y: number, elite = false) {
+  if (elite) def = eliteDefOf(def); // tinh anh (M7.3, `elite.ts`): số liệu nhân, `id` giữ nguyên
   const id = `m${++w.monsterSeq}`;
   const m = new Monster();
   m.kind = def.id;
+  if (elite) m.elite = 1; // đặt MỘT lần lúc sinh
   m.x = x;
   m.y = y;
   m.hp = def.hp;
@@ -51,7 +54,9 @@ function placeMonster(w: World, def: MonsterKind, x: number, y: number) {
     hpFrac: 0,
     // Lệch pha theo số thứ tự để quái không cùng nhúc nhích một tick (không dùng random: giữ nguyên chuỗi của bench có seed)
     strideLeft: w.monsterSeq % WANDER_STRIDE,
+    ...(elite ? { elite: true as const } : {}),
   });
+  return id;
 }
 
 export function spawnMonster(w: World, def: MonsterKind) {
@@ -62,7 +67,7 @@ export function spawnMonster(w: World, def: MonsterKind) {
     const d = map.dangerAt(x, y);
     if (d < def.minDanger || (def.id === "tho" && d > 0.45)) continue;
     if (map.inSafe(x, y, 160) || map.circleBlocked(x, y, def.radius)) continue;
-    placeMonster(w, def, x, y);
+    placeMonster(w, def, x, y, rollElite(w, def));
     return;
   }
 }
