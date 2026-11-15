@@ -62,27 +62,44 @@ jobs:
         # Do đó tất cả kịch bản đều chạy ổn định trên ubuntu-latest mà không cần GPU vật lý.
         # Nếu trong tương lai có kịch bản đòi hỏi GPU phần cứng chuyên dụng, hãy cấu hình --skip
         # kèm lý do kỹ thuật rõ ràng ngay tại đây.
+        env:
+          IN_ONLY: ${{ inputs.only }}
+          IN_SKIP: ${{ inputs.skip }}
+          IN_TIMEOUT: ${{ inputs.timeout }}
+          IN_NO_RETRY: ${{ inputs.no_retry }}
         run: |
           mkdir -p e2e-logs
-          ARGS="--logs e2e-logs"
+          args=(--logs e2e-logs)
 
-          if [ -n "${{ inputs.only }}" ]; then
-            ARGS="$ARGS --only ${{ inputs.only }}"
+          if [ -n "$IN_ONLY" ]; then
+            if [[ ! "$IN_ONLY" =~ ^[a-z0-9:,_-]*$ ]]; then
+              echo "Lỗi: input 'only' chứa ký tự không hợp lệ: $IN_ONLY" >&2
+              exit 1
+            fi
+            args+=(--only "$IN_ONLY")
           fi
 
-          if [ -n "${{ inputs.skip }}" ]; then
-            ARGS="$ARGS --skip ${{ inputs.skip }}"
+          if [ -n "$IN_SKIP" ]; then
+            if [[ ! "$IN_SKIP" =~ ^[a-z0-9:,_-]*$ ]]; then
+              echo "Lỗi: input 'skip' chứa ký tự không hợp lệ: $IN_SKIP" >&2
+              exit 1
+            fi
+            args+=(--skip "$IN_SKIP")
           fi
 
-          if [ -n "${{ inputs.timeout }}" ]; then
-            ARGS="$ARGS --timeout ${{ inputs.timeout }}"
+          if [ -n "$IN_TIMEOUT" ]; then
+            if [[ ! "$IN_TIMEOUT" =~ ^[0-9]+$ ]]; then
+              echo "Lỗi: input 'timeout' phải là số nguyên dương: $IN_TIMEOUT" >&2
+              exit 1
+            fi
+            args+=(--timeout "$IN_TIMEOUT")
           fi
 
-          if [ "${{ inputs.no_retry }}" = "true" ]; then
-            ARGS="$ARGS --no-retry"
+          if [ "$IN_NO_RETRY" = "true" ]; then
+            args+=(--no-retry)
           fi
 
-          npm run e2e:all -w server -- $ARGS
+          npm run e2e:all -w server -- "${args[@]}"
 
       - name: Xuất bảng kết quả E2E vào Job Summary
         if: always()

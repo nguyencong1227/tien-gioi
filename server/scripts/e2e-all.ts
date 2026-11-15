@@ -16,6 +16,7 @@ import { spawn, execSync } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
+  mkdtempSync,
   readFileSync,
   readdirSync,
   rmSync,
@@ -414,64 +415,6 @@ export async function killProcessTree(
   await new Promise((r) => setTimeout(r, 100));
 }
 
-/**
- * Liệt kê danh sách tên các mục tạm e2e (tiền tố `tien-gioi-e2e-` hoặc `tg-`) hiện có trong tmpDir.
- * Dùng để chụp snapshot trước khi chạy một kịch bản E2E.
- */
-export function getE2eTmpEntries(tmpDir: string = os.tmpdir()): Set<string> {
-  try {
-    const entries = readdirSync(tmpDir);
-    const result = new Set<string>();
-    for (const name of entries) {
-      if (name.startsWith("tien-gioi-e2e-") || name.startsWith("tg-")) {
-        result.add(name);
-      }
-    }
-    return result;
-  } catch {
-    return new Set<string>();
-  }
-}
-
-/**
- * Xoá các mục tạm mới sinh ra trong lần chạy (có trong tmpDir nhưng không có trong beforeEntries).
- * Loại trừ excludeDir (ví dụ thư mục logsDir chứa file nhật ký của runner) để không xoá nhầm.
- */
-export function cleanupNewTmpEntries(
-  beforeEntries: Set<string>,
-  excludeDir?: string,
-  tmpDir: string = os.tmpdir(),
-): string[] {
-  const cleaned: string[] = [];
-  try {
-    const current = readdirSync(tmpDir);
-    const normExclude = excludeDir ? path.resolve(excludeDir) : null;
-
-    for (const name of current) {
-      if (!name.startsWith("tien-gioi-e2e-") && !name.startsWith("tg-")) {
-        continue;
-      }
-      if (beforeEntries.has(name)) {
-        continue;
-      }
-      const fullPath = path.join(tmpDir, name);
-      if (normExclude && path.resolve(fullPath) === normExclude) {
-        continue;
-      }
-
-      try {
-        rmSync(fullPath, { recursive: true, force: true });
-        cleaned.push(name);
-      } catch {
-        // Bỏ qua lỗi xoá từng file tạm
-      }
-    }
-  } catch {
-    // Bỏ qua lỗi đọc tmpDir
-  }
-  return cleaned;
-}
-
 /** Chạy một lần script bằng npm run (hoặc command tuỳ chọn) và bắt log + timeout */
 export function executeScriptOnce(
   scriptName: string,
@@ -482,14 +425,25 @@ export function executeScriptOnce(
     attempt: number;
     command?: { cmd: string; args: string[] };
     graceMs?: number;
+    privTmpDir?: string;
   },
-): Promise<{ exitCode: number | null; durationSec: number; log: string; timedOut: boolean }> {
+): Promise<{
+  exitCode: number | null;
+  durationSec: number;
+  log: string;
+  timedOut: boolean;
+  privTmpDir: string;
+}> {
   return new Promise((resolve) => {
     const startTime = Date.now();
     let timedOut = false;
     let logBuffer = "";
     let cleanupPromise: Promise<void> | null = null;
-    const tmpEntriesBefore = getE2eTmpEntries();
+
+    // Dùng thư mục tạm riêng biệt (ngắn, dưới os.tmpdir()) để cô lập môi trường chạy
+    // Mọi thư mục tạm của Chrome và file lưu của kịch bản đều sinh bên trong thư mục này
+    // và được dọn dẹp sạch sẽ sau khi script kết thúc mà không đụng chạm tới tài nguyên của dev khác
+    const privTmpDir = options.privTmpDir ?? mkdtempSync(path.join(os.tmpdir(), "tg-e2eall-"));
 
     const cmd = options.command?.cmd ?? "npm";
     const args = options.command?.args ?? ["run", scriptName, "-w", "server"];
@@ -500,6 +454,9 @@ export function executeScriptOnce(
       detached: true, // tạo process group để quản lý
       env: {
         ...process.env,
+        TMPDIR: privTmpDir,
+        TEMP: privTmpDir,
+        TMP: privTmpDir,
         FORCE_COLOR: "0",
       },
     });
@@ -519,6 +476,20 @@ export function executeScriptOnce(
       }
     }, options.timeoutSec * 1000);
 
+    const cleanupPrivTmp = async () => {
+      if (timedOut) {
+        // Chờ ngắn để tiến trình con giải phóng hoàn toàn file lock trước khi xoá thư mục
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      try {
+        if (existsSync(privTmpDir)) {
+          rmSync(privTmpDir, { recursive: true, force: true });
+        }
+      } catch {
+        // Bỏ qua lỗi dọn privTmpDir
+      }
+    };
+
     cp.on("close", async (code) => {
       clearTimeout(timer);
       if (cleanupPromise) {
@@ -532,15 +503,9 @@ export function executeScriptOnce(
       const durationSec = (Date.now() - startTime) / 1000;
       if (timedOut) {
         logBuffer += `\n[TIMEOUT] Script chạy quá giới hạn ${options.timeoutSec}s và đã bị dừng (đã dọn cây tiến trình).\n`;
-
-        // Dọn dẹp các thư mục tạm /tmp/tien-gioi-e2e-* hoặc tg-* mới sinh ra do script bị kill không kịp removeTmpDirs
-        await new Promise((r) => setTimeout(r, 200));
-        const excludeDir = options.logFile ? path.dirname(options.logFile) : undefined;
-        const cleaned = cleanupNewTmpEntries(tmpEntriesBefore, excludeDir);
-        if (cleaned.length > 0) {
-          logBuffer += `[CLEANUP] Đã dọn dẹp ${cleaned.length} thư mục tạm sau timeout: ${cleaned.join(", ")}\n`;
-        }
       }
+
+      await cleanupPrivTmp();
 
       // Ghi log ra file
       try {
@@ -554,11 +519,13 @@ export function executeScriptOnce(
         durationSec,
         log: logBuffer,
         timedOut,
+        privTmpDir,
       });
     });
 
-    cp.on("error", (err) => {
+    cp.on("error", async (err) => {
       clearTimeout(timer);
+      await cleanupPrivTmp();
       const durationSec = (Date.now() - startTime) / 1000;
       logBuffer += `\n[LỖI TIẾN TRÌNH] ${err.message}\n`;
       try {
@@ -571,6 +538,7 @@ export function executeScriptOnce(
         durationSec,
         log: logBuffer,
         timedOut: false,
+        privTmpDir,
       });
     });
   });
