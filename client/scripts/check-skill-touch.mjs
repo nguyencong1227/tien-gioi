@@ -185,13 +185,15 @@ try {
         "nằm trọn trong màn hình",
       );
       // vị trí: dọc / máy tính bảng = khối dính mép phải, ngay TRÊN nút Mục tiêu, ô 2 sát nút (dưới-phải); điện thoại NGANG (trên nút Mục tiêu là hàng nút menu +
-      // bản đồ nhỏ) = bên trái cột nút ngữ cảnh, trên thanh đan dược
+      // bản đồ nhỏ) = bên trái nút Mục tiêu và cột nút ngữ cảnh, đáy ngang thanh đan dược (#727: nút Mục tiêu / ngữ cảnh nằm trên thanh đan dược, ô chiêu bên trái)
       const t = info.target;
       const phoneLandscape = vp.w > vp.h && vp.h < 520;
       if (phoneLandscape) {
         check(
-          shown.every((s) => s.x + s.w <= t.x - 8 && s.y + s.h <= info.quick.y - 8 + 0.5),
-          "điện thoại ngang: bên trái nút Mục tiêu và TRÊN thanh đan dược (cách >= 8 px)",
+          shown.every(
+            (s) => s.x + s.w <= t.x - 8 + 0.5 && s.y + s.h <= info.quick.y + info.quick.h + 0.5,
+          ),
+          "điện thoại ngang: bên trái nút Mục tiêu (cách >= 8 px), đáy không thấp hơn thanh đan dược",
         );
       } else if (SCHEME === "dpad") {
         check(

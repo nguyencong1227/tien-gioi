@@ -156,9 +156,13 @@ try {
     }
     return { worst, pair };
   };
+  // Bỏ thuộc tính `hidden` của ba nút ngữ cảnh NGAY TRONG tác vụ đo (vòng lặp cảnh không kịp ẩn lại giữa chừng). CSS điện thoại ngang chọn ô xếp chồng của chúng bằng
+  // `:not([hidden])` (#727), nên chỉ ép hiện bằng CSS thì cả ba dồn vào một ô và đo ra chồng nhau giả.
+  const SHOW_CTX =
+    "for (const id of ['btn-pickup', 'btn-talk', 'btn-portal']) document.getElementById(id).hidden = false;";
   const rectsOf = (sels) =>
     J(
-      `(() => ${JSON.stringify(sels)}.map((s) => { const b = document.querySelector(s).getBoundingClientRect(); return { s, x: b.x, y: b.y, w: b.width, h: b.height, r: b.right, b: b.bottom }; }))()`,
+      `(() => { ${SHOW_CTX} return ${JSON.stringify(sels)}.map((s) => { const b = document.querySelector(s).getBoundingClientRect(); return { s, x: b.x, y: b.y, w: b.width, h: b.height, r: b.right, b: b.bottom }; }); })()`,
     );
 
   for (const vp of VIEWPORTS) {
@@ -202,6 +206,7 @@ try {
     );
     await sleep(150);
     const ctl = await J(`(() => {
+      ${SHOW_CTX}
       const sel = ['#sk-break','#sk-med','#sk-sword','#sk-slash','#quick-1','#quick-2','#btn-pickup','#btn-talk','#btn-portal'];
       return sel.map((s) => { const b = document.querySelector(s).getBoundingClientRect(); return { s, x: b.x, y: b.y, w: b.width, h: b.height, r: b.right, b: b.bottom }; });
     })()`);
@@ -235,6 +240,7 @@ try {
     // Không nút ngữ cảnh nào bị phần tử khác đè lên: năm điểm (tâm + bốn hướng ở 1/4) của mỗi nút phải trúng chính nút đó. Ở 360x640 nút cổng
     // từng nằm dưới thanh Nhiệm vụ của cột HUD trái: tâm nút trúng nút bật / tắt nhiệm vụ nên chạm vào nút cổng lại mở / đóng nhiệm vụ.
     const covered = await J(`(() => {
+      ${SHOW_CTX}
       const out = [];
       for (const s of ['#btn-pickup', '#btn-talk', '#btn-portal']) {
         const e = document.querySelector(s);

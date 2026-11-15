@@ -1797,11 +1797,111 @@ html[data-input="touch"] #skill-slots {
   bottom: calc(max(14px, var(--safe-b, env(safe-area-inset-bottom, 0px))) + 166px + 58px + 8px);
   pointer-events: none;
 }
-/* Điện thoại NGANG (844x390): phía trên nút Mục tiêu là hàng nút menu + bản đồ nhỏ nên không đặt trên Mục tiêu được. Khối nằm bên TRÁI cột nút ngữ cảnh
-   (cổng / nói chuyện / nhặt, cách mép phải 168 px, rộng 58) và TRÊN thanh đan dược (cao 48): vùng trống giữa cụm kỹ năng và nửa trái dành cho joystick. */
+/* ===== Điện thoại NGANG: vùng nút hành động (#727) =====
+   Cột phải (bản đồ nhỏ + thanh menu bảy nút) cao ~176 px nên chỉ còn H - 184 px chiều cao cho nút hành động; cụm kỹ năng đã cao 156 px, KHÔNG còn chỗ cho nút
+   Mục tiêu / nút ngữ cảnh xếp CHỒNG LÊN trên nó (trước đây nút Mục tiêu neo cách đáy 180 px, nút Cổng ở ô thứ ba cách đáy 220 px: chồng thanh menu khi H < ~417 px,
+   chạm giữa nút Mục tiêu ở 812 x 375 mở nhầm Cài đặt, chạm nút Cổng mở nhầm Túi). Nay mọi nút nằm BÊN TRÁI cụm kỹ năng, xếp từ đáy lên, đều dưới đáy cột phải:
+     cột A (ngay trái cụm kỹ năng): thanh đan dược ở đáy, nút Mục tiêu ngay trên nó;
+     cột B (trái cột A một ô): nút ngữ cảnh (nhặt / nói chuyện / cổng) xếp từ hàng thứ hai lên, CHỈ nút đang hiện chiếm ô (chọn ô theo số nút hiện phía trước, xem bên dưới; cao < 375 px nút 52 px);
+     khối ô chiêu 2 x 2: trái cột B, đáy ngang thanh đan dược.
+   Chiều cao < 340 px (568 x 320): thu cụm kỹ năng còn 84 % (nút 52 px, vẫn >= 44) để không chạm nút ☰. Test: e2e-giao-dien (LANDSCAPE_PHONES, touch-controls-kit.ts). */
+html[data-input="touch"][data-form="phone"][data-orient="landscape"] {
+  --ls-r: max(14px, var(--safe-r, env(safe-area-inset-right, 0px)));
+  --ls-b: max(14px, var(--safe-b, env(safe-area-inset-bottom, 0px)));
+  /* bề rộng cụm kỹ năng (nút 62 + khe 10 + nút Chém 84) */
+  --ls-cw: 156px;
+  /* cột A: mép trái cụm kỹ năng cộng khe 12 px */
+  --ls-a: calc(var(--ls-r) + var(--ls-cw) + 12px);
+  /* đáy hàng thứ hai: ngay trên thanh đan dược (cao 48) cách 8 px */
+  --ls-row2: calc(var(--ls-b) + 48px + 8px);
+  /* nút ngữ cảnh: cỡ và bước xếp chồng (cỡ + khe) */
+  --ls-ctx: 58px;
+  --ls-step: 66px;
+  /* nút Mục tiêu */
+  --ls-tgt: 58px;
+}
+/* Chiều cao < 375 px (740 x 360, 568 x 320): hai nút ngữ cảnh chồng lên nhau (Nói + Nhặt), hay ba nút (cổng trên nút Mục tiêu), sẽ chạm thanh menu, nên nút ngữ cảnh và nút Mục tiêu 52 px (vẫn >= 44), khe 6 px */
+@media (max-height: 374px) {
+  html[data-input="touch"][data-form="phone"][data-orient="landscape"] {
+    --ls-ctx: 52px;
+    --ls-step: 58px;
+    --ls-tgt: 52px;
+  }
+}
+@media (max-height: 339px) {
+  html[data-input="touch"][data-form="phone"][data-orient="landscape"] {
+    --ls-cw: 130px;
+  }
+  /* cụm kỹ năng cao 156 -> 130 px (nút 50, Chém 70; vẫn >= 44) để không chạm nút ☰ ở 568 x 320 */
+  html[data-input="touch"][data-form="phone"][data-orient="landscape"] #skills > .sk {
+    width: 50px;
+    height: 50px;
+  }
+  html[data-input="touch"][data-form="phone"][data-orient="landscape"] #skills > .sk.big {
+    width: 70px;
+    height: 70px;
+  }
+}
+/* Rất hẹp (568 x 320): Tổ đội / Nhiệm vụ rộng 150 px (thay vì 200 / 185) và ô chiêu 50 px, để cột trái (kết thúc ở x ~ 160) không chạm khối ô chiêu 2 x 2 ngay bên phải (x >= 170) */
+@media (max-width: 620px) {
+  html[data-input="touch"][data-form="phone"][data-orient="landscape"]
+    :is(#party-panel, #quest-tracker) {
+    width: 150px;
+  }
+  html[data-input="touch"][data-form="phone"][data-orient="landscape"] #skill-slots {
+    gap: 6px;
+    width: 106px;
+  }
+  html[data-input="touch"][data-form="phone"][data-orient="landscape"] #skill-slots .sk.slot {
+    width: 50px;
+    height: 50px;
+  }
+}
+/* cột trái cuộn thay vì ép từng bảng thấp lại (bảng bị ép thì nút trong bảng chồng lên nút bảng bên dưới); kiểu D-pad: cột kết thúc trên D-pad (152 px + khe) */
+html[data-input="touch"][data-form="phone"][data-orient="landscape"] #hud-col-left > * {
+  flex-shrink: 0;
+}
+html[data-input="touch"][data-form="phone"][data-orient="landscape"][data-touch-scheme="dpad"]
+  #hud-col-left {
+  max-height: calc(100dvh - var(--ls-b) - 152px - 16px);
+}
+html[data-input="touch"][data-form="phone"][data-orient="landscape"] #quickbar {
+  right: var(--ls-a);
+  bottom: var(--ls-b);
+}
+html[data-input="touch"][data-form="phone"][data-orient="landscape"] #btn-target {
+  right: var(--ls-a);
+  bottom: var(--ls-row2);
+  width: var(--ls-tgt);
+  height: var(--ls-tgt);
+}
+html[data-input="touch"][data-form="phone"][data-orient="landscape"]
+  :is(#btn-pickup, #btn-talk, #btn-portal) {
+  right: calc(var(--ls-a) + 58px + 8px);
+  bottom: var(--ls-row2);
+  width: var(--ls-ctx);
+  height: var(--ls-ctx);
+}
+/* Thứ tự trong DOM: nhặt, nói chuyện, cổng. Ô của mỗi nút = số nút ĐANG HIỆN đứng trước nó (mỗi ô cao `--ls-ctx` + khe: 58 + 8, hoặc 52 + 6 khi cao < 375 px). */
+html[data-input="touch"][data-form="phone"][data-orient="landscape"]
+  #btn-pickup:not([hidden])
+  ~ :is(#btn-talk, #btn-portal),
+html[data-input="touch"][data-form="phone"][data-orient="landscape"]
+  #btn-talk:not([hidden])
+  ~ #btn-portal {
+  bottom: calc(var(--ls-row2) + var(--ls-step));
+}
+/* Ba nút cùng lúc (hiếm): ô thứ ba lên cột A, ngay trên nút Mục tiêu (khe 8), vì cột B xếp ba ô sẽ chạm thanh menu */
+html[data-input="touch"][data-form="phone"][data-orient="landscape"]
+  #btn-pickup:not([hidden])
+  ~ #btn-talk:not([hidden])
+  ~ #btn-portal {
+  right: var(--ls-a);
+  bottom: calc(var(--ls-row2) + var(--ls-tgt) + 8px);
+}
 html[data-input="touch"][data-form="phone"][data-orient="landscape"] #skill-slots {
-  right: calc(max(14px, var(--safe-r, env(safe-area-inset-right, 0px))) + 168px + 58px + 8px);
-  bottom: calc(max(14px, var(--safe-b, env(safe-area-inset-bottom, 0px))) + 48px + 8px);
+  right: calc(var(--ls-a) + 58px + 8px + 58px + 8px);
+  bottom: var(--ls-b);
 }
 /* D-pad + DỌC: cột nút ngữ cảnh (nhặt / nói chuyện / cổng) xếp NGAY TRÊN nút Mục tiêu và thanh đan dược sang trái nút Mục tiêu (xem khối "D-pad + điện thoại DỌC"
    bên dưới), nên khối chiêu lùi sang trái cột đó (cách 8 px) và nằm TRÊN thanh đan dược. */
