@@ -1474,10 +1474,33 @@ function drawItemIcon(id) {
       s.line(15.3, 10.2, 9.7, 15.8, accent, 1);
       s.circle(12.5, 13, 1.3, cover);
     } else if (mark === "kiem") {
-      // Liệt Hỏa Kiếm: thanh kiếm dựng đứng có chắn tay
-      s.line(12.5, 10, 12.5, 16.8, accent, 1.6);
-      s.tri(11.2, 10.2, 13.8, 10.2, 12.5, 8.4, accent);
-      s.line(9.8, 14.2, 15.2, 14.2, accent, 1.4);
+      // Liệt Hỏa Kiếm: thanh kiếm CHÉO (mũi trên trái, chuôi dưới phải: ngược hướng mũi tên của Hàn Quang Tiễn), vẽ từng điểm ảnh cho sắc nét ở 24 px
+      // (đường khử răng cưa lem thành hình chim): lưỡi dày 2 điểm ảnh, chắn tay vuông góc với lưỡi, chuôi và núm. Không dựng đứng: kiếm dọc có chắn
+      // tay ngang kẹp giữa hai dải ngang của bìa đọc ra chữ Hán "王" (quy tắc: không chữ Hán trên ảnh); mũi cách dải trên 1 điểm ảnh.
+      const blade = [
+        [10, 9],
+        [10, 10],
+        [11, 10],
+        [11, 11],
+        [12, 11],
+        [12, 12],
+        [13, 12],
+        [13, 13],
+        [14, 13],
+      ];
+      const guard = [
+        [16, 11],
+        [15, 12],
+        [14, 14],
+        [13, 14],
+        [12, 15],
+      ];
+      const hilt = [
+        [15, 14],
+        [16, 15],
+        [17, 16],
+      ];
+      for (const [x, y] of [...blade, ...guard, ...hilt]) s.rect(x, y, 1, 1, accent);
     } else if (mark === "bo") {
       // Vân Hành Bộ: đám mây (ba cụm tròn trên đáy phẳng) có vệt gió bên dưới
       s.circle(10.6, 12.8, 2, accent);
