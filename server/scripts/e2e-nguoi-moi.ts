@@ -81,7 +81,6 @@ async function press(tab: Tab, k: Key) {
 const sha1Nfc = (s: string) =>
   createHash("sha1").update(s.normalize("NFC").toLowerCase().trim()).digest("hex");
 
-const BOOK = "kinh_hoa_van_kiem";
 const SKILL = "hoa_van_kiem";
 
 async function main() {
