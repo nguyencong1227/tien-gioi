@@ -18,6 +18,7 @@ import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { Tab, sleep, listenWithRetry, removeTmpDirs, getChromeGpuFlags } from "./e2e-kit";
 import { freePort } from "../src/test-port.js";
+import { getMap, DEFAULT_MAP_ID } from "@tien-gioi/shared";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
@@ -135,6 +136,23 @@ async function main() {
     };
     const url = `http://127.0.0.1:${PORT}/?debug=1`;
     const ev = (expr: string) => T.ev(expr) as Promise<any>;
+
+    // Lưu sẵn nhân vật 1 cạnh Bắc Môn Quan (như chặng 2 cạnh Vọng Trạch Quan và chặng 3 cạnh Lăng Hàn Quan)
+    // để đi bộ tới cổng chỉ mất vài ô bằng joystick ảo, tránh lội bộ 80 ô từ giữa trấn Lạc Hà gây quá hạn 90s khi FPS thấp trên CI runner
+    const lhBac = getMap(DEFAULT_MAP_ID)!.portals.find((p) => p.id === "lac_ha_bac")!;
+    await savePlayer({
+      name: currentName,
+      secretHash: hashSecret(currentSecret),
+      realm: 2,
+      tier: 0,
+      exp: 0,
+      mapId: DEFAULT_MAP_ID,
+      x: lhBac.spawn.x,
+      y: lhBac.spawn.y,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
     await setStorage("");
     await login(url);
     // Chrome headless không GPU tự rơi vào bậc Thấp (không sương, không ánh sáng): ép bậc Cao để các lớp M5.3 ở bản đồ đích thật sự có mặt
@@ -207,6 +225,35 @@ async function main() {
 
     // Qua cổng `id`: màn chuyển cảnh hiện, bản đồ đích đúng, màn chuyển cảnh ẩn lại (trả về các mẫu bán kính mống mắt)
     const crossPortal = async (id: string, destMapId: string) => {
+      // Cài đặt bộ lấy mẫu mống mắt TRONG TRANG bằng MutationObserver + requestAnimationFrame
+      // Bắt đầu lấy mẫu NGAY KHI transition-overlay nhận class 'active', không chờ CDP IPC thăm dò làm trôi mất 400ms
+      await ev(`(() => {
+        window.__irisSamples = [];
+        const overlay = document.getElementById('transition-overlay');
+        let sampling = false;
+        function sample() {
+          if (!sampling) return;
+          const r = parseFloat(getComputedStyle(overlay).getPropertyValue('--iris-r')) || 0;
+          window.__irisSamples.push(r);
+          if (window.__irisSamples.length < 60 && overlay.classList.contains('active')) {
+            requestAnimationFrame(sample);
+          }
+        }
+        const mo = new MutationObserver(() => {
+          if (overlay.classList.contains('active') && !sampling) {
+            sampling = true;
+            sample();
+          }
+        });
+        mo.observe(overlay, { attributes: true, attributeFilter: ['class'] });
+        // Nếu đã active từ trước thì lấy mẫu luôn
+        if (overlay.classList.contains('active')) {
+          sampling = true;
+          sample();
+        }
+        return 1;
+      })()`);
+
       await ev(`window.__scene.travelPortal(${JSON.stringify(id)}); 1`);
       await T.waitFor(
         `document.getElementById('transition-overlay').classList.contains('active') && !document.getElementById('transition-overlay').hidden`,
@@ -214,21 +261,14 @@ async function main() {
         5000,
       );
       ok(`màn chuyển cảnh hiện ngay khi qua cổng ${id}`);
-      // Lấy mẫu bán kính mống mắt trong lúc nó khép: phải có giá trị Ở GIỮA (đang chuyển động thật), không phải nhảy thẳng
-      const radii: number[] = [];
-      for (let i = 0; i < 14; i++) {
-        const r = Number(
-          await ev(
-            `parseFloat(getComputedStyle(document.getElementById('transition-overlay')).getPropertyValue('--iris-r')) || 0`,
-          ),
-        );
-        radii.push(r);
-        if (
-          !(await ev(`document.getElementById('transition-overlay').classList.contains('active')`))
-        )
-          break;
-        await sleep(40);
-      }
+
+      // Chờ màn chuyển cảnh thu thập mẫu mống mắt trong trang
+      await T.waitFor(
+        `(window.__irisSamples || []).some(r => r > 20 && r < 1500) || (window.__irisSamples || []).length >= 6`,
+        "mống mắt khép dần",
+        4000,
+      );
+      const radii = ((await ev(`window.__irisSamples || []`)) as number[]) || [];
       const mid = radii.filter((r) => r > 20 && r < 1500).length;
       must(
         mid >= 1,
@@ -264,7 +304,6 @@ async function main() {
     out(
       "\n--- Ba bản đồ: Hắc Phong Cốc -> Âm Sương Trạch -> Hắc Phong Cốc (cổng thật, nhân vật lưu sẵn cạnh Vọng Trạch Quan) ---",
     );
-    const { getMap } = await import("@tien-gioi/shared");
     const north = getMap("hac_phong")!.portal("hac_phong_bac")!;
     const NAME2 = "Canh Am Suong"; // tên 2-16 ký tự (luật đạo hiệu)
     const SECRET2 = "e2e_secret_cc_2222222222222";

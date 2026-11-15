@@ -23,7 +23,7 @@ Bản phát hành M7 (`docs/PHAN_CONG_M7.md`; hướng đã được người d�
 - Có hai câu hỏi cân bằng CHƯA được người dùng trả lời, A đã chọn mặc định (xem `questions.md`): Linh thạch dư ~168.000 sau khi rèn xong bộ IV, và tinh anh Độc Tước giết người solo.
 
 ### Đo và kiểm
-- `npm test` 4244 test qua (238 tệp); `e2e:all` chạy một lệnh 22 kịch bản E2E bằng Chrome thật + máy chủ Colyseus thật (22 / 22 xanh khi C chạy, #696; `e2e:nhip-tim` ca 4 đỏ trên runner CI KHÔNG phải chập chờn mà là lỗi sản phẩm thật (vòng nối lại treo ở lần thử đầu), đã sửa ở #694, xem mục Giao diện); `perf:mobile` 22 hàng 0 VƯỢT (có Hàn Vân); `leak:test` qua bốn bản đồ; bench bốn bản đồ đồng thời trong ngân sách (tick < 10 ms, patch < 520 byte / tick mỗi client).
+- `npm test` 4244 test qua (238 tệp); `e2e:all` chạy một lệnh 22 kịch bản E2E bằng Chrome thật + máy chủ Colyseus thật (22 / 22 xanh khi C chạy trên máy dev, #696; chạy tay trên runner GitHub `ubuntu-latest` (WebGL phần mềm, ~6 FPS; #694) tìm ra MỘT LỖI SẢN PHẨM thật (`e2e:nhip-tim` ca 4: vòng nối lại treo ở lần thử đầu, KHÔNG phải chập chờn; sửa ở #705, xem mục Giao diện) và nhiều ca đo phụ thuộc đồng hồ thật, sửa từng ca (`e2e:fx`, `e2e:bi-canh-nga`...); ca nào còn đỏ trên runner thì theo dõi ở #694); `perf:mobile` 22 hàng 0 VƯỢT (có Hàn Vân); `leak:test` qua bốn bản đồ; bench bốn bản đồ đồng thời trong ngân sách (tick < 10 ms, patch < 520 byte / tick mỗi client).
 
 ### Cần biết khi phát hành
 - Người chơi web chỉ cần tải lại trang. **APK `v0.2.x` phải cài lại** (`release.yml` dựng APK debug khi gắn thẻ).
