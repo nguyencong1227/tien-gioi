@@ -86,8 +86,32 @@ const K = {
   down: { key: "ArrowDown", code: "ArrowDown", vk: 40 },
 } satisfies Record<string, Key>;
 
-/** Phím thật qua CDP: nhấn rồi nhả (`shift` cho Shift+Tab). */
+/** Chờ trang vẽ ít nhất `n` khung hình Phaser (`window.__scene.game.loop.frame` tăng, dùng cho khẳng định âm "KHÔNG mở / KHÔNG chém", #717). */
+async function waitFrames(tab: Tab, n = 2) {
+  await tab.ev(
+    `new Promise((resolve) => { const l = window.__scene?.game?.loop; if (!l) return setTimeout(resolve, 100); const target = l.frame + ${n}; const deadline = performance.now() + 5000; const step = () => { if (l.frame >= target || performance.now() >= deadline) resolve(true); else requestAnimationFrame(step); }; requestAnimationFrame(step); })`,
+  );
+}
+
+/**
+ * Chờ điều kiện dương đúng (tối đa `ms` mili giây) mà KHÔNG ném ngoại lệ khi hết giờ: để câu `check(...)` ngay bên dưới
+ * phán quyết và báo đỏ đúng nhãn khi làm đột biến (#717).
+ */
+async function waitUntil(cond: () => boolean | Promise<boolean>, ms = 5000) {
+  const deadline = Date.now() + ms;
+  while (Date.now() < deadline) {
+    if (await cond()) return;
+    await sleep(30);
+  }
+}
+
+/** Phím thật qua CDP: nhấn rồi nhả (`shift` cho Shift+Tab), chờ sự kiện `keyup` thật sự chạy xong trên luồng chính của trang (#717). */
 async function press(tab: Tab, k: Key, shift = false) {
+  const prevSeq = Number(
+    await tab.ev(
+      `(() => { if (!window.__e2eKeyHooked) { window.__e2eKeyHooked = true; window.__e2eKeySeq = 0; window.addEventListener('keyup', () => { window.__e2eKeySeq++; }, false); } return window.__e2eKeySeq; })()`,
+    ),
+  );
   const base = {
     key: k.key,
     code: k.code,
@@ -101,10 +125,12 @@ async function press(tab: Tab, k: Key, shift = false) {
     ...(k.text ? { text: k.text, unmodifiedText: k.text } : {}),
   });
   await tab.send("Input.dispatchKeyEvent", { ...base, type: "keyUp" });
-  await sleep(140); // cho Phaser / DOM xử lý xong
+  await tab.ev(
+    `new Promise((resolve) => { const deadline = performance.now() + 5000; const poll = () => { if (window.__e2eKeySeq > ${prevSeq} || performance.now() >= deadline) setTimeout(resolve, 25); else setTimeout(poll, 10); }; poll(); })`,
+  );
 }
 
-/** Giữ một phím `ms` mili giây (di chuyển bằng Phaser cần phím GIỮ: isDown theo từng khung). */
+/** Giữ một phím `ms` mili giây VÀ ít nhất 4 khung hình Phaser (di chuyển bằng Phaser cần phím GIỮ: isDown theo từng khung). */
 async function hold(tab: Tab, k: Key, ms: number) {
   const base = {
     key: k.key,
@@ -114,7 +140,7 @@ async function hold(tab: Tab, k: Key, ms: number) {
     modifiers: 0,
   };
   await tab.send("Input.dispatchKeyEvent", { ...base, type: "rawKeyDown" });
-  await sleep(ms);
+  await Promise.all([sleep(ms), waitFrames(tab, 4)]);
   await tab.send("Input.dispatchKeyEvent", { ...base, type: "keyUp" });
   await sleep(150);
 }
@@ -369,7 +395,7 @@ async function main() {
     // ---- 3. J tự khoá + chém trúng (Cách là phím phụ) ----
     const hpBefore = world.state.monsters.get(nearId).hp;
     await press(t, K.j);
-    await sleep(300);
+    await waitUntil(() => (world.state.monsters.get(nearId)?.hp ?? 0) < hpBefore);
     check(
       "J khi chưa có mục tiêu: tự khoá con gần nhất",
       (await lock()) === nearId,
@@ -379,10 +405,12 @@ async function main() {
     check("J chém trúng: máu quái giảm (server)", hpAfter < hpBefore, `${hpBefore} -> ${hpAfter}`);
     await press(t, K.esc);
     // Cách vẫn chém (phím phụ): hồi chiêu chém ở client được đặt lại sau khi qua hồi chiêu của lần chém bằng J
-    await sleep(700);
+    await waitUntil(async () =>
+      Boolean(await ev(`window.__scene.time.now >= window.__scene.nextSlash`)),
+    );
     const slashT0 = Number(await ev(`window.__scene.nextSlash`));
     await press(t, K.space);
-    await sleep(200);
+    await waitUntil(async () => Number(await ev(`window.__scene.nextSlash`)) > slashT0);
     check(
       "Cách (phím phụ) vẫn chém: hồi chiêu chém ở client tăng",
       Number(await ev(`window.__scene.nextSlash`)) > slashT0,
@@ -396,7 +424,7 @@ async function main() {
     world.mctrl.clear();
     const mpBefore = me.mp;
     await press(t, K.k);
-    await sleep(300);
+    await waitUntil(() => me.mp < mpBefore || me.mp === 0);
     check(
       "Phím K (Kiếm khí): tốn linh lực (server)",
       me.mp < mpBefore || me.mp === 0,
@@ -409,32 +437,38 @@ async function main() {
     );
     await press(t, K.esc);
     // phím phụ 3: chờ hết hồi chiêu Kiếm khí rồi bấm, linh lực phải giảm tiếp
-    await sleep(1500);
+    await waitUntil(async () =>
+      Boolean(await ev(`window.__scene.time.now >= window.__scene.nextSword`)),
+    );
     me.mp = me.maxMp;
     const mpPhu = me.mp;
     await press(t, K.d3);
-    await sleep(300);
+    await waitUntil(() => me.mp < mpPhu);
     check("Phím phụ 3 vẫn phóng Kiếm khí (server)", me.mp < mpPhu, `${mpPhu} -> ${me.mp}`);
     await press(t, K.esc);
     await press(t, K.z);
-    // Chờ patch `meditating` về tới client trước khi bấm tiếp (`toggleMeditate` gửi `!this.me().meditating`: bấm khi client chưa nhận patch sẽ gửi lại giá trị cũ)
-    await t.waitFor(`window.__scene.me()?.meditating === true`, "client đồng bộ bật đả tọa", 5000);
+    // Chờ patch `meditating` về tới client trước khi bấm tiếp (`toggleMeditate` gửi `!this.me().meditating`: bấm khi client chưa nhận patch sẽ gửi lại giá trị cũ; dùng waitUntil không ném lỗi để đột biến bỏ gán phím Z vẫn đỏ đúng nhãn check, #717)
+    await waitUntil(
+      async () =>
+        me.meditating === true && Boolean(await ev(`window.__scene.me()?.meditating === true`)),
+    );
     check("Phím Z: bật đả tọa (server xác nhận)", me.meditating === true, String(me.meditating));
     await press(t, K.z);
-    await t.waitFor(`window.__scene.me()?.meditating === false`, "client đồng bộ tắt đả tọa", 5000);
+    await waitUntil(
+      async () =>
+        me.meditating === false && Boolean(await ev(`window.__scene.me()?.meditating === false`)),
+    );
     check("Phím Z lần nữa: tắt đả tọa", me.meditating === false, String(me.meditating));
     await press(t, K.d4);
-    await t.waitFor(
-      `window.__scene.me()?.meditating === true`,
-      "client đồng bộ bật đả tọa (phím 4)",
-      5000,
+    await waitUntil(
+      async () =>
+        me.meditating === true && Boolean(await ev(`window.__scene.me()?.meditating === true`)),
     );
     check("Phím phụ 4: bật đả tọa", me.meditating === true, String(me.meditating));
     await press(t, K.d4);
-    await t.waitFor(
-      `window.__scene.me()?.meditating === false`,
-      "client đồng bộ tắt đả tọa (phím 4)",
-      5000,
+    await waitUntil(
+      async () =>
+        me.meditating === false && Boolean(await ev(`window.__scene.me()?.meditating === false`)),
     );
     check("Phím phụ 4 lần nữa: tắt đả tọa", me.meditating === false, String(me.meditating));
     // L U I O (M7.6): ô chưa có chiêu thì báo lý do tại chỗ ("chưa mở" nếu cảnh giới chưa tới, "còn trống" nếu mở rồi mà chưa gắn), KHÔNG gửi gì;
@@ -447,7 +481,7 @@ async function main() {
       [K.o, 5],
     ] as Array<[Key, number]>) {
       await press(t, key);
-      await sleep(150);
+      await waitFrames(t, 2);
       check(
         `Phím ${key.code.slice(3)}: báo "Ô chiêu thức ${n} chưa mở / còn trống", không mở bảng nào`,
         new RegExp(`Ô chiêu thức ${n} (chưa mở|còn trống)`).test(String(await toastText())) &&
@@ -477,11 +511,13 @@ async function main() {
     const slashBefore = await ev(`window.__scene.nextSlash`);
     await press(t, K.b);
     await press(t, K.tab);
+    await waitFrames(t, 2);
     check("Túi mở: Tab KHÔNG chọn mục tiêu", (await lock()) === null, String(await lock()));
     await ev(
       `document.activeElement && document.activeElement.blur && document.activeElement.blur(); 1`,
     );
     await press(t, K.space);
+    await waitFrames(t, 2);
     check(
       "Túi mở (focus ngoài nút): Space KHÔNG chém",
       (await ev(`window.__scene.nextSlash`)) === slashBefore,
@@ -492,12 +528,17 @@ async function main() {
 
     // ---- 7. Chat bằng bàn phím ----
     await press(t, K.enter);
+    await waitUntil(
+      async () =>
+        (await ev(`document.activeElement && document.activeElement.id`)) === "chat-input",
+    );
     check(
       "Enter: focus vào ô chat",
       (await ev(`document.activeElement && document.activeElement.id`)) === "chat-input",
       String(await ev(`document.activeElement && document.activeElement.id`)),
     );
     await typeText(t, "bxa");
+    await waitFrames(t, 2);
     check(
       "Đang gõ chat: phím B KHÔNG mở túi",
       !(await ev(shown("inv-modal"))),
@@ -509,7 +550,11 @@ async function main() {
       String(await ev(`document.getElementById('chat-input').value`)),
     );
     await press(t, K.enter);
-    await sleep(300);
+    await waitUntil(
+      async () =>
+        (await ev(`document.getElementById('chat-input').value`)) === "" &&
+        (await ev(`document.activeElement && document.activeElement.id`)) !== "chat-input",
+    );
     check(
       "Enter gửi chat: ô chat trống và rời ô",
       (await ev(`document.getElementById('chat-input').value`)) === "" &&
@@ -517,8 +562,16 @@ async function main() {
       String(await ev(`document.activeElement && document.activeElement.id`)),
     );
     await press(t, K.enter);
+    await waitUntil(
+      async () =>
+        (await ev(`document.activeElement && document.activeElement.id`)) === "chat-input",
+    );
     await typeText(t, "a");
     await press(t, K.esc);
+    await waitUntil(
+      async () =>
+        (await ev(`document.activeElement && document.activeElement.id`)) !== "chat-input",
+    );
     check(
       "Esc ở ô chat: rời ô chat",
       (await ev(`document.activeElement && document.activeElement.id`)) !== "chat-input",
@@ -543,6 +596,7 @@ async function main() {
     await press(t, K.esc);
     const x1 = me.x;
     await hold(t, K.right, 700);
+    await waitUntil(() => me.x - x1 > 30);
     check(
       "Đóng túi: giữ mũi tên phải thì nhân vật đi sang phải (server)",
       me.x - x1 > 30,
@@ -555,7 +609,13 @@ async function main() {
     me.y = DEFAULT_MAP.townPx.y + 150;
     giveItem(world, sid, "hoi_huyet_dan", 3);
     me.hp = 30;
-    await sleep(400);
+    await waitUntil(async () =>
+      Boolean(
+        await ev(
+          `[...document.querySelectorAll('.inv-slot .slot-name')].some((e) => e.textContent === 'Hồi Huyết Đan')`,
+        ),
+      ),
+    );
     await press(t, K.b);
     const slotInfo = await ev(
       `(() => { const s = [...document.querySelectorAll('.inv-slot')]; const idx = s.findIndex(e => e.querySelector('.slot-name')?.textContent === 'Hồi Huyết Đan'); const top0 = s[0].getBoundingClientRect().top; const cols = s.filter(e => Math.abs(e.getBoundingClientRect().top - top0) < 2).length; return JSON.stringify({ idx, cols }); })()`,
@@ -588,8 +648,9 @@ async function main() {
     );
     const hp0 = me.hp;
     await press(t, K.enter);
-    await sleep(400);
+    await waitUntil(() => me.hp > hp0);
     check("Enter trên ô đan: dùng đan, máu hồi (server)", me.hp > hp0, `${hp0} -> ${me.hp}`);
+    await waitFrames(t, 2);
     check(
       "Enter dùng đan không mở chat",
       (await ev(`document.activeElement && document.activeElement.id`)) !== "chat-input",
@@ -664,7 +725,11 @@ async function main() {
     );
     const before = await ev(`window.__ui.getQuestLog().active.length`);
     await press(t, K.d1);
-    await sleep(500);
+    await waitUntil(
+      async () =>
+        !(await ev(shown("dialog-modal"))) &&
+        (await ev(`window.__ui.getQuestLog().active.length`)) === Number(before) + 1,
+    );
     check(
       "Phím số 1 chọn dòng 1: hộp thoại đóng",
       !(await ev(shown("dialog-modal"))),
@@ -756,7 +821,7 @@ async function main() {
       String(await ev(`document.activeElement && document.activeElement.className`)),
     );
     await press(t, K.enter);
-    await sleep(500);
+    await waitUntil(async () => Number(await ev(`window.__ui.getCurrentCoin()`)) < 500);
     check(
       "Enter trên nút Mua: túi có Hồi Huyết Đan mua thêm (server)",
       Number(await ev(`window.__ui.getCurrentCoin()`)) < 500,
@@ -892,10 +957,13 @@ async function main() {
     await press(t, K.esc);
     check("Esc đóng Cài đặt", !(await ev(shown("settings-modal"))), "settings-modal vẫn mở");
     // phím mới có tác dụng trong game: 9 phóng Kiếm khí (server trừ linh lực)
+    await waitUntil(async () =>
+      Boolean(await ev(`window.__scene.time.now >= window.__scene.nextSword`)),
+    );
     me.mp = me.maxMp;
     const mpX = me.mp;
     await press(t, K.d9);
-    await sleep(300);
+    await waitUntil(() => me.mp < mpX);
     check("Phím 9 mới: phóng Kiếm khí (server trừ linh lực)", me.mp < mpX, `${mpX} -> ${me.mp}`);
     // khôi phục mặc định
     await openKeys();
@@ -912,10 +980,13 @@ async function main() {
     );
     await press(t, K.esc);
     await press(t, K.esc);
+    await waitUntil(async () =>
+      Boolean(await ev(`window.__scene.time.now >= window.__scene.nextSword`)),
+    );
     me.mp = me.maxMp;
     const mpFull = me.mp;
     await press(t, K.d9);
-    await sleep(300);
+    await waitFrames(t, 2);
     check(
       "Sau khi khôi phục: phím 9 không còn phóng Kiếm khí",
       me.mp === mpFull,
@@ -1090,7 +1161,13 @@ async function main() {
     // tấm kết quả: nhận focus, giữ phím thế giới lại, Esc / Enter đóng được
     const slashMark = await ev(`window.__scene.nextSlash`);
     await ev(`document.getElementById('dungeon-end-modal').hidden = false; 1`);
-    await sleep(150);
+    await waitUntil(async () =>
+      Boolean(
+        await ev(
+          `document.activeElement && document.activeElement.closest('#dungeon-end-modal') !== null && window.__ui.isKeyboardCaptured()`,
+        ),
+      ),
+    );
     check(
       "Tấm kết quả bí cảnh hiện: focus vào nút của tấm, phím thế giới bị giữ",
       (await ev(
@@ -1100,6 +1177,7 @@ async function main() {
     );
     await ev(`document.activeElement.blur(); 1`);
     await press(t, K.space);
+    await waitFrames(t, 2);
     check(
       "Tấm kết quả mở: Space KHÔNG chém phía sau",
       (await ev(`window.__scene.nextSlash`)) === slashMark,
@@ -1112,7 +1190,10 @@ async function main() {
       `captured=${await ev(`window.__ui.isKeyboardCaptured()`)}`,
     );
     await ev(`document.getElementById('duel-end-modal').hidden = false; 1`);
-    await sleep(150);
+    await waitUntil(
+      async () =>
+        (await ev(`document.activeElement && document.activeElement.id`)) === "duend-btn-close",
+    );
     check(
       "Tấm kết quả quyết đấu hiện: focus ở nút Đóng; Enter đóng",
       (await ev(`document.activeElement && document.activeElement.id`)) === "duend-btn-close",
@@ -1238,7 +1319,7 @@ async function main() {
       `captured=${await ev(`window.__ui.isKeyboardCaptured()`)}`,
     );
     await press(tb, K.x);
-    await sleep(300);
+    await waitUntil(async () => !(await tb.ev(shown("duel-invite-box"))));
     check(
       "B bấm X: từ chối thách đấu, hộp mời ẩn",
       !(await tb.ev(shown("duel-invite-box"))),
@@ -1279,7 +1360,13 @@ async function main() {
     await ev(
       `window.__reborns = 0; window.__ui.showReborn = () => { window.__reborns += 1; }; window.__debugLimbo({ summary: { kiep: 1, realm: 1, tier: 4, minutes: 42, kills: 68, bossKills: 1, gain: 16 }, soul: { kiep: 1, duyen: 28, unlocks: { du_am: 1, ky_vat: 1 }, origins: ['kiem_khach'] }, keepable: ['lang_nha_kiem', 'tho_nhung_bao'] }); 1`,
     );
-    await sleep(200);
+    await waitUntil(async () =>
+      Boolean(
+        await ev(
+          `${shown("limbo-overlay")} && document.activeElement && document.activeElement.id === 'limbo-overlay' && window.__ui.isKeyboardCaptured()`,
+        ),
+      ),
+    );
     check(
       "Hoàng Tuyền hiện: focus ở KHUNG màn (không ở nút nào), phím thế giới bị giữ",
       !!(await ev(shown("limbo-overlay"))) &&
@@ -1289,12 +1376,14 @@ async function main() {
     );
     await press(t, K.space);
     await press(t, K.enter);
+    await waitFrames(t, 2);
     check(
       "Đang nhấn Cách / Enter lúc vừa gục: KHÔNG mua gì, KHÔNG đầu thai",
       (await textOf("#limbo-duyen-total")) === "28" && (await ev(`window.__reborns`)) === 0,
       `duyên=${await textOf("#limbo-duyen-total")} đầu thai=${await ev(`window.__reborns`)}`,
     );
     await press(t, K.esc);
+    await waitFrames(t, 2);
     check("Esc KHÔNG đóng màn Hoàng Tuyền", !!(await ev(shown("limbo-overlay"))), "đã đóng");
     await ev(`window.__ui.closeAllModals(); 1`); // WorldScene gọi mỗi lần cập nhật khi đang chết
     check(
@@ -1364,7 +1453,7 @@ async function main() {
       ),
     );
     await press(t, K.enter);
-    await sleep(200);
+    await waitUntil(async () => (await textOf("#limbo-duyen-total")) === "18");
     check(
       "Enter mua Kim nang: Duyên 28 -> 18 và focus vẫn ở màn (không rơi về đầu)",
       (await textOf("#limbo-duyen-total")) === "18" && !!(await inLimbo()),
@@ -1417,7 +1506,7 @@ async function main() {
     );
     await t.shot("ban-phim-nut-nhat.png");
     await press(t, K.f);
-    await sleep(500);
+    await waitUntil(() => invCount("nanh_soi") === nanhBefore + 2 && !world.state.loot.has(lootId));
     check(
       "F nhặt đồ rơi: túi có thêm 2 Nanh Sói (server), món đồ biến khỏi đất",
       invCount("nanh_soi") === nanhBefore + 2 && !world.state.loot.has(lootId),
@@ -1471,7 +1560,9 @@ async function main() {
       ),
     );
     await press(t, K.enter);
-    await sleep(600);
+    await waitUntil(
+      () => invCount("long_tho") === longBefore - 12 && invCount("tho_nhung_bao") === baoBefore + 1,
+    );
     check(
       "Enter trên nút Rèn: trừ 12 Lông Thỏ và có thêm Thổ Nhung Bào (server)",
       invCount("long_tho") === longBefore - 12 && invCount("tho_nhung_bao") === baoBefore + 1,

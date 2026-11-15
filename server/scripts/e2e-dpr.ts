@@ -347,6 +347,10 @@ async function main() {
     must(cfg2.has === false, `tắt Tiết kiệm pin gỡ giới hạn FPS: ${JSON.stringify(cfg2)}`);
     const f2 = await stepRate();
     must(f2 < 70, `tắt Tiết kiệm pin: không bị kẹt ở trần 30, đo ${f2.toFixed(1)}`);
+    must(
+      f1 > 2 && f2 > 2,
+      `vòng lặp còn chạy sau khi đổi giới hạn (f1=${f1.toFixed(1)}, f2=${f2.toFixed(1)})`,
+    );
     if (fast) must(f2 > 52, `tắt Tiết kiệm pin về ~60 FPS, đo ${f2.toFixed(1)}`);
     ok(
       `FPS: mặc định ${f0.toFixed(1)} -> tiết kiệm pin ${f1.toFixed(1)} -> tắt ${f2.toFixed(1)}${fast ? "" : " (máy chậm: kiểm cấu hình fps.limit, không kiểm ngưỡng dưới)"}`,
