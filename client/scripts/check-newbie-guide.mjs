@@ -5,7 +5,7 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 //    (trước đây `.auth-btn-primary` rộng 100 % ép nó còn 44 x 97 px, chữ xuống 5 dòng, nút "Đã Hiểu" cao 97 px); ở cảm ứng THẬT (`data-input="touch"`) nút phím tắt bị CSS ẩn và "Đã Hiểu" chiếm cả hàng; Chrome không đầu chỉ GIẢ khung (`mobile`) mà con trỏ vẫn là chuột nên ở bốn khung này nút phím tắt vẫn HIỆN và được đo như mọi khung;
 //  - có thẻ "Chiêu Thức" nói quyển học ở Túi đồ (nút Học), phím L U I O và bảng Công pháp, nhãn phím theo phím ĐANG GÁN (đổi phím thì chữ đổi theo);
 //  - Esc / Cách đóng hộp.
-// Ở bốn khung nhìn (1280x720, 844x390, 390x844, 360x640). Có thể chụp ảnh: `--shots <thư mục>`. Cần client đang chạy (`npm run dev -w client`, cổng của dev B là 5183).
+// Ở bốn khung nhìn (1280x720 chuột; 844x390, 390x844, 360x640 CẢM ỨNG THẬT: `Emulation.setTouchEmulationEnabled`, `data-input="touch"`): ở cảm ứng hộp chỉ dẫn / dòng chào nêu NÚT thay vì phím (#690). Có thể chụp ảnh: `--shots <thư mục>`. Cần client đang chạy (`npm run dev -w client`, cổng của dev B là 5183).
 //   node client/scripts/check-newbie-guide.mjs [--url http://127.0.0.1:5183] [--shots /tmp/tg-b-shots]
 import fs from "node:fs";
 import os from "node:os";
@@ -93,11 +93,12 @@ try {
     // KHÔNG đặt `tg_newbie_guide_dismissed`: người mới thật thấy hộp chỉ dẫn tự mở
     source: `try{localStorage.removeItem('tg_newbie_guide_dismissed');localStorage.setItem('tg_quality','high');localStorage.removeItem('tg_reduced_motion')}catch(e){}`,
   });
-  for (const [W, H, mobile] of [
-    [1280, 720, false],
-    [844, 390, true],
-    [390, 844, true],
-    [360, 640, true],
+  // khung chuột TRƯỚC, khung cảm ứng SAU: một khi Chrome bật giả lập cảm ứng thì không tắt lại được trong cùng phiên (như capture-viewports)
+  for (const [W, H, mobile, realTouch] of [
+    [1280, 720, false, false],
+    [844, 390, true, true],
+    [390, 844, true, true],
+    [360, 640, true, true],
   ]) {
     console.log(`\n--- ${W}x${H}${mobile ? " (cảm ứng)" : ""} ---`);
     await send("Emulation.setDeviceMetricsOverride", {
@@ -106,6 +107,14 @@ try {
       deviceScaleFactor: 1,
       mobile,
     });
+    if (realTouch) {
+      // cảm ứng THẬT (con trỏ chính là cảm ứng, `data-input="touch"`): `mobile` một mình chỉ giả khung nên con trỏ vẫn là chuột
+      await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
+      await send("Emulation.setEmitTouchEventsForMouse", {
+        enabled: true,
+        configuration: "mobile",
+      });
+    }
     await send("Page.navigate", { url: `${BASE_URL}/?skills=mock&n=2&debug=1` });
     for (let k = 0; k < 50; k++) {
       await sleep(300);
@@ -152,15 +161,55 @@ try {
       g.sw <= g.cw + 1 && g.ow <= g.vw + 1,
       `không tràn ngang (hộp ${g.sw}/${g.cw}, trang ${g.ow}/${g.vw})`,
     );
+    const input = await evalJs("document.documentElement.dataset.input");
+    check(
+      realTouch ? input === "touch" : input === "mouse",
+      `data-input = ${input} (mong đợi ${realTouch ? "touch" : "mouse"})`,
+    );
     const skill = g.cards.find((c) => c.startsWith("📖") || c.includes("Chiêu Thức"));
     check(
       Boolean(skill) && /Túi đồ/.test(skill) && /Học/.test(skill) && /Công pháp/.test(skill),
       `có thẻ Chiêu Thức nêu Túi đồ + nút Học + bảng Công pháp: "${(skill ?? "").slice(0, 140)}"`,
     );
-    check(
-      Boolean(skill) && /\bL\b.*\bU\b.*\bI\b.*\bO\b/.test(skill) && /Shift\+K/.test(skill),
-      "thẻ Chiêu Thức ghi đúng phím mặc định L U I O và Shift+K (lấy theo phím đang gán)",
-    );
+    const visibleText = g.cards.join(" ");
+    const dismissText = await evalJs("document.getElementById('newbie-btn-dismiss').innerText");
+    const chat = String(await evalJs("document.getElementById('chat')?.innerText ?? ''"));
+    if (realTouch) {
+      // người chơi cảm ứng KHÔNG có phím: chữ hiển thị nêu NÚT, không còn tên phím (#690)
+      check(
+        !/\bPhím\b|\bTab\b|Shift\+|\bEsc\b|\bEnter\b/.test(visibleText),
+        `hộp chỉ dẫn ở cảm ứng không còn tên phím (Phím / Tab / Shift+ / Esc / Enter): "${visibleText.match(/\bPhím\b|\bTab\b|Shift\+\S*|\bEsc\b|\bEnter\b/)?.[0] ?? ""}"`,
+      );
+      check(
+        /Chém/.test(visibleText) &&
+          /Mục tiêu/.test(visibleText) &&
+          /Đả tọa/.test(visibleText) &&
+          /Nói/.test(visibleText),
+        "hộp chỉ dẫn ở cảm ứng nêu các NÚT: Chém, Mục tiêu, Đả tọa, Nói",
+      );
+      check(
+        !/Phím Cách|Esc/.test(dismissText) && /Đã Hiểu/.test(dismissText),
+        `nút đóng ở cảm ứng: "${dismissText.replace(/\s+/g, " ")}" (không bảo bấm phím)`,
+      );
+      check(
+        /nút Nói/.test(chat) && !/\(F\)/.test(chat),
+        "dòng chào ở chat nêu nút Nói, không nêu phím (F)",
+      );
+      const qkey = await evalJs(
+        "(() => { const k = document.querySelector('#quick-1 .qkey'); return k ? getComputedStyle(k).display : 'none'; })()",
+      );
+      check(qkey === "none", `số phím '1' trên ô nhanh bị ẩn ở cảm ứng (${qkey})`);
+    } else {
+      check(
+        Boolean(skill) && /\bL\b.*\bU\b.*\bI\b.*\bO\b/.test(skill) && /Shift\+K/.test(skill),
+        "thẻ Chiêu Thức ghi đúng phím mặc định L U I O và Shift+K (lấy theo phím đang gán)",
+      );
+      check(
+        /Phím J/.test(visibleText) && /Phím Cách hoặc Esc/.test(dismissText),
+        "chuột: chữ hiển thị vẫn là bản phím (Phím J..., Phím Cách hoặc Esc)",
+      );
+      check(/\(F\)/.test(chat), "chuột: dòng chào ở chat nêu phím (F)");
+    }
     if (SHOTS) {
       const png = await send("Page.captureScreenshot", { format: "png" });
       fs.mkdirSync(SHOTS, { recursive: true });
