@@ -1007,6 +1007,40 @@ function arcStroke(s, cx, cy, r, a0, a1, hex, thickness = 1, a = 255) {
 const sdUnion = (a, b) => (x, y) => Math.min(a(x, y), b(x, y));
 const sdMinus = (a, b) => (x, y) => Math.max(a(x, y), -b(x, y));
 
+/**
+ * Viền tối 1 px quanh hình (điểm trong suốt hoặc bóng mờ kề điểm đặc): ô túi tô nền theo `def.color` (thường nhạt) nên icon nhạt cùng tông (lông băng, lông thép, xương, sao băng)
+ * chìm vào nền (đã chụp trong game, M7.5c); viền giữ hình đọc ra trên mọi nền. Chỉ gọi cho icon cần (`OUTLINED_ICONS`).
+ */
+function outlineSurface(s, hex, alpha = 235) {
+  const solid = (x, y) => x >= 0 && y >= 0 && x < s.w && y < s.h && s.data[s.idx(x, y) + 3] >= 200;
+  const marks = [];
+  for (let y = 0; y < s.h; y++)
+    for (let x = 0; x < s.w; x++)
+      if (
+        !solid(x, y) &&
+        (solid(x - 1, y) || solid(x + 1, y) || solid(x, y - 1) || solid(x, y + 1))
+      )
+        marks.push(s.idx(x, y));
+  for (const i of marks) {
+    s.data[i] = (hex >> 16) & 255;
+    s.data[i + 1] = (hex >> 8) & 255;
+    s.data[i + 2] = hex & 255;
+    s.data[i + 3] = alpha;
+  }
+}
+/** Icon Hàn Vân Lĩnh (M7.5c) có viền tối: nguyên liệu nhạt và đồ tông băng / thép trên ô túi nhạt. */
+const OUTLINED_ICONS = new Set([
+  "han_lang_mao",
+  "phong_nha_vu",
+  "tuong_cot",
+  "doc_tuoc_nang",
+  "han_vu_kiem",
+  "han_lang_bao",
+  "phong_nha_phu",
+  "tuyet_hanh_ngoa",
+  "han_tinh_boi",
+]);
+
 function drawItemIcon(id) {
   const s = new Surface(24, 24);
   s.ellipse(12, 21, 7, 2, 0x000000, 65);
@@ -1407,6 +1441,7 @@ function drawItemIcon(id) {
     s.circle(12, 13, 1.4, cover);
     s.rect(8, 18, 9, 1, accent);
   }
+  if (OUTLINED_ICONS.has(id)) outlineSurface(s, 0x2a3340);
   return s;
 }
 
