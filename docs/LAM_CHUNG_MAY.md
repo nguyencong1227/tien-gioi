@@ -31,7 +31,7 @@ git config user.name "Tên của bạn"
 git config user.email "email-cua-ban@example.com"
 ```
 
-Lệnh `git config` (không có `--global`) chỉ áp dụng cho thư mục đó, nên ba người dùng chung user Linux vẫn có tên commit khác nhau.
+Lệnh `git config` (không có `--global`) chỉ áp dụng cho thư mục đó, nên bốn người dùng chung user Linux vẫn có tên commit khác nhau.
 
 Nếu cần tạo lại từ đầu:
 
