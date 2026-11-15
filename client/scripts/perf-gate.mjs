@@ -16,7 +16,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { FX_PLANS, MIN_CASTS_EMITTED, MIN_CAST_PLAYED, MIN_FX_PLAYED } from "./fx-driver.mjs";
+import {
+  FX_PLANS,
+  MIN_CASTS_EMITTED,
+  MIN_CAST_CALLS,
+  MIN_CAST_PLAYED,
+  MIN_FX_PLAYED,
+} from "./fx-driver.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const REPO = path.resolve(path.dirname(__filename), "../..");
@@ -153,9 +159,12 @@ export function evaluatePerfResults(results, budget, { timeSlack = 1 } = {}) {
         // Kế hoạch `*-cast` (#515): phải CÓ bằng chứng chiêu thật chạy tới hạt (tin cast đã gửi VÀ game thật đã gọi `FxSystem.play` của `cast-*`), nếu không
         // đường onFx -> planCastFx hỏng hoặc bộ bắn không cast được mà gate vẫn xanh vì đỉnh "đo được" chỉ do Kiếm khí
         if (FX_PLANS[r.fxPlan]?.castMs) {
+          const calls =
+            isNum(r.castPlayed) && isNum(r.castRejected) ? r.castPlayed + r.castRejected : null;
           for (const [metric, actual, min] of [
             ["số tin cast đã gửi", r.castsEmitted, MIN_CASTS_EMITTED],
-            ["số lần game phát công thức cast-*", r.castPlayed, MIN_CAST_PLAYED],
+            ["số lần game gọi play cho công thức cast-*", calls, MIN_CAST_CALLS],
+            ["số lần game phát được công thức cast-*", r.castPlayed, MIN_CAST_PLAYED],
           ]) {
             if (!(isNum(actual) && actual >= min)) {
               violations.push({ id, metric, actual: String(actual), limit: `số >= ${min}` });

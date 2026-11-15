@@ -251,9 +251,14 @@ const isCount = (v) => typeof v === "number" && Number.isInteger(v) && v >= 0;
 
 /** Số lần phát thành công tối thiểu để tin báo cáo (5 giây ở nhịp `combat` phát vài chục lần). */
 export const MIN_FX_PLAYED = 10;
-/** Kế hoạch `*-cast`: số tin cast tối thiểu đã gửi (300 ms trong 5 s ~ 16) và số lần `play` của `cast-*` tối thiểu mà game thật đã gọi (chống xanh giả khi đường onFx hỏng). */
+/**
+ * Kế hoạch `*-cast`: bằng chứng cast thật sự chạy qua đường onFx. (1) `MIN_CASTS_EMITTED`: số tin cast đã gửi (300 ms trong 5 s ~ 17); (2) `MIN_CAST_CALLS`: số lần game thật
+ * GỌI `FxSystem.play` cho công thức `cast-*` (được + bị bỏ; ~ 17 ở bậc Thấp vì mỗi chiêu một điểm); (3) `MIN_CAST_PLAYED`: trong đó ít nhất chừng này được ngân sách nhận
+ * (bậc Thấp nhận 6-9 trong 17 vì trần 8 emitter, do đó KHÔNG đặt ngưỡng cao hơn: ba lần chạy thật lúc máy tải ra 6, 7, 7, 8, 9). Không phải trần hiệu năng, chỉ chống xanh giả.
+ */
 export const MIN_CASTS_EMITTED = 10;
-export const MIN_CAST_PLAYED = 8;
+export const MIN_CAST_CALLS = 10;
+export const MIN_CAST_PLAYED = 3;
 
 /**
  * Đọc báo cáo từ `JSON.stringify(window.__tgFxDriver.stop())`. Sai hình dạng / thiếu số cho `null` (perf-gate đỏ "thiếu số đo",

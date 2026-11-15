@@ -11,7 +11,7 @@ import {
   formatSummary,
   parseOverlayCounts,
 } from "./perf-gate.mjs";
-import { MIN_CASTS_EMITTED, MIN_CAST_PLAYED, MIN_FX_PLAYED } from "./fx-driver.mjs";
+import { MIN_CASTS_EMITTED, MIN_CAST_CALLS, MIN_CAST_PLAYED, MIN_FX_PLAYED } from "./fx-driver.mjs";
 import { formatPerfLines } from "../src/gfx/perf-overlay";
 import { OWN_OVERSHOOT as REAL_OWN_OVERSHOOT } from "../src/gfx/fx/budget";
 
@@ -291,11 +291,14 @@ describe("M5.1 #330: perf-gate (cổng ngân sách cho perf:mobile)", () => {
         ).toEqual(["đỉnh emitter (fx)"]);
       });
 
-      it("ĐỘT BIẾN: đường onFx hỏng (castPlayed 0 / quá ít) hoặc không gửi được tin (castsEmitted quá ít / null) -> ĐỎ, không xanh giả dù đỉnh do Kiếm khí vẫn trong trần", () => {
+      it("ĐỘT BIẾN: đường onFx hỏng (không gọi play cho cast-*), ngân sách nhận 0 chiêu, hoặc không gửi được tin -> ĐỎ, không xanh giả dù đỉnh do Kiếm khí vẫn trong trần", () => {
         for (const over of [
-          { castPlayed: 0 },
-          { castPlayed: MIN_CAST_PLAYED - 1 },
+          { castPlayed: 0, castRejected: 0 }, // đường onFx hỏng: không có lần play nào
+          { castPlayed: 0, castRejected: 17 }, // ngân sách bỏ hết
+          { castPlayed: MIN_CAST_PLAYED - 1, castRejected: 20 },
+          { castPlayed: 4, castRejected: 3 }, // gọi play quá ít (< MIN_CAST_CALLS)
           { castPlayed: null },
+          { castRejected: null },
           { castsEmitted: 0 },
           { castsEmitted: MIN_CASTS_EMITTED - 1 },
           { castsEmitted: null },
@@ -304,13 +307,31 @@ describe("M5.1 #330: perf-gate (cổng ngân sách cho perf:mobile)", () => {
           expect(ev.ok, JSON.stringify(over)).toBe(false);
           expect(ev.violations[0].metric).toMatch(/cast/);
         }
-        // đúng ngưỡng thì xanh
+        // đúng ngưỡng thì xanh (bậc Thấp thật nhận 6-9 trong 17 lần gọi: dưới 10 lần gọi là đỏ, 10 là xanh)
         expect(
           evaluatePerfResults(
-            [okCast("c", { castPlayed: MIN_CAST_PLAYED, castsEmitted: MIN_CASTS_EMITTED })],
+            [
+              okCast("c", {
+                castsEmitted: MIN_CASTS_EMITTED,
+                castPlayed: MIN_CAST_PLAYED,
+                castRejected: MIN_CAST_CALLS - MIN_CAST_PLAYED,
+              }),
+            ],
             budget,
           ).ok,
         ).toBe(true);
+        // số đo thật của ba lần chạy lúc máy tải (bậc Thấp): 7 / 10, 9 / 8, 6 / 11 (phát / bỏ) đều phải XANH
+        for (const [played, rejected] of [
+          [7, 10],
+          [9, 8],
+          [6, 11],
+        ])
+          expect(
+            evaluatePerfResults(
+              [okCast("c", { castPlayed: played, castRejected: rejected })],
+              budget,
+            ).ok,
+          ).toBe(true);
       });
 
       it("kế hoạch KHÔNG cast không bị đòi số cast (đo cũ giữ nguyên); bản tóm tắt ghi số cast gửi / phát / bỏ của kế hoạch cast", () => {

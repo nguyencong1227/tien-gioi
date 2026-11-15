@@ -9,6 +9,7 @@ import {
   FX_DRIVER_SOURCE,
   FX_PLANS,
   MIN_CASTS_EMITTED,
+  MIN_CAST_CALLS,
   MIN_CAST_PLAYED,
   MIN_FX_PLAYED,
   parseFxDriverReport,
@@ -532,6 +533,7 @@ describe("#515: kế hoạch `burst-cast` / `boss-cast` (hiệu ứng dùng chi�
     expect(report.castRejected).toBe(0);
     expect(report.casts).toBeGreaterThanOrEqual(MIN_CASTS_EMITTED);
     expect(report.castPlayed).toBeGreaterThanOrEqual(MIN_CAST_PLAYED);
+    expect(report.castPlayed + report.castRejected).toBeGreaterThanOrEqual(MIN_CAST_CALLS);
     expect(parseFxDriverReport(JSON.stringify(report))).toMatchObject({
       fxPlan: "boss-cast",
       castsEmitted: report.casts,
