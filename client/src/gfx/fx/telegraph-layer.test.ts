@@ -18,6 +18,10 @@ class FakeG {
   destroyed = false;
   clears = 0;
   calls: string[] = [];
+  /** Bán kính từng lần vẽ hình tròn (theo thứ tự lệnh), để kiểm sóng xung kích */
+  radii: number[] = [];
+  /** Độ đậm nét viền / màu tô gần nhất */
+  fillAlphas: number[] = [];
   setPosition(x: number, y: number) {
     this.x = x;
     this.y = y;
@@ -38,20 +42,25 @@ class FakeG {
   clear() {
     this.clears++;
     this.calls.length = 0;
+    this.radii.length = 0;
+    this.fillAlphas.length = 0;
     return this;
   }
-  fillStyle() {
+  fillStyle(_c?: number, a?: number) {
+    this.fillAlphas.push(a ?? 1);
     return this;
   }
   lineStyle() {
     return this;
   }
-  fillCircle() {
+  fillCircle(_x?: number, _y?: number, r?: number) {
     this.calls.push("fillCircle");
+    this.radii.push(r ?? NaN);
     return this;
   }
-  strokeCircle() {
+  strokeCircle(_x?: number, _y?: number, r?: number) {
     this.calls.push("strokeCircle");
+    this.radii.push(r ?? NaN);
     return this;
   }
   fillPoints(_p: unknown, _a?: boolean, _b?: boolean, n?: number) {
@@ -119,6 +128,58 @@ describe("TelegraphLayer: vùng báo trước", () => {
     expect(made[0].calls).toEqual(["fillCircle", "strokeCircle"]);
     expect(made[1].calls).toEqual(["fillPoints:14", "strokePoints:14"]); // tâm + 13 điểm cung
     expect(made[2].calls).toEqual(["fillPoints:4", "strokePoints:4"]);
+  });
+
+  it("circle lúc đáp (ms, ms + WARN_FADE_MS): thêm chớp phủ vòng + vòng sóng hai lớp nở ra ngoài r; trước lúc đáp thì chưa có", () => {
+    const { layer, made } = make();
+    layer.warn(warn({ shape: "circle", r: 60, ms: 800 }), 0);
+    layer.update(799);
+    expect(made[0].calls).toEqual(["fillCircle", "strokeCircle"]); // đang gồng: chỉ vùng tô + viền
+    layer.update(800 + 40);
+    // vùng tô + viền cũ, rồi chớp, rồi hai nét của vòng sóng (nét thẫm ngoài + lõi sáng) cùng bán kính
+    expect(made[0].calls).toEqual([
+      "fillCircle",
+      "strokeCircle",
+      "fillCircle",
+      "strokeCircle",
+      "strokeCircle",
+    ]);
+    expect(made[0].radii[2]).toBe(60); // chớp đúng bằng vòng
+    const r1 = made[0].radii[3];
+    expect(r1).toBeGreaterThan(60); // vòng sóng đã nở ra ngoài viền
+    expect(made[0].radii[4]).toBe(r1); // hai lớp trùng tâm, cùng bán kính
+    layer.update(800 + 120);
+    const r2 = made[0].radii[3];
+    expect(r2).toBeGreaterThan(r1); // và tiếp tục nở
+    expect(r2).toBeLessThanOrEqual(60 * 1.2 + 1e-9);
+  });
+
+  it("circle lúc đáp, giảm chuyển động: KHÔNG chớp, vòng sóng đứng đúng r (không nở)", () => {
+    const { layer, made, reduced } = make();
+    reduced.value = true;
+    layer.warn(warn({ shape: "circle", r: 60, ms: 800 }), 0);
+    layer.update(800 + 40);
+    expect(made[0].calls).toEqual(["fillCircle", "strokeCircle", "strokeCircle", "strokeCircle"]);
+    expect(made[0].radii).toEqual([60, 60, 60, 60]); // vùng tô (r * tiến độ 1) + viền + hai nét sóng, không nở
+  });
+
+  it("cone / line lúc đáp KHÔNG có sóng xung kích (chỉ circle)", () => {
+    const { layer, made } = make(24);
+    layer.warn(warn({ shape: "cone", angle: 0, arc: 1, ms: 800 }), 0);
+    layer.warn(warn({ shape: "line", angle: 0, w: 30, ms: 800 }), 0);
+    layer.update(800 + 40);
+    expect(made[0].calls).toEqual(["fillPoints:14", "strokePoints:14"]);
+    expect(made[1].calls).toEqual(["fillPoints:4", "strokePoints:4"]);
+  });
+
+  it("sóng xung kích dùng CHUNG Graphics của vùng báo (không tạo thêm đối tượng, không đổi số vùng đang sống)", () => {
+    const { layer, made } = make();
+    layer.warn(warn({ shape: "circle", ms: 800 }), 0);
+    layer.update(800 + 40);
+    expect(made).toHaveLength(1);
+    expect(layer.stats()).toMatchObject({ warns: 1, graphics: 1 });
+    layer.update(800 + WARN_FADE_MS);
+    expect(layer.stats().warns).toBe(0); // hết sóng thì biến mất như cũ
   });
 
   it("bậc Thấp vẽ cung thô hơn bậc Cao", () => {

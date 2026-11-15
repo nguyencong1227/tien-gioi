@@ -319,6 +319,62 @@ try {
       check(st.warns === 0, `${name}: hết ms + mờ thì biến mất (còn ${st.warns})`);
     }
 
+    // ---- Sóng xung kích lúc đòn TRÒN đáp xuống (đập đất, #629): vòng sóng thẫm nở ra ngoài r, đo bằng điểm ảnh thật ----
+    // Đồng hồ vùng báo được điều khiển TAY (tắt `update` của cảnh, gọi `update(T0 + ms + dt)` rồi chụp) nên phép đo tất định, không phụ thuộc máy chậm / nhanh.
+    // Chuyển động bình thường: lúc ms + 40 vòng sóng ở r * (1 + 0,2 * easeOut) ~ r * 1,127; giảm chuyển động: KHÔNG nở (vòng đứng ở r) và KHÔNG chớp.
+    for (const reducedMode of [true, false]) {
+      const tag = reducedMode ? "giảm chuyển động" : "chuyển động thường";
+      await open(q, { reduced: reducedMode });
+      const calmB = await calmSpot();
+      check(!!calmB, `sóng xung kích (${tag}): tìm được chỗ yên tĩnh`);
+      if (!calmB) continue;
+      const bcx = await evalJs("window.__scene.predX");
+      const bcy = await evalJs("window.__scene.predY");
+      const R = 90;
+      const MS = 600;
+      const DT = 40;
+      const burstMsg = { kind: "warn", shape: "circle", x: bcx + 200, y: bcy, r: R, ms: MS };
+      await clear();
+      await act("window.__scene.telegraphs.clear()", "burstbefore");
+      // tắt vòng cập nhật của cảnh (đồng hồ tay), phát vùng báo, nhảy tới ms + DT, chụp ở khung kế tiếp
+      const bi = await act(
+        `(() => { const t = sc.telegraphs; sc.__origTeleUpdate = t.update; t.update = () => {};
+           const T0 = sc.time.now; t.warn(${JSON.stringify(burstMsg)}, T0); sc.__origTeleUpdate.call(t, T0 + ${MS + DT}); })()`,
+        "burstpost",
+      );
+      await evalJs(
+        "(() => { const sc = window.__scene; sc.telegraphs.update = sc.__origTeleUpdate; sc.telegraphs.clear(); return 1; })()",
+      );
+      const kb = bi.w / bi.wvw;
+      const cb = toPx(bi, burstMsg.x, burstMsg.y);
+      const scaleWant = reducedMode ? 1 : 1 + 0.2 * (1 - Math.pow(1 - DT / 140, 3));
+      // điểm ảnh TỐI đi (nét viền thẫm 0x8a1c10 của vòng sóng: G và B giảm mạnh; R không giảm vì đỏ thẫm sáng hơn nền cỏ) trong hai vành: SÁT r (0,9 - 1,07 r) và NGOÀI r (1,07 - 1,3 r)
+      const ring = JSON.parse(
+        await evalJs(`(() => { const A = window.burstbefore, B = window.burstpost, W = ${bi.w};
+          const cx = ${cb.x}, cy = ${cb.y}, r0 = ${R * kb}, hi = r0 * 1.3;
+          let nIn = 0, nOut = 0, sum = 0;
+          for (let y = Math.max(0, Math.floor(cy - hi)); y < Math.min(${bi.h}, Math.ceil(cy + hi)); y++) for (let x = Math.max(0, Math.floor(cx - hi)); x < Math.min(W, Math.ceil(cx + hi)); x++) {
+            const d = Math.hypot(x - cx, y - cy); if (d < r0 * 0.9 || d > hi) continue;
+            const i = (y * W + x) * 4;
+            if ((A[i + 1] - B[i + 1]) > 35 && (A[i + 2] - B[i + 2]) > 25) { if (d <= r0 * 1.07) nIn++; else { nOut++; sum += d; } }
+          }
+          return JSON.stringify({ nIn, nOut, mean: nOut ? sum / nOut : 0 }); })()`),
+      );
+      if (reducedMode) {
+        check(
+          ring.nIn > 100 && ring.nOut < 40,
+          `sóng xung kích (${tag}): vòng sóng đứng đúng r (${ring.nIn} điểm ảnh tối sát r, ${ring.nOut} ở ngoài r * 1,07: KHÔNG nở)`,
+        );
+      } else {
+        const wantD = R * kb * scaleWant;
+        check(
+          ring.nOut > 300 && Math.abs(ring.mean - wantD) <= 4,
+          `sóng xung kích (${tag}): ${ring.nOut} điểm ảnh tối ở ngoài r, bán kính trung bình ${ring.mean.toFixed(1)} px khớp r * ${scaleWant.toFixed(3)} * zoom ${kb.toFixed(3)} = ${wantD.toFixed(1)} px (±4)`,
+        );
+      }
+      await clear();
+    }
+
     // ---- Đạn: đúng chỗ theo speed / angle, đúng màu hệ, hết tầm thì biến mất (mở lại bình thường: có nhịp thở, ngân sách đủ) ----
     await open(q);
     await clear();
