@@ -21,7 +21,7 @@ describe("Mô hình cân bằng chiêu thức, hệ và trạng thái (M7.9, iss
     expect(base).toBeCloseTo(lkStats.atk * 2.7, 2);
   });
 
-  it("12 chiêu thức M7: KHÔNG chiêu nào vượt quá trần 2,0x sức mạnh so với chém thường (kể cả khi khắc hệ)", () => {
+  it("18 chiêu thức M7: KHÔNG chiêu nào vượt quá trần 2,0x sức mạnh so với chém thường (kể cả khi khắc hệ)", () => {
     for (const def of SKILLS_M7) {
       const breakdown = computeSkillCombo(def, kdStats.atk, kdStats.maxMp, "none");
       // Sức mạnh thông thường không được > 2.0x
@@ -33,7 +33,7 @@ describe("Mô hình cân bằng chiêu thức, hệ và trạng thái (M7.9, iss
 
   it("generateSkillBalanceReport: báo cáo tổng thể xác nhận bất biến noSkillExceeds2x", () => {
     const report = generateSkillBalanceReport(kdStats);
-    expect(report.skills).toHaveLength(12);
+    expect(report.skills).toHaveLength(18);
     expect(report.noSkillExceeds2x).toBe(true);
     expect(report.maxRatioSkill.ratioVsBaseline).toBeLessThanOrEqual(2.0);
   });
@@ -95,7 +95,7 @@ describe("Mô hình cân bằng chiêu thức, hệ và trạng thái (M7.9, iss
   it("renderSkillBalanceMarkdown: sinh đúng cấu trúc markdown với đủ 3 mục", () => {
     const md = renderSkillBalanceMarkdown(kdStats);
     expect(md).toContain("## Cân bằng chiêu thức, ngũ hành và trạng thái (M7, #510)");
-    expect(md).toContain("Bảng 12 chiêu thức đợt 1");
+    expect(md).toContain("Bảng 18 chiêu thức");
     expect(md).toContain("Vòng chiêu mẫu theo cảnh giới");
     expect(md).toContain("Đánh giá tiêu chuẩn mục 10");
     expect(md).toContain("Hỏa Vân Kiếm");
@@ -119,10 +119,11 @@ describe("Mô hình cân bằng chiêu thức, hệ và trạng thái (M7.9, iss
     expect(impact3.withinTargetLimit).toBe(true);
   });
 
-  it("Đối chiếu mô hình với mã server thật (cast.ts + combat.ts): độ lệch <= 25% trên cả 8 chiêu gây sát thương", () => {
-    // Thử nghiệm toàn diện trên cả 8 chiêu thức M7 có mult > 0:
-    // gồm cả chiêu quạt (fan: Lạc Tuyết Phân Phi 5 tia), đòn thẳng (line: Huyền Băng Chỉ, Thanh Tùng Phi Châm),
-    // đòn nón (cone: Hỏa Vân Kiếm, Bổn Thạch Quyền, Ưng Trảo, Trọng Nhạc Trảm) và đòn vùng (ground: Cửu Cung Khốn Sát)
+  it("Đối chiếu mô hình với mã server thật (cast.ts + combat.ts): độ lệch <= 25% trên cả 13 chiêu gây sát thương", () => {
+    // Thử nghiệm toàn diện trên cả 13 chiêu thức M7 có mult > 0 (12 chiêu đợt 1 + 5 chiêu Nguyên Anh đợt 2, #654):
+    // gồm chiêu quạt (fan: Lạc Tuyết Phân Phi 5 tia, Băng Hoa Loạn 5 cánh), đòn thẳng (line: Huyền Băng Chỉ, Thanh Tùng Phi Châm, Hàn Quang Tiễn),
+    // đòn nón (cone: Hỏa Vân Kiếm, Bổn Thạch Quyền, Ưng Trảo, Trọng Nhạc Trảm, Bạch Kim Trảo, Liệt Hỏa Kiếm)
+    // và đòn vùng (ground: Cửu Cung Khốn Sát, Vân Thạch Trận). Vân Hành Bộ (self, mult 0) là buff nên không tính ở đây.
     const DAMAGE_SKILLS = [
       "hoa_van_kiem",
       "bon_thach_quyen",
@@ -132,6 +133,11 @@ describe("Mô hình cân bằng chiêu thức, hệ và trạng thái (M7.9, iss
       "thanh_tung_phi_cham",
       "lac_tuyet_phan_phi",
       "cuu_cung_khon_sat",
+      "han_quang_tien",
+      "bach_kim_trao",
+      "van_thach_tran",
+      "bang_hoa_loan",
+      "liet_hoa_kiem",
     ];
 
     for (const skillId of DAMAGE_SKILLS) {

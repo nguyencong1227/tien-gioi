@@ -146,12 +146,12 @@ describe("trạng thái", () => {
   });
 });
 
-describe("dữ liệu 12 chiêu đợt 1", () => {
+describe("dữ liệu chiêu thức (18: 12 chiêu đợt 1 + 6 chiêu Nguyên Anh đợt 2, #654)", () => {
   const ATTACK_SHAPES = new Set(["cone", "line", "fan", "nova", "ground"]);
 
-  it("đủ 12, id duy nhất, tra bằng skillOf, id độc -> undefined", () => {
-    expect(SKILLS_M7.length).toBe(12);
-    expect(new Set(SKILLS_M7.map((s) => s.id)).size).toBe(12);
+  it("đủ 18, id duy nhất, tra bằng skillOf, id độc -> undefined", () => {
+    expect(SKILLS_M7.length).toBe(18);
+    expect(new Set(SKILLS_M7.map((s) => s.id)).size).toBe(18);
     for (const s of SKILLS_M7) {
       expect(skillOf(s.id)).toBe(s);
       expect(SKILL_BY_ID[s.id]).toBe(s);
