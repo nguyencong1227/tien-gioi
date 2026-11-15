@@ -1,6 +1,6 @@
 # Làm việc chung một máy qua SSH
 
-Ba dev cùng SSH vào một máy, cùng user Linux `nguyencong`, dùng chung một tài khoản GitHub.
+Bốn dev cùng SSH vào một máy, cùng user Linux `nguyencong`, dùng chung một tài khoản GitHub.
 Để không giẫm chân nhau, **mỗi người một thư mục và một bộ cổng riêng**:
 
 | | Thư mục | Server | Client (Vite) | Tên commit |
@@ -8,6 +8,7 @@ Ba dev cùng SSH vào một máy, cùng user Linux `nguyencong`, dùng chung m�
 | **Dev A** (Server & Gameplay) | `~/TT/tien-gioi-a` | 2597 | 5173 | đặt trong `.git/config` của thư mục |
 | **Dev B** (Client & Trải nghiệm) | `~/TT/tien-gioi-b` | 2577 | 5183 | đặt trong `.git/config` của thư mục |
 | **Dev C** (Công cụ, Thử tải & Phát hành) | `~/TT/tien-gioi-c` | 2587 | 5193 | `Dev C`, đã đặt sẵn |
+| **Dev D** (Nội dung & Dữ liệu) | `~/TT/tien-gioi-d` | 2607 | 5203 | `Dev D`, đặt trong `.git/config` của thư mục khi dựng |
 
 Mỗi thư mục là một bản clone riêng của repo: nhánh riêng, `node_modules` riêng, dữ liệu nhân vật riêng
 (`server/data/`), tên commit riêng. Mọi người chỉ "gặp nhau" qua GitHub (push / PR / pull), giống như làm trên hai máy khác nhau.
@@ -37,7 +38,7 @@ Nếu cần tạo lại từ đầu:
 ```bash
 git clone https://github.com/nguyencong1227/tien-gioi.git ~/TT/tien-gioi-b
 cd ~/TT/tien-gioi-b
-cp .env.example .env.local     # rồi sửa cổng theo bảng trên (Dev B: 2577/5183, Dev C: 2587/5193)
+cp .env.example .env.local     # rồi sửa cổng theo bảng trên (Dev B: 2577/5183, Dev C: 2587/5193, Dev D: 2607/5203)
 npm install
 ```
 
@@ -68,6 +69,7 @@ Máy chủ dev có các địa chỉ:
 | Dev A | `http://100.109.206.6:5173` |
 | Dev B | `http://100.109.206.6:5183` |
 | Dev C | `http://100.109.206.6:5193` |
+| Dev D | `http://100.109.206.6:5203` |
 
 Client tự kết nối tới server cùng địa chỉ, cổng lấy theo `PORT` trong `.env.local`.
 
@@ -80,9 +82,11 @@ ssh -L 5173:localhost:5173 -L 2597:localhost:2597 nguyencong@100.109.206.6
 ssh -L 5183:localhost:5183 -L 2577:localhost:2577 nguyencong@100.109.206.6
 # Dev C
 ssh -L 5193:localhost:5193 -L 2587:localhost:2587 nguyencong@100.109.206.6
+# Dev D
+ssh -L 5203:localhost:5203 -L 2607:localhost:2607 nguyencong@100.109.206.6
 ```
 
-Rồi mở `http://localhost:5173` (Dev A) / `http://localhost:5183` (Dev B) / `http://localhost:5193` (Dev C).
+Rồi mở `http://localhost:5173` (Dev A) / `http://localhost:5183` (Dev B) / `http://localhost:5193` (Dev C) / `http://localhost:5203` (Dev D).
 
 ## Soạn code
 
