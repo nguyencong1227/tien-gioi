@@ -223,4 +223,21 @@ describe("nhiệm vụ Trúc Cơ / Kim Đan làm được từ đầu tới cu�
       expect(sums.get(realm)! / bars, `cảnh giới ${realm}`).toBeLessThanOrEqual(0.05);
     }
   });
+
+  it("thưởng tu vi VIỆC PHỤ mỗi cảnh giới Trúc Cơ / Kim Đan / Nguyên Anh <= 2,5% tổng thanh (việc phụ được loại khỏi cap chuỗi chính ở trên nên cần cap RIÊNG)", () => {
+    // Số thật lúc đặt (#725): Trúc Cơ 1,96 %, Kim Đan 1,50 %, Nguyên Anh 1,95 % (gộp với chuỗi chính Nguyên Anh = 6,87 %, chủ ý của A: việc phụ trả công 10-15 quái
+    // + nguyên liệu mỗi việc). Thêm việc phụ mới vượt 2,5 % thì phải cân lại có chủ ý (đổi ngưỡng này cùng PR), không để lọt vì "việc phụ không bị chặn".
+    const sums = new Map<number, number>();
+    for (const q of QUESTS) {
+      if (q.daily || !q.rewards.exp || !q.desc.startsWith("Việc phụ")) continue;
+      const reach = [...q.steps].reverse().find((s) => s.kind === "reachRealm");
+      const realm = reach?.kind === "reachRealm" ? reach.realm : (q.minRealm?.realm ?? 1);
+      sums.set(realm, (sums.get(realm) ?? 0) + q.rewards.exp);
+    }
+    for (const realm of [2, 3, 4]) {
+      const bars = [0, 1, 2].reduce((a, t) => a + expToNext(realm, t), 0);
+      expect(sums.get(realm)!, `cảnh giới ${realm}`).toBeGreaterThan(0);
+      expect(sums.get(realm)! / bars, `cảnh giới ${realm}`).toBeLessThanOrEqual(0.025);
+    }
+  });
 });
