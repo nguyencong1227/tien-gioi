@@ -39,7 +39,11 @@ export function spawnLoot(
  */
 export function dropLoot(w: World, mc: MonsterCtrl, x: number, y: number) {
   const owner = lootOwner(w, mc.damageBy);
-  for (const d of rollDrops(mc.def.id)) {
+  // Tinh anh (`elite.ts`): tung bảng rơi đồ thêm MỘT lần
+  const drops = mc.elite
+    ? [...rollDrops(mc.def.id), ...rollDrops(mc.def.id)]
+    : rollDrops(mc.def.id);
+  for (const d of drops) {
     const a = rand(0, Math.PI * 2),
       r = rand(0, 16);
     spawnLoot(w, d.itemId, d.qty, x + Math.cos(a) * r, y + Math.sin(a) * r, owner);

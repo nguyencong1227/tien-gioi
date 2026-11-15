@@ -159,6 +159,8 @@ export interface MonsterCtrl {
   slam?: { until: number; x: number; y: number };
   /** Thời điểm sớm nhất được đập đất lần kế (ms của `World.now`); trống = đập được ngay. */
   nextSlam?: number;
+  /** Tinh anh (M7.3, `systems/elite.ts`): `def` là bản nhân số liệu; rơi thêm đồ và tiền. Trống = quái thường. */
+  elite?: true;
 }
 
 /** Pha của đòn mạnh (`systems/charge.ts`): `windup` đứng gồng tới `until` rồi lao theo `angle`; `recover` đứng thở tới `until`. */

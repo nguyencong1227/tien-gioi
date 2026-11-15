@@ -24,6 +24,7 @@ import { onTreasureKill } from "./treasure";
 import { duelBeam, duelSlash, reviveInPlace } from "./duel";
 import { changeCoin, splitCoin } from "./wallet";
 import { absorbShield, entriesOf, takenMult } from "./status-rules";
+import { ELITE_COIN_MULT } from "./elite";
 
 /** Kiếm chém: hình quạt trước mặt. */
 export function slash(w: World, sid: string, angle: unknown) {
@@ -144,7 +145,7 @@ export function killMonster(w: World, id: string, mc: MonsterCtrl) {
  * PARTY_SHARE_RANGE) nhưng KHÔNG có thưởng đội, và tổng chia ra đúng bằng số đã tung (xem `splitCoin`).
  */
 function dropCoin(w: World, mc: MonsterCtrl, x: number, y: number) {
-  const coin = rollCoin(mc.def.id);
+  const coin = rollCoin(mc.def.id) * (mc.elite ? ELITE_COIN_MULT : 1); // tinh anh rơi gấp đôi (`elite.ts`)
   if (coin <= 0) return;
   const weights = new Map<string, number>();
   for (const [sid, wt] of killShares(w, mc.damageBy, x, y, false)) {
