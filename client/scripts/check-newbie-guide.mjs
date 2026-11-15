@@ -181,6 +181,10 @@ try {
         `hộp chỉ dẫn ở cảm ứng không còn tên phím (Phím / Tab / Shift+ / Esc / Enter): "${visibleText.match(/\bPhím\b|\bTab\b|Shift\+\S*|\bEsc\b|\bEnter\b/)?.[0] ?? ""}"`,
       );
       check(
+        /nút hướng cố định/.test(visibleText),
+        "hộp chỉ dẫn ở cảm ứng nhắc cả kiểu NÚT HƯỚNG cố định (tg_touch_scheme = dpad, đổi ở Cài đặt), không chỉ cần điều khiển nổi",
+      );
+      check(
         /Chém/.test(visibleText) &&
           /Mục tiêu/.test(visibleText) &&
           /Đả tọa/.test(visibleText) &&

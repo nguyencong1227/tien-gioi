@@ -17,6 +17,7 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "e2e:all": "npm run e2e:all -w server --",
     "e2e": "npm run e2e -w server --",
     "e2e:tai-khoan": "npm run e2e:tai-khoan -w server --",
     "e2e:bi-canh": "npm run e2e:bi-canh -w server --",
