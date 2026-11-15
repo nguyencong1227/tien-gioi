@@ -745,23 +745,29 @@ html[data-input="touch"] .qt-head {
 }
 .mm-foot {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   margin-top: 3px;
   font-size: var(--fs-10);
   padding: 0 2px;
 }
+/* Tên vùng dưới bản đồ nhỏ: nhận hết chỗ còn lại cạnh chữ "M" và cho xuống dòng thay vì cắt bằng dấu chấm lửng (trước đây `max-width: 85px` + nowrap cắt 7 / 8 tên vùng
+   ở màn cảm ứng: "Hàn Vân T…", "Âm Sương T…", mất đúng phần phân biệt; PC cắt "Vọng Sương Trạm") */
 #minimap-zone {
   color: #ffe08a;
   font-weight: 600;
-  max-width: 85px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
 }
 .mm-foot small {
   font-size: inherit; /* <small> mặc định là `smaller` (10 px -> 8,3 px): giữ đúng cỡ nhãn chân bản đồ */
   opacity: 0.7;
+}
+/* Màn cảm ứng không có phím M: bỏ chữ gợi ý để tên vùng có thêm ~11 px chiều ngang */
+html[data-input="touch"] .mm-foot small {
+  display: none;
 }
 
 /* Nút nói chuyện với NPC */
