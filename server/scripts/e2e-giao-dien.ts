@@ -4,7 +4,9 @@
 //  - thẻ nhân vật gọn: không có nút, hai chip (Linh thạch, đạo hữu) cùng MỘT hàng và không tràn, thẻ không quá rộng / cao;
 //  - thanh menu: bảy nút (MENU_BUTTONS) cùng cỡ, cùng một hàng, cách đều, nằm trong khung nhìn; màn < 620 px (MENU_COLLAPSE_BELOW) gộp vào nút ☰ mở ra đúng một hàng, chọn mục thì đóng;
 //  - không bảng nổi nào chồng lên nhau (cột trái, cột phải, chat), vùng giữa (quanh nhân vật) trống, ngân sách diện tích;
-//  - Tổ đội / Nhiệm vụ / Chat: mặc định thu gọn ở màn hẹp, mở ở máy tính rộng; chat thu gọn còn đúng một dòng, Enter mở, tự mờ, nhớ trạng thái.
+//  - Tổ đội / Nhiệm vụ / Chat: mặc định thu gọn ở màn hẹp, mở ở máy tính rộng; chat thu gọn còn đúng một dòng, Enter mở, tự mờ, nhớ trạng thái;
+//  - điện thoại NGANG (7 khung từ 915x412 xuống 568x320, `LANDSCAPE_PHONES`, cả hai kiểu điều khiển cảm ứng float / dpad, #727): MỌI điều khiển cảm ứng đang hiện (liệt kê tự động) không chồng lên nhau,
+//    chạm giữa mỗi điều khiển trúng đúng nó, không điều khiển nào ra ngoài màn, nút Mục tiêu >= 44 px (`touch-controls-kit.ts`).
 // Chạy: `npm run build -w client && npm run e2e:giao-dien -w server` (cần google-chrome). Ảnh (tuỳ chọn): đặt E2E_SHOTS=<thư mục>.
 import { spawn, execSync, type ChildProcess } from "node:child_process";
 import { existsSync, mkdtempSync } from "node:fs";
@@ -17,6 +19,14 @@ import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { Tab, sleep, listenWithRetry, removeTmpDirs, getChromeGpuFlags } from "./e2e-kit";
 import { VIEWPORTS, applyViewport, crowdHud, viewportOf } from "./layout-kit";
+import {
+  LANDSCAPE_PHONES,
+  TOUCH_STATES,
+  findTouchConflicts,
+  measureInState,
+  type OverlapException,
+  type TouchControl,
+} from "./touch-controls-kit";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
@@ -28,6 +38,21 @@ const out = (m: string) => console.log(m);
 /** Số nút của thanh menu (Nhân vật, Công pháp, Túi, Nhiệm vụ, Tông môn, Âm thanh, Cài đặt) và độ rộng (px) dưới đó menu gộp vào ☰ (`@media (max-width: 619px)` ở style.css, #684) */
 const MENU_BUTTONS = 7;
 const MENU_COLLAPSE_BELOW = 620;
+
+/**
+ * Cặp điều khiển cảm ứng được phép chồng nhau ở điện thoại ngang (khai báo CÓ CHỦ Ý, kèm lý do). Quan hệ chứa nhau (bản đồ nhỏ chứa phần con...) đã tự được bỏ qua.
+ * Hiện KHÔNG có ngoại lệ nào: thêm vào đây thì phải ghi rõ vì sao chồng là đúng (vd. hai nút cùng chỗ nhưng không bao giờ cùng hiện).
+ */
+const TOUCH_OVERLAP_EXCEPTIONS: readonly OverlapException[] = [];
+/** Điều khiển phải có trong MỌI phép đo (chống đo rỗng đạt giả khi bộ chọn hỏng hoặc phần tử đổi id); nút ngữ cảnh được thêm theo từng trạng thái. */
+const TOUCH_CORE_CONTROLS = [
+  "btn-target",
+  "sk-break",
+  "quick-1",
+  "sk-slot2",
+  "sk-slot5",
+  "minimap-wrap",
+];
 
 /** Đo bố cục hiện tại trong trang (một lần gọi): toạ độ các phần tử cần kiểm. */
 const MEASURE = `(() => {
@@ -316,6 +341,65 @@ async function main() {
         inCentre.join(", "),
       );
       await T.shot(`giao-dien-${tag}`);
+    }
+
+    // ---- Điện thoại NGANG: không điều khiển cảm ứng nào chồng nhau / ra ngoài màn, chạm giữa trúng đúng nút (#727) ----
+    // Mỗi khung x hai kiểu điều khiển (float / dpad) x các trạng thái cụm cảm ứng (`TOUCH_STATES`: nút ngữ cảnh hiện riêng lẻ hoặc cặp, bốn ô chiêu đã gắn).
+    for (const p of LANDSCAPE_PHONES) {
+      for (const scheme of ["float", "dpad"] as const) {
+        await applyViewport(T, { w: p.w, h: p.h, touch: true, note: p.note });
+        await T.ev(`document.documentElement.dataset.touchScheme = '${scheme}'; 1`);
+        await sleep(350);
+        const d = JSON.parse(
+          String(
+            await T.ev(
+              `JSON.stringify({ w: innerWidth, h: innerHeight, orient: document.documentElement.dataset.orient, input: document.documentElement.dataset.input })`,
+            ),
+          ),
+        ) as { w: number; h: number; orient: string; input: string };
+        check(
+          `${p.w}x${p.h} ${scheme}: khung đúng (cảm ứng, ngang)`,
+          d.w === p.w && d.h === p.h && d.input === "touch" && d.orient === "landscape",
+          JSON.stringify(d),
+        );
+        for (const state of TOUCH_STATES) {
+          if (p.h < state.minHeight) continue;
+          const tag = `${p.w}x${p.h} ${scheme} / ${state.id}`;
+          const controls = JSON.parse(String(await T.ev(measureInState(state)))) as TouchControl[];
+          if (process.env.E2E_TOUCH_DUMP)
+            for (const c of controls)
+              out(
+                `    ${c.key.padEnd(22)} x ${Math.round(c.l)}-${Math.round(c.r)} y ${Math.round(c.t)}-${Math.round(c.b)} (${Math.round(c.r - c.l)}x${Math.round(c.b - c.t)})`,
+              );
+          const keys = new Set(controls.map((c) => c.key));
+          const missing = [...TOUCH_CORE_CONTROLS, ...state.show].filter((k) => !keys.has(k));
+          const conflicts = findTouchConflicts(controls, p.w, p.h, TOUCH_OVERLAP_EXCEPTIONS);
+          const tg = controls.find((c) => c.key === "btn-target");
+          const problems = [
+            ...(controls.length >= 12 && missing.length === 0
+              ? []
+              : [`thiếu điều khiển ${missing.join(",")} (đo ${controls.length})`]),
+            ...conflicts.overlaps.map((o) => `chồng: ${o.a} x ${o.b} (${o.w}x${o.h} px)`),
+            ...conflicts.tapMisses.map((m) => `chạm giữa ${m.key} trúng ${m.hit}`),
+            ...conflicts.offscreen.map(
+              (o) =>
+                `ra ngoài màn: ${o.key} [${Math.round(o.l)},${Math.round(o.t)} - ${Math.round(o.r)},${Math.round(o.b)}]`,
+            ),
+            ...(tg && tg.r - tg.l >= 44 && tg.b - tg.t >= 44
+              ? []
+              : [
+                  `nút Mục tiêu nhỏ hơn 44 px (${tg ? `${Math.round(tg.r - tg.l)}x${Math.round(tg.b - tg.t)}` : "không có"})`,
+                ]),
+          ];
+          check(
+            `${tag}: ${controls.length} điều khiển, không chồng nhau / ra ngoài màn, chạm giữa trúng đúng nút`,
+            problems.length === 0,
+            problems.join("; "),
+          );
+        }
+        if (scheme === "float") await T.shot(`ngang-${p.w}x${p.h}`);
+        await T.ev(`document.documentElement.dataset.touchScheme = 'float'; 1`);
+      }
     }
 
     // ---- Chat thu gọn, tự mờ; Tổ đội / Nhiệm vụ nhớ trạng thái; nhiệm vụ trống ----
