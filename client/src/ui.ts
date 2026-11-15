@@ -128,7 +128,7 @@ import {
   type SectConfirmKind,
 } from "./sect";
 import { canAffordFee, feeChipText, recipeFee } from "./forge-fee";
-import { doneRows, doneSummary } from "./quest-log";
+import { QUEST_KIND_BADGE, QUEST_KIND_LABEL, doneRows, doneSummary, questKind } from "./quest-log";
 import { pickupBtnText, portalBtnText, talkBtnText } from "./ctx-btn";
 import { sound } from "./audio";
 import { bookTeach, useLabelOf } from "./item-use";
@@ -1014,7 +1014,7 @@ function renderQuestTracker() {
 
     const badge = document.createElement("span");
     badge.className = "qt-badge";
-    badge.textContent = def.daily ? "Lặp" : "Chính";
+    badge.textContent = QUEST_KIND_BADGE[questKind(def)];
 
     titleRow.append(nameSpan, badge);
 
@@ -1201,7 +1201,8 @@ function renderQuestModalImpl() {
       const { text, ready } = describeStep(def, a);
 
       const card = document.createElement("div");
-      card.className = `q-card ${def.daily ? "daily" : "main-q"}`;
+      const kind = questKind(def);
+      card.className = `q-card ${kind === "daily" ? "daily" : kind === "side" ? "side-q" : "main-q"}`;
 
       const head = document.createElement("div");
       head.className = "q-card-head";
@@ -1213,7 +1214,7 @@ function renderQuestModalImpl() {
       const giver = document.createElement("small");
       giver.style.opacity = "0.75";
       const npc = NPC_BY_ID[def.giver];
-      giver.textContent = `${npc?.name ?? def.giver} (${def.daily ? "Hằng ngày" : "Chính tuyến"})`;
+      giver.textContent = `${npc?.name ?? def.giver} (${QUEST_KIND_LABEL[kind]})`;
 
       head.append(title, giver);
 
@@ -1270,7 +1271,7 @@ function renderQuestModalImpl() {
       title.textContent = row.title;
       const badge = document.createElement("span");
       badge.className = "qt-badge";
-      badge.textContent = row.daily ? "Xong hôm nay" : "Đã xong";
+      badge.textContent = row.daily ? "Xong hôm nay" : row.side ? "Việc phụ" : "Đã xong";
       const chev = document.createElement("span");
       chev.className = "q-row-chev";
       chev.setAttribute("aria-hidden", "true");

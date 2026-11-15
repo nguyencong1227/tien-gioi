@@ -39,6 +39,7 @@ import {
 } from "./skill-bar";
 import { mockSpawnOf, mockStartMapId, mockSyncsState } from "./mock-map";
 import { parseMockStatus } from "./status-badges";
+import { questKind } from "./quest-log";
 import { captureEarlyMessages } from "./early-messages";
 import { joinWithRedirect, isClientOutdatedError } from "./connection";
 import { clearToken, getToken } from "./auth";
@@ -688,7 +689,8 @@ async function start(room: Room, mapId: string) {
       npcs: NPCS.map((n) => ({ id: n.id, x: n.x, y: n.y, mapId: n.mapId ?? DEFAULT_MAP_ID })),
     });
     (window as any).__questIds = () => ({
-      main: QUESTS.filter((q) => !q.daily).map((q) => q.id),
+      main: QUESTS.filter((q) => questKind(q) === "main").map((q) => q.id),
+      side: QUESTS.filter((q) => questKind(q) === "side").map((q) => q.id),
       daily: QUESTS.filter((q) => q.daily).map((q) => q.id),
     });
     (window as any).__scene = activeScene;

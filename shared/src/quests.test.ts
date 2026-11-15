@@ -222,6 +222,15 @@ describe("nội dung nhiệm vụ (#19)", () => {
     ]);
   });
 
+  it("việc phụ (không lặp, không thuộc chuỗi chính) ghi 'Việc phụ (không bắt buộc)' ở đầu mô tả; nhiệm vụ trong chuỗi chính và nhiệm vụ lặp thì không", () => {
+    const inChain = new Set(chain());
+    const side = QUESTS.filter((q) => !q.daily && !inChain.has(q.id));
+    expect(side.map((q) => q.id).sort()).toEqual(["giao_hoan", "mang_hoan"]);
+    for (const q of side) expect(q.desc.startsWith("Việc phụ (không bắt buộc)"), q.id).toBe(true);
+    for (const q of QUESTS)
+      if (q.daily || inChain.has(q.id)) expect(q.desc.startsWith("Việc phụ"), q.id).toBe(false);
+  });
+
   it("mốc cảnh giới trong chuỗi chỉ tăng dần", () => {
     let prev = -1;
     for (const id of chain()) {

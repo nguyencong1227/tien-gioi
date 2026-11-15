@@ -8,6 +8,7 @@ import {
   DEFAULT_MAP,
   DUNGEON_DAILY_REWARDS,
   DUNGEON_MAPS,
+  HAN_VAN_ID,
   INVENTORY_SLOTS,
   ITEM_BY_ID,
   LINH_HU_MAP_ID,
@@ -1752,6 +1753,153 @@ describe("audit-saves (Issue #112)", () => {
           expect(skillErrors).toEqual([]);
         }
       }
+    });
+  });
+
+  describe("M7.5d / #506: audit-saves Nguyên Anh & Hàn Vân Lĩnh", () => {
+    const hvMap = getMap(HAN_VAN_ID)!;
+
+    // Hồ sơ nhân vật Nguyên Anh chuẩn chỉ ở Hàn Vân Trạm
+    const validNguyenAnhPlayer = {
+      ...validPlayer,
+      name: "Băng Vân",
+      realm: 4,
+      tier: 1, // Nguyên Anh trung kỳ
+      exp: 150000,
+      coin: 88888,
+      mapId: HAN_VAN_ID,
+      x: 2048,
+      y: 3648, // Trong Hàn Vân Trạm
+      inventory: [
+        { itemId: "thuong_hoi_huyet_dan", qty: 20 },
+        { itemId: "thuong_hoi_linh_dan", qty: 20 },
+        { itemId: "han_lang_mao", qty: 15 },
+        { itemId: "phong_nha_vu", qty: 12 },
+        { itemId: "tuong_cot", qty: 8 },
+        { itemId: "doc_tuoc_nang", qty: 6 },
+        { itemId: "thien_han_chau", qty: 3 },
+      ],
+      equipment: {
+        weapon: "han_vu_kiem",
+        robe: "han_lang_bao",
+        talisman: "phong_nha_phu",
+        boots: "tuyet_hanh_ngoa",
+        jade: "han_tinh_boi",
+        treasure: "han_bang_an",
+      },
+      quests: {
+        done: [
+          "lang_han_quan",
+          "han_van_len",
+          "han_lang_hoan",
+          "phong_nha_cham",
+          "cot_tuong_cot",
+          "giao_hoan", // Việc phụ hoàn thành hợp lệ
+        ],
+        active: [{ id: "doc_tuoc_nang_cb", progress: 0 }],
+        daily: {
+          han_lang_quay: "2026-11-15T00:00:00.000Z",
+        },
+      },
+      skills: {
+        learned: { ung_trao: 1, hoa_van_kiem: 2, bon_thach_quyen: 3, cuu_cung_khon_sat: 1 },
+        slots: ["ung_trao", "hoa_van_kiem", "bon_thach_quyen", "cuu_cung_khon_sat"],
+      },
+    };
+
+    it("hồ sơ nhân vật Nguyên Anh hợp lệ (bộ IV, đồ đan cấp 3, quest Nguyên Anh tại Hàn Vân Lĩnh) -> 0 lỗi", () => {
+      const raw = JSON.stringify(validNguyenAnhPlayer);
+      const errors = auditPlayerSaveData(raw, raw.length);
+      expect(errors).toEqual([]);
+    });
+
+    it("toạ độ vượt biên hoặc rơi vào ô chặn / vách núi Hàn Vân Lĩnh -> pos_out_of_bounds, pos_blocked", () => {
+      // Vượt biên Hàn Vân Lĩnh (kích thước thế giới worldW x worldH)
+      const outBounds = JSON.stringify({
+        ...validNguyenAnhPlayer,
+        x: hvMap.worldW + 100,
+        y: 2000,
+      });
+      const errsOut = auditPlayerSaveData(outBounds, outBounds.length);
+      expect(errsOut.map((e) => e.code)).toContain("pos_out_of_bounds");
+
+      // Rơi vào vách núi / góc chặn mép bản đồ (0, 0)
+      const blocked = JSON.stringify({
+        ...validNguyenAnhPlayer,
+        x: 0,
+        y: 0,
+      });
+      const errsBlocked = auditPlayerSaveData(blocked, blocked.length);
+      expect(errsBlocked.map((e) => e.code)).toContain("pos_blocked");
+      expect(errsBlocked.find((e) => e.code === "pos_blocked")!.message).toContain(hvMap.def.name);
+    });
+
+    it("chỗ xuất hiện của cổng nam Hàn Vân Lĩnh (han_van_nam) và cổng bắc Âm Sương (am_suong_bac) là toạ độ lưu hợp lệ", () => {
+      const portalHv = hvMap.portals.find((p) => p.id === "han_van_nam")!;
+      expect(portalHv).toBeDefined();
+      const rawHv = JSON.stringify({
+        ...validNguyenAnhPlayer,
+        x: portalHv.spawn.x,
+        y: portalHv.spawn.y,
+      });
+      expect(auditPlayerSaveData(rawHv, rawHv.length)).toEqual([]);
+
+      const asMap = getMap("am_suong")!;
+      const portalAs = asMap.portals.find((p) => p.id === "am_suong_bac")!;
+      expect(portalAs).toBeDefined();
+      const rawAs = JSON.stringify({
+        ...validPlayer,
+        mapId: "am_suong",
+        x: portalAs.spawn.x,
+        y: portalAs.spawn.y,
+      });
+      expect(auditPlayerSaveData(rawAs, rawAs.length)).toEqual([]);
+    });
+
+    it("phát hiện trang bị bộ IV gắn sai ô -> invalid_equip_slot, hoặc trang bị vật phẩm lạ -> unknown_equip_item", () => {
+      // Gắn nhầm kiếm Hàn Vũ vào ô robe
+      const badSlot = JSON.stringify({
+        ...validNguyenAnhPlayer,
+        equipment: {
+          ...validNguyenAnhPlayer.equipment,
+          robe: "han_vu_kiem",
+        },
+      });
+      const errsSlot = auditPlayerSaveData(badSlot, badSlot.length);
+      expect(errsSlot.map((e) => e.code)).toContain("invalid_equip_slot");
+
+      // Trang bị id lạ không có thật
+      const unknownItem = JSON.stringify({
+        ...validNguyenAnhPlayer,
+        equipment: {
+          ...validNguyenAnhPlayer.equipment,
+          weapon: "han_vu_kiem_fake",
+        },
+      });
+      const errsUnknown = auditPlayerSaveData(unknownItem, unknownItem.length);
+      expect(errsUnknown.map((e) => e.code)).toContain("unknown_equip_item");
+    });
+
+    it("phát hiện nhiệm vụ Nguyên Anh bị trùng trong done hoặc chứa nhiệm vụ lạ", () => {
+      const dupQuest = JSON.stringify({
+        ...validNguyenAnhPlayer,
+        quests: {
+          ...validNguyenAnhPlayer.quests,
+          done: ["lang_han_quan", "han_van_len", "lang_han_quan"],
+        },
+      });
+      const errsDup = auditPlayerSaveData(dupQuest, dupQuest.length);
+      expect(errsDup.map((e) => e.code)).toContain("duplicate_quest_done");
+
+      const fakeQuest = JSON.stringify({
+        ...validNguyenAnhPlayer,
+        quests: {
+          ...validNguyenAnhPlayer.quests,
+          done: ["lang_han_quan", "nhiem_vu_gia_han_van"],
+        },
+      });
+      const errsFake = auditPlayerSaveData(fakeQuest, fakeQuest.length);
+      expect(errsFake.map((e) => e.code)).toContain("unknown_quest");
     });
   });
 });

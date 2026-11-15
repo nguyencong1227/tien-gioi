@@ -541,6 +541,18 @@ Cùng bậc nhưng KHÁC bộ: bên mặc bộ cao hơn thắng 100% số trận
 | Kim Đan Hậu kỳ | Sương Hồ | 3.0 | 2.8 | 0.95x | 361 | 450 (20%) | 1.00x |
 | Kim Đan Hậu kỳ | Thạch Quy | 12.2 | 12.1 | 0.99x | 380 | 493 (22%) | 1.04x |
 | Kim Đan Hậu kỳ | Độc Thiềm | 4.9 | 4.8 | 0.99x | 756 | 1,252 (56%) | 1.32x |
+| Nguyên Anh Sơ kỳ | Hàn Lang | 4.2 | 4.0 | 0.95x | 897 | 1,247 (43%) | 1.11x |
+| Nguyên Anh Sơ kỳ | Phong Nha | 4.1 | 4.0 | 0.99x | 1,013 | 1,236 (42%) | 0.98x |
+| Nguyên Anh Sơ kỳ | Cốt Tượng | 17.3 | 17.3 | 1.00x | 1,354 | 1,826 (63%) | 1.08x |
+| Nguyên Anh Sơ kỳ | Độc Tước | 6.9 | 6.8 | 1.00x | 1,879 | 2,805 (96%) | 1.19x |
+| Nguyên Anh Trung kỳ | Hàn Lang | 3.7 | 3.6 | 0.98x | 790 | 1,077 (32%) | 1.09x |
+| Nguyên Anh Trung kỳ | Phong Nha | 3.6 | 3.6 | 1.01x | 893 | 1,236 (37%) | 1.11x |
+| Nguyên Anh Trung kỳ | Cốt Tượng | 15.2 | 14.9 | 0.98x | 1,106 | 1,474 (44%) | 1.07x |
+| Nguyên Anh Trung kỳ | Độc Tước | 6.1 | 6.0 | 1.00x | 1,656 | 2,252 (68%) | 1.09x |
+| Nguyên Anh Hậu kỳ | Hàn Lang | 3.3 | 3.2 | 0.99x | 696 | 1,022 (27%) | 1.17x |
+| Nguyên Anh Hậu kỳ | Phong Nha | 3.2 | 3.2 | 1.02x | 786 | 1,236 (33%) | 1.26x |
+| Nguyên Anh Hậu kỳ | Cốt Tượng | 13.4 | 13.3 | 0.99x | 1,006 | 1,336 (35%) | 1.06x |
+| Nguyên Anh Hậu kỳ | Độc Tước | 5.3 | 5.2 | 0.98x | 1,458 | 2,252 (59%) | 1.24x |
 
 Thời gian hạ quái khớp mô hình trong **0.92x - 1.02x** (mục tiêu lệch <= ~25%): tốc độ tu vi / giờ và Linh thạch / giờ của mục 1 (phụ thuộc thời gian trận) đáng tin ở phần này. Khí huyết mất của mã thật bằng **0.97x - 1.32x** mô hình không né (mô hình giả định né 20%, nên mã thật không né mất nhiều hơn mô hình 21-66%; phần dư ngoài hệ số né là làm tròn: quái đánh phát đầu ngay khi vào tầm nên số đòn là làm tròn LÊN, rõ nhất ở trận ngắn). Hệ quả: tiêu chí "an toàn" (mất <= 50% khí huyết mỗi trận) dựa trên giả định né; người KHÔNG né mất nhiều hơn số ở mục 1, vd Kim Đan Hậu kỳ Độc Thiềm: **56%** thay vì 34%; vẫn sống (đả tọa / đan hồi giữa các trận) nhưng sát ngưỡng khi gặp hai con cùng lúc.
 
