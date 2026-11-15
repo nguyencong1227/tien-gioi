@@ -581,6 +581,12 @@ const TIER_OF: Record<string, [number, number]> = {
   thach_quy: [3, 0],
   doc_thiem: [3, 0],
   hac_giao: [3, 0],
+  // Quái Hàn Vân Lĩnh (Nguyên Anh, M7.10)
+  han_lang: [4, 0],
+  phong_nha: [4, 0],
+  cot_tuong: [4, 0],
+  doc_tuoc: [4, 0],
+  thien_han_vuong: [4, 0],
 };
 
 export interface SearchCase {
