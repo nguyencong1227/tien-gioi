@@ -15,6 +15,7 @@ import {
   DEFAULT_MAP,
   DEFAULT_MAP_ID,
   HAC_PHONG_ID,
+  HAN_VAN_ID,
   MONSTER_BY_ID,
   PROTOCOL_VERSION,
   SKILLS,
@@ -111,20 +112,28 @@ export async function measureSearchTime(options: MeasureOptions): Promise<Measur
   const port = await freePort();
   await server.listen(port);
 
-  // Tạo nhân vật Kim Đan Hậu kỳ có trang bị đầy đủ và đan dược để bot luôn an toàn, tập trung đo thời gian tìm quái
+  // Tạo nhân vật (Kim Đan Hậu kỳ hoặc Nguyên Anh Hậu kỳ nếu ở Hàn Vân Lĩnh) có trang bị đầy đủ và đan dược để bot luôn an toàn, tập trung đo thời gian tìm quái
   const botName = `Bot${monsterId.replace(/_/g, "")}${Math.floor(Math.random() * 900 + 100)}`;
   const botSecret = "botsecret12345678";
-  const gear = bestGear(3, 2); // Kim Đan Hậu kỳ (realm 3, tier 2)
+  const isHanVan = mapId === HAN_VAN_ID;
+  const realm = isHanVan ? 4 : 3;
+  const gear = bestGear(realm, 2); // Hậu kỳ (tier 2)
   const nowIso = new Date().toISOString();
   const invSlots = Array.from({ length: 16 }, () => null) as any[];
-  invSlots[0] = { itemId: "dai_hoi_huyet_dan", qty: 99 };
-  invSlots[1] = { itemId: "hoi_huyet_dan", qty: 99 };
-  invSlots[2] = { itemId: "dai_hoi_linh_dan", qty: 99 };
+  if (isHanVan) {
+    invSlots[0] = { itemId: "thuong_hoi_huyet_dan", qty: 99 };
+    invSlots[1] = { itemId: "dai_hoi_huyet_dan", qty: 99 };
+    invSlots[2] = { itemId: "thuong_hoi_linh_dan", qty: 99 };
+  } else {
+    invSlots[0] = { itemId: "dai_hoi_huyet_dan", qty: 99 };
+    invSlots[1] = { itemId: "hoi_huyet_dan", qty: 99 };
+    invSlots[2] = { itemId: "dai_hoi_linh_dan", qty: 99 };
+  }
 
   await savePlayer({
     name: botName,
     secretHash: hashSecret(botSecret),
-    realm: 3,
+    realm,
     tier: 2,
     exp: 0,
     x: map.townPx.x,
@@ -1036,6 +1045,11 @@ if (process.argv[1]?.endsWith("bot-kim-dan.ts")) {
         { mapId: "am_suong", monsterId: "thach_quy", viewKey: "pc", kills: 3 },
         { mapId: "am_suong", monsterId: "doc_thiem", viewKey: "pc", kills: 3 },
         { mapId: "am_suong", monsterId: "hac_giao", viewKey: "pc", kills: 2 },
+        // 4. Quái Hàn Vân Lĩnh (Nguyên Anh, M7.10)
+        { mapId: "han_van", monsterId: "han_lang", viewKey: "pc", kills: 3 },
+        { mapId: "han_van", monsterId: "doc_tuoc", viewKey: "pc", kills: 3 },
+        { mapId: "han_van", monsterId: "cot_tuong", viewKey: "pc", kills: 3 },
+        { mapId: "han_van", monsterId: "thien_han_vuong", viewKey: "pc", kills: 2 },
       ];
 
       const results: MeasureResult[] = [];
@@ -1071,11 +1085,19 @@ if (process.argv[1]?.endsWith("bot-kim-dan.ts")) {
             ? 90
             : r.monsterId === "hac_giao"
               ? 90
-              : r.monsterId === "suong_ho"
-                ? 10
-                : r.monsterId === "thach_quy"
-                  ? 12
-                  : 14;
+              : r.monsterId === "thien_han_vuong"
+                ? 90
+                : r.monsterId === "han_lang"
+                  ? 10
+                  : r.monsterId === "doc_tuoc"
+                    ? 14
+                    : r.monsterId === "cot_tuong"
+                      ? 14
+                      : r.monsterId === "suong_ho"
+                        ? 10
+                        : r.monsterId === "thach_quy"
+                          ? 12
+                          : 14;
         const count =
           r.mapId === "lac_ha" && r.monsterId === "mang"
             ? 2
@@ -1083,9 +1105,17 @@ if (process.argv[1]?.endsWith("bot-kim-dan.ts")) {
               ? 6
               : r.monsterId === "hac_giao"
                 ? 2
-                : r.monsterId === "suong_ho"
-                  ? 24
-                  : 18;
+                : r.monsterId === "thien_han_vuong"
+                  ? 2
+                  : r.monsterId === "han_lang"
+                    ? 28
+                    : r.monsterId === "doc_tuoc"
+                      ? 16
+                      : r.monsterId === "cot_tuong"
+                        ? 16
+                        : r.monsterId === "suong_ho"
+                          ? 24
+                          : 18;
         let verdict = "-";
         if (r.monsterId === "mang") {
           verdict =

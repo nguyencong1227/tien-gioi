@@ -832,3 +832,135 @@ describe("bot tránh đạn tầm xa: fx bolt (M7.10 #511)", () => {
     expect(hasPoisonEvade).toBe(false);
   });
 });
+
+describe("bot tránh đập đất: fx warn circle (Cốt Tượng & Thiên Hàn Vương, M7.10 #511)", () => {
+  it("parseWarnZoneFromFx trích xuất chính xác vùng đập đất hình tròn từ fx warn circle", () => {
+    const realNow = performance.now();
+    // Cốt Tượng: r = 90, windup = 1100 ms
+    const msgCT = {
+      kind: "warn" as const,
+      shape: "circle" as const,
+      x: 300,
+      y: 400,
+      r: 90,
+      ms: 1100,
+    };
+    const zCT = parseWarnZoneFromFx(msgCT, realNow);
+    expect(zCT).not.toBeNull();
+    expect(zCT!.shape).toBe("circle");
+    expect(zCT!.x).toBe(300);
+    expect(zCT!.y).toBe(400);
+    expect(zCT!.r).toBe(90);
+    expect(zCT!.expiresAt).toBe(realNow + 1100);
+
+    // Thiên Hàn Vương: r = 140, windup = 1000 ms
+    const msgTHV = {
+      kind: "warn" as const,
+      shape: "circle" as const,
+      x: 500,
+      y: 600,
+      r: 140,
+      ms: 1000,
+    };
+    const zTHV = parseWarnZoneFromFx(msgTHV, realNow);
+    expect(zTHV).not.toBeNull();
+    expect(zTHV!.shape).toBe("circle");
+    expect(zTHV!.r).toBe(140);
+    expect(zTHV!.expiresAt).toBe(realNow + 1000);
+  });
+
+  it("bot nhận diện đập đất hình tròn, chọn hướng né xuyên tâm ra xa và dọn dẹp đúng hạn", () => {
+    const realNow = performance.now();
+    const warnMsg = {
+      kind: "warn" as const,
+      shape: "circle" as const,
+      x: 200,
+      y: 200,
+      r: 90,
+      ms: 1100,
+    };
+    const zone = parseWarnZoneFromFx(warnMsg, realNow)!;
+    zone.targeted = true;
+
+    // Bot đang đứng ở (200, 240) - cách tâm đập đất 40 px (nằm sâu trong vòng 90 px)
+    const fakeBot = {
+      predX: 200,
+      predY: 240,
+      warns: [zone],
+      warnsHitCount: 0,
+      warnsEvadedCount: 0,
+    } as unknown as BotState;
+
+    expect(isPointInWarnZone(fakeBot.predX, fakeBot.predY, zone, 0)).toBe(true);
+
+    // Tính hướng né: phải đẩy thẳng xuyên tâm ra xa (dy > 0, dx = 0)
+    const vec = computeEvadeVector(fakeBot.predX, fakeBot.predY, fakeBot.warns, realNow);
+    expect(vec).not.toBeNull();
+    expect(vec!.dx).toBeCloseTo(0, 2);
+    expect(vec!.dy).toBeCloseTo(1, 2);
+
+    // Giả lập bot chạy 15 tick (mỗi tick 7 px = 105 px theo phương y)
+    fakeBot.predY += 105; // Toạ độ mới (200, 345): cách tâm 145 px > reach = 90 + 14 = 104 px
+    expect(isPointInWarnZone(fakeBot.predX, fakeBot.predY, zone, 0)).toBe(false);
+
+    // Khi đòn đập đất kết thúc (t = realNow + 1100 ms)
+    updateBotWarns(fakeBot, realNow + 1100, true);
+    expect(fakeBot.warns.length).toBe(0);
+    expect(fakeBot.warnsEvadedCount).toBe(1);
+    expect(fakeBot.warnsHitCount).toBe(0);
+  });
+
+  it("mô phỏng trong World thật với Cốt Tượng: bot né xuyên tâm thoát đòn đập đất thành công 100%", () => {
+    const t = makeWorld(DEFAULT_MAP);
+    const { p: pStand } = addPlayer(t.w, "StandPlayer", 4, 0); // Nguyên Anh Sơ kỳ
+    const { p: pEvade } = addPlayer(t.w, "EvadePlayer", 4, 0);
+    pEvade.y = pStand.y + 500; // Đặt cách xa 500 px để 2 quái không can thiệp nhau
+
+    // Quái Cốt Tượng cho người đứng yên
+    const monStand = addMonster(t.w, "cot_tuong", pStand.x + 50, pStand.y);
+    monStand.mc.homeX = monStand.m.x;
+    monStand.mc.homeY = monStand.m.y;
+    monStand.mc.target = "StandPlayer";
+
+    // Quái Cốt Tượng cho người né
+    const monEvade = addMonster(t.w, "cot_tuong", pEvade.x + 50, pEvade.y);
+    monEvade.mc.homeX = monEvade.m.x;
+    monEvade.mc.homeY = monEvade.m.y;
+    monEvade.mc.target = "EvadePlayer";
+
+    t.w.now = 10_000;
+    // Đảm bảo quái sẵn sàng đập đất
+    monStand.mc.nextSlam = 10_000;
+    monEvade.mc.nextSlam = 10_000;
+    monStand.mc.nextAttack = 20_000; // Chưa đánh thường
+    monEvade.mc.nextAttack = 20_000;
+
+    // Tick đầu tiên: quái nhận diện mục tiêu và bắt đầu gồng đập đất
+    t.w.now += 50;
+    tickWorld(t.w, 50);
+
+    expect(monStand.mc.slam).toBeDefined();
+    expect(monEvade.mc.slam).toBeDefined();
+    expect(monStand.mc.slam!.until).toBe(10_050 + 1100);
+
+    const hp0Stand = pStand.hp;
+    const hp0Evade = pEvade.hp;
+
+    // Trong 1100 ms (22 tick tiếp theo):
+    // pStand đứng yên.
+    // pEvade bước né xuyên tâm sang trái (quái ở x + 50, pEvade ở x -> né theo dx = -1) với tốc độ 140 px/s (7 px/tick)
+    for (let i = 0; i < 22; i++) {
+      t.w.now += 50;
+      pEvade.x -= 7;
+      tickWorld(t.w, 50);
+    }
+
+    // Đòn đập đất đã đáp xuống:
+    // pStand đứng yên: bị trúng đòn đập đất, mất máu!
+    expect(pStand.hp).toBeLessThan(hp0Stand);
+
+    // pEvade né xuyên tâm: đã cách tâm đập đất 50 + 22 * 7 = 204 px > 90 + 14 = 104 px
+    // Không bị trúng đòn đập đất, máu còn nguyên vẹn 100%!
+    expect(pEvade.hp).toBe(hp0Evade);
+  });
+});
