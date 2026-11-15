@@ -3054,7 +3054,7 @@ html[data-input="touch"] #newbie-btn-keys {
     font-size: var(--fs-10);
     line-height: 12px;
   }
-  /* Nút HUD >= 44x44 (mục 4.2 điều 1). Lưới 3 cột x 2 hàng cho 6 nút (3 x 44 + 2 x 6 = 144 px) thấp hơn 3 hàng x 32 px trước đây */
+  /* Nút HUD >= 44x44 (mục 4.2 điều 1) ở điện thoại ngang thấp. Thanh menu là MỘT hàng 7 nút (7 x 44 + 6 x 4 + đệm ~ 338 px, #684); chú thích cũ nói lưới 3 cột x 2 hàng cho 6 nút (bố cục trước khi có thanh menu) */
   .hud-btn {
     min-width: 44px;
     min-height: 44px;
