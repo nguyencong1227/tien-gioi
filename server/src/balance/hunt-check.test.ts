@@ -164,6 +164,51 @@ describe("trùm Hắc Giao theo đội, mã thật (đứng đánh liên tục, 
   });
 });
 
+describe("trùm Thiên Hàn Vương theo đội, mã thật (Nguyên Anh, M7.9: đứng đánh liên tục, uống Thượng Hồi Huyết Đan khi dưới 50%)", () => {
+  const NA_BOSS = {
+    realm: 4,
+    bossId: "thien_han_vuong",
+    potionId: "thuong_hoi_huyet_dan",
+  } as const;
+  const sum = (tier: number, party: number, potions: number, runs = 3) =>
+    bossSummary(tier, party, potions, runs, NA_BOSS);
+
+  it("đội 2 người trở lên mang 8 viên hạ được ở cả ba bậc Nguyên Anh, không ai chết", () => {
+    for (const tier of [0, 1, 2])
+      for (const party of [2, 3, 4]) {
+        const s = sum(tier, party, 8);
+        expect(s.killRate, `bậc ${tier} đội ${party}`).toBe(1);
+        expect(s.deathsPerRun, `bậc ${tier} đội ${party}`).toBe(0);
+      }
+  });
+
+  it("KHÔNG đan: Sơ kỳ không đội nào hạ được; một người và đội 2 người không đội nào hạ được ở mọi bậc (đan là điều kiện của luật)", () => {
+    for (const party of [1, 2, 3, 4])
+      expect(sum(0, party, 0).killRate, `Sơ kỳ đội ${party}`).toBe(0);
+    for (const tier of [0, 1, 2])
+      for (const party of [1, 2])
+        expect(sum(tier, party, 0).killRate, `bậc ${tier} đội ${party}`).toBe(0);
+  });
+
+  it("một người: Sơ kỳ cần đủ đan (8 viên không hạ được); đủ đan thì hạ được 0 chết ở cả ba bậc; đội đông hạ nhanh hơn người đơn (tỉ lệ ~ 1 / số người)", () => {
+    expect(sum(0, 1, 8).killRate).toBe(0);
+    for (const tier of [0, 1, 2]) {
+      const solo = sum(tier, 1, POTIONS_PLENTY);
+      expect(solo.killRate, `bậc ${tier}`).toBe(1);
+      expect(solo.deathsPerRun, `bậc ${tier}`).toBe(0);
+      const four = sum(tier, 4, 8);
+      expect(four.seconds!, `bậc ${tier}`).toBeLessThan(solo.seconds! * 0.45);
+    }
+  });
+
+  it("trùm Nguyên Anh cùng cỡ Hắc Giao: thời gian đội 3 người Trung kỳ trong 0,7-1,3x của Hắc Giao (mọi thứ chưa lệch xa khi nhân theo tỉ lệ chỉ số)", () => {
+    const hg = bossSummary(1, 3, 8, 3);
+    const na = sum(1, 3, 8);
+    expect(na.seconds! / hg.seconds!).toBeGreaterThan(0.7);
+    expect(na.seconds! / hg.seconds!).toBeLessThan(1.3);
+  });
+});
+
 describe("renderHuntCheck", () => {
   it("có mục 9, đủ bảng thường và bảng trùm, không NaN / undefined / \\n", () => {
     const md = renderHuntCheck();

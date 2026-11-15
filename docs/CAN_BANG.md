@@ -561,6 +561,23 @@ Thời gian hạ quái khớp mô hình trong **0.92x - 1.02x** (mục tiêu l�
 | Hậu kỳ | 3 | 100% hạ, 35 giây, 1.0 chết / trận | 100% hạ, 31 giây, 0.0 chết / trận, 2.0 đan | 100% hạ, 31 giây, 0.0 chết / trận, 2.0 đan |
 | Hậu kỳ | 4 | 100% hạ, 24 giây, 0.8 chết / trận | 100% hạ, 23 giây, 0.0 chết / trận, 1.0 đan | 100% hạ, 23 giây, 0.0 chết / trận, 1.0 đan |
 
+**Trùm Thiên Hàn Vương theo đội, mã thật (Nguyên Anh, M7.9).** Cùng cách đo như Hắc Giao: đội cùng bậc đứng cạnh trùm đánh thường liên tục (KHÔNG né: trùm lao và đập đất vòng 140 px đều trúng), uống Thượng Hồi Huyết Đan (hồi 90 %) khi khí huyết dưới 50%, ca khó. Kết quả cùng dạng với Hắc Giao: KHÔNG đan thì Sơ kỳ không đội nào hạ được, Trung / Hậu kỳ chỉ đội 4 (và đội 3 Hậu kỳ một nửa số trận) hạ được mà còn người chết, tức cần đan; với 8 viên đội 2 trở lên hạ được, không ai chết ở cả ba bậc; một người cần đủ đan ở Sơ kỳ (Trung / Hậu kỳ hạ được cả với 8 viên, giống Hắc Giao). Số cuối do M7.9 hiệu chỉnh khi có bot thật (C).
+
+| Bậc | Đội | Không đan | 8 viên / người | Đủ đan (30 viên / người) |
+|---|---:|---|---|---|
+| Sơ kỳ | 1 | không hạ được (1.0 chết / trận) | không hạ được (1.0 chết / trận) | 100% hạ, 120 giây, 0.0 chết / trận, 10.0 đan |
+| Sơ kỳ | 2 | không hạ được (2.0 chết / trận) | 100% hạ, 60 giây, 0.0 chết / trận, 6.8 đan | 100% hạ, 60 giây, 0.0 chết / trận, 6.8 đan |
+| Sơ kỳ | 3 | không hạ được (3.0 chết / trận) | 100% hạ, 40 giây, 0.0 chết / trận, 5.0 đan | 100% hạ, 40 giây, 0.0 chết / trận, 5.0 đan |
+| Sơ kỳ | 4 | không hạ được (4.0 chết / trận) | 100% hạ, 30 giây, 0.0 chết / trận, 5.0 đan | 100% hạ, 30 giây, 0.0 chết / trận, 5.0 đan |
+| Trung kỳ | 1 | không hạ được (1.0 chết / trận) | 100% hạ, 106 giây, 0.0 chết / trận, 8.0 đan | 100% hạ, 106 giây, 0.0 chết / trận, 8.7 đan |
+| Trung kỳ | 2 | không hạ được (2.0 chết / trận) | 100% hạ, 52 giây, 0.0 chết / trận, 5.0 đan | 100% hạ, 52 giây, 0.0 chết / trận, 5.0 đan |
+| Trung kỳ | 3 | không hạ được (3.0 chết / trận) | 100% hạ, 36 giây, 0.0 chết / trận, 5.0 đan | 100% hạ, 36 giây, 0.0 chết / trận, 5.0 đan |
+| Trung kỳ | 4 | 100% hạ, 30 giây, 2.0 chết / trận | 100% hạ, 26 giây, 0.0 chết / trận, 4.5 đan | 100% hạ, 26 giây, 0.0 chết / trận, 4.5 đan |
+| Hậu kỳ | 1 | không hạ được (1.0 chết / trận) | 100% hạ, 93 giây, 0.0 chết / trận, 7.3 đan | 100% hạ, 93 giây, 0.0 chết / trận, 7.3 đan |
+| Hậu kỳ | 2 | không hạ được (2.0 chết / trận) | 100% hạ, 46 giây, 0.0 chết / trận, 4.7 đan | 100% hạ, 46 giây, 0.0 chết / trận, 4.7 đan |
+| Hậu kỳ | 3 | 50% hạ, 41 giây, 2.5 chết / trận | 100% hạ, 31 giây, 0.0 chết / trận, 2.0 đan | 100% hạ, 31 giây, 0.0 chết / trận, 2.0 đan |
+| Hậu kỳ | 4 | 100% hạ, 25 giây, 1.0 chết / trận | 100% hạ, 23 giây, 0.0 chết / trận, 2.0 đan | 100% hạ, 23 giây, 0.0 chết / trận, 2.0 đan |
+
 **Vì sao một người hạ được.** Sát thương trùm lên MỘT người (trúng 100%, không né) là **5.8% / 4.9% / 4.2%** khí huyết mỗi giây ở Sơ / Trung / Hậu kỳ, còn đan hồi **7.0%** mỗi giây: ở CẢ BA bậc sát thương < tốc độ hồi nên một người bền vững nếu đủ đan. Trần 8 viên chỉ là giới hạn mang, không phải của luật: ở cột "8 viên" solo Sơ kỳ không hạ được và Trung kỳ hạ được ít, nhưng đủ đan thì hạ được 100%, 0 chết ở mọi bậc.
 
 **Chi phí MỖI NGƯỜI để có 19 Giao Lân (một bộ III).** Đồ rơi của trùm là MỘT chủ (cùng giả định mục 6), nên cả đội cần `số người x 19`, mỗi trận rơi trung bình 3: số trận tăng theo cỡ đội và mỗi trận ngắn lại tương ứng nên **thời gian mỗi người gần như KHÔNG đổi theo cỡ đội**; cái đổi là **số đan** (đủ đan, mỗi người mang theo):
