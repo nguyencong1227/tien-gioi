@@ -10,7 +10,7 @@ import {
   segDist,
   updateBotWarns,
 } from "./bots";
-import { DEFAULT_MAP } from "@tien-gioi/shared";
+import { DEFAULT_MAP, MONSTER_BY_ID, PLAYER_RADIUS, statsFor } from "@tien-gioi/shared";
 import { addMonster, addPlayer, makeWorld } from "../src/systems/test-helpers";
 import { tickMonsters } from "../src/systems/monsters";
 import { tickWorld } from "../src/systems/tick";
@@ -964,23 +964,17 @@ describe("bot tránh đập đất: fx warn circle (Cốt Tượng & Thiên Hàn
     expect(pEvade.hp).toBe(hp0Evade);
   });
 
-  it("đo biên an toàn né vòng 140 px của Thiên Hàn Vương: ở tốc độ 182 px/s còn ~0.35 s biên nếu 1.0 s, thực tế 1.2 s có > 0.54 s biên; phản xạ 200 ms né thoát 100% (nit 3 của B ở #629)", () => {
-    // Phân tích động học:
-    // Trùm Thiên Hàn Vương: radius = 140 px, PLAYER_RADIUS = 14 px -> reach = 154 px.
-    // Người chơi đứng ở cự ly chém thường cận chiến (d0 = 35 px).
-    // Tốc độ di chuyển có giày bậc IV: speed = 182 px/s (mỗi tick 50 ms chạy ~9.1 px).
-    // Quãng đường cần thoát: 154 - 35 = 119 px.
-    // Thời gian chạy cần thiết: 119 / 182 = 0.654 s (654 ms).
-    // Nếu windupMs = 1000 ms (giả định của B): biên an toàn lý thuyết là 1000 ms - 654 ms = 346 ms (~0.35 s biên, khớp tính toán ~0.37 s của B).
-    const tRun = (154 - 35) / 182;
-    const marginHypothetical = 1.0 - tRun;
-    expect(marginHypothetical).toBeGreaterThan(0.34);
-    expect(marginHypothetical).toBeLessThan(0.38);
-
-    // Trong game thật (shared/src/game.ts): Dev A đã đặt windupMs = 1200 ms (1.2 s):
-    // Biên an toàn thực tế: 1200 ms - 654 ms = 546 ms (~0.55 s biên, cực kỳ an toàn cho phản xạ người chơi)!
-    const marginActual = 1.2 - tRun;
-    expect(marginActual).toBeGreaterThan(0.54);
+  it("đo biên an toàn né vòng đập đất của Thiên Hàn Vương từ số liệu THẬT (`MONSTERS`, `statsFor`): đứng sát tâm vẫn còn biên cho phản xạ 200 ms (nit 3 của B ở #629)", () => {
+    // Đầu vào đọc từ `shared/`, không chép số: đổi `slam.radius` / `windupMs` / tốc độ / PLAYER_RADIUS thì ca này tự đổi theo.
+    const slam = MONSTER_BY_ID.thien_han_vuong.slam!;
+    // Tốc độ GỐC Nguyên Anh Hậu kỳ, KHÔNG đồ: sàn của mọi người chơi (phù bộ IV +28 và hài +24 chỉ làm biên rộng hơn)
+    const speed = statsFor(4, 2).speed;
+    // Người đứng sát tâm trùm (tệ nhất) phải chạy tới mép vòng + bán kính người chơi
+    const reach = slam.radius + PLAYER_RADIUS;
+    const tRunWorst = reach / speed;
+    const marginWorst = slam.windupMs / 1000 - tRunWorst;
+    // Biên tệ nhất còn đủ để người chơi chậm phản xạ 200 ms mà vẫn thoát (còn >= 0,1 s)
+    expect(marginWorst - 0.2).toBeGreaterThanOrEqual(0.1);
 
     // Mô phỏng trong World thật:
     const t = makeWorld(DEFAULT_MAP);
@@ -1018,12 +1012,12 @@ describe("bot tránh đập đất: fx warn circle (Cốt Tượng & Thiên Hàn
     // Trong 1200 ms tiếp theo (24 tick):
     // pStand: đứng yên hoàn toàn.
     // pEvade: người chơi có độ trễ phản xạ 200 ms (4 tick đầu đứng yên, chưa kịp chạy).
-    // Từ tick thứ 5 trở đi (từ 200 ms tới 1200 ms = 20 tick): bot chạy xuyên tâm ra xa với tốc độ 182 px/s (9.1 px/tick).
+    // Từ tick thứ 5 trở đi (20 tick còn lại): chạy xuyên tâm ra xa với tốc độ gốc `speed` (không đồ).
     for (let i = 1; i <= 24; i++) {
       t.w.now += 50;
       if (i > 4) {
         // Sau 200 ms phản xạ: chạy né sang trái
-        pEvade.x -= 182 * 0.05; // 9.1 px mỗi tick
+        pEvade.x -= speed * 0.05; // mỗi tick 50 ms
       }
       tickWorld(t.w, 50);
     }
@@ -1032,9 +1026,9 @@ describe("bot tránh đập đất: fx warn circle (Cốt Tượng & Thiên Hàn
     // pStand đứng yên: dính đòn đập đất của Thiên Hàn Vương, mất máu!
     expect(pStand.hp).toBeLessThan(hp0Stand);
 
-    // pEvade né với phản xạ 200 ms: đã chạy được 20 * 9.1 = 182 px,
-    // toạ độ cách tâm đập đất: 35 + 182 = 217 px > reach 154 px.
-    // Né thành công 100%, bảo toàn nguyên vẹn khí huyết!
+    // pEvade né với phản xạ 200 ms: đã chạy 20 tick x speed x 0,05 s = speed px, cách tâm 35 + speed px > reach
+    // (Lưu ý: dời người bằng tay, KHÔNG qua `moveWithCollision`: ca này ghim luật 'ra khỏi vòng trước lúc đáp thì trượt', không đo phản xạ người thật).
+    expect(35 + speed).toBeGreaterThan(reach);
     expect(pEvade.hp).toBe(hp0Evade);
   });
 });
