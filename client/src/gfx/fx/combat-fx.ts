@@ -44,7 +44,7 @@ export interface HitPlan {
 }
 
 /**
- * Màu hạt riêng của quái Kim Đan và trùm (M6 #409): đòn thường và lúc gục. Quái cũ KHÔNG có mục ở đây (giữ nguyên màu chung).
+ * Màu hạt riêng của quái Kim Đan, Nguyên Anh (Hàn Vân Lĩnh) và trùm (M6 #409, M7.5b #506): đòn thường và lúc gục. Quái cũ KHÔNG có mục ở đây (giữ nguyên màu chung).
  * Đòn nặng / chí mạng luôn vàng (đọc ra ngay là đòn mạnh), không đổi theo loài.
  */
 export const MONSTER_FX_TINT: Readonly<Record<string, number>> = {
@@ -53,6 +53,12 @@ export const MONSTER_FX_TINT: Readonly<Record<string, number>> = {
   doc_thiem: 0xc4f24a, // độc vàng lục (khác xanh mint của hồi máu 0x7dffa0)
   hac_giao: 0x8fd0ff, // xanh nước sâu
   yeu_vuong: 0xd6a8ff, // tím linh khí
+  // Quái Nguyên Anh của Hàn Vân Lĩnh (M7.5b #506): mỗi loài một màu, khác màu chung và khác loài Kim Đan cùng vai
+  han_lang: 0xa8dcf5, // băng xanh lam (khác trắng băng của Sương Hồ)
+  phong_nha: 0xe8d58a, // vàng thép (hệ kim, cùng màu đạn kim)
+  cot_tuong: 0xe8dfc8, // bụi xương ngà
+  doc_tuoc: 0x9be05a, // độc lục sáng (khác vàng lục của Độc Thiềm)
+  thien_han_vuong: 0xbff4ff, // băng sâu phát sáng (trùm)
 };
 
 /** Quái `kind` trong sổ game; id lạ / độc ("constructor", "__proto__") là `undefined` (state do server gửi, không tin). */

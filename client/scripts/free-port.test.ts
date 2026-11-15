@@ -14,13 +14,24 @@ const close = (s: net.Server) => new Promise<void>((r) => s.close(() => r()));
 
 describe("freePort (cổng trống cho script Chrome / CDP)", () => {
   it("trả số nguyên hợp lệ và bind được NGAY sau đó (nhiều lần liên tiếp)", async () => {
+    // Giữa lúc `freePort` đóng cổng và lúc bind lại, một tệp vitest KHÁC chạy song song có thể xin đúng cổng đó (cùng cái đua của `server/src/test-port.test.ts`):
+    // mỗi vòng thử tối đa 5 cổng MỚI, chỉ đỏ khi cả 5 lần đều EADDRINUSE (đỏ chập chờn khi chạy cả bộ song song, 15/11/2026)
     for (let i = 0; i < 10; i++) {
-      const p = await freePort();
-      expect(Number.isInteger(p)).toBe(true);
-      expect(p).toBeGreaterThanOrEqual(1024);
-      expect(p).toBeLessThanOrEqual(65535);
-      const s = await listen(p);
-      await close(s);
+      let bound = false;
+      for (let attempt = 0; attempt < 5 && !bound; attempt++) {
+        const p = await freePort();
+        expect(Number.isInteger(p)).toBe(true);
+        expect(p).toBeGreaterThanOrEqual(1024);
+        expect(p).toBeLessThanOrEqual(65535);
+        try {
+          const s = await listen(p);
+          await close(s);
+          bound = true;
+        } catch (err) {
+          if ((err as NodeJS.ErrnoException).code !== "EADDRINUSE") throw err;
+        }
+      }
+      expect(bound, `vòng ${i}: cả 5 cổng freePort cấp đều bận`).toBe(true);
     }
   });
 
