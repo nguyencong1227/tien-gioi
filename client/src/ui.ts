@@ -183,6 +183,7 @@ import {
 } from "./skills-panel";
 import { transitionMs, waitOrSkip } from "./gfx/scene-transition";
 import { getDisplay, onDisplayChange } from "./gfx/display";
+import { optionTag, skipHintText } from "./dialog-opt";
 import {
   CHAT_PREF_KEY,
   MAP_LEGEND_PREF_KEY,
@@ -2091,30 +2092,11 @@ function renderDialogOptions() {
     }
     btn.append(labelSpan);
 
-    if (opt.action.kind === "turnIn") {
+    const tagInfo = optionTag(opt.action.kind, opt.label, !!opt.disabled);
+    if (tagInfo) {
       const tag = document.createElement("small");
-      tag.textContent = "Trả thưởng";
-      tag.style.color = "#ffe08a";
-      btn.append(tag);
-    } else if (opt.action.kind === "accept") {
-      const tag = document.createElement("small");
-      tag.textContent = "Nhận việc";
-      tag.style.color = "#ffe08a";
-      btn.append(tag);
-    } else if (opt.action.kind === "forge") {
-      const tag = document.createElement("small");
-      tag.textContent = "Lò rèn";
-      tag.style.color = "#ffe08a";
-      btn.append(tag);
-    } else if (opt.action.kind === "shop") {
-      const tag = document.createElement("small");
-      tag.textContent = "Cửa hàng";
-      tag.style.color = "#ffe08a";
-      btn.append(tag);
-    } else if (opt.action.kind === "dungeon") {
-      const tag = document.createElement("small");
-      tag.textContent = opt.disabled ? "Chưa đủ điều kiện" : "Bí cảnh";
-      tag.style.color = opt.disabled ? "#fca5a5" : "#ffe08a";
+      tag.textContent = tagInfo.text;
+      tag.style.color = tagInfo.color;
       btn.append(tag);
     }
 
@@ -4238,6 +4220,7 @@ export const ui = {
 
     $("dialog-modal").hidden = false;
     $("dlg-options").replaceChildren();
+    $("dlg-skip-hint").textContent = skipHintText(document.documentElement.dataset.input);
     $("dlg-skip-hint").hidden = false;
     modalStack.push("dialog-modal");
     focusModal($("dialog-modal"));
