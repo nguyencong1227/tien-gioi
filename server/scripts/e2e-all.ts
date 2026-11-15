@@ -430,6 +430,7 @@ export function executeScriptOnce(
     command?: { cmd: string; args: string[] };
     graceMs?: number;
     privTmpDir?: string;
+    logsDir?: string;
   },
 ): Promise<{
   exitCode: number | null;
@@ -462,6 +463,7 @@ export function executeScriptOnce(
         TEMP: privTmpDir,
         TMP: privTmpDir,
         FORCE_COLOR: "0",
+        E2E_LOG_DIR: options.logsDir,
       },
     });
 
@@ -638,6 +640,7 @@ export async function runE2eAll(args: string[] = process.argv.slice(2)): Promise
       cwd: repoRoot,
       timeoutSec: options.timeoutSec,
       logFile,
+      logsDir: options.logsDir,
       attempt: 1,
     });
 
@@ -663,6 +666,7 @@ export async function runE2eAll(args: string[] = process.argv.slice(2)): Promise
         cwd: repoRoot,
         timeoutSec: options.timeoutSec,
         logFile,
+        logsDir: options.logsDir,
         attempt: 2,
       });
 

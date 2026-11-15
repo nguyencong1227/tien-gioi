@@ -177,24 +177,67 @@ async function main() {
       return { total: Object.keys(chars).length, bad: bad.length }; })()`)) as any;
     must(uv.bad === 0, `mọi glyph có UV hợp lệ trong [0,1] (${uv.total} glyph, hỏng ${uv.bad})`);
     // Và chữ bay THẬT SỰ ĐƯỢC VẼ: chữ tím (nền cỏ không có màu tím) chụp từ canvas WebGL phải có nhiều điểm ảnh tím
-    const painted = Number(
-      await T.ev(`new Promise((resolve) => { const s = window.__scene, cam = s.cameras.main;
-        cam.centerOn(s.predX, s.predY);
-        s.fx.floatNumber('88', s.predX, s.predY - 40, { color: 0xff00ff, size: 48, priority: 2 });
-        const r = s.game.canvas.getBoundingClientRect();
-        const w = Math.round(r.width), h = Math.round(r.height);
-        // Màu tím nhạt hơn một chút (g < 130): ánh sáng môi trường + sương (#357, #362) phủ nhẹ lên chữ nên g của 0xff00ff tăng tới ~70-90.
-        // Thăm dò tối đa 3 s (máy dùng chung có thể quá tải, khung chậm: chờ cố định 60 ms làm ca kiểm chập chờn); lấy số LỚN NHẤT thấy được
-        let best = 0, tries = 0;
-        const grab = () => s.game.renderer.snapshotArea(0, 0, w, h, (img) => {
-          const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
-          const x = c.getContext('2d'); x.drawImage(img, 0, 0);
-          const d = x.getImageData(0, 0, c.width, c.height).data; let n = 0;
-          for (let i = 0; i < d.length; i += 4) if (d[i] > 180 && d[i + 2] > 180 && d[i + 1] < 130) n++;
-          if (n > best) best = n;
-          if (best > 150 || ++tries >= 25) resolve(best); else setTimeout(grab, 120); });
-        setTimeout(grab, 60); })`),
-    );
+    const paintResult = (await T.ev(`new Promise((resolve) => {
+      const s = window.__scene, cam = s.cameras.main;
+      cam.centerOn(s.predX, s.predY);
+      s.fx.floatNumber('88', s.predX, s.predY - 40, { color: 0xff00ff, size: 48, priority: 2 });
+      const r = s.game.canvas.getBoundingClientRect();
+      const w = Math.round(r.width), h = Math.round(r.height);
+      // Màu tím nhạt hơn một chút (g < 130): ánh sáng môi trường + sương (#357, #362) phủ nhẹ lên chữ nên g của 0xff00ff tăng tới ~70-90.
+      // Thăm dò tối đa 3 s (máy dùng chung có thể quá tải, khung chậm: chờ cố định 60 ms làm ca kiểm chập chờn); lấy số LỚN NHẤT thấy được
+      let best = 0, tries = 0, lastNonBlack = 0, lastTotal = 0;
+      const grab = () => s.game.renderer.snapshotArea(0, 0, w, h, (img) => {
+        const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+        const x = c.getContext('2d'); x.drawImage(img, 0, 0);
+        const d = x.getImageData(0, 0, c.width, c.height).data;
+        let n = 0, nonBlack = 0;
+        for (let i = 0; i < d.length; i += 4) {
+          if (d[i] > 180 && d[i + 2] > 180 && d[i + 1] < 130) n++;
+          if (d[i] > 0 || d[i + 1] > 0 || d[i + 2] > 0) nonBlack++;
+        }
+        if (n > best) best = n;
+        lastNonBlack = nonBlack;
+        lastTotal = c.width * c.height;
+        if (best > 150 || ++tries >= 25) {
+          const renType = s.game.renderer.type === 2 ? 'WEBGL' : (s.game.renderer.type === 1 ? 'CANVAS' : String(s.game.renderer.type));
+          const gl = s.game.renderer.gl;
+          const isContextLost = gl && typeof gl.isContextLost === 'function' ? gl.isContextLost() : null;
+          resolve({
+            best,
+            tries,
+            rendererType: renType,
+            actualFps: Math.round(s.game.loop.actualFps * 10) / 10,
+            visibilityState: document.visibilityState,
+            nonBlackPx: lastNonBlack,
+            totalPx: lastTotal,
+            glContextLost: isContextLost,
+            canvasW: s.game.canvas ? s.game.canvas.width : 0,
+            canvasH: s.game.canvas ? s.game.canvas.height : 0,
+            rectW: w,
+            rectH: h,
+          });
+        } else {
+          setTimeout(grab, 120);
+        }
+      });
+      setTimeout(grab, 60);
+    })`)) as any;
+
+    const painted = Number(paintResult?.best ?? 0);
+    if (painted <= 150) {
+      out(`  [CHẨN ĐOÁN FX KHI ĐỎ]:`);
+      out(`    renderer.type: ${paintResult?.rendererType} (cần WEBGL)`);
+      out(`    actualFps: ${paintResult?.actualFps}`);
+      out(`    visibilityState: ${paintResult?.visibilityState}`);
+      out(`    glContextLost: ${paintResult?.glContextLost}`);
+      out(`    điểm ảnh khác đen: ${paintResult?.nonBlackPx}/${paintResult?.totalPx}`);
+      out(
+        `    kích thước canvas: ${paintResult?.canvasW}x${paintResult?.canvasH} (CSS: ${paintResult?.rectW}x${paintResult?.rectH})`,
+      );
+      out(`    số lần thử: ${paintResult?.tries}`);
+      const shotPath = await T.shot("fx-failure");
+      if (shotPath) out(`    đã lưu ảnh chụp: ${shotPath}`);
+    }
     must(painted > 150, `chữ bay được VẼ thật ra màn hình (điểm ảnh tím: ${painted})`);
     ok(`glyph có UV hợp lệ và chữ bay thật sự được vẽ (${painted} điểm ảnh)`);
     await T.ev(`window.__fx.clear(); 1`);

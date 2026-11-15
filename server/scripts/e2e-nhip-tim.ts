@@ -180,6 +180,27 @@ async function main() {
   const { changeCoin } = await import("../src/systems/wallet.js");
   WorldRoom.reconnectGraceS = 20;
 
+  const serverLogs: string[] = [];
+  const logServer = (msg: string) => {
+    serverLogs.push(`[${new Date().toISOString()}] ${msg}`);
+    if (serverLogs.length > 50) serverLogs.shift();
+  };
+  const origOnLeave = WorldRoom.prototype.onLeave;
+  WorldRoom.prototype.onLeave = async function (client: any, consented?: boolean) {
+    logServer(`WorldRoom onLeave: sid=${client?.sessionId}, consented=${consented}`);
+    return origOnLeave.call(this, client, consented);
+  };
+  const origAllowReconnection = WorldRoom.prototype.allowReconnection;
+  WorldRoom.prototype.allowReconnection = function (client: any, seconds: number) {
+    logServer(`WorldRoom allowReconnection: sid=${client?.sessionId}, seconds=${seconds}`);
+    return origAllowReconnection.call(this, client, seconds);
+  };
+  const origOnJoin = WorldRoom.prototype.onJoin;
+  WorldRoom.prototype.onJoin = function (client: any, options: any, auth: any) {
+    logServer(`WorldRoom onJoin: sid=${client?.sessionId}, name=${auth?.name ?? options?.name}`);
+    return origOnJoin.call(this, client, options, auth);
+  };
+
   // Dựng HTTP + WebSocket Server Colyseus
   const app = express();
   app.get("/health", (_req, res) => res.json({ ok: true }));
@@ -564,11 +585,38 @@ async function main() {
     );
     proxy.holeExisting();
     // Nối lại qua kết nối mới xong rất nhanh (banner chỉ lóe vài chục ms), nên chờ TOKEN phòng đổi thay vì thăm dò banner
-    await tab.waitFor(
-      `window.__scene?.room?.reconnectionToken && window.__scene.room.reconnectionToken !== ${JSON.stringify(token4)}`,
-      "nhịp tim phát hiện chết và nối lại qua kết nối mới (token phòng đổi)",
-      25000,
-    );
+    try {
+      await tab.waitFor(
+        `window.__scene?.room?.reconnectionToken && window.__scene.room.reconnectionToken !== ${JSON.stringify(token4)}`,
+        "nhịp tim phát hiện chết và nối lại qua kết nối mới (token phòng đổi)",
+        25000,
+      );
+    } catch (e: any) {
+      const diag = (await tab.ev(`(() => {
+        const b = document.getElementById('reconnect-banner');
+        const hb = window.__heartbeat;
+        const rm = window.__scene?.room;
+        return {
+          banner: b ? { hidden: b.hidden, text: b.textContent, display: window.getComputedStyle(b).display } : null,
+          heartbeat: hb ? { supported: hb.state?.supported ?? hb.supported, stopped: hb.stopped, pendingSince: hb.state?.pendingSince ?? null } : null,
+          room: rm ? { isOpen: !!rm.connection?.isOpen, sessionId: rm.sessionId, token: rm.reconnectionToken } : null,
+          attachCount: window.__attachCount,
+        };
+      })()`)) as any;
+      out(`  [CHẨN ĐOÁN CA 4 HẾT GIỜ]:`);
+      out(`    banner: ${JSON.stringify(diag?.banner)}`);
+      out(`    heartbeat: ${JSON.stringify(diag?.heartbeat)}`);
+      out(`    room: ${JSON.stringify(diag?.room)} (token ban đầu: ${token4})`);
+      out(`    attachCount: ${diag?.attachCount}`);
+      out(
+        `    console tail gần nhất:\n      ${tab.consoleTail.slice(-10).join("\n      ") || "(không có)"}`,
+      );
+      out(`    console errors:\n      ${tab.errors.slice(-10).join("\n      ") || "(không có)"}`);
+      out(
+        `    nhật ký server gần nhất:\n      ${serverLogs.slice(-10).join("\n      ") || "(không có)"}`,
+      );
+      throw e;
+    }
     await tab.waitFor(
       `(() => { const b = document.getElementById('reconnect-banner'); return !b || b.hidden; })()`,
       "banner nối lại ẩn sau khi nối lại",
@@ -609,17 +657,20 @@ async function main() {
     if (tab) {
       try {
         const info = await tab.ev(`({
-          url: location.href,
-          uiHidden: document.getElementById('ui')?.hidden,
-          loginHidden: document.getElementById('login')?.hidden,
-          loginNameVal: document.getElementById('login-name')?.value,
-          loginErr: document.getElementById('login-err')?.textContent,
-          hasScene: !!window.__scene,
-          hasRoom: !!window.__scene?.room,
-          hudName: document.getElementById('hud-name')?.textContent
-        })`);
+            url: location.href,
+            uiHidden: document.getElementById('ui')?.hidden,
+            loginHidden: document.getElementById('login')?.hidden,
+            loginNameVal: document.getElementById('login-name')?.value,
+            loginErr: document.getElementById('login-err')?.textContent,
+            hasScene: !!window.__scene,
+            hasRoom: !!window.__scene?.room,
+            hudName: document.getElementById('hud-name')?.textContent
+          })`);
         out(`  [TAB INFO]: ${JSON.stringify(info)}`);
+        if (tab.consoleTail.length)
+          out(`  [CONSOLE TAIL]:\n    ${tab.consoleTail.slice(-10).join("\n    ")}`);
         if (tab.errors.length) out(`  [TAB ERRORS]:\n    ${tab.errors.join("\n    ")}`);
+        if (serverLogs.length) out(`  [SERVER LOGS]:\n    ${serverLogs.slice(-10).join("\n    ")}`);
       } catch (e) {
         out(`  [CANNOT GET TAB INFO]: ${e}`);
       }

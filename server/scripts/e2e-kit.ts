@@ -7,12 +7,19 @@ import path from "node:path";
 import WebSocket from "ws";
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-export const SHOTS = process.env.E2E_SHOTS ? path.resolve(process.env.E2E_SHOTS) : undefined;
+export const SHOTS = process.env.E2E_SHOTS
+  ? path.resolve(process.env.E2E_SHOTS)
+  : process.env.E2E_LOG_DIR
+    ? path.resolve(process.env.E2E_LOG_DIR)
+    : undefined;
 export const TIMEOUT = 15000;
 
 /** Trả về cờ tăng tốc GPU NVIDIA RTX hoặc lùi về phần mềm nếu không có GPU / trên CI */
 export function getChromeGpuFlags(): string[] {
-  if (process.env.DISABLE_GPU === "1" || process.env.FORCE_SWIFTSHADER === "1") {
+  if (process.env.FORCE_SWIFTSHADER === "1") {
+    return ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"];
+  }
+  if (process.env.DISABLE_GPU === "1") {
     return ["--disable-gpu"];
   }
   if (process.env.CI && !process.env.FORCE_GPU) {
@@ -76,6 +83,7 @@ export class Tab {
   private id = 0;
   private pending = new Map<number, (r: any) => void>();
   readonly errors: string[] = [];
+  readonly consoleTail: string[] = [];
   private constructor(
     readonly label: string,
     private ws: WebSocket,
@@ -95,6 +103,8 @@ export class Tab {
           const text = (d.params.args ?? [])
             .map((a: any) => a.value ?? a.description ?? "")
             .join(" ");
+          this.consoleTail.push(`[${type}] ${text.slice(0, 300)}`);
+          if (this.consoleTail.length > 30) this.consoleTail.shift();
           if (type === "error") this.errors.push(`CONSOLE ERROR: ${text.slice(0, 300)}`);
           else if (
             type === "warning" &&
@@ -162,14 +172,17 @@ export class Tab {
     throw new Error(`Hết thời gian chờ (${timeout}ms) ở ${this.label}: ${label}`);
   }
 
-  async shot(file: string) {
-    if (!SHOTS) return;
-    mkdirSync(SHOTS, { recursive: true });
-    const r = await this.send("Page.captureScreenshot", { format: "png" });
-    writeFileSync(
-      path.join(SHOTS, `${this.label}-${file}.png`),
-      Buffer.from(r.result.data, "base64"),
-    );
+  async shot(file: string): Promise<string | null> {
+    if (!SHOTS) return null;
+    try {
+      mkdirSync(SHOTS, { recursive: true });
+      const r = await this.send("Page.captureScreenshot", { format: "png" });
+      const dest = path.join(SHOTS, `${this.label}-${file}.png`);
+      writeFileSync(dest, Buffer.from(r.result.data, "base64"));
+      return dest;
+    } catch {
+      return null;
+    }
   }
 
   close() {
