@@ -106,6 +106,41 @@ export function warnAlive(elapsed: number, ms: number): boolean {
   return elapsed < ms + WARN_FADE_MS;
 }
 
+/** Sóng xung kích của vòng `circle`: nở thêm tối đa chừng này (so với bán kính vòng) trong `WARN_FADE_MS`. */
+export const WARN_BURST_GROW = 0.2;
+/** Độ đậm lớn nhất của chớp trắng phủ vòng ngay lúc đáp (mờ về 0 trong `WARN_FADE_MS`). */
+export const WARN_BURST_FLASH = 0.35;
+
+/** Hình của sóng xung kích tại một thời điểm: bán kính vòng sóng = `r * scale`, độ đậm nét sóng `ring`, độ đậm chớp trắng `flash`. */
+export interface WarnBurst {
+  scale: number;
+  ring: number;
+  flash: number;
+}
+
+/**
+ * Sóng xung kích LÚC ĐÒN ĐÁP XUỐNG (đập đất, #629): vùng `circle` hết `ms` thì ngoài việc mờ đi còn có một vòng sóng trắng nở nhanh từ viền ra ngoài và một chớp trắng phủ
+ * vòng, để người chơi thấy "đòn vừa đáp" (trước đó chỉ thấy vòng tự biến mất kèm vệt chém nhỏ). Chỉ vùng `circle` có (nón / vạch là đòn lao / chém, đã có vệt riêng).
+ * `null` khi chưa tới lúc đáp (`elapsed <= ms`), đã hết `WARN_FADE_MS` hoặc số không hợp lệ. Giảm chuyển động: không nở, không chớp, chỉ đổi nét viền sang trắng rồi mờ
+ * (người nhạy với chớp sáng / chuyển động vẫn thấy dấu hiệu đòn đã đáp).
+ */
+export function warnBurst(
+  elapsed: number,
+  ms: number,
+  shape: string,
+  reduced: boolean,
+): WarnBurst | null {
+  if (shape !== "circle") return null;
+  if (!Number.isFinite(elapsed) || !(ms > 0) || elapsed <= ms) return null;
+  const q = (elapsed - ms) / WARN_FADE_MS;
+  if (q >= 1) return null;
+  const fade = 1 - q;
+  if (reduced) return { scale: 1, ring: fade, flash: 0 };
+  // nở nhanh rồi chậm dần (easeOutCubic), mờ tuyến tính
+  const e = 1 - fade * fade * fade;
+  return { scale: 1 + WARN_BURST_GROW * e, ring: fade, flash: WARN_BURST_FLASH * fade };
+}
+
 /** Khoảng cách từ điểm (px, py) tới đoạn (ax, ay)-(bx, by). */
 function segDist(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
   const dx = bx - ax;
