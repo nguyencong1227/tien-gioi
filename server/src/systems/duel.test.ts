@@ -681,10 +681,10 @@ describe("PK: trang bị ba ô riêng có tác dụng (M7.4: bạo kích `crit` 
     for (const id of injected.splice(0)) delete ITEM_BY_ID[id];
   });
   /** Trận Alpha - Bravo ở pha đánh, hai người cùng Kim Đan (mở cả ba ô riêng). */
-  function fight() {
+  function fight(realm = 3) {
     const t = makeWorld(DEFAULT_MAP, new Hub());
-    const a = addPlayer(t.w, A, 3, 0);
-    const b = addPlayer(t.w, B, 3, 0);
+    const a = addPlayer(t.w, A, realm, 0);
+    const b = addPlayer(t.w, B, realm, 0);
     b.p.x = a.p.x + 45;
     b.p.y = a.p.y;
     startDuel({ ...t, ps: [a, b] } as unknown as T);
@@ -692,10 +692,10 @@ describe("PK: trang bị ba ô riêng có tác dụng (M7.4: bạo kích `crit` 
     b.p.hp = b.p.maxHp = 1_000_000;
     return { ...t, a, b };
   }
-  const hit = (t: ReturnType<typeof fight>, random: number) => {
+  const hit = (t: ReturnType<typeof fight>, random: number, mult = 1) => {
     const hp0 = t.b.p.hp;
     vi.spyOn(Math, "random").mockReturnValue(random);
-    expect(duelHit(t.w, A, B, 1)).toBe(true);
+    expect(duelHit(t.w, A, B, mult)).toBe(true);
     vi.restoreAllMocks();
     return hp0 - t.b.p.hp;
   };
@@ -719,6 +719,48 @@ describe("PK: trang bị ba ô riêng có tác dụng (M7.4: bạo kích `crit` 
     duelHit(tiny.w, A, B, 0.0001);
     vi.restoreAllMocks();
     expect(before - tiny.b.p.hp).toBeGreaterThanOrEqual(1);
+  });
+
+  it("GIÁP làm tròn đúng (Math.round, không phải floor): chọn hệ số đòn để phần lẻ của sát thương sau giáp >= 0,5 rồi so với round / floor (nit của B ở #659)", () => {
+    inject("t_guard6", "boots", { guard: 6 });
+    let mult = 0;
+    let raw = 0;
+    for (let m = 0.5; m < 4 && mult === 0; m += 0.05) {
+      const r = hit(fight(), 0.5, m);
+      const exact = r * 0.94;
+      if (Math.round(exact) !== Math.floor(exact)) {
+        mult = m;
+        raw = r;
+      }
+    }
+    expect(mult, "phải tìm được hệ số cho phần lẻ >= 0,5").toBeGreaterThan(0);
+    const t = fight();
+    setEquipment(t.b.p, { ...emptyEquipment(), boots: "t_guard6" });
+    const guarded = hit(t, 0.5, mult);
+    expect(guarded).toBe(Math.round(raw * 0.94));
+    expect(guarded).not.toBe(Math.floor(raw * 0.94));
+  });
+
+  it("Ô CHƯA MỞ không tính: pháp bảo mở từ Kim Đan nên ở Trúc Cơ giáp 40 % của nó KHÔNG giảm sát thương PK, bạo kích +40 % KHÔNG cộng (nit của B ở #659)", () => {
+    inject("t_locked", "treasure", { guard: 40, crit: 40 });
+    // Trúc Cơ (realm 2): ô pháp bảo chưa mở
+    const plain = fight(2);
+    const noGuard = hit(plain, 0.45);
+    const t = fight(2);
+    setEquipment(t.b.p, { ...emptyEquipment(), treasure: "t_locked" });
+    expect(hit(t, 0.45)).toBe(noGuard); // giáp của người bị đánh: không tính
+    const t2 = fight(2);
+    setEquipment(t2.a.p, { ...emptyEquipment(), treasure: "t_locked" });
+    expect(hit(t2, 0.45)).toBe(noGuard); // bạo kích của người đánh: không cộng (tung 0,45 vẫn không bạo kích)
+    // Kim Đan (realm 3): ô đã mở nên CÓ tác dụng: giáp giảm, bạo kích đổi kết quả tung 0,45
+    const open = fight(3);
+    const openBase = hit(open, 0.45);
+    const og = fight(3);
+    setEquipment(og.b.p, { ...emptyEquipment(), treasure: "t_locked" });
+    expect(hit(og, 0.45)).toBeLessThan(openBase);
+    const oc = fight(3);
+    setEquipment(oc.a.p, { ...emptyEquipment(), treasure: "t_locked" });
+    expect(hit(oc, 0.45)).toBeGreaterThan(openBase);
   });
 
   it("GIÁP của người ĐÁNH không giảm sát thương nó gây; chỉ giáp của người bị đánh mới tính", () => {
