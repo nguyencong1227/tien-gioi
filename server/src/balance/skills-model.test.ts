@@ -119,10 +119,11 @@ describe("Mô hình cân bằng chiêu thức, hệ và trạng thái (M7.9, iss
     expect(impact3.withinTargetLimit).toBe(true);
   });
 
-  it("Đối chiếu mô hình với mã server thật (cast.ts + combat.ts): độ lệch <= 25% trên cả 8 chiêu gây sát thương", () => {
-    // Thử nghiệm toàn diện trên cả 8 chiêu thức M7 có mult > 0:
-    // gồm cả chiêu quạt (fan: Lạc Tuyết Phân Phi 5 tia), đòn thẳng (line: Huyền Băng Chỉ, Thanh Tùng Phi Châm),
-    // đòn nón (cone: Hỏa Vân Kiếm, Bổn Thạch Quyền, Ưng Trảo, Trọng Nhạc Trảm) và đòn vùng (ground: Cửu Cung Khốn Sát)
+  it("Đối chiếu mô hình với mã server thật (cast.ts + combat.ts): độ lệch <= 25% trên cả 13 chiêu gây sát thương", () => {
+    // Thử nghiệm toàn diện trên cả 13 chiêu thức M7 có mult > 0 (12 chiêu đợt 1 + 5 chiêu Nguyên Anh đợt 2, #654):
+    // gồm chiêu quạt (fan: Lạc Tuyết Phân Phi 5 tia, Băng Hoa Loạn 5 cánh), đòn thẳng (line: Huyền Băng Chỉ, Thanh Tùng Phi Châm, Hàn Quang Tiễn),
+    // đòn nón (cone: Hỏa Vân Kiếm, Bổn Thạch Quyền, Ưng Trảo, Trọng Nhạc Trảm, Bạch Kim Trảo, Liệt Hỏa Kiếm)
+    // và đòn vùng (ground: Cửu Cung Khốn Sát, Vân Thạch Trận). Vân Hành Bộ (self, mult 0) là buff nên không tính ở đây.
     const DAMAGE_SKILLS = [
       "hoa_van_kiem",
       "bon_thach_quyen",
@@ -132,6 +133,11 @@ describe("Mô hình cân bằng chiêu thức, hệ và trạng thái (M7.9, iss
       "thanh_tung_phi_cham",
       "lac_tuyet_phan_phi",
       "cuu_cung_khon_sat",
+      "han_quang_tien",
+      "bach_kim_trao",
+      "van_thach_tran",
+      "bang_hoa_loan",
+      "liet_hoa_kiem",
     ];
 
     for (const skillId of DAMAGE_SKILLS) {

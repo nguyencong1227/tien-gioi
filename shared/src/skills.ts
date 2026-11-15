@@ -586,7 +586,7 @@ export const SKILLS_M7: readonly SkillDef[] = [
     id: "van_hanh_bo",
     name: "Vân Hành Bộ",
     bookName: "Vân Hành Bộ",
-    desc: "Bộ pháp phong hệ lướt người trên lớp khí gió cuộn quanh chân, bước đi như mây trôi. Nhanh hơn gió một nhịp, né trọn một đợt công kích.",
+    desc: "Bộ pháp phong hệ lướt người trên lớp khí gió cuộn quanh chân, bước đi như mây trôi. Nhanh hơn gió một nhịp, lướt bước thoăn thoắt trong chốc lát.",
     element: "phong",
     shape: "self",
     cooldown: 8000,
