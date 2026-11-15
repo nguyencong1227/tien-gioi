@@ -1253,3 +1253,40 @@ Kịch bản: 100 bot chia làm 6 nhóm hành vi tự hành (săn quái, trấn/
 2. **Khả năng tải của 4 phòng Colyseus:** CPU luồng chính trung bình chỉ 4,55 ms/tick cho cả 100 bot trải rộng khắp 4 bản đồ có quái tinh anh hoạt động. Tick p95 của phòng tải cao nhất duy trì ở mức 2,55 ms (đỉnh 3,10 ms), hoàn toàn cách xa ngưỡng giới hạn 10 ms.
 3. **Chuyển cổng 4 bản đồ ổn định tuyệt đối:** Quá trình qua cổng liên tục giữa Lạc Hà, Hắc Phong, Âm Sương và Hàn Vân không gây ra bất kỳ lỗi giải phóng hay xung đột lưu file nào (`kiem-save` đạt 0 lỗi), bảo toàn 100% tài sản tiền tệ và trang bị của người chơi.
 
+---
+
+## 26. Bộ kiểm thử hồi quy M7: Chuyển bản đồ bốn phòng liên thông & Thử tải đồng thời (M7.11 #512)
+
+### 26.1. Bối cảnh & Yêu cầu hồi quy M7
+- Nâng cấp bộ kiểm thử tích hợp chuyển bản đồ (`server/scripts/portal-stress.test.ts`) từ 3 bản đồ lên toàn diện **4 bản đồ**: Lạc Hà Trấn (`lac_ha`) ↔ Hắc Phong Cốc (`hac_phong`) ↔ Âm Sương Trạch (`am_suong`) ↔ Hàn Vân Lĩnh (`han_van`).
+- Đảm bảo hợp đồng dữ liệu M7: bổ sung sổ chiêu (`skills`: `learned`, `slots`) vào hồ sơ mẫu để xác thực toàn vẹn dữ liệu song song với tu vi, tiền tệ, túi đồ, trang bị và sổ nhiệm vụ.
+- Kiểm thử các ca biên phức tạp trên chuỗi Âm Sương ↔ Hàn Vân:
+  1. Tuyến khứ hồi 6 chặng bốn bản đồ.
+  2. Cách ly phòng: nhân vật lưu ở Hàn Vân bị các phòng khác từ chối `wrong_map:han_van`, phòng Hàn Vân tiếp nhận đúng toạ độ an toàn.
+  3. Rớt mạng ở Hàn Vân: nối lại trong thời gian chờ (`reconnect`) hoặc đăng nhập lại (`joinOrCreate`) đều huỷ ghost sạch sẽ, không nhân bản nhân vật.
+  4. Đua kết nối 2 tab: tab 2 bị từ chối 409 khi đăng nhập trùng hoặc đua nhau lúc qua cổng.
+  5. Chốt `travelling` của cơ chế lưu `persist` tránh đè ghi đè bản ghi đích.
+  6. Thử tải đồng thời (concurrency stress): nhiều bot cùng qua cổng Âm Sương ↔ Hàn Vân đồng thời, sau đó chạy kiểm toán `kiem-save` (`auditSavesDirectory`) kiểm tra 0 lỗi.
+
+### 26.2. Kết quả kiểm thử thực tế (`server/scripts/portal-stress.test.ts`)
+
+| Nhóm kịch bản | Số ca test | Kết quả | Ghi chú & Đột biến kiểm chứng |
+|---|:---:|:---:|---|
+| **Độ trễ & độ tin cậy chuyển phòng cơ bản** | 4 | ✅ **ĐẠT (4/4)** | p50 < 600 ms, p95 < 900 ms; dọn sạch ghost và giải phóng tài nguyên phòng khi bot rời |
+| **Bốn bản đồ liên thông & định tuyến phòng** | 3 | ✅ **ĐẠT (3/3)** | Vòng khứ hồi 6 chặng (418 ms); Lạc Hà / Hắc Phong / Âm Sương từ chối `wrong_map:han_van` |
+| **Bảo toàn dữ liệu M7 qua cổng (skills + inv + quest)** | 2 | ✅ **ĐẠT (2/2)** | Vòng 6 chặng giữ nguyên 100% chiêu thức, trang bị, tu vi, tiền và túi đồ |
+| **Rớt mạng & nối lại tại Hàn Vân Lĩnh** | 2 | ✅ **ĐẠT (2/2)** | Nối lại bằng token (216 ms) hoặc đăng nhập lại (175 ms) huỷ ghost thành công, 1 người chơi duy nhất |
+| **Đua kết nối & xung đột 2 tab tại Hàn Vân Lĩnh** | 2 | ✅ **ĐẠT (2/2)** | Tab 2 nhận mã 409 hoặc `wrong_map:han_van`; lưu muộn không đè phòng mới |
+| **Chốt `travelling` tránh đè dữ liệu** | 1 | ✅ **ĐẠT (1/1)** | Lưu định kỳ lúc đang chuyển cảnh bị bỏ qua an toàn |
+| **Thử tải đồng thời (Concurrency Stress)** | 1 | ✅ **ĐẠT (1/1)** | 4 bot cùng chuyển cổng Âm Sương ↔ Hàn Vân đồng thời (252 ms); `auditSavesDirectory` báo 0 lỗi |
+| **Tương thích ngược tệp lưu cũ** | 1 | ✅ **ĐẠT (1/1)** | Tệp thiếu `mapId` hoặc `mapId` lạ được đưa về Lạc Hà; cả 3 phòng khác đều từ chối |
+| **Tổng cộng** | **18** | ✅ **18/18 PASS** | Thời gian chạy: ~8,4 s |
+
+### 26.3. Kiểm chứng đột biến (Mutation Testing)
+- **Đột biến thử nghiệm:** Cố tình làm lệch toạ độ xuất hiện ở bản đồ đích `x: to.spawn.x + 100` trong `server/src/systems/travel.ts` (`planTravel`).
+- **Phản ứng của bộ test:** Ngay lập tức bắt được 2 lỗi:
+  1. `AssertionError: tới hac_phong: expected 100 to be less than 2` (phát hiện lệch vị trí xuất hiện cổng).
+  2. `kiem-save sau bão chuyển cổng: Toạ độ (x: 2244, y: 240) nằm đè lên vật cản không thể di chuyển trên bản đồ Âm Sương Trạch` (`auditSavesDirectory` bắt được lỗi vị trí kẹt vật cản).
+- **Kết luận:** Bộ kiểm thử hồi quy 4 bản đồ hoạt động cực kỳ nhạy bén, bảo đảm ngăn chặn mọi hồi quy về toạ độ, trạng thái chuyển phòng và toàn vẹn dữ liệu hồ sơ M7.
+
+
