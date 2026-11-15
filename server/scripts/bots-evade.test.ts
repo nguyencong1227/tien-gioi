@@ -853,20 +853,20 @@ describe("bot tránh đập đất: fx warn circle (Cốt Tượng & Thiên Hàn
     expect(zCT!.r).toBe(90);
     expect(zCT!.expiresAt).toBe(realNow + 1100);
 
-    // Thiên Hàn Vương: r = 140, windup = 1000 ms
+    // Thiên Hàn Vương: r = 140, windup = 1200 ms (M7.3 game.ts)
     const msgTHV = {
       kind: "warn" as const,
       shape: "circle" as const,
       x: 500,
       y: 600,
       r: 140,
-      ms: 1000,
+      ms: 1200,
     };
     const zTHV = parseWarnZoneFromFx(msgTHV, realNow);
     expect(zTHV).not.toBeNull();
     expect(zTHV!.shape).toBe("circle");
     expect(zTHV!.r).toBe(140);
-    expect(zTHV!.expiresAt).toBe(realNow + 1000);
+    expect(zTHV!.expiresAt).toBe(realNow + 1200);
   });
 
   it("bot nhận diện đập đất hình tròn, chọn hướng né xuyên tâm ra xa và dọn dẹp đúng hạn", () => {
@@ -961,6 +961,80 @@ describe("bot tránh đập đất: fx warn circle (Cốt Tượng & Thiên Hàn
 
     // pEvade né xuyên tâm: đã cách tâm đập đất 50 + 22 * 7 = 204 px > 90 + 14 = 104 px
     // Không bị trúng đòn đập đất, máu còn nguyên vẹn 100%!
+    expect(pEvade.hp).toBe(hp0Evade);
+  });
+
+  it("đo biên an toàn né vòng 140 px của Thiên Hàn Vương: ở tốc độ 182 px/s còn ~0.35 s biên nếu 1.0 s, thực tế 1.2 s có > 0.54 s biên; phản xạ 200 ms né thoát 100% (nit 3 của B ở #629)", () => {
+    // Phân tích động học:
+    // Trùm Thiên Hàn Vương: radius = 140 px, PLAYER_RADIUS = 14 px -> reach = 154 px.
+    // Người chơi đứng ở cự ly chém thường cận chiến (d0 = 35 px).
+    // Tốc độ di chuyển có giày bậc IV: speed = 182 px/s (mỗi tick 50 ms chạy ~9.1 px).
+    // Quãng đường cần thoát: 154 - 35 = 119 px.
+    // Thời gian chạy cần thiết: 119 / 182 = 0.654 s (654 ms).
+    // Nếu windupMs = 1000 ms (giả định của B): biên an toàn lý thuyết là 1000 ms - 654 ms = 346 ms (~0.35 s biên, khớp tính toán ~0.37 s của B).
+    const tRun = (154 - 35) / 182;
+    const marginHypothetical = 1.0 - tRun;
+    expect(marginHypothetical).toBeGreaterThan(0.34);
+    expect(marginHypothetical).toBeLessThan(0.38);
+
+    // Trong game thật (shared/src/game.ts): Dev A đã đặt windupMs = 1200 ms (1.2 s):
+    // Biên an toàn thực tế: 1200 ms - 654 ms = 546 ms (~0.55 s biên, cực kỳ an toàn cho phản xạ người chơi)!
+    const marginActual = 1.2 - tRun;
+    expect(marginActual).toBeGreaterThan(0.54);
+
+    // Mô phỏng trong World thật:
+    const t = makeWorld(DEFAULT_MAP);
+    const { p: pStand } = addPlayer(t.w, "StandTHV", 4, 2); // Nguyên Anh Hậu kỳ
+    const { p: pEvade } = addPlayer(t.w, "EvadeTHV", 4, 2);
+    pEvade.y = pStand.y + 600; // Cách xa 600 px
+
+    const bossStand = addMonster(t.w, "thien_han_vuong", pStand.x + 35, pStand.y);
+    bossStand.mc.homeX = bossStand.m.x;
+    bossStand.mc.homeY = bossStand.m.y;
+    bossStand.mc.target = "StandTHV";
+
+    const bossEvade = addMonster(t.w, "thien_han_vuong", pEvade.x + 35, pEvade.y);
+    bossEvade.mc.homeX = bossEvade.m.x;
+    bossEvade.mc.homeY = bossEvade.m.y;
+    bossEvade.mc.target = "EvadeTHV";
+
+    t.w.now = 50_000;
+    bossStand.mc.nextSlam = 50_000;
+    bossEvade.mc.nextSlam = 50_000;
+    bossStand.mc.nextAttack = 60_000;
+    bossEvade.mc.nextAttack = 60_000;
+
+    // Tick bắt đầu gồng đập đất
+    t.w.now += 50;
+    tickWorld(t.w, 50);
+
+    expect(bossStand.mc.slam).toBeDefined();
+    expect(bossEvade.mc.slam).toBeDefined();
+    expect(bossStand.mc.slam!.until).toBe(50_050 + 1200); // 1200 ms windup thực tế
+
+    const hp0Stand = pStand.hp;
+    const hp0Evade = pEvade.hp;
+
+    // Trong 1200 ms tiếp theo (24 tick):
+    // pStand: đứng yên hoàn toàn.
+    // pEvade: người chơi có độ trễ phản xạ 200 ms (4 tick đầu đứng yên, chưa kịp chạy).
+    // Từ tick thứ 5 trở đi (từ 200 ms tới 1200 ms = 20 tick): bot chạy xuyên tâm ra xa với tốc độ 182 px/s (9.1 px/tick).
+    for (let i = 1; i <= 24; i++) {
+      t.w.now += 50;
+      if (i > 4) {
+        // Sau 200 ms phản xạ: chạy né sang trái
+        pEvade.x -= 182 * 0.05; // 9.1 px mỗi tick
+      }
+      tickWorld(t.w, 50);
+    }
+
+    // Đòn đập đất đáp xuống:
+    // pStand đứng yên: dính đòn đập đất của Thiên Hàn Vương, mất máu!
+    expect(pStand.hp).toBeLessThan(hp0Stand);
+
+    // pEvade né với phản xạ 200 ms: đã chạy được 20 * 9.1 = 182 px,
+    // toạ độ cách tâm đập đất: 35 + 182 = 217 px > reach 154 px.
+    // Né thành công 100%, bảo toàn nguyên vẹn khí huyết!
     expect(pEvade.hp).toBe(hp0Evade);
   });
 });
