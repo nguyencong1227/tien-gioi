@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { SKILLS_M7 } from "@tien-gioi/shared";
 import {
   AI_ASSET_DIR,
   auditAiImages,
@@ -195,15 +196,17 @@ describe("Nguồn nội dung, hình ảnh và âm thanh bên ngoài (M7.16 #517,
   const contentSourcePath = path.resolve(rootDir, "docs/NGUON_NOI_DUNG.md");
   const creditsPath = path.resolve(rootDir, "CREDITS.md");
 
-  it("docs/NGUON_NOI_DUNG.md tồn tại và chứa cấu trúc bảng nguồn hợp lệ (chưa có tệp thì audit sạch)", () => {
+  it("docs/NGUON_NOI_DUNG.md tồn tại, bảng nguồn hợp lệ: 12 dòng `cong_phap` (12 chiêu M7.1), audit sạch, mỗi chiêu của SKILLS_M7 đúng MỘT dòng", () => {
     expect(fs.existsSync(contentSourcePath)).toBe(true);
     const content = fs.readFileSync(contentSourcePath, "utf-8");
     expect(content).toContain("## 3. Bảng nguồn");
     expect(content).toContain("Đã duyệt chữ Hán");
 
-    // Khi chưa có tệp ngoài nào được đưa vào repo thì kiểm tra không có lỗi
     const audit = auditContentSources(contentSourcePath, creditsPath, rootDir);
-    expect(audit.entries).toEqual([]);
+    // Chưa có hình / âm nào lấy từ nguồn: mọi dòng là dữ liệu chiêu thức (`cong_phap`), không cần tệp trên đĩa / dòng CREDITS.md
+    expect(audit.entries.length).toBe(12);
+    expect(audit.entries.every((e) => e.type === "cong_phap")).toBe(true);
+    expect(audit.entries.every((e) => e.cjkChecked === "KHONG_AP_DUNG")).toBe(true);
     expect(audit.missingInCredits).toEqual([]);
     expect(audit.missingFiles).toEqual([]);
     expect(audit.notInVkttDir).toEqual([]);
@@ -211,6 +214,22 @@ describe("Nguồn nội dung, hình ảnh và âm thanh bên ngoài (M7.16 #517,
     expect(audit.cjkDetectedInFile).toEqual([]);
     expect(audit.unrecordedVkttFiles).toEqual([]);
     expect(audit.unrecordedCreditsVktt).toEqual([]);
+
+    // Hai chiều: mỗi chiêu của SKILLS_M7 (lấy nguyên văn từ nguồn) có đúng một dòng ghi `skills.ts` id `<id>`; không dòng nào trỏ id không tồn tại
+    const ids = SKILLS_M7.map((s) => s.id);
+    for (const id of ids) {
+      const rows = audit.entries.filter(
+        (e) => e.inRepo.includes(`id \`${id}\``) || e.inRepo.includes(`id ${id}`),
+      );
+      expect(rows.length, `chiêu ${id} phải có đúng một dòng ở bảng nguồn`).toBe(1);
+    }
+    for (const e of audit.entries) {
+      const m = /id `?([a-z_]+)`?/.exec(e.inRepo);
+      expect(
+        m && ids.includes(m[1]),
+        `dòng ${e.lineNum} trỏ id chiêu không tồn tại: ${e.inRepo}`,
+      ).toBe(true);
+    }
   });
 
   it("checkImageFileCjk: không có dương tính giả trên toàn bộ ảnh thật hiện có trong client/public", () => {
