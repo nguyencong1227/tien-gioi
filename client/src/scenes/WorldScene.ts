@@ -89,6 +89,7 @@ import {
   getMap,
   DEFAULT_MAP_ID,
   type InputMsg,
+  type MonsterKind,
   type StatusMsg,
   SKILL_MSG,
   type CastMsg,
@@ -140,6 +141,15 @@ import { StatusTracker } from "../status-track";
 import { BAR_SLOTS, SkillTracker, aimMode, blockedToast, slotView } from "../skill-bar";
 import { SkillBarDom } from "../skill-bar-dom";
 import { StatusBadgesDom, badgeViews } from "../status-badges";
+import {
+  ELITE_STYLE,
+  eliteAuraDims,
+  eliteAuraPulse,
+  eliteBarWidth,
+  eliteLabelText,
+  eliteName,
+  isElite,
+} from "../elite";
 import { buildSkillsPanel, slotMessage } from "../skills-panel";
 import {
   buildMockThuMonDialog,
@@ -172,6 +182,7 @@ import {
   MAP_COLORS,
   cameraView,
   canvasPixelSize,
+  drawDiamond,
   drawDot,
   drawHaloText,
   drawMapBase,
@@ -232,6 +243,9 @@ interface Entity {
   animPrefix?: string;
   lastEquipKey?: string;
   lastBarKey?: number;
+  /** Tinh anh (M7.3 bước 6, `Monster.elite`): cờ đã áp dụng + vầng sáng dưới chân (dựng lười một lần, `elite.ts`) */
+  elite?: boolean;
+  eliteAura?: Phaser.GameObjects.Ellipse;
   /** Huy hiệu trạng thái có hại trên đầu quái (M7.7 bước 3b, #508): Graphics dựng lười, mặt nạ `Monster.fx` đã vẽ và số chấm */
   statusG?: Phaser.GameObjects.Graphics;
   lastFx?: number;
@@ -1347,9 +1361,15 @@ export class WorldScene extends Phaser.Scene {
     if (btn) {
       btn.classList.toggle("locked", id !== null);
       btn.setAttribute("aria-pressed", String(id !== null));
-      const kind = id ? this.monsters.get(id)?.monKind : undefined;
+      const mon = id ? this.monsters.get(id) : undefined;
+      const kind = mon?.monKind;
       const label = document.getElementById("btn-target-label");
-      if (label) label.textContent = kind ? (MONSTER_BY_ID[kind]?.name ?? "Mục tiêu") : "Mục tiêu";
+      if (label)
+        label.textContent = kind
+          ? MONSTER_BY_ID[kind]
+            ? eliteName(MONSTER_BY_ID[kind].name, !!mon?.elite)
+            : "Mục tiêu"
+          : "Mục tiêu";
     }
     if (id === null) this.targetRing?.setVisible(false);
   }
@@ -2551,6 +2571,19 @@ export class WorldScene extends Phaser.Scene {
       this.monsters.forEach((m) => {
         ctx.fillRect(v.ox + m.tx * v.scale - mr, v.oy + m.ty * v.scale - mr, 2 * mr, 2 * mr);
       });
+      // Tinh anh (hiếm, tối đa vài con): thoi cam viền trắng vẽ ĐÈ lên chấm đỏ, to hơn một nấc
+      this.monsters.forEach((m) => {
+        if (m.elite)
+          drawDiamond(
+            ctx,
+            v.ox + m.tx * v.scale,
+            v.oy + m.ty * v.scale,
+            (big ? 4.6 : 3.2) * u,
+            MAP_COLORS.elite,
+            "#ffffff",
+            u,
+          );
+      });
       // Người chơi khác (chấm lam, trừ đồng đội)
       this.players.forEach((p, pid) => {
         if (pid === this.sid) return;
@@ -2901,6 +2934,8 @@ export class WorldScene extends Phaser.Scene {
         }
         this.monsters.set(id, e);
       }
+      const elite = isElite(m.elite);
+      if (elite !== !!e.elite) this.setMonsterElite(e, def, elite);
       const monDist = Math.hypot(m.x - e.root.x, m.y - e.root.y);
       e.tx = m.x;
       e.ty = m.y;
@@ -2925,15 +2960,22 @@ export class WorldScene extends Phaser.Scene {
       this.syncShadow(e);
       e.root.setDepth(e.root.y);
       e.sprite.setFlipX(Math.cos(m.angle) < 0);
+      if (e.eliteAura) {
+        // Nhịp chung của cảnh (không tween riêng từng con); giảm chuyển động thì đứng yên
+        const pulse = eliteAuraPulse(this.auraWave, animReducedMotion());
+        e.eliteAura.setScale(pulse.scale).setAlpha(pulse.alpha);
+      }
+      // Tinh anh: thanh máu to hơn, màu cam viền vàng, LUÔN hiện (kể cả khi đầy) để thấy từ xa
       this.drawBar(
         e,
         m.hp / m.maxHp,
-        0xc0392b,
+        elite ? ELITE_STYLE.bar : 0xc0392b,
         -def.radius - 10,
-        Math.max(24, def.radius * 2),
-        m.hp < m.maxHp,
+        elite ? eliteBarWidth(def.radius) : Math.max(24, def.radius * 2),
+        elite || m.hp < m.maxHp,
+        elite,
       );
-      this.syncMonsterStatus(e, m.fx, def.radius, !!def.boss);
+      this.syncMonsterStatus(e, m.fx, def.radius, !!def.boss || elite);
     });
     for (const [id, e] of this.monsters) {
       if (seen.has(id)) continue;
@@ -3250,16 +3292,76 @@ export class WorldScene extends Phaser.Scene {
     };
   }
 
-  private drawBar(e: Entity, frac: number, color: number, y: number, w: number, visible: boolean) {
+  private drawBar(
+    e: Entity,
+    frac: number,
+    color: number,
+    y: number,
+    w: number,
+    visible: boolean,
+    edge = false,
+  ) {
     const fillW = visible ? Math.round(w * Phaser.Math.Clamp(frac, 0, 1)) : -1;
-    const key = visible ? fillW + color * 256 : -1;
+    const key = visible ? fillW + color * 256 + (edge ? 1e10 : 0) : -1;
     if (e.lastBarKey === key) return;
     e.lastBarKey = key;
     const g = e.bar;
     g.clear();
     if (!visible) return;
+    if (edge) {
+      // Thanh của tinh anh cao 6 px có viền vàng 1 px (nổi hơn thanh 4 px của quái thường)
+      g.fillStyle(0x000000, 0.7).fillRect(-w / 2 - 1, y - 1, w + 2, 6);
+      g.fillStyle(color, 1).fillRect(-w / 2, y, fillW, 4);
+      g.lineStyle(1, ELITE_STYLE.barEdge, 0.95).strokeRect(-w / 2 - 1, y - 1, w + 2, 6);
+      return;
+    }
     g.fillStyle(0x000000, 0.55).fillRect(-w / 2, y, w, 4);
     g.fillStyle(color, 1).fillRect(-w / 2, y, fillW, 4);
+  }
+
+  /**
+   * Bật / tắt dấu hiệu tinh anh trên một con quái (M7.3 bước 6, `Monster.elite`; nhìn rõ từ xa vì từ Kim Đan tinh anh hạ được cả người đứng yên): vầng sáng cam dưới chân
+   * (dựng lười MỘT lần, chèn dưới sprite), chữ vàng "★ <tên> tinh anh" trên đầu (dùng lại nhãn của trùm nếu có). Cờ chỉ đổi hiếm (đặt một lần lúc sinh) nên chỗ này không nóng.
+   * Reset khoá vẽ thanh máu / chấm trạng thái để vẽ lại đúng kiểu và độ cao nhãn mới.
+   */
+  private setMonsterElite(e: Entity, def: MonsterKind, elite: boolean) {
+    e.elite = elite;
+    e.lastBarKey = undefined;
+    e.lastFx = undefined;
+    if (elite) {
+      if (!e.eliteAura) {
+        const d = eliteAuraDims(def.radius);
+        e.eliteAura = this.add
+          .ellipse(0, d.y, d.w, d.h, ELITE_STYLE.auraFill, 0.5)
+          .setStrokeStyle(2, ELITE_STYLE.auraLine, 0.95);
+        e.root.addAt(e.eliteAura, 1); // dưới sprite, trên bóng
+      }
+      e.eliteAura.setVisible(true);
+      const text = eliteLabelText(def.name);
+      if (e.label) {
+        e.label.setText(text).setColor(ELITE_STYLE.label);
+      } else {
+        e.label = this.add
+          .text(0, -def.radius - 22, text, {
+            fontFamily: '"Noto Serif", Georgia, serif',
+            fontSize: "13px",
+            color: ELITE_STYLE.label,
+            stroke: "#000",
+            strokeThickness: 3,
+          })
+          .setOrigin(0.5);
+        e.root.add(e.label);
+      }
+    } else {
+      e.eliteAura?.setVisible(false);
+      if (e.label) {
+        if (def.boss) e.label.setText(def.name).setColor("#ffb0a0");
+        else {
+          e.label.destroy();
+          e.label = undefined;
+        }
+      }
+    }
   }
 
   // ---------------- Hiệu ứng ----------------
