@@ -93,61 +93,39 @@ describe("bot-hunt: mô phỏng bot THẬT Nguyên Anh (có độ trễ phản x
     expect(res.seconds).toBeLessThan(200);
   });
 
-  it("đo số bot thật Nguyên Anh đối chiếu CAN_BANG (M7.10 / M7.9)", () => {
-    console.log("\n=== BẢNG SỐ ĐO BOT THẬT NGUYÊN ANH (M7.10) ===");
-    for (let tier = 0; tier <= 2; tier++) {
-      const tierLabel = tier === 0 ? "Sơ kỳ" : tier === 1 ? "Trung kỳ" : "Hậu kỳ";
-      console.log(`\n--- [CẢNH GIỚI NGUYÊN ANH - ${tierLabel.toUpperCase()}] ---`);
-      for (const mId of HAN_VAN_MONSTERS) {
-        const noEvade = botHuntSummary(NA_REALM, tier, mId, {
-          evade: false,
-          useOwnerGear: false,
-          runs: 6,
-        });
-        const evadeNoGear = botHuntSummary(NA_REALM, tier, mId, {
-          evade: true,
-          useOwnerGear: false,
-          runs: 6,
-        });
-        const evadeWithGear = botHuntSummary(NA_REALM, tier, mId, {
-          evade: true,
-          useOwnerGear: true,
-          runs: 6,
-        });
-
-        console.log(`[${mId.toUpperCase()}]:`);
-        console.log(
-          `  - Đứng yên (3 món): ${noEvade.medianSeconds.toFixed(1)}s | ST: ${noEvade.medianTotalDmg.toFixed(0)} | Mất máu: ${(noEvade.worstLostFrac * 100).toFixed(0)}%`,
-        );
-        console.log(
-          `  - Né đòn (3 món):   ${evadeNoGear.medianSeconds.toFixed(1)}s | ST: ${evadeNoGear.medianTotalDmg.toFixed(0)} | Mất máu: ${(evadeNoGear.worstLostFrac * 100).toFixed(0)}%`,
-        );
-        console.log(
-          `  - Né + 6 món:       ${evadeWithGear.medianSeconds.toFixed(1)}s | ST: ${evadeWithGear.medianTotalDmg.toFixed(0)} | Mất máu: ${(evadeWithGear.worstLostFrac * 100).toFixed(0)}%`,
-        );
-      }
-
-      console.log(`\n[THIÊN HÀN VƯƠNG] Trùm ${tierLabel}:`);
-      for (const party of [4, 3]) {
-        const boss3M = botHuntSummary(NA_REALM, tier, "thien_han_vuong", {
-          party,
-          evade: true,
-          useOwnerGear: false,
-          runs: 6,
-        });
-        const boss6M = botHuntSummary(NA_REALM, tier, "thien_han_vuong", {
-          party,
-          evade: true,
-          useOwnerGear: true,
-          runs: 6,
-        });
-        console.log(
-          `  - Đội ${party} (né, 3 món): ${boss3M.medianSeconds.toFixed(1)}s | Đan/người: ${boss3M.medianPotions.toFixed(1)} | Chết: ${boss3M.deathsTotal}/6 trận`,
-        );
-        console.log(
-          `  - Đội ${party} (né, 6 món): ${boss6M.medianSeconds.toFixed(1)}s | Đan/người: ${boss6M.medianPotions.toFixed(1)} | Chết: ${boss6M.deathsTotal}/6 trận`,
-        );
-      }
+  it("thực nghiệm bot thật đánh TINH ANH Hàn Vân Lĩnh: 3 loài (Hàn Lang, Phong Nha, Cốt Tượng) solo né + đan sống sót 100%, Độc Tước cần đội 2 người", () => {
+    // 3 loài thường tinh anh: solo có né + đan dược sống sót 100% (chết 0/3)
+    for (const mId of ["han_lang", "phong_nha", "cot_tuong"] as const) {
+      const summary = botHuntSummary(NA_REALM, 2, mId, {
+        elite: true,
+        evade: true,
+        useOwnerGear: false,
+        runs: 3,
+      });
+      expect(summary.deathsTotal, `${mId} tinh anh solo`).toBe(0);
+      expect(summary.killedAll, `${mId} tinh anh solo`).toBe(true);
+      expect(summary.lowestHpFrac).toBeLessThan(0.8); // đáy khí huyết không tụt quá sâu
     }
+
+    // Độc Tước tinh anh (độc tầm xa dồn dập): solo tử vong
+    const docTuocSolo = botHuntSummary(NA_REALM, 2, "doc_tuoc", {
+      elite: true,
+      evade: true,
+      useOwnerGear: false,
+      runs: 3,
+    });
+    expect(docTuocSolo.deathsTotal).toBeGreaterThan(0);
+
+    // Độc Tước tinh anh khi đi ĐỘI 2 NGƯỜI: sống sót 100%
+    const docTuocParty = botHuntSummary(NA_REALM, 2, "doc_tuoc", {
+      elite: true,
+      party: 2,
+      evade: true,
+      useOwnerGear: false,
+      runs: 3,
+    });
+    expect(docTuocParty.deathsTotal).toBe(0);
+    expect(docTuocParty.killedAll).toBe(true);
+    expect(docTuocParty.medianSeconds).toBeLessThan(15);
   });
 });
