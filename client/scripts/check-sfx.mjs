@@ -189,6 +189,17 @@ try {
     `hai chiêu liền nhau chỉ kêu MỘT lần (${burst.osc} = ${hoaCone.osc})`,
   );
 
+  // chiêu của NGƯỜI KHÁC (trong tầm nhìn) rồi chiêu của MÌNH cách nhau < 50 ms (cùng một lần bơm): tiếng của mình KHÔNG được mất vì khoá chống dồn chung (A, review #699)
+  const crowd = await deltaOf(() =>
+    evalJs(
+      `(() => { const sc = window.__scene; sc.room.emit('fx', { kind: 'cast', by: 'nguoi-la', skill: 'hoa_van_kiem', x: sc.predX + 40, y: sc.predY, angle: 0, range: 150 }); sc.room.emit('fx', { kind: 'cast', by: sc.sid, skill: 'hoa_van_kiem', x: sc.predX, y: sc.predY, angle: 0, range: 150 }); return 1; })()`,
+    ),
+  );
+  check(
+    crowd.osc >= 2 * hoaCone.osc,
+    `chiêu người khác ngay trước chiêu của MÌNH: cả hai đều kêu, tiếng của mình không bị nuốt (${crowd.osc} dao động >= ${2 * hoaCone.osc})`,
+  );
+
   const bolt = await deltaOf(() => fx({ kind: "bolt", speed: 300, range: 280, element: "bang" }));
   check(bolt.osc >= 1, `đạn tầm xa của quái có tiếng (${bolt.osc})`);
   const boltFar = await deltaOf(() =>

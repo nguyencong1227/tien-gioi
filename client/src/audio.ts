@@ -33,7 +33,7 @@ class SoundEngine {
   private bgmTimer: number | null = null;
   private lastBlipAt = 0;
   private lastWarnAt = -1;
-  /** Lần phát gần nhất (giây theo đồng hồ Web Audio) của từng loại tiếng chiến đấu M7 ("cast" / "bolt" / "status"): chống dồn (`SFX_MIN_GAP_S`) */
+  /** Lần phát gần nhất (giây theo đồng hồ Web Audio) của từng loại tiếng chiến đấu M7 ("cast" của mình / "cast-other" của người khác / "bolt" / "status"): chống dồn (`SFX_MIN_GAP_S`) */
   private lastSfxAt: Record<string, number> = {};
   /** Đệm nhiễu trắng dùng chung cho các công thức có nhiễu (dựng lười một lần) */
   private noiseBuf: AudioBuffer | null = null;
@@ -418,7 +418,8 @@ class SoundEngine {
 
   /** Tiếng DÙNG CHIÊU theo hệ + hình (`castSfx`); `mine` = chiêu của chính mình (to), người khác trong tầm nhìn nhỏ hơn. */
   cast(element: unknown, shape: unknown, mine: boolean) {
-    this.playSfx(castSfx(element, shape), "cast", mine ? 1 : 0.4);
+    // khoá chống dồn TÁCH: một người khác ra chiêu trong 50 ms TRƯỚC chiêu của mình không được làm mất tiếng của mình (phản hồi cho chính hành động của mình là tiếng quan trọng nhất; A, review #699)
+    this.playSfx(castSfx(element, shape), mine ? "cast" : "cast-other", mine ? 1 : 0.4);
   }
 
   /** Tiếng đạn tầm xa của quái bắn ra (`boltSfx`, hệ của đạn nếu có). */
