@@ -1,0 +1,116 @@
+{
+  "capturedAt": "2026-11-15T02:35:52.472Z",
+  "format": "webp",
+  "quality": 75,
+  "maps": true,
+  "viewports": [
+    {
+      "id": "desktop-hd",
+      "name": "Máy tính Laptop / HD (1280x720)",
+      "width": 1280,
+      "height": 720,
+      "dpr": 1,
+      "mobile": false
+    },
+    {
+      "id": "tablet-p",
+      "name": "Máy tính bảng dọc (iPad Portrait)",
+      "width": 768,
+      "height": 1024,
+      "dpr": 2,
+      "mobile": true
+    },
+    {
+      "id": "mobile-l",
+      "name": "Điện thoại ngang (Gaming landscape)",
+      "width": 844,
+      "height": 390,
+      "dpr": 2,
+      "mobile": true
+    },
+    {
+      "id": "mobile-p",
+      "name": "Điện thoại dọc (iPhone / Android chuẩn)",
+      "width": 390,
+      "height": 844,
+      "dpr": 2,
+      "mobile": true
+    },
+    {
+      "id": "mobile-sm",
+      "name": "Điện thoại nhỏ (Compact 360x640)",
+      "width": 360,
+      "height": 640,
+      "dpr": 2,
+      "mobile": true
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "10-map-han-van",
+      "name": "Hàn Vân Lĩnh (băng nguyên: sương + hạt tuyết + nước)"
+    }
+  ],
+  "images": [
+    {
+      "viewportId": "desktop-hd",
+      "viewportName": "Máy tính Laptop / HD (1280x720)",
+      "width": 1280,
+      "height": 720,
+      "dpr": 1,
+      "scenarioId": "10-map-han-van",
+      "scenarioName": "Hàn Vân Lĩnh (băng nguyên: sương + hạt tuyết + nước)",
+      "fileName": "desktop-hd__10-map-han-van.webp",
+      "sizeKb": 63.2,
+      "sha256": "bd5aa53bd16663230dfcf4d7bfb03f13457bb1a6ad115010035735c4f86e58cc"
+    },
+    {
+      "viewportId": "tablet-p",
+      "viewportName": "Máy tính bảng dọc (iPad Portrait)",
+      "width": 768,
+      "height": 1024,
+      "dpr": 2,
+      "scenarioId": "10-map-han-van",
+      "scenarioName": "Hàn Vân Lĩnh (băng nguyên: sương + hạt tuyết + nước)",
+      "fileName": "tablet-p__10-map-han-van.webp",
+      "sizeKb": 199.7,
+      "sha256": "075b32124c0ace738e823b85970c7d12de32ee6b63da2a306002589dc5a18d4e"
+    },
+    {
+      "viewportId": "mobile-l",
+      "viewportName": "Điện thoại ngang (Gaming landscape)",
+      "width": 844,
+      "height": 390,
+      "dpr": 2,
+      "scenarioId": "10-map-han-van",
+      "scenarioName": "Hàn Vân Lĩnh (băng nguyên: sương + hạt tuyết + nước)",
+      "fileName": "mobile-l__10-map-han-van.webp",
+      "sizeKb": 100,
+      "sha256": "382c6e79afa026080a3c17f8b55153d1e93d5e31674d45cd402e0ed48a9819b2"
+    },
+    {
+      "viewportId": "mobile-p",
+      "viewportName": "Điện thoại dọc (iPhone / Android chuẩn)",
+      "width": 390,
+      "height": 844,
+      "dpr": 2,
+      "scenarioId": "10-map-han-van",
+      "scenarioName": "Hàn Vân Lĩnh (băng nguyên: sương + hạt tuyết + nước)",
+      "fileName": "mobile-p__10-map-han-van.webp",
+      "sizeKb": 120.6,
+      "sha256": "d781685895edf8769c2e04a478e8827232afaa83e494bafabeba59b66c84bd12"
+    },
+    {
+      "viewportId": "mobile-sm",
+      "viewportName": "Điện thoại nhỏ (Compact 360x640)",
+      "width": 360,
+      "height": 640,
+      "dpr": 2,
+      "scenarioId": "10-map-han-van",
+      "scenarioName": "Hàn Vân Lĩnh (băng nguyên: sương + hạt tuyết + nước)",
+      "fileName": "mobile-sm__10-map-han-van.webp",
+      "sizeKb": 95.5,
+      "sha256": "86238524410467cee8e0af4c8b2bf6b5066ed620955458a69f556d59addf1572"
+    }
+  ]
+}

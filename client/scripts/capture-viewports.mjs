@@ -466,6 +466,8 @@ export const MAP_SCENARIOS = [
     "hac_phong",
   ),
   mapScenario("09-map-am-suong", "Âm Sương Trạch (sương + thời tiết + nước)", "am_suong"),
+  // Bản đồ thứ tư (M7.5, M7.8 #509): băng nguyên (nền nhạt, sương lạnh, hạt tuyết); chạy riêng `--maps --scenarios=10-map-han-van --out-dir=docs/screenshots/m7-ban-do`
+  mapScenario("10-map-han-van", "Hàn Vân Lĩnh (băng nguyên: sương + hạt tuyết + nước)", "han_van"),
 ];
 
 /** Năm khung nhìn đại diện cho ảnh bản đồ: máy tính HD, tablet dọc, điện thoại ngang / dọc / nhỏ. */
@@ -887,7 +889,7 @@ function generateGalleryHtml(manifest) {
 function generateReadmeMd(manifest) {
   const totalSizeKb = manifest.images.reduce((sum, img) => sum + img.sizeKb, 0);
   const mapNote = manifest.maps
-    ? "\n> **Bộ ảnh bản đồ ngoài** (`--maps`, #408 bước 4): Hắc Phong Cốc (mốc so sánh) và Âm Sương Trạch (bản đồ mới) ở năm khung nhìn; sương + thời tiết + nước BẬT, 12 đạo hữu đứng giữa trấn. Bộ ảnh mốc M5 nằm ở `docs/screenshots/m5-baseline` và không bị đụng tới.\n"
+    ? "\n> **Bộ ảnh bản đồ ngoài** (`--maps`, #408 bước 4): Hắc Phong Cốc (mốc so sánh, `08`), Âm Sương Trạch (`09`) và Hàn Vân Lĩnh (`10`, M7.5) ở năm khung nhìn (tên kịch bản nằm trong tên tệp; chỉ kịch bản đã chọn được ghi); sương + thời tiết + nước BẬT, 12 đạo hữu đứng giữa trấn. Bộ ảnh mốc M5 nằm ở `docs/screenshots/m5-baseline` và không bị đụng tới.\n"
     : "";
   return `# Bộ Ảnh Mốc Đa Viewport M5 (Baseline Multi-Viewport Screenshots)
 ${mapNote}

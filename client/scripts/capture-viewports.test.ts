@@ -62,8 +62,12 @@ describe("capture-viewports", () => {
   });
 
   describe("kịch bản bản đồ ngoài (--maps, #408 bước 4)", () => {
-    it("chụp Hắc Phong (mốc) và Âm Sương, KHÔNG lẫn vào bộ ảnh mốc M5", () => {
-      expect(MAP_SCENARIOS.map((s) => s.id)).toEqual(["08-map-hac-phong", "09-map-am-suong"]);
+    it("chụp Hắc Phong (mốc), Âm Sương và Hàn Vân, KHÔNG lẫn vào bộ ảnh mốc M5", () => {
+      expect(MAP_SCENARIOS.map((s) => s.id)).toEqual([
+        "08-map-hac-phong",
+        "09-map-am-suong",
+        "10-map-han-van",
+      ]);
       const m5 = new Set(SCENARIOS.map((s) => s.id));
       for (const sc of MAP_SCENARIOS) expect(m5.has(sc.id)).toBe(false);
     });
@@ -72,6 +76,7 @@ describe("capture-viewports", () => {
       const want: Record<string, string> = {
         "08-map-hac-phong": "hac_phong",
         "09-map-am-suong": "am_suong",
+        "10-map-han-van": "han_van",
       };
       for (const sc of MAP_SCENARIOS) {
         expect(sc.mode).toBe("map");
