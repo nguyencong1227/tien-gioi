@@ -258,12 +258,16 @@ function pathToPortal(
 
 type BotRole = "hunt" | "crowd" | "travel" | "dungeon" | "duel" | "sect";
 
+const SOAK_MAP_IDS = ["lac_ha", "hac_phong", "am_suong", "han_van"];
+
 /**
- * Bản đồ xuất phát của bot. Mọi vai đều ở Lạc Hà, trừ các bot "travel" mang số chẵn: xuất phát ở Hắc Phong Cốc sát cổng Bắc (đi bộ từ cổng Nam
- * lên Bắc dài ~2700 px qua vùng quái nguy hiểm, bot Luyện Khí không tới nổi) để soak có người qua lại giữa Hắc Phong và Âm Sương thật (M6, #410).
+ * Bản đồ xuất phát của bot. Mọi vai đều ở Lạc Hà, trừ các bot "travel": phân bổ trải đều qua bốn bản đồ
+ * (Lạc Hà, Hắc Phong, Âm Sương, Hàn Vân) sát các cổng chuyển cảnh để soak có người qua lại giữa mọi cặp bản đồ (M7.10 #511).
  */
 function startMapOf(role: BotRole, index: number): GameMap {
-  return role === "travel" && index % 2 === 0 ? (getMap("hac_phong") ?? DEFAULT_MAP) : DEFAULT_MAP;
+  if (role !== "travel") return DEFAULT_MAP;
+  const targetId = SOAK_MAP_IDS[index % SOAK_MAP_IDS.length];
+  return getMap(targetId) ?? DEFAULT_MAP;
 }
 
 interface BotState {
@@ -439,8 +443,10 @@ export async function main(): Promise<number> {
       cx = DEFAULT_MAP.townPx.x + Math.cos(angle) * r;
       cy = DEFAULT_MAP.townPx.y + Math.sin(angle) * r;
     } else if (role === "travel") {
-      // sát cổng cuối danh sách của bản đồ xuất phát: Lạc Hà chỉ có một cổng, Hắc Phong thì cổng Bắc (sang Âm Sương)
-      const portal = startMapOf(role, i).portals.at(-1);
+      // Sát cổng chuyển cảnh của bản đồ xuất phát (chọn xen kẽ các cổng nếu bản đồ có nhiều cổng; M7.10 #511)
+      const startMap = startMapOf(role, i);
+      const portalIdx = Math.floor(i / SOAK_MAP_IDS.length) % startMap.portals.length;
+      const portal = startMap.portals[portalIdx] ?? startMap.portals.at(-1);
       cx = portal ? portal.spawn.x : DEFAULT_MAP.townPx.x;
       cy = portal ? portal.spawn.y : DEFAULT_MAP.townPx.y;
     } else if (role === "dungeon") {
