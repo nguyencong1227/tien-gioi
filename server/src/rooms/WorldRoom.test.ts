@@ -2638,7 +2638,9 @@ describe("luân hồi: chết thật, Hoàng Tuyền, đầu thai (M3 bước 2)
       expect(playerOf(name).limbo).toBeDefined();
       // đĩa xong: chân linh ĐÃ ghi (ghi trước là chủ ý) nhưng KHÔNG dựng kiếp mới cho người đã đi (không `applyRebirth`, không lưu đè hồ sơ)
       held.release();
-      await sleep(500);
+      // chờ THEO ĐIỀU KIỆN (chân linh đã ghi xuống đĩa) thay vì ngủ cố định 500 ms: CI chậm thì `sleep(500)` kết thúc trước lúc ghi xong (đỏ ngẫu nhiên ở #652)
+      await waitFor(() => soulOf(name).engraved.length > 0, 8000);
+      await sleep(100); // và chừa một nhịp để chắc KHÔNG có `applyRebirth` chạy muộn sau lần ghi
       expect(soulOf(name).engraved).toEqual(["hoa_van_kiem"]);
       expect(soulOf(name).kiep).toBe(kiepBefore);
       expect(playerOf(name).limbo).toBeDefined();
