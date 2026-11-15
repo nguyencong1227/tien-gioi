@@ -18,6 +18,7 @@ import {
   AM_SUONG_ID,
   DEFAULT_MAP_ID,
   HAC_PHONG_ID,
+  HAN_VAN_ID,
   QUESTS,
   TRAVEL_COOLDOWN_MS,
   emptyInventory,
@@ -25,10 +26,12 @@ import {
   parseWrongMap,
   roomNameOf,
   type InvMsg,
+  type SkillsMsg,
   type TravelMsg,
   type TravelToMsg,
   type WalletMsg,
 } from "@tien-gioi/shared";
+import { auditSavesDirectory } from "./audit-saves";
 
 const dataDir = mkdtempSync(path.join(tmpdir(), "tien-gioi-portal-test-"));
 process.env.DATA_DIR = dataDir;
@@ -108,9 +111,11 @@ async function joinRoom(name: string, secret: string, mapId: string) {
   const invs: InvMsg[] = [];
   const wallets: WalletMsg[] = [];
   const travelTos: TravelToMsg[] = [];
+  const skillsMsgs: SkillsMsg[] = [];
   room.onMessage("inv", (m: InvMsg) => invs.push(m));
   room.onMessage("wallet", (m: WalletMsg) => wallets.push(m));
   room.onMessage("travelTo", (m: TravelToMsg) => travelTos.push(m));
+  room.onMessage("skills", (m: SkillsMsg) => skillsMsgs.push(m));
   await waitFor(() => (room.state as any)?.players?.get(room.sessionId));
   return {
     room,
@@ -118,6 +123,7 @@ async function joinRoom(name: string, secret: string, mapId: string) {
     invs,
     wallets,
     travelTos,
+    skillsMsgs,
     me: () => (room.state as any).players.get(room.sessionId),
   };
 }
@@ -180,9 +186,11 @@ describe("Thử tải & độ tin cậy chuyển bản đồ qua cổng (Issue #
       const nextInvs: InvMsg[] = [];
       const nextWallets: WalletMsg[] = [];
       const nextTravelTos: TravelToMsg[] = [];
+      const nextSkillsMsgs: SkillsMsg[] = [];
       nextRoom.onMessage("inv", (m: InvMsg) => nextInvs.push(m));
       nextRoom.onMessage("wallet", (m: WalletMsg) => nextWallets.push(m));
       nextRoom.onMessage("travelTo", (m: TravelToMsg) => nextTravelTos.push(m));
+      nextRoom.onMessage("skills", (m: SkillsMsg) => nextSkillsMsgs.push(m));
 
       cur = {
         room: nextRoom,
@@ -190,6 +198,7 @@ describe("Thử tải & độ tin cậy chuyển bản đồ qua cổng (Issue #
         invs: nextInvs,
         wallets: nextWallets,
         travelTos: nextTravelTos,
+        skillsMsgs: nextSkillsMsgs,
         me: () => (nextRoom.state as any).players.get(nextRoom.sessionId),
       };
 
@@ -355,9 +364,9 @@ async function hop(cur: Conn, name: string, fromMapId: string, portalId: string)
   return next;
 }
 
-describe("Ba bản đồ: Lạc Hà <-> Hắc Phong Cốc <-> Âm Sương Trạch (M6, #405)", () => {
-  it("đi hết một vòng khứ hồi bốn chặng: tới đúng chỗ xuất hiện của cổng đích, trong khu an toàn, dữ liệu nguyên vẹn", async () => {
-    const name = `Bot Ba Ban Do ${++nameSeq}`;
+describe("Bốn bản đồ: Lạc Hà <-> Hắc Phong Cốc <-> Âm Sương Trạch <-> Hàn Vân Lĩnh (M7.11, #512)", () => {
+  it("đi hết một vòng khứ hồi sáu chặng bốn bản đồ: tới đúng chỗ xuất hiện của cổng đích, trong khu an toàn, dữ liệu nguyên vẹn", async () => {
+    const name = `Bot Bon Ban Do ${++nameSeq}`;
     let cur = await joinRoom(name, secretOf(name), DEFAULT_MAP_ID);
     cur.room.send("chat", { text: "/give nanh_soi 5" });
     await waitFor(() => cur.invs.some((m) => m.gained));
@@ -366,6 +375,8 @@ describe("Ba bản đồ: Lạc Hà <-> Hắc Phong Cốc <-> Âm Sương Trạc
     const route: [string, string][] = [
       [DEFAULT_MAP_ID, "lac_ha_bac"],
       [HAC_PHONG_ID, "hac_phong_bac"],
+      [AM_SUONG_ID, "am_suong_bac"],
+      [HAN_VAN_ID, "han_van_nam"],
       [AM_SUONG_ID, "am_suong_nam"],
       [HAC_PHONG_ID, "hac_phong_nam"],
     ];
@@ -387,6 +398,8 @@ describe("Ba bản đồ: Lạc Hà <-> Hắc Phong Cốc <-> Âm Sương Trạc
       DEFAULT_MAP_ID,
       HAC_PHONG_ID,
       AM_SUONG_ID,
+      HAN_VAN_ID,
+      AM_SUONG_ID,
       HAC_PHONG_ID,
       DEFAULT_MAP_ID,
     ]);
@@ -396,7 +409,7 @@ describe("Ba bản đồ: Lạc Hà <-> Hắc Phong Cốc <-> Âm Sương Trạc
     expect(saved.exp).toBe(42);
     expect(saved.inventory?.find((s: any) => s?.itemId === "nanh_soi")?.qty).toBe(5);
     expect(cur.me().exp).toBe(42);
-  }, 30_000);
+  }, 45_000);
 
   it("nhân vật lưu ở Âm Sương: phòng Lạc Hà và Hắc Phong trả wrong_map:am_suong, phòng Âm Sương nhận, có quái và đúng bản đồ", async () => {
     const name = `Bot Am Suong ${++nameSeq}`;
@@ -432,9 +445,44 @@ describe("Ba bản đồ: Lạc Hà <-> Hắc Phong Cốc <-> Âm Sương Trạc
     expect(ok.me().x).toBeCloseTo(spawn.x, 0);
     expect(ok.me().y).toBeCloseTo(spawn.y, 0);
   });
+
+  it("nhân vật lưu ở Hàn Vân Lĩnh: các phòng Lạc Hà, Hắc Phong, Âm Sương trả wrong_map:han_van, phòng Hàn Vân nhận, có quái và đúng bản đồ", async () => {
+    const name = `Bot Han Van ${++nameSeq}`;
+    const to = getMap(AM_SUONG_ID)!.portal("am_suong_bac")!;
+    const spawn = getMap(to.toMap)!.portal(to.toPortal)!.spawn;
+    await savePlayer({
+      name,
+      secretHash: hashSecret(secretOf(name)),
+      realm: 4,
+      tier: 0,
+      exp: 0,
+      mapId: HAN_VAN_ID,
+      x: spawn.x,
+      y: spawn.y,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    for (const wrong of [DEFAULT_MAP_ID, HAC_PHONG_ID, AM_SUONG_ID]) {
+      const client = new Client(`ws://localhost:${PORT}`);
+      let err: any = null;
+      try {
+        rooms.push(await client.joinOrCreate(roomNameOf(wrong), { name, secret: secretOf(name) }));
+      } catch (e: any) {
+        err = e;
+      }
+      expect(err, `vào nhầm ${wrong}`).not.toBeNull();
+      expect(parseWrongMap(err.code, err.message)).toBe(HAN_VAN_ID);
+    }
+    const ok = await joinRoom(name, secretOf(name), HAN_VAN_ID);
+    const sr = serverRoom(ok.room);
+    expect(sr.mapId).toBe(HAN_VAN_ID);
+    expect(sr.state.monsters.size).toBeGreaterThan(0);
+    expect(ok.me().x).toBeCloseTo(spawn.x, 0);
+    expect(ok.me().y).toBeCloseTo(spawn.y, 0);
+  });
 });
 
-describe("Ba bản đồ: dữ liệu nguyên vẹn sau MỖI lần qua cổng, rớt mạng và hai tab cùng mã (M6, #411 mục 1)", () => {
+describe("Bốn bản đồ: dữ liệu nguyên vẹn sau MỖI lần qua cổng, rớt mạng và hai tab cùng mã (M7.11, #512)", () => {
   // Hồ sơ mẫu có MỌI loại dữ liệu cần giữ: tu vi, Linh thạch, túi đồ, sổ nhiệm vụ (đang làm dở một nhiệm vụ diệt quái, đã xong một nhiệm vụ)
   const EXP = 42;
   const COIN = 12345;
@@ -443,6 +491,10 @@ describe("Ba bản đồ: dữ liệu nguyên vẹn sau MỖI lần qua cổng, 
   const TIER = 2;
   const LIFE_ID = "kiep-thu-nghiem-0123";
   const equipment = { weapon: "lang_nha_kiem", robe: "tho_nhung_bao", talisman: "lang_nha_phu" };
+  const skills = {
+    learned: { hoa_van_kiem: 2, bon_thach_quyen: 1 },
+    slots: ["hoa_van_kiem", "", "", ""] as [string, string, string, string],
+  };
   const killQuest = QUESTS.find(
     (q) => !q.daily && q.steps[0]?.kind === "kill" && (q.steps[0] as { count: number }).count >= 3,
   )!;
@@ -472,6 +524,7 @@ describe("Ba bản đồ: dữ liệu nguyên vẹn sau MỖI lần qua cổng, 
       quests,
       equipment,
       lifeId: LIFE_ID,
+      skills,
       mapId,
       ...(spawn ? { x: spawn.x, y: spawn.y } : {}),
       createdAt: new Date().toISOString(),
@@ -480,7 +533,12 @@ describe("Ba bản đồ: dữ liệu nguyên vẹn sau MỖI lần qua cổng, 
   }
 
   /** Hồ sơ trên đĩa VÀ trạng thái sống ở phòng hiện tại đều khớp hồ sơ mẫu. */
-  async function expectIntact(cur: Conn, name: string, where: string) {
+  async function expectIntact(
+    cur: Conn,
+    name: string,
+    where: string,
+    expectedSkills: typeof skills | null = skills,
+  ) {
     const f = fileOf(name);
     expect(f.realm, `${where}: cảnh giới trên đĩa`).toBe(REALM);
     expect(f.tier, `${where}: tầng trên đĩa`).toBe(TIER);
@@ -500,6 +558,19 @@ describe("Ba bản đồ: dữ liệu nguyên vẹn sau MỖI lần qua cổng, 
     await waitFor(() => cur.wallets.at(-1)?.coin === COIN);
     await waitFor(() => cur.invs.at(-1) && items(cur.invs.at(-1)!.slots).length === 2);
     expect(items(cur.invs.at(-1)!.slots), `${where}: túi đồ đang chơi`).toEqual(items(inventory));
+    if (expectedSkills) {
+      expect(f.skills, `${where}: sổ chiêu trên đĩa`).toEqual(expectedSkills);
+      await waitFor(
+        () =>
+          cur.skillsMsgs.length > 0 &&
+          cur.skillsMsgs.at(-1)?.learned?.hoa_van_kiem === expectedSkills.learned.hoa_van_kiem,
+      );
+      const lastSkills = cur.skillsMsgs.at(-1)!;
+      expect(lastSkills.learned, `${where}: chiêu đã học đang chơi`).toEqual(
+        expectedSkills.learned,
+      );
+      expect(lastSkills.slots, `${where}: ô chiêu đang chơi`).toEqual(expectedSkills.slots);
+    }
   }
 
   /** Rớt mạng bất thường (đóng WebSocket không "thoát chủ động") rồi nối lại bằng token như client thật. */
@@ -514,9 +585,11 @@ describe("Ba bản đồ: dữ liệu nguyên vẹn sau MỖI lần qua cổng, 
     const invs: InvMsg[] = [];
     const wallets: WalletMsg[] = [];
     const travelTos: TravelToMsg[] = [];
+    const skillsMsgs: SkillsMsg[] = [];
     room.onMessage("inv", (m: InvMsg) => invs.push(m));
     room.onMessage("wallet", (m: WalletMsg) => wallets.push(m));
     room.onMessage("travelTo", (m: TravelToMsg) => travelTos.push(m));
+    room.onMessage("skills", (m: SkillsMsg) => skillsMsgs.push(m));
     await waitFor(() => (room.state as any)?.players?.get(room.sessionId));
     return {
       room,
@@ -524,18 +597,21 @@ describe("Ba bản đồ: dữ liệu nguyên vẹn sau MỖI lần qua cổng, 
       invs,
       wallets,
       travelTos,
+      skillsMsgs,
       me: () => (room.state as any).players.get(room.sessionId),
     };
   }
 
-  it("vòng khứ hồi bốn chặng: tu vi, Linh thạch, túi đồ, sổ nhiệm vụ nguyên vẹn SAU MỖI lần qua cổng (đĩa và đang chơi)", async () => {
-    const name = `Bot Toan Ven ${++nameSeq}`;
+  it("vòng khứ hồi sáu chặng bốn bản đồ: tu vi, Linh thạch, túi đồ, sổ nhiệm vụ, sổ chiêu nguyên vẹn SAU MỖI lần qua cổng (đĩa và đang chơi)", async () => {
+    const name = `Bot4M ${++nameSeq}`;
     await seed(name, DEFAULT_MAP_ID);
     let cur = await joinRoom(name, secretOf(name), DEFAULT_MAP_ID);
     await expectIntact(cur, name, DEFAULT_MAP_ID);
     const route: [string, string][] = [
       [DEFAULT_MAP_ID, "lac_ha_bac"],
       [HAC_PHONG_ID, "hac_phong_bac"],
+      [AM_SUONG_ID, "am_suong_bac"],
+      [HAN_VAN_ID, "han_van_nam"],
       [AM_SUONG_ID, "am_suong_nam"],
       [HAC_PHONG_ID, "hac_phong_nam"],
     ];
@@ -543,7 +619,7 @@ describe("Ba bản đồ: dữ liệu nguyên vẹn sau MỖI lần qua cổng, 
       cur = await hop(cur, name, fromMapId, portalId);
       await expectIntact(cur, name, `sau ${portalId}`);
     }
-  }, 40_000);
+  }, 45_000);
 
   it("rớt mạng ở Âm Sương rồi nối lại trong thời gian chờ: vẫn ở Âm Sương, dữ liệu nguyên, vẫn qua cổng được", async () => {
     const name = `Bot Roi Mang ${++nameSeq}`;
@@ -567,6 +643,27 @@ describe("Ba bản đồ: dữ liệu nguyên vẹn sau MỖI lần qua cổng, 
     await expectIntact(next, name, "qua cổng sau khi nối lại");
   }, 30_000);
 
+  it("rớt mạng ở Hàn Vân Lĩnh rồi nối lại trong thời gian chờ: vẫn ở Hàn Vân Lĩnh, dữ liệu nguyên, vẫn qua cổng về Âm Sương được", async () => {
+    const name = `BotRM HV ${++nameSeq}`;
+    await seed(name, HAN_VAN_ID, "han_van_nam");
+    const first = await joinRoom(name, secretOf(name), HAN_VAN_ID);
+    await expectIntact(first, name, "vào Hàn Vân Lĩnh");
+    const sid = first.room.sessionId;
+
+    const again = await dropAndReconnect(first);
+    expect(again.room.sessionId).toBe(sid);
+    expect(serverRoom(again.room).mapId).toBe(HAN_VAN_ID);
+    await expectIntact(again, name, "sau khi nối lại");
+    const sr = serverRoom(again.room);
+    const same = [...sr.state.players.values()].filter((p: any) => p.name === name);
+    expect(same.length).toBe(1);
+    expect(sr.ghosts.has(sid)).toBe(false);
+
+    // Nối lại xong vẫn qua cổng bình thường về Âm Sương và dữ liệu theo sang bản đồ đích
+    const next = await hop(again, name, HAN_VAN_ID, "han_van_nam");
+    await expectIntact(next, name, "qua cổng về Âm Sương sau khi nối lại");
+  }, 30_000);
+
   it("rớt mạng ở Âm Sương rồi ĐĂNG NHẬP LẠI (mất token): huỷ chờ, vào lại đúng phòng, một nhân vật, dữ liệu nguyên", async () => {
     const name = `Bot Nhap Lai ${++nameSeq}`;
     await seed(name, AM_SUONG_ID, "am_suong_nam");
@@ -580,6 +677,21 @@ describe("Ba bản đồ: dữ liệu nguyên vẹn sau MỖI lần qua cổng, 
     expect(sr.ghosts.has(sid)).toBe(false);
     expect([...sr.state.players.values()].filter((p: any) => p.name === name).length).toBe(1);
     await expectIntact(second, name, "đăng nhập lại");
+  }, 30_000);
+
+  it("rớt mạng ở Hàn Vân Lĩnh rồi ĐĂNG NHẬP LẠI (mất token): huỷ chờ, vào lại đúng phòng, một nhân vật, dữ liệu nguyên", async () => {
+    const name = `BotNL HV ${++nameSeq}`;
+    await seed(name, HAN_VAN_ID, "han_van_nam");
+    const first = await joinRoom(name, secretOf(name), HAN_VAN_ID);
+    const sr = serverRoom(first.room);
+    const sid = first.room.sessionId;
+    (first.room.connection.transport as any).ws.close();
+    await waitFor(() => sr.ghosts.has(sid));
+
+    const second = await joinRoom(name, secretOf(name), HAN_VAN_ID);
+    expect(sr.ghosts.has(sid)).toBe(false);
+    expect([...sr.state.players.values()].filter((p: any) => p.name === name).length).toBe(1);
+    await expectIntact(second, name, "đăng nhập lại ở Hàn Vân");
   }, 30_000);
 
   it("hai tab cùng mã nhân vật ở Âm Sương: tab thứ hai bị từ chối 409, tab đầu không bị ảnh hưởng", async () => {
@@ -605,17 +717,40 @@ describe("Ba bản đồ: dữ liệu nguyên vẹn sau MỖI lần qua cổng, 
     await expectIntact(a, name, "tab đầu sau khi tab hai bị từ chối");
   }, 30_000);
 
-  it("hai tab đua nhau lúc qua cổng: tab hai không vào được phòng cũ (409 hoặc wrong_map), chỉ vào được phòng đích, đĩa không bị đè lại", async () => {
-    const name = `Bot Dua Cong ${++nameSeq}`;
-    await seed(name, HAC_PHONG_ID, "hac_phong_bac");
-    const a = await joinRoom(name, secretOf(name), HAC_PHONG_ID);
-    const portal = getMap(HAC_PHONG_ID)!.portal("hac_phong_bac")!;
+  it("hai tab cùng mã nhân vật ở Hàn Vân Lĩnh: tab thứ hai bị từ chối 409, tab đầu không bị ảnh hưởng", async () => {
+    const name = `BotTab HV ${++nameSeq}`;
+    await seed(name, HAN_VAN_ID, "han_van_nam");
+    const a = await joinRoom(name, secretOf(name), HAN_VAN_ID);
+    let err: any = null;
+    try {
+      rooms.push(
+        await new Client(`ws://localhost:${PORT}`).joinOrCreate(roomNameOf(HAN_VAN_ID), {
+          name,
+          secret: secretOf(name),
+        }),
+      );
+    } catch (e: any) {
+      err = e;
+    }
+    expect(err?.code).toBe(409);
+    expect(a.room.connection.isOpen).toBe(true);
+    expect(
+      [...serverRoom(a.room).state.players.values()].filter((p: any) => p.name === name).length,
+    ).toBe(1);
+    await expectIntact(a, name, "tab đầu sau khi tab hai bị từ chối ở Hàn Vân");
+  }, 30_000);
+
+  it("hai tab đua nhau lúc qua cổng Âm Sương <-> Hàn Vân: tab hai không vào được phòng cũ (409 hoặc wrong_map), chỉ vào được phòng đích, đĩa không bị đè lại", async () => {
+    const name = `BotDua HV ${++nameSeq}`;
+    await seed(name, AM_SUONG_ID, "am_suong_bac");
+    const a = await joinRoom(name, secretOf(name), AM_SUONG_ID);
+    const portal = getMap(AM_SUONG_ID)!.portal("am_suong_bac")!;
     standAt(a.room, portal);
     serverRoom(a.room).world.ctrl.get(a.room.sessionId).save.travelAt = 0;
 
     // Tab A qua cổng ĐỒNG THỜI với tab B vào lại phòng cũ bằng cùng mã nhân vật
     const joinOld = new Client(`ws://localhost:${PORT}`)
-      .joinOrCreate(roomNameOf(HAC_PHONG_ID), { name, secret: secretOf(name) })
+      .joinOrCreate(roomNameOf(AM_SUONG_ID), { name, secret: secretOf(name) })
       .then(
         (r) => {
           rooms.push(r);
@@ -623,19 +758,19 @@ describe("Ba bản đồ: dữ liệu nguyên vẹn sau MỖI lần qua cổng, 
         },
         (err: any) => ({ ok: false as const, err }),
       );
-    a.room.send("travel", { portalId: "hac_phong_bac" } satisfies TravelMsg);
+    a.room.send("travel", { portalId: "am_suong_bac" } satisfies TravelMsg);
     const res = await joinOld;
     expect(res.ok, "không được có hai nhân vật cùng tên ở phòng cũ").toBe(false);
     const code = res.err?.code;
     const wrong = parseWrongMap(code, res.err?.message ?? "");
-    expect(code === 409 || wrong === AM_SUONG_ID, `lỗi bất ngờ: ${code} ${res.err?.message}`).toBe(
+    expect(code === 409 || wrong === HAN_VAN_ID, `lỗi bất ngờ: ${code} ${res.err?.message}`).toBe(
       true,
     );
 
     await waitFor(() => a.travelTos.length > 0);
     await waitFor(() => !a.room.connection.isOpen);
     const b = await joinRoom(name, secretOf(name), portal.toMap);
-    await expectIntact(b, name, "tab hai ở phòng đích");
+    await expectIntact(b, name, "tab hai ở phòng đích Hàn Vân");
     // Lưu muộn của phòng cũ không được đè bản ghi mới (savePlayer xếp hàng theo tệp)
     await sleep(500);
     expect(fileOf(name).mapId).toBe(portal.toMap);
@@ -643,18 +778,19 @@ describe("Ba bản đồ: dữ liệu nguyên vẹn sau MỖI lần qua cổng, 
       [...serverRoom(b.room).state.players.values()].filter((p: any) => p.name === name).length,
     ).toBe(1);
   }, 30_000);
-  it("lưu định kỳ chạy ĐÚNG lúc đang qua cổng không đè bản ghi đích (chốt `travelling` của persist)", async () => {
-    const name = `Bot Dinh Ky ${++nameSeq}`;
-    await seed(name, HAC_PHONG_ID, "hac_phong_bac");
-    const a = await joinRoom(name, secretOf(name), HAC_PHONG_ID);
-    const portal = getMap(HAC_PHONG_ID)!.portal("hac_phong_bac")!;
+
+  it("lưu định kỳ chạy ĐÚNG lúc đang qua cổng Âm Sương <-> Hàn Vân không đè bản ghi đích (chốt `travelling` của persist)", async () => {
+    const name = `BotDK HV ${++nameSeq}`;
+    await seed(name, AM_SUONG_ID, "am_suong_bac");
+    const a = await joinRoom(name, secretOf(name), AM_SUONG_ID);
+    const portal = getMap(AM_SUONG_ID)!.portal("am_suong_bac")!;
     standAt(a.room, portal);
     const sr = serverRoom(a.room);
     const sid = a.room.sessionId;
     const p = sr.state.players.get(sid);
     const c = sr.world.ctrl.get(sid);
     c.save.travelAt = 0;
-    a.room.send("travel", { portalId: "hac_phong_bac" } satisfies TravelMsg);
+    a.room.send("travel", { portalId: "am_suong_bac" } satisfies TravelMsg);
     await waitFor(() => c.travelling);
     // Lưu định kỳ / lúc rớt mạng chạy sau khi đã bắt đầu qua cổng: phải bị bỏ qua, không ghi lại bản đồ cũ
     await sr.persist(p, c);
@@ -665,6 +801,72 @@ describe("Ba bản đồ: dữ liệu nguyên vẹn sau MỖI lần qua cổng, 
     const b = await joinRoom(name, secretOf(name), portal.toMap);
     await expectIntact(b, name, "đích sau lưu định kỳ chen ngang");
   }, 30_000);
+
+  it("thử tải đồng thời (concurrency stress): 4 bot cùng qua cổng Âm Sương <-> Hàn Vân đồng thời, không lỗi, kiem-save 0 lỗi", async () => {
+    const BOTS_COUNT = 4;
+    const botNames = Array.from({ length: BOTS_COUNT }, (_, i) => `BotCC ${++nameSeq} ${i}`);
+
+    const configs = [
+      { mapId: AM_SUONG_ID, portalId: "am_suong_bac", targetMapId: HAN_VAN_ID },
+      { mapId: AM_SUONG_ID, portalId: "am_suong_bac", targetMapId: HAN_VAN_ID },
+      { mapId: HAN_VAN_ID, portalId: "han_van_nam", targetMapId: AM_SUONG_ID },
+      { mapId: HAN_VAN_ID, portalId: "han_van_nam", targetMapId: AM_SUONG_ID },
+    ];
+
+    const conns: Conn[] = [];
+    for (let i = 0; i < BOTS_COUNT; i++) {
+      const name = botNames[i];
+      const cfg = configs[i];
+      await seed(name, cfg.mapId, cfg.portalId);
+      const conn = await joinRoom(name, secretOf(name), cfg.mapId);
+      conns.push(conn);
+    }
+
+    // Đặt bot tại cổng và xóa travelAt
+    for (let i = 0; i < BOTS_COUNT; i++) {
+      const conn = conns[i];
+      const cfg = configs[i];
+      const portal = getMap(cfg.mapId)!.portal(cfg.portalId)!;
+      standAt(conn.room, portal);
+      serverRoom(conn.room).world.ctrl.get(conn.room.sessionId).save.travelAt = 0;
+    }
+
+    // Gửi travel đồng thời
+    for (let i = 0; i < BOTS_COUNT; i++) {
+      conns[i].room.send("travel", { portalId: configs[i].portalId } satisfies TravelMsg);
+    }
+
+    // Chờ nhận travelTo và đóng phòng cũ
+    await Promise.all(
+      conns.map(async (conn, i) => {
+        const targetMapId = configs[i].targetMapId;
+        await waitFor(() => conn.travelTos.find((m) => m.mapId === targetMapId), 8000);
+        await waitFor(() => !conn.room.connection.isOpen, 8000);
+      }),
+    );
+
+    // Kết nối vào phòng đích đồng thời
+    await Promise.all(
+      conns.map(async (conn, i) => {
+        const name = botNames[i];
+        const targetMapId = configs[i].targetMapId;
+        const next = await joinRoom(name, secretOf(name), targetMapId);
+        expect(serverRoom(next.room).mapId).toBe(targetMapId);
+        expect(fileOf(name).mapId).toBe(targetMapId);
+        await expectIntact(next, name, `concurrency đích ${targetMapId}`);
+        return next;
+      }),
+    );
+
+    // Kiểm toán toàn vẹn thư mục lưu
+    const auditRes = auditSavesDirectory(dataDir);
+    expect(
+      auditRes.errorFiles,
+      `kiem-save sau bão chuyển cổng: ${JSON.stringify(auditRes.failedFiles)}`,
+    ).toBe(0);
+    expect(auditRes.failedFiles.length).toBe(0);
+  }, 40_000);
+
   it("tệp lưu cũ (thiếu mapId, hoặc mapId của bản đồ không còn / chưa biết): vào được Lạc Hà, phòng khác trả wrong_map:lac_ha", async () => {
     for (const [label, extra] of [
       ["thiếu mapId (tệp trước M3)", {}],
@@ -682,11 +884,12 @@ describe("Ba bản đồ: dữ liệu nguyên vẹn sau MỖI lần qua cổng, 
         quests,
         equipment,
         lifeId: LIFE_ID,
+        skills,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         ...extra,
       });
-      for (const wrong of [HAC_PHONG_ID, AM_SUONG_ID]) {
+      for (const wrong of [HAC_PHONG_ID, AM_SUONG_ID, HAN_VAN_ID]) {
         let err: any = null;
         try {
           rooms.push(
@@ -704,10 +907,10 @@ describe("Ba bản đồ: dữ liệu nguyên vẹn sau MỖI lần qua cổng, 
       }
       const ok = await joinRoom(name, secretOf(name), DEFAULT_MAP_ID);
       expect(serverRoom(ok.room).mapId, label).toBe(DEFAULT_MAP_ID);
-      await expectIntact(ok, name, label);
+      await expectIntact(ok, name, label, null);
       // Qua cổng từ tệp cũ cũng chạy bình thường (ghi mapId đích đúng)
       const next = await hop(ok, name, DEFAULT_MAP_ID, "lac_ha_bac");
-      await expectIntact(next, name, `${label}: sau khi qua cổng`);
+      await expectIntact(next, name, `${label}: sau khi qua cổng`, null);
     }
   }, 30_000);
 });
