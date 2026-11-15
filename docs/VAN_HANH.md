@@ -380,11 +380,41 @@ Công cụ `thong-ke-tien-do` theo dõi tỉ lệ người chơi tiếp cận h�
 - **Cơ chế thời gian chơi kiếp (`life.playMs`):** Thời gian chơi tích luỹ được tính riêng cho **kiếp hiện tại** (được làm mới về 0 khi luân hồi chuyển kiếp).
 - **Phân biệt Dư âm tu hành và Khắc chân linh:**
   - **Dư âm tu hành (`du_am`):** Nâng cấp bằng Duyên tại Tam Sinh Thạch (10 nấc, mỗi nấc +10% tốc độ tu luyện từ quái và đả toạ, tối đa +100% ở nấc 10 theo `THIET_KE_LUAN_HOI.md` mục 6).
-  - **Khắc chân linh (`engrave`):** Mở nấc bằng Duyên tại Tam Sinh Thạch (3 nấc 40 / 100 / 220 Duyên) để giữ lại 1–3 chiêu thức qua kiếp.
+  - **Khắc chân linh (`khac`):** Mở nấc bằng Duyên tại Tam Sinh Thạch (3 nấc 40 / 100 / 220 Duyên) để giữ lại 1–3 chiêu thức qua kiếp.
   - **Trạng thái chiêu khắc ở kiếp mới:** Chiêu thức truyền kiếp được giữ ở **tầng 1** và ở trạng thái **chưa gắn ô** (báo "Cần đạt Luyện Khí" cho tới khi nhân vật đột phá lên Luyện Khí tầng 1 mới mở ô để gắn). Do đó, việc nhân vật ở Phàm Nhân kiếp >= 2 có chiêu đã học nhưng số ô gắn = 0 (`Chiêu / Ô TB` có dạng `1.0 / 0.0`) là **hoàn toàn bình thường**.
 - **Đánh giá cân bằng đối với kiếp >= 2:**
   - Khi dồn Duyên vào Dư âm tu hành, thời gian từ đầu kiếp tới hết Kim Đan rút ngắn có lộ trình rõ ràng: từ 484 phút (~8.1 giờ ở kiếp 1) xuống 326 phút (~5.4 giờ ở kiếp 2), 288 phút (~4.8 giờ ở kiếp 3) và 273 phút (~4.55 giờ ở kiếp 4) theo bảng tính `CAN_BANG.md` mục 4.
   - **Đây là cơ chế thiết kế có chủ đích** của hệ thống Luân Hồi Chân Linh nhằm tạo cảm giác tiến bộ qua các kiếp, **không phải lỗi cày cuốc hay bất thường cân bằng quái**.
   - Khi xem xét cảnh báo cân bằng từ báo cáo `thong-ke-tien-do`, người vận hành cần lưu ý tách biệt các trường hợp kiếp >= 2 trước khi quyết định điều chỉnh thông số quái vật hay bãi luyện.
+
+---
+
+## 10. Bộ Chạy Toàn Diện E2E (`e2e:all`) & Giám sát Tự động (#694, M7.16)
+
+Hệ thống kiểm thử E2E (End-to-End) của Tiên Giới sử dụng trình duyệt Google Chrome thật kết nối WebSocket đến máy chủ Colyseus thật, bao quát toàn bộ các luồng chơi, giao diện, mạng và cơ chế game.
+
+### 10.1. Chạy Toàn Bộ Kiểm Thử E2E Một Lệnh
+```bash
+# Chạy toàn bộ các kịch bản E2E tuần tự (tự động thử lại 1 lần nếu gặp lỗi thoáng qua)
+npm run e2e:all -w server
+
+# Chạy có tự động build client trước nếu có thay đổi
+npm run e2e:all -w server -- --build
+
+# Chỉ chạy một số kịch bản cụ thể (--only hoặc -o)
+npm run e2e:all -w server -- --only noi-lai,chat-luong
+
+# Bỏ qua một số kịch bản (--skip hoặc -s)
+npm run e2e:all -w server -- --skip map,dpr
+
+# Tùy chỉnh timeout (giây) và thư mục lưu nhật ký (logs)
+npm run e2e:all -w server -- --timeout 180 --logs /tmp/e2e-run
+```
+
+### 10.2. Cơ chế Thử lại & Phân loại Kết quả
+- **XANH (PASS):** Script hoàn thành thành công 100% ngay ở lần chạy đầu tiên.
+- **FLAKY:** Script thất bại ở lần chạy 1 nhưng vượt qua ở lần chạy thử lại thứ 2. Không làm gián đoạn mã thoát (exit code 0), nhưng được ghi nhận rõ ràng trong bảng báo cáo để theo dõi và gia cố độ ổn định.
+- **ĐỎ (FAIL):** Script thất bại cả 2 lần (hoặc quá thời gian timeout). Tiến trình sẽ in 3–5 dòng cuối cùng của nhật ký lỗi và thoát với mã `1`.
+
 
 

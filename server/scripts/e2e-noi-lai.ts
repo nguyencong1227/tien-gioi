@@ -544,7 +544,9 @@ async function main() {
   }
 
   if (failed) {
-    out(`\n❌ E2E NỐI LẠI THẤT BẠI: ${failed}`);
+    out(
+      `\n❌ E2E NỐI LẠI THẤT BẠI: ${failed} (tổng byte client: ${proxy.clientBytes}, byte game: ${proxy.gameClientBytes})`,
+    );
     process.exit(1);
   }
   out("\n🎉 E2E THẬT NỐI LẠI PASS 100%!");
