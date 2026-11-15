@@ -270,6 +270,15 @@ describe("rớt mạng và nối lại (#116)", () => {
 
   const gone = (a: { room: Room }) => !serverState(a.room).players.get(a.room.sessionId);
 
+  /**
+   * Chờ đến khi SERVER thật sự giữ chỗ nối lại (hồn lìa xác: `onLeave` đã gọi `allowReconnection`). Token nối lại chỉ hợp lệ từ lúc đó,
+   * mà client thấy WebSocket đóng TRƯỚC khi server chạy `onLeave`: một `sleep` cố định (150-300 ms) là cuộc đua với máy tải cao
+   * (nối lại sớm bị "reconnection token invalid or expired", ghost còn sót lại làm đỏ dây chuyền các ca sau trong cùng phòng).
+   * Luôn gọi sau `dropConnection` và TRƯỚC `reconnectTo` / các khẳng định về trạng thái "đang chờ".
+   */
+  const waitGhost = (a: { room: Room }, sid = a.room.sessionId) =>
+    waitFor(() => (serverRoom(a.room) as any).ghosts.has(sid), 5000);
+
   it("nối lại trong thời gian chờ: cùng sessionId, nhân vật còn nguyên, nhận lại túi / ví, vùng nhìn đúng, điều khiển được", async () => {
     const a = await join("Noi Lai");
     const b = await join("Hang Xom");
@@ -282,7 +291,8 @@ describe("rớt mạng và nối lại (#116)", () => {
 
     dropConnection(a.room);
     await waitFor(() => !a.room.connection.isOpen);
-    await sleep(300);
+    await waitGhost(a);
+    await sleep(300); // và giữ chỗ chờ một lúc: trạng thái "đang chờ" ổn định, không tự dọn
     // Đang chờ: nhân vật vẫn ở trong thế giới, người khác vẫn thấy, số người không đổi
     expect(serverState(a.room).players.get(sid)).toBeTruthy();
     expect((b.room.state as any).players.get(sid)).toBeTruthy();
@@ -321,7 +331,7 @@ describe("rớt mạng và nối lại (#116)", () => {
       await waitFor(() => a.me().boots === "t_o_boots");
       dropConnection(a.room);
       await waitFor(() => !a.room.connection.isOpen);
-      await sleep(200);
+      await waitGhost(a);
       const r2 = await reconnectTo(a.room);
       expect(r2.room.sessionId).toBe(sid);
       await waitFor(() => r2.me().boots === "t_o_boots");
@@ -342,7 +352,7 @@ describe("rớt mạng và nối lại (#116)", () => {
     ).toBe("added");
     dropConnection(a.room);
     await waitFor(() => !a.room.connection.isOpen);
-    await sleep(200);
+    await waitGhost(a);
     const r2 = await reconnectTo(a.room);
     const sk = await waitFor(() => r2.skills[0]);
     expect(sk.slots).toEqual(["", "", "", ""]);
@@ -469,7 +479,7 @@ describe("rớt mạng và nối lại (#116)", () => {
     const token = a.room.reconnectionToken;
     dropConnection(a.room);
     await waitFor(() => !a.room.connection.isOpen);
-    await sleep(200);
+    await waitGhost(a, oldSid);
     // Người lạ biết tên nhưng sai mã: vẫn bị từ chối, nhân vật vẫn chờ
     const other = new Client(`ws://localhost:${PORT}`);
     await expect(
@@ -505,7 +515,7 @@ describe("rớt mạng và nối lại (#116)", () => {
     for (let i = 0; i < 3; i++) {
       dropConnection(cur);
       await waitFor(() => !cur.connection.isOpen);
-      await sleep(150);
+      await waitGhost({ room: cur }, sid);
       const r = await reconnectTo(cur);
       expect(r.room.sessionId).toBe(sid);
       await waitFor(() => r.invs[0]);
