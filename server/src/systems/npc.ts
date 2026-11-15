@@ -72,8 +72,23 @@ function buildDialog(w: World, p: Player, c: PlayerCtrl, npc: NpcDef): DialogMsg
   // Ưu tiên: có nhiệm vụ để trả > có nhiệm vụ mới > đang làm dở > lời chào
   const lines = ready[0]
     ? [`Việc "${ready[0].title}" xong rồi sao? Để ta xem nào.`]
-    : (offers[0]?.talk.offer ?? doing[0]?.talk.progress ?? npc.dialog);
+    : (offers[0]?.talk.offer ?? doing[0]?.talk.progress ?? greetingLines(npc.dialog));
   return { npcId: npc.id, lines, options };
+}
+
+/**
+ * Lời chào của NPC khi không có nhiệm vụ để nhận / trả: dòng ĐẦU (tự giới thiệu, luôn hiện) cộng MỘT dòng biến thể chọn ngẫu nhiên trong các dòng còn lại,
+ * để NPC có nhiều lời thoại (4-5 dòng) mà người chơi không phải đọc hết mỗi lần bấm nói chuyện. NPC có từ 2 dòng trở xuống thì hiện nguyên như cũ.
+ * `rnd` trả số trong [0, 1) (mặc định `Math.random`; test truyền hàm cố định).
+ */
+export function greetingLines(
+  dialog: readonly string[],
+  rnd: () => number = Math.random,
+): string[] {
+  if (dialog.length <= 2) return [...dialog];
+  const rest = dialog.slice(1);
+  const i = Math.min(rest.length - 1, Math.max(0, Math.floor(rnd() * rest.length)));
+  return [dialog[0], rest[i]];
 }
 
 export function talk(w: World, sid: string, npcId: unknown) {
