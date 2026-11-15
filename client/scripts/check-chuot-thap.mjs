@@ -6,12 +6,13 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 //      bản đồ lớn, cài đặt, hộp thoại NPC, chỉ dẫn: bảng nằm trong khung, không tràn ngang, nút Đóng trong khung và >= 44 px, nút >= 44 px; bảng phải tự cuộn thì ghi chú (không tính lỗi: tấm dài tự cuộn là thiết kế);
 //  (b) khẳng định phân loại (`data-form`) đúng quy tắc và KHÔNG có vấn đề bố cục ở mọi khung truyền vào.
 // Con trỏ CHUỘT (cờ Chrome như check-skills-panel), `?skills=mock&n=4&realm=4`. Có thể chụp ảnh: `--shots <thư mục>`. Cần client đang chạy (`npm run dev -w client`, cổng của dev B là 5183).
-//   node client/scripts/check-chuot-thap.mjs [--url http://127.0.0.1:5183] [--shots /tmp/tg-b-shots] [--measure] [--min-h 540] [--ui-scale 1.15] [--frames '[[1280,577],[1366,625]]']
-//   --measure: chỉ in số đo, không khẳng định (dùng để chọn `DESKTOP_MIN_HEIGHT`); --min-h: giá trị `DESKTOP_MIN_HEIGHT` để kiểm `data-form`.
+//   node client/scripts/check-chuot-thap.mjs [--url http://127.0.0.1:5183] [--shots /tmp/tg-b-shots] [--measure] [--min-h <số>] [--ui-scale 1.15] [--frames '[[1280,577],[1366,625]]']
+//   --measure: chỉ in số đo, không khẳng định (dùng để chọn `DESKTOP_MIN_HEIGHT`); --min-h: ghi đè `DESKTOP_MIN_HEIGHT` để kiểm `data-form` (mặc định: giá trị trong `client/src/gfx/display.ts`).
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
 
@@ -23,6 +24,16 @@ const argOf = (name, dflt) => {
 const BASE_URL = argOf("--url", "http://127.0.0.1:5183");
 const SHOTS = argOf("--shots", "");
 const MEASURE = process.argv.includes("--measure");
+// `DESKTOP_MIN_HEIGHT` đọc thẳng từ nguồn (một nơi duy nhất): chạy trần không cờ thì khẳng định theo mốc thật đang cài, không phải gõ `--min-h 500` (nit của A ở #682)
+const SRC_MIN_H = Number(
+  /DESKTOP_MIN_HEIGHT\s*=\s*(\d+)/.exec(
+    fs.readFileSync(
+      path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../src/gfx/display.ts"),
+      "utf8",
+    ),
+  )?.[1],
+);
+if (!Number.isFinite(SRC_MIN_H)) throw new Error("Không đọc được DESKTOP_MIN_HEIGHT từ display.ts");
 const CDP_PORT = await freePort();
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-chuot-thap-"));
 const chrome = spawn(
@@ -258,7 +269,7 @@ try {
       `${r.w}x${r.h}  form=${r.form}  ${badOf(r).length === 0 ? "KHÔNG vấn đề" : badOf(r).length + " vấn đề"}`,
     );
   if (!MEASURE) {
-    const minH = Number(argOf("--min-h", "0"));
+    const minH = Number(argOf("--min-h", String(SRC_MIN_H)));
     console.log(`\n--- khẳng định (DESKTOP_MIN_HEIGHT = ${minH}) ---`);
     for (const r of results) {
       const want = r.w >= 900 && r.h >= minH ? "desktop" : "phone";
