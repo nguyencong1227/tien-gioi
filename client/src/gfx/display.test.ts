@@ -3,6 +3,8 @@ import {
   PHONE_MAX_SHORT_SIDE,
   RESIZE_DEBOUNCE_MS,
   UI_SCALE_STORAGE_KEY,
+  DESKTOP_MIN_HEIGHT,
+  DESKTOP_MIN_WIDTH,
   classifyForm,
   classifyOrient,
   clampUiScale,
@@ -92,6 +94,16 @@ describe("gfx/display: phân loại thiết bị theo khung nhìn (không theo U
     [2560, 1440, false, "desktop", "landscape"],
     // cửa sổ trình duyệt hẹp trên máy tính: cạnh ngắn < 600 là phone dù có chuột (bố cục thu gọn)
     [500, 900, false, "phone", "portrait"],
+    [767, 500, false, "phone", "landscape"],
+    // #676: chuột + THẤP mà RỘNG vẫn là máy tính (khung nhìn thật của màn 720p / laptop 1366x768 sau khi trừ thanh tab, địa chỉ)
+    [1280, 577, false, "desktop", "landscape"],
+    [1366, 625, false, "desktop", "landscape"],
+    [1280, 520, false, "desktop", "landscape"],
+    // ... nhưng thấp hơn mốc đo được (DESKTOP_MIN_HEIGHT) thì bố cục máy tính hết chỗ: phone
+    [1280, 480, false, "phone", "landscape"],
+    [1280, 400, false, "phone", "landscape"],
+    // cảm ứng thì khác: cạnh ngắn < 600 luôn là phone dù rộng
+    [1280, 577, true, "phone", "landscape"],
     // laptop cảm ứng có chuột (con trỏ chính chuột) vẫn là desktop
     [1366, 768, false, "desktop", "landscape"],
   ];
@@ -106,6 +118,23 @@ describe("gfx/display: phân loại thiết bị theo khung nhìn (không theo U
     expect(classifyForm(PHONE_MAX_SHORT_SIDE - 1, 900, true)).toBe("phone");
     expect(classifyForm(PHONE_MAX_SHORT_SIDE, 900, true)).toBe("tablet");
     expect(classifyForm(PHONE_MAX_SHORT_SIDE, 900, false)).toBe("desktop");
+  });
+
+  it("#676: ranh giới của cửa sổ CHUỘT thấp: đúng DESKTOP_MIN_WIDTH và DESKTOP_MIN_HEIGHT là máy tính, thiếu một trong hai là phone", () => {
+    expect(DESKTOP_MIN_WIDTH).toBe(900);
+    expect(DESKTOP_MIN_HEIGHT).toBe(500);
+    expect(classifyForm(DESKTOP_MIN_WIDTH, DESKTOP_MIN_HEIGHT, false)).toBe("desktop");
+    expect(classifyForm(DESKTOP_MIN_WIDTH - 1, DESKTOP_MIN_HEIGHT, false)).toBe("phone");
+    expect(classifyForm(DESKTOP_MIN_WIDTH, DESKTOP_MIN_HEIGHT - 1, false)).toBe("phone");
+    // cửa sổ hẹp dọc có cạnh DÀI >= 900 không được lọt sang máy tính (lỗ của đề xuất đầu: điều kiện theo cạnh dài; nay xét bề RỘNG)
+    expect(classifyForm(500, 1400, false)).toBe("phone");
+    expect(classifyForm(500, 900, false)).toBe("phone");
+  });
+
+  it("#676: cạnh ngắn >= 600 không đổi (không phụ thuộc DESKTOP_MIN_*)", () => {
+    expect(classifyForm(600, 600, false)).toBe("desktop");
+    expect(classifyForm(600, 600, true)).toBe("tablet");
+    expect(classifyForm(1024, 600, true)).toBe("tablet");
   });
 
   it("vuông: coi là landscape (cùng quy ước >=)", () => {
