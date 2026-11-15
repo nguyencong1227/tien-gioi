@@ -11,7 +11,7 @@ import {
   formatSummary,
   parseOverlayCounts,
 } from "./perf-gate.mjs";
-import { MIN_FX_PLAYED } from "./fx-driver.mjs";
+import { MIN_CASTS_EMITTED, MIN_CAST_PLAYED, MIN_FX_PLAYED } from "./fx-driver.mjs";
 import { formatPerfLines } from "../src/gfx/perf-overlay";
 import { OWN_OVERSHOOT as REAL_OWN_OVERSHOOT } from "../src/gfx/fx/budget";
 
@@ -260,6 +260,76 @@ describe("M5.1 #330: perf-gate (cổng ngân sách cho perf:mobile)", () => {
         "m: ngân sách của đỉnh chữ bay (fx)",
         "h: ngân sách của đỉnh hạt (fx)",
       ]);
+    });
+
+    describe("kế hoạch `*-cast` (#515): phải có bằng chứng chiêu thật chạy tới hạt", () => {
+      const okCast = (id: string, over: Record<string, unknown> = {}) =>
+        okFx(id, "low", {
+          fxPlan: "boss-cast",
+          fxPlayed: 120,
+          particlesPeak: 104,
+          emittersPeak: 8,
+          floatsPeak: 8,
+          castsEmitted: 17,
+          castPlayed: 26,
+          castRejected: 9,
+          ...over,
+        });
+
+      it("đủ tin cast đã gửi và đủ lần game phát cast-* -> xanh (ca xấu nhất bậc Thấp 104 / 120 hạt, 8 / 8 emitter đạt, trần KHÔNG nới)", () => {
+        expect(evaluatePerfResults([okCast("boss-cast-low-4x")], budget).ok).toBe(true);
+        // đúng trần cứng thì còn xanh, vượt thì đỏ (cùng trần với kịch bản thường)
+        expect(
+          evaluatePerfResults([okCast("c", { particlesPeak: 120, emittersPeak: 8 })], budget).ok,
+        ).toBe(true);
+        const ev = evaluatePerfResults([okCast("c", { particlesPeak: 121 })], budget);
+        expect(ev.violations.map((v) => v.metric)).toEqual(["đỉnh hạt (fx)"]);
+        expect(
+          evaluatePerfResults([okCast("c", { emittersPeak: 9 })], budget).violations.map(
+            (v) => v.metric,
+          ),
+        ).toEqual(["đỉnh emitter (fx)"]);
+      });
+
+      it("ĐỘT BIẾN: đường onFx hỏng (castPlayed 0 / quá ít) hoặc không gửi được tin (castsEmitted quá ít / null) -> ĐỎ, không xanh giả dù đỉnh do Kiếm khí vẫn trong trần", () => {
+        for (const over of [
+          { castPlayed: 0 },
+          { castPlayed: MIN_CAST_PLAYED - 1 },
+          { castPlayed: null },
+          { castsEmitted: 0 },
+          { castsEmitted: MIN_CASTS_EMITTED - 1 },
+          { castsEmitted: null },
+        ]) {
+          const ev = evaluatePerfResults([okCast("c", over)], budget);
+          expect(ev.ok, JSON.stringify(over)).toBe(false);
+          expect(ev.violations[0].metric).toMatch(/cast/);
+        }
+        // đúng ngưỡng thì xanh
+        expect(
+          evaluatePerfResults(
+            [okCast("c", { castPlayed: MIN_CAST_PLAYED, castsEmitted: MIN_CASTS_EMITTED })],
+            budget,
+          ).ok,
+        ).toBe(true);
+      });
+
+      it("kế hoạch KHÔNG cast không bị đòi số cast (đo cũ giữ nguyên); bản tóm tắt ghi số cast gửi / phát / bỏ của kế hoạch cast", () => {
+        expect(
+          evaluatePerfResults(
+            [okFx("burst", "low", { fxPlan: "burst", castsEmitted: null, castPlayed: null })],
+            budget,
+          ).ok,
+        ).toBe(true);
+        const md = formatSummary(
+          evaluatePerfResults(
+            [okCast("boss-cast-low-4x", { particleLimit: 60, emitterLimit: 4 })],
+            budget,
+          ),
+        );
+        expect(md).toContain(
+          "boss-cast: 120 / 8; 104/120 · 8/8 · 8/8; cast 17 gửi / 26 phát / 9 bỏ",
+        );
+      });
     });
 
     it("bản tóm tắt có cột 'Hiệu ứng bắn thật' (kế hoạch, phát / bỏ, đỉnh / trần cứng); kịch bản không bắn ghi '-'", () => {

@@ -3,14 +3,19 @@ import fs from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
 import {
+  FX_CAST_SKILLS,
   FX_DRIVER_COLORS,
   FX_DRIVER_RECIPES,
   FX_DRIVER_SOURCE,
   FX_PLANS,
+  MIN_CASTS_EMITTED,
+  MIN_CAST_PLAYED,
   MIN_FX_PLAYED,
   parseFxDriverReport,
 } from "./fx-driver.mjs";
+import { SKILL_BY_ID } from "@tien-gioi/shared";
 import { getRecipe } from "../src/gfx/fx/recipes";
+import { castRecipeId } from "../src/gfx/fx/recipes-cast";
 import { FX_COLOR } from "../src/gfx/fx/recipes-combat";
 
 // Test HỢP ĐỒNG (bài học #390): bộ bắn hiệu ứng chạy trong TRANG, nên test chạy CHÍNH `FX_DRIVER_SOURCE` trong `node:vm` với một `window.__fx` giả
@@ -26,9 +31,13 @@ interface Call {
   at: number;
 }
 
-function makePage(over: { fx?: unknown; noScene?: boolean } = {}) {
+function makePage(
+  over: { fx?: unknown; noScene?: boolean; noRoom?: boolean; deadCast?: boolean } = {},
+) {
   let nowMs = 0;
   const calls: Call[] = [];
+  /** Tin `fx` đã gửi qua `window.__scene.room.emit` (chiêu của kế hoạch `*-cast`). */
+  const emitted: Array<{ type: string; msg: any }> = [];
   const live = { particles: 0, emitters: 0, floats: 0, admitted: 0, dropped: 0 };
   const intervals: Array<{ fn: () => void; cleared: boolean }> = [];
   const fx = over.fx ?? {
@@ -70,7 +79,25 @@ function makePage(over: { fx?: unknown; noScene?: boolean } = {}) {
     __fx: fx,
     __scene: over.noScene
       ? undefined
-      : { cameras: { main: { worldView: { centerX: 500, centerY: 400 } } } },
+      : {
+          cameras: { main: { worldView: { centerX: 500, centerY: 400 } } },
+          sid: "me",
+          // giống `WorldScene.onFx` (case "cast"): của mình ưu tiên 2, của người khác ưu tiên 1, công thức `cast-<fx>` của chiêu; `deadCast` = đường onFx hỏng (nhận tin, không phát gì)
+          room: over.noRoom
+            ? undefined
+            : {
+                emit(type: string, msg: any) {
+                  emitted.push({ type, msg });
+                  if (over.deadCast || type !== "fx" || msg?.kind !== "cast") return;
+                  const def = SKILL_BY_ID[msg.skill];
+                  if (!def) return;
+                  (sandbox.__fx as any).play(castRecipeId(def.fx), msg.x, msg.y, {
+                    priority: msg.by === "me" ? 2 : 1,
+                    angle: msg.angle,
+                  });
+                },
+              },
+        },
   };
   sandbox.window = sandbox;
   const ctx = vm.createContext(sandbox);
@@ -85,7 +112,7 @@ function makePage(over: { fx?: unknown; noScene?: boolean } = {}) {
       live.floats = Math.max(0, live.floats - 1);
     }
   };
-  return { sandbox, calls, live, inject, advance };
+  return { sandbox, calls, emitted, live, inject, advance };
 }
 
 const plays = (calls: Call[], id: string) => calls.filter((c) => c.kind === "play" && c.id === id);
@@ -401,5 +428,175 @@ describe("M5.1 #400: parseFxDriverReport (hàm thuần)", () => {
       expect(parseFxDriverReport({ ...good, [k]: "3" }), `chuỗi ${k}`).toBeNull();
     }
     expect(parseFxDriverReport({ ...good, plan: undefined })).toBeNull();
+  });
+});
+
+describe("#515: kế hoạch `burst-cast` / `boss-cast` (hiệu ứng dùng chiêu của 18 chiêu qua đường onFx thật)", () => {
+  const CAST_PLANS = ["burst-cast", "boss-cast"] as const;
+
+  it("FX_CAST_SKILLS TRÙNG đúng các chiêu trong `SKILLS` của shared (thêm / bớt chiêu mà quên ở đây thì đỏ), không trùng id", () => {
+    expect([...FX_CAST_SKILLS].sort()).toEqual(Object.keys(SKILL_BY_ID).sort());
+    expect(new Set(FX_CAST_SKILLS).size).toBe(FX_CAST_SKILLS.length);
+    expect(FX_CAST_SKILLS).toHaveLength(18);
+    // sáu chiêu Nguyên Anh đợt 2 (#722) nằm trong danh sách
+    for (const id of [
+      "han_quang_tien",
+      "bach_kim_trao",
+      "van_thach_tran",
+      "bang_hoa_loan",
+      "liet_hoa_kiem",
+      "van_hanh_bo",
+    ])
+      expect(FX_CAST_SKILLS, id).toContain(id);
+  });
+
+  it("hai kế hoạch cast giữ NHỊP của `burst` / `boss` (ca xấu nhất) và thêm `castMs` 300; kế hoạch cũ KHÔNG có `castMs` (đo cũ giữ nguyên)", () => {
+    const base = (p: any) => ({ ...p, castMs: undefined });
+    expect(base(FX_PLANS["burst-cast"])).toEqual({ ...FX_PLANS.burst, castMs: undefined });
+    expect(base(FX_PLANS["boss-cast"])).toEqual({ ...FX_PLANS.boss, castMs: undefined });
+    for (const p of CAST_PLANS) expect((FX_PLANS as any)[p].castMs).toBe(300);
+    for (const p of ["combat", "burst", "boss"])
+      expect((FX_PLANS as any)[p].castMs, p).toBeUndefined();
+  });
+
+  it("start: kế hoạch cast cần window.__scene.room.emit (không có -> báo lỗi rõ); kế hoạch thường vẫn chạy khi không có phòng", () => {
+    for (const noRoom of [true, false]) {
+      const page = makePage({ noRoom });
+      page.inject();
+      const r = page.sandbox.__tgFxDriver.start("boss-cast");
+      if (noRoom)
+        expect(r).toMatchObject({ ok: false, error: expect.stringContaining("room.emit") });
+      else expect(r).toEqual({ ok: true });
+    }
+    const page = makePage({ noScene: true });
+    page.inject();
+    expect(page.sandbox.__tgFxDriver.start("boss-cast")).toMatchObject({ ok: false });
+    expect(page.sandbox.__tgFxDriver.start("combat")).toMatchObject({ ok: true });
+  });
+
+  it("cứ 300 ms gửi MỘT tin `fx {kind: cast}` qua room.emit, chiêu xoay vòng đúng thứ tự FX_CAST_SKILLS, quanh tâm khung nhìn, hai trong ba lần là của mình", () => {
+    for (const plan of CAST_PLANS) {
+      const page = makePage();
+      page.inject();
+      page.sandbox.__tgFxDriver.start(plan);
+      page.advance(6000);
+      const casts = page.emitted.filter((e) => e.type === "fx" && e.msg.kind === "cast");
+      expect(casts.length, plan).toBeGreaterThanOrEqual(19);
+      expect(casts.length, plan).toBeLessThanOrEqual(21);
+      casts.forEach((e, k) => {
+        expect(e.msg.skill).toBe(FX_CAST_SKILLS[k % FX_CAST_SKILLS.length]);
+        expect(e.msg.by).toBe(k % 3 === 2 ? "perf-bot" : "me");
+        expect([e.msg.x, e.msg.y]).toEqual([500, 400]);
+        expect(e.msg.range).toBe(150);
+        expect(Number.isFinite(e.msg.angle)).toBe(true);
+      });
+      // đủ cả 18 chiêu sau 18 lần
+      expect(new Set(casts.slice(0, 18).map((e) => e.msg.skill)).size).toBe(18);
+    }
+  });
+
+  it("chiêu tới `FxSystem.play` bằng công thức `cast-<fx>` của chính chiêu đó (đường onFx), ưu tiên 2 của mình / 1 của đồng đội", () => {
+    const page = makePage();
+    page.inject();
+    page.sandbox.__tgFxDriver.start("burst-cast");
+    page.advance(6000);
+    const castPlays = page.calls.filter((c) => c.kind === "play" && c.id!.startsWith("cast-"));
+    expect(castPlays.length).toBeGreaterThanOrEqual(19);
+    const casts = page.emitted.map((e) => e.msg);
+    castPlays.forEach((c, k) => {
+      expect(c.id).toBe(castRecipeId(SKILL_BY_ID[casts[k].skill].fx));
+      expect(c.opts.priority).toBe(casts[k].by === "me" ? 2 : 1);
+    });
+  });
+
+  it("chạy lại cùng hạt giống cho CÙNG chuỗi tin cast và hiệu ứng (tất định)", () => {
+    const run = () => {
+      const p = makePage();
+      p.inject();
+      p.sandbox.__tgFxDriver.start("boss-cast");
+      p.advance(4000);
+      return JSON.stringify([p.calls, p.emitted]);
+    };
+    expect(run()).toBe(run());
+  });
+
+  it("báo cáo stop() có số tin cast đã gửi và số lần game phát / từ chối công thức cast-*; parse đọc đúng, kế hoạch không cast thì không có ba trường đó", () => {
+    const page = makePage();
+    page.inject();
+    page.sandbox.__tgFxDriver.start("boss-cast");
+    page.advance(5000);
+    const report = page.sandbox.__tgFxDriver.stop();
+    const castPlays = page.calls.filter((c) => c.kind === "play" && c.id!.startsWith("cast-"));
+    expect(report.casts).toBe(page.emitted.length);
+    expect(report.castPlayed).toBe(castPlays.length);
+    expect(report.castRejected).toBe(0);
+    expect(report.casts).toBeGreaterThanOrEqual(MIN_CASTS_EMITTED);
+    expect(report.castPlayed).toBeGreaterThanOrEqual(MIN_CAST_PLAYED);
+    expect(parseFxDriverReport(JSON.stringify(report))).toMatchObject({
+      fxPlan: "boss-cast",
+      castsEmitted: report.casts,
+      castPlayed: report.castPlayed,
+      castRejected: 0,
+    });
+    // kế hoạch không cast: báo cáo KHÔNG có ba trường cast (hình dạng cũ giữ nguyên, không mặc định 0)
+    const p2 = makePage();
+    p2.inject();
+    p2.sandbox.__tgFxDriver.start("boss");
+    p2.advance(1500);
+    const old = parseFxDriverReport(JSON.stringify(p2.sandbox.__tgFxDriver.stop()))!;
+    expect(old.fxPlan).toBe("boss");
+    for (const k of ["castsEmitted", "castPlayed", "castRejected"])
+      expect(old).not.toHaveProperty(k);
+    // có trường cast thì phải là số đếm
+    expect(parseFxDriverReport({ ...report, castPlayed: "x" })).toBeNull();
+    expect(parseFxDriverReport({ ...report, casts: -1 })).toBeNull();
+  });
+
+  it("ĐỘT BIẾN: đường onFx hỏng (phòng nhận tin nhưng không phát hiệu ứng) -> castPlayed = 0 dù tin vẫn gửi (để gate đỏ, không xanh giả)", () => {
+    const page = makePage({ deadCast: true });
+    page.inject();
+    page.sandbox.__tgFxDriver.start("burst-cast");
+    page.advance(5000);
+    const report = page.sandbox.__tgFxDriver.stop();
+    expect(report.casts).toBeGreaterThanOrEqual(MIN_CASTS_EMITTED);
+    expect(report.castPlayed).toBe(0);
+  });
+
+  it("bộ đếm bọc `fx.play` chỉ đếm công thức cast-* (không đếm hiệu ứng của chính bộ bắn) và stop() trả `fx.play` về nguyên bản", () => {
+    const page = makePage();
+    const fx = page.sandbox.__fx;
+    const original = fx.play;
+    page.inject();
+    page.sandbox.__tgFxDriver.start("burst-cast");
+    expect(fx.play).not.toBe(original);
+    page.advance(2000);
+    const report = page.sandbox.__tgFxDriver.stop();
+    expect(fx.play).toBe(original);
+    expect(report.played).toBeGreaterThan(report.castPlayed); // hiệu ứng của chính bộ bắn nhiều hơn và KHÔNG tính vào castPlayed
+    // kế hoạch thường không bọc
+    const p2 = makePage();
+    const orig2 = p2.sandbox.__fx.play;
+    p2.inject();
+    p2.sandbox.__tgFxDriver.start("burst");
+    expect(p2.sandbox.__fx.play).toBe(orig2);
+  });
+
+  it("stop() huỷ vòng lặp cast: không gửi thêm tin sau khi dừng", () => {
+    const page = makePage();
+    page.inject();
+    page.sandbox.__tgFxDriver.start("boss-cast");
+    page.advance(1000);
+    page.sandbox.__tgFxDriver.stop();
+    const n = page.emitted.length;
+    page.advance(2000);
+    expect(page.emitted.length).toBe(n);
+  });
+
+  it("harness có kịch bản cast ở bậc Thấp (burst và trùm: trần chặt nhất) và bậc Cao (trùm), CPU 4x, dùng đúng hai kế hoạch cast", () => {
+    const src = fs.readFileSync(path.join(__dirname, "measure-mobile-perf.mjs"), "utf8");
+    for (const id of ["burst-cast-low-4x", "boss-cast-low-4x", "boss-cast-high-4x"])
+      expect(src, id).toContain(`id: "${id}"`);
+    const used = new Set([...src.matchAll(/^\s*fx:\s*"([^"]+)"/gm)].map((m) => m[1]));
+    for (const p of CAST_PLANS) expect(used, p).toContain(p);
   });
 });
