@@ -239,12 +239,13 @@ export function checkClientDist(rootDir: string): {
   };
 }
 
-/** Trích xuất 3-5 dòng cuối của chuỗi log */
-export function extractLastLines(logContent: string, count = 5): string[] {
+/** Trích xuất ~15 dòng cuối của chuỗi log, lọc bỏ các dòng boilerplate của npm error */
+export function extractLastLines(logContent: string, count = 15): string[] {
   const lines = logContent
     .split(/\r?\n/)
     .map((l) => l.trim())
-    .filter((l) => l.length > 0);
+    .filter((l) => l.length > 0)
+    .filter((l) => !l.startsWith("npm error") && !l.startsWith("npm ERR!"));
   if (lines.length <= count) return lines;
   return lines.slice(-count);
 }
@@ -679,7 +680,7 @@ export async function runE2eAll(args: string[] = process.argv.slice(2)): Promise
         });
       } else {
         out(`❌ ĐỎ (${run2.durationSec.toFixed(1)}s)`);
-        const lastLines = extractLastLines(run2.log, 5);
+        const lastLines = extractLastLines(run2.log, 15);
         results.push({
           script,
           status: "ĐỎ",
@@ -692,7 +693,7 @@ export async function runE2eAll(args: string[] = process.argv.slice(2)): Promise
       }
     } else {
       out(`❌ ĐỎ (${run1.durationSec.toFixed(1)}s)`);
-      const lastLines = extractLastLines(run1.log, 5);
+      const lastLines = extractLastLines(run1.log, 15);
       results.push({
         script,
         status: "ĐỎ",

@@ -203,6 +203,24 @@ describe("e2e:all - Bộ chạy toàn diện E2E (M7.16, Issue #694)", () => {
       const text = "Lỗi A\nLỗi B";
       expect(extractLastLines(text, 5)).toEqual(["Lỗi A", "Lỗi B"]);
     });
+
+    it("lọc bỏ các dòng boilerplate của npm error và trích xuất tối đa count dòng thực tế", () => {
+      const text = `
+        Dòng log thực tế 1
+        Dòng log thực tế 2
+        Error: Thất bại ở bước xác thực
+            at Object.run (/server/scripts/test.ts:42)
+        npm error Lifecycle script test failed
+        npm error code 1
+        npm error path /home/runner/work/tien-gioi
+        npm error command failed
+      `;
+      const lines = extractLastLines(text, 15);
+      expect(lines).not.toContain("npm error Lifecycle script test failed");
+      expect(lines).toContain("Error: Thất bại ở bước xác thực");
+      expect(lines).toContain("Dòng log thực tế 1");
+      expect(lines.every((l) => !l.startsWith("npm error"))).toBe(true);
+    });
   });
 
   describe("formatResultTable & formatFailureDetails", () => {
