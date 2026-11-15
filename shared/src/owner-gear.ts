@@ -39,6 +39,20 @@ export const OWNER_GEAR_ITEMS: ItemDef[] = [
     reqRealm: 3,
     reqTier: 2,
   }),
+  // Bộ IV (Nguyên Anh sơ kỳ, M7.5c; độ hiếm 4 vì thang độ hiếm không giảm theo bậc): tốc độ / giáp tăng đều theo bậc (8, 12, 16, 20 -> 24; 2, 3, 4, 5 -> 6)
+  equip(
+    "tuyet_hanh_ngoa",
+    "Tuyết Hành Ngoa",
+    4,
+    "Hài lót lông tuyết, đạp băng như đi trên đất bằng.",
+    0x9cc0dc,
+    {
+      slot: "boots",
+      stats: { speed: 24, guard: 6 },
+      reqRealm: 4,
+      reqTier: 0,
+    },
+  ),
   // ---------- Ngọc bội: khí huyết + linh lực (Kim Đan trở lên thêm giảm hồi chiêu) ----------
   equip("tho_nguyet_boi", "Thố Nguyệt Bội", 1, "Ngọc bội trắng như trăng thố.", 0xd8d4c4, {
     slot: "jade",
@@ -69,6 +83,20 @@ export const OWNER_GEAR_ITEMS: ItemDef[] = [
       stats: { hp: 280, mp: 90, cdr: 5 },
       reqRealm: 3,
       reqTier: 2,
+    },
+  ),
+  // Bộ IV (Nguyên Anh sơ kỳ, M7.5c): hp / mp / giảm hồi chiêu tăng đều theo bậc (180, 280 -> 400; 60, 90 -> 125; 3, 5 -> 6)
+  equip(
+    "han_tinh_boi",
+    "Hàn Tinh Bội",
+    4,
+    "Ngọc bội kết từ sao lạnh, linh khí chảy đều như dòng băng.",
+    0x8fc0e8,
+    {
+      slot: "jade",
+      stats: { hp: 400, mp: 125, cdr: 6 },
+      reqRealm: 4,
+      reqTier: 0,
     },
   ),
   // ---------- Pháp bảo (mở từ Kim Đan): nội tại ở `TREASURES`, chỉ số nền nhỏ ----------
@@ -133,6 +161,8 @@ export const OWNER_GEAR_VALUE: Record<string, number> = {
   suong_linh_boi: 1800,
   giao_anh_ngoa: 9000,
   giao_chau_boi: 9000,
+  tuyet_hanh_ngoa: 12000, // bộ IV (M7.5c): thần phẩm, cao hơn bộ III (10000); luôn thấp hơn phí rèn
+  han_tinh_boi: 12000,
   ho_than_an: 2000,
   hap_linh_chau: 2000,
   xich_diem_an: 4500,

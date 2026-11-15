@@ -322,6 +322,7 @@ export const MONSTERS: MonsterKind[] = [
     behavior: "poisoner",
     boltSpeed: 240,
     boltRange: 280,
+    boltElement: "am", // đạn độc màu tím như Độc Thiềm: "tím = độc" nhất quán (đề xuất của B ở #622; `element` mộc của quái vẫn quyết định khắc / bị khắc)
   },
   // Trùm Nguyên Anh: bãi của đội 3-4 người (như Hắc Giao); lao thẳng (đập đất + vòng lạnh thêm ở bước hành vi kế)
   {
