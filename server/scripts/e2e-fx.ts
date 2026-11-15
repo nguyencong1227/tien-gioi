@@ -113,6 +113,7 @@ async function main() {
       await T.waitFor(
         `!document.getElementById('ui')?.hidden && !!window.__scene?.room && !!document.getElementById('hud-name')?.textContent && (window.__scene?.predX > 0 || window.__scene?.hasMe)`,
         "vào game thành công và nhân vật có toạ độ",
+        45000, // bước dựng, không phải khẳng định: máy / runner bị bóp CPU vào game chậm (WebGL phần mềm ~6 FPS)
       );
     };
     const setQuality = (v: string) =>
@@ -179,53 +180,66 @@ async function main() {
         return ![g.u0, g.v0, g.u1, g.v1].every((v) => Number.isFinite(v) && v >= 0 && v <= 1) || g.u1 < g.u0 || g.v1 < g.v0; });
       return { total: Object.keys(chars).length, bad: bad.length }; })()`)) as any;
     must(uv.bad === 0, `mọi glyph có UV hợp lệ trong [0,1] (${uv.total} glyph, hỏng ${uv.bad})`);
-    // Và chữ bay THẬT SỰ ĐƯỢC VẼ: chữ tím (nền cỏ không có màu tím) chụp từ canvas WebGL phải có nhiều điểm ảnh tím
+    // Và chữ bay THẬT SỰ ĐƯỢC VẼ: chữ tím (nền cỏ không có màu tím) chụp từ canvas WebGL phải có nhiều điểm ảnh tím.
+    // ĐO THEO KHUNG, KHÔNG THEO ĐỒNG HỒ: chữ bay sống FLOAT_MS = 800 ms theo `scene.time.now` và mờ rất nhanh (alpha = (1 - p)^3, ~0,4 sau
+    // 200 ms) nên đo bằng `setTimeout` rồi chờ khung kế tiếp chỉ đúng khi khung nhanh. Trên runner CI (WebGL phần mềm, ~6 FPS; cục bộ tái hiện
+    // bằng `taskset -c 0`) khung đầu tiên sau lúc sinh chữ đến sau hàng trăm ms, chữ đã mờ dưới ngưỡng màu: 0 điểm ảnh dù chữ vẫn được vẽ.
+    // Cách đúng: sinh chữ và xin chụp CÙNG MỘT khung (trong sự kiện `update` của cảnh, sau khi đồng hồ đã cập nhật): chữ có tiến độ 0 (đậm
+    // nhất) ở đúng khung được vẽ rồi chụp, FPS bao nhiêu cũng vậy. Mỗi lần thử dùng một khung mới; tối đa 8 khung.
     const paintResult = (await T.ev(`new Promise((resolve) => {
       const s = window.__scene, cam = s.cameras.main;
-      cam.centerOn(s.predX, s.predY);
-      s.fx.floatNumber('88', s.predX, s.predY - 40, { color: 0xff00ff, size: 48, priority: 2 });
       const r = s.game.canvas.getBoundingClientRect();
       const w = Math.round(r.width), h = Math.round(r.height);
-      // Màu tím nhạt hơn một chút (g < 130): ánh sáng môi trường + sương (#357, #362) phủ nhẹ lên chữ nên g của 0xff00ff tăng tới ~70-90.
-      // Thăm dò tối đa 3 s (máy dùng chung có thể quá tải, khung chậm: chờ cố định 60 ms làm ca kiểm chập chờn); lấy số LỚN NHẤT thấy được
-      let best = 0, tries = 0, lastNonBlack = 0, lastTotal = 0;
-      const grab = () => s.game.renderer.snapshotArea(0, 0, w, h, (img) => {
-        const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
-        const x = c.getContext('2d'); x.drawImage(img, 0, 0);
-        const d = x.getImageData(0, 0, c.width, c.height).data;
-        let n = 0, nonBlack = 0;
-        for (let i = 0; i < d.length; i += 4) {
-          if (d[i] > 180 && d[i + 2] > 180 && d[i + 1] < 130) n++;
-          if (d[i] > 0 || d[i + 1] > 0 || d[i + 2] > 0) nonBlack++;
-        }
-        if (n > best) best = n;
-        lastNonBlack = nonBlack;
-        lastTotal = c.width * c.height;
-        if (best > 150 || ++tries >= 25) {
-          const renType = s.game.renderer.type === 2 ? 'WEBGL' : (s.game.renderer.type === 1 ? 'CANVAS' : String(s.game.renderer.type));
-          const gl = s.game.renderer.gl;
-          const isContextLost = gl && typeof gl.isContextLost === 'function' ? gl.isContextLost() : null;
-          resolve({
-            best,
-            tries,
-            rendererType: renType,
-            actualFps: Math.round(s.game.loop.actualFps * 10) / 10,
-            visibilityState: document.visibilityState,
-            nonBlackPx: lastNonBlack,
-            totalPx: lastTotal,
-            glContextLost: isContextLost,
-            canvasW: s.game.canvas ? s.game.canvas.width : 0,
-            canvasH: s.game.canvas ? s.game.canvas.height : 0,
-            rectW: w,
-            rectH: h,
-            predX: s.predX,
-            predY: s.predY,
-          });
-        } else {
-          setTimeout(grab, 120);
-        }
+      let best = 0, tries = 0, lastNonBlack = 0, lastTotal = 0, alphaAtSnap = null, done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        const renType = s.game.renderer.type === 2 ? 'WEBGL' : (s.game.renderer.type === 1 ? 'CANVAS' : String(s.game.renderer.type));
+        const gl = s.game.renderer.gl;
+        const isContextLost = gl && typeof gl.isContextLost === 'function' ? gl.isContextLost() : null;
+        resolve({
+          best,
+          tries,
+          rendererType: renType,
+          actualFps: Math.round(s.game.loop.actualFps * 10) / 10,
+          visibilityState: document.visibilityState,
+          nonBlackPx: lastNonBlack,
+          totalPx: lastTotal,
+          glContextLost: isContextLost,
+          canvasW: s.game.canvas ? s.game.canvas.width : 0,
+          canvasH: s.game.canvas ? s.game.canvas.height : 0,
+          rectW: w,
+          rectH: h,
+          predX: s.predX,
+          predY: s.predY,
+          alphaAtSnap,
+        });
+      };
+      // Chốt an toàn: khung không bao giờ chạy (tab ẩn, vòng lặp dừng) thì báo thất bại thay vì treo cả E2E
+      setTimeout(finish, 20000);
+      const attempt = () => s.events.once('update', () => {
+        cam.centerOn(s.predX, s.predY);
+        s.fx.floatNumber('88', s.predX, s.predY - 40, { color: 0xff00ff, size: 48, priority: 2 });
+        s.game.renderer.snapshotArea(0, 0, w, h, (img) => {
+          const bm = (s.children?.list ?? []).filter((c) => c.type === 'BitmapText' && c.visible);
+          alphaAtSnap = bm.length ? Math.round(bm[bm.length - 1].alpha * 100) / 100 : null;
+          const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+          const x = c.getContext('2d'); x.drawImage(img, 0, 0);
+          const d = x.getImageData(0, 0, c.width, c.height).data;
+          let n = 0, nonBlack = 0;
+          // Màu tím nhạt hơn một chút (g < 130): ánh sáng môi trường + sương (#357, #362) phủ nhẹ lên chữ nên g của 0xff00ff tăng tới ~70-90
+          for (let i = 0; i < d.length; i += 4) {
+            if (d[i] > 180 && d[i + 2] > 180 && d[i + 1] < 130) n++;
+            if (d[i] > 0 || d[i + 1] > 0 || d[i + 2] > 0) nonBlack++;
+          }
+          if (n > best) best = n;
+          lastNonBlack = nonBlack;
+          lastTotal = c.width * c.height;
+          if (best > 150 || ++tries >= 8) finish();
+          else attempt();
+        });
       });
-      setTimeout(grab, 60);
+      attempt();
     })`)) as any;
 
     const painted = Number(paintResult?.best ?? 0);
@@ -240,7 +254,9 @@ async function main() {
         `    kích thước canvas: ${paintResult?.canvasW}x${paintResult?.canvasH} (CSS: ${paintResult?.rectW}x${paintResult?.rectH})`,
       );
       out(`    toạ độ nhân vật: (${paintResult?.predX}, ${paintResult?.predY})`);
-      out(`    số lần thử: ${paintResult?.tries}`);
+      out(
+        `    số khung đã thử: ${paintResult?.tries}; độ đậm (alpha) của chữ ở khung chụp cuối: ${paintResult?.alphaAtSnap}`,
+      );
       const shotPath = await T.shot("fx-failure");
       if (shotPath) out(`    đã lưu ảnh chụp: ${shotPath}`);
     }
@@ -250,20 +266,29 @@ async function main() {
 
     // ---------------- Ca 2: ngân sách hạt theo bậc ----------------
     out("\n--- Ca 2: số hạt sống THẬT không vượt ngân sách (Cao: 520 hạt / 24 emitter) ---");
-    const okN = await burst(60, "{}");
+    // MỘT lần đánh giá cho cả hai đợt: ngân sách tính theo `scene.time.now` (chỉ nhích mỗi KHUNG), nên trong một tác vụ JS nó đứng yên.
+    // Tách thành nhiều lần gọi CDP thì trên máy / runner chậm (~6 FPS) giữa hai đợt có khung chạy, hiệu ứng đợt đầu (<= 320 ms) hết hạn và
+    // ngân sách được trả lại: đợt hai nhận 40 thay vì 24 (lỗi của phép đo, không phải của lõi).
+    const two = (await fx(`(() => {
+      const play = (n, opts) => { let ok = 0; for (let i = 0; i < n; i++) if (fx.play('hit-spark', window.__scene.predX, window.__scene.predY, opts)) ok++; return ok; };
+      const alive = () => window.__scene.children.list.filter((c) => c.type === 'ParticleEmitter').reduce((n, e) => n + e.getAliveParticleCount(), 0);
+      const okN = play(60, {}); const alive1 = alive();
+      const okMine = play(40, { priority: 2 }); const alive2 = alive();
+      return { okN, alive1, okMine, alive2 };
+    })()`)) as { okN: number; alive1: number; okMine: number; alive2: number };
     must(
-      okN === 24,
-      `Cao: 60 lần phát cùng lúc ưu tiên 1 -> chỉ 24 được nhận (trần emitter), nhận ${okN}`,
+      two.okN === 24,
+      `Cao: 60 lần phát cùng lúc ưu tiên 1 -> chỉ 24 được nhận (trần emitter), nhận ${two.okN}`,
     );
-    const alive1 = await aliveParticles();
-    must(alive1 > 0 && alive1 <= 520, `hạt sống thật > 0 và <= 520: ${alive1}`);
-    ok(`24/60 hiệu ứng được nhận, hạt sống thật ${alive1} <= 520`);
+    must(two.alive1 > 0 && two.alive1 <= 520, `hạt sống thật > 0 và <= 520: ${two.alive1}`);
+    ok(`24/60 hiệu ứng được nhận, hạt sống thật ${two.alive1} <= 520`);
     // ưu tiên 2 vượt trần tới gấp đôi
-    const okMine = await burst(40, "{ priority: 2 }");
-    must(okMine === 24, `ưu tiên 2: vượt trần tới 48 emitter -> nhận thêm 24, nhận ${okMine}`);
+    must(
+      two.okMine === 24,
+      `ưu tiên 2: vượt trần tới 48 emitter -> nhận thêm 24, nhận ${two.okMine}`,
+    );
     ok("ưu tiên 2 (của mình) vượt được trần tới gấp đôi (48 emitter), phần vượt gấp đôi bị bỏ");
-    const alive2 = await aliveParticles();
-    must(alive2 <= 520 * 2, `hạt sống thật <= gấp đôi trần: ${alive2}`);
+    must(two.alive2 <= 520 * 2, `hạt sống thật <= gấp đôi trần: ${two.alive2}`);
     // ưu tiên 0: tối đa 60 % trần
     // Hạt hết thời gian sống (<= 320 ms theo đồng hồ Phaser): thăm dò tới 15 s thay vì chờ cố định (máy quá tải thì khung chậm)
     await T.waitFor(
@@ -295,10 +320,14 @@ async function main() {
     out("\n--- Ca 4: giảm chuyển động giảm hạt 70 % ---");
     await setCheck("set-reduced-motion", true);
     await sleep(300);
-    const before = await aliveParticles();
-    must((await burst(1, "{}")) === 1, "phát được một hiệu ứng khi giảm chuyển động");
-    await sleep(60);
-    const added = (await aliveParticles()) - before;
+    // Cùng một lần đánh giá (cùng một khung): hạt của đợt trước hết hạn giữa `before` và `after` làm `added` sai (âm) khi khung chậm
+    const red = (await fx(`(() => {
+      const alive = () => window.__scene.children.list.filter((c) => c.type === 'ParticleEmitter').reduce((n, e) => n + e.getAliveParticleCount(), 0);
+      const before = alive(); const played = fx.play('hit-spark', window.__scene.predX, window.__scene.predY, {});
+      return { played, added: alive() - before };
+    })()`)) as { played: boolean; added: number };
+    must(red.played === true, "phát được một hiệu ứng khi giảm chuyển động");
+    const added = red.added;
     must(
       added === Math.round(8 * 0.3),
       `giảm chuyển động: 8 hạt -> ${Math.round(8 * 0.3)} hạt, thấy ${added}`,
