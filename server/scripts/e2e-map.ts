@@ -354,6 +354,9 @@ async function main() {
       T.waitFor(
         `window.__fx.stats().liveEmitters === 0 && window.__scene.children.list.filter((c) => c.type === 'ParticleEmitter').reduce((n, e) => n + e.getAliveParticleCount(), 0) === 0`,
         "hạt thời tiết hết",
+        // Bước chờ, không phải khẳng định: Phaser tính tuổi hạt bằng delta chặn trần (minFps 5), nên khi FPS < 5 (runner CI, `taskset -c 0`) hạt già đi
+        // chậm hơn đồng hồ và cần hơn 15 s mặc định để hết (A đo ở review #712: 15 s hết giờ ở đầu Ca 6)
+        40000,
       );
     // Mặc định ở ?debug: thời tiết TẮT để các script đo khác có cảnh sạch
     must(

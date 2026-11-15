@@ -177,7 +177,10 @@ async function main() {
         let i = 1; window.__walkLen = path.length;
         window.__walkTimer = setInterval(() => { if (Math.hypot(s.predX - p.x, s.predY - p.y) < 30 || i >= path.length) { J.x = 0; J.y = 0; J.active = false; clearInterval(window.__walkTimer); return; }
           const [tx, ty] = path[i], dx = tx - s.predX, dy = ty - s.predY, d = Math.hypot(dx, dy);
-          if (d < 8) { i++; return; } J.x = dx / d; J.y = dy / d; J.active = true; }, 40); return 1; })()`);
+          // Waypoint ĐÃ QUA khi hình chiếu của nhân vật dọc đoạn đường tới nó vượt 1 (hoặc tới sát 8 px): khung chậm (~4-6 FPS, runner CI) nhảy
+          // 27-45 px mỗi khung nên bán kính 8 px không bao giờ trúng, nhân vật quay quanh waypoint tới hết hạn chờ (đo: 90 s ở am_suong_nam khi ghim một nhân)
+          const [bx, by] = path[i - 1], sx = tx - bx, sy = ty - by, along = ((s.predX - bx) * sx + (s.predY - by) * sy) / (sx * sx + sy * sy || 1);
+          if (d < 8 || along >= 1) { i++; return; } J.x = dx / d; J.y = dy / d; J.active = true; }, 40); return 1; })()`);
       must(
         !(await ev(`window.__walkErr`)),
         `có đường đi bộ tới cổng ${id} (${await ev(`window.__walkErr`)})`,
@@ -225,34 +228,20 @@ async function main() {
 
     // Qua cổng `id`: màn chuyển cảnh hiện, bản đồ đích đúng, màn chuyển cảnh ẩn lại (trả về các mẫu bán kính mống mắt)
     const crossPortal = async (id: string, destMapId: string) => {
-      // Cài đặt bộ lấy mẫu mống mắt TRONG TRANG bằng MutationObserver + requestAnimationFrame
-      // Bắt đầu lấy mẫu NGAY KHI transition-overlay nhận class 'active', không chờ CDP IPC thăm dò làm trôi mất 400ms
-      await ev(`(() => {
-        window.__irisSamples = [];
-        const overlay = document.getElementById('transition-overlay');
-        let sampling = false;
-        function sample() {
-          if (!sampling) return;
-          const r = parseFloat(getComputedStyle(overlay).getPropertyValue('--iris-r')) || 0;
-          window.__irisSamples.push(r);
-          if (window.__irisSamples.length < 60 && overlay.classList.contains('active')) {
-            requestAnimationFrame(sample);
-          }
-        }
-        const mo = new MutationObserver(() => {
-          if (overlay.classList.contains('active') && !sampling) {
-            sampling = true;
-            sample();
-          }
-        });
-        mo.observe(overlay, { attributes: true, attributeFilter: ['class'] });
-        // Nếu đã active từ trước thì lấy mẫu luôn
-        if (overlay.classList.contains('active')) {
-          sampling = true;
-          sample();
-        }
-        return 1;
-      })()`);
+      // Ghi mống mắt TRONG TRANG: sự kiện `transitionrun` / `transitionend` của biến --iris-r (transition CSS 0,4 s, thuộc tính đã đăng ký bằng @property)
+      // cộng mẫu mỗi khung vẽ (chỉ để báo cáo). KHÔNG đòi "có mẫu ở giữa": khi một khung đứng > 400 ms (máy tải, runner ~4-6 FPS) giá trị nhảy
+      // thẳng từ đầy sang 0 giữa hai khung dù transition vẫn chạy đúng 0,4 s (đo: [1920, 1920, 1920, 0, 0, 0] khi ghim một nhân CPU)
+      await ev(`(() => { const o = document.getElementById('transition-overlay');
+        if (window.__irisRec) { o.removeEventListener('transitionrun', window.__irisRec); o.removeEventListener('transitionend', window.__irisRec); }
+        if (window.__irisOff) window.__irisOff();
+        const R = (window.__iris = { runs: [], ends: [], frames: [] }); let on = true; window.__irisOff = () => { on = false; };
+        window.__irisRec = (e) => { if (e.propertyName !== '--iris-r') return;
+          // Lúc transition BẮT ĐẦU chạy: đọc thời lượng cấu hình (ms) từ Web Animations (A đo ra 400 ở mọi lần qua cổng)
+          const dur = e.type === 'transitionrun' ? ((o.getAnimations().find((a) => a.transitionProperty === '--iris-r') || {}).effect || { getTiming: () => ({}) }).getTiming().duration : undefined;
+          (e.type === 'transitionrun' ? R.runs : R.ends).push({ t: performance.now(), el: e.elapsedTime, dur }); };
+        o.addEventListener('transitionrun', window.__irisRec); o.addEventListener('transitionend', window.__irisRec);
+        const tick = () => { if (!on) return; if (o.classList.contains('active')) R.frames.push(parseFloat(getComputedStyle(o).getPropertyValue('--iris-r')) || 0); requestAnimationFrame(tick); };
+        requestAnimationFrame(tick); return 1; })()`);
 
       await ev(`window.__scene.travelPortal(${JSON.stringify(id)}); 1`);
       await T.waitFor(
@@ -262,19 +251,28 @@ async function main() {
       );
       ok(`màn chuyển cảnh hiện ngay khi qua cổng ${id}`);
 
-      // Chờ màn chuyển cảnh thu thập mẫu mống mắt trong trang
+      // Mống mắt phải CHUYỂN ĐỘNG thật: một transition CSS của --iris-r có thời lượng ~0,4 s BẮT ĐẦU chạy (không phải nhảy thẳng). KHÔNG đòi nó chạy
+      // hết: khi khung đứng (máy tải, runner ~4-6 FPS) transition đóng bị đảo chiều giữa chừng bởi lần mở lại, và `transitionend` đầu tiên là của
+      // transition NGƯỢC đã bị rút ngắn (đo: "kéo dài 0,228 s" khi ghim một nhân CPU)
       await T.waitFor(
-        `(window.__irisSamples || []).some(r => r > 20 && r < 1500) || (window.__irisSamples || []).length >= 6`,
-        "mống mắt khép dần",
-        4000,
+        `window.__iris.runs.length >= 1`,
+        "mống mắt khép: transition của --iris-r phải chạy (mống mắt nhảy thẳng, không có transition?)",
+        15000,
       );
-      const radii = ((await ev(`window.__irisSamples || []`)) as number[]) || [];
-      const mid = radii.filter((r) => r > 20 && r < 1500).length;
+      const iris = (await ev(`window.__iris`)) as {
+        runs: Array<{ t: number; el: number; dur?: number }>;
+        ends: Array<{ t: number; el: number }>;
+        frames: number[];
+      };
+      const mid = iris.frames.filter((r) => r > 20 && r < 1500).length;
+      const longest = Math.max(0, ...iris.runs.map((r) => r.dur ?? 0));
       must(
-        mid >= 1,
-        `mống mắt THẬT SỰ chuyển động: ${mid} mẫu ở giữa (0, đầy) trong ${radii.length} mẫu [${radii.map((r) => r.toFixed(0)).join(", ")}]`,
+        longest >= 350,
+        `mống mắt THẬT SỰ chuyển động: ${iris.runs.length} transition chạy, thời lượng dài nhất ${longest} ms (cần >= 350 ms; ${mid} mẫu ở giữa trong ${iris.frames.length} khung vẽ)`,
       );
-      ok(`mống mắt khép dần: ${radii.map((r) => r.toFixed(0)).join(" -> ")} px`);
+      ok(
+        `mống mắt khép dần: transition --iris-r ${longest} ms, ${mid} mẫu ở giữa trong ${iris.frames.length} khung vẽ`,
+      );
       await T.waitFor(
         `window.__scene && window.__scene.map && window.__scene.map.def.id === ${JSON.stringify(destMapId)}`,
         `sang bản đồ ${destMapId}`,
