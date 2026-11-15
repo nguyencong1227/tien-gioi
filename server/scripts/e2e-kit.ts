@@ -7,7 +7,12 @@ import path from "node:path";
 import WebSocket from "ws";
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-export const SHOTS = process.env.E2E_SHOTS
+/** Thư mục ảnh chụp THƯỜNG LỆ (`E2E_SHOTS`): chỉ bật khi dev xin. KHÔNG bật theo `E2E_LOG_DIR`: `Page.captureScreenshot` rất chậm khi máy / runner bị
+ *  bóp CPU (WebGL phần mềm), mà nhiều ca chụp đúng lúc một lớp phủ có hẹn giờ đang hiện (vd `e2e-bi-canh-nga` ảnh "1-gục"): bật theo log làm
+ *  lớp phủ biến mất trước khi ca kiểm đọc nó (#694, hồi quy của #704). */
+export const SHOTS = process.env.E2E_SHOTS ? path.resolve(process.env.E2E_SHOTS) : undefined;
+/** Thư mục ảnh CHẨN ĐOÁN khi đỏ (`shot(file, { onFailure: true })`): `E2E_SHOTS` nếu có, không thì thư mục log của `e2e:all` (artifact CI). */
+export const FAILURE_SHOTS = process.env.E2E_SHOTS
   ? path.resolve(process.env.E2E_SHOTS)
   : process.env.E2E_LOG_DIR
     ? path.resolve(process.env.E2E_LOG_DIR)
@@ -172,12 +177,14 @@ export class Tab {
     throw new Error(`Hết thời gian chờ (${timeout}ms) ở ${this.label}: ${label}`);
   }
 
-  async shot(file: string): Promise<string | null> {
-    if (!SHOTS) return null;
+  /** Chụp ảnh. Thường lệ chỉ khi có `E2E_SHOTS`; `onFailure: true` (ảnh chẩn đoán lúc đã đỏ, không còn gì để làm hỏng) cũng ghi vào thư mục log CI. */
+  async shot(file: string, opts: { onFailure?: boolean } = {}): Promise<string | null> {
+    const dir = opts.onFailure ? FAILURE_SHOTS : SHOTS;
+    if (!dir) return null;
     try {
-      mkdirSync(SHOTS, { recursive: true });
+      mkdirSync(dir, { recursive: true });
       const r = await this.send("Page.captureScreenshot", { format: "png" });
-      const dest = path.join(SHOTS, `${this.label}-${file}.png`);
+      const dest = path.join(dir, `${this.label}-${file}.png`);
       writeFileSync(dest, Buffer.from(r.result.data, "base64"));
       return dest;
     } catch {
