@@ -4,6 +4,8 @@
 // đầy), bản đồ đích có lớp trang trí / ánh sáng / sương, màn chuyển cảnh ẩn lại, 0 lỗi console.
 // Chặng hai (M6, #408): nhân vật lưu sẵn cạnh Vọng Trạch Quan đi Hắc Phong Cốc -> Âm Sương Trạch -> Hắc Phong Cốc bằng cổng THẬT (vào nhầm
 // phòng thì `wrong_map` đưa về đúng phòng): kiểu trang trí / ánh sáng / sương / dấu cổng / tên vùng của bản đồ thứ ba, 0 lỗi console.
+// Chặng ba (M7.5, #506, M7.8 #509): nhân vật lưu sẵn cạnh Lăng Hàn Quan đi Âm Sương Trạch -> Hàn Vân Lĩnh -> Âm Sương Trạch bằng cổng THẬT: bản đồ thứ tư dựng đủ lớp
+// (kiểu `han_van`), chỗ xuất hiện đúng cạnh Hồi Sương Quan (cổng nam, trong khu an toàn), quay về đúng cổng bắc Âm Sương.
 // Chạy: `npm run build && npm run e2e:chuyen-canh -w server` (cần google-chrome).
 import { spawn, execSync, type ChildProcess } from "node:child_process";
 import { existsSync, mkdtempSync } from "node:fs";
@@ -15,16 +17,19 @@ import express from "express";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { Tab, sleep, listenWithRetry, removeTmpDirs, getChromeGpuFlags } from "./e2e-kit";
+import { freePort } from "../src/test-port.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
 const clientDist = path.resolve(repoRoot, "client/dist");
 const pickPort = () => 38000 + Math.floor(Math.random() * 2000);
 let PORT = pickPort();
-const CDP = 9800 + Math.floor(Math.random() * 300);
 const out = (m: string) => console.log(m);
 
 async function main() {
+  // Cổng do hệ điều hành cấp (không `Math.random`): cổng CDP trùng Chrome của dev khác thì ta điều khiển nhầm trình duyệt của họ (nit của A ở #549)
+  const CDP = await freePort();
+  PORT = await freePort();
   out("=== E2E THẬT chuyển cảnh qua cổng: server Colyseus thật + Chrome headless ===");
   if (!existsSync(path.join(clientDist, "index.html"))) {
     execSync("npm run build -w client", { cwd: repoRoot, stdio: "inherit" });
@@ -293,6 +298,74 @@ async function main() {
     await crossPortal("hac_phong_bac", "am_suong");
     await walkToPortal("am_suong_nam");
     await crossPortal("am_suong_nam", "hac_phong");
+
+    // ---------------- Chặng ba (M7.5, #506): Âm Sương Trạch -> Hàn Vân Lĩnh -> Âm Sương Trạch ----------------
+    // Nhân vật thứ ba lưu sẵn cạnh Lăng Hàn Quan (chỗ xuất hiện của cổng bắc Âm Sương, trong khu an toàn): bản đồ thứ tư là bản đồ Nguyên Anh, đi bộ từ cổng nam
+    // qua cả Âm Sương dày quái là không cần thiết cho kiểm cổng.
+    out(
+      "\n--- Bốn bản đồ: Âm Sương Trạch -> Hàn Vân Lĩnh -> Âm Sương Trạch (cổng thật, nhân vật lưu sẵn cạnh Lăng Hàn Quan) ---",
+    );
+    const amBac = getMap("am_suong")!.portal("am_suong_bac")!;
+    const hanNam = getMap("han_van")!.portal("han_van_nam")!;
+    const NAME3 = "Canh Han Van";
+    const SECRET3 = "e2e_secret_cc_3333333333333";
+    await savePlayer({
+      name: NAME3,
+      secretHash: hashSecret(SECRET3),
+      realm: 4,
+      tier: 0,
+      exp: 0,
+      mapId: "am_suong",
+      x: amBac.spawn.x,
+      y: amBac.spawn.y,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    currentName = NAME3;
+    currentSecret = SECRET3;
+    await setStorage("");
+    await login(url);
+    await ev(
+      `(() => { const s = document.getElementById('set-quality'); s.value = 'high'; s.dispatchEvent(new Event('change')); })(); 1`,
+    );
+    await T.waitFor(
+      `window.__scene && window.__scene.map && window.__scene.map.def.id === 'am_suong'`,
+      "vào đúng phòng Âm Sương Trạch (wrong_map đưa về đúng phòng)",
+      30000,
+    );
+    ok("nhân vật lưu ở Âm Sương Trạch vào đúng phòng (qua wrong_map)");
+    await checkDest("am_suong");
+    await walkToPortal("am_suong_bac");
+    await crossPortal("am_suong_bac", "han_van");
+    // bản đồ thứ tư: đúng kích thước, chỗ xuất hiện cạnh Hồi Sương Quan (spawn của cổng nam), vẫn trong khu an toàn
+    const hv = await ev(
+      `JSON.stringify({ w: window.__scene.map.def.w, h: window.__scene.map.def.h, x: window.__scene.predX, y: window.__scene.predY, town: window.__scene.map.inTown(window.__scene.predX, window.__scene.predY) })`,
+    );
+    const hvInfo = JSON.parse(hv as string) as {
+      w: number;
+      h: number;
+      x: number;
+      y: number;
+      town: boolean;
+    };
+    must(
+      hvInfo.w === 128 && hvInfo.h === 128,
+      `Hàn Vân Lĩnh 128 x 128 ô (${hvInfo.w} x ${hvInfo.h})`,
+    );
+    must(
+      Math.hypot(hvInfo.x - hanNam.spawn.x, hvInfo.y - hanNam.spawn.y) < 80,
+      `xuất hiện cạnh Hồi Sương Quan: (${hvInfo.x.toFixed(0)}, ${hvInfo.y.toFixed(0)}) cách chỗ xuất hiện (${hanNam.spawn.x}, ${hanNam.spawn.y}) < 80 px`,
+    );
+    ok(`bản đồ thứ tư: ${hvInfo.w} x ${hvInfo.h} ô, xuất hiện đúng cạnh Hồi Sương Quan`);
+    await walkToPortal("han_van_nam");
+    await crossPortal("han_van_nam", "am_suong");
+    const back = await ev(`JSON.stringify({ x: window.__scene.predX, y: window.__scene.predY })`);
+    const backXY = JSON.parse(back as string) as { x: number; y: number };
+    must(
+      Math.hypot(backXY.x - amBac.spawn.x, backXY.y - amBac.spawn.y) < 80,
+      `về Âm Sương xuất hiện cạnh Lăng Hàn Quan: (${backXY.x.toFixed(0)}, ${backXY.y.toFixed(0)}) cách (${amBac.spawn.x}, ${amBac.spawn.y}) < 80 px`,
+    );
+    ok("về Âm Sương Trạch đúng cạnh Lăng Hàn Quan");
     must(T.errors.length === 0, `0 lỗi console / exception (${T.errors.slice(0, 2).join(" | ")})`);
     ok("0 lỗi console / exception");
     out("\n=== E2E CHUYỂN CẢNH QUA CỔNG ĐẠT ===");

@@ -274,13 +274,17 @@ try {
   await key("Home", "Home", 36);
   check((await cam()).follow, "phím Home: về chỗ mình");
 
-  console.log("\n--- Sơ đồ nối ba bản đồ, chú giải, xem bản đồ khác ---");
+  console.log("\n--- Sơ đồ nối bốn bản đồ, chú giải, xem bản đồ khác ---");
   const nodes = JSON.parse(
     await evalJs(
       `JSON.stringify([...document.querySelectorAll("#map-graph .mg-node")].map((b) => ({ id: b.dataset.mapId, cur: b.getAttribute("aria-current"), pressed: b.getAttribute("aria-pressed"), h: Math.round(b.getBoundingClientRect().height) })))`,
     ),
   );
-  check(nodes.length === 3, `sơ đồ nối có 3 nút bản đồ (${nodes.map((n) => n.id).join(", ")})`);
+  check(
+    nodes.length === 4 &&
+      ["lac_ha", "hac_phong", "am_suong", "han_van"].every((id) => nodes.some((n) => n.id === id)),
+    `sơ đồ nối có 4 nút bản đồ, kể cả Hàn Vân (M7.5) (${nodes.map((n) => n.id).join(", ")})`,
+  );
   const hereNode = nodes.find((n) => n.id === "lac_ha");
   check(
     hereNode?.cur === "location" && hereNode?.pressed === "true",
@@ -342,6 +346,21 @@ try {
   );
   c = await cam();
   check(c.follow && c.zoom === 1, "về bản đồ mình: zoom 1, bám theo mình");
+  // Bản đồ thứ tư (M7.5): bấm nút Hàn Vân thì xem được, tiêu đề + ảnh đổi, rồi 'Về chỗ mình'
+  const hashLac = await canvasHash();
+  await click('#map-graph .mg-node[data-map-id="han_van"]');
+  const hv = JSON.parse(
+    await evalJs(
+      `JSON.stringify({ id: window.__scene.mapViewId, title: document.getElementById("map-title").textContent })`,
+    ),
+  );
+  check(
+    hv.id === "han_van" && hv.title.includes("Hàn Vân Lĩnh"),
+    `bấm nút Hàn Vân: đang xem han_van, tiêu đề đổi (${hv.id}, ${hv.title})`,
+  );
+  check((await canvasHash()) !== hashLac, "ảnh bản đồ ĐỔI sang Hàn Vân Lĩnh");
+  await click("#map-recenter");
+  check((await evalJs("window.__scene.mapViewId")) === null, "'Về chỗ mình' sau khi xem Hàn Vân");
   await click('#map-graph .mg-node[data-map-id="am_suong"]');
   await close();
   await open();
@@ -445,6 +464,19 @@ try {
     c.follow && c.zoom === 1,
     `camera bản đồ lớn đặt lại sau khi qua cổng (${JSON.stringify(c)})`,
   );
+  // Qua cổng bắc Âm Sương sang bản đồ thứ tư: sơ đồ 'đang đứng' ở Hàn Vân
+  await close();
+  await goMap("am_suong");
+  await goMap("han_van");
+  await open();
+  gs = await graphState();
+  check(
+    !gs.hidden &&
+      gs.current.length === 1 &&
+      gs.current[0] === "han_van" &&
+      gs.title.includes("Hàn Vân Lĩnh"),
+    `qua cổng Âm Sương -> Hàn Vân: 'đang đứng' ở han_van, đang xem bản đồ mình vừa tới (${JSON.stringify(gs.current)}, ${gs.title})`,
+  );
   await close();
   await goMap("bi_canh_linh_hu");
   await open();
@@ -458,6 +490,36 @@ try {
     !gs.hidden && gs.current.length === 1 && gs.current[0] === "lac_ha",
     `ra khỏi bí cảnh về Lạc Hà: sơ đồ hiện lại, 'đang đứng' ở lac_ha (${gs.hidden}, ${JSON.stringify(gs.current)})`,
   );
+
+  console.log(
+    "\n--- Điện thoại ngang 844 x 390: bốn nút sơ đồ nằm trên MỘT hàng (không chiếm thêm chiều cao của bản đồ) ---",
+  );
+  await close();
+  await send("Emulation.setDeviceMetricsOverride", {
+    width: 844,
+    height: 390,
+    deviceScaleFactor: 1,
+    mobile: true,
+  });
+  await sleep(400);
+  await open();
+  const row = JSON.parse(
+    await evalJs(`JSON.stringify((() => {
+      const g = document.getElementById("map-graph").getBoundingClientRect();
+      const ns = [...document.querySelectorAll("#map-graph .mg-node")].map((b) => { const r = b.getBoundingClientRect(); return { id: b.dataset.mapId, y: Math.round(r.y), h: Math.round(r.height), right: Math.round(r.right) }; });
+      const modal = document.querySelector("#map-modal .modal-box, #map-modal").getBoundingClientRect();
+      return { gh: Math.round(g.height), ns, modalRight: Math.round(modal.right), vw: innerWidth };
+    })())`),
+  );
+  check(
+    row.ns.length === 4 && new Set(row.ns.map((n) => n.y)).size <= 2 && row.gh <= 52,
+    `bốn nút cùng một hàng (cao ${row.gh} px; y ${row.ns.map((n) => n.y).join(", ")})`,
+  );
+  check(
+    row.ns.every((n) => n.h >= 44 && n.right <= row.vw),
+    "mọi nút >= 44 px cao và nằm trong màn hình",
+  );
+  await close();
 
   check(pageErrors === 0, `0 lỗi console / exception (${pageErrors})`);
   ws.close();
