@@ -66,11 +66,28 @@ export interface MonsterKind {
   boltSpeed?: number;
   boltRange?: number;
   /**
+   * Đập đất (M7.3, `server/src/systems/slam.ts`): ĐÒN PHỤ độc lập với `behavior` (quái cận chiến hay `charger` đều có thể kèm đập đất). Khi có người trong `radius`
+   * và đã hết hồi, quái đứng gồng `windupMs` (báo trước bằng `fx` `warn` hình tròn), rồi đập: mọi người còn trong vòng LÚC ĐÁP đòn mất `atk` x `mult`.
+   */
+  slam?: SlamDef;
+  /**
    * Hệ HIỂN THỊ của đạn: chỉ quyết định MÀU đạn ở client (`fx` `bolt` gửi `element = boltElement ?? element`), KHÔNG tính khắc / bị khắc (`elementMult` chỉ đọc `element`).
    * Cần vì đặt `element` cho quái làm đổi sát thương chiêu của người chơi lên quái (x1,3 / x0,8): đạn băng của Sương Hồ muốn màu băng mà không đổi cân bằng. Bỏ trống thì
    * dùng `element`, rồi tới màu trung tính (đỏ cam).
    */
   boltElement?: Element;
+}
+
+/** Đập đất của quái (`MonsterKind.slam`). Tâm vòng là chỗ quái đứng lúc bắt đầu gồng (quái đứng yên suốt lúc gồng). */
+export interface SlamDef {
+  /** Thời gian gồng (ms): người chơi bước ra khỏi vòng trong khoảng này thì không trúng (>= 600 để kịp tránh) */
+  windupMs: number;
+  /** Bán kính vùng đập (px), cũng là khoảng cách người chơi tới quái để quái bắt đầu gồng */
+  radius: number;
+  /** Hệ số sát thương so với `atk` */
+  mult: number;
+  /** Chờ giữa hai lần đập (ms), tính từ lúc đáp đòn */
+  cdMs: number;
 }
 
 /** Hành vi quái (M7.3). `melee` là mặc định. */
@@ -283,7 +300,8 @@ export const MONSTERS: MonsterKind[] = [
     level: 17,
     color: 0xd8cdb4,
     element: "tho",
-    // Voi xương to, chậm, máu rất cao, công thấp. Cận chiến ở bước này; đập đất báo trước (`warn` vòng / hình quạt) thêm ở bước hành vi kế (M7.3).
+    // Voi xương to, chậm, máu rất cao, công thấp. Cận chiến + ĐẬP ĐẤT báo trước (gồng 1,1 s, vòng 90 px, x2 công, 6 s một lần): đứng sát nó là phải biết bước ra.
+    slam: { windupMs: 1100, radius: 90, mult: 2, cdMs: 6000 },
   },
   {
     id: "doc_tuoc",
@@ -325,6 +343,8 @@ export const MONSTERS: MonsterKind[] = [
     element: "thuy",
     behavior: "charger",
     windupMs: 900,
+    // Vừa lao vừa ĐẬP ĐẤT vòng lớn (gồng 1,2 s, vòng 140 px, x1,8 công, 7 s một lần): đứng sát trùm thì phải bước ra, đứng xa thì tránh đường lao
+    slam: { windupMs: 1200, radius: 140, mult: 1.8, cdMs: 7000 },
   },
   // Trùm của bí cảnh Linh Hư (docs/THIET_KE_BI_CANH.md). Không sinh ngoài hoang: `MONSTER_CAP.yeu_vuong = 0` và các bản đồ
   // thường không khai báo loại này. Số liệu cân bằng ở 4c-2 (`server/src/balance/dungeon.ts`, docs/CAN_BANG.md mục "Bí cảnh"):
