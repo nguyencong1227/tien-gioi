@@ -6,14 +6,15 @@ MMORPG 2D tu tiên, chiến đấu thời gian thực. Client Phaser 3 + Vite, s
 Trả lời người dùng bằng tiếng Việt. Comment trong code viết tiếng Việt.
 
 ## Nhóm và nơi làm việc
-- 3 dev cùng SSH vào một máy, cùng user Linux `nguyencong`, cùng tài khoản GitHub `nguyencong1227`.
+- 4 dev cùng SSH vào một máy, cùng user Linux `nguyencong`, cùng tài khoản GitHub `nguyencong1227`.
 - **Dev A (Server & Gameplay, giao việc):** `~/TT/tien-gioi-a`, cổng 2597/5173, nhánh `a/...`. Dùng Claude Code.
 - **Dev B (Client & Trải nghiệm):** `~/TT/tien-gioi-b`, cổng 2577/5183, nhánh `b/...`. Dùng Antigravity CLI (`agy`).
 - **Dev C (Công cụ, Thử tải & Phát hành):** `~/TT/tien-gioi-c`, cổng 2587/5193, nhánh `c/...`. Dùng Antigravity CLI (`agy`).
+- **Dev D (Nội dung & Dữ liệu):** `~/TT/tien-gioi-d`, cổng 2607/5203, nhánh `d/...`. Agent chạy bằng model Ornith qua endpoint riêng do người dùng dựng (khoá và địa chỉ endpoint KHÔNG ghi vào repo, log hay thư). Chỉ soạn NỘI DUNG GỐC của Tiên Giới theo khung dữ liệu có sẵn (chiêu thức / công pháp, vật phẩm, quái, lời thoại nhiệm vụ) kèm test và tài liệu; KHÔNG làm đồ hoạ, phát hành, hạ tầng; mọi PR do Dev A review (đụng `shared/` thì thêm một dev khác xem). Chuyển nội dung từ Vạn Kiếp Tu Tiên chỉ khi người dùng xác nhận RIÊNG cho Dev D (mặc định: không; quy tắc Asset nguồn 3 bên dưới vẫn áp dụng nếu có). Endpoint lỗi kết nối / 502 / 503 nghĩa là máy model đang khởi động lại: chờ rồi thử lại, không tính là hết hạn mức.
 - Thư mục mở lúc khởi động là thư mục của dev đang làm việc với bạn: chỉ làm trong đó. Không sửa, không `git switch`, không chạy server trong thư mục của người khác.
-- Không sửa `~/.bashrc`, `~/.gitconfig`, `~/.gemini/`, `~/.claude/` hay cấu hình global: ba người dùng chung.
-- **Việc được giao nằm trong GitHub issue** (nhãn `dev-a` / `dev-b` / `dev-c`). Trước khi làm, đọc issue bằng `gh issue view <số>`: issue ghi hợp đồng `shared/` cần dùng, tin nhắn, phụ thuộc và tiêu chí xong. Trợ lý AI không nhớ cuộc trò chuyện của dev khác; issue và comment trên PR là nơi duy nhất truyền thông tin giữa các dev.
-- Chi tiết: `docs/LAM_CHUNG_MAY.md`. Phân công M2: `docs/PHAN_CONG.md` và GitHub issues (nhãn `dev-a` / `dev-b` / `dev-c` / `shared`, milestone Sprint 0–3).
+- Không sửa `~/.bashrc`, `~/.gitconfig`, `~/.gemini/`, `~/.claude/` hay cấu hình global: bốn người dùng chung.
+- **Việc được giao nằm trong GitHub issue** (nhãn `dev-a` / `dev-b` / `dev-c` / `dev-d`). Trước khi làm, đọc issue bằng `gh issue view <số>`: issue ghi hợp đồng `shared/` cần dùng, tin nhắn, phụ thuộc và tiêu chí xong. Trợ lý AI không nhớ cuộc trò chuyện của dev khác; issue và comment trên PR là nơi duy nhất truyền thông tin giữa các dev.
+- Chi tiết: `docs/LAM_CHUNG_MAY.md`. Phân công M2: `docs/PHAN_CONG.md` và GitHub issues (nhãn `dev-a` / `dev-b` / `dev-c` / `dev-d` / `shared`, milestone Sprint 0–3).
 
 ## Lệnh
 Node 22 ở `~/.local/node/bin`. Nếu `npm` không có trong PATH thì thêm `export PATH=~/.local/node/bin:$PATH` vào đầu lệnh.

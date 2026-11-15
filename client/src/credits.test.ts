@@ -191,22 +191,32 @@ describe("Tài liệu rà soát khớp số tệp thật (M6, #411)", () => {
   });
 });
 
+/**
+ * Chiêu GỐC của Tiên Giới (soạn riêng, KHÔNG lấy từ Vạn Kiếp Tu Tiên): id trong `SKILLS_M7` nhưng không có dòng ở bảng nguồn `docs/NGUON_NOI_DUNG.md`. Ai thêm chiêu gốc
+ * (Dev D, Dev A...) thêm id vào đây; chiêu lấy từ nguồn thì thêm DÒNG ở bảng nguồn thay vì thêm vào đây.
+ */
+const ORIGINAL_SKILL_IDS: string[] = [];
+
 describe("Nguồn nội dung, hình ảnh và âm thanh bên ngoài (M7.16 #517, QUYET_DINH_M3 mục 19-20)", () => {
   const rootDir = path.resolve(__dirname, "../..");
   const contentSourcePath = path.resolve(rootDir, "docs/NGUON_NOI_DUNG.md");
   const creditsPath = path.resolve(rootDir, "CREDITS.md");
 
-  it("docs/NGUON_NOI_DUNG.md tồn tại, bảng nguồn hợp lệ: 12 dòng `cong_phap` (12 chiêu M7.1), audit sạch, mỗi chiêu của SKILLS_M7 đúng MỘT dòng", () => {
+  it("docs/NGUON_NOI_DUNG.md tồn tại, bảng nguồn hợp lệ: >= 12 dòng `cong_phap` (12 chiêu M7.1), audit sạch, mỗi chiêu của SKILLS_M7 khai báo đúng MỘT nơi", () => {
     expect(fs.existsSync(contentSourcePath)).toBe(true);
     const content = fs.readFileSync(contentSourcePath, "utf-8");
     expect(content).toContain("## 3. Bảng nguồn");
     expect(content).toContain("Đã duyệt chữ Hán");
 
     const audit = auditContentSources(contentSourcePath, creditsPath, rootDir);
-    // Chưa có hình / âm nào lấy từ nguồn: mọi dòng là dữ liệu chiêu thức (`cong_phap`), không cần tệp trên đĩa / dòng CREDITS.md
-    expect(audit.entries.length).toBe(12);
-    expect(audit.entries.every((e) => e.type === "cong_phap")).toBe(true);
-    expect(audit.entries.every((e) => e.cjkChecked === "KHONG_AP_DUNG")).toBe(true);
+    // Bảng đã điền: ít nhất 12 dòng chiêu thức (`cong_phap`, M7.1); dòng sau này (trang bị, hình, âm...) được thêm mà không phải sửa ca này
+    expect(audit.entries.length).toBeGreaterThanOrEqual(12);
+    expect(audit.entries.filter((e) => e.type === "cong_phap").length).toBeGreaterThanOrEqual(12);
+    expect(
+      audit.entries
+        .filter((e) => e.type === "cong_phap")
+        .every((e) => e.cjkChecked === "KHONG_AP_DUNG"),
+    ).toBe(true);
     expect(audit.missingInCredits).toEqual([]);
     expect(audit.missingFiles).toEqual([]);
     expect(audit.notInVkttDir).toEqual([]);
@@ -215,14 +225,23 @@ describe("Nguồn nội dung, hình ảnh và âm thanh bên ngoài (M7.16 #517,
     expect(audit.unrecordedVkttFiles).toEqual([]);
     expect(audit.unrecordedCreditsVktt).toEqual([]);
 
-    // Hai chiều: mỗi chiêu của SKILLS_M7 (lấy nguyên văn từ nguồn) có đúng một dòng ghi `skills.ts` id `<id>`; không dòng nào trỏ id không tồn tại
+    // Hai chiều: mỗi chiêu của SKILLS_M7 PHẢI được khai báo MỘT trong hai nơi: (1) có đúng một dòng ở bảng nguồn (lấy từ Vạn Kiếp Tu Tiên), hoặc (2) nằm trong
+    // `ORIGINAL_SKILL_IDS` bên dưới (chiêu GỐC của Tiên Giới, không lấy từ nguồn). Thêm chiêu mới mà không khai báo thì đỏ; không dòng nào trỏ id không tồn tại.
     const ids = SKILLS_M7.map((s) => s.id);
-    for (const id of ids) {
-      const rows = audit.entries.filter(
+    const rowsOf = (id: string) =>
+      audit.entries.filter(
         (e) => e.inRepo.includes(`id \`${id}\``) || e.inRepo.includes(`id ${id}`),
       );
-      expect(rows.length, `chiêu ${id} phải có đúng một dòng ở bảng nguồn`).toBe(1);
+    for (const id of ids) {
+      const n = rowsOf(id).length;
+      const original = ORIGINAL_SKILL_IDS.includes(id);
+      expect(
+        n + (original ? 1 : 0),
+        `chiêu ${id}: khai báo ĐÚNG MỘT nơi (dòng bảng nguồn nếu lấy từ nguồn, hoặc ORIGINAL_SKILL_IDS nếu là chiêu gốc): ${n} dòng, gốc=${original}`,
+      ).toBe(1);
     }
+    for (const id of ORIGINAL_SKILL_IDS)
+      expect(ids, `ORIGINAL_SKILL_IDS có id lạ ${id}`).toContain(id);
     for (const e of audit.entries) {
       const m = /id `?([a-z_]+)`?/.exec(e.inRepo);
       expect(
