@@ -205,6 +205,20 @@ describe("runReconnect: lần thử THUA lỗi dứt khoát không được phá
     await expect(r).resolves.toBeNull();
   });
 
+  it("lỗi dứt khoát khi một lần thử KHÁC sắp tới hạn treo: hạn treo đó không mở thêm lần mới", async () => {
+    const first = deferred<string>();
+    let n = 0;
+    const attempt = vi.fn(() => (++n === 1 ? first.promise : new Promise<string>(() => {})));
+    const r = runReconnect(base({ attempt, isFatal, deadlineMs: 20000 }));
+    await vi.advanceTimersByTimeAsync(2100); // lần 2 mở lúc 2000 ms (treo), hạn treo của nó là 4000 ms
+    first.reject(new Error("token expired")); // lần 1 dứt khoát lúc 2100 ms, lần 2 còn chạy nên vòng chưa kết thúc
+    await vi.advanceTimersByTimeAsync(5000); // qua 4000 ms: hạn treo của lần 2 KHÔNG được mở lần 3
+    expect(attempt).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(20000);
+    await expect(r).resolves.toBeNull();
+    expect(attempt).toHaveBeenCalledTimes(2);
+  });
+
   it("lỗi dứt khoát ở lần thử CUỐI còn chạy thì kết thúc ngay (không đợi hết hạn)", async () => {
     const first = deferred<string>();
     let n = 0;
