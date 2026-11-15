@@ -10,6 +10,10 @@
  *   - mình bị đánh (`hurt-self`, ưu tiên 2) kèm chữ đỏ;
  *   - công pháp lớn: kiếm khí (`sword-qi` rải dọc đường bay + `sword-tip` ở mũi) và `slash-edge`;
  *   - quái gục (`mon-vanish`);
+ *   - kế hoạch `burst-cast` / `boss-cast` (#515, đề xuất của B sau #722): thêm HIỆU ỨNG DÙNG CHIÊU M7 của cả 18 chiêu (`FX_CAST_SKILLS`) cứ `castMs` (300 ms:
+ *     một đội 3-4 người cùng dùng chiêu) qua ĐÚNG đường của game: tin `fx {kind: "cast"}` phát bằng `window.__scene.room.emit` -> `WorldScene.onFx` -> `planCastFx`
+ *     -> `playFxPoints` -> `FxSystem.play` (có bộ chặn ngân sách emitter của bậc). Trước đây kịch bản `burst` / `boss` chỉ bắn Kiếm khí nên 18 chiêu chưa bị
+ *     `perf-gate` kiểm; hai lần trong ba là chiêu của MÌNH (ưu tiên 2, ca nặng), một lần là của đồng đội (ưu tiên 1), chiêu và hướng theo chuỗi tất định;
  *   - kế hoạch `boss` (M6 #409, nit của A ở #450): đòn thường lên TRÙM là `boss-hit` (thay `hit-spark`) và trùm gục nổ `boss-vanish` (ưu tiên 2
  *     như `planMonsterDeath`), đo bằng số thật chứ không chỉ bằng test `FxBudget`.
  * Vị trí quanh TÂM KHUNG NHÌN của camera (không phụ thuộc chế độ mock không đối chiếu vị trí). Dùng bộ sinh số giả ngẫu nhiên có hạt giống cố định
@@ -24,6 +28,31 @@
  * Chữ bay: ngân sách `damageNumbers`; hạt / emitter: ưu tiên 2 được vượt trần tới `OWN_OVERSHOOT` lần (docs 7.1) nên trần CỨNG của cổng là
  * trần x `OWN_OVERSHOOT` (xem `perf-gate.mjs`).
  */
+
+/**
+ * 18 chiêu (12 đợt 1 + 6 Nguyên Anh đợt 2, #722) của kế hoạch `*-cast`. Test `fx-driver.test.ts` đòi danh sách này TRÙNG đúng các chiêu trong `SKILLS` của `shared/`
+ * (thêm chiêu mà quên ở đây là test đỏ), nên hiệu năng của chiêu mới luôn được đo.
+ */
+export const FX_CAST_SKILLS = [
+  "hoa_van_kiem",
+  "bon_thach_quyen",
+  "ung_trao",
+  "trong_nhac_tram",
+  "huyen_bang_chi",
+  "kim_chung_trao",
+  "bich_thuy_hoi_xuan",
+  "phieu_phong_bo",
+  "thanh_tung_phi_cham",
+  "lac_tuyet_phan_phi",
+  "cuu_cung_khon_sat",
+  "me_tung_bo",
+  "han_quang_tien",
+  "bach_kim_trao",
+  "van_thach_tran",
+  "bang_hoa_loan",
+  "liet_hoa_kiem",
+  "van_hanh_bo",
+];
 
 /** Màu chữ (trùng `FX_COLOR` trong `recipes-combat.ts`; test đối chiếu). */
 export const FX_DRIVER_COLORS = { hit: 0xffe9a8, crit: 0xffd34d, hurt: 0xff6b5e };
@@ -52,12 +81,24 @@ export const FX_PLANS = {
   combat: { hitMs: 200, otherMs: 350, hurtMs: 1200, skillMs: 1500, killMs: 3000 },
   burst: { hitMs: 100, otherMs: 160, hurtMs: 500, skillMs: 600, killMs: 1200 },
   boss: { hitMs: 100, otherMs: 160, hurtMs: 500, skillMs: 600, killMs: 1200, boss: true },
+  // `castMs`: cứ chừng đó ms phát một lần dùng chiêu (xoay vòng `FX_CAST_SKILLS`); còn lại giống `burst` / `boss`
+  "burst-cast": { hitMs: 100, otherMs: 160, hurtMs: 500, skillMs: 600, killMs: 1200, castMs: 300 },
+  "boss-cast": {
+    hitMs: 100,
+    otherMs: 160,
+    hurtMs: 500,
+    skillMs: 600,
+    killMs: 1200,
+    boss: true,
+    castMs: 300,
+  },
 };
 
 export const FX_DRIVER_SOURCE = `(() => {
   if (window.__tgFxDriver) return;
   const PLANS = ${JSON.stringify(FX_PLANS)};
   const COLOR = ${JSON.stringify(FX_DRIVER_COLORS)};
+  const CAST_SKILLS = ${JSON.stringify(FX_CAST_SKILLS)};
   const TICK_MS = 20;
   let run = null;
 
@@ -82,17 +123,34 @@ export const FX_DRIVER_SOURCE = `(() => {
       if (!fx || typeof fx.play !== "function" || typeof fx.floatNumber !== "function" || typeof fx.stats !== "function")
         return { ok: false, error: "không có window.__fx (cần ?debug=1)" };
       if (run) return { ok: false, error: "đang chạy" };
+      const scene = window.__scene;
+      if (plan.castMs && !(scene && scene.room && typeof scene.room.emit === "function"))
+        return { ok: false, error: "không có window.__scene.room.emit (kế hoạch cast cần chế độ mock ?duel=mock&debug=1)" };
       const rand = rng(20261112);
       const s0 = fx.stats();
       run = {
         planName, fx, plan, rand, startedAt: performance.now(),
-        next: { hit: 0, other: 0, hurt: 0, skill: 0, kill: 0 },
+        next: { hit: 0, other: 0, hurt: 0, skill: 0, kill: 0, cast: 0 },
         played: 0, rejected: 0, floatsPlayed: 0, floatsRejected: 0,
+        castIdx: 0, casts: 0, castPlayed: 0, castRejected: 0, origPlay: null,
         peakParticles: 0, peakEmitters: 0, peakFloats: 0,
         admitted0: s0.admitted, dropped0: s0.dropped,
         timer: null,
       };
       const r = run;
+      if (plan.castMs) {
+        // Đếm lần FxSystem.play của công thức cast-* do CHÍNH game gọi (đường onFx thật): bằng chứng cast thật sự chạy tới hạt, không chỉ tin đã gửi.
+        r.origPlay = fx.play;
+        const orig = r.origPlay;
+        fx.play = function (id) {
+          const ok = orig.apply(this, arguments);
+          if (typeof id === "string" && id.startsWith("cast-")) {
+            if (ok) r.castPlayed++; else r.castRejected++;
+            peaks(); // đọc đỉnh NGAY SAU mỗi lần phát của chiêu (điểm phát có trễ nên không do bước tick của bộ bắn gọi)
+          }
+          return ok;
+        };
+      }
       const peaks = () => {
         const s = fx.stats();
         if (s.liveParticles > r.peakParticles) r.peakParticles = s.liveParticles;
@@ -148,6 +206,15 @@ export const FX_DRIVER_SOURCE = `(() => {
           play("slash-edge", q.x, q.y, { priority: 2 });
           num("Bạo! " + Math.round(150 + rand() * 250), q.x, q.y - 10, COLOR.crit, 20, 2);
         }
+        if (plan.castMs && now >= r.next.cast) {
+          r.next.cast = now + plan.castMs;
+          const c = center();
+          const k = r.castIdx++;
+          // hai trong ba lần là chiêu của MÌNH (ưu tiên 2: ca nặng, được vượt trần danh nghĩa), một lần của đồng đội (ưu tiên 1)
+          scene.room.emit("fx", { kind: "cast", by: k % 3 === 2 ? "perf-bot" : scene.sid, skill: CAST_SKILLS[k % CAST_SKILLS.length], x: c.x, y: c.y, angle: rand() * Math.PI * 2, range: 150 });
+          r.casts++;
+          peaks();
+        }
         if (now >= r.next.kill) {
           r.next.kill = now + plan.killMs;
           const p = near(110);
@@ -163,6 +230,7 @@ export const FX_DRIVER_SOURCE = `(() => {
       const r = run;
       if (!r) return null;
       clearInterval(r.timer);
+      if (r.origPlay) r.fx.play = r.origPlay;
       run = null;
       const s = r.fx.stats();
       return {
@@ -171,6 +239,7 @@ export const FX_DRIVER_SOURCE = `(() => {
         played: r.played, rejected: r.rejected,
         floatsPlayed: r.floatsPlayed, floatsRejected: r.floatsRejected,
         peakParticles: r.peakParticles, peakEmitters: r.peakEmitters, peakFloats: r.peakFloats,
+        ...(r.plan.castMs ? { casts: r.casts, castPlayed: r.castPlayed, castRejected: r.castRejected } : {}),
         particleLimit: s.particleLimit,
         fxAdmitted: s.admitted - r.admitted0, fxDropped: s.dropped - r.dropped0,
       };
@@ -182,13 +251,22 @@ const isCount = (v) => typeof v === "number" && Number.isInteger(v) && v >= 0;
 
 /** Số lần phát thành công tối thiểu để tin báo cáo (5 giây ở nhịp `combat` phát vài chục lần). */
 export const MIN_FX_PLAYED = 10;
+/**
+ * Kế hoạch `*-cast`: bằng chứng cast thật sự chạy qua đường onFx. (1) `MIN_CASTS_EMITTED`: số tin cast đã gửi (300 ms trong 5 s ~ 17); (2) `MIN_CAST_CALLS`: số lần game thật
+ * GỌI `FxSystem.play` cho công thức `cast-*` (được + bị bỏ; ~ 17 ở bậc Thấp vì mỗi chiêu một điểm); (3) `MIN_CAST_PLAYED`: trong đó ít nhất chừng này được ngân sách nhận
+ * (bậc Thấp nhận 6-9 trong 17 vì trần 8 emitter, do đó KHÔNG đặt ngưỡng cao hơn: ba lần chạy thật lúc máy tải ra 6, 7, 7, 8, 9). Không phải trần hiệu năng, chỉ chống xanh giả.
+ */
+export const MIN_CASTS_EMITTED = 10;
+export const MIN_CAST_CALLS = 10;
+export const MIN_CAST_PLAYED = 3;
 
 /**
  * Đọc báo cáo từ `JSON.stringify(window.__tgFxDriver.stop())`. Sai hình dạng / thiếu số cho `null` (perf-gate đỏ "thiếu số đo",
  * KHÔNG mặc định 0).
  * @param {unknown} raw
  * @returns {{ fxPlan: string, fxPlayed: number, fxRejected: number, floatsPlayed: number, floatsRejected: number,
- *   particlesPeak: number, emittersPeak: number, floatsPeak: number, fxAdmitted: number, fxDropped: number } | null}
+ *   particlesPeak: number, emittersPeak: number, floatsPeak: number, fxAdmitted: number, fxDropped: number,
+ *   castsEmitted?: number, castPlayed?: number, castRejected?: number } | null}
  */
 export function parseFxDriverReport(raw) {
   let v = raw;
@@ -213,6 +291,11 @@ export function parseFxDriverReport(raw) {
   ];
   for (const k of need) if (!isCount(v[k])) return null;
   if (typeof v.plan !== "string") return null;
+  // `casts` / `castPlayed` / `castRejected`: chỉ kế hoạch `*-cast` có; có mặt thì phải là số đếm (rác -> null, không mặc định 0)
+  const hasCast =
+    v.casts !== undefined || v.castPlayed !== undefined || v.castRejected !== undefined;
+  if (hasCast)
+    for (const k of ["casts", "castPlayed", "castRejected"]) if (!isCount(v[k])) return null;
   return {
     fxPlan: v.plan,
     fxPlayed: v.played,
@@ -224,5 +307,9 @@ export function parseFxDriverReport(raw) {
     floatsPeak: v.peakFloats,
     fxAdmitted: v.fxAdmitted,
     fxDropped: v.fxDropped,
+    // chỉ kế hoạch `*-cast` có ba trường này (vắng thì KHÔNG thêm khoá: báo cáo cũ giữ nguyên hình dạng)
+    ...(hasCast
+      ? { castsEmitted: v.casts, castPlayed: v.castPlayed, castRejected: v.castRejected }
+      : {}),
   };
 }
