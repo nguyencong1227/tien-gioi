@@ -139,28 +139,27 @@ export function findTouchConflicts(
 /** Trạng thái điều khiển cần kiểm: các nút ngữ cảnh (do vòng lặp cảnh bật / tắt MỖI khung) hiện cùng bốn ô chiêu đã gắn (mặc định trên cảm ứng chỉ ô đã gắn mới hiện). */
 export interface TouchState {
   id: string;
-  /** id các nút ngữ cảnh được ép hiện */
+  /** id các nút ngữ cảnh hiện (nút ngữ cảnh khác ẩn). Ba nút cùng lúc (nhặt + nói + cổng) rất hiếm và KHÔNG nằm trong phép đo: ô thứ ba chạm thanh menu ở mọi khung ngang. */
   show: readonly string[];
-  /** chiều cao khung nhìn nhỏ nhất mà trạng thái này được bảo đảm (trạng thái hiếm, vd. hai nút ngữ cảnh cùng lúc) */
-  minHeight: number;
 }
 
 export const TOUCH_STATES: readonly TouchState[] = [
-  { id: "nền (bốn ô chiêu, không nút ngữ cảnh)", show: [], minHeight: 0 },
-  { id: "đứng cạnh cổng (nút Cổng)", show: ["btn-portal"], minHeight: 0 },
-  { id: "đứng cạnh NPC (nút Nói)", show: ["btn-talk"], minHeight: 0 },
-  { id: "đứng cạnh đồ rơi (nút Nhặt)", show: ["btn-pickup"], minHeight: 0 },
-  { id: "NPC + đồ rơi (Nói + Nhặt)", show: ["btn-talk", "btn-pickup"], minHeight: 375 },
+  { id: "nền (bốn ô chiêu, không nút ngữ cảnh)", show: [] },
+  { id: "đứng cạnh cổng (nút Cổng)", show: ["btn-portal"] },
+  { id: "đứng cạnh NPC (nút Nói)", show: ["btn-talk"] },
+  { id: "đứng cạnh đồ rơi (nút Nhặt)", show: ["btn-pickup"] },
+  { id: "NPC + đồ rơi (Nói + Nhặt)", show: ["btn-talk", "btn-pickup"] },
 ];
 
 /**
- * Kịch bản đo ở trạng thái `state`, chạy trong MỘT lần `Runtime.evaluate`: ép hiện nút ngữ cảnh + bốn ô chiêu, đo, rồi trả lại nguyên trạng ngay trong cùng tác vụ,
+ * Kịch bản đo ở trạng thái `state`, chạy trong MỘT lần `Runtime.evaluate`: đặt ba nút ngữ cảnh (hiện đúng các nút của trạng thái) + bốn ô chiêu, đo, rồi trả lại nguyên trạng ngay trong cùng tác vụ,
  * nên vòng lặp cảnh (gọi `talkPrompt(null)`... mỗi khung) không kịp bật / tắt lại giữa chừng.
  */
 export function measureInState(state: TouchState): string {
   return `(() => {
     const touched = [];
-    for (const id of ${JSON.stringify(state.show)}) { const e = document.getElementById(id); touched.push([e, e.hidden]); e.hidden = false; }
+    // CẢ BA nút ngữ cảnh đặt theo trạng thái (nút không thuộc trạng thái thì ẩn): vòng lặp cảnh có thể đang tự hiện nút Nói khi nhân vật đứng cạnh NPC
+    for (const id of ['btn-pickup', 'btn-talk', 'btn-portal']) { const e = document.getElementById(id); touched.push([e, e.hidden]); e.hidden = !${JSON.stringify(state.show)}.includes(id); }
     const slots = [...document.querySelectorAll('#skill-slots .sk.slot')].map((s) => [s, s.className]);
     for (const [s] of slots) { s.classList.remove('k-empty', 'k-locked'); s.classList.add('k-ready'); }
     try { return ${TOUCH_CONTROLS_SCRIPT}; }

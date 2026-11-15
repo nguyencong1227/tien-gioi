@@ -363,7 +363,6 @@ async function main() {
           JSON.stringify(d),
         );
         for (const state of TOUCH_STATES) {
-          if (p.h < state.minHeight) continue;
           const tag = `${p.w}x${p.h} ${scheme} / ${state.id}`;
           const controls = JSON.parse(String(await T.ev(measureInState(state)))) as TouchControl[];
           if (process.env.E2E_TOUCH_DUMP)
