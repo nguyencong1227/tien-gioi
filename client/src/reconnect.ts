@@ -40,6 +40,8 @@ export function runReconnect<R>(opts: ReconnectOptions<R>): Promise<R | null> {
 
   return new Promise<R | null>((resolve) => {
     let finished = false;
+    // Đã gặp lỗi dứt khoát nhưng còn lần thử khác đang chạy: không mở lần mới, chờ các lần đó (xem `fail`)
+    let fatal = false;
     const timers = new Set<ReturnType<typeof setTimeout>>();
     const later = (fn: () => void, ms: number) => {
       const t = setTimeout(() => {
@@ -56,8 +58,19 @@ export function runReconnect<R>(opts: ReconnectOptions<R>): Promise<R | null> {
       resolve(room);
     };
 
+    // Một lần thử THẤT BẠI (không phải thắng). Lỗi dứt khoát chỉ kết thúc vòng khi KHÔNG còn lần thử nào khác đang chạy: server không
+    // "tiêu" token ở bước POST, nên hai lần thử song song cùng được nhận chỗ; lần vào WebSocket sau bị từ chối bằng chính lỗi
+    // "seat reservation expired" / "reconnection token invalid or expired" (đo trên server Colyseus thật), có thể về TRƯỚC khi
+    // phòng của lần thắng kịp tới nơi: kết thúc ngay thì vòng trả null và phòng thắng bị `onLate` đóng. (Review B ở #705.)
+    const fail = (isFatalError: boolean) => {
+      if (isFatalError) fatal = true;
+      if (fatal) {
+        if (inflight === 0) finish(null);
+      } else later(start, opts.retryMs);
+    };
+
     const start = () => {
-      if (finished) return;
+      if (finished || fatal) return;
       const remainingMs = deadline - now();
       if (remainingMs <= 0) return;
       if (inflight >= maxInflight) {
@@ -73,15 +86,13 @@ export function runReconnect<R>(opts: ReconnectOptions<R>): Promise<R | null> {
         if (!settled) start();
       }, opts.stallMs);
 
-      const retry = () => later(start, opts.retryMs);
       let p: Promise<R | null | undefined>;
       try {
         p = opts.attempt();
       } catch (err) {
         settled = true;
         inflight--;
-        if (opts.isFatal(err)) finish(null);
-        else retry();
+        fail(opts.isFatal(err));
         return;
       }
       p.then(
@@ -91,14 +102,12 @@ export function runReconnect<R>(opts: ReconnectOptions<R>): Promise<R | null> {
           if (room) {
             if (finished) opts.onLate?.(room);
             else finish(room);
-          } else retry();
+          } else if (!finished) fail(false);
         },
         (err) => {
           settled = true;
           inflight--;
-          if (finished) return;
-          if (opts.isFatal(err)) finish(null);
-          else retry();
+          if (!finished) fail(opts.isFatal(err));
         },
       );
     };

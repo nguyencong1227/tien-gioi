@@ -159,3 +159,65 @@ describe("runReconnect: vòng nối lại không treo vì một lần thử treo
     await expect(r).resolves.toBe("phong-2");
   });
 });
+
+describe("runReconnect: lần thử THUA lỗi dứt khoát không được phá lần thắng (review B ở #705)", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+  // Đo trên server Colyseus thật: POST reconnect không "tiêu" token, nên hai lần thử song song cùng được nhận chỗ; lần vào sau bị
+  // từ chối với "seat reservation expired." hoặc "reconnection token invalid or expired." (cả hai khớp `isFatal` của main.ts).
+  const isFatal = (e: unknown) => String((e as Error)?.message ?? "").includes("expired");
+
+  it("mạng chậm: lần thua (lỗi expired) về TRƯỚC lần thắng thì vẫn nối được, không gọi onLate", async () => {
+    let n = 0;
+    const attempt = vi.fn(
+      () =>
+        new Promise<string>((res, rej) => {
+          n++;
+          if (n === 1)
+            setTimeout(() => res("phong-thang"), 3100); // lần 1 chậm nhưng sống
+          else setTimeout(() => rej(new Error("reconnection token invalid or expired.")), 1000); // lần 2 mở lúc 2000 ms, lỗi lúc 3000 ms
+        }),
+    );
+    const onLate = vi.fn();
+    const r = runReconnect(base({ attempt, isFatal, onLate }));
+    await vi.advanceTimersByTimeAsync(3200);
+    await expect(r).resolves.toBe("phong-thang");
+    expect(onLate).not.toHaveBeenCalled();
+  });
+
+  it("lỗi dứt khoát khi còn lần thử TREO MÃI: không mở lần mới, hết hạn tổng thì trả null", async () => {
+    let n = 0;
+    const attempt = vi.fn(() => {
+      n++;
+      return n === 1
+        ? new Promise<string>(() => {})
+        : Promise.reject(new Error("room has been disposed (expired)"));
+    });
+    const r = runReconnect(base({ attempt, isFatal, deadlineMs: 20000 }));
+    let done = false;
+    void r.then(() => (done = true));
+    await vi.advanceTimersByTimeAsync(2100); // lần 2 mở lúc 2000 ms và lỗi dứt khoát ngay
+    expect(attempt).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(10000);
+    expect(done).toBe(false); // còn lần 1 đang chạy: chờ nó (có thể về muộn), không kết thúc sớm
+    expect(attempt).toHaveBeenCalledTimes(2); // và không mở thêm lần nào sau lỗi dứt khoát
+    await vi.advanceTimersByTimeAsync(8000);
+    await expect(r).resolves.toBeNull();
+  });
+
+  it("lỗi dứt khoát ở lần thử CUỐI còn chạy thì kết thúc ngay (không đợi hết hạn)", async () => {
+    const first = deferred<string>();
+    let n = 0;
+    const attempt = vi.fn(() =>
+      ++n === 1 ? first.promise : Promise.reject(new Error("seat reservation expired.")),
+    );
+    const r = runReconnect(base({ attempt, isFatal, deadlineMs: 20000 }));
+    await vi.advanceTimersByTimeAsync(2100); // lần 2 lỗi dứt khoát, lần 1 còn chạy
+    let done = false;
+    void r.then(() => (done = true));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(done).toBe(false);
+    first.reject(new Error("token expired")); // lần 1 cũng dứt khoát: hết lần thử đang chạy
+    await expect(r).resolves.toBeNull();
+  });
+});
