@@ -13,7 +13,16 @@
 //   npm run e2e:all -w server -- --dry-run
 //   npm run e2e:all -w server -- --no-retry
 import { spawn, execSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -416,13 +425,25 @@ export function executeScriptOnce(
     attempt: number;
     command?: { cmd: string; args: string[] };
     graceMs?: number;
+    privTmpDir?: string;
   },
-): Promise<{ exitCode: number | null; durationSec: number; log: string; timedOut: boolean }> {
+): Promise<{
+  exitCode: number | null;
+  durationSec: number;
+  log: string;
+  timedOut: boolean;
+  privTmpDir: string;
+}> {
   return new Promise((resolve) => {
     const startTime = Date.now();
     let timedOut = false;
     let logBuffer = "";
     let cleanupPromise: Promise<void> | null = null;
+
+    // Dùng thư mục tạm riêng biệt (ngắn, dưới os.tmpdir()) để cô lập môi trường chạy
+    // Mọi thư mục tạm của Chrome và file lưu của kịch bản đều sinh bên trong thư mục này
+    // và được dọn dẹp sạch sẽ sau khi script kết thúc mà không đụng chạm tới tài nguyên của dev khác
+    const privTmpDir = options.privTmpDir ?? mkdtempSync(path.join(os.tmpdir(), "tg-e2eall-"));
 
     const cmd = options.command?.cmd ?? "npm";
     const args = options.command?.args ?? ["run", scriptName, "-w", "server"];
@@ -433,6 +454,9 @@ export function executeScriptOnce(
       detached: true, // tạo process group để quản lý
       env: {
         ...process.env,
+        TMPDIR: privTmpDir,
+        TEMP: privTmpDir,
+        TMP: privTmpDir,
         FORCE_COLOR: "0",
       },
     });
@@ -452,6 +476,20 @@ export function executeScriptOnce(
       }
     }, options.timeoutSec * 1000);
 
+    const cleanupPrivTmp = async () => {
+      if (timedOut) {
+        // Chờ ngắn để tiến trình con giải phóng hoàn toàn file lock trước khi xoá thư mục
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      try {
+        if (existsSync(privTmpDir)) {
+          rmSync(privTmpDir, { recursive: true, force: true });
+        }
+      } catch {
+        // Bỏ qua lỗi dọn privTmpDir
+      }
+    };
+
     cp.on("close", async (code) => {
       clearTimeout(timer);
       if (cleanupPromise) {
@@ -467,6 +505,8 @@ export function executeScriptOnce(
         logBuffer += `\n[TIMEOUT] Script chạy quá giới hạn ${options.timeoutSec}s và đã bị dừng (đã dọn cây tiến trình).\n`;
       }
 
+      await cleanupPrivTmp();
+
       // Ghi log ra file
       try {
         writeFileSync(options.logFile, logBuffer, { flag: options.attempt > 1 ? "a" : "w" });
@@ -479,11 +519,13 @@ export function executeScriptOnce(
         durationSec,
         log: logBuffer,
         timedOut,
+        privTmpDir,
       });
     });
 
-    cp.on("error", (err) => {
+    cp.on("error", async (err) => {
       clearTimeout(timer);
+      await cleanupPrivTmp();
       const durationSec = (Date.now() - startTime) / 1000;
       logBuffer += `\n[LỖI TIẾN TRÌNH] ${err.message}\n`;
       try {
@@ -496,6 +538,7 @@ export function executeScriptOnce(
         durationSec,
         log: logBuffer,
         timedOut: false,
+        privTmpDir,
       });
     });
   });

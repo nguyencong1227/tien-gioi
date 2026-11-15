@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { existsSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -293,6 +293,84 @@ describe("e2e:all - Bộ chạy toàn diện E2E (M7.16, Issue #694)", () => {
         if (existsSync(logFile)) rmSync(logFile);
       } catch {
         // Bỏ qua lỗi dọn file log test
+      }
+    });
+
+    it("khi timeout xảy ra, thư mục TMPDIR riêng (tg-e2eall-*) và file con detached ghi vào đó bị tự động xoá sạch", async () => {
+      const marker = `tg_tmp_clean_${Date.now()}`;
+      const logFile = path.join(os.tmpdir(), `${marker}.log`);
+
+      // Script tạo file và thư mục con bên trong os.tmpdir() (vốn đã được trỏ tới privTmpDir qua biến môi trường TMPDIR)
+      const scriptCode = `
+        const fs = require('fs');
+        const path = require('path');
+        const os = require('os');
+        const leakDir = path.join(os.tmpdir(), 'tien-gioi-e2e-leak-chrome');
+        fs.mkdirSync(leakDir, { recursive: true });
+        fs.writeFileSync(path.join(leakDir, 'leak.txt'), 'chrome-leak-data');
+        setInterval(() => {}, 1000);
+      `;
+
+      const result = await executeScriptOnce("mock-timeout-tmp-cleanup", {
+        cwd: process.cwd(),
+        timeoutSec: 0.4,
+        logFile,
+        attempt: 1,
+        command: { cmd: "node", args: ["-e", scriptCode] },
+        graceMs: 100,
+      });
+
+      expect(result.timedOut).toBe(true);
+      expect(result.exitCode).toBe(124);
+
+      // Thư mục TMPDIR riêng của lần chạy này phải bị xoá sạch hoàn toàn
+      expect(existsSync(result.privTmpDir)).toBe(false);
+
+      try {
+        if (existsSync(logFile)) rmSync(logFile);
+      } catch {
+        // Bỏ qua lỗi dọn file log test
+      }
+    });
+
+    it("các mục tg-* do công cụ / dev khác tạo KHÔNG BAO GIỜ bị xoá nhầm khi runner timeout", async () => {
+      const marker = `tg_foreign_probe_${Date.now()}`;
+      const logFile = path.join(os.tmpdir(), `${marker}.log`);
+
+      // Giả lập dev khác hoặc công cụ khác đang tạo ảnh hoặc lock trong /tmp
+      const foreignDir = path.join(os.tmpdir(), `tg-foreign-probe-shots-${Date.now()}`);
+      const foreignLock = path.join(os.tmpdir(), `tg-foreign-probe-${Date.now()}.lock`);
+      mkdirSync(foreignDir, { recursive: true });
+      writeFileSync(path.join(foreignDir, "anh.png"), "image-content");
+      writeFileSync(foreignLock, "lock-content");
+
+      const scriptCode = `
+        setInterval(() => {}, 1000);
+      `;
+
+      const result = await executeScriptOnce("mock-timeout-foreign-safety", {
+        cwd: process.cwd(),
+        timeoutSec: 0.4,
+        logFile,
+        attempt: 1,
+        command: { cmd: "node", args: ["-e", scriptCode] },
+        graceMs: 100,
+      });
+
+      expect(result.timedOut).toBe(true);
+      expect(result.exitCode).toBe(124);
+
+      // Đảm bảo tuyệt đối: tài nguyên của dev khác VẪN NGUYÊN VẸN 100%
+      expect(existsSync(foreignDir)).toBe(true);
+      expect(existsSync(foreignLock)).toBe(true);
+
+      // Dọn dẹp tài nguyên giả lập của test
+      try {
+        rmSync(foreignDir, { recursive: true, force: true });
+        rmSync(foreignLock, { force: true });
+        if (existsSync(logFile)) rmSync(logFile);
+      } catch {
+        // Bỏ qua
       }
     });
   });
