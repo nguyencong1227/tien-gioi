@@ -2058,6 +2058,16 @@ html[data-input="touch"] #skill-slots .sk.slot .keycap {
   margin-top: 2px;
   opacity: 0.9;
 }
+/* Điện thoại DỌC: ô túi chỉ ~42-54 px mà chữ nội dung >= 14 px, nên tên chỉ còn 2-3 chữ ("Hồi…", "Th…") và hàng chục món cắt giống hệt nhau (đo cả 69 món: 68 / 69 tên bị cắt ở 390 x 844).
+   Bỏ tên, biểu tượng to hơn; viền + dấu độ hiếm + số lượng vẫn nói thay, chạm ô thì bảng chi tiết ngay dưới lưới ghi tên đầy đủ, `aria-label` vẫn đủ tên (cùng cách thanh chiêu cảm ứng bỏ tên).
+   Điện thoại NGANG giữ tên (ô 80 px, ~7 chữ): ngăn kéo thấp (390 px) nên bảng chi tiết nằm dưới màn hình, tên trong ô là thứ duy nhất thấy ngay. Máy tính bảng / máy tính giữ tên (ô 61 px). */
+html[data-form="phone"][data-orient="portrait"] .inv-slot .slot-name {
+  display: none;
+}
+html[data-form="phone"][data-orient="portrait"] .inv-slot .slot-icon {
+  width: 34px;
+  height: 34px;
+}
 .inv-slot .slot-qty {
   position: absolute;
   bottom: 2px;
