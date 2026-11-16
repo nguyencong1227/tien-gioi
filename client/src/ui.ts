@@ -184,6 +184,7 @@ import {
 import { transitionMs, waitOrSkip } from "./gfx/scene-transition";
 import { getDisplay, onDisplayChange } from "./gfx/display";
 import { optionTag, skipHintText } from "./dialog-opt";
+import { craftButtonText, craftFeeHint, craftSubtitle, craftTitle } from "./craft-ui";
 import {
   CHAT_PREF_KEY,
   MAP_LEGEND_PREF_KEY,
@@ -1631,7 +1632,9 @@ function renderForgeModal() {
 
 function renderForgeModalImpl() {
   const npc = NPC_BY_ID[forgeNpcId];
-  $("forge-title").textContent = npc ? `Lò Rèn · ${npc.name}` : "Lò Rèn Thiết Ngưu";
+  // Tiêu đề, dòng phụ và nút theo TRẠM của NPC (#514): Lò Rèn / Lò Đan / Bàn Phù, chữ từ `CRAFT_STATIONS` (shared); NPC cũ không có `station` = Lò Rèn
+  $("forge-title").textContent = craftTitle(npc);
+  $("forge-sub").textContent = craftSubtitle(npc);
   const list = $("forge-list");
   list.replaceChildren();
 
@@ -1710,8 +1713,9 @@ function renderForgeModalImpl() {
     forgeBtn.type = "button";
     forgeBtn.className = "forge-btn";
     forgeBtn.disabled = !canCraft;
-    forgeBtn.textContent = "Rèn";
-    if (fee > 0) forgeBtn.title = `Rèn: tốn ${fee.toLocaleString("vi-VN")} ${CURRENCY_NAME}`;
+    forgeBtn.textContent = craftButtonText(npc);
+    if (fee > 0)
+      forgeBtn.title = craftFeeHint(npc, `${fee.toLocaleString("vi-VN")} ${CURRENCY_NAME}`);
     forgeBtn.addEventListener("click", (e) => {
       e.preventDefault();
       if (!canCraft) return;
@@ -2092,7 +2096,12 @@ function renderDialogOptions() {
     }
     btn.append(labelSpan);
 
-    const tagInfo = optionTag(opt.action.kind, opt.label, !!opt.disabled);
+    const tagInfo = optionTag(
+      opt.action.kind,
+      opt.label,
+      !!opt.disabled,
+      opt.action.kind === "forge" ? opt.action.station : undefined, // Lò đan / Bàn phù (#514); thiếu = Lò rèn
+    );
     if (tagInfo) {
       const tag = document.createElement("small");
       tag.textContent = tagInfo.text;
