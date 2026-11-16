@@ -1483,6 +1483,7 @@
             <button type="button" id="sect-tab-btn-members" class="sect-tab">Thành viên</button>
             <button type="button" id="sect-tab-btn-treasury" class="sect-tab">Kho tông môn</button>
             <button type="button" id="sect-tab-btn-vault" class="sect-tab">Kho đồ</button>
+            <button type="button" id="sect-tab-btn-hall" class="sect-tab">Nội vụ</button>
           </div>
 
           <!-- Tab 1: Tổng quan -->
@@ -1636,6 +1637,7 @@
               role="grid"
               aria-label="Kho đồ tông môn"
             ></div>
+            <p id="sect-vault-locked" class="sect-vault-locked" role="note"></p>
             <h4>Túi đồ của ngươi <small>(chọn món để góp)</small></h4>
             <div
               id="sect-vault-bag"
@@ -1669,6 +1671,8 @@
               <div id="sect-vault-log" class="sect-logs-list"></div>
             </div>
           </div>
+          <!-- Tab 5: Nội vụ (M8.6, #843): cấp tông + điểm, cống hiến của mình, nhiệm vụ hôm nay, cửa hàng; vẽ bằng `sect-hall-ui.ts` -->
+          <div id="sect-tab-hall" class="sect-tab-content" hidden></div>
         </div>
 
         <!-- Hộp xác nhận trong game cho Nhường / Trục xuất / Rời (thay confirm() gốc, #246) -->
