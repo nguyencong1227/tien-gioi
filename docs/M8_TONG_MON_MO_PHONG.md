@@ -1,10 +1,10 @@
 # M8 — Mô phỏng ngân sách tông môn có chiều sâu (Dev D, #844 M8.7)
 
-> Phần **mô phỏng ngân sách** của M8.7, làm được NGAY từ thiết kế (chỉ đọc hằng số hợp đồng M8.1 + `docs/CAN_BANG.md`), BEFORE hợp đồng `shared/` M8.1 (#848 / #838) vào main.
-> Dữ liệu đầu vào là các hằng số trên nhánh hợp đồng `a/m8-hop-dong-shared` (`shared/src/sect-depth.ts`) và số thu nhập trong `docs/CAN_BANG.md`.
-> **Mọi số trong thiết kế là ĐỀ XUẤT của A; D chốt bằng mô phỏng này (THIET_KE_TONG_MON.md mục 12.11.3).** Kết quả cuối sẽ gộp vào `docs/CAN_BANG.md` + mở rộng `npm run can-bang -w server` ở PR M8.7 đầy đủ (sau khi hợp đồng vào main).
+> Phần **mô phỏng ngân sách** của M8.7, làm theo thiết kế (đọc hằng số hợp đồng M8.1 + `docs/CAN_BANG.md`). Hợp đồng M8.1 (`shared/src/sect-depth.ts`), 5 tên cấp, và máy chủ M8.3-M8.5 đã ở `main` (PR #848 / #838 đã merge).
+> Dữ liệu đầu vào là các hằng số trong `shared/src/sect-depth.ts` (trên main) và số thu nhập trong `docs/CAN_BANG.md`.
+> **Mọi số trong thiết kế là ĐỀ XUẤT của A; D chốt bằng mô phỏng này (THIET_KE_TONG_MON.md mục 12.11.3).** Kết quả cuối sẽ gộp vào `docs/CAN_BANG.md` + mở rộng `npm run can-bang -w server` ở PR M8.7 đầy đủ (dữ liệu `SECT_SHOP`, sau hợp đồng đã vào main).
 
-## 0. Đầu vào (hằng số hợp đồng M8.1 — `a/m8-hop-dong-shared:shared/src/sect-depth.ts`)
+## 0. Đầu vào (hằng số hợp đồng M8.1 — `shared/src/sect-depth.ts` trên main)
 
 | Hằng | Giá trị | Nghĩa |
 |---|--:|---|
@@ -80,6 +80,8 @@ So với thu nhập săn (`CAN_BANG.md`), quy ra "giờ săn tương đương" c
 
 Bất biến mục 12.6: "trần giá trị mua mỗi ngày KHÔNG vượt ~1 giờ săn của bậc thấp nhất món dùng được." → 700 LT-đvt = **0,54 giờ săn Luyện Khí** < 1 giờ ✓ (còn dư ~45%). Cửa hàng là **tiện lợi / phần thưởng tham gia tông**, KHÔNG phải chỗ kiếm tiền. **Đạt.**
 
+> **Giới hạn của (b):** kết luận này dựa trên neo `SECT_CH_VALUE_LT = 5` và CHƯA đối chiếu giá thật của `SECT_SHOP` (D đang viết ở #844). Nó chỉ đúng nếu **mọi món trong `SECT_SHOP` có giá trị mua ≤ (giá cống hiến × 5)**; sẽ kiểm bằng dữ liệu thật ở PR M8.7 đầy đủ — đừng coi (b) là đã chốt trên giá thật.
+
 ## 3. (d) Không có vòng Linh thạch → cống hiến → hàng → bán lại có lời
 
 Chuỗi chuyển đổi:
@@ -119,11 +121,11 @@ Mô phỏng **XÁC NHẬN** các số khởi đầu của A đạt mọi mục t
 
 **Ghi chú tuỳ chọn (KHÔNG chặn, A/người dùng quyết):** trần mua 700 LT-đvt/ngày còn dư ~45% dưới mốc 1 giờ săn Luyện Khí. Nếu A muốn cửa hàng "hào phóng" hơn một chút cho bậc cao, có thể nới `SECT_CH_VALUE_LT` xuống 4 (trần 560 LT-đvt = 0,43 giờ) — nhưng KHÔNG cần vì số hiện tại đã an toàn và đúng ý "tiện lợi, không phải chỗ rửa tiền". **Khuyến nghị: GIỮ NGUYÊN.**
 
-## 6. Bước tiếp (PR M8.7 đầy đủ, SAU khi hợp đồng M8.1 #848 vào main)
+## 6. Bước tiếp (PR M8.7 đầy đủ — dữ liệu `SECT_SHOP` + `SECT_TERMS`; hợp đồng M8.1 đã vào main)
 
-1. Dùng `sectQuestViolations()` / `sectShopViolations()` (hợp đồng M8.1) kiểm dữ liệu thật `SECT_QUESTS` (≥12 mẫu × 4 bậc) và `SECT_SHOP` (5 nhóm) của D.
-2. Đặt tên 5 cấp + `SECT_TERMS` (ghi `docs/NGUON_NOI_DUNG.md` mục 3 nếu lấy nguyên văn VKTT).
-3. Mở rộng `npm run can-bang -w server` thêm mục tông môn (đọc `sectAwardDay` / `SECT_EARN_DAY_CAP` / `SECT_CH_VALUE_LT` trên nhánh `a/m8-hop-dong-shared` nếu muốn chạy trước), gộp các bảng ở mục 1-4 vào `docs/CAN_BANG.md`.
+1. Dùng `sectQuestViolations()` / `sectShopViolations()` (hợp đồng M8.1, đã trên main) kiểm dữ liệu thật `SECT_SHOP` (5 nhóm) của D; `SECT_QUESTS` (≥12 mẫu × 4 bậc) do Dev E làm ở #856.
+2. `SECT_TERMS`: 5 tên cấp (Sơ Lập / Tiểu Thành / Trung Hưng / Hưng Vượng / Đỉnh Thịnh) ĐÃ có trong hợp đồng `SECT_LEVELS[].name`; nếu ghi thêm thuật ngữ giải thích lấy nguyên văn VKTT thì ghi `docs/NGUON_NOI_DUNG.md` mục 3.
+3. Mở rộng `npm run can-bang -w server` thêm mục tông môn (đọc `sectAwardDay` / `SECT_EARN_DAY_CAP` / `SECT_CH_VALUE_LT` trên main), gộp các bảng ở mục 1-4 vào `docs/CAN_BANG.md`.
 4. Chạy TOÀN BỘ `npm test` + `typecheck` + `lint` + `prettier --check .` trước PR; PR ghi `Closes #844`.
 
-*Lưu:* phần dữ liệu `SECT_QUESTS` / `SECT_SHOP` / tên cấp CHƯA viết (phụ thuộc hợp đồng M8.1 #848 đang mở, B+C review). Tài liệu này chỉ là phần mô phỏng ngân sách làm được ngay.
+*Lưu:* phần dữ liệu `SECT_SHOP` + `SECT_TERMS` CHƯA viết (Dev D, #844); `SECT_QUESTS` tách sang #856 (Dev E). Hợp đồng M8.1 (#848) ĐÃ vào main. Tài liệu này chỉ là phần mô phỏng ngân sách làm được ngay.
