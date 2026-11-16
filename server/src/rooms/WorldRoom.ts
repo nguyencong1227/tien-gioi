@@ -175,6 +175,7 @@ import {
 import { applyRebirth, creditSoul } from "../systems/reincarnation";
 import { RateLimiter } from "../rate-limit";
 import { audit, auditCoinThreshold } from "../audit";
+import { testExpMultFor } from "../test-exp";
 import { defaultHub, type Hub } from "../hub";
 
 const SAVE_EVERY_MS = 30_000;
@@ -225,6 +226,11 @@ export class WorldRoom extends Room<WorldState> {
    * trường (`server/src/protocol.ts`). Mặc định `MIN_PROTOCOL_VERSION` của `shared/` (0: nhận cả client chưa gửi `v`).
    */
   static minProtocol = MIN_PROTOCOL_VERSION;
+  /**
+   * Hệ số tu vi THỬ NGHIỆM theo đạo hiệu chuẩn hoá (`TEST_EXP_MULT`, QUYET_DINH_M3 mục 34, `server/src/test-exp.ts`); `index.ts` đặt từ môi trường.
+   * Mặc định rỗng = tắt. Tra MỘT lần lúc vào phòng (`onJoin`), không đọc lại trong tick.
+   */
+  static testExpMult: ReadonlyMap<string, number> = new Map();
   /**
    * Dịch vụ tông môn (đặt ở `index.ts` theo `STORE`). `null`: dùng kho tệp mặc định (`defaultSectStore`, dựng lười). `SECTS=off`
    * (biến môi trường) gỡ tính năng: không có dịch vụ, mọi tin tông môn bị từ chối.
@@ -624,6 +630,12 @@ export class WorldRoom extends Room<WorldState> {
     applyStats(p, true, mult);
     const limbo = sanitizeLimbo(save.limbo); // đang ở Hoàng Tuyền: nằm "chết" cho tới khi đầu thai
     if (limbo) p.dead = true;
+    // Hệ số tu vi thử nghiệm (mục 34): chỉ khi đạo hiệu có trong cấu hình; ghi audit mỗi lần vào phòng (minh bạch), người khác không bị ảnh hưởng
+    const testMult = testExpMultFor(WorldRoom.testExpMult, p.name);
+    if (testMult > 1) {
+      p.testExpMult = testMult;
+      audit("test.exp_mult", { name: p.name, mult: testMult, map: this.mapId });
+    }
     this.state.players.set(client.sessionId, p);
     this.world.ctrl.set(client.sessionId, {
       save,

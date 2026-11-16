@@ -38,9 +38,13 @@ export function applyStats(p: Player, heal: boolean, mult?: StatMult) {
  * Cộng tu vi; đủ thì tự lên bậc nhỏ. Bậc cuối của cảnh giới thì dừng ở đầy, chờ Đột phá.
  * `scale`: hệ số tốc độ tu luyện của chân linh (Dư âm tu hành, `expMultOf`): chỉ truyền cho tu vi từ HẠ QUÁI và ĐẢ TỌA;
  * đan dược (phần trăm thanh) và thưởng nhiệm vụ (số cố định) không nhân.
+ * `Player.testExpMult` (hệ số THỬ NGHIỆM của `TEST_EXP_MULT`, mặc định 1, QUYET_DINH_M3 mục 34) nhân SAU CÙNG, lên MỌI nguồn đi qua đây (hạ quái,
+ * đả tọa, đan, nhiệm vụ, bí cảnh): hệ số ngoài 1-10 (không bao giờ đặt ra, nhưng đây là chỗ tiền tệ tu vi) bị coi là 1.
  */
 export function gainExp(w: World, sid: string, p: Player, amount: number, scale = 1) {
   amount *= scale;
+  const test = p.testExpMult;
+  if (test > 1 && test <= 10) amount *= test;
   if (isPeak(p.realm, p.tier)) {
     p.exp = Math.min(p.expMax, p.exp + amount);
     return;

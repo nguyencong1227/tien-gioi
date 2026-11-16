@@ -55,6 +55,11 @@ export class Player extends Schema {
   @view(TAG_OWNER) @type("string") boots = "";
   @view(TAG_OWNER) @type("string") jade = "";
   @view(TAG_OWNER) @type("string") treasure = "";
+  /**
+   * Hệ số tu vi THỬ NGHIỆM của chính nhân vật này (`TEST_EXP_MULT`, QUYET_DINH_M3 mục 34, `server/src/test-exp.ts`): 1 = không nhân (mặc định),
+   * 2-10 = `gainExp` nhân tu vi thêm ngần này. CHỈ chủ nhận (client hiện nhãn "Thử nghiệm ×N"); đặt MỘT lần lúc vào phòng, không đổi trong tick.
+   */
+  @view(TAG_OWNER) @type("uint8") testExpMult = 1;
 }
 
 export class Monster extends Schema {
