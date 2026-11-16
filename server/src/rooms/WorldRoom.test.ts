@@ -2217,19 +2217,19 @@ describe("nghề nhỏ: hiệu lực chế phẩm mất khi qua cổng hoặc th
     a.room.send("useItem", { slot });
     await waitFor(() => statuses.find((m) => m.list.some((e) => e[0] === "dao_ho")));
     const w = (serverRoom(a.room) as any).world;
-    applyPlayerStatus(
-      w,
-      a.room.sessionId,
-      { status: "haste", ms: 8000, ratio: 0.2, chance: 1 },
-      0,
-      "t",
-    );
-    await waitFor(() => statuses.find((m) => m.list.some((e) => e[0] === "haste")));
-    expect(idsOf(a.room).sort()).toEqual(["dao_ho", "haste"]);
+    // buff chiêu (haste) và phù lát 2 (amp_hoa, cdr_phu): đủ bốn ô, đều phải mất khi qua cổng / thoát phòng
+    for (const [id, ms, ratio] of [
+      ["haste", 8000, 0.2],
+      ["amp_hoa", 60_000, 0.2],
+      ["cdr_phu", 60_000, 0.15],
+    ] as const)
+      applyPlayerStatus(w, a.room.sessionId, { status: id, ms, ratio, chance: 1 }, 0, "t");
+    await waitFor(() => statuses.find((m) => m.list.some((e) => e[0] === "cdr_phu")));
+    expect(idsOf(a.room).sort()).toEqual(["amp_hoa", "cdr_phu", "dao_ho", "haste"]);
     return statuses;
   }
 
-  it("QUA CỔNG: phòng đích không mang dao_ho / buff chiêu; hồ sơ không lưu trạng thái; đan đã bị trừ", async () => {
+  it("QUA CỔNG: phòng đích không mang dao_ho / phù / buff chiêu; hồ sơ không lưu trạng thái; đan đã bị trừ", async () => {
     installPill();
     const name = "Cong Xoa Dan";
     const a = await join(name);
@@ -2246,6 +2246,8 @@ describe("nghề nhỏ: hiệu lực chế phẩm mất khi qua cổng hoặc th
     const saved = fileJson(name);
     expect(saved).not.toContain("dao_ho");
     expect(saved).not.toContain("haste");
+    expect(saved).not.toContain("amp_hoa");
+    expect(saved).not.toContain("cdr_phu");
     expect(saved).not.toContain(PILL);
     // vào phòng đích: hộp trạng thái trống (cả phía máy chủ lẫn tin `status` nhận được)
     const b = await join(name, secretOf(name), got[0].mapId);
@@ -2256,7 +2258,7 @@ describe("nghề nhỏ: hiệu lực chế phẩm mất khi qua cổng hoặc th
     expect(statuses.flatMap((m) => m.list.map((e) => e[0]))).toEqual([]);
   });
 
-  it("THOÁT PHÒNG rồi vào lại: không còn dao_ho / buff chiêu", async () => {
+  it("THOÁT PHÒNG rồi vào lại: không còn dao_ho / phù / buff chiêu", async () => {
     installPill();
     const name = "Thoat Xoa Dan";
     const a = await join(name);
