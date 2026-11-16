@@ -5,7 +5,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { ITEMS, addToInventory } from "@tien-gioi/shared";
+import { ITEMS } from "@tien-gioi/shared";
 import { Hub } from "../hub";
 import { FileSectStore } from "../sect-store";
 import { SectService } from "../sect-service";
@@ -29,7 +29,7 @@ let svc: SectService;
 
 beforeEach(async () => {
   lh = makeWorld(undefined, new Hub());
-  let tick = 1_700_000_000_000;
+  const tick = 1_700_000_000_000;
   // đồng hồ KHÔNG tiến: hai cập nhật liên tiếp cùng một mili giây (ca xấu nhất cho việc so `updatedAt`)
   store = new FileSectStore(path.join(root, `s${++n}`), () => tick);
   svc = new SectService(store, () => tick);
