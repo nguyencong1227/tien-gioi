@@ -2,7 +2,14 @@
 // dưới hàng Linh thạch / số đạo hữu. Dữ liệu từ `StatusTracker.active(now)` (server gửi `status`, client tự đếm lùi). Lớp THUẦN (mô hình + vẽ vào đối tượng DOM tối thiểu)
 // nên test được không cần jsdom. Chỉ GHI DOM khi dấu hiệu đổi (id, số giây làm tròn lên, cường độ): gọi mỗi khung vẫn rẻ và trình đọc màn hình không bị đọc lại liên tục.
 // Huy hiệu trên đầu quái / người khác cần `Monster.fx` công khai (hợp đồng đã có `STATUS_BIT`, schema ở M7.3 #504) nên làm ở bước sau.
-import { STATUSES, statusOf, type StatusDef, type StatusEntry } from "@tien-gioi/shared";
+import {
+  ELEMENT_BY_ID,
+  STATUSES,
+  ampElementOf,
+  statusOf,
+  type StatusDef,
+  type StatusEntry,
+} from "@tien-gioi/shared";
 
 /** Còn từng này giây trở xuống thì ô nhấp nháy (trừ khi giảm chuyển động): sắp hết, người chơi cần biết. */
 export const BADGE_URGENT_SECS = 2;
@@ -48,6 +55,13 @@ export function effectText(def: StatusDef, ratio: number | undefined): string {
       return "hồi khí huyết mỗi giây";
     case "breakAid":
       return pct > 0 ? `cộng ${pct}% xác suất đột phá lần kế` : "cộng xác suất đột phá lần kế";
+    case "amp": {
+      const el = ampElementOf(def.id);
+      const heText = el ? ` hệ ${ELEMENT_BY_ID[el].name}` : "";
+      return pct > 0 ? `tăng ${pct}% sát thương chiêu${heText}` : `tăng sát thương chiêu${heText}`;
+    }
+    case "cdr":
+      return pct > 0 ? `giảm ${pct}% hồi chiêu` : "giảm hồi chiêu";
   }
 }
 
@@ -57,6 +71,8 @@ function ratioTag(def: StatusDef, ratio: number | undefined): string {
   if (def.kind === "haste") return ` +${Math.round(ratio * 100)}%`;
   if (def.kind === "slow") return ` −${Math.round(ratio * 100)}%`;
   if (def.kind === "breakAid") return ` +${Math.round(ratio * 100)}%`;
+  if (def.kind === "amp") return ` +${Math.round(ratio * 100)}%`;
+  if (def.kind === "cdr") return ` −${Math.round(ratio * 100)}%`;
   return "";
 }
 

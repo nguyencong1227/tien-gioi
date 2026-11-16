@@ -215,3 +215,23 @@ describe("status-badges: StatusBadgesDom", () => {
     expect(badgeSignature(badgeViews([["poison", 5000]]))).not.toBe(a);
   });
 });
+
+describe("status-badges: phù (nghề nhỏ lát 2, #514)", () => {
+  it("phù tăng sát thương: tên + dấu +X% + hệ trong câu đọc; phù tốc chiêu: dấu −X%", () => {
+    const [a, c] = badgeViews([
+      ["amp_hoa", 59_000, 0.2],
+      ["cdr_phu", 30_000, 0.15],
+    ]);
+    expect(a).toMatchObject({ id: "amp_hoa", name: "Phù Hỏa", harmful: false, secs: 59 });
+    expect(a.label).toBe("Phù Hỏa +20% 59");
+    expect(a.aria).toBe("Phù Hỏa: tăng 20% sát thương chiêu hệ Hỏa, còn 59 giây");
+    expect(c.label).toBe("Phù Tốc Chiêu −15% 30");
+    expect(c.aria).toBe("Phù Tốc Chiêu: giảm 15% hồi chiêu, còn 30 giây");
+  });
+
+  it("thiếu ratio: không nêu số nhưng vẫn có câu tác dụng", () => {
+    const [a] = badgeViews([["amp_kim", 10_000]]);
+    expect(a.label).toBe("Phù Kim 10");
+    expect(a.aria).toBe("Phù Kim: tăng sát thương chiêu hệ Kim, còn 10 giây");
+  });
+});

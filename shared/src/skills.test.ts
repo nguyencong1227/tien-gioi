@@ -641,11 +641,32 @@ describe("tên trạng thái", () => {
 });
 
 describe("tốc độ di chuyển theo trạng thái (moveSpeedMul, StatusEntry.ratio)", () => {
-  it("chỉ tăng tốc / tê cóng / hộ đạo ghi ratio; loại khác không", () => {
+  it("chỉ tăng tốc / tê cóng / hộ đạo / phù ghi ratio; loại khác không", () => {
     const ratioIds = STATUSES.filter(
-      (st) => st.kind === "haste" || st.kind === "slow" || st.kind === "breakAid",
+      (st) =>
+        st.kind === "haste" ||
+        st.kind === "slow" ||
+        st.kind === "breakAid" ||
+        st.kind === "amp" ||
+        st.kind === "cdr",
     ).map((st) => st.id);
-    expect(ratioIds.sort()).toEqual(["chill", "dao_ho", "haste"]);
+    expect(ratioIds.sort()).toEqual(
+      [
+        "amp_am",
+        "amp_bang",
+        "amp_hoa",
+        "amp_kim",
+        "amp_loi",
+        "amp_moc",
+        "amp_phong",
+        "amp_tho",
+        "amp_thuy",
+        "cdr_phu",
+        "chill",
+        "dao_ho",
+        "haste",
+      ].sort(),
+    );
     for (const st of STATUSES) expect(statusCarriesRatio(st.id)).toBe(ratioIds.includes(st.id));
     for (const bad of ["constructor", "__proto__", "", 3, null, undefined])
       expect(statusCarriesRatio(bad)).toBe(false);
