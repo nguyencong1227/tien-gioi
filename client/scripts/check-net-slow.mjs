@@ -134,52 +134,6 @@ async function main() {
       source: `try { localStorage.setItem('tg_newbie_guide_dismissed','1'); localStorage.setItem('tg_quality','low'); } catch (e) {}`,
     });
 
-    // ---- đầu vào THẬT của Chrome ----
-    const mouse = (type, x, y, extra = {}) =>
-      send("Input.dispatchMouseEvent", {
-        type,
-        x,
-        y,
-        button: "left",
-        buttons: type === "mousePressed" ? 1 : 0,
-        clickCount: 1,
-        ...extra,
-      });
-    const moveTo = async (x, y) => mouse("mouseMoved", x, y, { button: "none", buttons: 0 });
-    const clickAt = async (x, y) => {
-      await moveTo(x, y);
-      await mouse("mousePressed", x, y);
-      await mouse("mouseReleased", x, y);
-    };
-    const tapAt = async (x, y) => {
-      await send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
-      await send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-    };
-    const keyDef = {
-      Enter: [13, "\r"],
-      Escape: [27, ""],
-      ArrowRight: [39, ""],
-      ArrowLeft: [37, ""],
-      ArrowDown: [40, ""],
-      Tab: [9, ""],
-    };
-    const press = async (key) => {
-      const [vk, text] = keyDef[key];
-      await send("Input.dispatchKeyEvent", {
-        type: "keyDown",
-        key,
-        code: key,
-        windowsVirtualKeyCode: vk,
-        ...(text ? { text } : {}),
-      });
-      await send("Input.dispatchKeyEvent", {
-        type: "keyUp",
-        key,
-        code: key,
-        windowsVirtualKeyCode: vk,
-      });
-    };
-
     for (const vp of VIEWPORTS) {
       if (onlyVp && vp.name !== onlyVp) continue;
       console.log(`\n=== ${vp.name} (${vp.mobile ? "cảm ứng" : "chuột"}) ===`);
