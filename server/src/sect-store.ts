@@ -590,7 +590,12 @@ export class FileSectStore implements SectStore {
       const cur = this.byId.get(id);
       if (!cur) return null;
       const next = assertWritableSect(
-        { ...fn(structuredClone(cur)), id, v: 1, updatedAt: this.clock() },
+        {
+          ...fn(structuredClone(cur)),
+          id,
+          v: 1,
+          updatedAt: Math.max(this.clock(), cur.updatedAt + 1),
+        },
         this.clock(),
       );
       const c = this.conflictOf(next);

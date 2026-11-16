@@ -24,7 +24,7 @@ export function tickWorld(w: World, dtMs: number) {
     if (p.dead) return tickRespawn(w, p, c);
     if (w.ghosts.size > 0 && w.ghosts.has(sid)) return; // hồn lìa xác: đứng yên, không hồi phục, không tu luyện
     c.life.playMs += dtMs; // thời gian chơi thật của kiếp (không tính chết, hồn lìa xác)
-    applyInputs(w.map, p, c, dtMs); // ngân sách bước theo thời gian thật (`dtMs` đồng hồ phòng), không +1 mỗi tick
+    w.inputStats.dropped += applyInputs(w.map, p, c, dtMs); // ngân sách bước theo thời gian thật (`dtMs` đồng hồ phòng), không +1 mỗi tick; input cũ vượt backlog bị bỏ (mục 41)
     if (c.inputs.length >= INPUT_BACKLOG_WARN) w.inputStats.backlogTicks++;
     if ((w.tick + c.posPhase) % POS_SYNC_EVERY_TICKS === 0) syncPublicPos(p);
     if (!w.duels.has(sid)) tickRecovery(w, sid, p, c, dt); // trong trận thách đấu: không hồi khí huyết / linh lực, không đả tọa
