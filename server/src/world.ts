@@ -24,6 +24,7 @@ import type {
   DuelEndMsg,
   SectInvitedMsg,
   SectHallMsg,
+  SectBuff,
   SectVaultMsg,
   NetShieldMsg,
   SectMsg,
@@ -138,6 +139,12 @@ export interface PlayerCtrl {
    * CHỈ ở phía máy chủ (không vào state, không gửi client: người dùng bỏ nhãn ở mục 36); `gainExp` nhân sau cùng.
    */
   testExpMult?: number;
+  /**
+   * Buff tông môn (M8.3b, docs/THIET_KE_TONG_MON.md mục 12.5): hệ số tu vi / cơ hội rơi đồ (chủ đồ) / tốc độ hồi phục ngoài đả tọa, CHỈ khi cấp tông >= 2 (cấp 1 không buff nên để
+   * trống: đường nóng không tốn gì). `systems/sect.ts` (`applySectBuff`) đặt lúc vào phòng / lên cấp / thành viên đổi, xoá khi rời / bị mời ra / giải tán. CHỈ phía máy chủ (không vào
+   * state); `gainExp`, `dropLoot`, `tickRecovery` đọc. Người ngoại tuyến không có `PlayerCtrl` nên không có buff (chỉ người ĐANG TRỰC TUYẾN).
+   */
+  sectBuff?: SectBuff;
   /** Dữ liệu chạy của pháp bảo đang mặc (M7.4, `systems/treasure.ts`): đồng hồ khiên, chỗ đứng yên. Chỉ có khi đang có pháp bảo tác dụng. */
   treasure?: TreasureRt;
 }
