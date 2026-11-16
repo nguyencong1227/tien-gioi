@@ -44,7 +44,7 @@ import {
 } from "@tien-gioi/shared";
 import { defineRooms } from "../src/rooms/WorldRoom";
 import { freePort } from "../src/test-port";
-import { gridOf, planPath } from "../src/balance/search-check";
+import { gridOf, planPath, type Grid } from "../src/balance/search-check";
 import { safeSpot } from "../src/systems/movement";
 import { hashSecret, savePlayer } from "../src/store";
 import { assertNotProd } from "./assert-not-prod";
@@ -153,9 +153,10 @@ export function estimateDropsRequired(itemId: string, count: number): DropEstima
     };
   }
 
-  let bestMonster: string | undefined;
-  let bestRate = 0;
-  let hasWild = false;
+  let bestWildMonster: string | undefined;
+  let bestWildRate = 0;
+  let fallbackMonster: string | undefined;
+  let fallbackRate = 0;
 
   for (const d of drops) {
     const mon = MONSTER_BY_ID[d.monster];
@@ -169,16 +170,21 @@ export function estimateDropsRequired(itemId: string, count: number): DropEstima
       d.monster === "thien_han_vuong";
 
     if (isWild && !isBoss) {
-      hasWild = true;
-      if (d.rate > bestRate) {
-        bestRate = d.rate;
-        bestMonster = d.monster;
+      if (d.rate > bestWildRate) {
+        bestWildRate = d.rate;
+        bestWildMonster = d.monster;
       }
-    } else if (!bestMonster && d.rate > bestRate) {
-      bestRate = d.rate;
-      bestMonster = d.monster;
+    } else {
+      if (d.rate > fallbackRate) {
+        fallbackRate = d.rate;
+        fallbackMonster = d.monster;
+      }
     }
   }
+
+  const hasWild = bestWildMonster !== undefined;
+  const bestMonster = bestWildMonster ?? fallbackMonster;
+  const bestRate = bestWildMonster ? bestWildRate : fallbackRate;
 
   if (!hasWild || !bestMonster) {
     return {
@@ -410,6 +416,7 @@ export interface QuestWalkOptions {
   timeoutSec?: number;
   silent?: boolean;
   dataDir?: string;
+  repeat?: number;
 }
 
 export interface QuestWalkResult {
@@ -470,7 +477,245 @@ function freeCellsNear(
     : new Set([Math.min(grid.w * grid.h - 1, Math.max(0, cy * grid.w + cx))]);
 }
 
-/** Di chuyển bot tới toạ độ đích (px) bằng tìm đường A* (planPath) tránh vật cản */
+/**
+ * Heap nhị phân tối thiểu đơn giản cho tìm đường an toàn né quái.
+ */
+class SafePathHeap {
+  keys: number[] = [];
+  vals: number[] = [];
+  get size() {
+    return this.keys.length;
+  }
+  clear() {
+    this.keys.length = 0;
+    this.vals.length = 0;
+  }
+  push(k: number, v: number) {
+    let i = this.keys.length;
+    this.keys.push(k);
+    this.vals.push(v);
+    while (i > 0) {
+      const p = (i - 1) >> 1;
+      if (this.keys[p] <= k) break;
+      this.keys[i] = this.keys[p];
+      this.vals[i] = this.vals[p];
+      i = p;
+    }
+    this.keys[i] = k;
+    this.vals[i] = v;
+  }
+  pop(): number {
+    const top = this.vals[0];
+    const lk = this.keys.pop()!;
+    const lv = this.vals.pop()!;
+    const n = this.keys.length;
+    if (n > 0) {
+      let i = 0;
+      for (;;) {
+        let c = 2 * i + 1;
+        if (c >= n) break;
+        if (c + 1 < n && this.keys[c + 1] < this.keys[c]) c++;
+        if (this.keys[c] >= lk) break;
+        this.keys[i] = this.keys[c];
+        this.vals[i] = this.vals[c];
+        i = c;
+      }
+      this.keys[i] = lk;
+      this.vals[i] = lv;
+    }
+    return top;
+  }
+}
+
+const safeHeap = new SafePathHeap();
+const SQRT2 = Math.SQRT2;
+
+/**
+ * Tính ma trận phạt nguy hiểm quanh các con quái trên bản đồ (Issue #818).
+ * Các ô nằm trong bán kính aggro / thức tỉnh của quái sẽ bị cộng thêm chi phí phạt.
+ * @param grid Lưới ô của bản đồ
+ * @param monsters Danh sách quái (tọa độ x, y, bán kính aggro, máu hp, loài kind)
+ * @param penaltyFactor Hệ số phạt né (mặc định = 18; nếu = 0 thì không phạt né quái - đột biến 1)
+ * @param ignoreMonsterKind Bỏ qua loài quái này (dùng khi đang đi săn chính loài quái mục tiêu)
+ */
+export function buildDangerPenaltyMap(
+  grid: Grid,
+  monsters: Iterable<{ x: number; y: number; aggro?: number; hp?: number; kind?: string }>,
+  penaltyFactor = 18,
+  ignoreMonsterKind?: string,
+): Float32Array {
+  const penalty = new Float32Array(grid.w * grid.h);
+  if (penaltyFactor <= 0) return penalty;
+
+  for (const m of monsters) {
+    if (m.hp !== undefined && m.hp <= 0) continue;
+    if (ignoreMonsterKind && m.kind === ignoreMonsterKind) continue;
+    // Bán kính vùng nguy hiểm: tầm aggro của quái cộng thêm bán kính an toàn 32px (1 ô)
+    // Nếu quái không có aggro (aggro = 0, quái hiền như thỏ) thì không phạt.
+    const aggro = m.aggro ?? 160;
+    if (aggro <= 0) continue;
+    const r = aggro + 32;
+    const r2 = r * r;
+
+    const minTx = Math.max(0, Math.floor((m.x - r) / 32));
+    const maxTx = Math.min(grid.w - 1, Math.floor((m.x + r) / 32));
+    const minTy = Math.max(0, Math.floor((m.y - r) / 32));
+    const maxTy = Math.min(grid.h - 1, Math.floor((m.y + r) / 32));
+
+    for (let ty = minTy; ty <= maxTy; ty++) {
+      for (let tx = minTx; tx <= maxTx; tx++) {
+        const idx = ty * grid.w + tx;
+        if (grid.free[idx] !== 1) continue;
+        const cx = (tx + 0.5) * 32;
+        const cy = (ty + 0.5) * 32;
+        const d2 = (cx - m.x) ** 2 + (cy - m.y) ** 2;
+        if (d2 < r2) {
+          const d = Math.sqrt(d2);
+          const p = penaltyFactor * (1 - d / r);
+          if (p > penalty[idx]) penalty[idx] = p;
+        }
+      }
+    }
+  }
+
+  return penalty;
+}
+
+/**
+ * Tìm đường đi an toàn A* né các vùng quái (có ma trận phạt nguy hiểm, Issue #818).
+ * Nếu không có phạt (penaltyMap toàn 0), trả về đường ngắn nhất hình học.
+ * Nếu mọi đường đều phải qua quái, chọn đường có tổng chi phí phạt nhỏ nhất.
+ */
+export function planSafePath(
+  g: Grid,
+  sx: number,
+  sy: number,
+  goals: ReadonlySet<number>,
+  penaltyMap?: Float32Array,
+): { cells: number[]; length: number; totalPenalty: number } | null {
+  const { w, h, free, dist, parent, stamp } = g;
+  const tx0 = Math.min(w - 1, Math.max(0, Math.floor(sx / 32)));
+  const ty0 = Math.min(h - 1, Math.max(0, Math.floor(sy / 32)));
+  const start = ty0 * w + tx0;
+  const run = ++g.run;
+  safeHeap.clear();
+  dist[start] = 0;
+  parent[start] = -1;
+  stamp[start] = run;
+  safeHeap.push(0, start);
+
+  while (safeHeap.size > 0) {
+    const key = safeHeap.keys[0];
+    const cur = safeHeap.pop();
+    if (key > dist[cur]) continue;
+    if (goals.has(cur)) {
+      const cells: number[] = [];
+      let totalPenalty = 0;
+      for (let c = cur; c !== -1; c = parent[c]) {
+        cells.push(c);
+        if (penaltyMap) totalPenalty += penaltyMap[c];
+      }
+      cells.reverse();
+      return { cells, length: key, totalPenalty };
+    }
+    const cx = cur % w,
+      cy = (cur / w) | 0;
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        const nx = cx + dx,
+          ny = cy + dy;
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        const ni = ny * w + nx;
+        if (!free[ni]) continue;
+        // không cắt góc tường
+        if (dx !== 0 && dy !== 0 && (!free[cy * w + nx] || !free[ny * w + cx])) continue;
+        const stepDist = dx !== 0 && dy !== 0 ? SQRT2 : 1;
+        const stepPenalty = penaltyMap ? penaltyMap[ni] : 0;
+        const nd = key + stepDist + stepPenalty;
+        if (stamp[ni] === run && dist[ni] <= nd) continue;
+        stamp[ni] = run;
+        dist[ni] = nd;
+        parent[ni] = cur;
+        safeHeap.push(nd, ni);
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Đánh giá xem món đồ rơi tại (lootX, lootY) có an toàn để bot nhặt lúc này hay không (Issue #818).
+ * @param lootX Tọa độ x của đồ rơi
+ * @param lootY Tọa độ y của đồ rơi
+ * @param me Thể trạng của bot (hp, maxHp, toạ độ x, y)
+ * @param monsters Danh sách quái đang hoạt động
+ * @param meSessionId Session ID của bot
+ * @param safetyRadius Bán kính kiểm tra an toàn quanh đồ rơi (mặc định 160px)
+ */
+export function isLootSafeToPick(
+  lootX: number,
+  lootY: number,
+  me: { x: number; y: number; hp: number; maxHp: number },
+  monsters: Iterable<{
+    x: number;
+    y: number;
+    hp?: number;
+    target?: string | null;
+    aggro?: number;
+    attackRange?: number;
+    kind?: string;
+  }>,
+  meSessionId?: string,
+  safetyRadius = 150,
+): { safe: boolean; reason?: string; dangerMonsterId?: string } {
+  // 1. Máu bot quá thấp (< 50%): không an toàn để dừng lại nhặt đồ dã ngoại
+  if (me.hp < me.maxHp * 0.5) {
+    return { safe: false, reason: "low_hp" };
+  }
+
+  // 2. Kiểm tra các con quái xung quanh món đồ và xung quanh bot
+  let closestDangerDist = Infinity;
+  let dangerId: string | undefined = undefined;
+
+  for (const m of monsters as any) {
+    const mon = m as any;
+    if (!mon || (mon.hp !== undefined && mon.hp <= 0)) continue;
+
+    // Quái đang nhắm vào bot
+    const targetingMe = meSessionId && mon.target === meSessionId;
+    const distToLoot = Math.hypot(mon.x - lootX, mon.y - lootY);
+    const distToMe = Math.hypot(mon.x - me.x, mon.y - me.y);
+
+    const aggro = mon.aggro ?? 160;
+    const atkRange = mon.attackRange ?? 40;
+    const dangerRange = Math.max(safetyRadius, atkRange + 50);
+
+    // Nếu quái đang đánh bot và còn gần
+    if (targetingMe && distToMe < aggro + 40) {
+      if (distToMe < closestDangerDist) {
+        closestDangerDist = distToMe;
+        dangerId = mon.id;
+      }
+    }
+
+    // Nếu quái nằm quá gần món đồ (canh giữ đồ rơi)
+    if (distToLoot < dangerRange) {
+      if (distToLoot < closestDangerDist) {
+        closestDangerDist = distToLoot;
+        dangerId = mon.id;
+      }
+    }
+  }
+
+  if (dangerId) {
+    return { safe: false, reason: "monster_guarding_loot", dangerMonsterId: dangerId };
+  }
+
+  return { safe: true };
+}
+
+/** Di chuyển bot tới toạ độ đích (px) bằng tìm đường A* (planSafePath né quái hoặc planPath) */
 export async function moveTo(
   room: Room,
   targetX: number,
@@ -480,6 +725,9 @@ export async function moveTo(
   maxWaitMs?: number,
   abortIf?: () => boolean,
   onTick?: () => void,
+  avoidMonsters = true,
+  ignoreMonsterKind?: string,
+  avoidPenaltyFactor = 18,
 ): Promise<boolean> {
   const mapObj = getMap(mapId) ?? DEFAULT_MAP;
   const grid = gridOf(mapObj);
@@ -490,6 +738,7 @@ export async function moveTo(
   const timeoutMs = maxWaitMs ?? Math.max(12000, Math.ceil((initialDist / 120) * 1000) + 10000);
   const start = Date.now();
   let seq = 0;
+  let nextPillAt = 0;
 
   while (Date.now() - start < timeoutMs) {
     if (onTick) onTick();
@@ -500,13 +749,48 @@ export async function moveTo(
       await new Promise((res) => setTimeout(res, 50));
       continue;
     }
+
+    const now = Date.now();
+    if (now >= nextPillAt && me.hp < me.maxHp * 0.8) {
+      room.send("useItem", { itemId: "thuong_hoi_huyet_dan" });
+      room.send("useItem", { itemId: "dai_hoi_huyet_dan" });
+      room.send("useItem", { itemId: "trung_hoi_huyet_dan" });
+      room.send("useItem", { itemId: "hoi_huyet_dan" });
+      nextPillAt = now + 1200;
+    }
+
+    // Tự vệ cơ bản nếu bị quái chặn đường áp sát
+    if (room.state.monsters) {
+      for (const mon of room.state.monsters.values()) {
+        if (!mon || mon.hp <= 0) continue;
+        const dMon = Math.hypot(mon.x - me.x, mon.y - me.y);
+        if (dMon <= 60) {
+          const ang = Math.atan2(mon.y - me.y, mon.x - me.x);
+          room.send("attack", { angle: ang });
+          break;
+        }
+      }
+    }
     const dist = Math.hypot(targetX - me.x, targetY - me.y);
     if (dist <= targetDist) {
       room.send("input", { seq: seq + 1, dx: 0, dy: 0 });
       return true;
     }
 
-    const pathResult = planPath(grid, me.x, me.y, goals);
+    let pathResult: { cells: number[]; length: number } | null = null;
+    if (avoidMonsters && room.state.monsters && room.state.monsters.size > 0) {
+      const penaltyMap = buildDangerPenaltyMap(
+        grid,
+        room.state.monsters.values(),
+        avoidPenaltyFactor,
+        ignoreMonsterKind,
+      );
+      pathResult = planSafePath(grid, me.x, me.y, goals, penaltyMap);
+    }
+    if (!pathResult) {
+      pathResult = planPath(grid, me.x, me.y, goals);
+    }
+
     let dx: number;
     let dy: number;
     if (pathResult && pathResult.cells.length > 1) {
@@ -685,9 +969,12 @@ export async function walkSingleQuest(
   const gear = buildFullBestGear(Math.max(1, realm), tier);
   const nowIso = new Date().toISOString();
   const invSlots: any[] = Array.from({ length: 16 }, () => null);
-  invSlots[0] = { itemId: "dai_hoi_huyet_dan", qty: 99 };
+  const healPillId =
+    realm >= 4 ? "thuong_hoi_huyet_dan" : realm >= 2 ? "dai_hoi_huyet_dan" : "hoi_huyet_dan";
+  const manaPillId = realm >= 3 ? "dai_hoi_linh_dan" : "hoi_linh_dan";
+  invSlots[0] = { itemId: healPillId, qty: 99 };
   invSlots[1] = { itemId: "hoi_huyet_dan", qty: 99 };
-  invSlots[2] = { itemId: "dai_hoi_linh_dan", qty: 99 };
+  invSlots[2] = { itemId: manaPillId, qty: 99 };
 
   // Sổ chiêu thức nạp sẵn các chiêu thức phù hợp với cảnh giới
   const skillBook: SkillBook = {
@@ -919,7 +1206,11 @@ export async function walkSingleQuest(
       );
       let patrolIdx = 0;
 
-      const huntTimeoutMs = Math.max(timeoutSec * 1000, targetCount * 18000);
+      const expectedKills =
+        isCollect && collectItemId
+          ? estimateDropsRequired(collectItemId, targetCount).expectedKills
+          : targetCount;
+      const huntTimeoutMs = Math.max(timeoutSec * 1000, expectedKills * 25000);
       const huntStart = Date.now();
       let nextPillAt = 0;
       let nextSmallPillAt = 0;
@@ -969,20 +1260,20 @@ export async function walkSingleQuest(
           lastStatusLog = Date.now();
         }
 
-        // Tự cắn đan hồi máu / hồi mana (2 loại đan hồi máu độc lập)
+        // Tự cắn đan hồi máu / hồi mana (2 loại đan hồi máu độc lập, cooldown server ~1.2s)
         if (me.hp < me.maxHp * 0.85) {
           if (Date.now() >= nextPillAt) {
             room!.send("useItem", { slot: 0 });
-            nextPillAt = Date.now() + 8500;
+            nextPillAt = Date.now() + 1500;
           }
           if (me.hp < me.maxHp * 0.6 && Date.now() >= nextSmallPillAt) {
             room!.send("useItem", { slot: 1 });
-            nextSmallPillAt = Date.now() + 8500;
+            nextSmallPillAt = Date.now() + 1500;
           }
         }
         if (me.mp < me.maxMp * 0.5 && Date.now() >= nextManaAt) {
           room!.send("useItem", { slot: 2 });
-          nextManaAt = Date.now() + 8500;
+          nextManaAt = Date.now() + 1500;
         }
 
         // Kiểm tra điều kiện hoàn thành
@@ -1032,52 +1323,74 @@ export async function walkSingleQuest(
           });
         }
 
-        if (nearestLootId) {
-          const approachCount = (lootApproachFrames.get(nearestLootId) ?? 0) + 1;
-          lootApproachFrames.set(nearestLootId, approachCount);
-
-          if (approachCount > 40 && nearestLootDist > 40) {
-            // Không thể tiếp cận sau 2 giây, bỏ qua để không kẹt
-            pickupAttempts.set(nearestLootId, 99);
-          } else if (nearestLootDist > 38) {
-            const pRes = lootPath as { cells: number[] } | null;
-            if (pRes && pRes.cells.length > 1) {
-              const grid = gridOf(mapObj);
-              const nextCell = pRes.cells[1];
-              const nx = ((nextCell % grid.w) + 0.5) * 32;
-              const ny = (Math.floor(nextCell / grid.w) + 0.5) * 32;
-              const ang = Math.atan2(ny - me.y, nx - me.x);
-              room!.send("input", { seq: ++seq, dx: Math.cos(ang), dy: Math.sin(ang) });
-            } else {
-              const ang = Math.atan2(lootY - me.y, lootX - me.x);
-              room!.send("input", { seq: ++seq, dx: Math.cos(ang), dy: Math.sin(ang) });
-            }
-          } else {
-            room!.send("input", { seq: ++seq, dx: 0, dy: 0 });
-            if (Date.now() >= nextPickupAt) {
-              log(`[LOOT] Nhặt đồ rơi '${nearestLootId}' (dist: ${nearestLootDist.toFixed(1)})`);
-              pickupAttempts.set(nearestLootId, (pickupAttempts.get(nearestLootId) ?? 0) + 1);
-              room!.send("pickup", { lootId: nearestLootId });
-              nextPickupAt = Date.now() + 250;
-            }
-          }
-          await new Promise((res) => setTimeout(res, 50));
-          continue;
-        }
-
-        // Tự vệ nếu có quái mục tiêu áp sát (<= 58px) ngáng đường khi đang bị mất máu
+        // Tự vệ nếu có quái mục tiêu áp sát (<= 65px) hoặc quái đang bắn tỉa bot
         let selfDefenseId: string | null = null;
         let selfDefenseAngle = 0;
+        let selfDefenseDist = Infinity;
         if (room!.state.monsters && me.hp < me.maxHp * 0.95) {
           room!.state.monsters.forEach((m: any, id: string) => {
-            if (m && m.hp > 0 && isValidTarget(m)) {
+            if (m && m.hp > 0) {
+              const isTargetMon = isValidTarget(m);
+              const isTargetingMe = m.target === room!.sessionId;
               const d = Math.hypot(m.x - me.x, m.y - me.y);
-              if (d <= 58) {
-                selfDefenseId = id;
-                selfDefenseAngle = Math.atan2(m.y - me.y, m.x - me.x);
+              // Tự vệ nếu: quái mục tiêu áp sát <= 65px, HOẶC quái đang nhắm bắn bot trong cự ly <= 160px
+              if ((isTargetMon && d <= 65) || (isTargetingMe && d <= 160)) {
+                if (d < selfDefenseDist) {
+                  selfDefenseDist = d;
+                  selfDefenseId = id;
+                  selfDefenseAngle = Math.atan2(m.y - me.y, m.x - me.x);
+                }
               }
             }
           });
+        }
+
+        // Nhặt đồ có chọn lúc (Issue #818 mục 2)
+        if (nearestLootId) {
+          const safety = isLootSafeToPick(lootX, lootY, me, room!.state.monsters, room!.sessionId);
+          if (!safety.safe) {
+            // Không an toàn để nhặt ngay (quái đang bắn hoặc canh giữ): ưu tiên tiêu diệt mối đe dọa trước
+            if (safety.dangerMonsterId && room!.state.monsters?.has(safety.dangerMonsterId)) {
+              const dm = room!.state.monsters.get(safety.dangerMonsterId)!;
+              const dDist = Math.hypot(dm.x - me.x, dm.y - me.y);
+              if (dDist <= 65) {
+                selfDefenseId = safety.dangerMonsterId;
+                selfDefenseAngle = Math.atan2(dm.y - me.y, dm.x - me.x);
+              }
+            }
+            // Không continue ngay mà để luồng rơi xuống phần tự vệ / chiến đấu bên dưới
+          } else {
+            const approachCount = (lootApproachFrames.get(nearestLootId) ?? 0) + 1;
+            lootApproachFrames.set(nearestLootId, approachCount);
+
+            if (approachCount > 40 && nearestLootDist > 40) {
+              // Không thể tiếp cận sau 2 giây, bỏ qua để không kẹt
+              pickupAttempts.set(nearestLootId, 99);
+            } else if (nearestLootDist > 38) {
+              const pRes = lootPath as { cells: number[] } | null;
+              if (pRes && pRes.cells.length > 1) {
+                const grid = gridOf(mapObj);
+                const nextCell = pRes.cells[1];
+                const nx = ((nextCell % grid.w) + 0.5) * 32;
+                const ny = (Math.floor(nextCell / grid.w) + 0.5) * 32;
+                const ang = Math.atan2(ny - me.y, nx - me.x);
+                room!.send("input", { seq: ++seq, dx: Math.cos(ang), dy: Math.sin(ang) });
+              } else {
+                const ang = Math.atan2(lootY - me.y, lootX - me.x);
+                room!.send("input", { seq: ++seq, dx: Math.cos(ang), dy: Math.sin(ang) });
+              }
+            } else {
+              room!.send("input", { seq: ++seq, dx: 0, dy: 0 });
+              if (Date.now() >= nextPickupAt) {
+                log(`[LOOT] Nhặt đồ rơi '${nearestLootId}' (dist: ${nearestLootDist.toFixed(1)})`);
+                pickupAttempts.set(nearestLootId, (pickupAttempts.get(nearestLootId) ?? 0) + 1);
+                room!.send("pickup", { lootId: nearestLootId });
+                nextPickupAt = Date.now() + 250;
+              }
+            }
+            await new Promise((res) => setTimeout(res, 50));
+            continue;
+          }
         }
 
         if (selfDefenseId) {
@@ -1234,6 +1547,8 @@ export async function walkSingleQuest(
             return false;
           },
           checkAbort,
+          true,
+          monDef?.id,
         );
         if (!aborted) {
           patrolIdx++;
@@ -1301,9 +1616,22 @@ export async function walkSingleQuest(
           checkAbort();
           log(`Đã cấp ${step.count} '${step.itemId}' vào túi đồ (${rsn}).`);
         } else {
-          // Săn đồ rơi thật
+          // Săn đồ rơi thật: ưu tiên quái thường dã ngoại không phải trùm thế giới
+          const est = estimateDropsRequired(step.itemId, step.count);
           const drops = findDropsFor(step.itemId);
-          const monTarget = drops[0]?.monster;
+          const monTarget =
+            est.bestMonster ??
+            drops.find((d) => {
+              const m = MONSTER_BY_ID[d.monster];
+              return (
+                m &&
+                !m.boss &&
+                d.monster !== "hac_giao" &&
+                d.monster !== "yeu_vuong" &&
+                d.monster !== "thien_han_vuong"
+              );
+            })?.monster ??
+            drops[0]?.monster;
           if (!monTarget) {
             throw new Error(`Không tìm thấy quái dã ngoại rơi '${step.itemId}'.`);
           }
@@ -1338,7 +1666,17 @@ export async function walkSingleQuest(
     await travelToMap(plan.giverMapId);
 
     log(`Quay lại gặp NPC '${q.giver}' để trả nhiệm vụ...`);
-    await moveTo(room, giverNpc.x, giverNpc.y, 36, currentMapId, undefined, undefined, checkAbort);
+    await moveTo(
+      room,
+      giverNpc.x,
+      giverNpc.y,
+      36,
+      currentMapId,
+      undefined,
+      undefined,
+      checkAbort,
+      false, // Về trấn trả nhiệm vụ: ưu tiên đường thẳng ngắn nhất để thoát khỏi bãi quái
+    );
     checkAbort();
 
     const meBefore = room.state.players?.get(room.sessionId);
@@ -1492,20 +1830,46 @@ export async function runQuestWalk(options: QuestWalkOptions = {}): Promise<{
   console.log(`  Máy chủ Colyseus cổng: ${port} | Số nhiệm vụ kiểm tra: ${questsToRun.length}`);
   console.log(`========================================================================\n`);
 
+  const repeat = Math.max(1, options.repeat ?? 1);
   const results: QuestWalkResult[] = [];
   let allPassed = true;
 
-  for (let i = 0; i < questsToRun.length; i++) {
-    const q = questsToRun[i];
-    console.log(`[${i + 1}/${questsToRun.length}] Kiểm tra '${q.title}' (${q.id})...`);
-    const res = await walkSingleQuest(client, q, options);
-    results.push(res);
-    if (!res.success) allPassed = false;
+  interface QuestStats {
+    quest: QuestDef;
+    runs: QuestWalkResult[];
+  }
+  const statsMap = new Map<string, QuestStats>();
 
-    const statusBadge = res.success ? "✓ THÀNH CÔNG" : "✗ THẤT BẠI";
-    const giveBadge = res.usedGive ? ` (Cấp đồ: ${res.giveReasons.join(", ")})` : "";
-    console.log(`  => ${statusBadge} sau ${res.durationSec}s${giveBadge}`);
-    if (res.error) console.log(`     Lỗi: ${res.error}`);
+  for (let r = 0; r < repeat; r++) {
+    if (repeat > 1) {
+      console.log(`\n--- LƯỢT CHẠY ${r + 1}/${repeat} ---`);
+    }
+    for (let i = 0; i < questsToRun.length; i++) {
+      const q = questsToRun[i];
+      const prefix = repeat > 1 ? `[Lượt ${r + 1}/${repeat}] ` : "";
+      console.log(`${prefix}[${i + 1}/${questsToRun.length}] Kiểm tra '${q.title}' (${q.id})...`);
+      const res = await walkSingleQuest(client, q, options);
+      if (r === 0) {
+        results.push(res);
+      } else {
+        const existingIdx = results.findIndex((item) => item.id === q.id);
+        if (existingIdx >= 0) results[existingIdx] = res;
+      }
+
+      let st = statsMap.get(q.id);
+      if (!st) {
+        st = { quest: q, runs: [] };
+        statsMap.set(q.id, st);
+      }
+      st.runs.push(res);
+
+      if (!res.success) allPassed = false;
+
+      const statusBadge = res.success ? "✓ THÀNH CÔNG" : "✗ THẤT BẠI";
+      const giveBadge = res.usedGive ? ` (Cấp đồ: ${res.giveReasons.join(", ")})` : "";
+      console.log(`  => ${statusBadge} sau ${res.durationSec}s${giveBadge}`);
+      if (res.error) console.log(`     Lỗi: ${res.error}`);
+    }
   }
 
   await server.gracefullyShutdown(false);
@@ -1519,20 +1883,47 @@ export async function runQuestWalk(options: QuestWalkOptions = {}): Promise<{
 
   // In bảng báo cáo tổng kết dạng Markdown
   console.log(`\n============================ BẢNG BÁO CÁO KẾT QUẢ ============================`);
-  console.log(
-    `| STT | Mã | Tên nhiệm vụ | Bản đồ | NPC giao | Cảnh giới | Kết quả | Thời gian | Cấp đồ (/give) |`,
-  );
-  console.log(
-    `| --- | -- | ------------ | ------ | -------- | --------- | ------- | --------- | -------------- |`,
-  );
-  results.forEach((r, idx) => {
-    const stt = String(idx + 1).padStart(3, " ");
-    const status = r.success ? "✓ ĐẠT" : "**✗ ĐỎ**";
-    const give = r.usedGive ? `Có (${r.giveReasons.join("; ")})` : "Không";
+  if (repeat > 1) {
     console.log(
-      `| ${stt} | \`${r.id}\` | ${r.title} | ${r.mapId} | ${r.giver} | ${r.minRealmText} | ${status} | ${r.durationSec}s | ${give} |`,
+      `| STT | Mã | Tên nhiệm vụ | Bản đồ | Bậc yêu cầu | Tỉ lệ ĐẠT | Đánh giá | Thời gian TB | Chi tiết các lần |`,
     );
-  });
+    console.log(
+      `| --- | -- | ------------ | ------ | ----------- | :-------: | :------: | :----------: | ---------------- |`,
+    );
+    let idx = 0;
+    statsMap.forEach((st, qId) => {
+      idx++;
+      const stt = String(idx).padStart(3, " ");
+      const passed = st.runs.filter((x) => x.success).length;
+      let evalText = "✗ ĐỎ";
+      if (passed === repeat) evalText = "✓ ĐẠT ổn định";
+      else if (passed > 0) evalText = "⚠ CHẬP CHỜN";
+
+      const avgTime =
+        Math.round((st.runs.reduce((acc, cur) => acc + cur.durationSec, 0) / repeat) * 10) / 10;
+      const detail = st.runs
+        .map((x, runIdx) => `#${runIdx + 1}: ${x.success ? "✓" : "✗"} (${x.durationSec}s)`)
+        .join("; ");
+      console.log(
+        `| ${stt} | \`${qId}\` | ${st.quest.title} | ${st.runs[0].mapId} | ${st.runs[0].minRealmText} | ${passed}/${repeat} | **${evalText}** | ${avgTime}s | ${detail} |`,
+      );
+    });
+  } else {
+    console.log(
+      `| STT | Mã | Tên nhiệm vụ | Bản đồ | NPC giao | Cảnh giới | Kết quả | Thời gian | Cấp đồ (/give) |`,
+    );
+    console.log(
+      `| --- | -- | ------------ | ------ | -------- | --------- | ------- | --------- | -------------- |`,
+    );
+    results.forEach((r, idx) => {
+      const stt = String(idx + 1).padStart(3, " ");
+      const status = r.success ? "✓ ĐẠT" : "**✗ ĐỎ**";
+      const give = r.usedGive ? `Có (${r.giveReasons.join("; ")})` : "Không";
+      console.log(
+        `| ${stt} | \`${r.id}\` | ${r.title} | ${r.mapId} | ${r.giver} | ${r.minRealmText} | ${status} | ${r.durationSec}s | ${give} |`,
+      );
+    });
+  }
   console.log(`==============================================================================`);
   console.log(
     `Tổng số: ${results.length} | Thành công: ${results.filter((r) => r.success).length} | Thất bại: ${results.filter((r) => !r.success).length} | Tổng thời gian: ${totalTimeSec}s\n`,
@@ -1564,12 +1955,15 @@ if (isDirectCli) {
   const giveAll = args.includes("--give-all");
   const timeoutArg = args.find((a) => a.startsWith("--timeout="))?.split("=")[1];
   const timeoutSec = timeoutArg ? Number(timeoutArg) : 60;
+  const repeatArg = args.find((a) => a.startsWith("--repeat="))?.split("=")[1];
+  const repeat = repeatArg ? Math.max(1, Number(repeatArg)) : 1;
 
   runQuestWalk({
     questId: questArg,
     mapId: mapArg,
     giveAll,
     timeoutSec,
+    repeat,
   })
     .then(({ allPassed }) => {
       process.exit(allPassed ? 0 : 1);

@@ -1461,73 +1461,93 @@ npm run quest-walk -w server -- --quest=tru_tho
 npm run quest-walk -w server -- --map=lac_ha
 ```
 
-### 27.3. Bảng kết quả kiểm thử khả thi trên bản đồ thực tế (`QUESTS` hiện tại)
+### 27.3. Bảng kết quả kiểm thử khả thi trên bản đồ thực tế (`QUESTS` hiện tại - Trước #757 vs Sau #818)
 
 > Ghi chú về cơ chế `/give`: Theo thiết kế chuẩn của Issue #757 và review của Dev A, bot **chỉ được phép dùng `/give` khi `needsGive === true`** (nghĩa là vật phẩm không có nguồn rơi dã ngoại, hoặc trùm thế giới/bí cảnh cần tổ đội mà bot chạy đơn độc). Với mọi quái thường và vật phẩm có trong bảng rơi dã ngoại (`DROP_TABLES`), bot phải di chuyển tới bãi quái thật bằng tìm đường A*, tuần tra 8 hướng, săn quái và nhặt đồ rơi thật qua tin nhắn `pickup { lootId }` (kèm cơ chế tự vệ `SELF-DEFENSE` khi bị quái cản đường tấn công).
 >
-> **Cơ chế ngắt an toàn khi bot gục ngã (Review lần 2):** Khi bot nhận tin `limbo` (chết do quái/vào Hoàng Tuyền), `reborn`, hoặc `travelTo` ngoài kế hoạch, bot lập tức dừng nhiệm vụ và báo **ĐỎ ngay trong < 3.5s** kèm lý do cụ thể (`bot_died` / `unplanned_travel`, nêu rõ bản đồ và bước bị ngắt), tuyệt đối không giữ phòng cũ, không in log `SELF-DEFENSE` lặp vô tận và không chờ hết timeout 450s.
+> **Cơ chế né quái và nhặt đồ an toàn (Issue #818):**
+> 1. `buildDangerPenaltyMap`: Ma trận phạt chi phí vùng nguy hiểm quanh quái (bán kính aggro + 32px), bỏ qua quái hiền và loài quái đang săn.
+> 2. `planSafePath`: Tìm đường A* ưu tiên các ô có tổng chi phí phạt nguy hiểm nhỏ nhất thay vì đâm thẳng qua bầy quái.
+> 3. `isLootSafeToPick`: Đánh giá mức độ an toàn trước khi nhặt rơi (kiểm tra máu bot > 50%, dọn quái canh giữ và quái đang nhắm bắn trước).
+> 4. `moveTo`: Tự cắn đan dược hồi máu khi di chuyển dã ngoại, tự vệ áp sát <= 60px; khi về trấn trả nhiệm vụ chuyển đường ngắn nhất để vào vùng an toàn nhanh nhất.
+>
+> **Phân loại nhóm lỗi theo phân tích #757 & Issue #818:**
+> - **Không lỗi**: Nhiệm vụ hoàn thành trọn vẹn (✅ ĐẠT).
+> - **Nhóm 1 (Trùm thế giới)**: Quái cấp trùm thế giới/bí cảnh cần tổ đội người chơi (`hac_giao`, `doc_long_giao`, `thien_han_dieu`), bot đơn độc không thể solo (2 ca).
+> - **Nhóm 2 (Hành vi bot né quái / nhặt đồ)**: Đã giải quyết triệt để trong #818 (`lang_han_quan` đạt ổn định 5/5; `doc_nang_nop` và `doc_thiem_nang` thoát hoàn toàn lỗi nhặt đồ/chọn boss sai và đạt 4/5, phần ranh giới chập chờn còn lại do quái dã ngoại Độc Thiềm hội đồng ở bước săn thuộc Nhóm 3 cân bằng quái #805; 2 ca thu thập cấp 4 chuyển sang Nhóm 3).
+> - **Nhóm 3 (Cân bằng quái dã ngoại)**: Quái cấp 3 Âm Sương và cấp 4 Hàn Vân có chỉ số sát thương/DoT/máu quá cao so với người chơi đơn độc cùng cảnh giới (15 ca, chờ nhóm thiết kế/cân bằng ở PR #805).
 
-| STT | Mã nhiệm vụ | Tên nhiệm vụ | Bản đồ | Bậc yêu cầu | Loại bước chính | Kết quả | Thời gian | Cấp đồ (/give) | Trạng thái & Ghi chú vận hành |
-|---|---|---|:---:|:---:|---|:---:|---:|:---:|---|
-| 1 | `nhap_the` | Nhập thế | `lac_ha` | Phàm Nhân | `talk` (truong_tran) | ✅ **ĐẠT** | 3.0s | Không | Hoàn thành |
-| 2 | `tru_tho` | Thỏ phá ruộng | `lac_ha` | Phàm Nhân | `kill` (5 tho) + `collect` (3 long_tho) | ✅ **ĐẠT** | 14.9s | Không (săn & nhặt rơi thật) | Hoàn thành |
-| 3 | `buoc_vao_tien_do` | Bước vào Tiên lộ | `lac_ha` | Luyện Khí 1 | `reachRealm` (Luyện Khí 1) | ✅ **ĐẠT** | 0.4s | Không | Hoàn thành |
-| 4 | `tinh_toa` | Tĩnh tọa ngưng thần | `lac_ha` | Luyện Khí 1 | `talk` (dao_si) | ✅ **ĐẠT** | 0.4s | Không | Hoàn thành |
-| 5 | `nanh_soi_ren_kiem` | Nanh sói cho lò rèn | `lac_ha` | Trúc Cơ 1 | `kill` (8 lang) + `collect` (5 nanh_soi) | ✅ **ĐẠT** | 47.9s | Không (săn & nhặt rơi thật) | Hoàn thành |
-| 6 | `thuoc_cho_tran` | Thuốc cho người trong trấn | `lac_ha` | Luyện Khí 1 | `collect` (8 long_tho, 4 nanh_soi) | ✅ **ĐẠT** | 40.5s | Không (săn & nhặt rơi thật) | Hoàn thành |
-| 7 | `hac_ho` | Hắc Hổ hạ sơn | `lac_ha` | Luyện Khí 2 | `kill` (10 ho) | ✅ **ĐẠT** | 41.0s | Không (săn quái thật) | Hoàn thành |
-| 8 | `dinh_luyen_khi` | Đỉnh Luyện Khí | `lac_ha` | Luyện Khí 9 | `reachRealm` (Luyện Khí 9) | ✅ **ĐẠT** | 0.4s | Không | Hoàn thành |
-| 9 | `truc_co_nhap_mon` | Trúc Cơ nhập môn | `lac_ha` | Trúc Cơ 1 | `reachRealm` (Trúc Cơ 1) | ✅ **ĐẠT** | 0.4s | Không | Hoàn thành |
-| 10 | `mang_hoan` | Mãng hoạn | `lac_ha` | Trúc Cơ 1 | `kill` (1 mang - Xích Mãng) | ✅ **ĐẠT** | 29.3s | Có (/give vảy trùm thế giới) | Hoàn thành |
-| 11 | `thanh_lo_tram` | Thanh Lộ Trạm | `lac_ha` | Trúc Cơ 1 | `talk` (lai_buon tại `hac_phong`) qua portal | ✅ **ĐẠT** | 17.6s | Không | Hoàn thành (di chuyển liên bản đồ) |
-| 12 | `vong_suong` | Vọng Sương | `am_suong` | Trúc Cơ 3 | `talk` (tram_truong) | ✅ **ĐẠT** | 0.4s | Không | Hoàn thành |
-| 13 | `suong_ho_hoan` | Sương Hồ hoạn | `am_suong` | Kim Đan 1 | `kill` (25 suong_ho) | ❌ **ĐỎ** | 35.2s | Không (chuẩn bị trang bị Kim Đan 1) | Dừng ngay (<3.5s): `bot_died` tại Âm Sương Trạch do quái Kim Đan dồn sát thương |
-| 14 | `thach_quy_giap` | Mai rùa | `am_suong` | Kim Đan 1 | `kill` (15 thach_quy) | ❌ **ĐỎ** | 28.2s | Không (chuẩn bị trang bị Kim Đan 1) | Dừng ngay (<3.5s): `bot_died` tại Âm Sương Trạch do Thạch Quy thủ cao |
-| 15 | `doc_thiem_nang` | Độc nang | `am_suong` | Kim Đan 1 | `collect` (10 doc_thiem_nang) | ❌ **ĐỎ** | 22.5s | Không (chuẩn bị trang bị Kim Đan 1) | Dừng ngay (<3.5s): `bot_died` tại Âm Sương Trạch do Độc Thiềm phun độc |
-| 16 | `kim_dan_hau_ky` | Kim Đan hậu kỳ | `am_suong` | Kim Đan 2 | `reachRealm` (Kim Đan 2) | ✅ **ĐẠT** | 0.4s | Không | Hoàn thành |
-| 17 | `giao_hoan` | Giao hoạn | `am_suong` | Kim Đan 2 | `kill` (1 doc_long_giao) | ❌ **ĐỎ** | 19.6s | Không | Dừng ngay (<3.5s): `bot_died`, Độc Long Giao là trùm thế giới cần tổ đội |
-| 18 | `lang_han_quan` | Lăng Hàn Quan | `am_suong` | Kim Đan 3 | `talk` (tram_truong_han tại `han_van`) | ❌ **ĐỎ** | 19.4s | Không | Dừng ngay (<3.5s): `bot_died` khi băng qua quái dã ngoại tới cổng liên bản đồ |
-| 19 | `han_van_len` | Hàn Vân | `han_van` | Kim Đan 3 | `reachRealm` (Kim Đan 3) | ✅ **ĐẠT** | 0.4s | Không | Hoàn thành |
-| 20 | `han_lang_hoan` | Hàn Lang hoạn | `han_van` | Nguyên Anh 1 | `kill` (20 han_lang) | ❌ **ĐỎ** | 70.5s | Không (chuẩn bị trang bị Nguyên Anh 1) | Dừng ngay (<3.5s): `bot_died` tại Hàn Vân Lĩnh do bầy Hàn Lang cấp 4 dồn sát thương |
-| 21 | `phong_nha_cham` | Phong Nha | `han_van` | Nguyên Anh 1 | `kill` (15 phong_nha) | ❌ **ĐỎ** | 67.4s | Không (chuẩn bị trang bị Nguyên Anh 1) | Dừng ngay (<3.5s): `bot_died` tại Hàn Vân Lĩnh do quái Phong Nha đánh nhanh |
-| 22 | `cot_tuong_cot` | Tượng cốt | `han_van` | Nguyên Anh 1 | `kill` (12 cot_tuong) | ❌ **ĐỎ** | 46.1s | Không (chuẩn bị trang bị Nguyên Anh 1) | Dừng ngay (<3.5s): `bot_died` tại Hàn Vân Lĩnh do Cốt Tượng dồn sát thương |
-| 23 | `doc_tuoc_nang_cb` | Độc tước | `han_van` | Nguyên Anh 1 | `kill` (12 doc_tuoc) | ❌ **ĐỎ** | 39.8s | Không (chuẩn bị trang bị Nguyên Anh 1) | Dừng ngay (<3.5s): `bot_died` tại Hàn Vân Lĩnh do Độc Tước đánh tầm xa |
-| 24 | `nguyen_anh_hau_ky` | Nguyên Anh hậu kỳ | `han_van` | Nguyên Anh 2 | `reachRealm` (Nguyên Anh 2) | ✅ **ĐẠT** | 0.5s | Không | Hoàn thành |
-| 25 | `thien_han_hoan` | Thiên Hàn hoạn | `han_van` | Nguyên Anh 2 | `kill` (1 thien_han_dieu) | ❌ **ĐỎ** | 18.9s | Không | Dừng ngay (<3.5s): `bot_died`, Thiên Hàn Điêu là trùm thế giới cần tổ đội |
-| 26 | `lap_uy_bang_nguyen` | Lập uy băng nguyên | `han_van` | Nguyên Anh 1 | `kill` (10 han_lang, 10 phong_nha) | ❌ **ĐỎ** | 52.3s | Không (chuẩn bị trang bị Nguyên Anh 1) | Dừng ngay (<3.5s): `bot_died` do quái dã ngoại Hàn Vân hội đồng |
-| 27 | `ren_trao_bach_kim` | Rèn trảo bạch kim | `han_van` | Nguyên Anh 2 | `collect` (5 nanh_phong_nha, 3 cot_tuong_khuc) | ❌ **ĐỎ** | 43.1s | Không (chuẩn bị trang bị Nguyên Anh 2) | Dừng ngay (<3.5s): `bot_died` khi săn nhặt đồ rơi quái cấp 4 |
-| 28 | `luet_gio_han_van` | Lướt gió Hàn Vân | `han_van` | Nguyên Anh 3 | `kill` (10 doc_tuoc) + `talk` | ❌ **ĐỎ** | 38.6s | Không (chuẩn bị trang bị Nguyên Anh 3) | Dừng ngay (<3.5s): `bot_died` do Độc Tước đánh độc tầm xa |
-| 29 | `lang_hai` | Lang hại | `lac_ha` | Luyện Khí 1 | `kill` (10 lang - hằng ngày) | ✅ **ĐẠT** | 54.8s | Không (săn quái thật) | Hoàn thành nhiệm vụ hằng ngày |
-| 30 | `nop_nanh` | Nanh sói làm thuốc | `lac_ha` | Luyện Khí 1 | `collect` (5 nanh_soi - hằng ngày) | ✅ **ĐẠT** | 55.5s | Không (săn & nhặt rơi thật) | Hoàn thành nhiệm vụ hằng ngày |
-| 31 | `ho_hoan` | Hổ hoạn | `lac_ha` | Luyện Khí 7 | `kill` (3 ho - hằng ngày) | ✅ **ĐẠT** | 37.2s | Không (săn quái thật) | Hoàn thành nhiệm vụ hằng ngày |
-| 32 | `suong_ho_quay` | Sương Hồ quấy nhiễu | `am_suong` | Kim Đan 1 | `kill` (15 suong_ho - hằng ngày) | ❌ **ĐỎ** | 31.4s | Không (chuẩn bị trang bị Kim Đan 1) | Dừng ngay (<3.5s): `bot_died` tại Âm Sương Trạch |
-| 33 | `thach_quy_phien` | Thạch Quy chắn đường | `am_suong` | Kim Đan 1 | `kill` (10 thach_quy - hằng ngày) | ❌ **ĐỎ** | 26.8s | Không (chuẩn bị trang bị Kim Đan 1) | Dừng ngay (<3.5s): `bot_died` tại Âm Sương Trạch |
-| 34 | `doc_nang_nop` | Độc nang cho dược sư | `am_suong` | Kim Đan 2 | `collect` (6 doc_thiem_nang - hằng ngày) | ❌ **ĐỎ** | 21.7s | Không (chuẩn bị trang bị Kim Đan 2) | Dừng ngay (<3.5s): `bot_died` tại Âm Sương Trạch |
-| 35 | `han_lang_quay` | Hàn Lang quấy nhiễu | `han_van` | Nguyên Anh 1 | `kill` (12 han_lang - hằng ngày) | ❌ **ĐỎ** | 34.2s | Không (chuẩn bị trang bị Nguyên Anh 1) | Dừng ngay (<3.5s): `bot_died` tại Hàn Vân Lĩnh |
-| 36 | `cot_tuong_phien` | Cốt Tượng chắn đường | `han_van` | Nguyên Anh 1 | `kill` (8 cot_tuong - hằng ngày) | ❌ **ĐỎ** | 29.5s | Không (chuẩn bị trang bị Nguyên Anh 1) | Dừng ngay (<3.5s): `bot_died` tại Hàn Vân Lĩnh |
-| 37 | `doc_tuoc_nop` | Độc tước nang nộp trạm | `han_van` | Nguyên Anh 2 | `collect` (5 doc_tuoc_nang - hằng ngày) | ❌ **ĐỎ** | 24.3s | Không (chuẩn bị trang bị Nguyên Anh 2) | Dừng ngay (<3.5s): `bot_died` tại Hàn Vân Lĩnh |
+| STT | Mã nhiệm vụ | Tên nhiệm vụ | Bản đồ | Bậc yêu cầu | Loại bước chính | Kết quả #757 | Kết quả #818 (Đo lặp lại k/N) | Thời gian #818 | Nhóm lỗi / Phân loại | Ghi chú vận hành & cải tiến |
+|---|---|---|:---:|:---:|---|:---:|:---:|---:|:---:|---|
+| 1 | `nhap_the` | Nhập thế | `lac_ha` | Phàm Nhân | `talk` (truong_tran) | ✅ **ĐẠT** | ✅ **ĐẠT ổn định** | 3.0s | Không lỗi | Hoàn thành |
+| 2 | `tru_tho` | Thỏ phá ruộng | `lac_ha` | Phàm Nhân | `kill` (5 tho) + `collect` (3 long_tho) | ✅ **ĐẠT** | ✅ **ĐẠT ổn định** | 14.0s | Không lỗi | Săn & nhặt rơi thật |
+| 3 | `buoc_vao_tien_do` | Bước vào Tiên lộ | `lac_ha` | Luyện Khí 1 | `reachRealm` (Luyện Khí 1) | ✅ **ĐẠT** | ✅ **ĐẠT ổn định** | 0.4s | Không lỗi | Hoàn thành |
+| 4 | `tinh_toa` | Tĩnh tọa ngưng thần | `lac_ha` | Luyện Khí 1 | `talk` (dao_si) | ✅ **ĐẠT** | ✅ **ĐẠT ổn định** | 0.4s | Không lỗi | Hoàn thành |
+| 5 | `nanh_soi_ren_kiem` | Nanh sói cho lò rèn | `lac_ha` | Trúc Cơ 1 | `kill` (8 lang) + `collect` (5 nanh_soi) | ✅ **ĐẠT** | ✅ **ĐẠT ổn định** | 43.6s | Không lỗi | Săn & nhặt rơi thật, tự cắn đan về trấn |
+| 6 | `thuoc_cho_tran` | Thuốc cho người trong trấn | `lac_ha` | Luyện Khí 1 | `collect` (8 long_tho, 4 nanh_soi) | ✅ **ĐẠT** | ✅ **ĐẠT ổn định** | 40.5s | Không lỗi | Săn & nhặt rơi thật |
+| 7 | `hac_ho` | Hắc Hổ hạ sơn | `lac_ha` | Luyện Khí 2 | `kill` (10 ho) | ✅ **ĐẠT** | ✅ **ĐẠT ổn định** | 41.0s | Không lỗi | Săn quái thật |
+| 8 | `dinh_luyen_khi` | Đỉnh Luyện Khí | `lac_ha` | Luyện Khí 9 | `reachRealm` (Luyện Khí 9) | ✅ **ĐẠT** | ✅ **ĐẠT ổn định** | 0.4s | Không lỗi | Hoàn thành |
+| 9 | `truc_co_nhap_mon` | Trúc Cơ nhập môn | `lac_ha` | Trúc Cơ 1 | `reachRealm` (Trúc Cơ 1) | ✅ **ĐẠT** | ✅ **ĐẠT ổn định** | 0.4s | Không lỗi | Hoàn thành |
+| 10 | `mang_hoan` | Mãng hoạn | `lac_ha` | Trúc Cơ 1 | `kill` (1 mang - Xích Mãng) | ✅ **ĐẠT** | ✅ **ĐẠT ổn định** | 28.7s | Không lỗi | Cần /give vảy trùm thế giới |
+| 11 | `thanh_lo_tram` | Thanh Lộ Trạm | `lac_ha` | Trúc Cơ 1 | `talk` (lai_buon tại `hac_phong`) qua portal | ✅ **ĐẠT** | ✅ **ĐẠT ổn định** | 19.5s | Không lỗi | Hoàn thành (di chuyển liên bản đồ) |
+| 12 | `vong_suong` | Vọng Sương | `am_suong` | Trúc Cơ 3 | `talk` (tram_truong) | ✅ **ĐẠT** | ✅ **ĐẠT ổn định** | 0.4s | Không lỗi | Hoàn thành |
+| 13 | `suong_ho_hoan` | Sương Hồ hoạn | `am_suong` | Kim Đan 1 | `kill` (25 suong_ho) | ❌ **ĐỎ** | ❌ **ĐỎ** | 35.2s | Nhóm 3 (Cân bằng quái) | Sương Hồ cấp 3 dồn sát thương (#805) |
+| 14 | `thach_quy_giap` | Mai rùa | `am_suong` | Kim Đan 1 | `kill` (15 thach_quy) | ❌ **ĐỎ** | ❌ **ĐỎ** | 28.2s | Nhóm 3 (Cân bằng quái) | Thạch Quy thủ cao, dồn sát thương (#805) |
+| 15 | `doc_thiem_nang` | Độc nang | `am_suong` | Kim Đan 1 | `collect` (10 doc_thiem_nang) | ❌ **ĐỎ** | ⚠ **CHẬP CHỜN (4/5)** | TB 121.5s | Nhóm 3 (Cân bằng quái) | Nhặt đồ né quái an toàn; ranh giới ĐỎ/ĐẠT do chết ở bước săn Độc Thiềm khi bầy quái tụ hội đồng (#805) |
+| 16 | `kim_dan_hau_ky` | Kim Đan hậu kỳ | `am_suong` | Kim Đan 2 | `reachRealm` (Kim Đan 2) | ✅ **ĐẠT** | ✅ **ĐẠT ổn định** | 0.4s | Không lỗi | Hoàn thành |
+| 17 | `giao_hoan` | Giao hoạn | `am_suong` | Kim Đan 2 | `kill` (1 doc_long_giao) | ❌ **ĐỎ** | ❌ **ĐỎ** | 19.6s | Nhóm 1 (Trùm thế giới) | Độc Long Giao là trùm thế giới cần tổ đội |
+| 18 | `lang_han_quan` | Lăng Hàn Quan | `am_suong` | Kim Đan 3 | `talk` (tram_truong_han tại `han_van`) | ❌ **ĐỎ** | ✅ **ĐẠT ổn định (5/5)** | TB 34.2s | Không lỗi (Đã xong Nhóm 2) | **A* né bãi quái nguy hiểm tới portal Âm Sương thành công 100% (A: 1/1, C: 5/5)** |
+| 19 | `han_van_len` | Hàn Vân | `han_van` | Kim Đan 3 | `reachRealm` (Kim Đan 3) | ✅ **ĐẠT** | ✅ **ĐẠT ổn định** | 0.4s | Không lỗi | Hoàn thành |
+| 20 | `han_lang_hoan` | Hàn Lang hoạn | `han_van` | Nguyên Anh 1 | `kill` (20 han_lang) | ❌ **ĐỎ** | ❌ **ĐỎ** | 70.5s | Nhóm 3 (Cân bằng quái) | Hàn Lang cấp 4 dồn sát thương (#805) |
+| 21 | `phong_nha_cham` | Phong Nha | `han_van` | Nguyên Anh 1 | `kill` (15 phong_nha) | ❌ **ĐỎ** | ❌ **ĐỎ** | 67.4s | Nhóm 3 (Cân bằng quái) | Phong Nha đánh nhanh (#805) |
+| 22 | `cot_tuong_cot` | Tượng cốt | `han_van` | Nguyên Anh 1 | `kill` (12 cot_tuong) | ❌ **ĐỎ** | ❌ **ĐỎ** | 46.1s | Nhóm 3 (Cân bằng quái) | Cốt Tượng 11.8k HP (#805) |
+| 23 | `doc_tuoc_nang_cb` | Độc tước | `han_van` | Nguyên Anh 1 | `kill` (12 doc_tuoc) | ❌ **ĐỎ** | ❌ **ĐỎ** | 39.8s | Nhóm 3 (Cân bằng quái) | Độc Tước đánh tầm xa DoT (#805) |
+| 24 | `nguyen_anh_hau_ky` | Nguyên Anh hậu kỳ | `han_van` | Nguyên Anh 2 | `reachRealm` (Nguyên Anh 2) | ✅ **ĐẠT** | ✅ **ĐẠT ổn định** | 0.5s | Không lỗi | Hoàn thành |
+| 25 | `thien_han_hoan` | Thiên Hàn hoạn | `han_van` | Nguyên Anh 2 | `kill` (1 thien_han_dieu) | ❌ **ĐỎ** | ❌ **ĐỎ** | 18.9s | Nhóm 1 (Trùm thế giới) | Thiên Hàn Điêu là trùm thế giới cần tổ đội |
+| 26 | `lap_uy_bang_nguyen` | Lập uy băng nguyên | `han_van` | Nguyên Anh 1 | `kill` (10 han_lang, 10 phong_nha) | ❌ **ĐỎ** | ❌ **ĐỎ** | 52.3s | Nhóm 3 (Cân bằng quái) | Quái dã ngoại hội đồng (#805) |
+| 27 | `ren_trao_bach_kim` | Rèn trảo bạch kim | `han_van` | Nguyên Anh 2 | `collect` (5 nanh_phong_nha, 3 cot_tuong_khuc) | ❌ **ĐỎ** | ❌ **ĐỎ (0/5)** | TB 59.9s | Nhóm 3 (Cân bằng quái) | Sống lâu hơn; gục ở bước săn Cốt Tượng 11.8k HP do cạn đan dược (#805) |
+| 28 | `luet_gio_han_van` | Lướt gió Hàn Vân | `han_van` | Nguyên Anh 3 | `kill` (10 doc_tuoc) + `talk` | ❌ **ĐỎ** | ❌ **ĐỎ** | 38.6s | Nhóm 3 (Cân bằng quái) | Độc Tước đánh tầm xa (#805) |
+| 29 | `lang_hai` | Lang hại | `lac_ha` | Luyện Khí 1 | `kill` (10 lang - hằng ngày) | ✅ **ĐẠT** | ✅ **ĐẠT ổn định** | 54.8s | Không lỗi | Hoàn thành nhiệm vụ hằng ngày |
+| 30 | `nop_nanh` | Nanh sói làm thuốc | `lac_ha` | Luyện Khí 1 | `collect` (5 nanh_soi - hằng ngày) | ✅ **ĐẠT** | ✅ **ĐẠT ổn định** | 55.5s | Không lỗi | Hoàn thành nhiệm vụ hằng ngày |
+| 31 | `ho_hoan` | Hổ hoạn | `lac_ha` | Luyện Khí 7 | `kill` (3 ho - hằng ngày) | ✅ **ĐẠT** | ✅ **ĐẠT ổn định** | 37.2s | Không lỗi | Hoàn thành nhiệm vụ hằng ngày |
+| 32 | `suong_ho_quay` | Sương Hồ quấy nhiễu | `am_suong` | Kim Đan 1 | `kill` (15 suong_ho - hằng ngày) | ❌ **ĐỎ** | ❌ **ĐỎ** | 31.4s | Nhóm 3 (Cân bằng quái) | Sương Hồ cấp 3 dồn sát thương (#805) |
+| 33 | `thach_quy_phien` | Thạch Quy chắn đường | `am_suong` | Kim Đan 1 | `kill` (10 thach_quy - hằng ngày) | ❌ **ĐỎ** | ❌ **ĐỎ** | 26.8s | Nhóm 3 (Cân bằng quái) | Thạch Quy thủ cao (#805) |
+| 34 | `doc_nang_nop` | Độc nang cho dược sư | `am_suong` | Kim Đan 2 | `collect` (6 doc_thiem_nang - hằng ngày) | ❌ **ĐỎ** | ⚠ **CHẬP CHỜN (4/5)** | TB 65.8s | Nhóm 3 (Cân bằng quái) | Nhặt đồ né quái tốt; ranh giới ĐỎ/ĐẠT khi quái Độc Thiềm dã ngoại hội đồng ở bước săn (#805) |
+| 35 | `han_lang_quay` | Hàn Lang quấy nhiễu | `han_van` | Nguyên Anh 1 | `kill` (12 han_lang - hằng ngày) | ❌ **ĐỎ** | ❌ **ĐỎ** | 34.2s | Nhóm 3 (Cân bằng quái) | Hàn Lang cấp 4 (#805) |
+| 36 | `cot_tuong_phien` | Cốt Tượng chắn đường | `han_van` | Nguyên Anh 1 | `kill` (8 cot_tuong - hằng ngày) | ❌ **ĐỎ** | ❌ **ĐỎ** | 29.5s | Nhóm 3 (Cân bằng quái) | Cốt Tượng cấp 4 (#805) |
+| 37 | `doc_tuoc_nop` | Độc tước nang nộp trạm | `han_van` | Nguyên Anh 2 | `collect` (5 doc_tuoc_nang - hằng ngày) | ❌ **ĐỎ** | ❌ **ĐỎ (0/5)** | TB 65.9s | Nhóm 3 (Cân bằng quái) | Gục ngã khi săn Độc Tước do DoT bắn tỉa tầm xa của quái cấp 4 (#805) |
 
-**Tổng thời gian chạy thực tế trên máy chủ Colyseus thật:** **918.4 giây (~15.3 phút)**.
-- **Thành công (✅ ĐẠT): 17/37 nhiệm vụ** (100% nhiệm vụ Lạc Hà Trấn + toàn bộ các nhiệm vụ cảnh giới / đối thoại NPC của mọi bản đồ).
-- **Thất bại (❌ ĐỎ): 20/37 nhiệm vụ** (toàn bộ các nhiệm vụ chiến đấu dã ngoại tại Âm Sương Trạch và Hàn Vân Lĩnh). Tất cả 20 ca đỏ đều được xác nhận do bot đơn độc bị quái dã ngoại cấp cao dồn sát thương gục ngã (`bot_died`). Cơ chế ngắt an toàn mới xử lý triệt để: bot lập tức dừng bài test trong < 3.5s, đóng room an toàn, không kẹt 450s timeout và không in log lặp.
+**Tổng quan đo kiểm khả thi trên máy chủ Colyseus thật (chạy lặp lại k/N các ca ranh giới):**
+- **18 ca ĐẠT ổn định**: 17 ca cũ (Lạc Hà Trấn + toàn bộ nhiệm vụ đối thoại / cảnh giới liên bản đồ) + 1 ca `lang_han_quan` (đạt 5/5, TB 34.2s nhờ thuật toán A* né bãi quái nguy hiểm).
+- **2 ca CHẬP CHỜN**: `doc_nang_nop` (4/5) và `doc_thiem_nang` (4/5). Cơ chế né quái và nhặt an toàn đã giải quyết triệt để lỗi nhặt đồ dại dột / săn nhầm trùm Hắc Giao, tuy nhiên quái Độc Thiềm Âm Sương Trạch có độc lực cao, khi tụ hội đồng thì bot có xác suất gục ngã ở bước săn (chuyển sang Nhóm 3 cân bằng quái, chờ PR #805).
+- **17 ca ĐỎ**:
+  - **Nhóm 1 (Trùm thế giới)**: 2 ca (`giao_hoan`, `thien_han_hoan`) do trùm thế giới cần tổ đội người chơi.
+  - **Nhóm 3 (Cân bằng quái dã ngoại)**: 15 ca tại Âm Sương Trạch và Hàn Vân Lĩnh do chỉ số quái cấp 3 & 4 vượt ngưỡng sinh tồn của người chơi solo (kèm 2 ca thu thập `ren_trao_bach_kim` 0/5, `doc_tuoc_nop` 0/5).
+  - **Nhóm 2 (Hành vi bot)**: 0 ca. Không còn ca nào thất bại do bot đi đường dại dột hay nhặt đồ giữa bầy quái.
 
 ### 27.4. Kiểm thử đơn vị & Đột biến kiểm chứng (`quest-walk.test.ts`)
-Bộ kiểm thử đơn vị độc lập (`server/scripts/quest-walk.test.ts`) gồm **13 bài test** chạy trong vitest (~3.8s), bao gồm:
+Bộ kiểm thử đơn vị độc lập (`server/scripts/quest-walk.test.ts`) gồm **16 bài test** chạy trong vitest (~3.9s), bao gồm:
 1. **Kiểm tra tính khả thi tĩnh 100% nhiệm vụ**: Mọi nhiệm vụ trong `QUESTS` đều có kế hoạch bước khả thi trên main hiện tại.
 2. **Kiểm tra hàm phụ trợ**:
    - `findMapForMonster`: xác định đúng bản đồ sinh ra quái theo `monsterCap`.
    - `findDropsFor`: tìm đúng danh sách quái rơi vật phẩm từ `DROP_TABLES`.
-   - `estimateDropsRequired`: ước lượng chính xác số quái cần hạ và tỉ lệ rơi hợp lý.
+   - `estimateDropsRequired`: ước lượng chính xác số quái cần hạ và tỉ lệ rơi hợp lý (ưu tiên quái thường thay vì trùm thế giới).
    - `isMapReachableForQuest`: kiểm tra tính liên thông giữa các bản đồ theo cảnh giới yêu cầu.
    - `findPortalTo`: tìm đúng portal chuyển tiếp giữa các bản đồ kề nhau.
    - `portal lac_ha_bac`: có đường đi hợp lệ từ trấn (không bị kẹt).
    - `getPatrolPoints`: sinh danh sách điểm tuần tra bao phủ 8 hướng quanh trấn.
-3. **5 bài test đột biến kiểm chứng chuẩn Issue #757 & Review của Dev A (Mutation Testing)**:
+3. **Cơ chế bot né quái và nhặt đồ an toàn (Issue #818)**:
+   - `buildDangerPenaltyMap`: tính đúng ma trận phạt nguy hiểm quanh quái (bán kính aggro + 32px), bỏ qua quái hiền và quái đang săn.
+   - `planSafePath`: tìm đường đi vòng an toàn né bãi quái nguy hiểm thay vì đi xuyên qua tâm quái.
+   - `isLootSafeToPick`: đánh giá an toàn trước khi nhặt (máu < 50%, có quái canh giữ, có quái nhắm bắn).
+4. **7 bài test đột biến kiểm chứng chuẩn Issue #757, #818 & Review của Dev A (Mutation Testing)**:
    - *Đột biến (a) (Nâng số lượng thu thập vượt khả năng rơi)*: Sửa bước `collect` yêu cầu số lượng rơi ước tính cần hạ > 60 quái (`estimateDropsRequired > 60`) -> `planQuestSteps` phát hiện và báo ĐỎ ngay từ bước phân tích tĩnh.
    - *Đột biến (b) (Quái không sinh ở bản đồ nhiệm vụ / chuỗi cổng liên thông)*: Sửa bước `kill` trỏ tới quái có thật trong game nhưng bản đồ sinh quái không liên thông theo cảnh giới của nhiệm vụ -> `planQuestSteps` phát hiện và báo ĐỎ.
    - *Đột biến (c) (Sai lệch phần thưởng exp trên máy chủ thật)*: Cố tình làm sai lệch giá trị thưởng `rewards.exp` khác với `QuestDef` khi trả nhiệm vụ trên máy chủ Colyseus thật -> bot phát hiện sai lệch số exp thực tế nhận được so với kỳ vọng và báo ĐỎ bài test.
    - *Đột biến (d) (Dừng ngay khi bot chết / nhận tin limbo trên máy chủ thật - Review lần 2)*: Giả lập nhân vật bị quái đánh chết trong lúc săn, máy chủ Colyseus gửi tin nhắn `limbo` -> bot lập tức dừng nhiệm vụ và báo ĐỎ trong 234ms (< 3.5s, tuyệt đối không bị treo 450s hay in log lặp).
    - *Đột biến (e) (Dừng ngay khi nhận tin travelTo ngoài kế hoạch - Review lần 2)*: Máy chủ bất ngờ gửi tin nhắn `travelTo` trong khi bot đang làm nhiệm vụ tĩnh -> bot lập tức dừng và báo ĐỎ trong 234ms (< 3.5s) với lý do `unplanned_travel`.
+   - *Đột biến (f) (Phạt né quái = 0 / không cộng ma trận phạt vào chi phí A* - Issue #818)*: Khi `penaltyFactor = 0`, thuật toán A* đi thẳng qua ô quái nguy hiểm `centerCell`, làm ĐỎ kiểm tra `safePath!.cells.includes(centerCell) === false` trong `quest-walk.test.ts`.
+   - *Đột biến (g) (Bỏ né quái khi di chuyển liên bản đồ trên máy chủ thật - Issue #818)*: Khi bỏ né quái (`avoidMonsters = false` hoặc không dùng ma trận phạt) ở nhiệm vụ `lang_han_quan`, bot đi thẳng qua đầm lầy Âm Sương Trạch nơi bầy Sương Hồ và Thạch Quy canh giữ, bot bị đánh gục (`bot_died`), làm ĐỎ bài test tích hợp máy chủ thật trong < 20s.
 
 
 
