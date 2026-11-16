@@ -25,6 +25,7 @@ import {
   type DungeonStateMsg,
   type SectInvitedMsg,
   type SectVaultMsg,
+  type NetShieldMsg,
   type SectMsg,
   type SectPresenceMsg,
   type DuelInvitedMsg,
@@ -69,6 +70,7 @@ export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
   const sectPresences: { sid: string; msg: SectPresenceMsg }[] = [];
   const sectInviteds: { sid: string; msg: SectInvitedMsg }[] = [];
   const sectVaults: { sid: string; msg: SectVaultMsg }[] = [];
+  const netShields: { sid: string; msg: NetShieldMsg }[] = [];
   const dmgs: DmgMsg[] = [];
   /** Số sát thương gửi RIÊNG cho chủ (sát thương theo giây): tách khỏi `dmgs` (gửi gần). */
   const dmgsTo: { sid: string; msg: DmgMsg }[] = [];
@@ -104,6 +106,7 @@ export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
       sectPresence: (sid, msg) => sectPresences.push({ sid, msg }),
       sectInvited: (sid, msg) => sectInviteds.push({ sid, msg }),
       sectVault: (sid, msg) => sectVaults.push({ sid, msg }),
+      netShield: (sid, msg) => netShields.push({ sid, msg }),
     },
     map,
     hub,
@@ -137,6 +140,7 @@ export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
     sectPresences,
     sectInviteds,
     sectVaults,
+    netShields,
     dmgs,
     dmgsTo,
   };

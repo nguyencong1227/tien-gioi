@@ -188,6 +188,8 @@ export interface RoomSummary {
   tick: TickSummary;
   /** Hàng đợi input di chuyển (`World.inputStats`): bị bỏ vì đầy / số lượt tụt hậu (mục 25) */
   input: { dropped: number; backlogTicks: number };
+  /** Bảo vệ khi mất kết nối (mục 33, `World.netStats`): lần vào im lặng (hồn lìa xác dù socket mở) / lần tha chết do mạng */
+  net: { silent: number; spared: number };
 }
 
 export interface MetricsSnapshot {
@@ -232,6 +234,7 @@ export function collectMetrics(
       monsters: w.state.monsters.size,
       tick,
       input: { dropped: w.inputStats.dropped, backlogTicks: w.inputStats.backlogTicks },
+      net: { silent: w.netStats.silent, spared: w.netStats.spared },
     });
   }
   return {
@@ -312,6 +315,18 @@ export function renderPrometheus(s: MetricsSnapshot): string {
     "counter",
     "So luot (nguoi choi x tick) hang doi input con tu 6 input tro len sau khi xu ly (may chu tut hau so voi client)",
     (r) => r.input.backlogTicks,
+  );
+  perRoom(
+    "tiengioi_room_net_silent_total",
+    "counter",
+    "So lan nguoi choi im lang qua 3 giay (hon lia xac du socket mo): mang chap chon hoac co y ngat goi",
+    (r) => r.net.silent,
+  );
+  perRoom(
+    "tiengioi_room_net_spared_total",
+    "counter",
+    "So lan tha chet do mang (bi ha khi client da im lang tu 2 giay: khong mat kiep)",
+    (r) => r.net.spared,
   );
   metric(
     "tiengioi_room_tick_ms",

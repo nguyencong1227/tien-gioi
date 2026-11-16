@@ -18,6 +18,7 @@ import { bossKilled } from "./dungeon";
 import { onMonsterKilled } from "./quests";
 import { killShares } from "./party";
 import { dungeonFall } from "./dungeon";
+import { isShielded, spareFromNetDeath } from "./net-guard";
 import { beginLimbo } from "./reincarnation";
 import { rollDamage } from "./damage";
 import { onTreasureKill } from "./treasure";
@@ -171,6 +172,7 @@ export function hurtPlayer(
   const c = w.ctrl.get(sid);
   if (!c || p.dead) return false;
   if (w.ghosts.has(sid)) return false; // rớt mạng, đang chờ nối lại: bất tử
+  if (isShielded(w, sid)) return false; // hộ thể sau nối lại / có tin lại / được tha chết do mạng (mục 33): bất tử
   if (w.duels.has(sid)) return false; // đang thách đấu: bất tử trước quái (không để một con hổ đi ngang giết người thật)
   if (c.dodgeUntil !== undefined && w.now < c.dodgeUntil) return false; // đang né (chiêu bộ pháp): đòn trượt, không ngắt đả tọa / hồi phục
   damagePlayer(
@@ -194,6 +196,7 @@ export function hurtPlayerDot(w: World, sid: string, p: Player, dmg: number) {
   const c = w.ctrl.get(sid);
   if (!c || p.dead) return;
   if (w.ghosts.has(sid)) return;
+  if (isShielded(w, sid)) return;
   if (w.duels.has(sid)) return;
   damagePlayer(w, sid, p, c, dmg, null);
 }
@@ -237,6 +240,8 @@ function damagePlayer(
   }
   if (fallText === null) return;
   if (p.hp <= 0) {
+    // Mạng chập chờn (client im lặng từ 2 giây trước): TỪ CHỐI cho chết, hồi ở điểm an toàn (mục 33; trước bí cảnh vì ở đó gục vẫn mất lượt)
+    if (spareFromNetDeath(w, sid, p, c)) return;
     // Trong phòng bí cảnh: gục KHÔNG mất kiếp (bị đẩy ra, mất lượt; quyết định 11/11/2026, systems/dungeon.ts `dungeonFall`)
     if (dungeonFall(w, sid, p, c)) return;
     // Chết thật = luân hồi (docs/THIET_KE_LUAN_HOI.md): nhân vật của kiếp mất hẳn, linh hồn vào Hoàng Tuyền

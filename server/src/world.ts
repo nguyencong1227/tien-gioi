@@ -24,6 +24,7 @@ import type {
   DuelEndMsg,
   SectInvitedMsg,
   SectVaultMsg,
+  NetShieldMsg,
   SectMsg,
   SectPresenceMsg,
 } from "@tien-gioi/shared";
@@ -101,6 +102,15 @@ export interface PlayerCtrl {
    */
   moveMul?: number;
   stunned?: boolean;
+  /**
+   * Bảo vệ khi mất kết nối (mục 33, `systems/net-guard.ts`): `beatMs` = nhịp gửi tin client khai lúc vào phòng (`parseBeatMs`; `undefined` = client cũ: KHÔNG áp luật im lặng);
+   * `lastHeardAt` = lúc (ms, `Date.now()`) nhận tin cuối của client; `silent` = đang là hồn lìa xác vì IM LẶNG (socket còn mở), từ `silentSince`; `shieldUntil` = hộ thể tới lúc này (ms, `w.now`).
+   */
+  beatMs?: number;
+  lastHeardAt?: number;
+  silent?: boolean;
+  silentSince?: number;
+  shieldUntil?: number;
   /** Đang né đòn của quái tới thời điểm này (ms, `w.now`): chiêu bộ pháp (`SkillDef.dodgeMs`, `systems/cast.ts`); `hurtPlayer` bỏ qua sát thương */
   dodgeUntil?: number;
   /** Định danh kiếp hiện tại và bộ đếm thành tựu của kiếp (lưu cùng nhân vật; không vào state chung) */
@@ -230,6 +240,8 @@ export interface WorldEvents {
   sectInvited(sessionId: string, msg: SectInvitedMsg): void;
   /** Ảnh chụp KHO ĐỒ của tông môn gửi chính người nhận (mục 11; `vault: null` = không còn ở tông môn nào). */
   sectVault(sessionId: string, msg: SectVaultMsg): void;
+  /** Hộ thể sau nối lại / có tin lại sau im lặng / được tha chết do mạng (mục 33; chỉ chủ nhân vật nhận). */
+  netShield(sessionId: string, msg: NetShieldMsg): void;
 }
 
 export class World {
@@ -251,6 +263,10 @@ export class World {
    * chơi chỉ phải tra tập này khi nó khác rỗng (hầu hết thời gian là rỗng).
    */
   readonly ghosts = new Set<string>();
+  /** Người đang được hộ thể (mục 33; hết hạn thì `tickNetGuard` gỡ): quái không nhắm, sát thương không vào. Kiểm `size > 0` trước (đường nóng của quái). */
+  readonly shielded = new Set<string>();
+  /** Số đo bảo vệ khi mất kết nối của phòng (`/metrics`): lần vào im lặng, lần tha chết do mạng. */
+  readonly netStats = { silent: 0, spared: 0 };
   /**
    * Mục tiêu đang có trạng thái (M7.2b): id quái / sessionId người chơi. `tickStatuses` chỉ duyệt hai tập này (thường rỗng) nên không tốn gì khi
    * không ai dính trạng thái; tự gỡ khi hết trạng thái hoặc mục tiêu biến mất.
