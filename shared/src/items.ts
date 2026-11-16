@@ -881,14 +881,21 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
   ],
 };
 
-/** Tung bảng rơi đồ. rng trả về số trong [0, 1) (truyền vào để test được). */
+/**
+ * Tung bảng rơi đồ. rng trả về số trong [0, 1) (truyền vào để test được).
+ * `chanceMult` (M8, buff tông môn, `sectBuffOf(...).drop`) nhân cơ hội rơi của MỖI món (cơ hội >= 1 thì luôn rơi): mặc định 1 = không đổi gì; giá trị không hợp lệ
+ * (không phải số hữu hạn, nhỏ hơn 1) coi là 1; kẹp tối đa 2 (buff thật không bao giờ vượt `SECT_BUFF_DROP_MAX`). Với `chanceMult` = 1 kết quả và số lần gọi `rng`
+ * y hệt trước M8 (bench có seed không lệch quỹ đạo).
+ */
 export function rollDrops(
   monsterKind: string,
   rng: () => number = Math.random,
+  chanceMult = 1,
 ): { itemId: string; qty: number }[] {
   const out: { itemId: string; qty: number }[] = [];
+  const mult = Number.isFinite(chanceMult) && chanceMult > 1 ? Math.min(chanceMult, 2) : 1;
   for (const e of DROP_TABLES[monsterKind] ?? []) {
-    if (rng() >= e.chance) continue;
+    if (rng() >= e.chance * mult) continue; // rng < 1 nên cơ hội >= 1 luôn rơi (không cần kẹp)
     const qty = e.min + Math.floor(rng() * (e.max - e.min + 1));
     out.push({ itemId: e.itemId, qty: Math.min(qty, e.max) });
   }
