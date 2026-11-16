@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   BOSSES,
   BOSS_ADDS_CAP,
+  BOSS_ARMOR_MAX_MS,
   BOSS_BY_KIND,
   BOSS_COND_RADIUS,
   BOSS_ESCAPE_SPEED,
@@ -46,6 +47,9 @@ describe("hằng số công bằng (mục 2 THIET_KE_TRUM.md)", () => {
     expect(BOSS_HIT_GRACE_PX).toBeGreaterThan(0);
     expect(BOSS_HIT_GRACE_PX).toBeLessThan(PLAYER_RADIUS);
     expect(BOSS_ADDS_CAP).toBeGreaterThanOrEqual(1);
+    // client (`boss-bar.ts` `BOSS_ARMOR_MAX_MS`) chỉ vẽ giáp tới 60 giây: trần của dữ liệu không được vượt mức đó
+    expect(BOSS_ARMOR_MAX_MS).toBeGreaterThan(0);
+    expect(BOSS_ARMOR_MAX_MS).toBeLessThanOrEqual(60_000);
     expect(BOSS_COND_RADIUS).toBeGreaterThan(0);
   });
 });
@@ -195,6 +199,14 @@ describe("bossViolations bắt đúng từng luật", () => {
     expect(withShape({ t: "summon", kind: "khong_co", count: 1 })).toMatch(/không có thật/);
     expect(withShape({ t: "summon", kind: "tho", count: 0 })).toMatch(/không có thật/);
     expect(withShape({ t: "buff", dmgTakenMult: 1.5, ms: 4000 })).toMatch(/giáp/);
+    // thời gian giáp có TRẦN (`BOSS_ARMOR_MAX_MS`): đúng bằng trần thì được, hơn 1 ms thì bị bắt; ms <= 0 / hỏng cũng bị bắt
+    expect(withShape({ t: "buff", dmgTakenMult: 0.5, ms: BOSS_ARMOR_MAX_MS })).not.toMatch(/giáp/);
+    expect(withShape({ t: "buff", dmgTakenMult: 0.5, ms: BOSS_ARMOR_MAX_MS + 1 })).toMatch(/giáp/);
+    expect(withShape({ t: "buff", dmgTakenMult: 0.5, ms: 0 })).toMatch(/giáp/);
+    expect(withShape({ t: "buff", dmgTakenMult: 0.5, ms: Number.NaN })).toMatch(/giáp/);
+    expect(withShape({ t: "buff", dmgTakenMult: 0.5, ms: Number.POSITIVE_INFINITY })).toMatch(
+      /giáp/,
+    );
     expect(withShape({ t: "circleAt", at: "farthest", r: Number.NaN })).toMatch(/bán kính/);
   });
 
