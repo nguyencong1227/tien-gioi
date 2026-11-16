@@ -67,7 +67,6 @@ describe("bot thử tải tông môn M8: decideSectM8Action (Issue #846, M8.9)",
   it("trả về null nếu bot chưa gia nhập tông môn (không có sectTag)", () => {
     const res = decideSectM8Action({
       sectTag: undefined,
-      isLeader: false,
       sectHall: null,
       sectContrib: 0,
     });
@@ -77,7 +76,6 @@ describe("bot thử tải tông môn M8: decideSectM8Action (Issue #846, M8.9)",
   it("trả về hallGet nếu bot đã có sectTag nhưng chưa nhận được ảnh chụp Nội Vụ (sectHall = null)", () => {
     const res = decideSectM8Action({
       sectTag: "P01",
-      isLeader: false,
       sectHall: null,
       sectContrib: 0,
     });
@@ -88,7 +86,6 @@ describe("bot thử tải tông môn M8: decideSectM8Action (Issue #846, M8.9)",
     const hall = mockHallView();
     const res = decideSectM8Action({
       sectTag: "P01",
-      isLeader: false,
       sectHall: hall,
       sectContrib: 20,
     });
@@ -109,7 +106,6 @@ describe("bot thử tải tông môn M8: decideSectM8Action (Issue #846, M8.9)",
     // Không nhận quest nữa mà chuyển sang đổi đồ cửa hàng
     const res = decideSectM8Action({
       sectTag: "P01",
-      isLeader: false,
       sectHall: hall,
       sectContrib: 50,
     });
@@ -131,7 +127,6 @@ describe("bot thử tải tông môn M8: decideSectM8Action (Issue #846, M8.9)",
     });
     const res = decideSectM8Action({
       sectTag: "P01",
-      isLeader: false,
       sectHall: hall,
       sectContrib: 20,
     });
@@ -153,7 +148,6 @@ describe("bot thử tải tông môn M8: decideSectM8Action (Issue #846, M8.9)",
     });
     const res = decideSectM8Action({
       sectTag: "P01",
-      isLeader: false,
       sectHall: hall,
       sectContrib: 15,
     });
@@ -166,7 +160,6 @@ describe("bot thử tải tông môn M8: decideSectM8Action (Issue #846, M8.9)",
     });
     const res = decideSectM8Action({
       sectTag: "P01",
-      isLeader: false,
       sectHall: hall,
       sectContrib: 2,
     });
@@ -199,7 +192,6 @@ describe("bot thử tải tông môn M8: decideSectM8Action (Issue #846, M8.9)",
     });
     const res = decideSectM8Action({
       sectTag: "P01",
-      isLeader: false,
       sectHall: hall,
       sectContrib: 100,
     });

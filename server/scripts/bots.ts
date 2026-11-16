@@ -322,7 +322,6 @@ function seededPrng(seed: number) {
 
 export interface BotSectM8DecisionState {
   sectTag?: string;
-  isLeader: boolean;
   sectHall: SectHallView | null;
   sectContrib: number;
 }
@@ -2607,7 +2606,6 @@ async function runLoadTest(
         const trySectM8Actions = () => {
           const decision = decideSectM8Action({
             sectTag: b.sectTag,
-            isLeader,
             sectHall: b.sectHall ?? null,
             sectContrib: b.sectContrib ?? 0,
           });
@@ -2642,7 +2640,8 @@ async function runLoadTest(
 
             const r = Math.random();
             if (r < 0.25) {
-              b.room.send(SECT_MSG.deposit, { amount: 100 });
+              // Nộp 500 Linh thạch -> nhận 5 cống hiến (đủ điều kiện đổi bảo khố ngay)
+              b.room.send(SECT_MSG.deposit, { amount: 500 });
               if (measuring) b.sectDepositsCount++;
             } else if (r < 0.45) {
               b.room.send(SECT_MSG.withdraw, { amount: 50 });
@@ -2659,17 +2658,16 @@ async function runLoadTest(
           if (b.sectTag) {
             const r = Math.random();
             if (r < 0.08) {
-              // Nhảy tông môn (leave)
+              // Nhảy tông môn (leave): reset trạng thái, tiếp tục tick để gửi input di chuyển bình thường
               b.room.send(SECT_MSG.leave, {});
               b.sectTag = undefined;
               b.sectHall = null;
               b.sectContrib = 0;
               if (measuring) b.sectLeavesCount++;
               b.nextSectActionAt = now + 4000;
-              return;
-            }
-            if (r < 0.4) {
-              b.room.send(SECT_MSG.deposit, { amount: 50 });
+            } else if (r < 0.4) {
+              // Nộp 500 Linh thạch -> nhận 5 cống hiến
+              b.room.send(SECT_MSG.deposit, { amount: 500 });
               if (measuring) b.sectDepositsCount++;
             } else if (r < 0.8) {
               trySectM8Actions();
@@ -3740,7 +3738,7 @@ function printMetrics(m: LoadTestMetrics) {
       m.sectLeavesTotal !== undefined
     ) {
       console.log(
-        `  + Chiều sâu M8: Nhận NV: ${m.sectQuestsAcceptedTotal ?? 0} | Trả NV: ${m.sectQuestsTurnedInTotal ?? 0} | Đổi bảo khố: ${m.sectShopBuysTotal ?? 0} | Nhảy tông: ${m.sectLeavesTotal ?? 0}`,
+        `  + Chiều sâu M8: Nhận NV: ${m.sectQuestsAcceptedTotal ?? 0} | Gửi trả NV: ${m.sectQuestsTurnedInTotal ?? 0} | Đổi bảo khố: ${m.sectShopBuysTotal ?? 0} | Nhảy tông: ${m.sectLeavesTotal ?? 0}`,
       );
     }
   }
