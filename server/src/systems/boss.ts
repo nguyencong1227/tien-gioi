@@ -338,6 +338,7 @@ function summonAdds(
   if (!def) return;
   const room = bs.def.maxAdds - bossLiveAdds(w, bs);
   const n = Math.min(count, room);
+  let placed = 0;
   for (let i = 0; i < n; i++) {
     const a0 = ((i + bossRand(bs)) * 2 * Math.PI) / Math.max(1, count);
     const dist = mc.def.radius + def.radius + 40;
@@ -354,9 +355,19 @@ function summonAdds(
         amc.target = mc.target;
         bs.adds.add(aid);
       }
+      placed++;
       break;
     }
   }
+  // MỘT `fx` mỗi lần gọi, chỉ khi có ít nhất một con thật sự xuất hiện (vẽ hiệu ứng / tiếng gọi hồn; quái con tự hiện qua state)
+  if (placed > 0) w.events.fx({ kind: "bossSummon", by: id, x: m.x, y: m.y, n: placed });
+}
+
+/** Dựng giáp: `ms` ms nhận `mult` lần sát thương; MỘT `fx` lúc dựng (client tự đếm `ms`), dựng lại lúc đang có giáp thì fx mới thay fx cũ. */
+function raiseArmor(w: World, id: string, m: Monster, bs: BossCtrl, ms: number, mult: number) {
+  bs.armorUntil = w.now + ms;
+  bs.armorMult = mult;
+  w.events.fx({ kind: "bossArmor", by: id, x: m.x, y: m.y, ms, mult });
 }
 
 function runAction(
@@ -368,10 +379,7 @@ function runAction(
   act: BossAction,
 ) {
   if (act.t === "summon") summonAdds(w, id, m, mc, bs, act.kind, act.count);
-  else {
-    bs.armorUntil = w.now + act.ms;
-    bs.armorMult = act.dmgTakenMult;
-  }
+  else raiseArmor(w, id, m, bs, act.ms, act.dmgTakenMult);
 }
 
 // ---------- Giai đoạn, cuồng nộ ----------
@@ -387,6 +395,8 @@ function refreshMults(bs: BossCtrl) {
 
 /** Chuyển tới giai đoạn `to` (> hiện tại): chạy `onEnter` của từng giai đoạn đã vượt, ngắt chiêu đang gồng (không đáp), gầm không sát thương. */
 function enterPhase(w: World, id: string, m: Monster, mc: MonsterCtrl, bs: BossCtrl, to: number) {
+  // `bossPhase` đi TRƯỚC `bossArmor` / `bossSummon` của `onEnter` (client thấy gầm rồi mới giáp / gọi quái con); `onEnter` không dời trùm nên (x, y) không đổi
+  w.events.fx({ kind: "bossPhase", by: id, x: m.x, y: m.y, phase: to });
   for (let i = bs.phase + 1; i <= to; i++)
     for (const act of bs.def.phases[i]!.onEnter ?? []) runAction(w, id, m, mc, bs, act);
   bs.phase = to;
@@ -394,7 +404,6 @@ function enterPhase(w: World, id: string, m: Monster, mc: MonsterCtrl, bs: BossC
   bs.roarUntil = w.now + BOSS_PHASE_ROAR_MS;
   refreshMults(bs);
   bs.nextCastAt = bs.roarUntil + gapOf(bs);
-  w.events.fx({ kind: "bossPhase", by: id, x: m.x, y: m.y, phase: to });
 }
 
 // ---------- Đáp đòn ----------
@@ -510,8 +519,7 @@ function resolveCast(
       summonAdds(w, id, m, mc, bs, s.kind, s.count);
       break;
     case "buff":
-      bs.armorUntil = w.now + s.ms;
-      bs.armorMult = s.dmgTakenMult;
+      raiseArmor(w, id, m, bs, s.ms, s.dmgTakenMult);
       break;
     case "rain":
       break; // từng vòng xử lý ở `runCast`
