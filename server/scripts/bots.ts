@@ -346,18 +346,18 @@ export function decideSectM8Action(state: BotSectM8DecisionState): BotSectM8Deci
     return { type: "questAccept", questId: offerQuest.questId };
   }
 
-  // 2. Thử trả nhiệm vụ đang làm
-  const activeQuest = state.sectHall.quests.find((q) => q.state === "active");
-  if (activeQuest) {
-    return { type: "questTurnIn", questId: activeQuest.questId };
-  }
-
-  // 3. Đổi đồ cửa hàng nếu đủ cống hiến
+  // 2. Đổi đồ cửa hàng nếu đủ cống hiến (ưu tiên tiêu cống hiến đã tích lũy trước khi thử trả nhiệm vụ)
   if (state.sectContrib >= 5) {
     const buyableItem = state.sectHall.shop.find((item) => item.locked === null && item.left > 0);
     if (buyableItem) {
       return { type: "shopBuy", itemId: buyableItem.itemId, qty: 1 };
     }
+  }
+
+  // 3. Thử trả nhiệm vụ đang làm (đường tải gửi liên tục)
+  const activeQuest = state.sectHall.quests.find((q) => q.state === "active");
+  if (activeQuest) {
+    return { type: "questTurnIn", questId: activeQuest.questId };
   }
 
   return null;

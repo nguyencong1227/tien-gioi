@@ -112,7 +112,7 @@ describe("bot thử tải tông môn M8: decideSectM8Action (Issue #846, M8.9)",
     expect(res).toEqual({ type: "shopBuy", itemId: "hoi_huyet_dan", qty: 1 });
   });
 
-  it("trả nhiệm vụ đang làm (state = active) khi không còn nhiệm vụ mới nhận được", () => {
+  it("trả nhiệm vụ đang làm (state = active) khi không còn nhiệm vụ mới nhận được và chưa đủ cống hiến đổi đồ", () => {
     const hall = mockHallView({
       quests: [
         {
@@ -128,7 +128,7 @@ describe("bot thử tải tông môn M8: decideSectM8Action (Issue #846, M8.9)",
     const res = decideSectM8Action({
       sectTag: "P01",
       sectHall: hall,
-      sectContrib: 20,
+      sectContrib: 0,
     });
     expect(res).toEqual({ type: "questTurnIn", questId: "st_tru_lang_t0" });
   });
