@@ -499,4 +499,9 @@ export interface JoinOptions {
   secret?: string;
   token?: string;
   v?: number;
+  /**
+   * Nhịp gửi tin của client ở tiền cảnh (ms, `NET_BEAT_MS` ở `net-guard.ts`). Có khai (trong khoảng hợp lệ) thì máy chủ áp luật "im lặng quá
+   * `NET_SILENCE_GHOST_MS` thì thành hồn lìa xác" cho người này; không khai (client cũ) thì giữ hành vi cũ.
+   */
+  beatMs?: number;
 }
