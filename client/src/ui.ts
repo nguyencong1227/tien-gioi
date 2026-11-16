@@ -192,6 +192,7 @@ import { getDisplay, onDisplayChange } from "./gfx/display";
 import { optionTag, skipHintText } from "./dialog-opt";
 import { dropConfirmText, dropStillValid, dropWarnText, planDrop, type DropPlan } from "./inv-drop";
 import { inConfirmGuard, type ConfirmSpec } from "./act-confirm";
+import { PREFER_TARGET_STORAGE_KEY, parsePreferTarget } from "./aim-order";
 import { craftButtonText, craftFeeHint, craftSubtitle, craftTitle } from "./craft-ui";
 import {
   CHAT_PREF_KEY,
@@ -325,6 +326,8 @@ let skillsModel: SkillsPanelModel | null = null;
 let mapModalOpen = false;
 let settingsModalOpen = false;
 let hideOtherNames = false;
+/** "Ưu tiên mục tiêu hơn chuột" (mục 29, mặc định TẮT: con trỏ chuột hợp lệ thắng mục tiêu). */
+let preferTargetOverMouse = false;
 /** Bản đồ nhỏ đang hiện (false = thu gọn thành nhãn tên khu, vẫn bấm được để mở bản đồ lớn). */
 let minimapVisible = true;
 let questTab: "active" | "done" = "active";
@@ -561,6 +564,11 @@ function loadSettings() {
     hideOtherNames = localStorage.getItem(HIDE_NAMES_KEY) === "1";
   } catch {
     hideOtherNames = false;
+  }
+  try {
+    preferTargetOverMouse = parsePreferTarget(localStorage.getItem(PREFER_TARGET_STORAGE_KEY));
+  } catch {
+    preferTargetOverMouse = false;
   }
   minimapVisible = minimapOpen(parseTrackerPref(readPref(MINIMAP_PREF_KEY)));
   // Chất lượng đồ hoạ (và class body.low-fx tương thích) do gfx/quality.ts quản lý (#323): một nguồn duy nhất
@@ -3497,6 +3505,7 @@ export const ui = {
     const sfxVal = $("set-sfx-val");
     const muteChk = $("set-mute") as HTMLInputElement;
     const hideNamesChk = $("set-hide-names") as HTMLInputElement;
+    const preferTargetChk = $("set-prefer-target") as HTMLInputElement;
     const minimapChk = $("set-minimap") as HTMLInputElement;
     const qualitySel = $("set-quality") as HTMLSelectElement;
     const qualityNow = $("set-quality-now");
@@ -3518,6 +3527,7 @@ export const ui = {
       sfxVal.textContent = `${sPct}%`;
       muteChk.checked = sound.isMuted();
       hideNamesChk.checked = hideOtherNames;
+      preferTargetChk.checked = preferTargetOverMouse;
       minimapChk.checked = minimapVisible;
       const q = getQuality();
       qualitySel.value = q.mode;
@@ -3543,6 +3553,14 @@ export const ui = {
       hideOtherNames = hideNamesChk.checked;
       try {
         localStorage.setItem(HIDE_NAMES_KEY, hideOtherNames ? "1" : "0");
+      } catch {
+        // Bỏ qua nếu trình duyệt chặn localStorage
+      }
+    });
+    preferTargetChk.addEventListener("change", () => {
+      preferTargetOverMouse = preferTargetChk.checked;
+      try {
+        localStorage.setItem(PREFER_TARGET_STORAGE_KEY, preferTargetOverMouse ? "1" : "0");
       } catch {
         // Bỏ qua nếu trình duyệt chặn localStorage
       }
@@ -3794,6 +3812,11 @@ export const ui = {
 
   isHideNames() {
     return hideOtherNames;
+  },
+
+  /** Cài đặt "Ưu tiên mục tiêu hơn chuột" (mục 29): bật thì chiêu bay về mục tiêu kể cả khi chuột đang ở trong màn chơi. */
+  isPreferTarget() {
+    return preferTargetOverMouse;
   },
 
   /** Bậc Thấp (hiệu ứng phụ tắt). Nguồn duy nhất: gfx/quality.ts (di cư từ `tg_low_fx`). */
