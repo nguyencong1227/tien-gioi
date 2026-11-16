@@ -47,6 +47,7 @@ import { giveItem } from "./inventory";
 import { spawnLoot } from "./loot";
 import { nearNpc } from "./near-npc";
 import { refreshQuests } from "./quests";
+import { sectDungeonBonus } from "./sect";
 import { changeCoin } from "./wallet";
 
 /** NPC mở bí cảnh (shared/src/npcs.ts). */
@@ -583,6 +584,7 @@ export function bossKilled(w: World, mc: MonsterCtrl) {
   if (!run || !def || run.phase !== "running" || run.exitAt !== null || mc.def.id !== def.boss)
     return;
   const perMember = new Map<string, Pick<DungeonEndMsg, "reward" | "noReward" | "rewardsLeft">>();
+  const rewarded: string[] = [];
   for (const m of insideMembers(w, run)) {
     const c = w.ctrl.get(m.sid);
     if (!c) continue;
@@ -608,9 +610,11 @@ export function bossKilled(w: World, mc: MonsterCtrl) {
         dungeonDaily: { day: dayKey(w.now), rewards: DUNGEON_DAILY_REWARDS - left + 1 },
       };
       perMember.set(m.sid, { reward, rewardsLeft: left - 1 });
+      rewarded.push(m.sid);
     }
   }
   finishRun(w, run, "won", "boss_dead", DUNGEON_LOOT_MS, perMember);
+  void sectDungeonBonus(w, rewarded); // M8.3b: đồng môn cùng nhận thưởng bí cảnh được cống hiến (mục 12.3)
 }
 
 /**

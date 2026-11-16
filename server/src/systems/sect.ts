@@ -20,6 +20,8 @@ import {
   cleanSectName,
   cleanSectTag,
   addToInventory,
+  SECT_DUNGEON_CH,
+  sectBuffOf,
   sectLevelInfo,
   sectLevelOf,
   dayKey,
@@ -203,6 +205,17 @@ function vaultMsgFor(w: World, sid: string, sect: Sect, soulKey: string) {
   return { vault: sectVaultViewOf(sect, soulKey, dayKey(w.now), newLifeLockLeft(w, sid)) };
 }
 
+/**
+ * Đặt buff tông môn (M8.3b) cho phiên `sid` ở phòng `w` theo cấp tông của `sect`: cấp 1 KHÔNG buff nên để trống (đường nóng `gainExp` / `dropLoot` / `tickRecovery` không tốn gì).
+ * Hệ số lấy từ `sectBuffOf` (đã nằm trong trần `SECT_BUFF_*_MAX`); gọi lúc vào phòng, lên cấp, thành viên đổi.
+ */
+function applySectBuff(w: World, sid: string, sect: Sect) {
+  const c = w.ctrl.get(sid);
+  if (!c) return;
+  const level = sectLevelOf(sect.points ?? 0);
+  c.sectBuff = level >= 2 ? sectBuffOf(level) : undefined;
+}
+
 /** Ảnh chụp "Nội vụ" cho người `soulKey` đang đứng ở phòng `w` với phiên `sid` (đồng hồ phòng + cờ "chờ sang ngày" của phòng đó). */
 function hallMsgFor(w: World, sect: Sect, soulKey: string) {
   return { hall: sectHallViewOf(sect, soulKey, w.now, w.sectEarnWarmup) };
@@ -228,6 +241,7 @@ function broadcastSect(w: World, sect: Sect, removed: { soulKey: string; name: s
     loc.w.events.sect(loc.sid, { sect: sectViewOf(sect, m.soulKey) });
     loc.w.events.sectVault(loc.sid, vaultMsgFor(loc.w, loc.sid, sect, m.soulKey));
     loc.w.events.sectHall(loc.sid, hallMsgFor(loc.w, sect, m.soulKey));
+    applySectBuff(loc.w, loc.sid, sect);
   }
   sendPresence(w, sect); // ai đang trực tuyến cập nhật NGAY khi thành viên đổi (không chờ nhịp `tickSect`)
   sendRemoved(w, removed);
@@ -243,6 +257,8 @@ function sendRemoved(w: World, removed: { soulKey: string; name: string }[]) {
     loc.p.sect = "";
     loc.w.events.sect(loc.sid, NO_SECT);
     loc.w.events.sectHall(loc.sid, { hall: null });
+    const rc = loc.w.ctrl.get(loc.sid);
+    if (rc) rc.sectBuff = undefined; // rời / bị mời ra / giải tán: hết buff ngay
     loc.w.events.sectVault(loc.sid, { vault: null });
   }
 }
@@ -287,6 +303,7 @@ export async function sectOnJoin(w: World, sid: string) {
   w.events.sect(sid, { sect: sectViewOf(sect, a.soulKey) });
   w.events.sectVault(sid, vaultMsgFor(w, sid, sect, a.soulKey));
   w.events.sectHall(sid, hallMsgFor(w, sect, a.soulKey));
+  applySectBuff(w, sid, sect);
   sendPresence(w, sect); // mọi người trong tông môn thấy người mới trực tuyến ngay
 }
 
@@ -339,6 +356,32 @@ async function awardContribution(
     w.hub.sects.cache.set(res.sect.id, res.sect);
   }
   return res.granted;
+}
+
+/**
+ * Thưởng bí cảnh cho đồng môn (M8.3b, mục 12.3): `sids` là những người NHẬN THƯỞNG khi trùm bí cảnh chết. Trong số đó, mỗi nhóm có TỪ 2 thành viên CÙNG tông môn: mỗi người +`SECT_DUNGEON_CH`
+ * cống hiến qua `awardContribution` (trần: một lần mỗi ngày, `sectAwardDay`; vẫn chờ sang ngày, đã chết thì không). Đi một mình hoặc mỗi tông chỉ một người thì không có. Lỗi không bao giờ
+ * ném ra ngoài (bí cảnh đã trao thưởng xong).
+ */
+export async function sectDungeonBonus(w: World, sids: readonly string[]) {
+  if (!w.sectService) return;
+  const groups = new Map<string, { sid: string; a: SectActor }[]>();
+  for (const sid of sids) {
+    const a = actorOf(w, sid);
+    const sectId = a ? w.hub.sects.online.get(a.soulKey) : undefined;
+    if (!a || !sectId) continue;
+    const list = groups.get(sectId) ?? [];
+    list.push({ sid, a });
+    groups.set(sectId, list);
+  }
+  for (const list of groups.values()) {
+    if (list.length < 2) continue;
+    for (const { sid, a } of list) {
+      const ch = await awardContribution(w, sid, a, "dungeon", SECT_DUNGEON_CH).catch(() => 0);
+      if (ch > 0 && stillHere(w, sid, a.soulKey))
+        toastGood(w, sid, `Hoàn thành bí cảnh cùng đồng môn: +${ch} cống hiến.`);
+    }
+  }
 }
 
 /** Rời phòng (kể cả đi qua cổng): người này không còn trực tuyến ở đây. Gọi TRƯỚC khi xoá khỏi `ctrl`. */
