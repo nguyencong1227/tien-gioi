@@ -164,6 +164,14 @@ Kẽ hở (đã có sẵn với kho Linh thạch của Tông chủ): góp đồ 
 - Mã từ chối mới (`SECT_FAILS`, kèm câu tiếng Việt ở `sectFailMessage`): `vault_full`, `vault_changed`, `vault_limit`, `vault_denied`, `vault_locked`, `bag_full`, `item_invalid`.
 - `PROTOCOL_VERSION` KHÔNG tăng: chỉ THÊM tin / trường tùy chọn (client cũ bỏ qua tin lạ; không có giao diện kho thì không gửi). Ghi vào CHANGELOG.
 
+### 11.9b Hiện thực máy chủ (K2 + K3, `server/`)
+- `sect-store.ts`: `SectVault` / `emptySectVault`, `Sect.vault`, `SectMemberRecord.draw`, `sanitizeVault` (món lạ bỏ, qty ép [1, stack], đủ `SECT_VAULT_SLOTS` ô, hạn mức mặc định khi thiếu), `assertWritableSect` TỪ CHỐI kho sai (không im lặng sửa), `withVaultLogEntry`. PostgreSQL không đổi lược đồ (`data jsonb`).
+- `sect-service.ts`: `vaultDeposit` (all-or-nothing, `vault_full` / `vault_denied`), `vaultWithdraw` (khoá kỳ vọng theo ô `vault_changed`; Đệ tử: số món / lượt và `drawPerDay` đọc-sửa-ghi trong `update`), `vaultReturn` (trả phần túi không nhận được, hoàn lượt khi không nhận gì), `vaultPolicy` (chỉ Tông chủ), `sectVaultViewOf`.
+- `systems/sect.ts`: `sectVaultDeposit` (kiểm sớm -> trừ túi -> LƯU hồ sơ -> kho; lỗi thì trả túi, túi đầy thì rơi đất tại chân), `sectVaultWithdraw` (túi còn chỗ -> trừ kho -> cộng túi -> lưu; túi vừa đầy / người chơi rời / gục / đang qua cổng thì trả kho), `sectVaultPolicy`; một người một thao tác kho đồ (`SectBook.vaultBusy`); `broadcastSect` / `sectOnJoin` gửi `sectVault` (mất tông môn: `vault: null`).
+- Cờ kiếp mới: `sect-config.ts` (`SECT_NEWLIFE_LOCK_HOURS`, mặc định tắt; `docs/TRIEN_KHAI.md`), `World.sectNewLifeLockMs`, khoá cả `sectWithdraw` (Linh thạch).
+- Tin nhắn đăng ký bằng `this.on(...)` trong `WorldRoom` (giới hạn tần suất sẵn có; `red-team` tấn công cả ba). Nhật ký kiểm toán: `sect.vault_deposit` / `sect.vault_withdraw` / `sect.vault_policy`.
+- Test: `systems/sect-vault.test.ts` (27 ca, gồm đua rút, lỗi chen giữa chừng, bảo toàn đồ ngẫu nhiên có seed), `store-contract.ts` (file + PostgreSQL), `sect-store.test.ts`, `sect-config.test.ts`, `WorldRoom.sect.test.ts` (Colyseus thật).
+
 ### 11.10 Chia PR và phân công
 | PR | Nội dung | Ai |
 |---|---|---|

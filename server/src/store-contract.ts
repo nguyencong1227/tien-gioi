@@ -5,7 +5,13 @@ import { describe, expect, it } from "vitest";
 import type { AccountStore, NewAccount, SessionRecord, SessionStore } from "./account-store";
 import { hashToken } from "./auth";
 import type { PlayerStore } from "./player-store";
-import { SectConflictError, type Sect, type SectStore } from "./sect-store";
+import { SectConflictError, emptySectVault, type Sect, type SectStore } from "./sect-store";
+import {
+  ITEMS,
+  SECT_VAULT_DRAW_DEFAULT,
+  SECT_VAULT_DRAW_MAX,
+  SECT_VAULT_SLOTS,
+} from "@tien-gioi/shared";
 import type { SoulStore } from "./soul";
 import type { SavedPlayer } from "./store";
 
@@ -604,6 +610,7 @@ export const makeSect = (id: string, overrides?: Partial<Sect>): Sect => ({
   members: [{ soulKey: `chu_${id}`, name: `Chu ${id}`, rank: "chu", joinedAt: 1000 }],
   coin: 0,
   log: [],
+  vault: emptySectVault(),
   createdAt: 1000,
   updatedAt: 1000,
   ...overrides,
@@ -1015,6 +1022,93 @@ export function describeSectStoreContract(
           expect(dep.status === "fulfilled" && dep.value).toBeNull();
         }
       }
+    });
+    // ----- Kho đồ (docs/THIET_KE_TONG_MON.md mục 11, QUYET_DINH_M3 mục 27) -----
+    const bigStack = ITEMS.reduce((a, b) => (b.stack > a.stack ? b : a));
+
+    it("kho đồ: ghi rồi đọc lại đúng ô / số lượng / sổ / hạn mức / lượt rút; kết quả là bản sao", async () => {
+      const store = await createStore();
+      const v = emptySectVault();
+      v.slots[3] = { itemId: bigStack.id, qty: 7 };
+      v.slots[39] = { itemId: ITEMS[0].id, qty: 1 };
+      v.drawPerDay = 5;
+      v.log = [{ at: 5, name: "Chu c1", kind: "deposit", itemId: bigStack.id, qty: 7 }];
+      const sect = makeSect("c1");
+      sect.vault = v;
+      sect.members[0].draw = { day: "2026-11-16", n: 2 };
+      await store.create(sect);
+      const got = await store.get("c1");
+      expect(got?.vault.slots).toHaveLength(SECT_VAULT_SLOTS);
+      expect(got?.vault.slots[3]).toEqual({ itemId: bigStack.id, qty: 7 });
+      expect(got?.vault.slots[39]).toEqual({ itemId: ITEMS[0].id, qty: 1 });
+      expect(got?.vault.slots[0]).toBeNull();
+      expect(got?.vault.drawPerDay).toBe(5);
+      expect(got?.vault.log).toEqual(v.log);
+      expect(got?.members[0].draw).toEqual({ day: "2026-11-16", n: 2 });
+      got!.vault.slots[3]!.qty = 999; // sửa bản sao không ảnh hưởng kho
+      expect((await store.get("c1"))?.vault.slots[3]?.qty).toBe(7);
+    });
+
+    it("bản ghi cũ (trước mục 27) không có kho đồ đọc ra kho rỗng với hạn mức mặc định", async () => {
+      const store = await createStore();
+      await store.create(makeSect("c1", { vault: undefined as never }));
+      const got = await store.get("c1");
+      expect(got?.vault.slots).toHaveLength(SECT_VAULT_SLOTS);
+      expect(got?.vault.slots.every((x) => x === null)).toBe(true);
+      expect(got?.vault.drawPerDay).toBe(SECT_VAULT_DRAW_DEFAULT);
+      expect(got?.vault.log).toEqual([]);
+    });
+
+    it("update kho đồ nguyên tử: 40 lần rút 1 đồng thời trừ đúng 40, không mất, không nhân đôi; hết đồ thì lần rút ném lỗi và không ghi", async () => {
+      const store = await createStore();
+      const start = Math.min(bigStack.stack, 45);
+      const sect = makeSect("c1");
+      sect.vault.slots[0] = { itemId: bigStack.id, qty: start };
+      await store.create(sect);
+      const take = (s: Sect): Sect => {
+        const slot = s.vault.slots[0];
+        if (!slot || slot.qty < 1) throw new Error("hết đồ");
+        s.vault.slots[0] = slot.qty > 1 ? { itemId: slot.itemId, qty: slot.qty - 1 } : null;
+        return s;
+      };
+      const results = await Promise.allSettled(
+        Array.from({ length: start + 10 }, () => store.update("c1", take)),
+      );
+      expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(start);
+      expect(results.filter((r) => r.status === "rejected")).toHaveLength(10);
+      expect((await store.get("c1"))?.vault.slots[0]).toBeNull();
+    });
+
+    it("ghi kho đồ sai bị TỪ CHỐI (không im lặng sửa), không ghi gì: ô sai độ dài, món lạ, qty quá chồng, qty không nguyên, hạn mức ngoài khung, lượt rút sai", async () => {
+      const store = await createStore();
+      const sect = makeSect("c1");
+      sect.vault.slots[0] = { itemId: bigStack.id, qty: 3 };
+      await store.create(sect);
+      const bads: ((s: Sect) => void)[] = [
+        (s) => s.vault.slots.pop(),
+        (s) => (s.vault.slots[1] = { itemId: "khong_co_mon_nay", qty: 1 }),
+        (s) => (s.vault.slots[1] = { itemId: bigStack.id, qty: bigStack.stack + 1 }),
+        (s) => (s.vault.slots[1] = { itemId: bigStack.id, qty: 1.5 }),
+        (s) => (s.vault.slots[1] = { itemId: bigStack.id, qty: 0 }),
+        (s) => (s.vault.drawPerDay = SECT_VAULT_DRAW_MAX + 1),
+        (s) => (s.vault.drawPerDay = -1),
+        (s) => (s.members[0].draw = { day: "hôm qua", n: 1 }),
+        (s) => (s.members[0].draw = { day: "2026-11-16", n: -3 }),
+      ];
+      for (const bad of bads) {
+        await expect(
+          store.update("c1", (s) => {
+            bad(s);
+            return s;
+          }),
+        ).rejects.toThrow();
+      }
+      const kept = await store.get("c1");
+      expect(kept?.vault.slots[0]).toEqual({ itemId: bigStack.id, qty: 3 });
+      expect(kept?.vault.slots[1]).toBeNull();
+      expect(kept?.vault.slots).toHaveLength(SECT_VAULT_SLOTS);
+      expect(kept?.vault.drawPerDay).toBe(SECT_VAULT_DRAW_DEFAULT);
+      expect(kept?.members[0].draw).toBeUndefined();
     });
   });
 }

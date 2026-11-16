@@ -165,6 +165,7 @@ export function runBench(
         sect: () => {},
         sectPresence: () => {},
         sectInvited: () => {},
+        sectVault: () => {},
       },
       map,
     );
@@ -438,6 +439,7 @@ export function runMultiMapBench(
           sect: () => {},
           sectPresence: () => {},
           sectInvited: () => {},
+          sectVault: () => {},
         },
         map,
       );
