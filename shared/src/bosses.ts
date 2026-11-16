@@ -22,6 +22,11 @@ export const BOSS_PHASE_ROAR_MS = 1500;
 /** Trần cứng số quái con đồng thời của MỘT trùm (`BossDef.maxAdds` không vượt mức này). */
 export const BOSS_ADDS_CAP = 6;
 /**
+ * Thời gian giáp tối đa (ms) của MỘT lần dựng (`buff.ms`): trùm không được "bất khả xâm phạm" quá lâu (chết = mất kiếp nên người chơi cần hạ được trùm), và client chỉ vẽ giáp
+ * trong khung này (`client/src/boss-bar.ts` bỏ `fx` `bossArmor` có `ms` lớn hơn). `bossViolations` bắt dữ liệu vượt mức.
+ */
+export const BOSS_ARMOR_MAX_MS = 60_000;
+/**
  * Tốc độ (px/giây) của người chơi CHẬM nhất dùng để kiểm "né được": cảnh giới 0, chưa trang bị (`statsFor`: 150 + 8 x cảnh giới + đồ). Chưa tính hiệu ứng làm chậm.
  * Đổi `statsFor` làm tốc độ cơ bản thấp hơn thì sửa cả hằng này (và chạy lại `bossViolations`).
  */
@@ -288,9 +293,10 @@ function shapeProblems(s: BossShape): string[] {
     case "buff":
       if (
         !(typeof s.dmgTakenMult === "number" && s.dmgTakenMult > 0 && s.dmgTakenMult <= 1) ||
-        !pos(s.ms)
+        !pos(s.ms) ||
+        s.ms > BOSS_ARMOR_MAX_MS
       )
-        bad.push("giáp dmgTakenMult (0,1] / ms");
+        bad.push("giáp dmgTakenMult (0,1] / ms (<= BOSS_ARMOR_MAX_MS)");
       break;
   }
   return bad;
