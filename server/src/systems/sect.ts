@@ -28,6 +28,7 @@ import {
   parseSectAmount,
   parseSectHallGet,
   parseSectQuest,
+  parseSectShopBuy,
   parseSectAnswer,
   parseSectInvite,
   parseSectKick,
@@ -63,6 +64,7 @@ import {
   sectViewOf,
   type SectActor,
   type SectHallCtx,
+  shopKnown,
 } from "../sect-service";
 import type { World } from "../world";
 import { exchangeItems, sendInv, takeFromSlot } from "./inventory";
@@ -236,7 +238,18 @@ function applySectBuff(w: World, sid: string, sect: Sect) {
 function hallCtxOf(w: World, sid: string): SectHallCtx | undefined {
   const p = w.state.players.get(sid);
   const c = w.ctrl.get(sid);
-  return p && c ? { realm: p.realm, active: c.quests.active.map((a) => a.id) } : undefined;
+  return p && c
+    ? {
+        realm: p.realm,
+        active: c.quests.active.map((a) => a.id),
+        learned: learnedOf(c),
+      }
+    : undefined;
+}
+
+/** Id các chiêu đã học (tầng >= 1) trong sổ chiêu của người chơi. */
+function learnedOf(c: { skills: { learned: Record<string, number> } }): string[] {
+  return Object.keys(c.skills.learned).filter((id) => (c.skills.learned[id] ?? 0) > 0);
 }
 
 /** Ảnh chụp "Nội vụ" cho người `soulKey` đang đứng ở phòng `w` với phiên `sid` (đồng hồ phòng + cờ "chờ sang ngày" của phòng đó, cảnh giới và nhiệm vụ đang làm của chính người đó). */
@@ -1070,4 +1083,77 @@ export async function sectQuestTurnIn(w: World, sid: string, raw: unknown) {
   } finally {
     book.busy.delete(a.soulKey);
   }
+}
+
+// ---------- Cửa hàng tông môn (M8.5, mục 12.6) ----------
+
+/**
+ * `sectShopBuy { itemId, qty }`: mua trọn vẹn HOẶC không gì cả. Thứ tự (chỉ MẤT, không bao giờ vừa có hàng vừa còn cống hiến): kiểm sớm (còn sống, không qua cổng, túi nhận được trên BẢN SAO)
+ * -> `svc.shopBuy` (kiểm cấp tông, kinh quyển đã học, hạn mức NGÀY, đủ cống hiến rồi trừ `contrib` + tăng `today.buys` trong MỘT `update`) -> cộng túi -> LƯU hồ sơ. Túi không nhận được
+ * (người chơi vừa nhặt đầy, rời phòng, gục, đang qua cổng) thì HOÀN cống hiến bằng một `update` nữa. Lưu lỗi thì KHÔNG hoàn (hàng đã nằm trong túi; chỉ có thể MẤT nếu sập trước lần lưu kế).
+ */
+export async function sectShopBuy(w: World, sid: string, raw: unknown) {
+  const svc = w.sectService;
+  if (!svc) return toastFail(w, sid, "disabled");
+  const msg = parseSectShopBuy(raw);
+  const a = actorOf(w, sid);
+  const c = w.ctrl.get(sid);
+  if (!a || !c) return;
+  if (!msg) return toastFail(w, sid, "item_invalid");
+  if (isDown(w, sid)) return downFail(w, sid);
+  if (c.travelling || c.limbo) return toastFail(w, sid, "error");
+  const book = w.hub.sects;
+  if (book.busy.has(a.soulKey)) return toastFail(w, sid, "error"); // một thao tác tông môn một lúc (chung với kho đồ, nhiệm vụ)
+  book.busy.add(a.soulKey);
+  try {
+    // Kiểm sớm trên BẢN SAO túi: không nhận được thì không trừ gì
+    if (addToInventory(cloneBag(c.inv), msg.itemId, msg.qty) > 0)
+      return toastFail(w, sid, "bag_full");
+    const res = await svc.shopBuy(a, msg.itemId, msg.qty, {
+      known: shopKnown(msg.itemId, learnedOf(c)),
+    });
+    if (!res.ok) return toastFail(w, sid, res.reason);
+    w.hub.sects.cache.set(res.sect.id, res.sect);
+    // Cống hiến đã trừ: hàng phải VÀO túi hoặc cống hiến phải VỀ. Kiểm lại SAU `await` (túi / người chơi có thể đã đổi)
+    const c2 = w.ctrl.get(sid);
+    const fits =
+      c2 !== undefined &&
+      stillHere(w, sid, a.soulKey) &&
+      !isDown(w, sid) &&
+      !c2.travelling &&
+      !c2.limbo &&
+      addToInventory(cloneBag(c2.inv), msg.itemId, msg.qty) === 0;
+    if (!fits || !c2) {
+      const back = await svc.shopRefund(a, msg.itemId, msg.qty, res.cost);
+      if (back.ok) {
+        w.hub.sects.cache.set(back.sect.id, back.sect);
+        if (stillHere(w, sid, a.soulKey))
+          w.events.sectHall(sid, hallMsgFor(w, sid, back.sect, a.soulKey));
+      }
+      return toastFail(
+        w,
+        sid,
+        stillHere(w, sid, a.soulKey) && !isDown(w, sid) ? "bag_full" : "error",
+      );
+    }
+    addToInventory(c2.inv, msg.itemId, msg.qty);
+    sendInv(w, sid, [{ itemId: msg.itemId, qty: msg.qty }]);
+    w.audit?.("sect.shop_buy", {
+      name: a.name,
+      sect: res.sect.name,
+      itemId: msg.itemId,
+      qty: msg.qty,
+      cost: res.cost,
+    });
+    w.events.sectHall(sid, hallMsgFor(w, sid, res.sect, a.soulKey));
+    toastGood(w, sid, `Đã đổi ${msg.qty} ${itemName(msg.itemId)} (-${res.cost} cống hiến).`);
+    await saveNow(w, sid);
+  } finally {
+    book.busy.delete(a.soulKey);
+  }
+}
+
+/** Bản sao túi (để thử `addToInventory` mà không đụng túi thật). */
+function cloneBag(inv: Inventory): Inventory {
+  return inv.map((s) => (s ? { ...s } : s)) as Inventory;
 }

@@ -49,12 +49,17 @@ import {
   dayKey,
   SECT_QUEST_BY_ID,
   SECT_QUEST_TEMPLATE_BY_ID,
+  SECT_SHOP,
+  SECT_SHOP_BY_ITEM,
+  SECT_SHOP_QTY_MAX,
+  sectShopLock,
   type InvSlot,
   type SectAssignableRank,
   type SectEarnSource,
   type SectFail,
   type SectHallQuest,
   type SectHallView,
+  type SectShopItemView,
   type SectView,
   type SectVaultView,
 } from "@tien-gioi/shared";
@@ -654,6 +659,99 @@ export class SectService {
       return { ok: true, sect };
     });
   }
+
+  // ---------- Cửa hàng tông (M8.5, mục 12.6) ----------
+
+  /**
+   * Mua `qty` món `itemId` bằng cống hiến: MỘT `update` nguyên tử kiểm hết trên bản ghi đọc trong `update` (cấp tông, kinh quyển đã học, hạn mức ngày, đủ cống hiến) rồi trừ `contrib` và
+   * tăng `today.buys` cùng lúc. `opts.known` do người gọi tính (cần sổ chiêu của người chơi, bản ghi tông môn không có): món là kinh quyển mà người mua ĐÃ HỌC. KHÔNG đụng `merit` / `points`
+   * (tiêu cống hiến không làm tông hạ cấp hay hạ thứ hạng đóng góp). Từ chối `shop_locked` / `shop_known` / `shop_limit` / `no_contrib` / `item_invalid`. Túi, lưu hồ sơ: người gọi (`systems/sect.ts`).
+   */
+  shopBuy(
+    actor: SectActor,
+    itemId: unknown,
+    qty: unknown,
+    opts: { known: boolean },
+  ): Promise<SectResult<{ sect: Sect; cost: number }>> {
+    return this.guarded(actor.soulKey, async () => {
+      const e = byId(SECT_SHOP_BY_ITEM, itemId);
+      if (
+        !e ||
+        typeof qty !== "number" ||
+        !Number.isSafeInteger(qty) ||
+        qty < 1 ||
+        qty > SECT_SHOP_QTY_MAX
+      )
+        throw new Refusal("item_invalid");
+      const now = this.clock();
+      let cost = 0;
+      const sect = await this.mutate(actor.soulKey, (s, me) => {
+        if (sectLevelOf(s.points ?? 0) < e.minLevel) throw new Refusal("shop_locked");
+        if (opts.known) throw new Refusal("shop_known");
+        const day = sectDayState(me.today, now);
+        const bought = day.buys[e.itemId] ?? 0;
+        if (bought + qty > e.limitDay) throw new Refusal("shop_limit");
+        const total = e.cost * qty;
+        const contrib = me.contrib ?? 0;
+        if (!Number.isSafeInteger(total) || contrib < total) throw new Refusal("no_contrib");
+        cost = total;
+        return {
+          ...s,
+          members: s.members.map((m) =>
+            m.soulKey === me.soulKey
+              ? {
+                  ...m,
+                  contrib: contrib - total,
+                  today: { ...day, buys: { ...day.buys, [e.itemId]: bought + qty } },
+                }
+              : m,
+          ),
+        };
+      });
+      return { ok: true, sect, cost };
+    });
+  }
+
+  /**
+   * Hoàn một lần mua mà túi không nhận được (đầy / người chơi đã rời / gục): trả lại `cost` cống hiến (kẹp `SECT_CONTRIB_CAP`) và bớt `qty` khỏi số đã mua hôm nay (nếu đã sang ngày thì
+   * sổ mới trống nên chỉ trả cống hiến). Người đã rời tông thì không còn gì để hoàn (`not_in_sect`: chỉ MẤT, không bao giờ tăng).
+   */
+  shopRefund(
+    actor: SectActor,
+    itemId: string,
+    qty: number,
+    cost: number,
+  ): Promise<SectResult<{ sect: Sect }>> {
+    return this.guarded(actor.soulKey, async () => {
+      const now = this.clock();
+      const sect = await this.mutate(actor.soulKey, (s, me) => {
+        const day = sectDayState(me.today, now);
+        const buys = { ...day.buys };
+        const left = (buys[itemId] ?? 0) - qty;
+        if (left > 0) buys[itemId] = left;
+        else delete buys[itemId];
+        return {
+          ...s,
+          members: s.members.map((m) =>
+            m.soulKey === me.soulKey
+              ? {
+                  ...m,
+                  contrib: Math.min(SECT_CONTRIB_CAP, (me.contrib ?? 0) + cost),
+                  today: { ...day, buys },
+                }
+              : m,
+          ),
+        };
+      });
+      return { ok: true, sect };
+    });
+  }
+}
+
+/** Món `itemId` là kinh quyển mà người có các chiêu `learned` ĐÃ HỌC? (`teaches` tra bảng bằng `byId`). */
+export function shopKnown(itemId: string, learned: readonly string[]): boolean {
+  const def = byId(ITEM_BY_ID, itemId);
+  return def?.type === "book" && def.teaches !== undefined && learned.includes(def.teaches);
 }
 
 /**
@@ -691,7 +789,7 @@ export function sectHallViewOf(
       earnFromAt: sectCanEarn(me.joinedAt, now, warmup) ? 0 : sectEarnFromAt(me.joinedAt, warmup),
     },
     quests: ctx ? hallQuestsOf(sect, day, now, ctx) : [],
-    shop: [],
+    shop: ctx ? hallShopOf(sect, me, day, ctx) : [],
   };
 }
 
@@ -701,6 +799,35 @@ export interface SectHallCtx {
   realm: number;
   /** Id nhiệm vụ đang làm trong sổ nhiệm vụ của người xem (bản nào cũng được: nhận Luyện Khí rồi đột phá vẫn là cùng một mẫu) */
   active: readonly string[];
+  /** Id các chiêu người xem ĐÃ HỌC (cho cờ `known` của kinh quyển ở cửa hàng) */
+  learned: readonly string[];
+}
+
+/** Cửa hàng của người xem (mục 12.6): mọi món kèm cấp mở, số lượt còn hôm nay và LÝ DO chưa mua được (`sectShopLock`, hiện bằng chữ trước khi bấm). */
+function hallShopOf(
+  sect: Sect,
+  me: { contrib?: number },
+  day: { buys: Readonly<Record<string, number>> },
+  ctx: SectHallCtx,
+): SectShopItemView[] {
+  const level = sectLevelOf(sect.points ?? 0);
+  return SECT_SHOP.map((e) => {
+    const bought = day.buys[e.itemId] ?? 0;
+    return {
+      itemId: e.itemId,
+      cost: e.cost,
+      minLevel: e.minLevel,
+      limitDay: e.limitDay,
+      hall: e.hall,
+      left: Math.max(0, e.limitDay - bought),
+      locked: sectShopLock(e, {
+        level,
+        contrib: me.contrib ?? 0,
+        boughtToday: bought,
+        known: shopKnown(e.itemId, ctx.learned),
+      }),
+    };
+  });
 }
 
 /**
