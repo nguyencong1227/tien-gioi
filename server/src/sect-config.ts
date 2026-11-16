@@ -55,7 +55,10 @@ export function earnWarmupOf(env: NodeJS.ProcessEnv): EarnWarmup {
       ],
     };
   if (v === "on" || v === "1" || v === "true") return { on: true, warnings: [] };
-  return { on: true, warnings: [`SECT_EARN_WARMUP='${raw}' không hiểu: giữ BẬT (chỉ nhận off / on).`] };
+  return {
+    on: true,
+    warnings: [`SECT_EARN_WARMUP='${raw}' không hiểu: giữ BẬT (chỉ nhận off / on).`],
+  };
 }
 
 /** `newLifeLockOf(env).ms` (cho WorldRoom). */
