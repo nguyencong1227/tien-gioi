@@ -2,7 +2,18 @@
 
 Định dạng theo từng bản phát hành (thẻ `vX.Y.Z`). Số `#` là PR / issue trên GitHub.
 
-## [Chưa phát hành] — sau v0.3.1
+## [0.3.2] — 17/11/2026: bản vá (nhân vật không còn "trôi" sau khi nhả phím, nghề nhỏ lát 1)
+
+Bản vá sau v0.3.1, làm theo yêu cầu ưu tiên cao của người dùng ở `QUYET_DINH_M3.md` mục 41 (báo từ bản chạy thật) và đồng ý phát hành ở mục 43. Phần dưới là TÓM TẮT cho người quyết định; chi tiết từng PR nằm ở các mục bên dưới.
+
+- **Di chuyển hết "trôi như liệt phím" (mục 41):** khi mạng nhà đứng 1-3 giây rồi xả dồn, nhân vật trước đây còn đi tiếp 1,5-2,5 giây (300-450 px) sau khi nhả phím; nay dừng trong 0-0,25 giây (15-113 px; bot thật trên máy chủ Colyseus đo 41-276 ms). Máy chủ chỉ giữ tối đa 0,25 giây input chờ và input DỪNG cắt hàng đợi (#852); client gửi input dừng NGAY khi nhả phím (3 tin liên tiếp, bù mất gói) và đối chiếu vị trí mượt, không giật (#851). Không đổi `shared/` hay `PROTOCOL_VERSION`.
+- **Nghề nhỏ lát 1 (#763):** NPC Mộc Diên (Lão đan sư) + ba đan hộ đạo (Đột Phá / Kinh Chỉ / Dưỡng Anh) cộng xác suất đột phá + giao diện chế tác theo trạm (#815, #769).
+- **Kho tông môn:** ảnh chụp kho / quỹ không bao giờ lùi về bản cũ khi hai thao tác chồng nhau (#881; hiển thị, không nhân đôi đồ).
+- **Công cụ / kiểm thử (không đổi trò chơi):** các test chập chờn đã đo được (kho tông môn, movement) nay chờ theo điều kiện; bot né vùng cảnh báo vành khuyên (#890).
+- **Có trong mã nhưng CHƯA hiện cho người chơi (chuẩn bị):** hợp đồng + lưu trữ M8 tông môn chiều sâu (#848, #850: cấp tông, cống hiến; chưa có nguồn kiếm và giao diện nào), hợp đồng trùm nhiều chiêu (#877; bộ thực thi nằm ở bản sau). Không có thay đổi hành vi.
+- **KHÔNG nằm trong bản này (để bản sau):** cân bằng Âm Sương / Hàn Vân + 8 Hắc Giao (mục 30-32, PR #805 còn nháp); tông môn chiều sâu M8 phần nguồn kiếm / buff / nhiệm vụ / cửa hàng / giao diện (hỏi người dùng khi xong, mục 39); bộ chiêu trùm (mục 42).
+- **Triển khai:** giữ `MIN_PROTOCOL_VERSION=3` (client cũ vẫn vào được); `PROTOCOL_VERSION` vẫn 4; triển khai MÁY CHỦ trước hoặc cùng lúc với client; `TEST_EXP_MULT="Han:3,Hàn Tuyết:3"` giữ nguyên (mục 40). `/metrics` `input_dropped` nay đếm cả input cũ bị bỏ vì quá hạn (tăng so với v0.3.1 là bình thường).
+
 
 ### Giao diện
 - **Di chuyển hết "trôi" phía CLIENT (người dùng báo trên v0.3.1, `QUYET_DINH_M3.md` mục 41; phần máy chủ do Dev A; không đổi `shared/` hay `PROTOCOL_VERSION`):** (1) **nhả phím phải dừng ngay:** khi hết ý định đi (nhả phím / cần điều khiển, bị choáng, mở bảng chặn phím) sau khi đã gửi input di chuyển, client gửi NGAY ở khung vẽ đầu tiên (không chờ nhịp 20 Hz) một input DỪNG `{ seq, dx: 0, dy: 0 }` rồi lặp thêm hai tin ở hai bước 50 ms kế tiếp (tổng 3 tin, `seq` liên tiếp, huỷ phần lặp nếu đi lại; không gửi khi chưa đi / đang nối lại / Hoàng Tuyền / đã gục). Máy chủ cũ coi tin dừng là một bước không di chuyển (tương thích), máy chủ mới dùng nó để xoá hàng input còn tồn; (2) **đối chiếu mượt:** vị trí VẼ của mình = vị trí đoán trước + độ lệch bù; khi `reconcile` làm vị trí đoán trước nhảy (máy chủ bỏ / xoá input cũ, đụng tường khác...) thì nhân vật giữ nguyên chỗ rồi trượt về trong ~120 ms (hằng thời gian); độ lệch tích luỹ từ 48 px trở lên thì dịch chuyển TỨC THÌ thay vì lao ngang màn hình. Logic chơi (nhắm, nhặt, chạm cổng) vẫn dùng vị trí đoán trước thật. Mã: `client/src/move-stop.ts`, `client/src/move-smooth.ts` (hàm thuần + test), `WorldScene`; kiểm Chrome thật `client/scripts/check-move-stop.mjs` (số đo trước / sau ở `docs/THIET_KE_DI_CHUYEN.md` mục 5).
