@@ -35,6 +35,7 @@ import {
   SECT_VAULT_LOG_MAX,
   SECT_VAULT_QTY_MAX,
   SECT_VAULT_SLOTS,
+  SECT_VAULT_SLOTS_MAX,
   canSect,
   cleanMotd,
   cleanSectName,
@@ -519,11 +520,15 @@ describe("kho đồ tông môn (docs/THIET_KE_TONG_MON.md mục 11)", () => {
     expect(
       parseSectVaultWithdraw({ slot: SECT_VAULT_SLOTS - 1, itemId: realId, qty: 1 }),
     ).not.toBeNull();
+    // M8: ô kho tối đa là SECT_VAULT_SLOTS_MAX - 1 (máy chủ từ chối ô đang khoá theo cấp tông)
+    expect(
+      parseSectVaultWithdraw({ slot: SECT_VAULT_SLOTS_MAX - 1, itemId: realId, qty: 1 }),
+    ).not.toBeNull();
     for (const bad of [
       null,
       {},
       { slot: -1, itemId: realId, qty: 1 },
-      { slot: SECT_VAULT_SLOTS, itemId: realId, qty: 1 },
+      { slot: SECT_VAULT_SLOTS_MAX, itemId: realId, qty: 1 },
       { slot: 0, itemId: "khong_co_mon_nay", qty: 1 },
       { slot: 0, itemId: "constructor", qty: 1 },
       { slot: 0, itemId: "__proto__", qty: 1 },
