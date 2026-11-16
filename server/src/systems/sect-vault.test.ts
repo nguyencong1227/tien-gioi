@@ -24,6 +24,7 @@ import { SectService } from "../sect-service";
 import {
   sectAnswer,
   sectCreate,
+  sectDeposit,
   sectInvite,
   sectKick,
   sectRank,
@@ -32,6 +33,8 @@ import {
   sectVaultWithdraw,
   sectWithdraw,
 } from "./sect";
+import { hurtPlayer } from "./combat";
+import { applyRebirth } from "./reincarnation";
 import { addPlayer, makeWorld } from "./test-helpers";
 
 const root = mkdtempSync(path.join(tmpdir(), "tien-gioi-sect-vault-"));
@@ -682,5 +685,150 @@ describe("bảo toàn đồ: không bao giờ nhân đôi (đua ngẫu nhiên c�
     // không có thao tác nào làm đồ biến mất ở các nhánh không lỗi: tổng còn lại khá sát ban đầu (mất tối đa phần đang chuyển lúc lưu lỗi: ở đây lưu lỗi
     // được trả lại túi nên không mất)
     for (const id of [MAT.id, OTHER.id]) expect(await total(id)).toBe(start[id]);
+  });
+});
+
+/** Hạ người chơi bằng đòn kết liễu THẬT (`hurtPlayer`): `beginLimbo` chạy đồng bộ (Hoàng Tuyền, túi + ví về 0). */
+function kill(r: Room, who: string): void {
+  r.w.reincarnate = true;
+  const p = r.w.state.players.get(who)!;
+  p.hp = 1;
+  expect(hurtPlayer(r.w, who, p, 1e6, { kind: "lang" })).toBe(true);
+  expect(r.w.ctrl.get(who)!.limbo, "đã vào Hoàng Tuyền").toBeDefined();
+}
+
+describe("ĐÃ CHẾT thì không góp được kho (QUYET_DINH_M3 mục 38)", () => {
+  it("góp ngay TRƯỚC khi chết: đồ vào kho; chết xong túi trống; tổng đúng bằng ban đầu (không nhân đôi)", async () => {
+    await setup();
+    give(lh, C, MAT.id, 10);
+    await sectVaultDeposit(lh.w, C, { slot: slotOf(lh, C, MAT.id), qty: 10 });
+    expect(await vaultQty(MAT.id)).toBe(10);
+    kill(lh, C);
+    expect(held(lh, C, MAT.id)).toBe(0);
+    expect(await total(MAT.id)).toBe(10);
+  });
+
+  it("chết GIỮA CHỪNG (đã trừ túi, đang chờ lưu hồ sơ): đồ ĐÃ góp trước khi chết vẫn vào kho; không nhân đôi, không biến mất", async () => {
+    await setup();
+    give(lh, C, MAT.id, 10);
+    lh.w.onSaveNow = async (sid) => {
+      order.push(`save:${sid}`);
+      if (sid === C) kill(lh, C); // bị hạ NGAY lúc đang lưu (túi đã trừ ở bước đồng bộ trước đó)
+      return true;
+    };
+    await sectVaultDeposit(lh.w, C, { slot: slotOf(lh, C, MAT.id), qty: 10 });
+    expect(await vaultQty(MAT.id)).toBe(10);
+    expect(held(lh, C, MAT.id)).toBe(0);
+    expect(await total(MAT.id)).toBe(10);
+  });
+
+  it("chết TRONG LÚC chờ kiểm kho (sau khi nhận yêu cầu, trước khi trừ túi): bị từ chối, KHÔNG gọi dịch vụ, kho không tăng, không đồ nào sống sót qua cái chết", async () => {
+    await setup();
+    give(lh, C, MAT.id, 10);
+    const real = svc.sectOf.bind(svc);
+    let fired = false;
+    svc.sectOf = async (k: string) => {
+      const sct = await real(k);
+      if (!fired) {
+        fired = true;
+        kill(lh, C); // yêu cầu góp đã gửi từ TRƯỚC, nhưng máy chủ xử lý SAU thời điểm chết
+      }
+      return sct;
+    };
+    await sectVaultDeposit(lh.w, C, { slot: slotOf(lh, C, MAT.id), qty: 10 });
+    expect(lastToast(lh, C)).toMatch(/gục/);
+    expect(order.filter((x) => x.startsWith("service:"))).toEqual([]);
+    expect(await vaultQty(MAT.id)).toBe(0);
+    expect(await total(MAT.id)).toBe(0); // đồ kiếp cũ mất theo luật luân hồi, không "cứu" qua kho
+  });
+
+  it("gửi góp SAU khi chết (Hoàng Tuyền), kể cả khi túi lại có đồ: từ chối, đồ không vào kho, không nhân đôi", async () => {
+    await setup();
+    kill(lh, C);
+    give(lh, C, MAT.id, 10); // dựng cả trường hợp xấu nhất: túi của người đã chết có đồ
+    await sectVaultDeposit(lh.w, C, { slot: slotOf(lh, C, MAT.id), qty: 10 });
+    expect(lastToast(lh, C)).toMatch(/gục/);
+    expect(held(lh, C, MAT.id)).toBe(10);
+    expect(await vaultQty(MAT.id)).toBe(0);
+    expect(order).toEqual([]);
+    // Linh thạch cũng vậy
+    const treasury = (await vaultOf()).coin;
+    lh.w.ctrl.get(C)!.coin = 500;
+    await sectDeposit(lh.w, C, { amount: 100 });
+    expect(lastToast(lh, C)).toMatch(/gục/);
+    expect(lh.w.ctrl.get(C)!.coin).toBe(500);
+    expect((await vaultOf()).coin).toBe(treasury);
+  });
+
+  it("khí huyết về 0 nhưng CHƯA vào Hoàng Tuyền (gục ở bí cảnh / chờ hồi sinh): cũng không góp được (đồ và Linh thạch nguyên vẹn)", async () => {
+    await setup();
+    give(lh, C, MAT.id, 10);
+    const p = lh.w.state.players.get(C)!;
+    p.dead = true;
+    const coin0 = lh.w.ctrl.get(C)!.coin;
+    await sectVaultDeposit(lh.w, C, { slot: slotOf(lh, C, MAT.id), qty: 10 });
+    await sectDeposit(lh.w, C, { amount: 100 });
+    expect(held(lh, C, MAT.id)).toBe(10);
+    expect(lh.w.ctrl.get(C)!.coin).toBe(coin0);
+    expect(await vaultQty(MAT.id)).toBe(0);
+    expect(order).toEqual([]);
+    p.dead = false; // hồi sinh: góp lại được
+    await sectVaultDeposit(lh.w, C, { slot: slotOf(lh, C, MAT.id), qty: 10 });
+    expect(await vaultQty(MAT.id)).toBe(10);
+  });
+
+  it("chết đúng lúc đang góp Linh thạch (sau kiểm kho): từ chối, kho Linh thạch không tăng, không hoàn tiền vào ví người đã chết", async () => {
+    await setup();
+    const treasury = (await vaultOf()).coin;
+    const real = svc.sectOf.bind(svc);
+    let fired = false;
+    svc.sectOf = async (k: string) => {
+      const sct = await real(k);
+      if (!fired) {
+        fired = true;
+        kill(lh, C);
+      }
+      return sct;
+    };
+    await sectDeposit(lh.w, C, { amount: 100 });
+    expect(lastToast(lh, C)).toMatch(/gục/);
+    expect((await vaultOf()).coin).toBe(treasury);
+    expect(lh.w.ctrl.get(C)!.coin).toBe(0); // ví kiếp cũ đã về 0 và không được cộng thêm
+  });
+
+  it("THA CHẾT do mạng (mục 33.4) KHÔNG tính là chết: vẫn góp được sau khi được tha và hồi", async () => {
+    await setup();
+    give(lh, C, MAT.id, 10);
+    const c = lh.w.ctrl.get(C)!;
+    const p = lh.w.state.players.get(C)!;
+    c.beatMs = 1000; // client có khai nhịp
+    c.lastHeardAt = lh.w.now - 2200; // im lặng 2,2 giây (trong [2000, 3000))
+    p.hp = 1;
+    hurtPlayer(lh.w, C, p, 1e6, { kind: "lang" });
+    expect(p.dead).toBe(false);
+    expect(c.limbo).toBeUndefined();
+    lh.w.shielded.delete(C); // hộ thể sau khi được tha không liên quan tới luật góp kho
+    c.shieldUntil = undefined;
+    await sectVaultDeposit(lh.w, C, { slot: slotOf(lh, C, MAT.id), qty: 10 });
+    expect(await vaultQty(MAT.id)).toBe(10);
+  });
+
+  it("đầu thai xong: rút được theo luật chức vụ (cờ kiếp mới tắt mặc định); đồ góp từ kiếp trước vẫn ở kho", async () => {
+    await setup();
+    give(lh, C, MAT.id, 10);
+    await sectVaultDeposit(lh.w, C, { slot: slotOf(lh, C, MAT.id), qty: 10 });
+    expect(await vaultQty(MAT.id)).toBe(10);
+    kill(lh, C);
+    // chưa đầu thai: ở Hoàng Tuyền không rút được (đã có luật cũ), kho không đổi
+    await sectVaultWithdraw(lh.w, C, { slot: 0, itemId: MAT.id, qty: 3 });
+    expect(held(lh, C, MAT.id)).toBe(0);
+    expect(await vaultQty(MAT.id)).toBe(10);
+    const t = { w: lh.w, p: lh.w.state.players.get(C)!, c: lh.w.ctrl.get(C)! };
+    applyRebirth(t.w, C, t.p, t.c, { origin: "pham_gia", keep: [] });
+    expect(t.c.limbo).toBeUndefined();
+    expect(lh.w.sectNewLifeLockMs).toBe(0);
+    await sectVaultWithdraw(lh.w, C, { slot: 0, itemId: MAT.id, qty: 3 }); // Đệ tử: trong hạn mức mỗi lần / mỗi ngày
+    expect(held(lh, C, MAT.id)).toBe(3);
+    expect(await vaultQty(MAT.id)).toBe(7);
   });
 });
