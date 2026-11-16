@@ -548,6 +548,79 @@ async function main() {
       await sleep(350);
       check((await alerts()) === a2 + 1, "hình tròn ĐẶC (không r0): đứng ở tâm vẫn báo nguy hiểm");
       await sleep(900);
+
+      // ---- bù độ trễ mạng (#873, hướng 2): `rttSource` rút ngắn vùng báo VÀ thanh gồng CÙNG MỘT mức ----
+      // độ bù = clamp(RTT + 10, 0, min(250, 0,3 x ms)); RTT chưa biết (null) thì không bù (mock không có nhịp tim nên mặc định là null)
+      const setRtt = (v) =>
+        evalJs(`(() => { window.__scene.rttSource = () => ${JSON.stringify(v)}; return 1; })()`);
+      const lat = async (rtt, ms) => {
+        await setRtt(rtt);
+        await evalJs(
+          `(() => { const sc = window.__scene; sc.telegraphs.clear(); sc.bossFx.clear(); return 1; })()`,
+        );
+        await clearBosses();
+        await setBoss("m1", {});
+        await fx({ kind: "bossCast", by: "m1", x: 0, y: 0, ability: "quat_duoi", ms });
+        await place({ ms });
+        return evalJs(`(() => {
+          const sc = window.__scene;
+          const w = sc.telegraphs.snapshot(sc.time.now).warns;
+          const c = sc.bossFx.castTiming("m1", sc.time.now);
+          return { rings: w.length, ringMs: w[0] && w[0].ms, castMs: c && c.castMs };
+        })()`);
+      };
+      check(
+        (await evalJs(`window.__scene.rttSource()`)) === null,
+        "mock: rttSource mặc định là null (không bù khi chưa có nhịp tim)",
+      );
+      for (const [rtt, ms, want] of [
+        [null, 1000, 1000], // chưa đủ mẫu: không bù
+        [0, 1000, 990],
+        [60, 1000, 930],
+        [160, 1000, 830],
+        [1000, 1000, 750], // RTT hỏng: kẹp 250 ms
+        [1000, 800, 560], // báo trước ngắn: không co quá 30 %
+        [-50, 1000, 1000], // RTT âm không làm vùng báo dài ra
+      ]) {
+        const r = await lat(rtt, ms);
+        check(
+          r.rings === 1 &&
+            Math.abs(r.ringMs - want) < 1e-6 &&
+            r.castMs !== null &&
+            Math.abs(r.castMs - want) < 1e-6,
+          `bù độ trễ RTT ${rtt}, báo trước ${ms} ms: vùng báo ${r.ringMs} = thanh gồng ${r.castMs} = ${want}`,
+        );
+      }
+      // đầy SỚM đúng mức: RTT 160 thì sau ~870 ms vùng báo đã đầy và thanh gồng đã chạm 100 % (không bù thì mới ~87 %)
+      const fullAfter = async (rtt, waitMs) => {
+        await lat(rtt, 1000);
+        await sleep(waitMs);
+        return evalJs(`(() => {
+          const sc = window.__scene;
+          const w = sc.telegraphs.snapshot(sc.time.now).warns[0];
+          const fill = document.getElementById("boss-bar-castfill").style.width;
+          return { progress: w.progress, elapsed: w.elapsed, fill };
+        })()`);
+      };
+      const withComp = await fullAfter(160, 880);
+      check(
+        withComp.progress === 1 && withComp.elapsed >= 830 && withComp.elapsed < 1000,
+        `RTT 160: sau ${Math.round(withComp.elapsed)} ms vùng báo đã ĐẦY (tiến độ ${withComp.progress})`,
+      );
+      check(
+        withComp.fill === "100%",
+        `RTT 160: thanh gồng cũng đã đầy cùng lúc ("${withComp.fill}")`,
+      );
+      const noComp = await fullAfter(null, 880);
+      check(
+        noComp.progress < 1 && noComp.elapsed >= 830,
+        `không bù (RTT chưa biết): cùng thời điểm vùng báo CHƯA đầy (tiến độ ${noComp.progress.toFixed(2)})`,
+      );
+      await evalJs(
+        `(() => { const sc = window.__scene; sc.rttSource = () => null; sc.telegraphs.clear(); return 1; })()`,
+      );
+      await clearBosses();
+      await sleep(900);
     }
   } finally {
     try {
