@@ -2595,7 +2595,14 @@ describe("chân linh và bộ đếm kiếp (M3 bước 2)", () => {
     expect([ctrl().life.kills, ctrl().life.bossKills]).toEqual([2, 1]);
     const first = ctrl().life.playMs;
     await leave(a);
-    const saved1 = JSON.parse(readFileSync(playerFile(name), "utf8")).life;
+    const saved1 = await waitFor(() => {
+      try {
+        const l = JSON.parse(readFileSync(playerFile(name), "utf8")).life;
+        return l && l.kills === 2 && l.bossKills === 1 ? l : undefined;
+      } catch {
+        return undefined;
+      }
+    }, 4000);
     expect([saved1.kills, saved1.bossKills]).toEqual([2, 1]);
     expect(saved1.playMs).toBeGreaterThanOrEqual(Math.floor(first));
     // vào lại: bộ đếm nạp từ file rồi cộng tiếp
