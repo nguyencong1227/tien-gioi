@@ -260,6 +260,23 @@ async function main() {
         `\nBậc ${tier}: cơ chế trùm làm FPS ${a.fpsAvg} -> ${b.fpsAvg}, update p95 ${a.updateP95Ms} -> ${b.updateP95Ms} ms (chênh ${(b.updateP95Ms - a.updateP95Ms).toFixed(3)} ms)`,
       );
   }
+  // Bằng chứng cơ chế CHẠY THẬT (không để số đẹp mà cơ chế không chạy: một lần ngoại lệ trang làm `update` rẻ giả tạo): tin gửi đủ, vầng giáp bật, hạt đang sống, không lỗi trang
+  const bad = [];
+  if (pageErrors.length)
+    bad.push(`có ${pageErrors.length} lỗi trang: ${[...new Set(pageErrors)][0]}`);
+  for (const r of rows.filter((x) => x.mech)) {
+    if (r.mech.sent < 40) bad.push(`bậc ${r.tier}: chỉ ${r.mech.sent} tin gửi (cần >= 40)`);
+    if ((r.mech.armorSeen ?? 0) < 20)
+      bad.push(
+        `bậc ${r.tier}: vầng giáp chỉ thấy ${r.mech.armorSeen ?? 0} lần lấy mẫu (cần >= 20)`,
+      );
+    if (r.mech.peakParticles < 20)
+      bad.push(`bậc ${r.tier}: đỉnh hạt chỉ ${r.mech.peakParticles} (cần >= 20)`);
+  }
+  if (bad.length) {
+    console.error(`\n❌ SỐ ĐO KHÔNG ĐÁNG TIN (cơ chế trùm không chạy đủ):\n- ${bad.join("\n- ")}`);
+    process.exit(1);
+  }
   process.exit(0);
 }
 
