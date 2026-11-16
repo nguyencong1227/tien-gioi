@@ -599,6 +599,27 @@ describe("nhiệm vụ quá ngày và sổ nhiệm vụ đầy (góp ý của B 
     });
   });
 
+  it("nhận nhiệm vụ mới khi sổ đầy vì nhiệm vụ tông quá ngày: gỡ cái quá ngày TRƯỚC khi kiểm sổ đầy (không kẹt)", async () => {
+    await withFakeTemplate(async () => {
+      const k = findDay(false);
+      now += k * DAY;
+      lh.w.now = now;
+      await seed();
+      await join(A);
+      const c = lh.w.ctrl.get(A)!;
+      await accept(A, `${slot0(k)}.t0`);
+      for (const q of QUESTS.slice(0, MAX_ACTIVE_QUESTS - 1))
+        c.quests.active.push({ id: q.id, step: 0, count: 0 });
+      expect(active(A)).toHaveLength(MAX_ACTIVE_QUESTS); // đầy, trong đó có 1 nhiệm vụ tông của hôm qua
+      now += DAY;
+      lh.w.now = now;
+      const today = `${slot0(k + 1)}.t0`;
+      await accept(A, today);
+      expect(active(A).map((x) => x.id)).toContain(today);
+      expect(active(A)).toHaveLength(MAX_ACTIVE_QUESTS);
+    });
+  });
+
   it("sổ nhiệm vụ đầy (MAX_ACTIVE_QUESTS): từ chối nhận, không thêm, báo rõ lý do; bỏ bớt thì nhận được", async () => {
     await seed();
     await join(A);
