@@ -604,6 +604,10 @@ try {
     await sleep(300);
 
     // --- 3c) Nút khoá mục tiêu: ba quái thật trong state mock (gần nhất, xa hơn, ngoài tầm) ---
+    // Từ mục 26 (#26) MẶC ĐỊNH là chế độ nhắm Tự động: `tickAutoTarget` tự khoá quái gần nhất mỗi ~100 ms nên ca này (chưa khoá, bấm = khoá gần nhất, xoay vòng,
+    // nhả khi mục tiêu mất) chỉ đúng ở chế độ THỦ CÔNG: đặt Thủ công cho riêng ca này rồi trả về Tự động. Hành vi Tự động trên cảm ứng (nút = chọn tay tạm thời)
+    // do `check-aim-mode.mjs` kiểm (bốn khung cảm ứng).
+    await evalJs("window.__ui.setAimMode('manual'); window.__scene.setLockedTarget(null); 0");
     await evalJs(`(() => {
       const sc = window.__scene;
       const at = (dx, dy) => ({ kind: "tho", x: sc.predX + dx, y: sc.predY + dy, hp: 40, maxHp: 40, angle: 0 });
@@ -644,7 +648,7 @@ try {
     check(L.id === "t-gan", `bấm lần 3: vòng lại con gần nhất, bỏ qua con ngoài tầm (${L.id})`);
     // Đánh về phía mục tiêu khoá dù con khác gần hơn: khoá con ở xa hơn rồi hỏi hướng ngắm
     await tap(); // -> t-giua (phía dưới)
-    const ang = await evalJs("window.__scene.aim(500)");
+    const ang = await evalJs('window.__scene.pickAim("target", 500)');
     check(
       Math.abs(ang - Math.PI / 2) < 0.01,
       `ngắm về con đang khoá (phía dưới) dù con kia gần hơn (${Number(ang).toFixed(2)} rad)`,
@@ -679,6 +683,8 @@ try {
     await evalJs(
       `(() => { const m = window.__scene.state.monsters; m.delete("t-giua"); m.delete("t-xa"); 0; })()`,
     );
+    // Trả về chế độ nhắm mặc định (Tự động; lưu theo thiết bị nên khung nhìn kế tiếp cũng cần) cho các mục sau
+    await evalJs("window.__ui.setAimMode('auto'); 0");
 
     // Trả về joystick nổi để các mục sau (và khung nhìn kế tiếp) chạy như mặc định
     await evalJs("window.__ui.toggleSettingsModal(true);0");
