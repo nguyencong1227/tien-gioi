@@ -49,6 +49,11 @@ export interface WarnPlan {
   y: number;
   /** circle: bán kính; cone: bán kính cung; line: chiều dài (px) */
   r: number;
+  /**
+   * Bán kính TRONG của `circle` (px, mục 42 trùm, VÀNH KHUYÊN): vùng nguy hiểm là `[r0, r]`, bên trong `r0` là chỗ an toàn. 0 = hình tròn đặc (mọi tin cũ, hoặc `r0` hỏng / không nhỏ hơn
+   * `r`: coi là đặc, nghiêng về phía THẬN TRỌNG như client cũ vì vẽ thừa vùng nguy hiểm không giết ai, vẽ thiếu thì có).
+   */
+  r0: number;
   angle: number;
   /** Góc mở của `cone` (rad) */
   arc: number;
@@ -67,11 +72,18 @@ export function planWarn(m: WarnMsg): WarnPlan | null {
   const arc = m.arc === undefined ? WARN_DEFAULT_ARC : m.arc;
   const w = m.w === undefined ? WARN_DEFAULT_W : m.w;
   if (!finite(angle, arc, w) || !(arc > 0) || !(w > 0)) return null;
+  const r = clamp(m.r, 4, WARN_MAX_R);
+  // vành khuyên: chỉ `circle`, 0 < r0 < r (sau khi kẹp r); r0 hỏng / vượt r thì hình tròn ĐẶC (thận trọng)
+  const r0 =
+    shape === "circle" && m.r0 !== undefined && Number.isFinite(m.r0) && m.r0 > 0 && m.r0 < r
+      ? clamp(m.r0, 2, Math.max(2, r - 2))
+      : 0;
   return {
     shape,
     x: m.x,
     y: m.y,
-    r: clamp(m.r, 4, WARN_MAX_R),
+    r,
+    r0,
     angle,
     arc: clamp(arc, 0.1, Math.PI * 2),
     w: clamp(w, 4, WARN_MAX_W),
@@ -159,12 +171,16 @@ function angleDiff(a: number, b: number): number {
 /**
  * Người chơi (tâm (px, py), bán kính thân `pad`) có đang đứng TRONG vùng báo không: đúng ý nghĩa vùng máy chủ kiểm trúng (thân chạm vào vùng là trúng), dùng để cảnh báo
  * "bạn đang trong vùng nguy hiểm" (viền sáng + tiếng báo). `line`: khoảng cách tới đoạn dài `r` <= nửa bề rộng + `pad` (hình viên thuốc, như `charge.ts`); `circle`: khoảng cách
- * tâm <= `r` + `pad`; `cone`: trong bán kính `r` + `pad` và lệch hướng không quá nửa góc mở (nới thêm `asin(pad / d)` vì thân có bề rộng). Số không hữu hạn thì `false`.
+ * tâm <= `r` + `pad` (vành khuyên: và >= `r0` - `pad`); `cone`: trong bán kính `r` + `pad` và lệch hướng không quá nửa góc mở (nới thêm `asin(pad / d)` vì thân có bề rộng). Số không hữu hạn thì `false`.
  */
 export function warnCovers(plan: WarnPlan, px: number, py: number, pad = 0): boolean {
   if (!finite(px, py, pad)) return false;
   const p = Math.max(0, pad);
-  if (plan.shape === "circle") return Math.hypot(px - plan.x, py - plan.y) <= plan.r + p;
+  if (plan.shape === "circle") {
+    const d = Math.hypot(px - plan.x, py - plan.y);
+    // vành khuyên: thân chạm DẢI [r0, r] mới là trúng; đứng trọn trong lỗ giữa (thân không chạm dải) là an toàn
+    return d <= plan.r + p && d >= plan.r0 - p;
+  }
   if (plan.shape === "line") {
     const bx = plan.x + Math.cos(plan.angle) * plan.r;
     const by = plan.y + Math.sin(plan.angle) * plan.r;

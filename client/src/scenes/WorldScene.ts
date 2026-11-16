@@ -227,6 +227,8 @@ import {
   fitView,
 } from "../map-render";
 import { moveVector } from "../move-input";
+import { BossFxTracker, pickBossForBar, type BossCand } from "../boss-bar";
+import { BossBarDom } from "../boss-bar-ui";
 import { MoveKeys } from "../move-keys";
 import { StopBurst } from "../move-stop";
 import { absorbJump, decayCorr } from "../move-smooth";
@@ -377,6 +379,11 @@ export class WorldScene extends Phaser.Scene {
   /** Phím di chuyển theo `event.code` (không theo `keyCode` của Phaser: bộ gõ tiếng Việt làm `keyCode` = 229, mục 25) */
   /** Phím di chuyển do người chơi đổi được (`move.*` trong `keybinds.ts`): tra hướng theo bảng phím hiện tại mỗi lần. */
   private moveKeys = new MoveKeys((code) => moveDirOf(code));
+
+  /** Trùm (mục 42, T4 #873): trạng thái theo `fx` (`bossCast` / `bossPhase` / `bossEnrage`) + thanh máu trùm (DOM, `boss-bar-ui.ts`), cập nhật ~10 lần / giây */
+  private bossFx = new BossFxTracker();
+  private bossBar = new BossBarDom(document);
+  private nextBossBarAt = 0;
 
   // Đoán trước di chuyển của chính mình
   private seq = 0;
@@ -2108,6 +2115,8 @@ export class WorldScene extends Phaser.Scene {
       e.root.destroy();
     }
     this.monsters.clear();
+    this.bossFx.clear();
+    this.bossBar.update(null);
     this.recentHit.clear();
     this.setLockedTarget(null);
 
@@ -2501,6 +2510,7 @@ export class WorldScene extends Phaser.Scene {
     const k = 1 - Math.exp(-LERP_RATE * (deltaMs / 1000));
     this.syncPlayers(k, deltaMs);
     this.syncMonsters(k);
+    this.syncBossBar(this.time.now);
     this.tickAutoTarget();
     this.syncShield();
     this.syncTargetLock();
@@ -3532,7 +3542,24 @@ export class WorldScene extends Phaser.Scene {
         e.root.destroy();
       }
       this.monsters.delete(id);
+      this.bossFx.forget(id);
     }
+  }
+
+  /**
+   * Thanh máu trùm (mục 42, T4 #873): chọn MỘT trùm (gần nhất trong tầm; bí cảnh luôn hiện trùm của run) từ state công khai rồi vẽ mô hình; không việc mỗi khung (~10 lần / giây).
+   * Chỉ trùm ĐANG ĐÁNH / ở gần mới hiện thanh: 8 Hắc Giao rải bản đồ không thành 8 thanh.
+   */
+  private syncBossBar(now: number) {
+    if (now < this.nextBossBarAt) return;
+    this.nextBossBarAt = now + 100;
+    const cands: BossCand[] = [];
+    this.state.monsters.forEach((m: any, id: string) => {
+      cands.push({ id, kind: m.kind, x: m.x, y: m.y, hp: m.hp, maxHp: m.maxHp });
+    });
+    const me = this.hasMe ? { x: this.predX, y: this.predY } : null;
+    const pick = pickBossForBar(cands, me, { always: isDungeonMap(this.map.def.id) });
+    this.bossBar.update(pick ? this.bossFx.modelOf(pick, now) : null);
   }
 
   /** Phát hoạt ảnh theo máy trạng thái (gfx/anim/mon-anim.ts); chỉ đổi khi trạng thái đổi. */
@@ -4014,6 +4041,19 @@ export class WorldScene extends Phaser.Scene {
       case "warn":
         // Báo trước đòn của quái (M7.7, #508): vùng tô đặc lớn dần tới lúc đòn đáp xuống; client chỉ vẽ, máy chủ quyết định trúng / trượt
         this.telegraphs.warn(m, this.time.now);
+        return;
+      case "bossCast":
+        // Trùm bắt đầu vận chiêu (mục 42): tên chiêu lên thanh máu trùm; vùng cảnh báo trên đất do `fx` `warn` đi kèm lo
+        this.bossFx.onCast(m.by, m.ability, m.ms, this.time.now);
+        return;
+      case "bossPhase":
+        // Trùm chuyển giai đoạn: thanh chớp + rung nhẹ khung hình (bỏ rung khi giảm chuyển động)
+        this.bossFx.onPhase(m.by, this.time.now);
+        if (!getQuality().reducedMotion && this.inView(m.x, m.y, 240))
+          this.cameras.main.shake(320, 0.004);
+        return;
+      case "bossEnrage":
+        this.bossFx.onEnrage(m.by, this.time.now);
         return;
       case "bolt":
         // Đạn tầm xa của quái: client tự bay theo `speed` / `angle` tới hết `range` (đạn không là state)
