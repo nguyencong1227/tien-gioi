@@ -24,7 +24,22 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
-import { DEFAULT_MAP, DEFAULT_MAP_ID, SECT_CREATE_COST, roomNameOf } from "@tien-gioi/shared";
+import {
+  DEFAULT_MAP,
+  DEFAULT_MAP_ID,
+  INVENTORY_SLOTS,
+  ITEM_BY_ID,
+  SECT_CREATE_COST,
+  SECT_SHOP,
+  addToInventory,
+  countItem,
+  dayKey,
+  questDefAny,
+  roomNameOf,
+  sectFailMessage,
+  sectQuestCh,
+  sectQuestSlots,
+} from "@tien-gioi/shared";
 import { Tab, shown, sleep, listenWithRetry, removeTmpDirs, getChromeGpuFlags } from "./e2e-kit";
 import { ACT_CONFIRM_GUARD_MS } from "../../client/src/act-confirm";
 
@@ -566,6 +581,212 @@ async function main() {
       "B thành Trưởng lão",
     );
     out("  ✓ [7/9] A thăng B làm Trưởng lão: bảng của B cập nhật");
+
+    // 7b. NỘI VỤ (M8.3-M8.6) với máy chủ THẬT: nhận / trả nhiệm vụ tông, đổi ở cửa hàng, hết hạn mức, túi đầy (qua giao diện thật của B; số thật đọc từ tệp tông môn + túi)
+    // Dữ liệu nhiệm vụ / cửa hàng là bảng THẬT của game (E / D còn thay ở M8.7): bước này đọc từ ảnh chụp máy chủ gửi, không cứng tên / số.
+    {
+      const { onMonsterKilled, refreshQuests } = await import("../src/systems/quests.js");
+      world.sectEarnWarmup = false; // dev / E2E: vào tông cùng ngày vẫn kiếm được cống hiến (mục 12.3)
+      const sectId = sectOnDisk().id as string;
+      const store = world.sectService.store;
+      const sidB = sids.get(B.name)!;
+      const memberB = () => sectOnDisk().members.find((m: any) => m.name === B.name);
+      const hall = (): Promise<any> =>
+        tb.ev(`JSON.parse(JSON.stringify(window.__ui.getSectHall()))`);
+      // Bấm nút `label` ở hàng (trong tab Nội vụ) có chứa `needle`; trả "ok" / "khoá" / "không có hàng" / "không có nút"
+      const rowBtn = (needle: string, label: string): Promise<string> =>
+        tb.ev(
+          `(() => { const li = [...document.querySelectorAll('#sect-tab-hall li.sect-hall-row')].find((x) => x.textContent.includes(${JSON.stringify(needle)})); if (!li) return 'không có hàng'; const b = [...li.querySelectorAll('button')].find((x) => x.textContent === ${JSON.stringify(label)}); if (!b) return 'không có nút'; if (b.disabled) return 'khoá'; b.click(); return 'ok'; })()`,
+        );
+      const reopenHall = async () => {
+        await press(tb, "sect-tab-btn-overview");
+        await press(tb, "sect-tab-btn-hall"); // vào tab Nội vụ xin ảnh chụp mới
+        await sleep(300);
+      };
+      await press(tb, "sect-tab-btn-hall");
+      await tb.waitFor(
+        `(window.__ui.getSectHall()?.quests?.length ?? 0) > 0 && (window.__ui.getSectHall()?.shop?.length ?? 0) > 0`,
+        "ảnh chụp Nội vụ THẬT (nhiệm vụ + cửa hàng) từ máy chủ",
+      );
+      let h0 = await hall();
+      if (h0.shop.length !== SECT_SHOP.length)
+        throw new Error(`Cửa hàng phải có ${SECT_SHOP.length} món, thực tế ${h0.shop.length}`);
+      if (!h0.quests.every((q: any) => q.state === "offer"))
+        throw new Error(
+          `Mọi nhiệm vụ phải 'chưa nhận', thực tế ${h0.quests.map((q: any) => q.state)}`,
+        );
+      if (h0.me.contrib !== 0)
+        throw new Error(`Cống hiến ban đầu phải 0, thực tế ${h0.me.contrib}`);
+      await tb.waitFor(
+        `document.querySelectorAll('#sect-tab-hall li.sect-hall-row').length === ${h0.quests.length + h0.shop.length}`,
+        "tab Nội vụ vẽ đủ hàng nhiệm vụ + cửa hàng",
+      );
+      await tb.shot("7b-noi-vu");
+
+      // --- nhận + trả một nhiệm vụ CÓ THẬT (loại thu thập / hạ quái: làm được ở máy chủ thử) ---
+      const doable = h0.quests
+        .map((q: any) => ({ q, def: questDefAny(q.questId) }))
+        .find(
+          ({ def }: any) =>
+            def &&
+            def.steps.length > 0 &&
+            def.steps.every((st: any) => st.kind === "collect" || st.kind === "kill"),
+        );
+      if (!doable)
+        throw new Error("Không có nhiệm vụ tông nào làm được bằng thu thập / hạ quái để thử");
+      const { q: quest, def } = doable;
+      const ch = sectQuestCh(def.id);
+      const rewardRoom = (def.rewards.items ?? []).reduce(
+        (a: number, r: any) => a + Math.ceil(r.qty),
+        0,
+      );
+      if (rewardRoom > INVENTORY_SLOTS) throw new Error("Phần thưởng nhiệm vụ nhiều hơn túi");
+      if ((await rowBtn(quest.title, "Nhận")) !== "ok") throw new Error("Nút Nhận phải bấm được");
+      for (
+        let i = 0;
+        i < 50 && !ctrlOf(B.name).quests.active.some((a: any) => a.id === def.id);
+        i++
+      )
+        await sleep(100);
+      if (!ctrlOf(B.name).quests.active.some((a: any) => a.id === def.id))
+        throw new Error("Nhận xong, nhiệm vụ phải vào sổ nhiệm vụ của B");
+      await tb.waitFor(
+        `(window.__ui.getSectHall()?.quests ?? []).some((q) => q.questId === ${JSON.stringify(quest.questId)} && q.state === 'active')`,
+        "ảnh chụp báo 'đang làm'",
+      );
+      // làm xong nhiệm vụ (đúng đường tiến độ của game: nhặt đồ vào túi / hạ quái qua onMonsterKilled)
+      for (const st of def.steps as any[]) {
+        if (st.kind === "collect") {
+          if (addToInventory(ctrlOf(B.name).inv, st.itemId, st.count) > 0)
+            throw new Error("Túi B không đủ chỗ cho đồ thu thập");
+          refreshQuests(world, sidB);
+        } else for (let k = 0; k < st.count; k++) onMonsterKilled(world, sidB, st.monster);
+      }
+      await reopenHall();
+      const coinBefore = ctrlOf(B.name).coin;
+      if ((await rowBtn(quest.title, "Trả")) !== "ok") throw new Error("Nút Trả phải bấm được");
+      for (let i = 0; i < 80 && (memberB().contrib ?? 0) !== ch; i++) await sleep(100);
+      const mb = memberB();
+      if ((mb.contrib ?? 0) !== ch || (mb.merit ?? 0) !== ch)
+        throw new Error(
+          `Trả xong: cống hiến + công tích của B phải là ${ch}, thực tế ${mb.contrib} / ${mb.merit}`,
+        );
+      if (ctrlOf(B.name).quests.active.some((a: any) => a.id === def.id))
+        throw new Error("Trả xong, nhiệm vụ phải rời sổ nhiệm vụ");
+      if (!mb.today.quests.length) throw new Error("Sổ ngày phải ghi nhiệm vụ đã trả");
+      await tb.waitFor(
+        `(window.__ui.getSectHall()?.quests ?? []).some((q) => q.questId === ${JSON.stringify(quest.questId)} && q.state === 'done') && window.__ui.getSectHall().me.contrib === ${ch}`,
+        "ảnh chụp báo 'đã xong' và cống hiến mới",
+      );
+      if ((await rowBtn(quest.title, "Trả")) === "ok")
+        throw new Error("Nhiệm vụ đã trả hôm nay không được còn nút Trả bấm được");
+      if (ctrlOf(B.name).coin !== coinBefore) throw new Error("Trả nhiệm vụ không được đụng ví");
+
+      // --- cửa hàng: đổi một món qua giao diện (trừ cống hiến, thêm đồ, ghi số đã mua, lưu hồ sơ) ---
+      const sectNow = sectOnDisk();
+      await (store as any).update(sectId, (sc: any) => ({
+        ...sc,
+        points: 40_000, // cấp tối đa: mọi món mở khoá
+        members: sc.members.map((m: any) =>
+          m.name === B.name ? { ...m, contrib: 500, merit: Math.max(m.merit ?? 0, 500) } : m,
+        ),
+      }));
+      void sectNow;
+      await reopenHall();
+      h0 = await hall();
+      const item = h0.shop.find((e: any) => e.locked === null && e.limitDay >= 2);
+      if (!item) throw new Error("Phải có món mua được (còn >= 2 lượt) để thử cửa hàng");
+      const itemName = ITEM_BY_ID[item.itemId]!.name;
+      const have0 = countItem(ctrlOf(B.name).inv, item.itemId);
+      if ((await rowBtn(itemName, "Đổi")) !== "ok")
+        throw new Error(`Nút Đổi "${itemName}" phải bấm được`);
+      for (let i = 0; i < 80 && (memberB().contrib ?? 0) !== 500 - item.cost; i++) await sleep(100);
+      if ((memberB().contrib ?? 0) !== 500 - item.cost)
+        throw new Error(
+          `Đổi xong: cống hiến phải còn ${500 - item.cost}, thực tế ${memberB().contrib}`,
+        );
+      if (countItem(ctrlOf(B.name).inv, item.itemId) !== have0 + 1)
+        throw new Error("Đổi xong: túi phải thêm đúng 1 món");
+      if ((memberB().today.buys?.[item.itemId] ?? 0) !== 1)
+        throw new Error("Sổ ngày phải ghi đã mua 1");
+      for (let i = 0; i < 50; i++) {
+        const sv = saveOf(B.name);
+        if (JSON.stringify(sv.inv ?? sv.inventory ?? []).includes(item.itemId)) break;
+        await sleep(100);
+      }
+      if (!JSON.stringify(saveOf(B.name)).includes(item.itemId))
+        throw new Error("Hồ sơ của B phải được lưu sau khi đổi (đồ mới nằm trong tệp)");
+
+      // --- hết hạn mức ngày: còn đúng 1 lượt, đổi xong thì khoá với lý do chữ ---
+      await (store as any).update(sectId, (sc: any) => ({
+        ...sc,
+        members: sc.members.map((m: any) =>
+          m.name === B.name
+            ? {
+                ...m,
+                contrib: 500,
+                today: {
+                  day: dayKey(Date.now()),
+                  earned: 0,
+                  deposit: 0,
+                  quests: [],
+                  dungeon: false,
+                  buys: { [item.itemId]: item.limitDay - 1 },
+                },
+              }
+            : m,
+        ),
+      }));
+      await reopenHall();
+      const last = (await hall()).shop.find((e: any) => e.itemId === item.itemId);
+      if (last.left !== 1 || last.locked !== null)
+        throw new Error(
+          `Còn đúng 1 lượt và mua được, thực tế left=${last.left} locked=${last.locked}`,
+        );
+      if ((await rowBtn(itemName, "Đổi")) !== "ok") throw new Error("Lượt cuối phải đổi được");
+      for (let i = 0; i < 80 && (memberB().today.buys?.[item.itemId] ?? 0) !== item.limitDay; i++)
+        await sleep(100);
+      await tb.waitFor(
+        `(window.__ui.getSectHall()?.shop ?? []).some((e) => e.itemId === ${JSON.stringify(item.itemId)} && e.locked === 'limit' && e.left === 0)`,
+        "ảnh chụp báo hết hạn mức (limit)",
+      );
+      if ((await rowBtn(itemName, "Đổi")) !== "khoá")
+        throw new Error("Hết hạn mức: nút Đổi phải bị khoá");
+      const whyText = await tb.ev(
+        `(() => { const li = [...document.querySelectorAll('#sect-tab-hall li.sect-hall-row')].find((x) => x.textContent.includes(${JSON.stringify(itemName)})); return li ? li.textContent : ''; })()`,
+      );
+      if (!/hạn mức|lượt/i.test(whyText))
+        throw new Error(`Hàng hết hạn mức phải nêu lý do bằng chữ: "${whyText}"`);
+
+      // --- túi đầy: máy chủ từ chối TRƯỚC khi trừ cống hiến ---
+      const other = (await hall()).shop.find(
+        (e: any) => e.itemId !== item.itemId && e.locked === null,
+      );
+      if (!other) throw new Error("Phải có món thứ hai mua được để thử túi đầy");
+      const otherName = ITEM_BY_ID[other.itemId]!.name;
+      const inv = ctrlOf(B.name).inv;
+      const saved = inv.map((x: any) => (x ? { ...x } : x));
+      for (let i = 0; i < inv.length; i++) inv[i] = { itemId: "long_tho", qty: 1 };
+      const contribFull = memberB().contrib ?? 0;
+      const buysFull = JSON.stringify(memberB().today.buys ?? {});
+      if ((await rowBtn(otherName, "Đổi")) !== "ok")
+        throw new Error("Nút Đổi phải bấm được dù túi đầy (máy chủ từ chối)");
+      await tb.waitFor(
+        `document.getElementById('toast')?.textContent?.includes(${JSON.stringify(sectFailMessage("bag_full"))})`,
+        "toast túi đầy",
+      );
+      await sleep(400);
+      if (
+        (memberB().contrib ?? 0) !== contribFull ||
+        JSON.stringify(memberB().today.buys ?? {}) !== buysFull
+      )
+        throw new Error("Túi đầy: cống hiến và số đã mua KHÔNG được đổi");
+      for (let i = 0; i < inv.length; i++) inv[i] = saved[i];
+      out(
+        `  ✓ [7b] NỘI VỤ với máy chủ thật: tab hiện ${h0.quests.length} nhiệm vụ + ${SECT_SHOP.length} món; nhận + trả "${quest.title}" (+${ch} cống hiến + công tích, sổ ngày, rời sổ nhiệm vụ, ví không đổi); đổi "${itemName}" (-${item.cost}, +1 vào túi, đã lưu hồ sơ); hết hạn mức: nút khoá kèm lý do; túi đầy: toast "${sectFailMessage("bag_full")}", không mất cống hiến`,
+      );
+      await press(tb, "sect-tab-btn-treasury"); // trở lại các bước sau như cũ
+    }
 
     // 8. B rời tông môn
     await press(tb, "sect-tab-btn-overview");
