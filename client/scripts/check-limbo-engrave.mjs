@@ -132,8 +132,19 @@ try {
     evalJs(
       `document.querySelector('#limbo-engrave-list [data-nav="engrave:${id}"]').closest('.engrave-item').click(); 1`,
     ).then(() => sleep(120));
+  /** Hộp xác nhận chung (issue #779): bấm Đầu thai / Mở chỉ MỞ hộp; chờ qua cửa sổ chống click ma (450 ms) rồi xác nhận bằng nút "Bán / Mở / Đầu thai" (pointerdown như chạm thật) */
+  const confirmYes = async () => {
+    for (let k = 0; k < 20 && !(await evalJs("window.__ui.isActConfirmOpen()")); k++)
+      await sleep(50);
+    await sleep(520);
+    await evalJs(
+      "document.getElementById('act-btn-yes').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); 1",
+    );
+    await sleep(100);
+  };
   const rebirth = async () => {
     await evalJs("document.getElementById('limbo-btn-rebirth').click(); 1");
+    await confirmYes();
     await sleep(150);
     return J("window.__rebirthChoices");
   };
@@ -253,6 +264,7 @@ try {
   await clickItem("ung_trao");
   await clickItem("me_tung_bo"); // lựa chọn đã đụng: me_tung_bo
   await evalJs("document.querySelector('[data-nav=\"stone:khac\"]').click(); 1");
+  await confirmYes(); // mở nấc bằng Duyên có hộp xác nhận
   await sleep(300);
   st = await state();
   check(st.hint === "Tối đa 2 chiêu (đã chọn 1/2)", `sau khi mua nấc 2: "${st.hint}"`);
@@ -299,14 +311,26 @@ try {
   await evalJs(
     "document.getElementById('limbo-btn-rebirth').click(); document.getElementById('limbo-btn-rebirth').click(); 1",
   );
-  await sleep(150);
-  check((await J("window.__rebirthChoices")).length === 1, "hai lần bấm liền: chỉ MỘT tin");
+  await confirmYes();
+  await evalJs(
+    "document.getElementById('limbo-btn-rebirth').click(); document.getElementById('limbo-btn-rebirth').click(); 1",
+  ); // đang chờ máy chủ (aria-disabled): bấm thêm KHÔNG mở hộp, KHÔNG gửi thêm
+  await sleep(700);
+  check(
+    (await evalJs("window.__ui.isActConfirmOpen()")) === false,
+    "đã gửi: bấm thêm không mở hộp nữa",
+  );
+  check(
+    (await J("window.__rebirthChoices")).length === 1,
+    "hai lần bấm liền + bấm thêm lúc chờ: chỉ MỘT tin",
+  );
   const aria = await evalJs(
     "document.getElementById('limbo-btn-rebirth').getAttribute('aria-disabled')",
   );
   check(aria === "true", "nút aria-disabled trong lúc chờ");
   await sleep(3200);
   await evalJs("document.getElementById('limbo-btn-rebirth').click(); 1");
+  await confirmYes();
   await sleep(150);
   check(
     (await J("window.__rebirthChoices")).length === 2,

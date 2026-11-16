@@ -31,6 +31,7 @@ import {
   roomNameOf,
 } from "@tien-gioi/shared";
 import { Tab, sleep, shown, listenWithRetry, removeTmpDirs, getChromeGpuFlags } from "./e2e-kit";
+import { ACT_CONFIRM_GUARD_MS } from "../../client/src/act-confirm";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
@@ -1456,6 +1457,10 @@ async function main() {
       ),
     );
     await press(t, K.enter);
+    // mở bằng Duyên có HỘP XÁC NHẬN (issue #779): chờ qua cửa sổ chống click ma rồi Y
+    await waitUntil(async () => !!(await ev(shown("act-confirm"))));
+    await sleep(ACT_CONFIRM_GUARD_MS + 150);
+    await press(t, K.y);
     await waitUntil(async () => (await textOf("#limbo-duyen-total")) === "18");
     check(
       "Enter mua Kim nang: Duyên 28 -> 18 và focus vẫn ở màn (không rơi về đầu)",
@@ -1469,7 +1474,14 @@ async function main() {
     );
     await press(t, K.enter);
     check(
-      "Enter trên nút đầu thai: gọi đầu thai đúng một lần",
+      "Enter trên nút đầu thai: mở hộp TÓM TẮT, chưa gọi đầu thai",
+      !!(await ev(shown("act-confirm"))) && (await ev(`window.__reborns`)) !== 1,
+      String(await ev(`window.__reborns`)),
+    );
+    await sleep(ACT_CONFIRM_GUARD_MS + 150);
+    await press(t, K.y);
+    check(
+      "Y trong hộp tóm tắt: gọi đầu thai đúng một lần",
       (await ev(`window.__reborns`)) === 1,
       String(await ev(`window.__reborns`)),
     );
