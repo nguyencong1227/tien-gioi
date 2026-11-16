@@ -387,6 +387,8 @@ async function main() {
           `(() => { const r = document.querySelector("#chat").getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`,
         );
         await mouseTo(chat.x, chat.y);
+        // chế độ Thủ công (mục 26): chỉ ở đó "chưa khoá" mới có nghĩa; chế độ Tự động (mặc định) tự giữ mục tiêu nên không bao giờ chưa khoá (ca [6b] ở dưới)
+        await evalJs(`window.__ui.setAimMode("manual")`);
         await evalJs(`window.__scene.setLockedTarget(null)`);
         // quái sát nhân vật (trong tầm MỌI chiêu): nếu dash tự lao vào quái gần nhất thì ca dưới đây mới đỏ
         await evalJs(
@@ -416,6 +418,23 @@ async function main() {
         check(
           aFace !== null && near(aFace, DECOY_FACING),
           `không quái, không chuột hợp lệ: về hướng nhìn (${fmt(aFace)})`,
+        );
+
+        console.log(
+          "  [6b] chế độ Tự động (mặc định): luôn có mục tiêu, nên dash không phím cũng lao về mục tiêu (mục 29: phím -> chuột hợp lệ -> mục tiêu)",
+        );
+        await evalJs(`window.__ui.setAimMode("auto")`);
+        await evalJs(
+          `(() => { const sc = window.__scene, t = sc.map.townPx; sc.predX = t.x; sc.predY = t.y; sc.pending.length = 0; sc.cameras.main.centerOn(t.x, t.y); sc.state.monsters.set("m2", { kind: "lang", x: t.x + 120, y: t.y, angle: 0, hp: 100, maxHp: 100, fx: 0, elite: 0 }); return 1; })()`,
+        );
+        await sleep(800);
+        const east2 = await evalJs(
+          `(() => { const sc = window.__scene, m = sc.monsters.get("m2"); return Math.atan2(m.ty - sc.predY, m.tx - sc.predX); })()`,
+        );
+        const aAutoDash = await fire("KeyO");
+        check(
+          aAutoDash !== null && near(aAutoDash, east2),
+          `Tự động, chuột trên chat, không giữ phím: dash về mục tiêu tự động (${fmt(aAutoDash)})`,
         );
       } else {
         console.log("  [7] cảm ứng: không có chuột, luôn về mục tiêu");

@@ -201,6 +201,13 @@ import {
   type ConfirmSpec,
 } from "./act-confirm";
 import { PREFER_TARGET_STORAGE_KEY, parsePreferTarget } from "./aim-order";
+import {
+  AIM_MODE_LABEL,
+  AIM_MODE_STORAGE_KEY,
+  DEFAULT_AIM_MODE,
+  parseAimMode,
+  type AimMode,
+} from "./auto-target";
 import { craftButtonText, craftFeeHint, craftSubtitle, craftTitle } from "./craft-ui";
 import {
   CHAT_PREF_KEY,
@@ -336,6 +343,8 @@ let settingsModalOpen = false;
 let hideOtherNames = false;
 /** "Ưu tiên mục tiêu hơn chuột" (mục 29, mặc định TẮT: con trỏ chuột hợp lệ thắng mục tiêu). */
 let preferTargetOverMouse = false;
+/** "Chế độ nhắm" (mục 26, mặc định Tự động — gần nhất, kể cả người chơi cũ chưa từng đổi; lưu theo thiết bị). */
+let aimModeSetting: AimMode = DEFAULT_AIM_MODE;
 /** Bản đồ nhỏ đang hiện (false = thu gọn thành nhãn tên khu, vẫn bấm được để mở bản đồ lớn). */
 let minimapVisible = true;
 let questTab: "active" | "done" = "active";
@@ -577,6 +586,11 @@ function loadSettings() {
     preferTargetOverMouse = parsePreferTarget(localStorage.getItem(PREFER_TARGET_STORAGE_KEY));
   } catch {
     preferTargetOverMouse = false;
+  }
+  try {
+    aimModeSetting = parseAimMode(localStorage.getItem(AIM_MODE_STORAGE_KEY));
+  } catch {
+    aimModeSetting = DEFAULT_AIM_MODE;
   }
   minimapVisible = minimapOpen(parseTrackerPref(readPref(MINIMAP_PREF_KEY)));
   // Chất lượng đồ hoạ (và class body.low-fx tương thích) do gfx/quality.ts quản lý (#323): một nguồn duy nhất
@@ -3590,6 +3604,7 @@ export const ui = {
     const muteChk = $("set-mute") as HTMLInputElement;
     const hideNamesChk = $("set-hide-names") as HTMLInputElement;
     const preferTargetChk = $("set-prefer-target") as HTMLInputElement;
+    const aimModeSel = $("set-aim-mode") as HTMLSelectElement;
     const minimapChk = $("set-minimap") as HTMLInputElement;
     const qualitySel = $("set-quality") as HTMLSelectElement;
     const qualityNow = $("set-quality-now");
@@ -3612,6 +3627,7 @@ export const ui = {
       muteChk.checked = sound.isMuted();
       hideNamesChk.checked = hideOtherNames;
       preferTargetChk.checked = preferTargetOverMouse;
+      aimModeSel.value = aimModeSetting;
       minimapChk.checked = minimapVisible;
       const q = getQuality();
       qualitySel.value = q.mode;
@@ -3641,6 +3657,7 @@ export const ui = {
         // Bỏ qua nếu trình duyệt chặn localStorage
       }
     });
+    aimModeSel.addEventListener("change", () => this.setAimMode(parseAimMode(aimModeSel.value)));
     preferTargetChk.addEventListener("change", () => {
       preferTargetOverMouse = preferTargetChk.checked;
       try {
@@ -3896,6 +3913,25 @@ export const ui = {
 
   isHideNames() {
     return hideOtherNames;
+  },
+
+  /** "Chế độ nhắm" hiện tại (mục 26): `auto` = tự chuyển mục tiêu sang đối tượng gần nhất (mặc định), `manual` = khoá tay như cũ. */
+  getAimMode(): AimMode {
+    return aimModeSetting;
+  },
+
+  /** Đổi chế độ nhắm (Cài đặt hoặc phím tắt): lưu theo thiết bị, đồng bộ ô chọn trong Cài đặt, `notify` = báo bằng toast (phím tắt). */
+  setAimMode(mode: AimMode, notify = false) {
+    if (mode === aimModeSetting) return;
+    aimModeSetting = mode;
+    try {
+      localStorage.setItem(AIM_MODE_STORAGE_KEY, mode);
+    } catch {
+      // Bỏ qua nếu trình duyệt chặn localStorage
+    }
+    const sel = document.getElementById("set-aim-mode") as HTMLSelectElement | null;
+    if (sel) sel.value = mode;
+    if (notify) this.toast({ text: `Chế độ nhắm: ${AIM_MODE_LABEL[mode]}`, tone: "info" });
   },
 
   /** Cài đặt "Ưu tiên mục tiêu hơn chuột" (mục 29): bật thì chiêu bay về mục tiêu kể cả khi chuột đang ở trong màn chơi. */

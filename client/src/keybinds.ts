@@ -17,6 +17,7 @@ export type ActionId =
   | "attack"
   | "target.next"
   | "target.prev"
+  | "target.mode"
   | "skill.sword"
   | "skill.slot2"
   | "skill.slot3"
@@ -116,6 +117,13 @@ export const ACTIONS: readonly ActionDef[] = [
     label: "Mục tiêu trước",
     group: "combat",
     defaults: ["Shift+Tab"],
+    world: true,
+  },
+  {
+    id: "target.mode",
+    label: "Đổi chế độ nhắm (tự động / thủ công)",
+    group: "combat",
+    defaults: ["Backquote"],
     world: true,
   },
   {
