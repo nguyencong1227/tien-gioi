@@ -11,16 +11,19 @@ import {
   type QuestDef,
 } from "@tien-gioi/shared";
 import {
+  buildDangerPenaltyMap,
   estimateDropsRequired,
   findDropsFor,
   findMapForMonster,
   findPortalTo,
   getPatrolPoints,
+  isLootSafeToPick,
   isMapReachableForQuest,
   planQuestSteps,
+  planSafePath,
   walkSingleQuest,
 } from "./quest-walk";
-import { gridOf, planPath } from "../src/balance/search-check";
+import { gridOf, planPath, newGrid } from "../src/balance/search-check";
 import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { Client } from "colyseus.js";
@@ -297,6 +300,114 @@ describe("quest-walk: kiểm tra tính khả thi tĩnh của nhiệm vụ (Issue
       expect(result.error).toContain("unplanned_travel");
       expect(result.error).toContain("am_suong_trach");
       expect(elapsed).toBeLessThan(3500);
+    });
+  });
+
+  describe("quest-walk: bot né quái và nhặt đồ có chọn lúc (Issue #818)", () => {
+    it("buildDangerPenaltyMap: tính đúng ma trận phạt nguy hiểm quanh quái", () => {
+      const w = 15;
+      const h = 15;
+      const free = new Uint8Array(w * h).fill(1);
+      const grid = newGrid(w, h, free);
+
+      const monX = (7 + 0.5) * 32;
+      const monY = (7 + 0.5) * 32;
+      const monsters = [
+        { x: monX, y: monY, aggro: 64, hp: 1000, kind: "suong_ho" },
+        { x: 32, y: 32, aggro: 0, hp: 100, kind: "tho" }, // quái hiền, không phạt
+        { x: 64, y: 64, aggro: 150, hp: 0, kind: "thach_quy" }, // quái chết, không phạt
+      ];
+
+      const pMap = buildDangerPenaltyMap(grid, monsters, 20);
+      const centerIdx = 7 * w + 7;
+      expect(pMap[centerIdx]).toBeGreaterThan(15);
+
+      // Ô ở xa (0, 0) không bị phạt
+      expect(pMap[0]).toBe(0);
+
+      // Quái hiền và quái chết không gây phạt
+      expect(pMap[1 * w + 1]).toBe(0);
+      expect(pMap[2 * w + 2]).toBe(0);
+
+      // Bỏ qua loài quái mục tiêu khi ignoreMonsterKind được truyền
+      const pMapIgnore = buildDangerPenaltyMap(grid, monsters, 20, "suong_ho");
+      expect(pMapIgnore[centerIdx]).toBe(0);
+
+      // Hệ số penaltyFactor = 0 (đột biến) trả về ma trận toàn 0
+      const pMapZero = buildDangerPenaltyMap(grid, monsters, 0);
+      expect(pMapZero[centerIdx]).toBe(0);
+    });
+
+    it("planSafePath: tìm đường đi vòng né bãi quái nguy hiểm thay vì đi xuyên qua", () => {
+      const w = 21;
+      const h = 21;
+      const free = new Uint8Array(w * h).fill(1);
+      const grid = newGrid(w, h, free);
+
+      const startCell = 10 * w + 2; // (2, 10)
+      const goalCell = 10 * w + 18; // (18, 10)
+      const sx = (2 + 0.5) * 32;
+      const sy = (10 + 0.5) * 32;
+      const goals = new Set([goalCell]);
+
+      // Đặt 1 con quái nguy hiểm chặn đúng đường thẳng ở giữa (10, 10)
+      const monX = (10 + 0.5) * 32;
+      const monY = (10 + 0.5) * 32;
+      const monsters = [{ x: monX, y: monY, aggro: 96, hp: 5000, kind: "thach_quy" }];
+
+      // 1. Khi KHÔNG CÓ PHẠT (penaltyFactor = 0, đường ngắn nhất hình học):
+      const zeroPenalty = buildDangerPenaltyMap(grid, monsters, 0);
+      const straightPath = planSafePath(grid, sx, sy, goals, zeroPenalty);
+      expect(straightPath).not.toBeNull();
+      // Đi thẳng qua tâm quái (10, 10)
+      const centerCell = 10 * w + 10;
+      expect(straightPath!.cells.includes(centerCell)).toBe(true);
+      expect(straightPath!.cells.every((c) => Math.floor(c / w) === 10)).toBe(true);
+
+      // 2. Khi CÓ PHẠT NÉ QUÁI (penaltyFactor = 18):
+      const dangerPenalty = buildDangerPenaltyMap(grid, monsters, 18);
+      const safePath = planSafePath(grid, sx, sy, goals, dangerPenalty);
+      expect(safePath).not.toBeNull();
+      // Đường an toàn đi vòng lên trên hoặc vòng xuống dưới, TUYỆT ĐỐI KHÔNG đi qua tâm quái (10, 10)
+      expect(safePath!.cells.includes(centerCell)).toBe(false);
+      // Có ít nhất một ô lệch khỏi trục y = 10 (đã đi vòng)
+      const deviated = safePath!.cells.some((c) => Math.floor(c / w) !== 10);
+      expect(deviated).toBe(true);
+    });
+
+    it("isLootSafeToPick: kiểm tra an toàn chính xác trước khi cho bot nhặt đồ", () => {
+      const me = { x: 500, y: 500, hp: 2000, maxHp: 2000 };
+      const lootX = 520;
+      const lootY = 500;
+
+      // 1. Bình thường an toàn
+      const res1 = isLootSafeToPick(lootX, lootY, me, []);
+      expect(res1.safe).toBe(true);
+
+      // 2. Máu thấp (< 50%): không an toàn
+      const resLowHp = isLootSafeToPick(lootX, lootY, { ...me, hp: 800 }, []);
+      expect(resLowHp.safe).toBe(false);
+      expect(resLowHp.reason).toBe("low_hp");
+
+      // 3. Có quái canh giữ ngay trên món đồ
+      const guardingMonsters = [
+        { id: "m1", x: 530, y: 500, hp: 2500, kind: "doc_thiem", attackRange: 42, aggro: 220 },
+      ];
+      const resGuarding = isLootSafeToPick(lootX, lootY, me, guardingMonsters);
+      expect(resGuarding.safe).toBe(false);
+      expect(resGuarding.dangerMonsterId).toBe("m1");
+
+      // 4. Có quái đang nhắm vào bot từ cự ly gần
+      const targetingMonsters = [
+        { id: "m2", x: 600, y: 500, hp: 2500, target: "bot_session_1", aggro: 200 },
+      ];
+      const resTargeting = isLootSafeToPick(lootX, lootY, me, targetingMonsters, "bot_session_1");
+      expect(resTargeting.safe).toBe(false);
+
+      // 5. Quái ở xa (> 300px) không nhắm vào bot: an toàn
+      const farMonsters = [{ id: "m3", x: 900, y: 900, hp: 2500, target: null, aggro: 150 }];
+      const resFar = isLootSafeToPick(lootX, lootY, me, farMonsters, "bot_session_1");
+      expect(resFar.safe).toBe(true);
     });
   });
 });
