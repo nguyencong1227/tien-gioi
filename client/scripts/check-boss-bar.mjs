@@ -12,33 +12,6 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
  *   - vùng cảnh báo VÀNH KHUYÊN (`warn` có `r0`): đứng ở TÂM (chỗ an toàn) KHÔNG báo nguy hiểm, bước lên DẢI thì báo, vòng tròn đặc thì báo cả ở tâm;
  *   - thanh nằm gọn trong khung nhìn, không chặn chạm (`pointer-events: none`), không chữ Hán. `--shots`: lưu ảnh mỗi khung nhìn.
  */
-/**
- * Kiểm tab "Nội vụ" của bảng Tông môn (M8.6, issue #843; `sect-hall.ts` + `sect-hall-ui.ts` + `ui.ts`) trong Chrome THẬT, chế độ mock (không cần máy chủ / Vite), 5 khung nhìn:
- *
- *   npm run build -w client && node client/scripts/check-sect-hall.mjs [--shots <thư mục>] [--vp <khung>]
- *
- * Dùng `window.__ui.onSect` + `window.__ui.onSectHall` với ảnh chụp MẪU của `shared/` (`window.__sampleSectHall`), bắt tin gửi đi bằng cách đè `window.__scene.room.send`:
- *   - vào tab xin `sectHallGet`; chưa có ảnh chụp thì ghi "Đang tải"; năm tab không tràn ngang;
- *   - cấp tông + thanh điểm (aria progressbar), cống hiến / công tích, 3 nhiệm vụ (đã xong / đang làm / chưa nhận), cửa hàng chia Bảo khố / Tàng Kinh Các;
- *   - nút Nhận / Trả / Đổi gửi ĐÚNG tin (`sectQuestAccept` / `sectQuestTurnIn` / `sectShopBuy`), khoá "Đang xử lý…" tới khi có ảnh chụp mới hoặc toast;
- *   - món khoá nêu LÝ DO bằng chữ (liên kết `aria-describedby`); mới vào tông: "sang ngày mới" + Trả mờ; đã gục: khoá tất cả bằng chuỗi `down`;
- *   - qua mốc đặt lại: xin ảnh chụp mới ĐÚNG MỘT lần; rời tông: hộp xác nhận nêu số cống hiến + công tích sẽ MẤT;
- *   - không chữ Hán, không tràn ngang, nút >= 44 px trên điện thoại. `--shots`: lưu ảnh mỗi khung nhìn.
- */
-/**
- * Kiểm DỪNG NGAY + ĐỐI CHIẾU MƯỢT (QUYET_DINH_M3 mục 41: di chuyển "trôi" trên v0.3.1) trong Chrome THẬT, chế độ mock (không cần máy chủ / Vite):
- *
- *   npm run build -w client && node client/scripts/check-move-stop.mjs [--vp <khung>] [--reps <số lần đo độ trễ, mặc định 12>]
- *
- *   [1] NHẢ PHÍM -> tin DỪNG {dx: 0, dy: 0} gửi NGAY (trong ~1 khung vẽ, không chờ nhịp 50 ms), đúng 3 tin, seq liên tiếp tăng dần sau input di chuyển cuối;
- *   [2] đứng yên thì KHÔNG gửi gì thêm (không spam tin dừng);
- *   [3] ĐI LẠI giữa chừng huỷ phần lặp cũ: không có tin dừng "mồ côi" sau input di chuyển mới; nhả lần hai mới có bộ tin dừng mới;
- *   [4] mở bảng (chặn phím) khi đang giữ phím: cũng gửi tin dừng (hết ý định đi);
- *   [5] ĐỐI CHIẾU MƯỢT: `pred` nhảy lùi 20 px (máy chủ bỏ / xoá input): nhân vật vẽ KHÔNG giật tức thì mà trượt về trong ~150-600 ms, không đoạn nào quá 40 % độ lệch trong một khung;
- *       lệch lớn (200 px) thì dịch chuyển TỨC THÌ (không lao ngang màn hình).
- *
- * Mock không chạy đối chiếu thật nên script ghi đè `room.send` để bắt tin, và gọi `reconcile()` của cảnh khi cần.
- */
 import http from "node:http";
 import fs from "node:fs";
 import os from "node:os";
