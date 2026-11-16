@@ -2,6 +2,11 @@
 
 Định dạng theo từng bản phát hành (thẻ `vX.Y.Z`). Số `#` là PR / issue trên GitHub.
 
+## [Chưa phát hành] — sau v0.3.1
+
+### Công cụ và thử tải
+- **`WorldRoom.sect.test.ts` ca kho đồ hết chập chờn "Hết thời gian chờ lượt N" (#752; chỉ test, không đổi mã trò chơi):** NGUYÊN NHÂN là test, không phải máy chủ: vòng rút chờ túi đồ của Đệ tử đổi (`ctrlOf(B).inv`), nhưng máy chủ cộng túi TRƯỚC khi lưu hồ sơ và chỉ nhả khoá "một thao tác kho một lúc" của người đó SAU khi lưu xong (`sectVaultWithdraw`), nên test gửi lượt rút kế khi khoá còn giữ, lượt đó bị từ chối "trục trặc" và test treo đến hết 4 giây; ở máy rảnh lưu xong trong vài ms nên hiếm thấy, dưới tải thì lưu chậm là đỏ. Nay mỗi lượt chờ toast "Đã rút" (máy chủ gửi ngay trước khi nhả khoá, cùng một lượt chạy). Tái hiện TẤT ĐỊNH: `slowSave` làm mỗi lần lưu hồ sơ chậm 150 ms (bản cũ + lưu chậm = đỏ đúng "Hết thời gian chờ lượt 2"; bản mới xanh). Ca MỚI "khoá một-thao-tác-một-lúc": `gateSave` giữ việc lưu đứng yên cho tới khi test nhả, lượt góp / rút thứ hai của cùng người bị từ chối ngay, đồ không nhân đôi, hạn mức chỉ tính một lượt, tổng đồ không đổi (trước đây không test nào đụng khoá này; bỏ khoá ở góp hoặc ở rút đều ĐỎ).
+
 ## [0.3.1] — 16/11/2026: bản vá (túi đồ, di chuyển bàn phím, nhắm mục tiêu, kho tông môn, bảo vệ khi mất kết nối)
 
 Bản vá sau v0.3.0, làm theo các yêu cầu của người dùng ở `QUYET_DINH_M3.md` mục 24-29, 33 và 34 (báo từ bản chạy thật). Phần dưới là TÓM TẮT cho người quyết định; chi tiết từng PR nằm ở các mục "Giao diện", "Máy chủ", "Công cụ và thử tải", "Giao thức" kế tiếp.
