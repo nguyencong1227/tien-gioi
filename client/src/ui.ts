@@ -190,6 +190,7 @@ import {
 import { transitionMs, waitOrSkip } from "./gfx/scene-transition";
 import { getDisplay, onDisplayChange } from "./gfx/display";
 import { optionTag, skipHintText } from "./dialog-opt";
+import { dropConfirmText, dropStillValid, dropWarnText, planDrop, type DropPlan } from "./inv-drop";
 import { craftButtonText, craftFeeHint, craftSubtitle, craftTitle } from "./craft-ui";
 import {
   CHAT_PREF_KEY,
@@ -692,6 +693,70 @@ function fillBookTeach(box: HTMLElement, def: ItemDef) {
   box.hidden = false;
 }
 
+/** Chọn ô `i` ở túi (chuột bấm, chạm, bàn phím): đổi ô được chọn thì hộp xác nhận vứt đang mở (của ô cũ) đóng lại. Rê chuột KHÔNG gọi hàm này. */
+function selectSlot(i: number) {
+  if (selectedSlot === i) return;
+  closeDropConfirm(false);
+  selectedSlot = i;
+  renderInventory();
+}
+
+/** Kế hoạch vứt đang chờ xác nhận (chụp lúc bấm "Vứt 1" / "Vứt hết"); `null` = không có hộp. */
+let dropPlanPending: DropPlan | null = null;
+/** Nút đã mở hộp (trả focus về đó khi đóng hộp bằng Esc / "Giữ lại") */
+let dropConfirmOpener: HTMLElement | null = null;
+/**
+ * Chống "click ma" (cảm ứng): hộp xác nhận hiện NGAY CHỖ nút Vứt vừa chạm; `click` do trình duyệt tạo sau khi nhả ngón có thể rơi vào nút "Vứt" của
+ * hộp (bố cục vừa đổi) và xác nhận luôn mà người chơi chưa kịp đọc. Hai nút trong hộp bỏ qua mọi lần bấm trong chừng này ms đầu sau khi hộp mở.
+ */
+const DROP_CONFIRM_GUARD_MS = 450;
+let dropConfirmOpenedAt = -Infinity;
+
+/** Mở hộp xác nhận vứt cho ô được chọn: ghi rõ TÊN + SỐ LƯỢNG (+ dòng nhắc đồ quý). `all` = "Vứt hết", ngược lại vứt 1. */
+function askDropConfirm(all: boolean, opener: HTMLElement | null) {
+  const plan = planDrop(invSlots, selectedSlot, all);
+  const def = plan ? ITEM_BY_ID[plan.itemId] : undefined;
+  if (!plan || !def) return;
+  dropPlanPending = plan;
+  dropConfirmOpener = opener;
+  dropConfirmOpenedAt = performance.now();
+  $("inv-drop-text").textContent = dropConfirmText(def.name, plan);
+  const warn = dropWarnText(def.rarity, rarityStyle(def.rarity).name);
+  const warnEl = $("inv-drop-warn");
+  warnEl.textContent = warn ?? "";
+  warnEl.hidden = warn === null;
+  $("inv-detail").classList.add("dropping"); // hộp thế chỗ hàng nút hành động (không đẩy bố cục xuống dưới nút Đóng nổi của điện thoại)
+  $("inv-drop-confirm").hidden = false;
+  ($("inv-drop-no") as HTMLButtonElement).focus(); // mặc định "Giữ lại": Enter nhầm cũng không vứt
+}
+
+/** Đóng hộp xác nhận vứt; `refocus` = trả focus về nút đã mở hộp. `false` nếu hộp không mở. */
+function closeDropConfirm(refocus = true): boolean {
+  const box = document.getElementById("inv-drop-confirm");
+  if (!box || box.hidden) return false;
+  box.hidden = true;
+  $("inv-detail").classList.remove("dropping");
+  dropPlanPending = null;
+  const back = dropConfirmOpener;
+  dropConfirmOpener = null;
+  if (refocus && back && !back.hidden) back.focus();
+  return true;
+}
+
+/** "Vứt" trong hộp: kiểm lại túi vẫn còn ĐÚNG món + đủ số lượng như lúc bấm rồi mới gửi `dropItem`; đã đổi thì huỷ kèm thông báo. */
+function confirmDrop() {
+  if (performance.now() - dropConfirmOpenedAt < DROP_CONFIRM_GUARD_MS) return; // click ma ngay sau khi hộp mở: bỏ qua
+  const plan = dropPlanPending;
+  closeDropConfirm(true);
+  if (!plan) return;
+  if (!dropStillValid(invSlots, plan)) {
+    ui.toast({ text: "Túi đồ vừa đổi, chưa vứt gì. Hãy chọn lại món.", tone: "info" });
+    return;
+  }
+  if (plan.all) callbacks?.onDrop(plan.index);
+  else callbacks?.onDrop(plan.index, plan.qty);
+}
+
 /** Dòng thông tin thêm của vật phẩm dùng được ở khung so sánh: "Hiệu lực: ..." của đan / phù gắn trạng thái (#514), "Dạy: ..." của kinh quyển (M7.4); món khác ẩn khung. */
 function fillUseInfo(box: HTMLElement, def: ItemDef) {
   const eff = statusEffectLine(def);
@@ -739,7 +804,7 @@ function renderSlotDetail() {
     clearRarityText(nameEl);
     rarityEl.textContent = "";
     rarityEl.style.color = "";
-    descEl.textContent = "Chạm hoặc rê chuột vào một ô có vật phẩm để xem mô tả, dùng hoặc vứt.";
+    descEl.textContent = "Bấm hoặc chạm vào một ô có vật phẩm để xem mô tả, dùng hoặc vứt.";
     cmpEl.hidden = true;
     actionsEl.hidden = true;
     return;
@@ -808,6 +873,7 @@ function renderInventory() {
       applyItemVisual(slotIconEls[i], def);
       slotNameEls[i].textContent = def.name;
       btn.setAttribute("aria-label", itemAria(def, s.qty)); // tên + bậc (+ số lượng): dấu ◆ ★ bị giấu khỏi trình đọc
+      btn.title = s.qty > 1 ? `${def.name} ×${s.qty}` : def.name; // rê chuột chỉ hiện chú thích, KHÔNG đổi ô được chọn
       applyRarityBadge(btn, def.rarity);
       slotQtyEls[i].textContent = s.qty > 1 ? `${s.qty}` : "";
     } else {
@@ -815,6 +881,7 @@ function renderInventory() {
       applyItemVisual(slotIconEls[i], undefined);
       slotNameEls[i].textContent = "";
       btn.setAttribute("aria-label", "Ô trống");
+      btn.removeAttribute("title");
       clearRarityBadge(btn);
       slotQtyEls[i].textContent = "";
       slotCdEls[i].style.transform = "scaleY(0)";
@@ -1634,12 +1701,7 @@ function renderCharModalImpl() {
       true,
     );
 
-    row.addEventListener("pointerenter", (e) => {
-      if (e.pointerType === "mouse" && previewEquipItemId !== def.id) {
-        previewEquipItemId = def.id;
-        renderCharModal();
-      }
-    });
+    // Xem so sánh trang bị: bấm / chạm hàng (bấm lần nữa để tắt). KHÔNG đổi theo rê chuột (cùng lỗi túi đồ, QUYET_DINH_M3 mục 24: hover chỉ làm sáng).
     row.addEventListener("pointerdown", (e) => {
       e.preventDefault();
       previewEquipItemId = previewEquipItemId === def.id ? null : def.id;
@@ -1772,7 +1834,8 @@ let shopModalOpen = false;
 let shopNpcId = "duoc_su";
 let shopTab: "buy" | "sell" = "buy";
 const shopBuyQuantities: Record<string, number> = {};
-const shopSellQuantities: Record<number, number> = {};
+/** Số lượng định bán theo `ô:món` (không chỉ theo ô: ô đổi sang món khác thì không thừa kế số lượng của món cũ) */
+const shopSellQuantities: Record<string, number> = {};
 let currentCoin = 0;
 
 function renderShopModal() {
@@ -1957,8 +2020,9 @@ function renderShopSellImpl() {
     if (canSell) sellableCount++;
 
     const maxQty = slot.qty;
-    const qty = Math.min(maxQty, Math.max(1, shopSellQuantities[i] ?? 1));
-    shopSellQuantities[i] = qty;
+    const sellKey = `${i}:${slot.itemId}`;
+    const qty = Math.min(maxQty, Math.max(1, shopSellQuantities[sellKey] ?? 1));
+    shopSellQuantities[sellKey] = qty;
     const totalPrice = unitPrice * qty;
 
     const card = document.createElement("div");
@@ -2017,7 +2081,7 @@ function renderShopSellImpl() {
         btnMinus,
         () => {
           if (qty > 1) {
-            shopSellQuantities[i] = qty - 1;
+            shopSellQuantities[sellKey] = qty - 1;
             renderShopSell();
           }
         },
@@ -2039,7 +2103,7 @@ function renderShopSellImpl() {
         btnPlus,
         () => {
           if (qty < maxQty) {
-            shopSellQuantities[i] = qty + 1;
+            shopSellQuantities[sellKey] = qty + 1;
             renderShopSell();
           }
         },
@@ -2978,16 +3042,14 @@ export const ui = {
       cd.className = "cd";
 
       btn.append(icon, name, qty, cd);
-      btn.addEventListener("pointerenter", (e) => {
-        if (e.pointerType === "mouse") {
-          selectedSlot = i;
-          renderInventory();
-        }
-      });
+      // LỖI TÚI ĐỒ (QUYET_DINH_M3 mục 24): trước đây `pointerenter` (rê chuột) cũng đổi ô ĐƯỢC CHỌN, nên bấm món rồi rê chuột sang nút Vứt (đi ngang các ô khác)
+      // thì Vứt rơi vào món cuối cùng chuột đi qua. Giờ CHỈ bấm chuột / chạm (`pointerdown`, nút chính) hoặc bàn phím (focus bằng phím mũi tên / Tab, Enter) mới
+      // chọn ô; rê chuột chỉ làm sáng ô bằng CSS (`:hover`) và hiện chú thích (`title`). KHÔNG gắn `pointerenter` / `mouseover` / `pointermove` vào đây
+      // (`inv-select.test.ts` canh).
       btn.addEventListener("pointerdown", (e) => {
-        e.preventDefault();
-        selectedSlot = i;
-        renderInventory();
+        e.preventDefault(); // không cho chuột kéo focus vào ô: chọn ô đi qua đường này, không qua `focus`
+        if (e.button !== 0) return; // chuột phải / giữa không chọn
+        selectSlot(i);
       });
       // dùng / mặc vật phẩm của ô (nhấp đúp bằng chuột, Enter bằng bàn phím)
       const activate = () => {
@@ -3004,10 +3066,7 @@ export const ui = {
       btn.addEventListener("dblclick", activate);
       // bàn phím (#463): focus vào ô = chọn ô (hiện chi tiết như rê chuột), Enter = dùng / mặc
       btn.addEventListener("focus", () => {
-        if (selectedSlot !== i) {
-          selectedSlot = i;
-          renderInventory();
-        }
+        selectSlot(i);
       });
       btn.addEventListener("keydown", (e) => {
         if (e.key !== "Enter") return;
@@ -3065,11 +3124,13 @@ export const ui = {
         callbacks?.onEquip(selectedSlot);
       }
     });
-    bindTap("inv-btn-drop1", () => {
-      if (invSlots[selectedSlot]) callbacks?.onDrop(selectedSlot, 1);
-    });
-    bindTap("inv-btn-dropall", () => {
-      if (invSlots[selectedSlot]) callbacks?.onDrop(selectedSlot);
+    // Vứt có HỘP XÁC NHẬN ghi tên + số lượng (QUYET_DINH_M3 mục 24); gửi `dropItem` chỉ khi bấm "Vứt" trong hộp
+    bindTap("inv-btn-drop1", () => askDropConfirm(false, $("inv-btn-drop1")));
+    bindTap("inv-btn-dropall", () => askDropConfirm(true, $("inv-btn-dropall")));
+    bindTap("inv-drop-yes", () => confirmDrop());
+    bindTap("inv-drop-no", () => {
+      if (performance.now() - dropConfirmOpenedAt < DROP_CONFIRM_GUARD_MS) return;
+      closeDropConfirm(true);
     });
     bindTap("quick-1", () => this.useQuick(1));
     bindTap("quick-2", () => this.useQuick(2));
@@ -3704,9 +3765,15 @@ export const ui = {
       focusModal($("inv-modal"));
       renderInventory();
     } else {
+      closeDropConfirm(false);
       modalStack.remove("inv-modal");
       returnFocus($("btn-bag"));
     }
+  },
+
+  /** Đóng hộp xác nhận vứt nếu đang mở (Esc đóng hộp trước, rồi mới tới túi đồ). */
+  closeInvDropConfirm(): boolean {
+    return closeDropConfirm(true);
   },
 
   isInventoryOpen() {
@@ -4090,6 +4157,7 @@ export const ui = {
         }
         return false;
       },
+      closeInvDropConfirm: () => this.closeInvDropConfirm(),
       closeSectActionConfirm: () => this.closeSectConfirm(),
       closeSectDisbandConfirm: () => this.closeSectDisbandConfirm(),
       closeDhudLeaveConfirm: () => this.closeDhudLeaveConfirm(),
@@ -4198,6 +4266,8 @@ export const ui = {
 
   onInv(m: InvMsg) {
     invSlots = m.slots;
+    // túi đổi trong lúc hộp xác nhận vứt đang mở và món định vứt không còn đúng (đổi món / không đủ số lượng): đóng hộp, lời trong hộp không còn đúng
+    if (dropPlanPending && !dropStillValid(invSlots, dropPlanPending)) closeDropConfirm(false);
     const now = performance.now();
     itemCdUntil.clear();
     for (const [itemId, remMs] of Object.entries(m.cd ?? {})) {
