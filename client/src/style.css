@@ -7371,6 +7371,40 @@ body.ui-hidden
   font-weight: 700;
   color: #ffe08a;
 }
+.boss-bar-notes {
+  display: flex;
+  flex-wrap: nowrap; /* một dòng: điện thoại 360 px không được thêm dòng làm thanh tụt xuống quá nửa khung nhìn */
+  gap: 4px 6px;
+  margin-top: 2px;
+  min-width: 0;
+}
+.boss-bar-notes > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.boss-bar-armor {
+  font-size: var(--fs-12);
+  font-weight: 700;
+  color: #d8f0ff;
+  background: rgba(70, 130, 180, 0.55);
+  border: 1px solid rgba(190, 230, 255, 0.7);
+  border-radius: 4px;
+  padding: 0 6px;
+}
+.boss-bar-summon {
+  font-size: var(--fs-12);
+  font-weight: 700;
+  color: #ead9ff;
+  background: rgba(120, 70, 160, 0.55);
+  border: 1px solid rgba(220, 190, 255, 0.7);
+  border-radius: 4px;
+  padding: 0 6px;
+}
+.boss-bar.armored .boss-bar-fill {
+  filter: saturate(0.55) brightness(1.15);
+}
 .boss-bar-castbar {
   flex: 1;
   height: 4px;

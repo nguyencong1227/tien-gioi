@@ -32,6 +32,8 @@ export interface HitInput {
   mine: boolean;
   /** Loại quái bị đánh (`MonsterDef.id`, từ state: KHÔNG tin, có thể lạ); không có khi mục tiêu là người chơi. */
   kind?: string;
+  /** Mục tiêu là TRÙM đang có giáp (`bossArmor`): số bay nhỏ hơn, màu xanh nhạt để người đánh biết sát thương đang bị giảm (thanh trùm có chữ "Có giáp" là kênh chính). */
+  armored?: boolean;
 }
 
 export interface HitPlan {
@@ -120,12 +122,21 @@ export function planMonsterDeath(kind: string | undefined): DeathPlan {
   return tint === undefined ? { recipe: "mon-vanish" } : { recipe: "mon-vanish", tint };
 }
 
+/** Màu số sát thương bay lên TRÙM đang có giáp (xanh nhạt, khác trắng thường / vàng chí mạng). */
+export const ARMORED_NUMBER_COLOR = 0x9fd3ff;
+
 /** Chữ sát thương bay (màu / cỡ / ưu tiên). Giữ đúng kiểu cũ: mình bị đánh đỏ, chí mạng vàng lớn hơn. */
 export function planHitNumber(i: HitInput): NumberPlan {
   return {
     text: `${i.crit ? "Bạo! " : ""}${i.amount}`,
-    color: i.toPlayer ? FX_COLOR.hurt : i.crit ? FX_COLOR.crit : 0xffffff,
-    size: i.crit ? 20 : 15,
+    color: i.toPlayer
+      ? FX_COLOR.hurt
+      : i.armored
+        ? ARMORED_NUMBER_COLOR
+        : i.crit
+          ? FX_COLOR.crit
+          : 0xffffff,
+    size: i.armored && !i.toPlayer ? 13 : i.crit ? 20 : 15,
     // Mình bị đánh hoặc mình đánh = ưu tiên 2 (không bao giờ bị bỏ khi đông); còn lại 1.
     priority: i.targetIsMe || i.mine ? 2 : 1,
   };

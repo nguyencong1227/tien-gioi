@@ -377,7 +377,7 @@
         Chế độ Quyết đấu giả lập (DEV / Debug)
       </div>
 
-      <!-- Thanh máu TRÙM (mục 42, T4 #873): trùm gần nhất / trùm bí cảnh; mốc giai đoạn, tên chiêu đang vận, chỉ báo cuồng nộ (vẽ bằng boss-bar-ui.ts) -->
+      <!-- Thanh máu TRÙM (mục 42, T4 #873): trùm gần nhất / trùm bí cảnh; mốc giai đoạn, tên chiêu đang vận, chỉ báo cuồng nộ, giáp + gọi quái con (vẽ bằng boss-bar-ui.ts) -->
       <section id="boss-bar" class="boss-bar" hidden aria-label="Trùm">
         <div class="boss-bar-head">
           <b id="boss-bar-name"></b>
@@ -398,6 +398,10 @@
         <div class="boss-bar-castrow">
           <span id="boss-bar-cast" class="boss-bar-cast" role="status" aria-live="polite"></span>
           <span class="boss-bar-castbar" hidden><i id="boss-bar-castfill"></i></span>
+        </div>
+        <div id="boss-bar-notes" class="boss-bar-notes" hidden>
+          <span id="boss-bar-armor" class="boss-bar-armor" role="status" hidden></span>
+          <span id="boss-bar-summon" class="boss-bar-summon" role="status" hidden></span>
         </div>
       </section>
 

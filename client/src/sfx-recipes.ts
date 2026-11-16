@@ -184,8 +184,8 @@ export function statusSfx(kind: unknown, harmful: boolean): SfxRecipe | null {
   }
 }
 
-/** Bốn khoảnh khắc của một con TRÙM có tiếng riêng (mục 42, T4 #873): gồng chiêu, đòn rơi, đổi giai đoạn, cuồng nộ. */
-export type BossSfxKind = "cast" | "strike" | "phase" | "enrage";
+/** Sáu khoảnh khắc của một con TRÙM có tiếng riêng (mục 42, T4 #873): gồng chiêu, đòn rơi, đổi giai đoạn, cuồng nộ, dựng giáp, gọi quái con. */
+export type BossSfxKind = "cast" | "strike" | "phase" | "enrage" | "armor" | "summon";
 
 /**
  * Công thức tiếng của TRÙM, trầm và nặng hơn mọi tiếng chiêu thường để nhận ra ngay "đây là trùm" kể cả khi nhìn chỗ khác; sắc theo HỆ của chiêu (`element`; hệ lạ -> vô sắc):
@@ -193,6 +193,7 @@ export type BossSfxKind = "cast" | "strike" | "phase" | "enrage";
  *   - `strike` (đòn rơi): thịch trầm + sắc hệ + một đợt nhiễu ngắn;
  *   - `phase` (đổi giai đoạn): tiếng gầm dài, trầm, rung;
  *   - `enrage` (cuồng nộ): còi gắt hai nhịp trên nền trầm.
+ *   - `armor` (dựng giáp): tiếng kim loại ngân hai nốt cao trên nền trầm; `summon` (gọi quái con): hồn bốc lên, hai nốt trầm lệch phách + hơi gió.
  * Loại lạ -> `null` (im lặng, như `statusSfx`). Vẫn bị `clampRecipe` ép vào giới hạn chung (ngắn, nhỏ, trong dải tần).
  */
 export function bossSfx(kind: unknown, element?: unknown): SfxRecipe | null {
@@ -218,6 +219,19 @@ export function bossSfx(kind: unknown, element?: unknown): SfxRecipe | null {
       return clampRecipe({
         partials: [p("sawtooth", 96, 52, 0.58, 0.32), p("square", 71, 48, 0.55, 0.14, 0.02)],
         noise: { at: 0.02, dur: 0.5, vol: 0.2, lp: 700 },
+      });
+    case "armor": // dựng giáp: tiếng kim loại ngân (hai nốt cao chồng lên nền trầm)
+      return clampRecipe({
+        partials: [
+          p("square", 880, 1320, 0.22, 0.2),
+          p("triangle", 1320, 1760, 0.3, 0.16, 0.06),
+          p("sawtooth", 80, 70, 0.4, 0.2),
+        ],
+      });
+    case "summon": // gọi quái con: hồn bốc lên, hai nốt trầm lệch phách kèm hơi gió
+      return clampRecipe({
+        partials: [p("sine", 100, 260, 0.5, 0.26), p("sine", 106, 275, 0.5, 0.2, 0.04)],
+        noise: { at: 0.05, dur: 0.45, vol: 0.14, lp: 1100 },
       });
     case "enrage":
       return clampRecipe({
