@@ -37,6 +37,30 @@ export type ItemEffect =
    */
   | { kind: "status"; id: StatusId; ratio: number; ms: number; forRealm?: number };
 
+/**
+ * Những chuỗi người chơi phải thấy trong `desc` của vật phẩm có `ItemEffect` kind `status`: phần trăm làm tròn ("12%" hoặc "12 %", chấp nhận cả hai
+ * kiểu viết) và thời gian ("900 giây", thêm "15 phút" khi chẵn phút). `pct` rỗng khi `ratio` làm tròn về 0 (không có số để nêu).
+ */
+export function statusEffectFigures(e: { ratio: number; ms: number }): {
+  pct: string[];
+  time: string[];
+} {
+  const p = Math.round(e.ratio * 100);
+  const secs = Math.round(e.ms / 1000);
+  const time = [`${secs} giây`];
+  if (secs > 0 && secs % 60 === 0) time.push(`${secs / 60} phút`);
+  return { pct: p > 0 ? [`${p}%`, `${p} %`] : [], time };
+}
+
+/** `desc` có nêu ĐÚNG con số của hiệu ứng trạng thái không (xem `statusEffectFigures`): D viết tay, A chỉnh số thì lệch; test hợp đồng bắt. */
+export function statusDescMatches(desc: string, e: { ratio: number; ms: number }): boolean {
+  const f = statusEffectFigures(e);
+  return (
+    (f.pct.length === 0 || f.pct.some((s) => desc.includes(s))) &&
+    f.time.some((s) => desc.includes(s))
+  );
+}
+
 /** Tu vi một viên đan tu vi cho khi thanh tu vi tối đa là `expMax`: `round(expMax * pct)`, cắt ở `maxExp` nếu có; luôn số nguyên >= 0. */
 export function expPillGain(effect: { pct: number; maxExp?: number }, expMax: number): number {
   const raw = Number.isFinite(expMax) && expMax > 0 ? Math.round(expMax * effect.pct) : 0;

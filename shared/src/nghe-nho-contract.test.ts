@@ -5,11 +5,14 @@ import {
   BREAK_CHANCE_CAP,
   CRAFT_STATIONS,
   CRAFT_STATION_IDS,
+  ITEMS,
+  REALMS,
   MAX_STATUSES,
   NPCS,
   NPC_BY_ID,
   RECIPES,
   STATUSES,
+  canAttemptBreakthrough,
   breakthroughChance,
   breakthroughChanceWith,
   clampStatusEffect,
@@ -17,6 +20,8 @@ import {
   craftSuccessText,
   isCraftStation,
   sanitizeStatusList,
+  statusDescMatches,
+  statusEffectFigures,
   statusCarriesRatio,
   statusOf,
 } from "./index";
@@ -186,5 +191,58 @@ describe("clampStatusEffect (hiệu ứng trạng thái của vật phẩm)", ()
       { id: "dao_ho", ratio: 0.1, ms: "1000" },
     ];
     for (const b of bad) expect(clampStatusEffect(b as never), JSON.stringify(b)).toBeNull();
+  });
+});
+
+describe("canAttemptBreakthrough (MỘT nguồn cho máy chủ và client)", () => {
+  const lastTier = (realm: number) => REALMS[realm].tiers.length - 1;
+
+  it("chỉ đúng khi ở tầng cuối + đủ tu vi + chưa đỉnh tiên đồ", () => {
+    for (let realm = 1; realm < REALMS.length - 1; realm++) {
+      const last = lastTier(realm);
+      expect(canAttemptBreakthrough(realm, last, 100, 100), `r${realm} đủ`).toBe(true);
+      expect(canAttemptBreakthrough(realm, last, 101, 100), `r${realm} dư`).toBe(true);
+      expect(canAttemptBreakthrough(realm, last, 99, 100), `r${realm} thiếu`).toBe(false);
+      expect(canAttemptBreakthrough(realm, last - 1, 100, 100), `r${realm} chưa tầng cuối`).toBe(
+        false,
+      );
+    }
+    const peak = REALMS.length - 1;
+    expect(canAttemptBreakthrough(peak, lastTier(peak), 10 ** 9, 100), "đỉnh tiên đồ").toBe(false);
+  });
+
+  it("không bao giờ ném lỗi và trả false với dữ liệu hỏng", () => {
+    expect(canAttemptBreakthrough(1, lastTier(1), NaN, 100)).toBe(false);
+    expect(canAttemptBreakthrough(1, lastTier(1), 100, NaN)).toBe(false);
+    expect(canAttemptBreakthrough(999, 0, 100, 100)).toBe(false);
+    expect(canAttemptBreakthrough(-1, 0, 100, 100)).toBe(false);
+  });
+});
+
+describe("mô tả vật phẩm trạng thái khớp con số (statusDescMatches)", () => {
+  it("mọi vật phẩm có hiệu ứng `status` nêu đúng phần trăm và thời gian trong desc", () => {
+    for (const it of ITEMS) {
+      const e = it.effect;
+      if (!e || e.kind !== "status") continue;
+      expect(
+        statusDescMatches(it.desc, e),
+        `${it.id}: desc "${it.desc}" lệch ${JSON.stringify(e)}`,
+      ).toBe(true);
+    }
+  });
+
+  it("figures và khớp: chấp nhận '12%' / '12 %', '900 giây' / '15 phút'; bắt lệch số", () => {
+    expect(statusEffectFigures({ ratio: 0.12, ms: 900000 })).toEqual({
+      pct: ["12%", "12 %"],
+      time: ["900 giây", "15 phút"],
+    });
+    expect(statusEffectFigures({ ratio: 0, ms: 45000 })).toEqual({ pct: [], time: ["45 giây"] });
+    const e = { ratio: 0.12, ms: 900000 };
+    expect(statusDescMatches("Cộng 12% xác suất đột phá trong 15 phút.", e)).toBe(true);
+    expect(statusDescMatches("Cộng 12 % xác suất đột phá trong 900 giây.", e)).toBe(true);
+    expect(statusDescMatches("Cộng 15% xác suất đột phá trong 15 phút.", e)).toBe(false); // sai %
+    expect(statusDescMatches("Cộng 12% xác suất đột phá trong 10 phút.", e)).toBe(false); // sai thời gian
+    expect(statusDescMatches("Cộng xác suất đột phá một lần.", e)).toBe(false); // không nêu số
+    expect(statusDescMatches("Tăng thêm trong 45 giây.", { ratio: 0, ms: 45000 })).toBe(true);
   });
 });
