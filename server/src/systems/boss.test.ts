@@ -774,6 +774,28 @@ describe("fx giáp / triệu hồi của trùm (bossArmor / bossSummon, T4 #873)
     expect(summons(log)).toHaveLength(0);
   });
 
+  it("gọi 2 mà chỉ dựng được 1 (con đầu hết chỗ đặt): `bossSummon.n` = 1 = số con THẬT, không phải số muốn gọi / số còn chỗ", () => {
+    const { w, mon, tick, until, log } = scene(
+      def([ab("goi", { t: "summon", kind: "tho", count: 2 }, { dmgMult: 0, cooldownMs: 60_000 })], {
+        maxAdds: 2,
+      }),
+    );
+    // Chặn đúng 4 lần thử đặt đầu tiên SAU khi trùm bắt đầu gọi (con thứ nhất thử đủ 4 hướng đều bị chặn), từ đó không chặn nữa: con thứ hai đặt được
+    let blocked = 0;
+    let armed = false;
+    (w.map as { circleBlocked: unknown }).circleBlocked = () => {
+      if (!armed) return false;
+      return blocked++ < 4;
+    };
+    until(() => log.some((l) => l.fx.kind === "bossCast"));
+    armed = true;
+    until(() => summons(log).length > 0);
+    tick(5);
+    expect(bossLiveAdds(w, mon.mc.boss!)).toBe(1);
+    expect(summons(log)).toHaveLength(1);
+    expect(summons(log)[0]!.n).toBe(1);
+  });
+
   it("onEnter gọi quái con: `bossPhase` rồi `bossSummon` với n = số con xuất hiện", () => {
     const d = def([ab("a", { t: "circleAt", at: "target", r: 60 })]);
     d.phases.push(

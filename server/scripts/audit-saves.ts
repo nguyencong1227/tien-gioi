@@ -44,6 +44,9 @@ import {
   SECT_CONTRIB_CAP,
   SECT_EARN_DAY_CAP,
   SECT_DEPOSIT_DAY_CAP,
+  SECT_DUNGEON_CH,
+  SECT_QUEST_CH,
+  SECT_QUEST_TEMPLATE_BY_ID,
   SECT_SHOP,
   isSectQuestTemplate,
   sectLevelInfo,
@@ -1629,6 +1632,38 @@ export function auditSectSaveData(rawText: string, byteLength: number): AuditErr
             errors.push({
               code: "invalid_sect_member_today_dungeon",
               message: `Thành viên thứ ${i} có today.dungeon (${show(m.today.dungeon)}) phải là boolean`,
+            });
+          }
+
+          // Bất biến mục 12.2 / Issue #846: today.earned <= SECT_EARN_DAY_CAP + khớp các nguồn
+          // Các nguồn hợp lệ: deposit (m.today.deposit), dungeon (SECT_DUNGEON_CH nếu true), quests (cống hiến theo độ khó của từng mẫu)
+          let questsMaxCh = 0;
+          if (Array.isArray(m.today.quests)) {
+            for (const qId of m.today.quests) {
+              if (typeof qId === "string") {
+                const tpl = byId(SECT_QUEST_TEMPLATE_BY_ID, qId);
+                const diff = tpl && [1, 2, 3].includes(tpl.difficulty) ? tpl.difficulty : 3;
+                questsMaxCh += SECT_QUEST_CH[diff - 1] ?? 40;
+              }
+            }
+          }
+          const depositCh =
+            typeof m.today.deposit === "number" &&
+            Number.isSafeInteger(m.today.deposit) &&
+            m.today.deposit >= 0
+              ? m.today.deposit
+              : 0;
+          const dungeonCh = m.today.dungeon === true ? SECT_DUNGEON_CH : 0;
+          const maxFromSources = depositCh + dungeonCh + questsMaxCh;
+
+          if (
+            typeof m.today.earned === "number" &&
+            Number.isSafeInteger(m.today.earned) &&
+            m.today.earned > maxFromSources
+          ) {
+            errors.push({
+              code: "sect_member_today_earned_exceeds_sources",
+              message: `Thành viên thứ ${i} có today.earned (${m.today.earned}) vượt quá tổng cống hiến tối đa từ các nguồn đã ghi nhận (${maxFromSources} = góp kho ${depositCh} + bí cảnh ${dungeonCh} + nhiệm vụ ${questsMaxCh})`,
             });
           }
           if (m.today.buys !== undefined) {
