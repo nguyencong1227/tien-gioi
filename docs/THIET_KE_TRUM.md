@@ -54,7 +54,7 @@ Bài kiểm thử hiệu năng tự động hoá trong `server/src/systems/boss-
 
 **Kết luận & Ngân sách duy trì:**
 1. **CPU Tick:** Với 50 người chơi và 8 trùm vận chiêu liên tục, thời gian tick trung bình **~0.14 ms** (p95 ~0.36 ms), nằm sâu dưới ngân sách trần 10.0 ms của kiến trúc.
-2. **Độ phức tạp `pickCast`:** Khi số người chơi tăng gấp 10 lần (10 -> 100 người), thời gian tick chỉ tăng ~3 lần (0.07 ms -> 0.20 ms, tỉ lệ < 4.0x), chứng minh độ phức tạp lọc mục tiêu và kiểm tra điều kiện là $O(n)$ tuyến tính hoặc thấp hơn, tuyệt đối không bị $O(n^2)$.
+2. **Độ phức tạp `pickCast`:** Khi số người chơi tăng gấp 10 lần (10 -> 100 người) với trùm liên tục chọn chiêu ở mọi tick, thời gian `tickMonsters` chỉ tăng từ 0.033 ms lên 0.120 ms (tỉ lệ ~3.6x, < 25x), chứng minh độ phức tạp lọc mục tiêu và kiểm tra điều kiện là O(n) tuyến tính, tuyệt đối không bị O(n^2).
 3. **Băng thông State Patch:** Byte patch mỗi tick mỗi client chỉ **~2.2–6.0 byte/tick**, nằm sâu dưới trần 520 byte/tick/client. Toàn bộ cơ chế trùm (giai đoạn, cuồng nộ, vận chiêu) không bổ sung bất kỳ trường state công khai nào vào `schema.ts`.
 4. **Tần suất tin `fx`:** Một client đứng gần trùm chỉ nhận trung bình **~1.1–1.7 fx/giây** (bao gồm `warn`, `bossCast`, `bossSummon`, `bossArmor`), cách xa ngưỡng an toàn 15 fx/giây, không gây dồn ứ tin mạng.
 5. **Trạng thái ngủ:** Khi 0 người chơi, trùm ngủ hoàn toàn, CPU tick ~0 và 0 byte patch.
