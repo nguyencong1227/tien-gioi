@@ -37,6 +37,10 @@ import {
   dayKey,
   emptySectDay,
   isSectQuest,
+  isSectQuestTemplate,
+  questDefAny,
+  sectQuestTemplateOf,
+  SECT_QUEST_TEMPLATE_BY_ID,
   ITEM_BY_ID,
   parseSectHallGet,
   parseSectQuest,
@@ -237,7 +241,7 @@ describe("ngày giờ Việt Nam và chờ sang ngày (mục 12.3)", () => {
 describe("sổ ngày của thành viên (sectDayState)", () => {
   const now = Date.UTC(2026, 10, 17, 3, 0, 0); // 10:00 VN 17/11
   const today = dayKey(now);
-  const someQuest = Object.keys(SECT_QUEST_BY_ID)[0]!;
+  const someQuest = SECT_QUESTS[0]!.id; // sổ ngày lưu id MẪU, không phải id cụ thể có hậu tố bậc
 
   it("thiếu / sai kiểu / khác ngày -> sổ MỚI của hôm nay", () => {
     const fresh = emptySectDay(today);
@@ -253,7 +257,7 @@ describe("sổ ngày của thành viên (sectDayState)", () => {
       day: today,
       earned: 9999,
       deposit: 500,
-      quests: [someQuest, someQuest, "constructor", "khong_co", 7],
+      quests: [someQuest, someQuest, `${someQuest}.t0`, "constructor", "khong_co", 7],
       dungeon: true,
       buys: { [SECT_SHOP[0]!.itemId]: 9999, constructor: 3, ["__proto__"]: 4, khong_co: 2 },
     };
@@ -298,8 +302,8 @@ describe("sectAwardDay: MỘT nơi tính cống hiến (mục 12.3)", () => {
     expect(a.day.dungeon).toBe(true);
     expect(sectAwardDay(a.day, "dungeon", SECT_DUNGEON_CH).granted).toBe(0);
     const b = sectAwardDay(day0, "quest", 30, q);
-    expect(b.granted).toBe(30);
-    expect(b.day.quests).toEqual([q]);
+    expect(b.granted).toBe(sectQuestCh(q)); // kẹp theo phần của nhiệm vụ (F2): xin 30 mà nhiệm vụ chỉ 20 thì được 20
+    expect(b.day.quests).toEqual([sectQuestTemplateOf(q)]); // lưu id MẪU
     const again = sectAwardDay(b.day, "quest", 30, q);
     expect(again.granted).toBe(0);
     expect(again.refused).toBe("quest_done");
@@ -314,7 +318,10 @@ describe("sectAwardDay: MỘT nơi tính cống hiến (mục 12.3)", () => {
       expect(sectAwardDay(day0, "deposit", bad).granted).toBe(0);
     }
     expect(sectAwardDay(day0, "deposit", 1e12).granted).toBe(SECT_DEPOSIT_DAY_CAP);
-    expect(sectAwardDay(day0, "quest", 1e12, q).granted).toBe(SECT_EARN_DAY_CAP);
+    // F2: nhiệm vụ KHÔNG cho xin quá phần của nó dù `want` khổng lồ (không thể bơm tới trần ngày)
+    expect(sectAwardDay(day0, "quest", 1e12, q).granted).toBe(sectQuestCh(q));
+    expect(sectAwardDay(day0, "quest", 9999, q).granted).toBe(sectQuestCh(q));
+    expect(sectAwardDay(day0, "quest", 5, q).granted).toBe(5); // xin ít hơn thì được ít hơn
     expect(day0).toEqual(frozen);
   });
 
@@ -357,6 +364,91 @@ describe("sectAwardDay: MỘT nơi tính cống hiến (mục 12.3)", () => {
     expect(sectDepositCh(250)).toBe(2);
     expect(sectDepositCh(NaN)).toBe(0);
     expect(sectDepositCh(-100)).toBe(0);
+  });
+});
+
+describe("F1: nhiệm vụ khoá theo MẪU, đổi bậc giữa ngày không làm lại được (mục 12.7)", () => {
+  const tpl = SECT_QUESTS[0]!; // khung: có bậc 0 và 1
+  const t0 = sectQuestId(tpl.id, 0);
+  const t1 = sectQuestId(tpl.id, 1);
+  const day0 = emptySectDay("2026-11-17");
+
+  it("sectQuestTemplateOf: id cụ thể -> id mẫu; id lạ / không đúng dạng -> undefined", () => {
+    expect(sectQuestTemplateOf(t0)).toBe(tpl.id);
+    expect(sectQuestTemplateOf(t1)).toBe(tpl.id);
+    for (const bad of [
+      undefined,
+      null,
+      5,
+      "",
+      tpl.id,
+      `${tpl.id}.t9`,
+      `${tpl.id}.t2`,
+      "st_khong_co.t0",
+      "constructor",
+      "__proto__",
+      ".t0",
+    ]) {
+      expect(sectQuestTemplateOf(bad)).toBeUndefined();
+    }
+    expect(isSectQuestTemplate(tpl.id)).toBe(true);
+    for (const bad of [t0, "constructor", "__proto__", 5, null, undefined]) {
+      expect(isSectQuestTemplate(bad)).toBe(false);
+    }
+  });
+
+  it("trả bản .t0 rồi bản .t1 của CÙNG mẫu (đột phá giữa ngày): lần hai bị quest_done, không cộng gì", () => {
+    const a = sectAwardDay(day0, "quest", 99, t0);
+    expect(a.granted).toBe(sectQuestCh(t0));
+    expect(a.day.quests).toEqual([tpl.id]); // lưu id MẪU
+    const b = sectAwardDay(a.day, "quest", 99, t1);
+    expect(b).toMatchObject({ granted: 0, refused: "quest_done" });
+    expect(b.day.earned).toBe(a.day.earned);
+    expect(b.day.quests).toEqual([tpl.id]);
+  });
+
+  it("ngược chiều (đầu thai về bậc thấp): trả .t1 rồi .t0 cũng bị quest_done; ĐỌC LẠI qua sectDayState giữ nguyên khoá", () => {
+    const a = sectAwardDay(day0, "quest", 99, t1);
+    const reread = sectDayState(JSON.parse(JSON.stringify(a.day)), Date.UTC(2026, 10, 17, 3, 0, 0));
+    expect(reread.day).toBe("2026-11-17");
+    expect(reread.quests).toEqual([tpl.id]);
+    expect(sectAwardDay(reread, "quest", 99, t0)).toMatchObject({
+      granted: 0,
+      refused: "quest_done",
+    });
+    // mẫu KHÁC thì vẫn trả được bình thường
+    const other = SECT_QUESTS[1]!;
+    expect(sectAwardDay(reread, "quest", 99, sectQuestId(other.id, 0)).granted).toBe(
+      sectQuestCh(sectQuestId(other.id, 0)),
+    );
+  });
+
+  it("sổ ngày cũ lưu id CỤ THỂ (không phải id mẫu) bị lọc bỏ khi đọc (không phải khoá hợp lệ)", () => {
+    const s = sectDayState(
+      { day: "2026-11-17", earned: 20, quests: [t0] },
+      Date.UTC(2026, 10, 17, 3, 0, 0),
+    );
+    expect(s.quests).toEqual([]);
+  });
+
+  it("questDefAny tra cả hai bảng bằng hasOwnProperty: nhiệm vụ thường, nhiệm vụ tông; lạ và khoá nguyên mẫu -> undefined", () => {
+    expect(questDefAny(QUESTS[0]!.id)).toBe(QUEST_BY_ID[QUESTS[0]!.id]);
+    expect(questDefAny(t0)).toBe(SECT_QUEST_BY_ID[t0]);
+    for (const bad of [
+      undefined,
+      null,
+      5,
+      "khong_co",
+      "constructor",
+      "__proto__",
+      "toString",
+      "hasOwnProperty",
+    ]) {
+      expect(questDefAny(bad)).toBeUndefined();
+    }
+    expect(Object.keys(SECT_QUEST_TEMPLATE_BY_ID).sort()).toEqual(
+      SECT_QUESTS.map((t) => t.id).sort(),
+    );
   });
 });
 
@@ -736,13 +828,23 @@ describe("rollDrops(..., chanceMult) cho buff rơi đồ (mục 12.5)", () => {
     for (const bad of [NaN, Infinity, -1, 0, 0.5, "2" as unknown as number]) {
       expect(rollDrops(kind, constRng(0.5), bad)).toEqual(base);
     }
-    // mult 100 bị kẹp 2: món cơ hội <= 0.45 không bao giờ rơi với rng 0.999 (0.45 x 2 = 0.9 < 0.999)
-    const lowKind = Object.keys(DROP_TABLES).find((k) =>
-      DROP_TABLES[k]!.some((e) => e.chance <= 0.45),
-    )!;
-    expect(lowKind).toBeDefined();
-    const lowEntry = DROP_TABLES[lowKind]!.find((e) => e.chance <= 0.45)!;
-    expect(rollDrops(lowKind, constRng(0.999), 100).some((d) => d.itemId === lowEntry.itemId)).toBe(
+    // mult 100 bị kẹp 2 (F3): chọn món có cơ hội LỚN NHẤT <= 0.45 để phân biệt kẹp 2 với không kẹp / kẹp lớn hơn:
+    // chance x 2 < 0.999 (không rơi nếu kẹp đúng) nhưng chance x 5 >= 0.999 (rơi nếu kẹp sai thành 5 hoặc không kẹp)
+    let best: { kind: string; itemId: string; chance: number } | undefined;
+    for (const [k, table] of Object.entries(DROP_TABLES)) {
+      for (const e of table) {
+        if (e.chance <= 0.45 && (!best || e.chance > best.chance)) {
+          best = { kind: k, itemId: e.itemId, chance: e.chance };
+        }
+      }
+    }
+    expect(best).toBeDefined();
+    expect(best!.chance * 2).toBeLessThan(0.999);
+    expect(best!.chance * 5).toBeGreaterThan(0.999); // điều kiện của phép thử: nếu đổi bảng rơi làm sai, test hỏng ngay (không lặng lẽ bỏ qua)
+    expect(rollDrops(best!.kind, constRng(0.999), 100).some((d) => d.itemId === best!.itemId)).toBe(
+      false,
+    );
+    expect(rollDrops(best!.kind, constRng(0.999), 2).some((d) => d.itemId === best!.itemId)).toBe(
       false,
     );
     // khi rng = 0 mọi món đều rơi, kể cả khi có buff, và số lượng nằm trong [min, max]

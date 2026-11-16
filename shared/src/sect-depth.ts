@@ -8,7 +8,7 @@
 import { ITEM_BY_ID } from "./items";
 import { SHOPS, ITEM_VALUE, buyPrice } from "./currency";
 import { MONSTER_BY_ID } from "./game";
-import { dayKey, type QuestDef, type QuestReward, type QuestStep } from "./quests";
+import { QUEST_BY_ID, dayKey, type QuestDef, type QuestReward, type QuestStep } from "./quests";
 import { SECT_ELDERS_MAX, SECT_MAX_MEMBERS, SECT_VAULT_SLOTS, SECT_VAULT_SLOTS_MAX } from "./sect";
 
 // ---------- Từ ngữ (một nơi: giao diện, toast máy chủ và dữ liệu của D dùng chung) ----------
@@ -205,7 +205,10 @@ export interface SectDayState {
   earned: number;
   /** Phần kiếm bằng góp kho, 0..`SECT_DEPOSIT_DAY_CAP` */
   deposit: number;
-  /** Id nhiệm vụ tông đã TRẢ hôm nay (theo LINH HỒN: đầu thai giữa ngày không làm lại) */
+  /**
+   * Id MẪU (`SectQuestTemplate.id`, KHÔNG phải id cụ thể có hậu tố bậc) của nhiệm vụ tông đã TRẢ hôm nay. Theo LINH HỒN: đầu thai giữa ngày không làm lại; và vì
+   * khoá theo MẪU nên ĐỔI BẬC giữa ngày (đột phá, đầu thai) cũng không làm lại được cùng ô nhiệm vụ (bản `.t0` và `.t1` của một mẫu là MỘT nhiệm vụ).
+   */
   quests: string[];
   /** Đã nhận thưởng bí cảnh hôm nay */
   dungeon: boolean;
@@ -231,11 +234,7 @@ export function sectDayState(raw: unknown, now: number): SectDayState {
   const r = raw as Record<string, unknown>;
   if (r.day !== today) return emptySectDay(today);
   const quests = Array.isArray(r.quests)
-    ? [
-        ...new Set(
-          r.quests.filter((q): q is string => typeof q === "string" && has(SECT_QUEST_BY_ID, q)),
-        ),
-      ]
+    ? [...new Set(r.quests.filter((q): q is string => isSectQuestTemplate(q)))]
     : [];
   const buys: Record<string, number> = {};
   if (r.buys !== null && typeof r.buys === "object" && !Array.isArray(r.buys)) {
@@ -279,8 +278,8 @@ export interface SectAwardResult {
 
 /**
  * MỘT hàm duy nhất tính cống hiến kiếm được (server bọc trong `SectStore.update`, cộng `contrib` + `merit` + `Sect.points` cùng `granted`).
- * `want` là số muốn cộng (nguyên dương; với `quest` là `SECT_QUEST_CH` của nhiệm vụ). `key` là id nhiệm vụ (bắt buộc với `quest`). Kẹp theo trần ngày
- * và trần nguồn; `dungeon` chỉ một lần mỗi ngày; một nhiệm vụ chỉ trả một lần mỗi ngày. Không kiểm `sectCanEarn` / sống chết: người gọi kiểm trước.
+ * `want` là số muốn cộng (nguyên dương; với `quest` luôn bị kẹp về `sectQuestCh(key)`). `key` là id nhiệm vụ CỤ THỂ (bắt buộc với `quest`). Kẹp theo trần ngày
+ * và trần nguồn; `dungeon` chỉ một lần mỗi ngày; MỘT MẪU nhiệm vụ chỉ trả một lần mỗi ngày (bất kể bậc: `day.quests` lưu id mẫu). Không kiểm `sectCanEarn` / sống chết: người gọi kiểm trước.
  */
 export function sectAwardDay(
   day: SectDayState,
@@ -294,17 +293,20 @@ export function sectAwardDay(
     buys: { ...day.buys },
   };
   if (!Number.isSafeInteger(want) || want < 1) return { day: next, granted: 0, refused: null };
+  let tplId: string | undefined;
   if (source === "quest") {
-    if (typeof key !== "string" || !has(SECT_QUEST_BY_ID, key))
-      return { day: next, granted: 0, refused: null };
-    if (day.quests.includes(key)) return { day: next, granted: 0, refused: "quest_done" };
+    tplId = sectQuestTemplateOf(key);
+    if (tplId === undefined) return { day: next, granted: 0, refused: null };
+    if (day.quests.includes(tplId)) return { day: next, granted: 0, refused: "quest_done" };
+    // MỘT-hàm-duy-nhất tính cống hiến: người gọi KHÔNG được xin quá phần của nhiệm vụ (sectQuestCh theo độ khó), dù `want` lớn hơn
+    want = Math.min(want, sectQuestCh(key));
   }
   const granted = Math.min(want, sectEarnLeft(day, source));
   if (granted < 1) return { day: next, granted: 0, refused: null };
   next.earned += granted;
   if (source === "deposit") next.deposit += granted;
   if (source === "dungeon") next.dungeon = true;
-  if (source === "quest") next.quests.push(key!);
+  if (source === "quest") next.quests.push(tplId!);
   return { day: next, granted, refused: null };
 }
 
@@ -510,11 +512,42 @@ export function sectQuestViolations(
   return bad;
 }
 
+/** Mọi mẫu nhiệm vụ tông theo id mẫu. */
+export const SECT_QUEST_TEMPLATE_BY_ID: Record<string, SectQuestTemplate> = Object.fromEntries(
+  SECT_QUESTS.map((t) => [t.id, t]),
+);
+
+/** `id` có phải id MẪU nhiệm vụ tông có thật không (tra bằng `hasOwnProperty`)? */
+export function isSectQuestTemplate(id: unknown): id is string {
+  return typeof id === "string" && has(SECT_QUEST_TEMPLATE_BY_ID, id);
+}
+
+/**
+ * Id MẪU của nhiệm vụ tông CỤ THỂ `questId` (`st_tru_lang.t1` -> `st_tru_lang`); `undefined` nếu không phải nhiệm vụ tông có thật. Khoá "đã trả hôm nay" và ô nhiệm vụ trong ngày
+ * (`sectQuestSlots`) đều theo id mẫu, nên đổi bậc giữa ngày không làm lại được cùng ô.
+ */
+export function sectQuestTemplateOf(questId: unknown): string | undefined {
+  if (typeof questId !== "string" || !has(SECT_QUEST_BY_ID, questId)) return undefined;
+  // `questId` đã là nhiệm vụ cụ thể CÓ THẬT (kiểm ở trên) nên phần trước hậu tố bậc chắc chắn là id mẫu có thật
+  const m = /^(.+)\.t[0-3]$/.exec(questId);
+  return m ? m[1] : undefined;
+}
+
+/**
+ * Định nghĩa nhiệm vụ theo id, từ CẢ HAI bảng: nhiệm vụ thường (`QUEST_BY_ID`) và nhiệm vụ tông (`SECT_QUEST_BY_ID`); `undefined` nếu lạ. Server (`sanitizeQuests`, tiến độ) và
+ * client (sổ nhiệm vụ, chỉ đường) dùng chung để không mỗi nơi một kiểu và không quên `hasOwnProperty`.
+ */
+export function questDefAny(id: unknown): QuestDef | undefined {
+  if (typeof id !== "string") return undefined;
+  if (has(QUEST_BY_ID, id)) return QUEST_BY_ID[id];
+  if (has(SECT_QUEST_BY_ID, id)) return SECT_QUEST_BY_ID[id];
+  return undefined;
+}
+
 /** Cống hiến của nhiệm vụ cụ thể `questId` (theo độ khó của mẫu); 0 nếu không phải nhiệm vụ tông. */
 export function sectQuestCh(questId: unknown): number {
-  if (typeof questId !== "string") return 0;
-  const tpl = SECT_QUESTS.find((t) => questId.startsWith(`${t.id}.t`));
-  return tpl && has(SECT_QUEST_BY_ID, questId) ? SECT_QUEST_CH[tpl.difficulty - 1]! : 0;
+  const t = sectQuestTemplateOf(questId);
+  return t ? SECT_QUEST_CH[SECT_QUEST_TEMPLATE_BY_ID[t]!.difficulty - 1]! : 0;
 }
 
 /** Băm chuỗi ổn định (FNV-1a 32 bit): cùng đầu vào luôn cùng kết quả ở server và client. */
