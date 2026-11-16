@@ -32,6 +32,7 @@ import {
   shown,
 } from "./e2e-kit";
 import { freePort } from "../src/test-port.js";
+import { ACT_CONFIRM_GUARD_MS } from "../../client/src/act-confirm";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
@@ -52,6 +53,7 @@ const ENTER: Key = { key: "Enter", code: "Enter", vk: 13, text: "\r" };
 const ESC: Key = { key: "Escape", code: "Escape", vk: 27 };
 const F_KEY: Key = { key: "f", code: "KeyF", vk: 70, text: "f" };
 const V_KEY: Key = { key: "v", code: "KeyV", vk: 86, text: "v" };
+const Y_KEY: Key = { key: "y", code: "KeyY", vk: 89, text: "y" };
 const B_KEY: Key = { key: "b", code: "KeyB", vk: 66, text: "b" };
 const L_KEY: Key = { key: "l", code: "KeyL", vk: 76, text: "l" };
 const SHIFT_K: Key = { key: "K", code: "KeyK", vk: 75, text: "K", modifiers: 8 };
@@ -348,6 +350,10 @@ async function main() {
     Math.random = () => 0; // đột phá thành công (máy chủ cùng tiến trình)
     try {
       await press(T, V_KEY);
+      // Đột phá có HỘP XÁC NHẬN (#779, #781): V chỉ mở hộp (nêu xác suất + hậu quả), Y mới gửi; Y trong cửa sổ chống click ma bị bỏ qua nên chờ qua `ACT_CONFIRM_GUARD_MS`
+      await T.waitFor(shown("act-confirm"), "hộp xác nhận đột phá hiện sau phím V");
+      await sleep(ACT_CONFIRM_GUARD_MS + 150);
+      await press(T, Y_KEY);
       await until(() => me.realm === 1, "máy chủ cho đột phá lên Luyện Khí", 5000);
     } finally {
       Math.random = realRandom;
