@@ -528,8 +528,9 @@ export function isSectQuestTemplate(id: unknown): id is string {
  */
 export function sectQuestTemplateOf(questId: unknown): string | undefined {
   if (typeof questId !== "string" || !has(SECT_QUEST_BY_ID, questId)) return undefined;
+  // `questId` đã là nhiệm vụ cụ thể CÓ THẬT (kiểm ở trên) nên phần trước hậu tố bậc chắc chắn là id mẫu có thật
   const m = /^(.+)\.t[0-3]$/.exec(questId);
-  return m && isSectQuestTemplate(m[1]) ? m[1] : undefined;
+  return m ? m[1] : undefined;
 }
 
 /**
