@@ -17,5 +17,6 @@ export * from "./dungeon";
 export * from "./duel";
 export * from "./sect";
 export * from "./net-guard";
+export * from "./test-exp";
 export * from "./protocol";
 export * from "./heartbeat";

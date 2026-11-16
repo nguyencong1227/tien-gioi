@@ -40,6 +40,7 @@
 
 ### Giao thức
 - **`PROTOCOL_VERSION` 3 -> 4** (`shared/src/protocol.ts`, nghề nhỏ #514, `docs/THIET_KE_NGHE_NHO.md`): vật phẩm gắn trạng thái (`ItemEffect` kind `status`, trạng thái `dao_ho`) và trạm chế tác (`NpcDef.station`: Lò đan / Bàn phù); client cũ không hiểu hiệu ứng mới của vật phẩm và gọi lò đan là "Lò Rèn". `MIN_PROTOCOL_VERSION` KHÔNG đổi (nâng lúc phát hành bản có nghề). Tăng trước khi PR dữ liệu nghề đầu tiên (#763) vào `main`.
+- **Hợp đồng tin `testExp` (hệ số tu vi thử nghiệm, người dùng yêu cầu ở `QUYET_DINH_M3.md` mục 34; chỉ THÊM, KHÔNG tăng `PROTOCOL_VERSION`: client cũ bỏ qua tin lạ):** `shared/src/test-exp.ts`: tin máy chủ -> CHỦ nhân vật `{ mult }` (chỉ `sendTo`, không broadcast / không vào state chung), khi vào phòng và khi nối lại; `mult` trong [1, 10]; `parseTestExp` (client không tin tuyệt đối: kẹp, làm tròn 2 chữ số, bỏ tin rác), `testExpLabel` ("Thử nghiệm ×5" / "×2,5"). Máy chủ nhân tu vi theo `TEST_EXP_MULT` là việc của Dev A; nhãn cạnh thanh Tu vi là việc của Dev B (PR riêng).
 
 ## [0.3.0] — 16/11/2026: M7, chiều sâu chiến đấu + Nguyên Anh (Hàn Vân Lĩnh)
 
