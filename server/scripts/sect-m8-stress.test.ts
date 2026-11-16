@@ -14,6 +14,7 @@ const dataDir = mkdtempSync(path.join(tmpdir(), "tien-gioi-sect-m8-stress-"));
 process.env.DATA_DIR = dataDir;
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { dayKey } from "@tien-gioi/shared";
 import { FileSectStore, type SectMemberRecord } from "../src/sect-store";
 import { SectService } from "../src/sect-service";
 import { makeSect } from "../src/store-contract";
@@ -248,7 +249,234 @@ describe("Thử tải & Bất biến cống hiến tông môn M8 (Issue #846, M8
     expect(s.points).toBe(3000);
   });
 
-  it("6. Kiểm toán toàn vẹn file lưu (audit-saves) sau thử tải M8: 0 lỗi vi phạm", () => {
+  it("6. Đua trả cùng 1 nhiệm vụ tông môn: chỉ 1 lần ghi nhận cống hiến, các lần đua sau bị từ chối quest_done", async () => {
+    const sectId = "sect_quest_race_01";
+    const leader = "chu_quest_race";
+    const racer = "de_quest_racer";
+    await store.create(
+      makeSect(sectId, {
+        name: "Đua Nhiệm Vụ",
+        tag: "DNV1",
+        leader,
+        members: [
+          { soulKey: leader, name: "Chủ Đua NV", rank: "chu", joinedAt: NOW - 86_400_000 },
+          { soulKey: racer, name: "Đệ Tử Đua", rank: "de_tu", joinedAt: NOW - 86_400_000 },
+        ],
+      }),
+    );
+
+    // Gửi 10 yêu cầu trả cùng một nhiệm vụ mẫu st_tru_lang đồng thời
+    const reqs = Array.from({ length: 10 }, () =>
+      svc.award({ soulKey: racer, name: "Đệ Tử Đua" }, "quest", 10, {
+        key: "st_tru_lang.t0",
+        warmup: false,
+      }),
+    );
+    const results = await Promise.all(reqs);
+
+    const okCount = results.filter((r) => r.ok).length;
+    const failDone = results.filter((r) => !r.ok && r.reason === "quest_done").length;
+    expect(okCount).toBe(1);
+    expect(failDone).toBe(9);
+
+    // Kiểm tra bản ghi tông môn: chỉ cộng đúng 10 cống hiến và 10 điểm tông
+    const s = (await store.get(sectId))!;
+    expect(s.points).toBe(10);
+    const m = s.members.find((x) => x.soulKey === racer)!;
+    expect(m.contrib).toBe(10);
+    expect(m.merit).toBe(10);
+    expect(m.today?.quests).toEqual(["st_tru_lang"]);
+  });
+
+  it("7. Nhảy tông môn giữa ngày: bảo toàn today.quests của linh hồn, ngăn chặn gian lận làm lại cùng mẫu nhiệm vụ", async () => {
+    const sectId1 = "sect_jump_q_01";
+    const sectId2 = "sect_jump_q_02";
+    const leader1 = "chu_jump_q1";
+    const leader2 = "chu_jump_q2";
+    const jumper = "de_jump_q";
+
+    await store.create(
+      makeSect(sectId1, {
+        name: "Tông NV Một",
+        tag: "TN1",
+        leader: leader1,
+        members: [
+          { soulKey: leader1, name: "Chủ Một", rank: "chu", joinedAt: NOW - 86_400_000 },
+          { soulKey: jumper, name: "Đệ Nhảy NV", rank: "de_tu", joinedAt: NOW - 86_400_000 },
+        ],
+      }),
+    );
+    await store.create(
+      makeSect(sectId2, {
+        name: "Tông NV Hai",
+        tag: "TN2",
+        leader: leader2,
+        members: [{ soulKey: leader2, name: "Chủ Hai", rank: "chu", joinedAt: NOW - 86_400_000 }],
+      }),
+    );
+
+    // Ở Tông 1: Hoàn thành nhiệm vụ mẫu st_tru_lang
+    const a1 = await svc.award({ soulKey: jumper, name: "Đệ Nhảy NV" }, "quest", 10, {
+      key: "st_tru_lang.t0",
+      warmup: false,
+    });
+    expect(a1.ok).toBe(true);
+
+    // Rời Tông 1
+    const l1 = await svc.leave({ soulKey: jumper, name: "Đệ Nhảy NV" });
+    expect(l1.ok).toBe(true);
+
+    // Nhảy sang Tông 2 trong cùng ngày (bảo toàn sổ ngày today.quests của linh hồn)
+    const j2 = await store.update(sectId2, (s) => ({
+      ...s,
+      members: [
+        ...s.members,
+        {
+          soulKey: jumper,
+          name: "Đệ Nhảy NV",
+          rank: "de_tu",
+          joinedAt: clock,
+          today: {
+            day: dayKey(clock),
+            earned: 10,
+            deposit: 0,
+            quests: ["st_tru_lang"],
+            dungeon: false,
+            buys: {},
+          },
+        },
+      ],
+    }));
+    expect(j2).toBeDefined();
+
+    // Trường hợp 1: Chế độ warmup mặc định (warmup: true) -> bị từ chối ngay lập tức vì not_warm
+    const warmFail = await svc.award({ soulKey: jumper, name: "Đệ Nhảy NV" }, "quest", 10, {
+      key: "st_nop_nanh.t0",
+      warmup: true,
+    });
+    expect(warmFail.ok).toBe(false);
+    if (!warmFail.ok) expect(warmFail.reason).toBe("not_warm");
+
+    // Trường hợp 2: Khi warmup=false, thử làm LẠI mẫu đã làm ở tông cũ (st_tru_lang) -> bị từ chối quest_done
+    const dupQuestFail = await svc.award({ soulKey: jumper, name: "Đệ Nhảy NV" }, "quest", 10, {
+      key: "st_tru_lang.t0",
+      warmup: false,
+    });
+    expect(dupQuestFail.ok).toBe(false);
+    if (!dupQuestFail.ok) expect(dupQuestFail.reason).toBe("quest_done");
+
+    // Trường hợp 3: Mẫu CHƯA làm hôm nay (st_nop_nanh) thì vẫn được phép hoàn thành
+    const newQuestOk = await svc.award({ soulKey: jumper, name: "Đệ Nhảy NV" }, "quest", 20, {
+      key: "st_nop_nanh.t0",
+      warmup: false,
+    });
+    expect(newQuestOk.ok).toBe(true);
+  });
+
+  it("8. Đột phá cảnh giới giữa lúc làm nhiệm vụ: mẫu nhiệm vụ giữ nguyên, khóa theo mẫu tránh nhận lại ở bậc mới", async () => {
+    const sectId = "sect_realm_break_01";
+    const leader = "chu_realm_break";
+    const pupil = "de_break";
+
+    await store.create(
+      makeSect(sectId, {
+        name: "Đột Phá Tông",
+        tag: "DPT1",
+        leader,
+        members: [
+          { soulKey: leader, name: "Chủ Đột Phá", rank: "chu", joinedAt: NOW - 86_400_000 },
+          { soulKey: pupil, name: "Đệ Tử Đột Phá", rank: "de_tu", joinedAt: NOW - 86_400_000 },
+        ],
+      }),
+    );
+
+    // Đệ tử nhận nhiệm vụ ở bậc Luyện Khí (t0): st_tru_ho.t0 (độ khó 3, 40 cống hiến)
+    // Trong lúc làm, đệ tử đột phá lên Trúc Cơ (t1)
+    // Khi nộp, trả qua award với key của bản đã nhận (st_tru_ho.t0)
+    const turnInRes = await svc.award({ soulKey: pupil, name: "Đệ Tử Đột Phá" }, "quest", 40, {
+      key: "st_tru_ho.t0",
+      warmup: false,
+    });
+    expect(turnInRes.ok).toBe(true);
+    if (turnInRes.ok) {
+      expect(turnInRes.granted).toBe(40);
+      const m = turnInRes.sect.members.find((x) => x.soulKey === pupil)!;
+      // today.quests ghi nhận MẪU chung "st_tru_ho", không lưu hậu tố bậc
+      expect(m.today?.quests).toContain("st_tru_ho");
+    }
+
+    // Sau khi đã ở Trúc Cơ, cố tình xin nhận / nộp bản Trúc Cơ (st_tru_ho.t1) của cùng mẫu trong ngày -> quest_done
+    const retryTier1 = await svc.award({ soulKey: pupil, name: "Đệ Tử Đột Phá" }, "quest", 40, {
+      key: "st_tru_ho.t1",
+      warmup: false,
+    });
+    expect(retryTier1.ok).toBe(false);
+    if (!retryTier1.ok) expect(retryTier1.reason).toBe("quest_done");
+  });
+
+  it("9. Đua nộp nhiều nhiệm vụ đồng thời giữa các thành viên: cộng dồn chính xác điểm tông môn và bảo toàn bất biến", async () => {
+    const sectId = "sect_multi_quest_01";
+    const leader = "chu_multi_q";
+    const members: SectMemberRecord[] = [
+      { soulKey: leader, name: "Chủ Multi", rank: "chu", joinedAt: NOW - 86_400_000 },
+    ];
+    for (let k = 1; k <= 3; k++) {
+      members.push({
+        soulKey: `de_multi_${k}`,
+        name: `Đệ Tử M${k}`,
+        rank: "de_tu",
+        joinedAt: NOW - 86_400_000,
+      });
+    }
+
+    await store.create(
+      makeSect(sectId, {
+        name: "Đa Nhiệm Vụ",
+        tag: "DNV2",
+        leader,
+        members,
+      }),
+    );
+
+    // 3 đệ tử nộp 3 nhiệm vụ khác nhau đồng thời:
+    // Đệ 1: st_tru_lang.t0 (10 CH)
+    // Đệ 2: st_nop_nanh.t0 (20 CH)
+    // Đệ 3: st_tru_ho.t0 (40 CH)
+    const tasks = [
+      svc.award({ soulKey: "de_multi_1", name: "Đệ Tử M1" }, "quest", 10, {
+        key: "st_tru_lang.t0",
+        warmup: false,
+      }),
+      svc.award({ soulKey: "de_multi_2", name: "Đệ Tử M2" }, "quest", 20, {
+        key: "st_nop_nanh.t0",
+        warmup: false,
+      }),
+      svc.award({ soulKey: "de_multi_3", name: "Đệ Tử M3" }, "quest", 40, {
+        key: "st_tru_ho.t0",
+        warmup: false,
+      }),
+    ];
+
+    const results = await Promise.all(tasks);
+    for (const r of results) {
+      expect(r.ok).toBe(true);
+    }
+
+    const s = (await store.get(sectId))!;
+    // Tổng điểm tông môn = 10 + 20 + 40 = 70
+    expect(s.points).toBe(70);
+
+    let sumMerit = 0;
+    for (const m of s.members) {
+      const contrib = m.contrib ?? 0;
+      const merit = m.merit ?? 0;
+      expect(contrib).toBeLessThanOrEqual(merit);
+      sumMerit += merit;
+    }
+    expect(s.points).toBeGreaterThanOrEqual(sumMerit);
+  });
+
+  it("10. Kiểm toán toàn vẹn file lưu (audit-saves) sau toàn bộ thử tải M8 (kèm today.quests): 0 lỗi vi phạm", () => {
     const report = auditSavesDirectory(dataDir);
     expect(report.totalSects, "phải có hồ sơ tông môn trong thư mục test").toBeGreaterThan(0);
     expect(report.errorSects).toBe(0);
