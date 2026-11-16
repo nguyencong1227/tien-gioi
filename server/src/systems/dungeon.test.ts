@@ -789,6 +789,15 @@ describe("trùm chết: thắng, thưởng hoàn thành, lượt mỗi ngày (4c
     const dir = mkdtempSync(path.join(tmpdir(), "tien-gioi-dungeon-sect-"));
     try {
       const store = new FileSectStore(dir, () => 1_700_000_000_000);
+      // Ép đúng thứ tự từng gây chập chờn: lần cập nhật thứ HAI (phần của người thứ hai) chậm hơn hẳn, nên Tông chủ đã có cống hiến mà đồng môn thì chưa.
+      // Test phải chờ CẢ HAI chứ không chỉ người đầu (trước đây đọc ngay `contrib` của đồng môn: 'expected undefined to be 20' khi máy bận).
+      const realUpdate = store.update.bind(store);
+      let slowAfterFirst = false;
+      let updates = 0;
+      store.update = (id, fn) =>
+        slowAfterFirst && ++updates >= 2
+          ? new Promise((r) => setTimeout(r, 300)).then(() => realUpdate(id, fn))
+          : realUpdate(id, fn);
       const svc = new SectService(store, () => f.w.now);
       const f = fight();
       f.w.sectService = svc;
@@ -807,10 +816,17 @@ describe("trùm chết: thắng, thưởng hoàn thành, lượt mỗi ngày (4c
       );
       await sectOnJoin(f.w, LEADER);
       await sectOnJoin(f.w, MEMBER);
+      slowAfterFirst = true;
       bossKilled(f.w, f.boss.mc);
       const contribOf = async (who: string) =>
         (await store.get("t1"))!.members.find((m) => m.soulKey === key(who))!.contrib;
-      for (let i = 0; i < 100 && (await contribOf(LEADER)) === undefined; i++)
+      // chờ theo điều kiện (cả hai đã có cống hiến), không ngủ cố định
+      for (
+        let i = 0;
+        i < 100 &&
+        ((await contribOf(LEADER)) === undefined || (await contribOf(MEMBER)) === undefined);
+        i++
+      )
         await new Promise((r) => setTimeout(r, 20));
       expect(await contribOf(LEADER)).toBe(SECT_DUNGEON_CH);
       expect(await contribOf(MEMBER)).toBe(SECT_DUNGEON_CH);

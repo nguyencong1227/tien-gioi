@@ -377,6 +377,30 @@
         Chế độ Quyết đấu giả lập (DEV / Debug)
       </div>
 
+      <!-- Thanh máu TRÙM (mục 42, T4 #873): trùm gần nhất / trùm bí cảnh; mốc giai đoạn, tên chiêu đang vận, chỉ báo cuồng nộ (vẽ bằng boss-bar-ui.ts) -->
+      <section id="boss-bar" class="boss-bar" hidden aria-label="Trùm">
+        <div class="boss-bar-head">
+          <b id="boss-bar-name"></b>
+          <span id="boss-bar-phase" class="boss-bar-phase" hidden></span>
+          <span id="boss-bar-enrage" class="boss-bar-enrage" hidden>🔥 Cuồng nộ</span>
+        </div>
+        <div
+          id="boss-bar-track"
+          class="boss-bar-track"
+          role="progressbar"
+          aria-labelledby="boss-bar-name"
+          aria-valuemin="0"
+          aria-valuemax="100"
+        >
+          <span id="boss-bar-fill" class="boss-bar-fill"></span>
+        </div>
+        <p id="boss-bar-hp" class="boss-bar-hp"></p>
+        <div class="boss-bar-castrow">
+          <span id="boss-bar-cast" class="boss-bar-cast" role="status" aria-live="polite"></span>
+          <span class="boss-bar-castbar" hidden><i id="boss-bar-castfill"></i></span>
+        </div>
+      </section>
+
       <!-- HUD Bí cảnh (M3.4, chỉ hiện khi ở trong bản đồ bí cảnh) -->
       <section id="dungeon-hud" class="panel dungeon-hud" hidden aria-label="Bí cảnh">
         <div class="dhud-head">
