@@ -7,6 +7,8 @@
 > **Toàn bộ số liệu dưới đây là SỐ DỪNG BAN ĐẦU, CHƯA MÔ PHỎNG**, chỉ để A định hướng thiết kế; số cuối do mô phỏng kinh tế chốt (M7.9 sau).
 >
 > **Cập nhật theo review của A (#764):** đã sửa con số khoá nguồn (85 / 72 công thức thật), tách đan đột phá thành mục riêng (là lát 1 = #763), sửa hai nguyên liệu sai (Tụ Linh ×3, Tái Tạo phụ mộc phẩm-3), nêu quy tắc định giá phụ liệu, và cập nhật toàn bộ theo sáu câu trả lời của A (phụ liệu cố định, không hỏa pháp, không bán, bỏ thọ nguyên giữ đột phá, chế tức thì, mua nền ở NPC).
+>
+> **Đính chính review lần 2 của A (đầu `c5814ae`):** đan lát 1 là nhóm **`dot_pha`** (Trúc Cơ Đan 0,15 / Kết Kim Đan 0,12 / Dưỡng Anh Đan 0,09 — A trước đó đọc nhầm trường, `dot_pha` là "tăng tỉ lệ đột phá" đúng nghĩa `dao_ho`, KHÔNG phải `pha_binh_canh` là phá bình cảnh — TT không có trạng thái kẹt bình cảnh); Phá Chướng / Toái Bích / Thông Huyền chuyển sang danh sách LOẠI BỎ. Hiệu chỉnh lại tổng giá mục 5 (Lôi Âm ~450, Cửu Chuyển ~1170, Tái Tạo ~1390, Kim Lân Độc ~2654, Vạn Sinh ~2800) + thêm dòng đan hộ đạo.
 
 ---
 
@@ -70,20 +72,23 @@ nguon: [pho_bien]  # pho_bien (phổ biến) / co (hiếm) / tong_mon (tông mô
 | Nguyên Anh | **Duệ Kim Đan** ★ | Cửu Diệp Kiếm Thảo ×1 + Hạt Vương Độc Thích ×1 | 200 | Bạo phát +3 đòn gấp rưỡi, hồi linh lực. *"ba lượt ra đòn nặng gấp rưỡi, linh lực thêm sáu hơi thở"* |
 | Nguyên Anh | Vạn Sinh Đan | Cửu Tuệ Linh Đạo ×1 + phụ mộc linh dược phẩm-5 ×1 | 1000 | Hồi 65% khí huyết. *"sinh cơ tràn khắp kinh mạch… hồi hơn sáu phần khí huyết"* |
 
-**Đan đột phá (lát 1 của nghề — issue #763, KHÔNG loại bỏ).** Trong nguồn là hiệu ứng `pha_binh_canh` trên item `dan_duoc.yaml` (KHÔNG phải `dot_pha` — cái đó là chỉ số tăng tỉ lệ trên đan thường). TT **có** `breakthroughChance(realm)` 77 / 69 / 61 % (thất bại mất 30 % tu vi + nửa khí huyết), nên đan đột phá khớp cơ chế sẵn. Ba đan này là lát 1 D làm sau #761 merge:
+**Đan đột phá (lát 1 của nghề — issue #763, KHÔNG loại bỏ).** Trong nguồn là hiệu ứng `dot_pha` — trường NGANG HÀNG `dung` trên item `dan_duoc.yaml`, nghĩa "Tăng X% tỉ lệ đột phá", đúng với cơ chế `dao_ho` của TT (cộng thêm xác suất đột phá). TT **có** `breakthroughChance(realm)` 77 / 69 / 61 % (thất bại mất 30 % tu vi + nửa khí huyết), nên đan đột phá khớp cơ chế sẵn. Số liệu lấy thẳng nguồn:
 
-| Bậc | Thành phẩm | Nguyên liệu (chủ) | Phí | Hiệu ứng (`pha_binh_canh`) | `nguon` |
-| --- | --- | --- | --- | --- | --- |
-| Trúc Cơ | Phá Chướng Đan | Khai Khiếu Châu ×1 | 20 | Phá bình cảnh Trúc Cơ (1 phần). *"vách chân khí vỡ ra, bước sang tiểu cảnh giới kế"* | `pho_bien` |
-| Kim Đan | Toái Bích Đan | Xuyên Bích Giác ×1 | 60 | Phá bình cảnh Kim Đan (1 phần). *"vách chướng vỡ vụn như tường đất gặp lũ"* | `pho_bien` |
-| Nguyên Anh | Thông Huyền Đan | Huyền Quan Tủy ×1 | 100 | Phá bình cảnh Nguyên Anh (1 phần). *"cửa ải trong thân tự mở"* | **`tong_mon`** (mở khoá qua tông môn — D11 cân nhắc) |
+| Bậc (item) | Thành phẩm | `dot_pha` | Công thức (`chu`, phí, `nguon`) | Tổng chủ liệu + phí |
+| --- | --- | --- | --- | --- |
+| Luyện Khí → Trúc Cơ | **Trúc Cơ Đan** (`gia` 300) | `ti_le` 0,15 | Huyết Linh Chi ×1 (40) + Thanh Tâm Thảo ×1 (15), phí 20, `tong_mon` | 75 |
+| Trúc Cơ → Kim Đan | **Kết Kim Đan** (`gia` 1200) | `ti_le` 0,12 | Tử Nham Hoa ×1 (300), phí 40, `tong_mon` | 340 |
+| Kim Đan → Nguyên Anh | **Dưỡng Anh Đan** (`gia` 4000) | `ti_le` 0,09 (`tam_ma` 10: bỏ, TT không có tâm ma) | Giao Châu Liên ×1 (1000) + phụ thổ linh dược phẩm-3 ×1 (thấp nhất khớp mẫu), phí 20, `tong_mon` | 1020 + phụ |
+| (thêm, Nguyên Anh) | Trấn Hồn Đan (`gia` 3600) | 0,05 (`tam_ma` 30: bỏ) | Hàn Nguyệt Quế ×1 (950), phí 50, `pho_bien` | 1000 |
+| (thêm, mọi bậc) | Thanh Tâm Đan (`gia` 200) | 0,03 không gắn bậc (`tam_ma` 15: bỏ) | Thanh Tâm Thảo ×2 (15) + Thủy Tiên Căn ×1 (38), phí 8, `pho_bien` | 76 |
 
-> Phá Hư Đan (Hóa Thần, `canh_gioi` 5) — LOẠI (siêu trần).
-> Lưu ý: `dot_pha` trên đan thường (Trúc Cơ Đan +15 %, Kết Đan Đan +12 %, Duỳ Anh Đan +9 % tam ma…) là cơ chế **tăng tỉ lệ đột phá**, khác với `pha_binh_canh` là **phá bình cảnh trực tiếp**; lát 1 (#763) lấy `pha_binh_canh`.
+> Ghi chú: `nguon: tong_mon` (mở khoá qua tông môn) KHÔNG áp ở Tiên Giới (công thức mở sẵn ở NPC); `Hóa Anh Đan` (0,06, `co`), `Thiên Nguyên Quả` / `Tử Phủ Linh Quả` / `Thiên Lôi Đan` (`pham`, không phải `ti_le`) và các đan Hóa Thần (`canh_gioi` 5) LOẠI.
+> Gợi ý cho D11 (#763): `ratio` khởi điểm theo nguồn 0,15 / 0,12 / 0,09 (nằm trong khung `dao_ho` ≤ 0,2); A chốt số sau khi xem EV (xác suất gốc 77 / 69 / 61 % + ratio vẫn kẹp `BREAK_CHANCE_CAP`).
 
 **Loại bỏ (luyện đan) + lý do:**
 - **Đan tự tu (`tu_luyen`)** — Dưỡng Khí Đan…: tu theo năm/tháng, cơ chế ngoại tuyến TT không có.
 - **Đan dưỡng phẩm (`duong_pham`)** — Cố Cơ Đan / Uẩn Đan Lộ / Uẩn Anh Liên / Uẩn Thần Đăng: "ôn dưỡng phẩm chất đan điền một bậc, mỗi cảnh giới chỉ một lần" — cơ chế nâng phẩm chất thân thể TT chưa có, để sau nếu làm.
+- **Phá bình cảnh (`pha_binh_canh`)** — Phá Chướng Đan / Toái Bích Đan / Thông Huyền Đan: cơ chế "tu vi đầy mà không lên nổi, phá bình cảnh trực tiếp"; TT KHÔNG có trạng thái "kẹt bình cảnh" (đột phá là kiểm xác suất `breakthroughChance`, không có bình cảnh để phá) → LOẠI. (Đan đột phá thật của TT là nhóm `dot_pha`, xem mục riêng trên.)
 - **Đan hồi/thần thức trùng lặp** — Sinh Cơ Đan (hồi 40% = Hồi Huyết Đan hiện có), Bổ Khí Đan (hồi linh lực ~ Hồi Linh Đan): trùng đan hiện có, KHÔNG cần làm lại (xem mục 4).
 - **Siêu trần** — Thương Long Đan, Kim Ô Đan, Tạo Hóa Đan (cảnh giới 5 Hóa Thần): vượt trần nội dung TT.
 - **Cần hệ thống trạng thái TT chưa có** — Tịch Độc Đan (trừ độc: cần cơ chế độc/trạng thái), Định Thần Đan (tam ma): đề nghị để sau nếu làm hệ trạng thái.
@@ -168,11 +173,10 @@ TT có 7 đan tiêu dùng: Hồi Huyết Đan (hồi 40%), Đại Hồi Huyết 
 | Cỡ | Ví dụ (thành phẩm — tổng nguyên liệu + phí) |
 | --- | --- |
 | Luyện Khí | Hỏa Đạn Phù ~5, Định Thân Phù ~35, Cuồng Huyết Phù ~105, Tráng Đảm Đan ~44, Hồi Xuân Đan ~11 |
-| Trúc Cơ | Liệt Diễm Phù ~319, Toái Giáp Phù ~322, Lôi Âm Đan ~430 (360 + phụ 90), Hoàn Hồn Đan ~260 |
-| Kim Đan | Lôi Nộ Phù ~1454, Khốn Long Phù ~1954, Cửu Chuyển Kim Đan ~1915 (1850 + phụ 65*), Tái Tạo Đan ~2290 (1300 + phụ 90) |
-| Nguyên Anh | Kim Lân Độc Phù ~3550, Tam Muội Hỏa Phù ~3054, Vạn Sinh Đan ~2800, Duệ Kim Đan ~5100 |
-
-<small>*Cửu Chuyển Kim Đan phụ là hoa linh dược phẩm-3; con số chỉ minh hoạ cách cộng, chưa chốt item.</small>
+| Trúc Cơ | Liệt Diễm Phù ~319, Toái Giáp Phù ~322, Lôi Âm Đan ~450 (360 + phụ 90), Hoàn Hồn Đan ~260 |
+| Kim Đan | Lôi Nộ Phù ~1454, Khốn Long Phù ~1954, Cửu Chuyển Kim Đan ~1170 (1050 + phụ 120 Xích Tinh Quả — hoa linh dược phẩm-3 thấp nhất), Tái Tạo Đan ~1390 (1300 + phụ 90) |
+| Nguyên Anh | Kim Lân Độc Phù ~2654 (1804 + Huyền Quan Tủy 850 — yêu tài phẩm-5 thấp nhất), Tam Muội Hỏa Phù ~3054, Vạn Sinh Đan ~2800, Duệ Kim Đan ~5100 |
+| Đan hộ đạo (lát 1) | Trúc Cơ Đan ~75, Kết Kim Đan ~340, Dưỡng Anh Đan ~1020 + phụ (thổ linh dược phẩm-3 thấp nhất khớp mẫu) |
 
 **Nhận xét:**
 - Chi phí do **nguyên liệu rơi quái hiếm** chi phối (không mua được) → với phù/đan dùng một lần, nguy cơ sinh tiền THẤP hơn đồ rèn (vì nguyên liệu phải cày, và thành phẩm bị tiêu thụ khi dùng, lại KHÔNG bán được NPC).
@@ -190,7 +194,7 @@ TT có 7 đan tiêu dùng: Hồi Huyết Đan (hồi 40%), Đại Hồi Huyết 
 1. **Phụ liệu `phu`:** CỐ ĐỊNH. Mỗi phụ liệu chọn MỘT vật phẩm cụ thể; `RecipeDef.inputs` giữ `{itemId, qty}`, không làm khớp mẫu. (Giá phụ liệu mẫu: thấp nhất khớp mẫu, xem mục 5.)
 2. **Hỏa pháp văn / vũ:** KHÔNG có. Chế tác tất định, một công thức một kết quả; chỉ thêm tỉ lệ hỏng nếu mô phỏng EV cho thấy cần.
 3. **Bán lại:** KHÔNG bán. Đầu ra của trạm `alchemy` / `talisman` không vào `ITEM_VALUE` (nên `sellPrice` = 0), test khoá.
-4. **Thọ nguyên / đột phá:** Thọ nguyên **BỎ**. Đột phá **GIỮ** — là lát 1 của nghề (`pha_binh_canh`, issue #763), KHÔNG "bỏ cả hai".
+4. **Thọ nguyên / đột phá:** Thọ nguyên **BỎ**. Đột phá **GIỮ** — là lát 1 của nghề (`dot_pha`, issue #763), KHÔNG "bỏ cả hai".
 5. **Thời gian chế:** tức thì (không theo ngày, không hàng đợi); giới hạn dùng nằm ở `def.cooldown`.
 6. **Nguyên liệu nền:** Chu Sa / Phù Chỉ (và Yêu Huyết Mặc) đồng ý bán ở NPC (chỗ xả Linh thạch) theo luật `SHOPS` hiện có, chốt số ở lát 2 (Bàn phù). Thảo mộc / yêu tài lát 1: lấy nguyên liệu quái rơi ĐÃ CÓ; cần nguyên liệu mới thì mở issue riêng cho A.
 
