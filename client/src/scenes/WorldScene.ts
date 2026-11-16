@@ -1573,7 +1573,7 @@ export class WorldScene extends Phaser.Scene {
           stroke: "#5a3b00",
           strokeThickness: 4,
         })
-        .setOrigin(0.5, 1)
+        .setOrigin(0.5, 0)
         .setDepth(this.map.worldH + 3);
     }
     const pulse = isReducedMotion() ? 1 : 1 + 0.07 * Math.sin(this.time.now / 140);
@@ -1586,7 +1586,8 @@ export class WorldScene extends Phaser.Scene {
       this.shieldLabelKey = label;
       this.shieldText.setText(label);
     }
-    this.shieldText.setPosition(x, y - 48).setVisible(true);
+    // dưới chân vầng sáng: trên đầu đã có tên + cảnh giới của nhân vật
+    this.shieldText.setPosition(x, y + 44).setVisible(true);
   }
 
   /** Bấm/chạm trúng người chơi khác thì mở menu tương tác (mời tổ đội). */
