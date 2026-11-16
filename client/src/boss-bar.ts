@@ -119,6 +119,16 @@ export class BossFxTracker {
   onEnrage(by: string, now: number): void {
     if (typeof by === "string" && finite(now)) this.enrageAt.set(by, now);
   }
+  /**
+   * Thời gian đã trôi kể từ lúc báo chiêu và thời lượng gồng của trùm `id`, nếu còn trong khoảng gồng + đáp (`graceMs` = thời gian đáp, mặc định 0); `null` nếu không có chiêu
+   * hoặc đã quá. Dùng cho hoạt ảnh gồng / đáp trên thân trùm (`boss-cast-anim.ts`), cùng một bản ghi với thanh máu nên hai nơi luôn khớp nhau.
+   */
+  castTiming(id: string, now: number, graceMs = 0): { elapsedMs: number; castMs: number } | null {
+    const rec = this.cast.get(id);
+    if (!rec || !finite(now, graceMs)) return null;
+    const el = now - rec.startAt;
+    return el >= 0 && el < rec.ms + Math.max(0, graceMs) ? { elapsedMs: el, castMs: rec.ms } : null;
+  }
   forget(id: string): void {
     this.cast.delete(id);
     this.phaseAt.delete(id);
