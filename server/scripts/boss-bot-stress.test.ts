@@ -31,7 +31,6 @@ const rooms: Room[] = [];
 
 beforeAll(async () => {
   process.env.DATA_DIR = dataDir;
-  process.env.BOSS_MOVES = "on";
   const mod = await import("../src/rooms/WorldRoom");
   server = new Server({ transport: new WebSocketTransport(), gracefullyShutdown: false });
   mod.defineRooms(server);
@@ -86,6 +85,13 @@ async function createTestBot(
   rooms.push(room);
 
   await waitFor(() => (room.state as any)?.players?.get(room.sessionId));
+  // Phòng KHÔNG có quái thật: các `warn` trong test đều do test tự phát (`broadcast`); một con quái thật (trùm, hổ lao, đập đất) đứng gần bot cũng gửi `warn` làm các khẳng định
+  // đếm "đúng 1 warn" đỏ chập chờn (CI của #898: `expected ... to have a length of 1 but got 2`). Không bật `BOSS_MOVES` vì test không cần trùm chạy bộ chiêu.
+  const world = serverRoom(room).world;
+  for (const id of [...world.state.monsters.keys()]) {
+    world.state.monsters.delete(id);
+    world.mctrl.delete(id);
+  }
 
   const receivedWarns: any[] = [];
   const bot = {
