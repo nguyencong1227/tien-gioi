@@ -28,12 +28,12 @@ import type { WorldState } from "../schema";
 
 const dataDir = mkdtempSync(path.join(tmpdir(), "tien-gioi-sect-room-"));
 import { listenWithRetry } from "../test-port";
+import { gateSave, restoreSaves, slowSave } from "./test-save-hooks";
 
 // cổng do hệ điều hành cấp ở beforeAll (`listenWithRetry`): tự động thử lại nếu gặp EADDRINUSE giữa các tệp chạy song song
 let PORT = 0;
 let server: Server;
 const rooms: Room[] = [];
-const slowSaves: (() => void)[] = []; // hàm khôi phục của `slowSave`, chạy ở afterEach
 
 beforeAll(async () => {
   process.env.DATA_DIR = dataDir; // store.ts / sect-store.ts đọc biến này lúc dùng
@@ -43,7 +43,7 @@ beforeAll(async () => {
   PORT = await listenWithRetry(server);
 });
 afterEach(async () => {
-  for (const undo of slowSaves.splice(0).reverse()) undo(); // trả việc lưu về bình thường trước khi đóng phòng (đóng phòng cũng lưu hồ sơ)
+  restoreSaves(); // trả việc lưu về bình thường trước khi đóng phòng (đóng phòng cũng lưu hồ sơ)
   await Promise.all(rooms.splice(0).map((r) => r.connection.isOpen && r.leave(true)));
   await sleep(150);
 });
@@ -134,37 +134,6 @@ const sectFiles = () =>
   existsSync(path.join(dataDir, "sects"))
     ? readdirSync(path.join(dataDir, "sects")).filter((f) => f.endsWith(".json"))
     : [];
-
-/**
- * Chen vào việc LƯU HỒ SƠ của phòng (`wait` chạy trước mỗi lần lưu thật); tự trả về bình thường ở afterEach. Máy chủ giữ khoá "một thao
- * tác kho một lúc" của từng người cho tới khi lưu xong, mà túi đồ đổi TRƯỚC lúc lưu: nên đây là cách làm cho cửa sổ đua (túi đã đổi, thao
- * tác chưa xong) lớn ra TẤT ĐỊNH, thay vì phụ thuộc tốc độ đĩa của máy chạy test (#752: chập chờn "Hết thời gian chờ lượt 2" dưới tải).
- */
-function delaySave(room: Room, wait: () => Promise<unknown>, release: () => void = () => {}) {
-  const players = (serverRoom(room) as any).players;
-  const real = players.save;
-  players.save = async (...args: unknown[]) => {
-    await wait();
-    return real.apply(players, args);
-  };
-  slowSaves.push(() => {
-    release(); // đừng để lưu nào kẹt lại khi ca kết thúc giữa chừng
-    players.save = real;
-  });
-}
-/** Mọi lần lưu hồ sơ chậm thêm `ms` (mô phỏng đĩa chậm / máy tải nặng). */
-const slowSave = (room: Room, ms: number) => delaySave(room, () => sleep(ms));
-/** Mọi lần lưu hồ sơ ĐỨNG yên cho tới khi gọi hàm trả về (không phụ thuộc đồng hồ: test chủ động quyết định lúc nào lưu xong). */
-function gateSave(room: Room): () => void {
-  let open = () => {};
-  const gate = new Promise<void>((r) => (open = r));
-  delaySave(
-    room,
-    () => gate,
-    () => open(),
-  );
-  return () => open();
-}
 
 /** Nhân vật ở Hắc Phong Cốc: tạo ở Lạc Hà rồi sửa hồ sơ sang bản đồ đó (như đã đi qua cổng), vào phòng của bản đồ đó. */
 async function joinIn(name: string, mapId: string): Promise<Hero> {
