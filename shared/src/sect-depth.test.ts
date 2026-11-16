@@ -179,9 +179,12 @@ describe("bảng cấp tông (mục 12.4)", () => {
     expect(sectLevelInfo(2.9).level).toBe(2);
     expect(sectLevelInfo("x").level).toBe(1);
     expect(sectLevelInfo(NaN).level).toBe(1);
+    const before = JSON.parse(JSON.stringify(SECT_LEVELS));
     const b = sectBuffOf(5);
     b.exp = 99;
-    expect(sectBuffOf(5).exp).toBe(SECT_LEVELS[4]!.buff.exp);
+    b.regen = 99;
+    expect(sectBuffOf(5)).toEqual(before[4].buff);
+    expect(JSON.parse(JSON.stringify(SECT_LEVELS))).toEqual(before); // bảng gốc không bị sửa
     expect(sectPointsToNext(0)).toBe(1_000);
     expect(sectPointsToNext(1_000)).toBe(3_000);
     expect(sectPointsToNext(29_999)).toBe(1);
@@ -475,6 +478,33 @@ describe("nhiệm vụ tông môn (mục 12.7)", () => {
       );
     const multi = [1, 2, 3].some((df) => SECT_QUESTS.filter((t) => t.difficulty === df).length > 1);
     if (multi) expect(seen.size).toBeGreaterThan(1);
+    // bảng tổng hợp 5 mẫu / độ khó: chọn PHẢI trải ra nhiều mẫu qua các ngày (không kẹt một mẫu), vẫn tất định và đúng độ khó ô
+    const pool = (df: 1 | 2 | 3) =>
+      Array.from({ length: 5 }, (_, n) => ({
+        ...SECT_QUESTS[df - 1]!,
+        id: `st_gia_${df}_${n}`,
+        difficulty: df,
+      }));
+    const big = [...pool(1), ...pool(2), ...pool(3)];
+    const picked: Set<string>[] = [new Set(), new Set(), new Set()];
+    for (let d = 0; d < 120; d++) {
+      const day = dayKey(Date.UTC(2026, 0, 1) + d * 86_400_000);
+      const slots = sectQuestSlots("tong-x", day, big);
+      expect(sectQuestSlots("tong-x", day, big)).toEqual(slots);
+      expect(slots).toHaveLength(3);
+      slots.forEach((id, i) => {
+        expect(id.startsWith(`st_gia_${i + 1}_`)).toBe(true);
+        picked[i]!.add(id);
+      });
+    }
+    for (const set of picked) expect(set.size).toBe(5); // 120 ngày phủ hết 5 mẫu
+    // hai tông môn khác nhau cho chuỗi chọn khác nhau (không dùng chung một bộ)
+    const days = Array.from({ length: 30 }, (_, d) =>
+      dayKey(Date.UTC(2026, 0, 1) + d * 86_400_000),
+    );
+    const seqA = days.map((d) => sectQuestSlots("tong-a", d, big).join());
+    const seqB = days.map((d) => sectQuestSlots("tong-b", d, big).join());
+    expect(seqA).not.toEqual(seqB);
     // hai tông môn khác nhau có thể khác nhau, nhưng luôn hợp lệ
     for (const id of sectQuestSlots("tong-b", "2026-11-17")) {
       expect(SECT_QUESTS.some((t) => t.id === id)).toBe(true);

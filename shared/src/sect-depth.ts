@@ -529,12 +529,16 @@ function hash32(s: string): number {
 
 /**
  * Id MẪU của các nhiệm vụ hôm nay của tông môn `sectId` (ngày `day` = `dayKey`): tối đa `SECT_QUEST_SLOTS` mẫu, ô i có độ khó i + 1,
- * chọn tất định theo `hash(sectId, day, i)` nên mọi thành viên cùng thấy. Độ khó chưa có mẫu thì bỏ ô đó.
+ * chọn tất định theo `hash(sectId, day, i)` nên mọi thành viên cùng thấy. Độ khó chưa có mẫu thì bỏ ô đó. `templates` chỉ để test bằng bảng tổng hợp.
  */
-export function sectQuestSlots(sectId: string, day: string): string[] {
+export function sectQuestSlots(
+  sectId: string,
+  day: string,
+  templates: readonly SectQuestTemplate[] = SECT_QUESTS,
+): string[] {
   const out: string[] = [];
   for (let i = 0; i < SECT_QUEST_SLOTS; i++) {
-    const pool = SECT_QUESTS.filter((t) => t.difficulty === i + 1);
+    const pool = templates.filter((t) => t.difficulty === i + 1);
     if (pool.length) out.push(pool[hash32(`${sectId}|${day}|${i}`) % pool.length]!.id);
   }
   return out;
