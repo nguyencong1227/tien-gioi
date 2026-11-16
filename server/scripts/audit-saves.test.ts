@@ -500,6 +500,36 @@ describe("audit-saves (Issue #112)", () => {
       );
     });
 
+    it("M8.4: quests.active chứa nhiệm vụ tông môn hợp lệ (tra cứu qua questDefAny) -> 0 lỗi; chứa id lạ -> unknown_quest", () => {
+      const pSectQuest = {
+        ...validPlayer,
+        quests: {
+          done: ["nhap_the"],
+          active: [
+            { id: "st_tru_lang.t0", step: 0, count: 0 },
+            { id: "st_nop_nanh.t0", step: 0, count: 0 },
+          ],
+        },
+      };
+      const raw = JSON.stringify(pSectQuest);
+      expect(auditPlayerSaveData(raw, raw.length)).toEqual([]);
+
+      // Nhiệm vụ active là id lạ hoặc constructor
+      for (const badId of ["quest_khong_ton_tai", "constructor"]) {
+        const pBad = {
+          ...validPlayer,
+          quests: {
+            done: ["nhap_the"],
+            active: [{ id: badId, step: 0, count: 0 }],
+          },
+        };
+        const rawBad = JSON.stringify(pBad);
+        expect(auditPlayerSaveData(rawBad, rawBad.length).map((e) => e.code)).toContain(
+          "unknown_quest",
+        );
+      }
+    });
+
     it("file có itemId = secretHash và quests.done chứa secretHash -> kết quả report và console không chứa hash", () => {
       const sensitiveHash = "9999999999999999999999999999999999999999999999999999999999999999";
       const pMalicious = {
@@ -1659,6 +1689,24 @@ describe("audit-saves (Issue #112)", () => {
         "duplicate_sect_member_today_quest",
       );
 
+      // today.quests vượt quá SECT_QUEST_SLOTS (3) -> sect_member_today_quests_exceed_slots
+      const rawTooManyQuests = JSON.stringify({
+        ...validSect,
+        members: [
+          {
+            ...validSect.members[0],
+            today: {
+              day: "2026-11-17",
+              earned: 0,
+              quests: ["st_tru_lang", "st_nop_nanh", "st_tru_ho", "st_tru_lang_extra"],
+            },
+          },
+        ],
+      });
+      expect(
+        auditSectSaveData(rawTooManyQuests, rawTooManyQuests.length).map((e) => e.code),
+      ).toContain("sect_member_today_quests_exceed_slots");
+
       // today.dungeon không phải boolean
       const rawBadDungeon = JSON.stringify({
         ...validSect,
@@ -1759,6 +1807,30 @@ describe("audit-saves (Issue #112)", () => {
       const raw = JSON.stringify(fullM8Sect);
       const errors = auditSectSaveData(raw, raw.length);
       expect(errors).toEqual([]);
+    });
+
+    it("M8.4 đột biến: nới lỏng kiểm tra số lượng today.quests vượt SECT_QUEST_SLOTS thì test bắt buộc đỏ", () => {
+      // Hàm nới lỏng: chỉ kiểm tra là mảng, không kiểm tra <= SECT_QUEST_SLOTS
+      const laxQuestCount = (q: unknown) => Array.isArray(q);
+      expect(laxQuestCount(["st_tru_lang", "st_nop_nanh", "st_tru_ho", "st_extra"])).toBe(true);
+
+      // auditSectSaveData THẬT bắt buộc phát hiện lỗi:
+      const raw = JSON.stringify({
+        ...validSect,
+        members: [
+          {
+            ...validSect.members[0],
+            today: {
+              day: "2026-11-17",
+              earned: 0,
+              quests: ["st_tru_lang", "st_nop_nanh", "st_tru_ho", "st_extra"],
+            },
+          },
+        ],
+      });
+      expect(auditSectSaveData(raw, raw.length).map((e) => e.code)).toContain(
+        "sect_member_today_quests_exceed_slots",
+      );
     });
 
     it("quét thư mục sects/: phát hiện lệch tên file, trùng tên, trùng tag, và thành viên ở 2 tông môn", () => {
