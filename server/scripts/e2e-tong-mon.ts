@@ -38,7 +38,6 @@ import {
   roomNameOf,
   sectFailMessage,
   sectQuestCh,
-  sectQuestSlots,
 } from "@tien-gioi/shared";
 import { Tab, shown, sleep, listenWithRetry, removeTmpDirs, getChromeGpuFlags } from "./e2e-kit";
 import { ACT_CONFIRM_GUARD_MS } from "../../client/src/act-confirm";
@@ -683,7 +682,6 @@ async function main() {
       if (ctrlOf(B.name).coin !== coinBefore) throw new Error("Trả nhiệm vụ không được đụng ví");
 
       // --- cửa hàng: đổi một món qua giao diện (trừ cống hiến, thêm đồ, ghi số đã mua, lưu hồ sơ) ---
-      const sectNow = sectOnDisk();
       await (store as any).update(sectId, (sc: any) => ({
         ...sc,
         points: 40_000, // cấp tối đa: mọi món mở khoá
@@ -691,7 +689,6 @@ async function main() {
           m.name === B.name ? { ...m, contrib: 500, merit: Math.max(m.merit ?? 0, 500) } : m,
         ),
       }));
-      void sectNow;
       await reopenHall();
       h0 = await hall();
       const item = h0.shop.find((e: any) => e.locked === null && e.limitDay >= 2);
