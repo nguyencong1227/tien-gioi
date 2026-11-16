@@ -300,12 +300,24 @@ async function main() {
       await tap(yes1.x, yes1.y);
       // `click` "ma" do trình duyệt tạo sau khi nhả ngón (cảm ứng: hộp đóng ở pointerdown nên click rơi xuống nút bên dưới): giả lập ngay sau khi hộp đóng
       await sleep(100);
-      await evalJs(`document.querySelector('[data-nav="stone:khac"]').click(); 1`);
+      await evalJs(
+        `document.querySelector('[data-nav="stone:khac"]').dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 })); 1`,
+      );
       await sleep(600);
       check(
         !(await box()).open && (await duyen()) === 490,
         `xác nhận sau cửa sổ chống click ma: trừ Duyên đúng MỘT lần (${await duyen()})`,
       );
+      // thao tác bằng BÀN PHÍM / lập trình (click có detail = 0) ngay sau khi hộp đóng KHÔNG phải click ma: vẫn mở được hộp mới
+      await evalJs(`document.querySelector('[data-nav="stone:khac"]').click(); 1`);
+      await sleep(200);
+      check(
+        (await box()).open,
+        "click bàn phím (detail 0) ngay sau khi đóng hộp: mở hộp mới, không bị coi là click ma",
+      );
+      await sleep(400);
+      await key("KeyX", "x", 88);
+      await sleep(400);
 
       console.log(
         "  [2] 'Giữ lại' / Esc / X: không trừ Duyên; Esc chỉ đóng hộp, KHÔNG đóng Hoàng Tuyền",

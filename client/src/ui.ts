@@ -727,6 +727,14 @@ let actConfirmFromShop = false;
 /** Lúc hộp xác nhận đóng gần nhất (ms, `performance.now`). Hộp đóng ngay ở `pointerdown`, nên `click` do trình duyệt tạo sau khi nhả ngón rơi xuống nút ở DƯỚI hộp (nút Bán): bỏ qua `click` trong cửa sổ chống click ma. */
 let actConfirmClosedAt = -1e12;
 
+/**
+ * `click` "ma" (chuột / chạm: `detail > 0`) ngay sau khi hộp xác nhận vừa đóng, rơi xuống nút bên dưới hộp. Thao tác bằng BÀN PHÍM (Enter / Cách: `detail === 0`) hoặc lập trình thì không
+ * phải click ma, không chặn (người dùng bàn phím xác nhận bằng Y rồi bấm Enter ngay phải được).
+ */
+function ghostClick(e: MouseEvent): boolean {
+  return e.detail > 0 && inConfirmGuard(actConfirmClosedAt, performance.now());
+}
+
 /** Mở hộp xác nhận: nêu hậu quả bằng chữ; "Giữ lại" được focus; `onOk` chỉ chạy khi bấm xác nhận SAU cửa sổ chống click ma. */
 function askActConfirm(spec: ConfirmSpec, onOk: () => void, opener: HTMLElement | null) {
   actConfirmAction = onOk;
@@ -2179,7 +2187,7 @@ function renderShopSellImpl() {
         e.preventDefault();
         e.stopPropagation();
         // click "ma" sau khi vừa xác nhận / giữ lại ở hộp (cảm ứng): không mở lại hộp, không bán lần nữa
-        if (inConfirmGuard(actConfirmClosedAt, performance.now())) return;
+        if (ghostClick(e)) return;
         // Đồ quý / trang bị: hộp xác nhận (issue #779); đồ thường bán thẳng
         const plan = sellPlan(invSlots, i, qty, unitPrice, {
           name: def.name,
@@ -2596,9 +2604,9 @@ function renderLimboStoneListImpl() {
         btn.title = `Thiếu ${cost - activeSoulView.duyen} Duyên`;
       } else {
         btn.disabled = false;
-        btn.addEventListener("click", () => {
+        btn.addEventListener("click", (e) => {
           // click "ma" sau khi vừa đóng hộp xác nhận (cảm ứng: hộp đóng ở pointerdown, click rơi xuống nút bên dưới): bỏ qua
-          if (inConfirmGuard(actConfirmClosedAt, performance.now())) return;
+          if (ghostClick(e)) return;
           const duyen = activeSoulView?.duyen ?? 0;
           const plan = unlockPlan(`${def.name} nấc ${currentLv + 1}`, cost, duyen);
           if (!plan) return;
@@ -2664,8 +2672,8 @@ function renderLimboStoneListImpl() {
         btn.title = `Thiếu ${o.cost - activeSoulView.duyen} Duyên`;
       } else {
         btn.disabled = false;
-        btn.addEventListener("click", () => {
-          if (inConfirmGuard(actConfirmClosedAt, performance.now())) return; // click ma sau khi đóng hộp
+        btn.addEventListener("click", (e) => {
+          if (ghostClick(e)) return; // click ma sau khi đóng hộp
           const duyen = activeSoulView?.duyen ?? 0;
           const plan = unlockPlan(`xuất thân ${o.name}`, o.cost, duyen);
           if (!plan) return;
@@ -5109,9 +5117,9 @@ export const ui = {
     const rebirthBtn = $("limbo-btn-rebirth");
     if (rebirthBtn) {
       rebirthBtn.removeAttribute("aria-disabled");
-      rebirthBtn.onclick = () => {
+      rebirthBtn.onclick = (e) => {
         if (rebirthBusy) return; // đã gửi, đang chờ máy chủ: máy chủ cũng bỏ tin `rebirth` thứ hai
-        if (inConfirmGuard(actConfirmClosedAt, performance.now())) return; // click ma sau khi đóng hộp xác nhận (cảm ứng)
+        if (ghostClick(e)) return; // click ma sau khi đóng hộp xác nhận (cảm ứng)
         const soul = activeSoulView;
         const choice: RebirthChoice = { origin: selectedOrigin, keep: selectedRelics };
         // `engrave` CHỈ khi người chơi đã đổi tập chiêu khắc (vắng = giữ nguyên chiêu đã khắc); kẹp lại theo danh sách / nấc hiện hành
