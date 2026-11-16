@@ -1605,7 +1605,7 @@ Mục 42 (`QUYET_DINH_M3.md`) và thiết kế trùm `docs/THIET_KE_TRUM.md` (Is
 ### 29.2. Kịch bản thực nghiệm & Phương pháp kiểm chứng
 Kịch bản được tích hợp và kiểm thử tự động tại `server/scripts/boss-bot-stress.test.ts`:
 - **Môi trường:** máy chủ Colyseus thật khởi động trong tiến trình (`WorldRoom`), cổng mạng ngẫu nhiên cấp bởi `listenWithRetry`, kết nối bằng `colyseus.js` Client. Kênh chuyển phát cảnh báo `fx` là sự kiện WebSocket giữa máy chủ và client.
-- **Hình mẫu hình học cảnh báo của test:** sử dụng 3 dạng hình học chuẩn tắc được định nghĩa trong `shared/src/boss-geom.ts` (chưa gắn với số liệu chiêu thức trùm thật của Xích Mãng / Hắc Giao / Thiên Hàn Vương — dữ liệu trùm thật thuộc issue #872):
+- **Hình mẫu hình học cảnh báo của test:** sử dụng 3 dạng hình học chuẩn tắc với các thông số đặt thẳng trong `server/scripts/boss-bot-stress.test.ts` (chưa gắn với số liệu chiêu thức trùm thật của Xích Mãng / Hắc Giao / Thiên Hàn Vương — dữ liệu trùm thật thuộc issue #872):
   + Vành khuyên: tâm `(1000, 1000)`, `r = 150`, `r0 = 50`, báo trước 800 ms.
   + Nón quạt: tâm `(1000, 1000)`, `r = 250`, góc quét 0° (hướng sang phải), `arc = 90°`, báo trước 1000 ms.
   + Đường thẳng: xuất phát `(1000, 1000)`, đích `(1300, 1000)`, chiều rộng `w = 60`, báo trước 800 ms.
