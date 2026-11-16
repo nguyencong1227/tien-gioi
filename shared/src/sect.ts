@@ -602,7 +602,7 @@ const FAIL_MESSAGES: Record<SectFail, string> = {
   vault_changed: "Kho đồ vừa có người lấy hoặc thêm đồ, hãy xem lại rồi thử lần nữa.",
   vault_limit: "Hôm nay ngươi đã dùng hết lượt rút kho đồ, hoặc số món vượt mức cho phép mỗi lượt.",
   vault_denied: "Món đồ này không được góp vào kho tông môn.",
-  vault_locked: "Kiếp này của ngươi còn quá mới, chưa được rút đồ trong kho tông môn.",
+  vault_locked: "Kiếp này của ngươi còn quá mới, chưa được rút của kho tông môn.",
   bag_full: "Túi đồ của ngươi không đủ chỗ.",
   item_invalid: "Món đồ hoặc số lượng không hợp lệ.",
 };
