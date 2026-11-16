@@ -288,6 +288,68 @@ async function main() {
         "chiêu lạ vẫn báo 'Đang vận chiêu' (không im lặng)",
       );
 
+      // ---- hoạt ảnh gồng / đáp trên THÂN trùm (boss-cast-anim.ts): co thấp + nở ngang + ánh đỏ cam, đáp bật vươn rồi trả về ----
+      // (mock chạy ở bậc đồ hoạ Thấp: tín hiệu chiến đấu vẫn phải chạy)
+      const samplePose = (ms) =>
+        evalJs(`(async () => {
+          const e = window.__scene.monsters.get("m1");
+          const out = [];
+          const t0 = performance.now();
+          while (performance.now() - t0 < ${ms}) {
+            out.push({ t: performance.now() - t0, sx: e.sprite.scaleX, sy: e.sprite.scaleY, glow: e.bossGlow || 0, tinted: !!e.sprite.isTinted });
+            await new Promise((r) => setTimeout(r, 16));
+          }
+          return out;
+        })()`);
+      const near1 = (v) => Math.abs(v - 1) < 1e-6;
+      await sleep(1100); // chiêu lạ ở trên (800 ms + thời gian đáp) đã xong
+      let ser = await samplePose(120);
+      let last = ser[ser.length - 1];
+      check(
+        near1(last.sx) && near1(last.sy) && last.glow === 0 && !last.tinted,
+        `không vận chiêu: thân trùm đứng yên (tỉ lệ ${last.sx.toFixed(3)} x ${last.sy.toFixed(3)}, không ánh)`,
+      );
+      await fx({ kind: "bossCast", by: "m1", x: 0, y: 0, ability: "quat_duoi", ms: 1200 });
+      ser = await samplePose(1200 + 160 + 400);
+      const wind = ser.filter((p) => p.t < 1100);
+      check(
+        wind.some((p) => p.sx > 1.01 && p.sy < 0.99 && p.tinted && p.glow >= 3),
+        "gồng: thân co thấp + nở ngang + ánh đỏ cam (cuối chiêu: " +
+          `${wind.at(-1).sx.toFixed(3)} x ${wind.at(-1).sy.toFixed(3)}, ánh ${wind.at(-1).glow}/8)`,
+      );
+      check(
+        wind.every((p, i) => i === 0 || p.glow >= wind[i - 1].glow),
+        "gồng: ánh chỉ tăng, không giật lùi",
+      );
+      check(
+        ser.some((p) => p.sy > 1.02 && p.sx < 0.99),
+        `đáp: thân bật vươn cao + hẹp ngang (đỉnh ${Math.max(...ser.map((p) => p.sy)).toFixed(3)} dọc)`,
+      );
+      last = ser[ser.length - 1];
+      check(
+        near1(last.sx) && near1(last.sy) && last.glow === 0 && !last.tinted,
+        "hết đáp: tỉ lệ về đúng 1 x 1 và hết ánh (không kẹt tỉ lệ / màu lệch)",
+      );
+      // giảm chuyển động: KHÔNG co giãn, chỉ còn ánh màu
+      await evalJs(
+        `(() => { const c = document.getElementById("set-reduced-motion"); c.checked = true; c.dispatchEvent(new Event("change")); return 1; })()`,
+      );
+      await fx({ kind: "bossCast", by: "m1", x: 0, y: 0, ability: "quat_duoi", ms: 1000 });
+      ser = await samplePose(1000 + 160 + 300);
+      check(
+        ser.every((p) => near1(p.sx) && near1(p.sy)),
+        "giảm chuyển động: thân trùm KHÔNG co giãn lúc nào",
+      );
+      check(
+        ser.some((p) => p.tinted && p.glow >= 4),
+        "giảm chuyển động: vẫn có ánh màu báo gồng (tên chiêu bằng chữ trên thanh là dấu hiệu thứ hai)",
+      );
+      last = ser[ser.length - 1];
+      check(last.glow === 0 && !last.tinted, "giảm chuyển động: hết đáp thì hết ánh");
+      await evalJs(
+        `(() => { const c = document.getElementById("set-reduced-motion"); c.checked = false; c.dispatchEvent(new Event("change")); return 1; })()`,
+      );
+
       // ---- bossPhase / bossEnrage ----
       await fx({ kind: "bossPhase", by: "m1", x: 0, y: 0, phase: 1 });
       await tick();

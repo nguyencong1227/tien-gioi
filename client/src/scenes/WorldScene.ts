@@ -228,6 +228,15 @@ import {
 } from "../map-render";
 import { moveVector } from "../move-input";
 import { BossFxTracker, pickBossForBar, type BossCand } from "../boss-bar";
+import {
+  BOSS_STRIKE_MS,
+  NEUTRAL_POSE,
+  bossCastPose,
+  bossGlowStep,
+  bossGlowTint,
+  composeTween,
+  type BossCastPose,
+} from "../boss-cast-anim";
 import { BossBarDom } from "../boss-bar-ui";
 import { MoveKeys } from "../move-keys";
 import { StopBurst } from "../move-stop";
@@ -320,6 +329,8 @@ interface Entity {
   spriteBaseY?: number;
   tweenPhase?: number;
   tweenActive?: boolean;
+  /** Bậc ánh đỏ cam đang áp lên sprite trùm khi vận chiêu (0 = không; `boss-cast-anim.ts`), để chỉ gọi `setTint` khi đổi bậc */
+  bossGlow?: number;
   /** Khoảng cách tới nhân vật của mình (px) do `animDue` tính ở khung này; `stepTween` dùng lại (không tính `Math.hypot` lần nữa). */
   distMe?: number;
 }
@@ -3472,6 +3483,7 @@ export class WorldScene extends Phaser.Scene {
       if (!e.root.visible) e.root.setVisible(true);
       if (e.sprite.anims.isPaused) e.sprite.anims.resume();
       if (this.animDue(e)) this.updateMonsterAnim(e);
+      const pose = def.boss ? this.bossPose(e, id) : NEUTRAL_POSE;
       this.stepTween(
         e,
         false,
@@ -3479,6 +3491,7 @@ export class WorldScene extends Phaser.Scene {
         false,
         e.monAnim ? sinceStart(this.time.now, e.monAnim.attackUntil, monAnimMs("attack")) : -1,
         e.monAnim ? sinceStart(this.time.now, e.monAnim.hurtUntil, monAnimMs("hurt")) : -1,
+        pose,
       );
       this.syncShadow(e);
       e.root.setDepth(e.root.y);
@@ -3504,6 +3517,10 @@ export class WorldScene extends Phaser.Scene {
     for (const [id, e] of this.monsters) {
       if (seen.has(id)) continue;
       this.stepTween(e, false, false, true, -1, -1); // gục: trả sprite về tỉ lệ gốc (nhát chí mạng đang nén dở thì không kẹt tỉ lệ lệch)
+      if (e.bossGlow) {
+        e.bossGlow = 0;
+        e.sprite.clearTint(); // trùm gục giữa lúc vận chiêu: không giữ ánh đỏ cam lên hình đổ
+      }
       if (e.root.visible) {
         // Quái biến khỏi state khi đang hiện trong màn hình = gục: tan thành điểm sáng (ngoài camera thì root ẩn, không vào đây)
         // Chỉ khi còn gần mình: quái rời vùng nhìn của server (xa hơn 1100 px) cũng biến khỏi state nhưng KHÔNG gục
@@ -3700,6 +3717,21 @@ export class WorldScene extends Phaser.Scene {
   }
 
   /**
+   * Tư thế gồng / đáp của trùm `id` lúc này (`boss-cast-anim.ts`) và áp ánh đỏ cam lên sprite (chỉ gọi `setTint` khi đổi bậc). Không vận chiêu: trung tính, trả sprite về màu gốc đúng một lần.
+   */
+  private bossPose(e: Entity, id: string): Readonly<BossCastPose> {
+    const tm = this.bossFx.castTiming(id, this.time.now, BOSS_STRIKE_MS);
+    const pose = tm ? bossCastPose(tm.elapsedMs, tm.castMs, animReducedMotion()) : NEUTRAL_POSE;
+    const step = bossGlowStep(pose.glow);
+    if (step !== (e.bossGlow ?? 0)) {
+      e.bossGlow = step;
+      if (step === 0) e.sprite.clearTint();
+      else e.sprite.setTint(bossGlowTint(step));
+    }
+    return pose;
+  }
+
+  /**
    * Tween nhẹ mỗi khung (gfx/anim/tween.ts): nhấp nhô khi đi, co giãn khi đánh / bị đánh. Tắt khi giảm chuyển động, bậc Thấp, ở xa
    * (`tweenEnabled`); lúc tắt trả sprite về vị trí / tỉ lệ gốc đúng MỘT lần rồi không ghi gì nữa (không tốn mỗi khung).
    */
@@ -3710,9 +3742,10 @@ export class WorldScene extends Phaser.Scene {
     dead: boolean,
     strikeSince: number,
     hurtSince: number,
+    pose: Readonly<BossCastPose> = NEUTRAL_POSE,
   ) {
     const near = me || (e.distMe ?? Number.POSITIVE_INFINITY) < FAR_ANIM_DIST;
-    const t = spriteTween({
+    const base = spriteTween({
       enabled: tweenEnabled(getQuality(), near),
       nowMs: this.time.now,
       moving,
@@ -3721,6 +3754,8 @@ export class WorldScene extends Phaser.Scene {
       hurtSince,
       phaseMs: (e.tweenPhase ??= Math.random() * WALK_BOB_PERIOD_MS),
     });
+    // Trùm đang vận chiêu: gồng / đáp nhân lên tween nền (kể cả bậc Thấp / ở xa: đây là tín hiệu chiến đấu, không phải trang trí)
+    const t = composeTween(base, pose);
     if (t === NEUTRAL_TWEEN) {
       if (!e.tweenActive) return;
       e.tweenActive = false;

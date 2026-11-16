@@ -161,6 +161,39 @@ describe("BossFxTracker.modelOf: mô hình thanh", () => {
   });
 });
 
+describe("BossFxTracker.castTiming: thời gian gồng cho hoạt ảnh trên thân trùm", () => {
+  it("không có chiêu: null; có chiêu: thời gian đã trôi + thời lượng gồng, cùng bản ghi với thanh máu", () => {
+    const t = new BossFxTracker();
+    expect(t.castTiming("b1", 1000)).toBeNull();
+    t.onCast("b1", "x", 1200, 1000);
+    expect(t.castTiming("b1", 1000)).toEqual({ elapsedMs: 0, castMs: 1200 });
+    expect(t.castTiming("b1", 1700)).toEqual({ elapsedMs: 700, castMs: 1200 });
+    expect(t.castTiming("khac", 1700)).toBeNull();
+  });
+
+  it("hết gồng (không có thời gian đáp) thì null; có `graceMs` thì còn thêm đúng chừng đó", () => {
+    const t = new BossFxTracker();
+    t.onCast("b1", "x", 1000, 0);
+    expect(t.castTiming("b1", 999)).not.toBeNull();
+    expect(t.castTiming("b1", 1000)).toBeNull();
+    expect(t.castTiming("b1", 1000, 160)).toEqual({ elapsedMs: 1000, castMs: 1000 });
+    expect(t.castTiming("b1", 1159, 160)).not.toBeNull();
+    expect(t.castTiming("b1", 1160, 160)).toBeNull();
+  });
+
+  it("đồng hồ lùi / số hỏng / `forget` / chiêu mới ghi đè: không ném, không trả bậy", () => {
+    const t = new BossFxTracker();
+    t.onCast("b1", "x", 1000, 5000);
+    expect(t.castTiming("b1", 4000)).toBeNull();
+    expect(t.castTiming("b1", NaN)).toBeNull();
+    expect(t.castTiming("b1", 5100, NaN)).toBeNull();
+    t.onCast("b1", "y", 500, 6000);
+    expect(t.castTiming("b1", 6100)).toEqual({ elapsedMs: 100, castMs: 500 });
+    t.forget("b1");
+    expect(t.castTiming("b1", 6100)).toBeNull();
+  });
+});
+
 describe("bossBarText (đọc cho màn hình đọc)", () => {
   it("nêu tên, phần trăm và giai đoạn (chỉ khi có nhiều giai đoạn)", () => {
     const t = new BossFxTracker();
