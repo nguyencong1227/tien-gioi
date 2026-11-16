@@ -6,6 +6,7 @@ import {
   REALMS,
   statsFor,
   expToNext,
+  canAttemptBreakthrough,
   isLastTier,
   isPeak,
   breakthroughChance,
@@ -72,7 +73,7 @@ export function breakthrough(w: World, sid: string) {
   if (w.now < c.nextBreak) return;
   if (isPeak(p.realm, p.tier))
     return w.events.toast(sid, { text: "Đã tới đỉnh tiên đồ.", tone: "info" });
-  if (!isLastTier(p.realm, p.tier) || p.exp < p.expMax) {
+  if (!canAttemptBreakthrough(p.realm, p.tier, p.exp, p.expMax)) {
     return w.events.toast(sid, {
       text: `Chưa đủ hỏa hầu. Cần đạt đỉnh ${REALMS[p.realm].name} với đầy tu vi.`,
       tone: "info",

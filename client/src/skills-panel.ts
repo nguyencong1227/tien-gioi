@@ -68,6 +68,9 @@ export function effectText(e: SkillEffect): string {
     case "regen":
       body = ` (hồi ${pct(e.ratio)}% khí huyết tối đa mỗi giây)`;
       break;
+    case "breakAid":
+      body = ` (cộng ${pct(e.ratio)}% xác suất đột phá lần kế)`;
+      break;
     case "stun":
       body = "";
       break;

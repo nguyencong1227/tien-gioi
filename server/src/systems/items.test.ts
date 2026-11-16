@@ -104,6 +104,7 @@ describe("dùng đan dược", () => {
     const { p } = addPlayer(w, "a", 1, 0);
     giveItem(w, "a", "tu_khi_dan", 1);
     const e = ITEM_BY_ID.tu_khi_dan.effect!;
+    if (e.kind !== "exp") throw new Error("Tụ Khí Đan phải có hiệu ứng exp");
     p.exp = p.expMax * 0.99;
     const before = p.expMax;
     useItem(w, "a", 0);

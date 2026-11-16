@@ -29,8 +29,7 @@ import {
   statsFor,
   canEquip,
   realmLabel,
-  isLastTier,
-  isPeak,
+  canAttemptBreakthrough,
   expToNext,
   stepProgress,
   questReady,
@@ -4462,7 +4461,7 @@ export const ui = {
       cachedMeditating = p.meditating;
       $("sk-med").classList.toggle("on", p.meditating);
     }
-    const canBreak = isLastTier(p.realm, p.tier) && p.exp >= p.expMax && !isPeak(p.realm, p.tier);
+    const canBreak = canAttemptBreakthrough(p.realm, p.tier, p.exp, p.expMax);
     if (canBreak !== cachedCanBreak) {
       cachedCanBreak = canBreak;
       $("sk-break").classList.toggle("ready", canBreak);

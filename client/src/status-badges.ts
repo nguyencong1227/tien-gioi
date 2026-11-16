@@ -46,6 +46,8 @@ export function effectText(def: StatusDef, ratio: number | undefined): string {
       return pct > 0 ? `tăng ${pct}% tốc độ di chuyển` : "tăng tốc độ di chuyển";
     case "regen":
       return "hồi khí huyết mỗi giây";
+    case "breakAid":
+      return pct > 0 ? `cộng ${pct}% xác suất đột phá lần kế` : "cộng xác suất đột phá lần kế";
   }
 }
 
@@ -54,6 +56,7 @@ function ratioTag(def: StatusDef, ratio: number | undefined): string {
   if (ratio === undefined || !(ratio > 0)) return "";
   if (def.kind === "haste") return ` +${Math.round(ratio * 100)}%`;
   if (def.kind === "slow") return ` −${Math.round(ratio * 100)}%`;
+  if (def.kind === "breakAid") return ` +${Math.round(ratio * 100)}%`;
   return "";
 }
 

@@ -3,7 +3,7 @@
 
 import { SKILL_BOOK_ITEMS, bookIdOf } from "./books";
 import { STAT_CAPS } from "./stat-caps";
-import type { Element } from "./skills";
+import type { Element, StatusId } from "./skills";
 import { OWNER_GEAR_ITEMS } from "./owner-gear";
 
 export type ItemType = "consumable" | "material" | "equip" | "book";
@@ -29,7 +29,37 @@ export const RARITY_COLORS = [0xc9c4b8, 0x6fcf73, 0x4fa3ff, 0xc277ff, 0xffb23f] 
 export type ItemEffect =
   | { kind: "healHp"; pct: number }
   | { kind: "healMp"; pct: number }
-  | { kind: "exp"; pct: number; maxExp?: number };
+  | { kind: "exp"; pct: number; maxExp?: number }
+  /**
+   * Nghề nhỏ (#514): dùng vật phẩm thì GẮN trạng thái CÓ LỢI `id` lên người dùng (đan hộ đạo `dao_ho`; sau này phù / đan tăng cường), thời gian
+   * `ms`, cường độ `ratio`. Máy chủ KHÔNG tin số trong dữ liệu: kẹp bằng `clampStatusEffect` theo `STATUSES` (`maxMs`, `maxRatio`).
+   * `forRealm` (chỉ đan hộ đạo): cảnh giới đang đứng ở đỉnh để đột phá lên `forRealm + 1`; đan sai bậc bị từ chối, KHÔNG trừ đan.
+   */
+  | { kind: "status"; id: StatusId; ratio: number; ms: number; forRealm?: number };
+
+/**
+ * Những chuỗi người chơi phải thấy trong `desc` của vật phẩm có `ItemEffect` kind `status`: phần trăm làm tròn ("12%" hoặc "12 %", chấp nhận cả hai
+ * kiểu viết) và thời gian ("900 giây", thêm "15 phút" khi chẵn phút). `pct` rỗng khi `ratio` làm tròn về 0 (không có số để nêu).
+ */
+export function statusEffectFigures(e: { ratio: number; ms: number }): {
+  pct: string[];
+  time: string[];
+} {
+  const p = Math.round(e.ratio * 100);
+  const secs = Math.round(e.ms / 1000);
+  const time = [`${secs} giây`];
+  if (secs > 0 && secs % 60 === 0) time.push(`${secs / 60} phút`);
+  return { pct: p > 0 ? [`${p}%`, `${p} %`] : [], time };
+}
+
+/** `desc` có nêu ĐÚNG con số của hiệu ứng trạng thái không (xem `statusEffectFigures`): D viết tay, A chỉnh số thì lệch; test hợp đồng bắt. */
+export function statusDescMatches(desc: string, e: { ratio: number; ms: number }): boolean {
+  const f = statusEffectFigures(e);
+  return (
+    (f.pct.length === 0 || f.pct.some((s) => desc.includes(s))) &&
+    f.time.some((s) => desc.includes(s))
+  );
+}
 
 /** Tu vi một viên đan tu vi cho khi thanh tu vi tối đa là `expMax`: `round(expMax * pct)`, cắt ở `maxExp` nếu có; luôn số nguyên >= 0. */
 export function expPillGain(effect: { pct: number; maxExp?: number }, expMax: number): number {
