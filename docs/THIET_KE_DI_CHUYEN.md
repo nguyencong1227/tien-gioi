@@ -32,3 +32,30 @@ Sửa: `applyInputs(map, p, c, dtMs)` cộng `dtMs / TICK_MS` (đồng hồ phò
 ## 3. Còn lại của mục 25 (kế hoạch)
 - **A:** (xong, #783) hàng đợi theo thời gian thật; (xong) số đo `/metrics`: `tiengioi_room_input_dropped_total`, `tiengioi_room_input_backlog_ticks_total` (`docs/VAN_HANH.md`) để thấy lỗi mạng của người dùng trên bản chạy thật; (tiếp, chỉ làm nếu số đo thật cho thấy cần) client giữ lại một bước khi `pending` dài dai dẳng.
 - **B (client, #784 đã vào `main`):** bàn phím theo `event.code` (`move-keys.ts`; bộ gõ Telex / VNI làm Phaser mất phím: `key = Process`, `keyCode = 229`), quên phím khi `blur` / `pagehide` / `contextmenu` / ẩn tab / vào ô chat, chỉ ô NHẬP CHỮ chặn đi bộ, tự gỡ mục sót trong ngăn xếp bảng; còn lại: báo mất kết nối / lag sớm hơn ngưỡng nhịp tim 8 giây.
+
+## 4. "Trôi như liệt phím" (mục 41 QUYET_DINH_M3, v0.3.2)
+**Triệu chứng (người dùng, v0.3.1):** nhả phím rồi nhân vật vẫn đi tiếp một lúc (tới vài giây), như phím bị liệt.
+
+**Nguyên nhân (đọc mã + mô phỏng):** mạng nhà đứng rồi xả dồn (mục 18.5) làm hàng đợi input (`c.inputs`) đầy input CŨ. Hàng đợi tới 60 input (3 giây) và máy chủ áp MỌI input theo token bucket thời gian thật (1 bước / 50 ms): nên sau khi gói dồn tới, máy chủ còn đi tiếp cả quãng đường đã đoán mà người chơi đã nhả phím từ lâu, tới ~3 giây. Client đối chiếu theo `lastSeq` nên kéo nhân vật đi theo.
+
+**Số đo (mô phỏng đồng hồ ảo, cùng kịch bản trước / sau; `systems/movement-drift.test.ts`):** máy chủ đứng yên hẳn sau khi gói dồn tới bao lâu, và đi thêm bao nhiêu px:
+| kịch bản | trước (v0.3.1) | sau |
+|---|---|---|
+| mạng đứng 2 s, client cũ (không input dừng) | 1,5 s / 300 px | 0,25 s / 113 px |
+| mạng đứng 2 s, client mới (3 input dừng) | 1,5 s / 300 px | 0 s / 15 px |
+| mạng đứng 3 s, client cũ | 2,5 s / 450 px | 0,25 s / 113 px |
+| mạng đứng 3 s, client mới | 2,5 s / 450 px | 0 s / 15 px |
+| mạng đứng 0,4 s, client mới | 0 s / 60 px | 0 s / 15 px |
+
+**Sửa (`systems/movement.ts`):**
+1. **Backlog <= `MAX_INPUT_BACKLOG` = 5 input (0,25 giây):** trước khi áp, input CŨ NHẤT vượt (số bước áp được tick này theo ngân sách + 5) bị BỎ (giữ thứ tự `seq`); `applyInputs` trả số đã bỏ, `tickWorld` cộng vào `World.inputStats.dropped`. `INPUT_BACKLOG_WARN` 6 -> 4 (backlog sau áp nay <= 5). Chặn cứng 64 lúc nhận (bỏ input CŨ NHẤT, trước đây bỏ input MỚI).
+2. **Input dừng cắt hàng đợi:** input có hướng gần 0 (`dx = dy = 0`, ngưỡng 0,05 như `applyInputs`) cắt hàng đợi còn `STOP_KEEP_INPUTS` = 2 input cũ nhất rồi xếp vào: nhả phím thì dừng trong <= 3 tick dù hàng đợi đang đầy; sau khi áp `lastSeq` = seq của input dừng nên client bỏ hết pending cũ. Giữ lại 1-2 input cũ nhất vì ở mạng tốt luôn có 1-2 input "đang bay" mà client đã đoán trước: xoá sạch thì MỖI lần dừng nhân vật bị kéo giật lùi 1-2 bước (7-15 px).
+3. **Chống chạy nhanh giữ nguyên:** `MAX_MOVE_BUDGET` 10 bước, tốc độ bền vững 1 bước / 50 ms thật; input dừng không cho thêm bước (còn mất input); test 1000 cặp (đi, dừng) trong một nhịp.
+
+**Hợp đồng với client (B, PR `b/di-chuyen-dung-muot`):** khi hết phím, client gửi NGAY một input `{ seq: ++seq, dx: 0, dy: 0 }` (không chờ nhịp 20 Hz), lặp thêm 2 lần ở hai bước 50 ms kế tiếp (seq liên tiếp tăng dần, huỷ lặp nếu đi lại). Máy chủ cũ coi nó là bước không di chuyển nên tương thích ngược; client cũ không gửi input dừng vẫn được cắt backlog <= 0,25 giây. Không đổi `shared/` hay `PROTOCOL_VERSION`.
+
+**Cái giá (người dùng đã chọn):** một lần mạng đứng LÂU hơn (ngân sách 0,5 giây + backlog 0,25 giây) làm nhân vật bị kéo lại một đoạn (client hấp thụ: nội suy nếu nhỏ, dịch tức thời nếu lệch lớn) thay vì trôi tiếp. Backlog đứng yên <= 5 input sau một đợt dồn vẫn còn (token bucket không xả nhanh hơn thời gian thật), nên vị trí máy chủ có thể tụt sau client tới 0,25 giây cho tới khi người chơi dừng.
+
+**Theo dõi bản chạy thật:** `/metrics` `tiengioi_room_input_dropped_total` (nay gồm cả input cũ bị bỏ và bị input dừng cắt: sẽ TĂNG so với v0.3.1, bình thường) và `tiengioi_room_input_backlog_ticks_total` (số lượt backlog sau áp >= 4: nên gần 0 khi mạng tốt). Ghi số TRƯỚC khi nâng cấp để so.
+
+**Phát hiện lúc làm phòng thật (rate limiter):** tin `input` có giới hạn tần suất (`MESSAGE_LIMITS.input`, token bucket). Burst cũ 40 làm đợt xả dồn sau mạng đứng > 2 giây bị bỏ đúng PHẦN ĐUÔI của đợt (chính các tin DỪNG nằm cuối, vì TCP giao đúng thứ tự), nên nhả phím mà máy chủ không bao giờ thấy tin dừng. Nâng `burst` lên **100** (= 5 giây ở 20 Hz; nhịp tim ứng dụng coi là chết sau 8 giây); spam bền vững trên 30 tin / giây vẫn bị bỏ rồi ngắt. Test phòng thật `rooms/WorldRoom.movement.test.ts` (client đệm 60-100 tin rồi xả dồn + 3 tin dừng): đột biến "burst về 40" làm 4 ca ĐỎ.

@@ -214,6 +214,10 @@ function hallMsgFor(w: World, sect: Sect, soulKey: string) {
  */
 function broadcastSect(w: World, sect: Sect, removed: { soulKey: string; name: string }[] = []) {
   const book = w.hub.sects;
+  // Mỗi thao tác nhận bản ghi NGAY sau `update` nhưng PHÁT sau khi lưu hồ sơ (chậm, thời gian khác nhau): hai thao tác đua nhau có thể phát bản CŨ SAU bản MỚI, và người chơi kẹt ở ảnh
+  // chụp cũ (kho còn món đã rút...). `updatedAt` tăng nghiêm ngặt theo từng lần ghi (`SectStore.update`) nên bản NHỚ mới hơn thì thay thế bản cũ vừa nhận (CI #864: "đua rút cùng 1 ô kho").
+  const known = book.cache.get(sect.id);
+  if (known && known.updatedAt > sect.updatedAt) sect = known;
   book.cache.set(sect.id, sect);
   book.lastPresence.delete(sect.id); // thành viên đổi: gửi lại presence ở nhịp tới
   for (const m of sect.members) {
