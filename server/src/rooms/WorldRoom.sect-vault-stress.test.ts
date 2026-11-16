@@ -25,7 +25,7 @@ import {
 } from "@tien-gioi/shared";
 import type { WorldRoom } from "./WorldRoom";
 import { listenWithRetry } from "../test-port";
-import { restoreSaves, slowSave } from "./test-save-hooks";
+import { restoreSaves, slowSave, slowSaveFor } from "./test-save-hooks";
 
 const dataDir = mkdtempSync(path.join(tmpdir(), "tien-gioi-vault-stress-"));
 
@@ -338,4 +338,52 @@ describe("WorldRoom sect-vault soak & stress (Issue #790 K6)", () => {
     // Số lượng rút ra không bao giờ vượt 25
     expect(withdrawn).toBeLessThanOrEqual(25);
   }, 25_000);
+
+  it("ảnh chụp kho KHÔNG bị bản cũ đè: người rút TRƯỚC lưu hồ sơ chậm hơn người rút SAU thì ảnh chụp cuối của mọi thành viên vẫn là số dư thật", async () => {
+    const Chu = await join(`OrdChu ${++seq}`, roomNameOf(DEFAULT_MAP_ID));
+    const Lao = await join(`OrdLao ${++seq}`, roomNameOf(DEFAULT_MAP_ID));
+    ctrlOf(Chu).coin = SECT_CREATE_COST + 1000;
+    Chu.room.send(SECT_MSG.create, { name: `Ord Sect ${seq}`, tag: `OR${seq % 1000}` });
+    await waitFor(() => lastSnap(Chu), 4000, "Chu lập tông môn");
+    Chu.room.send(SECT_MSG.invite, { name: Lao.name });
+    await waitFor(() => Lao.invited[0], 4000, "lời mời");
+    Lao.room.send(SECT_MSG.accept, { from: Chu.name });
+    await waitFor(() => lastSnap(Lao)?.myRank === "de_tu", 4000, "Lao nhận lời");
+    Chu.room.send(SECT_MSG.rank, { name: Lao.name, rank: "truong_lao" }); // Trưởng lão rút tự do, không dính hạn mức
+    await waitFor(() => lastSnap(Lao)?.myRank === "truong_lao", 4000, "Lao lên Trưởng lão");
+
+    addToInventory(ctrlOf(Chu).inv, MAT.id, 25);
+    await worldOf(Chu.room).onSaveNow(Chu.room.sessionId);
+    const slotChu = ctrlOf(Chu).inv.findIndex((s: any) => s?.itemId === MAT.id);
+    Chu.room.send(SECT_MSG.vaultDeposit, { slot: slotChu, qty: 25 });
+    await waitFor(() => countInSlots(lastVault(Lao)?.slots, MAT.id) === 25, 4000, "kho có 25");
+    const vSlot = (lastVault(Chu)?.slots ?? []).findIndex((s) => s?.itemId === MAT.id);
+
+    // Chu rút TRƯỚC (kho 25 -> 15) nhưng hồ sơ của Chu lưu CHẬM 600 ms; Lao rút SAU (15 -> 5) và lưu ngay: ảnh chụp "5" phát TRƯỚC ảnh chụp "15"
+    slowSaveFor(Chu.room, 600, [Chu.name]);
+    Chu.room.send(SECT_MSG.vaultWithdraw, { slot: vSlot, itemId: MAT.id, qty: 10 });
+    await waitFor(
+      () => countInSlots(ctrlOf(Chu).inv, MAT.id) === 10,
+      4000,
+      "Chu đã nhận 10 (kho 15)",
+    );
+    Lao.room.send(SECT_MSG.vaultWithdraw, { slot: vSlot, itemId: MAT.id, qty: 10 });
+    await waitFor(
+      () => countInSlots(ctrlOf(Lao).inv, MAT.id) === 10,
+      4000,
+      "Lao đã nhận 10 (kho 5)",
+    );
+
+    // Chờ cả hai thao tác xong hẳn (toast "Đã rút" của từng người), rồi kho thật còn 5: mọi thành viên PHẢI thấy 5, không được kẹt ở bản cũ 15
+    await waitFor(
+      () => [Chu, Lao].every((h) => h.toasts.some((t) => /^Đã rút /.test(t))),
+      8000,
+      "cả hai lượt rút xong",
+    );
+    await waitFor(
+      () => [Chu, Lao].every((h) => countInSlots(lastVault(h)?.slots, MAT.id) === 5),
+      4000,
+      "ảnh chụp kho cuối cùng của mọi thành viên = số dư thật (5), không phải bản cũ (15)",
+    );
+  });
 });

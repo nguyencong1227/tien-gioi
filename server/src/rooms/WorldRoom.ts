@@ -155,6 +155,7 @@ import {
   sectOnJoin,
   sectRank,
   sectTransfer,
+  sectHallGet,
   sectVaultDeposit,
   sectVaultPolicy,
   sectVaultWithdraw,
@@ -175,6 +176,7 @@ import {
 import { applyRebirth, creditSoul } from "../systems/reincarnation";
 import { RateLimiter } from "../rate-limit";
 import { audit, auditCoinThreshold } from "../audit";
+import { bossMovesOf } from "../systems/boss-config";
 import { testExpMultFor } from "../test-exp";
 import { defaultHub, type Hub } from "../hub";
 
@@ -236,6 +238,8 @@ export class WorldRoom extends Room<WorldState> {
    * (biến môi trường) gỡ tính năng: không có dịch vụ, mọi tin tông môn bị từ chối.
    */
   static sects: SectService | null = null;
+  /** "Chờ sang ngày mới kiếm được cống hiến" (M8; mặc định BẬT; `index.ts` đặt từ `SECT_EARN_WARMUP`, `off` chỉ để dev / E2E). */
+  static sectEarnWarmup = true;
   private static defaultSects: SectService | undefined;
   static sectService(): SectService | null {
     if (process.env.SECTS === "off") return null;
@@ -289,6 +293,7 @@ export class WorldRoom extends Room<WorldState> {
         sectPresence: (sid, msg) => this.sendTo(sid, SECT_MSG.presence, msg),
         sectInvited: (sid, msg) => this.sendTo(sid, SECT_MSG.invited, msg),
         sectVault: (sid, msg) => this.sendTo(sid, SECT_MSG.vault, msg),
+        sectHall: (sid, msg) => this.sendTo(sid, SECT_MSG.hall, msg),
         netShield: (sid, msg) => this.sendTo(sid, NET_MSG.shield, msg),
       },
       map,
@@ -296,9 +301,11 @@ export class WorldRoom extends Room<WorldState> {
     );
     // Chết do quái = luân hồi: lưu hồ sơ ở trạng thái Hoàng Tuyền, cộng Duyên, gửi màn hình Hoàng Tuyền
     w.reincarnate = true;
+    w.bossMoves = bossMovesOf(process.env); // bộ chiêu trùm (mục 42): mặc định tắt, `BOSS_MOVES=on` để bật
     w.onLimbo = (sid) => void this.enterLimbo(sid);
     // Tông môn (M3.6): dịch vụ dùng chung (`SECTS=off` gỡ gấp); lưu hồ sơ NGAY khi chuyển Linh thạch sang kho
     w.sectService = WorldRoom.sectService();
+    w.sectEarnWarmup = WorldRoom.sectEarnWarmup;
     w.sectNewLifeLockMs = newLifeLockMsOf(process.env); // cờ kiếp mới chưa được rút (mặc định tắt)
     // Nhật ký kiểm toán (M4 2.4): chỉ ghi khi `startAudit` đã bật ở index.ts
     w.audit = audit;
@@ -438,6 +445,7 @@ export class WorldRoom extends Room<WorldState> {
     this.on(SECT_MSG.motd, (sid, m) => void sectMotd(w, sid, m));
     this.on(SECT_MSG.deposit, (sid, m) => void sectDeposit(w, sid, m));
     this.on(SECT_MSG.withdraw, (sid, m) => void sectWithdraw(w, sid, m));
+    this.on(SECT_MSG.hallGet, (sid, m) => void sectHallGet(w, sid, m));
     this.on(SECT_MSG.vaultDeposit, (sid, m) => void sectVaultDeposit(w, sid, m));
     this.on(SECT_MSG.vaultWithdraw, (sid, m) => void sectVaultWithdraw(w, sid, m));
     this.on(SECT_MSG.vaultPolicy, (sid, m) => void sectVaultPolicy(w, sid, m));

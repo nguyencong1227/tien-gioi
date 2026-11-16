@@ -1,11 +1,15 @@
 // Bí cảnh, phần sảnh (M3 bước 4b-1): mở, mời, vào, từ chối, hết hạn mời, hộp thoại Thủ môn. World giả, nhiều phòng dùng chung Hub.
 import { describe, expect, it, vi } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import {
   DEFAULT_MAP,
   DUNGEON_DAILY_REWARDS,
   DUNGEON_INVITE_MS,
   DUNGEON_LOOT_MS,
   DUNGEON_OPEN_COOLDOWN_MS,
+  SECT_DUNGEON_CH,
   HAC_PHONG_ID,
   LINH_HU_ID,
   LINH_HU_MAP_ID,
@@ -20,6 +24,10 @@ import {
   INVENTORY_SLOTS,
 } from "@tien-gioi/shared";
 import { Hub } from "../hub";
+import { FileSectStore } from "../sect-store";
+import { SectService } from "../sect-service";
+import { makeSect } from "../store-contract";
+import { sectOnJoin } from "./sect";
 import { partyAnswer, partyInvite } from "./party";
 import { killMonster } from "./combat";
 import {
@@ -775,6 +783,40 @@ describe("trùm chết: thắng, thưởng hoàn thành, lượt mỗi ngày (4c
     // HUD: trùm đã biến mất
     expect(f.dun.dungeonStates.at(-1)!.msg.boss).toBeNull();
     expect(f.dun.dungeonStates.at(-1)!.msg.phase).toBe("won");
+  });
+
+  it("M8.3b: hạ trùm CÙNG đồng môn (2 người nhận thưởng cùng một tông): mỗi người +SECT_DUNGEON_CH cống hiến", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "tien-gioi-dungeon-sect-"));
+    try {
+      const store = new FileSectStore(dir, () => 1_700_000_000_000);
+      const svc = new SectService(store, () => f.w.now);
+      const f = fight();
+      f.w.sectService = svc;
+      f.w.onSaveNow = async () => true;
+      const old = f.w.now - 2 * 86_400_000;
+      await store.create(
+        makeSect("t1", {
+          name: "Thanh Van",
+          tag: "TV",
+          leader: key(LEADER),
+          members: [
+            { soulKey: key(LEADER), name: LEADER, rank: "chu", joinedAt: old },
+            { soulKey: key(MEMBER), name: MEMBER, rank: "de_tu", joinedAt: old },
+          ],
+        }),
+      );
+      await sectOnJoin(f.w, LEADER);
+      await sectOnJoin(f.w, MEMBER);
+      bossKilled(f.w, f.boss.mc);
+      const contribOf = async (who: string) =>
+        (await store.get("t1"))!.members.find((m) => m.soulKey === key(who))!.contrib;
+      for (let i = 0; i < 100 && (await contribOf(LEADER)) === undefined; i++)
+        await new Promise((r) => setTimeout(r, 20));
+      expect(await contribOf(LEADER)).toBe(SECT_DUNGEON_CH);
+      expect(await contribOf(MEMBER)).toBe(SECT_DUNGEON_CH);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("nhật ký kiểm toán: hạ trùm ghi dungeon.end MỘT lần và dungeon.reward cho từng người nhận thưởng (không cho người không đủ điều kiện)", () => {

@@ -44,7 +44,14 @@ export function chargeEffectOf(def: MonsterKind): SkillEffect | undefined {
 }
 
 /** Khoảng cách từ điểm (px, py) tới đoạn (ax, ay)-(bx, by). */
-function segDist(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+export function segDist(
+  px: number,
+  py: number,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+): number {
   const dx = bx - ax;
   const dy = by - ay;
   const len2 = dx * dx + dy * dy;
