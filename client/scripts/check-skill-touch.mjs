@@ -4,21 +4,22 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 // ở 4 khung nhìn (360x640, 390x844, 844x390, 768x1024) và 3 số chiêu, mỗi nút chiêu: hiện (chỉ chiêu đã gắn), >= 56 px, nằm trọn trong màn hình, KHÔNG chồng và cách
 // >= 8 px mọi nút / khung khác đang hiện (kể cả ba nút ngữ cảnh ép hiện cùng lúc, khung chat, bản đồ nhỏ, cột HUD); 1-2 chiêu nằm bên TRÁI nút Mục tiêu, 3-4 chiêu nằm
 // TRÊN nút Mục tiêu; chạm thật vào nút -> đúng một tin `cast`; ô khoá / trống không có nút. Có thể chụp ảnh: `--shots <thư mục>`.
-// Cần client đang chạy (`npm run dev -w client`, cổng của dev B là 5183).
-//   node client/scripts/check-skill-touch.mjs [--url http://127.0.0.1:5183] [--shots /tmp/tg-b-shots]
+// Mặc định tự dựng Vite của cây này trên cổng trống (tự tắt khi xong); `--url` để dùng client đang chạy sẵn.
+//   node client/scripts/check-skill-touch.mjs [--url <client đang chạy sẵn, tuỳ chọn>] [--shots /tmp/tg-b-shots]
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { resolveClientUrl } from "./client-url.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const argOf = (name, dflt) => {
   const i = process.argv.indexOf(name);
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : dflt;
 };
-const BASE_URL = argOf("--url", "http://127.0.0.1:5183");
+const BASE_URL = await resolveClientUrl(argOf("--url", ""));
 const SHOTS = argOf("--shots", "");
 const ALL_VIEWPORTS = [
   { name: "360x640", w: 360, h: 640 },

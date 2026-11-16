@@ -3,21 +3,22 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 // Kiểm thanh chiêu thức L U I O (M7.6, #507) bằng Chrome THẬT qua CDP ở chế độ giả lập `?skills=mock` (KHÔNG cần máy chủ): phím L U I O và chạm nút -> đúng số tin
 // `cast`; ô hồi chiêu / thiếu linh lực / choáng / khoá / trống KHÔNG gửi; lớp trạng thái `k-*` đúng; vòng quét + số giây đếm lùi; hướng đánh theo con trỏ (chuột trong
 // canvas) / theo hình chiêu; đổi số chiêu và cảnh giới (`?n=`, `?realm=`). Có thể chụp ảnh: `--shots <thư mục>`.
-// Cần client đang chạy (`npm run dev -w client`, cổng của dev B là 5183).
-//   node client/scripts/check-skill-bar.mjs [--url http://127.0.0.1:5183] [--shots /tmp/tg-b-shots]
+// Mặc định tự dựng Vite của cây này trên cổng trống (tự tắt khi xong); `--url` để dùng client đang chạy sẵn.
+//   node client/scripts/check-skill-bar.mjs [--url <client đang chạy sẵn, tuỳ chọn>] [--shots /tmp/tg-b-shots]
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { resolveClientUrl } from "./client-url.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const argOf = (name, dflt) => {
   const i = process.argv.indexOf(name);
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : dflt;
 };
-const BASE_URL = argOf("--url", "http://127.0.0.1:5183");
+const BASE_URL = await resolveClientUrl(argOf("--url", ""));
 const SHOTS = argOf("--shots", "");
 const CDP_PORT = await freePort();
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-skill-bar-"));

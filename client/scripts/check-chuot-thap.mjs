@@ -5,8 +5,8 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 //      nhau (khung trái, nhiệm vụ, chat, bản đồ nhỏ, nút HUD, ô chiêu, nút Chém / Kiếm khí / Đả tọa / Đột phá, Nói, ô nhanh), nút HUD >= 44 px; rồi mở lần lượt túi, nhân vật, nhiệm vụ, công pháp,
 //      bản đồ lớn, cài đặt, hộp thoại NPC, chỉ dẫn: bảng nằm trong khung, không tràn ngang, nút Đóng trong khung và >= 44 px, nút >= 44 px; bảng phải tự cuộn thì ghi chú (không tính lỗi: tấm dài tự cuộn là thiết kế);
 //  (b) khẳng định phân loại (`data-form`) đúng quy tắc và KHÔNG có vấn đề bố cục ở mọi khung truyền vào.
-// Con trỏ CHUỘT (cờ Chrome như check-skills-panel), `?skills=mock&n=4&realm=4`. Có thể chụp ảnh: `--shots <thư mục>`. Cần client đang chạy (`npm run dev -w client`, cổng của dev B là 5183).
-//   node client/scripts/check-chuot-thap.mjs [--url http://127.0.0.1:5183] [--shots /tmp/tg-b-shots] [--measure] [--min-h <số>] [--ui-scale 1.15] [--frames '[[1280,577],[1366,625]]']
+// Con trỏ CHUỘT (cờ Chrome như check-skills-panel), `?skills=mock&n=4&realm=4`. Có thể chụp ảnh: `--shots <thư mục>`. Mặc định tự dựng Vite của cây này trên cổng trống (tự tắt khi xong); `--url` để dùng client đang chạy sẵn.
+//   node client/scripts/check-chuot-thap.mjs [--url <client đang chạy sẵn, tuỳ chọn>] [--shots /tmp/tg-b-shots] [--measure] [--min-h <số>] [--ui-scale 1.15] [--frames '[[1280,577],[1366,625]]']
 //   --measure: chỉ in số đo, không khẳng định (dùng để chọn `DESKTOP_MIN_HEIGHT`); --min-h: ghi đè `DESKTOP_MIN_HEIGHT` để kiểm `data-form` (mặc định: giá trị trong `client/src/gfx/display.ts`).
 import fs from "node:fs";
 import os from "node:os";
@@ -15,13 +15,14 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { resolveClientUrl } from "./client-url.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const argOf = (name, dflt) => {
   const i = process.argv.indexOf(name);
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : dflt;
 };
-const BASE_URL = argOf("--url", "http://127.0.0.1:5183");
+const BASE_URL = await resolveClientUrl(argOf("--url", ""));
 const SHOTS = argOf("--shots", "");
 const MEASURE = process.argv.includes("--measure");
 // `DESKTOP_MIN_HEIGHT` đọc thẳng từ nguồn (một nơi duy nhất): chạy trần không cờ thì khẳng định theo mốc thật đang cài, không phải gõ `--min-h 500` (nit của A ở #682)

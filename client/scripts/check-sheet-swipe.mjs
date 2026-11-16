@@ -3,18 +3,19 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 // Cổng kiểm cử chỉ KÉO ĐỂ ĐÓNG TẤM (M5.1 #326, docs/THIET_KE_GIAO_DIEN_DO_HOA.md mục 4.2 điều 5; client/src/gfx/sheet-swipe.ts) trong Chrome thật,
 // bằng cảm ứng thật qua CDP (`Input.dispatchTouchEvent`): trên điện thoại vuốt TIÊU ĐỀ tấm xuống (dọc) / sang phải (ngang) thì tấm theo ngón tay,
 // thả đủ xa hoặc vuốt nhanh thì đóng, thả sớm thì trả về; vuốt ngược chiều / sai trục / ở thân tấm thì không đóng; máy tính bảng không có cử chỉ này;
-// Giảm chuyển động thì đóng ngay. Cần client đang chạy (`npm run dev -w client`, cổng của dev B là 5183); chế độ mock (?duel=mock&debug=1), KHÔNG cần server.
-//   node client/scripts/check-sheet-swipe.mjs [--url http://127.0.0.1:5183]
+// Giảm chuyển động thì đóng ngay. Mặc định tự dựng Vite của cây này trên cổng trống (tự tắt khi xong); `--url` để dùng client đang chạy sẵn; chế độ mock (?duel=mock&debug=1), KHÔNG cần server.
+//   node client/scripts/check-sheet-swipe.mjs [--url <client đang chạy sẵn, tuỳ chọn>]
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { resolveClientUrl } from "./client-url.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const i = process.argv.indexOf("--url");
-const BASE_URL = i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : "http://127.0.0.1:5183";
+const BASE_URL = await resolveClientUrl(i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : "");
 const CDP_PORT = await freePort();
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-swipe-"));
 const chrome = spawn(

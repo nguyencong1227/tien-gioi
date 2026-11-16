@@ -4,21 +4,22 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 //  - chi tiết túi: quyển có nút "Học", đan dược "Dùng" (đổi qua lại không kẹt nhãn), nguyên liệu ẩn nút; 12 icon sách tải được;
 //  - dòng "Dạy: <chiêu> · Đủ cảnh giới (..) / Cần .." ở khung chi tiết, đổi theo cảnh giới (Luyện Khí học được chiêu cơ bản, chiêu Trúc Cơ thì "Cần"); món khác ẩn khung;
 //  - bấm nút Học, nhấp đúp ô và phím Enter trên ô (#463) đều gửi `useItem {slot}` cho quyển và đan dược, KHÔNG gửi cho nguyên liệu;
-//  - 0 lỗi JS. Có thể chụp ảnh: `--shots <thư mục>`. Cần client đang chạy (`npm run dev -w client`, cổng của dev B là 5183).
-//   node client/scripts/check-book-bag.mjs [--url http://127.0.0.1:5183] [--shots /tmp/tg-b-shots]
+//  - 0 lỗi JS. Có thể chụp ảnh: `--shots <thư mục>`. Mặc định tự dựng Vite của cây này trên cổng trống (tự tắt khi xong); `--url` để dùng client đang chạy sẵn.
+//   node client/scripts/check-book-bag.mjs [--url <client đang chạy sẵn, tuỳ chọn>] [--shots /tmp/tg-b-shots]
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { resolveClientUrl } from "./client-url.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const argOf = (name, dflt) => {
   const i = process.argv.indexOf(name);
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : dflt;
 };
-const BASE_URL = argOf("--url", "http://127.0.0.1:5183");
+const BASE_URL = await resolveClientUrl(argOf("--url", ""));
 const SHOTS = argOf("--shots", "");
 const CDP_PORT = await freePort();
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-book-bag-"));
