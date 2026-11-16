@@ -5,6 +5,7 @@ import {
   ModalStack,
   isTypingElement,
   getFocusableElements,
+  focusModal,
   processEscapeKey,
   type EscapeHandlers,
   isReducedMotion,
@@ -571,5 +572,53 @@ describe("ModalStack.pruneHidden: gỡ mục sót (QUYET_DINH_M3 mục 25: WASD 
     st.push("a");
     expect(st.pruneHidden(() => false)).toBe(0);
     expect(st.size()).toBe(1);
+  });
+});
+
+describe("a11y: focusModal không cuộn tấm (tấm điện thoại cao hơn màn hình)", () => {
+  /** Phần tử giả đủ cho `getFocusableElements` ở môi trường node (không có `window`). */
+  const el = (cls: string[], extra: Partial<{ autofocus: boolean }> = {}) => {
+    const focus = vi.fn();
+    return {
+      el: {
+        hidden: false,
+        getClientRects: () => [{}],
+        classList: { contains: (c: string) => cls.includes(c) },
+        hasAttribute: (a: string) => a === "autofocus" && !!extra.autofocus,
+        focus,
+      } as unknown as HTMLElement,
+      focus,
+    };
+  };
+  const modalOf = (children: HTMLElement[]) => {
+    const focus = vi.fn();
+    return {
+      modal: { querySelectorAll: () => children, focus } as unknown as HTMLElement,
+      focus,
+    };
+  };
+
+  it("nút đóng nằm CUỐI tấm cao (Cài đặt ~1550 px trên màn 844 px): focus KHÔNG được kéo cuộn tấm tới nút (tấm mở ra đã cuộn mất tiêu đề, cử chỉ kéo-để-đóng với tay không tới)", () => {
+    const first = el(["btn"]);
+    const close = el(["modal-close"]);
+    const { modal } = modalOf([first.el, close.el]);
+    focusModal(modal);
+    expect(close.focus).toHaveBeenCalledTimes(1);
+    expect(close.focus).toHaveBeenCalledWith({ preventScroll: true });
+    expect(first.focus).not.toHaveBeenCalled();
+  });
+
+  it("ô autofocus, phần tử đầu tiên (không có nút đóng) và chính tấm (rỗng) đều focus với preventScroll", () => {
+    const auto = el(["btn"], { autofocus: true });
+    focusModal(modalOf([el(["btn"]).el, auto.el]).modal);
+    expect(auto.focus).toHaveBeenCalledWith({ preventScroll: true });
+
+    const a = el(["btn"]);
+    focusModal(modalOf([a.el, el(["btn"]).el]).modal);
+    expect(a.focus).toHaveBeenCalledWith({ preventScroll: true });
+
+    const empty = modalOf([]);
+    focusModal(empty.modal);
+    expect(empty.focus).toHaveBeenCalledWith({ preventScroll: true });
   });
 });
