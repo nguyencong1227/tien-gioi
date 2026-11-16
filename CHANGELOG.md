@@ -4,7 +4,7 @@
 
 ## [0.3.1] — 16/11/2026: bản vá (túi đồ, di chuyển bàn phím, nhắm mục tiêu, kho tông môn, bảo vệ khi mất kết nối)
 
-Bản vá sau v0.3.0, làm theo các yêu cầu của người dùng ở `QUYET_DINH_M3.md` mục 24-29 và 33 (báo từ bản chạy thật). Phần dưới là TÓM TẮT cho người quyết định; chi tiết từng PR nằm ở các mục "Giao diện", "Máy chủ", "Công cụ và thử tải", "Giao thức" kế tiếp.
+Bản vá sau v0.3.0, làm theo các yêu cầu của người dùng ở `QUYET_DINH_M3.md` mục 24-29, 33 và 34 (báo từ bản chạy thật). Phần dưới là TÓM TẮT cho người quyết định; chi tiết từng PR nằm ở các mục "Giao diện", "Máy chủ", "Công cụ và thử tải", "Giao thức" kế tiếp.
 
 - **Túi đồ (mục 24):** rê chuột vào ô đồ không còn làm hỏng chọn ô / thanh công cụ.
 - **Di chuyển bằng bàn phím (mục 25):** hết giật / "liệt nút": máy chủ đếm hàng đợi input theo THỜI GIAN THẬT (nguyên nhân gốc là ngân sách lệch dần ~1 input mỗi 12 giây), client đọc phím theo `event.code` (chịu được Unikey / Telex, IME), nhả hết phím khi mất tiêu điểm, phím di chuyển đổi được, chip "Mạng chậm" báo sớm.
@@ -12,8 +12,10 @@ Bản vá sau v0.3.0, làm theo các yêu cầu của người dùng ở `QUYET_
 - **Kho đồ tông môn (mục 27):** máy chủ (cất / rút / chính sách / nhật ký / lượt rút theo ngày, chống nhân đôi vật phẩm bằng khoá kỳ vọng theo ô) VÀ giao diện: tab "Kho đồ" trong bảng Tông môn (lưới kho 40 ô + túi, hộp xác nhận cho đồ quý / số lớn / Đệ tử có hạn mức, Tông chủ chỉnh hạn mức, sổ kho; #788).
 - **Bảo vệ tính mạng khi mất kết nối (mục 33, ưu tiên cao nhất của bản vá):** im lặng quá 3 giây thì nhân vật thành "bóng", sau 90 giây mới bị loại khỏi phòng; khi nối lại có khiên 3 giây và quái bỏ mục tiêu; nếu đang im lặng từ 2 giây mà bị đòn chí mạng thì giữ lại 10% khí huyết ở chỗ an toàn, KHÔNG mất kiếp. Cần cả máy chủ lẫn client mới (client cũ không khai báo nhịp tim nên không được bảo vệ, không hỏng gì).
 - **Hộp xác nhận** khi ĐỘT PHÁ, khi BÁN đồ quý / trang bị, ở HOÀNG TUYỀN khi mở nấc chân linh / xuất thân bằng Duyên + tóm tắt trước khi đầu thai, và khi LẬP tông môn (phí mất hẳn) / NỘP Linh thạch vào kho tông môn mà không rút lại được (rà soát thao tác không hoàn tác được, #779; chỉ phía client).
-- **KHÔNG nằm trong bản này:** cân bằng Âm Sương / Hàn Vân (mục 30-32, PR #805 còn nháp, đang chờ người dùng chốt hướng). Nội dung nghề nhỏ #514 chỉ có nền, người chơi chưa thấy.
-- **Triển khai:** giữ `MIN_PROTOCOL_VERSION=3` (client cũ vẫn vào được); triển khai MÁY CHỦ trước hoặc cùng lúc với client; bật `AUDIT_LOG` để thấy các sự kiện `net.*` (im lặng / nối lại / cứu chết / rớt).
+- **Hệ số tu vi THỬ NGHIỆM (mục 34 / 36):** biến môi trường `TEST_EXP_MULT` (`đạo_hiệu:hệ_số`, mặc định tắt) nhân MỌI nguồn tu vi của nhân vật chỉ định để người dùng tự thử game; chỉ phía máy chủ, không nhãn client, có cảnh báo khởi động + audit `test.exp_mult`; bản chạy thật bật cho Han x5 và Hàn Tuyết x3 (cách bật / tắt: `docs/VAN_HANH.md` mục 11).
+- **Công cụ / kiểm thử (không đổi trò chơi):** hết các test chập chờn đã đo được (`kiem-mat-ket-noi` ca 2, bộ đếm kiếp, `check-anim`), script Chrome thật tự dựng Vite của cây đang đứng, bot `quest-walk` né quái + đo lặp k/N; **tạm dừng build APK** (mục 37, công tắc biến repo `BUILD_APK`, mặc định tắt; APK cũ không được cập nhật theo bản này).
+- **KHÔNG nằm trong bản này (để v0.3.2):** cân bằng Âm Sương / Hàn Vân + 8 Hắc Giao (mục 30-32, PR #805 còn nháp, test cân bằng chưa tái hiệu chuẩn). Nội dung nghề nhỏ #514 (Lò đan Mộc Diên, đan hộ đạo; PR #815 của Dev D) CHƯA vào: bản này chỉ có nền (người chơi chưa thấy NPC / vật phẩm / công thức nghề), `PROTOCOL_VERSION` là 4 (client cũ vẫn vào được vì `MIN_PROTOCOL_VERSION` giữ 3).
+- **Triển khai:** giữ `MIN_PROTOCOL_VERSION=3` (client cũ vẫn vào được); triển khai MÁY CHỦ trước hoặc cùng lúc với client; bật `AUDIT_LOG` để thấy các sự kiện `net.*` (im lặng / nối lại / cứu chết / rớt) và `test.exp_mult`; thêm `TEST_EXP_MULT="Han:5,Hàn Tuyết:3"` vào `.env.production` của bản chạy thật (người dùng cho phép, mục 35 / 36).
 
 
 ### Giao diện
