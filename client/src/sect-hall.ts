@@ -3,6 +3,9 @@
 // cửa hàng (kèm LÝ DO khoá bằng chữ), buff, cảnh báo khi rời tông. Mọi chữ lấy từ `SECT_TERMS` / `sectFailMessage` của `shared/` (một nơi, không tự đặt chuỗi).
 import {
   ITEM_BY_ID,
+  SECT_BUFF_DROP_MAX,
+  SECT_BUFF_EXP_MAX,
+  SECT_BUFF_REGEN_MAX,
   SECT_EARN_DAY_CAP,
   SECT_LEVEL_MAX,
   SECT_QUEST_BY_ID,
@@ -117,7 +120,11 @@ export function sanitizeHallView(raw: unknown): SectHallView | null {
     points,
     pointsFrom,
     pointsNext,
-    buff: { exp: mult(b.exp, 1.1), drop: mult(b.drop, 1.1), regen: mult(b.regen, 1.3) },
+    buff: {
+      exp: mult(b.exp, SECT_BUFF_EXP_MAX),
+      drop: mult(b.drop, SECT_BUFF_DROP_MAX),
+      regen: mult(b.regen, SECT_BUFF_REGEN_MAX),
+    },
     caps: {
       members: whole(caps.members, 1000),
       elders: whole(caps.elders, 1000),
