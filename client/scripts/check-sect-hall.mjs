@@ -472,6 +472,52 @@ async function main() {
         dt1?.promote?.disabled === true && /Đã tối đa 3 Trưởng lão/.test(dt1.promote.title),
         `cấp 1 (tối đa 3, đang 3): nút Thăng TL khoá kèm lý do (${JSON.stringify(dt1?.promote)})`,
       );
+      // tổng số thành viên + nút "Mời vào tông môn" theo giới hạn thành viên của CẤP TÔNG (30 ở cấp 1, 40 ở cấp 3): không cứng 30
+      const summaryText = () =>
+        evalJs(`document.getElementById("sect-members-summary")?.textContent ?? ""`);
+      check(
+        (await summaryText()) === "Tổng số: 5 / 30",
+        `cấp 1: tổng số thành viên '${await summaryText()}' (giới hạn 30)`,
+      );
+      await hallOf(3);
+      await evalJs(`document.getElementById("sect-tab-btn-overview").click(); 1`);
+      await evalJs(`document.getElementById("sect-tab-btn-members").click(); 1`);
+      await sleep(150);
+      check(
+        (await summaryText()) === "Tổng số: 5 / 40",
+        `cấp 3: tổng số thành viên '${await summaryText()}' (giới hạn 40)`,
+      );
+      const full30 = {
+        sect: {
+          ...sect.sect,
+          members: Array.from({ length: 30 }, (_, i) => ({
+            name: i === 0 ? "Mộc Thanh" : `Đệ tử ${i}`,
+            rank: i === 0 ? "chu" : "de_tu",
+            joinedAt: NOW - 86400000,
+          })),
+        },
+      };
+      const inviteBtn = async () => {
+        await evalJs(`window.__ui.openPlayerMenu("Khách Lạ", 1, 1, 200, 200, undefined, ""); 1`);
+        await sleep(100);
+        return evalJs(
+          `(() => { const b = document.getElementById("pm-sect-btn"); return { disabled: b.disabled, text: b.textContent.trim() }; })()`,
+        );
+      };
+      await evalJs(`window.__ui.onSect(${JSON.stringify(full30)}); 1`);
+      await hallOf(1); // cấp 1: tối đa 30, đang 30 -> đủ
+      let ib = await inviteBtn();
+      check(
+        ib.disabled && ib.text === "Tông môn đã đủ (30/30)",
+        `cấp 1 đang 30 / 30: nút Mời bị khoá: ${JSON.stringify(ib)}`,
+      );
+      await hallOf(3); // cấp 3: tối đa 40, đang 30 -> còn chỗ
+      ib = await inviteBtn();
+      check(
+        !ib.disabled && ib.text === "Mời vào tông môn",
+        `cấp 3 đang 30 / 40: nút Mời BẤM ĐƯỢC (máy chủ còn cho): ${JSON.stringify(ib)}`,
+      );
+      await evalJs(`window.__ui.closePlayerMenu?.(); 1`);
       await evalJs(`window.__ui.onSect(${JSON.stringify(sect)}); 1`);
       await hallOf(2);
 
