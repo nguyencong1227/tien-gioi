@@ -206,6 +206,12 @@ try {
       const hp = await headPoint(id);
       const size = vp.orient === "portrait" ? rest.h : rest.w;
       const tag = `${vp.name} ${id}`;
+      // Tấm KHÔNG được tự cuộn lúc mở (`focusModal` dùng preventScroll): trên điện thoại tấm cao hơn màn hình và nút đóng nằm giữa / cuối nội dung, `focus()`
+      // mặc định kéo cuộn tới nút (Cài đặt mở ở scrollTop 426) làm tiêu đề trôi khỏi màn hình, cử chỉ kéo-để-đóng với tay không tới (28 mục đỏ trên main, lượt 448)
+      check(
+        hp.y > 0 && hp.y < vp.h,
+        `${tag}: tiêu đề tấm nằm trong màn hình lúc mở, tấm không tự cuộn (tâm tiêu đề y=${Math.round(hp.y)} / ${vp.h})`,
+      );
       if (vp.form !== "phone") {
         // Máy tính bảng: cửa sổ nổi, không có cử chỉ kéo để đóng. Ép `touch-action: none` ở tiêu đề để trình duyệt không tự huỷ cử chỉ:
         // chỉ còn chốt `data-form === "phone"` trong JS đứng giữa cú vuốt và việc đóng tấm
