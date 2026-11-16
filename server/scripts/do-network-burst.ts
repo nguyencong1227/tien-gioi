@@ -57,9 +57,9 @@ async function runScenarioWithFreshClient(
   const getCtrl = () => wr.world.ctrl.get(room.sessionId);
   const world = wr.world;
 
-  // Đặt nhân vật ở vị trí thoáng đãng
-  p.x = 800;
-  p.y = 800;
+  // Đặt nhân vật ở vùng an toàn không có vật cản (sân Lạc Hà Trấn thông thoáng 600px)
+  p.x = 1300;
+  p.y = 1500;
 
   // Chờ đứng yên và hồi token
   await sleep(options.startDelayMs ?? 200);
