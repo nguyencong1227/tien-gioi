@@ -111,6 +111,8 @@ export interface PlayerCtrl {
   silent?: boolean;
   silentSince?: number;
   shieldUntil?: number;
+  /** Các lần được tha chết do mạng gần đây (`w.now`, ms), tối đa `NET_SPARE_MAX` mục: chống client sửa nhịp tim để không bao giờ chết thật (`spareFromNetDeath`). */
+  spareAts?: number[];
   /** Đang né đòn của quái tới thời điểm này (ms, `w.now`): chiêu bộ pháp (`SkillDef.dodgeMs`, `systems/cast.ts`); `hurtPlayer` bỏ qua sát thương */
   dodgeUntil?: number;
   /** Định danh kiếp hiện tại và bộ đếm thành tựu của kiếp (lưu cùng nhân vật; không vào state chung) */
@@ -266,7 +268,7 @@ export class World {
   /** Người đang được hộ thể (mục 33; hết hạn thì `tickNetGuard` gỡ): quái không nhắm, sát thương không vào. Kiểm `size > 0` trước (đường nóng của quái). */
   readonly shielded = new Set<string>();
   /** Số đo bảo vệ khi mất kết nối của phòng (`/metrics`): lần vào im lặng, lần tha chết do mạng. */
-  readonly netStats = { silent: 0, spared: 0 };
+  readonly netStats = { silent: 0, spared: 0, spareDenied: 0 };
   /**
    * Mục tiêu đang có trạng thái (M7.2b): id quái / sessionId người chơi. `tickStatuses` chỉ duyệt hai tập này (thường rỗng) nên không tốn gì khi
    * không ai dính trạng thái; tự gỡ khi hết trạng thái hoặc mục tiêu biến mất.

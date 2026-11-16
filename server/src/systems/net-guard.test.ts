@@ -12,7 +12,15 @@ import {
 import { Hub } from "../hub";
 import { hurtPlayer, hurtPlayerDot } from "./combat";
 import { tickDuels, duelAnswer, duelChallenge } from "./duel";
-import { heard, isShielded, reconnected, silenceMs, tickNetGuard } from "./net-guard";
+import {
+  NET_SPARE_MAX,
+  NET_SPARE_WINDOW_MS,
+  heard,
+  isShielded,
+  reconnected,
+  silenceMs,
+  tickNetGuard,
+} from "./net-guard";
 import { tickMonsters } from "./monsters";
 import { tickWorld } from "./tick";
 import { addMonster, addPlayer, makeWorld } from "./test-helpers";
@@ -247,6 +255,84 @@ describe("tha chết do mạng (bị hạ khi client đã im lặng >= 2 giây)"
     lethal(s);
     expect(s.p.dead).toBe(false);
     expect(s.p.hp).toBeGreaterThan(0);
+  });
+});
+
+describe("giới hạn tha chết (chống client sửa nhịp tim để không bao giờ chết thật)", () => {
+  /** Một lần "bị đánh lúc im lặng 2,5 giây": xoá hộ thể / trạng thái của lần trước rồi đòn kết liễu. */
+  function strike(s: S) {
+    s.c.shieldUntil = undefined;
+    s.w.shielded.delete("a");
+    s.w.ghosts.delete("a");
+    s.c.silent = false;
+    s.c.lastHeardAt = s.w.now - 2500;
+    s.p.hp = s.p.maxHp;
+    const spared = s.w.netStats.spared;
+    lethal(s);
+    return s.w.netStats.spared > spared; // `hurtPlayer` trả true cả khi chết thật nên đọc số đo để biết có được tha không
+  }
+
+  it(`${NET_SPARE_MAX} lần đầu được tha; lần kế tiếp trong cửa sổ KHÔNG tha: chết thật (Hoàng Tuyền, mất kiếp), ghi net.spare_denied, đếm số đo`, () => {
+    const s = setup();
+    s.w.reincarnate = true;
+    for (let i = 1; i <= NET_SPARE_MAX; i++) {
+      s.w.now += 5000;
+      expect(strike(s)).toBe(true);
+      expect(s.c.limbo).toBeUndefined();
+      expect(s.audits.filter((a) => a.ev === "net.spared").at(-1)?.f).toMatchObject({
+        inWindow: i,
+      });
+    }
+    expect(s.w.netStats.spared).toBe(NET_SPARE_MAX);
+    s.w.now += 5000;
+    strike(s);
+    expect(s.c.limbo).toBeDefined(); // chết thật
+    expect(s.w.netStats.spared).toBe(NET_SPARE_MAX);
+    expect(s.w.netStats.spareDenied).toBe(1);
+    expect(s.audits.find((a) => a.ev === "net.spare_denied")?.f).toMatchObject({
+      name: "a",
+      inWindow: NET_SPARE_MAX,
+      windowMs: NET_SPARE_WINDOW_MS,
+      silentMs: 2500,
+    });
+  });
+
+  it("hết cửa sổ thì được tha lại; lần cũ nhất trượt khỏi cửa sổ trả lại đúng một lượt", () => {
+    const s = setup();
+    s.w.reincarnate = true;
+    for (let i = 0; i < NET_SPARE_MAX; i++) {
+      s.w.now += 60_000; // cách nhau 1 phút
+      expect(strike(s)).toBe(true);
+    }
+    // lần cũ nhất cách đây NET_SPARE_WINDOW_MS - 1 ms: còn trong cửa sổ -> từ chối
+    s.w.now = s.c.spareAts![0] + NET_SPARE_WINDOW_MS - 1;
+    expect(strike(s)).toBe(false);
+    expect(s.c.limbo).toBeDefined();
+    // trôi thêm 1 ms: lần cũ nhất ra khỏi cửa sổ -> lại được tha (và mảng không phình quá mức)
+    s.c.limbo = undefined;
+    s.p.dead = false;
+    s.p.hp = s.p.maxHp;
+    s.w.now += 1;
+    expect(strike(s)).toBe(true);
+    expect(s.c.spareAts!.length).toBeLessThanOrEqual(NET_SPARE_MAX);
+  });
+
+  it("đối chứng: bị từ chối KHÔNG tiêu lượt; chỉ lần được tha mới tính; chết khi im lặng < 2 giây không tính vào hạn mức", () => {
+    const s = setup();
+    s.w.reincarnate = true;
+    s.w.now += 5000;
+    s.c.lastHeardAt = s.w.now - 1000; // chưa tới 2 giây
+    lethal(s);
+    expect(s.c.spareAts).toBeUndefined();
+    expect(s.w.netStats.spareDenied).toBe(0);
+  });
+
+  it("client cũ (không khai nhịp) không bị đếm hạn mức và không sinh net.spare_denied", () => {
+    const s = setup({ beat: false });
+    s.w.reincarnate = true;
+    lethal(s);
+    expect(s.c.spareAts).toBeUndefined();
+    expect(s.audits.some((a) => a.ev === "net.spare_denied")).toBe(false);
   });
 });
 

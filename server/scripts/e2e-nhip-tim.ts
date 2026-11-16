@@ -1,11 +1,13 @@
 // E2E THẬT nhịp tim ứng dụng (ping / pong) và vòng đời nền / tiền cảnh (M4.2b, Issue #293):
 // Server Colyseus thật + Proxy TCP trung gian (hỗ trợ chế độ BLACKHOLE mô phỏng socket nửa mở thật) + Chrome headless.
-// Năm ca:
+// Sáu ca:
 //  1. Blackhole ở tiền cảnh: socket TCP vẫn mở nhưng ngừng byte -> client phát hiện chết trong <= HEARTBEAT_TIMEOUT_MS + nhịp (<= 14s)
 //     rồi mở lại proxy thì nối lại thành công, cùng sessionId, ví / túi đồ nguyên vẹn.
 //  2. Quay lại tiền cảnh sau khi ở nền: ghi đè document.visibilityState + bắn visibilitychange -> phát hiện chết trong <= RESUME_TIMEOUT_MS + dung sai (<= 4.5s).
 //  3. Server không trả pong (server cũ không hỗ trợ nhịp tim): proxy chặn tin pong -> client KHÔNG tự ngắt kết nối, chip "Mạng chậm" cũng không hiện.
 //  4. Socket cũ (nửa mở) đóng MUỘN sau khi đã nối lại xong (đổi mạng): sự kiện đóng của phòng CŨ không được chạy lại vòng nối lại.
+//  6. (mục 33, cần máy chủ có `net-guard`) Đường hầm ĐỨNG 5 giây (stall: byte bị hoãn, không mất) rồi thông: máy chủ ghost sau 3 giây im lặng dù socket mở, có tin lại thì hộ thể 3 giây
+//     + `netShield` tới client (vầng sáng), dải + toast "Đã kết nối lại", không ngắt kết nối.
 //  5. Chip "Mạng chậm" (mục 25): đang ĐI BỘ mà mạng đứng thì chip hiện sau ~SLOW_AFTER_MS, TRƯỚC banner nối lại; Ca 1 (đứng yên) chip cũng hiện trước banner
 //     (nhờ ping) và tắt khi nối lại xong.
 // Chạy: `npm run build && npm run e2e:nhip-tim -w server` (cần google-chrome).
@@ -53,6 +55,8 @@ class TcpProxy {
   private allowNew = true;
   private blackhole = false;
   private dropPong = false;
+  private stalled = false;
+  private stallQueue: Array<() => void> = [];
   private holed = new Set<{ client: net.Socket; target: net.Socket }>();
   clientBytes = 0;
   /** Sổ sự kiện (đo cho chẩn đoán khi đỏ): kết nối mới và dòng yêu cầu HTTP đầu của từng chuỗi byte client -> server, kèm cờ `holed`. */
@@ -101,6 +105,12 @@ class TcpProxy {
           this.note(
             `#${id} ${m[1]} ${m[2].split("?")[0].slice(0, 60)}${this.holed.has(pair) ? "  <-- SOCKET NỬA MỞ, byte bị nuốt" : ""}`,
           );
+        if (this.stalled) {
+          this.stallQueue.push(() => {
+            if (!targetSocket.destroyed) targetSocket.write(d);
+          });
+          return;
+        }
         if (this.blackhole || this.holed.has(pair)) {
           // Blackhole: giữ socket mở nhưng ngừng chuyển tiếp byte hai chiều
           return;
@@ -109,6 +119,12 @@ class TcpProxy {
       });
 
       targetSocket.on("data", (d: Buffer) => {
+        if (this.stalled) {
+          this.stallQueue.push(() => {
+            if (!clientSocket.destroyed) clientSocket.write(d);
+          });
+          return;
+        }
         if (this.blackhole || this.holed.has(pair)) {
           return;
         }
@@ -148,6 +164,19 @@ class TcpProxy {
 
   setAllowNewConnections(allow: boolean) {
     this.allowNew = allow;
+  }
+
+  /**
+   * STALL: GIỮ byte hai chiều (không bỏ) rồi xả đúng thứ tự khi `setStall(false)`: mô phỏng đường hầm "đứng" rồi thông lại (TCP hoãn chứ không mất byte). Khác blackhole (bỏ byte, luồng WebSocket
+   * không dùng tiếp được): sau stall socket vẫn dùng tiếp, nên đo được đường "có tin lại sau im lặng" của máy chủ (mục 33: hộ thể, quái mất mục tiêu).
+   */
+  setStall(on: boolean) {
+    this.stalled = on;
+    if (!on) {
+      const q = this.stallQueue;
+      this.stallQueue = [];
+      for (const f of q) f();
+    }
   }
 
   setBlackhole(blackhole: boolean) {
@@ -804,12 +833,102 @@ async function main() {
     );
     out('  ✓ Nối lại xong: chip "Mạng chậm" đã tắt');
 
+    // =========================================================================
+    // CA 6 (mục 33, cần máy chủ có `net-guard`): đường hầm ĐỨNG rồi thông lại (stall, byte bị hoãn chứ không mất)
+    // =========================================================================
+    out(
+      "\n--- Ca 6: Đường hầm đứng 5 giây rồi thông: máy chủ ghost sau 3 giây, có tin lại thì hộ thể 3 giây ---",
+    );
+    const NAME_6 = "Duong Ham Dung";
+    const SECRET_6 = "e2e_secret_heartbeat_66666666";
+    await setIdentity(NAME_6, SECRET_6);
+    await tab.send("Page.navigate", { url: `http://127.0.0.1:${PORT_PROXY}/?debug` });
+    await tab.waitFor(
+      `typeof window.__switchAuthView === 'function' && !!document.getElementById('login-form')`,
+      "form đăng nhập ca 6",
+    );
+    await tab.ev(
+      `const inp = document.getElementById('login-name'); if (inp) inp.value = ${JSON.stringify(NAME_6)}; document.getElementById('login-form').requestSubmit(); 1`,
+    );
+    await tab.waitFor(
+      `!document.getElementById('ui')?.hidden && !!window.__scene?.room && !!document.getElementById('hud-name')?.textContent`,
+      "vào game ca 6",
+    );
+    await tab.waitFor(shown("hud-name"), "đạo hiệu ca 6");
+    await sleep(2500); // vài nhịp 1 giây đầu: máy chủ đã ghi nhận tin của client
+    const sp6 = await serverPlayer();
+    if (sp6.ctrl.beatMs !== NET_BEAT_MS) {
+      throw new Error(
+        `Ca 6: máy chủ không ghi nhận nhịp client khai (beatMs=${sp6.ctrl.beatMs}, cần ${NET_BEAT_MS})`,
+      );
+    }
+    if (sp6.ctrl.silent || sp6.world.ghosts.has(sp6.sid))
+      throw new Error("Ca 6: ghost oan khi mạng bình thường");
+    out(`  ✓ Máy chủ ghi nhận beatMs=${sp6.ctrl.beatMs} của client; mạng thông: không ghost oan`);
+    const t6 = Date.now();
+    proxy.setStall(true);
+    await until(
+      async () => Boolean((await serverPlayer()).ctrl?.silent),
+      "máy chủ coi im lặng quá 3 giây là hồn lìa xác",
+      8000,
+    );
+    const ghostMs = Date.now() - t6;
+    const sp6b = await serverPlayer();
+    if (!sp6b.world.ghosts.has(sp6b.sid))
+      throw new Error("Ca 6: silent nhưng không nằm trong world.ghosts");
+    // im lặng tính từ TIN CUỐI (có thể trước t6 tới một nhịp): ghost sau 3-4 giây kể từ lúc đứng
+    if (ghostMs < 2000 || ghostMs > 5500)
+      throw new Error(`Ca 6: ghost sau ${ghostMs}ms (cần ~3000-4000)`);
+    out(
+      `  ✓ Máy chủ: hồn lìa xác sau ${ghostMs}ms im lặng, socket vẫn mở (bất tử, quái bỏ mục tiêu)`,
+    );
+    await tab.waitFor(shown("net-slow"), 'dải "Mất kết nối" hiện trong lúc đứng', 4000);
+    if (await tab.ev(`!document.getElementById('reconnect-banner')?.hidden`)) {
+      throw new Error("Ca 6: banner nối lại hiện (socket chưa chết, chỉ đứng)");
+    }
+    out('  ✓ Client: dải "Mất kết nối — nhân vật đang được bảo vệ" hiện, chưa có banner nối lại');
+    proxy.setStall(false); // thông lại: tin dồn ứ tới máy chủ
+    await until(
+      async () => !(await serverPlayer()).ctrl?.silent,
+      "có tin lại: máy chủ cho ra khỏi hồn lìa xác",
+      5000,
+    );
+    const sp6c = await serverPlayer();
+    if (sp6c.world.ghosts.has(sp6c.sid))
+      throw new Error("Ca 6: còn trong world.ghosts sau khi có tin lại");
+    if (!sp6c.world.shielded.has(sp6c.sid))
+      throw new Error("Ca 6: không được hộ thể sau khi có tin lại");
+    out("  ✓ Máy chủ: có tin lại thì ra khỏi hồn lìa xác và được hộ thể 3 giây");
+    await tab.waitFor(
+      `!!window.__scene?.shieldRing?.visible && /Hộ thể/.test(window.__scene?.shieldText?.text ?? '')`,
+      "client nhận netShield: vầng sáng + chữ Hộ thể",
+      4000,
+    );
+    out("  ✓ Client: nhận netShield, vầng sáng + chữ Hộ thể hiện");
+    await tab.waitFor(
+      `[...document.querySelectorAll('#toast p')].some((p) => p.textContent.includes('Đã kết nối lại'))`,
+      'toast "Đã kết nối lại" khi tín hiệu về',
+      5000,
+    );
+    await tab.waitFor(
+      `document.getElementById('net-slow')?.hidden !== false`,
+      "dải tắt khi tín hiệu về",
+      5000,
+    );
+    await tab.waitFor(`!window.__scene?.shieldRing?.visible`, "hộ thể hết sau ~3 giây", 6000);
+    await until(
+      async () => !(await serverPlayer()).world.shielded.has(sp6c.sid),
+      "máy chủ gỡ hộ thể",
+      5000,
+    );
+    out("  ✓ Hộ thể hết đúng hạn ở cả máy chủ lẫn client; không ngắt kết nối, không nối lại");
+
     if (tab.errors.length) {
       throw new Error(`Có lỗi console trong quá trình test: ${tab.errors.join("; ")}`);
     }
-    out("  ✓ 0 lỗi console / exception trong toàn bộ 5 ca");
+    out("  ✓ 0 lỗi console / exception trong toàn bộ 6 ca");
 
-    out("\n=== TẤT CẢ 5 CA E2E NHỊP TIM ĐỀU ĐẠT ===");
+    out("\n=== TẤT CẢ 6 CA E2E NHỊP TIM ĐỀU ĐẠT ===");
   } catch (err: any) {
     failed = err?.message || String(err);
     out(`\n[LỖI E2E NHỊP TIM] ${failed}`);
