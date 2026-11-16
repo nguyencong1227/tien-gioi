@@ -96,7 +96,9 @@ describe("công thức Lò đan (lao_dan)", () => {
     for (const r of recipes)
       for (const inp of r.inputs) {
         expect(ITEM_BY_ID[inp.itemId], `${r.id}: nguyên liệu ${inp.itemId}`).toBeDefined();
-        expect(droppable.has(inp.itemId), `${r.id}: ${inp.itemId} không rơi từ quái nào`).toBe(true);
+        expect(droppable.has(inp.itemId), `${r.id}: ${inp.itemId} không rơi từ quái nào`).toBe(
+          true,
+        );
         expect(inp.qty, `${r.id}:${inp.itemId}`).toBeGreaterThan(0);
       }
   });

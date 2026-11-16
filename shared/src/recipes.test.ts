@@ -118,13 +118,14 @@ describe("canEquip", () => {
 });
 
 describe("công thức rèn", () => {
-  it("id không trùng, NPC tồn tại, ra đúng trang bị", () => {
+  it("id không trùng, NPC tồn tại, công thức RÈN ra đúng trang bị", () => {
     expect(new Set(RECIPES.map((r) => r.id)).size).toBe(RECIPES.length);
     for (const r of RECIPES) {
       expect(RECIPE_BY_ID[r.id]).toBe(r);
       expect(NPC_BY_ID[r.npcId]).toBeDefined();
-      expect(ITEM_BY_ID[r.output.itemId]?.type).toBe("equip");
       expect(r.output.qty).toBe(1);
+      // Công thức RÈN (thợ rèn) luôn ra TRANG BỊ; Lò đan (`lao_dan`, #763) ra đan hộ đạo (consumable), do lo-dan-lat1.test.ts kiểm
+      if (r.npcId !== "lao_dan") expect(ITEM_BY_ID[r.output.itemId]?.type).toBe("equip");
     }
   });
 
