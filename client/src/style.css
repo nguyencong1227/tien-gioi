@@ -6194,6 +6194,15 @@ body.low-fx.in-limbo .stone-item {
   min-width: 2.2em;
   text-align: center;
 }
+/* nút Góp / Rút: đủ rộng để chạm (>= 44 px cả hai chiều) kể cả khi chữ chỉ có 3 ký tự */
+.sect-vault-actions .sect-primary-btn {
+  min-width: 96px;
+  min-height: 44px;
+}
+.sect-vault-policy .sect-small-btn {
+  min-width: 64px;
+  min-height: 44px;
+}
 .sect-vault-why {
   flex: 1 1 100%;
   margin: 0;
