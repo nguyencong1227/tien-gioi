@@ -1,0 +1,45 @@
+{
+  "mode": "cpu-load",
+  "timestamp": "2026-11-16T15:36:06.660Z",
+  "runsTarget": 3,
+  "runsCompleted": 3,
+  "avgRunDurationSec": 91,
+  "flakySuitesCount": 0,
+  "stableSuitesCount": 1281,
+  "suiteStats": [],
+  "runs": [
+    {
+      "runIndex": 1,
+      "mode": "cpu-load",
+      "success": true,
+      "durationMs": 90158,
+      "totalSuites": 1281,
+      "failedSuites": 0,
+      "totalTests": 4903,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 2,
+      "mode": "cpu-load",
+      "success": true,
+      "durationMs": 91199,
+      "totalSuites": 1281,
+      "failedSuites": 0,
+      "totalTests": 4903,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 3,
+      "mode": "cpu-load",
+      "success": true,
+      "durationMs": 91606,
+      "totalSuites": 1281,
+      "failedSuites": 0,
+      "totalTests": 4903,
+      "failedTests": 0,
+      "failures": []
+    }
+  ]
+}

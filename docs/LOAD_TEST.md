@@ -1474,7 +1474,7 @@ npm run quest-walk -w server -- --map=lac_ha
 > **Phân loại nhóm lỗi theo phân tích #757 & Issue #818:**
 > - **Không lỗi**: Nhiệm vụ hoàn thành trọn vẹn (✅ ĐẠT).
 > - **Nhóm 1 (Trùm thế giới)**: Quái cấp trùm thế giới/bí cảnh cần tổ đội người chơi (`hac_giao`, `doc_long_giao`, `thien_han_dieu`), bot đơn độc không thể solo (2 ca).
-> - **Nhóm 2 (Hành vi bot né quái / nhặt đồ)**: Đã giải quyết triệt để trong #818 (`lang_han_quan` đạt ổn định 5/5; `doc_nang_nop` và `doc_thiem_nang` thoát hoàn toàn lỗi nhặt đồ/chọn boss sai và đạt 4/5, phần ranh giới chập chờn còn lại do quái dã ngoại Độc Thiềm hội đồng ở bước săn thuộc Nhóm 3 cân bằng quái #805; 2 ca thu thập cấp 4 chuyển sang Nhóm 3).
+> - **Nhóm 2 (Hành vi bot né quái / nhặt đồ)**: Đã giải quyết triệt để trong #818 (`lang_han_quan` đạt ổn định: C 5/5, A 3/3; `doc_nang_nop` C 4/5, A 1/2; `doc_thiem_nang` C 4/5, A 1/5 và 0/3 - thoát hoàn toàn lỗi nhặt đồ/chọn boss sai, phần chập chờn còn lại do quái dã ngoại Độc Thiềm hội đồng ở bước săn thuộc Nhóm 3 cân bằng quái #805; 2 ca thu thập cấp 4 chuyển sang Nhóm 3).
 > - **Nhóm 3 (Cân bằng quái dã ngoại)**: Quái cấp 3 Âm Sương và cấp 4 Hàn Vân có chỉ số sát thương/DoT/máu quá cao so với người chơi đơn độc cùng cảnh giới (15 ca, chờ nhóm thiết kế/cân bằng ở PR #805).
 
 | STT | Mã nhiệm vụ | Tên nhiệm vụ | Bản đồ | Bậc yêu cầu | Loại bước chính | Kết quả #757 | Kết quả #818 (Đo lặp lại k/N) | Thời gian #818 | Nhóm lỗi / Phân loại | Ghi chú vận hành & cải tiến |
