@@ -17,7 +17,7 @@
 
 ## 3. Mô hình dữ liệu (`shared/src/bosses.ts`, PR T1)
 ```
-BossDef { kind: string (id MonsterKind), phases: BossPhase[], enrage?: BossEnrage, maxAdds: number, stunDrMs: number }
+BossDef { kind: string (id MonsterKind), abilities: BossAbility[], phases: BossPhase[], enrage?: BossEnrage, maxAdds: number }
 BossPhase { id, fromHp: 1..0 (phân số khí huyết TRÊN, giai đoạn đầu = 1), speedMult, atkMult, cdMult, castGapMs (>= 600),
             abilities: string[] (id chiêu mở ở giai đoạn này), onEnter?: BossAction[] (tiếng gầm, triệu hồi, giáp) }
 BossAbility { id, name, shape, telegraphMs (>= 800), recoverMs, cooldownMs, weight, dmgMult, element?, status?, cond: { minDist?, maxDist?, minTargets?, maxTargets?, hpBelow? } }
@@ -33,7 +33,7 @@ BossEnrage { afterMs, atkMult, speedMult, cdMult }     // chỉ trùm bí cảnh
 - **Chọn chiêu:** khi `now >= nextCastAt` và không đang vận: lọc theo giai đoạn + `cond` + hồi chiêu rồi chọn theo `weight` bằng **bộ ngẫu nhiên có seed riêng của con trùm** (`mc.boss.rng`, KHÔNG `Math.random`: giữ nguyên chuỗi bench có seed, test lặp lại được). Không chiêu nào hợp lệ thì đánh thường như cũ.
 - **Vận chiêu:** (1) khoá điểm / hướng, gửi `fx` `warn` (một lần mỗi vòng, `sendNear`) + `fx` `bossCast { by, ability, ms }`; (2) đứng yên tới `hitAt = startAt + telegraphMs` (mưa: mỗi vòng có `warn` riêng, mỗi vòng >= 800 ms từ lúc hiện); (3) ĐÁP: gom người trong vùng (vị trí lúc đáp, bộ lọc mục tiêu mục 2.4) rồi `hurtPlayer` (+ trạng thái); (4) `recoverMs` thở rồi `nextCastAt = now + castGapMs x cdMult`.
 - **Một chiêu một lúc** (trừ `rain`, nơi từng vòng tự báo trước): không bao giờ hai đòn nặng chồng báo trước. Lần vận đầu sau khi gây hấn >= 1,2 giây.
-- **Choáng:** ngắt cú gồng (trừ chiêu đánh dấu `unstoppable`), phạt chờ `cooldownMs`; sau mỗi lần choáng trùm MIỄN khống chế `stunDrMs` (6 giây): không khoá choáng vĩnh viễn.
+- **Khống chế:** trùm đã MIỄN choáng sẵn (`status.ts`: `stunImmune: !!mc.def.boss`) nên không có cú gồng nào bị ngắt bằng choáng; tê cóng (làm chậm) vẫn áp được nhưng KHÔNG làm chậm việc vận chiêu (chỉ làm chậm di chuyển, `speedMult`).
 - **Giai đoạn:** hết khí huyết tới ngưỡng thì chuyển MỘT lần: ngắt chiêu đang gồng (không đáp), gầm 1,5 giây KHÔNG sát thương (`fx` `bossPhase`), chạy `onEnter` (triệu hồi tối đa `maxAdds` quái con không rơi đồ / tu vi để khỏi cày, tự biến mất khi trùm chết hoặc reset; giáp: `dmgTakenMult`, hiện qua `fx`).
 - **Cuồng nộ (bí cảnh):** sau `enrage.afterMs` (đếm khi có người trong vùng, dừng khi không): nhân `atkMult` / `speedMult` / `cdMult` và gửi `fx` `bossEnrage`. **KHÔNG rút ngắn báo trước dưới 800 ms** (cuồng nộ làm đòn dày và nặng hơn, không làm đòn không kịp né).
 - **Reset:** kéo quá xa nhà (`LEASH_DIST`) hoặc không còn mục tiêu: về nhà, hồi đầy khí huyết, giai đoạn 0, xoá hồi chiêu, đồng hồ cuồng nộ và quái con (không để trùm hồi dở dang giữ giai đoạn cao).
@@ -68,6 +68,6 @@ BossEnrage { afterMs, atkMult, speedMult, cdMult }     // chỉ trùm bí cảnh
 1. Báo trước tối thiểu 800 ms cho MỌI đòn (kể cả cuồng nộ). 2. Mỗi trúng <= ~55% khí huyết tối đa của người đúng bậc. 3. Không có tường chặn đường ở bản đầu. 4. Quái con của trùm không rơi đồ / tu vi. 5. Hắc Giao giữ 3 chiêu để 8 con không nặng.
 
 ## 9. Kiểm thử và cân bằng bắt buộc
-- **Bất biến công bằng (F + A, đột biến):** không bao giờ có sát thương lên người chơi trước `hitAt`; mọi sát thương trùm tới SAU một `warn` của chính nó cùng vùng với `ms` >= 800; không hai chiêu nặng chồng; người hồn lìa xác / hộ thể / chết không trúng; reset đúng; số quái con <= `maxAdds`; chọn chiêu tất định theo seed.
+- **Bất biến công bằng (F + A, đột biến):** không bao giờ có sát thương lên người chơi trước `hitAt`; mọi sát thương trùm tới SAU một `warn` của chính nó cùng vùng với `ms` >= 800 (`bossViolations` kiểm DỮ LIỆU, bộ thực thi kiểm LÚC CHẠY); không hai chiêu nặng chồng; người hồn lìa xác / hộ thể / chết không trúng; reset đúng; số quái con <= `maxAdds`; chọn chiêu tất định theo seed.
 - **Mô phỏng (D):** thời gian hạ trùm đúng bậc solo / đội 3-4 người; tỉ lệ chết khi bot né hoàn hảo ~0 và khi KHÔNG né cao (chứng minh chiêu có ý nghĩa mà không quá tàn nhẫn); không có "đường tắt" (đứng sát chân trùm né hết bằng một chỗ).
 - Mỗi PR: TOÀN BỘ `npm test` + typecheck + lint + prettier; số đo `bench` trước / sau khi đụng vòng tick.
