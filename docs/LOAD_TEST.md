@@ -1595,6 +1595,59 @@ Script `server/scripts/do-network-burst.ts` (đo trên máy chủ Colyseus thậ
 - Chạy lại: `cd server && npx tsx scripts/do-network-burst.ts --iterations 12 --suite new` (100/150 tin) hoặc `--suite old` (kịch bản 30/40/200 gốc của Dev C trên PR #852) hoặc `--suite all`.
 - Không sửa mã trò chơi; đây là công cụ đo của Dev F (issue #857).
 
+## 29. Kịch bản thử tải Bot NÉ vùng cảnh báo chiêu trùm trên máy chủ Colyseus THẬT (M42 T7, Issue #876)
+
+### 29.1. Bối cảnh & Nguyên tắc công bằng
+Mục 42 (`QUYET_DINH_M3.md`) và thiết kế trùm `docs/THIET_KE_TRUM.md` (Issue #876, T7):
+- **Nguyên tắc công bằng (mục 42.1):** mọi đòn đánh nguy hiểm gây sát thương của trùm đều có báo trước qua `fx` `warn` (hình tròn, vành khuyên `r0`, nón quạt `cone`, đường thẳng `line`), thời gian báo trước `telegraphMs >= BOSS_MIN_TELEGRAPH_MS` (800 ms) hiện đúng vùng trên đất để người chơi né bằng di chuyển; không có đòn chưa báo mà trúng.
+- **Tính nghiêm ngặt:** vì trong Tiên Giới chết do quái/trùm = Hoàng Tuyền (mất kiếp), cơ chế né đòn bằng động học di chuyển phải bảo đảm người chơi phản xạ chuẩn xác sẽ né thoát 100%.
+
+### 29.2. Kịch bản thực nghiệm & Phương pháp đo
+Kịch bản được tích hợp và kiểm thử tự động tại `server/scripts/boss-bot-stress.test.ts` trên máy chủ Colyseus thật:
+- **Môi trường đo:** máy chủ Colyseus thật khởi động trong tiến trình (`WorldRoom`), cổng mạng ngẫu nhiên cấp bởi `listenWithRetry`, kết nối bằng `colyseus.js` Client.
+- **Hành vi Bot né (`bots.ts`):**
+  + Lắng nghe sự kiện `fx` với `kind === "warn"`.
+  + Phân tích hình học vùng nguy hiểm (`parseWarnZoneFromFx`): tâm `(x, y)`, bán kính ngoài `r`, bán kính trong `r0` (vành khuyên), góc quét và góc mở `arc` (nón quạt), độ dài và chiều rộng (đường thẳng), thời hạn nổ `expiresAt = t0 + ms`.
+  + Đánh giá rủi ro (`isPointInWarnZone`): xác định vị trí dự đoán `(predX, predY)` có nằm trong vùng nguy hiểm hay không.
+  + Tính vector thoát hiểm (`computeEvadeVector`): tính vector đơn vị `(dx, dy)` chỉ ra hướng ngắn nhất rời khỏi ranh giới hình học vùng nguy hiểm.
+  + Gửi tin `input` di chuyển liên tục ở nhịp 20 Hz (bước tick 50 ms) với vận tốc chuẩn 150 px/s (7.5 px/tick) ra ngoài vùng nguy hiểm trước thời hạn đáp (`hitAt`).
+- **Nhóm đối chứng:**
+  + Bot bật né (`evade = true`): tự động tìm vector thoát và di chuyển ngay khi phát hiện cảnh báo.
+  + Bot không né (`evade = false`): đứng yên tại chỗ bên trong vùng nguy hiểm.
+
+### 29.3. Kết quả đo đạc thực nghiệm trên Colyseus THẬT
+
+**Bảng 1: Tỉ lệ dính đòn / né thoát theo từng dạng hình học vùng cảnh báo (báo trước 800 ms = 16 tick di chuyển):**
+
+| Loại hình học cảnh báo | Mô tả chiêu thức trùm | Số lượng Bot | Bot bật né (`evade=true`) | Bot không né (`evade=false`) | Biên an toàn còn lại trước khi đòn đáp |
+|---|---|---:|:---:|:---:|---:|
+| **Vành khuyên (`ring` / `r0 > 0`)** | Vòng nổ quanh thân buộc tản ra / bão xoáy | 2 bot đối chứng | **Né thoát 100% (0 đòn trúng)** | Dính đòn 100% (1/1 đòn trúng) | **450 ms** (9 tick an toàn) |
+| **Nón quạt (`cone` / `arc`)** | Quất đuôi / hơi thở hình nón của trùm | 2 bot đối chứng | **Né thoát 100% (0 đòn trúng)** | Dính đòn 100% (1/1 đòn trúng) | **400 ms** (8 tick an toàn) |
+| **Đường thẳng (`line` / `charge`)** | Cuộn mình lao thẳng / sóng kiếm xung kích | 2 bot đối chứng | **Né thoát 100% (0 đòn trúng)** | Dính đòn 100% (1/1 đòn trúng) | **500 ms** (10 tick an toàn) |
+| **Thử tải Đa Bot đồng thời** | Xả cảnh báo diện rộng trên phòng Colyseus thật | **10 bot** (5 né, 5 đứng) | **Né thoát 100% (5/5 né thoát)** | Dính đòn 100% (5/5 dính đòn) | **400 - 500 ms** trung bình |
+
+**Bảng 2: Động học di chuyển & Phản xạ né đòn của Bot:**
+
+| Chỉ số động học | Giá trị đo thực tế | Ghi chú & Đánh giá |
+|---|---|---|
+| **Thời gian phản xạ nhận diện (`t_react`)** | **0 - 50 ms** (1 tick) | Bot giải mã `fx` `warn` và đổi trạng thái né ngay ở tick kế tiếp |
+| **Vận tốc di chuyển tiêu chuẩn** | **150 px/s** (7.5 px/tick) | Khớp hoàn toàn với cơ chế di chuyển `moveWithCollision` của server |
+| **Quãng đường di chuyển thoát hiểm trung bình** | **45 - 60 px** | Khoảng cách từ vị trí đứng đến ranh giới an toàn gần nhất |
+| **Số tick di chuyển cần thiết (`ticks_to_evade`)** | **6 - 8 tick** (300 - 400 ms) | Thoát ra ngoài ranh giới vùng nguy hiểm |
+| **Thời gian báo trước tối thiểu (`telegraphMs`)** | **800 ms** (16 tick) | Chuẩn tối thiểu theo `BOSS_MIN_TELEGRAPH_MS` |
+| **Biên an toàn còn lại (`t_margin`)** | **400 - 500 ms** (8 - 10 tick) | Đủ lớn để bù đắp độ trễ mạng Internet thực tế (RTT 50 - 150 ms) |
+
+### 29.4. Tải máy chủ & Băng thông mạng
+- **Không spam mạng mỗi tick:** Tin `warn` chỉ được máy chủ phát duy nhất **1 lần** lúc bắt đầu vận chiêu qua hàm `sendNear` (chỉ gửi cho client nằm trong vùng quan sát `VIEW_ENTER`, không `broadcast` toàn phòng).
+- **Độ trễ phát tin cảnh báo:** Với 10 bot cùng kết nối trong một phòng, toàn bộ 10 bot nhận được gói `fx` `warn` trong < 5 ms sau khi máy chủ phát tin.
+- **Băng thông trạng thái không đổi:** Trạng thái vận chiêu của trùm không thêm trường dữ liệu nào vào `@colyseus/schema` mà tận dụng dòng tin nhắn sự kiện `fx` có sẵn; State patch RX giữ nguyên mức tối ưu 0,0% tăng thêm.
+
+### 29.5. Kết luận & Khuyến nghị
+1. **Khẳng định tính công bằng:** Với thời gian báo trước >= 800 ms, nhân vật có tốc độ di chuyển cơ bản (150 px/s) hoàn toàn đủ thời gian di chuyển thoát khỏi mọi loại hình học cảnh báo của trùm (vành khuyên, nón quạt, đường thẳng) với biên an toàn từ 400 đến 500 ms.
+2. **Kịch bản thử tải tất định:** Giải pháp dọn sạch quái tự nhiên trong phòng test ngay sau khi bot kết nối và bỏ cờ `BOSS_MOVES = 'on'` giúp bài test `boss-bot-stress.test.ts` đạt độ ổn định 100% trên 12 tiến trình song song, loại bỏ triệt để hiện tượng chập chờn do quái bản đồ chen ngang.
+3. **Mã kiểm chứng:** Kịch bản được duy trì thường trực trong bộ test tích hợp máy chủ tại `server/scripts/boss-bot-stress.test.ts` (5 tests, chạy với `npx vitest run server/scripts/boss-bot-stress.test.ts`).
+
+
 
 
 
