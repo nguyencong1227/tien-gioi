@@ -597,6 +597,18 @@ function returnToBag(w: World, sid: string, soulKey: string, itemId: string, qty
 
 const itemName = (id: string) => ITEM_BY_ID[id]?.name ?? id;
 
+/** Lý do từ chối cho thấy giao diện đang xem kho CŨ (người khác vừa lấy / thêm đồ, hay hết lượt): gửi lại ảnh chụp mới nhất cho chính người bị từ chối. */
+const STALE_VAULT_FAILS: readonly SectFail[] = ["vault_changed", "vault_full", "vault_limit"];
+
+/** Báo từ chối; nếu giao diện đang thấy kho cũ thì gửi kèm ảnh chụp kho MỚI NHẤT (tải lại bản ghi nếu chưa có `known`), khỏi chờ người khác làm kho đổi. */
+async function vaultFail(w: World, sid: string, a: SectActor, reason: SectFail, known?: Sect) {
+  toastFail(w, sid, reason);
+  if (!STALE_VAULT_FAILS.includes(reason)) return;
+  const sect = known ?? (await w.sectService?.sectOf(a.soulKey));
+  if (sect && stillHere(w, sid, a.soulKey))
+    w.events.sectVault(sid, vaultMsgFor(w, sid, sect, a.soulKey));
+}
+
 /** `sectVaultDeposit { slot, qty }`: kiểm sớm -> trừ túi -> LƯU hồ sơ -> cộng kho; từ chối / lỗi thì trả túi. */
 export async function sectVaultDeposit(w: World, sid: string, raw: unknown) {
   const svc = w.sectService;
@@ -618,7 +630,7 @@ export async function sectVaultDeposit(w: World, sid: string, raw: unknown) {
     if (!sectVaultAccepts(itemId)) return toastFail(w, sid, "vault_denied");
     const cur = await svc.sectOf(a.soulKey);
     if (!cur) return toastFail(w, sid, "not_in_sect"); // khỏi trừ rồi hoàn
-    if (!vaultHolds(cur, itemId, msg.qty)) return toastFail(w, sid, "vault_full");
+    if (!vaultHolds(cur, itemId, msg.qty)) return vaultFail(w, sid, a, "vault_full", cur);
     // Sau `await` túi có thể đã đổi (nhặt / dùng / vứt): kiểm lại ĐÚNG ô và số lượng rồi mới trừ
     const c2 = w.ctrl.get(sid);
     if (!c2 || !stillHere(w, sid, a.soulKey) || c2.travelling || c2.limbo)
@@ -635,7 +647,7 @@ export async function sectVaultDeposit(w: World, sid: string, raw: unknown) {
     const res = await svc.vaultDeposit(a, itemId, msg.qty);
     if (!res.ok) {
       returnToBag(w, sid, a.soulKey, itemId, msg.qty); // trả đồ
-      return toastFail(w, sid, res.reason);
+      return vaultFail(w, sid, a, res.reason);
     }
     broadcastSect(w, res.sect);
     w.audit?.("sect.vault_deposit", { name: a.name, sect: res.sect.name, itemId, qty: msg.qty });
@@ -666,7 +678,7 @@ export async function sectVaultWithdraw(w: World, sid: string, raw: unknown) {
     if (!bagHolds(c.inv, msg.itemId, msg.qty)) return toastFail(w, sid, "bag_full");
     const today = dayKey(w.now);
     const res = await svc.vaultWithdraw(a, msg, today);
-    if (!res.ok) return toastFail(w, sid, res.reason);
+    if (!res.ok) return vaultFail(w, sid, a, res.reason);
     // Kho đã trừ: đồ phải VÀO túi hoặc VỀ kho. Chỉ cộng túi khi người này vẫn ở đây, cùng linh hồn, còn sống kiếp này và không đang qua cổng.
     const cur = w.ctrl.get(sid);
     let left = msg.qty;
