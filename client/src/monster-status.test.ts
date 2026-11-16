@@ -12,6 +12,8 @@ import {
   type PipGraphics,
   type PipPoint,
   type PipShape,
+  pipRowTop,
+  targetLabelRise,
 } from "./monster-status";
 
 describe("monster-status: pipsOf (mặt nạ -> chấm)", () => {
@@ -135,5 +137,36 @@ describe("monster-status: drawPips", () => {
     expect(drawPips(g, [], -30)).toBe(0);
     expect(g.calls).toEqual(["clear"]);
     expect(g.styles).toEqual([]);
+  });
+});
+
+describe("monster-status: nhãn mục tiêu không che hàng chấm (mục 26: Tự động là mặc định, quái gần nhất luôn có nhãn)", () => {
+  it("pipRowTop: mép trên = tâm hàng + nửa chấm + quầng 2 px (thường 21, trùm / tinh anh 36)", () => {
+    expect(pipRowTop(13, false)).toBe(13 + 21 + PIP_R + 2);
+    expect(pipRowTop(24, true)).toBe(24 + 36 + PIP_R + 2);
+  });
+
+  it("không có chấm: nhãn ngay trên vòng đánh dấu như cũ (ringR + 6), không dịch", () => {
+    for (const r of [13, 16, 24, 40]) expect(targetLabelRise(r + 12, 0)).toBe(r + 12 + 6);
+  });
+
+  it("có chấm: đáy nhãn nằm TRÊN mép trên hàng chấm (mọi bán kính quái, thường và trùm), và không nâng thừa quá 2 px", () => {
+    for (const boss of [false, true]) {
+      for (const r of [8, 13, 16, 20, 24, 30, 40]) {
+        const ringR = r + 12;
+        const top = pipRowTop(r, boss);
+        const rise = targetLabelRise(ringR, top);
+        expect(rise, `r=${r} boss=${boss}`).toBeGreaterThanOrEqual(top + 2);
+        expect(rise, `r=${r} boss=${boss}: không nâng thừa`).toBeLessThanOrEqual(
+          Math.max(ringR + 6, top + 2),
+        );
+      }
+    }
+  });
+
+  it("trường hợp đã đo (Hôi Lang bán kính 13, 6 chấm): nhãn đáy ở 42 px, hàng chấm lên tới 40 px (trước sửa: nhãn ở 31 px che 9 px của hàng chấm)", () => {
+    expect(pipRowTop(13, false)).toBe(40);
+    expect(targetLabelRise(13 + 12, 40)).toBe(42);
+    expect(13 + 12 + 6).toBe(31);
   });
 });
