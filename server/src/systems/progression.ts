@@ -9,13 +9,14 @@ import {
   canAttemptBreakthrough,
   isLastTier,
   isPeak,
-  breakthroughChance,
+  breakthroughChanceWith,
   type StatMult,
   expMultOf,
 } from "@tien-gioi/shared";
 import type { Player } from "../schema";
 import { takeWhole, type World, type PlayerCtrl } from "../world";
 import { refreshQuests } from "./quests";
+import { consumeBreakAid } from "./status";
 
 const BREAK_COOLDOWN_MS = 3000;
 
@@ -81,7 +82,9 @@ export function breakthrough(w: World, sid: string) {
   }
   c.nextBreak = w.now + BREAK_COOLDOWN_MS;
   p.meditating = false;
-  if (Math.random() < breakthroughChance(p.realm)) {
+  // Đan hộ đạo (#514): đọc cộng thêm rồi GỠ (tiêu hao dù thành công hay thất bại); chỉ tới đây khi đã đủ điều kiện thử, nên không mất oan
+  const aid = consumeBreakAid(w, sid);
+  if (Math.random() < breakthroughChanceWith(p.realm, aid)) {
     p.realm += 1;
     p.tier = 0;
     p.exp = 0;

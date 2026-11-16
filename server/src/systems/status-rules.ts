@@ -95,6 +95,16 @@ export function pruneStatuses(box: StatusBox, now: number): boolean {
 }
 
 /**
+ * Gỡ trạng thái `id` còn hiệu lực khỏi `box` và trả mục đã gỡ (undefined nếu không có / đã hết hạn). Dọn mục hết hạn trước. Dùng cho trạng thái
+ * TIÊU HAO khi dùng (đan hộ đạo `dao_ho`, #514): đọc cường độ và gỡ trong MỘT thao tác để không dùng được hai lần.
+ */
+export function takeStatus(box: StatusBox, id: string, now: number): StatusInst | undefined {
+  pruneStatuses(box, now);
+  const i = box.list.findIndex((s) => s.id === id);
+  return i < 0 ? undefined : box.list.splice(i, 1)[0];
+}
+
+/**
  * Gắn trạng thái `effect` (đã qua xác suất `chance`) lên `box` tại thời điểm `now`.
  * Thời gian kẹp [0, `maxMs`], cường độ kẹp [0, `maxRatio`] của trạng thái. Cùng loại: giữ hạn muộn hơn, cường độ mạnh hơn, và với khiên
  * thì nạp lại đầy (làm mới). Đủ `MAX_STATUSES`: đẩy cái hết hạn sớm nhất ra nếu nó hết sớm hơn cái mới, không thì bỏ cái mới.

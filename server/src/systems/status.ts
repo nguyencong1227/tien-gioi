@@ -14,6 +14,7 @@ import {
   takeDotDamage,
   pruneStatuses,
   stripDots,
+  takeStatus,
   type AddResult,
   type StatusBox,
 } from "./status-rules";
@@ -102,6 +103,19 @@ export function refreshMoveCache(c: PlayerCtrl, now: number) {
   const m = moveSpeedMul(entriesOf(box, now));
   c.moveMul = m === 1 ? undefined : m;
   c.stunned = isStunned(box, now) ? true : undefined;
+}
+
+/**
+ * Đột phá (#514): đọc cộng thêm xác suất của đan hộ đạo `dao_ho` còn hiệu lực rồi GỠ nó (tiêu hao dù đột phá thành công hay thất bại; gửi lại
+ * danh sách cho chủ). Trả 0 khi không có. Gọi ĐÚNG MỘT lần mỗi lần thử đột phá, sau khi đã qua mọi điều kiện (hỏa hầu, hồi) để đan không bị mất oan.
+ */
+export function consumeBreakAid(w: World, sid: string): number {
+  const box = w.ctrl.get(sid)?.st;
+  if (!box) return 0;
+  const s = takeStatus(box, "dao_ho", w.now);
+  if (!s) return 0;
+  sendStatus(w, sid);
+  return s.ratio;
 }
 
 /** Gửi cho chủ danh sách trạng thái còn hiệu lực của chính mình (rỗng cũng gửi: client xoá huy hiệu). */
