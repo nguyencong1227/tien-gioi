@@ -1685,6 +1685,112 @@ Kịch bản được tích hợp và kiểm thử tự động tại `server/sc
 2. **Kế hoạch thử tải trên trùm thật:** Phần đo lường tỉ lệ sống sót, thời gian hạ trùm, số đòn trúng trên các trùm thật (Xích Mãng, Hắc Giao, Thiên Hàn Vương) theo yêu cầu đầy đủ của Issue #876 sẽ được tiến hành sau khi Dev E hoàn thành việc đưa dữ liệu bộ chiêu trùm thật vào `main` (Issue #872).
 3. **Mã kiểm thử thường trực:** Bài test được lưu tại `server/scripts/boss-bot-stress.test.ts` (5 tests, chạy bằng lệnh `npx vitest run server/scripts/boss-bot-stress.test.ts`).
 
+---
+
+## 30. Thống kê thời lượng & Phân tích ổn định CI GitHub Actions (Issue #945)
+
+> Kịch bản đo: Thu thập thời lượng thực tế của >= 40 lượt chạy CI gần nhất bằng script `node server/scripts/measure-ci.mjs` (gọi GitHub REST API `actions/runs/{id}/jobs`).
+
+### 30.1. Hiện tượng & Bối cảnh
+- **Lượt chạy bị huỷ sau 10 phút (Run `43952326729` - PR #924):** Job `check` của CI bị GitHub Actions tự động huỷ sau đúng 10 phút do chạm trần `timeout-minutes: 10`. Khi chạy lại (`gh run rerun --failed`), cả job xanh hoàn toàn chỉ mất 311 giây (5 phút 11 giây), trong đó bước `Test` mất 228 giây.
+- **Dao động thời lượng trên runner GitHub Actions:** Trong khi chạy kiểm thử cục bộ trên máy dev mất ~75–90 giây cho cả bộ 307 tệp (~5370 ca kiểm thử), thời lượng trên CI dao động mạnh từ 159 giây đến 239 giây cho riêng bước `Test`, và từ 208 giây đến 365 giây cho toàn bộ job `check`.
+- **Hệ quả của việc huỷ ngang do timeout:** Khi job bị huỷ bởi `timeout-minutes: 10`, GitHub Actions lập tức ngắt runner mà không xuất log chi tiết hay đẩy artifact, dẫn đến không xác định được test nào bị nghẽn hoặc runner bị chậm ở khâu nào.
+
+### 30.2. Bảng tổng hợp thời lượng 50 lượt CI gần nhất
+
+**Phân loại kết quả (50 lượt gần nhất):**
+- **Thành công (success):** 34 lượt (~68%).
+- **Thất bại (failure):** 1 lượt (~2%) do lỗi định dạng Prettier trên PR #912 của Dev G.
+- **Bị huỷ (cancelled):** 15 lượt (~30%) do cơ chế huỷ lượt cũ khi có commit dồn dập trên `main` (`concurrency: cancel-in-progress: true`).
+
+**Bảng 1: Phân bố thời lượng Job `check` và Bước `Test` (34 lượt thành công):**
+
+| Chỉ số thời lượng | Job `check` (toàn bộ) | Bước `Test` (vitest run) | Ghi chú |
+|---|---:|---:|---|
+| **Mẫu đo (N)** | **34** | **34** | Chỉ tính các lượt hoàn thành thành công |
+| **Nhanh nhất (Min)** | **208 giây** (3m 28s) | **159 giây** (2m 39s) | Lượt chạy khi runner GitHub Actions ít tải |
+| **Trung bình (TB)** | **271 giây** (4m 31s) | **194 giây** (3m 14s) | Thời lượng trung bình ổn định |
+| **Trung vị (Median)** | **265 giây** (4m 25s) | **194 giây** (3m 14s) | 50% số lượt hoàn thành dưới mốc này |
+| **Bách phân vị 95 (p95)** | **330 giây** (5m 30s) | **237 giây** (3m 57s) | Mức tải cao trên hạ tầng runner |
+| **Chậm nhất (Max)** | **365 giây** (6m 05s) | **239 giây** (3m 59s) | Chậm nhất trong các lượt bình thường |
+
+**Bảng 2: Phân bổ thời lượng từng bước trong Job `check` (Đo thực tế qua `measure-ci.mjs`):**
+
+| Bước trong Job `check` | Min | TB | Median | p95 | MAX | Tỉ lệ TB/Job | Ghi chú |
+|---|---:|---:|---:|---:|---:|---:|---|
+| **1. `actions/checkout@v4`** | 2s | 4s | 3s | 7s | **8s** | 1.5% | Kéo mã nguồn Git (đột biến riêng ở lượt 43952326729 xem mục 30.4) |
+| **2. `actions/setup-node@v4`** | 1s | 5s | 4s | 10s | **10s** | 1.8% | Nạp Node.js 22 theo `.nvmrc` |
+| **3. `npm ci`** | 9s | 26s | 18s | 54s | **54s** | 9.5% | Cài đặt dependencies từ `package-lock.json` (tận dụng cache) |
+| **4. Kiểm tra kiểu (`typecheck`)** | 10s | 12s | 12s | 17s | **17s** | 4.4% | `tsc --build` toàn bộ workspace |
+| **5. Lint (`npm run lint`)** | 9s | 12s | 12s | 16s | **16s** | 4.4% | ESLint toàn bộ repo |
+| **6. Kiểm tra định dạng (`prettier`)** | 12s | 16s | 15s | 20s | **21s** | 5.8% | Prettier kiểm tra định dạng |
+| **7. Test (`npm run test`)** | 159s | 191s | 181s | 236s | **237s** | 69.5% | Chạy 307 tệp test qua vitest worker threads |
+| **8. Build client (`npm run build`)** | 4s | 5s | 4s | 6s | **6s** | 1.8% | Vite đóng gói client vào `client/dist` |
+| **TỔNG CẢ JOB CHECK** | **216s** | **275s** | **266s** | **358s** | **365s** | **100.0%** | Trung bình ~4 phút 35 giây |
+
+### 30.3. Danh sách chi tiết các lượt chạy CI gần nhất (Thu thập thực tế)
+
+| Run ID | Nhánh | Sự kiện | Kết quả | Job check | Checkout | npm ci | Typecheck | Test |
+|---|---|---|---|---:|---:|---:|---:|---:|
+| 43968049904 | `a/test-movement-20hz-khong-bu` | pull_request | success | 250s | 3s | 35s | 11s | 167s |
+| 43967991109 | `c/945-ci-duration-log-timeout` | pull_request | success | 293s | 3s | 44s | 12s | 198s |
+| 43967181936 | `b/don-chu-thich-boss-bar` | pull_request | success | 245s | 2s | 33s | 11s | 164s |
+| 43966802891 | `main` | push | success | 358s | 3s | 54s | 17s | 235s |
+| 43966593294 | `a/changelog-trum-fx-tran-giap` | pull_request | success | 277s | 4s | 39s | 12s | 181s |
+| 43965599283 | `a/test-quest-nav-khong-cung-id-tong` | pull_request | success | 365s | 4s | 54s | 17s | 237s |
+| 43965534049 | `b/do-hieu-nang-trum` | pull_request | success | 298s | 4s | 44s | 13s | 196s |
+| 43965375579 | `b/giap-tran-dung-chung` | pull_request | success | 298s | 3s | 45s | 13s | 199s |
+| 43964957067 | `main` | push | failure | 295s | 3s | 45s | 13s | 197s |
+| 43964506367 | `b/do-hieu-nang-trum` | pull_request | success | 276s | 8s | 38s | 11s | 175s |
+| 43963624239 | `main` | push | success | 253s | 6s | 14s | 10s | 177s |
+| 43963512951 | `a/test-trieu-hoi-dat-mot-phan` | pull_request | success | 266s | 3s | 15s | 12s | 196s |
+| 43963407874 | `a/trum-giap-ms-toi-da` | pull_request | success | 245s | 3s | 13s | 11s | 177s |
+| 43963379461 | `c/846-audit-saves-sect-sources` | pull_request | success | 268s | 3s | 15s | 13s | 197s |
+| 43963285413 | `a/fix-sect-shop-gục-chap-chon` | pull_request | success | 216s | 3s | 9s | 10s | 159s |
+| 43962576747 | `b/trum-giap-trieu-hoi` | pull_request | success | 325s | 4s | 18s | 16s | 236s |
+| 43961777476 | `c/846-audit-saves-sect-sources` | pull_request | success | 253s | 7s | 14s | 11s | 175s |
+| 43960840290 | `main` | push | success | 263s | 3s | 16s | 12s | 194s |
+| 43960053920 | `c/846-docs-load-test-sect-m8` | pull_request | success | 242s | 3s | 11s | 11s | 180s |
+| 43959715255 | `main` | push | success | 248s | 5s | 14s | 11s | 179s |
+| 43959446574 | `d/m8-7-budget-sim` | pull_request | success | 250s | 6s | 14s | 11s | 179s |
+| 43958011007 | `a/changelog-trum-ne-kip` | pull_request | success | 311s | 3s | 18s | 15s | 225s |
+| 43957833257 | `main` | push | success | 259s | 7s | 13s | 12s | 180s |
+| 43952326729 | `a/agents-tong-mon-chieu-sau` | pull_request | success (rerun) | 311s | 4s | 16s | 15s | 228s |
+
+### 30.4. Phân tích nguyên nhân thực tế lượt bị huỷ ở 10 phút (Run `43952326729`)
+Tra cứu API chi tiết của **Lượt 1 (Attempt 1)** bị huỷ (`gh api repos/nguyencong1227/tien-gioi/actions/runs/43952326729/attempts/1/jobs`):
+
+| Bước | Bắt đầu | Kết thúc | Thời lượng | Tình trạng |
+|---|---|---|---|---|
+| **Set up job** | 20:41:15 | 20:41:15 | 0s | Hoàn thành |
+| **`actions/checkout@v4`** | **20:41:15** | **20:48:09** | **6 phút 54 giây (414s)** | **Đột biến bất thường** (bình thường 2–8s) |
+| **setup-node + npm ci** | 20:48:09 | 20:48:25 | 16s | Bình thường |
+| **typecheck + lint + prettier** | 20:48:25 | 20:49:01 | 36s | Bình thường |
+| **Test (`npm run test`)** | **20:49:01** | **20:51:27** | **2 phút 26 giây (146s)** | **Bị huỷ (cancelled)** khi vừa chạm 10 phút cả job |
+
+1. **Nguyên nhân chính xác:**
+   - Lượt huỷ duy nhất quan sát được là do bước `actions/checkout@v4` ngốn **6 phút 54 giây** (chiếm tới 70% ngân sách 10 phút của cả job) do sự cố nghẽn mạng / hạ tầng Git clone của runner GitHub Actions lúc đó.
+   - Hoàn toàn **không có bằng chứng về nghẽn CPU hoặc treo deadlock trong bước Test**: vitest mới chạy được 2 phút 26 giây thì toàn bộ job bị hết giờ (trong khi thời gian trung bình của bước Test là 3 phút 14 giây, tức là vitest thậm chí còn chưa kịp hoàn thành thời lượng bình thường). Lần chạy lại (attempt 2) xanh bình thường trong 311s cho thấy sự cố mang tính ngẫu nhiên về mạng/hạ tầng runner.
+
+2. **Bài học về shell bẫy lỗi trong GitHub Actions (`pipefail`):**
+   - Khi ghi nhật ký ra tệp bằng pipe: `npm run test --if-present 2>&1 | tee vitest.log`, shell mặc định của GitHub Actions trên Linux là `bash -e {0}` (KHÔNG có `pipefail`).
+   - Nếu không khai báo `shell: bash`, mã thoát của cả câu lệnh pipe sẽ là mã thoát của lệnh cuối cùng (`tee`), vốn luôn là 0! Điều này dẫn tới nguy cơ: vitest đỏ nhưng bước Test vẫn xanh và PR hỏng vẫn vượt qua CI.
+   - Bắt buộc phải khai báo tường minh `shell: bash` (GitHub Actions tự động chuyển thành `bash --noprofile --norc -eo pipefail {0}`).
+
+### 30.5. Các giải pháp đã triển khai (Issue #945)
+1. **Khống chế timeout riêng cho bước checkout (`timeout-minutes: 3`):**
+   - Đặt `timeout-minutes: 3` cho `actions/checkout@v4`. Nếu hạ tầng GitHub Actions gặp trục trặc mạng khi clone, bước này sẽ timeout và báo lỗi ngay sau 3 phút thay vì ngốn 7–10 phút của cả job.
+2. **Nâng trần timeout của job `check` lên 15 phút (`timeout-minutes: 15`):**
+   - Bảo đảm khoảng đệm an toàn cho cả job ngay cả khi các bước phụ trợ dao động tải.
+3. **Khai báo `shell: bash` có `pipefail` kèm lưu artifact `vitest.log`:**
+   - Bảo đảm bất kỳ ca kiểm thử vitest nào đỏ đều khiến bước Test thất bại (`exit 1`).
+   - Bước `actions/upload-artifact@v4` được kích hoạt khi `failure() || cancelled()` để tải tệp nhật ký `vitest.log` lên cho dev đối chiếu ngay tên ca kiểm thử bị lỗi hoặc bị gián đoạn.
+4. **Cảnh báo tiến trình treo (`hanging-process` reporter):**
+   - Thêm reporter `hanging-process` trong cấu hình Vitest CI (`vitest.config.ts`) để in cảnh báo khi có socket hoặc timer chưa dọn dẹp.
+5. **Thêm `vitest.log` vào `.gitignore`:**
+   - Giữ cây làm việc cục bộ luôn sạch sẽ khi dev chạy thử lệnh kiểm thử có ghi log.
+
+
 
 
 
