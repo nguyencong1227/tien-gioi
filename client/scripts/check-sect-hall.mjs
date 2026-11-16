@@ -467,14 +467,32 @@ async function main() {
       );
 
       if (shotsDir) {
+        // Bảng Tông môn ĐANG MỞ ở tab Nội vụ (các bước trên đã đóng bảng để kiểm HUD / sổ nhiệm vụ: không mở lại thì ảnh chỉ có màn chơi)
+        await evalJs(
+          `window.__ui.toggleSectModal(true); window.__ui.onSect(${JSON.stringify(sect)}); 1`,
+        );
         await hallOf(3);
         await evalJs(`document.getElementById("sect-tab-btn-hall").click(); 1`);
         await sleep(300);
-        const shot = await send("Page.captureScreenshot", { format: "png" });
-        fs.writeFileSync(
-          path.join(shotsDir, `sect-hall-${vp.name}.png`),
-          Buffer.from(shot.result.data, "base64"),
-        );
+        const snap = async (suffix) => {
+          const shot = await send("Page.captureScreenshot", { format: "webp", quality: 85 });
+          fs.writeFileSync(
+            path.join(shotsDir, `sect-hall-${vp.name}${suffix}.webp`),
+            Buffer.from(shot.result.data, "base64"),
+          );
+        };
+        await snap("");
+        // cuộn tới hai mục dưới để ảnh cũng thấy nhiệm vụ + cửa hàng
+        for (const [heading, suffix] of [
+          ["Nhiệm vụ hôm nay", "-nhiem-vu"],
+          ["Cửa hàng tông môn", "-cua-hang"],
+        ]) {
+          await evalJs(
+            `(() => { const h = [...document.querySelectorAll("#sect-tab-hall h4, #sect-tab-hall h3")].find((x) => x.textContent.trim() === ${JSON.stringify(heading)}); if (h) h.scrollIntoView({ block: "start" }); return Boolean(h); })()`,
+          );
+          await sleep(200);
+          await snap(suffix);
+        }
       }
       await evalJs(`window.__ui.toggleSectModal(false); 1`);
     }
