@@ -14,6 +14,8 @@ export interface EscapeHandlers {
   blurChat?: () => boolean;
   /** Hộp xác nhận vứt đồ ở túi (Esc = Giữ lại, QUYET_DINH_M3 mục 24) */
   closeInvDropConfirm?: () => boolean;
+  /** Hộp xác nhận dùng chung (đột phá, bán đồ quý, ...; Esc = Giữ lại, issue #779) */
+  closeActConfirm?: () => boolean;
   closeSectActionConfirm?: () => boolean;
   closeSectDisbandConfirm?: () => boolean;
   closeDhudLeaveConfirm?: () => boolean;
@@ -234,6 +236,7 @@ export function processEscapeKey(handlers: EscapeHandlers): boolean {
   }
 
   // 3. Hộp xác nhận hành động con (bấm Esc = Huỷ, an toàn)
+  if (handlers.closeActConfirm?.()) return true;
   if (handlers.closeInvDropConfirm?.()) return true;
   if (handlers.closeSectActionConfirm?.()) return true;
   if (handlers.closeSectDisbandConfirm?.()) return true;

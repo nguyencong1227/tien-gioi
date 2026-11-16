@@ -191,6 +191,7 @@ import { transitionMs, waitOrSkip } from "./gfx/scene-transition";
 import { getDisplay, onDisplayChange } from "./gfx/display";
 import { optionTag, skipHintText } from "./dialog-opt";
 import { dropConfirmText, dropStillValid, dropWarnText, planDrop, type DropPlan } from "./inv-drop";
+import { inConfirmGuard, type ConfirmSpec } from "./act-confirm";
 import { craftButtonText, craftFeeHint, craftSubtitle, craftTitle } from "./craft-ui";
 import {
   CHAT_PREF_KEY,
@@ -699,6 +700,38 @@ function selectSlot(i: number) {
   closeDropConfirm(false);
   selectedSlot = i;
   renderInventory();
+}
+
+// ---------- Hộp xác nhận DÙNG CHUNG (issue #779, docs/RA_SOAT_THAO_TAC.md) ----------
+let actConfirmAction: (() => void) | null = null;
+let actConfirmOpener: HTMLElement | null = null;
+let actConfirmOpenedAt = -Infinity;
+
+/** Mở hộp xác nhận: nêu hậu quả bằng chữ; "Giữ lại" được focus; `onOk` chỉ chạy khi bấm xác nhận SAU cửa sổ chống click ma. */
+function askActConfirm(spec: ConfirmSpec, onOk: () => void, opener: HTMLElement | null) {
+  actConfirmAction = onOk;
+  actConfirmOpener = opener;
+  actConfirmOpenedAt = performance.now();
+  $("act-confirm-text").textContent = spec.text;
+  const warn = $("act-confirm-warn");
+  warn.textContent = spec.warn ?? "";
+  warn.hidden = spec.warn === null;
+  $("act-btn-yes-label").textContent = spec.ok;
+  $("act-btn-no-label").textContent = spec.cancel;
+  $("act-confirm").hidden = false;
+  ($("act-btn-no") as HTMLButtonElement).focus(); // mặc định "Giữ lại": Enter nhầm cũng không làm gì
+}
+
+/** Đóng hộp xác nhận dùng chung; `refocus` = trả focus về nút đã mở hộp. `false` nếu hộp không mở. */
+function closeActConfirm(refocus = true): boolean {
+  const box = document.getElementById("act-confirm");
+  if (!box || box.hidden) return false;
+  box.hidden = true;
+  actConfirmAction = null;
+  const back = actConfirmOpener;
+  actConfirmOpener = null;
+  if (refocus && back && !back.hidden) back.focus();
+  return true;
 }
 
 /** Kế hoạch vứt đang chờ xác nhận (chụp lúc bấm "Vứt 1" / "Vứt hết"); `null` = không có hộp. */
@@ -3128,6 +3161,17 @@ export const ui = {
     bindTap("inv-btn-drop1", () => askDropConfirm(false, $("inv-btn-drop1")));
     bindTap("inv-btn-dropall", () => askDropConfirm(true, $("inv-btn-dropall")));
     bindTap("inv-drop-yes", () => confirmDrop());
+    // Hộp xác nhận dùng chung: bỏ qua bấm trong cửa sổ chống click ma; "Chưa / Giữ lại" cũng vậy (hộp không được chớp tắt dưới ngón tay)
+    bindTap("act-btn-yes", () => {
+      if (inConfirmGuard(actConfirmOpenedAt, performance.now())) return;
+      const go = actConfirmAction;
+      closeActConfirm(true);
+      go?.();
+    });
+    bindTap("act-btn-no", () => {
+      if (inConfirmGuard(actConfirmOpenedAt, performance.now())) return;
+      closeActConfirm(true);
+    });
     bindTap("inv-drop-no", () => {
       if (performance.now() - dropConfirmOpenedAt < DROP_CONFIRM_GUARD_MS) return;
       closeDropConfirm(true);
@@ -3734,6 +3778,8 @@ export const ui = {
   answerPrompt(answer: PromptAnswer): boolean {
     const id = pickPromptButton(answer, buttonShown);
     if (!id) return false;
+    // X (giữ lại) là ý định CHỦ Ý bằng bàn phím: không bị cửa sổ chống click ma của hộp xác nhận dùng chung chặn (Y vẫn bị chặn trong cửa sổ đó)
+    if (id === "act-btn-no") actConfirmOpenedAt = performance.now() - 10_000;
     $(id).click();
     return true;
   },
@@ -3769,6 +3815,23 @@ export const ui = {
       modalStack.remove("inv-modal");
       returnFocus($("btn-bag"));
     }
+  },
+
+  /**
+   * Hộp xác nhận dùng chung cho thao tác khó hoàn tác (issue #779): `spec` = chữ (câu hỏi, dòng nhắc, nút), `onOk` chạy khi xác nhận. Có nền tối chặn bấm
+   * xuyên; Esc / X = giữ lại, Y = xác nhận (`prompts.ts`). `opener` = nút để trả focus khi đóng.
+   */
+  askConfirm(spec: ConfirmSpec, onOk: () => void, opener: HTMLElement | null = null) {
+    askActConfirm(spec, onOk, opener);
+  },
+
+  /** Đóng hộp xác nhận dùng chung nếu đang mở (Esc đóng hộp trước, rồi mới tới bảng); `refocus` = trả focus về nút đã mở. */
+  closeActConfirm(refocus = true): boolean {
+    return closeActConfirm(refocus);
+  },
+
+  isActConfirmOpen(): boolean {
+    return !$("act-confirm").hidden;
   },
 
   /** Đóng hộp xác nhận vứt nếu đang mở (Esc đóng hộp trước, rồi mới tới túi đồ). */
@@ -3936,7 +3999,7 @@ export const ui = {
   },
 
   closeAllModals(): boolean {
-    let closedAny = false;
+    let closedAny = closeActConfirm(false);
     if (this.isDialogOpen()) {
       this.closeDialog();
       closedAny = true;
@@ -4157,6 +4220,7 @@ export const ui = {
         }
         return false;
       },
+      closeActConfirm: () => this.closeActConfirm(true),
       closeInvDropConfirm: () => this.closeInvDropConfirm(),
       closeSectActionConfirm: () => this.closeSectConfirm(),
       closeSectDisbandConfirm: () => this.closeSectDisbandConfirm(),
@@ -4234,7 +4298,14 @@ export const ui = {
         const el = document.getElementById(id);
         return !!el && (el.hidden || el.closest("[hidden]") !== null);
       });
-    return modalStack.size() > 0 || this.isDialogOpen() || this.isPlayerMenuOpen();
+    // hộp xác nhận dùng chung (#779) KHÔNG nằm trong modalStack (Esc / Y / X do nó tự xử lý) nhưng vẫn là tầng trên cùng: đang mở mà giữ D thì nhân vật không được
+    // lặng lẽ đi tiếp (người chơi đọc hậu quả, quái đánh). keyup vẫn tới MoveKeys (pha bắt trên window) nên đóng hộp xong không kẹt phím.
+    return (
+      modalStack.size() > 0 ||
+      this.isDialogOpen() ||
+      this.isPlayerMenuOpen() ||
+      this.isActConfirmOpen()
+    );
   },
 
   showNewbieGuide(force = false) {
@@ -4894,6 +4965,7 @@ export const ui = {
       onRebirth?: (choice: RebirthChoice) => void;
     },
   ) {
+    closeActConfirm(false); // gục lúc hộp xác nhận (đột phá, bán...) còn mở: hộp nằm TRÊN màn hình Hoàng Tuyền nên phải đóng
     activeLimboMsg = msg;
     activeSoulView = msg.soul;
     selectedOrigin =

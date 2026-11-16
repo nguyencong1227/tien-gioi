@@ -1631,6 +1631,31 @@
         </div>
       </div>
 
+      <!-- Hộp xác nhận DÙNG CHUNG cho thao tác khó hoàn tác (issue #779, docs/RA_SOAT_THAO_TAC.md): đột phá, bán đồ quý, mở chân linh... Y = xác nhận, X = giữ lại -->
+      <div
+        id="act-confirm"
+        class="act-confirm"
+        hidden
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="act-confirm-text"
+      >
+        <div class="act-confirm-box">
+          <p id="act-confirm-text"></p>
+          <small id="act-confirm-warn" hidden></small>
+          <div class="act-confirm-btns">
+            <button type="button" id="act-btn-no" class="act-btn">
+              <span id="act-btn-no-label">Giữ lại</span>
+              <kbd class="btn-key" aria-hidden="true" data-key-action="prompt.no">X</kbd>
+            </button>
+            <button type="button" id="act-btn-yes" class="act-btn drop">
+              <span id="act-btn-yes-label">Xác nhận</span>
+              <kbd class="btn-key" aria-hidden="true" data-key-action="prompt.yes">Y</kbd>
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Lời mời tổ đội -->
       <div
         id="party-invite-box"
