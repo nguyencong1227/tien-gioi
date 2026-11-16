@@ -16,7 +16,9 @@ export interface Limit {
  * giới hạn ở đây chỉ chặn spam để server không phải xử lý (và gửi toast) hàng nghìn lần mỗi giây.
  */
 export const MESSAGE_LIMITS: Record<string, Limit> = {
-  input: { perSec: 30, burst: 40 },
+  // Mục 41: mạng nhà đứng 3-5 giây rồi xả dồn 60-100 tin `input` MỘT lúc; burst cũ 40 bỏ đúng PHẦN ĐUÔI của đợt dồn (chính các tin DỪNG nằm cuối) nên nhả phím
+  // mà nhân vật không dừng. 100 = 5 giây ở 20 Hz (nhịp tim ứng dụng coi là chết sau 8 giây); spam bền vững trên 30 tin / giây vẫn bị bỏ.
+  input: { perSec: 30, burst: 100 },
   attack: { perSec: 10, burst: 10 },
   skill: { perSec: 10, burst: 10 },
   // Dùng chiêu thức (M7.2b): như `skill` (hồi chiêu từng ô do server giữ, giới hạn này chỉ chặn spam)
