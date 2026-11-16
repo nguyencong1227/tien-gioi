@@ -122,6 +122,99 @@ describe("status-rules: gắn và làm mới", () => {
   });
 });
 
+describe("status-rules: đủ ô, trạng thái có hại ưu tiên (đồ chế làm đầy ô, #514)", () => {
+  /** Hộp bốn buff có lợi: haste hết lúc 6000, shield 8000, regen 7000, dao_ho 15 phút (đồ chế). */
+  const bonBuff = () => {
+    const box = newStatusBox();
+    addStatus(box, eff("haste", 6000, 0.2), 0);
+    addStatus(box, eff("shield", 8000, 0.2), 0, { maxHp: 100 });
+    addStatus(box, eff("regen", 7000, 0.1), 0);
+    addStatus(box, eff("dao_ho", 900000, 0.1), 0);
+    expect(box.list).toHaveLength(MAX_STATUSES);
+    return box;
+  };
+  const ids = (box: ReturnType<typeof newStatusBox>) => box.list.map((s) => s.id).sort();
+
+  it("bốn buff + một trạng thái có hại ngắn: có hại VÀO, buff hết sớm nhất mất, đan hộ đạo ở lại (không thành miễn nhiễm sát thương theo giây)", () => {
+    const box = bonBuff();
+    // bỏng 3 giây ngắn hơn MỌI buff: luật cũ sẽ bỏ nó ("full"), nay phải vào
+    expect(addStatus(box, eff("burn", 3000), 0, { baseDmg: 10 })).toBe("added");
+    expect(ids(box)).toEqual(["burn", "dao_ho", "regen", "shield"]); // haste (6000) mất
+    expect(box.list).toHaveLength(MAX_STATUSES);
+    // vỡ giáp (khống chế) và chảy máu tiếp theo cũng vào, mỗi lần đẩy buff sớm nhất kế tiếp (regen, rồi shield), dao_ho vẫn còn
+    expect(addStatus(box, eff("bleed", 2000), 0, { baseDmg: 10 })).toBe("added");
+    expect(ids(box)).toEqual(["bleed", "burn", "dao_ho", "shield"]);
+    expect(addStatus(box, eff("sunder", 1000, 0.3), 0)).toBe("added");
+    expect(ids(box)).toEqual(["bleed", "burn", "dao_ho", "sunder"]);
+  });
+
+  it("ba buff + một trạng thái có hại + choáng: choáng vẫn vào, đẩy BUFF sớm nhất chứ không đẩy bỏng", () => {
+    const box = newStatusBox();
+    addStatus(box, eff("haste", 8000, 0.2), 0);
+    addStatus(box, eff("shield", 8000, 0.2), 1, { maxHp: 100 });
+    addStatus(box, eff("regen", 8000, 0.1), 2);
+    addStatus(box, eff("burn", 500), 0, { baseDmg: 10 }); // bỏng hết SỚM nhất cả hộp
+    expect(addStatus(box, eff("stun", 1000, 0), 0)).toBe("added");
+    expect(isStunned(box, 500)).toBe(true);
+    expect(ids(box)).toEqual(["burn", "regen", "shield", "stun"]); // haste (buff sớm nhất, 8000 < 8001 < 8002) mất, bỏng còn
+  });
+
+  it("đan hộ đạo không bị đẩy trước buff chiêu ngắn hơn (kể cả khi nó là buff cũ nhất)", () => {
+    const box = newStatusBox();
+    addStatus(box, eff("dao_ho", 900000, 0.1), 0); // gắn TRƯỚC mọi buff khác
+    addStatus(box, eff("haste", 8000, 0.2), 10);
+    addStatus(box, eff("burn", 8000), 10, { baseDmg: 10 });
+    addStatus(box, eff("poison", 8000), 10, { baseDmg: 10 });
+    expect(addStatus(box, eff("bleed", 8000), 10, { baseDmg: 10 })).toBe("added");
+    expect(ids(box)).toEqual(["bleed", "burn", "dao_ho", "poison"]); // haste mất, dao_ho còn
+  });
+
+  it("buff có lợi mới KHÔNG BAO GIỜ đẩy trạng thái có hại, dù sống lâu hơn tất cả; không có chỗ thì bị bỏ", () => {
+    const box = newStatusBox();
+    const bad: StatusId[] = ["burn", "poison", "bleed", "chill"];
+    bad.forEach((id, i) => addStatus(box, eff(id, 2000 + i * 1000), 0, { baseDmg: 10 }));
+    expect(addStatus(box, eff("shield", 8000, 0.2), 0, { maxHp: 100 })).toBe("full");
+    expect(addStatus(box, eff("dao_ho", 900000, 0.1), 0)).toBe("full");
+    expect(box.list.map((s) => s.id)).toEqual(bad);
+  });
+
+  it("buff có lợi mới chỉ đẩy buff có lợi hết sớm hơn nó (vẫn giữ trạng thái có hại)", () => {
+    const box = newStatusBox();
+    addStatus(box, eff("haste", 3000, 0.2), 0);
+    addStatus(box, eff("burn", 1000), 0, { baseDmg: 10 });
+    addStatus(box, eff("poison", 1000), 0, { baseDmg: 10 });
+    addStatus(box, eff("bleed", 1000), 0, { baseDmg: 10 });
+    expect(addStatus(box, eff("shield", 8000, 0.2), 0, { maxHp: 100 })).toBe("added");
+    expect(ids(box)).toEqual(["bleed", "burn", "poison", "shield"]); // haste (buff duy nhất, sớm hơn) mất
+    // regen 1 giây ngắn hơn buff còn lại (shield 8 giây): bị bỏ
+    expect(addStatus(box, eff("regen", 1000, 0.1), 0)).toBe("full");
+    expect(ids(box)).toEqual(["bleed", "burn", "poison", "shield"]);
+  });
+
+  it("buff duy nhất là đan hộ đạo: trạng thái có hại thứ tư theo luật cũ, KHÔNG đẩy đan (đã tốn một viên)", () => {
+    const box = newStatusBox();
+    addStatus(box, eff("dao_ho", 900000, 0.1), 0);
+    addStatus(box, eff("burn", 3000), 0, { baseDmg: 10 });
+    addStatus(box, eff("poison", 4000), 0, { baseDmg: 10 });
+    addStatus(box, eff("bleed", 5000), 0, { baseDmg: 10 });
+    // tê cóng 2 giây ngắn hơn nạn nhân (bỏng 3 giây): bị bỏ như cũ, đan còn nguyên
+    expect(addStatus(box, eff("chill", 2000, 0.3), 0)).toBe("full");
+    expect(ids(box)).toEqual(["bleed", "burn", "dao_ho", "poison"]);
+    // khống chế vẫn luôn vào, đẩy trạng thái thường có hại hết sớm nhất (bỏng), KHÔNG đẩy đan
+    expect(addStatus(box, eff("sunder", 1000, 0.3), 0)).toBe("added");
+    expect(ids(box)).toEqual(["bleed", "dao_ho", "poison", "sunder"]);
+  });
+
+  it("hộp chưa đủ ô: không đẩy ai (cả có hại lẫn có lợi)", () => {
+    const box = newStatusBox();
+    addStatus(box, eff("haste", 8000, 0.2), 0);
+    addStatus(box, eff("burn", 8000), 0, { baseDmg: 10 });
+    addStatus(box, eff("dao_ho", 900000, 0.1), 0);
+    expect(addStatus(box, eff("chill", 1000, 0.3), 0)).toBe("added");
+    expect(box.list).toHaveLength(MAX_STATUSES);
+  });
+});
+
 describe("status-rules: choáng", () => {
   it("tối đa STUN_MAX_MS; không lặp liền nhau: miễn cả lúc đang choáng và STUN_IMMUNE_MS sau khi hết", () => {
     const box = newStatusBox();
