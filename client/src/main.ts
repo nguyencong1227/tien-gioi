@@ -7,6 +7,8 @@ import {
   JOIN_BAD_TOKEN,
   JOIN_NEED_CHARACTER,
   NPCS,
+  NPC_BY_ID,
+  ITEM_BY_ID,
   QUESTS,
   RECIPES,
   SHOPS,
@@ -678,6 +680,8 @@ async function start(room: Room, mapId: string) {
     (window as any).__ui = ui;
     // Cho `check-quest-log.mjs` (#409): id mọi nhiệm vụ chính tuyến / lặp THẬT của game để nạp vào sổ nhiệm vụ
     // Cho `check-forge-shop.mjs` (#409): công thức rèn + cửa hàng THẬT của game (nguyên liệu, phí) để nạp túi / ví đúng ca "đủ" / "thiếu"
+    // Cho `check-craft-ui.mjs` (#769): đối tượng dữ liệu DÙNG CHUNG để script chèn NPC / đan / công thức THỬ (nghề nhỏ chưa có dữ liệu thật: D làm ở #763) rồi dọn
+    (window as any).__craftData = { NPC_BY_ID, ITEM_BY_ID, RECIPES };
     (window as any).__catalog = () => ({
       recipes: RECIPES.map((r) => ({
         id: r.id,

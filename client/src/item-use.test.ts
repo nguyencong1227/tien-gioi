@@ -13,6 +13,7 @@ import {
 } from "@tien-gioi/shared";
 import {
   bookTeach,
+  isQuickCandidate,
   statusEffectLine,
   useBlockReason,
   useLabelOf,
@@ -161,6 +162,25 @@ describe("useBlockReason: nút Dùng của vật phẩm gắn trạng thái", ()
     ])
       expect(useBlockReason(d, ctx({ activeIds: new Set(["dao_ho"]) }))).toBeNull();
     expect(useBlockReason(ITEM_BY_ID[bookIdOf("hoa_van_kiem")], ctx())).toBeNull();
+  });
+});
+
+describe("isQuickCandidate: ô dùng nhanh không bị đan / phù gắn trạng thái chiếm", () => {
+  it("đan hồi huyết / hồi linh / tu vi là ứng viên; đan hộ đạo, phù (gắn trạng thái) thì không", () => {
+    expect(isQuickCandidate(ITEM_BY_ID.hoi_huyet_dan)).toBe(true);
+    expect(isQuickCandidate(ITEM_BY_ID.hoi_linh_dan)).toBe(true);
+    expect(isQuickCandidate(pill())).toBe(false);
+    expect(isQuickCandidate(pill({ forRealm: undefined }))).toBe(false);
+  });
+  it("nguyên liệu, trang bị, kinh quyển, không có món: không", () => {
+    expect(isQuickCandidate(ITEM_BY_ID.long_tho)).toBe(false);
+    expect(isQuickCandidate(ITEM_BY_ID.lang_nha_kiem)).toBe(false);
+    expect(isQuickCandidate(ITEM_BY_ID[bookIdOf("hoa_van_kiem")])).toBe(false);
+    expect(isQuickCandidate(undefined)).toBe(false);
+  });
+  it("MỌI đan dược thật hiện có (chưa có đan gắn trạng thái) vẫn là ứng viên: hành vi cũ không đổi", () => {
+    for (const it of ITEMS)
+      if (it.type === "consumable") expect(isQuickCandidate(it), it.id).toBe(true);
   });
 });
 

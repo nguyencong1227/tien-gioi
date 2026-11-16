@@ -138,7 +138,13 @@ import {
 } from "./quest-log";
 import { pickupBtnText, portalBtnText, talkBtnText } from "./ctx-btn";
 import { sound } from "./audio";
-import { bookTeach, statusEffectLine, useBlockReason, useLabelOf } from "./item-use";
+import {
+  bookTeach,
+  isQuickCandidate,
+  statusEffectLine,
+  useBlockReason,
+  useLabelOf,
+} from "./item-use";
 import {
   applyRarityBadge,
   applyRarityText,
@@ -593,7 +599,7 @@ function resolveQuickItems(): [string, string] {
   for (const s of invSlots) {
     if (!s) continue;
     const def = ITEM_BY_ID[s.itemId];
-    if (def?.type === "consumable" && !consumablesInBag.includes(def.id)) {
+    if (isQuickCandidate(def) && def && !consumablesInBag.includes(def.id)) {
       consumablesInBag.push(def.id);
     }
   }

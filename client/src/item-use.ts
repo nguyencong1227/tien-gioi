@@ -48,6 +48,15 @@ export function bookTeach(
   };
 }
 
+/**
+ * Món có thể chiếm ô dùng nhanh khi túi KHÔNG có đan hồi huyết / hồi linh (ô rơi về đan dược khác): đan dược (`consumable`) trừ đan / phù gắn trạng thái
+ * (`effect.kind === "status"`, nghề nhỏ #514). Đan hộ đạo chỉ dùng được ở đỉnh cảnh giới và phù chỉ có 60 giây: bấm nhầm bằng phím tắt giữa trận là mất đồ chế
+ * (đan hộ đạo thì máy chủ từ chối + không trừ, nhưng phù thì dùng được ngay), nên chỉ dùng từ túi đồ, có dòng "Hiệu lực" và hộp lý do.
+ */
+export function isQuickCandidate(def: Pick<ItemDef, "type" | "effect"> | undefined): boolean {
+  return def?.type === "consumable" && def.effect?.kind !== "status";
+}
+
 /** Bối cảnh để quyết định nút "Dùng" của vật phẩm gắn trạng thái có mờ không (tất cả lấy từ state của CHÍNH MÌNH, client không tin gì khác). */
 export interface UseContext {
   /** Id các trạng thái đang còn hiệu lực (từ `StatusTracker.active`) */
