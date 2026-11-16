@@ -1751,6 +1751,150 @@ describe("audit-saves (Issue #112)", () => {
       );
     });
 
+    it("M8: today.earned vượt quá tổng cống hiến các nguồn đã ghi nhận -> sect_member_today_earned_exceeds_sources (kèm các ca ranh giới nguồn)", () => {
+      // 1. Không có nguồn nào: maxFromSources = 0. earned = 0 thì hợp lệ, earned = 1 thì lỗi
+      const makeTodaySect = (today: Record<string, unknown>) =>
+        JSON.stringify({
+          ...validSect,
+          members: [
+            {
+              ...validSect.members[0],
+              today: { day: "2026-11-17", ...today },
+            },
+          ],
+        });
+
+      const rawZeroClean = makeTodaySect({ earned: 0, deposit: 0, quests: [], dungeon: false });
+      expect(auditSectSaveData(rawZeroClean, rawZeroClean.length).map((e) => e.code)).not.toContain(
+        "sect_member_today_earned_exceeds_sources",
+      );
+
+      const rawZeroExceed = makeTodaySect({ earned: 1, deposit: 0, quests: [], dungeon: false });
+      expect(auditSectSaveData(rawZeroExceed, rawZeroExceed.length).map((e) => e.code)).toContain(
+        "sect_member_today_earned_exceeds_sources",
+      );
+
+      // 2. Ranh giới Bí cảnh (dungeon): SECT_DUNGEON_CH = 20
+      // earned = 20 -> sạch, earned = 21 -> lỗi
+      const rawDungeonClean = makeTodaySect({ earned: 20, deposit: 0, quests: [], dungeon: true });
+      expect(
+        auditSectSaveData(rawDungeonClean, rawDungeonClean.length).map((e) => e.code),
+      ).not.toContain("sect_member_today_earned_exceeds_sources");
+
+      const rawDungeonExceed = makeTodaySect({ earned: 21, deposit: 0, quests: [], dungeon: true });
+      expect(
+        auditSectSaveData(rawDungeonExceed, rawDungeonExceed.length).map((e) => e.code),
+      ).toContain("sect_member_today_earned_exceeds_sources");
+
+      // 3. Ranh giới Mẫu lạ ngoài bảng fixture: mặc định bậc 3 an toàn (40 CH)
+      // earned = 40 -> sạch, earned = 41 -> lỗi
+      const rawUnknownClean = makeTodaySect({
+        earned: 40,
+        deposit: 0,
+        quests: ["khong_co_trong_bang"],
+        dungeon: false,
+      });
+      expect(
+        auditSectSaveData(rawUnknownClean, rawUnknownClean.length).map((e) => e.code),
+      ).not.toContain("sect_member_today_earned_exceeds_sources");
+
+      const rawUnknownExceed = makeTodaySect({
+        earned: 41,
+        deposit: 0,
+        quests: ["khong_co_trong_bang"],
+        dungeon: false,
+      });
+      expect(
+        auditSectSaveData(rawUnknownExceed, rawUnknownExceed.length).map((e) => e.code),
+      ).toContain("sect_member_today_earned_exceeds_sources");
+
+      // 4. Ranh giới theo từng bậc của fixture:
+      // - st_tru_lang (độ khó 1, 20 CH): 20 sạch, 21 lỗi
+      const rawQ1Clean = makeTodaySect({
+        earned: 20,
+        deposit: 0,
+        quests: ["st_tru_lang"],
+        dungeon: false,
+      });
+      expect(auditSectSaveData(rawQ1Clean, rawQ1Clean.length).map((e) => e.code)).not.toContain(
+        "sect_member_today_earned_exceeds_sources",
+      );
+
+      const rawQ1Exceed = makeTodaySect({
+        earned: 21,
+        deposit: 0,
+        quests: ["st_tru_lang"],
+        dungeon: false,
+      });
+      expect(auditSectSaveData(rawQ1Exceed, rawQ1Exceed.length).map((e) => e.code)).toContain(
+        "sect_member_today_earned_exceeds_sources",
+      );
+
+      // - st_nop_nanh (độ khó 2, 30 CH): 30 sạch, 31 lỗi
+      const rawQ2Clean = makeTodaySect({
+        earned: 30,
+        deposit: 0,
+        quests: ["st_nop_nanh"],
+        dungeon: false,
+      });
+      expect(auditSectSaveData(rawQ2Clean, rawQ2Clean.length).map((e) => e.code)).not.toContain(
+        "sect_member_today_earned_exceeds_sources",
+      );
+
+      const rawQ2Exceed = makeTodaySect({
+        earned: 31,
+        deposit: 0,
+        quests: ["st_nop_nanh"],
+        dungeon: false,
+      });
+      expect(auditSectSaveData(rawQ2Exceed, rawQ2Exceed.length).map((e) => e.code)).toContain(
+        "sect_member_today_earned_exceeds_sources",
+      );
+
+      // - st_tru_ho (độ khó 3, 40 CH): 40 sạch, 41 lỗi
+      const rawQ3Clean = makeTodaySect({
+        earned: 40,
+        deposit: 0,
+        quests: ["st_tru_ho"],
+        dungeon: false,
+      });
+      expect(auditSectSaveData(rawQ3Clean, rawQ3Clean.length).map((e) => e.code)).not.toContain(
+        "sect_member_today_earned_exceeds_sources",
+      );
+
+      const rawQ3Exceed = makeTodaySect({
+        earned: 41,
+        deposit: 0,
+        quests: ["st_tru_ho"],
+        dungeon: false,
+      });
+      expect(auditSectSaveData(rawQ3Exceed, rawQ3Exceed.length).map((e) => e.code)).toContain(
+        "sect_member_today_earned_exceeds_sources",
+      );
+
+      // 5. Kết hợp nhiều nguồn: góp kho 15 + bí cảnh 20 + st_tru_lang (20) + st_nop_nanh (30) = 85
+      // earned = 85 -> sạch, earned = 86 -> lỗi
+      const rawComboClean = makeTodaySect({
+        earned: 85,
+        deposit: 15,
+        quests: ["st_tru_lang", "st_nop_nanh"],
+        dungeon: true,
+      });
+      expect(
+        auditSectSaveData(rawComboClean, rawComboClean.length).map((e) => e.code),
+      ).not.toContain("sect_member_today_earned_exceeds_sources");
+
+      const rawComboExceed = makeTodaySect({
+        earned: 86,
+        deposit: 15,
+        quests: ["st_tru_lang", "st_nop_nanh"],
+        dungeon: true,
+      });
+      expect(auditSectSaveData(rawComboExceed, rawComboExceed.length).map((e) => e.code)).toContain(
+        "sect_member_today_earned_exceeds_sources",
+      );
+    });
+
     it("M8: ô kho vượt quá cấp tông môn bị khoá nhưng chứa vật phẩm -> sect_vault_locked_slot_not_empty", () => {
       // Cấp 1 (points = 0) chỉ mở 40 ô (SECT_VAULT_SLOTS). Mảng 80 ô (SECT_VAULT_SLOTS_MAX), ô thứ 40 (index 40) có đồ -> lỗi
       const slots = Array.from({ length: SECT_VAULT_SLOTS_MAX }, (_, i) =>
@@ -1782,7 +1926,7 @@ describe("audit-saves (Issue #112)", () => {
               day: "2026-11-17",
               earned: 80,
               deposit: 20,
-              quests: ["st_tru_lang"],
+              quests: ["st_tru_lang", "st_tru_ho"],
               dungeon: true,
               buys: { [SECT_SHOP[0].itemId]: 1 },
             },
@@ -1807,30 +1951,6 @@ describe("audit-saves (Issue #112)", () => {
       const raw = JSON.stringify(fullM8Sect);
       const errors = auditSectSaveData(raw, raw.length);
       expect(errors).toEqual([]);
-    });
-
-    it("M8.4 đột biến: nới lỏng kiểm tra số lượng today.quests vượt SECT_QUEST_SLOTS thì test bắt buộc đỏ", () => {
-      // Hàm nới lỏng: chỉ kiểm tra là mảng, không kiểm tra <= SECT_QUEST_SLOTS
-      const laxQuestCount = (q: unknown) => Array.isArray(q);
-      expect(laxQuestCount(["st_tru_lang", "st_nop_nanh", "st_tru_ho", "st_extra"])).toBe(true);
-
-      // auditSectSaveData THẬT bắt buộc phát hiện lỗi:
-      const raw = JSON.stringify({
-        ...validSect,
-        members: [
-          {
-            ...validSect.members[0],
-            today: {
-              day: "2026-11-17",
-              earned: 0,
-              quests: ["st_tru_lang", "st_nop_nanh", "st_tru_ho", "st_extra"],
-            },
-          },
-        ],
-      });
-      expect(auditSectSaveData(raw, raw.length).map((e) => e.code)).toContain(
-        "sect_member_today_quests_exceed_slots",
-      );
     });
 
     it("quét thư mục sects/: phát hiện lệch tên file, trùng tên, trùng tag, và thành viên ở 2 tông môn", () => {
