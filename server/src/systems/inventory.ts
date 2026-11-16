@@ -163,6 +163,15 @@ export function useItem(w: World, sid: string, slot: unknown) {
           });
         }
       }
+      // Cùng hiệu lực còn hạn: TỪ CHỐI, KHÔNG trừ (uống thêm chỉ làm mới và mất trọn một viên để kéo dài vài giây; review #761 của B, quyết định A)
+      const active = c.st?.list.find((s) => s.id === eff.id && s.until > w.now);
+      if (active) {
+        const left = Math.ceil((active.until - w.now) / 1000);
+        return w.events.toast(sid, {
+          text: `${def.name} đang còn hiệu lực (còn ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}), chưa cần dùng thêm.`,
+          tone: "info",
+        });
+      }
       const res = applyPlayerStatus(
         w,
         sid,

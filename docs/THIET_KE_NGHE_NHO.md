@@ -18,7 +18,7 @@
 2. **Toast do máy chủ ghi theo trạm:** `craft` đọc `NPC_BY_ID[rc.npcId]?.station ?? "forge"`, ghi `${verb} thành công ${tên}.`.
 3. **Sản phẩm là VẬT PHẨM DÙNG TỪ TÚI** (như đan hiện có), KHÔNG gắn vào ô chiêu: `useItem` thêm nhánh `ItemEffect` mới `{ kind: "status"; id: StatusId; ratio: number; ms: number; forRealm?: number }` (máy chủ kẹp `ms` <= `maxMs`, `ratio` <= `maxRatio` của `STATUSES`; `forRealm` chỉ dùng cho đan hộ đạo; hồi dùng `def.cooldown` như đan).
 4. **Hiệu lực có thời hạn đi qua hệ trạng thái có sẵn** (HUD trả lời B): chủ nhận tin `status` `[id, msLeft, ratio?]`, B vẽ chip đếm ngược từ `msLeft` (thêm tên + biểu tượng + màu cho từng id). Không thêm tin mới, không đưa vào state chung. `statusCarriesRatio` mở rộng cho loại mới để `ratio` được gửi.
-5. **Luật chung của hiệu lực chế phẩm:** cùng id làm mới, không cộng dồn; mỗi hiệu lực có `maxMs` / `maxRatio` kẹp theo `STATUSES`; mất khi chết / qua kiếp / thoát phòng / qua cổng (đúng như trạng thái hiện có, nêu rõ trong mô tả vật phẩm); KHÔNG dùng được khi đang thách đấu (như đan hồi huyết hiện có) để trận PK không bị nghiêng bằng đồ chế; không lưu hồ sơ (không thêm dữ liệu lưu).
+5. **Luật chung của hiệu lực chế phẩm:** không cộng dồn; dùng vật phẩm khi CÙNG id còn hạn thì TỪ CHỐI và KHÔNG trừ (toast "còn hiệu lực (còn m:ss)"; quyết định A theo review #761 của B: làm mới chỉ kéo dài vài giây mà mất trọn một viên; client có thể làm mờ nút Dùng theo chip `status`), hết hạn mới dùng lại được (chiêu / quái gắn cùng id vẫn làm mới như cũ); mỗi hiệu lực có `maxMs` / `maxRatio` kẹp theo `STATUSES`; mất khi chết / qua kiếp / thoát phòng / qua cổng (đúng như trạng thái hiện có, nêu rõ trong mô tả vật phẩm); KHÔNG dùng được khi đang thách đấu (như đan hồi huyết hiện có) để trận PK không bị nghiêng bằng đồ chế; không lưu hồ sơ (không thêm dữ liệu lưu).
 6. **Chế tác tất định ở lát 1** (không có "tỉ lệ thành / hỏng"): khung thời gian thực, thất bại ngẫu nhiên khi mất nguyên liệu quý gây khó chịu, và chống sinh tiền đã đủ nhờ mục 4 bên dưới. Nếu mô phỏng kinh tế của D cho thấy cần, thêm sau `RecipeDef.failPct` (máy chủ ngẫu nhiên, test seed) ở lát riêng.
 
 ## 3. Ba nhóm sản phẩm (lát theo mục 7)
@@ -45,7 +45,7 @@
 
 ## 6. Máy chủ (A) — việc theo lát
 - `craft`: động từ theo trạm (mục 2.2); giữ trọn vẹn hoặc không gì cả.
-- `useItem`: nhánh `status` (kẹp, cùng id làm mới, chặn khi thách đấu / đang gục, `def.cooldown`), gửi `status`; test: kẹp `ms` / `ratio` quá khung, dùng đan hộ đạo hai lần không cộng dồn, hiệu lực mất khi chết / qua kiếp.
+- `useItem`: nhánh `status` (kẹp, cùng id còn hạn thì từ chối không trừ, chặn khi thách đấu / đang gục, `def.cooldown`), gửi `status`; test: kẹp `ms` / `ratio` quá khung, dùng đan hộ đạo lần hai khi còn hạn bị từ chối không trừ, hiệu lực mất khi chết / qua kiếp.
 - `breakthrough`: đọc + gỡ `dao_ho`; test seed `Math.random`: đột phá thành công / thất bại đều gỡ trạng thái, xác suất bằng `chance + ratio` kẹp 0,95, đan sai bậc (`forRealm` khác `p.realm`) hoặc chưa ở đỉnh bậc thì từ chối trọn vẹn, KHÔNG trừ đan.
 - Lát 2: `cast.ts` / `skills.ts` như mục 3; test sát thương nhân đúng hệ, không nhân hệ khác; `cdr_phu` cộng dồn với trang bị và kẹp `CDR_CAP`; gửi lại `cdMax`.
 - Hiệu năng: không thêm trường state công khai; `status` chỉ gửi cho chủ khi đổi (đã có). Đo `perf.test.ts` / `bench` nếu đụng `cast`.
