@@ -223,11 +223,11 @@ describe("sectHallGet / sectHall (chỉ đọc, không tự đẩy lúc nửa đ
     expect(lh.sectHalls.length).toBe(count + 1); // chỉ ca Charlie
   });
 
-  it("nhiệm vụ và cửa hàng ở ảnh chụp M8.3 là mảng RỖNG (M8.4 / M8.5 điền); khớp kiểu thật của hợp đồng M8.1", async () => {
+  it("ảnh chụp có 3 nhiệm vụ hôm nay (M8.4, chi tiết ở sect-quest.test.ts); cửa hàng còn RỖNG (M8.5 điền); khớp kiểu thật của hợp đồng M8.1", async () => {
     await seed(2 * DAY);
     await join(A);
     const hall = lastHall(A)!;
-    expect(hall.quests).toEqual([]);
+    expect(hall.quests).toHaveLength(3);
     expect(hall.shop).toEqual([]);
     expect(hall.pointsNext).toBe(1000);
     expect(hall.pointsFrom).toBe(0);
