@@ -388,6 +388,12 @@ async function main() {
         );
         await mouseTo(chat.x, chat.y);
         await evalJs(`window.__scene.setLockedTarget(null)`);
+        // dash (A xác nhận ở #536): KHÔNG tự lao vào quái gần nhất khi chưa khoá; không phím, không chuột hợp lệ, chưa khoá -> hướng nhìn
+        const aDash = await fire("KeyO");
+        check(
+          aDash !== null && near(aDash, DECOY_FACING),
+          `chưa khoá, chuột trên chat, không giữ phím: dash về hướng nhìn, không lao vào quái (${fmt(aDash)})`,
+        );
         const aCone = await fire("KeyL");
         check(
           aCone !== null && near(aCone, east),
