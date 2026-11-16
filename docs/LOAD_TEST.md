@@ -633,18 +633,18 @@ Bộ kiểm thử stress test tự động hoá 7 kịch bản then chốt trên
 2. **Kết quả đo lường thực tế (6 bot, 60 giây, server Colyseus thật cổng 2587):**
    - **Lệnh chạy:** `npm run bots -w server -- --bots=6 --sect --duration=60`
    - **Kết nối:** Giữ vững 6/6 bot suốt 60s (0 ngắt bất thường, 0 lỗi 4429).
-   - **Hoạt động chiều sâu M8:**
-     + Nhận nhiệm vụ: **5** lượt.
-     + Gửi trả nhiệm vụ: **0** (ở đợt chạy đối chứng khi bot không đổi bảo khố: **6** lượt gửi).
-     + Đổi bảo khố: **3** lượt mua thành công.
-     + Nhảy tông môn: **0** (ở đợt chạy đối chứng: **1** lượt nhảy tông).
+   - **Hoạt động chiều sâu M8 (số lượt tin bot gửi lên máy chủ):**
+     + Nhận nhiệm vụ: **5** lượt gửi (`questAccept`).
+     + Gửi trả nhiệm vụ: **0** lượt gửi (`questTurnIn`; ở đợt chạy đối chứng khi bot chưa đổi bảo khố: **6** lượt gửi).
+     + Đổi bảo khố: **3** lượt gửi (`shopBuy`).
+     + Nhảy tông môn: **0** lượt gửi (`leave`; ở đợt chạy đối chứng: **1** lượt gửi).
      + Tương tác kho & chat: Lập: 2 phái, Mời: 20, Nạp kho: 4 lượt (500 LS/lượt), Rút kho: 2, Chat `/s`: 6.
    - **Tải hệ thống & Băng thông:**
      + CPU server mỗi tick (50 ms): Trung bình **0.81 ms** | p95 **1.29 ms** | Max **3.2 ms** (ngân sách < 10 ms).
      + Bộ nhớ server RSS: **119.4 MB**.
      + Băng thông mỗi bot: Nhận TB **2.36 KB/s** (20.9 gói/s), Gửi TB **0.6 KB/s** (14.7 gói/s).
      + Nhịp nhận patch (Δt): TB **50.18 ms** | p95 **50.97 ms**. Độ trễ vòng lặp: TB **51.07 ms**.
-     + Dữ liệu đĩa: Toàn bộ file lưu người chơi và tông môn được dọn dẹp sạch sẽ sau khi kết thúc đợt chạy (`kiem-save` 0 lỗi).
+     + Dữ liệu đĩa: Kịch bản bot tự động dọn dẹp sạch sẽ 6/6 file lưu người chơi và tông môn sau khi kết thúc đợt chạy.
 
 
 ## 16. E2E thật phiên bản giao thức (M4 2.5, `npm run e2e:phien-ban -w server`)
