@@ -210,7 +210,7 @@ async function main() {
         c.hidden === false && c.w > 0 && c.h > 0,
         `chip hiện (${Math.round(c.w)}x${Math.round(c.h)})`,
       );
-      check(/Mạng chậm/.test(c.text), `chữ: "${c.text}"`);
+      check(/Mất kết nối — nhân vật đang được bảo vệ/.test(c.text), `chữ: "${c.text}"`);
       check(c.role === "status", `role = ${c.role} (đọc được bằng trình đọc màn hình)`);
       check(
         c.pe === "none" && !c.topIsChip,

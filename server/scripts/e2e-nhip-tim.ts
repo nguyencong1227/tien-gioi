@@ -20,7 +20,7 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
-import { HEARTBEAT_INTERVAL_MS, HEARTBEAT_TIMEOUT_MS, RESUME_TIMEOUT_MS } from "@tien-gioi/shared";
+import { HEARTBEAT_TIMEOUT_MS, NET_BEAT_MS, RESUME_TIMEOUT_MS } from "@tien-gioi/shared";
 // Ngưỡng báo "Mạng chậm" của client (chip báo sớm hơn nhịp tim, QUYET_DINH_M3 mục 25): nhập từ mã client để script và mã dùng MỘT con số
 import { SLOW_AFTER_MS, SLOW_POLL_MS } from "../../client/src/net-slow";
 import {
@@ -44,8 +44,7 @@ let PORT_PROXY = pickPortProxy();
 const CDP = 9800 + Math.floor(Math.random() * 300);
 const out = (m: string) => console.log(m);
 /** Xấu nhất phát hiện socket chết ở tiền cảnh: tới nhịp ping kế + hạn chờ làm tròn lên bội nhịp, cộng dung sai 1,5s */
-const DETECT_MAX_MS =
-  HEARTBEAT_INTERVAL_MS * (1 + Math.ceil(HEARTBEAT_TIMEOUT_MS / HEARTBEAT_INTERVAL_MS)) + 1500;
+const DETECT_MAX_MS = NET_BEAT_MS * (1 + Math.ceil(HEARTBEAT_TIMEOUT_MS / NET_BEAT_MS)) + 1500;
 
 /** Proxy TCP chuyển tiếp byte giữa client Chrome và server Colyseus thật, hỗ trợ BLACKHOLE và DROP PONG. */
 class TcpProxy {
@@ -399,7 +398,11 @@ async function main() {
     // Chip "Mạng chậm" phải hiện TRƯỚC banner (đứng yên: chờ pong của ping kế <= một nhịp + SLOW_AFTER_MS), banner chưa hiện lúc đó
     await tab.waitFor(shown("net-slow"), 'chip "Mạng chậm" hiện sau blackhole', 12000);
     const chipMs = Date.now() - t0;
-    const chipMax = HEARTBEAT_INTERVAL_MS + SLOW_AFTER_MS + SLOW_POLL_MS + 1500;
+    const chipText = String(await tab.ev(`document.getElementById('net-slow')?.textContent ?? ''`));
+    if (!chipText.includes("Mất kết nối") || !chipText.includes("được bảo vệ")) {
+      throw new Error(`Ca 1: chữ trên dải sai: "${chipText.trim()}"`);
+    }
+    const chipMax = NET_BEAT_MS + SLOW_AFTER_MS + SLOW_POLL_MS + 1500;
     const bannerAtChip = Boolean(
       await tab.ev(`!document.getElementById('reconnect-banner')?.hidden`),
     );
@@ -443,6 +446,12 @@ async function main() {
       throw new Error('Ca 1: chip "Mạng chậm" còn hiện sau khi đã nối lại');
     }
     out('  ✓ Nối lại xong: chip "Mạng chậm" đã tắt');
+    await tab.waitFor(
+      `[...document.querySelectorAll('#toast p')].some((p) => p.textContent.includes('Đã kết nối lại'))`,
+      'toast "Đã kết nối lại" sau khi nối lại',
+      5000,
+    );
+    out('  ✓ Toast "Đã kết nối lại." hiện sau khi nối lại');
 
     const sidAfter = String(await tab.ev(`window.__scene?.room?.sessionId ?? ''`));
     if (sidAfter !== sidBefore) {

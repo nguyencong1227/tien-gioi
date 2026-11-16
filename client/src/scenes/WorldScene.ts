@@ -101,6 +101,7 @@ import {
   type SkillsMsg,
   type FxMsg,
   type DmgMsg,
+  NET_MSG,
   type ChatOut,
   type ToastMsg,
   type InvMsg,
@@ -178,6 +179,7 @@ import {
   type AimKind,
   type CursorPos,
 } from "../aim-order";
+import { ShieldTimer, parseNetShield, shieldLabel } from "../net-shield";
 import {
   ACTION_BY_ID,
   actionOfEvent,
@@ -382,6 +384,11 @@ export class WorldScene extends Phaser.Scene {
   private nextSlash = 0;
   /** Khoá mục tiêu (#327): id quái đang khoá (null = tự ngắm quái gần nhất như cũ) và vòng đánh dấu. */
   private lockedTargetId: string | null = null;
+  /** Hộ thể sau khi nối lại / có tin lại / được tha chết vì mạng (mục 33): máy chủ gửi `netShield`, client đếm ngược theo đồng hồ của mình và vẽ vầng sáng + chữ. */
+  private shield = new ShieldTimer();
+  private shieldRing?: Phaser.GameObjects.Arc;
+  private shieldText?: Phaser.GameObjects.Text;
+  private shieldLabelKey = "";
   private targetRing?: Phaser.GameObjects.Arc;
   /** Nút Mục tiêu mờ đi khi không có quái trong tầm khoá (kiểm mỗi 200 ms, chỉ ghi DOM khi đổi). */
   private targetIdleAt = 0;
@@ -1532,6 +1539,56 @@ export class WorldScene extends Phaser.Scene {
       .setVisible(true);
   }
 
+  /** Tin `netShield` của máy chủ (chỉ gửi chủ): bắt đầu đếm ngược hộ thể theo đồng hồ client. Tin hỏng bị bỏ. */
+  public onNetShield(raw: unknown) {
+    const m = parseNetShield(raw);
+    if (!m) return;
+    this.shield.start(m, performance.now());
+  }
+
+  /** Mỗi khung: vầng sáng quanh nhân vật MÌNH + chữ "Hộ thể 2,4s" đếm ngược khi đang hộ thể; hết thì ẩn. Giảm chuyển động: không nhịp thở. */
+  private syncShield() {
+    const now = performance.now();
+    if (!this.shield.active(now)) {
+      if (this.shieldRing?.visible) this.shieldRing.setVisible(false);
+      if (this.shieldText?.visible) this.shieldText.setVisible(false);
+      this.shieldLabelKey = "";
+      return;
+    }
+    const mine = this.players.get(this.sid);
+    const x = mine?.root.x ?? this.predX;
+    const y = mine?.root.y ?? this.predY;
+    if (!this.shieldRing) {
+      this.shieldRing = this.add
+        .circle(0, 0, 36, 0xfff1b8, 0.16)
+        .setStrokeStyle(3, 0xffd666, 0.95)
+        .setDepth(this.map.worldH + 2);
+    }
+    if (!this.shieldText) {
+      this.shieldText = this.add
+        .text(0, 0, "", {
+          fontFamily: "'Noto Serif', serif",
+          fontSize: "14px",
+          color: "#fff7d6",
+          stroke: "#5a3b00",
+          strokeThickness: 4,
+        })
+        .setOrigin(0.5, 1)
+        .setDepth(this.map.worldH + 3);
+    }
+    const pulse = isReducedMotion() ? 1 : 1 + 0.07 * Math.sin(this.time.now / 140);
+    this.shieldRing
+      .setPosition(x, y)
+      .setRadius(36 * pulse)
+      .setVisible(true);
+    const label = shieldLabel(this.shield.remaining(now)) ?? "";
+    if (label !== this.shieldLabelKey) {
+      this.shieldLabelKey = label;
+      this.shieldText.setText(label);
+    }
+    this.shieldText.setPosition(x, y - 48).setVisible(true);
+  }
+
   /** Bấm/chạm trúng người chơi khác thì mở menu tương tác (mời tổ đội). */
   private tryClickPlayer(pointer: Phaser.Input.Pointer): boolean {
     // Nếu con trỏ ở gần quái vật sống thì ưu tiên đánh quái, không mở menu
@@ -2046,6 +2103,7 @@ export class WorldScene extends Phaser.Scene {
     };
     reg("fx", (m: FxMsg) => this.onFx(m));
     reg("dmg", (m: DmgMsg) => this.onDmg(m));
+    reg(NET_MSG.shield, (m: unknown) => this.onNetShield(m));
     reg("chat", (m: ChatOut) => ui.chat(m));
     reg("toast", (m: ToastMsg) => ui.toast(m));
     reg("inv", (m: InvMsg) => ui.onInv(m));
@@ -2192,6 +2250,7 @@ export class WorldScene extends Phaser.Scene {
     const k = 1 - Math.exp(-LERP_RATE * (deltaMs / 1000));
     this.syncPlayers(k, deltaMs);
     this.syncMonsters(k);
+    this.syncShield();
     this.syncTargetLock();
     this.syncTargetBtnIdle();
     this.syncLoot();
