@@ -2,7 +2,19 @@
 
 Định dạng theo từng bản phát hành (thẻ `vX.Y.Z`). Số `#` là PR / issue trên GitHub.
 
-## [Chưa phát hành] — sau v0.3.0
+## [0.3.1] — 16/11/2026: bản vá (túi đồ, di chuyển bàn phím, nhắm mục tiêu, kho tông môn, bảo vệ khi mất kết nối)
+
+Bản vá sau v0.3.0, làm theo các yêu cầu của người dùng ở `QUYET_DINH_M3.md` mục 24-29 và 33 (báo từ bản chạy thật). Phần dưới là TÓM TẮT cho người quyết định; chi tiết từng PR nằm ở các mục "Giao diện", "Máy chủ", "Công cụ và thử tải", "Giao thức" kế tiếp.
+
+- **Túi đồ (mục 24):** rê chuột vào ô đồ không còn làm hỏng chọn ô / thanh công cụ.
+- **Di chuyển bằng bàn phím (mục 25):** hết giật / "liệt nút": máy chủ đếm hàng đợi input theo THỜI GIAN THẬT (nguyên nhân gốc là ngân sách lệch dần ~1 input mỗi 12 giây), client đọc phím theo `event.code` (chịu được Unikey / Telex, IME), nhả hết phím khi mất tiêu điểm, phím di chuyển đổi được, chip "Mạng chậm" báo sớm.
+- **Nhắm mục tiêu (mục 26, 29):** thêm chế độ "Tự động - gần nhất" làm mặc định (phím `` ` `` đổi chế độ); hướng chiêu giữ ưu tiên con trỏ, ngoại lệ khi con trỏ đang nằm trên bản đồ nhỏ / bản đồ lớn / khung giao diện.
+- **Kho đồ tông môn (mục 27):** PHẦN MÁY CHỦ (cất / rút / chính sách / nhật ký / lượt rút theo ngày, chống nhân đôi vật phẩm bằng khoá kỳ vọng theo ô). Giao diện (#788) CHƯA có trong bản này nên người chơi chưa thấy kho.
+- **Bảo vệ tính mạng khi mất kết nối (mục 33, ưu tiên cao nhất của bản vá):** im lặng quá 3 giây thì nhân vật thành "bóng", sau 90 giây mới bị loại khỏi phòng; khi nối lại có khiên 3 giây và quái bỏ mục tiêu; nếu đang im lặng từ 2 giây mà bị đòn chí mạng thì giữ lại 10% khí huyết ở chỗ an toàn, KHÔNG mất kiếp. Cần cả máy chủ lẫn client mới (client cũ không khai báo nhịp tim nên không được bảo vệ, không hỏng gì).
+- **Hộp xác nhận** khi ĐỘT PHÁ và khi BÁN đồ quý / trang bị (rà soát thao tác không hoàn tác được, #779).
+- **KHÔNG nằm trong bản này:** cân bằng Âm Sương / Hàn Vân (mục 30-32, PR #805 còn nháp, đang chờ người dùng chốt hướng) và giao diện kho tông môn (#788). Nội dung nghề nhỏ #514 chỉ có nền, người chơi chưa thấy.
+- **Triển khai:** giữ `MIN_PROTOCOL_VERSION=3` (client cũ vẫn vào được); triển khai MÁY CHỦ trước hoặc cùng lúc với client; bật `AUDIT_LOG` để thấy các sự kiện `net.*` (im lặng / nối lại / cứu chết / rớt).
+
 
 ### Giao diện
 - **Gợi ý "nên đi đội" khi gặp tinh anh (#750, nội dung của B; người dùng chốt ở `QUYET_DINH_M3.md` mục 22.2: giữ nguyên độ mạnh của tinh anh, kể cả Độc Tước, và nhắc người chơi đi đội):** thông báo "★ <tên> tinh anh: nên đi đội." hiện MỘT lần mỗi loài trong một phiên khi tinh anh đầu tiên của loài đó vào khung hình; bỏ qua khi người chơi đã vào đội (không ghi nhớ lúc ở đội, nên rời đội gặp lại vẫn được nhắc); chú giải bản đồ ghi "Tinh anh (mạnh, hiếm: nên đi đội)". Chỉ phía client (`client/src/elite.ts`, `EliteHintGate`), không đổi máy chủ, `shared/` hay giao thức. Kiểm bằng Chrome thật ở 4 khung nhìn (`check-elite-badge.mjs`) và test đơn vị.
