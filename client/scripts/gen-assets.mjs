@@ -1096,10 +1096,10 @@ function drawItemIcon(id) {
         s.set(x, y, 0xfff3b0);
       s.circle(15, 15, 1.2, 0xffffff, 200);
     }
-  } else if (id === "dot_pha_dan" || id === "jinzhi_dan" || id === "duyang_dan") {
+  } else if (id === "dot_pha_dan" || id === "kinh_chi_dan" || id === "duong_anh_dan") {
     // Đan hộ đạo (nghề nhỏ lát 1, #763): viên đan có ngọn lửa luyện trên đỉnh; số mũi tên lên vàng = bậc cảnh giới (1 Luyện Khí, 2 Trúc Cơ, 3 Kim Đan).
     // Khác đan hồi (viên tròn lớn + vòng sáng + chấm trắng) cả về hình lẫn màu; bậc đọc được bằng số mũi tên, không chỉ bằng màu.
-    const tier = id === "dot_pha_dan" ? 1 : id === "jinzhi_dan" ? 2 : 3;
+    const tier = id === "dot_pha_dan" ? 1 : id === "kinh_chi_dan" ? 2 : 3;
     const main = [0xe0953f, 0xc8503f, 0xa655a0][tier - 1];
     const dark = [0x9a5a1c, 0x7e2a20, 0x5e2a5a][tier - 1];
     // Ngọn lửa luyện đan hình giọt nước (vẽ trước, thân đan che chân lửa): màu ấm cố định cho cả ba để không giống cuống quả cầu
@@ -1851,8 +1851,8 @@ function buildAtlas() {
     "thuong_hoi_linh_dan",
     // Nghề nhỏ lát 1 (#763): ba đan hộ đạo theo bậc cảnh giới
     "dot_pha_dan",
-    "jinzhi_dan",
-    "duyang_dan",
+    "kinh_chi_dan",
+    "duong_anh_dan",
   ];
   for (const id of itemIds) {
     const icon = drawItemIcon(id);

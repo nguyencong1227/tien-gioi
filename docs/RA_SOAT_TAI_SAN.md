@@ -3,7 +3,7 @@
 > Thực hiện theo kế hoạch M4-sớm (Issue #257, `docs/PHAN_CONG_M4.md` mục 4.4).
 > Người thực hiện: **Dev B (Client & Trải nghiệm)**.
 > Ngày thực hiện: **11/11/2026**.
-> **Cập nhật nghề nhỏ lát 1 (16/11/2026, #763, Dev B):** thêm 3 icon đan hộ đạo `dot_pha_dan`, `jinzhi_dan`, `duyang_dan` (hàng 87-89, vẽ SAU dữ liệu của Dev D, mỗi viên có ngọn lửa luyện và 1 / 2 / 3 mũi tên lên theo bậc cảnh giới) và 1 NPC Lò đan `lao_dan` (Mộc Diên) sinh bằng `gen-assets.mjs`, atlas 438 khung (mục 2b), tổng 91 tệp tĩnh.
+> **Cập nhật nghề nhỏ lát 1 (16/11/2026, #763, Dev B):** thêm 3 icon đan hộ đạo `dot_pha_dan`, `kinh_chi_dan`, `duong_anh_dan` (hàng 87-89, vẽ SAU dữ liệu của Dev D, mỗi viên có ngọn lửa luyện và 1 / 2 / 3 mũi tên lên theo bậc cảnh giới) và 1 NPC Lò đan `lao_dan` (Mộc Diên) sinh bằng `gen-assets.mjs`, atlas 438 khung (mục 2b), tổng 91 tệp tĩnh.
 >
 > **Cập nhật M7.4 (15/11/2026, #505, Dev A):** thêm 14 icon cho đồ ba ô riêng (hài, ngọc bội, pháp bảo) sinh bằng `gen-assets.mjs` (hàng 43-56, mục 2) và 12 icon kinh quyển (hàng 57-68), atlas 363 khung (mục 2b), tổng 70 tệp tĩnh.
 >
@@ -111,8 +111,8 @@
 | 85 | `client/public/assets/items/kinh_liet_hoa_kiem.png` | Icon kinh quyển Liệt Hỏa Kiếm (đợt 2 Nguyên Anh, #654; dấu riêng giữa bìa) | Do nhóm Tiên Giới (Dev A) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
 | 86 | `client/public/assets/items/kinh_van_hanh_bo.png` | Icon kinh quyển Vân Hành Bộ (đợt 2 Nguyên Anh, #654; dấu riêng giữa bìa) | Do nhóm Tiên Giới (Dev A) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
 | 87 | `client/public/assets/items/dot_pha_dan.png` | Icon đan hộ đạo Đột Phá Đan (nghề nhỏ lát 1, #763; viên đan có ngọn lửa luyện, 1 mũi tên lên = bậc Luyện Khí) | Do nhóm Tiên Giới (Dev B) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
-| 88 | `client/public/assets/items/jinzhi_dan.png` | Icon đan hộ đạo Kinh Chỉ Đan (nghề nhỏ lát 1, #763; ngọn lửa luyện, 2 mũi tên lên = bậc Trúc Cơ) | Do nhóm Tiên Giới (Dev B) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
-| 89 | `client/public/assets/items/duyang_dan.png` | Icon đan hộ đạo Dưỡng Anh Đan (nghề nhỏ lát 1, #763; ngọn lửa luyện, 3 mũi tên lên = bậc Kim Đan) | Do nhóm Tiên Giới (Dev B) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
+| 88 | `client/public/assets/items/kinh_chi_dan.png` | Icon đan hộ đạo Kinh Chỉ Đan (nghề nhỏ lát 1, #763; ngọn lửa luyện, 2 mũi tên lên = bậc Trúc Cơ) | Do nhóm Tiên Giới (Dev B) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
+| 89 | `client/public/assets/items/duong_anh_dan.png` | Icon đan hộ đạo Dưỡng Anh Đan (nghề nhỏ lát 1, #763; ngọn lửa luyện, 3 mũi tên lên = bậc Kim Đan) | Do nhóm Tiên Giới (Dev B) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
 
 > Hàng 2-3 (atlas) nay có **438 khung** (xem 2b). Hàng 4-19 và 28-89 cộng lại là **78 icon**: 60 khớp 60 mặt hàng trong `ITEMS` của `shared/` (gồm 3 đan hộ đạo hàng 87-89, #763, vẽ SAU dữ liệu của Dev D) (mọi vật phẩm đều có icon riêng, không món nào dùng ảnh thay thế) + 12 icon Hàn Vân Lĩnh (hàng 69-80, M7.5 #506) + 6 icon kinh quyển đợt 2 (hàng 81-86, #654, A) vẽ TRƯỚC vật phẩm trong `shared/` (id chưa có trong `ITEMS` thì vô hại; A / Dev D thêm dữ liệu sau).
 
