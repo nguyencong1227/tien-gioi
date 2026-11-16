@@ -120,6 +120,35 @@ export const COMBAT_RECIPES: readonly FxRecipe[] = [
       gravityY: -26,
     },
   },
+  // Trùm dựng GIÁP (mục 42, T4 #873): vòng sáng xanh nở ra quanh trùm một lần (vầng giáp tồn tại do `WorldScene.syncBossArmor` vẽ, đây chỉ là nhát chớp lúc dựng)
+  {
+    id: "boss-armor",
+    priority: 1,
+    particles: {
+      frames: ["ring", "spark"],
+      count: 14,
+      lifespan: { min: 380, max: 700 },
+      speed: { min: 50, max: 130 },
+      scale: { start: 0.9, end: 0 },
+      alpha: { start: 1, end: 0 },
+      tint: 0xbfe6ff,
+    },
+  },
+  // Trùm GỌI quái con (T4 #873): hồn tím bốc lên quanh chỗ trùm đứng (quái con tự hiện qua state)
+  {
+    id: "boss-summon",
+    priority: 1,
+    particles: {
+      frames: ["dot", "ember", "ring"],
+      count: 18,
+      lifespan: { min: 500, max: 900 },
+      speed: { min: 40, max: 150 },
+      scale: { start: 0.8, end: 0 },
+      alpha: { start: 0.95, end: 0 },
+      tint: 0xc9a0ff,
+      gravityY: -34,
+    },
+  },
   {
     id: "mon-vanish",
     priority: 1,

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { MONSTERS, MONSTER_BY_ID } from "@tien-gioi/shared";
 import { FxBudget } from "./budget";
 import {
+  ARMORED_NUMBER_COLOR,
   MONSTER_FX_TINT,
   planMonsterDeath,
   HEAL_JUMP_FRAC,
@@ -121,6 +122,32 @@ describe("gfx/fx: planHitFx / planHitNumber", () => {
     const h = healNumber(50);
     expect(h).toMatchObject({ text: "+50", priority: 2 });
     expect(h.color).not.toBe(n.color);
+  });
+
+  it("trùm đang có giáp (T4 #873): số bay xanh nhạt và nhỏ hơn số thường; chí mạng vẫn nhận ra; đánh người chơi vẫn đỏ", () => {
+    const plain = planHitNumber(hit({ amount: 12 }));
+    const armored = planHitNumber(hit({ amount: 12, armored: true }));
+    expect(armored.text).toBe("12");
+    expect(armored.color).toBe(ARMORED_NUMBER_COLOR);
+    expect(armored.color).not.toBe(plain.color);
+    expect(armored.size).toBeLessThan(plain.size);
+    expect(armored.priority).toBe(plain.priority);
+    const critArmored = planHitNumber(hit({ amount: 40, crit: true, armored: true }));
+    expect(critArmored.text).toBe("Bạo! 40"); // chí mạng vẫn có chữ riêng
+    expect(critArmored.color).toBe(ARMORED_NUMBER_COLOR);
+    expect(planHitNumber(hit({ toPlayer: true, targetIsMe: true, armored: true })).color).toBe(
+      0xff6b5e,
+    );
+    expect(planHitNumber(hit({ toPlayer: true, armored: true })).size).toBe(15);
+  });
+
+  it("công thức hạt giáp / gọi quái con đã đăng ký và nằm trong ngân sách (kiểm chung ở 'mọi công thức chiến đấu')", () => {
+    for (const id of ["boss-armor", "boss-summon"]) {
+      const r = COMBAT_RECIPES.find((x) => x.id === id);
+      expect(r, id).toBeDefined();
+      expect(getRecipe(id)).toBe(r);
+      expect(r!.shake).toBeUndefined(); // không rung: chỉ đòn nặng mới rung
+    }
   });
 });
 

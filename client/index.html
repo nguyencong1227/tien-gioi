@@ -377,6 +377,34 @@
         Chế độ Quyết đấu giả lập (DEV / Debug)
       </div>
 
+      <!-- Thanh máu TRÙM (mục 42, T4 #873): trùm gần nhất / trùm bí cảnh; mốc giai đoạn, tên chiêu đang vận, chỉ báo cuồng nộ, giáp + gọi quái con (vẽ bằng boss-bar-ui.ts) -->
+      <section id="boss-bar" class="boss-bar" hidden aria-label="Trùm">
+        <div class="boss-bar-head">
+          <b id="boss-bar-name"></b>
+          <span id="boss-bar-phase" class="boss-bar-phase" hidden></span>
+          <span id="boss-bar-enrage" class="boss-bar-enrage" hidden>🔥 Cuồng nộ</span>
+        </div>
+        <div
+          id="boss-bar-track"
+          class="boss-bar-track"
+          role="progressbar"
+          aria-labelledby="boss-bar-name"
+          aria-valuemin="0"
+          aria-valuemax="100"
+        >
+          <span id="boss-bar-fill" class="boss-bar-fill"></span>
+        </div>
+        <p id="boss-bar-hp" class="boss-bar-hp"></p>
+        <div class="boss-bar-castrow">
+          <span id="boss-bar-cast" class="boss-bar-cast" role="status" aria-live="polite"></span>
+          <span class="boss-bar-castbar" hidden><i id="boss-bar-castfill"></i></span>
+        </div>
+        <div id="boss-bar-notes" class="boss-bar-notes" hidden>
+          <span id="boss-bar-armor" class="boss-bar-armor" role="status" hidden></span>
+          <span id="boss-bar-summon" class="boss-bar-summon" role="status" hidden></span>
+        </div>
+      </section>
+
       <!-- HUD Bí cảnh (M3.4, chỉ hiện khi ở trong bản đồ bí cảnh) -->
       <section id="dungeon-hud" class="panel dungeon-hud" hidden aria-label="Bí cảnh">
         <div class="dhud-head">
@@ -1459,6 +1487,7 @@
             <button type="button" id="sect-tab-btn-members" class="sect-tab">Thành viên</button>
             <button type="button" id="sect-tab-btn-treasury" class="sect-tab">Kho tông môn</button>
             <button type="button" id="sect-tab-btn-vault" class="sect-tab">Kho đồ</button>
+            <button type="button" id="sect-tab-btn-hall" class="sect-tab">Nội vụ</button>
           </div>
 
           <!-- Tab 1: Tổng quan -->
@@ -1612,6 +1641,7 @@
               role="grid"
               aria-label="Kho đồ tông môn"
             ></div>
+            <p id="sect-vault-locked" class="sect-vault-locked" role="note"></p>
             <h4>Túi đồ của ngươi <small>(chọn món để góp)</small></h4>
             <div
               id="sect-vault-bag"
@@ -1645,6 +1675,8 @@
               <div id="sect-vault-log" class="sect-logs-list"></div>
             </div>
           </div>
+          <!-- Tab 5: Nội vụ (M8.6, #843): cấp tông + điểm, cống hiến của mình, nhiệm vụ hôm nay, cửa hàng; vẽ bằng `sect-hall-ui.ts` -->
+          <div id="sect-tab-hall" class="sect-tab-content" hidden></div>
         </div>
 
         <!-- Hộp xác nhận trong game cho Nhường / Trục xuất / Rời (thay confirm() gốc, #246) -->

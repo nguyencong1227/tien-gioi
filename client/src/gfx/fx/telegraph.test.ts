@@ -451,3 +451,53 @@ describe("telegraph: warnCovers (mình có đang trong vùng báo không)", () =
     expect(warnCovers(c, 0, 0, -50)).toBe(true); // bề dày âm coi như 0
   });
 });
+
+describe("telegraph: VÀNH KHUYÊN (r0, mục 42 trùm)", () => {
+  const ring = (r0: unknown, extra: Record<string, unknown> = {}) =>
+    ({ kind: "warn", shape: "circle", x: 100, y: 100, r: 120, ms: 900, r0, ...extra }) as never;
+
+  it("planWarn: r0 hợp lệ (0 < r0 < r) được giữ; thiếu / hỏng / không nhỏ hơn r thì hình tròn ĐẶC (thận trọng: không bao giờ vẽ thiếu vùng nguy hiểm)", () => {
+    expect(planWarn(ring(60))!.r0).toBe(60);
+    for (const bad of [undefined, 0, -5, Number.NaN, Infinity, "60", null, 120, 500])
+      expect(planWarn(ring(bad))!.r0, String(bad)).toBe(0);
+    // tin cũ không có r0 -> 0
+    expect(
+      planWarn({ kind: "warn", shape: "circle", x: 0, y: 0, r: 50, ms: 900 } as never)!.r0,
+    ).toBe(0);
+  });
+
+  it("planWarn: r0 chỉ có nghĩa với circle (cone / line bỏ qua); r bị kẹp thì r0 cũng không vượt r", () => {
+    expect(planWarn(ring(60, { shape: "cone", angle: 0 }))!.r0).toBe(0);
+    expect(planWarn(ring(60, { shape: "line", angle: 0, w: 20 }))!.r0).toBe(0);
+    const big = planWarn(ring(300, { r: 10_000 }))!;
+    expect(big.r).toBe(WARN_MAX_R);
+    expect(big.r0).toBe(300);
+    const near = planWarn(ring(119))!; // sát r: kẹp để vẫn còn dải
+    expect(near.r0).toBeLessThan(near.r);
+  });
+
+  it("warnCovers: giữa LỖ (thân không chạm dải) là an toàn; trên dải và mép dải là trúng; ngoài vành là an toàn", () => {
+    const plan = planWarn(ring(60))!; // dải [60, 120] quanh (100, 100)
+    const at = (d: number) => warnCovers(plan, 100 + d, 100, 0);
+    expect(at(0)).toBe(false); // tâm lỗ
+    expect(at(40)).toBe(false);
+    expect(at(59)).toBe(false);
+    expect(at(60)).toBe(true); // mép trong
+    expect(at(90)).toBe(true); // giữa dải
+    expect(at(120)).toBe(true); // mép ngoài
+    expect(at(121)).toBe(false);
+    // thân có bán kính 12: chạm dải khi tâm cách mép trong <= 12 (đứng sát mép lỗ vẫn bị tính trúng)
+    const body = (d: number) => warnCovers(plan, 100 + d, 100, 12);
+    expect(body(47)).toBe(false);
+    expect(body(48)).toBe(true);
+    expect(body(132)).toBe(true);
+    expect(body(133)).toBe(false);
+  });
+
+  it("warnCovers: hình tròn ĐẶC (r0 = 0) vẫn trúng cả ở tâm (không đổi so với trước)", () => {
+    const solid = planWarn(ring(undefined))!;
+    expect(warnCovers(solid, 100, 100, 0)).toBe(true);
+    expect(warnCovers(solid, 220, 100, 0)).toBe(true);
+    expect(warnCovers(solid, 221, 100, 0)).toBe(false);
+  });
+});
