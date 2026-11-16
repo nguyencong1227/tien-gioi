@@ -4,7 +4,6 @@
 //   npm run quest-walk -w server
 //   npm run quest-walk -w server -- --quest=nhap_the
 //   npm run quest-walk -w server -- --map=lac_ha
-//   npm run quest-walk -w server -- --map=am_suong
 //   npm run quest-walk -w server -- --give-all
 import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
@@ -21,31 +20,29 @@ import {
   HAC_PHONG_ID,
   HAN_VAN_ID,
   ITEM_BY_ID,
-  MONSTERS,
   MONSTER_BY_ID,
   NPC_BY_ID,
-  NPC_RANGE,
-  PICKUP_RANGE,
   PROTOCOL_VERSION,
   QUESTS,
   QUEST_BY_ID,
   QUEST_PREV,
   REALMS,
-  SKILLS,
-  TICK_MS,
+  SKILL_MSG,
   getMap,
   roomNameOf,
   stepOf,
+  type GameMap,
   type Inventory,
+  type MonsterKind,
   type QuestDef,
-  type QuestProgress,
-  type QuestStep,
   type QuestsMsg,
+  type SkillBook,
 } from "@tien-gioi/shared";
 import { defineRooms } from "../src/rooms/WorldRoom";
 import { freePort } from "../src/test-port";
 import { bestGear } from "../src/balance/simulate";
-import { gridOf, planPath, sweepOf } from "../src/balance/search-check";
+import { gridOf, planPath } from "../src/balance/search-check";
+import { safeSpot } from "../src/systems/movement";
 import { hashSecret, savePlayer } from "../src/store";
 import { assertNotProd } from "./assert-not-prod";
 
@@ -73,6 +70,23 @@ export interface PlannedQuest {
   rewards: { exp: number; items: { itemId: string; qty: number }[] };
 }
 
+export interface DropSource {
+  monster: string;
+  chance: number;
+  min: number;
+  max: number;
+  rate: number;
+}
+
+export interface DropEstimate {
+  hasWildSource: boolean;
+  bestMonster?: string;
+  bestRate: number;
+  expectedKills: number;
+  isRareOrBoss: boolean;
+  reason?: string;
+}
+
 /** Tìm bản đồ đầu tiên mà loài quái này sinh ra */
 export function findMapForMonster(monsterId: string): string | null {
   for (const mapId of MAP_ORDER) {
@@ -82,14 +96,114 @@ export function findMapForMonster(monsterId: string): string | null {
   return null;
 }
 
-/** Tìm danh sách quái rơi vật phẩm này */
-export function findDropsFor(itemId: string): { monster: string; chance: number }[] {
-  const res: { monster: string; chance: number }[] = [];
+/** Tìm danh sách quái rơi vật phẩm này kèm tỉ lệ */
+export function findDropsFor(itemId: string): DropSource[] {
+  const res: DropSource[] = [];
   for (const [mon, drops] of Object.entries(DROP_TABLES)) {
     const d = drops?.find((x) => x.itemId === itemId);
-    if (d) res.push({ monster: mon, chance: d.chance });
+    if (d) {
+      const min = d.min ?? 1;
+      const max = d.max ?? 1;
+      const avgQty = (min + max) / 2;
+      res.push({
+        monster: mon,
+        chance: d.chance,
+        min,
+        max,
+        rate: d.chance * avgQty,
+      });
+    }
   }
+  res.sort((a, b) => b.rate - a.rate);
   return res;
+}
+
+/** Ước lượng số quái cần hạ để gom đủ vật phẩm rơi (Issue #757) */
+export function estimateDropsRequired(itemId: string, count: number): DropEstimate {
+  const drops = findDropsFor(itemId);
+  if (drops.length === 0) {
+    return {
+      hasWildSource: false,
+      bestRate: 0,
+      expectedKills: Infinity,
+      isRareOrBoss: true,
+      reason: "Không có quái nào rơi đồ này (cần /give hoặc mua cửa hàng)",
+    };
+  }
+
+  let bestMonster: string | undefined;
+  let bestRate = 0;
+  let hasWild = false;
+
+  for (const d of drops) {
+    const mon = MONSTER_BY_ID[d.monster];
+    if (!mon) continue;
+    const mapId = findMapForMonster(d.monster);
+    const isWild = mapId !== null;
+    const isBoss =
+      mon.boss === true ||
+      d.monster === "yeu_vuong" ||
+      d.monster === "hac_giao" ||
+      d.monster === "thien_han_vuong";
+
+    if (isWild && !isBoss) {
+      hasWild = true;
+      if (d.rate > bestRate) {
+        bestRate = d.rate;
+        bestMonster = d.monster;
+      }
+    } else if (!bestMonster && d.rate > bestRate) {
+      bestRate = d.rate;
+      bestMonster = d.monster;
+    }
+  }
+
+  if (!hasWild || !bestMonster) {
+    return {
+      hasWildSource: false,
+      bestMonster,
+      bestRate,
+      expectedKills: bestRate > 0 ? Math.ceil(count / bestRate) : Infinity,
+      isRareOrBoss: true,
+      reason: "Vật phẩm chỉ rơi từ trùm hoặc quái hiếm (cần cấp /give)",
+    };
+  }
+
+  const expectedKills = Math.ceil(count / bestRate);
+  const isTooManyKills = expectedKills > 60; // Ngưỡng trần khả năng rơi hợp lý
+  return {
+    hasWildSource: true,
+    bestMonster,
+    bestRate,
+    expectedKills,
+    isRareOrBoss: isTooManyKills || bestRate < 0.1,
+    reason: isTooManyKills
+      ? `Vượt quá khả năng rơi hợp lý (ước tính cần hạ ${expectedKills} quái > 60)`
+      : undefined,
+  };
+}
+
+/** Kiểm tra bản đồ đích có tiếp cận được từ bản đồ nhiệm vụ theo cảnh giới yêu cầu */
+export function isMapReachableForQuest(
+  fromMapId: string,
+  targetMapId: string,
+  minRealm?: { realm: number; tier: number },
+): boolean {
+  if (fromMapId === targetMapId) return true;
+  const fromIdx = MAP_ORDER.indexOf(fromMapId as any);
+  const targetIdx = MAP_ORDER.indexOf(targetMapId as any);
+  if (fromIdx < 0 || targetIdx < 0) return false;
+
+  const mapReqRealm: Record<string, number> = {
+    [DEFAULT_MAP_ID]: 0,
+    [HAC_PHONG_ID]: 1,
+    [AM_SUONG_ID]: 2,
+    [HAN_VAN_ID]: 3,
+  };
+  const r = minRealm?.realm ?? 0;
+  const targetReq = mapReqRealm[targetMapId] ?? 0;
+  // Cho phép nhiệm vụ chuẩn bị đột phá bước vào bản đồ kế tiếp (chênh tối đa 1 cấp)
+  return r >= targetReq - 1;
 }
 
 /** Lập kế hoạch và kiểm tra tính khả thi tĩnh của một nhiệm vụ */
@@ -131,6 +245,19 @@ export function planQuestSteps(q: QuestDef): PlannedQuest {
             needsGive: false,
             reason: "Quái không sinh ở bản đồ nào",
           });
+        } else if (!isMapReachableForQuest(giverMapId, mapId, q.minRealm)) {
+          issues.push(
+            `Bước ${idx + 1}: quái '${s.monster}' sinh ở bản đồ '${mapId}', không thể tiếp cận từ '${giverMapId}' theo cảnh giới yêu cầu.`,
+          );
+          plannedSteps.push({
+            kind: "kill",
+            target: s.monster,
+            count: s.count,
+            mapId,
+            feasible: false,
+            needsGive: false,
+            reason: "Quái ở bản đồ ngoài tầm tiếp cận",
+          });
         } else {
           plannedSteps.push({
             kind: "kill",
@@ -156,22 +283,27 @@ export function planQuestSteps(q: QuestDef): PlannedQuest {
           reason: "Vật phẩm không tồn tại",
         });
       } else {
-        const drops = findDropsFor(s.itemId);
-        const hasSource = drops.length > 0;
-        const bestDrop = drops[0];
-        const isRareOrBoss =
-          !hasSource ||
-          drops.some((d) => MONSTER_BY_ID[d.monster]?.boss) ||
-          (bestDrop && bestDrop.chance < 0.2);
-
-        if (!hasSource) {
+        const est = estimateDropsRequired(s.itemId, s.count);
+        if (est.expectedKills > 60) {
+          issues.push(
+            `Bước ${idx + 1}: số lượng yêu cầu (${s.count} '${s.itemId}') vượt quá khả năng rơi hợp lý (ước tính cần hạ ${est.expectedKills} quái > 60).`,
+          );
+          plannedSteps.push({
+            kind: "collect",
+            target: s.itemId,
+            count: s.count,
+            feasible: false,
+            needsGive: false,
+            reason: est.reason,
+          });
+        } else if (!est.hasWildSource) {
           plannedSteps.push({
             kind: "collect",
             target: s.itemId,
             count: s.count,
             feasible: true,
             needsGive: true,
-            reason: "Không có quái nào rơi (cần cấp /give hoặc mua shop)",
+            reason: est.reason,
           });
         } else {
           plannedSteps.push({
@@ -179,8 +311,7 @@ export function planQuestSteps(q: QuestDef): PlannedQuest {
             target: s.itemId,
             count: s.count,
             feasible: true,
-            needsGive: isRareOrBoss,
-            reason: isRareOrBoss ? "Rơi hiếm hoặc từ trùm đội" : undefined,
+            needsGive: false,
           });
         }
       }
@@ -293,6 +424,30 @@ export function findPortalTo(
   return portal ? { id: portal.id, x: portal.x, y: portal.y } : null;
 }
 
+/** Tìm các ô đi được lân cận điểm px, py để tránh kẹt khi điểm đích rơi vào mép vật cản */
+function freeCellsNear(
+  grid: { w: number; h: number; free: Uint8Array },
+  px: number,
+  py: number,
+): Set<number> {
+  const cx = Math.floor(px / 32);
+  const cy = Math.floor(py / 32);
+  const set = new Set<number>();
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const nx = cx + dx;
+      const ny = cy + dy;
+      if (nx >= 0 && nx < grid.w && ny >= 0 && ny < grid.h) {
+        const idx = ny * grid.w + nx;
+        if (grid.free[idx] === 1) set.add(idx);
+      }
+    }
+  }
+  return set.size > 0
+    ? set
+    : new Set([Math.min(grid.w * grid.h - 1, Math.max(0, cy * grid.w + cx))]);
+}
+
 /** Di chuyển bot tới toạ độ đích (px) bằng tìm đường A* (planPath) tránh vật cản */
 export async function moveTo(
   room: Room,
@@ -301,14 +456,11 @@ export async function moveTo(
   targetDist = 36,
   mapId: string = DEFAULT_MAP_ID,
   maxWaitMs?: number,
+  abortIf?: () => boolean,
 ): Promise<boolean> {
   const mapObj = getMap(mapId) ?? DEFAULT_MAP;
   const grid = gridOf(mapObj);
-  const goalCell = Math.min(
-    grid.w * grid.h - 1,
-    Math.max(0, Math.floor(targetY / 32) * grid.w + Math.floor(targetX / 32)),
-  );
-  const goals = new Set<number>([goalCell]);
+  const goals = freeCellsNear(grid, targetX, targetY);
 
   let me = room.state.players?.get(room.sessionId);
   const initialDist = me ? Math.hypot(targetX - me.x, targetY - me.y) : 1000;
@@ -317,6 +469,8 @@ export async function moveTo(
   let seq = 0;
 
   while (Date.now() - start < timeoutMs) {
+    if (abortIf && abortIf()) return true;
+
     me = room.state.players?.get(room.sessionId);
     if (!me) {
       await new Promise((res) => setTimeout(res, 50));
@@ -324,13 +478,13 @@ export async function moveTo(
     }
     const dist = Math.hypot(targetX - me.x, targetY - me.y);
     if (dist <= targetDist) {
-      room.send("input", { seq: ++seq, dx: 0, dy: 0 });
+      room.send("input", { seq: seq + 1, dx: 0, dy: 0 });
       return true;
     }
 
     const pathResult = planPath(grid, me.x, me.y, goals);
-    let dx = 0;
-    let dy = 0;
+    let dx: number;
+    let dy: number;
     if (pathResult && pathResult.cells.length > 1) {
       const nextCell = pathResult.cells[1];
       const nx = ((nextCell % grid.w) + 0.5) * 32;
@@ -351,19 +505,45 @@ export async function moveTo(
 }
 
 /** Lấy danh sách toạ độ tuần tra các bãi quái sinh ra trên bản đồ */
-export function getPatrolPoints(map: any, monDef: any): { x: number; y: number }[] {
-  const sweep = sweepOf(map, monDef);
+export function getPatrolPoints(map: GameMap, monDef: MonsterKind): { x: number; y: number }[] {
   const grid = gridOf(map);
-  const pts: { x: number; y: number }[] = [];
-  for (let i = 0; i < sweep.goal.length; i++) {
-    const cell = sweep.goal[i];
-    if (cell !== -1 && grid.free[cell] === 1) {
-      const tileX = (cell % grid.w) + 0.5;
-      const tileY = Math.floor(cell / grid.w) + 0.5;
-      pts.push({ x: tileX * 32, y: tileY * 32 });
+  const rawPts: { x: number; y: number; dist: number }[] = [];
+  const minD = monDef.minDanger;
+  const maxD = monDef.id === "lang" ? 0.42 : minD + 0.22;
+
+  // Quét lưới cách nhau mỗi 4 ô (128 px)
+  const stepTiles = 4;
+  for (let ty = 2; ty < grid.h - 2; ty += stepTiles) {
+    for (let tx = 2; tx < grid.w - 2; tx += stepTiles) {
+      const idx = ty * grid.w + tx;
+      if (grid.free[idx] !== 1) continue;
+      const x = (tx + 0.5) * 32;
+      const y = (ty + 0.5) * 32;
+      if (map.inSafe(x, y)) continue;
+
+      const d = map.dangerAt(x, y);
+      if (d >= minD && d <= maxD) {
+        const distFromTown = Math.hypot(x - map.townPx.x, y - map.townPx.y);
+        rawPts.push({ x, y, dist: distFromTown });
+      }
     }
   }
-  return pts.length > 0 ? pts : [{ x: map.townPx.x, y: map.townPx.y }];
+
+  if (rawPts.length === 0) {
+    return [{ x: map.townPx.x, y: map.townPx.y }];
+  }
+
+  // Sắp xếp các điểm theo khoảng cách từ trấn (gần trấn trước)
+  rawPts.sort((a, b) => a.dist - b.dist);
+
+  const sampled: { x: number; y: number }[] = [];
+  const sampleCount = Math.min(8, rawPts.length);
+  const stride = Math.max(1, Math.floor(rawPts.length / sampleCount));
+  for (let i = 0; i < rawPts.length && sampled.length < sampleCount; i += stride) {
+    const spot = safeSpot(map, rawPts[i].x, rawPts[i].y);
+    sampled.push(spot);
+  }
+  return sampled.length > 0 ? sampled : [{ x: rawPts[0].x, y: rawPts[0].y }];
 }
 
 /** Chạy một nhiệm vụ trên Colyseus Server thật với bot client */
@@ -394,14 +574,14 @@ export async function walkSingleQuest(
     };
   }
 
-  const { giveAll = true, timeoutSec = 60, silent = false } = options;
+  const { giveAll = false, timeoutSec = 60, silent = false } = options;
   const startTime = Date.now();
   let usedGive = false;
   const giveReasons: string[] = [];
   let stepsDone = 0;
 
-  // Khởi tạo hồ sơ bot phù hợp với quest (minRealm hoặc mốc reachRealm)
-  let realm = q.minRealm?.realm ?? 1;
+  // Khởi tạo hồ sơ bot phù hợp với quest và chuỗi tiền nhiệm
+  let realm = q.minRealm?.realm ?? 0;
   let tier = q.minRealm?.tier ?? 0;
 
   for (const s of q.steps) {
@@ -410,6 +590,46 @@ export async function walkSingleQuest(
         realm = s.realm;
         tier = s.tier;
       }
+    }
+  }
+
+  const doneIds: string[] = [];
+  for (let cur = QUEST_PREV[q.id]; cur; cur = QUEST_PREV[cur]) {
+    doneIds.push(cur);
+    const prevQ = QUEST_BY_ID[cur];
+    if (prevQ) {
+      if (
+        prevQ.minRealm &&
+        stepOf(realm, tier) < stepOf(prevQ.minRealm.realm, prevQ.minRealm.tier)
+      ) {
+        realm = prevQ.minRealm.realm;
+        tier = prevQ.minRealm.tier;
+      }
+      for (const s of prevQ.steps) {
+        if (s.kind === "reachRealm" && stepOf(realm, tier) < stepOf(s.realm, s.tier)) {
+          realm = s.realm;
+          tier = s.tier;
+        }
+      }
+    }
+  }
+
+  // Nếu nhiệm vụ săn trùm thế giới / trùm đội (Xích Mãng, Hắc Giao, Thiên Hàn Vương, Yêu Vương):
+  // do bot chạy solo một mình (không có đội 3-4 người), nạp cảnh giới hậu kỳ (tier 8) để đủ sức solo
+  const isBossQuest = q.steps.some(
+    (s) =>
+      (s.kind === "kill" &&
+        ["mang", "yeu_vuong", "hac_giao", "thien_han_vuong"].includes(s.monster)) ||
+      (s.kind === "collect" && ["vay_mang", "giao_lan", "thien_han_chau"].includes(s.itemId)),
+  );
+  if (isBossQuest) {
+    tier = Math.max(tier, 8);
+  } else {
+    // Nếu nhiệm vụ có đánh quái hoặc sau bước nhập môn, cảnh giới ít nhất là Luyện Khí tầng 6 (tier 5)
+    const hasKillStep = q.steps.some((s) => s.kind === "kill" || s.kind === "collect");
+    if (hasKillStep && realm <= 1 && q.id !== "tru_tho") {
+      realm = 1;
+      tier = Math.max(tier, 5);
     }
   }
 
@@ -425,11 +645,16 @@ export async function walkSingleQuest(
   invSlots[1] = { itemId: "hoi_huyet_dan", qty: 99 };
   invSlots[2] = { itemId: "dai_hoi_linh_dan", qty: 99 };
 
-  // Nạp các nhiệm vụ tiền nhiệm vào done để bot có thể nhận nhiệm vụ trong chuỗi
-  const doneIds: string[] = [];
-  for (let cur = QUEST_PREV[q.id]; cur; cur = QUEST_PREV[cur]) {
-    doneIds.push(cur);
-  }
+  // Sổ chiêu thức nạp sẵn các chiêu thức phù hợp với cảnh giới
+  const skillBook: SkillBook = {
+    learned: {
+      hoa_van_kiem: 3,
+      thanh_tung_phi_cham: 3,
+      van_thach_tran: 3,
+      phong_hanh_quyet: 3,
+    },
+    slots: ["hoa_van_kiem", "thanh_tung_phi_cham", "van_thach_tran", ""],
+  };
 
   await savePlayer({
     name: botName,
@@ -442,6 +667,7 @@ export async function walkSingleQuest(
     mapId: currentMapId,
     equipment: gear,
     inventory: invSlots,
+    skills: skillBook,
     quests: {
       active: [],
       done: doneIds,
@@ -456,7 +682,6 @@ export async function walkSingleQuest(
   let questsMsg: QuestsMsg | null = null;
   let invMsg: Inventory = invSlots;
   let lastToast: string = "";
-  let lastExp = 0;
 
   const log = (msg: string) => {
     if (!silent) console.log(`  [${q.id}] ${msg}`);
@@ -482,10 +707,30 @@ export async function walkSingleQuest(
         if (t?.text) lastToast = t.text;
       });
       r.onMessage("limbo", () => {
+        log(`Bot rơi vào Hoàng Tuyền (limbo), gửi rebirth...`);
         r.send("rebirth", { origin: "pham_gia", keep: [] });
+        setTimeout(() => {
+          r.send("chat", { text: "/give dai_hoi_huyet_dan 99" });
+          r.send("chat", { text: "/give hoi_huyet_dan 99" });
+        }, 500);
       });
-      // Bỏ qua các tin nhắn khác
-      for (const m of ["dmg", "fx", "wallet", "chat", "sys", "party", "sect", "trade", "dialog"]) {
+      r.onMessage("dmg", (m: any) => {
+        if (m?.target === botName || m?.source === botName) {
+          log(`[DMG] ${m.source} -> ${m.target}: ${m.amount} (hp left: ${m.hp})`);
+        }
+      });
+      for (const m of [
+        "fx",
+        "wallet",
+        "chat",
+        "sys",
+        "party",
+        "sect",
+        "trade",
+        "dialog",
+        SKILL_MSG.skills,
+        SKILL_MSG.status,
+      ]) {
         r.onMessage(m, () => {});
       }
     };
@@ -506,7 +751,6 @@ export async function walkSingleQuest(
     await new Promise((res) => setTimeout(res, 60));
     room.send("questAccept", { questId: q.id });
 
-    // Chờ xác nhận nhiệm vụ đã vào active
     const acceptStart = Date.now();
     const hasActive = () =>
       questsMsg ? (questsMsg as QuestsMsg).active.some((a) => a.id === q.id) : false;
@@ -521,6 +765,320 @@ export async function walkSingleQuest(
 
     log(`Đã nhận nhiệm vụ '${q.title}' thành công.`);
 
+    // Hàm hỗ trợ chuyển bản đồ qua portal
+    const travelToMap = async (targetMap: string) => {
+      while (currentMapId !== targetMap) {
+        const portal = findPortalTo(currentMapId, targetMap);
+        if (!portal) {
+          throw new Error(`Không tìm thấy portal từ '${currentMapId}' sang '${targetMap}'.`);
+        }
+        log(`Di chuyển tới portal '${portal.id}' (${portal.x}, ${portal.y})...`);
+        await moveTo(room!, portal.x, portal.y, 48, currentMapId);
+
+        let nextMapReceived: string | null = null;
+        room!.onMessage("travelTo", (t: any) => {
+          if (t?.mapId) nextMapReceived = t.mapId;
+        });
+
+        room!.send("travel", { portalId: portal.id });
+
+        const travelWait = Date.now();
+        while (!nextMapReceived && Date.now() - travelWait < 5000) {
+          await new Promise((res) => setTimeout(res, 60));
+        }
+
+        if (!nextMapReceived) {
+          throw new Error(`Lỗi chuyển bản đồ qua portal '${portal.id}'. Toast: ${lastToast}`);
+        }
+
+        currentMapId = nextMapReceived;
+        try {
+          room!.leave(false);
+        } catch {
+          /* ignore */
+        }
+        const closeWait = Date.now();
+        while (room!.connection.isOpen && Date.now() - closeWait < 1000) {
+          await new Promise((res) => setTimeout(res, 50));
+        }
+
+        room = await client.joinOrCreate(roomNameOf(currentMapId), {
+          name: botName,
+          secret: botSecret,
+          v: PROTOCOL_VERSION,
+        });
+        setupRoomListeners(room);
+        log(`Đã chuyển tới bản đồ '${currentMapId}'.`);
+        await new Promise((res) => setTimeout(res, 100));
+      }
+    };
+
+    // Hàm hỗ trợ săn quái và nhặt đồ rơi thật
+    const huntAndCollect = async (params: {
+      monsterKind?: string;
+      collectItemId?: string;
+      targetCount: number;
+      isCollect: boolean;
+      currentStepIdx: number;
+    }) => {
+      const { monsterKind, collectItemId, targetCount, isCollect, currentStepIdx } = params;
+      const targetMapId = monsterKind
+        ? (findMapForMonster(monsterKind) ?? currentMapId)
+        : currentMapId;
+      await travelToMap(targetMapId);
+
+      const monDef = monsterKind ? MONSTER_BY_ID[monsterKind] : undefined;
+      const mapObj = getMap(currentMapId) ?? DEFAULT_MAP;
+      const patrolPoints = monDef
+        ? getPatrolPoints(mapObj, monDef)
+        : [{ x: mapObj.townPx.x, y: mapObj.townPx.y }];
+      log(
+        `[HUNT] Patrol points (${patrolPoints.length}): ${JSON.stringify(patrolPoints.slice(0, 5))}`,
+      );
+      let patrolIdx = 0;
+
+      const huntTimeoutMs = Math.max(timeoutSec * 1000, targetCount * 18000);
+      const huntStart = Date.now();
+      let nextPillAt = 0;
+      let nextSmallPillAt = 0;
+      let nextManaAt = 0;
+      let nextAttackAt = 0;
+      let nextCastAt = 0;
+      let nextSwordAt = 0;
+      let nextPickupAt = 0;
+      let seq = 0;
+      const pickupAttempts = new Map<string, number>();
+
+      const getItemQty = () => {
+        if (!collectItemId) return 0;
+        return (invMsg ?? []).reduce(
+          (sum, slot) => (slot?.itemId === collectItemId ? sum + (slot.qty ?? 0) : sum),
+          0,
+        );
+      };
+
+      const initialQty = getItemQty();
+
+      let lastStatusLog = 0;
+      while (Date.now() - huntStart < huntTimeoutMs) {
+        const me = room!.state.players?.get(room!.sessionId);
+        if (!me) {
+          await new Promise((res) => setTimeout(res, 50));
+          continue;
+        }
+
+        if (Date.now() - lastStatusLog > 2000) {
+          log(
+            `[HUNT] Pos: (${Math.round(me.x)}, ${Math.round(me.y)}), HP: ${me.hp}/${me.maxHp}, MP: ${me.mp}/${me.maxMp}`,
+          );
+          lastStatusLog = Date.now();
+        }
+
+        // Tự cắn đan hồi máu / hồi mana (2 loại đan hồi máu độc lập)
+        if (me.hp < me.maxHp * 0.8) {
+          if (Date.now() >= nextPillAt) {
+            room!.send("useItem", { slot: 0 });
+            nextPillAt = Date.now() + 10500;
+          } else if (Date.now() >= nextSmallPillAt) {
+            room!.send("useItem", { slot: 1 });
+            nextSmallPillAt = Date.now() + 8500;
+          }
+        }
+        if (me.mp < me.maxMp * 0.5 && Date.now() >= nextManaAt) {
+          room!.send("useItem", { slot: 2 });
+          nextManaAt = Date.now() + 8500;
+        }
+
+        // Kiểm tra điều kiện hoàn thành
+        if (isCollect) {
+          if (getItemQty() >= initialQty + targetCount || getItemQty() >= targetCount) {
+            return;
+          }
+        } else {
+          const qm = questsMsg as QuestsMsg | null;
+          const curProg = qm?.active.find((a) => a.id === q.id);
+          if (curProg) {
+            if (curProg.step > currentStepIdx || curProg.count >= targetCount) {
+              return;
+            }
+          }
+        }
+
+        // Ưu tiên nhặt đồ rơi gần bot (tầm nhìn 400px)
+        let nearestLootId: string | null = null;
+        let lootX = 0;
+        let lootY = 0;
+        let nearestLootDist = 400;
+
+        if (room!.state.loot) {
+          room!.state.loot.forEach((l: any, id: string) => {
+            if (l) {
+              const attempts = pickupAttempts.get(id) ?? 0;
+              if (attempts < 3) {
+                const d = Math.hypot(l.x - me.x, l.y - me.y);
+                if (d < nearestLootDist) {
+                  nearestLootDist = d;
+                  nearestLootId = id;
+                  lootX = l.x;
+                  lootY = l.y;
+                }
+              }
+            }
+          });
+        }
+
+        if (nearestLootId) {
+          if (nearestLootDist > 28) {
+            const grid = gridOf(mapObj);
+            const goals = freeCellsNear(grid, lootX, lootY);
+            const pathRes = planPath(grid, me.x, me.y, goals);
+            if (pathRes && pathRes.cells.length > 1) {
+              const nextCell = pathRes.cells[1];
+              const nx = ((nextCell % grid.w) + 0.5) * 32;
+              const ny = (Math.floor(nextCell / grid.w) + 0.5) * 32;
+              const ang = Math.atan2(ny - me.y, nx - me.x);
+              room!.send("input", { seq: ++seq, dx: Math.cos(ang), dy: Math.sin(ang) });
+            } else {
+              const ang = Math.atan2(lootY - me.y, lootX - me.x);
+              room!.send("input", { seq: ++seq, dx: Math.cos(ang), dy: Math.sin(ang) });
+            }
+          } else {
+            room!.send("input", { seq: ++seq, dx: 0, dy: 0 });
+            if (Date.now() >= nextPickupAt) {
+              log(`[LOOT] Nhặt đồ rơi '${nearestLootId}' (dist: ${nearestLootDist.toFixed(1)})`);
+              pickupAttempts.set(nearestLootId, (pickupAttempts.get(nearestLootId) ?? 0) + 1);
+              room!.send("pickup", { lootId: nearestLootId });
+              nextPickupAt = Date.now() + 250;
+            }
+          }
+          await new Promise((res) => setTimeout(res, 50));
+          continue;
+        }
+
+        // Tìm quái mục tiêu gần nhất có đường đi tới được
+        let targetId: string | null = null;
+        let targetX = 0;
+        let targetY = 0;
+        let targetPath: { cells: number[]; length: number } | null = null;
+        let closestDist = Infinity;
+
+        if (room!.state.monsters) {
+          const grid = gridOf(mapObj);
+          room!.state.monsters.forEach((m: any, id: string) => {
+            if (m && m.hp > 0 && (!monsterKind || m.kind === monsterKind)) {
+              const d = Math.hypot(m.x - me.x, m.y - me.y);
+              if (d < closestDist && d <= 900) {
+                const goals = freeCellsNear(grid, m.x, m.y);
+                const pathRes = planPath(grid, me.x, me.y, goals);
+                if (pathRes) {
+                  closestDist = d;
+                  targetId = id;
+                  targetX = m.x;
+                  targetY = m.y;
+                  targetPath = pathRes;
+                }
+              }
+            }
+          });
+        }
+
+        if (targetId) {
+          const liveMon = room!.state.monsters?.get(targetId);
+          if (liveMon) {
+            targetX = liveMon.x;
+            targetY = liveMon.y;
+          }
+          const dist = Math.hypot(targetX - me.x, targetY - me.y);
+          const angle = Math.atan2(targetY - me.y, targetX - me.x);
+          if (dist > 36) {
+            const pRes = targetPath as { cells: number[] } | null;
+            if (pRes && pRes.cells.length > 1) {
+              const grid = gridOf(mapObj);
+              const nextCell = pRes.cells[1];
+              const nx = ((nextCell % grid.w) + 0.5) * 32;
+              const ny = (Math.floor(nextCell / grid.w) + 0.5) * 32;
+              const ang = Math.atan2(ny - me.y, nx - me.x);
+              room!.send("input", { seq: ++seq, dx: Math.cos(ang), dy: Math.sin(ang) });
+            } else {
+              room!.send("input", { seq: ++seq, dx: Math.cos(angle), dy: Math.sin(angle) });
+            }
+          } else {
+            room!.send("input", { seq: ++seq, dx: 0, dy: 0 });
+          }
+
+          if (dist <= 55) {
+            const now = Date.now();
+            if (now >= nextAttackAt) {
+              const monObj = room!.state.monsters?.get(targetId);
+              log(
+                `[COMBAT] Chém quái '${monObj?.kind ?? targetId}' (HP: ${monObj?.hp}), dist: ${dist.toFixed(1)}`,
+              );
+              room!.send("attack", { angle });
+              nextAttackAt = now + 350;
+            }
+            if (now >= nextCastAt) {
+              room!.send(SKILL_MSG.cast, { slot: 2, angle });
+              nextCastAt = now + 3100;
+            }
+            if (now >= nextSwordAt && me.mp >= 20) {
+              room!.send("skill", { id: "sword", angle });
+              nextSwordAt = now + 1100;
+            }
+          }
+          await new Promise((res) => setTimeout(res, 50));
+          continue;
+        }
+
+        // Tuần tra có tìm đường A* tránh vật cản tới bãi quái
+        const pt = patrolPoints[patrolIdx % patrolPoints.length];
+        const reached = await moveTo(room!, pt.x, pt.y, 48, currentMapId, undefined, () => {
+          const curMe = room!.state.players?.get(room!.sessionId);
+          if (!curMe) return false;
+          // Ngắt tuần tra nếu có loot gần (<= 250px)
+          let hasLoot = false;
+          if (room!.state.loot) {
+            room!.state.loot.forEach((l: any, lid: string) => {
+              if (
+                (pickupAttempts.get(lid) ?? 0) < 3 &&
+                Math.hypot(l.x - curMe.x, l.y - curMe.y) <= 250
+              ) {
+                hasLoot = true;
+              }
+            });
+          }
+          if (hasLoot) return true;
+          // Ngắt tuần tra nếu có quái mục tiêu gần (<= 400px)
+          let hasMon = false;
+          if (room!.state.monsters) {
+            room!.state.monsters.forEach((m: any) => {
+              if (m && m.hp > 0 && (!monsterKind || m.kind === monsterKind)) {
+                if (Math.hypot(m.x - curMe.x, m.y - curMe.y) <= 400) {
+                  hasMon = true;
+                }
+              }
+            });
+          }
+          return hasMon;
+        });
+        if (reached) {
+          const curMe = room!.state.players?.get(room!.sessionId);
+          if (curMe && Math.hypot(pt.x - curMe.x, pt.y - curMe.y) <= 55) {
+            patrolIdx++;
+          }
+        }
+
+        await new Promise((res) => setTimeout(res, 50));
+      }
+
+      if (isCollect) {
+        throw new Error(
+          `Quá thời gian thu thập đồ rơi '${collectItemId}' (${getItemQty()}/${targetCount}).`,
+        );
+      } else {
+        throw new Error(`Quá thời gian săn quái '${monsterKind}' (${targetCount}).`);
+      }
+    };
+
     // 3. Thực hiện từng step
     for (let stepIdx = 0; stepIdx < q.steps.length; stepIdx++) {
       const step = q.steps[stepIdx];
@@ -531,172 +1089,54 @@ export async function walkSingleQuest(
       } else if (step.kind === "talk") {
         const targetNpc = NPC_BY_ID[step.npcId]!;
         const targetMapId = targetNpc.mapId ?? DEFAULT_MAP_ID;
+        await travelToMap(targetMapId);
 
-        // Nếu cần chuyển bản đồ
-        while (currentMapId !== targetMapId) {
-          const portal = findPortalTo(currentMapId, targetMapId);
-          if (!portal) {
-            throw new Error(`Không tìm thấy portal từ '${currentMapId}' sang '${targetMapId}'.`);
-          }
-          log(`Di chuyển tới portal '${portal.id}' (${portal.x}, ${portal.y})...`);
-          await moveTo(room, portal.x, portal.y, 48, currentMapId);
-
-          let nextMapReceived: string | null = null;
-          room.onMessage("travelTo", (t: any) => {
-            if (t?.mapId) nextMapReceived = t.mapId;
-          });
-
-          room.send("travel", { portalId: portal.id });
-
-          const travelWait = Date.now();
-          while (!nextMapReceived && Date.now() - travelWait < 5000) {
-            await new Promise((res) => setTimeout(res, 60));
-          }
-
-          if (!nextMapReceived) {
-            throw new Error(`Lỗi chuyển bản đồ qua portal '${portal.id}'. Toast: ${lastToast}`);
-          }
-
-          currentMapId = nextMapReceived;
-          await room.leave();
-          room = await client.joinOrCreate(roomNameOf(currentMapId), {
-            name: botName,
-            secret: botSecret,
-            v: PROTOCOL_VERSION,
-          });
-          setupRoomListeners(room);
-          log(`Đã chuyển tới bản đồ '${currentMapId}'.`);
-          await new Promise((res) => setTimeout(res, 100));
-        }
-
-        // Di chuyển tới NPC đích và nói chuyện
         log(`Di chuyển tới NPC '${step.npcId}' (${targetNpc.name})...`);
         await moveTo(room, targetNpc.x, targetNpc.y, 36, currentMapId);
         room.send("talk", { npcId: step.npcId });
         await new Promise((res) => setTimeout(res, 200));
         log(`Đã nói chuyện với NPC '${step.npcId}'.`);
       } else if (step.kind === "collect") {
-        // Cấp vật phẩm bằng lệnh /give khi không chạy production
-        room.send("chat", { text: `/give ${step.itemId} ${step.count}` });
-        usedGive = true;
-        const rsn = plan.steps[stepIdx]?.reason ?? "Cấp vật phẩm kiểm tra tính khả thi";
-        if (!giveReasons.includes(rsn)) giveReasons.push(rsn);
-        await new Promise((res) => setTimeout(res, 150));
-        log(`Đã cấp ${step.count} '${step.itemId}' vào túi đồ (${rsn}).`);
-      } else if (step.kind === "kill") {
-        const monMapId = findMapForMonster(step.monster) ?? currentMapId;
-
-        // Di chuyển sang bản đồ có quái nếu đang ở bản đồ khác
-        while (currentMapId !== monMapId) {
-          const portal = findPortalTo(currentMapId, monMapId);
-          if (!portal) break;
-          await moveTo(room, portal.x, portal.y, 48, currentMapId);
-          let nextMapReceived: string | null = null;
-          room.onMessage("travelTo", (t: any) => {
-            if (t?.mapId) nextMapReceived = t.mapId;
-          });
-          room.send("travel", { portalId: portal.id });
-          const tw = Date.now();
-          while (!nextMapReceived && Date.now() - tw < 5000) {
-            await new Promise((res) => setTimeout(res, 60));
-          }
-          if (nextMapReceived) {
-            currentMapId = nextMapReceived;
-            await room.leave();
-            room = await client.joinOrCreate(roomNameOf(currentMapId), {
-              name: botName,
-              secret: botSecret,
-              v: PROTOCOL_VERSION,
-            });
-            setupRoomListeners(room);
-            await new Promise((res) => setTimeout(res, 100));
-          }
-        }
-
-        const monDef = MONSTER_BY_ID[step.monster]!;
-        const mapObj = getMap(currentMapId) ?? DEFAULT_MAP;
-        const patrolPoints = getPatrolPoints(mapObj, monDef);
-        let patrolIdx = 0;
-
-        log(
-          `Săn ${step.count} '${step.monster}' ở bản đồ '${currentMapId}' (${patrolPoints.length} điểm tuần tra)...`,
+        const plannedStep = plan.steps[stepIdx];
+        const hasEnough = (invMsg ?? []).some(
+          (slot) => slot?.itemId === step.itemId && (slot.qty ?? 0) >= step.count,
         );
-        let killsCount = 0;
-        const huntTimeoutMs = Math.max(timeoutSec * 1000, step.count * 15000);
-        const huntStart = Date.now();
-        let nextPillAt = 0;
 
-        while (killsCount < step.count) {
-          if (Date.now() - huntStart > huntTimeoutMs) {
-            throw new Error(
-              `Quá thời gian săn quái '${step.monster}' (${killsCount}/${step.count}).`,
-            );
+        if (hasEnough) {
+          log(`Túi đồ đã có sẵn đủ ${step.count} '${step.itemId}'.`);
+        } else if (plannedStep?.needsGive || giveAll) {
+          // Chỉ /give khi needsGive hoặc người dùng bật cờ giveAll
+          room.send("chat", { text: `/give ${step.itemId} ${step.count}` });
+          usedGive = true;
+          const rsn = plannedStep?.reason ?? "Cấp theo tùy chọn giveAll";
+          if (!giveReasons.includes(rsn)) giveReasons.push(rsn);
+          await new Promise((res) => setTimeout(res, 200));
+          log(`Đã cấp ${step.count} '${step.itemId}' vào túi đồ (${rsn}).`);
+        } else {
+          // Săn đồ rơi thật
+          const drops = findDropsFor(step.itemId);
+          const monTarget = drops[0]?.monster;
+          if (!monTarget) {
+            throw new Error(`Không tìm thấy quái dã ngoại rơi '${step.itemId}'.`);
           }
-
-          // Tìm quái trong room.state
-          let targetId: string | null = null;
-          let targetX = 0;
-          let targetY = 0;
-
-          const me = room.state.players?.get(room.sessionId);
-
-          if (me && me.hp < me.maxHp * 0.75 && Date.now() >= nextPillAt) {
-            room.send("useItem", { slot: 0 });
-            nextPillAt = Date.now() + 8500;
-          }
-
-          if (room.state.monsters && me) {
-            let closestDist = Infinity;
-            room.state.monsters.forEach((m: any, id: string) => {
-              if (m && m.kind === step.monster && m.hp > 0) {
-                const d = Math.hypot(m.x - me.x, m.y - me.y);
-                if (d < closestDist) {
-                  closestDist = d;
-                  targetId = id;
-                  targetX = m.x;
-                  targetY = m.y;
-                }
-              }
-            });
-          }
-
-          if (targetId && me) {
-            const dist = Math.hypot(targetX - me.x, targetY - me.y);
-            const angle = Math.atan2(targetY - me.y, targetX - me.x);
-            if (dist > 36) {
-              room.send("input", { seq: 1, dx: Math.cos(angle), dy: Math.sin(angle) });
-            } else {
-              room.send("input", { seq: 1, dx: 0, dy: 0 });
-            }
-            room.send("attack", { angle });
-            room.send("skill", { id: "sword", angle });
-          } else if (me) {
-            // Tuần tra tới các bãi sinh của loài quái này
-            const pt = patrolPoints[patrolIdx % patrolPoints.length];
-            const distToPt = Math.hypot(pt.x - me.x, pt.y - me.y);
-            if (distToPt < 50) {
-              patrolIdx++;
-            }
-            const ang = Math.atan2(pt.y - me.y, pt.x - me.x);
-            room.send("input", { seq: 1, dx: Math.cos(ang), dy: Math.sin(ang) });
-          }
-
-          await new Promise((res) => setTimeout(res, 50));
-
-          // Kiểm tra tiến độ nhiệm vụ trong questsMsg
-          const qm = questsMsg as QuestsMsg | null;
-          const currentProgress = qm?.active.find((a) => a.id === q.id);
-          if (currentProgress) {
-            if (currentProgress.step > stepIdx) {
-              // Bước kill đã xong!
-              killsCount = step.count;
-              break;
-            } else if (currentProgress.step === stepIdx) {
-              killsCount = currentProgress.count;
-            }
-          }
+          log(`Săn quái '${monTarget}' nhặt đủ ${step.count} '${step.itemId}'...`);
+          await huntAndCollect({
+            monsterKind: monTarget,
+            collectItemId: step.itemId,
+            targetCount: step.count,
+            isCollect: true,
+            currentStepIdx: stepIdx,
+          });
+          log(`Đã thu thập đủ ${step.count} '${step.itemId}' qua rơi thật.`);
         }
-
+      } else if (step.kind === "kill") {
+        log(`Săn ${step.count} '${step.monster}'...`);
+        await huntAndCollect({
+          monsterKind: step.monster,
+          targetCount: step.count,
+          isCollect: false,
+          currentStepIdx: stepIdx,
+        });
         log(`Đã hạ đủ ${step.count} '${step.monster}'.`);
       }
 
@@ -705,34 +1145,14 @@ export async function walkSingleQuest(
     }
 
     // 4. Trả nhiệm vụ: quay về gặp NPC giver
-    while (currentMapId !== plan.giverMapId) {
-      const portal = findPortalTo(currentMapId, plan.giverMapId);
-      if (!portal) break;
-      await moveTo(room, portal.x, portal.y, 48, currentMapId);
-      let nextMapReceived: string | null = null;
-      room.onMessage("travelTo", (t: any) => {
-        if (t?.mapId) nextMapReceived = t.mapId;
-      });
-      room.send("travel", { portalId: portal.id });
-      const tw = Date.now();
-      while (!nextMapReceived && Date.now() - tw < 5000) {
-        await new Promise((res) => setTimeout(res, 60));
-      }
-      if (nextMapReceived) {
-        currentMapId = nextMapReceived;
-        await room.leave();
-        room = await client.joinOrCreate(roomNameOf(currentMapId), {
-          name: botName,
-          secret: botSecret,
-          v: PROTOCOL_VERSION,
-        });
-        setupRoomListeners(room);
-        await new Promise((res) => setTimeout(res, 100));
-      }
-    }
+    await travelToMap(plan.giverMapId);
 
     log(`Quay lại gặp NPC '${q.giver}' để trả nhiệm vụ...`);
     await moveTo(room, giverNpc.x, giverNpc.y, 36, currentMapId);
+
+    const meBefore = room.state.players?.get(room.sessionId);
+    const lastExp = meBefore?.exp ?? 0;
+
     room.send("talk", { npcId: q.giver });
     await new Promise((res) => setTimeout(res, 80));
     room.send("questTurnIn", { questId: q.id });
@@ -749,6 +1169,7 @@ export async function walkSingleQuest(
         !qm.active.some((a) => a.id === q.id)
       );
     };
+
     while (!isDone) {
       if (Date.now() - turnInWait > 4000) {
         throw new Error(
@@ -762,7 +1183,26 @@ export async function walkSingleQuest(
       await new Promise((res) => setTimeout(res, 60));
     }
 
-    // 5. Kiểm tra phần thưởng
+    // 5. Xác thực phần thưởng
+    const meAfter = room.state.players?.get(room.sessionId);
+    const expGained = (meAfter?.exp ?? 0) - lastExp;
+    const expectedExp = q.rewards.exp ?? 0;
+
+    // Nếu nhân vật chạm trần expMax chờ đột phá (isLastTier), exp sẽ bị kẹp ở expMax
+    const isCappedAtMax =
+      meAfter !== undefined &&
+      meAfter.exp === meAfter.expMax &&
+      lastExp + expectedExp >= meAfter.expMax;
+
+    if (expectedExp > 0 && expGained !== expectedExp && expGained >= 0 && !isCappedAtMax) {
+      // Trường hợp đột phá cảnh giới làm reset exp thì bỏ qua kiểm tra chênh lệch đơn giản
+      if (meAfter?.realm === meBefore?.realm && meAfter?.tier === meBefore?.tier) {
+        throw new Error(
+          `Phần thưởng exp không khớp: kỳ vọng ${expectedExp}, thực tế nhận ${expGained}`,
+        );
+      }
+    }
+
     if (q.rewards.items && q.rewards.items.length > 0) {
       for (const rew of q.rewards.items) {
         const found = invMsg?.some((slot) => slot?.itemId === rew.itemId && slot.qty >= rew.qty);
@@ -793,7 +1233,9 @@ export async function walkSingleQuest(
     if (room) {
       try {
         await room.leave();
-      } catch {}
+      } catch {
+        /* ignore */
+      }
     }
     const durationSec = Math.round((Date.now() - startTime) / 100) / 10;
     return {
@@ -833,7 +1275,6 @@ export async function runQuestWalk(options: QuestWalkOptions = {}): Promise<{
 
   const client = new Client(`ws://127.0.0.1:${port}`);
 
-  // Lọc nhiệm vụ cần chạy
   let questsToRun = QUESTS;
   if (options.questId) {
     const found = QUEST_BY_ID[options.questId];
@@ -871,7 +1312,9 @@ export async function runQuestWalk(options: QuestWalkOptions = {}): Promise<{
   await server.gracefullyShutdown(false);
   try {
     rmSync(dataDir, { recursive: true, force: true });
-  } catch {}
+  } catch {
+    /* ignore */
+  }
 
   const totalTimeSec = Math.round((Date.now() - startTime) / 100) / 10;
 
@@ -896,6 +1339,19 @@ export async function runQuestWalk(options: QuestWalkOptions = {}): Promise<{
     `Tổng số: ${results.length} | Thành công: ${results.filter((r) => r.success).length} | Thất bại: ${results.filter((r) => !r.success).length} | Tổng thời gian: ${totalTimeSec}s\n`,
   );
 
+  const failedQuests = results.filter((r) => !r.success);
+  if (failedQuests.length > 0) {
+    console.log(`DANH SÁCH NHIỆM VỤ THẤT BẠI (${failedQuests.length}):`);
+    failedQuests.forEach((f) => {
+      console.log(`  - [${f.id}] '${f.title}': ${f.error}`);
+    });
+    console.log("");
+  } else {
+    console.log(
+      `✓ TẤT CẢ ${results.length} NHIỆM VỤ ĐÃ KIỂM TRA ĐỀU ĐẠT TÍNH KHẢ THI TRÊN MÁY CHỦ THẬT.\n`,
+    );
+  }
+
   return { results, allPassed, totalTimeSec };
 }
 
@@ -906,7 +1362,7 @@ if (isDirectCli) {
   const args = process.argv.slice(2);
   const questArg = args.find((a) => a.startsWith("--quest="))?.split("=")[1];
   const mapArg = args.find((a) => a.startsWith("--map="))?.split("=")[1];
-  const giveAll = args.includes("--give-all") || true; // Mặc định giveAll để bot chạy ổn định
+  const giveAll = args.includes("--give-all");
   const timeoutArg = args.find((a) => a.startsWith("--timeout="))?.split("=")[1];
   const timeoutSec = timeoutArg ? Number(timeoutArg) : 60;
 

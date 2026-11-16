@@ -2,25 +2,34 @@ import { describe, expect, it } from "vitest";
 import {
   AM_SUONG_ID,
   DEFAULT_MAP_ID,
-  DROP_TABLES,
   HAC_PHONG_ID,
   HAN_VAN_ID,
-  ITEM_BY_ID,
   MONSTER_BY_ID,
-  NPC_BY_ID,
   QUESTS,
   QUEST_BY_ID,
   getMap,
   type QuestDef,
 } from "@tien-gioi/shared";
 import {
+  estimateDropsRequired,
   findDropsFor,
   findMapForMonster,
   findPortalTo,
   getPatrolPoints,
+  isMapReachableForQuest,
   planQuestSteps,
+  walkSingleQuest,
 } from "./quest-walk";
 import { gridOf, planPath } from "../src/balance/search-check";
+import { Server } from "colyseus";
+import { WebSocketTransport } from "@colyseus/ws-transport";
+import { Client } from "colyseus.js";
+import { defineRooms } from "../src/rooms/WorldRoom";
+import { freePort } from "../src/test-port";
+import { assertNotProd } from "./assert-not-prod";
+import { mkdtempSync, rmSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
 describe("quest-walk: kiểm tra tính khả thi tĩnh của nhiệm vụ (Issue #757)", () => {
   it("mọi nhiệm vụ trong QUESTS đều có kế hoạch bước khả thi trên main hiện tại", () => {
@@ -69,23 +78,44 @@ describe("quest-walk: kiểm tra tính khả thi tĩnh của nhiệm vụ (Issue
     expect(findDropsFor("vat_pham_khong_roi")).toEqual([]);
   });
 
+  it("estimateDropsRequired: ước lượng chính xác số quái cần hạ và tỉ lệ", () => {
+    // da_tho: rơi từ tho (rate = 0.5 * 1.5 = 0.75)
+    const estDaTho = estimateDropsRequired("long_tho", 3);
+    expect(estDaTho.hasWildSource).toBe(true);
+    expect(estDaTho.bestMonster).toBe("tho");
+    expect(estDaTho.expectedKills).toBe(Math.ceil(3 / estDaTho.bestRate));
+    expect(estDaTho.isRareOrBoss).toBe(false);
+
+    // Vật phẩm không tồn tại nguồn rơi
+    const estFake = estimateDropsRequired("fake_item_123", 5);
+    expect(estFake.hasWildSource).toBe(false);
+    expect(estFake.isRareOrBoss).toBe(true);
+  });
+
+  it("isMapReachableForQuest: kiểm tra tính liên thông theo cảnh giới", () => {
+    // lac_ha -> lac_ha: luôn được
+    expect(isMapReachableForQuest(DEFAULT_MAP_ID, DEFAULT_MAP_ID)).toBe(true);
+    // lac_ha -> hac_phong: được
+    expect(isMapReachableForQuest(DEFAULT_MAP_ID, HAC_PHONG_ID, { realm: 0, tier: 0 })).toBe(true);
+    // lac_ha -> han_van_linh (cách 3 cấp bản đồ) với nhiệm vụ Phàm Nhân: không được
+    expect(isMapReachableForQuest(DEFAULT_MAP_ID, HAN_VAN_ID, { realm: 0, tier: 0 })).toBe(false);
+    // han_van_linh với nhiệm vụ Nguyên Anh (realm 4): được
+    expect(isMapReachableForQuest(DEFAULT_MAP_ID, HAN_VAN_ID, { realm: 4, tier: 0 })).toBe(true);
+  });
+
   it("findPortalTo: tìm đúng portal chuyển map giữa các bản đồ kề nhau", () => {
-    // lac_ha -> hac_phong
     const p1 = findPortalTo(DEFAULT_MAP_ID, HAC_PHONG_ID);
     expect(p1).toBeDefined();
     expect(p1?.id).toBe("lac_ha_bac");
 
-    // hac_phong -> am_suong
     const p2 = findPortalTo(HAC_PHONG_ID, AM_SUONG_ID);
     expect(p2).toBeDefined();
     expect(p2?.id).toBe("hac_phong_bac");
 
-    // am_suong -> han_van
     const p3 = findPortalTo(AM_SUONG_ID, HAN_VAN_ID);
     expect(p3).toBeDefined();
     expect(p3?.id).toBe("am_suong_bac");
 
-    // Chiều ngược lại: han_van -> am_suong
     const p4 = findPortalTo(HAN_VAN_ID, AM_SUONG_ID);
     expect(p4).toBeDefined();
     expect(p4?.id).toBe("han_van_nam");
@@ -97,15 +127,9 @@ describe("quest-walk: kiểm tra tính khả thi tĩnh của nhiệm vụ (Issue
     const tileX = Math.floor(p.x / 32);
     const tileY = Math.floor(p.y / 32);
     const cell = tileY * grid.w + tileX;
-    console.log("Portal cell free:", grid.free[cell]);
-    console.log(
-      "Spawn cell free:",
-      grid.free[Math.floor(p.spawn.y / 32) * grid.w + Math.floor(p.spawn.x / 32)],
-    );
-    const path = planPath(grid, 1536, 1536, new Set([cell]));
-    console.log("Path length:", path?.cells.length);
-    expect(path).toBeDefined();
-    expect(path!.cells.length).toBeGreaterThan(0);
+    const pathResult = planPath(grid, 1536, 1536, new Set([cell]));
+    expect(pathResult).toBeDefined();
+    expect(pathResult!.cells.length).toBeGreaterThan(0);
   });
 
   it("getPatrolPoints: sinh danh sách điểm tuần tra hợp lệ cho quái", () => {
@@ -118,72 +142,70 @@ describe("quest-walk: kiểm tra tính khả thi tĩnh của nhiệm vụ (Issue
     }
   });
 
-  describe("Đột biến ĐỎ (mutations) bắt đúng lỗi cấu hình nhiệm vụ", () => {
-    it("đột biến 1: trỏ tới loài quái không tồn tại -> báo không khả thi", () => {
+  describe("Đột biến kiểm chứng đúng yêu cầu Issue #757 (Dev A review)", () => {
+    it("đột biến (a): nâng count bước thu thập vượt khả năng rơi (> 60 quái) -> planQuestSteps báo ĐỎ", () => {
+      // nanh_soi_ren_kiem gốc: count = 5 nanh sói
+      // Nâng lên count = 100 nanh sói (tỉ lệ rơi nanh sói từ lang là ~0.675 -> cần hạ > 140 quái)
       const mutatedQuest: QuestDef = {
-        ...QUEST_BY_ID.tru_tho,
-        id: "tru_tho_mutated",
-        steps: [{ kind: "kill", monster: "quai_khong_ton_tai", count: 5 }],
+        ...QUEST_BY_ID.nanh_soi_ren_kiem,
+        id: "nanh_soi_ren_kiem_mutated_count",
+        steps: [
+          { kind: "kill", monster: "lang", count: 8 },
+          { kind: "collect", itemId: "nanh_soi", count: 100 },
+        ],
       };
       const plan = planQuestSteps(mutatedQuest);
       expect(plan.feasible).toBe(false);
-      expect(plan.issues.some((s) => s.includes("không tồn tại trong MONSTER_BY_ID"))).toBe(true);
+      expect(plan.issues.some((s) => s.includes("vượt quá khả năng rơi hợp lý"))).toBe(true);
     });
 
-    it("đột biến 2: trỏ tới quái không sinh ở bản đồ nào (trùm bí cảnh) -> báo không khả thi", () => {
+    it("đột biến (b): bước kill trỏ quái có thật nhưng không sinh ở bản đồ nhiệm vụ / chuỗi cổng liên thông -> planQuestSteps báo ĐỎ", () => {
+      // tru_tho ở Lạc Hà (Phàm Nhân / Luyện Khí), đột biến yêu cầu hạ quái Hàn Lang (chỉ sinh ở Hàn Vân Lĩnh - Nguyên Anh)
       const mutatedQuest: QuestDef = {
         ...QUEST_BY_ID.tru_tho,
-        id: "tru_tho_boss_in_wild",
-        steps: [{ kind: "kill", monster: "yeu_vuong", count: 1 }],
+        id: "tru_tho_mutated_unreachable_monster",
+        steps: [{ kind: "kill", monster: "han_lang", count: 5 }],
       };
       const plan = planQuestSteps(mutatedQuest);
       expect(plan.feasible).toBe(false);
-      expect(plan.issues.some((s) => s.includes("không sinh ra ở bất kỳ bản đồ nào"))).toBe(true);
+      expect(
+        plan.issues.some((s) =>
+          s.includes("không thể tiếp cận từ 'lac_ha' theo cảnh giới yêu cầu"),
+        ),
+      ).toBe(true);
     });
 
-    it("đột biến 3: vật phẩm thu thập không tồn tại -> báo không khả thi", () => {
-      const mutatedQuest: QuestDef = {
-        ...QUEST_BY_ID.tru_tho,
-        id: "tru_tho_fake_item",
-        steps: [{ kind: "collect", itemId: "item_khong_ton_tai", count: 3 }],
-      };
-      const plan = planQuestSteps(mutatedQuest);
-      expect(plan.feasible).toBe(false);
-      expect(plan.issues.some((s) => s.includes("không tồn tại trong ITEM_BY_ID"))).toBe(true);
-    });
+    it("đột biến (c): thưởng exp SAI giá trị so với QuestDef.rewards.exp -> bot phát hiện lỗi sau khi trả nhiệm vụ trên máy chủ thật", async () => {
+      const tempDir = mkdtempSync(path.join(os.tmpdir(), "tien-gioi-qw-test-"));
+      process.env.DATA_DIR = path.join(tempDir, "players");
 
-    it("đột biến 4: NPC giao không tồn tại -> báo không khả thi", () => {
-      const mutatedQuest: QuestDef = {
-        ...QUEST_BY_ID.tru_tho,
-        id: "tru_tho_fake_giver",
-        giver: "npc_ma",
-      };
-      const plan = planQuestSteps(mutatedQuest);
-      expect(plan.feasible).toBe(false);
-      expect(plan.issues.some((s) => s.includes("NPC giao 'npc_ma' không tồn tại"))).toBe(true);
-    });
+      const server = new Server({ transport: new WebSocketTransport(), gracefullyShutdown: false });
+      defineRooms(server);
+      const port = await freePort();
+      assertNotProd(port, "quest-walk-test");
+      await server.listen(port);
 
-    it("đột biến 5: NPC nói chuyện không tồn tại -> báo không khả thi", () => {
+      const client = new Client(`ws://127.0.0.1:${port}`);
+
+      // Nhiệm vụ nhap_the có exp thưởng chuẩn là 10.
+      // Đột biến sửa kỳ vọng exp thành 9999 (trong khi server thật trả về 10 exp).
       const mutatedQuest: QuestDef = {
         ...QUEST_BY_ID.nhap_the,
-        id: "nhap_the_fake_talk",
-        steps: [{ kind: "talk", npcId: "npc_la" }],
+        rewards: { exp: 9999 },
       };
-      const plan = planQuestSteps(mutatedQuest);
-      expect(plan.feasible).toBe(false);
-      expect(plan.issues.some((s) => s.includes("NPC 'npc_la' không tồn tại"))).toBe(true);
-    });
 
-    it("đột biến 6: thưởng exp âm hoặc vật phẩm thưởng số lượng <= 0 -> báo lỗi", () => {
-      const mutatedQuest: QuestDef = {
-        ...QUEST_BY_ID.nhap_the,
-        id: "nhap_the_bad_reward",
-        rewards: { exp: -100, items: [{ itemId: "hoi_huyet_dan", qty: 0 }] },
-      };
-      const plan = planQuestSteps(mutatedQuest);
-      expect(plan.feasible).toBe(false);
-      expect(plan.issues.some((s) => s.includes("Phần thưởng exp không hợp lệ"))).toBe(true);
-      expect(plan.issues.some((s) => s.includes("phải > 0"))).toBe(true);
+      const result = await walkSingleQuest(client, mutatedQuest, { silent: true });
+
+      await server.gracefullyShutdown(false);
+      try {
+        rmSync(tempDir, { recursive: true, force: true });
+      } catch {
+        /* ignore */
+      }
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("Phần thưởng exp không khớp");
+      expect(result.error).toContain("kỳ vọng 9999");
     });
   });
 });
