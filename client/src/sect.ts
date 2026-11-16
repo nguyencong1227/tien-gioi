@@ -4,7 +4,9 @@
 import {
   type SectRank,
   SECT_RANK_LABEL,
+  SECT_ELDERS_MAX,
   SECT_MAX_MEMBERS,
+  SECT_TERMS,
   sectKey,
   type SectView,
   type SectMember,
@@ -147,6 +149,23 @@ export function sectMemberStatusText(m: MergedSectMember): string {
   if (m.realm !== undefined && m.tier !== undefined) parts.push(realmLabel(m.realm, m.tier));
   if (m.mapId) parts.push(mapLabelOf(m.mapId));
   return parts.join(" · ");
+}
+
+/** Dòng công tích của một thành viên ("Công tích 1.234"); rỗng nếu thiếu / không dương / hỏng (máy chủ cũ hoặc chưa kiếm được gì: không hiện "Công tích 0"). */
+export function sectMemberMeritText(m: { merit?: unknown }): string {
+  const v = m.merit;
+  if (typeof v !== "number" || !Number.isFinite(v) || v <= 0) return "";
+  return `${SECT_TERMS.merit} ${Math.floor(v).toLocaleString("vi-VN")}`;
+}
+
+/**
+ * Số Trưởng lão tối đa của tông môn lúc này: `caps.elders` của ảnh chụp Nội vụ (máy chủ tính theo CẤP TÔNG, 3 ở cấp 1 tới 7 ở cấp 5); chưa có ảnh chụp / số hỏng thì mức cấp 1
+ * (`SECT_ELDERS_MAX`, cũng là mức máy chủ cũ). KHÔNG cứng 3: tông cấp cao thăng được nhiều hơn.
+ */
+export function sectEldersCap(capsElders: unknown): number {
+  return typeof capsElders === "number" && Number.isSafeInteger(capsElders) && capsElders >= 1
+    ? capsElders
+    : SECT_ELDERS_MAX;
 }
 
 /** Kiểm tra chế độ giả lập tông môn: chỉ bật khi DEV hoặc có cờ debug / test */

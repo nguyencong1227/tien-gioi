@@ -48,6 +48,7 @@ export const VIEWPORTS = [
   { name: "844x390", w: 844, h: 390, dpr: 2, mobile: true },
   { name: "390x844", w: 390, h: 844, dpr: 2, mobile: true },
   { name: "360x640", w: 360, h: 640, dpr: 2, mobile: true },
+  { name: "640x360", w: 640, h: 360, dpr: 2, mobile: true },
 ];
 const MIN_TAP_PX = 44;
 
@@ -418,6 +419,60 @@ async function main() {
       await evalJs(
         `window.__ui.onSect(${JSON.stringify(sect)}); window.__ui.toggleSectModal(true); 1`,
       );
+      await hallOf(2);
+
+      // ---- danh sách thành viên: hiện CÔNG TÍCH; "Thăng TL" theo giới hạn Trưởng lão của CẤP TÔNG (không cứng 3) ----
+      const memberSect = {
+        sect: {
+          ...sect.sect,
+          members: [
+            { name: "Mộc Thanh", rank: "chu", joinedAt: NOW - 86400000, merit: 900 },
+            { name: "Lão Nhất", rank: "truong_lao", joinedAt: NOW - 86400000, merit: 1234 },
+            { name: "Lão Nhị", rank: "truong_lao", joinedAt: NOW - 86400000 },
+            { name: "Lão Tam", rank: "truong_lao", joinedAt: NOW - 86400000, merit: 7 },
+            { name: "Đệ Tử Một", rank: "de_tu", joinedAt: NOW - 86400000, merit: 40 },
+          ],
+        },
+      };
+      const membersView = () =>
+        evalJs(`(() => ({
+          rows: [...document.querySelectorAll("#sect-members-list .sect-member-item")].map((r) => ({
+            name: r.querySelector(".sect-member-name")?.textContent ?? "",
+            merit: r.querySelector(".sect-member-merit")?.textContent ?? "",
+            promote: (() => { const b = [...r.querySelectorAll("button")].find((x) => x.textContent === "Thăng TL"); return b ? { disabled: b.disabled, title: b.title } : null; })(),
+          })),
+        }))()`);
+      await evalJs(
+        `window.__ui.onSect(${JSON.stringify(memberSect)}); document.getElementById("sect-tab-btn-overview").click(); 1`,
+      );
+      await hallOf(3); // cấp 3: tối đa 5 Trưởng lão (đang có 3)
+      await evalJs(`document.getElementById("sect-tab-btn-members").click(); 1`);
+      await sleep(150);
+      let mv = await membersView();
+      const merits = Object.fromEntries(mv.rows.map((r) => [r.name, r.merit]));
+      check(
+        merits["Lão Nhất"] === "Công tích 1.234" &&
+          merits["Đệ Tử Một"] === "Công tích 40" &&
+          merits["Lão Tam"] === "Công tích 7" &&
+          merits["Lão Nhị"] === "",
+        `danh sách thành viên hiện công tích (chỉ người có công tích): ${JSON.stringify(merits)}`,
+      );
+      const dt = mv.rows.find((r) => r.name === "Đệ Tử Một");
+      check(
+        dt?.promote && dt.promote.disabled === false,
+        `cấp 3 (tối đa 5 Trưởng lão, đang 3): nút Thăng TL BẤM ĐƯỢC (${JSON.stringify(dt?.promote)})`,
+      );
+      await hallOf(1); // cấp 1: tối đa 3 Trưởng lão (đang 3) -> khoá
+      await evalJs(`document.getElementById("sect-tab-btn-overview").click(); 1`);
+      await evalJs(`document.getElementById("sect-tab-btn-members").click(); 1`);
+      await sleep(150);
+      mv = await membersView();
+      const dt1 = mv.rows.find((r) => r.name === "Đệ Tử Một");
+      check(
+        dt1?.promote?.disabled === true && /Đã tối đa 3 Trưởng lão/.test(dt1.promote.title),
+        `cấp 1 (tối đa 3, đang 3): nút Thăng TL khoá kèm lý do (${JSON.stringify(dt1?.promote)})`,
+      );
+      await evalJs(`window.__ui.onSect(${JSON.stringify(sect)}); 1`);
       await hallOf(2);
 
       // ---- rời tông: hộp xác nhận nêu số mất ----

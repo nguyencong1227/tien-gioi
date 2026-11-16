@@ -98,7 +98,6 @@ import {
   canSect,
   SECT_MAX_MEMBERS,
   SECT_CREATE_COST,
-  SECT_ELDERS_MAX,
   cleanSectName,
   cleanSectTag,
   cleanMotd,
@@ -130,7 +129,9 @@ import {
   formatSectMembersSummary,
   mergeMemberPresence,
   mapLabelOf,
+  sectMemberMeritText,
   sectMemberStatusText,
+  sectEldersCap,
   sectConfirmText,
   type SectConfirmKind,
 } from "./sect";
@@ -3050,6 +3051,14 @@ function renderSectMembersTab() {
     statusRow.textContent = sectMemberStatusText(m);
 
     info.append(titleRow, statusRow);
+    // Công tích (M8.6): hiện cho từng thành viên có công tích (máy chủ chỉ gửi khi > 0)
+    const meritText = sectMemberMeritText(m);
+    if (meritText) {
+      const meritRow = document.createElement("div");
+      meritRow.className = "sect-member-merit";
+      meritRow.textContent = meritText;
+      info.append(meritRow);
+    }
     item.append(info);
 
     if (m.name !== currentName) {
@@ -3063,9 +3072,11 @@ function renderSectMembersTab() {
         btnPromote.type = "button";
         btnPromote.className = "sect-action-btn";
         btnPromote.textContent = "Thăng TL";
-        btnPromote.disabled = elderCount >= SECT_ELDERS_MAX;
+        // Giới hạn Trưởng lão theo CẤP TÔNG (3 ở cấp 1, tới 7 ở cấp 5): lấy từ ảnh chụp Nội vụ, không cứng 3 (máy chủ cho thăng tới mức này)
+        const eldersCap = sectEldersCap(sectHall?.view.caps.elders);
+        btnPromote.disabled = elderCount >= eldersCap;
         btnPromote.title =
-          elderCount >= SECT_ELDERS_MAX ? "Đã tối đa 3 Trưởng lão" : "Thăng làm Trưởng lão";
+          elderCount >= eldersCap ? `Đã tối đa ${eldersCap} Trưởng lão` : "Thăng làm Trưởng lão";
         btnPromote.addEventListener("click", () => {
           callbacks?.onSectRank?.(m.name, "truong_lao");
         });
