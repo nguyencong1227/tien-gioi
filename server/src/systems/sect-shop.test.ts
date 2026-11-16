@@ -282,6 +282,34 @@ describe("túi và người chơi: thứ tự chỉ MẤT", () => {
     expect(bagCount(A, HP)).toBe(0);
   });
 
+  it("túi đầy: bản ghi tông môn KHÔNG bị đụng tới (kiểm sớm trên bản sao, không trừ rồi hoàn)", async () => {
+    await seed(100);
+    await join(A);
+    fillBag(A);
+    let calls = 0;
+    const real = svc.shopBuy.bind(svc);
+    svc.shopBuy = ((...args: Parameters<typeof real>) => (
+      calls++,
+      real(...args)
+    )) as typeof svc.shopBuy;
+    await buy(A, HP, 2);
+    svc.shopBuy = real;
+    expect(calls).toBe(0);
+  });
+
+  it("đang có một thao tác tông môn dở (kho đồ / nhiệm vụ / mua khác): từ chối error, không đổi gì; xong thì mua được", async () => {
+    await seed(100);
+    await join(A);
+    lh.w.hub.sects.busy.add(keyOf(A));
+    await buy(A, HP, 2);
+    expect(lastToast(A)).toBe(failText("error"));
+    expect((await meOf(A)).contrib).toBe(100);
+    lh.w.hub.sects.busy.delete(keyOf(A));
+    await buy(A, HP, 2);
+    expect((await meOf(A)).contrib).toBe(90);
+    expect(lh.w.hub.sects.busy.has(keyOf(A))).toBe(false); // thả khoá sau khi xong (kể cả khi lỗi)
+  });
+
   it("túi vừa đầy GIỮA LÚC chờ máy chủ: HOÀN cống hiến và hạn mức, không có hàng, toast bag_full", async () => {
     await seed(100);
     await join(A);
