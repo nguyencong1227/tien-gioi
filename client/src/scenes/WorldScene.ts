@@ -304,6 +304,8 @@ interface Entity {
   /** Tinh anh (M7.3 bước 6, `Monster.elite`): cờ đã áp dụng + vầng sáng dưới chân (dựng lười một lần, `elite.ts`) */
   elite?: boolean;
   eliteAura?: Phaser.GameObjects.Ellipse;
+  /** Vầng giáp của TRÙM đang có giáp (`bossArmor`, T4 #873): vòng tròn bao quanh thân, dựng lười, ẩn khi giáp hết */
+  armorAura?: Phaser.GameObjects.Arc;
   /** Huy hiệu trạng thái có hại trên đầu quái (M7.7 bước 3b, #508): Graphics dựng lười, mặt nạ `Monster.fx` đã vẽ và số chấm */
   statusG?: Phaser.GameObjects.Graphics;
   lastFx?: number;
@@ -3521,6 +3523,7 @@ export class WorldScene extends Phaser.Scene {
         elite,
       );
       this.syncMonsterStatus(e, m.fx, def.radius, !!def.boss || elite);
+      if (def.boss) this.syncBossArmor(e, id, def.radius);
     });
     for (const [id, e] of this.monsters) {
       if (seen.has(id)) continue;
@@ -3722,6 +3725,29 @@ export class WorldScene extends Phaser.Scene {
     if (e.shadowOn === on) return;
     e.shadowOn = on;
     e.shadow?.setVisible(on);
+  }
+
+  /**
+   * Vầng GIÁP của trùm `id` (`bossArmor`, T4 #873): vòng tròn xanh bao quanh thân suốt thời gian giáp, mờ dần khi sắp hết, nhịp chung của cảnh (`auraWave`); giảm chuyển động thì đứng yên.
+   * Dựng lười MỘT lần, giáp hết thì ẩn. Hình tròn có viền (không chỉ màu) nên người mù màu vẫn thấy; chữ "Có giáp" trên thanh trùm là kênh chính.
+   */
+  private syncBossArmor(e: Entity, id: string, radius: number) {
+    const a = this.bossFx.armorOf(id, this.time.now);
+    if (!a) {
+      if (e.armorAura?.visible) e.armorAura.setVisible(false);
+      return;
+    }
+    if (!e.armorAura) {
+      e.armorAura = this.add
+        .circle(0, -radius * 0.35, radius + 16, 0x7fc4ff, 0.16)
+        .setStrokeStyle(3, 0xdff2ff, 0.9);
+      e.root.add(e.armorAura); // trên sprite: là vầng bao quanh, không phải bóng dưới chân
+    }
+    const pulse = animReducedMotion() ? 0.5 : this.auraWave;
+    e.armorAura
+      .setVisible(true)
+      .setScale(1 + 0.05 * pulse)
+      .setAlpha(Math.min(1, 0.35 + 0.65 * Math.min(1, a.frac * 3)) * (0.75 + 0.25 * pulse));
   }
 
   /**
@@ -4101,6 +4127,22 @@ export class WorldScene extends Phaser.Scene {
         this.bossFx.onEnrage(m.by, this.time.now);
         sound.boss("enrage"); // một lần duy nhất (bí cảnh), cả đội cần nghe dù đang đứng xa
         return;
+      case "bossArmor":
+        // Trùm dựng giáp (mục 42, T4): chữ "Có giáp" + đếm ngược trên thanh trùm, vầng giáp quanh thân (`syncBossArmor`), số bay xanh nhạt (`planHitNumber`); `fx` hỏng bị bỏ ở `onArmor`
+        this.bossFx.onArmor(m.by, m.ms, m.mult, this.time.now);
+        if (this.inView(m.x, m.y, BOSS_SFX_VIEW)) {
+          this.fx.play("boss-armor", m.x, m.y - 8, { priority: 1 });
+          sound.boss("armor");
+        }
+        return;
+      case "bossSummon":
+        // Trùm gọi quái con: chữ "Gọi N quái con" trên thanh trùm + hồn bốc lên ở chỗ trùm đứng + tiếng; quái con tự hiện qua state như quái thường
+        this.bossFx.onSummon(m.by, m.n, this.time.now);
+        if (this.inView(m.x, m.y, BOSS_SFX_VIEW)) {
+          this.fx.play("boss-summon", m.x, m.y - 8, { priority: 1 });
+          sound.boss("summon");
+        }
+        return;
       case "bolt":
         // Đạn tầm xa của quái: client tự bay theo `speed` / `angle` tới hết `range` (đạn không là state)
         this.telegraphs.bolt(m, this.time.now);
@@ -4263,6 +4305,8 @@ export class WorldScene extends Phaser.Scene {
       targetMaxHp: maxHp,
       // Loại quái bị đánh (từ state; `planHitFx` tự bỏ id lạ): trùm / quái Kim Đan có hiệu ứng riêng
       kind: m.toPlayer ? undefined : (target as { kind?: string } | undefined)?.kind,
+      // Trùm đang có giáp: số bay xanh nhạt, nhỏ hơn (người đánh biết sát thương đang bị giảm)
+      armored: !m.toPlayer && this.bossFx.armorOf(m.target, this.time.now) !== null,
       mine:
         !targetIsMe &&
         !m.toPlayer &&

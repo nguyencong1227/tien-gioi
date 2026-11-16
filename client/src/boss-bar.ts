@@ -17,6 +17,10 @@ export const BOSS_BAR_RANGE = 600;
 export const BOSS_SFX_VIEW = 480;
 /** Giữ tên chiêu trên thanh thêm chừng này (ms) sau lúc đòn đáp (đọc kịp, nhất là tên ngắn). */
 export const BOSS_CAST_LINGER_MS = 500;
+/** Dòng "Gọi N quái con" trên thanh trùm giữ chừng này (ms) sau lúc nhận `bossSummon`, rồi tắt (đọc kịp, không dán mãi). */
+export const BOSS_SUMMON_NOTE_MS = 3000;
+/** Trần thời lượng giáp client chịu nhận (ms): `fx` hỏng không được dựng giáp mãi mãi (máy chủ thật chỉ vài giây). */
+export const BOSS_ARMOR_MAX_MS = 60_000;
 /** Cuồng nộ chớp mạnh chừng này (ms) lúc mới nhận `bossEnrage`, rồi giữ chỉ báo đứng yên. */
 export const BOSS_ENRAGE_FLASH_MS = 1500;
 
@@ -86,6 +90,15 @@ export function bossMarkPercents(marks: readonly number[]): number[] {
     .map((m) => Math.round(Math.min(1, Math.max(0, m)) * 1000) / 10);
 }
 
+/**
+ * Phần trăm sát thương trùm NHẬN khi có giáp (`bossArmor.mult` 0,5 -> 50): số nguyên 1..100; `null` nếu `mult` hỏng (không phải số hữu hạn, <= 0 hoặc > 1: client không tin `fx`,
+ * không ghi "nhận 0 %" / "nhận 300 %" lên thanh).
+ */
+export function armorPercent(mult: unknown): number | null {
+  if (typeof mult !== "number" || !Number.isFinite(mult) || mult <= 0 || mult > 1) return null;
+  return Math.max(1, Math.round(mult * 100));
+}
+
 export interface BossBarModel {
   id: string;
   /** Tên trùm (từ bảng quái) */
@@ -108,6 +121,19 @@ export interface BossBarModel {
   /** Đã cuồng nộ (bí cảnh) và còn đang chớp mạnh (`BOSS_ENRAGE_FLASH_MS`) */
   enrageFlash: boolean;
   enraged: boolean;
+  /** Đang có GIÁP (`bossArmor`): phần trăm sát thương trùm nhận + còn bao lâu (ms); `null` = không có giáp. Hiện bằng CHỮ trên thanh (không chỉ vầng màu quanh trùm). */
+  armor: { pct: number; leftMs: number } | null;
+  /** Vừa gọi quái con (`bossSummon`, trong `BOSS_SUMMON_NOTE_MS`): số con; `null` = không */
+  summonN: number | null;
+}
+
+interface ArmorRec {
+  /** Lúc giáp hết (đồng hồ cảnh, ms) */
+  until: number;
+  /** Tổng thời lượng (ms) */
+  ms: number;
+  /** Sát thương nhận (0 < mult <= 1) */
+  mult: number;
 }
 
 interface CastRec {
@@ -124,6 +150,8 @@ export class BossFxTracker {
   private cast = new Map<string, CastRec>();
   private phaseAt = new Map<string, number>();
   private enrageAt = new Map<string, number>();
+  private armor = new Map<string, ArmorRec>();
+  private summon = new Map<string, { at: number; n: number }>();
 
   onCast(by: string, ability: string, ms: number, now: number): void {
     if (typeof by !== "string" || typeof ability !== "string" || !finite(ms, now) || ms <= 0)
@@ -132,6 +160,27 @@ export class BossFxTracker {
   }
   onPhase(by: string, now: number): void {
     if (typeof by === "string" && finite(now)) this.phaseAt.set(by, now);
+  }
+  /** `bossArmor`: trùm dựng giáp `ms` ms nhận `mult` lần sát thương. Số hỏng (ms <= 0 / quá `BOSS_ARMOR_MAX_MS`, `mult` ngoài (0, 1]) thì bỏ; dựng lại thì THAY bản cũ. */
+  onArmor(by: string, ms: number, mult: number, now: number): void {
+    if (typeof by !== "string" || !finite(ms, now) || ms <= 0 || ms > BOSS_ARMOR_MAX_MS) return;
+    if (armorPercent(mult) === null) return;
+    this.armor.set(by, { until: now + ms, ms, mult });
+  }
+  /** `bossSummon`: trùm gọi `n` >= 1 quái con (số lẻ / hỏng thì bỏ). */
+  onSummon(by: string, n: number, now: number): void {
+    if (typeof by !== "string" || !finite(now) || !Number.isInteger(n) || n < 1 || n > 99) return;
+    this.summon.set(by, { at: now, n });
+  }
+  /** Giáp còn hiệu lực của trùm `id` lúc `now`: hệ số, còn bao lâu và phần còn lại 0..1 (cho vầng giáp mờ dần); `null` nếu không có / đã hết. */
+  armorOf(id: string, now: number): { mult: number; leftMs: number; frac: number } | null {
+    const r = this.armor.get(id);
+    if (!r || !finite(now)) return null;
+    const left = r.until - now;
+    // đồng hồ cảnh lùi (trước lúc nhận) thì không được báo còn NHIỀU HƠN thời lượng giáp
+    return left > 0
+      ? { mult: r.mult, leftMs: Math.min(left, r.ms), frac: Math.min(1, left / r.ms) }
+      : null;
   }
   onEnrage(by: string, now: number): void {
     if (typeof by === "string" && finite(now)) this.enrageAt.set(by, now);
@@ -150,11 +199,15 @@ export class BossFxTracker {
     this.cast.delete(id);
     this.phaseAt.delete(id);
     this.enrageAt.delete(id);
+    this.armor.delete(id);
+    this.summon.delete(id);
   }
   clear(): void {
     this.cast.clear();
     this.phaseAt.clear();
     this.enrageAt.clear();
+    this.armor.clear();
+    this.summon.clear();
   }
 
   /** Mô hình thanh của trùm `c` lúc `now`. Chiêu lạ (không có trong dữ liệu) vẫn hiện "Đang vận chiêu" để người chơi biết trùm đang gồng (không im lặng). */
@@ -176,6 +229,8 @@ export class BossFxTracker {
     }
     const pAt = this.phaseAt.get(c.id);
     const eAt = this.enrageAt.get(c.id);
+    const ar = this.armorOf(c.id, now);
+    const sm = this.summon.get(c.id);
     return {
       id: c.id,
       name: mon.name,
@@ -190,6 +245,8 @@ export class BossFxTracker {
       roaring: pAt !== undefined && now - pAt < BOSS_PHASE_ROAR_MS,
       enrageFlash: eAt !== undefined && now - eAt < BOSS_ENRAGE_FLASH_MS,
       enraged: eAt !== undefined,
+      armor: ar ? { pct: armorPercent(ar.mult) ?? 100, leftMs: ar.leftMs } : null,
+      summonN: sm && now - sm.at >= 0 && now - sm.at < BOSS_SUMMON_NOTE_MS ? sm.n : null,
     };
   }
 }
@@ -198,5 +255,6 @@ export class BossFxTracker {
 export function bossBarText(m: BossBarModel): string {
   const pct = Math.round(m.frac * 100);
   const ph = m.phaseCount > 1 ? `, giai đoạn ${m.phase + 1} / ${m.phaseCount}` : "";
-  return `${m.name}: ${pct} % khí huyết${ph}`;
+  const ar = m.armor ? `, có giáp (nhận ${m.armor.pct} % sát thương)` : "";
+  return `${m.name}: ${pct} % khí huyết${ph}${ar}`;
 }

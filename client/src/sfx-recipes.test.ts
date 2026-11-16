@@ -124,7 +124,7 @@ describe("clampRecipe: kẻ gọi sai số liệu cũng không phát ra tiếng 
 });
 
 describe("bossSfx: tiếng của trùm (gồng / đòn rơi / đổi giai đoạn / cuồng nộ)", () => {
-  const KINDS = ["cast", "strike", "phase", "enrage"] as const;
+  const KINDS = ["cast", "strike", "phase", "enrage", "armor", "summon"] as const;
   const lowest = (r: SfxRecipe) => Math.min(...r.partials.map((q) => Math.min(q.f0, q.f1)));
 
   it("mọi loại x mọi hệ đều hợp lệ (ngắn, nhỏ, trong dải tần)", () => {
@@ -134,16 +134,16 @@ describe("bossSfx: tiếng của trùm (gồng / đòn rơi / đổi giai đoạ
     }
   });
 
-  it("bốn loại cho bốn tiếng KHÁC nhau", () => {
+  it("sáu loại cho sáu tiếng KHÁC nhau", () => {
     expect(new Set(KINDS.map((k) => JSON.stringify(bossSfx(k, "hoa")))).size).toBe(KINDS.length);
   });
 
-  it("sắc theo HỆ của chiêu: gồng và đòn rơi đổi theo hệ; đổi giai đoạn / cuồng nộ không phụ thuộc hệ", () => {
+  it("sắc theo HỆ của chiêu: gồng và đòn rơi đổi theo hệ; đổi giai đoạn / cuồng nộ / giáp / gọi quái con không phụ thuộc hệ", () => {
     for (const k of ["cast", "strike"] as const) {
       const seen = new Set(ELEMENTS.map((e) => JSON.stringify(bossSfx(k, e.id))));
       expect(seen.size).toBeGreaterThanOrEqual(ELEMENTS.length - 1);
     }
-    for (const k of ["phase", "enrage"] as const)
+    for (const k of ["phase", "enrage", "armor", "summon"] as const)
       expect(JSON.stringify(bossSfx(k, "hoa"))).toBe(JSON.stringify(bossSfx(k, "bang")));
   });
 

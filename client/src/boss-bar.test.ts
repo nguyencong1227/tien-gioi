@@ -4,9 +4,12 @@ import { BOSS_BY_KIND, BOSS_PHASE_ROAR_MS, MONSTER_BY_ID } from "@tien-gioi/shar
 import {
   BOSS_BAR_RANGE,
   BOSS_CAST_LINGER_MS,
+  BOSS_ARMOR_MAX_MS,
   BOSS_ENRAGE_FLASH_MS,
   BOSS_SFX_VIEW,
+  BOSS_SUMMON_NOTE_MS,
   BossFxTracker,
+  armorPercent,
   bossAbilityElement,
   bossBarText,
   bossMarkPercents,
@@ -224,6 +227,102 @@ describe("bossAbilityElement: hệ của chiêu cho tiếng trùm", () => {
   it("BOSS_SFX_VIEW là số dương hợp lý (px)", () => {
     expect(BOSS_SFX_VIEW).toBeGreaterThan(0);
     expect(BOSS_SFX_VIEW).toBeLessThanOrEqual(1000);
+  });
+});
+
+describe("giáp + gọi quái con của trùm (T4 #873, fx bossArmor / bossSummon)", () => {
+  const c = cand("b1");
+
+  it("armorPercent: 0,5 -> 50; kẹp 1..100; hệ số ngoài (0, 1] hoặc hỏng -> null (client không tin fx)", () => {
+    expect(armorPercent(0.5)).toBe(50);
+    expect(armorPercent(1)).toBe(100);
+    expect(armorPercent(0.004)).toBe(1);
+    expect(armorPercent(0.333)).toBe(33);
+    for (const bad of [
+      0,
+      -0.2,
+      1.01,
+      3,
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      "0.5",
+      null,
+      undefined,
+      {},
+    ])
+      expect(armorPercent(bad), String(bad)).toBeNull();
+  });
+
+  it("onArmor -> armorOf: còn bao lâu + phần còn lại giảm dần; hết giờ thì null; model có chữ phần trăm", () => {
+    const t = new BossFxTracker();
+    expect(t.armorOf("b1", 1000)).toBeNull();
+    t.onArmor("b1", 4000, 0.5, 1000);
+    expect(t.armorOf("b1", 1000)).toEqual({ mult: 0.5, leftMs: 4000, frac: 1 });
+    expect(t.armorOf("b1", 3000)).toEqual({ mult: 0.5, leftMs: 2000, frac: 0.5 });
+    expect(t.armorOf("b1", 4999)?.leftMs).toBe(1);
+    expect(t.armorOf("b1", 5000)).toBeNull();
+    expect(t.armorOf("khac", 3000)).toBeNull();
+    // đồng hồ cảnh lùi về trước lúc nhận: không báo còn nhiều hơn thời lượng giáp, phần còn lại không vượt 1
+    expect(t.armorOf("b1", 0)).toEqual({ mult: 0.5, leftMs: 4000, frac: 1 });
+    expect(t.modelOf(c, 3000).armor).toEqual({ pct: 50, leftMs: 2000 });
+    expect(t.modelOf(c, 5000).armor).toBeNull();
+    expect(bossBarText(t.modelOf(c, 3000))).toContain("có giáp (nhận 50 % sát thương)");
+    expect(bossBarText(t.modelOf(c, 5000))).not.toContain("giáp");
+  });
+
+  it("dựng giáp lại lúc đang có giáp THAY bản cũ (hệ số + thời hạn mới)", () => {
+    const t = new BossFxTracker();
+    t.onArmor("b1", 4000, 0.5, 1000);
+    t.onArmor("b1", 2000, 0.25, 2000);
+    expect(t.armorOf("b1", 2500)).toEqual({ mult: 0.25, leftMs: 1500, frac: 0.75 });
+    expect(t.armorOf("b1", 4100)).toBeNull(); // hạn mới 4000, không còn hạn cũ 5000
+  });
+
+  it("fx hỏng bị bỏ: ms <= 0 / quá trần / không phải số, mult ngoài (0, 1], id sai kiểu; không ném", () => {
+    const t = new BossFxTracker();
+    t.onArmor("b1", 0, 0.5, 0);
+    t.onArmor("b1", -5, 0.5, 0);
+    t.onArmor("b1", BOSS_ARMOR_MAX_MS + 1, 0.5, 0);
+    t.onArmor("b1", Number.NaN, 0.5, 0);
+    t.onArmor("b1", 1000, 0, 0);
+    t.onArmor("b1", 1000, 2, 0);
+    t.onArmor("b1", 1000, Number.NaN, 0);
+    t.onArmor(7 as unknown as string, 1000, 0.5, 0);
+    t.onArmor("b1", 1000, 0.5, Number.NaN);
+    expect(t.armorOf("b1", 1)).toBeNull();
+    t.onArmor("b1", BOSS_ARMOR_MAX_MS, 0.5, 0); // đúng trần thì nhận
+    expect(t.armorOf("b1", 1)).not.toBeNull();
+    expect(t.armorOf("b1", Number.NaN)).toBeNull();
+  });
+
+  it("onSummon: model báo 'N quái con' trong BOSS_SUMMON_NOTE_MS rồi tắt; n lẻ / < 1 / quá lớn / hỏng bị bỏ", () => {
+    const t = new BossFxTracker();
+    expect(t.modelOf(c, 1000).summonN).toBeNull();
+    t.onSummon("b1", 2, 1000);
+    expect(t.modelOf(c, 1000).summonN).toBe(2);
+    expect(t.modelOf(c, 1000 + BOSS_SUMMON_NOTE_MS - 1).summonN).toBe(2);
+    expect(t.modelOf(c, 1000 + BOSS_SUMMON_NOTE_MS).summonN).toBeNull();
+    expect(t.modelOf(c, 500).summonN).toBeNull(); // đồng hồ lùi: không báo
+    const u = new BossFxTracker();
+    for (const bad of [0, -1, 1.5, Number.NaN, 100, Number.POSITIVE_INFINITY])
+      u.onSummon("b1", bad, 0);
+    u.onSummon("b1", 3, Number.NaN);
+    u.onSummon(7 as unknown as string, 3, 0);
+    expect(u.modelOf(c, 1).summonN).toBeNull();
+  });
+
+  it("forget / clear xoá cả giáp lẫn ghi chú gọi quái con", () => {
+    const t = new BossFxTracker();
+    t.onArmor("b1", 4000, 0.5, 0);
+    t.onSummon("b1", 2, 0);
+    t.forget("b1");
+    expect(t.armorOf("b1", 1)).toBeNull();
+    expect(t.modelOf(c, 1).summonN).toBeNull();
+    t.onArmor("b1", 4000, 0.5, 0);
+    t.onSummon("b1", 2, 0);
+    t.clear();
+    expect(t.armorOf("b1", 1)).toBeNull();
+    expect(t.modelOf(c, 1).summonN).toBeNull();
   });
 });
 
