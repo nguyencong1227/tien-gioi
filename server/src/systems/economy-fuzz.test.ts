@@ -7,7 +7,7 @@
 //  2. Bất biến cấu trúc: túi đúng 24 ô, mỗi ô 1..stack, ví nguyên 0..COIN_CAP, trang bị đúng ô, đồ trên đất qty nguyên >= 1.
 // Nguồn sinh hợp lệ (quái rơi / thưởng) là các thao tác "nguồn" riêng; mỗi nhiệm vụ chỉ trả thưởng MỘT lần (mỗi ngày với nhiệm vụ lặp).
 // Mọi lỗi in kèm hạt + số bước để tái hiện: đổi `SEEDS` / `STEPS` rồi chạy lại.
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 import {
   COIN_CAP,
   EQUIP_SLOTS,
@@ -15,6 +15,7 @@ import {
   ITEMS,
   ITEM_BY_ID,
   LOOT_DESPAWN_MS,
+  MAX_STATUSES,
   NPCS,
   NPC_BY_ID,
   QUEST_BY_ID,
@@ -33,6 +34,7 @@ import {
   startPackOf,
   validateRebirth,
   type EquipSlot,
+  type ItemDef,
 } from "@tien-gioi/shared";
 import type { World } from "../world";
 import { changeCoin, splitCoin } from "./wallet";
@@ -42,6 +44,7 @@ import { buy, sell } from "./shop";
 import { equip, equipmentOf, sanitizeEquipment, unequip } from "./equipment";
 import { abandonQuest, acceptQuest, craft, trade, turnInQuest } from "./npc";
 import { applyRebirth, beginLimbo } from "./reincarnation";
+import { applyStats } from "./progression";
 import { addPlayer, makeWorld } from "./test-helpers";
 
 // ---------- Hạt giống, bộ sinh ----------
@@ -58,6 +61,76 @@ function rng(seed: number) {
 }
 
 const SIDS = ["P1", "P2", "P3"] as const;
+
+// Đan hộ đạo thử cho nghề nhỏ (#514, issue #770): dữ liệu thật của D chưa vào (#763), chèn tạm vào bảng
+const TEST_STATUS_PILLS: readonly ItemDef[] = [
+  {
+    id: "thu_truc_co_dan",
+    name: "Thử Trúc Cơ Đan",
+    desc: "Đan thử hộ đạo Trúc Cơ",
+    color: 0x4fa3ff,
+    type: "consumable",
+    stack: 9,
+    rarity: 2,
+    effect: {
+      kind: "status",
+      id: "dao_ho",
+      ms: 900_000,
+      ratio: 0.15,
+      forRealm: 1,
+    },
+  },
+  {
+    id: "thu_ket_kim_dan",
+    name: "Thử Kết Kim Đan",
+    desc: "Đan thử hộ đạo Kim Đan",
+    color: 0xc277ff,
+    type: "consumable",
+    stack: 9,
+    rarity: 3,
+    effect: {
+      kind: "status",
+      id: "dao_ho",
+      ms: 900_000,
+      ratio: 0.15,
+      forRealm: 2,
+    },
+  },
+  {
+    id: "thu_duong_anh_dan",
+    name: "Thử Dưỡng Anh Đan",
+    desc: "Đan thử hộ đạo Nguyên Anh",
+    color: 0xffb23f,
+    type: "consumable",
+    stack: 9,
+    rarity: 4,
+    effect: {
+      kind: "status",
+      id: "dao_ho",
+      ms: 900_000,
+      ratio: 0.15,
+      forRealm: 3,
+    },
+  },
+];
+for (const p of TEST_STATUS_PILLS) {
+  (ITEMS as ItemDef[]).push(p);
+  ITEM_BY_ID[p.id] = p;
+}
+
+afterAll(() => {
+  for (const p of TEST_STATUS_PILLS) {
+    delete ITEM_BY_ID[p.id];
+    const idx = ITEMS.findIndex((it) => it.id === p.id);
+    if (idx >= 0) (ITEMS as ItemDef[]).splice(idx, 1);
+  }
+});
+
+export const statusPillStats = {
+  accepted: 0,
+  rejected: 0,
+};
+
 const ITEM_IDS = ITEMS.map((i) => i.id);
 const SHOP_NPCS = Object.keys(SHOP_BY_NPC);
 const TRADE_NPCS = [...new Set(TRADES.map((t) => t.npcId))];
@@ -164,6 +237,14 @@ function checkStructure(w: World, where: string) {
     }
     const ids = c.quests.active.map((q) => q.id);
     expect(new Set(ids).size, `${at}: nhiệm vụ đang làm trùng ${ids}`).toBe(ids.length);
+    if (c.st) {
+      expect(
+        c.st.list.length,
+        `${at}: hộp trạng thái vượt quá ${MAX_STATUSES}`,
+      ).toBeLessThanOrEqual(MAX_STATUSES);
+      const stIds = c.st.list.map((s) => s.id);
+      expect(new Set(stIds).size, `${at}: hộp trạng thái có id trùng ${stIds}`).toBe(stIds.length);
+    }
   }
   w.state.loot.forEach((l, id) => {
     expect(ITEM_BY_ID[l.itemId], `${where}: đồ rơi ${id} lạ`).toBeTruthy();
@@ -432,23 +513,99 @@ function makeFuzz(seed: number) {
     () => {
       const sid = sidOf();
       const c = w.ctrl.get(sid)!;
+      const p = w.state.players.get(sid)!;
       const potions = c.inv.flatMap((x, i) => (x && ITEM_BY_ID[x.itemId]?.effect ? [i] : []));
       const slot = potions.length && chance(0.75) ? pick(potions) : slotArg();
       const s = typeof slot === "number" ? c.inv[slot] : null;
       const item = s?.itemId;
+      const def = item ? ITEM_BY_ID[item] : undefined;
+      const eff = def?.effect;
+
       if (chance(0.5)) w.now += 20_000; // hồi chiêu đan
+      if (eff?.kind === "status" && chance(0.3)) {
+        // Thỉnh thoảng tăng thời gian qua hẳn thời hạn hiệu lực để thử dùng lại đan status
+        w.now += 950_000;
+      }
       if (chance(0.7)) {
         // bị thương / cạn linh lực / chưa đầy tu vi: đan dược mới có chỗ tác dụng
-        const p = w.state.players.get(sid)!;
         p.hp = Math.max(1, Math.floor(p.maxHp * rand()));
         p.mp = Math.floor(p.maxMp * rand());
         p.exp = Math.floor(p.expMax * rand() * 0.5);
       }
+      if (eff?.kind === "status" && eff.forRealm !== undefined) {
+        // Ngẫu nhiên đặt người chơi ở đỉnh bậc đúng hoặc sai để thử cả nhánh chấp nhận và từ chối
+        if (chance(0.5)) {
+          // Nhánh chấp nhận: đúng cảnh giới forRealm, tầng cuối, exp đầy
+          p.realm = Math.trunc(eff.forRealm);
+          p.tier = REALMS[p.realm].tiers.length - 1;
+          applyStats(p, false);
+          p.exp = p.expMax;
+        } else {
+          // Nhánh từ chối: sai cảnh giới, hoặc chưa đạt tầng cuối, hoặc tu vi chưa đầy
+          if (chance(0.35)) {
+            p.realm = (Math.trunc(eff.forRealm) + 1) % (REALMS.length - 1);
+            p.tier = REALMS[p.realm].tiers.length - 1;
+            applyStats(p, false);
+            p.exp = p.expMax;
+          } else if (chance(0.5)) {
+            p.realm = Math.trunc(eff.forRealm);
+            p.tier = Math.max(0, REALMS[p.realm].tiers.length - 2);
+            applyStats(p, false);
+            p.exp = p.expMax;
+          } else {
+            p.realm = Math.trunc(eff.forRealm);
+            p.tier = REALMS[p.realm].tiers.length - 1;
+            applyStats(p, false);
+            p.exp = Math.max(0, Math.floor(p.expMax * 0.5));
+          }
+        }
+      }
+
+      const boxBefore = c.st?.list ? c.st.list.map((st) => ({ ...st })) : [];
+
       return {
         label: `${sid} dùng ô ${JSON.stringify(slot)} (${item})`,
-        run: () => useItem(w, sid, slot),
-        verify: (d) =>
-          oneOf(d, ...(item ? [{ name: "dùng", want: effect(sid, 0, { [item]: -1 }) }] : [])),
+        run: () => {
+          const invBefore = typeof slot === "number" ? c.inv[slot]?.qty : undefined;
+          useItem(w, sid, slot);
+          if (typeof slot === "number" && item && eff?.kind === "status") {
+            const invAfter = c.inv[slot]?.itemId === item ? c.inv[slot]?.qty : 0;
+            if (invBefore !== undefined && invAfter < invBefore) {
+              statusPillStats.accepted++;
+            } else {
+              statusPillStats.rejected++;
+            }
+          }
+        },
+        verify: (d) => {
+          if (!item) {
+            expect(isNone(d)).toBe(true);
+            return;
+          }
+          if (eff?.kind === "status") {
+            const consumed = d.mine[sid]?.[item] === -1;
+            if (consumed) {
+              // Trừ 1 đan: sổ cái đúng -1 item, ví và đồ khác không đổi
+              expect(d).toEqual(effect(sid, 0, { [item]: -1 }));
+              // Bất biến: hộp trạng thái phải chứa eff.id còn hạn (until > w.now)
+              const boxAfter = c.st?.list ?? [];
+              const active = boxAfter.find((st) => st.id === eff.id && st.until > w.now);
+              expect(
+                active,
+                `dùng đan ${item} thành công nhưng không có trạng thái ${eff.id} còn hạn`,
+              ).toBeTruthy();
+            } else {
+              // Không trừ: hộp trạng thái KHÔNG đổi, không trừ đan, không trừ tiền, không đổi đồ khác
+              expect(isNone(d)).toBe(true);
+              const boxAfter = c.st?.list ? c.st.list.map((st) => ({ ...st })) : [];
+              expect(boxAfter, `dùng đan ${item} bị từ chối nhưng hộp trạng thái bị đổi`).toEqual(
+                boxBefore,
+              );
+            }
+          } else {
+            oneOf(d, ...(item ? [{ name: "dùng", want: effect(sid, 0, { [item]: -1 }) }] : []));
+          }
+        },
       };
     },
     // ----- đổi đồ / rèn -----
@@ -683,6 +840,10 @@ function makeFuzz(seed: number) {
       return ["đan dược", [{ itemId: pick(potions).id, qty: 1 + Math.floor(rand() * 5) }]];
     },
     (): [string, { itemId: string; qty: number }[]] => {
+      const pill = pick(TEST_STATUS_PILLS);
+      return [`đan hộ đạo thử ${pill.id}`, [{ itemId: pill.id, qty: 1 + Math.floor(rand() * 3) }]];
+    },
+    (): [string, { itemId: string; qty: number }[]] => {
       const q = pick(QUESTS);
       const need = q.steps.flatMap((st) =>
         st.kind === "collect" ? [{ itemId: st.itemId, qty: st.count }] : [],
@@ -784,6 +945,13 @@ describe("kinh tế: chuỗi thao tác ngẫu nhiên không sinh thêm / làm m�
       expect(seen[k] ?? 0, `thao tác "${k}" chưa lần nào thực sự đổi trạng thái`).toBeGreaterThan(
         0,
       );
+    expect(
+      statusPillStats.accepted,
+      "nhánh chấp nhận đan status chưa lần nào chạy",
+    ).toBeGreaterThan(0);
+    expect(statusPillStats.rejected, "nhánh từ chối đan status chưa lần nào chạy").toBeGreaterThan(
+      0,
+    );
   });
 });
 
