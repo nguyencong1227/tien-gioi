@@ -30,6 +30,7 @@ import {
 import { KeyedQueue } from "./pg/queue";
 import {
   SectConflictError,
+  emptySectVault,
   newSectId,
   withLogEntry,
   type Sect,
@@ -168,6 +169,7 @@ export class SectService {
         members: [{ soulKey: actor.soulKey, name: actor.name, rank: "chu", joinedAt: now }],
         coin: 0,
         log: [],
+        vault: emptySectVault(),
         createdAt: now,
         updatedAt: now,
       });
