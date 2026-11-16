@@ -768,7 +768,14 @@ Mỗi lần sinh quái thường hiếu chiến (không trùm, không Linh Thố
 | Cốt Tượng | Nguyên Anh Sơ kỳ | 17.3 / 43.2 | 32% / 122% | giết người đứng yên |
 | Độc Tước | Nguyên Anh Trung kỳ | 6.1 / 15.2 | 50% / 187% | giết người đứng yên |
 
-Đọc bảng: 7 / 9 loài có tinh anh làm người ĐỨNG YÊN solo mất hơn 100% khí huyết (Kim Đan và Nguyên Anh), nên tinh anh là mini-trùm: phải né báo trước đòn (loài gốc đã có), uống đan hoặc đi theo đội; chạy về khu an toàn là cách thoát. Luyện Khí / Trúc Cơ chỉ nhích nhẹ. Chết do quái là mất kiếp (Hoàng Tuyền) nên đây là rủi ro thật: số hệ số (khí huyết x2.5, công x1.5, xác suất 4%) là số khởi đầu theo `docs/PHAN_CONG_M7.md` mục 6, chờ bot thật của C và quyết định của người dùng (`questions.md`).
+Đọc bảng: 7 / 9 loài có tinh anh làm người ĐỨNG YÊN solo mất hơn 100% khí huyết (Kim Đan và Nguyên Anh), nên tinh anh là mini-trùm: phải né báo trước đòn (loài gốc đã có), uống đan hoặc đi theo đội; chạy về khu an toàn là cách thoát. Luyện Khí / Trúc Cơ chỉ nhích nhẹ. Chết do quái là mất kiếp (Hoàng Tuyền) nên đây là rủi ro thật. Hệ số (khí huyết x2.5, công x1.5, xác suất 4%) ban đầu theo `docs/PHAN_CONG_M7.md` mục 6; bot thật của C và quyết định của người dùng bên dưới.
+
+**Quyết định (QUYET_DINH_M3 mục 22.2, người dùng chốt 16/11/2026): GIỮ NGUYÊN độ mạnh của tinh anh, KHÔNG giảm hệ số.** Số đo bot thật đánh tinh anh Hàn Vân Lĩnh (Nguyên Anh Hậu kỳ, phản xạ 200 ms, né báo trước đòn, uống đan khi khí huyết dưới 50 %, cùng cấu hình cho mọi loài):
+
+- **Hàn Lang / Phong Nha / Cốt Tượng:** solo SỐNG 6/6 (đáy khí huyết ~53-61 %, tốn 1 đan).
+- **Độc Tước:** solo CHẾT 6/6 kể cả mặc đủ 6 món đồ ô riêng hoặc mang 8 đan (tử vong ~11 giây: sát thương độc dồn dập nhanh hơn hồi chiêu 12 giây của đan dược, chỉ kịp dùng 1 viên trước khi hết máu); đi ĐỘI 2 người thì sống an toàn 6/6 (đáy máu 66 %, hạ trong 6,4 giây).
+
+Giữ nguyên vì: (1) tinh anh là mini-trùm — sao vàng + vầng cam dưới chân báo rõ từ xa (`client/src/elite.ts`), chạy về trấn / khu an toàn là thoát, rủi ro mất kiếp là cốt lõi thiết kế; (2) 3/4 loài solo có né + đan vẫn sống, chỉ Độc Tước (độc + đạn tầm xa) quá gắt khi một mình, nên GỢI Ý trong game thay vì hạ số: thông báo MỘT LẦN "★ Độc Tước tinh anh: nên đi đội." khi gặp (`client/src/elite.ts`, PR #750), không dán chữ lên đầu mọi tinh anh; (3) khuyến khích đi đội đúng tinh thần game. **Xem lại nếu** số liệu chơi thật sau này cho thấy người chơi bỏ Hàn Vân Lĩnh vì sợ Độc Tước tinh anh (tỉ lệ vào bản đồ / sống sót bất thường): khi đó cân nhắc giảm `ELITE_ATK_MULT` hoặc loại `doc_tuoc` khỏi `canBeElite` (mỗi bên một dòng ở `server/src/systems/elite.ts`).
 
 ### 6. Thực nghiệm bot THẬT Nguyên Anh (M7.10 Refs #511, #510)
 
@@ -816,7 +823,7 @@ Mỗi lần sinh quái thường hiếu chiến (không trùm, không Linh Thố
      + **3/4 loài (Hàn Lang, Phong Nha, Cốt Tượng):** người chơi solo **CÓ NÉ + UỐNG ĐAN sống sót an toàn (0/6 tử vong)**, đáy khí huyết an toàn ~53% và tiêu tốn 1 viên đan hồi phục.
      + **Độc Tước Tinh Anh:** người chơi solo tử vong 6/6 trận (kể cả mặc đủ 6 món hoặc mang 8 đan: tử vong ở ~11s với 6/6 trận chết vì sát thương độc dồn dập nhanh hơn hồi chiêu 12s của đan dược, chỉ kịp dùng 1 viên trước khi hết máu).
      + **Lập đội 2 người:** Độc Tước Tinh Anh bị hạ gục an toàn trong 6.4s mà không có bất kỳ ai tử vong (0/6 trận, đáy máu 66%). Cốt Tượng Tinh Anh rút ngắn thời gian từ 79.4s xuống 21.0s và hoàn toàn không tốn viên đan nào.
-   - **Ghi nhận:** Bộ hệ số tinh anh (x2.5 khí huyết, x1.5 công, xác suất 4%) của M7.3 hiện là số đo thực nghiệm; rủi ro Độc Tước tinh anh solo chết 100% đã được ghi nhận vào `~/TT/orchestra/questions.md` chờ người dùng quyết định xem có cần điều chỉnh hệ số hay phân loại loài quái.
+   - **Ghi nhận:** Bộ hệ số tinh anh (x2.5 khí huyết, x1.5 công, xác suất 4%) của M7.3 là số đo thực nghiệm; rủi ro Độc Tước tinh anh solo chết 100% đã được **người dùng chốt GIỮ NGUYÊN** (QUYET_DINH_M3 mục 22.2, 16/11/2026): tinh anh là mini-trùm nhìn rõ (sao vàng + vầng cam), chạy về trấn là thoát, gợi ý "nên đi đội" trong game (`client/src/elite.ts`, PR #750) thay vì hạ số; xem lại nếu số liệu chơi thật cho thấy người chơi bỏ Hàn Vân vì sợ Độc Tước (chi tiết ở mục "Tinh anh").
 
 
 ## Cân bằng chiêu thức, ngũ hành và trạng thái (M7, #510)

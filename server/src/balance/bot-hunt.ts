@@ -578,6 +578,6 @@ ${eliteRows
      + **3/4 loài (Hàn Lang, Phong Nha, Cốt Tượng):** người chơi solo **CÓ NÉ + UỐNG ĐAN sống sót an toàn (0/6 tử vong)**, đáy khí huyết an toàn ~53% và tiêu tốn 1 viên đan hồi phục.
      + **Độc Tước Tinh Anh:** người chơi solo tử vong 6/6 trận (kể cả mặc đủ 6 món hoặc mang 8 đan: tử vong ở ~11s với ${docTuocSolo8.deathsTotal}/6 trận chết vì sát thương độc dồn dập nhanh hơn hồi chiêu 12s của đan dược, chỉ kịp dùng 1 viên trước khi hết máu).
      + **Lập đội 2 người:** Độc Tước Tinh Anh bị hạ gục an toàn trong 6.4s mà không có bất kỳ ai tử vong (0/6 trận, đáy máu 66%). Cốt Tượng Tinh Anh rút ngắn thời gian từ 79.4s xuống 21.0s và hoàn toàn không tốn viên đan nào.
-   - **Ghi nhận:** Bộ hệ số tinh anh (x2.5 khí huyết, x1.5 công, xác suất 4%) của M7.3 hiện là số đo thực nghiệm; rủi ro Độc Tước tinh anh solo chết 100% đã được ghi nhận vào \`~/TT/orchestra/questions.md\` chờ người dùng quyết định xem có cần điều chỉnh hệ số hay phân loại loài quái.
+   - **Ghi nhận:** Bộ hệ số tinh anh (x2.5 khí huyết, x1.5 công, xác suất 4%) của M7.3 là số đo thực nghiệm; rủi ro Độc Tước tinh anh solo chết 100% đã được **người dùng chốt GIỮ NGUYÊN** (QUYET_DINH_M3 mục 22.2, 16/11/2026): tinh anh là mini-trùm nhìn rõ (sao vàng + vầng cam), chạy về trấn là thoát, gợi ý "nên đi đội" trong game (\`client/src/elite.ts\`, PR #750) thay vì hạ số; xem lại nếu số liệu chơi thật cho thấy người chơi bỏ Hàn Vân vì sợ Độc Tước (chi tiết ở mục "Tinh anh").
 `;
 }

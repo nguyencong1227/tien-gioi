@@ -38,11 +38,24 @@ describe("mô hình tinh anh", () => {
     for (const r of rows) expect(r.normalDanger, r.id).toBeLessThanOrEqual(0.5);
   });
 
-  it("mục Markdown nêu rủi ro mất kiếp và xin quyết định người dùng", () => {
+  it("mục Markdown nêu rủi ro mất kiếp (mini-trùm, Hoàng Tuyền) và đủ mọi loài trong bảng", () => {
     const md = renderTinhAnh();
     expect(md).toContain("## Tinh anh");
     expect(md).toContain("mini-trùm");
     expect(md).toContain("Hoàng Tuyền");
     for (const c of ELITE_CASES) expect(md).toContain(MONSTER_BY_ID[c.id].name);
+  });
+
+  it("ghi quyết định GIỮ NGUYÊN của người dùng (mục 22.2): số đo bot thật + lý do + gợi ý đi đội, KHÔNG còn 'chờ quyết định'", () => {
+    const md = renderTinhAnh();
+    expect(md).toContain("GIỮ NGUYÊN");
+    expect(md).toContain("Độc Tước");
+    // bot thật: Độc Tước solo chết 6/6, đi đội 2 sống
+    expect(md).toContain("solo CHẾT 6/6");
+    expect(md).toContain("ĐỘI 2 người");
+    // gợi ý trong game đã vào main (#750)
+    expect(md).toContain("nên đi đội");
+    // quyết định đã chốt, không còn để ngỏ
+    expect(md).not.toContain("chờ bot thật của C và quyết định của người dùng");
   });
 });
