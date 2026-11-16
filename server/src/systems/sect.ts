@@ -49,6 +49,7 @@ import {
   sectQuestTemplateOf,
   SECT_QUEST_BY_ID,
   questReady,
+  MAX_ACTIVE_QUESTS,
   sectVaultAccepts,
   type ChatOut,
   type Inventory,
@@ -338,6 +339,7 @@ export async function sectOnJoin(w: World, sid: string) {
   loc.p.sect = sect.tag;
   w.events.sect(sid, { sect: sectViewOf(sect, a.soulKey) });
   w.events.sectVault(sid, vaultMsgFor(w, sid, sect, a.soulKey));
+  purgeStaleSectQuests(w, sid, sect); // nhiệm vụ tông của hôm trước đã quá ngày (mục 12.7)
   w.events.sectHall(sid, hallMsgFor(w, sid, sect, a.soulKey));
   applySectBuff(w, sid, sect);
   sendPresence(w, sect); // mọi người trong tông môn thấy người mới trực tuyến ngay
@@ -353,6 +355,7 @@ export async function sectHallGet(w: World, sid: string, raw: unknown) {
   if (!svc || !a || !parseSectHallGet(raw)) return;
   const sect = await svc.sectOf(a.soulKey);
   if (!stillHere(w, sid, a.soulKey)) return;
+  if (sect) purgeStaleSectQuests(w, sid, sect); // qua nửa đêm: gỡ nhiệm vụ tông quá ngày trước khi dựng ảnh chụp
   w.events.sectHall(sid, sect ? hallMsgFor(w, sid, sect, a.soulKey) : { hall: null });
 }
 
@@ -949,6 +952,25 @@ export async function sectVaultPolicy(w: World, sid: string, raw: unknown) {
 // Nhận / trả qua bảng Tông môn (không cần NPC). Tiến độ đi chung bộ máy `systems/quests.ts` (`questDefAny` gộp bảng thường và bảng tông). "Đã làm hôm nay" nằm trong sổ NGÀY của LINH HỒN
 // (`members[i].today.quests`, khoá theo id MẪU) nên đầu thai / đổi bậc / nhảy tông giữa ngày không làm lại được; cống hiến đi qua MỘT cổng `award` (trần ngày, chờ sang ngày).
 
+/**
+ * Gỡ khỏi sổ nhiệm vụ những nhiệm vụ tông đã QUÁ NGÀY: mẫu của chúng không còn trong 3 ô của HÔM NAY (bảng mẫu có nhiều hơn một mẫu mỗi độ khó thì ô xoay theo ngày), nên không còn trả được
+ * (`quest_unavailable`) và sẽ chất đống trong sổ (tối đa `MAX_ACTIVE_QUESTS`). Nhiệm vụ hằng ngày làm lại mỗi ngày nên bỏ tiến độ cũ là đúng; mẫu vẫn nằm trong ô hôm nay thì GIỮ (cùng nhiệm vụ,
+ * không mất tiến độ qua nửa đêm). Trả `true` nếu có gỡ (đã gửi lại sổ nhiệm vụ). Gọi khi vào phòng, xin ảnh chụp Nội vụ, nhận và trả.
+ */
+function purgeStaleSectQuests(w: World, sid: string, sect: Sect): boolean {
+  const c = w.ctrl.get(sid);
+  if (!c || c.quests.active.length === 0) return false;
+  const slots = sectQuestSlots(sect.id, dayKey(w.now));
+  const keep = c.quests.active.filter((a) => {
+    const tpl = sectQuestTemplateOf(a.id);
+    return tpl === undefined || slots.includes(tpl);
+  });
+  if (keep.length === c.quests.active.length) return false;
+  c.quests.active = keep;
+  sendQuests(w, sid);
+  return true;
+}
+
 /** Nhiệm vụ đang làm có cùng MẪU `tplId` (bản bậc nào cũng tính), nếu có. */
 function activeOfTemplate(
   c: { quests: { active: { id: string; step: number; count: number }[] } },
@@ -979,6 +1001,7 @@ export async function sectQuestAccept(w: World, sid: string, raw: unknown) {
   if (!c || !p || !me) return;
   if (isDown(w, sid)) return downFail(w, sid); // vừa bị hạ trong lúc chờ
   if (c.travelling || c.limbo) return toastFail(w, sid, "error");
+  purgeStaleSectQuests(w, sid, sect);
   const tpl = sectQuestTemplateOf(msg.questId);
   // Phải là một trong các mẫu của HÔM NAY và đúng bản theo bậc hiện tại của mình (client xin ảnh chụp mới nếu vừa đột phá)
   if (
@@ -989,6 +1012,12 @@ export async function sectQuestAccept(w: World, sid: string, raw: unknown) {
     return toastFail(w, sid, "quest_unavailable");
   if (sectDayState(me.today, w.now).quests.includes(tpl)) return toastFail(w, sid, "quest_done");
   if (activeOfTemplate(c, tpl)) return toastFail(w, sid, "quest_active");
+  // Cùng giới hạn sổ nhiệm vụ như nhận ở NPC (`canAccept`): sổ đầy thì từ chối, không chất đống nhiệm vụ tông
+  if (c.quests.active.length >= MAX_ACTIVE_QUESTS)
+    return w.events.toast(sid, {
+      text: `Sổ nhiệm vụ đã đầy (tối đa ${MAX_ACTIVE_QUESTS}), hãy hoàn thành hoặc bỏ bớt một nhiệm vụ trước.`,
+      tone: "bad",
+    });
   const def = SECT_QUEST_BY_ID[msg.questId];
   if (!def) return toastFail(w, sid, "quest_unavailable");
   c.quests.active.push({ id: def.id, step: 0, count: 0 });
@@ -1028,6 +1057,7 @@ export async function sectQuestTurnIn(w: World, sid: string, raw: unknown) {
     const p1 = w.state.players.get(sid);
     if (!c1 || !p1 || !me) return;
     if (isDown(w, sid)) return downFail(w, sid);
+    purgeStaleSectQuests(w, sid, sect);
     if (!sectQuestSlots(sect.id, dayKey(w.now)).includes(tpl))
       return toastFail(w, sid, "quest_unavailable");
     if (sectDayState(me.today, w.now).quests.includes(tpl)) return toastFail(w, sid, "quest_done");

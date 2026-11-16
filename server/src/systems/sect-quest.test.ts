@@ -6,12 +6,18 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import {
   INVENTORY_SLOTS,
+  MAX_ACTIVE_QUESTS,
+  QUESTS,
   SECT_EARN_DAY_CAP,
+  SECT_QUESTS,
   SECT_QUEST_BY_ID,
+  SECT_QUEST_TEMPLATE_BY_ID,
   addToInventory,
   dayKey,
   sectFailMessage,
+  sectQuestSlots,
   type SectFail,
+  type SectQuestTemplate,
 } from "@tien-gioi/shared";
 import { Hub } from "../hub";
 import { FileSectStore } from "../sect-store";
@@ -503,5 +509,108 @@ describe("tin nhắn bị lạm dụng", () => {
     expect(lastToast(A)).toBe(failText("disabled"));
     await turnIn(A, LANG);
     expect(lastToast(A)).toBe(failText("disabled"));
+  });
+});
+
+describe("nhiệm vụ quá ngày và sổ nhiệm vụ đầy (góp ý của B ở #895)", () => {
+  const FAKE = "st_gia";
+  /** Thêm tạm một MẪU thứ hai cùng độ khó 1 (bảng mẫu M8.1 chỉ có một mẫu mỗi độ khó nên ô không xoay; M8.7 sẽ có >= 12 mẫu), dọn sau mỗi ca. */
+  const withFakeTemplate = async (fn: () => Promise<void>) => {
+    const base = SECT_QUESTS.find((t) => t.id === "st_tru_lang")!;
+    const fake: SectQuestTemplate = { ...base, id: FAKE, title: "Trừ sói giả" };
+    (SECT_QUESTS as SectQuestTemplate[]).push(fake);
+    SECT_QUEST_TEMPLATE_BY_ID[FAKE] = fake;
+    SECT_QUEST_BY_ID[`${FAKE}.t0`] = {
+      ...SECT_QUEST_BY_ID[LANG]!,
+      id: `${FAKE}.t0`,
+      title: "Trừ sói giả",
+    };
+    try {
+      await fn();
+    } finally {
+      (SECT_QUESTS as SectQuestTemplate[]).pop();
+      delete SECT_QUEST_TEMPLATE_BY_ID[FAKE];
+      delete SECT_QUEST_BY_ID[`${FAKE}.t0`];
+    }
+  };
+  /** Ô độ khó 1 của tông "t1" ở ngày thứ `k` kể từ mốc test. */
+  const slot0 = (k: number) => sectQuestSlots("t1", dayKey(1_700_000_000_000 + k * DAY))[0]!;
+  /** Ngày k đầu tiên mà ô độ khó 1 ĐỔI sang mẫu khác ở ngày k + 1 (hoặc GIỮ NGUYÊN, nếu `same`). */
+  const findDay = (same: boolean) => {
+    for (let k = 0; k < 90; k++) if ((slot0(k) === slot0(k + 1)) === same) return k;
+    throw new Error("không tìm được ngày cho ca xoay ô");
+  };
+
+  it("hôm sau ô đổi sang mẫu khác: xin ảnh chụp Nội vụ gỡ nhiệm vụ tông quá ngày khỏi sổ (không chất đống, không kẹt không trả được)", async () => {
+    await withFakeTemplate(async () => {
+      const k = findDay(false);
+      now += k * DAY;
+      lh.w.now = now;
+      await seed();
+      await join(A);
+      const old = `${slot0(k)}.t0`;
+      await accept(A, old);
+      expect(active(A).map((x) => x.id)).toEqual([old]);
+      now += DAY; // sang ngày: ô độ khó 1 đã đổi
+      lh.w.now = now;
+      const { sectHallGet } = await import("./sect");
+      await sectHallGet(lh.w, A, {});
+      expect(active(A)).toEqual([]);
+      expect(lh.quests.at(-1)!.msg.active).toEqual([]); // sổ gửi lại cho chủ
+      expect(lastHall(A)!.quests[0]!.questId).toBe(`${slot0(k + 1)}.t0`);
+      expect(lastHall(A)!.quests[0]!.state).toBe("offer");
+    });
+  });
+
+  it("trả nhiệm vụ quá ngày: quest_unavailable VÀ gỡ khỏi sổ; không cộng cống hiến", async () => {
+    await withFakeTemplate(async () => {
+      const k = findDay(false);
+      now += k * DAY;
+      lh.w.now = now;
+      await seed();
+      await join(A);
+      const old = `${slot0(k)}.t0`;
+      await accept(A, old);
+      kill(A, "lang", 10);
+      now += DAY;
+      lh.w.now = now;
+      await turnIn(A, old);
+      expect(lastToast(A)).toBe(failText("quest_unavailable"));
+      expect(active(A)).toEqual([]);
+      expect((await meOf(A)).contrib ?? 0).toBe(0);
+    });
+  });
+
+  it("mẫu vẫn nằm trong ô hôm sau: GIỮ nhiệm vụ và tiến độ qua nửa đêm", async () => {
+    await withFakeTemplate(async () => {
+      const k = findDay(true);
+      now += k * DAY;
+      lh.w.now = now;
+      await seed();
+      await join(A);
+      const same = `${slot0(k)}.t0`;
+      await accept(A, same);
+      kill(A, "lang", 4);
+      now += DAY;
+      lh.w.now = now;
+      const { sectHallGet } = await import("./sect");
+      await sectHallGet(lh.w, A, {});
+      expect(active(A)).toEqual([{ id: same, step: 0, count: 4 }]);
+    });
+  });
+
+  it("sổ nhiệm vụ đầy (MAX_ACTIVE_QUESTS): từ chối nhận, không thêm, báo rõ lý do; bỏ bớt thì nhận được", async () => {
+    await seed();
+    await join(A);
+    const c = lh.w.ctrl.get(A)!;
+    for (const q of QUESTS.slice(0, MAX_ACTIVE_QUESTS))
+      c.quests.active.push({ id: q.id, step: 0, count: 0 });
+    expect(active(A)).toHaveLength(MAX_ACTIVE_QUESTS);
+    await accept(A, LANG);
+    expect(lastToast(A)).toContain("Sổ nhiệm vụ đã đầy");
+    expect(active(A)).toHaveLength(MAX_ACTIVE_QUESTS);
+    c.quests.active.pop();
+    await accept(A, LANG);
+    expect(active(A).at(-1)).toMatchObject({ id: LANG });
   });
 });
