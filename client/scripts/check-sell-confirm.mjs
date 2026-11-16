@@ -311,7 +311,7 @@ async function main() {
       b = await sellBtnOf("Đại Hồi Huyết Đan");
       check(b && b.hit, "nút Bán của Đại Hồi Huyết Đan (đồ quý) bấm được");
       await tap(b.x, b.y);
-      await sleep(250);
+      await sleep(100);
       let st = await box();
       check(st.open, "đồ quý: hộp xác nhận mở");
       check(
@@ -322,7 +322,6 @@ async function main() {
       check(st.yes === "Bán" && st.no === "Giữ lại", `nút: "${st.no}" / "${st.yes}"`);
       check(st.active === "act-btn-no", `focus ở "Giữ lại" (${st.active})`);
       check((await sold()).length === 0, "chưa gửi bán khi chưa xác nhận");
-      await shot("ban-do-quy");
       const yesBtn = await center("#act-btn-yes");
       check(
         yesBtn.hit && (!vp.mobile || (yesBtn.w >= 44 && yesBtn.h >= 44)),
@@ -334,6 +333,7 @@ async function main() {
         (await box()).open && (await sold()).length === 0,
         "bấm NGAY khi hộp vừa mở (click ma): bị bỏ qua",
       );
+      await shot("ban-do-quy"); // chụp SAU phép kiểm click ma (chụp ảnh tốn hơn cửa sổ chống click ma 450 ms)
       await sleep(560);
       await tap(yesBtn.x, yesBtn.y);
       await sleep(250);
@@ -355,13 +355,13 @@ async function main() {
       await sleep(300); // qua cửa sổ chống click ma (450 ms) của CẢ HAI nút trong hộp
       const no = await center("#act-btn-no");
       await tap(no.x, no.y);
-      await sleep(200);
+      await sleep(560); // qua cửa sổ chặn click ma sau khi hộp đóng, để bấm nút Bán lần nữa được tính
       check(!(await box()).open && (await sold()).length === 0, "'Giữ lại': hộp đóng, không bán");
       b = await sellBtnOf("Đại Hồi Huyết Đan");
       await tap(b.x, b.y);
       await sleep(300);
       await key("Escape", "Escape", 27);
-      await sleep(200);
+      await sleep(560); // qua cửa sổ chặn click ma sau khi hộp đóng, để bấm nút Bán lần nữa được tính
       check(
         !(await box()).open && (await sold()).length === 0,
         "Esc: hộp đóng, không bán, cửa hàng VẪN mở",
@@ -374,7 +374,7 @@ async function main() {
       await tap(b.x, b.y);
       await sleep(300);
       await key("KeyX", "x", 88);
-      await sleep(200);
+      await sleep(560); // qua cửa sổ chặn click ma sau khi hộp đóng, để bấm nút Bán lần nữa được tính
       check(!(await box()).open && (await sold()).length === 0, "phím X: giữ lại");
 
       console.log("  [4] trang bị: có hộp");

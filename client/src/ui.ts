@@ -716,6 +716,8 @@ let actConfirmOpener: HTMLElement | null = null;
 let actConfirmOpenedAt = -Infinity;
 /** Hộp đang mở do nút Bán ở cửa hàng: cửa hàng đóng (đi xa NPC, Esc...) thì hộp đóng theo, không bán vào chỗ không còn mở. */
 let actConfirmFromShop = false;
+/** Lúc hộp xác nhận đóng gần nhất (ms, `performance.now`). Hộp đóng ngay ở `pointerdown`, nên `click` do trình duyệt tạo sau khi nhả ngón rơi xuống nút ở DƯỚI hộp (nút Bán): bỏ qua `click` trong cửa sổ chống click ma. */
+let actConfirmClosedAt = -1e12;
 
 /** Mở hộp xác nhận: nêu hậu quả bằng chữ; "Giữ lại" được focus; `onOk` chỉ chạy khi bấm xác nhận SAU cửa sổ chống click ma. */
 function askActConfirm(spec: ConfirmSpec, onOk: () => void, opener: HTMLElement | null) {
@@ -739,6 +741,7 @@ function closeActConfirm(refocus = true): boolean {
   box.hidden = true;
   actConfirmAction = null;
   actConfirmFromShop = false;
+  actConfirmClosedAt = performance.now();
   const back = actConfirmOpener;
   actConfirmOpener = null;
   if (refocus && back && !back.hidden) back.focus();
@@ -2167,6 +2170,8 @@ function renderShopSellImpl() {
       sellBtn.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
+        // click "ma" sau khi vừa xác nhận / giữ lại ở hộp (cảm ứng): không mở lại hộp, không bán lần nữa
+        if (inConfirmGuard(actConfirmClosedAt, performance.now())) return;
         // Đồ quý / trang bị: hộp xác nhận (issue #779); đồ thường bán thẳng
         const plan = sellPlan(invSlots, i, qty, unitPrice, {
           name: def.name,
