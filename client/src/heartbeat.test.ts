@@ -448,6 +448,7 @@ describe("HeartbeatController: nhịp 1 giây (mục 33, NET_BEAT_MS)", () => {
     expect(NET_BEAT_MS).toBeLessThan(HEARTBEAT_INTERVAL_MS);
     expect(NET_BEAT_MS * 2).toBeLessThanOrEqual(NET_SILENCE_GHOST_MS);
     const { harness, sent } = setup(); // không truyền intervalMs
+    expect([...harness.timers.values()].map((t) => t.ms)).toEqual([HEARTBEAT_INTERVAL_MS]);
     expect(sent).toHaveLength(1);
     harness.advanceTime(NET_BEAT_MS * 3);
     expect(sent).toHaveLength(1); // chưa có pong: không gửi thêm; và chưa tới nhịp 5 giây
@@ -455,6 +456,8 @@ describe("HeartbeatController: nhịp 1 giây (mục 33, NET_BEAT_MS)", () => {
 
   it("ping mỗi NET_BEAT_MS kể cả khi đứng yên (pong về nhanh): 10 giây liền gửi đúng ~10 ping, không bao giờ dồn quá 1 ping / nhịp", () => {
     const { harness, sent, pong, onDead } = setup(NET_BEAT_MS);
+    // chu kỳ ĐÃ ĐĂNG KÝ với bộ hẹn giờ là NET_BEAT_MS (harness giả chạy mọi timer ở mỗi lần `advanceTime` nên không tự kiểm được chu kỳ)
+    expect([...harness.timers.values()].map((t) => t.ms)).toEqual([NET_BEAT_MS]);
     pong();
     for (let i = 0; i < 10; i++) {
       harness.advanceTime(NET_BEAT_MS);
