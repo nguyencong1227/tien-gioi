@@ -50,6 +50,7 @@ import {
   shown,
 } from "./e2e-kit";
 import { freePort } from "../src/test-port.js";
+import { ACT_CONFIRM_GUARD_MS } from "../../client/src/act-confirm";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
@@ -60,6 +61,7 @@ const out = (m: string) => console.log(m);
 
 /** Phím thật qua CDP (nhấn rồi nhả). */
 const ENTER = { key: "Enter", code: "Enter", vk: 13, text: "\r" };
+const Y_KEY = { key: "y", code: "KeyY", vk: 89, text: "y" };
 const DELETE = { key: "Delete", code: "Delete", vk: 46 };
 const ESC = { key: "Escape", code: "Escape", vk: 27 };
 const L_KEY = { key: "l", code: "KeyL", vk: 76, text: "l" };
@@ -341,6 +343,10 @@ async function main() {
       // Đầu thai bằng phím Enter trên nút
       await ev(`document.getElementById('limbo-btn-rebirth').focus(); 1`);
       await press(T, ENTER);
+      // hộp TÓM TẮT đầu thai (issue #779): chờ qua cửa sổ chống click ma rồi Y
+      await T.waitFor(shown("act-confirm"), "hộp tóm tắt đầu thai");
+      await sleep(ACT_CONFIRM_GUARD_MS + 150);
+      await press(T, Y_KEY);
       await T.waitFor(shown("reborn-overlay"), "màn Mạnh Bà", 10000);
       await T.waitFor(
         `document.getElementById('reborn-overlay')?.hidden`,

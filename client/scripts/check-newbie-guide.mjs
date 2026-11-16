@@ -5,21 +5,22 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 //    (trước đây `.auth-btn-primary` rộng 100 % ép nó còn 44 x 97 px, chữ xuống 5 dòng, nút "Đã Hiểu" cao 97 px); ở cảm ứng THẬT (`data-input="touch"`) nút phím tắt bị CSS ẩn và "Đã Hiểu" chiếm cả hàng; Chrome không đầu chỉ GIẢ khung (`mobile`) mà con trỏ vẫn là chuột nên ở bốn khung này nút phím tắt vẫn HIỆN và được đo như mọi khung;
 //  - có thẻ "Chiêu Thức" nói quyển học ở Túi đồ (nút Học), phím L U I O và bảng Công pháp, nhãn phím theo phím ĐANG GÁN (đổi phím thì chữ đổi theo);
 //  - Esc / Cách đóng hộp.
-// Ở bốn khung nhìn (1280x720 chuột; 844x390, 390x844, 360x640 CẢM ỨNG THẬT: `Emulation.setTouchEmulationEnabled`, `data-input="touch"`): ở cảm ứng hộp chỉ dẫn / dòng chào nêu NÚT thay vì phím (#690). Có thể chụp ảnh: `--shots <thư mục>`. Cần client đang chạy (`npm run dev -w client`, cổng của dev B là 5183).
-//   node client/scripts/check-newbie-guide.mjs [--url http://127.0.0.1:5183] [--shots /tmp/tg-b-shots]
+// Ở bốn khung nhìn (1280x720 chuột; 844x390, 390x844, 360x640 CẢM ỨNG THẬT: `Emulation.setTouchEmulationEnabled`, `data-input="touch"`): ở cảm ứng hộp chỉ dẫn / dòng chào nêu NÚT thay vì phím (#690). Có thể chụp ảnh: `--shots <thư mục>`. Mặc định tự dựng Vite của cây này trên cổng trống (tự tắt khi xong); `--url` để dùng client đang chạy sẵn.
+//   node client/scripts/check-newbie-guide.mjs [--url <client đang chạy sẵn, tuỳ chọn>] [--shots /tmp/tg-b-shots]
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { resolveClientUrl } from "./client-url.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const argOf = (name, dflt) => {
   const i = process.argv.indexOf(name);
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : dflt;
 };
-const BASE_URL = argOf("--url", "http://127.0.0.1:5183");
+const BASE_URL = await resolveClientUrl(argOf("--url", ""));
 const SHOTS = argOf("--shots", "");
 const CDP_PORT = await freePort();
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-newbie-guide-"));

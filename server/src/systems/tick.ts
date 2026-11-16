@@ -1,6 +1,6 @@
 // Một tick của thế giới (TICK_MS). WorldRoom gọi mỗi tick; benchmark (server/src/perf) gọi y hệt.
 import type { World } from "../world";
-import { POS_SYNC_EVERY_TICKS, applyInputs, syncPublicPos } from "./movement";
+import { INPUT_BACKLOG_WARN, POS_SYNC_EVERY_TICKS, applyInputs, syncPublicPos } from "./movement";
 import { tickRespawn } from "./combat";
 import { tickMonsters } from "./monsters";
 import { tickRecovery } from "./progression";
@@ -12,17 +12,20 @@ import { tickSect } from "./sect";
 import { tickStatuses } from "./status";
 import { tickBolts } from "./bolt";
 import { tickTreasure } from "./treasure";
+import { tickNetGuard } from "./net-guard";
 
 export function tickWorld(w: World, dtMs: number) {
   const dt = dtMs / 1000;
   w.state.players.forEach((p, sid) => {
     const c = w.ctrl.get(sid);
     if (!c) return;
+    if (c.beatMs !== undefined || c.shieldUntil !== undefined) tickNetGuard(w, sid, c); // mục 33: im lặng -> hồn lìa xác, hết hạn hộ thể (client cũ không tốn gì)
     if (c.limbo) return; // ở Hoàng Tuyền: không hồi sinh theo đồng hồ, chỉ đầu thai khi người chơi chọn
     if (p.dead) return tickRespawn(w, p, c);
     if (w.ghosts.size > 0 && w.ghosts.has(sid)) return; // hồn lìa xác: đứng yên, không hồi phục, không tu luyện
     c.life.playMs += dtMs; // thời gian chơi thật của kiếp (không tính chết, hồn lìa xác)
     applyInputs(w.map, p, c, dtMs); // ngân sách bước theo thời gian thật (`dtMs` đồng hồ phòng), không +1 mỗi tick
+    if (c.inputs.length >= INPUT_BACKLOG_WARN) w.inputStats.backlogTicks++;
     if ((w.tick + c.posPhase) % POS_SYNC_EVERY_TICKS === 0) syncPublicPos(p);
     if (!w.duels.has(sid)) tickRecovery(w, sid, p, c, dt); // trong trận thách đấu: không hồi khí huyết / linh lực, không đả tọa
     // Pháp bảo (M7.4): khiên tự dựng, hồi khi đứng yên; không mặc thì không tốn gì. Trong trận thách đấu: KHÔNG chạy (cùng nguyên tắc khoá hồi phục của `tickRecovery`;

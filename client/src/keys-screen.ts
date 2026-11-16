@@ -5,8 +5,10 @@
 import {
   ACTIONS,
   ACTION_BY_ID,
+  ARROW_CODES,
   RESERVED_CODES,
   holderOf,
+  isMoveAction,
   isValidToken,
   keyLabel,
   tokenOfEvent,
@@ -17,6 +19,7 @@ import {
 } from "./keybinds";
 
 export const GROUP_TITLE: Readonly<Record<ActionGroup, string>> = {
+  move: "Di chuyển",
   combat: "Chiến đấu",
   interact: "Tương tác",
   panel: "Bảng và cửa sổ",
@@ -88,10 +91,16 @@ export function captureOutcome(
   if (RESERVED_CODES.has(bare)) {
     return {
       kind: "reject",
-      message: `${keyLabel(bare)} là phím cố định (đi bộ / Esc), chọn phím khác.`,
+      message: `${keyLabel(bare)} là phím cố định (đóng bảng / bỏ chọn), chọn phím khác.`,
     };
   }
-  if (!isValidToken(token)) {
+  if (ARROW_CODES.has(bare) && !isMoveAction(id)) {
+    return {
+      kind: "reject",
+      message: `${keyLabel(bare)} dành cho điều hướng bảng và đi bộ, chọn phím khác.`,
+    };
+  }
+  if (!isValidToken(token, id)) {
     return { kind: "reject", message: "Phím này không gán được, chọn phím khác." };
   }
   const name = ACTION_BY_ID[id].label;

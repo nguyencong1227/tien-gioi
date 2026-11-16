@@ -1,18 +1,19 @@
 import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 /* global console, setTimeout, fetch, process */
-// Kiểm hoạt ảnh người chơi bị đánh / gục trong Chrome thật (M5.2 #328 phần 2). Cần client đang chạy (npm run dev -w client).
+// Kiểm hoạt ảnh người chơi bị đánh / gục trong Chrome thật (M5.2 #328 phần 2). Mặc định tự dựng Vite của cây này trên cổng trống (tự tắt khi xong); `--url` để dùng client đang chạy sẵn.
 // Dùng chế độ mock (?duel=mock&debug=1) nên KHÔNG cần server: đặt `dead` trên người chơi mock và gọi `scene.onDmg` như tin `dmg`.
-//   node client/scripts/check-anim.mjs [--url http://127.0.0.1:5183]
+//   node client/scripts/check-anim.mjs [--url <client đang chạy sẵn, tuỳ chọn>]
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { resolveClientUrl } from "./client-url.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const i = process.argv.indexOf("--url");
-const BASE_URL = i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : "http://127.0.0.1:5183";
+const BASE_URL = await resolveClientUrl(i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : "");
 const CDP_PORT = await freePort();
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-anim-"));
 const chrome = spawn(
@@ -92,10 +93,16 @@ try {
     mobile: false,
   });
   await send("Page.navigate", { url: `${BASE_URL}/?duel=mock&debug=1` });
-  for (let k = 0; k < 40; k++) {
+  // Chờ ĐẾN KHI thực thể người chơi (có sprite) đã dựng, không chỉ `me()` (state): khi máy tải nặng (nhiều script chạy song song) `me()` có sớm hơn thực thể,
+  // script đi tiếp và chết ở `Object.getPrototypeOf(undefined)` (đo: 2 / 8 lần chạy song song, lượt 449)
+  let ready = false;
+  for (let k = 0; k < 100 && !ready; k++) {
     await sleep(300);
-    if (await evalJs("Boolean(window.__scene && window.__scene.me && window.__scene.me())")) break;
+    ready = await evalJs(
+      "Boolean(window.__scene && window.__scene.me && window.__scene.me() && window.__scene.players && window.__scene.players.get(window.__scene.sid) && window.__scene.players.get(window.__scene.sid).sprite)",
+    );
   }
+  if (!ready) throw new Error(`Thực thể người chơi không dựng được sau 30 giây ở ${BASE_URL}`);
   await sleep(600);
 
   // Ghi lại mọi lần Sprite.play bắt đầu bằng me- / other- / robe-
@@ -117,33 +124,50 @@ try {
       `(() => { const sc = window.__scene; const e = sc.players.get(sc.sid); return { state: e.playerAnimState, key: e.sprite.anims.currentAnim ? e.sprite.anims.currentAnim.key : null, plays: window.__plays.slice() }; })()`,
     );
 
+  /**
+   * Chạy `action` rồi ghi lại (state, key hoạt ảnh) MỖI KHUNG HÌNH trong `ms` mili giây của đồng hồ trò chơi, hoàn toàn TRONG trang (không qua CDP): chớp bị đánh chỉ
+   * kéo dài ~167 ms (`PLAYER_HURT_FPS` = 6) nên `sleep(70)` rồi mới hỏi qua CDP trượt khi máy tải nặng (đo: 3 / 8 lần chạy song song đỏ, lượt 449).
+   */
+  const watch = (action, ms) =>
+    evalJs(`new Promise((resolve) => {
+      const sc = window.__scene, e = sc.players.get(sc.sid), t0 = sc.time.now, seen = [];
+      ${action};
+      const tick = () => {
+        const state = e.playerAnimState, key = e.sprite.anims.currentAnim ? e.sprite.anims.currentAnim.key : null;
+        const last = seen[seen.length - 1];
+        if (!last || last.state !== state || last.key !== key) seen.push({ state, key });
+        if (sc.time.now - t0 >= ${ms}) return resolve(JSON.stringify(seen));
+        requestAnimationFrame(tick);
+      };
+      tick();
+    })`).then((v) => JSON.parse(v));
+  const dmgToMe = `sc.onDmg({ target: sc.sid, amount: 7, x: sc.predX, y: sc.predY - 20, toPlayer: true })`;
+  const fmt = (seq) => seq.map((x) => `${x.state}/${x.key}`).join(" -> ");
+
   let s = await st();
   check(s.state === "idle" && /-idle-/.test(s.key ?? ""), `ban đầu đứng (${s.state} / ${s.key})`);
 
-  // 1) Bị đánh: tin dmg toPlayer đúng người chơi
-  await evalJs(
-    `(() => { const sc = window.__scene; sc.onDmg({ target: sc.sid, amount: 7, x: sc.predX, y: sc.predY - 20, toPlayer: true }); 0; })()`,
-  );
-  await sleep(70);
-  s = await st();
+  // 1) Bị đánh: tin dmg toPlayer đúng người chơi. Quan sát 800 ms trong trang: có chớp bị đánh (`hurt` với khung `-hurt-`), rồi hết giật lùi và về đứng
+  const seq1 = await watch(dmgToMe, 800);
   check(
-    s.state === "hurt" && /-hurt-/.test(s.key ?? ""),
-    `trúng đòn: chớp bị đánh (${s.state} / ${s.key})`,
+    seq1.some((x) => x.state === "hurt" && /-hurt-/.test(x.key ?? "")),
+    `trúng đòn: chớp bị đánh (${fmt(seq1)})`,
   );
-  await sleep(400);
-  s = await st();
+  const end1 = seq1[seq1.length - 1];
   check(
-    s.state === "idle" && /-idle-/.test(s.key ?? ""),
-    `hết giật lùi: về đứng (${s.state} / ${s.key})`,
+    end1.state === "idle" && /-idle-/.test(end1.key ?? ""),
+    `hết giật lùi: về đứng (${end1.state} / ${end1.key})`,
   );
 
-  // 2) Tin dmg lên QUÁI (toPlayer sai) không làm người chơi chớp
-  await evalJs(
-    `(() => { const sc = window.__scene; sc.onDmg({ target: "khong-co-quai", amount: 3, x: sc.predX, y: sc.predY, crit: false }); 0; })()`,
+  // 2) Tin dmg lên QUÁI (toPlayer sai) không làm người chơi chớp: quan sát 400 ms trong trang, MỌI khung đều là đứng
+  const seq2 = await watch(
+    `sc.onDmg({ target: "khong-co-quai", amount: 3, x: sc.predX, y: sc.predY, crit: false })`,
+    400,
   );
-  await sleep(70);
-  s = await st();
-  check(s.state === "idle", `sát thương lên quái không làm mình chớp (${s.state})`);
+  check(
+    seq2.every((x) => x.state === "idle"),
+    `sát thương lên quái không làm mình chớp (${fmt(seq2)})`,
+  );
 
   // 3) Gục: p.dead = true -> me-die 4 khung rồi nằm lại; hồi sinh -> đứng
   await evalJs(
@@ -203,12 +227,12 @@ try {
     `(() => { const c = document.getElementById("set-reduced-motion"); c.checked = true; c.dispatchEvent(new Event("change")); })()`,
   );
   await sleep(200);
-  await evalJs(
-    `(() => { const sc = window.__scene; sc.onDmg({ target: sc.sid, amount: 7, x: sc.predX, y: sc.predY - 20, toPlayer: true }); 0; })()`,
+  // quan sát 600 ms trong trang: MỌI khung đều là đứng (không một khung `hurt` nào lọt qua giữa hai lần hỏi CDP)
+  const seq4 = await watch(dmgToMe, 600);
+  check(
+    seq4.every((x) => x.state === "idle"),
+    `giảm chuyển động: trúng đòn không chớp (${fmt(seq4)})`,
   );
-  await sleep(70);
-  s = await st();
-  check(s.state === "idle", `giảm chuyển động: trúng đòn không chớp (${s.state})`);
 
   // 5) Giảm chuyển động: gục KHÔNG phát 4 khung đổ xuống, chỉ hiện thẳng khung xác nằm lại (nit của A ở #346); hồi sinh thì về đứng
   const dieFrames = await evalJs(`new Promise((resolve) => {

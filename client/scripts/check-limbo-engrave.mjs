@@ -4,21 +4,22 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 // Khắc chân linh chỉ hiện MỘT lần ở Tam Sinh Thạch; danh sách theo `LimboMsg.engravable`, mặc định chọn sẵn chiêu đã khắc, không vượt `engraveSlotsOf`;
 // tin `rebirth` chỉ kèm `engrave` khi người chơi ĐỔI tập chiêu (vắng = giữ nguyên, `[]` = xoá hết); mua thêm nấc giữ lựa chọn; ca chưa mở / chưa học;
 // bàn phím (Enter trên ô tích); bấm đầu thai hai lần chỉ gửi một tin; không tràn ngang ở 360x640, mục bấm >= 44 px. Có thể chụp ảnh: `--shots <thư mục>`.
-// Cần client đang chạy (`npm run dev -w client`, cổng của dev B là 5183).
-//   node client/scripts/check-limbo-engrave.mjs [--url http://127.0.0.1:5183] [--shots /tmp/tg-b-shots]
+// Mặc định tự dựng Vite của cây này trên cổng trống (tự tắt khi xong); `--url` để dùng client đang chạy sẵn.
+//   node client/scripts/check-limbo-engrave.mjs [--url <client đang chạy sẵn, tuỳ chọn>] [--shots /tmp/tg-b-shots]
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { resolveClientUrl } from "./client-url.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const argOf = (name, dflt) => {
   const i = process.argv.indexOf(name);
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : dflt;
 };
-const BASE_URL = argOf("--url", "http://127.0.0.1:5183");
+const BASE_URL = await resolveClientUrl(argOf("--url", ""));
 const SHOTS = argOf("--shots", "");
 const CDP_PORT = await freePort();
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-limbo-engrave-"));
@@ -102,10 +103,16 @@ try {
       mobile: false,
     });
     await send("Page.navigate", { url: `${BASE_URL}/?duel=mock&debug=1` });
-    for (let k = 0; k < 50; k++) {
+    let ready = false;
+    for (let k = 0; k < 50 && !ready; k++) {
       await sleep(300);
-      if (await evalJs("typeof window.__debugLimbo === 'function' && Boolean(window.__ui)")) break;
+      ready = await evalJs("typeof window.__debugLimbo === 'function' && Boolean(window.__ui)");
     }
+    // Báo RÕ thay vì chết ở `window.__debugLimbo is not a function` (nit của A, lượt 447): `--url` tới client của cây khác / bản cũ
+    if (!ready)
+      throw new Error(
+        `Không có window.__debugLimbo / __ui sau 15 giây ở ${BASE_URL}: client ở địa chỉ này là bản cũ, hay không chạy ?duel=mock&debug=1? Bỏ --url để script tự dựng Vite của cây này.`,
+      );
     await sleep(500);
   };
   /** Mở màn Hoàng Tuyền với dữ liệu tuỳ ý (null = bản mẫu: nấc khắc 1, đã khắc ung_trao, khắc được 3 chiêu); xoá nhật ký các tin đầu thai */
@@ -132,8 +139,19 @@ try {
     evalJs(
       `document.querySelector('#limbo-engrave-list [data-nav="engrave:${id}"]').closest('.engrave-item').click(); 1`,
     ).then(() => sleep(120));
+  /** Hộp xác nhận chung (issue #779): bấm Đầu thai / Mở chỉ MỞ hộp; chờ qua cửa sổ chống click ma (450 ms) rồi xác nhận bằng nút "Bán / Mở / Đầu thai" (pointerdown như chạm thật) */
+  const confirmYes = async () => {
+    for (let k = 0; k < 20 && !(await evalJs("window.__ui.isActConfirmOpen()")); k++)
+      await sleep(50);
+    await sleep(520);
+    await evalJs(
+      "document.getElementById('act-btn-yes').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); 1",
+    );
+    await sleep(100);
+  };
   const rebirth = async () => {
     await evalJs("document.getElementById('limbo-btn-rebirth').click(); 1");
+    await confirmYes();
     await sleep(150);
     return J("window.__rebirthChoices");
   };
@@ -253,6 +271,7 @@ try {
   await clickItem("ung_trao");
   await clickItem("me_tung_bo"); // lựa chọn đã đụng: me_tung_bo
   await evalJs("document.querySelector('[data-nav=\"stone:khac\"]').click(); 1");
+  await confirmYes(); // mở nấc bằng Duyên có hộp xác nhận
   await sleep(300);
   st = await state();
   check(st.hint === "Tối đa 2 chiêu (đã chọn 1/2)", `sau khi mua nấc 2: "${st.hint}"`);
@@ -299,14 +318,26 @@ try {
   await evalJs(
     "document.getElementById('limbo-btn-rebirth').click(); document.getElementById('limbo-btn-rebirth').click(); 1",
   );
-  await sleep(150);
-  check((await J("window.__rebirthChoices")).length === 1, "hai lần bấm liền: chỉ MỘT tin");
+  await confirmYes();
+  await evalJs(
+    "document.getElementById('limbo-btn-rebirth').click(); document.getElementById('limbo-btn-rebirth').click(); 1",
+  ); // đang chờ máy chủ (aria-disabled): bấm thêm KHÔNG mở hộp, KHÔNG gửi thêm
+  await sleep(700);
+  check(
+    (await evalJs("window.__ui.isActConfirmOpen()")) === false,
+    "đã gửi: bấm thêm không mở hộp nữa",
+  );
+  check(
+    (await J("window.__rebirthChoices")).length === 1,
+    "hai lần bấm liền + bấm thêm lúc chờ: chỉ MỘT tin",
+  );
   const aria = await evalJs(
     "document.getElementById('limbo-btn-rebirth').getAttribute('aria-disabled')",
   );
   check(aria === "true", "nút aria-disabled trong lúc chờ");
   await sleep(3200);
   await evalJs("document.getElementById('limbo-btn-rebirth').click(); 1");
+  await confirmYes();
   await sleep(150);
   check(
     (await J("window.__rebirthChoices")).length === 2,

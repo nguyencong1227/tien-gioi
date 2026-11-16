@@ -1,19 +1,19 @@
 import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 /* global console, setTimeout, fetch, process */
 // Kiểm phóng to / kéo bản đồ lớn (QUYET_DINH_M3 mục 17.2, #496 bước 3) bằng sự kiện THẬT qua CDP (`Input.dispatch*`): lăn chuột, kéo chuột,
-// nút +/-/"Về chỗ mình", phím +/-/mũi tên/Home, chụm hai ngón (cảm ứng), mở lại thì về mặc định, mũi tên không làm nhân vật đi. Cần client đang
-// chạy (`npm run dev -w client`, cổng của dev B là 5183). Dùng chế độ mock (?duel=mock&debug=1) nên KHÔNG cần server.
-//   node client/scripts/check-map-zoom.mjs [--url http://127.0.0.1:5183]
+// nút +/-/"Về chỗ mình", phím +/-/mũi tên/Home, chụm hai ngón (cảm ứng), mở lại thì về mặc định, mũi tên không làm nhân vật đi. Mặc định tự dựng Vite của cây này trên cổng trống (tự tắt khi xong); `--url` để dùng client đang chạy sẵn. Dùng chế độ mock (?duel=mock&debug=1) nên KHÔNG cần server.
+//   node client/scripts/check-map-zoom.mjs [--url <client đang chạy sẵn, tuỳ chọn>]
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { resolveClientUrl } from "./client-url.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const i = process.argv.indexOf("--url");
-const BASE_URL = i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : "http://127.0.0.1:5183";
+const BASE_URL = await resolveClientUrl(i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : "");
 const CDP_PORT = await freePort();
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-map-zoom-"));
 const chrome = spawn(

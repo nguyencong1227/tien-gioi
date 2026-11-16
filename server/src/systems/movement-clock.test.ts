@@ -136,4 +136,15 @@ describe("hàng đợi input theo thời gian thật", () => {
     tickWorld(w, TICK_MS);
     expect(p.lastSeq).toBe(3);
   });
+
+  it("cộng dồn số thực không làm mất bước: 10 tick x 5 ms cộng ra 0,9999999999999999 vẫn đủ một bước (BUDGET_EPS)", () => {
+    const { w } = makeWorld();
+    const { p, c } = addPlayer(w, "a");
+    c.moveBudget = 0;
+    queueInput(w, "a", { seq: 1, dx: 0, dy: 1 });
+    for (let i = 0; i < 9; i++) applyInputs(w.map, p, c, 5);
+    expect(p.lastSeq).toBe(0); // 0,9 bước: chưa đủ
+    applyInputs(w.map, p, c, 5); // 10 x 0,1 = 0,9999999999999999 trong số thực
+    expect(p.lastSeq).toBe(1);
+  });
 });

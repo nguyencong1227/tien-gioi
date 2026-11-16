@@ -6,21 +6,22 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 // `skillSlot` và bảng + thanh chiêu cập nhật theo `skills` của máy chủ giả (chi tiết đang mở KHÔNG gập lại khi vẽ lại); ô khoá chỉ báo, không gửi; Delete gỡ (cả khi chỉ focus hàng);
 // mũi tên đi giữa các hàng / các ô; ca chưa học chiêu nào; cảnh giới đổi lúc đang mở; 18 chiêu (12 thật + 6 tên dài giả) ở 5 khung: hàng >= 44 px, không tràn, không cắt tên,
 // chiêu cuối cuộn tới được, chi tiết mở vẫn đủ nút >= 44 px. Có thể chụp ảnh: `--shots <thư mục>`.
-// Cần client đang chạy (`npm run dev -w client`, cổng của dev B là 5183).
-//   node client/scripts/check-skills-panel.mjs [--url http://127.0.0.1:5183] [--shots /tmp/tg-b-shots]
+// Mặc định tự dựng Vite của cây này trên cổng trống (tự tắt khi xong); `--url` để dùng client đang chạy sẵn.
+//   node client/scripts/check-skills-panel.mjs [--url <client đang chạy sẵn, tuỳ chọn>] [--shots /tmp/tg-b-shots]
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { resolveClientUrl } from "./client-url.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const argOf = (name, dflt) => {
   const i = process.argv.indexOf(name);
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : dflt;
 };
-const BASE_URL = argOf("--url", "http://127.0.0.1:5183");
+const BASE_URL = await resolveClientUrl(argOf("--url", ""));
 const SHOTS = argOf("--shots", "");
 const CDP_PORT = await freePort();
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-skills-panel-"));

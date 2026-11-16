@@ -23,6 +23,8 @@ import {
 } from "./metrics";
 import { startupWarnings } from "./startup";
 import { addPlayer, makeWorld } from "./systems/test-helpers";
+import { queueInput } from "./systems/movement";
+import { tickWorld } from "./systems/tick";
 
 describe("TickStats", () => {
   it("rỗng: toàn số 0", () => {
@@ -168,6 +170,71 @@ describe("collectMetrics", () => {
     const { hub, b } = twoRoomHub();
     b.w.dispose();
     expect(collectMetrics(hub, probe).rooms.map((r) => r.room)).toEqual(["roomA"]);
+  });
+});
+
+describe("số đo hàng đợi input di chuyển (mục 25)", () => {
+  it("hàng đợi đầy thì đếm input bị bỏ; còn tồn từ INPUT_BACKLOG_WARN trở lên sau xử lý thì đếm lượt tụt hậu; hiện ở collectMetrics và /metrics", () => {
+    const { hub, a } = twoRoomHub();
+    const { p, c } = addPlayer(a.w, "walker");
+    c.moveBudget = 0;
+    for (let seq = 1; seq <= 70; seq++) queueInput(a.w, "walker", { seq, dx: 1, dy: 0 });
+    expect(a.w.inputStats.dropped).toBe(10); // hàng đợi 60: 10 input vượt bị bỏ
+    tickWorld(a.w, TICK_MS); // xử lý 1 bước: còn 59 chờ (>= INPUT_BACKLOG_WARN)
+    expect(p.lastSeq).toBe(1);
+    expect(a.w.inputStats.backlogTicks).toBeGreaterThanOrEqual(1);
+    const before = a.w.inputStats.backlogTicks;
+    c.inputs.length = 0; // hết tồn: tick sau không đếm thêm cho người này
+    tickWorld(a.w, TICK_MS);
+    expect(a.w.inputStats.backlogTicks).toBe(before);
+    const snap = collectMetrics(hub, probe);
+    const ra = snap.rooms.find((r) => r.room === "roomA")!;
+    expect(ra.input).toEqual({ dropped: 10, backlogTicks: before });
+    expect(snap.rooms.find((r) => r.room === "roomB")!.input).toEqual({
+      dropped: 0,
+      backlogTicks: 0,
+    });
+    const text = renderPrometheus(snap);
+    expect(text).toMatch(/tiengioi_room_input_dropped_total\{room="roomA",map="[a-z_]+"\} 10/);
+    expect(text).toMatch(
+      new RegExp(
+        `tiengioi_room_input_backlog_ticks_total\\{room="roomA",map="[a-z_]+"\\} ${before}`,
+      ),
+    );
+  });
+
+  it("đi bình thường (1 input / tick) không tạo tụt hậu hay bỏ input", () => {
+    const { a } = twoRoomHub();
+    addPlayer(a.w, "walker");
+    for (let seq = 1; seq <= 400; seq++) {
+      queueInput(a.w, "walker", { seq, dx: seq % 40 < 20 ? 1 : -1, dy: 0 });
+      tickWorld(a.w, TICK_MS);
+    }
+    expect(a.w.inputStats).toEqual({ dropped: 0, backlogTicks: 0 });
+  });
+});
+
+describe("số đo bảo vệ khi mất kết nối (mục 33)", () => {
+  it("lần im lặng / tha chết hiện ở collectMetrics và văn bản Prometheus (nhãn phòng)", () => {
+    const { hub, a } = twoRoomHub();
+    a.w.netStats.silent = 3;
+    a.w.netStats.spared = 1;
+    a.w.netStats.spareDenied = 2;
+    const snap = collectMetrics(hub, probe);
+    expect(snap.rooms.find((r) => r.room === "roomA")!.net).toEqual({
+      silent: 3,
+      spared: 1,
+      spareDenied: 2,
+    });
+    expect(snap.rooms.find((r) => r.room === "roomB")!.net).toEqual({
+      silent: 0,
+      spared: 0,
+      spareDenied: 0,
+    });
+    const text = renderPrometheus(snap);
+    expect(text).toMatch(/tiengioi_room_net_silent_total\{room="roomA",map="[a-z_]+"\} 3/);
+    expect(text).toMatch(/tiengioi_room_net_spared_total\{room="roomA",map="[a-z_]+"\} 1/);
+    expect(text).toMatch(/tiengioi_room_net_spare_denied_total\{room="roomA",map="[a-z_]+"\} 2/);
   });
 });
 

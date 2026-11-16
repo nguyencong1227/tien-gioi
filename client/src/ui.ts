@@ -89,8 +89,14 @@ import {
   type SectInvitedMsg,
   type SectAssignableRank,
   type SectMsg,
+  type SectVaultMsg,
+  type SectVaultView,
+  type SectVaultDepositMsg,
+  type SectVaultWithdrawMsg,
+  SECT_VAULT_SLOTS,
   canSect,
   SECT_MAX_MEMBERS,
+  SECT_CREATE_COST,
   SECT_ELDERS_MAX,
   cleanSectName,
   cleanSectTag,
@@ -127,6 +133,22 @@ import {
   sectConfirmText,
   type SectConfirmKind,
 } from "./sect";
+import {
+  clampQty,
+  depositBlock,
+  drawPerDayOptions,
+  drawSummary,
+  maxDepositQty,
+  maxWithdrawQty,
+  planDeposit,
+  planStillValid,
+  planWithdraw,
+  sanitizeVaultView,
+  vaultBlockText,
+  vaultLogLine,
+  withdrawBlock,
+  type VaultPlan,
+} from "./sect-vault";
 import { canAffordFee, feeChipText, recipeFee } from "./forge-fee";
 import {
   QUEST_KIND_BADGE,
@@ -191,6 +213,27 @@ import { transitionMs, waitOrSkip } from "./gfx/scene-transition";
 import { getDisplay, onDisplayChange } from "./gfx/display";
 import { optionTag, skipHintText } from "./dialog-opt";
 import { dropConfirmText, dropStillValid, dropWarnText, planDrop, type DropPlan } from "./inv-drop";
+import {
+  inConfirmGuard,
+  rebirthPlan,
+  sectCreatePlan,
+  sectCreateStillValid,
+  sectDepositPlan,
+  sectDepositStillValid,
+  sellPlan,
+  sellStillValid,
+  unlockPlan,
+  unlockStillValid,
+  type ConfirmSpec,
+} from "./act-confirm";
+import { PREFER_TARGET_STORAGE_KEY, parsePreferTarget } from "./aim-order";
+import {
+  AIM_MODE_LABEL,
+  AIM_MODE_STORAGE_KEY,
+  DEFAULT_AIM_MODE,
+  parseAimMode,
+  type AimMode,
+} from "./auto-target";
 import { craftButtonText, craftFeeHint, craftSubtitle, craftTitle } from "./craft-ui";
 import {
   CHAT_PREF_KEY,
@@ -289,6 +332,9 @@ export interface UiCallbacks {
   onSectMotd?: (motd: string) => void;
   onSectDeposit?: (amount: number) => void;
   onSectWithdraw?: (amount: number) => void;
+  onSectVaultDeposit?: (msg: SectVaultDepositMsg) => void;
+  onSectVaultWithdraw?: (msg: SectVaultWithdrawMsg) => void;
+  onSectVaultPolicy?: (drawPerDay: number) => void;
   /** Bảng Công pháp: gắn chiêu vào ô 2-5 (`skillId` "" = gỡ); máy chủ trả `skills` (sổ đúng) */
   onSkillSlot?: (slot: SkillSlot, skillId: string) => void;
   /** Bảng Công pháp vừa mở: cảnh dựng mô hình mới từ sổ chiêu hiện tại (`ui.setSkillsModel`) */
@@ -324,6 +370,10 @@ let skillsModel: SkillsPanelModel | null = null;
 let mapModalOpen = false;
 let settingsModalOpen = false;
 let hideOtherNames = false;
+/** "Ưu tiên mục tiêu hơn chuột" (mục 29, mặc định TẮT: con trỏ chuột hợp lệ thắng mục tiêu). */
+let preferTargetOverMouse = false;
+/** "Chế độ nhắm" (mục 26, mặc định Tự động — gần nhất, kể cả người chơi cũ chưa từng đổi; lưu theo thiết bị). */
+let aimModeSetting: AimMode = DEFAULT_AIM_MODE;
 /** Bản đồ nhỏ đang hiện (false = thu gọn thành nhãn tên khu, vẫn bấm được để mở bản đồ lớn). */
 let minimapVisible = true;
 let questTab: "active" | "done" = "active";
@@ -404,7 +454,19 @@ function stopDuelCountdownTimer() {
 let currentSect: SectView | null = null;
 let currentSectPresence: SectPresenceMsg | null = null;
 let sectModalOpen = false;
-let sectTab: "overview" | "members" | "treasury" = "overview";
+let sectTab: "overview" | "members" | "treasury" | "vault" = "overview";
+// ---- Kho đồ tông môn (mục 27, K4, #788) ----
+/** Ảnh chụp kho đồ MỚI NHẤT máy chủ gửi (đã làm sạch); `null` = chưa có / không còn tông môn. */
+let sectVault: SectVaultView | null = null;
+/** Ô đang chọn: từ kho (rút) hoặc từ túi (góp). Chỉ bấm / chạm / bàn phím mới chọn, rê chuột KHÔNG chọn (mục 24, `inv-select.test.ts`). */
+let vaultSel: { from: "vault" | "bag"; index: number } | null = null;
+let vaultQty = 1;
+/** Đang chờ máy chủ trả lời một thao tác kho đồ (mỗi người một thao tác tại một thời điểm): khoá nút tới khi có ảnh chụp mới / toast / hết `VAULT_BUSY_MS`. */
+let vaultBusy = false;
+let vaultBusyTimer: ReturnType<typeof setTimeout> | null = null;
+const VAULT_BUSY_MS = 5000;
+const vaultSlotEls: HTMLButtonElement[] = [];
+const vaultBagEls: HTMLButtonElement[] = [];
 let currentSectInvite: SectInvitedMsg | null = null;
 let sectInviteInterval: number | null = null;
 let sectConfirmAction: (() => void) | null = null;
@@ -561,6 +623,16 @@ function loadSettings() {
   } catch {
     hideOtherNames = false;
   }
+  try {
+    preferTargetOverMouse = parsePreferTarget(localStorage.getItem(PREFER_TARGET_STORAGE_KEY));
+  } catch {
+    preferTargetOverMouse = false;
+  }
+  try {
+    aimModeSetting = parseAimMode(localStorage.getItem(AIM_MODE_STORAGE_KEY));
+  } catch {
+    aimModeSetting = DEFAULT_AIM_MODE;
+  }
   minimapVisible = minimapOpen(parseTrackerPref(readPref(MINIMAP_PREF_KEY)));
   // Chất lượng đồ hoạ (và class body.low-fx tương thích) do gfx/quality.ts quản lý (#323): một nguồn duy nhất
 }
@@ -699,6 +771,55 @@ function selectSlot(i: number) {
   closeDropConfirm(false);
   selectedSlot = i;
   renderInventory();
+}
+
+// ---------- Hộp xác nhận DÙNG CHUNG (issue #779, docs/RA_SOAT_THAO_TAC.md) ----------
+let actConfirmAction: (() => void) | null = null;
+let actConfirmOpener: HTMLElement | null = null;
+let actConfirmOpenedAt = -Infinity;
+/** Hộp đang mở do nút Bán ở cửa hàng: cửa hàng đóng (đi xa NPC, Esc...) thì hộp đóng theo, không bán vào chỗ không còn mở. */
+let actConfirmFromShop = false;
+/** Hộp đang mở do biểu mẫu Lập / Nộp của bảng Tông môn: bảng đóng (Esc, bị trục xuất, đổi cảnh) thì hộp đóng theo, không lập / nộp vào chỗ không còn mở. */
+let actConfirmFromSect = false;
+/** Lúc hộp xác nhận đóng gần nhất (ms, `performance.now`). Hộp đóng ngay ở `pointerdown`, nên `click` do trình duyệt tạo sau khi nhả ngón rơi xuống nút ở DƯỚI hộp (nút Bán): bỏ qua `click` trong cửa sổ chống click ma. */
+let actConfirmClosedAt = -1e12;
+
+/**
+ * `click` "ma" (chuột / chạm: `detail > 0`) ngay sau khi hộp xác nhận vừa đóng, rơi xuống nút bên dưới hộp. Thao tác bằng BÀN PHÍM (Enter / Cách: `detail === 0`) hoặc lập trình thì không
+ * phải click ma, không chặn (người dùng bàn phím xác nhận bằng Y rồi bấm Enter ngay phải được).
+ */
+function ghostClick(e: MouseEvent): boolean {
+  return e.detail > 0 && inConfirmGuard(actConfirmClosedAt, performance.now());
+}
+
+/** Mở hộp xác nhận: nêu hậu quả bằng chữ; "Giữ lại" được focus; `onOk` chỉ chạy khi bấm xác nhận SAU cửa sổ chống click ma. */
+function askActConfirm(spec: ConfirmSpec, onOk: () => void, opener: HTMLElement | null) {
+  actConfirmAction = onOk;
+  actConfirmOpener = opener;
+  actConfirmOpenedAt = performance.now();
+  $("act-confirm-text").textContent = spec.text;
+  const warn = $("act-confirm-warn");
+  warn.textContent = spec.warn ?? "";
+  warn.hidden = spec.warn === null;
+  $("act-btn-yes-label").textContent = spec.ok;
+  $("act-btn-no-label").textContent = spec.cancel;
+  $("act-confirm").hidden = false;
+  ($("act-btn-no") as HTMLButtonElement).focus(); // mặc định "Giữ lại": Enter nhầm cũng không làm gì
+}
+
+/** Đóng hộp xác nhận dùng chung; `refocus` = trả focus về nút đã mở hộp. `false` nếu hộp không mở. */
+function closeActConfirm(refocus = true): boolean {
+  const box = document.getElementById("act-confirm");
+  if (!box || box.hidden) return false;
+  box.hidden = true;
+  actConfirmAction = null;
+  actConfirmFromShop = false;
+  actConfirmFromSect = false;
+  actConfirmClosedAt = performance.now();
+  const back = actConfirmOpener;
+  actConfirmOpener = null;
+  if (refocus && back && !back.hidden) back.focus();
+  return true;
 }
 
 /** Kế hoạch vứt đang chờ xác nhận (chụp lúc bấm "Vứt 1" / "Vứt hết"); `null` = không có hộp. */
@@ -2123,8 +2244,36 @@ function renderShopSellImpl() {
       sellBtn.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
-        sound.pickup();
-        callbacks?.onSell?.(shopNpcId, i, qty);
+        // click "ma" sau khi vừa xác nhận / giữ lại ở hộp (cảm ứng): không mở lại hộp, không bán lần nữa
+        if (ghostClick(e)) return;
+        // Đồ quý / trang bị: hộp xác nhận (issue #779); đồ thường bán thẳng
+        const plan = sellPlan(invSlots, i, qty, unitPrice, {
+          name: def.name,
+          type: def.type,
+          rarity: def.rarity,
+          rarityName: rarityStyle(def.rarity).name,
+        });
+        if (!plan) {
+          sound.pickup();
+          callbacks?.onSell?.(shopNpcId, i, qty);
+          return;
+        }
+        const npc = shopNpcId;
+        askActConfirm(
+          plan.spec,
+          () => {
+            // túi có thể đổi trong lúc hộp mở (nhặt, dùng, máy chủ gửi lại): kiểm lại ĐÚNG món + số lượng, không bán món khác
+            if (!sellStillValid(invSlots, plan)) {
+              ui.toast({ text: "Túi vừa đổi, chưa bán gì. Hãy chọn lại món.", tone: "info" });
+              renderShopSell();
+              return;
+            }
+            sound.pickup();
+            callbacks?.onSell?.(npc, plan.index, plan.qty);
+          },
+          sellBtn,
+        );
+        actConfirmFromShop = true;
       });
 
       right.append(qtyBox, sellBtn);
@@ -2513,8 +2662,26 @@ function renderLimboStoneListImpl() {
         btn.title = `Thiếu ${cost - activeSoulView.duyen} Duyên`;
       } else {
         btn.disabled = false;
-        btn.addEventListener("click", () => {
-          limboBuyCb?.(def.id);
+        btn.addEventListener("click", (e) => {
+          // click "ma" sau khi vừa đóng hộp xác nhận (cảm ứng: hộp đóng ở pointerdown, click rơi xuống nút bên dưới): bỏ qua
+          if (ghostClick(e)) return;
+          const duyen = activeSoulView?.duyen ?? 0;
+          const plan = unlockPlan(`${def.name} nấc ${currentLv + 1}`, cost, duyen);
+          if (!plan) return;
+          askActConfirm(
+            plan.spec,
+            () => {
+              // chân linh có thể đổi trong lúc hộp mở: kiểm lại giá + Duyên, không trừ Duyên theo lời hỏi cũ
+              const now = activeSoulView ? nextCost(activeSoulView, def.id) : null;
+              if (!unlockStillValid(plan, now, activeSoulView?.duyen ?? 0)) {
+                ui.toast({ text: "Chân linh vừa đổi, chưa mở gì. Hãy xem lại.", tone: "info" });
+                renderLimboAll();
+                return;
+              }
+              limboBuyCb?.(def.id);
+            },
+            btn,
+          );
         });
       }
     }
@@ -2563,8 +2730,24 @@ function renderLimboStoneListImpl() {
         btn.title = `Thiếu ${o.cost - activeSoulView.duyen} Duyên`;
       } else {
         btn.disabled = false;
-        btn.addEventListener("click", () => {
-          limboBuyCb?.(`${ORIGIN_BUY_PREFIX}${o.id}`);
+        btn.addEventListener("click", (e) => {
+          if (ghostClick(e)) return; // click ma sau khi đóng hộp
+          const duyen = activeSoulView?.duyen ?? 0;
+          const plan = unlockPlan(`xuất thân ${o.name}`, o.cost, duyen);
+          if (!plan) return;
+          askActConfirm(
+            plan.spec,
+            () => {
+              const owned = activeSoulView?.origins.includes(o.id) ?? false;
+              if (!unlockStillValid(plan, owned ? null : o.cost, activeSoulView?.duyen ?? 0)) {
+                ui.toast({ text: "Chân linh vừa đổi, chưa mở gì. Hãy xem lại.", tone: "info" });
+                renderLimboAll();
+                return;
+              }
+              limboBuyCb?.(`${ORIGIN_BUY_PREFIX}${o.id}`);
+            },
+            btn,
+          );
         });
       }
     }
@@ -2938,6 +3121,247 @@ function renderSectTreasuryTab() {
   }
 }
 
+// ---------- Kho đồ tông môn (mục 27, K4, #788) ----------
+
+function fillVaultSlot(
+  btn: HTMLButtonElement,
+  slot: { itemId: string; qty: number } | null,
+  selected: boolean,
+) {
+  const icon = btn.querySelector<HTMLElement>(".slot-icon");
+  const nameEl = btn.querySelector<HTMLElement>(".slot-name");
+  const qtyEl = btn.querySelector<HTMLElement>(".slot-qty");
+  btn.classList.toggle("selected", selected);
+  btn.setAttribute("aria-selected", String(selected));
+  const def = slot ? ITEM_BY_ID[slot.itemId] : undefined;
+  if (slot && def) {
+    btn.style.borderColor = rarityStyle(def.rarity).color;
+    if (icon) applyItemVisual(icon, def);
+    if (nameEl) nameEl.textContent = def.name;
+    btn.setAttribute("aria-label", itemAria(def, slot.qty));
+    btn.title = slot.qty > 1 ? `${def.name} ×${slot.qty}` : def.name; // rê chuột chỉ hiện chú thích, KHÔNG chọn ô
+    applyRarityBadge(btn, def.rarity);
+    if (qtyEl) qtyEl.textContent = slot.qty > 1 ? `${slot.qty}` : "";
+  } else {
+    btn.style.borderColor = "rgba(243, 220, 160, 0.22)";
+    if (icon) applyItemVisual(icon, undefined);
+    if (nameEl) nameEl.textContent = "";
+    btn.setAttribute("aria-label", "Ô trống");
+    btn.removeAttribute("title");
+    clearRarityBadge(btn);
+    if (qtyEl) qtyEl.textContent = "";
+  }
+}
+
+/** Số lượng tối đa chọn được cho ô đang chọn (0 nếu chưa chọn / ô trống). */
+function vaultSelMax(): number {
+  if (!vaultSel) return 0;
+  const rank = currentSect?.myRank ?? null;
+  if (vaultSel.from === "vault")
+    return sectVault ? maxWithdrawQty(sectVault, rank, vaultSel.index) : 0;
+  return maxDepositQty(invSlots, vaultSel.index);
+}
+
+/** Bỏ lựa chọn nếu ô đã chọn không còn gì (bị rút hết, đã góp hết) và kẹp số lượng vào [1, tối đa]. */
+function reconcileVaultSelection() {
+  if (!vaultSel) return;
+  const max = vaultSelMax();
+  if (max < 1) {
+    vaultSel = null;
+    vaultQty = 1;
+    return;
+  }
+  vaultQty = clampQty(vaultQty, max) || 1;
+}
+
+function renderSectVaultTab() {
+  if (!currentSect) return;
+  const v = sectVault;
+  const rank = currentSect.myRank;
+  reconcileVaultSelection();
+  $("sect-vault-draw").textContent = v ? drawSummary(v, rank) : "Đang tải kho đồ…";
+  const used = v ? v.slots.filter((x) => x !== null).length : 0;
+  $("sect-vault-count").textContent = v ? `(${used} / ${v.slots.length} ô)` : "";
+  for (let i = 0; i < vaultSlotEls.length; i++) {
+    fillVaultSlot(
+      vaultSlotEls[i],
+      v?.slots[i] ?? null,
+      vaultSel?.from === "vault" && vaultSel.index === i,
+    );
+  }
+  for (let i = 0; i < vaultBagEls.length; i++) {
+    fillVaultSlot(
+      vaultBagEls[i],
+      invSlots[i] ?? null,
+      vaultSel?.from === "bag" && vaultSel.index === i,
+    );
+  }
+
+  // thanh hành động: món đang chọn, số lượng, nút Góp / Rút, lý do không bấm được (bằng chữ)
+  const selEl = $("sect-vault-sel");
+  const qtyBox = $("sect-vault-qty-box");
+  const act = $("sect-vault-act") as HTMLButtonElement;
+  const why = $("sect-vault-why");
+  if (!v || !vaultSel) {
+    selEl.textContent = "Chưa chọn món nào.";
+    qtyBox.hidden = true;
+    act.textContent = "Chọn món";
+    act.disabled = true;
+    why.textContent = v ? vaultBlockText("no_selection") : "";
+  } else {
+    const isVault = vaultSel.from === "vault";
+    const slot = isVault ? v.slots[vaultSel.index] : invSlots[vaultSel.index];
+    const def = slot ? ITEM_BY_ID[slot.itemId] : undefined;
+    const reason = isVault
+      ? withdrawBlock(v, rank, vaultSel.index)
+      : depositBlock(v, invSlots, vaultSel.index);
+    const max = vaultSelMax();
+    selEl.textContent = `${isVault ? "Trong kho" : "Trong túi"}: ${def?.name ?? "?"}${slot && slot.qty > 1 ? ` (có ${slot.qty})` : ""}`;
+    qtyBox.hidden = max <= 1 || reason !== null;
+    $("sect-vault-qty").textContent = String(vaultQty);
+    ($("sect-vault-minus") as HTMLButtonElement).disabled = vaultQty <= 1;
+    ($("sect-vault-plus") as HTMLButtonElement).disabled = vaultQty >= max;
+    act.textContent = vaultBusy ? "Đang xử lý…" : isVault ? "Rút" : "Góp";
+    act.disabled = reason !== null || vaultBusy;
+    why.textContent = reason !== null ? vaultBlockText(reason) : "";
+  }
+
+  // chỉnh hạn mức: CHỈ Tông chủ (`canSect`); chọn sẵn giá trị hiện tại
+  const policy = $("sect-vault-policy");
+  const canPolicy = canSect("vaultPolicy", rank);
+  policy.hidden = !canPolicy || !v;
+  if (canPolicy && v) {
+    const sel = $("sect-vault-policy-sel") as HTMLSelectElement;
+    if (sel.options.length === 0) {
+      for (const n of drawPerDayOptions()) {
+        const o = document.createElement("option");
+        o.value = String(n);
+        o.textContent = n === 0 ? "0 (Đệ tử không rút được)" : `${n} lượt / ngày`;
+        sel.append(o);
+      }
+    }
+    if (document.activeElement !== sel) sel.value = String(v.drawPerDay);
+  }
+
+  // sổ kho đồ: mới nhất đứng đầu
+  const logEl = $("sect-vault-log");
+  logEl.replaceChildren();
+  const log = v?.log ?? [];
+  if (log.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "sect-empty-log";
+    empty.textContent = "Chưa có ai góp hay rút đồ.";
+    logEl.append(empty);
+  } else {
+    for (const e of log) {
+      const item = document.createElement("div");
+      item.className = `sect-log-item ${e.kind}`;
+      item.textContent = vaultLogLine(e);
+      logEl.append(item);
+    }
+  }
+}
+
+function endVaultBusy() {
+  if (vaultBusyTimer) clearTimeout(vaultBusyTimer);
+  vaultBusyTimer = null;
+  if (!vaultBusy) return;
+  vaultBusy = false;
+  if (sectModalOpen && sectTab === "vault") renderSectVaultTab();
+}
+
+function selectVaultSlot(from: "vault" | "bag", index: number) {
+  if (vaultSel?.from === from && vaultSel.index === index) return;
+  vaultSel = { from, index };
+  vaultQty = 1;
+  if (sectModalOpen && sectTab === "vault") renderSectVaultTab();
+}
+
+/** Gửi một kế hoạch góp / rút (sau hộp xác nhận nếu có). Khoá nút tới khi máy chủ trả lời (ảnh chụp kho mới hoặc toast từ chối). */
+function sendVaultPlan(plan: VaultPlan) {
+  vaultBusy = true;
+  if (vaultBusyTimer) clearTimeout(vaultBusyTimer);
+  vaultBusyTimer = setTimeout(endVaultBusy, VAULT_BUSY_MS);
+  if (plan.type === "deposit")
+    callbacks?.onSectVaultDeposit?.({ slot: plan.msg.slot, qty: plan.qty });
+  else
+    callbacks?.onSectVaultWithdraw?.({
+      slot: plan.msg.slot,
+      itemId: plan.itemId,
+      qty: plan.qty,
+    });
+  renderSectVaultTab();
+}
+
+function runVaultAction() {
+  if (vaultBusy || !vaultSel || !sectVault || !currentSect) return;
+  const rank = currentSect.myRank;
+  const plan =
+    vaultSel.from === "vault"
+      ? planWithdraw(sectVault, rank, vaultSel.index, vaultQty)
+      : planDeposit(sectVault, invSlots, vaultSel.index, vaultQty);
+  if (!plan) return;
+  if (!plan.confirm) return sendVaultPlan(plan);
+  askActConfirm(
+    plan.confirm,
+    () => {
+      // ảnh chụp kho / túi có thể đổi trong lúc hộp mở: kiểm lại ĐÚNG món + số lượng, không gửi theo lời hỏi cũ
+      if (!planStillValid(sectVault, invSlots, plan)) {
+        ui.toast({ text: "Kho hoặc túi vừa đổi, chưa làm gì. Hãy chọn lại.", tone: "info" });
+        renderSectVaultTab();
+        return;
+      }
+      sendVaultPlan(plan);
+    },
+    $("sect-vault-act"),
+  );
+}
+
+function buildSectVaultGrids() {
+  const make = (
+    host: HTMLElement,
+    count: number,
+    from: "vault" | "bag",
+    els: HTMLButtonElement[],
+  ) => {
+    host.replaceChildren();
+    els.length = 0;
+    for (let i = 0; i < count; i++) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "inv-slot";
+      btn.setAttribute("role", "gridcell");
+      const icon = document.createElement("i");
+      icon.className = "slot-icon";
+      const name = document.createElement("span");
+      name.className = "slot-name";
+      const qty = document.createElement("b");
+      qty.className = "slot-qty";
+      btn.append(icon, name, qty);
+      // CHỈ bấm chuột / chạm (`pointerdown`, nút chính) hoặc bàn phím (focus bằng mũi tên / Tab) mới CHỌN ô; rê chuột chỉ sáng ô bằng CSS và hiện chú thích (mục 24).
+      btn.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        if (e.button !== 0) return;
+        selectVaultSlot(from, i);
+        // `preventDefault` ở trên chặn trình duyệt tự chuyển focus: tự chuyển, để ô được CHỌN và ô đang FOCUS (Enter chạy trên ô này) luôn là MỘT
+        btn.focus({ preventScroll: true });
+      });
+      btn.addEventListener("focus", () => selectVaultSlot(from, i));
+      btn.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        if (e.repeat) return;
+        selectVaultSlot(from, i);
+        runVaultAction();
+      });
+      els.push(btn);
+      host.append(btn);
+    }
+  };
+  make($("sect-vault-grid"), SECT_VAULT_SLOTS, "vault", vaultSlotEls);
+  make($("sect-vault-bag"), INVENTORY_SLOTS, "bag", vaultBagEls);
+}
+
 function renderSectModal() {
   withFocusKept($("sect-modal"), renderSectModalImpl);
 }
@@ -2971,10 +3395,12 @@ function renderSectModalImpl() {
   $("sect-tab-btn-overview").classList.toggle("active", sectTab === "overview");
   $("sect-tab-btn-members").classList.toggle("active", sectTab === "members");
   $("sect-tab-btn-treasury").classList.toggle("active", sectTab === "treasury");
+  $("sect-tab-btn-vault").classList.toggle("active", sectTab === "vault");
 
   $("sect-tab-overview").hidden = sectTab !== "overview";
   $("sect-tab-members").hidden = sectTab !== "members";
   $("sect-tab-treasury").hidden = sectTab !== "treasury";
+  $("sect-tab-vault").hidden = sectTab !== "vault";
 
   if (sectTab === "overview") {
     $("sect-meta-tag").textContent = `[${currentSect.tag}]`;
@@ -2999,6 +3425,8 @@ function renderSectModalImpl() {
     renderSectMembersTab();
   } else if (sectTab === "treasury") {
     renderSectTreasuryTab();
+  } else if (sectTab === "vault") {
+    renderSectVaultTab();
   }
 }
 
@@ -3128,6 +3556,17 @@ export const ui = {
     bindTap("inv-btn-drop1", () => askDropConfirm(false, $("inv-btn-drop1")));
     bindTap("inv-btn-dropall", () => askDropConfirm(true, $("inv-btn-dropall")));
     bindTap("inv-drop-yes", () => confirmDrop());
+    // Hộp xác nhận dùng chung: bỏ qua bấm trong cửa sổ chống click ma; "Chưa / Giữ lại" cũng vậy (hộp không được chớp tắt dưới ngón tay)
+    bindTap("act-btn-yes", () => {
+      if (inConfirmGuard(actConfirmOpenedAt, performance.now())) return;
+      const go = actConfirmAction;
+      closeActConfirm(true);
+      go?.();
+    });
+    bindTap("act-btn-no", () => {
+      if (inConfirmGuard(actConfirmOpenedAt, performance.now())) return;
+      closeActConfirm(true);
+    });
     bindTap("inv-drop-no", () => {
       if (performance.now() - dropConfirmOpenedAt < DROP_CONFIRM_GUARD_MS) return;
       closeDropConfirm(true);
@@ -3190,6 +3629,28 @@ export const ui = {
     bindTap("sect-tab-btn-overview", () => this.switchSectTab("overview"));
     bindTap("sect-tab-btn-members", () => this.switchSectTab("members"));
     bindTap("sect-tab-btn-treasury", () => this.switchSectTab("treasury"));
+    bindTap("sect-tab-btn-vault", () => this.switchSectTab("vault"));
+    buildSectVaultGrids();
+    bindTap("sect-vault-minus", () => {
+      vaultQty = Math.max(1, vaultQty - 1);
+      renderSectVaultTab();
+    });
+    bindTap("sect-vault-plus", () => {
+      vaultQty = clampQty(vaultQty + 1, vaultSelMax()) || 1;
+      renderSectVaultTab();
+    });
+    // Nút Góp / Rút dùng `click` (KHÔNG `bindTap`/pointerdown): hộp xác nhận đóng ở `pointerdown` của nút "Góp"/"Rút"/"Giữ lại" nằm ĐÚNG chỗ nút này, nên `click` ma sau khi nhả ngón
+    // sẽ rơi xuống đây và mở lại hộp; chỉ chặn click của chuột / chạm (`detail > 0`) trong cửa sổ chống click ma, Enter / Space bằng bàn phím (`detail` = 0) vẫn bấm được ngay.
+    $("sect-vault-act").addEventListener("click", (e) => {
+      e.preventDefault();
+      if (e.detail > 0 && inConfirmGuard(actConfirmClosedAt, performance.now())) return;
+      runVaultAction();
+    });
+    $("sect-vault-policy").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const sel = $("sect-vault-policy-sel") as HTMLSelectElement;
+      callbacks?.onSectVaultPolicy?.(Number(sel.value));
+    });
 
     // Form tạo tông môn
     $("sect-form-create")?.addEventListener("submit", (e) => {
@@ -3206,8 +3667,32 @@ export const ui = {
         this.toast({ text: "Biệt hiệu phải từ 2 đến 4 ký tự", tone: "bad" });
         return;
       }
-      callbacks?.onSectCreate?.(name, tag);
+      // Phí lập MẤT HẲN (#779 hàng 13): hộp nêu tên + biệt hiệu + phí; ví không đủ thì gửi thẳng (chưa mất gì, máy chủ trả lý do)
+      const plan = sectCreatePlan(name, tag, SECT_CREATE_COST, currentCoin);
+      if (!plan) {
+        callbacks?.onSectCreate?.(name, tag);
+        return;
+      }
+      askActConfirm(
+        plan.spec,
+        () => {
+          // đã nhận lời mời của tông môn khác / ví vừa đổi trong lúc hộp mở: huỷ, không lập theo lời hỏi đã cũ
+          if (!sectCreateStillValid(plan, currentSect !== null, currentCoin)) {
+            this.toast({ text: "Linh thạch hoặc tông môn vừa đổi, chưa lập gì.", tone: "info" });
+            return;
+          }
+          callbacks?.onSectCreate?.(plan.name, plan.tag);
+        },
+        $("sect-btn-create"),
+      );
+      actConfirmFromSect = true;
     });
+    // `click` ma sau khi hộp đóng (cảm ứng: hộp đóng ở `pointerdown`, `click` rơi xuống nút Lập / Nộp bên dưới) không được gửi lại biểu mẫu; Enter trong ô nhập (`detail` 0) vẫn gửi
+    for (const id of ["sect-btn-create", "sect-btn-deposit"]) {
+      $(id)?.addEventListener("click", (e) => {
+        if (ghostClick(e)) e.preventDefault();
+      });
+    }
 
     // Form sửa MOTD
     bindTap("sect-btn-edit-motd", () => {
@@ -3275,8 +3760,30 @@ export const ui = {
         this.toast({ text: "Số lượng Linh thạch không hợp lệ", tone: "bad" });
         return;
       }
-      callbacks?.onSectDeposit?.(amount);
-      input.value = "";
+      // Người KHÔNG rút lại được (Trưởng lão, Đệ tử) nộp là mất (#779 hàng 14): hỏi; Tông chủ rút lại được: gửi thẳng
+      const spec = sectDepositPlan(
+        amount,
+        currentCoin,
+        currentSect ? canSect("withdraw", currentSect.myRank) : true,
+      );
+      if (!spec) {
+        callbacks?.onSectDeposit?.(amount);
+        input.value = "";
+        return;
+      }
+      askActConfirm(
+        spec,
+        () => {
+          if (!sectDepositStillValid(amount, currentSect !== null, currentCoin)) {
+            this.toast({ text: "Linh thạch hoặc tông môn vừa đổi, chưa nộp gì.", tone: "info" });
+            return;
+          }
+          callbacks?.onSectDeposit?.(amount);
+          input.value = "";
+        },
+        $("sect-btn-deposit"),
+      );
+      actConfirmFromSect = true;
     });
 
     // Kho tông môn: Rút
@@ -3453,6 +3960,8 @@ export const ui = {
     const sfxVal = $("set-sfx-val");
     const muteChk = $("set-mute") as HTMLInputElement;
     const hideNamesChk = $("set-hide-names") as HTMLInputElement;
+    const preferTargetChk = $("set-prefer-target") as HTMLInputElement;
+    const aimModeSel = $("set-aim-mode") as HTMLSelectElement;
     const minimapChk = $("set-minimap") as HTMLInputElement;
     const qualitySel = $("set-quality") as HTMLSelectElement;
     const qualityNow = $("set-quality-now");
@@ -3474,6 +3983,8 @@ export const ui = {
       sfxVal.textContent = `${sPct}%`;
       muteChk.checked = sound.isMuted();
       hideNamesChk.checked = hideOtherNames;
+      preferTargetChk.checked = preferTargetOverMouse;
+      aimModeSel.value = aimModeSetting;
       minimapChk.checked = minimapVisible;
       const q = getQuality();
       qualitySel.value = q.mode;
@@ -3499,6 +4010,15 @@ export const ui = {
       hideOtherNames = hideNamesChk.checked;
       try {
         localStorage.setItem(HIDE_NAMES_KEY, hideOtherNames ? "1" : "0");
+      } catch {
+        // Bỏ qua nếu trình duyệt chặn localStorage
+      }
+    });
+    aimModeSel.addEventListener("change", () => this.setAimMode(parseAimMode(aimModeSel.value)));
+    preferTargetChk.addEventListener("change", () => {
+      preferTargetOverMouse = preferTargetChk.checked;
+      try {
+        localStorage.setItem(PREFER_TARGET_STORAGE_KEY, preferTargetOverMouse ? "1" : "0");
       } catch {
         // Bỏ qua nếu trình duyệt chặn localStorage
       }
@@ -3734,6 +4254,8 @@ export const ui = {
   answerPrompt(answer: PromptAnswer): boolean {
     const id = pickPromptButton(answer, buttonShown);
     if (!id) return false;
+    // X (giữ lại) là ý định CHỦ Ý bằng bàn phím: không bị cửa sổ chống click ma của hộp xác nhận dùng chung chặn (Y vẫn bị chặn trong cửa sổ đó)
+    if (id === "act-btn-no") actConfirmOpenedAt = performance.now() - 10_000;
     $(id).click();
     return true;
   },
@@ -3748,6 +4270,30 @@ export const ui = {
 
   isHideNames() {
     return hideOtherNames;
+  },
+
+  /** "Chế độ nhắm" hiện tại (mục 26): `auto` = tự chuyển mục tiêu sang đối tượng gần nhất (mặc định), `manual` = khoá tay như cũ. */
+  getAimMode(): AimMode {
+    return aimModeSetting;
+  },
+
+  /** Đổi chế độ nhắm (Cài đặt hoặc phím tắt): lưu theo thiết bị, đồng bộ ô chọn trong Cài đặt, `notify` = báo bằng toast (phím tắt). */
+  setAimMode(mode: AimMode, notify = false) {
+    if (mode === aimModeSetting) return;
+    aimModeSetting = mode;
+    try {
+      localStorage.setItem(AIM_MODE_STORAGE_KEY, mode);
+    } catch {
+      // Bỏ qua nếu trình duyệt chặn localStorage
+    }
+    const sel = document.getElementById("set-aim-mode") as HTMLSelectElement | null;
+    if (sel) sel.value = mode;
+    if (notify) this.toast({ text: `Chế độ nhắm: ${AIM_MODE_LABEL[mode]}`, tone: "info" });
+  },
+
+  /** Cài đặt "Ưu tiên mục tiêu hơn chuột" (mục 29): bật thì chiêu bay về mục tiêu kể cả khi chuột đang ở trong màn chơi. */
+  isPreferTarget() {
+    return preferTargetOverMouse;
   },
 
   /** Bậc Thấp (hiệu ứng phụ tắt). Nguồn duy nhất: gfx/quality.ts (di cư từ `tg_low_fx`). */
@@ -3769,6 +4315,23 @@ export const ui = {
       modalStack.remove("inv-modal");
       returnFocus($("btn-bag"));
     }
+  },
+
+  /**
+   * Hộp xác nhận dùng chung cho thao tác khó hoàn tác (issue #779): `spec` = chữ (câu hỏi, dòng nhắc, nút), `onOk` chạy khi xác nhận. Có nền tối chặn bấm
+   * xuyên; Esc / X = giữ lại, Y = xác nhận (`prompts.ts`). `opener` = nút để trả focus khi đóng.
+   */
+  askConfirm(spec: ConfirmSpec, onOk: () => void, opener: HTMLElement | null = null) {
+    askActConfirm(spec, onOk, opener);
+  },
+
+  /** Đóng hộp xác nhận dùng chung nếu đang mở (Esc đóng hộp trước, rồi mới tới bảng); `refocus` = trả focus về nút đã mở. */
+  closeActConfirm(refocus = true): boolean {
+    return closeActConfirm(refocus);
+  },
+
+  isActConfirmOpen(): boolean {
+    return !$("act-confirm").hidden;
   },
 
   /** Đóng hộp xác nhận vứt nếu đang mở (Esc đóng hộp trước, rồi mới tới túi đồ). */
@@ -3835,6 +4398,7 @@ export const ui = {
       focusModal($("shop-modal"));
       renderShopModal();
     } else {
+      if (actConfirmFromShop) closeActConfirm(false);
       modalStack.remove("shop-modal");
       returnFocus();
     }
@@ -3936,7 +4500,7 @@ export const ui = {
   },
 
   closeAllModals(): boolean {
-    let closedAny = false;
+    let closedAny = closeActConfirm(false);
     if (this.isDialogOpen()) {
       this.closeDialog();
       closedAny = true;
@@ -4157,6 +4721,7 @@ export const ui = {
         }
         return false;
       },
+      closeActConfirm: () => this.closeActConfirm(true),
       closeInvDropConfirm: () => this.closeInvDropConfirm(),
       closeSectActionConfirm: () => this.closeSectConfirm(),
       closeSectDisbandConfirm: () => this.closeSectDisbandConfirm(),
@@ -4234,7 +4799,14 @@ export const ui = {
         const el = document.getElementById(id);
         return !!el && (el.hidden || el.closest("[hidden]") !== null);
       });
-    return modalStack.size() > 0 || this.isDialogOpen() || this.isPlayerMenuOpen();
+    // hộp xác nhận dùng chung (#779) KHÔNG nằm trong modalStack (Esc / Y / X do nó tự xử lý) nhưng vẫn là tầng trên cùng: đang mở mà giữ D thì nhân vật không được
+    // lặng lẽ đi tiếp (người chơi đọc hậu quả, quái đánh). keyup vẫn tới MoveKeys (pha bắt trên window) nên đóng hộp xong không kẹt phím.
+    return (
+      modalStack.size() > 0 ||
+      this.isDialogOpen() ||
+      this.isPlayerMenuOpen() ||
+      this.isActConfirmOpen()
+    );
   },
 
   showNewbieGuide(force = false) {
@@ -4302,6 +4874,7 @@ export const ui = {
     renderQuestTracker();
     if (questModalOpen) renderQuestModal();
     if (shopModalOpen && shopTab === "sell") renderShopSell();
+    if (sectModalOpen && sectTab === "vault") renderSectVaultTab(); // túi đổi (góp xong, nhặt): lưới túi trong tab Kho đồ cũng đổi
   },
 
   onWallet(m: WalletMsg) {
@@ -4816,6 +5389,8 @@ export const ui = {
   },
 
   toast(m: ToastMsg) {
+    // đang chờ máy chủ trả lời thao tác kho đồ mà có toast tới: coi là lời từ chối / báo (`sectFailMessage`), mở khoá nút (ảnh chụp kho mới tới riêng)
+    if (vaultBusy) endVaultBusy();
     const p = document.createElement("p");
     p.className = m.tone ?? "info";
     p.textContent = m.text;
@@ -4866,6 +5441,17 @@ export const ui = {
     reload.onclick = () => location.reload();
   },
 
+  /** Chip "Mạng chậm" (chờ phản hồi quá ~2,5 giây, `net-slow.ts`): hiện / ẩn, không chặn điều khiển. */
+  setNetSlow(slow: boolean) {
+    const chip = document.getElementById("net-slow");
+    if (chip) chip.hidden = !slow;
+  },
+
+  isNetSlowShown(): boolean {
+    const chip = document.getElementById("net-slow");
+    return !!chip && !chip.hidden;
+  },
+
   hideReconnectNotice() {
     const banner = $("reconnect-banner");
     banner.hidden = true;
@@ -4894,6 +5480,7 @@ export const ui = {
       onRebirth?: (choice: RebirthChoice) => void;
     },
   ) {
+    closeActConfirm(false); // gục lúc hộp xác nhận (đột phá, bán...) còn mở: hộp nằm TRÊN màn hình Hoàng Tuyền nên phải đóng
     activeLimboMsg = msg;
     activeSoulView = msg.soul;
     selectedOrigin =
@@ -4926,8 +5513,9 @@ export const ui = {
     const rebirthBtn = $("limbo-btn-rebirth");
     if (rebirthBtn) {
       rebirthBtn.removeAttribute("aria-disabled");
-      rebirthBtn.onclick = () => {
+      rebirthBtn.onclick = (e) => {
         if (rebirthBusy) return; // đã gửi, đang chờ máy chủ: máy chủ cũng bỏ tin `rebirth` thứ hai
+        if (ghostClick(e)) return; // click ma sau khi đóng hộp xác nhận (cảm ứng)
         const soul = activeSoulView;
         const choice: RebirthChoice = { origin: selectedOrigin, keep: selectedRelics };
         // `engrave` CHỈ khi người chơi đã đổi tập chiêu khắc (vắng = giữ nguyên chiêu đã khắc); kẹp lại theo danh sách / nấc hiện hành
@@ -4940,15 +5528,25 @@ export const ui = {
           const engrave = engraveToSend(soul.engraved, sel);
           if (engrave !== undefined) choice.engrave = engrave;
         }
-        rebirthBusy = true;
-        rebirthBtn.setAttribute("aria-disabled", "true");
-        // máy chủ từ chối (toast, vẫn ở Hoàng Tuyền) thì cho bấm lại sau một lát
-        rebirthBusyTimer = setTimeout(() => {
-          rebirthBusy = false;
-          rebirthBusyTimer = null;
-          rebirthBtn.removeAttribute("aria-disabled");
-        }, REBIRTH_BUSY_MS);
-        limboRebirthCb?.(choice);
+        // Tóm tắt trước khi đầu thai (issue #779): xuất thân, số di vật giữ, số chiêu khắc. Đường DUY NHẤT ra khỏi Hoàng Tuyền nên chỉ để bắt lỗi chọn nhầm ("Xem lại" quay về màn chọn)
+        const originName = ORIGINS.find((o) => o.id === choice.origin)?.name ?? choice.origin;
+        const engraveCount = (choice.engrave ?? soul?.engraved ?? []).length;
+        askActConfirm(
+          rebirthPlan(originName, choice.keep.length, engraveCount),
+          () => {
+            if (rebirthBusy) return;
+            rebirthBusy = true;
+            rebirthBtn.setAttribute("aria-disabled", "true");
+            // máy chủ từ chối (toast, vẫn ở Hoàng Tuyền) thì cho bấm lại sau một lát
+            rebirthBusyTimer = setTimeout(() => {
+              rebirthBusy = false;
+              rebirthBusyTimer = null;
+              rebirthBtn.removeAttribute("aria-disabled");
+            }, REBIRTH_BUSY_MS);
+            limboRebirthCb?.(choice);
+          },
+          rebirthBtn,
+        );
       };
     }
   },
@@ -4964,6 +5562,7 @@ export const ui = {
 
   /** Đóng màn hình Hoàng Tuyền */
   hideLimbo() {
+    closeActConfirm(false); // máy chủ đóng Hoàng Tuyền (đã đầu thai) lúc hộp xác nhận còn mở
     activeLimboMsg = null;
     activeSoulView = null;
     limboBuyCb = null;
@@ -5440,6 +6039,7 @@ export const ui = {
       renderSectModal();
     } else {
       closeSectConfirm();
+      if (actConfirmFromSect) closeActConfirm(false);
       $("sect-modal").hidden = true;
       $("btn-sect")?.classList.remove("active");
       $("btn-sect")?.setAttribute("aria-expanded", "false");
@@ -5460,18 +6060,42 @@ export const ui = {
     return true;
   },
 
-  switchSectTab(tab: "overview" | "members" | "treasury") {
+  switchSectTab(tab: "overview" | "members" | "treasury" | "vault") {
     sectTab = tab;
     renderSectModal();
   },
 
   onSect(m: SectMsg) {
     currentSect = m.sect;
-    // Không còn tông môn (bị trục xuất / giải tán): hộp xác nhận cũ không còn ý nghĩa
-    if (!m.sect) closeSectConfirm();
+    // Không còn tông môn (bị trục xuất / giải tán): hộp xác nhận cũ không còn ý nghĩa, kho đồ cũng không còn
+    if (!m.sect) {
+      closeSectConfirm();
+      sectVault = null;
+      vaultSel = null;
+      vaultQty = 1;
+      endVaultBusy();
+    }
     if (sectModalOpen) {
       renderSectModal();
     }
+  },
+
+  /** Ảnh chụp kho đồ tông môn (mục 27): thay bản cũ, mở khoá nút (máy chủ đã trả lời), vẽ lại nếu đang xem tab Kho đồ. `vault: null` = không còn tông môn. */
+  onSectVault(m: SectVaultMsg) {
+    sectVault = sanitizeVaultView(m?.vault);
+    if (!sectVault) {
+      vaultSel = null;
+      vaultQty = 1;
+    }
+    if (vaultBusyTimer) clearTimeout(vaultBusyTimer);
+    vaultBusyTimer = null;
+    vaultBusy = false;
+    if (sectModalOpen && sectTab === "vault") renderSectVaultTab();
+  },
+
+  /** Bản sao ảnh chụp kho đồ hiện tại (cho script kiểm / gỡ lỗi). */
+  getSectVault(): SectVaultView | null {
+    return sectVault;
   },
 
   onSectPresence(m: SectPresenceMsg) {

@@ -3,11 +3,19 @@ import {
   HUD_KEYS,
   applyKeyLabels,
   helpStripText,
+  moveHint,
   initKeyLabels,
   type KeyLabelDoc,
   type KeyLabelEl,
 } from "./keybinds-dom";
-import { ACTION_BY_ID, DEFAULT_KEYMAP, _resetKeymapCache, rebind, resetKeymap } from "./keybinds";
+import {
+  ACTION_BY_ID,
+  DEFAULT_KEYMAP,
+  _resetKeymapCache,
+  rebind,
+  resetKeymap,
+  sanitizeKeymap,
+} from "./keybinds";
 
 class El implements KeyLabelEl {
   attrs: Record<string, string> = {};
@@ -165,6 +173,19 @@ describe("nhãn phím HUD (#463)", () => {
 
   it("mọi nút HUD trỏ tới một hành động có thật", () => {
     for (const k of HUD_KEYS) expect(ACTION_BY_ID[k.action], k.id).toBeDefined();
+  });
+
+  it("gợi ý phím đi bộ: mặc định 'WASD / mũi tên đi'; đã đổi thì ghi phím chính theo thứ tự lên, trái, xuống, phải", () => {
+    expect(moveHint(DEFAULT_KEYMAP)).toBe("WASD / mũi tên đi");
+    expect(helpStripText(DEFAULT_KEYMAP).startsWith("WASD / mũi tên đi")).toBe(true);
+    const m = sanitizeKeymap({
+      "move.up": ["KeyI"],
+      "move.left": ["KeyJ"],
+      "move.down": ["KeyK"],
+      "move.right": ["KeyL"],
+    });
+    expect(moveHint(m)).toBe("I J K L đi");
+    expect(helpStripText(m).startsWith("I J K L đi")).toBe(true);
   });
 
   it("dòng gợi ý đầu màn hình: phím mới (J chém, Tab mục tiêu, K kiếm khí, Z đả tọa, B túi, N nhiệm vụ), không còn Cách chém / J nhiệm vụ", () => {

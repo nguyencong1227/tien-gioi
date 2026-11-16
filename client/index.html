@@ -1075,6 +1075,20 @@
             <input type="checkbox" id="set-hide-names" />
           </label>
           <label class="set-row">
+            <span>Chế độ nhắm</span>
+            <select id="set-aim-mode">
+              <option value="auto">Tự động: nhắm đối tượng gần nhất</option>
+              <option value="manual">Thủ công: tự khoá mục tiêu (Tab, Esc bỏ khoá)</option>
+            </select>
+          </label>
+          <label class="set-row toggle">
+            <span
+              >Ưu tiên mục tiêu hơn chuột (chiêu bay về mục tiêu, kể cả khi chuột ở trong màn
+              chơi)</span
+            >
+            <input type="checkbox" id="set-prefer-target" />
+          </label>
+          <label class="set-row">
             <span>Chất lượng đồ hoạ <em id="set-quality-now"></em></span>
             <select id="set-quality">
               <option value="auto">Tự động (khuyên dùng)</option>
@@ -1444,6 +1458,7 @@
             </button>
             <button type="button" id="sect-tab-btn-members" class="sect-tab">Thành viên</button>
             <button type="button" id="sect-tab-btn-treasury" class="sect-tab">Kho tông môn</button>
+            <button type="button" id="sect-tab-btn-vault" class="sect-tab">Kho đồ</button>
           </div>
 
           <!-- Tab 1: Tổng quan -->
@@ -1586,6 +1601,50 @@
               <div id="sect-logs-list" class="sect-logs-list"></div>
             </div>
           </div>
+
+          <!-- Tab 4: Kho đồ (mục 27, K4, #788): lưới kho + túi, góp / rút, hạn mức, sổ, chỉnh hạn mức (Tông chủ) -->
+          <div id="sect-tab-vault" class="sect-tab-content" hidden>
+            <p id="sect-vault-draw" class="sect-vault-draw" role="status"></p>
+            <h4>Kho đồ tông môn <small id="sect-vault-count"></small></h4>
+            <div
+              id="sect-vault-grid"
+              class="sect-vault-grid"
+              role="grid"
+              aria-label="Kho đồ tông môn"
+            ></div>
+            <h4>Túi đồ của ngươi <small>(chọn món để góp)</small></h4>
+            <div
+              id="sect-vault-bag"
+              class="sect-vault-grid"
+              role="grid"
+              aria-label="Túi đồ của ngươi"
+            ></div>
+            <div id="sect-vault-actions" class="sect-vault-actions">
+              <div id="sect-vault-sel" class="sect-vault-sel" role="status">Chưa chọn món nào.</div>
+              <div id="sect-vault-qty-box" class="sect-vault-qty" hidden>
+                <button type="button" id="sect-vault-minus" aria-label="Bớt một">-</button>
+                <b id="sect-vault-qty" aria-live="polite">1</b>
+                <button type="button" id="sect-vault-plus" aria-label="Thêm một">+</button>
+              </div>
+              <button type="button" id="sect-vault-act" class="sect-primary-btn" disabled>
+                Chọn món
+              </button>
+              <p id="sect-vault-why" class="sect-vault-why" role="status"></p>
+            </div>
+            <form id="sect-vault-policy" class="sect-vault-policy" hidden>
+              <label for="sect-vault-policy-sel">Lượt rút kho đồ mỗi ngày của Đệ tử</label>
+              <div class="sect-input-row">
+                <select id="sect-vault-policy-sel"></select>
+                <button type="submit" id="sect-vault-policy-save" class="sect-small-btn">
+                  Lưu
+                </button>
+              </div>
+            </form>
+            <div class="sect-logs-box">
+              <h4>Sổ kho đồ</h4>
+              <div id="sect-vault-log" class="sect-logs-list"></div>
+            </div>
+          </div>
         </div>
 
         <!-- Hộp xác nhận trong game cho Nhường / Trục xuất / Rời (thay confirm() gốc, #246) -->
@@ -1628,6 +1687,31 @@
           <button type="button" id="tvl-btn-no" class="tvl-btn stay">
             Ở lại <kbd class="btn-key" aria-hidden="true" data-key-action="prompt.no">X</kbd>
           </button>
+        </div>
+      </div>
+
+      <!-- Hộp xác nhận DÙNG CHUNG cho thao tác khó hoàn tác (issue #779, docs/RA_SOAT_THAO_TAC.md): đột phá, bán đồ quý, mở chân linh... Y = xác nhận, X = giữ lại -->
+      <div
+        id="act-confirm"
+        class="act-confirm"
+        hidden
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="act-confirm-text"
+      >
+        <div class="act-confirm-box">
+          <p id="act-confirm-text"></p>
+          <small id="act-confirm-warn" hidden></small>
+          <div class="act-confirm-btns">
+            <button type="button" id="act-btn-no" class="act-btn">
+              <span id="act-btn-no-label">Giữ lại</span>
+              <kbd class="btn-key" aria-hidden="true" data-key-action="prompt.no">X</kbd>
+            </button>
+            <button type="button" id="act-btn-yes" class="act-btn drop">
+              <span id="act-btn-yes-label">Xác nhận</span>
+              <kbd class="btn-key" aria-hidden="true" data-key-action="prompt.yes">Y</kbd>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1867,6 +1951,11 @@
         <button type="button" id="reconnect-reload" class="reconnect-reload" hidden>
           Tải lại trang
         </button>
+      </div>
+
+      <div id="net-slow" class="net-slow-chip" hidden role="status" aria-live="polite">
+        <span class="net-slow-dot" aria-hidden="true"></span>
+        <span id="net-slow-text">Mất kết nối — nhân vật đang được bảo vệ</span>
       </div>
 
       <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>

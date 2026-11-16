@@ -6,6 +6,8 @@ import {
   TRAVEL_JOIN_TIMEOUT_MS,
   JOIN_BAD_TOKEN,
   JOIN_NEED_CHARACTER,
+  NET_BEAT_MS,
+  NET_RECONNECT_GRACE_S,
   NPCS,
   NPC_BY_ID,
   ITEM_BY_ID,
@@ -49,6 +51,7 @@ import { initAuthUi, switchAuthView } from "./auth-ui";
 import { setupPwa, canReloadSafely, isNativeApp, type PwaGameState } from "./pwa";
 import { setupNativeApp, getOutdatedUiConfig, getAppUpdateUrl } from "./native-app";
 import { HeartbeatController } from "./heartbeat";
+import { NET_BACK_TEXT, NetSlowMonitor } from "./net-slow";
 import { runReconnect } from "./reconnect";
 import { sound } from "./audio";
 import { initDisplay } from "./gfx/display";
@@ -288,6 +291,16 @@ let activeScene: WorldScene | null = null;
 let activeToken: string | null = null;
 let activeRoom: Room | null = null;
 let activeHeartbeat: HeartbeatController | null = null;
+/** Chip "Mạng chậm" của phòng đang chơi (báo sớm hơn nhịp tim 8 giây, `net-slow.ts`); sống và chết cùng nhịp tim. */
+let activeNetSlow: NetSlowMonitor | null = null;
+
+/** Dừng nhịp tim và chip "Mạng chậm" của phòng hiện tại (rớt mạng, đổi phòng, nối lại, thoát). */
+function stopLiveness() {
+  activeHeartbeat?.stop();
+  activeHeartbeat = null;
+  activeNetSlow?.stop();
+  activeNetSlow = null;
+}
 let isReconnecting = false;
 let isTraveling = false;
 
@@ -458,8 +471,7 @@ const FAIL_TEXT = "Mất kết nối với Tiên Giới. Tải lại trang để
 
 /** Không nối lại được: chặn điều khiển, giữ banner cố định kèm nút "Tải lại trang". */
 function showDisconnected() {
-  activeHeartbeat?.stop();
-  activeHeartbeat = null;
+  stopLiveness();
   activeScene?.setReconnecting(true);
   ui.showReconnectFailed(FAIL_TEXT);
 }
@@ -470,8 +482,7 @@ async function startReconnect(codeOrReason?: number | string) {
   if (isTraveling) return;
 
   // Dừng nhịp tim của phòng cũ ngay khi bắt đầu nối lại
-  activeHeartbeat?.stop();
-  activeHeartbeat = null;
+  stopLiveness();
 
   // 1000: đóng bình thường; 4000-4999: mã của ứng dụng (4000 chủ động thoát, 4429 bị ngắt vì spam)
   if (typeof codeOrReason === "number") {
@@ -503,7 +514,8 @@ async function startReconnect(codeOrReason?: number | string) {
 
   const token = activeToken;
   const client = activeClient;
-  const GRACE_SECONDS = 20;
+  // Giữ chỗ phía máy chủ `NET_RECONNECT_GRACE_S` giây (mục 33: rớt mạng tới 25 giây + nối lại): client cố nối lại đúng chừng đó, banner đếm ngược theo đó
+  const GRACE_SECONDS = NET_RECONNECT_GRACE_S;
   const RETRY_INTERVAL_MS = 1500;
   // Một lần thử chưa có kết quả sau chừng này thì mở thêm lần song song: `client.reconnect()` có thể TREO MÃI khi Chrome dùng lại một
   // socket keep-alive đã chết (sau đổi mạng / socket nửa mở), `reconnect.ts`. 2 s dư cho nối lại bình thường (một POST + một WebSocket).
@@ -532,10 +544,10 @@ async function startReconnect(codeOrReason?: number | string) {
     activeScene?.attachRoom(reconnectedRoom);
     activeScene?.setReconnecting(false);
     isReconnecting = false;
-    ui.toast({ text: "Đã nối lại.", tone: "good" });
+    ui.toast({ text: "Đã kết nối lại.", tone: "good" });
     setupRoomLifecycle(reconnectedRoom);
   } else {
-    // Thất bại hẳn (hết 20 giây / token hết hạn): KHÔNG ẩn banner, vẫn chặn điều khiển
+    // Thất bại hẳn (hết thời gian giữ chỗ / token hết hạn): KHÔNG ẩn banner, vẫn chặn điều khiển
     isReconnecting = false;
     showDisconnected();
   }
@@ -546,13 +558,25 @@ function setupRoomLifecycle(room: Room) {
   activeToken = room.reconnectionToken;
 
   // Dọn dẹp bộ điều khiển nhịp tim của phòng trước (nếu có)
-  activeHeartbeat?.stop();
-  activeHeartbeat = null;
+  stopLiveness();
+
+  // Chip "Mạng chậm": báo khi chờ phản hồi (pong, patch sau input) quá ~2,5 giây, SỚM hơn nhịp tim 8 giây; không đổi giao thức. Khởi động TRƯỚC nhịp tim vì nó bọc
+  // `room.send` để đếm ping / input đã gửi, mà nhịp tim gửi ping đầu ngay trong `start()`.
+  activeNetSlow = new NetSlowMonitor({
+    room,
+    onChange: (slow, resumed) => {
+      ui.setNetSlow(slow);
+      // tín hiệu về lại mà không phải nối lại socket: báo ngay (nối lại socket có toast riêng ở `startReconnect`)
+      if (resumed) ui.toast({ text: NET_BACK_TEXT, tone: "good" });
+    },
+  });
+  activeNetSlow.start();
 
   // Khởi động nhịp tim (M4.2b: cả trong bí cảnh, chết sẽ gọi startReconnect -> showDisconnected)
   activeHeartbeat = new HeartbeatController({
     room,
     sound,
+    intervalMs: NET_BEAT_MS, // ping mỗi 1 giây ở tiền cảnh kể cả khi đứng yên (mục 33)
     onDead: () => {
       startReconnect("heartbeat");
     },
@@ -563,6 +587,7 @@ function setupRoomLifecycle(room: Room) {
     (import.meta.env.DEV || new URLSearchParams(location.search).has("debug"))
   ) {
     (window as any).__heartbeat = activeHeartbeat;
+    (window as any).__netSlow = activeNetSlow;
   }
 
   // Lắng nghe sự kiện đi qua cổng chuyển phòng (M3 bước 1)
@@ -572,8 +597,7 @@ function setupRoomLifecycle(room: Room) {
     if (!targetMap) return;
 
     isTraveling = true;
-    activeHeartbeat?.stop();
-    activeHeartbeat = null;
+    stopLiveness();
     activeScene?.setReconnecting(true);
     ui.showTransition(targetMap.def.name);
 

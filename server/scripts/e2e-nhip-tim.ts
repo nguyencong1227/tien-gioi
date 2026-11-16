@@ -1,11 +1,15 @@
 // E2E THẬT nhịp tim ứng dụng (ping / pong) và vòng đời nền / tiền cảnh (M4.2b, Issue #293):
 // Server Colyseus thật + Proxy TCP trung gian (hỗ trợ chế độ BLACKHOLE mô phỏng socket nửa mở thật) + Chrome headless.
-// Bốn ca:
+// Sáu ca:
 //  1. Blackhole ở tiền cảnh: socket TCP vẫn mở nhưng ngừng byte -> client phát hiện chết trong <= HEARTBEAT_TIMEOUT_MS + nhịp (<= 14s)
 //     rồi mở lại proxy thì nối lại thành công, cùng sessionId, ví / túi đồ nguyên vẹn.
 //  2. Quay lại tiền cảnh sau khi ở nền: ghi đè document.visibilityState + bắn visibilitychange -> phát hiện chết trong <= RESUME_TIMEOUT_MS + dung sai (<= 4.5s).
-//  3. Server không trả pong (server cũ không hỗ trợ nhịp tim): proxy chặn tin pong -> client KHÔNG tự ngắt kết nối.
+//  3. Server không trả pong (server cũ không hỗ trợ nhịp tim): proxy chặn tin pong -> client KHÔNG tự ngắt kết nối, chip "Mạng chậm" cũng không hiện.
 //  4. Socket cũ (nửa mở) đóng MUỘN sau khi đã nối lại xong (đổi mạng): sự kiện đóng của phòng CŨ không được chạy lại vòng nối lại.
+//  6. (mục 33, cần máy chủ có `net-guard`) Đường hầm ĐỨNG 5 giây (stall: byte bị hoãn, không mất) rồi thông: máy chủ ghost sau 3 giây im lặng dù socket mở, có tin lại thì hộ thể 3 giây
+//     + `netShield` tới client (vầng sáng), dải + toast "Đã kết nối lại", không ngắt kết nối.
+//  5. Chip "Mạng chậm" (mục 25): đang ĐI BỘ mà mạng đứng thì chip hiện sau ~SLOW_AFTER_MS, TRƯỚC banner nối lại; Ca 1 (đứng yên) chip cũng hiện trước banner
+//     (nhờ ping) và tắt khi nối lại xong.
 // Chạy: `npm run build && npm run e2e:nhip-tim -w server` (cần google-chrome).
 
 import { spawn, execSync, type ChildProcess } from "node:child_process";
@@ -18,7 +22,9 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
-import { HEARTBEAT_INTERVAL_MS, HEARTBEAT_TIMEOUT_MS, RESUME_TIMEOUT_MS } from "@tien-gioi/shared";
+import { HEARTBEAT_TIMEOUT_MS, NET_BEAT_MS, RESUME_TIMEOUT_MS } from "@tien-gioi/shared";
+// Ngưỡng báo "Mạng chậm" của client (chip báo sớm hơn nhịp tim, QUYET_DINH_M3 mục 25): nhập từ mã client để script và mã dùng MỘT con số
+import { SLOW_AFTER_MS, SLOW_POLL_MS } from "../../client/src/net-slow";
 import {
   Tab,
   sleep,
@@ -40,8 +46,7 @@ let PORT_PROXY = pickPortProxy();
 const CDP = 9800 + Math.floor(Math.random() * 300);
 const out = (m: string) => console.log(m);
 /** Xấu nhất phát hiện socket chết ở tiền cảnh: tới nhịp ping kế + hạn chờ làm tròn lên bội nhịp, cộng dung sai 1,5s */
-const DETECT_MAX_MS =
-  HEARTBEAT_INTERVAL_MS * (1 + Math.ceil(HEARTBEAT_TIMEOUT_MS / HEARTBEAT_INTERVAL_MS)) + 1500;
+const DETECT_MAX_MS = NET_BEAT_MS * (1 + Math.ceil(HEARTBEAT_TIMEOUT_MS / NET_BEAT_MS)) + 1500;
 
 /** Proxy TCP chuyển tiếp byte giữa client Chrome và server Colyseus thật, hỗ trợ BLACKHOLE và DROP PONG. */
 class TcpProxy {
@@ -50,6 +55,8 @@ class TcpProxy {
   private allowNew = true;
   private blackhole = false;
   private dropPong = false;
+  private stalled = false;
+  private stallQueue: Array<() => void> = [];
   private holed = new Set<{ client: net.Socket; target: net.Socket }>();
   clientBytes = 0;
   /** Sổ sự kiện (đo cho chẩn đoán khi đỏ): kết nối mới và dòng yêu cầu HTTP đầu của từng chuỗi byte client -> server, kèm cờ `holed`. */
@@ -98,6 +105,12 @@ class TcpProxy {
           this.note(
             `#${id} ${m[1]} ${m[2].split("?")[0].slice(0, 60)}${this.holed.has(pair) ? "  <-- SOCKET NỬA MỞ, byte bị nuốt" : ""}`,
           );
+        if (this.stalled) {
+          this.stallQueue.push(() => {
+            if (!targetSocket.destroyed) targetSocket.write(d);
+          });
+          return;
+        }
         if (this.blackhole || this.holed.has(pair)) {
           // Blackhole: giữ socket mở nhưng ngừng chuyển tiếp byte hai chiều
           return;
@@ -106,6 +119,12 @@ class TcpProxy {
       });
 
       targetSocket.on("data", (d: Buffer) => {
+        if (this.stalled) {
+          this.stallQueue.push(() => {
+            if (!clientSocket.destroyed) clientSocket.write(d);
+          });
+          return;
+        }
         if (this.blackhole || this.holed.has(pair)) {
           return;
         }
@@ -145,6 +164,19 @@ class TcpProxy {
 
   setAllowNewConnections(allow: boolean) {
     this.allowNew = allow;
+  }
+
+  /**
+   * STALL: GIỮ byte hai chiều (không bỏ) rồi xả đúng thứ tự khi `setStall(false)`: mô phỏng đường hầm "đứng" rồi thông lại (TCP hoãn chứ không mất byte). Khác blackhole (bỏ byte, luồng WebSocket
+   * không dùng tiếp được): sau stall socket vẫn dùng tiếp, nên đo được đường "có tin lại sau im lặng" của máy chủ (mục 33: hộ thể, quái mất mục tiêu).
+   */
+  setStall(on: boolean) {
+    this.stalled = on;
+    if (!on) {
+      const q = this.stallQueue;
+      this.stallQueue = [];
+      for (const f of q) f();
+    }
   }
 
   setBlackhole(blackhole: boolean) {
@@ -392,6 +424,25 @@ async function main() {
 
     // Kiểm tra mỗi HEARTBEAT_INTERVAL_MS nên xấu nhất = chờ tới nhịp ping kế (5s) + hạn chờ làm tròn lên bội nhịp (10s) = 15s (bản đầu
     // đặt 14s: chạy 13,7s, chập chờn). Dung sai 1,5s.
+    // Chip "Mạng chậm" phải hiện TRƯỚC banner (đứng yên: chờ pong của ping kế <= một nhịp + SLOW_AFTER_MS), banner chưa hiện lúc đó
+    await tab.waitFor(shown("net-slow"), 'chip "Mạng chậm" hiện sau blackhole', 12000);
+    const chipMs = Date.now() - t0;
+    const chipText = String(await tab.ev(`document.getElementById('net-slow')?.textContent ?? ''`));
+    if (!chipText.includes("Mất kết nối") || !chipText.includes("được bảo vệ")) {
+      throw new Error(`Ca 1: chữ trên dải sai: "${chipText.trim()}"`);
+    }
+    const chipMax = NET_BEAT_MS + SLOW_AFTER_MS + SLOW_POLL_MS + 1500;
+    const bannerAtChip = Boolean(
+      await tab.ev(`!document.getElementById('reconnect-banner')?.hidden`),
+    );
+    if (chipMs > chipMax || bannerAtChip) {
+      throw new Error(
+        `Ca 1: chip "Mạng chậm" hiện sau ${chipMs}ms (cần <= ${chipMax}ms) và phải TRƯỚC banner nối lại (banner đã hiện: ${bannerAtChip})`,
+      );
+    }
+    out(
+      `  ✓ Chip "Mạng chậm" hiện sau ${chipMs}ms, trước banner nối lại (sớm hơn ${HEARTBEAT_TIMEOUT_MS}ms của nhịp tim)`,
+    );
     await tab.waitFor(shown("reconnect-banner"), "banner nối lại hiển thị sau blackhole", 20000);
     const tDetect = Date.now();
     const detectDuration = tDetect - t0;
@@ -419,6 +470,17 @@ async function main() {
       "banner nối lại ẩn đi sau khi nối lại",
       15000,
     );
+
+    if (await tab.ev(`!document.getElementById('net-slow')?.hidden`)) {
+      throw new Error('Ca 1: chip "Mạng chậm" còn hiện sau khi đã nối lại');
+    }
+    out('  ✓ Nối lại xong: chip "Mạng chậm" đã tắt');
+    await tab.waitFor(
+      `[...document.querySelectorAll('#toast p')].some((p) => p.textContent.includes('Đã kết nối lại'))`,
+      'toast "Đã kết nối lại" sau khi nối lại',
+      5000,
+    );
+    out('  ✓ Toast "Đã kết nối lại." hiện sau khi nối lại');
 
     const sidAfter = String(await tab.ev(`window.__scene?.room?.sessionId ?? ''`));
     if (sidAfter !== sidBefore) {
@@ -586,6 +648,11 @@ async function main() {
       );
     }
     out("  ✓ Khẳng định: Banner nối lại KHÔNG hiển thị, client KHÔNG tự ngắt kết nối");
+    // máy chủ cũ không trả pong: ping không phải bằng chứng gì, chip "Mạng chậm" cũng KHÔNG được hiện (phòng lặng im là bình thường)
+    if (await tab.ev(`!document.getElementById('net-slow')?.hidden`)) {
+      throw new Error('Ca 3: chip "Mạng chậm" hiện dù chỉ vì máy chủ cũ không trả pong (báo nhầm)');
+    }
+    out('  ✓ Máy chủ cũ không trả pong: chip "Mạng chậm" KHÔNG hiện (báo nhầm)');
 
     proxy.setDropPong(false);
 
@@ -688,12 +755,180 @@ async function main() {
       "  ✓ Chỉ nối lại ĐÚNG MỘT lần; sự kiện đóng muộn của phòng cũ bị bỏ qua, nhịp tim phòng mới còn chạy",
     );
 
+    // =========================================================================
+    // CA 5: đang ĐI BỘ mà mạng đứng: chip "Mạng chậm" hiện sau ~SLOW_AFTER_MS (không phải đợi ping 5 giây + 8 giây), trước banner
+    // =========================================================================
+    out('\n--- Ca 5: Đang đi bộ mà mạng đứng: chip "Mạng chậm" hiện sớm ---');
+    const NAME_5 = "Mang Cham Som";
+    const SECRET_5 = "e2e_secret_heartbeat_55555555";
+    await setIdentity(NAME_5, SECRET_5);
+    await tab.send("Page.navigate", { url: `http://127.0.0.1:${PORT_PROXY}/?debug` });
+    await tab.waitFor(
+      `typeof window.__switchAuthView === 'function' && !!document.getElementById('login-form')`,
+      "form đăng nhập ca 5",
+    );
+    await tab.ev(
+      `const inp = document.getElementById('login-name'); if (inp) inp.value = ${JSON.stringify(NAME_5)}; document.getElementById('login-form').requestSubmit(); 1`,
+    );
+    await tab.waitFor(
+      `!document.getElementById('ui')?.hidden && !!window.__scene?.room && !!document.getElementById('hud-name')?.textContent`,
+      "vào game ca 5",
+    );
+    await tab.waitFor(shown("hud-name"), "đạo hiệu ca 5");
+    await sleep(1500);
+    if (await tab.ev(`!document.getElementById('net-slow')?.hidden`)) {
+      throw new Error('Ca 5: chip "Mạng chậm" hiện khi mạng bình thường (báo nhầm)');
+    }
+    const key5 = (type: string) =>
+      T.send("Input.dispatchKeyEvent", {
+        type,
+        key: "d",
+        code: "KeyD",
+        windowsVirtualKeyCode: 68,
+      });
+    await key5("rawKeyDown");
+    // đi bộ 3 giây trên mạng thông: patch về đều, chip KHÔNG được hiện (kể cả khi chạm tường: input vẫn tiêu thụ và `lastSeq` vẫn tăng)
+    for (let i = 0; i < 6; i++) {
+      await sleep(500);
+      await key5("rawKeyDown"); // phím lặp của hệ điều hành
+      if (await tab.ev(`!document.getElementById('net-slow')?.hidden`)) {
+        throw new Error('Ca 5: chip "Mạng chậm" hiện khi đang đi bộ trên mạng thông (báo nhầm)');
+      }
+    }
+    out("  ✓ Đi bộ 3 giây trên mạng thông: không báo nhầm");
+    const t5 = Date.now();
+    proxy.setBlackhole(true);
+    // vẫn giữ D (phím lặp) trong lúc mạng đứng
+    let chip5Ms = -1;
+    for (let waited = 0; waited < 9000; waited += 250) {
+      await sleep(250);
+      await key5("rawKeyDown");
+      if (await tab.ev(shown("net-slow"))) {
+        chip5Ms = Date.now() - t5;
+        break;
+      }
+    }
+    const chip5Max = SLOW_AFTER_MS + SLOW_POLL_MS + 1500;
+    const banner5 = Boolean(await tab.ev(`!document.getElementById('reconnect-banner')?.hidden`));
+    if (chip5Ms < 0 || chip5Ms > chip5Max || banner5) {
+      throw new Error(
+        `Ca 5: chip "Mạng chậm" hiện sau ${chip5Ms}ms (cần <= ${chip5Max}ms, khi đang đi bộ) và trước banner (banner đã hiện: ${banner5})`,
+      );
+    }
+    out(
+      `  ✓ Đang đi bộ, mạng đứng: chip "Mạng chậm" hiện sau ${chip5Ms}ms (ngưỡng <= ${chip5Max}ms), banner nối lại chưa hiện`,
+    );
+    await key5("keyUp");
+    proxy.setBlackhole(false);
+    proxy.dropAll();
+    await tab.waitFor(
+      `(() => { const b = document.getElementById('reconnect-banner'); return !b || b.hidden; })() && !!window.__scene?.room?.connection?.isOpen`,
+      "nối lại xong ca 5",
+      25000,
+    );
+    await tab.waitFor(
+      `document.getElementById('net-slow')?.hidden !== false`,
+      "chip tắt sau khi nối lại ca 5",
+      5000,
+    );
+    out('  ✓ Nối lại xong: chip "Mạng chậm" đã tắt');
+
+    // =========================================================================
+    // CA 6 (mục 33, cần máy chủ có `net-guard`): đường hầm ĐỨNG rồi thông lại (stall, byte bị hoãn chứ không mất)
+    // =========================================================================
+    out(
+      "\n--- Ca 6: Đường hầm đứng 5 giây rồi thông: máy chủ ghost sau 3 giây, có tin lại thì hộ thể 3 giây ---",
+    );
+    const NAME_6 = "Duong Ham Dung";
+    const SECRET_6 = "e2e_secret_heartbeat_66666666";
+    await setIdentity(NAME_6, SECRET_6);
+    await tab.send("Page.navigate", { url: `http://127.0.0.1:${PORT_PROXY}/?debug` });
+    await tab.waitFor(
+      `typeof window.__switchAuthView === 'function' && !!document.getElementById('login-form')`,
+      "form đăng nhập ca 6",
+    );
+    await tab.ev(
+      `const inp = document.getElementById('login-name'); if (inp) inp.value = ${JSON.stringify(NAME_6)}; document.getElementById('login-form').requestSubmit(); 1`,
+    );
+    await tab.waitFor(
+      `!document.getElementById('ui')?.hidden && !!window.__scene?.room && !!document.getElementById('hud-name')?.textContent`,
+      "vào game ca 6",
+    );
+    await tab.waitFor(shown("hud-name"), "đạo hiệu ca 6");
+    await sleep(2500); // vài nhịp 1 giây đầu: máy chủ đã ghi nhận tin của client
+    const sp6 = await serverPlayer();
+    if (sp6.ctrl.beatMs !== NET_BEAT_MS) {
+      throw new Error(
+        `Ca 6: máy chủ không ghi nhận nhịp client khai (beatMs=${sp6.ctrl.beatMs}, cần ${NET_BEAT_MS})`,
+      );
+    }
+    if (sp6.ctrl.silent || sp6.world.ghosts.has(sp6.sid))
+      throw new Error("Ca 6: ghost oan khi mạng bình thường");
+    out(`  ✓ Máy chủ ghi nhận beatMs=${sp6.ctrl.beatMs} của client; mạng thông: không ghost oan`);
+    const t6 = Date.now();
+    proxy.setStall(true);
+    await until(
+      async () => Boolean((await serverPlayer()).ctrl?.silent),
+      "máy chủ coi im lặng quá 3 giây là hồn lìa xác",
+      8000,
+    );
+    const ghostMs = Date.now() - t6;
+    const sp6b = await serverPlayer();
+    if (!sp6b.world.ghosts.has(sp6b.sid))
+      throw new Error("Ca 6: silent nhưng không nằm trong world.ghosts");
+    // im lặng tính từ TIN CUỐI (có thể trước t6 tới một nhịp): ghost sau 3-4 giây kể từ lúc đứng
+    if (ghostMs < 2000 || ghostMs > 5500)
+      throw new Error(`Ca 6: ghost sau ${ghostMs}ms (cần ~3000-4000)`);
+    out(
+      `  ✓ Máy chủ: hồn lìa xác sau ${ghostMs}ms im lặng, socket vẫn mở (bất tử, quái bỏ mục tiêu)`,
+    );
+    await tab.waitFor(shown("net-slow"), 'dải "Mất kết nối" hiện trong lúc đứng', 4000);
+    if (await tab.ev(`!document.getElementById('reconnect-banner')?.hidden`)) {
+      throw new Error("Ca 6: banner nối lại hiện (socket chưa chết, chỉ đứng)");
+    }
+    out('  ✓ Client: dải "Mất kết nối — nhân vật đang được bảo vệ" hiện, chưa có banner nối lại');
+    proxy.setStall(false); // thông lại: tin dồn ứ tới máy chủ
+    await until(
+      async () => !(await serverPlayer()).ctrl?.silent,
+      "có tin lại: máy chủ cho ra khỏi hồn lìa xác",
+      5000,
+    );
+    const sp6c = await serverPlayer();
+    if (sp6c.world.ghosts.has(sp6c.sid))
+      throw new Error("Ca 6: còn trong world.ghosts sau khi có tin lại");
+    if (!sp6c.world.shielded.has(sp6c.sid))
+      throw new Error("Ca 6: không được hộ thể sau khi có tin lại");
+    out("  ✓ Máy chủ: có tin lại thì ra khỏi hồn lìa xác và được hộ thể 3 giây");
+    await tab.waitFor(
+      `!!window.__scene?.shieldRing?.visible && /Hộ thể/.test(window.__scene?.shieldText?.text ?? '')`,
+      "client nhận netShield: vầng sáng + chữ Hộ thể",
+      4000,
+    );
+    out("  ✓ Client: nhận netShield, vầng sáng + chữ Hộ thể hiện");
+    await tab.waitFor(
+      `[...document.querySelectorAll('#toast p')].some((p) => p.textContent.includes('Đã kết nối lại'))`,
+      'toast "Đã kết nối lại" khi tín hiệu về',
+      5000,
+    );
+    await tab.waitFor(
+      `document.getElementById('net-slow')?.hidden !== false`,
+      "dải tắt khi tín hiệu về",
+      5000,
+    );
+    await tab.waitFor(`!window.__scene?.shieldRing?.visible`, "hộ thể hết sau ~3 giây", 6000);
+    await until(
+      async () => !(await serverPlayer()).world.shielded.has(sp6c.sid),
+      "máy chủ gỡ hộ thể",
+      5000,
+    );
+    out("  ✓ Hộ thể hết đúng hạn ở cả máy chủ lẫn client; không ngắt kết nối, không nối lại");
+
     if (tab.errors.length) {
       throw new Error(`Có lỗi console trong quá trình test: ${tab.errors.join("; ")}`);
     }
-    out("  ✓ 0 lỗi console / exception trong toàn bộ 4 ca");
+    out("  ✓ 0 lỗi console / exception trong toàn bộ 6 ca");
 
-    out("\n=== TẤT CẢ 4 CA E2E NHỊP TIM ĐỀU ĐẠT ===");
+    out("\n=== TẤT CẢ 6 CA E2E NHỊP TIM ĐỀU ĐẠT ===");
   } catch (err: any) {
     failed = err?.message || String(err);
     out(`\n[LỖI E2E NHỊP TIM] ${failed}`);

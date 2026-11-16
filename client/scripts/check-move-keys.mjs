@@ -272,6 +272,12 @@ async function main() {
         `giây nhanh nhất ${maxStep.toFixed(0)} px <= 130% chuẩn (không giật tăng tốc)`,
       );
       check(await stopped(), "nhả phím: nhân vật dừng");
+      const toastTexts = () =>
+        evalJs(`[...document.querySelectorAll("#toast p")].map((p) => p.textContent)`);
+      check(
+        !(await toastTexts()).some((t) => t.includes("bộ gõ")),
+        "chơi bình thường 30 giây: KHÔNG hiện gợi ý bộ gõ",
+      );
 
       console.log("  [2] bộ gõ kiểu Windows: key = 'Process', keyCode 229");
       for (const code of ["KeyD", "KeyA", "KeyW", "KeyS", "ArrowRight"]) {
@@ -381,6 +387,16 @@ async function main() {
         `ô đánh dấu (checkbox) đang giữ focus: vẫn đi (${withCb.x.toFixed(0)} px)`,
       );
       await evalJs(`document.getElementById("mk-test-cb").remove()`);
+      // thanh trượt (range) còn giữ focus, như thanh âm lượng ở Cài đặt sau khi bấm: KHÔNG chặn đi bộ
+      await evalJs(
+        `(() => { const c = document.createElement("input"); c.type = "range"; c.id = "mk-test-range"; c.style.position = "fixed"; c.style.left = "-100px"; document.body.append(c); c.focus(); return document.activeElement === c; })()`,
+      );
+      const withRange = await hold("KeyD", 600);
+      check(
+        withRange.x > base * 0.4,
+        `thanh trượt (range) đang giữ focus: vẫn đi (${withRange.x.toFixed(0)} px)`,
+      );
+      await evalJs(`document.getElementById("mk-test-range").remove()`);
       if (chatFocusable) {
         await evalJs(`document.getElementById("chat-input").focus()`);
         const inChat = await hold("KeyD", 500);
@@ -410,6 +426,206 @@ async function main() {
         `bảng đã ẩn nhưng còn trong ngăn xếp: tự chữa, đi lại được (${healed.x.toFixed(0)} px)`,
       );
       await evalJs(`window.__ui.toggleInventory(false)`);
+
+      console.log("  [8] bộ gõ Unikey chèn Backspace + chữ có dấu nhiều lần: gợi ý MỘT lần");
+      await evalJs(`document.querySelectorAll("#toast p").forEach((p) => p.remove())`);
+      for (let i = 0; i < 3; i++) {
+        await down("KeyW");
+        await sleep(20);
+        await down("Backspace");
+        await up("Backspace");
+        await send("Input.dispatchKeyEvent", {
+          type: "rawKeyDown",
+          key: "ư",
+          code: "",
+          windowsVirtualKeyCode: 231,
+        });
+        await send("Input.dispatchKeyEvent", {
+          type: "keyUp",
+          key: "ư",
+          code: "",
+          windowsVirtualKeyCode: 231,
+        });
+        await up("KeyW");
+        await sleep(200);
+      }
+      const hint = (await toastTexts()).filter((t) => t.includes("bộ gõ"));
+      check(hint.length === 1, `gợi ý bộ gõ hiện đúng MỘT lần: ${JSON.stringify(hint)}`);
+      await sleep(200);
+
+      console.log("  [9] độ trễ từ lúc nhấn phím đến lúc thấy nhân vật nhích");
+      const lat = [];
+      for (let i = 0; i < 10; i++) {
+        await reset();
+        await sleep(120);
+        const x0 = (await pos()).x;
+        const t1 = Date.now();
+        await down("KeyD");
+        let dt = -1;
+        while (Date.now() - t1 < 1000) {
+          if ((await pos()).x - x0 > 0.5) {
+            dt = Date.now() - t1;
+            break;
+          }
+          await sleep(4);
+        }
+        await up("KeyD");
+        await sleep(100);
+        lat.push(dt);
+      }
+      lat.sort((a, b) => a - b);
+      const med = lat[Math.floor(lat.length / 2)];
+      check(
+        lat[0] >= 0 && med <= 150,
+        `độ trễ nhấn phím -> nhích: trung vị ${med} ms (<= 150), lớn nhất ${lat[lat.length - 1]} ms`,
+      );
+    }
+
+    // ---- [10] phím di chuyển ĐỔI ĐƯỢC (bảng phím `move.*`, QUYET_DINH_M3 mục 25): nạp bảng phím đã đổi ở máy tính ----
+    if (!onlyVp || onlyVp === "1280x720") {
+      console.log(
+        "\n=== Phím di chuyển ĐỔI ĐƯỢC: I J K L đi (lên, trái, xuống, phải), W A S D hết đi ===",
+      );
+      await send("Emulation.setTouchEmulationEnabled", { enabled: false });
+      await send("Emulation.setDeviceMetricsOverride", {
+        width: 1280,
+        height: 720,
+        deviceScaleFactor: 1,
+        mobile: false,
+      });
+      const seed = {
+        "move.up": ["KeyI"],
+        "move.left": ["KeyJ"],
+        "move.down": ["KeyK"],
+        "move.right": ["KeyL"],
+      };
+      await send("Page.addScriptToEvaluateOnNewDocument", {
+        source: `try { localStorage.setItem('tg_keymap', ${JSON.stringify(JSON.stringify(seed))}); } catch (e) {}`,
+      });
+      await evalJs("window.__isOldPage = true");
+      await send("Page.navigate", {
+        url: `http://127.0.0.1:${HTTP_PORT}/?dungeon=mock&debug=1&map=am_suong`,
+      });
+      let ready2 = false;
+      for (let i = 0; i < 80 && !ready2; i++) {
+        await sleep(200);
+        ready2 = Boolean(
+          await evalJs(
+            `Boolean(!window.__isOldPage && window.__getMap && window.__scene && window.__ui && !document.getElementById("ui")?.hidden)`,
+          ),
+        );
+      }
+      if (!ready2) {
+        console.log("  ✗ cảnh không sẵn sàng (cần ?debug)");
+        failures++;
+      } else {
+        await sleep(600);
+        await evalJs(`(() => {
+          window.__sent = [];
+          window.__scene.room.send = (t, m) => { window.__sent.push([t, m]); };
+          const n = window.__craftData.NPC_BY_ID.tho_ren_suong;
+          window.__start = { x: n.x, y: n.y + 90 };
+          return 1;
+        })()`);
+        const VK2 = {
+          KeyI: 73,
+          KeyJ: 74,
+          KeyK: 75,
+          KeyL: 76,
+          KeyW: 87,
+          KeyA: 65,
+          KeyS: 83,
+          KeyD: 68,
+          ArrowRight: 39,
+        };
+        const KEY2 = {
+          KeyI: "i",
+          KeyJ: "j",
+          KeyK: "k",
+          KeyL: "l",
+          KeyW: "w",
+          KeyA: "a",
+          KeyS: "s",
+          KeyD: "d",
+          ArrowRight: "ArrowRight",
+        };
+        const holdKey = async (code, ms) => {
+          await evalJs(
+            `(() => { const sc = window.__scene; sc.predX = window.__start.x; sc.predY = window.__start.y; sc.cameras.main.centerOn(sc.predX, sc.predY); return 1; })()`,
+          );
+          await send("Input.dispatchKeyEvent", {
+            type: "rawKeyDown",
+            key: KEY2[code],
+            code,
+            windowsVirtualKeyCode: VK2[code],
+          });
+          await sleep(ms);
+          const p = await evalJs(
+            `({ x: window.__scene.predX - window.__start.x, y: window.__scene.predY - window.__start.y })`,
+          );
+          await send("Input.dispatchKeyEvent", {
+            type: "keyUp",
+            key: KEY2[code],
+            code,
+            windowsVirtualKeyCode: VK2[code],
+          });
+          await sleep(100);
+          return p;
+        };
+        console.log("  [10] bảng phím đã đổi: phím mới đi, phím cũ không đi");
+        const MIN = 30;
+        const r = await holdKey("KeyL", 600);
+        check(
+          r.x > MIN && Math.abs(r.y) < 1,
+          `L = đi phải (${r.x.toFixed(0)}, ${r.y.toFixed(0)} px)`,
+        );
+        const l = await holdKey("KeyJ", 600);
+        check(
+          l.x < -MIN && Math.abs(l.y) < 1,
+          `J = đi trái (${l.x.toFixed(0)}, ${l.y.toFixed(0)} px)`,
+        );
+        const u = await holdKey("KeyI", 600);
+        check(
+          u.y < -MIN && Math.abs(u.x) < 1,
+          `I = đi lên (${u.x.toFixed(0)}, ${u.y.toFixed(0)} px)`,
+        );
+        const d = await holdKey("KeyK", 600);
+        check(
+          d.y > MIN && Math.abs(d.x) < 1,
+          `K = đi xuống (${d.x.toFixed(0)}, ${d.y.toFixed(0)} px)`,
+        );
+        for (const code of ["KeyW", "KeyA", "KeyS", "KeyD", "ArrowRight"]) {
+          const o = await holdKey(code, 500);
+          check(
+            Math.hypot(o.x, o.y) < 1,
+            `${code} không còn là phím đi (${o.x.toFixed(0)}, ${o.y.toFixed(0)} px)`,
+          );
+        }
+        const helpText = await evalJs(`document.getElementById("help")?.textContent ?? ""`);
+        check(
+          helpText.startsWith("I J K L đi"),
+          `dòng gợi ý đầu màn hình ghi phím mới: "${helpText.slice(0, 40)}"`,
+        );
+
+        console.log('  [11] màn "Phím tắt" có nhóm Di chuyển, ghi đúng phím đã đổi');
+        await evalJs(`window.__ui.toggleKeysModal(true)`);
+        await sleep(300);
+        const keysTxt = await evalJs(`document.getElementById("keys-modal")?.innerText ?? ""`);
+        check(/Di chuyển/.test(keysTxt), 'có nhóm "Di chuyển"');
+        check(
+          /Đi sang phải/.test(keysTxt) && /Đi lên/.test(keysTxt),
+          "có bốn dòng Đi lên / xuống / trái / phải",
+        );
+        const rows = await evalJs(
+          `[...document.querySelectorAll("#keys-modal .keys-row")].map((r) => r.innerText.replace(/\\s+/g, " ").trim()).filter((t) => t.startsWith("Đi "))`,
+        );
+        check(
+          rows.some((t) => /Đi lên.*\bI\b/.test(t)) &&
+            rows.some((t) => /Đi sang phải.*\bL\b/.test(t)),
+          `dòng Đi lên ghi I, Đi sang phải ghi L: ${JSON.stringify(rows)}`,
+        );
+        await evalJs(`window.__ui.toggleKeysModal(false)`);
+      }
     }
   } finally {
     try {

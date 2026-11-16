@@ -10,14 +10,17 @@ import { Client, type Room } from "colyseus.js";
 import {
   DEFAULT_MAP_ID,
   HAC_PHONG_ID,
+  ITEMS,
   SECT_CREATE_COST,
   SECT_MSG,
+  addToInventory,
   getMap,
   roomNameOf,
   type ChatOut,
   type SectInvitedMsg,
   type SectMsg,
   type SectPresenceMsg,
+  type SectVaultMsg,
   type ToastMsg,
 } from "@tien-gioi/shared";
 import type { WorldRoom } from "./WorldRoom";
@@ -73,6 +76,7 @@ interface Hero {
   snaps: SectMsg[];
   presences: SectPresenceMsg[];
   invited: SectInvitedMsg[];
+  vaults: SectVaultMsg[];
   chats: ChatOut[];
   toasts: string[];
 }
@@ -81,6 +85,7 @@ function listen(room: Room, h: Hero) {
   room.onMessage(SECT_MSG.snapshot, (m: SectMsg) => h.snaps.push(m));
   room.onMessage(SECT_MSG.presence, (m: SectPresenceMsg) => h.presences.push(m));
   room.onMessage(SECT_MSG.invited, (m: SectInvitedMsg) => h.invited.push(m));
+  room.onMessage(SECT_MSG.vault, (m: SectVaultMsg) => h.vaults.push(m));
   room.onMessage("chat", (m: ChatOut) => h.chats.push(m));
   room.onMessage("toast", (m: ToastMsg) => h.toasts.push(m.text));
   for (const t of ["inv", "wallet", "quests", "dialog", "fx", "dmg", "soul", "party"])
@@ -93,7 +98,16 @@ async function join(name: string, roomName: string): Promise<Hero> {
     secret: secretOf(name),
   });
   rooms.push(room);
-  const h: Hero = { name, room, snaps: [], presences: [], invited: [], chats: [], toasts: [] };
+  const h: Hero = {
+    name,
+    room,
+    snaps: [],
+    presences: [],
+    invited: [],
+    vaults: [],
+    chats: [],
+    toasts: [],
+  };
   listen(room, h);
   await waitFor(() => (room.state as any)?.players?.get(room.sessionId), 4000, "vào phòng");
   const w = worldOf(room);
@@ -322,4 +336,75 @@ describe("tông môn: luồng đầy đủ", () => {
     expect(lastSnap(A)?.coin).toBe(0);
     expect(ctrlOf(C).coin).toBe(0);
   }, 30_000);
+});
+
+describe("tông môn: kho đồ qua server Colyseus thật (mục 27)", () => {
+  const MAT = ITEMS.filter((i) => i.stack >= 99)[0];
+  const countIn = (slots: ({ itemId: string; qty: number } | null)[] | undefined, id: string) =>
+    (slots ?? []).reduce((t, x) => t + (x?.itemId === id ? x.qty : 0), 0);
+  const lastVault = (h: Hero) => h.vaults.at(-1)?.vault;
+
+  it("Đệ tử góp, Tông chủ nhận ảnh chụp kho; Đệ tử rút có hạn mức (lượt 4 bị từ chối); túi + hồ sơ + tệp tông môn khớp, tổng đồ không đổi; tin rác không làm gì", async () => {
+    const A = await join(`Kho Chu ${++seq}`, roomNameOf(DEFAULT_MAP_ID));
+    const B = await join(`Kho De ${++seq}`, roomNameOf(DEFAULT_MAP_ID));
+    ctrlOf(A).coin = 3000;
+    const sectName = `Kho Mon ${seq}`;
+    A.room.send(SECT_MSG.create, { name: sectName, tag: "KM" });
+    await waitFor(() => lastSnap(A), 5000, "ảnh chụp của Tông chủ");
+    A.room.send(SECT_MSG.invite, { name: B.name });
+    await waitFor(() => B.invited[0], 4000, "lời mời");
+    B.room.send(SECT_MSG.accept, { from: A.name });
+    await waitFor(() => lastSnap(B)?.myRank === "de_tu", 4000, "B vào tông môn");
+    // đổi thành viên đã gửi kho (rỗng) cho cả hai
+    await waitFor(() => lastVault(B) && lastVault(A), 4000, "ảnh chụp kho đồ");
+    expect(lastVault(B)?.slots).toHaveLength(40);
+    expect(lastVault(B)?.myDrawsLeft).toBe(3);
+    expect(lastVault(A)?.myDrawsLeft).toBeNull();
+
+    addToInventory(ctrlOf(B).inv, MAT.id, 40);
+    const slot = ctrlOf(B).inv.findIndex((s: { itemId: string } | null) => s?.itemId === MAT.id);
+    B.room.send(SECT_MSG.vaultDeposit, { slot, qty: 30 });
+    await waitFor(() => countIn(lastVault(A)?.slots, MAT.id) === 30, 4000, "kho đồ có 30");
+    expect(countIn(ctrlOf(B).inv, MAT.id)).toBe(10);
+    expect(countIn(saveOf(B.name).inventory, MAT.id)).toBe(10); // đồ đã trừ xuống hồ sơ TRƯỚC khi kho cộng
+    expect(lastVault(A)?.log[0]).toMatchObject({ name: B.name, kind: "deposit", qty: 30 });
+    const file = sectFiles()
+      .map((f) => JSON.parse(readFileSync(path.join(dataDir, "sects", f), "utf8")))
+      .find((x) => x.name === sectName);
+    expect(countIn(file?.vault.slots, MAT.id)).toBe(30);
+
+    // tin rác không làm gì (không lỗi, không đổi)
+    for (const bad of [null, {}, { slot: -1, qty: 1 }, { slot: 0, itemId: "constructor", qty: 1 }])
+      B.room.send(SECT_MSG.vaultWithdraw, bad);
+    B.room.send(SECT_MSG.vaultPolicy, { drawPerDay: 99 });
+    await sleep(300);
+    expect(countIn(lastVault(A)?.slots, MAT.id)).toBe(30);
+
+    // Đệ tử rút: 3 lượt (mỗi lượt 2 món), lượt 4 bị từ chối
+    const vslot = lastVault(A)!.slots.findIndex((s) => s?.itemId === MAT.id);
+    for (let i = 0; i < 3; i++) {
+      B.room.send(SECT_MSG.vaultWithdraw, { slot: vslot, itemId: MAT.id, qty: 2 });
+      await waitFor(
+        () => countIn(ctrlOf(B).inv, MAT.id) === 10 + 2 * (i + 1),
+        4000,
+        `lượt ${i + 1}`,
+      );
+    }
+    B.room.send(SECT_MSG.vaultWithdraw, { slot: vslot, itemId: MAT.id, qty: 2 });
+    await waitFor(
+      () => B.toasts.some((t) => /hết lượt rút/.test(t)),
+      4000,
+      "lượt thứ 4 bị từ chối",
+    );
+    expect(countIn(ctrlOf(B).inv, MAT.id)).toBe(16);
+    expect(lastVault(B)?.myDrawsLeft).toBe(0);
+
+    // Tông chủ nâng hạn mức lên 5: Đệ tử có thêm lượt
+    A.room.send(SECT_MSG.vaultPolicy, { drawPerDay: 5 });
+    await waitFor(() => lastVault(B)?.drawPerDay === 5, 4000, "hạn mức 5");
+    expect(lastVault(B)?.myDrawsLeft).toBe(2);
+    // Tổng đồ (túi A + túi B + kho) bằng đúng số đưa vào ban đầu (40)
+    const vaultNow = countIn(lastVault(A)?.slots, MAT.id);
+    expect(countIn(ctrlOf(A).inv, MAT.id) + countIn(ctrlOf(B).inv, MAT.id) + vaultNow).toBe(40);
+  });
 });

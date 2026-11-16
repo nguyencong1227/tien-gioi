@@ -23,6 +23,8 @@ import type {
   DuelStateMsg,
   DuelEndMsg,
   SectInvitedMsg,
+  SectVaultMsg,
+  NetShieldMsg,
   SectMsg,
   SectPresenceMsg,
 } from "@tien-gioi/shared";
@@ -100,6 +102,17 @@ export interface PlayerCtrl {
    */
   moveMul?: number;
   stunned?: boolean;
+  /**
+   * Bảo vệ khi mất kết nối (mục 33, `systems/net-guard.ts`): `beatMs` = nhịp gửi tin client khai lúc vào phòng (`parseBeatMs`; `undefined` = client cũ: KHÔNG áp luật im lặng);
+   * `lastHeardAt` = lúc (ms, `Date.now()`) nhận tin cuối của client; `silent` = đang là hồn lìa xác vì IM LẶNG (socket còn mở), từ `silentSince`; `shieldUntil` = hộ thể tới lúc này (ms, `w.now`).
+   */
+  beatMs?: number;
+  lastHeardAt?: number;
+  silent?: boolean;
+  silentSince?: number;
+  shieldUntil?: number;
+  /** Các lần được tha chết do mạng gần đây (`w.now`, ms), tối đa `NET_SPARE_MAX` mục: chống client sửa nhịp tim để không bao giờ chết thật (`spareFromNetDeath`). */
+  spareAts?: number[];
   /** Đang né đòn của quái tới thời điểm này (ms, `w.now`): chiêu bộ pháp (`SkillDef.dodgeMs`, `systems/cast.ts`); `hurtPlayer` bỏ qua sát thương */
   dodgeUntil?: number;
   /** Định danh kiếp hiện tại và bộ đếm thành tựu của kiếp (lưu cùng nhân vật; không vào state chung) */
@@ -227,6 +240,10 @@ export interface WorldEvents {
   sectPresence(sessionId: string, msg: SectPresenceMsg): void;
   /** Có người mời vào tông môn (chỉ người được mời nhận). */
   sectInvited(sessionId: string, msg: SectInvitedMsg): void;
+  /** Ảnh chụp KHO ĐỒ của tông môn gửi chính người nhận (mục 11; `vault: null` = không còn ở tông môn nào). */
+  sectVault(sessionId: string, msg: SectVaultMsg): void;
+  /** Hộ thể sau nối lại / có tin lại sau im lặng / được tha chết do mạng (mục 33; chỉ chủ nhân vật nhận). */
+  netShield(sessionId: string, msg: NetShieldMsg): void;
 }
 
 export class World {
@@ -248,6 +265,10 @@ export class World {
    * chơi chỉ phải tra tập này khi nó khác rỗng (hầu hết thời gian là rỗng).
    */
   readonly ghosts = new Set<string>();
+  /** Người đang được hộ thể (mục 33; hết hạn thì `tickNetGuard` gỡ): quái không nhắm, sát thương không vào. Kiểm `size > 0` trước (đường nóng của quái). */
+  readonly shielded = new Set<string>();
+  /** Số đo bảo vệ khi mất kết nối của phòng (`/metrics`): lần vào im lặng, lần tha chết do mạng. */
+  readonly netStats = { silent: 0, spared: 0, spareDenied: 0 };
   /**
    * Mục tiêu đang có trạng thái (M7.2b): id quái / sessionId người chơi. `tickStatuses` chỉ duyệt hai tập này (thường rỗng) nên không tốn gì khi
    * không ai dính trạng thái; tự gỡ khi hết trạng thái hoặc mục tiêu biến mất.
@@ -288,10 +309,21 @@ export class World {
   /** Thời gian xử lý mỗi tick của phòng này (M4 3.3); `WorldRoom.update` ghi, `/metrics` đọc. Bench / test không ghi. */
   readonly tickStats = new TickStats();
   /**
+   * Số đo hàng đợi input di chuyển của phòng (mục 25 QUYET_DINH_M3, `docs/THIET_KE_DI_CHUYEN.md`), `/metrics` đọc: `dropped` = input bị bỏ vì hàng đợi đầy
+   * (client đã đoán trước nên nhân vật bị kéo giật lùi); `backlogTicks` = số lượt (người chơi x tick) mà hàng đợi còn `INPUT_BACKLOG_WARN` input trở lên sau khi
+   * xử lý (máy chủ tụt hậu so với client). Hai số này tăng đều trên bản chạy thật thì có chuyện về mạng hoặc nhịp tick.
+   */
+  readonly inputStats = { dropped: 0, backlogTicks: 0 };
+  /**
    * Dịch vụ tông môn (docs/THIET_KE_TONG_MON.md): WorldRoom đặt khi tạo phòng. `null` (test đơn vị không đặt, hoặc `SECTS=off`):
    * mọi tin tông môn bị từ chối `disabled`, vào phòng không tra tông môn.
    */
   sectService: SectService | null = null;
+  /**
+   * Cờ "kiếp mới chưa được rút" (docs/THIET_KE_TONG_MON.md mục 11.7): kiếp có `life.playMs` nhỏ hơn chừng này (ms) chưa được rút kho đồ và kho Linh thạch của tông môn.
+   * 0 = tắt (mặc định, người dùng chưa chọn). `WorldRoom` đặt từ biến môi trường `SECT_NEWLIFE_LOCK_HOURS`.
+   */
+  sectNewLifeLockMs = 0;
   /**
    * Phòng đăng ký: lưu hồ sơ của một người NGAY và chờ ghi xong (trước khi chuyển Linh thạch sang kho tông môn).
    * Trả `true` CHỈ khi hồ sơ đã nằm trên đĩa / DB; `false` khi lưu lỗi hoặc không lưu được lúc này (đang qua cổng: bản ghi

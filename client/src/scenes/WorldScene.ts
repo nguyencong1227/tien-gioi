@@ -2,7 +2,15 @@ import { getDisplay } from "../gfx/display";
 import { welcomeText } from "../welcome";
 import { createFxSystem, type FxSystem } from "../gfx/fx/fx";
 import { planCastFx } from "../gfx/fx/cast-fx";
-import { drawPips, pipsLabel, pipsOf } from "../monster-status";
+import {
+  PIP_ROW_Y,
+  PIP_ROW_Y_BOSS,
+  drawPips,
+  pipRowTop,
+  pipsLabel,
+  pipsOf,
+  targetLabelRise,
+} from "../monster-status";
 import { TelegraphLayer } from "../gfx/fx/telegraph-layer";
 import { recipeIds } from "../gfx/fx/recipes";
 import {
@@ -101,6 +109,7 @@ import {
   type SkillsMsg,
   type FxMsg,
   type DmgMsg,
+  NET_MSG,
   type ChatOut,
   type ToastMsg,
   type InvMsg,
@@ -134,6 +143,7 @@ import {
   type DuelChallengeCheck,
   SECT_MSG,
   type SectMsg,
+  type SectVaultMsg,
   type SectPresenceMsg,
   type SectInvitedMsg,
 } from "@tien-gioi/shared";
@@ -144,6 +154,7 @@ import { BAR_SLOTS, SkillTracker, aimMode, blockedToast, slotView } from "../ski
 import { SkillBarDom } from "../skill-bar-dom";
 import { StatusBadgesDom, badgeViews } from "../status-badges";
 import { craftBuffNames, travelConfirmText, useSuccessText } from "../craft-buff";
+import { breakthroughPlan, samePlan } from "../act-confirm";
 import {
   ELITE_STYLE,
   EliteHintGate,
@@ -169,13 +180,33 @@ import { clientCanChallenge } from "../duel";
 import { replayEarlyMessages } from "../early-messages";
 import { sound } from "../audio";
 import { joystick, setupJoystick } from "../joystick";
-import { keepLock, pickNextPlayer, pickNextTarget, pickPrevTarget } from "../target-lock";
+import { keepLock, pickNextPlayer, pickNextTarget } from "../target-lock";
+import {
+  ENGAGED_MS,
+  cycleTarget,
+  escapeTarget,
+  otherAimMode,
+  stepTarget,
+  type AimMode,
+  type AutoCandidate,
+  type TargetState,
+} from "../auto-target";
+import {
+  chooseAim,
+  cursorFromPointer,
+  cursorOnScene,
+  type AimKind,
+  type CursorPos,
+} from "../aim-order";
+import { ShieldTimer, parseNetShield, shieldLabel } from "../net-shield";
 import {
   ACTION_BY_ID,
   actionOfEvent,
   getKeymap,
   getLookup,
+  isMoveAction,
   keyLabels,
+  moveDirOf,
   onKeymapChange,
   primaryKeyLabel,
   type ActionId,
@@ -196,6 +227,7 @@ import {
 } from "../map-render";
 import { moveVector } from "../move-input";
 import { MoveKeys } from "../move-keys";
+import { IME_HINT_TEXT, ImeSniffer } from "../ime-hint";
 import { isTypingElement, isReducedMotion } from "../a11y";
 import {
   markMonAttack,
@@ -256,6 +288,8 @@ interface Entity {
   statusG?: Phaser.GameObjects.Graphics;
   lastFx?: number;
   pipCount?: number;
+  /** Mép trên của hàng chấm (px phía trên tâm quái; 0 = không có chấm): nhãn mục tiêu khoá nâng lên trên đó (`targetLabelRise`) */
+  pipTop?: number;
   pipText?: string;
   /** Số lần vẽ lại hàng chấm (script kiểm: chỉ tăng khi mặt nạ đổi) */
   pipDraws?: number;
@@ -338,7 +372,8 @@ export class WorldScene extends Phaser.Scene {
   private portalFxAt = new Map<string, number>();
   private npcs = new Map<string, NpcEntity>();
   /** Phím di chuyển theo `event.code` (không theo `keyCode` của Phaser: bộ gõ tiếng Việt làm `keyCode` = 229, mục 25) */
-  private moveKeys = new MoveKeys();
+  /** Phím di chuyển do người chơi đổi được (`move.*` trong `keybinds.ts`): tra hướng theo bảng phím hiện tại mỗi lần. */
+  private moveKeys = new MoveKeys((code) => moveDirOf(code));
 
   // Đoán trước di chuyển của chính mình
   private seq = 0;
@@ -358,7 +393,8 @@ export class WorldScene extends Phaser.Scene {
   private skillsPanelKey = "";
   private slotKeys: Record<SkillSlot, string[]> = { 2: [], 3: [], 4: [], 5: [] };
   /** Con trỏ CHUỘT đang ở trong canvas (chạm / bút thì không): chiêu nhắm theo con trỏ khi đúng */
-  private mouseIn = false;
+  /** Con trỏ CHUỘT gần nhất (toạ độ cửa sổ); `null` = chưa có / rời cửa sổ / vừa chạm. Hợp lệ hay không do `cursorAngle()` kiểm LÚC BẤM (mục 29). */
+  private cursorPos: CursorPos | null = null;
   private predX = 0;
   private predY = 0;
   private hasMe = false;
@@ -372,6 +408,21 @@ export class WorldScene extends Phaser.Scene {
   private nextSlash = 0;
   /** Khoá mục tiêu (#327): id quái đang khoá (null = tự ngắm quái gần nhất như cũ) và vòng đánh dấu. */
   private lockedTargetId: string | null = null;
+  /** Mục tiêu CHỌN TAY (Tab / nút) lúc đang ở chế độ Tự động: giữ tới khi nó mất / ra khỏi màn hình hoặc bấm Esc, rồi quay lại tự động (mục 26). */
+  private targetPinned = false;
+  /** Chế độ nhắm ở khung trước (phát hiện đổi chế độ giữa chừng để bỏ ghim) */
+  private lastAimMode: AimMode | null = null;
+  private nextAutoTargetAt = 0;
+  /** Mốc trúng đòn gần nhất của từng quái (`time.now`): "đang bị đánh dở" chỉ để phân thắng bại khi khoảng cách gần bằng nhau (`DmgMsg` không nêu người đánh). */
+  private recentHit = new Map<string, number>();
+  /** Tên + khí huyết nhỏ của mục tiêu hiện tại, ngay trên vòng đánh dấu */
+  private targetInfo?: Phaser.GameObjects.Text;
+  private targetInfoKey = "";
+  /** Hộ thể sau khi nối lại / có tin lại / được tha chết vì mạng (mục 33): máy chủ gửi `netShield`, client đếm ngược theo đồng hồ của mình và vẽ vầng sáng + chữ. */
+  private shield = new ShieldTimer();
+  private shieldRing?: Phaser.GameObjects.Arc;
+  private shieldText?: Phaser.GameObjects.Text;
+  private shieldLabelKey = "";
   private targetRing?: Phaser.GameObjects.Arc;
   /** Nút Mục tiêu mờ đi khi không có quái trong tầm khoá (kiểm mỗi 200 ms, chỉ ghi DOM khi đổi). */
   private targetIdleAt = 0;
@@ -569,8 +620,9 @@ export class WorldScene extends Phaser.Scene {
       onPickup: () => !this.isReconnecting && this.pickupNearest(),
       // Esc khi không còn bảng nào để đóng: bỏ chọn mục tiêu (QUYET_DINH_M3 mục 13, #463)
       onClearTarget: () => {
-        if (this.lockedTargetId === null) return false;
-        this.setLockedTarget(null);
+        const r = escapeTarget(ui.getAimMode(), this.targetState());
+        if (!r.handled) return false; // chế độ Tự động mà không ghim tay: Esc không làm gì (bỏ ra là chọn lại ngay)
+        this.applyTargetState(r.state);
         return true;
       },
       onTalk: () => !this.isReconnecting && this.talkClosestNpc(),
@@ -654,6 +706,12 @@ export class WorldScene extends Phaser.Scene {
         !this.isReconnecting && this.room.send(SECT_MSG.deposit, { amount }),
       onSectWithdraw: (amount) =>
         !this.isReconnecting && this.room.send(SECT_MSG.withdraw, { amount }),
+      onSectVaultDeposit: (msg) =>
+        !this.isReconnecting && this.room.send(SECT_MSG.vaultDeposit, msg),
+      onSectVaultWithdraw: (msg) =>
+        !this.isReconnecting && this.room.send(SECT_MSG.vaultWithdraw, msg),
+      onSectVaultPolicy: (drawPerDay) =>
+        !this.isReconnecting && this.room.send(SECT_MSG.vaultPolicy, { drawPerDay }),
     });
 
     this.setupInput();
@@ -1110,10 +1168,36 @@ export class WorldScene extends Phaser.Scene {
     // `keyCode` = 229 nên Phaser không thấy phím nào ("liệt nút", QUYET_DINH_M3 mục 25). Nghe ở pha BẮT (capture) để không bị `stopPropagation` / `defaultPrevented`
     // của nút hay bảng che mất keyup. Mọi phím HÀNH ĐỘNG đi qua bảng phím `keybinds.ts` (đổi được, HUD đọc nhãn từ đó) ở `onKeyDown`.
     const mk = this.moveKeys;
+    // Gợi ý MỘT lần khi bộ gõ kiểu hook (Unikey / EVKey Telex) chèn Backspace / chữ có dấu hay nuốt keydown (`ime-hint.ts`): trình duyệt không nhận được phím thì client không cứu được
+    const ime = new ImeSniffer((code) => moveDirOf(code));
     const kd = (e: KeyboardEvent) => {
-      mk.keyDown(e, isTypingElement(e.target as Element | null));
+      const typing = isTypingElement(e.target as Element | null);
+      mk.keyDown(e, typing);
+      if (
+        ime.feed({
+          type: "down",
+          code: e.code,
+          key: e.key,
+          keyCode: e.keyCode,
+          typing,
+          at: performance.now(),
+        })
+      )
+        ui.toast({ text: IME_HINT_TEXT, tone: "info" });
     };
-    const ku = (e: KeyboardEvent) => mk.keyUp(e);
+    const ku = (e: KeyboardEvent) => {
+      const wasHeld = mk.keyUp(e);
+      if (
+        ime.feed({
+          type: "up",
+          code: e.code,
+          typing: isTypingElement(e.target as Element | null),
+          wasHeld,
+          at: performance.now(),
+        })
+      )
+        ui.toast({ text: IME_HINT_TEXT, tone: "info" });
+    };
     // keyup có thể KHÔNG BAO GIỜ tới (Alt-Tab, đổi tab, menu chuột phải, vào ô chat): quên hết phím đang giữ để không kẹt
     const forget = () => mk.clear();
     const onVisibility = () => {
@@ -1130,19 +1214,24 @@ export class WorldScene extends Phaser.Scene {
     document.addEventListener("visibilitychange", onVisibility);
     document.addEventListener("focusin", onFocusIn, true);
     window.addEventListener("keydown", this.onKeyDown);
-    // Con trỏ chuột trong canvas (chiêu nhắm theo con trỏ): chạm / bút không tính. `pointerleave` cũng bắn khi con trỏ rời sang nút HUD phủ trên canvas.
-    const canvas = this.game.canvas;
-    const onMove = (e: PointerEvent) => {
-      this.mouseIn = e.pointerType === "mouse";
+    // Con trỏ CHUỘT (chiêu nhắm theo con trỏ, mục 29): ghi toạ độ cửa sổ ở pha bắt trên window (chạm / bút xoá). Có hợp lệ hay không (con trỏ đang ở trên canvas màn chơi,
+    // không phải trên minimap / bản đồ lớn / chat / thanh chiêu / bảng) do `cursorAngle()` kiểm LÚC BẤM theo phần tử dưới con trỏ: một bảng mở ra dưới con chuột đứng yên
+    // (phím M) không gửi sự kiện nào nên không thể chỉ dựa vào `pointerleave` của canvas.
+    const onPointer = (e: PointerEvent) => {
+      this.cursorPos = cursorFromPointer(e);
     };
-    const onLeave = () => {
-      this.mouseIn = false;
+    const onCursorGone = () => {
+      this.cursorPos = null;
     };
-    canvas.addEventListener("pointermove", onMove);
-    canvas.addEventListener("pointerdown", onMove);
-    canvas.addEventListener("pointerleave", onLeave);
+    window.addEventListener("pointermove", onPointer, true);
+    window.addEventListener("pointerdown", onPointer, true);
+    document.documentElement.addEventListener("mouseleave", onCursorGone);
+    window.addEventListener("blur", onCursorGone);
     this.syncSlotKeys();
-    const offKeymap = onKeymapChange(() => this.syncSlotKeys());
+    const offKeymap = onKeymapChange(() => {
+      this.syncSlotKeys();
+      mk.clear(); // đổi phím (kể cả phím di chuyển) giữa lúc đang giữ: quên phím cũ, khỏi kẹt hướng
+    });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       window.removeEventListener("keydown", this.onKeyDown);
       window.removeEventListener("keydown", kd, true);
@@ -1152,9 +1241,10 @@ export class WorldScene extends Phaser.Scene {
       window.removeEventListener("contextmenu", forget);
       document.removeEventListener("visibilitychange", onVisibility);
       document.removeEventListener("focusin", onFocusIn, true);
-      canvas.removeEventListener("pointermove", onMove);
-      canvas.removeEventListener("pointerdown", onMove);
-      canvas.removeEventListener("pointerleave", onLeave);
+      window.removeEventListener("pointermove", onPointer, true);
+      window.removeEventListener("pointerdown", onPointer, true);
+      document.documentElement.removeEventListener("mouseleave", onCursorGone);
+      window.removeEventListener("blur", onCursorGone);
       offKeymap();
     });
     // Esc do `ui.ts` xử lý ở `window` (một chỗ duy nhất, kể cả bỏ chọn mục tiêu qua `onClearTarget`): đăng ký thêm ở đây làm MỖI lần Esc chạy hai lần
@@ -1193,7 +1283,7 @@ export class WorldScene extends Phaser.Scene {
     bind("btn-target", () => this.toggleLockTarget());
     bind("sk-sword", () => this.sword());
     bind("sk-med", () => this.toggleMeditate());
-    bind("sk-break", () => !this.isReconnecting && this.room.send("breakthrough"));
+    bind("sk-break", () => this.requestBreakthrough(document.getElementById("sk-break")));
     for (const n of [2, 3, 4, 5] as const)
       bind(`sk-slot${n}`, () => this.runAction(`skill.slot${n}`));
 
@@ -1236,6 +1326,8 @@ export class WorldScene extends Phaser.Scene {
     if (e.defaultPrevented || isTypingElement(document.activeElement)) return;
     const action = actionOfEvent(e, getLookup());
     if (!action) return;
+    // phím di chuyển (`move.*`) do `MoveKeys` xử lý (keydown / keyup ở pha bắt, `setupInput`): ở đây không chặn mặc định, không chạy hành động
+    if (isMoveAction(action)) return;
     const def = ACTION_BY_ID[action];
     if (def.world && ui.isKeyboardCaptured()) return;
     // phím đã nhận: chặn hành vi mặc định (Tab đổi focus, Space cuộn / bấm nút...) kể cả khi giữ phím lặp
@@ -1247,11 +1339,11 @@ export class WorldScene extends Phaser.Scene {
   private runAction(action: ActionId) {
     switch (action) {
       case "attack":
-        this.autoLockNearest();
+        if (this.cursorAngle() === null) this.autoLockNearest();
         this.slash();
         break;
       case "skill.sword":
-        this.autoLockNearest();
+        if (this.cursorAngle() === null) this.autoLockNearest();
         this.sword();
         break;
       case "skill.slot2":
@@ -1264,7 +1356,7 @@ export class WorldScene extends Phaser.Scene {
         this.toggleMeditate();
         break;
       case "skill.breakthrough":
-        if (!this.isReconnecting) this.room.send("breakthrough");
+        this.requestBreakthrough(null);
         break;
       case "quick.1":
         ui.useQuick(1);
@@ -1280,6 +1372,9 @@ export class WorldScene extends Phaser.Scene {
         break;
       case "target.prev":
         this.toggleLockTarget(-1, true);
+        break;
+      case "target.mode":
+        ui.setAimMode(otherAimMode(ui.getAimMode()), true);
         break;
       case "prompt.yes":
         ui.answerPrompt("yes");
@@ -1330,27 +1425,106 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  /** Bấm đánh bằng bàn phím mà chưa có mục tiêu: tự khoá con quái gần nhất trong tầm (vòng đánh dấu hiện ra, kỹ năng quay về phía nó). */
+  /**
+   * Bấm đánh bằng bàn phím mà chưa có mục tiêu: tự khoá con quái gần nhất trong tầm (vòng đánh dấu hiện ra, kỹ năng quay về phía nó). Chế độ Tự động (mục 26): mục tiêu
+   * luôn do `tickAutoTarget` giữ, ở đây chỉ chạy một nhịp NGAY (không chờ 100 ms) để đòn đầu tiên cũng theo mục tiêu.
+   */
   private autoLockNearest() {
-    if (this.lockedTargetId !== null || this.isReconnecting || ui.isLimboOpen()) return;
+    if (this.isReconnecting || ui.isLimboOpen()) return;
     const me = this.me();
     if (!me || me.dead) return;
+    if (ui.getAimMode() === "auto") {
+      this.tickAutoTarget(true);
+      return;
+    }
+    if (this.lockedTargetId !== null) return;
     const id = pickNextTarget(this.targetCandidates(true), null);
     if (id) this.setLockedTarget(id);
   }
 
+  /** Trạng thái mục tiêu hiện tại (cho `auto-target.ts`). */
+  private targetState(): TargetState {
+    return { id: this.lockedTargetId, pinned: this.targetPinned };
+  }
+
+  private applyTargetState(s: TargetState) {
+    if (s.id !== this.lockedTargetId) this.setLockedTarget(s.id);
+    this.targetPinned = s.id === null ? false : s.pinned;
+  }
+
+  /** Id ứng viên của người chơi (đối thủ PK) mang tiền tố này để không trùng id quái. */
+  private static readonly PLAYER_TARGET = "p:";
+
+  /** Thực thể của mục tiêu (quái, hoặc đối thủ PK có tiền tố `p:`); `undefined` nếu không còn. */
+  private targetEntity(id: string): Entity | undefined {
+    return id.startsWith(WorldScene.PLAYER_TARGET)
+      ? this.players.get(id.slice(WorldScene.PLAYER_TARGET.length))
+      : this.monsters.get(id);
+  }
+
+  /** Đối thủ trong trận PK thách đấu đang đánh (theo đạo hiệu ở `DuelStateMsg.opponent`), `null` nếu không có / không thấy. */
+  private duelOpponent(): { sid: string; e: Entity } | null {
+    if (!ui.isDuelActive()) return null;
+    const name = ui.getDuelOpponent();
+    if (!name) return null;
+    let found: { sid: string; e: Entity } | null = null;
+    this.state.players.forEach((p: any, sid: string) => {
+      if (found || sid === this.sid || p.name !== name) return;
+      const e = this.players.get(sid);
+      if (e) found = { sid, e };
+    });
+    return found;
+  }
+
   /**
-   * Ứng viên khoá mục tiêu. `onScreenOnly` (bàn phím, góp ý của A ở #465): chỉ quái ĐANG THẤY trên màn hình (trong khung camera), không phải cả
+   * Ứng viên nhắm mục tiêu. `onScreenOnly` (bàn phím, góp ý của A ở #465): chỉ quái ĐANG THẤY trên màn hình (trong khung camera), không phải cả
    * tầm khoá 520 px (khung máy tính cao chỉ ~640 px nên quái ở 450 px phía trên nằm ngoài màn hình). Nút cảm ứng giữ nguyên (mọi quái trong tầm).
+   * Trong trận PK thách đấu chỉ có ĐỐI THỦ (mục 26). Quái vừa trúng đòn được gắn `engaged` (chỉ phân thắng bại khi gần bằng nhau).
    */
-  private targetCandidates(onScreenOnly: boolean): Array<{ id: string; dist: number }> {
+  private targetCandidates(onScreenOnly: boolean): AutoCandidate[] {
     const view = this.cameras.main.worldView;
-    const cands: Array<{ id: string; dist: number }> = [];
+    const cands: AutoCandidate[] = [];
+    const opp = this.duelOpponent();
+    if (opp) {
+      if (!onScreenOnly || view.contains(opp.e.tx, opp.e.ty))
+        cands.push({
+          id: WorldScene.PLAYER_TARGET + opp.sid,
+          dist: Math.hypot(opp.e.tx - this.predX, opp.e.ty - this.predY),
+        });
+      return cands;
+    }
+    const now = this.time.now;
+    if (this.recentHit.size > 64)
+      for (const [id, t] of this.recentHit) if (now - t > ENGAGED_MS) this.recentHit.delete(id);
     this.monsters.forEach((m, id) => {
       if (onScreenOnly && !view.contains(m.tx, m.ty)) return;
-      cands.push({ id, dist: Math.hypot(m.tx - this.predX, m.ty - this.predY) });
+      const t = this.recentHit.get(id);
+      cands.push({
+        id,
+        dist: Math.hypot(m.tx - this.predX, m.ty - this.predY),
+        engaged: t !== undefined && now - t < ENGAGED_MS,
+      });
     });
     return cands;
+  }
+
+  /**
+   * Chế độ Tự động (mục 26, mặc định): mỗi ~100 ms chọn lại mục tiêu theo `stepTarget` (gần nhất, chống nhảy, mất mục tiêu thì chọn ngay; mục tiêu chọn tay giữ tới khi
+   * mất). Chế độ Thủ công không làm gì ở đây (khoá tay như cũ). Đổi chế độ giữa chừng: bỏ ghim, giữ mục tiêu đang có. `force` = chạy ngay, không chờ nhịp.
+   */
+  private tickAutoTarget(force = false) {
+    const mode = ui.getAimMode();
+    if (mode !== this.lastAimMode) {
+      this.lastAimMode = mode;
+      this.targetPinned = false;
+    }
+    if (mode !== "auto" || this.isReconnecting || ui.isLimboOpen()) return;
+    const me = this.me();
+    if (!me || me.dead) return;
+    const now = this.time.now;
+    if (!force && now < this.nextAutoTargetAt) return;
+    this.nextAutoTargetAt = now + 100;
+    this.applyTargetState(stepTarget("auto", this.targetState(), this.targetCandidates(true)));
   }
 
   private moveDir() {
@@ -1368,16 +1542,20 @@ export class WorldScene extends Phaser.Scene {
     });
   }
 
-  /** Tự ngắm con quái gần nhất trong tầm, không có thì đánh theo hướng đang nhìn. */
-  private aim(range: number) {
+  /** Hướng tới mục tiêu đang khoá (còn trong tầm khoá); `null` nếu không khoá hoặc mục tiêu đã mất / quá xa. */
+  private lockedTargetAngle(): number | null {
+    const locked = this.lockedTargetId ? this.targetEntity(this.lockedTargetId) : undefined;
+    if (!locked) return null;
+    const d = Math.hypot(locked.tx - this.predX, locked.ty - this.predY);
+    return keepLock(d) ? Math.atan2(locked.ty - this.predY, locked.tx - this.predX) : null;
+  }
+
+  /** Hướng tới mục tiêu: con quái đang khoá, không có thì con quái gần nhất trong `range` (tự ngắm); `null` nếu không có con nào. */
+  private targetAngle(range: number): number | null {
+    const locked = this.lockedTargetAngle();
+    if (locked !== null) return locked;
     let best = range,
-      angle = this.facing;
-    // Đang khoá mục tiêu còn trong tầm: đánh về phía nó (nhả khoá nếu nó đã mất / quá xa)
-    const locked = this.lockedTargetId ? this.monsters.get(this.lockedTargetId) : undefined;
-    if (locked) {
-      const d = Math.hypot(locked.tx - this.predX, locked.ty - this.predY);
-      if (keepLock(d)) return Math.atan2(locked.ty - this.predY, locked.tx - this.predX);
-    }
+      angle: number | null = null;
     this.monsters.forEach((m) => {
       const d = Math.hypot(m.tx - this.predX, m.ty - this.predY);
       if (d < best) {
@@ -1389,32 +1567,71 @@ export class WorldScene extends Phaser.Scene {
   }
 
   /**
+   * Hướng đánh theo thứ tự của mục 29 (`aim-order.ts`): con trỏ chuột hợp lệ -> mục tiêu (khoá, hoặc quái gần nhất trong tầm) -> hướng nhìn; dash: phím hướng đang giữ
+   * đi trước; "Ưu tiên mục tiêu hơn chuột" đổi chỗ con trỏ và mục tiêu. `lockedOnly`: chỉ mục tiêu ĐÃ KHOÁ (dash không tự lao vào quái gần nhất).
+   */
+  private pickAim(kind: AimKind, range: number, lockedOnly = false): number {
+    let move: number | null = null;
+    if (kind === "move") {
+      const { dx, dy } = this.moveDir();
+      if (dx !== 0 || dy !== 0) move = Math.atan2(dy, dx);
+    }
+    return chooseAim(
+      kind,
+      {
+        move,
+        cursor: this.cursorAngle(),
+        target: lockedOnly ? this.lockedTargetAngle() : this.targetAngle(range),
+        facing: this.facing,
+      },
+      ui.isPreferTarget(),
+    ).angle;
+  }
+
+  /**
    * Bấm nút / phím Tab hoặc T: khoá con quái gần nhất, bấm tiếp chuyển sang con xa hơn, hết vòng hoặc chỉ còn một con thì nhả khoá.
    * `step` = -1 (Shift+Tab): đi ngược xa -> gần. `onScreenOnly`: chỉ quái đang thấy trên màn hình (phím Tab; xem `targetCandidates`).
    */
   private toggleLockTarget(step: 1 | -1 = 1, onScreenOnly = false) {
     if (this.isReconnecting || ui.isLimboOpen()) return;
-    const pick = step === 1 ? pickNextTarget : pickPrevTarget;
-    this.setLockedTarget(pick(this.targetCandidates(onScreenOnly), this.lockedTargetId));
+    const mode = ui.getAimMode();
+    // Tự động: chỉ chọn trong quái ĐANG THẤY (cùng tập với `tickAutoTarget`), nếu không mục tiêu chọn tay ở ngoài màn hình bị bỏ ghim ngay khung sau
+    const next = cycleTarget(
+      mode,
+      this.targetState(),
+      this.targetCandidates(onScreenOnly || mode === "auto"),
+      step,
+    );
+    this.applyTargetState(next);
   }
 
   private setLockedTarget(id: string | null) {
     this.lockedTargetId = id;
+    if (id === null) this.targetPinned = false;
     const btn = document.getElementById("btn-target");
     if (btn) {
       btn.classList.toggle("locked", id !== null);
       btn.setAttribute("aria-pressed", String(id !== null));
-      const mon = id ? this.monsters.get(id) : undefined;
-      const kind = mon?.monKind;
       const label = document.getElementById("btn-target-label");
-      if (label)
-        label.textContent = kind
-          ? MONSTER_BY_ID[kind]
-            ? eliteName(MONSTER_BY_ID[kind].name, !!mon?.elite)
-            : "Mục tiêu"
-          : "Mục tiêu";
+      if (label) label.textContent = id ? this.targetName(id) : "Mục tiêu";
     }
-    if (id === null) this.targetRing?.setVisible(false);
+    if (id === null) {
+      this.targetRing?.setVisible(false);
+      this.targetInfo?.setVisible(false);
+    }
+  }
+
+  /** Tên hiển thị của mục tiêu: quái (kèm dấu tinh anh) hoặc đạo hiệu đối thủ PK; "Mục tiêu" nếu chưa rõ. */
+  private targetName(id: string): string {
+    if (id.startsWith(WorldScene.PLAYER_TARGET)) {
+      const p: any = this.state.players.get(id.slice(WorldScene.PLAYER_TARGET.length));
+      return p?.name || "Đối thủ";
+    }
+    const mon = this.monsters.get(id);
+    const kind = mon?.monKind;
+    return kind && MONSTER_BY_ID[kind]
+      ? eliteName(MONSTER_BY_ID[kind].name, !!mon?.elite)
+      : "Mục tiêu";
   }
 
   /**
@@ -1426,12 +1643,7 @@ export class WorldScene extends Phaser.Scene {
     if (now - this.targetIdleAt < 200) return;
     this.targetIdleAt = now;
     let any = this.lockedTargetId !== null;
-    if (!any)
-      for (const m of this.monsters.values())
-        if (keepLock(Math.hypot(m.tx - this.predX, m.ty - this.predY))) {
-          any = true;
-          break;
-        }
+    if (!any) any = this.targetCandidates(false).some((c) => keepLock(c.dist));
     const idle = !any;
     if (idle === this.targetBtnIdle) return;
     this.targetBtnIdle = idle;
@@ -1446,9 +1658,11 @@ export class WorldScene extends Phaser.Scene {
   private syncTargetLock() {
     const id = this.lockedTargetId;
     if (!id) return;
-    const e = this.monsters.get(id);
+    const e = this.targetEntity(id);
     const d = e ? Math.hypot(e.tx - this.predX, e.ty - this.predY) : null;
-    if (!e || !keepLock(d)) {
+    // đối thủ PK chỉ là mục tiêu trong trận: hết trận thì nhả (kể cả chế độ Thủ công)
+    const duelOver = id.startsWith(WorldScene.PLAYER_TARGET) && !ui.isDuelActive();
+    if (!e || !keepLock(d) || duelOver) {
       this.setLockedTarget(null);
       return;
     }
@@ -1465,6 +1679,91 @@ export class WorldScene extends Phaser.Scene {
       .setPosition(e.root.x, e.root.y)
       .setRadius(r * pulse)
       .setVisible(true);
+    this.syncTargetInfo(id, e, r);
+  }
+
+  /** Tên + khí huyết (%) nhỏ ngay trên vòng đánh dấu: người chơi thấy rõ mình đang nhắm ai (mục 26). Chỉ vẽ lại chữ khi nội dung đổi. */
+  private syncTargetInfo(id: string, e: Entity, ringR: number) {
+    const isPlayer = id.startsWith(WorldScene.PLAYER_TARGET);
+    const st: any = isPlayer
+      ? this.state.players.get(id.slice(WorldScene.PLAYER_TARGET.length))
+      : this.state.monsters.get(id);
+    const hpMax = Number(st?.maxHp);
+    const pct =
+      hpMax > 0 ? Math.max(0, Math.min(100, Math.round((Number(st?.hp) / hpMax) * 100))) : null;
+    const key = `${id}|${pct}|${this.lockedTargetId === id ? "" : "?"}`;
+    if (!this.targetInfo) {
+      this.targetInfo = this.add
+        .text(0, 0, "", {
+          fontFamily: "'Noto Serif', serif",
+          fontSize: "12px",
+          color: "#ffe3de",
+          stroke: "#2a0d0a",
+          strokeThickness: 3,
+        })
+        .setOrigin(0.5, 1)
+        .setDepth(this.map.worldH + 1);
+    }
+    if (key !== this.targetInfoKey) {
+      this.targetInfoKey = key;
+      this.targetInfo.setText(
+        pct === null ? this.targetName(id) : `${this.targetName(id)} · ${pct}%`,
+      );
+    }
+    this.targetInfo
+      .setPosition(e.root.x, e.root.y - targetLabelRise(ringR, e.pipTop ?? 0))
+      .setVisible(true);
+  }
+
+  /** Tin `netShield` của máy chủ (chỉ gửi chủ): bắt đầu đếm ngược hộ thể theo đồng hồ client. Tin hỏng bị bỏ. */
+  public onNetShield(raw: unknown) {
+    const m = parseNetShield(raw);
+    if (!m) return;
+    this.shield.start(m, performance.now());
+  }
+
+  /** Mỗi khung: vầng sáng quanh nhân vật MÌNH + chữ "Hộ thể 2,4s" đếm ngược khi đang hộ thể; hết thì ẩn. Giảm chuyển động: không nhịp thở. */
+  private syncShield() {
+    const now = performance.now();
+    if (!this.shield.active(now)) {
+      if (this.shieldRing?.visible) this.shieldRing.setVisible(false);
+      if (this.shieldText?.visible) this.shieldText.setVisible(false);
+      this.shieldLabelKey = "";
+      return;
+    }
+    const mine = this.players.get(this.sid);
+    const x = mine?.root.x ?? this.predX;
+    const y = mine?.root.y ?? this.predY;
+    if (!this.shieldRing) {
+      this.shieldRing = this.add
+        .circle(0, 0, 36, 0xfff1b8, 0.16)
+        .setStrokeStyle(3, 0xffd666, 0.95)
+        .setDepth(this.map.worldH + 2);
+    }
+    if (!this.shieldText) {
+      this.shieldText = this.add
+        .text(0, 0, "", {
+          fontFamily: "'Noto Serif', serif",
+          fontSize: "14px",
+          color: "#fff7d6",
+          stroke: "#5a3b00",
+          strokeThickness: 4,
+        })
+        .setOrigin(0.5, 0)
+        .setDepth(this.map.worldH + 3);
+    }
+    const pulse = isReducedMotion() ? 1 : 1 + 0.07 * Math.sin(this.time.now / 140);
+    this.shieldRing
+      .setPosition(x, y)
+      .setRadius(36 * pulse)
+      .setVisible(true);
+    const label = shieldLabel(this.shield.remaining(now)) ?? "";
+    if (label !== this.shieldLabelKey) {
+      this.shieldLabelKey = label;
+      this.shieldText.setText(label);
+    }
+    // dưới chân vầng sáng: trên đầu đã có tên + cảnh giới của nhân vật
+    this.shieldText.setPosition(x, y + 44).setVisible(true);
   }
 
   /** Bấm/chạm trúng người chơi khác thì mở menu tương tác (mời tổ đội). */
@@ -1584,7 +1883,7 @@ export class WorldScene extends Phaser.Scene {
     this.recordCombat();
     this.nextSlash = this.time.now + SKILLS.slash.cooldown;
     this.lastAttack = { at: this.time.now, range: SKILLS.slash.range };
-    const a = angle ?? this.aim(SKILLS.slash.range + 60);
+    const a = angle ?? this.pickAim("basic", SKILLS.slash.range + 60);
     this.facing = a;
     const myEntity = this.players.get(this.sid);
     if (myEntity) myEntity.slashUntil = this.time.now + SLASH_MS;
@@ -1601,7 +1900,7 @@ export class WorldScene extends Phaser.Scene {
     this.recordCombat();
     this.nextSword = this.time.now + SKILLS.sword.cooldown;
     this.lastAttack = { at: this.time.now, range: SKILLS.sword.range };
-    const a = this.aim(SKILLS.sword.range);
+    const a = this.pickAim("basic", SKILLS.sword.range);
     this.facing = a;
     const myEntity = this.players.get(this.sid);
     if (myEntity) myEntity.slashUntil = this.time.now + SLASH_MS;
@@ -1654,6 +1953,43 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Đột phá (nút HUD và phím tắt): khi ĐỦ điều kiện thử thì HỎI trước (thất bại mất tu vi + nửa khí huyết, thành công không hoàn tác; hộp nêu xác suất kể cả
+   * đan hộ đạo), lúc xác nhận so lại kế hoạch rồi mới gửi `breakthrough`. Chưa đủ điều kiện thì gửi luôn: máy chủ từ chối KHÔNG mất gì và báo lý do.
+   */
+  private requestBreakthrough(opener: HTMLElement | null) {
+    if (this.isReconnecting) return;
+    const planNow = () => {
+      const me = this.me();
+      return me
+        ? breakthroughPlan(
+            me.realm,
+            me.tier,
+            me.exp,
+            me.expMax,
+            this.status.active(performance.now()),
+          )
+        : null;
+    };
+    const plan = planNow();
+    if (!plan) {
+      this.room.send("breakthrough");
+      return;
+    }
+    ui.askConfirm(
+      plan.spec,
+      () => {
+        if (this.isReconnecting) return;
+        if (!samePlan(plan, planNow())) {
+          ui.toast({ text: "Điều kiện đột phá vừa đổi, chưa đột phá. Hãy thử lại.", tone: "info" });
+          return;
+        }
+        this.room.send("breakthrough");
+      },
+      opener,
+    );
+  }
+
   public travelPortal(portalId: string) {
     if (this.isReconnecting) return;
     // Qua cổng XOÁ hiệu lực đan / phù (máy chủ, test #767): đang có thì hỏi trước (buff của chiêu thì không hỏi). "Đi" mới gửi `travel`.
@@ -1687,6 +2023,7 @@ export class WorldScene extends Phaser.Scene {
     this.isReconnecting = reconnecting;
     if (reconnecting) {
       ui.closeTravelConfirm();
+      ui.closeActConfirm(false);
       this.moving = false;
       this.duelKoUntil = 0;
       this.dungeonFallUntil = 0;
@@ -1746,6 +2083,7 @@ export class WorldScene extends Phaser.Scene {
       e.root.destroy();
     }
     this.monsters.clear();
+    this.recentHit.clear();
     this.setLockedTarget(null);
 
     for (const [, le] of this.loots) {
@@ -1775,6 +2113,7 @@ export class WorldScene extends Phaser.Scene {
     ui.talkPrompt(null);
     ui.pickupPrompt(null);
     ui.closeTravelConfirm();
+    ui.closeActConfirm(false);
   }
 
   /** Nhận danh sách trạng thái của chính mình (server gửi khi thêm / mất / làm mới, vơi khiên, nối lại). Công khai để script kiểm giả lập (`?debug`) bơm tin. */
@@ -1847,26 +2186,32 @@ export class WorldScene extends Phaser.Scene {
     this.nextSkillBarAt = 0;
   }
 
-  /** Góc từ nhân vật tới con trỏ chuột (rad); `null` khi không có chuột trong canvas. */
+  /**
+   * Góc từ nhân vật tới con trỏ chuột (rad); `null` khi KHÔNG có chuột hợp lệ (mục 29): chưa có chuột, chuột rời cửa sổ, chạm / bút, hoặc phần tử dưới con trỏ KHÔNG
+   * phải canvas màn chơi (bản đồ nhỏ, bản đồ lớn, thẻ nhân vật, thanh menu, thanh chiêu, Tổ đội, Nhiệm vụ, Chat, bảng đang mở). Kiểm LÚC GỌI theo toạ độ con trỏ lần cuối.
+   */
   private cursorAngle(): number | null {
-    if (!this.mouseIn) return null;
+    const c = this.cursorPos;
+    if (!c) return null;
+    if (!cursorOnScene(document.elementFromPoint(c.x, c.y), this.game.canvas)) return null;
     const p = this.input.activePointer;
     if (p.wasTouch) return null;
     const w = p.positionToCamera(this.cameras.main) as Phaser.Math.Vector2;
     return Math.atan2(w.y - this.predY, w.x - this.predX);
   }
 
-  /** Hướng đánh của chiêu theo hình (`aimMode`, A xác nhận ở #536). */
+  /** Hướng đánh của chiêu theo hình (`aimMode`, A xác nhận ở #536; thứ tự ưu tiên theo mục 29, `aim-order.ts`). */
   private skillAngle(def: SkillDef): number {
+    const range = (def.reach ?? 0) + def.range;
     switch (aimMode(def.shape)) {
-      case "move": {
-        const { dx, dy } = this.moveDir();
-        return dx !== 0 || dy !== 0 ? Math.atan2(dy, dx) : this.facing;
-      }
+      case "move":
+        // phím hướng -> con trỏ hợp lệ -> mục tiêu ĐÃ KHOÁ (không tự lao vào quái gần nhất) -> hướng nhìn
+        return this.pickAim("move", range, true);
       case "facing":
-        return this.facing;
+        // vòng nổ / hộ thể: quay mặt theo cùng thứ tự với chiêu có hướng trước khi tung
+        return this.pickAim("facing", range);
       case "target":
-        return this.cursorAngle() ?? this.aim((def.reach ?? 0) + def.range);
+        return this.pickAim("target", range);
     }
   }
 
@@ -1936,6 +2281,7 @@ export class WorldScene extends Phaser.Scene {
     };
     reg("fx", (m: FxMsg) => this.onFx(m));
     reg("dmg", (m: DmgMsg) => this.onDmg(m));
+    reg(NET_MSG.shield, (m: unknown) => this.onNetShield(m));
     reg("chat", (m: ChatOut) => ui.chat(m));
     reg("toast", (m: ToastMsg) => ui.toast(m));
     reg("inv", (m: InvMsg) => ui.onInv(m));
@@ -1972,6 +2318,7 @@ export class WorldScene extends Phaser.Scene {
       ui.onDuelEnd(m);
     });
     reg(SECT_MSG.snapshot, (m: SectMsg) => ui.onSect(m));
+    reg(SECT_MSG.vault, (m: SectVaultMsg) => ui.onSectVault(m));
     reg(SECT_MSG.presence, (m: SectPresenceMsg) => ui.onSectPresence(m));
     reg(SECT_MSG.invited, (m: SectInvitedMsg) => ui.onSectInvited(m));
     replayEarlyMessages(this.room, handlers);
@@ -2082,6 +2429,8 @@ export class WorldScene extends Phaser.Scene {
     const k = 1 - Math.exp(-LERP_RATE * (deltaMs / 1000));
     this.syncPlayers(k, deltaMs);
     this.syncMonsters(k);
+    this.tickAutoTarget();
+    this.syncShield();
     this.syncTargetLock();
     this.syncTargetBtnIdle();
     this.syncLoot();
@@ -3350,15 +3699,17 @@ export class WorldScene extends Phaser.Scene {
     e.pipCount = pips.length;
     e.pipText = pipsLabel(pips);
     if (pips.length === 0) {
+      e.pipTop = 0;
       e.statusG?.clear().setVisible(false);
       return;
     }
+    e.pipTop = pipRowTop(radius, boss);
     if (!e.statusG) {
       e.statusG = this.add.graphics();
       e.root.add(e.statusG);
     }
     e.statusG.setVisible(true);
-    drawPips(e.statusG, pips, -radius - (boss ? 36 : 21));
+    drawPips(e.statusG, pips, -radius - (boss ? PIP_ROW_Y_BOSS : PIP_ROW_Y));
     e.pipDraws = (e.pipDraws ?? 0) + 1;
   }
 
@@ -3507,6 +3858,7 @@ export class WorldScene extends Phaser.Scene {
     if (m.target === this.sid) {
       this.recordCombat();
     }
+    if (!m.toPlayer) this.recentHit.set(m.target, this.time.now);
     if (!this.inView(m.x, m.y, 96)) return;
     if (!animReducedMotion()) {
       if (m.toPlayer) {

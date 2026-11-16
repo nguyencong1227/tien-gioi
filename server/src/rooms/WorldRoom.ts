@@ -20,6 +20,9 @@ import {
   DUNGEON_MSG,
   DUEL_MSG,
   HEARTBEAT_MSG,
+  NET_MSG,
+  NET_RECONNECT_GRACE_S,
+  parseBeatMs,
   parsePing,
   type PongMsg,
   SECT_MSG,
@@ -87,6 +90,7 @@ import {
 } from "../store";
 import { defaultSectStore } from "../sect-store";
 import { SectService } from "../sect-service";
+import { newLifeLockMsOf } from "../sect-config";
 import { defaultSoulStore, type SoulStore } from "../soul";
 import { defaultPlayerStore, type PlayerStore } from "../player-store";
 import { legacyIdentity, type Identity } from "../identity";
@@ -126,6 +130,7 @@ import { buy, sell } from "../systems/shop";
 import { abandonQuest, acceptQuest, craft, talk, trade, turnInQuest } from "../systems/npc";
 import { equip, equipmentOf, sanitizeEquipment, setEquipment, unequip } from "../systems/equipment";
 import { tickWorld } from "../systems/tick";
+import { heard, reconnected } from "../systems/net-guard";
 import { VIEW_ENTER } from "../systems/interest";
 import {
   partyAnswer,
@@ -150,6 +155,9 @@ import {
   sectOnJoin,
   sectRank,
   sectTransfer,
+  sectVaultDeposit,
+  sectVaultPolicy,
+  sectVaultWithdraw,
   sectWithdraw,
 } from "../systems/sect";
 import {
@@ -177,7 +185,7 @@ export const CLOSE_TRAVEL = 4000;
 /** Mã nhân vật dài hơn mức này thì từ chối luôn (client tạo mã 32 ký tự) */
 const MAX_SECRET_LEN = 256;
 /** Giây giữ nhân vật chờ kết nối lại khi rớt mạng bất thường (#116) */
-export const RECONNECT_GRACE_S = 20;
+export const RECONNECT_GRACE_S = NET_RECONNECT_GRACE_S; // 90 giây (mục 33; trước đây 20 < thời gian rớt thực tế 25 giây + nối lại)
 
 /** Người chơi vừa rớt mạng, nhân vật vẫn ở trong thế giới chờ kết nối lại */
 interface Ghost {
@@ -274,6 +282,8 @@ export class WorldRoom extends Room<WorldState> {
         sect: (sid, msg) => this.sendTo(sid, SECT_MSG.snapshot, msg),
         sectPresence: (sid, msg) => this.sendTo(sid, SECT_MSG.presence, msg),
         sectInvited: (sid, msg) => this.sendTo(sid, SECT_MSG.invited, msg),
+        sectVault: (sid, msg) => this.sendTo(sid, SECT_MSG.vault, msg),
+        netShield: (sid, msg) => this.sendTo(sid, NET_MSG.shield, msg),
       },
       map,
       this.hub,
@@ -283,6 +293,7 @@ export class WorldRoom extends Room<WorldState> {
     w.onLimbo = (sid) => void this.enterLimbo(sid);
     // Tông môn (M3.6): dịch vụ dùng chung (`SECTS=off` gỡ gấp); lưu hồ sơ NGAY khi chuyển Linh thạch sang kho
     w.sectService = WorldRoom.sectService();
+    w.sectNewLifeLockMs = newLifeLockMsOf(process.env); // cờ kiếp mới chưa được rút (mặc định tắt)
     // Nhật ký kiểm toán (M4 2.4): chỉ ghi khi `startAudit` đã bật ở index.ts
     w.audit = audit;
     w.auditCoinMin = auditCoinThreshold(process.env);
@@ -421,6 +432,9 @@ export class WorldRoom extends Room<WorldState> {
     this.on(SECT_MSG.motd, (sid, m) => void sectMotd(w, sid, m));
     this.on(SECT_MSG.deposit, (sid, m) => void sectDeposit(w, sid, m));
     this.on(SECT_MSG.withdraw, (sid, m) => void sectWithdraw(w, sid, m));
+    this.on(SECT_MSG.vaultDeposit, (sid, m) => void sectVaultDeposit(w, sid, m));
+    this.on(SECT_MSG.vaultWithdraw, (sid, m) => void sectVaultWithdraw(w, sid, m));
+    this.on(SECT_MSG.vaultPolicy, (sid, m) => void sectVaultPolicy(w, sid, m));
     this.on<SoulBuyMsg>("soulBuy", (sid, m) => void this.soulBuy(sid, m?.id));
     this.on<RebirthMsg>("rebirth", (sid, m) => void this.rebirth(sid, m));
     // Loại tin nhắn không đăng ký: bỏ qua, tính là spam
@@ -432,6 +446,9 @@ export class WorldRoom extends Room<WorldState> {
     this.onMessage(type, (c: Client, m: unknown) => {
       const lim = this.limiters.get(c.sessionId);
       if (!lim) return;
+      // Mục 33: MỌI tin hợp lệ là bằng chứng còn sống (kể cả tin bị giới hạn tần suất); đang là hồn lìa xác vì im lặng thì ra khỏi trạng thái đó (kèm hộ thể)
+      const ctl = this.world.ctrl.get(c.sessionId);
+      if (ctl) heard(this.world, c.sessionId, ctl);
       const v = lim.check(type, Date.now());
       if (v === "kick") return this.kick(c);
       // Tin nhắn hợp lệ luôn là object (hoặc không có, vd "breakthrough"); m có thể là bất cứ gì
@@ -611,6 +628,9 @@ export class WorldRoom extends Room<WorldState> {
     this.world.ctrl.set(client.sessionId, {
       save,
       identity,
+      // Mục 33: client có khai nhịp gửi tin (`JoinOptions.beatMs`) thì máy chủ áp luật im lặng cho người này; client cũ thì không
+      beatMs: parseBeatMs(_options?.beatMs) ?? undefined,
+      lastHeardAt: Date.now(),
       inputs: [],
       moveBudget: 4,
       posPhase: this.world.ctrl.size % POS_SYNC_EVERY_TICKS,
@@ -675,15 +695,27 @@ export class WorldRoom extends Room<WorldState> {
         this.ghosts.set(sid, { cancel: () => wait.reject(false), done });
       c.inputs.length = 0; // không còn ai điều khiển: bỏ input đang chờ
       // Hồn lìa xác: bất tử trong lúc chờ, quái bỏ mục tiêu ngay (rớt mạng không được làm mất kiếp)
+      c.silent = false; // đã im lặng từ trước (socket nay mới đóng) thì từ đây là hồn lìa xác THẬT: tickNetGuard bỏ qua, nối lại mới ra
+      const droppedAt = this.world.now;
       this.world.ghosts.add(sid);
       forgetTarget(this.world, sid);
+      // Nhật ký kiểm toán (mục 33, chính sách chỉ ghi nhận): rớt socket giữa trận hay lúc yên, có đang thách đấu không
+      audit("net.drop", {
+        name: p.name,
+        map: this.mapId,
+        hp: Math.round(p.hp),
+        maxHp: p.maxHp,
+        recentlyHit: droppedAt - c.lastHitAt < 5000,
+        duel: this.world.duels.has(sid),
+        silentMs: Math.max(0, Date.now() - (c.lastHeardAt ?? Date.now())),
+      });
       // Lưu ngay, phòng khi server sập trong lúc chờ
       await this.persist(p, c).catch((e) => console.error("save failed", e));
       try {
         await wait;
         // Nối lại được: client nhận Room mới nên gửi lại dữ liệu riêng (tin `party` tới theo nhịp snapshot)
         this.ghosts.delete(sid);
-        this.world.ghosts.delete(sid);
+        reconnected(this.world, sid, c, Math.max(0, Date.now() - droppedAt)); // hết hồn lìa xác, hộ thể 3 giây + quái mất mục tiêu (mục 33)
         sendInv(this.world, sid);
         sendQuests(this.world, sid);
         sendSkills(this.world, sid);

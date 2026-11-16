@@ -186,6 +186,10 @@ export interface RoomSummary {
   ghosts: number;
   monsters: number;
   tick: TickSummary;
+  /** Hàng đợi input di chuyển (`World.inputStats`): bị bỏ vì đầy / số lượt tụt hậu (mục 25) */
+  input: { dropped: number; backlogTicks: number };
+  /** Bảo vệ khi mất kết nối (mục 33, `World.netStats`): lần vào im lặng (hồn lìa xác dù socket mở) / lần tha chết do mạng / lần KHÔNG tha vì đã hết hạn mức */
+  net: { silent: number; spared: number; spareDenied: number };
 }
 
 export interface MetricsSnapshot {
@@ -229,6 +233,12 @@ export function collectMetrics(
       ghosts: w.ghosts.size,
       monsters: w.state.monsters.size,
       tick,
+      input: { dropped: w.inputStats.dropped, backlogTicks: w.inputStats.backlogTicks },
+      net: {
+        silent: w.netStats.silent,
+        spared: w.netStats.spared,
+        spareDenied: w.netStats.spareDenied,
+      },
     });
   }
   return {
@@ -297,6 +307,36 @@ export function renderPrometheus(s: MetricsSnapshot): string {
     "counter",
     "So tick chay lau hon mot nhip",
     (r) => r.tick.overrun,
+  );
+  perRoom(
+    "tiengioi_room_input_dropped_total",
+    "counter",
+    "Input di chuyen bi bo vi hang doi day (nhan vat bi keo giat lui)",
+    (r) => r.input.dropped,
+  );
+  perRoom(
+    "tiengioi_room_input_backlog_ticks_total",
+    "counter",
+    "So luot (nguoi choi x tick) hang doi input con tu 6 input tro len sau khi xu ly (may chu tut hau so voi client)",
+    (r) => r.input.backlogTicks,
+  );
+  perRoom(
+    "tiengioi_room_net_silent_total",
+    "counter",
+    "So lan nguoi choi im lang qua 3 giay (hon lia xac du socket mo): mang chap chon hoac co y ngat goi",
+    (r) => r.net.silent,
+  );
+  perRoom(
+    "tiengioi_room_net_spared_total",
+    "counter",
+    "So lan tha chet do mang (bi ha khi client da im lang tu 2 giay: khong mat kiep)",
+    (r) => r.net.spared,
+  );
+  perRoom(
+    "tiengioi_room_net_spare_denied_total",
+    "counter",
+    "So lan KHONG tha chet do mang vi da het han muc 3 lan / 10 phut (chet that; tang nhanh = co the client sua nhip tim de khong bao gio chet)",
+    (r) => r.net.spareDenied,
   );
   metric(
     "tiengioi_room_tick_ms",

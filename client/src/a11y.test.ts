@@ -5,6 +5,7 @@ import {
   ModalStack,
   isTypingElement,
   getFocusableElements,
+  focusModal,
   processEscapeKey,
   type EscapeHandlers,
   isReducedMotion,
@@ -106,6 +107,12 @@ describe("a11y: isTypingElement", () => {
 
     expect(isTypingElement(checkbox)).toBe(false);
     expect(isTypingElement(radio)).toBe(false);
+    // thanh trượt (âm lượng, bản đồ nhỏ...), nút, màu, tệp: không phải gõ chữ (QUYET_DINH_M3 mục 25)
+    for (const type of ["range", "button", "submit", "reset", "color", "file", "image"])
+      expect(isTypingElement({ tagName: "INPUT", type } as unknown as Element), type).toBe(false);
+    // ô chữ các loại vẫn là gõ chữ
+    for (const type of ["text", "search", "email", "url", "tel", "password", "number"])
+      expect(isTypingElement({ tagName: "INPUT", type } as unknown as Element), type).toBe(true);
     expect(isTypingElement(button)).toBe(false);
     expect(isTypingElement(regularDiv)).toBe(false);
     expect(isTypingElement(null)).toBe(false);
@@ -165,6 +172,18 @@ describe("a11y: processEscapeKey", () => {
     const result = processEscapeKey(handlers);
     expect(result).toBe(true);
     expect(handlers.closeDhudLeaveConfirm).toHaveBeenCalledTimes(1);
+    expect(handlers.closeTopModal).not.toHaveBeenCalled();
+  });
+
+  it("đóng hộp xác nhận dùng chung (đột phá, bán đồ quý...; Esc = Giữ lại): đóng hộp TRƯỚC mọi thứ khác", () => {
+    const handlers: EscapeHandlers = {
+      closeActConfirm: vi.fn(() => true),
+      closeInvDropConfirm: vi.fn(() => true),
+      closeTopModal: vi.fn(() => true),
+    };
+    expect(processEscapeKey(handlers)).toBe(true);
+    expect(handlers.closeActConfirm).toHaveBeenCalledTimes(1);
+    expect(handlers.closeInvDropConfirm).not.toHaveBeenCalled();
     expect(handlers.closeTopModal).not.toHaveBeenCalled();
   });
 
@@ -553,5 +572,53 @@ describe("ModalStack.pruneHidden: gỡ mục sót (QUYET_DINH_M3 mục 25: WASD 
     st.push("a");
     expect(st.pruneHidden(() => false)).toBe(0);
     expect(st.size()).toBe(1);
+  });
+});
+
+describe("a11y: focusModal không cuộn tấm (tấm điện thoại cao hơn màn hình)", () => {
+  /** Phần tử giả đủ cho `getFocusableElements` ở môi trường node (không có `window`). */
+  const el = (cls: string[], extra: Partial<{ autofocus: boolean }> = {}) => {
+    const focus = vi.fn();
+    return {
+      el: {
+        hidden: false,
+        getClientRects: () => [{}],
+        classList: { contains: (c: string) => cls.includes(c) },
+        hasAttribute: (a: string) => a === "autofocus" && !!extra.autofocus,
+        focus,
+      } as unknown as HTMLElement,
+      focus,
+    };
+  };
+  const modalOf = (children: HTMLElement[]) => {
+    const focus = vi.fn();
+    return {
+      modal: { querySelectorAll: () => children, focus } as unknown as HTMLElement,
+      focus,
+    };
+  };
+
+  it("nút đóng nằm CUỐI tấm cao (Cài đặt ~1550 px trên màn 844 px): focus KHÔNG được kéo cuộn tấm tới nút (tấm mở ra đã cuộn mất tiêu đề, cử chỉ kéo-để-đóng với tay không tới)", () => {
+    const first = el(["btn"]);
+    const close = el(["modal-close"]);
+    const { modal } = modalOf([first.el, close.el]);
+    focusModal(modal);
+    expect(close.focus).toHaveBeenCalledTimes(1);
+    expect(close.focus).toHaveBeenCalledWith({ preventScroll: true });
+    expect(first.focus).not.toHaveBeenCalled();
+  });
+
+  it("ô autofocus, phần tử đầu tiên (không có nút đóng) và chính tấm (rỗng) đều focus với preventScroll", () => {
+    const auto = el(["btn"], { autofocus: true });
+    focusModal(modalOf([el(["btn"]).el, auto.el]).modal);
+    expect(auto.focus).toHaveBeenCalledWith({ preventScroll: true });
+
+    const a = el(["btn"]);
+    focusModal(modalOf([a.el, el(["btn"]).el]).modal);
+    expect(a.focus).toHaveBeenCalledWith({ preventScroll: true });
+
+    const empty = modalOf([]);
+    focusModal(empty.modal);
+    expect(empty.focus).toHaveBeenCalledWith({ preventScroll: true });
   });
 });
