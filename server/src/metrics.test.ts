@@ -174,14 +174,15 @@ describe("collectMetrics", () => {
 });
 
 describe("số đo hàng đợi input di chuyển (mục 25)", () => {
-  it("hàng đợi đầy thì đếm input bị bỏ; còn tồn từ INPUT_BACKLOG_WARN trở lên sau xử lý thì đếm lượt tụt hậu; hiện ở collectMetrics và /metrics", () => {
+  it("input bị bỏ (hàng đợi đầy lúc nhận, cũ vượt backlog lúc áp) được đếm; còn tồn từ INPUT_BACKLOG_WARN trở lên sau xử lý thì đếm lượt tụt hậu; hiện ở collectMetrics và /metrics", () => {
     const { hub, a } = twoRoomHub();
     const { p, c } = addPlayer(a.w, "walker");
     c.moveBudget = 0;
     for (let seq = 1; seq <= 70; seq++) queueInput(a.w, "walker", { seq, dx: 1, dy: 0 });
-    expect(a.w.inputStats.dropped).toBe(10); // hàng đợi 60: 10 input vượt bị bỏ
-    tickWorld(a.w, TICK_MS); // xử lý 1 bước: còn 59 chờ (>= INPUT_BACKLOG_WARN)
-    expect(p.lastSeq).toBe(1);
+    expect(a.w.inputStats.dropped).toBe(6); // chặn cứng 64 lúc nhận: 6 input cũ nhất vượt bị bỏ
+    tickWorld(a.w, TICK_MS); // ngân sách 1 bước: giữ 1 + MAX_INPUT_BACKLOG (5) = 6 input mới nhất (65-70), áp 1, còn 5 chờ (>= INPUT_BACKLOG_WARN)
+    expect(a.w.inputStats.dropped).toBe(64); // 6 + 58 bỏ lúc áp
+    expect(p.lastSeq).toBe(65);
     expect(a.w.inputStats.backlogTicks).toBeGreaterThanOrEqual(1);
     const before = a.w.inputStats.backlogTicks;
     c.inputs.length = 0; // hết tồn: tick sau không đếm thêm cho người này
@@ -189,13 +190,13 @@ describe("số đo hàng đợi input di chuyển (mục 25)", () => {
     expect(a.w.inputStats.backlogTicks).toBe(before);
     const snap = collectMetrics(hub, probe);
     const ra = snap.rooms.find((r) => r.room === "roomA")!;
-    expect(ra.input).toEqual({ dropped: 10, backlogTicks: before });
+    expect(ra.input).toEqual({ dropped: 64, backlogTicks: before });
     expect(snap.rooms.find((r) => r.room === "roomB")!.input).toEqual({
       dropped: 0,
       backlogTicks: 0,
     });
     const text = renderPrometheus(snap);
-    expect(text).toMatch(/tiengioi_room_input_dropped_total\{room="roomA",map="[a-z_]+"\} 10/);
+    expect(text).toMatch(/tiengioi_room_input_dropped_total\{room="roomA",map="[a-z_]+"\} 64/);
     expect(text).toMatch(
       new RegExp(
         `tiengioi_room_input_backlog_ticks_total\\{room="roomA",map="[a-z_]+"\\} ${before}`,

@@ -324,8 +324,8 @@ export class World {
   /** Thời gian xử lý mỗi tick của phòng này (M4 3.3); `WorldRoom.update` ghi, `/metrics` đọc. Bench / test không ghi. */
   readonly tickStats = new TickStats();
   /**
-   * Số đo hàng đợi input di chuyển của phòng (mục 25 QUYET_DINH_M3, `docs/THIET_KE_DI_CHUYEN.md`), `/metrics` đọc: `dropped` = input bị bỏ vì hàng đợi đầy
-   * (client đã đoán trước nên nhân vật bị kéo giật lùi); `backlogTicks` = số lượt (người chơi x tick) mà hàng đợi còn `INPUT_BACKLOG_WARN` input trở lên sau khi
+   * Số đo hàng đợi input di chuyển của phòng (mục 25 + 41 QUYET_DINH_M3, `docs/THIET_KE_DI_CHUYEN.md`), `/metrics` đọc: `dropped` = input bị bỏ (cũ vượt backlog
+   * `MAX_INPUT_BACKLOG`, bị input dừng cắt, hoặc hàng đợi đầy; client đã đoán trước nên nhân vật bị kéo lại); `backlogTicks` = số lượt (người chơi x tick) mà hàng đợi còn `INPUT_BACKLOG_WARN` input trở lên sau khi
    * xử lý (máy chủ tụt hậu so với client). Hai số này tăng đều trên bản chạy thật thì có chuyện về mạng hoặc nhịp tick.
    */
   readonly inputStats = { dropped: 0, backlogTicks: 0 };
