@@ -416,13 +416,10 @@ function run(defSeed: number, def: BossDef, mode: "dodge" | "stand", simMs: numb
         if (s.t === "pull" && warnsInCast > 1) continue; // hai vòng cùng một đòn
         if (s.t === "pool" && warnsInCast > 1) continue; // báo lần hai = vũng hiện ra (đã tính ở lần một)
         const th = threatOf(fx, cur);
-        const spotPlan = worstSpot(
-          th.hit,
-          th.box,
-          hazards.filter((hz) => hz.until > w.now).map((hz) => hz.hit),
-        );
+        // chỗ xấu nhất và đường thoát tính như vùng đứng MỘT MÌNH (đúng phạm vi của luật tĩnh); vũng cũ chỉ được phép KHÔNG liên quan tới kế hoạch này (xem dưới)
+        const spotPlan = worstSpot(th.hit, th.box, []);
         const live = hazards.filter((hz) => hz.until > w.now);
-        // cả vùng nằm trong vũng cũ, hoặc đường thoát cắt qua vũng (bot đơn giản không biết vòng): cho bot ra xa, bỏ qua đòn này
+        // vũng cũ chạm vào chỗ đặt, đường thoát hay đích (bot đơn giản không biết vòng; luật tĩnh cũng không tính hai vùng chồng nhau): cho bot ra xa, bỏ qua đòn này
         const crosses =
           spotPlan !== null &&
           live.length > 0 &&
