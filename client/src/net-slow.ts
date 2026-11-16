@@ -82,6 +82,8 @@ export class NetSlowMonitor {
   private slow = false;
   private timer: unknown = null;
   private stopped = false;
+  /** Đã nhận ít nhất một `pong`: máy chủ hiểu `ping`. */
+  private pongSeen = false;
   private origSend: NetSlowRoom["send"] | null = null;
   private wrapper: NetSlowRoom["send"] | null = null;
 
@@ -105,12 +107,17 @@ export class NetSlowMonitor {
     const orig = room.send.bind(room);
     this.origSend = room.send;
     room.send = (type: string, message?: unknown) => {
-      if (type === "ping" || type === "input") this.detector.noteSend(this.now());
+      // `ping` chỉ chắc chắn được đáp lại khi máy chủ từng trả `pong` (máy chủ cũ không hiểu `ping`, như `supported` của nhịp tim); `input` thì luôn được đáp bằng patch
+      if (type === "input" || (type === "ping" && this.pongSeen))
+        this.detector.noteSend(this.now());
       orig(type, message);
     };
     this.wrapper = room.send;
     room.onStateChange(() => this.detector.noteInbound());
-    room.onMessage("pong", () => this.detector.noteInbound());
+    room.onMessage("pong", () => {
+      this.pongSeen = true;
+      this.detector.noteInbound();
+    });
     this.detector.poll(this.now()); // đặt mốc `poll` đầu tiên: lần gửi ngay sau `start()` (ping đầu của nhịp tim) không bị coi là "cũ"
     this.timer = this.setIntervalFn(() => this.tick(), SLOW_POLL_MS);
   }

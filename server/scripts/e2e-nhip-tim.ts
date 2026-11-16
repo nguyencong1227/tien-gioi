@@ -4,7 +4,7 @@
 //  1. Blackhole ở tiền cảnh: socket TCP vẫn mở nhưng ngừng byte -> client phát hiện chết trong <= HEARTBEAT_TIMEOUT_MS + nhịp (<= 14s)
 //     rồi mở lại proxy thì nối lại thành công, cùng sessionId, ví / túi đồ nguyên vẹn.
 //  2. Quay lại tiền cảnh sau khi ở nền: ghi đè document.visibilityState + bắn visibilitychange -> phát hiện chết trong <= RESUME_TIMEOUT_MS + dung sai (<= 4.5s).
-//  3. Server không trả pong (server cũ không hỗ trợ nhịp tim): proxy chặn tin pong -> client KHÔNG tự ngắt kết nối.
+//  3. Server không trả pong (server cũ không hỗ trợ nhịp tim): proxy chặn tin pong -> client KHÔNG tự ngắt kết nối, chip "Mạng chậm" cũng không hiện.
 //  4. Socket cũ (nửa mở) đóng MUỘN sau khi đã nối lại xong (đổi mạng): sự kiện đóng của phòng CŨ không được chạy lại vòng nối lại.
 //  5. Chip "Mạng chậm" (mục 25): đang ĐI BỘ mà mạng đứng thì chip hiện sau ~SLOW_AFTER_MS, TRƯỚC banner nối lại; Ca 1 (đứng yên) chip cũng hiện trước banner
 //     (nhờ ping) và tắt khi nối lại xong.
@@ -610,6 +610,11 @@ async function main() {
       );
     }
     out("  ✓ Khẳng định: Banner nối lại KHÔNG hiển thị, client KHÔNG tự ngắt kết nối");
+    // máy chủ cũ không trả pong: ping không phải bằng chứng gì, chip "Mạng chậm" cũng KHÔNG được hiện (phòng lặng im là bình thường)
+    if (await tab.ev(`!document.getElementById('net-slow')?.hidden`)) {
+      throw new Error('Ca 3: chip "Mạng chậm" hiện dù chỉ vì máy chủ cũ không trả pong (báo nhầm)');
+    }
+    out('  ✓ Máy chủ cũ không trả pong: chip "Mạng chậm" KHÔNG hiện (báo nhầm)');
 
     proxy.setDropPong(false);
 

@@ -178,10 +178,23 @@ describe("NetSlowMonitor", () => {
     h.mon.stop();
   });
 
+  it("máy chủ CŨ không trả pong (chưa từng nhận pong): ping không đặt mốc chờ, không báo nhầm khi phòng lặng im", () => {
+    const h = harness();
+    h.mon.start();
+    for (let i = 0; i < 6; i++) {
+      h.fr.room.send("ping", { t: i });
+      h.advance(5000);
+    }
+    expect(h.calls).toEqual([]);
+    expect(h.mon.isSlow()).toBe(false);
+    h.mon.stop();
+  });
+
   it("ping không có pong: chip hiện ~2,5 giây sau, pong về thì tắt (sau thời gian hiện tối thiểu)", () => {
     const h = harness();
     h.mon.start();
     h.advance(1000);
+    h.fr.pong(); // máy chủ hiểu ping (đã từng trả pong)
     h.fr.room.send("ping", { t: 1 });
     h.advance(2000);
     expect(h.calls).toEqual([]); // 2 giây: chưa
@@ -220,6 +233,7 @@ describe("NetSlowMonitor", () => {
     const original = h.fr.room.send;
     h.mon.start();
     expect(h.fr.room.send).not.toBe(original);
+    h.fr.pong(); // máy chủ hiểu ping
     h.fr.room.send("ping", { t: 1 });
     h.advance(4000);
     expect(h.mon.isSlow()).toBe(true);
