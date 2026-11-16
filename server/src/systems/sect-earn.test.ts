@@ -170,6 +170,21 @@ describe("góp Linh thạch / đồ -> cống hiến (mục 12.3)", () => {
     expect(lastHall(B)!.me.merit).toBe(0);
   });
 
+  it("chết GIỮA LÚC góp (sau khi kho đã cộng, trước khi cộng cống hiến): kho giữ phần đã góp (góp trước khi chết), nhưng KHÔNG có cống hiến cho người đã chết", async () => {
+    await seed(2 * DAY);
+    await join(A);
+    const orig = svc.deposit.bind(svc);
+    svc.deposit = async (...args: Parameters<typeof orig>) => {
+      const r = await orig(...args);
+      lh.w.state.players.get(A)!.dead = true; // bị hạ ngay sau khi kho đã ghi
+      return r;
+    };
+    await sectDeposit(lh.w, A, { amount: 1000 });
+    expect((await store.get("t1"))!.coin).toBe(1000);
+    expect((await meOf(A)).contrib).toBeUndefined();
+    expect(earnEvents()).toHaveLength(0);
+  });
+
   it("người ĐÃ CHẾT không góp được (mục 38) nên không có cống hiến; người khác vẫn kiếm bình thường", async () => {
     await seed(2 * DAY);
     await join(A);

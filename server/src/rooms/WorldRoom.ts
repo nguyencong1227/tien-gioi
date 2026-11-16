@@ -90,7 +90,7 @@ import {
 } from "../store";
 import { defaultSectStore } from "../sect-store";
 import { SectService } from "../sect-service";
-import { earnWarmupOf, newLifeLockMsOf } from "../sect-config";
+import { newLifeLockMsOf } from "../sect-config";
 import { defaultSoulStore, type SoulStore } from "../soul";
 import { defaultPlayerStore, type PlayerStore } from "../player-store";
 import { legacyIdentity, type Identity } from "../identity";
