@@ -14,6 +14,7 @@ import { angleDiff, quantAngle, type World, type PlayerCtrl, type MonsterCtrl } 
 import { applyStats, gainExp } from "./progression";
 import { safeSpot, syncPublicPos } from "./movement";
 import { dropLoot } from "./loot";
+import { bossArmorMult, bossDespawnAdds } from "./boss-state";
 import { bossKilled } from "./dungeon";
 import { onMonsterKilled } from "./quests";
 import { killShares } from "./party";
@@ -106,6 +107,7 @@ export function dealMonsterDamage(
   const mc = w.mctrl.get(id);
   if (!mc) return;
   if (mc.st && mc.st.list.length > 0) dmg = Math.max(1, Math.round(dmg * takenMult(mc.st, w.now)));
+  if (mc.boss) dmg = Math.max(1, Math.round(dmg * bossArmorMult(mc, w.now))); // giáp của trùm (`buff`, mục 42)
   mon.hp = Math.max(0, mon.hp - dmg);
   if (by) mc.damageBy.set(by, (mc.damageBy.get(by) ?? 0) + dmg);
   if (aggro && by) mc.target = by;
@@ -116,6 +118,13 @@ export function dealMonsterDamage(
 /** Chia tu vi theo tỉ lệ sát thương cho những người còn sống, rơi đồ, rồi xóa quái. */
 export function killMonster(w: World, id: string, mc: MonsterCtrl) {
   const mon = w.state.monsters.get(id);
+  if (mc.addOf !== undefined) {
+    // Quái con do trùm gọi (mục 42): KHÔNG tu vi, KHÔNG rơi đồ / Linh thạch, KHÔNG tính nhiệm vụ hay kiếp: chỉ biến mất (chống cày)
+    w.state.monsters.delete(id);
+    w.mctrl.delete(id);
+    return;
+  }
+  if (mc.boss) bossDespawnAdds(w, mc.boss); // trùm chết: quái con biến mất theo, không để chúng đứng lại
   // Hệ số tu vi của từng người (đội chia đều có thưởng, người lẻ theo sát thương: xem killShares)
   const shares = killShares(w, mc.damageBy, mon?.x ?? 0, mon?.y ?? 0);
   for (const [sid, frac] of shares) {

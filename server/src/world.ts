@@ -50,6 +50,7 @@ import type { StatusBox } from "./systems/status-rules";
 import { Duels } from "./systems/duel";
 import { TickStats } from "./metrics";
 import type { Bolt } from "./systems/bolt";
+import type { BossCtrl } from "./systems/boss-state";
 import type { TreasureRt } from "./systems/treasure";
 
 /** Dữ liệu riêng của server cho mỗi người chơi (không gửi xuống client). */
@@ -179,6 +180,10 @@ export interface MonsterCtrl {
   nextSlam?: number;
   /** Tinh anh (M7.3, `systems/elite.ts`): `def` là bản nhân số liệu; rơi thêm đồ và tiền. Trống = quái thường. */
   elite?: true;
+  /** Trùm nhiều chiêu (mục 42, `systems/boss.ts`): giai đoạn, chiêu đang vận, hồi chiêu, quái con. Chỉ có khi phòng bật `World.bossMoves` và loài có bộ chiêu. */
+  boss?: BossCtrl;
+  /** Quái con do trùm gọi: id trùm. KHÔNG rơi đồ, KHÔNG tu vi, KHÔNG tính nhiệm vụ (chống cày); biến mất khi trùm chết hoặc reset. */
+  addOf?: string;
 }
 
 /** Pha của đòn mạnh (`systems/charge.ts`): `windup` đứng gồng tới `until` rồi lao theo `angle`; `recover` đứng thở tới `until`. */
@@ -293,6 +298,11 @@ export class World {
    * system / bench chạy riêng không cần phòng. Nhánh hồi sinh còn dùng cho chết không mất kiếp (PK thách đấu, bước 5).
    */
   reincarnate = false;
+  /**
+   * Trùm nhiều chiêu (mục 42, `systems/boss.ts`): bật thì trùm có bộ chiêu trong `BOSSES` dùng bộ thực thi mới (báo trước, giai đoạn, triệu hồi, cuồng nộ) thay cho đòn thường / đập đất / lao.
+   * Mặc định TẮT (bản chạy thật không đổi cho tới khi dữ liệu thật của E và cân bằng của D xong); `WorldRoom` đặt từ `BOSS_MOVES` (`server/src/systems/boss-config.ts`).
+   */
+  bossMoves = false;
   /** Phòng đăng ký: được gọi (một lần) khi một người vừa vào Hoàng Tuyền, để lưu file, cộng Duyên và gửi `limbo`. */
   onLimbo: ((sid: string) => void) | null = null;
   /**
