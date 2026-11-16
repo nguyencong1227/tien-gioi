@@ -52,15 +52,16 @@ describe("quái sinh ở Âm Sương Trạch", () => {
       for (const old of ["tho", "lang", "ho", "mang", "yeu_vuong"])
         expect(count[old], old).toBeUndefined();
       expect(w.state.monsters.size).toBe(68); // 24 + 18 + 18 + 8 (Hắc Giao 8 con: mục 32 QUYET_DINH_M3)
-      // Hắc Giao RẢI ĐỀU: hai con bất kỳ cách nhau >= SPAWN_SPREAD_PX (không dồn một chỗ / quanh cổng)
+      // Hắc Giao RẢI ĐỀU: hai con bất kỳ cách nhau >= 700 px = SPAWN_SPREAD_PX.hac_giao (không dồn một chỗ / quanh cổng)
       const giao = [...w.state.monsters.values()].filter((m) => m.kind === "hac_giao");
       expect(giao).toHaveLength(8);
+      expect(SPAWN_SPREAD_PX.hac_giao).toBe(700);
       for (let i = 0; i < giao.length; i++)
         for (let j = i + 1; j < giao.length; j++)
           expect(
             Math.hypot(giao[i].x - giao[j].x, giao[i].y - giao[j].y),
             `Hắc Giao ${i}-${j} hạt ${seed}`,
-          ).toBeGreaterThanOrEqual(SPAWN_SPREAD_PX.hac_giao);
+          ).toBeGreaterThanOrEqual(700); // số đã chốt (đo bản đồ thật: ~17 con chứa được); nhập thẳng để đột biến hằng số không tự làm test yếu đi
       vi.restoreAllMocks();
     }
   });
