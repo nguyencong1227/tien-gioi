@@ -2199,6 +2199,10 @@ html[data-input="touch"] #skill-slots .sk.slot .keycap {
     background: rgba(255, 255, 255, 0.1);
   }
 }
+/* hộp xác nhận vứt THẾ CHỖ hàng nút hành động: bố cục không dài thêm, nút luôn ở chỗ người chơi vừa chạm (không chui xuống dưới nút Đóng nổi) */
+#inv-detail.dropping #inv-actions {
+  display: none;
+}
 .inv-drop-confirm {
   margin-top: 8px;
   padding: 10px 12px;
