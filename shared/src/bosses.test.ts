@@ -241,11 +241,13 @@ describe("bossViolations bắt đúng từng luật", () => {
 });
 
 describe("fx mới của trùm (client cũ bỏ qua fx lạ; warn có r0 tuỳ chọn)", () => {
-  it("bossCast / bossPhase / bossEnrage mang (x, y) như mọi fx để sendNear chỉ gửi cho người ở gần; warn r0 tuỳ chọn; đi qua JSON không đổi", () => {
+  it("bossCast / bossPhase / bossEnrage / bossArmor / bossSummon mang (x, y) như mọi fx để sendNear chỉ gửi cho người ở gần; warn r0 tuỳ chọn; đi qua JSON không đổi", () => {
     const fx: FxMsg[] = [
       { kind: "bossCast", by: "m1", x: 10, y: 20, ability: "quat_duoi", ms: 900 },
       { kind: "bossPhase", by: "m1", x: 10, y: 20, phase: 1 },
       { kind: "bossEnrage", by: "m1", x: 10, y: 20 },
+      { kind: "bossArmor", by: "m1", x: 10, y: 20, ms: 4000, mult: 0.5 },
+      { kind: "bossSummon", by: "m1", x: 10, y: 20, n: 2 },
       { kind: "warn", shape: "circle", x: 1, y: 2, r: 120, r0: 40, ms: 900 },
       { kind: "warn", shape: "circle", x: 1, y: 2, r: 120, ms: 900 },
     ];
