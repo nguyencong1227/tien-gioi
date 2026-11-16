@@ -763,6 +763,17 @@ describe("fx giáp / triệu hồi của trùm (bossArmor / bossSummon, T4 #873)
     for (const f of summons(log)) expect(f.n).toBeGreaterThanOrEqual(1);
   });
 
+  it("gọi mà KHÔNG dựng được con nào (mọi chỗ quanh trùm bị chặn): có `bossCast` nhưng KHÔNG `bossSummon`", () => {
+    const { w, mon, tick, until, log } = scene(
+      def([ab("goi", { t: "summon", kind: "tho", count: 2 }, { dmgMult: 0, cooldownMs: 1500 })]),
+    );
+    (w.map as { circleBlocked: unknown }).circleBlocked = () => true;
+    until(() => log.some((l) => l.fx.kind === "bossCast"));
+    tick(100);
+    expect(bossLiveAdds(w, mon.mc.boss!)).toBe(0);
+    expect(summons(log)).toHaveLength(0);
+  });
+
   it("onEnter gọi quái con: `bossPhase` rồi `bossSummon` với n = số con xuất hiện", () => {
     const d = def([ab("a", { t: "circleAt", at: "target", r: 60 })]);
     d.phases.push(
