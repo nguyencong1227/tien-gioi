@@ -388,6 +388,11 @@ async function main() {
         );
         await mouseTo(chat.x, chat.y);
         await evalJs(`window.__scene.setLockedTarget(null)`);
+        // quái sát nhân vật (trong tầm MỌI chiêu): nếu dash tự lao vào quái gần nhất thì ca dưới đây mới đỏ
+        await evalJs(
+          `(() => { const sc = window.__scene, m = sc.state.monsters.get("m1"); m.x = sc.predX + 60; m.y = sc.predY; return 1; })()`,
+        );
+        await sleep(700);
         // dash (A xác nhận ở #536): KHÔNG tự lao vào quái gần nhất khi chưa khoá; không phím, không chuột hợp lệ, chưa khoá -> hướng nhìn
         const aDash = await fire("KeyO");
         check(
