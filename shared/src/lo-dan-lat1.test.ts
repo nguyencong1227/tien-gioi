@@ -15,7 +15,7 @@ import {
 } from "./index";
 
 /** Ba đan hộ đạo (đầu ra của Lò đan), theo bậc đột phá tăng dần: LK->TC, TC->KD, KD->NA. */
-const DAO_HO_IDS = ["dot_pha_dan", "jinzhi_dan", "duyang_dan"] as const;
+const DAO_HO_IDS = ["dot_pha_dan", "kinh_chi_dan", "duong_anh_dan"] as const;
 const DAO_HO_FOR_REALM = [1, 2, 3];
 const daoHoItems = DAO_HO_IDS.map((id) => ITEM_BY_ID[id]!);
 
@@ -42,7 +42,7 @@ describe("NPC Lò đan (lao_dan)", () => {
   });
 });
 
-describe("ba đan hộ đạo (dot_pha_dan / jinzhi_dan / duyang_dan)", () => {
+describe("ba đan hộ đạo (dot_pha_dan / kinh_chi_dan / duong_anh_dan)", () => {
   it("mỗi đan: consumable, effect kind `status`, id `dao_ho`, forRealm đúng 1 / 2 / 3", () => {
     DAO_HO_IDS.forEach((id, i) => {
       const it = ITEM_BY_ID[id]!;
@@ -121,7 +121,7 @@ describe("công thức Lò đan (lao_dan)", () => {
 // ĐỘT BIẾN ĐỎ (issue #763 "Test cần có": >= 5): năm luật dưới đây KHÓA dữ liệu thật — Dã tự chạy đột biến
 // (mutate dữ liệu -> test ĐỎ -> `git checkout --` phục hồi) trước khi commit, kết quả dán PR. Mỗi luật tương
 // ứng một đột biến trong mục "Test cần có"; nếu ai sửa dữ liệu sai luật, test này sẽ đỏ.
-describe("đột biến đỏ — năm luật khoá dữ liệu đan hộ đạo (#763)", () => {
+describe("luật khoá dữ liệu đan hộ đạo (#763)", () => {
   it("(1) đột biến ĐỎ: thêm đan hộ đạo vào ITEM_VALUE (mở chốt chặn sinh Linh thạch) -> sellPrice > 0", () => {
     // Luật: mọi vật phẩm đều có giá TRỪ ba đan hộ đạo (khóa ở currency.test.ts / data-integrity.test.ts).
     // Đột biến: ai bỏ ba đan ra khỏi danh sách miễn giá -> sellPrice(dan) > 0 -> ĐỎ.
@@ -138,9 +138,9 @@ describe("đột biến đỏ — năm luật khoá dữ liệu đan hộ đạo
     }
   });
 
-  it("(3) đột biến ĐỎ: forRealm sai bậc (vd jinzhi_dan -> 1) -> không khớp thứ tự LK/TC/KD", () => {
-    // Luật: dot_pha=1 (LK->TC), jinzhi=2 (TC->KD), duyang=3 (KD->NA).
-    // Đột biến: đổi forRealm của jinzhi_dan -> 1 -> mảng [1,1,3] -> ĐỎ.
+  it("(3) đột biến ĐỎ: forRealm sai bậc (vd kinh_chi_dan -> 1) -> không khớp thứ tự LK/TC/KD", () => {
+    // Luật: dot_pha_dan=1 (LK->TC), kinh_chi_dan=2 (TC->KD), duong_anh_dan=3 (KD->NA).
+    // Đột biến: đổi forRealm của kinh_chi_dan -> 1 -> mảng [1,1,3] -> ĐỎ.
     expect(daoHoItems.map((it) => (it.effect as { forRealm: number }).forRealm)).toEqual([1, 2, 3]);
   });
 

@@ -179,7 +179,7 @@ describe("isQuickCandidate: ô dùng nhanh không bị đan / phù gắn trạng
     expect(isQuickCandidate(undefined)).toBe(false);
   });
   it("mọi đan hồi (huyết / linh / tu vi, KHÔNG gắn trạng thái) vẫn là ứng viên: hành vi cũ không đổi", () => {
-    // Đan hộ đạo (#763: dot_pha_dan / jinzhi_dan / duyang_dan) gắn trạng thái `dao_ho` → KHÔNG là ứng viên dùng nhanh
+    // Đan hộ đạo (#763: dot_pha_dan / kinh_chi_dan / duong_anh_dan) gắn trạng thái `dao_ho` → KHÔNG là ứng viên dùng nhanh
     // (đã kiểm `pill()` → false ở trên). Ở đây chốt các đan hồi cũ KHÔNG gắn trạng thái vẫn là ứng viên, hành vi không đổi.
     for (const it of ITEMS)
       if (it.type === "consumable" && it.effect?.kind !== "status")

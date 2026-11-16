@@ -49,15 +49,19 @@ Phí `coin` + giá trị nguyên liệu (quái rơi) là chỗ **xả Linh thạ
 | Kinh Chỉ Đan | 3.000 | ~4.750 (Trúc Cơ hậu kỳ) | **~0,63 giờ** | vay_mang ×6, da_ho ×6 |
 | Dưỡng Anh Đan | 8.000 | ~16.700 (Kim Đan, mang) | **~0,48 giờ** | suong_mao ×8, quy_giap ×6, doc_nang ×4 |
 
-**Nhận xét:** phí quy ra **dưới một giờ săn** cho mọi đan — rất nhẹ so với giá trị (giảm tới 0,63 giờ phục hồi
-mỗi lần thất bại ở Dưỡng Anh). Nguyên liệu là đồ quái rơi ĐÃ CÓ ở đúng vùng săn của mỗi lần đột phá (LK: Lạc Hà /
+> Nguồn con số thu nhập LS/giờ (làm tròn) từ `docs/CAN_BANG.md`: **mục 2 "Thu nhập Linh thạch mỗi giờ khi săn
+> một loại quái"** cho Luyện Khí → Trúc Cơ — LK Tầng 9 Hắc Hổ **3,815** (dòng ~113), TC Hậu kỳ Hắc Hổ **4,752**
+> (dòng ~122); **mục "Kim Đan sau nội dung → 1. Săn solo"** cho Kim Đan — KD Hậu kỳ Xích Mãng **16,715** (dòng ~373).
+
+**Nhận xét:** phí quy ra **dưới một giờ săn** cho mọi đan — rất nhẹ so với giá trị (giảm tới ~0,8 giờ phục hồi
+mỗi lần thất bại ở Dưỡng Anh, mục 2). Nguyên liệu là đồ quái rơi ĐÃ CÓ ở đúng vùng săn của mỗi lần đột phá (LK: Lạc Hà /
 TC: Xích Mãng boss / KD: Âm Sương), KHÔNG thêm nguồn rơi mới ở lát 1. `coin` tăng theo bậc (500 → 3.000 → 8.000,
 test giữ `forRealm` tăng dần theo `coin`), đúng với giá trị đan tăng theo bậc.
 
 ## 4. Kết luận — đan ĐÁNG mua, KHÔNG bắt buộc
 
-- **Đáng mua:** EV (giảm thất bại 33–70%, tiết kiệm tới ~0,63 giờ tu vi + máu/lần) lớn hơn chi phí (phí < 1 giờ
-  săn + nguyên liệu rơi). Người chơi cày tới đột phá cảnh giới lớn sẽ thấy lời.
+- **Đáng mua:** EV (giảm thất bại ~41–42%, tiết kiệm tới ~0,8 giờ tu vi + máu/lần ở bậc cao nhất) lớn hơn chi phí
+  (phí < 1 giờ săn + nguyên liệu rơi). Người chơi cày tới đột phá cảnh giới lớn sẽ thấy lời.
 - **Không bắt buộc:** phí + nguyên liệu nhỏ (dưới một giờ săn), KHÔNG trả quá tay; đột phá KHÔNG có đan vẫn làm
   được (p gốc 61–77%), chỉ rủi ro hơn. KHÔNG bán lại được (`sellPrice` = 0, KHÔNG vào `ITEM_VALUE`) — chốt chặn
   chống sinh Linh thạch.

@@ -413,7 +413,7 @@ describe("nhất quán dữ liệu game (Issue #112 - data-integrity)", () => {
 
     it("mọi vật phẩm đều có định nghĩa giá trong ITEM_VALUE", () => {
       // Đan hộ đạo (Lò đan, #763) cố ý KHÔNG có giá: đồ tự chế chỉ tiêu hao, KHÔNG bán được (guard trong lo-dan-lat1.test.ts).
-      const khong_gia = new Set(["dot_pha_dan", "jinzhi_dan", "duyang_dan"]);
+      const khong_gia = new Set(["dot_pha_dan", "kinh_chi_dan", "duong_anh_dan"]);
       for (const item of ITEMS) {
         if (khong_gia.has(item.id)) continue;
         expect(

@@ -181,11 +181,11 @@ export const DAO_HO_RECIPES: RecipeDef[] = [
     ["nanh_soi", 8],
     ["da_ho", 4],
   ]),
-  ld("luyen_jinzhi_dan", "jinzhi_dan", 3000, [
+  ld("luyen_kinh_chi_dan", "kinh_chi_dan", 3000, [
     ["vay_mang", 6],
     ["da_ho", 6],
   ]),
-  ld("luyen_duyang_dan", "duyang_dan", 8000, [
+  ld("luyen_duong_anh_dan", "duong_anh_dan", 8000, [
     ["suong_mao", 8],
     ["quy_giap", 6],
     ["doc_nang", 4],
