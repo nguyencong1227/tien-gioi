@@ -214,6 +214,20 @@ describe("số đo hàng đợi input di chuyển (mục 25)", () => {
   });
 });
 
+describe("số đo bảo vệ khi mất kết nối (mục 33)", () => {
+  it("lần im lặng / tha chết hiện ở collectMetrics và văn bản Prometheus (nhãn phòng)", () => {
+    const { hub, a } = twoRoomHub();
+    a.w.netStats.silent = 3;
+    a.w.netStats.spared = 1;
+    const snap = collectMetrics(hub, probe);
+    expect(snap.rooms.find((r) => r.room === "roomA")!.net).toEqual({ silent: 3, spared: 1 });
+    expect(snap.rooms.find((r) => r.room === "roomB")!.net).toEqual({ silent: 0, spared: 0 });
+    const text = renderPrometheus(snap);
+    expect(text).toMatch(/tiengioi_room_net_silent_total\{room="roomA",map="[a-z_]+"\} 3/);
+    expect(text).toMatch(/tiengioi_room_net_spared_total\{room="roomA",map="[a-z_]+"\} 1/);
+  });
+});
+
 describe("renderPrometheus", () => {
   it("có số đo chính, nhãn phòng / bản đồ và thoát ký tự đặc biệt trong nhãn", () => {
     const { hub, a } = twoRoomHub();
