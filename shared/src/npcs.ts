@@ -229,7 +229,7 @@ export const NPCS: NpcDef[] = [
       "Đột phá rủi ro lắm, thất bại là mất tu vi cùng nửa khí huyết; đan hộ đạo cộng chút xác suất cho an toàn hơn.",
       "Muốn luyện đan hộ đạo thì mang nguyên liệu yêu thú tới, ta sẽ nấu cho ngươi viên hộ đạo đúng cảnh giới của mình.",
       "Đan hộ đạo chỉ dùng được khi ngươi đã đạt đỉnh bậc với đầy tu vi, đúng cảnh giới của viên đan mới có tác dụng.",
-      "Hiệu lực đan hộ đạo có hạn, dùng xong trước khi đột phá là vừa; qua cổng hay rời trấn là mất, chớ luyện sớm.",
+      "Hiệu lực đan hộ đạo có hạn, dùng xong trước khi đột phá là vừa; qua cổng hay thoát game là mất, chớ luyện sớm.",
     ],
     color: 0xb07a3a,
   },
