@@ -424,7 +424,7 @@ if (
       if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true });
       const outPath =
         opts.outputJsonPath ?? path.join(dataDir, `flaky-${opts.mode ?? "idle"}.json`);
-      writeFileSync(outPath, JSON.stringify(report, null, 2), "utf8");
+      writeFileSync(outPath, JSON.stringify(report, null, 2) + "\n", "utf8");
       console.log(`Đã lưu kết quả chi tiết vào: ${outPath}\n`);
       process.exit(0);
     })
