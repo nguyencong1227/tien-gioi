@@ -41,12 +41,19 @@ import {
   sectLevelInfo,
   sectLevelOf,
   sectResetAt,
+  sectQuestCh,
+  sectQuestFor,
+  sectQuestSlots,
   sectQuestTemplateOf,
   sectVaultAccepts,
+  dayKey,
+  SECT_QUEST_BY_ID,
+  SECT_QUEST_TEMPLATE_BY_ID,
   type InvSlot,
   type SectAssignableRank,
   type SectEarnSource,
   type SectFail,
+  type SectHallQuest,
   type SectHallView,
   type SectView,
   type SectVaultView,
@@ -658,6 +665,7 @@ export function sectHallViewOf(
   viewerKey: string,
   now: number,
   warmup: boolean,
+  ctx?: SectHallCtx,
 ): SectHallView | null {
   const me = sect.members.find((m) => m.soulKey === viewerKey);
   if (!me) return null;
@@ -682,9 +690,51 @@ export function sectHallViewOf(
       depositLeft: sectEarnLeft(day, "deposit"),
       earnFromAt: sectCanEarn(me.joinedAt, now, warmup) ? 0 : sectEarnFromAt(me.joinedAt, warmup),
     },
-    quests: [],
+    quests: ctx ? hallQuestsOf(sect, day, now, ctx) : [],
     shop: [],
   };
+}
+
+/** Phần của người xem mà bản ghi tông môn KHÔNG có (cảnh giới, nhiệm vụ đang làm): người gọi lấy từ `World` rồi truyền vào `sectHallViewOf`. */
+export interface SectHallCtx {
+  /** Cảnh giới hiện tại (quyết định bản theo BẬC của nhiệm vụ) */
+  realm: number;
+  /** Id nhiệm vụ đang làm trong sổ nhiệm vụ của người xem (bản nào cũng được: nhận Luyện Khí rồi đột phá vẫn là cùng một mẫu) */
+  active: readonly string[];
+}
+
+/**
+ * Nhiệm vụ tông hôm nay của người xem (mục 12.7): `sectQuestSlots` chọn tất định theo `hash(sectId, ngày)` nên mọi thành viên cùng thấy cùng các MẪU; mỗi mẫu hiện bản theo bậc của
+ * người xem (`sectQuestFor`). Trạng thái theo MẪU (không theo bản): `done` = đã trả hôm nay (sổ ngày của linh hồn nên đầu thai / đổi bậc giữa ngày không làm lại được), `active` = đang làm
+ * (bản nào cũng tính), còn lại `offer`.
+ */
+function hallQuestsOf(
+  sect: Sect,
+  day: { quests: readonly string[] },
+  now: number,
+  ctx: SectHallCtx,
+): SectHallQuest[] {
+  const out: SectHallQuest[] = [];
+  for (const tplId of sectQuestSlots(sect.id, dayKey(now))) {
+    const id = sectQuestFor(tplId, ctx.realm);
+    const def = id ? SECT_QUEST_BY_ID[id] : undefined;
+    const tpl = byId(SECT_QUEST_TEMPLATE_BY_ID, tplId);
+    if (!id || !def || !tpl) continue;
+    const state = day.quests.includes(tplId)
+      ? "done"
+      : ctx.active.some((a) => sectQuestTemplateOf(a) === tplId)
+        ? "active"
+        : "offer";
+    out.push({
+      questId: id,
+      title: def.title,
+      desc: def.desc,
+      difficulty: tpl.difficulty,
+      ch: sectQuestCh(id),
+      state,
+    });
+  }
+  return out;
 }
 
 /** Ảnh chụp gửi cho thành viên `viewerKey` (`SectMsg.sect`); `null` nếu người đó không ở tông môn. Thành viên xếp theo `compareSectMembers`. */

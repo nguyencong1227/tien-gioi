@@ -156,6 +156,8 @@ import {
   sectRank,
   sectTransfer,
   sectHallGet,
+  sectQuestAccept,
+  sectQuestTurnIn,
   sectVaultDeposit,
   sectVaultPolicy,
   sectVaultWithdraw,
@@ -444,6 +446,8 @@ export class WorldRoom extends Room<WorldState> {
     this.on(SECT_MSG.deposit, (sid, m) => void sectDeposit(w, sid, m));
     this.on(SECT_MSG.withdraw, (sid, m) => void sectWithdraw(w, sid, m));
     this.on(SECT_MSG.hallGet, (sid, m) => void sectHallGet(w, sid, m));
+    this.on(SECT_MSG.questAccept, (sid, m) => void sectQuestAccept(w, sid, m));
+    this.on(SECT_MSG.questTurnIn, (sid, m) => void sectQuestTurnIn(w, sid, m));
     this.on(SECT_MSG.vaultDeposit, (sid, m) => void sectVaultDeposit(w, sid, m));
     this.on(SECT_MSG.vaultWithdraw, (sid, m) => void sectVaultWithdraw(w, sid, m));
     this.on(SECT_MSG.vaultPolicy, (sid, m) => void sectVaultPolicy(w, sid, m));

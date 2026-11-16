@@ -94,6 +94,8 @@ export const EXPECTED_MESSAGE_TYPES = [
   SECT_MSG.vaultWithdraw,
   SECT_MSG.vaultPolicy,
   SECT_MSG.hallGet, // M8: xin ảnh chụp Nội vụ (chỉ đọc)
+  SECT_MSG.questAccept, // M8.4: nhận nhiệm vụ tông môn
+  SECT_MSG.questTurnIn, // M8.4: trả nhiệm vụ tông môn
   // Luân hồi
   "soulBuy",
   "rebirth",
