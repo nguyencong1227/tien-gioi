@@ -125,10 +125,10 @@ export const BREAK_CHANCE_CAP = 0.95;
 
 /**
  * Xác suất đột phá có cộng `bonus` (phân số, từ trạng thái `dao_ho`): `breakthroughChance(realm) + bonus`, kẹp ở `BREAK_CHANCE_CAP`.
- * `bonus` âm / không hữu hạn coi là 0 (không bao giờ GIẢM xác suất gốc); không bao giờ thấp hơn `breakthroughChance(realm)`.
+ * `bonus` không hữu hạn coi là 0; `bonus` âm không bao giờ GIẢM xác suất gốc (`Math.max` với `base`).
  */
 export function breakthroughChanceWith(realm: number, bonus: number): number {
   const base = breakthroughChance(realm);
-  const b = Number.isFinite(bonus) && bonus > 0 ? bonus : 0;
+  const b = Number.isFinite(bonus) ? bonus : 0;
   return Math.max(base, Math.min(BREAK_CHANCE_CAP, base + b));
 }
