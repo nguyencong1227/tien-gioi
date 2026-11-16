@@ -177,7 +177,10 @@ export class BossFxTracker {
     const r = this.armor.get(id);
     if (!r || !finite(now)) return null;
     const left = r.until - now;
-    return left > 0 ? { mult: r.mult, leftMs: left, frac: Math.min(1, left / r.ms) } : null;
+    // đồng hồ cảnh lùi (trước lúc nhận) thì không được báo còn NHIỀU HƠN thời lượng giáp
+    return left > 0
+      ? { mult: r.mult, leftMs: Math.min(left, r.ms), frac: Math.min(1, left / r.ms) }
+      : null;
   }
   onEnrage(by: string, now: number): void {
     if (typeof by === "string" && finite(now)) this.enrageAt.set(by, now);

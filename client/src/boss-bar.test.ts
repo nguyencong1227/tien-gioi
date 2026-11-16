@@ -262,6 +262,8 @@ describe("giáp + gọi quái con của trùm (T4 #873, fx bossArmor / bossSummo
     expect(t.armorOf("b1", 4999)?.leftMs).toBe(1);
     expect(t.armorOf("b1", 5000)).toBeNull();
     expect(t.armorOf("khac", 3000)).toBeNull();
+    // đồng hồ cảnh lùi về trước lúc nhận: không báo còn nhiều hơn thời lượng giáp, phần còn lại không vượt 1
+    expect(t.armorOf("b1", 0)).toEqual({ mult: 0.5, leftMs: 4000, frac: 1 });
     expect(t.modelOf(c, 3000).armor).toEqual({ pct: 50, leftMs: 2000 });
     expect(t.modelOf(c, 5000).armor).toBeNull();
     expect(bossBarText(t.modelOf(c, 3000))).toContain("có giáp (nhận 50 % sát thương)");
