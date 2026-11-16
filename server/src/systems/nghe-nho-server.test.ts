@@ -82,13 +82,25 @@ describe("useItem: ItemEffect `status`", () => {
     expect(aidOf(t)!.until - t.w.now).toBe(900_000);
   });
 
-  it("dùng hai viên: LÀM MỚI, không cộng dồn (ratio lớn nhất, một mục dao_ho), vẫn trừ đủ hai đan", () => {
+  it("viên thứ hai khi hiệu lực còn hạn: TỪ CHỐI, KHÔNG trừ đan, không đổi hạn / ratio; hết hạn thì dùng lại được", () => {
     const t = setup(aid({ ratio: 0.1 }));
     useItem(t.w, "a", 0);
-    ITEM_BY_ID[TEST_PILL].effect = aid({ ratio: 0.18 }) as ItemEffect;
+    const until = aidOf(t)!.until;
+    expect(qtyOf(t)).toBe(1);
+    ITEM_BY_ID[TEST_PILL].effect = aid({ ratio: 0.18 }) as ItemEffect; // viên mạnh hơn cũng không làm mới khi còn hạn
+    t.w.now += 60_000;
     useItem(t.w, "a", 0);
     expect(t.c.st!.list.filter((s) => s.id === "dao_ho")).toHaveLength(1);
+    expect(aidOf(t)!.until).toBe(until);
+    expect(aidOf(t)!.ratio).toBeCloseTo(0.1, 12);
+    expect(qtyOf(t)).toBe(1); // vẫn còn một viên
+    expect(t.toasts.at(-1)?.msg.text).toContain("còn hiệu lực");
+    expect(t.toasts.at(-1)?.msg.text).toContain("9:00"); // 600 s - 60 s
+    // hết hạn: dùng lại bình thường
+    t.w.now = until;
+    useItem(t.w, "a", 0);
     expect(aidOf(t)!.ratio).toBeCloseTo(0.18, 12);
+    expect(aidOf(t)!.until).toBe(until + 600_000);
     expect(qtyOf(t)).toBe(0);
   });
 
