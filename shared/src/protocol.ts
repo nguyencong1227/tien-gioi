@@ -31,8 +31,13 @@
  * (`ItemType` "book"), hành vi quái (`MonsterKind.behavior`...): client cũ không có hộp công pháp / báo trước đòn và không hiểu tin mới. DỰ KIẾN
  * thêm cùng đợt M7 (chưa có trong bản này): `Monster.fx` / `Monster.elite` (M7.3), ba ô trang bị mới (M7.4), bản đồ + quái Nguyên Anh (M7.5).
  * `MIN_PROTOCOL_VERSION` giữ nguyên tới lúc phát hành v0.3.0 (M7.14).
+ * 4 (nghề nhỏ #514, `docs/THIET_KE_NGHE_NHO.md`): `ItemEffect` kind `status` (đan hộ đạo: vật phẩm gắn trạng thái), `StatusId` `dao_ho` (kind `breakAid`,
+ * tin `status` mang `ratio` cho loại mới), `NpcDef.station` + `DialogAction` `forge.station` (Lò đan / Bàn phù: chữ tiêu đề, nút, toast theo trạm) và
+ * vật phẩm / NPC / công thức nghề mới; client cũ không hiểu hiệu ứng `status` của vật phẩm (không số liệu, không chip đếm ngược) và gọi lò đan là
+ * "Lò Rèn". Tăng TRƯỚC khi PR dữ liệu nghề đầu tiên (NPC Lò đan + đan hộ đạo, issue #763) vào `main`. `MIN_PROTOCOL_VERSION` KHÔNG đổi: nâng nó là
+ * quyết định lúc phát hành bản có nghề.
  */
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 
 /** Phiên bản thấp nhất server còn nhận. 0 = nhận cả client chưa biết tới `v`. */
 export const MIN_PROTOCOL_VERSION = 0;
