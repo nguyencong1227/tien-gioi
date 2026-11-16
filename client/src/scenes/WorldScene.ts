@@ -171,7 +171,17 @@ import { clientCanChallenge } from "../duel";
 import { replayEarlyMessages } from "../early-messages";
 import { sound } from "../audio";
 import { joystick, setupJoystick } from "../joystick";
-import { keepLock, pickNextPlayer, pickNextTarget, pickPrevTarget } from "../target-lock";
+import { keepLock, pickNextPlayer, pickNextTarget } from "../target-lock";
+import {
+  ENGAGED_MS,
+  cycleTarget,
+  escapeTarget,
+  otherAimMode,
+  stepTarget,
+  type AimMode,
+  type AutoCandidate,
+  type TargetState,
+} from "../auto-target";
 import {
   chooseAim,
   cursorFromPointer,
@@ -387,6 +397,16 @@ export class WorldScene extends Phaser.Scene {
   private nextSlash = 0;
   /** Khoá mục tiêu (#327): id quái đang khoá (null = tự ngắm quái gần nhất như cũ) và vòng đánh dấu. */
   private lockedTargetId: string | null = null;
+  /** Mục tiêu CHỌN TAY (Tab / nút) lúc đang ở chế độ Tự động: giữ tới khi nó mất / ra khỏi màn hình hoặc bấm Esc, rồi quay lại tự động (mục 26). */
+  private targetPinned = false;
+  /** Chế độ nhắm ở khung trước (phát hiện đổi chế độ giữa chừng để bỏ ghim) */
+  private lastAimMode: AimMode | null = null;
+  private nextAutoTargetAt = 0;
+  /** Mốc trúng đòn gần nhất của từng quái (`time.now`): "đang bị đánh dở" chỉ để phân thắng bại khi khoảng cách gần bằng nhau (`DmgMsg` không nêu người đánh). */
+  private recentHit = new Map<string, number>();
+  /** Tên + khí huyết nhỏ của mục tiêu hiện tại, ngay trên vòng đánh dấu */
+  private targetInfo?: Phaser.GameObjects.Text;
+  private targetInfoKey = "";
   /** Hộ thể sau khi nối lại / có tin lại / được tha chết vì mạng (mục 33): máy chủ gửi `netShield`, client đếm ngược theo đồng hồ của mình và vẽ vầng sáng + chữ. */
   private shield = new ShieldTimer();
   private shieldRing?: Phaser.GameObjects.Arc;
@@ -589,8 +609,9 @@ export class WorldScene extends Phaser.Scene {
       onPickup: () => !this.isReconnecting && this.pickupNearest(),
       // Esc khi không còn bảng nào để đóng: bỏ chọn mục tiêu (QUYET_DINH_M3 mục 13, #463)
       onClearTarget: () => {
-        if (this.lockedTargetId === null) return false;
-        this.setLockedTarget(null);
+        const r = escapeTarget(ui.getAimMode(), this.targetState());
+        if (!r.handled) return false; // chế độ Tự động mà không ghim tay: Esc không làm gì (bỏ ra là chọn lại ngay)
+        this.applyTargetState(r.state);
         return true;
       },
       onTalk: () => !this.isReconnecting && this.talkClosestNpc(),
@@ -1335,6 +1356,9 @@ export class WorldScene extends Phaser.Scene {
       case "target.prev":
         this.toggleLockTarget(-1, true);
         break;
+      case "target.mode":
+        ui.setAimMode(otherAimMode(ui.getAimMode()), true);
+        break;
       case "prompt.yes":
         ui.answerPrompt("yes");
         break;
@@ -1384,27 +1408,106 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  /** Bấm đánh bằng bàn phím mà chưa có mục tiêu: tự khoá con quái gần nhất trong tầm (vòng đánh dấu hiện ra, kỹ năng quay về phía nó). */
+  /**
+   * Bấm đánh bằng bàn phím mà chưa có mục tiêu: tự khoá con quái gần nhất trong tầm (vòng đánh dấu hiện ra, kỹ năng quay về phía nó). Chế độ Tự động (mục 26): mục tiêu
+   * luôn do `tickAutoTarget` giữ, ở đây chỉ chạy một nhịp NGAY (không chờ 100 ms) để đòn đầu tiên cũng theo mục tiêu.
+   */
   private autoLockNearest() {
-    if (this.lockedTargetId !== null || this.isReconnecting || ui.isLimboOpen()) return;
+    if (this.isReconnecting || ui.isLimboOpen()) return;
     const me = this.me();
     if (!me || me.dead) return;
+    if (ui.getAimMode() === "auto") {
+      this.tickAutoTarget(true);
+      return;
+    }
+    if (this.lockedTargetId !== null) return;
     const id = pickNextTarget(this.targetCandidates(true), null);
     if (id) this.setLockedTarget(id);
   }
 
+  /** Trạng thái mục tiêu hiện tại (cho `auto-target.ts`). */
+  private targetState(): TargetState {
+    return { id: this.lockedTargetId, pinned: this.targetPinned };
+  }
+
+  private applyTargetState(s: TargetState) {
+    if (s.id !== this.lockedTargetId) this.setLockedTarget(s.id);
+    this.targetPinned = s.id === null ? false : s.pinned;
+  }
+
+  /** Id ứng viên của người chơi (đối thủ PK) mang tiền tố này để không trùng id quái. */
+  private static readonly PLAYER_TARGET = "p:";
+
+  /** Thực thể của mục tiêu (quái, hoặc đối thủ PK có tiền tố `p:`); `undefined` nếu không còn. */
+  private targetEntity(id: string): Entity | undefined {
+    return id.startsWith(WorldScene.PLAYER_TARGET)
+      ? this.players.get(id.slice(WorldScene.PLAYER_TARGET.length))
+      : this.monsters.get(id);
+  }
+
+  /** Đối thủ trong trận PK thách đấu đang đánh (theo đạo hiệu ở `DuelStateMsg.opponent`), `null` nếu không có / không thấy. */
+  private duelOpponent(): { sid: string; e: Entity } | null {
+    if (!ui.isDuelActive()) return null;
+    const name = ui.getDuelOpponent();
+    if (!name) return null;
+    let found: { sid: string; e: Entity } | null = null;
+    this.state.players.forEach((p: any, sid: string) => {
+      if (found || sid === this.sid || p.name !== name) return;
+      const e = this.players.get(sid);
+      if (e) found = { sid, e };
+    });
+    return found;
+  }
+
   /**
-   * Ứng viên khoá mục tiêu. `onScreenOnly` (bàn phím, góp ý của A ở #465): chỉ quái ĐANG THẤY trên màn hình (trong khung camera), không phải cả
+   * Ứng viên nhắm mục tiêu. `onScreenOnly` (bàn phím, góp ý của A ở #465): chỉ quái ĐANG THẤY trên màn hình (trong khung camera), không phải cả
    * tầm khoá 520 px (khung máy tính cao chỉ ~640 px nên quái ở 450 px phía trên nằm ngoài màn hình). Nút cảm ứng giữ nguyên (mọi quái trong tầm).
+   * Trong trận PK thách đấu chỉ có ĐỐI THỦ (mục 26). Quái vừa trúng đòn được gắn `engaged` (chỉ phân thắng bại khi gần bằng nhau).
    */
-  private targetCandidates(onScreenOnly: boolean): Array<{ id: string; dist: number }> {
+  private targetCandidates(onScreenOnly: boolean): AutoCandidate[] {
     const view = this.cameras.main.worldView;
-    const cands: Array<{ id: string; dist: number }> = [];
+    const cands: AutoCandidate[] = [];
+    const opp = this.duelOpponent();
+    if (opp) {
+      if (!onScreenOnly || view.contains(opp.e.tx, opp.e.ty))
+        cands.push({
+          id: WorldScene.PLAYER_TARGET + opp.sid,
+          dist: Math.hypot(opp.e.tx - this.predX, opp.e.ty - this.predY),
+        });
+      return cands;
+    }
+    const now = this.time.now;
+    if (this.recentHit.size > 64)
+      for (const [id, t] of this.recentHit) if (now - t > ENGAGED_MS) this.recentHit.delete(id);
     this.monsters.forEach((m, id) => {
       if (onScreenOnly && !view.contains(m.tx, m.ty)) return;
-      cands.push({ id, dist: Math.hypot(m.tx - this.predX, m.ty - this.predY) });
+      const t = this.recentHit.get(id);
+      cands.push({
+        id,
+        dist: Math.hypot(m.tx - this.predX, m.ty - this.predY),
+        engaged: t !== undefined && now - t < ENGAGED_MS,
+      });
     });
     return cands;
+  }
+
+  /**
+   * Chế độ Tự động (mục 26, mặc định): mỗi ~100 ms chọn lại mục tiêu theo `stepTarget` (gần nhất, chống nhảy, mất mục tiêu thì chọn ngay; mục tiêu chọn tay giữ tới khi
+   * mất). Chế độ Thủ công không làm gì ở đây (khoá tay như cũ). Đổi chế độ giữa chừng: bỏ ghim, giữ mục tiêu đang có. `force` = chạy ngay, không chờ nhịp.
+   */
+  private tickAutoTarget(force = false) {
+    const mode = ui.getAimMode();
+    if (mode !== this.lastAimMode) {
+      this.lastAimMode = mode;
+      this.targetPinned = false;
+    }
+    if (mode !== "auto" || this.isReconnecting || ui.isLimboOpen()) return;
+    const me = this.me();
+    if (!me || me.dead) return;
+    const now = this.time.now;
+    if (!force && now < this.nextAutoTargetAt) return;
+    this.nextAutoTargetAt = now + 100;
+    this.applyTargetState(stepTarget("auto", this.targetState(), this.targetCandidates(true)));
   }
 
   private moveDir() {
@@ -1424,7 +1527,7 @@ export class WorldScene extends Phaser.Scene {
 
   /** Hướng tới mục tiêu đang khoá (còn trong tầm khoá); `null` nếu không khoá hoặc mục tiêu đã mất / quá xa. */
   private lockedTargetAngle(): number | null {
-    const locked = this.lockedTargetId ? this.monsters.get(this.lockedTargetId) : undefined;
+    const locked = this.lockedTargetId ? this.targetEntity(this.lockedTargetId) : undefined;
     if (!locked) return null;
     const d = Math.hypot(locked.tx - this.predX, locked.ty - this.predY);
     return keepLock(d) ? Math.atan2(locked.ty - this.predY, locked.tx - this.predX) : null;
@@ -1474,27 +1577,44 @@ export class WorldScene extends Phaser.Scene {
    */
   private toggleLockTarget(step: 1 | -1 = 1, onScreenOnly = false) {
     if (this.isReconnecting || ui.isLimboOpen()) return;
-    const pick = step === 1 ? pickNextTarget : pickPrevTarget;
-    this.setLockedTarget(pick(this.targetCandidates(onScreenOnly), this.lockedTargetId));
+    const mode = ui.getAimMode();
+    // Tự động: chỉ chọn trong quái ĐANG THẤY (cùng tập với `tickAutoTarget`), nếu không mục tiêu chọn tay ở ngoài màn hình bị bỏ ghim ngay khung sau
+    const next = cycleTarget(
+      mode,
+      this.targetState(),
+      this.targetCandidates(onScreenOnly || mode === "auto"),
+      step,
+    );
+    this.applyTargetState(next);
   }
 
   private setLockedTarget(id: string | null) {
     this.lockedTargetId = id;
+    if (id === null) this.targetPinned = false;
     const btn = document.getElementById("btn-target");
     if (btn) {
       btn.classList.toggle("locked", id !== null);
       btn.setAttribute("aria-pressed", String(id !== null));
-      const mon = id ? this.monsters.get(id) : undefined;
-      const kind = mon?.monKind;
       const label = document.getElementById("btn-target-label");
-      if (label)
-        label.textContent = kind
-          ? MONSTER_BY_ID[kind]
-            ? eliteName(MONSTER_BY_ID[kind].name, !!mon?.elite)
-            : "Mục tiêu"
-          : "Mục tiêu";
+      if (label) label.textContent = id ? this.targetName(id) : "Mục tiêu";
     }
-    if (id === null) this.targetRing?.setVisible(false);
+    if (id === null) {
+      this.targetRing?.setVisible(false);
+      this.targetInfo?.setVisible(false);
+    }
+  }
+
+  /** Tên hiển thị của mục tiêu: quái (kèm dấu tinh anh) hoặc đạo hiệu đối thủ PK; "Mục tiêu" nếu chưa rõ. */
+  private targetName(id: string): string {
+    if (id.startsWith(WorldScene.PLAYER_TARGET)) {
+      const p: any = this.state.players.get(id.slice(WorldScene.PLAYER_TARGET.length));
+      return p?.name || "Đối thủ";
+    }
+    const mon = this.monsters.get(id);
+    const kind = mon?.monKind;
+    return kind && MONSTER_BY_ID[kind]
+      ? eliteName(MONSTER_BY_ID[kind].name, !!mon?.elite)
+      : "Mục tiêu";
   }
 
   /**
@@ -1506,12 +1626,7 @@ export class WorldScene extends Phaser.Scene {
     if (now - this.targetIdleAt < 200) return;
     this.targetIdleAt = now;
     let any = this.lockedTargetId !== null;
-    if (!any)
-      for (const m of this.monsters.values())
-        if (keepLock(Math.hypot(m.tx - this.predX, m.ty - this.predY))) {
-          any = true;
-          break;
-        }
+    if (!any) any = this.targetCandidates(false).some((c) => keepLock(c.dist));
     const idle = !any;
     if (idle === this.targetBtnIdle) return;
     this.targetBtnIdle = idle;
@@ -1526,9 +1641,11 @@ export class WorldScene extends Phaser.Scene {
   private syncTargetLock() {
     const id = this.lockedTargetId;
     if (!id) return;
-    const e = this.monsters.get(id);
+    const e = this.targetEntity(id);
     const d = e ? Math.hypot(e.tx - this.predX, e.ty - this.predY) : null;
-    if (!e || !keepLock(d)) {
+    // đối thủ PK chỉ là mục tiêu trong trận: hết trận thì nhả (kể cả chế độ Thủ công)
+    const duelOver = id.startsWith(WorldScene.PLAYER_TARGET) && !ui.isDuelActive();
+    if (!e || !keepLock(d) || duelOver) {
       this.setLockedTarget(null);
       return;
     }
@@ -1545,6 +1662,38 @@ export class WorldScene extends Phaser.Scene {
       .setPosition(e.root.x, e.root.y)
       .setRadius(r * pulse)
       .setVisible(true);
+    this.syncTargetInfo(id, e, r);
+  }
+
+  /** Tên + khí huyết (%) nhỏ ngay trên vòng đánh dấu: người chơi thấy rõ mình đang nhắm ai (mục 26). Chỉ vẽ lại chữ khi nội dung đổi. */
+  private syncTargetInfo(id: string, e: Entity, ringR: number) {
+    const isPlayer = id.startsWith(WorldScene.PLAYER_TARGET);
+    const st: any = isPlayer
+      ? this.state.players.get(id.slice(WorldScene.PLAYER_TARGET.length))
+      : this.state.monsters.get(id);
+    const hpMax = Number(st?.maxHp);
+    const pct =
+      hpMax > 0 ? Math.max(0, Math.min(100, Math.round((Number(st?.hp) / hpMax) * 100))) : null;
+    const key = `${id}|${pct}|${this.lockedTargetId === id ? "" : "?"}`;
+    if (!this.targetInfo) {
+      this.targetInfo = this.add
+        .text(0, 0, "", {
+          fontFamily: "'Noto Serif', serif",
+          fontSize: "12px",
+          color: "#ffe3de",
+          stroke: "#2a0d0a",
+          strokeThickness: 3,
+        })
+        .setOrigin(0.5, 1)
+        .setDepth(this.map.worldH + 1);
+    }
+    if (key !== this.targetInfoKey) {
+      this.targetInfoKey = key;
+      this.targetInfo.setText(
+        pct === null ? this.targetName(id) : `${this.targetName(id)} · ${pct}%`,
+      );
+    }
+    this.targetInfo.setPosition(e.root.x, e.root.y - ringR - 6).setVisible(true);
   }
 
   /** Tin `netShield` của máy chủ (chỉ gửi chủ): bắt đầu đếm ngược hộ thể theo đồng hồ client. Tin hỏng bị bỏ. */
@@ -1915,6 +2064,7 @@ export class WorldScene extends Phaser.Scene {
       e.root.destroy();
     }
     this.monsters.clear();
+    this.recentHit.clear();
     this.setLockedTarget(null);
 
     for (const [, le] of this.loots) {
@@ -2259,6 +2409,7 @@ export class WorldScene extends Phaser.Scene {
     const k = 1 - Math.exp(-LERP_RATE * (deltaMs / 1000));
     this.syncPlayers(k, deltaMs);
     this.syncMonsters(k);
+    this.tickAutoTarget();
     this.syncShield();
     this.syncTargetLock();
     this.syncTargetBtnIdle();
@@ -3685,6 +3836,7 @@ export class WorldScene extends Phaser.Scene {
     if (m.target === this.sid) {
       this.recordCombat();
     }
+    if (!m.toPlayer) this.recentHit.set(m.target, this.time.now);
     if (!this.inView(m.x, m.y, 96)) return;
     if (!animReducedMotion()) {
       if (m.toPlayer) {
