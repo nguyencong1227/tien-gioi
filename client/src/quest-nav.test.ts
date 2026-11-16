@@ -130,10 +130,16 @@ describe("questGoal: đích của bước hiện tại", () => {
   });
 
   it("nhiệm vụ TÔNG MÔN xong hết bước: trả ở bảng Tông môn, đứng ở đâu cũng được (không có NPC để đi tới); chưa xong thì đích bước như thường", () => {
-    const q = SECT_QUEST_BY_ID["st_tru_lang.t0"]!;
-    expect(q.steps[0]).toMatchObject({ kind: "kill", monster: "lang" });
-    // chưa xong: đích là bản đồ có sinh Hôi Lang
-    expect(questGoal(q, at(0), ctx())).toEqual({ kind: "maps", mapIds: mapsSpawning("lang") });
+    // Lấy một mẫu THẬT có bước đầu là "kill" (không cứng id: E / D thay bảng nhiệm vụ tông ở M8.7 thì id đổi, test cứng id làm đỏ `npm test`)
+    const q = Object.values(SECT_QUEST_BY_ID).find((x) => x.steps[0]?.kind === "kill")!;
+    expect(q, "bảng nhiệm vụ tông phải có ít nhất một mẫu bước đầu là kill").toBeDefined();
+    const first = q.steps[0] as { kind: "kill"; monster: string };
+    expect(first.kind).toBe("kill");
+    // chưa xong: đích là bản đồ có sinh loài quái của bước đầu
+    expect(questGoal(q, at(0), ctx())).toEqual({
+      kind: "maps",
+      mapIds: mapsSpawning(first.monster),
+    });
     // xong hết bước: không tra NPC "tong_mon" (không phải NPC), đứng ở đâu trả cũng được
     expect(questGoal(q, at(q.steps.length), ctx())).toEqual({ kind: "anywhere" });
   });
