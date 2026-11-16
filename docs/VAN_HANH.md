@@ -477,3 +477,9 @@ Tu vi đã tích luỹ KHÔNG bị trừ lại khi tắt (đã là tu vi thật 
 - Chỉ nên dùng cho nhân vật của người vận hành tự thử game; mỗi lần bật / tắt phải khởi động lại máy chủ (biến môi trường đọc một lần lúc khởi động).
 - Nhiều tiến trình / nhiều phòng: mỗi lần vào BẤT KỲ phòng nào (kể cả qua cổng, bí cảnh) đều tra lại và ghi một dòng audit.
 - Máy chủ chạy dev (`npm run dev`) đặt qua `.env.local` ở gốc repo như các biến khác.
+
+## 12. Bộ chiêu trùm nhiều chiêu (`BOSS_MOVES`, `QUYET_DINH_M3.md` mục 42, `THIET_KE_TRUM.md`)
+
+- **Bật / tắt:** biến môi trường `BOSS_MOVES` (`on`, `1`, `true`, `yes`; không phân biệt hoa thường). Mặc định **TẮT**: khi tắt, trùm chạy đúng như cũ (đánh thường, Thiên Hàn Vương còn đập đất và lao). Giá trị lạ (gõ nhầm) coi là TẮT, không bao giờ bật ngầm. Đọc MỘT lần lúc dựng phòng; đổi phải khởi động lại máy chủ.
+- **Khi bật:** trùm có bộ chiêu trong `BOSSES` (`shared/src/bosses.ts`) dùng bộ thực thi `server/src/systems/boss.ts`: mọi đòn có báo trước >= 800 ms (`fx` `warn`), chuyển giai đoạn theo khí huyết, triệu hồi quái con (không rơi đồ / tu vi), cuồng nộ ở bí cảnh, reset khi hết mục tiêu. Bộ chiêu thay hẳn đập đất / lao của loài đó.
+- **Hiện tại chỉ có bộ chiêu MẪU của Xích Mãng** (số liệu khung, KHÔNG phải cân bằng; dữ liệu thật của E ở T3 #872, cân bằng của D ở T5), nên bản chạy thật chưa nên bật. Chỉ bật trên máy dev / thử nghiệm.
