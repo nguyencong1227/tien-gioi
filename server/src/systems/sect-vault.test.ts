@@ -537,6 +537,59 @@ describe("rút đồ", () => {
   });
 });
 
+describe("ảnh chụp kho gửi lại cho người bị từ chối vì thấy kho cũ (nhờ của B ở #786)", () => {
+  const vaultMsgs = (r: Room, who: string) => r.sectVaults.filter((s) => s.sid === who).length;
+  async function stock5() {
+    await setup();
+    await seedVault((s) => {
+      s.vault.slots[0] = { itemId: MAT.id, qty: 5 };
+    });
+  }
+
+  it("vault_changed (ô đã đổi / không đủ số lượng): CHÍNH người đó nhận ảnh chụp kho mới nhất, người khác không nhận thêm", async () => {
+    await stock5();
+    const a0 = vaultMsgs(lh, A);
+    const b0 = vaultMsgs(hp, B);
+    await sectVaultWithdraw(lh.w, A, { slot: 0, itemId: OTHER.id, qty: 1 }); // giao diện cũ: tưởng ô 0 là OTHER
+    expect(lastToast(lh, A)).toMatch(/vừa có người lấy hoặc thêm đồ/);
+    expect(vaultMsgs(lh, A)).toBe(a0 + 1);
+    expect(lastVault(lh, A)?.vault?.slots[0]).toEqual({ itemId: MAT.id, qty: 5 }); // thấy đúng kho hiện tại
+    expect(vaultMsgs(hp, B)).toBe(b0);
+  });
+
+  it("vault_limit (hết lượt): nhận lại ảnh chụp với myDrawsLeft = 0", async () => {
+    await stock5();
+    for (let i = 0; i < 3; i++)
+      await sectVaultWithdraw(lh.w, C, { slot: 0, itemId: MAT.id, qty: 1 });
+    const c0 = vaultMsgs(lh, C);
+    await sectVaultWithdraw(lh.w, C, { slot: 0, itemId: MAT.id, qty: 1 }); // lượt 4
+    expect(lastToast(lh, C)).toMatch(/hết lượt rút/);
+    expect(vaultMsgs(lh, C)).toBe(c0 + 1);
+    expect(lastVault(lh, C)?.vault?.myDrawsLeft).toBe(0);
+  });
+
+  it("vault_full khi góp (kiểm sớm): nhận lại ảnh chụp kho đầy; lỗi khác (túi đầy, không phải tông môn) KHÔNG gửi lại", async () => {
+    await setup();
+    await seedVault((s) => {
+      for (let i = 0; i < SECT_VAULT_SLOTS; i++)
+        s.vault.slots[i] = { itemId: MAT.id, qty: MAT.stack };
+    });
+    give(lh, C, MAT.id, 5);
+    const c0 = vaultMsgs(lh, C);
+    await sectVaultDeposit(lh.w, C, { slot: slotOf(lh, C, MAT.id), qty: 5 });
+    expect(lastToast(lh, C)).toMatch(/Kho đồ tông môn đã đầy/);
+    expect(vaultMsgs(lh, C)).toBe(c0 + 1);
+    expect(lastVault(lh, C)?.vault?.slots.every((x) => x?.qty === MAT.stack)).toBe(true);
+    // túi đầy khi rút: không phải lý do "kho cũ"
+    const c = lh.w.ctrl.get(C)!;
+    for (let i = 0; i < c.inv.length; i++) c.inv[i] = { itemId: OTHER.id, qty: OTHER.stack };
+    const c1 = vaultMsgs(lh, C);
+    await sectVaultWithdraw(lh.w, C, { slot: 0, itemId: MAT.id, qty: 1 });
+    expect(lastToast(lh, C)).toMatch(/không đủ chỗ/);
+    expect(vaultMsgs(lh, C)).toBe(c1);
+  });
+});
+
 describe("cờ kiếp mới chưa được rút (SECT_NEWLIFE_LOCK_HOURS, mặc định tắt)", () => {
   it("tắt (mặc định): đầu thai xong rút ngay theo luật chức vụ", async () => {
     await setup();
