@@ -416,6 +416,7 @@ export interface QuestWalkOptions {
   timeoutSec?: number;
   silent?: boolean;
   dataDir?: string;
+  repeat?: number;
 }
 
 export interface QuestWalkResult {
@@ -1829,20 +1830,46 @@ export async function runQuestWalk(options: QuestWalkOptions = {}): Promise<{
   console.log(`  Máy chủ Colyseus cổng: ${port} | Số nhiệm vụ kiểm tra: ${questsToRun.length}`);
   console.log(`========================================================================\n`);
 
+  const repeat = Math.max(1, options.repeat ?? 1);
   const results: QuestWalkResult[] = [];
   let allPassed = true;
 
-  for (let i = 0; i < questsToRun.length; i++) {
-    const q = questsToRun[i];
-    console.log(`[${i + 1}/${questsToRun.length}] Kiểm tra '${q.title}' (${q.id})...`);
-    const res = await walkSingleQuest(client, q, options);
-    results.push(res);
-    if (!res.success) allPassed = false;
+  interface QuestStats {
+    quest: QuestDef;
+    runs: QuestWalkResult[];
+  }
+  const statsMap = new Map<string, QuestStats>();
 
-    const statusBadge = res.success ? "✓ THÀNH CÔNG" : "✗ THẤT BẠI";
-    const giveBadge = res.usedGive ? ` (Cấp đồ: ${res.giveReasons.join(", ")})` : "";
-    console.log(`  => ${statusBadge} sau ${res.durationSec}s${giveBadge}`);
-    if (res.error) console.log(`     Lỗi: ${res.error}`);
+  for (let r = 0; r < repeat; r++) {
+    if (repeat > 1) {
+      console.log(`\n--- LƯỢT CHẠY ${r + 1}/${repeat} ---`);
+    }
+    for (let i = 0; i < questsToRun.length; i++) {
+      const q = questsToRun[i];
+      const prefix = repeat > 1 ? `[Lượt ${r + 1}/${repeat}] ` : "";
+      console.log(`${prefix}[${i + 1}/${questsToRun.length}] Kiểm tra '${q.title}' (${q.id})...`);
+      const res = await walkSingleQuest(client, q, options);
+      if (r === 0) {
+        results.push(res);
+      } else {
+        const existingIdx = results.findIndex((item) => item.id === q.id);
+        if (existingIdx >= 0) results[existingIdx] = res;
+      }
+
+      let st = statsMap.get(q.id);
+      if (!st) {
+        st = { quest: q, runs: [] };
+        statsMap.set(q.id, st);
+      }
+      st.runs.push(res);
+
+      if (!res.success) allPassed = false;
+
+      const statusBadge = res.success ? "✓ THÀNH CÔNG" : "✗ THẤT BẠI";
+      const giveBadge = res.usedGive ? ` (Cấp đồ: ${res.giveReasons.join(", ")})` : "";
+      console.log(`  => ${statusBadge} sau ${res.durationSec}s${giveBadge}`);
+      if (res.error) console.log(`     Lỗi: ${res.error}`);
+    }
   }
 
   await server.gracefullyShutdown(false);
@@ -1856,20 +1883,47 @@ export async function runQuestWalk(options: QuestWalkOptions = {}): Promise<{
 
   // In bảng báo cáo tổng kết dạng Markdown
   console.log(`\n============================ BẢNG BÁO CÁO KẾT QUẢ ============================`);
-  console.log(
-    `| STT | Mã | Tên nhiệm vụ | Bản đồ | NPC giao | Cảnh giới | Kết quả | Thời gian | Cấp đồ (/give) |`,
-  );
-  console.log(
-    `| --- | -- | ------------ | ------ | -------- | --------- | ------- | --------- | -------------- |`,
-  );
-  results.forEach((r, idx) => {
-    const stt = String(idx + 1).padStart(3, " ");
-    const status = r.success ? "✓ ĐẠT" : "**✗ ĐỎ**";
-    const give = r.usedGive ? `Có (${r.giveReasons.join("; ")})` : "Không";
+  if (repeat > 1) {
     console.log(
-      `| ${stt} | \`${r.id}\` | ${r.title} | ${r.mapId} | ${r.giver} | ${r.minRealmText} | ${status} | ${r.durationSec}s | ${give} |`,
+      `| STT | Mã | Tên nhiệm vụ | Bản đồ | Bậc yêu cầu | Tỉ lệ ĐẠT | Đánh giá | Thời gian TB | Chi tiết các lần |`,
     );
-  });
+    console.log(
+      `| --- | -- | ------------ | ------ | ----------- | :-------: | :------: | :----------: | ---------------- |`,
+    );
+    let idx = 0;
+    statsMap.forEach((st, qId) => {
+      idx++;
+      const stt = String(idx).padStart(3, " ");
+      const passed = st.runs.filter((x) => x.success).length;
+      let evalText = "✗ ĐỎ";
+      if (passed === repeat) evalText = "✓ ĐẠT ổn định";
+      else if (passed > 0) evalText = "⚠ CHẬP CHỜN";
+
+      const avgTime =
+        Math.round((st.runs.reduce((acc, cur) => acc + cur.durationSec, 0) / repeat) * 10) / 10;
+      const detail = st.runs
+        .map((x, runIdx) => `#${runIdx + 1}: ${x.success ? "✓" : "✗"} (${x.durationSec}s)`)
+        .join("; ");
+      console.log(
+        `| ${stt} | \`${qId}\` | ${st.quest.title} | ${st.runs[0].mapId} | ${st.runs[0].minRealmText} | ${passed}/${repeat} | **${evalText}** | ${avgTime}s | ${detail} |`,
+      );
+    });
+  } else {
+    console.log(
+      `| STT | Mã | Tên nhiệm vụ | Bản đồ | NPC giao | Cảnh giới | Kết quả | Thời gian | Cấp đồ (/give) |`,
+    );
+    console.log(
+      `| --- | -- | ------------ | ------ | -------- | --------- | ------- | --------- | -------------- |`,
+    );
+    results.forEach((r, idx) => {
+      const stt = String(idx + 1).padStart(3, " ");
+      const status = r.success ? "✓ ĐẠT" : "**✗ ĐỎ**";
+      const give = r.usedGive ? `Có (${r.giveReasons.join("; ")})` : "Không";
+      console.log(
+        `| ${stt} | \`${r.id}\` | ${r.title} | ${r.mapId} | ${r.giver} | ${r.minRealmText} | ${status} | ${r.durationSec}s | ${give} |`,
+      );
+    });
+  }
   console.log(`==============================================================================`);
   console.log(
     `Tổng số: ${results.length} | Thành công: ${results.filter((r) => r.success).length} | Thất bại: ${results.filter((r) => !r.success).length} | Tổng thời gian: ${totalTimeSec}s\n`,
@@ -1901,12 +1955,15 @@ if (isDirectCli) {
   const giveAll = args.includes("--give-all");
   const timeoutArg = args.find((a) => a.startsWith("--timeout="))?.split("=")[1];
   const timeoutSec = timeoutArg ? Number(timeoutArg) : 60;
+  const repeatArg = args.find((a) => a.startsWith("--repeat="))?.split("=")[1];
+  const repeat = repeatArg ? Math.max(1, Number(repeatArg)) : 1;
 
   runQuestWalk({
     questId: questArg,
     mapId: mapArg,
     giveAll,
     timeoutSec,
+    repeat,
   })
     .then(({ allPassed }) => {
       process.exit(allPassed ? 0 : 1);
