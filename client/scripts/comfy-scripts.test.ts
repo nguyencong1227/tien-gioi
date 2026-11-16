@@ -227,11 +227,9 @@ exit 0
   });
 
   it("tích hợp chrome-gpu: detectGpu tự động nhường GPU khi có khóa và tg-comfy active", () => {
-    const tmpLock = "/tmp/tg-comfy.lock";
-    const hadLock = fs.existsSync(tmpLock);
     const origEnv = { ...process.env };
-
     const stubDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-stub-comfy-"));
+    const tmpLock = path.join(stubDir, "tg-comfy.lock");
     const stubBin = path.join(stubDir, "systemctl");
     fs.writeFileSync(
       stubBin,
@@ -249,6 +247,7 @@ exit 3
       delete process.env.DISABLE_GPU;
       delete process.env.CI;
       process.env.FORCE_GPU = "1";
+      process.env.COMFY_LOCK_FILE = tmpLock;
       process.env.PATH = `${stubDir}:${process.env.PATH}`;
 
       fs.writeFileSync(tmpLock, "2026-11-14T18:30:00Z\n");
@@ -258,13 +257,6 @@ exit 3
       expect(getChromeGpuFlags()).toEqual(["--disable-gpu"]);
     } finally {
       process.env = origEnv;
-      if (!hadLock && fs.existsSync(tmpLock)) {
-        try {
-          fs.unlinkSync(tmpLock);
-        } catch {
-          // bỏ qua
-        }
-      }
       fs.rmSync(stubDir, { recursive: true, force: true });
     }
   });
