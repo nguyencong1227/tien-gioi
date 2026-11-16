@@ -1,6 +1,7 @@
 import { authModeOf, parseTrustProxy } from "./auth-http";
 import { storeKindOf } from "./stores";
 import { minProtocolOf } from "./protocol";
+import { testExpMultOf } from "./test-exp";
 import { corsOriginsOf } from "./cors";
 import { metricsTokenOf, thresholdsOf } from "./metrics";
 import { newLifeLockOf } from "./sect-config";
@@ -48,6 +49,7 @@ export function startupWarnings(env: NodeJS.ProcessEnv): string[] {
     );
   }
   warnings.push(...minProtocolOf(env).warnings);
+  warnings.push(...testExpMultOf(env).warnings);
   warnings.push(...newLifeLockOf(env).warnings);
   warnings.push(...metricsTokenOf(env).warnings, ...thresholdsOf(env).warnings);
   warnings.push(...corsOriginsOf(env).warnings);

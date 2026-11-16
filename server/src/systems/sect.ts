@@ -148,6 +148,26 @@ function stillHere(w: World, sid: string, soulKey: string): boolean {
 }
 
 /**
+ * ĐÃ CHẾT (QUYET_DINH_M3 mục 38): khí huyết về 0 (`p.dead`) hoặc ở Hoàng Tuyền (`c.limbo`, từ lúc bị hạ tới khi đầu thai xong). Người đã chết KHÔNG góp được gì vào
+ * kho (đồ lẫn Linh thạch): đồ của kiếp cũ mất theo luật luân hồi, không "cứu" qua kho. `beginLimbo` (đặt `limbo` + xoá túi + xoá ví) chạy ĐỒNG BỘ trong `hurtPlayer`,
+ * và mọi yêu cầu góp được kiểm ở đây SAU khi chết thì bị từ chối (kể cả gửi trước, máy chủ nhận sau): không có cửa sổ nào góp được đồ của người đã chết. "Tha chết do
+ * mạng" (mục 33.4) KHÔNG đặt `dead` / `limbo` nên không tính là chết. Đồ / tiền đã trừ khỏi túi / ví TRƯỚC khi chết (đang chờ lưu / ghi kho) vẫn vào kho (góp trước khi chết).
+ */
+function isDown(w: World, sid: string): boolean {
+  const p = w.state.players.get(sid);
+  const c = w.ctrl.get(sid);
+  return !p || !c || p.dead || c.limbo !== undefined;
+}
+
+/** Báo người đã chết không góp được (lý do riêng, không dùng `error` chung). */
+function downFail(w: World, sid: string) {
+  w.events.toast(sid, {
+    text: "Ngươi đã gục, không góp được vào kho tông môn.",
+    tone: "bad",
+  });
+}
+
+/**
  * Ví của người này đang nhận được tiền: còn trong phòng, cùng linh hồn, và KHÔNG ở Hoàng Tuyền. Lúc đầu thai `applyRebirth` GHI ĐÈ
  * `coin` bằng phần mang theo (`min(coinAtDeath, coinCarryCap)`), nên Linh thạch cộng vào ví của kiếp đã mất sẽ biến mất.
  */
@@ -504,7 +524,10 @@ export async function sectDeposit(w: World, sid: string, raw: unknown) {
   const a = actorOf(w, sid);
   if (!a) return;
   if (!msg) return toastFail(w, sid, "amount_invalid");
+  if (isDown(w, sid)) return downFail(w, sid); // đã chết (mục 38): không góp
   if (!(await svc.sectOf(a.soulKey))) return toastFail(w, sid, "not_in_sect"); // khỏi trừ rồi hoàn
+  // Sau `await` người này có thể vừa bị hạ: kiểm lại NGAY trước khi trừ ví (đồng bộ với `trySpendCoin`, không `await` chen giữa)
+  if (stillHere(w, sid, a.soulKey) && isDown(w, sid)) return downFail(w, sid);
   if (!stillHere(w, sid, a.soulKey) || !trySpendCoin(w, sid, msg.amount))
     return toastFail(w, sid, "no_coin");
   // Ví đã trừ phải xuống file TRƯỚC khi kho được cộng; lưu không được thì huỷ, hoàn ví (kho chưa đụng tới)
@@ -619,6 +642,7 @@ export async function sectVaultDeposit(w: World, sid: string, raw: unknown) {
   if (!a || !c) return;
   if (!msg) return toastFail(w, sid, "item_invalid");
   // Đang qua cổng: hồ sơ không lưu được lúc này (đồ trừ khỏi túi mà đĩa vẫn giữ đồ: nhân đôi nếu sập). Ở Hoàng Tuyền: túi của kiếp đã mất.
+  if (isDown(w, sid)) return downFail(w, sid); // đã chết (mục 38): không góp
   if (c.travelling || c.limbo) return toastFail(w, sid, "error");
   const book = w.hub.sects;
   if (book.vaultBusy.has(a.soulKey)) return toastFail(w, sid, "error"); // đang xử lý một thao tác kho đồ của chính người này
@@ -633,8 +657,9 @@ export async function sectVaultDeposit(w: World, sid: string, raw: unknown) {
     if (!vaultHolds(cur, itemId, msg.qty)) return vaultFail(w, sid, a, "vault_full", cur);
     // Sau `await` túi có thể đã đổi (nhặt / dùng / vứt): kiểm lại ĐÚNG ô và số lượng rồi mới trừ
     const c2 = w.ctrl.get(sid);
-    if (!c2 || !stillHere(w, sid, a.soulKey) || c2.travelling || c2.limbo)
-      return toastFail(w, sid, "error");
+    if (!c2 || !stillHere(w, sid, a.soulKey)) return toastFail(w, sid, "error");
+    if (isDown(w, sid)) return downFail(w, sid); // vừa bị hạ trong lúc chờ: túi đã bị xoá / sắp bị xoá, KHÔNG góp (mục 38)
+    if (c2.travelling || c2.limbo) return toastFail(w, sid, "error");
     const s2 = c2.inv[msg.slot];
     if (!s2 || s2.itemId !== itemId || msg.qty > s2.qty) return toastFail(w, sid, "item_invalid");
     takeFromSlot(c2.inv, msg.slot, msg.qty);

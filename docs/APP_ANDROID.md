@@ -2,6 +2,9 @@
 
 Tài liệu hướng dẫn quy trình build, đồng bộ và phát triển ứng dụng Android native của Tiên Giới bằng Capacitor.
 
+> [!IMPORTANT]
+> **TẠM DỪNG build APK** (người dùng chốt ở `QUYET_DINH_M3.md` mục 37, 16/11/2026: "không cần build APK cho đến khi mình nhắc lại"). Job `android-apk` trong `.github/workflows/android.yml` chỉ chạy khi biến repo `BUILD_APK` = `true` (mặc định KHÔNG đặt, nên job bị bỏ qua và `release.yml` không bị chậm hay đỏ). Bật lại: `gh variable set BUILD_APK --body true`; tắt: `gh variable delete BUILD_APK`. Dự án Capacitor (`app/`) và mã Android giữ nguyên, không xoá. Web / PWA trên điện thoại không đổi. Không có việc mới riêng cho Android cho tới khi người dùng nhắc lại.
+
 ---
 
 ## 1. Cấu trúc Dự án

@@ -21,6 +21,10 @@ permissions:
 jobs:
   android-apk:
     name: Dựng gói APK Android (Debug & Release)
+    # TẠM DỪNG build APK (người dùng chốt ở QUYET_DINH_M3 mục 37, 16/11/2026: "không cần build APK cho đến khi mình nhắc lại"): job chỉ chạy khi biến
+    # repo `BUILD_APK` = true (mặc định KHÔNG đặt, nên job bị bỏ qua, release.yml không bị chậm / đỏ). Bật lại: `gh variable set BUILD_APK --body true`
+    # (Settings > Secrets and variables > Actions > Variables); tắt: `gh variable delete BUILD_APK`. Dự án Capacitor và mã Android giữ nguyên.
+    if: ${{ vars.BUILD_APK == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
