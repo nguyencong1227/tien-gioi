@@ -12,12 +12,14 @@ import { tickSect } from "./sect";
 import { tickStatuses } from "./status";
 import { tickBolts } from "./bolt";
 import { tickTreasure } from "./treasure";
+import { tickNetGuard } from "./net-guard";
 
 export function tickWorld(w: World, dtMs: number) {
   const dt = dtMs / 1000;
   w.state.players.forEach((p, sid) => {
     const c = w.ctrl.get(sid);
     if (!c) return;
+    if (c.beatMs !== undefined || c.shieldUntil !== undefined) tickNetGuard(w, sid, c); // mục 33: im lặng -> hồn lìa xác, hết hạn hộ thể (client cũ không tốn gì)
     if (c.limbo) return; // ở Hoàng Tuyền: không hồi sinh theo đồng hồ, chỉ đầu thai khi người chơi chọn
     if (p.dead) return tickRespawn(w, p, c);
     if (w.ghosts.size > 0 && w.ghosts.has(sid)) return; // hồn lìa xác: đứng yên, không hồi phục, không tu luyện

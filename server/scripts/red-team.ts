@@ -400,6 +400,7 @@ export async function runRedTeam(options: {
       "party",
       "sectInvited",
       "sectVault",
+      "netShield",
       "sect",
     ]) {
       r.onMessage(t, () => {});

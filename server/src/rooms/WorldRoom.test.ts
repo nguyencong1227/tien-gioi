@@ -809,13 +809,13 @@ describe("nhịp tim ứng dụng ping / pong (M4.2b)", () => {
     expect(pongs).toEqual([{ t: 9 }]);
   });
 
-  it("giới hạn tần suất: gửi dồn 30 ping chỉ được trả lời tối đa burst (3) + vài lượt hồi, và không bị ngắt", async () => {
+  it("giới hạn tần suất: gửi dồn 30 ping chỉ được trả lời tối đa burst (6, nhịp tim 1 giây của mục 33) + vài lượt hồi, và không bị ngắt", async () => {
     const a = await join("Nhip Tim Spam");
     const pongs = collectPongs(a.room);
     for (let i = 0; i < 30; i++) a.room.send("ping", { t: i });
     await sleep(400);
-    expect(pongs.length).toBeGreaterThanOrEqual(3);
-    expect(pongs.length).toBeLessThanOrEqual(5);
+    expect(pongs.length).toBeGreaterThanOrEqual(6);
+    expect(pongs.length).toBeLessThanOrEqual(8);
     expect(a.room.connection.isOpen).toBe(true); // 30 tin vẫn nằm xa ngưỡng ngắt vì spam
   });
 });
