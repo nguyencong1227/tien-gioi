@@ -5,21 +5,22 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 //  - fx = 0: không chấm, không Graphics hiện; fx bật bit nào thì có đúng chấm đó (số chấm + tên) và đúng MÀU ở đúng VỊ TRÍ (cân giữa, cách đều, trên thanh máu);
 //  - sáu bit cùng lúc: sáu màu khác nhau, đều thấy; tắt về 0 thì hết sạch điểm ảnh chấm; trùm có hàng chấm cao hơn quái thường (tránh đè tên trùm);
 //  - bật / tắt 30 lần không tạo thêm Graphics (không rò); `fx` rác (NaN, chuỗi, bit lạ, âm) không chấm, không lỗi JS.
-// Có thể chụp ảnh: `--shots <thư mục>`. Cần client đang chạy (`npm run dev -w client`, cổng của dev B là 5183).
-//   node client/scripts/check-monster-status.mjs [--url http://127.0.0.1:5183] [--shots /tmp/tg-b-shots]
+// Có thể chụp ảnh: `--shots <thư mục>`. Mặc định tự dựng Vite của cây này trên cổng trống (tự tắt khi xong); `--url` để dùng client đang chạy sẵn.
+//   node client/scripts/check-monster-status.mjs [--url <client đang chạy sẵn, tuỳ chọn>] [--shots /tmp/tg-b-shots]
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { resolveClientUrl } from "./client-url.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const argOf = (name, dflt) => {
   const i = process.argv.indexOf(name);
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : dflt;
 };
-const BASE_URL = argOf("--url", "http://127.0.0.1:5183");
+const BASE_URL = await resolveClientUrl(argOf("--url", ""));
 const SHOTS = argOf("--shots", "");
 /** Bit -> [tên, màu 0xRRGGBB] (khớp `STATUS_BIT` và `PIP_STYLE`) */
 const BITS = [

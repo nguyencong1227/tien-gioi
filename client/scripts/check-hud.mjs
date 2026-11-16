@@ -2,18 +2,19 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 /* global console, setTimeout, fetch, process */
 // Kiểm HUD gọn trên điện thoại (M5.1 #326; quy tắc mới ở QUYET_DINH_M3 mục 15): bảng Nhiệm vụ thu gọn mặc định ở MỌI điện thoại (dọc lẫn ngang) và cửa sổ hẹp
 // (< 700 px), mở ở tablet / máy tính đủ rộng; bấm tiêu đề để mở / thu, lựa chọn được nhớ (`tg_qt_open`) và thắng mặc định kể cả khi xoay máy; cột HUD trái cao <= 72 % chiều cao khi thu gọn. Chrome thật, chạm
-// thật (CDP). Cần client đang chạy (`npm run dev -w client`, cổng của dev B là 5183). Dùng chế độ mock (?duel=mock&debug=1) nên KHÔNG cần server.
-//   node client/scripts/check-hud.mjs [--url http://127.0.0.1:5183]
+// thật (CDP). Mặc định tự dựng Vite của cây này trên cổng trống (tự tắt khi xong); `--url` để dùng client đang chạy sẵn. Dùng chế độ mock (?duel=mock&debug=1) nên KHÔNG cần server.
+//   node client/scripts/check-hud.mjs [--url <client đang chạy sẵn, tuỳ chọn>]
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { resolveClientUrl } from "./client-url.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const i = process.argv.indexOf("--url");
-const BASE_URL = i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : "http://127.0.0.1:5183";
+const BASE_URL = await resolveClientUrl(i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : "");
 const CDP_PORT = await freePort();
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-hud-"));
 const chrome = spawn(

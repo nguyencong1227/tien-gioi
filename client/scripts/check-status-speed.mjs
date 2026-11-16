@@ -3,18 +3,19 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 // Kiểm đoán trước di chuyển theo trạng thái của chính mình (M7.2b, StatusEntry.ratio + moveSpeedMul dùng chung): giữ phím mũi tên THẬT qua CDP, đo
 // quãng đường mỗi `input` ở client khi (a) không có gì, (b) tăng tốc +40 %, (c) tê cóng 50 %, (d) cả hai, (e) hết hạn, (f) choáng (không gửi `input`,
 // đứng yên), rồi (g) `reconcile` chạy lại input chưa xác nhận với CÙNG hệ số (khớp vị trí đoán trước) và bỏ qua khi choáng, (h) đổi bản đồ xoá danh sách.
-// Cần client đang chạy (`npm run dev -w client`, cổng của dev B là 5183). Dùng chế độ mock (?duel=mock&debug=1) nên KHÔNG cần server.
-//   node client/scripts/check-status-speed.mjs [--url http://127.0.0.1:5183]
+// Mặc định tự dựng Vite của cây này trên cổng trống (tự tắt khi xong); `--url` để dùng client đang chạy sẵn. Dùng chế độ mock (?duel=mock&debug=1) nên KHÔNG cần server.
+//   node client/scripts/check-status-speed.mjs [--url <client đang chạy sẵn, tuỳ chọn>]
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { resolveClientUrl } from "./client-url.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const i = process.argv.indexOf("--url");
-const BASE_URL = i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : "http://127.0.0.1:5183";
+const BASE_URL = await resolveClientUrl(i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : "");
 const CDP_PORT = await freePort();
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-status-speed-"));
 const chrome = spawn(
