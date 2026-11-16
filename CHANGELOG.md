@@ -11,7 +11,7 @@ Bản vá sau v0.3.0, làm theo các yêu cầu của người dùng ở `QUYET_
 - **Nhắm mục tiêu (mục 26, 29):** thêm chế độ "Tự động - gần nhất" làm mặc định (phím `` ` `` đổi chế độ); hướng chiêu giữ ưu tiên con trỏ, ngoại lệ khi con trỏ đang nằm trên bản đồ nhỏ / bản đồ lớn / khung giao diện.
 - **Kho đồ tông môn (mục 27):** PHẦN MÁY CHỦ (cất / rút / chính sách / nhật ký / lượt rút theo ngày, chống nhân đôi vật phẩm bằng khoá kỳ vọng theo ô). Giao diện (#788) CHƯA có trong bản này nên người chơi chưa thấy kho.
 - **Bảo vệ tính mạng khi mất kết nối (mục 33, ưu tiên cao nhất của bản vá):** im lặng quá 3 giây thì nhân vật thành "bóng", sau 90 giây mới bị loại khỏi phòng; khi nối lại có khiên 3 giây và quái bỏ mục tiêu; nếu đang im lặng từ 2 giây mà bị đòn chí mạng thì giữ lại 10% khí huyết ở chỗ an toàn, KHÔNG mất kiếp. Cần cả máy chủ lẫn client mới (client cũ không khai báo nhịp tim nên không được bảo vệ, không hỏng gì).
-- **Hộp xác nhận** khi ĐỘT PHÁ và khi BÁN đồ quý / trang bị (rà soát thao tác không hoàn tác được, #779).
+- **Hộp xác nhận** khi ĐỘT PHÁ, khi BÁN đồ quý / trang bị, và ở HOÀNG TUYỀN khi mở nấc chân linh / xuất thân bằng Duyên + tóm tắt trước khi đầu thai (rà soát thao tác không hoàn tác được, #779; chỉ phía client).
 - **KHÔNG nằm trong bản này:** cân bằng Âm Sương / Hàn Vân (mục 30-32, PR #805 còn nháp, đang chờ người dùng chốt hướng) và giao diện kho tông môn (#788). Nội dung nghề nhỏ #514 chỉ có nền, người chơi chưa thấy.
 - **Triển khai:** giữ `MIN_PROTOCOL_VERSION=3` (client cũ vẫn vào được); triển khai MÁY CHỦ trước hoặc cùng lúc với client; bật `AUDIT_LOG` để thấy các sự kiện `net.*` (im lặng / nối lại / cứu chết / rớt).
 
