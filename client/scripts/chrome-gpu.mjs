@@ -9,16 +9,21 @@ import process from "node:process";
  * Phòng ngừa lỗi khóa mồ côi (stale lock) làm Chrome headless chạy phần mềm vĩnh viễn (Review PR #499).
  */
 export function isComfyRunning() {
-  const comfyLockPath = "/tmp/tg-comfy.lock";
+  const envLock = process.env.COMFY_LOCK_FILE;
+  const comfyLockPath = envLock || "/tmp/tg-comfy.lock";
   const userRuntimeLock = process.env.XDG_RUNTIME_DIR
     ? `${process.env.XDG_RUNTIME_DIR}/tg-comfy.lock`
     : `/run/user/${process.getuid ? process.getuid() : 1000}/tg-comfy.lock`;
 
-  const targetLock = fs.existsSync(userRuntimeLock)
-    ? userRuntimeLock
-    : fs.existsSync(comfyLockPath)
-      ? comfyLockPath
-      : null;
+  const targetLock = envLock
+    ? fs.existsSync(envLock)
+      ? envLock
+      : null
+    : fs.existsSync(userRuntimeLock)
+      ? userRuntimeLock
+      : fs.existsSync(comfyLockPath)
+        ? comfyLockPath
+        : null;
 
   if (!targetLock) return false;
 
