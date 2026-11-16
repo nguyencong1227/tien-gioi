@@ -20,9 +20,15 @@ import {
   SECT_LOG_MAX,
   SECT_MAX_MEMBERS,
   SECT_VAULT_SLOTS,
+  SECT_VAULT_SLOTS_MAX,
   SECT_VAULT_LOG_MAX,
   SECT_VAULT_DRAW_MAX,
   SECT_VAULT_QTY_MAX,
+  SECT_POINTS_CAP,
+  SECT_CONTRIB_CAP,
+  SECT_EARN_DAY_CAP,
+  SECT_DEPOSIT_DAY_CAP,
+  SECT_SHOP,
   SKILLS_M7,
   sanitizeSkillBook,
 } from "@tien-gioi/shared";
@@ -1500,6 +1506,254 @@ describe("audit-saves (Issue #112)", () => {
       expect(auditSectSaveData(badCtor, badCtor.length).map((e) => e.code)).toContain(
         "unknown_sect_vault_item",
       );
+    });
+
+    it("M8: points sai kiểu / âm / vượt cap -> invalid_sect_points", () => {
+      for (const badPoints of [-1, 1.5, Infinity, "100", SECT_POINTS_CAP + 1]) {
+        const raw = JSON.stringify({ ...validSect, points: badPoints });
+        expect(auditSectSaveData(raw, raw.length).map((e) => e.code)).toContain(
+          "invalid_sect_points",
+        );
+      }
+    });
+
+    it("M8: contrib và merit của thành viên sai kiểu / âm / vượt cap", () => {
+      // contrib hỏng
+      for (const badContrib of [-1, 2.5, Infinity, SECT_CONTRIB_CAP + 1]) {
+        const raw = JSON.stringify({
+          ...validSect,
+          members: [{ ...validSect.members[0], contrib: badContrib }],
+        });
+        expect(auditSectSaveData(raw, raw.length).map((e) => e.code)).toContain(
+          "invalid_sect_member_contrib",
+        );
+      }
+
+      // merit hỏng
+      for (const badMerit of [-1, 3.5, Infinity, SECT_POINTS_CAP + 1]) {
+        const raw = JSON.stringify({
+          ...validSect,
+          members: [{ ...validSect.members[0], merit: badMerit }],
+        });
+        expect(auditSectSaveData(raw, raw.length).map((e) => e.code)).toContain(
+          "invalid_sect_member_merit",
+        );
+      }
+    });
+
+    it("M8: bất biến contrib <= merit -> sect_member_contrib_exceeds_merit", () => {
+      const raw = JSON.stringify({
+        ...validSect,
+        members: [{ ...validSect.members[0], contrib: 50, merit: 30 }],
+      });
+      expect(auditSectSaveData(raw, raw.length).map((e) => e.code)).toContain(
+        "sect_member_contrib_exceeds_merit",
+      );
+    });
+
+    it("M8: bất biến points >= tổng merit thành viên hiện tại -> sect_points_less_than_members_merit", () => {
+      const raw = JSON.stringify({
+        ...validSect,
+        points: 50,
+        members: [
+          { ...validSect.members[0], merit: 40 },
+          { ...validSect.members[1], merit: 30 },
+        ],
+      });
+      expect(auditSectSaveData(raw, raw.length).map((e) => e.code)).toContain(
+        "sect_points_less_than_members_merit",
+      );
+    });
+
+    it("M8: today của thành viên hỏng (day, earned, deposit, quests, dungeon, buys)", () => {
+      // today không phải object
+      const rawNotObj = JSON.stringify({
+        ...validSect,
+        members: [{ ...validSect.members[0], today: "hôm nay" }],
+      });
+      expect(auditSectSaveData(rawNotObj, rawNotObj.length).map((e) => e.code)).toContain(
+        "invalid_sect_member_today",
+      );
+
+      // today.day sai định dạng
+      const rawBadDay = JSON.stringify({
+        ...validSect,
+        members: [{ ...validSect.members[0], today: { day: "2026/11/17", earned: 50 } }],
+      });
+      expect(auditSectSaveData(rawBadDay, rawBadDay.length).map((e) => e.code)).toContain(
+        "invalid_sect_member_today_day",
+      );
+
+      // today.earned âm hoặc vượt cap
+      const rawBadEarned = JSON.stringify({
+        ...validSect,
+        members: [
+          { ...validSect.members[0], today: { day: "2026-11-17", earned: SECT_EARN_DAY_CAP + 1 } },
+        ],
+      });
+      expect(auditSectSaveData(rawBadEarned, rawBadEarned.length).map((e) => e.code)).toContain(
+        "invalid_sect_member_today_earned",
+      );
+
+      // today.deposit vượt earned hoặc vượt cap
+      const rawDepExceedsEarned = JSON.stringify({
+        ...validSect,
+        members: [
+          { ...validSect.members[0], today: { day: "2026-11-17", earned: 10, deposit: 20 } },
+        ],
+      });
+      expect(
+        auditSectSaveData(rawDepExceedsEarned, rawDepExceedsEarned.length).map((e) => e.code),
+      ).toContain("invalid_sect_member_today_deposit_exceeds_earned");
+
+      const rawDepExceedsCap = JSON.stringify({
+        ...validSect,
+        members: [
+          {
+            ...validSect.members[0],
+            today: {
+              day: "2026-11-17",
+              earned: SECT_DEPOSIT_DAY_CAP + 1,
+              deposit: SECT_DEPOSIT_DAY_CAP + 1,
+            },
+          },
+        ],
+      });
+      expect(
+        auditSectSaveData(rawDepExceedsCap, rawDepExceedsCap.length).map((e) => e.code),
+      ).toContain("invalid_sect_member_today_deposit");
+
+      // today.quests chứa mẫu không hợp lệ hoặc trùng lặp
+      const rawBadQuest = JSON.stringify({
+        ...validSect,
+        members: [
+          {
+            ...validSect.members[0],
+            today: { day: "2026-11-17", earned: 0, quests: ["mau_khong_ton_tai"] },
+          },
+        ],
+      });
+      expect(auditSectSaveData(rawBadQuest, rawBadQuest.length).map((e) => e.code)).toContain(
+        "invalid_sect_member_today_quest_template",
+      );
+
+      const rawDupQuest = JSON.stringify({
+        ...validSect,
+        members: [
+          {
+            ...validSect.members[0],
+            today: {
+              day: "2026-11-17",
+              earned: 0,
+              quests: ["st_tru_lang", "st_tru_lang"],
+            },
+          },
+        ],
+      });
+      expect(auditSectSaveData(rawDupQuest, rawDupQuest.length).map((e) => e.code)).toContain(
+        "duplicate_sect_member_today_quest",
+      );
+
+      // today.dungeon không phải boolean
+      const rawBadDungeon = JSON.stringify({
+        ...validSect,
+        members: [
+          { ...validSect.members[0], today: { day: "2026-11-17", earned: 0, dungeon: "yes" } },
+        ],
+      });
+      expect(auditSectSaveData(rawBadDungeon, rawBadDungeon.length).map((e) => e.code)).toContain(
+        "invalid_sect_member_today_dungeon",
+      );
+
+      // today.buys chứa món lạ hoặc vượt số lượng giới hạn ngày
+      const rawBadBuysItem = JSON.stringify({
+        ...validSect,
+        members: [
+          {
+            ...validSect.members[0],
+            today: { day: "2026-11-17", earned: 0, buys: { mon_la_khong_ban: 1 } },
+          },
+        ],
+      });
+      expect(auditSectSaveData(rawBadBuysItem, rawBadBuysItem.length).map((e) => e.code)).toContain(
+        "invalid_sect_member_today_buy_item",
+      );
+
+      const shopEntry = SECT_SHOP[0];
+      const rawBadBuysQty = JSON.stringify({
+        ...validSect,
+        members: [
+          {
+            ...validSect.members[0],
+            today: {
+              day: "2026-11-17",
+              earned: 0,
+              buys: { [shopEntry.itemId]: shopEntry.limitDay + 1 },
+            },
+          },
+        ],
+      });
+      expect(auditSectSaveData(rawBadBuysQty, rawBadBuysQty.length).map((e) => e.code)).toContain(
+        "invalid_sect_member_today_buy_qty",
+      );
+    });
+
+    it("M8: ô kho vượt quá cấp tông môn bị khoá nhưng chứa vật phẩm -> sect_vault_locked_slot_not_empty", () => {
+      // Cấp 1 (points = 0) chỉ mở 40 ô (SECT_VAULT_SLOTS). Mảng 80 ô (SECT_VAULT_SLOTS_MAX), ô thứ 40 (index 40) có đồ -> lỗi
+      const slots = Array.from({ length: SECT_VAULT_SLOTS_MAX }, (_, i) =>
+        i === 40 ? { itemId: "hoi_huyet_dan", qty: 5 } : null,
+      );
+      const raw = JSON.stringify({
+        ...validSect,
+        points: 0,
+        vault: { slots, log: [], drawPerDay: 3 },
+      });
+      expect(auditSectSaveData(raw, raw.length).map((e) => e.code)).toContain(
+        "sect_vault_locked_slot_not_empty",
+      );
+    });
+
+    it("M8: tông môn cấp 2 hợp lệ đầy đủ các trường M8 -> 0 lỗi", () => {
+      const fullM8Sect = {
+        ...validSect,
+        points: 1500, // Cấp 2 (ngưỡng 1000..3999, maxMembers: 35, maxElders: 4, vaultSlots: 50)
+        members: [
+          {
+            soulKey: "soul_chu_1",
+            name: "Huyền Chân Tử",
+            rank: "chu",
+            joinedAt: 1700000000000,
+            contrib: 80,
+            merit: 100,
+            today: {
+              day: "2026-11-17",
+              earned: 80,
+              deposit: 20,
+              quests: ["st_tru_lang"],
+              dungeon: true,
+              buys: { [SECT_SHOP[0].itemId]: 1 },
+            },
+          },
+          {
+            soulKey: "soul_lao_1",
+            name: "Thanh Hư Đạo",
+            rank: "truong_lao",
+            joinedAt: 1700000001000,
+            contrib: 50,
+            merit: 70,
+          },
+        ],
+        vault: {
+          slots: Array.from({ length: SECT_VAULT_SLOTS_MAX }, (_, i) =>
+            i < 50 ? { itemId: "hoi_huyet_dan", qty: 1 } : null,
+          ),
+          log: [],
+          drawPerDay: 5,
+        },
+      };
+      const raw = JSON.stringify(fullM8Sect);
+      const errors = auditSectSaveData(raw, raw.length);
+      expect(errors).toEqual([]);
     });
 
     it("quét thư mục sects/: phát hiện lệch tên file, trùng tên, trùng tag, và thành viên ở 2 tông môn", () => {
