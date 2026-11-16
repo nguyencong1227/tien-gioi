@@ -206,17 +206,12 @@ function vaultMsgFor(w: World, sid: string, sect: Sect, soulKey: string) {
  * Sau một thay đổi thành công: nhớ bản ghi mới, gửi `SectMsg` cho mọi thành viên đang trực tuyến, đặt `Player.sect`, và gửi
  * `NO_SECT` (xoá cờ) cho những người vừa bị gỡ. Không gửi gì cho người ngoại tuyến (vào phòng sẽ tự nhận).
  */
-function broadcastSect(
-  w: World,
-  incoming: Sect,
-  removed: { soulKey: string; name: string }[] = [],
-) {
+function broadcastSect(w: World, sect: Sect, removed: { soulKey: string; name: string }[] = []) {
   const book = w.hub.sects;
-  // Hai thao tác cùng tông môn có thể phát ảnh chụp theo thứ tự ĐẢO: kho đồ chỉ phát SAU `await saveNow`, nên người rút TRƯỚC mà lưu hồ sơ chậm hơn người rút SAU sẽ phát bản
-  // CŨ sau bản mới, và mọi thành viên thấy kho / quỹ cũ cho tới thao tác kế tiếp (B bắt được ở `WorldRoom.sect-vault-stress` dưới tải: kho còn 15 trong khi đã rút còn 5).
-  // Không bao giờ phát bản CŨ hơn bản đã phát (`updatedAt` do kho đặt, tăng theo từng lần ghi): bản mới hơn trong `cache` thắng.
-  const known = book.cache.get(incoming.id);
-  const sect = known && known.updatedAt > incoming.updatedAt ? known : incoming;
+  // Mỗi thao tác nhận bản ghi NGAY sau `update` nhưng PHÁT sau khi lưu hồ sơ (chậm, thời gian khác nhau): hai thao tác đua nhau có thể phát bản CŨ SAU bản MỚI, và người chơi kẹt ở ảnh
+  // chụp cũ (kho còn món đã rút...). `updatedAt` tăng nghiêm ngặt theo từng lần ghi (`SectStore.update`) nên bản NHỚ mới hơn thì thay thế bản cũ vừa nhận (CI #864: "đua rút cùng 1 ô kho").
+  const known = book.cache.get(sect.id);
+  if (known && known.updatedAt > sect.updatedAt) sect = known;
   book.cache.set(sect.id, sect);
   book.lastPresence.delete(sect.id); // thành viên đổi: gửi lại presence ở nhịp tới
   for (const m of sect.members) {
