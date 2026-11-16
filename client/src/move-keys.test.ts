@@ -58,6 +58,24 @@ describe("MoveKeys: nhận phím theo vị trí (code)", () => {
     expect(m.any).toBe(false);
   });
 
+  it("keyUp trả `true` nếu phím đang giữ HOẶC đã bấm nhưng bị bỏ qua (Ctrl+W, đang gõ chữ); `false` chỉ với keyup mồ côi (bộ gõ nuốt keydown)", () => {
+    const m = new MoveKeys();
+    expect(m.keyUp({ code: "KeyD" })).toBe(false); // mồ côi
+    press(m, "KeyD");
+    expect(m.keyUp({ code: "KeyD" })).toBe(true);
+    expect(m.keyUp({ code: "KeyD" })).toBe(false);
+    m.keyDown({ code: "KeyW", ctrlKey: true }); // bị bỏ qua nhưng KHÔNG mồ côi
+    expect(m.keyUp({ code: "KeyW" })).toBe(true);
+    m.keyDown({ code: "KeyA" }, true); // đang gõ chữ
+    expect(m.keyUp({ code: "KeyA" })).toBe(true);
+    // phím đang giữ lúc clear() (Alt-Tab rồi nhả khi quay lại): keyup muộn KHÔNG mồ côi
+    press(m, "KeyS");
+    m.clear();
+    expect(m.any).toBe(false);
+    expect(m.keyUp({ code: "KeyS" })).toBe(true);
+    expect(m.keyUp({ code: "KeyS" })).toBe(false); // chỉ một lần
+  });
+
   it("clear() quên mọi phím (mất focus / ẩn tab / mở chat): không phím nào kẹt", () => {
     const m = new MoveKeys();
     press(m, "KeyW");
