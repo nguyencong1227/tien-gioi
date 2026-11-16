@@ -31,8 +31,12 @@ export const BOSS_ARMOR_MAX_MS = 60_000;
  * Đổi `statsFor` làm tốc độ cơ bản thấp hơn thì sửa cả hằng này (và chạy lại `bossViolations`).
  */
 export const BOSS_ESCAPE_SPEED = 150;
-/** Phản xạ + độ trễ vẽ / mạng (ms) người chơi cần trước khi bắt đầu bước, tính từ lúc `warn` hiện. ĐỀ XUẤT của A (người dùng / D đổi được; mục 8 `THIET_KE_TRUM.md`). */
-export const BOSS_REACT_MS = 300;
+/**
+ * Phản xạ + độ trễ vẽ / mạng (ms) người chơi cần trước khi bắt đầu bước, tính từ lúc `warn` hiện. 400 = ~200 phản xạ + ~200 trễ: người chơi THẤY ring lúc ~RTT / 2 sau
+ * khi máy chủ phát `warn` mà input cuối còn tác dụng phải tới máy chủ ~RTT / 2 trước khi đòn đáp, nên thời gian thực có chỉ còn `telegraphMs - RTT - ~10` (phân tích của B ở
+ * #873: 300 chỉ đủ tới RTT ~90 ms, 400 đủ tới ~190 ms, tức 4G thường). Chết = mất kiếp nên nghiêng về người chơi. ĐỀ XUẤT của A (người dùng / D đổi được; mục 8 `THIET_KE_TRUM.md`).
+ */
+export const BOSS_REACT_MS = 400;
 
 // ---------- Hình chiêu ----------
 
@@ -173,7 +177,7 @@ export const BOSSES: readonly BossDef[] = [
         id: "quat_duoi",
         name: "Quất đuôi",
         shape: { t: "cone", r: 150, arc: (2 * Math.PI) / 3 },
-        telegraphMs: 900,
+        telegraphMs: 1000,
         recoverMs: 700,
         cooldownMs: 7000,
         weight: 3,
