@@ -4,7 +4,12 @@
 // 2. Đua kiếm cống hiến đồng thời giữa nhiều thành viên: bất biến contrib <= merit và points >= tổng merit được bảo toàn tuyệt đối.
 // 3. Trần ngày: không thành viên nào vượt SECT_EARN_DAY_CAP (140) hoặc trần nguồn nộp kho (30).
 // 4. Nhảy tông môn: rời tông môn làm mất số dư cống hiến, không mang sang tông mới.
-// 5. Kiểm toán toàn vẹn audit-saves sau phiên thử tải: 0 lỗi vi phạm.
+// 5. Thăng cấp tông môn qua điểm tích lũy points (1k/4k/12k/30k).
+// 6. Đua trả nhiệm vụ tông môn M8.4: khóa theo mẫu, chống gian lận nộp trùng lặp.
+// 7. Bảo toàn sổ ngày today.quests của linh hồn khi nhảy tông giữa ngày.
+// 8. Đua mua đồng thời cửa hàng tông môn M8.5: kẹp hạn mức limitDay, trừ cống hiến nguyên tử.
+// 9. Khoá mua theo cấp tông môn và hoàn tiền an toàn (shopRefund).
+// 10. Kiểm toán toàn vẹn audit-saves sau toàn bộ thử tải M8 (nhiệm vụ + cửa hàng): 0 lỗi vi phạm.
 
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -19,10 +24,11 @@ import { FileSectStore, type SectMemberRecord } from "../src/sect-store";
 import { SectService } from "../src/sect-service";
 import { makeSect } from "../src/store-contract";
 import { auditSavesDirectory } from "./audit-saves";
-import { installSectQuestFixture } from "../src/systems/sect-fixtures";
+import { installSectQuestFixture, installSectShopFixture } from "../src/systems/sect-fixtures";
 
-// Bảng nhiệm vụ tông CỐ ĐỊNH: test không phụ thuộc vào việc cập nhật dữ liệu thật của E (M8.7a) / D (M8.7)
-const restoreQuestFixture = installSectQuestFixture();
+// Bảng nhiệm vụ & cửa hàng tông CỐ ĐỊNH: test không phụ thuộc vào việc cập nhật dữ liệu thật của E (M8.7a) / D (M8.7)
+let restoreQuestFixture: () => void;
+let restoreShopFixture: () => void;
 
 let store: FileSectStore;
 let svc: SectService;
@@ -30,12 +36,15 @@ const NOW = 1_700_000_000_000;
 let clock = NOW;
 
 beforeAll(() => {
+  restoreQuestFixture = installSectQuestFixture();
+  restoreShopFixture = installSectShopFixture();
   store = new FileSectStore(path.join(dataDir, "sects"), () => clock);
   svc = new SectService(store, () => clock);
 });
 
 afterAll(() => {
-  restoreQuestFixture();
+  restoreShopFixture?.();
+  restoreQuestFixture?.();
   rmSync(dataDir, { recursive: true, force: true });
 });
 
@@ -233,25 +242,25 @@ describe("Thử tải & Bất biến cống hiến tông môn M8 (Issue #846, M8
     expect(s.points ?? 0).toBe(0);
 
     // Thử tải nộp điểm số lượng lớn trực tiếp vào store (giả lập nhiều ngày nộp kho tích lũy)
-    // Cấp 2 cần 300 điểm
-    await store.update(sectId, (cur) => ({ ...cur, points: 300 }));
+    // Cấp 2 cần 1_000 điểm
+    await store.update(sectId, (cur) => ({ ...cur, points: 1_000 }));
     s = (await store.get(sectId))!;
-    expect(s.points).toBe(300);
+    expect(s.points).toBe(1_000);
 
-    // Cấp 3 cần 900 điểm
-    await store.update(sectId, (cur) => ({ ...cur, points: 900 }));
+    // Cấp 3 cần 4_000 điểm
+    await store.update(sectId, (cur) => ({ ...cur, points: 4_000 }));
     s = (await store.get(sectId))!;
-    expect(s.points).toBe(900);
+    expect(s.points).toBe(4_000);
 
-    // Cấp 4 cần 1800 điểm
-    await store.update(sectId, (cur) => ({ ...cur, points: 1800 }));
+    // Cấp 4 cần 12_000 điểm
+    await store.update(sectId, (cur) => ({ ...cur, points: 12_000 }));
     s = (await store.get(sectId))!;
-    expect(s.points).toBe(1800);
+    expect(s.points).toBe(12_000);
 
-    // Cấp 5 cần 3000 điểm
-    await store.update(sectId, (cur) => ({ ...cur, points: 3000 }));
+    // Cấp 5 cần 30_000 điểm
+    await store.update(sectId, (cur) => ({ ...cur, points: 30_000 }));
     s = (await store.get(sectId))!;
-    expect(s.points).toBe(3000);
+    expect(s.points).toBe(30_000);
   });
 
   it("6. Đua trả cùng 1 nhiệm vụ tông môn: chỉ 1 lần ghi nhận cống hiến, các lần đua sau bị từ chối quest_done", async () => {
@@ -481,7 +490,245 @@ describe("Thử tải & Bất biến cống hiến tông môn M8 (Issue #846, M8
     expect(s.points).toBeGreaterThanOrEqual(sumMerit);
   });
 
-  it("10. Kiểm toán toàn vẹn file lưu (audit-saves) sau toàn bộ thử tải M8 (kèm today.quests): 0 lỗi vi phạm", () => {
+  it("10. Đua mua đồng thời trong cửa hàng tông môn (M8.5): kẹp hạn mức limitDay, trừ cống hiến nguyên tử, bảo toàn points & merit", async () => {
+    const sectId = "sect_shop_race_01";
+    const leader = "chu_shop_race";
+    const buyer = "de_shop_buyer";
+
+    await store.create(
+      makeSect(sectId, {
+        name: "Đua Cửa Hàng",
+        tag: "DCH1",
+        leader,
+        members: [
+          { soulKey: leader, name: "Chủ Đua CH", rank: "chu", joinedAt: NOW - 86_400_000 },
+          {
+            soulKey: buyer,
+            name: "Đệ Mua",
+            rank: "de_tu",
+            joinedAt: NOW - 86_400_000,
+            contrib: 100,
+            merit: 100,
+          },
+        ],
+        points: 500, // Cấp 2
+      }),
+    );
+
+    // Món hoi_huyet_dan trong SHOP_FIXTURE: cost = 5, minLevel = 1, limitDay = 10
+    // Gửi 14 yêu cầu mua 1 món cùng lúc (vượt quá limitDay = 10)
+    const buys = Array.from({ length: 14 }, () =>
+      svc.shopBuy({ soulKey: buyer, name: "Đệ Mua" }, "hoi_huyet_dan", 1, { known: false }),
+    );
+
+    const results = await Promise.all(buys);
+    const okBuys = results.filter((r) => r.ok);
+    const limitFail = results.filter((r) => !r.ok && r.reason === "shop_limit");
+
+    expect(okBuys.length).toBe(10);
+    expect(limitFail.length).toBe(4);
+
+    const s = (await store.get(sectId))!;
+    const m = s.members.find((x) => x.soulKey === buyer)!;
+
+    // Đã mua 10 món, mỗi món 5 cống hiến: 100 - 50 = 50 cống hiến còn lại
+    expect(m.contrib).toBe(50);
+    expect(m.merit).toBe(100); // merit KHÔNG bị giảm
+    expect(m.contrib).toBeLessThanOrEqual(m.merit ?? 0);
+    expect(m.today?.buys?.["hoi_huyet_dan"]).toBe(10);
+
+    // Mua cửa hàng KHÔNG làm giảm điểm tông môn (points bảo toàn)
+    expect(s.points).toBe(500);
+  });
+
+  it("11. Cửa hàng tông môn khóa theo cấp (M8.5): từ chối shop_locked ở cấp thấp, thành công khi thăng cấp", async () => {
+    const sectId = "sect_shop_level_01";
+    const leader = "chu_shop_lvl";
+    const pupil = "de_shop_lvl";
+
+    await store.create(
+      makeSect(sectId, {
+        name: "Cấp Cửa Hàng",
+        tag: "CCH1",
+        leader,
+        members: [
+          { soulKey: leader, name: "Chủ Cấp CH", rank: "chu", joinedAt: NOW - 86_400_000 },
+          {
+            soulKey: pupil,
+            name: "Đệ Cấp CH",
+            rank: "de_tu",
+            joinedAt: NOW - 86_400_000,
+            contrib: 100,
+            merit: 100,
+          },
+        ],
+        points: 100, // Cấp 1
+      }),
+    );
+
+    // tu_khi_dan: cost = 30, minLevel = 3, limitDay = 2
+    // Khi tông môn cấp 1: mua bị từ chối shop_locked
+    const failLevel = await svc.shopBuy({ soulKey: pupil, name: "Đệ Cấp CH" }, "tu_khi_dan", 1, {
+      known: false,
+    });
+    expect(failLevel.ok).toBe(false);
+    if (!failLevel.ok) expect(failLevel.reason).toBe("shop_locked");
+
+    // Thử mua với cờ known = true (đã học kinh quyển) -> shop_known
+    const failKnown = await svc.shopBuy({ soulKey: pupil, name: "Đệ Cấp CH" }, "hoi_huyet_dan", 1, {
+      known: true,
+    });
+    expect(failKnown.ok).toBe(false);
+    if (!failKnown.ok) expect(failKnown.reason).toBe("shop_known");
+
+    // Thăng cấp tông môn lên Cấp 3 (cần 4_000 điểm)
+    await store.update(sectId, (cur) => ({ ...cur, points: 4_000 }));
+
+    // Mua lần 1: thành công
+    const buy1 = await svc.shopBuy({ soulKey: pupil, name: "Đệ Cấp CH" }, "tu_khi_dan", 1, {
+      known: false,
+    });
+    expect(buy1.ok).toBe(true);
+
+    // Mua lần 2: thành công
+    const buy2 = await svc.shopBuy({ soulKey: pupil, name: "Đệ Cấp CH" }, "tu_khi_dan", 1, {
+      known: false,
+    });
+    expect(buy2.ok).toBe(true);
+
+    // Mua lần 3: vượt limitDay = 2 -> shop_limit
+    const buy3 = await svc.shopBuy({ soulKey: pupil, name: "Đệ Cấp CH" }, "tu_khi_dan", 1, {
+      known: false,
+    });
+    expect(buy3.ok).toBe(false);
+    if (!buy3.ok) expect(buy3.reason).toBe("shop_limit");
+
+    const s = (await store.get(sectId))!;
+    const m = s.members.find((x) => x.soulKey === pupil)!;
+    // Đã mua 2 lần 30 = 60 cống hiến: 100 - 60 = 40
+    expect(m.contrib).toBe(40);
+    expect(m.today?.buys?.["tu_khi_dan"]).toBe(2);
+  });
+
+  it("12. Hoàn tiền cửa hàng (shopRefund - M8.5): hoàn cống hiến, giảm số lượng đã mua, kiểm tra an toàn khi rời tông", async () => {
+    const sectId = "sect_refund_01";
+    const leader = "chu_refund";
+    const buyer = "de_refunder";
+
+    await store.create(
+      makeSect(sectId, {
+        name: "Hoàn Tiền Tông",
+        tag: "HTT1",
+        leader,
+        members: [
+          { soulKey: leader, name: "Chủ Hoàn", rank: "chu", joinedAt: NOW - 86_400_000 },
+          {
+            soulKey: buyer,
+            name: "Đệ Hoàn",
+            rank: "de_tu",
+            joinedAt: NOW - 86_400_000,
+            contrib: 50,
+            merit: 50,
+          },
+        ],
+        points: 50,
+      }),
+    );
+
+    // Mua 2 hoi_huyet_dan (cost = 10)
+    const buyRes = await svc.shopBuy({ soulKey: buyer, name: "Đệ Hoàn" }, "hoi_huyet_dan", 2, {
+      known: false,
+    });
+    expect(buyRes.ok).toBe(true);
+
+    let s = (await store.get(sectId))!;
+    let m = s.members.find((x) => x.soulKey === buyer)!;
+    expect(m.contrib).toBe(40);
+    expect(m.today?.buys?.["hoi_huyet_dan"]).toBe(2);
+
+    // Giả lập túi đồ đầy: hoàn trả lại 2 món và 10 cống hiến
+    const refRes = await svc.shopRefund(
+      { soulKey: buyer, name: "Đệ Hoàn" },
+      "hoi_huyet_dan",
+      2,
+      10,
+    );
+    expect(refRes.ok).toBe(true);
+
+    s = (await store.get(sectId))!;
+    m = s.members.find((x) => x.soulKey === buyer)!;
+    expect(m.contrib).toBe(50);
+    // Khi hoàn hết, khoá món được xoá khỏi today.buys (tối ưu kích thước lưu)
+    expect(m.today?.buys?.["hoi_huyet_dan"]).toBeUndefined();
+
+    // Rời tông môn rồi cố gắng gọi shopRefund -> not_in_sect
+    const leaveRes = await svc.leave({ soulKey: buyer, name: "Đệ Hoàn" });
+    expect(leaveRes.ok).toBe(true);
+
+    const refAfterLeave = await svc.shopRefund(
+      { soulKey: buyer, name: "Đệ Hoàn" },
+      "hoi_huyet_dan",
+      1,
+      5,
+    );
+    expect(refAfterLeave.ok).toBe(false);
+    if (!refAfterLeave.ok) expect(refAfterLeave.reason).toBe("not_in_sect");
+  });
+
+  it("13. Từ chối mua khi không đủ cống hiến hoặc dữ liệu đầu vào không hợp lệ", async () => {
+    const sectId = "sect_invalid_buy_01";
+    const leader = "chu_inv";
+    const poor = "de_poor";
+
+    await store.create(
+      makeSect(sectId, {
+        name: "Không Đủ Tiền",
+        tag: "KDT1",
+        leader,
+        members: [
+          { soulKey: leader, name: "Chủ Inv", rank: "chu", joinedAt: NOW - 86_400_000 },
+          {
+            soulKey: poor,
+            name: "Đệ Nghèo",
+            rank: "de_tu",
+            joinedAt: NOW - 86_400_000,
+            contrib: 2, // Chỉ có 2 cống hiến, món cần 5
+            merit: 2,
+          },
+        ],
+        points: 2,
+      }),
+    );
+
+    // Không đủ cống hiến -> no_contrib
+    const r1 = await svc.shopBuy({ soulKey: poor, name: "Đệ Nghèo" }, "hoi_huyet_dan", 1, {
+      known: false,
+    });
+    expect(r1.ok).toBe(false);
+    if (!r1.ok) expect(r1.reason).toBe("no_contrib");
+
+    // Món không có trong cửa hàng -> item_invalid
+    const r2 = await svc.shopBuy({ soulKey: poor, name: "Đệ Nghèo" }, "item_khong_ton_tai", 1, {
+      known: false,
+    });
+    expect(r2.ok).toBe(false);
+    if (!r2.ok) expect(r2.reason).toBe("item_invalid");
+
+    // Số lượng <= 0 hoặc không phải số nguyên -> item_invalid
+    const r3 = await svc.shopBuy({ soulKey: poor, name: "Đệ Nghèo" }, "hoi_huyet_dan", 0, {
+      known: false,
+    });
+    expect(r3.ok).toBe(false);
+    if (!r3.ok) expect(r3.reason).toBe("item_invalid");
+
+    const r4 = await svc.shopBuy({ soulKey: poor, name: "Đệ Nghèo" }, "hoi_huyet_dan", 1.5, {
+      known: false,
+    });
+    expect(r4.ok).toBe(false);
+    if (!r4.ok) expect(r4.reason).toBe("item_invalid");
+  });
+
+  it("14. Kiểm toán toàn vẹn file lưu (audit-saves) sau toàn bộ thử tải M8 (nhiệm vụ + cửa hàng): 0 lỗi vi phạm", () => {
     const report = auditSavesDirectory(dataDir);
     expect(report.totalSects, "phải có hồ sơ tông môn trong thư mục test").toBeGreaterThan(0);
     expect(report.errorSects).toBe(0);
