@@ -3,7 +3,10 @@
 import {
   INVENTORY_SLOTS,
   ITEM_BY_ID,
+  REALMS,
   addToInventory,
+  canAttemptBreakthrough,
+  clampStatusEffect,
   emptyInventory,
   expPillGain,
   type Inventory,
@@ -13,6 +16,7 @@ import type { World } from "../world";
 import { gainExp } from "./progression";
 import { refreshQuests } from "./quests";
 import { learnFromBook } from "./skills";
+import { applyPlayerStatus } from "./status";
 import { byId } from "./lookup";
 
 /** Đọc túi từ file lưu: bỏ món không còn tồn tại, ép số lượng về [1, stack], đúng 24 ô. */
@@ -139,6 +143,55 @@ export function useItem(w: World, sid: string, slot: unknown) {
       // Có trần tuyệt đối (`maxExp`, M6): thanh tu vi lớn dần theo cảnh giới nên "5% thanh" không thể cứ nhân lên (shared/items.ts `expPillGain`)
       gainExp(w, sid, p, expPillGain(e, p.expMax));
       break;
+    case "status": {
+      // Nghề nhỏ (#514): gắn trạng thái CÓ LỢI lên người dùng. Từ chối thì KHÔNG trừ vật phẩm (mọi nhánh `return` trước `takeFromSlot`).
+      const eff = clampStatusEffect(e);
+      if (!eff) return w.events.toast(sid, { text: `${def.name} không dùng được.`, tone: "bad" });
+      if (w.duels.has(sid))
+        return w.events.toast(sid, {
+          text: `Đang thách đấu, không dùng ${def.name} được.`,
+          tone: "bad",
+        });
+      if (e.forRealm !== undefined) {
+        // Đan hộ đạo: chỉ dùng khi đang ở đỉnh cảnh giới `forRealm` với đầy tu vi (cùng điều kiện với nút Đột phá)
+        const forRealm = Math.trunc(e.forRealm);
+        if (p.realm !== forRealm || !canAttemptBreakthrough(p.realm, p.tier, p.exp, p.expMax)) {
+          const name = REALMS[forRealm]?.name ?? "cảnh giới";
+          return w.events.toast(sid, {
+            text: `${def.name} chỉ dùng khi đã đạt đỉnh ${name} với đầy tu vi.`,
+            tone: "info",
+          });
+        }
+      }
+      // Cùng hiệu lực còn hạn: TỪ CHỐI, KHÔNG trừ (uống thêm chỉ làm mới và mất trọn một viên để kéo dài vài giây; review #761 của B, quyết định A)
+      const active = c.st?.list.find((s) => s.id === eff.id && s.until > w.now);
+      if (active) {
+        const left = Math.ceil((active.until - w.now) / 1000);
+        return w.events.toast(sid, {
+          text: `${def.name} đang còn hiệu lực (còn ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}), chưa cần dùng thêm.`,
+          tone: "info",
+        });
+      }
+      const res = applyPlayerStatus(
+        w,
+        sid,
+        { status: eff.id, ms: eff.ms, ratio: eff.ratio, chance: 1 },
+        0,
+        `item:${def.id}`,
+      );
+      if (res !== "added" && res !== "refreshed")
+        return w.events.toast(sid, {
+          text: `Chưa dùng ${def.name} được lúc này (quá nhiều trạng thái).`,
+          tone: "info",
+        });
+      break;
+    }
+    default: {
+      // Kiểu hiệu ứng chưa biết (dữ liệu mới thêm mà quên nhánh ở đây): KHÔNG trừ vật phẩm. `never` làm typecheck đỏ nếu thiếu nhánh.
+      const unknownEffect: never = e;
+      void unknownEffect;
+      return;
+    }
   }
   takeFromSlot(c.inv, i, 1);
   if (def.cooldown) c.itemCd.set(def.id, w.now + def.cooldown);

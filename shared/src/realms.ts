@@ -119,3 +119,31 @@ export function canEquip(itemId: string, realm: number, tier: number): boolean {
 export function breakthroughChance(realm: number): number {
   return Math.max(0.15, 0.85 - realm * 0.08);
 }
+
+/**
+ * Đủ điều kiện THỬ đột phá cảnh giới lớn: đang ở tầng cuối của cảnh giới, tu vi đầy (`exp >= expMax`) và chưa phải đỉnh tiên đồ.
+ * MỘT nguồn cho máy chủ (`breakthrough`, đan hộ đạo `useItem`) và client (nút Đột phá, nút "Dùng" của đan hộ đạo) để không lệch nhau.
+ * Số không hữu hạn (NaN) hoặc cảnh giới ngoài bảng cho kết quả `false`. Máy chủ vẫn là nơi quyết định.
+ */
+export function canAttemptBreakthrough(
+  realm: number,
+  tier: number,
+  exp: number,
+  expMax: number,
+): boolean {
+  if (!REALMS[realm]) return false;
+  return isLastTier(realm, tier) && exp >= expMax && !isPeak(realm, tier);
+}
+
+/** Trần xác suất đột phá khi có đan hộ đạo (#514): không bao giờ chắc chắn 100 %, thất bại vẫn còn ý nghĩa. */
+export const BREAK_CHANCE_CAP = 0.95;
+
+/**
+ * Xác suất đột phá có cộng `bonus` (phân số, từ trạng thái `dao_ho`): `breakthroughChance(realm) + bonus`, kẹp ở `BREAK_CHANCE_CAP`.
+ * `bonus` không hữu hạn coi là 0; `bonus` âm không bao giờ GIẢM xác suất gốc (`Math.max` với `base`).
+ */
+export function breakthroughChanceWith(realm: number, bonus: number): number {
+  const base = breakthroughChance(realm);
+  const b = Number.isFinite(bonus) ? bonus : 0;
+  return Math.max(base, Math.min(BREAK_CHANCE_CAP, base + b));
+}

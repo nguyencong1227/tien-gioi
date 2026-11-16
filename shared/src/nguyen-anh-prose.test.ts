@@ -102,7 +102,8 @@ describe("số liệu vật phẩm Nguyên Anh KHÔNG đổi (M7.9, #742)", () =
       }
       if (want.healPct !== undefined) {
         expect(it!.effect?.kind, `${id}: kind`).toMatch(/heal/);
-        expect(it!.effect?.pct, `${id}: pct hồi`).toBe(want.healPct);
+        const eff = it!.effect;
+        expect(eff && "pct" in eff ? eff.pct : undefined, `${id}: pct hồi`).toBe(want.healPct);
       }
       if (want.value !== undefined) expect(OWNER_GEAR_VALUE[id], `${id}: giá bán`).toBe(want.value);
     }

@@ -5,7 +5,9 @@
 import {
   MAX_STATUSES,
   STUN_IMMUNE_MS,
+  statusAmpMult,
   statusCarriesRatio,
+  statusCdr,
   statusMask,
   statusOf,
   type SkillEffect,
@@ -52,9 +54,9 @@ export interface AddOpts {
 }
 
 /**
- * `added`: thêm mới (kể cả đẩy ra trạng thái yếu nhất khi đã đủ `MAX_STATUSES`; khống chế luôn vào được); `refreshed`: cùng loại nên làm mới
- * (KHÔNG cộng dồn); `resisted`: choáng bị chặn (trùm / đang miễn); `full`: đủ trạng thái và trạng thái thường mới không sống lâu hơn cái yếu nhất
- * (không phải khống chế); `ignored`: id lạ, thời gian <= 0.
+ * `added`: thêm mới (kể cả đẩy ra một trạng thái khi đã đủ `MAX_STATUSES`: có hại luôn vào, xem `addStatus`); `refreshed`: cùng loại nên làm mới
+ * (KHÔNG cộng dồn); `resisted`: choáng bị chặn (trùm / đang miễn); `full`: đủ trạng thái và trạng thái mới không vào được (buff không đẩy được gì,
+ * hoặc trạng thái thường có hại không sống lâu hơn nạn nhân); `ignored`: id lạ, thời gian <= 0.
  */
 export type AddResult = "added" | "refreshed" | "resisted" | "full" | "ignored";
 
@@ -65,6 +67,21 @@ const finite = (n: unknown, fallback: number): number =>
 function isControl(id: StatusId): boolean {
   const kind = statusOf(id)?.kind;
   return kind === "stun" || kind === "vuln";
+}
+
+/**
+ * Vị trí buff CÓ LỢI hết hạn sớm nhất trong hộp (-1 nếu không có). `withBreakAid` = false thì bỏ qua đan hộ đạo (`breakAid`: đã tốn một viên
+ * đan, chỉ mất khi là buff duy nhất).
+ */
+function earliestBuff(box: StatusBox, withBreakAid: boolean): number {
+  let victim = -1;
+  for (let i = 0; i < box.list.length; i++) {
+    const d = statusOf(box.list[i].id);
+    if (!d || d.harmful) continue;
+    if (!withBreakAid && d.kind === "breakAid") continue;
+    if (victim < 0 || box.list[i].until < box.list[victim].until) victim = i;
+  }
+  return victim;
 }
 
 /**
@@ -95,9 +112,24 @@ export function pruneStatuses(box: StatusBox, now: number): boolean {
 }
 
 /**
+ * Gỡ trạng thái `id` còn hiệu lực khỏi `box` và trả mục đã gỡ (undefined nếu không có / đã hết hạn). Dọn mục hết hạn trước. Dùng cho trạng thái
+ * TIÊU HAO khi dùng (đan hộ đạo `dao_ho`, #514): đọc cường độ và gỡ trong MỘT thao tác để không dùng được hai lần.
+ */
+export function takeStatus(box: StatusBox, id: string, now: number): StatusInst | undefined {
+  pruneStatuses(box, now);
+  const i = box.list.findIndex((s) => s.id === id);
+  return i < 0 ? undefined : box.list.splice(i, 1)[0];
+}
+
+/**
  * Gắn trạng thái `effect` (đã qua xác suất `chance`) lên `box` tại thời điểm `now`.
  * Thời gian kẹp [0, `maxMs`], cường độ kẹp [0, `maxRatio`] của trạng thái. Cùng loại: giữ hạn muộn hơn, cường độ mạnh hơn, và với khiên
- * thì nạp lại đầy (làm mới). Đủ `MAX_STATUSES`: đẩy cái hết hạn sớm nhất ra nếu nó hết sớm hơn cái mới, không thì bỏ cái mới.
+ * thì nạp lại đầy (làm mới). Đủ `MAX_STATUSES` (docs/THIET_KE_NGHE_NHO.md mục 8.5, quyết định A: đồ chế làm đầy ô nên đồ chế không được vô tình
+ * cho miễn nhiễm sát thương theo thời gian):
+ * - trạng thái CÓ HẠI mới luôn VÀO; nạn nhân là buff CÓ LỢI hết sớm nhất (trừ đan hộ đạo khi còn lựa chọn khác);
+ * - buff CÓ LỢI mới chỉ đẩy được buff có lợi hết sớm hơn nó, KHÔNG BAO GIỜ đẩy trạng thái có hại; không có chỗ thì bị bỏ;
+ * - hộp không còn buff nào đẩy được (toàn trạng thái có hại, hoặc buff duy nhất là đan hộ đạo): luật cũ, khống chế luôn vào, trạng thái thường
+ *   có hại chỉ vào khi sống lâu hơn nạn nhân (trạng thái KHÔNG phải khống chế hết sớm nhất).
  */
 export function addStatus(
   box: StatusBox,
@@ -129,21 +161,51 @@ export function addStatus(
     return "refreshed";
   }
   if (box.list.length >= MAX_STATUSES) {
-    // Chỗ trống: khống chế (choáng, vỡ giáp) luôn VÀO được và không bao giờ bị trạng thái khác đẩy ra (choáng ngắn nhất nên nếu so thời gian thì
-    // "ba buff + một trạng thái" thành miễn choáng); nạn nhân luôn là trạng thái KHÔNG phải khống chế có hạn hết sớm nhất. Trạng thái thường
-    // chỉ vào khi sống lâu hơn nạn nhân.
-    let victim = -1;
-    for (let i = 0; i < box.list.length; i++) {
-      if (isControl(box.list[i].id)) continue;
-      if (victim < 0 || box.list[i].until < box.list[victim].until) victim = i;
+    if (def.harmful) {
+      // Có hại luôn vào: nạn nhân là buff có lợi hết sớm nhất (đan hộ đạo chỉ bị đẩy khi không còn buff nào khác, và khi đó dùng luật cũ).
+      let victim = earliestBuff(box, false);
+      if (victim < 0) {
+        // Luật cũ: khống chế (choáng, vỡ giáp) luôn VÀO và không bị trạng thái khác đẩy ra (choáng ngắn nhất nên nếu so thời gian thì "ba
+        // trạng thái + một choáng" thành miễn choáng); nạn nhân là trạng thái KHÔNG phải khống chế hết sớm nhất; trạng thái thường chỉ vào
+        // khi sống lâu hơn nạn nhân.
+        for (let i = 0; i < box.list.length; i++) {
+          if (isControl(box.list[i].id)) continue;
+          if (victim < 0 || box.list[i].until < box.list[victim].until) victim = i;
+        }
+        if (victim < 0) return "full"; // toàn khống chế (không xảy ra: chỉ có hai loại khống chế nên tối đa hai mục)
+        if (!isControl(def.id) && box.list[victim].until >= until) return "full";
+      }
+      box.list.splice(victim, 1);
+    } else {
+      // Buff có lợi: chỉ đẩy buff có lợi hết sớm hơn nó; không bao giờ đẩy trạng thái có hại.
+      const victim = earliestBuff(box, true);
+      if (victim < 0 || box.list[victim].until >= until) return "full";
+      box.list.splice(victim, 1);
     }
-    if (victim < 0) return "full"; // toàn khống chế (không xảy ra: chỉ có hai loại khống chế nên tối đa hai mục)
-    if (!isControl(def.id) && box.list[victim].until >= until) return "full";
-    box.list.splice(victim, 1);
   }
   box.list.push({ id: def.id, until, ratio, dps, pool, last: now, src });
   if (stun) box.stunImmuneUntil = until + STUN_IMMUNE_MS;
   return "added";
+}
+
+/**
+ * Hệ số nhân sát thương GÂY RA của chiêu hệ `element` từ phù `amp_<hệ>` còn hiệu lực trên `box` (nghề nhỏ lát 2, #514): `statusAmpMult` của `shared/`
+ * (một công thức cho máy chủ và công cụ) trên danh sách còn hạn. 1 khi không có hộp / không có phù đó / hệ khác. Gọi MỘT lần mỗi lần dùng chiêu, không mỗi tick.
+ */
+export function ampMultOf(box: StatusBox | undefined, now: number, element: unknown): number {
+  if (!box || box.list.length === 0) return 1;
+  return statusAmpMult(entriesOf(box, now), element);
+}
+
+/** Giảm hồi chiêu (phân số, 0..`maxRatio` của `cdr_phu`) từ phù `cdr_phu` còn hiệu lực; 0 khi không có. Cộng với của trang bị rồi kẹp `CDR_CAP` ở `skillCooldownMs`. */
+export function phuCdrOf(box: StatusBox | undefined, now: number): number {
+  if (!box || box.list.length === 0) return 0;
+  return statusCdr(entriesOf(box, now));
+}
+
+/** Cường độ `cdr_phu` ĐANG LƯU trong hộp, kể cả mục chưa kịp dọn hết hạn (0 khi không có): người gọi so trước / sau một thao tác để biết có phải gửi lại sổ chiêu (`cdMax`). */
+export function cdrPhuStored(box: StatusBox | undefined): number {
+  return box?.list.find((x) => x.id === "cdr_phu")?.ratio ?? 0;
 }
 
 /** Đang bị choáng (không di chuyển, không ra đòn). */

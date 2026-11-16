@@ -173,6 +173,9 @@ export function statusSfx(kind: unknown, harmful: boolean): SfxRecipe | null {
     case "shield":
     case "haste":
     case "regen":
+    case "breakAid":
+    case "amp":
+    case "cdr":
       return clampRecipe({
         partials: [p("sine", harmful ? 330 : 523, harmful ? 250 : 784, 0.26, 0.24)],
       });

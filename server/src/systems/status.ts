@@ -5,8 +5,10 @@
 import { moveSpeedMul, statusOf, type SkillEffect } from "@tien-gioi/shared";
 import { takeWhole, type PlayerCtrl, type World } from "../world";
 import { dealMonsterDamage, hurtPlayerDot } from "./combat";
+import { sendSkills } from "./skills";
 import {
   addStatus,
+  cdrPhuStored,
   entriesOf,
   isStunned,
   maskOf,
@@ -14,6 +16,7 @@ import {
   takeDotDamage,
   pruneStatuses,
   stripDots,
+  takeStatus,
   type AddResult,
   type StatusBox,
 } from "./status-rules";
@@ -79,12 +82,15 @@ export function applyPlayerStatus(
   const { p, c } = r;
   if (!rolls(effect.chance, rng)) return "miss";
   const box = (c.st ??= newStatusBox());
+  const cdr0 = cdrPhuStored(box);
   const res = addStatus(box, effect, w.now, { baseDmg, maxHp: p.maxHp, src });
   if (res === "added" || res === "refreshed") {
     w.statusP.add(sid);
     refreshMoveCache(c, w.now);
     sendStatus(w, sid); // cả khi làm mới: thời gian và cường độ (chiêu mạnh hơn ghi đè chiêu yếu) có thể đổi
   }
+  // phù cdr_phu vào / ra / đổi cường độ (kể cả bị đẩy hay hết hạn lúc dọn đầu `addStatus`): `cdMax` đổi nên gửi lại sổ chiêu
+  if (cdrPhuStored(box) !== cdr0) sendSkills(w, sid);
   return res;
 }
 
@@ -104,6 +110,19 @@ export function refreshMoveCache(c: PlayerCtrl, now: number) {
   c.stunned = isStunned(box, now) ? true : undefined;
 }
 
+/**
+ * Đột phá (#514): đọc cộng thêm xác suất của đan hộ đạo `dao_ho` còn hiệu lực rồi GỠ nó (tiêu hao dù đột phá thành công hay thất bại; gửi lại
+ * danh sách cho chủ). Trả 0 khi không có. Gọi ĐÚNG MỘT lần mỗi lần thử đột phá, sau khi đã qua mọi điều kiện (hỏa hầu, hồi) để đan không bị mất oan.
+ */
+export function consumeBreakAid(w: World, sid: string): number {
+  const box = w.ctrl.get(sid)?.st;
+  if (!box) return 0;
+  const s = takeStatus(box, "dao_ho", w.now);
+  if (!s) return 0;
+  sendStatus(w, sid);
+  return s.ratio;
+}
+
 /** Gửi cho chủ danh sách trạng thái còn hiệu lực của chính mình (rỗng cũng gửi: client xoá huy hiệu). */
 export function sendStatus(w: World, sid: string) {
   const box = w.ctrl.get(sid)?.st;
@@ -115,9 +134,11 @@ export function clearPlayerStatus(w: World, sid: string) {
   const c = w.ctrl.get(sid);
   w.statusP.delete(sid);
   if (!c?.st || c.st.list.length === 0) return;
+  const cdr0 = cdrPhuStored(c.st);
   c.st.list.length = 0;
   refreshMoveCache(c, w.now);
   sendStatus(w, sid);
+  if (cdr0 !== 0) sendSkills(w, sid); // mất phù cdr_phu: `cdMax` trở lại như chỉ có trang bị
 }
 
 /** Một tick: sát thương theo giây lên quái, hồi phục cho người chơi, gỡ trạng thái hết hạn. Hai tập rỗng thì không làm gì. */
@@ -185,10 +206,12 @@ function tickPlayerStatuses(w: World, dt: number) {
       if (dmg < 1) continue;
       hurtPlayerDot(w, sid, p, dmg); // không giết, không đổi `p.dead` / `c.limbo` / hộp trạng thái: không cần thoát vòng sớm
     }
+    const cdr0 = cdrPhuStored(box);
     if (pruneStatuses(box, now) || cleansed) {
       refreshMoveCache(c, now);
       sendStatus(w, sid);
     }
+    if (cdrPhuStored(box) !== cdr0) sendSkills(w, sid); // cdr_phu hết hạn: sổ chiêu cần `cdMax` mới
     if (box.list.length === 0) w.statusP.delete(sid);
   }
 }

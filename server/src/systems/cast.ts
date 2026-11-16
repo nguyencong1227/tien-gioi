@@ -24,8 +24,9 @@ import { rollDamage } from "./damage";
 import { treasureElementMult } from "./treasure";
 import { duelHit } from "./duel";
 import { syncPublicPos } from "./movement";
-import { cdrOf, sendSkills } from "./skills";
+import { cdrNow, sendSkills } from "./skills";
 import { applyMonsterStatus, applyPlayerStatus } from "./status";
+import { ampMultOf } from "./status-rules";
 
 /** Bước nhỏ nhất khi lao (px): như một bước di chuyển thường, để `moveWithCollision` không xuyên tường. */
 const DASH_STEP = 8;
@@ -145,7 +146,7 @@ export function cast(w: World, sid: string, raw: unknown) {
     w.events.toast(sid, { text: "Linh lực không đủ.", tone: "bad" });
     return;
   }
-  c.skillCd[idx] = w.now + skillCooldownMs(def, level, cdrOf(p));
+  c.skillCd[idx] = w.now + skillCooldownMs(def, level, cdrNow(w, sid, p, c)); // trang bị + phù cdr_phu (#514 lát 2)
   p.mp -= cost;
   p.meditating = false;
   p.angle = quantAngle(m.angle);
@@ -168,6 +169,7 @@ export function cast(w: World, sid: string, raw: unknown) {
   if (mult > 0) {
     const st = statsFor(p.realm, p.tier, p, c.mult);
     const atk = st.atk;
+    const amp = ampMultOf(c.st, w.now, def.element); // một lần mỗi lần dùng chiêu (không mỗi mục tiêu)
     // gom mục tiêu trước rồi mới gây sát thương: hạ quái xoá nó khỏi bảng trong lúc duyệt
     const hits: { id: string; n: number }[] = [];
     w.state.monsters.forEach((mon, id) => {
@@ -186,7 +188,9 @@ export function cast(w: World, sid: string, raw: unknown) {
       const mc = w.mctrl.get(h.id);
       if (!mon || !mc) continue;
       const em =
-        elementMult(def.element, mc.def.element ?? "none") * treasureElementMult(p, def.element); // pháp bảo hệ (M7.4)
+        elementMult(def.element, mc.def.element ?? "none") *
+        treasureElementMult(p, def.element) * // pháp bảo hệ (M7.4)
+        amp; // phù amp_<hệ> cùng hệ với chiêu (#514 lát 2); đòn lên người thách đấu (`castAtOpponent`) KHÔNG nhân
       let first = 0;
       for (let k = 0; k < h.n && w.mctrl.has(h.id); k++) {
         const { dmg, crit } = rollDamage(atk, mult * em, st.crit); // bạo kích cộng thêm từ trang bị (M7.4)

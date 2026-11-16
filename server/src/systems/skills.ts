@@ -18,6 +18,7 @@ import {
 import type { Player } from "../schema";
 import type { World, PlayerCtrl } from "../world";
 import { byId } from "./lookup";
+import { phuCdrOf } from "./status-rules";
 
 /** Hồi chiêu còn lại (ms, >= 0, số nguyên) của bốn ô chiêu tại thời điểm `now`. */
 export function cooldownsLeft(c: PlayerCtrl, now: number): SkillsMsg["cd"] {
@@ -30,6 +31,14 @@ export function cooldownsLeft(c: PlayerCtrl, now: number): SkillsMsg["cd"] {
  */
 export function cdrOf(p: Player): number {
   return equipBonus(p, p.realm).cdr / 100;
+}
+
+/**
+ * Giảm hồi chiêu HIỆN TẠI của người chơi: trang bị (`cdrOf`) cộng phù `cdr_phu` còn hiệu lực (nghề nhỏ lát 2, #514). Phù KHÔNG tác dụng khi đang thách đấu
+ * (PK không nghiêng bằng đồ chế). Tổng có thể vượt `CDR_CAP`: `skillCooldownMs` kẹp. Dùng cho `cdMax` gửi client lẫn đặt `skillCd` lúc dùng chiêu.
+ */
+export function cdrNow(w: World, sid: string, p: Player, c: PlayerCtrl): number {
+  return cdrOf(p) + (w.duels.has(sid) ? 0 : phuCdrOf(c.st, w.now));
 }
 
 /** Tổng hồi chiêu (ms) của bốn ô sau tầng chiêu + `cdr`; 0 = ô trống. Client chia `cd / cdMax` để vẽ vòng hồi chiêu. */
@@ -49,7 +58,7 @@ export function sendSkills(w: World, sid: string) {
     learned: { ...c.skills.learned },
     slots: [...c.skills.slots] as SkillsMsg["slots"],
     cd: cooldownsLeft(c, w.now),
-    cdMax: cooldownsMax(c, cdrOf(p)),
+    cdMax: cooldownsMax(c, cdrNow(w, sid, p, c)),
   };
   w.events.skills(sid, msg);
 }

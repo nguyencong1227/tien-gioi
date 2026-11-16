@@ -2,7 +2,14 @@
 // dưới hàng Linh thạch / số đạo hữu. Dữ liệu từ `StatusTracker.active(now)` (server gửi `status`, client tự đếm lùi). Lớp THUẦN (mô hình + vẽ vào đối tượng DOM tối thiểu)
 // nên test được không cần jsdom. Chỉ GHI DOM khi dấu hiệu đổi (id, số giây làm tròn lên, cường độ): gọi mỗi khung vẫn rẻ và trình đọc màn hình không bị đọc lại liên tục.
 // Huy hiệu trên đầu quái / người khác cần `Monster.fx` công khai (hợp đồng đã có `STATUS_BIT`, schema ở M7.3 #504) nên làm ở bước sau.
-import { STATUSES, statusOf, type StatusDef, type StatusEntry } from "@tien-gioi/shared";
+import {
+  ELEMENT_BY_ID,
+  STATUSES,
+  ampElementOf,
+  statusOf,
+  type StatusDef,
+  type StatusEntry,
+} from "@tien-gioi/shared";
 
 /** Còn từng này giây trở xuống thì ô nhấp nháy (trừ khi giảm chuyển động): sắp hết, người chơi cần biết. */
 export const BADGE_URGENT_SECS = 2;
@@ -20,12 +27,31 @@ export interface BadgeView {
   harmful: boolean;
   /** Số giây còn lại, làm tròn LÊN (>= 1): ô còn hiện thì luôn >= 1 */
   secs: number;
-  /** Chữ trên ô: "Độc 7", "Tê cóng −30% 4" */
+  /** Chữ trên ô: "Độc 7", "Tê cóng −30% 4", "Hộ đạo +15% 14:59" (từ 60 giây trở lên in phút:giây, xem `formatRemain`) */
   label: string;
   /** Câu cho trình đọc màn hình: tên, tác dụng, thời gian còn lại */
   aria: string;
   /** Sắp hết: nhấp nháy */
   urgent: boolean;
+}
+
+/**
+ * Thời gian còn lại trên ô: dưới 60 giây in số giây thuần ("59"), từ 60 giây in phút:giây ("1:00", "14:59") để đan / phù chế (15 phút) đọc được
+ * ngay ("Hộ đạo +15% 899" khó đọc). Giây luôn 2 chữ số; phút không chia thêm thành giờ (hiệu lực lâu nhất là 15 phút).
+ */
+export function formatRemain(secs: number): string {
+  const s = Math.max(0, Math.floor(Number.isFinite(secs) ? secs : 0));
+  if (s < 60) return String(s);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+/** Cùng thời gian bằng chữ cho trình đọc màn hình: "59 giây", "1 phút", "14 phút 59 giây" (không ghi "0 giây" khi chẵn phút). */
+export function remainWords(secs: number): string {
+  const s = Math.max(0, Math.floor(Number.isFinite(secs) ? secs : 0));
+  if (s < 60) return `${s} giây`;
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return r === 0 ? `${m} phút` : `${m} phút ${r} giây`;
 }
 
 /** Câu tác dụng ngắn theo loại (cường độ chỉ có với tăng tốc / tê cóng: các loại khác KHÔNG ghi số vì server không gửi). */
@@ -46,6 +72,15 @@ export function effectText(def: StatusDef, ratio: number | undefined): string {
       return pct > 0 ? `tăng ${pct}% tốc độ di chuyển` : "tăng tốc độ di chuyển";
     case "regen":
       return "hồi khí huyết mỗi giây";
+    case "breakAid":
+      return pct > 0 ? `cộng ${pct}% xác suất đột phá lần kế` : "cộng xác suất đột phá lần kế";
+    case "amp": {
+      const el = ampElementOf(def.id);
+      const heText = el ? ` hệ ${ELEMENT_BY_ID[el].name}` : "";
+      return pct > 0 ? `tăng ${pct}% sát thương chiêu${heText}` : `tăng sát thương chiêu${heText}`;
+    }
+    case "cdr":
+      return pct > 0 ? `giảm ${pct}% hồi chiêu` : "giảm hồi chiêu";
   }
 }
 
@@ -54,6 +89,9 @@ function ratioTag(def: StatusDef, ratio: number | undefined): string {
   if (ratio === undefined || !(ratio > 0)) return "";
   if (def.kind === "haste") return ` +${Math.round(ratio * 100)}%`;
   if (def.kind === "slow") return ` −${Math.round(ratio * 100)}%`;
+  if (def.kind === "breakAid") return ` +${Math.round(ratio * 100)}%`;
+  if (def.kind === "amp") return ` +${Math.round(ratio * 100)}%`;
+  if (def.kind === "cdr") return ` −${Math.round(ratio * 100)}%`;
   return "";
 }
 
@@ -76,8 +114,8 @@ export function badgeViews(active: readonly StatusEntry[]): BadgeView[] {
       name: def.name,
       harmful: def.harmful,
       secs,
-      label: `${def.name}${ratioTag(def, ratio)} ${secs}`,
-      aria: `${def.name}: ${effectText(def, ratio)}, còn ${secs} giây`,
+      label: `${def.name}${ratioTag(def, ratio)} ${formatRemain(secs)}`,
+      aria: `${def.name}: ${effectText(def, ratio)}, còn ${remainWords(secs)}`,
       urgent: secs <= BADGE_URGENT_SECS,
     });
   }

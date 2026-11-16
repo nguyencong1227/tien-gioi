@@ -2,6 +2,15 @@
 
 Định dạng theo từng bản phát hành (thẻ `vX.Y.Z`). Số `#` là PR / issue trên GitHub.
 
+## [Chưa phát hành] — sau v0.3.0
+
+### Giao diện
+- **Gợi ý "nên đi đội" khi gặp tinh anh (#750, nội dung của B; người dùng chốt ở `QUYET_DINH_M3.md` mục 22.2: giữ nguyên độ mạnh của tinh anh, kể cả Độc Tước, và nhắc người chơi đi đội):** thông báo "★ <tên> tinh anh: nên đi đội." hiện MỘT lần mỗi loài trong một phiên khi tinh anh đầu tiên của loài đó vào khung hình; bỏ qua khi người chơi đã vào đội (không ghi nhớ lúc ở đội, nên rời đội gặp lại vẫn được nhắc); chú giải bản đồ ghi "Tinh anh (mạnh, hiếm: nên đi đội)". Chỉ phía client (`client/src/elite.ts`, `EliteHintGate`), không đổi máy chủ, `shared/` hay giao thức. Kiểm bằng Chrome thật ở 4 khung nhìn (`check-elite-badge.mjs`) và test đơn vị.
+- **Giao diện nghề nhỏ lát 1 (#769, nghề nhỏ #514; chỉ phía client, không đổi máy chủ, `shared/` hay giao thức):** (1) bảng chế tác theo TRẠM của NPC: tiêu đề "Lò Đan" / "Bàn Phù" / "Lò Rèn", dòng phụ, nút "Luyện" / "Chế" / "Rèn", gợi ý phí và thẻ lựa chọn hội thoại lấy từ `CRAFT_STATIONS`, thợ rèn cũ giữ nguyên chữ; (2) chip trạng thái đếm ngược dạng phút:giây từ 60 giây ("Hộ đạo +15% 14:59", chữ đọc cho trình đọc màn hình "còn 14 phút 59 giây"); (3) nút "Dùng" của đan / phù gắn trạng thái MỜ kèm lý do ("Đang còn hiệu lực", "Cần đỉnh Trúc Cơ, đầy tu vi") theo cùng thứ tự kiểm với máy chủ (máy chủ vẫn từ chối + không trừ); (4) dòng "Hiệu lực: cộng 15% xác suất đột phá lần kế · 15 phút" ở chi tiết túi, tính từ số máy chủ thật sự áp dụng; (5) hộp xác nhận khi bấm qua cổng mà đang có hiệu lực đan / phù ("Qua cổng sẽ mất Hộ đạo. Vẫn đi?", Y đi / X ở lại; buff của chiêu không bị hỏi; máy chủ xoá thật, #767); (6) toast thành công khi dùng đan / phù. Kèm: đan / phù gắn trạng thái không chiếm ô dùng nhanh khi túi không có đan hồi huyết / hồi linh; toast dài không còn bị bóp thành cột hẹp ở điện thoại; nút Dùng mờ vẫn đọc được. Kiểm bằng Chrome thật ở 5 khung nhìn (`client/scripts/check-craft-ui.mjs`, dữ liệu thử chèn qua `window.__craftData` ở `?debug`) và ảnh ở `docs/screenshots/nghe-nho-lat1/`.
+
+### Giao thức
+- **`PROTOCOL_VERSION` 3 -> 4** (`shared/src/protocol.ts`, nghề nhỏ #514, `docs/THIET_KE_NGHE_NHO.md`): vật phẩm gắn trạng thái (`ItemEffect` kind `status`, trạng thái `dao_ho`) và trạm chế tác (`NpcDef.station`: Lò đan / Bàn phù); client cũ không hiểu hiệu ứng mới của vật phẩm và gọi lò đan là "Lò Rèn". `MIN_PROTOCOL_VERSION` KHÔNG đổi (nâng lúc phát hành bản có nghề). Tăng trước khi PR dữ liệu nghề đầu tiên (#763) vào `main`.
+
 ## [0.3.0] — 16/11/2026: M7, chiều sâu chiến đấu + Nguyên Anh (Hàn Vân Lĩnh)
 
 Bản phát hành M7 (`docs/PHAN_CONG_M7.md`; hướng đã được người dùng duyệt ở `QUYET_DINH_M3.md` mục 18-21): chiều sâu chiến đấu (chiêu thức học được theo hệ, trạng thái, quái báo trước đòn, tinh anh) và cảnh giới Nguyên Anh trọn vẹn với bản đồ thứ tư. Người dùng đã đồng ý phát hành (`QUYET_DINH_M3.md` mục 22, 16/11/2026). Phần dưới là TÓM TẮT cho người quyết định; chi tiết từng PR nằm ở hai mục "Máy chủ" và "Giao diện" kế tiếp.
