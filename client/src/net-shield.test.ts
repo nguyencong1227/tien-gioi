@@ -56,7 +56,7 @@ describe("ShieldTimer: đếm ngược theo đồng hồ client", () => {
     expect(t.active(1000)).toBe(false);
     t.start({ ms: 3000, reason: "resume" }, 1000);
     expect(t.active(1000)).toBe(true);
-    expect(t.remaining(2500)).toBe(2500);
+    expect(t.remaining(2500)).toBe(1500);
     expect(t.active(3999)).toBe(true);
     expect(t.active(4000)).toBe(false);
     expect(t.remaining(9999)).toBe(0);
