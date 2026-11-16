@@ -8,6 +8,7 @@ import {
   ITEM_BY_ID,
   SECT_DEPOSIT_DAY_CAP,
   SECT_EARN_DAY_CAP,
+  SECT_SHOP,
   addToInventory,
   sectFailMessage,
   sectLevelOf,
@@ -223,12 +224,12 @@ describe("sectHallGet / sectHall (chỉ đọc, không tự đẩy lúc nửa đ
     expect(lh.sectHalls.length).toBe(count + 1); // chỉ ca Charlie
   });
 
-  it("ảnh chụp có 3 nhiệm vụ hôm nay (M8.4, chi tiết ở sect-quest.test.ts); cửa hàng còn RỖNG (M8.5 điền); khớp kiểu thật của hợp đồng M8.1", async () => {
+  it("ảnh chụp có 3 nhiệm vụ hôm nay (M8.4, sect-quest.test.ts) và cửa hàng (M8.5, sect-shop.test.ts); khớp kiểu thật của hợp đồng M8.1", async () => {
     await seed(2 * DAY);
     await join(A);
     const hall = lastHall(A)!;
     expect(hall.quests).toHaveLength(3);
-    expect(hall.shop).toEqual([]);
+    expect(hall.shop.map((r) => r.itemId)).toEqual(SECT_SHOP.map((e) => e.itemId));
     expect(hall.pointsNext).toBe(1000);
     expect(hall.pointsFrom).toBe(0);
     expect(hall.caps).toEqual({ members: 30, elders: 3, vaultSlots: 40 });
