@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { STATUSES, type StatusEntry } from "@tien-gioi/shared";
+import { AMP_ELEMENTS, STATUSES, type StatusEntry } from "@tien-gioi/shared";
 import {
   USE_TOAST_WINDOW_MS,
   craftBuffNames,
@@ -14,8 +14,12 @@ describe("isCraftKind: loại trạng thái đến từ chế phẩm", () => {
     for (const k of ["haste", "shield", "regen", "dot", "slow", "vuln", "stun", "", "lạ"])
       expect(isCraftKind(k), k).toBe(false);
   });
-  it("trong bảng STATUSES hiện có: chỉ đan hộ đạo là chế phẩm (không buff chiêu nào bị tính nhầm)", () => {
-    expect(STATUSES.filter((s) => isCraftKind(s.kind)).map((s) => s.id)).toEqual(["dao_ho"]);
+  it("trong bảng STATUSES: đan hộ đạo, chín phù tăng sát thương và phù tốc chiêu là chế phẩm; không buff chiêu nào bị tính nhầm", () => {
+    expect(STATUSES.filter((s) => isCraftKind(s.kind)).map((s) => s.id)).toEqual([
+      "dao_ho",
+      ...AMP_ELEMENTS.map((el) => `amp_${el}`),
+      "cdr_phu",
+    ]);
   });
 });
 
@@ -45,6 +49,18 @@ describe("craftBuffNames + travelConfirmText: hộp xác nhận qua cổng", () 
       ]),
     ).toEqual(["Hộ đạo"]);
   });
+  it("phù (lát 2) cũng bị cảnh báo: nêu tên từng phù, đan hộ đạo đứng trước theo thứ tự danh sách", () => {
+    const names = craftBuffNames([
+      ["dao_ho", 600_000, 0.15],
+      ["amp_hoa", 59_000, 0.2],
+      ["cdr_phu", 30_000, 0.15],
+      ["haste", 5000, 0.3],
+    ]);
+    expect(names).toEqual(["Hộ đạo", "Phù Hỏa", "Phù Tốc Chiêu"]);
+    expect(travelConfirmText(names)).toBe(
+      "Qua cổng sẽ mất Hộ đạo, Phù Hỏa, Phù Tốc Chiêu. Vẫn đi?",
+    );
+  });
   it("nhiều tên nối bằng dấu phẩy", () => {
     expect(travelConfirmText(["Hộ đạo", "Cuồng lực"])).toBe(
       "Qua cổng sẽ mất Hộ đạo, Cuồng lực. Vẫn đi?",
@@ -69,6 +85,14 @@ describe("useSuccessText: toast khi dùng đan thành công", () => {
   it("chip chế phẩm MỚI hiện ngay sau một lần bấm Dùng: báo tác dụng + thời gian", () => {
     expect(useSuccessText(none, dao, 1000, 1500)).toBe(
       "Hộ đạo: cộng 15% xác suất đột phá lần kế trong 15 phút",
+    );
+  });
+  it("phù: toast nêu hệ và thời gian", () => {
+    expect(useSuccessText(none, [["amp_hoa", 60_000, 0.2]], 0, 100)).toBe(
+      "Phù Hỏa: tăng 20% sát thương chiêu hệ Hỏa trong 1 phút",
+    );
+    expect(useSuccessText(none, [["cdr_phu", 30_000, 0.15]], 0, 100)).toBe(
+      "Phù Tốc Chiêu: giảm 15% hồi chiêu trong 30 giây",
     );
   });
   it("thời gian không chẵn phút nói cả giây", () => {

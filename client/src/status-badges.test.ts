@@ -255,6 +255,14 @@ describe("status-badges: thời gian còn lại dạng m:ss (#514, issue #769)",
     expect(badgeViews([["dao_ho", 60_000, 0.15]])[0].label).toBe("Hộ đạo +15% 1:00");
   });
 
+  it("phù 60 giây: đếm ngược m:ss từ lúc tròn 60 giây, dưới đó số giây thuần (khớp ví dụ 'Phù Hỏa +20% 59' của hợp đồng lát 2)", () => {
+    expect(badgeViews([["amp_hoa", 60_000, 0.2]])[0].label).toBe("Phù Hỏa +20% 1:00");
+    expect(badgeViews([["amp_hoa", 59_000, 0.2]])[0].label).toBe("Phù Hỏa +20% 59");
+    expect(badgeViews([["amp_hoa", 60_000, 0.2]])[0].aria).toBe(
+      "Phù Hỏa: tăng 20% sát thương chiêu hệ Hỏa, còn 1 phút",
+    );
+  });
+
   it("hiệu ứng ngắn (dưới 60 giây) giữ nguyên số giây thuần như trước", () => {
     expect(badgeViews([["poison", 6200]])[0].label).toBe("Độc 7");
     expect(badgeViews([["haste", 5000, 0.3]])[0].label).toBe("Tăng tốc +30% 5");
@@ -266,5 +274,25 @@ describe("status-badges: thời gian còn lại dạng m:ss (#514, issue #769)",
     const c = badgeSignature(badgeViews([["dao_ho", 898_900, 0.15]])); // 899 giây
     expect(a).toBe(b);
     expect(a).not.toBe(c);
+  });
+});
+
+describe("status-badges: phù (nghề nhỏ lát 2, #514)", () => {
+  it("phù tăng sát thương: tên + dấu +X% + hệ trong câu đọc; phù tốc chiêu: dấu −X%", () => {
+    const [a, c] = badgeViews([
+      ["amp_hoa", 59_000, 0.2],
+      ["cdr_phu", 30_000, 0.15],
+    ]);
+    expect(a).toMatchObject({ id: "amp_hoa", name: "Phù Hỏa", harmful: false, secs: 59 });
+    expect(a.label).toBe("Phù Hỏa +20% 59");
+    expect(a.aria).toBe("Phù Hỏa: tăng 20% sát thương chiêu hệ Hỏa, còn 59 giây");
+    expect(c.label).toBe("Phù Tốc Chiêu −15% 30");
+    expect(c.aria).toBe("Phù Tốc Chiêu: giảm 15% hồi chiêu, còn 30 giây");
+  });
+
+  it("thiếu ratio: không nêu số nhưng vẫn có câu tác dụng", () => {
+    const [a] = badgeViews([["amp_kim", 10_000]]);
+    expect(a.label).toBe("Phù Kim 10");
+    expect(a.aria).toBe("Phù Kim: tăng sát thương chiêu hệ Kim, còn 10 giây");
   });
 });
