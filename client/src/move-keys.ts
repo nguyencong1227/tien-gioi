@@ -13,7 +13,7 @@
 //  - KHÔNG tự hết hạn theo thời gian: hệ điều hành chỉ lặp phím được bấm cuối, nên phím giữ trước đó im lặng hàng giây vẫn đang giữ thật.
 export type MoveDir = "left" | "right" | "up" | "down";
 
-/** Vị trí phím -> hướng. WASD và mũi tên (cả hai nhóm cùng lúc được). */
+/** Vị trí phím -> hướng MẶC ĐỊNH. WASD và mũi tên (cả hai nhóm cùng lúc được). Phím THẬT do người chơi đổi được (`keybinds.ts`, `move.*`): `MoveKeys` nhận bộ tra hướng từ ngoài. */
 export const MOVE_CODES: Readonly<Record<string, MoveDir>> = {
   KeyA: "left",
   ArrowLeft: "left",
@@ -33,6 +33,13 @@ export interface KeyLike {
   altKey?: boolean;
 }
 
+/** Tra hướng của một phím (`event.code`): `null` nếu không phải phím di chuyển. Gọi MỖI LẦN cần nên đổi phím giữa lúc đang giữ vẫn đúng. */
+export type MoveResolver = (code: string) => MoveDir | null;
+
+/** Bộ tra mặc định: bảng `MOVE_CODES` (cho test và lúc chưa nối với bảng phím). */
+export const defaultMoveResolver: MoveResolver = (code) =>
+  Object.prototype.hasOwnProperty.call(MOVE_CODES, code) ? MOVE_CODES[code] : null;
+
 export interface MoveState {
   left: boolean;
   right: boolean;
@@ -47,13 +54,15 @@ export class MoveKeys {
   private ignored = new Set<string>();
   private order = 0;
 
+  constructor(private readonly resolve: MoveResolver = defaultMoveResolver) {}
+
   /**
    * Ghi nhận keydown. `typing` = đang gõ ở ô nhập văn bản (không ghi nhận). Trả `true` nếu là phím di chuyển đã được ghi nhận (hoặc đang giữ: phím lặp
    * làm mới trạng thái, không đổi thứ tự bấm).
    */
   keyDown(e: KeyLike, typing = false): boolean {
     const code = e.code ?? "";
-    if (!Object.prototype.hasOwnProperty.call(MOVE_CODES, code)) return false;
+    if (this.resolve(code) === null) return false;
     if (typing || e.ctrlKey || e.metaKey || e.altKey) {
       this.ignored.add(code);
       return false;
@@ -84,7 +93,7 @@ export class MoveKeys {
   /** Số thứ tự bấm mới nhất của một hướng (0 = không giữ). */
   private latest(dir: MoveDir): number {
     let best = 0;
-    for (const [code, n] of this.held) if (MOVE_CODES[code] === dir && n > best) best = n;
+    for (const [code, n] of this.held) if (this.resolve(code) === dir && n > best) best = n;
     return best;
   }
 
