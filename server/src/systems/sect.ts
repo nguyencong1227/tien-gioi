@@ -27,6 +27,8 @@ import {
   dayKey,
   parseSectAmount,
   parseSectHallGet,
+  parseSectQuest,
+  parseSectShopBuy,
   parseSectAnswer,
   parseSectInvite,
   parseSectKick,
@@ -37,9 +39,17 @@ import {
   parseSectVaultPolicy,
   parseSectVaultWithdraw,
   sectDepositCh,
+  sectDayState,
   sectDepositValue,
   sectFailMessage,
   sectKey,
+  sectQuestCh,
+  sectQuestFor,
+  sectQuestSlots,
+  sectQuestTemplateOf,
+  SECT_QUEST_BY_ID,
+  questReady,
+  MAX_ACTIVE_QUESTS,
   sectVaultAccepts,
   type ChatOut,
   type Inventory,
@@ -49,9 +59,18 @@ import {
 } from "@tien-gioi/shared";
 import type { Located } from "../hub";
 import type { Sect } from "../sect-store";
-import { sectHallViewOf, sectVaultViewOf, sectViewOf, type SectActor } from "../sect-service";
+import {
+  sectHallViewOf,
+  sectVaultViewOf,
+  sectViewOf,
+  type SectActor,
+  type SectHallCtx,
+  shopKnown,
+} from "../sect-service";
 import type { World } from "../world";
-import { sendInv, takeFromSlot } from "./inventory";
+import { exchangeItems, sendInv, takeFromSlot } from "./inventory";
+import { gainExp } from "./progression";
+import { questCtx, refreshQuests, sendQuests } from "./quests";
 import { spawnLoot } from "./loot";
 import { changeCoin, trySpendCoin } from "./wallet";
 
@@ -216,9 +235,27 @@ function applySectBuff(w: World, sid: string, sect: Sect) {
   c.sectBuff = level >= 2 ? sectBuffOf(level) : undefined;
 }
 
-/** Ảnh chụp "Nội vụ" cho người `soulKey` đang đứng ở phòng `w` với phiên `sid` (đồng hồ phòng + cờ "chờ sang ngày" của phòng đó). */
-function hallMsgFor(w: World, sect: Sect, soulKey: string) {
-  return { hall: sectHallViewOf(sect, soulKey, w.now, w.sectEarnWarmup) };
+/** Phần của người xem mà bản ghi tông môn không có (cảnh giới, nhiệm vụ đang làm): đọc từ `World` cho ảnh chụp Nội vụ. */
+function hallCtxOf(w: World, sid: string): SectHallCtx | undefined {
+  const p = w.state.players.get(sid);
+  const c = w.ctrl.get(sid);
+  return p && c
+    ? {
+        realm: p.realm,
+        active: c.quests.active.map((a) => a.id),
+        learned: learnedOf(c),
+      }
+    : undefined;
+}
+
+/** Id các chiêu đã học (tầng >= 1) trong sổ chiêu của người chơi. */
+function learnedOf(c: { skills: { learned: Record<string, number> } }): string[] {
+  return Object.keys(c.skills.learned).filter((id) => (c.skills.learned[id] ?? 0) > 0);
+}
+
+/** Ảnh chụp "Nội vụ" cho người `soulKey` đang đứng ở phòng `w` với phiên `sid` (đồng hồ phòng + cờ "chờ sang ngày" của phòng đó, cảnh giới và nhiệm vụ đang làm của chính người đó). */
+function hallMsgFor(w: World, sid: string, sect: Sect, soulKey: string) {
+  return { hall: sectHallViewOf(sect, soulKey, w.now, w.sectEarnWarmup, hallCtxOf(w, sid)) };
 }
 
 /**
@@ -240,7 +277,7 @@ function broadcastSect(w: World, sect: Sect, removed: { soulKey: string; name: s
     book.online.set(m.soulKey, sect.id);
     loc.w.events.sect(loc.sid, { sect: sectViewOf(sect, m.soulKey) });
     loc.w.events.sectVault(loc.sid, vaultMsgFor(loc.w, loc.sid, sect, m.soulKey));
-    loc.w.events.sectHall(loc.sid, hallMsgFor(loc.w, sect, m.soulKey));
+    loc.w.events.sectHall(loc.sid, hallMsgFor(loc.w, loc.sid, sect, m.soulKey));
     applySectBuff(loc.w, loc.sid, sect);
   }
   sendPresence(w, sect); // ai đang trực tuyến cập nhật NGAY khi thành viên đổi (không chờ nhịp `tickSect`)
@@ -302,7 +339,8 @@ export async function sectOnJoin(w: World, sid: string) {
   loc.p.sect = sect.tag;
   w.events.sect(sid, { sect: sectViewOf(sect, a.soulKey) });
   w.events.sectVault(sid, vaultMsgFor(w, sid, sect, a.soulKey));
-  w.events.sectHall(sid, hallMsgFor(w, sect, a.soulKey));
+  purgeStaleSectQuests(w, sid, sect); // nhiệm vụ tông của hôm trước đã quá ngày (mục 12.7)
+  w.events.sectHall(sid, hallMsgFor(w, sid, sect, a.soulKey));
   applySectBuff(w, sid, sect);
   sendPresence(w, sect); // mọi người trong tông môn thấy người mới trực tuyến ngay
 }
@@ -317,26 +355,33 @@ export async function sectHallGet(w: World, sid: string, raw: unknown) {
   if (!svc || !a || !parseSectHallGet(raw)) return;
   const sect = await svc.sectOf(a.soulKey);
   if (!stillHere(w, sid, a.soulKey)) return;
-  w.events.sectHall(sid, sect ? hallMsgFor(w, sect, a.soulKey) : { hall: null });
+  if (sect) purgeStaleSectQuests(w, sid, sect); // qua nửa đêm: gỡ nhiệm vụ tông quá ngày trước khi dựng ảnh chụp
+  w.events.sectHall(sid, sect ? hallMsgFor(w, sid, sect, a.soulKey) : { hall: null });
 }
+
+/** Kết quả của `awardCore`: số cống hiến được cộng (kèm bản ghi mới), hoặc lý do bị từ chối (`not_warm`, `earn_cap`, `quest_done`, ...). */
+type AwardOutcome = { ok: true; granted: number; sect: Sect } | { ok: false; reason: SectFail };
 
 /**
  * Cộng cống hiến cho `sid` từ `source` qua MỘT cổng (`SectService.award`): gọi SAU khi thao tác chính (góp kho) đã THÀNH CÔNG; thao tác chính KHÔNG bị hoàn khi cống hiến bị từ chối
- * (chưa tới ngày được kiếm, hết trần, đã chết: chỉ là không có cống hiến). Trả số cống hiến được cộng (0 = không). Thành công thì ghi audit `sect.earn`, gửi lại `sectHall` cho
- * NGƯỜI KIẾM; lên cấp thì ghi `sect.level_up`, báo cả tông môn (toast + ảnh chụp). Người đã chết / ở Hoàng Tuyền không kiếm (mục 12.3, cùng `isDown`).
+ * (chưa tới ngày được kiếm, hết trần, đã chết: chỉ là không có cống hiến). Thành công thì ghi audit `sect.earn`; lên cấp thì ghi `sect.level_up`, báo cả tông môn (toast + ảnh chụp);
+ * không lên cấp và `sendHall` thì gửi lại `sectHall` cho NGƯỜI KIẾM (nhiệm vụ tự gửi SAU khi đã gỡ khỏi sổ nhiệm vụ, nên truyền `false`). Người đã chết / ở Hoàng Tuyền không kiếm (mục 12.3, cùng `isDown`).
  */
-async function awardContribution(
+async function awardCore(
   w: World,
   sid: string,
   a: SectActor,
   source: SectEarnSource,
   want: number,
   key?: string,
-): Promise<number> {
+  sendHall = true,
+): Promise<AwardOutcome> {
   const svc = w.sectService;
-  if (!svc || want < 1 || isDown(w, sid)) return 0;
+  if (!svc) return { ok: false, reason: "disabled" };
+  if (want < 1 || isDown(w, sid))
+    return { ok: false, reason: isDown(w, sid) ? "down" : "amount_invalid" };
   const res = await svc.award(a, source, want, { key, warmup: w.sectEarnWarmup });
-  if (!res.ok) return 0;
+  if (!res.ok) return { ok: false, reason: res.reason };
   w.audit?.("sect.earn", {
     name: a.name,
     sect: res.sect.name,
@@ -351,11 +396,25 @@ async function awardContribution(
       const loc = locateMember(w, m);
       if (loc) toastGood(loc.w, loc.sid, `Tông môn ${res.sect.name} lên cấp ${res.level}!`);
     }
-  } else if (stillHere(w, sid, a.soulKey)) {
-    w.events.sectHall(sid, hallMsgFor(w, res.sect, a.soulKey));
+  } else {
     w.hub.sects.cache.set(res.sect.id, res.sect);
+    if (sendHall && stillHere(w, sid, a.soulKey))
+      w.events.sectHall(sid, hallMsgFor(w, sid, res.sect, a.soulKey));
   }
-  return res.granted;
+  return { ok: true, granted: res.granted, sect: res.sect };
+}
+
+/** Như `awardCore` nhưng chỉ trả số cống hiến được cộng (0 = không): cho nguồn phụ (góp kho, bí cảnh) mà thao tác chính đã xong. */
+async function awardContribution(
+  w: World,
+  sid: string,
+  a: SectActor,
+  source: SectEarnSource,
+  want: number,
+  key?: string,
+): Promise<number> {
+  const r = await awardCore(w, sid, a, source, want, key);
+  return r.ok ? r.granted : 0;
 }
 
 /**
@@ -887,4 +946,244 @@ export async function sectVaultPolicy(w: World, sid: string, raw: unknown) {
   broadcastSect(w, res.sect);
   w.audit?.("sect.vault_policy", { name: a.name, sect: res.sect.name, drawPerDay: msg.drawPerDay });
   toastGood(w, sid, `Đệ tử nay được rút kho đồ ${msg.drawPerDay} lượt mỗi ngày.`);
+}
+
+// ---------- Nhiệm vụ tông môn hằng ngày (M8.4, docs/THIET_KE_TONG_MON.md mục 12.7) ----------
+// Nhận / trả qua bảng Tông môn (không cần NPC). Tiến độ đi chung bộ máy `systems/quests.ts` (`questDefAny` gộp bảng thường và bảng tông). "Đã làm hôm nay" nằm trong sổ NGÀY của LINH HỒN
+// (`members[i].today.quests`, khoá theo id MẪU) nên đầu thai / đổi bậc / nhảy tông giữa ngày không làm lại được; cống hiến đi qua MỘT cổng `award` (trần ngày, chờ sang ngày).
+
+/**
+ * Gỡ khỏi sổ nhiệm vụ những nhiệm vụ tông đã QUÁ NGÀY: mẫu của chúng không còn trong 3 ô của HÔM NAY (bảng mẫu có nhiều hơn một mẫu mỗi độ khó thì ô xoay theo ngày), nên không còn trả được
+ * (`quest_unavailable`) và sẽ chất đống trong sổ (tối đa `MAX_ACTIVE_QUESTS`). Nhiệm vụ hằng ngày làm lại mỗi ngày nên bỏ tiến độ cũ là đúng; mẫu vẫn nằm trong ô hôm nay thì GIỮ (cùng nhiệm vụ,
+ * không mất tiến độ qua nửa đêm). Trả `true` nếu có gỡ (đã gửi lại sổ nhiệm vụ). Gọi khi vào phòng, xin ảnh chụp Nội vụ, nhận và trả.
+ */
+function purgeStaleSectQuests(w: World, sid: string, sect: Sect): boolean {
+  const c = w.ctrl.get(sid);
+  if (!c || c.quests.active.length === 0) return false;
+  const slots = sectQuestSlots(sect.id, dayKey(w.now));
+  const keep = c.quests.active.filter((a) => {
+    const tpl = sectQuestTemplateOf(a.id);
+    return tpl === undefined || slots.includes(tpl);
+  });
+  if (keep.length === c.quests.active.length) return false;
+  c.quests.active = keep;
+  sendQuests(w, sid);
+  return true;
+}
+
+/** Nhiệm vụ đang làm có cùng MẪU `tplId` (bản bậc nào cũng tính), nếu có. */
+function activeOfTemplate(
+  c: { quests: { active: { id: string; step: number; count: number }[] } },
+  tplId: string,
+) {
+  const idx = c.quests.active.findIndex((a) => sectQuestTemplateOf(a.id) === tplId);
+  return idx < 0 ? undefined : { idx, prog: c.quests.active[idx]! };
+}
+
+/**
+ * `sectQuestAccept { questId }`: nhận một trong các nhiệm vụ tông HÔM NAY (đúng bản theo bậc của mình), chưa trả hôm nay, chưa đang làm, còn sống. Không đụng bản ghi tông môn (chỉ sổ nhiệm vụ
+ * của người nhận), nên không cần khoá `busy`: kiểm và ghi sổ nằm gọn sau MỘT `await` (không chen được).
+ */
+export async function sectQuestAccept(w: World, sid: string, raw: unknown) {
+  const svc = w.sectService;
+  if (!svc) return toastFail(w, sid, "disabled");
+  const msg = parseSectQuest(raw);
+  const a = actorOf(w, sid);
+  if (!a) return;
+  if (!msg) return toastFail(w, sid, "quest_unavailable");
+  if (isDown(w, sid)) return downFail(w, sid);
+  const sect = await svc.sectOf(a.soulKey);
+  if (!stillHere(w, sid, a.soulKey)) return;
+  if (!sect) return toastFail(w, sid, "not_in_sect");
+  const c = w.ctrl.get(sid);
+  const p = w.state.players.get(sid);
+  const me = sect.members.find((m) => m.soulKey === a.soulKey);
+  if (!c || !p || !me) return;
+  if (isDown(w, sid)) return downFail(w, sid); // vừa bị hạ trong lúc chờ
+  if (c.travelling || c.limbo) return toastFail(w, sid, "error");
+  purgeStaleSectQuests(w, sid, sect);
+  const tpl = sectQuestTemplateOf(msg.questId);
+  // Phải là một trong các mẫu của HÔM NAY và đúng bản theo bậc hiện tại của mình (client xin ảnh chụp mới nếu vừa đột phá)
+  if (
+    !tpl ||
+    !sectQuestSlots(sect.id, dayKey(w.now)).includes(tpl) ||
+    sectQuestFor(tpl, p.realm) !== msg.questId
+  )
+    return toastFail(w, sid, "quest_unavailable");
+  if (sectDayState(me.today, w.now).quests.includes(tpl)) return toastFail(w, sid, "quest_done");
+  if (activeOfTemplate(c, tpl)) return toastFail(w, sid, "quest_active");
+  // Cùng giới hạn sổ nhiệm vụ như nhận ở NPC (`canAccept`): sổ đầy thì từ chối, không chất đống nhiệm vụ tông
+  if (c.quests.active.length >= MAX_ACTIVE_QUESTS)
+    return w.events.toast(sid, {
+      text: `Sổ nhiệm vụ đã đầy (tối đa ${MAX_ACTIVE_QUESTS}), hãy hoàn thành hoặc bỏ bớt một nhiệm vụ trước.`,
+      tone: "bad",
+    });
+  const def = SECT_QUEST_BY_ID[msg.questId];
+  if (!def) return toastFail(w, sid, "quest_unavailable");
+  c.quests.active.push({ id: def.id, step: 0, count: 0 });
+  toastGood(w, sid, `Nhận nhiệm vụ tông môn: ${def.title}`);
+  sendQuests(w, sid);
+  refreshQuests(w, sid); // bước đầu có thể đã đạt sẵn (đủ đồ trong túi...)
+  w.events.sectHall(sid, hallMsgFor(w, sid, sect, a.soulKey));
+}
+
+/**
+ * `sectQuestTurnIn { questId }`: trả nhiệm vụ tông. Thứ tự (chỉ MẤT, không bao giờ nhận hai lần): kiểm sớm (còn sống, là thành viên, mẫu có trong việc hôm nay, chưa trả hôm nay, đang làm và đủ
+ * tiến độ, túi nhận được phần thưởng trên BẢN SAO) -> `award` (đánh dấu "đã trả" + cộng cống hiến trong MỘT `update`; từ chối `not_warm` / `earn_cap` thì nhiệm vụ GIỮ NGUYÊN, không mất gì)
+ * -> trừ đồ nộp + thêm đồ thưởng + tu vi (qua `gainExp`, nên có buff tông) -> gỡ khỏi sổ nhiệm vụ -> LƯU hồ sơ. Sập giữa `award` và lưu: mất phần thưởng đồ / tu vi, không bao giờ trả được lần hai.
+ */
+export async function sectQuestTurnIn(w: World, sid: string, raw: unknown) {
+  const svc = w.sectService;
+  if (!svc) return toastFail(w, sid, "disabled");
+  const msg = parseSectQuest(raw);
+  const a = actorOf(w, sid);
+  const c = w.ctrl.get(sid);
+  const p = w.state.players.get(sid);
+  if (!a || !c || !p) return;
+  if (!msg) return toastFail(w, sid, "quest_unavailable");
+  if (isDown(w, sid)) return downFail(w, sid);
+  if (c.travelling || c.limbo) return toastFail(w, sid, "error");
+  const tpl = sectQuestTemplateOf(msg.questId);
+  if (!tpl) return toastFail(w, sid, "quest_unavailable");
+  const book = w.hub.sects;
+  if (book.busy.has(a.soulKey)) return toastFail(w, sid, "error"); // một thao tác tông môn một lúc (chung với kho đồ)
+  book.busy.add(a.soulKey);
+  try {
+    const sect = await svc.sectOf(a.soulKey);
+    if (!stillHere(w, sid, a.soulKey)) return;
+    if (!sect) return toastFail(w, sid, "not_in_sect");
+    const me = sect.members.find((m) => m.soulKey === a.soulKey);
+    const c1 = w.ctrl.get(sid);
+    const p1 = w.state.players.get(sid);
+    if (!c1 || !p1 || !me) return;
+    if (isDown(w, sid)) return downFail(w, sid);
+    purgeStaleSectQuests(w, sid, sect);
+    if (!sectQuestSlots(sect.id, dayKey(w.now)).includes(tpl))
+      return toastFail(w, sid, "quest_unavailable");
+    if (sectDayState(me.today, w.now).quests.includes(tpl)) return toastFail(w, sid, "quest_done");
+    const entry = activeOfTemplate(c1, tpl);
+    const def = entry ? SECT_QUEST_BY_ID[entry.prog.id] : undefined;
+    if (!entry || !def) return toastFail(w, sid, "quest_unavailable"); // chưa nhận
+    if (!questReady(def, entry.prog, questCtx(p1, c1)))
+      return w.events.toast(sid, { text: "Nhiệm vụ chưa hoàn thành.", tone: "bad" });
+    const remove = def.steps.flatMap((s) =>
+      s.kind === "collect" ? [{ itemId: s.itemId, qty: s.count }] : [],
+    );
+    const add = def.rewards.items ?? [];
+    // Thử trên BẢN SAO túi: không nhận được phần thưởng thì từ chối TRƯỚC khi đánh dấu "đã trả"
+    if (!exchangeItems(c1.inv.map((x) => (x ? { ...x } : x)) as typeof c1.inv, remove, add))
+      return w.events.toast(sid, {
+        text: "Túi đồ đã đầy, không nhận được phần thưởng.",
+        tone: "bad",
+      });
+    const award = await awardCore(w, sid, a, "quest", sectQuestCh(def.id), def.id, false);
+    if (!award.ok) return toastFail(w, sid, award.reason); // chưa tới ngày được kiếm / hết trần: nhiệm vụ còn nguyên
+    w.audit?.("sect.quest_turnin", {
+      name: a.name,
+      sect: award.sect.name,
+      questId: def.id,
+      amount: award.granted,
+    });
+    // Sổ ngày đã đánh dấu. Từ đây chỉ có thể MẤT phần thưởng đồ / tu vi (rời phòng, gục, hoặc đồ nộp đã đổi trong lúc chờ), không bao giờ trả được lần hai.
+    const c2 = w.ctrl.get(sid);
+    const p2 = w.state.players.get(sid);
+    if (c2 && p2 && stillHere(w, sid, a.soulKey) && !isDown(w, sid)) {
+      const idx = c2.quests.active.findIndex((x) => x.id === def.id);
+      if (idx >= 0) {
+        if (exchangeItems(c2.inv, remove, add)) {
+          if (remove.length || add.length)
+            sendInv(
+              w,
+              sid,
+              add.map((x) => ({ ...x })),
+            );
+          if (def.rewards.exp) gainExp(w, sid, p2, def.rewards.exp);
+        }
+        c2.quests.active.splice(idx, 1);
+        sendQuests(w, sid);
+      }
+      w.events.sectHall(sid, hallMsgFor(w, sid, award.sect, a.soulKey));
+      toastGood(
+        w,
+        sid,
+        `Hoàn thành nhiệm vụ tông môn: ${def.title} (+${award.granted} cống hiến).`,
+      );
+      await saveNow(w, sid);
+    }
+  } finally {
+    book.busy.delete(a.soulKey);
+  }
+}
+
+// ---------- Cửa hàng tông môn (M8.5, mục 12.6) ----------
+
+/**
+ * `sectShopBuy { itemId, qty }`: mua trọn vẹn HOẶC không gì cả. Thứ tự (chỉ MẤT, không bao giờ vừa có hàng vừa còn cống hiến): kiểm sớm (còn sống, không qua cổng, túi nhận được trên BẢN SAO)
+ * -> `svc.shopBuy` (kiểm cấp tông, kinh quyển đã học, hạn mức NGÀY, đủ cống hiến rồi trừ `contrib` + tăng `today.buys` trong MỘT `update`) -> cộng túi -> LƯU hồ sơ. Túi không nhận được
+ * (người chơi vừa nhặt đầy, rời phòng, gục, đang qua cổng) thì HOÀN cống hiến bằng một `update` nữa. Lưu lỗi thì KHÔNG hoàn (hàng đã nằm trong túi; chỉ có thể MẤT nếu sập trước lần lưu kế).
+ */
+export async function sectShopBuy(w: World, sid: string, raw: unknown) {
+  const svc = w.sectService;
+  if (!svc) return toastFail(w, sid, "disabled");
+  const msg = parseSectShopBuy(raw);
+  const a = actorOf(w, sid);
+  const c = w.ctrl.get(sid);
+  if (!a || !c) return;
+  if (!msg) return toastFail(w, sid, "item_invalid");
+  if (isDown(w, sid)) return downFail(w, sid);
+  if (c.travelling || c.limbo) return toastFail(w, sid, "error");
+  const book = w.hub.sects;
+  if (book.busy.has(a.soulKey)) return toastFail(w, sid, "error"); // một thao tác tông môn một lúc (chung với kho đồ, nhiệm vụ)
+  book.busy.add(a.soulKey);
+  try {
+    // Kiểm sớm trên BẢN SAO túi: không nhận được thì không trừ gì
+    if (addToInventory(cloneBag(c.inv), msg.itemId, msg.qty) > 0)
+      return toastFail(w, sid, "bag_full");
+    const res = await svc.shopBuy(a, msg.itemId, msg.qty, {
+      known: shopKnown(msg.itemId, learnedOf(c)),
+    });
+    if (!res.ok) return toastFail(w, sid, res.reason);
+    w.hub.sects.cache.set(res.sect.id, res.sect);
+    // Cống hiến đã trừ: hàng phải VÀO túi hoặc cống hiến phải VỀ. Kiểm lại SAU `await` (túi / người chơi có thể đã đổi)
+    const c2 = w.ctrl.get(sid);
+    const fits =
+      c2 !== undefined &&
+      stillHere(w, sid, a.soulKey) &&
+      !isDown(w, sid) &&
+      !c2.travelling &&
+      !c2.limbo &&
+      addToInventory(cloneBag(c2.inv), msg.itemId, msg.qty) === 0;
+    if (!fits || !c2) {
+      const back = await svc.shopRefund(a, msg.itemId, msg.qty, res.cost);
+      if (back.ok) {
+        w.hub.sects.cache.set(back.sect.id, back.sect);
+        if (stillHere(w, sid, a.soulKey))
+          w.events.sectHall(sid, hallMsgFor(w, sid, back.sect, a.soulKey));
+      }
+      return toastFail(
+        w,
+        sid,
+        stillHere(w, sid, a.soulKey) && !isDown(w, sid) ? "bag_full" : "error",
+      );
+    }
+    addToInventory(c2.inv, msg.itemId, msg.qty);
+    sendInv(w, sid, [{ itemId: msg.itemId, qty: msg.qty }]);
+    w.audit?.("sect.shop_buy", {
+      name: a.name,
+      sect: res.sect.name,
+      itemId: msg.itemId,
+      qty: msg.qty,
+      cost: res.cost,
+    });
+    w.events.sectHall(sid, hallMsgFor(w, sid, res.sect, a.soulKey));
+    toastGood(w, sid, `Đã đổi ${msg.qty} ${itemName(msg.itemId)} (-${res.cost} cống hiến).`);
+    await saveNow(w, sid);
+  } finally {
+    book.busy.delete(a.soulKey);
+  }
+}
+
+/** Bản sao túi (để thử `addToInventory` mà không đụng túi thật). */
+function cloneBag(inv: Inventory): Inventory {
+  return inv.map((s) => (s ? { ...s } : s)) as Inventory;
 }
