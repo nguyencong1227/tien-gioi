@@ -144,6 +144,7 @@ import { BAR_SLOTS, SkillTracker, aimMode, blockedToast, slotView } from "../ski
 import { SkillBarDom } from "../skill-bar-dom";
 import { StatusBadgesDom, badgeViews } from "../status-badges";
 import { craftBuffNames, travelConfirmText, useSuccessText } from "../craft-buff";
+import { breakthroughPlan, samePlan } from "../act-confirm";
 import {
   ELITE_STYLE,
   EliteHintGate,
@@ -1164,7 +1165,7 @@ export class WorldScene extends Phaser.Scene {
     bind("btn-target", () => this.toggleLockTarget());
     bind("sk-sword", () => this.sword());
     bind("sk-med", () => this.toggleMeditate());
-    bind("sk-break", () => !this.isReconnecting && this.room.send("breakthrough"));
+    bind("sk-break", () => this.requestBreakthrough(document.getElementById("sk-break")));
     for (const n of [2, 3, 4, 5] as const)
       bind(`sk-slot${n}`, () => this.runAction(`skill.slot${n}`));
 
@@ -1235,7 +1236,7 @@ export class WorldScene extends Phaser.Scene {
         this.toggleMeditate();
         break;
       case "skill.breakthrough":
-        if (!this.isReconnecting) this.room.send("breakthrough");
+        this.requestBreakthrough(null);
         break;
       case "quick.1":
         ui.useQuick(1);
@@ -1624,6 +1625,43 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Đột phá (nút HUD và phím tắt): khi ĐỦ điều kiện thử thì HỎI trước (thất bại mất tu vi + nửa khí huyết, thành công không hoàn tác; hộp nêu xác suất kể cả
+   * đan hộ đạo), lúc xác nhận so lại kế hoạch rồi mới gửi `breakthrough`. Chưa đủ điều kiện thì gửi luôn: máy chủ từ chối KHÔNG mất gì và báo lý do.
+   */
+  private requestBreakthrough(opener: HTMLElement | null) {
+    if (this.isReconnecting) return;
+    const planNow = () => {
+      const me = this.me();
+      return me
+        ? breakthroughPlan(
+            me.realm,
+            me.tier,
+            me.exp,
+            me.expMax,
+            this.status.active(performance.now()),
+          )
+        : null;
+    };
+    const plan = planNow();
+    if (!plan) {
+      this.room.send("breakthrough");
+      return;
+    }
+    ui.askConfirm(
+      plan.spec,
+      () => {
+        if (this.isReconnecting) return;
+        if (!samePlan(plan, planNow())) {
+          ui.toast({ text: "Điều kiện đột phá vừa đổi, chưa đột phá. Hãy thử lại.", tone: "info" });
+          return;
+        }
+        this.room.send("breakthrough");
+      },
+      opener,
+    );
+  }
+
   public travelPortal(portalId: string) {
     if (this.isReconnecting) return;
     // Qua cổng XOÁ hiệu lực đan / phù (máy chủ, test #767): đang có thì hỏi trước (buff của chiêu thì không hỏi). "Đi" mới gửi `travel`.
@@ -1657,6 +1695,7 @@ export class WorldScene extends Phaser.Scene {
     this.isReconnecting = reconnecting;
     if (reconnecting) {
       ui.closeTravelConfirm();
+      ui.closeActConfirm(false);
       this.moving = false;
       this.duelKoUntil = 0;
       this.dungeonFallUntil = 0;
@@ -1745,6 +1784,7 @@ export class WorldScene extends Phaser.Scene {
     ui.talkPrompt(null);
     ui.pickupPrompt(null);
     ui.closeTravelConfirm();
+    ui.closeActConfirm(false);
   }
 
   /** Nhận danh sách trạng thái của chính mình (server gửi khi thêm / mất / làm mới, vơi khiên, nối lại). Công khai để script kiểm giả lập (`?debug`) bơm tin. */

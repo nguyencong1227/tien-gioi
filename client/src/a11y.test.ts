@@ -168,6 +168,18 @@ describe("a11y: processEscapeKey", () => {
     expect(handlers.closeTopModal).not.toHaveBeenCalled();
   });
 
+  it("đóng hộp xác nhận dùng chung (đột phá, bán đồ quý...; Esc = Giữ lại): đóng hộp TRƯỚC mọi thứ khác", () => {
+    const handlers: EscapeHandlers = {
+      closeActConfirm: vi.fn(() => true),
+      closeInvDropConfirm: vi.fn(() => true),
+      closeTopModal: vi.fn(() => true),
+    };
+    expect(processEscapeKey(handlers)).toBe(true);
+    expect(handlers.closeActConfirm).toHaveBeenCalledTimes(1);
+    expect(handlers.closeInvDropConfirm).not.toHaveBeenCalled();
+    expect(handlers.closeTopModal).not.toHaveBeenCalled();
+  });
+
   it("đóng hộp xác nhận vứt đồ ở túi (Esc = Giữ lại): đóng hộp TRƯỚC, túi đồ vẫn mở", () => {
     const handlers: EscapeHandlers = {
       closeInvDropConfirm: vi.fn(() => true),
