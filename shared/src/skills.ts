@@ -841,8 +841,8 @@ export interface SkillsMsg {
 }
 
 /**
- * Một trạng thái đang có trên chính mình: id, thời gian còn lại (ms) lúc gửi, và `ratio` (KHÔNG bắt buộc) CHỈ cho tăng tốc / tê cóng: hai trạng thái
- * này đổi tốc độ di chuyển mà client đoán trước, nên client cần cường độ để nhân đúng như server (`moveSpeedMul`). Loại khác bỏ trống phần tử thứ ba
+ * Một trạng thái đang có trên chính mình: id, thời gian còn lại (ms) lúc gửi, và `ratio` (KHÔNG bắt buộc) CHỈ cho tăng tốc / tê cóng (đổi tốc độ di chuyển mà client đoán trước,
+ * nên client cần cường độ để nhân đúng như server, `moveSpeedMul`) và hộ đạo (`breakAid`, client hiện "+X %" xác suất đột phá). Loại khác bỏ trống phần tử thứ ba
  * (mã tách `[id, ms]` cũ không vỡ). Nơi nhận không tin tin nhắn: dùng `sanitizeStatusList`.
  */
 export type StatusEntry = [id: StatusId, msLeft: number, ratio?: number];
@@ -905,7 +905,7 @@ export function moveSpeedMul(list: readonly StatusEntry[]): number {
 
 /**
  * Làm sạch danh sách trạng thái nhận từ server (client không tin tin nhắn, như mọi tin khác): chỉ giữ mục có id trong bảng và `msLeft` hữu hạn > 0
- * (kẹp `maxMs`), `ratio` chỉ giữ cho tăng tốc / tê cóng (kẹp [0, `maxRatio`], thiếu thì 0); mỗi id một lần; tối đa `MAX_STATUSES` mục.
+ * (kẹp `maxMs`), `ratio` chỉ giữ cho loại mang ratio (`statusCarriesRatio`: tăng tốc / tê cóng / hộ đạo; kẹp [0, `maxRatio`], thiếu thì 0); mỗi id một lần; tối đa `MAX_STATUSES` mục.
  * Không phải mảng thì rỗng.
  */
 export function sanitizeStatusList(raw: unknown): StatusEntry[] {
