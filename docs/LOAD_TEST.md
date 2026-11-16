@@ -1263,7 +1263,7 @@ Lệnh thực thi trên `main` (`ebac5d6` — đã gồm dữ liệu #722: 18 ch
 npm run soak -w server -- --bots=100 --minutes=10
 ```
 
-> **Phạm vi kiểm chứng của `soak` hiện tại:** Lần chạy này xác nhận độ ổn định bộ nhớ (`VmRSS`), ngân sách tick, lưu thông 4 bản đồ qua cổng, `kiem-save` và bảo toàn Linh thạch khi server chạy với toàn bộ bảng dữ liệu #722. Lưu ý rằng `soak.ts:481` tạo hồ sơ bot ở `realm = 1` (Luyện Khí, `tier` 4, không truyền sổ chiêu) và vòng lặp hành vi `soak.ts:822–829` chỉ gửi đòn cơ bản `slash` / `sword` (còn với CLI `bots.ts:1895`, cảnh giới được chọn theo `realm = duel ? 1 : dungeon ? 1 : skills ? 2 : rnd() < 0.8 ? 1 : 2`, tối đa `realm = 2` Trúc Cơ), nên `soak` 10 phút này **không** thi triển 6 chiêu Nguyên Anh đợt 2 (`sampleSkillsForRealm(4)` trong `bots.ts` được kiểm qua test đơn vị `bots-skills.test.ts`). Việc đo hiệu năng thi triển trực tiếp đủ 6 chiêu Nguyên Anh đợt 2 đã được kiểm chứng tại bài test `"người chơi Nguyên Anh (realm 4, tier 0..2) thi triển đủ 6 chiêu đợt 2 quanh bãi quái Hàn Vân (#722, #515): tick < 10 ms, byte/tick < 520 mỗi client"` trong `server/src/systems/perf.test.ts` (#733): tick trung bình **0,65 – 0,84 ms**, p95 **2,45 – 3,08 ms** ($< 10$ ms), patch **~208 – 209 B/tick** mỗi client ($< 520$ B/tick), thi triển tất định `han_quang_tien` 50 / `bach_kim_trao` 50 / `bang_hoa_loan` 30 / `liet_hoa_kiem` 20 / `van_thach_tran` 15 / `van_hanh_bo` 10 lượt (~2.700 – 2.770 sự kiện `dmg`, 27 – 29 bản tin `status`).
+> **Phạm vi kiểm chứng của lần chạy này (KHÔNG bật `--m7`):** xác nhận độ ổn định bộ nhớ (`VmRSS`), ngân sách tick, lưu thông 4 bản đồ qua cổng, `kiem-save` và bảo toàn Linh thạch khi server chạy với toàn bộ bảng dữ liệu #722. Khi KHÔNG bật `--m7`, `soak` giữ nguyên hành vi cũ: hồ sơ bot ở `realm = 1` (Luyện Khí, `tier` 4, không truyền sổ chiêu) và vòng lặp hành vi chỉ gửi đòn cơ bản `slash` / `sword` (còn với CLI `bots.ts`, cảnh giới được chọn theo `realm = duel ? 1 : dungeon ? 1 : skills ? 2 : rnd() < 0.8 ? 1 : 2`, tối đa `realm = 2` Trúc Cơ), nên lần chạy 10 phút NÀY **không** thi triển 6 chiêu Nguyên Anh đợt 2. **Soak có chiêu thức và Nguyên Anh là mục 25.6 (`--m7`).** (`sampleSkillsForRealm(4)` trong `bots.ts` được kiểm qua test đơn vị `bots-skills.test.ts`.) Việc đo hiệu năng thi triển trực tiếp đủ 6 chiêu Nguyên Anh đợt 2 đã được kiểm chứng tại bài test `"người chơi Nguyên Anh (realm 4, tier 0..2) thi triển đủ 6 chiêu đợt 2 quanh bãi quái Hàn Vân (#722, #515): tick < 10 ms, byte/tick < 520 mỗi client"` trong `server/src/systems/perf.test.ts` (#733): tick trung bình **0,65 – 0,84 ms**, p95 **2,45 – 3,08 ms** ($< 10$ ms), patch **~208 – 209 B/tick** mỗi client ($< 520$ B/tick), thi triển tất định `han_quang_tien` 50 / `bach_kim_trao` 50 / `bang_hoa_loan` 30 / `liet_hoa_kiem` 20 / `van_thach_tran` 15 / `van_hanh_bo` 10 lượt (~2.700 – 2.770 sự kiện `dmg`, 27 – 29 bản tin `status`).
 
 #### Bảng tổng hợp số đo thử tải dài (10,0 phút, 60 mẫu liên tục mỗi 10 giây, đo khi máy có tải nền `load average ~14–17`):
 
@@ -1291,6 +1291,80 @@ npm run soak -w server -- --bots=100 --minutes=10
 
 #### Nhận xét:
 - Các chỉ số thời gian xử lý tick p95 (**4,49 ms**, đỉnh **8,53 ms**), CPU luồng chính (**7,33 ms/tick**) và loop lag p99 (**85,3 ms**) cao hơn lần đo 30 phút ở mục 25.4 (`2,55 / 3,10 ms`, CPU `4,55 ms/tick`, loop lag `27,1 ms`) là do máy chủ đang chịu tải nền cao (`load average ~14–17`) trong suốt 10 phút chạy, **không phải** do thay đổi mã nguồn ở #722; dù dưới tải nền nặng, toàn bộ chỉ số vẫn nằm trong ngân sách cho phép ($\le 10,0$ ms/tick, 0 overrun).
+
+### 25.6. Soak 10 phút CÓ nội dung M7 (`--m7`): sổ chiêu + Nguyên Anh ở Hàn Vân Lĩnh (#515)
+
+Mục 25.5 (và mọi soak trước đó) chạy bot Luyện Khí không có sổ chiêu nên **không đo gì** về chiêu thức, trạng thái, đạn, tinh anh hay Nguyên Anh dài hạn. Nay có tuỳ chọn:
+
+```bash
+npm run soak -w server -- --bots=100 --minutes=10 --m7          # --skills cùng nghĩa
+npm run soak -w server -- --bots=100 --minutes=10 --na=0.3      # --na=<tỉ lệ> chỉnh phần Nguyên Anh (0,2 | 20 | 20 %), tự bật --m7
+```
+
+**Mặc định (không `--m7`) soak giữ nguyên số của soak cũ** (test `soak-plan.test.ts` giữ đúng bảng phân vai 30 / 20 / 10 / 16 / 12 / 12 của 100 bot). Chỉ khi bật `--m7`:
+
+| Vai (100 bot, 20 %) | Số bot | Cảnh giới / bậc | Bản đồ | Sổ chiêu |
+|---|---:|---|---|---|
+| Nguyên Anh săn (`na`) | 20 | Nguyên Anh, bậc 2 / 1 / 0 xoay vòng | Hàn Vân Lĩnh | 4 ô, ưu tiên chiêu Nguyên Anh mà bậc đó dùng được |
+| Săn quái (`hunt`) | 24 | Trúc Cơ và Kim Đan xen kẽ | Lạc Hà Trấn | 2 / 3 ô, rải qua 12 chiêu đợt 1 |
+| Trấn 16 · cổng 8 · bí cảnh 12 · PK 8 · tông môn 12 | 56 | Luyện Khí như cũ | như cũ | không có (như cũ) |
+
+(Phần còn lại, 80 bot, chia theo tỉ lệ cũ: 24 săn, 16 trấn, 8 cổng, 12 bí cảnh, 8 PK, 12 tông môn; 20 bot Nguyên Anh xếp cuối để chỉ số các nhóm bí cảnh / PK / tông môn không xô lệch.) Sổ chiêu do `soak-plan.ts` phân bổ **tất định** (không ngẫu nhiên): mỗi bot lấy các chiêu nó đủ cảnh giới / bậc dùng (`skillReqMet`, giống lúc server kiểm `cast`) mà ÍT bot được gắn nhất, nên 18 chiêu đều có chủ; HAI bot Nguyên Anh đầu (bậc 2 rồi bậc 1) đã phủ đủ 6 chiêu Nguyên Anh đợt 2 (chiêu cần bậc 1 / 2 chỉ gắn được cho bot đủ bậc).
+
+**Đếm lượt thi triển:** từ tin `fx {kind: "cast"}` MÁY CHỦ gửi về đúng người dùng chiêu (`by` = sessionId của chính bot), tức là chỉ tính lần server ĐÃ chấp nhận (đủ ô, đủ cảnh giới / bậc, hết hồi chiêu, đủ linh lực), không tính tin cast bot gửi đi. Báo cáo JSON có thêm `castsByBot` (bot nào dùng chiêu nào) để lần ra bot không dùng chiêu được giao.
+
+**Kiểm (ĐỎ nếu vi phạm):** có bot Nguyên Anh; CẢ 6 chiêu Nguyên Anh (lấy từ bảng chiêu `shared/` theo `reqRealm >= 4`, không chép tay) có ít nhất một lượt thi triển. Chiêu đợt 1 chưa thi triển chỉ được ghi lại, không làm đỏ.
+
+#### Kết quả `main` + nhánh `b/soak-m7` (đầu `87498a1`), 100 bot, 10 phút, máy rảnh (`load average` 1 phút: **1,02** lúc bắt đầu, **0,35** lúc kết thúc; 5 phút ~0,5):
+
+| Hạng mục đo | `--m7` (100 bot) | Soak mặc định, cùng máy ngay sau đó (không `--m7`) | Ngưỡng | Đánh giá |
+|---|---|---|---|:---:|
+| Bot sống đến cuối | **100 / 100** (rớt 0) | 100 / 100 | >= 95 % | ✅ |
+| Bot theo cảnh giới (gieo) | Luyện Khí 56 · Trúc Cơ 12 · Kim Đan 12 · **Nguyên Anh 20** | 100 Luyện Khí | — | — |
+| Cảnh giới lúc cuối | khớp lúc gieo (20 Nguyên Anh, **không bot nào luân hồi về Phàm Nhân**) | — | — | — |
+| VmRSS ban đầu → sau 5 phút → cuối | 155,4 → 159,3 → **159,4 MB** | 166,6 → 214,4 → 214,0 MB | — | — |
+| Biến thiên VmRSS sau làm nóng | **+0,14 MB** | -0,37 MB | <= 50 MB | ✅ |
+| Dốc OLS nửa sau | **+0,06 MB/phút** | 0 MB/phút | <= 1,00 MB/phút | ✅ |
+| Tick p95 phòng tệ nhất | TB **1,75 ms** · Đỉnh **2,00 ms** | TB 2,32 · Đỉnh 2,64 ms | <= 10 ms | ✅ |
+| Quá tải tick (> 50 ms) | **0** | 0 | 0 | ✅ |
+| CPU luồng chính / tick | **3,42 ms** | 3,95 ms | <= 10 ms | ✅ |
+| Độ trễ vòng lặp p99 | **23 ms** | 22,8 ms | <= 100 ms | ✅ |
+| Băng thông nhận / bot | TB **207 B/tick** (p95 267; 4,04 KB/s) | TB 286 B/tick (p95 384; 5,58 KB/s) | <= 600 B/tick | ✅ |
+| Qua cổng bốn bản đồ | `am_suong` 264 · `hac_phong` 263 · `lac_ha` 159 · `han_van` 159 | 316 · 315 · 212 · 211 | không kẹt | ✅ |
+| Cảnh báo giám sát / lỗi log / lỗi `/metrics` | **0 / 0 / 0** | 0 / 0 / 0 | 0 | ✅ |
+| `kiem-save` | **0 lỗi** (100 nhân vật, 100 chân linh, 4 tông môn) | 0 lỗi | 0 | ✅ |
+| Tệp hỏng `*.hong-*` | **0** | 0 | 0 | ✅ |
+| Bảo toàn Linh thạch | **ĐẠT** (Ví 22.464 + Kho 7.100 = 29.564 <= Trần 37.614, lệch ví bot 0) | ĐẠT | lệch 0 | ✅ |
+| **Lượt thi triển chiêu (máy chủ xác nhận)** | **976** lượt, 42 bot dùng chiêu (cả 20 bot Nguyên Anh) | 0 (không sổ chiêu) | > 0 | ✅ |
+| **Chiêu Nguyên Anh có lượt thi triển** | **6 / 6** | — | 6 / 6 | ✅ |
+| Chiêu của game có lượt thi triển | **18 / 18** | — | càng nhiều càng tốt | ✅ |
+
+Số lượt thi triển theo chiêu (976): `me_tung_bo` 272, `van_hanh_bo` 215, `thanh_tung_phi_cham` 71, `van_thach_tran` 60, `cuu_cung_khon_sat` 56, `han_quang_tien` 52, `bich_thuy_hoi_xuan` 45, `bang_hoa_loan` 43, `kim_chung_trao` 36, `hoa_van_kiem` 25, `huyen_bang_chi` 24, `bach_kim_trao` 20, `bon_thach_quyen` 14, `lac_tuyet_phan_phi` 12, `trong_nhac_tram` 12, `phieu_phong_bo` 9, `liet_hoa_kiem` 8, `ung_trao` 2. Chiêu Nguyên Anh: `van_hanh_bo` 215, `van_thach_tran` 60, `han_quang_tien` 52, `bang_hoa_loan` 43, `bach_kim_trao` 20, `liet_hoa_kiem` 8.
+
+#### Soak 30 phút `--m7` (đầu `2fbca34`, 100 bot, 03:00-03:30, `load average` 1 phút 0,43 lúc bắt đầu / 0,58 lúc kết thúc): ĐỎ ở `kiem-save`, còn lại trong ngân sách
+
+| Hạng mục đo | Kết quả | Ngưỡng | Đánh giá |
+|---|---|---|:---:|
+| Bot sống đến cuối | **100 / 100** (rớt 0) | >= 95 % | ✅ |
+| VmRSS ban đầu → sau 5 phút → cuối | 159,4 → 211,6 → **212,5 MB** | — | — |
+| Biến thiên VmRSS sau làm nóng / dốc OLS nửa sau | **+0,84 MB** / **+0,036 MB/phút** | <= 50 MB / <= 1,00 MB/phút | ✅ |
+| Tick p95 phòng tệ nhất / quá tải tick | TB **1,76 ms**, đỉnh **1,94 ms** / **0** | <= 10 ms / 0 | ✅ |
+| CPU luồng chính / tick · loop lag p99 | **3,26 ms** · **22,1 ms** | <= 10 ms · <= 100 ms | ✅ |
+| Băng thông nhận / bot | TB **185 B/tick** (p95 216; 3,61 KB/s) | <= 600 B/tick | ✅ |
+| Hàng đợi ghi · cảnh báo giám sát · lỗi log · lỗi `/metrics` | inflight max 1, tuổi 0 s · **0 · 0 · 0** | 0 | ✅ |
+| Qua cổng bốn bản đồ | `hac_phong` 794 · `am_suong` 794 · `lac_ha` 478 · `han_van` 479 | không kẹt | ✅ |
+| Bảo toàn Linh thạch | **ĐẠT** (Ví 16.243 + Kho 11.400 = 27.643 <= Trần 43.343, lệch ví bot 0) | lệch 0 | ✅ |
+| Lượt thi triển / chiêu Nguyên Anh / cả game | **1.063** · **6 / 6** · **18 / 18** | > 0 | ✅ |
+| Cảnh giới lúc cuối | Nguyên Anh **20 / 20** còn nguyên; 6 bot luân hồi về Phàm Nhân (5 Luyện Khí + 1 Trúc Cơ, gục do quái trong 30 phút) | — | — |
+| **`kiem-save`** | **1 lỗi** `pos_blocked` (Bot 010, Kim Đan săn ở Lạc Hà, toạ độ lưu (1097, 2005)) | 0 lỗi | ❌ |
+
+**Lỗi `kiem-save` duy nhất là do LÀM TRÒN vị trí lúc lưu, không phải dữ liệu hỏng, nhưng là một chỗ lệch có thật giữa lưu và kiểm (có sẵn từ trước, không phải do `--m7` gây ra, chưa đo xem `--m7` có làm hay xảy ra hơn không).** `WorldRoom.ts` (dòng ~1021) lưu `{x: Math.round(p.x), y: Math.round(p.y)}`; `kiem-save` kiểm `circleBlocked(x, y, PLAYER_RADIUS)` trên toạ độ NGUYÊN đã làm tròn. Người chơi đứng sát tường là chỗ HỢP LỆ với server (số thực), nhưng làm tròn có thể đẩy tâm vào tường tới 0,5 px: quét lưới 0,05 px quanh (1097, 2005) cho thấy **231 / 441 vị trí số thực làm tròn về đúng toạ độ đó mà server vẫn cho đứng** (ví dụ (1096,50; 2004,50)). Chưa biết cái gì đưa Bot 010 sát tường (thử 5.184 lần dùng `phieu_phong_bo` từ nhiều điểm / hướng trên Lạc Hà: 0 lần cho vị trí bị chặn hoặc làm tròn bị chặn, nên KHÔNG phải do chiêu lao như giả thuyết ban đầu); xác suất thấp (soak 30 phút cũ ở mục 25.4 và hai lần 10 phút gần nhất 0 lỗi). Hệ quả khi vào lại (kiểm bằng test tạm trên `moveWithCollision`, MẪU TỔNG HỢP chứ không phải tỉ lệ thật: 400 toạ độ nguyên bị chặn nhưng có vị trí số thực hợp lệ cách <= 0,5 px, mỗi toạ độ thử 16 hướng ở bước 7,5 px = 150 px/s x 50 ms): **395 / 400 thoát được ra vùng hợp lệ sau 20 bước, 5 / 400 (1,25 %) KHÔNG nhúc nhích được hướng nào** (có thể là góc kẹt giữa hai tường); tức phần lớn chỉ bị lệch 0,5 px rồi tự thoát, nhưng có ca nhân vật đứng im sau khi vào lại. Chưa đo xác suất xảy ra ngoài thực tế. Hướng sửa có thể (cần A quyết, server): lưu thêm nửa pixel về phía thoáng, hoặc `kiem-save` cho dung sai 1 px. **Soak này nên được coi là ĐỎ thật, chưa chạy lại để "xanh".**
+
+#### Nhận xét và giới hạn:
+- **Không rò bộ nhớ khi có chiêu / Nguyên Anh:** dốc +0,06 MB/phút, tick p95 đỉnh 2,0 ms, 0 overrun, 0 lỗi: 976 lượt dùng chiêu trong 10 phút không làm số nào xấu đi so với soak mặc định chạy ngay sau. Cột "soak mặc định" KHÔNG cùng cơ cấu bot: `--m7` có 80 bot vai cũ (12 bí cảnh / 8 PK / 8 cổng) thay vì 100 (16 / 12 / 10), nên số lượt qua cổng không so được. **VmRSS tuyệt đối cũng không so được, và không nên đọc chênh 159 so với 214 MB là "`--m7` nhẹ hơn":** lần soak 30 phút `--m7` ngay sau đó (bên dưới) cùng chế độ nhưng RSS đứng ở ~212 MB suốt cả phiên (159 MB chỉ là số lúc khởi động của chính nó), tức RSS tuyệt đối dao động chừng 50 MB giữa các lần chạy cùng cấu hình (kích cỡ heap V8 lúc làm nóng). Chỉ DỐC RSS là tiêu chí rò rỉ.
+- **Lần chạy `--m7` đầu tiên ĐỎ đúng như kiểm đặt ra** (đầu `a6aee37`, trước khi sửa hành vi bot): chỉ 3 / 6 chiêu Nguyên Anh được thi triển (`bach_kim_trao`, `bang_hoa_loan`, `liet_hoa_kiem` không lần nào), 452 lượt. Nguyên nhân là **lỗi của bot, không phải của server**: Hàn Vân Lĩnh chỉ có 62 quái trên bản đồ 4096 x 4096 và con gần trạm nhất cách ~600 px (quái sinh từ `minDanger` 0,2 trở ra), nên bot đứng quanh trạm với tầm tìm quái 300 px của bot cũ gần như không gặp quái; khi mở rộng tầm tìm, bot đâm đầu vào vách băng (chỉ chiêu tự thân `van_hanh_bo` được dùng, chiêu nón 90-95 px không bao giờ chạm quái); khi đi vòng được thì 4 / 4 bot Nguyên Anh gục trong chưa đầy 90 giây (bot không có trang bị bộ IV) và luân hồi về Phàm Nhân. Bản đo ở trên là sau khi bot Nguyên Anh (1) tìm quái trong tầm 1000 px của vùng nhìn, (2) đi vòng vách theo BFS (dùng lại `pathToPortal`), (3) rút về trạm đả tọa khi khí huyết < 50 % hoặc linh lực < 20 % rồi mới săn tiếp. Hệ quả cần biết: bot Nguyên Anh của soak **không luân hồi** (cảnh giới cuối khớp lúc gieo), nên `--m7` KHÔNG đo luân hồi / Hoàng Tuyền của Nguyên Anh (đã có thử tải luân hồi riêng, mục 6).
+- **Đột biến (kiểm thật sự bắt được):** (a) bỏ sổ chiêu khỏi tệp gieo (`seedSoakBot` truyền `undefined`) làm test `soak-plan.test.ts` "tệp lưu mang sổ chiêu" ĐỎ và soak 40 giây ĐỎ (`0/6 chiêu Nguyên Anh`, 0 lượt thi triển); (b) bỏ `liet_hoa_kiem` khỏi phân bổ làm 3 test phủ chiêu ĐỎ và soak 40 giây ĐỎ (`3/6`, nêu đích danh chiêu thiếu).
+- **Chưa đo, không suy ra từ số này:** soak chỉ đếm lượt thi triển; **không đếm** trạng thái (độc, bỏng, choáng...), đạn (`bolt` của Phong Nha / Độc Tước), tinh anh hay tin `fx warn` (không có bộ đếm phía server cho chúng). Bot Nguyên Anh đánh quái Hàn Vân nên có thể gặp chúng nhưng soak không xác nhận; chi phí tick của 6 chiêu Nguyên Anh dưới tải vẫn lấy từ `perf.test.ts` (#733, mục 25.5). Bot không né đòn báo trước (`--evade` là của `bots.ts`, mục 24). Soak 10 phút ĐẠT; soak 30 phút có `--m7` đã chạy một lần (bên dưới) và ĐỎ ở `kiem-save` (một vị trí lưu làm tròn vào tường), các số còn lại đều trong ngân sách; chưa chạy lặp lại.
 
 ---
 

@@ -5,8 +5,10 @@ import {
   classifyServerLogLine,
   formatSoakTable,
   linearRegression,
+  type M7SoakContext,
   type SoakSample,
 } from "./soak-analysis";
+import { ALL_SKILL_IDS, NGUYEN_ANH_SKILL_IDS } from "./soak-plan";
 
 describe("classifyServerLogLine", () => {
   it("dòng rỗng hoặc khoảng trắng trả 'info'", () => {
@@ -294,6 +296,78 @@ describe("analyzeSoak", () => {
 
     expect(res.pass).toBe(false);
     expect(res.reasons.some((r) => r.includes("Bảo toàn Linh thạch thất bại"))).toBe(true);
+  });
+
+  describe("nội dung M7 (--m7)", () => {
+    const samples = generateSamples(60, 10, () => 90);
+    /** Mọi chiêu đều được thi triển 10 lần, 20 bot Nguyên Anh */
+    function m7Ctx(over: Partial<M7SoakContext> = {}): M7SoakContext {
+      return {
+        requiredSkillIds: NGUYEN_ANH_SKILL_IDS,
+        allSkillIds: ALL_SKILL_IDS,
+        realmCounts: { 1: 56, 2: 12, 3: 12, 4: 20 },
+        skillCastCounts: Object.fromEntries(ALL_SKILL_IDS.map((id) => [id, 10])),
+        ...over,
+      };
+    }
+
+    it("không bật --m7: không có phần m7 và không kiểm gì về chiêu (soak cũ giữ nguyên)", () => {
+      const res = analyzeSoak(samples, {}, {});
+      expect(res.pass).toBe(true);
+      expect(res.m7).toBeUndefined();
+      expect(formatSoakTable(res)).not.toContain("NỘI DUNG M7");
+    });
+
+    it("ĐẠT khi có bot Nguyên Anh và cả 6 chiêu Nguyên Anh đều được thi triển", () => {
+      const res = analyzeSoak(samples, {}, { m7: m7Ctx() });
+      expect(res.pass).toBe(true);
+      expect(res.m7?.missingRequired).toEqual([]);
+      expect(res.m7?.notCast).toEqual([]);
+      expect(res.m7?.totalSkillCasts).toBe(180);
+    });
+
+    it("KHÔNG ĐẠT khi một chiêu Nguyên Anh không được thi triển lần nào, nêu đích danh chiêu đó", () => {
+      const counts = Object.fromEntries(ALL_SKILL_IDS.map((id) => [id, 10]));
+      counts["liet_hoa_kiem"] = 0;
+      const res = analyzeSoak(samples, {}, { m7: m7Ctx({ skillCastCounts: counts }) });
+      expect(res.pass).toBe(false);
+      expect(res.m7?.missingRequired).toEqual(["liet_hoa_kiem"]);
+      expect(res.reasons.some((r) => r.includes("1/6") && r.includes("liet_hoa_kiem"))).toBe(true);
+    });
+
+    it("KHÔNG ĐẠT khi không chiêu nào được thi triển (sổ chiêu không vào được máy chủ)", () => {
+      const res = analyzeSoak(samples, {}, { m7: m7Ctx({ skillCastCounts: {} }) });
+      expect(res.pass).toBe(false);
+      expect(res.m7?.missingRequired).toHaveLength(6);
+      expect(res.m7?.totalSkillCasts).toBe(0);
+    });
+
+    it("KHÔNG ĐẠT khi không có bot Nguyên Anh nào được gieo", () => {
+      const res = analyzeSoak(samples, {}, { m7: m7Ctx({ realmCounts: { 1: 100 } }) });
+      expect(res.pass).toBe(false);
+      expect(res.reasons.some((r) => r.includes("không có bot Nguyên Anh"))).toBe(true);
+    });
+
+    it("chiêu không bắt buộc chưa thi triển chỉ được ghi lại, KHÔNG làm đỏ", () => {
+      const counts = Object.fromEntries(ALL_SKILL_IDS.map((id) => [id, 10]));
+      counts["bon_thach_quyen"] = 0;
+      const res = analyzeSoak(samples, {}, { m7: m7Ctx({ skillCastCounts: counts }) });
+      expect(res.pass).toBe(true);
+      expect(res.m7?.notCast).toEqual(["bon_thach_quyen"]);
+    });
+
+    it("bảng tổng kết in số bot theo cảnh giới, lượt thi triển, chiêu thiếu và số lần từng chiêu", () => {
+      const counts = Object.fromEntries(ALL_SKILL_IDS.map((id) => [id, 10]));
+      counts["bon_thach_quyen"] = 0;
+      counts["han_quang_tien"] = 99;
+      const res = analyzeSoak(samples, {}, { m7: m7Ctx({ skillCastCounts: counts }) });
+      const table = formatSoakTable(res);
+      expect(table).toContain("NỘI DUNG M7");
+      expect(table).toContain("Luyện Khí 56 | Trúc Cơ 12 | Kim Đan 12 | Nguyên Anh 20");
+      expect(table).toContain("6/6 có lượt thi triển");
+      expect(table).toContain("Chiêu chưa thi triển:  bon_thach_quyen");
+      expect(table).toContain("han_quang_tien 99");
+    });
   });
 
   it("formatSoakTable hiển thị đầy đủ các trường và số đo từ /metrics", () => {

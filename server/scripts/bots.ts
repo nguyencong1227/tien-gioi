@@ -1151,11 +1151,72 @@ async function runIdleZeroBotTest(
 }
 
 /**
+ * Phần trạng thái chiêu thức của bot mà `applySkillsMsg` / `autoAssignBotSkills` / `tryCastLearnedSkill` đụng tới. Tách thành `Pick` để
+ * soak.ts (có `BotState` riêng, gọn hơn) dùng lại đúng các hàm này thay vì chép logic chọn chiêu.
+ */
+export type SkillCaster = Pick<
+  BotState,
+  | "skills"
+  | "room"
+  | "skillsLearned"
+  | "skillsSlots"
+  | "skillsCd"
+  | "skillsCdMax"
+  | "skillsNextCastAt"
+  | "skillsLastRxAt"
+  | "skillsCastCount"
+  | "skillsSent"
+>;
+
+/** Trạng thái khởi đầu của phần chiêu thức trong một bot (chưa nhận tin `skills` nào, chưa thi triển lần nào) */
+export function emptySkillCaster(skills: boolean): Omit<SkillCaster, "room"> {
+  return {
+    skills,
+    skillsLearned: {},
+    skillsSlots: ["", "", "", ""],
+    skillsCd: [0, 0, 0, 0],
+    skillsCdMax: [0, 0, 0, 0],
+    skillsNextCastAt: [0, 0, 0, 0],
+    skillsLastRxAt: 0,
+    skillsCastCount: 0,
+    skillsSent: 0,
+  };
+}
+
+/** Áp tin `skills` của máy chủ (sổ chiêu, hồi chiêu) vào bot, rồi lắp chiêu vào các ô còn trống. */
+export function applySkillsMsg(b: SkillCaster, msg: SkillsMsg): void {
+  if (!msg || typeof msg !== "object") return;
+  b.skillsLearned = msg.learned ?? {};
+  if (Array.isArray(msg.slots)) {
+    b.skillsSlots = [
+      msg.slots[0] ?? "",
+      msg.slots[1] ?? "",
+      msg.slots[2] ?? "",
+      msg.slots[3] ?? "",
+    ];
+  }
+  if (Array.isArray(msg.cd)) {
+    b.skillsCd = [msg.cd[0] ?? 0, msg.cd[1] ?? 0, msg.cd[2] ?? 0, msg.cd[3] ?? 0];
+    const now = performance.now();
+    for (let i = 0; i < 4; i++) {
+      if (b.skillsCd[i] > 0) {
+        b.skillsNextCastAt[i] = Math.max(b.skillsNextCastAt[i], now + b.skillsCd[i]);
+      }
+    }
+  }
+  if (Array.isArray(msg.cdMax)) {
+    b.skillsCdMax = [msg.cdMax[0] ?? 0, msg.cdMax[1] ?? 0, msg.cdMax[2] ?? 0, msg.cdMax[3] ?? 0];
+  }
+  b.skillsLastRxAt = performance.now();
+  autoAssignBotSkills(b);
+}
+
+/**
  * Tự động gán chiêu thức đã học vào các ô còn trống (ô 2-5, M7.10 #511).
  * Khi bot nhận tin nhắn skills hoặc khi cảnh giới thay đổi, hàm này duyệt các ô
  * mở theo cảnh giới và gửi tin SKILL_MSG.slot để lắp chiêu chưa được trang bị.
  */
-export function autoAssignBotSkills(b: BotState): void {
+export function autoAssignBotSkills(b: SkillCaster): void {
   if (!b.skills) return;
   const me = b.room.state?.players?.get?.(b.room.sessionId);
   const realm = typeof me?.realm === "number" ? me.realm : 1;
@@ -1192,7 +1253,7 @@ export function autoAssignBotSkills(b: BotState): void {
  * Ưu tiên chiêu có tương khắc ngũ hành với hệ của quái mục tiêu.
  */
 export function tryCastLearnedSkill(
-  b: BotState,
+  b: SkillCaster,
   me: any,
   targetDist: number,
   targetAngle: number,
@@ -1547,36 +1608,7 @@ function bindRoomEvents(
   room.onMessage(SKILL_MSG.skills, (msg: SkillsMsg) => {
     b.rxMsgs++;
     b.skillsMsgsCount++;
-    if (msg && typeof msg === "object") {
-      b.skillsLearned = msg.learned ?? {};
-      if (Array.isArray(msg.slots)) {
-        b.skillsSlots = [
-          msg.slots[0] ?? "",
-          msg.slots[1] ?? "",
-          msg.slots[2] ?? "",
-          msg.slots[3] ?? "",
-        ];
-      }
-      if (Array.isArray(msg.cd)) {
-        b.skillsCd = [msg.cd[0] ?? 0, msg.cd[1] ?? 0, msg.cd[2] ?? 0, msg.cd[3] ?? 0];
-        const now = performance.now();
-        for (let i = 0; i < 4; i++) {
-          if (b.skillsCd[i] > 0) {
-            b.skillsNextCastAt[i] = Math.max(b.skillsNextCastAt[i], now + b.skillsCd[i]);
-          }
-        }
-      }
-      if (Array.isArray(msg.cdMax)) {
-        b.skillsCdMax = [
-          msg.cdMax[0] ?? 0,
-          msg.cdMax[1] ?? 0,
-          msg.cdMax[2] ?? 0,
-          msg.cdMax[3] ?? 0,
-        ];
-      }
-      b.skillsLastRxAt = performance.now();
-      autoAssignBotSkills(b);
-    }
+    applySkillsMsg(b, msg);
   });
   room.onMessage(SKILL_MSG.status, () => {
     b.rxMsgs++;

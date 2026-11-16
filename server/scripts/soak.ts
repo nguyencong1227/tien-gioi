@@ -12,6 +12,10 @@
 // Cách dùng:
 //   npm run soak -w server -- --bots=100 --minutes=30
 //   npm run soak -w server -- --bots=20 --duration=60   (thử nhanh 60 giây)
+//   npm run soak -w server -- --bots=100 --minutes=10 --m7   (có nội dung M7: sổ chiêu, ~20 % Nguyên Anh ở Hàn Vân Lĩnh; xem soak-plan.ts)
+//
+// Mặc định (không --m7) soak giữ y hệt trước đây: 100 bot Luyện Khí KHÔNG có sổ chiêu, nên KHÔNG đo gì về chiêu thức / trạng thái / đạn /
+// tinh anh / Nguyên Anh. Chỉ khi bật --m7 báo cáo mới có số lượt thi triển theo chiêu và số bot theo cảnh giới.
 
 import { execSync, spawn, type ChildProcess } from "node:child_process";
 import crypto from "node:crypto";
@@ -32,8 +36,10 @@ import {
   LINH_HU_ID,
   NPC_BY_ID,
   PLAYER_RADIUS,
+  HAN_VAN_ID,
   PROTOCOL_VERSION,
   SECT_MSG,
+  SKILL_MSG,
   SKILLS,
   TICK_MS,
   TRAVEL_COOLDOWN_MS,
@@ -50,18 +56,38 @@ import {
   type PartyMsg,
   type SectInvitedMsg,
   type SectMsg,
+  type SkillsMsg,
   type TravelToMsg,
   type WalletMsg,
 } from "@tien-gioi/shared";
 import { auditSavesDirectory } from "./audit-saves";
 import { assertNotProd } from "./assert-not-prod";
-import { readServerExecRuntimeMs, readServerRssMb, seedBotSaveFile } from "./bots";
+import {
+  applySkillsMsg,
+  emptySkillCaster,
+  readServerExecRuntimeMs,
+  readServerRssMb,
+  tryCastLearnedSkill,
+  type SkillCaster,
+} from "./bots";
 import {
   analyzeSoak,
   classifyServerLogLine,
   formatSoakTable,
+  type M7SoakContext,
   type SoakSample,
 } from "./soak-analysis";
+import {
+  ALL_SKILL_IDS,
+  DEFAULT_NA_RATIO,
+  NGUYEN_ANH_SKILL_IDS,
+  allocateSoakRoles,
+  countRealms,
+  planM7Bots,
+  seedSoakBot,
+  soakNaCount,
+  type SoakRole,
+} from "./soak-plan";
 
 // Lọc cảnh báo nội bộ của @colyseus/schema client decoder khi nhiều bot trong cùng tiến trình
 const origConsoleWarn = console.warn;
@@ -94,15 +120,29 @@ export interface SoakCliArgs {
   sampleIntervalSec: number;
   outJsonPath?: string;
   keepDataDir: boolean;
+  /** Bật nội dung M7: bot Trúc Cơ / Kim Đan có sổ chiêu + một phần Nguyên Anh ở Hàn Vân Lĩnh (mặc định tắt: soak cũ giữ nguyên) */
+  m7: boolean;
+  /** Tỉ lệ bot Nguyên Anh khi bật `--m7` (0..1; mặc định 0,2) */
+  naRatio: number;
 }
 
-function parseCliArgs(argv: string[]): SoakCliArgs {
+/** `--na=0.2` / `--na=20` / `--na=20%` -> tỉ lệ 0..1; không hợp lệ -> `null` */
+export function parseNaRatio(raw: string): number | null {
+  const num = Number(raw.trim().replace(/%$/, ""));
+  if (!Number.isFinite(num) || num <= 0) return null;
+  const frac = num > 1 ? num / 100 : num;
+  return Math.min(1, frac);
+}
+
+export function parseCliArgs(argv: string[]): SoakCliArgs {
   let bots = 100;
   let durationSec = 60; // Mặc định 60s để thử nhanh; khi chạy dài dùng --minutes=30
   let port = 0;
   let sampleIntervalSec = 10;
   let outJsonPath: string | undefined;
   let keepDataDir = false;
+  let m7 = false;
+  let naRatio = DEFAULT_NA_RATIO;
 
   for (const arg of argv) {
     if (arg.startsWith("--bots=")) {
@@ -120,10 +160,18 @@ function parseCliArgs(argv: string[]): SoakCliArgs {
       outJsonPath = arg.slice(6);
     } else if (arg === "--keep-data") {
       keepDataDir = true;
+    } else if (arg === "--m7" || arg === "--skills") {
+      m7 = true;
+    } else if (arg.startsWith("--na=")) {
+      const ratio = parseNaRatio(arg.slice(5));
+      if (ratio !== null) {
+        naRatio = ratio;
+        m7 = true; // chỉ định tỉ lệ Nguyên Anh thì đương nhiên là bật nội dung M7
+      }
     }
   }
 
-  return { bots, durationSec, port, sampleIntervalSec, outJsonPath, keepDataDir };
+  return { bots, durationSec, port, sampleIntervalSec, outJsonPath, keepDataDir, m7, naRatio };
 }
 
 /** Tìm PID thật của tiến trình server (nếu được bọc bởi launcher tsx) */
@@ -256,7 +304,31 @@ function pathToPortal(
   return pts;
 }
 
-type BotRole = "hunt" | "crowd" | "travel" | "dungeon" | "duel" | "sect";
+/** Đường thẳng (x0, y0) -> (x1, y1) có thông (không vướng ô chặn, bước 16 px, bằng `circleBlocked` của server) không? */
+function segmentClear(map: GameMap, x0: number, y0: number, x1: number, y1: number): boolean {
+  const n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 16));
+  for (let i = 1; i <= n; i++) {
+    const t = i / n;
+    if (map.circleBlocked(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, PLAYER_RADIUS)) return false;
+  }
+  return true;
+}
+
+type BotRole = SoakRole;
+
+/** Tầm tìm quái của bot Nguyên Anh (px): gần hết vùng nhìn của server (`VIEW_ENTER` 1100), chừa biên để quái chưa kịp ra khỏi view */
+const NA_HUNT_RADIUS = 1000;
+/** Tính lại đường đi vòng tới quái sau chừng này ms (quái đi lại nên đường cũ lệch dần) */
+const NA_PATH_REFRESH_MS = 3000;
+/**
+ * Bot Nguyên Anh không có trang bị (bộ IV 43.500 Linh thạch), nên gặp quái Hàn Vân là gục trong chưa đầy 90 giây rồi luân hồi về Phàm Nhân
+ * (soak ngắn đầu tiên: 4 / 4 bot Nguyên Anh gục): soak dài sẽ chỉ còn đo luân hồi. Như người chơi thật, bot rút về trạm nghỉ khi khí huyết / linh lực
+ * xuống thấp (đả tọa hồi 6 % khí huyết, 10 % linh lực mỗi giây) rồi mới đi săn tiếp.
+ */
+const NA_REST_BELOW_HP = 0.5;
+const NA_REST_BELOW_MP = 0.2;
+const NA_RESUME_HP = 0.95;
+const NA_RESUME_MP = 0.9;
 
 const SOAK_MAP_IDS = ["lac_ha", "hac_phong", "am_suong", "han_van"];
 
@@ -265,12 +337,14 @@ const SOAK_MAP_IDS = ["lac_ha", "hac_phong", "am_suong", "han_van"];
  * (Lạc Hà, Hắc Phong, Âm Sương, Hàn Vân) sát các cổng chuyển cảnh để soak có người qua lại giữa mọi cặp bản đồ (M7.10 #511).
  */
 function startMapOf(role: BotRole, index: number): GameMap {
+  // Bot Nguyên Anh (chỉ có khi bật --m7) săn ở Hàn Vân Lĩnh: khớp `mapId` của kế hoạch (soak-plan.ts)
+  if (role === "na") return getMap(HAN_VAN_ID) ?? DEFAULT_MAP;
   if (role !== "travel") return DEFAULT_MAP;
   const targetId = SOAK_MAP_IDS[index % SOAK_MAP_IDS.length];
   return getMap(targetId) ?? DEFAULT_MAP;
 }
 
-interface BotState {
+interface BotState extends SkillCaster {
   index: number;
   name: string;
   secret: string;
@@ -314,6 +388,13 @@ interface BotState {
   sectTag?: string;
   sectIsLeader: boolean;
   nextSectActionAt: number;
+  /** Bot Nguyên Anh: các điểm đi bộ vòng qua vật cản tới con quái đang đuổi (xem `pathToPortal`), `null` = đường thẳng thông */
+  huntPath: Array<{ x: number; y: number }> | null;
+  huntPathAt: number;
+  huntPathMonster: string;
+  /** Bot Nguyên Anh đang rút về trạm nghỉ (hồi khí huyết / linh lực) */
+  resting: boolean;
+  nextMeditateAt: number;
   closedCode: number | null;
 }
 
@@ -349,6 +430,11 @@ export async function main(): Promise<number> {
   console.log("            BẮT ĐẦU THỬ TẢI DÀI TIÊN GIỚI (M4 3.5 - ISSUE #282)");
   console.log("================================================================================");
   console.log(`Số bot:            ${args.bots}`);
+  if (args.m7) {
+    console.log(
+      `Chế độ:            --m7 (sổ chiêu; ~${Math.round(args.naRatio * 100)}% Nguyên Anh ở Hàn Vân Lĩnh)`,
+    );
+  }
   console.log(
     `Thời lượng:        ${(args.durationSec / 60).toFixed(1)} phút (${args.durationSec} giây)`,
   );
@@ -396,28 +482,22 @@ export async function main(): Promise<number> {
   process.on("SIGINT", () => void cleanupAndExit(130));
   process.on("SIGTERM", () => void cleanupAndExit(143));
 
-  // 1. Phân bổ vai trò cho các bot
-  const botRoles: BotRole[] = [];
-  const countHunt = Math.max(1, Math.round(args.bots * 0.3));
-  const countCrowd = Math.max(1, Math.round(args.bots * 0.2));
-  const countTravel = Math.max(1, Math.round(args.bots * 0.1));
-  const countDungeon = Math.max(0, Math.floor((args.bots * 0.16) / 4) * 4);
-  const countDuel = Math.max(0, Math.floor((args.bots * 0.12) / 2) * 2);
-  const countSect = Math.max(
-    0,
-    args.bots - (countHunt + countCrowd + countTravel + countDungeon + countDuel),
-  );
-
-  for (let i = 0; i < countHunt; i++) botRoles.push("hunt");
-  for (let i = 0; i < countCrowd; i++) botRoles.push("crowd");
-  for (let i = 0; i < countTravel; i++) botRoles.push("travel");
-  for (let i = 0; i < countDungeon; i++) botRoles.push("dungeon");
-  for (let i = 0; i < countDuel; i++) botRoles.push("duel");
-  for (let i = 0; i < countSect; i++) botRoles.push("sect");
-  while (botRoles.length < args.bots) botRoles.push("hunt");
+  // 1. Phân bổ vai trò cho các bot (soak-plan.ts): không --m7 thì đúng bảng cũ; --m7 thêm vai "na" (Nguyên Anh ở Hàn Vân Lĩnh)
+  const naCount = args.m7 ? soakNaCount(args.bots, args.naRatio) : 0;
+  const botRoles = allocateSoakRoles(args.bots, naCount);
+  const roleCount = (r: BotRole) => botRoles.slice(0, args.bots).filter((x) => x === r).length;
+  const countHunt = roleCount("hunt");
+  const countCrowd = roleCount("crowd");
+  const countTravel = roleCount("travel");
+  const countDungeon = roleCount("dungeon");
+  const countDuel = roleCount("duel");
+  const countSect = roleCount("sect");
+  // Cảnh giới / bậc / bản đồ / sổ chiêu theo vai (chỉ khi --m7; bot khác gieo như cũ)
+  const m7Plans = args.m7 ? planM7Bots(botRoles, args.bots) : [];
+  const naFirstIndex = botRoles.indexOf("na");
 
   console.log(
-    `Phân bổ kịch bản (${args.bots} bot): Săn quái ${countHunt} | Trấn/Shop ${countCrowd} | Cổng ${countTravel} | Bí cảnh ${countDungeon} | PK ${countDuel} | Tông môn ${countSect}`,
+    `Phân bổ kịch bản (${args.bots} bot): Săn quái ${countHunt} | Trấn/Shop ${countCrowd} | Cổng ${countTravel} | Bí cảnh ${countDungeon} | PK ${countDuel} | Tông môn ${countSect}${args.m7 ? ` | Nguyên Anh (Hàn Vân) ${roleCount("na")}` : ""}`,
   );
 
   // 2. Gieo sẵn file lưu nhân vật vào tempDir
@@ -437,6 +517,14 @@ export async function main(): Promise<number> {
       const angle = (i / countHunt) * Math.PI * 2;
       cx = DEFAULT_MAP.townPx.x + Math.cos(angle) * (DEFAULT_MAP.townPx.r + 150);
       cy = DEFAULT_MAP.townPx.y + Math.sin(angle) * (DEFAULT_MAP.townPx.r + 150);
+    } else if (role === "na") {
+      // Bot Nguyên Anh rải đều quanh trạm Hàn Vân Lĩnh, ba lớp bán kính: ngoài vùng an toàn nhưng chưa vào sâu vùng quái mạnh
+      const hv = startMapOf(role, i);
+      const k = i - 1 - naFirstIndex;
+      const angle = (k / Math.max(1, naCount)) * Math.PI * 2;
+      const r = hv.townPx.r + 150 + (k % 3) * 100;
+      cx = hv.townPx.x + Math.cos(angle) * r;
+      cy = hv.townPx.y + Math.sin(angle) * r;
     } else if (role === "crowd") {
       const angle = Math.random() * Math.PI * 2;
       const r = Math.random() * (DEFAULT_MAP.townPx.r - 30);
@@ -473,18 +561,18 @@ export async function main(): Promise<number> {
     }
     initialPositions.set(i, { x: cx, y: cy });
 
-    seedBotSaveFile(
+    seedSoakBot({
       name,
       secret,
-      cx,
-      cy,
-      role === "dungeon" ? 1 : 1,
-      role === "dungeon" ? 8 : 4,
-      startMap.def.id,
-      undefined,
-      initialCoin,
-      tempDir,
-    );
+      x: cx,
+      y: cy,
+      baseRealm: 1,
+      baseTier: role === "dungeon" ? 8 : 4,
+      baseMapId: startMap.def.id,
+      coin: initialCoin,
+      dir: tempDir,
+      plan: m7Plans[i - 1] ?? null,
+    });
   }
 
   // 3. Khởi động server con
@@ -571,6 +659,13 @@ export async function main(): Promise<number> {
   const bots: BotState[] = [];
   /** Số lần bot vào phòng của từng bản đồ qua cổng (kiểm ba bản đồ đều được ghé; M6, #410) */
   const mapVisits = new Map<string, number>();
+  /**
+   * Số lần thi triển theo id chiêu, đếm từ tin `fx` `cast` MÁY CHỦ gửi về đúng người dùng chiêu (`by` = sessionId của chính bot):
+   * chỉ tính lần máy chủ đã chấp nhận (đủ ô, đủ cảnh giới / bậc, hết hồi chiêu, đủ linh lực), không tính tin bot gửi đi.
+   */
+  const skillCastCounts: Record<string, number> = {};
+  /** Cùng số liệu theo từng bot (tên bot -> id chiêu -> số lần): để tìm bot nào không dùng chiêu được giao khi một chiêu thiếu lượt */
+  const castsByBot: Record<string, Record<string, number>> = {};
   const wsUrl = `ws://localhost:${port}`;
 
   const bindBotEvents = (b: BotState, room: Room) => {
@@ -581,7 +676,16 @@ export async function main(): Promise<number> {
     room.onMessage("toast", () => {});
     room.onMessage("quests", () => {});
     room.onMessage("soul", () => {});
-    room.onMessage("fx", () => {});
+    room.onMessage("fx", (msg: { kind?: string; by?: string; skill?: string }) => {
+      if (msg?.kind === "cast" && msg.by === room.sessionId && typeof msg.skill === "string") {
+        skillCastCounts[msg.skill] = (skillCastCounts[msg.skill] ?? 0) + 1;
+        const own = (castsByBot[b.name] ??= {});
+        own[msg.skill] = (own[msg.skill] ?? 0) + 1;
+      }
+    });
+    // Sổ chiêu + hồi chiêu của chính bot (bot không có sổ chiêu thì hàm này chỉ ghi nhận, không lắp gì)
+    room.onMessage(SKILL_MSG.skills, (msg: SkillsMsg) => applySkillsMsg(b, msg));
+    room.onMessage(SKILL_MSG.status, () => {});
     room.onMessage("dmg", () => {});
     room.onMessage("dialog", () => {});
     room.onMessage("reborn", () => {});
@@ -768,7 +872,13 @@ export async function main(): Promise<number> {
       nextDuelChallengeAt: performance.now() + 3000 + Math.random() * 4000,
       sectIsLeader: role === "sect" && (i - 1) % 3 === 0,
       nextSectActionAt: performance.now() + 2000 + Math.random() * 3000,
+      huntPath: null,
+      huntPathAt: 0,
+      huntPathMonster: "",
+      resting: false,
+      nextMeditateAt: 0,
       closedCode: null,
+      ...emptySkillCaster(m7Plans[i - 1] != null),
     };
 
     bindBotEvents(b, room);
@@ -798,30 +908,120 @@ export async function main(): Promise<number> {
 
     let dx = 0;
     let dy = 0;
+    /** Đang đi theo điểm đường đã tính (BFS): bỏ kiểm đệm 32 px bên dưới (đường BFS chỉ chừa bán kính người chơi), như bot "travel" */
+    let followingPath = false;
 
     switch (b.role) {
+      case "na": // Nguyên Anh ở Hàn Vân Lĩnh săn như bot "hunt" (khác: cảnh giới, bản đồ, sổ chiêu và tầm tìm quái)
       case "hunt": {
-        // Tìm quái gần nhất trong bán kính 300px
+        // Tìm quái gần nhất trong bán kính 300px. Hàn Vân Lĩnh chỉ có 62 quái trên bản đồ 4096 x 4096, con gần trạm nhất cách ~600 px
+        // (quái sinh từ `minDanger` 0,2 trở ra): bán kính 300 px thì bot Nguyên Anh đứng quanh trạm gần như không gặp quái nào (soak 10 phút
+        // đầu tiên: 3 / 6 chiêu Nguyên Anh không lần nào được thi triển). Bot Nguyên Anh nhìn tới tầm thấy của vùng nhìn (VIEW_ENTER 1100 px).
+        const naHunter = b.role === "na";
+        // Bot Nguyên Anh thấp khí huyết / linh lực: rút về trạm Hàn Vân, đả tọa đến khi gần đầy rồi mới săn tiếp
+        if (naHunter && me) {
+          const hpRatio = me.hp / Math.max(1, me.maxHp);
+          const mpRatio = me.mp / Math.max(1, me.maxMp);
+          if (!b.resting && (hpRatio < NA_REST_BELOW_HP || mpRatio < NA_REST_BELOW_MP)) {
+            b.resting = true;
+            b.huntPath = null;
+          } else if (b.resting && hpRatio >= NA_RESUME_HP && mpRatio >= NA_RESUME_MP) {
+            b.resting = false;
+            b.huntPath = null;
+            b.room.send("meditate", { on: false });
+          }
+        }
+        if (b.resting) {
+          if (b.map.inTown(b.predX, b.predY)) {
+            // Trong trạm: đứng yên đả tọa (gửi lại định kỳ vì bị đánh / di chuyển là thôi đả tọa)
+            if (now >= b.nextMeditateAt) {
+              b.room.send("meditate", { on: true });
+              b.nextMeditateAt = now + 3000;
+            }
+          } else {
+            const town = b.map.townPx;
+            if (!b.huntPath || b.huntPathMonster !== "town" || now >= b.huntPathAt + 4000) {
+              b.huntPath =
+                pathToPortal(b.map, b.predX, b.predY, { x: town.x, y: town.y, r: town.r }) ?? [];
+              b.huntPathAt = now;
+              b.huntPathMonster = "town";
+            }
+            while (
+              b.huntPath.length > 1 &&
+              Math.hypot(b.huntPath[0].x - b.predX, b.huntPath[0].y - b.predY) < 24
+            ) {
+              b.huntPath.shift();
+            }
+            const wp = b.huntPath[0] ?? town;
+            const a = Math.atan2(wp.y - b.predY, wp.x - b.predX);
+            dx = Math.cos(a);
+            dy = Math.sin(a);
+            followingPath = true;
+          }
+          break;
+        }
         let nearestMon: any = null;
-        let minDist = 300;
-        b.room.state.monsters.forEach((m: any) => {
+        let nearestId = "";
+        let minDist = naHunter ? NA_HUNT_RADIUS : 300;
+        b.room.state.monsters.forEach((m: any, id: string) => {
           if (m.hp <= 0) return;
           const d = Math.hypot(m.x - b.predX, m.y - b.predY);
           if (d < minDist && isPositionSafe(b.map, m.x, m.y, 20)) {
             minDist = d;
             nearestMon = m;
+            nearestId = id;
           }
         });
 
         if (nearestMon) {
+          // Săn lang thang: bãi săn dời theo con quái đang đuổi (không thì hết quái gần là bot quay về bãi cũ rồi lại đi)
+          if (naHunter) {
+            b.campX = b.predX;
+            b.campY = b.predY;
+          }
           const angle = Math.atan2(nearestMon.y - b.predY, nearestMon.x - b.predX);
           if (minDist > SKILLS.slash.range) {
-            dx = Math.cos(angle);
-            dy = Math.sin(angle);
+            let aimX = nearestMon.x;
+            let aimY = nearestMon.y;
+            // Bot Nguyên Anh đứng cách quái xa: đường thẳng bị vách băng chặn thì đi vòng theo BFS, không thì chỉ đâm đầu vào vách, cả đời không
+            // chạm quái, nên các chiêu tầm ngắn (nón 90-95 px) không bao giờ được thi triển (chỉ chiêu tự thân như Vân Hành Bộ)
+            if (naHunter && !segmentClear(b.map, b.predX, b.predY, aimX, aimY)) {
+              if (
+                !b.huntPath ||
+                b.huntPathMonster !== nearestId ||
+                now >= b.huntPathAt + NA_PATH_REFRESH_MS
+              ) {
+                b.huntPath =
+                  pathToPortal(b.map, b.predX, b.predY, { x: aimX, y: aimY, r: 120 }) ?? [];
+                b.huntPathAt = now;
+                b.huntPathMonster = nearestId;
+              }
+              while (
+                b.huntPath.length > 1 &&
+                Math.hypot(b.huntPath[0].x - b.predX, b.huntPath[0].y - b.predY) < 24
+              ) {
+                b.huntPath.shift();
+              }
+              const wp = b.huntPath[0];
+              if (wp) {
+                aimX = wp.x;
+                aimY = wp.y;
+                followingPath = true;
+              }
+            } else {
+              b.huntPath = null;
+            }
+            const a = Math.atan2(aimY - b.predY, aimX - b.predX);
+            dx = Math.cos(a);
+            dy = Math.sin(a);
           }
           if (minDist <= SKILLS.slash.range + 10 && now >= b.nextSlashAt) {
             b.room.send("attack", { angle });
             b.nextSlashAt = now + SKILLS.slash.cooldown + 50;
+          }
+          // Có sổ chiêu (--m7): dùng chiêu đã học theo luật của bots.ts (chọn chiêu mạnh nhất đang sẵn sàng, đủ linh lực, trong tầm)
+          if (b.skills && me) {
+            tryCastLearnedSkill(b, me, minDist, angle, now, true);
           }
           if (minDist <= SKILLS.sword.range && now >= b.nextSwordAt) {
             b.room.send("cast", { skillId: "sword", angle });
@@ -1049,7 +1249,7 @@ export async function main(): Promise<number> {
       const testX = Math.round(b.predX + dx * stepPx);
       const testY = Math.round(b.predY + dy * stepPx);
       // bot "travel" đi thẳng tới cổng nên bỏ kiểm này: cổng Bắc nằm sát mép bản đồ (y = 112 < 150) nên `isPositionSafe` luôn từ chối và bot đứng im
-      if (b.role !== "travel" && !isPositionSafe(b.map, testX, testY, 32)) {
+      if (b.role !== "travel" && !followingPath && !isPositionSafe(b.map, testX, testY, 32)) {
         b.wanderAngle += Math.PI * 0.75 + (Math.random() - 0.5) * 0.5;
         b.avoidUntil = now + 600;
         dx = 0;
@@ -1167,6 +1367,15 @@ export async function main(): Promise<number> {
   console.log("\nThời gian đo kết thúc. Đang dừng hành động bot để xả hết tin nhắn...");
   await sleep(1500);
 
+  // Cảnh giới THẬT của bot lúc cuối (chết do quái thì luân hồi, cảnh giới có thể tụt so với lúc gieo): chỉ để ghi nhận, không kiểm
+  const finalRealmCounts: Record<number, number> = {};
+  if (args.m7) {
+    for (const b of bots) {
+      const realm = b.room?.state?.players?.get?.(b.room.sessionId)?.realm;
+      if (typeof realm === "number") finalRealmCounts[realm] = (finalRealmCounts[realm] ?? 0) + 1;
+    }
+  }
+
   // 7. Ngắt kết nối các bot và tắt máy chủ bằng SIGTERM
   console.log("Đang ngắt kết nối bot và tắt máy chủ bằng SIGTERM...");
   for (const b of bots) {
@@ -1282,6 +1491,14 @@ export async function main(): Promise<number> {
   );
 
   // 9. Phân tích tự động và in bảng tổng kết
+  const m7Context: M7SoakContext | undefined = args.m7
+    ? {
+        requiredSkillIds: NGUYEN_ANH_SKILL_IDS,
+        allSkillIds: ALL_SKILL_IDS,
+        realmCounts: countRealms(m7Plans),
+        skillCastCounts,
+      }
+    : undefined;
   const analysis = analyzeSoak(
     samples,
     {},
@@ -1291,11 +1508,21 @@ export async function main(): Promise<number> {
       auditErrorsTotal,
       hongFilesCount,
       currencyConservationPassed,
+      m7: m7Context,
     },
   );
 
   const formattedTable = formatSoakTable(analysis);
   console.log("\n" + formattedTable);
+  if (args.m7) {
+    console.log(
+      `- Cảnh giới của bot lúc cuối (sau luân hồi nếu có): ${
+        Object.entries(finalRealmCounts)
+          .map(([r, n]) => `realm ${r}: ${n}`)
+          .join(" | ") || "(không đọc được)"
+      }`,
+    );
+  }
   const mapVisitsObj = Object.fromEntries(mapVisits);
   console.log(
     `- Lượt qua cổng vào từng bản đồ: ${
@@ -1314,6 +1541,8 @@ export async function main(): Promise<number> {
       port,
       dataDir: tempDir,
       mapVisits: mapVisitsObj,
+      m7: args.m7,
+      ...(args.m7 ? { naRatio: args.naRatio, naBots: naCount, finalRealmCounts, castsByBot } : {}),
     },
     analysis,
     samples,
