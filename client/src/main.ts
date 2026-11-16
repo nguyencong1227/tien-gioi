@@ -49,6 +49,7 @@ import { initAuthUi, switchAuthView } from "./auth-ui";
 import { setupPwa, canReloadSafely, isNativeApp, type PwaGameState } from "./pwa";
 import { setupNativeApp, getOutdatedUiConfig, getAppUpdateUrl } from "./native-app";
 import { HeartbeatController } from "./heartbeat";
+import { NetSlowMonitor } from "./net-slow";
 import { runReconnect } from "./reconnect";
 import { sound } from "./audio";
 import { initDisplay } from "./gfx/display";
@@ -288,6 +289,16 @@ let activeScene: WorldScene | null = null;
 let activeToken: string | null = null;
 let activeRoom: Room | null = null;
 let activeHeartbeat: HeartbeatController | null = null;
+/** Chip "Mạng chậm" của phòng đang chơi (báo sớm hơn nhịp tim 8 giây, `net-slow.ts`); sống và chết cùng nhịp tim. */
+let activeNetSlow: NetSlowMonitor | null = null;
+
+/** Dừng nhịp tim và chip "Mạng chậm" của phòng hiện tại (rớt mạng, đổi phòng, nối lại, thoát). */
+function stopLiveness() {
+  activeHeartbeat?.stop();
+  activeHeartbeat = null;
+  activeNetSlow?.stop();
+  activeNetSlow = null;
+}
 let isReconnecting = false;
 let isTraveling = false;
 
@@ -458,8 +469,7 @@ const FAIL_TEXT = "Mất kết nối với Tiên Giới. Tải lại trang để
 
 /** Không nối lại được: chặn điều khiển, giữ banner cố định kèm nút "Tải lại trang". */
 function showDisconnected() {
-  activeHeartbeat?.stop();
-  activeHeartbeat = null;
+  stopLiveness();
   activeScene?.setReconnecting(true);
   ui.showReconnectFailed(FAIL_TEXT);
 }
@@ -470,8 +480,7 @@ async function startReconnect(codeOrReason?: number | string) {
   if (isTraveling) return;
 
   // Dừng nhịp tim của phòng cũ ngay khi bắt đầu nối lại
-  activeHeartbeat?.stop();
-  activeHeartbeat = null;
+  stopLiveness();
 
   // 1000: đóng bình thường; 4000-4999: mã của ứng dụng (4000 chủ động thoát, 4429 bị ngắt vì spam)
   if (typeof codeOrReason === "number") {
@@ -546,8 +555,12 @@ function setupRoomLifecycle(room: Room) {
   activeToken = room.reconnectionToken;
 
   // Dọn dẹp bộ điều khiển nhịp tim của phòng trước (nếu có)
-  activeHeartbeat?.stop();
-  activeHeartbeat = null;
+  stopLiveness();
+
+  // Chip "Mạng chậm": báo khi chờ phản hồi (pong, patch sau input) quá ~2,5 giây, SỚM hơn nhịp tim 8 giây; không đổi giao thức. Khởi động TRƯỚC nhịp tim vì nó bọc
+  // `room.send` để đếm ping / input đã gửi, mà nhịp tim gửi ping đầu ngay trong `start()`.
+  activeNetSlow = new NetSlowMonitor({ room, onChange: (slow) => ui.setNetSlow(slow) });
+  activeNetSlow.start();
 
   // Khởi động nhịp tim (M4.2b: cả trong bí cảnh, chết sẽ gọi startReconnect -> showDisconnected)
   activeHeartbeat = new HeartbeatController({
@@ -563,6 +576,7 @@ function setupRoomLifecycle(room: Room) {
     (import.meta.env.DEV || new URLSearchParams(location.search).has("debug"))
   ) {
     (window as any).__heartbeat = activeHeartbeat;
+    (window as any).__netSlow = activeNetSlow;
   }
 
   // Lắng nghe sự kiện đi qua cổng chuyển phòng (M3 bước 1)
@@ -572,8 +586,7 @@ function setupRoomLifecycle(room: Room) {
     if (!targetMap) return;
 
     isTraveling = true;
-    activeHeartbeat?.stop();
-    activeHeartbeat = null;
+    stopLiveness();
     activeScene?.setReconnecting(true);
     ui.showTransition(targetMap.def.name);
 

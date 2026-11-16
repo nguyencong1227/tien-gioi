@@ -4937,6 +4937,17 @@ export const ui = {
     reload.onclick = () => location.reload();
   },
 
+  /** Chip "Mạng chậm" (chờ phản hồi quá ~2,5 giây, `net-slow.ts`): hiện / ẩn, không chặn điều khiển. */
+  setNetSlow(slow: boolean) {
+    const chip = document.getElementById("net-slow");
+    if (chip) chip.hidden = !slow;
+  },
+
+  isNetSlowShown(): boolean {
+    const chip = document.getElementById("net-slow");
+    return !!chip && !chip.hidden;
+  },
+
   hideReconnectNotice() {
     const banner = $("reconnect-banner");
     banner.hidden = true;
