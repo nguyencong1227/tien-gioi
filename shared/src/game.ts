@@ -453,8 +453,19 @@ export type FxMsg =
       arc?: number;
       /** Bề rộng vùng báo (px), CHỈ dùng với `line`: bằng đúng bề rộng server tính khi đáp đòn */
       w?: number;
+      /**
+       * Bán kính TRONG (px), CHỈ dùng với `circle` (M42 trùm, vành khuyên): vùng nguy hiểm là `[r0, r]`, giữa `r0` là chỗ an toàn. Thiếu = hình tròn đặc.
+       * Client cũ không biết trường này vẽ cả hình tròn đặc: thận trọng hơn, không nguy hiểm.
+       */
+      r0?: number;
       ms: number;
     }
+  /** Trùm (mục 42) bắt đầu vận chiêu `ability` (id trong `BossDef.abilities`): thanh máu trùm hiện tên chiêu trong `ms`. (x, y) = chỗ trùm đứng (để `sendNear` chỉ gửi cho người ở gần). Client cũ bỏ qua `fx` lạ. */
+  | { kind: "bossCast"; by: string; x: number; y: number; ability: string; ms: number }
+  /** Trùm chuyển sang giai đoạn `phase` (chỉ số trong `BossDef.phases`): tiếng gầm, hiệu ứng, cập nhật thanh máu. */
+  | { kind: "bossPhase"; by: string; x: number; y: number; phase: number }
+  /** Trùm bí cảnh vào cuồng nộ (đánh quá lâu). */
+  | { kind: "bossEnrage"; by: string; x: number; y: number }
   /** Đạn tầm xa bắn ra lúc này: bay thẳng từ (x, y) theo `angle` với `speed` (px/giây) tối đa `range` px; client tự vẽ, server tự kiểm trúng */
   | {
       kind: "bolt";

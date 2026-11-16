@@ -30,6 +30,29 @@ describe("giới hạn tần suất tin nhắn", () => {
     for (let t = 0; t < 60_000; t += 50) expect(lim.check("input", t)).toBe("ok");
   });
 
+  it("MỤC 41: đợt xả dồn sau khi mạng đứng 3 giây (60 input + 3 tin DỪNG) KHÔNG bị bỏ tin nào, kể cả các tin dừng nằm cuối; đứng 5 giây (100 tin) vẫn đủ", () => {
+    for (const n of [63, MESSAGE_LIMITS.input.burst]) {
+      const lim = new RateLimiter(0);
+      // đứng im lâu trước đó (quỹ đã đầy), rồi n tin tới CÙNG MỘT LÚC
+      for (let i = 0; i < n; i++) expect(lim.check("input", 60_000)).toBe("ok");
+    }
+    expect(MESSAGE_LIMITS.input.burst).toBeGreaterThanOrEqual(63); // 3 giây x 20 Hz + 3 tin dừng
+    expect(MESSAGE_LIMITS.input.burst).toBeGreaterThanOrEqual(5 * 20); // nhịp tim coi là chết sau 8 giây; 5 giây đầu phải dồn được
+  });
+
+  it("spam input bền vững (hàng nghìn tin trong một nhịp) vẫn bị bỏ rồi ngắt kết nối: nới burst không mở cửa cho spam", () => {
+    const lim = new RateLimiter(0);
+    let ok = 0;
+    let kicked = false;
+    for (let i = 0; i < 2000 && !kicked; i++) {
+      const v = lim.check("input", 1000);
+      if (v === "ok") ok++;
+      if (v === "kick") kicked = true;
+    }
+    expect(ok).toBe(MESSAGE_LIMITS.input.burst);
+    expect(kicked).toBe(true);
+  });
+
   it("mỗi loại tin nhắn có quỹ riêng; loại không khai báo dùng DEFAULT_LIMIT", () => {
     const lim = new RateLimiter(0);
     for (let i = 0; i < DEFAULT_LIMIT.burst; i++) expect(lim.check("talk", 0)).toBe("ok");
