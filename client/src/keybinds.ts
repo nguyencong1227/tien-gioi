@@ -4,11 +4,16 @@
  * thay vì gắn cứng từng phím, HUD và màn "Phím tắt" đọc nhãn từ đây nên không bao giờ lệch với phím thật.
  *
  * Phím được ghi theo `KeyboardEvent.code` (vị trí vật lý: không đổi khi bật bộ gõ tiếng Việt, khác `key` có thể thành "Process"),
- * kèm tiền tố `Shift+` nếu cần phân biệt (Tab / Shift+Tab). Di chuyển (WASD + mũi tên) và Esc là phím CỐ ĐỊNH, không đổi được.
+ * kèm tiền tố `Shift+` nếu cần phân biệt (Tab / Shift+Tab). Di chuyển là bốn hành động `move.*` ĐỔI ĐƯỢC như mọi hành động khác (mặc định W A S D và mũi tên, QUYET_DINH_M3 mục 25);
+ * chỉ Esc là phím CỐ ĐỊNH. Mũi tên chỉ gán được cho `move.*` (ở bảng đang mở chúng là phím điều hướng của bảng).
  * Cảm ứng không dùng mô-đun này.
  */
 
 export type ActionId =
+  | "move.left"
+  | "move.right"
+  | "move.up"
+  | "move.down"
   | "attack"
   | "target.next"
   | "target.prev"
@@ -39,7 +44,7 @@ export type ActionId =
   | "sound.mute"
   | "ui.toggle";
 
-export type ActionGroup = "combat" | "interact" | "panel" | "other";
+export type ActionGroup = "move" | "combat" | "interact" | "panel" | "other";
 
 export interface ActionDef {
   id: ActionId;
@@ -68,6 +73,30 @@ export const SKILL_SLOTS = [2, 3, 4, 5] as const;
 const SLOT_KEYS = ["KeyL", "KeyU", "KeyI", "KeyO"] as const;
 
 export const ACTIONS: readonly ActionDef[] = [
+  // Di chuyển (đổi được, QUYET_DINH_M3 mục 25): `WorldScene` KHÔNG chạy qua `runAction` mà `MoveKeys` (`move-keys.ts`) đọc trạng thái giữ phím theo `event.code`,
+  // tra hướng bằng `moveDirOf`. Mặc định W A S D + mũi tên (cả hai nhóm cùng dùng được).
+  {
+    id: "move.left",
+    label: "Đi sang trái",
+    group: "move",
+    defaults: ["KeyA", "ArrowLeft"],
+    world: false,
+  },
+  {
+    id: "move.right",
+    label: "Đi sang phải",
+    group: "move",
+    defaults: ["KeyD", "ArrowRight"],
+    world: false,
+  },
+  { id: "move.up", label: "Đi lên", group: "move", defaults: ["KeyW", "ArrowUp"], world: false },
+  {
+    id: "move.down",
+    label: "Đi xuống",
+    group: "move",
+    defaults: ["KeyS", "ArrowDown"],
+    world: false,
+  },
   {
     id: "attack",
     label: "Kiếm chém",
@@ -223,17 +252,15 @@ export const ACTION_BY_ID: Readonly<Record<ActionId, ActionDef>> = Object.fromEn
   ACTIONS.map((a) => [a.id, a]),
 ) as Record<ActionId, ActionDef>;
 
-/** Phím CỐ ĐỊNH: không gán được cho hành động nào (di chuyển, Esc đóng / bỏ chọn, Tab trong bảng là của trình duyệt). */
-export const RESERVED_CODES: ReadonlySet<string> = new Set([
-  "KeyW",
-  "KeyA",
-  "KeyS",
-  "KeyD",
+/** Phím CỐ ĐỊNH: không gán được cho hành động nào (Esc đóng bảng / bỏ chọn / thoát ô chat). WASD và mũi tên KHÔNG còn cố định: gán được cho di chuyển (`move.*`). */
+export const RESERVED_CODES: ReadonlySet<string> = new Set(["Escape"]);
+
+/** Mũi tên: ở bảng đang mở là phím điều hướng của bảng nên CHỈ gán được cho hành động di chuyển (`move.*`), không gán cho chém / mở bảng... */
+export const ARROW_CODES: ReadonlySet<string> = new Set([
   "ArrowUp",
   "ArrowDown",
   "ArrowLeft",
   "ArrowRight",
-  "Escape",
 ]);
 
 export type Keymap = Readonly<Record<ActionId, readonly string[]>>;
@@ -245,9 +272,21 @@ export const DEFAULT_KEYMAP: Keymap = Object.fromEntries(
 /** Một phím hợp lệ: `Shift+` tuỳ chọn rồi mã phím chữ-số (`KeyI`, `Digit3`, `Space`, `Tab`, `F5`, `Numpad1`...) */
 const TOKEN_RE = /^(Shift\+)?[A-Za-z][A-Za-z0-9]{0,14}$/;
 
-export function isValidToken(token: unknown): token is string {
+/** Hành động này là di chuyển (`move.left` ...) không. */
+export function isMoveAction(id: string): boolean {
+  return id.startsWith("move.");
+}
+
+/**
+ * Phím hợp lệ cho hành động `id`: đúng dạng, không phải phím cố định (Esc), và mũi tên chỉ cho di chuyển. `id` bỏ trống (không biết hành động nào) thì coi như hành động
+ * thường: mũi tên bị từ chối.
+ */
+export function isValidToken(token: unknown, id?: string): token is string {
   if (typeof token !== "string" || !TOKEN_RE.test(token)) return false;
-  return !RESERVED_CODES.has(token.replace(/^Shift\+/, ""));
+  const bare = token.replace(/^Shift\+/, "");
+  if (RESERVED_CODES.has(bare)) return false;
+  if (ARROW_CODES.has(bare) && !(id !== undefined && isMoveAction(id))) return false;
+  return true;
 }
 
 /**
@@ -266,7 +305,7 @@ export function sanitizeKeymap(raw: unknown): Keymap {
     const list: string[] = [];
     for (const t of v) {
       if (list.length >= 3) break;
-      if (isValidToken(t) && !used.has(t) && !list.includes(t)) list.push(t);
+      if (isValidToken(t, a.id) && !used.has(t) && !list.includes(t)) list.push(t);
     }
     if (list.length === 0) continue;
     for (const t of list) used.add(t);
@@ -287,6 +326,25 @@ export function buildLookup(map: Keymap): ReadonlyMap<string, ActionId> {
   const m = new Map<string, ActionId>();
   for (const a of ACTIONS) for (const t of map[a.id]) if (!m.has(t)) m.set(t, a.id);
   return m;
+}
+
+/** Hướng đi ứng với một phím (`event.code`) theo bảng phím hiện tại (`move.left` -> `left`...), hoặc `null`. Tra mỗi lần gọi nên đổi phím giữa chừng vẫn đúng. */
+export function moveDirOf(
+  code: string,
+  lookup: ReadonlyMap<string, ActionId> = getLookup(),
+): "left" | "right" | "up" | "down" | null {
+  switch (lookup.get(code)) {
+    case "move.left":
+      return "left";
+    case "move.right":
+      return "right";
+    case "move.up":
+      return "up";
+    case "move.down":
+      return "down";
+    default:
+      return null;
+  }
 }
 
 export interface KeyEventLike {
@@ -396,7 +454,10 @@ export function holderOf(token: string, map: Keymap = getKeymap()): ActionId | n
 
 /** Phím CỐ ĐỊNH (không đổi được) hiện ở màn "Phím tắt": mô tả luật chung, không nằm trong bảng `ACTIONS`. */
 export const FIXED_KEYS: ReadonlyArray<{ keys: string; what: string }> = [
-  { keys: "W A S D / ← ↑ ↓ →", what: "Đi bộ (khi bảng đang mở: mũi tên chuyển nút trong bảng)" },
+  {
+    keys: "← ↑ ↓ →",
+    what: "Khi bảng đang mở: chuyển nút trong bảng (không đi bộ). Đi bộ đổi ở nhóm Di chuyển",
+  },
   { keys: "Esc", what: "Đóng bảng trên cùng, bỏ chọn mục tiêu, thoát ô chat" },
   { keys: "Enter / Cách", what: "Bấm nút đang chọn trong bảng; tua nhanh chữ hội thoại" },
   { keys: "1 - 9", what: "Chọn dòng trả lời khi đang nói chuyện với NPC" },
@@ -473,7 +534,7 @@ export function resetKeymap(): void {
  * (người chơi không còn cách gọi nó). Trả `false` nếu phím không hợp lệ / cố định.
  */
 export function rebind(id: ActionId, token: string): boolean {
-  if (!isValidToken(token)) return false;
+  if (!isValidToken(token, id)) return false;
   const cur = getKeymap();
   const oldPrimary = cur[id][0];
   const orphans = ACTIONS.filter(

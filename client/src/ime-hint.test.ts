@@ -107,3 +107,27 @@ describe("ImeSniffer: gợi ý khi bộ gõ kiểu hook chèn Backspace / chữ 
     expect(IME_HINT_TEXT).toContain("mũi tên");
   });
 });
+
+describe("ImeSniffer: phím di chuyển đổi được", () => {
+  /** Bấm chữ `code` rồi Backspace 3 lần (ba dấu hiệu = đủ ngưỡng): có gợi ý không */
+  const backspaceAfter = (code: string, resolve: (c: string) => "left" | null) => {
+    const s = new ImeSniffer(resolve);
+    let fired = false;
+    let t = 0;
+    for (let i = 0; i < 3; i++) {
+      fired ||= s.feed(down(code, t));
+      fired ||= s.feed(down("Backspace", t + 20));
+      t += 400;
+    }
+    return fired;
+  };
+  const jIsLeft = (c: string) => (c === "KeyJ" ? ("left" as const) : null);
+
+  it("dùng bộ tra hướng của bảng phím: Backspace ngay sau J (đã đổi thành đi trái) là dấu hiệu bộ gõ", () => {
+    expect(backspaceAfter("KeyJ", jIsLeft)).toBe(true);
+  });
+
+  it("chữ không còn là phím đi (W khi bảng phím đã đổi) thì không tính", () => {
+    expect(backspaceAfter("KeyW", jIsLeft)).toBe(false);
+  });
+});

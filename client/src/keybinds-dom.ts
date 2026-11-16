@@ -69,11 +69,25 @@ export interface KeyLabelDoc {
   createElement(tag: string): KeyLabelEl;
 }
 
+/**
+ * Gợi ý phím đi bộ: giữ nguyên "WASD / mũi tên đi" khi bốn hướng còn phím mặc định; người chơi đã đổi thì ghi phím chính của từng hướng theo thứ tự lên, trái, xuống, phải
+ * (vd "I J K L đi"); một hướng không còn phím nào thì ghi "?" cho hướng đó.
+ */
+export function moveHint(map: Keymap): string {
+  const dirs: ActionId[] = ["move.up", "move.left", "move.down", "move.right"];
+  const isDefault = dirs.every((id) => {
+    const def = ACTION_BY_ID[id].defaults;
+    return map[id].length === def.length && map[id].every((t, i) => t === def[i]);
+  });
+  if (isDefault) return "WASD / mũi tên đi";
+  return `${dirs.map((id) => (map[id][0] ? keyLabel(map[id][0]) : "?")).join(" ")} đi`;
+}
+
 /** Dòng gợi ý phím ngắn ở đầu màn hình (`#help`): phím CHÍNH của từng hành động chính, đổi phím thì đổi theo. */
 export function helpStripText(map: Keymap): string {
   const k = (id: ActionId) => keyLabel(map[id][0] ?? "");
   return [
-    "WASD / mũi tên đi",
+    moveHint(map),
     `${k("attack")} chém`,
     `${k("target.next")} mục tiêu`,
     `${k("skill.sword")} kiếm khí`,

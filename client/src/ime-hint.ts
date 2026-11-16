@@ -6,7 +6,7 @@
 //  - Backspace NGAY SAU một phím chữ di chuyển (bộ gõ xoá chữ vừa gõ để thay bằng chữ có dấu);
 //  - keyup của phím di chuyển KHÔNG có keydown trước (bộ gõ nuốt keydown).
 // Đủ `IME_HINT_SCORE` dấu hiệu trong `IME_HINT_WINDOW_MS` thì gợi ý MỘT lần.
-import { MOVE_CODES } from "./move-keys";
+import { defaultMoveResolver, type MoveResolver } from "./move-keys";
 
 export const IME_HINT_SCORE = 3;
 export const IME_HINT_WINDOW_MS = 15_000;
@@ -30,6 +30,9 @@ export interface ImeKey {
 }
 
 export class ImeSniffer {
+  /** `resolve`: tra hướng của phím theo bảng phím hiện tại (di chuyển đổi được); mặc định WASD + mũi tên. */
+  constructor(private readonly resolve: MoveResolver = defaultMoveResolver) {}
+
   private hits: number[] = [];
   private lastLetterAt = -Infinity;
   private shown = false;
@@ -43,8 +46,8 @@ export class ImeSniffer {
   feed(e: ImeKey): boolean {
     if (this.shown || e.typing) return false;
     const code = e.code ?? "";
-    const isMoveLetter =
-      code.startsWith("Key") && Object.prototype.hasOwnProperty.call(MOVE_CODES, code);
+    const isMove = this.resolve(code) !== null;
+    const isMoveLetter = code.startsWith("Key") && isMove;
     if (e.type === "down") {
       if (isMoveLetter) this.lastLetterAt = e.at;
       const noCode = code === "" || code === "Unidentified";
@@ -52,7 +55,7 @@ export class ImeSniffer {
         noCode && (e.keyCode === 229 || e.keyCode === 231 || (e.key ?? "").length === 1);
       if (synthetic && e.key !== "Shift" && e.key !== "Control" && e.key !== "Alt") this.hit(e.at);
       else if (code === "Backspace" && e.at - this.lastLetterAt <= IME_BACKSPACE_MS) this.hit(e.at);
-    } else if (Object.prototype.hasOwnProperty.call(MOVE_CODES, code) && e.wasHeld === false) {
+    } else if (isMove && e.wasHeld === false) {
       this.hit(e.at);
     }
     return this.shown;
