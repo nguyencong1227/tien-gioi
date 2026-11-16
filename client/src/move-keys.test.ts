@@ -94,6 +94,23 @@ describe("MoveKeys: phím giữ, lặp, đổi hướng nhanh", () => {
     expect(m.state()).toEqual(none);
   });
 
+  it("đối xứng cả bốn chiều: phím bấm SAU luôn thắng (D rồi A -> trái; W rồi S -> xuống; S rồi W -> lên)", () => {
+    const cases: [string, string, Partial<typeof none>][] = [
+      ["KeyD", "KeyA", { left: true }],
+      ["KeyA", "KeyD", { right: true }],
+      ["KeyW", "KeyS", { down: true }],
+      ["KeyS", "KeyW", { up: true }],
+      ["ArrowLeft", "KeyD", { right: true }],
+      ["KeyD", "ArrowLeft", { left: true }],
+    ];
+    for (const [first, second, want] of cases) {
+      const m = new MoveKeys();
+      press(m, first);
+      press(m, second);
+      expect(m.state(), `${first} rồi ${second}`).toEqual({ ...none, ...want });
+    }
+  });
+
   it("phím KẸT (mất keyup) không chặn hướng ngược lại: bấm phím ngược thì đi được", () => {
     const m = new MoveKeys();
     press(m, "KeyA"); // keyup của A không bao giờ tới
