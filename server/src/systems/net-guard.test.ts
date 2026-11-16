@@ -167,6 +167,24 @@ describe("có tin lại / nối lại: hộ thể 3 giây + quái mất mục ti
     expect(hurtPlayer(s.w, "a", s.p, 50, m)).toBe(true);
   });
 
+  it("đang hộ thể thì sát thương theo giây (hurtPlayerDot) không trừ máu; hết hạn thì trừ máu như thường", () => {
+    const s = setup();
+    s.p.hp = 100;
+    advance(s.w, NET_SILENCE_GHOST_MS + 100);
+    heard(s.w, "a", s.c, s.w.now);
+    expect(isShielded(s.w, "a")).toBe(true);
+    // đang hộ thể: độc / bỏng không trừ máu
+    hurtPlayerDot(s.w, "a", s.p, 30);
+    expect(s.p.hp).toBe(100);
+    // hết hạn hộ thể
+    advanceAlive(s, NET_SHIELD_MS + 100);
+    expect(isShielded(s.w, "a")).toBe(false);
+    // hết hộ thể: độc / bỏng trừ máu
+    const hpBefore = s.p.hp;
+    hurtPlayerDot(s.w, "a", s.p, 30);
+    expect(s.p.hp).toBeLessThan(hpBefore);
+  });
+
   it("nối lại sau rớt socket thật: hết hồn lìa xác, hộ thể + gửi netShield, mốc nghe làm mới, quái mất mục tiêu, máu giữ nguyên", () => {
     const s = setup();
     const { mc } = addMonster(s.w, "lang", s.p.x + 20, s.p.y);
