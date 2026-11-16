@@ -6,7 +6,7 @@
 
 **Làm:** người chơi **lập tông môn** (tên + biệt hiệu ngắn), **mời** người khác vào (người kia nhận), có **chức vụ** (Tông chủ / Trưởng lão / Đệ tử), **chat tông môn** xuyên mọi bản đồ, **thông báo tông môn** (một dòng), **kho chung Linh thạch** (góp, rút có phân quyền, có sổ ghi), rời / mời ra / chuyển quyền / giải tán. **Thành viên là LINH HỒN**: đầu thai (đổi kiếp, nhân vật đặt lại) vẫn ở trong tông môn với đúng chức vụ.
 
-**Không làm (bản đầu):** cấp tông môn / buff / nhiệm vụ / chiến tranh tông môn / bảng xếp hạng (cần "danh vọng", để sau khi người dùng chốt); kho vật phẩm (bản đầu chưa làm; đã thiết kế ở MỤC 11 sau yêu cầu của người dùng, `QUYET_DINH_M3.md` mục 27); xin gia nhập từ ngoài (chỉ mời); nhiều tông môn một người; chia tông môn hay sáp nhập.
+**Không làm (bản đầu):** cấp tông môn / buff / nhiệm vụ / chiến tranh tông môn / bảng xếp hạng (cần "danh vọng", để sau khi người dùng chốt; **cấp, buff, nhiệm vụ, cống hiến và cửa hàng tông đã được người dùng chốt làm ở M8: MỤC 12**; chiến tranh và bảng xếp hạng vẫn để sau); kho vật phẩm (bản đầu chưa làm; đã thiết kế ở MỤC 11 sau yêu cầu của người dùng, `QUYET_DINH_M3.md` mục 27); xin gia nhập từ ngoài (chỉ mời); nhiều tông môn một người; chia tông môn hay sáp nhập.
 
 ## 2. Hiện trạng đã đọc mã (cái để tái dùng, cái cần thêm)
 - **Danh tính / linh hồn:** `Identity.soulKey` (`identity.ts`): chế độ tài khoản là `accountId`, chế độ cũ là tên chuẩn hoá. `SoulStore` (`soul.ts`) là mẫu giao diện lưu trữ có bản file (`FileSoulStore`: ghi tệp tạm + `rename`, hàng đợi theo khoá) và bản PostgreSQL (`server/src/pg/`), cùng bộ kiểm chung `store-contract.ts`. Một tài khoản = một linh hồn = một đạo hiệu cố định (`THIET_KE_TAI_KHOAN.md` mục 3): tên hiển thị của thành viên gần như không đổi.
@@ -190,3 +190,107 @@ Kẽ hở (đã có sẵn với kho Linh thạch của Tông chủ): góp đồ 
 2. Hạn mức Đệ tử: 3 lượt / ngày, tối đa 10 món / lượt (con số do A đề xuất).
 3. Trưởng lão rút TỰ DO (theo yêu cầu): rủi ro một Trưởng lão xấu rút sạch kho; giảm nhẹ bằng sổ kho + Tông chủ giáng chức được. Nếu muốn, thêm sau hạn mức riêng cho Trưởng lão.
 4. 40 ô cố định, chưa mở rộng theo cấp tông môn (cấp tông môn chưa có).
+
+## 12. Chiều sâu tông môn (M8, `QUYET_DINH_M3.md` mục 39)
+
+> Bổ sung của Dev A, soạn TRƯỚC khi viết mã (B giao diện, C bot / thử tải, D nội dung / mô phỏng / fuzz kinh tế đọc mục này; kế hoạch và chia việc ở `docs/PHAN_CONG_M8.md`). **Mọi con số trong mục này là ĐỀ XUẤT của A**, D chốt lại bằng mô phỏng (mục 12.11). Chiến tranh tông môn NGOÀI phạm vi (người dùng: để sau).
+
+### 12.1 Quyết định và nguồn ý tưởng
+- Người dùng chốt năm thứ: **cống hiến**, **cửa hàng tông**, **cấp tông**, **buff tông**, **nhiệm vụ tông hằng ngày**. Cống hiến theo LINH HỒN (sống qua kiếp, như mọi thứ của thành viên).
+- Nguồn ý tưởng (mục 19-20; thuật ngữ của Vạn Kiếp Tu Tiên, `site/assets/content-ClG6Ha-i.json`, `/content/meta/thuat_ngu.yaml`): **cống hiến** = "điểm làm việc cho tông, dùng để đổi đồ ở bảo khố, Tàng Kinh Các; tiêu thì mất"; **công tích** = "thành tích tích lũy, không mất khi tiêu cống hiến"; **bảo khố** = đổi đồ; **Tàng Kinh Các** = đổi công pháp. Chỉ lấy KHÁI NIỆM và tên gọi chung; không lấy tông phái / nhân vật của game đó. Tên cấp tông, mặt hàng, nhiệm vụ do D soạn (ghi `docs/NGUON_NOI_DUNG.md` mục 3 khi lấy nguyên văn).
+- **Nguyên tắc xuyên suốt (như mục 4.4 / 11):** server quyết định; mọi thao tác thu / chi đọc - sửa - ghi trong `SectStore.update` (nguyên tử theo tông môn); khi có nhiều bước ngoài kho thì thứ tự là "nhánh lỗi chỉ BỚT, không bao giờ THÊM" (thà mất hơn nhân đôi).
+
+### 12.2 Ba con số và cấp tông (dữ liệu bền vững)
+Thêm vào bản ghi `Sect` (đều TÙY CHỌN khi đọc: bản ghi cũ thiếu thì `sanitizeSect` đặt 0; `v` giữ 1; PostgreSQL lưu `data jsonb` nên KHÔNG đổi lược đồ):
+```
+members[i].contrib  : số dư cống hiến có thể TIÊU (nguyên, 0..SECT_CONTRIB_CAP)
+members[i].merit    : công tích = tổng cống hiến đã kiếm trong tông này, KHÔNG BAO GIỜ giảm (nguyên, >= contrib)
+members[i].today    : { day: dayKey, earned, deposit, quests: string[], dungeon: boolean, buys: { [itemId]: n } }   // sổ trong NGÀY, đổi ngày thì đặt lại
+Sect.points         : điểm tông = tổng cống hiến mọi thành viên từng kiếm (nguyên, chỉ TĂNG, kể cả khi thành viên đã rời)
+```
+- **Cấp tông KHÔNG lưu**: `sectLevelOf(points)` (hàm thuần ở `shared/`, bảng `SECT_LEVELS`) nên không thể lệch với điểm. Tiêu cống hiến KHÔNG làm tụt điểm tông hay cấp tông.
+- Bất biến (`assertWritableSect` TỪ CHỐI khi ghi sai, không kẹp lặng lẽ; `sanitizeSect` kẹp khi ĐỌC; `kiem-save` báo): `0 <= contrib <= merit`; `points >= tổng merit các thành viên hiện có`; `today.earned <= SECT_EARN_DAY_CAP`; mọi số nguyên hữu hạn.
+- **Rời tông / bị mời ra / giải tán: cống hiến và công tích CỦA NGƯỜI ĐÓ MẤT** (bản ghi thành viên biến mất; VKTT cũng "nộp lại cống hiến" khi xuống núi). Điểm tông của tông môn giữ nguyên (đã đóng góp cho tông). Client hỏi xác nhận kèm số cống hiến sẽ mất.
+
+### 12.3 Kiếm cống hiến (trần theo NGÀY, chống lạm dụng)
+Mọi nguồn đi qua MỘT hàm `SectService.award(soulKey, source, amount, key?)` trong `update`: cộng `contrib`, `merit`, `Sect.points` CÙNG MỘT lần ghi, kiểm trần, ghi `today`. Không có đường kiếm nào khác.
+| Nguồn | Cống hiến | Trần / ngày / người |
+|---|---|---|
+| Nhiệm vụ tông (mục 12.7) | 20 / 30 / 40 theo độ khó, 3 nhiệm vụ / ngày | 90 (mỗi `questId` một lần / ngày) |
+| Góp kho (Linh thạch hoặc đồ, mục 4.4 / 11.4) | 1 cống hiến mỗi `SECT_DEPOSIT_VALUE_PER_CH` = 100 Linh thạch giá trị (đồ tính theo `ITEM_VALUE x qty`; phần lẻ dồn lại không có, làm tròn xuống) | 30 (`today.deposit`) |
+| Bí cảnh hoàn thành khi trong đội có từ 2 thành viên CÙNG tông (hook ở `payReward`, `systems/dungeon.ts`) | 20 cho MỖI thành viên cùng tông trong đội | 1 lần / ngày (`today.dungeon`) |
+| **Tổng** | | `SECT_EARN_DAY_CAP` = 140 |
+- **Vòng góp - rút (Tông chủ / Trưởng lão rút tự do): chỉ kiếm được tối đa trần góp (30) mỗi ngày dù lặp bao nhiêu lần** (hai người góp - rút chéo cũng bị chặn bởi trần của TỪNG người). Không dựa vào "số ròng": đơn giản và kiểm được.
+- **Chống nhảy tông / lập tông hằng ngày để lấy trần lại: chỉ thành viên ĐÃ VÀO tông từ trước ngày hôm nay (`dayKey(joinedAt) < dayKey(now)`) mới kiếm được cống hiến** (`sectCanEarn`, hàm thuần). Tính chất: một linh hồn kiếm tối đa MỘT trần mỗi ngày trên mọi tông môn gộp lại (rời tông thì mất cả cống hiến, vào tông khác lại phải chờ sang ngày). Người mới vào / Tông chủ mới lập thấy dòng "ngày mai mới kiếm được cống hiến". Góp kho vẫn góp được, chỉ không tính cống hiến.
+- Thao tác thu - chi cống hiến khi **đã chết / ở Hoàng Tuyền / hồn lìa xác** bị từ chối (cùng `isDown` của #834): không nhận nhiệm vụ, không trả, không mua, không góp-tính-cống-hiến lúc đã chết (chết do mạng được tha thì như đang sống).
+
+### 12.4 Cấp tông (`SECT_LEVELS`, bảng thuần ở `shared/`)
+| Cấp | Điểm tông cần | Thành viên tối đa | Trưởng lão tối đa | Ô kho đồ | Mở ở cửa hàng |
+|:-:|--:|:-:|:-:|:-:|---|
+| 1 | 0 | 30 | 3 | 40 | nhóm 1 |
+| 2 | 1.000 | 35 | 4 | 50 | nhóm 2 |
+| 3 | 4.000 | 40 | 5 | 60 | nhóm 3 |
+| 4 | 12.000 | 45 | 6 | 70 | nhóm 4 |
+| 5 | 30.000 | 50 | 7 | 80 | nhóm 5 |
+- Cấp 1 GIỮ đúng giới hạn hiện có (30 thành viên, 3 Trưởng lão, 40 ô) nên **không tông môn nào đang chạy bị vượt giới hạn hay mất ô**. Tông 3 người tích cực: kiếm TỐI ĐA 140 / người / ngày thì lên cấp 2 sau ~3 ngày, cấp 3 ~10 ngày, cấp 4 ~4 tuần, cấp 5 ~10 tuần; chỉ làm 3 nhiệm vụ (90 / ngày) thì ~4 ngày, ~15 ngày, ~6 tuần, ~16 tuần (tông 2 người: gấp rưỡi): lên cấp là chuyện của tuần, không phải của giờ, và cấp 5 là mục tiêu dài hạn. Quy mô thật hiện nay là 1 tông / 2 thành viên (`SELECT` trên bản chạy thật 16/11/2026) nên bảng phải với tới được bằng ít người.
+- **Kho mở rộng:** mảng `Sect.vault.slots` dài `SECT_VAULT_SLOTS_MAX` = 80 (bản ghi cũ 40 ô được ĐỆM thêm ô trống khi đọc, không đổi thứ tự); chỉ `slotsOf(level)` ô đầu dùng được, ô sau bị khoá (client vẽ mờ, server từ chối góp vào ô khoá `vault_locked_slot`). Tên hằng `SECT_VAULT_SLOTS` giữ nghĩa "ô ở cấp 1" để không vỡ mã đang dùng; thêm `SECT_VAULT_SLOTS_MAX`.
+- Lên cấp: ghi trong cùng lần `update` cộng điểm (so `levelOf` trước / sau), phát `sectHall` + toast "Tông môn lên cấp N" cho thành viên trực tuyến, cập nhật buff (mục 12.5), audit `sect.level_up`. Chưa có xuống cấp.
+
+### 12.5 Buff tông môn (chỉ cho người đang TRỰC TUYẾN, nhẹ)
+| Cấp | Tu vi | Cơ hội rơi đồ | Hồi khí huyết / linh lực (ngoài đả tọa) |
+|:-:|:-:|:-:|:-:|
+| 1 | – | – | – |
+| 2 | +2% | – | – |
+| 3 | +3% | +3% | – |
+| 4 | +4% | +5% | +10% |
+| 5 | +5% | +5% | +15% |
+- Cài vào `PlayerCtrl.sectBuff` ({exp, drop, regen} dạng hệ số 1,0x) lúc vào phòng, khi tông môn lên cấp, khi rời / bị mời ra / giải tán (xoá). KHÔNG thêm trường vào `schema.ts` (client chỉ cần ảnh chụp `sectHall` để hiện), nên byte / tick bench giữ 0,0%; số liệu sống ở `PlayerCtrl` và chỉ đọc khi cần, không việc mỗi tick mới.
+- Điểm gắn (đúng MỘT chỗ mỗi loại, có test đột biến): **tu vi** = `gainExp` nhân `sectBuff.exp` SAU `scale` và TRƯỚC `testExpMult` (thứ tự: `scale`, buff tông, hệ số thử nghiệm); **rơi đồ** = `rollDrops(kind, rng, chanceMult = 1)` (`shared/src/items.ts`, mặc định 1 nên mọi chỗ gọi cũ và bench không đổi): `chance x chanceMult` kẹp 1, dùng buff của CHỦ ĐỒ (`lootOwner`); **hồi phục** = `regen` trong `systems/progression.ts` nhân tỉ lệ ngoài đả tọa.
+- Buff cộng GỘP trong từng loại (không nhân chồng giữa nhiều nguồn); trần cứng `SECT_BUFF_EXP_MAX` 1,10 / `SECT_BUFF_DROP_MAX` 1,10 / `SECT_BUFF_REGEN_MAX` 1,30 để một lỗi bảng không làm buff vô hạn. Ngân sách cân bằng: tu vi +5% là trần cho cả 5 cấp (D kiểm bằng mô phỏng `can-bang` rằng nhịp lên bậc không đổi quá 5%).
+
+### 12.6 Cửa hàng tông môn (Bảo khố: đồ; Tàng Kinh Các: kinh quyển công pháp)
+- **Tiền tệ riêng:** chỉ tiêu `contrib` (không tiêu `merit`, không tiêu Linh thạch). Bảng `SECT_SHOP: { itemId, cost, minLevel, limitDay }[]` ở `shared/` (D soạn dữ liệu, mục 12.11); mua bằng tin `sectShopBuy { itemId, qty }`.
+- **Neo giá:** `SECT_CH_VALUE_LT` = 5: một cống hiến "đáng" 5 Linh thạch giá mua NPC; góp kho đổi cống hiến theo 100 Linh thạch / 1 cống hiến (mục 12.3), nên đường Linh thạch -> cống hiến -> hàng lỗ ~95%: cửa hàng KHÔNG phải chỗ đổi tiền. Bất biến test: `cost x SECT_CH_VALUE_LT >= giá mua NPC của món` hoặc món không bán ở NPC nào; trần giá trị mua được mỗi ngày = `SECT_EARN_DAY_CAP x SECT_CH_VALUE_LT` = 700 Linh thạch-tương-đương, D kiểm so với thu nhập `CAN_BANG.md` (Luyện Khí ~1.300 Linh thạch / giờ săn, Kim Đan 5.000-15.000): không vượt ~1 giờ săn của bậc thấp nhất món dùng được.
+- **Gợi ý nhóm hàng** (D chốt): nhóm 1 đan hồi phục + nguyên liệu cơ bản; nhóm 2 kinh quyển phổ thông (`rarity` 0-1); nhóm 3 đan tu luyện trung cấp; nhóm 4 kinh quyển `rarity` 2; nhóm 5 đồ hiếm + kinh quyển `rarity` 3. Mọi món có **hạn mức THEO NGÀY** mỗi người (`limitDay`, đếm trong `members[i].today.buys`; kinh quyển / đồ hiếm thường 1 / ngày). Không có hạn mức "trọn đời": rời tông là mất cống hiến nên không còn gì để mua lại, và chờ sang ngày + trần kiếm đã chặn việc gom. Kinh quyển mà người mua ĐÃ HỌC rồi thì server từ chối (`shop_known`, kiểm theo chiêu đã học), tránh phí cống hiến.
+- **Luồng mua** (mua trọn vẹn hoặc không gì cả, giống `shop.ts`): kiểm sớm (còn sống, không qua cổng, một thao tác tông môn một lúc: dùng `SectBook.busy` chung với kho đồ, đủ cống hiến, đủ cấp, còn hạn mức ngày, túi còn chỗ bằng thử trên BẢN SAO) -> `update` trừ `contrib` + tăng `today.buys` -> cộng vào túi (`addToInventory`) -> LƯU hồ sơ ngay (`World.onSaveNow`). Túi vừa đầy ở giữa / lưu lỗi: hoàn cống hiến bằng một `update` nữa (không hoàn thì chỉ MẤT cống hiến, không bao giờ có hàng mà vẫn còn cống hiến). Sập giữa trừ và lưu: mất cống hiến, không nhân đôi.
+
+### 12.7 Nhiệm vụ tông môn hằng ngày
+- **3 nhiệm vụ mỗi ngày mỗi tông môn**, chọn tất định từ bảng `SECT_QUESTS` bằng `hash(sectId, dayKey)` (mọi thành viên cùng tông thấy cùng 3 "ô"; ô nào cũng có bản theo BẬC của người nhận: Luyện Khí / Trúc Cơ / Kim Đan / Nguyên Anh, nên người ở bậc nào cũng có việc vừa sức). Loại bước dùng lại `QuestStep` (`kill` / `collect` / `reachRealm` / `talk`) và dùng lại bộ máy tiến độ của `systems/quests.ts` (`bump`, `stepSatisfied`): thêm các `QuestDef` của tông vào `QUEST_BY_ID` (cờ `sect: true`, KHÔNG có NPC giao; `acceptQuest` / `turnInQuest` hiện có bỏ qua chúng) để `sanitizeQuests`, tiến độ, sổ nhiệm vụ, `onMonsterKilled` chạy sẵn.
+- **Nhận / trả qua bảng Tông môn** (không cần đứng gần NPC): tin `sectQuestAccept { questId }` / `sectQuestTurnIn { questId }`. Server kiểm: là thành viên, `questId` thuộc 3 ô hôm nay ĐÚNG bậc của mình, chưa trả hôm nay (`members[i].today.quests`, theo LINH HỒN nên đầu thai giữa ngày không làm lại được), đang sống. Trả: kiểm túi trên bản sao -> `award` (đánh dấu + cộng cống hiến trong `update`) -> trừ / thêm đồ + tu vi (qua `gainExp`, nên có buff tông) -> toast. Thứ tự đảm bảo chỉ MẤT (sập giữa chừng mất phần thưởng đồ / tu vi), không bao giờ nhận hai lần.
+- Thưởng ngoài cống hiến nhỏ (tu vi ~ một nhiệm vụ hằng ngày thường, thỉnh thoảng một đan); độ khó 20 / 30 / 40 cống hiến tương ứng 1 / 2 / 3 mức (hạ quái cùng bậc, nộp nguyên liệu, hạ tinh anh / cùng đội). D soạn >= 12 mẫu x 4 bậc.
+- Tông môn không đủ người thì vẫn có 3 nhiệm vụ (không cần đội); nhiệm vụ "cùng đội" chỉ là một loại trong bảng, không bắt buộc.
+
+### 12.8 Luân hồi, chết, rời tông (tóm tắt các va chạm)
+- Chết thật + đầu thai: cống hiến / công tích GIỮ (theo linh hồn); sổ trong ngày (`today`) giữ nên không làm lại nhiệm vụ trong ngày; buff theo tông môn (vẫn trong tông) nên đầu thai xong còn buff.
+- Cờ `SECT_NEWLIFE_LOCK_HOURS` (mục 11.7) KHÔNG áp cho cửa hàng (cống hiến không phải đồ của kiếp trước; mất ở chỗ khác: giới hạn ngày).
+- Mời ra / rời / giải tán: mất cống hiến (mục 12.2), không hoàn lại. Giải tán vẫn chỉ khi kho Linh thạch và kho đồ rỗng (như cũ); điểm tông mất theo tông môn.
+- Tông chủ chuyển quyền: cống hiến không đi theo chức vụ.
+
+### 12.9 Hợp đồng `shared/` (PR M8.1, chỉ sửa `shared/`, B và C review; chi tiết cuối cùng theo mã)
+- Hằng số: `SECT_CONTRIB_CAP`, `SECT_POINTS_CAP`, `SECT_EARN_DAY_CAP`, `SECT_DEPOSIT_VALUE_PER_CH`, `SECT_DEPOSIT_DAY_CAP`, `SECT_CH_VALUE_LT`, `SECT_VAULT_SLOTS_MAX`, `SECT_BUFF_*_MAX`; bảng `SECT_LEVELS`; hàm thuần `sectLevelOf(points)`, `sectLevelInfo(level)`, `sectBuffOf(level)`, `sectCanEarn(joinedAt, now)`, `sectDepositValue(...)`, `sectQuestSlots(sectId, day)`, `sectDayState(member, now)` (đặt lại sổ khi sang ngày).
+- Bảng dữ liệu (D điền): `SECT_QUESTS` (`QuestDef` + `{ sect: true, tier, cong_hien }`), `SECT_SHOP`. PR M8.1 chỉ có KHUNG + vài mục mẫu cho test; dữ liệu thật ở PR của D.
+- Tin nhắn (THÊM, không đổi cái cũ nên `PROTOCOL_VERSION` KHÔNG tăng; client cũ bỏ qua tin lạ): client -> server `sectQuestAccept`, `sectQuestTurnIn`, `sectShopBuy`; server -> client `sectHall { hall: SectHallView | null }` = { cấp, điểm, ngưỡng cấp kế, buff, giới hạn theo cấp, `me` { `contrib`, `merit`, `earnedToday`, `earnFrom` (ngày được kiếm), `depositLeft` }, 3 nhiệm vụ hôm nay + trạng thái, cửa hàng (món, giá, khoá theo cấp, số lượt còn) }; gửi lúc vào phòng và khi ĐỔI (kiếm / tiêu / lên cấp), cho NGƯỜI ĐỔI, riêng thay đổi cấp / điểm gửi cả tông môn. `SectView.members[i]` thêm `merit` (công tích) để hiện thứ hạng đóng góp. Mã từ chối mới (`SECT_FAILS` + `sectFailMessage`): `not_warm`, `earn_cap`, `no_contrib`, `shop_locked`, `shop_limit`, `shop_known`, `quest_unavailable`, `quest_done`, `quest_active`, `down`, `vault_locked_slot`.
+- Nhật ký kiểm toán (AGENTS.md: thêm sự kiện nhạy cảm thì ghi ở đây + test): `sect.earn` { tên, nguồn, số }, `sect.shop_buy` { tên, món, số, giá }, `sect.level_up` { sectId, cấp }, `sect.quest_turnin`. Không đưa bí mật vào trường.
+
+### 12.10 Hiệu năng, lưu trữ
+- Không việc mỗi tick: tin `sectHall` chỉ khi đổi, mỗi người vài lần / ngày; buff đọc từ `PlayerCtrl`. Bản ghi `Sect` nhỉnh thêm: ~1 KB (30 thành viên x `today`), vẫn trong một lần ghi. `perf.test.ts` giữ ngưỡng; bench byte / tick phải 0,0% so mốc.
+- Đồng thời: mọi thu / chi qua `SectStore.update` (hàng đợi theo `sectId`); một người một thao tác tông môn tại một thời điểm (`SectBook.busy`, đổi tên từ `vaultBusy` ở PR M8.2).
+- `kiem-save` (C) kiểm thêm bất biến mục 12.2; `chuyen-du-lieu` không đổi (bản ghi cùng `data jsonb`).
+
+### 12.11 Kiểm thử bắt buộc và mô phỏng (D + A; "chống sinh tiền / nhân đôi")
+1. **Bảo toàn / giới hạn cống hiến:** hàng loạt kịch bản ngẫu nhiên có seed (góp - rút chéo giữa người, nhảy tông, rời - vào lại, đầu thai giữa ngày, trả nhiệm vụ hai lần, gửi dồn tin, lưu lỗi, sập giữa chừng): với MỌI linh hồn và MỌI ngày, tổng cống hiến kiếm trên mọi tông môn `<= SECT_EARN_DAY_CAP`; `contrib` không bao giờ âm hay vượt `merit`; tổng `points` của tông môn đúng bằng tổng đã `award`; đồ mua không nhân đôi (tổng cống hiến + đồ trên đĩa không tăng qua sập).
+2. **Đột biến** cho từng bất biến (bỏ trần ngày, bỏ chờ sang ngày, bỏ kiểm `isDown`, cộng `contrib` mà không cộng `merit`, tiêu `merit`, buff nhân hai lần, đổi thứ tự `gainExp`...): test phải ĐỎ đúng chỗ.
+3. **Mô phỏng cân bằng (`npm run can-bang -w server`, D mở rộng):** (a) tốc độ lên cấp theo số thành viên tích cực (1 / 2 / 3 / 5 / 10 người) so bảng mục 12.4; (b) giá trị hàng mua được mỗi ngày so thu nhập từng bậc (mục 12.6); (c) tác động buff lên nhịp lên bậc (<= 5%) và lượng rơi đồ (<= +5%); (d) không có vòng Linh thạch -> cống hiến -> hàng -> bán lại có lời. Số ra ghi `docs/CAN_BANG.md` mục tông môn.
+4. **Tích hợp (Colyseus thật, `WorldRoom.sect.test.ts`):** một vòng đời đầy đủ: lập tông -> mời -> sang ngày -> nhiệm vụ -> cống hiến -> lên cấp -> buff thấy trong `gainExp` -> mua hàng -> rời (mất cống hiến).
+
+### 12.12 Chia PR (chi tiết, thứ tự, người làm: `docs/PHAN_CONG_M8.md`)
+M8.1 hợp đồng `shared/` (A) -> M8.2 lưu trữ + dịch vụ cống hiến / điểm / cấp (A) -> M8.3 nguồn kiếm + buff (A) -> M8.4 nhiệm vụ tông (A, dùng nội dung D) -> M8.5 cửa hàng tông (A, dùng nội dung D); song song: M8.6 giao diện (B), M8.7 nội dung + mô phỏng (D), M8.8 fuzz kinh tế (D), M8.9 bot / kiểm save / thử tải (C); M8.10 nghiệm thu + hỏi người dùng phát hành.
+
+### 12.13 Câu hỏi mở (A đã chọn hướng an toàn; người dùng đổi được, KHÔNG chặn)
+1. Rời tông MẤT cống hiến + công tích (mặc định; chống nhảy tông). Nếu người dùng muốn giữ một phần: đề xuất hoàn 0%.
+2. Tông mới vào / mới lập phải chờ sang ngày mới kiếm cống hiến (mặc định; chống nhảy tông). Nới: cho Tông chủ vừa lập kiếm ngay (mở cửa cho "lập tông mỗi ngày", chi phí 1.000 Linh thạch mỗi lần).
+3. Trần 140 cống hiến / ngày và neo giá 1 cống hiến = 5 Linh thạch: số khởi đầu, D chỉnh bằng mô phỏng.
+4. Buff tối đa +5% tu vi / +5% rơi đồ / +15% hồi: số khởi đầu.
+5. Kinh quyển `rarity` cao ở cửa hàng cấp 4-5: có hay không (mặc định có, mỗi ngày một quyển / người).
+6. Bảng xếp hạng tông môn (điểm tông / cấp) và đối kháng / chiến tranh: KHÔNG làm trong M8 (chiến tranh người dùng đã để sau; bảng xếp hạng hỏi khi M8 xong).
+7. Tông chủ bỏ chơi vô thời hạn: giữ nguyên mục 10.1 (chưa chuyển quyền tự động).
