@@ -313,7 +313,19 @@ describe("WorldRoom sect-vault soak & stress (Issue #790 K6)", () => {
     Lao.room.send(SECT_MSG.vaultWithdraw, { slot: vSlot, itemId: MAT.id, qty: 10 });
     De.room.send(SECT_MSG.vaultWithdraw, { slot: vSlot, itemId: MAT.id, qty: 10 });
 
-    await sleep(400);
+    // Chờ THEO ĐIỀU KIỆN, không `sleep` cố định (#752): ảnh chụp kho phía client đến sau lần rút cuối trên máy chậm / CI bận (CI #850 từng đỏ "expected 35 to be 25":
+    // 20 đã rút + 15 là ảnh kho CŨ, không phải đồ nhân đôi). Điều kiện là TRẠNG THÁI CUỐI (túi 3 người có 20, kho hiện 5), không phải "tổng = 25" (đúng ngay từ đầu,
+    // lúc chưa ai rút). Nhân đôi thật thì túi vượt 20 hoặc tổng vượt 25 và `waitFor` hết giờ.
+    const invs = () =>
+      countInSlots(ctrlOf(Chu).inv, MAT.id) +
+      countInSlots(ctrlOf(Lao).inv, MAT.id) +
+      countInSlots(ctrlOf(De).inv, MAT.id);
+    await waitFor(
+      () => invs() === 20 && countInSlots(lastVault(Chu)?.slots, MAT.id) === 5,
+      8000,
+      "hai lượt rút thành công (túi 20), kho còn 5",
+    );
+    await sleep(300); // thêm một nhịp: không có lượt rút nào lọt thêm (không nhân đôi) sau trạng thái cuối
 
     const invChu = countInSlots(ctrlOf(Chu).inv, MAT.id);
     const invLao = countInSlots(ctrlOf(Lao).inv, MAT.id);
@@ -324,5 +336,8 @@ describe("WorldRoom sect-vault soak & stress (Issue #790 K6)", () => {
     expect(invChu + invLao + invDe + inVault).toBe(25);
     // Số lượng rút ra không bao giờ vượt 25
     expect(invChu + invLao + invDe).toBeLessThanOrEqual(25);
+    // Đúng HAI trong ba lượt rút 10 thành công (lượt thứ ba thấy ô chỉ còn 5 nên bị từ chối), kho còn 5
+    expect(invChu + invLao + invDe).toBe(20);
+    expect(inVault).toBe(5);
   }, 25_000);
 });
