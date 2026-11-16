@@ -14,8 +14,6 @@ import {
 
 /** Trùm ngoài hoang chỉ hiện thanh khi trong tầm này (px); bí cảnh luôn hiện (trùm duy nhất của run). */
 export const BOSS_BAR_RANGE = 600;
-// Trần thời lượng giáp client chịu nhận = `BOSS_ARMOR_MAX_MS` của `shared/` (cùng trần `bossViolations` dùng cho dữ liệu): `fx` `bossArmor` có `ms` hơn mức này bị bỏ.
-
 /** Tiếng của trùm chỉ phát khi trùm trong / sát tầm nhìn (px ngoài rìa màn hình; `inView`): trùm ở xa khuất không gầm vào tai người chơi. */
 export const BOSS_SFX_VIEW = 480;
 /** Giữ tên chiêu trên thanh thêm chừng này (ms) sau lúc đòn đáp (đọc kịp, nhất là tên ngắn). */
@@ -162,7 +160,7 @@ export class BossFxTracker {
   onPhase(by: string, now: number): void {
     if (typeof by === "string" && finite(now)) this.phaseAt.set(by, now);
   }
-  /** `bossArmor`: trùm dựng giáp `ms` ms nhận `mult` lần sát thương. Số hỏng (ms <= 0 / quá `BOSS_ARMOR_MAX_MS`, `mult` ngoài (0, 1]) thì bỏ; dựng lại thì THAY bản cũ. */
+  /** `bossArmor`: trùm dựng giáp `ms` ms nhận `mult` lần sát thương. Số hỏng (ms <= 0 / quá `BOSS_ARMOR_MAX_MS` của `shared/`, cùng trần `bossViolations` dùng cho dữ liệu, `mult` ngoài (0, 1]) thì bỏ; dựng lại thì THAY bản cũ. */
   onArmor(by: string, ms: number, mult: number, now: number): void {
     if (typeof by !== "string" || !finite(ms, now) || ms <= 0 || ms > BOSS_ARMOR_MAX_MS) return;
     if (armorPercent(mult) === null) return;
