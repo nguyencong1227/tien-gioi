@@ -440,3 +440,40 @@ Toàn bộ nhật ký chi tiết từng kịch bản và bảng tổng kết Mar
 
 
 
+
+---
+
+## 11. Hệ số tu vi THỬ NGHIỆM cho một nhân vật (`TEST_EXP_MULT`, `QUYET_DINH_M3.md` mục 34)
+
+Để chính người dùng thử game (vd nhân vật `Han` tu vi x5) mà KHÔNG đụng người chơi khác. Chỉ nhân **tu vi**; không đổi rơi đồ, Linh thạch, sát thương.
+
+- **Cấu hình:** biến môi trường `TEST_EXP_MULT` = `đạo_hiệu:hệ_số`, nhiều mục cách nhau dấu phẩy, vd `TEST_EXP_MULT=Han:5` hoặc `TEST_EXP_MULT=Han:5,Linh Nhi:2`. Mặc định rỗng = **TẮT**.
+- **Luật:** đạo hiệu khớp KHÔNG phân biệt hoa thường (cùng chuẩn hoá với khoá chân linh); hệ số là **số nguyên từ 1 đến 10** (1 = không nhân). Mục sai (thiếu `:`, tên rỗng, hệ số ngoài 1-10 hoặc không nguyên) bị **bỏ kèm cảnh báo** lúc khởi động, không bao giờ kẹp lặng lẽ (gõ nhầm `Han:50` không thành x10).
+- **Nhân những gì:** MỌI nguồn tu vi của nhân vật đó (hạ quái kể cả trong bí cảnh, đả tọa, đan tu vi, thưởng nhiệm vụ), áp SAU các hệ số khác (Dư âm tu hành, tinh anh, chênh bậc). Bậc cuối của cảnh giới vẫn dừng ở đầy, chờ Đột phá. Mã: `server/src/test-exp.ts` (đọc cấu hình), `gainExp` ở `server/src/systems/progression.ts` (chỗ nhân duy nhất), `WorldRoom.onJoin` (tra một lần lúc vào phòng).
+- **Minh bạch (hai chỗ; người dùng bỏ nhãn ở client, mục 36):** (1) lúc khởi động máy chủ in một dòng `[CẢNH BÁO] TEST_EXP_MULT đang BẬT (chỉ để thử nghiệm): nhân tu vi của Han x5...`; (2) mỗi lần nhân vật vào phòng ghi audit `{"ev":"test.exp_mult","name":"Han","mult":5,"map":"lac_ha",...}`. Hệ số chỉ nằm phía máy chủ (`PlayerCtrl.testExpMult`), KHÔNG vào state và không gửi client nào.
+
+### 11.1. Bật trên bản chạy thật
+```bash
+cd ~/TT/tien-gioi-prod
+echo 'TEST_EXP_MULT=Han:5' >> .env.production          # hoặc sửa dòng đã có
+cat .current-tag                                        # thẻ đang chạy, vd 0.3.1
+./prod.sh up "$(cat .current-tag)"                      # nạp lại cấu hình (khởi động lại game, ~30 giây lưu hồ sơ trước khi tắt)
+./prod.sh logs game 2>&1 | grep -E "TEST_EXP_MULT" | tail -3   # phải thấy dòng CẢNH BÁO "đang BẬT ... Han x5"
+```
+Rồi cho nhân vật `Han` vào game: log có `"ev":"test.exp_mult"` (`./prod.sh logs game | grep test.exp_mult`) và tu vi nhận được gấp đúng hệ số (so với người thường cùng điều kiện).
+
+Nhiều nhân vật: ngăn cách bằng dấu phẩy, ghi ĐÚNG đạo hiệu như trong CSDL (có dấu, có khoảng trắng), vd `TEST_EXP_MULT=Han:5,Hàn Tuyết:3`; không có khớp gần đúng tự động (tránh trúng người khác tên na ná). Nên đặt trong dấu nháy kép khi có khoảng trắng (compose đọc đúng): `TEST_EXP_MULT="Han:5,Hàn Tuyết:3"`; kiểm dòng cảnh báo khởi động phải in đúng tên không dính nháy.
+
+### 11.2. Tắt
+```bash
+cd ~/TT/tien-gioi-prod
+sed -i '/^TEST_EXP_MULT=/d' .env.production             # xoá dòng
+./prod.sh up "$(cat .current-tag)"
+./prod.sh logs --since 2m game 2>&1 | grep -c TEST_EXP_MULT   # log của lần khởi động mới (2 phút gần nhất): phải ra 0
+```
+Tu vi đã tích luỹ KHÔNG bị trừ lại khi tắt (đã là tu vi thật của nhân vật). Muốn trả về thì sửa hồ sơ nhân vật thủ công (ngoài phạm vi mục này).
+
+### 11.3. Lưu ý
+- Chỉ nên dùng cho nhân vật của người vận hành tự thử game; mỗi lần bật / tắt phải khởi động lại máy chủ (biến môi trường đọc một lần lúc khởi động).
+- Nhiều tiến trình / nhiều phòng: mỗi lần vào BẤT KỲ phòng nào (kể cả qua cổng, bí cảnh) đều tra lại và ghi một dòng audit.
+- Máy chủ chạy dev (`npm run dev`) đặt qua `.env.local` ở gốc repo như các biến khác.

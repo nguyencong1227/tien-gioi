@@ -10,6 +10,7 @@ import { SectService } from "./sect-service";
 import { portPolicy, startupWarnings } from "./startup";
 import { startAudit } from "./audit";
 import { minProtocolOf } from "./protocol";
+import { testExpMultOf } from "./test-exp";
 import { mountAuth } from "./auth-http";
 import { mountCors } from "./cors";
 import { createStores } from "./stores";
@@ -36,6 +37,7 @@ async function main() {
   // Backend lưu trữ chung cho nhân vật, chân linh, tài khoản, phiên (STORE=file mặc định | pg + DATABASE_URL)
   const stores = await createStores(process.env);
   WorldRoom.minProtocol = minProtocolOf(process.env).value; // client cũ hơn mức này bị từ chối khi vào phòng (M4 2.5)
+  WorldRoom.testExpMult = testExpMultOf(process.env).value; // hệ số tu vi thử nghiệm theo đạo hiệu (TEST_EXP_MULT, QUYET_DINH_M3 mục 34); rỗng = tắt
   WorldRoom.players = stores.players;
   WorldRoom.souls = stores.souls;
   WorldRoom.sects = new SectService(stores.sects); // tông môn cùng backend với nhân vật / chân linh (`SECTS=off` gỡ tính năng)
