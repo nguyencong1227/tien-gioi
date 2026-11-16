@@ -21,7 +21,7 @@ import {
   walkSingleQuest,
 } from "./quest-walk";
 import { gridOf, planPath } from "../src/balance/search-check";
-import { Server } from "colyseus";
+import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { Client } from "colyseus.js";
 import { defineRooms } from "../src/rooms/WorldRoom";
@@ -206,6 +206,97 @@ describe("quest-walk: kiểm tra tính khả thi tĩnh của nhiệm vụ (Issue
       expect(result.success).toBe(false);
       expect(result.error).toContain("Phần thưởng exp không khớp");
       expect(result.error).toContain("kỳ vọng 9999");
+    });
+
+    it("đột biến (d): bot chết nhận tin limbo -> dừng ĐỎ ngay lập tức (< 3.5s), không kẹt 450s (Review lần 2 của Dev A)", async () => {
+      const tempDir = mkdtempSync(path.join(os.tmpdir(), "tien-gioi-qw-limbo-"));
+      process.env.DATA_DIR = path.join(tempDir, "players");
+
+      const server = new Server({ transport: new WebSocketTransport(), gracefullyShutdown: false });
+      defineRooms(server);
+      const port = await freePort();
+      assertNotProd(port, "quest-walk-limbo-test");
+      await server.listen(port);
+
+      const client = new Client(`ws://127.0.0.1:${port}`);
+
+      const origJoinOrCreate = client.joinOrCreate.bind(client);
+      client.joinOrCreate = async (...args: any[]) => {
+        const rm = await (origJoinOrCreate as any)(...args);
+        // Sau khi bot vào phòng và gắn listeners (200ms), server gửi tin "limbo" tới bot
+        setTimeout(() => {
+          const sRoom = matchMaker.getLocalRoomById(rm.roomId);
+          if (sRoom) {
+            sRoom.broadcast("limbo", {});
+          }
+        }, 200);
+        return rm;
+      };
+
+      const t0 = Date.now();
+      const result = await walkSingleQuest(client, QUEST_BY_ID.thuoc_cho_tran, {
+        silent: true,
+        timeoutSec: 10,
+      });
+      const elapsed = Date.now() - t0;
+
+      await server.gracefullyShutdown(false);
+      try {
+        rmSync(tempDir, { recursive: true, force: true });
+      } catch {
+        /* ignore */
+      }
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("bot_died");
+      expect(result.error).toContain("nhận tin limbo");
+      // Dừng ngay lập tức trong vòng < 3.5 giây (thay vì kẹt 60s hay 450s)
+      expect(elapsed).toBeLessThan(3500);
+    });
+
+    it("đột biến (e): nhận tin travelTo ngoài kế hoạch -> dừng ĐỎ ngay lập tức (< 3.5s) kèm lý do rõ ràng", async () => {
+      const tempDir = mkdtempSync(path.join(os.tmpdir(), "tien-gioi-qw-travel-"));
+      process.env.DATA_DIR = path.join(tempDir, "players");
+
+      const server = new Server({ transport: new WebSocketTransport(), gracefullyShutdown: false });
+      defineRooms(server);
+      const port = await freePort();
+      assertNotProd(port, "quest-walk-travel-test");
+      await server.listen(port);
+
+      const client = new Client(`ws://127.0.0.1:${port}`);
+
+      const origJoinOrCreate = client.joinOrCreate.bind(client);
+      client.joinOrCreate = async (...args: any[]) => {
+        const rm = await (origJoinOrCreate as any)(...args);
+        // Sau khi bot vào phòng và gắn listeners (200ms), server gửi tin travelTo ngoài kế hoạch
+        setTimeout(() => {
+          const sRoom = matchMaker.getLocalRoomById(rm.roomId);
+          if (sRoom) {
+            sRoom.broadcast("travelTo", { mapId: "am_suong_trach" });
+          }
+        }, 200);
+        return rm;
+      };
+
+      const t0 = Date.now();
+      const result = await walkSingleQuest(client, QUEST_BY_ID.thuoc_cho_tran, {
+        silent: true,
+        timeoutSec: 10,
+      });
+      const elapsed = Date.now() - t0;
+
+      await server.gracefullyShutdown(false);
+      try {
+        rmSync(tempDir, { recursive: true, force: true });
+      } catch {
+        /* ignore */
+      }
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("unplanned_travel");
+      expect(result.error).toContain("am_suong_trach");
+      expect(elapsed).toBeLessThan(3500);
     });
   });
 });

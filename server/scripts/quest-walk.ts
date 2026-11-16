@@ -17,8 +17,10 @@ import {
   DEFAULT_MAP,
   DEFAULT_MAP_ID,
   DROP_TABLES,
+  EQUIP_SLOTS,
   HAC_PHONG_ID,
   HAN_VAN_ID,
+  ITEMS,
   ITEM_BY_ID,
   MONSTER_BY_ID,
   NPC_BY_ID,
@@ -28,9 +30,11 @@ import {
   QUEST_PREV,
   REALMS,
   SKILL_MSG,
+  emptyEquipment,
   getMap,
   roomNameOf,
   stepOf,
+  type Equipment,
   type GameMap,
   type Inventory,
   type MonsterKind,
@@ -40,13 +44,31 @@ import {
 } from "@tien-gioi/shared";
 import { defineRooms } from "../src/rooms/WorldRoom";
 import { freePort } from "../src/test-port";
-import { bestGear } from "../src/balance/simulate";
 import { gridOf, planPath } from "../src/balance/search-check";
 import { safeSpot } from "../src/systems/movement";
 import { hashSecret, savePlayer } from "../src/store";
 import { assertNotProd } from "./assert-not-prod";
 
 export const MAP_ORDER = [DEFAULT_MAP_ID, HAC_PHONG_ID, AM_SUONG_ID, HAN_VAN_ID] as const;
+
+/** Trang bị đầy đủ nhất 6 ô cho bot theo cảnh giới yêu cầu để đủ sức làm các nhiệm vụ nguy hiểm */
+export function buildFullBestGear(realm: number, tier: number): Equipment {
+  const eq = emptyEquipment();
+  const step = stepOf(realm, tier);
+  for (const slot of EQUIP_SLOTS) {
+    let best = -1;
+    for (const it of ITEMS) {
+      const e = it.equip;
+      if (!e || e.slot !== slot) continue;
+      const need = stepOf(e.reqRealm, e.reqTier);
+      if (need <= step && need > best) {
+        best = need;
+        eq[slot] = it.id;
+      }
+    }
+  }
+  return eq;
+}
 
 export interface PlannedStep {
   kind: "kill" | "collect" | "talk" | "reachRealm";
@@ -457,6 +479,7 @@ export async function moveTo(
   mapId: string = DEFAULT_MAP_ID,
   maxWaitMs?: number,
   abortIf?: () => boolean,
+  onTick?: () => void,
 ): Promise<boolean> {
   const mapObj = getMap(mapId) ?? DEFAULT_MAP;
   const grid = gridOf(mapObj);
@@ -469,6 +492,7 @@ export async function moveTo(
   let seq = 0;
 
   while (Date.now() - start < timeoutMs) {
+    if (onTick) onTick();
     if (abortIf && abortIf()) return true;
 
     me = room.state.players?.get(room.sessionId);
@@ -633,11 +657,23 @@ export async function walkSingleQuest(
   if (isBossQuest) {
     tier = Math.max(tier, 8);
   } else {
-    // Nếu nhiệm vụ có đánh quái hoặc sau bước nhập môn, cảnh giới ít nhất là Luyện Khí tầng 6 (tier 5)
-    const hasKillStep = q.steps.some((s) => s.kind === "kill" || s.kind === "collect");
-    if (hasKillStep && realm <= 1 && q.id !== "tru_tho") {
-      realm = 1;
-      tier = Math.max(tier, 5);
+    // Chuẩn bị cấp bậc cho bot để đủ sức làm các nhiệm vụ theo cảnh giới yêu cầu:
+    // Trúc Cơ (realm 2): tier 2
+    // Kim Đan (realm 3): tier 2 (Kim Đan hậu kỳ kèm bestGear(3, 2))
+    // Nguyên Anh (realm 4): tier 2 (Nguyên Anh hậu kỳ kèm bestGear(4, 2))
+    // Luyện Khí có đánh quái: ít nhất Luyện Khí tầng 6 (tier 5)
+    if (realm === 4) {
+      tier = Math.max(tier, 2);
+    } else if (realm === 3) {
+      tier = Math.max(tier, 2);
+    } else if (realm === 2) {
+      tier = Math.max(tier, 2);
+    } else {
+      const hasKillStep = q.steps.some((s) => s.kind === "kill" || s.kind === "collect");
+      if (hasKillStep && realm <= 1 && q.id !== "tru_tho") {
+        realm = 1;
+        tier = Math.max(tier, 5);
+      }
     }
   }
 
@@ -646,7 +682,7 @@ export async function walkSingleQuest(
   const botName = `BotQW${Math.floor(Math.random() * 90000 + 10000)}`;
   const botSecret = "botqwsecret123456";
 
-  const gear = bestGear(Math.max(1, realm), tier);
+  const gear = buildFullBestGear(Math.max(1, realm), tier);
   const nowIso = new Date().toISOString();
   const invSlots: any[] = Array.from({ length: 16 }, () => null);
   invSlots[0] = { itemId: "dai_hoi_huyet_dan", qty: 99 };
@@ -690,9 +726,23 @@ export async function walkSingleQuest(
   let questsMsg: QuestsMsg | null = null;
   let invMsg: Inventory = invSlots;
   let lastToast: string = "";
+  let abortReason: string | null = null;
+  let currentStepDesc = "Khởi tạo bot";
+  let isPlannedTravel = false;
 
   const log = (msg: string) => {
     if (!silent) console.log(`  [${q.id}] ${msg}`);
+  };
+
+  const checkAbort = () => {
+    if (abortReason) {
+      throw new Error(abortReason);
+    }
+    if (room && !room.connection.isOpen && !isPlannedTravel) {
+      throw new Error(
+        `connection_closed: Mất kết nối phòng tại bản đồ '${currentMapId}' trong bước [${currentStepDesc}]`,
+      );
+    }
   };
 
   try {
@@ -714,13 +764,22 @@ export async function walkSingleQuest(
       r.onMessage("toast", (t: any) => {
         if (t?.text) lastToast = t.text;
       });
-      r.onMessage("limbo", () => {
-        log(`Bot rơi vào Hoàng Tuyền (limbo), gửi rebirth...`);
-        r.send("rebirth", { origin: "pham_gia", keep: [] });
-        setTimeout(() => {
-          r.send("chat", { text: "/give dai_hoi_huyet_dan 99" });
-          r.send("chat", { text: "/give hoi_huyet_dan 99" });
-        }, 500);
+      r.onMessage("limbo", (_msg: any) => {
+        const reason = `bot_died: Bot gục ngã (nhận tin limbo) tại bản đồ '${currentMapId}' trong bước [${currentStepDesc}]`;
+        log(`[ABORT] ${reason}`);
+        if (!abortReason) abortReason = reason;
+      });
+      r.onMessage("reborn", () => {
+        const reason = `bot_reborn: Bot nhận tin reborn ngoài kế hoạch tại bản đồ '${currentMapId}' trong bước [${currentStepDesc}]`;
+        log(`[ABORT] ${reason}`);
+        if (!abortReason) abortReason = reason;
+      });
+      r.onMessage("travelTo", (t: any) => {
+        if (!isPlannedTravel) {
+          const reason = `unplanned_travel: Bot nhận tin travelTo ngoài kế hoạch (đích: ${t?.mapId}) tại bản đồ '${currentMapId}' trong bước [${currentStepDesc}]`;
+          log(`[ABORT] ${reason}`);
+          if (!abortReason) abortReason = reason;
+        }
       });
       r.onMessage("dmg", (m: any) => {
         if (m?.target === botName || m?.source === botName) {
@@ -748,15 +807,19 @@ export async function walkSingleQuest(
     // Chờ nhận tin quests ban đầu
     const waitInitial = Date.now();
     while (!questsMsg && Date.now() - waitInitial < 3000) {
+      checkAbort();
       await new Promise((res) => setTimeout(res, 50));
     }
 
+    currentStepDesc = `Đi tới NPC giao '${q.giver}' (${giverNpc.mapId ?? DEFAULT_MAP_ID})`;
     log(`Đã vào phòng ${roomNameOf(currentMapId)}, di chuyển tới NPC ${q.giver}...`);
-    await moveTo(room, giverNpc.x, giverNpc.y, 36, currentMapId);
+    await moveTo(room, giverNpc.x, giverNpc.y, 36, currentMapId, undefined, undefined, checkAbort);
 
     // 2. Nhận nhiệm vụ ở NPC giver
+    currentStepDesc = `Nhận nhiệm vụ tại NPC '${q.giver}'`;
     room.send("talk", { npcId: q.giver });
     await new Promise((res) => setTimeout(res, 60));
+    checkAbort();
     room.send("questAccept", { questId: q.id });
 
     const acceptStart = Date.now();
@@ -776,48 +839,56 @@ export async function walkSingleQuest(
     // Hàm hỗ trợ chuyển bản đồ qua portal
     const travelToMap = async (targetMap: string) => {
       while (currentMapId !== targetMap) {
+        checkAbort();
         const portal = findPortalTo(currentMapId, targetMap);
         if (!portal) {
           throw new Error(`Không tìm thấy portal từ '${currentMapId}' sang '${targetMap}'.`);
         }
+        currentStepDesc = `Chuyển bản đồ từ '${currentMapId}' sang '${targetMap}' qua portal '${portal.id}'`;
         log(`Di chuyển tới portal '${portal.id}' (${portal.x}, ${portal.y})...`);
-        await moveTo(room!, portal.x, portal.y, 48, currentMapId);
+        await moveTo(room!, portal.x, portal.y, 48, currentMapId, undefined, undefined, checkAbort);
 
         let nextMapReceived: string | null = null;
-        room!.onMessage("travelTo", (t: any) => {
-          if (t?.mapId) nextMapReceived = t.mapId;
-        });
-
-        room!.send("travel", { portalId: portal.id });
-
-        const travelWait = Date.now();
-        while (!nextMapReceived && Date.now() - travelWait < 5000) {
-          await new Promise((res) => setTimeout(res, 60));
-        }
-
-        if (!nextMapReceived) {
-          throw new Error(`Lỗi chuyển bản đồ qua portal '${portal.id}'. Toast: ${lastToast}`);
-        }
-
-        currentMapId = nextMapReceived;
+        isPlannedTravel = true;
         try {
-          room!.leave(false);
-        } catch {
-          /* ignore */
-        }
-        const closeWait = Date.now();
-        while (room!.connection.isOpen && Date.now() - closeWait < 1000) {
-          await new Promise((res) => setTimeout(res, 50));
-        }
+          room!.onMessage("travelTo", (t: any) => {
+            if (t?.mapId) nextMapReceived = t.mapId;
+          });
 
-        room = await client.joinOrCreate(roomNameOf(currentMapId), {
-          name: botName,
-          secret: botSecret,
-          v: PROTOCOL_VERSION,
-        });
-        setupRoomListeners(room);
-        log(`Đã chuyển tới bản đồ '${currentMapId}'.`);
-        await new Promise((res) => setTimeout(res, 100));
+          room!.send("travel", { portalId: portal.id });
+
+          const travelWait = Date.now();
+          while (!nextMapReceived && Date.now() - travelWait < 5000) {
+            checkAbort();
+            await new Promise((res) => setTimeout(res, 60));
+          }
+
+          if (!nextMapReceived) {
+            throw new Error(`Lỗi chuyển bản đồ qua portal '${portal.id}'. Toast: ${lastToast}`);
+          }
+
+          currentMapId = nextMapReceived;
+          try {
+            room!.leave(true);
+          } catch {
+            /* ignore */
+          }
+          const closeWait = Date.now();
+          while (room!.connection.isOpen && Date.now() - closeWait < 1000) {
+            await new Promise((res) => setTimeout(res, 50));
+          }
+
+          room = await client.joinOrCreate(roomNameOf(currentMapId), {
+            name: botName,
+            secret: botSecret,
+            v: PROTOCOL_VERSION,
+          });
+          setupRoomListeners(room);
+          log(`Đã chuyển tới bản đồ '${currentMapId}'.`);
+          await new Promise((res) => setTimeout(res, 100));
+        } finally {
+          isPlannedTravel = false;
+        }
       }
     };
 
@@ -830,6 +901,9 @@ export async function walkSingleQuest(
       currentStepIdx: number;
     }) => {
       const { monsterKind, collectItemId, targetCount, isCollect, currentStepIdx } = params;
+      currentStepDesc = isCollect
+        ? `Thu thập ${targetCount} '${collectItemId}' từ quái '${monsterKind}'`
+        : `Săn ${targetCount} quái '${monsterKind}'`;
       const targetMapId = monsterKind
         ? (findMapForMonster(monsterKind) ?? currentMapId)
         : currentMapId;
@@ -877,8 +951,13 @@ export async function walkSingleQuest(
 
       let lastStatusLog = 0;
       while (Date.now() - huntStart < huntTimeoutMs) {
+        checkAbort();
         const me = room!.state.players?.get(room!.sessionId);
-        if (!me) {
+        if (!me || me.hp <= 0) {
+          if (me && me.hp <= 0 && !abortReason) {
+            abortReason = `bot_died: Khí huyết bot cạn kiệt (HP <= 0) tại bản đồ '${currentMapId}' trong bước [${currentStepDesc}]`;
+          }
+          checkAbort();
           await new Promise((res) => setTimeout(res, 50));
           continue;
         }
@@ -891,11 +970,12 @@ export async function walkSingleQuest(
         }
 
         // Tự cắn đan hồi máu / hồi mana (2 loại đan hồi máu độc lập)
-        if (me.hp < me.maxHp * 0.8) {
+        if (me.hp < me.maxHp * 0.85) {
           if (Date.now() >= nextPillAt) {
             room!.send("useItem", { slot: 0 });
-            nextPillAt = Date.now() + 10500;
-          } else if (Date.now() >= nextSmallPillAt) {
+            nextPillAt = Date.now() + 8500;
+          }
+          if (me.hp < me.maxHp * 0.6 && Date.now() >= nextSmallPillAt) {
             room!.send("useItem", { slot: 1 });
             nextSmallPillAt = Date.now() + 8500;
           }
@@ -985,12 +1065,12 @@ export async function walkSingleQuest(
           continue;
         }
 
-        // Tự vệ nếu có bất kỳ quái nào áp sát (<= 58px) ngáng đường khi đang bị mất máu
+        // Tự vệ nếu có quái mục tiêu áp sát (<= 58px) ngáng đường khi đang bị mất máu
         let selfDefenseId: string | null = null;
         let selfDefenseAngle = 0;
         if (room!.state.monsters && me.hp < me.maxHp * 0.95) {
           room!.state.monsters.forEach((m: any, id: string) => {
-            if (m && m.hp > 0) {
+            if (m && m.hp > 0 && isValidTarget(m)) {
               const d = Math.hypot(m.x - me.x, m.y - me.y);
               if (d <= 58) {
                 selfDefenseId = id;
@@ -1003,9 +1083,10 @@ export async function walkSingleQuest(
         if (selfDefenseId) {
           const now = Date.now();
           const monObj = room!.state.monsters?.get(selfDefenseId);
+
           if (now >= nextAttackAt) {
             log(
-              `[SELF-DEFENSE] Tiêu diệt quái cản đường '${monObj?.kind ?? selfDefenseId}' (HP: ${monObj?.hp})`,
+              `[SELF-DEFENSE] Tiêu diệt quái mục tiêu áp sát '${monObj?.kind ?? selfDefenseId}' (HP: ${monObj?.hp})`,
             );
             room!.send("attack", { angle: selfDefenseAngle });
             nextAttackAt = now + 350;
@@ -1018,6 +1099,7 @@ export async function walkSingleQuest(
             room!.send("skill", { id: "sword", angle: selfDefenseAngle });
             nextSwordAt = now + 900;
           }
+
           await new Promise((res) => setTimeout(res, 50));
           continue;
         }
@@ -1074,6 +1156,10 @@ export async function walkSingleQuest(
           }
 
           const now = Date.now();
+          if (dist <= 220 && now >= nextCastAt) {
+            room!.send(SKILL_MSG.cast, { slot: 1, angle }); // Thanh Tùng Phi Châm tầm xa
+            nextCastAt = now + 3100;
+          }
           if (dist <= 180 && dist > 55 && now >= nextSwordAt && me.mp >= 20) {
             room!.send("skill", { id: "sword", angle });
             nextSwordAt = now + 900;
@@ -1104,42 +1190,51 @@ export async function walkSingleQuest(
         // Tuần tra có tìm đường A* tránh vật cản tới bãi quái
         const pt = patrolPoints[patrolIdx % patrolPoints.length];
         let aborted = false;
-        await moveTo(room!, pt.x, pt.y, 48, currentMapId, 6000, () => {
-          const curMe = room!.state.players?.get(room!.sessionId);
-          if (!curMe) return false;
-          // Ngắt tuần tra nếu có loot gần (<= 250px)
-          let hasLoot = false;
-          if (room!.state.loot) {
-            room!.state.loot.forEach((l: any, lid: string) => {
-              if (
-                (pickupAttempts.get(lid) ?? 0) < 3 &&
-                Math.hypot(l.x - curMe.x, l.y - curMe.y) <= 250
-              ) {
-                hasLoot = true;
-              }
-            });
-          }
-          if (hasLoot) {
-            aborted = true;
-            return true;
-          }
-          // Ngắt tuần tra nếu có quái mục tiêu gần (<= 600px)
-          let hasMon = false;
-          if (room!.state.monsters) {
-            room!.state.monsters.forEach((m: any) => {
-              if (isValidTarget(m)) {
-                if (Math.hypot(m.x - curMe.x, m.y - curMe.y) <= 600) {
-                  hasMon = true;
+        await moveTo(
+          room!,
+          pt.x,
+          pt.y,
+          48,
+          currentMapId,
+          6000,
+          () => {
+            const curMe = room!.state.players?.get(room!.sessionId);
+            if (!curMe) return false;
+            // Ngắt tuần tra nếu có loot gần (<= 250px)
+            let hasLoot = false;
+            if (room!.state.loot) {
+              room!.state.loot.forEach((l: any, lid: string) => {
+                if (
+                  (pickupAttempts.get(lid) ?? 0) < 3 &&
+                  Math.hypot(l.x - curMe.x, l.y - curMe.y) <= 250
+                ) {
+                  hasLoot = true;
                 }
-              }
-            });
-          }
-          if (hasMon) {
-            aborted = true;
-            return true;
-          }
-          return false;
-        });
+              });
+            }
+            if (hasLoot) {
+              aborted = true;
+              return true;
+            }
+            // Ngắt tuần tra nếu có quái mục tiêu gần (<= 600px)
+            let hasMon = false;
+            if (room!.state.monsters) {
+              room!.state.monsters.forEach((m: any) => {
+                if (isValidTarget(m)) {
+                  if (Math.hypot(m.x - curMe.x, m.y - curMe.y) <= 600) {
+                    hasMon = true;
+                  }
+                }
+              });
+            }
+            if (hasMon) {
+              aborted = true;
+              return true;
+            }
+            return false;
+          },
+          checkAbort,
+        );
         if (!aborted) {
           patrolIdx++;
         }
@@ -1162,18 +1257,32 @@ export async function walkSingleQuest(
       log(`Bắt đầu bước ${stepIdx + 1}/${q.steps.length}: ${step.kind}...`);
 
       if (step.kind === "reachRealm") {
+        currentStepDesc = `Đạt cảnh giới (${step.realm}, ${step.tier})`;
         log(`Kiểm tra đạt cảnh giới yêu cầu (${step.realm}, ${step.tier}): đã đạt theo hồ sơ.`);
       } else if (step.kind === "talk") {
         const targetNpc = NPC_BY_ID[step.npcId]!;
         const targetMapId = targetNpc.mapId ?? DEFAULT_MAP_ID;
+        currentStepDesc = `Nói chuyện với NPC '${step.npcId}' (${targetNpc.name})`;
         await travelToMap(targetMapId);
 
         log(`Di chuyển tới NPC '${step.npcId}' (${targetNpc.name})...`);
-        await moveTo(room, targetNpc.x, targetNpc.y, 36, currentMapId);
+        await moveTo(
+          room,
+          targetNpc.x,
+          targetNpc.y,
+          36,
+          currentMapId,
+          undefined,
+          undefined,
+          checkAbort,
+        );
+        checkAbort();
         room.send("talk", { npcId: step.npcId });
         await new Promise((res) => setTimeout(res, 200));
+        checkAbort();
         log(`Đã nói chuyện với NPC '${step.npcId}'.`);
       } else if (step.kind === "collect") {
+        currentStepDesc = `Thu thập ${step.count} '${step.itemId}'`;
         const plannedStep = plan.steps[stepIdx];
         const hasEnough = (invMsg ?? []).some(
           (slot) => slot?.itemId === step.itemId && (slot.qty ?? 0) >= step.count,
@@ -1183,11 +1292,13 @@ export async function walkSingleQuest(
           log(`Túi đồ đã có sẵn đủ ${step.count} '${step.itemId}'.`);
         } else if (plannedStep?.needsGive || giveAll) {
           // Chỉ /give khi needsGive hoặc người dùng bật cờ giveAll
+          checkAbort();
           room.send("chat", { text: `/give ${step.itemId} ${step.count}` });
           usedGive = true;
           const rsn = plannedStep?.reason ?? "Cấp theo tùy chọn giveAll";
           if (!giveReasons.includes(rsn)) giveReasons.push(rsn);
           await new Promise((res) => setTimeout(res, 200));
+          checkAbort();
           log(`Đã cấp ${step.count} '${step.itemId}' vào túi đồ (${rsn}).`);
         } else {
           // Săn đồ rơi thật
@@ -1207,6 +1318,7 @@ export async function walkSingleQuest(
           log(`Đã thu thập đủ ${step.count} '${step.itemId}' qua rơi thật.`);
         }
       } else if (step.kind === "kill") {
+        currentStepDesc = `Hạ gục ${step.count} '${step.monster}'`;
         log(`Săn ${step.count} '${step.monster}'...`);
         await huntAndCollect({
           monsterKind: step.monster,
@@ -1222,16 +1334,19 @@ export async function walkSingleQuest(
     }
 
     // 4. Trả nhiệm vụ: quay về gặp NPC giver
+    currentStepDesc = `Quay lại trả nhiệm vụ ở NPC '${q.giver}'`;
     await travelToMap(plan.giverMapId);
 
     log(`Quay lại gặp NPC '${q.giver}' để trả nhiệm vụ...`);
-    await moveTo(room, giverNpc.x, giverNpc.y, 36, currentMapId);
+    await moveTo(room, giverNpc.x, giverNpc.y, 36, currentMapId, undefined, undefined, checkAbort);
+    checkAbort();
 
     const meBefore = room.state.players?.get(room.sessionId);
     const lastExp = meBefore?.exp ?? 0;
 
     room.send("talk", { npcId: q.giver });
     await new Promise((res) => setTimeout(res, 80));
+    checkAbort();
     room.send("questTurnIn", { questId: q.id });
 
     // Chờ xác nhận nhiệm vụ đã chuyển vào done hoặc dailyDone
@@ -1248,6 +1363,7 @@ export async function walkSingleQuest(
     };
 
     while (!isDone) {
+      checkAbort();
       if (Date.now() - turnInWait > 4000) {
         throw new Error(
           `Không trả được nhiệm vụ '${q.id}' ở NPC '${q.giver}'. Toast: ${lastToast}`,
@@ -1292,7 +1408,13 @@ export async function walkSingleQuest(
     const durationSec = Math.round((Date.now() - startTime) / 100) / 10;
     log(`Nhiệm vụ '${q.title}' hoàn thành xuất sắc trong ${durationSec}s.`);
 
-    await room.leave();
+    if (room && room.connection.isOpen) {
+      try {
+        await room.leave(true);
+      } catch {
+        /* ignore */
+      }
+    }
     return {
       id: q.id,
       title: q.title,
@@ -1307,9 +1429,9 @@ export async function walkSingleQuest(
       totalSteps: q.steps.length,
     };
   } catch (err: any) {
-    if (room) {
+    if (room && room.connection.isOpen) {
       try {
-        await room.leave();
+        await room.leave(true);
       } catch {
         /* ignore */
       }
