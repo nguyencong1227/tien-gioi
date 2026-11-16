@@ -10,18 +10,26 @@ import { promises as fs } from "node:fs";
 import { randomBytes, randomUUID } from "node:crypto";
 import path from "node:path";
 import {
+  ITEM_BY_ID,
   SECT_COIN_CAP,
   SECT_LOG_MAX,
   SECT_RANKS,
+  SECT_VAULT_DRAW_DEFAULT,
+  SECT_VAULT_DRAW_MAX,
+  SECT_VAULT_LOG_MAX,
+  SECT_VAULT_SLOTS,
   cleanMotd,
   cleanName,
   cleanSectName,
   cleanSectTag,
   sectKey,
+  type InvSlot,
   type SectLogEntry,
   type SectLogKind,
   type SectRank,
+  type SectVaultLogEntry,
 } from "@tien-gioi/shared";
+import { byId } from "./systems/lookup";
 
 // ---------- Kiểu dữ liệu ----------
 
@@ -33,6 +41,32 @@ export interface SectMemberRecord {
   rank: SectRank;
   /** ms epoch */
   joinedAt: number;
+  /**
+   * Lượt rút kho đồ của Đệ tử trong ngày `day` (`dayKey`, giờ Việt Nam): đếm theo LINH HỒN nên đầu thai không đặt lại (docs/THIET_KE_TONG_MON.md
+   * mục 11.6). Thiếu = chưa rút lần nào. Đọc - sửa - ghi TRONG `update` cùng lúc trừ kho, nên gửi dồn không vượt hạn mức.
+   */
+  draw?: { day: string; n: number };
+}
+
+/**
+ * Kho ĐỒ của tông môn (mục 11 THIET_KE_TONG_MON.md): `SECT_VAULT_SLOTS` ô cùng hình `InvSlot` như túi đồ, sổ (mới nhất đứng đầu, tối đa
+ * `SECT_VAULT_LOG_MAX`) và hạn mức rút / ngày của Đệ tử (Tông chủ chỉnh). Mọi thay đổi đi qua `SectStore.update` (nguyên tử theo tông môn).
+ */
+export interface SectVault {
+  /** Đúng `SECT_VAULT_SLOTS` phần tử; ô trống là `null` */
+  slots: (InvSlot | null)[];
+  log: SectVaultLogEntry[];
+  /** 0..`SECT_VAULT_DRAW_MAX` */
+  drawPerDay: number;
+}
+
+/** Kho đồ rỗng, hạn mức mặc định. */
+export function emptySectVault(): SectVault {
+  return {
+    slots: Array.from({ length: SECT_VAULT_SLOTS }, () => null),
+    log: [],
+    drawPerDay: SECT_VAULT_DRAW_DEFAULT,
+  };
 }
 
 export interface Sect {
@@ -50,6 +84,8 @@ export interface Sect {
   coin: number;
   /** Sổ kho, MỚI NHẤT ĐỨNG ĐẦU, tối đa `SECT_LOG_MAX` */
   log: SectLogEntry[];
+  /** Kho đồ (bản ghi cũ không có thì `sanitizeSect` dựng kho rỗng; `v` vẫn là 1) */
+  vault: SectVault;
   /** ms epoch */
   createdAt: number;
   updatedAt: number;
@@ -134,6 +170,66 @@ function sanitizeLog(raw: unknown): SectLogEntry[] {
   return out;
 }
 
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+/** Trần chặn số lượt rút đếm hỏng; KHÔNG phải trần nghiệp vụ (hạn mức là `drawPerDay`). */
+const SANE_DRAWS = 1_000_000;
+
+function sanitizeDraw(raw: unknown): { day: string; n: number } | undefined {
+  if (!isRecord(raw) || typeof raw.day !== "string" || !DAY_RE.test(raw.day)) return undefined;
+  return { day: raw.day, n: intIn(raw.n, SANE_DRAWS, 0) };
+}
+
+function sanitizeVaultLog(raw: unknown): SectVaultLogEntry[] {
+  if (!Array.isArray(raw)) return [];
+  const out: SectVaultLogEntry[] = [];
+  for (const e of raw) {
+    if (out.length >= SECT_VAULT_LOG_MAX) break;
+    if (!isRecord(e)) continue;
+    const name = cleanName(e.name);
+    const kind = LOG_KINDS.find((k) => k === e.kind);
+    const def = byId(ITEM_BY_ID, e.itemId);
+    const qty = e.qty;
+    if (name === null || !kind || !def) continue;
+    if (typeof qty !== "number" || !Number.isSafeInteger(qty) || qty < 1) continue;
+    out.push({ at: intIn(e.at, Number.MAX_SAFE_INTEGER, 0), name, kind, itemId: def.id, qty });
+  }
+  return out;
+}
+
+/**
+ * Làm sạch kho đồ đọc từ tệp / DB: đúng `SECT_VAULT_SLOTS` ô; món không còn tồn tại bị bỏ (ô thành trống), `qty` ép về [1, stack]; `drawPerDay`
+ * kẹp 0..`SECT_VAULT_DRAW_MAX` (thiếu / hỏng thì mặc định); sổ hỏng thì bỏ từng mục. Thiếu cả kho (bản ghi trước mục 27) thì kho rỗng.
+ */
+export function sanitizeVault(raw: unknown): SectVault {
+  const v = emptySectVault();
+  if (!isRecord(raw)) return v;
+  if (Array.isArray(raw.slots)) {
+    for (let i = 0; i < SECT_VAULT_SLOTS; i++) {
+      const sl = raw.slots[i];
+      if (!isRecord(sl)) continue;
+      const def = byId(ITEM_BY_ID, sl.itemId);
+      const qty = Math.floor(Number(sl.qty));
+      if (def && qty >= 1) v.slots[i] = { itemId: def.id, qty: Math.min(qty, def.stack) };
+    }
+  }
+  v.log = sanitizeVaultLog(raw.log);
+  v.drawPerDay = intIn(raw.drawPerDay, SECT_VAULT_DRAW_MAX, SECT_VAULT_DRAW_DEFAULT);
+  return v;
+}
+
+/** Hai kho đồ giống nhau về NỘI DUNG (ô và hạn mức; sổ chỉ để xem nên không so)? Dùng để từ chối ghi kho sai thay vì im lặng sửa (đồ không được biến mất). */
+function sameVaultContent(a: SectVault, b: SectVault): boolean {
+  if (a.drawPerDay !== b.drawPerDay || a.slots.length !== b.slots.length) return false;
+  for (let i = 0; i < a.slots.length; i++) {
+    const x = a.slots[i];
+    const y = b.slots[i];
+    if (x === null || y === null || x === undefined || y === undefined) {
+      if ((x ?? null) !== (y ?? null)) return false;
+    } else if (x.itemId !== y.itemId || x.qty !== y.qty) return false;
+  }
+  return true;
+}
+
 /**
  * Làm sạch bản ghi đọc từ tệp / DB (không tin dữ liệu lưu): kiểu, độ dài, hạng, bất biến, số kẹp. Trả `null` nếu bản ghi
  * không cứu được (sai kiểu, thiếu / trùng thành viên, không đúng một Tông chủ hoặc `leader` lệch, tên / biệt hiệu sai luật).
@@ -165,11 +261,13 @@ export function sanitizeSect(raw: unknown, now: number = Date.now()): Sect | nul
       if (chief !== null) return null; // hai Tông chủ
       chief = soulKey;
     }
+    const draw = sanitizeDraw(m.draw);
     members.push({
       soulKey,
       name: mname,
       rank,
       joinedAt: intIn(m.joinedAt, Number.MAX_SAFE_INTEGER, now),
+      ...(draw ? { draw } : {}),
     });
   }
   if (chief === null || chief !== raw.leader) return null;
@@ -183,6 +281,7 @@ export function sanitizeSect(raw: unknown, now: number = Date.now()): Sect | nul
     members,
     coin: intIn(raw.coin, SECT_COIN_CAP, 0),
     log: sanitizeLog(raw.log),
+    vault: sanitizeVault(raw.vault),
     createdAt: intIn(raw.createdAt, Number.MAX_SAFE_INTEGER, now),
     updatedAt: intIn(raw.updatedAt, Number.MAX_SAFE_INTEGER, now),
   };
@@ -205,12 +304,29 @@ export function assertWritableSect(next: Sect, now: number): Sect {
     throw new Error(
       "Tông môn không hợp lệ (số kho, tên, biệt hiệu hoặc thành viên chưa chuẩn hoá)",
     );
+  // kho đồ: KHÔNG im lặng sửa (ô sai độ dài, món lạ, qty quá chồng, hạn mức ngoài khung): đồ không được biến mất âm thầm
+  if (!sameVaultContent(s.vault, next.vault ?? emptySectVault()))
+    throw new Error("Tông môn không hợp lệ (kho đồ chưa chuẩn hoá: ô, món, số lượng hoặc hạn mức)");
+  for (let i = 0; i < s.members.length; i++) {
+    const a = s.members[i].draw;
+    const b = next.members[i].draw;
+    if ((a?.day ?? null) !== (b?.day ?? null) || (a?.n ?? 0) !== (b?.n ?? 0))
+      throw new Error("Tông môn không hợp lệ (lượt rút kho đồ của thành viên chưa chuẩn hoá)");
+  }
   return s;
 }
 
 /** Thêm một mục sổ kho (đứng đầu), cắt còn `SECT_LOG_MAX`. Trả mảng mới. */
 export function withLogEntry(log: readonly SectLogEntry[], entry: SectLogEntry): SectLogEntry[] {
   return [entry, ...log].slice(0, SECT_LOG_MAX);
+}
+
+/** Thêm một mục sổ kho đồ (đứng đầu), cắt còn `SECT_VAULT_LOG_MAX`. Trả mảng mới. */
+export function withVaultLogEntry(
+  log: readonly SectVaultLogEntry[],
+  entry: SectVaultLogEntry,
+): SectVaultLogEntry[] {
+  return [entry, ...log].slice(0, SECT_VAULT_LOG_MAX);
 }
 
 // ---------- Bản file ----------

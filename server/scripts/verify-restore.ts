@@ -30,7 +30,7 @@ import { fileURLToPath } from "node:url";
 import { DEFAULT_MAP_ID, cleanName } from "@tien-gioi/shared";
 import { FileAccountStore, FileSessionStore } from "../src/account-store";
 import { AuthService } from "../src/auth-service";
-import { FileSectStore } from "../src/sect-store";
+import { FileSectStore, emptySectVault } from "../src/sect-store";
 import { FileSoulStore, soulIdOf } from "../src/soul";
 import { auditSavesDirectory, type AuditReport } from "./audit-saves";
 import { performBackup } from "./backup";
@@ -116,6 +116,7 @@ export async function createSampleGameData(dataDir: string): Promise<void> {
     members: [{ soulKey: sKey, name: playerName, rank: "chu", joinedAt: 1700000000000 }],
     coin: 20000,
     log: [{ at: 1700000000000, name: playerName, kind: "deposit", amount: 20000 }],
+    vault: emptySectVault(),
     createdAt: 1700000000000,
     updatedAt: 1700000000000,
   });
