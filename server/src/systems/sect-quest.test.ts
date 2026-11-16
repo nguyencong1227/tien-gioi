@@ -25,10 +25,15 @@ import { SectService } from "../sect-service";
 import { makeSect } from "../store-contract";
 import { sanitizeQuests, onMonsterKilled } from "./quests";
 import { sectOnJoin, sectQuestAccept, sectQuestTurnIn } from "./sect";
+import { installSectQuestFixture } from "./sect-fixtures";
 import { addPlayer, makeWorld } from "./test-helpers";
 
 const root = mkdtempSync(path.join(tmpdir(), "tien-gioi-sect-quest-"));
-afterAll(() => rmSync(root, { recursive: true, force: true }));
+const restoreFixture = installSectQuestFixture(); // bảng cố định, không phụ thuộc dữ liệu thật của E / D (M8.7)
+afterAll(() => {
+  restoreFixture();
+  rmSync(root, { recursive: true, force: true });
+});
 let n = 0;
 const DAY = 86_400_000;
 const A = "Alpha";
