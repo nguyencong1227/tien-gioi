@@ -1751,6 +1751,82 @@ describe("audit-saves (Issue #112)", () => {
       );
     });
 
+    it("M8: today.earned vượt quá tổng cống hiến các nguồn đã ghi nhận -> sect_member_today_earned_exceeds_sources", () => {
+      // Ca 1: earned = 50 nhưng không làm nhiệm vụ, không bí cảnh, không góp kho (max = 0)
+      const rawGhostPoints = JSON.stringify({
+        ...validSect,
+        members: [
+          {
+            ...validSect.members[0],
+            today: { day: "2026-11-17", earned: 50, deposit: 0, quests: [], dungeon: false },
+          },
+        ],
+      });
+      expect(auditSectSaveData(rawGhostPoints, rawGhostPoints.length).map((e) => e.code)).toContain(
+        "sect_member_today_earned_exceeds_sources",
+      );
+
+      // Ca 2: earned = 50 nhưng chỉ góp kho 10 + st_tru_lang (20) = 30
+      const rawExceedsSources = JSON.stringify({
+        ...validSect,
+        members: [
+          {
+            ...validSect.members[0],
+            today: {
+              day: "2026-11-17",
+              earned: 50,
+              deposit: 10,
+              quests: ["st_tru_lang"],
+              dungeon: false,
+            },
+          },
+        ],
+      });
+      expect(
+        auditSectSaveData(rawExceedsSources, rawExceedsSources.length).map((e) => e.code),
+      ).toContain("sect_member_today_earned_exceeds_sources");
+
+      // Ca 3: earned = 30 khớp nguồn deposit 10 + st_tru_lang 20 = 30 -> KHÔNG có lỗi sect_member_today_earned_exceeds_sources
+      const rawValidSources = JSON.stringify({
+        ...validSect,
+        members: [
+          {
+            ...validSect.members[0],
+            today: {
+              day: "2026-11-17",
+              earned: 30,
+              deposit: 10,
+              quests: ["st_tru_lang"],
+              dungeon: false,
+            },
+          },
+        ],
+      });
+      expect(
+        auditSectSaveData(rawValidSources, rawValidSources.length).map((e) => e.code),
+      ).not.toContain("sect_member_today_earned_exceeds_sources");
+    });
+
+    it("M8 đột biến: nới lỏng kiểm tra today.earned vượt các nguồn thì test bắt buộc đỏ", () => {
+      // Hàm nới lỏng: chỉ kiểm tra earned <= SECT_EARN_DAY_CAP, không kiểm tra khớp các nguồn
+      const laxEarnedCheck = (earned: number) => earned <= SECT_EARN_DAY_CAP;
+      expect(laxEarnedCheck(100)).toBe(true);
+
+      // Hàm audit THẬT bắt buộc phát hiện ra earned = 50 không có nguồn
+      const rawGhost = JSON.stringify({
+        ...validSect,
+        members: [
+          {
+            ...validSect.members[0],
+            today: { day: "2026-11-17", earned: 50 },
+          },
+        ],
+      });
+      expect(auditSectSaveData(rawGhost, rawGhost.length).map((e) => e.code)).toContain(
+        "sect_member_today_earned_exceeds_sources",
+      );
+    });
+
     it("M8: ô kho vượt quá cấp tông môn bị khoá nhưng chứa vật phẩm -> sect_vault_locked_slot_not_empty", () => {
       // Cấp 1 (points = 0) chỉ mở 40 ô (SECT_VAULT_SLOTS). Mảng 80 ô (SECT_VAULT_SLOTS_MAX), ô thứ 40 (index 40) có đồ -> lỗi
       const slots = Array.from({ length: SECT_VAULT_SLOTS_MAX }, (_, i) =>
@@ -1782,7 +1858,7 @@ describe("audit-saves (Issue #112)", () => {
               day: "2026-11-17",
               earned: 80,
               deposit: 20,
-              quests: ["st_tru_lang"],
+              quests: ["st_tru_lang", "st_tru_ho"],
               dungeon: true,
               buys: { [SECT_SHOP[0].itemId]: 1 },
             },
