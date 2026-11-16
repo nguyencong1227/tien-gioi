@@ -140,7 +140,7 @@ const sectFiles = () =>
  * tác kho một lúc" của từng người cho tới khi lưu xong, mà túi đồ đổi TRƯỚC lúc lưu: nên đây là cách làm cho cửa sổ đua (túi đã đổi, thao
  * tác chưa xong) lớn ra TẤT ĐỊNH, thay vì phụ thuộc tốc độ đĩa của máy chạy test (#752: chập chờn "Hết thời gian chờ lượt 2" dưới tải).
  */
-function delaySave(room: Room, wait: () => Promise<void>, release: () => void = () => {}) {
+function delaySave(room: Room, wait: () => Promise<unknown>, release: () => void = () => {}) {
   const players = (serverRoom(room) as any).players;
   const real = players.save;
   players.save = async (...args: unknown[]) => {
