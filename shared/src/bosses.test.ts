@@ -417,7 +417,7 @@ describe("né được bằng di chuyển (bossEscapePx, bossEscapeMs, luật c�
       }
   });
 
-  it("bossViolations: vòng tròn quá lớn so với báo trước bị bắt, đúng ở ranh giới (r 72 qua, r 73 trượt ở 800 ms)", () => {
+  it("bossViolations: vòng tròn quá lớn so với báo trước bị bắt, đúng ở ranh giới (r 57 qua, r 58 trượt ở 800 ms)", () => {
     const circle = (r: number, telegraphMs: number) =>
       probe((x) => {
         const a = x.abilities[0]!;
@@ -426,14 +426,14 @@ describe("né được bằng di chuyển (bossEscapePx, bossEscapeMs, luật c�
         a.cooldownMs = telegraphMs + a.recoverMs;
         delete a.cond;
       });
-    // 800 ms: 300 ms phản xạ + 500 ms x 150 px/giây = 75 px = r + 3
-    expect(circle(72, 800)).toBe("");
-    expect(circle(73, 800)).toMatch(/không né kịp/);
+    // 800 ms: 400 ms phản xạ + 400 ms x 150 px/giây = 60 px = r + 3
+    expect(circle(57, 800)).toBe("");
+    expect(circle(58, 800)).toMatch(/không né kịp/);
     expect(circle(150, 800)).toMatch(/không né kịp/);
     expect(circle(150, 800)).toMatch(/mang\.quat_duoi/);
-    // tăng báo trước thì qua: r 150 cần 300 + 153 / 150 x 1000 = 1320 ms
-    expect(circle(150, 1319)).toMatch(/không né kịp/);
-    expect(circle(150, 1320)).toBe("");
+    // tăng báo trước thì qua: r 150 cần 400 + 153 / 150 x 1000 = 1420 ms
+    expect(circle(150, 1419)).toMatch(/không né kịp/);
+    expect(circle(150, 1420)).toBe("");
   });
 
   it("bossViolations: chiêu không sát thương và hình hỏng không bị luật né kịp quấy rầy", () => {
@@ -467,9 +467,9 @@ describe("né được bằng di chuyển (bossEscapePx, bossEscapeMs, luật c�
       /không né kịp/,
     );
     // cùng hình nhỏ vừa thì sạch
-    expect(shaped({ t: "cone", r: 150, arc: Math.PI }, 900)).toBe("");
-    expect(shaped({ t: "charge", len: 300, w: 100 }, 900)).toBe("");
-    expect(shaped({ t: "ring", r0: 60, r: 160 }, 900)).toBe("");
-    expect(shaped({ t: "pull", r: 100, pullPx: 20, blastR: 60 }, 900)).toBe("");
+    expect(shaped({ t: "cone", r: 150, arc: Math.PI }, 1000)).toBe("");
+    expect(shaped({ t: "charge", len: 300, w: 100 }, 1000)).toBe("");
+    expect(shaped({ t: "ring", r0: 60, r: 160 }, 1000)).toBe("");
+    expect(shaped({ t: "pull", r: 100, pullPx: 20, blastR: 60 }, 1000)).toBe("");
   });
 });
