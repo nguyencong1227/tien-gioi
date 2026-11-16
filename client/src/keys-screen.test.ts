@@ -3,6 +3,7 @@ import {
   ACTIONS,
   DEFAULT_KEYMAP,
   FIXED_KEYS,
+  ARROW_CODES,
   RESERVED_CODES,
   _resetKeymapCache,
   getKeymap,
@@ -86,7 +87,7 @@ describe("keysScreenModel", () => {
       expect(g.title).toBe(GROUP_TITLE[g.group]);
       expect(g.title.length).toBeGreaterThan(0);
     }
-    expect(groups.map((g) => g.group)).toEqual(["combat", "interact", "panel", "other"]);
+    expect(groups.map((g) => g.group)).toEqual(["move", "combat", "interact", "panel", "other"]);
   });
   it("mỗi dòng có nhãn phím (chính trước); mặc định thì không dòng nào 'custom'", () => {
     const rows = keysScreenModel(DEFAULT_KEYMAP).flatMap((g) => g.rows);
@@ -125,9 +126,10 @@ describe("keysScreenModel", () => {
         .some((r) => r.unbound),
     ).toBe(false);
   });
-  it("phím cố định có mô tả và nhắc cả mũi tên lẫn WASD, Esc, phím số hội thoại", () => {
+  it("phím cố định có mô tả và nhắc mũi tên trong bảng (đi bộ đổi ở nhóm Di chuyển), Esc, phím số hội thoại", () => {
     const all = FIXED_KEYS.map((k) => k.keys + " " + k.what).join(" | ");
-    expect(all).toMatch(/W A S D/);
+    expect(all).toMatch(/← ↑ ↓ →/);
+    expect(all).toMatch(/Di chuyển/);
     expect(all).toMatch(/Esc/);
     expect(all).toMatch(/1 - 9/);
   });
@@ -144,13 +146,18 @@ describe("captureOutcome: quyết định khi bấm phím lúc chờ gán", () =
     expect(captureOutcome("attack", ev("Enter", { repeat: true }), map()).kind).toBe("ignore");
     expect(captureOutcome("attack", ev("Space", { repeat: true }), map()).kind).toBe("ignore");
   });
-  it("phím cố định (WASD, mũi tên) bị từ chối kèm lời giải thích, KHÔNG gán", () => {
-    for (const c of RESERVED_CODES) {
-      if (c === "Escape") continue;
+  it("mũi tên gán cho hành động KHÔNG phải di chuyển bị từ chối kèm lời giải thích; gán cho di chuyển thì được", () => {
+    for (const c of ARROW_CODES) {
       const r = captureOutcome("attack", ev(c), map());
       expect(r.kind, c).toBe("reject");
-      if (r.kind === "reject") expect(r.message).toMatch(/cố định/);
+      if (r.kind === "reject") expect(r.message).toMatch(/điều hướng bảng/);
+      expect(captureOutcome("move.up", ev(c), map()).kind, `${c} cho di chuyển`).toBe("bind");
     }
+  });
+  it("WASD không còn cố định: gán được cho chém; phím cố định còn lại (Esc) chỉ huỷ", () => {
+    expect(captureOutcome("attack", ev("KeyW"), map()).kind).toBe("bind");
+    expect(captureOutcome("move.up", ev("KeyI"), map()).kind).toBe("bind");
+    for (const c of RESERVED_CODES) expect(c).toBe("Escape");
   });
   it("phím tự do -> bind, lời nhắn có tên hành động và phím", () => {
     const r = captureOutcome("skill.sword", ev("Digit9"), map());

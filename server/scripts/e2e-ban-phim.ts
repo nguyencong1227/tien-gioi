@@ -889,10 +889,11 @@ async function main() {
       String(await textOf("#keys-status")),
     );
     await t.shot("ban-phim-phim-tat-cho.png");
-    await press(t, K.w);
+    // Mũi tên chỉ gán được cho hành động DI CHUYỂN (ở bảng đang mở chúng là phím điều hướng bảng); W A S D không còn cố định (là phím mặc định của di chuyển, gán được)
+    await press(t, K.up);
     check(
-      "Bấm W (phím cố định): bị từ chối, vẫn chờ, không đổi phím nào",
-      String(await textOf("#keys-status")).includes("cố định") &&
+      "Bấm mũi tên Lên (chỉ cho di chuyển): bị từ chối, vẫn chờ, không đổi phím nào",
+      String(await textOf("#keys-status")).includes("điều hướng bảng") &&
         !!(await ev(
           `document.querySelector(${JSON.stringify(swordBtn)}).classList.contains('waiting')`,
         )) &&

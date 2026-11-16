@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MOVE_CODES, MoveKeys, isImeEvent } from "./move-keys";
+import { MOVE_CODES, MoveKeys, isImeEvent, type MoveDir, type MoveResolver } from "./move-keys";
 import { moveVector } from "./move-input";
 
 const press = (m: MoveKeys, code: string, extra: Record<string, unknown> = {}) =>
@@ -161,5 +161,50 @@ describe("MoveKeys: phím giữ, lặp, đổi hướng nhanh", () => {
     press(m, "KeyW");
     // không có API hết hạn: trạng thái chỉ đổi bởi keyup / clear
     expect(m.state().right).toBe(true);
+  });
+});
+
+describe("MoveKeys: phím di chuyển ĐỔI ĐƯỢC (bộ tra hướng tiêm từ bảng phím)", () => {
+  /** I J K L đi (lên, trái, xuống, phải) và W A S D hết là phím đi */
+  const IJKL: Record<string, MoveDir> = { KeyI: "up", KeyJ: "left", KeyK: "down", KeyL: "right" };
+  const resolve: MoveResolver = (c) =>
+    Object.prototype.hasOwnProperty.call(IJKL, c) ? IJKL[c] : null;
+
+  it("chỉ phím theo bộ tra mới đi; WASD mặc định không còn là phím đi", () => {
+    const m = new MoveKeys(resolve);
+    expect(press(m, "KeyL")).toBe(true);
+    expect(m.state()).toEqual({ ...none, right: true });
+    m.keyUp({ code: "KeyL" });
+    expect(press(m, "KeyD")).toBe(false);
+    expect(press(m, "ArrowUp")).toBe(false);
+    expect(m.state()).toEqual(none);
+  });
+
+  it("bộ tra được gọi MỖI LẦN: đổi phím giữa lúc đang giữ thì hướng theo bảng mới (phím không còn là phím đi thì thôi tính)", () => {
+    let map: Record<string, MoveDir> = { KeyI: "up" };
+    const m = new MoveKeys((c) => map[c] ?? null);
+    expect(press(m, "KeyI")).toBe(true);
+    expect(m.state().up).toBe(true);
+    map = { KeyI: "down" }; // người chơi đổi KeyI sang đi xuống
+    expect(m.state()).toEqual({ ...none, down: true });
+    map = {}; // KeyI không còn là phím di chuyển
+    expect(m.state()).toEqual(none);
+  });
+
+  it("phím bấm SAU thắng vẫn đúng với phím đã đổi; keyup luôn nhả", () => {
+    const m = new MoveKeys(resolve);
+    press(m, "KeyJ");
+    press(m, "KeyL");
+    expect(m.state()).toEqual({ ...none, right: true }); // L bấm sau
+    m.keyUp({ code: "KeyL" });
+    expect(m.state()).toEqual({ ...none, left: true });
+    m.keyUp({ code: "KeyJ" });
+    expect(m.state()).toEqual(none);
+  });
+
+  it("mặc định (không truyền bộ tra) vẫn là WASD + mũi tên", () => {
+    const m = new MoveKeys();
+    expect(press(m, "KeyA")).toBe(true);
+    expect(press(m, "KeyI")).toBe(false);
   });
 });
