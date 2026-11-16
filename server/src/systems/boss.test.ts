@@ -627,6 +627,24 @@ describe("giai đoạn", () => {
     }
   });
 
+  it("đang gầm trùm ĐỨNG YÊN (không đuổi, không đánh thường); hết gầm mới đi tiếp", () => {
+    const { mon, p, tick, w } = scene(twoPhases(false), 400);
+    mon.mc.def = { ...MANG, speed: 120 }; // lần này trùm biết đi
+    tick(2);
+    mon.m.hp = Math.floor(mon.m.maxHp * 0.4);
+    tick(1);
+    const x0 = mon.m.x;
+    const until = mon.mc.boss!.roarUntil;
+    expect(until).toBeGreaterThan(w.now);
+    while (w.now < until - TICK_MS) {
+      tick();
+      expect(mon.m.x).toBe(x0);
+    }
+    tick(10);
+    expect(mon.m.x).not.toBe(x0); // hết gầm: đuổi tiếp
+    expect(p.hp).toBeGreaterThan(0);
+  });
+
   it("nhảy qua nhiều ngưỡng trong một tick: chạy `onEnter` của MỌI giai đoạn đã vượt, vào thẳng giai đoạn cuối", () => {
     const d = twoPhases();
     d.phases.push(
@@ -812,6 +830,27 @@ describe("bộ lọc mục tiêu (mục 33: bảo vệ mất kết nối)", () =
       tick(120);
       expect(p.hp).toBe(hp0);
     }
+  });
+
+  it("người đứng trong khu an toàn (trấn) KHÔNG trúng dù nằm trong vùng đáp; người ngoài khu cùng vùng thì trúng", () => {
+    const { w, mon, p, tick, until } = scene(
+      def([ab("roi", { t: "circleAt", at: "self", r: 320 })]),
+      100,
+    );
+    const t = w.map.townPx;
+    mon.m.x = t.x + t.r + 110; // trùm đứng ngay ngoài trấn
+    mon.m.y = t.y;
+    p.x = mon.m.x + 100; // người làm mục tiêu: ngoài trấn
+    p.y = t.y;
+    const home = addPlayer(w, "h", 4, 0);
+    home.p.x = t.x + t.r - 40; // trong trấn, cách trùm ~150 px: nằm trong vòng r = 320
+    home.p.y = t.y;
+    home.p.hp = home.p.maxHp = 1_000_000_000;
+    expect(w.map.inSafe(home.p.x, home.p.y, 20)).toBe(true);
+    expect(Math.hypot(home.p.x - mon.m.x, home.p.y - mon.m.y)).toBeLessThan(320);
+    until(() => p.hp < 1_000_000_000);
+    tick(20);
+    expect(home.p.hp).toBe(1_000_000_000);
   });
 
   it("nhiều người trong vùng đáp: ai trong vùng đều trúng, ai ngoài thì không", () => {
