@@ -684,6 +684,37 @@ async function main() {
         `Enter: gửi đúng một tin rút (${JSON.stringify(m)})`,
       );
 
+      console.log(
+        "  [13b] focus bàn phím ở ô A, rồi bấm chuột chọn ô B: Enter chạy trên B (ô được chọn = ô đang focus), không phải A",
+      );
+      await reset("chu");
+      await evalJs(`document.querySelector(${JSON.stringify(slotSel("vault", 0))}).focus(); 1`);
+      await sleep(100);
+      await tapSel(slotSel("vault", 2));
+      s = await st();
+      check(
+        JSON.stringify(s.selVault) === "[2]",
+        `bấm ô 2: chọn ô 2 (${JSON.stringify(s.selVault)})`,
+      );
+      const foc = await evalJs(
+        `(() => { const e = document.activeElement; return e && e.parentNode ? [e.parentNode.id, [...e.parentNode.children].indexOf(e)] : null; })()`,
+      );
+      check(
+        JSON.stringify(foc) === '["sect-vault-grid",2]',
+        `focus đi theo ô vừa bấm (${JSON.stringify(foc)})`,
+      );
+      await key("Enter", "Enter", 13);
+      await sleep(250);
+      b = await box();
+      check(
+        b.open &&
+          b.text === "Rút Lang Nha Kiếm từ kho tông môn?" &&
+          (await vaultMsgs()).length === 0,
+        `Enter: hộp của ô 2 (Lang Nha Kiếm), chưa gửi gì ("${b.text}")`,
+      );
+      await key("Escape", "Escape", 27);
+      await sleep(500);
+
       console.log("  [14] rời tông môn: kho đồ xoá sạch");
       await evalJs(`window.__ui.onSect({ sect: null }); 1`);
       await sleep(150);

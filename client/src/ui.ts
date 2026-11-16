@@ -3285,6 +3285,8 @@ function buildSectVaultGrids() {
         e.preventDefault();
         if (e.button !== 0) return;
         selectVaultSlot(from, i);
+        // `preventDefault` ở trên chặn trình duyệt tự chuyển focus: tự chuyển, để ô được CHỌN và ô đang FOCUS (Enter chạy trên ô này) luôn là MỘT
+        btn.focus({ preventScroll: true });
       });
       btn.addEventListener("focus", () => selectVaultSlot(from, i));
       btn.addEventListener("keydown", (e) => {
