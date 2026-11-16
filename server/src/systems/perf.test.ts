@@ -812,7 +812,7 @@ describe("kịch bản hiệu năng chiêu thức (M7.10 #511)", () => {
     };
 
     // Chạy mô phỏng n = 3 lần và lấy min theo từng tick để loại bỏ nhiễu preempt CPU khi chạy song song hoặc dưới tải (#723, #752).
-    // Vì mô phỏng có điều kiện ban đầu giống hệt nhau nên logic từng tick là hoàn toàn tất định.
+    // Vì mô phỏng cùng điều kiện ban đầu nên logic từng tick tương đương giữa các lần chạy.
     const first = runCombatSim();
     const minTickDurations = [...first.tickDurations];
     for (let r = 1; r < 3; r++) {
