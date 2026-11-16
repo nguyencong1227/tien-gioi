@@ -66,7 +66,11 @@ export function formatSectMembersSummary(count: number, max: number = SECT_MAX_M
 export type SectConfirmKind = "transfer" | "kick" | "leave";
 
 /** Nội dung hộp xác nhận trong game: câu hỏi + chữ trên nút đồng ý */
-export function sectConfirmText(kind: SectConfirmKind, name = ""): { text: string; ok: string } {
+export function sectConfirmText(
+  kind: SectConfirmKind,
+  name = "",
+  leaveNote = "",
+): { text: string; ok: string } {
   switch (kind) {
     case "transfer":
       return {
@@ -76,7 +80,13 @@ export function sectConfirmText(kind: SectConfirmKind, name = ""): { text: strin
     case "kick":
       return { text: `Trục xuất ${name} khỏi tông môn?`, ok: "Trục xuất" };
     case "leave":
-      return { text: "Rời khỏi tông môn? Ngươi sẽ mất biệt hiệu.", ok: "Rời tông môn" };
+      // `leaveNote` (M8.6): hậu quả về cống hiến / công tích sẽ mất (`hallLeaveWarning`)
+      return {
+        text: leaveNote
+          ? `Rời khỏi tông môn? ${leaveNote} Ngươi cũng sẽ mất biệt hiệu.`
+          : "Rời khỏi tông môn? Ngươi sẽ mất biệt hiệu.",
+        ok: "Rời tông môn",
+      };
   }
 }
 

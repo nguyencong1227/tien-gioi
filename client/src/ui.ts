@@ -90,6 +90,7 @@ import {
   type SectAssignableRank,
   type SectMsg,
   type SectVaultMsg,
+  type SectHallMsg,
   type SectVaultView,
   type SectVaultDepositMsg,
   type SectVaultWithdrawMsg,
@@ -149,6 +150,8 @@ import {
   withdrawBlock,
   type VaultPlan,
 } from "./sect-vault";
+import { hallLeaveWarning, sanitizeHallView } from "./sect-hall";
+import { renderHall, updateHallCountdown, type HallUiState } from "./sect-hall-ui";
 import { canAffordFee, feeChipText, recipeFee } from "./forge-fee";
 import {
   QUEST_KIND_BADGE,
@@ -335,6 +338,13 @@ export interface UiCallbacks {
   onSectVaultDeposit?: (msg: SectVaultDepositMsg) => void;
   onSectVaultWithdraw?: (msg: SectVaultWithdrawMsg) => void;
   onSectVaultPolicy?: (drawPerDay: number) => void;
+  /** Tab Nội vụ (M8.6): xin ảnh chụp mới (lúc mở tab, khi qua mốc đặt lại trong ngày), nhận / trả nhiệm vụ tông, mua ở cửa hàng tông */
+  onSectHallGet?: () => void;
+  onSectQuestAccept?: (questId: string) => void;
+  onSectQuestTurnIn?: (questId: string) => void;
+  onSectShopBuy?: (itemId: string) => void;
+  /** Đã gục / ở Hoàng Tuyền (khoá nhận / trả / mua ở tab Nội vụ; máy chủ vẫn kiểm lại) */
+  isSectDown?: () => boolean;
   /** Bảng Công pháp: gắn chiêu vào ô 2-5 (`skillId` "" = gỡ); máy chủ trả `skills` (sổ đúng) */
   onSkillSlot?: (slot: SkillSlot, skillId: string) => void;
   /** Bảng Công pháp vừa mở: cảnh dựng mô hình mới từ sổ chiêu hiện tại (`ui.setSkillsModel`) */
@@ -454,7 +464,17 @@ function stopDuelCountdownTimer() {
 let currentSect: SectView | null = null;
 let currentSectPresence: SectPresenceMsg | null = null;
 let sectModalOpen = false;
-let sectTab: "overview" | "members" | "treasury" | "vault" = "overview";
+let sectTab: "overview" | "members" | "treasury" | "vault" | "hall" = "overview";
+// ---- Nội vụ tông môn (M8.6, #843) ----
+/** Ảnh chụp "Nội vụ" MỚI NHẤT đã làm sạch + đồng hồ máy khách lúc nhận (để đếm ngược theo giờ máy chủ); `null` = chưa có. */
+let sectHall: { view: NonNullable<ReturnType<typeof sanitizeHallView>>; at: number } | null = null;
+/** Thao tác đang chờ máy chủ trả lời (khoá nút): `quest:<id>` / `shop:<itemId>`; mở khoá khi có ảnh chụp mới / toast / hết `HALL_BUSY_MS`. */
+const hallBusy = new Set<string>();
+let hallBusyTimer: ReturnType<typeof setTimeout> | null = null;
+const HALL_BUSY_MS = 5000;
+/** Đồng hồ đếm ngược của tab Nội vụ (mỗi giây, chỉ chạy khi tab đang xem) và mốc đặt lại đã xin ảnh chụp mới (mỗi mốc xin MỘT lần). */
+let hallClock: ReturnType<typeof setInterval> | null = null;
+let hallRefreshedFor = 0;
 // ---- Kho đồ tông môn (mục 27, K4, #788) ----
 /** Ảnh chụp kho đồ MỚI NHẤT máy chủ gửi (đã làm sạch); `null` = chưa có / không còn tông môn. */
 let sectVault: SectVaultView | null = null;
@@ -477,7 +497,11 @@ let travelConfirmAction: (() => void) | null = null;
 function askSectConfirm(kind: SectConfirmKind, name: string, onOk: () => void) {
   const box = document.getElementById("sect-action-confirm");
   if (!box) return;
-  const { text, ok } = sectConfirmText(kind, name);
+  const { text, ok } = sectConfirmText(
+    kind,
+    name,
+    kind === "leave" ? hallLeaveWarning(sectHall?.view ?? null) : "",
+  );
   sectConfirmAction = onOk;
   $("sect-action-confirm-text").textContent = text;
   $("sect-action-confirm-ok").textContent = ok;
@@ -3362,6 +3386,70 @@ function buildSectVaultGrids() {
   make($("sect-vault-bag"), INVENTORY_SLOTS, "bag", vaultBagEls);
 }
 
+function endHallBusy() {
+  if (hallBusyTimer) clearTimeout(hallBusyTimer);
+  hallBusyTimer = null;
+  if (!hallBusy.size) return;
+  hallBusy.clear();
+  if (sectModalOpen && sectTab === "hall") renderSectHallTab();
+}
+
+function beginHallBusy(key: string) {
+  hallBusy.add(key);
+  if (hallBusyTimer) clearTimeout(hallBusyTimer);
+  hallBusyTimer = setTimeout(endHallBusy, HALL_BUSY_MS);
+  if (sectModalOpen && sectTab === "hall") renderSectHallTab();
+}
+
+function hallUiState(): HallUiState {
+  return {
+    view: sectHall?.view ?? null,
+    receivedAt: sectHall?.at ?? 0,
+    nowClient: Date.now(),
+    down: callbacks?.isSectDown?.() ?? false,
+    busy: hallBusy,
+  };
+}
+
+function renderSectHallTab() {
+  renderHall($("sect-tab-hall"), hallUiState(), {
+    onAccept: (id) => {
+      beginHallBusy(`quest:${id}`);
+      callbacks?.onSectQuestAccept?.(id);
+    },
+    onTurnIn: (id) => {
+      beginHallBusy(`quest:${id}`);
+      callbacks?.onSectQuestTurnIn?.(id);
+    },
+    onBuy: (itemId) => {
+      beginHallBusy(`shop:${itemId}`);
+      callbacks?.onSectShopBuy?.(itemId);
+    },
+  });
+}
+
+/** Đồng hồ tab Nội vụ: chạy khi tab đang xem; qua mốc đặt lại thì xin ảnh chụp mới (một lần cho mỗi mốc). */
+function syncHallClock() {
+  const want = sectModalOpen && sectTab === "hall" && currentSect !== null;
+  if (!want) {
+    if (hallClock !== null) clearInterval(hallClock);
+    hallClock = null;
+    return;
+  }
+  if (hallClock !== null) return;
+  hallClock = setInterval(() => {
+    const view = sectHall?.view;
+    if (!view) return;
+    if (
+      updateHallCountdown($("sect-tab-hall"), hallUiState()) &&
+      hallRefreshedFor !== view.resetAt
+    ) {
+      hallRefreshedFor = view.resetAt;
+      callbacks?.onSectHallGet?.();
+    }
+  }, 1000);
+}
+
 function renderSectModal() {
   withFocusKept($("sect-modal"), renderSectModalImpl);
 }
@@ -3396,16 +3484,21 @@ function renderSectModalImpl() {
   $("sect-tab-btn-members").classList.toggle("active", sectTab === "members");
   $("sect-tab-btn-treasury").classList.toggle("active", sectTab === "treasury");
   $("sect-tab-btn-vault").classList.toggle("active", sectTab === "vault");
+  $("sect-tab-btn-hall").classList.toggle("active", sectTab === "hall");
 
   $("sect-tab-overview").hidden = sectTab !== "overview";
   $("sect-tab-members").hidden = sectTab !== "members";
   $("sect-tab-treasury").hidden = sectTab !== "treasury";
   $("sect-tab-vault").hidden = sectTab !== "vault";
+  $("sect-tab-hall").hidden = sectTab !== "hall";
+  syncHallClock();
 
   if (sectTab === "overview") {
     $("sect-meta-tag").textContent = `[${currentSect.tag}]`;
     $("sect-meta-my-rank").textContent = formatSectRole(currentSect.myRank);
-    $("sect-meta-member-count").textContent = `${currentSect.members.length} / ${SECT_MAX_MEMBERS}`;
+    // giới hạn thành viên theo cấp tông (M8): có ảnh chụp Nội vụ thì dùng, chưa có thì mức cấp 1
+    $("sect-meta-member-count").textContent =
+      `${currentSect.members.length} / ${sectHall?.view.caps.members || SECT_MAX_MEMBERS}`;
     $("sect-meta-treasury").textContent = formatSectTreasury(currentSect.coin);
 
     const motdEl = $("sect-motd-text");
@@ -3427,6 +3520,8 @@ function renderSectModalImpl() {
     renderSectTreasuryTab();
   } else if (sectTab === "vault") {
     renderSectVaultTab();
+  } else if (sectTab === "hall") {
+    renderSectHallTab();
   }
 }
 
@@ -3630,6 +3725,7 @@ export const ui = {
     bindTap("sect-tab-btn-members", () => this.switchSectTab("members"));
     bindTap("sect-tab-btn-treasury", () => this.switchSectTab("treasury"));
     bindTap("sect-tab-btn-vault", () => this.switchSectTab("vault"));
+    bindTap("sect-tab-btn-hall", () => this.switchSectTab("hall"));
     buildSectVaultGrids();
     bindTap("sect-vault-minus", () => {
       vaultQty = Math.max(1, vaultQty - 1);
@@ -5391,6 +5487,7 @@ export const ui = {
   toast(m: ToastMsg) {
     // đang chờ máy chủ trả lời thao tác kho đồ mà có toast tới: coi là lời từ chối / báo (`sectFailMessage`), mở khoá nút (ảnh chụp kho mới tới riêng)
     if (vaultBusy) endVaultBusy();
+    if (hallBusy.size) endHallBusy(); // thao tác Nội vụ có toast trả lời (kết quả / từ chối): mở khoá nút
     const p = document.createElement("p");
     p.className = m.tone ?? "info";
     p.textContent = m.text;
@@ -6036,6 +6133,7 @@ export const ui = {
       $("btn-sect")?.setAttribute("aria-expanded", "true");
       modalStack.push("sect-modal", $("btn-sect"));
       focusModal($("sect-modal"));
+      if (sectTab === "hall" && currentSect) callbacks?.onSectHallGet?.();
       renderSectModal();
     } else {
       closeSectConfirm();
@@ -6060,9 +6158,26 @@ export const ui = {
     return true;
   },
 
-  switchSectTab(tab: "overview" | "members" | "treasury" | "vault") {
+  switchSectTab(tab: "overview" | "members" | "treasury" | "vault" | "hall") {
     sectTab = tab;
+    // vào tab Nội vụ: xin ảnh chụp mới (đồng hồ trong ngày có thể đã qua mốc đặt lại kể từ lần trước)
+    if (tab === "hall" && currentSect) callbacks?.onSectHallGet?.();
     renderSectModal();
+  },
+
+  /** Ảnh chụp "Nội vụ" (M8.6): làm sạch, thay bản cũ, mở khoá nút; `hall: null` = không còn tông môn. */
+  onSectHall(m: SectHallMsg) {
+    const view = sanitizeHallView(m?.hall);
+    sectHall = view ? { view, at: Date.now() } : null;
+    hallRefreshedFor = 0;
+    endHallBusy();
+    if (sectModalOpen && sectTab === "hall") renderSectHallTab();
+    else if (sectModalOpen && sectTab === "overview") renderSectModal();
+  },
+
+  /** Bản sao ảnh chụp "Nội vụ" hiện tại (cho script kiểm / gỡ lỗi). */
+  getSectHall() {
+    return sectHall?.view ?? null;
   },
 
   onSect(m: SectMsg) {
@@ -6074,6 +6189,8 @@ export const ui = {
       vaultSel = null;
       vaultQty = 1;
       endVaultBusy();
+      sectHall = null;
+      endHallBusy();
     }
     if (sectModalOpen) {
       renderSectModal();

@@ -7152,3 +7152,130 @@ body.ui-hidden
 #minimap-wrap.collapsed #minimap-zone {
   max-width: 130px;
 }
+
+/* ---------- Tab Nội vụ của bảng Tông môn (M8.6, #843; `sect-hall-ui.ts`) ---------- */
+.sect-tabs {
+  flex-wrap: wrap; /* năm tab: trên khung hẹp thì xuống dòng, không tràn ngang */
+}
+.sect-tab {
+  flex: 1 1 auto;
+}
+.sect-hall-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid rgba(212, 175, 55, 0.22);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  min-width: 0;
+}
+.sect-hall-card h4,
+.sect-hall-card h5 {
+  margin: 0;
+}
+.sect-hall-sub {
+  margin-top: 6px;
+  color: #ffe08a;
+  font-size: var(--fs-13);
+}
+.sect-hall-bar {
+  height: 12px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+.sect-hall-bar-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #b8972e, #f6d878);
+}
+.sect-hall-points,
+.sect-hall-caps,
+.sect-hall-buffs,
+.sect-hall-today,
+.sect-hall-deposit,
+.sect-hall-reset,
+.sect-hall-desc,
+.sect-hall-empty {
+  margin: 0;
+  font-size: var(--fs-13);
+  overflow-wrap: anywhere;
+}
+.sect-hall-deposit,
+.sect-hall-reset,
+.sect-hall-desc {
+  color: #c9c2b0;
+}
+.sect-hall-note {
+  margin: 0;
+  font-size: var(--fs-13);
+  color: #ffe08a;
+}
+.sect-hall-note.warn {
+  color: #ffb199;
+}
+.sect-hall-stats {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.sect-hall-stat {
+  display: flex;
+  flex-direction: column;
+  min-width: 96px;
+  font-size: var(--fs-13);
+}
+.sect-hall-stat b {
+  font-size: var(--fs-18, 1.15rem);
+  color: #ffe08a;
+}
+.sect-hall-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sect-hall-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+}
+.sect-hall-row.done,
+.sect-hall-row.locked {
+  opacity: 0.72;
+}
+.sect-hall-row-head,
+.sect-hall-row-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sect-hall-tag {
+  font-size: var(--fs-12);
+  color: #ffe08a;
+}
+.sect-hall-state {
+  font-size: var(--fs-12);
+  color: #9ca3af;
+}
+.sect-hall-state.done {
+  color: #8fd694;
+}
+.sect-hall-why {
+  margin: 0;
+  font-size: var(--fs-12);
+  color: #ffb199;
+  overflow-wrap: anywhere;
+}
+.sect-hall-btn {
+  min-width: 84px;
+  min-height: 44px; /* chạm được trên điện thoại */
+}

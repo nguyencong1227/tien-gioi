@@ -144,6 +144,7 @@ import {
   SECT_MSG,
   type SectMsg,
   type SectVaultMsg,
+  type SectHallMsg,
   type SectPresenceMsg,
   type SectInvitedMsg,
 } from "@tien-gioi/shared";
@@ -712,6 +713,14 @@ export class WorldScene extends Phaser.Scene {
         !this.isReconnecting && this.room.send(SECT_MSG.vaultWithdraw, msg),
       onSectVaultPolicy: (drawPerDay) =>
         !this.isReconnecting && this.room.send(SECT_MSG.vaultPolicy, { drawPerDay }),
+      onSectHallGet: () => !this.isReconnecting && this.room.send(SECT_MSG.hallGet, {}),
+      onSectQuestAccept: (questId) =>
+        !this.isReconnecting && this.room.send(SECT_MSG.questAccept, { questId }),
+      onSectQuestTurnIn: (questId) =>
+        !this.isReconnecting && this.room.send(SECT_MSG.questTurnIn, { questId }),
+      onSectShopBuy: (itemId) =>
+        !this.isReconnecting && this.room.send(SECT_MSG.shopBuy, { itemId, qty: 1 }),
+      isSectDown: () => Boolean(this.me()?.dead) || ui.isLimboOpen(),
     });
 
     this.setupInput();
@@ -2319,6 +2328,7 @@ export class WorldScene extends Phaser.Scene {
     });
     reg(SECT_MSG.snapshot, (m: SectMsg) => ui.onSect(m));
     reg(SECT_MSG.vault, (m: SectVaultMsg) => ui.onSectVault(m));
+    reg(SECT_MSG.hall, (m: SectHallMsg) => ui.onSectHall(m));
     reg(SECT_MSG.presence, (m: SectPresenceMsg) => ui.onSectPresence(m));
     reg(SECT_MSG.invited, (m: SectInvitedMsg) => ui.onSectInvited(m));
     replayEarlyMessages(this.room, handlers);
