@@ -1,8 +1,13 @@
 import {
   ITEM_BY_ID,
   MAIN_QUEST_START,
+  NPC_BY_ID,
   QUESTS,
   QUEST_BY_ID,
+  SECT_QUEST_GIVER,
+  SECT_TERMS,
+  isSectQuest,
+  questDefAny,
   type QuestReward,
 } from "@tien-gioi/shared";
 
@@ -22,8 +27,8 @@ export interface DoneRow {
   side: boolean;
 }
 
-/** Loại nhiệm vụ: chuỗi chính, việc phụ (không lặp, ngoài chuỗi chính), hoặc lặp hằng ngày. */
-export type QuestKind = "main" | "side" | "daily";
+/** Loại nhiệm vụ: chuỗi chính, việc phụ (không lặp, ngoài chuỗi chính), lặp hằng ngày, hoặc nhiệm vụ TÔNG MÔN (M8, trả ở bảng Tông môn, không có NPC giao). */
+export type QuestKind = "main" | "side" | "daily" | "sect";
 
 /**
  * Id các nhiệm vụ THUỘC chuỗi chính: đi từ nhiệm vụ đầu theo `next`. Nhiệm vụ không lặp mà không nằm trong chuỗi (không ai nối tới) là việc phụ:
@@ -44,8 +49,11 @@ const MAIN_CHAIN: ReadonlySet<string> = (() => {
 })();
 
 /** Loại của nhiệm vụ `def` (không có định nghĩa: coi như việc phụ, không ném lỗi). */
-export function questKind(def: { id: string; daily?: boolean } | undefined): QuestKind {
+export function questKind(
+  def: { id: string; daily?: boolean; giver?: unknown } | undefined,
+): QuestKind {
   if (!def) return "side";
+  if (isSectQuest(def)) return "sect"; // `daily: true` nhưng là loại riêng: không có NPC giao
   if (def.daily) return "daily";
   return MAIN_CHAIN.has(def.id) ? "main" : "side";
 }
@@ -55,6 +63,7 @@ export const QUEST_KIND_LABEL: Readonly<Record<QuestKind, string>> = {
   main: "Chính tuyến",
   side: "Việc phụ",
   daily: "Hằng ngày",
+  sect: "Tông môn",
 };
 
 /** Nhãn ngắn trên hộp thoại NPC (cùng hàng với tên nhiệm vụ). */
@@ -62,12 +71,33 @@ export const QUEST_KIND_BADGE: Readonly<Record<QuestKind, string>> = {
   main: "Chính",
   side: "Phụ",
   daily: "Lặp",
+  sect: "Tông",
 };
+
+/**
+ * Dòng phụ của thẻ nhiệm vụ đang làm: người giao + loại. Nhiệm vụ TÔNG MÔN không có NPC (giver là `SECT_QUEST_GIVER`, KHÔNG tra `NPC_BY_ID`): ghi nơi nhận / trả là bảng Tông môn.
+ * NPC lạ thì ghi chính id (không ném lỗi).
+ */
+export function questCardSubtitle(def: { id: string; giver: string; daily?: boolean }): string {
+  if (def.giver === SECT_QUEST_GIVER) return `Nhiệm vụ ${SECT_TERMS.hall.toLowerCase()} tông môn`;
+  const npc = Object.prototype.hasOwnProperty.call(NPC_BY_ID, def.giver)
+    ? NPC_BY_ID[def.giver]
+    : undefined;
+  return `${npc?.name ?? def.giver} (${QUEST_KIND_LABEL[questKind(def)]})`;
+}
+
+/** Dòng trạng thái khi nhiệm vụ đã xong mọi bước: NPC thường thì tới gặp người giao; nhiệm vụ tông môn thì mở bảng Tông môn, tab Nội vụ để trả (không có NPC để đi tới). */
+export function questReadyText(def: { giver: string }): string {
+  if (def.giver === SECT_QUEST_GIVER)
+    return `Hoàn thành · Mở bảng Tông môn > ${SECT_TERMS.hall} để trả nhiệm vụ`;
+  const npc = Object.prototype.hasOwnProperty.call(NPC_BY_ID, def.giver)
+    ? NPC_BY_ID[def.giver]
+    : undefined;
+  return `Hoàn thành · Gặp ${npc?.name ?? "NPC"} trả nhiệm vụ`;
+}
 
 /** Vị trí của nhiệm vụ trong `QUESTS` = thứ tự chuỗi chính (nhiệm vụ nối nhau theo thứ tự khai báo). */
 const ORDER: Record<string, number> = Object.fromEntries(QUESTS.map((q, i) => [q.id, i]));
-
-const has = (o: object, k: string): boolean => Object.prototype.hasOwnProperty.call(o, k);
 
 /**
  * Các hàng của tab "Đã hoàn thành": nhiệm vụ chính tuyến theo thứ tự chuỗi, rồi nhiệm vụ lặp hôm nay.
@@ -78,21 +108,22 @@ export function doneRows(done: readonly string[], dailyDone: readonly string[]):
   const seen = new Set<string>();
   const rows: DoneRow[] = [];
   for (const id of [...done, ...dailyDone]) {
-    if (typeof id !== "string" || seen.has(id) || !has(QUEST_BY_ID, id)) continue;
+    const def = questDefAny(id); // cả nhiệm vụ thường lẫn nhiệm vụ tông môn; id lạ / độc (constructor, __proto__) -> undefined
+    if (typeof id !== "string" || seen.has(id) || !def) continue;
     seen.add(id);
-    const def = QUEST_BY_ID[id];
     const kind = questKind(def);
     rows.push({
       id,
       title: def.title,
       desc: def.desc,
-      daily: kind === "daily",
+      daily: kind === "daily" || kind === "sect", // nhiệm vụ tông môn cũng LẶP hằng ngày
       side: kind === "side",
     });
   }
   // Chính tuyến trước (theo thứ tự chuỗi), rồi việc phụ, rồi lặp (cũng theo thứ tự khai báo cho ổn định)
   const rank = (r: DoneRow) => (r.daily ? 2 : r.side ? 1 : 0);
-  return rows.sort((a, b) => rank(a) - rank(b) || ORDER[a.id] - ORDER[b.id]);
+  const order = (id: string) => ORDER[id] ?? Number.MAX_SAFE_INTEGER; // nhiệm vụ tông môn không nằm trong QUESTS: xếp cuối nhóm
+  return rows.sort((a, b) => rank(a) - rank(b) || order(a.id) - order(b.id));
 }
 
 /** Số nhiệm vụ THUỘC chuỗi chính của game (không tính việc phụ và nhiệm vụ lặp): mẫu số của dòng tóm tắt. */
