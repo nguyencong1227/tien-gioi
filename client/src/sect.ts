@@ -159,6 +159,23 @@ export function sectMemberMeritText(m: { merit?: unknown }): string {
 }
 
 /**
+ * Số thành viên tối đa của tông môn lúc này: `caps.members` của ảnh chụp Nội vụ (máy chủ tính theo CẤP TÔNG: 30 ở cấp 1 tới 50 ở cấp 5); chưa có ảnh chụp / số hỏng thì mức cấp 1
+ * (`SECT_MAX_MEMBERS`, cũng là mức máy chủ cũ). KHÔNG cứng 30: nút mời vào tông môn phải theo cấp, nếu không tông cấp cao bị chặn mời ở 30 dù máy chủ còn cho.
+ */
+export function sectMembersCap(capsMembers: unknown): number {
+  return typeof capsMembers === "number" && Number.isSafeInteger(capsMembers) && capsMembers >= 1
+    ? capsMembers
+    : SECT_MAX_MEMBERS;
+}
+
+/** Chữ nút "Mời vào tông môn" khi tông đã ĐỦ người ("Tông môn đã đủ (35/35)"); `null` nếu còn chỗ. `cap` lấy từ `sectMembersCap`. */
+export function sectFullText(count: number, cap: number): string | null {
+  return Number.isFinite(count) && Number.isFinite(cap) && count >= cap
+    ? `Tông môn đã đủ (${cap}/${cap})`
+    : null;
+}
+
+/**
  * Số Trưởng lão tối đa của tông môn lúc này: `caps.elders` của ảnh chụp Nội vụ (máy chủ tính theo CẤP TÔNG, 3 ở cấp 1 tới 7 ở cấp 5); chưa có ảnh chụp / số hỏng thì mức cấp 1
  * (`SECT_ELDERS_MAX`, cũng là mức máy chủ cũ). KHÔNG cứng 3: tông cấp cao thăng được nhiều hơn.
  */

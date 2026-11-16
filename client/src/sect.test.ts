@@ -11,12 +11,21 @@ import {
   sectMemberStatusText,
   sectMemberMeritText,
   sectEldersCap,
+  sectMembersCap,
+  sectFullText,
   UNKNOWN_MAP_LABEL,
   sectConfirmText,
   isMockSectEnabled,
   MOCK_SECT_SAMPLES,
 } from "./sect";
-import { MAPS, DUNGEON_MAPS, SECT_ELDERS_MAX, SECT_LEVELS, realmLabel } from "@tien-gioi/shared";
+import {
+  MAPS,
+  DUNGEON_MAPS,
+  SECT_ELDERS_MAX,
+  SECT_LEVELS,
+  SECT_MAX_MEMBERS,
+  realmLabel,
+} from "@tien-gioi/shared";
 import type { SectMember, SectPresenceMsg, SectLogEntry } from "@tien-gioi/shared";
 
 describe("sectConfirmText (hộp xác nhận trong game, #246)", () => {
@@ -247,5 +256,25 @@ describe("sectEldersCap: giới hạn Trưởng lão theo CẤP TÔNG, không c�
   it("chưa có ảnh chụp / số hỏng: mức cấp 1 (SECT_ELDERS_MAX), không ném", () => {
     for (const bad of [undefined, null, 0, -1, 2.5, Number.NaN, "5", Number.MAX_VALUE, {}])
       expect(sectEldersCap(bad), String(bad)).toBe(SECT_ELDERS_MAX);
+  });
+});
+
+describe("sectMembersCap / sectFullText: giới hạn thành viên theo CẤP TÔNG, không cứng 30 (M8.6)", () => {
+  it("lấy đúng `caps.members` ở mọi cấp (cấp cao nhận nhiều hơn 30)", () => {
+    for (const l of SECT_LEVELS)
+      expect(sectMembersCap(l.maxMembers), `cấp ${l.level}`).toBe(l.maxMembers);
+    expect(Math.max(...SECT_LEVELS.map((l) => l.maxMembers))).toBeGreaterThan(SECT_MAX_MEMBERS);
+  });
+  it("chưa có ảnh chụp / số hỏng: mức cấp 1 (SECT_MAX_MEMBERS), không ném", () => {
+    for (const bad of [undefined, null, 0, -1, 2.5, Number.NaN, "40", Number.MAX_VALUE, {}])
+      expect(sectMembersCap(bad), String(bad)).toBe(SECT_MAX_MEMBERS);
+  });
+  it("sectFullText: đủ người thì nêu 'đủ (cap/cap)', còn chỗ hoặc số hỏng thì null; tông cấp 3 đang 30 người KHÔNG đủ", () => {
+    expect(sectFullText(30, 30)).toBe("Tông môn đã đủ (30/30)");
+    expect(sectFullText(40, 40)).toBe("Tông môn đã đủ (40/40)");
+    expect(sectFullText(29, 30)).toBeNull();
+    expect(sectFullText(30, sectMembersCap(SECT_LEVELS[2]!.maxMembers))).toBeNull();
+    expect(sectFullText(Number.NaN, 30)).toBeNull();
+    expect(sectFullText(5, Number.NaN)).toBeNull();
   });
 });

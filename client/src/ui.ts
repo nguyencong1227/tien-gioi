@@ -96,7 +96,6 @@ import {
   type SectVaultWithdrawMsg,
   SECT_VAULT_SLOTS,
   canSect,
-  SECT_MAX_MEMBERS,
   SECT_CREATE_COST,
   cleanSectName,
   cleanSectTag,
@@ -132,6 +131,8 @@ import {
   sectMemberMeritText,
   sectMemberStatusText,
   sectEldersCap,
+  sectMembersCap,
+  sectFullText,
   sectConfirmText,
   type SectConfirmKind,
 } from "./sect";
@@ -3022,7 +3023,10 @@ function renderSectMembersTab() {
   const merged = mergeMemberPresence(currentSect.members, currentSectPresence);
   const summaryEl = $("sect-members-summary");
   if (summaryEl) {
-    summaryEl.textContent = formatSectMembersSummary(merged.length);
+    summaryEl.textContent = formatSectMembersSummary(
+      merged.length,
+      sectMembersCap(sectHall?.view.caps.members),
+    );
   }
   const myRank = currentSect.myRank;
 
@@ -3533,7 +3537,7 @@ function renderSectModalImpl() {
     $("sect-meta-my-rank").textContent = formatSectRole(currentSect.myRank);
     // giới hạn thành viên theo cấp tông (M8): có ảnh chụp Nội vụ thì dùng, chưa có thì mức cấp 1
     $("sect-meta-member-count").textContent =
-      `${currentSect.members.length} / ${sectHall?.view.caps.members || SECT_MAX_MEMBERS}`;
+      `${currentSect.members.length} / ${sectMembersCap(sectHall?.view.caps.members)}`;
     $("sect-meta-treasury").textContent = formatSectTreasury(currentSect.coin);
 
     const motdEl = $("sect-motd-text");
@@ -5472,9 +5476,14 @@ export const ui = {
           sectBtn.disabled = true;
           sectBtn.textContent = "Đã cùng tông môn";
           if (sectHint) sectHint.hidden = true;
-        } else if (currentSect.members.length >= SECT_MAX_MEMBERS) {
+        } else if (
+          sectFullText(currentSect.members.length, sectMembersCap(sectHall?.view.caps.members))
+        ) {
+          // Giới hạn thành viên theo CẤP TÔNG (30 tới 50), lấy từ ảnh chụp Nội vụ: không cứng 30 (máy chủ còn cho mời tới mức cấp)
           sectBtn.disabled = true;
-          sectBtn.textContent = `Tông môn đã đủ (${SECT_MAX_MEMBERS}/${SECT_MAX_MEMBERS})`;
+          sectBtn.textContent =
+            sectFullText(currentSect.members.length, sectMembersCap(sectHall?.view.caps.members)) ??
+            "Tông môn đã đủ";
           if (sectHint) sectHint.hidden = true;
         } else {
           sectBtn.disabled = false;
