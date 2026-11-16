@@ -674,6 +674,114 @@ describe("giai đoạn", () => {
   });
 });
 
+describe("fx giáp / triệu hồi của trùm (bossArmor / bossSummon, T4 #873)", () => {
+  type Armor = Extract<FxMsg, { kind: "bossArmor" }>;
+  type Summon = Extract<FxMsg, { kind: "bossSummon" }>;
+  const armors = (log: { fx: FxMsg }[]) =>
+    log.filter((l) => l.fx.kind === "bossArmor").map((l) => l.fx as Armor);
+  const summons = (log: { fx: FxMsg }[]) =>
+    log.filter((l) => l.fx.kind === "bossSummon").map((l) => l.fx as Summon);
+
+  it("chiêu giáp: ĐÚNG MỘT `bossArmor` lúc dựng (ms, mult khớp dữ liệu, chỗ trùm đứng), không gửi lại mỗi tick", () => {
+    const { mon, tick, until, log } = scene(
+      def([
+        ab("giap", { t: "buff", dmgTakenMult: 0.5, ms: 4000 }, { dmgMult: 0, cooldownMs: 60_000 }),
+      ]),
+    );
+    until(() => armors(log).length > 0);
+    tick(60); // 3 giây giáp vẫn đang có: không gửi thêm
+    expect(armors(log)).toHaveLength(1);
+    expect(armors(log)[0]).toEqual({
+      kind: "bossArmor",
+      by: mon.id,
+      x: mon.m.x,
+      y: mon.m.y,
+      ms: 4000,
+      mult: 0.5,
+    });
+  });
+
+  it("fx giáp đi đúng lúc giáp có tác dụng: có `bossArmor` thì sát thương nhận đã nhân `mult`", () => {
+    const { w, mon, until, log } = scene(
+      def([ab("giap", { t: "buff", dmgTakenMult: 0.25, ms: 5000 }, { dmgMult: 0 })]),
+    );
+    until(() => armors(log).length > 0);
+    const hp0 = mon.m.hp;
+    dealMonsterDamage(w, mon.id, mon.m, "a", 100, false);
+    expect(hp0 - mon.m.hp).toBe(Math.round(100 * armors(log)[0]!.mult));
+  });
+
+  it("chiêu không phải giáp / triệu hồi (đòn gây sát thương) KHÔNG sinh `bossArmor` / `bossSummon`", () => {
+    const { tick, log } = scene(def([ab("a", { t: "circleAt", at: "target", r: 60 })]));
+    tick(200);
+    expect(log.some((l) => l.fx.kind === "warn")).toBe(true);
+    expect(armors(log)).toHaveLength(0);
+    expect(summons(log)).toHaveLength(0);
+  });
+
+  it("onEnter vào giai đoạn: `bossPhase` TRƯỚC, rồi `bossArmor` (một lần)", () => {
+    const d = def([ab("a", { t: "circleAt", at: "target", r: 60 })]);
+    d.phases.push(
+      phase(["a"], {
+        id: "p1",
+        fromHp: 0.5,
+        onEnter: [{ t: "buff", dmgTakenMult: 0.5, ms: 5000 }],
+      }),
+    );
+    const { mon, tick, log } = scene(d);
+    tick(5);
+    expect(armors(log)).toHaveLength(0);
+    mon.m.hp = Math.floor(mon.m.maxHp * 0.4);
+    tick(1);
+    const kinds = log.map((l) => l.fx.kind).filter((k) => k === "bossPhase" || k === "bossArmor");
+    expect(kinds).toEqual(["bossPhase", "bossArmor"]);
+    expect(armors(log)[0]).toMatchObject({ by: mon.id, ms: 5000, mult: 0.5 });
+  });
+
+  it("triệu hồi: `bossSummon` mang số con THẬT SỰ xuất hiện (<= maxAdds), một lần mỗi lần gọi", () => {
+    const { w, mon, until, log } = scene(
+      def([ab("goi", { t: "summon", kind: "tho", count: 5 }, { dmgMult: 0, cooldownMs: 60_000 })], {
+        maxAdds: 2,
+      }),
+    );
+    until(() => summons(log).length > 0);
+    expect(summons(log)).toHaveLength(1);
+    expect(summons(log)[0]).toMatchObject({ kind: "bossSummon", by: mon.id, n: 2 });
+    expect(bossLiveAdds(w, mon.mc.boss!)).toBe(summons(log)[0]!.n);
+  });
+
+  it("triệu hồi lúc đã đủ quái con (không còn chỗ): KHÔNG gửi `bossSummon` (n luôn >= 1)", () => {
+    const { w, mon, tick, until, log } = scene(
+      def([ab("goi", { t: "summon", kind: "tho", count: 2 }, { dmgMult: 0, cooldownMs: 1500 })], {
+        maxAdds: 2,
+      }),
+    );
+    until(() => summons(log).length > 0);
+    tick(400); // gọi nhiều lần nữa nhưng đã đủ 2 con
+    expect(bossLiveAdds(w, mon.mc.boss!)).toBe(2);
+    expect(summons(log)).toHaveLength(1);
+    for (const f of summons(log)) expect(f.n).toBeGreaterThanOrEqual(1);
+  });
+
+  it("onEnter gọi quái con: `bossPhase` rồi `bossSummon` với n = số con xuất hiện", () => {
+    const d = def([ab("a", { t: "circleAt", at: "target", r: 60 })]);
+    d.phases.push(
+      phase(["a"], {
+        id: "p1",
+        fromHp: 0.5,
+        onEnter: [{ t: "summon", kind: "tho", count: 2 }],
+      }),
+    );
+    const { w, mon, tick, log } = scene(d);
+    tick(5);
+    mon.m.hp = Math.floor(mon.m.maxHp * 0.4);
+    tick(1);
+    const kinds = log.map((l) => l.fx.kind).filter((k) => k === "bossPhase" || k === "bossSummon");
+    expect(kinds).toEqual(["bossPhase", "bossSummon"]);
+    expect(summons(log)[0]!.n).toBe(bossLiveAdds(w, mon.mc.boss!));
+  });
+});
+
 describe("quái con của trùm", () => {
   it("hạ quái con: KHÔNG tu vi, KHÔNG rơi đồ / Linh thạch, KHÔNG tính kiếp; và nó biến mất", () => {
     const { w, mon, p, c, until } = scene(
