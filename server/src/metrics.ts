@@ -186,6 +186,8 @@ export interface RoomSummary {
   ghosts: number;
   monsters: number;
   tick: TickSummary;
+  /** Hàng đợi input di chuyển (`World.inputStats`): bị bỏ vì đầy / số lượt tụt hậu (mục 25) */
+  input: { dropped: number; backlogTicks: number };
 }
 
 export interface MetricsSnapshot {
@@ -229,6 +231,7 @@ export function collectMetrics(
       ghosts: w.ghosts.size,
       monsters: w.state.monsters.size,
       tick,
+      input: { dropped: w.inputStats.dropped, backlogTicks: w.inputStats.backlogTicks },
     });
   }
   return {
@@ -297,6 +300,18 @@ export function renderPrometheus(s: MetricsSnapshot): string {
     "counter",
     "So tick chay lau hon mot nhip",
     (r) => r.tick.overrun,
+  );
+  perRoom(
+    "tiengioi_room_input_dropped_total",
+    "counter",
+    "Input di chuyen bi bo vi hang doi day (nhan vat bi keo giat lui)",
+    (r) => r.input.dropped,
+  );
+  perRoom(
+    "tiengioi_room_input_backlog_ticks_total",
+    "counter",
+    "So luot (nguoi choi x tick) hang doi input con tu 6 input tro len sau khi xu ly (may chu tut hau so voi client)",
+    (r) => r.input.backlogTicks,
   );
   metric(
     "tiengioi_room_tick_ms",
