@@ -243,7 +243,9 @@ async function main() {
     if (!first?.webSocketDebuggerUrl) throw new Error("Không kết nối được Chrome DevTools");
     tab = await Tab.open("A", first.webSocketDebuggerUrl);
     await tab.send("Page.addScriptToEvaluateOnNewDocument", {
-      source: `localStorage.setItem("tien-gioi:name", ${JSON.stringify(NAME)}); localStorage.setItem("tien-gioi:secret", ${JSON.stringify(SECRET)});`,
+      // "Thủ công — khoá mục tiêu": ca Tab / Shift+Tab / Esc dưới đây kiểm CHẾ ĐỘ THỦ CÔNG (chưa khoá, Tab khoá con gần nhất...). Mặc định mới là Tự động (mục 26: tự nhắm gần nhất,
+      // `check-aim-mode.mjs` kiểm bằng Chrome thật) nên ở đây phải chọn Thủ công.
+      source: `localStorage.setItem("tg_aim_mode", "manual"); localStorage.setItem("tien-gioi:name", ${JSON.stringify(NAME)}); localStorage.setItem("tien-gioi:secret", ${JSON.stringify(SECRET)});`,
     });
     await tab.send("Page.navigate", { url: `http://127.0.0.1:${PORT}/?debug` });
     await tab.waitFor(

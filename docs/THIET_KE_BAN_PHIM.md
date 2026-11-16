@@ -12,6 +12,7 @@ Một nguồn duy nhất: `client/src/keybinds.ts` (`ACTIONS`). HUD, dòng gợi
 | Kiếm chém | J, Space | giữ phím thì chém liên tục; chưa có mục tiêu thì tự khoá con gần nhất. Cụm J K L U I O: xem mục 3 (QUYET_DINH_M3 mục 17.1) |
 | Chọn mục tiêu / mục tiêu kế | Tab, T | gần nhất, bấm tiếp đi xa dần rồi vòng lại; chỉ còn một con thì bấm nữa là nhả |
 | Mục tiêu trước | Shift+Tab | đi ngược xa -> gần |
+| Đổi chế độ nhắm | ` (Backquote) | Tự động (mặc định, tự nhắm đối tượng gần nhất, Tab chọn tay tạm thời) <-> Thủ công (khoá tay như cũ); mục 26 QUYET_DINH_M3, lưu theo thiết bị `tg_aim_mode`; đổi được ở Cài đặt |
 | Bỏ chọn mục tiêu | Esc | chỉ khi không còn bảng / hộp thoại nào để đóng |
 | Kiếm khí | K, 3 | tự khoá con gần nhất nếu chưa có mục tiêu |
 | Ô chiêu thức 2 / 3 / 4 / 5 | L / U / I / O | CHƯA có chiêu (M7 mới lấp): hiện mờ ở HUD máy tính, bấm chỉ báo "ô còn trống", không gửi gì lên máy chủ |
