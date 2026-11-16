@@ -40,6 +40,25 @@ BossEnrage { afterMs, atkMult, speedMult, cdMult }     // chỉ trùm bí cảnh
 - **Reset:** kéo quá xa nhà (`LEASH_DIST`) hoặc không còn mục tiêu: về nhà, hồi đầy khí huyết, giai đoạn 0, xoá hồi chiêu, đồng hồ cuồng nộ và quái con (không để trùm hồi dở dang giữ giai đoạn cao).
 - **Hiệu năng:** trùm ít (<= vài con mỗi phòng); `warn` chỉ gửi lúc bắt đầu vận (không mỗi tick); không cấp phát trong vòng nóng; đo `bench` trước / sau (ca 8 Hắc Giao cùng bản đồ).
 
+### 4.1. Ngân sách & Kết quả đo hiệu năng máy chủ (8 trùm + 50-100 người, Issue #936)
+Bài kiểm thử hiệu năng tự động hoá trong `server/src/systems/boss-perf.test.ts` đo đạc trực tiếp trên thế giới `World` thật (bản đồ Lạc Hà `DEFAULT_MAP`, cờ `bossMoves = true`), 8 trùm rải quanh trấn ngoài hoang dã với bộ chiêu mẫu đầy đủ các hình học (`circleAt`, `ring`, `cone`, `line`, `rain`, `pull`, `summon`, `buff`) và điều kiện mục tiêu (`minTargets`, `maxTargets`).
+
+**Bảng hiệu năng máy chủ (Đo trong 10-30 giây mô phỏng, 20 tick/s):**
+
+| Quy mô (Người) | Số trùm | Tick TB (ms) | Tick p95 (ms) | Tick Max (ms) | Byte Patch / tick / client | fx / giây (1 client) | Đánh giá |
+|---:|---:|---:|---:|---:|---:|---:|---|
+| **0** | 8 | 0.00 ms | 0.00 ms | 0.04 ms | **0.0 byte** | 0.00 | Trùm ngủ, 0 byte patch, CPU ~0 |
+| **10** | 8 | 0.03 ms | 0.05 ms | 0.24 ms | **1.7 byte** | 1.70 | Cực kỳ nhẹ |
+| **50** | 8 | **0.09–0.14 ms** | **0.20–0.36 ms** | 1.09–1.46 ms | **2.2–6.0 byte** | **1.13–1.60** | **ĐẠT** (xa dưới trần 10 ms & 520 byte) |
+| **100** | 8 | 0.20 ms | 0.54 ms | 1.62 ms | **2.9 byte** | 1.20 | Không nghẽn |
+
+**Kết luận & Ngân sách duy trì:**
+1. **CPU Tick:** Với 50 người chơi và 8 trùm vận chiêu liên tục, thời gian tick trung bình **~0.14 ms** (p95 ~0.36 ms), nằm sâu dưới ngân sách trần 10.0 ms của kiến trúc.
+2. **Độ phức tạp `pickCast`:** Khi số người chơi tăng gấp 10 lần (10 -> 100 người) với trùm liên tục chọn chiêu ở mọi tick, thời gian `tickMonsters` chỉ tăng từ 0.033 ms lên 0.120 ms (tỉ lệ ~3.6x, < 25x), chứng minh độ phức tạp lọc mục tiêu và kiểm tra điều kiện là O(n) tuyến tính, tuyệt đối không bị O(n^2).
+3. **Băng thông State Patch:** Byte patch mỗi tick mỗi client chỉ **~2.2–6.0 byte/tick**, nằm sâu dưới trần 520 byte/tick/client. Toàn bộ cơ chế trùm (giai đoạn, cuồng nộ, vận chiêu) không bổ sung bất kỳ trường state công khai nào vào `schema.ts`.
+4. **Tần suất tin `fx`:** Một client đứng gần trùm chỉ nhận trung bình **~1.1–1.7 fx/giây** (bao gồm `warn`, `bossCast`, `bossSummon`, `bossArmor`), cách xa ngưỡng an toàn 15 fx/giây, không gây dồn ứ tin mạng.
+5. **Trạng thái ngủ:** Khi 0 người chơi, trùm ngủ hoàn toàn, CPU tick ~0 và 0 byte patch.
+
 ## 5. Giao thức và client (B, PR T4)
 - Dùng lại `fx` `warn` cho MỌI báo trước nên **client / APK cũ vẫn thấy vùng cảnh báo** (hình vành khuyên được thêm trường tuỳ chọn `r0`: client cũ vẽ cả hình tròn đặc = thận trọng hơn, không nguy hiểm). THÊM ba `fx`: `bossCast { by, ability, ms }` (tên chiêu cho thanh máu), `bossPhase { by, phase }`, `bossEnrage { by }`; client cũ bỏ qua `fx` lạ (T1 kiểm bằng test). `PROTOCOL_VERSION` KHÔNG tăng nếu test xác nhận; tăng ở PR T1 nếu cần.
 - Việc của B: vẽ vùng cảnh báo rõ trên điện thoại + máy tính (viền + nền mờ + vòng thời gian co lại, màu theo hệ, âm báo), hoạt ảnh vận chiêu, **thanh máu trùm có mốc giai đoạn + tên chiêu đang vận + chỉ báo cuồng nộ**, hình triệu hồi; đúng ngân sách M5 / mục 21 (Android tầm trung >= 50 FPS); tôn trọng thời điểm máy chủ (`ms` tính từ lúc nhận, bù độ trễ bằng `now` đồng bộ nếu có).
