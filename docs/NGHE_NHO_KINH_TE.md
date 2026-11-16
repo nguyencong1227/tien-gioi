@@ -28,14 +28,15 @@ Giá trị của đan = **giảm kỳ vọng lần thất bại** → giảm tu 
 
 | Đan | `ratio` | p(có đan) | Kỳ vọng lần thất bại KHÔNG/CÓ | Tu vi mất kỳ vọng KHÔNG/CÓ | Giờ phục hồi KHÔNG/CÓ | **Giảm thất bại** | **Giảm giờ phục hồi** |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| Đột Phá Đan (LK→TC) | +15% | **92%** | 0,30 → 0,09 | 9,0% → 2,6% | 1,4 phút → 0,7 phút | **−70%** | **−0,7 phút** |
-| Kinh Chỉ Đan (TC→KD) | +12% | **81%** | 0,45 → 0,23 | 13,5% → 7,0% | 14 phút → 7 phút | **−49%** | **−7 phút** |
-| Dưỡng Anh Đan (KD→NA) | +9% | **70%** | 0,64 → 0,43 | 19,2% → 12,9% | 1,9 giờ → 1,3 giờ | **−33%** | **−0,63 giờ** |
+| Đột Phá Đan (LK→TC) | +8% | **85%** | 0,30 → 0,18 | 9,0% → 5,3% | ~1,4 phút → ~0,8 phút | **−41%** | **−0,6 phút** |
+| Kinh Chỉ Đan (TC→KD) | +10% | **79%** | 0,45 → 0,27 | 13,5% → 8,0% | ~14 phút → ~8,3 phút | **−41%** | **−5,7 phút** |
+| Dưỡng Anh Đan (KD→NA) | +12% | **73%** | 0,64 → 0,37 | 19,2% → 11,1% | ~1,9 giờ → ~1,1 giờ | **−42%** | **−0,8 giờ** |
 
-**Kết luận EV:** đan hộ đạo cắt gần một nửa (Đột Phá/Kinh Chỉ) đến một phần ba (Dưỡng Anh) số lần thất bại đột
-phá. Giá trị lớn nhất ở **Kim Đan → Nguyên Anh** (thất bại 0,64 lần → mất ~19% thanh, ~1,9 giờ phục hồi mỗi lần
-thất bại): một viên Dưỡng Anh Đan tiết kiệm ~0,63 giờ tu vi + máu mỗi lần đột phá. Ở bậc thấp (Luyện Khí), đột
-phá vốn đã an toàn (77%), nên giá trị tuyệt đối nhỏ — phù hợp với việc đan đắt dần theo bậc.
+**Kết luận EV:** với `ratio` TĂNG theo bậc (0,08 / 0,10 / 0,12), ba đan cắt **đều ~41%** số lần thất bại ở mọi bậc —
+điều chỉnh đúng cho việc chi phí một lần thất bại tăng mạnh theo bậc (1,4 phút → 14 phút → 1,9 giờ). Giá trị tuyệt
+đối lớn nhất vẫn ở **Kim Đan → Nguyên Anh**: một viên Dưỡng Anh Đan tiết kiệm ~0,8 giờ tu vi + máu mỗi lần đột phá.
+Ở bậc thấp (Luyện Khí) giá trị tuyệt đối nhỏ nhất (đột phá vốn an toàn, 77%), nhưng tỷ lệ giảm (~41%) đều nhau, nên
+đan đắt nhất (Dưỡng Anh) cũng mạnh nhất — đúng với chi phí thất bại cao nhất theo bậc.
 
 ## 3. Phí Linh thạch + nguyên liệu (chi phí)
 
@@ -62,6 +63,8 @@ test giữ `forRealm` tăng dần theo `coin`), đúng với giá trị đan tă
   chống sinh Linh thạch.
 - **Xả Linh thạch dư:** ba đan là một kênh xả nhỏ, tập trung ở các mốc đột phá cảnh giới (không phải kênh xả
   chính — mức xả lớn ở Nguyên Anh ~168.000 vẫn là câu hỏi cân bằng riêng, KHÔNG thuộc lát 1 này).
-- **Số `ratio` (0,15 / 0,12 / 0,09) là đề xuất của D trong khung issue (cộng 8–15%, nhẹ theo bậc); Dev A chốt
-  khi review.** Nếu A muốn tăng theo bậc (ngược lại), chỉ đổi `ratio` + cập nhật `desc` (test `statusDescMatches`
-  + mutation #2 giữ chặt); EV ở mục 2 tính lại theo số mới.
+- **Số `ratio` (0,08 / 0,10 / 0,12, TĂNG theo bậc) là Dev A chốt khi review #815 (16/11), ngược lại đề xuất GIẢM
+  theo bậc (0,15 / 0,12 / 0,09) của D.** Lý do: chi phí một lần thất bại tăng mạnh theo bậc (1,4 phút → 14 phút →
+  1,9 giờ) nên đan ĐẮT nhất (Dưỡng Anh, 8.000 LS) phải MẠNH nhất; ba số này cho p mới 85/79/73% và cắt đều ~41% số
+  lần thất bại (EV ở mục 2). Đổi `ratio` thì cập nhật `desc` (test `statusDescMatches` + mutation #2 giữ chặt) và
+  tính lại EV ở mục 2 theo số mới.
