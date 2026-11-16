@@ -12,6 +12,8 @@ export interface ModalEntry {
 export interface EscapeHandlers {
   isTyping?: () => boolean;
   blurChat?: () => boolean;
+  /** Hộp xác nhận vứt đồ ở túi (Esc = Giữ lại, QUYET_DINH_M3 mục 24) */
+  closeInvDropConfirm?: () => boolean;
   closeSectActionConfirm?: () => boolean;
   closeSectDisbandConfirm?: () => boolean;
   closeDhudLeaveConfirm?: () => boolean;
@@ -219,6 +221,7 @@ export function processEscapeKey(handlers: EscapeHandlers): boolean {
   }
 
   // 3. Hộp xác nhận hành động con (bấm Esc = Huỷ, an toàn)
+  if (handlers.closeInvDropConfirm?.()) return true;
   if (handlers.closeSectActionConfirm?.()) return true;
   if (handlers.closeSectDisbandConfirm?.()) return true;
   if (handlers.closeDhudLeaveConfirm?.()) return true;
