@@ -43,6 +43,7 @@ describe("pickPromptButton: Y / X trả lời hộp đang hiện (#463)", () => 
       left = left.filter((x) => x !== id);
     }
     expect(order).toEqual([
+      "act-btn-yes",
       "tvl-btn-yes",
       "dhud-btn-leave-yes",
       "duel-btn-yield-yes",
@@ -57,7 +58,7 @@ describe("pickPromptButton: Y / X trả lời hộp đang hiện (#463)", () => 
     const stem = (id: string) => id.replace(/-(yes|no|accept|decline|enter)$/, "");
     PROMPT_BUTTONS.yes.forEach((y, i) => {
       const n = PROMPT_BUTTONS.no[i];
-      // cùng tiền tố hộp (tvl / pib / dib / duib / sib / dhud-btn-leave / duel-btn-yield)
+      // cùng tiền tố hộp (act / tvl / pib / dib / duib / sib / dhud-btn-leave / duel-btn-yield)
       expect(stem(y).slice(0, 3)).toBe(stem(n).slice(0, 3));
     });
   });

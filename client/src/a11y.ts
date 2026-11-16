@@ -12,6 +12,10 @@ export interface ModalEntry {
 export interface EscapeHandlers {
   isTyping?: () => boolean;
   blurChat?: () => boolean;
+  /** Hộp xác nhận vứt đồ ở túi (Esc = Giữ lại, QUYET_DINH_M3 mục 24) */
+  closeInvDropConfirm?: () => boolean;
+  /** Hộp xác nhận dùng chung (đột phá, bán đồ quý, ...; Esc = Giữ lại, issue #779) */
+  closeActConfirm?: () => boolean;
   closeSectActionConfirm?: () => boolean;
   closeSectDisbandConfirm?: () => boolean;
   closeDhudLeaveConfirm?: () => boolean;
@@ -71,6 +75,19 @@ export class ModalStack {
 
   size(): number {
     return this.stack.length;
+  }
+
+  /**
+   * Gỡ các mục SÓT: bảng đã ẩn nhưng đường đóng quên `remove` (đã gặp: menu người chơi, #468) làm `isKeyboardCaptured()` kẹt true và WASD / phím thế giới
+   * "liệt" cho tới khi bấm Esc (QUYET_DINH_M3 mục 25). `isGone(id)` = phần tử của bảng đã ẩn hoặc nằm trong vùng ẩn; không biết (không có phần tử) thì GIỮ.
+   * Trả số mục đã gỡ.
+   */
+  pruneHidden(isGone: (id: string) => boolean): number {
+    let n = 0;
+    for (const m of this.getEntries()) {
+      if (isGone(m.id) && this.remove(m.id)) n++;
+    }
+    return n;
   }
 
   clear(): void {
@@ -219,6 +236,8 @@ export function processEscapeKey(handlers: EscapeHandlers): boolean {
   }
 
   // 3. Hộp xác nhận hành động con (bấm Esc = Huỷ, an toàn)
+  if (handlers.closeActConfirm?.()) return true;
+  if (handlers.closeInvDropConfirm?.()) return true;
   if (handlers.closeSectActionConfirm?.()) return true;
   if (handlers.closeSectDisbandConfirm?.()) return true;
   if (handlers.closeDhudLeaveConfirm?.()) return true;

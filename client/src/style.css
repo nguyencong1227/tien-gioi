@@ -2192,6 +2192,42 @@ html[data-input="touch"] #skill-slots .sk.slot .keycap {
   justify-content: center;
   overflow: hidden;
 }
+/* Rê chuột chỉ SÁNG ô (không đổi ô được chọn, QUYET_DINH_M3 mục 24): nhẹ hơn `.selected` để không nhầm với món đã chọn; chỉ khi có chuột thật */
+@media (hover: hover) {
+  .inv-slot:hover:not(.selected) {
+    border-color: rgba(243, 220, 160, 0.6);
+    background: rgba(255, 255, 255, 0.1);
+  }
+}
+/* hộp xác nhận vứt THẾ CHỖ hàng nút hành động: bố cục không dài thêm, nút luôn ở chỗ người chơi vừa chạm (không chui xuống dưới nút Đóng nổi) */
+#inv-detail.dropping #inv-actions {
+  display: none;
+}
+.inv-drop-confirm {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1.5px solid #e0a93b;
+  border-radius: 8px;
+  background: rgba(24, 21, 18, 0.97);
+  text-align: center;
+}
+.inv-drop-confirm p {
+  margin: 0 0 4px 0;
+  font-size: var(--fs-14);
+  font-weight: 700;
+  color: #fff6dc;
+}
+.inv-drop-confirm small {
+  display: block;
+  margin-bottom: 6px;
+  font-size: var(--fs-12);
+  color: #ffd27a;
+}
+.inv-drop-btns {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
 .inv-slot.selected {
   box-shadow:
     0 0 0 2px #ffe08a,
@@ -3397,6 +3433,53 @@ html[data-input="touch"] #newbie-btn-keys {
 }
 #chat-log p.party b {
   color: #95de64;
+}
+
+/* Hộp xác nhận dùng chung (#779): giữa màn hình, nền tối chặn bấm xuyên; cao hơn mọi bảng và cả màn hình Hoàng Tuyền (z-index 10000) */
+.act-confirm {
+  position: fixed;
+  inset: 0;
+  z-index: 10010;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.55);
+}
+.act-confirm[hidden] {
+  display: none;
+}
+.act-confirm-box {
+  width: min(92vw, 380px);
+  padding: 14px 16px;
+  background: rgba(24, 21, 18, 0.98);
+  border: 1.5px solid #e0a93b;
+  border-radius: 10px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.85);
+  text-align: center;
+}
+.act-confirm-box p {
+  margin: 0 0 6px 0;
+  font-size: var(--fs-15, 15px);
+  font-weight: 700;
+  color: #fff6dc;
+}
+.act-confirm-box small {
+  display: block;
+  margin-bottom: 8px;
+  font-size: var(--fs-13);
+  color: #ffd27a;
+}
+.act-confirm-btns {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.act-confirm-btns .act-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
 /* Xác nhận qua cổng khi đang có hiệu lực đan / phù (#514): trên các lời mời (z-index cao hơn), viền hổ phách vì mất đồ dùng tay */

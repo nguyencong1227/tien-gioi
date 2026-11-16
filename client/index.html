@@ -888,7 +888,7 @@
               <b id="inv-item-name">Chưa chọn vật phẩm</b>
               <span id="inv-item-rarity" class="rarity-tag"></span>
             </div>
-            <p id="inv-item-desc">Chạm hoặc rê chuột vào một ô để xem chi tiết.</p>
+            <p id="inv-item-desc">Bấm hoặc chạm vào một ô để xem chi tiết.</p>
             <div id="inv-equip-cmp" class="equip-cmp" hidden></div>
           </div>
           <div id="inv-actions" hidden>
@@ -896,6 +896,22 @@
             <button type="button" id="inv-btn-equip" class="act-btn use" hidden>Mặc</button>
             <button type="button" id="inv-btn-drop1" class="act-btn drop">Vứt 1</button>
             <button type="button" id="inv-btn-dropall" class="act-btn drop">Vứt hết</button>
+          </div>
+          <!-- Hộp xác nhận vứt (QUYET_DINH_M3 mục 24): ghi tên + số lượng; "Giữ lại" là nút được focus; Esc = Giữ lại -->
+          <div
+            id="inv-drop-confirm"
+            class="inv-drop-confirm"
+            hidden
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="inv-drop-text"
+          >
+            <p id="inv-drop-text"></p>
+            <small id="inv-drop-warn" hidden></small>
+            <div class="inv-drop-btns">
+              <button type="button" id="inv-drop-no" class="act-btn">Giữ lại</button>
+              <button type="button" id="inv-drop-yes" class="act-btn drop">Vứt</button>
+            </div>
           </div>
         </footer>
       </section>
@@ -1615,6 +1631,31 @@
         </div>
       </div>
 
+      <!-- Hộp xác nhận DÙNG CHUNG cho thao tác khó hoàn tác (issue #779, docs/RA_SOAT_THAO_TAC.md): đột phá, bán đồ quý, mở chân linh... Y = xác nhận, X = giữ lại -->
+      <div
+        id="act-confirm"
+        class="act-confirm"
+        hidden
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="act-confirm-text"
+      >
+        <div class="act-confirm-box">
+          <p id="act-confirm-text"></p>
+          <small id="act-confirm-warn" hidden></small>
+          <div class="act-confirm-btns">
+            <button type="button" id="act-btn-no" class="act-btn">
+              <span id="act-btn-no-label">Giữ lại</span>
+              <kbd class="btn-key" aria-hidden="true" data-key-action="prompt.no">X</kbd>
+            </button>
+            <button type="button" id="act-btn-yes" class="act-btn drop">
+              <span id="act-btn-yes-label">Xác nhận</span>
+              <kbd class="btn-key" aria-hidden="true" data-key-action="prompt.yes">Y</kbd>
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Lời mời tổ đội -->
       <div
         id="party-invite-box"
@@ -2003,7 +2044,8 @@
               <b>Di Chuyển & Điều Khiển</b>
               <p class="guide-keys">
                 Phím <b>W / A / S / D</b> hoặc 4 phím mũi tên. Trên điện thoại: vuốt cần điều khiển
-                ảo ở góc trái.
+                ảo ở góc trái. Đang bật bộ gõ tiếng Việt (Unikey, EVKey...) mà nhân vật không đi?
+                Dùng 4 phím mũi tên, hoặc tắt bộ gõ khi chơi.
               </p>
               <p class="guide-touch">
                 Chạm giữ rồi kéo ở nửa trái màn hình: cần điều khiển ảo hiện ra để đi. Nếu đổi kiểu

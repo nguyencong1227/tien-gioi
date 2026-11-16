@@ -144,6 +144,7 @@ import { BAR_SLOTS, SkillTracker, aimMode, blockedToast, slotView } from "../ski
 import { SkillBarDom } from "../skill-bar-dom";
 import { StatusBadgesDom, badgeViews } from "../status-badges";
 import { craftBuffNames, travelConfirmText, useSuccessText } from "../craft-buff";
+import { breakthroughPlan, samePlan } from "../act-confirm";
 import {
   ELITE_STYLE,
   EliteHintGate,
@@ -195,6 +196,7 @@ import {
   fitView,
 } from "../map-render";
 import { moveVector } from "../move-input";
+import { MoveKeys } from "../move-keys";
 import { isTypingElement, isReducedMotion } from "../a11y";
 import {
   markMonAttack,
@@ -336,7 +338,8 @@ export class WorldScene extends Phaser.Scene {
   private lastPickup: { id: string; at: number } | null = null;
   private portalFxAt = new Map<string, number>();
   private npcs = new Map<string, NpcEntity>();
-  private keys!: Record<string, Phaser.Input.Keyboard.Key>;
+  /** Phím di chuyển theo `event.code` (không theo `keyCode` của Phaser: bộ gõ tiếng Việt làm `keyCode` = 229, mục 25) */
+  private moveKeys = new MoveKeys();
 
   // Đoán trước di chuyển của chính mình
   private seq = 0;
@@ -1104,9 +1107,29 @@ export class WorldScene extends Phaser.Scene {
   // ---------------- Input ----------------
 
   private setupInput() {
-    // Chỉ phím DI CHUYỂN do Phaser giữ (isDown mỗi khung). enableCapture = false: để còn gõ được chữ vào ô chat.
-    // Mọi phím HÀNH ĐỘNG đi qua bảng phím `keybinds.ts` (đổi được, HUD đọc nhãn từ đó) ở `onKeyDown`.
-    this.keys = this.input.keyboard!.addKeys("W,A,S,D,UP,DOWN,LEFT,RIGHT", false) as any;
+    // Phím DI CHUYỂN theo VỊ TRÍ phím (`event.code`, `move-keys.ts`), không qua `keyCode` của Phaser: bộ gõ tiếng Việt (Telex / VNI) gửi W A S D với `key` = "Process",
+    // `keyCode` = 229 nên Phaser không thấy phím nào ("liệt nút", QUYET_DINH_M3 mục 25). Nghe ở pha BẮT (capture) để không bị `stopPropagation` / `defaultPrevented`
+    // của nút hay bảng che mất keyup. Mọi phím HÀNH ĐỘNG đi qua bảng phím `keybinds.ts` (đổi được, HUD đọc nhãn từ đó) ở `onKeyDown`.
+    const mk = this.moveKeys;
+    const kd = (e: KeyboardEvent) => {
+      mk.keyDown(e, isTypingElement(e.target as Element | null));
+    };
+    const ku = (e: KeyboardEvent) => mk.keyUp(e);
+    // keyup có thể KHÔNG BAO GIỜ tới (Alt-Tab, đổi tab, menu chuột phải, vào ô chat): quên hết phím đang giữ để không kẹt
+    const forget = () => mk.clear();
+    const onVisibility = () => {
+      if (document.hidden) mk.clear();
+    };
+    const onFocusIn = (e: FocusEvent) => {
+      if (isTypingElement(e.target as Element | null)) mk.clear();
+    };
+    window.addEventListener("keydown", kd, true);
+    window.addEventListener("keyup", ku, true);
+    window.addEventListener("blur", forget);
+    window.addEventListener("pagehide", forget);
+    window.addEventListener("contextmenu", forget);
+    document.addEventListener("visibilitychange", onVisibility);
+    document.addEventListener("focusin", onFocusIn, true);
     window.addEventListener("keydown", this.onKeyDown);
     // Con trỏ chuột trong canvas (chiêu nhắm theo con trỏ): chạm / bút không tính. `pointerleave` cũng bắn khi con trỏ rời sang nút HUD phủ trên canvas.
     const canvas = this.game.canvas;
@@ -1123,6 +1146,13 @@ export class WorldScene extends Phaser.Scene {
     const offKeymap = onKeymapChange(() => this.syncSlotKeys());
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       window.removeEventListener("keydown", this.onKeyDown);
+      window.removeEventListener("keydown", kd, true);
+      window.removeEventListener("keyup", ku, true);
+      window.removeEventListener("blur", forget);
+      window.removeEventListener("pagehide", forget);
+      window.removeEventListener("contextmenu", forget);
+      document.removeEventListener("visibilitychange", onVisibility);
+      document.removeEventListener("focusin", onFocusIn, true);
       canvas.removeEventListener("pointermove", onMove);
       canvas.removeEventListener("pointerdown", onMove);
       canvas.removeEventListener("pointerleave", onLeave);
@@ -1164,7 +1194,7 @@ export class WorldScene extends Phaser.Scene {
     bind("btn-target", () => this.toggleLockTarget());
     bind("sk-sword", () => this.sword());
     bind("sk-med", () => this.toggleMeditate());
-    bind("sk-break", () => !this.isReconnecting && this.room.send("breakthrough"));
+    bind("sk-break", () => this.requestBreakthrough(document.getElementById("sk-break")));
     for (const n of [2, 3, 4, 5] as const)
       bind(`sk-slot${n}`, () => this.runAction(`skill.slot${n}`));
 
@@ -1235,7 +1265,7 @@ export class WorldScene extends Phaser.Scene {
         this.toggleMeditate();
         break;
       case "skill.breakthrough":
-        if (!this.isReconnecting) this.room.send("breakthrough");
+        this.requestBreakthrough(null);
         break;
       case "quick.1":
         ui.useQuick(1);
@@ -1325,13 +1355,14 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private moveDir() {
-    if (document.activeElement instanceof HTMLInputElement) return { dx: 0, dy: 0 };
-    const k = this.keys;
+    // chỉ ô NHẬP CHỮ chặn đi bộ (trước đây mọi `<input>`, kể cả ô đánh dấu / thanh trượt còn giữ focus sau khi đóng bảng, làm nhân vật đứng im)
+    if (isTypingElement(document.activeElement)) return { dx: 0, dy: 0 };
+    const k = this.moveKeys.state();
     return moveVector({
-      left: k.A.isDown || k.LEFT.isDown,
-      right: k.D.isDown || k.RIGHT.isDown,
-      up: k.W.isDown || k.UP.isDown,
-      down: k.S.isDown || k.DOWN.isDown,
+      left: k.left,
+      right: k.right,
+      up: k.up,
+      down: k.down,
       // bảng / hộp thoại đang mở: mũi tên điều hướng bảng, BÀN PHÍM không đi (#463); cần điều khiển ảo giữ nguyên hành vi cảm ứng
       keyboardBlocked: ui.isKeyboardCaptured(),
       joystick,
@@ -1624,6 +1655,43 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Đột phá (nút HUD và phím tắt): khi ĐỦ điều kiện thử thì HỎI trước (thất bại mất tu vi + nửa khí huyết, thành công không hoàn tác; hộp nêu xác suất kể cả
+   * đan hộ đạo), lúc xác nhận so lại kế hoạch rồi mới gửi `breakthrough`. Chưa đủ điều kiện thì gửi luôn: máy chủ từ chối KHÔNG mất gì và báo lý do.
+   */
+  private requestBreakthrough(opener: HTMLElement | null) {
+    if (this.isReconnecting) return;
+    const planNow = () => {
+      const me = this.me();
+      return me
+        ? breakthroughPlan(
+            me.realm,
+            me.tier,
+            me.exp,
+            me.expMax,
+            this.status.active(performance.now()),
+          )
+        : null;
+    };
+    const plan = planNow();
+    if (!plan) {
+      this.room.send("breakthrough");
+      return;
+    }
+    ui.askConfirm(
+      plan.spec,
+      () => {
+        if (this.isReconnecting) return;
+        if (!samePlan(plan, planNow())) {
+          ui.toast({ text: "Điều kiện đột phá vừa đổi, chưa đột phá. Hãy thử lại.", tone: "info" });
+          return;
+        }
+        this.room.send("breakthrough");
+      },
+      opener,
+    );
+  }
+
   public travelPortal(portalId: string) {
     if (this.isReconnecting) return;
     // Qua cổng XOÁ hiệu lực đan / phù (máy chủ, test #767): đang có thì hỏi trước (buff của chiêu thì không hỏi). "Đi" mới gửi `travel`.
@@ -1657,6 +1725,7 @@ export class WorldScene extends Phaser.Scene {
     this.isReconnecting = reconnecting;
     if (reconnecting) {
       ui.closeTravelConfirm();
+      ui.closeActConfirm(false);
       this.moving = false;
       this.duelKoUntil = 0;
       this.dungeonFallUntil = 0;
@@ -1745,6 +1814,7 @@ export class WorldScene extends Phaser.Scene {
     ui.talkPrompt(null);
     ui.pickupPrompt(null);
     ui.closeTravelConfirm();
+    ui.closeActConfirm(false);
   }
 
   /** Nhận danh sách trạng thái của chính mình (server gửi khi thêm / mất / làm mới, vơi khiên, nối lại). Công khai để script kiểm giả lập (`?debug`) bơm tin. */

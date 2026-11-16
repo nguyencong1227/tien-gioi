@@ -168,6 +168,38 @@ describe("a11y: processEscapeKey", () => {
     expect(handlers.closeTopModal).not.toHaveBeenCalled();
   });
 
+  it("đóng hộp xác nhận dùng chung (đột phá, bán đồ quý...; Esc = Giữ lại): đóng hộp TRƯỚC mọi thứ khác", () => {
+    const handlers: EscapeHandlers = {
+      closeActConfirm: vi.fn(() => true),
+      closeInvDropConfirm: vi.fn(() => true),
+      closeTopModal: vi.fn(() => true),
+    };
+    expect(processEscapeKey(handlers)).toBe(true);
+    expect(handlers.closeActConfirm).toHaveBeenCalledTimes(1);
+    expect(handlers.closeInvDropConfirm).not.toHaveBeenCalled();
+    expect(handlers.closeTopModal).not.toHaveBeenCalled();
+  });
+
+  it("đóng hộp xác nhận vứt đồ ở túi (Esc = Giữ lại): đóng hộp TRƯỚC, túi đồ vẫn mở", () => {
+    const handlers: EscapeHandlers = {
+      closeInvDropConfirm: vi.fn(() => true),
+      closeTopModal: vi.fn(() => true),
+    };
+    expect(processEscapeKey(handlers)).toBe(true);
+    expect(handlers.closeInvDropConfirm).toHaveBeenCalledTimes(1);
+    expect(handlers.closeTopModal).not.toHaveBeenCalled();
+  });
+
+  it("không có hộp xác nhận vứt đang mở: Esc đóng modal trên cùng như thường", () => {
+    const handlers: EscapeHandlers = {
+      closeInvDropConfirm: vi.fn(() => false),
+      closeTopModal: vi.fn(() => true),
+    };
+    expect(processEscapeKey(handlers)).toBe(true);
+    expect(handlers.closeInvDropConfirm).toHaveBeenCalledTimes(1);
+    expect(handlers.closeTopModal).toHaveBeenCalledTimes(1);
+  });
+
   it("đóng hộp xác nhận đầu hàng PK", () => {
     const handlers: EscapeHandlers = {
       closeDuelYieldConfirm: vi.fn(() => true),
@@ -512,5 +544,26 @@ describe("a11y: syncReducedMotionDom & motion-ok (Issue #280)", () => {
     syncReducedMotionDom();
     expect(document.body.classList.toggle).toHaveBeenCalledWith("reduced-motion", true);
     expect(document.body.classList.toggle).toHaveBeenCalledWith("motion-ok", false);
+  });
+});
+
+describe("ModalStack.pruneHidden: gỡ mục sót (QUYET_DINH_M3 mục 25: WASD liệt vì bảng đã ẩn còn trong ngăn xếp)", () => {
+  it("gỡ mục có bảng đã ẩn, giữ mục còn hiện hoặc không biết", () => {
+    const st = new ModalStack();
+    st.push("inv-modal");
+    st.push("player-menu");
+    st.push("khong-co-phan-tu");
+    st.push("char-modal");
+    const gone = new Set(["player-menu", "char-modal"]);
+    const n = st.pruneHidden((id) => gone.has(id));
+    expect(n).toBe(2);
+    expect(st.getEntries().map((m) => m.id)).toEqual(["inv-modal", "khong-co-phan-tu"]);
+  });
+  it("không có gì ẩn: không đổi; ngăn xếp rỗng: 0", () => {
+    const st = new ModalStack();
+    expect(st.pruneHidden(() => true)).toBe(0);
+    st.push("a");
+    expect(st.pruneHidden(() => false)).toBe(0);
+    expect(st.size()).toBe(1);
   });
 });
