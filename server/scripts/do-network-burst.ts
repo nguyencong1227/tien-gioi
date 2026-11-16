@@ -241,7 +241,9 @@ async function main() {
   const { results, metrics } = await runNetworkBurstSuite();
 
   console.log("\n### BẢNG KẾT QUẢ ĐO:");
-  console.log("| Kịch bản | Gửi (pkt) | Đứng yên sau (ms) | Đi thêm (px) | Bị drop | Vận tốc max (px/s) |");
+  console.log(
+    "| Kịch bản | Gửi (pkt) | Đứng yên sau (ms) | Đi thêm (px) | Bị drop | Vận tốc max (px/s) |",
+  );
   console.log("|---|---:|---:|---:|---:|---:|");
   for (const r of results) {
     console.log(
@@ -249,7 +251,9 @@ async function main() {
     );
   }
 
-  console.log(`\nMetrics: tiengioi_room_input_dropped_total=${metrics.dropped}, tiengioi_room_input_backlog_ticks_total=${metrics.backlogTicks}`);
+  console.log(
+    `\nMetrics: tiengioi_room_input_dropped_total=${metrics.dropped}, tiengioi_room_input_backlog_ticks_total=${metrics.backlogTicks}`,
+  );
 }
 
 if (process.argv[1]?.endsWith("do-network-burst.ts")) {
