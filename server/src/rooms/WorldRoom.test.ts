@@ -10,6 +10,10 @@ import { WebSocketTransport } from "@colyseus/ws-transport";
 import { Client, getStateCallbacks, type Room } from "colyseus.js";
 import {
   ROOM_NAME,
+  NET_BEAT_MS,
+  NET_RECONNECT_GRACE_S,
+  NET_SHIELD_MS,
+  NET_SPARE_HP_PCT,
   COIN_CAP,
   COIN_DROPS,
   MONSTER_CAP,
@@ -55,6 +59,7 @@ import {
 } from "@tien-gioi/shared";
 import { changeCoin } from "../systems/wallet";
 import { applyPlayerStatus } from "../systems/status";
+import { addMonster } from "../systems/test-helpers";
 import type { WorldRoom } from "./WorldRoom";
 import type { WorldState } from "../schema";
 
@@ -106,9 +111,14 @@ async function waitFor<T>(fn: () => T | undefined | false, ms = 3000): Promise<T
 let nameSeq = 0;
 const secretOf = (name: string) => `secret-${name}-0123456789abcdef`;
 
-async function join(name = `Thu ${++nameSeq}`, secret = secretOf(name), mapId = DEFAULT_MAP_ID) {
+async function join(
+  name = `Thu ${++nameSeq}`,
+  secret = secretOf(name),
+  mapId = DEFAULT_MAP_ID,
+  extra: Record<string, unknown> = {},
+) {
   const client = new Client(`ws://localhost:${PORT}`);
-  const room = await client.joinOrCreate(roomNameOf(mapId), { name, secret });
+  const room = await client.joinOrCreate(roomNameOf(mapId), { name, secret, ...extra });
   const chat: ChatOut[] = [];
   const toasts: ToastMsg[] = [];
   const invs: InvMsg[] = [];
@@ -129,10 +139,13 @@ async function join(name = `Thu ${++nameSeq}`, secret = secretOf(name), mapId = 
   room.onMessage("toast", (m: ToastMsg) => toasts.push(m));
   room.onMessage("fx", () => {});
   room.onMessage("dmg", () => {});
+  const shields: { ms: number; reason: string }[] = [];
+  room.onMessage("netShield", (m: { ms: number; reason: string }) => shields.push(m));
   rooms.push(room);
   await waitFor(() => (room.state as any)?.players?.get(room.sessionId));
   return {
     room,
+    shields,
     name,
     chat,
     toasts,
@@ -818,6 +831,145 @@ describe("nhịp tim ứng dụng ping / pong (M4.2b)", () => {
     expect(pongs.length).toBeLessThanOrEqual(8);
     expect(a.room.connection.isOpen).toBe(true); // 30 tin vẫn nằm xa ngưỡng ngắt vì spam
   });
+});
+
+describe("bảo vệ tính mạng khi mất kết nối (mục 33)", () => {
+  const world = (room: Room) => (serverRoom(room) as any).world;
+  const ctrl = (room: Room) => world(room).ctrl.get(room.sessionId);
+  const BEAT = { beatMs: NET_BEAT_MS };
+  /** Quái dữ đứng sát người chơi, đang nhắm người đó. */
+  function monsterOnTop(room: Room) {
+    const p = serverState(room).players.get(room.sessionId)!;
+    const { id, m, mc } = addMonster(world(room), "lang", p.x + 10, p.y);
+    m.hp = m.maxHp = 1e6;
+    mc.target = room.sessionId;
+    return id;
+  }
+
+  it("giữ chỗ chờ nối lại mặc định 90 giây (trước đây 20), khớp hằng của shared", () => {
+    expect(defaultGraceS).toBe(NET_RECONNECT_GRACE_S);
+    expect(NET_RECONNECT_GRACE_S).toBe(90);
+  });
+
+  it("socket ĐỨNG (không đóng, client ngừng gửi tin) giữa quái dữ: sau 3 giây thành hồn lìa xác, nhiều giây im lặng sau đó không mất máu, không chết; có tin lại thì ra + hộ thể + nhận netShield", async () => {
+    const a = await join("Dung Im", secretOf("Dung Im"), DEFAULT_MAP_ID, BEAT);
+    const sid = a.room.sessionId;
+    const w = world(a.room);
+    expect(ctrl(a.room).beatMs).toBe(NET_BEAT_MS);
+    // vài nhịp đều đặn rồi IM LẶNG (socket vẫn mở)
+    for (let i = 0; i < 3; i++) {
+      a.room.send("ping", { t: i });
+      await sleep(300);
+    }
+    const p = serverState(a.room).players.get(sid)!;
+    const hp0 = p.hp;
+    const mid = monsterOnTop(a.room);
+    await sleep(1200); // còn trong 3 giây im lặng: quái có thể đánh (đối chứng: chưa ghost)
+    expect(w.ghosts.has(sid)).toBe(false);
+    await waitFor(() => w.ghosts.has(sid), 4000);
+    expect(ctrl(a.room).silent).toBe(true);
+    const hpAtGhost = p.hp;
+    expect(hpAtGhost).toBeGreaterThan(0);
+    expect(a.room.connection.isOpen).toBe(true); // socket vẫn mở: máy chủ tự phát hiện bằng im lặng
+    await sleep(3000); // im lặng tiếp: quái đứng sát mà không mất máu
+    expect(p.hp).toBe(hpAtGhost);
+    expect(p.dead).toBe(false);
+    expect(ctrl(a.room).limbo).toBeUndefined();
+    expect(w.mctrl.get(mid).target).toBeNull();
+    // có tin lại: ra khỏi hồn lìa xác, hộ thể, nhận netShield
+    a.room.send("ping", { t: 99 });
+    await waitFor(() => !w.ghosts.has(sid), 2000);
+    await waitFor(() => a.shields[0], 2000);
+    expect(a.shields[0]).toEqual({ ms: NET_SHIELD_MS, reason: "resume" });
+    expect(w.shielded.has(sid)).toBe(true);
+    expect(p.hp).toBeGreaterThanOrEqual(Math.min(hp0, hpAtGhost)); // không mất máu vì chuyện mạng
+    w.state.monsters.delete(mid);
+    w.mctrl.delete(mid);
+  }, 20_000);
+
+  it("client KHÔNG khai nhịp (bản cũ) và im lặng: KHÔNG bị coi là hồn lìa xác (giữ hành vi cũ)", async () => {
+    const a = await join("Ban Cu Im");
+    const sid = a.room.sessionId;
+    expect(ctrl(a.room).beatMs).toBeUndefined();
+    await sleep(3600);
+    expect(world(a.room).ghosts.has(sid)).toBe(false);
+  }, 10_000);
+
+  it("khai nhịp ngoài khoảng (quá thưa / không phải số): không áp luật im lặng", async () => {
+    const a = await join("Nhip Xau", secretOf("Nhip Xau"), DEFAULT_MAP_ID, { beatMs: 5000 });
+    expect(ctrl(a.room).beatMs).toBeUndefined();
+    const b = await join("Nhip Xau 2", secretOf("Nhip Xau 2"), DEFAULT_MAP_ID, { beatMs: "1000" });
+    expect(ctrl(b.room).beatMs).toBeUndefined();
+  });
+
+  it("bị hạ khi client đã im lặng >= 2 giây (socket mở): KHÔNG mất kiếp, KHÔNG Hoàng Tuyền; hồi ở điểm an toàn với ít máu, nhận netShield spared", async () => {
+    const a = await join("Tha Chet Mang", secretOf("Tha Chet Mang"), DEFAULT_MAP_ID, BEAT);
+    const sid = a.room.sessionId;
+    const w = world(a.room);
+    const p = serverState(a.room).players.get(sid)!;
+    const lifeId = ctrl(a.room).lifeId;
+    a.room.send("ping", { t: 1 });
+    await sleep(2300); // im lặng 2,3 giây (chưa tới 3 giây nên chưa là hồn lìa xác)
+    expect(w.ghosts.has(sid)).toBe(false);
+    const mid = monsterOnTop(a.room);
+    p.hp = 1;
+    // đòn kết liễu: đi qua đúng đường của quái (hurtPlayer)
+    const { hurtPlayer } = await import("../systems/combat");
+    hurtPlayer(w, sid, p, 1e6, { kind: "lang" });
+    expect(p.dead).toBe(false);
+    expect(ctrl(a.room).limbo).toBeUndefined();
+    expect(ctrl(a.room).lifeId).toBe(lifeId);
+    expect(p.hp).toBe(Math.max(1, Math.round(p.maxHp * NET_SPARE_HP_PCT)));
+    expect(w.map.inSafe(p.x, p.y)).toBe(true);
+    await waitFor(() => a.shields.find((x) => x.reason === "spared"), 2000);
+    w.state.monsters.delete(mid);
+    w.mctrl.delete(mid);
+  }, 15_000);
+
+  it("rớt socket thật rồi nối lại: nhận netShield resume, hộ thể, đúng chỗ, máu giữ nguyên, beatMs còn nguyên (không cần khai lại)", async () => {
+    const a = await join("Roi Noi Lai 33", secretOf("Roi Noi Lai 33"), DEFAULT_MAP_ID, BEAT);
+    const sid = a.room.sessionId;
+    const w = world(a.room);
+    const p = serverState(a.room).players.get(sid)!;
+    const { x, y } = p;
+    p.hp = Math.max(1, Math.floor(p.maxHp / 2));
+    const hp = p.hp;
+    (a.room.connection.transport as any).ws.close();
+    await waitFor(() => !a.room.connection.isOpen);
+    await waitFor(() => (serverRoom(a.room) as any).ghosts.has(sid), 3000);
+    expect(w.ghosts.has(sid)).toBe(true);
+    const client = new Client(`ws://localhost:${PORT}`);
+    const r2 = await client.reconnect(a.room.reconnectionToken);
+    const shields: { ms: number; reason: string }[] = [];
+    r2.onMessage("netShield", (m: { ms: number; reason: string }) => shields.push(m));
+    for (const t of [
+      "chat",
+      "toast",
+      "fx",
+      "dmg",
+      "party",
+      "partyInvited",
+      "dialog",
+      "inv",
+      "wallet",
+      "quests",
+      "skills",
+      "status",
+      "sect",
+      "sectVault",
+      "sectPresence",
+    ])
+      r2.onMessage(t, () => {});
+    rooms.push(r2);
+    await waitFor(() => !w.ghosts.has(sid), 3000);
+    await waitFor(() => shields[0], 3000);
+    expect(shields[0]).toEqual({ ms: NET_SHIELD_MS, reason: "resume" });
+    expect(w.shielded.has(sid)).toBe(true);
+    expect(p.hp).toBe(hp);
+    expect(p.x).toBeCloseTo(x, 3);
+    expect(p.y).toBeCloseTo(y, 3);
+    expect(ctrl(a.room).beatMs).toBe(NET_BEAT_MS);
+  }, 15_000);
 });
 
 describe("giám sát vận hành (M4 3.3)", () => {
