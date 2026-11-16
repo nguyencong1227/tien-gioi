@@ -6,6 +6,7 @@ import {
   MONSTER_BY_ID,
   QUESTS,
   QUEST_BY_ID,
+  SECT_QUEST_BY_ID,
   emptyInventory,
   getMap,
   addToInventory,
@@ -126,6 +127,15 @@ describe("questGoal: đích của bước hiện tại", () => {
 
   it("reachRealm: đứng ở đâu cũng được", () => {
     expect(questGoal(QUEST_BY_ID.vong_suong, at(0), ctx())).toEqual({ kind: "anywhere" });
+  });
+
+  it("nhiệm vụ TÔNG MÔN xong hết bước: trả ở bảng Tông môn, đứng ở đâu cũng được (không có NPC để đi tới); chưa xong thì đích bước như thường", () => {
+    const q = SECT_QUEST_BY_ID["st_tru_lang.t0"]!;
+    expect(q.steps[0]).toMatchObject({ kind: "kill", monster: "lang" });
+    // chưa xong: đích là bản đồ có sinh Hôi Lang
+    expect(questGoal(q, at(0), ctx())).toEqual({ kind: "maps", mapIds: mapsSpawning("lang") });
+    // xong hết bước: không tra NPC "tong_mon" (không phải NPC), đứng ở đâu trả cũng được
+    expect(questGoal(q, at(q.steps.length), ctx())).toEqual({ kind: "anywhere" });
   });
 
   it("xong hết bước: về người giao ở bản đồ của họ (trả suong_ho_hoan ở Vọng Sương)", () => {

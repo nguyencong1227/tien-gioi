@@ -89,7 +89,7 @@ import {
   NPC_BY_ID,
   NPC_RANGE,
   npcsOfMap,
-  QUEST_BY_ID,
+  questDefAny,
   npcMarker,
   questReady,
   statsFor,
@@ -2700,7 +2700,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private resolveQuestTarget(questId: string): { x: number; y: number; hop?: NavHop } | null {
-    const def = QUEST_BY_ID[questId];
+    const def = questDefAny(questId);
     if (!def) return null;
     const qLog = ui.getQuestLog();
     const prog = qLog.active.find((a) => a.id === questId);
@@ -2993,7 +2993,7 @@ export class WorldScene extends Phaser.Scene {
       if (target) {
         questTarget = target;
         // ghim đích nhiệm vụ: ở bản đồ KHÁC thì đích là cổng kế tiếp trên đường tới đó ("Qua <cổng>")
-        const name = QUEST_BY_ID[trackId ?? ""]?.title ?? "Nhiệm vụ";
+        const name = questDefAny(trackId)?.title ?? "Nhiệm vụ";
         pins.push({ x: target.x, y: target.y, text: target.hop ? hopLabel(target.hop) : name });
       }
     }

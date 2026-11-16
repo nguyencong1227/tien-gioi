@@ -405,6 +405,39 @@ async function main() {
       );
       await evalJs(`document.getElementById("sect-action-confirm-cancel").click(); 1`);
 
+      // ---- nhiệm vụ TÔNG MÔN trong sổ nhiệm vụ / HUD: không có NPC giao, trả ở bảng Tông môn ----
+      await evalJs(`window.__ui.toggleSectModal(false); 1`);
+      await evalJs(
+        `window.__ui.onQuests({ active: [{ id: "st_tru_lang.t0", step: 1, count: 0 }], done: [], dailyDone: [] }); 1`,
+      );
+      await sleep(150);
+      const qt = await evalJs(
+        `[...document.querySelectorAll(".qt-item")].map((e) => ({ title: e.querySelector(".qt-title span")?.textContent ?? "", badge: e.querySelector(".qt-badge")?.textContent ?? "", step: e.querySelector(".qt-step")?.textContent ?? "", ready: e.classList.contains("ready") }))`,
+      );
+      check(
+        qt.length === 1 &&
+          qt[0].title === "Trừ sói quanh trấn" &&
+          qt[0].badge === "Tông" &&
+          qt[0].ready &&
+          /Mở bảng Tông môn > Nội vụ để trả/.test(qt[0].step),
+        `HUD: nhiệm vụ tông môn hiện tên + huy hiệu 'Tông' + 'Mở bảng Tông môn > Nội vụ để trả': ${JSON.stringify(qt[0])}`,
+      );
+      await evalJs(`window.__ui.toggleQuestModal(true); 1`);
+      await sleep(200);
+      const qc = await evalJs(
+        `[...document.querySelectorAll("#quest-list .q-card")].map((c) => ({ giver: c.querySelector(".q-card-head small")?.textContent ?? "", progress: c.querySelector(".q-card-progress")?.textContent ?? "" }))`,
+      );
+      check(
+        qc.length === 1 &&
+          qc[0].giver === "Nhiệm vụ nội vụ tông môn" &&
+          !/tong_mon/.test(qc[0].giver) &&
+          /Mở bảng Tông môn > Nội vụ/.test(qc[0].progress),
+        `sổ nhiệm vụ: không hiện id 'tong_mon', ghi nơi trả là bảng Tông môn: ${JSON.stringify(qc[0])}`,
+      );
+      await evalJs(
+        `window.__ui.toggleQuestModal(false); window.__ui.onQuests({ active: [], done: [], dailyDone: [] }); 1`,
+      );
+
       if (shotsDir) {
         await hallOf(3);
         await evalJs(`document.getElementById("sect-tab-btn-hall").click(); 1`);

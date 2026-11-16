@@ -21,7 +21,7 @@ import {
   EQUIP_SLOT_NAMES,
   equipBonus,
   RECIPES,
-  QUEST_BY_ID,
+  questDefAny,
   NPC_BY_ID,
   MONSTER_BY_ID,
   emptyInventory,
@@ -156,7 +156,8 @@ import { renderHall, updateHallCountdown, type HallUiState } from "./sect-hall-u
 import { canAffordFee, feeChipText, recipeFee } from "./forge-fee";
 import {
   QUEST_KIND_BADGE,
-  QUEST_KIND_LABEL,
+  questCardSubtitle,
+  questReadyText,
   doneRows,
   doneSummary,
   questKind,
@@ -1113,8 +1114,7 @@ function describeStep(
 } {
   const ctx = getCtx();
   if (questReady(def, prog, ctx)) {
-    const npc = NPC_BY_ID[def.giver];
-    return { text: `Hoàn thành · Gặp ${npc?.name ?? "NPC"} trả nhiệm vụ`, ready: true };
+    return { text: questReadyText(def), ready: true };
   }
   const s = def.steps[prog.step];
   if (!s) return { text: "Đã hoàn thành", ready: true };
@@ -1265,7 +1265,7 @@ function renderQuestTracker() {
   }
 
   for (const a of questLog.active) {
-    const def = QUEST_BY_ID[a.id];
+    const def = questDefAny(a.id); // nhiệm vụ thường + nhiệm vụ tông môn (M8)
     if (!def) continue;
     const { text, ready } = describeStep(def, a);
 
@@ -1462,13 +1462,13 @@ function renderQuestModalImpl() {
       return;
     }
     for (const a of questLog.active) {
-      const def = QUEST_BY_ID[a.id];
+      const def = questDefAny(a.id);
       if (!def) continue;
       const { text, ready } = describeStep(def, a);
 
       const card = document.createElement("div");
       const kind = questKind(def);
-      card.className = `q-card ${kind === "daily" ? "daily" : kind === "side" ? "side-q" : "main-q"}`;
+      card.className = `q-card ${kind === "daily" || kind === "sect" ? "daily" : kind === "side" ? "side-q" : "main-q"}`;
 
       const head = document.createElement("div");
       head.className = "q-card-head";
@@ -1479,8 +1479,7 @@ function renderQuestModalImpl() {
 
       const giver = document.createElement("small");
       giver.style.opacity = "0.75";
-      const npc = NPC_BY_ID[def.giver];
-      giver.textContent = `${npc?.name ?? def.giver} (${QUEST_KIND_LABEL[kind]})`;
+      giver.textContent = questCardSubtitle(def);
 
       head.append(title, giver);
 
