@@ -168,6 +168,26 @@ describe("a11y: processEscapeKey", () => {
     expect(handlers.closeTopModal).not.toHaveBeenCalled();
   });
 
+  it("đóng hộp xác nhận vứt đồ ở túi (Esc = Giữ lại): đóng hộp TRƯỚC, túi đồ vẫn mở", () => {
+    const handlers: EscapeHandlers = {
+      closeInvDropConfirm: vi.fn(() => true),
+      closeTopModal: vi.fn(() => true),
+    };
+    expect(processEscapeKey(handlers)).toBe(true);
+    expect(handlers.closeInvDropConfirm).toHaveBeenCalledTimes(1);
+    expect(handlers.closeTopModal).not.toHaveBeenCalled();
+  });
+
+  it("không có hộp xác nhận vứt đang mở: Esc đóng modal trên cùng như thường", () => {
+    const handlers: EscapeHandlers = {
+      closeInvDropConfirm: vi.fn(() => false),
+      closeTopModal: vi.fn(() => true),
+    };
+    expect(processEscapeKey(handlers)).toBe(true);
+    expect(handlers.closeInvDropConfirm).toHaveBeenCalledTimes(1);
+    expect(handlers.closeTopModal).toHaveBeenCalledTimes(1);
+  });
+
   it("đóng hộp xác nhận đầu hàng PK", () => {
     const handlers: EscapeHandlers = {
       closeDuelYieldConfirm: vi.fn(() => true),
