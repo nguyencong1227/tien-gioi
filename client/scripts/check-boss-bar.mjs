@@ -61,7 +61,6 @@ export const VIEWPORTS = [
   { name: "390x844", w: 390, h: 844, dpr: 2, mobile: true },
   { name: "360x640", w: 360, h: 640, dpr: 2, mobile: true },
 ];
-const MIN_TAP_PX = 44;
 
 async function main() {
   const shotsArg = process.argv.indexOf("--shots");
@@ -363,8 +362,6 @@ async function main() {
         evalJs(
           `(() => { const sc = window.__scene; sc.predX = window.__start.x + ${dx}; sc.predY = window.__start.y; return 1; })()`,
         );
-      const warnRing = (r0) =>
-        fx({ kind: "warn", shape: "circle", x: 0, y: 0, r: 120, ms: 900, ...(r0 ? { r0 } : {}) });
       // tâm vùng = chỗ đứng gốc
       const place = (extra) =>
         evalJs(
