@@ -314,7 +314,8 @@ describe("FileSectStore: riêng của bản file", () => {
     expect(readdirSync(dir)).toEqual(["f1.json"]);
     const onDisk = sanitizeSect(JSON.parse(readFileSync(path.join(dir, "f1.json"), "utf8")), NOW);
     expect(onDisk?.coin).toBe(19);
-    expect(onDisk?.updatedAt).toBe(NOW);
+    // đồng hồ cố định: mỗi lần ghi `updatedAt` TĂNG NGHIÊM NGẶT 1 ms (10 lần update sau lần tạo): nền để so bản mới / cũ khi phát ảnh chụp
+    expect(onDisk?.updatedAt).toBe(NOW + 10);
   });
 
   it("delete xoá tệp (không để lại tệp mồ côi để lần khởi động sau sống lại)", async () => {
