@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { TICK_MS } from "@tien-gioi/shared";
 import { makeWorld, addPlayer } from "./test-helpers";
 import { applyInputs, queueInput } from "./movement";
+import { tickWorld } from "./tick";
 
 /** Một lần chạy mô phỏng. Trả số input đã gửi, bị bỏ (hàng đợi đầy), độ sâu hàng đợi lớn nhất / cuối, `lastSeq`. */
 function simulate(o: {
@@ -123,5 +124,16 @@ describe("hàng đợi input theo thời gian thật", () => {
     for (let seq = 1; seq <= 40; seq++) queueInput(w, "a", { seq, dx: 0, dy: 1 });
     applyInputs(w.map, p, c, 3_600_000); // máy chủ treo cả giờ
     expect(p.lastSeq).toBe(10);
+  });
+
+  it("tickWorld truyền thời gian thật của tick xuống hàng đợi: tick trễ 100 ms xử lý được 2 bước (không cố định 1)", () => {
+    const { w } = makeWorld();
+    const { p, c } = addPlayer(w, "a");
+    c.moveBudget = 0;
+    for (let seq = 1; seq <= 5; seq++) queueInput(w, "a", { seq, dx: 0, dy: 1 });
+    tickWorld(w, 2 * TICK_MS);
+    expect(p.lastSeq).toBe(2);
+    tickWorld(w, TICK_MS);
+    expect(p.lastSeq).toBe(3);
   });
 });
