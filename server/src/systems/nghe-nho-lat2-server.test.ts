@@ -3,18 +3,37 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   CDR_CAP,
+  ITEM_BY_ID,
   SKILL_BY_ID,
   elementMult,
   skillCooldownMs,
   skillDamageMult,
   statsFor,
+  type ItemDef,
 } from "@tien-gioi/shared";
 import { cast } from "./cast";
 import { cdrNow } from "./skills";
 import { applyPlayerStatus, clearPlayerStatus, tickStatuses } from "./status";
 import { addMonster, addPlayer, makeWorld } from "./test-helpers";
 
-afterEach(() => vi.restoreAllMocks());
+/** Món trang bị thử có `cdr` (chèn vào bảng chung, dọn sau mỗi ca): chưa có món thật cho ô riêng nên test tự dựng. */
+const TEST_BOOTS = "t_hai_cdr_phu";
+const withBoots = (cdr: number) => {
+  ITEM_BY_ID[TEST_BOOTS] = {
+    id: TEST_BOOTS,
+    name: "Hài thử",
+    type: "equip",
+    stack: 1,
+    rarity: 2,
+    desc: "thử",
+    equip: { slot: "boots", stats: { cdr }, reqRealm: 0, reqTier: 0 },
+    color: 0,
+  } as unknown as ItemDef;
+};
+afterEach(() => {
+  vi.restoreAllMocks();
+  delete ITEM_BY_ID[TEST_BOOTS];
+});
 
 /** Người chơi Hóa Thần (đủ bốn ô chiêu), đầy linh lực; ô 2 gắn `bon_thach_quyen` (hệ thổ), ô 3 `hoa_van_kiem` (hệ hỏa). */
 function setup() {
@@ -145,6 +164,37 @@ describe("phù cdr_phu: giảm hồi chiêu", () => {
     expect(skillCooldownMs(def, 1, 0.15)).toBeLessThan(skillCooldownMs(def, 1, 0));
     // cộng trang bị 0,25 => 0,4 > CDR_CAP: hồi chiêu bằng đúng ở trần
     expect(skillCooldownMs(def, 1, 0.25 + 0.15)).toBe(skillCooldownMs(def, 1, CDR_CAP));
+  });
+
+  it("CỘNG với giảm hồi chiêu của trang bị (không lấy max): trang bị 0,10 + phù 0,15 = 0,25; vượt trần thì kẹp CDR_CAP", () => {
+    const t = setup();
+    withBoots(10);
+    t.p.boots = TEST_BOOTS;
+    expect(cdrNow(t.w, "a", t.p, t.c)).toBeCloseTo(0.1, 12);
+    give(t, "cdr_phu", 60_000, 0.15);
+    expect(cdrNow(t.w, "a", t.p, t.c)).toBeCloseTo(0.25, 12); // cộng, không phải max(0,1; 0,15)
+    const def = SKILL_BY_ID["bon_thach_quyen"];
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    const now0 = t.w.now;
+    cast(t.w, "a", { slot: 2, angle: 0 });
+    expect(t.c.skillCd[0] - now0).toBe(skillCooldownMs(def, 1, 0.25));
+    expect(skillCooldownMs(def, 1, 0.25)).toBeLessThan(skillCooldownMs(def, 1, 0.15)); // khác nhiều so với chỉ max
+    // trang bị mạnh 0,25 + phù 0,15 = 0,4 > CDR_CAP: kẹp ở skillCooldownMs
+    withBoots(25);
+    expect(skillCooldownMs(def, 1, cdrNow(t.w, "a", t.p, t.c))).toBe(
+      skillCooldownMs(def, 1, CDR_CAP),
+    );
+  });
+
+  it("phù quá hạn nhưng hộp chưa dọn: KHÔNG còn tính (cdrNow chỉ còn trang bị)", () => {
+    const t = setup();
+    withBoots(10);
+    t.p.boots = TEST_BOOTS;
+    give(t, "cdr_phu", 10_000, 0.15);
+    expect(cdrNow(t.w, "a", t.p, t.c)).toBeCloseTo(0.25, 12);
+    t.w.now += 11_000; // quá hạn, chưa tick nên mục còn trong hộp
+    expect(t.c.st!.list.some((x) => x.id === "cdr_phu")).toBe(true);
+    expect(cdrNow(t.w, "a", t.p, t.c)).toBeCloseTo(0.1, 12);
   });
 
   it("gửi lại sổ chiêu (cdMax mới) khi phù vào, và khi hết hạn lúc dọn", () => {
