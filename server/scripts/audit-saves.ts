@@ -40,6 +40,10 @@ import {
   SECT_TAG_MAX,
   SECT_MOTD_MAX,
   SECT_RANKS,
+  SECT_VAULT_SLOTS,
+  SECT_VAULT_LOG_MAX,
+  SECT_VAULT_DRAW_MAX,
+  SECT_VAULT_QTY_MAX,
   cleanMotd,
   cleanSectName,
   cleanSectTag,
@@ -1446,6 +1450,28 @@ export function auditSectSaveData(rawText: string, byteLength: number): AuditErr
           message: `Thành viên thứ ${i} có joinedAt (${show(m.joinedAt)}) không phải số epoch ms hợp lệ`,
         });
       }
+
+      if (m.draw !== undefined) {
+        if (m.draw === null || typeof m.draw !== "object" || Array.isArray(m.draw)) {
+          errors.push({
+            code: "invalid_sect_member_draw",
+            message: `Thành viên thứ ${i} có draw không phải là một JSON Object`,
+          });
+        } else {
+          if (typeof m.draw.day !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(m.draw.day)) {
+            errors.push({
+              code: "invalid_sect_member_draw_day",
+              message: `Thành viên thứ ${i} có draw.day (${show(m.draw.day)}) không hợp lệ (cần định dạng YYYY-MM-DD)`,
+            });
+          }
+          if (typeof m.draw.n !== "number" || !Number.isSafeInteger(m.draw.n) || m.draw.n < 0) {
+            errors.push({
+              code: "invalid_sect_member_draw_count",
+              message: `Thành viên thứ ${i} có draw.n (${show(m.draw.n)}) phải là số nguyên không âm`,
+            });
+          }
+        }
+      }
     }
 
     if (chuCount !== 1 || !leaderFound) {
@@ -1526,7 +1552,129 @@ export function auditSectSaveData(rawText: string, byteLength: number): AuditErr
     }
   }
 
-  // 10. createdAt, updatedAt
+  // 10. vault: kho đồ tông môn (#786, #790)
+  if (data.vault !== undefined) {
+    if (data.vault === null || typeof data.vault !== "object" || Array.isArray(data.vault)) {
+      errors.push({
+        code: "invalid_sect_vault",
+        message: "vault phải là một JSON Object",
+      });
+    } else {
+      // 10a. slots: mảng đúng SECT_VAULT_SLOTS ô
+      if (!Array.isArray(data.vault.slots) || data.vault.slots.length !== SECT_VAULT_SLOTS) {
+        errors.push({
+          code: "invalid_sect_vault_slots",
+          message: `vault.slots phải là mảng đúng ${SECT_VAULT_SLOTS} ô`,
+        });
+      } else {
+        for (let i = 0; i < data.vault.slots.length; i++) {
+          const sl = data.vault.slots[i];
+          if (sl === null || sl === undefined) continue;
+          if (typeof sl !== "object" || Array.isArray(sl)) {
+            errors.push({
+              code: "invalid_sect_vault_slot",
+              message: `Ô kho đồ thứ ${i} không phải là object hoặc null`,
+            });
+            continue;
+          }
+          const itemDef = typeof sl.itemId === "string" ? byId(ITEM_BY_ID, sl.itemId) : undefined;
+          if (!itemDef) {
+            errors.push({
+              code: "unknown_sect_vault_item",
+              message: `Ô kho đồ thứ ${i} chứa vật phẩm không tồn tại trong ITEM_BY_ID: ${show(sl.itemId)}`,
+            });
+          }
+          const maxStack = itemDef ? itemDef.stack : 1;
+          if (
+            typeof sl.qty !== "number" ||
+            !Number.isSafeInteger(sl.qty) ||
+            sl.qty < 1 ||
+            sl.qty > maxStack
+          ) {
+            errors.push({
+              code: "invalid_sect_vault_qty",
+              message: `Ô kho đồ thứ ${i} có số lượng (${show(sl.qty)}) không hợp lệ (cần số nguyên 1..${maxStack})`,
+            });
+          }
+        }
+      }
+
+      // 10b. log: sổ kho đồ (tối đa SECT_VAULT_LOG_MAX)
+      if (data.vault.log !== undefined) {
+        if (!Array.isArray(data.vault.log) || data.vault.log.length > SECT_VAULT_LOG_MAX) {
+          errors.push({
+            code: "invalid_sect_vault_log",
+            message: `vault.log phải là mảng chứa tối đa ${SECT_VAULT_LOG_MAX} mục`,
+          });
+        } else {
+          for (let i = 0; i < data.vault.log.length; i++) {
+            const entry = data.vault.log[i];
+            if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
+              errors.push({
+                code: "invalid_sect_vault_log_entry",
+                message: `Mục sổ kho đồ thứ ${i} không phải là một object`,
+              });
+              continue;
+            }
+            if (!isFiniteEpoch(entry.at)) {
+              errors.push({
+                code: "invalid_sect_vault_log_time",
+                message: `Mục sổ kho đồ thứ ${i} có mốc thời gian (${show(entry.at)}) không hợp lệ`,
+              });
+            }
+            if (typeof entry.name !== "string" || cleanName(entry.name) === null) {
+              errors.push({
+                code: "invalid_sect_vault_log_name",
+                message: `Mục sổ kho đồ thứ ${i} có tên (${show(entry.name)}) không hợp lệ`,
+              });
+            }
+            if (entry.kind !== "deposit" && entry.kind !== "withdraw") {
+              errors.push({
+                code: "invalid_sect_vault_log_kind",
+                message: `Mục sổ kho đồ thứ ${i} có loại giao dịch (${show(entry.kind)}) không hợp lệ (cần deposit hoặc withdraw)`,
+              });
+            }
+            const logItemDef =
+              typeof entry.itemId === "string" ? byId(ITEM_BY_ID, entry.itemId) : undefined;
+            if (!logItemDef) {
+              errors.push({
+                code: "unknown_sect_vault_log_item",
+                message: `Mục sổ kho đồ thứ ${i} chứa vật phẩm không tồn tại trong ITEM_BY_ID: ${show(entry.itemId)}`,
+              });
+            }
+            if (
+              typeof entry.qty !== "number" ||
+              !Number.isSafeInteger(entry.qty) ||
+              entry.qty < 1 ||
+              entry.qty > SECT_VAULT_QTY_MAX
+            ) {
+              errors.push({
+                code: "invalid_sect_vault_log_qty",
+                message: `Mục sổ kho đồ thứ ${i} có số lượng (${show(entry.qty)}) không hợp lệ (cần số nguyên 1..${SECT_VAULT_QTY_MAX})`,
+              });
+            }
+          }
+        }
+      }
+
+      // 10c. drawPerDay: hạn mức rút Đệ tử (0..SECT_VAULT_DRAW_MAX)
+      if (data.vault.drawPerDay !== undefined) {
+        if (
+          typeof data.vault.drawPerDay !== "number" ||
+          !Number.isInteger(data.vault.drawPerDay) ||
+          data.vault.drawPerDay < 0 ||
+          data.vault.drawPerDay > SECT_VAULT_DRAW_MAX
+        ) {
+          errors.push({
+            code: "invalid_sect_vault_draw_policy",
+            message: `vault.drawPerDay (${show(data.vault.drawPerDay)}) không hợp lệ (cần số nguyên 0..${SECT_VAULT_DRAW_MAX})`,
+          });
+        }
+      }
+    }
+  }
+
+  // 11. createdAt, updatedAt
   if (!isFiniteEpoch(data.createdAt)) {
     errors.push({
       code: "invalid_sect_time",

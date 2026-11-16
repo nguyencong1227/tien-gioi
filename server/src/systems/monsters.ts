@@ -132,6 +132,7 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
     target &&
     (target.dead ||
       (w.ghosts.size > 0 && w.ghosts.has(mc.target!)) ||
+      (w.shielded.size > 0 && w.shielded.has(mc.target!)) || // hộ thể sau nối lại: quái bỏ mục tiêu (mục 33)
       (w.duels.active && w.duels.has(mc.target!)) ||
       w.map.inSafe(target.x, target.y, 20) ||
       Math.hypot(m.x - mc.homeX, m.y - mc.homeY) > LEASH_DIST)
@@ -147,6 +148,7 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
     w.state.players.forEach((p, sid) => {
       if (p.dead) return;
       if (w.ghosts.size > 0 && w.ghosts.has(sid)) return; // hồn lìa xác: quái không thấy
+      if (w.shielded.size > 0 && w.shielded.has(sid)) return; // đang hộ thể: quái không nhắm (mục 33)
       if (w.duels.active && w.duels.has(sid)) return; // đang thách đấu: quái không thấy
       const d = Math.hypot(p.x - m.x, p.y - m.y);
       if (d < nearest) nearest = d;

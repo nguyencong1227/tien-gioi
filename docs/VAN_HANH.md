@@ -229,6 +229,8 @@ Hệ thống giám sát vận hành thu thập số đo từ mọi phòng thế 
 | `tiengioi_room_tick_overrun_total{room, map}` | Counter | Số tick chạy quá thời gian nhịp chuẩn (> 50 ms) từ khi phòng khởi tạo |
 | `tiengioi_room_input_dropped_total{room, map}` | Counter | Số input di chuyển bị BỎ vì hàng đợi của người chơi đầy (60 input = 3 giây): mỗi lần bỏ là nhân vật bị kéo giật lùi ở client. Phải đứng yên ở 0; tăng nghĩa là mạng giữ gói rồi dồn quá 3 giây hoặc client gửi quá nhanh (mục 25, `docs/THIET_KE_DI_CHUYEN.md`) |
 | `tiengioi_room_input_backlog_ticks_total{room, map}` | Counter | Số lượt (người chơi x tick) mà hàng đợi input còn từ 6 input trở lên SAU khi xử lý (máy chủ tụt hậu từ 0,3 giây so với client). Bình thường gần như đứng yên; tăng đều là máy chủ xử lý chậm hơn client gửi (nhịp tick) hoặc mạng dồn gói |
+| `tiengioi_room_net_silent_total{room, map}` | Counter | Số lần người chơi (client có khai nhịp) IM LẶNG quá 3 giây và thành "hồn lìa xác" dù socket còn mở (mạng đứng, tab nền, hoặc CỐ Ý ngắt gói để thoát trận). Tăng dồn dập ở MỘT người thì xem nhật ký kiểm toán `net.silent` (`docs/THIET_KE_MAT_KET_NOI.md` mục 7) |
+| `tiengioi_room_net_spared_total{room, map}` | Counter | Số lần THA CHẾT do mạng (bị hạ khi client đã im lặng từ 2 giây: không Hoàng Tuyền, không mất kiếp). Nhật ký `net.spared` |
 | `tiengioi_writes_inflight` | Gauge | Số yêu cầu ghi hồ sơ nhân vật đang xếp hàng/đang xử lý. Cảnh báo khi vượt `WRITE_WARN_PENDING` (mặc định `200`) |
 | `tiengioi_writes_oldest_age_seconds` | Gauge | Thời gian chờ của yêu cầu ghi lâu nhất trong hàng đợi. Cảnh báo khi vượt `WRITE_WARN_AGE_S` (mặc định `30s`) |
 | `tiengioi_writes_started_total` | Counter | Tổng số lượt ghi hồ sơ nhân vật bắt đầu thực hiện |
