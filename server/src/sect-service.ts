@@ -32,14 +32,22 @@ import {
   sectCanEarn,
   sectDayState,
   sectKey,
+  SECT_EARN_DAY_CAP,
+  SECT_LEVELS,
+  SECT_LEVEL_MAX,
+  sectBuffOf,
+  sectEarnFromAt,
+  sectEarnLeft,
   sectLevelInfo,
   sectLevelOf,
+  sectResetAt,
   sectQuestTemplateOf,
   sectVaultAccepts,
   type InvSlot,
   type SectAssignableRank,
   type SectEarnSource,
   type SectFail,
+  type SectHallView,
   type SectView,
   type SectVaultView,
 } from "@tien-gioi/shared";
@@ -639,6 +647,44 @@ export class SectService {
       return { ok: true, sect };
     });
   }
+}
+
+/**
+ * Ảnh chụp "Nội vụ" (M8, `SectHallMsg.hall`) gửi thành viên `viewerKey`; `null` nếu người đó không ở tông môn. `now` là đồng hồ phòng (ms), `warmup` là cờ "chờ sang ngày"
+ * (`World.sectEarnWarmup`). Nhiệm vụ và cửa hàng để RỖNG ở bước này (M8.4 / M8.5 điền): client dựng giao diện khớp kiểu thật.
+ */
+export function sectHallViewOf(
+  sect: Sect,
+  viewerKey: string,
+  now: number,
+  warmup: boolean,
+): SectHallView | null {
+  const me = sect.members.find((m) => m.soulKey === viewerKey);
+  if (!me) return null;
+  const points = sect.points ?? 0;
+  const level = sectLevelOf(points);
+  const info = sectLevelInfo(level);
+  const day = sectDayState(me.today, now);
+  return {
+    now,
+    resetAt: sectResetAt(now),
+    level,
+    points,
+    pointsFrom: info.points,
+    pointsNext: level < SECT_LEVEL_MAX ? SECT_LEVELS[level]!.points : null,
+    buff: sectBuffOf(level),
+    caps: { members: info.maxMembers, elders: info.maxElders, vaultSlots: info.vaultSlots },
+    me: {
+      contrib: me.contrib ?? 0,
+      merit: me.merit ?? 0,
+      earnedToday: day.earned,
+      earnCap: SECT_EARN_DAY_CAP,
+      depositLeft: sectEarnLeft(day, "deposit"),
+      earnFromAt: sectCanEarn(me.joinedAt, now, warmup) ? 0 : sectEarnFromAt(me.joinedAt, warmup),
+    },
+    quests: [],
+    shop: [],
+  };
 }
 
 /** Ảnh chụp gửi cho thành viên `viewerKey` (`SectMsg.sect`); `null` nếu người đó không ở tông môn. Thành viên xếp theo `compareSectMembers`. */
