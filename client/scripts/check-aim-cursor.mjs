@@ -195,6 +195,9 @@ async function main() {
           `(() => { const sc = window.__scene, m = sc.monsters.get("m1"); return Math.atan2(m.ty - sc.predY, m.tx - sc.predX); })()`,
         );
       const SHIFT = 0.4; // dung sai góc (rad)
+      // Hướng nhìn "mồi" đặt lại trước MỖI lần bấm (nam-tây-nam, khác cả đông lẫn tây lẫn bắc): mỗi đòn đều cập nhật `facing`, nếu không thì hướng nhìn của lần bắn trước
+      // trùng đúng hướng cần tới và một chiêu chỉ dùng `facing` (bỏ qua chuột / mục tiêu) vẫn qua được
+      const DECOY_FACING = Math.PI / 2 + 0.3;
       const near = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b))) < SHIFT;
       const canvasRect = () =>
         evalJs(
@@ -234,7 +237,7 @@ async function main() {
         });
       const resetCd = () =>
         evalJs(
-          `(() => { const sc = window.__scene; sc.nextSlash = 0; sc.nextSword = 0; sc.onSkills(${BOOK}); window.__sent.length = 0; return 1; })()`,
+          `(() => { const sc = window.__scene; sc.nextSlash = 0; sc.nextSword = 0; sc.onSkills(${BOOK}); sc.facing = ${DECOY_FACING}; window.__sent.length = 0; return 1; })()`,
         );
       const lastAngle = (types) =>
         evalJs(
@@ -395,12 +398,12 @@ async function main() {
           "quái gần nhất đã được tự khoá",
         );
         await evalJs(
-          `(() => { const sc = window.__scene; sc.setLockedTarget(null); sc.state.monsters.delete("m1"); sc.facing = 1.0; return 1; })()`,
+          `(() => { const sc = window.__scene; sc.setLockedTarget(null); sc.state.monsters.delete("m1"); return 1; })()`,
         );
         await sleep(500);
         const aFace = await fire("KeyL");
         check(
-          aFace !== null && near(aFace, 1.0),
+          aFace !== null && near(aFace, DECOY_FACING),
           `không quái, không chuột hợp lệ: về hướng nhìn (${fmt(aFace)})`,
         );
       } else {
