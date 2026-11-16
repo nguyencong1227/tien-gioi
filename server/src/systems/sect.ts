@@ -11,6 +11,7 @@
 // kiểm lại `ctrl` còn đó (và cùng danh tính) trước khi đụng tới ví.
 import {
   COIN_CAP,
+  ITEM_BY_ID,
   NO_SECT,
   SECT_CREATE_COST,
   SECT_INVITES_MAX,
@@ -18,6 +19,8 @@ import {
   SECT_PRESENCE_MS,
   cleanSectName,
   cleanSectTag,
+  addToInventory,
+  dayKey,
   parseSectAmount,
   parseSectAnswer,
   parseSectInvite,
@@ -25,16 +28,23 @@ import {
   parseSectMotd,
   parseSectRank,
   parseSectTransfer,
+  parseSectVaultDeposit,
+  parseSectVaultPolicy,
+  parseSectVaultWithdraw,
   sectFailMessage,
   sectKey,
+  sectVaultAccepts,
   type ChatOut,
+  type Inventory,
   type SectFail,
   type SectPresenceEntry,
 } from "@tien-gioi/shared";
 import type { Located } from "../hub";
 import type { Sect } from "../sect-store";
-import { sectViewOf, type SectActor } from "../sect-service";
+import { sectVaultViewOf, sectViewOf, type SectActor } from "../sect-service";
 import type { World } from "../world";
+import { sendInv, takeFromSlot } from "./inventory";
+import { spawnLoot } from "./loot";
 import { changeCoin, trySpendCoin } from "./wallet";
 
 // ---------- Sổ chung (một cho cả tiến trình, qua `Hub.sects`) ----------
@@ -58,6 +68,8 @@ export class SectBook {
   readonly online = new Map<string, string>();
   /** Bản ghi mới nhất của các tông môn đang có người trực tuyến (cập nhật sau mỗi thao tác thành công). */
   readonly cache = new Map<string, Sect>();
+  /** Linh hồn đang có MỘT thao tác kho đồ dở (góp / rút): thao tác thứ hai của cùng người bị từ chối thay vì chồng lên (mục 11.5 lớp 3). */
+  readonly vaultBusy = new Set<string>();
   /** Lần gửi `sectPresence` gần nhất của từng tông môn (để chỉ gửi khi đổi). */
   readonly lastPresence = new Map<string, string>();
   private nextTickAt = 0;
@@ -157,6 +169,17 @@ function saveNow(w: World, sid: string): Promise<boolean> {
 
 // ---------- Gửi ảnh chụp / presence ----------
 
+/** Còn bao nhiêu ms hết khoá "kiếp mới chưa được rút" của người chơi `sid` ở phòng `w` (0 = không khoá hoặc cờ tắt). */
+function newLifeLockLeft(w: World, sid: string): number {
+  const c = w.ctrl.get(sid);
+  return c && w.sectNewLifeLockMs > 0 ? Math.max(0, w.sectNewLifeLockMs - c.life.playMs) : 0;
+}
+
+/** Ảnh chụp kho đồ cho người `soulKey` đang đứng ở phòng `w` với phiên `sid` (lượt rút còn lại theo ngày của phòng đó, khoá kiếp mới của chính người đó). */
+function vaultMsgFor(w: World, sid: string, sect: Sect, soulKey: string) {
+  return { vault: sectVaultViewOf(sect, soulKey, dayKey(w.now), newLifeLockLeft(w, sid)) };
+}
+
 /**
  * Sau một thay đổi thành công: nhớ bản ghi mới, gửi `SectMsg` cho mọi thành viên đang trực tuyến, đặt `Player.sect`, và gửi
  * `NO_SECT` (xoá cờ) cho những người vừa bị gỡ. Không gửi gì cho người ngoại tuyến (vào phòng sẽ tự nhận).
@@ -171,6 +194,7 @@ function broadcastSect(w: World, sect: Sect, removed: { soulKey: string; name: s
     loc.p.sect = sect.tag;
     book.online.set(m.soulKey, sect.id);
     loc.w.events.sect(loc.sid, { sect: sectViewOf(sect, m.soulKey) });
+    loc.w.events.sectVault(loc.sid, vaultMsgFor(loc.w, loc.sid, sect, m.soulKey));
   }
   sendPresence(w, sect); // ai đang trực tuyến cập nhật NGAY khi thành viên đổi (không chờ nhịp `tickSect`)
   sendRemoved(w, removed);
@@ -185,6 +209,7 @@ function sendRemoved(w: World, removed: { soulKey: string; name: string }[]) {
     if (!loc) continue;
     loc.p.sect = "";
     loc.w.events.sect(loc.sid, NO_SECT);
+    loc.w.events.sectVault(loc.sid, { vault: null });
   }
 }
 
@@ -226,6 +251,7 @@ export async function sectOnJoin(w: World, sid: string) {
   if (!loc) return;
   loc.p.sect = sect.tag;
   w.events.sect(sid, { sect: sectViewOf(sect, a.soulKey) });
+  w.events.sectVault(sid, vaultMsgFor(w, sid, sect, a.soulKey));
   sendPresence(w, sect); // mọi người trong tông môn thấy người mới trực tuyến ngay
 }
 
@@ -513,6 +539,7 @@ export async function sectWithdraw(w: World, sid: string, raw: unknown) {
   const c = w.ctrl.get(sid);
   if (!a || !c) return;
   if (!msg) return toastFail(w, sid, "amount_invalid");
+  if (newLifeLockLeft(w, sid) > 0) return toastFail(w, sid, "vault_locked"); // cờ kiếp mới chưa được rút (mặc định tắt)
   if (COIN_CAP - c.coin < msg.amount) return toastFail(w, sid, "wallet_full");
   // Đang qua cổng: hồ sơ không lưu được lúc này, rút ra sẽ mất (kho đã trừ, ví không xuống đĩa). Thử lại sau.
   // Đang ở Hoàng Tuyền: ví của kiếp đã mất, đầu thai sẽ ghi đè, rút ra cũng mất. Từ chối từ đầu, kho nguyên.
@@ -536,4 +563,155 @@ export async function sectWithdraw(w: World, sid: string, raw: unknown) {
       treasury: sect.coin,
     });
   if (credited > 0) toastGood(w, sid, `Đã rút ${credited} Linh thạch từ kho tông môn.`);
+}
+
+// ---------- Kho đồ (túi <-> hồ sơ <-> kho; docs/THIET_KE_TONG_MON.md mục 11.4) ----------
+// Ưu tiên MẤT hơn NHÂN ĐÔI: GÓP = trừ túi -> LƯU hồ sơ -> cộng kho (từ chối / lỗi thì trả túi, túi đầy thì rơi đất); RÚT = trừ kho (kèm hạn mức, sổ) -> cộng
+// túi -> LƯU hồ sơ (túi không nhận trọn thì trả phần thừa vào kho, không được thì rơi đất). Sập giữa chừng chỉ có thể MẤT phần đồ đang chuyển, không bao giờ có thêm.
+
+/** Túi `inv` còn chỗ cho `qty` món `itemId` không (thử trên bản sao). */
+function bagHolds(inv: Inventory, itemId: string, qty: number): boolean {
+  const copy = inv.map((s) => (s ? { ...s } : null));
+  return addToInventory(copy, itemId, qty) === 0;
+}
+
+/** Kho `sect` còn chỗ cho `qty` món `itemId` không (thử trên bản sao; kiểm SỚM để khỏi trừ túi rồi hoàn). */
+function vaultHolds(sect: Sect, itemId: string, qty: number): boolean {
+  const copy = sect.vault.slots.map((s) => (s ? { ...s } : null));
+  return addToInventory(copy, itemId, qty) === 0;
+}
+
+/**
+ * Trả đồ vào túi của `sid` (đúng linh hồn); phần túi không nhận thì RƠI XUỐNG ĐẤT tại chân (chủ nhặt trước). Người chơi đã rời thì đồ mất: không bao giờ
+ * cộng ở hai chỗ.
+ */
+function returnToBag(w: World, sid: string, soulKey: string, itemId: string, qty: number) {
+  const c = w.ctrl.get(sid);
+  const p = w.state.players.get(sid);
+  if (!c || !p || c.identity.soulKey !== soulKey) return;
+  const left = addToInventory(c.inv, itemId, qty);
+  if (left < qty) sendInv(w, sid, [{ itemId, qty: qty - left }]);
+  else sendInv(w, sid);
+  if (left > 0) spawnLoot(w, itemId, left, p.x, p.y, sid);
+}
+
+const itemName = (id: string) => ITEM_BY_ID[id]?.name ?? id;
+
+/** `sectVaultDeposit { slot, qty }`: kiểm sớm -> trừ túi -> LƯU hồ sơ -> cộng kho; từ chối / lỗi thì trả túi. */
+export async function sectVaultDeposit(w: World, sid: string, raw: unknown) {
+  const svc = w.sectService;
+  if (!svc) return toastFail(w, sid, "disabled");
+  const msg = parseSectVaultDeposit(raw);
+  const a = actorOf(w, sid);
+  const c = w.ctrl.get(sid);
+  if (!a || !c) return;
+  if (!msg) return toastFail(w, sid, "item_invalid");
+  // Đang qua cổng: hồ sơ không lưu được lúc này (đồ trừ khỏi túi mà đĩa vẫn giữ đồ: nhân đôi nếu sập). Ở Hoàng Tuyền: túi của kiếp đã mất.
+  if (c.travelling || c.limbo) return toastFail(w, sid, "error");
+  const book = w.hub.sects;
+  if (book.vaultBusy.has(a.soulKey)) return toastFail(w, sid, "error"); // đang xử lý một thao tác kho đồ của chính người này
+  book.vaultBusy.add(a.soulKey);
+  try {
+    const slot = c.inv[msg.slot];
+    if (!slot || msg.qty > slot.qty) return toastFail(w, sid, "item_invalid");
+    const itemId = slot.itemId;
+    if (!sectVaultAccepts(itemId)) return toastFail(w, sid, "vault_denied");
+    const cur = await svc.sectOf(a.soulKey);
+    if (!cur) return toastFail(w, sid, "not_in_sect"); // khỏi trừ rồi hoàn
+    if (!vaultHolds(cur, itemId, msg.qty)) return toastFail(w, sid, "vault_full");
+    // Sau `await` túi có thể đã đổi (nhặt / dùng / vứt): kiểm lại ĐÚNG ô và số lượng rồi mới trừ
+    const c2 = w.ctrl.get(sid);
+    if (!c2 || !stillHere(w, sid, a.soulKey) || c2.travelling || c2.limbo)
+      return toastFail(w, sid, "error");
+    const s2 = c2.inv[msg.slot];
+    if (!s2 || s2.itemId !== itemId || msg.qty > s2.qty) return toastFail(w, sid, "item_invalid");
+    takeFromSlot(c2.inv, msg.slot, msg.qty);
+    sendInv(w, sid);
+    // Túi đã trừ phải xuống đĩa TRƯỚC khi kho được cộng; lưu không được thì huỷ, trả túi (kho chưa đụng tới)
+    if (!(await saveNow(w, sid))) {
+      returnToBag(w, sid, a.soulKey, itemId, msg.qty);
+      return toastFail(w, sid, "error");
+    }
+    const res = await svc.vaultDeposit(a, itemId, msg.qty);
+    if (!res.ok) {
+      returnToBag(w, sid, a.soulKey, itemId, msg.qty); // trả đồ
+      return toastFail(w, sid, res.reason);
+    }
+    broadcastSect(w, res.sect);
+    w.audit?.("sect.vault_deposit", { name: a.name, sect: res.sect.name, itemId, qty: msg.qty });
+    toastGood(w, sid, `Đã góp ${msg.qty} ${itemName(itemId)} vào kho đồ tông môn.`);
+  } finally {
+    book.vaultBusy.delete(a.soulKey);
+  }
+}
+
+/**
+ * `sectVaultWithdraw { slot, itemId, qty }`: kiểm sớm (túi còn chỗ, khoá kiếp mới) -> trừ kho (nguyên tử: quyền, khoá kỳ vọng theo ô, hạn mức, sổ) -> cộng túi ->
+ * LƯU hồ sơ. Túi không nhận trọn (vừa đầy, người chơi đã rời / gục / đang qua cổng) thì TRẢ phần thừa vào kho; kho cũng hết chỗ thì rơi đất tại chân.
+ */
+export async function sectVaultWithdraw(w: World, sid: string, raw: unknown) {
+  const svc = w.sectService;
+  if (!svc) return toastFail(w, sid, "disabled");
+  const msg = parseSectVaultWithdraw(raw);
+  const a = actorOf(w, sid);
+  const c = w.ctrl.get(sid);
+  if (!a || !c) return;
+  if (!msg) return toastFail(w, sid, "item_invalid");
+  if (c.travelling || c.limbo) return toastFail(w, sid, "error");
+  if (newLifeLockLeft(w, sid) > 0) return toastFail(w, sid, "vault_locked");
+  const book = w.hub.sects;
+  if (book.vaultBusy.has(a.soulKey)) return toastFail(w, sid, "error");
+  book.vaultBusy.add(a.soulKey);
+  try {
+    if (!bagHolds(c.inv, msg.itemId, msg.qty)) return toastFail(w, sid, "bag_full");
+    const today = dayKey(w.now);
+    const res = await svc.vaultWithdraw(a, msg, today);
+    if (!res.ok) return toastFail(w, sid, res.reason);
+    // Kho đã trừ: đồ phải VÀO túi hoặc VỀ kho. Chỉ cộng túi khi người này vẫn ở đây, cùng linh hồn, còn sống kiếp này và không đang qua cổng.
+    const cur = w.ctrl.get(sid);
+    let left = msg.qty;
+    if (cur && walletOpen(w, sid, a.soulKey) && !cur.travelling) {
+      left = addToInventory(cur.inv, msg.itemId, msg.qty);
+      if (left < msg.qty) sendInv(w, sid, [{ itemId: msg.itemId, qty: msg.qty - left }]);
+    }
+    const got = msg.qty - left;
+    let sect = res.sect;
+    if (left > 0) {
+      // trả phần chưa nhận được vào kho (hoàn cả lượt rút nếu không nhận được gì); kho hết chỗ thì rơi đất tại chân
+      const back = await svc.vaultReturn(a, msg.itemId, left, got === 0, today);
+      if (back.ok) sect = back.sect;
+      else {
+        const p = w.state.players.get(sid);
+        if (p && stillHere(w, sid, a.soulKey)) spawnLoot(w, msg.itemId, left, p.x, p.y, sid);
+      }
+    }
+    if (got > 0) await saveNow(w, sid);
+    broadcastSect(w, sect);
+    if (got > 0) {
+      w.audit?.("sect.vault_withdraw", {
+        name: a.name,
+        sect: sect.name,
+        itemId: msg.itemId,
+        qty: got,
+      });
+      toastGood(w, sid, `Đã rút ${got} ${itemName(msg.itemId)} từ kho đồ tông môn.`);
+    } else toastFail(w, sid, "bag_full");
+  } finally {
+    book.vaultBusy.delete(a.soulKey);
+  }
+}
+
+/** `sectVaultPolicy { drawPerDay }`: chỉ Tông chủ; đặt số lượt rút / ngày của Đệ tử rồi gửi lại kho cho mọi thành viên trực tuyến. */
+export async function sectVaultPolicy(w: World, sid: string, raw: unknown) {
+  const svc = w.sectService;
+  if (!svc) return toastFail(w, sid, "disabled");
+  const msg = parseSectVaultPolicy(raw);
+  const a = actorOf(w, sid);
+  if (!a) return;
+  if (!msg) return toastFail(w, sid, "amount_invalid");
+  const res = await svc.vaultPolicy(a, msg.drawPerDay);
+  if (!res.ok) return toastFail(w, sid, res.reason);
+  broadcastSect(w, res.sect);
+  w.audit?.("sect.vault_policy", { name: a.name, sect: res.sect.name, drawPerDay: msg.drawPerDay });
+  toastGood(w, sid, `Đệ tử nay được rút kho đồ ${msg.drawPerDay} lượt mỗi ngày.`);
 }

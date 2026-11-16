@@ -5,15 +5,26 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vites
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { SECT_COIN_CAP, SECT_LOG_MAX } from "@tien-gioi/shared";
+import {
+  ITEMS,
+  SECT_COIN_CAP,
+  SECT_LOG_MAX,
+  SECT_VAULT_DRAW_DEFAULT,
+  SECT_VAULT_DRAW_MAX,
+  SECT_VAULT_LOG_MAX,
+  SECT_VAULT_SLOTS,
+} from "@tien-gioi/shared";
 import {
   FileSectStore,
   SectConflictError,
   assertWritableSect,
+  emptySectVault,
   isSectId,
   sanitizeSect,
+  sanitizeVault,
   sectsDir,
   withLogEntry,
+  withVaultLogEntry,
   type Sect,
 } from "./sect-store";
 import { makeSect } from "./store-contract";
@@ -146,6 +157,7 @@ describe("sanitizeSect (không tin dữ liệu lưu)", () => {
         "tag",
         "updatedAt",
         "v",
+        "vault",
       ].sort(),
     );
     expect(Object.keys(out.members[0]).sort()).toEqual(["joinedAt", "name", "rank", "soulKey"]);
@@ -330,5 +342,128 @@ describe("sectsDir", () => {
     expect(sectsDir()).toBe(path.join("/tmp/du-lieu", "sects"));
     process.env.SECTS_DIR = "/tmp/tong-mon";
     expect(sectsDir()).toBe("/tmp/tong-mon");
+  });
+});
+
+describe("kho đồ tông môn: sanitizeVault / assertWritableSect / withVaultLogEntry (mục 11)", () => {
+  const big = ITEMS.reduce((a, b) => (b.stack > a.stack ? b : a));
+  const real = ITEMS[0];
+
+  it("thiếu kho (bản ghi cũ) hoặc kiểu sai: kho rỗng đủ SECT_VAULT_SLOTS ô, hạn mức mặc định", () => {
+    for (const raw of [undefined, null, 5, "x", [], {}]) {
+      const v = sanitizeVault(raw);
+      expect(v.slots).toHaveLength(SECT_VAULT_SLOTS);
+      expect(v.slots.every((x) => x === null)).toBe(true);
+      expect(v.drawPerDay).toBe(SECT_VAULT_DRAW_DEFAULT);
+      expect(v.log).toEqual([]);
+    }
+    const old = { ...makeSect("o1") } as Record<string, unknown>;
+    delete old.vault;
+    expect(sanitizeSect(old, NOW)?.vault).toEqual(emptySectVault());
+  });
+
+  it("làm sạch ô: món lạ / tên nguyên mẫu bị bỏ, qty ép về [1, stack], ô thừa bị cắt, ô hỏng thành trống", () => {
+    const slots: unknown[] = Array.from({ length: SECT_VAULT_SLOTS + 5 }, () => null);
+    slots[0] = { itemId: big.id, qty: big.stack + 500 };
+    slots[1] = { itemId: "khong_co", qty: 3 };
+    slots[2] = { itemId: "constructor", qty: 3 };
+    slots[3] = { itemId: real.id, qty: 0 };
+    slots[4] = { itemId: real.id, qty: 2.9 };
+    slots[5] = "hỏng";
+    slots[SECT_VAULT_SLOTS + 1] = { itemId: real.id, qty: 1 }; // ngoài số ô: bị cắt
+    const v = sanitizeVault({ slots, drawPerDay: 4 });
+    expect(v.slots).toHaveLength(SECT_VAULT_SLOTS);
+    expect(v.slots[0]).toEqual({ itemId: big.id, qty: big.stack });
+    expect(v.slots[1]).toBeNull();
+    expect(v.slots[2]).toBeNull();
+    expect(v.slots[3]).toBeNull();
+    expect(v.slots[4]).toEqual({ itemId: real.id, qty: 2 });
+    expect(v.slots[5]).toBeNull();
+    expect(v.drawPerDay).toBe(4);
+  });
+
+  it("hạn mức kẹp 0..SECT_VAULT_DRAW_MAX (số lẻ cắt xuống), hỏng thì mặc định; sổ hỏng bỏ từng mục, dài thì cắt giữ mục đầu", () => {
+    expect(sanitizeVault({ drawPerDay: 999 }).drawPerDay).toBe(SECT_VAULT_DRAW_MAX);
+    expect(sanitizeVault({ drawPerDay: -4 }).drawPerDay).toBe(0);
+    expect(sanitizeVault({ drawPerDay: 2.9 }).drawPerDay).toBe(2);
+    expect(sanitizeVault({ drawPerDay: "3" }).drawPerDay).toBe(SECT_VAULT_DRAW_DEFAULT);
+    expect(sanitizeVault({ drawPerDay: Number.NaN }).drawPerDay).toBe(SECT_VAULT_DRAW_DEFAULT);
+    const good = (i: number) => ({
+      at: i,
+      name: "Chu s1",
+      kind: "withdraw" as const,
+      itemId: real.id,
+      qty: i + 1,
+    });
+    const log = [
+      good(1),
+      { ...good(2), itemId: "khong_co" },
+      { ...good(3), qty: 0 },
+      { ...good(4), kind: "xoa" },
+      { ...good(5), name: "" },
+      ...Array.from({ length: SECT_VAULT_LOG_MAX + 4 }, (_, i) => good(10 + i)),
+    ];
+    const out = sanitizeVault({ log }).log;
+    expect(out).toHaveLength(SECT_VAULT_LOG_MAX);
+    expect(out[0]).toEqual(good(1)); // các mục hỏng bị bỏ riêng, mục đầu giữ nguyên
+    expect(out.every((e) => e.qty >= 1)).toBe(true);
+  });
+
+  it("lượt rút của thành viên: ngày đúng dạng + số nguyên không âm được giữ; sai thì bỏ riêng trường đó", () => {
+    const withDraw = (draw: unknown) => {
+      const s = makeSect("d1");
+      (s.members[0] as unknown as Record<string, unknown>).draw = draw;
+      return sanitizeSect(JSON.parse(JSON.stringify(s)), NOW)!.members[0].draw;
+    };
+    expect(withDraw({ day: "2026-11-16", n: 2 })).toEqual({ day: "2026-11-16", n: 2 });
+    expect(withDraw({ day: "2026-11-16", n: 2.7 })).toEqual({ day: "2026-11-16", n: 2 });
+    expect(withDraw({ day: "2026-11-16", n: -5 })).toEqual({ day: "2026-11-16", n: 0 });
+    for (const bad of [{ day: "hôm qua", n: 1 }, { n: 1 }, null, "x", 3]) {
+      expect(withDraw(bad)).toBeUndefined();
+    }
+  });
+
+  it("assertWritableSect: kho đồ hợp lệ qua; ô sai / món lạ / quá chồng / hạn mức ngoài khung / lượt rút sai thì NÉM LỖI (đồ không biến mất im lặng)", () => {
+    const okSect = makeSect("w1");
+    okSect.vault.slots[0] = { itemId: big.id, qty: big.stack };
+    okSect.vault.drawPerDay = SECT_VAULT_DRAW_MAX;
+    okSect.members[0].draw = { day: "2026-11-16", n: 3 };
+    expect(assertWritableSect(okSect, NOW).vault.slots[0]).toEqual({
+      itemId: big.id,
+      qty: big.stack,
+    });
+    const mutate = (f: (s: Sect) => void) => {
+      const s = structuredClone(okSect);
+      f(s);
+      return s;
+    };
+    for (const bad of [
+      mutate((s) => s.vault.slots.pop()),
+      mutate((s) => (s.vault.slots[1] = { itemId: "khong_co", qty: 1 })),
+      mutate((s) => (s.vault.slots[1] = { itemId: big.id, qty: big.stack + 1 })),
+      mutate((s) => (s.vault.slots[1] = { itemId: real.id, qty: 1.5 })),
+      mutate((s) => (s.vault.drawPerDay = SECT_VAULT_DRAW_MAX + 1)),
+      mutate((s) => (s.members[0].draw = { day: "x", n: 1 })),
+      mutate((s) => (s.members[0].draw = { day: "2026-11-16", n: 1.5 })),
+    ])
+      expect(() => assertWritableSect(bad, NOW)).toThrow();
+  });
+
+  it("withVaultLogEntry: mục mới đứng đầu, cắt còn SECT_VAULT_LOG_MAX, không sửa mảng cũ; sổ quá dài khi ghi thì cắt (không phải lỗi)", () => {
+    const e = (i: number) => ({
+      at: i,
+      name: "Chu",
+      kind: "deposit" as const,
+      itemId: real.id,
+      qty: 1,
+    });
+    const base = Array.from({ length: SECT_VAULT_LOG_MAX }, (_, i) => e(i));
+    const next = withVaultLogEntry(base, e(999));
+    expect(next).toHaveLength(SECT_VAULT_LOG_MAX);
+    expect(next[0].at).toBe(999);
+    expect(base[0].at).toBe(0);
+    const s = makeSect("w2");
+    s.vault.log = [...base, e(1), e(2)];
+    expect(assertWritableSect(s, NOW).vault.log).toHaveLength(SECT_VAULT_LOG_MAX);
   });
 });

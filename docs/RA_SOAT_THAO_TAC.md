@@ -51,7 +51,7 @@ Quét toàn bộ `client/src` tìm `pointerenter`, `pointerover`, `pointermove`,
 | Tông môn, Tổ đội, Thách đấu, Bí cảnh | không có | Nút theo từng dòng / thành viên; hộp xác nhận theo dòng đã bấm | AN TOÀN |
 | Hộp thoại NPC | `click` + phím số 1-9 | Phím số = chọn VÀ làm (chủ ý, nhãn hiện số) | AN TOÀN (không có hover) |
 | Thẻ xuất thân (đầu thai) | `click` / Enter / Cách | Chọn bằng bấm hoặc phím; không hover | AN TOÀN |
-| Canvas thế giới (`WorldScene.ts`) | `pointermove` | Chỉ ghi `mouseIn` (nhắm chiêu theo con trỏ lúc BẤM chiêu), không đổi mục tiêu / lựa chọn | AN TOÀN |
+| Cửa sổ (`WorldScene.ts`) | `pointermove` / `pointerdown` (pha bắt) | Chỉ ghi toạ độ con trỏ chuột (`cursorPos`; nhắm chiêu theo con trỏ lúc BẤM chiêu, hợp lệ khi phần tử dưới con trỏ là canvas, mục 29), không đổi mục tiêu / lựa chọn | AN TOÀN |
 | Bản đồ lớn (`map-input.ts`) | `pointermove` | Kéo bản đồ chỉ khi đang giữ con trỏ | AN TOÀN |
 | Cần điều khiển, kéo để đóng tấm | `pointermove` | Chỉ trong lúc đang kéo | AN TOÀN |
 | Khung chat | `pointerenter` / `focusin` | Hiện khung (`bumpChat`) | AN TOÀN (không đổi lựa chọn) |

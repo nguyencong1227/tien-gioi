@@ -90,6 +90,9 @@ export const EXPECTED_MESSAGE_TYPES = [
   SECT_MSG.motd,
   SECT_MSG.deposit,
   SECT_MSG.withdraw,
+  SECT_MSG.vaultDeposit,
+  SECT_MSG.vaultWithdraw,
+  SECT_MSG.vaultPolicy,
   // Luân hồi
   "soulBuy",
   "rebirth",
@@ -396,6 +399,7 @@ export async function runRedTeam(options: {
       "partyInvited",
       "party",
       "sectInvited",
+      "sectVault",
       "sect",
     ]) {
       r.onMessage(t, () => {});
