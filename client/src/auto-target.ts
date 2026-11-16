@@ -45,6 +45,8 @@ export function switchMargin(dist: number): number {
 
 /** Đối tượng đang bị đánh dở được coi là gần hơn chừng này khi so sánh (ưu tiên giữ mục tiêu đang đánh nếu khoảng cách gần bằng nhau). */
 export const ENGAGED_FACTOR = 0.85;
+/** Quái vừa trúng đòn trong chừng này ms thì tính là "đang bị đánh dở" (`DmgMsg` không nêu người đánh nên chỉ xấp xỉ; chỉ dùng để phân thắng bại khi khoảng cách gần bằng nhau). */
+export const ENGAGED_MS = 2000;
 
 export interface AutoCandidate {
   id: string;
