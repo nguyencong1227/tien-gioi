@@ -156,6 +156,7 @@ import {
 import { hallLeaveWarning, hallRefreshDelayMs, sanitizeHallView } from "./sect-hall";
 import { renderHall, updateHallCountdown, type HallUiState } from "./sect-hall-ui";
 import { canAffordFee, feeChipText, recipeFee } from "./forge-fee";
+import { perfRttText } from "./net-latency";
 import {
   QUEST_KIND_BADGE,
   questCardSubtitle,
@@ -4323,6 +4324,8 @@ export const ui = {
     monsters: number;
     loots: number;
     tweens: number;
+    /** Trung vị RTT (ms) của 5 pong gần nhất; `null` = chưa đủ mẫu (bảng ghi "--") */
+    rttMs?: number | null;
   }) {
     const panel = $("perf-panel");
     if (panel.hidden) return;
@@ -4331,6 +4334,7 @@ export const ui = {
       `${stats.frameAvgMs.toFixed(1)} / ${stats.frameP95Ms.toFixed(1)} ms`;
     $("perf-entities").textContent = `${stats.players} / ${stats.monsters} / ${stats.loots}`;
     $("perf-tweens").textContent = `${stats.tweens}`;
+    $("perf-rtt").textContent = perfRttText(stats.rttMs);
   },
 
   updateMuteIcon(muted: boolean) {

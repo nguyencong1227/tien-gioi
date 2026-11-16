@@ -11,6 +11,7 @@ import {
   type HeartbeatState,
   type PongMsg,
 } from "@tien-gioi/shared";
+import { RttTracker } from "./net-latency";
 
 export interface HeartbeatRoom {
   send(type: string, message?: any): void;
@@ -64,6 +65,8 @@ export class HeartbeatController {
   private lastPingAt = Number.NEGATIVE_INFINITY;
   private stopped = false;
   private unregisterPong: (() => void) | null = null;
+  /** RTT đo từ các cặp ping / pong (#873): trung vị vài mẫu gần nhất cho độ bù vùng cảnh báo (`net-latency.ts`) */
+  private readonly rtt = new RttTracker();
 
   private readonly room: HeartbeatRoom;
   private readonly intervalMs: number;
@@ -96,6 +99,14 @@ export class HeartbeatController {
     this.clearTimeoutFn = opts.clearTimeout ?? ((id) => clearTimeout(id));
   }
 
+  /**
+   * RTT (ms) = trung vị của 5 pong gần nhất; `null` khi chưa đủ 2 mẫu (người dùng số này phải coi `null` là "chưa biết", không bù).
+   * Một pong chậm lẻ loi không làm số nhảy; pong của ping cũ (ở nền lâu) bị bỏ, xem `RttTracker`.
+   */
+  get lastRttMs(): number | null {
+    return this.rtt.median();
+  }
+
   /** Khởi động gửi nhịp tim và lắng nghe phản hồi. */
   start(): void {
     if (this.stopped) return;
@@ -124,6 +135,7 @@ export class HeartbeatController {
   handlePong(msg: PongMsg | null | undefined): void {
     if (!msg || typeof msg.t !== "number") return;
     if (this.pendingT !== null && msg.t === this.pendingT) {
+      this.rtt.add(this.now() - this.pendingT);
       this.state.supported = true;
       this.state.pendingSince = null;
       this.pendingT = null;

@@ -508,3 +508,92 @@ describe("HeartbeatController: nhịp 1 giây (mục 33, NET_BEAT_MS)", () => {
     expect(sent.length).toBe(before);
   });
 });
+
+describe("HeartbeatController: RTT từ pong (#873, bù độ trễ vùng cảnh báo)", () => {
+  function setup() {
+    const harness = createMockHarness();
+    const { room, sent, messageHandlers } = createMockRoom();
+    const { doc } = createMockDoc();
+    const ctrl = new HeartbeatController({
+      room,
+      onDead: vi.fn(),
+      doc,
+      intervalMs: NET_BEAT_MS,
+      now: harness.now,
+      setInterval: harness.setInterval,
+      clearInterval: harness.clearInterval,
+      setTimeout: harness.setTimeout,
+      clearTimeout: harness.clearTimeout,
+    });
+    ctrl.start();
+    /** pong của ping mới nhất, về sau `rtt` ms */
+    const pongAfter = (rtt: number) => {
+      const last = sent[sent.length - 1].message as { t: number };
+      harness.advanceTime(rtt);
+      messageHandlers.get(HEARTBEAT_MSG.pong)!({ t: last.t });
+    };
+    return { harness, sent, ctrl, pongAfter, messageHandlers };
+  }
+
+  it("chưa có pong / mới một pong: lastRttMs = null (chưa đủ 2 mẫu thì không bù)", () => {
+    const { ctrl, pongAfter } = setup();
+    expect(ctrl.lastRttMs).toBeNull();
+    pongAfter(60);
+    expect(ctrl.lastRttMs).toBeNull();
+  });
+
+  it("đủ 2 pong: lastRttMs là RTT đo được; 5 pong: trung vị, một pong chậm lẻ loi không làm số nhảy", () => {
+    const { ctrl, pongAfter, harness } = setup();
+    const rtts = [60, 62, 58, 61];
+    for (const r of rtts) {
+      pongAfter(r);
+      harness.advanceTime(NET_BEAT_MS); // tick: ping kế
+    }
+    expect(ctrl.lastRttMs).toBeCloseTo(60.5, 6);
+    pongAfter(900); // pong chậm lẻ loi
+    expect(ctrl.lastRttMs).toBe(61);
+  });
+
+  it("pong của ping cũ (không phải ping đang chờ) KHÔNG tạo mẫu RTT", () => {
+    const { ctrl, pongAfter, sent, harness, messageHandlers } = setup();
+    pongAfter(60);
+    harness.advanceTime(NET_BEAT_MS); // ping #2
+    const first = sent[0].message as { t: number };
+    messageHandlers.get(HEARTBEAT_MSG.pong)!({ t: first.t }); // pong lặp của ping #1
+    messageHandlers.get(HEARTBEAT_MSG.pong)!({ t: -1 });
+    messageHandlers.get(HEARTBEAT_MSG.pong)!(null);
+    expect(ctrl.lastRttMs).toBeNull(); // vẫn chỉ một mẫu hợp lệ
+  });
+
+  it("ping chờ lúc xuống nền rồi quay lại sau lâu: pong CŨ (về sau, không còn là ping đang chờ) không tạo mẫu RTT khổng lồ", () => {
+    const harness = createMockHarness();
+    const { room, sent, messageHandlers } = createMockRoom();
+    const { doc, triggerVisibilityChange } = createMockDoc();
+    const ctrl = new HeartbeatController({
+      room,
+      onDead: vi.fn(),
+      doc,
+      intervalMs: NET_BEAT_MS,
+      now: harness.now,
+      setInterval: harness.setInterval,
+      clearInterval: harness.clearInterval,
+      setTimeout: harness.setTimeout,
+      clearTimeout: harness.clearTimeout,
+    });
+    ctrl.start();
+    const pong = (t: number) => messageHandlers.get(HEARTBEAT_MSG.pong)!({ t });
+    for (let i = 0; i < 2; i++) {
+      harness.advanceTime(70);
+      pong((sent[sent.length - 1].message as { t: number }).t);
+      harness.advanceTime(NET_BEAT_MS);
+    }
+    expect(ctrl.lastRttMs).toBe(70);
+    const stale = (sent[sent.length - 1].message as { t: number }).t; // ping đang chờ lúc xuống nền
+    triggerVisibilityChange(true);
+    harness.advanceTime(5000);
+    triggerVisibilityChange(false); // quay lại: ping MỚI thay ping cũ
+    expect((sent[sent.length - 1].message as { t: number }).t).not.toBe(stale);
+    pong(stale); // pong của ping cũ về muộn
+    expect(ctrl.lastRttMs).toBe(70); // không thành mẫu 5 giây
+  });
+});
