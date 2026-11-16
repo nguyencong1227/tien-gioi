@@ -350,20 +350,145 @@ async function main() {
         `(() => { const c = document.getElementById("set-reduced-motion"); c.checked = false; c.dispatchEvent(new Event("change")); return 1; })()`,
       );
 
+      // ---- tiếng riêng của trùm (sound.boss): gồng ngay lúc báo, đòn rơi đúng lúc đáp, sắc theo hệ của chiêu ----
+      await evalJs(`(() => {
+        const sd = window.__sound;
+        window.__bossSfx = [];
+        if (!sd.__origBoss) sd.__origBoss = sd.boss.bind(sd);
+        sd.boss = (kind, element) => { window.__bossSfx.push({ kind, element, t: performance.now() }); };
+        return 1;
+      })()`);
+      const sfxLog = () => evalJs(`window.__bossSfx.splice(0)`);
+      await sleep(300);
+      await sfxLog();
+      const bx = await evalJs(`window.__start.x + 80`); // máy chủ gửi x, y CỦA TRÙM trong fx (mock: trùm đặt ở start + 80)
+      const by = await evalJs(`window.__start.y`);
+      await fx({ kind: "bossCast", by: "m1", x: bx, y: by, ability: "quat_duoi", ms: 700 });
+      await sleep(250);
+      let snd = await sfxLog();
+      check(
+        snd.length === 1 && snd[0].kind === "cast",
+        `bossCast: tiếng gồng phát NGAY (${JSON.stringify(snd.map((x) => x.kind))}), chưa có tiếng đòn rơi`,
+      );
+      await sleep(700);
+      snd = await sfxLog();
+      check(
+        snd.length === 1 && snd[0].kind === "strike",
+        `đúng lúc đáp (ms sau): tiếng đòn rơi (${JSON.stringify(snd.map((x) => x.kind))})`,
+      );
+      await fx({ kind: "bossCast", by: "m1", x: 5000, y: 5000, ability: "quat_duoi", ms: 300 });
+      await sleep(650);
+      snd = await sfxLog();
+      check(snd.length === 0, "trùm vận chiêu ở NGOÀI tầm nhìn: không có tiếng");
       // ---- bossPhase / bossEnrage ----
-      await fx({ kind: "bossPhase", by: "m1", x: 0, y: 0, phase: 1 });
+      await sfxLog();
+      await fx({ kind: "bossPhase", by: "m1", x: bx, y: by, phase: 1 });
       await tick();
       check((await bar()).roaring, "bossPhase: thanh chớp");
+      snd = await sfxLog();
+      check(
+        snd.length === 1 && snd[0].kind === "phase",
+        `bossPhase: tiếng gầm đổi giai đoạn (${JSON.stringify(snd.map((x) => x.kind))})`,
+      );
       await sleep(1700);
       check(!(await bar()).roaring, "hết tiếng gầm: thanh hết chớp");
       check(!(await bar()).enrage, "chưa cuồng nộ: không có chỉ báo");
-      await fx({ kind: "bossEnrage", by: "m1", x: 0, y: 0 });
+      await fx({ kind: "bossEnrage", by: "m1", x: bx, y: by });
       await tick();
       b = await bar();
       check(b.enrage && b.flash, "bossEnrage: chỉ báo 'Cuồng nộ' bằng chữ + chớp");
+      snd = await sfxLog();
+      check(
+        snd.length === 1 && snd[0].kind === "enrage",
+        `bossEnrage: còi cuồng nộ (${JSON.stringify(snd.map((x) => x.kind))})`,
+      );
+      await evalJs(`(() => { const sd = window.__sound; sd.boss = sd.__origBoss; return 1; })()`);
       await sleep(1700);
       b = await bar();
       check(b.enrage && !b.flash, "hết chớp mà chỉ báo cuồng nộ vẫn còn");
+
+      // ---- GIÁP (bossArmor) + GỌI QUÁI CON (bossSummon) của trùm: chữ trên thanh, vầng giáp quanh thân, số bay xanh, tiếng, tự hết ----
+      await evalJs(`(() => {
+        const sd = window.__sound;
+        window.__bossSfx = [];
+        if (!sd.__origBoss) sd.__origBoss = sd.boss.bind(sd);
+        sd.boss = (kind, element) => { window.__bossSfx.push({ kind, element }); };
+        return 1;
+      })()`);
+      await sfxLog();
+      const armorUi = () =>
+        evalJs(`(() => {
+          const a = document.getElementById("boss-bar-armor");
+          const e = window.__scene.monsters.get("m1");
+          return {
+            text: a.hidden ? "" : a.textContent,
+            cls: document.getElementById("boss-bar").classList.contains("armored"),
+            aura: Boolean(e?.armorAura?.visible),
+            auraStroke: e?.armorAura ? e.armorAura.isStroked : false,
+            armoredHit: window.__scene.hitInput({ target: "m1", amount: 5, x: 0, y: 0, toPlayer: false }).armored === true,
+            vt: document.getElementById("boss-bar-track").getAttribute("aria-valuetext"),
+          };
+        })()`);
+      await fx({ kind: "bossArmor", by: "m1", x: bx, y: by, ms: 2500, mult: 0.5 });
+      await tick();
+      let au = await armorUi();
+      check(
+        /Giáp: nhận 50% sát thương \([1-3] s\)/.test(au.text) && au.cls,
+        `bossArmor: thanh trùm ghi bằng CHỮ "${au.text}"`,
+      );
+      check(
+        au.aura && au.auraStroke,
+        "bossArmor: vầng giáp (vòng tròn CÓ VIỀN) bao quanh thân trùm",
+      );
+      await fx({ kind: "bossSummon", by: "m1", x: bx, y: by, n: 1 }); // cả hai dòng ghi chú cùng hiện: thanh vẫn nằm gọn nửa trên khung nhìn
+      await tick();
+      const bb = await bar();
+      check(
+        bb.rect.l >= 0 && bb.rect.r <= vp.w && bb.rect.t >= 0 && bb.rect.b <= vp.h * 0.5,
+        `giáp + gọi quái con cùng hiện: thanh vẫn gọn trong nửa trên khung nhìn (${Math.round(bb.rect.t)}-${Math.round(bb.rect.b)} / ${vp.h * 0.5})`,
+      );
+      check(
+        au.armoredHit,
+        "bossArmor: số sát thương bay lên trùm đang có giáp mang cờ 'armored' (xanh nhạt)",
+      );
+      check(
+        /có giáp \(nhận 50 % sát thương\)/.test(au.vt),
+        `bossArmor: aria-valuetext có giáp: "${au.vt}"`,
+      );
+      snd = await sfxLog();
+      check(
+        snd.length >= 1 && snd[0].kind === "armor",
+        `bossArmor: tiếng giáp (${JSON.stringify(snd.map((x) => x.kind))})`,
+      );
+      await sleep(2500 - 260 + 500); // quá hạn giáp
+      au = await armorUi();
+      check(
+        au.text === "" && !au.cls && !au.aura && !au.armoredHit,
+        `hết giáp: chữ, vầng và cờ số bay đều tắt (${JSON.stringify({ t: au.text, c: au.cls, a: au.aura, h: au.armoredHit })})`,
+      );
+      await fx({ kind: "bossArmor", by: "m1", x: bx, y: by, ms: 2500, mult: 3 }); // fx hỏng (mult ngoài (0, 1])
+      await fx({ kind: "bossArmor", by: "m1", x: bx, y: by, ms: -5, mult: 0.5 });
+      await tick();
+      au = await armorUi();
+      check(au.text === "" && !au.aura, "bossArmor hỏng (mult 3 / ms âm): bỏ qua, không dựng giáp");
+      await sfxLog();
+      await fx({ kind: "bossSummon", by: "m1", x: bx, y: by, n: 2 });
+      await tick();
+      const sm = await evalJs(
+        `(() => { const e = document.getElementById("boss-bar-summon"); return e.hidden ? "" : e.textContent; })()`,
+      );
+      check(sm === "Gọi 2 quái con", `bossSummon: thanh trùm ghi "${sm}"`);
+      snd = await sfxLog();
+      check(
+        snd.length === 1 && snd[0].kind === "summon",
+        `bossSummon: tiếng gọi quái con (${JSON.stringify(snd.map((x) => x.kind))})`,
+      );
+      await sleep(3200);
+      const sm2 = await evalJs(
+        `(() => { const e = document.getElementById("boss-bar-summon"); return e.hidden ? "" : e.textContent; })()`,
+      );
+      check(sm2 === "", "bossSummon: dòng 'Gọi quái con' tự tắt sau vài giây");
+      await evalJs(`(() => { const sd = window.__sound; sd.boss = sd.__origBoss; return 1; })()`);
 
       // ---- bố cục ----
       check(b.pe === "none", "thanh không chặn chạm / nhấp (pointer-events: none)");

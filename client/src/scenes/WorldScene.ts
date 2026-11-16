@@ -227,7 +227,13 @@ import {
   fitView,
 } from "../map-render";
 import { moveVector } from "../move-input";
-import { BossFxTracker, pickBossForBar, type BossCand } from "../boss-bar";
+import {
+  BOSS_SFX_VIEW,
+  BossFxTracker,
+  bossAbilityElement,
+  pickBossForBar,
+  type BossCand,
+} from "../boss-bar";
 import {
   BOSS_STRIKE_MS,
   NEUTRAL_POSE,
@@ -298,6 +304,8 @@ interface Entity {
   /** Tinh anh (M7.3 bước 6, `Monster.elite`): cờ đã áp dụng + vầng sáng dưới chân (dựng lười một lần, `elite.ts`) */
   elite?: boolean;
   eliteAura?: Phaser.GameObjects.Ellipse;
+  /** Vầng giáp của TRÙM đang có giáp (`bossArmor`, T4 #873): vòng tròn bao quanh thân, dựng lười, ẩn khi giáp hết */
+  armorAura?: Phaser.GameObjects.Arc;
   /** Huy hiệu trạng thái có hại trên đầu quái (M7.7 bước 3b, #508): Graphics dựng lười, mặt nạ `Monster.fx` đã vẽ và số chấm */
   statusG?: Phaser.GameObjects.Graphics;
   lastFx?: number;
@@ -764,6 +772,8 @@ export class WorldScene extends Phaser.Scene {
       (window as any).__game = this.game;
       (window as any).__scene = this;
       (window as any).__fx = this.fx;
+      // Cho `check-boss-bar.mjs`: bắt lời gọi `sound.boss` (headless không có âm thanh thật) để kiểm tiếng trùm đúng lúc, đúng hệ
+      (window as any).__sound = sound;
       // Cho `leak:test`: danh sách mọi công thức hạt đã đăng ký, để khởi động phát MỖI công thức một lần (mỗi công thức tạo MỘT emitter ở lần phát đầu, `fx.ts` emitterFor)
       (window as any).__fxRecipeIds = recipeIds;
       // Cho `leak:test` (client/scripts/leak-test.mjs) dựng lại hình ảnh của từng bản đồ ngay trong trang (#408 bước 4)
@@ -3513,6 +3523,7 @@ export class WorldScene extends Phaser.Scene {
         elite,
       );
       this.syncMonsterStatus(e, m.fx, def.radius, !!def.boss || elite);
+      if (def.boss) this.syncBossArmor(e, id, def.radius);
     });
     for (const [id, e] of this.monsters) {
       if (seen.has(id)) continue;
@@ -3714,6 +3725,29 @@ export class WorldScene extends Phaser.Scene {
     if (e.shadowOn === on) return;
     e.shadowOn = on;
     e.shadow?.setVisible(on);
+  }
+
+  /**
+   * Vầng GIÁP của trùm `id` (`bossArmor`, T4 #873): vòng tròn xanh bao quanh thân suốt thời gian giáp, mờ dần khi sắp hết, nhịp chung của cảnh (`auraWave`); giảm chuyển động thì đứng yên.
+   * Dựng lười MỘT lần, giáp hết thì ẩn. Hình tròn có viền (không chỉ màu) nên người mù màu vẫn thấy; chữ "Có giáp" trên thanh trùm là kênh chính.
+   */
+  private syncBossArmor(e: Entity, id: string, radius: number) {
+    const a = this.bossFx.armorOf(id, this.time.now);
+    if (!a) {
+      if (e.armorAura?.visible) e.armorAura.setVisible(false);
+      return;
+    }
+    if (!e.armorAura) {
+      e.armorAura = this.add
+        .circle(0, -radius * 0.35, radius + 16, 0x7fc4ff, 0.16)
+        .setStrokeStyle(3, 0xdff2ff, 0.9);
+      e.root.add(e.armorAura); // trên sprite: là vầng bao quanh, không phải bóng dưới chân
+    }
+    const pulse = animReducedMotion() ? 0.5 : this.auraWave;
+    e.armorAura
+      .setVisible(true)
+      .setScale(1 + 0.05 * pulse)
+      .setAlpha(Math.min(1, 0.35 + 0.65 * Math.min(1, a.frac * 3)) * (0.75 + 0.25 * pulse));
   }
 
   /**
@@ -4080,15 +4114,34 @@ export class WorldScene extends Phaser.Scene {
       case "bossCast":
         // Trùm bắt đầu vận chiêu (mục 42): tên chiêu lên thanh máu trùm; vùng cảnh báo trên đất do `fx` `warn` đi kèm lo
         this.bossFx.onCast(m.by, m.ability, m.ms, this.time.now);
+        this.bossCastSound(m);
         return;
       case "bossPhase":
         // Trùm chuyển giai đoạn: thanh chớp + rung nhẹ khung hình (bỏ rung khi giảm chuyển động)
         this.bossFx.onPhase(m.by, this.time.now);
         if (!getQuality().reducedMotion && this.inView(m.x, m.y, 240))
           this.cameras.main.shake(320, 0.004);
+        if (this.inView(m.x, m.y, BOSS_SFX_VIEW)) sound.boss("phase");
         return;
       case "bossEnrage":
         this.bossFx.onEnrage(m.by, this.time.now);
+        sound.boss("enrage"); // một lần duy nhất (bí cảnh), cả đội cần nghe dù đang đứng xa
+        return;
+      case "bossArmor":
+        // Trùm dựng giáp (mục 42, T4): chữ "Có giáp" + đếm ngược trên thanh trùm, vầng giáp quanh thân (`syncBossArmor`), số bay xanh nhạt (`planHitNumber`); `fx` hỏng bị bỏ ở `onArmor`
+        this.bossFx.onArmor(m.by, m.ms, m.mult, this.time.now);
+        if (this.inView(m.x, m.y, BOSS_SFX_VIEW)) {
+          this.fx.play("boss-armor", m.x, m.y - 8, { priority: 1 });
+          sound.boss("armor");
+        }
+        return;
+      case "bossSummon":
+        // Trùm gọi quái con: chữ "Gọi N quái con" trên thanh trùm + hồn bốc lên ở chỗ trùm đứng + tiếng; quái con tự hiện qua state như quái thường
+        this.bossFx.onSummon(m.by, m.n, this.time.now);
+        if (this.inView(m.x, m.y, BOSS_SFX_VIEW)) {
+          this.fx.play("boss-summon", m.x, m.y - 8, { priority: 1 });
+          sound.boss("summon");
+        }
         return;
       case "bolt":
         // Đạn tầm xa của quái: client tự bay theo `speed` / `angle` tới hết `range` (đạn không là state)
@@ -4101,6 +4154,20 @@ export class WorldScene extends Phaser.Scene {
         if (!this.inView(m.x, m.y, 120)) return;
         return this.fxBreakFail(m.x, m.y, m.by === this.sid);
     }
+  }
+
+  /**
+   * Tiếng của trùm khi vận chiêu (`sfx-recipes.ts` `bossSfx`): tiếng gồng ngay lúc báo, tiếng đòn rơi đúng lúc đáp (`ms` sau), sắc theo hệ của chiêu. Chỉ khi trùm trong / sát tầm nhìn
+   * (`BOSS_SFX_VIEW`). Người đã rời cảnh giữa chừng thì tiếng đòn rơi bị huỷ cùng đồng hồ cảnh.
+   */
+  private bossCastSound(m: { by: string; x: number; y: number; ability: string; ms: number }) {
+    if (!this.inView(m.x, m.y, BOSS_SFX_VIEW)) return;
+    const el = bossAbilityElement(this.state.monsters.get(m.by)?.kind, m.ability);
+    sound.boss("cast", el);
+    const ms = Number.isFinite(m.ms) ? Math.min(Math.max(m.ms, 0), 8000) : 0;
+    this.time.delayedCall(ms, () => {
+      if (this.inView(m.x, m.y, BOSS_SFX_VIEW)) sound.boss("strike", el);
+    });
   }
 
   private fxSlash(x: number, y: number, angle: number, color: number, scale = 1, mine = false) {
@@ -4238,6 +4305,8 @@ export class WorldScene extends Phaser.Scene {
       targetMaxHp: maxHp,
       // Loại quái bị đánh (từ state; `planHitFx` tự bỏ id lạ): trùm / quái Kim Đan có hiệu ứng riêng
       kind: m.toPlayer ? undefined : (target as { kind?: string } | undefined)?.kind,
+      // Trùm đang có giáp: số bay xanh nhạt, nhỏ hơn (người đánh biết sát thương đang bị giảm)
+      armored: !m.toPlayer && this.bossFx.armorOf(m.target, this.time.now) !== null,
       mine:
         !targetIsMe &&
         !m.toPlayer &&

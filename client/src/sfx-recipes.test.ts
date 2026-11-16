@@ -6,6 +6,7 @@ import {
   SFX_MAX_S,
   SFX_MIN_HZ,
   boltSfx,
+  bossSfx,
   castSfx,
   clampRecipe,
   statusSfx,
@@ -119,5 +120,55 @@ describe("clampRecipe: kẻ gọi sai số liệu cũng không phát ra tiếng 
       noise: { at: 50, dur: 50, vol: 9, lp: -3 },
     });
     valid(bad);
+  });
+});
+
+describe("bossSfx: tiếng của trùm (gồng / đòn rơi / đổi giai đoạn / cuồng nộ)", () => {
+  const KINDS = ["cast", "strike", "phase", "enrage", "armor", "summon"] as const;
+  const lowest = (r: SfxRecipe) => Math.min(...r.partials.map((q) => Math.min(q.f0, q.f1)));
+
+  it("mọi loại x mọi hệ đều hợp lệ (ngắn, nhỏ, trong dải tần)", () => {
+    for (const k of KINDS) {
+      valid(bossSfx(k));
+      for (const e of ELEMENTS) valid(bossSfx(k, e.id));
+    }
+  });
+
+  it("sáu loại cho sáu tiếng KHÁC nhau", () => {
+    expect(new Set(KINDS.map((k) => JSON.stringify(bossSfx(k, "hoa")))).size).toBe(KINDS.length);
+  });
+
+  it("sắc theo HỆ của chiêu: gồng và đòn rơi đổi theo hệ; đổi giai đoạn / cuồng nộ / giáp / gọi quái con không phụ thuộc hệ", () => {
+    for (const k of ["cast", "strike"] as const) {
+      const seen = new Set(ELEMENTS.map((e) => JSON.stringify(bossSfx(k, e.id))));
+      expect(seen.size).toBeGreaterThanOrEqual(ELEMENTS.length - 1);
+    }
+    for (const k of ["phase", "enrage", "armor", "summon"] as const)
+      expect(JSON.stringify(bossSfx(k, "hoa"))).toBe(JSON.stringify(bossSfx(k, "bang")));
+  });
+
+  it("trầm hơn tiếng chiêu thường: luôn có thành phần trầm (<= 120 Hz) mà tiếng chiêu cùng hệ không có", () => {
+    for (const k of KINDS) expect(lowest(bossSfx(k, "kim")!)).toBeLessThanOrEqual(120);
+    expect(lowest(castSfx("kim", "cone"))).toBeGreaterThan(120);
+  });
+
+  it("gồng dâng lên (tần số trầm tăng), đòn rơi và gầm hạ xuống", () => {
+    const bass = (r: SfxRecipe) => r.partials[0]!;
+    expect(bass(bossSfx("cast")!).f1).toBeGreaterThan(bass(bossSfx("cast")!).f0);
+    expect(bass(bossSfx("strike")!).f1).toBeLessThan(bass(bossSfx("strike")!).f0);
+    expect(bass(bossSfx("phase")!).f1).toBeLessThan(bass(bossSfx("phase")!).f0);
+  });
+
+  it("cuồng nộ là còi HAI nhịp (hai thành phần vuông cùng tần số cách nhau về thời gian)", () => {
+    const sq = bossSfx("enrage")!.partials.filter((q) => q.wave === "square");
+    expect(sq.length).toBe(2);
+    expect(sq[1]!.at).toBeGreaterThan(sq[0]!.at + sq[0]!.dur - 1e-9);
+  });
+
+  it("loại lạ / hệ lạ / giá trị độc: loại lạ im lặng (null), hệ lạ rơi về vô sắc, không ném", () => {
+    for (const bad of [undefined, null, 0, "", "constructor", "__proto__", {}, "CAST"])
+      expect(bossSfx(bad, "hoa")).toBeNull();
+    for (const el of ["constructor", "__proto__", 7, null, "khong_co"])
+      expect(JSON.stringify(bossSfx("cast", el))).toBe(JSON.stringify(bossSfx("cast", "none")));
   });
 });

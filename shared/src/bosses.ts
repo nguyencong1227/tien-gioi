@@ -4,7 +4,7 @@
 // chuyển giai đoạn, triệu hồi, cuồng nộ. File này chỉ có kiểu, hằng số, hàm thuần và kiểm dữ liệu; server vẫn quyết định mọi kết quả.
 // Công bằng (vì chết = mất kiếp): mọi đòn GÂY SÁT THƯƠNG có báo trước >= `BOSS_MIN_TELEGRAPH_MS` (kể cả khi cuồng nộ), né được bằng di chuyển.
 // Giai đoạn là hàm THUẦN của khí huyết (`bossPhaseOf`): client suy ra mốc trên thanh máu từ bảng này, KHÔNG thêm trường vào state.
-import { MONSTER_BY_ID } from "./game";
+import { MONSTER_BY_ID, PLAYER_RADIUS } from "./game";
 import { STATUS_BY_ID, type Element, type SkillEffect } from "./skills";
 
 // ---------- Hằng số ----------
@@ -21,6 +21,18 @@ export const BOSS_FIRST_CAST_DELAY_MS = 1200;
 export const BOSS_PHASE_ROAR_MS = 1500;
 /** Trần cứng số quái con đồng thời của MỘT trùm (`BossDef.maxAdds` không vượt mức này). */
 export const BOSS_ADDS_CAP = 6;
+/**
+ * Thời gian giáp tối đa (ms) của MỘT lần dựng (`buff.ms`): trùm không được "bất khả xâm phạm" quá lâu (chết = mất kiếp nên người chơi cần hạ được trùm), và client chỉ vẽ giáp
+ * trong khung này (`client/src/boss-bar.ts` bỏ `fx` `bossArmor` có `ms` lớn hơn). `bossViolations` bắt dữ liệu vượt mức.
+ */
+export const BOSS_ARMOR_MAX_MS = 60_000;
+/**
+ * Tốc độ (px/giây) của người chơi CHẬM nhất dùng để kiểm "né được": cảnh giới 0, chưa trang bị (`statsFor`: 150 + 8 x cảnh giới + đồ). Chưa tính hiệu ứng làm chậm.
+ * Đổi `statsFor` làm tốc độ cơ bản thấp hơn thì sửa cả hằng này (và chạy lại `bossViolations`).
+ */
+export const BOSS_ESCAPE_SPEED = 150;
+/** Phản xạ + độ trễ vẽ / mạng (ms) người chơi cần trước khi bắt đầu bước, tính từ lúc `warn` hiện. ĐỀ XUẤT của A (người dùng / D đổi được; mục 8 `THIET_KE_TRUM.md`). */
+export const BOSS_REACT_MS = 300;
 
 // ---------- Hình chiêu ----------
 
@@ -281,16 +293,66 @@ function shapeProblems(s: BossShape): string[] {
     case "buff":
       if (
         !(typeof s.dmgTakenMult === "number" && s.dmgTakenMult > 0 && s.dmgTakenMult <= 1) ||
-        !pos(s.ms)
+        !pos(s.ms) ||
+        s.ms > BOSS_ARMOR_MAX_MS
       )
-        bad.push("giáp dmgTakenMult (0,1] / ms");
+        bad.push("giáp dmgTakenMult (0,1] / ms (<= BOSS_ARMOR_MAX_MS)");
       break;
   }
   return bad;
 }
 
+// ---------- Né được bằng di chuyển ----------
+
 /**
- * Kiểm bảng trùm: trả danh sách lỗi (rỗng = sạch). Luật công bằng (mục 2 `THIET_KE_TRUM.md`): mọi chiêu có sát thương báo trước >= `BOSS_MIN_TELEGRAPH_MS`; nghỉ giữa các lần vận
+ * Quãng đường (px) XẤU NHẤT một người đứng yên phải đi để ra khỏi vùng trúng của `shape`: từ điểm "sâu nhất" trong vùng (tâm vòng tròn, giữa bề rộng vành khuyên / đường
+ * lao, trục nón ở chỗ cách đều mép) tới chỗ an toàn gần nhất. `reach` là mức nới của bộ thực thi (`PLAYER_RADIUS` - `BOSS_HIT_GRACE_PX`: tâm người chơi cách mép vùng <= `reach`
+ * vẫn trúng) nên người đó phải ra xa thêm chừng ấy. `null` cho hình KHÔNG sát thương (`summon`, `buff`) hoặc số liệu hình không hợp lệ.
+ *  - `circleAt`, `pool`, `rain` (mỗi vòng), `blink` (`landR`): `r` + `reach`;
+ *  - `ring`: nếu lỗ giữa đủ chứa thân người (`r0` - `reach` >= `PLAYER_RADIUS`) thì chui vào lỗ hoặc ra ngoài, gần hơn: nửa bề rộng vành + `reach`; lỗ nhỏ hơn coi như vòng đặc;
+ *  - `cone`: bán kính đường tròn lớn nhất nằm trong hình quạt (nửa góc mở <= 90 độ: `r` sin / (1 + sin); lớn hơn: `r` / 2; cả vòng 360 độ: `r`) + `reach`;
+ *  - `line`, `charge`: bước ngang ra khỏi đường: nửa bề rộng `w` + `reach`;
+ *  - `pull`: phải đứng ngoài tầm nổ SAU khi bị kéo: `max(blastR, min(r, blastR + pullPx))` + `reach`.
+ */
+export function bossEscapePx(
+  shape: BossShape,
+  reach: number = PLAYER_RADIUS - BOSS_HIT_GRACE_PX,
+): number | null {
+  if (shapeProblems(shape).length > 0) return null;
+  switch (shape.t) {
+    case "circleAt":
+    case "pool":
+    case "rain":
+      return shape.r + reach;
+    case "blink":
+      return shape.landR + reach;
+    case "ring":
+      return shape.r0 - reach >= PLAYER_RADIUS ? (shape.r - shape.r0) / 2 + reach : shape.r + reach;
+    case "cone": {
+      if (shape.arc >= 2 * Math.PI) return shape.r + reach;
+      const half = shape.arc / 2;
+      if (half >= Math.PI / 2) return shape.r / 2 + reach;
+      const s = Math.sin(half);
+      return (shape.r * s) / (1 + s) + reach;
+    }
+    case "line":
+    case "charge":
+      return shape.w / 2 + reach;
+    case "pull":
+      return Math.max(shape.blastR, Math.min(shape.r, shape.blastR + shape.pullPx)) + reach;
+    case "summon":
+    case "buff":
+      return null;
+  }
+}
+
+/** Thời gian (ms) tối thiểu một người đi xa `px` ở tốc độ chậm nhất mà vẫn kịp ra khỏi vùng: phản xạ `BOSS_REACT_MS` + `px` / `BOSS_ESCAPE_SPEED`. */
+export function bossEscapeMs(px: number): number {
+  return BOSS_REACT_MS + (1000 * px) / BOSS_ESCAPE_SPEED;
+}
+
+/**
+ * Kiểm bảng trùm: trả danh sách lỗi (rỗng = sạch). Luật công bằng (mục 2 `THIET_KE_TRUM.md`): mọi chiêu có sát thương báo trước >= `BOSS_MIN_TELEGRAPH_MS` VÀ đủ để người đứng yên ở chỗ xấu nhất ra khỏi vùng (`bossEscapePx`, `bossEscapeMs`); nghỉ giữa các lần vận
  * >= `BOSS_MIN_CAST_GAP_MS`; `cooldownMs` >= `telegraphMs` + `recoverMs`. Còn: `kind` có thật và là trùm; id đúng dạng và không trùng; giai đoạn đầu `fromHp` = 1, các giai đoạn sau giảm
  * nghiêm ngặt trong (0, 1); chiêu của giai đoạn có thật; trọng số > 0; hệ số > 0; tổng triệu hồi một lần <= `maxAdds` <= `BOSS_ADDS_CAP`; cuồng nộ hợp lệ.
  */
@@ -322,6 +384,14 @@ export function bossViolations(defs: readonly BossDef[] = BOSSES): string[] {
         bad.push(
           `${w}: báo trước ${a.telegraphMs} ms < ${BOSS_MIN_TELEGRAPH_MS} ms (đòn có sát thương phải báo trước)`,
         );
+      else if (bossShapeDamages(a.shape)) {
+        // Né được bằng di chuyển (mục 2 `THIET_KE_TRUM.md`): người đứng yên ở chỗ xấu nhất trong vùng vẫn ra kịp trước khi đáp đòn
+        const px = bossEscapePx(a.shape);
+        if (px !== null && bossEscapeMs(px) > a.telegraphMs)
+          bad.push(
+            `${w}: không né kịp: cần ${Math.ceil(bossEscapeMs(px))} ms (phản xạ ${BOSS_REACT_MS} + đi ${Math.ceil(px)} px ở ${BOSS_ESCAPE_SPEED} px/giây) > báo trước ${a.telegraphMs} ms; giảm vùng hoặc tăng báo trước`,
+          );
+      }
       if (!(typeof a.recoverMs === "number" && a.recoverMs >= 0))
         bad.push(`${w}: recoverMs không hợp lệ`);
       if (!(typeof a.cooldownMs === "number") || a.cooldownMs < a.telegraphMs + a.recoverMs)

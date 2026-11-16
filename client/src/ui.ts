@@ -96,9 +96,7 @@ import {
   type SectVaultWithdrawMsg,
   SECT_VAULT_SLOTS,
   canSect,
-  SECT_MAX_MEMBERS,
   SECT_CREATE_COST,
-  SECT_ELDERS_MAX,
   cleanSectName,
   cleanSectTag,
   cleanMotd,
@@ -130,7 +128,11 @@ import {
   formatSectMembersSummary,
   mergeMemberPresence,
   mapLabelOf,
+  sectMemberMeritText,
   sectMemberStatusText,
+  sectEldersCap,
+  sectMembersCap,
+  sectFullText,
   sectConfirmText,
   type SectConfirmKind,
 } from "./sect";
@@ -151,7 +153,7 @@ import {
   type VaultPlan,
   vaultLockedNote,
 } from "./sect-vault";
-import { hallLeaveWarning, sanitizeHallView } from "./sect-hall";
+import { hallLeaveWarning, hallRefreshDelayMs, sanitizeHallView } from "./sect-hall";
 import { renderHall, updateHallCountdown, type HallUiState } from "./sect-hall-ui";
 import { canAffordFee, feeChipText, recipeFee } from "./forge-fee";
 import {
@@ -477,6 +479,8 @@ const HALL_BUSY_MS = 5000;
 /** Đồng hồ đếm ngược của tab Nội vụ (mỗi giây, chỉ chạy khi tab đang xem) và mốc đặt lại đã xin ảnh chụp mới (mỗi mốc xin MỘT lần). */
 let hallClock: ReturnType<typeof setInterval> | null = null;
 let hallRefreshedFor = 0;
+/** Hẹn giờ NỀN (một lần, kể cả khi tab Nội vụ đóng): qua mốc đặt lại thì xin ảnh chụp mới để máy chủ gỡ nhiệm vụ tông quá ngày (`hallRefreshDelayMs`). */
+let hallResetTimer: ReturnType<typeof setTimeout> | null = null;
 // ---- Kho đồ tông môn (mục 27, K4, #788) ----
 /** Ảnh chụp kho đồ MỚI NHẤT máy chủ gửi (đã làm sạch); `null` = chưa có / không còn tông môn. */
 let sectVault: SectVaultView | null = null;
@@ -3019,7 +3023,10 @@ function renderSectMembersTab() {
   const merged = mergeMemberPresence(currentSect.members, currentSectPresence);
   const summaryEl = $("sect-members-summary");
   if (summaryEl) {
-    summaryEl.textContent = formatSectMembersSummary(merged.length);
+    summaryEl.textContent = formatSectMembersSummary(
+      merged.length,
+      sectMembersCap(sectHall?.view.caps.members),
+    );
   }
   const myRank = currentSect.myRank;
 
@@ -3048,6 +3055,14 @@ function renderSectMembersTab() {
     statusRow.textContent = sectMemberStatusText(m);
 
     info.append(titleRow, statusRow);
+    // Công tích (M8.6): hiện cho từng thành viên có công tích (máy chủ chỉ gửi khi > 0)
+    const meritText = sectMemberMeritText(m);
+    if (meritText) {
+      const meritRow = document.createElement("div");
+      meritRow.className = "sect-member-merit";
+      meritRow.textContent = meritText;
+      info.append(meritRow);
+    }
     item.append(info);
 
     if (m.name !== currentName) {
@@ -3061,9 +3076,11 @@ function renderSectMembersTab() {
         btnPromote.type = "button";
         btnPromote.className = "sect-action-btn";
         btnPromote.textContent = "Thăng TL";
-        btnPromote.disabled = elderCount >= SECT_ELDERS_MAX;
+        // Giới hạn Trưởng lão theo CẤP TÔNG (3 ở cấp 1, tới 7 ở cấp 5): lấy từ ảnh chụp Nội vụ, không cứng 3 (máy chủ cho thăng tới mức này)
+        const eldersCap = sectEldersCap(sectHall?.view.caps.elders);
+        btnPromote.disabled = elderCount >= eldersCap;
         btnPromote.title =
-          elderCount >= SECT_ELDERS_MAX ? "Đã tối đa 3 Trưởng lão" : "Thăng làm Trưởng lão";
+          elderCount >= eldersCap ? `Đã tối đa ${eldersCap} Trưởng lão` : "Thăng làm Trưởng lão";
         btnPromote.addEventListener("click", () => {
           callbacks?.onSectRank?.(m.name, "truong_lao");
         });
@@ -3432,6 +3449,24 @@ function renderSectHallTab() {
   });
 }
 
+/** Hẹn / bỏ hẹn giờ nền xin ảnh chụp Nội vụ mới khi qua mốc đặt lại (mỗi mốc MỘT lần, chung `hallRefreshedFor` với đồng hồ của tab nên không xin đôi). */
+function scheduleHallRefresh() {
+  if (hallResetTimer !== null) clearTimeout(hallResetTimer);
+  hallResetTimer = null;
+  if (!sectHall || !currentSect) return;
+  const view = sectHall.view;
+  hallResetTimer = setTimeout(
+    () => {
+      hallResetTimer = null;
+      if (!currentSect || sectHall?.view.resetAt !== view.resetAt) return;
+      if (hallRefreshedFor === view.resetAt) return;
+      hallRefreshedFor = view.resetAt;
+      callbacks?.onSectHallGet?.();
+    },
+    hallRefreshDelayMs(view, Date.now() - sectHall.at),
+  );
+}
+
 /** Đồng hồ tab Nội vụ: chạy khi tab đang xem; qua mốc đặt lại thì xin ảnh chụp mới (một lần cho mỗi mốc). */
 function syncHallClock() {
   const want = sectModalOpen && sectTab === "hall" && currentSect !== null;
@@ -3502,7 +3537,7 @@ function renderSectModalImpl() {
     $("sect-meta-my-rank").textContent = formatSectRole(currentSect.myRank);
     // giới hạn thành viên theo cấp tông (M8): có ảnh chụp Nội vụ thì dùng, chưa có thì mức cấp 1
     $("sect-meta-member-count").textContent =
-      `${currentSect.members.length} / ${sectHall?.view.caps.members || SECT_MAX_MEMBERS}`;
+      `${currentSect.members.length} / ${sectMembersCap(sectHall?.view.caps.members)}`;
     $("sect-meta-treasury").textContent = formatSectTreasury(currentSect.coin);
 
     const motdEl = $("sect-motd-text");
@@ -5441,9 +5476,14 @@ export const ui = {
           sectBtn.disabled = true;
           sectBtn.textContent = "Đã cùng tông môn";
           if (sectHint) sectHint.hidden = true;
-        } else if (currentSect.members.length >= SECT_MAX_MEMBERS) {
+        } else if (
+          sectFullText(currentSect.members.length, sectMembersCap(sectHall?.view.caps.members))
+        ) {
+          // Giới hạn thành viên theo CẤP TÔNG (30 tới 50), lấy từ ảnh chụp Nội vụ: không cứng 30 (máy chủ còn cho mời tới mức cấp)
           sectBtn.disabled = true;
-          sectBtn.textContent = `Tông môn đã đủ (${SECT_MAX_MEMBERS}/${SECT_MAX_MEMBERS})`;
+          sectBtn.textContent =
+            sectFullText(currentSect.members.length, sectMembersCap(sectHall?.view.caps.members)) ??
+            "Tông môn đã đủ";
           if (sectHint) sectHint.hidden = true;
         } else {
           sectBtn.disabled = false;
@@ -6147,6 +6187,7 @@ export const ui = {
       $("btn-sect")?.setAttribute("aria-expanded", "false");
       modalStack.remove("sect-modal");
       returnFocus($("btn-sect"));
+      syncHallClock(); // đóng bảng thì dừng đồng hồ tab Nội vụ (trước đây chạy tiếp mỗi giây trên tab ẩn); qua mốc đặt lại đã có hẹn giờ nền (`scheduleHallRefresh`)
     }
   },
 
@@ -6174,6 +6215,7 @@ export const ui = {
     const view = sanitizeHallView(m?.hall);
     sectHall = view ? { view, at: Date.now() } : null;
     hallRefreshedFor = 0;
+    scheduleHallRefresh();
     endHallBusy();
     if (sectModalOpen && sectTab === "hall") renderSectHallTab();
     else if (sectModalOpen && sectTab === "overview") renderSectModal();
@@ -6194,6 +6236,7 @@ export const ui = {
       vaultQty = 1;
       endVaultBusy();
       sectHall = null;
+      scheduleHallRefresh(); // bỏ hẹn giờ: không còn tông môn thì không xin gì
       endHallBusy();
     }
     if (sectModalOpen) {

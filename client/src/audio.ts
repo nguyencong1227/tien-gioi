@@ -1,7 +1,7 @@
 // Hệ thống nhạc nền (trấn / hoang dã chuyển mượt) và âm thanh hiệu ứng bằng Web Audio API.
 // Không cần file âm thanh nặng, tuân thủ chính sách autoplay của trình duyệt và lưu trạng thái tắt tiếng vào localStorage.
 
-import { SFX_MIN_GAP_S, boltSfx, castSfx, statusSfx, type SfxRecipe } from "./sfx-recipes";
+import { SFX_MIN_GAP_S, boltSfx, bossSfx, castSfx, statusSfx, type SfxRecipe } from "./sfx-recipes";
 
 export type BgmZone = "town" | "wild";
 
@@ -425,6 +425,15 @@ class SoundEngine {
   /** Tiếng đạn tầm xa của quái bắn ra (`boltSfx`, hệ của đạn nếu có). */
   bolt(element?: unknown) {
     this.playSfx(boltSfx(element), "bolt", 0.8);
+  }
+
+  /**
+   * Tiếng của TRÙM (`bossSfx`): `kind` = gồng / đòn rơi / đổi giai đoạn / cuồng nộ, sắc theo `element` của chiêu. Chống dồn riêng từng loại (`playSfx`); loại lạ thì im.
+   * `volume` 0..1 nhân thêm (trùm ở rìa tầm nhìn nhỏ hơn).
+   */
+  boss(kind: unknown, element?: unknown, volume = 1) {
+    const r = bossSfx(kind, element);
+    if (r) this.playSfx(r, `boss-${String(kind)}`, volume);
   }
 
   /** Tiếng khi MÌNH dính một trạng thái mới (`statusSfx`); loại lạ thì im. */

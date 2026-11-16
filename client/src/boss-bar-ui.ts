@@ -12,6 +12,9 @@ export class BossBarDom {
   private readonly hp: HTMLElement;
   private readonly cast: HTMLElement;
   private readonly castFill: HTMLElement;
+  private readonly notes: HTMLElement;
+  private readonly armor: HTMLElement;
+  private readonly summon: HTMLElement;
   private markKey = "";
   private shownId: string | null = null;
 
@@ -30,6 +33,9 @@ export class BossBarDom {
     this.hp = get("boss-bar-hp");
     this.cast = get("boss-bar-cast");
     this.castFill = get("boss-bar-castfill");
+    this.notes = get("boss-bar-notes");
+    this.armor = get("boss-bar-armor");
+    this.summon = get("boss-bar-summon");
   }
 
   /** Cập nhật thanh theo mô hình; `null` = ẩn thanh. */
@@ -72,9 +78,19 @@ export class BossBarDom {
     if (this.castFill.style.width !== cf) this.castFill.style.width = cf;
     this.castFill.parentElement!.hidden = !m.castName;
     this.enrage.hidden = !m.enraged;
+    // giáp + gọi quái con bằng CHỮ (không chỉ vầng màu quanh trùm): người chơi biết vì sao sát thương tụt và lúc nào giáp hết
+    const armorText = m.armor
+      ? `🛡 Giáp: nhận ${m.armor.pct}% sát thương (${Math.max(1, Math.ceil(m.armor.leftMs / 1000))} s)`
+      : "";
+    setText(this.armor, armorText);
+    this.armor.hidden = !m.armor;
+    setText(this.summon, m.summonN !== null ? `Gọi ${m.summonN} quái con` : "");
+    this.summon.hidden = m.summonN === null;
+    this.notes.hidden = !m.armor && m.summonN === null;
     toggle(this.root, "roaring", m.roaring);
     toggle(this.root, "enrage-flash", m.enrageFlash);
     toggle(this.root, "casting", m.castName !== null);
+    toggle(this.root, "armored", m.armor !== null);
   }
 }
 

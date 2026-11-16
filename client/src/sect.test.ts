@@ -9,12 +9,23 @@ import {
   mergeMemberPresence,
   mapLabelOf,
   sectMemberStatusText,
+  sectMemberMeritText,
+  sectEldersCap,
+  sectMembersCap,
+  sectFullText,
   UNKNOWN_MAP_LABEL,
   sectConfirmText,
   isMockSectEnabled,
   MOCK_SECT_SAMPLES,
 } from "./sect";
-import { MAPS, DUNGEON_MAPS, realmLabel } from "@tien-gioi/shared";
+import {
+  MAPS,
+  DUNGEON_MAPS,
+  SECT_ELDERS_MAX,
+  SECT_LEVELS,
+  SECT_MAX_MEMBERS,
+  realmLabel,
+} from "@tien-gioi/shared";
 import type { SectMember, SectPresenceMsg, SectLogEntry } from "@tien-gioi/shared";
 
 describe("sectConfirmText (hộp xác nhận trong game, #246)", () => {
@@ -222,5 +233,48 @@ describe("nhãn bản đồ trong bảng tổ đội / tông môn (M6 #409): tê
     expect(sectMemberStatusText({ ...base, online: true, realm: 0, tier: 3 }).endsWith("·")).toBe(
       false,
     );
+  });
+});
+
+describe("sectMemberMeritText: công tích trong danh sách thành viên (M8.6, #843)", () => {
+  it("có công tích thì hiện 'Công tích N' (số theo vi-VN); thiếu / 0 / âm / hỏng thì không hiện gì", () => {
+    expect(sectMemberMeritText({ merit: 1234 })).toBe("Công tích 1.234");
+    expect(sectMemberMeritText({ merit: 5 })).toBe("Công tích 5");
+    expect(sectMemberMeritText({ merit: 7.9 })).toBe("Công tích 7");
+    for (const bad of [undefined, 0, -3, Number.NaN, Number.POSITIVE_INFINITY, "12", null, {}])
+      expect(sectMemberMeritText({ merit: bad }), String(bad)).toBe("");
+    expect(sectMemberMeritText({})).toBe("");
+  });
+});
+
+describe("sectEldersCap: giới hạn Trưởng lão theo CẤP TÔNG, không cứng 3 (M8.6)", () => {
+  it("lấy đúng `caps.elders` của ảnh chụp Nội vụ ở mọi cấp (cấp cao thăng được nhiều hơn 3)", () => {
+    for (const l of SECT_LEVELS)
+      expect(sectEldersCap(l.maxElders), `cấp ${l.level}`).toBe(l.maxElders);
+    expect(Math.max(...SECT_LEVELS.map((l) => l.maxElders))).toBeGreaterThan(SECT_ELDERS_MAX);
+  });
+  it("chưa có ảnh chụp / số hỏng: mức cấp 1 (SECT_ELDERS_MAX), không ném", () => {
+    for (const bad of [undefined, null, 0, -1, 2.5, Number.NaN, "5", Number.MAX_VALUE, {}])
+      expect(sectEldersCap(bad), String(bad)).toBe(SECT_ELDERS_MAX);
+  });
+});
+
+describe("sectMembersCap / sectFullText: giới hạn thành viên theo CẤP TÔNG, không cứng 30 (M8.6)", () => {
+  it("lấy đúng `caps.members` ở mọi cấp (cấp cao nhận nhiều hơn 30)", () => {
+    for (const l of SECT_LEVELS)
+      expect(sectMembersCap(l.maxMembers), `cấp ${l.level}`).toBe(l.maxMembers);
+    expect(Math.max(...SECT_LEVELS.map((l) => l.maxMembers))).toBeGreaterThan(SECT_MAX_MEMBERS);
+  });
+  it("chưa có ảnh chụp / số hỏng: mức cấp 1 (SECT_MAX_MEMBERS), không ném", () => {
+    for (const bad of [undefined, null, 0, -1, 2.5, Number.NaN, "40", Number.MAX_VALUE, {}])
+      expect(sectMembersCap(bad), String(bad)).toBe(SECT_MAX_MEMBERS);
+  });
+  it("sectFullText: đủ người thì nêu 'đủ (cap/cap)', còn chỗ hoặc số hỏng thì null; tông cấp 3 đang 30 người KHÔNG đủ", () => {
+    expect(sectFullText(30, 30)).toBe("Tông môn đã đủ (30/30)");
+    expect(sectFullText(40, 40)).toBe("Tông môn đã đủ (40/40)");
+    expect(sectFullText(29, 30)).toBeNull();
+    expect(sectFullText(30, sectMembersCap(SECT_LEVELS[2]!.maxMembers))).toBeNull();
+    expect(sectFullText(Number.NaN, 30)).toBeNull();
+    expect(sectFullText(5, Number.NaN)).toBeNull();
   });
 });
