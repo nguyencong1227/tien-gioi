@@ -20,12 +20,31 @@ export interface BadgeView {
   harmful: boolean;
   /** Số giây còn lại, làm tròn LÊN (>= 1): ô còn hiện thì luôn >= 1 */
   secs: number;
-  /** Chữ trên ô: "Độc 7", "Tê cóng −30% 4" */
+  /** Chữ trên ô: "Độc 7", "Tê cóng −30% 4", "Hộ đạo +15% 14:59" (từ 60 giây trở lên in phút:giây, xem `formatRemain`) */
   label: string;
   /** Câu cho trình đọc màn hình: tên, tác dụng, thời gian còn lại */
   aria: string;
   /** Sắp hết: nhấp nháy */
   urgent: boolean;
+}
+
+/**
+ * Thời gian còn lại trên ô: dưới 60 giây in số giây thuần ("59"), từ 60 giây in phút:giây ("1:00", "14:59") để đan / phù chế (15 phút) đọc được
+ * ngay ("Hộ đạo +15% 899" khó đọc). Giây luôn 2 chữ số; phút không chia thêm thành giờ (hiệu lực lâu nhất là 15 phút).
+ */
+export function formatRemain(secs: number): string {
+  const s = Math.max(0, Math.floor(Number.isFinite(secs) ? secs : 0));
+  if (s < 60) return String(s);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+/** Cùng thời gian bằng chữ cho trình đọc màn hình: "59 giây", "1 phút", "14 phút 59 giây" (không ghi "0 giây" khi chẵn phút). */
+export function remainWords(secs: number): string {
+  const s = Math.max(0, Math.floor(Number.isFinite(secs) ? secs : 0));
+  if (s < 60) return `${s} giây`;
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return r === 0 ? `${m} phút` : `${m} phút ${r} giây`;
 }
 
 /** Câu tác dụng ngắn theo loại (cường độ chỉ có với tăng tốc / tê cóng: các loại khác KHÔNG ghi số vì server không gửi). */
@@ -79,8 +98,8 @@ export function badgeViews(active: readonly StatusEntry[]): BadgeView[] {
       name: def.name,
       harmful: def.harmful,
       secs,
-      label: `${def.name}${ratioTag(def, ratio)} ${secs}`,
-      aria: `${def.name}: ${effectText(def, ratio)}, còn ${secs} giây`,
+      label: `${def.name}${ratioTag(def, ratio)} ${formatRemain(secs)}`,
+      aria: `${def.name}: ${effectText(def, ratio)}, còn ${remainWords(secs)}`,
       urgent: secs <= BADGE_URGENT_SECS,
     });
   }
