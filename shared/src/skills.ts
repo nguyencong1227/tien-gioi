@@ -103,6 +103,20 @@ export function elementMult(attacker: unknown, defender: unknown): number {
 // Trạng thái
 // ---------------------------------------------------------------------------------------------------------------
 
+/** Hệ có phù tăng sát thương (`amp_<hệ>`): chín hệ có tên, KHÔNG gồm `none` (chiêu vô sắc không có phù riêng). */
+export type AmpElement = Exclude<Element, "none">;
+export const AMP_ELEMENTS: readonly AmpElement[] = [
+  "kim",
+  "moc",
+  "thuy",
+  "hoa",
+  "tho",
+  "bang",
+  "phong",
+  "loi",
+  "am",
+];
+
 export type StatusId =
   | "burn"
   | "poison"
@@ -113,7 +127,10 @@ export type StatusId =
   | "shield"
   | "haste"
   | "regen"
-  | "dao_ho";
+  | "dao_ho"
+  // Nghề nhỏ lát 2 (#514, phù): tăng sát thương chiêu của một hệ, giảm hồi chiêu
+  | `amp_${AmpElement}`
+  | "cdr_phu";
 
 /**
  * Loại tác dụng của trạng thái và ý nghĩa của `ratio` ở `SkillEffect`:
@@ -122,10 +139,12 @@ export type StatusId =
  *  - `stun`: không làm gì được (không dùng `ratio`); `shield`: hấp thụ `ratio` x khí huyết tối đa;
  *  - `haste`: tăng tốc độ `ratio`; `regen`: hồi `ratio` x khí huyết tối đa mỗi giây;
  *  - `breakAid` (#514, đan hộ đạo): cộng `ratio` vào xác suất đột phá cảnh giới của lần đột phá kế tiếp (`breakthroughChanceWith`),
- *    gỡ ngay sau lần đó dù thành công hay thất bại; hết hạn mà chưa dùng thì mất.
+ *    gỡ ngay sau lần đó dù thành công hay thất bại; hết hạn mà chưa dùng thì mất;
+ *  - `amp` (#514 lát 2, phù `amp_<hệ>`): sát thương GÂY RA của chiêu cùng hệ nhân `1 + ratio` (`statusAmpMult`); không áp cho đòn thường và chiêu hệ khác;
+ *  - `cdr` (#514 lát 2, `cdr_phu`): cộng `ratio` vào giảm hồi chiêu của trang bị (`statusCdr`), tổng vẫn kẹp `CDR_CAP`.
  */
 export type StatusKind =
-  "dot" | "slow" | "vuln" | "stun" | "shield" | "haste" | "regen" | "breakAid";
+  "dot" | "slow" | "vuln" | "stun" | "shield" | "haste" | "regen" | "breakAid" | "amp" | "cdr";
 
 export interface StatusDef {
   id: StatusId;
@@ -147,6 +166,10 @@ export const MAX_STATUSES = 4;
 export const STUN_MAX_MS = 1200;
 export const STUN_IMMUNE_MS = 3000;
 
+/** Phù (#514 lát 2): hiệu lực tối đa 60 giây; phù tăng sát thương tối đa +30% (ratio 0,3). `cdr_phu` tối đa 0,15 (tổng với trang bị vẫn kẹp `CDR_CAP` = 0,3). */
+export const AMP_MAX_MS = 60_000;
+export const AMP_MAX_RATIO = 0.3;
+
 export const STATUSES: readonly StatusDef[] = [
   { id: "burn", name: "Bỏng", kind: "dot", harmful: true, maxMs: 8000, maxRatio: 0.5 },
   { id: "poison", name: "Độc", kind: "dot", harmful: true, maxMs: 10000, maxRatio: 0.5 },
@@ -159,6 +182,23 @@ export const STATUSES: readonly StatusDef[] = [
   { id: "regen", name: "Hồi phục", kind: "regen", harmful: false, maxMs: 8000, maxRatio: 0.15 },
   // Nghề nhỏ (#514): id mới luôn thêm CUỐI để thứ tự cũ không đổi
   { id: "dao_ho", name: "Hộ đạo", kind: "breakAid", harmful: false, maxMs: 900000, maxRatio: 0.2 },
+  // Nghề nhỏ lát 2 (#514, phù): một id cho mỗi hệ vì mục trạng thái chỉ có [id, ms, ratio]
+  ...AMP_ELEMENTS.map((el): StatusDef => ({
+    id: `amp_${el}`,
+    name: `Phù ${ELEMENT_BY_ID[el].name}`,
+    kind: "amp",
+    harmful: false,
+    maxMs: AMP_MAX_MS,
+    maxRatio: AMP_MAX_RATIO,
+  })),
+  {
+    id: "cdr_phu",
+    name: "Phù Tốc Chiêu",
+    kind: "cdr",
+    harmful: false,
+    maxMs: AMP_MAX_MS,
+    maxRatio: 0.15,
+  },
 ];
 
 export const STATUS_BY_ID: Readonly<Record<string, StatusDef>> = Object.fromEntries(
@@ -169,6 +209,20 @@ export function statusOf(id: unknown): StatusDef | undefined {
   return typeof id === "string" && Object.prototype.hasOwnProperty.call(STATUS_BY_ID, id)
     ? STATUS_BY_ID[id]
     : undefined;
+}
+
+/** Id trạng thái phù tăng sát thương của hệ `element` (`amp_<hệ>`); `undefined` cho `none` / giá trị lạ. */
+export function ampStatusIdOf(element: unknown): StatusId | undefined {
+  return typeof element === "string" && (AMP_ELEMENTS as readonly string[]).includes(element)
+    ? (`amp_${element}` as StatusId)
+    : undefined;
+}
+
+/** Hệ của một trạng thái `amp_<hệ>`; `undefined` cho id khác. */
+export function ampElementOf(id: unknown): AmpElement | undefined {
+  const def = statusOf(id);
+  if (!def || def.kind !== "amp") return undefined;
+  return AMP_ELEMENTS.find((el) => `amp_${el}` === def.id);
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -842,19 +896,24 @@ export interface SkillsMsg {
 
 /**
  * Một trạng thái đang có trên chính mình: id, thời gian còn lại (ms) lúc gửi, và `ratio` (KHÔNG bắt buộc) CHỈ cho tăng tốc / tê cóng (đổi tốc độ di chuyển mà client đoán trước,
- * nên client cần cường độ để nhân đúng như server, `moveSpeedMul`) và hộ đạo (`breakAid`, client hiện "+X %" xác suất đột phá). Loại khác bỏ trống phần tử thứ ba
+ * nên client cần cường độ để nhân đúng như server, `moveSpeedMul`) và hộ đạo / phù (`breakAid` / `amp` / `cdr`, client hiện "+X %" trên chip). Loại khác bỏ trống phần tử thứ ba
  * (mã tách `[id, ms]` cũ không vỡ). Nơi nhận không tin tin nhắn: dùng `sanitizeStatusList`.
  */
 export type StatusEntry = [id: StatusId, msLeft: number, ratio?: number];
 
 /**
  * Trạng thái nào ghi `ratio` trong `StatusEntry`: những cái đổi tốc độ di chuyển của người chơi (client cần để đoán trước di chuyển)
- * và `breakAid` (client hiện "+X %" xác suất đột phá trên chip hộ đạo, #514).
+ * và `breakAid` (client hiện "+X %" xác suất đột phá trên chip hộ đạo, #514), `amp` / `cdr` (client hiện "+X %" sát thương / "-X %" hồi chiêu trên chip phù, #514 lát 2).
  */
 export function statusCarriesRatio(id: unknown): boolean {
   const def = statusOf(id);
   return (
-    def !== undefined && (def.kind === "haste" || def.kind === "slow" || def.kind === "breakAid")
+    def !== undefined &&
+    (def.kind === "haste" ||
+      def.kind === "slow" ||
+      def.kind === "breakAid" ||
+      def.kind === "amp" ||
+      def.kind === "cdr")
   );
 }
 
@@ -903,9 +962,37 @@ export function moveSpeedMul(list: readonly StatusEntry[]): number {
   return Math.min(MOVE_SPEED_MUL_MAX, Math.max(MOVE_SPEED_MUL_MIN, m));
 }
 
+/** `ratio` đã kẹp của mục còn hiệu lực đầu tiên có id `id` và loại `kind` (0 nếu không có / hết hạn / `ratio` hỏng). Dùng chung cho `statusAmpMult` / `statusCdr`. */
+function activeRatio(list: readonly StatusEntry[], id: StatusId): number {
+  const def = statusOf(id);
+  if (!def) return 0;
+  let best = 0;
+  for (const e of list) {
+    if (!Array.isArray(e) || e[0] !== id || typeof e[1] !== "number" || !(e[1] > 0)) continue;
+    const r = typeof e[2] === "number" && Number.isFinite(e[2]) ? e[2] : 0;
+    best = Math.max(best, Math.min(def.maxRatio, Math.max(0, r)));
+  }
+  return best;
+}
+
+/**
+ * Hệ số nhân sát thương GÂY RA của chiêu hệ `element` từ phù `amp_<hệ>` còn hiệu lực trong `list` (danh sách trạng thái của CHÍNH MÌNH):
+ * `1 + ratio` (ratio kẹp [0, `maxRatio`]). 1 khi không có phù đó, hệ `none` / lạ, mục hết hạn. MỘT hàm cho máy chủ (tính sát thương) và mọi
+ * công cụ (bot, mô hình cân bằng); máy chủ vẫn là người quyết định (client không tính sát thương).
+ */
+export function statusAmpMult(list: readonly StatusEntry[], element: unknown): number {
+  const id = ampStatusIdOf(element);
+  return id ? 1 + activeRatio(list, id) : 1;
+}
+
+/** Giảm hồi chiêu (0..`maxRatio` của `cdr_phu`, phân số) từ phù `cdr_phu` còn hiệu lực trong `list`; 0 khi không có. Cộng với của trang bị rồi kẹp `CDR_CAP` ở `skillCooldownMs`. */
+export function statusCdr(list: readonly StatusEntry[]): number {
+  return activeRatio(list, "cdr_phu");
+}
+
 /**
  * Làm sạch danh sách trạng thái nhận từ server (client không tin tin nhắn, như mọi tin khác): chỉ giữ mục có id trong bảng và `msLeft` hữu hạn > 0
- * (kẹp `maxMs`), `ratio` chỉ giữ cho loại mang ratio (`statusCarriesRatio`: tăng tốc / tê cóng / hộ đạo; kẹp [0, `maxRatio`], thiếu thì 0); mỗi id một lần; tối đa `MAX_STATUSES` mục.
+ * (kẹp `maxMs`), `ratio` chỉ giữ cho loại mang ratio (`statusCarriesRatio`: tăng tốc / tê cóng / hộ đạo / phù; kẹp [0, `maxRatio`], thiếu thì 0); mỗi id một lần; tối đa `MAX_STATUSES` mục.
  * Không phải mảng thì rỗng.
  */
 export function sanitizeStatusList(raw: unknown): StatusEntry[] {

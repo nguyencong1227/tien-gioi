@@ -71,6 +71,12 @@ export function effectText(e: SkillEffect): string {
     case "breakAid":
       body = ` (cộng ${pct(e.ratio)}% xác suất đột phá lần kế)`;
       break;
+    case "amp":
+      body = ` (tăng ${pct(e.ratio)}% sát thương chiêu cùng hệ)`;
+      break;
+    case "cdr":
+      body = ` (giảm ${pct(e.ratio)}% hồi chiêu)`;
+      break;
     case "stun":
       body = "";
       break;
