@@ -191,7 +191,7 @@ import { transitionMs, waitOrSkip } from "./gfx/scene-transition";
 import { getDisplay, onDisplayChange } from "./gfx/display";
 import { optionTag, skipHintText } from "./dialog-opt";
 import { dropConfirmText, dropStillValid, dropWarnText, planDrop, type DropPlan } from "./inv-drop";
-import { inConfirmGuard, type ConfirmSpec } from "./act-confirm";
+import { inConfirmGuard, sellPlan, sellStillValid, type ConfirmSpec } from "./act-confirm";
 import { PREFER_TARGET_STORAGE_KEY, parsePreferTarget } from "./aim-order";
 import { craftButtonText, craftFeeHint, craftSubtitle, craftTitle } from "./craft-ui";
 import {
@@ -714,6 +714,8 @@ function selectSlot(i: number) {
 let actConfirmAction: (() => void) | null = null;
 let actConfirmOpener: HTMLElement | null = null;
 let actConfirmOpenedAt = -Infinity;
+/** Hộp đang mở do nút Bán ở cửa hàng: cửa hàng đóng (đi xa NPC, Esc...) thì hộp đóng theo, không bán vào chỗ không còn mở. */
+let actConfirmFromShop = false;
 
 /** Mở hộp xác nhận: nêu hậu quả bằng chữ; "Giữ lại" được focus; `onOk` chỉ chạy khi bấm xác nhận SAU cửa sổ chống click ma. */
 function askActConfirm(spec: ConfirmSpec, onOk: () => void, opener: HTMLElement | null) {
@@ -736,6 +738,7 @@ function closeActConfirm(refocus = true): boolean {
   if (!box || box.hidden) return false;
   box.hidden = true;
   actConfirmAction = null;
+  actConfirmFromShop = false;
   const back = actConfirmOpener;
   actConfirmOpener = null;
   if (refocus && back && !back.hidden) back.focus();
@@ -2164,8 +2167,34 @@ function renderShopSellImpl() {
       sellBtn.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
-        sound.pickup();
-        callbacks?.onSell?.(shopNpcId, i, qty);
+        // Đồ quý / trang bị: hộp xác nhận (issue #779); đồ thường bán thẳng
+        const plan = sellPlan(invSlots, i, qty, unitPrice, {
+          name: def.name,
+          type: def.type,
+          rarity: def.rarity,
+          rarityName: rarityStyle(def.rarity).name,
+        });
+        if (!plan) {
+          sound.pickup();
+          callbacks?.onSell?.(shopNpcId, i, qty);
+          return;
+        }
+        const npc = shopNpcId;
+        askActConfirm(
+          plan.spec,
+          () => {
+            // túi có thể đổi trong lúc hộp mở (nhặt, dùng, máy chủ gửi lại): kiểm lại ĐÚNG món + số lượng, không bán món khác
+            if (!sellStillValid(invSlots, plan)) {
+              ui.toast({ text: "Túi vừa đổi, chưa bán gì. Hãy chọn lại món.", tone: "info" });
+              renderShopSell();
+              return;
+            }
+            sound.pickup();
+            callbacks?.onSell?.(npc, plan.index, plan.qty);
+          },
+          sellBtn,
+        );
+        actConfirmFromShop = true;
       });
 
       right.append(qtyBox, sellBtn);
@@ -3921,6 +3950,7 @@ export const ui = {
       focusModal($("shop-modal"));
       renderShopModal();
     } else {
+      if (actConfirmFromShop) closeActConfirm(false);
       modalStack.remove("shop-modal");
       returnFocus();
     }
