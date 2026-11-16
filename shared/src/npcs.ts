@@ -1,5 +1,6 @@
 // NPC trong Lạc Hà Trấn và giao dịch đổi đồ: hợp đồng giữa client và server (Sprint 2).
 import { AM_SUONG_ID, DEFAULT_MAP_ID, HAC_PHONG_ID, HAN_VAN_ID, TOWN_PX } from "./map";
+import type { CraftStation } from "./craft-station";
 
 export interface NpcDef {
   id: string;
@@ -8,6 +9,11 @@ export interface NpcDef {
   name: string;
   /** Danh xưng hiện dưới tên, vd "Trưởng trấn" */
   title: string;
+  /**
+   * Loại trạm chế tác của NPC này (nghề nhỏ, #514): `forge` (Lò rèn), `alchemy` (Lò đan), `talisman` (Bàn phù). Thiếu = `forge`, nên
+   * mọi NPC cũ không đổi. Chữ hiển thị lấy từ `CRAFT_STATIONS[station]` (`craft-station.ts`); dùng `craftStationOf(npc)`, đừng đọc trực tiếp.
+   */
+  station?: CraftStation;
   /** Vị trí (px), đứng yên */
   x: number;
   y: number;

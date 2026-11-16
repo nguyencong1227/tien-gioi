@@ -3,7 +3,7 @@
 
 import { SKILL_BOOK_ITEMS, bookIdOf } from "./books";
 import { STAT_CAPS } from "./stat-caps";
-import type { Element } from "./skills";
+import type { Element, StatusId } from "./skills";
 import { OWNER_GEAR_ITEMS } from "./owner-gear";
 
 export type ItemType = "consumable" | "material" | "equip" | "book";
@@ -29,7 +29,13 @@ export const RARITY_COLORS = [0xc9c4b8, 0x6fcf73, 0x4fa3ff, 0xc277ff, 0xffb23f] 
 export type ItemEffect =
   | { kind: "healHp"; pct: number }
   | { kind: "healMp"; pct: number }
-  | { kind: "exp"; pct: number; maxExp?: number };
+  | { kind: "exp"; pct: number; maxExp?: number }
+  /**
+   * Nghề nhỏ (#514): dùng vật phẩm thì GẮN trạng thái CÓ LỢI `id` lên người dùng (đan hộ đạo `dao_ho`; sau này phù / đan tăng cường), thời gian
+   * `ms`, cường độ `ratio`. Máy chủ KHÔNG tin số trong dữ liệu: kẹp bằng `clampStatusEffect` theo `STATUSES` (`maxMs`, `maxRatio`).
+   * `forRealm` (chỉ đan hộ đạo): cảnh giới đang đứng ở đỉnh để đột phá lên `forRealm + 1`; đan sai bậc bị từ chối, KHÔNG trừ đan.
+   */
+  | { kind: "status"; id: StatusId; ratio: number; ms: number; forRealm?: number };
 
 /** Tu vi một viên đan tu vi cho khi thanh tu vi tối đa là `expMax`: `round(expMax * pct)`, cắt ở `maxExp` nếu có; luôn số nguyên >= 0. */
 export function expPillGain(effect: { pct: number; maxExp?: number }, expMax: number): number {

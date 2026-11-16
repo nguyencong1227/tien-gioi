@@ -104,16 +104,28 @@ export function elementMult(attacker: unknown, defender: unknown): number {
 // ---------------------------------------------------------------------------------------------------------------
 
 export type StatusId =
-  "burn" | "poison" | "bleed" | "chill" | "sunder" | "stun" | "shield" | "haste" | "regen";
+  | "burn"
+  | "poison"
+  | "bleed"
+  | "chill"
+  | "sunder"
+  | "stun"
+  | "shield"
+  | "haste"
+  | "regen"
+  | "dao_ho";
 
 /**
  * Loại tác dụng của trạng thái và ý nghĩa của `ratio` ở `SkillEffect`:
  *  - `dot`: sát thương mỗi giây = `ratio` x sát thương gốc của đòn gây ra nó (đốt, độc, chảy máu);
  *  - `slow`: giảm tốc độ di chuyển `ratio` (tê cóng); `vuln`: nhận thêm `ratio` sát thương (vỡ giáp);
  *  - `stun`: không làm gì được (không dùng `ratio`); `shield`: hấp thụ `ratio` x khí huyết tối đa;
- *  - `haste`: tăng tốc độ `ratio`; `regen`: hồi `ratio` x khí huyết tối đa mỗi giây.
+ *  - `haste`: tăng tốc độ `ratio`; `regen`: hồi `ratio` x khí huyết tối đa mỗi giây;
+ *  - `breakAid` (#514, đan hộ đạo): cộng `ratio` vào xác suất đột phá cảnh giới của lần đột phá kế tiếp (`breakthroughChanceWith`),
+ *    gỡ ngay sau lần đó dù thành công hay thất bại; hết hạn mà chưa dùng thì mất.
  */
-export type StatusKind = "dot" | "slow" | "vuln" | "stun" | "shield" | "haste" | "regen";
+export type StatusKind =
+  "dot" | "slow" | "vuln" | "stun" | "shield" | "haste" | "regen" | "breakAid";
 
 export interface StatusDef {
   id: StatusId;
@@ -145,6 +157,8 @@ export const STATUSES: readonly StatusDef[] = [
   { id: "shield", name: "Hộ thể", kind: "shield", harmful: false, maxMs: 8000, maxRatio: 0.5 },
   { id: "haste", name: "Tăng tốc", kind: "haste", harmful: false, maxMs: 8000, maxRatio: 0.6 },
   { id: "regen", name: "Hồi phục", kind: "regen", harmful: false, maxMs: 8000, maxRatio: 0.15 },
+  // Nghề nhỏ (#514): id mới luôn thêm CUỐI để thứ tự cũ không đổi
+  { id: "dao_ho", name: "Hộ đạo", kind: "breakAid", harmful: false, maxMs: 900000, maxRatio: 0.2 },
 ];
 
 export const STATUS_BY_ID: Readonly<Record<string, StatusDef>> = Object.fromEntries(
@@ -833,10 +847,36 @@ export interface SkillsMsg {
  */
 export type StatusEntry = [id: StatusId, msLeft: number, ratio?: number];
 
-/** Trạng thái nào ghi `ratio` trong `StatusEntry`: chỉ những cái đổi tốc độ di chuyển của người chơi. */
+/**
+ * Trạng thái nào ghi `ratio` trong `StatusEntry`: những cái đổi tốc độ di chuyển của người chơi (client cần để đoán trước di chuyển)
+ * và `breakAid` (client hiện "+X %" xác suất đột phá trên chip hộ đạo, #514).
+ */
 export function statusCarriesRatio(id: unknown): boolean {
   const def = statusOf(id);
-  return def !== undefined && (def.kind === "haste" || def.kind === "slow");
+  return (
+    def !== undefined && (def.kind === "haste" || def.kind === "slow" || def.kind === "breakAid")
+  );
+}
+
+/**
+ * Kẹp hiệu ứng trạng thái của vật phẩm (`ItemEffect` kind `status`) theo `STATUSES`: `id` phải là trạng thái CÓ THẬT và CÓ LỢI
+ * (vật phẩm không được gắn trạng thái có hại lên người dùng); `ms` làm tròn, trong 1..`maxMs`; `ratio` trong 0..`maxRatio`.
+ * Không hợp lệ (id lạ / có hại, số không hữu hạn) trả `null`: máy chủ từ chối dùng, không trừ vật phẩm.
+ */
+export function clampStatusEffect(e: {
+  id: unknown;
+  ratio: unknown;
+  ms: unknown;
+}): { id: StatusId; ratio: number; ms: number } | null {
+  const def = statusOf(e.id);
+  if (!def || def.harmful) return null;
+  if (typeof e.ms !== "number" || !Number.isFinite(e.ms) || e.ms < 1) return null;
+  if (typeof e.ratio !== "number" || !Number.isFinite(e.ratio) || e.ratio < 0) return null;
+  return {
+    id: def.id,
+    ms: Math.min(def.maxMs, Math.round(e.ms)),
+    ratio: Math.min(def.maxRatio, e.ratio),
+  };
 }
 
 /** Hệ số tốc độ di chuyển cho phép (kẹp): không bao giờ đứng yên vì tê cóng, không nhanh quá mức tránh được va chạm / xuyên tường. */

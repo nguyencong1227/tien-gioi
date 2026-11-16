@@ -3,6 +3,7 @@
 // nên hai bên luôn tính giống nhau.
 import { stepOf } from "./realms";
 import type { Inventory } from "./items";
+import type { CraftStation } from "./craft-station";
 
 /** Các loại bước. Bước làm lần lượt theo thứ tự trong `steps`. */
 export type QuestStep =
@@ -1054,7 +1055,8 @@ export type DialogAction =
   | { kind: "accept"; questId: string }
   | { kind: "turnIn"; questId: string }
   | { kind: "trade"; tradeId: string }
-  | { kind: "forge" }
+  /** `station` (#514): loại trạm để client vẽ tiêu đề / nút theo `CRAFT_STATIONS`; thiếu = `forge`, client cũ bỏ qua trường này */
+  | { kind: "forge"; station?: CraftStation }
   /** Mở bảng cửa hàng của NPC này (`SHOP_BY_NPC` trong currency.ts); mua / bán đi qua tin `buy` / `sell` */
   | { kind: "shop" }
   /** Mở bí cảnh `dungeonId` cho đội (chỉ đội trưởng): bấm thì client gửi tin `dungeonOpen { dungeonId }` (dungeon.ts); server kiểm mọi điều kiện, docs/THIET_KE_BI_CANH.md */

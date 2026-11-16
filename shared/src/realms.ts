@@ -119,3 +119,16 @@ export function canEquip(itemId: string, realm: number, tier: number): boolean {
 export function breakthroughChance(realm: number): number {
   return Math.max(0.15, 0.85 - realm * 0.08);
 }
+
+/** Trần xác suất đột phá khi có đan hộ đạo (#514): không bao giờ chắc chắn 100 %, thất bại vẫn còn ý nghĩa. */
+export const BREAK_CHANCE_CAP = 0.95;
+
+/**
+ * Xác suất đột phá có cộng `bonus` (phân số, từ trạng thái `dao_ho`): `breakthroughChance(realm) + bonus`, kẹp ở `BREAK_CHANCE_CAP`.
+ * `bonus` âm / không hữu hạn coi là 0 (không bao giờ GIẢM xác suất gốc); không bao giờ thấp hơn `breakthroughChance(realm)`.
+ */
+export function breakthroughChanceWith(realm: number, bonus: number): number {
+  const base = breakthroughChance(realm);
+  const b = Number.isFinite(bonus) && bonus > 0 ? bonus : 0;
+  return Math.max(base, Math.min(BREAK_CHANCE_CAP, base + b));
+}

@@ -7,6 +7,7 @@ export * from "./books";
 export * from "./npcs";
 export * from "./quests";
 export * from "./recipes";
+export * from "./craft-station";
 export * from "./party";
 export * from "./currency";
 export * from "./travel";
