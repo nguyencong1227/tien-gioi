@@ -399,6 +399,25 @@ describe("ngân sách băng thông và CPU (benchmark có seed, kết quả cố
     expect(r.walletKbPerClient).toBeGreaterThan(0);
     expect(r.walletKbPerClient).toBeLessThan(0.5);
   });
+
+  it("kho đồ tông môn (sectVault): không tick nào gửi sectVault khi không ai đụng kho (Issue #790 K6)", () => {
+    const { w } = makeWorld();
+    // Tạo 5 người chơi
+    for (let i = 0; i < 5; i++) {
+      addPlayer(w, `p_sect_${i}`, 1, 0);
+    }
+    const sentVaults: string[] = [];
+    w.events.sectVault = (sid) => sentVaults.push(sid);
+
+    // Chạy 40 ticks vòng lặp thế giới
+    for (let t = 0; t < 40; t++) {
+      w.now += 50;
+      tickWorld(w, 50);
+    }
+
+    // Khẳng định: vòng lặp tick không bao giờ phát tán ảnh chụp kho đồ khi không ai thao tác
+    expect(sentVaults).toHaveLength(0);
+  });
 });
 
 describe("kịch bản hiệu năng chiêu thức (M7.10 #511)", () => {
