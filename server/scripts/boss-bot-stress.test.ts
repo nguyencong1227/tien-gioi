@@ -87,6 +87,9 @@ async function createTestBot(
 
   await waitFor(() => (room.state as any)?.players?.get(room.sessionId));
 
+  // Dọn sạch quái tự nhiên trên bản đồ phòng test để tránh trùm tự động cast chiêu chen ngang vào kịch bản test
+  serverRoom(room).state.monsters.clear();
+
   const receivedWarns: any[] = [];
   const bot = {
     name,
