@@ -7279,3 +7279,13 @@ body.ui-hidden
   min-width: 84px;
   min-height: 44px; /* chạm được trên điện thoại */
 }
+
+/* Ô kho còn khoá theo cấp tông (M8): ghi chú dưới lưới kho */
+.sect-vault-locked {
+  margin: 4px 0 0;
+  font-size: var(--fs-12);
+  color: #c9c2b0;
+}
+.sect-vault-locked:empty {
+  display: none;
+}

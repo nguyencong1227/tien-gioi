@@ -149,6 +149,7 @@ import {
   vaultLogLine,
   withdrawBlock,
   type VaultPlan,
+  vaultLockedNote,
 } from "./sect-vault";
 import { hallLeaveWarning, sanitizeHallView } from "./sect-hall";
 import { renderHall, updateHallCountdown, type HallUiState } from "./sect-hall-ui";
@@ -3202,6 +3203,10 @@ function renderSectVaultTab() {
   if (!currentSect) return;
   const v = sectVault;
   const rank = currentSect.myRank;
+  // số ô kho theo cấp tông (M8, `SectVaultView.unlocked`): lưới vẽ lại khi số ô đổi (lên cấp), chỉ vẽ ô ĐÃ MỞ + ghi chú ô còn khoá
+  const wantCells = Math.max(SECT_VAULT_SLOTS, v?.slots.length ?? SECT_VAULT_SLOTS);
+  if (vaultSlotEls.length !== wantCells) buildSectVaultGrids(wantCells);
+  $("sect-vault-locked").textContent = v ? vaultLockedNote(v.slots.length) : "";
   reconcileVaultSelection();
   $("sect-vault-draw").textContent = v ? drawSummary(v, rank) : "Đang tải kho đồ…";
   const used = v ? v.slots.filter((x) => x !== null).length : 0;
@@ -3341,7 +3346,7 @@ function runVaultAction() {
   );
 }
 
-function buildSectVaultGrids() {
+function buildSectVaultGrids(vaultCount: number = SECT_VAULT_SLOTS) {
   const make = (
     host: HTMLElement,
     count: number,
@@ -3382,7 +3387,7 @@ function buildSectVaultGrids() {
       host.append(btn);
     }
   };
-  make($("sect-vault-grid"), SECT_VAULT_SLOTS, "vault", vaultSlotEls);
+  make($("sect-vault-grid"), vaultCount, "vault", vaultSlotEls);
   make($("sect-vault-bag"), INVENTORY_SLOTS, "bag", vaultBagEls);
 }
 
