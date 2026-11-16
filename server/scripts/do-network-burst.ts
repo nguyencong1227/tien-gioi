@@ -212,16 +212,13 @@ function median(xs: number[]): number {
 function mean(xs: number[]): number {
   return xs.reduce((a, b) => a + b, 0) / xs.length;
 }
-function max(xs: number[]): number {
-  return Math.max(...xs);
-}
 
 interface Agg {
   scenario: string;
   n: number;
-  settle: [number, number, number, number]; // min, median, mean, max
-  drift: [number, number, number, number];
-  trailing: [number, number, number, number];
+  settle: number[]; // min, median, mean, max
+  drift: number[]; // min, median, mean, max
+  trailing: number[]; // min, median, mean, max
   stopArrivedN: number; // tin dừng tới nơi k/N (khi có tin dừng)
   hasStop: boolean;
 }
@@ -268,7 +265,8 @@ function aggregate(scenarios: BurstResult[]): Agg[] {
 
 async function main() {
   const iters = Number(process.argv[process.argv.indexOf("--iterations") + 1] ?? 1) || 1;
-  const want = (process.argv[process.argv.indexOf("--suite") + 1] ?? "all") as "new" | "old" | "all";
+  const want = (process.argv[process.argv.indexOf("--suite") + 1] ?? "all") as
+    "new" | "old" | "all";
   console.log(
     `=== ĐO MẠNG GIẬT XẢ DỒN INPUT (Colyseus THẬT) — lặp ${iters} lần, nhóm kịch bản "${want}" — mục 41 / #857 [F1] ===`,
   );
@@ -285,7 +283,10 @@ async function main() {
     const suite = await runSuiteOnce(server, port, want);
     // in tóm tắt mỗi lượt để theo dõi tiến độ / phát hiện chập chờn
     const line = suite
-      .map((r) => `${r.scenario.slice(0, 18)}: dừng=${r.settleTimeMs}ms trôi=${r.driftPx}px đuôi_bị_bỏ=${r.trailingDropped}${r.hasStop ? ` dừng_tới=${r.stopArrived}` : ""}`)
+      .map(
+        (r) =>
+          `${r.scenario.slice(0, 18)}: dừng=${r.settleTimeMs}ms trôi=${r.driftPx}px đuôi_bị_bỏ=${r.trailingDropped}${r.lastStopSeq > 0 ? ` dừng_tới=${r.stopArrived}` : ""}`,
+      )
       .join("\n    ");
     console.log(`--- lượt ${i + 1}/${iters} ---\n    ${line}`);
     all.push(...suite);
@@ -296,7 +297,9 @@ async function main() {
 
   const agg = aggregate(all);
   console.log("\n### TỔNG HỢP (min / median / mean / max):");
-  console.log("| Kịch bản | N | Dừng (ms): min/med/mean/max | Trôi (px): min/med/mean/max | Đuôi bị bỏ: min/med/mean/max | Tin dừng tới nơi |");
+  console.log(
+    "| Kịch bản | N | Dừng (ms): min/med/mean/max | Trôi (px): min/med/mean/max | Đuôi bị bỏ: min/med/mean/max | Tin dừng tới nơi |",
+  );
   console.log("|---|---:|---|---|---|---:|");
   for (const a of agg) {
     const stop = a.hasStop ? `${a.stopArrivedN}/${a.n}` : "—";

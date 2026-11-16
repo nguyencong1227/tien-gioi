@@ -1549,6 +1549,52 @@ Bộ kiểm thử đơn vị độc lập (`server/scripts/quest-walk.test.ts`) 
    - *Đột biến (f) (Phạt né quái = 0 / không cộng ma trận phạt vào chi phí A* - Issue #818)*: Khi `penaltyFactor = 0`, thuật toán A* đi thẳng qua ô quái nguy hiểm `centerCell`, làm ĐỎ kiểm tra `safePath!.cells.includes(centerCell) === false` trong `quest-walk.test.ts`.
    - *Đột biến (g) (Bỏ né quái khi di chuyển liên bản đồ trên máy chủ thật - Issue #818)*: Khi bỏ né quái (`avoidMonsters = false` hoặc không dùng ma trận phạt) ở nhiệm vụ `lang_han_quan`, bot đi thẳng qua đầm lầy Âm Sương Trạch nơi bầy Sương Hồ và Thạch Quy canh giữ, bot bị đánh gục (`bot_died`), làm ĐỎ bài test tích hợp máy chủ thật trong < 20s.
 
+## 28. Bot mạng giật xả dồn input 100 / 150 tin trên Colyseus THẬT: đo trôi trước / sau #852 (issue #857 [F1], mục 41)
+
+### 28.1. Bối cảnh & phạm vi
+Mục 41 (`QUYET_DINH_M3.md`): mạng nhà đứng rồi xả dồn làm nhân vật "trôi như liệt phím". PR #852 (đã merge vào `main`, đầu `ac7d6a7`) sửa phía máy chủ: backlog 0,25 giây (`MAX_INPUT_BACKLOG = 5`), tin dừng cắt hàng đợi (`STOP_KEEP_INPUTS = 2`), và **nâng giới hạn tần suất `input` burst 40 -> 100**. Phạm vi thu hẹp của #857 [F1] (theo thư Dev A): chạy lại + **mở rộng kịch bản lên 100 và 150 tin** — burst 100 nay vừa khít 100 tin nên **tin dừng cuối phải tới nơi**; 150 tin thì **phần đuôi (bao gồm tin dừng) bị bỏ** ở lớp giới hạn tần suất, đo hậu quả.
+
+### 28.2. Cách chạy & tham số
+Script `server/scripts/do-network-burst.ts` (đo trên máy chủ Colyseus thật trong tiến trình, cổng do hệ điều hành cấp qua `listenWithRetry`, dữ liệu ghi thư mục tạm, tắt hết khi xong). Bot colyseus.js giữ phím di chuyển (`dx=1`), **xả dồn N tin `input` cùng lúc** rồi (tuỳ kịch bản) gửi 3 tin dừng (`dx=dy=0`, mô phỏng client mới #851). TCP giữ thứ tự nên tin dừng ở ĐUÔI: bị bỏ thì bỏ đúng tin dừng — đúng hiện thực mạng giật.
+
+- Chờ theo **ĐIỀU KIỆN**, không `sleep` cố định: coi nhân vật "đứng yên hẳn" khi vị trí không đổi >= 200 ms **và** hàng đợi input đã rỗng.
+- Chạy **lặp 12 lượt** (`--iterations 12`); tổng hợp min / median / mean / max + tỉ lệ tin dừng tới nơi k/N.
+- Hai mã so sánh, chạy CÙNG script: **"trước #852"** = `main` tại `bfd6eb1` (burst 40, không backlog cap / cắt dừng); **"sau #852"** = `main` tại `004a7f8` (burst 100). Nhân vật đặt ở sân trấn thông thoáng (`x=1300, y=1500`), đi về +x.
+- Chỉ số: **Dừng (ms)** = thời gian từ lúc xả dồn tới lần di chuyển cuối; **Trôi (px)** = quãng đi thêm; **Đuôi bị bỏ** = `sent - lastSeq cuối` (seq đơn điệu: số tin không bao giờ tới tay máy chủ, chủ yếu bị giới hạn tần suất bỏ); **Tin dừng tới nơi** = `lastSeq cuối >= seq tin dừng cuối`.
+
+### 28.3. Kết quả (lặp 12 lượt, N=12 mỗi ô)
+
+**Sau #852 (`main` @ `004a7f8`, burst 100):**
+
+| Kịch bản | Dừng min/med/mean/max (ms) | Trôi (px) | Đuôi bị bỏ | Tin dừng tới nơi |
+|---|---|---|---|---|
+| 100 tin (97 đi + 3 dừng) — vừa khít burst 100 | 10 / 22 / **25** / 53 | 15 | 0 | **12/12** |
+| 100 tin (100 đi), không dừng (client cũ) | 265 / 270 / 275 / 318 | 112,5 | 0 | — |
+| 150 tin (147 đi + 3 dừng) — vượt burst 100 | 268 / 276 / **283** / 328 | 112,5 | 50 | **0/12** |
+| 150 tin (150 đi), không dừng (client cũ) | 266 / 274 / 272 / 281 | 112,5 | 50 | — |
+
+**Trước #852 (`main` @ `bfd6eb1`, burst 40):**
+
+| Kịch bản | Dừng min/med/mean/max (ms) | Trôi (px) | Đuôi bị bỏ | Tin dừng tới nơi |
+|---|---|---|---|---|
+| 100 tin (97 đi + 3 dừng) | 1518 / 1529 / **1528** / 1536 | 300 | 60 | 0/12 |
+| 100 tin (100 đi), không dừng | 1516 / 1525 / 1526 / 1537 | 300 | 60 | — |
+| 150 tin (147 đi + 3 dừng) | 1522 / 1528 / **1529** / 1538 | 300 | 110 | 0/12 |
+| 150 tin (150 đi), không dừng | 1514 / 1528 / 1527 / 1537 | 300 | 110 | — |
+
+### 28.4. Phân tích & kết luận
+- **Trước #852:** dù gửi 100 hay 150 tin, giới hạn tần suất burst 40 chỉ cho ~40 tin qua -> đi ~40 bước = **300 px trong ~1,5 giây**; tin dừng ở đuôi LUÔN bị bỏ (0/12). Con số gần như y hệt cho 100 và 150 vì burst 40 đã chặn từ đầu — KHÔNG đạt mục 41 (dừng <= 0,3 s).
+- **Sau #852, client MỚI (gửi tin dừng):**
+  - **100 tin vừa khít burst 100 -> tất cả qua, tin dừng LUÔN tới nơi (12/12), dừng trong 25 ms / 15 px** (max 53 ms). ĐẠT mạnh mục 41.
+  - **150 tin vượt burst 100 -> 50 tin đuôi LUÔN bị bỏ (12/12), tin dừng KHÔNG tới (0/12)**; nhưng `MAX_INPUT_BACKLOG = 5` + token bucket vẫn chặn drift ở **112,5 px** và dừng trong **283 ms trung bình** (đỉnh 328 ms). Hậu quả của việc mất tin dừng bị giới hạn cứng, không trôi hàng giây như trước.
+- **Sau #852, client CŨ (không tin dừng):** backlog cap tự chặn ở ~275–283 ms trung bình / 112,5 px (đỉnh ~318–328 ms). Phần lớn đạt <= 0,3 s trên trung bình; đỉnh có thể nhích quá 300 ms khi dồn >= 100 tin — nhưng đây là biên spam/DoS, không phải chơi bình thường (client thật gửi <= 20 input/giây và có tin dừng).
+- **Kết luận:** #852 cải thiện thời gian dừng sau đợt dồn **~1,5 s -> 25 ms (client mới) / ~275 ms (client cũ)**, drift **300 px -> 15–112,5 px**. Tiêu chí mục 41 ĐẠT với client mới (tin dừng tới nơi, burst <= 100); ngay cả khi burst > 100 làm mất tin dừng, backlog cap vẫn giữ drift <= 112,5 px và dừng <= ~0,3 s.
+
+### 28.5. Kiểm
+- Script chạy lặp được (cổng `listenWithRetry` không bao giờ 2567, dữ liệu tạm, `gracefullyShutdown` + `rmSync` khi xong), chờ theo điều kiện (không `sleep` cố định), đã chạy **12 lượt** mỗi bên, số liệu ở trên là số THẬT đo được (không ghi số chưa đo).
+- Chạy lại: `cd server && npx tsx scripts/do-network-burst.ts --iterations 12 --suite new` (100/150 tin) hoặc `--suite old` (kịch bản 30/40/200 gốc của Dev C trên PR #852) hoặc `--suite all`.
+- Không sửa mã trò chơi; đây là công cụ đo của Dev F (issue #857).
+
 
 
 
