@@ -14,12 +14,15 @@ import {
   type SectHallView,
 } from "@tien-gioi/shared";
 import {
+  HALL_REFRESH_MAX_MS,
+  HALL_RESET_MARGIN_MS,
   formatHallDuration,
   hallBuffLines,
   hallEarnNote,
   hallLeaveWarning,
   hallProgress,
   hallQuestRows,
+  hallRefreshDelayMs,
   hallResetInMs,
   hallShopRows,
   sanitizeHallView,
@@ -313,5 +316,33 @@ describe("hallShopRows và lý do khoá", () => {
     const v = clone(sample(3));
     v.shop[0]!.hall = "tangKinh";
     expect(hallShopRows(v, { down: false })[0]!.hallLabel).toBe("Tàng Kinh Các");
+  });
+});
+
+describe("hallRefreshDelayMs: hẹn giờ xin ảnh chụp mới khi qua mốc đặt lại (kể cả tab đóng)", () => {
+  const at = (msToReset: number): SectHallView => ({ ...sample(), resetAt: NOW + msToReset });
+
+  it("= còn bao lâu tới mốc (theo giờ máy chủ) + biên an toàn", () => {
+    expect(hallRefreshDelayMs(at(60_000), 0)).toBe(60_000 + HALL_RESET_MARGIN_MS);
+    expect(hallRefreshDelayMs(at(60_000), 15_000)).toBe(45_000 + HALL_RESET_MARGIN_MS);
+  });
+
+  it("đã qua mốc rồi (đồng hồ chạy lâu hơn): không âm, vẫn chờ đúng biên (không xin trước khi máy chủ chắc chắn sang ngày)", () => {
+    expect(hallRefreshDelayMs(at(1000), 5000)).toBe(HALL_RESET_MARGIN_MS);
+    expect(hallRefreshDelayMs(at(0), 0)).toBe(HALL_RESET_MARGIN_MS);
+    expect(hallRefreshDelayMs(at(-86_400_000), 0)).toBe(HALL_RESET_MARGIN_MS);
+  });
+
+  it("mốc xa bất thường bị kẹp (setTimeout tràn ở ~24,8 ngày); số hỏng không ném, không NaN", () => {
+    expect(hallRefreshDelayMs(at(10 * 86_400_000), 0)).toBe(HALL_REFRESH_MAX_MS);
+    expect(hallRefreshDelayMs(at(60_000), NaN)).toBe(60_000 + HALL_RESET_MARGIN_MS);
+    expect(hallRefreshDelayMs({ ...sample(), resetAt: NaN }, 0)).toBe(HALL_REFRESH_MAX_MS);
+    expect(Number.isFinite(hallRefreshDelayMs({ ...sample(), now: Infinity }, 0))).toBe(true);
+  });
+
+  it("thời gian máy khách đã trôi (elapsed) làm hẹn sớm hơn, không phụ thuộc giờ máy khách", () => {
+    const a = hallRefreshDelayMs(at(10 * 60_000), 0);
+    const b = hallRefreshDelayMs(at(10 * 60_000), 4 * 60_000);
+    expect(a - b).toBe(4 * 60_000);
   });
 });

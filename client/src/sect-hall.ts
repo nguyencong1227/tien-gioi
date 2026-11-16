@@ -154,6 +154,23 @@ export function hallResetInMs(view: SectHallView, elapsedMs: number): number {
   return Math.max(0, view.resetAt - (view.now + el));
 }
 
+/** Chờ thêm chừng này (ms) SAU mốc đặt lại rồi mới xin ảnh chụp mới: máy chủ chắc chắn đã sang ngày (lệch đồng hồ / độ trễ mạng), không xin sớm rồi nhận lại bản cũ. */
+export const HALL_RESET_MARGIN_MS = 2000;
+/** Hẹn giờ xin ảnh chụp mới không bao giờ quá chừng này (ms): `setTimeout` của trình duyệt tràn ở ~24,8 ngày, ảnh chụp lạ (mốc đặt lại xa bất thường) không được làm tràn. */
+export const HALL_REFRESH_MAX_MS = 25 * 60 * 60 * 1000;
+
+/**
+ * Sau bao lâu (ms) máy khách nên TỰ xin ảnh chụp Nội vụ mới vì đã qua mốc đặt lại (00:00 giờ Việt Nam), KỂ CẢ khi tab Nội vụ đang đóng: máy chủ gỡ nhiệm vụ tông quá ngày chỉ khi nhận
+ * `sectHallGet` (hoặc nhận / trả / vào phòng), nên không xin thì nhiệm vụ cũ nằm mãi ở HUD / sổ nhiệm vụ. = còn bao lâu tới mốc (theo đồng hồ MÁY CHỦ, `hallResetInMs`) + `HALL_RESET_MARGIN_MS`,
+ * kẹp trong [margin, `HALL_REFRESH_MAX_MS`]. Số hỏng -> kẹp về `HALL_REFRESH_MAX_MS` (không bao giờ ném / trả NaN).
+ */
+export function hallRefreshDelayMs(view: SectHallView, elapsedMs: number): number {
+  const d = hallResetInMs(view, elapsedMs) + HALL_RESET_MARGIN_MS;
+  return Number.isFinite(d)
+    ? Math.min(HALL_REFRESH_MAX_MS, Math.max(HALL_RESET_MARGIN_MS, d))
+    : HALL_REFRESH_MAX_MS;
+}
+
 /** Thời gian còn lại cho người đọc: "5 giờ 12 phút", "12 phút", "dưới 1 phút". Làm tròn LÊN phút (không báo "0 phút" khi còn vài giây). */
 export function formatHallDuration(ms: number): string {
   if (!Number.isFinite(ms) || ms <= 0) return "dưới 1 phút";
