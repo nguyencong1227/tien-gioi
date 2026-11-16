@@ -75,6 +75,19 @@ export class ModalStack {
     return this.stack.length;
   }
 
+  /**
+   * Gỡ các mục SÓT: bảng đã ẩn nhưng đường đóng quên `remove` (đã gặp: menu người chơi, #468) làm `isKeyboardCaptured()` kẹt true và WASD / phím thế giới
+   * "liệt" cho tới khi bấm Esc (QUYET_DINH_M3 mục 25). `isGone(id)` = phần tử của bảng đã ẩn hoặc nằm trong vùng ẩn; không biết (không có phần tử) thì GIỮ.
+   * Trả số mục đã gỡ.
+   */
+  pruneHidden(isGone: (id: string) => boolean): number {
+    let n = 0;
+    for (const m of this.getEntries()) {
+      if (isGone(m.id) && this.remove(m.id)) n++;
+    }
+    return n;
+  }
+
   clear(): void {
     while (this.stack.length > 0) {
       this.pop();
