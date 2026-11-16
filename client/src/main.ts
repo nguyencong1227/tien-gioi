@@ -14,6 +14,7 @@ import {
   QUESTS,
   RECIPES,
   SHOPS,
+  sampleSectHall,
   SKILLS_M7,
   getMap,
   isDungeonMap,
@@ -706,6 +707,8 @@ async function start(room: Room, mapId: string) {
     // Cho `check-forge-shop.mjs` (#409): công thức rèn + cửa hàng THẬT của game (nguyên liệu, phí) để nạp túi / ví đúng ca "đủ" / "thiếu"
     // Cho `check-craft-ui.mjs` (#769): đối tượng dữ liệu DÙNG CHUNG để script chèn NPC / đan / công thức THỬ (nghề nhỏ chưa có dữ liệu thật: D làm ở #763) rồi dọn
     (window as any).__craftData = { NPC_BY_ID, ITEM_BY_ID, RECIPES };
+    // Cho `check-sect-hall.mjs` (M8.6, #843): ảnh chụp "Nội vụ" MẪU khớp kiểu thật (`sampleSectHall` của `shared/`) để nạp vào bảng Tông môn
+    (window as any).__sampleSectHall = sampleSectHall;
     (window as any).__catalog = () => ({
       recipes: RECIPES.map((r) => ({
         id: r.id,

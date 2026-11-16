@@ -1,14 +1,25 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { ITEM_BY_ID, MAIN_QUEST_START, QUESTS, QUEST_BY_ID } from "@tien-gioi/shared";
+import {
+  ITEM_BY_ID,
+  MAIN_QUEST_START,
+  NPC_BY_ID,
+  QUESTS,
+  QUEST_BY_ID,
+  SECT_QUEST_BY_ID,
+  SECT_QUEST_GIVER,
+  isSectQuest,
+} from "@tien-gioi/shared";
 import {
   MAIN_QUEST_TOTAL,
   QUEST_KIND_BADGE,
   QUEST_KIND_LABEL,
   doneRows,
   doneSummary,
+  questCardSubtitle,
   questKind,
+  questReadyText,
   rewardParts,
 } from "./quest-log";
 
@@ -35,8 +46,13 @@ describe("loại nhiệm vụ: chính tuyến / việc phụ / lặp", () => {
   it("việc phụ có thật (Xích Mãng theo đội) và KHÔNG được gọi là chính tuyến; nhãn tiếng Việt đúng", () => {
     expect(SIDE).toContain("mang_hoan");
     expect(questKind(QUEST_BY_ID.mang_hoan)).toBe("side");
-    expect(QUEST_KIND_LABEL).toEqual({ main: "Chính tuyến", side: "Việc phụ", daily: "Hằng ngày" });
-    expect(QUEST_KIND_BADGE).toEqual({ main: "Chính", side: "Phụ", daily: "Lặp" });
+    expect(QUEST_KIND_LABEL).toEqual({
+      main: "Chính tuyến",
+      side: "Việc phụ",
+      daily: "Hằng ngày",
+      sect: "Tông môn",
+    });
+    expect(QUEST_KIND_BADGE).toEqual({ main: "Chính", side: "Phụ", daily: "Lặp", sect: "Tông" });
   });
 
   it("id lạ / thiếu định nghĩa: coi là việc phụ, không ném lỗi", () => {
@@ -115,11 +131,51 @@ describe("doneSummary", () => {
   });
 });
 
+describe("nhiệm vụ TÔNG MÔN (M8.6): không có NPC giao", () => {
+  const sectDef = SECT_QUEST_BY_ID[Object.keys(SECT_QUEST_BY_ID)[0]!]!;
+
+  it("questKind: nhiệm vụ tông môn là loại riêng 'sect' (dù `daily: true`); nhiệm vụ thường không đổi", () => {
+    expect(sectDef.daily).toBe(true);
+    expect(isSectQuest(sectDef)).toBe(true);
+    expect(questKind(sectDef)).toBe("sect");
+    for (const id of MAIN) expect(questKind(QUEST_BY_ID[id]), id).toBe("main");
+    for (const id of DAILY) expect(questKind(QUEST_BY_ID[id]), id).toBe("daily");
+  });
+
+  it("questCardSubtitle: nhiệm vụ tông môn không tra NPC (không hiện id 'tong_mon'); NPC thường kèm loại; NPC lạ / độc ghi chính id", () => {
+    const s = questCardSubtitle(sectDef);
+    expect(s).toBe("Nhiệm vụ nội vụ tông môn");
+    expect(s).not.toContain(SECT_QUEST_GIVER);
+    const q = QUEST_BY_ID[MAIN[0]!]!;
+    expect(questCardSubtitle(q)).toBe(`${NPC_BY_ID[q.giver]!.name} (Chính tuyến)`);
+    expect(questCardSubtitle({ id: "x", giver: "khong_co" })).toBe("khong_co (Việc phụ)");
+    expect(questCardSubtitle({ id: "x", giver: "constructor" })).toBe("constructor (Việc phụ)");
+  });
+
+  it("questReadyText: tông môn -> mở bảng Tông môn > Nội vụ để trả; NPC thường -> gặp NPC trả; NPC lạ -> 'NPC'", () => {
+    expect(questReadyText(sectDef)).toBe("Hoàn thành · Mở bảng Tông môn > Nội vụ để trả nhiệm vụ");
+    const q = QUEST_BY_ID[MAIN[0]!]!;
+    expect(questReadyText(q)).toBe(`Hoàn thành · Gặp ${NPC_BY_ID[q.giver]!.name} trả nhiệm vụ`);
+    expect(questReadyText({ giver: "khong_co" })).toBe("Hoàn thành · Gặp NPC trả nhiệm vụ");
+    expect(questReadyText({ giver: "constructor" })).toBe("Hoàn thành · Gặp NPC trả nhiệm vụ");
+  });
+
+  it("doneRows nhận id nhiệm vụ tông môn (xếp trong nhóm lặp, cuối nhóm); id độc vẫn bị bỏ", () => {
+    const rows = doneRows(
+      [MAIN[0]!],
+      [DAILY[0]!, sectDef.id, "constructor", "__proto__", sectDef.id],
+    );
+    expect(rows.map((r) => r.id)).toEqual([MAIN[0], DAILY[0], sectDef.id]);
+    const sectRow = rows.find((r) => r.id === sectDef.id)!;
+    expect(sectRow).toMatchObject({ daily: true, side: false, title: sectDef.title });
+  });
+});
+
 describe("giao diện dùng đúng loại nhiệm vụ (không gọi việc phụ là chính tuyến)", () => {
   const ui = fs.readFileSync(path.resolve(__dirname, "ui.ts"), "utf8");
 
   it("ui.ts dán nhãn thẻ đang làm / huy hiệu hộp thoại / hàng đã xong qua `questKind`, không còn nhãn cứng 'Chính tuyến' theo `daily`", () => {
-    expect(ui).toContain("QUEST_KIND_LABEL[kind]");
+    expect(ui).toContain("questCardSubtitle(def)");
     expect(ui).toContain("QUEST_KIND_BADGE[questKind(def)]");
     expect(ui).toContain('row.side ? "Việc phụ"');
     expect(ui).not.toMatch(/def\.daily \? "Hằng ngày" : "Chính tuyến"/);

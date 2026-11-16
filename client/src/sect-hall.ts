@@ -243,12 +243,11 @@ export function hallEarnNote(v: SectHallView, serverNowMs: number): HallEarnNote
   return { today, note: null, waiting: false };
 }
 
-/** Câu cảnh báo trong hộp xác nhận RỜI tông: nêu số cống hiến và công tích sẽ MẤT (không hoàn lại). `null` ảnh chụp = chưa có số, dùng câu chung. */
+/** Câu hậu quả trong hộp xác nhận RỜI tông: nêu số cống hiến và công tích sẽ MẤT (không hoàn lại). `null` = chưa có ảnh chụp (chưa có số), dùng câu chung không số. */
 export function hallLeaveWarning(v: SectHallView | null): string {
-  const base = "Rời tông môn?";
   if (!v)
-    return `${base} ${SECT_TERMS.contrib} và ${SECT_TERMS.merit.toLowerCase()} của ngươi ở tông này sẽ mất, không hoàn lại.`;
-  return `${base} Ngươi sẽ MẤT ${v.me.contrib.toLocaleString("vi-VN")} ${SECT_TERMS.contrib.toLowerCase()} và ${v.me.merit.toLocaleString("vi-VN")} ${SECT_TERMS.merit.toLowerCase()}, không hoàn lại.`;
+    return `${SECT_TERMS.contrib} và ${SECT_TERMS.merit.toLowerCase()} của ngươi ở tông này sẽ mất, không hoàn lại.`;
+  return `Ngươi sẽ MẤT ${v.me.contrib.toLocaleString("vi-VN")} ${SECT_TERMS.contrib.toLowerCase()} và ${v.me.merit.toLocaleString("vi-VN")} ${SECT_TERMS.merit.toLowerCase()}, không hoàn lại.`;
 }
 
 // ---------- Nhiệm vụ hôm nay ----------

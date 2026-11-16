@@ -89,7 +89,7 @@ import {
   NPC_BY_ID,
   NPC_RANGE,
   npcsOfMap,
-  QUEST_BY_ID,
+  questDefAny,
   npcMarker,
   questReady,
   statsFor,
@@ -144,6 +144,7 @@ import {
   SECT_MSG,
   type SectMsg,
   type SectVaultMsg,
+  type SectHallMsg,
   type SectPresenceMsg,
   type SectInvitedMsg,
 } from "@tien-gioi/shared";
@@ -731,6 +732,14 @@ export class WorldScene extends Phaser.Scene {
         !this.isReconnecting && this.room.send(SECT_MSG.vaultWithdraw, msg),
       onSectVaultPolicy: (drawPerDay) =>
         !this.isReconnecting && this.room.send(SECT_MSG.vaultPolicy, { drawPerDay }),
+      onSectHallGet: () => !this.isReconnecting && this.room.send(SECT_MSG.hallGet, {}),
+      onSectQuestAccept: (questId) =>
+        !this.isReconnecting && this.room.send(SECT_MSG.questAccept, { questId }),
+      onSectQuestTurnIn: (questId) =>
+        !this.isReconnecting && this.room.send(SECT_MSG.questTurnIn, { questId }),
+      onSectShopBuy: (itemId) =>
+        !this.isReconnecting && this.room.send(SECT_MSG.shopBuy, { itemId, qty: 1 }),
+      isSectDown: () => Boolean(this.me()?.dead) || ui.isLimboOpen(),
     });
 
     this.setupInput();
@@ -2344,6 +2353,7 @@ export class WorldScene extends Phaser.Scene {
     });
     reg(SECT_MSG.snapshot, (m: SectMsg) => ui.onSect(m));
     reg(SECT_MSG.vault, (m: SectVaultMsg) => ui.onSectVault(m));
+    reg(SECT_MSG.hall, (m: SectHallMsg) => ui.onSectHall(m));
     reg(SECT_MSG.presence, (m: SectPresenceMsg) => ui.onSectPresence(m));
     reg(SECT_MSG.invited, (m: SectInvitedMsg) => ui.onSectInvited(m));
     replayEarlyMessages(this.room, handlers);
@@ -2762,7 +2772,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private resolveQuestTarget(questId: string): { x: number; y: number; hop?: NavHop } | null {
-    const def = QUEST_BY_ID[questId];
+    const def = questDefAny(questId);
     if (!def) return null;
     const qLog = ui.getQuestLog();
     const prog = qLog.active.find((a) => a.id === questId);
@@ -3055,7 +3065,7 @@ export class WorldScene extends Phaser.Scene {
       if (target) {
         questTarget = target;
         // ghim đích nhiệm vụ: ở bản đồ KHÁC thì đích là cổng kế tiếp trên đường tới đó ("Qua <cổng>")
-        const name = QUEST_BY_ID[trackId ?? ""]?.title ?? "Nhiệm vụ";
+        const name = questDefAny(trackId)?.title ?? "Nhiệm vụ";
         pins.push({ x: target.x, y: target.y, text: target.hop ? hopLabel(target.hop) : name });
       }
     }
