@@ -1,9 +1,11 @@
 // Quái: sinh, bổ sung, AI (lang thang, phát hiện, đuổi, tấn công, về nhà).
 import { PLAYER_RADIUS, MONSTERS, type MonsterKind } from "@tien-gioi/shared";
-import { Monster } from "../schema";
+import type { Monster } from "../schema";
 import { rand, quantAngle, takeWhole, type World, type MonsterCtrl } from "../world";
 import { hurtPlayer } from "./combat";
-import { eliteDefOf, rollElite } from "./elite";
+import { rollElite } from "./elite";
+import { placeMonster, WANDER_STRIDE } from "./monster-place";
+import { bossReset, bossStep } from "./boss";
 import { chargerStep } from "./charge";
 import { cancelSlam, slamStep } from "./slam";
 import { isRanged, onHitEffectOf, rangedStep } from "./bolt";
@@ -11,6 +13,7 @@ import { applyPlayerStatus } from "./status";
 import { isStunned, speedMult } from "./status-rules";
 
 const LEASH_DIST = 520; // kéo quá xa nhà thì bỏ mục tiêu
+export { placeMonster, WANDER_STRIDE };
 const WANDER_RADIUS = 90;
 const RETURN_HOME_DIST = 200;
 const MAX_SPAWN_PER_TOPUP = 3;
@@ -20,44 +23,6 @@ const MAX_SPAWN_PER_TOPUP = 3;
  * vẫn tốn CPU và mỗi tick gửi vị trí mới cho mọi client: 88 con ≈ 900 byte/tick dù không có ai chơi.
  */
 export const MONSTER_WAKE_DIST = 900;
-
-/**
- * Quái KHÔNG có mục tiêu (lang thang, về nhà) chỉ áp bước di chuyển mỗi WANDER_STRIDE tick, với bước dài gấp bấy nhiêu lần:
- * tốc độ trung bình y hệt, nhưng vị trí trong state chỉ đổi 1/WANDER_STRIDE số lần (#80). Quái chạy chậm (~1 px/tick) và client
- * nội suy vị trí quái nên không nhìn ra; quái có mục tiêu (đang đuổi / đánh) vẫn di chuyển mỗi tick.
- * Vị trí thật vẫn nằm trong state (không tách vị trí mô phỏng) nên các system khác đọc `m.x`, `m.y` như cũ.
- */
-export const WANDER_STRIDE = 4;
-
-/** Dựng một con quái `def` ở (x, y): vào state và dữ liệu riêng. Không kiểm vị trí (người gọi lo). */
-export function placeMonster(w: World, def: MonsterKind, x: number, y: number, elite = false) {
-  if (elite) def = eliteDefOf(def); // tinh anh (M7.3, `elite.ts`): số liệu nhân, `id` giữ nguyên
-  const id = `m${++w.monsterSeq}`;
-  const m = new Monster();
-  m.kind = def.id;
-  if (elite) m.elite = 1; // đặt MỘT lần lúc sinh
-  m.x = x;
-  m.y = y;
-  m.hp = def.hp;
-  m.maxHp = def.hp;
-  w.state.monsters.set(id, m);
-  w.mctrl.set(id, {
-    def,
-    homeX: x,
-    homeY: y,
-    target: null,
-    nextAttack: 0,
-    wanderX: x,
-    wanderY: y,
-    nextWander: 0,
-    damageBy: new Map(),
-    hpFrac: 0,
-    // Lệch pha theo số thứ tự để quái không cùng nhúc nhích một tick (không dùng random: giữ nguyên chuỗi của bench có seed)
-    strideLeft: w.monsterSeq % WANDER_STRIDE,
-    ...(elite ? { elite: true as const } : {}),
-  });
-  return id;
-}
 
 export function spawnMonster(w: World, def: MonsterKind) {
   const map = w.map;
@@ -165,7 +130,23 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
     tx = target.x;
     ty = target.y;
     speed = def.speed;
-    if (def.slam && slamStep(w, id, m, mc, d, stunned)) {
+    if (mc.boss) {
+      // Trùm nhiều chiêu (mục 42, `boss.ts`): bộ chiêu bằng dữ liệu thay hẳn đập đất / lao của loài đó (một chiêu một lúc). Đang gầm / vận chiêu thì đứng yên, không đánh thường.
+      if (bossStep(w, id, m, mc, target, d, dt)) speed = 0;
+      else if (d <= def.attackRange + PLAYER_RADIUS) {
+        speed = 0;
+        const aim = Math.atan2(target.y - m.y, target.x - m.x);
+        m.angle = quantAngle(aim);
+        if (!stunned && w.now >= mc.nextAttack) {
+          mc.nextAttack = w.now + def.attackCd;
+          w.events.fx({ kind: "mslash", by: id, x: m.x, y: m.y, angle: aim });
+          const dmg = Math.round(def.atk * mc.boss.atk * rand(0.85, 1.15));
+          const eff = onHitEffectOf(def);
+          if (hurtPlayer(w, mc.target!, target, dmg, m) && eff)
+            applyPlayerStatus(w, mc.target!, eff, dmg, "");
+        }
+      }
+    } else if (def.slam && slamStep(w, id, m, mc, d, stunned)) {
       // Đang gồng đập đất / vừa đáp đòn (M7.3, `slam.ts`): đứng yên, không đánh thường, không lao
       speed = 0;
     } else if (def.behavior === "charger" && chargerStep(w, id, m, mc, target, d, stunned)) {
@@ -194,6 +175,7 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
   } else {
     mc.ai = undefined; // mất mục tiêu giữa lúc gồng / thở: bỏ đòn đang dở
     cancelSlam(mc);
+    if (mc.boss) bossReset(w, m, mc); // trùm đang trong trận mà hết mục tiêu: reset (hồi đầy, giai đoạn 0, bỏ quái con)
     // Đang đi về nhà hoặc lang thang
     if (Math.hypot(m.x - mc.homeX, m.y - mc.homeY) > RETURN_HOME_DIST) {
       tx = mc.homeX;
@@ -215,6 +197,7 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
     } else mc.hpFrac = 0;
   }
 
+  if (mc.boss) speed *= mc.boss.mv; // giai đoạn / cuồng nộ: nhanh hơn
   if (st !== undefined) speed = stunned ? 0 : speed * speedMult(st, w.now);
 
   // Không có mục tiêu: chỉ áp bước di chuyển mỗi WANDER_STRIDE tick (bước dài gấp WANDER_STRIDE lần)
