@@ -86,6 +86,33 @@ async function burst(room: Room, n: number, stops: number): Promise<number> {
   }
 }
 
+/**
+ * Đi `n` bước 20 Hz (+x) rồi 3 tin dừng, như `WorldScene` (một input mỗi 50 ms). Trả seq cuối.
+ * Lịch KHÔNG đuổi kịp: gửi trễ thì dời mốc kế tiếp (`setInterval` của trình duyệt cũng không bắn bù các nhịp đã lỡ). Lịch tuyệt đối cũ (`t0 + i * 50`) khiến sau mỗi lần
+ * tiến trình bị giữ lâu (test chạy song song, máy tải) phía gửi dồn cả chục tin trong vài ms, vượt `MAX_INPUT_BACKLOG` nên máy chủ (đúng) bỏ tin: CI từng đỏ
+ * "expected 1 to be +0" (#923). `stall` giữ vòng lặp sự kiện bằng vòng bận để dựng lại đúng cú đứng hình đó một cách tất định.
+ */
+async function walk20Hz(
+  room: Room,
+  n: number,
+  stall?: { stallAt: number; stallMs: number },
+): Promise<number> {
+  let s = 0;
+  let due = Date.now();
+  for (let i = 0; i < n; i++) {
+    await sleep(Math.max(0, due - Date.now()));
+    if (stall && i === stall.stallAt) {
+      const end = Date.now() + stall.stallMs;
+      while (Date.now() < end); // đứng hình: không timer / I/O nào chạy (máy chủ cùng tiến trình cũng đứng)
+    }
+    room.send("input", { seq: ++s, dx: 1, dy: 0 });
+    due = Math.max(due, Date.now()) + TICK_MS;
+  }
+  await sleep(Math.max(0, due - Date.now())); // một nhịp nữa rồi mới nhả phím (tin dừng tới lúc hàng đợi đã rỗng, như người chơi thật)
+  for (let i = 0; i < 3; i++) room.send("input", { seq: ++s, dx: 0, dy: 0 });
+  return s;
+}
+
 /** Chờ máy chủ xử lý xong hàng đợi, trả { x đã đi, thời gian (ms) tới lúc đứng yên hẳn }. */
 async function settle(room: Room, x0: number) {
   const t0 = Date.now();
@@ -143,17 +170,25 @@ describe("mạng đứng rồi xả dồn, nhả phím (phòng thật)", () => {
     const x0 = p.x;
     const w = (serverRoom(room) as any).world;
     const dropped0 = w.inputStats.dropped;
-    let s = 0;
-    const t0 = Date.now();
-    for (let i = 0; i < 40; i++) {
-      room.send("input", { seq: ++s, dx: 1, dy: 0 });
-      await sleep(Math.max(0, t0 + (i + 1) * TICK_MS - Date.now())); // lịch tuyệt đối 20 Hz
-    }
-    for (let i = 0; i < 3; i++) room.send("input", { seq: ++s, dx: 0, dy: 0 });
+    const s = await walk20Hz(room, 40);
     await waitFor(() => p.lastSeq === s, 2000, "tới tin dừng cuối");
     const { moved } = await settle(room, x0);
     expect(w.inputStats.dropped - dropped0).toBe(0);
     expect(moved).toBeGreaterThan(30 * 7.5); // đi gần đủ 40 bước (mạng tốt: không bị cắt vô cớ)
+    expect(moved).toBeLessThanOrEqual(41 * 7.5 + 1e-6);
+  });
+
+  it("tiến trình đứng hình 1,2 giây giữa chừng (máy tải, #923): khách thật KHÔNG bắn bù nên không input nào bị bỏ, vẫn đi đủ và dừng ngay", async () => {
+    const room = await join();
+    const p = serverPlayer(room);
+    const x0 = p.x;
+    const w = (serverRoom(room) as any).world;
+    const dropped0 = w.inputStats.dropped;
+    const s = await walk20Hz(room, 40, { stallAt: 15, stallMs: 1200 });
+    await waitFor(() => p.lastSeq === s, 2000, "tới tin dừng cuối");
+    const { moved } = await settle(room, x0);
+    expect(w.inputStats.dropped - dropped0).toBe(0);
+    expect(moved).toBeGreaterThan(30 * 7.5);
     expect(moved).toBeLessThanOrEqual(41 * 7.5 + 1e-6);
   });
 });
