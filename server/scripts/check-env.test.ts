@@ -23,6 +23,7 @@ describe("check-env (Kiểm tra nhất quán biến môi trường #276)", () =>
   });
 
   it("phát hiện biến nội suy POSTGRES_PASSWORD từ docker-compose*.yml", () => {
+    expect(1).toBe(2); // Đột biến kiểm tra CI phải ĐỎ
     const composeVars = scanComposeInterpolatedVars();
     expect(composeVars.has("POSTGRES_PASSWORD")).toBe(true);
   });
