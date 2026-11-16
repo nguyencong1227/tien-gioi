@@ -392,6 +392,34 @@ async function main() {
         "dòng đếm ngược báo 'Đang sang ngày mới…'",
       );
 
+      // ---- hẹn giờ NỀN: qua mốc đặt lại khi tab Nội vụ ĐÓNG vẫn xin ảnh chụp mới (máy chủ gỡ nhiệm vụ tông quá ngày khi nhận sectHallGet) ----
+      await evalJs(
+        `window.__ui.toggleSectModal(false); window.__ui.onSect(${JSON.stringify(sect)}); 1`,
+      );
+      await hallOf(2, "v.resetAt = v.now + 800");
+      await clearSent();
+      await sleep(800 + 2000 - 700); // chưa tới mốc + biên an toàn 2 s: chưa xin
+      let bg = (await sent()).filter((m) => m[0] === "sectHallGet").length;
+      check(bg === 0, `tab đóng, chưa qua mốc + biên: chưa xin (đã gửi ${bg})`);
+      await sleep(1500);
+      bg = (await sent()).filter((m) => m[0] === "sectHallGet").length;
+      check(bg === 1, `tab đóng, qua mốc đặt lại: tự xin sectHallGet đúng 1 lần (đã gửi ${bg})`);
+      await sleep(3000);
+      bg = (await sent()).filter((m) => m[0] === "sectHallGet").length;
+      check(bg === 1, `tab đóng: không xin lặp cho cùng một mốc (đã gửi ${bg})`);
+      // rời tông trước khi tới mốc: huỷ hẹn giờ, không xin gì
+      await hallOf(2, "v.resetAt = v.now + 800");
+      await evalJs(`window.__ui.onSect({ sect: null }); 1`);
+      await clearSent();
+      await sleep(800 + 2000 + 1200);
+      bg = (await sent()).filter((m) => m[0] === "sectHallGet").length;
+      check(bg === 0, `rời tông trước mốc: không xin ảnh chụp (đã gửi ${bg})`);
+      // khôi phục trạng thái cho mục sau (đang ở trong tông, mở bảng)
+      await evalJs(
+        `window.__ui.onSect(${JSON.stringify(sect)}); window.__ui.toggleSectModal(true); 1`,
+      );
+      await hallOf(2);
+
       // ---- rời tông: hộp xác nhận nêu số mất ----
       await hallOf(2, "v.me.contrib = 1234; v.me.merit = 56789");
       await evalJs(`document.getElementById("sect-tab-btn-overview").click(); 1`);
