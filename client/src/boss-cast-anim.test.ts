@@ -123,6 +123,10 @@ describe("ánh đỏ cam: lượng tử hoá và màu", () => {
     expect(bossGlowStep(1)).toBe(BOSS_GLOW_STEPS);
     expect(bossGlowStep(7)).toBe(BOSS_GLOW_STEPS);
     expect(bossGlowStep(0.5)).toBe(BOSS_GLOW_STEPS / 2);
+    // làm tròn (không cắt xuống): 0,6 x 8 = 4,8 -> bậc 5; 0,06 x 8 = 0,48 -> bậc 0
+    expect(bossGlowStep(0.6)).toBe(5);
+    expect(bossGlowStep(0.06)).toBe(0);
+    expect(bossGlowStep(0.07)).toBe(1);
   });
 
   it("bậc tăng không giảm theo ánh (đơn điệu): cảnh chỉ gọi setTint khi đổi bậc", () => {
