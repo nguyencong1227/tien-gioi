@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { TICK_MS } from "@tien-gioi/shared";
 import { makeWorld, addPlayer } from "./test-helpers";
-import { applyInputs, queueInput } from "./movement";
+import { MAX_INPUT_BACKLOG, applyInputs, queueInput } from "./movement";
 import { tickWorld } from "./tick";
 
 /** Một lần chạy mô phỏng. Trả số input đã gửi, bị bỏ (hàng đợi đầy), độ sâu hàng đợi lớn nhất / cuối, `lastSeq`. */
@@ -25,6 +25,7 @@ function simulate(o: {
   let sent = 0;
   let dropped = 0;
   let maxDepth = 0;
+  let maxDepthAfter = 0; // độ sâu SAU khi áp (backlog còn lại): mục 41 giữ <= MAX_INPUT_BACKLOG
   // sự kiện đến máy chủ: (thời điểm đến, seq, dx)
   const arrivals: { at: number; seq: number; dx: number }[] = [];
   for (let n = 0; n < total; n++) {
@@ -46,10 +47,11 @@ function simulate(o: {
       if (c.inputs.length === before) dropped++;
     }
     maxDepth = Math.max(maxDepth, c.inputs.length);
-    applyInputs(w.map, p, c, now - lastTick);
+    dropped += applyInputs(w.map, p, c, now - lastTick); // mục 41: input cũ vượt backlog bị bỏ
+    maxDepthAfter = Math.max(maxDepthAfter, c.inputs.length);
     lastTick = now;
   }
-  return { sent, dropped, maxDepth, depth: c.inputs.length, lastSeq: p.lastSeq };
+  return { sent, dropped, maxDepth, maxDepthAfter, depth: c.inputs.length, lastSeq: p.lastSeq };
 }
 
 describe("hàng đợi input theo thời gian thật", () => {
@@ -74,56 +76,94 @@ describe("hàng đợi input theo thời gian thật", () => {
     expect(r.sent - r.lastSeq).toBeLessThanOrEqual(3);
   });
 
-  it("mạng giữ gói 2 giây: không bỏ input nào (hàng đợi chứa được); phần vượt ngân sách xả dần khi người chơi ngừng đi", () => {
-    const r = simulate({ seconds: 60, tickMs: 50, stall: [10_000, 12_000] });
-    expect(r.dropped).toBe(0);
-    expect(r.maxDepth).toBeLessThanOrEqual(60);
-  });
-
-  it("mạng giữ gói quá 3 giây: input vượt hàng đợi bị bỏ (đã có giới hạn, không phình bộ nhớ)", () => {
-    const r = simulate({ seconds: 60, tickMs: 50, stall: [10_000, 14_000] }); // 80 input dồn
+  it("mạng giữ gói 2 giây rồi xả dồn (mục 41): input CŨ vượt ngân sách + backlog 0,25 giây bị BỎ, backlog sau mỗi tick không bao giờ quá MAX_INPUT_BACKLOG, hết dồn ngay (không trôi 2 giây)", () => {
+    const r = simulate({ seconds: 60, tickMs: 50, stall: [10_000, 12_000] }); // 40 input dồn
     expect(r.dropped).toBeGreaterThan(0);
-    expect(r.maxDepth).toBeLessThanOrEqual(60);
+    expect(r.maxDepthAfter).toBeLessThanOrEqual(MAX_INPUT_BACKLOG);
+    expect(r.depth).toBeLessThanOrEqual(MAX_INPUT_BACKLOG); // backlog còn lại LUÔN <= 0,25 giây (hết dồn 2 giây)
+    // đã bỏ khoảng 25 / 40 (ngân sách 10 + backlog 5 được giữ): không áp lại cả 2 giây đã trễ
+    expect(r.dropped).toBeGreaterThanOrEqual(20);
+    expect(r.dropped).toBeLessThanOrEqual(30);
   });
 
-  it("chống chạy nhanh: đứng im rồi gửi dồn 200 input cùng lúc chỉ đi được ngân sách tối đa, sau đó đúng 1 bước / TICK_MS", () => {
+  it("mạng giữ gói 4 giây: vẫn bị chặn (không phình bộ nhớ): hàng đợi lúc nhận <= 64, backlog sau áp <= MAX_INPUT_BACKLOG", () => {
+    const r = simulate({ seconds: 60, tickMs: 50, stall: [10_000, 14_000] }); // 80 input dồn
+    expect(r.dropped).toBeGreaterThan(40);
+    expect(r.maxDepth).toBeLessThanOrEqual(64);
+    expect(r.maxDepthAfter).toBeLessThanOrEqual(MAX_INPUT_BACKLOG);
+  });
+
+  /**
+   * Bộ đo số BƯỚC đã áp: đã gửi - đã bỏ (lúc nhận + lúc áp) - còn chờ. Không đo bằng quãng đường (nhân vật có thể bị bản đồ chặn). Mọi input đều phải
+   * thuộc đúng MỘT trong ba nhóm: đã áp / đã bỏ / còn chờ.
+   */
+  function rig() {
     const { w } = makeWorld();
     const { p, c } = addPlayer(w, "a");
-    for (let i = 0; i < 400; i++) applyInputs(w.map, p, c, TICK_MS); // đứng im 20 giây: ngân sách đầy
-    for (let seq = 1; seq <= 200; seq++) queueInput(w, "a", { seq, dx: 0, dy: 1 });
-    expect(c.inputs.length).toBe(60); // hàng đợi chặn ở 60 (3 giây)
-    applyInputs(w.map, p, c, TICK_MS);
-    const burst = p.lastSeq;
+    let pushed = 0;
+    let dropAtApply = 0;
+    return {
+      w,
+      p,
+      c,
+      push(dy: number, seq = pushed + 1) {
+        queueInput(w, "a", { seq, dx: 0, dy });
+        pushed++;
+      },
+      apply(dtMs: number = TICK_MS) {
+        dropAtApply += applyInputs(w.map, p, c, dtMs);
+      },
+      get dropped() {
+        return w.inputStats.dropped + dropAtApply;
+      },
+      get applied() {
+        return pushed - w.inputStats.dropped - dropAtApply - c.inputs.length;
+      },
+    };
+  }
+
+  it("chống chạy nhanh: đứng im rồi gửi dồn 200 input cùng lúc chỉ đi được ngân sách tối đa, sau đó đúng 1 bước / TICK_MS (mục 41: phần cũ vượt backlog bị bỏ)", () => {
+    const r = rig();
+    for (let i = 0; i < 400; i++) r.apply(); // đứng im 20 giây: ngân sách đầy
+    for (let seq = 1; seq <= 200; seq++) r.push(1, seq);
+    expect(r.c.inputs.length).toBe(64); // chặn cứng lúc nhận
+    r.apply();
+    const burst = r.applied;
     expect(burst).toBeGreaterThanOrEqual(1);
-    expect(burst).toBeLessThanOrEqual(11); // tối đa 10 bước dồn + 1 của chính tick này
-    for (let i = 0; i < 20; i++) applyInputs(w.map, p, c, TICK_MS);
-    expect(p.lastSeq - burst).toBeLessThanOrEqual(20); // bền vững: không quá 1 bước mỗi 50 ms thời gian thật
-    expect(p.lastSeq - burst).toBeGreaterThanOrEqual(19);
+    expect(burst).toBeLessThanOrEqual(10); // tối đa 10 bước dồn (ngân sách), KHÔNG phải cả hàng đợi
+    expect(r.c.inputs.length).toBeLessThanOrEqual(MAX_INPUT_BACKLOG);
+    // sau đó bền vững: không quá 1 bước mỗi 50 ms thời gian thật (chỉ còn <= 5 input chờ)
+    for (let i = 0; i < 20; i++) r.apply();
+    expect(r.applied - burst).toBeLessThanOrEqual(MAX_INPUT_BACKLOG);
+    expect(r.c.inputs.length).toBe(0);
+    expect(r.applied + r.dropped).toBe(200);
   });
 
-  it("chống chạy nhanh theo thời gian THẬT: 100 tick ngắn 25 ms chỉ được ~50 bước, không phải 100", () => {
-    const { w } = makeWorld();
-    const { p, c } = addPlayer(w, "a");
-    c.moveBudget = 0;
-    for (let seq = 1; seq <= 40; seq++) queueInput(w, "a", { seq, dx: 0, dy: 1 });
-    for (let i = 0; i < 40; i++) applyInputs(w.map, p, c, TICK_MS / 2); // 40 tick x 25 ms = 1 giây = 20 bước
-    expect(p.lastSeq).toBe(20);
-  });
-
-  it("dt sai không phá ngân sách: NaN / âm coi như một tick đúng nhịp; dt khổng lồ bị chặn ở mức tối đa", () => {
-    for (const bad of [Number.NaN, -500, Number.POSITIVE_INFINITY]) {
-      const { w } = makeWorld();
-      const { p, c } = addPlayer(w, "a");
-      c.moveBudget = 0;
-      for (let seq = 1; seq <= 50; seq++) queueInput(w, "a", { seq, dx: 0, dy: 1 });
-      applyInputs(w.map, p, c, bad);
-      expect(p.lastSeq).toBe(1);
+  it("chống chạy nhanh theo thời gian THẬT: client gửi 40 Hz (gấp đôi) trong 1 giây chỉ áp được ~20 bước, dư bị bỏ chứ không đi nhanh hơn", () => {
+    const r = rig();
+    r.c.moveBudget = 0;
+    for (let i = 0; i < 40; i++) {
+      r.push(1); // mỗi tick 25 ms: gửi 1 input (40 Hz) rồi áp với dt 25 ms
+      r.apply(TICK_MS / 2);
     }
-    const { w } = makeWorld();
-    const { p, c } = addPlayer(w, "a");
-    for (let seq = 1; seq <= 40; seq++) queueInput(w, "a", { seq, dx: 0, dy: 1 });
-    applyInputs(w.map, p, c, 3_600_000); // máy chủ treo cả giờ
-    expect(p.lastSeq).toBe(10);
+    expect(r.applied).toBeLessThanOrEqual(20); // 1 giây thật = tối đa 20 bước
+    expect(r.applied).toBeGreaterThanOrEqual(19);
+    expect(r.applied + r.dropped + r.c.inputs.length).toBe(40); // không mất dấu input nào: áp / bỏ / còn chờ
+    expect(r.c.inputs.length).toBeLessThanOrEqual(MAX_INPUT_BACKLOG);
+  });
+
+  it("dt sai không phá ngân sách: NaN / âm coi như một tick đúng nhịp (1 bước); dt khổng lồ bị chặn ở mức tối đa (10 bước)", () => {
+    for (const bad of [Number.NaN, -500, Number.POSITIVE_INFINITY]) {
+      const r = rig();
+      r.c.moveBudget = 0;
+      for (let seq = 1; seq <= 50; seq++) r.push(1, seq);
+      r.apply(bad);
+      expect(r.applied).toBe(1);
+    }
+    const r = rig();
+    for (let seq = 1; seq <= 40; seq++) r.push(1, seq);
+    r.apply(3_600_000); // máy chủ treo cả giờ
+    expect(r.applied).toBe(10);
   });
 
   it("tickWorld truyền thời gian thật của tick xuống hàng đợi: tick trễ 100 ms xử lý được 2 bước (không cố định 1)", () => {
