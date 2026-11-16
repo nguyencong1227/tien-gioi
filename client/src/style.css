@@ -7152,3 +7152,120 @@ body.ui-hidden
 #minimap-wrap.collapsed #minimap-zone {
   max-width: 130px;
 }
+
+/* ---------- Thanh máu TRÙM (mục 42, T4 #873; `boss-bar-ui.ts`) ---------- */
+.boss-bar {
+  position: fixed;
+  top: max(8px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(440px, calc(100vw - 24px));
+  box-sizing: border-box;
+  padding: 6px 10px 8px;
+  border: 1px solid rgba(255, 120, 90, 0.55);
+  border-radius: 8px;
+  background: rgba(20, 12, 10, 0.82);
+  color: #ffe9e0;
+  z-index: 18;
+  pointer-events: none; /* không chặn chạm / nhấp vào thế giới phía sau */
+}
+.boss-bar[hidden] {
+  display: none;
+}
+.boss-bar-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: var(--fs-14);
+}
+.boss-bar-head b {
+  color: #ffb0a0;
+}
+.boss-bar-phase {
+  font-size: var(--fs-12);
+  color: #ffe08a;
+}
+.boss-bar-enrage {
+  font-size: var(--fs-12);
+  font-weight: 700;
+  color: #fff;
+  background: #b3261e;
+  border-radius: 4px;
+  padding: 0 6px;
+}
+.boss-bar-track {
+  position: relative;
+  height: 14px;
+  margin-top: 4px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+.boss-bar-fill {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #a21d14, #e9573f);
+}
+.boss-bar-mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: #ffe08a; /* vạch sáng cả trên phần tô lẫn phần trống */
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55);
+}
+.boss-bar-hp {
+  margin: 2px 0 0;
+  font-size: var(--fs-11);
+  color: #d9c9c2;
+}
+.boss-bar-castrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 18px;
+  margin-top: 2px;
+}
+.boss-bar-cast {
+  font-size: var(--fs-13);
+  font-weight: 700;
+  color: #ffe08a;
+}
+.boss-bar-castbar {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+.boss-bar-castbar[hidden] {
+  display: none;
+}
+.boss-bar-castbar i {
+  display: block;
+  height: 100%;
+  background: #ffe08a;
+}
+.boss-bar.roaring {
+  border-color: #ffe08a;
+  box-shadow: 0 0 0 2px rgba(255, 224, 138, 0.5);
+}
+.boss-bar.enrage-flash {
+  border-color: #ff4030;
+  box-shadow: 0 0 0 3px rgba(255, 64, 48, 0.6);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .boss-bar.roaring,
+  .boss-bar.enrage-flash {
+    transition: box-shadow 0.15s ease;
+  }
+}
+/* Điện thoại / máy tính bảng ĐỨNG: khung thông tin của mình (khí huyết / linh lực), bản đồ nhỏ và nút menu chiếm phần trên cùng: thanh trùm nằm dưới chúng, không che số liệu của chính mình hay nút bấm */
+@media (orientation: portrait) {
+  .boss-bar {
+    top: calc(max(8px, env(safe-area-inset-top)) + 186px);
+  }
+}
