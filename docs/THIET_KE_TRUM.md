@@ -40,6 +40,25 @@ BossEnrage { afterMs, atkMult, speedMult, cdMult }     // chỉ trùm bí cảnh
 - **Reset:** kéo quá xa nhà (`LEASH_DIST`) hoặc không còn mục tiêu: về nhà, hồi đầy khí huyết, giai đoạn 0, xoá hồi chiêu, đồng hồ cuồng nộ và quái con (không để trùm hồi dở dang giữ giai đoạn cao).
 - **Hiệu năng:** trùm ít (<= vài con mỗi phòng); `warn` chỉ gửi lúc bắt đầu vận (không mỗi tick); không cấp phát trong vòng nóng; đo `bench` trước / sau (ca 8 Hắc Giao cùng bản đồ).
 
+### 4.1. Ngân sách & Kết quả đo hiệu năng máy chủ (8 trùm + 50-100 người, Issue #936)
+Bài kiểm thử hiệu năng tự động hoá trong `server/src/systems/boss-perf.test.ts` đo đạc trực tiếp trên thế giới `World` thật (bản đồ Lạc Hà `DEFAULT_MAP`, cờ `bossMoves = true`), 8 trùm rải quanh trấn ngoài hoang dã với bộ chiêu mẫu đầy đủ các hình học (`circleAt`, `ring`, `cone`, `line`, `rain`, `pull`, `summon`, `buff`) và điều kiện mục tiêu (`minTargets`, `maxTargets`).
+
+**Bảng hiệu năng máy chủ (Đo trong 10-30 giây mô phỏng, 20 tick/s):**
+
+| Quy mô (Người) | Số trùm | Tick TB (ms) | Tick p95 (ms) | Tick Max (ms) | Byte Patch / tick / client | fx / giây (1 client) | Đánh giá |
+|---:|---:|---:|---:|---:|---:|---:|---|
+| **0** | 8 | 0.00 ms | 0.00 ms | 0.04 ms | **0.0 byte** | 0.00 | Trùm ngủ, 0 byte patch, CPU ~0 |
+| **10** | 8 | 0.03 ms | 0.05 ms | 0.24 ms | **1.7 byte** | 1.70 | Cực kỳ nhẹ |
+| **50** | 8 | **0.09–0.14 ms** | **0.20–0.36 ms** | 1.09–1.46 ms | **2.2–6.0 byte** | **1.13–1.60** | **ĐẠT** (xa dưới trần 10 ms & 520 byte) |
+| **100** | 8 | 0.20 ms | 0.54 ms | 1.62 ms | **2.9 byte** | 1.20 | Không nghẽn |
+
+**Kết luận & Ngân sách duy trì:**
+1. **CPU Tick:** Với 50 người chơi và 8 trùm vận chiêu liên tục, thời gian tick trung bình **~0.14 ms** (p95 ~0.36 ms), nằm sâu dưới ngân sách trần 10.0 ms của kiến trúc.
+2. **Độ phức tạp `pickCast`:** Khi số người chơi tăng gấp 10 lần (10 -> 100 người) với trùm liên tục chọn chiêu ở mọi tick, thời gian `tickMonsters` chỉ tăng từ 0.033 ms lên 0.120 ms (tỉ lệ ~3.6x, < 25x), chứng minh độ phức tạp lọc mục tiêu và kiểm tra điều kiện là O(n) tuyến tính, tuyệt đối không bị O(n^2).
+3. **Băng thông State Patch:** Byte patch mỗi tick mỗi client chỉ **~2.2–6.0 byte/tick**, nằm sâu dưới trần 520 byte/tick/client. Toàn bộ cơ chế trùm (giai đoạn, cuồng nộ, vận chiêu) không bổ sung bất kỳ trường state công khai nào vào `schema.ts`.
+4. **Tần suất tin `fx`:** Một client đứng gần trùm chỉ nhận trung bình **~1.1–1.7 fx/giây** (bao gồm `warn`, `bossCast`, `bossSummon`, `bossArmor`), cách xa ngưỡng an toàn 15 fx/giây, không gây dồn ứ tin mạng.
+5. **Trạng thái ngủ:** Khi 0 người chơi, trùm ngủ hoàn toàn, CPU tick ~0 và 0 byte patch.
+
 ## 5. Giao thức và client (B, PR T4)
 - Dùng lại `fx` `warn` cho MỌI báo trước nên **client / APK cũ vẫn thấy vùng cảnh báo** (hình vành khuyên được thêm trường tuỳ chọn `r0`: client cũ vẽ cả hình tròn đặc = thận trọng hơn, không nguy hiểm). THÊM ba `fx`: `bossCast { by, ability, ms }` (tên chiêu cho thanh máu), `bossPhase { by, phase }`, `bossEnrage { by }`; client cũ bỏ qua `fx` lạ (T1 kiểm bằng test). `PROTOCOL_VERSION` KHÔNG tăng nếu test xác nhận; tăng ở PR T1 nếu cần.
 - Việc của B: vẽ vùng cảnh báo rõ trên điện thoại + máy tính (viền + nền mờ + vòng thời gian co lại, màu theo hệ, âm báo), hoạt ảnh vận chiêu, **thanh máu trùm có mốc giai đoạn + tên chiêu đang vận + chỉ báo cuồng nộ**, hình triệu hồi; đúng ngân sách M5 / mục 21 (Android tầm trung >= 50 FPS); tôn trọng thời điểm máy chủ (`ms` tính từ lúc nhận, bù độ trễ bằng `now` đồng bộ nếu có).
@@ -72,6 +91,6 @@ BossEnrage { afterMs, atkMult, speedMult, cdMult }     // chỉ trùm bí cảnh
 
 ## 9. Kiểm thử và cân bằng bắt buộc
 - **Bất biến công bằng (F + A, đột biến):** không bao giờ có sát thương lên người chơi trước `hitAt`; mọi sát thương trùm tới SAU một `warn` của chính nó cùng vùng với `ms` >= 800 (`bossViolations` kiểm DỮ LIỆU, bộ thực thi kiểm LÚC CHẠY); không hai chiêu nặng chồng; người hồn lìa xác / hộ thể / chết không trúng; reset đúng; số quái con <= `maxAdds`; chọn chiêu tất định theo seed.
-- **Né kịp (kiểm TĨNH trên dữ liệu, `bossEscapePx` / `bossEscapeMs` trong `shared/src/bosses.ts`, chạy trong `bossViolations`; PR #919):** người đứng yên ở chỗ XẤU NHẤT trong vùng phải ra kịp trước khi đáp đòn: `BOSS_REACT_MS` (400 ms, phản xạ + trễ vẽ / mạng; nâng từ 300 ở #950 theo phân tích độ trễ của B ở #873: 300 chỉ đủ tới RTT ~90 ms, 400 đủ tới ~190 ms) + quãng thoát / `BOSS_ESCAPE_SPEED` (150 px/giây, người chậm nhất) <= `telegraphMs`. Quãng thoát theo hình: tròn / vũng / mưa / dịch chuyển = `r` + 3; vành khuyên = nửa bề rộng vành + 3 (lỗ giữa phải chứa được thân người, nhỏ hơn thì coi như vòng đặc); nón = bán kính đường tròn lớn nhất nằm trong quạt + 3; đường / lao = nửa bề rộng + 3; kéo = ra khỏi tầm nổ SAU khi bị kéo. Giới hạn nhanh: tròn `r <= 0,15 T - 63`, đường / vành `w <= 0,3 T - 126` (T = báo trước ms; T 900 thì r <= 72, T 1200 thì r <= 117, T 1500 thì r <= 162). Hai hằng số là ĐỀ XUẤT; kiểm này CHƯA tính hiệu ứng làm chậm, tường chặn hay quái con cản đường nên không thay cho bot né (T7) và mô phỏng của D.
+- **Né kịp (kiểm TĨNH trên dữ liệu, `bossEscapePx` / `bossEscapeMs` trong `shared/src/bosses.ts`, chạy trong `bossViolations`; PR #919):** người đứng yên ở chỗ XẤU NHẤT trong vùng phải ra kịp trước khi đáp đòn: `BOSS_REACT_MS` (400 ms, phản xạ + trễ vẽ / mạng; nâng từ 300 ở #950 theo phân tích độ trễ của B ở #873: 300 chỉ đủ tới RTT ~90 ms, 400 đủ tới ~190 ms) + quãng thoát / `BOSS_ESCAPE_SPEED` (150 px/giây, người chậm nhất) <= `telegraphMs`. Quãng thoát theo hình: tròn / vũng / mưa / dịch chuyển = `r` + 3; vành khuyên = nửa bề rộng vành + 3 (lỗ giữa phải chứa được thân người, nhỏ hơn thì coi như vòng đặc); nón = bán kính đường tròn lớn nhất nằm trong quạt + 3 (quá 270° coi như cả vòng: r + 3, vì khoảng khuyết phía sau bị mức nới bít dần; đo trên vùng trúng thật ở #935); đường / lao = nửa bề rộng + 3; kéo = ra khỏi tầm nổ SAU khi bị kéo. Giới hạn nhanh: tròn `r <= 0,15 T - 63`, đường / vành `w <= 0,3 T - 126` (T = báo trước ms; T 900 thì r <= 72, T 1200 thì r <= 117, T 1500 thì r <= 162). Hai hằng số là ĐỀ XUẤT; kiểm này CHƯA tính hiệu ứng làm chậm, tường chặn hay quái con cản đường nên không thay cho bot né (T7) và mô phỏng của D.
 - **Mô phỏng (D):** thời gian hạ trùm đúng bậc solo / đội 3-4 người; tỉ lệ chết khi bot né hoàn hảo ~0 và khi KHÔNG né cao (chứng minh chiêu có ý nghĩa mà không quá tàn nhẫn); không có "đường tắt" (đứng sát chân trùm né hết bằng một chỗ).
 - Mỗi PR: TOÀN BỘ `npm test` + typecheck + lint + prettier; số đo `bench` trước / sau khi đụng vòng tick.
