@@ -6140,6 +6140,85 @@ body.low-fx.in-limbo .stone-item {
   cursor: pointer;
   transition: all 0.15s ease;
 }
+/* Kho đồ tông môn (mục 27, K4, #788): hai lưới ô như túi đồ (`.inv-slot`), thanh hành động, hạn mức, sổ */
+.sect-vault-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 6px;
+  margin: 6px 0 12px;
+}
+.sect-vault-grid .inv-slot {
+  min-height: 44px;
+}
+.sect-vault-draw {
+  margin: 4px 0 8px;
+  font-size: var(--fs-13);
+  color: #f6d878;
+}
+.sect-vault-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  margin: 8px 0;
+  background: rgba(20, 16, 10, 0.96);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  border-radius: 8px;
+}
+.sect-vault-sel {
+  flex: 1 1 160px;
+  min-width: 0;
+  font-size: var(--fs-13);
+  overflow-wrap: anywhere;
+}
+.sect-vault-qty {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sect-vault-qty button {
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 6px;
+  border: 1px solid rgba(212, 175, 55, 0.5);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font-size: var(--fs-16);
+  cursor: pointer;
+}
+.sect-vault-qty b {
+  min-width: 2.2em;
+  text-align: center;
+}
+.sect-vault-why {
+  flex: 1 1 100%;
+  margin: 0;
+  font-size: var(--fs-12);
+  color: #ffb199;
+}
+.sect-vault-why:empty {
+  display: none;
+}
+.sect-vault-policy {
+  margin: 8px 0;
+}
+.sect-vault-policy label {
+  display: block;
+  font-size: var(--fs-13);
+  margin-bottom: 4px;
+}
+.sect-vault-policy select {
+  min-height: 44px;
+}
+@media (max-width: 620px) {
+  .sect-vault-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
 .sect-tab.active {
   background: rgba(212, 175, 55, 0.15);
   border-color: rgba(212, 175, 55, 0.4);
