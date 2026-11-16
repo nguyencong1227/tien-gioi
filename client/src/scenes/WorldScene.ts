@@ -110,6 +110,7 @@ import {
   type FxMsg,
   type DmgMsg,
   NET_MSG,
+  TEST_EXP_MSG,
   type ChatOut,
   type ToastMsg,
   type InvMsg,
@@ -2279,6 +2280,10 @@ export class WorldScene extends Phaser.Scene {
       handlers[type] = fn;
       this.room.onMessage(type, fn);
     };
+    // Nhãn hệ số tu vi thử nghiệm (mục 34) thuộc về MỘT phòng: vào phòng mới (qua cổng) thì xoá nhãn cũ, tin `testExp` của phòng này (gửi lúc vào, phát lại
+    // từ early-messages) dựng lại nếu còn hệ số; nối lại (`isInitial` = false) giữ nguyên nhãn, máy chủ gửi lại
+    if (isInitial) ui.setTestExp(1);
+    reg(TEST_EXP_MSG, (m: unknown) => ui.onTestExp(m));
     reg("fx", (m: FxMsg) => this.onFx(m));
     reg("dmg", (m: DmgMsg) => this.onDmg(m));
     reg(NET_MSG.shield, (m: unknown) => this.onNetShield(m));

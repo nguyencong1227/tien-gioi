@@ -101,6 +101,9 @@ import {
   cleanSectName,
   cleanSectTag,
   cleanMotd,
+  hasTestExp,
+  parseTestExp,
+  testExpLabel,
 } from "@tien-gioi/shared";
 import {
   dungeonEndReasonText,
@@ -5461,6 +5464,34 @@ export const ui = {
   },
 
   /** Cập nhật số Kiếp hiển thị ở HUD */
+  /**
+   * Tin `testExp` của máy chủ (mục 34, chỉ gửi chủ): nhân vật này có hệ số tu vi thử nghiệm. Hệ số > 1 hiện nhãn "Thử nghiệm ×N" dưới thanh Tu vi,
+   * `{ mult: 1 }` xoá nhãn; tin rác (`parseTestExp` trả `null`) bị bỏ qua, giữ nhãn đang có.
+   */
+  onTestExp(raw: unknown) {
+    const m = parseTestExp(raw);
+    if (!m) return;
+    this.setTestExp(m.mult);
+  },
+
+  /** Hiện / ẩn nhãn hệ số tu vi thử nghiệm (1 hoặc nhỏ hơn = ẩn). */
+  setTestExp(mult: number) {
+    const el = document.getElementById("hud-testexp");
+    if (!el) return;
+    if (!hasTestExp(mult)) {
+      el.hidden = true;
+      el.textContent = "";
+      el.removeAttribute("title");
+      el.removeAttribute("aria-label");
+      return;
+    }
+    const label = testExpLabel(mult);
+    el.textContent = label;
+    el.title = `${label}: tu vi của nhân vật này đang được nhân lên để thử nghiệm (không ảnh hưởng người chơi khác)`;
+    el.setAttribute("aria-label", el.title);
+    el.hidden = false;
+  },
+
   setKiep(kiep: number) {
     const badge = $("hud-kiep");
     if (!badge) return;

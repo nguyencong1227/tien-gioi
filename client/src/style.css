@@ -4081,6 +4081,27 @@ body.reduced-motion .transition-overlay.active {
    Luân Hồi (Hoàng Tuyền & Tam Sinh Thạch - M3.2)
    ========================================================================== */
 
+/* Nhãn "Thử nghiệm ×N" ngay dưới thanh Tu vi (QUYET_DINH_M3 mục 34): chỉ hiện khi máy chủ báo nhân vật này có hệ số tu vi thử nghiệm (tin riêng `testExp`).
+   Màu hổ phách (khác huy hiệu Kiếp màu tím, khác các thanh) để người test nhận ra ngay; ẩn thì không chiếm chỗ nên HUD của người khác không đổi. */
+.hud-testexp {
+  display: inline-block;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin: 1px 0 2px;
+  padding: 1px 8px;
+  border: 1px solid rgba(255, 176, 64, 0.55);
+  border-radius: 999px;
+  background: rgba(255, 160, 40, 0.2);
+  color: #ffd9a0;
+  font-size: var(--fs-11);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Badge Kiếp N ở HUD */
 .hud-kiep-badge {
   background: rgba(140, 80, 220, 0.25);
