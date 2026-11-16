@@ -185,7 +185,9 @@ import {
   actionOfEvent,
   getKeymap,
   getLookup,
+  isMoveAction,
   keyLabels,
+  moveDirOf,
   onKeymapChange,
   primaryKeyLabel,
   type ActionId,
@@ -349,7 +351,8 @@ export class WorldScene extends Phaser.Scene {
   private portalFxAt = new Map<string, number>();
   private npcs = new Map<string, NpcEntity>();
   /** Phím di chuyển theo `event.code` (không theo `keyCode` của Phaser: bộ gõ tiếng Việt làm `keyCode` = 229, mục 25) */
-  private moveKeys = new MoveKeys();
+  /** Phím di chuyển do người chơi đổi được (`move.*` trong `keybinds.ts`): tra hướng theo bảng phím hiện tại mỗi lần. */
+  private moveKeys = new MoveKeys((code) => moveDirOf(code));
 
   // Đoán trước di chuyển của chính mình
   private seq = 0;
@@ -1128,7 +1131,7 @@ export class WorldScene extends Phaser.Scene {
     // của nút hay bảng che mất keyup. Mọi phím HÀNH ĐỘNG đi qua bảng phím `keybinds.ts` (đổi được, HUD đọc nhãn từ đó) ở `onKeyDown`.
     const mk = this.moveKeys;
     // Gợi ý MỘT lần khi bộ gõ kiểu hook (Unikey / EVKey Telex) chèn Backspace / chữ có dấu hay nuốt keydown (`ime-hint.ts`): trình duyệt không nhận được phím thì client không cứu được
-    const ime = new ImeSniffer();
+    const ime = new ImeSniffer((code) => moveDirOf(code));
     const kd = (e: KeyboardEvent) => {
       const typing = isTypingElement(e.target as Element | null);
       mk.keyDown(e, typing);
@@ -1187,7 +1190,10 @@ export class WorldScene extends Phaser.Scene {
     document.documentElement.addEventListener("mouseleave", onCursorGone);
     window.addEventListener("blur", onCursorGone);
     this.syncSlotKeys();
-    const offKeymap = onKeymapChange(() => this.syncSlotKeys());
+    const offKeymap = onKeymapChange(() => {
+      this.syncSlotKeys();
+      mk.clear(); // đổi phím (kể cả phím di chuyển) giữa lúc đang giữ: quên phím cũ, khỏi kẹt hướng
+    });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       window.removeEventListener("keydown", this.onKeyDown);
       window.removeEventListener("keydown", kd, true);
@@ -1282,6 +1288,8 @@ export class WorldScene extends Phaser.Scene {
     if (e.defaultPrevented || isTypingElement(document.activeElement)) return;
     const action = actionOfEvent(e, getLookup());
     if (!action) return;
+    // phím di chuyển (`move.*`) do `MoveKeys` xử lý (keydown / keyup ở pha bắt, `setupInput`): ở đây không chặn mặc định, không chạy hành động
+    if (isMoveAction(action)) return;
     const def = ACTION_BY_ID[action];
     if (def.world && ui.isKeyboardCaptured()) return;
     // phím đã nhận: chặn hành vi mặc định (Tab đổi focus, Space cuộn / bấm nút...) kể cả khi giữ phím lặp
