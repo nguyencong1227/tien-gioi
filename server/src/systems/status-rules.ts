@@ -5,7 +5,9 @@
 import {
   MAX_STATUSES,
   STUN_IMMUNE_MS,
+  statusAmpMult,
   statusCarriesRatio,
+  statusCdr,
   statusMask,
   statusOf,
   type SkillEffect,
@@ -184,6 +186,26 @@ export function addStatus(
   box.list.push({ id: def.id, until, ratio, dps, pool, last: now, src });
   if (stun) box.stunImmuneUntil = until + STUN_IMMUNE_MS;
   return "added";
+}
+
+/**
+ * Hệ số nhân sát thương GÂY RA của chiêu hệ `element` từ phù `amp_<hệ>` còn hiệu lực trên `box` (nghề nhỏ lát 2, #514): `statusAmpMult` của `shared/`
+ * (một công thức cho máy chủ và công cụ) trên danh sách còn hạn. 1 khi không có hộp / không có phù đó / hệ khác. Gọi MỘT lần mỗi lần dùng chiêu, không mỗi tick.
+ */
+export function ampMultOf(box: StatusBox | undefined, now: number, element: unknown): number {
+  if (!box || box.list.length === 0) return 1;
+  return statusAmpMult(entriesOf(box, now), element);
+}
+
+/** Giảm hồi chiêu (phân số, 0..`maxRatio` của `cdr_phu`) từ phù `cdr_phu` còn hiệu lực; 0 khi không có. Cộng với của trang bị rồi kẹp `CDR_CAP` ở `skillCooldownMs`. */
+export function phuCdrOf(box: StatusBox | undefined, now: number): number {
+  if (!box || box.list.length === 0) return 0;
+  return statusCdr(entriesOf(box, now));
+}
+
+/** Cường độ `cdr_phu` ĐANG LƯU trong hộp, kể cả mục chưa kịp dọn hết hạn (0 khi không có): người gọi so trước / sau một thao tác để biết có phải gửi lại sổ chiêu (`cdMax`). */
+export function cdrPhuStored(box: StatusBox | undefined): number {
+  return box?.list.find((x) => x.id === "cdr_phu")?.ratio ?? 0;
 }
 
 /** Đang bị choáng (không di chuyển, không ra đòn). */
