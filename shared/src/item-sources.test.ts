@@ -1,5 +1,5 @@
 // Kiểm toán nguồn của MỌI vật phẩm (issue #751): mọi vật phẩm phải có ít nhất MỘT đường vào game
-// (rơi quái / cửa hàng / công thức / thưởng nhiệm vụ / đổi NPC / rương bí cảnh), trừ danh sách ngoại lệ có chú thích.
+// (rơi quái / cửa hàng / cửa hàng tông / công thức / thưởng nhiệm vụ + nhiệm vụ tông / đổi NPC / rương bí cảnh), trừ ngoại lệ có chú thích.
 // Nguyên liệu (type "material") phải được ít nhất một công thức / nhiệm vụ / đổi đồ dùng tới (không là nguyên liệu "chết").
 // KHÔNG đổi số dữ liệu game — chỉ kiểm chứng (test chéo). Báo cáo đầy đủ ở docs/KIEM_TOAN_VAT_PHAM.md.
 import { describe, expect, it } from "vitest";
@@ -9,15 +9,18 @@ import {
   ITEMS,
   QUESTS,
   RECIPES,
+  SECT_QUESTS,
+  SECT_SHOP,
   SHOPS,
   TRADES,
 } from "./index";
 import { OWNER_GEAR_ITEMS } from "./owner-gear";
 
-export type Source = "drop" | "shop" | "recipe" | "quest" | "trade" | "dungeon";
+export type Source =
+  "drop" | "shop" | "recipe" | "quest" | "trade" | "dungeon" | "sect_shop" | "sect_quest";
 
 /**
- * Mọi cách vật phẩm `itemId` được NGƯỜI CHƠI NHẬN (không trùng): rơi quái / mua cửa hàng / chế thành phẩm / thưởng nhiệm vụ / NPC đổi cho / rương bí cảnh.
+ * Mọi cách vật phẩm `itemId` được NGƯỜI CHƠI NHẬN (không trùng): rơi quái / mua cửa hàng / mua cửa hàng tông / chế thành phẩm / thưởng nhiệm vụ / thưởng nhiệm vụ tông / NPC đổi cho / rương bí cảnh.
  * Dùng cho kiểm tra "mọi vật phẩm có ít nhất MỘT đường vào".
  */
 export function sourcesOf(itemId: string): Source[] {
@@ -39,11 +42,20 @@ export function sourcesOf(itemId: string): Source[] {
   if (TRADES.some((t) => t.give.some((g) => g.itemId === itemId))) out.push("trade");
   // 6. Phần thưởng bí cảnh (DUNGEONS[].reward.items)
   if (DUNGEONS.some((d) => d.reward?.items.some((r) => r.itemId === itemId))) out.push("dungeon");
+  // 7. Mua ở cửa hàng tông môn (SECT_SHOP): món chỉ có ở đây sẽ KHÔNG bị báo mồ côi khi D thay bảng thật (M8.7)
+  if (SECT_SHOP.some((e) => e.itemId === itemId)) out.push("sect_shop");
+  // 8. Thưởng nhiệm vụ tông (SECT_QUESTS[].byTier[*].rewards.items)
+  if (
+    SECT_QUESTS.some((t) =>
+      Object.values(t.byTier).some((def) => def.rewards.items?.some((r) => r.itemId === itemId)),
+    )
+  )
+    out.push("sect_quest");
   return out;
 }
 
 /**
- * Mọi cách nguyên liệu `itemId` bị TIÊU THỤ (không trùng): làm nguyên liệu đầu vào công thức / mục thu thập nhiệm vụ / NPC thu lấy khi đổi đồ.
+ * Mọi cách nguyên liệu `itemId` bị TIÊU THỤ (không trùng): làm nguyên liệu đầu vào công thức / mục thu thập nhiệm vụ / mục thu thập nhiệm vụ tông / NPC thu lấy khi đổi đồ.
  * Dùng cho kiểm tra "mọi nguyên liệu được ít nhất một nơi dùng tới" (không là nguyên liệu chết).
  */
 export function consumedBy(itemId: string): Source[] {
@@ -55,6 +67,15 @@ export function consumedBy(itemId: string): Source[] {
     out.push("quest");
   // 3. NPC thu lấy khi đổi đồ (TRADES[].get)
   if (TRADES.some((t) => t.get.itemId === itemId)) out.push("trade");
+  // 4. Mục thu thập nhiệm vụ tông (SECT_QUESTS[].byTier[*].steps kind collect): nguyên liệu chỉ dùng cho tông sẽ KHÔNG bị báo chết
+  if (
+    SECT_QUESTS.some((t) =>
+      Object.values(t.byTier).some((def) =>
+        def.steps.some((s) => s.kind === "collect" && s.itemId === itemId),
+      ),
+    )
+  )
+    out.push("sect_quest");
   return out;
 }
 
@@ -118,6 +139,16 @@ describe("kiểm toán nguồn vật phẩm (issue #751)", () => {
     for (const d of DUNGEONS)
       for (const r of d.reward?.items ?? [])
         expect(validIds.has(r.itemId), `DUNGEON reward lạ: ${r.itemId}`).toBe(true);
+    for (const e of SECT_SHOP)
+      expect(validIds.has(e.itemId), `SECT_SHOP itemId lạ: ${e.itemId}`).toBe(true);
+    for (const t of SECT_QUESTS)
+      for (const def of Object.values(t.byTier)) {
+        for (const rw of def.rewards.items ?? [])
+          expect(validIds.has(rw.itemId), `SECT_QUEST reward lạ: ${rw.itemId}`).toBe(true);
+        for (const s of def.steps)
+          if (s.kind === "collect")
+            expect(validIds.has(s.itemId), `SECT_QUEST collect lạ: ${s.itemId}`).toBe(true);
+      }
   });
 
   it("ngoại lệ (nếu có) đều là vật phẩm CÓ THẬT và nêu lý do", () => {

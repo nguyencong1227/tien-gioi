@@ -6,12 +6,12 @@
 
 ## 1. Mục đích & phương pháp
 
-Mọi vật phẩm trong game phải có **ít nhất một đường vào** (người chơi nhận được từ đâu đó): rơi quái / mua cửa hàng / chế thành phẩm / thưởng nhiệm vụ / NPC đổi cho / rương bí cảnh. Nguyên liệu (`type: "material"`) phải được **ít nhất một nơi tiêu thụ** (công thức đầu vào / mục thu thập nhiệm vụ / NPC thu khi đổi), không để thành nguyên liệu "chết".
+Mọi vật phẩm trong game phải có **ít nhất một đường vào** (người chơi nhận được từ đâu đó): rơi quái / mua cửa hàng / mua cửa hàng tông / chế thành phẩm / thưởng nhiệm vụ / thưởng nhiệm vụ tông / NPC đổi cho / rương bí cảnh. Nguyên liệu (`type: "material"`) phải được **ít nhất một nơi tiêu thụ** (công thức đầu vào / mục thu thập nhiệm vụ / mục thu thập nhiệm vụ tông / NPC thu khi đổi), không để thành nguyên liệu "chết".
 
 Kiểm bằng hai hàm thuần trong `shared/src/item-sources.test.ts`:
 
-- `sourcesOf(itemId)` — mọi cách người chơi **nhận** vật phẩm: `drop` (rơi quái, `DROP_TABLES`), `shop` (`SHOPS`), `recipe` (thành phẩm `RECIPES[].output`), `quest` (thưởng `QUESTS[].rewards.items`), `trade` (NPC cho `TRADES[].give`), `dungeon` (thưởng `DUNGEONS[].reward.items`).
-- `consumedBy(itemId)` — mọi cách nguyên liệu bị **tiêu thụ**: `recipe` (nguyên liệu đầu vào `RECIPES[].inputs`), `quest` (bước thu thập `steps[].kind === "collect"`), `trade` (`TRADES[].get`).
+- `sourcesOf(itemId)` — mọi cách người chơi **nhận** vật phẩm: `drop` (rơi quái, `DROP_TABLES`), `shop` (`SHOPS`), `sect_shop` (mua ở cửa hàng tông `SECT_SHOP`), `recipe` (thành phẩm `RECIPES[].output`), `quest` (thưởng `QUESTS[].rewards.items`), `sect_quest` (thưởng nhiệm vụ tông `SECT_QUESTS[].byTier[*].rewards.items`), `trade` (NPC cho `TRADES[].give`), `dungeon` (thưởng `DUNGEONS[].reward.items`).
+- `consumedBy(itemId)` — mọi cách nguyên liệu bị **tiêu thụ**: `recipe` (nguyên liệu đầu vào `RECIPES[].inputs`), `quest` (bước thu thập `steps[].kind === "collect"`), `sect_quest` (bước thu thập `collect` của nhiệm vụ tông), `trade` (`TRADES[].get`).
 
 Test gồm 4 điều kiện (xem tệp test): mọi vật phẩm có ≥1 nguồn vào; mọi nguyên liệu được ≥1 nơi dùng; mọi itemId trong các bảng nguồn đều trỏ tới vật phẩm có thật; mọi mục ngoại lệ (nếu có) đều hợp lệ và nêu lý do.
 
@@ -38,9 +38,9 @@ Kí hiệu: `S:` = nguồn vào (sources), `C:` = nơi tiêu thụ (consumed). D
 
 | Id | S (nguồn vào) | C (tiêu thụ) | Ghi chú |
 | --- | --- | --- | --- |
-| `hoi_huyet_dan` | drop, shop, quest | trade | Đan hồi máu cơ bản |
-| `hoi_linh_dan` | drop, shop, quest | trade | Đan hồi linh lực |
-| `tu_khi_dan` | drop, quest, dungeon | - | Thưởng bí cảnh Linh Hư |
+| `hoi_huyet_dan` | drop, shop, sect_shop, quest, sect_quest | trade | Đan hồi máu cơ bản; cũng bán ở cửa hàng tông & thưởng nhiệm vụ tông |
+| `hoi_linh_dan` | drop, shop, sect_shop, quest | trade | Đan hồi linh lực; cũng bán ở cửa hàng tông |
+| `tu_khi_dan` | drop, sect_shop, quest, dungeon | - | Thưởng bí cảnh Linh Hư; cũng bán ở cửa hàng tông |
 | `dai_hoi_huyet_dan` | drop, shop, quest | - | |
 | `dai_hoi_linh_dan` | drop, shop, quest | - | |
 | `thuong_hoi_huyet_dan` | drop, shop, quest | - | |
@@ -139,10 +139,11 @@ _(đầy đủ 18 kinh quyển — mọi quyển đều có nguồn `drop` / `sh
 - **Đan hộ đạo** (`dot_pha_dan`, `kinh_chi_dan`, `duong_anh_dan`): CHỈ có nguồn vào là `recipe` (chế tại Lò đan, #763), KHÔNG bán được và KHÔNG có giá trong `ITEM_VALUE` (theo thiết kế — đồ tự chế chỉ tiêu hao). Đây KHÔNG phải vật phẩm mồ côi: chúng có nguồn vào hợp lệ (công thức). Test `data-integrity` (`shared/src/data-integrity.test.ts`) đã có danh sách trắng riêng cho ba món này ở điều kiện "mọi vật phẩm đều có định nghĩa giá".
 - **Trang bị ô riêng của chủ** (`OWNER_GEAR_ITEMS` trong `owner-gear.ts`, 16 món: hài / ngọc bội / pháp bảo — M7.4 #505): tất cả đều là equip CÙNG id đã có trong `ITEMS` (đã được kiểm nguồn ở §3.3). Test `item-sources.test.ts` có điều kiện đảm bảo KHÔNG có owner-gear nào "lang thang" ngoài `ITEMS` (khi đó nó sẽ KHÔNG bị kiểm nguồn).
 - **Nguyên liệu elite** (`han_lang_mao`, `phong_nha_vu`, `tuong_cot`, `doc_tuoc_nang`): rơi từ quái elite, dùng chế trang bị bậc cao và là mục thu thập nhiệm vụ — đều được dùng tới, không chết.
+- **Cửa hàng tông & nhiệm vụ tông** (`SECT_SHOP`, `SECT_QUESTS`): hai nguồn vào/tiêu thụ này được `sourcesOf` / `consumedBy` công nhận kể từ lần cập nhật này, để tránh báo sai "mồ côi / nguyên liệu chết" cho những món Dev D dự định đặt riêng cho tông (M8.7). Mẫu hiện tại (`hoi_huyet_dan`, `hoi_linh_dan`, `tu_khi_dan` ở cửa hàng; thưởng `hoi_huyet_dan` ở nhiệm vụ tông) đều là món ĐÃ có nguồn vào khác, nên kết quả kiểm toán KHÔNG đổi (vẫn 0 mồ côi, 0 nguyên liệu chết). Khi D thay bảng thật, nếu có món CHỈ có ở cửa hàng / nhiệm vụ tông thì chúng vẫn được tính là có nguồn — test KHÔNG báo sai.
 
 ## 5. Kết luận cho Dev A
 
 - **Không cần hành động sửa dữ liệu.** Mọi vật phẩm đều có nguồn vào, mọi nguyên liệu đều được tiêu thụ, không itemId rác.
-- **Kiểm chứng lâu dài:** `shared/src/item-sources.test.ts` chạy trong `npm test` mọi nơi — thêm vật phẩm mới mà quên nối nguồn (rơi / shop / công thức / thưởng / đổi / rương) thì test RED, buộc phải nối trước khi merge.
+- **Kiểm chứng lâu dài:** `shared/src/item-sources.test.ts` chạy trong `npm test` mọi nơi — thêm vật phẩm mới mà quên nối nguồn (rơi / shop / cửa hàng tông / công thức / thưởng nhiệm vụ / thưởng nhiệm vụ tông / đổi / rương) thì test RED, buộc phải nối trước khi merge.
 - **Nếu phát hiện vật phẩm mồ côi HỢP PHÁP** (cố ý không có nguồn, ví dụ vật phẩm sự kiện): thêm vào `NGOAI_LE` trong `item-sources.test.ts` kèm lý do, đừng để test đỏ.
-- **Nếu phát hiện vật phẩm mồ côi DO QUÊN** nối nguồn: mở issue `dev-a` để nối nguồn rơi / shop / công thức / thưởng / đổi / rương — việc này KHÔNG sửa số game.
+- **Nếu phát hiện vật phẩm mồ côi DO QUÊN** nối nguồn: mở issue `dev-a` để nối nguồn rơi / shop / cửa hàng tông / công thức / thưởng nhiệm vụ / thưởng nhiệm vụ tông / đổi / rương — việc này KHÔNG sửa số game.
