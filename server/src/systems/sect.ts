@@ -20,6 +20,8 @@ import {
   cleanSectName,
   cleanSectTag,
   addToInventory,
+  sectLevelInfo,
+  sectLevelOf,
   dayKey,
   parseSectAmount,
   parseSectAnswer,
@@ -68,8 +70,8 @@ export class SectBook {
   readonly online = new Map<string, string>();
   /** Bản ghi mới nhất của các tông môn đang có người trực tuyến (cập nhật sau mỗi thao tác thành công). */
   readonly cache = new Map<string, Sect>();
-  /** Linh hồn đang có MỘT thao tác kho đồ dở (góp / rút): thao tác thứ hai của cùng người bị từ chối thay vì chồng lên (mục 11.5 lớp 3). */
-  readonly vaultBusy = new Set<string>();
+  /** Linh hồn đang có MỘT thao tác tông môn dở (kho đồ: góp / rút; M8: nhiệm vụ, cửa hàng): thao tác thứ hai của cùng người bị từ chối thay vì chồng lên (mục 11.5 lớp 3). */
+  readonly busy = new Set<string>();
   /** Lần gửi `sectPresence` gần nhất của từng tông môn (để chỉ gửi khi đổi). */
   readonly lastPresence = new Map<string, string>();
   private nextTickAt = 0;
@@ -598,10 +600,15 @@ function bagHolds(inv: Inventory, itemId: string, qty: number): boolean {
   return addToInventory(copy, itemId, qty) === 0;
 }
 
-/** Kho `sect` còn chỗ cho `qty` món `itemId` không (thử trên bản sao; kiểm SỚM để khỏi trừ túi rồi hoàn). */
+/**
+ * Kho `sect` còn chỗ cho `qty` món `itemId` không (thử trên bản sao; kiểm SỚM để khỏi trừ túi rồi hoàn). Chỉ tính các ô ĐÃ MỞ theo cấp tông (M8: ô khoá không
+ * chứa được): phải khớp `addToVault` của `SectService`, không thì kiểm sớm cho qua rồi dịch vụ từ chối SAU khi đã trừ túi và lưu hồ sơ.
+ */
 function vaultHolds(sect: Sect, itemId: string, qty: number): boolean {
-  const copy = sect.vault.slots.map((s) => (s ? { ...s } : null));
-  return addToInventory(copy, itemId, qty) === 0;
+  const open = sect.vault.slots
+    .slice(0, sectLevelInfo(sectLevelOf(sect.points ?? 0)).vaultSlots)
+    .map((s) => (s ? { ...s } : null));
+  return addToInventory(open, itemId, qty) === 0;
 }
 
 /**
@@ -645,8 +652,8 @@ export async function sectVaultDeposit(w: World, sid: string, raw: unknown) {
   if (isDown(w, sid)) return downFail(w, sid); // đã chết (mục 38): không góp
   if (c.travelling || c.limbo) return toastFail(w, sid, "error");
   const book = w.hub.sects;
-  if (book.vaultBusy.has(a.soulKey)) return toastFail(w, sid, "error"); // đang xử lý một thao tác kho đồ của chính người này
-  book.vaultBusy.add(a.soulKey);
+  if (book.busy.has(a.soulKey)) return toastFail(w, sid, "error"); // đang xử lý một thao tác kho đồ của chính người này
+  book.busy.add(a.soulKey);
   try {
     const slot = c.inv[msg.slot];
     if (!slot || msg.qty > slot.qty) return toastFail(w, sid, "item_invalid");
@@ -678,7 +685,7 @@ export async function sectVaultDeposit(w: World, sid: string, raw: unknown) {
     w.audit?.("sect.vault_deposit", { name: a.name, sect: res.sect.name, itemId, qty: msg.qty });
     toastGood(w, sid, `Đã góp ${msg.qty} ${itemName(itemId)} vào kho đồ tông môn.`);
   } finally {
-    book.vaultBusy.delete(a.soulKey);
+    book.busy.delete(a.soulKey);
   }
 }
 
@@ -697,8 +704,8 @@ export async function sectVaultWithdraw(w: World, sid: string, raw: unknown) {
   if (c.travelling || c.limbo) return toastFail(w, sid, "error");
   if (newLifeLockLeft(w, sid) > 0) return toastFail(w, sid, "vault_locked");
   const book = w.hub.sects;
-  if (book.vaultBusy.has(a.soulKey)) return toastFail(w, sid, "error");
-  book.vaultBusy.add(a.soulKey);
+  if (book.busy.has(a.soulKey)) return toastFail(w, sid, "error");
+  book.busy.add(a.soulKey);
   try {
     if (!bagHolds(c.inv, msg.itemId, msg.qty)) return toastFail(w, sid, "bag_full");
     const today = dayKey(w.now);
@@ -734,7 +741,7 @@ export async function sectVaultWithdraw(w: World, sid: string, raw: unknown) {
       toastGood(w, sid, `Đã rút ${got} ${itemName(msg.itemId)} từ kho đồ tông môn.`);
     } else toastFail(w, sid, "bag_full");
   } finally {
-    book.vaultBusy.delete(a.soulKey);
+    book.busy.delete(a.soulKey);
   }
 }
 

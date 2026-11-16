@@ -6,16 +6,26 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import {
   COIN_CAP,
+  ITEMS,
   SECT_COIN_CAP,
   SECT_CREATE_COOLDOWN_MS,
+  SECT_EARN_DAY_CAP,
   SECT_ELDERS_MAX,
+  SECT_QUESTS,
+  dayKey,
+  sectQuestCh,
+  sectQuestFor,
+  sectQuestId,
+  sectQuestTemplateOf,
+  SECT_VAULT_SLOTS,
   SECT_LOG_MAX,
   SECT_MAX_MEMBERS,
   SECT_MOTD_MAX,
   SECT_REJOIN_COOLDOWN_MS,
 } from "@tien-gioi/shared";
 import { FileSectStore, type Sect } from "./sect-store";
-import { SectService, sectViewOf, type SectActor } from "./sect-service";
+import { SectService, sectVaultViewOf, sectViewOf, type SectActor } from "./sect-service";
+import { emptySectVault } from "./sect-store";
 import { makeSect } from "./store-contract";
 
 const root = mkdtempSync(path.join(tmpdir(), "tien-gioi-sect-svc-"));
@@ -638,5 +648,299 @@ describe("ảnh chụp, hồi chiêu, lỗi hệ thống", () => {
       expect(await svc.deposit(B, 5)).toMatchObject({ ok: true });
       expect((await get()).coin).toBe(5);
     });
+  });
+});
+
+describe("M8.2: cống hiến, điểm tông, cấp tông (docs/THIET_KE_TONG_MON.md mục 12)", () => {
+  const DAY = 86_400_000;
+  /** Một id CỤ THỂ cho MỖI mẫu nhiệm vụ (khung: 3 mẫu, độ khó 1 / 2 / 3 = 20 / 30 / 40 cống hiến). */
+  const TQ = SECT_QUESTS.map((t) => sectQuestFor(t.id, 1)!);
+  const q0 = TQ[0]!;
+  const ch0 = sectQuestCh(q0); // 20
+  const tpl0 = sectQuestTemplateOf(q0)!;
+  /** Dựng tông môn rồi tua đồng hồ 2 ngày: mọi thành viên đã vào từ TRƯỚC hôm nay (kiếm được cống hiến). */
+  async function seedOld(
+    members: [string, "truong_lao" | "de_tu"][] = [],
+    over: Partial<Sect> = {},
+  ) {
+    const sect = await seed(members, over);
+    now += 2 * DAY;
+    return sect;
+  }
+  const meOf = async (k: string) => (await get()).members.find((m) => m.soulKey === `k_${k}`)!;
+
+  it("award quest: cộng contrib + merit + điểm tông CÙNG MỘT LẦN, ghi sổ ngày, chưa lên cấp", async () => {
+    await seedOld([["b", "de_tu"]]);
+    const r = await svc.award(A, "quest", 30, { key: q0 }); // xin 30 nhưng nhiệm vụ chỉ có phần của nó (F2)
+    expect(r).toMatchObject({ ok: true, granted: ch0, level: 1, levelUp: false });
+    const a = await meOf("a");
+    expect(a).toMatchObject({ contrib: ch0, merit: ch0 });
+    expect(a.today).toMatchObject({ earned: ch0, deposit: 0, quests: [tpl0], dungeon: false });
+    expect((await get()).points).toBe(ch0);
+    expect((await meOf("b")).contrib).toBeUndefined(); // người khác không đổi
+  });
+
+  it("chờ sang ngày: vào tông CÙNG ngày thì not_warm (không ghi gì); warmup=false (dev / E2E) thì kiếm được", async () => {
+    await seed();
+    const before = JSON.stringify(await get());
+    expect(await svc.award(A, "quest", 20, { key: q0 })).toEqual({ ok: false, reason: "not_warm" });
+    expect(JSON.stringify(await get())).toBe(before);
+    expect(await svc.award(A, "quest", 20, { key: q0, warmup: false })).toMatchObject({
+      ok: true,
+      granted: 20,
+    });
+    // qua nửa đêm giờ VN thì kiếm được mà không cần cờ
+    now += 2 * DAY;
+    expect(await svc.award(A, "deposit", 5)).toMatchObject({ ok: true, granted: 5 });
+  });
+
+  it("từ chối đúng lý do: không ở tông, số xấu, nhiệm vụ lạ, nhiệm vụ đã trả hôm nay; sang ngày mới thì trả lại được", async () => {
+    await seedOld();
+    expect(await svc.award(B, "deposit", 5)).toEqual({ ok: false, reason: "not_in_sect" });
+    for (const bad of [0, -1, 1.5, NaN, Infinity]) {
+      expect(await svc.award(A, "deposit", bad)).toEqual({ ok: false, reason: "amount_invalid" });
+    }
+    for (const key of [undefined, "constructor", "khong_co.t0", "__proto__"]) {
+      expect(await svc.award(A, "quest", 30, { key })).toEqual({
+        ok: false,
+        reason: "quest_unavailable",
+      });
+    }
+    expect((await svc.award(A, "quest", 30, { key: q0 })).ok).toBe(true);
+    expect(await svc.award(A, "quest", 30, { key: q0 })).toEqual({
+      ok: false,
+      reason: "quest_done",
+    });
+    expect((await meOf("a")).merit).toBe(ch0); // lần thứ hai không cộng gì
+    now += DAY; // sang ngày mới: sổ đặt lại, trả lại được
+    expect(await svc.award(A, "quest", 30, { key: q0 })).toMatchObject({ ok: true, granted: ch0 });
+    expect((await meOf("a")).today?.quests).toEqual([tpl0]);
+    expect((await meOf("a")).merit).toBe(2 * ch0);
+  });
+
+  it("TRẦN: góp kho <= 30 / ngày, bí cảnh một lần, ba nhiệm vụ 20 + 30 + 40, tổng đúng SECT_EARN_DAY_CAP; hết trần thì earn_cap / quest_done và không ghi gì", async () => {
+    await seedOld();
+    let total = 0;
+    for (let i = 0; i < 10; i++) {
+      const r = await svc.award(A, "deposit", 7);
+      if (r.ok) total += r.granted;
+      else expect(r.reason).toBe("earn_cap");
+    }
+    expect(total).toBe(30); // 7+7+7+7+2
+    expect(await svc.award(A, "dungeon", 20)).toMatchObject({ ok: true, granted: 20 });
+    expect(await svc.award(A, "dungeon", 20)).toEqual({ ok: false, reason: "earn_cap" });
+    // ba nhiệm vụ (mỗi mẫu một lần) lấp ĐÚNG phần còn lại của trần ngày: 50 + 20 + 30 + 40 = 140
+    expect(await svc.award(A, "quest", 999, { key: TQ[0] })).toMatchObject({ granted: 20 });
+    expect(await svc.award(A, "quest", 999, { key: TQ[1] })).toMatchObject({ granted: 30 });
+    expect(await svc.award(A, "quest", 999, { key: TQ[2] })).toMatchObject({ granted: 40 });
+    const full = await get();
+    expect(await svc.award(A, "deposit", 5)).toEqual({ ok: false, reason: "earn_cap" });
+    expect(await svc.award(A, "quest", 999, { key: TQ[0] })).toEqual({
+      ok: false,
+      reason: "quest_done",
+    });
+    expect(JSON.stringify(await get())).toBe(JSON.stringify(full));
+    const a = await meOf("a");
+    expect(a.merit).toBe(SECT_EARN_DAY_CAP);
+    expect(a.contrib).toBe(SECT_EARN_DAY_CAP);
+    expect(a.today?.earned).toBe(SECT_EARN_DAY_CAP);
+    expect(full.points).toBe(SECT_EARN_DAY_CAP);
+  });
+
+  it("trần ngày CẮT phần thưởng: còn 20 cống hiến trong trần thì nhiệm vụ 40 chỉ cộng 20; sổ ngày dựng sẵn (cũng đọc ngược được)", async () => {
+    await seedOld();
+    const today = dayKey(now);
+    await store.update("t1", (x) => ({
+      ...x,
+      points: 120,
+      members: x.members.map((m) => ({
+        ...m,
+        contrib: 120,
+        merit: 120,
+        today: { day: today, earned: 120, deposit: 0, quests: [], dungeon: false, buys: {} },
+      })),
+    }));
+    expect(await svc.award(A, "quest", 999, { key: TQ[2] })).toMatchObject({
+      ok: true,
+      granted: 20,
+    });
+    const a = await meOf("a");
+    expect(a.today?.earned).toBe(SECT_EARN_DAY_CAP);
+    expect(a.merit).toBe(140);
+    expect((await get()).points).toBe(140);
+    expect(await svc.award(A, "deposit", 1)).toEqual({ ok: false, reason: "earn_cap" });
+  });
+
+  it("F1 (review B): đổi bậc giữa ngày KHÔNG làm lại cùng ô nhiệm vụ: trả bản .t0 rồi bản .t1 của một mẫu -> quest_done, không cộng gì", async () => {
+    await seedOld();
+    const tpl = SECT_QUESTS[0]!;
+    expect(await svc.award(A, "quest", 999, { key: sectQuestId(tpl.id, 0) })).toMatchObject({
+      ok: true,
+      granted: 20,
+    });
+    const before = JSON.stringify(await get());
+    expect(await svc.award(A, "quest", 999, { key: sectQuestId(tpl.id, 1) })).toEqual({
+      ok: false,
+      reason: "quest_done",
+    });
+    expect(JSON.stringify(await get())).toBe(before);
+    // đọc lại từ kho (tệp) vẫn giữ khoá theo MẪU
+    expect((await meOf("a")).today?.quests).toEqual([tpl.id]);
+  });
+
+  it("lên cấp ở đúng lần vượt ngưỡng (levelUp một lần), cấp tính từ điểm", async () => {
+    await seedOld([], { points: 990 });
+    const r = await svc.award(A, "quest", 20, { key: q0 });
+    expect(r).toMatchObject({ ok: true, granted: 20, level: 2, levelUp: true });
+    expect((await get()).points).toBe(1010);
+    const r2 = await svc.award(A, "deposit", 5);
+    expect(r2).toMatchObject({ ok: true, level: 2, levelUp: false });
+  });
+
+  it("đồng thời: 40 lần award của hai người qua hàng đợi: không mất lần nào, tổng điểm = tổng công tích, mỗi người <= trần ngày", async () => {
+    await seedOld([["b", "de_tu"]]);
+    const jobs = [
+      ...Array.from({ length: 20 }, (_, i) =>
+        svc.award(A, i % 2 ? "deposit" : "quest", 9, { key: TQ[i % TQ.length] }),
+      ),
+      ...Array.from({ length: 20 }, () => svc.award(B, "deposit", 3)),
+    ];
+    const rs = await Promise.all(jobs);
+    const granted = rs.reduce((t, r) => t + (r.ok ? r.granted : 0), 0);
+    const sect = await get();
+    const merits = sect.members.reduce((t, m) => t + (m.merit ?? 0), 0);
+    expect(granted).toBe(merits);
+    expect(sect.points).toBe(merits);
+    for (const m of sect.members) {
+      expect(m.merit).toBe(m.contrib);
+      expect(m.today!.earned).toBeLessThanOrEqual(SECT_EARN_DAY_CAP);
+    }
+  });
+
+  it("rời tông / bị mời ra MẤT cống hiến và công tích (bản ghi thành viên biến mất); điểm tông của tông môn GIỮ NGUYÊN; vào lại bắt đầu từ 0", async () => {
+    await seedOld([
+      ["b", "de_tu"],
+      ["c", "de_tu"],
+    ]);
+    await svc.award(B, "quest", 30, { key: q0 });
+    await svc.award(C, "quest", 20, { key: q0 });
+    expect((await get()).points).toBe(2 * ch0);
+    expect(await svc.leave(B)).toMatchObject({ ok: true });
+    expect((await get()).members.some((m) => m.soulKey === B.soulKey)).toBe(false);
+    expect((await get()).points).toBe(2 * ch0); // điểm tông không tụt
+    expect(await svc.kick(A, C.name)).toMatchObject({ ok: true });
+    expect((await get()).points).toBe(2 * ch0);
+    // B vào lại (qua hồi chiêu): không còn cống hiến
+    now += SECT_REJOIN_COOLDOWN_MS + 1;
+    expect(await svc.join("t1", A.soulKey, B)).toMatchObject({ ok: true });
+    const again = await meOf("b");
+    expect(again.contrib).toBeUndefined();
+    expect(again.merit).toBeUndefined();
+    expect(again.today).toBeUndefined();
+    // và vừa vào CÙNG ngày thì chưa kiếm được (chống nhảy tông lấy lại trần)
+    expect(await svc.award(B, "deposit", 5)).toEqual({ ok: false, reason: "not_warm" });
+  });
+
+  it("giới hạn thành viên theo cấp: cấp 1 = 30 (như cũ), lên cấp 2 thì nhận tới 35", async () => {
+    const many = (n: number): [string, "de_tu"][] =>
+      Array.from({ length: n }, (_, i) => [`m${i}`, "de_tu"]);
+    await seed(many(SECT_MAX_MEMBERS - 1)); // A + 29 = 30 người: đầy ở cấp 1
+    expect((await get()).members).toHaveLength(SECT_MAX_MEMBERS);
+    expect(await svc.checkInvite(A.soulKey, "k_moi")).toEqual({ ok: false, reason: "sect_full" });
+    expect(await svc.join("t1", A.soulKey, actor("moi"))).toEqual({
+      ok: false,
+      reason: "sect_full",
+    });
+    await store.update("t1", (x) => ({ ...x, points: 1000 })); // cấp 2: 35 thành viên
+    expect(await svc.checkInvite(A.soulKey, "k_moi")).toMatchObject({ ok: true });
+    for (let i = 0; i < 5; i++) {
+      expect(await svc.join("t1", A.soulKey, actor(`n${i}`))).toMatchObject({ ok: true });
+    }
+    expect((await get()).members).toHaveLength(35);
+    expect(await svc.join("t1", A.soulKey, actor("n5"))).toEqual({
+      ok: false,
+      reason: "sect_full",
+    });
+  });
+
+  it("giới hạn Trưởng lão theo cấp: cấp 1 = 3, cấp 2 = 4; chuyển quyền cũng tính theo cấp", async () => {
+    await seed([
+      ["b", "truong_lao"],
+      ["c", "truong_lao"],
+      ["d", "truong_lao"],
+      ["e", "de_tu"],
+      ["f", "de_tu"],
+    ]);
+    expect(await svc.setRank(A, "Ten e", "truong_lao")).toEqual({
+      ok: false,
+      reason: "elders_full",
+    });
+    await store.update("t1", (x) => ({ ...x, points: 1000 }));
+    expect(await svc.setRank(A, "Ten e", "truong_lao")).toMatchObject({ ok: true }); // 4 Trưởng lão
+    expect(await svc.setRank(A, "Ten f", "truong_lao")).toEqual({
+      ok: false,
+      reason: "elders_full",
+    });
+  });
+
+  it("kho đồ theo cấp: cấp 1 góp được tới 40 ô, ô 40+ khoá (vault_full / vault_locked_slot); lên cấp 2 thì ô 40-49 dùng được, ô 50+ vẫn khoá", async () => {
+    const item = ITEMS.reduce((a, b) => (b.stack > a.stack ? b : a));
+    const vault = emptySectVault();
+    for (let i = 0; i < SECT_VAULT_SLOTS; i++)
+      vault.slots[i] = { itemId: item.id, qty: item.stack };
+    await seed([], { vault });
+    // đầy 40 ô cấp 1: không góp thêm được dù mảng có 80 ô
+    expect(await svc.vaultDeposit(A, item.id, 1)).toEqual({ ok: false, reason: "vault_full" });
+    expect(await svc.vaultReturn(A, item.id, 1, false, "2026-11-17")).toEqual({
+      ok: false,
+      reason: "vault_full",
+    });
+    // rút từ ô khoá
+    expect(await svc.vaultWithdraw(A, { slot: 45, itemId: item.id, qty: 1 }, "2026-11-17")).toEqual(
+      {
+        ok: false,
+        reason: "vault_locked_slot",
+      },
+    );
+    expect(await svc.vaultWithdraw(A, { slot: 80, itemId: item.id, qty: 1 }, "2026-11-17")).toEqual(
+      {
+        ok: false,
+        reason: "item_invalid",
+      },
+    );
+    await store.update("t1", (x) => ({ ...x, points: 1000 })); // cấp 2: 50 ô
+    expect(await svc.vaultDeposit(A, item.id, 3)).toMatchObject({ ok: true });
+    expect((await get()).vault.slots[40]).toEqual({ itemId: item.id, qty: 3 });
+    // lấp tới hết 10 ô mới mở rồi vẫn từ chối (ô 50+ khoá)
+    for (let i = 41; i < 50; i++)
+      await store.update("t1", (x) => {
+        x.vault.slots[i] = { itemId: item.id, qty: item.stack };
+        return x;
+      });
+    await store.update("t1", (x) => {
+      x.vault.slots[40] = { itemId: item.id, qty: item.stack };
+      return x;
+    });
+    expect(await svc.vaultDeposit(A, item.id, 1)).toEqual({ ok: false, reason: "vault_full" });
+    expect((await get()).vault.slots.slice(50).every((x) => x === null)).toBe(true);
+  });
+
+  it("ảnh chụp: công tích chỉ hiện khi > 0 (bản ghi cũ giữ nguyên); kho gửi đúng các ô ĐÃ MỞ kèm unlocked (cấp 1 = 40 ô như trước M8)", async () => {
+    await seedOld([["b", "de_tu"]]);
+    await svc.award(A, "quest", 30, { key: q0 });
+    const sect = await get();
+    const view = sectViewOf(sect, A.soulKey)!;
+    const byName = (n: string) => view.members.find((m) => m.name === n)!;
+    expect(byName(A.name).merit).toBe(ch0);
+    expect("merit" in byName(B.name)).toBe(false);
+    const v1 = sectVaultViewOf(sect, A.soulKey, "2026-11-17", 0)!;
+    expect(v1.slots).toHaveLength(SECT_VAULT_SLOTS);
+    expect(v1.unlocked).toBe(SECT_VAULT_SLOTS);
+    const v2 = sectVaultViewOf({ ...sect, points: 1000 }, A.soulKey, "2026-11-17", 0)!;
+    expect(v2.slots).toHaveLength(50);
+    expect(v2.unlocked).toBe(50);
+    expect(
+      sectVaultViewOf({ ...sect, points: 30_000 }, A.soulKey, "2026-11-17", 0)!.slots,
+    ).toHaveLength(80);
   });
 });
