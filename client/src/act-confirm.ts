@@ -1,5 +1,6 @@
 // Hộp xác nhận DÙNG CHUNG cho thao tác khó hoàn tác (issue #779, docs/RA_SOAT_THAO_TAC.md): lớp THUẦN (không DOM) nên test được. Cùng khuôn với `inv-drop.ts`:
 // nêu HẬU QUẢ bằng chữ, kiểm lại lúc xác nhận, "Giữ lại" được focus mặc định, Esc = Giữ lại, chống click ma 450 ms cho cảm ứng.
+import { DROP_WARN_RARITY, type DropSlot } from "./inv-drop";
 import {
   BREAK_FAIL_EXP_LOSS,
   REALMS,
@@ -85,4 +86,76 @@ export function breakthroughPlan(
 /** Hai kế hoạch đột phá cùng cảnh giới và cùng xác suất không (lúc xác nhận so lại với lúc bấm). */
 export function samePlan(a: BreakPlan | null, b: BreakPlan | null): boolean {
   return !!a && !!b && a.realm === b.realm && a.pct === b.pct;
+}
+
+// ---------- Bán đồ quý / trang bị (issue #779, docs/RA_SOAT_THAO_TAC.md hàng 2) ----------
+
+/** Thông tin món cần để quyết định có hỏi lúc bán không (từ `ItemDef`). `rarityName` là tên bậc phẩm hiển thị. */
+export interface SellItemInfo {
+  name: string;
+  type: string;
+  rarity: number;
+  rarityName: string;
+}
+
+/** Kế hoạch bán chụp lúc bấm "Bán": món + số lượng + số Linh thạch nhận; so lại túi lúc xác nhận (`sellStillValid`). */
+export interface SellPlan {
+  /** Chỉ số ô lúc bấm */
+  index: number;
+  itemId: string;
+  /** Số lượng sẽ bán (>= 1) */
+  qty: number;
+  /** Tổng Linh thạch nhận */
+  total: number;
+  spec: ConfirmSpec;
+}
+
+/** Bán món này có cần hỏi không: trang bị, hoặc đồ quý (bậc >= `DROP_WARN_RARITY`). Đồ thường (đan, vật liệu rẻ) bán thẳng: mất ít, mua lại được. */
+export function needsSellConfirm(info: { type: string; rarity: number }): boolean {
+  return info.type === "equip" || (Number.isFinite(info.rarity) && info.rarity >= DROP_WARN_RARITY);
+}
+
+/**
+ * Hộp xác nhận BÁN: `null` nếu không cần hỏi (đồ thường) hoặc dữ liệu hỏng (ô trống, số lượng ngoài khoảng, giá không dương). Lời nêu TÊN + SỐ LƯỢNG + số Linh thạch nhận
+ * và nhắc mua lại tốn hơn giá bán. Giá do chỗ gọi tính bằng `sellPrice` (CÙNG hàm với máy chủ).
+ */
+export function sellPlan(
+  slots: readonly (DropSlot | null | undefined)[],
+  index: number,
+  qty: number,
+  unitPrice: number,
+  info: SellItemInfo,
+): SellPlan | null {
+  if (!needsSellConfirm(info)) return null;
+  if (!Number.isInteger(index) || index < 0 || index >= slots.length) return null;
+  const s = slots[index];
+  if (!s || typeof s.itemId !== "string" || s.itemId === "") return null;
+  if (!Number.isInteger(qty) || qty < 1 || !Number.isFinite(s.qty) || s.qty < qty) return null;
+  if (!Number.isFinite(unitPrice) || unitPrice <= 0) return null;
+  const total = Math.round(unitPrice * qty);
+  const text =
+    qty > 1
+      ? `Bán ${info.name} ×${qty} được ${total} Linh thạch?`
+      : `Bán ${info.name} được ${total} Linh thạch?`;
+  const kind = info.type === "equip" ? "Trang bị" : "Đồ";
+  const valuable = Number.isFinite(info.rarity) && info.rarity >= DROP_WARN_RARITY;
+  const warn = valuable
+    ? `${kind} quý: ${info.rarityName}. Bán rồi mua lại tốn hơn giá bán, có thể không còn chỗ mua.`
+    : "Trang bị: bán rồi mua lại tốn hơn giá bán.";
+  return {
+    index,
+    itemId: s.itemId,
+    qty,
+    total,
+    spec: { text, warn, ok: "Bán", cancel: "Giữ lại" },
+  };
+}
+
+/** Túi hiện tại còn đúng món + đủ số lượng như lúc bấm không (nếu không thì HUỶ, không bán món khác). */
+export function sellStillValid(
+  slots: readonly (DropSlot | null | undefined)[],
+  plan: SellPlan,
+): boolean {
+  const s = slots[plan.index];
+  return !!s && s.itemId === plan.itemId && Number.isFinite(s.qty) && s.qty >= plan.qty;
 }
