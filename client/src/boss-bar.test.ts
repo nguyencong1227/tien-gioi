@@ -1,10 +1,14 @@
 // Thanh máu trùm (mục 42, T4 #873): chọn trùm hiện thanh, mô hình thanh, mốc giai đoạn, tên chiêu, cuồng nộ.
 import { describe, expect, it } from "vitest";
-import { BOSS_BY_KIND, BOSS_PHASE_ROAR_MS, MONSTER_BY_ID } from "@tien-gioi/shared";
+import {
+  BOSS_ARMOR_MAX_MS,
+  BOSS_BY_KIND,
+  BOSS_PHASE_ROAR_MS,
+  MONSTER_BY_ID,
+} from "@tien-gioi/shared";
 import {
   BOSS_BAR_RANGE,
   BOSS_CAST_LINGER_MS,
-  BOSS_ARMOR_MAX_MS,
   BOSS_ENRAGE_FLASH_MS,
   BOSS_SFX_VIEW,
   BOSS_SUMMON_NOTE_MS,
