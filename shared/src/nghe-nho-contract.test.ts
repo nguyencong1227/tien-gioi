@@ -245,4 +245,15 @@ describe("mô tả vật phẩm trạng thái khớp con số (statusDescMatches
     expect(statusDescMatches("Cộng xác suất đột phá một lần.", e)).toBe(false); // không nêu số
     expect(statusDescMatches("Tăng thêm trong 45 giây.", { ratio: 0, ms: 45000 })).toBe(true);
   });
+
+  it("khớp theo SỐ NGUYÊN VẸN, không khớp chuỗi con ('112%', '0,12%', '115 phút', '1900 giây' đều lệch)", () => {
+    const e = { ratio: 0.12, ms: 900000 };
+    expect(statusDescMatches("Cộng 112% xác suất trong 15 phút.", e)).toBe(false);
+    expect(statusDescMatches("Cộng 0,12% xác suất trong 15 phút.", e)).toBe(false);
+    expect(statusDescMatches("Cộng 12% xác suất trong 115 phút.", e)).toBe(false);
+    expect(statusDescMatches("Cộng 12% xác suất trong 1900 giây.", e)).toBe(false);
+    expect(statusDescMatches("Cộng 12% xác suất trong 900 giây.", e)).toBe(true);
+    expect(statusDescMatches("12% và 15 phút", e)).toBe(true); // ở đầu chuỗi
+    expect(statusDescMatches("Tăng 3,12% hoặc 12% trong 15 phút.", e)).toBe(true); // một lần khớp đúng là đủ
+  });
 });

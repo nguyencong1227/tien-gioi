@@ -52,12 +52,23 @@ export function statusEffectFigures(e: { ratio: number; ms: number }): {
   return { pct: p > 0 ? [`${p}%`, `${p} %`] : [], time };
 }
 
+/**
+ * `desc` có chứa `figure` như MỘT SỐ NGUYÊN VẸN không: ký tự đứng ngay trước không được là chữ số / dấu thập phân (`.`, `,`), để "12%" không khớp
+ * "112%" hay "0,12%" và "15 phút" không khớp "115 phút".
+ */
+function hasFigure(desc: string, figure: string): boolean {
+  for (let i = desc.indexOf(figure); i >= 0; i = desc.indexOf(figure, i + 1)) {
+    if (i === 0 || !/[\d.,]/.test(desc[i - 1])) return true;
+  }
+  return false;
+}
+
 /** `desc` có nêu ĐÚNG con số của hiệu ứng trạng thái không (xem `statusEffectFigures`): D viết tay, A chỉnh số thì lệch; test hợp đồng bắt. */
 export function statusDescMatches(desc: string, e: { ratio: number; ms: number }): boolean {
   const f = statusEffectFigures(e);
   return (
-    (f.pct.length === 0 || f.pct.some((s) => desc.includes(s))) &&
-    f.time.some((s) => desc.includes(s))
+    (f.pct.length === 0 || f.pct.some((s) => hasFigure(desc, s))) &&
+    f.time.some((s) => hasFigure(desc, s))
   );
 }
 
