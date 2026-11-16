@@ -21,6 +21,9 @@ import { newBossCtrl, type BossZone } from "./boss-state";
 import { tickMonsters } from "./monsters";
 
 const REACH = PLAYER_RADIUS - BOSS_HIT_GRACE_PX;
+/** Dung sai (px) công thức so với đo: không được THẤP hơn thật quá `LOWER`, không được cao hơn quá `UPPER`. Trên 260 ca không quá tay, chênh (công thức - đo) nằm trong [-1,73; +1,17]; cận trên 2,5 (chứ không phải 6 như #935 nêu) để bắt cả việc `bossInZone` bỏ mức nới `reach` 3 px. */
+const LOWER = 2;
+const UPPER = 2.5;
 const DEG = Math.PI / 180;
 
 // ---------- Vùng trúng THẬT theo hình (sao y `resolveCast`, boss ở gốc, hướng +x) ----------
@@ -273,19 +276,19 @@ describe("bossEscapePx so với vùng trúng THẬT (bossInZone, có reach) cho 
   });
 
   for (const c of cases) {
-    it(`${c.label}: công thức trong [đo - 2, đo + 6]${c.conservative ? " (cố ý quá tay: chỉ cận dưới)" : ""}`, () => {
+    it(`${c.label}: công thức trong [đo - 2, đo + 2,5]${c.conservative ? " (cố ý quá tay: chỉ cận dưới)" : ""}`, () => {
       const f = bossEscapePx(c.shape);
       expect(f, "công thức trả null cho hình hợp lệ").not.toBeNull();
       const m = measure(c.shape);
       expect(
         f!,
         `${c.label}: công thức ${f!.toFixed(1)} px, đo ${m.toFixed(1)} px`,
-      ).toBeGreaterThanOrEqual(m - 2);
+      ).toBeGreaterThanOrEqual(m - LOWER);
       if (!c.conservative)
         expect(
           f!,
           `${c.label}: công thức ${f!.toFixed(1)} px, đo ${m.toFixed(1)} px`,
-        ).toBeLessThanOrEqual(m + 6);
+        ).toBeLessThanOrEqual(m + UPPER);
     });
   }
 });
