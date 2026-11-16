@@ -219,12 +219,22 @@ describe("số đo bảo vệ khi mất kết nối (mục 33)", () => {
     const { hub, a } = twoRoomHub();
     a.w.netStats.silent = 3;
     a.w.netStats.spared = 1;
+    a.w.netStats.spareDenied = 2;
     const snap = collectMetrics(hub, probe);
-    expect(snap.rooms.find((r) => r.room === "roomA")!.net).toEqual({ silent: 3, spared: 1 });
-    expect(snap.rooms.find((r) => r.room === "roomB")!.net).toEqual({ silent: 0, spared: 0 });
+    expect(snap.rooms.find((r) => r.room === "roomA")!.net).toEqual({
+      silent: 3,
+      spared: 1,
+      spareDenied: 2,
+    });
+    expect(snap.rooms.find((r) => r.room === "roomB")!.net).toEqual({
+      silent: 0,
+      spared: 0,
+      spareDenied: 0,
+    });
     const text = renderPrometheus(snap);
     expect(text).toMatch(/tiengioi_room_net_silent_total\{room="roomA",map="[a-z_]+"\} 3/);
     expect(text).toMatch(/tiengioi_room_net_spared_total\{room="roomA",map="[a-z_]+"\} 1/);
+    expect(text).toMatch(/tiengioi_room_net_spare_denied_total\{room="roomA",map="[a-z_]+"\} 2/);
   });
 });
 
