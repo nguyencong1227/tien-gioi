@@ -27,9 +27,15 @@ import { FileSectStore, type Sect } from "./sect-store";
 import { SectService, sectVaultViewOf, sectViewOf, type SectActor } from "./sect-service";
 import { emptySectVault } from "./sect-store";
 import { makeSect } from "./store-contract";
+import { installSectQuestFixture } from "./systems/sect-fixtures";
 
 const root = mkdtempSync(path.join(tmpdir(), "tien-gioi-sect-svc-"));
-afterAll(() => rmSync(root, { recursive: true, force: true }));
+// Bảng nhiệm vụ tông CỐ ĐỊNH: test không được cứng dữ liệu thật của E / D (M8.7)
+const restoreQuestFixture = installSectQuestFixture();
+afterAll(() => {
+  restoreQuestFixture();
+  rmSync(root, { recursive: true, force: true });
+});
 let n = 0;
 
 let now = 1_700_000_000_000;
