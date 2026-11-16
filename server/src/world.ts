@@ -23,6 +23,8 @@ import type {
   DuelStateMsg,
   DuelEndMsg,
   SectInvitedMsg,
+  SectHallMsg,
+  SectBuff,
   SectVaultMsg,
   NetShieldMsg,
   SectMsg,
@@ -137,6 +139,12 @@ export interface PlayerCtrl {
    * CHỈ ở phía máy chủ (không vào state, không gửi client: người dùng bỏ nhãn ở mục 36); `gainExp` nhân sau cùng.
    */
   testExpMult?: number;
+  /**
+   * Buff tông môn (M8.3b, docs/THIET_KE_TONG_MON.md mục 12.5): hệ số tu vi / cơ hội rơi đồ (chủ đồ) / tốc độ hồi phục ngoài đả tọa, CHỈ khi cấp tông >= 2 (cấp 1 không buff nên để
+   * trống: đường nóng không tốn gì). `systems/sect.ts` (`applySectBuff`) đặt lúc vào phòng / lên cấp / thành viên đổi, xoá khi rời / bị mời ra / giải tán. CHỈ phía máy chủ (không vào
+   * state); `gainExp`, `dropLoot`, `tickRecovery` đọc. Người ngoại tuyến không có `PlayerCtrl` nên không có buff (chỉ người ĐANG TRỰC TUYẾN).
+   */
+  sectBuff?: SectBuff;
   /** Dữ liệu chạy của pháp bảo đang mặc (M7.4, `systems/treasure.ts`): đồng hồ khiên, chỗ đứng yên. Chỉ có khi đang có pháp bảo tác dụng. */
   treasure?: TreasureRt;
 }
@@ -247,6 +255,8 @@ export interface WorldEvents {
   sectInvited(sessionId: string, msg: SectInvitedMsg): void;
   /** Ảnh chụp KHO ĐỒ của tông môn gửi chính người nhận (mục 11; `vault: null` = không còn ở tông môn nào). */
   sectVault(sessionId: string, msg: SectVaultMsg): void;
+  /** Ảnh chụp "Nội vụ" (M8: cấp, cống hiến, nhiệm vụ, cửa hàng) gửi chính người nhận (`hall: null` = không còn ở tông môn nào). */
+  sectHall(sessionId: string, msg: SectHallMsg): void;
   /** Hộ thể sau nối lại / có tin lại sau im lặng / được tha chết do mạng (mục 33; chỉ chủ nhân vật nhận). */
   netShield(sessionId: string, msg: NetShieldMsg): void;
 }
@@ -329,6 +339,11 @@ export class World {
    * 0 = tắt (mặc định, người dùng chưa chọn). `WorldRoom` đặt từ biến môi trường `SECT_NEWLIFE_LOCK_HOURS`.
    */
   sectNewLifeLockMs = 0;
+  /**
+   * "Chờ sang ngày mới kiếm được cống hiến" (M8, `sectCanEarn`): MẶC ĐỊNH BẬT. `WorldRoom` đặt từ `SECT_EARN_WARMUP` (`off` chỉ để dev / E2E; test đơn vị đặt `false` khi cần
+   * kiểm kiếm ngay).
+   */
+  sectEarnWarmup = true;
   /**
    * Phòng đăng ký: lưu hồ sơ của một người NGAY và chờ ghi xong (trước khi chuyển Linh thạch sang kho tông môn).
    * Trả `true` CHỈ khi hồ sơ đã nằm trên đĩa / DB; `false` khi lưu lỗi hoặc không lưu được lúc này (đang qua cổng: bản ghi
