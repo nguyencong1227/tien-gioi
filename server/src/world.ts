@@ -23,6 +23,7 @@ import type {
   DuelStateMsg,
   DuelEndMsg,
   SectInvitedMsg,
+  SectHallMsg,
   SectVaultMsg,
   NetShieldMsg,
   SectMsg,
@@ -247,6 +248,8 @@ export interface WorldEvents {
   sectInvited(sessionId: string, msg: SectInvitedMsg): void;
   /** Ảnh chụp KHO ĐỒ của tông môn gửi chính người nhận (mục 11; `vault: null` = không còn ở tông môn nào). */
   sectVault(sessionId: string, msg: SectVaultMsg): void;
+  /** Ảnh chụp "Nội vụ" (M8: cấp, cống hiến, nhiệm vụ, cửa hàng) gửi chính người nhận (`hall: null` = không còn ở tông môn nào). */
+  sectHall(sessionId: string, msg: SectHallMsg): void;
   /** Hộ thể sau nối lại / có tin lại sau im lặng / được tha chết do mạng (mục 33; chỉ chủ nhân vật nhận). */
   netShield(sessionId: string, msg: NetShieldMsg): void;
 }
@@ -329,6 +332,11 @@ export class World {
    * 0 = tắt (mặc định, người dùng chưa chọn). `WorldRoom` đặt từ biến môi trường `SECT_NEWLIFE_LOCK_HOURS`.
    */
   sectNewLifeLockMs = 0;
+  /**
+   * "Chờ sang ngày mới kiếm được cống hiến" (M8, `sectCanEarn`): MẶC ĐỊNH BẬT. `WorldRoom` đặt từ `SECT_EARN_WARMUP` (`off` chỉ để dev / E2E; test đơn vị đặt `false` khi cần
+   * kiểm kiếm ngay).
+   */
+  sectEarnWarmup = true;
   /**
    * Phòng đăng ký: lưu hồ sơ của một người NGAY và chờ ghi xong (trước khi chuyển Linh thạch sang kho tông môn).
    * Trả `true` CHỈ khi hồ sơ đã nằm trên đĩa / DB; `false` khi lưu lỗi hoặc không lưu được lúc này (đang qua cổng: bản ghi

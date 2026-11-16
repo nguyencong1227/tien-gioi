@@ -35,5 +35,28 @@ export function newLifeLockOf(env: NodeJS.ProcessEnv): NewLifeLock {
   return { ms: Math.floor(n * MS_PER_HOUR), warnings: [] };
 }
 
+/**
+ * `SECT_EARN_WARMUP` (M8, docs/THIET_KE_TONG_MON.md mục 12.3): "chờ sang ngày mới kiếm được cống hiến" (thành viên vào tông CÙNG ngày chưa kiếm được; chống nhảy tông / lập tông mỗi ngày để lấy lại trần).
+ * MẶC ĐỊNH BẬT. `off` (hoặc `0` / `false`) CHỈ để dev / E2E (kiểm trong một phiên); `warnings` nhắc khi tắt: KHÔNG BAO GIỜ tắt trên bản chạy thật. Giá trị lạ coi là BẬT (kèm cảnh báo).
+ */
+export interface EarnWarmup {
+  on: boolean;
+  warnings: string[];
+}
+export function earnWarmupOf(env: NodeJS.ProcessEnv): EarnWarmup {
+  const raw = env.SECT_EARN_WARMUP;
+  if (raw === undefined || raw.trim() === "") return { on: true, warnings: [] };
+  const v = raw.trim().toLowerCase();
+  if (v === "off" || v === "0" || v === "false")
+    return {
+      on: false,
+      warnings: [
+        "SECT_EARN_WARMUP=off: thành viên mới vào tông kiếm được cống hiến NGAY (chỉ để dev / E2E). KHÔNG BAO GIỜ tắt trên bản chạy thật: mở cửa cho nhảy tông lấy lại trần kiếm mỗi ngày.",
+      ],
+    };
+  if (v === "on" || v === "1" || v === "true") return { on: true, warnings: [] };
+  return { on: true, warnings: [`SECT_EARN_WARMUP='${raw}' không hiểu: giữ BẬT (chỉ nhận off / on).`] };
+}
+
 /** `newLifeLockOf(env).ms` (cho WorldRoom). */
 export const newLifeLockMsOf = (env: NodeJS.ProcessEnv): number => newLifeLockOf(env).ms;

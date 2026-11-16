@@ -24,6 +24,7 @@ import {
   sectLevelOf,
   dayKey,
   parseSectAmount,
+  parseSectHallGet,
   parseSectAnswer,
   parseSectInvite,
   parseSectKick,
@@ -33,17 +34,20 @@ import {
   parseSectVaultDeposit,
   parseSectVaultPolicy,
   parseSectVaultWithdraw,
+  sectDepositCh,
+  sectDepositValue,
   sectFailMessage,
   sectKey,
   sectVaultAccepts,
   type ChatOut,
   type Inventory,
+  type SectEarnSource,
   type SectFail,
   type SectPresenceEntry,
 } from "@tien-gioi/shared";
 import type { Located } from "../hub";
 import type { Sect } from "../sect-store";
-import { sectVaultViewOf, sectViewOf, type SectActor } from "../sect-service";
+import { sectHallViewOf, sectVaultViewOf, sectViewOf, type SectActor } from "../sect-service";
 import type { World } from "../world";
 import { sendInv, takeFromSlot } from "./inventory";
 import { spawnLoot } from "./loot";
@@ -163,10 +167,7 @@ function isDown(w: World, sid: string): boolean {
 
 /** Báo người đã chết không góp được (lý do riêng, không dùng `error` chung). */
 function downFail(w: World, sid: string) {
-  w.events.toast(sid, {
-    text: "Ngươi đã gục, không góp được vào kho tông môn.",
-    tone: "bad",
-  });
+  toastFail(w, sid, "down"); // chuỗi CHUNG cho góp / nhận / trả / mua (review B ở #837: không dùng chuỗi riêng cho góp)
 }
 
 /**
@@ -202,6 +203,11 @@ function vaultMsgFor(w: World, sid: string, sect: Sect, soulKey: string) {
   return { vault: sectVaultViewOf(sect, soulKey, dayKey(w.now), newLifeLockLeft(w, sid)) };
 }
 
+/** Ảnh chụp "Nội vụ" cho người `soulKey` đang đứng ở phòng `w` với phiên `sid` (đồng hồ phòng + cờ "chờ sang ngày" của phòng đó). */
+function hallMsgFor(w: World, sect: Sect, soulKey: string) {
+  return { hall: sectHallViewOf(sect, soulKey, w.now, w.sectEarnWarmup) };
+}
+
 /**
  * Sau một thay đổi thành công: nhớ bản ghi mới, gửi `SectMsg` cho mọi thành viên đang trực tuyến, đặt `Player.sect`, và gửi
  * `NO_SECT` (xoá cờ) cho những người vừa bị gỡ. Không gửi gì cho người ngoại tuyến (vào phòng sẽ tự nhận).
@@ -217,6 +223,7 @@ function broadcastSect(w: World, sect: Sect, removed: { soulKey: string; name: s
     book.online.set(m.soulKey, sect.id);
     loc.w.events.sect(loc.sid, { sect: sectViewOf(sect, m.soulKey) });
     loc.w.events.sectVault(loc.sid, vaultMsgFor(loc.w, loc.sid, sect, m.soulKey));
+    loc.w.events.sectHall(loc.sid, hallMsgFor(loc.w, sect, m.soulKey));
   }
   sendPresence(w, sect); // ai đang trực tuyến cập nhật NGAY khi thành viên đổi (không chờ nhịp `tickSect`)
   sendRemoved(w, removed);
@@ -231,6 +238,7 @@ function sendRemoved(w: World, removed: { soulKey: string; name: string }[]) {
     if (!loc) continue;
     loc.p.sect = "";
     loc.w.events.sect(loc.sid, NO_SECT);
+    loc.w.events.sectHall(loc.sid, { hall: null });
     loc.w.events.sectVault(loc.sid, { vault: null });
   }
 }
@@ -274,7 +282,59 @@ export async function sectOnJoin(w: World, sid: string) {
   loc.p.sect = sect.tag;
   w.events.sect(sid, { sect: sectViewOf(sect, a.soulKey) });
   w.events.sectVault(sid, vaultMsgFor(w, sid, sect, a.soulKey));
+  w.events.sectHall(sid, hallMsgFor(w, sect, a.soulKey));
   sendPresence(w, sect); // mọi người trong tông môn thấy người mới trực tuyến ngay
+}
+
+/**
+ * `sectHallGet`: xin ảnh chụp "Nội vụ" mới (chỉ đọc, giới hạn tần suất ở `WorldRoom.on`). Client xin lúc mở tab và khi qua mốc đặt lại trong ngày (`SectHallView.resetAt`);
+ * máy chủ KHÔNG tự đẩy lúc nửa đêm. Không ở tông môn nào thì trả `hall: null`.
+ */
+export async function sectHallGet(w: World, sid: string, raw: unknown) {
+  const svc = w.sectService;
+  const a = actorOf(w, sid);
+  if (!svc || !a || !parseSectHallGet(raw)) return;
+  const sect = await svc.sectOf(a.soulKey);
+  if (!stillHere(w, sid, a.soulKey)) return;
+  w.events.sectHall(sid, sect ? hallMsgFor(w, sect, a.soulKey) : { hall: null });
+}
+
+/**
+ * Cộng cống hiến cho `sid` từ `source` qua MỘT cổng (`SectService.award`): gọi SAU khi thao tác chính (góp kho) đã THÀNH CÔNG; thao tác chính KHÔNG bị hoàn khi cống hiến bị từ chối
+ * (chưa tới ngày được kiếm, hết trần, đã chết: chỉ là không có cống hiến). Trả số cống hiến được cộng (0 = không). Thành công thì ghi audit `sect.earn`, gửi lại `sectHall` cho
+ * NGƯỜI KIẾM; lên cấp thì ghi `sect.level_up`, báo cả tông môn (toast + ảnh chụp). Người đã chết / ở Hoàng Tuyền không kiếm (mục 12.3, cùng `isDown`).
+ */
+async function awardContribution(
+  w: World,
+  sid: string,
+  a: SectActor,
+  source: SectEarnSource,
+  want: number,
+  key?: string,
+): Promise<number> {
+  const svc = w.sectService;
+  if (!svc || want < 1 || isDown(w, sid)) return 0;
+  const res = await svc.award(a, source, want, { key, warmup: w.sectEarnWarmup });
+  if (!res.ok) return 0;
+  w.audit?.("sect.earn", {
+    name: a.name,
+    sect: res.sect.name,
+    source,
+    amount: res.granted,
+    level: res.level,
+  });
+  if (res.levelUp) {
+    w.audit?.("sect.level_up", { sect: res.sect.name, level: res.level });
+    broadcastSect(w, res.sect); // cả tông môn nhận ảnh chụp mới (cấp, giới hạn, buff)
+    for (const m of res.sect.members) {
+      const loc = locateMember(w, m);
+      if (loc) toastGood(loc.w, loc.sid, `Tông môn ${res.sect.name} lên cấp ${res.level}!`);
+    }
+  } else if (stillHere(w, sid, a.soulKey)) {
+    w.events.sectHall(sid, hallMsgFor(w, res.sect, a.soulKey));
+    w.hub.sects.cache.set(res.sect.id, res.sect);
+  }
+  return res.granted;
 }
 
 /** Rời phòng (kể cả đi qua cổng): người này không còn trực tuyến ở đây. Gọi TRƯỚC khi xoá khỏi `ctrl`. */
@@ -549,7 +609,18 @@ export async function sectDeposit(w: World, sid: string, raw: unknown) {
     amount: msg.amount,
     treasury: res.sect.coin,
   });
-  toastGood(w, sid, `Đã góp ${msg.amount} Linh thạch vào kho tông môn.`);
+  const ch = await awardContribution(
+    w,
+    sid,
+    a,
+    "deposit",
+    sectDepositCh(sectDepositValue({ coin: msg.amount })),
+  );
+  toastGood(
+    w,
+    sid,
+    `Đã góp ${msg.amount} Linh thạch vào kho tông môn.${ch > 0 ? ` (+${ch} cống hiến)` : ""}`,
+  );
 }
 
 /**
@@ -683,7 +754,18 @@ export async function sectVaultDeposit(w: World, sid: string, raw: unknown) {
     }
     broadcastSect(w, res.sect);
     w.audit?.("sect.vault_deposit", { name: a.name, sect: res.sect.name, itemId, qty: msg.qty });
-    toastGood(w, sid, `Đã góp ${msg.qty} ${itemName(itemId)} vào kho đồ tông môn.`);
+    const ch = await awardContribution(
+      w,
+      sid,
+      a,
+      "deposit",
+      sectDepositCh(sectDepositValue({ itemId, qty: msg.qty })),
+    );
+    toastGood(
+      w,
+      sid,
+      `Đã góp ${msg.qty} ${itemName(itemId)} vào kho đồ tông môn.${ch > 0 ? ` (+${ch} cống hiến)` : ""}`,
+    );
   } finally {
     book.busy.delete(a.soulKey);
   }
