@@ -38,6 +38,24 @@ export function pipsOf(mask: unknown): PipSpec[] {
 /** Bán kính một chấm (px thế giới) và khoảng cách giữa tâm hai chấm. */
 export const PIP_R = 4;
 export const PIP_STEP = 11;
+/** Tâm hàng chấm ở dưới tâm quái bao nhiêu px phía TRÊN (cộng bán kính quái); trùm / tinh anh cao hơn một nấc để không đè tên. */
+export const PIP_ROW_Y = 21;
+export const PIP_ROW_Y_BOSS = 36;
+
+/** Mép TRÊN của hàng chấm, tính từ tâm quái (px phía trên): tâm hàng + nửa chấm + quầng đen 2 px. */
+export function pipRowTop(radius: number, boss: boolean): number {
+  return radius + (boss ? PIP_ROW_Y_BOSS : PIP_ROW_Y) + PIP_R + 2;
+}
+
+/**
+ * Đáy nhãn "tên · %" của mục tiêu khoá (px phía trên tâm quái). Mặc định ngay trên vòng đánh dấu (`ringR + 6`); quái đang có chấm trạng thái (`pipTop` > 0,
+ * xem `pipRowTop`) thì nâng lên TRÊN hàng chấm 2 px. Từ mục 26 chế độ nhắm mặc định là Tự động nên quái gần nhất luôn có nhãn này; trước khi nâng, nhãn
+ * (cao ~15 px) che gần hết hàng chấm của chính con quái đang nhắm (ô chấm Tê cóng / Choáng bị che, `check-monster-status.mjs` đỏ).
+ */
+export function targetLabelRise(ringR: number, pipTop: number): number {
+  const base = ringR + 6;
+  return pipTop > 0 ? Math.max(base, pipTop + 2) : base;
+}
 
 /** Toạ độ x (tương đối tâm quái) của `n` chấm xếp thành hàng ngang cân giữa. */
 export function pipOffsets(n: number): number[] {
