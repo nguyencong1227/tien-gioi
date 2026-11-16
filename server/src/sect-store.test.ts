@@ -13,7 +13,7 @@ import {
   SECT_EARN_DAY_CAP,
   SECT_LOG_MAX,
   SECT_POINTS_CAP,
-  SECT_QUEST_BY_ID,
+  SECT_QUESTS,
   SECT_VAULT_SLOTS,
   SECT_VAULT_DRAW_DEFAULT,
   SECT_VAULT_DRAW_MAX,
@@ -476,7 +476,7 @@ describe("kho đồ tông môn: sanitizeVault / assertWritableSect / withVaultLo
 });
 
 describe("M8: cống hiến / công tích / điểm tông / sổ ngày / kho đệm (mục 12.2)", () => {
-  const qid = Object.keys(SECT_QUEST_BY_ID)[0]!;
+  const qid = SECT_QUESTS[0]!.id; // sổ ngày lưu id MẪU
   const raw = (over: Record<string, unknown> = {}) =>
     JSON.parse(JSON.stringify({ ...makeSect("m1"), ...over })) as Record<string, any>;
 
@@ -549,7 +549,7 @@ describe("M8: cống hiến / công tích / điểm tông / sổ ngày / kho đ�
       day: "2026-11-01",
       earned: 99999,
       deposit: 99999,
-      quests: [qid, qid, "constructor", "khong_co", 7],
+      quests: [qid, qid, `${qid}.t0`, "constructor", "khong_co", 7], // id cụ thể (có hậu tố bậc) không phải khoá hợp lệ
       dungeon: true,
       buys: { hoi_huyet_dan: 99999, constructor: 3, ["__proto__"]: 2, khong_co: 1 },
     });

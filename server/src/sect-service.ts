@@ -17,7 +17,6 @@ import {
   SECT_CREATE_COOLDOWN_MS,
   SECT_PERMS,
   SECT_POINTS_CAP,
-  SECT_QUEST_BY_ID,
   SECT_REJOIN_COOLDOWN_MS,
   SECT_VAULT_DRAW_MAX,
   SECT_VAULT_DRAW_MODE,
@@ -35,6 +34,7 @@ import {
   sectKey,
   sectLevelInfo,
   sectLevelOf,
+  sectQuestTemplateOf,
   sectVaultAccepts,
   type InvSlot,
   type SectAssignableRank,
@@ -474,9 +474,7 @@ export class SectService {
         const r = sectAwardDay(sectDayState(me.today, now), source, want, opts.key);
         if (r.refused === "quest_done") throw new Refusal("quest_done");
         if (r.granted < 1) {
-          const known =
-            typeof opts.key === "string" &&
-            Object.prototype.hasOwnProperty.call(SECT_QUEST_BY_ID, opts.key);
+          const known = sectQuestTemplateOf(opts.key) !== undefined;
           throw new Refusal(source === "quest" && !known ? "quest_unavailable" : "earn_cap");
         }
         const contrib = me.contrib ?? 0;

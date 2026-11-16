@@ -7,7 +7,7 @@ import {
   SECT_EARN_DAY_CAP,
   SECT_LOG_MAX,
   SECT_POINTS_CAP,
-  SECT_QUEST_BY_ID,
+  SECT_QUESTS,
 } from "@tien-gioi/shared";
 import { describe, expect, it } from "vitest";
 import type { AccountStore, NewAccount, SessionRecord, SessionStore } from "./account-store";
@@ -1120,7 +1120,7 @@ export function describeSectStoreContract(
     });
 
     // ----- M8: cống hiến / công tích / sổ ngày / điểm tông / ô kho theo cấp (docs/THIET_KE_TONG_MON.md mục 12.2) -----
-    const questId = Object.keys(SECT_QUEST_BY_ID)[0]!;
+    const questId = SECT_QUESTS[0]!.id; // sổ ngày lưu id MẪU (không phải id cụ thể có hậu tố bậc)
     const day = (over: Record<string, unknown> = {}) => ({
       day: "2026-11-17",
       earned: 50,

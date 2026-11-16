@@ -17,7 +17,6 @@ import {
   SECT_EARN_DAY_CAP,
   SECT_LOG_MAX,
   SECT_POINTS_CAP,
-  SECT_QUEST_BY_ID,
   SECT_RANKS,
   SECT_SHOP,
   SECT_VAULT_DRAW_DEFAULT,
@@ -28,6 +27,7 @@ import {
   cleanName,
   cleanSectName,
   cleanSectTag,
+  isSectQuestTemplate,
   sectKey,
   sectLevelInfo,
   sectLevelOf,
@@ -216,14 +216,7 @@ export function sanitizeDay(raw: unknown): SectDayState | undefined {
   const earned = wholeIn(raw.earned, SECT_EARN_DAY_CAP);
   const deposit = Math.min(wholeIn(raw.deposit, SECT_DEPOSIT_DAY_CAP), earned);
   const quests = Array.isArray(raw.quests)
-    ? [
-        ...new Set(
-          raw.quests.filter(
-            (q): q is string =>
-              typeof q === "string" && Object.prototype.hasOwnProperty.call(SECT_QUEST_BY_ID, q),
-          ),
-        ),
-      ]
+    ? [...new Set(raw.quests.filter((q): q is string => isSectQuestTemplate(q)))]
     : [];
   const buys: Record<string, number> = {};
   if (isRecord(raw.buys)) {
