@@ -2,7 +2,8 @@ import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
+import { installSectQuestFixture } from "../src/systems/sect-fixtures";
 import {
   COIN_CAP,
   DEFAULT_MAP,
@@ -42,6 +43,10 @@ import {
   MAX_FILE_SIZE,
   show,
 } from "./audit-saves.js";
+
+// Bảng nhiệm vụ tông CỐ ĐỊNH: test không được cứng dữ liệu thật của E / D (M8.7)
+const restoreQuestFixture = installSectQuestFixture();
+afterAll(() => restoreQuestFixture());
 
 function hashFileSha256(filePath: string): string {
   return createHash("sha256").update(readFileSync(filePath)).digest("hex");
