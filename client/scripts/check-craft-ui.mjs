@@ -12,6 +12,7 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
  *   3. Túi đồ: nút Dùng MỜ kèm lý do (chưa đỉnh / đang còn hiệu lực), sáng lại khi hết chip; dòng "Hiệu lực: ..." ở khung chi tiết.
  *   4. Qua cổng: có chip chế phẩm thì hộp xác nhận hiện (Y đi / X ở lại, nút >= 44 px, nằm trong màn hình); chỉ có buff chiêu thì KHÔNG hỏi và `travel` gửi đi.
  *   5. Toast thành công khi chip chế phẩm hiện ngay sau một lần bấm Dùng.
+ * `--vp <tên khung>`: chỉ chạy một khung nhìn (đột biến nhanh).
  * `--shots`: lưu ảnh `<tên>-<khung>.webp` của cảnh 1-4 (kiểm bằng mắt).
  */
 import http from "node:http";
@@ -190,7 +191,12 @@ async function main() {
       source: `try { localStorage.setItem('tg_newbie_guide_dismissed','1'); localStorage.setItem('tg_quality','low'); } catch (e) {}`,
     });
 
+    // `--vp 360x640` chỉ chạy một khung nhìn (chạy đột biến nhanh)
+    const onlyVp = process.argv.includes("--vp")
+      ? process.argv[process.argv.indexOf("--vp") + 1]
+      : null;
     for (const vp of VIEWPORTS) {
+      if (onlyVp && vp.name !== onlyVp) continue;
       console.log(`\n=== ${vp.name} ===`);
       await send("Emulation.setDeviceMetricsOverride", {
         width: vp.w,
