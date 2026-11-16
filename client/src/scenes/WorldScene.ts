@@ -145,11 +145,13 @@ import { SkillBarDom } from "../skill-bar-dom";
 import { StatusBadgesDom, badgeViews } from "../status-badges";
 import {
   ELITE_STYLE,
+  EliteHintGate,
   eliteAuraDims,
   eliteAuraPulse,
   eliteBarWidth,
   eliteLabelText,
   eliteName,
+  eliteSightText,
   isElite,
 } from "../elite";
 import { buildSkillsPanel, slotMessage } from "../skills-panel";
@@ -409,6 +411,8 @@ export class WorldScene extends Phaser.Scene {
   // Tái sử dụng Set và hồ đối tượng (object pool) để giảm cấp phát mỗi frame (#71)
   private seenIds = new Set<string>();
   private auraWave = 0;
+  /** Gợi ý "nên đi đội" một lần mỗi loài tinh anh trong phiên (mục 22.2, `elite.ts`) */
+  private readonly eliteHints = new EliteHintGate();
   private talismanWave = 0;
   private lootWave = 0;
   private lastAuxSync = 0;
@@ -2982,6 +2986,7 @@ export class WorldScene extends Phaser.Scene {
         const pulse = eliteAuraPulse(this.auraWave, animReducedMotion());
         e.eliteAura.setScale(pulse.scale).setAlpha(pulse.alpha);
       }
+      if (elite) this.hintEliteParty(m.kind, def.name);
       // Tinh anh: thanh máu to hơn, màu cam viền vàng, LUÔN hiện (kể cả khi đầy) để thấy từ xa
       this.drawBar(
         e,
@@ -3379,6 +3384,15 @@ export class WorldScene extends Phaser.Scene {
         }
       }
     }
+  }
+
+  /**
+   * Tinh anh vừa vào khung hình: nhắc "nên đi đội" MỘT lần mỗi loài mỗi phiên, bỏ qua nếu đã đi đội (`EliteHintGate`).
+   * Gọi mỗi khung cho từng tinh anh đang thấy (tối đa vài con): `take` chỉ tra một Set nhỏ nên không nóng.
+   */
+  private hintEliteParty(kind: string, name: string) {
+    if (this.eliteHints.take(kind, ui.getParty().members.length))
+      ui.toast({ text: eliteSightText(name), tone: "info" });
   }
 
   // ---------------- Hiệu ứng ----------------

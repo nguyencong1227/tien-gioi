@@ -8,6 +8,8 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 //  - bản đồ lớn: thoi cam viền trắng cho từng tinh anh (đè lên chấm đỏ), quái thường chỉ có chấm đỏ; chú giải có mục "Tinh anh";
 //  - nút Mục tiêu ghi "<tên> tinh anh" khi khoá tinh anh, tên thường khi khoá quái thường;
 //  - bỏ cờ tinh anh (`elite = 0`): nhãn / vầng sáng / thanh máu về như quái thường, không để rác;
+//  - gợi ý "nên đi đội" (mục 22.2): toast "★ <tên> tinh anh: nên đi đội." đúng MỘT lần mỗi loài (bật / tắt cờ lại không nhắc lần nữa), KHÔNG nhắc khi đang đi đội và vẫn nhắc loài đó
+//    khi rời đội; chú giải bản đồ ghi "nên đi đội";
 //  - không tạo đối tượng mới mỗi khung (số con của container đứng yên); vầng sáng nhịp theo sóng chung, giảm chuyển động thì đứng yên; 0 lỗi JS.
 // Có thể chụp ảnh: `--shots <thư mục>`. Cần client đang chạy (`npm run dev -w client`, cổng của dev B là 5183).
 //   node client/scripts/check-elite-badge.mjs [--url http://127.0.0.1:5183] [--shots /tmp/tg-b-shots]
@@ -124,6 +126,10 @@ try {
       me.x = t.x; me.y = t.y; sc.predX = me.x; sc.predY = me.y; sc.pending.length = 0; sc.hasMe = true;
       sc.cameras.main.stopFollow(); sc.cameras.main.centerOn(me.x, me.y); return 1; })()`);
     await sleep(500);
+    // Đếm mọi toast "tinh anh ..." xuất hiện từ lúc này (toast tự gỡ sau 3 giây nên phải bắt lúc thêm vào)
+    await evalJs(
+      `(() => { window.__eliteToasts = []; new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes) if (n.textContent && n.textContent.includes("tinh anh")) window.__eliteToasts.push(n.textContent); }).observe(document.getElementById("toast"), { childList: true }); return 1; })()`,
+    );
   };
   const spawn = (id, kind, dx, dy, extra = "") =>
     evalJs(
@@ -208,6 +214,14 @@ try {
       !b.n1.label && !b.n1.aura && !b.n1.barShown && !b.n1.elite,
       "quái thường bên cạnh (Hắc Hổ) KHÔNG đổi: không nhãn, không vầng sáng, thanh máu ẩn",
     );
+    // Gợi ý nên đi đội: mỗi loài đúng MỘT toast, nhãn tên theo loài
+    const hints = await J("window.__eliteToasts");
+    check(
+      hints.length === 2 &&
+        hints.includes("★ Hôi Lang tinh anh: nên đi đội.") &&
+        hints.includes("★ Cốt Tượng tinh anh: nên đi đội."),
+      `gợi ý nên đi đội: đúng một toast mỗi loài (${JSON.stringify(hints)})`,
+    );
     const infoB = await grab("shotB");
     const goldE1 =
       (await goldIn("shotB", infoB, b.e1.x, b.e1.y, 70)) -
@@ -254,8 +268,8 @@ try {
       `[...document.querySelectorAll("#map-legend span")].map((s) => s.textContent.trim())`,
     );
     check(
-      legend.some((t) => t.startsWith("Tinh anh")),
-      `chú giải bản đồ có mục "Tinh anh" (${legend.find((t) => t.startsWith("Tinh anh"))})`,
+      legend.some((t) => t.startsWith("Tinh anh") && t.includes("nên đi đội")),
+      `chú giải bản đồ có mục "Tinh anh" kèm "nên đi đội" (${legend.find((t) => t.startsWith("Tinh anh"))})`,
     );
     await evalJs("window.__ui.toggleMapModal(false); 0");
     // Bỏ cờ tinh anh: về như quái thường, không để rác
@@ -279,6 +293,27 @@ try {
       tElite === "Hôi Lang tinh anh" && tNormal === "Hắc Hổ",
       `nút Mục tiêu: "${tElite}" (tinh anh) / "${tNormal}" (thường)`,
     );
+    // Bật / tắt cờ tinh anh lại (e1 vừa bị bỏ rồi bật lại) KHÔNG nhắc lần hai
+    const again = await J("window.__eliteToasts");
+    check(again.length === 2, `bật lại cờ tinh anh: không nhắc lần hai (${again.length} toast)`);
+    // Đang đi đội (2 người): tinh anh loài MỚI không nhắc; rời đội thì loài đó được nhắc
+    await evalJs(`(() => { const sc = window.__scene, me = sc.me();
+      window.__ui.onParty({ leader: me.name, members: [
+        { name: me.name, realm: 1, tier: 1, hp: 10, maxHp: 10, x: sc.predX, y: sc.predY },
+        { name: "Đồng đội thử", realm: 1, tier: 1, hp: 10, maxHp: 10, x: sc.predX + 50, y: sc.predY } ] });
+      return 1; })()`);
+    await spawn("e3", "ho", -60, 130, ", elite: 1");
+    await sleep(500);
+    const inParty = await J("window.__eliteToasts");
+    check(inParty.length === 2, `đang đi đội: không nhắc loài mới (${inParty.length} toast)`);
+    await evalJs(`(() => { window.__ui.onParty({ leader: "", members: [] }); return 1; })()`);
+    await sleep(500);
+    const leftParty = await J("window.__eliteToasts");
+    check(
+      leftParty.length === 3 && leftParty[2] === "★ Hắc Hổ tinh anh: nên đi đội.",
+      `rời đội: loài chưa được nhắc giờ được nhắc (${JSON.stringify(leftParty.slice(2))})`,
+    );
+    await evalJs(`(() => { window.__scene.state.monsters.delete("e3"); return 1; })()`);
     // không tạo đối tượng mới mỗi khung: số con của container đứng yên trong 1,5 giây
     const ch0 = (await ent("e1")).children;
     await sleep(1500);

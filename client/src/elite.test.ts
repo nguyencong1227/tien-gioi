@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  ELITE_PARTY_HINT,
   ELITE_SUFFIX,
+  EliteHintGate,
   eliteAuraDims,
   eliteAuraPulse,
   eliteBarWidth,
   eliteLabelText,
   eliteName,
+  eliteSightText,
   isElite,
 } from "./elite";
 
@@ -57,5 +60,42 @@ describe("elite: kích cỡ và nhịp", () => {
     expect(eliteAuraPulse(NaN, false)).toEqual({ scale: 1, alpha: 0.5 });
     expect(eliteAuraPulse(5, false)).toEqual(hi); // kẹp
     expect(eliteAuraPulse(-5, false)).toEqual(lo);
+  });
+});
+
+describe("elite: gợi ý nên đi đội (mục 22.2)", () => {
+  it("lời thông báo có sao, tên đủ hậu tố và gợi ý; không thêm hậu tố hai lần", () => {
+    expect(eliteSightText("Độc Tước")).toBe("★ Độc Tước tinh anh: nên đi đội.");
+    expect(eliteSightText("Độc Tước tinh anh")).toBe("★ Độc Tước tinh anh: nên đi đội.");
+    expect(ELITE_PARTY_HINT).toBe("nên đi đội");
+  });
+
+  it("nhắc đúng MỘT lần cho mỗi loài, loài khác vẫn được nhắc", () => {
+    const g = new EliteHintGate();
+    expect(g.take("doc_tuoc", 0)).toBe(true);
+    expect(g.take("doc_tuoc", 0)).toBe(false);
+    expect(g.take("doc_tuoc", 1)).toBe(false);
+    expect(g.take("han_lang", 1)).toBe(true);
+  });
+
+  it("đang đi đội (>= 2 người) thì không nhắc và KHÔNG ghi nhớ: rời đội gặp lại thì vẫn nhắc", () => {
+    const g = new EliteHintGate();
+    expect(g.take("doc_tuoc", 2)).toBe(false);
+    expect(g.take("doc_tuoc", 4)).toBe(false);
+    expect(g.take("doc_tuoc", 1)).toBe(true);
+    expect(g.take("doc_tuoc", 1)).toBe(false);
+  });
+
+  it("đội một người (chỉ mình) vẫn là đi một mình; số đội rác không chặn nhắc", () => {
+    const g = new EliteHintGate();
+    expect(g.take("a", 1)).toBe(true);
+    for (const [i, n] of [NaN, -1, -Infinity].entries())
+      expect(g.take(`k${i}`, n), String(n)).toBe(true);
+  });
+
+  it("loài rỗng / không phải chuỗi bị bỏ qua, không làm hỏng cổng", () => {
+    const g = new EliteHintGate();
+    for (const k of ["", undefined, null, 3, {}]) expect(g.take(k, 0), String(k)).toBe(false);
+    expect(g.take("a", 0)).toBe(true);
   });
 });
