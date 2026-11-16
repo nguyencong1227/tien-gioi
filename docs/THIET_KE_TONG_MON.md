@@ -6,7 +6,7 @@
 
 **Làm:** người chơi **lập tông môn** (tên + biệt hiệu ngắn), **mời** người khác vào (người kia nhận), có **chức vụ** (Tông chủ / Trưởng lão / Đệ tử), **chat tông môn** xuyên mọi bản đồ, **thông báo tông môn** (một dòng), **kho chung Linh thạch** (góp, rút có phân quyền, có sổ ghi), rời / mời ra / chuyển quyền / giải tán. **Thành viên là LINH HỒN**: đầu thai (đổi kiếp, nhân vật đặt lại) vẫn ở trong tông môn với đúng chức vụ.
 
-**Không làm (bản đầu):** cấp tông môn / buff / nhiệm vụ / chiến tranh tông môn / bảng xếp hạng (cần "danh vọng", để sau khi người dùng chốt); kho vật phẩm (trùng lặp / mất đồ khi đồng thời, để sau); xin gia nhập từ ngoài (chỉ mời); nhiều tông môn một người; chia tông môn hay sáp nhập.
+**Không làm (bản đầu):** cấp tông môn / buff / nhiệm vụ / chiến tranh tông môn / bảng xếp hạng (cần "danh vọng", để sau khi người dùng chốt); kho vật phẩm (bản đầu chưa làm; đã thiết kế ở MỤC 11 sau yêu cầu của người dùng, `QUYET_DINH_M3.md` mục 27); xin gia nhập từ ngoài (chỉ mời); nhiều tông môn một người; chia tông môn hay sáp nhập.
 
 ## 2. Hiện trạng đã đọc mã (cái để tái dùng, cái cần thêm)
 - **Danh tính / linh hồn:** `Identity.soulKey` (`identity.ts`): chế độ tài khoản là `accountId`, chế độ cũ là tên chuẩn hoá. `SoulStore` (`soul.ts`) là mẫu giao diện lưu trữ có bản file (`FileSoulStore`: ghi tệp tạm + `rename`, hàng đợi theo khoá) và bản PostgreSQL (`server/src/pg/`), cùng bộ kiểm chung `store-contract.ts`. Một tài khoản = một linh hồn = một đạo hiệu cố định (`THIET_KE_TAI_KHOAN.md` mục 3): tên hiển thị của thành viên gần như không đổi.
@@ -94,7 +94,89 @@ Dữ liệu mới nằm ngoài hồ sơ nhân vật và chân linh nên **không
 
 ## 10. Câu hỏi mở (A chọn hướng an toàn, người dùng đổi nếu muốn)
 1. **Một người một tông môn; Tông chủ phải chuyển quyền trước khi rời** (không có tông môn vô chủ). Nếu Tông chủ bỏ chơi vô thời hạn thì tông môn kẹt: chưa có chuyển quyền tự động (đề xuất để sau, cần luật "bỏ chơi bao lâu").
-2. **Kho chung chỉ Linh thạch; chỉ Tông chủ rút được** (có sổ ghi). Kho vật phẩm và cho Trưởng lão rút (có hạn mức / ngày) để sau.
+2. **Kho chung Linh thạch: chỉ Tông chủ rút được** (có sổ ghi). **Kho đồ (vật phẩm) đã thiết kế ở mục 11** (Trưởng lão rút tự do, Đệ tử có hạn mức theo ngày).
 3. **Chưa có cấp / buff / nhiệm vụ tông môn**: bản đầu là bộ khung xã hội (thành viên, chức vụ, chat, kho). Kho là chỗ chuẩn bị để sau này nâng cấp tông môn bằng Linh thạch (cũng là một "chỗ xả tiền" mà `CAN_BANG.md` đã nêu thiếu).
 4. **Chỉ mời, không xin gia nhập**; tên và biệt hiệu duy nhất, không phân biệt hoa thường, không lọc từ ngữ (chưa có danh sách từ cấm; báo cáo / gỡ do người vận hành xử lý ở dữ liệu).
 5. **Tông môn gắn với linh hồn:** chết thật vẫn ở tông môn; đổi đạo hiệu (nếu sau này có) chỉ cập nhật tên hiển thị. Nếu muốn "bị trục xuất khi mất kiếp" thì ngược quyết định gốc: giữ nguyên.
+
+## 11. Kho đồ tông môn (người dùng yêu cầu, `QUYET_DINH_M3.md` mục 27: "tông môn chưa có chức năng gì")
+
+> Bổ sung của Dev A, soạn TRƯỚC khi viết mã (B giao diện, D test / fuzz, C bot đọc mục này). Mọi chữ "kho" không kèm "đồ" ở các mục 1-10 vẫn là kho Linh thạch. Đổi hợp đồng `shared/` đi qua PR riêng (mục 11.10).
+
+### 11.1 Quyết định
+- Thêm **kho đồ**: lưới `SECT_VAULT_SLOTS` = 40 ô (cùng hình `InvSlot` như túi đồ, xếp chồng theo `ItemDef.stack`), nằm TRONG bản ghi `Sect` (cùng nơi giữ kho Linh thạch). Giao diện là tab "Kho đồ" của bảng Tông môn (việc của B, dùng đúng hành vi chọn đã sửa ở mục 24: bấm chọn, rê chuột không đổi lựa chọn).
+- **Góp:** mọi thành viên, từ túi đồ (số lượng chọn được với đồ xếp chồng). **Rút:** theo chức vụ (mục 11.3). **Sổ kho đồ:** ai góp / rút món gì, bao nhiêu, lúc nào; mọi thành viên xem được.
+- **Ưu tiên tuyệt đối: KHÔNG BAO GIỜ nhân đôi đồ** (thà mất hơn nhân đôi), đúng nguyên tắc mục 4.4 của kho Linh thạch.
+- Kho thuộc TÔNG MÔN và sống qua mọi kiếp của thành viên (thành viên là linh hồn). Câu hỏi "người vừa đầu thai có rút lại đồ mình góp ở kiếp trước không" CHƯA được người dùng trả lời: mặc định **cho phép** theo luật chức vụ, nhưng có sẵn một cờ cấu hình để khoá (mục 11.7).
+- Chưa làm (chờ người dùng chọn): cấp tông môn mở rộng ô kho, cống hiến, cửa hàng / nhiệm vụ / buff tông môn.
+
+### 11.2 Mô hình dữ liệu
+Trong bản ghi `Sect` (server, `sect-store.ts`) thêm, TÙY CHỌN khi đọc (bản ghi cũ thiếu thì `sanitizeSect` dựng kho rỗng; `v` giữ 1; PostgreSQL lưu cả bản ghi ở cột `data jsonb` nên KHÔNG cần di chuyển lược đồ):
+```
+vault: { slots: (InvSlot | null)[SECT_VAULT_SLOTS],
+         log: { at, name, kind: "deposit" | "withdraw", itemId, qty }[] (<= SECT_VAULT_LOG_MAX, MỚI NHẤT ĐỨNG ĐẦU),
+         drawPerDay: 0..SECT_VAULT_DRAW_MAX }          // chính sách của Tông chủ, mặc định SECT_VAULT_DRAW_DEFAULT = 3
+members[i].draw?: { day: string, n: number }           // lượt Đệ tử đã rút trong ngày `day` (`dayKey`, cùng hàm nhiệm vụ hằng ngày)
+```
+- `sanitizeSect`: bỏ ô có món không còn tồn tại hoặc `qty` < 1, ép `qty` về [1, stack], ép đúng `SECT_VAULT_SLOTS` ô, `drawPerDay` kẹp, `draw` hỏng thì bỏ. `assertWritableSect` (lúc GHI) KHÔNG im lặng kẹp: ô sai bất biến thì ném lỗi, đồ không được biến mất âm thầm.
+- Sổ nằm cạnh kho (không dùng chung `log` Linh thạch: kiểu mục khác nhau, giới hạn độ dài khác).
+
+### 11.3 Quyền (thêm vào `SECT_PERMS` / `canSect`)
+| Thao tác | Tông chủ | Trưởng lão | Đệ tử |
+|---|:-:|:-:|:-:|
+| Xem kho đồ + sổ | có | có | có |
+| Góp đồ | có | có | có |
+| Rút đồ | tự do | tự do | **hạn mức** `drawPerDay` lượt / ngày, mỗi lượt tối đa `SECT_VAULT_DRAW_QTY_DE_TU` món (mục 11.6) |
+| Chỉnh `drawPerDay` | có | không | không |
+- Quyền kiểm TRÊN bản ghi đọc trong `update` (như mục 5), không dựa vào bộ nhớ.
+
+### 11.4 Luồng và thứ tự ghi (mất hơn nhân đôi)
+Đồ trong túi (bộ nhớ, lưu định kỳ) và kho (lưu ngay) không cùng một giao dịch, như Linh thạch (mục 4.4):
+- **Góp:** kiểm sớm (món hợp lệ, ô có đủ, chưa trong danh sách cấm, kho còn chỗ theo bản nhớ) -> trừ khỏi túi -> **lưu hồ sơ nhân vật NGAY và chờ xong** (`World.onSaveNow`, trả `false` khi đang qua cổng hoặc lưu lỗi thì HUỶ và trả đồ) -> `SectStore.update` cộng vào kho + ghi sổ. `update` từ chối (kho vừa đầy do người khác góp) hoặc lỗi thì **trả đồ vào túi**; túi không còn chỗ thì **rơi xuống đất tại chân** (`spawnLoot`, chủ nhặt trước): không bao giờ cộng hai chỗ. Sập giữa "lưu hồ sơ" và "cộng kho": mất số góp, không nhân đôi.
+- **Rút:** kiểm sớm (quyền, hạn mức, khoá kiếp mới, túi còn chỗ cho món + số lượng, không đang qua cổng) -> `SectStore.update` **trừ kho + ghi sổ + tăng `draw`** (nguyên tử) -> cộng vào túi -> **lưu hồ sơ ngay**. Túi vừa đầy ở giữa (đua với nhặt đồ): trả lại kho bằng một `update` nữa, không được thì rơi xuống đất tại chân. Sập giữa trừ kho và lưu túi: mất số rút (hiếm), không nhân đôi.
+- Các nhánh lỗi chỉ BỚT, không bao giờ THÊM; mọi cộng vào túi đi qua `addToInventory` (kiểm số thừa), mọi trừ qua `takeFromSlot`.
+- Giới hạn đã biết (giống mục 4.4): "commit không rõ kết quả" (kho ghi xong mà báo lỗi) có thể nhân đôi MỘT lần số góp đó; chỉ chữa được bằng sổ giao dịch có id (ngoài phạm vi).
+
+### 11.5 Đồng thời: hai người rút cùng một món
+Ba lớp, mỗi lớp có test riêng và đột biến:
+1. **Mọi thay đổi kho trong `SectStore.update(id, fn)`:** hàng đợi theo `sectId`, `fn` thuần trên BẢN SAO đọc mới nhất, nên hai lần rút không bao giờ thấy cùng một số dư.
+2. **Khoá kỳ vọng theo ô (phiên bản của ô):** tin rút mang `{ slot, itemId, qty }`; trong `update`, ô `slot` phải CÒN giữ đúng `itemId` với `qty` đủ, nếu không từ chối `vault_changed` (không bao giờ rút một món KHÁC vì giao diện cũ: ô vừa bị người khác rút hết rồi người khác góp món khác vào đúng ô đó). Không dùng số phiên bản toàn kho (làm hai người rút hai món khác nhau chặn nhau oan).
+3. **Một người một thao tác kho tại một thời điểm** (hàng đợi theo `soulKey`, như mục 4.2): hai tin `vaultWithdraw` liên tiếp của cùng người xử lý lần lượt, lần sau thấy túi / hạn mức đã đổi.
+- Hạn mức Đệ tử cũng đọc-sửa-ghi TRONG `update` (đếm lượt cùng lúc trừ kho), nên gửi dồn nhiều tin không vượt hạn mức.
+
+### 11.6 Chính sách và hạn mức
+- `drawPerDay` do Tông chủ đặt (0 = Đệ tử không rút được; tối đa `SECT_VAULT_DRAW_MAX` = 10; mặc định 3) qua tin `vaultPolicy`, ghi vào kho, thông báo cho thành viên trực tuyến.
+- Một **lượt** = một lần rút MỘT ô (một loại món), tối đa `SECT_VAULT_DRAW_QTY_DE_TU` = 10 món / lượt cho Đệ tử (chống "rút cả chồng 99 trong một lượt"); Tông chủ / Trưởng lão không bị hạn. Qua ngày (`dayKey`) đếm lại từ 0. Đếm theo LINH HỒN (`members[i].draw`), nên đầu thai không đặt lại hạn mức.
+- Báo lượt còn lại trong ảnh chụp (`myDrawsLeft`; `null` = không hạn).
+
+### 11.7 Luân hồi: cờ "kiếp mới chưa được rút"
+Kẽ hở (đã có sẵn với kho Linh thạch của Tông chủ): góp đồ rồi chết thật, đầu thai, rút lại làm "thừa kế". Cờ `SECT_NEWLIFE_LOCK_HOURS` (biến môi trường, **mặc định 0 = tắt**, người dùng chọn sau): bật thì người chơi có `life.playMs` của kiếp hiện tại nhỏ hơn chừng đó giờ KHÔNG rút được kho đồ (`vault_locked`) và KHÔNG rút được kho Linh thạch. Dùng `playMs` có sẵn (không thêm trường lưu). Đây là khoá theo KIẾP chứ không theo từng món: món xếp chồng nên không biết ai góp phần nào (sổ chỉ ghi giao dịch); khoá theo món cần ghi người góp trên từng ô và chia nhỏ ô, quá nặng so với lợi ích.
+
+### 11.8 Đồ không góp được
+- **Đồ đang mặc:** nằm ở ô trang bị chứ không ở túi đồ, nên tự nhiên không góp được (phải tháo ra túi trước).
+- **"Đồ đã khắc chân linh":** hiện đồ KHÔNG có trạng thái riêng từng món (túi là `{ itemId, qty }`); khắc chân linh là chiêu gắn vào linh hồn lúc đầu thai, không phải thuộc tính của đồ. Nếu sau này đồ có trạng thái riêng thì món đó nằm ngoài kho (ghi vào hợp đồng khi ấy).
+- **Vật phẩm nhiệm vụ:** `ItemDef` chưa có cờ riêng. Dùng danh sách chặn `SECT_VAULT_DENY_ITEMS` (`shared/`, ban đầu RỖNG; test kiểm mọi id có thật). D rà các nhiệm vụ (`QUESTS`) tìm món chỉ dùng cho nhiệm vụ rồi đề xuất danh sách (issue K5); góp món bị chặn trả `vault_denied`.
+- Số ô, số lượng, `itemId` từ client luôn kiểm bằng `slotIndex`, `byId(ITEM_BY_ID, id)`, số nguyên dương hữu hạn (như `dropItem`).
+
+### 11.9 Tin nhắn (đề xuất, chốt ở PR hợp đồng)
+- Client -> server (`SECT_MSG`, đăng ký bằng `this.on(...)`, giới hạn tần suất): `vaultDeposit {slot, qty}`, `vaultWithdraw {slot, itemId, qty}`, `vaultPolicy {drawPerDay}`.
+- Server -> client: `sectVault {vault}` (ảnh chụp kho đồ: ô, sổ, `drawPerDay`, `myDrawsLeft`, `lockMs`; gửi lúc vào phòng và mỗi khi kho đổi, cho thành viên trực tuyến; tách khỏi `SectView` để đổi thông báo / thành viên không kéo theo cả kho). Kho 40 ô + sổ 50 mục ~ vài KB một lần gửi, không mỗi tick; kiểm ở bench (không tick nào gửi khi không ai đụng kho).
+- Mã từ chối mới (`SECT_FAILS`, kèm câu tiếng Việt ở `sectFailMessage`): `vault_full`, `vault_changed`, `vault_limit`, `vault_denied`, `vault_locked`, `bag_full`, `item_invalid`.
+- `PROTOCOL_VERSION` KHÔNG tăng: chỉ THÊM tin / trường tùy chọn (client cũ bỏ qua tin lạ; không có giao diện kho thì không gửi). Ghi vào CHANGELOG.
+
+### 11.10 Chia PR và phân công
+| PR | Nội dung | Ai |
+|---|---|---|
+| K1 | `shared/`: hợp đồng mục 11.9 + hằng số + `canSect` mở rộng + test + đột biến (PR riêng, một dev khác review) | A |
+| K2 | Server: `Sect.vault` + `sanitizeSect` / `assertWritableSect` + bộ kiểm chung `store-contract` (file + PostgreSQL) | A |
+| K3 | Server: `SectService` góp / rút / chính sách + `systems/sect.ts` nối phòng + cờ kiếp mới + sổ; test đơn vị + tích hợp + **đột biến** (nhân đôi đồ, rút sai món, vượt hạn mức, thiếu quyền, kho đầy, đua rút, qua cổng, lưu lỗi) | A |
+| K4 | Client: tab "Kho đồ" (lưới, góp / rút, sổ, chính sách), xác nhận rút số lớn, ảnh 5 cỡ, script Chrome thật, bàn phím + cảm ứng | B |
+| K5 | Test / mô phỏng ĐỒNG THỜI và sập: tổng đồ (túi mọi người + kho + đất) không bao giờ vượt tổng ban đầu qua hàng loạt kịch bản đua (như `sect-crash.test.ts` của Linh thạch) + danh sách `SECT_VAULT_DENY_ITEMS` | D (LGTM B / C) |
+| K6 | Bot / soak đồng thời, `kiem-save` kiểm kho đồ | C |
+- Thứ tự: K1 -> (K2, K3 máy chủ; K4 giao diện bằng dữ liệu giả; K5 viết khung test) song song -> ghép. Người dùng xếp ưu tiên SAU lỗi túi đồ (mục 24), di chuyển (25), chế độ nhắm (26) và song song nghề nhỏ (#514).
+
+### 11.11 Câu hỏi mở (A đã chọn hướng an toàn, người dùng đổi được)
+1. Luân hồi: cờ mặc định tắt (mục 11.7). Nếu người dùng muốn chặn: đặt `SECT_NEWLIFE_LOCK_HOURS` (vd 24); áp cho cả kho Linh thạch.
+2. Hạn mức Đệ tử: 3 lượt / ngày, tối đa 10 món / lượt (con số do A đề xuất).
+3. Trưởng lão rút TỰ DO (theo yêu cầu): rủi ro một Trưởng lão xấu rút sạch kho; giảm nhẹ bằng sổ kho + Tông chủ giáng chức được. Nếu muốn, thêm sau hạn mức riêng cho Trưởng lão.
+4. 40 ô cố định, chưa mở rộng theo cấp tông môn (cấp tông môn chưa có).
