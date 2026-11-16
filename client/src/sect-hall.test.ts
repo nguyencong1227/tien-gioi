@@ -1,6 +1,9 @@
 // Tab "Nội vụ" (M8.6, #843): làm sạch ảnh chụp `sectHall` và các hàm dựng dòng. Dùng `sampleSectHall` của `shared/` (khớp kiểu thật) làm dữ liệu mẫu.
 import { describe, expect, it } from "vitest";
 import {
+  SECT_BUFF_DROP_MAX,
+  SECT_BUFF_EXP_MAX,
+  SECT_BUFF_REGEN_MAX,
   SECT_EARN_DAY_CAP,
   SECT_LEVEL_MAX,
   SECT_QUESTS,
@@ -65,7 +68,14 @@ describe("sanitizeHallView: không tin tin nhắn của máy chủ", () => {
     const v = clone(sample(5)) as unknown as { buff: Record<string, unknown> };
     v.buff = { exp: 9, drop: 0.5, regen: "x" };
     const c = sanitizeHallView(v)!;
-    expect(c.buff).toEqual({ exp: 1.1, drop: 1, regen: 1 });
+    expect(c.buff).toEqual({ exp: SECT_BUFF_EXP_MAX, drop: 1, regen: 1 });
+    // trần từng loại lấy từ `shared/` (không chép số): mỗi loại kẹp đúng theo hằng của nó
+    v.buff = { exp: 99, drop: 99, regen: 99 };
+    expect(sanitizeHallView(v)!.buff).toEqual({
+      exp: SECT_BUFF_EXP_MAX,
+      drop: SECT_BUFF_DROP_MAX,
+      regen: SECT_BUFF_REGEN_MAX,
+    });
   });
 
   it("nhiệm vụ LẠ bị bỏ (kể cả constructor / __proto__); trạng thái lạ và mục không phải object thì bỏ mục", () => {
