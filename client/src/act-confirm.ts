@@ -159,3 +159,65 @@ export function sellStillValid(
   const s = slots[plan.index];
   return !!s && s.itemId === plan.itemId && Number.isFinite(s.qty) && s.qty >= plan.qty;
 }
+
+// ---------- Hoàng Tuyền: mở bằng Duyên và tóm tắt đầu thai (issue #779, docs/RA_SOAT_THAO_TAC.md hàng 11, 12) ----------
+
+/** Kế hoạch mở một nấc chân linh / xuất thân bằng Duyên chụp lúc bấm: so lại giá + số Duyên lúc xác nhận (`unlockStillValid`). */
+export interface UnlockPlan {
+  /** Giá lúc bấm (Duyên) */
+  cost: number;
+  spec: ConfirmSpec;
+}
+
+/**
+ * Hộp "Mở <tên> tốn N Duyên (còn lại M)?" (Duyên là tiền vĩnh viễn qua các kiếp, KHÔNG hoàn lại; các thẻ nằm sát nhau nên chạm nhầm trên điện thoại là mất Duyên). `null` nếu giá không
+ * dương / không nguyên, số Duyên hỏng hoặc không đủ (nút lúc đó đã tắt, không hỏi).
+ */
+export function unlockPlan(name: string, cost: number, duyen: number): UnlockPlan | null {
+  if (!Number.isInteger(cost) || cost <= 0) return null;
+  if (!Number.isFinite(duyen) || duyen < cost) return null;
+  return {
+    cost,
+    spec: {
+      text: `Mở ${name} tốn ${cost} Duyên (còn lại ${Math.floor(duyen) - cost})?`,
+      warn: "Duyên tích qua nhiều kiếp, đã mở thì không hoàn lại.",
+      ok: "Mở",
+      cancel: "Giữ lại",
+    },
+  };
+}
+
+/**
+ * Lúc xác nhận: giá HIỆN TẠI của mục này (`null` = đã mở hết / đã sở hữu) vẫn đúng giá lúc bấm và số Duyên còn đủ không. Máy chủ gửi lại chân linh (mua xong, đồng bộ) có thể đổi
+ * cả hai trong lúc hộp mở: khác đi thì HUỶ, không trừ Duyên theo một lời hỏi đã cũ.
+ */
+export function unlockStillValid(
+  plan: UnlockPlan,
+  currentCost: number | null,
+  duyen: number,
+): boolean {
+  return (
+    currentCost !== null &&
+    currentCost === plan.cost &&
+    Number.isFinite(duyen) &&
+    duyen >= plan.cost
+  );
+}
+
+/**
+ * Hộp TÓM TẮT đầu thai: "Đầu thai làm <xuất thân>, giữ K di vật, khắc N chiêu?". Đầu thai là đường DUY NHẤT ra khỏi Hoàng Tuyền nên hộp chỉ để bắt lỗi chọn nhầm (không chặn):
+ * nút "Xem lại" quay về màn chọn. Số lượng hỏng (âm, thập phân, NaN) coi như 0.
+ */
+export function rebirthPlan(
+  originName: string,
+  keepCount: number,
+  engraveCount: number,
+): ConfirmSpec {
+  const n = (v: number) => (Number.isFinite(v) && v > 0 ? Math.floor(v) : 0);
+  return {
+    text: `Đầu thai làm ${originName}, giữ ${n(keepCount)} di vật, khắc ${n(engraveCount)} chiêu?`,
+    warn: "Kiếp này kết thúc: chỉ giữ di vật và chiêu khắc đã chọn, không đổi lại được.",
+    ok: "Đầu thai",
+    cancel: "Xem lại",
+  };
+}

@@ -279,6 +279,10 @@ async function main() {
     );
     await ev(`document.getElementById('limbo-btn-rebirth').focus(); 1`);
     await press(T, ENTER);
+    // hộp TÓM TẮT đầu thai (issue #779): mở ở "Xem lại"; chờ qua cửa sổ chống click ma rồi Y
+    await T.waitFor(shown("act-confirm"), "hộp tóm tắt đầu thai");
+    await sleep(ACT_CONFIRM_GUARD_MS + 150);
+    await press(T, Y_KEY);
     await T.waitFor(`${shown("reborn-overlay")}`, "màn Mạnh Bà", 10000);
     await T.waitFor(`document.getElementById('reborn-overlay')?.hidden`, "Mạnh Bà tự đóng", 12000);
     await T.waitFor(

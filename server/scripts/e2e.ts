@@ -19,6 +19,7 @@ import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { type SavedPlayer } from "../src/store.js";
 import { DEFAULT_MAP_ID, type Soul } from "@tien-gioi/shared";
+import { ACT_CONFIRM_GUARD_MS } from "../../client/src/act-confirm";
 import { assertNotProd } from "./assert-not-prod.js";
 import { killChrome, listenWithRetry, removeTmpDirs } from "./e2e-kit.js";
 
@@ -408,6 +409,16 @@ async function runE2e() {
           `(() => { const b = document.querySelector('.stone-buy-btn:not([disabled])'); const t = b.textContent; b.click(); return t; })()`,
         );
         console.log(`  ✓ [3/5] Click mở khoá Tam Sinh Thạch: "${buyBtnLabel}"...`);
+        // hộp xác nhận (issue #779): chờ qua cửa sổ chống click ma rồi xác nhận
+        await waitFor(
+          `!document.getElementById('act-confirm')?.hidden`,
+          5000,
+          "hộp xác nhận mở nấc",
+        );
+        await sleep(ACT_CONFIRM_GUARD_MS + 150);
+        await ev(
+          `document.getElementById('act-btn-yes').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); 1`,
+        );
 
         // Chờ Duyên thay đổi từ tin soul thật của server
         await waitFor(
@@ -427,6 +438,15 @@ async function runE2e() {
       // Click Đầu thai
       console.log("  ✓ [4/5] Click nút Đầu thai...");
       await ev(`document.getElementById('limbo-btn-rebirth')?.click(); 1`);
+      await waitFor(
+        `!document.getElementById('act-confirm')?.hidden`,
+        5000,
+        "hộp tóm tắt đầu thai",
+      );
+      await sleep(ACT_CONFIRM_GUARD_MS + 150);
+      await ev(
+        `document.getElementById('act-btn-yes').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); 1`,
+      );
 
       // Chờ màn hình Mạnh Bà (reborn) xuất hiện
       await waitFor(

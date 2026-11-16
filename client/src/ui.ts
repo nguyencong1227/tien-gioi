@@ -191,7 +191,15 @@ import { transitionMs, waitOrSkip } from "./gfx/scene-transition";
 import { getDisplay, onDisplayChange } from "./gfx/display";
 import { optionTag, skipHintText } from "./dialog-opt";
 import { dropConfirmText, dropStillValid, dropWarnText, planDrop, type DropPlan } from "./inv-drop";
-import { inConfirmGuard, sellPlan, sellStillValid, type ConfirmSpec } from "./act-confirm";
+import {
+  inConfirmGuard,
+  rebirthPlan,
+  sellPlan,
+  sellStillValid,
+  unlockPlan,
+  unlockStillValid,
+  type ConfirmSpec,
+} from "./act-confirm";
 import { PREFER_TARGET_STORAGE_KEY, parsePreferTarget } from "./aim-order";
 import {
   AIM_MODE_LABEL,
@@ -732,6 +740,14 @@ let actConfirmOpenedAt = -Infinity;
 let actConfirmFromShop = false;
 /** Lúc hộp xác nhận đóng gần nhất (ms, `performance.now`). Hộp đóng ngay ở `pointerdown`, nên `click` do trình duyệt tạo sau khi nhả ngón rơi xuống nút ở DƯỚI hộp (nút Bán): bỏ qua `click` trong cửa sổ chống click ma. */
 let actConfirmClosedAt = -1e12;
+
+/**
+ * `click` "ma" (chuột / chạm: `detail > 0`) ngay sau khi hộp xác nhận vừa đóng, rơi xuống nút bên dưới hộp. Thao tác bằng BÀN PHÍM (Enter / Cách: `detail === 0`) hoặc lập trình thì không
+ * phải click ma, không chặn (người dùng bàn phím xác nhận bằng Y rồi bấm Enter ngay phải được).
+ */
+function ghostClick(e: MouseEvent): boolean {
+  return e.detail > 0 && inConfirmGuard(actConfirmClosedAt, performance.now());
+}
 
 /** Mở hộp xác nhận: nêu hậu quả bằng chữ; "Giữ lại" được focus; `onOk` chỉ chạy khi bấm xác nhận SAU cửa sổ chống click ma. */
 function askActConfirm(spec: ConfirmSpec, onOk: () => void, opener: HTMLElement | null) {
@@ -2185,7 +2201,7 @@ function renderShopSellImpl() {
         e.preventDefault();
         e.stopPropagation();
         // click "ma" sau khi vừa xác nhận / giữ lại ở hộp (cảm ứng): không mở lại hộp, không bán lần nữa
-        if (inConfirmGuard(actConfirmClosedAt, performance.now())) return;
+        if (ghostClick(e)) return;
         // Đồ quý / trang bị: hộp xác nhận (issue #779); đồ thường bán thẳng
         const plan = sellPlan(invSlots, i, qty, unitPrice, {
           name: def.name,
@@ -2602,8 +2618,26 @@ function renderLimboStoneListImpl() {
         btn.title = `Thiếu ${cost - activeSoulView.duyen} Duyên`;
       } else {
         btn.disabled = false;
-        btn.addEventListener("click", () => {
-          limboBuyCb?.(def.id);
+        btn.addEventListener("click", (e) => {
+          // click "ma" sau khi vừa đóng hộp xác nhận (cảm ứng: hộp đóng ở pointerdown, click rơi xuống nút bên dưới): bỏ qua
+          if (ghostClick(e)) return;
+          const duyen = activeSoulView?.duyen ?? 0;
+          const plan = unlockPlan(`${def.name} nấc ${currentLv + 1}`, cost, duyen);
+          if (!plan) return;
+          askActConfirm(
+            plan.spec,
+            () => {
+              // chân linh có thể đổi trong lúc hộp mở: kiểm lại giá + Duyên, không trừ Duyên theo lời hỏi cũ
+              const now = activeSoulView ? nextCost(activeSoulView, def.id) : null;
+              if (!unlockStillValid(plan, now, activeSoulView?.duyen ?? 0)) {
+                ui.toast({ text: "Chân linh vừa đổi, chưa mở gì. Hãy xem lại.", tone: "info" });
+                renderLimboAll();
+                return;
+              }
+              limboBuyCb?.(def.id);
+            },
+            btn,
+          );
         });
       }
     }
@@ -2652,8 +2686,24 @@ function renderLimboStoneListImpl() {
         btn.title = `Thiếu ${o.cost - activeSoulView.duyen} Duyên`;
       } else {
         btn.disabled = false;
-        btn.addEventListener("click", () => {
-          limboBuyCb?.(`${ORIGIN_BUY_PREFIX}${o.id}`);
+        btn.addEventListener("click", (e) => {
+          if (ghostClick(e)) return; // click ma sau khi đóng hộp
+          const duyen = activeSoulView?.duyen ?? 0;
+          const plan = unlockPlan(`xuất thân ${o.name}`, o.cost, duyen);
+          if (!plan) return;
+          askActConfirm(
+            plan.spec,
+            () => {
+              const owned = activeSoulView?.origins.includes(o.id) ?? false;
+              if (!unlockStillValid(plan, owned ? null : o.cost, activeSoulView?.duyen ?? 0)) {
+                ui.toast({ text: "Chân linh vừa đổi, chưa mở gì. Hãy xem lại.", tone: "info" });
+                renderLimboAll();
+                return;
+              }
+              limboBuyCb?.(`${ORIGIN_BUY_PREFIX}${o.id}`);
+            },
+            btn,
+          );
         });
       }
     }
@@ -5103,8 +5153,9 @@ export const ui = {
     const rebirthBtn = $("limbo-btn-rebirth");
     if (rebirthBtn) {
       rebirthBtn.removeAttribute("aria-disabled");
-      rebirthBtn.onclick = () => {
+      rebirthBtn.onclick = (e) => {
         if (rebirthBusy) return; // đã gửi, đang chờ máy chủ: máy chủ cũng bỏ tin `rebirth` thứ hai
+        if (ghostClick(e)) return; // click ma sau khi đóng hộp xác nhận (cảm ứng)
         const soul = activeSoulView;
         const choice: RebirthChoice = { origin: selectedOrigin, keep: selectedRelics };
         // `engrave` CHỈ khi người chơi đã đổi tập chiêu khắc (vắng = giữ nguyên chiêu đã khắc); kẹp lại theo danh sách / nấc hiện hành
@@ -5117,15 +5168,25 @@ export const ui = {
           const engrave = engraveToSend(soul.engraved, sel);
           if (engrave !== undefined) choice.engrave = engrave;
         }
-        rebirthBusy = true;
-        rebirthBtn.setAttribute("aria-disabled", "true");
-        // máy chủ từ chối (toast, vẫn ở Hoàng Tuyền) thì cho bấm lại sau một lát
-        rebirthBusyTimer = setTimeout(() => {
-          rebirthBusy = false;
-          rebirthBusyTimer = null;
-          rebirthBtn.removeAttribute("aria-disabled");
-        }, REBIRTH_BUSY_MS);
-        limboRebirthCb?.(choice);
+        // Tóm tắt trước khi đầu thai (issue #779): xuất thân, số di vật giữ, số chiêu khắc. Đường DUY NHẤT ra khỏi Hoàng Tuyền nên chỉ để bắt lỗi chọn nhầm ("Xem lại" quay về màn chọn)
+        const originName = ORIGINS.find((o) => o.id === choice.origin)?.name ?? choice.origin;
+        const engraveCount = (choice.engrave ?? soul?.engraved ?? []).length;
+        askActConfirm(
+          rebirthPlan(originName, choice.keep.length, engraveCount),
+          () => {
+            if (rebirthBusy) return;
+            rebirthBusy = true;
+            rebirthBtn.setAttribute("aria-disabled", "true");
+            // máy chủ từ chối (toast, vẫn ở Hoàng Tuyền) thì cho bấm lại sau một lát
+            rebirthBusyTimer = setTimeout(() => {
+              rebirthBusy = false;
+              rebirthBusyTimer = null;
+              rebirthBtn.removeAttribute("aria-disabled");
+            }, REBIRTH_BUSY_MS);
+            limboRebirthCb?.(choice);
+          },
+          rebirthBtn,
+        );
       };
     }
   },
@@ -5141,6 +5202,7 @@ export const ui = {
 
   /** Đóng màn hình Hoàng Tuyền */
   hideLimbo() {
+    closeActConfirm(false); // máy chủ đóng Hoàng Tuyền (đã đầu thai) lúc hộp xác nhận còn mở
     activeLimboMsg = null;
     activeSoulView = null;
     limboBuyCb = null;
