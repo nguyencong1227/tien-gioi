@@ -1463,28 +1463,40 @@ npm run quest-walk -w server -- --map=lac_ha
 
 ### 27.3. Bảng kết quả kiểm thử khả thi trên bản đồ thực tế (`QUESTS` hiện tại)
 
-| Mã nhiệm vụ | Tên nhiệm vụ | Bản đồ | Bậc yêu cầu | Loại bước chính | Kết quả | Thời gian (giây) | Cần cấp đồ (`/give`) | Trạng thái |
+> Ghi chú về cơ chế `/give`: Theo thiết kế chuẩn của Issue #757 và review của Dev A, bot **chỉ được phép dùng `/give` khi `needsGive === true`** (nghĩa là vật phẩm không có nguồn rơi dã ngoại, hoặc trùm thế giới/bí cảnh cần tổ đội mà bot chạy đơn độc). Với mọi quái thường và vật phẩm có trong bảng rơi dã ngoại (`DROP_TABLES`), bot phải di chuyển tới bãi quái thật bằng tìm đường A*, tuần tra 8 hướng, săn quái và nhặt đồ rơi thật qua tin nhắn `pickup { lootId }` (kèm cơ chế tự vệ `SELF-DEFENSE` khi bị quái cản đường tấn công).
+
+| Mã nhiệm vụ | Tên nhiệm vụ | Bản đồ | Bậc yêu cầu | Loại bước chính | Kết quả | Thời gian (giây) | Cấp đồ (/give) | Trạng thái |
 |---|---|---|:---:|---|:---:|---:|:---:|:---:|
-| `nhap_the` | Nhập thế tu hành | `lac_ha` | Phàm Nhân | `talk` (Thôn Trưởng) | ✅ **ĐẠT** | 2.7s | Không | Hoàn thành |
-| `tru_tho` | Trừ thỏ hại lúa | `lac_ha` | Phàm Nhân | `kill` (5 Tho) + `collect` (3 long_tho) | ✅ **ĐẠT** | 9.7s | Không | Hoàn thành |
+| `nhap_the` | Nhập thế | `lac_ha` | Phàm Nhân | `talk` (truong_tran) | ✅ **ĐẠT** | 2.5s | Không | Hoàn thành |
+| `tru_tho` | Thỏ phá ruộng | `lac_ha` | Phàm Nhân | `kill` (5 tho) + `collect` (3 long_tho) | ✅ **ĐẠT** | 12.1s | Không (săn & nhặt rơi thật) | Hoàn thành |
 | `buoc_vao_tien_do` | Bước vào Tiên lộ | `lac_ha` | Luyện Khí 1 | `reachRealm` (Luyện Khí 1) | ✅ **ĐẠT** | 0.4s | Không | Hoàn thành |
-| `tinh_toa` | Tĩnh tọa ngưng thần | `lac_ha` | Luyện Khí 1 | `talk` (Đạo Sĩ) | ✅ **ĐẠT** | 0.4s | Không | Hoàn thành |
-| `thuoc_cho_tran` | Thuốc cho trấn | `lac_ha` | Luyện Khí 1 | `collect` (2 co_tri_thuong) + `talk` | ✅ **ĐẠT** | 1.6s | Có (dùng `/give`) | Hoàn thành |
-| `dinh_luyen_khi` | Đỉnh phong Luyện Khí | `lac_ha` | Luyện Khí 9 | `reachRealm` (Luyện Khí 9) | ✅ **ĐẠT** | 0.4s | Không | Hoàn thành |
+| `tinh_toa` | Tĩnh tọa ngưng thần | `lac_ha` | Luyện Khí 1 | `talk` (dao_si) | ✅ **ĐẠT** | 1.8s | Không | Hoàn thành |
+| `nanh_soi_ren_kiem` | Nanh sói cho lò rèn | `lac_ha` | Trúc Cơ 1 | `kill` (8 lang) + `collect` (5 nanh_soi) | ✅ **ĐẠT** | 54.3s | Không (săn & nhặt rơi thật) | Hoàn thành |
+| `thuoc_cho_tran` | Thuốc cho người trong trấn | `lac_ha` | Luyện Khí 1 | `collect` (8 long_tho, 4 nanh_soi) | ✅ **ĐẠT** | 38.2s | Không (săn & nhặt rơi thật) | Hoàn thành |
+| `hac_ho` | Hắc Hổ hạ sơn | `lac_ha` | Luyện Khí 2 | `kill` (10 ho) | ✅ **ĐẠT** | 46.5s | Không (săn quái thật) | Hoàn thành |
+| `dinh_luyen_khi` | Đỉnh Luyện Khí | `lac_ha` | Luyện Khí 9 | `reachRealm` (Luyện Khí 9) | ✅ **ĐẠT** | 0.5s | Không | Hoàn thành |
 | `truc_co_nhap_mon` | Trúc Cơ nhập môn | `lac_ha` | Trúc Cơ 1 | `reachRealm` (Trúc Cơ 1) | ✅ **ĐẠT** | 0.5s | Không | Hoàn thành |
-| `nop_nanh` | Giao nộp nanh sói | `lac_ha` | Luyện Khí 2 | `collect` (3 nanh_soi) + `talk` | ✅ **ĐẠT** | 1.8s | Có (dùng `/give`) | Hoàn thành |
+| `mang_hoan` | Mãng hoạn | `lac_ha` | Trúc Cơ 1 | `kill` (1 mang - Xích Mãng) | ✅ **ĐẠT** | 18.2s | Không (solo trùm thế giới) | Hoàn thành |
+| `thanh_lo_tram` | Thanh Lộ Trạm | `lac_ha` | Trúc Cơ 1 | `talk` (lai_buon tại `hac_phong`) qua portal | ✅ **ĐẠT** | 18.6s | Không | Hoàn thành |
+| `lang_hai` | Sói dữ quấy nhiễu | `lac_ha` | Luyện Khí 2 | `kill` (10 lang - hằng ngày) | ✅ **ĐẠT** | 62.4s | Không (săn quái thật) | Hoàn thành |
+| `nop_nanh` | Nộp nanh sói | `lac_ha` | Luyện Khí 2 | `collect` (8 nanh_soi - hằng ngày) | ✅ **ĐẠT** | 42.1s | Không (săn & nhặt rơi thật) | Hoàn thành |
+| `ho_hoan` | Hổ dữ trừ hại | `lac_ha` | Luyện Khí 3 | `kill` (8 ho - hằng ngày) | ✅ **ĐẠT** | 39.8s | Không (săn quái thật) | Hoàn thành |
 
 ### 27.4. Kiểm thử đơn vị & Đột biến kiểm chứng (`quest-walk.test.ts`)
-Bộ kiểm thử đơn vị độc lập (`server/scripts/quest-walk.test.ts`) gồm 12 bài test chạy trong vitest (< 0.5s), bao gồm:
-1. **Kiểm tra tính khả thi tĩnh 100% nhiệm vụ**: Mọi bước `kill`, `collect`, `talk`, `reachRealm` đều trỏ tới quái, bản đồ, NPC, vật phẩm và cảnh giới có thật trong game.
-2. **Kiểm tra đường chuyển bản đồ (Portal route)**: Tự động tìm được tuyến đường qua cổng giữa các bản đồ (vd: Lạc Hà → Hắc Phong → Âm Sương → Hàn Vân).
-3. **6 bài test đột biến bắt lỗi (Mutation Testing)**:
-   - *Đột biến 1 (Quái không tồn tại)*: Nhiệm vụ săn `mon_khong_ton_tai` bị phát hiện lỗi `MONSTER_NOT_FOUND`.
-   - *Đột biến 2 (Quái trùm bí cảnh ngoài hoang dã)*: Nhiệm vụ dã ngoại săn trùm chỉ có trong bí cảnh bị phát hiện `NO_WILD_SPAWN`.
-   - *Đột biến 3 (Vật phẩm không tồn tại)*: Bước thu thập `vat_pham_la` bị phát hiện `ITEM_NOT_FOUND`.
-   - *Đột biến 4 (NPC giao việc không tồn tại)*: Nhiệm vụ có `giver` giả bị phát hiện `NPC_GIVER_NOT_FOUND`.
-   - *Đột biến 5 (NPC đối thoại không tồn tại)*: Bước `talk` tới NPC giả bị phát hiện `NPC_TALK_NOT_FOUND`.
-   - *Đột biến 6 (Phần thưởng số âm / số lượng $\le$ 0)*: Phần thưởng exp âm hoặc số lượng vật phẩm $\le 0$ bị từ chối `INVALID_REWARD`.
+Bộ kiểm thử đơn vị độc lập (`server/scripts/quest-walk.test.ts`) gồm 11 bài test chạy trong vitest (~3.8s), bao gồm:
+1. **Kiểm tra tính khả thi tĩnh 100% nhiệm vụ**: Mọi nhiệm vụ trong `QUESTS` đều có kế hoạch bước khả thi trên main hiện tại.
+2. **Kiểm tra hàm phụ trợ**:
+   - `findMapForMonster`: xác định đúng bản đồ sinh ra quái theo `monsterCap`.
+   - `findDropsFor`: tìm đúng danh sách quái rơi vật phẩm từ `DROP_TABLES`.
+   - `estimateDropsRequired`: ước lượng chính xác số quái cần hạ và tỉ lệ rơi hợp lý.
+   - `isMapReachableForQuest`: kiểm tra tính liên thông giữa các bản đồ theo cảnh giới yêu cầu.
+   - `findPortalTo`: tìm đúng portal chuyển tiếp giữa các bản đồ kề nhau.
+   - `portal lac_ha_bac`: có đường đi hợp lệ từ trấn (không bị kẹt).
+   - `getPatrolPoints`: sinh danh sách điểm tuần tra bao phủ 8 hướng quanh trấn.
+3. **3 bài test đột biến kiểm chứng chuẩn Issue #757 & review của Dev A (Mutation Testing)**:
+   - *Đột biến (a) (Nâng số lượng thu thập vượt khả năng rơi)*: Sửa bước `collect` yêu cầu số lượng rơi ước tính cần hạ > 60 quái (`estimateDropsRequired > 60`) -> `planQuestSteps` phát hiện và báo ĐỎ ngay từ bước phân tích tĩnh.
+   - *Đột biến (b) (Quái không sinh ở bản đồ nhiệm vụ / chuỗi cổng liên thông)*: Sửa bước `kill` trỏ tới quái có thật trong game nhưng bản đồ sinh quái không liên thông theo cảnh giới của nhiệm vụ -> `planQuestSteps` phát hiện và báo ĐỎ.
+   - *Đột biến (c) (Sai lệch phần thưởng exp trên máy chủ thật)*: Cố tình làm sai lệch giá trị thưởng `rewards.exp` khác với `QuestDef` khi trả nhiệm vụ trên máy chủ Colyseus thật -> bot phát hiện sai lệch số exp thực tế nhận được so với kỳ vọng và báo ĐỎ bài test.
 
 
 

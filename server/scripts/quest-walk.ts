@@ -504,14 +504,18 @@ export async function moveTo(
   return false;
 }
 
-/** Lấy danh sách toạ độ tuần tra các bãi quái sinh ra trên bản đồ */
+/** Lấy danh sách toạ độ tuần tra các bãi quái sinh ra trên bản đồ, phân bổ đều 8 hướng quanh trấn */
 export function getPatrolPoints(map: GameMap, monDef: MonsterKind): { x: number; y: number }[] {
   const grid = gridOf(map);
-  const rawPts: { x: number; y: number; dist: number }[] = [];
   const minD = monDef.minDanger;
-  const maxD = monDef.id === "lang" ? 0.42 : minD + 0.22;
+  const maxD = monDef.id === "tho" ? 0.22 : monDef.id === "lang" ? 0.6 : minD + 0.35;
 
-  // Quét lưới cách nhau mỗi 4 ô (128 px)
+  // Thu thập các điểm đi được theo từng góc hướng (8 hướng quanh trấn)
+  const buckets: { x: number; y: number; dist: number; d: number }[][] = Array.from(
+    { length: 8 },
+    () => [],
+  );
+
   const stepTiles = 4;
   for (let ty = 2; ty < grid.h - 2; ty += stepTiles) {
     for (let tx = 2; tx < grid.w - 2; tx += stepTiles) {
@@ -523,27 +527,31 @@ export function getPatrolPoints(map: GameMap, monDef: MonsterKind): { x: number;
 
       const d = map.dangerAt(x, y);
       if (d >= minD && d <= maxD) {
-        const distFromTown = Math.hypot(x - map.townPx.x, y - map.townPx.y);
-        rawPts.push({ x, y, dist: distFromTown });
+        const dx = x - map.townPx.x;
+        const dy = y - map.townPx.y;
+        let angle = Math.atan2(dy, dx); // [-PI, PI]
+        if (angle < 0) angle += 2 * Math.PI; // [0, 2*PI]
+        const bucketIdx = Math.floor((angle / (2 * Math.PI)) * 8) % 8;
+        const distFromTown = Math.hypot(dx, dy);
+        buckets[bucketIdx].push({ x, y, dist: distFromTown, d });
       }
     }
   }
 
-  if (rawPts.length === 0) {
-    return [{ x: map.townPx.x, y: map.townPx.y }];
-  }
-
-  // Sắp xếp các điểm theo khoảng cách từ trấn (gần trấn trước)
-  rawPts.sort((a, b) => a.dist - b.dist);
-
   const sampled: { x: number; y: number }[] = [];
-  const sampleCount = Math.min(8, rawPts.length);
-  const stride = Math.max(1, Math.floor(rawPts.length / sampleCount));
-  for (let i = 0; i < rawPts.length && sampled.length < sampleCount; i += stride) {
-    const spot = safeSpot(map, rawPts[i].x, rawPts[i].y);
-    sampled.push(spot);
+  // Từ mỗi hướng, lấy 1 điểm ở khoảng giữa dải nguy hiểm để tuần tra bao quát
+  for (let b = 0; b < 8; b++) {
+    const list = buckets[b];
+    if (list.length > 0) {
+      list.sort((p1, p2) => p1.dist - p2.dist);
+      const midIdx = Math.floor(list.length * 0.45);
+      const chosen = list[midIdx];
+      const spot = safeSpot(map, chosen.x, chosen.y);
+      sampled.push(spot);
+    }
   }
-  return sampled.length > 0 ? sampled : [{ x: rawPts[0].x, y: rawPts[0].y }];
+
+  return sampled.length > 0 ? sampled : [{ x: map.townPx.x, y: map.townPx.y }];
 }
 
 /** Chạy một nhiệm vụ trên Colyseus Server thật với bot client */
@@ -848,6 +856,7 @@ export async function walkSingleQuest(
       let nextPickupAt = 0;
       let seq = 0;
       const pickupAttempts = new Map<string, number>();
+      const lootApproachFrames = new Map<string, number>();
 
       const getItemQty = () => {
         if (!collectItemId) return 0;
@@ -858,6 +867,13 @@ export async function walkSingleQuest(
       };
 
       const initialQty = getItemQty();
+
+      const isValidTarget = (m: any) => {
+        if (!m || m.hp <= 0) return false;
+        if (monsterKind && m.kind !== monsterKind) return false;
+        if (monsterKind === "tho" && mapObj.dangerAt(m.x, m.y) > 0.3) return false;
+        return true;
+      };
 
       let lastStatusLog = 0;
       while (Date.now() - huntStart < huntTimeoutMs) {
@@ -904,23 +920,32 @@ export async function walkSingleQuest(
           }
         }
 
-        // Ưu tiên nhặt đồ rơi gần bot (tầm nhìn 400px)
+        // Ưu tiên nhặt đồ rơi gần bot (tầm nhìn 350px)
         let nearestLootId: string | null = null;
         let lootX = 0;
         let lootY = 0;
-        let nearestLootDist = 400;
+        let nearestLootDist = 350;
+        let lootPath: { cells: number[]; length: number } | null = null;
 
         if (room!.state.loot) {
+          const grid = gridOf(mapObj);
           room!.state.loot.forEach((l: any, id: string) => {
             if (l) {
               const attempts = pickupAttempts.get(id) ?? 0;
               if (attempts < 3) {
                 const d = Math.hypot(l.x - me.x, l.y - me.y);
                 if (d < nearestLootDist) {
-                  nearestLootDist = d;
-                  nearestLootId = id;
-                  lootX = l.x;
-                  lootY = l.y;
+                  const goals = freeCellsNear(grid, l.x, l.y);
+                  const pathRes = planPath(grid, me.x, me.y, goals);
+                  if (pathRes) {
+                    nearestLootDist = d;
+                    nearestLootId = id;
+                    lootX = l.x;
+                    lootY = l.y;
+                    lootPath = pathRes;
+                  } else {
+                    pickupAttempts.set(id, 99); // Không có đường đi tới đồ rơi, bỏ qua
+                  }
                 }
               }
             }
@@ -928,12 +953,17 @@ export async function walkSingleQuest(
         }
 
         if (nearestLootId) {
-          if (nearestLootDist > 28) {
-            const grid = gridOf(mapObj);
-            const goals = freeCellsNear(grid, lootX, lootY);
-            const pathRes = planPath(grid, me.x, me.y, goals);
-            if (pathRes && pathRes.cells.length > 1) {
-              const nextCell = pathRes.cells[1];
+          const approachCount = (lootApproachFrames.get(nearestLootId) ?? 0) + 1;
+          lootApproachFrames.set(nearestLootId, approachCount);
+
+          if (approachCount > 40 && nearestLootDist > 40) {
+            // Không thể tiếp cận sau 2 giây, bỏ qua để không kẹt
+            pickupAttempts.set(nearestLootId, 99);
+          } else if (nearestLootDist > 38) {
+            const pRes = lootPath as { cells: number[] } | null;
+            if (pRes && pRes.cells.length > 1) {
+              const grid = gridOf(mapObj);
+              const nextCell = pRes.cells[1];
               const nx = ((nextCell % grid.w) + 0.5) * 32;
               const ny = (Math.floor(nextCell / grid.w) + 0.5) * 32;
               const ang = Math.atan2(ny - me.y, nx - me.x);
@@ -955,6 +985,43 @@ export async function walkSingleQuest(
           continue;
         }
 
+        // Tự vệ nếu có bất kỳ quái nào áp sát (<= 58px) ngáng đường khi đang bị mất máu
+        let selfDefenseId: string | null = null;
+        let selfDefenseAngle = 0;
+        if (room!.state.monsters && me.hp < me.maxHp * 0.95) {
+          room!.state.monsters.forEach((m: any, id: string) => {
+            if (m && m.hp > 0) {
+              const d = Math.hypot(m.x - me.x, m.y - me.y);
+              if (d <= 58) {
+                selfDefenseId = id;
+                selfDefenseAngle = Math.atan2(m.y - me.y, m.x - me.x);
+              }
+            }
+          });
+        }
+
+        if (selfDefenseId) {
+          const now = Date.now();
+          const monObj = room!.state.monsters?.get(selfDefenseId);
+          if (now >= nextAttackAt) {
+            log(
+              `[SELF-DEFENSE] Tiêu diệt quái cản đường '${monObj?.kind ?? selfDefenseId}' (HP: ${monObj?.hp})`,
+            );
+            room!.send("attack", { angle: selfDefenseAngle });
+            nextAttackAt = now + 350;
+          }
+          if (now >= nextCastAt) {
+            room!.send(SKILL_MSG.cast, { slot: 2, angle: selfDefenseAngle });
+            nextCastAt = now + 3100;
+          }
+          if (now >= nextSwordAt && me.mp >= 20) {
+            room!.send("skill", { id: "sword", angle: selfDefenseAngle });
+            nextSwordAt = now + 900;
+          }
+          await new Promise((res) => setTimeout(res, 50));
+          continue;
+        }
+
         // Tìm quái mục tiêu gần nhất có đường đi tới được
         let targetId: string | null = null;
         let targetX = 0;
@@ -965,9 +1032,9 @@ export async function walkSingleQuest(
         if (room!.state.monsters) {
           const grid = gridOf(mapObj);
           room!.state.monsters.forEach((m: any, id: string) => {
-            if (m && m.hp > 0 && (!monsterKind || m.kind === monsterKind)) {
+            if (isValidTarget(m)) {
               const d = Math.hypot(m.x - me.x, m.y - me.y);
-              if (d < closestDist && d <= 900) {
+              if (d < closestDist && d <= 1000) {
                 const goals = freeCellsNear(grid, m.x, m.y);
                 const pathRes = planPath(grid, me.x, me.y, goals);
                 if (pathRes) {
@@ -1006,8 +1073,13 @@ export async function walkSingleQuest(
             room!.send("input", { seq: ++seq, dx: 0, dy: 0 });
           }
 
+          const now = Date.now();
+          if (dist <= 180 && dist > 55 && now >= nextSwordAt && me.mp >= 20) {
+            room!.send("skill", { id: "sword", angle });
+            nextSwordAt = now + 900;
+          }
+
           if (dist <= 55) {
-            const now = Date.now();
             if (now >= nextAttackAt) {
               const monObj = room!.state.monsters?.get(targetId);
               log(
@@ -1022,7 +1094,7 @@ export async function walkSingleQuest(
             }
             if (now >= nextSwordAt && me.mp >= 20) {
               room!.send("skill", { id: "sword", angle });
-              nextSwordAt = now + 1100;
+              nextSwordAt = now + 900;
             }
           }
           await new Promise((res) => setTimeout(res, 50));
@@ -1031,7 +1103,8 @@ export async function walkSingleQuest(
 
         // Tuần tra có tìm đường A* tránh vật cản tới bãi quái
         const pt = patrolPoints[patrolIdx % patrolPoints.length];
-        const reached = await moveTo(room!, pt.x, pt.y, 48, currentMapId, undefined, () => {
+        let aborted = false;
+        await moveTo(room!, pt.x, pt.y, 48, currentMapId, 6000, () => {
           const curMe = room!.state.players?.get(room!.sessionId);
           if (!curMe) return false;
           // Ngắt tuần tra nếu có loot gần (<= 250px)
@@ -1046,25 +1119,29 @@ export async function walkSingleQuest(
               }
             });
           }
-          if (hasLoot) return true;
-          // Ngắt tuần tra nếu có quái mục tiêu gần (<= 400px)
+          if (hasLoot) {
+            aborted = true;
+            return true;
+          }
+          // Ngắt tuần tra nếu có quái mục tiêu gần (<= 600px)
           let hasMon = false;
           if (room!.state.monsters) {
             room!.state.monsters.forEach((m: any) => {
-              if (m && m.hp > 0 && (!monsterKind || m.kind === monsterKind)) {
-                if (Math.hypot(m.x - curMe.x, m.y - curMe.y) <= 400) {
+              if (isValidTarget(m)) {
+                if (Math.hypot(m.x - curMe.x, m.y - curMe.y) <= 600) {
                   hasMon = true;
                 }
               }
             });
           }
-          return hasMon;
-        });
-        if (reached) {
-          const curMe = room!.state.players?.get(room!.sessionId);
-          if (curMe && Math.hypot(pt.x - curMe.x, pt.y - curMe.y) <= 55) {
-            patrolIdx++;
+          if (hasMon) {
+            aborted = true;
+            return true;
           }
+          return false;
+        });
+        if (!aborted) {
+          patrolIdx++;
         }
 
         await new Promise((res) => setTimeout(res, 50));
