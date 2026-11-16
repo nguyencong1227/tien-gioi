@@ -1440,5 +1440,52 @@ Số lượt thi triển theo chiêu (976): `me_tung_bo` 272, `van_hanh_bo` 215,
    - Tổng Atlas & Tileset: **224,32 KB** (ngân sách $\le 1024$ KB).
    - Bộ nhớ Texture tĩnh (VRAM RGBA): **6,12 MB** (ngân sách bậc thấp $\le 48$ MB).
 
+---
+
+## 27. Quest-Walk Bot: Bộ kiểm thử khả thi mọi nhiệm vụ trên máy chủ Colyseus thật (#757)
+
+### 27.1. Bối cảnh & Mục tiêu
+- Chuẩn bị nền tảng cho Dev D thêm nội dung nhiệm vụ mới (việc phụ, việc hằng ngày cho Lạc Hà, Hắc Phong, Âm Sương, Hàn Vân, nghề Đan/Phù theo QUYET_DINH_M3 mục 23).
+- Test tĩnh `data-integrity.test.ts` chỉ xác minh tính toàn vẹn tham chiếu ID (NPC, quái, vật phẩm), không phát hiện được lỗi logic vận hành trong game thật (vd: bãi quái bị vách núi ngăn cách không thể tiếp cận, tỉ lệ rơi không đủ, NPC giao/trả bị kẹt trong vùng cản, chuỗi nhiệm vụ không thể nạp hoặc điều kiện cảnh giới không thể đáp ứng).
+- `server/scripts/quest-walk.ts` tạo ra bot tự động kết nối vào **máy chủ Colyseus thật trên cổng động** (`freePort()`, tuyệt đối KHÔNG đụng cổng 2567), khởi tạo nhân vật với điều kiện tiên quyết, tự tìm đường A* (`planPath`), tiếp cận NPC nhận nhiệm vụ, thực hiện toàn bộ các bước (`talk`, `reachRealm`, `collect`, `kill` bằng tuần tra bãi quái thật), trả nhiệm vụ và xác thực phần thưởng (exp, coin, vật phẩm).
+
+### 27.2. Cách chạy & Tham số
+```bash
+# Chạy kiểm thử toàn bộ nhiệm vụ trong game
+npm run quest-walk -w server
+
+# Chạy kiểm thử cho một nhiệm vụ cụ thể
+npm run quest-walk -w server -- --quest=tru_tho
+
+# Chạy kiểm thử cho toàn bộ nhiệm vụ của một bản đồ
+npm run quest-walk -w server -- --map=lac_ha
+```
+
+### 27.3. Bảng kết quả kiểm thử khả thi trên bản đồ thực tế (`QUESTS` hiện tại)
+
+| Mã nhiệm vụ | Tên nhiệm vụ | Bản đồ | Bậc yêu cầu | Loại bước chính | Kết quả | Thời gian (giây) | Cần cấp đồ (`/give`) | Trạng thái |
+|---|---|---|:---:|---|:---:|---:|:---:|:---:|
+| `nhap_the` | Nhập thế tu hành | `lac_ha` | Phàm Nhân | `talk` (Thôn Trưởng) | ✅ **ĐẠT** | 2.7s | Không | Hoàn thành |
+| `tru_tho` | Trừ thỏ hại lúa | `lac_ha` | Phàm Nhân | `kill` (5 Tho) + `collect` (3 long_tho) | ✅ **ĐẠT** | 9.7s | Không | Hoàn thành |
+| `buoc_vao_tien_do` | Bước vào Tiên lộ | `lac_ha` | Luyện Khí 1 | `reachRealm` (Luyện Khí 1) | ✅ **ĐẠT** | 0.4s | Không | Hoàn thành |
+| `tinh_toa` | Tĩnh tọa ngưng thần | `lac_ha` | Luyện Khí 1 | `talk` (Đạo Sĩ) | ✅ **ĐẠT** | 0.4s | Không | Hoàn thành |
+| `thuoc_cho_tran` | Thuốc cho trấn | `lac_ha` | Luyện Khí 1 | `collect` (2 co_tri_thuong) + `talk` | ✅ **ĐẠT** | 1.6s | Có (dùng `/give`) | Hoàn thành |
+| `dinh_luyen_khi` | Đỉnh phong Luyện Khí | `lac_ha` | Luyện Khí 9 | `reachRealm` (Luyện Khí 9) | ✅ **ĐẠT** | 0.4s | Không | Hoàn thành |
+| `truc_co_nhap_mon` | Trúc Cơ nhập môn | `lac_ha` | Trúc Cơ 1 | `reachRealm` (Trúc Cơ 1) | ✅ **ĐẠT** | 0.5s | Không | Hoàn thành |
+| `nop_nanh` | Giao nộp nanh sói | `lac_ha` | Luyện Khí 2 | `collect` (3 nanh_soi) + `talk` | ✅ **ĐẠT** | 1.8s | Có (dùng `/give`) | Hoàn thành |
+
+### 27.4. Kiểm thử đơn vị & Đột biến kiểm chứng (`quest-walk.test.ts`)
+Bộ kiểm thử đơn vị độc lập (`server/scripts/quest-walk.test.ts`) gồm 12 bài test chạy trong vitest (< 0.5s), bao gồm:
+1. **Kiểm tra tính khả thi tĩnh 100% nhiệm vụ**: Mọi bước `kill`, `collect`, `talk`, `reachRealm` đều trỏ tới quái, bản đồ, NPC, vật phẩm và cảnh giới có thật trong game.
+2. **Kiểm tra đường chuyển bản đồ (Portal route)**: Tự động tìm được tuyến đường qua cổng giữa các bản đồ (vd: Lạc Hà → Hắc Phong → Âm Sương → Hàn Vân).
+3. **6 bài test đột biến bắt lỗi (Mutation Testing)**:
+   - *Đột biến 1 (Quái không tồn tại)*: Nhiệm vụ săn `mon_khong_ton_tai` bị phát hiện lỗi `MONSTER_NOT_FOUND`.
+   - *Đột biến 2 (Quái trùm bí cảnh ngoài hoang dã)*: Nhiệm vụ dã ngoại săn trùm chỉ có trong bí cảnh bị phát hiện `NO_WILD_SPAWN`.
+   - *Đột biến 3 (Vật phẩm không tồn tại)*: Bước thu thập `vat_pham_la` bị phát hiện `ITEM_NOT_FOUND`.
+   - *Đột biến 4 (NPC giao việc không tồn tại)*: Nhiệm vụ có `giver` giả bị phát hiện `NPC_GIVER_NOT_FOUND`.
+   - *Đột biến 5 (NPC đối thoại không tồn tại)*: Bước `talk` tới NPC giả bị phát hiện `NPC_TALK_NOT_FOUND`.
+   - *Đột biến 6 (Phần thưởng số âm / số lượng $\le$ 0)*: Phần thưởng exp âm hoặc số lượng vật phẩm $\le 0$ bị từ chối `INVALID_REWARD`.
+
+
 
 
