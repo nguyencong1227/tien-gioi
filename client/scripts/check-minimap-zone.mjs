@@ -3,21 +3,22 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 // Kiểm NHÃN TÊN VÙNG dưới bản đồ nhỏ (`#minimap-zone`) trong Chrome THẬT (`?skills=mock`, không cần máy chủ), ở bốn khung nhìn: MỌI tên vùng của `MAPS` (trấn + hoang của cả bốn bản
 // đồ) đặt vào nhãn rồi đo: KHÔNG bị cắt (scrollWidth <= clientWidth), tối đa HAI dòng, chân bản đồ không đè thanh menu HUD bên dưới; màn cảm ứng ẩn chữ gợi ý "M" (không có phím M),
 // máy tính vẫn hiện. Trước đây `max-width: 85px` + một dòng + dấu chấm lửng cắt 7 / 8 tên ở màn cảm ứng ("Hàn Vân T…") và "Vọng Sương Trạm" ở máy tính.
-// Cần client đang chạy (`npm run dev -w client`, cổng của dev B là 5183).
-//   node client/scripts/check-minimap-zone.mjs [--url http://127.0.0.1:5183]
+// Mặc định tự dựng Vite của cây này trên cổng trống (tự tắt khi xong); `--url` để dùng client đang chạy sẵn.
+//   node client/scripts/check-minimap-zone.mjs [--url <client đang chạy sẵn, tuỳ chọn>]
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { resolveClientUrl } from "./client-url.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const argOf = (name, dflt) => {
   const i = process.argv.indexOf(name);
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : dflt;
 };
-const BASE_URL = argOf("--url", "http://127.0.0.1:5183");
+const BASE_URL = await resolveClientUrl(argOf("--url", ""));
 const MAP_TS = `/@fs/${path.resolve(import.meta.dirname, "../../shared/src/map.ts").replace(/^\//, "")}`;
 const CDP_PORT = await freePort();
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-minimap-zone-"));

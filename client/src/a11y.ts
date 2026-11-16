@@ -150,16 +150,20 @@ export function getFocusableElements(container: HTMLElement): HTMLElement[] {
 }
 
 /**
- * Đưa focus vào modal: ưu tiên nút đóng hoặc input/button đầu tiên, fallback vào chính modal
+ * Đưa focus vào modal: ưu tiên nút đóng hoặc input/button đầu tiên, fallback vào chính modal.
+ * LUÔN `preventScroll`: trên điện thoại tấm là vùng cuộn cao hơn màn hình (Cài đặt ~1550 px trên màn 844 px, ngang cả Túi / Bản đồ / Cửa hàng) và nút đóng
+ * nằm giữa / cuối nội dung, nên `focus()` mặc định kéo cuộn tới nút đó: tấm mở ra ĐÃ CUỘN (Cài đặt mở ở scrollTop 426) mất tiêu đề, cử chỉ kéo-để-đóng
+ * (bắt ở tiêu đề) với tay không tới. Phát hiện khi `check-sheet-swipe.mjs` đỏ 28 mục trên `main` (lượt 448).
  */
 export function focusModal(modalEl: HTMLElement | null): void {
   if (!modalEl) return;
+  const opts: FocusOptions = { preventScroll: true };
   const focusables = getFocusableElements(modalEl);
   if (focusables.length > 0) {
     // Ưu tiên input autofocus hoặc input đầu tiên nếu là form
     const autofocusEl = focusables.find((el) => el.hasAttribute("autofocus"));
     if (autofocusEl) {
-      autofocusEl.focus();
+      autofocusEl.focus(opts);
       return;
     }
     // Hoặc nút đóng
@@ -167,12 +171,12 @@ export function focusModal(modalEl: HTMLElement | null): void {
       (el) => el.classList.contains("modal-close") || el.classList.contains("pm-close"),
     );
     if (closeBtn) {
-      closeBtn.focus();
+      closeBtn.focus(opts);
       return;
     }
-    focusables[0].focus();
+    focusables[0].focus(opts);
   } else {
-    modalEl.focus();
+    modalEl.focus(opts);
   }
 }
 

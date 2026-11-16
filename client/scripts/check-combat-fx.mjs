@@ -1,8 +1,7 @@
 import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 /* global console, setTimeout, fetch, process, Buffer */
-// Kiểm hiệu ứng chiến đấu (hạt, rung, chữ bay, hồi máu, quái tan) trong Chrome thật (M5.2 #329). Cần client đang chạy
-// (`npm run dev -w client`, cổng của dev B là 5183). Dùng chế độ mock (?duel=mock&debug=1) nên KHÔNG cần server.
-//   node client/scripts/check-combat-fx.mjs [--url http://127.0.0.1:5183] [--shot docs/screenshots/combat-fx.webp]
+// Kiểm hiệu ứng chiến đấu (hạt, rung, chữ bay, hồi máu, quái tan) trong Chrome thật (M5.2 #329). Mặc định tự dựng Vite của cây này trên cổng trống (tự tắt khi xong); `--url` để dùng client đang chạy sẵn. Dùng chế độ mock (?duel=mock&debug=1) nên KHÔNG cần server.
+//   node client/scripts/check-combat-fx.mjs [--url <client đang chạy sẵn, tuỳ chọn>] [--shot docs/screenshots/combat-fx.webp]
 // Đo số HẠT SỐNG THẬT của Phaser (không đọc sổ ngân sách) và trạng thái rung của camera.
 import fs from "node:fs";
 import os from "node:os";
@@ -10,10 +9,11 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { resolveClientUrl } from "./client-url.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const i = process.argv.indexOf("--url");
-const BASE_URL = i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : "http://127.0.0.1:5183";
+const BASE_URL = await resolveClientUrl(i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : "");
 const CDP_PORT = await freePort();
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-combat-fx-"));
 const chrome = spawn(
@@ -102,11 +102,11 @@ try {
       await evalJs("Boolean(window.__scene && window.__scene.me && window.__scene.me())"),
     );
   }
-  // Báo RÕ khi không có client ở địa chỉ này (mặc định là cổng dev của B; cây khác truyền --url): trước đây script đi tiếp và chết
+  // Báo RÕ khi cảnh không lên ở địa chỉ này (không --url: Vite tự dựng của cây này; có --url: client của người khác có thể là bản cũ): trước đây script đi tiếp và chết
   // ở lần dùng `window.__scene` đầu tiên bằng "Cannot read properties of undefined (reading 'me')" (nit của A ở #450)
   if (!sceneReady)
     throw new Error(
-      `Cảnh không sẵn sàng sau 12 giây ở ${BASE_URL}: cần client đang chạy (\`npm run dev -w client\`; cổng dev của B là 5183, cây khác truyền --url http://127.0.0.1:<cổng>) và chế độ mock ?duel=mock&debug=1`,
+      `Cảnh không sẵn sàng sau 12 giây ở ${BASE_URL}: client ở địa chỉ này là bản cũ / không có chế độ mock ?duel=mock&debug=1? Bỏ --url để script tự dựng Vite của cây này.`,
     );
   await sleep(600);
 

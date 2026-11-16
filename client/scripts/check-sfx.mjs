@@ -4,20 +4,23 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 // để ĐẾM dao động / nguồn nhiễu được tạo, rồi bơm đúng các tin của máy chủ qua `window.__scene` (như leak-test): fx `cast` của mình (hệ + hình khác nhau cho số thành phần khác nhau: vòng nổ nhiều hơn tia),
 // fx `cast` của người khác ngoài tầm nhìn (im) / trong tầm nhìn (có tiếng), fx `bolt` của quái, tin `status` (trạng thái MỚI có tiếng, làm mới trạng thái đã có thì im, loại lợi cũng có),
 // chống dồn (hai chiêu cùng lúc chỉ kêu một lần), và ổn định (không lỗi JS). Mở khoá âm bằng PHÍM THẬT (chính sách autoplay: Audio chỉ mở sau cử chỉ người dùng).
-// Có thể chạy trên máy không loa: Web Audio vẫn chạy (không cần thiết bị ra). Cần client đang chạy (`npm run dev -w client`, cổng của dev B là 5183).
-//   node client/scripts/check-sfx.mjs [--url http://127.0.0.1:5183]
+// Có thể chạy trên máy không loa: Web Audio vẫn chạy (không cần thiết bị ra). Mặc định tự dựng Vite của cây này trên cổng trống (tự tắt khi xong); `--url` để dùng client đang chạy sẵn.
+//   node client/scripts/check-sfx.mjs [--url <client đang chạy sẵn, tuỳ chọn>]
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { resolveClientUrl } from "./client-url.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const BASE_URL = (() => {
-  const i = process.argv.indexOf("--url");
-  return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : "http://127.0.0.1:5183";
-})();
+const BASE_URL = await resolveClientUrl(
+  (() => {
+    const i = process.argv.indexOf("--url");
+    return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : "";
+  })(),
+);
 const CDP_PORT = await freePort();
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-sfx-"));
 const chrome = spawn(

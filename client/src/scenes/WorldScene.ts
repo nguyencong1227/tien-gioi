@@ -2,7 +2,15 @@ import { getDisplay } from "../gfx/display";
 import { welcomeText } from "../welcome";
 import { createFxSystem, type FxSystem } from "../gfx/fx/fx";
 import { planCastFx } from "../gfx/fx/cast-fx";
-import { drawPips, pipsLabel, pipsOf } from "../monster-status";
+import {
+  PIP_ROW_Y,
+  PIP_ROW_Y_BOSS,
+  drawPips,
+  pipRowTop,
+  pipsLabel,
+  pipsOf,
+  targetLabelRise,
+} from "../monster-status";
 import { TelegraphLayer } from "../gfx/fx/telegraph-layer";
 import { recipeIds } from "../gfx/fx/recipes";
 import {
@@ -280,6 +288,8 @@ interface Entity {
   statusG?: Phaser.GameObjects.Graphics;
   lastFx?: number;
   pipCount?: number;
+  /** Mép trên của hàng chấm (px phía trên tâm quái; 0 = không có chấm): nhãn mục tiêu khoá nâng lên trên đó (`targetLabelRise`) */
+  pipTop?: number;
   pipText?: string;
   /** Số lần vẽ lại hàng chấm (script kiểm: chỉ tăng khi mặt nạ đổi) */
   pipDraws?: number;
@@ -1700,7 +1710,9 @@ export class WorldScene extends Phaser.Scene {
         pct === null ? this.targetName(id) : `${this.targetName(id)} · ${pct}%`,
       );
     }
-    this.targetInfo.setPosition(e.root.x, e.root.y - ringR - 6).setVisible(true);
+    this.targetInfo
+      .setPosition(e.root.x, e.root.y - targetLabelRise(ringR, e.pipTop ?? 0))
+      .setVisible(true);
   }
 
   /** Tin `netShield` của máy chủ (chỉ gửi chủ): bắt đầu đếm ngược hộ thể theo đồng hồ client. Tin hỏng bị bỏ. */
@@ -3687,15 +3699,17 @@ export class WorldScene extends Phaser.Scene {
     e.pipCount = pips.length;
     e.pipText = pipsLabel(pips);
     if (pips.length === 0) {
+      e.pipTop = 0;
       e.statusG?.clear().setVisible(false);
       return;
     }
+    e.pipTop = pipRowTop(radius, boss);
     if (!e.statusG) {
       e.statusG = this.add.graphics();
       e.root.add(e.statusG);
     }
     e.statusG.setVisible(true);
-    drawPips(e.statusG, pips, -radius - (boss ? 36 : 21));
+    drawPips(e.statusG, pips, -radius - (boss ? PIP_ROW_Y_BOSS : PIP_ROW_Y));
     e.pipDraws = (e.pipDraws ?? 0) + 1;
   }
 

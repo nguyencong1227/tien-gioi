@@ -5,21 +5,22 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 //  - có hạt TUYẾT sống (hạt tint trắng ngà 0xf2f8ff, rơi xuống) mà cảnh mặc định không có; không có hạt cánh hoa (kiểu của Lạc Hà) khi đã ép kiểu băng nguyên;
 //  - màu trung bình vùng giữa cảnh LẠNH hơn hẳn bản mặc định (xanh - đỏ cao hơn >= 8 mức);
 //  - bỏ `?debug`, `?style=` không đổi được diện mạo (bản phát hành); id lạ (`constructor`) bị bỏ qua, 0 lỗi JS.
-// Có thể chụp ảnh: `--shots <thư mục>`. Cần client đang chạy (`npm run dev -w client`, cổng của dev B là 5183).
-//   node client/scripts/check-han-van-style.mjs [--url http://127.0.0.1:5183] [--shots /tmp/tg-b-shots]
+// Có thể chụp ảnh: `--shots <thư mục>`. Mặc định tự dựng Vite của cây này trên cổng trống (tự tắt khi xong); `--url` để dùng client đang chạy sẵn.
+//   node client/scripts/check-han-van-style.mjs [--url <client đang chạy sẵn, tuỳ chọn>] [--shots /tmp/tg-b-shots]
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { resolveClientUrl } from "./client-url.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const argOf = (name, dflt) => {
   const i = process.argv.indexOf(name);
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : dflt;
 };
-const BASE_URL = argOf("--url", "http://127.0.0.1:5183");
+const BASE_URL = await resolveClientUrl(argOf("--url", ""));
 const SHOTS = argOf("--shots", "");
 const SNOW_TINT = 0xf2f8ff;
 const PETAL_TINT = 0xf6c5d4;

@@ -4,21 +4,22 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 // Ở điện thoại ô túi chỉ ~42-68 px mà chữ nội dung >= 14 px, nên tên chỉ còn 2-3 chữ ("Hồi…", "Th…") và nhiều món cắt giống hệt nhau (đo cả 69 món: 68 / 69 tên bị cắt ở 390 x 844):
 //  - điện thoại DỌC (`data-form="phone"` + `data-orient="portrait"`): tên ô BỊ ẨN (không phải cắt dở), biểu tượng >= 32 px, ô >= 44 px, `aria-label` vẫn mở đầu bằng tên ĐẦY ĐỦ, chạm ô thì bảng chi tiết ghi tên đầy đủ;
 //  - máy tính, máy tính bảng và điện thoại NGANG (ô 80 px, bảng chi tiết nằm dưới màn hình): tên vẫn hiện, `aria-label` đủ tên, chọn ô thì bảng chi tiết ghi tên đầy đủ.
-// Có thể chụp ảnh: `--shots <thư mục>`. Cần client đang chạy (`npm run dev -w client`, cổng của dev B là 5183).
-//   node client/scripts/check-bag-names.mjs [--url http://127.0.0.1:5183] [--shots /tmp/tg-b-shots]
+// Có thể chụp ảnh: `--shots <thư mục>`. Mặc định tự dựng Vite của cây này trên cổng trống (tự tắt khi xong); `--url` để dùng client đang chạy sẵn.
+//   node client/scripts/check-bag-names.mjs [--url <client đang chạy sẵn, tuỳ chọn>] [--shots /tmp/tg-b-shots]
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { resolveClientUrl } from "./client-url.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const argOf = (name, dflt) => {
   const i = process.argv.indexOf(name);
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : dflt;
 };
-const BASE_URL = argOf("--url", "http://127.0.0.1:5183");
+const BASE_URL = await resolveClientUrl(argOf("--url", ""));
 const SHOTS = argOf("--shots", "");
 const CDP_PORT = await freePort();
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-bag-names-"));

@@ -1,8 +1,8 @@
 import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 /* global console, setTimeout, fetch, Buffer, process */
 // Chụp ảnh + khẳng định bố cục cho tấm chung (.sheet, M5.1 #326) ở nhiều khung nhìn.
-// Cần client đang chạy (npm run dev -w client hoặc vite preview). Dùng chế độ mock (?duel=mock&debug=1) nên KHÔNG cần server.
-//   node client/scripts/snap-sheet.mjs [--url http://127.0.0.1:5183] [--out docs/screenshots] [--no-shot]
+// Mặc định tự dựng Vite của cây này trên cổng trống (tự tắt khi xong); `--url` để dùng client đang chạy sẵn (kể cả `vite preview`). Dùng chế độ mock (?duel=mock&debug=1) nên KHÔNG cần server.
+//   node client/scripts/snap-sheet.mjs [--url <client đang chạy sẵn, tuỳ chọn>] [--out docs/screenshots] [--no-shot]
 // Thuộc tính <html data-form|orient> và --vh do gfx/display.ts (A, #322) đặt; script KHẲNG ĐỊNH chúng đúng với từng khung nhìn.
 import fs from "node:fs";
 import os from "node:os";
@@ -11,6 +11,7 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { resolveClientUrl } from "./client-url.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -19,7 +20,7 @@ const arg = (name, def) => {
   const i = process.argv.indexOf(`--${name}`);
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : def;
 };
-const BASE_URL = arg("url", "http://127.0.0.1:5183");
+const BASE_URL = await resolveClientUrl(arg("url", ""));
 const OUT_DIR = path.resolve(REPO, arg("out", "docs/screenshots"));
 const NO_SHOT = process.argv.includes("--no-shot");
 

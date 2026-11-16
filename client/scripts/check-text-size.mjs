@@ -2,19 +2,20 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 /* global console, setTimeout, fetch, process */
 // Cổng kiểm cỡ chữ (M5.1 #326, docs/THIET_KE_GIAO_DIEN_DO_HOA.md mục 4.2 điều 2) trong Chrome thật: trên điện thoại chữ NỘI DUNG (bảng, hộp thoại)
 // >= 14 px và nhãn HUD >= 12 px, kể cả khi chọn cỡ chữ Nhỏ; trên máy tính cỡ chữ gốc giữ nguyên ở Vừa và co giãn theo Nhỏ / Lớn; không tràn
-// ngang ở cỡ Lớn. Đo `font-size` TÍNH RA của mọi nút văn bản đang hiện. Cần client đang chạy (`npm run dev -w client`, cổng của dev B là 5183).
+// ngang ở cỡ Lớn. Đo `font-size` TÍNH RA của mọi nút văn bản đang hiện. Mặc định tự dựng Vite của cây này trên cổng trống (tự tắt khi xong); `--url` để dùng client đang chạy sẵn.
 // Dùng chế độ mock (?duel=mock&debug=1) nên KHÔNG cần server.
-//   node client/scripts/check-text-size.mjs [--url http://127.0.0.1:5183]
+//   node client/scripts/check-text-size.mjs [--url <client đang chạy sẵn, tuỳ chọn>]
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { resolveClientUrl } from "./client-url.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const i = process.argv.indexOf("--url");
-const BASE_URL = i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : "http://127.0.0.1:5183";
+const BASE_URL = await resolveClientUrl(i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : "");
 const CDP_PORT = await freePort();
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-text-"));
 const chrome = spawn(

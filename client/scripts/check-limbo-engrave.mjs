@@ -4,21 +4,22 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 // Khắc chân linh chỉ hiện MỘT lần ở Tam Sinh Thạch; danh sách theo `LimboMsg.engravable`, mặc định chọn sẵn chiêu đã khắc, không vượt `engraveSlotsOf`;
 // tin `rebirth` chỉ kèm `engrave` khi người chơi ĐỔI tập chiêu (vắng = giữ nguyên, `[]` = xoá hết); mua thêm nấc giữ lựa chọn; ca chưa mở / chưa học;
 // bàn phím (Enter trên ô tích); bấm đầu thai hai lần chỉ gửi một tin; không tràn ngang ở 360x640, mục bấm >= 44 px. Có thể chụp ảnh: `--shots <thư mục>`.
-// Cần client đang chạy (`npm run dev -w client`, cổng của dev B là 5183).
-//   node client/scripts/check-limbo-engrave.mjs [--url http://127.0.0.1:5183] [--shots /tmp/tg-b-shots]
+// Mặc định tự dựng Vite của cây này trên cổng trống (tự tắt khi xong); `--url` để dùng client đang chạy sẵn.
+//   node client/scripts/check-limbo-engrave.mjs [--url <client đang chạy sẵn, tuỳ chọn>] [--shots /tmp/tg-b-shots]
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { resolveClientUrl } from "./client-url.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const argOf = (name, dflt) => {
   const i = process.argv.indexOf(name);
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : dflt;
 };
-const BASE_URL = argOf("--url", "http://127.0.0.1:5183");
+const BASE_URL = await resolveClientUrl(argOf("--url", ""));
 const SHOTS = argOf("--shots", "");
 const CDP_PORT = await freePort();
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-limbo-engrave-"));
@@ -102,10 +103,16 @@ try {
       mobile: false,
     });
     await send("Page.navigate", { url: `${BASE_URL}/?duel=mock&debug=1` });
-    for (let k = 0; k < 50; k++) {
+    let ready = false;
+    for (let k = 0; k < 50 && !ready; k++) {
       await sleep(300);
-      if (await evalJs("typeof window.__debugLimbo === 'function' && Boolean(window.__ui)")) break;
+      ready = await evalJs("typeof window.__debugLimbo === 'function' && Boolean(window.__ui)");
     }
+    // Báo RÕ thay vì chết ở `window.__debugLimbo is not a function` (nit của A, lượt 447): `--url` tới client của cây khác / bản cũ
+    if (!ready)
+      throw new Error(
+        `Không có window.__debugLimbo / __ui sau 15 giây ở ${BASE_URL}: client ở địa chỉ này là bản cũ, hay không chạy ?duel=mock&debug=1? Bỏ --url để script tự dựng Vite của cây này.`,
+      );
     await sleep(500);
   };
   /** Mở màn Hoàng Tuyền với dữ liệu tuỳ ý (null = bản mẫu: nấc khắc 1, đã khắc ung_trao, khắc được 3 chiêu); xoá nhật ký các tin đầu thai */
