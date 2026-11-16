@@ -200,18 +200,21 @@ export interface Result {
   hitCasts: number; // số đòn mà khí huyết bot giảm quanh lúc đáp
   hurt: { at: number; ability: string; x: number; y: number }[]; // lần mất khí huyết (bot né)
   byShape: Record<string, { casts: number; hits: number }>;
+  /** Số lần mỗi chiêu (id) được vận và bot đứng ở vùng của nó (để biết chiêu nào đã được kiểm, vì `cond` có thể khiến chiêu không bao giờ được chọn). */
+  byAbility: Record<string, number>;
 }
 
 /**
  * Chạy `def` `simMs` ms mô phỏng với một bot. `opts.phase` (mặc định 0) đặt khí huyết trùm ngay dưới mốc vào giai đoạn đó để kiểm bộ chiêu của TỪNG giai đoạn.
- * Trả số đòn đã đáp / trúng bot theo hình và danh sách lần bot mất khí huyết (bot né phải rỗng).
+ * `opts.roam`: sau mỗi đòn bot được chuyển tới chỗ NGẪU NHIÊN (30-450 px quanh trùm, ngoài vũng cũ) để trùm chọn chiêu theo mọi khoảng cách (`cond` `minDist` / `maxDist`: chiêu
+ * cận chiến như nón chỉ được dùng khi người ở gần, chiêu lao khi ở xa); bắt buộc khi kiểm dữ liệu thật có `cond`. Trả số đòn đã đáp / trúng bot theo hình và danh sách lần bot mất khí huyết (bot né phải rỗng).
  */
 export function runDodgeBot(
   defSeed: number,
   def: BossDef,
   mode: "dodge" | "stand",
   simMs: number,
-  opts: { phase?: number } = {},
+  opts: { phase?: number; roam?: boolean } = {},
 ): Result {
   const h = makeWorld(openArena());
   const { w } = h;
@@ -241,11 +244,17 @@ export function runDodgeBot(
   }
   const threats: Threat[] = [];
   let plan: { tx: number; ty: number; moveAt: number } | null = null;
+  let roamAt = Infinity; // mốc chuyển bot tới chỗ mới (sau khi đòn gần nhất đã đáp)
+  let roamSeed = (defSeed * 2654435761) >>> 0;
+  const roamRnd = () => {
+    roamSeed = (Math.imul(roamSeed, 1664525) + 1013904223) >>> 0;
+    return roamSeed / 4294967296;
+  };
   let seen = 0;
   let cur: BossAbility | null = null;
   let warnsInCast = 0;
   let lastHp = p.hp;
-  const out: Result = { casts: 0, hitCasts: 0, hurt: [], byShape: {} };
+  const out: Result = { casts: 0, hitCasts: 0, hurt: [], byShape: {}, byAbility: {} };
   const tally = (shape: string, hit: boolean) => {
     const b = (out.byShape[shape] ??= { casts: 0, hits: 0 });
     b.casts++;
@@ -314,6 +323,7 @@ export function runDodgeBot(
         }
         p.x = spotPlan.sx;
         p.y = spotPlan.sy;
+        out.byAbility[cur.id] = (out.byAbility[cur.id] ?? 0) + 1;
         threats.push({
           hitAt: w.now + fx.ms,
           judgeAt: w.now + fx.ms + (s.t === "pool" ? s.tickMs : 0) + 2 * TICK_MS,
@@ -321,10 +331,26 @@ export function runDodgeBot(
           judged: false,
         });
         if (s.t === "pool") hazards.push({ hit: th.hit, until: w.now + fx.ms + s.ttlMs });
+        roamAt = w.now + fx.ms + (s.t === "pool" ? s.tickMs : 0) + 3 * TICK_MS;
         plan =
           mode === "dodge"
             ? { tx: spotPlan.tx, ty: spotPlan.ty, moveAt: w.now + FAIR_REFLEX_MS }
             : null;
+      }
+    }
+    // đi dạo: sau đòn gần nhất (bot đã né xong), chuyển tới chỗ ngẫu nhiên để lần chọn chiêu kế thấy khoảng cách khác
+    if (opts.roam && !plan && w.now >= roamAt) {
+      roamAt = Infinity;
+      const live = hazards.filter((hz) => hz.until > w.now);
+      for (let k = 0; k < 20; k++) {
+        const a2 = roamRnd() * 2 * Math.PI;
+        const r2 = 30 + roamRnd() * 420;
+        const x = mon.m.x + Math.cos(a2) * r2;
+        const y = mon.m.y + Math.sin(a2) * r2;
+        if (live.some((hz) => hz.hit(x, y)) || w.map.inSafe(x, y, 40)) continue;
+        p.x = x;
+        p.y = y;
+        break;
       }
     }
     // bot chạy mỗi tick một bước, sau khi phản xạ xong

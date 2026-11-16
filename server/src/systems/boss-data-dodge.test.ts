@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { BOSSES, bossViolations } from "@tien-gioi/shared";
 import { runDodgeBot } from "./boss-dodge-bot";
 
-const SEEDS = [1, 2, 3, 4, 5, 6];
+const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8];
 const SIM_MS = 40_000;
 
 describe("bot né hoàn hảo trên dữ liệu trùm THẬT (BOSSES)", () => {
@@ -18,16 +18,27 @@ describe("bot né hoàn hảo trên dữ liệu trùm THẬT (BOSSES)", () => {
     for (let ph = 0; ph < def.phases.length; ph++) {
       it(`${def.kind} giai đoạn ${ph} (${def.phases[ph]!.id}): bot né KHÔNG bao giờ trúng (${SEEDS.length} seed x ${SIM_MS / 1000} giây)`, () => {
         let casts = 0;
+        const seen: Record<string, number> = {};
         const fails: string[] = [];
         for (const seed of SEEDS) {
-          const r = runDodgeBot(seed, def, "dodge", SIM_MS, { phase: ph });
+          const r = runDodgeBot(seed, def, "dodge", SIM_MS, { phase: ph, roam: true });
           casts += r.casts;
+          for (const [id, n] of Object.entries(r.byAbility)) seen[id] = (seen[id] ?? 0) + n;
           if (r.hurt.length > 0)
             fails.push(
               `${def.kind} gđ ${ph} seed ${seed}: bot né bị trúng ${r.hurt.length} lần, đầu tiên ở chiêu ${r.hurt[0]!.ability} lúc +${r.hurt[0]!.at - 10_000} ms`,
             );
         }
         expect(fails, fails.join("\n")).toEqual([]);
+        // MỌI chiêu sát thương của giai đoạn phải thật sự được vận và kiểm (`cond` không được khiến chiêu nào không bao giờ chạm tới)
+        for (const id of def.phases[ph]!.abilities) {
+          const a = def.abilities.find((q) => q.id === id)!;
+          if (a.shape.t === "summon" || a.shape.t === "buff") continue;
+          expect(
+            seen[id] ?? 0,
+            `${def.kind} gđ ${ph}: chiêu ${id} không được kiểm lần nào`,
+          ).toBeGreaterThan(0);
+        }
         // chiêu của giai đoạn này chỉ có summon / buff thì không có đòn nào để né: không đòi số đòn
         const dmg = def.phases[ph]!.abilities.some((id) => {
           const a = def.abilities.find((q) => q.id === id)!;
@@ -48,7 +59,7 @@ describe("bot né hoàn hảo trên dữ liệu trùm THẬT (BOSSES)", () => {
         let casts = 0;
         let hits = 0;
         for (const seed of SEEDS.slice(0, 3)) {
-          const r = runDodgeBot(seed, def, "stand", 20_000, { phase: ph });
+          const r = runDodgeBot(seed, def, "stand", 20_000, { phase: ph, roam: true });
           casts += r.casts;
           hits += r.hitCasts;
         }
