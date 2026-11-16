@@ -966,8 +966,17 @@ function purgeStaleSectQuests(w: World, sid: string, sect: Sect): boolean {
     return tpl === undefined || slots.includes(tpl);
   });
   if (keep.length === c.quests.active.length) return false;
+  const gone = c.quests.active.length - keep.length;
   c.quests.active = keep;
   sendQuests(w, sid);
+  // Báo rõ vì sao nhiệm vụ biến mất khỏi sổ (không để người chơi tưởng mất lỗi)
+  w.events.toast(sid, {
+    text:
+      gone === 1
+        ? "Nhiệm vụ tông môn hôm trước đã hết hạn, không còn trong việc hôm nay."
+        : `${gone} nhiệm vụ tông môn hôm trước đã hết hạn, không còn trong việc hôm nay.`,
+    tone: "info",
+  });
   return true;
 }
 
