@@ -68,28 +68,46 @@ describe("sanitizeHallView: không tin tin nhắn của máy chủ", () => {
     expect(c.buff).toEqual({ exp: 1.1, drop: 1, regen: 1 });
   });
 
-  it("nhiệm vụ / món LẠ bị bỏ (kể cả constructor / __proto__), trạng thái và lý do khoá lạ thì bỏ mục", () => {
-    const v = clone(sample(3)) as unknown as { quests: unknown[]; shop: unknown[] };
-    const q0 = v.quests[0] as Record<string, unknown>;
-    const s0 = v.shop[0] as Record<string, unknown>;
-    v.quests = [
-      ...v.quests,
+  it("nhiệm vụ LẠ bị bỏ (kể cả constructor / __proto__); trạng thái lạ và mục không phải object thì bỏ mục", () => {
+    const base = sample(3);
+    const q0 = clone(base.quests[0]!) as unknown as Record<string, unknown>;
+    for (const junk of [
       { ...q0, questId: "constructor" },
       { ...q0, questId: "__proto__" },
       { ...q0, questId: "st_khong_co.t0" },
+      { ...q0, questId: 5 },
       { ...q0, state: "hacked" },
       null,
       7,
-    ];
-    v.shop = [
-      ...v.shop,
+    ]) {
+      // MỘT mục rác đứng ĐẦU (trong giới hạn 6 mục), rồi các mục thật: chỉ các mục thật được giữ
+      const v = clone(base) as unknown as { quests: unknown[] };
+      v.quests = [junk, ...v.quests];
+      expect(sanitizeHallView(v)!.quests, JSON.stringify(junk)).toEqual(base.quests);
+    }
+  });
+
+  it("món LẠ bị bỏ (kể cả constructor), lý do khoá lạ thì bỏ mục", () => {
+    const base = sample(3);
+    const s0 = clone(base.shop[0]!) as unknown as Record<string, unknown>;
+    for (const junk of [
       { ...s0, itemId: "constructor" },
       { ...s0, itemId: "khong_co_mon_nay" },
+      { ...s0, itemId: 5 },
       { ...s0, locked: "bi_an" },
-    ];
-    const c = sanitizeHallView(v)!;
-    expect(c.quests).toEqual(sample(3).quests);
-    expect(c.shop).toEqual(sample(3).shop);
+      null,
+    ]) {
+      const v = clone(base) as unknown as { shop: unknown[] };
+      v.shop = [junk, ...v.shop];
+      expect(sanitizeHallView(v)!.shop, JSON.stringify(junk)).toEqual(base.shop);
+    }
+  });
+
+  it("chỉ giữ tối đa 6 nhiệm vụ (máy chủ gửi 3: thừa là rác)", () => {
+    const base = sample(3);
+    const v = clone(base) as unknown as { quests: unknown[] };
+    v.quests = [...v.quests, ...v.quests, ...v.quests, ...v.quests];
+    expect(sanitizeHallView(v)!.quests.length).toBeLessThanOrEqual(6);
   });
 
   it("chuỗi bị cắt độ dài và bỏ ký tự điều khiển", () => {
