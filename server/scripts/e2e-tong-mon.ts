@@ -211,6 +211,12 @@ async function main() {
       await tab.waitFor(visible("sect-modal"), "bảng Tông môn");
     };
     const clickOn = async (tab: Tab, name: string) => {
+      // Cảnh chỉ dựng thực thể của người khác ở khung hình KẾ (`syncPlayers` trong vòng update): state đã có người đó chưa chắc đã có sprite
+      // (chập chờn ~1/4 lần ở bước 3: `find` trả `undefined` -> "undefined is not iterable"). Chờ sprite có thật rồi mới tính toạ độ.
+      await tab.waitFor(
+        `(() => { const s = window.__scene; return [...s.players.entries()].some(([id]) => s.state.players.get(id)?.name === ${JSON.stringify(name)}); })()`,
+        `thực thể "${name}" trong cảnh`,
+      );
       const pos = await tab.ev(
         `(() => { const s = window.__scene; const cam = s.cameras.main; const [, e] = [...s.players.entries()].find(([id]) => s.state.players.get(id)?.name === ${JSON.stringify(name)}); return { x: (e.root.x - cam.worldView.x) * cam.zoom, y: (e.root.y - cam.worldView.y) * cam.zoom }; })()`,
       );

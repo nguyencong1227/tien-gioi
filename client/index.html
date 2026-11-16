@@ -1458,6 +1458,7 @@
             </button>
             <button type="button" id="sect-tab-btn-members" class="sect-tab">Thành viên</button>
             <button type="button" id="sect-tab-btn-treasury" class="sect-tab">Kho tông môn</button>
+            <button type="button" id="sect-tab-btn-vault" class="sect-tab">Kho đồ</button>
           </div>
 
           <!-- Tab 1: Tổng quan -->
@@ -1598,6 +1599,50 @@
             <div class="sect-logs-box">
               <h4>Lịch sử biến động quỹ</h4>
               <div id="sect-logs-list" class="sect-logs-list"></div>
+            </div>
+          </div>
+
+          <!-- Tab 4: Kho đồ (mục 27, K4, #788): lưới kho + túi, góp / rút, hạn mức, sổ, chỉnh hạn mức (Tông chủ) -->
+          <div id="sect-tab-vault" class="sect-tab-content" hidden>
+            <p id="sect-vault-draw" class="sect-vault-draw" role="status"></p>
+            <h4>Kho đồ tông môn <small id="sect-vault-count"></small></h4>
+            <div
+              id="sect-vault-grid"
+              class="sect-vault-grid"
+              role="grid"
+              aria-label="Kho đồ tông môn"
+            ></div>
+            <h4>Túi đồ của ngươi <small>(chọn món để góp)</small></h4>
+            <div
+              id="sect-vault-bag"
+              class="sect-vault-grid"
+              role="grid"
+              aria-label="Túi đồ của ngươi"
+            ></div>
+            <div id="sect-vault-actions" class="sect-vault-actions">
+              <div id="sect-vault-sel" class="sect-vault-sel" role="status">Chưa chọn món nào.</div>
+              <div id="sect-vault-qty-box" class="sect-vault-qty" hidden>
+                <button type="button" id="sect-vault-minus" aria-label="Bớt một">-</button>
+                <b id="sect-vault-qty" aria-live="polite">1</b>
+                <button type="button" id="sect-vault-plus" aria-label="Thêm một">+</button>
+              </div>
+              <button type="button" id="sect-vault-act" class="sect-primary-btn" disabled>
+                Chọn món
+              </button>
+              <p id="sect-vault-why" class="sect-vault-why" role="status"></p>
+            </div>
+            <form id="sect-vault-policy" class="sect-vault-policy" hidden>
+              <label for="sect-vault-policy-sel">Lượt rút kho đồ mỗi ngày của Đệ tử</label>
+              <div class="sect-input-row">
+                <select id="sect-vault-policy-sel"></select>
+                <button type="submit" id="sect-vault-policy-save" class="sect-small-btn">
+                  Lưu
+                </button>
+              </div>
+            </form>
+            <div class="sect-logs-box">
+              <h4>Sổ kho đồ</h4>
+              <div id="sect-vault-log" class="sect-logs-list"></div>
             </div>
           </div>
         </div>

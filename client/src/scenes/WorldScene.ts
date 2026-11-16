@@ -135,6 +135,7 @@ import {
   type DuelChallengeCheck,
   SECT_MSG,
   type SectMsg,
+  type SectVaultMsg,
   type SectPresenceMsg,
   type SectInvitedMsg,
 } from "@tien-gioi/shared";
@@ -695,6 +696,12 @@ export class WorldScene extends Phaser.Scene {
         !this.isReconnecting && this.room.send(SECT_MSG.deposit, { amount }),
       onSectWithdraw: (amount) =>
         !this.isReconnecting && this.room.send(SECT_MSG.withdraw, { amount }),
+      onSectVaultDeposit: (msg) =>
+        !this.isReconnecting && this.room.send(SECT_MSG.vaultDeposit, msg),
+      onSectVaultWithdraw: (msg) =>
+        !this.isReconnecting && this.room.send(SECT_MSG.vaultWithdraw, msg),
+      onSectVaultPolicy: (drawPerDay) =>
+        !this.isReconnecting && this.room.send(SECT_MSG.vaultPolicy, { drawPerDay }),
     });
 
     this.setupInput();
@@ -2299,6 +2306,7 @@ export class WorldScene extends Phaser.Scene {
       ui.onDuelEnd(m);
     });
     reg(SECT_MSG.snapshot, (m: SectMsg) => ui.onSect(m));
+    reg(SECT_MSG.vault, (m: SectVaultMsg) => ui.onSectVault(m));
     reg(SECT_MSG.presence, (m: SectPresenceMsg) => ui.onSectPresence(m));
     reg(SECT_MSG.invited, (m: SectInvitedMsg) => ui.onSectInvited(m));
     replayEarlyMessages(this.room, handlers);
