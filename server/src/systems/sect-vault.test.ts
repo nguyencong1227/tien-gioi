@@ -259,7 +259,7 @@ describe("góp đồ", () => {
     const c = lh.w.ctrl.get(C)!;
     for (const f of [
       () => (c.travelling = true),
-      () => ((c.travelling = false), (c.limbo = true)),
+      () => ((c.travelling = false), (c.limbo = {} as never)),
     ]) {
       f();
       await sectVaultDeposit(lh.w, C, { slot: slotOf(lh, C, MAT.id), qty: 1 });
@@ -474,7 +474,7 @@ describe("rút đồ", () => {
     const orig = svc.vaultWithdraw.bind(svc);
     svc.vaultWithdraw = async (...a: Parameters<typeof orig>) => {
       const r = await orig(...a);
-      c.limbo = true;
+      c.limbo = {} as never;
       return r;
     };
     await sectVaultWithdraw(lh.w, C, slot0(4));
