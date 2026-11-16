@@ -1328,6 +1328,8 @@ export interface ActiveWarnZone {
   w: number;
   angle: number;
   arc: number;
+  /** Bán kính trong (px), CHỈ dùng với circle (vành khuyên của trùm, mục 42 #876) */
+  r0?: number;
   expiresAt: number;
   /** Bot có nằm trong vùng nguy hiểm của đòn này lúc nhận cảnh báo hay không */
   targeted?: boolean;
@@ -1350,6 +1352,7 @@ export function parseWarnZoneFromFx(
     const w = typeof msg.w === "number" && msg.w > 0 ? msg.w : 56;
     const angle = typeof msg.angle === "number" ? msg.angle : 0;
     const arc = typeof msg.arc === "number" ? msg.arc : Math.PI / 2;
+    const r0 = typeof msg.r0 === "number" && msg.r0 > 0 ? msg.r0 : undefined;
     const ms = typeof msg.ms === "number" && msg.ms > 0 ? msg.ms : 800;
     return {
       shape: msg.shape,
@@ -1359,6 +1362,7 @@ export function parseWarnZoneFromFx(
       w,
       angle,
       arc,
+      r0,
       expiresAt: now + ms,
     };
   }
@@ -1468,8 +1472,18 @@ export function isPointInWarnZone(
     return segDist(px, py, ax, ay, bx, by).dist <= reach;
   }
   if (warn.shape === "circle") {
+    const d = Math.hypot(px - warn.x, py - warn.y);
+    if (warn.r0 !== undefined && warn.r0 > 0) {
+      // Vành khuyên (donut/ring zone, trùm mục 42): nguy hiểm trong [r0 - reach, r + reach]
+      // Nếu d < r0 - reach: an toàn trong vùng lõi tâm
+      // Nếu d > r + reach: an toàn ngoài rìa
+      const reach = PLAYER_RADIUS + buffer;
+      const innerSafe = Math.max(0, warn.r0 - reach);
+      const outerReach = warn.r + reach;
+      return d >= innerSafe && d <= outerReach;
+    }
     const reach = warn.r + PLAYER_RADIUS + buffer;
-    return Math.hypot(px - warn.x, py - warn.y) <= reach;
+    return d <= reach;
   }
   if (warn.shape === "cone") {
     const d = Math.hypot(px - warn.x, py - warn.y);
@@ -1530,6 +1544,22 @@ export function computeEvadeVector(
 
   if (urgentWarn.shape === "circle") {
     const d = Math.hypot(px - urgentWarn.x, py - urgentWarn.y);
+    if (urgentWarn.r0 !== undefined && urgentWarn.r0 > 0) {
+      // Vành khuyên: bot đang ở trong vùng nguy hiểm. So sánh khoảng cách tới tâm an toàn và rìa ngoài
+      const mid = (urgentWarn.r0 + urgentWarn.r) / 2;
+      if (d < mid) {
+        // Gần tâm hơn -> chạy vào vùng lõi an toàn của tâm
+        if (d > 0.001) {
+          return { dx: -(px - urgentWarn.x) / d, dy: -(py - urgentWarn.y) / d };
+        }
+        return { dx: 0, dy: 0 };
+      }
+      // Gần rìa ngoài hơn -> chạy ra ngoài vòng bán kính r
+      if (d > 0.001) {
+        return { dx: (px - urgentWarn.x) / d, dy: (py - urgentWarn.y) / d };
+      }
+      return { dx: 1, dy: 0 };
+    }
     if (d > 0.001) {
       return { dx: (px - urgentWarn.x) / d, dy: (py - urgentWarn.y) / d };
     }
