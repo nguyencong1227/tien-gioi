@@ -4292,6 +4292,12 @@ export const ui = {
    * Space / Enter / mũi tên thuộc về bảng; phím mở / đóng bảng, chat, âm thanh vẫn chạy.
    */
   isKeyboardCaptured() {
+    // tự chữa mục sót: bảng đã ẩn mà còn trong ngăn xếp thì KHÔNG còn thuộc về bảng (mục 25: "liệt nút")
+    if (modalStack.size() > 0)
+      modalStack.pruneHidden((id) => {
+        const el = document.getElementById(id);
+        return !!el && (el.hidden || el.closest("[hidden]") !== null);
+      });
     return modalStack.size() > 0 || this.isDialogOpen() || this.isPlayerMenuOpen();
   },
 
