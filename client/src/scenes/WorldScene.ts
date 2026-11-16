@@ -1767,7 +1767,9 @@ export class WorldScene extends Phaser.Scene {
       this.refreshSkillsPanel();
     const stunned = this.status.stunned(now);
     // Huy hiệu trạng thái: danh sách rỗng thì `render([])` chỉ so một chuỗi rỗng (không đụng DOM)
-    this.statusBadges.render(badgeViews(this.status.active(now)));
+    const activeStatuses = this.status.active(now);
+    this.statusBadges.render(badgeViews(activeStatuses));
+    ui.setActiveStatuses(activeStatuses.map((e) => e[0])); // nút Dùng của đan / phù gắn trạng thái mờ khi còn hiệu lực (#514)
     let filled = 0;
     for (const slot of BAR_SLOTS) {
       const v = slotView(slot, this.skills, me, stunned, now);

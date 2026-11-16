@@ -138,7 +138,7 @@ import {
 } from "./quest-log";
 import { pickupBtnText, portalBtnText, talkBtnText } from "./ctx-btn";
 import { sound } from "./audio";
-import { bookTeach, useLabelOf } from "./item-use";
+import { bookTeach, statusEffectLine, useBlockReason, useLabelOf } from "./item-use";
 import {
   applyRarityBadge,
   applyRarityText,
@@ -684,6 +684,36 @@ function fillBookTeach(box: HTMLElement, def: ItemDef) {
   box.hidden = false;
 }
 
+/** Dòng thông tin thêm của vật phẩm dùng được ở khung so sánh: "Hiệu lực: ..." của đan / phù gắn trạng thái (#514), "Dạy: ..." của kinh quyển (M7.4); món khác ẩn khung. */
+function fillUseInfo(box: HTMLElement, def: ItemDef) {
+  const eff = statusEffectLine(def);
+  if (eff === null) {
+    fillBookTeach(box, def);
+    return;
+  }
+  box.replaceChildren();
+  const line = document.createElement("span");
+  line.className = "req-ok";
+  line.textContent = eff;
+  box.append(line);
+  box.hidden = false;
+}
+
+/** Chữ + trạng thái của nút Dùng / Học: đan gắn trạng thái MỜ kèm lý do ngắn khi còn hiệu lực / sai bậc (máy chủ vẫn từ chối + không trừ nếu bấm được). */
+function applyUseBtn(btn: HTMLButtonElement, def: ItemDef, label: string) {
+  const reason = useBlockReason(def, {
+    activeIds: activeStatusIds,
+    realm: currentRealm,
+    tier: currentTier,
+    exp: currentExp,
+    expMax: currentExpMax,
+  });
+  const text = reason ?? label;
+  if (btn.textContent !== text) btn.textContent = text;
+  const off = reason !== null;
+  if (btn.disabled !== off) btn.disabled = off;
+}
+
 function renderSlotDetail() {
   const s = invSlots[selectedSlot];
   const def = s ? ITEM_BY_ID[s.itemId] : undefined;
@@ -728,14 +758,14 @@ function renderSlotDetail() {
       ? "Mặc"
       : (slotLock ?? `Cần ${realmLabel(def.equip.reqRealm, def.equip.reqTier)}`);
   } else {
-    fillBookTeach(cmpEl, def);
+    fillUseInfo(cmpEl, def);
     equipBtn.hidden = true;
   }
 
   actionsEl.hidden = false;
   const useLabel = useLabelOf(def); // đan dược "Dùng", kinh quyển "Học" (M7.4)
   useBtn.hidden = useLabel === null;
-  if (useLabel !== null) useBtn.textContent = useLabel;
+  if (useLabel !== null) applyUseBtn(useBtn, def, useLabel);
   drop1Btn.hidden = s.qty <= 1;
 }
 
@@ -2137,6 +2167,11 @@ let cachedHudRealm = "";
 let cachedHudOnline = -1;
 let cachedMeditating: boolean | null = null;
 let cachedCanBreak: boolean | null = null;
+// Nút "Dùng" của đan / phù gắn trạng thái (#514, issue #769): cần biết trạng thái đang có + tu vi hiện tại để làm mờ đúng lúc
+let activeStatusIds: ReadonlySet<string> = new Set();
+let activeStatusKey = "";
+let currentExp = 0;
+let currentExpMax = 1;
 const cachedBarPct: Record<string, number> = {};
 const cachedBarText: Record<string, string> = {};
 const cachedCooldownFrac: Record<string, number> = {};
@@ -4416,6 +4451,18 @@ export const ui = {
     }
   },
 
+  /**
+   * Các trạng thái CÓ HIỆU LỰC của chính mình (id; scene gọi ~16 lần/giây từ `StatusTracker.active`): đan / phù gắn trạng thái đang có chip thì nút Dùng mờ
+   * "Đang còn hiệu lực" (máy chủ từ chối + không trừ, #766). Chỉ vẽ lại chi tiết túi khi TẬP id đổi (không phải mỗi giây: chip lo phần đếm ngược).
+   */
+  setActiveStatuses(ids: readonly string[]) {
+    const key = [...ids].sort().join(",");
+    if (key === activeStatusKey) return;
+    activeStatusKey = key;
+    activeStatusIds = new Set(ids);
+    if (invOpen) renderSlotDetail();
+  },
+
   hud(p: HudPlayer, online: number) {
     // Sáu ô (ba ô riêng chỉ chủ nhận, vắng = trống); so tại chỗ, chỉ dựng bộ mới khi đổi (hud chạy mỗi khung)
     const equipOrRealmChanged =
@@ -4425,6 +4472,7 @@ export const ui = {
     currentRealm = p.realm;
     currentTier = p.tier;
     if (equipOrRealmChanged) currentEquip = equipmentOf(p);
+    if (equipOrRealmChanged && invOpen) renderSlotDetail(); // đan hộ đạo đúng bậc chỉ dùng được ở bậc của nó
 
     if (equipOrRealmChanged) {
       if (charModalOpen) renderCharModal();
@@ -4458,6 +4506,8 @@ export const ui = {
     };
     const validExpMax =
       Number.isFinite(p.expMax) && p.expMax > 0 ? p.expMax : expToNext(p.realm, p.tier);
+    currentExp = p.exp;
+    currentExpMax = p.expMax;
     set("hp", p.hp, p.maxHp, "Khí huyết");
     set("mp", p.mp, p.maxMp, "Linh lực");
     set("exp", p.exp, validExpMax, "Tu vi");
@@ -4474,6 +4524,7 @@ export const ui = {
     if (canBreak !== cachedCanBreak) {
       cachedCanBreak = canBreak;
       $("sk-break").classList.toggle("ready", canBreak);
+      if (invOpen) renderSlotDetail(); // nút Dùng của đan hộ đạo mờ / sáng theo "đỉnh + đầy tu vi" (cùng điều kiện nút Đột phá)
     }
   },
 
