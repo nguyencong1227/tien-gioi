@@ -16,13 +16,14 @@ function playersOf(room: Room): { save: (...args: unknown[]) => Promise<unknown>
 /** Chen `wait` chạy trước MỖI lần lưu thật; `release` chạy khi khôi phục (đừng để lưu nào kẹt lại khi ca kết thúc giữa chừng). Khôi phục bằng `restoreSaves()`. */
 export function delaySave(
   room: Room,
-  wait: () => Promise<unknown>,
+  wait: (savedName?: string) => Promise<unknown>,
   release: () => void = () => {},
 ) {
   const players = playersOf(room);
   const real = players.save;
   players.save = async (...args: unknown[]) => {
-    await wait();
+    const rec = args[0] as { name?: unknown } | undefined;
+    await wait(typeof rec?.name === "string" ? rec.name : undefined); // tên hồ sơ đang lưu: để làm chậm riêng một số người
     return real.apply(players, args);
   };
   undos.push(() => {
@@ -33,6 +34,12 @@ export function delaySave(
 
 /** Mọi lần lưu hồ sơ chậm thêm `ms` (mô phỏng đĩa chậm / máy tải nặng). */
 export const slowSave = (room: Room, ms: number) => delaySave(room, () => sleep(ms));
+
+/** Chỉ việc lưu hồ sơ của các nhân vật có tên trong `names` chậm thêm `ms` (người khác lưu ngay): dựng thứ tự hoàn thành NGƯỢC thứ tự bắt đầu. */
+export const slowSaveFor = (room: Room, ms: number, names: readonly string[]) =>
+  delaySave(room, (name) =>
+    name !== undefined && names.includes(name) ? sleep(ms) : Promise.resolve(),
+  );
 
 /** Mọi lần lưu hồ sơ ĐỨNG yên cho tới khi gọi hàm trả về (test chủ động quyết định lúc nào lưu xong, không dùng đồng hồ). */
 export function gateSave(room: Room): () => void {
