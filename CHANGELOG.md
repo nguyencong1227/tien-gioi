@@ -2,6 +2,11 @@
 
 Định dạng theo từng bản phát hành (thẻ `vX.Y.Z`). Số `#` là PR / issue trên GitHub.
 
+## [Chưa phát hành] — bản vá sau v0.3.0 (chờ người dùng đồng ý phát hành v0.3.1)
+
+### Sửa lỗi
+- **Sửa lỗi túi đồ (người dùng báo trên bản chạy thật v0.3.0, `QUYET_DINH_M3.md` mục 24; chỉ phía client):** trước đây RÊ CHUỘT cũng đổi ô được chọn, nên bấm một món rồi rê sang nút Vứt (đi ngang các ô khác) thì Vứt rơi vào món cuối cùng chuột đi qua, không vứt được đúng món. Giờ chỉ bấm chuột (nút chính) / chạm / bàn phím (mũi tên, Tab) mới chọn ô; rê chuột chỉ làm sáng ô và hiện chú thích; nút hành động luôn gắn với món đã chọn cho tới khi chọn món khác hoặc đóng túi. Bảng nhân vật (so sánh trang bị) cũng không còn đổi theo rê chuột; số lượng định bán ở cửa hàng không còn thừa kế sang món khác trong cùng ô. **Vứt có hộp xác nhận** ghi tên + số lượng ("Vứt hết Lông thỏ ×7?", đồ quý có thêm dòng nhắc): "Giữ lại" là nút được focus, Esc đóng hộp trước rồi mới tới túi, đổi ô hoặc túi đổi món khi hộp đang mở thì hộp đóng, và lúc xác nhận kiểm lại túi còn đúng món + đủ số lượng mới gửi `dropItem`. Trên điện thoại hộp thế chỗ hàng nút hành động, bỏ qua bấm trong 450 ms đầu (chống "click ma" sau khi chạm Vứt) và tấm chừa chỗ cho nút Đóng nổi khi cuộn theo tiêu điểm. Kiểm bằng Chrome thật với sự kiện đầu vào thật của Chrome (chuột, cảm ứng, bàn phím) ở 5 khung nhìn: `client/scripts/check-inv-select.mjs`.
+
 ## [0.3.0] — 16/11/2026: M7, chiều sâu chiến đấu + Nguyên Anh (Hàn Vân Lĩnh)
 
 Bản phát hành M7 (`docs/PHAN_CONG_M7.md`; hướng đã được người dùng duyệt ở `QUYET_DINH_M3.md` mục 18-21): chiều sâu chiến đấu (chiêu thức học được theo hệ, trạng thái, quái báo trước đòn, tinh anh) và cảnh giới Nguyên Anh trọn vẹn với bản đồ thứ tư. Người dùng đã đồng ý phát hành (`QUYET_DINH_M3.md` mục 22, 16/11/2026). Phần dưới là TÓM TẮT cho người quyết định; chi tiết từng PR nằm ở hai mục "Máy chủ" và "Giao diện" kế tiếp.
