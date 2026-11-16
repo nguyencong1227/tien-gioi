@@ -7,7 +7,7 @@
 Bản vá sau v0.3.1, làm theo yêu cầu ưu tiên cao của người dùng ở `QUYET_DINH_M3.md` mục 41 (báo từ bản chạy thật) và đồng ý phát hành ở mục 43. Phần dưới là TÓM TẮT cho người quyết định; chi tiết từng PR nằm ở các mục bên dưới.
 
 - **Di chuyển hết "trôi như liệt phím" (mục 41):** khi mạng nhà đứng 1-3 giây rồi xả dồn, nhân vật trước đây còn đi tiếp 1,5-2,5 giây (300-450 px) sau khi nhả phím; nay dừng trong 0-0,25 giây (15-113 px; bot thật trên máy chủ Colyseus đo 41-276 ms). Máy chủ chỉ giữ tối đa 0,25 giây input chờ và input DỪNG cắt hàng đợi (#852); client gửi input dừng NGAY khi nhả phím (3 tin liên tiếp, bù mất gói) và đối chiếu vị trí mượt, không giật (#851). Không đổi `shared/` hay `PROTOCOL_VERSION`.
-- **Nghề nhỏ lát 1 (#763):** NPC Mộc Diên (Lão đan sư) + ba đan hộ đạo (Đột Phá / Kinh Chỉ / Dưỡng Anh) cộng xác suất đột phá + giao diện chế tác theo trạm (#815, #769).
+- **Nghề nhỏ lát 1 (#763):** NPC Mộc Diên (Lão đan sư) + ba đan hộ đạo (Đột Phá / Kinh Chỉ / Dưỡng Anh) cộng xác suất đột phá (#815; giao diện chế tác theo trạm đã có từ v0.3.1).
 - **Kho tông môn:** ảnh chụp kho / quỹ không bao giờ lùi về bản cũ khi hai thao tác chồng nhau (#881; hiển thị, không nhân đôi đồ).
 - **Công cụ / kiểm thử (không đổi trò chơi):** các test chập chờn đã đo được (kho tông môn, movement) nay chờ theo điều kiện; bot né vùng cảnh báo vành khuyên (#890).
 - **Có trong mã nhưng CHƯA hiện cho người chơi (chuẩn bị):** hợp đồng + lưu trữ M8 tông môn chiều sâu (#848, #850: cấp tông, cống hiến; chưa có nguồn kiếm và giao diện nào), hợp đồng trùm nhiều chiêu (#877; bộ thực thi nằm ở bản sau). Không có thay đổi hành vi.
