@@ -1,6 +1,6 @@
 // Rà phần CHỮ của nội dung Nguyên Anh (M7.9, #742): mô tả vật phẩm + lời thoại / mô tả nhiệm vụ Hàn Vân.
 // Chỉ kiểm chuỗi hiển thị (độ dài, giọng, chữ Hán, xưng hô) và KHÓA SỐ LIỆU cơ chế (chỉ số trang bị, pct đan, giá ô riêng)
-// để ai lỡ sửa số là đỏ. KHÔNG kiểm cân bằng (A giữ số); NOT đụng nguồn rơi / quái / chiêu.
+// để ai lỡ sửa số là đỏ. KHÔNG kiểm cân bằng (A giữ số); KHÔNG đụng nguồn rơi / quái / chiêu.
 // Đột biến đỏ (tự chạy trước khi push, dán vào PR): (1) rút desc dưới ngưỡng; (2) thêm "Bạn" vào lời thoại nhiệm vụ;
 // (3) chép trùng desc hai vật phẩm; (4) đổi một chỉ số / pct / giá vật phẩm Nguyên Anh.
 import { describe, expect, it } from "vitest";
@@ -45,7 +45,7 @@ const NGUYEN_ANH_NUMBERS: Record<
   string,
   { rarity: number; equip?: Record<string, number>; healPct?: number; value?: number }
 > = {
-  // Bộ IV: thần phẩm (4),reqRealm 4 — chỉ số ghi ở đây khớp items.ts / owner-gear.ts
+  // Bộ IV: thần phẩm (4), reqRealm 4 — chỉ số ghi ở đây khớp items.ts / owner-gear.ts
   han_vu_kiem: { rarity: 4, equip: { atk: 56 } },
   han_lang_bao: { rarity: 4, equip: { hp: 650 } },
   phong_nha_phu: { rarity: 4, equip: { mp: 170, speed: 28 } },
