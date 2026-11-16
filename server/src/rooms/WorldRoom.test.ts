@@ -2176,6 +2176,99 @@ describe("đi qua cổng giữa hai bản đồ (M3 bước 1)", () => {
   }, 35000);
 });
 
+describe("nghề nhỏ: hiệu lực chế phẩm mất khi qua cổng hoặc thoát phòng (#514, THIET_KE_NGHE_NHO 8.6)", () => {
+  // Hộp xác nhận của client ("qua cổng sẽ mất hiệu lực đan / phù") chỉ đúng nếu máy chủ THẬT SỰ xoá: trạng thái nằm trong `PlayerCtrl.st` của
+  // phòng, không lưu hồ sơ, nên vào phòng mới (cổng) hay vào lại sau khi thoát là hộp trống. Test dùng tin `useItem` thật với đan thử.
+  const PILL = "t_dan_ho_dao_cong";
+  const lacHa = getMap(DEFAULT_MAP_ID)!;
+  const BAC = lacHa.portals[0];
+  const fileJson = (name: string) => {
+    const f = readdirSync(dataDir)
+      .filter((x) => x.endsWith(".json"))
+      .find((x) => JSON.parse(readFileSync(path.join(dataDir, x), "utf8")).name === name);
+    return readFileSync(path.join(dataDir, f!), "utf8");
+  };
+  const installPill = () => {
+    ITEM_BY_ID[PILL] = {
+      id: PILL,
+      name: "Đan thử qua cổng",
+      type: "consumable",
+      stack: 9,
+      rarity: 3,
+      desc: "đan thử",
+      color: 0xffffff,
+      effect: { kind: "status", id: "dao_ho", ratio: 0.15, ms: 900_000 },
+    } as unknown as ItemDef;
+  };
+  afterEach(() => {
+    delete ITEM_BY_ID[PILL];
+  });
+  const idsOf = (room: Room) =>
+    ((serverRoom(room) as any).world.ctrl.get(room.sessionId)?.st?.list ?? []).map(
+      (s: { id: string }) => s.id,
+    );
+  /** Cho người chơi một đan thử, dùng bằng tin `useItem` thật, thêm một buff chiêu (haste) từ phía máy chủ; trả hộp thư `status`. */
+  async function dungDanVaBuff(a: Awaited<ReturnType<typeof join>>) {
+    const statuses: StatusMsg[] = [];
+    a.room.onMessage("status", (m: StatusMsg) => statuses.push(m));
+    a.room.send("chat", { text: `/give ${PILL} 1` });
+    const inv = await waitFor(() => a.invs.find((m) => m.slots.some((x) => x?.itemId === PILL)));
+    const slot = inv.slots.findIndex((x) => x?.itemId === PILL);
+    a.room.send("useItem", { slot });
+    await waitFor(() => statuses.find((m) => m.list.some((e) => e[0] === "dao_ho")));
+    const w = (serverRoom(a.room) as any).world;
+    applyPlayerStatus(
+      w,
+      a.room.sessionId,
+      { status: "haste", ms: 8000, ratio: 0.2, chance: 1 },
+      0,
+      "t",
+    );
+    await waitFor(() => statuses.find((m) => m.list.some((e) => e[0] === "haste")));
+    expect(idsOf(a.room).sort()).toEqual(["dao_ho", "haste"]);
+    return statuses;
+  }
+
+  it("QUA CỔNG: phòng đích không mang dao_ho / buff chiêu; hồ sơ không lưu trạng thái; đan đã bị trừ", async () => {
+    installPill();
+    const name = "Cong Xoa Dan";
+    const a = await join(name);
+    await dungDanVaBuff(a);
+    const sp = serverState(a.room).players.get(a.room.sessionId)!;
+    sp.x = BAC.x;
+    sp.y = BAC.y;
+    const got: TravelToMsg[] = [];
+    a.room.onMessage("travelTo", (m: TravelToMsg) => got.push(m));
+    a.room.send("travel", { portalId: BAC.id });
+    await waitFor(() => got.length === 1);
+    await waitFor(() => !a.room.connection.isOpen);
+    // hồ sơ đã lưu KHÔNG chứa trạng thái (không "dao_ho", không "haste"), và đan đã dùng hết
+    const saved = fileJson(name);
+    expect(saved).not.toContain("dao_ho");
+    expect(saved).not.toContain("haste");
+    expect(saved).not.toContain(PILL);
+    // vào phòng đích: hộp trạng thái trống (cả phía máy chủ lẫn tin `status` nhận được)
+    const b = await join(name, secretOf(name), got[0].mapId);
+    const statuses: StatusMsg[] = [];
+    b.room.onMessage("status", (m: StatusMsg) => statuses.push(m));
+    await sleep(300);
+    expect(idsOf(b.room)).toEqual([]);
+    expect(statuses.flatMap((m) => m.list.map((e) => e[0]))).toEqual([]);
+  });
+
+  it("THOÁT PHÒNG rồi vào lại: không còn dao_ho / buff chiêu", async () => {
+    installPill();
+    const name = "Thoat Xoa Dan";
+    const a = await join(name);
+    await dungDanVaBuff(a);
+    await a.room.leave(true); // thoát chủ động: không chờ nối lại
+    await sleep(300);
+    const b = await join(name);
+    await sleep(200);
+    expect(idsOf(b.room)).toEqual([]);
+  });
+});
+
 describe("đội dùng chung giữa các bản đồ (M3 bước 1)", () => {
   const hp = getMap(HAC_PHONG_ID)!;
   const BAC = getMap(DEFAULT_MAP_ID)!.portals[0];
