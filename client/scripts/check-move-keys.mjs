@@ -355,9 +355,15 @@ async function main() {
       await stuckCase("menu chuột phải (contextmenu)", () =>
         evalJs(`window.dispatchEvent(new Event("contextmenu"))`),
       );
-      await stuckCase("vào ô chat (focus ô nhập)", () =>
-        evalJs(`document.getElementById("chat-input").focus()`),
+      // ô chat có thể ẩn ở khung nhìn nhỏ (không focus được): chỉ kiểm khi focus thật sự vào được
+      const chatFocusable = await evalJs(
+        `(() => { const c = document.getElementById("chat-input"); c.focus(); const ok = document.activeElement === c; c.blur(); return ok; })()`,
       );
+      if (chatFocusable)
+        await stuckCase("vào ô chat (focus ô nhập)", () =>
+          evalJs(`document.getElementById("chat-input").focus()`),
+        );
+      else console.log("  - ô chat ẩn ở khung nhìn này: bỏ qua ca vào ô chat");
       await evalJs(`document.getElementById("chat-input").blur()`);
       const afterKept = await hold("KeyD", 600);
       check(
@@ -375,9 +381,11 @@ async function main() {
         `ô đánh dấu (checkbox) đang giữ focus: vẫn đi (${withCb.x.toFixed(0)} px)`,
       );
       await evalJs(`document.getElementById("mk-test-cb").remove()`);
-      await evalJs(`document.getElementById("chat-input").focus()`);
-      const inChat = await hold("KeyD", 500);
-      check(Math.hypot(inChat.x, inChat.y) < 1, "đang gõ ở ô chat: KHÔNG đi (phím là chữ)");
+      if (chatFocusable) {
+        await evalJs(`document.getElementById("chat-input").focus()`);
+        const inChat = await hold("KeyD", 500);
+        check(Math.hypot(inChat.x, inChat.y) < 1, "đang gõ ở ô chat: KHÔNG đi (phím là chữ)");
+      }
       await evalJs(`document.getElementById("chat-input").blur()`);
       await sleep(100);
       const backWalk = await hold("KeyD", 600);
