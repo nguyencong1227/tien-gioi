@@ -432,7 +432,7 @@ export interface SectVaultLogEntry {
 
 /** Ảnh chụp kho đồ gửi cho từng thành viên (riêng tư). Tách khỏi `SectView`: đổi thông báo / thành viên không kéo theo cả kho. */
 export interface SectVaultView {
-  /** Đúng `SECT_VAULT_SLOTS` ô (máy chủ trước M8) hoặc `SECT_VAULT_SLOTS_MAX` ô; ô trống là `null` */
+  /** Đúng `unlocked` ô ĐÃ MỞ theo cấp tông (máy chủ trước M8: `SECT_VAULT_SLOTS` ô); ô khoá không gửi; ô trống là `null` */
   slots: (InvSlot | null)[];
   /** Mới nhất đứng đầu, tối đa `SECT_VAULT_LOG_MAX` */
   log: SectVaultLogEntry[];
@@ -442,7 +442,7 @@ export interface SectVaultView {
   myDrawsLeft: number | null;
   /** Còn bao nhiêu ms nữa mới được rút (cờ "kiếp mới chưa được rút", mục 11.7); 0 = không khoá */
   lockMs: number;
-  /** Số ô DÙNG ĐƯỢC theo cấp tông (M8); thiếu = `SECT_VAULT_SLOTS`. `slots` dài `SECT_VAULT_SLOTS` (máy chủ cũ) hoặc `SECT_VAULT_SLOTS_MAX`. */
+  /** Số ô DÙNG ĐƯỢC theo cấp tông (M8) = độ dài `slots`; thiếu = `SECT_VAULT_SLOTS` (máy chủ cũ). Phần còn lại tới `SECT_VAULT_SLOTS_MAX` là ô khoá. */
   unlocked?: number;
 }
 
