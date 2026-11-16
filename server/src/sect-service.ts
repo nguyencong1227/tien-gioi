@@ -13,24 +13,32 @@ import {
   COIN_CAP,
   ITEM_BY_ID,
   SECT_COIN_CAP,
+  SECT_CONTRIB_CAP,
   SECT_CREATE_COOLDOWN_MS,
-  SECT_ELDERS_MAX,
-  SECT_MAX_MEMBERS,
   SECT_PERMS,
+  SECT_POINTS_CAP,
   SECT_REJOIN_COOLDOWN_MS,
   SECT_VAULT_DRAW_MAX,
   SECT_VAULT_DRAW_MODE,
   SECT_VAULT_DRAW_QTY_DE_TU,
-  SECT_VAULT_SLOTS,
+  SECT_VAULT_SLOTS_MAX,
   addToInventory,
   canSect,
   cleanMotd,
   cleanSectName,
   cleanSectTag,
   compareSectMembers,
+  sectAwardDay,
+  sectCanEarn,
+  sectDayState,
   sectKey,
+  sectLevelInfo,
+  sectLevelOf,
+  sectQuestTemplateOf,
   sectVaultAccepts,
+  type InvSlot,
   type SectAssignableRank,
+  type SectEarnSource,
   type SectFail,
   type SectView,
   type SectVaultView,
@@ -78,6 +86,25 @@ const eldersOf = (s: Sect) => s.members.filter((m) => m.rank === "truong_lao").l
 /** Lượt rút kho đồ đã dùng hôm nay (`today` = `dayKey`) của thành viên; qua ngày thì đếm lại từ 0. */
 const drawsUsed = (m: SectMemberRecord, today: string) => (m.draw?.day === today ? m.draw.n : 0);
 const copySlots = (s: Sect) => s.vault.slots.map((x) => (x ? { ...x } : null));
+/** Cấp tông (1..`SECT_LEVEL_MAX`) tính từ điểm tông: KHÔNG lưu, nên không thể lệch với điểm (mục 12.2). */
+const levelOf = (s: Sect) => sectLevelOf(s.points ?? 0);
+const infoOf = (s: Sect) => sectLevelInfo(levelOf(s));
+
+/**
+ * Thêm `qty` món vào CÁC Ô ĐÃ MỞ (`unlocked` ô đầu) của kho; ô khoá theo cấp tông không bao giờ bị đụng. Sửa `slots` tại chỗ (người gọi đã chép bằng `copySlots`);
+ * trả số dư KHÔNG chứa được (0 = đủ chỗ).
+ */
+function addToVault(
+  slots: (InvSlot | null)[],
+  unlocked: number,
+  itemId: string,
+  qty: number,
+): number {
+  const open = slots.slice(0, unlocked);
+  const left = addToInventory(open, itemId, qty);
+  for (let i = 0; i < open.length; i++) slots[i] = open[i];
+  return left;
+}
 
 export class SectService {
   private readonly queue = new KeyedQueue();
@@ -203,7 +230,7 @@ export class SectService {
       const me = sect.members.find((m) => m.soulKey === actorKey);
       if (!me) throw new Refusal("not_in_sect");
       if (!canSect("invite", me.rank)) throw new Refusal("forbidden");
-      if (sect.members.length >= SECT_MAX_MEMBERS) throw new Refusal("sect_full");
+      if (sect.members.length >= infoOf(sect).maxMembers) throw new Refusal("sect_full");
       if (targetKey === actorKey) throw new Refusal("target_self");
       if (await this.store.findBySoul(targetKey)) throw new Refusal("target_in_sect");
       if (this.rejoinLeft(targetKey) > 0) throw new Refusal("target_rejoin_cooldown");
@@ -222,7 +249,7 @@ export class SectService {
       const sect = await this.store.update(sectId, (s) => {
         const inviter = s.members.find((m) => m.soulKey === inviterKey);
         if (!inviter || !canSect("invite", inviter.rank)) throw new Refusal("invite_invalid");
-        if (s.members.length >= SECT_MAX_MEMBERS) throw new Refusal("sect_full");
+        if (s.members.length >= infoOf(s).maxMembers) throw new Refusal("sect_full");
         return {
           ...s,
           members: [
@@ -288,7 +315,7 @@ export class SectService {
     });
   }
 
-  /** Tông chủ đặt chức vụ `rank` (Trưởng lão / Đệ tử) cho thành viên `targetName`; Trưởng lão tối đa `SECT_ELDERS_MAX`. */
+  /** Tông chủ đặt chức vụ `rank` (Trưởng lão / Đệ tử) cho thành viên `targetName`; Trưởng lão tối đa theo cấp tông (`sectLevelInfo(...).maxElders`, cấp 1 = `SECT_ELDERS_MAX`). */
   setRank(
     actor: SectActor,
     targetName: string,
@@ -302,7 +329,7 @@ export class SectService {
         if (t.soulKey === me.soulKey) throw new Refusal("target_self");
         if (!canSect("setRank", me.rank, t.rank)) throw new Refusal("forbidden");
         if (t.rank === rank) throw new Refusal("same_rank");
-        if (rank === "truong_lao" && eldersOf(s) >= SECT_ELDERS_MAX)
+        if (rank === "truong_lao" && eldersOf(s) >= infoOf(s).maxElders)
           throw new Refusal("elders_full");
         return {
           ...s,
@@ -313,7 +340,7 @@ export class SectService {
     });
   }
 
-  /** Tông chủ chuyển quyền cho `targetName` (mình xuống Trưởng lão). Từ chối nếu việc đó làm vượt `SECT_ELDERS_MAX`. */
+  /** Tông chủ chuyển quyền cho `targetName` (mình xuống Trưởng lão). Từ chối nếu việc đó làm vượt số Trưởng lão tối đa theo cấp tông. */
   transfer(actor: SectActor, targetName: string): Promise<SectResult<{ sect: Sect }>> {
     return this.guarded(actor.soulKey, async () => {
       const sect = await this.mutate(actor.soulKey, (s, me) => {
@@ -324,7 +351,7 @@ export class SectService {
         if (!canSect("transfer", me.rank, t.rank)) throw new Refusal("forbidden");
         // Mình thành Trưởng lão; người nhận bỏ chức Trưởng lão (nếu có) để lên Tông chủ
         const elders = eldersOf(s) - (t.rank === "truong_lao" ? 1 : 0) + 1;
-        if (elders > SECT_ELDERS_MAX) throw new Refusal("elders_full");
+        if (elders > infoOf(s).maxElders) throw new Refusal("elders_full");
         return {
           ...s,
           leader: t.soulKey,
@@ -421,6 +448,61 @@ export class SectService {
     });
   }
 
+  // ---------- Cống hiến / điểm tông / cấp (M8, docs/THIET_KE_TONG_MON.md mục 12) ----------
+
+  /**
+   * MỘT đường duy nhất để cộng cống hiến (mọi nguồn: nhiệm vụ, góp kho, bí cảnh đều gọi hàm này): trong MỘT `update` nguyên tử tính bằng `sectAwardDay`
+   * (trần theo ngày, trần từng nguồn, mỗi nhiệm vụ một lần) rồi cộng cùng `granted` vào `contrib` + `merit` của người đó và `Sect.points`. Kiểm: là thành viên;
+   * `sectCanEarn` (chỉ ai vào từ TRƯỚC hôm nay; `opts.warmup = false` chỉ để dev / E2E, mục 12.3); `want` nguyên dương.
+   * Từ chối `not_warm` / `earn_cap` (hết trần ngày hoặc trần nguồn) / `quest_done` (nhiệm vụ đã trả hôm nay) / `quest_unavailable` (id lạ) / `amount_invalid`.
+   * Trả số thực được cộng, cấp tông sau đó và `levelUp` (lên cấp ở đúng lần này). Không đụng ví, túi, ghi nhật ký kiểm toán: người gọi (`systems/sect.ts`) lo.
+   * Người đã chết / ở Hoàng Tuyền: người gọi kiểm TRƯỚC (`isDown`).
+   */
+  award(
+    actor: SectActor,
+    source: SectEarnSource,
+    want: number,
+    opts: { key?: string; warmup?: boolean } = {},
+  ): Promise<SectResult<{ sect: Sect; granted: number; level: number; levelUp: boolean }>> {
+    return this.guarded(actor.soulKey, async () => {
+      if (!Number.isSafeInteger(want) || want < 1) throw new Refusal("amount_invalid");
+      const now = this.clock();
+      let granted = 0;
+      let before = 1;
+      const sect = await this.mutate(actor.soulKey, (s, me) => {
+        if (!sectCanEarn(me.joinedAt, now, opts.warmup ?? true)) throw new Refusal("not_warm");
+        const r = sectAwardDay(sectDayState(me.today, now), source, want, opts.key);
+        if (r.refused === "quest_done") throw new Refusal("quest_done");
+        if (r.granted < 1) {
+          const known = sectQuestTemplateOf(opts.key) !== undefined;
+          throw new Refusal(source === "quest" && !known ? "quest_unavailable" : "earn_cap");
+        }
+        const contrib = me.contrib ?? 0;
+        const merit = me.merit ?? 0;
+        const points = s.points ?? 0;
+        if (
+          contrib + r.granted > SECT_CONTRIB_CAP ||
+          merit + r.granted > SECT_POINTS_CAP ||
+          points + r.granted > SECT_POINTS_CAP
+        )
+          throw new Refusal("earn_cap");
+        granted = r.granted;
+        before = sectLevelOf(points);
+        return {
+          ...s,
+          points: points + r.granted,
+          members: s.members.map((m) =>
+            m.soulKey === me.soulKey
+              ? { ...m, contrib: contrib + r.granted, merit: merit + r.granted, today: r.day }
+              : m,
+          ),
+        };
+      });
+      const level = levelOf(sect);
+      return { ok: true, sect, granted, level, levelUp: level > before };
+    });
+  }
+
   // ---------- Kho đồ (docs/THIET_KE_TONG_MON.md mục 11) ----------
   // Dịch vụ chỉ lo LUẬT và kho lưu; túi đồ, lưu hồ sơ và thứ tự "túi <-> hồ sơ <-> kho" nằm ở `systems/sect.ts`. Mọi thay đổi là MỘT `update` nguyên tử:
   // quyền, khoá kỳ vọng theo ô, hạn mức ngày và số lượng đều kiểm TRÊN bản ghi đọc trong `update`, nên hai người cùng rút một món không bao giờ cùng thấy một số dư.
@@ -449,7 +531,7 @@ export class SectService {
       const sect = await this.mutate(actor.soulKey, (s, me) => {
         if (!canSect("vaultDeposit", me.rank)) throw new Refusal("forbidden");
         const slots = copySlots(s);
-        if (addToInventory(slots, def.id, n) > 0) throw new Refusal("vault_full");
+        if (addToVault(slots, infoOf(s).vaultSlots, def.id, n) > 0) throw new Refusal("vault_full");
         const entry = { at: now, name: me.name, kind: "deposit" as const, itemId: def.id, qty: n };
         return { ...s, vault: { ...s.vault, slots, log: withVaultLogEntry(s.vault.log, entry) } };
       });
@@ -475,12 +557,13 @@ export class SectService {
         typeof slot !== "number" ||
         !Number.isInteger(slot) ||
         slot < 0 ||
-        slot >= SECT_VAULT_SLOTS
+        slot >= SECT_VAULT_SLOTS_MAX
       )
         throw new Refusal("item_invalid");
       const now = this.clock();
       const sect = await this.mutate(actor.soulKey, (s, me) => {
         if (!canSect("vaultWithdraw", me.rank)) throw new Refusal("forbidden");
+        if (slot >= infoOf(s).vaultSlots) throw new Refusal("vault_locked_slot"); // ô chưa mở theo cấp tông (mục 12.4)
         const cell = s.vault.slots[slot];
         if (!cell || cell.itemId !== def.id || cell.qty < qty) throw new Refusal("vault_changed");
         let members = s.members;
@@ -521,7 +604,7 @@ export class SectService {
       const now = this.clock();
       const sect = await this.mutate(actor.soulKey, (s, me) => {
         const slots = copySlots(s);
-        if (addToInventory(slots, def.id, n) > 0) throw new Refusal("vault_full");
+        if (addToVault(slots, infoOf(s).vaultSlots, def.id, n) > 0) throw new Refusal("vault_full");
         const members =
           restoreDraw && me.draw?.day === today && me.draw.n > 0
             ? s.members.map((m) =>
@@ -568,7 +651,12 @@ export function sectViewOf(sect: Sect, viewerKey: string): SectView | null {
     motd: sect.motd,
     myRank: me.rank,
     members: sect.members
-      .map((m) => ({ name: m.name, rank: m.rank, joinedAt: m.joinedAt }))
+      .map((m) => ({
+        name: m.name,
+        rank: m.rank,
+        joinedAt: m.joinedAt,
+        ...(m.merit ? { merit: m.merit } : {}), // công tích (M8): thiếu = 0, nên bản ghi trước M8 giữ nguyên ảnh chụp
+      }))
       .sort(compareSectMembers),
     coin: sect.coin,
     log: sect.log.map((e) => ({ ...e })),
@@ -588,8 +676,11 @@ export function sectVaultViewOf(
 ): SectVaultView | null {
   const me = sect.members.find((m) => m.soulKey === viewerKey);
   if (!me) return null;
+  const unlocked = infoOf(sect).vaultSlots;
   return {
-    slots: sect.vault.slots.map((x) => (x ? { ...x } : null)),
+    // chỉ gửi các ô ĐÃ MỞ theo cấp tông (cấp 1 = 40 ô, y hệt trước M8); ô khoá luôn trống nên không cần gửi
+    slots: sect.vault.slots.slice(0, unlocked).map((x) => (x ? { ...x } : null)),
+    unlocked,
     log: sect.vault.log.map((e) => ({ ...e })),
     drawPerDay: sect.vault.drawPerDay,
     myDrawsLeft:
