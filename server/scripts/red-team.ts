@@ -93,6 +93,7 @@ export const EXPECTED_MESSAGE_TYPES = [
   SECT_MSG.vaultDeposit,
   SECT_MSG.vaultWithdraw,
   SECT_MSG.vaultPolicy,
+  SECT_MSG.hallGet, // M8: xin ảnh chụp Nội vụ (chỉ đọc)
   // Luân hồi
   "soulBuy",
   "rebirth",
@@ -400,6 +401,7 @@ export async function runRedTeam(options: {
       "party",
       "sectInvited",
       "sectVault",
+      "sectHall",
       "netShield",
       "sect",
     ]) {
