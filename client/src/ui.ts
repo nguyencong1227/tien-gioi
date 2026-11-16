@@ -191,7 +191,15 @@ import { transitionMs, waitOrSkip } from "./gfx/scene-transition";
 import { getDisplay, onDisplayChange } from "./gfx/display";
 import { optionTag, skipHintText } from "./dialog-opt";
 import { dropConfirmText, dropStillValid, dropWarnText, planDrop, type DropPlan } from "./inv-drop";
-import { inConfirmGuard, sellPlan, sellStillValid, type ConfirmSpec } from "./act-confirm";
+import {
+  inConfirmGuard,
+  rebirthPlan,
+  sellPlan,
+  sellStillValid,
+  unlockPlan,
+  unlockStillValid,
+  type ConfirmSpec,
+} from "./act-confirm";
 import { PREFER_TARGET_STORAGE_KEY, parsePreferTarget } from "./aim-order";
 import { craftButtonText, craftFeeHint, craftSubtitle, craftTitle } from "./craft-ui";
 import {
@@ -2589,7 +2597,25 @@ function renderLimboStoneListImpl() {
       } else {
         btn.disabled = false;
         btn.addEventListener("click", () => {
-          limboBuyCb?.(def.id);
+          // click "ma" sau khi vừa đóng hộp xác nhận (cảm ứng: hộp đóng ở pointerdown, click rơi xuống nút bên dưới): bỏ qua
+          if (inConfirmGuard(actConfirmClosedAt, performance.now())) return;
+          const duyen = activeSoulView?.duyen ?? 0;
+          const plan = unlockPlan(`${def.name} nấc ${currentLv + 1}`, cost, duyen);
+          if (!plan) return;
+          askActConfirm(
+            plan.spec,
+            () => {
+              // chân linh có thể đổi trong lúc hộp mở: kiểm lại giá + Duyên, không trừ Duyên theo lời hỏi cũ
+              const now = activeSoulView ? nextCost(activeSoulView, def.id) : null;
+              if (!unlockStillValid(plan, now, activeSoulView?.duyen ?? 0)) {
+                ui.toast({ text: "Chân linh vừa đổi, chưa mở gì. Hãy xem lại.", tone: "info" });
+                renderLimboAll();
+                return;
+              }
+              limboBuyCb?.(def.id);
+            },
+            btn,
+          );
         });
       }
     }
@@ -2639,7 +2665,23 @@ function renderLimboStoneListImpl() {
       } else {
         btn.disabled = false;
         btn.addEventListener("click", () => {
-          limboBuyCb?.(`${ORIGIN_BUY_PREFIX}${o.id}`);
+          if (inConfirmGuard(actConfirmClosedAt, performance.now())) return; // click ma sau khi đóng hộp
+          const duyen = activeSoulView?.duyen ?? 0;
+          const plan = unlockPlan(`xuất thân ${o.name}`, o.cost, duyen);
+          if (!plan) return;
+          askActConfirm(
+            plan.spec,
+            () => {
+              const owned = activeSoulView?.origins.includes(o.id) ?? false;
+              if (!unlockStillValid(plan, owned ? null : o.cost, activeSoulView?.duyen ?? 0)) {
+                ui.toast({ text: "Chân linh vừa đổi, chưa mở gì. Hãy xem lại.", tone: "info" });
+                renderLimboAll();
+                return;
+              }
+              limboBuyCb?.(`${ORIGIN_BUY_PREFIX}${o.id}`);
+            },
+            btn,
+          );
         });
       }
     }
@@ -5069,6 +5111,7 @@ export const ui = {
       rebirthBtn.removeAttribute("aria-disabled");
       rebirthBtn.onclick = () => {
         if (rebirthBusy) return; // đã gửi, đang chờ máy chủ: máy chủ cũng bỏ tin `rebirth` thứ hai
+        if (inConfirmGuard(actConfirmClosedAt, performance.now())) return; // click ma sau khi đóng hộp xác nhận (cảm ứng)
         const soul = activeSoulView;
         const choice: RebirthChoice = { origin: selectedOrigin, keep: selectedRelics };
         // `engrave` CHỈ khi người chơi đã đổi tập chiêu khắc (vắng = giữ nguyên chiêu đã khắc); kẹp lại theo danh sách / nấc hiện hành
@@ -5081,15 +5124,25 @@ export const ui = {
           const engrave = engraveToSend(soul.engraved, sel);
           if (engrave !== undefined) choice.engrave = engrave;
         }
-        rebirthBusy = true;
-        rebirthBtn.setAttribute("aria-disabled", "true");
-        // máy chủ từ chối (toast, vẫn ở Hoàng Tuyền) thì cho bấm lại sau một lát
-        rebirthBusyTimer = setTimeout(() => {
-          rebirthBusy = false;
-          rebirthBusyTimer = null;
-          rebirthBtn.removeAttribute("aria-disabled");
-        }, REBIRTH_BUSY_MS);
-        limboRebirthCb?.(choice);
+        // Tóm tắt trước khi đầu thai (issue #779): xuất thân, số di vật giữ, số chiêu khắc. Đường DUY NHẤT ra khỏi Hoàng Tuyền nên chỉ để bắt lỗi chọn nhầm ("Xem lại" quay về màn chọn)
+        const originName = ORIGINS.find((o) => o.id === choice.origin)?.name ?? choice.origin;
+        const engraveCount = (choice.engrave ?? soul?.engraved ?? []).length;
+        askActConfirm(
+          rebirthPlan(originName, choice.keep.length, engraveCount),
+          () => {
+            if (rebirthBusy) return;
+            rebirthBusy = true;
+            rebirthBtn.setAttribute("aria-disabled", "true");
+            // máy chủ từ chối (toast, vẫn ở Hoàng Tuyền) thì cho bấm lại sau một lát
+            rebirthBusyTimer = setTimeout(() => {
+              rebirthBusy = false;
+              rebirthBusyTimer = null;
+              rebirthBtn.removeAttribute("aria-disabled");
+            }, REBIRTH_BUSY_MS);
+            limboRebirthCb?.(choice);
+          },
+          rebirthBtn,
+        );
       };
     }
   },
@@ -5105,6 +5158,7 @@ export const ui = {
 
   /** Đóng màn hình Hoàng Tuyền */
   hideLimbo() {
+    closeActConfirm(false); // máy chủ đóng Hoàng Tuyền (đã đầu thai) lúc hộp xác nhận còn mở
     activeLimboMsg = null;
     activeSoulView = null;
     limboBuyCb = null;

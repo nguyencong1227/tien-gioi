@@ -11,9 +11,12 @@ import {
   breakthroughPlan,
   inConfirmGuard,
   needsSellConfirm,
+  rebirthPlan,
   samePlan,
   sellPlan,
   sellStillValid,
+  unlockPlan,
+  unlockStillValid,
 } from "./act-confirm";
 import { DROP_WARN_RARITY } from "./inv-drop";
 
@@ -165,5 +168,56 @@ describe("bán đồ: hỏi khi là đồ quý hoặc trang bị (hàng 2 của 
     expect(sellStillValid([null, null], p)).toBe(false);
     expect(sellStillValid([], p)).toBe(false);
     expect(sellStillValid([null, { itemId: "dai_hoi_huyet_dan", qty: 9 }], p)).toBe(true); // nhặt thêm: vẫn bán đúng 5
+  });
+});
+
+describe("Hoàng Tuyền: mở bằng Duyên (hàng 11) và tóm tắt đầu thai (hàng 12)", () => {
+  it("unlockPlan: nêu tên + giá + Duyên còn lại, nhắc không hoàn lại", () => {
+    const p = unlockPlan("Khắc chân linh nấc 2", 100, 130)!;
+    expect(p.cost).toBe(100);
+    expect(p.spec.text).toBe("Mở Khắc chân linh nấc 2 tốn 100 Duyên (còn lại 30)?");
+    expect(p.spec.warn).toMatch(/không hoàn lại/);
+    expect(p.spec.ok).toBe("Mở");
+    expect(p.spec.cancel).toBe("Giữ lại");
+  });
+
+  it("unlockPlan: không đủ Duyên / giá hỏng / Duyên hỏng thì null (nút đã tắt, không hỏi)", () => {
+    expect(unlockPlan("x", 100, 99)).toBeNull();
+    expect(unlockPlan("x", 0, 100)).toBeNull();
+    expect(unlockPlan("x", -5, 100)).toBeNull();
+    expect(unlockPlan("x", 10.5, 100)).toBeNull();
+    expect(unlockPlan("x", Number.NaN, 100)).toBeNull();
+    expect(unlockPlan("x", 10, Number.NaN)).toBeNull();
+    expect(unlockPlan("x", 10, Infinity)).toBeNull();
+    expect(unlockPlan("x", 100, 100)!.spec.text).toMatch(/còn lại 0\)/); // đủ vừa
+  });
+
+  it("unlockStillValid: giá đổi / đã mở hết / Duyên không còn đủ thì HUỶ", () => {
+    const p = unlockPlan("x", 100, 130)!;
+    expect(unlockStillValid(p, 100, 130)).toBe(true);
+    expect(unlockStillValid(p, 100, 100)).toBe(true);
+    expect(unlockStillValid(p, 100, 99)).toBe(false); // vừa tiêu Duyên chỗ khác
+    expect(unlockStillValid(p, 150, 500)).toBe(false); // nấc kế đắt hơn (đã mở nấc này)
+    expect(unlockStillValid(p, null, 500)).toBe(false); // đã mở hết / đã sở hữu
+    expect(unlockStillValid(p, 100, Number.NaN)).toBe(false);
+  });
+
+  it("rebirthPlan: tóm tắt xuất thân, số di vật giữ, số chiêu khắc; nút 'Xem lại' quay về màn chọn", () => {
+    const s = rebirthPlan("Kiếm khách", 2, 1);
+    expect(s.text).toBe("Đầu thai làm Kiếm khách, giữ 2 di vật, khắc 1 chiêu?");
+    expect(s.warn).toMatch(/không đổi lại được/);
+    expect(s.ok).toBe("Đầu thai");
+    expect(s.cancel).toBe("Xem lại");
+    expect(rebirthPlan("Phàm gia", 0, 0).text).toBe(
+      "Đầu thai làm Phàm gia, giữ 0 di vật, khắc 0 chiêu?",
+    );
+  });
+
+  it("rebirthPlan: số hỏng coi như 0, số thập phân làm tròn xuống", () => {
+    expect(rebirthPlan("A", -3, Number.NaN).text).toBe(
+      "Đầu thai làm A, giữ 0 di vật, khắc 0 chiêu?",
+    );
+    expect(rebirthPlan("A", 2.9, 1.2).text).toBe("Đầu thai làm A, giữ 2 di vật, khắc 1 chiêu?");
+    expect(rebirthPlan("A", Infinity, 1).text).toBe("Đầu thai làm A, giữ 0 di vật, khắc 1 chiêu?");
   });
 });
