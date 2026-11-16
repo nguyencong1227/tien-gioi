@@ -11,7 +11,11 @@ import {
   RECIPE_BY_ID,
   ITEM_BY_ID,
   SHOP_BY_NPC,
+  CRAFT_STATIONS,
+  NPC_BY_ID,
   canAccept,
+  craftStationOf,
+  craftSuccessText,
   countItem,
   dayKey,
   questReady,
@@ -34,6 +38,18 @@ import { GATEKEEPER_ID, dungeonDialog } from "./dungeon";
 export { nearNpc };
 
 const itemName = (id: string) => ITEM_BY_ID[id]?.name ?? id;
+
+/**
+ * Lựa chọn mở bảng chế của NPC (#514): nhãn theo trạm ("Rèn đồ" / "Luyện đan" / "Chế phù"). Lò rèn giữ NGUYÊN hành động cũ `{ kind: "forge" }`
+ * (không thêm `station`) để mọi thứ đang chạy không đổi; trạm khác gửi kèm `station` cho client vẽ tiêu đề / nút.
+ */
+function forgeOption(npc: NpcDef): DialogOption {
+  const station = craftStationOf(npc);
+  return {
+    label: CRAFT_STATIONS[station].label,
+    action: station === "forge" ? { kind: "forge" } : { kind: "forge", station },
+  };
+}
 
 /** Hộp thoại theo trạng thái nhiệm vụ hiện tại của người chơi với NPC này. */
 function buildDialog(w: World, p: Player, c: PlayerCtrl, npc: NpcDef): DialogMsg {
@@ -62,9 +78,7 @@ function buildDialog(w: World, p: Player, c: PlayerCtrl, npc: NpcDef): DialogMsg
       ...(t.give.every((g) => countItem(c.inv, g.itemId) >= g.qty) ? {} : { disabled: true }),
     })),
     // NPC có công thức rèn: một lựa chọn mở bảng rèn (danh sách RECIPES do client tự vẽ)
-    ...(RECIPES.some((x) => x.npcId === npc.id)
-      ? [{ label: "Rèn đồ", action: { kind: "forge" as const } }]
-      : []),
+    ...(RECIPES.some((x) => x.npcId === npc.id) ? [forgeOption(npc)] : []),
     // NPC có cửa hàng: một lựa chọn mở bảng mua / bán (hàng bán do client đọc từ SHOP_BY_NPC)
     ...(SHOP_BY_NPC[npc.id] ? [{ label: "Cửa hàng", action: { kind: "shop" as const } }] : []),
     { label: "Rời đi", action: { kind: "close" } },
@@ -220,6 +234,11 @@ export function craft(w: World, sid: string, recipeId: unknown) {
     return w.events.toast(sid, { text: "Túi đồ đã đầy.", tone: "bad" });
   }
   if (fee > 0) changeCoin(w, sid, -fee);
-  w.events.toast(sid, { text: `Rèn thành công ${itemName(rc.output.itemId)}.`, tone: "good" });
+  // Chữ theo trạm (#514): Rèn / Luyện / Chế thành công, từ `NpcDef.station` của NPC công thức (thiếu = lò rèn)
+  const station = craftStationOf(NPC_BY_ID[rc.npcId]);
+  w.events.toast(sid, {
+    text: craftSuccessText(station, itemName(rc.output.itemId)),
+    tone: "good",
+  });
   sendInv(w, sid, [{ ...rc.output }]);
 }
