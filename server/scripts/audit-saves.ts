@@ -55,6 +55,8 @@ import {
   cleanSectName,
   cleanSectTag,
   sectKey,
+  SECT_QUEST_SLOTS,
+  questDefAny,
 } from "@tien-gioi/shared";
 import { byId } from "../src/systems/lookup.js";
 import { soulIdOf } from "../src/soul.js";
@@ -455,7 +457,7 @@ export function auditPlayerSaveData(rawText: string, byteLength: number): AuditE
         } else {
           for (const act of data.quests.active) {
             const qId = act?.id;
-            if (typeof qId !== "string" || !byId(QUEST_BY_ID, qId)) {
+            if (typeof qId !== "string" || !questDefAny(qId)) {
               errors.push({
                 code: "unknown_quest",
                 message: `Nhiệm vụ đang làm không tồn tại: ${show(qId)}`,
@@ -1598,6 +1600,12 @@ export function auditSectSaveData(rawText: string, byteLength: number): AuditErr
                 message: `Thành viên thứ ${i} có today.quests không phải là một mảng`,
               });
             } else {
+              if (m.today.quests.length > SECT_QUEST_SLOTS) {
+                errors.push({
+                  code: "sect_member_today_quests_exceed_slots",
+                  message: `Thành viên thứ ${i} có today.quests (${m.today.quests.length}) vượt quá số ô nhiệm vụ mỗi ngày (${SECT_QUEST_SLOTS})`,
+                });
+              }
               const seenQuests = new Set<string>();
               for (let q = 0; q < m.today.quests.length; q++) {
                 const qId = m.today.quests[q];
