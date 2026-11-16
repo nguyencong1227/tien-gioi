@@ -761,6 +761,8 @@ export class WorldScene extends Phaser.Scene {
       (window as any).__game = this.game;
       (window as any).__scene = this;
       (window as any).__fx = this.fx;
+      // Cho `check-boss-bar.mjs`: bắt lời gọi `sound.boss` (headless không có âm thanh thật) để kiểm tiếng trùm đúng lúc, đúng hệ
+      (window as any).__sound = sound;
       // Cho `leak:test`: danh sách mọi công thức hạt đã đăng ký, để khởi động phát MỖI công thức một lần (mỗi công thức tạo MỘT emitter ở lần phát đầu, `fx.ts` emitterFor)
       (window as any).__fxRecipeIds = recipeIds;
       // Cho `leak:test` (client/scripts/leak-test.mjs) dựng lại hình ảnh của từng bản đồ ngay trong trang (#408 bước 4)
