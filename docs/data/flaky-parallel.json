@@ -1,0 +1,123 @@
+{
+  "mode": "parallel",
+  "timestamp": "2026-11-16T15:39:27.488Z",
+  "runsTarget": 2,
+  "runsCompleted": 4,
+  "avgRunDurationSec": 92.3,
+  "flakySuitesCount": 3,
+  "stableSuitesCount": 278,
+  "suiteStats": [
+    {
+      "suiteFile": "server/src/systems/perf.test.ts",
+      "totalRuns": 4,
+      "failedRuns": 2,
+      "failureRatePct": 50,
+      "avgDurationMs": 0,
+      "failedTestTitles": {
+        "kịch bản hiệu năng chiêu thức (M7.10 #511) > người chơi Nguyên Anh (realm 4, tier 0..2) thi triển đủ 6 chiêu đợt 2 quanh bãi quái Hàn Vân (#722, #515): tick < 10 ms, byte/tick < 520 mỗi client": 2
+      },
+      "sampleErrors": {
+        "kịch bản hiệu năng chiêu thức (M7.10 #511) > người chơi Nguyên Anh (realm 4, tier 0..2) thi triển đủ 6 chiêu đợt 2 quanh bãi quái Hàn Vân (#722, #515): tick < 10 ms, byte/tick < 520 mỗi client": "AssertionError: expected 19.37248399999953 to be less than 10\n    at /home/nguyencong/TT/tien-gioi-c/server/src/systems/perf.test.ts:811:19\n    at file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11\n    at file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26\n    at file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20\n    at new Promise (<anonymous>)\n    at runWithTimeout ("
+      }
+    },
+    {
+      "suiteFile": "client/scripts/comfy-scripts.test.ts",
+      "totalRuns": 4,
+      "failedRuns": 1,
+      "failureRatePct": 25,
+      "avgDurationMs": 0,
+      "failedTestTitles": {
+        "Dây chuyền đồ họa nháp ComfyUI + SDXL (Mục 16.2 & 17.3 QUYET_DINH_M3, G1 #486) > tích hợp chrome-gpu: detectGpu tự động nhường GPU khi có khóa và tg-comfy active": 1
+      },
+      "sampleErrors": {
+        "Dây chuyền đồ họa nháp ComfyUI + SDXL (Mục 16.2 & 17.3 QUYET_DINH_M3, G1 #486) > tích hợp chrome-gpu: detectGpu tự động nhường GPU khi có khóa và tg-comfy active": "AssertionError: expected [ '--enable-gpu', …(2) ] to deeply equal [ '--disable-gpu' ]\n    at /home/nguyencong/TT/tien-gioi-c/client/scripts/comfy-scripts.test.ts:258:35\n    at file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11\n    at file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26\n    at file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20\n    at new Promise (<anonym"
+      }
+    },
+    {
+      "suiteFile": "server/src/rooms/WorldRoom.sect.test.ts",
+      "totalRuns": 4,
+      "failedRuns": 1,
+      "failureRatePct": 25,
+      "avgDurationMs": 0,
+      "failedTestTitles": {
+        "tông môn: kho đồ qua server Colyseus thật (mục 27) > Đệ tử góp, Tông chủ nhận ảnh chụp kho; Đệ tử rút có hạn mức (lượt 4 bị từ chối); túi + hồ sơ + tệp tông môn khớp, tổng đồ không đổi; tin rác không làm gì": 1
+      },
+      "sampleErrors": {
+        "tông môn: kho đồ qua server Colyseus thật (mục 27) > Đệ tử góp, Tông chủ nhận ảnh chụp kho; Đệ tử rút có hạn mức (lượt 4 bị từ chối); túi + hồ sơ + tệp tông môn khớp, tổng đồ không đổi; tin rác không làm gì": "Error: Hết thời gian chờ lượt 2\n    at waitFor (/home/nguyencong/TT/tien-gioi-c/server/src/rooms/WorldRoom.sect.test.ts:63:33)\n    at /home/nguyencong/TT/tien-gioi-c/server/src/rooms/WorldRoom.sect.test.ts:387:7\n    at file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20"
+      }
+    }
+  ],
+  "runs": [
+    {
+      "runIndex": 1,
+      "mode": "parallel",
+      "success": true,
+      "durationMs": 92422,
+      "totalSuites": 281,
+      "failedSuites": 0,
+      "totalTests": 4903,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 2,
+      "mode": "parallel",
+      "success": false,
+      "durationMs": 92649,
+      "totalSuites": 281,
+      "failedSuites": 1,
+      "totalTests": 4903,
+      "failedTests": 1,
+      "failures": [
+        {
+          "suiteFile": "server/src/systems/perf.test.ts",
+          "testTitle": "kịch bản hiệu năng chiêu thức (M7.10 #511) > người chơi Nguyên Anh (realm 4, tier 0..2) thi triển đủ 6 chiêu đợt 2 quanh bãi quái Hàn Vân (#722, #515): tick < 10 ms, byte/tick < 520 mỗi client",
+          "errorMessage": "AssertionError: expected 19.37248399999953 to be less than 10\n    at /home/nguyencong/TT/tien-gioi-c/server/src/systems/perf.test.ts:811:19\n    at file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11\n    at file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26\n    at file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (",
+          "durationMs": 314.46631699999944
+        }
+      ]
+    },
+    {
+      "runIndex": 3,
+      "mode": "parallel",
+      "success": false,
+      "durationMs": 92306,
+      "totalSuites": 281,
+      "failedSuites": 1,
+      "totalTests": 4903,
+      "failedTests": 1,
+      "failures": [
+        {
+          "suiteFile": "client/scripts/comfy-scripts.test.ts",
+          "testTitle": "Dây chuyền đồ họa nháp ComfyUI + SDXL (Mục 16.2 & 17.3 QUYET_DINH_M3, G1 #486) > tích hợp chrome-gpu: detectGpu tự động nhường GPU khi có khóa và tg-comfy active",
+          "errorMessage": "AssertionError: expected [ '--enable-gpu', …(2) ] to deeply equal [ '--disable-gpu' ]\n    at /home/nguyencong/TT/tien-gioi-c/client/scripts/comfy-scripts.test.ts:258:35\n    at file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11\n    at file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26\n    at file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20\n    at new Promise (<anonym",
+          "durationMs": 47.038878999999724
+        }
+      ]
+    },
+    {
+      "runIndex": 4,
+      "mode": "parallel",
+      "success": false,
+      "durationMs": 91652,
+      "totalSuites": 281,
+      "failedSuites": 2,
+      "totalTests": 4903,
+      "failedTests": 2,
+      "failures": [
+        {
+          "suiteFile": "server/src/rooms/WorldRoom.sect.test.ts",
+          "testTitle": "tông môn: kho đồ qua server Colyseus thật (mục 27) > Đệ tử góp, Tông chủ nhận ảnh chụp kho; Đệ tử rút có hạn mức (lượt 4 bị từ chối); túi + hồ sơ + tệp tông môn khớp, tổng đồ không đổi; tin rác không làm gì",
+          "errorMessage": "Error: Hết thời gian chờ lượt 2\n    at waitFor (/home/nguyencong/TT/tien-gioi-c/server/src/rooms/WorldRoom.sect.test.ts:63:33)\n    at /home/nguyencong/TT/tien-gioi-c/server/src/rooms/WorldRoom.sect.test.ts:387:7\n    at file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20",
+          "durationMs": 5234.266747999999
+        },
+        {
+          "suiteFile": "server/src/systems/perf.test.ts",
+          "testTitle": "kịch bản hiệu năng chiêu thức (M7.10 #511) > người chơi Nguyên Anh (realm 4, tier 0..2) thi triển đủ 6 chiêu đợt 2 quanh bãi quái Hàn Vân (#722, #515): tick < 10 ms, byte/tick < 520 mỗi client",
+          "errorMessage": "AssertionError: expected 11.609846000000289 to be less than 10\n    at /home/nguyencong/TT/tien-gioi-c/server/src/systems/perf.test.ts:811:19\n    at file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11\n    at file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26\n    at file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20\n    at new Promise (<anonymous>)\n    at runWithTimeout ",
+          "durationMs": 182.15391200000067
+        }
+      ]
+    }
+  ]
+}
