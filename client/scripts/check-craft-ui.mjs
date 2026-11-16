@@ -128,7 +128,7 @@ async function main() {
       `--user-data-dir=${tmp}`,
       "about:blank",
     ],
-    { stdio: "ignore" },
+    { stdio: "ignore", detached: true }, // nhóm tiến trình riêng: dọn được cả tiến trình con của Chrome (zygote, GPU) một lần
   );
   let failures = 0;
   const check = (ok, msg) => {
@@ -454,6 +454,15 @@ async function main() {
         toast.some((t) => t === "Hộ đạo: cộng 15% xác suất đột phá lần kế trong 15 phút"),
         `toast thành công: ${JSON.stringify(toast)}`,
       );
+      // toast dài không bị bóp thành cột hẹp: nằm trong màn hình và tối đa 3 dòng (cao <= 110 px)
+      const toastBox = await evalJs(
+        `(() => { const p = [...document.querySelectorAll("#toast p")].pop(); if (!p) return null; const r = p.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, h: r.height }; })()`,
+      );
+      check(
+        toastBox !== null && toastBox.left >= -1 && toastBox.right <= vp.w + 1 && toastBox.h <= 110,
+        `toast gọn: ${toastBox ? `${(toastBox.right - toastBox.left).toFixed(0)}x${toastBox.h.toFixed(0)}px` : "không có"}`,
+      );
+      await shot("toast-thanh-cong");
       await evalJs(`window.__ui.toggleInventory(false)`);
 
       // ---- 4. Qua cổng ----
@@ -533,9 +542,22 @@ async function main() {
       })()`);
     }
   } finally {
-    chrome.kill("SIGKILL");
+    try {
+      process.kill(-chrome.pid, "SIGKILL"); // cả nhóm
+    } catch {
+      chrome.kill("SIGKILL");
+    }
     server.close();
-    fs.rmSync(tmp, { recursive: true, force: true });
+    // Chrome còn ghi vào thư mục hồ sơ ngay sau SIGKILL (ENOTEMPTY): chờ nó thoát rồi xoá có thử lại; dọn không được thì bỏ qua, KHÔNG làm đỏ kết quả kiểm
+    await new Promise((r) => {
+      chrome.once("exit", r);
+      setTimeout(r, 1500);
+    });
+    try {
+      fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    } catch {
+      // bỏ qua
+    }
   }
   console.log(failures === 0 ? "\nTẤT CẢ ĐẠT" : `\n${failures} LỖI`);
   process.exit(failures === 0 ? 0 : 1);

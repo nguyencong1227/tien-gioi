@@ -2287,7 +2287,9 @@ html[data-form="phone"][data-orient="portrait"] .inv-slot .slot-icon {
   color: #f6e7c4;
 }
 .act-btn.use:disabled {
-  opacity: 0.4;
+  /* mờ nhưng ĐỌC ĐƯỢC: nút mờ mang lý do ("Đang còn hiệu lực", "Cần đỉnh Trúc Cơ, đầy tu vi", #514) chứ không chỉ là trạng thái tắt */
+  opacity: 0.7;
+  filter: grayscale(0.45);
   cursor: default;
 }
 .act-btn.drop {
@@ -2300,6 +2302,10 @@ html[data-form="phone"][data-orient="portrait"] .inv-slot .slot-icon {
   top: 16%;
   left: 50%;
   transform: translateX(-50%);
+  /* `left: 50%` làm hộp co theo NỬA bề ngang còn lại: toast dài (vd. "Hộ đạo: cộng 15% xác suất đột phá lần kế trong 15 phút") bị bóp thành cột 4 dòng ở
+     điện thoại. `max-content` cho nó rộng đúng bằng chữ, tới tối đa 92% màn hình. */
+  width: max-content;
+  max-width: min(92vw, 420px);
   pointer-events: none;
   text-align: center;
 }
