@@ -314,7 +314,10 @@ export async function runNetGuardChecks(opts: RunOptions = {}): Promise<Summary>
         const { room, w, p, c } = bot;
         w.reincarnate = true; // Bật luân hồi để chết thật sẽ vào Hoàng Tuyền (limbo)
 
-        // Dọn dẹp quái tự nhiên để không tấn công người chơi trong lúc đang đo khoảng im lặng 2-3s
+        // Vô hiệu hoá quái sinh lại trong Ca 2 để không có quái dã ngoại chém trộm
+        // làm kích hoạt sớm spare/shield (nguyên nhân gây chập chờn dưới tải CI, #752).
+        const origCapOf = w.map.monsterCapOf.bind(w.map);
+        w.map.monsterCapOf = () => 0;
         w.state.monsters.clear();
         w.mctrl.clear();
 
@@ -333,95 +336,105 @@ export async function runNetGuardChecks(opts: RunOptions = {}): Promise<Summary>
           wildY += 32;
         }
 
-        for (let i = 1; i <= 4; i++) {
-          // Gỡ hộ thể và ghost nếu còn từ lần trước
-          c.shieldUntil = undefined;
-          w.shielded.delete(room.sessionId);
-          w.ghosts.delete(room.sessionId);
-          c.silent = false;
+        try {
+          for (let i = 1; i <= 4; i++) {
+            // Dọn sạch quái dã ngoại
+            w.state.monsters.clear();
+            w.mctrl.clear();
 
-          // Đưa nhân vật ra dã ngoại
-          p.x = wildX;
-          p.y = wildY;
-          syncPublicPos(p);
+            // Gỡ hộ thể và ghost nếu còn từ lần trước
+            c.shieldUntil = undefined;
+            w.shielded.delete(room.sessionId);
+            w.ghosts.delete(room.sessionId);
+            c.silent = false;
+            c.silentSince = undefined;
 
-          // Client gửi 1 ping và đợi máy chủ ghi nhận mốc lastHeardAt mới
-          const prevHeard = c.lastHeardAt;
-          room.send("ping", { t: Date.now() });
-          await waitFor(() => c.lastHeardAt !== prevHeard, 3000);
-          const heardAt = c.lastHeardAt!;
+            // Đưa nhân vật ra dã ngoại
+            p.x = wildX;
+            p.y = wildY;
+            syncPublicPos(p);
 
-          // Chờ im lặng trong khoảng [2100, 2800] ms (NET_SPARE_SILENCE_MS = 2000, NET_SILENCE_GHOST_MS = 3000)
-          while (Date.now() - heardAt < 2150) {
-            await sleep(30);
+            // Client gửi 1 ping và đợi máy chủ ghi nhận mốc lastHeardAt mới
+            const prevHeard = c.lastHeardAt;
+            room.send("ping", { t: Date.now() });
+            await waitFor(() => c.lastHeardAt !== prevHeard, 3000);
+
+            // Đẩy mốc im lặng xác định 2200ms trước thời điểm tick hiện tại của máy chủ.
+            // Xác định 100% trong khoảng [NET_SPARE_SILENCE_MS, NET_SILENCE_GHOST_MS) = [2000, 3000),
+            // loại bỏ hoàn toàn việc sleep thời gian thực có thể bị trôi dưới tải cao hoặc bị quái cắn trộm.
+            c.lastHeardAt = w.now - 2200;
+
+            const currentSilence = w.now - c.lastHeardAt;
+            if (currentSilence >= NET_SILENCE_GHOST_MS) {
+              throw new Error(
+                `Lần ${i}: Im lặng quá ${NET_SILENCE_GHOST_MS}ms (${currentSilence}ms) trước khi kết liễu`,
+              );
+            }
+            if (currentSilence < NET_SPARE_SILENCE_MS) {
+              throw new Error(
+                `Lần ${i}: Chưa đạt ngưỡng ${NET_SPARE_SILENCE_MS}ms (${currentSilence}ms)`,
+              );
+            }
+
+            // Máu thấp, quái tung đòn kết liễu
+            p.hp = 1;
+            hurtPlayer(w, room.sessionId, p, 1e6, { kind: "lang" });
+
+            if (i <= 3) {
+              // Lần 1-3: ĐƯỢC THA CHẾT
+              if (p.dead) throw new Error(`Lần ${i}: p.dead là true (bị chết thật)`);
+              if (c.limbo !== undefined) throw new Error(`Lần ${i}: c.limbo tồn tại (bị mất kiếp)`);
+              if (!w.map.inSafe(p.x, p.y)) {
+                throw new Error(`Lần ${i}: Nhân vật không được hồi ở điểm an toàn`);
+              }
+              const expectedHp = Math.max(1, Math.round(p.maxHp * NET_SPARE_HP_PCT));
+              if (p.hp !== expectedHp) {
+                throw new Error(
+                  `Lần ${i}: Máu không phải 10% maxHp (có ${p.hp}, kỳ vọng ${expectedHp})`,
+                );
+              }
+              if (w.netStats.spared !== i) {
+                throw new Error(
+                  `Lần ${i}: w.netStats.spared là ${w.netStats.spared}, kỳ vọng ${i}`,
+                );
+              }
+              const sparedAudit = audits.filter((a) => a.ev === "net.spared").at(-1);
+              if (!sparedAudit || sparedAudit.fields.inWindow !== i) {
+                throw new Error(`Lần ${i}: Thiếu audit net.spared với inWindow = ${i}`);
+              }
+            } else {
+              // Lần 4: HẾT HẠN MỨC 3 LẦN / 10 PHÚT -> CHẾT THẬT (Hoàng Tuyền)
+              if (c.limbo === undefined) {
+                throw new Error("Lần 4: c.limbo là undefined (vẫn được tha dù đã hết hạn mức!)");
+              }
+              if (w.netStats.spared !== NET_SPARE_MAX) {
+                throw new Error(
+                  `Lần 4: w.netStats.spared là ${w.netStats.spared}, kỳ vọng giữ nguyên ${NET_SPARE_MAX}`,
+                );
+              }
+              if (w.netStats.spareDenied !== 1) {
+                throw new Error(
+                  `Lần 4: w.netStats.spareDenied là ${w.netStats.spareDenied}, kỳ vọng 1`,
+                );
+              }
+              const deniedAudit = audits.find((a) => a.ev === "net.spare_denied");
+              if (!deniedAudit || deniedAudit.fields.inWindow !== NET_SPARE_MAX) {
+                throw new Error(
+                  `Lần 4: Thiếu audit net.spare_denied với inWindow = ${NET_SPARE_MAX}`,
+                );
+              }
+              const metricDenied = await getMetric("tiengioi_room_net_spare_denied_total");
+              if (metricDenied !== 1 && w.netStats.spareDenied !== 1) {
+                throw new Error(
+                  `Lần 4: Metric tiengioi_room_net_spare_denied_total là ${metricDenied}, kỳ vọng 1`,
+                );
+              }
+            }
           }
-          const currentSilence = Date.now() - heardAt;
-          if (currentSilence >= NET_SILENCE_GHOST_MS) {
-            throw new Error(
-              `Lần ${i}: Im lặng quá ${NET_SILENCE_GHOST_MS}ms (${currentSilence}ms) trước khi kết liễu`,
-            );
-          }
-          if (currentSilence < NET_SPARE_SILENCE_MS) {
-            throw new Error(
-              `Lần ${i}: Chưa đạt ngưỡng ${NET_SPARE_SILENCE_MS}ms (${currentSilence}ms)`,
-            );
-          }
-
-          // Máu thấp, quái tung đòn kết liễu
-          p.hp = 1;
-          hurtPlayer(w, room.sessionId, p, 1e6, { kind: "lang" });
-
-          if (i <= 3) {
-            // Lần 1-3: ĐƯỢC THA CHẾT
-            if (p.dead) throw new Error(`Lần ${i}: p.dead là true (bị chết thật)`);
-            if (c.limbo !== undefined) throw new Error(`Lần ${i}: c.limbo tồn tại (bị mất kiếp)`);
-            if (!w.map.inSafe(p.x, p.y)) {
-              throw new Error(`Lần ${i}: Nhân vật không được hồi ở điểm an toàn`);
-            }
-            const expectedHp = Math.max(1, Math.round(p.maxHp * NET_SPARE_HP_PCT));
-            if (p.hp !== expectedHp) {
-              throw new Error(
-                `Lần ${i}: Máu không phải 10% maxHp (có ${p.hp}, kỳ vọng ${expectedHp})`,
-              );
-            }
-            if (w.netStats.spared !== i) {
-              throw new Error(`Lần ${i}: w.netStats.spared là ${w.netStats.spared}, kỳ vọng ${i}`);
-            }
-            const sparedAudit = audits.filter((a) => a.ev === "net.spared").at(-1);
-            if (!sparedAudit || sparedAudit.fields.inWindow !== i) {
-              throw new Error(`Lần ${i}: Thiếu audit net.spared với inWindow = ${i}`);
-            }
-          } else {
-            // Lần 4: HẾT HẠN MỨC 3 LẦN / 10 PHÚT -> CHẾT THẬT (Hoàng Tuyền)
-            if (c.limbo === undefined) {
-              throw new Error("Lần 4: c.limbo là undefined (vẫn được tha dù đã hết hạn mức!)");
-            }
-            if (w.netStats.spared !== NET_SPARE_MAX) {
-              throw new Error(
-                `Lần 4: w.netStats.spared là ${w.netStats.spared}, kỳ vọng giữ nguyên ${NET_SPARE_MAX}`,
-              );
-            }
-            if (w.netStats.spareDenied !== 1) {
-              throw new Error(
-                `Lần 4: w.netStats.spareDenied là ${w.netStats.spareDenied}, kỳ vọng 1`,
-              );
-            }
-            const deniedAudit = audits.find((a) => a.ev === "net.spare_denied");
-            if (!deniedAudit || deniedAudit.fields.inWindow !== NET_SPARE_MAX) {
-              throw new Error(
-                `Lần 4: Thiếu audit net.spare_denied với inWindow = ${NET_SPARE_MAX}`,
-              );
-            }
-            const metricDenied = await getMetric("tiengioi_room_net_spare_denied_total");
-            if (metricDenied !== 1 && w.netStats.spareDenied !== 1) {
-              throw new Error(
-                `Lần 4: Metric tiengioi_room_net_spare_denied_total là ${metricDenied}, kỳ vọng 1`,
-              );
-            }
-          }
+        } finally {
+          w.map.monsterCapOf = origCapOf;
+          await room.leave(true).catch(() => {});
         }
-
-        await room.leave(true);
 
         results.push({
           id: "ca_2",
@@ -447,14 +460,29 @@ export async function runNetGuardChecks(opts: RunOptions = {}): Promise<Summary>
     if (selectedCase === "all" || selectedCase === "3") {
       const t0 = Date.now();
       try {
-        // 3a. Client mới nhưng im lặng < 2s rồi bị hạ
+        // 3a. Client mới nhưng im lặng < 2s rồi bị hạ (ở dã ngoại)
         const bot3a = await joinBot({ beatMs: NET_BEAT_MS });
         bot3a.w.reincarnate = true;
         const audits3a: string[] = [];
         bot3a.w.audit = (ev) => audits3a.push(ev);
 
+        const spot3a = safeSpot(bot3a.w.map);
+        let wildX3a = spot3a.x + 300;
+        let wildY3a = spot3a.y + 300;
+        while (
+          bot3a.w.map.isBlockedPx(wildX3a, wildY3a) ||
+          bot3a.w.map.inSafe(wildX3a, wildY3a, 40)
+        ) {
+          wildX3a += 32;
+          wildY3a += 32;
+        }
+        bot3a.p.x = wildX3a;
+        bot3a.p.y = wildY3a;
+        syncPublicPos(bot3a.p);
+
         bot3a.room.send("ping", { t: 1 });
-        await sleep(300); // Im lặng 300ms < 2000ms
+        await waitFor(() => bot3a.c.lastHeardAt !== undefined, 3000);
+        bot3a.c.lastHeardAt = bot3a.w.now - 300; // Im lặng 300ms < 2000ms
 
         bot3a.p.hp = 1;
         hurtPlayer(bot3a.w, bot3a.room.sessionId, bot3a.p, 1e6, { kind: "lang" });
@@ -470,12 +498,18 @@ export async function runNetGuardChecks(opts: RunOptions = {}): Promise<Summary>
         // 3b. Client CŨ (không khai beatMs)
         const bot3b = await joinBot({ beatMs: null });
         bot3b.w.reincarnate = true;
+        bot3b.p.x = wildX3a;
+        bot3b.p.y = wildY3a;
+        syncPublicPos(bot3b.p);
+
         if (bot3b.c.beatMs !== undefined) {
           throw new Error("3b: beatMs của client cũ không phải undefined");
         }
 
-        // Chờ 3.5s (> 3s NET_SILENCE_GHOST_MS)
-        await sleep(3500);
+        // Đặt mốc 3.5s trước (> 3s NET_SILENCE_GHOST_MS) và đợi 1 nhịp tick để tickNetGuard chạy
+        bot3b.c.lastHeardAt = bot3b.w.now - 3500;
+        await sleep(60);
+
         if (bot3b.w.ghosts.has(bot3b.room.sessionId)) {
           throw new Error("3b: Client cũ bị coi là ghost sau 3.5s im lặng");
         }

@@ -1925,9 +1925,24 @@ export async function runQuestWalk(options: QuestWalkOptions = {}): Promise<{
     });
   }
   console.log(`==============================================================================`);
-  console.log(
-    `Tổng số: ${results.length} | Thành công: ${results.filter((r) => r.success).length} | Thất bại: ${results.filter((r) => !r.success).length} | Tổng thời gian: ${totalTimeSec}s\n`,
-  );
+  if (repeat > 1) {
+    let stableCount = 0;
+    let flakyCount = 0;
+    let failCount = 0;
+    statsMap.forEach((st) => {
+      const p = st.runs.filter((x) => x.success).length;
+      if (p === repeat) stableCount++;
+      else if (p > 0) flakyCount++;
+      else failCount++;
+    });
+    console.log(
+      `Tổng số nhiệm vụ: ${statsMap.size} | ĐẠT ổn định: ${stableCount} | CHẬP CHỜN: ${flakyCount} | ĐỎ: ${failCount} | Lượt lặp: ${repeat} | Tổng thời gian: ${totalTimeSec}s\n`,
+    );
+  } else {
+    console.log(
+      `Tổng số: ${results.length} | Thành công: ${results.filter((r) => r.success).length} | Thất bại: ${results.filter((r) => !r.success).length} | Tổng thời gian: ${totalTimeSec}s\n`,
+    );
+  }
 
   const failedQuests = results.filter((r) => !r.success);
   if (failedQuests.length > 0) {
@@ -1956,7 +1971,17 @@ if (isDirectCli) {
   const timeoutArg = args.find((a) => a.startsWith("--timeout="))?.split("=")[1];
   const timeoutSec = timeoutArg ? Number(timeoutArg) : 60;
   const repeatArg = args.find((a) => a.startsWith("--repeat="))?.split("=")[1];
-  const repeat = repeatArg ? Math.max(1, Number(repeatArg)) : 1;
+  let repeat = 1;
+  if (repeatArg !== undefined) {
+    const parsed = Number(repeatArg);
+    if (!Number.isFinite(parsed) || parsed < 1 || !Number.isInteger(parsed)) {
+      console.error(
+        `Lỗi: Tham số --repeat phải là số nguyên dương hợp lệ (nhận '${repeatArg}').\nCách dùng: npm run quest-walk -w server -- --quest=<id> --repeat=5`,
+      );
+      process.exit(2);
+    }
+    repeat = parsed;
+  }
 
   runQuestWalk({
     questId: questArg,
