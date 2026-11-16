@@ -64,6 +64,11 @@ html[data-form="phone"] .sheet:not(.sheet-card) {
   animation: sheet-in-up 0.22s ease-out;
 }
 
+/* Nút Đóng nổi (cố định, góc dưới phải) che đáy tấm: cuộn theo tiêu điểm / `scrollIntoView` chừa chỗ cho nó, để nút vừa được focus không nằm dưới nút Đóng */
+html[data-form="phone"] .sheet:not(.sheet-card) {
+  scroll-padding-bottom: 84px;
+}
+
 /* Điện thoại xoay ngang: ngăn kéo sát cạnh phải, chừa cảnh game bên trái */
 html[data-form="phone"][data-orient="landscape"] .sheet:not(.sheet-card) {
   left: auto;

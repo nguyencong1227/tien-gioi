@@ -697,6 +697,12 @@ function selectSlot(i: number) {
 let dropPlanPending: DropPlan | null = null;
 /** Nút đã mở hộp (trả focus về đó khi đóng hộp bằng Esc / "Giữ lại") */
 let dropConfirmOpener: HTMLElement | null = null;
+/**
+ * Chống "click ma" (cảm ứng): hộp xác nhận hiện NGAY CHỖ nút Vứt vừa chạm; `click` do trình duyệt tạo sau khi nhả ngón có thể rơi vào nút "Vứt" của
+ * hộp (bố cục vừa đổi) và xác nhận luôn mà người chơi chưa kịp đọc. Hai nút trong hộp bỏ qua mọi lần bấm trong chừng này ms đầu sau khi hộp mở.
+ */
+const DROP_CONFIRM_GUARD_MS = 450;
+let dropConfirmOpenedAt = -Infinity;
 
 /** Mở hộp xác nhận vứt cho ô được chọn: ghi rõ TÊN + SỐ LƯỢNG (+ dòng nhắc đồ quý). `all` = "Vứt hết", ngược lại vứt 1. */
 function askDropConfirm(all: boolean, opener: HTMLElement | null) {
@@ -705,11 +711,13 @@ function askDropConfirm(all: boolean, opener: HTMLElement | null) {
   if (!plan || !def) return;
   dropPlanPending = plan;
   dropConfirmOpener = opener;
+  dropConfirmOpenedAt = performance.now();
   $("inv-drop-text").textContent = dropConfirmText(def.name, plan);
   const warn = dropWarnText(def.rarity, rarityStyle(def.rarity).name);
   const warnEl = $("inv-drop-warn");
   warnEl.textContent = warn ?? "";
   warnEl.hidden = warn === null;
+  $("inv-detail").classList.add("dropping"); // hộp thế chỗ hàng nút hành động (không đẩy bố cục xuống dưới nút Đóng nổi của điện thoại)
   $("inv-drop-confirm").hidden = false;
   ($("inv-drop-no") as HTMLButtonElement).focus(); // mặc định "Giữ lại": Enter nhầm cũng không vứt
 }
@@ -719,6 +727,7 @@ function closeDropConfirm(refocus = true): boolean {
   const box = document.getElementById("inv-drop-confirm");
   if (!box || box.hidden) return false;
   box.hidden = true;
+  $("inv-detail").classList.remove("dropping");
   dropPlanPending = null;
   const back = dropConfirmOpener;
   dropConfirmOpener = null;
@@ -728,6 +737,7 @@ function closeDropConfirm(refocus = true): boolean {
 
 /** "Vứt" trong hộp: kiểm lại túi vẫn còn ĐÚNG món + đủ số lượng như lúc bấm rồi mới gửi `dropItem`; đã đổi thì huỷ kèm thông báo. */
 function confirmDrop() {
+  if (performance.now() - dropConfirmOpenedAt < DROP_CONFIRM_GUARD_MS) return; // click ma ngay sau khi hộp mở: bỏ qua
   const plan = dropPlanPending;
   closeDropConfirm(true);
   if (!plan) return;
@@ -3067,7 +3077,10 @@ export const ui = {
     bindTap("inv-btn-drop1", () => askDropConfirm(false, $("inv-btn-drop1")));
     bindTap("inv-btn-dropall", () => askDropConfirm(true, $("inv-btn-dropall")));
     bindTap("inv-drop-yes", () => confirmDrop());
-    bindTap("inv-drop-no", () => closeDropConfirm(true));
+    bindTap("inv-drop-no", () => {
+      if (performance.now() - dropConfirmOpenedAt < DROP_CONFIRM_GUARD_MS) return;
+      closeDropConfirm(true);
+    });
     bindTap("quick-1", () => this.useQuick(1));
     bindTap("quick-2", () => this.useQuick(2));
     bindTap("btn-pickup", () => callbacks?.onPickup());
