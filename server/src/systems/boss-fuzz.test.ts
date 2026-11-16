@@ -10,10 +10,13 @@ import {
   BOSS_ESCAPE_SPEED,
   BOSS_HIT_GRACE_PX,
   BOSS_MIN_CAST_GAP_MS,
+  BOSS_MIN_TELEGRAPH_MS,
   BOSS_REACT_MS,
   DEFAULT_MAP,
   MONSTER_BY_ID,
   PLAYER_RADIUS,
+  bossEscapeMs,
+  bossEscapePx,
   bossViolations,
   type BossAbility,
   type BossDef,
@@ -81,7 +84,7 @@ function randomShape(r: Rnd, kind: (typeof SHAPES)[number], telegraphMs: number)
       return { t: "ring", r0: r() < 0.2 ? 0 : int(r, 14, rr - 20), r: rr };
     }
     case "cone":
-      return { t: "cone", r: int(r, 80, 280), arc: between(r, 30, 340) * DEG };
+      return { t: "cone", r: int(r, 80, 280), arc: between(r, 30, 359) * DEG };
     case "line":
       return { t: "line", len: int(r, 100, 500), w: int(r, 30, 200) };
     case "charge":
@@ -112,12 +115,21 @@ function randomDef(r: Rnd): BossDef {
   const n = int(r, 1, 3);
   const abilities: BossAbility[] = [];
   for (let i = 0; i < n; i++) {
-    const telegraphMs = int(r, 800, 2200);
+    let telegraphMs = int(r, 800, 2200);
+    const kind = SHAPES[int(r, 0, SHAPES.length - 1)]!;
+    let shape = randomShape(r, kind, telegraphMs);
+    // Một nửa số chiêu được đặt SÁT BIÊN luật (báo trước chỉ hơn mức tối thiểu của `bossEscapeMs` 0-40 ms): ngẫu nhiên đều gần như không bao giờ chạm biên, mà biên mới là
+    // nơi công thức sai (quãng thoát hụt vài px) sẽ làm bot trúng đòn.
+    const px = bossEscapePx(shape);
+    if (px !== null && r() < 0.5) {
+      telegraphMs = Math.max(BOSS_MIN_TELEGRAPH_MS, Math.ceil(bossEscapeMs(px)) + int(r, 0, 40));
+      if (shape.t === "rain") shape = { ...shape, gapMs: telegraphMs + int(r, 0, 400) };
+    }
     const recoverMs = int(r, 300, 1200);
     abilities.push({
       id: `c${i}`,
       name: `c${i}`,
-      shape: randomShape(r, SHAPES[int(r, 0, SHAPES.length - 1)]!, telegraphMs),
+      shape,
       telegraphMs,
       recoverMs,
       cooldownMs: telegraphMs + recoverMs + int(r, 0, 4000),
