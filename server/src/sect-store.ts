@@ -12,20 +12,29 @@ import path from "node:path";
 import {
   ITEM_BY_ID,
   SECT_COIN_CAP,
+  SECT_CONTRIB_CAP,
+  SECT_DEPOSIT_DAY_CAP,
+  SECT_EARN_DAY_CAP,
   SECT_LOG_MAX,
+  SECT_POINTS_CAP,
   SECT_RANKS,
+  SECT_SHOP,
   SECT_VAULT_DRAW_DEFAULT,
   SECT_VAULT_DRAW_MAX,
   SECT_VAULT_LOG_MAX,
-  SECT_VAULT_SLOTS,
+  SECT_VAULT_SLOTS_MAX,
   cleanMotd,
   cleanName,
   cleanSectName,
   cleanSectTag,
+  isSectQuestTemplate,
   sectKey,
+  sectLevelInfo,
+  sectLevelOf,
   type InvSlot,
   type SectLogEntry,
   type SectLogKind,
+  type SectDayState,
   type SectRank,
   type SectVaultLogEntry,
 } from "@tien-gioi/shared";
@@ -46,14 +55,23 @@ export interface SectMemberRecord {
    * mục 11.6). Thiếu = chưa rút lần nào. Đọc - sửa - ghi TRONG `update` cùng lúc trừ kho, nên gửi dồn không vượt hạn mức.
    */
   draw?: { day: string; n: number };
+  /**
+   * Cống hiến còn TIÊU được (M8, docs/THIET_KE_TONG_MON.md mục 12.2); thiếu = 0 (bản ghi trước M8, hoặc bằng 0: không lưu để bản ghi cũ giữ nguyên).
+   * Luôn `0 <= contrib <= merit`. Mất cùng bản ghi thành viên khi rời tông / bị mời ra.
+   */
+  contrib?: number;
+  /** Công tích: tổng cống hiến đã kiếm trong tông này, KHÔNG BAO GIỜ giảm (thiếu = 0). */
+  merit?: number;
+  /** Sổ trong ngày (`SectDayState`): kiếm được bao nhiêu, nhiệm vụ đã trả, đã mua gì. Sang ngày thì `sectDayState(today, now)` đặt lại. Thiếu = chưa kiếm / mua gì. */
+  today?: SectDayState;
 }
 
 /**
- * Kho ĐỒ của tông môn (mục 11 THIET_KE_TONG_MON.md): `SECT_VAULT_SLOTS` ô cùng hình `InvSlot` như túi đồ, sổ (mới nhất đứng đầu, tối đa
+ * Kho ĐỒ của tông môn (mục 11 THIET_KE_TONG_MON.md): `SECT_VAULT_SLOTS_MAX` ô (M8: mảng luôn dài tối đa; chỉ `sectLevelInfo(level).vaultSlots` ô đầu dùng được) cùng hình `InvSlot` như túi đồ, sổ (mới nhất đứng đầu, tối đa
  * `SECT_VAULT_LOG_MAX`) và hạn mức rút / ngày của Đệ tử (Tông chủ chỉnh). Mọi thay đổi đi qua `SectStore.update` (nguyên tử theo tông môn).
  */
 export interface SectVault {
-  /** Đúng `SECT_VAULT_SLOTS` phần tử; ô trống là `null` */
+  /** Đúng `SECT_VAULT_SLOTS_MAX` phần tử (bản ghi cũ 40 ô được đệm ô trống khi đọc); ô trống là `null`; ô khoá theo cấp luôn `null` */
   slots: (InvSlot | null)[];
   log: SectVaultLogEntry[];
   /** 0..`SECT_VAULT_DRAW_MAX` */
@@ -63,7 +81,7 @@ export interface SectVault {
 /** Kho đồ rỗng, hạn mức mặc định. */
 export function emptySectVault(): SectVault {
   return {
-    slots: Array.from({ length: SECT_VAULT_SLOTS }, () => null),
+    slots: Array.from({ length: SECT_VAULT_SLOTS_MAX }, () => null),
     log: [],
     drawPerDay: SECT_VAULT_DRAW_DEFAULT,
   };
@@ -86,6 +104,11 @@ export interface Sect {
   log: SectLogEntry[];
   /** Kho đồ (bản ghi cũ không có thì `sanitizeSect` dựng kho rỗng; `v` vẫn là 1) */
   vault: SectVault;
+  /**
+   * Điểm tông (M8, mục 12.2): tổng cống hiến mọi thành viên từng kiếm, chỉ TĂNG (kể cả khi thành viên đã rời). Cấp tông KHÔNG lưu: `sectLevelOf(points)`.
+   * Thiếu = 0 (bản ghi trước M8, hoặc bằng 0: không lưu). Luôn >= tổng `merit` của các thành viên HIỆN CÓ.
+   */
+  points?: number;
   /** ms epoch */
   createdAt: number;
   updatedAt: number;
@@ -179,6 +202,38 @@ function sanitizeDraw(raw: unknown): { day: string; n: number } | undefined {
   return { day: raw.day, n: intIn(raw.n, SANE_DRAWS, 0) };
 }
 
+/** Số nguyên không âm trong `[0, max]` hoặc `0` (KHÔNG làm tròn: số lẻ / âm / không phải số là hỏng nên về 0). */
+function wholeIn(v: unknown, max: number): number {
+  return typeof v === "number" && Number.isSafeInteger(v) && v > 0 ? Math.min(v, max) : 0;
+}
+
+/**
+ * Sổ ngày đọc từ tệp / DB: GIỮ nguyên ngày đã lưu (không đặt lại sang hôm nay: người đọc dùng `sectDayState(today, now)` khi cần), chỉ làm sạch:
+ * ngày đúng dạng, số trong trần, id nhiệm vụ / món có thật, không trùng. Trả `undefined` nếu hỏng hoặc rỗng (không lưu sổ rỗng).
+ */
+export function sanitizeDay(raw: unknown): SectDayState | undefined {
+  if (!isRecord(raw) || typeof raw.day !== "string" || !DAY_RE.test(raw.day)) return undefined;
+  const earned = wholeIn(raw.earned, SECT_EARN_DAY_CAP);
+  const deposit = Math.min(wholeIn(raw.deposit, SECT_DEPOSIT_DAY_CAP), earned);
+  const quests = Array.isArray(raw.quests)
+    ? [...new Set(raw.quests.filter((q): q is string => isSectQuestTemplate(q)))]
+    : [];
+  const buys: Record<string, number> = {};
+  if (isRecord(raw.buys)) {
+    for (const e of SECT_SHOP) {
+      const n = wholeIn(
+        Object.prototype.hasOwnProperty.call(raw.buys, e.itemId) ? raw.buys[e.itemId] : 0,
+        e.limitDay,
+      );
+      if (n > 0) buys[e.itemId] = n;
+    }
+  }
+  const dungeon = raw.dungeon === true;
+  if (!earned && !deposit && !quests.length && !dungeon && !Object.keys(buys).length)
+    return undefined;
+  return { day: raw.day, earned, deposit, quests, dungeon, buys };
+}
+
 function sanitizeVaultLog(raw: unknown): SectVaultLogEntry[] {
   if (!Array.isArray(raw)) return [];
   const out: SectVaultLogEntry[] = [];
@@ -197,14 +252,14 @@ function sanitizeVaultLog(raw: unknown): SectVaultLogEntry[] {
 }
 
 /**
- * Làm sạch kho đồ đọc từ tệp / DB: đúng `SECT_VAULT_SLOTS` ô; món không còn tồn tại bị bỏ (ô thành trống), `qty` ép về [1, stack]; `drawPerDay`
+ * Làm sạch kho đồ đọc từ tệp / DB: đúng `SECT_VAULT_SLOTS_MAX` ô (bản ghi cũ 40 ô được ĐỆM ô trống, không đổi thứ tự); món không còn tồn tại bị bỏ (ô thành trống), `qty` ép về [1, stack]; `drawPerDay`
  * kẹp 0..`SECT_VAULT_DRAW_MAX` (thiếu / hỏng thì mặc định); sổ hỏng thì bỏ từng mục. Thiếu cả kho (bản ghi trước mục 27) thì kho rỗng.
  */
 export function sanitizeVault(raw: unknown): SectVault {
   const v = emptySectVault();
   if (!isRecord(raw)) return v;
   if (Array.isArray(raw.slots)) {
-    for (let i = 0; i < SECT_VAULT_SLOTS; i++) {
+    for (let i = 0; i < SECT_VAULT_SLOTS_MAX; i++) {
       const sl = raw.slots[i];
       if (!isRecord(sl)) continue;
       const def = byId(ITEM_BY_ID, sl.itemId);
@@ -215,6 +270,26 @@ export function sanitizeVault(raw: unknown): SectVault {
   v.log = sanitizeVaultLog(raw.log);
   v.drawPerDay = intIn(raw.drawPerDay, SECT_VAULT_DRAW_MAX, SECT_VAULT_DRAW_DEFAULT);
   return v;
+}
+
+const dayEmpty = (d: SectDayState | undefined): boolean =>
+  !d || (!d.earned && !d.deposit && !d.quests.length && !d.dungeon && !Object.keys(d.buys).length);
+
+/** Hai sổ ngày giống nhau (không phụ thuộc thứ tự khoá); sổ RỖNG coi như không có sổ (`sanitizeDay` không lưu sổ rỗng). */
+function sameDay(a: SectDayState | undefined, b: SectDayState | undefined): boolean {
+  if (dayEmpty(a) && dayEmpty(b)) return true;
+  if (!a || !b || dayEmpty(a) || dayEmpty(b)) return false;
+  const ak = Object.keys(a.buys);
+  return (
+    a.day === b.day &&
+    a.earned === b.earned &&
+    a.deposit === b.deposit &&
+    a.dungeon === b.dungeon &&
+    a.quests.length === b.quests.length &&
+    a.quests.every((q, i) => q === b.quests[i]) &&
+    ak.length === Object.keys(b.buys).length &&
+    ak.every((k) => a.buys[k] === b.buys[k])
+  );
 }
 
 /** Hai kho đồ giống nhau về NỘI DUNG (ô và hạn mức; sổ chỉ để xem nên không so)? Dùng để từ chối ghi kho sai thay vì im lặng sửa (đồ không được biến mất). */
@@ -247,6 +322,7 @@ export function sanitizeSect(raw: unknown, now: number = Date.now()): Sect | nul
   const members: SectMemberRecord[] = [];
   const seen = new Set<string>();
   let chief: string | null = null;
+  let meritSum = 0;
   for (const m of raw.members) {
     if (!isRecord(m)) return null;
     const soulKey = m.soulKey;
@@ -262,15 +338,28 @@ export function sanitizeSect(raw: unknown, now: number = Date.now()): Sect | nul
       chief = soulKey;
     }
     const draw = sanitizeDraw(m.draw);
+    // M8: công tích >= cống hiến >= 0 (đọc hỏng thì kẹp, không phá cả bản ghi); bằng 0 thì không lưu
+    const merit = wholeIn(m.merit, SECT_POINTS_CAP);
+    const contrib = Math.min(wholeIn(m.contrib, SECT_CONTRIB_CAP), merit);
+    const today = sanitizeDay(m.today);
+    meritSum += merit;
     members.push({
       soulKey,
       name: mname,
       rank,
       joinedAt: intIn(m.joinedAt, Number.MAX_SAFE_INTEGER, now),
       ...(draw ? { draw } : {}),
+      ...(contrib ? { contrib } : {}),
+      ...(merit ? { merit } : {}),
+      ...(today ? { today } : {}),
     });
   }
   if (chief === null || chief !== raw.leader) return null;
+  // điểm tông >= tổng công tích thành viên hiện có (đọc thấp hơn thì nâng lên: không mất gì; GHI thấp hơn thì bị từ chối ở `assertWritableSect`)
+  const points = Math.max(
+    wholeIn(raw.points, SECT_POINTS_CAP),
+    Math.min(meritSum, SECT_POINTS_CAP),
+  );
   return {
     v: 1,
     id: raw.id,
@@ -282,6 +371,7 @@ export function sanitizeSect(raw: unknown, now: number = Date.now()): Sect | nul
     coin: intIn(raw.coin, SECT_COIN_CAP, 0),
     log: sanitizeLog(raw.log),
     vault: sanitizeVault(raw.vault),
+    ...(points ? { points } : {}),
     createdAt: intIn(raw.createdAt, Number.MAX_SAFE_INTEGER, now),
     updatedAt: intIn(raw.updatedAt, Number.MAX_SAFE_INTEGER, now),
   };
@@ -312,7 +402,27 @@ export function assertWritableSect(next: Sect, now: number): Sect {
     const b = next.members[i].draw;
     if ((a?.day ?? null) !== (b?.day ?? null) || (a?.n ?? 0) !== (b?.n ?? 0))
       throw new Error("Tông môn không hợp lệ (lượt rút kho đồ của thành viên chưa chuẩn hoá)");
+    // M8 (mục 12.2): cống hiến / công tích / sổ ngày KHÔNG im lặng sửa (sai bất biến là lỗi của người gọi: cống hiến không được tự sinh ra hay biến mất)
+    const x = s.members[i];
+    const y = next.members[i];
+    if (
+      (x.contrib ?? 0) !== (y.contrib ?? 0) ||
+      (x.merit ?? 0) !== (y.merit ?? 0) ||
+      !sameDay(x.today, y.today)
+    )
+      throw new Error(
+        "Tông môn không hợp lệ (cống hiến, công tích hoặc sổ ngày của thành viên chưa chuẩn hoá: cần 0 <= contrib <= merit, sổ trong trần)",
+      );
   }
+  if ((s.points ?? 0) !== (next.points ?? 0))
+    throw new Error(
+      "Tông môn không hợp lệ (điểm tông phải là số nguyên trong trần và không nhỏ hơn tổng công tích thành viên)",
+    );
+  // ô kho ngoài số ô đã MỞ theo cấp tông phải trống (đồ không nằm ở ô khoá)
+  const open = sectLevelInfo(sectLevelOf(s.points ?? 0)).vaultSlots;
+  for (let i = open; i < s.vault.slots.length; i++)
+    if (s.vault.slots[i] !== null)
+      throw new Error("Tông môn không hợp lệ (có đồ ở ô kho chưa mở theo cấp tông)");
   return s;
 }
 
@@ -480,7 +590,12 @@ export class FileSectStore implements SectStore {
       const cur = this.byId.get(id);
       if (!cur) return null;
       const next = assertWritableSect(
-        { ...fn(structuredClone(cur)), id, v: 1, updatedAt: this.clock() },
+        {
+          ...fn(structuredClone(cur)),
+          id,
+          v: 1,
+          updatedAt: Math.max(this.clock(), cur.updatedAt + 1),
+        },
         this.clock(),
       );
       const c = this.conflictOf(next);
