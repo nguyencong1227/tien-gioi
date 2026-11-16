@@ -598,8 +598,9 @@ async function main() {
         return evalJs(`(() => {
           const sc = window.__scene;
           const w = sc.telegraphs.snapshot(sc.time.now).warns[0];
-          const fill = document.getElementById("boss-bar-castfill").style.width;
-          return { progress: w.progress, elapsed: w.elapsed, fill };
+          // đọc thẳng mô hình thanh (thanh DOM cập nhật ~10 lần / giây nên có thể trễ tới 100 ms: không dùng cho phép đo thời điểm)
+          const castFrac = sc.bossFx.modelOf({ id: "m1", kind: "mang", hp: 4000, maxHp: 4000 }, sc.time.now).castFrac;
+          return { progress: w.progress, elapsed: w.elapsed, castFrac };
         })()`);
       };
       const withComp = await fullAfter(160, 880);
@@ -608,13 +609,13 @@ async function main() {
         `RTT 160: sau ${Math.round(withComp.elapsed)} ms vùng báo đã ĐẦY (tiến độ ${withComp.progress})`,
       );
       check(
-        withComp.fill === "100%",
-        `RTT 160: thanh gồng cũng đã đầy cùng lúc ("${withComp.fill}")`,
+        withComp.castFrac === 1,
+        `RTT 160: thanh gồng cũng đã đầy cùng lúc (${withComp.castFrac.toFixed(2)})`,
       );
       const noComp = await fullAfter(null, 880);
       check(
-        noComp.progress < 1 && noComp.elapsed >= 830,
-        `không bù (RTT chưa biết): cùng thời điểm vùng báo CHƯA đầy (tiến độ ${noComp.progress.toFixed(2)})`,
+        noComp.progress < 1 && noComp.castFrac < 1 && noComp.elapsed >= 830,
+        `không bù (RTT chưa biết): cùng thời điểm vùng báo và thanh gồng CHƯA đầy (${noComp.progress.toFixed(2)} / ${noComp.castFrac.toFixed(2)})`,
       );
       await evalJs(
         `(() => { const sc = window.__scene; sc.rttSource = () => null; sc.telegraphs.clear(); return 1; })()`,
