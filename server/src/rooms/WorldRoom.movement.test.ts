@@ -66,12 +66,24 @@ async function join() {
   return room;
 }
 
-/** Gửi một đợt `n` input di chuyển (+x) rồi `stops` input dừng, MỘT LÚC (đúng thứ tự). Trả seq cuối. */
-function burst(room: Room, n: number, stops: number): number {
-  let s = 0;
-  for (let i = 0; i < n; i++) room.send("input", { seq: ++s, dx: 1, dy: 0 });
-  for (let i = 0; i < stops; i++) room.send("input", { seq: ++s, dx: 0, dy: 0 });
-  return s;
+/**
+ * Gửi một đợt `n` input di chuyển (+x) rồi `stops` input dừng và để máy chủ nhận HẾT trước khi nó xử lý: đúng kịch bản "mạng đứng rồi xả dồn".
+ * Tạm chặn vòng `update` của phòng trong lúc gửi, chờ tin cuối nằm ở ĐUÔI hàng đợi, rồi thả ra. Không chặn thì chạy dưới tải (CI / máy bận) các tin tới rải
+ * qua nhiều tick và máy chủ xử lý dần từng đợt nhỏ: đó là hành vi ĐÚNG nhưng không phải thứ ca này đo (từng đỏ "expected 90 to be <= 15" ở CI). Trả seq cuối.
+ */
+async function burst(room: Room, n: number, stops: number): Promise<number> {
+  const r = serverRoom(room) as any;
+  r.update = () => {}; // thuộc tính của đối tượng che hàm của lớp: tick chạy không đụng hàng đợi
+  try {
+    let s = 0;
+    for (let i = 0; i < n; i++) room.send("input", { seq: ++s, dx: 1, dy: 0 });
+    for (let i = 0; i < stops; i++) room.send("input", { seq: ++s, dx: 0, dy: 0 });
+    const inputs = ctrlOf(room).inputs as { seq: number }[];
+    await waitFor(() => inputs[inputs.length - 1]?.seq === s, 3000, "toàn bộ đợt tin tới hàng đợi");
+    return s;
+  } finally {
+    delete r.update; // thả: máy chủ xử lý cả đợt dồn một lúc
+  }
 }
 
 /** Chờ máy chủ xử lý xong hàng đợi, trả { x đã đi, thời gian (ms) tới lúc đứng yên hẳn }. */
@@ -91,7 +103,7 @@ describe("mạng đứng rồi xả dồn, nhả phím (phòng thật)", () => {
     const room = await join();
     const p = serverPlayer(room);
     const x0 = p.x;
-    const last = burst(room, 60, 3);
+    const last = await burst(room, 60, 3);
     await waitFor(() => p.lastSeq === last, 3000, "máy chủ xử lý tới tin dừng cuối");
     const { moved, ms } = await settle(room, x0);
     expect(moved).toBeGreaterThan(0);
@@ -104,7 +116,7 @@ describe("mạng đứng rồi xả dồn, nhả phím (phòng thật)", () => {
     const room = await join();
     const p = serverPlayer(room);
     const x0 = p.x;
-    const last = burst(room, 97, 3);
+    const last = await burst(room, 97, 3);
     await waitFor(() => p.lastSeq === last, 3000, "tin dừng cuối (seq 100) tới được máy chủ");
     const { moved } = await settle(room, x0);
     expect(moved).toBeLessThanOrEqual(STOP_KEEP_INPUTS * 7.5 + 1e-6);
@@ -114,8 +126,8 @@ describe("mạng đứng rồi xả dồn, nhả phím (phòng thật)", () => {
     const room = await join();
     const p = serverPlayer(room);
     const x0 = p.x;
-    const last = burst(room, 60, 0);
     const t0 = Date.now();
+    const last = await burst(room, 60, 0);
     // chờ TIN CUỐI được áp (hàng đợi có thể rỗng tạm thời khi các tin còn đang tới qua WebSocket)
     await waitFor(() => p.lastSeq === last, 3000, "máy chủ áp tới input cuối (seq 60)");
     const { moved } = await settle(room, x0);
