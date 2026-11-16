@@ -188,8 +188,8 @@ export interface RoomSummary {
   tick: TickSummary;
   /** Hàng đợi input di chuyển (`World.inputStats`): bị bỏ vì đầy / số lượt tụt hậu (mục 25) */
   input: { dropped: number; backlogTicks: number };
-  /** Bảo vệ khi mất kết nối (mục 33, `World.netStats`): lần vào im lặng (hồn lìa xác dù socket mở) / lần tha chết do mạng */
-  net: { silent: number; spared: number };
+  /** Bảo vệ khi mất kết nối (mục 33, `World.netStats`): lần vào im lặng (hồn lìa xác dù socket mở) / lần tha chết do mạng / lần KHÔNG tha vì đã hết hạn mức */
+  net: { silent: number; spared: number; spareDenied: number };
 }
 
 export interface MetricsSnapshot {
@@ -234,7 +234,11 @@ export function collectMetrics(
       monsters: w.state.monsters.size,
       tick,
       input: { dropped: w.inputStats.dropped, backlogTicks: w.inputStats.backlogTicks },
-      net: { silent: w.netStats.silent, spared: w.netStats.spared },
+      net: {
+        silent: w.netStats.silent,
+        spared: w.netStats.spared,
+        spareDenied: w.netStats.spareDenied,
+      },
     });
   }
   return {
@@ -327,6 +331,12 @@ export function renderPrometheus(s: MetricsSnapshot): string {
     "counter",
     "So lan tha chet do mang (bi ha khi client da im lang tu 2 giay: khong mat kiep)",
     (r) => r.net.spared,
+  );
+  perRoom(
+    "tiengioi_room_net_spare_denied_total",
+    "counter",
+    "So lan KHONG tha chet do mang vi da het han muc 3 lan / 10 phut (chet that; tang nhanh = co the client sua nhip tim de khong bao gio chet)",
+    (r) => r.net.spareDenied,
   );
   metric(
     "tiengioi_room_tick_ms",
