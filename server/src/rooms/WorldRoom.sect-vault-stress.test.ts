@@ -311,9 +311,9 @@ describe("WorldRoom sect-vault soak & stress (Issue #790 K6)", () => {
     expect(vSlot).toBeGreaterThanOrEqual(0);
 
     // Chu, Lao, De đồng thời gửi rút 10 MAT từ đúng ô vSlot (tổng yêu cầu = 30 > 25 trong kho)
-    // Lưu hồ sơ chậm 300 ms (cố ý): ảnh chụp kho chỉ gửi SAU lúc lưu, nên bản cũ (ngủ cố định 400 ms rồi đọc ảnh chụp cuối) đọc phải ảnh CŨ và đỏ "45 / 35 thay vì 25"
+    // Lưu hồ sơ chậm 600 ms (cố ý): ảnh chụp kho chỉ gửi SAU lúc lưu, nên bản cũ (ngủ cố định 400 ms rồi đọc ảnh chụp cuối) đọc phải ảnh CŨ và đỏ "45 / 35 thay vì 25"
     // ngay khi đĩa / CI chậm; B tái hiện tất định bằng cách này. Nay chờ ĐÚNG tín hiệu (#752).
-    slowSave(Chu.room, 300);
+    slowSave(Chu.room, 600);
     const heroes = [Chu, Lao, De];
     const before = heroes.map((h) => h.toasts.length);
     for (const h of heroes)
