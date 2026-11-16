@@ -14,6 +14,7 @@ import {
   COIN_DROPS,
   MONSTER_CAP,
   TOWN_PX,
+  PLAYER_RADIUS,
   SKILLS,
   expToNext,
   statsFor,
@@ -717,6 +718,38 @@ describe("lưu nhân vật", () => {
     });
     expect(saved).toMatchObject({ realm: 1, tier: 3, exp: 12 });
     expect(saved.secretHash).not.toContain("secret"); // không lưu mã gốc
+  });
+
+  it("vị trí lưu là toạ độ nguyên KHÔNG đè vào tường dù làm tròn thường sẽ đẩy tâm vào tường (soak 30 phút --m7, #741)", async () => {
+    const lacHa = getMap(DEFAULT_MAP_ID)!;
+    // Vị trí thật hợp lệ (ngoài trấn) nhưng Math.round rơi vào ô chặn: quét một dải quanh tường, tất định
+    let spot: { x: number; y: number } | null = null;
+    for (let y = 1900.3; y < 2100 && !spot; y += 3.1) {
+      for (let x = 1000.1; x < 1200 && !spot; x += 0.37) {
+        if (
+          !lacHa.circleBlocked(x, y, PLAYER_RADIUS) &&
+          lacHa.circleBlocked(Math.round(x), Math.round(y), PLAYER_RADIUS) &&
+          !lacHa.inTown(x, y)
+        )
+          spot = { x, y };
+      }
+    }
+    expect(spot).not.toBeNull();
+    const { room } = await join("Sat Tuong");
+    const p = serverState(room).players.get(room.sessionId)!;
+    p.x = spot!.x;
+    p.y = spot!.y;
+    await room.leave(true);
+    rooms.length = 0;
+    const saved = await waitFor(() => {
+      for (const f of readdirSync(dataDir).filter((x) => x.endsWith(".json"))) {
+        const j = JSON.parse(readFileSync(path.join(dataDir, f), "utf8"));
+        if (j.name === "Sat Tuong" && typeof j.x === "number") return j;
+      }
+    });
+    expect(Number.isInteger(saved.x) && Number.isInteger(saved.y)).toBe(true);
+    expect(lacHa.circleBlocked(saved.x, saved.y, PLAYER_RADIUS)).toBe(false);
+    expect(Math.hypot(saved.x - spot!.x, saved.y - spot!.y)).toBeLessThan(1.5);
   });
 });
 
