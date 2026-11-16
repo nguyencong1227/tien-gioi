@@ -498,7 +498,8 @@ export const MAPS: readonly MapDef[] = [
       },
     ],
     // Tổng 62 (Hắc Phong Cốc 62; trần ~70 để tick < 10 ms): số liệu quái ở game.ts (#403), vùng sinh theo `minDanger` của từng loài
-    monsterCap: { suong_ho: 24, thach_quy: 18, doc_thiem: 18, hac_giao: 2 },
+    // Hắc Giao 8 con (người dùng chốt, QUYET_DINH_M3 mục 32; trước đây 2): tổng 68 (< trần ~70). Vị trí sinh tách nhau >= `SPAWN_SPREAD_PX` (systems/monsters.ts)
+    monsterCap: { suong_ho: 24, thach_quy: 18, doc_thiem: 18, hac_giao: 8 },
   },
   {
     id: HAN_VAN_ID,

@@ -71,7 +71,7 @@ describe("Âm Sương Trạch: bản đồ thứ ba", () => {
     }
     expect(m.monsterCapOf("tho")).toBe(0);
     expect(Object.values(m.monsterCap).reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(70);
-    expect(m.monsterCapOf("hac_giao")).toBe(2);
+    expect(m.monsterCapOf("hac_giao")).toBe(8); // người dùng chốt 8 con (mục 32)
   });
 
   it("đủ chỗ sinh cho từng loài: ô đi lại được, nối với trạm, ngoài khu an toàn, nguy hiểm >= minDanger, >= 100 ô mỗi quái", () => {

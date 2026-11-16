@@ -151,7 +151,11 @@ export function nguyenAnhBo(): BoGear[] {
           if (h) bossHours += (((BOSS_PARTY * qty) / avgDrop(drop)) * h.secPerKill) / 3600;
         } else {
           // Quái chưa an toàn solo ở bậc này: coi là cày ở bậc kế (số đo gần đúng)
-          const h = huntRate(m, NA, tier) ?? huntRate(m, NA, Math.min(2, tier + 1))!;
+          // Chưa an toàn solo ở MỌI bậc Nguyên Anh (mục 30: máu x1,5): coi là cày theo ĐỘI 2 người ở bậc cao nhất
+          const h =
+            huntRate(m, NA, tier) ??
+            huntRate(m, NA, Math.min(2, tier + 1)) ??
+            huntRate(m, NA, 2, 2)!;
           soloHours += (qty / avgDrop(drop)) * (h.secPerKill / 3600);
         }
         return { itemId, qty, source };

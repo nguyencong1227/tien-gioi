@@ -12,7 +12,7 @@ import {
 } from "@tien-gioi/shared";
 import { addMonster, addPlayer, makeWorld } from "./test-helpers";
 import { killMonster } from "./combat";
-import { spawnInitial, topUpMonsters, tickMonsters } from "./monsters";
+import { SPAWN_SPREAD_PX, spawnInitial, topUpMonsters, tickMonsters } from "./monsters";
 import { planTravel } from "./travel";
 
 const AM_SUONG = getMap(AM_SUONG_ID)!;
@@ -51,7 +51,16 @@ describe("quái sinh ở Âm Sương Trạch", () => {
         expect(count[id] ?? 0, `${id} hạt ${seed}`).toBe(AM_SUONG.monsterCapOf(id));
       for (const old of ["tho", "lang", "ho", "mang", "yeu_vuong"])
         expect(count[old], old).toBeUndefined();
-      expect(w.state.monsters.size).toBe(62);
+      expect(w.state.monsters.size).toBe(68); // 24 + 18 + 18 + 8 (Hắc Giao 8 con: mục 32 QUYET_DINH_M3)
+      // Hắc Giao RẢI ĐỀU: hai con bất kỳ cách nhau >= SPAWN_SPREAD_PX (không dồn một chỗ / quanh cổng)
+      const giao = [...w.state.monsters.values()].filter((m) => m.kind === "hac_giao");
+      expect(giao).toHaveLength(8);
+      for (let i = 0; i < giao.length; i++)
+        for (let j = i + 1; j < giao.length; j++)
+          expect(
+            Math.hypot(giao[i].x - giao[j].x, giao[i].y - giao[j].y),
+            `Hắc Giao ${i}-${j} hạt ${seed}`,
+          ).toBeGreaterThanOrEqual(SPAWN_SPREAD_PX.hac_giao);
       vi.restoreAllMocks();
     }
   });

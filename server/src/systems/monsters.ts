@@ -59,14 +59,34 @@ export function placeMonster(w: World, def: MonsterKind, x: number, y: number, e
   return id;
 }
 
+/**
+ * Khoảng cách tối thiểu (px) giữa hai con CÙNG loài lúc sinh, cho loài cần RẢI ĐỀU bản đồ (QUYET_DINH_M3 mục 32: Hắc Giao 8 con ở Âm Sương Trạch không được dồn một chỗ
+ * hay quanh cổng). Đo trên bản đồ thật: vùng sinh hợp lệ của Hắc Giao ~4.800 điểm trải khắp bản đồ (chỉ ~2 % trong 500 px quanh cổng), ~17 con cách nhau >= 700 px
+ * chứa được, nên 8 con xếp được; loài có khoảng cách thử nhiều lần hơn (`SPREAD_TRIES`). Hết lượt thử mà chưa có chỗ thì KHÔNG sinh lần này (`topUpMonsters` thử lại
+ * nhịp sau), không nới khoảng cách.
+ */
+export const SPAWN_SPREAD_PX: Readonly<Record<string, number>> = { hac_giao: 700 };
+const SPAWN_TRIES = 40;
+const SPREAD_TRIES = 400;
+
+/** Đã có con CÙNG loài trong vòng `r` px quanh (x, y) chưa. */
+function sameKindNear(w: World, kind: string, x: number, y: number, r: number): boolean {
+  for (const m of w.state.monsters.values()) {
+    if (m.kind === kind && Math.hypot(m.x - x, m.y - y) < r) return true;
+  }
+  return false;
+}
+
 export function spawnMonster(w: World, def: MonsterKind) {
   const map = w.map;
-  for (let i = 0; i < 40; i++) {
+  const spread = SPAWN_SPREAD_PX[def.id];
+  for (let i = 0; i < (spread === undefined ? SPAWN_TRIES : SPREAD_TRIES); i++) {
     const x = rand(64, map.worldW - 64),
       y = rand(64, map.worldH - 64);
     const d = map.dangerAt(x, y);
     if (d < def.minDanger || (def.id === "tho" && d > 0.45)) continue;
     if (map.inSafe(x, y, 160) || map.circleBlocked(x, y, def.radius)) continue;
+    if (spread !== undefined && sameKindNear(w, def.id, x, y, spread)) continue; // rải đều (mục 32)
     placeMonster(w, def, x, y, rollElite(w, def));
     return;
   }
