@@ -385,6 +385,162 @@ async function main() {
       "  ✓ [6/9] B góp 200, A rút 150: ví, hồ sơ, tệp tông môn khớp; tổng Linh thạch chỉ giảm đúng phí lập; Đệ tử không có ô rút",
     );
 
+    // 6b. KHO ĐỒ (QUYET_DINH_M3 mục 27, K4): qua tab "Kho đồ" THẬT với máy chủ thật. B (Đệ tử) góp, A (Tông chủ) rút, Đệ tử rút có HỘP XÁC NHẬN + hạn mức, Tông chủ chỉnh hạn mức.
+    // Bảo toàn: tổng số Hồi Huyết Đan (túi A + túi B + kho) luôn bằng số đã cấp.
+    const { giveItem } = await import("../src/systems/inventory.js");
+    const POTION = "hoi_huyet_dan";
+    const POTION_NAME = "Hồi Huyết Đan";
+    const GIVEN = 5;
+    const bagCount = (n: string) =>
+      (ctrlOf(n).inv as Array<{ itemId: string; qty: number } | null>).reduce(
+        (s, x) => s + (x && x.itemId === POTION ? x.qty : 0),
+        0,
+      );
+    const vaultCount = () =>
+      (sectOnDisk().vault.slots as Array<{ itemId: string; qty: number } | null>).reduce(
+        (s, x) => s + (x && x.itemId === POTION ? x.qty : 0),
+        0,
+      );
+    const waitServer = async (cond: () => boolean, label: string) => {
+      for (let i = 0; i < 60 && !cond(); i++) await sleep(100);
+      if (!cond()) throw new Error(`Hết thời gian chờ máy chủ: ${label}`);
+    };
+    /** Chọn ô ĐẦU TIÊN có tên `POTION_NAME` ở lưới `grid` bằng focus bàn phím (như người dùng mũi tên / Tab tới ô). */
+    const pickSlot = (tab: Tab, grid: "sect-vault-grid" | "sect-vault-bag") =>
+      tab.ev(
+        `(() => { const b = [...document.querySelectorAll('#${grid} .inv-slot')].find(e => e.querySelector('.slot-name')?.textContent === ${JSON.stringify(POTION_NAME)}); if (!b) throw new Error('không có ô ${POTION_NAME} ở ${grid}'); b.focus(); return 1; })()`,
+      );
+    /** Chỉnh ô số lượng (nút +/-) về `n`: số lượng đang chọn có thể còn lại từ lần trước nếu chọn lại đúng ô cũ. */
+    const setQty = async (tab: Tab, n: number) => {
+      for (let i = 0; i < 12; i++) {
+        const cur = Number(await text(tab, "sect-vault-qty"));
+        if (cur === n) return;
+        await press(tab, cur < n ? "sect-vault-plus" : "sect-vault-minus");
+        await sleep(80);
+      }
+      throw new Error(`Không chỉnh được số lượng về ${n}`);
+    };
+    const clickAct = (tab: Tab) => tab.ev(`document.getElementById('sect-vault-act').click(); 1`);
+    giveItem(world, sids.get(B.name)!, POTION, GIVEN);
+    await press(tb, "sect-tab-btn-vault");
+    await tb.waitFor(visible("sect-tab-vault"), "tab Kho đồ của B");
+    await tb.waitFor(
+      `[...document.querySelectorAll('#sect-vault-bag .slot-name')].some(e => e.textContent === ${JSON.stringify(POTION_NAME)})`,
+      "túi của B trong tab Kho đồ có đan",
+    );
+    await tb.waitFor(
+      `/Lượt rút hôm nay: còn 3 \\/ 3/.test(document.getElementById('sect-vault-draw')?.textContent || '')`,
+      "B thấy hạn mức rút 3 / 3 (ảnh chụp kho THẬT của máy chủ)",
+    );
+    // B góp 3 viên: chọn ô túi, +2, Góp (đồ thường, dưới 10: gửi thẳng, không hộp xác nhận)
+    await pickSlot(tb, "sect-vault-bag");
+    await setQty(tb, 3);
+    await tb.waitFor(
+      `document.getElementById('sect-vault-qty')?.textContent === '3'`,
+      "số lượng góp = 3",
+    );
+    await clickAct(tb);
+    await waitServer(() => vaultCount() === 3, "kho có 3 Hồi Huyết Đan trên đĩa");
+    if (bagCount(B.name) !== GIVEN - 3)
+      throw new Error(`Túi B phải còn ${GIVEN - 3}, thực tế ${bagCount(B.name)}`);
+    await tb.waitFor(
+      `[...document.querySelectorAll('#sect-vault-grid .slot-name')].some(e => e.textContent === ${JSON.stringify(POTION_NAME)})`,
+      "ảnh chụp kho mới của B có đan (nút mở khoá)",
+    );
+    await tb.waitFor(
+      `document.getElementById('sect-vault-act')?.textContent !== 'Đang xử lý…'`,
+      "nút Góp mở khoá sau khi có ảnh chụp",
+    );
+    // A thấy ngay trong tab Kho đồ (máy chủ gửi lại kho cho mọi thành viên trực tuyến) + sổ ghi đúng
+    await press(ta, "sect-tab-btn-vault");
+    await ta.waitFor(visible("sect-tab-vault"), "tab Kho đồ của A");
+    await ta.waitFor(
+      `[...document.querySelectorAll('#sect-vault-grid .slot-name')].some(e => e.textContent === ${JSON.stringify(POTION_NAME)})`,
+      "A thấy đan trong kho",
+    );
+    await ta.waitFor(
+      `[...document.querySelectorAll('#sect-vault-log .sect-log-item')].some(e => e.textContent.includes(${JSON.stringify(B.name)}) && e.textContent.includes('góp') && e.textContent.includes(${JSON.stringify(`${POTION_NAME} ×3`)}))`,
+      "sổ kho đồ ghi B góp 3",
+    );
+    if (!/không hạn/.test(await text(ta, "sect-vault-draw")))
+      throw new Error("Tông chủ phải thấy 'Lượt rút: không hạn'");
+    // A (Tông chủ) rút hết 3: không hạn mức, đồ thường -> gửi thẳng
+    await pickSlot(ta, "sect-vault-grid");
+    await setQty(ta, 3);
+    await ta.waitFor(
+      `document.getElementById('sect-vault-qty')?.textContent === '3'`,
+      "số lượng rút = 3",
+    );
+    await clickAct(ta);
+    await waitServer(() => vaultCount() === 0, "kho rỗng sau khi A rút");
+    if (bagCount(A.name) !== 3)
+      throw new Error(`Túi A phải có 3 Hồi Huyết Đan, thực tế ${bagCount(A.name)}`);
+    // B (Đệ tử): góp 1 rồi rút 1 CÓ HỘP XÁC NHẬN nêu hạn mức, trừ đúng MỘT lượt
+    await pickSlot(tb, "sect-vault-bag");
+    await tb.waitFor(
+      `/Trong túi/.test(document.getElementById('sect-vault-sel')?.textContent || '')`,
+      "B chọn ô túi",
+    );
+    await setQty(tb, 1);
+    await clickAct(tb);
+    await waitServer(() => vaultCount() === 1, "kho có 1 viên");
+    await tb.waitFor(
+      `document.getElementById('sect-vault-act')?.textContent !== 'Đang xử lý…' && [...document.querySelectorAll('#sect-vault-grid .slot-name')].some(e => e.textContent === ${JSON.stringify(POTION_NAME)})`,
+      "kho của B có 1 viên, nút mở khoá",
+    );
+    await pickSlot(tb, "sect-vault-grid");
+    await tb.waitFor(
+      `/Trong kho/.test(document.getElementById('sect-vault-sel')?.textContent || '')`,
+      "B chọn ô kho",
+    );
+    await clickAct(tb);
+    await tb.waitFor(visible("act-confirm"), "hộp xác nhận rút của Đệ tử (có hạn mức)");
+    const confirmText = await tb.ev(
+      `(document.getElementById('act-confirm')?.textContent || '').replace(/\\s+/g, ' ')`,
+    );
+    if (!/Tốn 1 lượt rút \(còn 3 \/ 3 hôm nay\)/.test(confirmText))
+      throw new Error(`Hộp xác nhận phải nêu hạn mức, thực tế "${confirmText}"`);
+    if (vaultCount() !== 1) throw new Error("Chưa xác nhận thì không được rút");
+    await tb.shot("7b-xac-nhan-rut");
+    await sleep(ACT_CONFIRM_GUARD_MS + 150); // qua cửa sổ chống click ma
+    await press(tb, "act-btn-yes");
+    await waitServer(() => vaultCount() === 0, "kho rỗng sau khi B rút");
+    await tb.waitFor(
+      `/Lượt rút hôm nay: còn 2 \\/ 3/.test(document.getElementById('sect-vault-draw')?.textContent || '')`,
+      "B còn 2 / 3 lượt rút (máy chủ trừ đúng một lượt)",
+    );
+    // Tông chủ đặt hạn mức 0: Đệ tử thấy chữ báo, nút rút không bấm được
+    await ta.waitFor(shown("sect-vault-policy"), "form hạn mức của Tông chủ");
+    if (!(await tb.ev(`document.getElementById('sect-vault-policy').hidden`)))
+      throw new Error("Đệ tử không được thấy form chỉnh hạn mức");
+    await ta.ev(
+      `(() => { const s = document.getElementById('sect-vault-policy-sel'); s.value = '0'; document.getElementById('sect-vault-policy').requestSubmit(); return 1; })()`,
+    );
+    await tb.waitFor(
+      `/chưa cho Đệ tử rút/.test(document.getElementById('sect-vault-draw')?.textContent || '')`,
+      "B thấy 'Tông chủ chưa cho Đệ tử rút kho đồ'",
+    );
+    await ta.ev(
+      `(() => { const s = document.getElementById('sect-vault-policy-sel'); s.value = '3'; document.getElementById('sect-vault-policy').requestSubmit(); return 1; })()`,
+    );
+    await tb.waitFor(
+      `/Lượt rút hôm nay: còn \\d \\/ 3/.test(document.getElementById('sect-vault-draw')?.textContent || '')`,
+      "hạn mức trả về 3 lượt / ngày",
+    );
+    const totalPotion = bagCount(A.name) + bagCount(B.name) + vaultCount();
+    if (totalPotion !== GIVEN)
+      throw new Error(
+        `Tổng Hồi Huyết Đan phải giữ ${GIVEN} (không nhân đôi / mất), thực tế ${totalPotion}`,
+      );
+    if (sectOnDisk().vault.log.length !== 4)
+      throw new Error(`Sổ kho phải có 4 dòng, thực tế ${sectOnDisk().vault.log.length}`);
+    await ta.shot("7c-kho-do-A");
+    out(
+      "  ✓ [6b] KHO ĐỒ qua giao diện thật: B góp 3, A thấy + sổ ghi, A rút 3, B (Đệ tử) góp 1 rồi rút 1 qua hộp xác nhận (trừ 1 lượt, còn 2 / 3), Tông chủ đặt hạn mức 0 rồi 3; tổng đan giữ nguyên",
+    );
+    await press(ta, "sect-tab-btn-treasury"); // trở lại các bước sau như cũ
+    await press(tb, "sect-tab-btn-treasury");
+
     // 7. Thăng Trưởng lão
     await press(ta, "sect-tab-btn-members");
     await ta.waitFor(
