@@ -57,3 +57,30 @@ export function eliteAuraPulse(wave: number, reduced: boolean): { scale: number;
   const w = Math.min(1, Math.max(0, wave));
   return { scale: 1 + 0.1 * w, alpha: 0.38 + 0.27 * w };
 }
+
+/**
+ * Gợi ý "nên đi đội" (người dùng chốt 16/11, QUYET_DINH_M3 mục 22.2: giữ nguyên độ mạnh của tinh anh, một mình hạ được là chấp nhận, nên GỢI Ý trong game thay vì hạ số).
+ * Hiện bằng một thông báo nhỏ MỘT LẦN cho mỗi loài trong một phiên chơi, ngay khi tinh anh đầu tiên của loài đó vào khung hình: không dán chữ lên đầu mọi tinh anh (nhãn đã dài: "★ Độc Tước tinh anh"),
+ * không nhắc lại mỗi lần gặp (người chơi quen thì thấy phiền), không nhắc người đã đi đội (đã làm điều được gợi ý).
+ */
+export const ELITE_PARTY_HINT = "nên đi đội";
+
+/** Lời thông báo khi tinh anh của loài `name` hiện ra: "★ Độc Tước tinh anh: nên đi đội." (ngắn để vừa hai dòng ở màn hình điện thoại 360 px; nhãn đã nói "tinh anh" là mạnh) */
+export function eliteSightText(name: string): string {
+  return `${eliteLabelText(name)}: ${ELITE_PARTY_HINT}.`;
+}
+
+/**
+ * Cổng "nhắc một lần mỗi loài": `take(kind, partySize)` trả `true` đúng một lần cho mỗi loài và chỉ khi người chơi chưa vào đội (< 2 người kể cả mình).
+ * Đang đi đội thì KHÔNG ghi nhớ loài đó: rời đội đi một mình gặp lại thì vẫn được nhắc (lúc đó mới cần). `kind` rỗng / không phải chuỗi bị bỏ qua.
+ */
+export class EliteHintGate {
+  private readonly told = new Set<string>();
+
+  take(kind: unknown, partySize: number): boolean {
+    if (typeof kind !== "string" || kind === "" || this.told.has(kind)) return false;
+    if (Number.isFinite(partySize) && partySize >= 2) return false;
+    this.told.add(kind);
+    return true;
+  }
+}
