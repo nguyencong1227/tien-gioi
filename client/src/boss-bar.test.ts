@@ -5,7 +5,9 @@ import {
   BOSS_BAR_RANGE,
   BOSS_CAST_LINGER_MS,
   BOSS_ENRAGE_FLASH_MS,
+  BOSS_SFX_VIEW,
   BossFxTracker,
+  bossAbilityElement,
   bossBarText,
   bossMarkPercents,
   isBossCand,
@@ -191,6 +193,37 @@ describe("BossFxTracker.castTiming: thời gian gồng cho hoạt ảnh trên th
     expect(t.castTiming("b1", 6100)).toEqual({ elapsedMs: 100, castMs: 500 });
     t.forget("b1");
     expect(t.castTiming("b1", 6100)).toBeNull();
+  });
+});
+
+describe("bossAbilityElement: hệ của chiêu cho tiếng trùm", () => {
+  const def = BOSS_BY_KIND["mang"]!;
+  it("chiêu có hệ riêng: dùng hệ đó; không có thì dùng hệ của chính con trùm", () => {
+    for (const a of def.abilities)
+      expect(bossAbilityElement("mang", a.id)).toBe(a.element ?? MONSTER_BY_ID["mang"]!.element);
+  });
+  it("chiêu CÓ hệ riêng thì hệ đó thắng hệ của con trùm (dữ liệu thật chưa có chiêu nào ghi hệ nên thêm tạm một chiêu)", () => {
+    const first = def.abilities[0]!;
+    def.abilities.push({ ...first, id: "tam_hệ_bang", element: "bang" });
+    try {
+      expect(bossAbilityElement("mang", "tam_hệ_bang")).toBe("bang");
+      expect(bossAbilityElement("mang", first.id)).toBe(
+        first.element ?? MONSTER_BY_ID["mang"]!.element,
+      );
+    } finally {
+      def.abilities.pop();
+    }
+    expect(bossAbilityElement("mang", "tam_hệ_bang")).toBe(MONSTER_BY_ID["mang"]!.element);
+  });
+  it("chiêu lạ / thiếu: hệ của con trùm; trùm lạ / id độc / sai kiểu: undefined, không ném", () => {
+    expect(bossAbilityElement("mang", "khong_co")).toBe(MONSTER_BY_ID["mang"]!.element);
+    expect(bossAbilityElement("mang", 5)).toBe(MONSTER_BY_ID["mang"]!.element);
+    for (const k of ["khong_co", "constructor", "__proto__", 7, null, undefined])
+      expect(bossAbilityElement(k, "quat_duoi")).toBeUndefined();
+  });
+  it("BOSS_SFX_VIEW là số dương hợp lý (px)", () => {
+    expect(BOSS_SFX_VIEW).toBeGreaterThan(0);
+    expect(BOSS_SFX_VIEW).toBeLessThanOrEqual(1000);
   });
 });
 

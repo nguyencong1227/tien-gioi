@@ -227,7 +227,13 @@ import {
   fitView,
 } from "../map-render";
 import { moveVector } from "../move-input";
-import { BossFxTracker, pickBossForBar, type BossCand } from "../boss-bar";
+import {
+  BOSS_SFX_VIEW,
+  BossFxTracker,
+  bossAbilityElement,
+  pickBossForBar,
+  type BossCand,
+} from "../boss-bar";
 import {
   BOSS_STRIKE_MS,
   NEUTRAL_POSE,
@@ -764,6 +770,8 @@ export class WorldScene extends Phaser.Scene {
       (window as any).__game = this.game;
       (window as any).__scene = this;
       (window as any).__fx = this.fx;
+      // Cho `check-boss-bar.mjs`: bắt lời gọi `sound.boss` (headless không có âm thanh thật) để kiểm tiếng trùm đúng lúc, đúng hệ
+      (window as any).__sound = sound;
       // Cho `leak:test`: danh sách mọi công thức hạt đã đăng ký, để khởi động phát MỖI công thức một lần (mỗi công thức tạo MỘT emitter ở lần phát đầu, `fx.ts` emitterFor)
       (window as any).__fxRecipeIds = recipeIds;
       // Cho `leak:test` (client/scripts/leak-test.mjs) dựng lại hình ảnh của từng bản đồ ngay trong trang (#408 bước 4)
@@ -4080,15 +4088,18 @@ export class WorldScene extends Phaser.Scene {
       case "bossCast":
         // Trùm bắt đầu vận chiêu (mục 42): tên chiêu lên thanh máu trùm; vùng cảnh báo trên đất do `fx` `warn` đi kèm lo
         this.bossFx.onCast(m.by, m.ability, m.ms, this.time.now);
+        this.bossCastSound(m);
         return;
       case "bossPhase":
         // Trùm chuyển giai đoạn: thanh chớp + rung nhẹ khung hình (bỏ rung khi giảm chuyển động)
         this.bossFx.onPhase(m.by, this.time.now);
         if (!getQuality().reducedMotion && this.inView(m.x, m.y, 240))
           this.cameras.main.shake(320, 0.004);
+        if (this.inView(m.x, m.y, BOSS_SFX_VIEW)) sound.boss("phase");
         return;
       case "bossEnrage":
         this.bossFx.onEnrage(m.by, this.time.now);
+        sound.boss("enrage"); // một lần duy nhất (bí cảnh), cả đội cần nghe dù đang đứng xa
         return;
       case "bolt":
         // Đạn tầm xa của quái: client tự bay theo `speed` / `angle` tới hết `range` (đạn không là state)
@@ -4101,6 +4112,20 @@ export class WorldScene extends Phaser.Scene {
         if (!this.inView(m.x, m.y, 120)) return;
         return this.fxBreakFail(m.x, m.y, m.by === this.sid);
     }
+  }
+
+  /**
+   * Tiếng của trùm khi vận chiêu (`sfx-recipes.ts` `bossSfx`): tiếng gồng ngay lúc báo, tiếng đòn rơi đúng lúc đáp (`ms` sau), sắc theo hệ của chiêu. Chỉ khi trùm trong / sát tầm nhìn
+   * (`BOSS_SFX_VIEW`). Người đã rời cảnh giữa chừng thì tiếng đòn rơi bị huỷ cùng đồng hồ cảnh.
+   */
+  private bossCastSound(m: { by: string; x: number; y: number; ability: string; ms: number }) {
+    if (!this.inView(m.x, m.y, BOSS_SFX_VIEW)) return;
+    const el = bossAbilityElement(this.state.monsters.get(m.by)?.kind, m.ability);
+    sound.boss("cast", el);
+    const ms = Number.isFinite(m.ms) ? Math.min(Math.max(m.ms, 0), 8000) : 0;
+    this.time.delayedCall(ms, () => {
+      if (this.inView(m.x, m.y, BOSS_SFX_VIEW)) sound.boss("strike", el);
+    });
   }
 
   private fxSlash(x: number, y: number, angle: number, color: number, scale = 1, mine = false) {

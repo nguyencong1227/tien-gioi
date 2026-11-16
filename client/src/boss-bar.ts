@@ -13,10 +13,27 @@ import {
 
 /** Trùm ngoài hoang chỉ hiện thanh khi trong tầm này (px); bí cảnh luôn hiện (trùm duy nhất của run). */
 export const BOSS_BAR_RANGE = 600;
+/** Tiếng của trùm chỉ phát khi trùm trong / sát tầm nhìn (px ngoài rìa màn hình; `inView`): trùm ở xa khuất không gầm vào tai người chơi. */
+export const BOSS_SFX_VIEW = 480;
 /** Giữ tên chiêu trên thanh thêm chừng này (ms) sau lúc đòn đáp (đọc kịp, nhất là tên ngắn). */
 export const BOSS_CAST_LINGER_MS = 500;
 /** Cuồng nộ chớp mạnh chừng này (ms) lúc mới nhận `bossEnrage`, rồi giữ chỉ báo đứng yên. */
 export const BOSS_ENRAGE_FLASH_MS = 1500;
+
+/**
+ * Hệ (màu / âm) của chiêu `abilityId` của trùm `kind`: `BossAbility.element`, bỏ trống thì hệ của chính con trùm (như vùng cảnh báo); không có thì `undefined`.
+ * Tra bảng bằng `hasOwnProperty` (id lạ / `constructor` không lọt). Dùng cho tiếng của trùm (`sfx-recipes.ts` `bossSfx`).
+ */
+export function bossAbilityElement(kind: unknown, abilityId: unknown): string | undefined {
+  if (typeof kind !== "string" || !Object.prototype.hasOwnProperty.call(MONSTER_BY_ID, kind))
+    return undefined;
+  const own = MONSTER_BY_ID[kind]!.element;
+  const ab =
+    typeof abilityId === "string"
+      ? bossDefOf(kind)?.abilities.find((a) => a.id === abilityId)
+      : undefined;
+  return ab?.element ?? own;
+}
 
 /** Một con trùm ứng viên (đọc từ state công khai). */
 export interface BossCand {
