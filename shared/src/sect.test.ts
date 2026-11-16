@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { COIN_CAP } from "./currency";
 import { DUEL_MSG } from "./duel";
 import { DUNGEON_MSG } from "./dungeon";
+import { INVENTORY_SLOTS, ITEMS, ITEM_BY_ID } from "./items";
 import {
   NO_SECT,
   SECT_ASSIGNABLE_RANKS,
@@ -26,6 +27,14 @@ import {
   SECT_REJOIN_COOLDOWN_MS,
   SECT_TAG_MAX,
   SECT_TAG_MIN,
+  SECT_VAULT_DENY_ITEMS,
+  SECT_VAULT_DRAW_DEFAULT,
+  SECT_VAULT_DRAW_MAX,
+  SECT_VAULT_DRAW_MODE,
+  SECT_VAULT_DRAW_QTY_DE_TU,
+  SECT_VAULT_LOG_MAX,
+  SECT_VAULT_QTY_MAX,
+  SECT_VAULT_SLOTS,
   canSect,
   cleanMotd,
   cleanSectName,
@@ -39,12 +48,18 @@ import {
   parseSectMotd,
   parseSectRank,
   parseSectTransfer,
+  parseSectVaultDeposit,
+  parseSectVaultPolicy,
+  parseSectVaultWithdraw,
   sectFailMessage,
   sectKey,
   sectRankOrder,
+  sectVaultAccepts,
+  sectVaultDrawQtyCap,
   type SectAction,
   type SectMember,
   type SectRank,
+  type SectVaultView,
 } from "./sect";
 
 describe("hằng số và tên tin nhắn", () => {
@@ -445,5 +460,142 @@ describe("lý do từ chối", () => {
   it("câu báo nhắc đúng giới hạn trong hằng số (không để lệch số khi đổi hằng số)", () => {
     expect(sectFailMessage("name_invalid")).toContain(`${SECT_NAME_MIN}-${SECT_NAME_MAX}`);
     expect(sectFailMessage("tag_invalid")).toContain(`${SECT_TAG_MIN}-${SECT_TAG_MAX}`);
+  });
+});
+
+describe("kho đồ tông môn (docs/THIET_KE_TONG_MON.md mục 11)", () => {
+  const realId = ITEMS[0].id;
+
+  it("hằng số: 40 ô, sổ 50, hạn mức mặc định nằm trong khung, qty tối đa >= chồng lớn nhất", () => {
+    expect(SECT_VAULT_SLOTS).toBe(40);
+    expect(SECT_VAULT_LOG_MAX).toBeGreaterThan(0);
+    expect(SECT_VAULT_DRAW_DEFAULT).toBeGreaterThanOrEqual(0);
+    expect(SECT_VAULT_DRAW_DEFAULT).toBeLessThanOrEqual(SECT_VAULT_DRAW_MAX);
+    expect(SECT_VAULT_DRAW_QTY_DE_TU).toBeGreaterThan(0);
+    for (const i of ITEMS) expect(SECT_VAULT_QTY_MAX).toBeGreaterThanOrEqual(i.stack);
+  });
+
+  it("tên tin kho đồ không trùng tin tông môn khác và bắt đầu bằng `sect`", () => {
+    for (const k of ["vaultDeposit", "vaultWithdraw", "vaultPolicy", "vault"] as const) {
+      expect(SECT_MSG[k]).toMatch(/^sectVault/);
+    }
+    expect(SECT_MSG.vault).toBe("sectVault");
+  });
+
+  it("parseSectVaultDeposit: chỉ nhận ô túi hợp lệ + số lượng nguyên 1..QTY_MAX", () => {
+    expect(parseSectVaultDeposit({ slot: 0, qty: 1 })).toEqual({ slot: 0, qty: 1 });
+    expect(parseSectVaultDeposit({ slot: INVENTORY_SLOTS - 1, qty: SECT_VAULT_QTY_MAX })).toEqual({
+      slot: INVENTORY_SLOTS - 1,
+      qty: SECT_VAULT_QTY_MAX,
+    });
+    for (const bad of [
+      null,
+      undefined,
+      "x",
+      [],
+      {},
+      { slot: -1, qty: 1 },
+      { slot: INVENTORY_SLOTS, qty: 1 },
+      { slot: 1.5, qty: 1 },
+      { slot: "3", qty: 1 },
+      { slot: Number.NaN, qty: 1 },
+      { slot: 0, qty: 0 },
+      { slot: 0, qty: -2 },
+      { slot: 0, qty: 1.5 },
+      { slot: 0, qty: SECT_VAULT_QTY_MAX + 1 },
+      { slot: 0, qty: Number.POSITIVE_INFINITY },
+      { slot: 0, qty: "2" },
+      { slot: 0 },
+    ])
+      expect(parseSectVaultDeposit(bad)).toBeNull();
+  });
+
+  it("parseSectVaultWithdraw: ô kho hợp lệ, itemId CÓ THẬT (không lọt `constructor` / `__proto__`), số lượng nguyên", () => {
+    expect(parseSectVaultWithdraw({ slot: 0, itemId: realId, qty: 3 })).toEqual({
+      slot: 0,
+      itemId: realId,
+      qty: 3,
+    });
+    expect(
+      parseSectVaultWithdraw({ slot: SECT_VAULT_SLOTS - 1, itemId: realId, qty: 1 }),
+    ).not.toBeNull();
+    for (const bad of [
+      null,
+      {},
+      { slot: -1, itemId: realId, qty: 1 },
+      { slot: SECT_VAULT_SLOTS, itemId: realId, qty: 1 },
+      { slot: 0, itemId: "khong_co_mon_nay", qty: 1 },
+      { slot: 0, itemId: "constructor", qty: 1 },
+      { slot: 0, itemId: "__proto__", qty: 1 },
+      { slot: 0, itemId: "toString", qty: 1 },
+      { slot: 0, itemId: 7, qty: 1 },
+      { slot: 0, itemId: realId, qty: 0 },
+      { slot: 0, itemId: realId, qty: 2.5 },
+      { slot: 0, itemId: realId, qty: SECT_VAULT_QTY_MAX + 1 },
+      { slot: 0, qty: 1 },
+    ])
+      expect(parseSectVaultWithdraw(bad)).toBeNull();
+  });
+
+  it("parseSectVaultPolicy: số lượt nguyên 0..DRAW_MAX", () => {
+    expect(parseSectVaultPolicy({ drawPerDay: 0 })).toEqual({ drawPerDay: 0 });
+    expect(parseSectVaultPolicy({ drawPerDay: SECT_VAULT_DRAW_MAX })).toEqual({
+      drawPerDay: SECT_VAULT_DRAW_MAX,
+    });
+    for (const bad of [
+      null,
+      {},
+      { drawPerDay: -1 },
+      { drawPerDay: SECT_VAULT_DRAW_MAX + 1 },
+      { drawPerDay: 2.5 },
+      { drawPerDay: Number.NaN },
+      { drawPerDay: "3" },
+    ])
+      expect(parseSectVaultPolicy(bad)).toBeNull();
+  });
+
+  it("sectVaultAccepts: món có thật góp được; món lạ / tên nguyên mẫu / không phải chuỗi thì không; danh sách chặn chỉ chứa id có thật", () => {
+    expect(sectVaultAccepts(realId)).toBe(true);
+    for (const bad of ["khong_co", "constructor", "__proto__", "toString", "", 5, null, undefined])
+      expect(sectVaultAccepts(bad)).toBe(false);
+    for (const id of SECT_VAULT_DENY_ITEMS) {
+      expect(Object.prototype.hasOwnProperty.call(ITEM_BY_ID, id)).toBe(true);
+      expect(sectVaultAccepts(id)).toBe(false);
+    }
+  });
+
+  it("quyền kho đồ khớp mục 11.3: ai cũng góp và thử rút; chỉ Tông chủ chỉnh hạn mức; Đệ tử bị hạn mức, hai chức trên rút tự do", () => {
+    for (const r of SECT_RANKS) {
+      expect(canSect("vaultDeposit", r)).toBe(true);
+      expect(canSect("vaultWithdraw", r)).toBe(true);
+    }
+    expect(canSect("vaultPolicy", "chu")).toBe(true);
+    expect(canSect("vaultPolicy", "truong_lao")).toBe(false);
+    expect(canSect("vaultPolicy", "de_tu")).toBe(false);
+    expect(canSect("vaultDeposit", null)).toBe(false);
+    expect(SECT_VAULT_DRAW_MODE).toEqual({ chu: "free", truong_lao: "free", de_tu: "limited" });
+    expect(sectVaultDrawQtyCap("chu")).toBe(Infinity);
+    expect(sectVaultDrawQtyCap("truong_lao")).toBe(Infinity);
+    expect(sectVaultDrawQtyCap("de_tu")).toBe(SECT_VAULT_DRAW_QTY_DE_TU);
+    expect(sectVaultDrawQtyCap(null)).toBe(0);
+    expect(sectVaultDrawQtyCap("constructor" as never)).toBe(0);
+  });
+
+  it("câu báo của lý do kho đồ nhắc đúng chủ đề (không lệch nhau)", () => {
+    expect(sectFailMessage("vault_full")).toContain("đầy");
+    expect(sectFailMessage("vault_limit")).toContain("lượt");
+    expect(sectFailMessage("vault_changed")).toContain("thử lần nữa");
+    expect(sectFailMessage("bag_full")).toContain("Túi đồ");
+  });
+
+  it("SectVaultView: đúng SECT_VAULT_SLOTS ô, hạn mức, lượt còn lại (null = không hạn)", () => {
+    const v: SectVaultView = {
+      slots: Array.from({ length: SECT_VAULT_SLOTS }, () => null),
+      log: [],
+      drawPerDay: SECT_VAULT_DRAW_DEFAULT,
+      myDrawsLeft: null,
+      lockMs: 0,
+    };
+    expect(v.slots).toHaveLength(SECT_VAULT_SLOTS);
   });
 });

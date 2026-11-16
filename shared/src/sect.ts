@@ -14,6 +14,7 @@
 // Mọi lý do từ chối đi về client bằng toast `sectFailMessage(reason)`; lỗi hệ thống không lộ chi tiết.
 import { cleanName } from "./account";
 import { COIN_CAP } from "./currency";
+import { INVENTORY_SLOTS, ITEM_BY_ID, ITEMS, type InvSlot } from "./items";
 
 // ---------- Hằng số (thời gian tính bằng ms) ----------
 
@@ -46,6 +47,26 @@ export const SECT_COIN_CAP = 9_999_999_999;
 export const SECT_LOG_MAX = 30;
 /** Gửi lại `sectPresence` mỗi chừng này, chỉ khi có đổi. */
 export const SECT_PRESENCE_MS = 10_000;
+
+// ----- Kho đồ (docs/THIET_KE_TONG_MON.md mục 11, QUYET_DINH_M3 mục 27) -----
+
+/** Số ô kho đồ của một tông môn (cùng hình `InvSlot` như túi đồ). */
+export const SECT_VAULT_SLOTS = 40;
+/** Số dòng sổ kho đồ giữ lại (mới nhất đứng đầu). */
+export const SECT_VAULT_LOG_MAX = 50;
+/** Số lượt rút mỗi ngày của Đệ tử khi Tông chủ chưa chỉnh. */
+export const SECT_VAULT_DRAW_DEFAULT = 3;
+/** Tông chủ chỉnh được số lượt rút / ngày của Đệ tử trong 0..mức này (0 = Đệ tử không rút được). */
+export const SECT_VAULT_DRAW_MAX = 10;
+/** Một lượt rút của Đệ tử lấy tối đa chừng này món (một lượt = một ô, một loại món). Tông chủ / Trưởng lão không bị hạn. */
+export const SECT_VAULT_DRAW_QTY_DE_TU = 10;
+/**
+ * Vật phẩm KHÔNG góp được vào kho đồ (ngoài đồ đang mặc, vốn không nằm ở túi). Ban đầu rỗng: `ItemDef` chưa có cờ "vật phẩm nhiệm vụ", Dev D rà `QUESTS` rồi
+ * đề xuất danh sách (issue K5). Test kiểm mọi id có thật.
+ */
+export const SECT_VAULT_DENY_ITEMS: readonly string[] = [];
+/** Số lượng lớn nhất một tin góp / rút có thể mang (chồng lớn nhất trong mọi vật phẩm); máy chủ còn kiểm theo `ItemDef.stack` của món cụ thể. */
+export const SECT_VAULT_QTY_MAX = ITEMS.reduce((m, i) => Math.max(m, i.stack), 1);
 
 // ---------- Chức vụ ----------
 
@@ -87,6 +108,11 @@ export const SECT_MSG = {
   invited: "sectInvited",
   snapshot: "sect",
   presence: "sectPresence",
+  // kho đồ (mục 11): tin lên máy chủ + ảnh chụp kho đồ về
+  vaultDeposit: "sectVaultDeposit",
+  vaultWithdraw: "sectVaultWithdraw",
+  vaultPolicy: "sectVaultPolicy",
+  vault: "sectVault",
 } as const;
 
 /** Client -> server: lập tông môn. */
@@ -122,6 +148,26 @@ export interface SectMotdMsg {
 /** Client -> server: góp (`sectDeposit`) hoặc rút (`sectWithdraw`) `amount` Linh thạch. */
 export interface SectAmountMsg {
   amount: number;
+}
+/** Client -> server: góp `qty` món ở ô túi đồ `slot` vào kho đồ tông môn. */
+export interface SectVaultDepositMsg {
+  /** Ô túi đồ, 0..`INVENTORY_SLOTS`-1 */
+  slot: number;
+  qty: number;
+}
+/**
+ * Client -> server: rút `qty` món `itemId` ở ô kho `slot`. `itemId` là món client ĐANG THẤY ở ô đó: máy chủ chỉ rút khi ô vẫn giữ đúng món và đủ số lượng
+ * (khoá kỳ vọng theo ô, mục 11.5), nếu không từ chối `vault_changed` (không bao giờ rút nhầm món khác khi giao diện cũ).
+ */
+export interface SectVaultWithdrawMsg {
+  /** Ô kho, 0..`SECT_VAULT_SLOTS`-1 */
+  slot: number;
+  itemId: string;
+  qty: number;
+}
+/** Client -> server (chỉ Tông chủ): số lượt rút / ngày của Đệ tử, 0..`SECT_VAULT_DRAW_MAX`. */
+export interface SectVaultPolicyMsg {
+  drawPerDay: number;
 }
 /** `sectLeave`, `sectDisband`: không có trường nào. */
 export type SectEmptyMsg = Record<string, never>;
@@ -248,6 +294,49 @@ export function parseSectAmount(raw: unknown): SectAmountMsg | null {
   return { amount: a };
 }
 
+/** Số nguyên trong [lo, hi] hoặc `null` (không làm tròn hộ client; 1.5, NaN, Infinity, chuỗi, ngoài khoảng đều bị từ chối). */
+function intIn(v: unknown, lo: number, hi: number): number | null {
+  return typeof v === "number" && Number.isSafeInteger(v) && v >= lo && v <= hi ? v : null;
+}
+
+/** Đọc `sectVaultDeposit`: ô túi hợp lệ + số lượng 1..`SECT_VAULT_QTY_MAX`, hoặc `null`. */
+export function parseSectVaultDeposit(raw: unknown): SectVaultDepositMsg | null {
+  const r = asRecord(raw);
+  if (!r) return null;
+  const slot = intIn(r.slot, 0, INVENTORY_SLOTS - 1);
+  const qty = intIn(r.qty, 1, SECT_VAULT_QTY_MAX);
+  return slot === null || qty === null ? null : { slot, qty };
+}
+
+/** Đọc `sectVaultWithdraw`: ô kho hợp lệ, `itemId` là món CÓ THẬT (tra bằng `hasOwnProperty`, không bằng `[]`), số lượng 1..`SECT_VAULT_QTY_MAX`, hoặc `null`. */
+export function parseSectVaultWithdraw(raw: unknown): SectVaultWithdrawMsg | null {
+  const r = asRecord(raw);
+  if (!r) return null;
+  const slot = intIn(r.slot, 0, SECT_VAULT_SLOTS - 1);
+  const qty = intIn(r.qty, 1, SECT_VAULT_QTY_MAX);
+  const id = r.itemId;
+  if (slot === null || qty === null || typeof id !== "string") return null;
+  if (!Object.prototype.hasOwnProperty.call(ITEM_BY_ID, id)) return null;
+  return { slot, itemId: id, qty };
+}
+
+/** Đọc `sectVaultPolicy`: số lượt / ngày nguyên trong 0..`SECT_VAULT_DRAW_MAX`, hoặc `null`. */
+export function parseSectVaultPolicy(raw: unknown): SectVaultPolicyMsg | null {
+  const r = asRecord(raw);
+  if (!r) return null;
+  const d = intIn(r.drawPerDay, 0, SECT_VAULT_DRAW_MAX);
+  return d === null ? null : { drawPerDay: d };
+}
+
+/** Món `itemId` góp được vào kho đồ không? (có thật và không nằm trong `SECT_VAULT_DENY_ITEMS`; đồ đang mặc vốn không ở túi) */
+export function sectVaultAccepts(itemId: unknown): boolean {
+  return (
+    typeof itemId === "string" &&
+    Object.prototype.hasOwnProperty.call(ITEM_BY_ID, itemId) &&
+    !SECT_VAULT_DENY_ITEMS.includes(itemId)
+  );
+}
+
 // ---------- Tin server -> client ----------
 
 /** Một thành viên trong ảnh chụp. Thứ tự trong `SectView.members` theo `compareSectMembers`. */
@@ -318,6 +407,34 @@ export interface SectInvitedMsg {
   ttlMs: number;
 }
 
+/** Một dòng sổ kho đồ: ai góp / rút món gì, bao nhiêu, lúc nào. `qty` luôn là số nguyên dương. */
+export interface SectVaultLogEntry {
+  at: number;
+  name: string;
+  kind: SectLogKind;
+  itemId: string;
+  qty: number;
+}
+
+/** Ảnh chụp kho đồ gửi cho từng thành viên (riêng tư). Tách khỏi `SectView`: đổi thông báo / thành viên không kéo theo cả kho. */
+export interface SectVaultView {
+  /** Đúng `SECT_VAULT_SLOTS` ô; ô trống là `null` */
+  slots: (InvSlot | null)[];
+  /** Mới nhất đứng đầu, tối đa `SECT_VAULT_LOG_MAX` */
+  log: SectVaultLogEntry[];
+  /** Số lượt rút / ngày của Đệ tử (Tông chủ chỉnh), 0..`SECT_VAULT_DRAW_MAX` */
+  drawPerDay: number;
+  /** Lượt rút còn lại hôm nay của CHÍNH người nhận; `null` = không bị hạn (Tông chủ / Trưởng lão) */
+  myDrawsLeft: number | null;
+  /** Còn bao nhiêu ms nữa mới được rút (cờ "kiếp mới chưa được rút", mục 11.7); 0 = không khoá */
+  lockMs: number;
+}
+
+/** Server -> client: gửi lúc vào phòng và mỗi khi kho đồ đổi (không mỗi tick). `vault: null` = không (còn) ở tông môn nào. */
+export interface SectVaultMsg {
+  vault: SectVaultView | null;
+}
+
 /** Xếp danh sách thành viên: chức vụ cao trước, rồi vào sớm trước, rồi theo tên. Server và client dùng chung để cùng một thứ tự. */
 export function compareSectMembers(a: SectMember, b: SectMember): number {
   return (
@@ -339,7 +456,10 @@ export type SectAction =
   | "setRank"
   | "transfer"
   | "disband"
-  | "leave";
+  | "leave"
+  | "vaultDeposit"
+  | "vaultWithdraw"
+  | "vaultPolicy";
 
 /**
  * Bảng quyền (docs/THIET_KE_TONG_MON.md mục 4.3). Ngoài bảng còn hai ràng buộc theo ĐỐI TƯỢNG trong `canSect`: `kick` (Trưởng lão
@@ -357,7 +477,24 @@ export const SECT_PERMS: Record<SectAction, Record<SectRank, boolean>> = {
   transfer: { chu: true, truong_lao: false, de_tu: false },
   disband: { chu: true, truong_lao: false, de_tu: false },
   leave: { chu: false, truong_lao: true, de_tu: true },
+  // kho đồ (mục 11.3): ai cũng góp và THỬ rút (Đệ tử bị hạn mức, xem `SECT_VAULT_DRAW_MODE`); chỉ Tông chủ chỉnh hạn mức
+  vaultDeposit: { chu: true, truong_lao: true, de_tu: true },
+  vaultWithdraw: { chu: true, truong_lao: true, de_tu: true },
+  vaultPolicy: { chu: true, truong_lao: false, de_tu: false },
 };
+
+/** Cách rút kho đồ theo chức vụ: `free` = không hạn mức; `limited` = `drawPerDay` lượt / ngày, mỗi lượt tối đa `SECT_VAULT_DRAW_QTY_DE_TU` món. */
+export const SECT_VAULT_DRAW_MODE: Record<SectRank, "free" | "limited"> = {
+  chu: "free",
+  truong_lao: "free",
+  de_tu: "limited",
+};
+
+/** Số món tối đa một lượt rút của chức vụ `rank` (Tông chủ / Trưởng lão: không hạn = `Infinity`; chức vụ lạ: 0). Máy chủ còn kẹp theo số có trong ô. */
+export function sectVaultDrawQtyCap(rank: SectRank | null): number {
+  if (rank === null || !SECT_RANKS.includes(rank)) return 0;
+  return SECT_VAULT_DRAW_MODE[rank] === "free" ? Infinity : SECT_VAULT_DRAW_QTY_DE_TU;
+}
 
 /** Chức vụ của người bị tác động mà người giữ chức `rank` được phép mời ra. */
 const KICKABLE: Record<SectRank, readonly SectRank[]> = {
@@ -419,6 +556,14 @@ export const SECT_FAILS = [
   "treasury_short",
   "wallet_full",
   "treasury_not_empty",
+  // kho đồ (mục 11)
+  "vault_full",
+  "vault_changed",
+  "vault_limit",
+  "vault_denied",
+  "vault_locked",
+  "bag_full",
+  "item_invalid",
 ] as const;
 export type SectFail = (typeof SECT_FAILS)[number];
 
@@ -453,6 +598,13 @@ const FAIL_MESSAGES: Record<SectFail, string> = {
   treasury_short: "Kho tông môn không đủ Linh thạch.",
   wallet_full: "Túi Linh thạch của ngươi không chứa thêm được.",
   treasury_not_empty: "Hãy rút hết Linh thạch trong kho trước khi giải tán tông môn.",
+  vault_full: "Kho đồ tông môn đã đầy, không chứa thêm được.",
+  vault_changed: "Kho đồ vừa có người lấy hoặc thêm đồ, hãy xem lại rồi thử lần nữa.",
+  vault_limit: "Hôm nay ngươi đã dùng hết lượt rút kho đồ, hoặc số món vượt mức cho phép mỗi lượt.",
+  vault_denied: "Món đồ này không được góp vào kho tông môn.",
+  vault_locked: "Kiếp này của ngươi còn quá mới, chưa được rút đồ trong kho tông môn.",
+  bag_full: "Túi đồ của ngươi không đủ chỗ.",
+  item_invalid: "Món đồ hoặc số lượng không hợp lệ.",
 };
 
 /** Câu báo cho người chơi (toast). Không lộ số / id nội bộ. */
