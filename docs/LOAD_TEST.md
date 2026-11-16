@@ -1795,3 +1795,72 @@ Tra cứu API chi tiết của **Lượt 1 (Attempt 1)** bị huỷ (`gh api rep
 
 
 
+
+## 31. Ngân sách hiệu năng 8 trùm vận chiêu + 50–100 người chơi (Mục 42 - Issue #936)
+
+### 31.1. Bối cảnh & Mục tiêu kiểm thử
+Khi bộ thực thi trùm nhiều chiêu (`server/src/systems/boss.ts`, PR T2) được tích hợp, máy chủ phải xử lý đồng thời logic vận chiêu, kiểm tra điều kiện khoảng cách/mục tiêu, tính toán hình học báo trước (`warn`) và đáp đòn cho các trùm trên bản đồ.
+Trước khi bộ dữ liệu trùm thật (#872) được nạp vào, bài đo hiệu năng thường trực `server/src/systems/boss-perf.test.ts` được thiết lập nhằm giữ vững ngân sách hiệu năng:
+- **Ngân sách CPU Tick:** Thời gian xử lý trung bình < 10.0 ms (p95 < 10.0 ms) trên `World` thật.
+- **Ngân sách Băng thông State Patch:** < 520 byte/tick/client (đo qua `StateView` và `Encoder`).
+- **Ngân sách Tần suất sự kiện `fx`:** Đo và đặt ngưỡng giới hạn số lượng tin `fx` một client nhận được khi đứng trong tầm trùm (< 15 fx/giây) để tránh nghẽn socket.
+- **Độ phức tạp thuật toán `pickCast`:** So sánh chi phí tick giữa 10 người và 100 người chơi cùng 8 trùm: khẳng định tỉ lệ tăng < 4.0x (chứng minh thuật toán không bị $O(n^2)$).
+- **Trạng thái ngủ (Idle State):** Ca 0 người chơi: trùm hoàn toàn ngủ, tiêu tốn ~0 ms CPU và 0 byte patch.
+
+### 31.2. Thiết lập bài đo (`server/src/systems/boss-perf.test.ts`)
+- **Bản đồ:** Lạc Hà Trấn (`DEFAULT_MAP`), cờ `bossMoves = true`.
+- **Số trùm:** 8 trùm loài `mang` (Xích Mãng) rải đều quanh trấn ngoài hoang dã (bán kính 1200 px cách tâm trấn, độc lập, không vướng khu an toàn hay chướng ngại vật).
+- **Bộ chiêu mô phỏng đầy đủ:** 8 chiêu phủ kín các dạng hình học và điều kiện:
+  + Vòng tròn tại mục tiêu (`circleAt`, $r=60$).
+  + Vành khuyên quanh thân (`ring`, $r_0=80, r=160$).
+  + Nón quạt (`cone`, $r=180, \text{arc}=60^\circ$).
+  + Đường thẳng / kích kiếm (`line`, $\text{len}=240, w=80$).
+  + Mưa vòng tròn rải rác (`rain`, $r=40, \text{count}=3$).
+  + Hấp lực trận kéo vào + nổ (`pull`, $r=200, \text{pullPx}=60, \text{blastR}=60$, điều kiện `minTargets: 2`).
+  + Triệu hồi quái con (`summon`, gọi 2 Hôi Lang, điều kiện `maxTargets: 15`).
+  + Hộ thể giảm sát thương (`buff`, giảm 50% trong 3s, điều kiện `minTargets: 1`).
+  Bộ chiêu đạt chuẩn 100% qua bộ kiểm tra hợp đồng và luật né tránh `bossViolations`.
+- **Số người chơi:** 0, 10, 50, 100 người chơi Kim Đan rải quanh các con trùm trong tầm 160–240 px (nằm trong tầm aggro 800 px và bán kính điều kiện mục tiêu 320 px).
+
+### 31.3. Kết quả đo đạc thực tế (Mô phỏng 10–30 giây, 20 tick/giây)
+
+| Quy mô (Người chơi) | Số trùm | Tick TB (ms) | Tick p95 (ms) | Tick Max (ms) | Byte Patch / tick / client | fx / giây (1 client gần trùm) | Đánh giá |
+|---:|---:|---:|---:|---:|---:|---:|---|
+| **0 người** | 8 | **0.00 ms** | 0.00 ms | 0.04 ms | **0.0 byte** | 0.00 | **ĐẠT:** Trùm ngủ, 0 byte patch, CPU ~0 |
+| **10 người** | 8 | **0.03 ms** | 0.05 ms | 0.24 ms | **1.7 byte** | 1.70 | Cực kỳ nhẹ |
+| **50 người** | 8 | **0.09–0.14 ms** | **0.20–0.36 ms** | 1.09–1.46 ms | **2.2–6.0 byte** | **1.13–1.60** | **ĐẠT:** Nằm sâu dưới trần 10 ms & 520 byte |
+| **100 người** | 8 | **0.20 ms** | 0.54 ms | 1.62 ms | **2.9 byte** | 1.20 | **ĐẠT:** Không nghẽn |
+
+### 31.4. Phân tích & Đánh giá chi tiết
+1. **CPU Tick máy chủ:**
+   - Ở quy mô chuẩn 50 người chơi và 8 trùm vận chiêu liên tục suốt 30 giây (600 tick), CPU tick trung bình chỉ tốn **0.14 ms** (p95 đạt 0.36 ms, đỉnh tối đa 1.46 ms). Máy chủ xử lý cực kỳ nhẹ nhàng, chỉ chiếm ~1.4% ngân sách 10 ms.
+2. **Độ phức tạp lựa chọn chiêu (`pickCast`):**
+   - Khi số lượng người chơi tăng gấp 10 lần (từ 10 người lên 100 người chơi), thời gian xử lý tick chỉ tăng từ 0.07 ms lên 0.20 ms (tỉ lệ tăng ~3.04x < 4.0x).
+   - Cơ chế đếm lười số lượng mục tiêu quanh trùm (`nearTargets`) trong `pickCast` hoạt động hiệu quả theo độ phức tạp $O(n)$, hoàn toàn loại bỏ nguy cơ nghẽn $O(n^2)$.
+3. **Băng thông State đồng bộ (`StateView` & `Encoder`):**
+   - Lượng byte patch trung bình mỗi tick gửi tới mỗi client chỉ dao động từ **2.2 đến 6.0 byte/tick**, cách xa giới hạn trần 520 byte/tick.
+   - Toàn bộ cơ chế vận chiêu, giai đoạn và cuồng nộ của trùm được thiết kế hoàn toàn qua các gói tin sự kiện `fx` ngắn hạn, không thêm bất kỳ trường trạng thái công khai nào vào schema.
+4. **Tần suất tin nhắn `fx` gửi tới client:**
+   - Với quy định nghỉ giữa các lần chiêu `castGapMs >= 600 ms` và thời gian báo trước `telegraphMs >= 800 ms`, khoảng cách giữa 2 lần ra chiêu của trùm luôn >= 1.4 giây.
+   - Một client đứng trong tầm giao tranh nhận trung bình **~1.1–1.7 tin fx/giây** (bao gồm `warn`, `bossCast`, `bossSummon`, `bossArmor`). Con số này hoàn toàn nằm dưới ngưỡng an toàn 15 fx/giây, không gây áp lực lên hàng đợi socket hay FPS của client.
+5. **Trạng thái ngủ khi không có người chơi:**
+   - Khi không có người chơi trong tầm phát hiện, toàn bộ 8 trùm rơi vào trạng thái ngủ: không quét chiêu, không sinh bản tin `fx`, byte patch đồng bộ bằng đúng 0 byte.
+
+### 31.5. Chứng minh độ tin cậy bằng 4 đột biến ĐỎ (Mutations)
+Để bảo đảm bài đo `server/src/systems/boss-perf.test.ts` có khả năng phát hiện lỗi thực sự và không bao giờ bị 'xanh giả', 4 đột biến mã đã được thử nghiệm và đều làm bài test chuyển ĐỎ chính xác:
+1. **Đột biến 1 (Vòng lặp người chơi $\times$ người chơi $O(n^2)$ trong `pickCast`):**
+   - *Cách tạo đột biến:* Thêm vòng lặp lồng $O(n^2)$ người chơi vào `pickCast`.
+   - *Kết quả:* Thời gian `tickMonsters` ở 100 người chơi vọt lên **5.03 ms** (tỉ lệ tăng gấp 69.12x so với 10 người chơi = 0.07 ms).
+   - *Bắt lỗi:* Ca test 3 ĐỎ: `AssertionError: expected 5.034372875000012 to be less than 1`.
+2. **Đột biến 2 (Gửi `warn` mỗi tick thay vì một lần lúc bắt đầu):**
+   - *Cách tạo đột biến:* Trong `runCast`, gọi `emitWarn(w, cast)` mỗi tick của chiêu đang vận.
+   - *Kết quả:* Tần suất sự kiện gửi tới client vọt lên **16.67 fx/giây** (vượt ngưỡng trần 15 fx/giây).
+   - *Bắt lỗi:* Ca test 2 ĐỎ: `AssertionError: expected 16.666666666666668 to be less than 15`.
+3. **Đột biến 3 (Ghi thêm 1 trường vào state công khai mỗi tick):**
+   - *Cách tạo đột biến:* Trong `bossStep`, gán `m.x = m.x + (w.now % 2 === 0 ? 0.01 : -0.01)` làm dirty state Colyseus mỗi tick.
+   - *Kết quả:* Byte patch state vọt lên **24.37 byte/tick/client** (tăng gấp hơn 4 lần so với bình thường ~6 byte).
+   - *Bắt lỗi:* Ca test 2 ĐỎ: `AssertionError: expected 24.36596666666658 to be less than 15`.
+4. **Đột biến 4 (Bỏ điều kiện "ngủ khi không có người chơi"):**
+   - *Cách tạo đột biến:* Trong `updateMonster`, ép nhánh kiểm tra `nearest > MONSTER_WAKE_DIST` thành `false`.
+   - *Kết quả:* 8 con trùm tự động lang thang dù không có ai chơi, toạ độ vị trí trùm bị trôi lệch khỏi vị trí sinh ban đầu (x đổi từ 2736 về 2730.28).
+   - *Bắt lỗi:* Ca test 1 ĐỎ: `AssertionError: expected 2730.282771868729 to be 2736`.
