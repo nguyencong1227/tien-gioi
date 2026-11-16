@@ -618,6 +618,35 @@ Bộ kiểm thử stress test tự động hoá 7 kịch bản then chốt trên
 | **6. Kiểm tra dọn dẹp rò rỉ sau N chu kỳ** | 3 chu kỳ liên tiếp (từ chối, nhận rồi rời, disconnect khi có lời mời treo): `Hub.sects.invitesSize` về 0, `online.size` về 0, `cache.size` về 0, `_cooldownSize` về 0 sau sweep | 0 lời mời treo, 0 tông môn rò rỉ trong cache, sạch sẽ bộ nhớ | **PASS** (~0.9s) |
 | **7. Kiểm tra tính toàn vẹn lưu trữ (`audit-saves`)** | Chạy `auditSavesDirectory` trên toàn bộ file lưu nhân vật và tông môn phát sinh: 0 file lỗi, 0 lỗi tông môn, 0 file mồ côi | Lưu trữ nhất quán, không bẩn dữ liệu trên đĩa | **PASS** (~0.15s) |
 
+### 15.3. Thử tải Hành vi Tông môn có Chiều sâu M8 (`--sect`, Issue #846, PR #927)
+
+Ở M8 (M8.3–M8.5), kịch bản bot `--sect` được mở rộng để mô phỏng và thử tải toàn diện các tương tác có chiều sâu của hệ thống Tông môn (Nội vụ, nhiệm vụ tông môn, bảo khố, biến động thành viên):
+
+1. **Hành vi bot M8 (`decideSectM8Action`):**
+   - **Đồng bộ sảnh Nội vụ (`sectHallGet`):** Bot xin ảnh chụp `SECT_MSG.hallGet` khi mới vào tông môn hoặc mất đồng bộ.
+   - **Nhận nhiệm vụ tông môn (`questAccept`):** Bot nhận nhiệm vụ có sẵn (`state: "offer"`) nếu chưa kẹp trần cống hiến ngày (`earnedToday < earnCap`).
+   - **Nộp Linh thạch nhận cống hiến (`deposit`):** Để kích hoạt đường đổi bảo khố, bot nộp **500 Linh thạch** mỗi lần (thay vì 50/100 như bản thử tải M3.6 cũ), nhận `floor(500 / 100) = 5` cống hiến (vừa đủ đổi món `hoi_huyet_dan` giá 5 cống hiến). *Lưu ý:* Khi chạy thử tải ngắn trong ngày tạo nhân vật, server cần chạy với `SECT_EARN_WARMUP=off` để bỏ qua thời gian chờ sang ngày mới.
+   - **Đổi đồ bảo khố (`shopBuy`):** Ưu tiên tiêu cống hiến tích luỹ khi `sectContrib >= 5` và bảo khố có món mở bán (`locked === null && left > 0`).
+   - **Thử tải gửi trả nhiệm vụ (`questTurnIn`):** Khi cống hiến đã tiêu (< 5), bot liên tục gửi yêu cầu trả nhiệm vụ đang làm (`active`) để thử tải đường truyền và kiểm tra tính an toàn của máy chủ (máy chủ từ chối an toàn khi nhiệm vụ chưa hoàn thành tiến độ).
+   - **Nhảy tông môn (`leave`):** Đệ tử có xác suất 8% tự rời tông môn giữa chừng để thử tải biến động thành viên và kiểm chứng việc bảo toàn nguyên tắc mất toàn bộ cống hiến/công tích. Bot tiếp tục di chuyển và gửi input bình thường ngay sau khi rời phái.
+
+2. **Kết quả đo lường thực tế (6 bot, 60 giây, server Colyseus thật cổng 2587):**
+   - **Lệnh chạy:** `npm run bots -w server -- --bots=6 --sect --duration=60`
+   - **Kết nối:** Giữ vững 6/6 bot suốt 60s (0 ngắt bất thường, 0 lỗi 4429).
+   - **Hoạt động chiều sâu M8 (số lượt tin bot gửi lên máy chủ):**
+     + Nhận nhiệm vụ: **5** lượt gửi (`questAccept`).
+     + Gửi trả nhiệm vụ: **0** lượt gửi (`questTurnIn`; ở đợt chạy đối chứng khi bot chưa đổi bảo khố: **6** lượt gửi).
+     + Đổi bảo khố: **3** lượt gửi (`shopBuy`).
+     + Nhảy tông môn: **0** lượt gửi (`leave`; ở đợt chạy đối chứng: **1** lượt gửi).
+     + Tương tác kho & chat: Lập: 2 phái, Mời: 20, Nạp kho: 4 lượt (500 LS/lượt), Rút kho: 2, Chat `/s`: 6.
+   - **Tải hệ thống & Băng thông:**
+     + CPU server mỗi tick (50 ms): Trung bình **0.81 ms** | p95 **1.29 ms** | Max **3.2 ms** (ngân sách < 10 ms).
+     + Bộ nhớ server RSS: **119.4 MB**.
+     + Băng thông mỗi bot: Nhận TB **2.36 KB/s** (20.9 gói/s), Gửi TB **0.6 KB/s** (14.7 gói/s).
+     + Nhịp nhận patch (Δt): TB **50.18 ms** | p95 **50.97 ms**. Độ trễ vòng lặp: TB **51.07 ms**.
+     + Dữ liệu đĩa: Kịch bản bot tự động dọn dẹp sạch sẽ 6/6 file lưu người chơi và tông môn sau khi kết thúc đợt chạy.
+
+
 ## 16. E2E thật phiên bản giao thức (M4 2.5, `npm run e2e:phien-ban -w server`)
 Chrome headless + server Colyseus thật trong tiến trình (thư mục dữ liệu tạm), cùng khung với mục 13 (`server/scripts/e2e-kit.ts`). Server nâng `WorldRoom.minProtocol` lên `PROTOCOL_VERSION + 1` nên client thật (gửi `v: PROTOCOL_VERSION`) thành "quá cũ". Luồng 4 bước: (1) client thấy màn hình "Phiên Bản Đã Cũ" nêu đúng mức tối thiểu và KHÔNG vào được game; (2) sau 2,5 giây `onAuth` được gọi đúng 1 lần (lỗi dứt khoát, không vòng thử lại / `wrong_map`) và không có hồ sơ nhân vật nào được tạo; (3) server hạ mức, bấm "Tải Lại Trang": trang tải lại sạch, màn hình tắt; (4) đăng nhập lại vào game bình thường. Cần `npm run build` (client/dist mới) và google-chrome. Đột biến: bỏ `throw new ClientOutdatedError` ở `client/src/connection.ts` thì bước 1 đỏ. Bước 1 kiểm HIỂN THỊ THẬT (không chỉ `!m.hidden`): `checkVisibility()`, kích thước, `elementFromPoint` ở giữa modal nằm trong modal (không bị che), màn hình đăng nhập đã ẩn; lý do: `hidden` của phần tử cha (`#ui` lúc chưa vào game) làm modal biến mất mà `m.hidden` vẫn `false`, nên bản chỉ kiểm `!m.hidden` đã để lọt lỗi ở #264 (modal nằm trong `#ui` nên người chơi không bao giờ thấy; sửa ở #270). Chạy trên main sau #261 (server) + #264 (client): bản kiểm hiển thị thật ĐỎ ở bước 1 (hết 15 giây chờ), sau #270: PASS 4/4.
 
