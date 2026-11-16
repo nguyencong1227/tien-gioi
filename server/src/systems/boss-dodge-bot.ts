@@ -202,6 +202,8 @@ export interface Result {
   byShape: Record<string, { casts: number; hits: number }>;
   /** Số lần mỗi chiêu (id) được vận và bot đứng ở vùng của nó (để biết chiêu nào đã được kiểm, vì `cond` có thể khiến chiêu không bao giờ được chọn). */
   byAbility: Record<string, number>;
+  /** Giai đoạn của trùm lúc kết thúc mô phỏng (phải >= `opts.phase`: bài kiểm thật sự chạy bộ chiêu của giai đoạn đó). */
+  phase: number;
 }
 
 /**
@@ -254,7 +256,7 @@ export function runDodgeBot(
   let cur: BossAbility | null = null;
   let warnsInCast = 0;
   let lastHp = p.hp;
-  const out: Result = { casts: 0, hitCasts: 0, hurt: [], byShape: {}, byAbility: {} };
+  const out: Result = { casts: 0, hitCasts: 0, hurt: [], byShape: {}, byAbility: {}, phase: 0 };
   const tally = (shape: string, hit: boolean) => {
     const b = (out.byShape[shape] ??= { casts: 0, hits: 0 });
     b.casts++;
@@ -375,5 +377,6 @@ export function runDodgeBot(
         tally(t.shape, false);
       }
   }
+  out.phase = mon.mc.boss!.phase;
   return out;
 }

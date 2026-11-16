@@ -22,6 +22,10 @@ describe("bot né hoàn hảo trên dữ liệu trùm THẬT (BOSSES)", () => {
         const fails: string[] = [];
         for (const seed of SEEDS) {
           const r = runDodgeBot(seed, def, "dodge", SIM_MS, { phase: ph, roam: true });
+          expect(
+            r.phase,
+            `${def.kind} seed ${seed}: trùm không ở giai đoạn ${ph}`,
+          ).toBeGreaterThanOrEqual(ph);
           casts += r.casts;
           for (const [id, n] of Object.entries(r.byAbility)) seen[id] = (seen[id] ?? 0) + n;
           if (r.hurt.length > 0)
