@@ -89,6 +89,11 @@ import {
   type SectInvitedMsg,
   type SectAssignableRank,
   type SectMsg,
+  type SectVaultMsg,
+  type SectVaultView,
+  type SectVaultDepositMsg,
+  type SectVaultWithdrawMsg,
+  SECT_VAULT_SLOTS,
   canSect,
   SECT_MAX_MEMBERS,
   SECT_ELDERS_MAX,
@@ -127,6 +132,22 @@ import {
   sectConfirmText,
   type SectConfirmKind,
 } from "./sect";
+import {
+  clampQty,
+  depositBlock,
+  drawPerDayOptions,
+  drawSummary,
+  maxDepositQty,
+  maxWithdrawQty,
+  planDeposit,
+  planStillValid,
+  planWithdraw,
+  sanitizeVaultView,
+  vaultBlockText,
+  vaultLogLine,
+  withdrawBlock,
+  type VaultPlan,
+} from "./sect-vault";
 import { canAffordFee, feeChipText, recipeFee } from "./forge-fee";
 import {
   QUEST_KIND_BADGE,
@@ -306,6 +327,9 @@ export interface UiCallbacks {
   onSectMotd?: (motd: string) => void;
   onSectDeposit?: (amount: number) => void;
   onSectWithdraw?: (amount: number) => void;
+  onSectVaultDeposit?: (msg: SectVaultDepositMsg) => void;
+  onSectVaultWithdraw?: (msg: SectVaultWithdrawMsg) => void;
+  onSectVaultPolicy?: (drawPerDay: number) => void;
   /** Bảng Công pháp: gắn chiêu vào ô 2-5 (`skillId` "" = gỡ); máy chủ trả `skills` (sổ đúng) */
   onSkillSlot?: (slot: SkillSlot, skillId: string) => void;
   /** Bảng Công pháp vừa mở: cảnh dựng mô hình mới từ sổ chiêu hiện tại (`ui.setSkillsModel`) */
@@ -425,7 +449,19 @@ function stopDuelCountdownTimer() {
 let currentSect: SectView | null = null;
 let currentSectPresence: SectPresenceMsg | null = null;
 let sectModalOpen = false;
-let sectTab: "overview" | "members" | "treasury" = "overview";
+let sectTab: "overview" | "members" | "treasury" | "vault" = "overview";
+// ---- Kho đồ tông môn (mục 27, K4, #788) ----
+/** Ảnh chụp kho đồ MỚI NHẤT máy chủ gửi (đã làm sạch); `null` = chưa có / không còn tông môn. */
+let sectVault: SectVaultView | null = null;
+/** Ô đang chọn: từ kho (rút) hoặc từ túi (góp). Chỉ bấm / chạm / bàn phím mới chọn, rê chuột KHÔNG chọn (mục 24, `inv-select.test.ts`). */
+let vaultSel: { from: "vault" | "bag"; index: number } | null = null;
+let vaultQty = 1;
+/** Đang chờ máy chủ trả lời một thao tác kho đồ (mỗi người một thao tác tại một thời điểm): khoá nút tới khi có ảnh chụp mới / toast / hết `VAULT_BUSY_MS`. */
+let vaultBusy = false;
+let vaultBusyTimer: ReturnType<typeof setTimeout> | null = null;
+const VAULT_BUSY_MS = 5000;
+const vaultSlotEls: HTMLButtonElement[] = [];
+const vaultBagEls: HTMLButtonElement[] = [];
 let currentSectInvite: SectInvitedMsg | null = null;
 let sectInviteInterval: number | null = null;
 let sectConfirmAction: (() => void) | null = null;
@@ -3077,6 +3113,247 @@ function renderSectTreasuryTab() {
   }
 }
 
+// ---------- Kho đồ tông môn (mục 27, K4, #788) ----------
+
+function fillVaultSlot(
+  btn: HTMLButtonElement,
+  slot: { itemId: string; qty: number } | null,
+  selected: boolean,
+) {
+  const icon = btn.querySelector<HTMLElement>(".slot-icon");
+  const nameEl = btn.querySelector<HTMLElement>(".slot-name");
+  const qtyEl = btn.querySelector<HTMLElement>(".slot-qty");
+  btn.classList.toggle("selected", selected);
+  btn.setAttribute("aria-selected", String(selected));
+  const def = slot ? ITEM_BY_ID[slot.itemId] : undefined;
+  if (slot && def) {
+    btn.style.borderColor = rarityStyle(def.rarity).color;
+    if (icon) applyItemVisual(icon, def);
+    if (nameEl) nameEl.textContent = def.name;
+    btn.setAttribute("aria-label", itemAria(def, slot.qty));
+    btn.title = slot.qty > 1 ? `${def.name} ×${slot.qty}` : def.name; // rê chuột chỉ hiện chú thích, KHÔNG chọn ô
+    applyRarityBadge(btn, def.rarity);
+    if (qtyEl) qtyEl.textContent = slot.qty > 1 ? `${slot.qty}` : "";
+  } else {
+    btn.style.borderColor = "rgba(243, 220, 160, 0.22)";
+    if (icon) applyItemVisual(icon, undefined);
+    if (nameEl) nameEl.textContent = "";
+    btn.setAttribute("aria-label", "Ô trống");
+    btn.removeAttribute("title");
+    clearRarityBadge(btn);
+    if (qtyEl) qtyEl.textContent = "";
+  }
+}
+
+/** Số lượng tối đa chọn được cho ô đang chọn (0 nếu chưa chọn / ô trống). */
+function vaultSelMax(): number {
+  if (!vaultSel) return 0;
+  const rank = currentSect?.myRank ?? null;
+  if (vaultSel.from === "vault")
+    return sectVault ? maxWithdrawQty(sectVault, rank, vaultSel.index) : 0;
+  return maxDepositQty(invSlots, vaultSel.index);
+}
+
+/** Bỏ lựa chọn nếu ô đã chọn không còn gì (bị rút hết, đã góp hết) và kẹp số lượng vào [1, tối đa]. */
+function reconcileVaultSelection() {
+  if (!vaultSel) return;
+  const max = vaultSelMax();
+  if (max < 1) {
+    vaultSel = null;
+    vaultQty = 1;
+    return;
+  }
+  vaultQty = clampQty(vaultQty, max) || 1;
+}
+
+function renderSectVaultTab() {
+  if (!currentSect) return;
+  const v = sectVault;
+  const rank = currentSect.myRank;
+  reconcileVaultSelection();
+  $("sect-vault-draw").textContent = v ? drawSummary(v, rank) : "Đang tải kho đồ…";
+  const used = v ? v.slots.filter((x) => x !== null).length : 0;
+  $("sect-vault-count").textContent = v ? `(${used} / ${v.slots.length} ô)` : "";
+  for (let i = 0; i < vaultSlotEls.length; i++) {
+    fillVaultSlot(
+      vaultSlotEls[i],
+      v?.slots[i] ?? null,
+      vaultSel?.from === "vault" && vaultSel.index === i,
+    );
+  }
+  for (let i = 0; i < vaultBagEls.length; i++) {
+    fillVaultSlot(
+      vaultBagEls[i],
+      invSlots[i] ?? null,
+      vaultSel?.from === "bag" && vaultSel.index === i,
+    );
+  }
+
+  // thanh hành động: món đang chọn, số lượng, nút Góp / Rút, lý do không bấm được (bằng chữ)
+  const selEl = $("sect-vault-sel");
+  const qtyBox = $("sect-vault-qty-box");
+  const act = $("sect-vault-act") as HTMLButtonElement;
+  const why = $("sect-vault-why");
+  if (!v || !vaultSel) {
+    selEl.textContent = "Chưa chọn món nào.";
+    qtyBox.hidden = true;
+    act.textContent = "Chọn món";
+    act.disabled = true;
+    why.textContent = v ? vaultBlockText("no_selection") : "";
+  } else {
+    const isVault = vaultSel.from === "vault";
+    const slot = isVault ? v.slots[vaultSel.index] : invSlots[vaultSel.index];
+    const def = slot ? ITEM_BY_ID[slot.itemId] : undefined;
+    const reason = isVault
+      ? withdrawBlock(v, rank, vaultSel.index)
+      : depositBlock(v, invSlots, vaultSel.index);
+    const max = vaultSelMax();
+    selEl.textContent = `${isVault ? "Trong kho" : "Trong túi"}: ${def?.name ?? "?"}${slot && slot.qty > 1 ? ` (có ${slot.qty})` : ""}`;
+    qtyBox.hidden = max <= 1 || reason !== null;
+    $("sect-vault-qty").textContent = String(vaultQty);
+    ($("sect-vault-minus") as HTMLButtonElement).disabled = vaultQty <= 1;
+    ($("sect-vault-plus") as HTMLButtonElement).disabled = vaultQty >= max;
+    act.textContent = vaultBusy ? "Đang xử lý…" : isVault ? "Rút" : "Góp";
+    act.disabled = reason !== null || vaultBusy;
+    why.textContent = reason !== null ? vaultBlockText(reason) : "";
+  }
+
+  // chỉnh hạn mức: CHỈ Tông chủ (`canSect`); chọn sẵn giá trị hiện tại
+  const policy = $("sect-vault-policy");
+  const canPolicy = canSect("vaultPolicy", rank);
+  policy.hidden = !canPolicy || !v;
+  if (canPolicy && v) {
+    const sel = $("sect-vault-policy-sel") as HTMLSelectElement;
+    if (sel.options.length === 0) {
+      for (const n of drawPerDayOptions()) {
+        const o = document.createElement("option");
+        o.value = String(n);
+        o.textContent = n === 0 ? "0 (Đệ tử không rút được)" : `${n} lượt / ngày`;
+        sel.append(o);
+      }
+    }
+    if (document.activeElement !== sel) sel.value = String(v.drawPerDay);
+  }
+
+  // sổ kho đồ: mới nhất đứng đầu
+  const logEl = $("sect-vault-log");
+  logEl.replaceChildren();
+  const log = v?.log ?? [];
+  if (log.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "sect-empty-log";
+    empty.textContent = "Chưa có ai góp hay rút đồ.";
+    logEl.append(empty);
+  } else {
+    for (const e of log) {
+      const item = document.createElement("div");
+      item.className = `sect-log-item ${e.kind}`;
+      item.textContent = vaultLogLine(e);
+      logEl.append(item);
+    }
+  }
+}
+
+function endVaultBusy() {
+  if (vaultBusyTimer) clearTimeout(vaultBusyTimer);
+  vaultBusyTimer = null;
+  if (!vaultBusy) return;
+  vaultBusy = false;
+  if (sectModalOpen && sectTab === "vault") renderSectVaultTab();
+}
+
+function selectVaultSlot(from: "vault" | "bag", index: number) {
+  if (vaultSel?.from === from && vaultSel.index === index) return;
+  vaultSel = { from, index };
+  vaultQty = 1;
+  if (sectModalOpen && sectTab === "vault") renderSectVaultTab();
+}
+
+/** Gửi một kế hoạch góp / rút (sau hộp xác nhận nếu có). Khoá nút tới khi máy chủ trả lời (ảnh chụp kho mới hoặc toast từ chối). */
+function sendVaultPlan(plan: VaultPlan) {
+  vaultBusy = true;
+  if (vaultBusyTimer) clearTimeout(vaultBusyTimer);
+  vaultBusyTimer = setTimeout(endVaultBusy, VAULT_BUSY_MS);
+  if (plan.type === "deposit")
+    callbacks?.onSectVaultDeposit?.({ slot: plan.msg.slot, qty: plan.qty });
+  else
+    callbacks?.onSectVaultWithdraw?.({
+      slot: plan.msg.slot,
+      itemId: plan.itemId,
+      qty: plan.qty,
+    });
+  renderSectVaultTab();
+}
+
+function runVaultAction() {
+  if (vaultBusy || !vaultSel || !sectVault || !currentSect) return;
+  const rank = currentSect.myRank;
+  const plan =
+    vaultSel.from === "vault"
+      ? planWithdraw(sectVault, rank, vaultSel.index, vaultQty)
+      : planDeposit(sectVault, invSlots, vaultSel.index, vaultQty);
+  if (!plan) return;
+  if (!plan.confirm) return sendVaultPlan(plan);
+  askActConfirm(
+    plan.confirm,
+    () => {
+      // ảnh chụp kho / túi có thể đổi trong lúc hộp mở: kiểm lại ĐÚNG món + số lượng, không gửi theo lời hỏi cũ
+      if (!planStillValid(sectVault, invSlots, plan)) {
+        ui.toast({ text: "Kho hoặc túi vừa đổi, chưa làm gì. Hãy chọn lại.", tone: "info" });
+        renderSectVaultTab();
+        return;
+      }
+      sendVaultPlan(plan);
+    },
+    $("sect-vault-act"),
+  );
+}
+
+function buildSectVaultGrids() {
+  const make = (
+    host: HTMLElement,
+    count: number,
+    from: "vault" | "bag",
+    els: HTMLButtonElement[],
+  ) => {
+    host.replaceChildren();
+    els.length = 0;
+    for (let i = 0; i < count; i++) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "inv-slot";
+      btn.setAttribute("role", "gridcell");
+      const icon = document.createElement("i");
+      icon.className = "slot-icon";
+      const name = document.createElement("span");
+      name.className = "slot-name";
+      const qty = document.createElement("b");
+      qty.className = "slot-qty";
+      btn.append(icon, name, qty);
+      // CHỈ bấm chuột / chạm (`pointerdown`, nút chính) hoặc bàn phím (focus bằng mũi tên / Tab) mới CHỌN ô; rê chuột chỉ sáng ô bằng CSS và hiện chú thích (mục 24).
+      btn.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        if (e.button !== 0) return;
+        selectVaultSlot(from, i);
+        // `preventDefault` ở trên chặn trình duyệt tự chuyển focus: tự chuyển, để ô được CHỌN và ô đang FOCUS (Enter chạy trên ô này) luôn là MỘT
+        btn.focus({ preventScroll: true });
+      });
+      btn.addEventListener("focus", () => selectVaultSlot(from, i));
+      btn.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        if (e.repeat) return;
+        selectVaultSlot(from, i);
+        runVaultAction();
+      });
+      els.push(btn);
+      host.append(btn);
+    }
+  };
+  make($("sect-vault-grid"), SECT_VAULT_SLOTS, "vault", vaultSlotEls);
+  make($("sect-vault-bag"), INVENTORY_SLOTS, "bag", vaultBagEls);
+}
+
 function renderSectModal() {
   withFocusKept($("sect-modal"), renderSectModalImpl);
 }
@@ -3110,10 +3387,12 @@ function renderSectModalImpl() {
   $("sect-tab-btn-overview").classList.toggle("active", sectTab === "overview");
   $("sect-tab-btn-members").classList.toggle("active", sectTab === "members");
   $("sect-tab-btn-treasury").classList.toggle("active", sectTab === "treasury");
+  $("sect-tab-btn-vault").classList.toggle("active", sectTab === "vault");
 
   $("sect-tab-overview").hidden = sectTab !== "overview";
   $("sect-tab-members").hidden = sectTab !== "members";
   $("sect-tab-treasury").hidden = sectTab !== "treasury";
+  $("sect-tab-vault").hidden = sectTab !== "vault";
 
   if (sectTab === "overview") {
     $("sect-meta-tag").textContent = `[${currentSect.tag}]`;
@@ -3138,6 +3417,8 @@ function renderSectModalImpl() {
     renderSectMembersTab();
   } else if (sectTab === "treasury") {
     renderSectTreasuryTab();
+  } else if (sectTab === "vault") {
+    renderSectVaultTab();
   }
 }
 
@@ -3340,6 +3621,28 @@ export const ui = {
     bindTap("sect-tab-btn-overview", () => this.switchSectTab("overview"));
     bindTap("sect-tab-btn-members", () => this.switchSectTab("members"));
     bindTap("sect-tab-btn-treasury", () => this.switchSectTab("treasury"));
+    bindTap("sect-tab-btn-vault", () => this.switchSectTab("vault"));
+    buildSectVaultGrids();
+    bindTap("sect-vault-minus", () => {
+      vaultQty = Math.max(1, vaultQty - 1);
+      renderSectVaultTab();
+    });
+    bindTap("sect-vault-plus", () => {
+      vaultQty = clampQty(vaultQty + 1, vaultSelMax()) || 1;
+      renderSectVaultTab();
+    });
+    // Nút Góp / Rút dùng `click` (KHÔNG `bindTap`/pointerdown): hộp xác nhận đóng ở `pointerdown` của nút "Góp"/"Rút"/"Giữ lại" nằm ĐÚNG chỗ nút này, nên `click` ma sau khi nhả ngón
+    // sẽ rơi xuống đây và mở lại hộp; chỉ chặn click của chuột / chạm (`detail > 0`) trong cửa sổ chống click ma, Enter / Space bằng bàn phím (`detail` = 0) vẫn bấm được ngay.
+    $("sect-vault-act").addEventListener("click", (e) => {
+      e.preventDefault();
+      if (e.detail > 0 && inConfirmGuard(actConfirmClosedAt, performance.now())) return;
+      runVaultAction();
+    });
+    $("sect-vault-policy").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const sel = $("sect-vault-policy-sel") as HTMLSelectElement;
+      callbacks?.onSectVaultPolicy?.(Number(sel.value));
+    });
 
     // Form tạo tông môn
     $("sect-form-create")?.addEventListener("submit", (e) => {
@@ -4517,6 +4820,7 @@ export const ui = {
     renderQuestTracker();
     if (questModalOpen) renderQuestModal();
     if (shopModalOpen && shopTab === "sell") renderShopSell();
+    if (sectModalOpen && sectTab === "vault") renderSectVaultTab(); // túi đổi (góp xong, nhặt): lưới túi trong tab Kho đồ cũng đổi
   },
 
   onWallet(m: WalletMsg) {
@@ -5031,6 +5335,8 @@ export const ui = {
   },
 
   toast(m: ToastMsg) {
+    // đang chờ máy chủ trả lời thao tác kho đồ mà có toast tới: coi là lời từ chối / báo (`sectFailMessage`), mở khoá nút (ảnh chụp kho mới tới riêng)
+    if (vaultBusy) endVaultBusy();
     const p = document.createElement("p");
     p.className = m.tone ?? "info";
     p.textContent = m.text;
@@ -5699,18 +6005,42 @@ export const ui = {
     return true;
   },
 
-  switchSectTab(tab: "overview" | "members" | "treasury") {
+  switchSectTab(tab: "overview" | "members" | "treasury" | "vault") {
     sectTab = tab;
     renderSectModal();
   },
 
   onSect(m: SectMsg) {
     currentSect = m.sect;
-    // Không còn tông môn (bị trục xuất / giải tán): hộp xác nhận cũ không còn ý nghĩa
-    if (!m.sect) closeSectConfirm();
+    // Không còn tông môn (bị trục xuất / giải tán): hộp xác nhận cũ không còn ý nghĩa, kho đồ cũng không còn
+    if (!m.sect) {
+      closeSectConfirm();
+      sectVault = null;
+      vaultSel = null;
+      vaultQty = 1;
+      endVaultBusy();
+    }
     if (sectModalOpen) {
       renderSectModal();
     }
+  },
+
+  /** Ảnh chụp kho đồ tông môn (mục 27): thay bản cũ, mở khoá nút (máy chủ đã trả lời), vẽ lại nếu đang xem tab Kho đồ. `vault: null` = không còn tông môn. */
+  onSectVault(m: SectVaultMsg) {
+    sectVault = sanitizeVaultView(m?.vault);
+    if (!sectVault) {
+      vaultSel = null;
+      vaultQty = 1;
+    }
+    if (vaultBusyTimer) clearTimeout(vaultBusyTimer);
+    vaultBusyTimer = null;
+    vaultBusy = false;
+    if (sectModalOpen && sectTab === "vault") renderSectVaultTab();
+  },
+
+  /** Bản sao ảnh chụp kho đồ hiện tại (cho script kiểm / gỡ lỗi). */
+  getSectVault(): SectVaultView | null {
+    return sectVault;
   },
 
   onSectPresence(m: SectPresenceMsg) {
