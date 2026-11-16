@@ -31,6 +31,12 @@ describe("savePos: toạ độ nguyên lưu vào hồ sơ không bị chặn khi
       expect(Number.isInteger(s.x) && Number.isInteger(s.y), `${c.x},${c.y}`).toBe(true);
       expect(blocked(s.x, s.y), `${c.x},${c.y} -> ${s.x},${s.y}`).toBe(false);
       expect(Math.hypot(s.x - c.x, s.y - c.y), `${c.x},${c.y}`).toBeLessThan(1.5);
+      // GẦN NHẤT: bằng khoảng cách nhỏ nhất tới một trong bốn góc floor / ceil KHÔNG bị chặn (tính độc lập trong test)
+      let nearest = Infinity;
+      for (const cx of [Math.floor(c.x), Math.ceil(c.x)])
+        for (const cy of [Math.floor(c.y), Math.ceil(c.y)])
+          if (!blocked(cx, cy)) nearest = Math.min(nearest, Math.hypot(cx - c.x, cy - c.y));
+      expect(Math.hypot(s.x - c.x, s.y - c.y), `${c.x},${c.y}`).toBeCloseTo(nearest, 9);
       if (blocked(Math.round(c.x), Math.round(c.y))) fixed++;
     }
     expect(fixed).toBe(cases.length); // mọi ca đều là ca làm tròn thường sẽ hỏng
