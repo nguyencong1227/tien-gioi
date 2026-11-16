@@ -4,6 +4,7 @@
 // (`bossCast` tên chiêu đang vận, `bossPhase` tiếng gầm, `bossEnrage` cuồng nộ), và mốc giai đoạn từ `BOSS_BY_KIND[kind].phases[].fromHp` (KHÔNG thêm trường vào schema: byte / tick giữ 0).
 // Giai đoạn suy từ khí huyết bằng `bossPhaseOf` của `shared/` (cùng hàm máy chủ dùng), `fx` chỉ để chớp / gầm.
 import {
+  BOSS_ARMOR_MAX_MS,
   BOSS_PHASE_ROAR_MS,
   MONSTER_BY_ID,
   bossDefOf,
@@ -13,14 +14,14 @@ import {
 
 /** Trùm ngoài hoang chỉ hiện thanh khi trong tầm này (px); bí cảnh luôn hiện (trùm duy nhất của run). */
 export const BOSS_BAR_RANGE = 600;
+// Trần thời lượng giáp client chịu nhận = `BOSS_ARMOR_MAX_MS` của `shared/` (cùng trần `bossViolations` dùng cho dữ liệu): `fx` `bossArmor` có `ms` hơn mức này bị bỏ.
+
 /** Tiếng của trùm chỉ phát khi trùm trong / sát tầm nhìn (px ngoài rìa màn hình; `inView`): trùm ở xa khuất không gầm vào tai người chơi. */
 export const BOSS_SFX_VIEW = 480;
 /** Giữ tên chiêu trên thanh thêm chừng này (ms) sau lúc đòn đáp (đọc kịp, nhất là tên ngắn). */
 export const BOSS_CAST_LINGER_MS = 500;
 /** Dòng "Gọi N quái con" trên thanh trùm giữ chừng này (ms) sau lúc nhận `bossSummon`, rồi tắt (đọc kịp, không dán mãi). */
 export const BOSS_SUMMON_NOTE_MS = 3000;
-/** Trần thời lượng giáp client chịu nhận (ms): `fx` hỏng không được dựng giáp mãi mãi (máy chủ thật chỉ vài giây). */
-export const BOSS_ARMOR_MAX_MS = 60_000;
 /** Cuồng nộ chớp mạnh chừng này (ms) lúc mới nhận `bossEnrage`, rồi giữ chỉ báo đứng yên. */
 export const BOSS_ENRAGE_FLASH_MS = 1500;
 
