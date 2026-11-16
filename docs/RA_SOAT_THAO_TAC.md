@@ -61,7 +61,7 @@ Canh lâu dài: `client/src/inv-select.test.ts` thất bại nếu `ui.ts` có n
 ## 3. Việc làm theo bảng (các PR nhỏ)
 
 1. Hạ tầng hộp xác nhận dùng chung `act-confirm` (lớp thuần `act-confirm.ts` + một hộp DOM `#act-confirm`: nêu chữ + dòng nhắc, "Giữ lại" focus mặc định, Esc, chống click ma 450 ms, đóng khi nối lại / gục) + **Đột phá** (hàng 10).
-2. **Bán đồ quý** (hàng 2).
+2. **Bán đồ quý** (hàng 2). **ĐÃ LÀM** (`act-confirm.ts`: `needsSellConfirm` / `sellPlan` / `sellStillValid`; `ui.ts`: nút "Bán" ở cửa hàng): trang bị hoặc bậc >= 2 thì hộp nêu "Bán <tên> ×N được M Linh thạch?" + nhắc mua lại tốn hơn giá bán; kiểm lại món + số lượng lúc xác nhận (túi đổi thì huỷ + báo, không bán món khác); cửa hàng đóng thì hộp đóng theo; `click` ma sau khi hộp đóng bị chặn 450 ms (cảm ứng: hộp đóng ở `pointerdown` nên `click` rơi xuống nút Bán bên dưới và mở lại hộp: lỗi tìm ra bằng script Chrome thật). Đồ thường bán thẳng. Script `client/scripts/check-sell-confirm.mjs` (5 khung nhìn, ảnh `docs/screenshots/xac-nhan-thao-tac/ban-do-quy-*.webp`, 5 đột biến đỏ).
 3. **Hoàng Tuyền**: mở nâng cấp bằng Duyên (hàng 11) và tóm tắt đầu thai (hàng 12).
 4. **Tông môn**: lập (hàng 13) và nộp kho khi không rút được (hàng 14).
 5. Mỗi bước kèm script Chrome thật (khuôn `client/scripts/check-inv-select.mjs`: chuột / cảm ứng / bàn phím, 5 khung nhìn), đột biến đỏ cho mỗi luật, ảnh 5 cỡ.
