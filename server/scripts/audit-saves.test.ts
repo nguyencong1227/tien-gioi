@@ -19,6 +19,10 @@ import {
   SECT_ELDERS_MAX,
   SECT_LOG_MAX,
   SECT_MAX_MEMBERS,
+  SECT_VAULT_SLOTS,
+  SECT_VAULT_LOG_MAX,
+  SECT_VAULT_DRAW_MAX,
+  SECT_VAULT_QTY_MAX,
   SKILLS_M7,
   sanitizeSkillBook,
 } from "@tien-gioi/shared";
@@ -1278,6 +1282,224 @@ describe("audit-saves (Issue #112)", () => {
       const errs = auditSectSaveData(badLogEntry, badLogEntry.length).map((e) => e.code);
       expect(errs).toContain("invalid_sect_log_kind");
       expect(errs).toContain("invalid_sect_log_amount");
+    });
+
+    it("kho đồ (vault) hợp lệ kèm draw của thành viên: 0 lỗi", () => {
+      const validVault = {
+        slots: Array.from({ length: SECT_VAULT_SLOTS }, (_, i) =>
+          i === 0 ? { itemId: "hoi_huyet_dan", qty: 5 } : null,
+        ),
+        log: [
+          {
+            at: 1700000004000,
+            name: "Huyền Chân Tử",
+            kind: "deposit",
+            itemId: "hoi_huyet_dan",
+            qty: 5,
+          },
+        ],
+        drawPerDay: 3,
+      };
+      const sectWithVault = {
+        ...validSect,
+        members: [
+          validSect.members[0],
+          validSect.members[1],
+          {
+            ...validSect.members[2],
+            draw: { day: "2026-11-16", n: 2 },
+          },
+        ],
+        vault: validVault,
+      };
+      const raw = JSON.stringify(sectWithVault);
+      expect(auditSectSaveData(raw, raw.length)).toEqual([]);
+    });
+
+    it("vault không phải object -> invalid_sect_vault", () => {
+      for (const badVault of [null, "vault", [1, 2, 3], 123]) {
+        const raw = JSON.stringify({ ...validSect, vault: badVault });
+        expect(auditSectSaveData(raw, raw.length).map((e) => e.code)).toContain(
+          "invalid_sect_vault",
+        );
+      }
+    });
+
+    it("vault.slots không đúng SECT_VAULT_SLOTS hoặc chứa ô hỏng -> invalid_sect_vault_slots / invalid_sect_vault_slot", () => {
+      const badLen = JSON.stringify({
+        ...validSect,
+        vault: { slots: [null, null], log: [], drawPerDay: 3 },
+      });
+      expect(auditSectSaveData(badLen, badLen.length).map((e) => e.code)).toContain(
+        "invalid_sect_vault_slots",
+      );
+
+      const badSlot = JSON.stringify({
+        ...validSect,
+        vault: {
+          slots: Array.from({ length: SECT_VAULT_SLOTS }, (_, i) => (i === 0 ? "hỏng" : null)),
+          log: [],
+          drawPerDay: 3,
+        },
+      });
+      expect(auditSectSaveData(badSlot, badSlot.length).map((e) => e.code)).toContain(
+        "invalid_sect_vault_slot",
+      );
+    });
+
+    it("vault.slots có món lạ hoặc qty ngoài [1, stack] -> unknown_sect_vault_item / invalid_sect_vault_qty", () => {
+      const badItem = JSON.stringify({
+        ...validSect,
+        vault: {
+          slots: Array.from({ length: SECT_VAULT_SLOTS }, (_, i) =>
+            i === 0 ? { itemId: "mon_la_khong_ton_tai", qty: 1 } : null,
+          ),
+          log: [],
+          drawPerDay: 3,
+        },
+      });
+      expect(auditSectSaveData(badItem, badItem.length).map((e) => e.code)).toContain(
+        "unknown_sect_vault_item",
+      );
+
+      // hoi_huyet_dan stack tối đa là 20. Kiểm tra qty = 0, qty = 21, qty không nguyên
+      for (const badQty of [0, -1, 21, 2.5, Infinity]) {
+        const badQtyJson = JSON.stringify({
+          ...validSect,
+          vault: {
+            slots: Array.from({ length: SECT_VAULT_SLOTS }, (_, i) =>
+              i === 0 ? { itemId: "hoi_huyet_dan", qty: badQty } : null,
+            ),
+            log: [],
+            drawPerDay: 3,
+          },
+        });
+        expect(auditSectSaveData(badQtyJson, badQtyJson.length).map((e) => e.code)).toContain(
+          "invalid_sect_vault_qty",
+        );
+      }
+    });
+
+    it("vault.log vượt SECT_VAULT_LOG_MAX hoặc entry hỏng -> invalid_sect_vault_log*", () => {
+      const bigLog = Array.from({ length: SECT_VAULT_LOG_MAX + 1 }, (_, i) => ({
+        at: 1700000000000 + i,
+        name: "Huyền Chân Tử",
+        kind: "deposit",
+        itemId: "hoi_huyet_dan",
+        qty: 1,
+      }));
+      const rawBig = JSON.stringify({
+        ...validSect,
+        vault: {
+          slots: Array.from({ length: SECT_VAULT_SLOTS }, () => null),
+          log: bigLog,
+          drawPerDay: 3,
+        },
+      });
+      expect(auditSectSaveData(rawBig, rawBig.length).map((e) => e.code)).toContain(
+        "invalid_sect_vault_log",
+      );
+
+      const badEntries = JSON.stringify({
+        ...validSect,
+        vault: {
+          slots: Array.from({ length: SECT_VAULT_SLOTS }, () => null),
+          log: [
+            {
+              at: "hỏng",
+              name: "",
+              kind: "hack",
+              itemId: "mon_la",
+              qty: SECT_VAULT_QTY_MAX + 10,
+            },
+          ],
+          drawPerDay: 3,
+        },
+      });
+      const codes = auditSectSaveData(badEntries, badEntries.length).map((e) => e.code);
+      expect(codes).toContain("invalid_sect_vault_log_time");
+      expect(codes).toContain("invalid_sect_vault_log_name");
+      expect(codes).toContain("invalid_sect_vault_log_kind");
+      expect(codes).toContain("unknown_sect_vault_log_item");
+      expect(codes).toContain("invalid_sect_vault_log_qty");
+    });
+
+    it("vault.drawPerDay ngoài khung [0, SECT_VAULT_DRAW_MAX] -> invalid_sect_vault_draw_policy", () => {
+      for (const badPolicy of [-1, SECT_VAULT_DRAW_MAX + 1, 2.5, "3"]) {
+        const raw = JSON.stringify({
+          ...validSect,
+          vault: {
+            slots: Array.from({ length: SECT_VAULT_SLOTS }, () => null),
+            log: [],
+            drawPerDay: badPolicy,
+          },
+        });
+        expect(auditSectSaveData(raw, raw.length).map((e) => e.code)).toContain(
+          "invalid_sect_vault_draw_policy",
+        );
+      }
+    });
+
+    it("members[i].draw không hợp lệ -> invalid_sect_member_draw*", () => {
+      // draw không phải object
+      const raw1 = JSON.stringify({
+        ...validSect,
+        members: [{ ...validSect.members[0], draw: "2026-11-16" }],
+      });
+      expect(auditSectSaveData(raw1, raw1.length).map((e) => e.code)).toContain(
+        "invalid_sect_member_draw",
+      );
+
+      // day sai format
+      const raw2 = JSON.stringify({
+        ...validSect,
+        members: [{ ...validSect.members[0], draw: { day: "16-11-2026", n: 1 } }],
+      });
+      expect(auditSectSaveData(raw2, raw2.length).map((e) => e.code)).toContain(
+        "invalid_sect_member_draw_day",
+      );
+
+      // n âm hoặc không phải số nguyên
+      const raw3 = JSON.stringify({
+        ...validSect,
+        members: [{ ...validSect.members[0], draw: { day: "2026-11-16", n: -1 } }],
+      });
+      expect(auditSectSaveData(raw3, raw3.length).map((e) => e.code)).toContain(
+        "invalid_sect_member_draw_count",
+      );
+    });
+
+    it("đột biến: nới lỏng kiểm tra kho đồ (bỏ qua kiểm tra độ dài slots hoặc tra cứu itemId bằng TABLE[id] trực tiếp)", () => {
+      // Đột biến 1: không kiểm tra độ dài slots (chấp nhận bất kỳ mảng nào)
+      const laxSlotsCheck = (slots: any) => Array.isArray(slots);
+      expect(laxSlotsCheck([null, null])).toBe(true);
+
+      // Đột biến 2: tra cứu itemId không dùng byId
+      const unsafeLookup = (TABLE: any, id: string) => TABLE[id];
+      expect(typeof unsafeLookup(ITEM_BY_ID, "constructor")).toBe("function");
+
+      // Hàm auditSectSaveData THẬT bắt buộc phát hiện cả hai:
+      const badSlots = JSON.stringify({
+        ...validSect,
+        vault: { slots: [null, null], log: [], drawPerDay: 3 },
+      });
+      expect(auditSectSaveData(badSlots, badSlots.length).map((e) => e.code)).toContain(
+        "invalid_sect_vault_slots",
+      );
+
+      const badCtor = JSON.stringify({
+        ...validSect,
+        vault: {
+          slots: Array.from({ length: SECT_VAULT_SLOTS }, (_, i) =>
+            i === 0 ? { itemId: "constructor", qty: 1 } : null,
+          ),
+          log: [],
+          drawPerDay: 3,
+        },
+      });
+      expect(auditSectSaveData(badCtor, badCtor.length).map((e) => e.code)).toContain(
+        "unknown_sect_vault_item",
+      );
     });
 
     it("quét thư mục sects/: phát hiện lệch tên file, trùng tên, trùng tag, và thành viên ở 2 tông môn", () => {

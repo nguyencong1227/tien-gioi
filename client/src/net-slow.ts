@@ -7,8 +7,17 @@
 // Mốc chờ bắt đầu ở lần gửi đầu tiên sau lần nhận gần nhất; BẤT KỲ thứ gì nhận về (patch state, pong) xoá mốc. Chờ quá `SLOW_AFTER_MS` thì "chậm"; có tin về lại là tắt
 // (giữ chip tối thiểu `SLOW_MIN_SHOW_MS` để kịp đọc, không nháy).
 
-/** Chờ phản hồi quá chừng này (ms) thì báo "Mạng chậm". Dưới 8 giây của nhịp tim; trên độ trễ xấu nhất bình thường của 4G (~1 giây) + một nhịp mất gói. */
-export const SLOW_AFTER_MS = 2500;
+/**
+ * Chờ phản hồi quá chừng này (ms) thì báo mất tín hiệu (mục 33: người dùng yêu cầu "mất tín hiệu quá 2 giây"). Dưới 8 giây của nhịp tim; trên độ trễ xấu nhất bình thường
+ * của 4G (~1 giây) + một nhịp mất gói. Máy chủ coi im lặng 3 giây là hồn lìa xác (`NET_SILENCE_GHOST_MS`) và tha chết từ 2 giây (`NET_SPARE_SILENCE_MS`), nên từ mốc này
+ * nhân vật đã không thể chết vì mạng.
+ */
+export const SLOW_AFTER_MS = 2000;
+
+/** Chữ trên dải (mục 33). */
+export const NET_LOST_TEXT = "Mất kết nối — nhân vật đang được bảo vệ";
+/** Báo khi tín hiệu về lại mà KHÔNG phải nối lại socket (nối lại socket có toast riêng ở `main.ts`). */
+export const NET_BACK_TEXT = "Đã kết nối lại.";
 /** Chip đã hiện thì giữ ít nhất chừng này (ms) kể cả khi tin đã về lại (không nhấp nháy). */
 export const SLOW_MIN_SHOW_MS = 1500;
 /** Lần `poll` trước cách quá chừng này (tab ẩn, máy treo, luồng chính bị chặn): không đủ bằng chứng về mạng, bỏ mốc chờ cũ. */
@@ -66,8 +75,8 @@ export interface NetSlowRoom {
 
 export interface NetSlowOptions {
   room: NetSlowRoom;
-  /** Hiện / ẩn chip (chỉ gọi khi giá trị ĐỔI) */
-  onChange: (slow: boolean) => void;
+  /** Hiện / ẩn chip (chỉ gọi khi giá trị ĐỔI). `resumed` = chip vừa TẮT vì tín hiệu về lại (không phải do `stop()`): chỗ gọi báo "Đã kết nối lại". */
+  onChange: (slow: boolean, resumed: boolean) => void;
   now?: () => number;
   setInterval?: (fn: () => void, ms: number) => unknown;
   clearInterval?: (id: unknown) => void;
@@ -88,7 +97,7 @@ export class NetSlowMonitor {
   private wrapper: NetSlowRoom["send"] | null = null;
 
   private readonly room: NetSlowRoom;
-  private readonly onChange: (slow: boolean) => void;
+  private readonly onChange: (slow: boolean, resumed: boolean) => void;
   private readonly now: () => number;
   private readonly setIntervalFn: (fn: () => void, ms: number) => unknown;
   private readonly clearIntervalFn: (id: unknown) => void;
@@ -128,7 +137,7 @@ export class NetSlowMonitor {
     const slow = this.detector.poll(this.now());
     if (slow !== this.slow) {
       this.slow = slow;
-      this.onChange(slow);
+      this.onChange(slow, !slow);
     }
   }
 
@@ -147,7 +156,7 @@ export class NetSlowMonitor {
     this.wrapper = null;
     if (this.slow) {
       this.slow = false;
-      this.onChange(false);
+      this.onChange(false, false); // dừng (rớt socket, đổi phòng): KHÔNG báo "đã kết nối lại"
     }
   }
 }

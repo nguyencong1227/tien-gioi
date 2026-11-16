@@ -2,6 +2,7 @@ import {
   DEFAULT_MAP_ID,
   JOIN_CLIENT_OUTDATED,
   JOIN_NOT_IN_RUN,
+  NET_BEAT_MS,
   PROTOCOL_VERSION,
   ROOM_ID_RE,
   getMap,
@@ -135,6 +136,8 @@ export async function joinWithRedirect<R>(
     try {
       const joinOpts: JoinOptions = {
         v: PROTOCOL_VERSION,
+        // Khai nhịp gửi tin (mục 33): máy chủ chỉ áp luật "im lặng quá 3 giây thì hồn lìa xác" cho client có khai; `HeartbeatController` gửi ping đúng nhịp này
+        beatMs: NET_BEAT_MS,
       };
       if (token) joinOpts.token = token;
       if (name) joinOpts.name = name;

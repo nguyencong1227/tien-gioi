@@ -34,6 +34,12 @@ export interface DocumentVisibilityLike {
 
 export interface HeartbeatOptions {
   room: HeartbeatRoom;
+  /**
+   * Nhịp ping ở tiền cảnh (ms). Mặc định `HEARTBEAT_INTERVAL_MS` (5 giây); `main.ts` truyền `NET_BEAT_MS` (1 giây, mục 33: máy chủ coi im lặng quá 3 giây là hồn lìa xác nên client
+   * phải gửi đều kể cả khi đứng yên). Ping kế chỉ đi khi KHÔNG còn ping chờ pong; pong về mà đã qua một nhịp kể từ ping trước thì gửi NGAY ping kế (không chờ tick), để RTT cao
+   * (4G, hơn 1 giây) không kéo giãn khoảng im lặng.
+   */
+  intervalMs?: number;
   onDead: () => void;
   sound?: SoundController;
   doc?: DocumentVisibilityLike;
@@ -54,10 +60,13 @@ export class HeartbeatController {
   private timerId: any = null;
   private resumeTimeoutId: any = null;
   private hiddenSince = 0;
+  /** Mốc gửi ping gần nhất (ms, đồng hồ của `now`) */
+  private lastPingAt = Number.NEGATIVE_INFINITY;
   private stopped = false;
   private unregisterPong: (() => void) | null = null;
 
   private readonly room: HeartbeatRoom;
+  private readonly intervalMs: number;
   private readonly onDeadCallback: () => void;
   private readonly sound?: SoundController;
   private readonly doc?: DocumentVisibilityLike;
@@ -73,6 +82,10 @@ export class HeartbeatController {
 
   constructor(opts: HeartbeatOptions) {
     this.room = opts.room;
+    this.intervalMs =
+      Number.isFinite(opts.intervalMs) && (opts.intervalMs as number) > 0
+        ? (opts.intervalMs as number)
+        : HEARTBEAT_INTERVAL_MS;
     this.onDeadCallback = opts.onDead;
     this.sound = opts.sound;
     this.doc = opts.doc ?? (typeof document !== "undefined" ? document : undefined);
@@ -118,10 +131,17 @@ export class HeartbeatController {
         this.clearTimeoutFn(this.resumeTimeoutId);
         this.resumeTimeoutId = null;
       }
+      // pong về trễ (RTT >= một nhịp): ping kế đi NGAY, không chờ tick (khoảng im lặng phía máy chủ không dài hơn RTT)
+      if (
+        !this.stopped &&
+        !this.isDocumentHidden() &&
+        this.now() - this.lastPingAt >= this.intervalMs
+      )
+        this.sendPing();
     }
   }
 
-  /** Chu kỳ kiểm tra định kỳ ở tiền cảnh (gọi mỗi HEARTBEAT_INTERVAL_MS). */
+  /** Chu kỳ kiểm tra định kỳ ở tiền cảnh (gọi mỗi `intervalMs`). */
   tick(): void {
     if (this.stopped || this.isDocumentHidden()) return;
 
@@ -140,6 +160,7 @@ export class HeartbeatController {
   /** Gửi một tin ping kèm mốc thời gian client. */
   private sendPing(): void {
     const t = this.now();
+    this.lastPingAt = t;
     this.state.pendingSince = t;
     this.pendingT = t;
     try {
@@ -208,7 +229,7 @@ export class HeartbeatController {
 
   private startInterval(): void {
     if (this.timerId === null && !this.stopped) {
-      this.timerId = this.setIntervalFn(() => this.tick(), HEARTBEAT_INTERVAL_MS);
+      this.timerId = this.setIntervalFn(() => this.tick(), this.intervalMs);
     }
   }
 
