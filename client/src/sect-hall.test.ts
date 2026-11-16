@@ -330,6 +330,9 @@ describe("hallRefreshDelayMs: hẹn giờ xin ảnh chụp mới khi qua mốc �
   it("đã qua mốc rồi (đồng hồ chạy lâu hơn): không âm, vẫn chờ đúng biên (không xin trước khi máy chủ chắc chắn sang ngày)", () => {
     expect(hallRefreshDelayMs(at(1000), 5000)).toBe(HALL_RESET_MARGIN_MS);
     expect(hallRefreshDelayMs(at(0), 0)).toBe(HALL_RESET_MARGIN_MS);
+    // biên đủ lớn để máy chủ chắc chắn đã sang ngày (không xin sớm rồi nhận lại bản cũ): >= 1 giây, và không quá dài để người chơi không đợi lâu
+    expect(HALL_RESET_MARGIN_MS).toBeGreaterThanOrEqual(1000);
+    expect(HALL_RESET_MARGIN_MS).toBeLessThanOrEqual(10_000);
     expect(hallRefreshDelayMs(at(-86_400_000), 0)).toBe(HALL_RESET_MARGIN_MS);
   });
 
