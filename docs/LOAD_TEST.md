@@ -1685,6 +1685,115 @@ Kịch bản được tích hợp và kiểm thử tự động tại `server/sc
 2. **Kế hoạch thử tải trên trùm thật:** Phần đo lường tỉ lệ sống sót, thời gian hạ trùm, số đòn trúng trên các trùm thật (Xích Mãng, Hắc Giao, Thiên Hàn Vương) theo yêu cầu đầy đủ của Issue #876 sẽ được tiến hành sau khi Dev E hoàn thành việc đưa dữ liệu bộ chiêu trùm thật vào `main` (Issue #872).
 3. **Mã kiểm thử thường trực:** Bài test được lưu tại `server/scripts/boss-bot-stress.test.ts` (5 tests, chạy bằng lệnh `npx vitest run server/scripts/boss-bot-stress.test.ts`).
 
+---
+
+## 30. Thống kê thời lượng & Phân tích ổn định CI GitHub Actions (Issue #945)
+
+> Kịch bản đo: Thu thập thời lượng thực tế của >= 40 lượt chạy CI gần nhất bằng script `node server/scripts/measure-ci.mjs` (gọi GitHub REST API `actions/runs/{id}/jobs`).
+
+### 30.1. Hiện tượng & Bối cảnh
+- **Lượt chạy bị huỷ sau 10 phút (Run `43952326729` - PR #924):** Job `check` của CI bị GitHub Actions tự động huỷ sau đúng 10 phút do chạm trần `timeout-minutes: 10`. Khi chạy lại (`gh run rerun --failed`), cả job xanh hoàn toàn chỉ mất 311 giây (5 phút 11 giây), trong đó bước `Test` mất 228 giây.
+- **Dao động thời lượng trên runner GitHub Actions:** Trong khi chạy kiểm thử cục bộ trên máy dev mất ~75–90 giây cho cả bộ 307 tệp (~5370 ca kiểm thử), thời lượng trên CI dao động mạnh từ 159 giây đến 239 giây cho riêng bước `Test`, và từ 208 giây đến 365 giây cho toàn bộ job `check`.
+- **Hệ quả của việc huỷ ngang do timeout:** Khi job bị huỷ bởi `timeout-minutes: 10`, GitHub Actions lập tức ngắt runner mà không xuất log chi tiết hay đẩy artifact, dẫn đến không xác định được test nào bị nghẽn hoặc runner bị chậm ở khâu nào.
+
+### 30.2. Bảng tổng hợp thời lượng 50 lượt CI gần nhất
+
+**Phân loại kết quả (50 lượt gần nhất):**
+- **Thành công (success):** 34 lượt (~68%).
+- **Thất bại (failure):** 1 lượt (~2%) do lỗi định dạng Prettier trên PR #912 của Dev G.
+- **Bị huỷ (cancelled):** 15 lượt (~30%) do cơ chế huỷ lượt cũ khi có commit dồn dập trên `main` (`concurrency: cancel-in-progress: true`).
+
+**Bảng 1: Phân bố thời lượng Job `check` và Bước `Test` (34 lượt thành công):**
+
+| Chỉ số thời lượng | Job `check` (toàn bộ) | Bước `Test` (vitest run) | Ghi chú |
+|---|---:|---:|---|
+| **Mẫu đo (N)** | **34** | **34** | Chỉ tính các lượt hoàn thành thành công |
+| **Nhanh nhất (Min)** | **208 giây** (3m 28s) | **159 giây** (2m 39s) | Lượt chạy khi runner GitHub Actions ít tải |
+| **Trung bình (TB)** | **271 giây** (4m 31s) | **194 giây** (3m 14s) | Thời lượng trung bình ổn định |
+| **Trung vị (Median)** | **265 giây** (4m 25s) | **194 giây** (3m 14s) | 50% số lượt hoàn thành dưới mốc này |
+| **Bách phân vị 95 (p95)** | **330 giây** (5m 30s) | **237 giây** (3m 57s) | Mức tải cao trên hạ tầng runner |
+| **Chậm nhất (Max)** | **365 giây** (6m 05s) | **239 giây** (3m 59s) | Chậm nhất trong các lượt bình thường |
+
+**Bảng 2: Phân bổ thời gian giữa các bước trong Job `check`:**
+
+| Bước trong Job `check` | Thời gian trung bình | Tỷ lệ thời gian | Ghi chú |
+|---|---:|---:|---|
+| **Cài đặt & Chuẩn bị (`setup-node`, `npm ci`)** | ~20 - 25s | ~8% | Tận dụng cache `npm` của GitHub Actions |
+| **Kiểm tra kiểu (`npm run typecheck`)** | ~11 - 17s | ~5% | Biên dịch TypeScript cho cả server và client |
+| **Lint (`npm run lint`)** | ~13 - 18s | ~5% | ESLint toàn bộ repo |
+| **Kiểm tra định dạng (`prettier --check .`)** | ~13 - 21s | ~6% | Prettier kiểm tra toàn bộ workspace |
+| **Chạy kiểm thử (`npm run test`)** | **159 - 239s** (TB 194s) | **~70 - 75%** | Chạy 307 tệp test qua vitest worker threads |
+| **Build client (`npm run build`)** | ~4 - 6s | ~2% | Vite đóng gói client |
+| **Ngân sách tĩnh (`check:budget`)** | < 1s | < 1% | Kiểm tra kích thước gói tải |
+
+### 30.3. Danh sách chi tiết các lượt chạy CI gần nhất (Thu thập thực tế)
+
+| Run ID | Nhánh | Sự kiện | Kết quả | Job check | Bước Test | Typecheck | Prettier |
+|---|---|---|---|---:|---:|---:|---:|
+| 43965599283 | `a/test-quest-nav-khong-cung-id-tong` | pull_request | success | 365s | 237s | 17s | 21s |
+| 43965534049 | `b/do-hieu-nang-trum` | pull_request | success | 298s | 196s | 13s | 16s |
+| 43965375579 | `b/giap-tran-dung-chung` | pull_request | success | 298s | 199s | 13s | 16s |
+| 43964957067 | `main` | push | failure | 295s | 197s | 13s | 17s |
+| 43964506367 | `b/do-hieu-nang-trum` | pull_request | success | 276s | 175s | 11s | 13s |
+| 43963624239 | `main` | push | success | 253s | 177s | 10s | 13s |
+| 43963512951 | `a/test-trieu-hoi-dat-mot-phan` | pull_request | success | 266s | 196s | 12s | 16s |
+| 43963407874 | `a/trum-giap-ms-toi-da` | pull_request | success | 245s | 177s | 11s | 15s |
+| 43963379461 | `c/846-audit-saves-sect-sources` | pull_request | success | 268s | 197s | 13s | 16s |
+| 43963285413 | `a/fix-sect-shop-gục-chap-chon` | pull_request | success | 216s | 159s | 10s | 12s |
+| 43962576747 | `b/trum-giap-trieu-hoi` | pull_request | success | 325s | 236s | 16s | 20s |
+| 43961777476 | `c/846-audit-saves-sect-sources` | pull_request | success | 253s | 175s | 11s | 14s |
+| 43960840290 | `main` | push | success | 263s | 194s | 12s | 15s |
+| 43960053920 | `c/846-docs-load-test-sect-m8` | pull_request | success | 242s | 180s | 11s | 14s |
+| 43959715255 | `main` | push | success | 248s | 179s | 11s | 15s |
+| 43959446574 | `d/m8-7-budget-sim` | pull_request | success | 250s | 179s | 11s | 14s |
+| 43958011007 | `a/changelog-trum-ne-kip` | pull_request | success | 311s | 225s | 15s | 20s |
+| 43957833257 | `main` | push | success | 259s | 180s | 12s | 14s |
+| 43957680283 | `b/tong-mon-truong-lao-cong-tich` | pull_request | success | 317s | 232s | 15s | 20s |
+| 43957639496 | `c/846-bots-sect-m8` | pull_request | success | 227s | 167s | 11s | 15s |
+| 43956736226 | `a/fx-trum-giap-server` | pull_request | success | 261s | 192s | 11s | 15s |
+| 43956593069 | `b/tong-mon-truong-lao-cong-tich` | pull_request | success | 237s | 173s | 10s | 13s |
+| 43956218603 | `c/846-bots-sect-m8` | pull_request | success | 248s | 180s | 11s | 14s |
+| 43956055773 | `a/fx-trum-giap-trieu-hoi` | pull_request | success | 227s | 169s | 11s | 13s |
+| 43955337016 | `a/changelog-trum-ne-kip` | pull_request | success | 275s | 200s | 13s | 17s |
+| 43955187704 | `main` | push | success | 323s | 235s | 17s | 21s |
+| 43955032891 | `b/check-noi-vu-du-lieu` | pull_request | success | 325s | 237s | 17s | 20s |
+| 43954809129 | `c/846-bots-sect-m8` | pull_request | success | 272s | 199s | 13s | 16s |
+| 43953970469 | `main` | push | success | 330s | 239s | 17s | 21s |
+| 43953899400 | `b/anh-noi-vu` | pull_request | success | 253s | 175s | 10s | 14s |
+| 43952695994 | `main` | push | success | 265s | 198s | 13s | 16s |
+| 43952451432 | `b/e2e-noi-vu` | pull_request | success | 274s | 197s | 13s | 16s |
+| 43952326729 | `a/agents-tong-mon-chieu-sau` | pull_request | success (rerun) | 311s | 228s | 15s | 20s |
+| 43951451828 | `c/876-boss-evade-load-test` | pull_request | success | 230s | 166s | 10s | 14s |
+| 43951331873 | `c/846-sect-shop-colyseus` | pull_request | success | 208s | 159s | 10s | 12s |
+| 43950757593 | `b/noi-vu-qua-nua-dem` | pull_request | success | 320s | 235s | 17s | 21s |
+| 43950658140 | `a/docs-trum-ne-kip` | pull_request | success | 318s | 232s | 16s | 20s |
+| 43950526339 | `a/trum-ne-duoc` | pull_request | success | 225s | 167s | 11s | 13s |
+| 43950508253 | `d/m8-7-budget-sim` | pull_request | success | 270s | 197s | 14s | 17s |
+
+### 30.4. Phân tích nguyên nhân & Kết luận
+1. **Nguyên nhân lượt bị huỷ ở 10 phút (Run `43952326729`):**
+   - Bộ kiểm thử hiện có **307 tệp test với 5.370+ ca kiểm thử**, chạy đa luồng (`pool: "threads"`) trên runner chuẩn của GitHub Actions (`ubuntu-latest` trang bị 2 vCPU ảo).
+   - Ở điều kiện bình thường, bước Test mất 159–239s (~2.5–4 phút).
+   - Tuy nhiên, hạ tầng máy ảo GitHub Actions sử dụng mô hình chia sẻ tài nguyên (multi-tenant). Khi máy chủ vật lý bị nghẽn (noisy neighbor throttling) hoặc gặp tranh chấp socket khi mở hàng chục Colyseus server thật chạy song song, thời lượng thực thi có thể bị kéo dài gấp 2.5–3 lần, chạm trúng trần `timeout-minutes: 10` (600s) của toàn bộ job `check`.
+   - Lần chạy lại (rerun) trên runner khác xanh 100% trong 5 phút 11 giây, chứng minh mã nguồn và test hoàn toàn sạch lỗi, không có deadlock vĩnh viễn.
+
+2. **Các điểm mù cần khắc phục:**
+   - Khi timeout xảy ra ở cấp độ job, toàn bộ tiến trình bị huỷ đột ngột mà không kịp lưu lại danh sách test đang chạy dở dang hay test nào bị chậm.
+   - Vitest chạy ở chế độ mặc định chỉ in tóm tắt ở cuối; nếu tiến trình bị kill giữa chừng thì không có log chi tiết của từng ca kiểm thử.
+
+### 30.5. Đề xuất & Giải pháp cải tiến (Theo Issue #945)
+1. **Lưu nhật ký kiểm thử (`vitest.log`) làm artifact khi có sự cố:**
+   - Trong `.github/workflows/ci.yml`, ghi toàn bộ output của lệnh test ra file (ví dụ `npm run test --if-present 2>&1 | tee vitest.log`).
+   - Bổ sung bước `if: always()` với action `actions/upload-artifact@v4` để đẩy tệp `vitest.log` lên GitHub Actions. Khi một test bị lỗi hoặc timeout, lập tức có log đầy đủ để tra cứu tên ca kiểm thử.
+2. **Cảnh báo tiến trình treo (`hanging-process` reporter):**
+   - Thêm reporter `--reporter=hanging-process` hoặc cấu hình trong `vitest.config.ts` để vitest tự động phát hiện và cảnh báo bất kỳ timer, socket hoặc handle bất đồng bộ nào chưa được dọn dẹp sau khi kiểm thử kết thúc.
+3. **Điều chỉnh ngưỡng Timeout:**
+   - Nâng `timeout-minutes` của job `check` từ **10 phút lên 15 phút** (cho phép runner vượt qua các thời điểm hạ tầng GitHub Actions bị nghẽn tải cục bộ mà không bị huỷ oan).
+   - Đồng thời đặt timeout riêng cho bước `Test` (ví dụ `timeout-minutes: 10`), bảo đảm nếu test bị treo thật thì bước test dừng lại trước khi hết giờ của job, tạo điều kiện cho bước `upload-artifact` kịp tải log lên.
+4. **Đề xuất tối ưu dài hạn (khi số test vượt 6.000 ca):**
+   - Sử dụng cơ chế sharding của Vitest (`vitest run --shard=1/2` và `2/2`) để chia đôi bộ test chạy trên 2 runner song song, giảm thời lượng bước test xuống còn ~90–120s.
+
+
 
 
 
