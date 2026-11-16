@@ -132,6 +132,11 @@ export interface PlayerCtrl {
    * đang để dành, ghi vào state mỗi EXP_FLUSH_MS (expAt = lần ghi kế tiếp).
    */
   frac: { hp: number; mp: number; exp: number; expAt: number };
+  /**
+   * Hệ số tu vi THỬ NGHIỆM (`TEST_EXP_MULT`, QUYET_DINH_M3 mục 34 / 36, `server/src/test-exp.ts`): chỉ có (2-10) khi đạo hiệu nằm trong cấu hình; `WorldRoom.onJoin` đặt MỘT lần.
+   * CHỈ ở phía máy chủ (không vào state, không gửi client: người dùng bỏ nhãn ở mục 36); `gainExp` nhân sau cùng.
+   */
+  testExpMult?: number;
   /** Dữ liệu chạy của pháp bảo đang mặc (M7.4, `systems/treasure.ts`): đồng hồ khiên, chỗ đứng yên. Chỉ có khi đang có pháp bảo tác dụng. */
   treasure?: TreasureRt;
 }
