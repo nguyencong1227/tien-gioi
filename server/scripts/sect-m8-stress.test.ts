@@ -19,6 +19,10 @@ import { FileSectStore, type SectMemberRecord } from "../src/sect-store";
 import { SectService } from "../src/sect-service";
 import { makeSect } from "../src/store-contract";
 import { auditSavesDirectory } from "./audit-saves";
+import { installSectQuestFixture } from "../src/systems/sect-fixtures";
+
+// Bảng nhiệm vụ tông CỐ ĐỊNH: test không phụ thuộc vào việc cập nhật dữ liệu thật của E (M8.7a) / D (M8.7)
+const restoreQuestFixture = installSectQuestFixture();
 
 let store: FileSectStore;
 let svc: SectService;
@@ -31,6 +35,7 @@ beforeAll(() => {
 });
 
 afterAll(() => {
+  restoreQuestFixture();
   rmSync(dataDir, { recursive: true, force: true });
 });
 
