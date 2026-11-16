@@ -144,6 +144,7 @@ import { BAR_SLOTS, SkillTracker, aimMode, blockedToast, slotView } from "../ski
 import { SkillBarDom } from "../skill-bar-dom";
 import { StatusBadgesDom, badgeViews } from "../status-badges";
 import { craftBuffNames, travelConfirmText, useSuccessText } from "../craft-buff";
+import { breakthroughPlan, samePlan } from "../act-confirm";
 import {
   ELITE_STYLE,
   EliteHintGate,
@@ -171,6 +172,13 @@ import { sound } from "../audio";
 import { joystick, setupJoystick } from "../joystick";
 import { keepLock, pickNextPlayer, pickNextTarget, pickPrevTarget } from "../target-lock";
 import {
+  chooseAim,
+  cursorFromPointer,
+  cursorOnScene,
+  type AimKind,
+  type CursorPos,
+} from "../aim-order";
+import {
   ACTION_BY_ID,
   actionOfEvent,
   getKeymap,
@@ -196,6 +204,7 @@ import {
 } from "../map-render";
 import { moveVector } from "../move-input";
 import { MoveKeys } from "../move-keys";
+import { IME_HINT_TEXT, ImeSniffer } from "../ime-hint";
 import { isTypingElement, isReducedMotion } from "../a11y";
 import {
   markMonAttack,
@@ -358,7 +367,8 @@ export class WorldScene extends Phaser.Scene {
   private skillsPanelKey = "";
   private slotKeys: Record<SkillSlot, string[]> = { 2: [], 3: [], 4: [], 5: [] };
   /** Con trỏ CHUỘT đang ở trong canvas (chạm / bút thì không): chiêu nhắm theo con trỏ khi đúng */
-  private mouseIn = false;
+  /** Con trỏ CHUỘT gần nhất (toạ độ cửa sổ); `null` = chưa có / rời cửa sổ / vừa chạm. Hợp lệ hay không do `cursorAngle()` kiểm LÚC BẤM (mục 29). */
+  private cursorPos: CursorPos | null = null;
   private predX = 0;
   private predY = 0;
   private hasMe = false;
@@ -1110,10 +1120,36 @@ export class WorldScene extends Phaser.Scene {
     // `keyCode` = 229 nên Phaser không thấy phím nào ("liệt nút", QUYET_DINH_M3 mục 25). Nghe ở pha BẮT (capture) để không bị `stopPropagation` / `defaultPrevented`
     // của nút hay bảng che mất keyup. Mọi phím HÀNH ĐỘNG đi qua bảng phím `keybinds.ts` (đổi được, HUD đọc nhãn từ đó) ở `onKeyDown`.
     const mk = this.moveKeys;
+    // Gợi ý MỘT lần khi bộ gõ kiểu hook (Unikey / EVKey Telex) chèn Backspace / chữ có dấu hay nuốt keydown (`ime-hint.ts`): trình duyệt không nhận được phím thì client không cứu được
+    const ime = new ImeSniffer();
     const kd = (e: KeyboardEvent) => {
-      mk.keyDown(e, isTypingElement(e.target as Element | null));
+      const typing = isTypingElement(e.target as Element | null);
+      mk.keyDown(e, typing);
+      if (
+        ime.feed({
+          type: "down",
+          code: e.code,
+          key: e.key,
+          keyCode: e.keyCode,
+          typing,
+          at: performance.now(),
+        })
+      )
+        ui.toast({ text: IME_HINT_TEXT, tone: "info" });
     };
-    const ku = (e: KeyboardEvent) => mk.keyUp(e);
+    const ku = (e: KeyboardEvent) => {
+      const wasHeld = mk.keyUp(e);
+      if (
+        ime.feed({
+          type: "up",
+          code: e.code,
+          typing: isTypingElement(e.target as Element | null),
+          wasHeld,
+          at: performance.now(),
+        })
+      )
+        ui.toast({ text: IME_HINT_TEXT, tone: "info" });
+    };
     // keyup có thể KHÔNG BAO GIỜ tới (Alt-Tab, đổi tab, menu chuột phải, vào ô chat): quên hết phím đang giữ để không kẹt
     const forget = () => mk.clear();
     const onVisibility = () => {
@@ -1130,17 +1166,19 @@ export class WorldScene extends Phaser.Scene {
     document.addEventListener("visibilitychange", onVisibility);
     document.addEventListener("focusin", onFocusIn, true);
     window.addEventListener("keydown", this.onKeyDown);
-    // Con trỏ chuột trong canvas (chiêu nhắm theo con trỏ): chạm / bút không tính. `pointerleave` cũng bắn khi con trỏ rời sang nút HUD phủ trên canvas.
-    const canvas = this.game.canvas;
-    const onMove = (e: PointerEvent) => {
-      this.mouseIn = e.pointerType === "mouse";
+    // Con trỏ CHUỘT (chiêu nhắm theo con trỏ, mục 29): ghi toạ độ cửa sổ ở pha bắt trên window (chạm / bút xoá). Có hợp lệ hay không (con trỏ đang ở trên canvas màn chơi,
+    // không phải trên minimap / bản đồ lớn / chat / thanh chiêu / bảng) do `cursorAngle()` kiểm LÚC BẤM theo phần tử dưới con trỏ: một bảng mở ra dưới con chuột đứng yên
+    // (phím M) không gửi sự kiện nào nên không thể chỉ dựa vào `pointerleave` của canvas.
+    const onPointer = (e: PointerEvent) => {
+      this.cursorPos = cursorFromPointer(e);
     };
-    const onLeave = () => {
-      this.mouseIn = false;
+    const onCursorGone = () => {
+      this.cursorPos = null;
     };
-    canvas.addEventListener("pointermove", onMove);
-    canvas.addEventListener("pointerdown", onMove);
-    canvas.addEventListener("pointerleave", onLeave);
+    window.addEventListener("pointermove", onPointer, true);
+    window.addEventListener("pointerdown", onPointer, true);
+    document.documentElement.addEventListener("mouseleave", onCursorGone);
+    window.addEventListener("blur", onCursorGone);
     this.syncSlotKeys();
     const offKeymap = onKeymapChange(() => this.syncSlotKeys());
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -1152,9 +1190,10 @@ export class WorldScene extends Phaser.Scene {
       window.removeEventListener("contextmenu", forget);
       document.removeEventListener("visibilitychange", onVisibility);
       document.removeEventListener("focusin", onFocusIn, true);
-      canvas.removeEventListener("pointermove", onMove);
-      canvas.removeEventListener("pointerdown", onMove);
-      canvas.removeEventListener("pointerleave", onLeave);
+      window.removeEventListener("pointermove", onPointer, true);
+      window.removeEventListener("pointerdown", onPointer, true);
+      document.documentElement.removeEventListener("mouseleave", onCursorGone);
+      window.removeEventListener("blur", onCursorGone);
       offKeymap();
     });
     // Esc do `ui.ts` xử lý ở `window` (một chỗ duy nhất, kể cả bỏ chọn mục tiêu qua `onClearTarget`): đăng ký thêm ở đây làm MỖI lần Esc chạy hai lần
@@ -1193,7 +1232,7 @@ export class WorldScene extends Phaser.Scene {
     bind("btn-target", () => this.toggleLockTarget());
     bind("sk-sword", () => this.sword());
     bind("sk-med", () => this.toggleMeditate());
-    bind("sk-break", () => !this.isReconnecting && this.room.send("breakthrough"));
+    bind("sk-break", () => this.requestBreakthrough(document.getElementById("sk-break")));
     for (const n of [2, 3, 4, 5] as const)
       bind(`sk-slot${n}`, () => this.runAction(`skill.slot${n}`));
 
@@ -1247,11 +1286,11 @@ export class WorldScene extends Phaser.Scene {
   private runAction(action: ActionId) {
     switch (action) {
       case "attack":
-        this.autoLockNearest();
+        if (this.cursorAngle() === null) this.autoLockNearest();
         this.slash();
         break;
       case "skill.sword":
-        this.autoLockNearest();
+        if (this.cursorAngle() === null) this.autoLockNearest();
         this.sword();
         break;
       case "skill.slot2":
@@ -1264,7 +1303,7 @@ export class WorldScene extends Phaser.Scene {
         this.toggleMeditate();
         break;
       case "skill.breakthrough":
-        if (!this.isReconnecting) this.room.send("breakthrough");
+        this.requestBreakthrough(null);
         break;
       case "quick.1":
         ui.useQuick(1);
@@ -1368,16 +1407,20 @@ export class WorldScene extends Phaser.Scene {
     });
   }
 
-  /** Tự ngắm con quái gần nhất trong tầm, không có thì đánh theo hướng đang nhìn. */
-  private aim(range: number) {
-    let best = range,
-      angle = this.facing;
-    // Đang khoá mục tiêu còn trong tầm: đánh về phía nó (nhả khoá nếu nó đã mất / quá xa)
+  /** Hướng tới mục tiêu đang khoá (còn trong tầm khoá); `null` nếu không khoá hoặc mục tiêu đã mất / quá xa. */
+  private lockedTargetAngle(): number | null {
     const locked = this.lockedTargetId ? this.monsters.get(this.lockedTargetId) : undefined;
-    if (locked) {
-      const d = Math.hypot(locked.tx - this.predX, locked.ty - this.predY);
-      if (keepLock(d)) return Math.atan2(locked.ty - this.predY, locked.tx - this.predX);
-    }
+    if (!locked) return null;
+    const d = Math.hypot(locked.tx - this.predX, locked.ty - this.predY);
+    return keepLock(d) ? Math.atan2(locked.ty - this.predY, locked.tx - this.predX) : null;
+  }
+
+  /** Hướng tới mục tiêu: con quái đang khoá, không có thì con quái gần nhất trong `range` (tự ngắm); `null` nếu không có con nào. */
+  private targetAngle(range: number): number | null {
+    const locked = this.lockedTargetAngle();
+    if (locked !== null) return locked;
+    let best = range,
+      angle: number | null = null;
     this.monsters.forEach((m) => {
       const d = Math.hypot(m.tx - this.predX, m.ty - this.predY);
       if (d < best) {
@@ -1386,6 +1429,28 @@ export class WorldScene extends Phaser.Scene {
       }
     });
     return angle;
+  }
+
+  /**
+   * Hướng đánh theo thứ tự của mục 29 (`aim-order.ts`): con trỏ chuột hợp lệ -> mục tiêu (khoá, hoặc quái gần nhất trong tầm) -> hướng nhìn; dash: phím hướng đang giữ
+   * đi trước; "Ưu tiên mục tiêu hơn chuột" đổi chỗ con trỏ và mục tiêu. `lockedOnly`: chỉ mục tiêu ĐÃ KHOÁ (dash không tự lao vào quái gần nhất).
+   */
+  private pickAim(kind: AimKind, range: number, lockedOnly = false): number {
+    let move: number | null = null;
+    if (kind === "move") {
+      const { dx, dy } = this.moveDir();
+      if (dx !== 0 || dy !== 0) move = Math.atan2(dy, dx);
+    }
+    return chooseAim(
+      kind,
+      {
+        move,
+        cursor: this.cursorAngle(),
+        target: lockedOnly ? this.lockedTargetAngle() : this.targetAngle(range),
+        facing: this.facing,
+      },
+      ui.isPreferTarget(),
+    ).angle;
   }
 
   /**
@@ -1584,7 +1649,7 @@ export class WorldScene extends Phaser.Scene {
     this.recordCombat();
     this.nextSlash = this.time.now + SKILLS.slash.cooldown;
     this.lastAttack = { at: this.time.now, range: SKILLS.slash.range };
-    const a = angle ?? this.aim(SKILLS.slash.range + 60);
+    const a = angle ?? this.pickAim("basic", SKILLS.slash.range + 60);
     this.facing = a;
     const myEntity = this.players.get(this.sid);
     if (myEntity) myEntity.slashUntil = this.time.now + SLASH_MS;
@@ -1601,7 +1666,7 @@ export class WorldScene extends Phaser.Scene {
     this.recordCombat();
     this.nextSword = this.time.now + SKILLS.sword.cooldown;
     this.lastAttack = { at: this.time.now, range: SKILLS.sword.range };
-    const a = this.aim(SKILLS.sword.range);
+    const a = this.pickAim("basic", SKILLS.sword.range);
     this.facing = a;
     const myEntity = this.players.get(this.sid);
     if (myEntity) myEntity.slashUntil = this.time.now + SLASH_MS;
@@ -1654,6 +1719,43 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Đột phá (nút HUD và phím tắt): khi ĐỦ điều kiện thử thì HỎI trước (thất bại mất tu vi + nửa khí huyết, thành công không hoàn tác; hộp nêu xác suất kể cả
+   * đan hộ đạo), lúc xác nhận so lại kế hoạch rồi mới gửi `breakthrough`. Chưa đủ điều kiện thì gửi luôn: máy chủ từ chối KHÔNG mất gì và báo lý do.
+   */
+  private requestBreakthrough(opener: HTMLElement | null) {
+    if (this.isReconnecting) return;
+    const planNow = () => {
+      const me = this.me();
+      return me
+        ? breakthroughPlan(
+            me.realm,
+            me.tier,
+            me.exp,
+            me.expMax,
+            this.status.active(performance.now()),
+          )
+        : null;
+    };
+    const plan = planNow();
+    if (!plan) {
+      this.room.send("breakthrough");
+      return;
+    }
+    ui.askConfirm(
+      plan.spec,
+      () => {
+        if (this.isReconnecting) return;
+        if (!samePlan(plan, planNow())) {
+          ui.toast({ text: "Điều kiện đột phá vừa đổi, chưa đột phá. Hãy thử lại.", tone: "info" });
+          return;
+        }
+        this.room.send("breakthrough");
+      },
+      opener,
+    );
+  }
+
   public travelPortal(portalId: string) {
     if (this.isReconnecting) return;
     // Qua cổng XOÁ hiệu lực đan / phù (máy chủ, test #767): đang có thì hỏi trước (buff của chiêu thì không hỏi). "Đi" mới gửi `travel`.
@@ -1687,6 +1789,7 @@ export class WorldScene extends Phaser.Scene {
     this.isReconnecting = reconnecting;
     if (reconnecting) {
       ui.closeTravelConfirm();
+      ui.closeActConfirm(false);
       this.moving = false;
       this.duelKoUntil = 0;
       this.dungeonFallUntil = 0;
@@ -1775,6 +1878,7 @@ export class WorldScene extends Phaser.Scene {
     ui.talkPrompt(null);
     ui.pickupPrompt(null);
     ui.closeTravelConfirm();
+    ui.closeActConfirm(false);
   }
 
   /** Nhận danh sách trạng thái của chính mình (server gửi khi thêm / mất / làm mới, vơi khiên, nối lại). Công khai để script kiểm giả lập (`?debug`) bơm tin. */
@@ -1847,26 +1951,32 @@ export class WorldScene extends Phaser.Scene {
     this.nextSkillBarAt = 0;
   }
 
-  /** Góc từ nhân vật tới con trỏ chuột (rad); `null` khi không có chuột trong canvas. */
+  /**
+   * Góc từ nhân vật tới con trỏ chuột (rad); `null` khi KHÔNG có chuột hợp lệ (mục 29): chưa có chuột, chuột rời cửa sổ, chạm / bút, hoặc phần tử dưới con trỏ KHÔNG
+   * phải canvas màn chơi (bản đồ nhỏ, bản đồ lớn, thẻ nhân vật, thanh menu, thanh chiêu, Tổ đội, Nhiệm vụ, Chat, bảng đang mở). Kiểm LÚC GỌI theo toạ độ con trỏ lần cuối.
+   */
   private cursorAngle(): number | null {
-    if (!this.mouseIn) return null;
+    const c = this.cursorPos;
+    if (!c) return null;
+    if (!cursorOnScene(document.elementFromPoint(c.x, c.y), this.game.canvas)) return null;
     const p = this.input.activePointer;
     if (p.wasTouch) return null;
     const w = p.positionToCamera(this.cameras.main) as Phaser.Math.Vector2;
     return Math.atan2(w.y - this.predY, w.x - this.predX);
   }
 
-  /** Hướng đánh của chiêu theo hình (`aimMode`, A xác nhận ở #536). */
+  /** Hướng đánh của chiêu theo hình (`aimMode`, A xác nhận ở #536; thứ tự ưu tiên theo mục 29, `aim-order.ts`). */
   private skillAngle(def: SkillDef): number {
+    const range = (def.reach ?? 0) + def.range;
     switch (aimMode(def.shape)) {
-      case "move": {
-        const { dx, dy } = this.moveDir();
-        return dx !== 0 || dy !== 0 ? Math.atan2(dy, dx) : this.facing;
-      }
+      case "move":
+        // phím hướng -> con trỏ hợp lệ -> mục tiêu ĐÃ KHOÁ (không tự lao vào quái gần nhất) -> hướng nhìn
+        return this.pickAim("move", range, true);
       case "facing":
-        return this.facing;
+        // vòng nổ / hộ thể: quay mặt theo cùng thứ tự với chiêu có hướng trước khi tung
+        return this.pickAim("facing", range);
       case "target":
-        return this.cursorAngle() ?? this.aim((def.reach ?? 0) + def.range);
+        return this.pickAim("target", range);
     }
   }
 

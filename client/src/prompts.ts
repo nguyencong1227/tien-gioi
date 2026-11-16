@@ -11,6 +11,7 @@ export type PromptAnswer = "yes" | "no";
 
 export const PROMPT_BUTTONS: Readonly<Record<PromptAnswer, readonly string[]>> = {
   yes: [
+    "act-btn-yes",
     "tvl-btn-yes",
     "dhud-btn-leave-yes",
     "duel-btn-yield-yes",
@@ -20,6 +21,7 @@ export const PROMPT_BUTTONS: Readonly<Record<PromptAnswer, readonly string[]>> =
     "sib-btn-accept",
   ],
   no: [
+    "act-btn-no",
     "tvl-btn-no",
     "dhud-btn-leave-no",
     "duel-btn-yield-no",

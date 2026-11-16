@@ -43,6 +43,8 @@ export interface MoveState {
 export class MoveKeys {
   /** Phím đang giữ -> số thứ tự lần bấm (lớn hơn = bấm sau) */
   private held = new Map<string, number>();
+  /** Phím di chuyển đã bấm xuống nhưng BỊ BỎ QUA (Ctrl / Alt, đang gõ chữ) hoặc đã bị `clear()` lúc đang giữ: keyup của chúng không phải keyup "mồ côi" */
+  private ignored = new Set<string>();
   private order = 0;
 
   /**
@@ -52,19 +54,25 @@ export class MoveKeys {
   keyDown(e: KeyLike, typing = false): boolean {
     const code = e.code ?? "";
     if (!Object.prototype.hasOwnProperty.call(MOVE_CODES, code)) return false;
-    if (typing || e.ctrlKey || e.metaKey || e.altKey) return false;
+    if (typing || e.ctrlKey || e.metaKey || e.altKey) {
+      this.ignored.add(code);
+      return false;
+    }
     if (!this.held.has(code)) this.held.set(code, ++this.order);
     return true;
   }
 
-  /** keyup luôn nhả (kể cả khi kèm Ctrl / Alt hay đang ở ô nhập). */
-  keyUp(e: KeyLike): void {
+  /** keyup luôn nhả (kể cả khi kèm Ctrl / Alt hay đang ở ô nhập). Trả `true` nếu phím đó đang được giữ (keyup MỒ CÔI = `false` mà là phím di chuyển: dấu hiệu bộ gõ nuốt keydown). */
+  keyUp(e: KeyLike): boolean {
     const code = e.code ?? "";
-    this.held.delete(code);
+    const had = this.held.delete(code);
+    return this.ignored.delete(code) || had;
   }
 
   /** Quên mọi phím đang giữ (mất focus, ẩn tab, mở chat, menu chuột phải: keyup có thể không bao giờ tới). */
   clear(): void {
+    // keyup của phím đang giữ lúc quên (nhả sau khi quay lại cửa sổ) KHÔNG phải keyup mồ côi: ghi nhớ để `keyUp` trả `true`
+    for (const code of this.held.keys()) this.ignored.add(code);
     this.held.clear();
   }
 

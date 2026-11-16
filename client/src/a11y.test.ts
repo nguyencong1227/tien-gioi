@@ -106,6 +106,12 @@ describe("a11y: isTypingElement", () => {
 
     expect(isTypingElement(checkbox)).toBe(false);
     expect(isTypingElement(radio)).toBe(false);
+    // thanh trượt (âm lượng, bản đồ nhỏ...), nút, màu, tệp: không phải gõ chữ (QUYET_DINH_M3 mục 25)
+    for (const type of ["range", "button", "submit", "reset", "color", "file", "image"])
+      expect(isTypingElement({ tagName: "INPUT", type } as unknown as Element), type).toBe(false);
+    // ô chữ các loại vẫn là gõ chữ
+    for (const type of ["text", "search", "email", "url", "tel", "password", "number"])
+      expect(isTypingElement({ tagName: "INPUT", type } as unknown as Element), type).toBe(true);
     expect(isTypingElement(button)).toBe(false);
     expect(isTypingElement(regularDiv)).toBe(false);
     expect(isTypingElement(null)).toBe(false);
@@ -165,6 +171,18 @@ describe("a11y: processEscapeKey", () => {
     const result = processEscapeKey(handlers);
     expect(result).toBe(true);
     expect(handlers.closeDhudLeaveConfirm).toHaveBeenCalledTimes(1);
+    expect(handlers.closeTopModal).not.toHaveBeenCalled();
+  });
+
+  it("đóng hộp xác nhận dùng chung (đột phá, bán đồ quý...; Esc = Giữ lại): đóng hộp TRƯỚC mọi thứ khác", () => {
+    const handlers: EscapeHandlers = {
+      closeActConfirm: vi.fn(() => true),
+      closeInvDropConfirm: vi.fn(() => true),
+      closeTopModal: vi.fn(() => true),
+    };
+    expect(processEscapeKey(handlers)).toBe(true);
+    expect(handlers.closeActConfirm).toHaveBeenCalledTimes(1);
+    expect(handlers.closeInvDropConfirm).not.toHaveBeenCalled();
     expect(handlers.closeTopModal).not.toHaveBeenCalled();
   });
 

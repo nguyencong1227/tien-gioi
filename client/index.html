@@ -1074,6 +1074,13 @@
             <span>Ẩn tên đồng đạo (đỡ rối khi đông người)</span>
             <input type="checkbox" id="set-hide-names" />
           </label>
+          <label class="set-row toggle">
+            <span
+              >Ưu tiên mục tiêu hơn chuột (chiêu bay về mục tiêu, kể cả khi chuột ở trong màn
+              chơi)</span
+            >
+            <input type="checkbox" id="set-prefer-target" />
+          </label>
           <label class="set-row">
             <span>Chất lượng đồ hoạ <em id="set-quality-now"></em></span>
             <select id="set-quality">
@@ -1631,6 +1638,31 @@
         </div>
       </div>
 
+      <!-- Hộp xác nhận DÙNG CHUNG cho thao tác khó hoàn tác (issue #779, docs/RA_SOAT_THAO_TAC.md): đột phá, bán đồ quý, mở chân linh... Y = xác nhận, X = giữ lại -->
+      <div
+        id="act-confirm"
+        class="act-confirm"
+        hidden
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="act-confirm-text"
+      >
+        <div class="act-confirm-box">
+          <p id="act-confirm-text"></p>
+          <small id="act-confirm-warn" hidden></small>
+          <div class="act-confirm-btns">
+            <button type="button" id="act-btn-no" class="act-btn">
+              <span id="act-btn-no-label">Giữ lại</span>
+              <kbd class="btn-key" aria-hidden="true" data-key-action="prompt.no">X</kbd>
+            </button>
+            <button type="button" id="act-btn-yes" class="act-btn drop">
+              <span id="act-btn-yes-label">Xác nhận</span>
+              <kbd class="btn-key" aria-hidden="true" data-key-action="prompt.yes">Y</kbd>
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Lời mời tổ đội -->
       <div
         id="party-invite-box"
@@ -1867,6 +1899,11 @@
         <button type="button" id="reconnect-reload" class="reconnect-reload" hidden>
           Tải lại trang
         </button>
+      </div>
+
+      <div id="net-slow" class="net-slow-chip" hidden role="status" aria-live="polite">
+        <span class="net-slow-dot" aria-hidden="true"></span>
+        <span>Mạng chậm…</span>
       </div>
 
       <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>

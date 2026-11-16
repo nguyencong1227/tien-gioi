@@ -14,6 +14,8 @@ export interface EscapeHandlers {
   blurChat?: () => boolean;
   /** Hộp xác nhận vứt đồ ở túi (Esc = Giữ lại, QUYET_DINH_M3 mục 24) */
   closeInvDropConfirm?: () => boolean;
+  /** Hộp xác nhận dùng chung (đột phá, bán đồ quý, ...; Esc = Giữ lại, issue #779) */
+  closeActConfirm?: () => boolean;
   closeSectActionConfirm?: () => boolean;
   closeSectDisbandConfirm?: () => boolean;
   closeDhudLeaveConfirm?: () => boolean;
@@ -101,18 +103,29 @@ export class ModalStack {
 
 export const modalStack = new ModalStack();
 
+/** Kiểu `<input>` KHÔNG nhận chữ gõ: giữ focus ở đây không được chặn phím di chuyển / phím tắt (thanh trượt âm lượng, ô đánh dấu của Cài đặt...). */
+const NON_TEXT_INPUT_TYPES: readonly string[] = [
+  "checkbox",
+  "radio",
+  "button",
+  "submit",
+  "reset",
+  "range",
+  "color",
+  "file",
+  "image",
+];
+
 /**
- * Kiểm tra xem người dùng có đang gõ văn bản trong input / textarea không
+ * Kiểm tra xem người dùng có đang gõ văn bản trong input / textarea không. Ô đánh dấu, nút chọn, thanh trượt (`range`), nút, màu, tệp KHÔNG tính
+ * (người dùng báo: bấm một thanh trượt ở Cài đặt xong, focus còn ở đó và nhân vật đứng im, QUYET_DINH_M3 mục 25).
  */
 export function isTypingElement(el?: Element | null): boolean {
   if (!el) return false;
   const tag = el.tagName?.toLowerCase();
   if (tag === "input" || tag === "textarea") {
-    // Checkbox và radio không coi là đang nhập văn bản
     const type = (el as HTMLInputElement).type?.toLowerCase();
-    if (type === "checkbox" || type === "radio" || type === "button" || type === "submit") {
-      return false;
-    }
+    if (type && NON_TEXT_INPUT_TYPES.includes(type)) return false;
     return true;
   }
   return Boolean((el as HTMLElement).isContentEditable);
@@ -234,6 +247,7 @@ export function processEscapeKey(handlers: EscapeHandlers): boolean {
   }
 
   // 3. Hộp xác nhận hành động con (bấm Esc = Huỷ, an toàn)
+  if (handlers.closeActConfirm?.()) return true;
   if (handlers.closeInvDropConfirm?.()) return true;
   if (handlers.closeSectActionConfirm?.()) return true;
   if (handlers.closeSectDisbandConfirm?.()) return true;

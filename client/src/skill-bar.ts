@@ -265,9 +265,10 @@ export function shortName(name: string, max = 10): string {
 }
 
 /**
- * Cách chọn HƯỚNG đánh theo hình chiêu (A xác nhận ở #536): `move` = bộ pháp lao: hướng ĐANG DI CHUYỂN, không có input thì hướng nhìn, KHÔNG quay về quái
- * gần nhất (sẽ lao vào quái); `facing` = vòng nổ / hộ thể: không cần hướng (gửi hướng nhìn); `target` = đánh về phía con trỏ (máy tính có chuột trong canvas)
- * hoặc `aim` (khoá / quái gần / hướng nhìn). Chiêu `ground` chỉ lấy HƯỚNG (server đặt vùng cách mình đúng `reach`, không theo khoảng cách tới con trỏ).
+ * Cách chọn HƯỚNG đánh theo hình chiêu (A xác nhận ở #536; thứ tự ưu tiên theo mục 29 của QUYET_DINH_M3, chi tiết ở `aim-order.ts`): `move` = bộ pháp lao (dash): phím hướng
+ * đang giữ, rồi con trỏ chuột hợp lệ, rồi mục tiêu ĐÃ KHOÁ (không tự lao vào quái gần nhất), rồi hướng nhìn; `facing` = vòng nổ / hộ thể: cùng thứ tự với `target`;
+ * `target` = con trỏ chuột hợp lệ (chuột thật đang ở trên canvas màn chơi, không phải trên minimap / bản đồ lớn / chat / thanh chiêu / bảng) -> mục tiêu (khoá, hoặc quái gần
+ * nhất trong tầm) -> hướng nhìn. Chiêu `ground` chỉ lấy HƯỚNG (server đặt vùng cách mình đúng `reach`, không theo khoảng cách tới con trỏ).
  */
 export type AimMode = "move" | "facing" | "target";
 export function aimMode(shape: SkillShape): AimMode {
