@@ -562,6 +562,9 @@ describe("nhiệm vụ quá ngày và sổ nhiệm vụ đầy (góp ý của B 
       await sectHallGet(lh.w, A, {});
       expect(active(A)).toEqual([]);
       expect(lh.quests.at(-1)!.msg.active).toEqual([]); // sổ gửi lại cho chủ
+      expect(
+        lh.toasts.filter((t) => t.sid === A).some((t) => t.msg.text.includes("đã hết hạn")),
+      ).toBe(true); // báo vì sao
       expect(lastHall(A)!.quests[0]!.questId).toBe(`${slot0(k + 1)}.t0`);
       expect(lastHall(A)!.quests[0]!.state).toBe("offer");
     });
@@ -601,6 +604,7 @@ describe("nhiệm vụ quá ngày và sổ nhiệm vụ đầy (góp ý của B 
       const { sectHallGet } = await import("./sect");
       await sectHallGet(lh.w, A, {});
       expect(active(A)).toEqual([{ id: same, step: 0, count: 4 }]);
+      expect(lh.toasts.some((t) => t.msg.text.includes("đã hết hạn"))).toBe(false); // không gỡ gì thì không báo
     });
   });
 
