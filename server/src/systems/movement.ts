@@ -23,7 +23,11 @@ export function queueInput(w: World, sid: string, m: InputMsg | undefined) {
   const c = w.ctrl.get(sid);
   if (!c || typeof m?.seq !== "number" || !Number.isFinite(m.dx) || !Number.isFinite(m.dy)) return;
   if (c.inputs.length < MAX_QUEUED_INPUTS) c.inputs.push({ seq: m.seq >>> 0, dx: m.dx, dy: m.dy });
+  else w.inputStats.dropped++;
 }
+
+/** Hàng đợi còn từng này input (0,3 giây) sau khi xử lý một tick thì tính là "tụt hậu" (`World.inputStats.backlogTicks`). Input chờ 1-2 là bình thường (đang bay). */
+export const INPUT_BACKLOG_WARN = 6;
 
 /**
  * Người khác nhận vị trí công khai px, py (số nguyên, 10 Hz) thay vì x, y thật 20 Hz (#80): ở 100 người tụ trong trấn
