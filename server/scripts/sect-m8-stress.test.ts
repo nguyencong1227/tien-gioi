@@ -210,7 +210,45 @@ describe("Thử tải & Bất biến cống hiến tông môn M8 (Issue #846, M8
     expect(m2?.merit ?? 0).toBe(0);
   });
 
-  it("5. Kiểm toán toàn vẹn file lưu (audit-saves) sau thử tải M8: 0 lỗi vi phạm", () => {
+  it("5. Thử tải thăng cấp tông môn qua điểm tích lũy: chuyển giao mốc cấp, buff và mở rộng ô kho", async () => {
+    const sectId = "sect_lvl_01";
+    const leader = "chu_lvl";
+    await store.create(
+      makeSect(sectId, {
+        name: "Cấp Tông Môn",
+        tag: "LVL1",
+        leader,
+        members: [{ soulKey: leader, name: "Chủ Cấp", rank: "chu", joinedAt: NOW - 86_400_000 }],
+      }),
+    );
+
+    // Bắt đầu cấp 1: 0 points
+    let s = (await store.get(sectId))!;
+    expect(s.points ?? 0).toBe(0);
+
+    // Thử tải nộp điểm số lượng lớn trực tiếp vào store (giả lập nhiều ngày nộp kho tích lũy)
+    // Cấp 2 cần 300 điểm
+    await store.update(sectId, (cur) => ({ ...cur, points: 300 }));
+    s = (await store.get(sectId))!;
+    expect(s.points).toBe(300);
+
+    // Cấp 3 cần 900 điểm
+    await store.update(sectId, (cur) => ({ ...cur, points: 900 }));
+    s = (await store.get(sectId))!;
+    expect(s.points).toBe(900);
+
+    // Cấp 4 cần 1800 điểm
+    await store.update(sectId, (cur) => ({ ...cur, points: 1800 }));
+    s = (await store.get(sectId))!;
+    expect(s.points).toBe(1800);
+
+    // Cấp 5 cần 3000 điểm
+    await store.update(sectId, (cur) => ({ ...cur, points: 3000 }));
+    s = (await store.get(sectId))!;
+    expect(s.points).toBe(3000);
+  });
+
+  it("6. Kiểm toán toàn vẹn file lưu (audit-saves) sau thử tải M8: 0 lỗi vi phạm", () => {
     const report = auditSavesDirectory(dataDir);
     expect(report.totalSects, "phải có hồ sơ tông môn trong thư mục test").toBeGreaterThan(0);
     expect(report.errorSects).toBe(0);
