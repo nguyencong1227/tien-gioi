@@ -22,7 +22,7 @@ export function tickWorld(w: World, dtMs: number) {
     if (p.dead) return tickRespawn(w, p, c);
     if (w.ghosts.size > 0 && w.ghosts.has(sid)) return; // hồn lìa xác: đứng yên, không hồi phục, không tu luyện
     c.life.playMs += dtMs; // thời gian chơi thật của kiếp (không tính chết, hồn lìa xác)
-    applyInputs(w.map, p, c);
+    applyInputs(w.map, p, c, dtMs); // ngân sách bước theo thời gian thật (`dtMs` đồng hồ phòng), không +1 mỗi tick
     if ((w.tick + c.posPhase) % POS_SYNC_EVERY_TICKS === 0) syncPublicPos(p);
     if (!w.duels.has(sid)) tickRecovery(w, sid, p, c, dt); // trong trận thách đấu: không hồi khí huyết / linh lực, không đả tọa
     // Pháp bảo (M7.4): khiên tự dựng, hồi khi đứng yên; không mặc thì không tốn gì. Trong trận thách đấu: KHÔNG chạy (cùng nguyên tắc khoá hồi phục của `tickRecovery`;

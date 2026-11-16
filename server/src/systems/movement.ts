@@ -3,8 +3,20 @@ import { TICK_MS, PLAYER_RADIUS, statsFor, type GameMap, type InputMsg } from "@
 import type { Player } from "../schema";
 import { rand, quantAngle, type World, type PlayerCtrl } from "../world";
 
-const MAX_QUEUED_INPUTS = 20;
-const MAX_MOVE_BUDGET = 4;
+/**
+ * Hàng đợi input tối đa mỗi người. Client gửi 20 input / giây; hàng đợi phải chứa được đợt dồn sau một lần mạng chập chờn (gói tin bị giữ rồi
+ * ập tới cùng lúc): đầy thì input MỚI bị bỏ, client đã đoán trước chúng nên nhân vật bị kéo giật lùi. 60 = 3 giây (mạng đứt lâu hơn thì
+ * nhịp tim ứng dụng của client coi là chết sau 8 giây và nối lại, `shared/src/heartbeat.ts`).
+ */
+const MAX_QUEUED_INPUTS = 60;
+/**
+ * Ngân sách bước tối đa dồn lại (mỗi bước = một TICK_MS thời gian thật). Ngân sách tích khi không có input (mạng chậm gói, rồi gói ập tới
+ * cùng lúc): 10 bước = 0,5 giây bù trễ mà không phải dồn hàng đợi. Cũng là mức "nhảy cóc" tối đa của client gian lận (đứng im 0,5 giây rồi gửi
+ * dồn): tốc độ bền vững vẫn đúng 1 bước / TICK_MS thời gian thật.
+ */
+const MAX_MOVE_BUDGET = 10;
+/** Sai số cộng dồn số thực: 0,9999999999 bước coi như đủ một bước (dt chia cho TICK_MS không luôn tròn). */
+const BUDGET_EPS = 1 - 1e-9;
 
 /** Nhận input từ client; bỏ qua dữ liệu sai kiểu. */
 export function queueInput(w: World, sid: string, m: InputMsg | undefined) {
@@ -13,10 +25,6 @@ export function queueInput(w: World, sid: string, m: InputMsg | undefined) {
   if (c.inputs.length < MAX_QUEUED_INPUTS) c.inputs.push({ seq: m.seq >>> 0, dx: m.dx, dy: m.dy });
 }
 
-/**
- * Áp các input đang chờ. Mỗi input = đúng một bước TICK_MS (client đoán trước y hệt).
- * Token bucket: mỗi tick +1, tối đa 4, nên gửi dồn dập cũng không đi nhanh hơn được.
- */
 /**
  * Người khác nhận vị trí công khai px, py (số nguyên, 10 Hz) thay vì x, y thật 20 Hz (#80): ở 100 người tụ trong trấn
  * việc đó cắt gần một nửa byte. Client nội suy vị trí người khác nên không nhìn ra. Đổi hằng số này để chỉnh nhịp.
@@ -36,12 +44,21 @@ export function syncPublicPos(p: Player) {
   p.py = Math.max(-INT16_MAX, Math.min(INT16_MAX, Math.round(p.y)));
 }
 
-export function applyInputs(map: GameMap, p: Player, c: PlayerCtrl) {
+/**
+ * Áp các input đang chờ. Mỗi input = đúng một bước TICK_MS (client đoán trước y hệt).
+ * Token bucket theo THỜI GIAN THẬT: mỗi tick cộng `dtMs / TICK_MS` bước (tối đa MAX_MOVE_BUDGET), nên gửi dồn dập cũng không đi nhanh hơn được.
+ * Cộng theo thời gian thật chứ không "+1 mỗi tick": `setInterval(50)` của Node chạy thật ~19,9 Hz (và tick bị trễ khi máy bận), trong khi client
+ * gửi đúng 20 Hz, nên cộng cố định mỗi tick làm hàng đợi tụt hậu thêm ~1 input / 12 giây, đầy sau ~4 phút đi liên tục rồi bỏ input, nhân vật
+ * giật lùi (đo bằng `scripts/do-input-lag.ts`, mục 25 QUYET_DINH_M3). `dtMs` mặc định TICK_MS (test đơn vị, bench).
+ */
+export function applyInputs(map: GameMap, p: Player, c: PlayerCtrl, dtMs: number = TICK_MS) {
   const step = TICK_MS / 1000;
-  c.moveBudget = Math.min(MAX_MOVE_BUDGET, c.moveBudget + 1);
+  // dt sai (NaN, âm) thì coi như một tick đúng nhịp; dt lớn (máy chủ bị treo) bị MAX_MOVE_BUDGET chặn
+  const credit = Number.isFinite(dtMs) && dtMs >= 0 ? dtMs / TICK_MS : 1;
+  c.moveBudget = Math.min(MAX_MOVE_BUDGET, c.moveBudget + credit);
   // hộ phù có tốc độ; tăng tốc / tê cóng nhân thêm `moveSpeedMul` (bản nhớ trong `c.moveMul`, client dùng CÙNG hàm để đoán trước)
   const speed = statsFor(p.realm, p.tier, p).speed * (c.moveMul ?? 1);
-  while (c.inputs.length && c.moveBudget >= 1) {
+  while (c.inputs.length && c.moveBudget >= BUDGET_EPS) {
     const inp = c.inputs.shift()!;
     c.moveBudget -= 1;
     let { dx, dy } = inp;
