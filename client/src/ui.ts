@@ -96,9 +96,7 @@ import {
   type SectVaultWithdrawMsg,
   SECT_VAULT_SLOTS,
   canSect,
-  SECT_MAX_MEMBERS,
   SECT_CREATE_COST,
-  SECT_ELDERS_MAX,
   cleanSectName,
   cleanSectTag,
   cleanMotd,
@@ -130,7 +128,11 @@ import {
   formatSectMembersSummary,
   mergeMemberPresence,
   mapLabelOf,
+  sectMemberMeritText,
   sectMemberStatusText,
+  sectEldersCap,
+  sectMembersCap,
+  sectFullText,
   sectConfirmText,
   type SectConfirmKind,
 } from "./sect";
@@ -3021,7 +3023,10 @@ function renderSectMembersTab() {
   const merged = mergeMemberPresence(currentSect.members, currentSectPresence);
   const summaryEl = $("sect-members-summary");
   if (summaryEl) {
-    summaryEl.textContent = formatSectMembersSummary(merged.length);
+    summaryEl.textContent = formatSectMembersSummary(
+      merged.length,
+      sectMembersCap(sectHall?.view.caps.members),
+    );
   }
   const myRank = currentSect.myRank;
 
@@ -3050,6 +3055,14 @@ function renderSectMembersTab() {
     statusRow.textContent = sectMemberStatusText(m);
 
     info.append(titleRow, statusRow);
+    // Công tích (M8.6): hiện cho từng thành viên có công tích (máy chủ chỉ gửi khi > 0)
+    const meritText = sectMemberMeritText(m);
+    if (meritText) {
+      const meritRow = document.createElement("div");
+      meritRow.className = "sect-member-merit";
+      meritRow.textContent = meritText;
+      info.append(meritRow);
+    }
     item.append(info);
 
     if (m.name !== currentName) {
@@ -3063,9 +3076,11 @@ function renderSectMembersTab() {
         btnPromote.type = "button";
         btnPromote.className = "sect-action-btn";
         btnPromote.textContent = "Thăng TL";
-        btnPromote.disabled = elderCount >= SECT_ELDERS_MAX;
+        // Giới hạn Trưởng lão theo CẤP TÔNG (3 ở cấp 1, tới 7 ở cấp 5): lấy từ ảnh chụp Nội vụ, không cứng 3 (máy chủ cho thăng tới mức này)
+        const eldersCap = sectEldersCap(sectHall?.view.caps.elders);
+        btnPromote.disabled = elderCount >= eldersCap;
         btnPromote.title =
-          elderCount >= SECT_ELDERS_MAX ? "Đã tối đa 3 Trưởng lão" : "Thăng làm Trưởng lão";
+          elderCount >= eldersCap ? `Đã tối đa ${eldersCap} Trưởng lão` : "Thăng làm Trưởng lão";
         btnPromote.addEventListener("click", () => {
           callbacks?.onSectRank?.(m.name, "truong_lao");
         });
@@ -3522,7 +3537,7 @@ function renderSectModalImpl() {
     $("sect-meta-my-rank").textContent = formatSectRole(currentSect.myRank);
     // giới hạn thành viên theo cấp tông (M8): có ảnh chụp Nội vụ thì dùng, chưa có thì mức cấp 1
     $("sect-meta-member-count").textContent =
-      `${currentSect.members.length} / ${sectHall?.view.caps.members || SECT_MAX_MEMBERS}`;
+      `${currentSect.members.length} / ${sectMembersCap(sectHall?.view.caps.members)}`;
     $("sect-meta-treasury").textContent = formatSectTreasury(currentSect.coin);
 
     const motdEl = $("sect-motd-text");
@@ -5461,9 +5476,14 @@ export const ui = {
           sectBtn.disabled = true;
           sectBtn.textContent = "Đã cùng tông môn";
           if (sectHint) sectHint.hidden = true;
-        } else if (currentSect.members.length >= SECT_MAX_MEMBERS) {
+        } else if (
+          sectFullText(currentSect.members.length, sectMembersCap(sectHall?.view.caps.members))
+        ) {
+          // Giới hạn thành viên theo CẤP TÔNG (30 tới 50), lấy từ ảnh chụp Nội vụ: không cứng 30 (máy chủ còn cho mời tới mức cấp)
           sectBtn.disabled = true;
-          sectBtn.textContent = `Tông môn đã đủ (${SECT_MAX_MEMBERS}/${SECT_MAX_MEMBERS})`;
+          sectBtn.textContent =
+            sectFullText(currentSect.members.length, sectMembersCap(sectHall?.view.caps.members)) ??
+            "Tông môn đã đủ";
           if (sectHint) sectHint.hidden = true;
         } else {
           sectBtn.disabled = false;

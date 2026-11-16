@@ -6503,6 +6503,10 @@ body.low-fx.in-limbo .stone-item {
 .sect-member-status.online {
   color: #34d399;
 }
+.sect-member-merit {
+  font-size: var(--fs-11);
+  color: #e0c070;
+}
 .sect-member-actions {
   display: flex;
   gap: 4px;

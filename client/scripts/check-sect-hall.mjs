@@ -48,6 +48,7 @@ export const VIEWPORTS = [
   { name: "844x390", w: 844, h: 390, dpr: 2, mobile: true },
   { name: "390x844", w: 390, h: 844, dpr: 2, mobile: true },
   { name: "360x640", w: 360, h: 640, dpr: 2, mobile: true },
+  { name: "640x360", w: 640, h: 360, dpr: 2, mobile: true },
 ];
 const MIN_TAP_PX = 44;
 
@@ -420,6 +421,106 @@ async function main() {
       );
       await hallOf(2);
 
+      // ---- danh sách thành viên: hiện CÔNG TÍCH; "Thăng TL" theo giới hạn Trưởng lão của CẤP TÔNG (không cứng 3) ----
+      const memberSect = {
+        sect: {
+          ...sect.sect,
+          members: [
+            { name: "Mộc Thanh", rank: "chu", joinedAt: NOW - 86400000, merit: 900 },
+            { name: "Lão Nhất", rank: "truong_lao", joinedAt: NOW - 86400000, merit: 1234 },
+            { name: "Lão Nhị", rank: "truong_lao", joinedAt: NOW - 86400000 },
+            { name: "Lão Tam", rank: "truong_lao", joinedAt: NOW - 86400000, merit: 7 },
+            { name: "Đệ Tử Một", rank: "de_tu", joinedAt: NOW - 86400000, merit: 40 },
+          ],
+        },
+      };
+      const membersView = () =>
+        evalJs(`(() => ({
+          rows: [...document.querySelectorAll("#sect-members-list .sect-member-item")].map((r) => ({
+            name: r.querySelector(".sect-member-name")?.textContent ?? "",
+            merit: r.querySelector(".sect-member-merit")?.textContent ?? "",
+            promote: (() => { const b = [...r.querySelectorAll("button")].find((x) => x.textContent === "Thăng TL"); return b ? { disabled: b.disabled, title: b.title } : null; })(),
+          })),
+        }))()`);
+      await evalJs(
+        `window.__ui.onSect(${JSON.stringify(memberSect)}); document.getElementById("sect-tab-btn-overview").click(); 1`,
+      );
+      await hallOf(3); // cấp 3: tối đa 5 Trưởng lão (đang có 3)
+      await evalJs(`document.getElementById("sect-tab-btn-members").click(); 1`);
+      await sleep(150);
+      let mv = await membersView();
+      const merits = Object.fromEntries(mv.rows.map((r) => [r.name, r.merit]));
+      check(
+        merits["Lão Nhất"] === "Công tích 1.234" &&
+          merits["Đệ Tử Một"] === "Công tích 40" &&
+          merits["Lão Tam"] === "Công tích 7" &&
+          merits["Lão Nhị"] === "",
+        `danh sách thành viên hiện công tích (chỉ người có công tích): ${JSON.stringify(merits)}`,
+      );
+      const dt = mv.rows.find((r) => r.name === "Đệ Tử Một");
+      check(
+        dt?.promote && dt.promote.disabled === false,
+        `cấp 3 (tối đa 5 Trưởng lão, đang 3): nút Thăng TL BẤM ĐƯỢC (${JSON.stringify(dt?.promote)})`,
+      );
+      await hallOf(1); // cấp 1: tối đa 3 Trưởng lão (đang 3) -> khoá
+      await evalJs(`document.getElementById("sect-tab-btn-overview").click(); 1`);
+      await evalJs(`document.getElementById("sect-tab-btn-members").click(); 1`);
+      await sleep(150);
+      mv = await membersView();
+      const dt1 = mv.rows.find((r) => r.name === "Đệ Tử Một");
+      check(
+        dt1?.promote?.disabled === true && /Đã tối đa 3 Trưởng lão/.test(dt1.promote.title),
+        `cấp 1 (tối đa 3, đang 3): nút Thăng TL khoá kèm lý do (${JSON.stringify(dt1?.promote)})`,
+      );
+      // tổng số thành viên + nút "Mời vào tông môn" theo giới hạn thành viên của CẤP TÔNG (30 ở cấp 1, 40 ở cấp 3): không cứng 30
+      const summaryText = () =>
+        evalJs(`document.getElementById("sect-members-summary")?.textContent ?? ""`);
+      check(
+        (await summaryText()) === "Tổng số: 5 / 30",
+        `cấp 1: tổng số thành viên '${await summaryText()}' (giới hạn 30)`,
+      );
+      await hallOf(3);
+      await evalJs(`document.getElementById("sect-tab-btn-overview").click(); 1`);
+      await evalJs(`document.getElementById("sect-tab-btn-members").click(); 1`);
+      await sleep(150);
+      check(
+        (await summaryText()) === "Tổng số: 5 / 40",
+        `cấp 3: tổng số thành viên '${await summaryText()}' (giới hạn 40)`,
+      );
+      const full30 = {
+        sect: {
+          ...sect.sect,
+          members: Array.from({ length: 30 }, (_, i) => ({
+            name: i === 0 ? "Mộc Thanh" : `Đệ tử ${i}`,
+            rank: i === 0 ? "chu" : "de_tu",
+            joinedAt: NOW - 86400000,
+          })),
+        },
+      };
+      const inviteBtn = async () => {
+        await evalJs(`window.__ui.openPlayerMenu("Khách Lạ", 1, 1, 200, 200, undefined, ""); 1`);
+        await sleep(100);
+        return evalJs(
+          `(() => { const b = document.getElementById("pm-sect-btn"); return { disabled: b.disabled, text: b.textContent.trim() }; })()`,
+        );
+      };
+      await evalJs(`window.__ui.onSect(${JSON.stringify(full30)}); 1`);
+      await hallOf(1); // cấp 1: tối đa 30, đang 30 -> đủ
+      let ib = await inviteBtn();
+      check(
+        ib.disabled && ib.text === "Tông môn đã đủ (30/30)",
+        `cấp 1 đang 30 / 30: nút Mời bị khoá: ${JSON.stringify(ib)}`,
+      );
+      await hallOf(3); // cấp 3: tối đa 40, đang 30 -> còn chỗ
+      ib = await inviteBtn();
+      check(
+        !ib.disabled && ib.text === "Mời vào tông môn",
+        `cấp 3 đang 30 / 40: nút Mời BẤM ĐƯỢC (máy chủ còn cho): ${JSON.stringify(ib)}`,
+      );
+      await evalJs(`window.__ui.closePlayerMenu?.(); 1`);
+      await evalJs(`window.__ui.onSect(${JSON.stringify(sect)}); 1`);
+      await hallOf(2);
+
       // ---- rời tông: hộp xác nhận nêu số mất ----
       await hallOf(2, "v.me.contrib = 1234; v.me.merit = 56789");
       await evalJs(`document.getElementById("sect-tab-btn-overview").click(); 1`);
@@ -435,8 +536,12 @@ async function main() {
 
       // ---- nhiệm vụ TÔNG MÔN trong sổ nhiệm vụ / HUD: không có NPC giao, trả ở bảng Tông môn ----
       await evalJs(`window.__ui.toggleSectModal(false); 1`);
+      // Nhiệm vụ lấy từ ảnh chụp mẫu (dữ liệu THẬT của game, E / D còn thay ở M8.7): không cứng id / tên của bảng khung. `step` lớn = đã xong mọi bước (sẵn sàng trả)
+      const hudQuest = await evalJs(
+        `(() => { const q = window.__sampleSectHall(2, Date.now()).quests[0]; return { questId: q.questId, title: q.title }; })()`,
+      );
       await evalJs(
-        `window.__ui.onQuests({ active: [{ id: "st_tru_lang.t0", step: 1, count: 0 }], done: [], dailyDone: [] }); 1`,
+        `window.__ui.onQuests({ active: [{ id: ${JSON.stringify(hudQuest.questId)}, step: 99, count: 0 }], done: [], dailyDone: [] }); 1`,
       );
       await sleep(150);
       const qt = await evalJs(
@@ -444,7 +549,7 @@ async function main() {
       );
       check(
         qt.length === 1 &&
-          qt[0].title === "Trừ sói quanh trấn" &&
+          qt[0].title === hudQuest.title &&
           qt[0].badge === "Tông" &&
           qt[0].ready &&
           /Mở bảng Tông môn > Nội vụ để trả/.test(qt[0].step),
