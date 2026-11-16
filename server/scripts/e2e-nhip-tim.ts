@@ -1,6 +1,6 @@
 // E2E THẬT nhịp tim ứng dụng (ping / pong) và vòng đời nền / tiền cảnh (M4.2b, Issue #293):
 // Server Colyseus thật + Proxy TCP trung gian (hỗ trợ chế độ BLACKHOLE mô phỏng socket nửa mở thật) + Chrome headless.
-// Sáu ca:
+// Bảy ca:
 //  1. Blackhole ở tiền cảnh: socket TCP vẫn mở nhưng ngừng byte -> client phát hiện chết trong <= HEARTBEAT_TIMEOUT_MS + nhịp (<= 14s)
 //     rồi mở lại proxy thì nối lại thành công, cùng sessionId, ví / túi đồ nguyên vẹn.
 //  2. Quay lại tiền cảnh sau khi ở nền: ghi đè document.visibilityState + bắn visibilitychange -> phát hiện chết trong <= RESUME_TIMEOUT_MS + dung sai (<= 4.5s).
@@ -8,6 +8,8 @@
 //  4. Socket cũ (nửa mở) đóng MUỘN sau khi đã nối lại xong (đổi mạng): sự kiện đóng của phòng CŨ không được chạy lại vòng nối lại.
 //  6. (mục 33, cần máy chủ có `net-guard`) Đường hầm ĐỨNG 5 giây (stall: byte bị hoãn, không mất) rồi thông: máy chủ ghost sau 3 giây im lặng dù socket mở, có tin lại thì hộ thể 3 giây
 //     + `netShield` tới client (vầng sáng), dải + toast "Đã kết nối lại", không ngắt kết nối.
+//  7. (#873) ĐỘ TRỄ MẠNG thật (proxy hoãn byte, RTT 0 / ~160 / ~800): `lastRttMs` đo từ pong, vùng báo (`warn`) + thanh gồng (`bossCast`) rút ngắn CÙNG một mức
+//     (clamp(RTT + 10, 0, min(250, 0,3 x ms))), HUD ?perf=1 ghi RTT, hết trễ thì trở lại.
 //  5. Chip "Mạng chậm" (mục 25): đang ĐI BỘ mà mạng đứng thì chip hiện sau ~SLOW_AFTER_MS, TRƯỚC banner nối lại; Ca 1 (đứng yên) chip cũng hiện trước banner
 //     (nhờ ping) và tắt khi nối lại xong.
 // Chạy: `npm run build && npm run e2e:nhip-tim -w server` (cần google-chrome).
@@ -115,7 +117,9 @@ class TcpProxy {
           // Blackhole: giữ socket mở nhưng ngừng chuyển tiếp byte hai chiều
           return;
         }
-        targetSocket.write(d);
+        this.flow("up", () => {
+          if (!targetSocket.destroyed) targetSocket.write(d);
+        });
       });
 
       targetSocket.on("data", (d: Buffer) => {
@@ -132,7 +136,9 @@ class TcpProxy {
           // Chặn tin pong từ server về client
           return;
         }
-        clientSocket.write(d);
+        this.flow("down", () => {
+          if (!clientSocket.destroyed) clientSocket.write(d);
+        });
       });
 
       const cleanup = () => {
@@ -177,6 +183,45 @@ class TcpProxy {
       this.stallQueue = [];
       for (const f of q) f();
     }
+  }
+
+  /**
+   * ĐỘ TRỄ giả lập (ms MỖI CHIỀU, RTT = 2 x `ms`): mỗi đoạn byte tới đích muộn `ms` ms nhưng vẫn ĐÚNG THỨ TỰ trong từng chiều (kể cả khi đổi `ms` giữa chừng:
+   * không đoạn nào vượt đoạn đứng trước). Khác stall (hoãn hết rồi xả một lượt): luồng vẫn chảy đều, chỉ chậm. Dùng đo RTT thật của nhịp tim (#873).
+   */
+  setDelay(ms: number) {
+    this.delayMs = Math.max(0, ms);
+  }
+
+  private delayMs = 0;
+  private flowQ: Record<"up" | "down", Array<{ due: number; f: () => void }>> = {
+    up: [],
+    down: [],
+  };
+  private flowTimer: Record<"up" | "down", NodeJS.Timeout | null> = { up: null, down: null };
+
+  private flow(dir: "up" | "down", f: () => void) {
+    const q = this.flowQ[dir];
+    if (this.delayMs <= 0 && q.length === 0) {
+      f();
+      return;
+    }
+    q.push({ due: Math.max(Date.now() + this.delayMs, q[q.length - 1]?.due ?? 0), f });
+    this.pumpFlow(dir);
+  }
+
+  private pumpFlow(dir: "up" | "down") {
+    const q = this.flowQ[dir];
+    if (this.flowTimer[dir] || q.length === 0) return;
+    this.flowTimer[dir] = setTimeout(
+      () => {
+        this.flowTimer[dir] = null;
+        const now = Date.now();
+        while (q.length > 0 && q[0]!.due <= now) q.shift()!.f();
+        this.pumpFlow(dir);
+      },
+      Math.max(0, q[0]!.due - Date.now()),
+    );
   }
 
   setBlackhole(blackhole: boolean) {
@@ -225,6 +270,11 @@ class TcpProxy {
   }
 
   async close(): Promise<void> {
+    for (const dir of ["up", "down"] as const) {
+      if (this.flowTimer[dir]) clearTimeout(this.flowTimer[dir]!);
+      this.flowTimer[dir] = null;
+      this.flowQ[dir].length = 0;
+    }
     this.dropAll();
     return new Promise((resolve) => this.server.close(() => resolve()));
   }
@@ -923,12 +973,117 @@ async function main() {
     );
     out("  ✓ Hộ thể hết đúng hạn ở cả máy chủ lẫn client; không ngắt kết nối, không nối lại");
 
+    // =========================================================================
+    // CA 7 (#873, hướng 2): ĐỘ TRỄ MẠNG thật -> `lastRttMs` (trung vị 5 pong) -> vùng báo + thanh gồng rút ngắn CÙNG một mức; HUD ?perf=1 ghi RTT
+    // =========================================================================
+    out(
+      "\n--- Ca 7: Độ trễ mạng giả lập (proxy): RTT đo được từ pong, vùng báo + thanh gồng rút ngắn đúng mức, HUD ?perf=1 ---",
+    );
+    const NAME_7 = "Do Tre Mang";
+    const SECRET_7 = "e2e_secret_heartbeat_77777777";
+    await setIdentity(NAME_7, SECRET_7);
+    await tab.send("Page.navigate", { url: `http://127.0.0.1:${PORT_PROXY}/?debug&perf=1` });
+    await tab.waitFor(
+      `typeof window.__switchAuthView === 'function' && !!document.getElementById('login-form')`,
+      "form đăng nhập ca 7",
+    );
+    await tab.ev(
+      `const inp = document.getElementById('login-name'); if (inp) inp.value = ${JSON.stringify(NAME_7)}; document.getElementById('login-form').requestSubmit(); 1`,
+    );
+    await tab.waitFor(
+      `!document.getElementById('ui')?.hidden && !!window.__scene?.room && !!document.getElementById('hud-name')?.textContent`,
+      "vào game ca 7",
+    );
+    await tab.waitFor(shown("hud-name"), "đạo hiệu ca 7");
+    /** Chờ trung vị RTT của nhịp tim nằm trong [lo, hi] (ms): cần vài pong mới sau khi đổi độ trễ */
+    const waitRtt = async (lo: number, hi: number, what: string, timeoutMs = 20000) => {
+      await tab!.waitFor(
+        `(() => { const r = window.__heartbeat?.lastRttMs; return typeof r === 'number' && r >= ${lo} && r <= ${hi}; })()`,
+        what,
+        timeoutMs,
+      );
+      return Number(await tab!.ev(`window.__heartbeat.lastRttMs`));
+    };
+    /** Phát MỘT cặp fx (vùng báo `warn` + `bossCast`) cùng `ms` qua bộ xử lý thật của cảnh rồi đọc `ms` hiệu dụng của cả hai */
+    const castAndRead = async (ms: number) =>
+      (await tab!.ev(`(() => {
+        const sc = window.__scene;
+        sc.telegraphs.clear(); sc.bossFx.clear();
+        const me = sc.me();
+        const x = me.px ?? me.x, y = me.py ?? me.y;
+        sc.onFx({ kind: 'bossCast', by: 'e2e_boss', x, y, ability: 'quat_duoi', ms: ${ms} });
+        sc.onFx({ kind: 'warn', shape: 'circle', x, y, r: 100, ms: ${ms} });
+        const w = sc.telegraphs.snapshot(sc.time.now).warns;
+        const c = sc.bossFx.castTiming('e2e_boss', sc.time.now);
+        return { rings: w.length, ringMs: w[0]?.ms, castMs: c?.castMs, rtt: window.__heartbeat.lastRttMs };
+      })()`)) as { rings: number; ringMs: number; castMs: number; rtt: number };
+
+    // (a) mạng cục bộ (không trễ): RTT nhỏ, bù ~ 10-50 ms
+    const rtt0 = await waitRtt(0, 40, "RTT đo được trên đường cục bộ (< 40 ms)");
+    out(`  ✓ Không trễ: lastRttMs = ${rtt0.toFixed(1)} ms (trung vị 5 pong)`);
+    if (Number(await tab.ev(`typeof window.__scene.rttSource() === 'number' ? 1 : 0`)) !== 1)
+      throw new Error("Ca 7: rttSource của cảnh không đọc được số từ nhịp tim thật");
+    await tab.waitFor(
+      `/^\\d+ ms$/.test(document.getElementById('perf-rtt')?.textContent ?? '')`,
+      "HUD ?perf=1 ghi RTT dạng 'N ms'",
+      5000,
+    );
+    const c0 = await castAndRead(1000);
+    if (c0.rings !== 1 || c0.ringMs < 920 || c0.ringMs > 995 || c0.castMs !== c0.ringMs)
+      throw new Error(`Ca 7: không trễ nhưng vùng báo ${c0.ringMs} / thanh gồng ${c0.castMs}`);
+    out(`  ✓ Vùng báo = thanh gồng = ${c0.ringMs.toFixed(1)} ms (bù = RTT + 10, báo trước 1000)`);
+
+    // (b) trễ 80 ms mỗi chiều (RTT ~160): trung vị đo được ~160; vùng báo ~ 1000 - (RTT + 10)
+    proxy.setDelay(80);
+    const rtt1 = await waitRtt(150, 260, "RTT ~160 ms sau khi đặt trễ 80 ms mỗi chiều");
+    out(`  ✓ Trễ 80 ms mỗi chiều: lastRttMs = ${rtt1.toFixed(1)} ms`);
+    // HUD cập nhật ~4 lần / giây (chậm hơn nhịp pong một chút): chờ tới khi ghi đúng số trung vị hiện tại
+    await tab.waitFor(
+      `(() => {
+        const m = /^(\\d+) ms$/.exec(document.getElementById('perf-rtt')?.textContent ?? '');
+        const r = window.__heartbeat.lastRttMs;
+        return !!m && typeof r === 'number' && Math.abs(Number(m[1]) - r) <= 10;
+      })()`,
+      "HUD ?perf=1 ghi RTT khớp lastRttMs (lệch <= 10 ms)",
+      5000,
+    );
+    const hud1 = String(await tab.ev(`document.getElementById('perf-rtt').textContent`));
+    out(`  ✓ HUD ?perf=1 ghi "${hud1}"`);
+    const c1 = await castAndRead(1000);
+    // RTT 150..260 -> bù 160..270 -> vùng 730..840 (và thanh gồng PHẢI bằng vùng báo)
+    if (c1.rings !== 1 || c1.ringMs < 720 || c1.ringMs > 845 || c1.castMs !== c1.ringMs)
+      throw new Error(`Ca 7: trễ 160 ms mà vùng báo ${c1.ringMs} / thanh gồng ${c1.castMs}`);
+    out(
+      `  ✓ RTT ${c1.rtt.toFixed(0)} ms: vùng báo = thanh gồng = ${c1.ringMs.toFixed(1)} ms / 1000`,
+    );
+
+    // (c) trễ 400 ms mỗi chiều (RTT ~800, xấu): bù KẸP 250 ms (báo trước dài) và 30 % (báo trước ngắn), vùng báo không biến mất
+    proxy.setDelay(400);
+    await waitRtt(650, 1000, "RTT ~800 ms sau khi đặt trễ 400 ms mỗi chiều", 30000);
+    const c2 = await castAndRead(1000);
+    if (c2.rings !== 1 || Math.abs(c2.ringMs - 750) > 1e-6 || c2.castMs !== c2.ringMs)
+      throw new Error(`Ca 7: RTT hỏng (800) mà vùng báo ${c2.ringMs} (cần 750 = kẹp 250 ms)`);
+    const c3 = await castAndRead(800);
+    if (c3.rings !== 1 || Math.abs(c3.ringMs - 560) > 1e-6 || c3.castMs !== c3.ringMs)
+      throw new Error(`Ca 7: RTT 800, báo trước 800: vùng báo ${c3.ringMs} (cần 560 = kẹp 30 %)`);
+    out("  ✓ RTT ~800: bù KẸP 250 ms (báo 1000 -> 750) và 30 % (báo 800 -> 560), không biến mất");
+    if (await tab.ev(`!document.getElementById('reconnect-banner')?.hidden`))
+      throw new Error("Ca 7: banner nối lại hiện khi chỉ có độ trễ");
+
+    // (d) hết trễ: trung vị trôi về nhỏ, vùng báo trở lại gần nguyên
+    proxy.setDelay(0);
+    await waitRtt(0, 60, "RTT về nhỏ sau khi bỏ độ trễ", 30000);
+    const c4 = await castAndRead(1000);
+    if (c4.rings !== 1 || c4.ringMs < 930 || c4.castMs !== c4.ringMs)
+      throw new Error(`Ca 7: hết trễ mà vùng báo ${c4.ringMs}`);
+    out(`  ✓ Hết trễ: vùng báo trở lại ${c4.ringMs.toFixed(1)} ms`);
+
     if (tab.errors.length) {
       throw new Error(`Có lỗi console trong quá trình test: ${tab.errors.join("; ")}`);
     }
-    out("  ✓ 0 lỗi console / exception trong toàn bộ 6 ca");
+    out("  ✓ 0 lỗi console / exception trong toàn bộ 7 ca");
 
-    out("\n=== TẤT CẢ 6 CA E2E NHỊP TIM ĐỀU ĐẠT ===");
+    out("\n=== TẤT CẢ 7 CA E2E NHỊP TIM ĐỀU ĐẠT ===");
   } catch (err: any) {
     failed = err?.message || String(err);
     out(`\n[LỖI E2E NHỊP TIM] ${failed}`);
