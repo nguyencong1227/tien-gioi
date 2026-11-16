@@ -630,14 +630,12 @@ export class WorldRoom extends Room<WorldState> {
     applyStats(p, true, mult);
     const limbo = sanitizeLimbo(save.limbo); // đang ở Hoàng Tuyền: nằm "chết" cho tới khi đầu thai
     if (limbo) p.dead = true;
-    // Hệ số tu vi thử nghiệm (mục 34): chỉ khi đạo hiệu có trong cấu hình; ghi audit mỗi lần vào phòng (minh bạch), người khác không bị ảnh hưởng
+    // Hệ số tu vi thử nghiệm (mục 34): chỉ khi đạo hiệu có trong cấu hình; CHỈ ở phía máy chủ (không vào state), ghi audit mỗi lần vào phòng
     const testMult = testExpMultFor(WorldRoom.testExpMult, p.name);
-    if (testMult > 1) {
-      p.testExpMult = testMult;
-      audit("test.exp_mult", { name: p.name, mult: testMult, map: this.mapId });
-    }
+    if (testMult > 1) audit("test.exp_mult", { name: p.name, mult: testMult, map: this.mapId });
     this.state.players.set(client.sessionId, p);
     this.world.ctrl.set(client.sessionId, {
+      testExpMult: testMult > 1 ? testMult : undefined,
       save,
       identity,
       // Mục 33: client có khai nhịp gửi tin (`JoinOptions.beatMs`) thì máy chủ áp luật im lặng cho người này; client cũ thì không

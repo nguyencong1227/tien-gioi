@@ -450,7 +450,7 @@ Toàn bộ nhật ký chi tiết từng kịch bản và bảng tổng kết Mar
 - **Cấu hình:** biến môi trường `TEST_EXP_MULT` = `đạo_hiệu:hệ_số`, nhiều mục cách nhau dấu phẩy, vd `TEST_EXP_MULT=Han:5` hoặc `TEST_EXP_MULT=Han:5,Linh Nhi:2`. Mặc định rỗng = **TẮT**.
 - **Luật:** đạo hiệu khớp KHÔNG phân biệt hoa thường (cùng chuẩn hoá với khoá chân linh); hệ số là **số nguyên từ 1 đến 10** (1 = không nhân). Mục sai (thiếu `:`, tên rỗng, hệ số ngoài 1-10 hoặc không nguyên) bị **bỏ kèm cảnh báo** lúc khởi động, không bao giờ kẹp lặng lẽ (gõ nhầm `Han:50` không thành x10).
 - **Nhân những gì:** MỌI nguồn tu vi của nhân vật đó (hạ quái kể cả trong bí cảnh, đả tọa, đan tu vi, thưởng nhiệm vụ), áp SAU các hệ số khác (Dư âm tu hành, tinh anh, chênh bậc). Bậc cuối của cảnh giới vẫn dừng ở đầy, chờ Đột phá. Mã: `server/src/test-exp.ts` (đọc cấu hình), `gainExp` ở `server/src/systems/progression.ts` (chỗ nhân duy nhất), `WorldRoom.onJoin` (tra một lần lúc vào phòng).
-- **Minh bạch (ba chỗ):** (1) lúc khởi động máy chủ in một dòng `[CẢNH BÁO] TEST_EXP_MULT đang BẬT (chỉ để thử nghiệm): nhân tu vi của Han x5...`; (2) mỗi lần nhân vật vào phòng ghi audit `{"ev":"test.exp_mult","name":"Han","mult":5,"map":"lac_ha",...}`; (3) client của CHÍNH người đó hiện nhãn "Thử nghiệm ×N" cạnh thanh Tu vi (trường `Player.testExpMult`, chỉ chủ nhận; người khác không thấy).
+- **Minh bạch (hai chỗ; người dùng bỏ nhãn ở client, mục 36):** (1) lúc khởi động máy chủ in một dòng `[CẢNH BÁO] TEST_EXP_MULT đang BẬT (chỉ để thử nghiệm): nhân tu vi của Han x5...`; (2) mỗi lần nhân vật vào phòng ghi audit `{"ev":"test.exp_mult","name":"Han","mult":5,"map":"lac_ha",...}`. Hệ số chỉ nằm phía máy chủ (`PlayerCtrl.testExpMult`), KHÔNG vào state và không gửi client nào.
 
 ### 11.1. Bật trên bản chạy thật
 ```bash
@@ -460,7 +460,9 @@ cat .current-tag                                        # thẻ đang chạy, vd
 ./prod.sh up "$(cat .current-tag)"                      # nạp lại cấu hình (khởi động lại game, ~30 giây lưu hồ sơ trước khi tắt)
 ./prod.sh logs game 2>&1 | grep -E "TEST_EXP_MULT" | tail -3   # phải thấy dòng CẢNH BÁO "đang BẬT ... Han x5"
 ```
-Rồi cho nhân vật `Han` vào game: log có `"ev":"test.exp_mult"` (`./prod.sh logs game | grep test.exp_mult`) và thấy nhãn "Thử nghiệm ×5" cạnh thanh Tu vi.
+Rồi cho nhân vật `Han` vào game: log có `"ev":"test.exp_mult"` (`./prod.sh logs game | grep test.exp_mult`) và tu vi nhận được gấp đúng hệ số (so với người thường cùng điều kiện).
+
+Nhiều nhân vật: ngăn cách bằng dấu phẩy, ghi ĐÚNG đạo hiệu như trong CSDL (có dấu, có khoảng trắng), vd `TEST_EXP_MULT=Han:5,Hàn Tuyết:3`; không có khớp gần đúng tự động (tránh trúng người khác tên na ná). Nên đặt trong dấu nháy kép khi có khoảng trắng (compose đọc đúng): `TEST_EXP_MULT="Han:5,Hàn Tuyết:3"`; kiểm dòng cảnh báo khởi động phải in đúng tên không dính nháy.
 
 ### 11.2. Tắt
 ```bash

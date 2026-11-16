@@ -1,4 +1,4 @@
-// Hệ số tu vi THỬ NGHIỆM (`Player.testExpMult`, QUYET_DINH_M3 mục 34): nhân MỌI nguồn tu vi sau các hệ số khác; không đổi gì khác; người khác không bị ảnh hưởng.
+// Hệ số tu vi THỬ NGHIỆM (`PlayerCtrl.testExpMult`, QUYET_DINH_M3 mục 34 / 36): nhân MỌI nguồn tu vi sau các hệ số khác; không đổi gì khác; người khác không bị ảnh hưởng.
 import { describe, expect, it } from "vitest";
 import { ITEM_BY_ID, NPC_BY_ID, expPillGain, meditateExpPerSec } from "@tien-gioi/shared";
 import { killMonster } from "./combat";
@@ -27,8 +27,8 @@ describe("gainExp: hệ số thử nghiệm nhân sau cùng", () => {
     const t = makeWorld();
     const a = addPlayer(t.w, "a", 1, 0);
     const b = addPlayer(t.w, "b", 1, 0);
-    expect(a.p.testExpMult).toBe(1);
-    b.p.testExpMult = 5;
+    expect(a.c.testExpMult).toBeUndefined(); // không có trong cấu hình thì không đặt gì
+    b.c.testExpMult = 5;
     gainExp(t.w, "a", a.p, 10);
     gainExp(t.w, "b", b.p, 10);
     expect(a.p.exp).toBe(10);
@@ -43,12 +43,12 @@ describe("gainExp: hệ số thử nghiệm nhân sau cùng", () => {
     const a = addPlayer(t.w, "a", 1, 0);
     for (const bad of [0, 11, 255]) {
       a.p.exp = 0;
-      a.p.testExpMult = bad;
+      a.c.testExpMult = bad;
       gainExp(t.w, "a", a.p, 10);
       expect(a.p.exp, `hệ số ${bad}`).toBe(10);
     }
     a.p.exp = 0;
-    a.p.testExpMult = 10;
+    a.c.testExpMult = 10;
     gainExp(t.w, "a", a.p, 10);
     expect(a.p.exp).toBe(100); // biên trên hợp lệ
   });
@@ -56,7 +56,7 @@ describe("gainExp: hệ số thử nghiệm nhân sau cùng", () => {
   it("vẫn dừng ở đầy khi tới bậc cuối của cảnh giới (chờ Đột phá), không tràn", () => {
     const t = makeWorld();
     const a = addPlayer(t.w, "a", 1, 8); // tầng cuối Luyện Khí
-    a.p.testExpMult = 10;
+    a.c.testExpMult = 10;
     gainExp(t.w, "a", a.p, a.p.expMax); // x10 vượt xa
     expect(a.p.exp).toBe(a.p.expMax);
     expect(a.p.tier).toBe(8);
@@ -68,7 +68,7 @@ describe("mọi nguồn tu vi đều qua hệ số thử nghiệm (x5), người
     const t = makeWorld();
     const a = addPlayer(t.w, "a", 1, 0);
     const b = addPlayer(t.w, "b", 1, 0);
-    b.p.testExpMult = 5;
+    b.c.testExpMult = 5;
     const ga = killFor(t, a);
     const gb = killFor(t, b);
     expect(ga).toBeGreaterThan(0);
@@ -79,7 +79,7 @@ describe("mọi nguồn tu vi đều qua hệ số thử nghiệm (x5), người
     const t = makeWorld();
     const a = addPlayer(t.w, "a", 1, 0);
     const b = addPlayer(t.w, "b", 1, 0);
-    b.p.testExpMult = 5;
+    b.c.testExpMult = 5;
     for (const x of [a, b]) {
       x.p.x = t.w.map.townPx.x;
       x.p.y = t.w.map.townPx.y;
@@ -97,7 +97,7 @@ describe("mọi nguồn tu vi đều qua hệ số thử nghiệm (x5), người
     const t = makeWorld();
     const a = addPlayer(t.w, "a", 1, 0);
     const b = addPlayer(t.w, "b", 1, 0);
-    b.p.testExpMult = 5;
+    b.c.testExpMult = 5;
     const pillId = "tu_khi_dan";
     const eff = ITEM_BY_ID[pillId]!.effect as { kind: "exp"; pct: number; maxExp?: number };
     expect(eff.kind).toBe("exp");
@@ -120,7 +120,7 @@ describe("mọi nguồn tu vi đều qua hệ số thử nghiệm (x5), người
     // Luyện Khí tầng 1 (thanh tu vi đủ lớn: Phàm Nhân chỉ có 40 nên x5 bị trần chặn, không đo được hệ số)
     const a = addPlayer(t.w, "a", 1, 0);
     const b = addPlayer(t.w, "b", 1, 0);
-    b.p.testExpMult = 5;
+    b.c.testExpMult = 5;
     const near = (x: typeof a, npcId: string) => {
       const n = NPC_BY_ID[npcId]!;
       x.p.x = n.x + 10;
@@ -149,7 +149,7 @@ describe("không đổi gì ngoài tu vi", () => {
     const run = (mult: number) => {
       const t = makeWorld();
       const a = addPlayer(t.w, "a", 1, 0);
-      a.p.testExpMult = mult;
+      a.c.testExpMult = mult;
       let s = 12345;
       const orig = Math.random;
       Math.random = () => {
