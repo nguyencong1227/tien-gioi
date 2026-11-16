@@ -350,17 +350,59 @@ async function main() {
         `(() => { const c = document.getElementById("set-reduced-motion"); c.checked = false; c.dispatchEvent(new Event("change")); return 1; })()`,
       );
 
+      // ---- tiếng riêng của trùm (sound.boss): gồng ngay lúc báo, đòn rơi đúng lúc đáp, sắc theo hệ của chiêu ----
+      await evalJs(`(() => {
+        const sd = window.__sound;
+        window.__bossSfx = [];
+        if (!sd.__origBoss) sd.__origBoss = sd.boss.bind(sd);
+        sd.boss = (kind, element) => { window.__bossSfx.push({ kind, element, t: performance.now() }); };
+        return 1;
+      })()`);
+      const sfxLog = () => evalJs(`window.__bossSfx.splice(0)`);
+      await sleep(300);
+      await sfxLog();
+      const bx = await evalJs(`window.__start.x + 80`); // máy chủ gửi x, y CỦA TRÙM trong fx (mock: trùm đặt ở start + 80)
+      const by = await evalJs(`window.__start.y`);
+      await fx({ kind: "bossCast", by: "m1", x: bx, y: by, ability: "quat_duoi", ms: 700 });
+      await sleep(250);
+      let snd = await sfxLog();
+      check(
+        snd.length === 1 && snd[0].kind === "cast",
+        `bossCast: tiếng gồng phát NGAY (${JSON.stringify(snd.map((x) => x.kind))}), chưa có tiếng đòn rơi`,
+      );
+      await sleep(700);
+      snd = await sfxLog();
+      check(
+        snd.length === 1 && snd[0].kind === "strike",
+        `đúng lúc đáp (ms sau): tiếng đòn rơi (${JSON.stringify(snd.map((x) => x.kind))})`,
+      );
+      await fx({ kind: "bossCast", by: "m1", x: 5000, y: 5000, ability: "quat_duoi", ms: 300 });
+      await sleep(650);
+      snd = await sfxLog();
+      check(snd.length === 0, "trùm vận chiêu ở NGOÀI tầm nhìn: không có tiếng");
       // ---- bossPhase / bossEnrage ----
-      await fx({ kind: "bossPhase", by: "m1", x: 0, y: 0, phase: 1 });
+      await sfxLog();
+      await fx({ kind: "bossPhase", by: "m1", x: bx, y: by, phase: 1 });
       await tick();
       check((await bar()).roaring, "bossPhase: thanh chớp");
+      snd = await sfxLog();
+      check(
+        snd.length === 1 && snd[0].kind === "phase",
+        `bossPhase: tiếng gầm đổi giai đoạn (${JSON.stringify(snd.map((x) => x.kind))})`,
+      );
       await sleep(1700);
       check(!(await bar()).roaring, "hết tiếng gầm: thanh hết chớp");
       check(!(await bar()).enrage, "chưa cuồng nộ: không có chỉ báo");
-      await fx({ kind: "bossEnrage", by: "m1", x: 0, y: 0 });
+      await fx({ kind: "bossEnrage", by: "m1", x: bx, y: by });
       await tick();
       b = await bar();
       check(b.enrage && b.flash, "bossEnrage: chỉ báo 'Cuồng nộ' bằng chữ + chớp");
+      snd = await sfxLog();
+      check(
+        snd.length === 1 && snd[0].kind === "enrage",
+        `bossEnrage: còi cuồng nộ (${JSON.stringify(snd.map((x) => x.kind))})`,
+      );
+      await evalJs(`(() => { const sd = window.__sound; sd.boss = sd.__origBoss; return 1; })()`);
       await sleep(1700);
       b = await bar();
       check(b.enrage && !b.flash, "hết chớp mà chỉ báo cuồng nộ vẫn còn");
