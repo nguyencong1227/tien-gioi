@@ -32,8 +32,6 @@ import {
   validateUsername,
   SECT_COIN_CAP,
   SECT_LOG_MAX,
-  SECT_MAX_MEMBERS,
-  SECT_ELDERS_MAX,
   SECT_NAME_MIN,
   SECT_NAME_MAX,
   SECT_TAG_MIN,
@@ -41,6 +39,9 @@ import {
   SECT_MOTD_MAX,
   SECT_RANKS,
   SECT_VAULT_SLOTS,
+  SECT_VAULT_SLOTS_MAX,
+  sectLevelInfo,
+  sectLevelOf,
   SECT_VAULT_LOG_MAX,
   SECT_VAULT_DRAW_MAX,
   SECT_VAULT_QTY_MAX,
@@ -1381,15 +1382,16 @@ export function auditSectSaveData(rawText: string, byteLength: number): AuditErr
     }
   }
 
-  // 7. members: danh sách thành viên
+  // 7. members: danh sách thành viên (giới hạn theo CẤP tông, M8: cấp tính từ `points`; thiếu / hỏng = 0 điểm = cấp 1 = 30 thành viên, 3 Trưởng lão)
+  const sectLimits = sectLevelInfo(sectLevelOf(data.points));
   if (
     !Array.isArray(data.members) ||
     data.members.length < 1 ||
-    data.members.length > SECT_MAX_MEMBERS
+    data.members.length > sectLimits.maxMembers
   ) {
     errors.push({
       code: "invalid_sect_members",
-      message: `members phải là mảng chứa 1–${SECT_MAX_MEMBERS} thành viên`,
+      message: `members phải là mảng chứa 1–${sectLimits.maxMembers} thành viên (cấp tông ${sectLimits.level})`,
     });
   } else {
     const seenSoulKeys = new Set<string>();
@@ -1481,10 +1483,10 @@ export function auditSectSaveData(rawText: string, byteLength: number): AuditErr
       });
     }
 
-    if (elderCount > SECT_ELDERS_MAX) {
+    if (elderCount > sectLimits.maxElders) {
       errors.push({
         code: "too_many_elders",
-        message: `Số lượng Trưởng lão (${elderCount}) vượt quá giới hạn tối đa ${SECT_ELDERS_MAX}`,
+        message: `Số lượng Trưởng lão (${elderCount}) vượt quá giới hạn tối đa ${sectLimits.maxElders} (cấp tông ${sectLimits.level})`,
       });
     }
   }
@@ -1560,11 +1562,15 @@ export function auditSectSaveData(rawText: string, byteLength: number): AuditErr
         message: "vault phải là một JSON Object",
       });
     } else {
-      // 10a. slots: mảng đúng SECT_VAULT_SLOTS ô
-      if (!Array.isArray(data.vault.slots) || data.vault.slots.length !== SECT_VAULT_SLOTS) {
+      // 10a. slots: mảng đúng SECT_VAULT_SLOTS ô (bản ghi trước M8, chưa ghi lại) hoặc SECT_VAULT_SLOTS_MAX ô (M8)
+      if (
+        !Array.isArray(data.vault.slots) ||
+        (data.vault.slots.length !== SECT_VAULT_SLOTS &&
+          data.vault.slots.length !== SECT_VAULT_SLOTS_MAX)
+      ) {
         errors.push({
           code: "invalid_sect_vault_slots",
-          message: `vault.slots phải là mảng đúng ${SECT_VAULT_SLOTS} ô`,
+          message: `vault.slots phải là mảng đúng ${SECT_VAULT_SLOTS} hoặc ${SECT_VAULT_SLOTS_MAX} ô`,
         });
       } else {
         for (let i = 0; i < data.vault.slots.length; i++) {
