@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const scene = readFileSync(new URL("./scenes/WorldScene.ts", import.meta.url), "utf8");
+const uiSrc = readFileSync(new URL("./ui.ts", import.meta.url), "utf8");
 
 describe("đột phá: mọi đường gửi đều qua hộp xác nhận", () => {
   it("chỉ có HAI chỗ gửi `breakthrough`, cả hai trong requestBreakthrough (chưa đủ điều kiện: máy chủ báo; đã xác nhận)", () => {
@@ -27,5 +28,14 @@ describe("đột phá: mọi đường gửi đều qua hộp xác nhận", () =
   it("nối lại mạng và đổi cảnh đóng hộp xác nhận", () => {
     const closes = [...scene.matchAll(/ui\.closeActConfirm\(false\)/g)];
     expect(closes.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("hộp xác nhận là tầng trên cùng của bàn phím", () => {
+  it("isKeyboardCaptured tính hộp xác nhận (hộp không nằm trong modalStack): đang mở mà giữ phím đi thì nhân vật đứng lại", () => {
+    const start = uiSrc.indexOf("isKeyboardCaptured() {");
+    expect(start).toBeGreaterThan(0);
+    const body = uiSrc.slice(start, uiSrc.indexOf("\n  },", start));
+    expect(body).toContain("this.isActConfirmOpen()");
   });
 });

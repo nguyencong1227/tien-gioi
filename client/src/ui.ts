@@ -4298,7 +4298,14 @@ export const ui = {
         const el = document.getElementById(id);
         return !!el && (el.hidden || el.closest("[hidden]") !== null);
       });
-    return modalStack.size() > 0 || this.isDialogOpen() || this.isPlayerMenuOpen();
+    // hộp xác nhận dùng chung (#779) KHÔNG nằm trong modalStack (Esc / Y / X do nó tự xử lý) nhưng vẫn là tầng trên cùng: đang mở mà giữ D thì nhân vật không được
+    // lặng lẽ đi tiếp (người chơi đọc hậu quả, quái đánh). keyup vẫn tới MoveKeys (pha bắt trên window) nên đóng hộp xong không kẹt phím.
+    return (
+      modalStack.size() > 0 ||
+      this.isDialogOpen() ||
+      this.isPlayerMenuOpen() ||
+      this.isActConfirmOpen()
+    );
   },
 
   showNewbieGuide(force = false) {

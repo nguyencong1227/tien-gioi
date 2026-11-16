@@ -12,6 +12,8 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
  *   - Phím tắt (V): hộp mở, focus ở "Chưa"; Y xác nhận (sau cửa sổ chống click ma), X giữ lại, Esc giữ lại.
  *   - Có đan hộ đạo: xác suất cao hơn, nhắc phần đã cộng. Điều kiện đổi giữa lúc hộp mở (hết đầy tu vi): xác nhận bị huỷ kèm thông báo, không gửi.
  *   - Nối lại mạng: hộp đóng. Nút trong hộp >= 44 px trên cảm ứng và không bị che.
+ *   - Đang giữ D mà bấm V: hộp mở thì nhân vật ĐỨNG LẠI (hộp là tầng trên cùng: `ui.isKeyboardCaptured()`), Esc đóng rồi D còn giữ thì đi tiếp, nhả D (kể cả
+ *     lúc hộp đang mở) thì dừng, không kẹt phím.
  * `--shots`: lưu ảnh hộp xác nhận mỗi khung nhìn.
  */
 import http from "node:http";
@@ -429,6 +431,74 @@ async function main() {
       await sleep(150);
       check(!(await box()).open, "mất kết nối / nối lại: hộp đóng");
       await evalJs(`window.__scene.setReconnecting(false)`);
+
+      // ---- [5] hộp xác nhận mở lúc đang giữ phím đi: nhân vật đứng lại, đóng hộp / nhả phím xong KHÔNG kẹt (A dặn ở #781) ----
+      console.log("  [5] giữ D, bấm V mở hộp: đứng lại; Esc; nhả D: không kẹt");
+      await evalJs(`(() => {
+        const n = window.__craftData.NPC_BY_ID.tho_ren_suong;
+        window.__start = { x: n.x, y: n.y + 90 };
+        const sc = window.__scene; sc.predX = window.__start.x; sc.predY = window.__start.y; sc.cameras.main.centerOn(sc.predX, sc.predY);
+        window.__sent.length = 0;
+        return 1;
+      })()`);
+      await setMe(true);
+      const dx = () => evalJs(`window.__scene.predX - window.__start.x`);
+      const keyD = (type, extra = {}) =>
+        send("Input.dispatchKeyEvent", {
+          type,
+          key: "d",
+          code: "KeyD",
+          windowsVirtualKeyCode: 68,
+          ...extra,
+        });
+      await keyD("rawKeyDown");
+      await sleep(500);
+      const walked = await dx();
+      check(walked > 20, `đang giữ D, hộp chưa mở: nhân vật đi (${Math.round(walked)} px)`);
+      await press2("v", "KeyV");
+      await sleep(150);
+      check((await box()).open, "bấm V giữa lúc giữ D: hộp mở");
+      const frozenA = await dx();
+      await sleep(600);
+      const frozenB = await dx();
+      check(
+        frozenB - frozenA < 2,
+        `hộp mở: nhân vật KHÔNG đi tiếp (${Math.round(frozenB - frozenA)} px trong 600 ms)`,
+      );
+      await press("Escape");
+      await sleep(150);
+      check(!(await box()).open, "Esc đóng hộp");
+      await sleep(300);
+      const afterEsc = await dx();
+      check(
+        afterEsc - frozenB > 10,
+        `đóng hộp mà D còn giữ: đi tiếp (${Math.round(afterEsc - frozenB)} px)`,
+      );
+      await keyD("keyUp");
+      await sleep(150);
+      const stopA = await dx();
+      await sleep(500);
+      const stopB = await dx();
+      check(
+        stopB - stopA < 2,
+        `nhả D: dừng, không kẹt phím (${Math.round(stopB - stopA)} px trong 500 ms)`,
+      );
+      // nhả D TRONG LÚC hộp mở: keyup không bị hộp nuốt, đóng hộp xong nhân vật vẫn đứng
+      await keyD("rawKeyDown");
+      await sleep(250);
+      await press2("v", "KeyV");
+      await sleep(150);
+      await keyD("keyUp");
+      await sleep(100);
+      await press("Escape");
+      await sleep(150);
+      const rel0 = await dx();
+      await sleep(500);
+      const rel1 = await dx();
+      check(
+        !(await box()).open && rel1 - rel0 < 2,
+        `nhả D lúc hộp đang mở rồi đóng hộp: không kẹt (${Math.round(rel1 - rel0)} px)`,
+      );
     }
   } finally {
     try {
