@@ -87,6 +87,7 @@ import {
 } from "../store";
 import { defaultSectStore } from "../sect-store";
 import { SectService } from "../sect-service";
+import { newLifeLockMsOf } from "../sect-config";
 import { defaultSoulStore, type SoulStore } from "../soul";
 import { defaultPlayerStore, type PlayerStore } from "../player-store";
 import { legacyIdentity, type Identity } from "../identity";
@@ -150,6 +151,9 @@ import {
   sectOnJoin,
   sectRank,
   sectTransfer,
+  sectVaultDeposit,
+  sectVaultPolicy,
+  sectVaultWithdraw,
   sectWithdraw,
 } from "../systems/sect";
 import {
@@ -274,6 +278,7 @@ export class WorldRoom extends Room<WorldState> {
         sect: (sid, msg) => this.sendTo(sid, SECT_MSG.snapshot, msg),
         sectPresence: (sid, msg) => this.sendTo(sid, SECT_MSG.presence, msg),
         sectInvited: (sid, msg) => this.sendTo(sid, SECT_MSG.invited, msg),
+        sectVault: (sid, msg) => this.sendTo(sid, SECT_MSG.vault, msg),
       },
       map,
       this.hub,
@@ -283,6 +288,7 @@ export class WorldRoom extends Room<WorldState> {
     w.onLimbo = (sid) => void this.enterLimbo(sid);
     // Tông môn (M3.6): dịch vụ dùng chung (`SECTS=off` gỡ gấp); lưu hồ sơ NGAY khi chuyển Linh thạch sang kho
     w.sectService = WorldRoom.sectService();
+    w.sectNewLifeLockMs = newLifeLockMsOf(process.env); // cờ kiếp mới chưa được rút (mặc định tắt)
     // Nhật ký kiểm toán (M4 2.4): chỉ ghi khi `startAudit` đã bật ở index.ts
     w.audit = audit;
     w.auditCoinMin = auditCoinThreshold(process.env);
@@ -421,6 +427,9 @@ export class WorldRoom extends Room<WorldState> {
     this.on(SECT_MSG.motd, (sid, m) => void sectMotd(w, sid, m));
     this.on(SECT_MSG.deposit, (sid, m) => void sectDeposit(w, sid, m));
     this.on(SECT_MSG.withdraw, (sid, m) => void sectWithdraw(w, sid, m));
+    this.on(SECT_MSG.vaultDeposit, (sid, m) => void sectVaultDeposit(w, sid, m));
+    this.on(SECT_MSG.vaultWithdraw, (sid, m) => void sectVaultWithdraw(w, sid, m));
+    this.on(SECT_MSG.vaultPolicy, (sid, m) => void sectVaultPolicy(w, sid, m));
     this.on<SoulBuyMsg>("soulBuy", (sid, m) => void this.soulBuy(sid, m?.id));
     this.on<RebirthMsg>("rebirth", (sid, m) => void this.rebirth(sid, m));
     // Loại tin nhắn không đăng ký: bỏ qua, tính là spam

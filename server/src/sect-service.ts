@@ -11,28 +11,38 @@
 // hàng theo kho (`update`). Hồi chiêu (lập, vào lại) nằm trong bộ nhớ: mất khi khởi động lại là chấp nhận được.
 import {
   COIN_CAP,
+  ITEM_BY_ID,
   SECT_COIN_CAP,
   SECT_CREATE_COOLDOWN_MS,
   SECT_ELDERS_MAX,
   SECT_MAX_MEMBERS,
   SECT_PERMS,
   SECT_REJOIN_COOLDOWN_MS,
+  SECT_VAULT_DRAW_MAX,
+  SECT_VAULT_DRAW_MODE,
+  SECT_VAULT_DRAW_QTY_DE_TU,
+  SECT_VAULT_SLOTS,
+  addToInventory,
   canSect,
   cleanMotd,
   cleanSectName,
   cleanSectTag,
   compareSectMembers,
   sectKey,
+  sectVaultAccepts,
   type SectAssignableRank,
   type SectFail,
   type SectView,
+  type SectVaultView,
 } from "@tien-gioi/shared";
 import { KeyedQueue } from "./pg/queue";
+import { byId } from "./systems/lookup";
 import {
   SectConflictError,
   emptySectVault,
   newSectId,
   withLogEntry,
+  withVaultLogEntry,
   type Sect,
   type SectMemberRecord,
   type SectStore,
@@ -65,6 +75,9 @@ function conflictReason(e: SectConflictError): SectFail {
 const sameName = (a: string, b: string) => sectKey(a) === sectKey(b);
 const findByName = (s: Sect, name: string) => s.members.find((m) => sameName(m.name, name));
 const eldersOf = (s: Sect) => s.members.filter((m) => m.rank === "truong_lao").length;
+/** Lượt rút kho đồ đã dùng hôm nay (`today` = `dayKey`) của thành viên; qua ngày thì đếm lại từ 0. */
+const drawsUsed = (m: SectMemberRecord, today: string) => (m.draw?.day === today ? m.draw.n : 0);
+const copySlots = (s: Sect) => s.vault.slots.map((x) => (x ? { ...x } : null));
 
 export class SectService {
   private readonly queue = new KeyedQueue();
@@ -407,6 +420,142 @@ export class SectService {
       return { ok: true, sect };
     });
   }
+
+  // ---------- Kho đồ (docs/THIET_KE_TONG_MON.md mục 11) ----------
+  // Dịch vụ chỉ lo LUẬT và kho lưu; túi đồ, lưu hồ sơ và thứ tự "túi <-> hồ sơ <-> kho" nằm ở `systems/sect.ts`. Mọi thay đổi là MỘT `update` nguyên tử:
+  // quyền, khoá kỳ vọng theo ô, hạn mức ngày và số lượng đều kiểm TRÊN bản ghi đọc trong `update`, nên hai người cùng rút một món không bao giờ cùng thấy một số dư.
+
+  /** Món + số lượng hợp lệ (món có thật, số nguyên dương an toàn) hoặc ném `item_invalid`. */
+  private vaultItem(itemId: unknown, qty: unknown) {
+    const def = byId(ITEM_BY_ID, itemId);
+    if (!def || typeof qty !== "number" || !Number.isSafeInteger(qty) || qty < 1)
+      throw new Refusal("item_invalid");
+    return { def, qty };
+  }
+
+  /**
+   * Góp `qty` món `itemId` vào kho đồ: gọi SAU khi túi đã trừ và hồ sơ đã lưu. Hết chỗ (cộng dồn rồi ô trống) thì từ chối `vault_full`, không góp dở;
+   * món trong danh sách chặn thì `vault_denied`. Người gọi hoàn đồ vào túi (hoặc để rơi đất) nếu từ chối.
+   */
+  vaultDeposit(
+    actor: SectActor,
+    itemId: unknown,
+    qty: unknown,
+  ): Promise<SectResult<{ sect: Sect }>> {
+    return this.guarded(actor.soulKey, async () => {
+      const { def, qty: n } = this.vaultItem(itemId, qty);
+      if (!sectVaultAccepts(def.id)) throw new Refusal("vault_denied");
+      const now = this.clock();
+      const sect = await this.mutate(actor.soulKey, (s, me) => {
+        if (!canSect("vaultDeposit", me.rank)) throw new Refusal("forbidden");
+        const slots = copySlots(s);
+        if (addToInventory(slots, def.id, n) > 0) throw new Refusal("vault_full");
+        const entry = { at: now, name: me.name, kind: "deposit" as const, itemId: def.id, qty: n };
+        return { ...s, vault: { ...s.vault, slots, log: withVaultLogEntry(s.vault.log, entry) } };
+      });
+      return { ok: true, sect };
+    });
+  }
+
+  /**
+   * Rút `qty` món `itemId` ở ô kho `slot` (khoá kỳ vọng theo ô: ô phải CÒN giữ đúng món với đủ số lượng, không thì `vault_changed`: không bao giờ rút nhầm món khác
+   * khi giao diện cũ). Đệ tử: mỗi lượt tối đa `SECT_VAULT_DRAW_QTY_DE_TU` món và tối đa `drawPerDay` lượt mỗi ngày (`today` = `dayKey`), đếm theo linh hồn và tăng
+   * NGAY trong `update` cùng lúc trừ kho (gửi dồn không vượt hạn mức). Tông chủ / Trưởng lão không hạn. Gọi TRƯỚC khi cộng túi; người gọi cộng túi rồi lưu hồ sơ
+   * (mất hơn nhân đôi, mục 11.4) và, nếu túi không nhận trọn, trả phần thừa bằng `vaultReturn`.
+   */
+  vaultWithdraw(
+    actor: SectActor,
+    req: { slot: unknown; itemId: unknown; qty: unknown },
+    today: string,
+  ): Promise<SectResult<{ sect: Sect }>> {
+    return this.guarded(actor.soulKey, async () => {
+      const { def, qty } = this.vaultItem(req.itemId, req.qty);
+      const slot = req.slot;
+      if (
+        typeof slot !== "number" ||
+        !Number.isInteger(slot) ||
+        slot < 0 ||
+        slot >= SECT_VAULT_SLOTS
+      )
+        throw new Refusal("item_invalid");
+      const now = this.clock();
+      const sect = await this.mutate(actor.soulKey, (s, me) => {
+        if (!canSect("vaultWithdraw", me.rank)) throw new Refusal("forbidden");
+        const cell = s.vault.slots[slot];
+        if (!cell || cell.itemId !== def.id || cell.qty < qty) throw new Refusal("vault_changed");
+        let members = s.members;
+        if (SECT_VAULT_DRAW_MODE[me.rank] === "limited") {
+          const used = drawsUsed(me, today);
+          if (qty > SECT_VAULT_DRAW_QTY_DE_TU || used >= s.vault.drawPerDay)
+            throw new Refusal("vault_limit");
+          members = s.members.map((m) =>
+            m.soulKey === me.soulKey ? { ...m, draw: { day: today, n: used + 1 } } : m,
+          );
+        }
+        const slots = copySlots(s);
+        slots[slot] = cell.qty > qty ? { itemId: cell.itemId, qty: cell.qty - qty } : null;
+        const entry = { at: now, name: me.name, kind: "withdraw" as const, itemId: def.id, qty };
+        return {
+          ...s,
+          members,
+          vault: { ...s.vault, slots, log: withVaultLogEntry(s.vault.log, entry) },
+        };
+      });
+      return { ok: true, sect };
+    });
+  }
+
+  /**
+   * Trả lại kho phần đồ đã rút mà túi không nhận được (túi vừa đầy, người chơi đã rời / đã gục). KHÔNG kiểm quyền hay danh sách chặn (đồ vốn của kho); `restoreDraw`
+   * hoàn lại một lượt rút đã tính (khi túi không nhận được gì). Kho hết chỗ (người khác vừa góp vào đúng chỗ đó) thì từ chối `vault_full`: người gọi để đồ rơi đất.
+   */
+  vaultReturn(
+    actor: SectActor,
+    itemId: unknown,
+    qty: unknown,
+    restoreDraw: boolean,
+    today: string,
+  ): Promise<SectResult<{ sect: Sect }>> {
+    return this.guarded(actor.soulKey, async () => {
+      const { def, qty: n } = this.vaultItem(itemId, qty);
+      const now = this.clock();
+      const sect = await this.mutate(actor.soulKey, (s, me) => {
+        const slots = copySlots(s);
+        if (addToInventory(slots, def.id, n) > 0) throw new Refusal("vault_full");
+        const members =
+          restoreDraw && me.draw?.day === today && me.draw.n > 0
+            ? s.members.map((m) =>
+                m.soulKey === me.soulKey ? { ...m, draw: { day: today, n: me.draw!.n - 1 } } : m,
+              )
+            : s.members;
+        const entry = { at: now, name: me.name, kind: "deposit" as const, itemId: def.id, qty: n };
+        return {
+          ...s,
+          members,
+          vault: { ...s.vault, slots, log: withVaultLogEntry(s.vault.log, entry) },
+        };
+      });
+      return { ok: true, sect };
+    });
+  }
+
+  /** Tông chủ đặt số lượt rút / ngày của Đệ tử (0..`SECT_VAULT_DRAW_MAX`). */
+  vaultPolicy(actor: SectActor, drawPerDay: unknown): Promise<SectResult<{ sect: Sect }>> {
+    return this.guarded(actor.soulKey, async () => {
+      if (
+        typeof drawPerDay !== "number" ||
+        !Number.isInteger(drawPerDay) ||
+        drawPerDay < 0 ||
+        drawPerDay > SECT_VAULT_DRAW_MAX
+      )
+        throw new Refusal("amount_invalid");
+      const sect = await this.mutate(actor.soulKey, (s, me) => {
+        if (!canSect("vaultPolicy", me.rank)) throw new Refusal("forbidden");
+        return { ...s, vault: { ...s.vault, drawPerDay } };
+      });
+      return { ok: true, sect };
+    });
+  }
 }
 
 /** Ảnh chụp gửi cho thành viên `viewerKey` (`SectMsg.sect`); `null` nếu người đó không ở tông môn. Thành viên xếp theo `compareSectMembers`. */
@@ -424,5 +573,29 @@ export function sectViewOf(sect: Sect, viewerKey: string): SectView | null {
     coin: sect.coin,
     log: sect.log.map((e) => ({ ...e })),
     createdAt: sect.createdAt,
+  };
+}
+
+/**
+ * Ảnh chụp kho đồ gửi cho thành viên `viewerKey` (`SectVaultMsg.vault`); `null` nếu người đó không ở tông môn. `today` = `dayKey` (tính lượt rút còn lại của Đệ tử),
+ * `lockMs` = còn bao lâu nữa hết khoá "kiếp mới chưa được rút" của chính người nhận (0 = không khoá).
+ */
+export function sectVaultViewOf(
+  sect: Sect,
+  viewerKey: string,
+  today: string,
+  lockMs: number,
+): SectVaultView | null {
+  const me = sect.members.find((m) => m.soulKey === viewerKey);
+  if (!me) return null;
+  return {
+    slots: sect.vault.slots.map((x) => (x ? { ...x } : null)),
+    log: sect.vault.log.map((e) => ({ ...e })),
+    drawPerDay: sect.vault.drawPerDay,
+    myDrawsLeft:
+      SECT_VAULT_DRAW_MODE[me.rank] === "limited"
+        ? Math.max(0, sect.vault.drawPerDay - drawsUsed(me, today))
+        : null,
+    lockMs: Math.max(0, Math.floor(lockMs)),
   };
 }

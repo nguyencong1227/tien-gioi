@@ -396,6 +396,7 @@ export async function runRedTeam(options: {
       "partyInvited",
       "party",
       "sectInvited",
+      "sectVault",
       "sect",
     ]) {
       r.onMessage(t, () => {});

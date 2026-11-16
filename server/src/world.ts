@@ -23,6 +23,7 @@ import type {
   DuelStateMsg,
   DuelEndMsg,
   SectInvitedMsg,
+  SectVaultMsg,
   SectMsg,
   SectPresenceMsg,
 } from "@tien-gioi/shared";
@@ -227,6 +228,8 @@ export interface WorldEvents {
   sectPresence(sessionId: string, msg: SectPresenceMsg): void;
   /** Có người mời vào tông môn (chỉ người được mời nhận). */
   sectInvited(sessionId: string, msg: SectInvitedMsg): void;
+  /** Ảnh chụp KHO ĐỒ của tông môn gửi chính người nhận (mục 11; `vault: null` = không còn ở tông môn nào). */
+  sectVault(sessionId: string, msg: SectVaultMsg): void;
 }
 
 export class World {
@@ -292,6 +295,11 @@ export class World {
    * mọi tin tông môn bị từ chối `disabled`, vào phòng không tra tông môn.
    */
   sectService: SectService | null = null;
+  /**
+   * Cờ "kiếp mới chưa được rút" (docs/THIET_KE_TONG_MON.md mục 11.7): kiếp có `life.playMs` nhỏ hơn chừng này (ms) chưa được rút kho đồ và kho Linh thạch của tông môn.
+   * 0 = tắt (mặc định, người dùng chưa chọn). `WorldRoom` đặt từ biến môi trường `SECT_NEWLIFE_LOCK_HOURS`.
+   */
+  sectNewLifeLockMs = 0;
   /**
    * Phòng đăng ký: lưu hồ sơ của một người NGAY và chờ ghi xong (trước khi chuyển Linh thạch sang kho tông môn).
    * Trả `true` CHỈ khi hồ sơ đã nằm trên đĩa / DB; `false` khi lưu lỗi hoặc không lưu được lúc này (đang qua cổng: bản ghi
