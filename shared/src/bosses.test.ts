@@ -313,6 +313,10 @@ describe("né được bằng di chuyển (bossEscapePx, bossEscapeMs, luật c�
     expect(bossEscapePx({ t: "cone", r: 150, arc: Math.PI })).toBeCloseTo(75 + REACH, 9);
     expect(bossEscapePx({ t: "cone", r: 150, arc: 1.5 * Math.PI })).toBeCloseTo(75 + REACH, 9);
     expect(bossEscapePx({ t: "cone", r: 150, arc: 2 * Math.PI })).toBe(150 + REACH);
+    // quá 270 độ coi như cả vòng (#935: khoảng khuyết phía sau bị `reach` bít, thoát thật xa hơn r / 2: 350 độ đo 93 px, 359 độ đo 153 px với r 150)
+    expect(bossEscapePx({ t: "cone", r: 150, arc: 1.5 * Math.PI + 0.01 })).toBe(150 + REACH);
+    expect(bossEscapePx({ t: "cone", r: 150, arc: (350 * Math.PI) / 180 })).toBe(150 + REACH);
+    expect(bossEscapePx({ t: "cone", r: 150, arc: (359 * Math.PI) / 180 })).toBe(150 + REACH);
     // kéo: thoát khỏi tầm nổ SAU khi bị kéo
     expect(bossEscapePx({ t: "pull", r: 200, pullPx: 60, blastR: 80 })).toBe(140 + REACH);
     expect(bossEscapePx({ t: "pull", r: 100, pullPx: 60, blastR: 80 })).toBe(100 + REACH);

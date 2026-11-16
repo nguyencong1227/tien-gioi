@@ -314,7 +314,7 @@ function shapeProblems(s: BossShape): string[] {
  * vẫn trúng) nên người đó phải ra xa thêm chừng ấy. `null` cho hình KHÔNG sát thương (`summon`, `buff`) hoặc số liệu hình không hợp lệ.
  *  - `circleAt`, `pool`, `rain` (mỗi vòng), `blink` (`landR`): `r` + `reach`;
  *  - `ring`: nếu lỗ giữa đủ chứa thân người (`r0` - `reach` >= `PLAYER_RADIUS`) thì chui vào lỗ hoặc ra ngoài, gần hơn: nửa bề rộng vành + `reach`; lỗ nhỏ hơn coi như vòng đặc;
- *  - `cone`: bán kính đường tròn lớn nhất nằm trong hình quạt (nửa góc mở <= 90 độ: `r` sin / (1 + sin); lớn hơn: `r` / 2; cả vòng 360 độ: `r`) + `reach`;
+ *  - `cone`: bán kính đường tròn lớn nhất nằm trong hình quạt (nửa góc mở <= 90 độ: `r` sin / (1 + sin); tới 270 độ: `r` / 2; QUÁ 270 độ coi như cả vòng: `r`) + `reach`. Quá 270 độ khoảng khuyết phía sau bị mức nới `reach` bít dần nên thoát thật xa hơn `r` / 2 (đo trên `bossInZone`, r 150: 300 độ 80 px, 340 độ 85, 350 độ 93, 355 độ 110, 359 độ 153; #935);
  *  - `line`, `charge`: bước ngang ra khỏi đường: nửa bề rộng `w` + `reach`;
  *  - `pull`: phải đứng ngoài tầm nổ SAU khi bị kéo: `max(blastR, min(r, blastR + pullPx))` + `reach`.
  */
@@ -333,7 +333,7 @@ export function bossEscapePx(
     case "ring":
       return shape.r0 - reach >= PLAYER_RADIUS ? (shape.r - shape.r0) / 2 + reach : shape.r + reach;
     case "cone": {
-      if (shape.arc >= 2 * Math.PI) return shape.r + reach;
+      if (shape.arc > 1.5 * Math.PI) return shape.r + reach; // quá 270 độ: coi như cả vòng (cận trên an toàn, xem chú thích trên)
       const half = shape.arc / 2;
       if (half >= Math.PI / 2) return shape.r / 2 + reach;
       const s = Math.sin(half);
