@@ -385,6 +385,43 @@ export const ITEMS: ItemDef[] = [
     cooldown: 12_000,
     color: 0x5fa0f0,
   },
+  // Đan hộ đạo (nghề nhỏ lát 1, #514/#763): gắn trạng thái `dao_ho` cộng xác suất đột phá, bị gỡ khi thử đột phá.
+  // Nguồn nội dung: nhóm đan `dot_pha` (tăng % đột phá) của Vạn Kiếp Tu Tiên, viết lại tên Việt theo thế giới Tiên Giới
+  // (docs/NGUON_NOI_DUNG.md mục 3 + CREDITS.md). KHÔNG vào ITEM_VALUE (sellPrice = 0): chốt chặn chống sinh Linh thạch.
+  // `ratio` giảm theo bậc (0,15 / 0,12 / 0,09) theo số Dev A chốt trong issue #763; A review lại nếu muốn tăng theo bậc.
+  {
+    id: "dot_pha_dan",
+    name: "Đột Phá Đan",
+    type: "consumable",
+    stack: 9,
+    rarity: 2,
+    desc: "Cộng 15% xác suất đột phá lần kế. Hiệu lực 15 phút; dùng khi đạt đỉnh Luyện Khí với đầy tu vi. Mất khi thoát hay qua cổng.",
+    effect: { kind: "status", id: "dao_ho", ratio: 0.15, ms: 900_000, forRealm: 1 },
+    cooldown: 5_000,
+    color: 0xd98a3a,
+  },
+  {
+    id: "jinzhi_dan",
+    name: "Kinh Chỉ Đan",
+    type: "consumable",
+    stack: 9,
+    rarity: 3,
+    desc: "Cộng 12% xác suất đột phá lần kế. Hiệu lực 15 phút; dùng khi đạt đỉnh Trúc Cơ với đầy tu vi. Mất khi thoát hay qua cổng.",
+    effect: { kind: "status", id: "dao_ho", ratio: 0.12, ms: 900_000, forRealm: 2 },
+    cooldown: 5_000,
+    color: 0xc05a4a,
+  },
+  {
+    id: "duyang_dan",
+    name: "Dưỡng Anh Đan",
+    type: "consumable",
+    stack: 9,
+    rarity: 3,
+    desc: "Cộng 9% xác suất đột phá lần kế. Hiệu lực 15 phút; dùng khi đạt đỉnh Kim Đan với đầy tu vi. Mất khi thoát hay qua cổng.",
+    effect: { kind: "status", id: "dao_ho", ratio: 0.09, ms: 900_000, forRealm: 3 },
+    cooldown: 5_000,
+    color: 0x9a4a8c,
+  },
   // ---------- Trang bị (rèn ở Thợ rèn, xem recipes.ts) ----------
   {
     id: "lang_nha_kiem",

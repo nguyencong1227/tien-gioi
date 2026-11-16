@@ -167,6 +167,31 @@ export const NGUYEN_ANH_RECIPES: RecipeDef[] = [
   ]),
 ];
 
+// Đan hộ đạo (nghề nhỏ lát 1, #514/#763): luyện ở Lò đan (`lao_dan`, trạm alchemy) ở Lạc Hà. Nguyên liệu là đồ quái rơi ĐÃ CÓ,
+// theo vùng săn của mỗi lần đột phá: LK (quái Lạc Hà) / TC (Xích Mãng, boss Lạc Hà) / KD (Âm Sương). Phí Linh thạch là chỗ xả tiền.
+// Số liệu EV (tại sao `coin` và nguyên liệu này): docs/NGHE_NHO_KINH_TE.md. `forRealm` của mỗi đan tăng dần theo `coin` (test giữ).
+const ld = (id: string, output: string, coin: number, inputs: [string, number][]): RecipeDef => ({
+  ...r(id, output, inputs),
+  npcId: "lao_dan",
+  coin,
+});
+export const DAO_HO_RECIPES: RecipeDef[] = [
+  ld("luyen_dot_pha_dan", "dot_pha_dan", 500, [
+    ["long_tho", 10],
+    ["nanh_soi", 8],
+    ["da_ho", 4],
+  ]),
+  ld("luyen_jinzhi_dan", "jinzhi_dan", 3000, [
+    ["vay_mang", 6],
+    ["da_ho", 6],
+  ]),
+  ld("luyen_duyang_dan", "duyang_dan", 8000, [
+    ["suong_mao", 8],
+    ["quy_giap", 6],
+    ["doc_nang", 4],
+  ]),
+];
+
 export const RECIPES: RecipeDef[] = [
   r("ren_lang_nha_kiem", "lang_nha_kiem", [
     ["nanh_soi", 8],
@@ -201,6 +226,7 @@ export const RECIPES: RecipeDef[] = [
     ["vay_mang", 2],
     ["da_ho", 4],
   ]),
+  ...DAO_HO_RECIPES,
   ...KIM_DAN_RECIPES,
   ...OWNER_GEAR_RECIPES,
   ...NGUYEN_ANH_RECIPES,
