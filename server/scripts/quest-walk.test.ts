@@ -344,7 +344,6 @@ describe("quest-walk: kiểm tra tính khả thi tĩnh của nhiệm vụ (Issue
       const free = new Uint8Array(w * h).fill(1);
       const grid = newGrid(w, h, free);
 
-      const startCell = 10 * w + 2; // (2, 10)
       const goalCell = 10 * w + 18; // (18, 10)
       const sx = (2 + 0.5) * 32;
       const sy = (10 + 0.5) * 32;
