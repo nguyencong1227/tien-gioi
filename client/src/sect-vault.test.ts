@@ -181,7 +181,7 @@ describe("Rút: nút bấm được hay không, vì sao", () => {
     ] as const) {
       const t = vaultBlockText(b);
       expect(t.length).toBeGreaterThan(5);
-      expect(/[㐀-鿿]/.test(t)).toBe(false);
+      expect(/[\u3400-\u9fff]/.test(t)).toBe(false); // không chữ Hán (viết bằng \u để tệp không chứa ký tự CJK)
     }
   });
 });
