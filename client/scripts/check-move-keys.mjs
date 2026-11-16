@@ -381,6 +381,16 @@ async function main() {
         `ô đánh dấu (checkbox) đang giữ focus: vẫn đi (${withCb.x.toFixed(0)} px)`,
       );
       await evalJs(`document.getElementById("mk-test-cb").remove()`);
+      // thanh trượt (range) còn giữ focus, như thanh âm lượng ở Cài đặt sau khi bấm: KHÔNG chặn đi bộ
+      await evalJs(
+        `(() => { const c = document.createElement("input"); c.type = "range"; c.id = "mk-test-range"; c.style.position = "fixed"; c.style.left = "-100px"; document.body.append(c); c.focus(); return document.activeElement === c; })()`,
+      );
+      const withRange = await hold("KeyD", 600);
+      check(
+        withRange.x > base * 0.4,
+        `thanh trượt (range) đang giữ focus: vẫn đi (${withRange.x.toFixed(0)} px)`,
+      );
+      await evalJs(`document.getElementById("mk-test-range").remove()`);
       if (chatFocusable) {
         await evalJs(`document.getElementById("chat-input").focus()`);
         const inChat = await hold("KeyD", 500);
