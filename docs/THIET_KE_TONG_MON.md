@@ -158,9 +158,9 @@ Kẽ hở (đã có sẵn với kho Linh thạch của Tông chủ): góp đồ 
 - **Vật phẩm nhiệm vụ:** `ItemDef` chưa có cờ riêng. Dùng danh sách chặn `SECT_VAULT_DENY_ITEMS` (`shared/`, ban đầu RỖNG; test kiểm mọi id có thật). D rà các nhiệm vụ (`QUESTS`) tìm món chỉ dùng cho nhiệm vụ rồi đề xuất danh sách (issue K5); góp món bị chặn trả `vault_denied`.
 - Số ô, số lượng, `itemId` từ client luôn kiểm bằng `slotIndex`, `byId(ITEM_BY_ID, id)`, số nguyên dương hữu hạn (như `dropItem`).
 
-### 11.9 Tin nhắn (đề xuất, chốt ở PR hợp đồng)
-- Client -> server (`SECT_MSG`, đăng ký bằng `this.on(...)`, giới hạn tần suất): `vaultDeposit {slot, qty}`, `vaultWithdraw {slot, itemId, qty}`, `vaultPolicy {drawPerDay}`.
-- Server -> client: `sectVault {vault}` (ảnh chụp kho đồ: ô, sổ, `drawPerDay`, `myDrawsLeft`, `lockMs`; gửi lúc vào phòng và mỗi khi kho đổi, cho thành viên trực tuyến; tách khỏi `SectView` để đổi thông báo / thành viên không kéo theo cả kho). Kho 40 ô + sổ 50 mục ~ vài KB một lần gửi, không mỗi tick; kiểm ở bench (không tick nào gửi khi không ai đụng kho).
+### 11.9 Tin nhắn (ĐÃ CHỐT ở PR hợp đồng K1 #792, `shared/src/sect.ts`)
+- Client -> server (`SECT_MSG`, đăng ký bằng `this.on(...)`, giới hạn tần suất): `sectVaultDeposit {slot, qty}` (ô túi 0..`INVENTORY_SLOTS`-1, qty nguyên 1..`SECT_VAULT_QTY_MAX`), `sectVaultWithdraw {slot, itemId, qty}` (ô kho 0..`SECT_VAULT_SLOTS`-1, `itemId` CÓ THẬT), `sectVaultPolicy {drawPerDay}` (0..`SECT_VAULT_DRAW_MAX`); bộ đọc `parseSectVaultDeposit` / `parseSectVaultWithdraw` / `parseSectVaultPolicy` (máy chủ vẫn gọi lại, không tin client); `sectVaultAccepts(itemId)` = món góp được. Quyền: `SectAction` `vaultDeposit` / `vaultWithdraw` (mọi chức vụ được THỬ) / `vaultPolicy` (chỉ Tông chủ); hạn mức Đệ tử ở `SECT_VAULT_DRAW_MODE` + `sectVaultDrawQtyCap(rank)`.
+- Server -> client: `sectVault {vault: SectVaultView | null}` (ảnh chụp kho đồ: ô, sổ, `drawPerDay`, `myDrawsLeft`, `lockMs`; gửi lúc vào phòng và mỗi khi kho đổi, cho thành viên trực tuyến; tách khỏi `SectView` để đổi thông báo / thành viên không kéo theo cả kho). Kho 40 ô + sổ 50 mục ~ vài KB một lần gửi, không mỗi tick; kiểm ở bench (không tick nào gửi khi không ai đụng kho).
 - Mã từ chối mới (`SECT_FAILS`, kèm câu tiếng Việt ở `sectFailMessage`): `vault_full`, `vault_changed`, `vault_limit`, `vault_denied`, `vault_locked`, `bag_full`, `item_invalid`.
 - `PROTOCOL_VERSION` KHÔNG tăng: chỉ THÊM tin / trường tùy chọn (client cũ bỏ qua tin lạ; không có giao diện kho thì không gửi). Ghi vào CHANGELOG.
 
