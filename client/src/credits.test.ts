@@ -251,7 +251,11 @@ describe("Nguồn nội dung, hình ảnh và âm thanh bên ngoài (M7.16 #517,
     }
     for (const id of ORIGINAL_SKILL_IDS)
       expect(ids, `ORIGINAL_SKILL_IDS có id lạ ${id}`).toContain(id);
+    // Chỉ dòng referencing chiêu (inRepo trỏ `shared/src/skills.ts`) mới bắt buộc chứa MỘT id chiêu hợp lệ.
+    // Dòng dữ liệu khác (du_lieu -> items.ts, trang_bi/phap_bao... sau này) KHÔNG chứa id chiêu nên bỏ qua;
+    // thêm dòng dữ liệu không phải chiêu mà không muốn sửa test này thì để inRepo KHÔNG có cụm "id <id>".
     for (const e of audit.entries) {
+      if (!e.inRepo.includes("skills.ts")) continue;
       const m = /id `?([a-z_]+)`?/.exec(e.inRepo);
       expect(
         m && ids.includes(m[1]),

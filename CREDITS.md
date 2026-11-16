@@ -99,6 +99,8 @@ Mỗi tệp của bên thứ ba trong `client/public/fonts/` PHẢI có một d�
 | `noto-serif-vietnamese-wght-italic.woff2` (chữ có dấu tiếng Việt, nghiêng) | npm `@fontsource-variable/noto-serif@5.3.0` (`files/noto-serif-vietnamese-wght-italic.woff2`) | The Noto Project Authors | SIL OFL 1.1 | 12/11/2026 | `7b88e337afea323d51a3ec524b4da220f4913646eb590cab048feda319364390` |
 | `OFL.txt` (văn bản giấy phép SIL OFL 1.1 đi kèm phông, OFL yêu cầu giữ cùng bản phân phối) | npm `@fontsource-variable/noto-serif@5.3.0` (`LICENSE`) | The Noto Project Authors | SIL OFL 1.1 | 12/11/2026 | `45d545469122348b916bfa4d362f691c3f7f3af7169fd46f920845cae97923df` |
 
+**Nội dung chữ / dữ liệu của Vạn Kiếp Tu Tiên** (tác giả Hải Quân · Bắc Team, dùng với sự cho phép — xem `docs/NGUON_NOI_DUNG.md`): ba đan hộ đạo `dot_pha_dan` / `jinzhi_dan` / `duyang_dan` (`shared/src/items.ts`, #763) lấy tên + ý "tăng % đột phá" từ nhóm đan `dot_pha` trong `/content/items/dan_duoc.yaml`; đổi tên Việt, KHÔNG chữ Hán, cơ chế `dao_ho` là của Tiên Giới; chi tiết ở dòng `du_lieu` mục 3 `docs/NGUON_NOI_DUNG.md`.
+
 Chỉ dùng tập con `latin` + `vietnamese` (đủ cho tiếng Việt); không đóng gói `latin-ext` (~187 KB) vì chữ ngoài hai tập con này rơi về `Georgia` / `serif` hệ thống. Không sửa nội dung tệp phông (OFL cho phép phân phối lại nguyên bản).
 
 ### Mẫu mục cho tài sản bên thứ ba (CC0 / CC-BY / OFL) để B / C dùng về sau

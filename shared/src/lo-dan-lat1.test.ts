@@ -117,3 +117,49 @@ describe("công thức Lò đan (lao_dan)", () => {
       expect(realms[i]!, "forRealm tăng dần theo coin").toBeGreaterThan(realms[i - 1]!);
   });
 });
+
+// ĐỘT BIẾN ĐỎ (issue #763 "Test cần có": >= 5): năm luật dưới đây KHÓA dữ liệu thật — Dã tự chạy đột biến
+// (mutate dữ liệu -> test ĐỎ -> `git checkout --` phục hồi) trước khi commit, kết quả dán PR. Mỗi luật tương
+// ứng một đột biến trong mục "Test cần có"; nếu ai sửa dữ liệu sai luật, test này sẽ đỏ.
+describe("đột biến đỏ — năm luật khoá dữ liệu đan hộ đạo (#763)", () => {
+  it("(1) đột biến ĐỎ: thêm đan hộ đạo vào ITEM_VALUE (mở chốt chặn sinh Linh thạch) -> sellPrice > 0", () => {
+    // Luật: mọi vật phẩm đều có giá TRỪ ba đan hộ đạo (khóa ở currency.test.ts / data-integrity.test.ts).
+    // Đột biến: ai bỏ ba đan ra khỏi danh sách miễn giá -> sellPrice(dan) > 0 -> ĐỎ.
+    for (const id of DAO_HO_IDS) expect(sellPrice(id), id).toBe(0);
+  });
+
+  it("(2) đột biến ĐỎ: sửa số trong effect làm lệch desc (ratio/ms) -> statusDescMatches đỏ", () => {
+    // Luật: desc phải nêu đúng % + thời gian khớp effect (statusDescMatches quét mọi vật phẩm status).
+    // Đột biến: đổi ratio/ms trong effect mà KHÔNG sửa desc -> desc nêu số cũ, effect số mới -> ĐỎ.
+    for (const itm of daoHoItems) {
+      const e = itm.effect as { ratio: number; ms: number };
+      expect(itm.desc).toContain(`${Math.round(e.ratio * 100)}%`);
+      expect(itm.desc).toContain(`${Math.round(e.ms / 60_000)} phút`);
+    }
+  });
+
+  it("(3) đột biến ĐỎ: forRealm sai bậc (vd jinzhi_dan -> 1) -> không khớp thứ tự LK/TC/KD", () => {
+    // Luật: dot_pha=1 (LK->TC), jinzhi=2 (TC->KD), duyang=3 (KD->NA).
+    // Đột biến: đổi forRealm của jinzhi_dan -> 1 -> mảng [1,1,3] -> ĐỎ.
+    expect(daoHoItems.map((it) => (it.effect as { forRealm: number }).forRealm)).toEqual([1, 2, 3]);
+  });
+
+  it("(4) đột biến ĐỎ: NPC Lò đan ra ngoài trấn Lạc Hà -> inTown đỏ", () => {
+    // Luật: NPC trạm alchemy đứng trong trấn (khớp npc-multi-map / vị trí hợp lệ).
+    // Đột biến: đổi x/y NPC ra rìa bản đồ -> inTown(x,y)=false -> ĐỎ.
+    expect(DEFAULT_MAP.inTown(NPC_BY_ID.lao_dan!.x, NPC_BY_ID.lao_dan!.y)).toBe(true);
+  });
+
+  it("(5) đột biến ĐỎ: công thức dùng nguyên liệu không tồn tại / không có nguồn rơi -> Đỏ", () => {
+    // Luật: mọi nguyên liệu công thức Lò đan phải tồn tại và rơi từ quái (không thêm nguồn rơi mới lát 1).
+    // Đột biến: thêm nguyên liệu lạ vào inputs -> ITEM_BY_ID[inp] undefined -> ĐỎ.
+    const droppable = new Set<string>();
+    for (const entries of Object.values(DROP_TABLES))
+      for (const e of entries) droppable.add(e.itemId);
+    for (const r of RECIPES.filter((x) => x.npcId === "lao_dan"))
+      for (const inp of r.inputs) {
+        expect(ITEM_BY_ID[inp.itemId], `${r.id}:${inp.itemId}`).toBeDefined();
+        expect(droppable.has(inp.itemId), `${r.id}:${inp.itemId} phải có nguồn rơi`).toBe(true);
+      }
+  });
+});
