@@ -96,6 +96,7 @@ import {
   SECT_VAULT_SLOTS,
   canSect,
   SECT_MAX_MEMBERS,
+  SECT_CREATE_COST,
   SECT_ELDERS_MAX,
   cleanSectName,
   cleanSectTag,
@@ -215,6 +216,10 @@ import { dropConfirmText, dropStillValid, dropWarnText, planDrop, type DropPlan 
 import {
   inConfirmGuard,
   rebirthPlan,
+  sectCreatePlan,
+  sectCreateStillValid,
+  sectDepositPlan,
+  sectDepositStillValid,
   sellPlan,
   sellStillValid,
   unlockPlan,
@@ -774,6 +779,8 @@ let actConfirmOpener: HTMLElement | null = null;
 let actConfirmOpenedAt = -Infinity;
 /** Hộp đang mở do nút Bán ở cửa hàng: cửa hàng đóng (đi xa NPC, Esc...) thì hộp đóng theo, không bán vào chỗ không còn mở. */
 let actConfirmFromShop = false;
+/** Hộp đang mở do biểu mẫu Lập / Nộp của bảng Tông môn: bảng đóng (Esc, bị trục xuất, đổi cảnh) thì hộp đóng theo, không lập / nộp vào chỗ không còn mở. */
+let actConfirmFromSect = false;
 /** Lúc hộp xác nhận đóng gần nhất (ms, `performance.now`). Hộp đóng ngay ở `pointerdown`, nên `click` do trình duyệt tạo sau khi nhả ngón rơi xuống nút ở DƯỚI hộp (nút Bán): bỏ qua `click` trong cửa sổ chống click ma. */
 let actConfirmClosedAt = -1e12;
 
@@ -807,6 +814,7 @@ function closeActConfirm(refocus = true): boolean {
   box.hidden = true;
   actConfirmAction = null;
   actConfirmFromShop = false;
+  actConfirmFromSect = false;
   actConfirmClosedAt = performance.now();
   const back = actConfirmOpener;
   actConfirmOpener = null;
@@ -3659,8 +3667,32 @@ export const ui = {
         this.toast({ text: "Biệt hiệu phải từ 2 đến 4 ký tự", tone: "bad" });
         return;
       }
-      callbacks?.onSectCreate?.(name, tag);
+      // Phí lập MẤT HẲN (#779 hàng 13): hộp nêu tên + biệt hiệu + phí; ví không đủ thì gửi thẳng (chưa mất gì, máy chủ trả lý do)
+      const plan = sectCreatePlan(name, tag, SECT_CREATE_COST, currentCoin);
+      if (!plan) {
+        callbacks?.onSectCreate?.(name, tag);
+        return;
+      }
+      askActConfirm(
+        plan.spec,
+        () => {
+          // đã nhận lời mời của tông môn khác / ví vừa đổi trong lúc hộp mở: huỷ, không lập theo lời hỏi đã cũ
+          if (!sectCreateStillValid(plan, currentSect !== null, currentCoin)) {
+            this.toast({ text: "Linh thạch hoặc tông môn vừa đổi, chưa lập gì.", tone: "info" });
+            return;
+          }
+          callbacks?.onSectCreate?.(plan.name, plan.tag);
+        },
+        $("sect-btn-create"),
+      );
+      actConfirmFromSect = true;
     });
+    // `click` ma sau khi hộp đóng (cảm ứng: hộp đóng ở `pointerdown`, `click` rơi xuống nút Lập / Nộp bên dưới) không được gửi lại biểu mẫu; Enter trong ô nhập (`detail` 0) vẫn gửi
+    for (const id of ["sect-btn-create", "sect-btn-deposit"]) {
+      $(id)?.addEventListener("click", (e) => {
+        if (ghostClick(e)) e.preventDefault();
+      });
+    }
 
     // Form sửa MOTD
     bindTap("sect-btn-edit-motd", () => {
@@ -3728,8 +3760,30 @@ export const ui = {
         this.toast({ text: "Số lượng Linh thạch không hợp lệ", tone: "bad" });
         return;
       }
-      callbacks?.onSectDeposit?.(amount);
-      input.value = "";
+      // Người KHÔNG rút lại được (Trưởng lão, Đệ tử) nộp là mất (#779 hàng 14): hỏi; Tông chủ rút lại được: gửi thẳng
+      const spec = sectDepositPlan(
+        amount,
+        currentCoin,
+        currentSect ? canSect("withdraw", currentSect.myRank) : true,
+      );
+      if (!spec) {
+        callbacks?.onSectDeposit?.(amount);
+        input.value = "";
+        return;
+      }
+      askActConfirm(
+        spec,
+        () => {
+          if (!sectDepositStillValid(amount, currentSect !== null, currentCoin)) {
+            this.toast({ text: "Linh thạch hoặc tông môn vừa đổi, chưa nộp gì.", tone: "info" });
+            return;
+          }
+          callbacks?.onSectDeposit?.(amount);
+          input.value = "";
+        },
+        $("sect-btn-deposit"),
+      );
+      actConfirmFromSect = true;
     });
 
     // Kho tông môn: Rút
@@ -5985,6 +6039,7 @@ export const ui = {
       renderSectModal();
     } else {
       closeSectConfirm();
+      if (actConfirmFromSect) closeActConfirm(false);
       $("sect-modal").hidden = true;
       $("btn-sect")?.classList.remove("active");
       $("btn-sect")?.setAttribute("aria-expanded", "false");

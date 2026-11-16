@@ -207,6 +207,17 @@ async function main() {
       );
     const submit = (tab: Tab, id: string) =>
       tab.ev(`document.getElementById(${JSON.stringify(id)}).requestSubmit(); 1`);
+    // Lập tông môn và nộp kho (người không rút được) có HỘP XÁC NHẬN (#779 hàng 13-14): kiểm chữ trong hộp, chờ qua cửa sổ chống click ma rồi bấm "Có" như người thật
+    const confirmAct = async (tab: Tab, expectText: RegExp, what: string) => {
+      await tab.waitFor(visible("act-confirm"), `hộp xác nhận ${what}`);
+      const t = await text(tab, "act-confirm-text");
+      if (!expectText.test(t)) throw new Error(`Hộp xác nhận ${what} nêu sai: "${t}"`);
+      await sleep(ACT_CONFIRM_GUARD_MS + 150);
+      await tab.ev(
+        `document.getElementById('act-btn-yes').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); 1`,
+      );
+      await tab.waitFor(`document.getElementById('act-confirm').hidden`, `hộp ${what} đóng`);
+    };
     const openModal = async (tab: Tab) => {
       if (!(await tab.ev(visible("sect-modal")))) await press(tab, "btn-sect");
       await tab.waitFor(visible("sect-modal"), "bảng Tông môn");
@@ -238,6 +249,11 @@ async function main() {
     await fill(ta, "sect-input-name", SECT.name);
     await fill(ta, "sect-input-tag", SECT.tag);
     await submit(ta, "sect-form-create");
+    await confirmAct(
+      ta,
+      new RegExp(`^Lập tông môn «${SECT.name}» \\[${SECT.tag}\\]\\? Tốn `),
+      "lập tông môn",
+    );
     await ta.waitFor(visible("sect-view-detail"), "bảng chi tiết sau khi lập");
     if (!(await text(ta, "sect-head-title")).includes(SECT.name))
       throw new Error(`Tiêu đề phải nêu "${SECT.name}"`);
@@ -335,6 +351,7 @@ async function main() {
     await tb.waitFor(visible("sect-tab-treasury"), "tab Kho của B");
     await fill(tb, "sect-input-deposit", "200");
     await submit(tb, "sect-form-deposit");
+    await confirmAct(tb, /^Nộp 200 Linh thạch vào kho tông môn\?$/, "nộp kho (Đệ tử)");
     await press(ta, "sect-tab-btn-treasury");
     await ta.waitFor(
       `document.getElementById('sect-treasury-value').textContent.replace(/\\D/g,'') === '200'`,
