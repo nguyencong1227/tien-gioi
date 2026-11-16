@@ -4,13 +4,14 @@
  * duy nhất bấm "Nhận" / "Từ chối". Hai phím chung (`prompt.yes` / `prompt.no`) bấm nút đầu tiên đang HIỆN theo thứ tự ưu tiên dưới đây;
  * hàm chọn là THUẦN (nhận hàm hỏi "nút này đang hiện không") để test.
  *
- * Thứ tự: hộp xác nhận (người chơi vừa tự mở, đang chờ) trước, rồi lời mời theo độ gấp: thách đấu (20 giây), bí cảnh (60), tổ đội, tông môn (30).
+ * Thứ tự: hộp xác nhận (người chơi vừa tự mở, đang chờ: qua cổng mất hiệu lực đan / phù, rời bí cảnh, đầu hàng) trước, rồi lời mời theo độ gấp: thách đấu (20 giây), bí cảnh (60), tổ đội, tông môn (30).
  * Hộp xác nhận của tông môn (giải tán / trục xuất / nhường) KHÔNG nằm ở đây: nằm trong bảng tông môn, đi bằng mũi tên + Enter, Esc = huỷ.
  */
 export type PromptAnswer = "yes" | "no";
 
 export const PROMPT_BUTTONS: Readonly<Record<PromptAnswer, readonly string[]>> = {
   yes: [
+    "tvl-btn-yes",
     "dhud-btn-leave-yes",
     "duel-btn-yield-yes",
     "duib-btn-accept",
@@ -19,6 +20,7 @@ export const PROMPT_BUTTONS: Readonly<Record<PromptAnswer, readonly string[]>> =
     "sib-btn-accept",
   ],
   no: [
+    "tvl-btn-no",
     "dhud-btn-leave-no",
     "duel-btn-yield-no",
     "duib-btn-decline",

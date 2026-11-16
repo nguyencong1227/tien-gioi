@@ -9,7 +9,9 @@ import {
   badgeSignature,
   badgeViews,
   effectText,
+  formatRemain,
   parseMockStatus,
+  remainWords,
   type BadgeChild,
 } from "./status-badges";
 
@@ -213,6 +215,65 @@ describe("status-badges: StatusBadgesDom", () => {
     expect(badgeSignature(badgeViews([["burn", 4500]]))).toBe(a); // vẫn 5 giây
     expect(badgeSignature(badgeViews([["burn", 3500]]))).not.toBe(a);
     expect(badgeSignature(badgeViews([["poison", 5000]]))).not.toBe(a);
+  });
+});
+
+describe("status-badges: thời gian còn lại dạng m:ss (#514, issue #769)", () => {
+  it("formatRemain: dưới 60 giây là số giây thuần, từ 60 giây là phút:giây (giây 2 chữ số)", () => {
+    expect(formatRemain(1)).toBe("1");
+    expect(formatRemain(59)).toBe("59");
+    expect(formatRemain(60)).toBe("1:00");
+    expect(formatRemain(61)).toBe("1:01");
+    expect(formatRemain(599)).toBe("9:59");
+    expect(formatRemain(899)).toBe("14:59");
+    expect(formatRemain(900)).toBe("15:00");
+  });
+
+  it("remainWords: bằng chữ, không ghi '0 giây' khi chẵn phút", () => {
+    expect(remainWords(1)).toBe("1 giây");
+    expect(remainWords(59)).toBe("59 giây");
+    expect(remainWords(60)).toBe("1 phút");
+    expect(remainWords(61)).toBe("1 phút 1 giây");
+    expect(remainWords(899)).toBe("14 phút 59 giây");
+    expect(remainWords(900)).toBe("15 phút");
+  });
+
+  it("số hỏng (NaN, âm, vô hạn) không ném lỗi và không in 'NaN'", () => {
+    for (const bad of [Number.NaN, -5, Number.POSITIVE_INFINITY]) {
+      expect(formatRemain(bad)).not.toMatch(/NaN|Infinity|-/);
+      expect(remainWords(bad)).not.toMatch(/NaN|Infinity|-/);
+    }
+  });
+
+  it("chip Hộ đạo: tên, màu có lợi, +15%, đếm ngược m:ss; aria đủ chữ", () => {
+    const [v] = badgeViews([["dao_ho", 899_000, 0.15]]);
+    expect(v).toMatchObject({ id: "dao_ho", name: "Hộ đạo", harmful: false, secs: 899 });
+    expect(v.label).toBe("Hộ đạo +15% 14:59");
+    expect(v.aria).toBe("Hộ đạo: cộng 15% xác suất đột phá lần kế, còn 14 phút 59 giây");
+    expect(badgeViews([["dao_ho", 900_000, 0.15]])[0].label).toBe("Hộ đạo +15% 15:00");
+    expect(badgeViews([["dao_ho", 59_000, 0.15]])[0].label).toBe("Hộ đạo +15% 59");
+    expect(badgeViews([["dao_ho", 60_000, 0.15]])[0].label).toBe("Hộ đạo +15% 1:00");
+  });
+
+  it("phù 60 giây: đếm ngược m:ss từ lúc tròn 60 giây, dưới đó số giây thuần (khớp ví dụ 'Phù Hỏa +20% 59' của hợp đồng lát 2)", () => {
+    expect(badgeViews([["amp_hoa", 60_000, 0.2]])[0].label).toBe("Phù Hỏa +20% 1:00");
+    expect(badgeViews([["amp_hoa", 59_000, 0.2]])[0].label).toBe("Phù Hỏa +20% 59");
+    expect(badgeViews([["amp_hoa", 60_000, 0.2]])[0].aria).toBe(
+      "Phù Hỏa: tăng 20% sát thương chiêu hệ Hỏa, còn 1 phút",
+    );
+  });
+
+  it("hiệu ứng ngắn (dưới 60 giây) giữ nguyên số giây thuần như trước", () => {
+    expect(badgeViews([["poison", 6200]])[0].label).toBe("Độc 7");
+    expect(badgeViews([["haste", 5000, 0.3]])[0].label).toBe("Tăng tốc +30% 5");
+  });
+
+  it("dấu hiệu đổi theo từng giây (ô được vẽ lại khi đồng hồ nhích), không đổi trong cùng một giây", () => {
+    const a = badgeSignature(badgeViews([["dao_ho", 899_500, 0.15]])); // 900 giây
+    const b = badgeSignature(badgeViews([["dao_ho", 899_001, 0.15]])); // 900 giây
+    const c = badgeSignature(badgeViews([["dao_ho", 898_900, 0.15]])); // 899 giây
+    expect(a).toBe(b);
+    expect(a).not.toBe(c);
   });
 });
 

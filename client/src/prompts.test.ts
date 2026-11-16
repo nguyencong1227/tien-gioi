@@ -12,6 +12,12 @@ describe("pickPromptButton: Y / X trả lời hộp đang hiện (#463)", () => 
     expect(pickPromptButton("yes", shown())).toBeNull();
     expect(pickPromptButton("no", shown())).toBeNull();
   });
+  it("xác nhận qua cổng (#769): Y = Đi, X = Ở lại, và hộp này được trả lời TRƯỚC mọi lời mời", () => {
+    expect(pickPromptButton("yes", shown("tvl-btn-yes", "tvl-btn-no"))).toBe("tvl-btn-yes");
+    expect(pickPromptButton("no", shown("tvl-btn-yes", "tvl-btn-no"))).toBe("tvl-btn-no");
+    expect(pickPromptButton("yes", shown("tvl-btn-yes", "pib-btn-accept"))).toBe("tvl-btn-yes");
+    expect(pickPromptButton("no", shown("pib-btn-decline", "tvl-btn-no"))).toBe("tvl-btn-no");
+  });
   it("mỗi loại lời mời: Y nhận, X từ chối đúng nút của hộp đó", () => {
     expect(pickPromptButton("yes", shown("pib-btn-accept", "pib-btn-decline"))).toBe(
       "pib-btn-accept",
@@ -26,7 +32,7 @@ describe("pickPromptButton: Y / X trả lời hộp đang hiện (#463)", () => 
     expect(pickPromptButton("yes", shown("sib-btn-accept"))).toBe("sib-btn-accept");
     expect(pickPromptButton("no", shown("sib-btn-decline"))).toBe("sib-btn-decline");
   });
-  it("nhiều hộp cùng hiện: xác nhận rời / đầu hàng trước, rồi thách đấu, bí cảnh, tổ đội, tông môn", () => {
+  it("nhiều hộp cùng hiện: xác nhận qua cổng / rời / đầu hàng trước, rồi thách đấu, bí cảnh, tổ đội, tông môn", () => {
     const all = [...PROMPT_BUTTONS.yes];
     const order: string[] = [];
     let left = all.slice();
@@ -37,6 +43,7 @@ describe("pickPromptButton: Y / X trả lời hộp đang hiện (#463)", () => 
       left = left.filter((x) => x !== id);
     }
     expect(order).toEqual([
+      "tvl-btn-yes",
       "dhud-btn-leave-yes",
       "duel-btn-yield-yes",
       "duib-btn-accept",
@@ -50,7 +57,7 @@ describe("pickPromptButton: Y / X trả lời hộp đang hiện (#463)", () => 
     const stem = (id: string) => id.replace(/-(yes|no|accept|decline|enter)$/, "");
     PROMPT_BUTTONS.yes.forEach((y, i) => {
       const n = PROMPT_BUTTONS.no[i];
-      // cùng tiền tố hộp (pib / dib / duib / sib / dhud-btn-leave / duel-btn-yield)
+      // cùng tiền tố hộp (tvl / pib / dib / duib / sib / dhud-btn-leave / duel-btn-yield)
       expect(stem(y).slice(0, 3)).toBe(stem(n).slice(0, 3));
     });
   });

@@ -951,7 +951,7 @@
         <header class="inv-head">
           <div>
             <h2 id="forge-title">Lò Rèn Thiết Ngưu</h2>
-            <small>Rèn trước để dành · Đủ cảnh giới mới mặc được</small>
+            <small id="forge-sub">Rèn trước để dành · Đủ cảnh giới mới mặc được</small>
           </div>
           <button
             type="button"
@@ -1594,6 +1594,26 @@
           </div>
         </div>
       </section>
+
+      <!-- Xác nhận qua cổng khi đang có hiệu lực đan / phù (#514, issue #769): qua cổng xoá hiệu lực. Y = Đi, X = Ở lại (prompts.ts) -->
+      <div
+        id="travel-confirm"
+        class="travel-confirm"
+        hidden
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="travel-confirm-text"
+      >
+        <p id="travel-confirm-text"></p>
+        <div class="travel-confirm-btns">
+          <button type="button" id="tvl-btn-yes" class="tvl-btn go">
+            Đi <kbd class="btn-key" aria-hidden="true" data-key-action="prompt.yes">Y</kbd>
+          </button>
+          <button type="button" id="tvl-btn-no" class="tvl-btn stay">
+            Ở lại <kbd class="btn-key" aria-hidden="true" data-key-action="prompt.no">X</kbd>
+          </button>
+        </div>
+      </div>
 
       <!-- Lời mời tổ đội -->
       <div

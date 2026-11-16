@@ -138,7 +138,13 @@ import {
 } from "./quest-log";
 import { pickupBtnText, portalBtnText, talkBtnText } from "./ctx-btn";
 import { sound } from "./audio";
-import { bookTeach, useLabelOf } from "./item-use";
+import {
+  bookTeach,
+  isQuickCandidate,
+  statusEffectLine,
+  useBlockReason,
+  useLabelOf,
+} from "./item-use";
 import {
   applyRarityBadge,
   applyRarityText,
@@ -184,6 +190,7 @@ import {
 import { transitionMs, waitOrSkip } from "./gfx/scene-transition";
 import { getDisplay, onDisplayChange } from "./gfx/display";
 import { optionTag, skipHintText } from "./dialog-opt";
+import { craftButtonText, craftFeeHint, craftSubtitle, craftTitle } from "./craft-ui";
 import {
   CHAT_PREF_KEY,
   MAP_LEGEND_PREF_KEY,
@@ -400,6 +407,8 @@ let sectTab: "overview" | "members" | "treasury" = "overview";
 let currentSectInvite: SectInvitedMsg | null = null;
 let sectInviteInterval: number | null = null;
 let sectConfirmAction: (() => void) | null = null;
+/** Hộp xác nhận qua cổng khi đang có hiệu lực đan / phù (#514, issue #769): việc làm khi người chơi chọn "Đi" */
+let travelConfirmAction: (() => void) | null = null;
 
 /** Hộp xác nhận trong game cho Nhường / Trục xuất / Rời (#246): confirm() gốc bị chặn / xấu trên điện thoại và PWA */
 function askSectConfirm(kind: SectConfirmKind, name: string, onOk: () => void) {
@@ -590,7 +599,7 @@ function resolveQuickItems(): [string, string] {
   for (const s of invSlots) {
     if (!s) continue;
     const def = ITEM_BY_ID[s.itemId];
-    if (def?.type === "consumable" && !consumablesInBag.includes(def.id)) {
+    if (isQuickCandidate(def) && def && !consumablesInBag.includes(def.id)) {
       consumablesInBag.push(def.id);
     }
   }
@@ -683,6 +692,36 @@ function fillBookTeach(box: HTMLElement, def: ItemDef) {
   box.hidden = false;
 }
 
+/** Dòng thông tin thêm của vật phẩm dùng được ở khung so sánh: "Hiệu lực: ..." của đan / phù gắn trạng thái (#514), "Dạy: ..." của kinh quyển (M7.4); món khác ẩn khung. */
+function fillUseInfo(box: HTMLElement, def: ItemDef) {
+  const eff = statusEffectLine(def);
+  if (eff === null) {
+    fillBookTeach(box, def);
+    return;
+  }
+  box.replaceChildren();
+  const line = document.createElement("span");
+  line.className = "req-ok";
+  line.textContent = eff;
+  box.append(line);
+  box.hidden = false;
+}
+
+/** Chữ + trạng thái của nút Dùng / Học: đan gắn trạng thái MỜ kèm lý do ngắn khi còn hiệu lực / sai bậc (máy chủ vẫn từ chối + không trừ nếu bấm được). */
+function applyUseBtn(btn: HTMLButtonElement, def: ItemDef, label: string) {
+  const reason = useBlockReason(def, {
+    activeIds: activeStatusIds,
+    realm: currentRealm,
+    tier: currentTier,
+    exp: currentExp,
+    expMax: currentExpMax,
+  });
+  const text = reason ?? label;
+  if (btn.textContent !== text) btn.textContent = text;
+  const off = reason !== null;
+  if (btn.disabled !== off) btn.disabled = off;
+}
+
 function renderSlotDetail() {
   const s = invSlots[selectedSlot];
   const def = s ? ITEM_BY_ID[s.itemId] : undefined;
@@ -727,14 +766,14 @@ function renderSlotDetail() {
       ? "Mặc"
       : (slotLock ?? `Cần ${realmLabel(def.equip.reqRealm, def.equip.reqTier)}`);
   } else {
-    fillBookTeach(cmpEl, def);
+    fillUseInfo(cmpEl, def);
     equipBtn.hidden = true;
   }
 
   actionsEl.hidden = false;
   const useLabel = useLabelOf(def); // đan dược "Dùng", kinh quyển "Học" (M7.4)
   useBtn.hidden = useLabel === null;
-  if (useLabel !== null) useBtn.textContent = useLabel;
+  if (useLabel !== null) applyUseBtn(useBtn, def, useLabel);
   drop1Btn.hidden = s.qty <= 1;
 }
 
@@ -1631,7 +1670,9 @@ function renderForgeModal() {
 
 function renderForgeModalImpl() {
   const npc = NPC_BY_ID[forgeNpcId];
-  $("forge-title").textContent = npc ? `Lò Rèn · ${npc.name}` : "Lò Rèn Thiết Ngưu";
+  // Tiêu đề, dòng phụ và nút theo TRẠM của NPC (#514): Lò Rèn / Lò Đan / Bàn Phù, chữ từ `CRAFT_STATIONS` (shared); NPC cũ không có `station` = Lò Rèn
+  $("forge-title").textContent = craftTitle(npc);
+  $("forge-sub").textContent = craftSubtitle(npc);
   const list = $("forge-list");
   list.replaceChildren();
 
@@ -1710,8 +1751,9 @@ function renderForgeModalImpl() {
     forgeBtn.type = "button";
     forgeBtn.className = "forge-btn";
     forgeBtn.disabled = !canCraft;
-    forgeBtn.textContent = "Rèn";
-    if (fee > 0) forgeBtn.title = `Rèn: tốn ${fee.toLocaleString("vi-VN")} ${CURRENCY_NAME}`;
+    forgeBtn.textContent = craftButtonText(npc);
+    if (fee > 0)
+      forgeBtn.title = craftFeeHint(npc, `${fee.toLocaleString("vi-VN")} ${CURRENCY_NAME}`);
     forgeBtn.addEventListener("click", (e) => {
       e.preventDefault();
       if (!canCraft) return;
@@ -2092,7 +2134,12 @@ function renderDialogOptions() {
     }
     btn.append(labelSpan);
 
-    const tagInfo = optionTag(opt.action.kind, opt.label, !!opt.disabled);
+    const tagInfo = optionTag(
+      opt.action.kind,
+      opt.label,
+      !!opt.disabled,
+      opt.action.kind === "forge" ? opt.action.station : undefined, // Lò đan / Bàn phù (#514); thiếu = Lò rèn
+    );
     if (tagInfo) {
       const tag = document.createElement("small");
       tag.textContent = tagInfo.text;
@@ -2128,6 +2175,11 @@ let cachedHudRealm = "";
 let cachedHudOnline = -1;
 let cachedMeditating: boolean | null = null;
 let cachedCanBreak: boolean | null = null;
+// Nút "Dùng" của đan / phù gắn trạng thái (#514, issue #769): cần biết trạng thái đang có + tu vi hiện tại để làm mờ đúng lúc
+let activeStatusIds: ReadonlySet<string> = new Set();
+let activeStatusKey = "";
+let currentExp = 0;
+let currentExpMax = 1;
 const cachedBarPct: Record<string, number> = {};
 const cachedBarText: Record<string, string> = {};
 const cachedCooldownFrac: Record<string, number> = {};
@@ -3224,6 +3276,14 @@ export const ui = {
       if (from) callbacks?.onDuelDecline?.(from);
     });
 
+    // Xác nhận qua cổng (#769): "Đi" gửi `travel`, "Ở lại" chỉ đóng hộp. Y / X bấm đúng hai nút này (`prompts.ts`).
+    bindTap("tvl-btn-yes", () => {
+      const go = travelConfirmAction;
+      this.closeTravelConfirm();
+      go?.();
+    });
+    bindTap("tvl-btn-no", () => this.closeTravelConfirm());
+
     bindTap("duel-btn-yield", () => {
       $("duel-btn-yield").hidden = true;
       $("duel-yield-confirm").hidden = false;
@@ -4279,6 +4339,25 @@ export const ui = {
     }
   },
 
+  /**
+   * Hộp xác nhận bấm qua cổng khi đang có hiệu lực đan / phù (máy chủ XOÁ hiệu lực khi qua cổng: #767). `text` đã dựng sẵn (`travelConfirmText`),
+   * `onGo` chạy khi chọn "Đi". Không chặn điều khiển (như các lời mời); Y / X trả lời (`prompts.ts`).
+   */
+  askTravelConfirm(text: string, onGo: () => void) {
+    travelConfirmAction = onGo;
+    $("travel-confirm-text").textContent = text;
+    $("travel-confirm").hidden = false;
+  },
+
+  closeTravelConfirm() {
+    travelConfirmAction = null;
+    $("travel-confirm").hidden = true;
+  },
+
+  isTravelConfirmOpen(): boolean {
+    return !$("travel-confirm").hidden;
+  },
+
   /** `itemName`: tên món đồ rơi gần nhất ("" = không rõ tên); `null` = ẩn nút. Nhãn trong nút cố định ngắn, tên đi vào title / aria-label. */
   pickupPrompt(itemName: string | null) {
     const btn = $("btn-pickup");
@@ -4407,6 +4486,18 @@ export const ui = {
     }
   },
 
+  /**
+   * Các trạng thái CÓ HIỆU LỰC của chính mình (id; scene gọi ~16 lần/giây từ `StatusTracker.active`): đan / phù gắn trạng thái đang có chip thì nút Dùng mờ
+   * "Đang còn hiệu lực" (máy chủ từ chối + không trừ, #766). Chỉ vẽ lại chi tiết túi khi TẬP id đổi (không phải mỗi giây: chip lo phần đếm ngược).
+   */
+  setActiveStatuses(ids: readonly string[]) {
+    const key = [...ids].sort().join(",");
+    if (key === activeStatusKey) return;
+    activeStatusKey = key;
+    activeStatusIds = new Set(ids);
+    if (invOpen) renderSlotDetail();
+  },
+
   hud(p: HudPlayer, online: number) {
     // Sáu ô (ba ô riêng chỉ chủ nhận, vắng = trống); so tại chỗ, chỉ dựng bộ mới khi đổi (hud chạy mỗi khung)
     const equipOrRealmChanged =
@@ -4416,6 +4507,7 @@ export const ui = {
     currentRealm = p.realm;
     currentTier = p.tier;
     if (equipOrRealmChanged) currentEquip = equipmentOf(p);
+    if (equipOrRealmChanged && invOpen) renderSlotDetail(); // đan hộ đạo đúng bậc chỉ dùng được ở bậc của nó
 
     if (equipOrRealmChanged) {
       if (charModalOpen) renderCharModal();
@@ -4449,6 +4541,8 @@ export const ui = {
     };
     const validExpMax =
       Number.isFinite(p.expMax) && p.expMax > 0 ? p.expMax : expToNext(p.realm, p.tier);
+    currentExp = p.exp;
+    currentExpMax = p.expMax;
     set("hp", p.hp, p.maxHp, "Khí huyết");
     set("mp", p.mp, p.maxMp, "Linh lực");
     set("exp", p.exp, validExpMax, "Tu vi");
@@ -4465,6 +4559,7 @@ export const ui = {
     if (canBreak !== cachedCanBreak) {
       cachedCanBreak = canBreak;
       $("sk-break").classList.toggle("ready", canBreak);
+      if (invOpen) renderSlotDetail(); // nút Dùng của đan hộ đạo mờ / sáng theo "đỉnh + đầy tu vi" (cùng điều kiện nút Đột phá)
     }
   },
 
