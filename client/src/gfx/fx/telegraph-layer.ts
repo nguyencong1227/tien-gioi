@@ -31,6 +31,7 @@ import {
   type WarnMsg,
   type WarnPlan,
 } from "./telegraph";
+import { warnShownMs } from "../../net-latency";
 
 /** Phía trên nền + vòng trấn (-5), dưới mọi thực thể (độ sâu = y >= 0): vùng báo nằm DƯỚI chân người và quái, không che chữ / hình. */
 export const WARN_DEPTH = -4;
@@ -150,13 +151,17 @@ export class TelegraphLayer {
     this.pool.push(g);
   }
 
-  /** Nhận tin `warn`. `false` khi tin không hợp lệ. */
-  warn(m: WarnMsg, now: number): boolean {
-    const plan = planWarn(m);
-    if (!plan) {
+  /**
+   * Nhận tin `warn`. `false` khi tin không hợp lệ. `rttMs` (trung vị RTT, `null` / bỏ trống = chưa biết) rút ngắn thời gian đếm tới "đầy" theo
+   * `warnShownMs` (`net-latency.ts`, #873): vùng đầy đúng lúc input cuối còn tác dụng thay vì sau hạn chót ~RTT; nội dung tin không đổi.
+   */
+  warn(m: WarnMsg, now: number, rttMs?: number | null): boolean {
+    const planned = planWarn(m);
+    if (!planned) {
       this.rejected++;
       return false;
     }
+    const plan = rttMs == null ? planned : { ...planned, ms: warnShownMs(planned.ms, rttMs) };
     const cap = telegraphLimits(this.deps.emitterBudget()).warns;
     let item: WarnItem;
     if (this.warns.length >= cap) {

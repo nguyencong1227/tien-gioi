@@ -234,6 +234,7 @@ import {
   pickBossForBar,
   type BossCand,
 } from "../boss-bar";
+import { warnShownMs } from "../net-latency";
 import {
   BOSS_STRIKE_MS,
   NEUTRAL_POSE,
@@ -519,6 +520,15 @@ export class WorldScene extends Phaser.Scene {
   telegraphs!: TelegraphLayer;
   /** Số tiếng báo "đang trong vùng nguy hiểm" đã phát (script kiểm `?debug`) */
   dangerCues = 0;
+  /**
+   * Nguồn RTT (ms, trung vị vài pong gần nhất; `null` = chưa biết) cho độ bù vùng cảnh báo (`net-latency.ts`, #873). `main.ts` nối vào `HeartbeatController.lastRttMs`
+   * (đổi theo phòng đang nối); mặc định `null` = không bù (chế độ mock, test). Script `?debug` đặt được để thử các mức RTT.
+   */
+  rttSource: () => number | null = () => null;
+  /** RTT hiện tại (ms) hoặc `null`; ĐỘC NHẤT một chỗ đọc, vùng báo (`warn`) và thanh gồng (`bossCast`) dùng chung nên không bao giờ lệch nhau. */
+  private rttMs(): number | null {
+    return this.rttSource();
+  }
 
   // Bảng đo hiệu năng (?perf=1, #71)
   private perfEnabled = false;
@@ -2621,6 +2631,7 @@ export class WorldScene extends Phaser.Scene {
           lootsAvg: Number((this.perfLootsSum / frames).toFixed(1)),
           tweensAvg: Number((this.perfTweenSum / frames).toFixed(1)),
           tweensMax: this.perfTweenMax,
+          rttMs: this.rttMs(),
         };
       },
     };
@@ -2666,6 +2677,7 @@ export class WorldScene extends Phaser.Scene {
       monsters: this.monsters.size,
       loots: this.loots.size,
       tweens: tweensCount,
+      rttMs: this.rttMs(),
     });
   }
 
@@ -4109,11 +4121,13 @@ export class WorldScene extends Phaser.Scene {
       }
       case "warn":
         // Báo trước đòn của quái (M7.7, #508): vùng tô đặc lớn dần tới lúc đòn đáp xuống; client chỉ vẽ, máy chủ quyết định trúng / trượt
-        this.telegraphs.warn(m, this.time.now);
+        // Đếm tới "đầy" rút ngắn theo RTT (`net-latency.ts`, #873): cùng một nguồn RTT với thanh gồng của trùm bên dưới
+        this.telegraphs.warn(m, this.time.now, this.rttMs());
         return;
       case "bossCast":
-        // Trùm bắt đầu vận chiêu (mục 42): tên chiêu lên thanh máu trùm; vùng cảnh báo trên đất do `fx` `warn` đi kèm lo
-        this.bossFx.onCast(m.by, m.ability, m.ms, this.time.now);
+        // Trùm bắt đầu vận chiêu (mục 42): tên chiêu lên thanh máu trùm; vùng cảnh báo trên đất do `fx` `warn` đi kèm lo.
+        // `ms` rút ngắn đúng như vùng báo (`warnShownMs`, cùng RTT): thanh tiến độ + hoạt ảnh gồng đầy cùng lúc với vành khuyên / nón / đường
+        this.bossFx.onCast(m.by, m.ability, warnShownMs(m.ms, this.rttMs()), this.time.now);
         this.bossCastSound(m);
         return;
       case "bossPhase":

@@ -698,6 +698,8 @@ async function start(room: Room, mapId: string) {
   ui.setCurrentMapId(mapId);
   const currentMap = getMap(mapId) || getMap(DEFAULT_MAP_ID)!;
   activeScene = new WorldScene(room, currentMap);
+  // RTT cho độ bù vùng cảnh báo (#873): đọc từ nhịp tim của phòng ĐANG nối (đổi mỗi lần nối lại / qua cổng), `null` khi chưa đủ mẫu
+  activeScene.rttSource = () => activeHeartbeat?.lastRttMs ?? null;
   if (
     typeof window !== "undefined" &&
     (import.meta.env.DEV || new URLSearchParams(location.search).has("debug"))
