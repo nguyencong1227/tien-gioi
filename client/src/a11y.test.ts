@@ -106,6 +106,12 @@ describe("a11y: isTypingElement", () => {
 
     expect(isTypingElement(checkbox)).toBe(false);
     expect(isTypingElement(radio)).toBe(false);
+    // thanh trượt (âm lượng, bản đồ nhỏ...), nút, màu, tệp: không phải gõ chữ (QUYET_DINH_M3 mục 25)
+    for (const type of ["range", "button", "submit", "reset", "color", "file", "image"])
+      expect(isTypingElement({ tagName: "INPUT", type } as unknown as Element), type).toBe(false);
+    // ô chữ các loại vẫn là gõ chữ
+    for (const type of ["text", "search", "email", "url", "tel", "password", "number"])
+      expect(isTypingElement({ tagName: "INPUT", type } as unknown as Element), type).toBe(true);
     expect(isTypingElement(button)).toBe(false);
     expect(isTypingElement(regularDiv)).toBe(false);
     expect(isTypingElement(null)).toBe(false);
