@@ -323,8 +323,10 @@ describe("Cửa hàng tông môn (sectShopBuy handler trên Colyseus thật)", (
     const H = await join(leaderName);
     await waitFor(() => lastHall(H), 4000, "ảnh chụp sectHall lúc vào");
 
-    // Đánh gục người chơi (dead = true)
+    // Đánh gục người chơi (dead = true) VÀ đặt mốc chết = bây giờ: nếu để `deadAt` = 0 thì `tickRespawn` thấy đã quá `RESPAWN_MS` và hồi sinh ở tick kế tiếp; khi máy tải
+    // tin `shopBuy` tới sau tick đó, máy chủ thấy người đã sống và cho mua (CI 17/11 04:42: 'Hết thời gian chờ toast từ chối do gục')
     playerOf(H).dead = true;
+    ctrlOf(H).deadAt = worldOf(H.room).now;
 
     H.room.send(SECT_MSG.shopBuy, { itemId: "hoi_huyet_dan", qty: 1 });
 
