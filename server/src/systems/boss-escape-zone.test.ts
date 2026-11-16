@@ -359,7 +359,10 @@ function strikes(shape: BossShape, px: number, py: number): boolean {
   return p.hp < hp0;
 }
 
-/** Điểm thử quanh trùm, rải theo lưới thưa có seed; chỉ lấy điểm "chắc chắn" (8 láng giềng cách 3 px cùng kết quả với `hits`, tránh sát mép). */
+/**
+ * Điểm thử quanh trùm, rải ngẫu nhiên có seed nhưng CHỈ lấy điểm SÁT MÉP vùng (trong 12-20 px quanh nó có điểm khác kết quả) mà vẫn "chắc chắn" (8 láng giềng cách 3 px cùng kết quả,
+ * tránh sai số sát mép): đổi kích thước / góc / lỗ của vùng ở bộ thực thi dù ít đều làm một điểm lật kết quả. Điểm ở sâu trong hay xa vùng thì hiển nhiên, không đáng thử.
+ */
 function probes(shape: BossShape, want: number): { x: number; y: number; hit: boolean }[] {
   const f = hits(shape);
   const b = boxOf(shape);
@@ -367,23 +370,20 @@ function probes(shape: BossShape, want: number): { x: number; y: number; hit: bo
   const rnd = () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296;
   const inside: { x: number; y: number; hit: boolean }[] = [];
   const outside: { x: number; y: number; hit: boolean }[] = [];
-  for (let n = 0; n < 4000 && (inside.length < want || outside.length < want); n++) {
+  const ring = (x: number, y: number, rad: number, n: number, pred: (v: boolean) => boolean) => {
+    for (let k = 0; k < n; k++) {
+      const a = (k * 2 * Math.PI) / n;
+      if (pred(f(x + Math.cos(a) * rad, y + Math.sin(a) * rad))) return true;
+    }
+    return false;
+  };
+  for (let n = 0; n < 60000 && (inside.length < want || outside.length < want); n++) {
     const x = b.x0 + rnd() * (b.x1 - b.x0);
     const y = (rnd() * 2 - 1) * b.hy;
     const h = f(x, y);
-    let stable = true;
-    for (let k = 0; k < 8 && stable; k++) {
-      const a = (k * Math.PI) / 4;
-      if (f(x + Math.cos(a) * 3, y + Math.sin(a) * 3) !== h) stable = false;
-    }
-    if (!stable) continue;
-    // điểm NGOÀI chỉ đáng thử khi sát vùng (có điểm trúng trong 14 px quanh nó): điểm xa thì hiển nhiên không trúng
-    let near = h;
-    for (let k = 0; k < 16 && !near; k++) {
-      const a = (k * Math.PI) / 8;
-      if (f(x + Math.cos(a) * 14, y + Math.sin(a) * 14)) near = true;
-    }
-    if (near) (h ? inside : outside).push({ x, y, hit: h });
+    if (ring(x, y, 3, 8, (v) => v !== h)) continue; // sát mép quá: bỏ
+    if (!ring(x, y, 12, 16, (v) => v !== h) && !ring(x, y, 20, 16, (v) => v !== h)) continue; // không sát mép: bỏ
+    (h ? inside : outside).push({ x, y, hit: h });
   }
   return [...inside.slice(0, want), ...outside.slice(0, want)];
 }
