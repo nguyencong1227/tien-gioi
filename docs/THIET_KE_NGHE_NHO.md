@@ -1,0 +1,69 @@
+# Thiết kế nghề nhỏ: luyện đan + chế phù (#514)
+
+> Người viết: Dev A (thiết kế + máy chủ). Người dùng đã duyệt (`~/TT/orchestra/QUYET_DINH_M3.md` mục 22.3, 16/11/2026): LÀM nghề luyện đan + chế phù SAU v0.3.0, nội dung lấy từ Vạn Kiếp Tu Tiên (mục 19-20); chia việc: **D** dữ liệu công thức / nguyên liệu + test + mô phỏng kinh tế, **B** giao diện, **A** thiết kế + máy chủ, **C** bot / fuzz chống sinh Linh thạch. Tài liệu này chốt HỢP ĐỒNG để bốn người làm song song. Số liệu cụ thể (giá, % ) do D mô phỏng đề xuất, A chốt khi review.
+
+## 1. Hiện trạng (đã đọc mã, `main` sau v0.3.0)
+- **Chế tác đã tổng quát:** `RecipeDef { id, npcId, inputs, output, coin? }` (`shared/src/recipes.ts`); `craft(w, sid, recipeId)` (`server/src/systems/npc.ts`) kiểm đứng gần NPC của công thức, đủ Linh thạch + nguyên liệu + chỗ túi, rồi trừ phí và nguyên liệu và đưa đồ: TRỌN VẸN HOẶC KHÔNG GÌ CẢ, tiền chỉ có thể MẤT. Toast thành công đang cứng "Rèn thành công ...". Client: bảng "Lò Rèn" (`ui.ts renderForgeModal`) dựng theo `npcId`, lựa chọn hội thoại `{ kind: "forge" }` mở nó. Nên lò đan / bàn phù chỉ là NPC mới + công thức mới, KHÔNG cần tin nhắn mới.
+- **Đan hiện chỉ hồi:** `ItemEffect = healHp | healMp | exp` (`shared/src/items.ts`); `useItem` (`systems/inventory.ts`) dùng từ túi, có hồi dùng (`def.cooldown`).
+- **Trạng thái có lợi đã có:** `STATUSES` (`shared/src/skills.ts`) có `shield`, `haste`, `regen` (`harmful: false`), tối đa `MAX_STATUSES` = 4, cùng id LÀM MỚI (không cộng dồn), `maxMs` / `maxRatio` kẹp. Chủ nhận tin `status` RIÊNG `list: [id, msLeft, ratio?][]` (`status-rules.ts entriesOf`); trạng thái xoá khi chết / qua kiếp (`clearPlayerStatus`), KHÔNG lưu vào hồ sơ, mất khi thoát phòng hay qua cổng (phòng khác).
+- **Đột phá có xác suất:** `breakthroughChance(realm) = max(0,15; 0,85 - 0,08 x realm)` (`shared/src/realms.ts`): Luyện Khí -> Trúc Cơ 77 %, Trúc Cơ -> Kim Đan 69 %, Kim Đan -> Nguyên Anh 61 %. Thất bại mất `BREAK_FAIL_EXP_LOSS` = 30 % tu vi và nửa khí huyết, rồi chờ hồi (`systems/progression.ts breakthrough`). Đây là nơi đan của Vạn Kiếp Tu Tiên (`dot_pha`: tăng % đột phá) khớp tự nhiên.
+- **Bán lại:** NPC chỉ thu mua vật phẩm có `sellPrice(itemId) > 0`, và `sellPrice` lấy từ `ITEM_VALUE` (`shared/src/currency.ts`): vật phẩm KHÔNG có mặt trong `ITEM_VALUE` thì không bán được.
+- **Nguồn nội dung (khảo sát của D, #749):** `~/TT/van-kiep-tu-tien-clone`: 157 công thức (85 luyện đan + 72 chế phù), 133 nguyên liệu; đan `dot_pha` (tăng % đột phá), phù có hiệu ứng dùng (hỏa cầu, dịch chuyển...). Quá nhiều cho một PR: chia lát (mục 7).
+
+## 2. Quyết định thiết kế
+1. **Hai trạm, tái dùng bảng chế:** NPC mới "Lò đan" và "Bàn phù", công thức `RecipeDef` với `npcId` của trạm. Phân biệt trạm bằng trường nhỏ trên NPC, không suy từ id (trả lời B ở #514):
+   - `NpcDef.station?: CraftStation` (`"forge" | "alchemy" | "talisman"`, thiếu = `forge` nên NPC cũ không đổi);
+   - `DialogAction`: `{ kind: "forge"; station?: CraftStation }` (cùng một kind `forge`, client cũ vẫn mở bảng theo `npcId`, chỉ sai chữ);
+   - `CRAFT_STATIONS: Record<CraftStation, { verb: string; label: string; button: string }>` ở `shared/` (Rèn / Luyện / Chế; "Rèn đồ" / "Luyện đan" / "Chế phù"; nút), để máy chủ ghi toast và B vẽ tiêu đề / nút từ MỘT nguồn.
+2. **Toast do máy chủ ghi theo trạm:** `craft` đọc `NPC_BY_ID[rc.npcId]?.station ?? "forge"`, ghi `${verb} thành công ${tên}.`.
+3. **Sản phẩm là VẬT PHẨM DÙNG TỪ TÚI** (như đan hiện có), KHÔNG gắn vào ô chiêu: `useItem` thêm nhánh `ItemEffect` mới `{ kind: "status"; id: StatusId; ratio: number; ms: number; forRealm?: number }` (máy chủ kẹp `ms` <= `maxMs`, `ratio` <= `maxRatio` của `STATUSES`; `forRealm` chỉ dùng cho đan hộ đạo; hồi dùng `def.cooldown` như đan).
+4. **Hiệu lực có thời hạn đi qua hệ trạng thái có sẵn** (HUD trả lời B): chủ nhận tin `status` `[id, msLeft, ratio?]`, B vẽ chip đếm ngược từ `msLeft` (thêm tên + biểu tượng + màu cho từng id). Không thêm tin mới, không đưa vào state chung. `statusCarriesRatio` mở rộng cho loại mới để `ratio` được gửi.
+5. **Luật chung của hiệu lực chế phẩm:** cùng id làm mới, không cộng dồn; mỗi hiệu lực có `maxMs` / `maxRatio` kẹp theo `STATUSES`; mất khi chết / qua kiếp / thoát phòng / qua cổng (đúng như trạng thái hiện có, nêu rõ trong mô tả vật phẩm); KHÔNG dùng được khi đang thách đấu (như đan hồi huyết hiện có) để trận PK không bị nghiêng bằng đồ chế; không lưu hồ sơ (không thêm dữ liệu lưu).
+6. **Chế tác tất định ở lát 1** (không có "tỉ lệ thành / hỏng"): khung thời gian thực, thất bại ngẫu nhiên khi mất nguyên liệu quý gây khó chịu, và chống sinh tiền đã đủ nhờ mục 4 bên dưới. Nếu mô phỏng kinh tế của D cho thấy cần, thêm sau `RecipeDef.failPct` (máy chủ ngẫu nhiên, test seed) ở lát riêng.
+
+## 3. Ba nhóm sản phẩm (lát theo mục 7)
+- **Đan hộ đạo (lát 1):** `StatusId` `dao_ho` (loại mới `breakAid`, có lợi, `maxMs` ~ 15 phút, `maxRatio` ~ 0,2). Dùng đan: gắn `dao_ho` với `ratio` = cộng thêm xác suất đột phá (cộng vào `breakthroughChance`, kẹp tổng <= 0,95, hằng mới `BREAK_CHANCE_CAP` ở `shared/`). Ở `breakthrough()`: SAU khi qua điều kiện (đủ hỏa hầu, hết hồi) và TRƯỚC khi tung xác suất, đọc `dao_ho` còn hiệu lực, tính xác suất, rồi GỠ `dao_ho` (thành công hay thất bại đều tiêu hao); gửi lại `status`. Mỗi đan khai báo bậc đột phá hợp lệ (`forRealm`: Luyện Khí -> Trúc Cơ, Trúc Cơ -> Kim Đan, Kim Đan -> Nguyên Anh) và chỉ dùng được khi người chơi đang ở đúng đỉnh bậc đó, để không phí đan. Lý do hợp lý: thất bại tốn 30 % tu vi + nửa khí huyết, đan là chỗ xả Linh thạch có ý nghĩa cho người sắp đột phá.
+- **Phù (lát 2):** `amp_<hệ>` (loại `amp`: sát thương gây ra của chiêu cùng hệ nhân `1 + ratio`, `maxMs` 60 giây, một id cho mỗi hệ vì mục trạng thái chỉ có `[id, ms, ratio]`) và `cdr_phu` (loại `cdr`: cộng vào giảm hồi chiêu 60 giây, cộng với `cdrOf(p)` từ trang bị và vẫn kẹp `CDR_CAP`). Điểm gắn: `cast.ts` (~dòng 189: `elementMult(...) * treasureElementMult(...)` nhân thêm `ampMult(c, def.element)`); `systems/skills.ts cdrOf` (đổi thành `cdrOf(p, c)`, và gửi lại sổ chiêu `cdMax` khi `cdr_phu` được gắn / hết hạn, như khi đổi trang bị).
+- **Đan tăng cường (lát 3, tuỳ):** loại có lợi ngắn hạn (vd tăng sát thương mọi hệ `amp_all`) cùng khuôn `ItemEffect.status`; chỉ làm nếu lát 1-2 xong sớm và người dùng muốn.
+
+## 4. Chống sinh Linh thạch (yêu cầu của người dùng, việc của D + C kiểm)
+- **Sản phẩm KHÔNG bán lại được:** KHÔNG thêm đầu ra của trạm `alchemy` / `talisman` vào `ITEM_VALUE` (nên `sellPrice` = 0, NPC không thu mua). Test khoá: mọi đầu ra của công thức có trạm khác `forge` có `sellPrice === 0`.
+- **Nguyên liệu không bán thành tiền vô hạn:** nguyên liệu mới (thảo dược, tài liệu rơi quái) theo luật hiện có: chỉ rơi từ quái, bán được thì giá thấp hơn tổng chi cho sản phẩm; D mô phỏng chứng minh `phí + giá nguyên liệu bán lại` luôn LỚN HƠN giá trị bán lại của thành phẩm (= 0) nên không có vòng "chế rồi bán".
+- **Mô hình theo giá trị kỳ vọng, không so giá danh nghĩa** (D: cả 157 công thức đều lãi danh nghĩa nên so giá danh nghĩa vô nghĩa): giá trị đan hộ đạo = (xác suất tăng) x (chi phí một lần thất bại: 30 % thanh tu vi cuối cảnh giới đổi ra giờ săn, + thời gian hồi) so với phí Linh thạch + nguyên liệu; mục tiêu là đan ĐÁNG mua nhưng không bắt buộc.
+- **Xả Linh thạch dư (câu hỏi cân bằng cũ, ~168.000 sau bộ IV Nguyên Anh):** nghề nhỏ là chỗ xả thêm; D đề xuất mức xả mục tiêu (vd phần trăm Linh thạch dư) trong mô phỏng, A chốt.
+- **C kiểm:** bot / fuzz đổi thứ tự `craft` / `use` / `sell` / `drop` / vứt-nhặt với đội, chứng minh tổng Linh thạch của thế giới KHÔNG tăng qua nghề (chỉ giảm) và không nhân đôi vật phẩm (như `economy-fuzz.test.ts` hiện có).
+
+## 5. Hợp đồng `shared/` (PR riêng, một dev ngoài A xem; sau đó D / A / B / C làm song song)
+1. `shared/src/recipes.ts` hoặc `npcs.ts`: `CraftStation`, `CRAFT_STATIONS`, `NpcDef.station?`.
+2. `shared/src/quests.ts` (`DialogAction`): `{ kind: "forge"; station?: CraftStation }`; máy chủ dựng lựa chọn "Luyện đan" / "Chế phù" theo `station` của NPC.
+3. `shared/src/skills.ts`: thêm CUỐI `STATUSES` các id có lợi mới (`dao_ho`, rồi `amp_*`, `cdr_phu` ở lát sau) + `StatusKind` mới (`breakAid`, `amp`, `cdr`); mở rộng `statusCarriesRatio` cho các loại mang `ratio`; `statusOf` / `sanitizeStatusList` không đổi cách dùng.
+4. `shared/src/items.ts`: `ItemEffect` thêm `{ kind: "status"; id: StatusId; ratio: number; ms: number; forRealm?: number }`; helper kẹp `clampStatusEffect(e)` dùng ở máy chủ.
+5. `shared/src/protocol.ts`: **`PROTOCOL_VERSION` 3 -> 4 khi nghề ra mắt** (vật phẩm / NPC / công thức / id trạng thái mới; client cũ bỏ im lặng id lạ nhưng không hiểu nội dung nên theo quy ước dự án tăng một lần cho cả nội dung nghề, đặt `MIN_PROTOCOL_VERSION=4` lúc phát hành). Chưa tăng ở PR hợp đồng đầu nếu chưa có nội dung nhìn thấy được; tăng ở PR đưa NPC / công thức vào.
+6. Test hợp đồng: `STATUSES` không trùng id, `maxMs` / `maxRatio` hợp lệ; `CRAFT_STATIONS` phủ mọi `CraftStation`; mọi `NpcDef.station` hợp lệ; mọi công thức trỏ NPC có `station` đúng; `ItemEffect.status` trỏ `StatusId` có thật và `ms` / `ratio` trong khung của `STATUSES`; client `effectText` / `ratioTag` (B) có nhánh cho loại mới (typecheck đỏ nếu thiếu: hai hàm không có nhánh mặc định).
+
+## 6. Máy chủ (A) — việc theo lát
+- `craft`: động từ theo trạm (mục 2.2); giữ trọn vẹn hoặc không gì cả.
+- `useItem`: nhánh `status` (kẹp, cùng id làm mới, chặn khi thách đấu / đang gục, `def.cooldown`), gửi `status`; test: kẹp `ms` / `ratio` quá khung, dùng đan hộ đạo hai lần không cộng dồn, hiệu lực mất khi chết / qua kiếp.
+- `breakthrough`: đọc + gỡ `dao_ho`; test seed `Math.random`: đột phá thành công / thất bại đều gỡ trạng thái, xác suất bằng `chance + ratio` kẹp 0,95, đan sai bậc (`forRealm` khác `p.realm`) hoặc chưa ở đỉnh bậc thì từ chối trọn vẹn, KHÔNG trừ đan.
+- Lát 2: `cast.ts` / `skills.ts` như mục 3; test sát thương nhân đúng hệ, không nhân hệ khác; `cdr_phu` cộng dồn với trang bị và kẹp `CDR_CAP`; gửi lại `cdMax`.
+- Hiệu năng: không thêm trường state công khai; `status` chỉ gửi cho chủ khi đổi (đã có). Đo `perf.test.ts` / `bench` nếu đụng `cast`.
+- Nhật ký kiểm toán: không thêm sự kiện nhạy cảm mới (đan / phù không đổi tiền ngoài phí chế đã đi qua `changeCoin`).
+
+## 7. Lát và phân việc
+| Lát | Nội dung | D (dữ liệu + test + mô phỏng) | A (hợp đồng + server) | B (client) | C (bot / fuzz) |
+|---|---|---|---|---|---|
+| 0 | Khảo sát nguồn (#749) | `docs/NGHE_NHO_NGUON.md` | đọc + chốt số | - | - |
+| 1 | Lò đan + đan hộ đạo ba bậc | NPC Lò đan (tên GỐC, đứng trong trấn) + 3-6 công thức + nguyên liệu + mô phỏng EV; `NGUON_NOI_DUNG.md` + `CREDITS.md` | hợp đồng (mục 5 gói 1-4), `useItem` `status`, `breakthrough`, `craft` động từ trạm | tiêu đề / nút theo trạm, chip đếm ngược, mô tả đan có số | fuzz kinh tế (chế / dùng / bán / vứt), bot đi chuỗi đột phá có đan |
+| 2 | Bàn phù: `amp_*`, `cdr_phu` | NPC Bàn phù + công thức + mô phỏng sát thương (chiêu Nguyên Anh nhân hệ) | `cast.ts` / `skills.ts`, test | chip phù, mô tả | fuzz hồi chiêu / khắc hệ với phù |
+| 3 (tuỳ) | Đan tăng cường | công thức + mô phỏng | cùng khuôn `status` | chip | cùng fuzz |
+
+Quy ước dữ liệu của D: tên Việt (nguyên văn nguồn nếu hợp), không chữ Hán; mô tả có SỐ ("tăng 12 % xác suất đột phá, 15 phút, mất khi thoát"); mỗi mục lấy từ Vạn Kiếp Tu Tiên có dòng trong `docs/NGUON_NOI_DUNG.md` mục 3 và `CREDITS.md` (`npm run check:credits`); NPC mới: dòng thoại 4-5 dòng theo `npc-dialogue.test.ts`. PR chỉ dữ liệu / test / tài liệu cần LGTM của B hoặc C (QUYET_DINH_M3 mục 23); PR đụng logic máy chủ / giao thức do A review.
+
+## 8. Câu hỏi mở (A chốt khi viết hợp đồng; không chặn bản nháp của D)
+1. `dao_ho` một id chung + `forRealm` trong `ItemEffect`, hay mỗi bậc một id (`dao_ho_1`, `dao_ho_2`, `dao_ho_3`)? Nghiêng về MỘT id chung (ít id, chip gọn) và kiểm bậc lúc DÙNG đan (đan chỉ dùng được khi đang ở đúng đỉnh bậc đó), để người chơi không phí đan.
+2. Hiệu lực mất khi qua cổng / thoát: có chấp nhận không? Với đan hộ đạo `maxMs` 15 phút là đủ vì người chơi dùng ngay trước khi bấm Đột phá; chuỗi nhiệm vụ cho đột phá Kim Đan ở Vọng Sương (`vong_suong`) và Nguyên Anh ở Hàn Vân Trạm (`han_van_len`) nên người chơi dùng đan SAU khi tới nơi và KHÔNG dùng trước khi qua cổng (hiệu lực mất khi qua cổng): mô tả đan phải nói rõ. Nếu người dùng muốn lưu qua phiên thì thêm trường hồ sơ (cần thiết kế riêng, không làm ở lát 1).
+3. Vị trí NPC Lò đan / Bàn phù: Lạc Hà (hầu hết người chơi qua đó), và có thêm ở Vọng Sương / Hàn Vân Trạm không? Đề xuất lát 1 chỉ ở Lạc Hà + Vọng Sương (người Kim Đan -> Nguyên Anh cần), Bàn phù ở lát 2.
+4. Tỉ lệ hỏng (mục 2.6): chỉ thêm nếu EV của D cho thấy cần.
+
+## 9. Không làm (giữ phạm vi, theo kế hoạch #514)
+Không "độ thành thạo nghề", không cây nghề, không bán thành phẩm cho NPC, không giao dịch giữa người chơi ngoài vứt / nhặt hiện có, không hình ảnh / âm thanh mới (client dùng biểu tượng sẵn / màu `color`; hình mới do A + B quyết riêng nếu có), không đổi số liệu cân bằng có sẵn.
