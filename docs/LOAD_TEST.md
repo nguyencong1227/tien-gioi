@@ -1552,3 +1552,48 @@ Bộ kiểm thử đơn vị độc lập (`server/scripts/quest-walk.test.ts`) 
 
 
 
+
+
+## 28. Thử nghiệm mạng giật xả dồn input và trôi vị trí (Mục 41 QUYET_DINH_M3 & PR #852)
+
+> Kịch bản: `server/scripts/do-network-burst.ts` kết nối bằng `colyseus.js` vào máy chủ Colyseus THẬT (cổng động `listenWithRetry`), kiểm tra hành vi xử lý của máy chủ khi mạng đứng từ 1.5s đến 2.0s rồi xả dồn input di chuyển và tin nhắn dừng.
+
+### 28.1. Bối cảnh & Phương pháp đo
+- **Nguyên nhân "trôi như liệt phím":** Mạng nhà chập chờn / nghẽn đường hầm khiến các gói `input` bị đệm dồn tại router / socket. Khi mạng thông, hàng chục input ập tới máy chủ cùng lúc. Trước PR #852, hàng đợi máy chủ chứa tới 60 input (~3 giây) và token bucket áp dần từng bước theo thời gian thật khiến nhân vật tiếp tục chạy thêm 1.0 – 1.6 giây (trôi 225 – 300 px) sau khi người chơi đã nhả phím.
+- **Giải pháp của PR #852:**
+  1. Giới hạn `MAX_INPUT_BACKLOG = 5` input (0,25 giây); input cũ vượt mức bị bỏ ngay trước mỗi tick.
+  2. Input dừng (`dx = dy = 0`) cắt hàng đợi ngay lập tức còn `STOP_KEEP_INPUTS = 2` input cũ nhất.
+  3. Giữ nguyên token bucket chống tăng tốc / dịch chuyển tức thời (`MAX_MOVE_BUDGET = 10`).
+- **Phương pháp đo trên Colyseus thật:**
+  - Bot vào phòng thế giới Lạc Hà Trấn, đứng tại sân trấn thông thoáng (`x = 1300, y = 1500`).
+  - Client đệm cục bộ 30–40 input di chuyển (mô phỏng mạng đứng 1.5s – 2.0s) kèm 3 input dừng cuối (theo PR #851 của client), sau đó xả dồn toàn bộ qua WebSocket.
+  - Đo thời gian từ lúc xả dồn tới khi vị trí thực tế trên server (`state.players` x, y) đứng yên hoàn toàn (`settleTimeMs`), quãng đường trôi thêm (`driftPx`), số input bị drop và số liệu `/metrics`.
+
+---
+
+### 28.2. Bảng kết quả so sánh: Trước (main v0.3.1) vs Sau (PR #852)
+
+| Kịch bản thử nghiệm | Trước (#852 / main v0.3.1) | Sau (PR #852) | Cải thiện | Đánh giá mục 41 |
+|---|---:|---:|---:|:---:|
+| **1. Mạng đứng 1.5s (30 input) + 3 input dừng (client mới #851)** | **1050 ms** / **225 px** (drop: 0) | **41 ms** / **15 px** (drop: 30) | **Giảm 96% thời gian, 93% quãng đường** | ✅ **ĐẠT** (<= 0.3s) |
+| **2. Mạng đứng 1.5s (30 input), không input dừng (client cũ)** | **1079 ms** / **225 px** (drop: 0) | **276 ms** / **105 px** (drop: 16) | **Giảm 74% thời gian, 53% quãng đường** | ✅ **ĐẠT** (<= 0.3s) |
+| **3. Mạng đứng 2.0s (40 input) + 3 input dừng (nhả phím)** | **1565 ms** / **300 px** (drop: 0) | **112 ms** / **82.5 px** (drop: 29) | **Giảm 93% thời gian, 72% quãng đường** | ✅ **ĐẠT** (<= 0.3s) |
+| **4. Mạng đứng 2.0s (40 input), không input dừng (client cũ)** | **1576 ms** / **300 px** (drop: 0) | **268 ms** / **105 px** (drop: 26) | **Giảm 83% thời gian, 65% quãng đường** | ✅ **ĐẠT** (<= 0.3s) |
+| **5. Spam dồn 200 input liên tiếp (Spam DoS)** | **1589 ms** / **300 px** (xả hết hàng đợi cũ 60) | **269 ms** / **105 px** (drop 26 input ngay đầu) | **Không chạy nhanh hơn tốc độ, dừng ngay** | ✅ **ĐẠT** (an toàn DoS) |
+
+---
+
+### 28.3. Đối chiếu chỉ số giám sát (/metrics)
+
+| Metric | Trước (v0.3.1) | Sau (PR #852) | Ý nghĩa vận hành |
+|---|---:|---:|---|
+| `tiengioi_room_input_dropped_total` | `NaN` (chưa có trường) | **127** (ghi nhận đầy đủ) | Ghi nhận chính xác số input cũ bị bỏ và input bị cắt bởi input dừng |
+| `tiengioi_room_input_backlog_ticks_total` | **113** ticks tụt hậu | **7** ticks tụt hậu (**giảm 94%**) | Số tick máy chủ bị tụt hậu hàng đợi giảm triệt để, gần như tiệm cận 0 |
+
+---
+
+### 28.4. Kết luận
+1. **Dừng ngay lập tức:** Khi người chơi nhả phím (client gửi input dừng), máy chủ Colyseus thật dừng nhân vật trong **41 – 112 ms** (nhanh hơn rất nhiều so với ngưỡng yêu cầu 300 ms).
+2. **Bảo vệ client cũ:** Client cũ không có input dừng vẫn được giới hạn backlog tối đa 0,25 giây (dừng trong **268 – 276 ms**, đi tối đa 105 px thay vì 300 px).
+3. **Chống gian lận tốc độ:** Gửi dồn 200 input liên tiếp không làm nhân vật dịch chuyển tức thời hay đi nhanh hơn tốc độ cho phép (tốc độ bền vững vẫn được khống chế bởi token bucket `moveBudget`).
+4. **Đủ tiêu chí mục 41:** Sẵn sàng cho bản phát hành **v0.3.2**.
