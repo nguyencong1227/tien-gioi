@@ -6,6 +6,7 @@ import {
   JOIN_NOT_IN_RUN,
   JOIN_WRONG_MAP,
   LINH_HU_MAP_ID,
+  NET_BEAT_MS,
   PROTOCOL_VERSION,
   clientOutdatedMessage,
   roomNameOf,
@@ -35,7 +36,7 @@ class MemoryStorage implements JoinStorage {
 }
 
 describe("connection helper (joinWithRedirect)", () => {
-  it("vào phòng thành công với bản đồ mặc định khi chưa có lưu trữ (luôn gửi v: PROTOCOL_VERSION)", async () => {
+  it("vào phòng thành công với bản đồ mặc định khi chưa có lưu trữ (luôn gửi v: PROTOCOL_VERSION và beatMs: NET_BEAT_MS, mục 33)", async () => {
     const storage = new MemoryStorage();
     const fakeRoom = { sessionId: "s1", reconnectionToken: "t1" };
     const joinOrCreate = vi.fn().mockResolvedValue(fakeRoom);
@@ -55,6 +56,7 @@ describe("connection helper (joinWithRedirect)", () => {
       name: "TieuPham",
       secret: "sec123",
       v: PROTOCOL_VERSION,
+      beatMs: NET_BEAT_MS,
     });
     expect(getSavedMap(storage, "TieuPham")).toBe(DEFAULT_MAP_ID);
   });
@@ -79,6 +81,7 @@ describe("connection helper (joinWithRedirect)", () => {
       name: "TieuPham",
       secret: "sec123",
       v: PROTOCOL_VERSION,
+      beatMs: NET_BEAT_MS,
     });
   });
 
@@ -111,11 +114,13 @@ describe("connection helper (joinWithRedirect)", () => {
       name: "TieuPham",
       secret: "sec123",
       v: PROTOCOL_VERSION,
+      beatMs: NET_BEAT_MS,
     });
     expect(joinOrCreate).toHaveBeenNthCalledWith(2, roomNameOf(HAC_PHONG_ID), {
       name: "TieuPham",
       secret: "sec123",
       v: PROTOCOL_VERSION,
+      beatMs: NET_BEAT_MS,
     });
     // Đã lưu lại map đúng vào storage
     expect(getSavedMap(storage, "TieuPham")).toBe(HAC_PHONG_ID);
@@ -164,6 +169,7 @@ describe("connection helper (joinWithRedirect)", () => {
       name: "TieuPham",
       secret: "sec123",
       v: PROTOCOL_VERSION,
+      beatMs: NET_BEAT_MS,
     });
     expect(getSavedMap(storage, "TieuPham")).toBe(DEFAULT_MAP_ID);
   });
@@ -205,11 +211,13 @@ describe("connection helper (joinWithRedirect)", () => {
       name: "TieuPham",
       secret: "sec123",
       v: PROTOCOL_VERSION,
+      beatMs: NET_BEAT_MS,
     });
     expect(joinOrCreate).toHaveBeenNthCalledWith(2, roomNameOf(DEFAULT_MAP_ID), {
       name: "TieuPham",
       secret: "sec123",
       v: PROTOCOL_VERSION,
+      beatMs: NET_BEAT_MS,
     });
     expect(getSavedMap(storage, "TieuPham")).toBe(DEFAULT_MAP_ID);
   });
@@ -254,6 +262,7 @@ describe("connection helper (joinWithRedirect)", () => {
     expect(joinOrCreate).toHaveBeenCalledWith(roomNameOf(DEFAULT_MAP_ID), {
       token: "tok_session_12345",
       v: PROTOCOL_VERSION,
+      beatMs: NET_BEAT_MS,
     });
   });
 
@@ -283,6 +292,7 @@ describe("connection helper (joinWithRedirect)", () => {
       name: "TieuPham",
       secret: "sec123",
       v: PROTOCOL_VERSION,
+      beatMs: NET_BEAT_MS,
     });
     expect(joinOrCreate).not.toHaveBeenCalled();
     // Không lưu map bí cảnh vào storage (vẫn giữ DEFAULT_MAP_ID)
@@ -315,6 +325,7 @@ describe("connection helper (joinWithRedirect)", () => {
     expect(joinOrCreate).toHaveBeenCalledWith(roomNameOf(DEFAULT_MAP_ID), {
       token: "tok_abc",
       v: PROTOCOL_VERSION,
+      beatMs: NET_BEAT_MS,
     });
   });
 
@@ -342,6 +353,7 @@ describe("connection helper (joinWithRedirect)", () => {
       name: "TieuPham",
       secret: "sec123",
       v: PROTOCOL_VERSION,
+      beatMs: NET_BEAT_MS,
     });
   });
 
@@ -384,6 +396,7 @@ describe("connection helper (joinWithRedirect)", () => {
       name: "TieuPham",
       secret: "sec123",
       v: PROTOCOL_VERSION,
+      beatMs: NET_BEAT_MS,
     });
   });
 

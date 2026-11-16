@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import { HEARTBEAT_INTERVAL_MS, HEARTBEAT_MSG, RESUME_TIMEOUT_MS } from "@tien-gioi/shared";
+import {
+  HEARTBEAT_INTERVAL_MS,
+  HEARTBEAT_MSG,
+  HEARTBEAT_TIMEOUT_MS,
+  NET_BEAT_MS,
+  NET_SILENCE_GHOST_MS,
+  RESUME_TIMEOUT_MS,
+} from "@tien-gioi/shared";
 import {
   HeartbeatController,
   type DocumentVisibilityLike,
@@ -409,5 +416,95 @@ describe("HeartbeatController", () => {
     expect(harness.timers.size).toBe(0);
     expect(messageHandlers.has(HEARTBEAT_MSG.pong)).toBe(false);
     expect(listeners.get("visibilitychange")?.size).toBe(0);
+  });
+});
+
+describe("HeartbeatController: nhịp 1 giây (mục 33, NET_BEAT_MS)", () => {
+  function setup(intervalMs?: number) {
+    const harness = createMockHarness();
+    const { room, sent, messageHandlers } = createMockRoom();
+    const { doc, triggerVisibilityChange } = createMockDoc();
+    const onDead = vi.fn();
+    const ctrl = new HeartbeatController({
+      room,
+      onDead,
+      doc,
+      intervalMs,
+      now: harness.now,
+      setInterval: harness.setInterval,
+      clearInterval: harness.clearInterval,
+      setTimeout: harness.setTimeout,
+      clearTimeout: harness.clearTimeout,
+    });
+    ctrl.start();
+    const pong = () => {
+      const last = sent[sent.length - 1].message as { t: number };
+      messageHandlers.get(HEARTBEAT_MSG.pong)!({ t: last.t });
+    };
+    return { harness, sent, ctrl, onDead, pong, triggerVisibilityChange };
+  }
+
+  it("nhịp mặc định vẫn là HEARTBEAT_INTERVAL_MS (5 giây, các test cũ), NET_BEAT_MS đủ dày cho luật im lặng của máy chủ", () => {
+    expect(NET_BEAT_MS).toBeLessThan(HEARTBEAT_INTERVAL_MS);
+    expect(NET_BEAT_MS * 2).toBeLessThanOrEqual(NET_SILENCE_GHOST_MS);
+    const { harness, sent } = setup(); // không truyền intervalMs
+    expect([...harness.timers.values()].map((t) => t.ms)).toEqual([HEARTBEAT_INTERVAL_MS]);
+    expect(sent).toHaveLength(1);
+    harness.advanceTime(NET_BEAT_MS * 3);
+    expect(sent).toHaveLength(1); // chưa có pong: không gửi thêm; và chưa tới nhịp 5 giây
+  });
+
+  it("ping mỗi NET_BEAT_MS kể cả khi đứng yên (pong về nhanh): 10 giây liền gửi đúng ~10 ping, không bao giờ dồn quá 1 ping / nhịp", () => {
+    const { harness, sent, pong, onDead } = setup(NET_BEAT_MS);
+    // chu kỳ ĐÃ ĐĂNG KÝ với bộ hẹn giờ là NET_BEAT_MS (harness giả chạy mọi timer ở mỗi lần `advanceTime` nên không tự kiểm được chu kỳ)
+    expect([...harness.timers.values()].map((t) => t.ms)).toEqual([NET_BEAT_MS]);
+    pong();
+    for (let i = 0; i < 10; i++) {
+      harness.advanceTime(NET_BEAT_MS);
+      pong();
+    }
+    expect(sent.length).toBe(11); // 1 lúc khởi động + 10 nhịp
+    const ts = sent.map((m) => (m.message as { t: number }).t);
+    for (let i = 1; i < ts.length; i++) expect(ts[i] - ts[i - 1]).toBe(NET_BEAT_MS);
+    expect(onDead).not.toHaveBeenCalled();
+  });
+
+  it("pong về TRỄ (RTT 1,2 giây > một nhịp): ping kế đi NGAY lúc pong về, không chờ tick kế (khoảng im lặng phía máy chủ không dài hơn RTT)", () => {
+    const { harness, sent, pong } = setup(NET_BEAT_MS);
+    pong(); // supported
+    harness.advanceTime(NET_BEAT_MS); // tick: ping #2
+    expect(sent.length).toBe(2);
+    harness.advanceTime(200); // chưa có pong, đang chờ
+    expect(sent.length).toBe(2);
+    pong(); // pong về sau 200 ms (< một nhịp): KHÔNG gửi ngay, chờ tick
+    expect(sent.length).toBe(2);
+    harness.advanceTime(NET_BEAT_MS - 200); // tick: ping #3
+    expect(sent.length).toBe(3);
+    harness.advanceTime(NET_BEAT_MS + 200); // tick đã bỏ qua vì còn ping chờ; 1,2 giây trôi qua
+    expect(sent.length).toBe(3);
+    pong(); // pong về sau 1,2 giây >= một nhịp
+    expect(sent.length).toBe(4); // gửi NGAY
+  });
+
+  it("còn ping chờ pong thì KHÔNG gửi dồn (mạng đứng): vẫn một ping chờ, tới HEARTBEAT_TIMEOUT_MS thì coi chết như cũ", () => {
+    const { harness, sent, pong, onDead } = setup(NET_BEAT_MS);
+    pong();
+    harness.advanceTime(NET_BEAT_MS); // ping #2, không bao giờ có pong
+    const n = sent.length;
+    harness.advanceTime(HEARTBEAT_TIMEOUT_MS - 1);
+    expect(sent.length).toBe(n);
+    expect(onDead).not.toHaveBeenCalled();
+    harness.advanceTime(NET_BEAT_MS + 1);
+    expect(onDead).toHaveBeenCalledTimes(1);
+  });
+
+  it("xuống nền: KHÔNG ping (máy chủ coi im lặng = hồn lìa xác, có chủ ý); pong về lúc đang ở nền không gửi ping mới", () => {
+    const { harness, sent, pong, triggerVisibilityChange } = setup(NET_BEAT_MS);
+    pong();
+    harness.advanceTime(NET_BEAT_MS * 2);
+    const before = sent.length;
+    triggerVisibilityChange(true);
+    harness.advanceTime(NET_BEAT_MS * 10);
+    expect(sent.length).toBe(before);
   });
 });

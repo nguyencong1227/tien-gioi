@@ -134,10 +134,14 @@ function harness() {
   const timers = new Map<number, () => void>();
   let id = 1;
   const calls: boolean[] = [];
+  const resumedFlags: boolean[] = [];
   const fr = fakeRoom();
   const mon = new NetSlowMonitor({
     room: fr.room,
-    onChange: (s) => calls.push(s),
+    onChange: (s, resumed) => {
+      calls.push(s);
+      resumedFlags.push(resumed);
+    },
     now: () => now,
     setInterval: (fn) => {
       timers.set(id, fn);
@@ -153,7 +157,7 @@ function harness() {
       timers.forEach((f) => f());
     }
   };
-  return { fr, mon, calls, advance, timers, setNow: (n: number) => (now = n) };
+  return { fr, mon, calls, resumedFlags, advance, timers, setNow: (n: number) => (now = n) };
 }
 
 describe("NetSlowMonitor", () => {
@@ -256,5 +260,26 @@ describe("NetSlowMonitor", () => {
     h.mon.stop();
     h.mon.tick();
     expect(h.calls).toEqual([]);
+  });
+
+  it("chip tắt vì tín hiệu về lại: onChange(false, resumed = true) để báo 'Đã kết nối lại'; tắt vì stop() thì resumed = false (không báo)", () => {
+    const h = harness();
+    h.mon.start();
+    h.fr.pong();
+    h.fr.room.send("ping", { t: 1 });
+    h.advance(SLOW_AFTER_MS + 1000);
+    expect(h.calls).toEqual([true]);
+    expect(h.resumedFlags).toEqual([false]); // lúc bật: resumed = false
+    h.fr.pong();
+    h.advance(SLOW_MIN_SHOW_MS + 1000);
+    expect(h.calls).toEqual([true, false]);
+    expect(h.resumedFlags).toEqual([false, true]); // tín hiệu về lại
+    const h2 = harness();
+    h2.mon.start();
+    h2.fr.pong();
+    h2.fr.room.send("ping", { t: 1 });
+    h2.advance(SLOW_AFTER_MS + 1000);
+    h2.mon.stop();
+    expect(h2.resumedFlags).toEqual([false, false]); // dừng (rớt socket): không phải "đã kết nối lại"
   });
 });
