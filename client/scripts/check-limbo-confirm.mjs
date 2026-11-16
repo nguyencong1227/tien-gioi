@@ -298,7 +298,10 @@ async function main() {
       await shot("hoang-tuyen-mo-duyen");
       await sleep(560);
       await tap(yes1.x, yes1.y);
-      await sleep(700);
+      // `click` "ma" do trình duyệt tạo sau khi nhả ngón (cảm ứng: hộp đóng ở pointerdown nên click rơi xuống nút bên dưới): giả lập ngay sau khi hộp đóng
+      await sleep(100);
+      await evalJs(`document.querySelector('[data-nav="stone:khac"]').click(); 1`);
+      await sleep(600);
       check(
         !(await box()).open && (await duyen()) === 490,
         `xác nhận sau cửa sổ chống click ma: trừ Duyên đúng MỘT lần (${await duyen()})`,
