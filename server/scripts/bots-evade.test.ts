@@ -1032,3 +1032,149 @@ describe("bot tránh đập đất: fx warn circle (Cốt Tượng & Thiên Hàn
     expect(pEvade.hp).toBe(hp0Evade);
   });
 });
+
+describe("bot né đòn cảnh báo trùm M42: vành khuyên (circle có r0, Issue #876 T7)", () => {
+  it("parseWarnZoneFromFx trích xuất chính xác r0 của vành khuyên trùm", () => {
+    const realNow = performance.now();
+    const ringWarn = {
+      kind: "warn" as const,
+      shape: "circle" as const,
+      x: 400,
+      y: 500,
+      r: 160,
+      r0: 60,
+      ms: 1200,
+    };
+    const z = parseWarnZoneFromFx(ringWarn, realNow);
+    expect(z).not.toBeNull();
+    expect(z!.shape).toBe("circle");
+    expect(z!.x).toBe(400);
+    expect(z!.y).toBe(500);
+    expect(z!.r).toBe(160);
+    expect(z!.r0).toBe(60);
+    expect(z!.expiresAt).toBe(realNow + 1200);
+  });
+
+  it("isPointInWarnZone nhận diện đúng 3 vùng: an toàn lõi tâm, nguy hiểm trong vành, và an toàn ngoài rìa", () => {
+    const zone: ActiveWarnZone = {
+      shape: "circle",
+      x: 100,
+      y: 100,
+      r: 160,
+      r0: 60,
+      w: 0,
+      angle: 0,
+      arc: 0,
+      expiresAt: performance.now() + 1000,
+    };
+
+    // 1. Ngay tại tâm (100, 100): cách tâm 0 px < r0 - PLAYER_RADIUS - buffer -> AN TOÀN
+    expect(isPointInWarnZone(100, 100, zone)).toBe(false);
+
+    // Cách tâm 20 px (< 60 - 12 - 8 = 40): AN TOÀN
+    expect(isPointInWarnZone(120, 100, zone)).toBe(false);
+
+    // 2. Nằm trong vành khuyên nguy hiểm:
+    // Cách tâm 50 px (vừa chạm rìa trong): NGUY HIỂM
+    expect(isPointInWarnZone(150, 100, zone)).toBe(true);
+
+    // Cách tâm 110 px (ở giữa vành): NGUY HIỂM
+    expect(isPointInWarnZone(100, 210, zone)).toBe(true);
+
+    // Cách tâm 175 px (chạm rìa ngoài, r = 160, reach = 160 + 12 + 8 = 180): NGUY HIỂM
+    expect(isPointInWarnZone(100, 275, zone)).toBe(true);
+
+    // 3. Nằm ngoài rìa an toàn:
+    // Cách tâm 190 px (> 180): AN TOÀN
+    expect(isPointInWarnZone(100, 290, zone)).toBe(false);
+  });
+
+  it("computeEvadeVector: ở nửa trong chọn chạy VÀO TÂM an toàn, ở nửa ngoài chọn chạy RA RÌA an toàn", () => {
+    const now = performance.now();
+    const ringZone: ActiveWarnZone = {
+      shape: "circle",
+      x: 200,
+      y: 200,
+      r: 160,
+      r0: 60,
+      w: 0,
+      angle: 0,
+      arc: 0,
+      expiresAt: now + 1000,
+    };
+    // Điểm giữa của vành: mid = (60 + 160) / 2 = 110 px
+
+    // Trường hợp 1: Bot ở vị trí an toàn tại tâm (200, 200) -> không cần né
+    expect(computeEvadeVector(200, 200, [ringZone], now)).toBeNull();
+
+    // Trường hợp 2: Bot ở nửa trong của vành (cách tâm 80 px < mid 110 px):
+    // Đứng tại (200, 280), hướng lệch là +y
+    // Vector né phải chỉ VỀ TÂM (-y)
+    const vecIn = computeEvadeVector(200, 280, [ringZone], now);
+    expect(vecIn).not.toBeNull();
+    expect(vecIn!.dx).toBeCloseTo(0, 3);
+    expect(vecIn!.dy).toBeCloseTo(-1, 3); // Chạy ngược lại hướng tâm (dy = -1)
+
+    // Trường hợp 3: Bot ở nửa ngoài của vành (cách tâm 130 px > mid 110 px):
+    // Đứng tại (200, 330), hướng lệch là +y
+    // Vector né phải chỉ RA RÌA (+y)
+    const vecOut = computeEvadeVector(200, 330, [ringZone], now);
+    expect(vecOut).not.toBeNull();
+    expect(vecOut!.dx).toBeCloseTo(0, 3);
+    expect(vecOut!.dy).toBeCloseTo(1, 3); // Chạy tiếp ra rìa ngoài (dy = +1)
+
+    // Trường hợp 4: Bot ở vị trí an toàn ngoài rìa (cách tâm 190 px) -> không cần né
+    expect(computeEvadeVector(200, 390, [ringZone], now)).toBeNull();
+  });
+
+  it("mô phỏng động học bot né vành khuyên: bot chạy vào tâm an toàn hoặc ra ngoài rìa trước khi đòn đáp", () => {
+    const t0 = performance.now();
+    const ringZone: ActiveWarnZone = {
+      shape: "circle",
+      x: 500,
+      y: 500,
+      r: 160,
+      r0: 60,
+      w: 0,
+      angle: 0,
+      arc: 0,
+      expiresAt: t0 + 1000,
+      targeted: true,
+    };
+
+    // Bot A đứng ở (500, 580) - cách tâm 80 px (nửa trong):
+    // Chạy vào tâm với tốc độ 150 px/s trong 300 ms -> đi 45 px về tâm -> cách tâm 35 px (< 40 an toàn)
+    let botAx = 500;
+    let botAy = 580;
+    const speed = 150; // px/s
+
+    // Mỗi bước 50 ms
+    for (let step = 0; step < 6; step++) {
+      const vec = computeEvadeVector(botAx, botAy, [ringZone], t0 + step * 50);
+      if (vec) {
+        botAx += vec.dx * speed * 0.05;
+        botAy += vec.dy * speed * 0.05;
+      }
+    }
+
+    // Sau 300 ms bot A đã vào vùng an toàn lõi tâm
+    expect(Math.hypot(botAx - 500, botAy - 500)).toBeLessThan(40);
+    expect(isPointInWarnZone(botAx, botAy, ringZone)).toBe(false);
+
+    // Bot B đứng ở (500, 630) - cách tâm 130 px (nửa ngoài):
+    // Chạy ra ngoài rìa với tốc độ 150 px/s trong 400 ms -> đi 60 px ra ngoài -> cách tâm 190 px (> 180 an toàn)
+    let botBx = 500;
+    let botBy = 630;
+    for (let step = 0; step < 8; step++) {
+      const vec = computeEvadeVector(botBx, botBy, [ringZone], t0 + step * 50);
+      if (vec) {
+        botBx += vec.dx * speed * 0.05;
+        botBy += vec.dy * speed * 0.05;
+      }
+    }
+
+    // Sau 400 ms bot B đã ra ngoài rìa an toàn
+    expect(Math.hypot(botBx - 500, botBy - 500)).toBeGreaterThan(180);
+    expect(isPointInWarnZone(botBx, botBy, ringZone)).toBe(false);
+  });
+});
