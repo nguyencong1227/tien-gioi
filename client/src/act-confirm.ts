@@ -221,3 +221,73 @@ export function rebirthPlan(
     cancel: "Xem lại",
   };
 }
+
+const vnNum = (n: number) => Math.floor(n).toLocaleString("vi-VN");
+
+/** Kế hoạch LẬP tông môn đang chờ xác nhận (chụp lúc bấm, kiểm lại lúc xác nhận). */
+export interface SectCreatePlan {
+  name: string;
+  tag: string;
+  cost: number;
+  spec: ConfirmSpec;
+}
+
+/**
+ * Hộp "Lập tông môn «tên» [biệt hiệu]? Tốn 1.000 Linh thạch": phí lập MẤT HẲN (không hoàn, kể cả khi giải tán), biểu mẫu gửi cả bằng Enter trong ô nhập (hàng 13 của
+ * `docs/RA_SOAT_THAO_TAC.md`). `null` = không hỏi, gửi thẳng: tên / biệt hiệu rỗng (biểu mẫu đã báo lỗi riêng), phí hỏng, hoặc ví KHÔNG đủ (chưa mất gì, máy chủ trả lý do).
+ */
+export function sectCreatePlan(
+  name: string,
+  tag: string,
+  cost: number,
+  coin: number,
+): SectCreatePlan | null {
+  if (!name || !tag) return null;
+  if (!Number.isInteger(cost) || cost <= 0) return null;
+  if (!Number.isFinite(coin) || coin < cost) return null;
+  return {
+    name,
+    tag,
+    cost,
+    spec: {
+      text: `Lập tông môn «${name}» [${tag}]? Tốn ${vnNum(cost)} Linh thạch (còn lại ${vnNum(coin - cost)}).`,
+      warn: "Phí lập không hoàn lại, kể cả khi giải tán.",
+      ok: "Lập",
+      cancel: "Chưa",
+    },
+  };
+}
+
+/** Lúc xác nhận: vẫn chưa ở tông môn nào (đã nhận lời mời / lập xong ở nơi khác thì HUỶ) và ví vẫn đủ phí. */
+export function sectCreateStillValid(
+  plan: SectCreatePlan,
+  hasSect: boolean,
+  coin: number,
+): boolean {
+  return !hasSect && Number.isFinite(coin) && coin >= plan.cost;
+}
+
+/**
+ * Hộp "Nộp N Linh thạch vào kho tông môn?" CHỈ khi người nộp KHÔNG rút lại được (`SECT_PERMS.withdraw`: chỉ Tông chủ): tiền nộp rồi không lấy lại (hàng 14). Tông chủ nộp thì rút
+ * lại được nên KHÔNG hỏi. `null` = gửi thẳng: Tông chủ, số tiền hỏng (không nguyên / <= 0), hoặc nộp quá số đang có (chưa mất gì, máy chủ trả lý do).
+ */
+export function sectDepositPlan(
+  amount: number,
+  coin: number,
+  canWithdraw: boolean,
+): ConfirmSpec | null {
+  if (canWithdraw) return null;
+  if (!Number.isInteger(amount) || amount <= 0) return null;
+  if (!Number.isFinite(coin) || amount > coin) return null;
+  return {
+    text: `Nộp ${vnNum(amount)} Linh thạch vào kho tông môn?`,
+    warn: "Chỉ Tông chủ rút được: nộp rồi ngươi không lấy lại được.",
+    ok: "Nộp",
+    cancel: "Giữ lại",
+  };
+}
+
+/** Lúc xác nhận: còn ở một tông môn và ví vẫn đủ số định nộp (khác đi thì HUỶ, không nộp theo lời hỏi đã cũ). */
+export function sectDepositStillValid(amount: number, inSect: boolean, coin: number): boolean {
+  return inSect && Number.isFinite(coin) && coin >= amount;
+}

@@ -17,6 +17,10 @@ import {
   sellStillValid,
   unlockPlan,
   unlockStillValid,
+  sectCreatePlan,
+  sectCreateStillValid,
+  sectDepositPlan,
+  sectDepositStillValid,
 } from "./act-confirm";
 import { DROP_WARN_RARITY } from "./inv-drop";
 
@@ -219,5 +223,64 @@ describe("Hoàng Tuyền: mở bằng Duyên (hàng 11) và tóm tắt đầu th
     );
     expect(rebirthPlan("A", 2.9, 1.2).text).toBe("Đầu thai làm A, giữ 2 di vật, khắc 1 chiêu?");
     expect(rebirthPlan("A", Infinity, 1).text).toBe("Đầu thai làm A, giữ 0 di vật, khắc 1 chiêu?");
+  });
+});
+
+describe("Tông môn: lập (hàng 13) và nộp kho (hàng 14)", () => {
+  it("sectCreatePlan: nêu tên + biệt hiệu + phí + số dư còn lại; phí mất hẳn", () => {
+    const p = sectCreatePlan("Tiêu Dao Phái", "TD", 1000, 2500)!;
+    expect(p.spec.text).toBe(
+      "Lập tông môn «Tiêu Dao Phái» [TD]? Tốn 1.000 Linh thạch (còn lại 1.500).",
+    );
+    expect(p.spec.warn).toMatch(/không hoàn lại, kể cả khi giải tán/);
+    expect(p.spec.ok).toBe("Lập");
+    expect(p.spec.cancel).toBe("Chưa");
+    expect(p.cost).toBe(1000);
+    expect(sectCreatePlan("A", "B", 1000, 1000)!.spec.text).toMatch(/còn lại 0\)/); // đủ vừa
+  });
+
+  it("sectCreatePlan: ví không đủ / phí hỏng / tên hay biệt hiệu rỗng thì không hỏi (gửi thẳng, chưa mất gì)", () => {
+    expect(sectCreatePlan("A", "B", 1000, 999)).toBeNull();
+    expect(sectCreatePlan("A", "B", 1000, Number.NaN)).toBeNull();
+    expect(sectCreatePlan("A", "B", 0, 5000)).toBeNull();
+    expect(sectCreatePlan("A", "B", -1, 5000)).toBeNull();
+    expect(sectCreatePlan("A", "B", 10.5, 5000)).toBeNull();
+    expect(sectCreatePlan("", "B", 1000, 5000)).toBeNull();
+    expect(sectCreatePlan("A", "", 1000, 5000)).toBeNull();
+  });
+
+  it("sectCreateStillValid: đã vào tông môn / ví không còn đủ phí thì HUỶ", () => {
+    const p = sectCreatePlan("A", "B", 1000, 3000)!;
+    expect(sectCreateStillValid(p, false, 3000)).toBe(true);
+    expect(sectCreateStillValid(p, false, 1000)).toBe(true);
+    expect(sectCreateStillValid(p, false, 999)).toBe(false);
+    expect(sectCreateStillValid(p, true, 3000)).toBe(false); // vừa nhận lời mời của tông môn khác
+    expect(sectCreateStillValid(p, false, Number.NaN)).toBe(false);
+  });
+
+  it("sectDepositPlan: người KHÔNG rút được (Trưởng lão, Đệ tử) được hỏi, nêu số tiền + 'chỉ Tông chủ rút được'", () => {
+    const s = sectDepositPlan(1500, 9000, false)!;
+    expect(s.text).toBe("Nộp 1.500 Linh thạch vào kho tông môn?");
+    expect(s.warn).toMatch(/Chỉ Tông chủ rút được/);
+    expect(s.ok).toBe("Nộp");
+    expect(s.cancel).toBe("Giữ lại");
+  });
+
+  it("sectDepositPlan: Tông chủ (rút lại được) KHÔNG hỏi; số hỏng hoặc vượt ví thì gửi thẳng", () => {
+    expect(sectDepositPlan(1500, 9000, true)).toBeNull();
+    expect(sectDepositPlan(0, 9000, false)).toBeNull();
+    expect(sectDepositPlan(-5, 9000, false)).toBeNull();
+    expect(sectDepositPlan(2.5, 9000, false)).toBeNull();
+    expect(sectDepositPlan(Number.NaN, 9000, false)).toBeNull();
+    expect(sectDepositPlan(9001, 9000, false)).toBeNull();
+    expect(sectDepositPlan(9000, 9000, false)).not.toBeNull(); // nộp hết ví vẫn hỏi
+    expect(sectDepositPlan(10, Number.NaN, false)).toBeNull();
+  });
+
+  it("sectDepositStillValid: không còn ở tông môn / ví không còn đủ thì HUỶ", () => {
+    expect(sectDepositStillValid(500, true, 500)).toBe(true);
+    expect(sectDepositStillValid(500, true, 499)).toBe(false);
+    expect(sectDepositStillValid(500, false, 9000)).toBe(false);
+    expect(sectDepositStillValid(500, true, Number.NaN)).toBe(false);
   });
 });
