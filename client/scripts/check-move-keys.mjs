@@ -272,6 +272,12 @@ async function main() {
         `giây nhanh nhất ${maxStep.toFixed(0)} px <= 130% chuẩn (không giật tăng tốc)`,
       );
       check(await stopped(), "nhả phím: nhân vật dừng");
+      const toastTexts = () =>
+        evalJs(`[...document.querySelectorAll("#toast p")].map((p) => p.textContent)`);
+      check(
+        !(await toastTexts()).some((t) => t.includes("bộ gõ")),
+        "chơi bình thường 30 giây: KHÔNG hiện gợi ý bộ gõ",
+      );
 
       console.log("  [2] bộ gõ kiểu Windows: key = 'Process', keyCode 229");
       for (const code of ["KeyD", "KeyA", "KeyW", "KeyS", "ArrowRight"]) {
@@ -420,6 +426,59 @@ async function main() {
         `bảng đã ẩn nhưng còn trong ngăn xếp: tự chữa, đi lại được (${healed.x.toFixed(0)} px)`,
       );
       await evalJs(`window.__ui.toggleInventory(false)`);
+
+      console.log("  [8] bộ gõ Unikey chèn Backspace + chữ có dấu nhiều lần: gợi ý MỘT lần");
+      await evalJs(`document.querySelectorAll("#toast p").forEach((p) => p.remove())`);
+      for (let i = 0; i < 3; i++) {
+        await down("KeyW");
+        await sleep(20);
+        await down("Backspace");
+        await up("Backspace");
+        await send("Input.dispatchKeyEvent", {
+          type: "rawKeyDown",
+          key: "ư",
+          code: "",
+          windowsVirtualKeyCode: 231,
+        });
+        await send("Input.dispatchKeyEvent", {
+          type: "keyUp",
+          key: "ư",
+          code: "",
+          windowsVirtualKeyCode: 231,
+        });
+        await up("KeyW");
+        await sleep(200);
+      }
+      const hint = (await toastTexts()).filter((t) => t.includes("bộ gõ"));
+      check(hint.length === 1, `gợi ý bộ gõ hiện đúng MỘT lần: ${JSON.stringify(hint)}`);
+      await sleep(200);
+
+      console.log("  [9] độ trễ từ lúc nhấn phím đến lúc thấy nhân vật nhích");
+      const lat = [];
+      for (let i = 0; i < 10; i++) {
+        await reset();
+        await sleep(120);
+        const x0 = (await pos()).x;
+        const t1 = Date.now();
+        await down("KeyD");
+        let dt = -1;
+        while (Date.now() - t1 < 1000) {
+          if ((await pos()).x - x0 > 0.5) {
+            dt = Date.now() - t1;
+            break;
+          }
+          await sleep(4);
+        }
+        await up("KeyD");
+        await sleep(100);
+        lat.push(dt);
+      }
+      lat.sort((a, b) => a - b);
+      const med = lat[Math.floor(lat.length / 2)];
+      check(
+        lat[0] >= 0 && med <= 150,
+        `độ trễ nhấn phím -> nhích: trung vị ${med} ms (<= 150), lớn nhất ${lat[lat.length - 1]} ms`,
+      );
     }
   } finally {
     try {

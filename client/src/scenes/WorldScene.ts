@@ -196,6 +196,7 @@ import {
 } from "../map-render";
 import { moveVector } from "../move-input";
 import { MoveKeys } from "../move-keys";
+import { IME_HINT_TEXT, ImeSniffer } from "../ime-hint";
 import { isTypingElement, isReducedMotion } from "../a11y";
 import {
   markMonAttack,
@@ -1110,10 +1111,36 @@ export class WorldScene extends Phaser.Scene {
     // `keyCode` = 229 nên Phaser không thấy phím nào ("liệt nút", QUYET_DINH_M3 mục 25). Nghe ở pha BẮT (capture) để không bị `stopPropagation` / `defaultPrevented`
     // của nút hay bảng che mất keyup. Mọi phím HÀNH ĐỘNG đi qua bảng phím `keybinds.ts` (đổi được, HUD đọc nhãn từ đó) ở `onKeyDown`.
     const mk = this.moveKeys;
+    // Gợi ý MỘT lần khi bộ gõ kiểu hook (Unikey / EVKey Telex) chèn Backspace / chữ có dấu hay nuốt keydown (`ime-hint.ts`): trình duyệt không nhận được phím thì client không cứu được
+    const ime = new ImeSniffer();
     const kd = (e: KeyboardEvent) => {
-      mk.keyDown(e, isTypingElement(e.target as Element | null));
+      const typing = isTypingElement(e.target as Element | null);
+      mk.keyDown(e, typing);
+      if (
+        ime.feed({
+          type: "down",
+          code: e.code,
+          key: e.key,
+          keyCode: e.keyCode,
+          typing,
+          at: performance.now(),
+        })
+      )
+        ui.toast({ text: IME_HINT_TEXT, tone: "info" });
     };
-    const ku = (e: KeyboardEvent) => mk.keyUp(e);
+    const ku = (e: KeyboardEvent) => {
+      const wasHeld = mk.keyUp(e);
+      if (
+        ime.feed({
+          type: "up",
+          code: e.code,
+          typing: isTypingElement(e.target as Element | null),
+          wasHeld,
+          at: performance.now(),
+        })
+      )
+        ui.toast({ text: IME_HINT_TEXT, tone: "info" });
+    };
     // keyup có thể KHÔNG BAO GIỜ tới (Alt-Tab, đổi tab, menu chuột phải, vào ô chat): quên hết phím đang giữ để không kẹt
     const forget = () => mk.clear();
     const onVisibility = () => {
