@@ -401,6 +401,8 @@ let sectTab: "overview" | "members" | "treasury" = "overview";
 let currentSectInvite: SectInvitedMsg | null = null;
 let sectInviteInterval: number | null = null;
 let sectConfirmAction: (() => void) | null = null;
+/** Hộp xác nhận qua cổng khi đang có hiệu lực đan / phù (#514, issue #769): việc làm khi người chơi chọn "Đi" */
+let travelConfirmAction: (() => void) | null = null;
 
 /** Hộp xác nhận trong game cho Nhường / Trục xuất / Rời (#246): confirm() gốc bị chặn / xấu trên điện thoại và PWA */
 function askSectConfirm(kind: SectConfirmKind, name: string, onOk: () => void) {
@@ -3268,6 +3270,14 @@ export const ui = {
       if (from) callbacks?.onDuelDecline?.(from);
     });
 
+    // Xác nhận qua cổng (#769): "Đi" gửi `travel`, "Ở lại" chỉ đóng hộp. Y / X bấm đúng hai nút này (`prompts.ts`).
+    bindTap("tvl-btn-yes", () => {
+      const go = travelConfirmAction;
+      this.closeTravelConfirm();
+      go?.();
+    });
+    bindTap("tvl-btn-no", () => this.closeTravelConfirm());
+
     bindTap("duel-btn-yield", () => {
       $("duel-btn-yield").hidden = true;
       $("duel-yield-confirm").hidden = false;
@@ -4321,6 +4331,25 @@ export const ui = {
     } else {
       portalCallback = null;
     }
+  },
+
+  /**
+   * Hộp xác nhận bấm qua cổng khi đang có hiệu lực đan / phù (máy chủ XOÁ hiệu lực khi qua cổng: #767). `text` đã dựng sẵn (`travelConfirmText`),
+   * `onGo` chạy khi chọn "Đi". Không chặn điều khiển (như các lời mời); Y / X trả lời (`prompts.ts`).
+   */
+  askTravelConfirm(text: string, onGo: () => void) {
+    travelConfirmAction = onGo;
+    $("travel-confirm-text").textContent = text;
+    $("travel-confirm").hidden = false;
+  },
+
+  closeTravelConfirm() {
+    travelConfirmAction = null;
+    $("travel-confirm").hidden = true;
+  },
+
+  isTravelConfirmOpen(): boolean {
+    return !$("travel-confirm").hidden;
   },
 
   /** `itemName`: tên món đồ rơi gần nhất ("" = không rõ tên); `null` = ẩn nút. Nhãn trong nút cố định ngắn, tên đi vào title / aria-label. */

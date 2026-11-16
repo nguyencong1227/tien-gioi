@@ -143,6 +143,7 @@ import { StatusTracker } from "../status-track";
 import { BAR_SLOTS, SkillTracker, aimMode, blockedToast, slotView } from "../skill-bar";
 import { SkillBarDom } from "../skill-bar-dom";
 import { StatusBadgesDom, badgeViews } from "../status-badges";
+import { craftBuffNames, travelConfirmText, useSuccessText } from "../craft-buff";
 import {
   ELITE_STYLE,
   EliteHintGate,
@@ -477,6 +478,8 @@ export class WorldScene extends Phaser.Scene {
   private townVisuals: Phaser.GameObjects.GameObject[] = [];
   private portalVisuals: Phaser.GameObjects.GameObject[] = [];
   private nearPortal: PortalDef | null = null;
+  /** Lúc (ms, performance.now) bấm Dùng vật phẩm gần nhất: chip chế phẩm mới hiện ngay sau đó thì báo thành công (`useSuccessText`, #514) */
+  private lastUseAt: number | null = null;
 
   constructor(
     private room: Room,
@@ -550,7 +553,11 @@ export class WorldScene extends Phaser.Scene {
     this.scale.on("resize", applyZoom);
 
     ui.init({
-      onUse: (slot) => !this.isReconnecting && this.room.send("useItem", { slot }),
+      onUse: (slot) => {
+        if (this.isReconnecting) return;
+        this.lastUseAt = performance.now();
+        this.room.send("useItem", { slot });
+      },
       onEquip: (slot) => !this.isReconnecting && this.room.send("equip", { slot }),
       onUnequip: (slot) => !this.isReconnecting && this.room.send("unequip", { slot }),
       onCraft: (recipeId) => !this.isReconnecting && this.room.send("craft", { recipeId }),
@@ -1619,6 +1626,17 @@ export class WorldScene extends Phaser.Scene {
 
   public travelPortal(portalId: string) {
     if (this.isReconnecting) return;
+    // Qua cổng XOÁ hiệu lực đan / phù (máy chủ, test #767): đang có thì hỏi trước (buff của chiêu thì không hỏi). "Đi" mới gửi `travel`.
+    const warn = travelConfirmText(craftBuffNames(this.status.active(performance.now())));
+    if (warn !== null) {
+      ui.askTravelConfirm(warn, () => this.sendTravel(portalId));
+      return;
+    }
+    this.sendTravel(portalId);
+  }
+
+  private sendTravel(portalId: string) {
+    if (this.isReconnecting) return;
     // Bắt đầu tải gói bản đồ đích NGAY khi gửi `travel`: chạy song song với màn chuyển cảnh và việc vào phòng mới (main.ts `travelTo`),
     // không nối đuôi sau chúng. Cổng lạ thì không có gì để tải; server vẫn là bên quyết định có cho đi không.
     const dest = this.map.portals.find((p) => p.id === portalId);
@@ -1638,6 +1656,7 @@ export class WorldScene extends Phaser.Scene {
   public setReconnecting(reconnecting: boolean) {
     this.isReconnecting = reconnecting;
     if (reconnecting) {
+      ui.closeTravelConfirm();
       this.moving = false;
       this.duelKoUntil = 0;
       this.dungeonFallUntil = 0;
@@ -1725,6 +1744,7 @@ export class WorldScene extends Phaser.Scene {
     this.closestNpcId = null;
     ui.talkPrompt(null);
     ui.pickupPrompt(null);
+    ui.closeTravelConfirm();
   }
 
   /** Nhận danh sách trạng thái của chính mình (server gửi khi thêm / mất / làm mới, vơi khiên, nối lại). Công khai để script kiểm giả lập (`?debug`) bơm tin. */
@@ -1732,6 +1752,12 @@ export class WorldScene extends Phaser.Scene {
     const now = performance.now();
     const before = new Set(this.status.active(now).map((e) => e[0]));
     this.status.set(m?.list, now);
+    // Dùng đan / phù thành công: máy chủ không gửi toast riêng, chip chế phẩm mới hiện ngay sau lần bấm Dùng thì báo tác dụng + thời gian (#514)
+    const okText = useSuccessText(before, this.status.active(now), this.lastUseAt, now);
+    if (okText !== null) {
+      this.lastUseAt = null;
+      ui.toast({ text: okText, tone: "good" });
+    }
     // tiếng khi dính trạng thái MỚI (một tiếng cho mỗi tin, ưu tiên loại có hại; làm mới trạng thái đã có thì im)
     let pick: { kind: string; harmful: boolean } | null = null;
     for (const e of this.status.active(now)) {
@@ -1770,6 +1796,9 @@ export class WorldScene extends Phaser.Scene {
     const activeStatuses = this.status.active(now);
     this.statusBadges.render(badgeViews(activeStatuses));
     ui.setActiveStatuses(activeStatuses.map((e) => e[0])); // nút Dùng của đan / phù gắn trạng thái mờ khi còn hiệu lực (#514)
+    // hiệu lực chế phẩm hết hạn trong lúc hộp hỏi qua cổng đang mở: lời "sẽ mất ..." không còn đúng, đóng hộp
+    if (ui.isTravelConfirmOpen() && craftBuffNames(activeStatuses).length === 0)
+      ui.closeTravelConfirm();
     let filled = 0;
     for (const slot of BAR_SLOTS) {
       const v = slotView(slot, this.skills, me, stunned, now);
@@ -2177,6 +2206,7 @@ export class WorldScene extends Phaser.Scene {
       if (this.nearPortal) {
         this.nearPortal = null;
         ui.portalPrompt(null);
+        ui.closeTravelConfirm(); // đã rời xa cổng: hộp hỏi qua cổng không còn nghĩa
       }
     }
   }

@@ -3393,6 +3393,55 @@ html[data-input="touch"] #newbie-btn-keys {
   color: #95de64;
 }
 
+/* Xác nhận qua cổng khi đang có hiệu lực đan / phù (#514): trên các lời mời (z-index cao hơn), viền hổ phách vì mất đồ dùng tay */
+.travel-confirm {
+  position: fixed;
+  z-index: 31;
+  top: max(20px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(92vw, 360px);
+  padding: 12px 14px;
+  background: rgba(24, 21, 18, 0.97);
+  border: 1.5px solid #e0a93b;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(4px);
+}
+.travel-confirm p {
+  margin: 0 0 8px 0;
+  font-size: var(--fs-13);
+  color: #fff6dc;
+  text-align: center;
+}
+.travel-confirm-btns {
+  display: flex;
+  gap: 8px;
+}
+.tvl-btn {
+  flex: 1;
+  min-height: 44px;
+  font-size: var(--fs-13);
+  font-weight: 700;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.tvl-btn.go {
+  background: #7a5b17;
+  border-color: #e0a93b;
+  color: #fff6dc;
+}
+.tvl-btn.stay {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e5e7eb;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
 .party-invite-box {
   position: fixed;
   z-index: 30;

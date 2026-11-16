@@ -57,7 +57,7 @@ describe("craftBuffNames + travelConfirmText: hộp xác nhận qua cổng", () 
         ["dao_ho", -5, 0.15],
         ["dao_ho", Number.NaN, 0.15],
         ["khong_co", 9000],
-      ] as StatusEntry[]),
+      ] as unknown as StatusEntry[]),
     ).toEqual([]);
   });
 });
@@ -92,6 +92,8 @@ describe("useSuccessText: toast khi dùng đan thành công", () => {
   });
   it("mục hết hạn / hỏng không báo", () => {
     expect(useSuccessText(none, [["dao_ho", 0, 0.15]], 0, 100)).toBeNull();
-    expect(useSuccessText(none, [["khong_co", 9000]] as StatusEntry[], 0, 100)).toBeNull();
+    expect(
+      useSuccessText(none, [["khong_co", 9000]] as unknown as StatusEntry[], 0, 100),
+    ).toBeNull();
   });
 });
