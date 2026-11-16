@@ -435,8 +435,12 @@ async function main() {
 
       // ---- nhiệm vụ TÔNG MÔN trong sổ nhiệm vụ / HUD: không có NPC giao, trả ở bảng Tông môn ----
       await evalJs(`window.__ui.toggleSectModal(false); 1`);
+      // Nhiệm vụ lấy từ ảnh chụp mẫu (dữ liệu THẬT của game, E / D còn thay ở M8.7): không cứng id / tên của bảng khung. `step` lớn = đã xong mọi bước (sẵn sàng trả)
+      const hudQuest = await evalJs(
+        `(() => { const q = window.__sampleSectHall(2, Date.now()).quests[0]; return { questId: q.questId, title: q.title }; })()`,
+      );
       await evalJs(
-        `window.__ui.onQuests({ active: [{ id: "st_tru_lang.t0", step: 1, count: 0 }], done: [], dailyDone: [] }); 1`,
+        `window.__ui.onQuests({ active: [{ id: ${JSON.stringify(hudQuest.questId)}, step: 99, count: 0 }], done: [], dailyDone: [] }); 1`,
       );
       await sleep(150);
       const qt = await evalJs(
@@ -444,7 +448,7 @@ async function main() {
       );
       check(
         qt.length === 1 &&
-          qt[0].title === "Trừ sói quanh trấn" &&
+          qt[0].title === hudQuest.title &&
           qt[0].badge === "Tông" &&
           qt[0].ready &&
           /Mở bảng Tông môn > Nội vụ để trả/.test(qt[0].step),
