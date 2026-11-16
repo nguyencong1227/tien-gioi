@@ -26,9 +26,7 @@ import {
   stripDots,
   takeStatus,
   type AddOpts,
-  type AddResult,
   type StatusBox,
-  type StatusInst,
 } from "./status-rules";
 
 function rng(seed: number) {
