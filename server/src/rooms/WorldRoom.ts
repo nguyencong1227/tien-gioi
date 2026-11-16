@@ -99,7 +99,13 @@ class BuyRefused extends Error {
   }
 }
 import { World, type PlayerCtrl } from "../world";
-import { POS_SYNC_EVERY_TICKS, queueInput, safeSpot, syncPublicPos } from "../systems/movement";
+import {
+  POS_SYNC_EVERY_TICKS,
+  queueInput,
+  safeSpot,
+  savePos,
+  syncPublicPos,
+} from "../systems/movement";
 import { slash, swordQi } from "../systems/combat";
 import {
   spawnDungeonMonsters,
@@ -1018,7 +1024,7 @@ export class WorldRoom extends Room<WorldState> {
       ? { x: Math.round(at.x), y: Math.round(at.y) }
       : p.dead || inRun || this.world.map.inTown(p.x, p.y)
         ? {}
-        : { x: Math.round(p.x), y: Math.round(p.y) };
+        : savePos(this.world.map, p.x, p.y);
     c.save = {
       ...c.save,
       realm: p.realm,

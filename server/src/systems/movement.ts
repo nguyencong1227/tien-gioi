@@ -68,6 +68,31 @@ export function applyInputs(map: GameMap, p: Player, c: PlayerCtrl) {
   }
 }
 
+/**
+ * Toạ độ NGUYÊN để ghi vào hồ sơ từ vị trí thật (số thực) của người chơi. Làm tròn thường (`Math.round`) có thể đẩy tâm vào tường tới
+ * 0,5 px dù chỗ đứng thật hợp lệ (người đứng sát tường), làm hồ sơ bị `kiem-save` báo `pos_blocked` và lúc vào lại bị `safeSpot` đưa về trấn
+ * (soak 30 phút `--m7`, #741). Nên: làm tròn thường nếu không bị chặn; không thì thử bốn góc `floor` / `ceil` và lấy điểm KHÔNG bị chặn gần
+ * vị trí thật nhất; không điểm nào thì trả làm tròn thường (vị trí thật nằm trong tường: `safeSpot` xử lý lúc vào lại).
+ */
+export function savePos(map: GameMap, x: number, y: number): { x: number; y: number } {
+  const rx = Math.round(x);
+  const ry = Math.round(y);
+  if (!map.circleBlocked(rx, ry, PLAYER_RADIUS)) return { x: rx, y: ry };
+  let best: { x: number; y: number } | null = null;
+  let bestD = Infinity;
+  for (const cx of [Math.floor(x), Math.ceil(x)]) {
+    for (const cy of [Math.floor(y), Math.ceil(y)]) {
+      if (map.circleBlocked(cx, cy, PLAYER_RADIUS)) continue;
+      const d = (cx - x) * (cx - x) + (cy - y) * (cy - y);
+      if (d < bestD) {
+        bestD = d;
+        best = { x: cx, y: cy };
+      }
+    }
+  }
+  return best ?? { x: rx, y: ry };
+}
+
 /** Vị trí đã lưu nếu còn hợp lệ, không thì một điểm ngẫu nhiên trong Lạc Hà Trấn. */
 export function safeSpot(map: GameMap, x?: number, y?: number) {
   const town = map.townPx;
