@@ -5,6 +5,7 @@ import {
   SKILL_SLOTS,
   DEFAULT_KEYMAP,
   KEYMAP_STORAGE_KEY,
+  ARROW_CODES,
   RESERVED_CODES,
   _resetKeymapCache,
   actionOfEvent,
@@ -12,7 +13,9 @@ import {
   diffFromDefault,
   getKeymap,
   getLookup,
+  isMoveAction,
   isValidToken,
+  moveDirOf,
   keyLabel,
   keyLabels,
   onKeymapChange,
@@ -107,14 +110,15 @@ describe("bảng phím mặc định (QUYET_DINH_M3 mục 13)", () => {
     expect(ACTION_BY_ID["panel.minimap"].world).toBe(false); // chạy cả khi bảng đang mở, như M
   });
 
-  it("không có phím nào gán cho hai hành động, và không phím mặc định nào là phím cố định (WASD, mũi tên, Esc)", () => {
+  it("không có phím nào gán cho hai hành động, và không phím mặc định nào là phím cố định (Esc); mũi tên chỉ là mặc định của di chuyển", () => {
     const seen = new Map<string, ActionId>();
     for (const a of ACTIONS)
       for (const t of a.defaults) {
         expect(seen.has(t), `${t} trùng giữa ${seen.get(t)} và ${a.id}`).toBe(false);
         seen.set(t, a.id);
-        expect(isValidToken(t), `${t} hợp lệ`).toBe(true);
+        expect(isValidToken(t, a.id), `${t} hợp lệ cho ${a.id}`).toBe(true);
         expect(RESERVED_CODES.has(t.replace(/^Shift\+/, ""))).toBe(false);
+        if (ARROW_CODES.has(t)) expect(isMoveAction(a.id), `${t} chỉ cho di chuyển`).toBe(true);
       }
   });
 
@@ -176,10 +180,46 @@ describe("actionOfEvent", () => {
     expect(actionOfEvent(ev("Space", { shiftKey: true }), lookup())).toBe("attack");
   });
 
-  it("phím không gán, phím di chuyển và Esc: null", () => {
+  it("phím không gán và Esc: null", () => {
     const l = lookup();
-    for (const c of ["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "Escape", "Digit9", "F5"])
-      expect(actionOfEvent(ev(c), l), c).toBeNull();
+    for (const c of ["Escape", "Digit9", "F5"]) expect(actionOfEvent(ev(c), l), c).toBeNull();
+  });
+
+  it("phím di chuyển là hành động `move.*` (đổi được): WASD + mũi tên mặc định", () => {
+    const l = lookup();
+    const want: Record<string, ActionId> = {
+      KeyW: "move.up",
+      ArrowUp: "move.up",
+      KeyA: "move.left",
+      ArrowLeft: "move.left",
+      KeyS: "move.down",
+      ArrowDown: "move.down",
+      KeyD: "move.right",
+      ArrowRight: "move.right",
+    };
+    for (const [c, id] of Object.entries(want)) expect(actionOfEvent(ev(c), l), c).toBe(id);
+  });
+
+  it("moveDirOf: tra hướng theo bảng phím hiện tại; phím không phải di chuyển là null", () => {
+    const l = lookup();
+    expect(moveDirOf("KeyW", l)).toBe("up");
+    expect(moveDirOf("ArrowLeft", l)).toBe("left");
+    expect(moveDirOf("KeyS", l)).toBe("down");
+    expect(moveDirOf("ArrowRight", l)).toBe("right");
+    expect(moveDirOf("KeyJ", l)).toBeNull(); // chém
+    expect(moveDirOf("Escape", l)).toBeNull();
+    expect(moveDirOf("constructor", l)).toBeNull();
+    // đổi phím: I J K L đi, W A S D hết là di chuyển
+    const m = sanitizeKeymap({
+      "move.up": ["KeyI"],
+      "move.left": ["KeyK"],
+      "move.down": ["KeyM"],
+      "move.right": ["KeyL"],
+    });
+    const l2 = buildLookup(m);
+    expect(moveDirOf("KeyI", l2)).toBe("up");
+    expect(moveDirOf("KeyK", l2)).toBe("left");
+    expect(moveDirOf("KeyW", l2)).toBeNull();
   });
 });
 
@@ -208,16 +248,20 @@ describe("isValidToken / sanitizeKeymap", () => {
     for (const t of [
       "",
       "Key I",
-      "KeyW",
       "Escape",
-      "ArrowLeft",
-      "Shift+KeyD",
+      "ArrowLeft", // không biết hành động nào: coi như hành động thường, mũi tên bị từ chối
       "1abc",
       "A".repeat(40),
     ])
       expect(isValidToken(t), t).toBe(false);
     expect(isValidToken(5)).toBe(false);
     expect(isValidToken(null)).toBe(false);
+    // WASD không còn cố định; mũi tên chỉ cho di chuyển
+    for (const t of ["KeyW", "KeyD", "Shift+KeyD"]) expect(isValidToken(t, "attack"), t).toBe(true);
+    expect(isValidToken("ArrowLeft", "attack")).toBe(false);
+    expect(isValidToken("ArrowLeft", "panel.map")).toBe(false);
+    expect(isValidToken("ArrowLeft", "move.left")).toBe(true);
+    expect(isValidToken("Escape", "move.left")).toBe(false);
     for (const t of ["KeyI", "Digit0", "Shift+Tab", "F12", "Numpad1", "Space"])
       expect(isValidToken(t), t).toBe(true);
   });
@@ -229,7 +273,7 @@ describe("isValidToken / sanitizeKeymap", () => {
 
   it("giữ phím hợp lệ, bỏ phím sai, hành động lạ bị bỏ, tối đa 3 phím mỗi hành động", () => {
     const m = sanitizeKeymap({
-      attack: ["Digit9", "KeyW", "Bad Key", "Digit9", "Digit8", "Digit7", "Digit9"],
+      attack: ["Digit9", "Escape", "Bad Key", "Digit9", "Digit8", "Digit7", "Digit9"],
       hack: ["KeyZ"],
     });
     expect(m.attack).toEqual(["Digit9", "Digit8", "Digit7"]);
@@ -359,8 +403,8 @@ describe("lưu / đổi phím", () => {
   });
 
   it("từ chối phím cố định và phím sai, bảng không đổi", () => {
-    expect(rebind("attack", "KeyW")).toBe(false);
     expect(rebind("attack", "Escape")).toBe(false);
+    expect(rebind("attack", "ArrowUp")).toBe(false); // mũi tên chỉ cho di chuyển
     expect(rebind("attack", "bad key")).toBe(false);
     expect(getKeymap()).toEqual(DEFAULT_KEYMAP);
     expect(store.size).toBe(0);
