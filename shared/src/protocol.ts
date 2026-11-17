@@ -37,7 +37,7 @@
  * "Lò Rèn". Tăng TRƯỚC khi PR dữ liệu nghề đầu tiên (NPC Lò đan + đan hộ đạo, issue #763) vào `main`. `MIN_PROTOCOL_VERSION` KHÔNG đổi: nâng nó là
  * quyết định lúc phát hành bản có nghề.
  * 5 (chặn đường, mục 52, issue #1061, `docs/THIET_KE_CHAN_DUONG.md`): tin `ambushOffer` / `ambushChoose` / `ambushState` / `ambushFlee` / `ambushEnd` (`ambush.ts`), bản đồ
- * đấu trường `arena_*` (`MapDef.kind` "arena"). Client cũ không có hộp thoại Chiến / Bỏ chạy nên máy chủ CHỈ chặn đường người chơi có `v >= AMBUSH_MIN_PROTOCOL` (= 5);
+ * đấu trường `arena_*` (`MapDef.kind` "arena"). Client cũ không có hộp thoại Chiến / Bỏ chạy nên máy chủ CHỈ chặn đường người chơi có `v >= AMBUSH_MIN_PROTOCOL` (= 6, bản đầu tiên có hộp thoại ở client: client v5 đang chạy thật KHÔNG có hộp thoại nên không bị chặn; CD10 chốt khi bật);
  * client cũ vẫn vào chơi bình thường. `MIN_PROTOCOL_VERSION` KHÔNG đổi.
  * 6 (thêm chiêu thức, mục 51, CT1b #1076, `docs/PHAN_CONG_CHIEU_THUC.md` mục 3 / 3b): hình chiêu `chain` / `bolt` / `zone` / `trap` / `aura` / `totem`, trạng thái `empower` / `weaken` /
  * `mark_<hệ>` / `windup` (vận khí, kind `slow`, ngoài trần `MAX_STATUSES`), `STATUS_BIT.weaken`, `Monster.mark`, `FxMsg` `pbolt` / `chain` / `zone` / `trap` / `totem` / `aura` / `fxEnd`.
