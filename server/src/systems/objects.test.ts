@@ -62,9 +62,16 @@ const advance = (t: T, ms: number, step = 100) => {
     tickObjects(t.w);
   }
 };
-type FxKind<K extends FxMsg["kind"]> = Extract<FxMsg, { kind: K }>;
+/** Các tin `fx` có `kind` chứa K (hình vật thể bền chung một kiểu có `kind` là hợp của bốn chuỗi). */
+type FxKind<K extends FxMsg["kind"]> = FxMsg extends infer U
+  ? U extends { kind: infer Q }
+    ? [K] extends [Q]
+      ? U
+      : never
+    : never
+  : never;
 const fxOf = <K extends FxMsg["kind"]>(t: T, k: K) =>
-  t.fx.filter((f): f is FxKind<K> => f.kind === k);
+  t.fx.filter((f) => f.kind === k) as unknown as FxKind<K>[];
 const dummy = (t: T, owner: string, n: number, kind: PObj["kind"] = "zone") => {
   for (let i = 0; i < n; i++)
     t.w.objs.push({
