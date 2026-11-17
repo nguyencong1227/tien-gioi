@@ -39,8 +39,11 @@
  * 5 (chặn đường, mục 52, issue #1061, `docs/THIET_KE_CHAN_DUONG.md`): tin `ambushOffer` / `ambushChoose` / `ambushState` / `ambushFlee` / `ambushEnd` (`ambush.ts`), bản đồ
  * đấu trường `arena_*` (`MapDef.kind` "arena"). Client cũ không có hộp thoại Chiến / Bỏ chạy nên máy chủ CHỈ chặn đường người chơi có `v >= AMBUSH_MIN_PROTOCOL` (= 5);
  * client cũ vẫn vào chơi bình thường. `MIN_PROTOCOL_VERSION` KHÔNG đổi.
+ * 6 (thêm chiêu thức, mục 51, CT1b #1076, `docs/PHAN_CONG_CHIEU_THUC.md` mục 3 / 3b): hình chiêu `chain` / `bolt` / `zone` / `trap` / `aura` / `totem`, trạng thái `empower` / `weaken` /
+ * `mark_<hệ>` / `windup` (vận khí, kind `slow`, ngoài trần `MAX_STATUSES`), `STATUS_BIT.weaken`, `Monster.mark`, `FxMsg` `pbolt` / `chain` / `zone` / `trap` / `totem` / `aura` / `fxEnd`.
+ * Client cũ không biết các id mới nên không vẽ hiệu ứng / không hiện huy hiệu và đoán sai tốc độ lúc vận khí (giật nhẹ <= 2,5 s); sát thương vẫn đúng (máy chủ quyết). `MIN_PROTOCOL_VERSION` KHÔNG đổi.
  */
-export const PROTOCOL_VERSION = 5;
+export const PROTOCOL_VERSION = 6;
 
 /** Phiên bản thấp nhất server còn nhận. 0 = nhận cả client chưa biết tới `v`. */
 export const MIN_PROTOCOL_VERSION = 0;

@@ -532,7 +532,41 @@ export type FxMsg =
       speed: number;
       range: number;
       element?: Element;
-    };
+    }
+  /**
+   * ĐẠN của người chơi, theo TỪNG ĐOẠN (mục 51, CT1b): bay thẳng từ (x, y) theo `angle` với `speed` (px/giây) trong `ms` (thời gian tới chỗ dừng do MÁY CHỦ tính: ô chặn, trúng,
+   * hết tầm). Mỗi lần nảy / xuyên đổi hướng máy chủ gửi `pbolt` MỚI từ điểm đó (client KHÔNG tự mô phỏng nảy). `skill` = id `SkillDef` (tra `fx` + hệ để vẽ). Phần trúng đã có `dmg`.
+   */
+  | {
+      kind: "pbolt";
+      by: string;
+      skill: string;
+      x: number;
+      y: number;
+      angle: number;
+      speed: number;
+      ms: number;
+    }
+  /** SÉT LAN: đường nảy theo thứ tự, `pts` = toạ độ phẳng [x0, y0, x1, y1, ...] (2 tới `CHAIN_FX_POINTS_MAX` điểm nguyên, điểm đầu là người dùng); (x, y) = chỗ người dùng đứng (để `sendNear` chỉ gửi cho người ở gần). Client vẽ tia nối tiếp; phần trúng có `dmg`. */
+  | { kind: "chain"; by: string; skill: string; x: number; y: number; pts: number[] }
+  /**
+   * VẬT THỂ BỀN (`zone` / `trap` / `totem` / `aura`) vừa dựng: `id` (số nguyên tăng dần THEO PHÒNG) để `fxEnd` gỡ đúng cái; (x, y) tâm, `r` bán kính, `ms` thời gian tồn tại tối đa. Gửi MỘT lần
+   * (`sendNear`); người đi VÀO vùng nhìn sau lúc dựng KHÔNG thấy nó (sát thương vẫn tính), nối lại mạng thì hình mất: chấp nhận vì vật thể ngắn.
+   */
+  | {
+      kind: "zone" | "trap" | "totem" | "aura";
+      by: string;
+      skill: string;
+      id: number;
+      x: number;
+      y: number;
+      r: number;
+      ms: number;
+    }
+  /** Vật thể bền `id` kết thúc SỚM hơn `ms`: `pop` (bẫy nổ) hoặc `gone` (chủ chết / rời / qua cổng, bị thay, vùng cũ nhất bị đẩy). (x, y) = chỗ vật thể đứng (để `sendNear` chỉ gửi cho người ở gần). */
+  | { kind: "fxEnd"; id: number; x: number; y: number; why: "pop" | "gone" };
+/** Số điểm tối đa của `FxMsg` `chain` (người dùng + `SKILL_LIMITS.chainBouncesMax` lần nảy + 1 mục tiêu đầu). */
+export const CHAIN_FX_POINTS_MAX = 6;
 export interface DmgMsg {
   target: string;
   amount: number;
