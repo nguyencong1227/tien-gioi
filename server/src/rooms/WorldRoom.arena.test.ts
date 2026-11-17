@@ -361,13 +361,25 @@ describe("Đấu trường chặn đường qua mạng (máy chủ Colyseus th�
     const offer = await waitFor(() => h.offers[0], 3000, "nhận ambushOffer");
     h.room.send(AMBUSH_MSG.seen, { id: offer.id });
     await sleep(AMBUSH_ARM_MS + 80);
-    h.room.send(AMBUSH_MSG.choose, { id: offer.id, choice: "fight" });
-    (h.room.connection.transport as any).ws.close(); // rớt NGAY: máy chủ đã nhận lựa chọn nhưng chưa kịp đưa sang
-    await waitFor(
-      () => env.w.hub.ambushes.ofKey(h.name.toLowerCase()) === undefined,
-      4000,
-      "vé bị huỷ và dọn",
-    );
+    // Làm `persist` (lần lưu lúc chuyển phòng) chậm 400 ms để có cửa sổ chắc chắn: vé đã lập, người chơi rớt TRƯỚC khi `handOff` kiểm client
+    const room = serverRoom(h.room) as any;
+    const persist = room.persist.bind(room);
+    room.persist = async (...args: unknown[]) => {
+      await sleep(400);
+      return persist(...args);
+    };
+    try {
+      h.room.send(AMBUSH_MSG.choose, { id: offer.id, choice: "fight" });
+      await waitFor(() => env.w.hub.ambushes.ofKey(h.name.toLowerCase()), 3000, "vé được lập");
+      (h.room.connection.transport as any).ws.close(); // rớt NGAY: đã có vé nhưng chưa kịp đưa sang
+      await waitFor(
+        () => env.w.hub.ambushes.ofKey(h.name.toLowerCase()) === undefined,
+        4000,
+        "vé bị huỷ và dọn",
+      );
+    } finally {
+      room.persist = persist;
+    }
     expect(env.c.coin).toBe(5000); // không phạt
   }, 20_000);
 
