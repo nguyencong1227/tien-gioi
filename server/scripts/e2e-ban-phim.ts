@@ -665,10 +665,11 @@ async function main() {
     // ---- 10. Nói chuyện NPC chỉ bằng phím ----
     const npc = NPC_BY_ID["truong_tran"];
     me.x = npc.x;
-    me.y = npc.y + 50;
+    // đứng sát Trưởng trấn (20 px): từ khi có Lão Phù ở (+40, -40) quanh tâm trấn (G, #1071) điểm cách 50 px cách đều hai NPC nên `closestNpcId` thành `lao_phu`
+    me.y = npc.y + 20;
     world.ctrl.get(sid).lastHitAt = 0;
     await t.waitFor(
-      `Math.abs(window.__scene.predX - ${Math.round(npc.x)}) < 40 && Math.abs(window.__scene.predY - ${Math.round(npc.y + 50)}) < 40 && window.__scene.closestNpcId === 'truong_tran'`,
+      `Math.abs(window.__scene.predX - ${Math.round(npc.x)}) < 40 && Math.abs(window.__scene.predY - ${Math.round(npc.y + 20)}) < 40 && window.__scene.closestNpcId === 'truong_tran'`,
       "đứng cạnh Trưởng trấn",
     );
     await t.waitFor(
