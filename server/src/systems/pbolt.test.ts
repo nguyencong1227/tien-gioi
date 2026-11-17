@@ -531,6 +531,7 @@ describe("cast bolt: dữ liệu sai và thứ tự việc hẹn giờ", () => {
 describe("cast bolt: vòng đời trong phòng", () => {
   it("đạn bay giữa khoảng không (không việc nào chờ) VẪN chiếm chỗ tới khi hết bay, rồi mới gỡ (trần đo theo đang bay thật)", () => {
     const t = setup();
+    vi.spyOn(t.w.map, "isBlockedPx").mockReturnValue(false); // bản đồ thật có ô chặn trên đường: gỡ để quãng bay đúng `range`
     bolt({ range: 400 });
     equip(t.c, "dan_thu");
     cast(t.w, "a", { slot: 2, angle: 0 });
