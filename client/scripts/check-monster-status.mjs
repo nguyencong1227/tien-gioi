@@ -286,20 +286,29 @@ try {
   );
   check(g0 === g1 && g1 <= 2, `bật / tắt 30 lần không tạo thêm Graphics (${g0} -> ${g1})`);
 
-  // fx rác
-  for (const bad of ["NaN", "'3'", "null", "undefined", "-1", "1.5", "Infinity", "64", "{}"]) {
+  // fx rác. Bit LẠ = 1 << 20 (ngoài mọi bit của `STATUS_BIT`, kể cả bit 64 `weaken` của mục 51 và bit 128 chừa cho `root`): chọn xa để script không hỏng mỗi lần thêm trạng thái
+  const UNKNOWN_BIT = 1 << 20;
+  for (const bad of ["NaN", "'3'", "null", "undefined", "-1", "1.5", "Infinity", String(UNKNOWN_BIT), "{}"]) {
     await evalJs(`window.__scene.state.monsters.get('m1').fx = ${bad}; 0`);
     await sleep(120);
     const p = await J("window.__scene.monsterPips('m1')");
     check(p.n === 0 && !p.visible, `fx rác (${bad}): không chấm`);
   }
-  // 64 | 2: bit lạ lẫn bit thật => chỉ bit thật
-  await evalJs("window.__scene.state.monsters.get('m1').fx = 64 | 2; 0");
+  // bit lạ | 2: bit lạ lẫn bit thật => chỉ bit thật
+  await evalJs(`window.__scene.state.monsters.get('m1').fx = ${UNKNOWN_BIT} | 2; 0`);
   await sleep(120);
   const mixed = await J("window.__scene.monsterPips('m1')");
   check(
     mixed.n === 1 && mixed.text === "Độc",
-    `bit lạ lẫn bit thật (64 | 2): chỉ giữ bit thật (${mixed.text})`,
+    `bit lạ lẫn bit thật (1 << 20 | 2): chỉ giữ bit thật (${mixed.text})`,
+  );
+  // 64 = `weaken` (mục 51) là bit THẬT: chấm "Suy Yếu" (cùng 2 = Độc cho ca trộn)
+  await evalJs("window.__scene.state.monsters.get('m1').fx = 64 | 2; 0");
+  await sleep(120);
+  const weak = await J("window.__scene.monsterPips('m1')");
+  check(
+    weak.n === 2 && weak.text === "Độc, Suy Yếu",
+    `bit 64 là Suy Yếu (weaken) thật: 2 chấm "Độc, Suy Yếu" (${weak.n} chấm, "${weak.text}")`,
   );
   // quái rời state: không lỗi
   await evalJs("window.__scene.state.monsters.delete('m1'); 0");

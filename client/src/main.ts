@@ -150,7 +150,14 @@ function createMockDungeonRoom(
     },
     // Giả lập máy chủ gửi tin `type` tới handler đã đăng ký của cảnh (script kiểm ở chế độ ?debug dùng để thử đúng đường tin nhắn, không gọi thẳng hàm)
     emit: (type: string, msg: unknown) => {
-      for (const fn of handlers.get(type) ?? []) fn(msg);
+      const typed = handlers.get(type);
+      if (typed && typed.length > 0) {
+        for (const fn of [...typed]) fn(msg);
+        return;
+      }
+      // Như colyseus.js: tin KHÔNG có handler riêng đi vào handler "*" (`captureEarlyMessages` ghi lại rồi phát lại khi cảnh đăng ký xong). Thiếu chỗ này, tin mock gửi lúc cảnh còn
+      // đang tải (gói Phaser + WorldScene tách chunk, #1097) bị mất: `?skills=mock` gửi sổ chiêu sau 400 ms nhưng ở dev server cảnh dựng chậm hơn thế
+      for (const fn of [...(handlers.get("*") ?? [])]) (fn as any)(type, msg);
     },
     // Máy chủ thật gọi lại ngay khi có state: cảnh lấy vị trí người chơi làm gốc (reconcile). Mock chỉ làm vậy khi `syncState` (xem mockSyncsState)
     onStateChange: (fn: () => void) => {
