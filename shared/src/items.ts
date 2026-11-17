@@ -860,6 +860,11 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("me_tung_bo"), chance: 0.02, min: 1, max: 1 },
     { itemId: bookIdOf("liet_hoa_kiem"), chance: 0.018, min: 1, max: 1 },
     { itemId: bookIdOf("van_hanh_bo"), chance: 0.012, min: 1, max: 1 },
+    // Kinh quyển 4 chiêu hệ Mộc cao cấp (CT7 #1052, Dev E): rơi hiếm từ Độc Tước (quái Mộc)
+    { itemId: bookIdOf("hac_sa_doc_chuong"), chance: 0.02, min: 1, max: 1 },
+    { itemId: bookIdOf("thiem_to_cong"), chance: 0.02, min: 1, max: 1 },
+    { itemId: bookIdOf("doan_truong_chi_phap"), chance: 0.02, min: 1, max: 1 },
+    { itemId: bookIdOf("kho_moc_phung_xuan_quyet"), chance: 0.02, min: 1, max: 1 },
   ],
   // Trùm Nguyên Anh: bãi của đội 3-4 người; Thiên Hàn châu là nguyên liệu vũ khí bộ IV
   thien_han_vuong: [
@@ -870,6 +875,8 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: "tu_khi_dan", chance: 0.6, min: 1, max: 2 },
     // Trùm rơi kinh quyển chiêu cao cấp nhất (M7.9, #654): Liệt Hỏa Kiếm, hiếm nhưng là phần thưởng hạ trùm
     { itemId: bookIdOf("liet_hoa_kiem"), chance: 0.25, min: 1, max: 1 },
+    // Kinh quyển chiêu Thủy cao cấp (CT7 #1052, Dev E): rơi khi hạ trùm Thủy Thiên Hàn Vương
+    { itemId: bookIdOf("thi_doc_am_chuong"), chance: 0.25, min: 1, max: 1 },
   ],
   // Trùm bí cảnh (docs/THIET_KE_BI_CANH.md): đồ rơi như quái thường (chủ đồ theo đội); thưởng hoàn thành riêng ở `DUNGEONS`.
   // Đã tính vào cân bằng 4c-2 (`server/src/balance/dungeon.ts`).

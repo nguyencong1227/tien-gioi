@@ -20,7 +20,7 @@
 
 ---
 
-## 2. Bảng thống kê chi tiết tài sản (97 tệp tĩnh = 6 ảnh AI (`login_bg.webp` và 5 thẻ bản đồ, #513) + 24 của M4 + 5 phông (#331) + 15 icon Kim Đan (M6) + 14 icon ba ô riêng + 12 icon kinh quyển (M7.4 #505) + 12 icon Hàn Vân Lĩnh (M7.5 #506) + 6 icon kinh quyển đợt 2 (#654) + 3 icon đan hộ đạo (#763); các mô-đun vẽ bằng mã ở mục 2c)
+## 2. Bảng thống kê chi tiết tài sản (104 tệp tĩnh = 6 ảnh AI (`login_bg.webp` và 5 thẻ bản đồ, #513) + 24 của M4 + 5 phông (#331) + 15 icon Kim Đan (M6) + 14 icon ba ô riêng + 12 icon kinh quyển (M7.4 #505) + 12 icon Hàn Vân Lĩnh (M7.5 #506) + 6 icon kinh quyển đợt 2 (#654) + 3 icon đan hộ đạo (#763) + 7 icon kinh quyển hệ Mộc/Thủy (CT7 #1052); các mô-đun vẽ bằng mã ở mục 2c)
 
 | STT | Đường dẫn tệp | Loại tài nguyên | Nguồn gốc / Tác giả | Giấy phép | Tình trạng |
 |:---:|---|---|---|:---:|:---:|
@@ -113,10 +113,17 @@
 | 87 | `client/public/assets/items/dot_pha_dan.png` | Icon đan hộ đạo Đột Phá Đan (nghề nhỏ lát 1, #763; viên đan có ngọn lửa luyện, 1 mũi tên lên = bậc Luyện Khí) | Do nhóm Tiên Giới (Dev B) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
 | 88 | `client/public/assets/items/kinh_chi_dan.png` | Icon đan hộ đạo Kinh Chỉ Đan (nghề nhỏ lát 1, #763; ngọn lửa luyện, 2 mũi tên lên = bậc Trúc Cơ) | Do nhóm Tiên Giới (Dev B) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
 | 89 | `client/public/assets/items/duong_anh_dan.png` | Icon đan hộ đạo Dưỡng Anh Đan (nghề nhỏ lát 1, #763; ngọn lửa luyện, 3 mũi tên lên = bậc Kim Đan) | Do nhóm Tiên Giới (Dev B) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
+| 90 | `client/public/assets/items/kinh_hu_thuy_chuong.png` | Icon kinh quyển Hủ Thủy Chưởng (hệ Mộc/Thủy CT7 #1052; dấu tròn giữa bìa) | Do nhóm Tiên Giới (Dev E) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
+| 91 | `client/public/assets/items/kinh_trien_xa_thu.png` | Icon kinh quyển Triền Xà Thủ (hệ Mộc/Thủy CT7 #1052; dấu tròn giữa bìa) | Do nhóm Tiên Giới (Dev E) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
+| 92 | `client/public/assets/items/kinh_hac_sa_doc_chuong.png` | Icon kinh quyển Hắc Sa Độc Chưởng (hệ Mộc/Thủy CT7 #1052; dấu tròn giữa bìa) | Do nhóm Tiên Giới (Dev E) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
+| 93 | `client/public/assets/items/kinh_thi_doc_am_chuong.png` | Icon kinh quyển Thi Độc Âm Chưởng (hệ Mộc/Thủy CT7 #1052; dấu tròn giữa bìa) | Do nhóm Tiên Giới (Dev E) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
+| 94 | `client/public/assets/items/kinh_thiem_to_cong.png` | Icon kinh quyển Thiềm Tô Công (hệ Mộc/Thủy CT7 #1052; dấu tròn giữa bìa) | Do nhóm Tiên Giới (Dev E) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
+| 95 | `client/public/assets/items/kinh_doan_truong_chi_phap.png` | Icon kinh quyển Đoạn Trường Chỉ Pháp (hệ Mộc/Thủy CT7 #1052; dấu tròn giữa bìa) | Do nhóm Tiên Giới (Dev E) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
+| 96 | `client/public/assets/items/kinh_kho_moc_phung_xuan_quyet.png` | Icon kinh quyển Khô Mộc Phùng Xuân Quyết (hệ Mộc/Thủy CT7 #1052; dấu tròn giữa bìa) | Do nhóm Tiên Giới (Dev E) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
 
-> Hàng 2-3 (atlas) nay có **438 khung** (xem 2b). Hàng 4-19 và 28-89 cộng lại là **78 icon**: 60 khớp 60 mặt hàng trong `ITEMS` của `shared/` (gồm 3 đan hộ đạo hàng 87-89, #763, vẽ SAU dữ liệu của Dev D) (mọi vật phẩm đều có icon riêng, không món nào dùng ảnh thay thế) + 12 icon Hàn Vân Lĩnh (hàng 69-80, M7.5 #506) + 6 icon kinh quyển đợt 2 (hàng 81-86, #654, A) vẽ TRƯỚC vật phẩm trong `shared/` (id chưa có trong `ITEMS` thì vô hại; A / Dev D thêm dữ liệu sau).
+> Hàng 2-3 (atlas) nay có **445 khung** (xem 2b). Hàng 4-19 và 28-96 cộng lại là **85 icon**: 60 khớp 60 mặt hàng trong `ITEMS` của `shared/` (gồm 3 đan hộ đạo hàng 87-89, #763, vẽ SAU dữ liệu của Dev D) (mọi vật phẩm đều có icon riêng, không món nào dùng ảnh thay thế) + 12 icon Hàn Vân Lĩnh (hàng 69-80, M7.5 #506) + 6 icon kinh quyển đợt 2 (hàng 81-86, #654, A) + 7 icon kinh quyển hệ Mộc/Thủy (hàng 90-96, CT7 #1052, E) vẽ TRƯỚC vật phẩm trong `shared/` (id chưa có trong `ITEMS` thì vô hại; A / Dev D thêm dữ liệu sau).
 
-### 2b. Khung atlas (tệp 2-3) sau đan hộ đạo #763: 438 khung (337 sau M6 + 14 icon ba ô riêng + 12 icon kinh quyển + 50 khung năm quái Hàn Vân Lĩnh + 12 icon + 3 NPC Hàn Vân Trạm + 6 icon kinh quyển đợt 2 + 1 NPC Lò đan + 3 icon đan hộ đạo), toàn bộ sinh bằng `gen-assets.mjs`
+### 2b. Khung atlas (tệp 2-3) sau kinh quyển hệ Mộc/Thủy CT7 #1052: 445 khung (337 sau M6 + 14 icon ba ô riêng + 12 icon kinh quyển + 50 khung năm quái Hàn Vân Lĩnh + 12 icon + 3 NPC Hàn Vân Trạm + 6 icon kinh quyển đợt 2 + 1 NPC Lò đan + 3 icon đan hộ đạo + 7 icon kinh quyển Mộc/Thủy), toàn bộ sinh bằng `gen-assets.mjs`
 
 | Nhóm khung | Số khung | Nội dung |
 |---|:---:|---|
@@ -124,7 +131,7 @@
 | `robe-*` | 123 | Ba bộ pháp bào `tho_nhung_bao`, `hac_ho_bao`, `xich_lan_bao` (3 x 41 khung như trên) |
 | `mon-*` | 140 | **9 yêu thú x 10 khung** (đứng, đi 0-1, đánh `atk-0..1`, bị đánh `hurt`, gục `die-0..3`): `tho`, `lang`, `ho`, `mang` và **M6 #407** `suong_ho`, `thach_quy`, `doc_thiem`, `hac_giao`, `yeu_vuong` và **M7.5b #506** (B, vẽ TRƯỚC khi loài vào `shared/`) `han_lang` (sói băng), `phong_nha` (chim nanh thép), `cot_tuong` (voi xương), `doc_tuoc` (sẻ độc), `thien_han_vuong` (trùm sư tử băng): **14 loài x 10 khung** (không còn "9 yêu thú x 10") |
 | `npc-*` | 13 | `truong_tran`, `duoc_su`, `tho_ren`, `cao_thi`, `lai_buon`, `thu_mon` và **M6** `tram_truong`, `lai_buon_suong`, `tho_ren_suong` và **#763** `lao_dan` (Mộc Diên, lão đan sư ôm lò đan) |
-| `item-*` | 78 | Biểu tượng vật phẩm trong thế giới (rơi trên đất), một khung cho mỗi icon ở bảng trên |
+| `item-*` | 85 | Biểu tượng vật phẩm trong thế giới (rơi trên đất), một khung cho mỗi icon ở bảng trên |
 | `swordbeam`, `dot` | 1 + 1 | Kiếm khí, chấm nhỏ dùng chung |
 
 Tư thế đánh / bị đánh / gục của yêu thú và nhân vật suy từ khung đi / đứng bằng biến đổi + đổi màu NGAY trong script (không có ảnh ngoài).
@@ -195,7 +202,7 @@ Danh sách HIỆN HÀNH, lấy từ dữ liệu của `shared/` (bản M4 ghi id
 
 | Hạng mục | Kết quả |
 |---|---|
-| Tệp tĩnh quét (`client/public/assets`, `icons`, `fonts`) | **97 tệp** (3 trong `assets/` + 6 ảnh AI `assets/ai/` (`login_bg.webp` + 5 thẻ bản đồ) + 78 icon + 5 icon PWA + 5 phông), **0 tệp thiếu nguồn / tác giả / giấy phép** |
+| Tệp tĩnh quét (`client/public/assets`, `icons`, `fonts`) | **104 tệp** (3 trong `assets/` + 6 ảnh AI `assets/ai/` (`login_bg.webp` + 5 thẻ bản đồ) + 85 icon + 5 icon PWA + 5 phông), **0 tệp thiếu nguồn / tác giả / giấy phép** |
 | Tài sản bên thứ ba có SHA-256 khớp `CREDITS.md` mục 6 | 5 / 5 (4 tệp `woff2` + `OFL.txt`) |
 | Giấy phép | CC0 1.0 (Tiên Giới tự tạo) cho 39 tệp; SIL OFL 1.1 cho 5 tệp phông (Noto Serif); không có CC-BY mới |
 | Mô-đun đồ hoạ / âm thanh vẽ bằng mã | 7 dòng (mô-đun hoặc nhóm mô-đun) ở 2c, không có tài sản ngoài |
