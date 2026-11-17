@@ -126,13 +126,13 @@ describe("mỗi luật ĐỎ khi bảng bị phá (bảng giả)", () => {
     ).toBe(true);
   });
 
-  it("buff tu vi: ranh giới 5% nhịp lên cảnh giới (x1,0526 sạch, x1,0527 vi phạm) và trần cứng", () => {
+  it("buff tu vi: ranh giới 5% nhịp lên cảnh giới (x1,0526 sạch, x1,0527 vi phạm), x1,2 cũng bị bắt", () => {
     const levels = (exp: number, drop = 1): SectLevelInfo[] =>
       SECT_LEVELS.map((l) => (l.level === 5 ? { ...l, buff: { ...l.buff, exp, drop } } : l));
     expect(sectBalanceViolations(SECT_SHOP, levels(1.0526))).toEqual([]);
     const over = sectBalanceViolations(SECT_SHOP, levels(1.0527));
     expect(over.some((x) => x.includes("buff tu vi"))).toBe(true);
-    // vượt trần cứng x1,10 cũng bị bắt
+    // buff lớn hơn nhiều (vượt cả trần cứng x1,10) cũng bị bắt
     expect(
       sectBalanceViolations(SECT_SHOP, levels(1.2)).some((x) => x.includes("buff tu vi")),
     ).toBe(true);

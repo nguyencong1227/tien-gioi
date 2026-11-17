@@ -121,7 +121,7 @@ export function sectLowestIncome(): { realm: number; name: string; perHour: numb
 /**
  * Các bất biến cân bằng tông môn trên bảng (rỗng = sạch). Tham số mặc định là bảng THẬT; test truyền bảng giả để chứng minh mỗi luật đỏ khi bị phá.
  * 1. KHÔNG vòng lời: bán lại NPC < vốn (cả hai cách quy vốn); 2. sức mua tối đa / ngày <= `SECT_MAX_HUNT_HOURS` giờ săn của bậc thấp nhất, ở MỌI cấp tông;
- * 3. buff không vượt ngân sách `SECT_BUFF_BUDGET` và nằm dưới trần cứng.
+ * 3. buff không vượt ngân sách `SECT_BUFF_BUDGET` (5% < trần cứng 10% nên đã bao trần cứng).
  */
 export function sectBalanceViolations(
   entries: readonly SectShopEntry[] = SECT_SHOP,
@@ -147,13 +147,13 @@ export function sectBalanceViolations(
         `cấp tông ${l.level}: sức mua tối đa / ngày ${Math.round(value)} LT = ${hours.toFixed(2)} giờ săn bậc thấp nhất (> ${SECT_MAX_HUNT_HOURS})`,
       );
     const expUp = 1 - 1 / l.buff.exp;
-    if (expUp > SECT_BUFF_BUDGET + 1e-9 || l.buff.exp > SECT_BUFF_EXP_MAX)
+    if (expUp > SECT_BUFF_BUDGET + 1e-9)
       out.push(
-        `cấp tông ${l.level}: buff tu vi x${l.buff.exp} làm nhịp lên cảnh giới nhanh ${(expUp * 100).toFixed(1)}% (ngân sách ${SECT_BUFF_BUDGET * 100}%, trần x${SECT_BUFF_EXP_MAX})`,
+        `cấp tông ${l.level}: buff tu vi x${l.buff.exp} làm nhịp lên cảnh giới nhanh ${(expUp * 100).toFixed(1)}% (ngân sách ${SECT_BUFF_BUDGET * 100}%; trần cứng x${SECT_BUFF_EXP_MAX} nằm trên ngân sách nên ngân sách bắt trước)`,
       );
-    if (l.buff.drop - 1 > SECT_BUFF_BUDGET + 1e-9 || l.buff.drop > SECT_BUFF_DROP_MAX)
+    if (l.buff.drop - 1 > SECT_BUFF_BUDGET + 1e-9)
       out.push(
-        `cấp tông ${l.level}: buff rơi đồ x${l.buff.drop} vượt ngân sách +${SECT_BUFF_BUDGET * 100}% (trần x${SECT_BUFF_DROP_MAX})`,
+        `cấp tông ${l.level}: buff rơi đồ x${l.buff.drop} vượt ngân sách +${SECT_BUFF_BUDGET * 100}% (trần cứng x${SECT_BUFF_DROP_MAX} nằm trên ngân sách)`,
       );
   }
   return out;
