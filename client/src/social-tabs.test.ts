@@ -113,6 +113,25 @@ describe("khớp index.html (bảng Xã hội)", () => {
     }
   });
 
+  it("tab Thành tựu có đủ chỗ đổ dữ liệu: tóm tắt + trạng thái (role=status), nút Tải lại ẩn sẵn, danh hiệu là radiogroup có nhãn, nhóm thành tựu", () => {
+    for (const id of [
+      "ach-summary",
+      "ach-status",
+      "ach-retry",
+      "ach-body",
+      "ach-worn",
+      "ach-titles",
+      "ach-groups",
+    ])
+      tagOf(id);
+    expect(tagOf("ach-summary")).toContain('aria-live="polite"');
+    expect(tagOf("ach-status")).toContain('role="status"');
+    expect(tagOf("ach-titles")).toContain('role="radiogroup"');
+    expect(tagOf("ach-titles")).toContain("aria-label=");
+    expect(/\shidden[\s>]/.test(tagOf("ach-retry"))).toBe(true);
+    expect(/\shidden[\s>]/.test(tagOf("ach-body"))).toBe(true);
+  });
+
   it("nút HUD Xã hội ẩn mặc định (bật bằng cờ ?social=1) và có aria-expanded", () => {
     const btn = tagOf("btn-social");
     expect(/\shidden[\s>]/.test(btn)).toBe(true);
