@@ -681,6 +681,74 @@ async function main() {
         throw new Error("Nhiệm vụ đã trả hôm nay không được còn nút Trả bấm được");
       if (ctrlOf(B.name).coin !== coinBefore) throw new Error("Trả nhiệm vụ không được đụng ví");
 
+      // --- ca GỤC: người chơi bị hạ gục vào Hoàng Tuyền: cống hiến giữ theo linh hồn, sổ ngày không cho nhận lại cùng ngày, kho tông không mất ---
+      const { hurtPlayer } = await import("../src/systems/combat.js");
+      const { applyRebirth } = await import("../src/systems/reincarnation.js");
+      const { sendWallet } = await import("../src/systems/wallet.js");
+      const coinTreasuryBeforeLimbo = sectOnDisk().coin;
+      const vaultCountBeforeLimbo = vaultCount();
+      const contribBeforeLimbo = memberB().contrib;
+      const meritBeforeLimbo = memberB().merit;
+      const questsDoneBeforeLimbo = [...memberB().today.quests];
+      const coinBBeforeLimbo = ctrlOf(B.name).coin;
+
+      // Bị quái hạ gục vào Hoàng Tuyền
+      hurtPlayer(world, sidB, playerOf(B.name), 999999, { kind: "lang" });
+      if (!playerOf(B.name).dead || !ctrlOf(B.name).limbo)
+        throw new Error("B phải vào trạng thái Hoàng Tuyền (limbo)");
+
+      // Bất biến khi đang ở Hoàng Tuyền: tiền mang theo người mất theo luật luân hồi nhưng kho tông môn và cống hiến nguyên vẹn
+      if (memberB().contrib !== contribBeforeLimbo || memberB().merit !== meritBeforeLimbo)
+        throw new Error("Gục: cống hiến và công tích của B phải được giữ theo linh hồn");
+      if (sectOnDisk().coin !== coinTreasuryBeforeLimbo || vaultCount() !== vaultCountBeforeLimbo)
+        throw new Error("Gục: kho tiền và kho đồ tông môn không được mất");
+      if (JSON.stringify(memberB().today.quests) !== JSON.stringify(questsDoneBeforeLimbo))
+        throw new Error("Gục: sổ ngày ghi nhận nhiệm vụ đã trả không được mất");
+
+      // B đầu thai / hồi sinh (khôi phục ví cá nhân của B về mức trước khi gục để bước 9 bảo toàn tổng kinh tế)
+      applyRebirth(world, sidB, playerOf(B.name), ctrlOf(B.name), { origin: "pham_gia", keep: [] });
+      ctrlOf(B.name).coin = coinBBeforeLimbo;
+      sendWallet(world, sidB);
+      await world.onSaveNow?.(sidB);
+      await sleep(400);
+      await tb.ev(`window.__ui?.hideLimbo?.(); 1`);
+      await reopenHall();
+
+      // Sau hồi sinh: cống hiến vẫn còn, nhiệm vụ đã trả hôm nay không thể nhận lại
+      const hAfterLimbo = await hall();
+      if (hAfterLimbo.me.contrib !== contribBeforeLimbo)
+        throw new Error(
+          `Sau hồi sinh: cống hiến phải giữ nguyên ${contribBeforeLimbo}, thực tế ${hAfterLimbo.me.contrib}`,
+        );
+      const qDoneAfter = hAfterLimbo.quests.find((q: any) => q.questId === quest.questId);
+      if (!qDoneAfter || qDoneAfter.state !== "done")
+        throw new Error("Nhiệm vụ đã trả phải ở trạng thái 'done' sau khi hồi sinh");
+      if ((await rowBtn(quest.title, "Nhận")) === "ok")
+        throw new Error("Nhiệm vụ đã trả cùng ngày không được có nút Nhận bấm được");
+
+      // --- Đua lệnh nhận cùng một mẫu nhiệm vụ: chỉ MỘT thành công, không nhân đôi vào sổ ---
+      const nextOffer = hAfterLimbo.quests.find(
+        (q: any) => q.questId !== quest.questId && q.state === "offer",
+      );
+      if (nextOffer) {
+        await Promise.all([
+          tb.ev(
+            `window.__scene.room.send("sectQuestAccept", { questId: ${JSON.stringify(nextOffer.questId)} }); 1`,
+          ),
+          tb.ev(
+            `window.__scene.room.send("sectQuestAccept", { questId: ${JSON.stringify(nextOffer.questId)} }); 1`,
+          ),
+        ]);
+        await sleep(300);
+        const activeMatches = ctrlOf(B.name).quests.active.filter(
+          (a: any) => a.id === nextOffer.questId,
+        );
+        if (activeMatches.length !== 1)
+          throw new Error(
+            `Đua lệnh nhận nhiệm vụ: chỉ được nhận đúng 1 lần, thực tế ${activeMatches.length}`,
+          );
+      }
+
       // --- cửa hàng: đổi một món qua giao diện (trừ cống hiến, thêm đồ, ghi số đã mua, lưu hồ sơ) ---
       await (store as any).update(sectId, (sc: any) => ({
         ...sc,
@@ -713,6 +781,68 @@ async function main() {
       }
       if (!JSON.stringify(saveOf(B.name)).includes(item.itemId))
         throw new Error("Hồ sơ của B phải được lưu sau khi đổi (đồ mới nằm trong tệp)");
+
+      // --- Đua lệnh mua món hạn mức 1 (limitDay: 1): chỉ MỘT thành công, không nhân đôi đồ / trừ đúp cống hiến ---
+      const l1Item = (await hall()).shop.find((e: any) => e.limitDay === 1 && e.locked === null);
+      if (!l1Item) throw new Error("Phải có món limitDay: 1 mua được để thử đua lệnh");
+      const l1CountBefore = countItem(ctrlOf(B.name).inv, l1Item.itemId);
+      const contribBeforeL1 = memberB().contrib ?? 0;
+      await Promise.all([
+        tb.ev(
+          `window.__scene.room.send("sectShopBuy", { itemId: ${JSON.stringify(l1Item.itemId)}, qty: 1 }); 1`,
+        ),
+        tb.ev(
+          `window.__scene.room.send("sectShopBuy", { itemId: ${JSON.stringify(l1Item.itemId)}, qty: 1 }); 1`,
+        ),
+      ]);
+      await sleep(400);
+      const buysL1 = memberB().today.buys?.[l1Item.itemId] ?? 0;
+      if (buysL1 !== 1)
+        throw new Error(`Đua mua limitDay: 1: chỉ được mua đúng 1 lần hôm nay, thực tế ${buysL1}`);
+      const l1CountAfter = countItem(ctrlOf(B.name).inv, l1Item.itemId);
+      if (l1CountAfter !== l1CountBefore + 1)
+        throw new Error(
+          `Đua mua limitDay: 1: túi chỉ được thêm đúng 1 món, thực tế tăng ${l1CountAfter - l1CountBefore}`,
+        );
+      const contribAfterL1 = memberB().contrib ?? 0;
+      if (contribAfterL1 !== contribBeforeL1 - l1Item.cost)
+        throw new Error(
+          `Đua mua limitDay: 1: cống hiến chỉ trừ đúng 1 lần cost (${l1Item.cost}), thực tế trừ ${contribBeforeL1 - contribAfterL1}`,
+        );
+
+      // --- Ảnh 5 khung nhìn (360x640, 390x844, 640x360, 844x390, 1280x720) vào docs/screenshots/ ---
+      const viewports = [
+        { name: "360x640", w: 360, h: 640, mobile: true },
+        { name: "390x844", w: 390, h: 844, mobile: true },
+        { name: "640x360", w: 640, h: 360, mobile: true },
+        { name: "844x390", w: 844, h: 390, mobile: true },
+        { name: "1280x720", w: 1280, h: 720, mobile: false },
+      ];
+      const screenshotsDir = path.join(repoRoot, "docs/screenshots");
+      mkdirSync(screenshotsDir, { recursive: true });
+      for (const vp of viewports) {
+        await tb.send("Emulation.setDeviceMetricsOverride", {
+          width: vp.w,
+          height: vp.h,
+          deviceScaleFactor: 1,
+          mobile: vp.mobile,
+        });
+        await sleep(150);
+        const scr = await tb.send("Page.captureScreenshot", { format: "png" });
+        if (scr.result?.data) {
+          writeFileSync(
+            path.join(screenshotsDir, `sect-hall-${vp.name}.png`),
+            Buffer.from(scr.result.data, "base64"),
+          );
+        }
+      }
+      await tb.send("Emulation.setDeviceMetricsOverride", {
+        width: 1280,
+        height: 720,
+        deviceScaleFactor: 1,
+        mobile: false,
+      });
+      await sleep(150);
 
       // --- hết hạn mức ngày: còn đúng 1 lượt, đổi xong thì khoá với lý do chữ ---
       await (store as any).update(sectId, (sc: any) => ({
@@ -780,16 +910,22 @@ async function main() {
         throw new Error("Túi đầy: cống hiến và số đã mua KHÔNG được đổi");
       for (let i = 0; i < inv.length; i++) inv[i] = saved[i];
       out(
-        `  ✓ [7b] NỘI VỤ với máy chủ thật: tab hiện ${h0.quests.length} nhiệm vụ + ${SECT_SHOP.length} món; nhận + trả "${quest.title}" (+${ch} cống hiến + công tích, sổ ngày, rời sổ nhiệm vụ, ví không đổi); đổi "${itemName}" (-${item.cost}, +1 vào túi, đã lưu hồ sơ); hết hạn mức: nút khoá kèm lý do; túi đầy: toast "${sectFailMessage("bag_full")}", không mất cống hiến`,
+        `  ✓ [7b] NỘI VỤ với máy chủ thật: tab hiện ${h0.quests.length} nhiệm vụ + ${SECT_SHOP.length} món; nhận + trả "${quest.title}" (+${ch} cống hiến + công tích); ca GỤC bảo toàn cống hiến/sổ ngày/kho; đua lệnh nhận nhiệm vụ & mua limitDay 1 (chỉ 1 thành công); ảnh 5 khung nhìn; đổi "${itemName}"; hết hạn mức & túi đầy chuẩn`,
       );
       await press(tb, "sect-tab-btn-treasury"); // trở lại các bước sau như cũ
     }
 
-    // 8. B rời tông môn
+    // 8. B rời tông môn: hộp xác nhận phải nêu rõ cống hiến và công tích sẽ MẤT
     await press(tb, "sect-tab-btn-overview");
     await press(tb, "sect-btn-leave");
     // Hộp xác nhận trong game (#246) thay confirm() gốc
     await tb.waitFor(visible("sect-action-confirm"), "hộp xác nhận rời tông môn");
+    const leaveConfirmText = await text(tb, "sect-action-confirm-text");
+    if (!/MẤT/i.test(leaveConfirmText) || !/cống hiến/i.test(leaveConfirmText)) {
+      throw new Error(
+        `Hộp xác nhận rời tông phải cảnh báo MẤT cống hiến, thực tế "${leaveConfirmText}"`,
+      );
+    }
     await press(tb, "sect-action-confirm-ok");
     await tb.waitFor(visible("sect-view-none"), "B về màn chưa có tông môn");
     await tb.waitFor(`true`, "");
@@ -803,7 +939,9 @@ async function main() {
       `(() => { const s = window.__scene; const e = [...s.players.entries()].find(([id]) => s.state.players.get(id)?.name === ${JSON.stringify(B.name)}); return !!e && !(e[1].lastLabel || '').includes('[${SECT.tag}]'); })()`,
       "A thấy B mất [TV]",
     );
-    out("  ✓ [8/9] B rời: bảng của B về màn lập, mất biệt hiệu; A thấy chỉ còn mình");
+    out(
+      "  ✓ [8/9] B rời: hộp xác nhận cảnh báo MẤT cống hiến; bảng của B về màn lập, mất biệt hiệu; A thấy chỉ còn mình",
+    );
 
     // 9. A giải tán: phải rút hết kho trước; xác nhận hai bước
     await press(ta, "sect-tab-btn-overview");
