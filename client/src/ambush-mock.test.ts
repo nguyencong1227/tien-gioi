@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   AMBUSH_ARM_MS,
+  AMBUSH_FLEE_CHANNEL_MS,
   AMBUSH_MSG,
   AMBUSH_OFFER_ID_RE,
   AMBUSH_OFFER_MS,
@@ -17,6 +18,7 @@ import {
   MOCK_OFFER_PRICE,
   installMockAmbush,
   isMockAmbushEnabled,
+  mockAmbushOutcome,
 } from "./ambush-mock";
 
 /** Hẹn giờ + đồng hồ GIẢ tất định: `advance(ms)` chạy các hẹn tới hạn theo thứ tự. */
@@ -50,7 +52,10 @@ class Sched {
   }
 }
 
-function setup(onTravel?: () => void) {
+function setup(
+  onTravel?: () => void,
+  extra: { outcome?: "won" | "died"; onDied?: () => void } = {},
+) {
   const sch = new Sched();
   const sent: { type: string; data: unknown }[] = [];
   const got: { type: string; data: unknown }[] = [];
@@ -60,6 +65,7 @@ function setup(onTravel?: () => void) {
   };
   const mock = installMockAmbush(room, {
     onTravel,
+    ...extra,
     now: sch.now,
     setTimer: sch.set,
     clearTimer: sch.clear,
@@ -198,11 +204,47 @@ describe("máy chủ giả chặn đường: luồng và luật như máy chủ 
     h.room.send(AMBUSH_MSG.choose, { id, choice: "fight" });
     h.sch.advance(2000);
     h.room.send(AMBUSH_MSG.flee, { choice: "flee_exp" });
-    h.room.send(AMBUSH_MSG.flee, { choice: "flee_coin" }); // đang xử lý
-    h.sch.advance(300);
+    h.room.send(AMBUSH_MSG.flee, { choice: "flee_coin" }); // đang vận: bấm lần hai bị bỏ qua
+    h.sch.advance(AMBUSH_FLEE_CHANNEL_MS - 1);
+    expect(h.ends()).toEqual([]); // MỤC 53: vận đủ 1 giây rồi mới thoát (không thoát tức thì)
+    h.sch.advance(1);
     expect(h.ends()).toEqual([{ result: "fled", paid: { exp: MOCK_MID_PRICE.exp } }]);
+    const atEnd = h.states().length;
     h.sch.advance(5000);
-    expect(h.states().length).toBeLessThanOrEqual(4); // hết trận: không còn ambushState
+    expect(h.states().length).toBe(atEnd); // hết trận: không còn ambushState
+  });
+
+  it("MỤC 53: bấm bỏ chạy giữa trận gửi NGAY ambushState có fleeMs = AMBUSH_FLEE_CHANNEL_MS (cùng giá giữa trận); trận chưa bấm thì KHÔNG có fleeMs", () => {
+    const h = setup();
+    h.mock.begin();
+    const id = h.offers()[0].id;
+    h.sch.advance(AMBUSH_ARM_MS);
+    h.room.send(AMBUSH_MSG.choose, { id, choice: "fight" });
+    h.sch.advance(1500);
+    expect(h.states().every((x) => x.fleeMs === undefined)).toBe(true);
+    const before = h.states().length;
+    h.room.send(AMBUSH_MSG.flee, { choice: "flee_coin" });
+    const st = h.states();
+    expect(st).toHaveLength(before + 1); // gửi ngay, không đợi nhịp giây
+    expect(st.at(-1)!.fleeMs).toBe(AMBUSH_FLEE_CHANNEL_MS);
+    expect(st.at(-1)!.price).toEqual(MOCK_MID_PRICE);
+  });
+
+  it("MỤC 53: ?ambush=mock&die=1: hết AMBUSH_MOCK_FIGHT_MS trận KẾT THÚC bằng chết thật (lost + died, KHÔNG paid) rồi gọi onDied; mặc định vẫn thắng", () => {
+    let died = 0;
+    const h = setup(undefined, { outcome: "died", onDied: () => died++ });
+    h.mock.begin();
+    const id = h.offers()[0].id;
+    h.sch.advance(AMBUSH_ARM_MS);
+    h.room.send(AMBUSH_MSG.choose, { id, choice: "fight" });
+    h.sch.advance(AMBUSH_MOCK_FIGHT_MS);
+    expect(h.ends()).toEqual([{ result: "lost", died: true }]);
+    expect(died).toBe(1);
+    h.sch.advance(AMBUSH_MOCK_REOFFER_MS);
+    expect(h.offers()).toHaveLength(2); // vẫn có đề nghị mới để xem lại
+    expect(mockAmbushOutcome("?ambush=mock&die=1")).toBe("died");
+    expect(mockAmbushOutcome("?ambush=mock")).toBe("won");
+    expect(mockAmbushOutcome("?die=0")).toBe("won");
   });
 
   it("không bỏ chạy: tự THẮNG sau AMBUSH_MOCK_FIGHT_MS kèm thưởng, rồi đề nghị mới", () => {

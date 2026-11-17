@@ -722,6 +722,8 @@ function renderAmbush(): void {
   const v = ambushDialogView(d, now);
   const reconnecting = document.body.classList.contains("reconnecting");
   setTextIfChanged(document.getElementById("ambush-foe"), v.foe);
+  const danger = document.getElementById("ambush-danger");
+  if (danger && danger.hidden === v.danger) danger.hidden = !v.danger; // mức tinh anh / cầm đầu: nhãn NGUY HIỂM
   setTextIfChanged(document.getElementById("ambush-scene"), v.scene);
   // đang nối lại: máy chủ ĐÓNG BĂNG đồng hồ, nên không đếm tiếp trên màn hình
   setTextIfChanged(
@@ -759,7 +761,9 @@ function pickAmbush(choice: unknown): void {
   const d = ambushDlg;
   if (!d || document.body.classList.contains("reconnecting")) return;
   const r = chooseAmbush(d, choice, performance.now());
-  if (r.send !== null && callbacks?.onAmbushChoose?.(r.send) === true) ambushDlg = r.dialog;
+  // như `pickFlee`: tin trả lời đến đồng bộ (máy chủ giả: đổi phòng đóng hộp thoại ngay) thì KHÔNG ghi đè trạng thái mới bằng bản cũ
+  if (r.send !== null && callbacks?.onAmbushChoose?.(r.send) === true && ambushDlg === d)
+    ambushDlg = r.dialog;
   renderAmbush();
 }
 
@@ -840,6 +844,16 @@ function renderArena(): void {
     document.getElementById("ahud-note"),
     reconnecting ? "Đang nối lại…" : v.confirming ? "" : v.note,
   );
+  // vận bỏ chạy (mục 53): thanh đầy dần trong 1 giây; bảng xác nhận đóng để người chơi thấy trận (vận KHÔNG bất khả xâm phạm)
+  const fleeBar = document.getElementById("ahud-flee-bar");
+  if (fleeBar) {
+    const show = v.fleeing && !reconnecting;
+    if (fleeBar.hidden === show) fleeBar.hidden = !show;
+    const fill = document.getElementById("ahud-flee-fill");
+    const w = `${Math.round(v.fleeFrac * 100)}%`;
+    if (fill && fill.style.width !== w) fill.style.width = w;
+  }
+  if (!h.confirming && fleeSheetOpen()) closeFleeSheet();
   if (!fleeSheetOpen()) return;
   setTextIfChanged(document.getElementById("aflee-text"), v.confirmText);
   v.buttons.forEach((b) => {
@@ -888,7 +902,11 @@ function pickFlee(choice: unknown): void {
   const h = arenaHud;
   if (!h || document.body.classList.contains("reconnecting")) return;
   const r = fleeArena(h, choice, performance.now());
-  if (r.send !== null && callbacks?.onAmbushFlee?.(r.send) === true) arenaHud = r.hud;
+  if (r.send !== null && callbacks?.onAmbushFlee?.(r.send) === true) {
+    // tin trả lời (`ambushState` có `fleeMs`) có thể đến ĐỒNG BỘ ngay trong lúc gửi (máy chủ giả `?ambush=mock`) và đã làm mới `arenaHud`: chỉ ghi thêm dấu "đã gửi", KHÔNG ghi đè bản mới
+    arenaHud =
+      arenaHud === h ? r.hud : arenaHud === null ? null : { ...arenaHud, sent: r.hud.sent };
+  }
   renderArena();
 }
 

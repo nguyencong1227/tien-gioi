@@ -14,6 +14,7 @@
  *  - Không tin tin nhắn: sai kiểu / ngoài khoảng thì bỏ; `msLeft` kẹp trong [0, `AMBUSH_TIME_MS`].
  */
 import {
+  AMBUSH_FLEE_CHANNEL_MS,
   AMBUSH_TIME_MS,
   type AmbushFleeChoice,
   type AmbushFleeMsg,
@@ -31,14 +32,24 @@ export const ARENA_URGENT_MS = 15_000;
 const isObj = (v: unknown): v is Record<string, unknown> =>
   v !== null && typeof v === "object" && !Array.isArray(v);
 
-/** Tin `ambushState` đã làm sạch; sai dạng thì `null`. `msLeft` kẹp trong [0, `AMBUSH_TIME_MS`], làm tròn xuống. */
+/**
+ * Tin `ambushState` đã làm sạch; sai dạng thì `null`. `msLeft` kẹp trong [0, `AMBUSH_TIME_MS`], làm tròn xuống. `fleeMs` (mục 53: đang VẬN bỏ chạy, còn bao lâu tới lúc thoát) chỉ giữ khi là số
+ * hữu hạn > 0, kẹp [1, `AMBUSH_FLEE_CHANNEL_MS`] (vận cố định 1 giây); giá trị hỏng thì coi như vắng (KHÔNG bỏ cả tin: giá và đồng hồ vẫn đúng).
+ */
 export function parseAmbushState(raw: unknown): AmbushStateMsg | null {
   if (!isObj(raw)) return null;
   const ms = raw.msLeft;
   if (typeof ms !== "number" || !Number.isFinite(ms)) return null;
   const price = parseAmbushPrice(raw.price);
   if (price === null) return null;
-  return { msLeft: Math.min(AMBUSH_TIME_MS, Math.max(0, Math.floor(ms))), price };
+  const out: AmbushStateMsg = {
+    msLeft: Math.min(AMBUSH_TIME_MS, Math.max(0, Math.floor(ms))),
+    price,
+  };
+  const f = raw.fleeMs;
+  if (typeof f === "number" && Number.isFinite(f) && f > 0)
+    out.fleeMs = Math.min(AMBUSH_FLEE_CHANNEL_MS, Math.max(1, Math.floor(f)));
+  return out;
 }
 
 /** Trạng thái HUD đấu trường ở client (không đổi tại chỗ: mọi hàm trả bản mới). */
@@ -53,6 +64,8 @@ export interface ArenaHud {
   confirming: boolean;
   /** Lựa chọn đã gửi và lúc gửi; `null` = chưa gửi. */
   sent: { choice: AmbushFleeChoice; at: number } | null;
+  /** Đang VẬN bỏ chạy (mục 53): đồng hồ máy khách lúc thoát = lúc nhận tin có `fleeMs` + `fleeMs`; `null` = không vận. Tin kế tiếp VẮNG `fleeMs` thì vận đã huỷ (chỉ khi bị hạ / hạ hết bầy: kèm `ambushEnd`). */
+  fleeAt: number | null;
 }
 
 const samePrice = (a: AmbushPrice, b: AmbushPrice): boolean =>
@@ -63,6 +76,7 @@ const samePrice = (a: AmbushPrice, b: AmbushPrice): boolean =>
  * giữ nguyên bước xác nhận đang mở và lựa chọn đã gửi.
  */
 export function updateArenaHud(prev: ArenaHud | null, st: AmbushStateMsg, now: number): ArenaHud {
+  const fleeAt = st.fleeMs !== undefined ? now + st.fleeMs : null;
   if (prev === null) {
     return {
       msAtRecv: st.msLeft,
@@ -71,6 +85,7 @@ export function updateArenaHud(prev: ArenaHud | null, st: AmbushStateMsg, now: n
       priceChangedAt: now,
       confirming: false,
       sent: null,
+      fleeAt,
     };
   }
   return {
@@ -79,12 +94,25 @@ export function updateArenaHud(prev: ArenaHud | null, st: AmbushStateMsg, now: n
     recvAt: now,
     price: st.price,
     priceChangedAt: samePrice(prev.price, st.price) ? prev.priceChangedAt : now,
+    fleeAt,
+    // đang vận thì bảng xác nhận đóng (người chơi phải thấy trận: vận KHÔNG bất khả xâm phạm, còn bị đánh)
+    confirming: fleeAt !== null ? false : prev.confirming,
   };
 }
 
 /** Thời gian còn (ms) theo đồng hồ cục bộ: tin cuối trừ khoảng trôi, không âm, đồng hồ lùi không làm tăng. */
 export function arenaRemainingMs(h: ArenaHud, now: number): number {
   return Math.max(0, h.msAtRecv - Math.max(0, now - h.recvAt));
+}
+
+/** Thời gian còn (ms) của vận bỏ chạy theo đồng hồ cục bộ; `null` = không đang vận. Không âm. */
+export function arenaFleeLeftMs(h: ArenaHud, now: number): number | null {
+  return h.fleeAt === null ? null : Math.max(0, h.fleeAt - now);
+}
+
+/** "0,6 giây" (một chữ số thập phân, dấu phẩy). */
+function fleeSecs(ms: number): string {
+  return `${(Math.ceil(ms / 100) / 10).toFixed(1).replace(".", ",")} giây`;
 }
 
 /** Mở / đóng bước xác nhận bỏ chạy (không làm gì khi đang chờ phản hồi của lựa chọn đã gửi). */
@@ -127,6 +155,10 @@ export interface ArenaHudView {
   confirming: boolean;
   /** Đã gửi lựa chọn, đang chờ máy chủ. */
   busy: boolean;
+  /** Đang VẬN bỏ chạy (mục 53): hiện thanh "Đang thoát..."; nút Bỏ chạy giữ nguyên chỗ nhưng không bấm lại được. */
+  fleeing: boolean;
+  /** Tiến độ vận 0..1 (cho thanh); 0 khi không vận. */
+  fleeFrac: number;
   note: string;
   /** Hai nút giá của bước xác nhận (Linh thạch, tu vi); chỉ có ý nghĩa khi `confirming`. */
   buttons: [ArenaFleeButton, ArenaFleeButton];
@@ -156,17 +188,22 @@ export function arenaHudView(h: ArenaHud, now: number): ArenaHudView {
   const expTxt = priceText(h.price.exp, "tu vi");
   const coinSub = h.price.coin.enough ? coinTxt : `${coinTxt} (không đủ)`;
   const expSub = h.price.exp > 0 ? expTxt : "Thanh tu vi trống";
+  const fleeLeft = arenaFleeLeftMs(h, now);
+  const fleeing = fleeLeft !== null;
   let note = "";
-  if (busy) note = "Đang xử lý…";
+  if (fleeing) note = `Đang thoát… ${fleeSecs(fleeLeft)}`;
+  else if (busy) note = "Đang xử lý…";
   else if (h.sent !== null) note = "Chưa có phản hồi, hãy thử lại.";
   else if (waitingServer) note = "Đang chờ máy chủ…";
   return {
     countdown: countdownText(remaining),
     urgent: remaining > 0 && remaining < ARENA_URGENT_MS,
     waitingServer,
-    canOpenFlee: !busy && h.sent === null && !h.confirming,
+    canOpenFlee: !fleeing && !busy && h.sent === null && !h.confirming,
     confirming: h.confirming,
     busy,
+    fleeing,
+    fleeFrac: fleeing ? Math.min(1, Math.max(0, 1 - fleeLeft / AMBUSH_FLEE_CHANNEL_MS)) : 0,
     note,
     buttons: [
       {
@@ -187,8 +224,11 @@ export function arenaHudView(h: ArenaHud, now: number): ArenaHudView {
             : "Bỏ chạy bằng tu vi: không dùng được vì thanh tu vi đang trống",
       },
     ],
-    confirmText: "Bỏ chạy giữa trận mất nhiều hơn lúc mới gặp. Chọn cách trả:",
-    announce: `Đấu trường. Còn ${Math.ceil(remaining / 1000)} giây. ${fleeWays(h.price, coinTxt, expTxt)}`,
+    confirmText:
+      "Bỏ chạy giữa trận mất nhiều hơn lúc mới gặp và cần vận 1 giây (trong lúc đó vẫn bị đánh). Chọn cách trả:",
+    announce:
+      `Đấu trường. Còn ${Math.ceil(remaining / 1000)} giây. ` +
+      (fleeing ? `Đang thoát, còn ${fleeSecs(fleeLeft)}.` : fleeWays(h.price, coinTxt, expTxt)),
   };
 }
 
