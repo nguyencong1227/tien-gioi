@@ -256,7 +256,7 @@ export function ambushDialogView(d: AmbushDialog, now: number): AmbushDialogView
     {
       choice: "fight",
       label: "Chiến",
-      sub: "Enter",
+      sub: "Đấu một mình",
       enabled: en("fight"),
       aria: "Chiến: đấu một mình với kẻ chặn đường. Phím Enter.",
     },
