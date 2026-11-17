@@ -13,6 +13,8 @@ import {
 } from "../monster-status";
 import { parseChainPts, planChainFx, planComboBurst } from "../gfx/fx/ct2-fx";
 import { TelegraphLayer } from "../gfx/fx/telegraph-layer";
+import { PBoltLayer } from "../gfx/fx/pbolt-layer";
+import { parsePBolt, pboltEnd, pboltPlan, planPBoltEnd } from "../gfx/fx/pbolt-fx";
 import { recipeIds } from "../gfx/fx/recipes";
 import {
   planSlashEdges,
@@ -529,6 +531,8 @@ export class WorldScene extends Phaser.Scene {
   fx!: FxSystem;
   /** Báo trước đòn + đạn tầm xa của quái (M7.7, #508): Graphics từ pool, không tốn ngân sách hạt */
   telegraphs!: TelegraphLayer;
+  /** Đạn bay của người chơi (`fx` `pbolt`, CT11b bước 2): vẽ theo từng đoạn máy chủ gửi, không mô phỏng */
+  pbolts!: PBoltLayer;
   /** Số tiếng báo "đang trong vùng nguy hiểm" đã phát (script kiểm `?debug`) */
   dangerCues = 0;
   /**
@@ -634,6 +638,11 @@ export class WorldScene extends Phaser.Scene {
         sound.warn();
       },
     });
+    this.pbolts = new PBoltLayer(this, {
+      emitterBudget: () => getQuality().emitterBudget,
+      reduced: () => getQuality().reducedMotion,
+      inView: (x, y, pad) => this.inView(x, y, pad),
+    });
     ensureShadowTexture(this);
     this.weatherPaused =
       typeof window !== "undefined" && !weatherEnabledByUrl(window.location.search);
@@ -649,6 +658,7 @@ export class WorldScene extends Phaser.Scene {
       offQuality();
       this.fx.destroy();
       this.telegraphs.destroy();
+      this.pbolts.destroy();
     });
 
     // Mũi tên chỉ hướng nhiệm vụ xoay quanh người chơi
@@ -2196,6 +2206,7 @@ export class WorldScene extends Phaser.Scene {
     }
     this.activeSlashes.length = 0;
     this.telegraphs.clear();
+    this.pbolts.clear();
 
     for (const it of this.activeSwords) {
       it.img.setVisible(false);
@@ -4059,6 +4070,7 @@ export class WorldScene extends Phaser.Scene {
   private stepTransientFx(now: number) {
     // 0. Báo trước đòn + đạn của quái: vẽ lại theo đồng hồ cảnh (vị trí đạn tính từ lúc bắn, không từ khung)
     this.telegraphs.update(now);
+    this.pbolts.update(now);
 
     // 1. Vệt chém (180ms)
     for (let i = this.activeSlashes.length - 1; i >= 0; i--) {
@@ -4204,6 +4216,19 @@ export class WorldScene extends Phaser.Scene {
             emitterBudget: getQuality().emitterBudget,
           }),
         );
+      }
+      case "pbolt": {
+        // Đạn của người chơi (mục 51, CT11b bước 2): MỖI tin là một đoạn thẳng máy chủ đã tính (tới ô chặn / trúng / hết tầm); nảy là một tin MỚI từ chỗ nảy. Client chỉ
+        // bay hình theo `speed` / `angle` trong `ms` rồi bụi ở cuối đoạn; sát thương đã có `dmg`. Tin hỏng / chiêu lạ / ngoài tầm nhìn: bỏ, không lỗi.
+        const def = skillOf(m.skill);
+        const p = parsePBolt(m);
+        if (!def || !p) return;
+        const end = pboltEnd(p);
+        // nhìn thấy khi điểm đầu HOẶC điểm cuối trong tầm (đạn bay ngang màn hình)
+        if (!this.inView(p.x, p.y, 480) && !this.inView(end.x, end.y, 480)) return;
+        const plan = pboltPlan(p, def.element, p.by === this.sid);
+        this.pbolts.add(plan, this.time.now);
+        return this.playFxPoints(planPBoltEnd(plan));
       }
       case "warn":
         // Báo trước đòn của quái (M7.7, #508): vùng tô đặc lớn dần tới lúc đòn đáp xuống; client chỉ vẽ, máy chủ quyết định trúng / trượt
