@@ -79,21 +79,21 @@ describe("client sect pure logic", () => {
     const time = new Date("2026-11-10T10:30:00Z").getTime();
     const depositLog: SectLogEntry = {
       at: time,
-      name: "Tiêu Phong",
+      name: "Bùi Chấn Nhạc",
       kind: "deposit",
       amount: 50000,
     };
     const logStr = formatSectLog(depositLog);
-    expect(logStr).toContain("Tiêu Phong đã góp +50.000 Linh thạch");
+    expect(logStr).toContain("Bùi Chấn Nhạc đã góp +50.000 Linh thạch");
 
     const withdrawLog: SectLogEntry = {
       at: time,
-      name: "Tiêu Phong",
+      name: "Bùi Chấn Nhạc",
       kind: "withdraw",
       amount: 10000,
     };
     const withdrawStr = formatSectLog(withdrawLog);
-    expect(withdrawStr).toContain("Tiêu Phong đã rút -10.000 Linh thạch");
+    expect(withdrawStr).toContain("Bùi Chấn Nhạc đã rút -10.000 Linh thạch");
   });
 
   it("sortSectMembers sắp xếp đúng thứ bậc Tông chủ -> Trưởng lão -> Đệ tử", () => {
@@ -112,38 +112,38 @@ describe("client sect pure logic", () => {
 
   it("mergeMemberPresence gắn cờ online và thông tin cảnh giới bản đồ", () => {
     const members: SectMember[] = [
-      { name: "Hàn Lập", rank: "chu", joinedAt: 100 },
-      { name: "Nam Cung Uyển", rank: "truong_lao", joinedAt: 200 },
-      { name: "Lệ Phi Vũ", rank: "de_tu", joinedAt: 300 },
+      { name: "Giang Tĩnh Uyên", rank: "chu", joinedAt: 100 },
+      { name: "Tống Uyển Thu", rank: "truong_lao", joinedAt: 200 },
+      { name: "Đỗ Phi Vân", rank: "de_tu", joinedAt: 300 },
     ];
     const presence: SectPresenceMsg = {
       online: [
-        { name: "Hàn Lập", realm: 2, tier: 1, mapId: "hac_phong" },
-        { name: "Lệ Phi Vũ", realm: 0, tier: 9, mapId: "lac_ha" },
+        { name: "Giang Tĩnh Uyên", realm: 2, tier: 1, mapId: "hac_phong" },
+        { name: "Đỗ Phi Vân", realm: 0, tier: 9, mapId: "lac_ha" },
       ],
     };
 
     const merged = mergeMemberPresence(members, presence);
     expect(merged).toHaveLength(3);
 
-    const hanLap = merged.find((m) => m.name === "Hàn Lập");
-    expect(hanLap?.online).toBe(true);
-    expect(hanLap?.mapId).toBe("hac_phong");
-    expect(hanLap?.realm).toBe(2);
+    const giangTinhUyen = merged.find((m) => m.name === "Giang Tĩnh Uyên");
+    expect(giangTinhUyen?.online).toBe(true);
+    expect(giangTinhUyen?.mapId).toBe("hac_phong");
+    expect(giangTinhUyen?.realm).toBe(2);
 
-    const uyen = merged.find((m) => m.name === "Nam Cung Uyển");
-    expect(uyen?.online).toBe(false);
+    const tongUyenThu = merged.find((m) => m.name === "Tống Uyển Thu");
+    expect(tongUyenThu?.online).toBe(false);
 
-    const lePhiVu = merged.find((m) => m.name === "Lệ Phi Vũ");
-    expect(lePhiVu?.online).toBe(true);
-    expect(lePhiVu?.mapId).toBe("lac_ha");
+    const doPhiVan = merged.find((m) => m.name === "Đỗ Phi Vân");
+    expect(doPhiVan?.online).toBe(true);
+    expect(doPhiVan?.mapId).toBe("lac_ha");
 
     // Khớp online với tên tiếng Việt có dấu khác dạng phân rã Unicode (NFC vs NFD)
     const nfcMembers: SectMember[] = [
-      { name: "Tiêu Viêm", rank: "chu", joinedAt: 100 }, // NFC
+      { name: "Phó Hồng Ngạn", rank: "chu", joinedAt: 100 }, // NFC
     ];
     const nfdPresence: SectPresenceMsg = {
-      online: [{ name: "Tiêu Viêm".normalize("NFD"), realm: 1, tier: 1, mapId: "lac_ha" }],
+      online: [{ name: "Phó Hồng Ngạn".normalize("NFD"), realm: 1, tier: 1, mapId: "lac_ha" }],
     };
     const nfdMerged = mergeMemberPresence(nfcMembers, nfdPresence);
     expect(nfdMerged[0].online).toBe(true);
@@ -181,7 +181,7 @@ describe("client sect pure logic", () => {
     expect(presence.online.length).toBeGreaterThan(0);
 
     const inv = MOCK_SECT_SAMPLES.invited();
-    expect(inv.from).toBe("Tiêu Phong");
+    expect(inv.from).toBe("Bùi Chấn Nhạc");
     expect(inv.sect).toBe("Tiêu Dao Phái");
     expect(inv.ttlMs).toBe(30_000);
   });

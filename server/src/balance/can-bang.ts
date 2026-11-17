@@ -25,6 +25,7 @@ import { renderOwnerGearSensitivity } from "./do-o-rieng";
 import { renderTinhAnh } from "./tinh-anh";
 import { renderBotHuntSection } from "./bot-hunt";
 import { renderSectEconomy } from "./tong-mon";
+import { renderBossBalance } from "./trum";
 import { renderSkillBalanceMarkdown } from "./skills-model";
 import { PK_TARGET_SECONDS, representativeLevels, summarizeDuels } from "./pk";
 import {
@@ -471,6 +472,8 @@ ${renderTinhAnh()}
 ${renderBotHuntSection()}
 
 ${renderSectEconomy()}
+
+${renderBossBalance()}
 
 ${renderSkillBalanceMarkdown(statsFor(3, 0, emptyEquipment()))}`,
   );

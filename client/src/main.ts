@@ -24,6 +24,7 @@ import {
 } from "@tien-gioi/shared";
 import { WorldScene } from "./scenes/WorldScene";
 import { ui } from "./ui";
+import { setMapCardOverride } from "./map-card";
 import {
   buildMockThuMonDialog,
   dungeonFallenDeathText,
@@ -160,7 +161,7 @@ function createMockDungeonRoom(
           [
             "mock-session-01",
             {
-              name: "Trương Tiểu Phàm",
+              name: "Tô Vân Hạc",
               realm,
               tier: 8,
               hp: dead ? 0 : 2500,
@@ -600,7 +601,7 @@ function setupRoomLifecycle(room: Room) {
     isTraveling = true;
     stopLiveness();
     activeScene?.setReconnecting(true);
-    ui.showTransition(targetMap.def.name);
+    ui.showTransition(targetMap.def.name, msg.mapId);
 
     try {
       // Chờ màn chuyển cảnh khép (mống mắt 400 ms, giảm chuyển động: mờ 300 ms); bấm / gõ phím thì bỏ qua (gfx/scene-transition.ts)
@@ -705,6 +706,8 @@ async function start(room: Room, mapId: string) {
     (import.meta.env.DEV || new URLSearchParams(location.search).has("debug"))
   ) {
     (window as any).__ui = ui;
+    // Cho `check-map-card.mjs`: thử thẻ minh hoạ của màn chuyển cảnh với ảnh thế chỗ (bản chạy thật không có mục ghi đè)
+    (window as any).__mapCardOverride = setMapCardOverride;
     // Cho `check-quest-log.mjs` (#409): id mọi nhiệm vụ chính tuyến / lặp THẬT của game để nạp vào sổ nhiệm vụ
     // Cho `check-forge-shop.mjs` (#409): công thức rèn + cửa hàng THẬT của game (nguyên liệu, phí) để nạp túi / ví đúng ca "đủ" / "thiếu"
     // Cho `check-craft-ui.mjs` (#769): đối tượng dữ liệu DÙNG CHUNG để script chèn NPC / đan / công thức THỬ (nghề nhỏ chưa có dữ liệu thật: D làm ở #763) rồi dọn
@@ -773,7 +776,7 @@ async function start(room: Room, mapId: string) {
           buildMockThuMonDialog({
             canOpen: false,
             failReason: "member_low",
-            failWho: "Lâm Kinh Vũ",
+            failWho: "Mạc Khinh Trần",
           }),
         ),
       showInvite: () => ui.onDungeonInvite(MOCK_DUNGEON_SAMPLES.invite()),
@@ -817,14 +820,14 @@ async function start(room: Room, mapId: string) {
       },
     };
     (window as any).__mockDuel = {
-      showInvite: (from = "Diệp Phàm") => ui.onDuelInvited(MOCK_DUEL_SAMPLES.invited(from)),
-      showCountdown: (opponent = "Diệp Phàm") =>
+      showInvite: (from = "Ngô Tử Khiêm") => ui.onDuelInvited(MOCK_DUEL_SAMPLES.invited(from)),
+      showCountdown: (opponent = "Ngô Tử Khiêm") =>
         ui.onDuelState(MOCK_DUEL_SAMPLES.stateCountdown(opponent)),
-      showFighting: (opponent = "Diệp Phàm") =>
+      showFighting: (opponent = "Ngô Tử Khiêm") =>
         ui.onDuelState(MOCK_DUEL_SAMPLES.stateFighting(opponent)),
       updateOpponentHp: (hp: number, maxHp: number) => ui.updateDuelOpponentHp(hp, maxHp),
-      showWon: (opponent = "Diệp Phàm") => ui.onDuelEnd(MOCK_DUEL_SAMPLES.endWon(opponent)),
-      showLost: (opponent = "Diệp Phàm") => ui.onDuelEnd(MOCK_DUEL_SAMPLES.endLost(opponent)),
+      showWon: (opponent = "Ngô Tử Khiêm") => ui.onDuelEnd(MOCK_DUEL_SAMPLES.endWon(opponent)),
+      showLost: (opponent = "Ngô Tử Khiêm") => ui.onDuelEnd(MOCK_DUEL_SAMPLES.endLost(opponent)),
       showDraw: () => ui.onDuelEnd(MOCK_DUEL_SAMPLES.endDraw()),
       hide: () => {
         ui.hideDuelHud();

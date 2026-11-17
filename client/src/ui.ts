@@ -51,7 +51,6 @@ import {
   buyPrice,
   sellPrice,
   SHOP_BY_NPC,
-  SHOP_MAX_QTY,
   type WalletMsg,
   UNLOCKS,
   ORIGINS,
@@ -148,7 +147,14 @@ import {
   type VaultPlan,
   vaultLockedNote,
 } from "./sect-vault";
-import { hallLeaveWarning, hallRefreshDelayMs, sanitizeHallView } from "./sect-hall";
+import {
+  depositPreviewText,
+  hallLeaveWarning,
+  hallRefreshDelayMs,
+  hallShopRows,
+  sanitizeHallView,
+  shopBuyPreviewText,
+} from "./sect-hall";
 import { renderHall, updateHallCountdown, type HallUiState } from "./sect-hall-ui";
 import { canAffordFee, feeChipText, recipeFee } from "./forge-fee";
 import { perfRttText } from "./net-latency";
@@ -207,7 +213,14 @@ import {
 import { transitionMs, waitOrSkip } from "./gfx/scene-transition";
 import { getDisplay, onDisplayChange } from "./gfx/display";
 import { optionTag, skipHintText } from "./dialog-opt";
-import { dropConfirmText, dropStillValid, dropWarnText, planDrop, type DropPlan } from "./inv-drop";
+import {
+  dropConfirmText,
+  dropStillValid,
+  dropWarnText,
+  planDrop,
+  withDropQty,
+  type DropPlan,
+} from "./inv-drop";
 import {
   inConfirmGuard,
   rebirthPlan,
@@ -263,7 +276,10 @@ import {
   markNewbieGuideDismissed,
 } from "./a11y";
 import { $, buttonShown, fmt, hexColor, onPress, readPref, writePref } from "./ui-util";
+import { applyMapCard, mapCardUrl } from "./map-card";
 import { describeStep, renderQuestTrackerView } from "./ui-quest-tracker";
+import { createQtyStepper, type QtyStepper } from "./qty-stepper";
+import { buyQtyMax, sellQtyMax } from "./shop-qty";
 
 // `fmt` từng được xuất từ đây (test `sect.test.ts` nhập động): giữ tên xuất cũ sau khi chuyển sang `ui-util.ts`.
 export { fmt };
@@ -337,7 +353,7 @@ export interface UiCallbacks {
   onSectHallGet?: () => void;
   onSectQuestAccept?: (questId: string) => void;
   onSectQuestTurnIn?: (questId: string) => void;
-  onSectShopBuy?: (itemId: string) => void;
+  onSectShopBuy?: (itemId: string, qty?: number) => void;
   /** Đã gục / ở Hoàng Tuyền (khoá nhận / trả / mua ở tab Nội vụ; máy chủ vẫn kiểm lại) */
   isSectDown?: () => boolean;
   /** Bảng Công pháp: gắn chiêu vào ô 2-5 (`skillId` "" = gỡ); máy chủ trả `skills` (sổ đúng) */
@@ -456,6 +472,9 @@ let sectHall: { view: NonNullable<ReturnType<typeof sanitizeHallView>>; at: numb
 const hallBusy = new Set<string>();
 /** Trạng thái mở / thu của các nhóm cửa hàng tông môn do người chơi đổi (khác mặc định); xoá khi rời / hết tông môn */
 const hallGroupOpen = new Map<string, boolean>();
+/** Khung "mua nhiều" của cửa hàng tông (ô số lượng dùng chung): hàng đang mở và MỘT ô số lượng dùng lại cho mọi hàng (`setQty` / `setMax` mỗi lần mở) */
+let hallBuyOpen: string | null = null;
+let hallBuyStepper: QtyStepper | null = null;
 let hallBusyTimer: ReturnType<typeof setTimeout> | null = null;
 const HALL_BUSY_MS = 5000;
 /** Đồng hồ đếm ngược của tab Nội vụ (mỗi giây, chỉ chạy khi tab đang xem) và mốc đặt lại đã xin ảnh chụp mới (mỗi mốc xin MỘT lần). */
@@ -469,6 +488,12 @@ let sectVault: SectVaultView | null = null;
 /** Ô đang chọn: từ kho (rút) hoặc từ túi (góp). Chỉ bấm / chạm / bàn phím mới chọn, rê chuột KHÔNG chọn (mục 24, `inv-select.test.ts`). */
 let vaultSel: { from: "vault" | "bag"; index: number } | null = null;
 let vaultQty = 1;
+/** Ô nhập số lượng dùng chung (qty-stepper.ts, mục 47) của kho đồ tông môn, và của hai ô Linh thạch ở tab Quỹ; gắn một lần ở `setup` */
+let vaultStepper: QtyStepper | null = null;
+let depositStepper: QtyStepper | null = null;
+let withdrawStepper: QtyStepper | null = null;
+/** Đang vẽ lại tab Kho đồ: `onChange` của ô số lượng bắn trong lúc `setMax` thì không vẽ lại lồng nhau */
+let vaultRendering = false;
 /** Đang chờ máy chủ trả lời một thao tác kho đồ (mỗi người một thao tác tại một thời điểm): khoá nút tới khi có ảnh chụp mới / toast / hết `VAULT_BUSY_MS`. */
 let vaultBusy = false;
 let vaultBusyTimer: ReturnType<typeof setTimeout> | null = null;
@@ -836,6 +861,10 @@ function closeActConfirm(refocus = true): boolean {
 
 /** Kế hoạch vứt đang chờ xác nhận (chụp lúc bấm "Vứt 1" / "Vứt hết"); `null` = không có hộp. */
 let dropPlanPending: DropPlan | null = null;
+/** Kế hoạch GỐC lúc bấm nút ("Vứt 1" / "Vứt hết"); ô số lượng đổi số thì kế hoạch đang chờ được dựng lại từ đây (`withDropQty`) */
+let dropPlanInit: DropPlan | null = null;
+/** Ô số lượng dùng chung trong hộp xác nhận vứt (mục 47); chỉ hiện khi ô túi có từ 2 cái */
+let dropStepper: QtyStepper | null = null;
 /** Nút đã mở hộp (trả focus về đó khi đóng hộp bằng Esc / "Giữ lại") */
 let dropConfirmOpener: HTMLElement | null = null;
 /**
@@ -844,6 +873,11 @@ let dropConfirmOpener: HTMLElement | null = null;
  */
 const DROP_CONFIRM_GUARD_MS = 450;
 let dropConfirmOpenedAt = -Infinity;
+/**
+ * Lúc hộp xác nhận vừa ĐÓNG: hộp biến mất thì hàng nút "Vứt 1" / "Vứt hết" hiện lại, có khi đúng chỗ ngón vừa chạm "Vứt" / "Giữ lại", và `click` do trình duyệt tạo sau khi nhả ngón rơi
+ * vào nút đó (`bindTap` nhớ lần chạm theo TỪNG nút nên không nhận ra) và mở hộp lần nữa ngay sau khi vừa vứt. Hai nút này bỏ qua click chuột / chạm trong cửa sổ chống click ma sau khi hộp đóng.
+ */
+let dropConfirmClosedAt = -Infinity;
 
 /** Mở hộp xác nhận vứt cho ô được chọn: ghi rõ TÊN + SỐ LƯỢNG (+ dòng nhắc đồ quý). `all` = "Vứt hết", ngược lại vứt 1. */
 function askDropConfirm(all: boolean, opener: HTMLElement | null) {
@@ -851,9 +885,17 @@ function askDropConfirm(all: boolean, opener: HTMLElement | null) {
   const def = plan ? ITEM_BY_ID[plan.itemId] : undefined;
   if (!plan || !def) return;
   dropPlanPending = plan;
+  dropPlanInit = plan;
   dropConfirmOpener = opener;
   dropConfirmOpenedAt = performance.now();
   $("inv-drop-text").textContent = dropConfirmText(def.name, plan);
+  // ô số lượng: chỉ khi có từ 2 cái (1 cái thì không có gì để chọn); "Vứt 1" mở với số 1, "Vứt hết" mở với toàn bộ, chỉnh được trước khi xác nhận
+  const stepper = dropStepper;
+  $("inv-drop-qty").hidden = !(plan.have >= 2 && stepper);
+  if (stepper && plan.have >= 2) {
+    stepper.setMax(plan.have);
+    stepper.setQty(plan.qty);
+  }
   const warn = dropWarnText(def.rarity, rarityStyle(def.rarity).name);
   const warnEl = $("inv-drop-warn");
   warnEl.textContent = warn ?? "";
@@ -868,18 +910,43 @@ function closeDropConfirm(refocus = true): boolean {
   const box = document.getElementById("inv-drop-confirm");
   if (!box || box.hidden) return false;
   box.hidden = true;
+  dropConfirmClosedAt = performance.now();
   $("inv-detail").classList.remove("dropping");
   dropPlanPending = null;
+  dropPlanInit = null;
   const back = dropConfirmOpener;
   dropConfirmOpener = null;
   if (refocus && back && !back.hidden) back.focus();
   return true;
 }
 
-/** "Vứt" trong hộp: kiểm lại túi vẫn còn ĐÚNG món + đủ số lượng như lúc bấm rồi mới gửi `dropItem`; đã đổi thì huỷ kèm thông báo. */
+/** Ô số lượng đổi số: dựng lại kế hoạch từ kế hoạch gốc và cập nhật lời trong hộp. Ô đang trống / sai (người chơi đang gõ lại) thì giữ kế hoạch cũ. */
+function onDropQtyChange(q: number | null) {
+  const init = dropPlanInit;
+  const def = init ? ITEM_BY_ID[init.itemId] : undefined;
+  if (!init || !def || q === null) return;
+  const plan = withDropQty(init, q);
+  dropPlanPending = plan;
+  $("inv-drop-text").textContent = dropConfirmText(def.name, plan);
+}
+
+/**
+ * "Vứt" trong hộp: đọc lại số trong ô (nếu có), kiểm lại túi vẫn còn ĐÚNG món + đủ số lượng rồi mới gửi `dropItem`; đã đổi thì huỷ kèm thông báo.
+ * Số trong ô trống / sai thì KHÔNG vứt và hộp vẫn mở (không gửi gì, không đoán số).
+ */
 function confirmDrop() {
   if (performance.now() - dropConfirmOpenedAt < DROP_CONFIRM_GUARD_MS) return; // click ma ngay sau khi hộp mở: bỏ qua
-  const plan = dropPlanPending;
+  let plan = dropPlanPending;
+  const init = dropPlanInit;
+  if (plan && init && !$("inv-drop-qty").hidden && dropStepper) {
+    const q = dropStepper.read();
+    if (q === null) {
+      ui.toast({ text: "Nhập số lượng vứt từ 1 trở lên.", tone: "bad" });
+      dropStepper.focus();
+      return;
+    }
+    plan = withDropQty(init, q);
+  }
   closeDropConfirm(true);
   if (!plan) return;
   if (!dropStillValid(invSlots, plan)) {
@@ -1845,6 +1912,48 @@ const shopBuyQuantities: Record<string, number> = {};
 const shopSellQuantities: Record<string, number> = {};
 let currentCoin = 0;
 
+/**
+ * Ô SỐ LƯỢNG của một thẻ cửa hàng NPC (mục 47): ô gõ số dùng chung (− / +, ×10 / ×100, Tối đa, giữ nút tăng nhanh dần, Enter xác nhận).
+ * Cả danh sách vẽ lại khi ví / túi đổi nên số chọn nhớ trong `store[key]` (chỉ ghi số HỢP LỆ: đang gõ dở / ô trống thì giữ số cũ); vẽ lại xong, ô dựng lại từ số đó.
+ * Đổi số chỉ cập nhật nút Mua / Bán tại chỗ (`onQty`), KHÔNG vẽ lại cả danh sách: vẽ lại sẽ làm mất con trỏ đang gõ. `nav` giữ `data-nav` cho điều hướng bằng mũi tên và
+ * `withFocusKept`; `onConfirm` = Enter trong ô (gọi nút Mua / Bán của chính thẻ).
+ */
+function createShopQty(args: {
+  idKey: string;
+  nav: string;
+  store: Record<string, number>;
+  key: string;
+  max: number;
+  label: string;
+  preview: (q: number) => string;
+  onQty: () => void;
+  onConfirm: () => void;
+}): QtyStepper {
+  const max = Math.max(1, Math.floor(args.max));
+  // `createQtyStepper` báo `onChange` ngay lúc dựng (số khởi đầu): chỉ chuyển tiếp cho nơi dùng SAU khi dựng xong (nơi dùng còn chưa có ô để đọc)
+  let ready = false;
+  const stepper = createQtyStepper({
+    label: args.label,
+    max,
+    initial: Math.min(max, Math.max(1, args.store[args.key] ?? 1)),
+    ids: { input: `shop-qty-${args.idKey}` },
+    preview: args.preview,
+    onChange: (q) => {
+      if (q !== null) args.store[args.key] = q;
+      if (ready) args.onQty();
+    },
+    onConfirm: args.onConfirm,
+  });
+  ready = true;
+  const q0 = stepper.getQty();
+  if (q0 !== null) args.store[args.key] = q0; // đã kẹp theo giới hạn hiện tại (ví / số đang có đổi)
+  const btns = stepper.el.querySelectorAll("button"); // thứ tự của `qty-stepper`: − + ×10 ×100 Tối đa
+  btns[0]!.dataset.nav = `${args.nav}:minus`;
+  btns[1]!.dataset.nav = `${args.nav}:plus`;
+  stepper.el.querySelector("input")!.dataset.nav = `${args.nav}:input`;
+  return stepper;
+}
+
 function renderShopModal() {
   const npc = NPC_BY_ID[shopNpcId];
   $("shop-title").textContent = npc ? `Cửa Hàng · ${npc.name}` : "Cửa Hàng Lão Dược Sư";
@@ -1892,10 +2001,8 @@ function renderShopBuyImpl() {
     if (!def) continue;
 
     const unitPrice = buyPrice(itemId);
-    const qty = Math.min(SHOP_MAX_QTY, Math.max(1, shopBuyQuantities[itemId] ?? 1));
-    shopBuyQuantities[itemId] = qty;
-    const totalPrice = unitPrice * qty;
-    const canAfford = currentCoin >= totalPrice;
+    // giới hạn = trần một lần của máy chủ, kẹp theo ví (tối thiểu 1: ví không đủ cả một cái thì nút Mua báo "Thiếu N")
+    const maxBuyQty = buyQtyMax(currentCoin, unitPrice);
 
     const card = document.createElement("div");
     card.className = "shop-card";
@@ -1932,75 +2039,59 @@ function renderShopBuyImpl() {
     info.append(nameRow, desc);
     left.append(icon, info);
 
-    // Cột phải: Chọn số lượng + Nút mua
+    // Cột phải: ô số lượng + nút mua
     const right = document.createElement("div");
     right.className = "shop-card-right";
-
-    const qtyBox = document.createElement("div");
-    qtyBox.className = "shop-qty-box";
-
-    const btnMinus = document.createElement("button");
-    btnMinus.type = "button";
-    btnMinus.className = "shop-qty-btn";
-    btnMinus.textContent = "−";
-    btnMinus.title = "Giảm số lượng";
-    btnMinus.dataset.nav = `buy:${itemId}:minus`;
-    btnMinus.disabled = qty <= 1;
-    onPress(
-      btnMinus,
-      () => {
-        if (qty > 1) {
-          shopBuyQuantities[itemId] = qty - 1;
-          renderShopBuy();
-        }
-      },
-      true,
-    );
-
-    const qtyVal = document.createElement("span");
-    qtyVal.className = "shop-qty-val";
-    qtyVal.textContent = `${qty}`;
-
-    const btnPlus = document.createElement("button");
-    btnPlus.type = "button";
-    btnPlus.className = "shop-qty-btn";
-    btnPlus.textContent = "+";
-    btnPlus.title = "Tăng số lượng";
-    btnPlus.dataset.nav = `buy:${itemId}:plus`;
-    btnPlus.disabled = qty >= SHOP_MAX_QTY;
-    onPress(
-      btnPlus,
-      () => {
-        if (qty < SHOP_MAX_QTY) {
-          shopBuyQuantities[itemId] = qty + 1;
-          renderShopBuy();
-        }
-      },
-      true,
-    );
-
-    qtyBox.append(btnMinus, qtyVal, btnPlus);
 
     const buyBtn = document.createElement("button");
     buyBtn.type = "button";
     buyBtn.className = "shop-act-btn buy";
-    buyBtn.disabled = !canAfford;
-
     const buyBtnText = document.createElement("span");
-    buyBtnText.textContent = canAfford
-      ? `Mua (${totalPrice} 💎)`
-      : `Thiếu ${totalPrice - currentCoin} 💎`;
     buyBtn.append(buyBtnText);
+
+    const qtyStepper = createShopQty({
+      idKey: `mua-${itemId}`,
+      nav: `buy:${itemId}`,
+      store: shopBuyQuantities,
+      key: itemId,
+      max: maxBuyQty,
+      label: `Số lượng ${def.name} muốn mua`,
+      preview: (q) =>
+        `Tổng ${(unitPrice * q).toLocaleString("vi-VN")} 💎, ví còn ${Math.max(0, currentCoin - unitPrice * q).toLocaleString("vi-VN")}.`,
+      onQty: () => refreshBuyBtn(),
+      onConfirm: () => buyBtn.click(),
+    });
+    /** Nút Mua theo số đang chọn: ô đang trống / sai thì mờ ("Nhập số lượng"), ví không đủ thì mờ kèm "Thiếu N 💎" */
+    const refreshBuyBtn = () => {
+      const q = qtyStepper.getQty();
+      if (q === null) {
+        buyBtn.disabled = true;
+        buyBtnText.textContent = "Nhập số lượng";
+        return;
+      }
+      const total = unitPrice * q;
+      const canAfford = currentCoin >= total;
+      buyBtn.disabled = !canAfford;
+      buyBtnText.textContent = canAfford ? `Mua (${total} 💎)` : `Thiếu ${total - currentCoin} 💎`;
+    };
+    refreshBuyBtn();
 
     buyBtn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      if (!canAfford) return;
+      // đọc lại chữ ĐANG có trong ô (không tin số cũ); trống / sai thì không mua, đưa focus về ô
+      const qty = qtyStepper.read();
+      if (qty === null) {
+        ui.toast({ text: "Nhập số lượng từ 1 trở lên.", tone: "bad" });
+        qtyStepper.focus();
+        return;
+      }
+      if (currentCoin < unitPrice * qty) return;
       sound.pickup();
       callbacks?.onBuy?.(shopNpcId, itemId, qty);
     });
 
-    right.append(qtyBox, buyBtn);
+    right.append(qtyStepper.el, buyBtn);
     card.append(left, right);
     list.append(card);
   }
@@ -2026,11 +2117,9 @@ function renderShopSellImpl() {
     const canSell = unitPrice > 0;
     if (canSell) sellableCount++;
 
-    const maxQty = slot.qty;
+    // trần một lần của máy chủ (`SHOP_MAX_QTY`): ngăn xếp lớn hơn thì bán từng đợt
+    const maxQty = sellQtyMax(slot.qty);
     const sellKey = `${i}:${slot.itemId}`;
-    const qty = Math.min(maxQty, Math.max(1, shopSellQuantities[sellKey] ?? 1));
-    shopSellQuantities[sellKey] = qty;
-    const totalPrice = unitPrice * qty;
 
     const card = document.createElement("div");
     card.className = `shop-card${canSell ? "" : " unsellable"}`;
@@ -2069,69 +2158,49 @@ function renderShopSellImpl() {
     info.append(nameRow, desc);
     left.append(icon, info);
 
-    // Cột phải: Chọn số lượng + Nút bán
+    // Cột phải: ô số lượng + nút bán
     const right = document.createElement("div");
     right.className = "shop-card-right";
 
     if (canSell) {
-      const qtyBox = document.createElement("div");
-      qtyBox.className = "shop-qty-box";
-
-      const btnMinus = document.createElement("button");
-      btnMinus.type = "button";
-      btnMinus.className = "shop-qty-btn";
-      btnMinus.textContent = "−";
-      btnMinus.title = "Giảm số lượng";
-      btnMinus.dataset.nav = `sell:${i}:minus`;
-      btnMinus.disabled = qty <= 1;
-      onPress(
-        btnMinus,
-        () => {
-          if (qty > 1) {
-            shopSellQuantities[sellKey] = qty - 1;
-            renderShopSell();
-          }
-        },
-        true,
-      );
-
-      const qtyVal = document.createElement("span");
-      qtyVal.className = "shop-qty-val";
-      qtyVal.textContent = `${qty}`;
-
-      const btnPlus = document.createElement("button");
-      btnPlus.type = "button";
-      btnPlus.className = "shop-qty-btn";
-      btnPlus.textContent = "+";
-      btnPlus.title = "Tăng số lượng";
-      btnPlus.dataset.nav = `sell:${i}:plus`;
-      btnPlus.disabled = qty >= maxQty;
-      onPress(
-        btnPlus,
-        () => {
-          if (qty < maxQty) {
-            shopSellQuantities[sellKey] = qty + 1;
-            renderShopSell();
-          }
-        },
-        true,
-      );
-
-      qtyBox.append(btnMinus, qtyVal, btnPlus);
-
       const sellBtn = document.createElement("button");
       sellBtn.type = "button";
       sellBtn.className = "shop-act-btn sell";
-
       const sellBtnText = document.createElement("span");
-      sellBtnText.textContent = `Bán (+${totalPrice} 💎)`;
       sellBtn.append(sellBtnText);
+
+      const qtyStepper = createShopQty({
+        idKey: `ban-${i}`,
+        nav: `sell:${i}`,
+        store: shopSellQuantities,
+        key: sellKey,
+        max: maxQty,
+        label: `Số lượng ${def.name} muốn bán`,
+        preview: (q) =>
+          `Nhận ${(unitPrice * q).toLocaleString("vi-VN")} 💎, ví lên ${(currentCoin + unitPrice * q).toLocaleString("vi-VN")}.`,
+        onQty: () => refreshSellBtn(),
+        onConfirm: () => sellBtn.click(),
+      });
+      /** Nút Bán theo số đang chọn: ô đang trống / sai thì mờ ("Nhập số lượng") */
+      const refreshSellBtn = () => {
+        const q = qtyStepper.getQty();
+        sellBtn.disabled = q === null;
+        sellBtnText.textContent = q === null ? "Nhập số lượng" : `Bán (+${unitPrice * q} 💎)`;
+      };
+      refreshSellBtn();
 
       sellBtn.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
         // click "ma" sau khi vừa xác nhận / giữ lại ở hộp (cảm ứng): không mở lại hộp, không bán lần nữa
         if (ghostClick(e)) return;
+        // đọc lại chữ ĐANG có trong ô (không tin số cũ); trống / sai thì không bán, đưa focus về ô
+        const qty = qtyStepper.read();
+        if (qty === null) {
+          ui.toast({ text: "Nhập số lượng từ 1 trở lên.", tone: "bad" });
+          qtyStepper.focus();
+          return;
+        }
         // Đồ quý / trang bị: hộp xác nhận (issue #779); đồ thường bán thẳng
         const plan = sellPlan(invSlots, i, qty, unitPrice, {
           name: def.name,
@@ -2162,7 +2231,7 @@ function renderShopSellImpl() {
         actConfirmFromShop = true;
       });
 
-      right.append(qtyBox, sellBtn);
+      right.append(qtyStepper.el, sellBtn);
     } else {
       const lockLabel = document.createElement("span");
       lockLabel.className = "shop-lock-label";
@@ -3000,6 +3069,8 @@ function renderSectTreasuryTab() {
 
   const canWithdraw = canSect("withdraw", currentSect.myRank);
   $("sect-form-withdraw").hidden = !canWithdraw;
+  withdrawStepper?.setMax(currentSect.coin); // ô rút quỹ kẹp theo quỹ hiện có
+  depositStepper?.setMax(currentCoin);
 
   const logsList = $("sect-logs-list");
   logsList.replaceChildren();
@@ -3067,13 +3138,31 @@ function reconcileVaultSelection() {
   const max = vaultSelMax();
   if (max < 1) {
     vaultSel = null;
-    vaultQty = 1;
+    resetVaultQty();
     return;
   }
-  vaultQty = clampQty(vaultQty, max) || 1;
+  vaultStepper?.setMax(max); // kẹp số đang chọn theo giới hạn mới (kho / túi / hạn mức đổi)
+  vaultQty = clampQty(vaultStepper?.getQty() ?? vaultQty, max) || 1;
+}
+
+/** Về số lượng 1 (đổi ô chọn, hết tông môn...): cả biến lẫn ô nhập. */
+function resetVaultQty() {
+  vaultQty = 1;
+  vaultStepper?.setQty(1);
 }
 
 function renderSectVaultTab() {
+  if (!currentSect) return;
+  if (vaultRendering) return;
+  vaultRendering = true;
+  try {
+    renderSectVaultTabImpl();
+  } finally {
+    vaultRendering = false;
+  }
+}
+
+function renderSectVaultTabImpl() {
   if (!currentSect) return;
   const v = sectVault;
   const rank = currentSect.myRank;
@@ -3121,12 +3210,13 @@ function renderSectVaultTab() {
     const max = vaultSelMax();
     selEl.textContent = `${isVault ? "Trong kho" : "Trong túi"}: ${def?.name ?? "?"}${slot && slot.qty > 1 ? ` (có ${slot.qty})` : ""}`;
     qtyBox.hidden = max <= 1 || reason !== null;
-    $("sect-vault-qty").textContent = String(vaultQty);
-    ($("sect-vault-minus") as HTMLButtonElement).disabled = vaultQty <= 1;
-    ($("sect-vault-plus") as HTMLButtonElement).disabled = vaultQty >= max;
+    const typed = vaultStepper?.getQty() ?? null;
     act.textContent = vaultBusy ? "Đang xử lý…" : isVault ? "Rút" : "Góp";
-    act.disabled = reason !== null || vaultBusy;
-    why.textContent = reason !== null ? vaultBlockText(reason) : "";
+    // ô số lượng đang trống / hỏng (và hiện ra) thì chưa bấm Góp / Rút được: nói rõ lý do bằng chữ
+    const needQty = !qtyBox.hidden && typed === null;
+    act.disabled = reason !== null || vaultBusy || needQty;
+    why.textContent =
+      reason !== null ? vaultBlockText(reason) : needQty ? "Nhập số lượng từ 1 trở lên." : "";
   }
 
   // chỉnh hạn mức: CHỈ Tông chủ (`canSect`); chọn sẵn giá trị hiện tại
@@ -3176,7 +3266,7 @@ function endVaultBusy() {
 function selectVaultSlot(from: "vault" | "bag", index: number) {
   if (vaultSel?.from === from && vaultSel.index === index) return;
   vaultSel = { from, index };
-  vaultQty = 1;
+  resetVaultQty();
   if (sectModalOpen && sectTab === "vault") renderSectVaultTab();
 }
 
@@ -3288,10 +3378,95 @@ function hallUiState(): HallUiState {
     down: callbacks?.isSectDown?.() ?? false,
     busy: hallBusy,
     groupOpen: hallGroupOpen,
+    buy:
+      hallBuyOpen && hallBuyStepper ? { itemId: hallBuyOpen, stepperEl: hallBuyStepper.el } : null,
   };
 }
 
+/** Hàng cửa hàng tông đang mở khung mua nhiều (theo ảnh chụp mới nhất), hoặc `null` nếu hàng không còn / đã khoá / hết lượt. */
+function hallBuyRow() {
+  const v = sectHall?.view;
+  if (!v || !hallBuyOpen) return null;
+  const row = hallShopRows(v, { down: callbacks?.isSectDown?.() ?? false }).find(
+    (r) => r.itemId === hallBuyOpen,
+  );
+  return row && row.maxBuy >= 1 ? row : null;
+}
+
+function closeHallBuy() {
+  hallBuyOpen = null;
+  if (sectModalOpen && sectTab === "hall") renderSectHallTab();
+}
+
+/** Mở / gấp khung "mua nhiều" của một hàng: một ô số lượng dùng chung, đặt lại về 1 mỗi lần mở sang hàng khác. */
+function toggleHallBuy(itemId: string) {
+  if (hallBuyOpen === itemId) return closeHallBuy();
+  hallBuyOpen = itemId;
+  const row = hallBuyRow();
+  if (!row) {
+    hallBuyOpen = null;
+    return;
+  }
+  if (!hallBuyStepper) {
+    hallBuyStepper = createQtyStepper({
+      label: "Số lượng đổi ở cửa hàng tông môn",
+      max: row.maxBuy,
+      initial: 1,
+      ids: { input: "sect-shop-qty" },
+      preview: (q) => {
+        const r = hallBuyRow();
+        return r ? shopBuyPreviewText(q, r.cost, sectHall?.view?.me.contrib ?? 0) : "";
+      },
+      onConfirm: () => runHallBuy(),
+      onCancel: () => closeHallBuy(),
+    });
+  }
+  hallBuyStepper.setMax(row.maxBuy);
+  hallBuyStepper.setQty(1);
+  renderSectHallTab();
+  hallBuyStepper.focus();
+}
+
+/** Xác nhận khung mua nhiều: đọc lại chữ trong ô (không tin số cũ), rồi gửi MỘT tin với số lượng đó (máy chủ vẫn kiểm lại tất cả). */
+function runHallBuy() {
+  const row = hallBuyRow();
+  if (!row) return closeHallBuy();
+  const qty = hallBuyStepper?.read() ?? null;
+  if (qty === null) {
+    ui.toast({ text: "Nhập số lượng từ 1 trở lên.", tone: "bad" });
+    return;
+  }
+  beginHallBusy(`shop:${row.itemId}`);
+  callbacks?.onSectShopBuy?.(row.itemId, qty);
+  hallBuyOpen = null; // đóng khung ngay; ảnh chụp mới về thì vẽ lại số lượt còn
+  if (sectModalOpen && sectTab === "hall") renderSectHallTab();
+}
+
+/**
+ * Vẽ lại tab Nội vụ nhưng GIỮ focus và vùng chọn của ô số lượng mua nhiều: `renderHall` thay cả cây DOM nên phần tử ô bị gỡ ra rồi gắn lại, mà gỡ phần tử đang focus thì
+ * mất focus (người chơi đang gõ dở sẽ bị ngắt mỗi khi ảnh chụp Nội vụ mới về).
+ */
 function renderSectHallTab() {
+  const input = hallBuyOpen
+    ? (document.getElementById("sect-shop-qty") as HTMLInputElement | null)
+    : null;
+  const keep = input !== null && document.activeElement === input;
+  const from = keep ? input.selectionStart : null;
+  const to = keep ? input.selectionEnd : null;
+  renderSectHallTabImpl();
+  if (keep && hallBuyOpen && input.isConnected) {
+    input.focus();
+    if (from !== null && to !== null) input.setSelectionRange(from, to);
+  }
+}
+
+function renderSectHallTabImpl() {
+  // khung mua nhiều: giới hạn theo ảnh chụp MỚI (cống hiến / lượt còn đổi); hàng khoá hoặc hết thì đóng khung
+  if (hallBuyOpen) {
+    const row = hallBuyRow();
+    if (!row) hallBuyOpen = null;
+    else hallBuyStepper?.setMax(row.maxBuy);
+  }
   renderHall($("sect-tab-hall"), hallUiState(), {
     onAccept: (id) => {
       beginHallBusy(`quest:${id}`);
@@ -3305,6 +3480,9 @@ function renderSectHallTab() {
       beginHallBusy(`shop:${itemId}`);
       callbacks?.onSectShopBuy?.(itemId);
     },
+    onBuyMore: (itemId) => toggleHallBuy(itemId),
+    onBuyConfirm: () => runHallBuy(),
+    onBuyCancel: () => closeHallBuy(),
     onGroupToggle: (key, open, defaultOpen) => {
       // chỉ nhớ lựa chọn KHÁC mặc định (mặc định đổi theo cấp tông thì nhóm theo mặc định mới)
       if (open === defaultOpen) hallGroupOpen.delete(key);
@@ -3551,8 +3729,30 @@ export const ui = {
       }
     });
     // Vứt có HỘP XÁC NHẬN ghi tên + số lượng (QUYET_DINH_M3 mục 24); gửi `dropItem` chỉ khi bấm "Vứt" trong hộp
+    // chặn click ma ngay sau khi hộp đóng (đăng ký TRƯỚC `bindTap`, pha bắt): chỉ click chuột / chạm (`detail` > 0), Enter / Space bằng bàn phím (`detail` 0) vẫn mở lại được ngay
+    for (const id of ["inv-btn-drop1", "inv-btn-dropall"]) {
+      $(id).addEventListener(
+        "click",
+        (e) => {
+          if (e.detail > 0 && performance.now() - dropConfirmClosedAt < DROP_CONFIRM_GUARD_MS)
+            e.stopImmediatePropagation();
+        },
+        true,
+      );
+    }
     bindTap("inv-btn-drop1", () => askDropConfirm(false, $("inv-btn-drop1")));
     bindTap("inv-btn-dropall", () => askDropConfirm(true, $("inv-btn-dropall")));
+    // Ô số lượng dùng chung trong hộp vứt (mục 47): Enter = Vứt (qua cửa sổ chống click ma của `confirmDrop`), Esc = Giữ lại
+    dropStepper = createQtyStepper({
+      label: "Số lượng vứt",
+      max: 1,
+      initial: 1,
+      ids: { input: "inv-drop-qty-input" },
+      onChange: (q) => onDropQtyChange(q),
+      onConfirm: () => confirmDrop(),
+      onCancel: () => void closeDropConfirm(true),
+    });
+    $("inv-drop-qty").append(dropStepper.el);
     bindTap("inv-drop-yes", () => confirmDrop());
     // Hộp xác nhận dùng chung: bỏ qua bấm trong cửa sổ chống click ma; "Chưa / Giữ lại" cũng vậy (hộp không được chớp tắt dưới ngón tay)
     bindTap("act-btn-yes", () => {
@@ -3630,14 +3830,43 @@ export const ui = {
     bindTap("sect-tab-btn-vault", () => this.switchSectTab("vault"));
     bindTap("sect-tab-btn-hall", () => this.switchSectTab("hall"));
     buildSectVaultGrids();
-    bindTap("sect-vault-minus", () => {
-      vaultQty = Math.max(1, vaultQty - 1);
-      renderSectVaultTab();
+    // Ô nhập SỐ LƯỢNG dùng chung (mục 47): gõ số, − / +, ×10 / ×100, Tối đa, giữ nút tăng nhanh dần, Enter xác nhận
+    vaultStepper = createQtyStepper({
+      label: "Số lượng góp hoặc rút",
+      max: 1,
+      ids: { input: "sect-vault-qty", minus: "sect-vault-minus", plus: "sect-vault-plus" },
+      preview: (q) =>
+        `${vaultSel?.from === "vault" ? "Rút" : "Góp"} ${q.toLocaleString("vi-VN")} trong tối đa ${vaultSelMax().toLocaleString("vi-VN")}.`,
+      onChange: (q) => {
+        if (q !== null) vaultQty = q;
+        if (!vaultRendering && sectModalOpen && sectTab === "vault") renderSectVaultTab();
+      },
+      onConfirm: () => runVaultAction(),
     });
-    bindTap("sect-vault-plus", () => {
-      vaultQty = clampQty(vaultQty + 1, vaultSelMax()) || 1;
-      renderSectVaultTab();
+    $("sect-vault-qty-box").append(vaultStepper.el);
+    depositStepper = createQtyStepper({
+      label: "Số Linh thạch góp vào quỹ",
+      placeholder: "Số Linh thạch",
+      max: currentCoin,
+      initial: 1,
+      ids: { input: "sect-input-deposit" },
+      preview: (q) => depositPreviewText(q, currentCoin, sectHall?.view?.me ?? null),
+      onConfirm: () => ($("sect-form-deposit") as HTMLFormElement).requestSubmit(),
     });
+    $("sect-deposit-qty").append(depositStepper.el);
+    depositStepper.clear();
+    withdrawStepper = createQtyStepper({
+      label: "Số Linh thạch rút từ quỹ",
+      placeholder: "Số Linh thạch",
+      max: currentSect?.coin ?? 0,
+      initial: 1,
+      ids: { input: "sect-input-withdraw" },
+      preview: (q) =>
+        `Quỹ còn lại ${Math.max(0, (currentSect?.coin ?? 0) - q).toLocaleString("vi-VN")} Linh thạch.`,
+      onConfirm: () => ($("sect-form-withdraw") as HTMLFormElement).requestSubmit(),
+    });
+    $("sect-withdraw-qty").append(withdrawStepper.el);
+    withdrawStepper.clear();
     // Nút Góp / Rút dùng `click` (KHÔNG `bindTap`/pointerdown): hộp xác nhận đóng ở `pointerdown` của nút "Góp"/"Rút"/"Giữ lại" nằm ĐÚNG chỗ nút này, nên `click` ma sau khi nhả ngón
     // sẽ rơi xuống đây và mở lại hộp; chỉ chặn click của chuột / chạm (`detail > 0`) trong cửa sổ chống click ma, Enter / Space bằng bàn phím (`detail` = 0) vẫn bấm được ngay.
     $("sect-vault-act").addEventListener("click", (e) => {
@@ -3753,9 +3982,8 @@ export const ui = {
     // Kho tông môn: Nộp
     $("sect-form-deposit")?.addEventListener("submit", (e) => {
       e.preventDefault();
-      const input = $("sect-input-deposit") as HTMLInputElement;
-      const amount = parseInt(input.value, 10);
-      if (isNaN(amount) || amount <= 0) {
+      const amount = depositStepper?.read() ?? null;
+      if (amount === null) {
         this.toast({ text: "Số lượng Linh thạch không hợp lệ", tone: "bad" });
         return;
       }
@@ -3767,7 +3995,7 @@ export const ui = {
       );
       if (!spec) {
         callbacks?.onSectDeposit?.(amount);
-        input.value = "";
+        depositStepper?.clear();
         return;
       }
       askActConfirm(
@@ -3778,7 +4006,7 @@ export const ui = {
             return;
           }
           callbacks?.onSectDeposit?.(amount);
-          input.value = "";
+          depositStepper?.clear();
         },
         $("sect-btn-deposit"),
       );
@@ -3788,14 +4016,13 @@ export const ui = {
     // Kho tông môn: Rút
     $("sect-form-withdraw")?.addEventListener("submit", (e) => {
       e.preventDefault();
-      const input = $("sect-input-withdraw") as HTMLInputElement;
-      const amount = parseInt(input.value, 10);
-      if (isNaN(amount) || amount <= 0) {
+      const amount = withdrawStepper?.read() ?? null;
+      if (amount === null) {
         this.toast({ text: "Số lượng Linh thạch không hợp lệ", tone: "bad" });
         return;
       }
       callbacks?.onSectWithdraw?.(amount);
-      input.value = "";
+      withdrawStepper?.clear();
     });
 
     // Hộp lời mời tông môn
@@ -4881,6 +5108,7 @@ export const ui = {
 
   onWallet(m: WalletMsg) {
     currentCoin = m.coin;
+    depositStepper?.setMax(currentCoin); // ô góp quỹ kẹp theo ví
     const coinStr = m.coin.toLocaleString("vi-VN");
     const hudCoin = $("hud-coin");
     if (hudCoin) hudCoin.textContent = coinStr;
@@ -5051,10 +5279,13 @@ export const ui = {
     renderPartyPanel();
   },
 
-  showTransition(mapName: string) {
+  showTransition(mapName: string, mapId?: string) {
     const overlay = $("transition-overlay");
     const nameEl = $("transition-map-name");
     if (nameEl) nameEl.textContent = mapName;
+    // Thẻ minh hoạ của bản đồ đích (ảnh AI, map-card.ts): chưa có ảnh / ảnh lỗi thì chỉ còn tên như cũ
+    const cardEl = document.getElementById("transition-card");
+    if (cardEl instanceof HTMLImageElement) applyMapCard(cardEl, mapCardUrl(mapId));
     overlay.hidden = false;
     // Ép tính kiểu (reflow) để trình duyệt GHI NHẬN kiểu "trước khi đổi" (mở) rồi mới thêm `active`: phần tử vừa bỏ `hidden`
     // (display: none) mà thêm lớp ngay trong cùng khung thì chuyển động CSS không chạy, màn đổi tức thì.
@@ -6100,10 +6331,11 @@ export const ui = {
       closeSectConfirm();
       sectVault = null;
       vaultSel = null;
-      vaultQty = 1;
+      resetVaultQty();
       endVaultBusy();
       sectHall = null;
       hallGroupOpen.clear();
+      hallBuyOpen = null;
       scheduleHallRefresh(); // bỏ hẹn giờ: không còn tông môn thì không xin gì
       endHallBusy();
     }
@@ -6117,7 +6349,7 @@ export const ui = {
     sectVault = sanitizeVaultView(m?.vault);
     if (!sectVault) {
       vaultSel = null;
-      vaultQty = 1;
+      resetVaultQty();
     }
     if (vaultBusyTimer) clearTimeout(vaultBusyTimer);
     vaultBusyTimer = null;

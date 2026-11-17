@@ -48,6 +48,18 @@ button {
 }
 
 /* Đăng nhập */
+/*
+ * Nền màn đăng nhập: ẢNH AI ĐẦU TIÊN của game (SDXL base, nhóm Tiên Giới tự sinh; nguồn gốc ở `docs/art/nguon/login_bg.json`, #513). Chỉ hiện khi tấm đăng nhập đang hiện; tấm giữa có nền giấy riêng
+ * nên chữ đăng nhập không nằm trên ảnh. Màu `--ink` giữ làm lớp dưới cùng: ảnh chưa kịp tải / lỗi / trình duyệt cũ không có `:has` thì màn đăng nhập y như trước. Lớp phủ tối nhẹ ở dưới
+ * để tấm đăng nhập nổi lên; ảnh vuông, `cover` căn lệch trái để tháp (chủ thể) không nằm sau tấm giữa trên màn ngang.
+ */
+body:has(#login:not([hidden])) {
+  background:
+    linear-gradient(rgba(29, 26, 22, 0.15), rgba(29, 26, 22, 0.5)),
+    url("/assets/ai/login_bg.webp") 32% 42% / cover no-repeat,
+    var(--ink);
+}
+
 #login {
   position: fixed;
   z-index: 20;
@@ -1576,7 +1588,6 @@ html[data-input="touch"] .mm-foot small {
   }
   .dlg-opt-btn:focus-visible,
   .inv-slot:focus-visible,
-  .shop-qty-btn:focus-visible,
   .act-btn:focus-visible {
     outline: 2px solid #ffe08a;
     outline-offset: 2px;
@@ -2223,6 +2234,15 @@ html[data-input="touch"] #skill-slots .sk.slot .keycap {
   font-size: var(--fs-12);
   color: #ffd27a;
 }
+/* ô số lượng vứt (mục 47): chỉ hiện khi có từ 2 cái; ghi chú kẹp / sai nằm ngay dưới ô */
+.inv-drop-qty {
+  margin: 4px 0 6px;
+  text-align: left;
+}
+/* vùng ghi chú trống không chừa khoảng hở (hộp vứt thế chỗ hàng nút, càng thấp càng tốt ở điện thoại ngang) */
+.inv-drop-qty .qty-note {
+  min-height: 0;
+}
 .inv-drop-btns {
   display: flex;
   gap: 8px;
@@ -2278,6 +2298,9 @@ html[data-form="phone"][data-orient="portrait"] .inv-slot .slot-icon {
   flex-direction: column;
   gap: 10px;
   min-height: 110px;
+  /* KHÔNG co: tấm có chiều cao cố định (điện thoại) nên chân trang bị flex co về `min-height` còn nội dung (chi tiết món, hộp xác nhận vứt có ô số lượng) tràn ra ngoài,
+     đệm đáy của tấm tính theo chân trang đã co nên nút Đóng nổi đè lên nút "Vứt" */
+  flex-shrink: 0;
   justify-content: space-between;
 }
 .inv-title-row {
@@ -3714,6 +3737,7 @@ html[data-input="touch"] #newbie-btn-keys {
 }
 .shop-card {
   display: flex;
+  flex-wrap: wrap; /* ô số lượng (một hàng: ô gõ + 5 nút) rộng: hẹp thì xuống dưới phần thông tin */
   align-items: center;
   justify-content: space-between;
   gap: 12px;
@@ -3730,7 +3754,7 @@ html[data-input="touch"] #newbie-btn-keys {
   display: flex;
   align-items: center;
   gap: 10px;
-  flex: 1;
+  flex: 1 1 200px;
   min-width: 0;
 }
 .shop-item-info {
@@ -3776,42 +3800,20 @@ html[data-input="touch"] #newbie-btn-keys {
 }
 .shop-card-right {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
-  flex-shrink: 0;
+  flex: 1 1 300px;
+  min-width: 0;
 }
-.shop-qty-box {
-  display: flex;
-  align-items: center;
-  border: 1px solid rgba(201, 162, 74, 0.4);
-  border-radius: 5px;
-  overflow: hidden;
-  background: rgba(0, 0, 0, 0.5);
+/* ô số lượng dùng chung (mục 47) trong thẻ cửa hàng: ghi chú trống không chừa khoảng hở */
+.shop-card-right .qty-stepper {
+  flex: 1 1 260px;
+  min-width: 0;
 }
-.shop-qty-btn {
-  min-width: 44px;
-  min-height: 44px;
-  background: transparent;
-  border: 0;
-  color: #ffe08a;
-  font-size: var(--fs-18);
-  font-weight: bold;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-}
-.shop-qty-btn:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-.shop-qty-val {
-  min-width: 28px;
-  text-align: center;
-  font-size: var(--fs-13);
-  font-weight: bold;
-  color: #fff;
+.shop-card-right .qty-note {
+  min-height: 0;
 }
 .shop-act-btn {
   min-height: 44px;
@@ -3866,8 +3868,16 @@ html[data-input="touch"] #newbie-btn-keys {
     align-items: stretch;
     gap: 8px;
   }
+  /* cột dọc: `flex-basis` của hai cột (bề rộng ở bố cục ngang) không được thành chiều cao */
+  .shop-card-left,
+  .shop-card-right {
+    flex: 0 0 auto;
+  }
   .shop-card-right {
     justify-content: flex-end;
+  }
+  .shop-card-right .qty-stepper {
+    flex: 1 1 100%;
   }
   .shop-item-name {
     max-width: 100%;
@@ -4063,6 +4073,24 @@ body.reduced-motion .transition-overlay.active {
   text-align: center;
   color: #ffe08a;
   font-family: "Noto Serif", Georgia, serif;
+}
+/* Thẻ minh hoạ bản đồ đích (ảnh AI 3:2, map-card.ts): chỉ hiện khi ảnh đã tải xong; cao thấp theo cả bề rộng lẫn chiều cao khung
+   để điện thoại ngang (390 px cao) vẫn còn chỗ cho tên + dòng "Đang tiến nhập..." */
+.transition-card {
+  display: block;
+  width: min(420px, 86vw, calc(40vh * 1.5));
+  aspect-ratio: 3 / 2;
+  height: auto;
+  margin: 0 auto 14px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  user-select: none;
+}
+.transition-card[hidden] {
+  display: none;
 }
 .transition-map-name {
   font-size: 32px;
@@ -7322,6 +7350,24 @@ body.ui-hidden
   min-height: 44px; /* chạm được trên điện thoại */
 }
 
+/* Khung "mua nhiều" của một hàng cửa hàng tông (ô số lượng dùng chung, mục 47): nằm ngay dưới hàng, hai nút xác nhận / huỷ có khoảng cách */
+.sect-hall-buy {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(255, 224, 138, 0.35);
+}
+.sect-hall-buy-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sect-hall-buy-actions .sect-hall-btn {
+  flex: 1 1 120px;
+}
+
 /* Ô kho còn khoá theo cấp tông (M8): ghi chú dưới lưới kho */
 .sect-vault-locked {
   margin: 4px 0 0;
@@ -7481,4 +7527,82 @@ body.ui-hidden
   .boss-bar {
     top: calc(max(8px, env(safe-area-inset-top)) + 186px);
   }
+}
+
+/* Ô nhập SỐ LƯỢNG dùng chung (qty-stepper.ts, QUYET_DINH_M3 mục 47): gõ số + − / + + ×10 / ×100 + Tối đa; nút >= 44 px để chạm bằng ngón cái */
+.qty-stepper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+}
+.qty-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 6px;
+}
+.qty-input {
+  flex: 1 1 88px;
+  min-width: 72px;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 6px 10px;
+  text-align: center;
+  font: inherit;
+  font-size: var(--fs-14, 14px);
+  font-variant-numeric: tabular-nums;
+  color: var(--paper);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  user-select: text;
+  -webkit-user-select: text;
+  touch-action: manipulation;
+}
+.qty-input[aria-invalid="true"] {
+  border-color: #e0715c;
+  outline: 1px solid #e0715c;
+}
+.qty-input:focus-visible {
+  outline: 2px solid #ffe08a;
+  outline-offset: 1px;
+}
+.qty-btn {
+  min-height: 44px;
+  min-width: 44px;
+  box-sizing: border-box;
+  padding: 0 10px;
+  font: inherit;
+  font-size: var(--fs-14, 14px);
+  color: #ffe08a;
+  background: #3a3220;
+  border: 1px solid #8a7440;
+  border-radius: 6px;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.qty-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.qty-btn:focus-visible {
+  outline: 2px solid #ffe08a;
+  outline-offset: 1px;
+}
+.qty-note {
+  margin: 0;
+  min-height: 1.3em;
+  font-size: var(--fs-12, 12px);
+  color: #cdbf9a;
+}
+.qty-note.bad {
+  color: #f0a090;
+}
+.sect-qty-mount {
+  width: 100%;
+  margin-bottom: 8px;
 }

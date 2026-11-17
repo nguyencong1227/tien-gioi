@@ -11,6 +11,7 @@ import {
   expToNext,
   killExp,
   meditateExpPerSec,
+  SUMMON_ONLY_KINDS,
 } from "@tien-gioi/shared";
 import {
   bestOption,
@@ -115,6 +116,7 @@ describe("kinh tế Linh thạch (mô hình, #102)", () => {
 
   it("mọi quái đều có kỳ vọng rơi tiền và đồ bán được > 0; quái mạnh hơn rơi nhiều hơn", () => {
     for (const m of MONSTERS) {
+      if (SUMMON_ONLY_KINDS.includes(m.id)) continue; // quái con của trùm (#887): không rơi gì theo quy ước
       expect(expectedCoinDrop(m.id), m.id).toBeGreaterThan(0);
       expect(expectedLootValue(m.id), m.id).toBeGreaterThan(0);
       expect(expectedTotalCoin(m.id), m.id).toBeGreaterThan(0);

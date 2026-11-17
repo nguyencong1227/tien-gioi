@@ -123,10 +123,10 @@ describe("dungeon client pure logic", () => {
     const failDlg = buildMockThuMonDialog({
       canOpen: false,
       failReason: "member_low",
-      failWho: "Lâm Kinh Vũ",
+      failWho: "Mạc Khinh Trần",
     });
     expect(failDlg.options[0].disabled).toBe(true);
-    expect(failDlg.options[0].label).toContain("Lâm Kinh Vũ");
+    expect(failDlg.options[0].label).toContain("Mạc Khinh Trần");
 
     expect(MOCK_DUNGEON_SAMPLES.endWon().result).toBe("won");
     expect(MOCK_DUNGEON_SAMPLES.endLost().result).toBe("lost");

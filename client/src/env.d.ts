@@ -113,3 +113,33 @@ declare module "*gen-notices.mjs" {
   ): string;
   export function buildNotices(root?: string): string;
 }
+
+/** Luật prompt ảnh AI (`client/scripts/art/prompt-rules.mjs`, docs/art/PHONG_CACH_MINH_HOA.md). */
+declare module "*prompt-rules.mjs" {
+  export interface StylePaletteEntry {
+    id: string;
+    hex: string;
+    role: string;
+    from: { css: string } | { map: string };
+  }
+  export interface MapCardItem {
+    id: string;
+    mapId: string;
+    seeds: number[];
+    prompt: string;
+  }
+  export const STYLE_PALETTE: readonly StylePaletteEntry[];
+  export const BANNED_PROMPT_TERMS: Readonly<Record<string, readonly string[]>>;
+  export const STYLE_ANCHORS: readonly string[];
+  export const REQUIRED_POSITIVE_CLAUSE: string;
+  export const REQUIRED_NEGATIVE_TERMS: readonly string[];
+  export const NEGATIVE_PROMPT: string;
+  export const MAP_CARD_BATCH: {
+    class: string;
+    aspect: string;
+    raw: { w: number; h: number };
+    final: { w: number; h: number; maxKb: number };
+    items: MapCardItem[];
+  };
+  export function promptViolations(prompt: unknown, negativePrompt: unknown): string[];
+}

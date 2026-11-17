@@ -906,6 +906,47 @@ Tụ Khí Đan (cấp tông 3, 30 cống hiến, tối đa 2 viên / ngày) cộ
 | Trúc Cơ Trung kỳ | 5.060 | 253 | 506 | 3,5 phút (10% thanh) |
 
 
+## Trùm nhiều chiêu trên DỮ LIỆU THẬT (mục 42, T5 #874)
+
+> Phần này sinh từ `server/src/balance/trum.ts`: chạy bộ thực thi thật (`systems/boss.ts` qua `tickMonsters`) trên `BOSSES` thật nên thêm / sửa trùm là báo cáo đổi theo (chạy lại `npm run can-bang -w server`).
+> Mỗi trùm ở bậc "đúng bậc" (`stepOf` = `level` của loài), người chơi mặc đồ tốt nhất, 8 trận (hạt giống 1..8) mỗi cỡ đội. Số liệu là ĐỀ XUẤT; đây chỉ ĐO. Bất biến giữ bằng `bossBalanceViolations` (test `trum.test.ts`).
+
+### 1. Thời gian hạ trùm (đứng yên đánh thường, KHÔNG né: ca khó)
+
+Thời gian thật = giây mô phỏng / 0.6 (né làm đánh chậm đi; `ASSUME_DUNGEON.bossUptime`). Mỗi người mang 8 Hồi Huyết Đan, uống khi khí huyết < 50%. "chiêu" là số chiêu trùm vận trung bình mỗi trận thắng (trận quá ngắn thì bộ chiêu chưa kịp có ý nghĩa); "chết" là số người chết trung bình mỗi trận khi không né.
+
+| Trùm | Bậc người chơi | 1 người | 2 người | 3 người | 4 người |
+|---|---|---|---|---|---|
+| Xích Mãng | bậc 12 (khí huyết 1.147) | không hạ nổi | 0,2 phút, 2 chiêu (100% thắng, 0 chết) | 0,1 phút, 1,3 chiêu (100% thắng, 0 chết) | 0,1 phút, 0,9 chiêu (100% thắng, 0 chết) |
+| Hắc Giao | bậc 15 (khí huyết 2.236) | không hạ nổi | không hạ nổi | 1 phút, 9 chiêu (100% thắng, 1 chết) | 0,7 phút, 6 chiêu (100% thắng, 0,5 chết) |
+| Thiên Hàn Vương | bậc 18 (khí huyết 3.798) | không hạ nổi | 1,4 phút, 11,9 chiêu (88% thắng, 0,6 chết) | 0,9 phút, 8,8 chiêu (100% thắng, 0,3 chết) | 0,7 phút, 5,5 chiêu (100% thắng, 0 chết) |
+| Linh Hư Yêu Vương | bậc 9 (khí huyết 620) | không hạ nổi | không hạ nổi | không hạ nổi | 4,6 phút, 46,5 chiêu (100% thắng, 1 chết) |
+
+### 2. Sát thương mỗi đòn và cuồng nộ
+
+Mỗi đòn / khí huyết tối đa của người đúng bậc, hệ số công lớn nhất trong mọi giai đoạn (và cuồng nộ). Thiết kế: <= 55%.
+
+| Trùm | Bộ chiêu | chiêu có sát thương | đòn nặng nhất (sát thương) | cuồng nộ | trận có tới cuồng nộ (1 / 2 / 3 / 4 người) |
+|---|---|--:|---|---|---|
+| Xích Mãng | 4 chiêu / 2 giai đoạn | 3 | cuon_minh 29% (336) | không có | 0% / 0% / 0% / 0% |
+| Hắc Giao | 3 chiêu / 2 giai đoạn | 2 | vuc_xoay 32% (720) | không có | 0% / 0% / 0% / 0% |
+| Thiên Hàn Vương | 6 chiêu / 3 giai đoạn | 5 | doi_lao 27% (1.037) | không có | 0% / 0% / 0% / 0% |
+| Linh Hư Yêu Vương | 4 chiêu / 3 giai đoạn | 3 | truy_kich 20% (124) | 5 phút (công x1.5) | 0% / 0% / 0% / 0% |
+
+### 3. Tỉ lệ trúng: bot né hoàn hảo vs bot đứng yên
+
+Bot né: phản xạ 400 ms rồi chạy 150 px/giây (`boss-dodge-bot.ts`, lời hứa công bằng); bot đứng yên ở chỗ XẤU NHẤT của vùng (đối chứng: chiêu phải có ý nghĩa). 4 hạt giống x 30 giây x mọi giai đoạn.
+
+| Trùm | đòn đã đáp (bot né) | trúng bot NÉ (phải 0) | đòn đã đáp (bot đứng yên) | trúng bot ĐỨNG YÊN |
+|---|--:|--:|--:|--:|
+| Xích Mãng | 59 | 0 | 59 | 59 (100%) |
+| Hắc Giao | 46 | 0 | 46 | 46 (100%) |
+| Thiên Hàn Vương | 175 | 0 | 176 | 176 (100%) |
+| Linh Hư Yêu Vương | 91 | 0 | 92 | 92 (100%) |
+
+**Không vi phạm bất biến nào** (mọi đòn <= ngưỡng, bot né hoàn hảo không bị trúng, bot đứng yên bị trúng).
+
+
 ## Cân bằng chiêu thức, ngũ hành và trạng thái (M7, #510)
 
 > Dựa trên `shared/src/skills.ts` (18 chiêu: 12 đợt 1 + 6 chiêu Nguyên Anh đợt 2, #654) và `server/src/systems/status-rules.ts`. Mọi chiêu thức được mô phỏng theo chu kỳ thi triển đều đặn theo hồi chiêu, kết hợp đan xen Kiếm chém thường (`SKILLS.slash`).

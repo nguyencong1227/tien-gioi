@@ -340,9 +340,9 @@ describe("planStillValid: kiểm lại lúc xác nhận", () => {
 describe("vaultLogLine", () => {
   it("'hh:mm · Tên đã góp / rút Món ×N'", () => {
     const at = new Date(2026, 10, 16, 9, 5).getTime();
-    expect(vaultLogLine({ at, name: "Tiêu Viêm", kind: "deposit", itemId: POTION, qty: 5 })).toBe(
-      "09:05 · Tiêu Viêm đã góp Hồi Huyết Đan ×5",
-    );
+    expect(
+      vaultLogLine({ at, name: "Phó Hồng Ngạn", kind: "deposit", itemId: POTION, qty: 5 }),
+    ).toBe("09:05 · Phó Hồng Ngạn đã góp Hồi Huyết Đan ×5");
     expect(vaultLogLine({ at, name: "A", kind: "withdraw", itemId: SWORD, qty: 1 })).toBe(
       "09:05 · A đã rút Lang Nha Kiếm",
     );

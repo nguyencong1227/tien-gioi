@@ -23,6 +23,7 @@ import {
   validateAiSource,
   webpChunks,
 } from "../scripts/check-credits.mjs";
+import { NEGATIVE_PROMPT } from "../scripts/art/prompt-rules.mjs";
 
 describe("Rà soát tài sản và giấy phép (check-credits)", () => {
   const rootDir = path.resolve(__dirname, "../..");
@@ -172,12 +173,15 @@ describe("Tài liệu rà soát khớp số tệp thật (M6, #411)", () => {
     const under = (d: string) =>
       scanned.filter((f) => f.replace(/\\/g, "/").includes(`client/public/${d}/`));
     const items = under("assets").filter((f) => f.replace(/\\/g, "/").includes("/items/"));
-    expect(under("assets")).toHaveLength(81);
+    // `assets/ai/` (ảnh AI, mục 7 CREDITS.md / 2e RA_SOAT) tính trong "assets" nhưng đếm riêng: 81 tệp tài sản thường + số ảnh AI
+    const ai = under("assets/ai");
+    expect(ai).toHaveLength(1); // login_bg.webp (#513): thêm ảnh AI thì sửa số này CÙNG LÚC với CREDITS.md và RA_SOAT_TAI_SAN.md
+    expect(under("assets")).toHaveLength(81 + ai.length);
     expect(under("icons")).toHaveLength(5);
     expect(under("fonts")).toHaveLength(5);
     expect(items).toHaveLength(78);
     const credits = doc("CREDITS.md");
-    expect(credits).toContain("`client/public/assets/`: 81 tệp");
+    expect(credits).toContain(`\`client/public/assets/\`: ${81 + ai.length} tệp`);
     expect(credits).toContain("78 biểu tượng vật phẩm");
   });
 
@@ -726,8 +730,9 @@ const validSource = (asset: string, finalSha: string, over: Record<string, unkno
   lora: [],
   comfyui: { comfyui: "0.3.0", pytorch: "2.5.0", driver: "560.35" },
   workflow: { path: "docs/art/workflow/sdxl-base.json", sha256: HEX },
-  prompt: "misty mountain pass at dawn, ink wash, muted palette",
-  negativePrompt: "text, watermark, letters",
+  prompt:
+    "misty mountain pass at dawn, painterly ink wash landscape, muted palette, no people, no text",
+  negativePrompt: NEGATIVE_PROMPT,
   seed: 12345,
   postProcess: [{ script: "client/scripts/art/to-webp.mjs", params: { maxWidth: 512 } }],
   reviewed: { by: "dev-b", date: "2026-11-15", noText: true, noOtherGameLikeness: true },
@@ -769,9 +774,9 @@ describe("Ảnh do AI sinh: nguồn, băm, siêu dữ liệu, dòng CREDITS (che
     return { root, audit, jsonPath, imgPath, rel, kinds };
   }
 
-  it("kho thật của repo: sạch (hiện chưa có ảnh AI nào) và thư mục ảnh AI chưa có tệp lạ", () => {
+  it("kho thật của repo: sạch và thư mục ảnh AI chỉ có đúng ảnh đã khai báo (thêm ảnh AI thì thêm vào danh sách này CÙNG LÚC với JSON nguồn)", () => {
     expect(auditAiImages().errors).toEqual([]);
-    expect(scanFiles(AI_ASSET_DIR)).toEqual([]);
+    expect(scanFiles(AI_ASSET_DIR)).toEqual(["client/public/assets/ai/login_bg.webp"]);
   });
 
   it("một ảnh WebP hợp lệ (JSON cùng tên, băm khớp, có dòng CREDITS, không siêu dữ liệu) thì qua", () => {
