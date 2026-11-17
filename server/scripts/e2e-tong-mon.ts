@@ -709,6 +709,9 @@ async function main() {
         throw new Error(
           `Đổi xong: cống hiến phải còn ${500 - item.cost}, thực tế ${memberB().contrib}`,
         );
+      // cống hiến (tệp tông môn) trừ trước, đồ vào túi (bộ nhớ) sau: CHỜ theo điều kiện, đừng đọc túi ngay (race chập chờn thi thoảng đỏ ở đây)
+      for (let i = 0; i < 50 && countItem(ctrlOf(B.name).inv, item.itemId) !== have0 + 1; i++)
+        await sleep(100);
       if (countItem(ctrlOf(B.name).inv, item.itemId) !== have0 + 1)
         throw new Error("Đổi xong: túi phải thêm đúng 1 món");
       if ((memberB().today.buys?.[item.itemId] ?? 0) !== 1)
