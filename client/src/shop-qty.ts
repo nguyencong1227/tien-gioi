@@ -4,11 +4,11 @@ import { SHOP_MAX_QTY } from "@tien-gioi/shared";
 
 /**
  * Mua tối đa mấy cái một lần: ví đủ trả (`coin / unitPrice`, làm tròn xuống), không quá trần `SHOP_MAX_QTY` của máy chủ, TỐI THIỂU 1 (ví không đủ cả một cái thì ô vẫn dùng được,
- * nút Mua mờ kèm "Thiếu N": người chơi vẫn thấy giá). Ví / giá hỏng (NaN, Infinity, âm) coi như ví 0; giá không dương coi như không có giới hạn theo ví.
+ * nút Mua mờ kèm "Thiếu N": người chơi vẫn thấy giá). Ví không hữu hạn coi như ví 0, ví âm cho kết quả âm nên cũng thành tối thiểu 1; giá không dương coi như không có giới hạn theo ví.
  */
 export function buyQtyMax(coin: number, unitPrice: number): number {
   if (!Number.isFinite(unitPrice) || unitPrice <= 0) return SHOP_MAX_QTY;
-  const wallet = Number.isFinite(coin) && coin > 0 ? Math.floor(coin) : 0;
+  const wallet = Number.isFinite(coin) ? Math.floor(coin) : 0;
   return Math.min(SHOP_MAX_QTY, Math.max(1, Math.floor(wallet / unitPrice)));
 }
 
