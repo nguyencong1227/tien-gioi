@@ -928,7 +928,7 @@ export class WorldRoom extends Room<WorldState> {
    */
   private async handOff(
     sid: string,
-    plan: { mapId: string; x: number; y: number },
+    plan: { mapId: string; x: number; y: number; allowDead?: boolean },
     dest?: { mapId: string; roomId?: string; valid?: () => boolean },
   ): Promise<boolean> {
     const p = this.state.players.get(sid);
@@ -950,7 +950,8 @@ export class WorldRoom extends Room<WorldState> {
     // Trong lúc lưu có thể chết, rớt mạng hoặc bị ngắt: huỷ, ghi lại bản đồ của phòng này (tự chữa)
     const client = this.clients.find((x) => x.sessionId === sid);
     const here = this.state.players.get(sid);
-    if (!client || !here || here.dead || this.ghosts.has(sid)) {
+    // `allowDead`: chết THẬT trong đấu trường chặn đường (mục 53): người chơi đang nằm ở Hoàng Tuyền và ĐƯỢC đưa về phòng của chỗ cũ (hồ sơ đã ghi bản ghi Hoàng Tuyền); chết do dịp khác trong lúc lưu vẫn huỷ
+    if (!client || !here || (here.dead && !plan.allowDead) || this.ghosts.has(sid)) {
       c.travelling = false;
       if (here) await this.persist(here, c).catch((e) => console.error("save failed", e));
       return false;
@@ -1160,7 +1161,12 @@ export class WorldRoom extends Room<WorldState> {
     if (!t) return;
     const c = this.world.ctrl.get(sid);
     if (c) c.save = { ...c.save, ambushReturnAt: Date.now() }; // phòng nhận người chơi bảo hộ 5 giây (`applyReturnGrace`); `persist` của `handOff` mang theo
-    const ok = await this.handOff(sid, { mapId: t.origin.mapId, x: t.origin.x, y: t.origin.y });
+    const ok = await this.handOff(sid, {
+      mapId: t.origin.mapId,
+      x: t.origin.x,
+      y: t.origin.y,
+      allowDead: c?.limbo !== undefined, // chết thật ở đấu trường (mục 53): về phòng gốc ở trạng thái Hoàng Tuyền
+    });
     if (ok) this.hub.ambushes._remove(t);
   }
 
