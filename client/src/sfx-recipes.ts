@@ -154,6 +154,7 @@ export function boltSfx(element?: unknown): SfxRecipe {
  * Loại lạ -> `null` (im lặng).
  */
 export function statusSfx(kind: unknown, harmful: boolean): SfxRecipe | null {
+  // `empower` / `weaken` / `mark` (mục 51, CT1b) dùng tiếng nhóm buff / debuff nhẹ; B chỉnh tiếng riêng ở CT11b
   switch (kind) {
     case "stun":
       return clampRecipe({
@@ -176,6 +177,9 @@ export function statusSfx(kind: unknown, harmful: boolean): SfxRecipe | null {
     case "breakAid":
     case "amp":
     case "cdr":
+    case "empower":
+    case "weaken":
+    case "mark":
       return clampRecipe({
         partials: [p("sine", harmful ? 330 : 523, harmful ? 250 : 784, 0.26, 0.24)],
       });

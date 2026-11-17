@@ -51,6 +51,13 @@ export const SHAPE_DEFAULT_STYLE: Readonly<Record<SkillShape, SkillStyle>> = {
   ground: "an",
   dash: "than_phap",
   self: "ho_the",
+  // hình mới (mục 51, CT1b): suy theo hành vi gần nhất
+  chain: "chi",
+  bolt: "chi",
+  zone: "phu",
+  trap: "tran",
+  aura: "ho_the",
+  totem: "tran",
 };
 
 const isStyle = (v: unknown): v is SkillStyle =>
