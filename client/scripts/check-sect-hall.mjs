@@ -604,13 +604,13 @@ async function main() {
           evalJs(`(() => {
             const card = [...document.querySelectorAll("#sect-tab-hall section")].find((x) => x.querySelector("h4")?.textContent.trim() === "Cửa hàng tông môn");
             const rows = [...card.querySelectorAll("li.sect-hall-row")];
-            const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+            const vis = (e) => e.checkVisibility() && e.getBoundingClientRect().height > 0;
             const groups = [...card.querySelectorAll("details.sect-hall-group")].map((d) => ({
               title: d.querySelector("summary").textContent, open: d.open, n: d.querySelectorAll("li.sect-hall-row").length,
               sumH: Math.round(d.querySelector("summary").getBoundingClientRect().height),
             }));
             const modal = document.getElementById("sect-modal");
-            return { total: rows.length, visible: rows.filter(vis).length, groups, subs: [...card.querySelectorAll("h5")].map((h) => h.textContent), overflow: modal.scrollWidth - modal.clientWidth };
+            return { total: rows.length, visible: rows.filter(vis).length, groups, subs: [...card.querySelectorAll("h5")].map((h) => h.textContent), overflow: modal.scrollWidth - modal.clientWidth, cardH: Math.round(card.getBoundingClientRect().height) };
           })()`);
         const toggleGroup = (title) =>
           evalJs(
@@ -637,6 +637,9 @@ async function main() {
           await hallOf(level);
           await sleep(180);
           const g = await probe();
+          console.log(
+            `    (cấp ${level}: thẻ cửa hàng cao ${g.cardH} px, ${g.visible} / ${g.total} hàng nhìn thấy)`,
+          );
           check(
             g.total === want.total,
             `gom nhóm cấp ${level}: đủ ${want.total} hàng trong DOM, không bỏ món nào (${g.total})`,
@@ -763,6 +766,14 @@ async function main() {
           );
           await sleep(200);
           await snap(suffix);
+        }
+        // nhóm chưa mở của cửa hàng (nếu có): cuộn tới tiêu đề nhóm đầu tiên để ảnh thấy nhóm thu gọn và nhóm mở sẵn
+        const hasGroup = await evalJs(
+          `(() => { const s = document.querySelector("#sect-tab-hall summary.sect-hall-group-title"); if (!s) return false; s.scrollIntoView({ block: "center" }); return true; })()`,
+        );
+        if (hasGroup) {
+          await sleep(200);
+          await snap("-cua-hang-nhom");
         }
       }
       await evalJs(`window.__ui.toggleSectModal(false); 1`);
