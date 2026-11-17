@@ -788,12 +788,50 @@ export interface SectShopEntry {
 }
 
 /**
- * KHUNG: vài món mẫu cho test và giao diện; Dev D thay bằng bảng thật (5 nhóm hàng, issue M8.7). Bất biến giá ở `sectShopViolations`.
+ * Cửa hàng tông môn THẬT (M8.7, #844; A viết vì D chưa kịp, D mô phỏng ngân sách ở `docs/M8_TONG_MON_MO_PHONG.md`). NĂM NHÓM HÀNG, nhóm k mở ở cấp tông k (mục 12.4 / 12.6
+ * `THIET_KE_TONG_MON.md`); ba món đầu giữ nguyên thứ tự của khung cũ (test và giao diện tham chiếu `SECT_SHOP[0]`).
+ *
+ * GIÁ: `cost` = ceil(2 x `ITEM_VALUE` / `SECT_CH_VALUE_LT`) (2 = hệ số giá mua NPC; món NPC có bán thì `sectShopViolations` đòi `cost x 5 >= buyPrice`, nên giá luôn >= giá mua NPC quy
+ * ra cống hiến). Ba món khung đầu giữ giá cũ (5 / 5 / 30; tu_khi_dan rẻ hơn công thức 6 cống hiến, chủ ý: đan tu luyện trung cấp là phần thưởng chính của cấp 3). Bốn đan hồi phục cao (Đại Hồi / Thượng Hồi Huyết, Linh) làm tròn LÊN bội 5 so với công thức (25 thay 24, 75 thay 72): đắt hơn chút, vẫn đúng `cost x 5 >= buyPrice`.
+ * `limitDay`: đan / nguyên liệu nhiều lượt; kinh quyển 1 / ngày (đã học thì `known` khoá luôn); đồ hiếm 2 / ngày.
+ * KHÔNG bán trang bị (kiếm / bào / phù / giày / bội / ấn): trang bị rơi từ trùm và nghề nhỏ là mốc tiến độ của từng bậc, bán bằng cống hiến sẽ đi tắt qua chúng (A chốt, người dùng đổi được).
  */
 export const SECT_SHOP: readonly SectShopEntry[] = [
+  // --- Nhóm 1 (cấp 1): đan hồi phục + nguyên liệu cơ bản (Bảo khố) ---
   { itemId: "hoi_huyet_dan", cost: 5, minLevel: 1, limitDay: 10, hall: "baoKho" },
   { itemId: "hoi_linh_dan", cost: 5, minLevel: 1, limitDay: 10, hall: "baoKho" },
+  // --- Nhóm 3 (cấp 3): đan tu luyện trung cấp (khung cũ, thứ tự giữ nguyên) ---
   { itemId: "tu_khi_dan", cost: 30, minLevel: 3, limitDay: 2, hall: "baoKho" },
+  // --- Nhóm 1 tiếp: nguyên liệu cơ bản ---
+  { itemId: "long_tho", cost: 1, minLevel: 1, limitDay: 10, hall: "baoKho" },
+  { itemId: "nanh_soi", cost: 2, minLevel: 1, limitDay: 10, hall: "baoKho" },
+  { itemId: "da_ho", cost: 8, minLevel: 1, limitDay: 10, hall: "baoKho" },
+  // --- Nhóm 2 (cấp 2): kinh quyển phổ thông, rarity 0-1 (Tàng Kinh Các) ---
+  { itemId: "kinh_phieu_phong_bo", cost: 3, minLevel: 2, limitDay: 1, hall: "tangKinh" },
+  { itemId: "kinh_bon_thach_quyen", cost: 12, minLevel: 2, limitDay: 1, hall: "tangKinh" },
+  { itemId: "kinh_ung_trao", cost: 12, minLevel: 2, limitDay: 1, hall: "tangKinh" },
+  { itemId: "kinh_kim_chung_trao", cost: 14, minLevel: 2, limitDay: 1, hall: "tangKinh" },
+  { itemId: "kinh_hoa_van_kiem", cost: 16, minLevel: 2, limitDay: 1, hall: "tangKinh" },
+  { itemId: "kinh_trong_nhac_tram", cost: 16, minLevel: 2, limitDay: 1, hall: "tangKinh" },
+  { itemId: "kinh_huyen_bang_chi", cost: 16, minLevel: 2, limitDay: 1, hall: "tangKinh" },
+  { itemId: "kinh_bich_thuy_hoi_xuan", cost: 16, minLevel: 2, limitDay: 1, hall: "tangKinh" },
+  // --- Nhóm 3 tiếp (cấp 3): đan hồi phục cao ---
+  { itemId: "dai_hoi_huyet_dan", cost: 25, minLevel: 3, limitDay: 5, hall: "baoKho" },
+  { itemId: "dai_hoi_linh_dan", cost: 25, minLevel: 3, limitDay: 5, hall: "baoKho" },
+  // --- Nhóm 4 (cấp 4): kinh quyển rarity 2 (Tàng Kinh Các) ---
+  { itemId: "kinh_me_tung_bo", cost: 30, minLevel: 4, limitDay: 1, hall: "tangKinh" },
+  { itemId: "kinh_han_quang_tien", cost: 48, minLevel: 4, limitDay: 1, hall: "tangKinh" },
+  { itemId: "kinh_bach_kim_trao", cost: 56, minLevel: 4, limitDay: 1, hall: "tangKinh" },
+  { itemId: "kinh_lac_tuyet_phan_phi", cost: 58, minLevel: 4, limitDay: 1, hall: "tangKinh" },
+  { itemId: "kinh_thanh_tung_phi_cham", cost: 60, minLevel: 4, limitDay: 1, hall: "tangKinh" },
+  { itemId: "kinh_cuu_cung_khon_sat", cost: 60, minLevel: 4, limitDay: 1, hall: "tangKinh" },
+  { itemId: "kinh_van_hanh_bo", cost: 60, minLevel: 4, limitDay: 1, hall: "tangKinh" },
+  // --- Nhóm 5 (cấp 5): đồ hiếm + kinh quyển rarity 3 ---
+  { itemId: "thuong_hoi_huyet_dan", cost: 75, minLevel: 5, limitDay: 2, hall: "baoKho" },
+  { itemId: "thuong_hoi_linh_dan", cost: 75, minLevel: 5, limitDay: 2, hall: "baoKho" },
+  { itemId: "kinh_bang_hoa_loan", cost: 80, minLevel: 5, limitDay: 1, hall: "tangKinh" },
+  { itemId: "kinh_van_thach_tran", cost: 84, minLevel: 5, limitDay: 1, hall: "tangKinh" },
+  { itemId: "kinh_liet_hoa_kiem", cost: 92, minLevel: 5, limitDay: 1, hall: "tangKinh" },
 ];
 
 export const SECT_SHOP_BY_ITEM: Record<string, SectShopEntry> = Object.fromEntries(
