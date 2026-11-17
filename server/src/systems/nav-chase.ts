@@ -46,8 +46,6 @@ export interface NavCtrl {
   /** Đích lúc tìm đường (để biết đích đã dịch xa chưa). */
   gx: number;
   gy: number;
-  /** Đường chỉ tới nút gần đích nhất (không tới được vùng đích). */
-  partial: boolean;
   /** Sớm nhất được tìm lại (ms của `World.now`). */
   repathAt: number;
   losAt: number;
@@ -72,7 +70,6 @@ function newNav(m: Monster, now: number): NavCtrl {
     i: 0,
     gx: 0,
     gy: 0,
-    partial: false,
     repathAt: 0,
     losAt: -1,
     los: true,
@@ -144,7 +141,7 @@ export function navIdle(mc: MonsterCtrl, m: Monster, now: number) {
 export function navPause(mc: MonsterCtrl, m: Monster, now: number) {
   const nav = mc.nav;
   if (!nav) return;
-  nav.pts = null;
+  // Giữ nguyên đường đang đi (còn hiệu lực sau lúc gồng / vận chiêu; đích dịch xa thì `navSteer` tự tìm lại): khỏi tìm đường lại sau MỖI chiêu
   nav.chkX = m.x;
   nav.chkY = m.y;
   nav.chkAt = now;
@@ -224,7 +221,6 @@ export function navSteer(
       if (res) {
         nav.pts = res.pts;
         nav.i = 0;
-        nav.partial = !res.reached;
       } else nav.pts = null; // không có nút thông gần chỗ đứng: đi thẳng như cũ
       nav.gx = tx;
       nav.gy = ty;

@@ -333,11 +333,11 @@ class NavGrid {
     const nodes: number[] = [];
     for (let k = end; k >= 0; k = parent[k]) nodes.push(k);
     nodes.reverse();
-    return { pts: this.smooth(nodes, cls, sx, sy), reached: reachedAt >= 0, expanded };
+    return { pts: this.smooth(nodes, cls), reached: reachedAt >= 0, expanded };
   }
 
   /** Làm thẳng đường: từ mỗi điểm nhảy tới điểm xa nhất còn nhìn thấy bằng đường thẳng thông cho cỡ `cls`. Nút đầu = chỗ đứng gần nhất. */
-  private smooth(nodes: number[], cls: number, _sx: number, _sy: number): Float32Array {
+  private smooth(nodes: number[], cls: number): Float32Array {
     const cols = this.cols;
     const px = (k: number) => (k % cols) * NAV_CELL;
     const py = (k: number) => Math.floor(k / cols) * NAV_CELL;

@@ -1,6 +1,6 @@
 // Tìm đường trên DỮ LIỆU BẢN ĐỒ THẬT (mục 48, #1012): chỗ sinh trùm đủ rộng, và trùm / quái đuổi được người ở mọi bản đồ có trùm dù đường thẳng bị cây, đá, nước chặn.
 // Số liệu tất định: bộ ngẫu nhiên đồng dư tuyến tính có hạt giống riêng (KHÔNG `Math.random`), nên đỏ là đỏ thật, không chập chờn.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   DUNGEON_MAPS,
   MAPS,
@@ -21,6 +21,7 @@ import {
 } from "./monsters";
 import { inMainRegion, lineClear, squareFree } from "./nav";
 import { isEvading } from "./nav-chase";
+import { flatMap, paint } from "./nav-test-helpers";
 
 function lcg(seed: number) {
   let s = seed >>> 0;
@@ -73,6 +74,27 @@ describe("chỗ sinh trùm trên bản đồ thật", () => {
       expect(ok).toBeGreaterThan(300); // đo lúc viết: >= 1000 ô 32 px mỗi bản đồ
     });
   }
+});
+
+describe("chỗ sinh trùm: không có chỗ rộng thì quay về luật cũ (không thiếu trùm)", () => {
+  it("bản đồ chỉ còn hành lang 3 ô: chỗ rộng (bán kính + 32 px) không có, trùm vẫn sinh được ở hành lang", () => {
+    const map = flatMap(60, 20);
+    paint(map, 1, 1, 58, 18); // cây phủ kín
+    paint(map, 1, 9, 58, 11, 0); // hành lang cỏ 3 ô (96 px): thân Xích Mãng (bán kính 24) lọt, hình vuông bán kính + 32 = 112 px thì không
+    const def = MONSTER_BY_ID["mang"];
+    const { w } = makeWorld(map);
+    const rnd = lcg(4242);
+    const spy = vi.spyOn(Math, "random").mockImplementation(rnd); // `rand` của máy chủ dùng Math.random: cố định để không chập chờn
+    try {
+      spawnMonster(w, def);
+    } finally {
+      spy.mockRestore();
+    }
+    const bosses = [...w.state.monsters.values()].filter((m) => m.kind === def.id);
+    expect(bosses.length).toBe(1);
+    expect(bossSpawnOk(w, def, bosses[0].x, bosses[0].y)).toBe(false); // đúng là đã lùi về luật cũ
+    expect(map.circleBlocked(bosses[0].x, bosses[0].y, def.radius)).toBe(false);
+  });
 });
 
 describe("trùm đuổi người trên bản đồ thật, đường thẳng bị chặn", () => {
