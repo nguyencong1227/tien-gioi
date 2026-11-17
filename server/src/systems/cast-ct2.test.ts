@@ -21,6 +21,8 @@ import {
   displacePlayer,
 } from "./cast";
 import { tickMonsters } from "./monsters";
+import { fireBolt } from "./bolt";
+import { MONSTER_BY_ID } from "@tien-gioi/shared";
 import { dealtMult } from "./status-rules";
 import { applyMonsterStatus, applyPlayerStatus, monsterHasStatus, tickStatuses } from "./status";
 import { addMonster, addPlayer, makeWorld } from "./test-helpers";
@@ -616,6 +618,50 @@ describe("weaken (Suy Yếu): quái gây ít sát thương hơn", () => {
     const bossWeak = hitTaken(true, "mang");
     expect(bossBase).toBeGreaterThan(0);
     expect(bossWeak / bossBase).toBeCloseTo(0.8, 1);
+  });
+});
+
+describe("weaken: các đường gây sát thương khác của quái (đạn, đập đất)", () => {
+  const weakEffect = { status: "weaken" as const, ms: 60_000, ratio: 0.4, chance: 1 };
+
+  it("đạn của quái tầm xa lấy `weaken` lúc BẮN: sát thương đạn giảm 40%", () => {
+    const t = setup();
+    const m = addMonster(t.w, "suong_ho", 1500, 1000);
+    t.w.now = 100_000;
+    expect(fireBolt(t.w, m.m, m.mc.def, 0, m.mc)).toBe(true);
+    const base = t.w.bolts[0]!.dmg;
+    applyMonsterStatus(t.w, m.id, weakEffect, 0, "a");
+    expect(fireBolt(t.w, m.m, m.mc.def, 0, m.mc)).toBe(true);
+    expect(t.w.bolts[1]!.dmg / base).toBeCloseTo(0.6, 1);
+    expect(fireBolt(t.w, m.m, m.mc.def, 0)).toBe(true); // không truyền mc (đường cũ): không đổi
+    expect(t.w.bolts[2]!.dmg).toBe(base);
+  });
+
+  /** Chạy `tickMonsters` tới khi người chơi mất máu (tối đa 120 tick = 6 giây); trả máu mất. */
+  function lossBy(kind: string, weaken: boolean) {
+    const t = setup();
+    t.p.hp = t.p.maxHp = 1_000_000;
+    t.w.now = 100_000;
+    const m = addMonster(t.w, kind, t.p.x + 30, t.p.y);
+    m.mc.target = "a";
+    m.mc.nextAttack = 0;
+    if (weaken) applyMonsterStatus(t.w, m.id, weakEffect, 0, "a");
+    const hp0 = t.p.hp;
+    for (let i = 0; i < 120 && t.p.hp === hp0; i++) {
+      t.w.now += TICK_MS;
+      tickMonsters(t.w, TICK_MS / 1000);
+    }
+    return hp0 - t.p.hp;
+  }
+
+  it("đập đất (`cot_tuong`) và lao (`ho`) cũng giảm 40% khi quái bị suy yếu", () => {
+    for (const kind of ["cot_tuong", "ho"]) {
+      expect(MONSTER_BY_ID[kind]).toBeDefined();
+      const base = lossBy(kind, false);
+      const weak = lossBy(kind, true);
+      expect(base, kind).toBeGreaterThan(0);
+      expect(weak / base, kind).toBeCloseTo(0.6, 1);
+    }
   });
 });
 
