@@ -317,33 +317,42 @@ export async function analyzeClientBundle(options = {}) {
     throw new Error("Không thể thu thập dữ liệu bundle từ Vite build.");
   }
 
-  // Tìm chunk JS chính (chứa logic ứng dụng và Phaser)
+  // Từ #1097 Phaser + cảnh thế giới nằm ở chunk riêng (tải sau màn đăng nhập): thành phần được tính trên TỔNG mọi chunk JS, gói khởi động báo riêng
   const chunks = Object.values(capturedBundle).filter((item) => item.type === "chunk");
-  const mainChunk = chunks.find(
-    (c) => c.fileName.endsWith(".js") && c.code && c.code.length > 500000,
-  );
-
-  if (!mainChunk) {
-    throw new Error("Không tìm thấy chunk JavaScript chính trong bundle.");
+  const jsChunks = chunks.filter((c) => c.fileName.endsWith(".js") && c.code);
+  if (jsChunks.length === 0) {
+    throw new Error("Không tìm thấy chunk JavaScript nào trong bundle.");
   }
+  const entryChunk = jsChunks.find((c) => c.isEntry) ?? jsChunks[0];
+  // Mỗi mô-đun nằm ở đúng một chunk nên gộp bảng `modules` không trùng khoá
+  const mainChunk = {
+    fileName:
+      jsChunks.length === 1
+        ? entryChunk.fileName
+        : `${jsChunks.length} chunk JS (khởi động: ${entryChunk.fileName})`,
+    code: jsChunks.map((c) => c.code).join("\n"),
+    modules: Object.assign({}, ...jsChunks.map((c) => c.modules)),
+  };
 
-  const rawBytes = mainChunk.code.length;
-  // Nén gzip với level 9 (chuẩn của check-perf-budget.mjs)
-  const gzipLevel9Buffer = zlib.gzipSync(mainChunk.code, { level: 9 });
-  const gzipBytes = gzipLevel9Buffer.length;
-  // Nén gzip mặc định (chuẩn của Vite build output)
-  const gzipDefaultBuffer = zlib.gzipSync(mainChunk.code);
-  const gzipDefaultBytes = gzipDefaultBuffer.length;
+  // Nén gzip từng chunk rồi cộng (trình duyệt tải từng tệp riêng); level 9 là chuẩn của check-perf-budget.mjs, mặc định là chuẩn của Vite build output
+  const rawBytes = jsChunks.reduce((a, c) => a + c.code.length, 0);
+  const gzipBytes = jsChunks.reduce((a, c) => a + zlib.gzipSync(c.code, { level: 9 }).length, 0);
+  const gzipDefaultBytes = jsChunks.reduce((a, c) => a + zlib.gzipSync(c.code).length, 0);
+  const startupGzipKb = Number(
+    (zlib.gzipSync(entryChunk.code, { level: 9 }).length / 1024).toFixed(2),
+  );
 
   const breakdown = classifyModules(mainChunk.modules, gzipBytes);
 
   // Đọc giới hạn ngân sách tĩnh để so sánh
-  let budgetMaxGzipKb = 540;
+  let budgetMaxGzipKb = 540; // trần TỔNG JS (`totalJsGzipKb`)
   const budgetPath = path.resolve(clientDir, "perf-budget.json");
   if (fs.existsSync(budgetPath)) {
     try {
       const budget = JSON.parse(fs.readFileSync(budgetPath, "utf-8"));
-      if (budget.mainJsGzipMaxKb) {
+      if (budget.static?.totalJsGzipKb) {
+        budgetMaxGzipKb = budget.static.totalJsGzipKb;
+      } else if (budget.mainJsGzipMaxKb) {
         budgetMaxGzipKb = budget.mainJsGzipMaxKb;
       }
     } catch {
@@ -377,6 +386,7 @@ export async function analyzeClientBundle(options = {}) {
 
   return {
     chunkFileName: mainChunk.fileName,
+    startupGzipKb,
     rawBytes,
     rawKb: Number((rawBytes / 1024).toFixed(2)),
     gzipBytes,
@@ -418,6 +428,11 @@ export function formatConsoleReport(report) {
   lines.push(
     `Chunk chính      : ${report.chunkFileName} (${report.rawKb} KiB thô, ${report.gzipKb} KiB gzip [level 9])`,
   );
+  if (report.startupGzipKb !== undefined) {
+    lines.push(
+      `Gói khởi động    : ${report.startupGzipKb} KiB gzip (JS cần để hiện màn đăng nhập)`,
+    );
+  }
   lines.push(`Theo chuẩn Vite  : ${report.viteRawKb} KB thô, ${report.viteGzipKb} KB gzip`);
   lines.push(
     `Ngân sách CI     : ${report.gzipKb} / ${report.budgetMaxGzipKb} KiB (Dư: ${report.remainingBudgetKb} KiB)`,

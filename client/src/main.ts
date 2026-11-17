@@ -1,5 +1,4 @@
 import { installMockAmbush, isMockAmbushEnabled, mockAmbushOutcome } from "./ambush-mock";
-import Phaser from "phaser";
 import { Client, type Room } from "colyseus.js";
 import {
   DEFAULT_MAP_ID,
@@ -26,7 +25,8 @@ import {
   type LimboMsg,
   type SkillsMsg,
 } from "@tien-gioi/shared";
-import { WorldScene } from "./scenes/WorldScene";
+import type { WorldScene } from "./scenes/WorldScene";
+import { loadGameModules, prefetchGameModulesWhenIdle } from "./game-modules";
 import { ui } from "./ui";
 import { setBossCardOverride } from "./boss-card";
 import { setMapCardOverride } from "./map-card";
@@ -417,6 +417,9 @@ initAuthUi({
   },
 });
 
+// Màn đăng nhập đã dựng xong: tải sẵn Phaser + cảnh thế giới lúc rảnh để bấm Vào không phải chờ (#1097)
+prefetchGameModulesWhenIdle();
+
 // Giả lập hiển thị modal phiên bản quá cũ khi có cờ ?outdated=N (phục vụ kiểm thử và nghiệm thu giao diện, M4 2.5)
 if (
   typeof window !== "undefined" &&
@@ -710,11 +713,24 @@ function setupRoomLifecycle(room: Room) {
 
 async function start(room: Room, mapId: string) {
   captureEarlyMessages(room); // trước mọi await: tin lúc vào phòng tới trước khi cảnh đăng ký handler
+  // Phaser + WorldScene ở chunk riêng (#1097): thường đã được tải sẵn lúc người chơi còn ở màn đăng nhập; chưa thì tải song song với chờ phông. Lỗi tải gói thành `null` ngay
+  // (không để lời hứa bị từ chối khi chưa ai chờ) rồi báo bên dưới.
+  const modulesLoading = loadGameModules().then(
+    (m) => m,
+    () => null,
+  );
   // Chờ font tiếng Việt tải xong trước khi Phaser vẽ Text lên canvas lần đầu
   await Promise.race([
     document.fonts.load('16px "Noto Serif"', "Tiếng Việt"),
     new Promise((r) => setTimeout(r, 3000)),
   ]);
+  const modules = await modulesLoading;
+  if (!modules) {
+    // mất mạng / gói trò chơi không tải được: rời phòng vừa vào (không để nhân vật đứng ngoài đó) rồi báo người chơi bấm Vào lại
+    room.leave?.();
+    throw new Error("Không tải được gói trò chơi. Kiểm tra mạng rồi bấm Vào lại.");
+  }
+  const { Phaser, WorldScene } = modules;
   ui.show();
   ui.setCurrentMapId(mapId);
   const currentMap = getMap(mapId) || getMap(DEFAULT_MAP_ID)!;

@@ -9,6 +9,8 @@ import {
   validatePackFilePath,
   checkWorstCaseTextureMemoryByTier,
   checkBundleGzip,
+  checkTotalJsGzip,
+  findStartupChunk,
   checkAtlasTileset,
   checkAiAssets,
   DEFAULT_AI_LIMITS,
@@ -173,6 +175,87 @@ describe("M5.1: check-perf-budget (Kiểm tra ngân sách hiệu năng tĩnh)", 
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
+  });
+
+  it("findStartupChunk / checkBundleGzip: gói KHỞI ĐỘNG là chunk index.html nạp, KHÔNG phải tệp lớn nhất (#1097)", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-test-dist-startup-"));
+    const assetsDir = path.join(tmpDir, "assets");
+    fs.mkdirSync(assetsDir, { recursive: true });
+    try {
+      // chunk khởi động nhỏ; một chunk `index-*.js` khác (tải sau) LỚN hơn: cách cũ (lớn nhất) sẽ chọn nhầm
+      fs.writeFileSync(path.join(assetsDir, "index-start111.js"), Buffer.alloc(2 * 1024, "a"));
+      fs.writeFileSync(
+        path.join(assetsDir, "index-later222.js"),
+        Buffer.from(Array.from({ length: 200 * 1024 }, (_, i) => (i * 7919) % 251)),
+      );
+      fs.writeFileSync(
+        path.join(tmpDir, "index.html"),
+        '<html><head><script type="module" crossorigin src="/assets/index-start111.js"></script></head></html>',
+      );
+      const names = fs.readdirSync(assetsDir);
+      expect(findStartupChunk(tmpDir, names)).toBe("index-start111.js");
+      const r = checkBundleGzip(tmpDir, 520);
+      expect(r.file).toBe("index-start111.js");
+      expect(r.rawBytes).toBe(2 * 1024);
+      // không có index.html -> dự phòng: tệp index-*.js lớn nhất
+      fs.rmSync(path.join(tmpDir, "index.html"));
+      expect(findStartupChunk(tmpDir, names)).toBeNull();
+      expect(checkBundleGzip(tmpDir, 520).file).toBe("index-later222.js");
+      // index.html trỏ tới tệp không có -> cũng dự phòng
+      fs.writeFileSync(
+        path.join(tmpDir, "index.html"),
+        '<script type="module" src="/assets/index-khongco.js"></script>',
+      );
+      expect(findStartupChunk(tmpDir, names)).toBeNull();
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("checkTotalJsGzip: cộng gzip MỌI tệp .js (không chỉ gói khởi động) và bắt vượt trần (Đột biến đỏ)", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-test-dist-total-"));
+    const assetsDir = path.join(tmpDir, "assets");
+    fs.mkdirSync(assetsDir, { recursive: true });
+    try {
+      // byte giả ngẫu nhiên (LCG có hạt) để gzip không nén được gần hết
+      const noise = (n: number, seed: number) => {
+        let x = seed;
+        return Buffer.from(
+          Array.from({ length: n }, () => {
+            x = (Math.imul(x, 1103515245) + 12345) >>> 0;
+            return (x >>> 16) & 255;
+          }),
+        );
+      };
+      fs.writeFileSync(path.join(assetsDir, "index-a.js"), noise(20 * 1024, 31));
+      fs.writeFileSync(path.join(assetsDir, "phaser-b.js"), noise(40 * 1024, 37));
+      fs.writeFileSync(path.join(assetsDir, "style.css"), noise(30 * 1024, 41)); // không phải JS: không tính
+      fs.writeFileSync(path.join(assetsDir, "x.js.map"), noise(30 * 1024, 43)); // bản đồ nguồn: không tính
+      const r = checkTotalJsGzip(tmpDir, 1000);
+      expect(r.files.map((f) => f.file)).toEqual(["index-a.js", "phaser-b.js"]);
+      expect(r.gzipKb).toBeGreaterThan(40);
+      expect(r.gzipKb).toBeCloseTo(
+        r.files.reduce((a, f) => a + f.gzipKb, 0),
+        1,
+      );
+      expect(r.ok).toBe(true);
+      expect(checkTotalJsGzip(tmpDir, 10).ok).toBe(false);
+      expect(() => checkTotalJsGzip(path.join(tmpDir, "khong-co"), 10)).toThrow(/không tồn tại/);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("perf-budget.json thật: có HAI trần (khởi động + tổng JS), khởi động nhỏ hơn tổng, tổng giữ 540 KB (#1088)", () => {
+    const budget = JSON.parse(
+      fs.readFileSync(path.join(__dirname, "../perf-budget.json"), "utf-8"),
+    ) as { static: Record<string, number> };
+    expect(typeof budget.static.startupGzipKb).toBe("number");
+    expect(typeof budget.static.totalJsGzipKb).toBe("number");
+    expect(budget.static.startupGzipKb).toBeLessThan(budget.static.totalJsGzipKb!);
+    expect(budget.static.startupGzipKb).toBeLessThanOrEqual(500);
+    expect(budget.static.totalJsGzipKb).toBeLessThanOrEqual(540);
+    expect(budget.static.bundleGzipKb).toBeUndefined();
   });
 
   it("checkAtlasTileset: tính tổng dung lượng và bắt lỗi khi vượt ngân sách (Đột biến đỏ)", () => {
@@ -586,7 +669,8 @@ describe("M5.1: check-perf-budget (Kiểm tra ngân sách hiệu năng tĩnh)", 
         budgetPath,
         JSON.stringify({
           static: {
-            bundleGzipKb: 0.001,
+            startupGzipKb: 0.001,
+            totalJsGzipKb: 0.001,
             atlasTilesetKb: 0.001,
             textureMemoryMb: { low: 0.001, mid: 0.001, high: 0.001 },
           },
@@ -597,7 +681,8 @@ describe("M5.1: check-perf-budget (Kiểm tra ngân sách hiệu năng tĩnh)", 
       expect(failRes.ok).toBe(false);
       // Gồm 3 vi phạm tĩnh cơ bản + các vi phạm VRAM theo bậc
       expect(failRes.errors.length).toBeGreaterThanOrEqual(3);
-      expect(failRes.errors.some((e) => e.includes("Gói JS chính"))).toBe(true);
+      expect(failRes.errors.some((e) => e.includes("Gói JS khởi động"))).toBe(true);
+      expect(failRes.errors.some((e) => e.includes("Tổng JS"))).toBe(true);
       expect(failRes.errors.some((e) => e.includes("Tổng dung lượng atlas"))).toBe(true);
       expect(failRes.errors.some((e) => e.includes("Tổng bộ nhớ texture"))).toBe(true);
       expect(failRes.errors.some((e) => e.includes("Bộ nhớ texture ca xấu nhất"))).toBe(true);

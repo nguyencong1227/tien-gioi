@@ -149,7 +149,8 @@ export function planBolt(a: PlanIn): Plan {
         continue;
       }
       dist = c.d;
-      if (bounce > 0) {
+      // chỉ nảy khi quãng bay còn lại sau chỗ trúng >= 1 px (trúng đúng cuối tầm thì dừng: đỡ một đoạn `ms` 0 vô nghĩa, B nêu ở #1108)
+      if (bounce > 0 && left - c.d >= 1) {
         const hx = x + ux * c.d;
         const hy = y + uy * c.d;
         let best: PTarget | null = null;
