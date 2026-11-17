@@ -401,9 +401,11 @@ function release(w: World, sid: string, def: SkillDef, level: number, angle: num
     for (const h of hits) strikeMonster(w, sid, def, sk, h.id, h.n, h.scale, x0, y0);
     if (isPersistShape(def.shape)) {
       // CT4: dựng vùng / bẫy / hào quang / tượng; mỗi lần tác dụng đi CÙNG `strikeMonster` với chiêu tức thời (chỉ đánh quái, PK không)
-      placeObject(w, sid, def, x0, y0, angle, (id, fx, fy) =>
+      const placed = placeObject(w, sid, def, x0, y0, angle, (id, fx, fy) =>
         strikeMonster(w, sid, def, sk, id, 1, 1, fx, fy),
       );
+      if (placed === "safe")
+        w.events.toast(sid, { text: `Không đặt được ${def.name} trong khu an toàn.`, tone: "bad" });
     }
     if (def.shape === "bolt") {
       // CT3: quy hoạch đường bay + hẹn giờ trúng từng quái / đối thủ; trúng đòn nào thì đi CÙNG `strikeMonster` / `opponentAftermath` với chiêu tức thời

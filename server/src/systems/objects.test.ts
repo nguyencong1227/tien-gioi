@@ -2,7 +2,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SKILL_BY_ID, SKILL_LIMITS, TICK_MS, type FxMsg, type SkillDef } from "@tien-gioi/shared";
 import { cast } from "./cast";
-import { PERSIST_KIND_MAX, isPersistShape, placeObject, tickObjects, type PObj } from "./objects";
+import {
+  PERSIST_KIND_MAX,
+  TRAP_SCAN_MS,
+  isPersistShape,
+  placeObject,
+  tickObjects,
+  type PObj,
+} from "./objects";
 import { tickWorld } from "./tick";
 import { addMonster, addPlayer, makeWorld } from "./test-helpers";
 
@@ -187,6 +194,15 @@ describe("zone: vùng duy trì", () => {
     expect(t.w.objs).toEqual([]);
     expect(fxOf(t, "zone")).toEqual([]);
     expect(t.p.mp).toBeLessThan(mp);
+    // báo cho người chơi (B, #1118): không để tốn linh lực mà không biết vì sao
+    expect(t.toasts.some((x) => /khu an toàn/.test(x.msg.text) && x.msg.tone === "bad")).toBe(true);
+  });
+
+  it("dữ liệu thiếu `durationMs` (`invalid`) KHÔNG có thông báo khu an toàn", () => {
+    const t = setup();
+    def(t, { shape: "zone", durationMs: undefined as never });
+    use(t);
+    expect(t.toasts.some((x) => /khu an toàn/.test(x.msg.text))).toBe(false);
   });
 
   it("chỉ đánh QUÁI: đối thủ thách đấu đứng trong vùng không mất máu", () => {
@@ -293,6 +309,21 @@ describe("trap: bẫy", () => {
   });
 });
 
+describe("trap: nhịp quét sau khi hoạt động", () => {
+  it("bẫy đã hoạt động quét quái mỗi TRAP_SCAN_MS (không mỗi tick): quái vào giữa hai lần quét bị bắt ở lần quét kế, không muộn hơn TRAP_SCAN_MS", () => {
+    const t = setup();
+    def(t, { shape: "trap", reach: 0, range: 60, armMs: 400, durationMs: 10_000 });
+    use(t);
+    advance(t, 1000); // đã hoạt động, đã quét vài lần không có quái
+    const scanAt = t.w.objs[0]!.nextAt;
+    expect(scanAt - t.w.now).toBeGreaterThan(0); // đã hẹn lần quét kế: không quét ở mọi tick
+    expect(scanAt - t.w.now).toBeLessThanOrEqual(TRAP_SCAN_MS);
+    const m = mon(t, 1030, 1000);
+    advance(t, TRAP_SCAN_MS, 10); // bước mịn hơn nhịp quét
+    expect(dmgTo(t, m.id)).toHaveLength(1);
+  });
+});
+
 describe("aura: hào quang bám theo người", () => {
   it("tâm là chỗ người đứng LÚC NÀY: người đi đâu đánh quái ở đó; quái quanh chỗ cũ thì không", () => {
     const t = setup();
@@ -390,10 +421,10 @@ describe("trần vật thể bền", () => {
     expect(fxOf(t, "fxEnd")).toEqual([]);
   });
 
-  it("placeObject với hình không phải vật thể bền: false, không đụng gì", () => {
+  it("placeObject với hình không phải vật thể bền: `invalid`, không đụng gì", () => {
     const t = setup();
     const d = withSkill({ id: "chem", shape: "cone" } as Partial<SkillDef> & { id: string });
-    expect(placeObject(t.w, "a", d, 0, 0, 0, () => {})).toBe(false);
+    expect(placeObject(t.w, "a", d, 0, 0, 0, () => {})).toBe("invalid");
     expect(t.w.objs).toEqual([]);
   });
 });

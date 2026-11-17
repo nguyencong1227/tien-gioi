@@ -9,9 +9,12 @@
 //  Đặt trong khu an toàn thì KHÔNG dựng (đã tốn linh lực + hồi chiêu như đạn vào tường).
 //  Trần (`SKILL_LIMITS.persistPerPlayerMax` mỗi người, `persistPerRoomMax` mỗi phòng, thêm trần theo loại: 3 vùng / 3 bẫy / 1 hào quang / 2 tượng): vượt thì vật thể CŨ NHẤT cùng loại / của người đó /
 //  của phòng bị đẩy ra (`fxEnd` `gone`). Chủ chết / rời phòng / qua cổng / vào bí cảnh (không còn trong phòng này) / hồn lìa xác / Hoàng Tuyền thì vật thể của họ tan (`fxEnd` `gone`).
-//  Băng thông: MỘT `fx` lúc dựng và (chỉ khi KẾT THÚC SỚM) MỘT `fxEnd`; tác dụng theo nhịp `nextAt` (không quét mỗi tick); không có vật thể thì thoát ngay. Không `Math.random` ở đây.
+//  Băng thông: MỘT `fx` lúc dựng và (chỉ khi KẾT THÚC SỚM) MỘT `fxEnd`; tác dụng theo nhịp `nextAt` (bẫy đã hoạt động quét mỗi `TRAP_SCAN_MS`, không mỗi tick); không có vật thể thì thoát ngay. Không `Math.random` ở đây.
 import { SKILL_LIMITS, type SkillDef } from "@tien-gioi/shared";
 import type { World } from "../world";
+
+/** Bẫy ĐÃ hoạt động quét quái mỗi chừng này (ms), không mỗi tick: đủ nhạy (quái chạy ~ vài px mỗi 100 ms) mà đỡ tốn khi nhiều bẫy chờ. */
+export const TRAP_SCAN_MS = 100;
 
 /** Trần theo LOẠI mỗi người (mục 3 của kế hoạch). */
 export const PERSIST_KIND_MAX = { zone: 3, trap: 3, aura: 1, totem: 2 } as const;
@@ -74,6 +77,9 @@ function tickOf(kind: PersistKind, def: SkillDef): number {
   return Math.max(min, finiteOr(def.tickMs, min));
 }
 
+/** Kết quả `placeObject`: `ok` đã dựng; `safe` vùng đặt / chỗ đứng ở khu an toàn (không dựng, nên báo người chơi); `invalid` hình không phải vật thể bền hoặc dữ liệu thiếu `durationMs`. */
+export type PlaceResult = "ok" | "safe" | "invalid";
+
 /** Gửi `fxEnd` (kết thúc SỚM) và gỡ vật thể khỏi danh sách. */
 function endObj(w: World, i: number, why: "pop" | "gone") {
   const o = w.objs[i]!;
@@ -100,7 +106,7 @@ function countOf(w: World, owner: string, kind?: PersistKind): number {
 }
 
 /**
- * Dựng vật thể của chiêu `def` (hình `zone` / `trap` / `aura` / `totem`) cho `sid` đứng ở (x0, y0) hướng `angle`. Trả `true` nếu đã dựng. Không dựng khi: thiếu `durationMs`, vùng đặt nằm trong khu an toàn.
+ * Dựng vật thể của chiêu `def` (hình `zone` / `trap` / `aura` / `totem`) cho `sid` đứng ở (x0, y0) hướng `angle`. Trả `ok` nếu đã dựng. Không dựng khi: thiếu `durationMs` (`invalid`), vùng đặt / chỗ đứng nằm trong khu an toàn (`safe`).
  * Đẩy vật thể cũ khi vượt trần (loại, người, phòng) TRƯỚC khi thêm. Gửi MỘT `fx` dựng.
  */
 export function placeObject(
@@ -111,15 +117,15 @@ export function placeObject(
   y0: number,
   angle: number,
   strike: PObj["strike"],
-): boolean {
+): PlaceResult {
   const kind = def.shape;
-  if (!isPersistShape(kind)) return false;
+  if (!isPersistShape(kind)) return "invalid";
   const dur = durationOf(kind, def);
-  if (dur <= 0) return false;
+  if (dur <= 0) return "invalid";
   const reach = kind === "aura" ? 0 : Math.max(0, finiteOr(def.reach, 0));
   const x = x0 + Math.cos(angle) * reach;
   const y = y0 + Math.sin(angle) * reach;
-  if (w.map.inSafe(x, y) || w.map.inSafe(x0, y0)) return false; // khu an toàn: vật thể bền không tồn tại ở đó
+  if (w.map.inSafe(x, y) || w.map.inSafe(x0, y0)) return "safe"; // khu an toàn: vật thể bền không tồn tại ở đó
   const r = Math.max(0, finiteOr(def.range, 0));
   const tick = tickOf(kind, def);
   // trần: theo loại (cũ nhất cùng loại của người này), theo người (cũ nhất của người này), theo phòng (cũ nhất của phòng)
@@ -156,7 +162,7 @@ export function placeObject(
     r: Math.round(r),
     ms: Math.round(dur),
   });
-  return true;
+  return "ok";
 }
 
 /** Id các quái có thân (tâm + bán kính quái) chạm vòng tròn (x, y, r); `nearest` chỉ lấy MỘT con gần nhất. Gom trước rồi mới tác dụng: hạ quái xoá nó khỏi bảng trong lúc duyệt. */
@@ -203,7 +209,10 @@ export function tickObjects(w: World) {
     if (o.kind === "trap") {
       // bẫy hoạt động từ `nextAt` (= đặt + armMs): quái chạm bán kính thì nổ MỘT lần, tác dụng mọi quái trong bán kính
       const hit = monstersIn(w, o.x, o.y, o.r, false);
-      if (hit.length === 0) continue;
+      if (hit.length === 0) {
+        o.nextAt = now + TRAP_SCAN_MS; // chưa có quái: quét lại sau một nhịp ngắn (không mỗi tick)
+        continue;
+      }
       for (const id of hit) o.strike(id, o.x, o.y);
       endObj(w, i, "pop");
       continue;
