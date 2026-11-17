@@ -13,12 +13,13 @@ import { PLAYER_RADIUS } from "@tien-gioi/shared";
 import type { Monster } from "../schema";
 import type { MonsterCtrl, World } from "../world";
 import { hurtPlayer } from "./combat";
+import { weakened } from "./status-rules";
 
 /** Đáp đòn: mọi người còn trong vòng (tâm lúc gồng) mất `round(atk x mult)`. Quái đã chết giữa lúc gồng thì không gọi tới đây. */
 function strike(w: World, id: string, m: Monster, mc: MonsterCtrl, x: number, y: number) {
   const slam = mc.def.slam!;
   w.events.fx({ kind: "mslash", by: id, x, y, angle: m.angle });
-  const dmg = Math.round(mc.def.atk * slam.mult);
+  const dmg = weakened(mc, w.now, Math.round(mc.def.atk * slam.mult)); // `weaken` (mục 51)
   const reach = slam.radius + PLAYER_RADIUS;
   // Gom trước rồi mới gây sát thương: `hurtPlayer` có thể làm người chơi chết / đổi `w.state.players` (luân hồi)
   const hit: string[] = [];
