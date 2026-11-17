@@ -24,6 +24,7 @@ import {
   hallQuestRows,
   hallRefreshDelayMs,
   hallResetInMs,
+  hallShopGroups,
   hallShopRows,
   sanitizeHallView,
   shopLockText,
@@ -347,5 +348,137 @@ describe("hallRefreshDelayMs: hẹn giờ xin ảnh chụp mới khi qua mốc �
     const a = hallRefreshDelayMs(at(10 * 60_000), 0);
     const b = hallRefreshDelayMs(at(10 * 60_000), 4 * 60_000);
     expect(a - b).toBe(4 * 60_000);
+  });
+});
+
+describe("hallShopGroups: gom cửa hàng theo cấp tông (bảng thật ~28 món)", () => {
+  type Item = SectHallView["shop"][number];
+  const item = (
+    itemId: string,
+    minLevel: number,
+    hall: Item["hall"],
+    extra: Partial<Item> = {},
+  ): Item => ({
+    itemId,
+    cost: 5,
+    minLevel,
+    limitDay: 10,
+    hall,
+    left: 10,
+    locked: null,
+    ...extra,
+  });
+  // thứ tự gốc cố ý XEN KẼ cấp (như bảng thật: tụ khí cấp 3 đứng giữa nguyên liệu cấp 1)
+  const SHOP: Item[] = [
+    item("hoi_huyet_dan", 1, "baoKho"),
+    item("hoi_linh_dan", 1, "baoKho"),
+    item("tu_khi_dan", 3, "baoKho"),
+    item("long_tho", 1, "baoKho"),
+    item("nanh_soi", 1, "baoKho"),
+    item("kinh_phieu_phong_bo", 2, "tangKinh"),
+    item("kinh_bon_thach_quyen", 2, "tangKinh"),
+    item("dai_hoi_huyet_dan", 3, "baoKho"),
+    item("kinh_me_tung_bo", 4, "tangKinh"),
+    item("thuong_hoi_huyet_dan", 5, "baoKho"),
+    item("kinh_bang_hoa_loan", 5, "tangKinh"),
+  ];
+  const view = (level: number): SectHallView => ({
+    ...clone(sample(level)),
+    level,
+    shop: clone(SHOP),
+  });
+  const groups = (level: number, down = false) => {
+    const v = view(level);
+    return hallShopGroups(hallShopRows(v, { down }), v.level);
+  };
+  const ids = (rows: { itemId: string }[]) => rows.map((r) => r.itemId);
+
+  it("cấp 1: món đã mở xếp theo cấp rồi thứ tự gốc (không còn xen kẽ), món chưa mở gom theo cấp tăng dần", () => {
+    const g = groups(1);
+    expect(g.map((x) => x.hall)).toEqual(["baoKho", "tangKinh"]);
+    const bk = g[0]!.sections;
+    expect(bk.map((s) => s.key)).toEqual(["baoKho:open", "baoKho:3", "baoKho:5"]);
+    expect(ids(bk[0]!.rows)).toEqual(["hoi_huyet_dan", "hoi_linh_dan", "long_tho", "nanh_soi"]);
+    expect(ids(bk[1]!.rows)).toEqual(["tu_khi_dan", "dai_hoi_huyet_dan"]);
+    expect(ids(bk[2]!.rows)).toEqual(["thuong_hoi_huyet_dan"]);
+    const tk = g[1]!.sections;
+    expect(tk.map((s) => s.key)).toEqual(["tangKinh:2", "tangKinh:4", "tangKinh:5"]); // Tàng Kinh chưa có món nào đã mở
+    expect(ids(tk[0]!.rows)).toEqual(["kinh_phieu_phong_bo", "kinh_bon_thach_quyen"]);
+  });
+
+  it("KHÔNG bỏ món nào và không nhân đôi: tổng số hàng = số món, mọi cấp tông", () => {
+    for (let lv = 1; lv <= SECT_LEVEL_MAX; lv++) {
+      const n = groups(lv).reduce(
+        (a, g) => a + g.sections.reduce((b, s) => b + s.rows.length, 0),
+        0,
+      );
+      expect(n, `cấp ${lv}`).toBe(SHOP.length);
+    }
+  });
+
+  it("mở sẵn: phần đã mở luôn mở; chỉ nhóm của cấp KẾ TIẾP (nhỏ nhất trên cả hai gian) mở, các cấp xa hơn thu gọn", () => {
+    const g = groups(1);
+    const open = (key: string) =>
+      g.flatMap((x) => x.sections).find((s) => s.key === key)!.defaultOpen;
+    expect(open("baoKho:open")).toBe(true);
+    expect(open("tangKinh:2")).toBe(true); // cấp kế tiếp toàn cục là 2 (Tàng Kinh)
+    expect(open("baoKho:3")).toBe(false);
+    expect(open("baoKho:5")).toBe(false);
+    expect(open("tangKinh:4")).toBe(false);
+    // cấp 2: cấp kế tiếp là 3 (Bảo khố); Tàng Kinh có phần đã mở (cấp 2) và nhóm cấp 4 thu gọn
+    const g2 = groups(2);
+    const open2 = (key: string) =>
+      g2.flatMap((x) => x.sections).find((s) => s.key === key)!.defaultOpen;
+    expect(open2("baoKho:3")).toBe(true);
+    expect(open2("tangKinh:open")).toBe(true);
+    expect(open2("tangKinh:4")).toBe(false);
+  });
+
+  it("tiêu đề nhóm nêu cấp, tên cấp và số món", () => {
+    const sec = groups(1)[0]!.sections.find((s) => s.key === "baoKho:3")!;
+    expect(sec.title).toMatch(/^Mở ở cấp tông 3 \(.+\) · 2 món$/);
+    expect(sec.level).toBe(3);
+    expect(groups(1)[0]!.sections[0]!.title).toBe("");
+    expect(groups(1)[0]!.sections[0]!.level).toBeNull();
+  });
+
+  it("cấp cao nhất: không còn nhóm khoá theo cấp, chỉ phần đã mở; hàng khoá vì lý do khác (đã học / hết lượt / thiếu cống hiến) VẪN ở phần đã mở", () => {
+    const v = view(SECT_LEVEL_MAX);
+    v.shop[0]!.locked = "limit";
+    v.shop[1]!.locked = "no_contrib";
+    v.shop[5]!.locked = "known";
+    const g = hallShopGroups(hallShopRows(v, { down: false }), v.level);
+    expect(g.every((x) => x.sections.length === 1 && x.sections[0]!.level === null)).toBe(true);
+    const flat = g.flatMap((x) => x.sections.flatMap((s) => s.rows));
+    expect(flat.find((r) => r.itemId === "hoi_huyet_dan")!.locked).toBe("limit");
+    expect(flat.find((r) => r.itemId === "kinh_phieu_phong_bo")!.locked).toBe("known");
+  });
+
+  it("đã gục (down): vẫn gom theo cấp (không dồn hết vào một phần) và không mất hàng", () => {
+    const g = groups(1, true);
+    expect(g[0]!.sections.map((s) => s.key)).toEqual(["baoKho:open", "baoKho:3", "baoKho:5"]);
+    expect(
+      g.flatMap((x) => x.sections.flatMap((s) => s.rows)).every((r) => r.locked === "down"),
+    ).toBe(true);
+  });
+
+  it("mọi món cùng cấp, hoặc cấp tông hỏng (NaN): không ném, coi như cấp 1", () => {
+    const rows = hallShopRows(view(1), { down: false });
+    expect(() => hallShopGroups(rows, Number.NaN)).not.toThrow();
+    expect(hallShopGroups(rows, Number.NaN)[0]!.sections[0]!.key).toBe("baoKho:open");
+    expect(hallShopGroups([], 3)).toEqual([]);
+  });
+
+  it("bảng THẬT của shared/: mọi cấp tông gom đủ mọi món và ở cấp 1 chỉ có đúng một nhóm mở sẵn ngoài phần đã mở", () => {
+    for (let lv = 1; lv <= SECT_LEVEL_MAX; lv++) {
+      const v = sample(lv);
+      const g = hallShopGroups(hallShopRows(v, { down: false }), v.level);
+      const n = g.reduce((a, x) => a + x.sections.reduce((b, s) => b + s.rows.length, 0), 0);
+      expect(n, `cấp ${lv}`).toBe(SECT_SHOP.length);
+      const lockedOpen = g
+        .flatMap((x) => x.sections)
+        .filter((s) => s.level !== null && s.defaultOpen);
+      expect(new Set(lockedOpen.map((s) => s.level)).size, `cấp ${lv}`).toBeLessThanOrEqual(1);
+    }
   });
 });

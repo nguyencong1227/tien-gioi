@@ -51,6 +51,8 @@ export const VIEWPORTS = [
   { name: "640x360", w: 640, h: 360, dpr: 2, mobile: true },
 ];
 const MIN_TAP_PX = 44;
+/** Cấp tông cao nhất (`SECT_LEVEL_MAX` của shared/): ở cấp này mọi món đã mở theo cấp */
+const SECT_LEVEL_MAX_FOR_CHECK = 5;
 
 async function main() {
   const shotsArg = process.argv.indexOf("--shots");
@@ -570,6 +572,170 @@ async function main() {
       await evalJs(
         `window.__ui.toggleQuestModal(false); window.__ui.onQuests({ active: [], done: [], dailyDone: [] }); 1`,
       );
+
+      // ---- cửa hàng GOM NHÓM theo cấp tông (bảng thật ~28 món: cuộn dài, nhiều hàng khoá) ----
+      // Kỳ vọng suy ra từ chính bảng `shop` của ảnh chụp mẫu (khớp `SECT_SHOP` thật; `sanitizeHallView` bỏ món lạ nên không bơm bảng riêng được), nên script đúng với mọi bảng.
+      {
+        const shopOf = (level) => evalJs(`window.__sampleSectHall(${level}, Date.now()).shop`);
+        // oracle độc lập với `hallShopGroups`: món đã mở theo cấp; nhóm chưa mở theo cấp tăng dần; chỉ cấp kế tiếp (nhỏ nhất trên cả hai gian) mở sẵn
+        const expectFor = (shop, level) => {
+          const lockedLv = shop.filter((r) => r.minLevel > level).map((r) => r.minLevel);
+          const next = lockedLv.length ? Math.min(...lockedLv) : null;
+          const groups = [];
+          let visible = 0;
+          const subs = [];
+          for (const hall of ["baoKho", "tangKinh"]) {
+            const mine = shop.filter((r) => r.hall === hall);
+            if (!mine.length) continue;
+            subs.push(hall === "baoKho" ? "Bảo khố" : "Tàng Kinh Các");
+            visible += mine.filter((r) => r.minLevel <= level).length;
+            for (const lv of [
+              ...new Set(mine.filter((r) => r.minLevel > level).map((r) => r.minLevel)),
+            ].sort((a, b) => a - b)) {
+              const n = mine.filter((r) => r.minLevel === lv).length;
+              const open = lv === next;
+              groups.push({ lv, n, open });
+              if (open) visible += n;
+            }
+          }
+          return { groups, visible, subs, total: shop.length };
+        };
+        const probe = () =>
+          evalJs(`(() => {
+            const card = [...document.querySelectorAll("#sect-tab-hall section")].find((x) => x.querySelector("h4")?.textContent.trim() === "Cửa hàng tông môn");
+            const rows = [...card.querySelectorAll("li.sect-hall-row")];
+            const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+            const groups = [...card.querySelectorAll("details.sect-hall-group")].map((d) => ({
+              title: d.querySelector("summary").textContent, open: d.open, n: d.querySelectorAll("li.sect-hall-row").length,
+              sumH: Math.round(d.querySelector("summary").getBoundingClientRect().height),
+            }));
+            const modal = document.getElementById("sect-modal");
+            return { total: rows.length, visible: rows.filter(vis).length, groups, subs: [...card.querySelectorAll("h5")].map((h) => h.textContent), overflow: modal.scrollWidth - modal.clientWidth };
+          })()`);
+        const toggleGroup = (title) =>
+          evalJs(
+            `(() => { const s = [...document.querySelectorAll("#sect-tab-hall summary")].find((x) => x.textContent.startsWith(${JSON.stringify(title)})); if (!s) return false; s.click(); return true; })()`,
+          );
+        const key = (type, k, code, vk, text) =>
+          send("Input.dispatchKeyEvent", {
+            type,
+            key: k,
+            code,
+            windowsVirtualKeyCode: vk,
+            nativeVirtualKeyCode: vk,
+            text: type === "keyDown" ? text : undefined,
+          });
+        const lvOf = (title) => Number(/Mở ở cấp tông (\d+)/.exec(title)?.[1]);
+
+        await evalJs(
+          `window.__ui.toggleSectModal(true); window.__ui.onSect(${JSON.stringify(sect)}); 1`,
+        );
+        await evalJs(`document.getElementById("sect-tab-btn-hall").click(); 1`);
+        for (const level of [1, 2, 3, 4, 5]) {
+          const shop = await shopOf(level);
+          const want = expectFor(shop, level);
+          await hallOf(level);
+          await sleep(180);
+          const g = await probe();
+          check(
+            g.total === want.total,
+            `gom nhóm cấp ${level}: đủ ${want.total} hàng trong DOM, không bỏ món nào (${g.total})`,
+          );
+          check(
+            JSON.stringify(g.subs) === JSON.stringify(want.subs),
+            `cấp ${level}: tiêu đề gian ${JSON.stringify(g.subs)}`,
+          );
+          check(
+            JSON.stringify(g.groups.map((x) => [lvOf(x.title), x.n, x.open])) ===
+              JSON.stringify(want.groups.map((x) => [x.lv, x.n, x.open])),
+            `cấp ${level}: nhóm chưa mở (cấp, số món, mở sẵn) khớp: ${JSON.stringify(g.groups.map((x) => [lvOf(x.title), x.n, x.open]))}`,
+          );
+          check(
+            g.visible === want.visible,
+            `cấp ${level}: ${g.visible} / ${g.total} hàng nhìn thấy (cần ${want.visible})`,
+          );
+          check(g.overflow <= 1, `cấp ${level}: không tràn ngang (${g.overflow})`);
+          if (vp.mobile && g.groups.length)
+            check(
+              g.groups.every((x) => x.sumH >= MIN_TAP_PX),
+              `cấp ${level}: tiêu đề nhóm >= ${MIN_TAP_PX} px (${JSON.stringify(g.groups.map((x) => x.sumH))})`,
+            );
+          if (level === SECT_LEVEL_MAX_FOR_CHECK)
+            check(g.groups.length === 0, "cấp tông cao nhất: không còn nhóm nào");
+        }
+
+        // tương tác ở cấp 1: mở một nhóm đang thu, thu một nhóm đang mở sẵn, bàn phím; vẽ lại vẫn giữ lựa chọn
+        const shop1 = await shopOf(1);
+        const want1 = expectFor(shop1, 1);
+        await hallOf(1);
+        await sleep(180);
+        let g = await probe();
+        const collapsed = g.groups.find((x) => !x.open);
+        const openByDefault = g.groups.find((x) => x.open);
+        if (collapsed) {
+          const before = g.visible;
+          check(
+            await toggleGroup(collapsed.title.split(" · ")[0]),
+            "bấm tiêu đề một nhóm đang thu",
+          );
+          await sleep(150);
+          g = await probe();
+          check(
+            g.visible === before + collapsed.n,
+            `nhóm mở ra: ${g.visible} hàng (cần ${before + collapsed.n})`,
+          );
+          await hallOf(1);
+          await sleep(180);
+          g = await probe();
+          check(
+            g.groups.find((x) => x.title === collapsed.title)?.open === true,
+            "vẽ lại tab (ảnh chụp mới): nhóm người chơi vừa mở VẪN mở",
+          );
+          check(await toggleGroup(collapsed.title.split(" · ")[0]), "thu lại nhóm vừa mở");
+          await sleep(150);
+        }
+        if (openByDefault) {
+          check(
+            await toggleGroup(openByDefault.title.split(" · ")[0]),
+            "bấm tiêu đề nhóm đang mở sẵn",
+          );
+          await sleep(150);
+          await hallOf(1);
+          await sleep(180);
+          g = await probe();
+          check(
+            g.groups.find((x) => x.title === openByDefault.title)?.open === false,
+            "nhóm mở sẵn mà người chơi vừa thu VẪN thu sau khi vẽ lại",
+          );
+          await toggleGroup(openByDefault.title.split(" · ")[0]);
+          await sleep(150);
+        }
+        const kbTitle = (await probe()).groups.find((x) => !x.open)?.title;
+        if (kbTitle) {
+          await evalJs(
+            `[...document.querySelectorAll("#sect-tab-hall summary")].find((x) => x.textContent === ${JSON.stringify(kbTitle)}).focus(); 1`,
+          );
+          const isOpen = async () => (await probe()).groups.find((x) => x.title === kbTitle).open;
+          const k0 = await isOpen();
+          await key("keyDown", "Enter", "Enter", 13, "\r");
+          await key("keyUp", "Enter", "Enter", 13);
+          await sleep(150);
+          const k1 = await isOpen();
+          await key("keyDown", " ", "Space", 32, " ");
+          await key("keyUp", " ", "Space", 32);
+          await sleep(150);
+          const k2 = await isOpen();
+          check(
+            k0 === false && k1 === true && k2 === false,
+            `bàn phím: Enter mở, Cách thu một nhóm (${k0} -> ${k1} -> ${k2})`,
+          );
+        }
+        check(
+          want1.groups.length === 0 || (await probe()).groups.length === want1.groups.length,
+          "sau các thao tác số nhóm không đổi",
+        );
+        await evalJs(`window.__ui.toggleSectModal(false); 1`);
+      }
 
       if (shotsDir) {
         // Bảng Tông môn ĐANG MỞ ở tab Nội vụ (các bước trên đã đóng bảng để kiểm HUD / sổ nhiệm vụ: không mở lại thì ảnh chỉ có màn chơi)

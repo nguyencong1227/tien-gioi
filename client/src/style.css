@@ -7183,6 +7183,31 @@ body.ui-hidden
   color: #ffe08a;
   font-size: var(--fs-13);
 }
+/* Nhóm cửa hàng "Mở ở cấp tông N" (details / summary: bàn phím Enter / Cách, đọc được bằng trình đọc màn hình); tiêu đề >= 44 px để chạm */
+.sect-hall-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sect-hall-group-title {
+  min-height: 44px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: #ffe08a;
+  font-size: var(--fs-13);
+  cursor: pointer;
+}
+.sect-hall-group[open] > .sect-hall-group-title {
+  margin-bottom: 8px;
+}
+.sect-hall-group-title:focus-visible {
+  outline: 2px solid #ffe08a;
+  outline-offset: 2px;
+}
 .sect-hall-bar {
   height: 12px;
   border-radius: 6px;
