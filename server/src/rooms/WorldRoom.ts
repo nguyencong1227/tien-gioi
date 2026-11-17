@@ -8,7 +8,11 @@ import {
   TICK_MS,
   type SoulSocial,
   SOCIAL_MSG,
+  ACHIEVEMENT_BY_ID,
+  achievementsDue,
+  newSocial,
   parseBoardsGet,
+  parseTitleSet,
   MAX_PLAYERS_PER_ROOM,
   MONSTER_RESPAWN_MS,
   DEFAULT_MAP_ID,
@@ -185,6 +189,8 @@ import { audit, auditCoinThreshold } from "../audit";
 import { bossMovesOf } from "../systems/boss-config";
 import { testExpMultFor } from "../test-exp";
 import type { LeaderboardService } from "../leaderboard";
+import { achievementsMsgOf, grantDue, unlockedTitles, wornTitle } from "../systems/achievements";
+import { trackSocial } from "../systems/social";
 import { defaultHub, type Hub } from "../hub";
 
 const SAVE_EVERY_MS = 30_000;
@@ -247,6 +253,11 @@ export class WorldRoom extends Room<WorldState> {
   static sects: SectService | null = null;
   /** Dịch vụ bảng xếp hạng (M9, `leaderboard.ts`; đặt ở `index.ts`, `LEADERBOARD=off` gỡ). `null`: tin `boardsGet` trả bảng trống. */
   static leaderboards: LeaderboardService | null = null;
+  /**
+   * Cấp thành tựu + Duyên thưởng + danh hiệu (M9.5). MẶC ĐỊNH TẮT (test và bản chạy thật hiện tại không đổi): bộ đếm xã hội vẫn được ghi (thành tựu đến hạn sẽ cấp ngay khi bật), nhưng không cấp
+   * thành tựu / không thưởng Duyên / không tin `achievementNew`. `index.ts` bật khi `ACHIEVEMENTS=on`; PR cuối của M9 đổi mặc định thành bật.
+   */
+  static achievements = false;
   /** "Chờ sang ngày mới kiếm được cống hiến" (M8; mặc định BẬT; `index.ts` đặt từ `SECT_EARN_WARMUP`, `off` chỉ để dev / E2E). */
   static sectEarnWarmup = true;
   private static defaultSects: SectService | undefined;
@@ -456,6 +467,8 @@ export class WorldRoom extends Room<WorldState> {
     this.on(SECT_MSG.deposit, (sid, m) => void sectDeposit(w, sid, m));
     this.on(SECT_MSG.withdraw, (sid, m) => void sectWithdraw(w, sid, m));
     this.on(SECT_MSG.hallGet, (sid, m) => void sectHallGet(w, sid, m));
+    this.on(SOCIAL_MSG.achievementsGet, (sid) => this.sendAchievements(sid)); // sổ thành tựu (M9.5): chỉ chủ, từ bản chân linh đang giữ
+    this.on(SOCIAL_MSG.titleSet, (sid, m) => void this.titleSet(sid, m));
     // Bảng xếp hạng (M9.3): tra bản chụp trong bộ nhớ (không I/O), chỉ cho người hỏi
     this.on(SOCIAL_MSG.boardsGet, (sid, m) => {
       const board = parseBoardsGet(m);
@@ -669,6 +682,7 @@ export class WorldRoom extends Room<WorldState> {
     // Hệ số tu vi thử nghiệm (mục 34): chỉ khi đạo hiệu có trong cấu hình; CHỈ ở phía máy chủ (không vào state), ghi audit mỗi lần vào phòng
     const testMult = testExpMultFor(WorldRoom.testExpMult, p.name);
     if (testMult > 1) audit("test.exp_mult", { name: p.name, mult: testMult, map: this.mapId });
+    p.title = wornTitle(soul.social); // danh hiệu đang đeo (M9.5), chỉ khi còn hợp lệ
     this.state.players.set(client.sessionId, p);
     this.world.ctrl.set(client.sessionId, {
       testExpMult: testMult > 1 ? testMult : undefined,
@@ -710,6 +724,15 @@ export class WorldRoom extends Room<WorldState> {
     sendSkills(this.world, client.sessionId);
     sendWallet(this.world, client.sessionId);
     this.world.events.soul(client.sessionId, soulView(soul)); // HUD ghi "Kiếp N" ngay từ lúc vào (không chỉ sau khi mua)
+    // Thành tựu (M9.5): ghi nhận MỘT lần cho cả nhóm (bản đồ đã tới, kiếp, cảnh giới cao nhất); chân linh cũ được cấp thành tựu đến hạn ngay lần vào đầu tiên
+    if (WorldRoom.achievements)
+      trackSocial(
+        this.world,
+        client.sessionId,
+        [`map:${this.mapId}`, 1],
+        ["kiep", soul.kiep],
+        ["realm_step", Math.max(soul.best.step, stepOf(p.realm, p.tier))],
+      );
     partyResync(this.world, client.sessionId); // vừa qua cổng từ bản đồ khác: vẫn ở trong đội, nhận đội hình ngay
     void sectOnJoin(this.world, client.sessionId); // tông môn theo linh hồn: nhận ảnh chụp + đặt biệt hiệu (bất đồng bộ)
     this.world.events.sys(`${p.name} (${realmLabel(p.realm, p.tier)}) đã nhập thế.`);
@@ -986,16 +1009,76 @@ export class WorldRoom extends Room<WorldState> {
 
   /** Cộng Duyên của kiếp vừa qua vào chân linh (idempotent theo `endedLifeId`) và ghi "đã cộng" vào hồ sơ. */
   /**
-   * M9: ghi phần xã hội của chân linh `soulKey` (nguyên tử theo chân linh, `SoulStore.update`) NGOÀI tick, rồi cập nhật `PlayerCtrl.soul` của người đang trực tuyến cùng chân linh.
-   * Lỗi chỉ ghi log: mất một lần thống kê còn hơn làm hỏng ván hay chặn hàng đợi.
+   * M9: ghi phần xã hội của chân linh `soulKey` (nguyên tử theo chân linh, `SoulStore.update`) NGOÀI tick: áp `fn` lên `Soul.social`, rồi CẤP mọi thành tựu đến hạn + cộng Duyên thưởng
+   * (`grantDue`) TRONG CÙNG lần ghi (sập máy không cấp một nửa). Sau đó cập nhật `PlayerCtrl.soul` của người đang trực tuyến cùng chân linh và báo họ (`achievementNew`, toast, `achievements`).
+   * Không ghi kho khi KHÔNG đổi gì (dò trên bản chân linh đang giữ: vào phòng mà bộ đếm `max` không tăng thì khỏi tốn một lần ghi tệp). Lỗi chỉ ghi log: mất một lần thống kê còn hơn làm hỏng ván.
    */
   private async socialUpdate(soulKey: string, fn: (s: SoulSocial | undefined) => SoulSocial) {
     try {
-      const soul = await this.souls.update(soulKey, (s) => ({ ...s, social: fn(s.social) }));
-      for (const c of this.world.ctrl.values()) if (c.identity.soulKey === soulKey) c.soul = soul;
+      const online = [...this.world.ctrl.values()].find((c) => c.identity.soulKey === soulKey);
+      if (online) {
+        const next = fn(online.soul.social);
+        if (
+          next === online.soul.social &&
+          (!WorldRoom.achievements || achievementsDue(next).length === 0)
+        )
+          return;
+      }
+      let granted: string[] = [];
+      const at = new Date().toISOString();
+      const soul = await this.souls.update(soulKey, (s) => {
+        const base = { ...s, social: fn(s.social) };
+        const r = WorldRoom.achievements
+          ? grantDue(base, at)
+          : { soul: base, granted: [] as string[] }; // gán lại mỗi lần chạy (PostgreSQL có thể thử lại)
+        granted = r.granted;
+        return r.soul;
+      });
+      for (const [sid, c] of this.world.ctrl) {
+        if (c.identity.soulKey !== soulKey) continue;
+        c.soul = soul;
+        if (granted.length === 0) continue;
+        for (const id of granted) {
+          this.sendTo(sid, SOCIAL_MSG.achievementNew, { id });
+          const def = ACHIEVEMENT_BY_ID[id];
+          if (def)
+            this.world.events.toast(sid, { text: `Đạt thành tựu: ${def.name}`, tone: "good" });
+        }
+        this.sendAchievements(sid);
+        this.world.events.soul(sid, soulView(soul)); // Duyên thưởng hiện ngay trên HUD
+      }
+      if (granted.length > 0)
+        audit("achievement.grant", { soul: soulKey, ids: granted.join(","), map: this.mapId });
     } catch (e) {
       console.error("[xã hội] ghi chân linh thất bại", e);
     }
+  }
+
+  /** Gửi `achievements` (đúng `Soul.social` rút gọn) cho chủ, từ bản chân linh đang giữ. */
+  private sendAchievements(sid: string) {
+    const c = this.world.ctrl.get(sid);
+    if (c) this.sendTo(sid, SOCIAL_MSG.achievements, achievementsMsgOf(c.soul.social));
+  }
+
+  /**
+   * `titleSet`: đeo danh hiệu đã mở / gỡ (`id: null`). Kiểm "đã mở" TRONG `SoulStore.update` (trên bản mới nhất, không tin cache). `Player.title` (state công khai) đổi theo kết quả.
+   * Hợp đồng: LUÔN gửi lại `achievements` (có `title` hiện tại) sau mỗi tin hợp lệ, thành công hay bị từ chối. Tin sai kiểu bị bỏ không trả lời.
+   */
+  private async titleSet(sid: string, m: unknown) {
+    const msg = parseTitleSet(m);
+    const c = this.world.ctrl.get(sid);
+    if (!msg || !c) return;
+    try {
+      c.soul = await this.souls.update(c.identity.soulKey, (s) => {
+        if (msg.id !== null && !unlockedTitles(s.social).has(msg.id)) return s; // chưa mở: giữ nguyên
+        return { ...s, social: { ...(s.social ?? newSocial()), title: msg.id } };
+      });
+      const p = this.state.players.get(sid);
+      if (p) p.title = wornTitle(c.soul.social);
+    } catch (e) {
+      console.error("[xã hội] đổi danh hiệu thất bại", e);
+    }
+    this.sendAchievements(sid);
   }
 
   private async creditLimbo(sid: string): Promise<boolean> {
