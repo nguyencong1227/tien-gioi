@@ -4,6 +4,9 @@
 
 ## [Chưa phát hành] — sau v0.5.0
 
+### Công cụ và tài liệu
+- **`e2e:nhip-tim` và `e2e:chieu` hết đỏ trên runner CI chậm (nightly `e2e.yml` 17/11 đỏ đúng hai kịch bản này; chỉ test, KHÔNG đổi mã trò chơi) (B):** NGUYÊN NHÂN là kỳ vọng của kịch bản, không phải trò chơi: trên runner CI hai lõi (Chrome WebGL mềm) pong chờ luồng chính nên RTT loopback đo ~40-50 ms, mà client rút ngắn vùng báo theo RTT (`warnShownMs`, #873). (1) `e2e:nhip-tim` ca 7a đòi RTT < 40 ms nên hết giờ 20 s ở CẢ HAI lần thử; nay trần 120 ms, vùng báo kiểm theo công thức `1000 - clamp(RTT + 10, 0, 250)` với RTT đọc CÙNG lúc phát (trước đây khoảng cứng 920-995 chỉ đúng khi RTT < 40), ca (b) nới trần RTT 160 ms + nền lên 320 (vẫn kẹp 250 nên khoảng vùng báo 750-840 không đổi). (2) `e2e:chieu` ca 9 đòi `ms` của vùng báo Cốt Tượng BẰNG CHÍNH XÁC 1100 (CI đo 1046,5 = 1100 - (RTT 43,5 + 10)); nay kiểm khoảng [0,7 x 1100, 1100]. Tái hiện: núm mới `E2E_NEN_MS` (độ trễ mỗi chiều làm RTT nền của ca 7; mặc định 0) = 22 (RTT nền ~45 ms): bản CŨ đỏ đúng như nightly (`Hết thời gian chờ (20000ms) ở A: RTT đo được trên đường cục bộ (< 40 ms)`), bản mới đạt cả ở RTT nền 68,5 ms; mặc định (không núm) cả hai kịch bản vẫn đạt. Tải CPU thuần (một lõi + hai vòng đốt) KHÔNG tái hiện được (RTT vẫn 1 ms): lỗi thật nằm ở luồng chính Chrome dựng hình mềm.
+
 ## [0.5.0] — 18/11/2026: M9 xã hội + chiêu thức đợt 1 + cân bằng Âm Sương / Hàn Vân (chặn đường đã có nhưng TẮT)
 
 Bản lớn thứ hai sau M7: **M9 xã hội**, **chiêu thức đợt 1** (30 chiêu, sáu chiêu dạng mới đầu tiên) và **cân bằng Âm Sương Trạch / Hàn Vân Lĩnh**. Phần dưới là TÓM TẮT cho người quyết định; chi tiết từng PR nằm ở các mục bên dưới.
