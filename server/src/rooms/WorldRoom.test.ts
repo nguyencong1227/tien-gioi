@@ -2583,9 +2583,26 @@ describe("chân linh và bộ đếm kiếp (M3 bước 2)", () => {
     tm.hp = 1;
     sr.world.mctrl.get(tid).homeX = tm.x;
     sr.world.mctrl.get(tid).homeY = tm.y;
+    // Con `tho` hiền (`aggro: 0`, không đuổi) nhưng vẫn LANG THANG quanh home (~25 px/s, bước mỗi WANDER_STRIDE
+    // tick); dưới tải, nó có thể đi khỏi quạt chém (tầm 64 px) trong lúc chờ hồi chiêu, hoặc tin `attack` bị hàng
+    // đợi làm trễ — cả hai khiến đòn đánh thật bỏ lỡ con quái còn 1 máu → `waitFor` hết hạn đỏ oan (issue #923 ca 2).
+    // GHIM quái ngay trước khi đánh VÀ tiếp tục ghim mỗi vòng chờ cho tới khi đòn đáp: dù tin attack tới lúc nào,
+    // quái luôn nằm trong quạt chém (angle 0, cách 20 px). Chờ theo điều kiện, không `sleep` dài cố định.
+    const pinThreat = () => {
+      const mon = serverState(a.room).monsters.get(tid);
+      if (mon) {
+        mon.x = p.x + 20;
+        mon.y = p.y;
+      }
+    };
+    pinThreat();
     await sleep(SKILLS.slash.cooldown + 50);
+    pinThreat();
     a.room.send("attack", { angle: 0 });
-    await waitFor(() => !serverState(a.room).monsters.has(tid), 3000);
+    await waitFor(() => {
+      pinThreat();
+      return !serverState(a.room).monsters.has(tid);
+    }, 8000);
     const [bid] = [...serverState(a.room).monsters].find(([, mm]) => mm.kind === "mang")!;
     const bmc = sr.world.mctrl.get(bid);
     bmc.damageBy.set(a.room.sessionId, 4000);
