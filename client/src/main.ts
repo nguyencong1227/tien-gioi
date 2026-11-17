@@ -1,3 +1,4 @@
+import { installMockAmbush, isMockAmbushEnabled } from "./ambush-mock";
 import Phaser from "phaser";
 import { Client, type Room } from "colyseus.js";
 import {
@@ -437,6 +438,7 @@ if (
     isMockDuelEnabled() ||
     isMockSectEnabled() ||
     isMockSkillsEnabled() ||
+    isMockAmbushEnabled() ||
     new URLSearchParams(location.search).has("crowd"))
 ) {
   const isFallen = isMockDungeonFallen();
@@ -450,8 +452,14 @@ if (
     isMockSkillsEnabled() ? mockRealm(location.search, mockSkillCount(location.search)) : 1,
   );
   if (isMockSkillsEnabled()) installMockSkills(mockRoom);
+  // `?ambush=mock`: máy chủ giả chạy trọn luồng chặn đường (hộp thoại -> đấu trường -> kết quả) qua `room.emit`, đi ĐÚNG đường nhận tin của cảnh
+  const ambushMock = isMockAmbushEnabled()
+    ? installMockAmbush(mockRoom, { onTravel: () => ui.hideAmbush() })
+    : null;
+  if (ambushMock) (window as any).__ambushMock = ambushMock;
   start(mockRoom, startMapId)
     .then(() => {
+      if (ambushMock) setTimeout(() => ambushMock.begin(), 600);
       if (isFallen) {
         setTimeout(() => {
           (window as any).__mockDungeon?.showFallen?.();
