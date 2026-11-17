@@ -932,11 +932,14 @@ describe("bảo vệ tính mạng khi mất kết nối (mục 33)", () => {
     const w = world(a.room);
     const p = serverState(a.room).players.get(sid)!;
     const { x, y } = p;
-    // Ghim máu về maxHp: tickRecovery (progression.ts) hồi máu mỗi tick khi ngoài combat >5s,
-    // nên máu ở giữa sẽ trôi trong khung nối lại (~1s) → bất biến "máu giữ nguyên" phải ghim ở điểm
-    // regen là no-op (cur >= max) mới định tất. Nối lại KHÔNG được đổi máu (không rớt về mặc định).
-    p.hp = p.maxHp;
+    // Máu để ở GIỮA (nửa maxHp) — bất biến "nối lại KHÔNG đổi máu" phải so với giá trị khác đầy
+    // mới có răng (nối lại sai đặt máu về maxHp thì ca phải đỏ). tickRecovery (progression.ts)
+    // hồi máu mỗi tick khi ngoài combat >5s (`w.now - lastHitAt > 5000`), nên đặt lastHitAt = w.now
+    // để cho người chơi đang ở trạng thái COMBAT → ca chỉ ~1s, tickRecovery KHÔNG hồi; hồn lìa xác
+    // thì tickWorld bỏ qua hồi phục. Vừa định tất vừa giữ khả năng bắt lỗi thật.
+    p.hp = Math.max(1, Math.floor(p.maxHp / 2));
     const hp = p.hp;
+    w.ctrl.get(sid)!.lastHitAt = w.now;
     (a.room.connection.transport as any).ws.close();
     await waitFor(() => !a.room.connection.isOpen);
     await waitFor(() => (serverRoom(a.room) as any).ghosts.has(sid), 3000);
