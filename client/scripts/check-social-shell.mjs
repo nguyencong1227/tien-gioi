@@ -930,18 +930,21 @@ async function main() {
       );
       check(/^Đã đạt 1 \/ \d+ thành tựu\.$/.test(a.summary), `tóm tắt: "${a.summary}"`);
       check(a.worn === "Danh hiệu đang đeo: Tái Sinh", `danh hiệu đang đeo: "${a.worn}"`);
+      // Số danh hiệu lấy từ DANH MỤC (`TITLES` của shared, D / A mở rộng tới 32 ở M9.9) nên KHÔNG cứng: sổ mẫu chỉ mở một danh hiệu (Tái Sinh) => nút = "Không đeo" + mọi danh hiệu
       check(
-        a.radios.length === 5 &&
+        a.radios.length >= 5 &&
           a.radios.filter((x) => x.checked === "true").length === 1 &&
           a.radios[1].checked === "true",
         `danh hiệu: Không đeo + ${a.radios.length - 1} danh hiệu, đúng MỘT cái được chọn (${a.radios.map((x) => x.t + (x.checked === "true" ? "*" : "")).join(" | ")})`,
       );
+      // khoá = mọi danh hiệu trừ "Không đeo" và Tái Sinh (cái duy nhất sổ mẫu đã mở)
+      const lockedN = a.radios.filter((x) => x.dis === "true").length;
       check(
-        a.radios.filter((x) => x.dis === "true").length === 3 &&
+        lockedN === a.radios.length - 2 &&
           a.radios
             .filter((x) => x.dis === "true")
             .every((x) => /^Mở bằng thành tựu: /.test(x.hint)),
-        "3 danh hiệu khoá: aria-disabled + nói cách mở bằng CHỮ",
+        `${lockedN} danh hiệu khoá: aria-disabled + nói cách mở bằng CHỮ`,
       );
       check(
         a.radios.every((x) => x.h >= 44 - 0.5),
