@@ -31,6 +31,7 @@ vi.mock("./skills-hoa", () => ({
   SKILLS_HOA: [fake("gia_hoa", "hoa", { rarity: 3, reqRealm: 4 })],
 }));
 vi.mock("./skills-khac", () => ({ SKILLS_KHAC: [fake("gia_khac", "loi")] }));
+vi.mock("./skills-dang-moi", () => ({ SKILLS_DANG_MOI: [fake("gia_dang_moi", "am")] }));
 
 import {
   LEARNABLE_SKILLS,
@@ -43,11 +44,11 @@ import {
 } from "./index";
 import { SHOP_BOOK_IDS, SKILL_BOOK_ITEMS, SKILL_BOOK_VALUE } from "./books";
 
-const IDS = ["gia_kim_tho", "gia_moc_thuy", "gia_hoa", "gia_khac"];
+const IDS = ["gia_kim_tho", "gia_moc_thuy", "gia_hoa", "gia_khac", "gia_dang_moi"];
 
 describe("LEARNABLE_SKILLS gom các tệp nhóm (dữ liệu giả)", () => {
-  it("18 chiêu gốc đứng đầu, rồi bốn nhóm theo thứ tự Kim-Thổ, Mộc-Thủy, Hỏa, khác", () => {
-    expect(LEARNABLE_SKILLS.length).toBe(SKILLS_M7.length + 4);
+  it("18 chiêu gốc đứng đầu, rồi năm nhóm theo thứ tự Kim-Thổ, Mộc-Thủy, Hỏa, khác, dạng mới", () => {
+    expect(LEARNABLE_SKILLS.length).toBe(SKILLS_M7.length + IDS.length);
     expect(LEARNABLE_SKILLS.slice(0, SKILLS_M7.length)).toEqual(SKILLS_M7);
     expect(LEARNABLE_SKILLS.slice(SKILLS_M7.length).map((s) => s.id)).toEqual(IDS);
   });

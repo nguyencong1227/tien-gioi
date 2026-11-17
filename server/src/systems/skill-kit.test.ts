@@ -15,6 +15,7 @@ import {
 } from "@tien-gioi/shared";
 import type { PlayerCtrl } from "../world";
 import { cast, shapeHits } from "./cast";
+import { tickWorld } from "./tick";
 import { addMonster, addPlayer, makeWorld } from "./test-helpers";
 
 /** Sát thương server ghi cho quái `id` (mảng các lần trúng; dài = số tia / nhịp). */
@@ -56,8 +57,42 @@ function zonePoints(def: SkillDef): { in: [number, number]; out: [number, number
       return { in: [def.range * 0.5, 0], out: [def.range + 200, 0] };
     case "dash":
       return { in: [(def.reach ?? 0) * 0.5, 0], out: [(def.reach ?? 0) * 0.5, 200] }; // trên /_off đường lao
+    // Hình mới (mục 51): đạn bay / sét lan đi theo hướng đánh; vùng / bẫy / tượng đặt ở `reach` rồi tác dụng quanh đó
+    case "chain":
+      return { in: [def.range * 0.5, 0], out: [def.range + 300, 0] }; // trong tầm với của mục tiêu đầu; quá xa
+    case "bolt":
+      return { in: [def.range * 0.4, 0], out: [def.range * 0.4, 400] }; // trên đường bay; lệch hẳn khỏi các viên
+    case "zone":
+    case "trap":
+      return { in: [def.reach ?? 0, 0], out: [(def.reach ?? 0) + def.range + 300, 0] }; // tâm vùng / bẫy; xa hẳn
+    case "totem":
+      return { in: [(def.reach ?? 0) + 30, 0], out: [(def.reach ?? 0) + def.range + 400, 0] }; // trong tầm đánh của tượng; ngoài tầm
     default:
       return { in: [def.range + 100, 0], out: [def.range + 300, 0] }; // self / không vùng
+  }
+}
+
+/** Chiêu tác dụng TRỄ sau lúc `cast` (đạn bay, bẫy chờ kích, vùng / tượng theo nhịp, chiêu vận): phải cho thế giới chạy mới thấy sát thương. */
+const isDelayed = (def: SkillDef): boolean =>
+  def.windupMs !== undefined || ["bolt", "zone", "trap", "aura", "totem"].includes(def.shape);
+
+/**
+ * Dùng chiêu ở ô 2 rồi, nếu chiêu tác dụng trễ, cho thế giới chạy từng tick 50 ms (tối đa 10 giây) tới khi `target` bị đánh ít nhất một lần (hoặc không còn gì để đợi).
+ * Chiêu tức thời thì chỉ `cast`. Đồng hồ thế giới tiến theo (`w.now`), như phòng thật.
+ */
+function castAndSettle(t: ReturnType<typeof setup>, def: SkillDef, target?: string) {
+  cast(t.w, "a", { slot: 2, angle: 0 });
+  if (!isDelayed(def)) return;
+  // Quái đứng yên: nếu để AI chạy, quái đi về phía người đánh và rời khỏi vùng / điểm đã đặt trước khi chiêu trễ kịp tác dụng
+  const pins = [...t.w.state.monsters.values()].map((m) => [m, m.x, m.y] as const);
+  for (let i = 0; i < 200; i++) {
+    if (target !== undefined && dmgOf(t.dmgs, target).length > 0) break;
+    t.w.now += 50;
+    tickWorld(t.w, 50);
+    for (const [m, x, y] of pins) {
+      m.x = x;
+      m.y = y;
+    }
   }
 }
 
@@ -133,6 +168,7 @@ describe.each(LEARNABLE_SKILLS.map((d) => [d.id, d] as const))(
       // Điểm chọn phải thực sự trong / ngoài vùng (với bán kính thật); nếu không thì bỏ qua ca này.
       if (want <= 0 || missHits !== 0) return;
       cast(t.w, "a", { slot: 2, angle: 0 });
+      if (isDelayed(def)) return; // chiêu trễ: số lần trúng theo thời gian, ca riêng bên dưới
       expect(dmgOf(t.dmgs, hit.id).length, def.id).toBe(want);
       expect(want, def.id).toBeGreaterThan(0);
       expect(dmgOf(t.dmgs, miss.id), def.id).toEqual([]);
@@ -154,14 +190,18 @@ describe.each(LEARNABLE_SKILLS.map((d) => [d.id, d] as const))(
             const hit = bigMonster(t, z.in[0], z.in[1]);
             // Điểm trong vùng thật (bán kính quái); nếu không thì bỏ qua ca này (điểm chọn chưa hợp cho chiêu này).
             if (shapeHits(def, t.p.x, t.p.y, 0, hit.m.x, hit.m.y, hit.mc.def.radius) <= 0) return;
-            cast(t.w, "a", { slot: 2, angle: 0 });
+            castAndSettle(t, def, hit.id);
             for (const e of harmful)
               if (e.chance > 0)
                 expect(
                   hit.mc.st!.list.some((s) => s.id === e.status),
                   `${def.id}:${e.status}`,
                 ).toBe(true);
-            expect(t.c.st, def.id).toBeUndefined(); // KHÔNG tự gắn trạng thái có hại lên mình
+            // KHÔNG tự gắn trạng thái có hại lên mình (chiêu vận để lại `st` rỗng sau khi đáp: chỉ cần không còn trạng thái có hại nào)
+            expect(
+              (t.c.st?.list ?? []).filter((x) => statusOf(x.id)?.harmful),
+              def.id,
+            ).toEqual([]);
           }
         }
         if (helpful.length > 0) {
@@ -179,6 +219,22 @@ describe.each(LEARNABLE_SKILLS.map((d) => [d.id, d] as const))(
       }
     });
 
+    it("chiêu tác dụng TRỄ (đạn bay / bẫy / vùng / tượng / chiêu vận): chạy thế giới thì quái trong vùng bị đánh, quái ngoài vùng KHÔNG", () => {
+      if (!isDelayed(def) || def.mult <= 0) return;
+      const z = zonePoints(def);
+      const t = setup();
+      equip(t.c, 2, def.id);
+      vi.spyOn(Math, "random").mockReturnValue(0.5);
+      const hit = bigMonster(t, z.in[0], z.in[1]);
+      const miss = bigMonster(t, z.out[0], z.out[1]);
+      castAndSettle(t, def, hit.id);
+      expect(
+        dmgOf(t.dmgs, hit.id).length,
+        `${def.id}: quái trong vùng phải bị đánh`,
+      ).toBeGreaterThan(0);
+      expect(dmgOf(t.dmgs, miss.id), `${def.id}: quái ngoài vùng không bị đánh`).toEqual([]);
+    });
+
     it("tầng + luyện: tầng 3 sát thương cao hơn, hồi chiêu ngắn hơn tầng 1", () => {
       // Hồi chiêu ngắn hơn ở mọi chiêu (thuần)
       expect(skillCooldownMs(def, 3, 0), def.id).toBeLessThan(skillCooldownMs(def, 1, 0));
@@ -190,7 +246,7 @@ describe.each(LEARNABLE_SKILLS.map((d) => [d.id, d] as const))(
         equip(t.c, 2, def.id, level);
         vi.spyOn(Math, "random").mockReturnValue(0.5);
         const hit = bigMonster(t, zonePoints(def).in[0], zonePoints(def).in[1]);
-        cast(t.w, "a", { slot: 2, angle: 0 });
+        castAndSettle(t, def, hit.id);
         return dmgOf(t.dmgs, hit.id)[0] ?? 0;
       };
       expect(castAt(3), def.id).toBeGreaterThan(castAt(1));
