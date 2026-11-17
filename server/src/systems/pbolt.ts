@@ -268,7 +268,9 @@ export function fireBolts(
     if (!mc || Math.abs(mon.x - x0) > lim || Math.abs(mon.y - y0) > lim) return;
     targets.push({ id, x: mon.x, y: mon.y, r: mc.def.radius });
   });
-  const opp = w.duels.active ? w.duels.opponentOf(sid) : undefined;
+  // đối thủ chỉ là mục tiêu khi trận ĐANG ở pha `fight` (`duelHit` từ chối pha khác: đối thủ đứng trong lúc đếm ngược không được chặn đạn)
+  const opp =
+    w.duels.active && w.duels.of(sid)?.phase === "fight" ? w.duels.opponentOf(sid) : undefined;
   const po = opp === undefined ? undefined : w.state.players.get(opp);
   if (opp !== undefined && po && !po.dead)
     targets.push({ id: PK_PREFIX + opp, x: po.x, y: po.y, r: PLAYER_RADIUS, pk: true });
