@@ -340,3 +340,136 @@ export const BOSS_CARD_BATCH = {
     },
   ],
 };
+
+/** Mệnh đề BẮT BUỘC trong prompt chân dung NPC: mặt khuất bóng (nón / mũ trùm / sương), KHÔNG vẽ nét mặt người (khỏi giống nhân vật game khác). */
+export const NPC_FACE_CLAUSE = "face hidden in shadow";
+
+/** Dựng prompt dương chuẩn cho CHÂN DUNG NPC (một dáng người nửa thân ở giữa khung, nhìn nghiêng / từ sau, mặt khuất bóng). */
+function buildNpcPrompt(subject, mood) {
+  return `${subject}, ${NPC_FACE_CLAUSE}, ${mood}, painterly soft ink wash and gouache half-length figure study, single figure centered, muted colors, misty depth, eastern mountain cultivation fantasy, no text`;
+}
+
+/**
+ * Lô 3: CHÂN DUNG NPC (mười hai NPC có hội thoại, trừ `cao_thi` là bảng cáo thị; vào gói tải theo nhu cầu `art:npc`, `client/public/packs/art-npc/`).
+ * Thô 1024x1024, cuối 256x256 WebP <= 20 KB. Ba hạt giống mỗi NPC; tên tệp thô `<id>_raw_<n>_00001_.png`. NPC là NGƯỜI nên: dáng nhìn nghiêng /
+ * từ sau, mặt khuất bóng nón / mũ trùm (`NPC_FACE_CLAUSE`, test bắt thiếu), không người nổi tiếng, không trang phục đặc trưng của nhân vật game khác;
+ * màu theo bản đồ của NPC (bảng màu mục 2). `npcId` là id trong `NPCS` của `shared/` (test bắt id sai).
+ */
+export const NPC_PORTRAIT_BATCH = {
+  class: "chan-dung-npc",
+  aspect: "1:1",
+  pack: "art:npc",
+  dir: "client/public/packs/art-npc",
+  raw: { w: 1024, h: 1024 },
+  final: { w: 256, h: 256, maxKb: 20 },
+  items: [
+    {
+      id: "npc_truong_tran",
+      npcId: "truong_tran",
+      seeds: [2026111911, 2026111912, 2026111913],
+      prompt: buildNpcPrompt(
+        "middle-aged village headman in a long dark blue robe seen from the side, wide-brimmed straw hat, hands folded, timber houses behind him",
+        "warm peach and amber light, soft rose haze",
+      ),
+    },
+    {
+      id: "npc_duoc_su",
+      npcId: "duoc_su",
+      seeds: [2026111921, 2026111922, 2026111923],
+      prompt: buildNpcPrompt(
+        "stooped old herbalist in a green robe seen from behind, cloth headwrap, carrying a basket of drying herbs",
+        "warm amber and sage light, soft cream haze",
+      ),
+    },
+    {
+      id: "npc_tho_ren",
+      npcId: "tho_ren",
+      seeds: [2026111931, 2026111932, 2026111933],
+      prompt: buildNpcPrompt(
+        "broad-shouldered blacksmith in a leather apron seen in profile, holding a hammer, a glowing forge behind him, hooded",
+        "warm amber with ember glow, soft rose haze",
+      ),
+    },
+    {
+      id: "npc_lai_buon",
+      npcId: "lai_buon",
+      seeds: [2026111941, 2026111942, 2026111943],
+      prompt: buildNpcPrompt(
+        "travelling merchant with a heavy pack and a long windblown coat seen from the side, hat brim pulled low",
+        "slate grey and cold blue shadows, pale grey haze",
+      ),
+    },
+    {
+      id: "npc_tram_truong",
+      npcId: "tram_truong",
+      seeds: [2026111951, 2026111952, 2026111953],
+      prompt: buildNpcPrompt(
+        "station master in a long coat holding a hooded lantern, standing on a stone platform, brimmed hat",
+        "moss green and grey-green mist, faint pale lantern light",
+      ),
+    },
+    {
+      id: "npc_lai_buon_suong",
+      npcId: "lai_buon_suong",
+      seeds: [2026111961, 2026111962, 2026111963],
+      prompt: buildNpcPrompt(
+        "merchant poling a small cargo boat through a foggy swamp, conical hat, sacks piled behind him",
+        "moss green and grey-green mist, dim sickly glow",
+      ),
+    },
+    {
+      id: "npc_tho_ren_suong",
+      npcId: "tho_ren_suong",
+      seeds: [2026111971, 2026111972, 2026111973],
+      prompt: buildNpcPrompt(
+        "swamp blacksmith in a heavy damp apron seen in profile, hooded, a forge glowing red in the fog",
+        "moss green mist with a warm ember glow",
+      ),
+    },
+    {
+      id: "npc_tram_truong_han",
+      npcId: "tram_truong_han",
+      seeds: [2026111981, 2026111982, 2026111983],
+      prompt: buildNpcPrompt(
+        "station master in a thick fur-trimmed coat and deep hood standing in drifting snow, one hand raised against the wind",
+        "pale ice blue and white haze, cold silver light",
+      ),
+    },
+    {
+      id: "npc_lai_buon_han",
+      npcId: "lai_buon_han",
+      seeds: [2026111991, 2026111992, 2026111993],
+      prompt: buildNpcPrompt(
+        "merchant in a fur hood leading a loaded pack animal through deep snow, seen from the side",
+        "pale ice blue and white haze, cold silver light",
+      ),
+    },
+    {
+      id: "npc_tho_ren_han",
+      npcId: "tho_ren_han",
+      seeds: [2026112001, 2026112002, 2026112003],
+      prompt: buildNpcPrompt(
+        "blacksmith at an outdoor forge in falling snow, fur-lined hood, raising a hammer, seen in profile",
+        "pale ice blue haze with a warm ember glow",
+      ),
+    },
+    {
+      id: "npc_thu_mon",
+      npcId: "thu_mon",
+      seeds: [2026112011, 2026112012, 2026112013],
+      prompt: buildNpcPrompt(
+        "gatekeeper in layered robes seen from behind, holding a long staff, standing before a glowing jade cavern gate",
+        "jade teal and cyan glow against deep blue-black shadows",
+      ),
+    },
+    {
+      id: "npc_lao_dan",
+      npcId: "lao_dan",
+      seeds: [2026112021, 2026112022, 2026112023],
+      prompt: buildNpcPrompt(
+        "old alchemist in a long robe bending over a clay furnace, wisps of pale smoke rising, hooded",
+        "warm amber and sage light, soft cream haze",
+      ),
+    },
+  ],
+};
