@@ -570,6 +570,19 @@ describe("bỏ chạy giữa trận (ambushFlee): vận 1 giây rồi thoát (m�
     expect(s.ambushEnds).toHaveLength(0);
   });
 
+  it("không đủ tu vi (thanh trống / thấp hơn giá chốt) mà chọn trả bằng tu vi: từ chối NGAY, báo toast, không vận", async () => {
+    const s = setup();
+    s.p.exp = 0;
+    await onAmbushFlee(s.w, s.sid, { choice: "flee_exp" });
+    expect(s.a.fleeing).toBeUndefined();
+    expect(s.toasts).toHaveLength(1);
+    expect(s.a.phase).toBe("fighting");
+    const t = setup();
+    t.p.exp = Math.max(0, t.a.price.exp - 1);
+    await onAmbushFlee(t.w, t.sid, { choice: "flee_exp" });
+    expect(t.a.fleeing).toBeUndefined();
+  });
+
   it("giá chốt báo đủ nhưng lúc thoát hết tiền: chuyển sang TRẢ BẰNG TU VI (không kẹt)", async () => {
     const s = setup();
     const chot = s.a.price.exp;
