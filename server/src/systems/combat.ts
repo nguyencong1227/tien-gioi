@@ -106,6 +106,7 @@ export function dealMonsterDamage(
   dmg: number,
   crit: boolean,
   aggro = true,
+  combo = false,
 ) {
   const mc = w.mctrl.get(id);
   if (!mc) return;
@@ -118,7 +119,15 @@ export function dealMonsterDamage(
     if (bc) bc.lastDealtAt = w.now; // chặn đường (mục 52): vừa đánh thì chưa bị chặn
   }
   if (aggro && by && !isEvading(w, mc)) mc.target = by; // đang rút về chỗ sinh (mục 48): không bị đòn đánh kéo lại
-  w.events.dmg({ target: id, amount: dmg, x: mon.x, y: mon.y - 18, crit });
+  // `combo` (mục 51): đòn ăn combo (gỡ dấu, nhân sát thương): client vẽ vụ nổ dấu; chỉ thêm trường khi đúng (tin thường không đổi)
+  w.events.dmg({
+    target: id,
+    amount: dmg,
+    x: mon.x,
+    y: mon.y - 18,
+    crit,
+    ...(combo ? { combo: true } : {}),
+  });
   if (mon.hp <= 0) killMonster(w, id, mc);
 }
 

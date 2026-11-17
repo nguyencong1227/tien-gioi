@@ -5,6 +5,7 @@
 import {
   MAX_STATUSES,
   STUN_IMMUNE_MS,
+  markIndexOf,
   statusAmpMult,
   statusCarriesRatio,
   statusCdr,
@@ -282,6 +283,31 @@ export function takeDotDamage(s: StatusInst, now: number): number {
   if (whole < 1) return 0;
   s.last += (whole * 1000) / s.dps;
   return whole;
+}
+
+/** Trạng thái `id` đang còn hiệu lực trên `box` không. */
+export function hasStatus(box: StatusBox | undefined, id: string, now: number): boolean {
+  if (!box) return false;
+  for (const s of box.list) if (s.id === id && s.until > now) return true;
+  return false;
+}
+
+/**
+ * Chỉ số 1..9 (`markIndexOf`) của DẤU hệ MỚI NHẤT còn hiệu lực trên `box` (đặt vào `Monster.mark`); 0 khi không có dấu nào. "Mới nhất" = hết hạn muộn nhất (gắn sau cùng, cùng thời lượng),
+ * hoà thì dấu gắn vào hộp sau.
+ */
+export function newestMarkIndex(box: StatusBox, now: number): number {
+  let best = 0;
+  let until = -Infinity;
+  for (const s of box.list) {
+    if (s.until <= now || statusOf(s.id)?.kind !== "mark") continue;
+    const index = markIndexOf(s.id.slice("mark_".length));
+    if (index > 0 && s.until >= until) {
+      best = index;
+      until = s.until;
+    }
+  }
+  return best;
 }
 
 /** Mặt nạ bit công khai (`Monster.fx`, M7.3) của các trạng thái CÓ HẠI còn hiệu lực. */
