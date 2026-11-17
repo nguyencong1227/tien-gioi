@@ -8395,6 +8395,17 @@ body.ui-hidden
   cursor: not-allowed;
   border-style: dashed;
 }
+/* dòng cố định dưới nút Chiến (mục 53): bị hạ là chết thật; chữ nổi (đậm + đỏ nhạt), không chỉ bằng màu */
+.ambush-death-note {
+  margin: 4px 0 0;
+  font-size: var(--fs-13);
+  font-weight: 700;
+  color: #ff8a7a;
+  text-align: center;
+}
+.ambush-death-note:empty {
+  display: none;
+}
 .ambush-or {
   margin: 6px 0 0;
   font-size: var(--fs-11);

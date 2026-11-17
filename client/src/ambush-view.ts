@@ -56,6 +56,9 @@ export const TIER_LABEL: Readonly<Record<AmbushTier, string>> = {
   leader: "Cầm đầu",
 };
 
+/** Dòng cố định dưới nút Chiến (mục 53; A chốt 18/11): bị hạ trong đấu trường là CHẾT THẬT, nói thẳng ở CẢ BA mức, LUÔN hiện (người chơi phải biết hậu quả trước khi bấm Chiến). */
+export const AMBUSH_DEATH_NOTE = "Bị hạ trong trận là chết thật.";
+
 /** Mức nào phải hiện nhãn NGUY HIỂM (mục 53: tinh anh, cầm đầu; mức thường thì không). */
 export function isDangerousTier(tier: AmbushTier): boolean {
   return tier === "elite" || tier === "leader";
@@ -208,6 +211,8 @@ export interface AmbushDialogView {
   countdown: string;
   /** Hết giờ cục bộ, chưa chọn: máy chủ sắp quyết (Chiến), KHÔNG tự chọn ở client. */
   waitingServer: boolean;
+  /** Dòng cảnh báo cố định dưới nút Chiến (`AMBUSH_DEATH_NOTE`), luôn có. */
+  deathNote: string;
   /** Kẻ chặn đường mức tinh anh / cầm đầu: hiện nhãn NGUY HIỂM (mục 53: bị hạ trong đấu trường là chết thật, nên mức cao phải cảnh báo rõ). */
   danger: boolean;
   /** Còn khoá `AMBUSH_ARM_MS` (nút mờ chưa nhận). */
@@ -276,7 +281,7 @@ export function ambushDialogView(d: AmbushDialog, now: number): AmbushDialogView
       label: "Chiến",
       sub: "Đấu một mình",
       enabled: en("fight"),
-      aria: "Chiến: đấu một mình với kẻ chặn đường. Phím Enter.",
+      aria: `Chiến: đấu một mình với kẻ chặn đường. ${AMBUSH_DEATH_NOTE} Phím Enter.`,
     },
     {
       choice: "flee_coin",
@@ -309,6 +314,7 @@ export function ambushDialogView(d: AmbushDialog, now: number): AmbushDialogView
     foe,
     countdown: waitingServer ? "Đang chờ máy chủ…" : countdownText(remaining),
     waitingServer,
+    deathNote: AMBUSH_DEATH_NOTE,
     danger,
     arming,
     busy,
@@ -316,7 +322,7 @@ export function ambushDialogView(d: AmbushDialog, now: number): AmbushDialogView
     buttons,
     announce:
       `Bị chặn đường. ${offer.scene} Kẻ chặn đường: ${foe}.${danger ? " Nguy hiểm." : ""} ` +
-      `Còn ${secs} giây, hết giờ là Chiến. ${fleeOptions(offer.price, coinTxt, expTxt)}`,
+      `Còn ${secs} giây, hết giờ là Chiến. ${AMBUSH_DEATH_NOTE} ${fleeOptions(offer.price, coinTxt, expTxt)}`,
   };
 }
 
