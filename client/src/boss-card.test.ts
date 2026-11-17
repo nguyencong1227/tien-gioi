@@ -96,6 +96,17 @@ describe("canh nối mã: thanh máu trùm dùng thẻ", () => {
     expect(/\.boss-bar-art\s*\{([^}]*)\}/.exec(css)![1]).toMatch(/pointer-events:\s*none/);
   });
 
+  it("CSS: hàng đầu thanh trùm GIỮ `align-items: baseline` (chữ không đổi gì khi chưa có ảnh); chỉ ảnh tự căn giữa (A, review #1007)", () => {
+    const css = read("client/src/style.css");
+    const head = /\.boss-bar-head\s*\{([^}]*)\}/.exec(css);
+    expect(head).not.toBeNull();
+    expect(head![1]).toMatch(/align-items:\s*baseline/);
+    expect(head![1]).not.toMatch(/align-items:\s*center/);
+    const art = /\.boss-bar-art\s*\{([^}]*)\}/.exec(css);
+    expect(art).not.toBeNull();
+    expect(art![1]).toMatch(/align-self:\s*center/);
+  });
+
   it("`__bossCardOverride` chỉ gắn trong khối DEV / ?debug", () => {
     const main = read("client/src/main.ts");
     const i = main.indexOf("window as any).__bossCardOverride");

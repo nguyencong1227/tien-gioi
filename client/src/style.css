@@ -7399,7 +7399,7 @@ body.ui-hidden
 }
 .boss-bar-head {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 8px;
   flex-wrap: wrap;
   font-size: var(--fs-14);
@@ -7407,9 +7407,11 @@ body.ui-hidden
 .boss-bar-head b {
   color: #ffb0a0;
 }
-/* Ảnh đại diện trùm (thẻ minh hoạ AI, boss-card.ts): chỉ hiện khi ảnh đã tải xong; điện thoại ngang thấp thì nhỏ hơn để thanh không cao thêm nhiều */
+/* Ảnh đại diện trùm (thẻ minh hoạ AI, boss-card.ts): chỉ hiện khi ảnh đã tải xong; điện thoại ngang thấp thì nhỏ hơn để thanh không cao thêm nhiều.
+   Hàng giữ `align-items: baseline` (chữ không đổi gì khi chưa có ảnh); riêng ảnh tự căn giữa theo chiều dọc. */
 .boss-bar-art {
   display: block;
+  align-self: center;
   flex: 0 0 auto;
   width: 40px;
   height: 40px;

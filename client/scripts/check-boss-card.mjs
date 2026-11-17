@@ -244,6 +244,7 @@ async function main() {
           bar: R(bar), art: R(art), name: R(name), nameText: name.textContent,
           artHidden: art.hidden, artSrc: art.getAttribute("src"), nw: art.naturalWidth, nh: art.naturalHeight,
           artAlt: art.getAttribute("alt"), artAria: art.getAttribute("aria-hidden"), artPtr: getComputedStyle(art).pointerEvents,
+          headAlign: getComputedStyle(art.parentElement).alignItems, artSelf: getComputedStyle(art).alignSelf,
           scrollW: document.documentElement.scrollWidth,
         };
       })()`);
@@ -302,9 +303,15 @@ async function main() {
         m.artAlt === "" && m.artAria === "true" && m.artPtr === "none",
         "ảnh chỉ trang trí: alt rỗng, aria-hidden, không bắt chuột",
       );
+      check(
+        m.headAlign === "baseline" && m.artSelf === "center",
+        `hàng đầu giữ căn theo đường chữ (${m.headAlign}), chỉ ảnh tự căn giữa (${m.artSelf})`,
+      );
       check(state.manifestHits === 1, `manifest tải đúng MỘT lần (${state.manifestHits})`);
-      // Tệp gói được lấy qua `fetch` (nạp gói) rồi qua `<img>` (giải mã): tối đa HAI yêu cầu mạng (máy chủ giả của script đặt `no-store` để đếm được; máy chủ thật cho phép
-      // dùng lại bộ nhớ đệm HTTP / Service Worker), MỌI yêu cầu đều bằng URL CÓ BĂM. Số 0 / 1 / 2 phụ thuộc Service Worker đã kích hoạt chưa nên KHÔNG ghim đúng một.
+      // Tệp gói được lấy qua `fetch` (nạp gói, `packs.ts`) rồi qua `<img>` (giải mã): tối đa HAI yêu cầu mạng, MỌI yêu cầu đều bằng URL CÓ BĂM. NGUYÊN NHÂN số yêu cầu không cố định
+      // (A thấy xanh / đỏ / xanh ở khung đầu 1280x720): máy chủ giả đặt `no-store` để đếm được, nhưng Service Worker (`sw.js`, cache-first cho tệp gói có `?v=`) vẫn lưu bản `fetch`.
+      // Khung ĐẦU TIÊN của một hồ sơ Chrome mới: trang chưa được Service Worker kiểm soát tới lúc nó kích hoạt + `clients.claim()` (đua với việc tải) nên `fetch` và `<img>` đều ra
+      // mạng (2) hoặc `<img>` kịp lấy bản đã lưu (1); các khung SAU dùng lại bản đã lưu (0, cùng băm). Vậy 0 / 1 / 2 đều đúng, chỉ 3 trở lên (tải thừa) là lỗi: KHÔNG ghim đúng một.
       check(
         state.fileUrls.length <= 2 && state.fileUrls.every((u) => /\?v=[0-9a-f]{12}$/.test(u)),
         `tệp gói được tải bằng URL có băm, tối đa hai yêu cầu (${state.fileUrls.length})`,
