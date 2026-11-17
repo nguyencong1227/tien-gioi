@@ -123,8 +123,15 @@ describe("boardsGet / boards qua phòng thật", () => {
 
   it("tin rác (bảng lạ, kiểu sai, không tải) bị bỏ, không trả lời, không sập phòng", async () => {
     const a = await spawn();
-    WorldRoomCls.leaderboards = service([a.name]);
-    await WorldRoomCls.leaderboards.refresh();
+    const svc = service([a.name]);
+    await svc.refresh();
+    let looked = 0;
+    const view = svc.view.bind(svc);
+    svc.view = (...args) => {
+      looked++;
+      return view(...args);
+    };
+    WorldRoomCls.leaderboards = svc;
     for (const bad of [
       { board: "constructor" },
       { board: "khong_co" },
@@ -138,6 +145,7 @@ describe("boardsGet / boards qua phòng thật", () => {
       a.room.send(SOCIAL_MSG.boardsGet, bad as never);
     await sleep(900); // đồng thời cho xô giới hạn tần suất (burst 6, 2/giây) hồi lại sau đợt tin rác
     expect(a.boards.length).toBe(0);
+    expect(looked).toBe(0); // tin rác không bao giờ tới dịch vụ
     a.room.send(SOCIAL_MSG.boardsGet, { board: "tuvi" }); // phòng còn sống
     await waitFor(() => a.boards[0], 3000, "phòng còn trả lời");
   });
