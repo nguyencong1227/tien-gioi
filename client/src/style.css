@@ -4074,6 +4074,24 @@ body.reduced-motion .transition-overlay.active {
   color: #ffe08a;
   font-family: "Noto Serif", Georgia, serif;
 }
+/* Thẻ minh hoạ bản đồ đích (ảnh AI 3:2, map-card.ts): chỉ hiện khi ảnh đã tải xong; cao thấp theo cả bề rộng lẫn chiều cao khung
+   để điện thoại ngang (390 px cao) vẫn còn chỗ cho tên + dòng "Đang tiến nhập..." */
+.transition-card {
+  display: block;
+  width: min(420px, 86vw, calc(40vh * 1.5));
+  aspect-ratio: 3 / 2;
+  height: auto;
+  margin: 0 auto 14px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  user-select: none;
+}
+.transition-card[hidden] {
+  display: none;
+}
 .transition-map-name {
   font-size: 32px;
   font-weight: bold;

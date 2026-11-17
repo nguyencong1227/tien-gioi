@@ -44,7 +44,7 @@ Lý do từng nhóm: tên game / truyện / nghệ sĩ khác vi phạm quy tắc
 | lớp | dùng ở | tỉ lệ | thô (SDXL) | cuối (WebP) | trần mỗi ảnh | trạng thái |
 |---|---|---|---|---|---|---|
 | nền đăng nhập | `section#login` | 1:1 | 1024x1024 | 1024x1024 | 150 KB | ĐÃ VÀO (`login_bg.webp`, 72 KB) |
-| **thẻ bản đồ** | đầu bảng Sơn Hà Đồ (`M`) và màn qua cổng (dự kiến, B nối sau khi có ảnh) | 3:2 (thô ≈ 3:2, B cắt nhẹ về đúng 3:2) | 1216x832 | 624x416 | 40 KB | **LÔ 1 (mục 5)** |
+| **thẻ bản đồ** | màn chuyển cảnh qua cổng (ĐÃ nối: `client/src/map-card.ts`, danh sách `MAP_CARDS`; chưa có ảnh thì chỉ hiện tên) và đầu bảng Sơn Hà Đồ (`M`, dự kiến) | 3:2 (thô ≈ 3:2, B cắt nhẹ về đúng 3:2) | 1216x832 | 624x416 | 40 KB | **LÔ 1 (mục 5)** |
 | thẻ trùm | thanh máu trùm / báo trùm (dự kiến) | 1:1 | 1024x1024 | 384x384 | 30 KB | lô 2, SAU khi B xem lô 1 |
 | chân dung NPC | khung hội thoại (dự kiến) | 1:1 | 1024x1024 | 256x256 | 20 KB | lô 3 |
 
@@ -82,4 +82,4 @@ icy highland with drifting snow, frozen lake and sheer ice cliffs under a pale d
 1. C chạy `scripts/art/comfy-up.sh`, sinh 15 ảnh, chạy `scripts/art/comfy-down.sh` (cổng 8188 sạch, đơn vị `tg-comfy` inactive), rồi báo B (thư) kèm danh sách tệp + băm ảnh thô.
 2. B xem từng ảnh (và 4 góc phóng 200 %), chọn MỘT ảnh mỗi bản đồ: ưu tiên ít chi tiết, màu gần bảng màu mục 2, KHÔNG chữ / ký tự giả / người / logo. Ảnh nào có chữ giả thì loại, sinh lại với hạt giống khác (C), không sửa tay.
 3. B chuyển ảnh thô được chọn sang `/mnt/data/comfyui/output/chosen/`, hậu kỳ bằng `client/scripts/art/hau-ky-webp.py` (cắt / đổi cỡ 624x416, WebP sạch, <= 40 KB), ghi `docs/art/nguon/<tên>.json` + mục riêng trong `CREDITS.md`, rồi `npm run check:credits` + `check:perf-budget`.
-4. B nối thẻ vào giao diện (bảng Sơn Hà Đồ trước) trong một PR riêng, có `capture-viewports` năm khung + kiểm không che / lệch nút (QUYET_DINH_M3 mục 15).
+4. B thêm mỗi thẻ đã chọn vào `MAP_CARDS` (`client/src/map-card.ts`, một dòng cho mỗi bản đồ) CÙNG PR với ảnh + tệp nguồn + `CREDITS.md`; màn chuyển cảnh qua cổng đã nối sẵn (`npm run build -w client && node client/scripts/check-map-card.mjs --shots <thư mục>` kiểm năm khung). Chỗ dùng thứ hai (đầu bảng Sơn Hà Đồ) là PR riêng, kèm `capture-viewports` năm khung + kiểm không che / lệch nút (QUYET_DINH_M3 mục 15).
