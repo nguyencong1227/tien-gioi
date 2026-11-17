@@ -11,6 +11,7 @@ import {
   pipsOf,
   targetLabelRise,
 } from "../monster-status";
+import { parseChainPts, planChainFx, planComboBurst } from "../gfx/fx/ct2-fx";
 import { TelegraphLayer } from "../gfx/fx/telegraph-layer";
 import { recipeIds } from "../gfx/fx/recipes";
 import {
@@ -314,6 +315,9 @@ interface Entity {
   /** Huy hiệu trạng thái có hại trên đầu quái (M7.7 bước 3b, #508): Graphics dựng lười, mặt nạ `Monster.fx` đã vẽ và số chấm */
   statusG?: Phaser.GameObjects.Graphics;
   lastFx?: number;
+  /** Dấu hệ (`Monster.mark` 1-9) cuối cùng còn thấy trên quái này và lúc thấy (`time.now`): màu vụ nổ khi `dmg.combo` tới sau khi máy chủ đã gỡ dấu */
+  lastMark?: number;
+  lastMarkAt?: number;
   pipCount?: number;
   /** Mép trên của hàng chấm (px phía trên tâm quái; 0 = không có chấm): nhãn mục tiêu khoá nâng lên trên đó (`targetLabelRise`) */
   pipTop?: number;
@@ -775,6 +779,7 @@ export class WorldScene extends Phaser.Scene {
       // Gặp chặn đường (mục 52): trả `true` chỉ khi tin thật sự đi (đang nối lại thì không gửi, hộp thoại thử lại sau)
       onAmbushSeen: (m) => this.sendAmbush(AMBUSH_MSG.seen, m),
       onAmbushChoose: (m) => this.sendAmbush(AMBUSH_MSG.choose, m),
+      onAmbushFlee: (m) => this.sendAmbush(AMBUSH_MSG.flee, m),
       onAchievementsGet: () =>
         !this.isReconnecting && this.room.send(SOCIAL_MSG.achievementsGet, {}),
       onTitleSet: (id) => !this.isReconnecting && this.room.send(SOCIAL_MSG.titleSet, { id }),
@@ -2421,6 +2426,7 @@ export class WorldScene extends Phaser.Scene {
     // Gặp chặn đường (mục 52, CD7): hộp thoại + kết cục; gửi lại cùng `id` sau nối lại là bản CẬP NHẬT (`ui.onAmbushOffer` tự phân biệt)
     reg(AMBUSH_MSG.offer, (m: unknown) => ui.onAmbushOffer(m));
     reg(AMBUSH_MSG.end, (m: unknown) => ui.onAmbushEnd(m));
+    reg(AMBUSH_MSG.state, (m: unknown) => ui.onAmbushState(m)); // đấu trường: mỗi giây `{ msLeft, giá giữa trận }`
     // Thành tựu + danh hiệu (M9.8): sổ (cũng là câu trả lời của `titleSet`) + thông báo mới đạt; `ui` tự làm sạch + tôn trọng cờ ?social=1
     reg(SOCIAL_MSG.achievements, (m: unknown) => ui.setAchievements(m));
     reg(SOCIAL_MSG.achievementNew, (m: unknown) => ui.onAchievementNew(m));
@@ -3576,7 +3582,7 @@ export class WorldScene extends Phaser.Scene {
         elite || m.hp < m.maxHp,
         elite,
       );
-      this.syncMonsterStatus(e, m.fx, def.radius, !!def.boss || elite);
+      this.syncMonsterStatus(e, m.fx, m.mark, def.radius, !!def.boss || elite);
       if (def.boss) this.syncBossArmor(e, id, def.radius);
     });
     for (const [id, e] of this.monsters) {
@@ -3922,11 +3928,20 @@ export class WorldScene extends Phaser.Scene {
    * Huy hiệu trạng thái có hại trên đầu quái từ `Monster.fx` (mặt nạ bit công khai, #559): chỉ vẽ lại khi mặt nạ ĐỔI (hiếm), Graphics dựng lười ở lần đầu cần.
    * Máy chủ cũ chưa có `fx` (undefined) hoặc giá trị rác thì coi như 0. Trùm có tên ở -radius-22 nên hàng chấm nằm cao hơn một nấc.
    */
-  private syncMonsterStatus(e: Entity, fx: unknown, radius: number, boss: boolean) {
+  private syncMonsterStatus(e: Entity, fx: unknown, mark: unknown, radius: number, boss: boolean) {
     const mask = typeof fx === "number" && Number.isInteger(fx) && fx > 0 ? fx : 0;
-    if (mask === (e.lastFx ?? 0)) return;
-    e.lastFx = mask;
-    const pips = pipsOf(mask);
+    // DẤU hệ (`Monster.mark`, mục 51 CT2): chỉ số 1-9; máy chủ cũ chưa có trường (undefined) hoặc giá trị rác thì coi như 0. Nhớ dấu cuối còn thấy để vụ nổ combo biết màu
+    // (máy chủ gỡ dấu cùng lúc đánh nên lúc `dmg.combo` tới state có thể đã về 0).
+    const mk =
+      typeof mark === "number" && Number.isInteger(mark) && mark >= 1 && mark <= 9 ? mark : 0;
+    if (mk > 0) {
+      e.lastMark = mk;
+      e.lastMarkAt = this.time.now;
+    }
+    const key = mask * 16 + mk;
+    if (key === (e.lastFx ?? 0)) return;
+    e.lastFx = key;
+    const pips = pipsOf(mask, mk);
     e.pipCount = pips.length;
     e.pipText = pipsLabel(pips);
     if (pips.length === 0) {
@@ -4107,6 +4122,20 @@ export class WorldScene extends Phaser.Scene {
     }
     this.onHitFx(m);
     sound.hit(m.crit);
+    if (m.combo === true) {
+      // đòn ĂN COMBO (mục 51, CT11b): vụ nổ dấu ngay chỗ trúng, màu theo hệ của dấu vừa bị gỡ (nhớ từ `syncMonsterStatus`, tối đa 2 giây trước)
+      const e = m.toPlayer ? undefined : this.monsters.get(m.target);
+      const fresh = e?.lastMarkAt !== undefined && this.time.now - e.lastMarkAt < 2000;
+      this.playFxPoints(
+        planComboBurst({
+          x: m.x,
+          y: m.y,
+          markIndex: fresh ? e?.lastMark : 0,
+          mine: !m.toPlayer && this.recentHit.has(m.target),
+          emitterBudget: getQuality().emitterBudget,
+        }),
+      );
+    }
   }
 
   private onFx(m: FxMsg) {
@@ -4157,6 +4186,21 @@ export class WorldScene extends Phaser.Scene {
             angle: m.angle,
             range: m.range,
             mine,
+            emitterBudget: getQuality().emitterBudget,
+          }),
+        );
+      }
+      case "chain": {
+        // Sét lan (mục 51, CT11b): tia nối tiếp từng đoạn giữa các mục tiêu máy chủ đã chọn, màu theo hệ; client chỉ vẽ, sát thương đã có `dmg`. Tin hỏng: bỏ cả tin
+        const def = skillOf(m.skill);
+        const pts = parseChainPts(m.pts);
+        if (!def || !pts) return;
+        if (!this.inView(m.x, m.y, 480)) return;
+        return this.playFxPoints(
+          planChainFx({
+            skill: def,
+            pts,
+            mine: m.by === this.sid,
             emitterBudget: getQuality().emitterBudget,
           }),
         );

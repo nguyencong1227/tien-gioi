@@ -27,7 +27,15 @@
 // ---------------------------------------------------------------------------------------------------------------
 
 import { STAT_CAPS } from "./stat-caps";
-import { TURN_MS, skillEffect, type SkillGrade, type SkillStyle } from "./skill-kit";
+import {
+  MASTERY_NEED,
+  SKILL_TIER_MAX,
+  TURN_MS,
+  skillEffect,
+  skillMaxLevelOf,
+  type SkillGrade,
+  type SkillStyle,
+} from "./skill-kit";
 import { SKILLS_KIM_THO } from "./skills-kim-tho";
 import { SKILLS_MOC_THUY } from "./skills-moc-thuy";
 import { SKILLS_HOA } from "./skills-hoa";
@@ -923,20 +931,26 @@ export function skillCooldownMs(def: Pick<SkillDef, "cooldown">, level: number, 
 // Tầng, ô chiêu, sổ chiêu của nhân vật
 // ---------------------------------------------------------------------------------------------------------------
 
-/** Tầng học tối đa của một chiêu (học thêm kinh quyển trùng thì +1 tầng). */
+/** Tầng học tối đa của chiêu KHÔNG khai phẩm (18 chiêu cũ): 3 (học thêm kinh quyển trùng thì +1 tầng). Chiêu có phẩm: `skillMaxLevelOf` (Hoàng 3 / Huyền 4 / Địa 5 / Thiên 6). */
 export const SKILL_MAX_LEVEL = 3;
-/** Mỗi tầng trên tầng 1: +15% sát thương và -8% hồi chiêu (đề xuất, M7.9 chỉnh). */
+/** Mỗi tầng trên tầng 1 (tầng 1-3): +15% sát thương và -8% hồi chiêu (đề xuất, M7.9 chỉnh). Tầng 4-6 theo bảng dưới (tăng chậm dần). */
 export const SKILL_LEVEL_DAMAGE = 0.15;
 export const SKILL_LEVEL_COOLDOWN = 0.08;
+/** Hệ số sát thương / hồi chiêu theo tầng 1..6 (tầng 1-3 TRÙNG công thức tuyến tính cũ: `1 + 0,15 (l - 1)`, `1 - 0,08 (l - 1)`). */
+export const SKILL_LEVEL_DAMAGE_TABLE: readonly number[] = [1, 1.15, 1.3, 1.4, 1.5, 1.6];
+export const SKILL_LEVEL_COOLDOWN_TABLE: readonly number[] = [1, 0.92, 0.84, 0.8, 0.76, 0.72];
+
+/** Tầng kẹp [1, `SKILL_TIER_MAX`] (số lạ -> 1). */
+function tierClamp(level: number): number {
+  return Math.min(SKILL_TIER_MAX, Math.max(1, Math.floor(Number.isFinite(level) ? level : 1)));
+}
 
 export function skillDamageMult(level: number): number {
-  const l = Math.min(SKILL_MAX_LEVEL, Math.max(1, Math.floor(Number.isFinite(level) ? level : 1)));
-  return 1 + SKILL_LEVEL_DAMAGE * (l - 1);
+  return SKILL_LEVEL_DAMAGE_TABLE[tierClamp(level) - 1]!;
 }
 
 export function skillCooldownMult(level: number): number {
-  const l = Math.min(SKILL_MAX_LEVEL, Math.max(1, Math.floor(Number.isFinite(level) ? level : 1)));
-  return 1 - SKILL_LEVEL_COOLDOWN * (l - 1);
+  return SKILL_LEVEL_COOLDOWN_TABLE[tierClamp(level) - 1]!;
 }
 
 /** Các ô chiêu học được: L U I O = ô 2-5 (ô 1 là Kiếm chém, Kiếm khí đứng riêng). */
@@ -958,16 +972,69 @@ export function slotOpen(slot: unknown, realm: number): boolean {
 export interface SkillBook {
   learned: Record<string, number>;
   slots: [string, string, string, string];
+  /**
+   * ĐIỂM LUYỆN dở dang của từng chiêu (CT5; id chiêu -> điểm, số nguyên >= 0, `< MASTERY_NEED` của tầng hiện tại). TUỲ CHỌN: file lưu cũ không có = chưa luyện gì. Chỉ có mục cho chiêu đã học
+   * còn luyện được (`masteryNeedOf` khác `null`); `sanitizeSkillBook` kẹp. Khắc chân linh KHÔNG mang (luyện lại ở kiếp mới).
+   */
+  mastery?: Record<string, number>;
 }
 
 export function emptySkillBook(): SkillBook {
   return { learned: {}, slots: ["", "", "", ""] };
 }
 
-function levelClamp(v: unknown): number {
+function levelClamp(v: unknown, max: number = SKILL_MAX_LEVEL): number {
   return typeof v === "number" && Number.isFinite(v)
-    ? Math.min(SKILL_MAX_LEVEL, Math.max(1, Math.floor(v)))
+    ? Math.min(max, Math.max(1, Math.floor(v)))
     : 1;
+}
+
+/**
+ * Điểm luyện cần để lên tầng kế của chiêu `def` đang ở tầng `level`; `null` = KHÔNG luyện được nữa (đã tới tầng tối đa - 1: tầng cuối chỉ bằng kinh quyển trùng; hoặc tầng không hợp lệ).
+ * Chiêu cũ (tối đa tầng 3) luyện được từ tầng 1 lên 2; tầng 3 chỉ bằng quyển.
+ */
+export function masteryNeedOf(def: { grade?: unknown }, level: number): number | null {
+  if (typeof level !== "number" || !Number.isInteger(level) || level < 1) return null;
+  return level < skillMaxLevelOf(def) - 1 && level <= MASTERY_NEED.length
+    ? MASTERY_NEED[level - 1]!
+    : null;
+}
+
+/**
+ * Cộng `points` điểm luyện cho chiêu `def` trong `book` (trả sổ MỚI, không sửa sổ cũ). Đủ `masteryNeedOf` thì lên tầng kế và chuyển phần dư sang tầng sau (lên liền nhiều tầng nếu đủ điểm),
+ * dừng ở tầng tối đa - 1. Chiêu chưa học / không luyện được / `points` không dương: trả nguyên sổ. `leveledTo` = tầng mới nếu có lên tầng.
+ */
+export function addMastery(
+  book: SkillBook,
+  def: { id: string; grade?: unknown },
+  points: number,
+): { book: SkillBook; leveledTo?: number } {
+  const has = Object.prototype.hasOwnProperty;
+  if (!has.call(book.learned, def.id) || !(points > 0) || !Number.isFinite(points)) return { book };
+  let level = book.learned[def.id]!;
+  let have =
+    (book.mastery && has.call(book.mastery, def.id) ? book.mastery[def.id]! : 0) +
+    Math.floor(points);
+  const start = level;
+  for (;;) {
+    const need = masteryNeedOf(def, level);
+    if (need === null) {
+      have = 0;
+      break;
+    }
+    if (have < need) break;
+    have -= need;
+    level += 1;
+  }
+  const mastery = { ...(book.mastery ?? {}) };
+  if (have > 0) mastery[def.id] = have;
+  else delete mastery[def.id];
+  const next: SkillBook = {
+    learned: level === start ? book.learned : { ...book.learned, [def.id]: level },
+    slots: book.slots,
+    ...(Object.keys(mastery).length > 0 ? { mastery } : {}), // không còn điểm nào thì không có trường (như `sanitizeSkillBook`)
+  };
+  return level === start ? { book: next } : { book: next, leveledTo: level };
 }
 
 /**
@@ -982,8 +1049,23 @@ export function sanitizeSkillBook(raw: unknown, realm: number): SkillBook {
     const src = r.learned as Record<string, unknown>;
     for (const def of LEARNABLE_SKILLS) {
       if (Object.prototype.hasOwnProperty.call(src, def.id))
-        out.learned[def.id] = levelClamp(src[def.id]);
+        out.learned[def.id] = levelClamp(src[def.id], skillMaxLevelOf(def));
     }
+  }
+  // Điểm luyện dở dang (CT5): chỉ cho chiêu ĐÃ HỌC còn luyện được, số nguyên 0 <= điểm < cần để lên tầng kế; không có / rác thì bỏ
+  if (r.mastery !== null && typeof r.mastery === "object" && !Array.isArray(r.mastery)) {
+    const src = r.mastery as Record<string, unknown>;
+    const mastery: Record<string, number> = {};
+    for (const def of LEARNABLE_SKILLS) {
+      if (!Object.prototype.hasOwnProperty.call(src, def.id)) continue;
+      const level = out.learned[def.id];
+      const need = level === undefined ? null : masteryNeedOf(def, level);
+      const v = src[def.id];
+      if (need === null || typeof v !== "number" || !Number.isFinite(v)) continue;
+      const pts = Math.min(need - 1, Math.max(0, Math.floor(v)));
+      if (pts > 0) mastery[def.id] = pts;
+    }
+    if (Object.keys(mastery).length > 0) out.mastery = mastery;
   }
   if (Array.isArray(r.slots)) {
     const used = new Set<string>();
@@ -997,6 +1079,17 @@ export function sanitizeSkillBook(raw: unknown, realm: number): SkillBook {
     }
   }
   return out;
+}
+
+/** `{ mastery }` của sổ cũ (bản sao) nếu có, để hàm tạo sổ mới không làm rơi điểm luyện. */
+function keepMastery(book: SkillBook): { mastery?: Record<string, number> } {
+  return book.mastery ? { mastery: { ...book.mastery } } : {};
+}
+
+function omitKey(o: Record<string, number>, k: string): Record<string, number> {
+  const { [k]: _drop, ...rest } = o;
+  void _drop;
+  return rest;
 }
 
 export type LearnResult =
@@ -1031,10 +1124,12 @@ export function learnSkill(
   if (!def) return { ok: false, reason: "unknown" };
   if (!skillReqMet(def, realm, tier)) return { ok: false, reason: "realm" };
   const cur = Object.prototype.hasOwnProperty.call(book.learned, def.id) ? book.learned[def.id] : 0;
-  if (cur >= SKILL_MAX_LEVEL) return { ok: false, reason: "maxed" };
+  if (cur >= skillMaxLevelOf(def)) return { ok: false, reason: "maxed" };
   const next: SkillBook = {
     learned: { ...book.learned, [def.id]: cur + 1 },
     slots: [...book.slots] as SkillBook["slots"],
+    // quyển trùng lên tầng thì điểm luyện dở dang của tầng cũ KHÔNG còn nghĩa: bỏ (luyện lại từ 0 ở tầng mới)
+    ...(book.mastery ? { mastery: omitKey(book.mastery, def.id) } : {}),
   };
   return { ok: true, level: cur + 1, book: next };
 }
@@ -1059,7 +1154,7 @@ export function assignSlot(
   const idx = LEARNABLE_SLOTS.indexOf(slot);
   if (skillId === "") {
     slots[idx] = "";
-    return { ok: true, book: { learned: { ...book.learned }, slots } };
+    return { ok: true, book: { learned: { ...book.learned }, slots, ...keepMastery(book) } };
   }
   const def = skillOf(skillId);
   if (!def) return { ok: false, reason: "unknown" };
@@ -1067,7 +1162,7 @@ export function assignSlot(
     return { ok: false, reason: "notLearned" };
   for (let i = 0; i < slots.length; i++) if (slots[i] === def.id) slots[i] = "";
   slots[idx] = def.id;
-  return { ok: true, book: { learned: { ...book.learned }, slots } };
+  return { ok: true, book: { learned: { ...book.learned }, slots, ...keepMastery(book) } };
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -1112,6 +1207,11 @@ export interface SkillsMsg {
    * để vẽ vòng hồi chiêu mà không cần biết `cdr`.
    */
   cdMax: [number, number, number, number];
+  /**
+   * ĐIỂM LUYỆN dở dang của chiêu đã học (TUỲ CHỌN, CT5; id -> điểm, như `SkillBook.mastery`): gửi khi mở sổ chiêu, khi lên tầng, tối đa 1 lần / 30 giây; client tự cộng giữa hai lần gửi CHỈ để
+   * hiện thanh tiến độ (`masteryNeedOf` cho mẫu số). Client cũ bỏ qua trường lạ.
+   */
+  mastery?: Record<string, number>;
 }
 
 /**

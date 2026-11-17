@@ -14,6 +14,7 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
  * `--shots`: lưu ảnh thanh trùm có thẻ mỗi khung.
  */
 import http from "node:http";
+import { BOSS_CARD_BATCH } from "./art/prompt-rules.mjs";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -25,6 +26,9 @@ import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+/** Mỗi trùm của lô 2 và tên tệp thẻ (`prompt-rules.mjs` là nguồn; `boss-card.test.ts` giữ `BOSS_CARDS` khớp). */
+const REAL_CARDS = BOSS_CARD_BATCH.items.map((i) => [i.bossId, `${i.id}.webp`]);
+
 const __filename = fileURLToPath(import.meta.url);
 const REPO = path.resolve(path.dirname(__filename), "../..");
 const DIST = path.join(REPO, "client/dist");
@@ -70,7 +74,11 @@ async function main() {
   const state = { packMode: "ok", manifestHits: 0, fileUrls: [] };
   const server = http.createServer((req, res) => {
     const urlPath = req.url.split("?")[0];
-    if (urlPath === "/packs/manifest.json" && state.packMode !== "none") {
+    if (
+      urlPath === "/packs/manifest.json" &&
+      state.packMode !== "none" &&
+      state.packMode !== "real"
+    ) {
       state.manifestHits++;
       const body = payloadOf(state.packMode);
       res.writeHead(200, { "Content-Type": "application/json" });
@@ -88,7 +96,9 @@ async function main() {
       );
       return;
     }
-    if (urlPath === `/packs/${PACK_FILE}`) {
+    if (state.packMode === "real" && urlPath.startsWith("/packs/art-trum/"))
+      state.fileUrls.push(req.url); // chế độ "real": manifest và thẻ lấy từ `client/dist/packs` THẬT (đi tiếp xuống phần tệp tĩnh)
+    if (urlPath === `/packs/${PACK_FILE}` && state.packMode !== "real") {
       state.fileUrls.push(req.url);
       if (state.packMode === "badfile") {
         res.writeHead(404);
@@ -376,6 +386,66 @@ async function main() {
       check(!m.barHidden && !m.art.shown, "gói chưa về sau 3 giây: ảnh ẩn, thanh vẫn dùng được");
       m = await until((x) => x.art.shown, 6000);
       check(m.art.shown && m.nw > 0, "gói về muộn: ảnh HIỆN (áp dụng khi về)");
+
+      // ---- E. gói THẬT của bản dựng (`client/dist/packs`, KHÔNG ghi đè `BOSS_CARDS`): mỗi trùm trong `BOSS_CARDS` hiện đúng thẻ của mình ----
+      const realManifest = path.join(DIST, "packs/manifest.json");
+      if (!fs.existsSync(realManifest)) {
+        check(
+          false,
+          "bản dựng không có packs/manifest.json (chạy `npm run build -w client` sau `npm run build:packs`)",
+        );
+      } else {
+        const real = JSON.parse(fs.readFileSync(realManifest, "utf8")).packs.find(
+          (p) => p.id === "art:trum",
+        );
+        // sạch Service Worker + bộ nhớ đệm của các ca giả trước đó (manifest giả không được dính sang ca gói thật)
+        await evalJs(
+          `(async () => { for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister(); for (const k of await caches.keys()) await caches.delete(k); return 1; })()`,
+        );
+        if (!(await loadPage(vp, "real"))) {
+          check(false, "cảnh không sẵn sàng ở ca gói thật");
+        }
+        for (const [kind, file] of REAL_CARDS) {
+          const entry = real?.files.find((f) => f.path === `art-trum/${file}`);
+          check(entry !== undefined, `manifest thật có art-trum/${file}`);
+          await clearBosses();
+          await setBoss(`r_${kind}`, kind);
+          m = await until(
+            (x) => !x.barHidden && x.art.shown && (x.artSrc ?? "").includes(`/${file}?v=`),
+            8000,
+          );
+          const want = new RegExp(
+            `^/packs/art-trum/${file.replace(".", "\\.")}\\?v=${entry?.sha256.slice(0, 12)}$`,
+          );
+          check(
+            m.art.shown && m.artSrc !== null && want.test(m.artSrc),
+            `${kind}: ảnh HIỆN, URL có băm ĐÚNG của thẻ thật (${m.artSrc})`,
+          );
+          check(
+            m.nw === 384 && m.nh === 384,
+            `${kind}: thẻ thật giải mã đúng 384x384 (${m.nw}x${m.nh})`,
+          );
+          check(
+            m.art.l >= m.bar.l - 0.5 && m.art.r <= m.bar.r + 0.5 && m.name.l >= m.art.r - 0.5,
+            `${kind}: ảnh nằm trong thanh, tên không bị đè`,
+          );
+          if (shotsDir) {
+            const png = await send("Page.captureScreenshot", {
+              format: "png",
+              clip: { x: m.bar.l, y: m.bar.t, width: m.bar.w, height: m.bar.h, scale: 3 },
+            });
+            fs.mkdirSync(shotsDir, { recursive: true });
+            fs.writeFileSync(
+              path.join(shotsDir, `thanh-trum-that-${kind}.png`),
+              Buffer.from(png.result.data, "base64"),
+            );
+          }
+        }
+        check(
+          state.fileUrls.length >= 1 && state.fileUrls.every((u) => /\?v=[0-9a-f]{12}$/.test(u)),
+          `mọi yêu cầu tệp thẻ thật đều dùng URL có băm (${state.fileUrls.length} yêu cầu tới máy chủ; phần còn lại lấy từ bộ nhớ đệm của trình duyệt)`,
+        );
+      }
     }
   } finally {
     try {
