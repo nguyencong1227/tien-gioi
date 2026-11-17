@@ -194,7 +194,7 @@ describe("nội dung nhiệm vụ (#19)", () => {
         "mang_hoan",
         "giao_hoan",
         "lac_ha_bong_bang",
-        "lac_ha_gai_kiem",
+        "lac_ha_nanh_kiem",
         "lac_ha_tru_ho",
         "lap_uy_bang_nguyen",
         "ren_trao_bach_kim",
@@ -239,7 +239,7 @@ describe("nội dung nhiệm vụ (#19)", () => {
     expect(side.map((q) => q.id).sort()).toEqual([
       "giao_hoan",
       "lac_ha_bong_bang",
-      "lac_ha_gai_kiem",
+      "lac_ha_nanh_kiem",
       "lac_ha_tru_ho",
       "lap_uy_bang_nguyen",
       "luet_gio_han_van",

@@ -809,7 +809,7 @@ export const QUESTS: QuestDef[] = [
     },
   },
   {
-    id: "lac_ha_gai_kiem",
+    id: "lac_ha_nanh_kiem",
     title: "Nanh kiếm cho lò rèn",
     giver: "tho_ren",
     desc: "Việc phụ (không bắt buộc): Thiết Ngưu cần nanh sói làm chuôi kiếm. Hạ 6 Hôi Lang, mang về 4 nanh.",
@@ -822,7 +822,7 @@ export const QUESTS: QuestDef[] = [
     talk: {
       offer: [
         "Hỡi tu sĩ, lò ta đang thiếu chuôi kiếm. Nanh sói mài nhẵn là tốt nhất.",
-        "Hôi Lang đi bầy ở vùng cỏ cao. Hạ sáu con, mang bốn nanh về. Làm tốt ta rèn cho ngươi món ra hồn.",
+        "Hôi Lang đi bầy ở vùng cỏ cao. Hạ sáu con, mang bốn nanh về. Làm tốt ta thưởng ngươi viên đan đả tọa.",
       ],
       progress: ["Nanh sói để mài chuôi, càng tươi càng chắc. Chém trúng rồi nhặt, đừng làm vỡ."],
       complete: [
