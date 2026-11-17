@@ -272,6 +272,7 @@ export function shortName(name: string, max = 10): string {
  */
 export type AimMode = "move" | "facing" | "target";
 export function aimMode(shape: SkillShape): AimMode {
+  // Hình mới (mục 51): ném / đặt / lan theo hướng nhắm như `ground` / `line`; hào quang quanh thân như `nova`. B tinh chỉnh ở CT11b.
   switch (shape) {
     case "dash":
       return "move";
@@ -282,7 +283,14 @@ export function aimMode(shape: SkillShape): AimMode {
     case "line":
     case "fan":
     case "ground":
+    case "chain":
+    case "bolt":
+    case "zone":
+    case "trap":
+    case "totem":
       return "target";
+    case "aura":
+      return "facing";
   }
 }
 

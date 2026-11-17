@@ -141,6 +141,10 @@ describe("đưa phù qua các hàm dùng chung", () => {
     const ids = STATUSES.map((s) => s.id);
     const at = ids.indexOf("dao_ho");
     expect(at).toBe(9);
-    expect(ids.slice(at + 1)).toEqual([...AMP_ELEMENTS.map((e) => `amp_${e}`), "cdr_phu"]);
+    // phù (lát 2) liền sau dao_ho; đợt thêm chiêu (mục 51, CT1b) nối tiếp SAU cdr_phu: thứ tự cũ không đổi
+    expect(ids.slice(at + 1, at + 1 + AMP_ELEMENTS.length + 1)).toEqual([
+      ...AMP_ELEMENTS.map((e) => `amp_${e}`),
+      "cdr_phu",
+    ]);
   });
 });
