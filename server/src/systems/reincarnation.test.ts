@@ -249,6 +249,8 @@ describe("applyRebirth: đầu thai", () => {
     expect(t.c.coin).toBe(0);
     expect(t.reborns).toEqual([{ sid: "a", msg: { kiep: 2 } }]);
     expect(t.sys.some((x) => /luân hồi/.test(x) && /thứ 2/.test(x))).toBe(true);
+    // sổ chiêu kiếp mới: ÉP kèm `mastery` rỗng để client bỏ thanh luyện của kiếp cũ (B, #1112): `{}`, không phải vắng trường
+    expect(t.skillMsgs.at(-1)!.msg.mastery).toEqual({});
   });
 
   it("Lễ Mạnh Bà, Ký vật, Kim nang, xuất thân: túi có quà + đồ giữ lại, Linh thạch tối đa theo trần, hệ số xuất thân", () => {

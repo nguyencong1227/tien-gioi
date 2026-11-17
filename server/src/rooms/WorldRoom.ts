@@ -784,7 +784,7 @@ export class WorldRoom extends Room<WorldState> {
     this.state.online = this.state.players.size;
     sendInv(this.world, client.sessionId);
     sendQuests(this.world, client.sessionId);
-    sendSkills(this.world, client.sessionId);
+    sendSkills(this.world, client.sessionId, true); // ÉP kèm `mastery` (`{}` nếu chưa có): client hiện thanh luyện 0 / N ngay, không đợi điểm đầu tiên (B, #1112)
     sendWallet(this.world, client.sessionId);
     this.world.events.soul(client.sessionId, soulView(soul)); // HUD ghi "Kiếp N" ngay từ lúc vào (không chỉ sau khi mua)
     // Thành tựu (M9.5): ghi nhận MỘT lần cho cả nhóm (bản đồ đã tới, kiếp, cảnh giới cao nhất); chân linh cũ được cấp thành tựu đến hạn ngay lần vào đầu tiên
@@ -852,7 +852,7 @@ export class WorldRoom extends Room<WorldState> {
         reconnected(this.world, sid, c, Math.max(0, Date.now() - droppedAt)); // hết hồn lìa xác, hộ thể 3 giây + quái mất mục tiêu (mục 33)
         sendInv(this.world, sid);
         sendQuests(this.world, sid);
-        sendSkills(this.world, sid);
+        sendSkills(this.world, sid, true); // nối lại: phòng mới, client mới nhận lại cả điểm luyện
         sendStatus(this.world, sid); // client mất hệ số tốc độ sau rớt mạng sẽ bị kéo giật nếu không gửi lại
         sendWallet(this.world, sid);
         ambushResend(this.world, sid); // đang giữa hộp thoại chặn đường: gửi LẠI (cùng id, thời gian còn thật) cho Room mới

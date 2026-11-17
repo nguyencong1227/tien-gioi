@@ -61,8 +61,8 @@ describe("giả định và phạm vi của mô hình Nguyên Anh", () => {
 describe("nhịp cả cảnh giới Nguyên Anh", () => {
   const pace = withNguyenAnh(() => nguyenAnhPacing());
 
-  it("6-9 giờ solo (mục tiêu PHAN_CONG_M7 mục 10)", () => {
-    expect(pace.hours).toBeGreaterThanOrEqual(6);
+  it("~4-9 giờ solo (mục tiêu PHAN_CONG_M7 mục 10 là 6-9 giờ; mục 30: tu vi x2 + máu x1,5 rút còn ~4,2 giờ, người dùng chủ ý thưởng nhiều tu vi hơn)", () => {
+    expect(pace.hours).toBeGreaterThanOrEqual(4);
     expect(pace.hours).toBeLessThanOrEqual(9);
   });
 
@@ -81,14 +81,16 @@ describe("nhịp cả cảnh giới Nguyên Anh", () => {
 describe("săn solo Nguyên Anh", () => {
   const solo = withNguyenAnh(() => nguyenAnhSolo());
 
-  it("mỗi bậc có ít nhất ba loài an toàn; Độc Tước (đòn nặng nhất) là loài DUY NHẤT chưa an toàn ở Sơ kỳ", () => {
+  it("mỗi bậc có ít nhất HAI loài an toàn (Sơ kỳ) / ba loài (Trung kỳ trở đi); mục 30: Độc Tước (đòn nặng nhất) không an toàn solo ở bậc nào, Phong Nha chỉ hụt ở Sơ kỳ", () => {
     for (let t = 0; t < 3; t++) {
       const safe = NGUYEN_ANH_MONSTER_IDS.filter((id) => solo[id][t]);
-      expect(safe.length, `bậc ${t}`).toBeGreaterThanOrEqual(3);
+      expect(safe.length, `bậc ${t}`).toBeGreaterThanOrEqual(t === 0 ? 2 : 3);
     }
-    expect(solo.doc_tuoc[0]).toBeNull();
-    for (const id of ["han_lang", "phong_nha", "cot_tuong"]) expect(solo[id][0], id).not.toBeNull();
-    expect(solo.doc_tuoc[1]).not.toBeNull();
+    // Trước mục 30: Độc Tước chỉ hụt ở Sơ kỳ, Phong Nha an toàn mọi bậc. Nay máu x1,5: khí huyết mất / trận của Độc Tước 0,97 / 0,75 / 0,58 và của Phong Nha Sơ kỳ 0,52 (> 0,5).
+    for (let t = 0; t < 3; t++) expect(solo.doc_tuoc[t], `Độc Tước bậc ${t}`).toBeNull();
+    expect(solo.phong_nha[0]).toBeNull();
+    for (const id of ["han_lang", "cot_tuong"]) expect(solo[id][0], id).not.toBeNull();
+    for (const id of ["han_lang", "phong_nha", "cot_tuong"]) expect(solo[id][1], id).not.toBeNull();
   });
 
   it("bãi không lệch quá ~2x về Linh thạch / giờ giữa các loài cùng bậc, và tu vi / giờ không quá ~1,5x loài chậm nhất an toàn", () => {
@@ -113,14 +115,14 @@ describe("săn solo Nguyên Anh", () => {
 describe("trùm Thiên Hàn Vương theo đội", () => {
   const boss = MONSTER_BY_ID[NGUYEN_ANH_BOSS_ID];
 
-  it("đội 4 an toàn ở cả ba bậc, đội 3 an toàn từ Trung kỳ, một người và đội 2 thì không", () => {
+  it("đội 4 an toàn ở cả ba bậc, đội 3 chỉ an toàn ở Hậu kỳ (mục 30: máu x1,5, trước đó từ Trung kỳ), một người và đội 2 thì không", () => {
     for (let t = 0; t < 3; t++) {
       expect(huntRate(boss, NA, t, BOSS_PARTY), `đội 4 bậc ${t}`).not.toBeNull();
       expect(huntRate(boss, NA, t, 1), `một người bậc ${t}`).toBeNull();
       expect(huntRate(boss, NA, t, 2), `đội 2 bậc ${t}`).toBeNull();
     }
     expect(huntRate(boss, NA, 0, 3)).toBeNull();
-    expect(huntRate(boss, NA, 1, 3)).not.toBeNull();
+    expect(huntRate(boss, NA, 1, 3)).toBeNull();
     expect(huntRate(boss, NA, 2, 3)).not.toBeNull();
   });
 
@@ -155,9 +157,9 @@ describe("kinh tế bộ IV", () => {
     expect(sellPrice("han_lang_mao")).toBeGreaterThan(0);
   });
 
-  it("nguyên liệu không phải nút cổ chai: cày đủ mất dưới một nửa thời gian bậc đầu", () => {
+  it("nguyên liệu không chiếm gần hết thời gian bậc đầu: cày đủ mất dưới ~80% (mục 30: 78%, nguyên liệu rơi theo con mà con chết chậm 1,5 lần; trước đó < 50%)", () => {
     expect(materialShare(eco, 0)).toBeGreaterThan(0);
-    expect(materialShare(eco, 0)).toBeLessThan(0.5);
+    expect(materialShare(eco, 0)).toBeLessThan(0.8);
   });
 
   it("phí rèn luôn cao hơn giá bán thành phẩm và trả đủ trước hết Trung kỳ (không chặn người chơi quá một bậc)", () => {
@@ -172,10 +174,10 @@ describe("kinh tế bộ IV", () => {
     expect(t.earned).toBeLessThan((t.minutes / 60) * t.coinPerHour);
   });
 
-  it("thu nhập cộng dồn tăng đều theo bậc và Linh thạch / giờ khả dụng tăng theo nguồn tốt hơn", () => {
+  it("thu nhập cộng dồn tăng đều theo bậc; Linh thạch / giờ khả dụng không tụt quá 5% giữa hai bậc (mục 30: Trung kỳ nhích xuống 3% vì Độc Tước không an toàn solo, trước đó tăng)", () => {
     for (let i = 1; i < eco.tiers.length; i++) {
       expect(eco.tiers[i].cumulative).toBeGreaterThan(eco.tiers[i - 1].cumulative);
-      expect(eco.tiers[i].coinPerHour).toBeGreaterThanOrEqual(eco.tiers[i - 1].coinPerHour);
+      expect(eco.tiers[i].coinPerHour).toBeGreaterThanOrEqual(eco.tiers[i - 1].coinPerHour * 0.95);
     }
     expect(eco.carry).toBeGreaterThanOrEqual(0);
   });

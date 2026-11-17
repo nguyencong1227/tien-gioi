@@ -19,7 +19,8 @@ describe("docs/CAN_BANG.md khớp bản sinh", () => {
       execFileSync(process.execPath, ["--import", "tsx", "src/balance/can-bang.ts", "--out", out], {
         cwd: serverDir,
         stdio: "pipe",
-        timeout: 120_000,
+        // `can-bang.ts` chạy ~45-70 giây trên máy dev, CI chậm 2-3 lần: trần 120 s từng đỏ ở #1124 (ETIMEDOUT, không do nội dung tài liệu lệch)
+        timeout: 300_000,
       });
       const generated = readFileSync(out, "utf8");
       const committed = readFileSync(doc, "utf8");
@@ -36,5 +37,5 @@ describe("docs/CAN_BANG.md khớp bản sinh", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
-  }, 150_000);
+  }, 330_000);
 });
