@@ -173,9 +173,7 @@ describe("thách đấu qua phòng thật", () => {
     expect(sb.dead).toBe(true);
     // M9.2: thống kê PK ghi vào CHÂN LINH (ngoài tick, `WorldRoom.socialUpdate`): A +1 thắng, B +1 thua, cả bộ đếm `pk_won` / `pk_lost`
     const souls = (serverRoom(a.room) as any).souls as {
-      get(
-        id: string,
-      ): Promise<{
+      get(id: string): Promise<{
         social?: { pk: { won: number; lost: number }; counters: Record<string, number> };
       } | null>;
     };
