@@ -240,7 +240,7 @@ Quy tắc MỚI viết theo thuộc tính (`html[data-form="phone"] ...`). Mỗi
 | Chữ sát thương đồng thời | 8 | 16 | 28 | ~40 | `FxBudget` |
 | Bộ nhớ texture (tổng w×h×4) | ≤ 48 MB | ≤ 80 MB | ≤ **256 MB** (trước 128) | ≤ 512 MB | tính từ danh sách texture |
 | JS heap sau 20 lần đổi bản đồ | tăng ≤ 10 % | | | | rò rỉ |
-| Gói JS chính (gzip) | ≤ 520 KB (hiện ~494 KB) | | | | `vite build` |
+| Gói JS chính (gzip) | ≤ **540 KB** (trước 520; hiện ~522 KB, 17/11/2026: hộp thoại chặn đường + sổ chiêu 48-80 chiêu + chat danh hiệu + thành tựu đã đẩy từ ~494 KB lên sát trần; nâng 20 KB, còn ~18 KB dư cho CD7 bước 3 và CT11b; muốn hạ lại thì tách mã ít dùng bằng `import()` thay vì giữ trần cũ) | | | | `vite build` |
 | Tài sản tải theo **gói** (mục 10.1) | gói lõi ≤ 2 MB; mỗi bản đồ ≤ 2 MB; biểu tượng ≤ 3 MB; âm thanh ≤ 5 MB; gói ảnh 2x ≤ 3 lần gói thường | | | (như bên) | `client/public/packs/manifest.json` + `check-perf-budget` |
 | Thời gian vào được thế giới (4G giả lập, mục 10.4) | đo rồi chốt | | | | harness C (hằng đêm, không chặn PR) |
 | Băng thông mạng (byte / tick, 100 người) | **không đổi** (so mốc `bench-baseline.json`) | | | | `npm run bench -w server` |

@@ -2328,6 +2328,45 @@
         </div>
       </div>
 
+      <!-- Gặp chặn đường (mục 52, CD7): hộp thoại Chiến / Bỏ chạy. KHÔNG đóng bằng Esc hay bấm nền; chỉ ba nút (hoặc hết giờ = Chiến do máy chủ quyết) -->
+      <section
+        id="ambush-modal"
+        class="ambush-modal"
+        hidden
+        role="alertdialog"
+        aria-modal="true"
+        aria-label="Chặn đường"
+        tabindex="-1"
+      >
+        <div class="ambush-box">
+          <h2 id="ambush-title" class="ambush-title">Chặn đường!</h2>
+          <p id="ambush-foe" class="ambush-foe"></p>
+          <p id="ambush-scene" class="ambush-scene"></p>
+          <div class="ambush-timer" aria-hidden="true">
+            <span id="ambush-countdown" class="ambush-countdown"></span>
+            <span class="ambush-bar"><i id="ambush-bar-fill"></i></span>
+          </div>
+          <button
+            id="ambush-fight"
+            type="button"
+            class="ambush-btn ambush-fight"
+            data-choice="fight"
+          >
+            <b class="ab-label"></b><span class="ab-sub"></span>
+          </button>
+          <p class="ambush-or" aria-hidden="true">hoặc bỏ chạy, mất:</p>
+          <div class="ambush-flee">
+            <button id="ambush-flee-coin" type="button" class="ambush-btn" data-choice="flee_coin">
+              <b class="ab-label"></b><span class="ab-sub"></span>
+            </button>
+            <button id="ambush-flee-exp" type="button" class="ambush-btn" data-choice="flee_exp">
+              <b class="ab-label"></b><span class="ab-sub"></span>
+            </button>
+          </div>
+          <p id="ambush-note" class="ambush-note" role="status" aria-live="polite"></p>
+        </div>
+      </section>
+
       <!-- Màn hình Hoàng Tuyền · Bến Vong Xuyên (Luân hồi M3.2) -->
       <section
         id="limbo-overlay"
