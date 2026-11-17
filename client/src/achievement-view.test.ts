@@ -253,7 +253,11 @@ describe("achievementsView (dữ liệu mẫu của shared)", () => {
 
   it("nhóm: đếm đạt / tổng đúng từng nhóm", () => {
     const g = v.groups.find((g) => g.id === "luan_hoi")!;
-    expect(g).toMatchObject({ done: 1, total: 1, label: "Luân hồi" });
+    expect(g).toMatchObject({
+      done: 1,
+      total: ACHIEVEMENTS.filter((x) => x.group === "luan_hoi").length,
+      label: "Luân hồi",
+    });
   });
 });
 
