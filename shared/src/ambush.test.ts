@@ -6,6 +6,10 @@ import {
   AMBUSH_FLEE_MIN_COIN,
   AMBUSH_MIN_PROTOCOL,
   AMBUSH_MSG,
+  AMBUSH_SEEN_MS,
+  AMBUSH_ARM_MS,
+  AMBUSH_IDLE_MS,
+  parseAmbushSeen,
   AMBUSH_OFFER_MS,
   AMBUSH_RESULTS,
   AMBUSH_ROLL_P_MAX,
@@ -38,6 +42,7 @@ import {
 } from "./ambush";
 import { ITEM_BY_ID } from "./items";
 import { PROTOCOL_VERSION } from "./protocol";
+import { NET_RECONNECT_GRACE_S } from "./net-guard";
 
 const CJK = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
 
@@ -51,8 +56,16 @@ describe("hằng số chặn đường", () => {
     expect(AMBUSH_OFFER_MS).toBe(10_000);
     expect(AMBUSH_TIME_MS).toBeGreaterThanOrEqual(60_000);
     expect(AMBUSH_EXIT_MS).toBeLessThan(AMBUSH_TIME_MS);
-    expect(AMBUSH_DROP_GRACE_S).toBeGreaterThan(0);
-    expect(AMBUSH_DROP_GRACE_S).toBeLessThanOrEqual(30);
+    // rớt mạng: ĐÚNG bảo vệ mất kết nối chung (mục 33), không ngắn hơn (yêu cầu gốc của người dùng "tôn trọng bảo vệ mất kết nối")
+    expect(AMBUSH_DROP_GRACE_S).toBe(NET_RECONNECT_GRACE_S);
+    expect(AMBUSH_DROP_GRACE_S).toBeGreaterThanOrEqual(60);
+    // xác nhận đã thấy: đủ ngắn để không kéo người vắng mặt vào trận, dài hơn độ trễ mạng; chống bấm sớm ngắn hơn thời gian ra hộp thoại
+    expect(AMBUSH_SEEN_MS).toBeGreaterThanOrEqual(2_000);
+    expect(AMBUSH_SEEN_MS).toBeLessThan(AMBUSH_OFFER_MS);
+    expect(AMBUSH_ARM_MS).toBeGreaterThanOrEqual(300);
+    expect(AMBUSH_ARM_MS).toBeLessThan(AMBUSH_SEEN_MS);
+    expect(AMBUSH_IDLE_MS).toBeGreaterThanOrEqual(10_000);
+    expect(AMBUSH_IDLE_MS).toBeLessThan(AMBUSH_TIME_MS);
     expect(AMBUSH_STRIDE_PX).toBeGreaterThanOrEqual(600);
     // hồi tối thiểu 5-10 phút chơi (mục 52); vừa vào game chưa bị chặn nhưng ngắn hơn hồi thường
     expect(AMBUSH_COOLDOWN_MS).toBeGreaterThanOrEqual(5 * 60_000);
@@ -90,10 +103,11 @@ describe("hằng số chặn đường", () => {
       offer: "ambushOffer",
       choose: "ambushChoose",
       state: "ambushState",
+      seen: "ambushSeen",
       flee: "ambushFlee",
       end: "ambushEnd",
     });
-    expect(new Set(Object.values(AMBUSH_MSG)).size).toBe(5);
+    expect(new Set(Object.values(AMBUSH_MSG)).size).toBe(6);
   });
 });
 
@@ -162,14 +176,24 @@ describe("giá bỏ chạy", () => {
   it("ambushPrice: ví đủ -> có giá Linh thạch; ví thiếu 1 -> coin null (chỉ còn tu vi); giá tu vi độc lập với ví", () => {
     const need = ambushCoinPrice(3, "offer");
     const base = { barSize: 20_000, expInBar: 5000, step: 3 };
-    expect(ambushPrice({ ...base, wallet: need }, "offer")).toEqual({ exp: 1000, coin: need });
-    expect(ambushPrice({ ...base, wallet: need - 1 }, "offer")).toEqual({ exp: 1000, coin: null });
-    expect(ambushPrice({ ...base, wallet: 0 }, "mid").coin).toBeNull();
-    expect(ambushPrice({ ...base, wallet: Number.NaN }, "mid").coin).toBeNull();
+    expect(ambushPrice({ ...base, wallet: need }, "offer")).toEqual({
+      exp: 1000,
+      coin: { price: need, enough: true },
+    });
+    // ví thiếu 1: vẫn HIỆN giá (nút mờ cho biết cần bao nhiêu), chỉ cờ `enough` tắt
+    expect(ambushPrice({ ...base, wallet: need - 1 }, "offer")).toEqual({
+      exp: 1000,
+      coin: { price: need, enough: false },
+    });
+    expect(ambushPrice({ ...base, wallet: 0 }, "mid").coin).toEqual({
+      price: ambushCoinPrice(3, "mid"),
+      enough: false,
+    });
+    expect(ambushPrice({ ...base, wallet: Number.NaN }, "mid").coin.enough).toBe(false);
     // tu vi sát đáy: giá tu vi 0 NHƯNG giá Linh thạch vẫn có sàn (không bỏ chạy miễn phí mãi)
     const floor = ambushPrice({ barSize: 20_000, expInBar: 0, step: 3, wallet: 1e9 }, "offer");
     expect(floor.exp).toBe(0);
-    expect(floor.coin).toBeGreaterThanOrEqual(AMBUSH_FLEE_MIN_COIN);
+    expect(floor.coin.price).toBeGreaterThanOrEqual(AMBUSH_FLEE_MIN_COIN);
   });
 });
 
@@ -206,6 +230,11 @@ describe("đọc tin từ mạng", () => {
     for (const b of bad) expect(parseAmbushChoose(b), JSON.stringify(b)).toBeNull();
     expect(AMBUSH_OFFER_ID_RE.test(id)).toBe(true);
   });
+  it("ambushSeen: chỉ `id` đúng dạng; rác -> null", () => {
+    expect(parseAmbushSeen({ id, x: 1 })).toEqual({ id });
+    for (const b of [null, [], {}, "id", { id: 1 }, { id: id.toUpperCase() }, { id: id + "0" }])
+      expect(parseAmbushSeen(b), JSON.stringify(b)).toBeNull();
+  });
   it("ambushFlee: chỉ flee_coin / flee_exp (KHÔNG nhận fight); rác -> null", () => {
     expect(parseAmbushFlee({ choice: "flee_coin" })).toEqual({ choice: "flee_coin" });
     expect(parseAmbushFlee({ choice: "flee_exp", x: 1 })).toEqual({ choice: "flee_exp" });
@@ -233,21 +262,24 @@ describe("dữ liệu mẫu cho giao diện", () => {
       expect(`${m.scene}${m.foe.name}`).not.toMatch(CJK);
       expect(m.scene).not.toMatch(/[{}]/);
       expect(m.ms).toBe(AMBUSH_OFFER_MS);
-      expect(m.price.coin).not.toBeNull();
+      expect(m.price.coin.enough).toBe(true);
+      expect(m.price.coin.price).toBeGreaterThan(0);
     }
-    expect(sampleAmbushOffer("normal", false).price.coin).toBeNull();
+    const poor = sampleAmbushOffer("normal", false).price.coin;
+    expect(poor.enough).toBe(false);
+    expect(poor.price).toBeGreaterThan(0); // vẫn hiện giá
     expect(sampleAmbushOffer("elite")).toEqual(sampleAmbushOffer("elite")); // tất định
   });
   it("trạng thái và kết cục mẫu: đủ mọi kết cục, thưởng chỉ khi thắng, vật phẩm có thật", () => {
     const s = sampleAmbushState();
-    expect(s.foeHpPct).toBeGreaterThan(0);
-    expect(s.foeHpPct).toBeLessThanOrEqual(100);
+    expect(Object.keys(s).sort()).toEqual(["msLeft", "price"]); // máu kẻ địch KHÔNG nằm ở đây (đã có trong state.monsters)
     expect(s.msLeft).toBeGreaterThan(0);
     for (const r of AMBUSH_RESULTS) {
       const e = sampleAmbushEnd(r);
       expect(e.result).toBe(r);
       expect(e.rewards !== undefined).toBe(r === "won");
-      if (r !== "won") expect(e.paid).toBeDefined();
+      // huỷ lặng lẽ không mất gì; mọi kết cục khác ngoài thắng đều có cái giá đã trừ
+      expect(e.paid !== undefined).toBe(r !== "won" && r !== "canceled");
       for (const it of e.rewards?.items ?? [])
         expect(ITEM_BY_ID[it.itemId], it.itemId).toBeDefined();
     }

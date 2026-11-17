@@ -11,6 +11,8 @@
 //  4. Kết thúc: `ambushEnd { result, paid?, rewards? }`; rồi server đưa về ĐÚNG chỗ cũ trên bản đồ gốc.
 // Giá hiện trên nút LÀ SỐ DO SERVER GỬI; server TÍNH LẠI khi nhận lựa chọn (không bao giờ tin số client).
 
+import { NET_RECONNECT_GRACE_S } from "./net-guard";
+
 // ---------- Hằng số (thời gian ms, khoảng cách px) ----------
 
 /** Phiên bản giao thức tối thiểu của client để được kích hoạt chặn đường (client cũ không có hộp thoại: đứng chờ rồi vào trận không nút bỏ chạy). */
@@ -25,8 +27,17 @@ export const AMBUSH_EXIT_MS = 4_000;
 export const AMBUSH_FALL_MS = 3_000;
 /** Bảo hộ sau khi về chỗ cũ (quái quanh đó không nhắm, không đánh được). */
 export const AMBUSH_RETURN_GRACE_MS = 5_000;
-/** Rớt mạng trong đấu trường: đóng băng chừng này chờ nối lại (giây), quá hạn thì trả giá giữa trận và rời. */
-export const AMBUSH_DROP_GRACE_S = 10;
+/**
+ * Rớt mạng (lúc hộp thoại hoặc trong đấu trường): giữ nguyên trạng chờ nối lại CHỪNG NÀY (giây) = đúng bảo vệ mất kết nối chung (mục 33, `NET_RECONNECT_GRACE_S`; yêu cầu gốc
+ * của người dùng "tôn trọng bảo vệ mất kết nối"). Trong lúc chờ: đồng hồ hộp thoại / trận ĐÓNG BĂNG, kẻ địch bỏ mục tiêu, người chơi bất khả xâm phạm. Quá hạn mới trả giá.
+ */
+export const AMBUSH_DROP_GRACE_S = NET_RECONNECT_GRACE_S;
+/** Hộp thoại phải được client XÁC NHẬN ĐÃ THẤY (`ambushSeen`) trong chừng này, không thì HUỶ lặng lẽ (không phạt, vẫn vào hồi): người đang vắng mặt không bị kéo vào trận. */
+export const AMBUSH_SEEN_MS = 4_000;
+/** Lựa chọn đến sớm hơn chừng này sau lúc dựng hộp thoại bị BỎ QUA (ngón tay đang bấm / giữ cần điều khiển đúng chỗ nút: không phạt, không đổi trạng thái). */
+export const AMBUSH_ARM_MS = 700;
+/** Trong đấu trường: không có đầu vào nào (di chuyển / chiêu / đánh) trong chừng này từ đầu trận mà bị hạ / hết giờ -> tính như ĐẦU HÀNG: giá hộp thoại, không phải giá giữa trận. */
+export const AMBUSH_IDLE_MS = 15_000;
 /** Cứ đi được chừng này (px, quãng THẬT ở vùng hoang) thì tung xúc xắc MỘT lần. */
 export const AMBUSH_STRIDE_PX = 1200;
 /** Xác suất mỗi lần tung: rìa trấn (`danger` 0) tới sâu trong hoang (`danger` 1). TẠM: CD6 (D) chốt bằng đo tốc độ thật (mục tiêu ~10 phút đi bộ / lần). */
@@ -118,10 +129,19 @@ export function ambushCoinPrice(step: unknown, stage: AmbushPriceStage): number 
   return Math.max(AMBUSH_FLEE_MIN_COIN, raw);
 }
 
-/** Giá hai cách trả. `coin: null` = KHÔNG đủ Linh thạch (nút Linh thạch mờ, chỉ còn tu vi). */
+/** Giá Linh thạch kèm cờ đủ hay không: nút Linh thạch vẫn HIỆN giá khi không đủ (mờ, để người chơi biết cần bao nhiêu). */
+export interface AmbushCoinPrice {
+  price: number;
+  enough: boolean;
+}
+
+/**
+ * Giá hai cách trả. Giá trong `ambushOffer` / `ambushState` là giá máy chủ CHỐT lúc gửi (gắn với `id` đề nghị): `ambushChoose` / `ambushFlee` trừ ĐÚNG số này, không
+ * tính lại theo trạng thái lúc nhận (giá hiện trên nút = giá bị trừ). Chỉ cần kiểm lại ví còn đủ.
+ */
 export interface AmbushPrice {
   exp: number;
-  coin: number | null;
+  coin: AmbushCoinPrice;
 }
 
 /** Đầu vào để tính giá (server đọc từ nhân vật thật; không bao giờ lấy từ client). */
@@ -136,22 +156,23 @@ export interface AmbushPriceInput {
   wallet: number;
 }
 
-/** Cả hai giá ở thời điểm `stage`; `coin` là `null` khi ví không đủ. Thuần. */
+/** Cả hai giá ở thời điểm `stage`; `coin.enough` là `false` khi ví không đủ. Thuần. */
 export function ambushPrice(input: AmbushPriceInput, stage: AmbushPriceStage): AmbushPrice {
-  const coin = ambushCoinPrice(input.step, stage);
+  const price = ambushCoinPrice(input.step, stage);
   return {
     exp: ambushExpPrice(input.barSize, input.expInBar, stage),
-    coin: wholeNonNeg(input.wallet) >= coin ? coin : null,
+    coin: { price, enough: wholeNonNeg(input.wallet) >= price },
   };
 }
 
 // ---------- Tin nhắn ----------
 
-/** Tên tin nhắn Colyseus của chặn đường. `offer` / `state` / `end` là server -> client (CHỈ người liên quan); `choose` / `flee` là client -> server. */
+/** Tên tin nhắn Colyseus của chặn đường. `offer` / `state` / `end` là server -> client (CHỈ người liên quan); `choose` / `seen` / `flee` là client -> server. */
 export const AMBUSH_MSG = {
   offer: "ambushOffer",
   choose: "ambushChoose",
   state: "ambushState",
+  seen: "ambushSeen",
   flee: "ambushFlee",
   end: "ambushEnd",
 } as const;
@@ -192,22 +213,32 @@ export interface AmbushFleeMsg {
   choice: AmbushFleeChoice;
 }
 
-/** Server -> client (trong đấu trường, mỗi giây và khi đổi): máu kẻ địch còn lại (%, cả bầy), thời gian còn, giá bỏ chạy giữa trận. */
+/**
+ * Server -> client (trong đấu trường, mỗi giây và khi đổi): thời gian còn (TƯƠNG ĐỐI) và giá bỏ chạy giữa trận (đã chốt). Máu kẻ địch KHÔNG nằm ở đây: đấu trường là một phòng thường,
+ * `state.monsters` đã đồng bộ máu từng con (thanh máu dùng cái sẵn có).
+ */
 export interface AmbushStateMsg {
-  foeHpPct: number;
   msLeft: number;
   price: AmbushPrice;
 }
 
-/** Kết cục: `won` (hạ hết), `fled` (bỏ chạy, ở hộp thoại hoặc giữa trận), `lost` (bị hạ), `timeout` (hết giờ), `dropped` (rớt mạng quá hạn / thoát). */
-export const AMBUSH_RESULTS = ["won", "fled", "lost", "timeout", "dropped"] as const;
+/** Client -> server: "hộp thoại `id` đã THẤY" (gửi khi hộp thoại thật sự hiện và trang đang hiển thị). Không nhận trong `AMBUSH_SEEN_MS` thì huỷ (kết cục `canceled`). */
+export interface AmbushSeenMsg {
+  id: string;
+}
+
+/**
+ * Kết cục: `won` (hạ hết), `fled` (bỏ chạy, ở hộp thoại hoặc giữa trận), `lost` (bị hạ), `timeout` (hết giờ), `dropped` (rớt mạng quá hạn chờ / thoát),
+ * `canceled` (huỷ lặng lẽ vì không xác nhận đã thấy: KHÔNG mất gì).
+ */
+export const AMBUSH_RESULTS = ["won", "fled", "lost", "timeout", "dropped", "canceled"] as const;
 export type AmbushResult = (typeof AMBUSH_RESULTS)[number];
 
 /** Server -> client: kết thúc. `paid` = cái giá ĐÃ trừ (có khi bỏ chạy / thua / hết giờ); `rewards` = thưởng (chỉ khi `won`). */
 export interface AmbushEndMsg {
   result: AmbushResult;
   paid?: { exp?: number; coin?: number };
-  rewards?: { exp: number; coin: number; items?: { itemId: string; count: number }[] };
+  rewards?: { exp: number; coin: number; items: { itemId: string; count: number }[] };
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> =>
@@ -223,6 +254,12 @@ export function parseAmbushChoose(raw: unknown): AmbushChooseMsg | null {
   if (typeof raw.id !== "string" || !AMBUSH_OFFER_ID_RE.test(raw.id)) return null;
   if (!isChoice(raw.choice)) return null;
   return { id: raw.id, choice: raw.choice };
+}
+
+/** Đọc `ambushSeen` từ mạng: `id` đúng dạng; sai thì `null`. Chỉ lấy `id`. */
+export function parseAmbushSeen(raw: unknown): AmbushSeenMsg | null {
+  if (!isObj(raw) || typeof raw.id !== "string" || !AMBUSH_OFFER_ID_RE.test(raw.id)) return null;
+  return { id: raw.id };
 }
 
 /** Đọc `ambushFlee` từ mạng: `choice` phải là `flee_coin` / `flee_exp` (KHÔNG nhận `fight`); sai thì `null`. */
@@ -242,14 +279,17 @@ export function sampleAmbushOffer(tier: AmbushTier = "normal", affordable = true
     scene:
       "Đường đi bỗng vắng hẳn. Từ bụi cỏ ven lối, một bóng đen lao ra chắn trước mặt, mắt đỏ ngầu.",
     foe: { name, tier, count: tier === "normal" ? 2 : 1 },
-    price: { exp: 420, coin: affordable ? ambushCoinPrice(3, "offer") : null },
+    price: { exp: 420, coin: { price: ambushCoinPrice(3, "offer"), enough: affordable } },
     ms: AMBUSH_OFFER_MS,
   };
 }
 
 /** Trạng thái đấu trường MẪU (tất định). */
 export function sampleAmbushState(): AmbushStateMsg {
-  return { foeHpPct: 64, msLeft: 83_000, price: { exp: 840, coin: ambushCoinPrice(3, "mid") } };
+  return {
+    msLeft: 83_000,
+    price: { exp: 840, coin: { price: ambushCoinPrice(3, "mid"), enough: true } },
+  };
 }
 
 /** Kết cục MẪU theo `result` (tất định). */
@@ -262,6 +302,8 @@ export function sampleAmbushEnd(result: AmbushResult = "won"): AmbushEndMsg {
       };
     case "fled":
       return { result, paid: { coin: ambushCoinPrice(3, "offer") } };
+    case "canceled":
+      return { result }; // huỷ lặng lẽ: không mất gì
     default:
       return { result, paid: { exp: 840 } };
   }
