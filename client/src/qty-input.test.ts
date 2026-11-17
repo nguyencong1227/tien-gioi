@@ -43,7 +43,7 @@ describe("parseQty (đọc chữ người chơi gõ)", () => {
   });
 
   it("chữ, dấu âm, số lẻ, ký hiệu khoa học: hỏng, KHÔNG đoán ý", () => {
-    for (const bad of ["abc", "-5", "1e3", "12abc", "3,5a", "+7", "١٢", "５"]) {
+    for (const bad of ["abc", "-5", "1e3", "12abc", "3,5a", "+7", "١٢", "\uFF15"]) {
       const r = parseQty(bad, 50);
       expect(r.qty, bad).toBeNull();
       expect(r.invalid, bad).toBe(true);
