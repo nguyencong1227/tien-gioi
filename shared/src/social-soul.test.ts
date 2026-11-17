@@ -48,6 +48,8 @@ describe("socialCounterMode: văn phạm khoá", () => {
       [],
     ])
       expect(socialCounterMode(bad), String(bad)).toBeNull();
+    expect(socialCounterMode("boss:_x")).toBeNull(); // đuôi cũng phải bắt đầu bằng chữ / số
+    expect(socialCounterMode("boss:__proto__")).toBeNull();
     // `boss:constructor` là khoá hợp lệ về văn phạm (đuôi là id) và là THUỘC TÍNH RIÊNG khi lưu, không đụng prototype
     expect(socialCounterMode("boss:constructor")).toBe("add");
   });
