@@ -491,6 +491,23 @@ describe("Đấu trường chặn đường qua mạng (máy chủ Colyseus th�
     expect(w2.ctrl.get(sid2).save.ambushReturnAt).toBeUndefined();
   }, 30_000);
 
+  it("rời đấu trường lúc ĐANG đánh bằng đường khác (chuyển phòng: nhận lời mời bí cảnh...) = bỏ trận: trả giá giữa trận bằng tu vi, không né được", async () => {
+    const { h } = await enterArena("Chuyen Phong");
+    const w = worldOf(h.room);
+    const sid = h.room.sessionId;
+    const p = serverState(h.room).players.get(sid)!;
+    await waitFor(() => h.states[0], 3000, "nhận ambushState");
+    p.x += 100;
+    await sleep(1200);
+    const chot = w.arena.price.exp;
+    expect(chot).toBeGreaterThan(0);
+    const room = serverRoom(h.room) as any;
+    expect(await room.handOff(sid, { mapId: DEFAULT_MAP_ID, x: 2000, y: 1536 })).toBe(true);
+    const saved = await loadPlayer(h.name);
+    expect(saved?.exp).toBe(400 - chot);
+    expect(w.arena.result).toBe("dropped");
+  }, 20_000);
+
   it("đầy MAX_AMBUSH_ROOMS: lựa chọn Chiến bị huỷ lặng lẽ (ambushEnd canceled), không phạt, không sang phòng nào", async () => {
     const h = await spawn("Dau Day");
     const env = prime(h);

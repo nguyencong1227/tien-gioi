@@ -919,6 +919,9 @@ export class WorldRoom extends Room<WorldState> {
     const p = this.state.players.get(sid);
     const c = this.world.ctrl.get(sid);
     if (!p || !c) return false;
+    // Rời đấu trường lúc ĐANG đánh bằng đường nào khác ngoài về chỗ cũ sau kết cục (nhận lời mời bí cảnh, đầu thai...) = bỏ trận: trả giá giữa trận bằng tu vi TRƯỚC khi lưu, không né
+    // được giá bằng cách chuyển phòng (review B ở #1091)
+    if (this.world.arena?.phase === "fighting") arenaDrop(this.world, sid);
     c.travelling = true;
     c.inputs.length = 0;
     try {
