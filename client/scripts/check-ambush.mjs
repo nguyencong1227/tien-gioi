@@ -353,6 +353,44 @@ try {
   const toast2 = await evalJs("document.querySelectorAll('#toast p').length");
   check(toast2 === 1, `huỷ lặng lẽ KHÔNG thêm toast nào (còn ${toast2}: chỉ toast bỏ chạy cũ)`);
 
+  console.log("--- giữ phím Enter (lặp) và tin chưa gửi được ---");
+  await offer();
+  await sleep(ARM_WAIT);
+  await clearSent();
+  // phím LẶP (giữ Enter từ trước, autoRepeat) KHÔNG được chọn; nhấn thật mới chọn
+  await send("Input.dispatchKeyEvent", {
+    type: "keyDown",
+    text: "\r",
+    autoRepeat: true,
+    ...base(KEY.Enter),
+  });
+  await send("Input.dispatchKeyEvent", { type: "keyUp", ...base(KEY.Enter) });
+  await sleep(150);
+  m = await sent();
+  check(
+    m.filter((x) => x.t === "ambushChoose").length === 0,
+    "Enter LẶP (đang giữ phím) không chọn gì",
+  );
+  await evalJs(`window.__ui.onAmbushEnd(${JSON.stringify({ result: "canceled" })}); 1`);
+  // máy khách đang nối lại (scene.isReconnecting) mà tin chưa đi được: chưa coi là ĐÃ GỬI `ambushSeen`, gửi bù khi gửi được
+  await evalJs("window.__scene.isReconnecting = true; 1");
+  await clearSent();
+  await offer({ id: "00112233445566aa" });
+  await sleep(600);
+  m = await sent();
+  check(
+    m.filter((x) => x.t === "ambushSeen").length === 0,
+    "scene đang nối lại: chưa gửi được ambushSeen (không giả vờ đã gửi)",
+  );
+  await evalJs("window.__scene.isReconnecting = false; 1");
+  await sleep(600);
+  m = await sent();
+  check(
+    m.filter((x) => x.t === "ambushSeen").length === 1,
+    `gửi được thì gửi bù ambushSeen đúng một lần (${m.filter((x) => x.t === "ambushSeen").length})`,
+  );
+  await evalJs(`window.__ui.onAmbushEnd(${JSON.stringify({ result: "canceled" })}); 1`);
+
   console.log("--- cập nhật cùng id (như sau khi nối lại mạng) ---");
   await offer();
   await sleep(ARM_WAIT + 100);
@@ -481,6 +519,54 @@ try {
     );
     await shot(`chan-duong-${f.name}`);
   }
+
+  console.log("--- cảm ứng: cần điều khiển đang giữ lúc hộp thoại hiện, kiểu dính đáy ---");
+  await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
+  await open(390, 844, true);
+  const coarse = await evalJs("matchMedia('(pointer: coarse)').matches");
+  const touches = new Map();
+  const dispatchTouch = (type) =>
+    send("Input.dispatchTouchEvent", {
+      type,
+      touchPoints: [...touches].map(([id, p]) => ({ id, x: p.x, y: p.y })),
+    });
+  // ngón 1 bắt đầu joystick nổi ở nửa trái, kéo sang phải; nửa phút sau mới có hộp thoại
+  touches.set(1, { x: 90, y: 640 });
+  await dispatchTouch("touchStart");
+  touches.set(1, { x: 150, y: 640 });
+  await dispatchTouch("touchMove");
+  await sleep(350);
+  const before = await J("window.__scene.moveDir()");
+  check(
+    before.dx > 0.2,
+    `(mồi) cần điều khiển đang kéo thì nhân vật muốn đi (dx=${before.dx.toFixed(2)})`,
+  );
+  await clearSent();
+  await offer();
+  await sleep(500);
+  const after = await J("window.__scene.moveDir()");
+  check(
+    after.dx === 0 && after.dy === 0,
+    `hộp thoại mở: cần điều khiển đang giữ KHÔNG còn đẩy nhân vật (dx=${after.dx}, dy=${after.dy})`,
+  );
+  m = await sent();
+  const joyMoves = m.filter((x) => x.t === "input" && (x.d.dx !== 0 || x.d.dy !== 0)).length;
+  check(joyMoves === 0, `500 ms sau khi hộp thoại mở: không gửi input di chuyển (${joyMoves})`);
+  await dispatchTouch("touchEnd");
+  touches.clear();
+  if (coarse) {
+    const Lc = await layout();
+    check(
+      Lc.vh - Lc.box.b <= 24 && Lc.box.b <= Lc.vh + 0.5,
+      `điện thoại dọc: hộp thoại dính đáy, dưới ngón cái (cách đáy ${Math.round(Lc.vh - Lc.box.b)} px)`,
+    );
+    const smallC = [Lc.fight, Lc.coin, Lc.exp].filter((b) => b.h < 44 || b.w < 44);
+    check(smallC.length === 0, `điện thoại dọc (cảm ứng): ba nút >= 44 px (${smallC.length} nhỏ)`);
+    await shot("chan-duong-cam-ung-dinh-day");
+  } else {
+    console.log("  (Chrome không báo pointer: coarse ở khung này: bỏ qua kiểm kiểu dính đáy)");
+  }
+  await send("Emulation.setTouchEmulationEnabled", { enabled: false });
 
   check(pageErrors === 0, `không có lỗi JS trên trang (${pageErrors})`);
 } finally {
