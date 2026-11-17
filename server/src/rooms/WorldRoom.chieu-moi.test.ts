@@ -24,6 +24,7 @@ import type { WorldRoom } from "./WorldRoom";
 import type { WorldState } from "../schema";
 import { listenWithRetry } from "../test-port";
 import { addMonster } from "../systems/test-helpers";
+import { MASTERY_SEND_MS } from "../systems/skills";
 
 const dataDir = mkdtempSync(path.join(tmpdir(), "tien-gioi-chieu-moi-"));
 let PORT = 0;
@@ -311,6 +312,11 @@ describe("chiêu thức đợt mới qua máy chủ thật (CT2-CT5)", () => {
     });
     equip(a, def);
     monsterHere(w, p, 100);
+    // Lúc VÀO phòng máy chủ đã ép gửi `mastery` (#1130) và ghi `masterySentAt`: điểm luyện kế tiếp chỉ kèm vào `skills` khi đã qua `MASTERY_SEND_MS` (client không tự cộng,
+    // thanh có thể trễ tới một nhịp; hợp đồng `SkillsMsg.mastery`). Giả như đã chơi đủ nhịp đó để thấy điểm đầu tiên đi ngay (không `sleep` 30 giây).
+    const c = w.ctrl.get(a.room.sessionId);
+    expect(c.masterySentAt).toBeDefined();
+    c.masterySentAt -= MASTERY_SEND_MS;
     a.room.send("cast", { slot: 2, angle: 0 });
     const withMastery = await waitFor(
       () => a.skills.find((s) => s.mastery?.["luyen_thu"] === 1),
