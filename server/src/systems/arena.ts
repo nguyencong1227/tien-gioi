@@ -7,8 +7,8 @@
 //
 // Luật:
 //  - `openTicket` (phòng thường, lúc người chơi chọn Chiến): chặn nếu đã có vé của người này hoặc đủ `MAX_AMBUSH_ROOMS`; đội nhận dòng thông báo "X bị chặn đường".
-//  - Trong phòng đấu trường (`World.arena`): trận bắt đầu lúc người chơi VÀO (`arenaJoined`), kéo dài tối đa `AMBUSH_TIME_MS`. Thắng = hạ hết bầy; thua = bị hạ (`arenaFall`, KHÔNG
-//    `beginLimbo`, không mất kiếp / đồ); hết giờ = thua; `ambushFlee` = bỏ chạy giữa trận; thoát / rớt mạng = giá giữa trận bằng tu vi (`arenaDrop`).
+//  - Trong phòng đấu trường (`World.arena`): trận bắt đầu lúc người chơi VÀO (`arenaJoined`), kéo dài tối đa `AMBUSH_TIME_MS`. Thắng = hạ hết bầy; thua = bị hạ (`arenaFall`: từ mục 53 = CHẾT THẬT
+//    qua `beginLimbo` khi luân hồi bật, không trừ giá; luân hồi tắt thì nằm rồi đứng dậy như cũ); hết giờ = thua (trả giá); `ambushFlee` = bỏ chạy giữa trận; thoát / rớt mạng = giá giữa trận bằng tu vi (`arenaDrop`).
 //  - Giá giữa trận CHỐT và làm mới mỗi `ambushState` (mỗi giây); thua / hết giờ / thoát trừ bằng TU VI (luôn trả được, không rớt cảnh giới). Chưa có đầu vào nào suốt trận mà
 //    thua / hết giờ thì tính ĐẦU HÀNG: giá HỘP THOẠI (người vắng mặt thật không bị phạt nặng gấp đôi).
 //  - Kết thúc: `ambushEnd`, `AMBUSH_EXIT_MS` xem kết quả (kẻ địch bỏ mục tiêu, bất khả xâm phạm), rồi `World.onArenaExit` đưa về chỗ cũ (thử lại mỗi 2 giây nếu lỗi).
@@ -17,6 +17,7 @@ import { randomBytes } from "node:crypto";
 import {
   AMBUSH_EXIT_MS,
   AMBUSH_FALL_MS,
+  AMBUSH_FLEE_CHANNEL_MS,
   AMBUSH_TIME_MS,
   MAX_AMBUSH_ROOMS,
   TICK_MS,
@@ -46,6 +47,8 @@ const FOE_RING_PX = 80;
 const EXIT_RETRY_MS = 2000;
 /** Đi xa chỗ vào hơn thế (px) thì tính là ĐÃ có đầu vào (không phải người vắng mặt). */
 const ACTED_MOVE_PX = 16;
+/** Chết thật trong đấu trường: chờ tối đa chừng này (ms) cho Duyên cộng xong rồi mới đưa về phòng gốc (quá thì phòng gốc tự cộng khi nạp hồ sơ Hoàng Tuyền). */
+const DIED_EXIT_PATIENCE_MS = 15_000;
 
 /**
  * Hệ số thưởng so với số liệu của chính kẻ địch (tu vi và Linh thạch rơi thường của từng con). TẠM: CD6 (Dev D) chốt bằng mô phỏng (mục 9 thiết kế: mục tiêu tu vi / phút hơn đánh quái
@@ -149,6 +152,11 @@ export interface ArenaCtrl {
   end?: AmbushEndMsg;
   /** Đang bỏ chạy: đã trừ `paid` (một lần), chờ LƯU xong rồi mới kết thúc. */
   settling?: { choice: "flee_coin" | "flee_exp"; paid: { exp?: number; coin?: number } };
+  /**
+   * Đang VẬN bỏ chạy (mục 53): `at` = lúc thoát (`World.now`). Bấm được cả khi bị khống chế; trong lúc vận KHÔNG bất khả xâm phạm (bị hạ = chết thật, huỷ vận, không trừ giá); hạ hết bầy
+   * trong lúc vận thì THẮNG (huỷ vận). Rớt mạng (hồn lìa xác) thì `at` dời theo (đóng băng).
+   */
+  fleeing?: { choice: "flee_coin" | "flee_exp"; at: number };
 }
 
 // ---------- Phòng thường: lập vé ----------
@@ -367,12 +375,30 @@ export function finishArena(w: World, sid: string, result: "won" | "lost" | "tim
 }
 
 /**
- * Hết khí huyết TRONG ĐẤU TRƯỜNG: KHÔNG chết thật (không `beginLimbo`, không mất cảnh giới / đồ / Linh thạch, không Duyên): nằm `AMBUSH_FALL_MS` rồi đứng dậy đầy khí huyết, trận kết
- * thúc `lost`. Gọi từ `hurtPlayer`; `false` ở phòng thường.
+ * Hết khí huyết TRONG ĐẤU TRƯỜNG (gọi từ `hurtPlayer`, TRƯỚC `beginLimbo`; "tha chết do mạng" `spareFromNetDeath` chạy trước nên rớt mạng không chết thật). `false` ở phòng thường.
+ *  - QUYET_DINH_M3 mục 53: khi luân hồi BẬT (`World.reincarnate`) và trận đang đánh, bị hạ = CHẾT THẬT: kết cục `lost` + `died` (KHÔNG trừ giá: cái chết thay giá), huỷ vận bỏ chạy đang
+ *    dở (không trừ giá), đặt đưa về phòng của CHỖ CŨ NGAY (hồ sơ lưu kèm bản ghi Hoàng Tuyền ở chỗ cũ; màn hình Hoàng Tuyền hiện ở đó), rồi trả `false` để `hurtPlayer` chạy `beginLimbo`.
+ *  - Luân hồi TẮT (bản thử / bench) hoặc trận không còn đang đánh: giữ cách cũ (nằm `AMBUSH_FALL_MS` rồi đứng dậy; đang đánh thì trận `lost` trừ giá giữa trận bằng tu vi).
  */
 export function arenaFall(w: World, sid: string, p: Player, c: PlayerCtrl): boolean {
   const a = w.arena;
   if (!a) return false;
+  if (a.phase === "fighting" && w.reincarnate) {
+    a.fleeing = undefined; // bị hạ giữa lúc vận bỏ chạy: chết thật, KHÔNG trừ giá
+    closeMatch(w, sid, a, "lost");
+    a.endAt = w.now; // đưa về chỗ cũ ngay (không đợi AMBUSH_EXIT_MS): màn hình Hoàng Tuyền hiện ở phòng gốc
+    a.exitTryAt = w.now;
+    a.end = { result: "lost", died: true };
+    w.audit?.("ambush.end", {
+      name: p.name,
+      result: "lost",
+      died: true,
+      map: a.ticket.origin.mapId,
+      tier: a.ticket.tier,
+    });
+    w.events.ambushEnd(sid, a.end);
+    return false; // `hurtPlayer` chạy `beginLimbo` ngay sau đây
+  }
   p.dead = true;
   p.meditating = false;
   c.deadAt = w.now;
@@ -381,15 +407,17 @@ export function arenaFall(w: World, sid: string, p: Player, c: PlayerCtrl): bool
   c.reviveHpPct = 1;
   forgetTarget(w, sid);
   if (a.phase === "fighting") {
-    w.events.toast(sid, { text: "Ngươi đã gục! Không mất kiếp.", tone: "bad" });
+    a.fleeing = undefined;
+    w.events.toast(sid, { text: "Ngươi đã gục!", tone: "bad" });
     finishArena(w, sid, "lost");
   }
   return true;
 }
 
 /**
- * `ambushFlee { choice }` giữa trận: trừ ĐÚNG giá đã chốt (`a.price`) -> LƯU -> mới kết thúc (`fled`). Lưu hỏng thì giữ trận + `settling`, lần bấm lại chỉ lưu (không trừ hai lần).
- * Không đủ để trả thì không trừ gì, báo toast.
+ * `ambushFlee { choice }` giữa trận (mục 53): BẤM ĐƯỢC LUÔN (kể cả khi đang bị khống chế: tin này không đi qua `cast` / di chuyển) nhưng cần VẬN `AMBUSH_FLEE_CHANNEL_MS` rồi mới thoát, để không
+ * lách được đòn đang ra bằng cách bấm đúng lúc. Bấm: kiểm cách trả hợp lệ (Linh thạch đủ giá, hoặc tu vi), đặt `a.fleeing`, gửi `ambushState` có `fleeMs`; bấm lần hai khi đang vận bị bỏ qua;
+ * đã trừ giá mà lần LƯU trước hỏng (`a.settling`) thì bấm lại là thử lưu tiếp (không trừ hai lần). Tới giờ thoát `tickArena` gọi `completeFlee`.
  */
 export async function onAmbushFlee(w: World, sid: string, raw: unknown): Promise<void> {
   const m = parseAmbushFlee(raw);
@@ -398,15 +426,52 @@ export async function onAmbushFlee(w: World, sid: string, raw: unknown): Promise
   const c = w.ctrl.get(sid);
   if (m === null || !a || !p || !c || p.dead || a.phase !== "fighting" || a.startedAt === null)
     return;
+  if (a.fleeing !== undefined) return; // đang vận: bấm thêm bị bỏ qua
+  if (a.settling !== undefined) {
+    if (a.settling.choice !== m.choice) return; // đang chờ lưu một cách trả khác: không đổi giữa chừng
+    return completeFlee(w, sid, a); // đã vận + đã trừ: thử lưu lại
+  }
+  // cách trả phải hợp lệ NGAY LÚC BẤM (Linh thạch đủ giá chốt / có tu vi để trả); lúc thoát vẫn kiểm lại và có đường lui (xem `completeFlee`)
+  if (m.choice === "flee_coin" && !a.price.coin.enough) {
+    w.events.toast(sid, { text: "Không đủ Linh thạch để bỏ chạy", tone: "bad" });
+    return;
+  }
+  if (m.choice === "flee_exp" && (a.price.exp <= 0 || p.exp < a.price.exp)) {
+    w.events.toast(sid, { text: "Không đủ tu vi để bỏ chạy", tone: "bad" });
+    return;
+  }
+  a.fleeing = { choice: m.choice, at: w.now + AMBUSH_FLEE_CHANNEL_MS };
+  w.events.ambushState(sid, {
+    msLeft: Math.max(0, a.deadline - w.now),
+    price: a.price,
+    fleeMs: AMBUSH_FLEE_CHANNEL_MS,
+  });
+}
+
+/**
+ * Hết thời gian vận: trừ ĐÚNG giá đã chốt (`a.price`) -> LƯU -> mới kết thúc (`fled`). Cách đã chọn không trả được nữa thì thử cách còn lại; cả hai đều không (hết sạch tiền và tu vi)
+ * thì thoát KHÔNG mất gì (người chơi luôn thoát được: mục 53; có dòng audit `ambush.flee_free`). Lưu hỏng thì giữ trận + `settling`, bấm lại chỉ lưu (không trừ hai lần).
+ */
+async function completeFlee(w: World, sid: string, a: ArenaCtrl): Promise<void> {
+  const p = w.state.players.get(sid);
+  const c = w.ctrl.get(sid);
+  if (!p || !c || p.dead || a.phase !== "fighting") return;
   if (a.settling === undefined) {
-    const paid = chargeFlee(w, sid, p, a.price, m.choice);
+    const want = a.fleeing?.choice ?? "flee_exp";
+    a.fleeing = undefined;
+    const other = want === "flee_coin" ? "flee_exp" : "flee_coin";
+    let choice: "flee_coin" | "flee_exp" = want;
+    let paid = chargeFlee(w, sid, p, a.price, want);
     if (paid === null) {
-      w.events.toast(sid, { text: "Không đủ để trả giá bỏ chạy", tone: "bad" });
-      return;
+      choice = other;
+      paid = chargeFlee(w, sid, p, a.price, other);
     }
-    a.settling = { choice: m.choice, paid };
-  } else if (a.settling.choice !== m.choice) {
-    return; // đang chờ lưu một cách trả khác: không đổi giữa chừng
+    if (paid === null) {
+      // hết sạch cả hai (chống bỏ chạy miễn phí ở HỘP THOẠI là chuyện khác; ở đây cái chết thật đang treo trên đầu nên LUÔN cho thoát)
+      paid = {};
+      w.audit?.("ambush.flee_free", { name: p.name, stage: "arena" });
+    }
+    a.settling = { choice, paid };
   }
   const settling = a.settling;
   const ok = (await w.onSaveNow?.(sid)) ?? true;
@@ -478,6 +543,7 @@ export function tickArena(w: World, dtMs: number = TICK_MS): void {
     if (a.phase === "fighting") {
       a.deadline += dtMs;
       a.nextStateAt += dtMs;
+      if (a.fleeing !== undefined) a.fleeing.at += dtMs; // đóng băng cả vận bỏ chạy
     } else if (a.endAt !== null) {
       a.endAt += dtMs;
       a.exitTryAt += dtMs;
@@ -487,19 +553,36 @@ export function tickArena(w: World, dtMs: number = TICK_MS): void {
   }
   if (a.phase === "fighting") {
     updateActed(w, a, p, c);
+    if (!foesAlive(w, a) && !p.dead) {
+      a.fleeing = undefined; // hạ hết bầy trong lúc vận: THẮNG (huỷ vận, không trừ giá)
+      return finishArena(w, sid, "won");
+    }
+    if (a.fleeing !== undefined && w.now >= a.fleeing.at && a.settling === undefined) {
+      void completeFlee(w, sid, a); // hết vận: trừ giá -> lưu -> thoát (ưu tiên hơn hết giờ: người đã bấm bỏ chạy thì được trả giá bỏ chạy)
+      return;
+    }
     if (w.now >= a.deadline) return finishArena(w, sid, "timeout");
-    if (!foesAlive(w, a) && !p.dead) return finishArena(w, sid, "won");
     if (w.now >= a.nextStateAt) {
       a.nextStateAt = w.now + 1000;
       a.price = ambushPriceOf(p, c, "mid");
-      w.events.ambushState(sid, { msLeft: Math.max(0, a.deadline - w.now), price: a.price });
+      const fleeMs = a.fleeing !== undefined ? Math.max(1, a.fleeing.at - w.now) : undefined;
+      w.events.ambushState(sid, {
+        msLeft: Math.max(0, a.deadline - w.now),
+        price: a.price,
+        ...(fleeMs !== undefined ? { fleeMs } : {}),
+      });
     }
     return;
   }
   // pha `over`: kẻ địch không đánh tiếp (đặt lại hộ thể phòng hộ thể mạng vừa ghi đè `shieldUntil` lúc nối lại); tới giờ thì đưa về chỗ cũ
   if (a.endAt !== null) lockOver(w, sid, c, a.endAt + 5_000);
   forgetTarget(w, sid);
-  if (a.endAt !== null && w.now >= a.endAt && w.now >= a.exitTryAt && !c.travelling && !p.dead) {
+  // Chết thật (mục 53): thoát khi Duyên đã cộng (`limbo.credited`, WorldRoom.enterLimbo) hoặc hết kiên nhẫn (phòng gốc tự cộng khi nạp hồ sơ Hoàng Tuyền); sống: thoát khi đã đứng dậy
+  const died = c.limbo !== undefined;
+  const ready = died
+    ? c.limbo!.credited || w.now >= (a.endAt ?? 0) + DIED_EXIT_PATIENCE_MS
+    : !p.dead;
+  if (a.endAt !== null && w.now >= a.endAt && w.now >= a.exitTryAt && !c.travelling && ready) {
     a.exitTryAt = w.now + EXIT_RETRY_MS;
     w.onArenaExit?.(sid);
   }

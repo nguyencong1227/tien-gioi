@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import {
   AMBUSH_EXIT_MS,
+  AMBUSH_FLEE_CHANNEL_MS,
   AMBUSH_MIN_PROTOCOL,
   AMBUSH_FALL_MS,
   AMBUSH_TIME_MS,
@@ -339,17 +340,71 @@ describe("thua / hết giờ: giá giữa trận bằng tu vi", () => {
     expect(s.p.exp).toBe(0);
   });
 
-  it("bị hạ: KHÔNG Hoàng Tuyền / mất kiếp (dù w.reincarnate), nằm AMBUSH_FALL_MS rồi đứng dậy ĐẦY khí huyết; trận lost, trừ giá giữa trận", () => {
+  it("MỤC 53: bị hạ KHI ĐANG ĐÁNH (luân hồi bật) = CHẾT THẬT: Hoàng Tuyền, kiếp kết thúc, KHÔNG trừ giá, `ambushEnd lost + died`, đưa về chỗ cũ NGAY (chờ Duyên cộng xong)", () => {
     const s = setup();
     act(s);
-    const chot = s.a.price.exp;
     const mc = [...s.w.mctrl.values()][0]!;
     const limbos = s.limbos.length;
     s.p.hp = 1;
     hurtPlayer(s.w, s.sid, s.p, 9999, { kind: mc.def.id });
     expect(s.p.dead).toBe(true);
+    expect(s.c.limbo).toBeDefined(); // `beginLimbo` đã chạy (mất kiếp)
+    expect(s.c.limbo!.endedLifeId).toBe(`life-${s.sid}`);
+    expect(s.a.result).toBe("lost");
+    expect(s.a.phase).toBe("over");
+    expect(s.ambushEnds.at(-1)!.msg).toEqual({ result: "lost", died: true }); // không `paid`: cái chết thay giá
+    expect(s.a.endAt).toBe(s.w.now); // về ngay, không đợi AMBUSH_EXIT_MS
+    expect(s.toasts.some((t) => /không mất kiếp/i.test(t.msg.text))).toBe(false);
+    expect(s.limbos.length).toBeGreaterThanOrEqual(limbos); // màn hình Hoàng Tuyền do hook của WorldRoom gửi (World giả không nối)
+    // chưa cộng Duyên: chưa thoát; cộng xong thì thoát đúng MỘT lần (thử lại mỗi EXIT_RETRY)
+    s.w.now += 100;
+    tickArena(s.w);
+    expect(s.exits).toEqual([]);
+    s.c.limbo!.credited = true;
+    s.w.now += 100;
+    tickArena(s.w);
+    expect(s.exits).toEqual([s.sid]);
+  });
+
+  it("chết thật mà Duyên mãi chưa cộng xong: hết kiên nhẫn (15 giây) vẫn đưa về phòng gốc (phòng gốc tự cộng khi nạp hồ sơ Hoàng Tuyền)", () => {
+    const s = setup();
+    act(s);
+    s.p.hp = 1;
+    hurtPlayer(s.w, s.sid, s.p, 9999, { kind: [...s.w.mctrl.values()][0]!.def.id });
+    s.w.now += 14_000;
+    tickArena(s.w);
+    expect(s.exits).toEqual([]);
+    s.w.now += 2_000;
+    tickArena(s.w);
+    expect(s.exits).toEqual([s.sid]);
+  });
+
+  it("MỤC 53: rớt mạng giữa đấu KHÔNG chết thật: client im lặng lúc bị đánh chết thì được THA CHẾT (`spareFromNetDeath` chạy trước `arenaFall`), trận vẫn đang đánh, không Hoàng Tuyền", () => {
+    const s = setup();
+    act(s);
+    s.c.beatMs = 1000;
+    s.c.lastHeardAt = s.w.now - 5_000; // im lặng 5 giây (>= NET_SPARE_SILENCE_MS)
+    const mc = [...s.w.mctrl.values()][0]!;
+    s.p.hp = 1;
+    hurtPlayer(s.w, s.sid, s.p, 9999, { kind: mc.def.id });
+    expect(s.p.dead).toBe(false);
     expect(s.c.limbo).toBeUndefined();
-    expect(s.limbos.length).toBe(limbos);
+    expect(s.a.phase).toBe("fighting");
+    expect(s.a.result).toBeUndefined();
+    expect(s.p.hp).toBeGreaterThan(1);
+    expect(s.ambushEnds).toHaveLength(0);
+  });
+
+  it("luân hồi TẮT (bản thử / bench): giữ cách cũ: không Hoàng Tuyền, nằm AMBUSH_FALL_MS rồi đứng dậy ĐẦY khí huyết; trận lost, trừ giá giữa trận", () => {
+    const s = setup();
+    s.w.reincarnate = false;
+    act(s);
+    const chot = s.a.price.exp;
+    const mc = [...s.w.mctrl.values()][0]!;
+    s.p.hp = 1;
+    hurtPlayer(s.w, s.sid, s.p, 9999, { kind: mc.def.id });
+    expect(s.p.dead).toBe(true);
+    expect(s.c.limbo).toBeUndefined();
     expect(s.a.result).toBe("lost");
     expect(s.p.exp).toBe(400 - chot);
     expect(s.c.lifeId).toBe(`life-${s.sid}`); // kiếp nguyên vẹn
@@ -372,8 +427,16 @@ describe("thua / hết giờ: giá giữa trận bằng tu vi", () => {
   });
 });
 
-describe("bỏ chạy giữa trận (ambushFlee)", () => {
-  it("flee_coin: trừ ĐÚNG giá đã chốt, LƯU xong mới đóng; kết cục fled + paid", async () => {
+/** Bấm bỏ chạy, trôi hết thời gian vận, chạy tick (hoàn tất bỏ chạy) và đợi các lời hứa lưu xong. */
+async function flee(s: ReturnType<typeof setup>, choice: string) {
+  await onAmbushFlee(s.w, s.sid, { choice });
+  s.w.now += AMBUSH_FLEE_CHANNEL_MS;
+  tickArena(s.w);
+  for (let i = 0; i < 6; i++) await Promise.resolve();
+}
+
+describe("bỏ chạy giữa trận (ambushFlee): vận 1 giây rồi thoát (mục 53)", () => {
+  it("flee_coin: trừ ĐÚNG giá đã chốt SAU khi vận, LƯU xong mới đóng; kết cục fled + paid", async () => {
     const s = setup();
     let coinAtSave = -1;
     s.w.onSaveNow = async () => {
@@ -381,7 +444,7 @@ describe("bỏ chạy giữa trận (ambushFlee)", () => {
       return true;
     };
     const price = s.a.price.coin.price;
-    await onAmbushFlee(s.w, s.sid, { choice: "flee_coin" });
+    await flee(s, "flee_coin");
     expect(coinAtSave).toBe(5000 - price);
     expect(s.ambushEnds.at(-1)!.msg).toEqual({ result: "fled", paid: { coin: price } });
     expect(s.a.phase).toBe("over");
@@ -393,28 +456,167 @@ describe("bỏ chạy giữa trận (ambushFlee)", () => {
     const chot = s.a.price.exp;
     s.p.expMax = 1_000_000; // nếu tính lại thì giá vọt lên
     s.p.exp = 100_000;
-    await onAmbushFlee(s.w, s.sid, { choice: "flee_exp" });
+    await flee(s, "flee_exp");
     expect(s.p.exp).toBe(100_000 - chot);
     expect(s.ambushEnds.at(-1)!.msg.paid).toEqual({ exp: chot });
   });
 
-  it("không đủ Linh thạch: không trừ gì, trận tiếp tục, báo toast", async () => {
+  it("VẬN: bấm chưa thoát ngay (không trừ gì, vẫn đang đánh, kẻ địch vẫn đánh được), gửi `ambushState.fleeMs`; bấm lần hai bị bỏ qua; chưa tới hạn thì chưa thoát", async () => {
     const s = setup();
-    s.c.coin = s.a.price.coin.price - 1;
+    const price = s.a.price.coin.price;
     await onAmbushFlee(s.w, s.sid, { choice: "flee_coin" });
-    expect(s.c.coin).toBe(s.a.price.coin.price - 1);
+    expect(s.a.phase).toBe("fighting");
+    expect(s.a.fleeing).toEqual({ choice: "flee_coin", at: s.w.now + AMBUSH_FLEE_CHANNEL_MS });
+    expect(s.c.coin).toBe(5000);
+    expect(s.ambushStates.at(-1)!.msg.fleeMs).toBe(AMBUSH_FLEE_CHANNEL_MS);
+    expect(s.w.shielded.has(s.sid)).toBe(false); // KHÔNG bất khả xâm phạm trong lúc vận
+    const at = s.a.fleeing!.at;
+    await onAmbushFlee(s.w, s.sid, { choice: "flee_exp" }); // lần hai: bỏ qua, không đổi cách trả
+    expect(s.a.fleeing).toEqual({ choice: "flee_coin", at });
+    s.w.now += AMBUSH_FLEE_CHANNEL_MS - 1;
+    tickArena(s.w);
+    await Promise.resolve();
+    expect(s.a.phase).toBe("fighting");
+    expect(s.c.coin).toBe(5000);
+    s.w.now += 1;
+    tickArena(s.w);
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+    expect(s.a.phase).toBe("over");
+    expect(s.c.coin).toBe(5000 - price);
+  });
+
+  it("LUÔN bấm được kể cả khi đang BỊ KHỐNG CHẾ (choáng): vẫn vào vận và thoát đúng hạn", async () => {
+    const s = setup();
+    s.c.stunned = true;
+    await flee(s, "flee_coin");
+    expect(s.a.result).toBe("fled");
+  });
+
+  it("`ambushState` mỗi giây mang `fleeMs` còn lại khi đang vận (giảm dần), và không có trường khi không vận", async () => {
+    const s = setup();
+    act(s);
+    s.w.now += 1000;
+    tickArena(s.w);
+    expect(s.ambushStates.at(-1)!.msg.fleeMs).toBeUndefined();
+    await onAmbushFlee(s.w, s.sid, { choice: "flee_coin" });
+    s.w.now += 400;
+    s.a.nextStateAt = s.w.now;
+    tickArena(s.w);
+    expect(s.ambushStates.at(-1)!.msg.fleeMs).toBe(AMBUSH_FLEE_CHANNEL_MS - 400);
+  });
+
+  it("bị hạ GIỮA lúc vận = chết thật, KHÔNG trừ giá (vận huỷ)", async () => {
+    const s = setup();
+    act(s);
+    await onAmbushFlee(s.w, s.sid, { choice: "flee_coin" });
+    const mc = [...s.w.mctrl.values()][0]!;
+    s.p.hp = 1;
+    hurtPlayer(s.w, s.sid, s.p, 9999, { kind: mc.def.id });
+    expect(s.a.fleeing).toBeUndefined();
+    expect(s.c.limbo).toBeDefined();
+    expect(s.c.limbo!.coinAtDeath).toBe(5000); // KHÔNG trừ Linh thạch: giá bỏ chạy chưa trả vì chưa hết vận (ví kiếp mới đã đặt lại 0 bởi Hoàng Tuyền)
+    expect(s.ambushEnds.at(-1)!.msg).toEqual({ result: "lost", died: true });
+    s.w.now += AMBUSH_FLEE_CHANNEL_MS;
+    tickArena(s.w);
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+    expect(s.a.result).toBe("lost"); // không đổi thành fled
+  });
+
+  it("hạ hết bầy GIỮA lúc vận: THẮNG (huỷ vận, không trừ giá)", async () => {
+    const s = setup();
+    act(s);
+    await onAmbushFlee(s.w, s.sid, { choice: "flee_coin" });
+    for (const id of s.a.foes) killMonster(s.w, id, s.w.mctrl.get(id)!);
+    s.w.now += 100;
+    tickArena(s.w);
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+    expect(s.a.result).toBe("won");
+    expect(s.a.fleeing).toBeUndefined();
+    expect(s.ambushEnds.at(-1)!.msg.paid).toBeUndefined();
+  });
+
+  it("rớt mạng (hồn lìa xác) giữa lúc vận: vận ĐÓNG BĂNG đúng bước tick; nối lại thì còn nguyên thời gian vận", async () => {
+    const s = setup();
+    await onAmbushFlee(s.w, s.sid, { choice: "flee_coin" });
+    const at = s.a.fleeing!.at;
+    s.w.ghosts.add(s.sid);
+    for (let i = 0; i < 40; i++) {
+      s.w.now += TICK_MS;
+      tickArena(s.w, TICK_MS);
+    }
+    expect(s.a.phase).toBe("fighting");
+    expect(s.a.fleeing!.at).toBe(at + 40 * TICK_MS);
+    expect(s.a.fleeing!.at - s.w.now).toBe(AMBUSH_FLEE_CHANNEL_MS); // còn nguyên 1 giây
+  });
+
+  it("bấm bỏ chạy và hết giờ cùng lúc: được trả giá BỎ CHẠY (ưu tiên hơn hết giờ)", async () => {
+    const s = setup();
+    act(s);
+    await onAmbushFlee(s.w, s.sid, { choice: "flee_coin" });
+    s.a.deadline = s.a.fleeing!.at; // hết giờ ngay lúc hết vận
+    s.w.now = s.a.fleeing!.at;
+    tickArena(s.w);
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+    expect(s.a.result).toBe("fled");
+  });
+
+  it("không đủ Linh thạch (giá chốt báo không đủ): từ chối NGAY, báo toast, không vận", async () => {
+    const s = setup();
+    s.a.price = { ...s.a.price, coin: { ...s.a.price.coin, enough: false } };
+    await onAmbushFlee(s.w, s.sid, { choice: "flee_coin" });
+    expect(s.a.fleeing).toBeUndefined();
     expect(s.a.phase).toBe("fighting");
     expect(s.toasts).toHaveLength(1);
     expect(s.ambushEnds).toHaveLength(0);
   });
 
-  it("lưu HỎNG: giữ trận, đã trừ MỘT lần; bấm lại chỉ lưu (không trừ hai lần); xong mới đóng", async () => {
+  it("không đủ tu vi (thanh trống / thấp hơn giá chốt) mà chọn trả bằng tu vi: từ chối NGAY, báo toast, không vận", async () => {
+    const s = setup();
+    s.p.exp = 0;
+    await onAmbushFlee(s.w, s.sid, { choice: "flee_exp" });
+    expect(s.a.fleeing).toBeUndefined();
+    expect(s.toasts).toHaveLength(1);
+    expect(s.a.phase).toBe("fighting");
+    const t = setup();
+    t.p.exp = Math.max(0, t.a.price.exp - 1);
+    await onAmbushFlee(t.w, t.sid, { choice: "flee_exp" });
+    expect(t.a.fleeing).toBeUndefined();
+  });
+
+  it("giá chốt báo đủ nhưng lúc thoát hết tiền: chuyển sang TRẢ BẰNG TU VI (không kẹt)", async () => {
+    const s = setup();
+    const chot = s.a.price.exp;
+    await onAmbushFlee(s.w, s.sid, { choice: "flee_coin" });
+    s.c.coin = 0; // tiêu hết trong lúc vận
+    s.w.now += AMBUSH_FLEE_CHANNEL_MS;
+    tickArena(s.w);
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+    expect(s.a.result).toBe("fled");
+    expect(s.ambushEnds.at(-1)!.msg.paid).toEqual({ exp: chot });
+  });
+
+  it("hết sạch cả Linh thạch lẫn tu vi: VẪN thoát được (không mất gì, audit flee_free): chết thật đang treo nên luôn cho thoát", async () => {
+    const s = setup();
+    const audits: string[] = [];
+    s.w.audit = (ev) => void audits.push(ev);
+    await onAmbushFlee(s.w, s.sid, { choice: "flee_coin" });
+    s.c.coin = 0;
+    s.p.exp = 0;
+    s.w.now += AMBUSH_FLEE_CHANNEL_MS;
+    tickArena(s.w);
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+    expect(s.a.result).toBe("fled");
+    expect(s.ambushEnds.at(-1)!.msg).toEqual({ result: "fled", paid: {} });
+    expect(audits).toContain("ambush.flee_free");
+  });
+
+  it("lưu HỎNG sau khi vận: giữ trận, đã trừ MỘT lần; bấm lại chỉ lưu (không vận lại, không trừ hai lần); xong mới đóng", async () => {
     const s = setup();
     let ok = false;
     s.w.onSaveNow = async () => ok;
     const before = s.c.coin;
     const price = s.a.price.coin.price;
-    await onAmbushFlee(s.w, s.sid, { choice: "flee_coin" });
+    await flee(s, "flee_coin");
     expect(s.a.phase).toBe("fighting");
     expect(s.c.coin).toBe(before - price);
     expect(s.toasts).toHaveLength(1);
@@ -429,11 +631,14 @@ describe("bỏ chạy giữa trận (ambushFlee)", () => {
     const s = setup();
     let release!: (v: boolean) => void;
     s.w.onSaveNow = () => new Promise<boolean>((r) => (release = r));
-    const first = onAmbushFlee(s.w, s.sid, { choice: "flee_coin" });
+    await onAmbushFlee(s.w, s.sid, { choice: "flee_coin" });
+    s.w.now += AMBUSH_FLEE_CHANNEL_MS;
+    tickArena(s.w); // hoàn tất vận: trừ giá, đang chờ lưu
+    for (let i = 0; i < 4; i++) await Promise.resolve();
     await onAmbushFlee(s.w, s.sid, { choice: "flee_exp" });
     expect(s.p.exp).toBe(400);
     release(true);
-    await first;
+    for (let i = 0; i < 6; i++) await Promise.resolve();
     const coin = s.c.coin;
     await onAmbushFlee(s.w, s.sid, { choice: "flee_coin" }); // trận đã `over`
     expect(s.c.coin).toBe(coin);
@@ -491,8 +696,10 @@ describe("thoát / rớt mạng khỏi đấu trường", () => {
     expect(s.p.exp).toBe(exp);
     const t = setup();
     t.w.onSaveNow = () => new Promise<boolean>(() => {});
-    void onAmbushFlee(t.w, t.sid, { choice: "flee_exp" });
-    await Promise.resolve();
+    await onAmbushFlee(t.w, t.sid, { choice: "flee_exp" });
+    t.w.now += AMBUSH_FLEE_CHANNEL_MS;
+    tickArena(t.w); // hoàn tất vận: đã trừ, chờ lưu mãi
+    for (let i = 0; i < 4; i++) await Promise.resolve();
     const afterCharge = t.p.exp;
     expect(arenaDrop(t.w, t.sid)).toBe(t.a.price.exp);
     expect(t.p.exp).toBe(afterCharge);
