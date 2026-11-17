@@ -224,6 +224,11 @@ describe("sanitizeWorldBossMsg (tin từ mạng)", () => {
       expect(sanitizeWorldBossMsg(bad)).toBeNull();
   });
 
+  it("phase lạ bị bỏ DÙ đủ id / tên / bản đồ (máy chủ mới hơn client: không đoán)", () => {
+    for (const phase of ["zzz", "constructor", "__proto__", "LIVE", "", "toString"])
+      expect(sanitizeWorldBossMsg({ phase, id: "a", name: "B", mapId: "han_van" })).toBeNull();
+  });
+
   it("none không cần id / tên", () => {
     expect(sanitizeWorldBossMsg({ phase: "none" })).toEqual({
       phase: "none",
