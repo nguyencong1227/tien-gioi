@@ -11,9 +11,11 @@ import {
   SECT_QUEST_BY_ID,
   SECT_SHOP_BY_ITEM,
   SECT_TERMS,
+  sectDepositCh,
   sectFailMessage,
   sectLevelInfo,
   type SectBuff,
+  type SectHallMe,
   type SectHallQuest,
   type SectHallQuestState,
   type SectHallView,
@@ -444,4 +446,27 @@ export function hallShopGroups(rows: readonly HallShopRow[], myLevel: number): H
     halls.push({ hall, hallLabel: mine[0]!.hallLabel, sections });
   }
   return halls;
+}
+
+// ---------- Chữ xem trước khi góp Linh thạch vào quỹ (ô số lượng dùng chung, mục 47) ----------
+
+/**
+ * Xem trước một lần góp `qty` Linh thạch vào quỹ: ví còn lại bao nhiêu và (nếu đã có ảnh chụp Nội vụ) được cộng bao nhiêu cống hiến. Cống hiến theo `sectDepositCh` rồi
+ * kẹp theo lượt góp còn lại hôm nay (`depositLeft`); chưa tới giờ được kiếm (`earnFromAt` > `serverNow`) thì nói rõ là chưa tính. Chỉ là gợi ý: máy chủ quyết định.
+ */
+export function depositPreviewText(
+  qty: number,
+  wallet: number,
+  me: SectHallMe | null,
+  serverNow = Date.now(),
+): string {
+  const left = Math.max(0, (Number.isFinite(wallet) ? wallet : 0) - qty);
+  const base = `Ví còn lại ${left.toLocaleString("vi-VN")} Linh thạch.`;
+  if (!me) return base;
+  if (me.earnFromAt > serverNow) return `${base} Cống hiến: ngày mai mới kiếm được.`;
+  const ch = sectDepositCh(qty);
+  if (ch < 1) return base;
+  const got = Math.min(ch, Math.max(0, me.depositLeft));
+  if (got < 1) return `${base} Hôm nay hết lượt kiếm cống hiến bằng cách góp.`;
+  return `${base} +${got.toLocaleString("vi-VN")} cống hiến${got < ch ? " (chạm trần hôm nay)" : ""}.`;
 }
