@@ -11,7 +11,7 @@ import {
   MONSTER_BY_ID,
   SHOPS,
   SHOP_BY_NPC,
-  SKILLS_M7,
+  LEARNABLE_SKILLS,
   buyPrice,
   rollDrops,
   sellPrice,
@@ -20,9 +20,9 @@ import {
 
 describe("kinh quyển: dữ liệu", () => {
   it("mỗi chiêu có ĐÚNG MỘT quyển (`kinh_<chiêu>`), có trong ITEMS một lần, dạy đúng chiêu, tên / độ hiếm theo chiêu", () => {
-    expect(SKILL_BOOK_ITEMS).toHaveLength(SKILLS_M7.length);
-    expect(new Set(SKILL_BOOK_ITEMS.map((b) => b.id)).size).toBe(SKILLS_M7.length);
-    for (const def of SKILLS_M7) {
+    expect(SKILL_BOOK_ITEMS).toHaveLength(LEARNABLE_SKILLS.length);
+    expect(new Set(SKILL_BOOK_ITEMS.map((b) => b.id)).size).toBe(LEARNABLE_SKILLS.length);
+    for (const def of LEARNABLE_SKILLS) {
       const id = bookIdOf(def.id);
       expect(id).toBe(`kinh_${def.id}`);
       const matches = ITEMS.filter((i) => i.id === id);
@@ -42,7 +42,7 @@ describe("kinh quyển: dữ liệu", () => {
   });
 
   it("giá: mỗi quyển có giá trị gốc dương; giá mua xấp xỉ `SkillDef.price` (không thấp hơn, hơn tối đa 1); bán lại luôn thấp hơn mua", () => {
-    for (const def of SKILLS_M7) {
+    for (const def of LEARNABLE_SKILLS) {
       const id = bookIdOf(def.id);
       expect(ITEM_VALUE[id], id).toBeGreaterThan(0);
       expect(buyPrice(id), id).toBeGreaterThanOrEqual(def.price);
@@ -55,7 +55,7 @@ describe("kinh quyển: dữ liệu", () => {
 
 describe("kinh quyển: nguồn", () => {
   it("cửa hàng bán đúng các chiêu CƠ BẢN (độ hiếm <= 1, Luyện Khí) ở Lão dược sư và Lái buôn Hắc Phong; Vọng Sương và chiêu cao cấp thì không", () => {
-    const basic = SKILLS_M7.filter((d) => d.rarity <= 1);
+    const basic = LEARNABLE_SKILLS.filter((d) => d.rarity <= 1);
     expect(basic.length).toBeGreaterThan(0);
     expect(SHOP_BOOK_IDS).toEqual(basic.map((d) => bookIdOf(d.id)));
     for (const d of basic) expect(d.reqRealm, d.id).toBeLessThanOrEqual(1);
@@ -65,7 +65,7 @@ describe("kinh quyển: nguồn", () => {
     }
     for (const id of SHOP_BOOK_IDS) expect(SHOP_BY_NPC.lai_buon_suong.itemIds).not.toContain(id);
     const sold = new Set(SHOPS.flatMap((s) => s.itemIds));
-    for (const d of SKILLS_M7.filter((x) => x.rarity >= 2))
+    for (const d of LEARNABLE_SKILLS.filter((x) => x.rarity >= 2))
       expect(sold.has(bookIdOf(d.id)), `${d.id} (cao cấp) không bán ở cửa hàng`).toBe(false);
   });
 
@@ -84,12 +84,12 @@ describe("kinh quyển: nguồn", () => {
       }
     }
     const sold = new Set(SHOPS.flatMap((s) => s.itemIds));
-    for (const d of SKILLS_M7) {
+    for (const d of LEARNABLE_SKILLS) {
       const id = bookIdOf(d.id);
       expect(sold.has(id) || dropped.has(id), `${id} phải bán hoặc rơi`).toBe(true);
     }
     // Chiêu cao cấp (Trúc Cơ trở lên) chỉ có nguồn là rơi: có ít nhất một nơi rơi
-    for (const d of SKILLS_M7.filter((x) => x.rarity >= 2))
+    for (const d of LEARNABLE_SKILLS.filter((x) => x.rarity >= 2))
       expect(dropped.has(bookIdOf(d.id)), d.id).toBe(true);
   });
 
