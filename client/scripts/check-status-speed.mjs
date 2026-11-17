@@ -103,16 +103,17 @@ try {
 
   // Đếm `input` gửi đi (mock chỉ in log); mock không chạy đối chiếu nên tự đặt predX / predY về chỗ đứng của máy chủ trước mỗi pha
   await evalJs(`(() => {
-    const sc = window.__scene; window.__inputs = 0;
+    const sc = window.__scene; window.__inputs = 0; window.__xs = [];
     const orig = sc.room.send.bind(sc.room);
-    sc.room.send = (t, d) => { if (t === "input") window.__inputs++; return orig(t, d); };
+    // ghi cả predX LÚC GỬI mỗi input: hiệu hai lần gửi liền nhau = đúng một bước đoán trước (không phụ thuộc lúc nhả phím / số input đếm được)
+    sc.room.send = (t, d) => { if (t === "input") { window.__inputs++; window.__xs.push(sc.predX); } return orig(t, d); };
     return 1; })()`);
   // Chỗ đứng mặc định của mock (512, 896) nằm trong ô chặn nên đi không nhúc nhích: đặt cả máy chủ giả lẫn đoán trước vào giữa trấn (thoáng)
   const spot = JSON.parse(await evalJs("JSON.stringify(window.__scene.map.townPx)"));
   const reset = () =>
     evalJs(`(() => { const sc = window.__scene, me = sc.me();
       me.x = ${spot.x}; me.y = ${spot.y};
-      sc.predX = me.x; sc.predY = me.y; sc.pending.length = 0; window.__inputs = 0;
+      sc.predX = me.x; sc.predY = me.y; sc.pending.length = 0; window.__inputs = 0; window.__xs = [];
       sc.cameras.main.centerOn(me.x, me.y); return 1; })()`);
   const pos = () =>
     evalJs("JSON.stringify({ x: window.__scene.predX, y: window.__scene.predY })").then(JSON.parse);
@@ -137,7 +138,12 @@ try {
     await sleep(120);
     const b = await pos();
     const n = await evalJs("window.__inputs");
-    return { n, dx: b.x - a.x, dy: b.y - a.y, per: n > 0 ? (b.x - a.x) / n : 0 };
+    // Bước mỗi input = MEDIAN các hiệu predX giữa hai lần gửi liền nhau. KHÔNG dùng dx / n: mock không có máy chủ xác nhận nên cảnh ngừng đoán sau ~13-14 input chưa xác nhận
+    // (xs dẹt ở đoạn cuối), n đếm cả các input đứng yên đó => dx / n lệch 1-2 % tuỳ số input gửi được trong 700 ms (máy tải thì n = 16 thay vì 17) và làm ca tỉ lệ 1,4 chập chờn.
+    const xs = JSON.parse(await evalJs("JSON.stringify(window.__xs)"));
+    const steps = xs.slice(1).map((x, i) => x - xs[i]).sort((p, q) => p - q);
+    const per = steps.length >= 3 ? steps[Math.floor(steps.length / 2)] : 0;
+    return { n, dx: b.x - a.x, dy: b.y - a.y, per };
   };
 
   console.log("--- Đoán trước theo trạng thái (mock, phím thật) ---");
