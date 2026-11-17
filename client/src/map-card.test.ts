@@ -37,6 +37,13 @@ describe("mapCardUrl", () => {
       expect(mapCardUrl(id, cards)).toBeNull();
   });
 
+  it("chỉ tính thuộc tính RIÊNG của bảng (bảng thừa kế qua prototype: không nhận) và chỉ nhận ĐÚNG chuỗi (đối tượng có toString cũng không)", () => {
+    const inherited = Object.create({ lac_ha: "evil.webp" }) as Record<string, string>;
+    expect(mapCardUrl("lac_ha", inherited)).toBeNull();
+    expect(mapCardUrl(["lac_ha"], cards)).toBeNull(); // ép kiểu mảng -> "lac_ha"
+    expect(mapCardUrl({ toString: () => "lac_ha" }, cards)).toBeNull();
+  });
+
   it("tên tệp rỗng => null (không trả cả thư mục)", () => {
     expect(mapCardUrl("rong", cards)).toBeNull();
   });
