@@ -60,7 +60,7 @@ export const MASTERY_WINDOW_MS = 60_000;
 
 /**
  * Gửi sổ chiêu + hồi chiêu cho chủ. Khi đổi sổ và lúc vào phòng; không gọi mỗi tick. `mastery` (điểm luyện dở dang, CT5) kèm theo khi `force` (vào phòng, lên tầng), hoặc đã
- * `MASTERY_SEND_MS` kể từ lần gửi trước; sổ chưa có điểm nào thì không có trường (client cũ / hồ sơ cũ y hệt như trước).
+ * `MASTERY_SEND_MS` kể từ lần gửi trước; khi KHÔNG ép mà sổ chưa có điểm nào thì không có trường (client cũ / hồ sơ cũ y hệt như trước), còn ép thì luôn có (`{}` nếu rỗng).
  */
 export function sendSkills(w: World, sid: string, force = false) {
   const c = w.ctrl.get(sid);
@@ -72,9 +72,13 @@ export function sendSkills(w: World, sid: string, force = false) {
     cd: cooldownsLeft(c, w.now),
     cdMax: cooldownsMax(c, cdrNow(w, sid, p, c)),
   };
-  if (
+  if (force) {
+    // ÉP (lên tầng): LUÔN kèm mastery, `{}` nếu hết điểm dở (B, #1112: trường vắng mà không có nghĩa "sổ hết điểm" thì client không phân biệt được với "giãn nhịp 30 giây")
+    msg.mastery = { ...(c.skills.mastery ?? {}) };
+    c.masterySentAt = w.now;
+  } else if (
     c.skills.mastery &&
-    (force || c.masterySentAt === undefined || w.now - c.masterySentAt >= MASTERY_SEND_MS)
+    (c.masterySentAt === undefined || w.now - c.masterySentAt >= MASTERY_SEND_MS)
   ) {
     msg.mastery = { ...c.skills.mastery };
     c.masterySentAt = w.now;

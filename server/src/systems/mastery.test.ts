@@ -274,6 +274,22 @@ describe("luyện chiêu: tin `skills` mang điểm (<= 1 lần / 30 giây)", ()
     expect(t.skillMsgs.at(-1)!.msg.mastery).toEqual({ tia_luyen: 7 });
   });
 
+  it('ÉP gửi (lên tầng) mà sổ HẾT điểm dở: vẫn kèm `mastery: {}` để client phân biệt với "giãn nhịp 30 giây"', () => {
+    const t = setup(3, 1);
+    t.c.skills.mastery = { tia_luyen: MASTERY_NEED[0]! - 1 };
+    target(t);
+    t.skillMsgs.length = 0;
+    cast(t.w, "a", { slot: 2, angle: 0 }); // lên tầng 2, dư 0, sổ không còn điểm nào
+    expect(t.c.skills.mastery).toBeUndefined();
+    const forced = t.skillMsgs.filter((m) => m.msg.mastery !== undefined);
+    expect(forced).toHaveLength(1);
+    expect(forced[0]!.msg.mastery).toEqual({});
+    // không ép + không có điểm: vẫn không có trường
+    t.w.now += MASTERY_SEND_MS * 2;
+    sendSkills(t.w, "a");
+    expect(t.skillMsgs.at(-1)!.msg.mastery).toBeUndefined();
+  });
+
   it("bản gửi là BẢN SAO: client / test sửa không làm đổi sổ của máy chủ", () => {
     const t = setup(3, 1);
     t.c.skills.mastery = { tia_luyen: 7 };
