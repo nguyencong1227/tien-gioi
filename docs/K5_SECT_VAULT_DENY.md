@@ -2,7 +2,9 @@
 
 > Dev D, issue **#789** (K5, `QUYET_DINH_M3.md` mục 27). Soạn theo thiết kế `docs/THIET_KE_TONG_MON.md` **mục 11.8** ("Đồ không góp được" → "Vật phẩm nhiệm vụ: ... Dùng danh sách chặn `SECT_VAULT_DENY_ITEMS` (`shared/`, ban đầu **RỖNG**; test kiểm mọi id có thật). D rà các nhiệm vụ (`QUESTS`) tìm món chỉ dùng cho nhiệm vụ rồi đề xuất danh sách").
 >
-> **Kết luận: với dữ liệu hiện tại, danh sách để RỖNG** — KHÔNG có vật phẩm nào "chỉ dùng cho nhiệm vụ". Lý do và bằng chứng dưới đây; A chốt rồi đặt hằng số + test vào `shared/` (K1).
+> **Kết luận: với dữ liệu hiện tại, danh sách để RỖNG** — KHÔNG có vật phẩm nào "chỉ dùng cho nhiệm vụ". Lý do và bằng chứng dưới đây.
+>
+> **Trạng thái (A đã chốt, review #990):** hằng `SECT_VAULT_DENY_ITEMS: readonly string[] = []` ĐÃ có ở `shared/src/sect.ts:72`; test "danh sách chặn chỉ chứa id có thật" ĐÃ có ở `shared/src/sect.test.ts` (ca `sectVaultAccepts`). A CHỐT **giữ RỖNG** (lý do mục 5). Tài liệu này là bản rà + ghi quyết định; KHÔNG đổi `shared/`.
 
 ## 1. Tiêu chí "đồ chỉ dùng cho nhiệm vụ" (phải chặn khỏi kho)
 
@@ -55,25 +57,35 @@ Mọi `itemId` trong `quests.ts` và `sect-depth.ts` đều resolves tới `ITEM
 
 ## 4. Kết luận
 
-`SECT_VAULT_DENY_ITEMS` **để RỖNG** (`[]`) ở K1, khớp dự liệu của thiết kế 11.8 ("ban đầu RỖNG"). Test kèm (`shared/`, A đặt) kiểm: (a) mọi id trong danh sách (hiện không có) đều có thật trong `ITEM_BY_ID`; (b) **bất biến dữ liệu** — KHÔNG có vật phẩm nào vừa có `ITEM_VALUE` = 0 (hoặc không bán được) vừa xuất hiện trong nhiệm vụ mà KHÔNG nằm trong danh sách chặn (xem mục 6).
+`SECT_VAULT_DENY_ITEMS` **giữ RỖNG** (`[]`), khớp dự liệu của thiết kế 11.8 ("ban đầu RỖNG") và quyết định của A (mục 5). Hằng đã ở `shared/src/sect.ts:72`; test "mọi id trong danh sách có thật trong `ITEM_BY_ID`" đã ở `shared/src/sect.test.ts` (ca `sectVaultAccepts`) — với danh sách rỗng, ca này thông tầm (không id để xét) nhưng vẫn giữ làm lưới an toàn khi nào thêm id. **Bất biến dữ liệu** (mục 6) — KHÔNG có vật phẩm nào vừa `ITEM_VALUE` = 0 vừa ở trong nhiệm vụ mà KHÔNG nằm trong danh sách — là guard tương lai, để làm ở PR test riêng (ưu tiên thấp).
 
-## 5. Câu hỏi mở cho A (có nên mở rộng tiêu chí?)
+## 5. Quyết định của A (review #990): GIỮ RỖNG, KHÔNG chặn mọi `collect`
 
-Mặc định trên chỉ chặn đồ *không có giá trị kinh tế*. Còn một **bẫy nhẹ** A có thể muốn chặn thêm: ngay cả nguyên liệu *có giá* (vd Lông thỏ 2 LS), người chơi góp hết vào kho rồi **không còn đủ trong túi để trả nhiệm vụ `collect`**, phải rút lại (tốn 1 lượt hạn mức Đệ tử) mới trả được. Đây là sự bất tiện chứ không mất mát (không nhân đôi, không mất đồ).
+Có một **bẫy nhẹ** ban đầu đặt ra: ngay cả nguyên liệu *có giá* (vd Lông thỏ 2 LS), người chơi góp hết vào kho rồi **không còn đủ trong túi để trả nhiệm vụ `collect`**, phải rút lại (tốn 1 lượt hạn mức Đệ tử) mới trả được. Đây là sự bất tiện chứ không mất mát (không nhân đôi, không mất đồ). **A đã xét và CHỐT KHÔNG mở rộng** — danh sách giữ rỗng, vì:
 
-- **Hướng an toàn (đề xuất giữ):** KHÔNG chặn — nguyên liệu có giá, góp kho là hợp lệ; bẫy chỉ là một cú rút thêm. Phù hợp chữ "chỉ dùng cho nhiệm vụ" trong 11.8.
-- **Hướng rộng hơn (A chọn nếu muốn):** chặn MỌI `itemId` là mục tiêu `collect` (bất kể giá), để người chơi KHÔNG bao giờ góp mất đồ đang cần trả nhiệm vụ. Nếu chọn hướng này, danh sách = đúng 13 id ở bảng 3a; D có thể nộp danh sách cụ thể + test theo yêu cầu.
+1. **Nguyên liệu là thứ kho tông môn sinh ra để chứa** (ngân hàng nguyên liệu cho tông); chặn mọi `collect` là chặn đúng món góp phổ biến nhất và làm kho vô nghĩa.
+2. **Cái "bẫy" chỉ là một lượt rút thêm** (mất 1 lượt hạn mức Đệ tử), không mất đồ, không nhân đôi.
+3. **Nếu người chơi kêu, xử lý bằng giao diện** (cảnh báo khi góp món đang là mục tiêu nhiệm vụ đang làm), KHÔNG bằng chặn.
 
-**D không tự mở rộng tiêu chí** (đổi phạm vi chặn = đổi cân bằng trải nghiệm, A chốt).
+→ `SECT_VAULT_DENY_ITEMS` giữ `[]`. D KHÔNG tự mở rộng tiêu chí (đổi phạm vi chặn = đổi cân bằng trải nghiệm, thuộc A).
 
 ## 6. Guard cho tương lai (khi có đồ nhiệm vụ THẬT)
 
 Khi nào thêm vật phẩm *chỉ dùng cho nhiệm vụ* (ví dụ một "phích thư nhiệm vụ" `ITEM_VALUE` = 0, không chế/dùng), bắt buộc:
 
 1. Thêm id vào `SECT_VAULT_DENY_ITEMS` (`shared/`); góp món đó trả `vault_denied` (đã có mã lỗi, mục 11.9).
-2. Test bất biến (D nộp ở K5): với mọi `itemId` trong `QUESTS` + `SECT_QUESTS`, nếu món đó KHÔNG bán được (`ITEM_VALUE` = 0) VÀ KHÔNG chế/dùng được → phải có trong `SECT_VAULT_DENY_ITEMS`. Đột biến: bỏ một id khỏi danh sách → test đỏ.
+2. **Test bất biến** (D nộp ở PR test riêng, ưu tiên thấp theo A): hàm thuần nhận bảng (nhiệm vụ, `ITEM_VALUE`, công thức, danh sách chặn) làm tham số + ca bảng giả (món `ITEM_VALUE` = 0, không chế / dùng, có trong nhiệm vụ, KHÔNG có trong danh sách chặn ⇒ đỏ; thêm vào danh sách ⇒ xanh); trên dữ liệu thật phải xanh. Đột biến: bỏ một id khỏi danh sách → test đỏ. PR chỉ test cần B / C LGTM.
 
-## 7. Cách kiểm (đã chạy, trên `origin/main` `9bdebd0c`)
+## 7. Mô phỏng kinh tế nhỏ (phần 4 của #789): kho có phá nhịp cân bằng không?
+
+Câu hỏi (issue #789 phần 4): một tông môn 30 người dùng kho theo hạn mức mặc định — một Đệ tử lấy tối đa bao nhiêu đồ / ngày, so với tốc độ rơi đồ thường?
+
+- **Trần rút của một Đệ tử:** `SECT_VAULT_DRAW_DEFAULT` = 3 lượt / ngày × `SECT_VAULT_DRAW_QTY_DE_TU` = 10 món / lượt = **30 món / ngày** (Tông chủ có thể nâng `drawPerDay` tới `SECT_VAULT_DRAW_MAX` = 10 → trần 100 món / ngày; Tông chủ / Trưởng lão rút tự do, không hạn).
+- **So với tốc độ rơi thường:** nguyên liệu phổ thông rơi từ quái dễ (vd `long_tho` chance 0,5 × trung bình 1,5 = ~0,75 món / sát thương; `nanh_soi` ~0,68 / sát thương). Một Đệ tử cày quái thường xuyên dễ đạt vài chục tới hàng trăm món / ngày — **vượt xa trần rút 30 / ngày**. Vậy hạn mức rút KHÔNG bao giờ là nút thắt và KHÔNG tạo đường tắt: Đệ tử KHÔNG thể rút nhanh hơn mình cày.
+- **Giá trị Linh thạch tối đa rút được / ngày:** 30 món × giá cao nhất trong kho. Nếu rút toàn `thien_han_chau` (1800 LS) = 54.000 LS / ngày / Đệ tử — NHƯNG chỉ rút được số đã có trong kho, mà số đó do cả tông cống hiến (trừ túi → lưu hồ sơ → cộng kho, không nhân đôi, K5 phần 2-3 #790). Không có nguồn nào sinh ra `thien_han_chau` ngoài hạ Thiên Hàn Vương.
+- **Kết luận:** kho đồ là cơ chế **ngân hàng / gộp nguyên liệu** (conservation — tổng đồ = tổng đã góp, do K5 phần 2-3 #790 đảm bảo), KHÔNG phải nguồn sinh đồ. Trần rút 30 / ngày / Đệ tử là một tiện lợi nhỏ, **KHÔNG phá nhịp cân bằng** vật liệu.
+
+## 8. Cách kiểm (đã chạy, trên `origin/main` `9bdebd0c`)
 
 - `grep` mọi `kind: "collect", itemId` ở `quests.ts` (13 id riêng) và `sect-depth.ts` (9 id riêng).
 - Đối chiếu mỗi id với `ITEM_VALUE` trong `currency.ts` (kể cả `...SKILL_BOOK_VALUE` cho `kinh_*`), số lần xuất hiện trong `recipes.ts`.
