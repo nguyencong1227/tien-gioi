@@ -37,6 +37,18 @@ export function stepOf(realm: number, tier: number): number {
   return s + tier;
 }
 
+/** Ngược của `stepOf`: (cảnh giới, bậc) ứng với vị trí `step` trên thang; `null` nếu `step` không phải số nguyên trong thang. Dùng đổi cột `step` của bảng xếp hạng Linh hồn ra chữ (`realmLabel`). */
+export function realmOfStep(step: number): { realm: number; tier: number } | null {
+  if (!Number.isInteger(step) || step < 0) return null;
+  let left = step;
+  for (let realm = 0; realm < REALMS.length; realm++) {
+    const n = REALMS[realm].tiers.length;
+    if (left < n) return { realm, tier: left };
+    left -= n;
+  }
+  return null;
+}
+
 export function isLastTier(realm: number, tier: number): boolean {
   return tier >= REALMS[realm].tiers.length - 1;
 }

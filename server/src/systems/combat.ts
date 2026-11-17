@@ -27,6 +27,8 @@ import { duelBeam, duelSlash, reviveInPlace } from "./duel";
 import { changeCoin, splitCoin } from "./wallet";
 import { absorbShield, entriesOf, takenMult } from "./status-rules";
 import { ELITE_COIN_MULT } from "./elite";
+import { isEvading } from "./nav-chase";
+import { trackSocial } from "./social";
 
 /** Kiếm chém: hình quạt trước mặt. */
 export function slash(w: World, sid: string, angle: unknown) {
@@ -110,7 +112,7 @@ export function dealMonsterDamage(
   if (mc.boss) dmg = Math.max(1, Math.round(dmg * bossArmorMult(mc, w.now))); // giáp của trùm (`buff`, mục 42)
   mon.hp = Math.max(0, mon.hp - dmg);
   if (by) mc.damageBy.set(by, (mc.damageBy.get(by) ?? 0) + dmg);
-  if (aggro && by) mc.target = by;
+  if (aggro && by && !isEvading(w, mc)) mc.target = by; // đang rút về chỗ sinh (mục 48): không bị đòn đánh kéo lại
   w.events.dmg({ target: id, amount: dmg, x: mon.x, y: mon.y - 18, crit });
   if (mon.hp <= 0) killMonster(w, id, mc);
 }
@@ -140,6 +142,7 @@ export function killMonster(w: World, id: string, mc: MonsterCtrl) {
       life.kills++;
       if (mc.def.boss) life.bossKills++;
     }
+    if (mc.def.boss) trackSocial(w, sid, [`boss:${mc.def.id}`, 1]); // thành tựu theo linh hồn (M9.5): số lần hạ từng loài trùm
   }
   if (mon) dropCoin(w, mc, mon.x, mon.y);
   if (mc.def.boss) w.events.sys(`🐉 ${mc.def.name} đã bị hạ!`);

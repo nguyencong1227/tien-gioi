@@ -51,7 +51,6 @@ import {
   buyPrice,
   sellPrice,
   SHOP_BY_NPC,
-  SHOP_MAX_QTY,
   type WalletMsg,
   UNLOCKS,
   ORIGINS,
@@ -95,7 +94,29 @@ import {
   cleanSectName,
   cleanSectTag,
   cleanMotd,
+  BOARD_IDS,
+  BOARD_LABELS,
+  type BoardId,
+  WORLD_BOSS_SCHEDULE,
+  type WorldBossMsg,
+  type AchievementsMsg,
 } from "@tien-gioi/shared";
+import { REFRESH_NOTE, asBoardId, boardView, sanitizeBoardsMsg } from "./board-view";
+import {
+  AskGate,
+  achievementsView,
+  sanitizeAchievementNewMsg,
+  sanitizeAchievementsMsg,
+  titleUnlockToast,
+} from "./achievement-view";
+import {
+  SCHEDULE_TZ_NOTE,
+  WB_OVERDUE_MS,
+  bannerShown,
+  sanitizeWorldBossMsg,
+  scheduleRows,
+  worldBossView,
+} from "./world-boss-view";
 import {
   dungeonEndReasonText,
   dungeonFallenToastText,
@@ -148,7 +169,14 @@ import {
   type VaultPlan,
   vaultLockedNote,
 } from "./sect-vault";
-import { hallLeaveWarning, hallRefreshDelayMs, sanitizeHallView } from "./sect-hall";
+import {
+  depositPreviewText,
+  hallLeaveWarning,
+  hallRefreshDelayMs,
+  hallShopRows,
+  sanitizeHallView,
+  shopBuyPreviewText,
+} from "./sect-hall";
 import { renderHall, updateHallCountdown, type HallUiState } from "./sect-hall-ui";
 import { canAffordFee, feeChipText, recipeFee } from "./forge-fee";
 import { perfRttText } from "./net-latency";
@@ -172,6 +200,15 @@ import {
 } from "./rarity";
 import { quickLabel } from "./quick-label";
 import { initKeyLabels } from "./keybinds-dom";
+import {
+  DEFAULT_SOCIAL_TAB,
+  SOCIAL_TABS,
+  asSocialTab,
+  socialEnabled,
+  socialTabByKey,
+  tabByKey,
+  type SocialTabId,
+} from "./social-tabs";
 import {
   ACTION_BY_ID,
   FIXED_KEYS,
@@ -207,7 +244,14 @@ import {
 import { transitionMs, waitOrSkip } from "./gfx/scene-transition";
 import { getDisplay, onDisplayChange } from "./gfx/display";
 import { optionTag, skipHintText } from "./dialog-opt";
-import { dropConfirmText, dropStillValid, dropWarnText, planDrop, type DropPlan } from "./inv-drop";
+import {
+  dropConfirmText,
+  dropStillValid,
+  dropWarnText,
+  planDrop,
+  withDropQty,
+  type DropPlan,
+} from "./inv-drop";
 import {
   inConfirmGuard,
   rebirthPlan,
@@ -263,7 +307,11 @@ import {
   markNewbieGuideDismissed,
 } from "./a11y";
 import { $, buttonShown, fmt, hexColor, onPress, readPref, writePref } from "./ui-util";
+import { applyMapCard, mapCardUrl } from "./map-card";
+import { NpcPortraitSlot } from "./npc-portrait";
 import { describeStep, renderQuestTrackerView } from "./ui-quest-tracker";
+import { createQtyStepper, type QtyStepper } from "./qty-stepper";
+import { buyQtyMax, sellQtyMax } from "./shop-qty";
 
 // `fmt` từng được xuất từ đây (test `sect.test.ts` nhập động): giữ tên xuất cũ sau khi chuyển sang `ui-util.ts`.
 export { fmt };
@@ -335,9 +383,16 @@ export interface UiCallbacks {
   onSectVaultPolicy?: (drawPerDay: number) => void;
   /** Tab Nội vụ (M8.6): xin ảnh chụp mới (lúc mở tab, khi qua mốc đặt lại trong ngày), nhận / trả nhiệm vụ tông, mua ở cửa hàng tông */
   onSectHallGet?: () => void;
+  /** Bảng Xã hội (M9.6): xin một bảng xếp hạng (máy chủ trả tin `boards`) */
+  onBoardsGet?: (board: BoardId) => void;
+  /** Bảng Xã hội, tab Sự kiện (M9.7): xin sự kiện trùm thế giới đang diễn ra / sắp tới (máy chủ trả tin `worldBoss`) */
+  onWorldBossGet?: () => void;
+  /** Bảng Xã hội, tab Thành tựu (M9.8): xin sổ thành tựu (máy chủ trả tin `achievements`) / đeo hoặc gỡ danh hiệu (`null` = gỡ; máy chủ LUÔN trả lại `achievements`) */
+  onAchievementsGet?: () => void;
+  onTitleSet?: (id: string | null) => void;
   onSectQuestAccept?: (questId: string) => void;
   onSectQuestTurnIn?: (questId: string) => void;
-  onSectShopBuy?: (itemId: string) => void;
+  onSectShopBuy?: (itemId: string, qty?: number) => void;
   /** Đã gục / ở Hoàng Tuyền (khoá nhận / trả / mua ở tab Nội vụ; máy chủ vẫn kiểm lại) */
   isSectDown?: () => boolean;
   /** Bảng Công pháp: gắn chiêu vào ô 2-5 (`skillId` "" = gỡ); máy chủ trả `skills` (sổ đúng) */
@@ -449,6 +504,534 @@ let currentSect: SectView | null = null;
 let currentSectPresence: SectPresenceMsg | null = null;
 let sectModalOpen = false;
 let sectTab: "overview" | "members" | "treasury" | "vault" | "hall" = "overview";
+// Bảng Xã hội (M9, #1025): khung ba tab; chỉ mở được khi cờ `?social=1` bật (`socialEnabled`)
+let socialModalOpen = false;
+let socialTab: SocialTabId = DEFAULT_SOCIAL_TAB;
+
+/** Đồng bộ thanh tab + thân tab Xã hội theo `socialTab` (aria-selected, tabindex lăn, ẩn / hiện thân). */
+function renderSocialTabs() {
+  for (const t of SOCIAL_TABS) {
+    const on = t.id === socialTab;
+    const btn = $(`social-tab-btn-${t.id}`);
+    btn.classList.toggle("active", on);
+    btn.setAttribute("aria-selected", on ? "true" : "false");
+    btn.tabIndex = on ? 0 : -1;
+    $(`social-tab-${t.id}`).hidden = !on;
+  }
+}
+// Tab Xếp hạng (M9.6, #1025): bốn bảng, mỗi bảng giữ bản MỚI NHẤT đã làm sạch + đồng hồ máy khách lúc nhận (chỉ để đo khoảng trôi của "tuổi bản chụp")
+let socialBoard: BoardId = BOARD_IDS[0];
+const socialBoards = new Map<
+  BoardId,
+  { msg: NonNullable<ReturnType<typeof sanitizeBoardsMsg>>; at: number }
+>();
+/** Lần xin gần nhất của từng bảng (đồng hồ máy khách): không xin lại trong `BOARD_ASK_GAP_MS`; quá `BOARD_WAIT_MS` chưa thấy trả lời thì hiện nút "Tải lại". */
+const socialBoardAsked = new Map<BoardId, number>();
+const BOARD_ASK_GAP_MS = 20_000;
+const BOARD_WAIT_MS = 6_000;
+let socialBoardTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearSocialBoardTimer() {
+  if (socialBoardTimer !== null) {
+    clearTimeout(socialBoardTimer);
+    socialBoardTimer = null;
+  }
+}
+
+/** Xin bảng `board` từ máy chủ (bỏ qua nếu vừa xin chưa lâu và đã có bản; `force` = bấm "Tải lại"). Có hẹn giờ để hiện nút thử lại nếu máy chủ im. */
+function requestSocialBoard(board: BoardId, force = false) {
+  const now = performance.now();
+  const last = socialBoardAsked.get(board);
+  if (!force && last !== undefined && now - last < BOARD_ASK_GAP_MS && socialBoards.has(board))
+    return;
+  socialBoardAsked.set(board, now);
+  callbacks?.onBoardsGet?.(board);
+  clearSocialBoardTimer();
+  if (!socialBoards.has(board)) {
+    socialBoardTimer = setTimeout(() => {
+      socialBoardTimer = null;
+      if (socialModalOpen && socialTab === "rank") renderSocialRank();
+    }, BOARD_WAIT_MS + 50);
+  }
+}
+
+/** Vẽ tab Xếp hạng: thanh tab phụ, câu "Hạng của bạn", bảng (đạo hiệu / danh hiệu / cột theo `BOARD_COLUMNS`), tuổi bản chụp, trạng thái tải / trống. Đổ chữ bằng `textContent`. */
+function renderSocialRank() {
+  for (const id of BOARD_IDS) {
+    const on = id === socialBoard;
+    const btn = $(`social-board-btn-${id}`);
+    btn.classList.toggle("active", on);
+    btn.setAttribute("aria-selected", on ? "true" : "false");
+    btn.tabIndex = on ? 0 : -1;
+  }
+  $("social-board-panel").setAttribute("aria-labelledby", `social-board-btn-${socialBoard}`);
+  const entry = socialBoards.get(socialBoard);
+  const status = $("social-board-status");
+  const wrap = $("social-board-wrap");
+  const retry = $("social-board-retry");
+  const mine = $("social-board-mine");
+  const age = $("social-board-age");
+  if (!entry) {
+    const asked = socialBoardAsked.get(socialBoard);
+    const stale = asked !== undefined && performance.now() - asked >= BOARD_WAIT_MS;
+    status.hidden = false;
+    status.textContent = stale
+      ? "Chưa nhận được bảng. Thử tải lại nhé."
+      : `Đang tải bảng ${BOARD_LABELS[socialBoard]}…`;
+    wrap.hidden = true;
+    retry.hidden = !stale;
+    mine.textContent = "";
+    age.textContent = "";
+    return;
+  }
+  const v = boardView(entry.msg, performance.now() - entry.at);
+  retry.hidden = true;
+  mine.textContent = v.mineText;
+  const ageLine = v.ageText ? v.ageText.charAt(0).toUpperCase() + v.ageText.slice(1) + ". " : "";
+  age.textContent = v.empty ? "" : `${ageLine}${REFRESH_NOTE}`;
+  status.hidden = !v.empty;
+  status.textContent = v.empty ? "Chưa có ai trên bảng này." : "";
+  wrap.hidden = v.empty;
+  const head = $("social-board-head");
+  head.textContent = "";
+  const th = (t: string, cls: string) => {
+    const e = document.createElement("th");
+    e.scope = "col";
+    e.textContent = t;
+    e.className = cls;
+    head.appendChild(e);
+  };
+  th("Hạng", "c-rank");
+  th(v.board === "tongmon" ? "Tông môn" : "Đạo hiệu", "c-name");
+  for (const c of v.columns) th(c, "c-num");
+  $("social-board-caption").textContent = `${v.label}: ${v.rows.length} dòng đầu bảng`;
+  const body = $("social-board-body");
+  body.textContent = "";
+  const addRow = (r: (typeof v.rows)[number], extra = "") => {
+    const tr = document.createElement("tr");
+    tr.className = `${r.mine ? "mine" : ""} ${extra}`.trim();
+    const rank = document.createElement("td");
+    rank.className = "c-rank";
+    rank.textContent = String(r.rank);
+    const name = document.createElement("td");
+    name.className = "c-name";
+    const n = document.createElement("span");
+    n.className = "n";
+    n.textContent = r.name;
+    name.appendChild(n);
+    if (r.title) {
+      const t = document.createElement("span");
+      t.className = "t";
+      t.textContent = r.title;
+      name.appendChild(t);
+    }
+    if (r.test) {
+      const t = document.createElement("span");
+      t.className = "test";
+      t.textContent = "thử nghiệm";
+      name.appendChild(t);
+    }
+    tr.append(rank, name);
+    for (const c of r.cells) {
+      const td = document.createElement("td");
+      // ô SỐ ("40.000", "—") không xuống dòng; ô CHỮ nhiều từ (tên cảnh giới) xuống dòng ở khoảng trắng
+      td.className = /\s/.test(c) ? "c-num" : "c-num nw";
+      td.textContent = c;
+      tr.appendChild(td);
+    }
+    body.appendChild(tr);
+  };
+  for (const r of v.rows) addRow(r);
+  if (v.mineRow) {
+    const gap = document.createElement("tr");
+    gap.className = "gap";
+    const td = document.createElement("td");
+    td.colSpan = 2 + v.columns.length;
+    td.textContent = "…";
+    td.setAttribute("aria-hidden", "true");
+    gap.appendChild(td);
+    body.appendChild(gap);
+    addRow(v.mineRow, "outside");
+  }
+}
+
+// ---- Trùm thế giới (M9.7, #1026): banner + tab Sự kiện, vẽ từ `world-boss-view.ts` ----
+/** Tin `worldBoss` MỚI NHẤT (mọi phase) + đồng hồ máy khách lúc nhận (chỉ để đo KHOẢNG TRÔI của đồng hồ đếm ngược, không phải giờ tuyệt đối). */
+let wbLast: { msg: WorldBossMsg; at: number } | null = null;
+/** Kết quả của sự kiện vừa kết thúc, hiện thay banner một lúc (`WB_RESULT_MS`). */
+let wbResult: { text: string; tone: "info" | "good" | "bad" } | null = null;
+let wbResultTimer: ReturnType<typeof setTimeout> | null = null;
+let wbAskedAt: number | null = null;
+let wbTabTimer: ReturnType<typeof setTimeout> | null = null;
+let wbTickTimer: ReturnType<typeof setInterval> | null = null;
+/** Danh sách đóng góp mở sẵn trên màn rộng; điện thoại / khung thấp thu gọn (bấm "Xem đóng góp" để mở). */
+let wbExpanded =
+  typeof window !== "undefined" && window.innerWidth >= 900 && window.innerHeight >= 500;
+let wbTopKey = "";
+let wbScheduleBuilt = false;
+const WB_RESULT_MS = 10_000;
+const WB_ASK_GAP_MS = 20_000;
+const WB_WAIT_MS = 6_000;
+/** Tin kết thúc giống hệt đến lại trong chừng này thì không toast lần hai (gửi lại khi vào phòng / nối lại). */
+const WB_DUP_MS = 60_000;
+
+function socialFlagOn(): boolean {
+  return typeof window !== "undefined" && socialEnabled(window.location.search);
+}
+
+function setWbText(id: string, t: string) {
+  const e = $(id);
+  if (e.textContent !== t) e.textContent = t;
+}
+
+/** Xin sự kiện trùm thế giới (bỏ qua nếu vừa xin chưa lâu và đã có tin; `force` = bấm "Tải lại" / tin đã quá hạn). */
+function requestWorldBoss(force = false) {
+  const now = performance.now();
+  if (!force && wbAskedAt !== null && now - wbAskedAt < WB_ASK_GAP_MS && wbLast) return;
+  wbAskedAt = now;
+  callbacks?.onWorldBossGet?.();
+  if (wbTabTimer !== null) clearTimeout(wbTabTimer);
+  wbTabTimer = null;
+  if (!wbLast) {
+    wbTabTimer = setTimeout(() => {
+      wbTabTimer = null;
+      renderWbTab();
+    }, WB_WAIT_MS + 50);
+  }
+}
+
+/** Banner đầu màn hình: đếm ngược / máu / phần đóng góp của mình / danh sách đóng góp, hoặc kết quả vừa kết thúc. Trả `true` nếu cần đồng hồ chạy. */
+function renderWbBanner(): boolean {
+  const banner = $("wb-banner");
+  const hide = () => {
+    if (!banner.hidden) banner.hidden = true;
+    return false;
+  };
+  if (!socialFlagOn()) return hide();
+  if (wbResult) {
+    banner.hidden = false;
+    banner.dataset.tone = wbResult.tone;
+    for (const id of ["wb-title", "wb-hp", "wb-mine"]) setWbText(id, "");
+    $("wb-timer").parentElement!.hidden = true;
+    $("wb-title").parentElement!.hidden = true;
+    $("wb-mine").hidden = true;
+    $("wb-toggle").hidden = true;
+    $("wb-top").hidden = true;
+    const r = $("wb-result");
+    r.hidden = false;
+    setWbText("wb-result", wbResult.text);
+    return false;
+  }
+  if (!wbLast) return hide();
+  const v = worldBossView(wbLast.msg, performance.now() - wbLast.at);
+  if (!bannerShown(v)) return hide();
+  banner.hidden = false;
+  banner.dataset.tone = "info";
+  $("wb-result").hidden = true;
+  $("wb-title").parentElement!.hidden = false;
+  $("wb-timer").parentElement!.hidden = v.leftMs === null;
+  setWbText("wb-title", v.title);
+  setWbText("wb-hp", v.hp);
+  setWbText("wb-timer-label", v.timerLabel);
+  setWbText("wb-timer", v.timer);
+  setWbText("wb-mine", v.mineText);
+  $("wb-mine").hidden = v.mineText === "";
+  $("wb-mine").classList.toggle("low", v.mineEligible === false);
+  const hasTop = v.top.length > 0;
+  const toggle = $("wb-toggle");
+  toggle.hidden = !hasTop;
+  toggle.setAttribute("aria-expanded", wbExpanded ? "true" : "false");
+  setWbText("wb-toggle", wbExpanded ? "Ẩn đóng góp" : "Xem đóng góp");
+  const list = $("wb-top");
+  list.hidden = !(hasTop && wbExpanded);
+  const key = v.top.map((r) => `${r.rank}|${r.name}|${r.title}|${r.pct}`).join("\n");
+  if (key !== wbTopKey) {
+    wbTopKey = key;
+    list.textContent = "";
+    for (const r of v.top) {
+      const li = document.createElement("li");
+      const n = document.createElement("span");
+      n.className = "n";
+      n.textContent = r.name;
+      li.append(n);
+      if (r.title) {
+        const t = document.createElement("span");
+        t.className = "t";
+        t.textContent = r.title;
+        li.append(t);
+      }
+      const pct = document.createElement("span");
+      pct.className = "pct";
+      pct.textContent = r.pct;
+      li.append(pct);
+      list.append(li);
+    }
+  }
+  return v.leftMs !== null;
+}
+
+/** Tab "Sự kiện": trạng thái hiện tại (đếm ngược / đang diễn ra / kết quả / chưa có) + bảng lịch hằng ngày (dữ liệu tĩnh của shared, giờ máy chủ). Trả `true` nếu cần đồng hồ chạy. */
+function renderWbTab(): boolean {
+  if (!socialModalOpen || socialTab !== "event") return false;
+  if (!wbScheduleBuilt) {
+    wbScheduleBuilt = true;
+    const rows = scheduleRows(WORLD_BOSS_SCHEDULE);
+    $("wbt-empty").hidden = rows.length > 0;
+    $("wbt-wrap").hidden = rows.length === 0;
+    const body = $("wbt-body");
+    body.textContent = "";
+    for (const r of rows) {
+      const tr = document.createElement("tr");
+      const cells: [string, string][] = [
+        [r.time, "c-time"],
+        [r.boss, "c-name"],
+        [r.map, ""],
+        [r.duration, "c-num nw"],
+      ];
+      for (const [t, cls] of cells) {
+        const td = document.createElement("td");
+        td.textContent = t;
+        if (cls) td.className = cls;
+        tr.append(td);
+      }
+      body.append(tr);
+    }
+    setWbText("wbt-tz", rows.length > 0 ? SCHEDULE_TZ_NOTE : "");
+  }
+  const retry = $("wbt-retry");
+  if (!wbLast) {
+    const stale = wbAskedAt !== null && performance.now() - wbAskedAt >= WB_WAIT_MS;
+    setWbText(
+      "wbt-status",
+      stale ? "Chưa nhận được thông tin sự kiện. Thử tải lại nhé." : "Đang tải sự kiện…",
+    );
+    setWbText("wbt-detail", "");
+    retry.hidden = !stale;
+    return false;
+  }
+  retry.hidden = true;
+  const v = worldBossView(wbLast.msg, performance.now() - wbLast.at);
+  if (v.active && v.overdueMs > WB_OVERDUE_MS) {
+    setWbText("wbt-status", "Đang cập nhật sự kiện…");
+    setWbText("wbt-detail", "");
+    return false;
+  }
+  let status: string;
+  let detail = "";
+  if (v.phase === "none" || v.phase === "ended") status = v.resultText;
+  else if (v.phase === "soon")
+    status = `${v.title}: ${v.timerLabel.toLowerCase()} ${v.timer}`.trim();
+  else {
+    status = `${v.title}: đang diễn ra${v.timer ? `, còn ${v.timer}` : ""}.`;
+    detail = [v.hp, v.mineText].filter(Boolean).join(" · ");
+  }
+  setWbText("wbt-status", status);
+  setWbText("wbt-detail", detail);
+  return v.active && v.leftMs !== null;
+}
+
+/** Bật / tắt đồng hồ 1 giây theo nhu cầu (banner hoặc tab Sự kiện đang hiện đồng hồ); không có gì đếm thì KHÔNG chạy gì nền. */
+function syncWbTick() {
+  // vẽ CẢ HAI trước rồi mới gộp (`a || b` sẽ bỏ qua vế sau khi vế đầu đúng: tab Sự kiện không được vẽ lại khi banner đang đếm)
+  const banner = renderWbBanner();
+  const tab = renderWbTab();
+  const need = banner || tab;
+  if (need && wbTickTimer === null) {
+    wbTickTimer = setInterval(() => {
+      const b = renderWbBanner();
+      const t = renderWbTab();
+      if (!b && !t) syncWbTick();
+    }, 1000);
+  } else if (!need && wbTickTimer !== null) {
+    clearInterval(wbTickTimer);
+    wbTickTimer = null;
+  }
+}
+
+// ---- Thành tựu + danh hiệu (M9.8, #1027): tab Thành tựu, vẽ từ `achievement-view.ts` ----
+/** Sổ thành tựu MỚI NHẤT (đã làm sạch) của chính mình; `null` = chưa nhận. Danh hiệu đang đeo lấy từ đây, KHÔNG đoán trước khi bấm. */
+let achLast: AchievementsMsg | null = null;
+/** Thành tựu mới đạt mà chưa xem (đánh dấu "Mới" + chấm trên nút HUD); xoá khi rời tab Thành tựu / đóng bảng. */
+const achNew = new Set<string>();
+const achGate = new AskGate();
+let achTimer: ReturnType<typeof setTimeout> | null = null;
+/** Đang chờ máy chủ trả lời việc đổi danh hiệu (`undefined` = không chờ; `null` = đang gỡ). Hết `ACH_TITLE_WAIT_MS` mà chưa thấy thì thôi chờ. */
+let achPending: string | null | undefined;
+let achPendingTimer: ReturnType<typeof setTimeout> | null = null;
+/** Nhóm mở / đóng do NGƯỜI CHƠI chọn (vẽ lại không làm mất lựa chọn). */
+const achOpen = new Map<string, boolean>();
+const ACH_TITLE_WAIT_MS = 5_000;
+/** Đã hiện danh sách thành tựu cho người chơi thấy kể từ lúc vào tab (điều kiện để xoá dấu "Mới" khi rời). */
+let achViewed = false;
+
+function achEl(id: string): HTMLElement {
+  return $(id);
+}
+
+/** Chấm "có thành tựu mới" trên nút HUD Xã hội (hình tròn, không chỉ màu) + nhãn đọc màn hình. */
+function syncAchDot() {
+  const btn = $("btn-social");
+  const on = achNew.size > 0 && !(socialModalOpen && socialTab === "ach");
+  btn.classList.toggle("has-new", on);
+  const base = "Xã hội: xếp hạng, thành tựu, sự kiện (Phím Shift+G)";
+  btn.setAttribute("aria-label", on ? `${base}. Có thành tựu mới` : base);
+}
+
+/** Rời tab Thành tựu (đổi tab / đóng bảng): nếu người chơi ĐÃ thấy danh sách thì xoá dấu "Mới" + chấm trên nút HUD; chưa từng thấy (mới đạt lúc đang ở tab khác) thì giữ. */
+function leaveAch() {
+  if (!achViewed) return;
+  achViewed = false;
+  if (achNew.size === 0) return;
+  achNew.clear();
+  syncAchDot();
+}
+
+function requestAch(force = false) {
+  const now = performance.now();
+  if (!achGate.tryAsk(now, achLast !== null, force)) return;
+  callbacks?.onAchievementsGet?.();
+  if (achTimer !== null) clearTimeout(achTimer);
+  achTimer = null;
+  if (!achLast) {
+    achTimer = setTimeout(() => {
+      achTimer = null;
+      renderAch();
+    }, achGate.waitMsValue + 50);
+  }
+}
+
+/** Vẽ tab Thành tựu: tóm tắt, danh hiệu (radiogroup), thành tựu theo nhóm (details). Đổ chữ bằng `textContent`; vẽ lại giữ nhóm người chơi đã mở / đóng. */
+function renderAch() {
+  if (!socialModalOpen || socialTab !== "ach") return;
+  const status = achEl("ach-status");
+  const retry = achEl("ach-retry");
+  const body = achEl("ach-body");
+  if (!achLast) {
+    const stale = achGate.stale(performance.now(), false);
+    status.hidden = false;
+    status.textContent = stale
+      ? "Chưa nhận được sổ thành tựu. Thử tải lại nhé."
+      : "Đang tải sổ thành tựu…";
+    retry.hidden = !stale;
+    body.hidden = true;
+    achEl("ach-summary").textContent = "";
+    return;
+  }
+  status.hidden = true;
+  retry.hidden = true;
+  body.hidden = false;
+  const v = achievementsView(achLast, achNew);
+  achViewed = true;
+  achEl("ach-summary").textContent = v.summary;
+  achEl("ach-worn").textContent = achPending !== undefined ? "Đang đổi danh hiệu…" : v.wornText;
+  // danh hiệu: một nút "Không đeo" + mỗi danh hiệu một nút (khoá thì aria-disabled + nói cách mở bằng CHỮ)
+  const titles = achEl("ach-titles");
+  titles.textContent = "";
+  const mkTitle = (
+    id: string | null,
+    text: string,
+    checked: boolean,
+    locked: boolean,
+    hint: string,
+  ) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "ach-title" + (checked ? " on" : "") + (locked ? " locked" : "");
+    b.setAttribute("role", "radio");
+    b.setAttribute("aria-checked", checked ? "true" : "false");
+    if (locked) b.setAttribute("aria-disabled", "true");
+    const t = document.createElement("span");
+    t.className = "ach-title-text";
+    t.textContent = text;
+    b.append(t);
+    if (hint) {
+      const h = document.createElement("span");
+      h.className = "ach-title-hint";
+      h.textContent = hint;
+      b.append(h);
+    }
+    b.addEventListener("click", () => {
+      if (locked || checked || achPending !== undefined) return;
+      achPending = id;
+      if (achPendingTimer !== null) clearTimeout(achPendingTimer);
+      achPendingTimer = setTimeout(() => {
+        achPendingTimer = null;
+        achPending = undefined;
+        renderAch();
+      }, ACH_TITLE_WAIT_MS);
+      callbacks?.onTitleSet?.(id);
+      renderAch();
+    });
+    titles.append(b);
+  };
+  mkTitle(null, "Không đeo", v.worn === null, false, "");
+  for (const t of v.titles) mkTitle(t.id, t.text, t.worn, !t.unlocked, t.hint);
+  // thành tựu theo nhóm
+  const groups = achEl("ach-groups");
+  groups.textContent = "";
+  const few = v.total <= 12;
+  v.groups.forEach((g, gi) => {
+    const det = document.createElement("details");
+    det.className = "ach-group";
+    const hasNew = g.items.some((i) => i.isNew);
+    det.open = achOpen.get(g.id) ?? (few || gi === 0 || hasNew);
+    det.addEventListener("toggle", () => achOpen.set(g.id, det.open));
+    const sum = document.createElement("summary");
+    sum.textContent = `${g.label} (${g.done} / ${g.total})`;
+    det.append(sum);
+    const ul = document.createElement("ul");
+    ul.className = "ach-list";
+    for (const it of g.items) {
+      const li = document.createElement("li");
+      li.className = "ach-item" + (it.done ? " done" : "") + (it.isNew ? " new" : "");
+      const head = document.createElement("div");
+      head.className = "ach-head";
+      const name = document.createElement("b");
+      name.className = "ach-name";
+      name.textContent = it.name;
+      head.append(name);
+      if (it.isNew) {
+        const n = document.createElement("span");
+        n.className = "ach-badge";
+        n.textContent = "Mới";
+        head.append(n);
+      }
+      const st = document.createElement("span");
+      st.className = "ach-state";
+      st.textContent = it.done ? (it.at ? `Hoàn thành · ${it.at}` : "Hoàn thành") : it.progress;
+      head.append(st);
+      li.append(head);
+      const d = document.createElement("p");
+      d.className = "ach-desc";
+      d.textContent = it.desc;
+      li.append(d);
+      if (!it.done) {
+        const bar = document.createElement("div");
+        bar.className = "ach-bar";
+        bar.setAttribute("role", "progressbar");
+        bar.setAttribute("aria-label", `Tiến độ: ${it.name}`);
+        bar.setAttribute("aria-valuemin", "0");
+        bar.setAttribute("aria-valuemax", "100");
+        bar.setAttribute("aria-valuenow", String(it.pct));
+        bar.setAttribute("aria-valuetext", it.progress);
+        const fill = document.createElement("i");
+        fill.style.width = `${it.pct}%`;
+        bar.append(fill);
+        li.append(bar);
+      }
+      if (it.reward) {
+        const r = document.createElement("p");
+        r.className = "ach-reward";
+        r.textContent = it.reward;
+        li.append(r);
+      }
+      ul.append(li);
+    }
+    det.append(ul);
+    groups.append(det);
+  });
+}
+
 // ---- Nội vụ tông môn (M8.6, #843) ----
 /** Ảnh chụp "Nội vụ" MỚI NHẤT đã làm sạch + đồng hồ máy khách lúc nhận (để đếm ngược theo giờ máy chủ); `null` = chưa có. */
 let sectHall: { view: NonNullable<ReturnType<typeof sanitizeHallView>>; at: number } | null = null;
@@ -456,6 +1039,9 @@ let sectHall: { view: NonNullable<ReturnType<typeof sanitizeHallView>>; at: numb
 const hallBusy = new Set<string>();
 /** Trạng thái mở / thu của các nhóm cửa hàng tông môn do người chơi đổi (khác mặc định); xoá khi rời / hết tông môn */
 const hallGroupOpen = new Map<string, boolean>();
+/** Khung "mua nhiều" của cửa hàng tông (ô số lượng dùng chung): hàng đang mở và MỘT ô số lượng dùng lại cho mọi hàng (`setQty` / `setMax` mỗi lần mở) */
+let hallBuyOpen: string | null = null;
+let hallBuyStepper: QtyStepper | null = null;
 let hallBusyTimer: ReturnType<typeof setTimeout> | null = null;
 const HALL_BUSY_MS = 5000;
 /** Đồng hồ đếm ngược của tab Nội vụ (mỗi giây, chỉ chạy khi tab đang xem) và mốc đặt lại đã xin ảnh chụp mới (mỗi mốc xin MỘT lần). */
@@ -469,6 +1055,12 @@ let sectVault: SectVaultView | null = null;
 /** Ô đang chọn: từ kho (rút) hoặc từ túi (góp). Chỉ bấm / chạm / bàn phím mới chọn, rê chuột KHÔNG chọn (mục 24, `inv-select.test.ts`). */
 let vaultSel: { from: "vault" | "bag"; index: number } | null = null;
 let vaultQty = 1;
+/** Ô nhập số lượng dùng chung (qty-stepper.ts, mục 47) của kho đồ tông môn, và của hai ô Linh thạch ở tab Quỹ; gắn một lần ở `setup` */
+let vaultStepper: QtyStepper | null = null;
+let depositStepper: QtyStepper | null = null;
+let withdrawStepper: QtyStepper | null = null;
+/** Đang vẽ lại tab Kho đồ: `onChange` của ô số lượng bắn trong lúc `setMax` thì không vẽ lại lồng nhau */
+let vaultRendering = false;
 /** Đang chờ máy chủ trả lời một thao tác kho đồ (mỗi người một thao tác tại một thời điểm): khoá nút tới khi có ảnh chụp mới / toast / hết `VAULT_BUSY_MS`. */
 let vaultBusy = false;
 let vaultBusyTimer: ReturnType<typeof setTimeout> | null = null;
@@ -651,6 +1243,8 @@ function loadSettings() {
 
 // Hộp thoại NPC
 let currentDialog: DialogMsg | null = null;
+/** Ô chân dung ở khung hội thoại (dựng lười ở lần mở đầu tiên). */
+let dlgPortrait: NpcPortraitSlot | null = null;
 let dlgTypeTimer: number | null = null;
 let dlgFullText = "";
 let dlgTypedLen = 0;
@@ -836,6 +1430,10 @@ function closeActConfirm(refocus = true): boolean {
 
 /** Kế hoạch vứt đang chờ xác nhận (chụp lúc bấm "Vứt 1" / "Vứt hết"); `null` = không có hộp. */
 let dropPlanPending: DropPlan | null = null;
+/** Kế hoạch GỐC lúc bấm nút ("Vứt 1" / "Vứt hết"); ô số lượng đổi số thì kế hoạch đang chờ được dựng lại từ đây (`withDropQty`) */
+let dropPlanInit: DropPlan | null = null;
+/** Ô số lượng dùng chung trong hộp xác nhận vứt (mục 47); chỉ hiện khi ô túi có từ 2 cái */
+let dropStepper: QtyStepper | null = null;
 /** Nút đã mở hộp (trả focus về đó khi đóng hộp bằng Esc / "Giữ lại") */
 let dropConfirmOpener: HTMLElement | null = null;
 /**
@@ -844,6 +1442,11 @@ let dropConfirmOpener: HTMLElement | null = null;
  */
 const DROP_CONFIRM_GUARD_MS = 450;
 let dropConfirmOpenedAt = -Infinity;
+/**
+ * Lúc hộp xác nhận vừa ĐÓNG: hộp biến mất thì hàng nút "Vứt 1" / "Vứt hết" hiện lại, có khi đúng chỗ ngón vừa chạm "Vứt" / "Giữ lại", và `click` do trình duyệt tạo sau khi nhả ngón rơi
+ * vào nút đó (`bindTap` nhớ lần chạm theo TỪNG nút nên không nhận ra) và mở hộp lần nữa ngay sau khi vừa vứt. Hai nút này bỏ qua click chuột / chạm trong cửa sổ chống click ma sau khi hộp đóng.
+ */
+let dropConfirmClosedAt = -Infinity;
 
 /** Mở hộp xác nhận vứt cho ô được chọn: ghi rõ TÊN + SỐ LƯỢNG (+ dòng nhắc đồ quý). `all` = "Vứt hết", ngược lại vứt 1. */
 function askDropConfirm(all: boolean, opener: HTMLElement | null) {
@@ -851,9 +1454,17 @@ function askDropConfirm(all: boolean, opener: HTMLElement | null) {
   const def = plan ? ITEM_BY_ID[plan.itemId] : undefined;
   if (!plan || !def) return;
   dropPlanPending = plan;
+  dropPlanInit = plan;
   dropConfirmOpener = opener;
   dropConfirmOpenedAt = performance.now();
   $("inv-drop-text").textContent = dropConfirmText(def.name, plan);
+  // ô số lượng: chỉ khi có từ 2 cái (1 cái thì không có gì để chọn); "Vứt 1" mở với số 1, "Vứt hết" mở với toàn bộ, chỉnh được trước khi xác nhận
+  const stepper = dropStepper;
+  $("inv-drop-qty").hidden = !(plan.have >= 2 && stepper);
+  if (stepper && plan.have >= 2) {
+    stepper.setMax(plan.have);
+    stepper.setQty(plan.qty);
+  }
   const warn = dropWarnText(def.rarity, rarityStyle(def.rarity).name);
   const warnEl = $("inv-drop-warn");
   warnEl.textContent = warn ?? "";
@@ -868,18 +1479,43 @@ function closeDropConfirm(refocus = true): boolean {
   const box = document.getElementById("inv-drop-confirm");
   if (!box || box.hidden) return false;
   box.hidden = true;
+  dropConfirmClosedAt = performance.now();
   $("inv-detail").classList.remove("dropping");
   dropPlanPending = null;
+  dropPlanInit = null;
   const back = dropConfirmOpener;
   dropConfirmOpener = null;
   if (refocus && back && !back.hidden) back.focus();
   return true;
 }
 
-/** "Vứt" trong hộp: kiểm lại túi vẫn còn ĐÚNG món + đủ số lượng như lúc bấm rồi mới gửi `dropItem`; đã đổi thì huỷ kèm thông báo. */
+/** Ô số lượng đổi số: dựng lại kế hoạch từ kế hoạch gốc và cập nhật lời trong hộp. Ô đang trống / sai (người chơi đang gõ lại) thì giữ kế hoạch cũ. */
+function onDropQtyChange(q: number | null) {
+  const init = dropPlanInit;
+  const def = init ? ITEM_BY_ID[init.itemId] : undefined;
+  if (!init || !def || q === null) return;
+  const plan = withDropQty(init, q);
+  dropPlanPending = plan;
+  $("inv-drop-text").textContent = dropConfirmText(def.name, plan);
+}
+
+/**
+ * "Vứt" trong hộp: đọc lại số trong ô (nếu có), kiểm lại túi vẫn còn ĐÚNG món + đủ số lượng rồi mới gửi `dropItem`; đã đổi thì huỷ kèm thông báo.
+ * Số trong ô trống / sai thì KHÔNG vứt và hộp vẫn mở (không gửi gì, không đoán số).
+ */
 function confirmDrop() {
   if (performance.now() - dropConfirmOpenedAt < DROP_CONFIRM_GUARD_MS) return; // click ma ngay sau khi hộp mở: bỏ qua
-  const plan = dropPlanPending;
+  let plan = dropPlanPending;
+  const init = dropPlanInit;
+  if (plan && init && !$("inv-drop-qty").hidden && dropStepper) {
+    const q = dropStepper.read();
+    if (q === null) {
+      ui.toast({ text: "Nhập số lượng vứt từ 1 trở lên.", tone: "bad" });
+      dropStepper.focus();
+      return;
+    }
+    plan = withDropQty(init, q);
+  }
   closeDropConfirm(true);
   if (!plan) return;
   if (!dropStillValid(invSlots, plan)) {
@@ -1845,6 +2481,48 @@ const shopBuyQuantities: Record<string, number> = {};
 const shopSellQuantities: Record<string, number> = {};
 let currentCoin = 0;
 
+/**
+ * Ô SỐ LƯỢNG của một thẻ cửa hàng NPC (mục 47): ô gõ số dùng chung (− / +, ×10 / ×100, Tối đa, giữ nút tăng nhanh dần, Enter xác nhận).
+ * Cả danh sách vẽ lại khi ví / túi đổi nên số chọn nhớ trong `store[key]` (chỉ ghi số HỢP LỆ: đang gõ dở / ô trống thì giữ số cũ); vẽ lại xong, ô dựng lại từ số đó.
+ * Đổi số chỉ cập nhật nút Mua / Bán tại chỗ (`onQty`), KHÔNG vẽ lại cả danh sách: vẽ lại sẽ làm mất con trỏ đang gõ. `nav` giữ `data-nav` cho điều hướng bằng mũi tên và
+ * `withFocusKept`; `onConfirm` = Enter trong ô (gọi nút Mua / Bán của chính thẻ).
+ */
+function createShopQty(args: {
+  idKey: string;
+  nav: string;
+  store: Record<string, number>;
+  key: string;
+  max: number;
+  label: string;
+  preview: (q: number) => string;
+  onQty: () => void;
+  onConfirm: () => void;
+}): QtyStepper {
+  const max = Math.max(1, Math.floor(args.max));
+  // `createQtyStepper` báo `onChange` ngay lúc dựng (số khởi đầu): chỉ chuyển tiếp cho nơi dùng SAU khi dựng xong (nơi dùng còn chưa có ô để đọc)
+  let ready = false;
+  const stepper = createQtyStepper({
+    label: args.label,
+    max,
+    initial: Math.min(max, Math.max(1, args.store[args.key] ?? 1)),
+    ids: { input: `shop-qty-${args.idKey}` },
+    preview: args.preview,
+    onChange: (q) => {
+      if (q !== null) args.store[args.key] = q;
+      if (ready) args.onQty();
+    },
+    onConfirm: args.onConfirm,
+  });
+  ready = true;
+  const q0 = stepper.getQty();
+  if (q0 !== null) args.store[args.key] = q0; // đã kẹp theo giới hạn hiện tại (ví / số đang có đổi)
+  const btns = stepper.el.querySelectorAll("button"); // thứ tự của `qty-stepper`: − + ×10 ×100 Tối đa
+  btns[0]!.dataset.nav = `${args.nav}:minus`;
+  btns[1]!.dataset.nav = `${args.nav}:plus`;
+  stepper.el.querySelector("input")!.dataset.nav = `${args.nav}:input`;
+  return stepper;
+}
+
 function renderShopModal() {
   const npc = NPC_BY_ID[shopNpcId];
   $("shop-title").textContent = npc ? `Cửa Hàng · ${npc.name}` : "Cửa Hàng Lão Dược Sư";
@@ -1892,10 +2570,8 @@ function renderShopBuyImpl() {
     if (!def) continue;
 
     const unitPrice = buyPrice(itemId);
-    const qty = Math.min(SHOP_MAX_QTY, Math.max(1, shopBuyQuantities[itemId] ?? 1));
-    shopBuyQuantities[itemId] = qty;
-    const totalPrice = unitPrice * qty;
-    const canAfford = currentCoin >= totalPrice;
+    // giới hạn = trần một lần của máy chủ, kẹp theo ví (tối thiểu 1: ví không đủ cả một cái thì nút Mua báo "Thiếu N")
+    const maxBuyQty = buyQtyMax(currentCoin, unitPrice);
 
     const card = document.createElement("div");
     card.className = "shop-card";
@@ -1932,75 +2608,59 @@ function renderShopBuyImpl() {
     info.append(nameRow, desc);
     left.append(icon, info);
 
-    // Cột phải: Chọn số lượng + Nút mua
+    // Cột phải: ô số lượng + nút mua
     const right = document.createElement("div");
     right.className = "shop-card-right";
-
-    const qtyBox = document.createElement("div");
-    qtyBox.className = "shop-qty-box";
-
-    const btnMinus = document.createElement("button");
-    btnMinus.type = "button";
-    btnMinus.className = "shop-qty-btn";
-    btnMinus.textContent = "−";
-    btnMinus.title = "Giảm số lượng";
-    btnMinus.dataset.nav = `buy:${itemId}:minus`;
-    btnMinus.disabled = qty <= 1;
-    onPress(
-      btnMinus,
-      () => {
-        if (qty > 1) {
-          shopBuyQuantities[itemId] = qty - 1;
-          renderShopBuy();
-        }
-      },
-      true,
-    );
-
-    const qtyVal = document.createElement("span");
-    qtyVal.className = "shop-qty-val";
-    qtyVal.textContent = `${qty}`;
-
-    const btnPlus = document.createElement("button");
-    btnPlus.type = "button";
-    btnPlus.className = "shop-qty-btn";
-    btnPlus.textContent = "+";
-    btnPlus.title = "Tăng số lượng";
-    btnPlus.dataset.nav = `buy:${itemId}:plus`;
-    btnPlus.disabled = qty >= SHOP_MAX_QTY;
-    onPress(
-      btnPlus,
-      () => {
-        if (qty < SHOP_MAX_QTY) {
-          shopBuyQuantities[itemId] = qty + 1;
-          renderShopBuy();
-        }
-      },
-      true,
-    );
-
-    qtyBox.append(btnMinus, qtyVal, btnPlus);
 
     const buyBtn = document.createElement("button");
     buyBtn.type = "button";
     buyBtn.className = "shop-act-btn buy";
-    buyBtn.disabled = !canAfford;
-
     const buyBtnText = document.createElement("span");
-    buyBtnText.textContent = canAfford
-      ? `Mua (${totalPrice} 💎)`
-      : `Thiếu ${totalPrice - currentCoin} 💎`;
     buyBtn.append(buyBtnText);
+
+    const qtyStepper = createShopQty({
+      idKey: `mua-${itemId}`,
+      nav: `buy:${itemId}`,
+      store: shopBuyQuantities,
+      key: itemId,
+      max: maxBuyQty,
+      label: `Số lượng ${def.name} muốn mua`,
+      preview: (q) =>
+        `Tổng ${(unitPrice * q).toLocaleString("vi-VN")} 💎, ví còn ${Math.max(0, currentCoin - unitPrice * q).toLocaleString("vi-VN")}.`,
+      onQty: () => refreshBuyBtn(),
+      onConfirm: () => buyBtn.click(),
+    });
+    /** Nút Mua theo số đang chọn: ô đang trống / sai thì mờ ("Nhập số lượng"), ví không đủ thì mờ kèm "Thiếu N 💎" */
+    const refreshBuyBtn = () => {
+      const q = qtyStepper.getQty();
+      if (q === null) {
+        buyBtn.disabled = true;
+        buyBtnText.textContent = "Nhập số lượng";
+        return;
+      }
+      const total = unitPrice * q;
+      const canAfford = currentCoin >= total;
+      buyBtn.disabled = !canAfford;
+      buyBtnText.textContent = canAfford ? `Mua (${total} 💎)` : `Thiếu ${total - currentCoin} 💎`;
+    };
+    refreshBuyBtn();
 
     buyBtn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      if (!canAfford) return;
+      // đọc lại chữ ĐANG có trong ô (không tin số cũ); trống / sai thì không mua, đưa focus về ô
+      const qty = qtyStepper.read();
+      if (qty === null) {
+        ui.toast({ text: "Nhập số lượng từ 1 trở lên.", tone: "bad" });
+        qtyStepper.focus();
+        return;
+      }
+      if (currentCoin < unitPrice * qty) return;
       sound.pickup();
       callbacks?.onBuy?.(shopNpcId, itemId, qty);
     });
 
-    right.append(qtyBox, buyBtn);
+    right.append(qtyStepper.el, buyBtn);
     card.append(left, right);
     list.append(card);
   }
@@ -2026,11 +2686,9 @@ function renderShopSellImpl() {
     const canSell = unitPrice > 0;
     if (canSell) sellableCount++;
 
-    const maxQty = slot.qty;
+    // trần một lần của máy chủ (`SHOP_MAX_QTY`): ngăn xếp lớn hơn thì bán từng đợt
+    const maxQty = sellQtyMax(slot.qty);
     const sellKey = `${i}:${slot.itemId}`;
-    const qty = Math.min(maxQty, Math.max(1, shopSellQuantities[sellKey] ?? 1));
-    shopSellQuantities[sellKey] = qty;
-    const totalPrice = unitPrice * qty;
 
     const card = document.createElement("div");
     card.className = `shop-card${canSell ? "" : " unsellable"}`;
@@ -2069,69 +2727,49 @@ function renderShopSellImpl() {
     info.append(nameRow, desc);
     left.append(icon, info);
 
-    // Cột phải: Chọn số lượng + Nút bán
+    // Cột phải: ô số lượng + nút bán
     const right = document.createElement("div");
     right.className = "shop-card-right";
 
     if (canSell) {
-      const qtyBox = document.createElement("div");
-      qtyBox.className = "shop-qty-box";
-
-      const btnMinus = document.createElement("button");
-      btnMinus.type = "button";
-      btnMinus.className = "shop-qty-btn";
-      btnMinus.textContent = "−";
-      btnMinus.title = "Giảm số lượng";
-      btnMinus.dataset.nav = `sell:${i}:minus`;
-      btnMinus.disabled = qty <= 1;
-      onPress(
-        btnMinus,
-        () => {
-          if (qty > 1) {
-            shopSellQuantities[sellKey] = qty - 1;
-            renderShopSell();
-          }
-        },
-        true,
-      );
-
-      const qtyVal = document.createElement("span");
-      qtyVal.className = "shop-qty-val";
-      qtyVal.textContent = `${qty}`;
-
-      const btnPlus = document.createElement("button");
-      btnPlus.type = "button";
-      btnPlus.className = "shop-qty-btn";
-      btnPlus.textContent = "+";
-      btnPlus.title = "Tăng số lượng";
-      btnPlus.dataset.nav = `sell:${i}:plus`;
-      btnPlus.disabled = qty >= maxQty;
-      onPress(
-        btnPlus,
-        () => {
-          if (qty < maxQty) {
-            shopSellQuantities[sellKey] = qty + 1;
-            renderShopSell();
-          }
-        },
-        true,
-      );
-
-      qtyBox.append(btnMinus, qtyVal, btnPlus);
-
       const sellBtn = document.createElement("button");
       sellBtn.type = "button";
       sellBtn.className = "shop-act-btn sell";
-
       const sellBtnText = document.createElement("span");
-      sellBtnText.textContent = `Bán (+${totalPrice} 💎)`;
       sellBtn.append(sellBtnText);
+
+      const qtyStepper = createShopQty({
+        idKey: `ban-${i}`,
+        nav: `sell:${i}`,
+        store: shopSellQuantities,
+        key: sellKey,
+        max: maxQty,
+        label: `Số lượng ${def.name} muốn bán`,
+        preview: (q) =>
+          `Nhận ${(unitPrice * q).toLocaleString("vi-VN")} 💎, ví lên ${(currentCoin + unitPrice * q).toLocaleString("vi-VN")}.`,
+        onQty: () => refreshSellBtn(),
+        onConfirm: () => sellBtn.click(),
+      });
+      /** Nút Bán theo số đang chọn: ô đang trống / sai thì mờ ("Nhập số lượng") */
+      const refreshSellBtn = () => {
+        const q = qtyStepper.getQty();
+        sellBtn.disabled = q === null;
+        sellBtnText.textContent = q === null ? "Nhập số lượng" : `Bán (+${unitPrice * q} 💎)`;
+      };
+      refreshSellBtn();
 
       sellBtn.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
         // click "ma" sau khi vừa xác nhận / giữ lại ở hộp (cảm ứng): không mở lại hộp, không bán lần nữa
         if (ghostClick(e)) return;
+        // đọc lại chữ ĐANG có trong ô (không tin số cũ); trống / sai thì không bán, đưa focus về ô
+        const qty = qtyStepper.read();
+        if (qty === null) {
+          ui.toast({ text: "Nhập số lượng từ 1 trở lên.", tone: "bad" });
+          qtyStepper.focus();
+          return;
+        }
         // Đồ quý / trang bị: hộp xác nhận (issue #779); đồ thường bán thẳng
         const plan = sellPlan(invSlots, i, qty, unitPrice, {
           name: def.name,
@@ -2162,7 +2800,7 @@ function renderShopSellImpl() {
         actConfirmFromShop = true;
       });
 
-      right.append(qtyBox, sellBtn);
+      right.append(qtyStepper.el, sellBtn);
     } else {
       const lockLabel = document.createElement("span");
       lockLabel.className = "shop-lock-label";
@@ -3000,6 +3638,8 @@ function renderSectTreasuryTab() {
 
   const canWithdraw = canSect("withdraw", currentSect.myRank);
   $("sect-form-withdraw").hidden = !canWithdraw;
+  withdrawStepper?.setMax(currentSect.coin); // ô rút quỹ kẹp theo quỹ hiện có
+  depositStepper?.setMax(currentCoin);
 
   const logsList = $("sect-logs-list");
   logsList.replaceChildren();
@@ -3067,13 +3707,31 @@ function reconcileVaultSelection() {
   const max = vaultSelMax();
   if (max < 1) {
     vaultSel = null;
-    vaultQty = 1;
+    resetVaultQty();
     return;
   }
-  vaultQty = clampQty(vaultQty, max) || 1;
+  vaultStepper?.setMax(max); // kẹp số đang chọn theo giới hạn mới (kho / túi / hạn mức đổi)
+  vaultQty = clampQty(vaultStepper?.getQty() ?? vaultQty, max) || 1;
+}
+
+/** Về số lượng 1 (đổi ô chọn, hết tông môn...): cả biến lẫn ô nhập. */
+function resetVaultQty() {
+  vaultQty = 1;
+  vaultStepper?.setQty(1);
 }
 
 function renderSectVaultTab() {
+  if (!currentSect) return;
+  if (vaultRendering) return;
+  vaultRendering = true;
+  try {
+    renderSectVaultTabImpl();
+  } finally {
+    vaultRendering = false;
+  }
+}
+
+function renderSectVaultTabImpl() {
   if (!currentSect) return;
   const v = sectVault;
   const rank = currentSect.myRank;
@@ -3121,12 +3779,13 @@ function renderSectVaultTab() {
     const max = vaultSelMax();
     selEl.textContent = `${isVault ? "Trong kho" : "Trong túi"}: ${def?.name ?? "?"}${slot && slot.qty > 1 ? ` (có ${slot.qty})` : ""}`;
     qtyBox.hidden = max <= 1 || reason !== null;
-    $("sect-vault-qty").textContent = String(vaultQty);
-    ($("sect-vault-minus") as HTMLButtonElement).disabled = vaultQty <= 1;
-    ($("sect-vault-plus") as HTMLButtonElement).disabled = vaultQty >= max;
+    const typed = vaultStepper?.getQty() ?? null;
     act.textContent = vaultBusy ? "Đang xử lý…" : isVault ? "Rút" : "Góp";
-    act.disabled = reason !== null || vaultBusy;
-    why.textContent = reason !== null ? vaultBlockText(reason) : "";
+    // ô số lượng đang trống / hỏng (và hiện ra) thì chưa bấm Góp / Rút được: nói rõ lý do bằng chữ
+    const needQty = !qtyBox.hidden && typed === null;
+    act.disabled = reason !== null || vaultBusy || needQty;
+    why.textContent =
+      reason !== null ? vaultBlockText(reason) : needQty ? "Nhập số lượng từ 1 trở lên." : "";
   }
 
   // chỉnh hạn mức: CHỈ Tông chủ (`canSect`); chọn sẵn giá trị hiện tại
@@ -3176,7 +3835,7 @@ function endVaultBusy() {
 function selectVaultSlot(from: "vault" | "bag", index: number) {
   if (vaultSel?.from === from && vaultSel.index === index) return;
   vaultSel = { from, index };
-  vaultQty = 1;
+  resetVaultQty();
   if (sectModalOpen && sectTab === "vault") renderSectVaultTab();
 }
 
@@ -3288,10 +3947,95 @@ function hallUiState(): HallUiState {
     down: callbacks?.isSectDown?.() ?? false,
     busy: hallBusy,
     groupOpen: hallGroupOpen,
+    buy:
+      hallBuyOpen && hallBuyStepper ? { itemId: hallBuyOpen, stepperEl: hallBuyStepper.el } : null,
   };
 }
 
+/** Hàng cửa hàng tông đang mở khung mua nhiều (theo ảnh chụp mới nhất), hoặc `null` nếu hàng không còn / đã khoá / hết lượt. */
+function hallBuyRow() {
+  const v = sectHall?.view;
+  if (!v || !hallBuyOpen) return null;
+  const row = hallShopRows(v, { down: callbacks?.isSectDown?.() ?? false }).find(
+    (r) => r.itemId === hallBuyOpen,
+  );
+  return row && row.maxBuy >= 1 ? row : null;
+}
+
+function closeHallBuy() {
+  hallBuyOpen = null;
+  if (sectModalOpen && sectTab === "hall") renderSectHallTab();
+}
+
+/** Mở / gấp khung "mua nhiều" của một hàng: một ô số lượng dùng chung, đặt lại về 1 mỗi lần mở sang hàng khác. */
+function toggleHallBuy(itemId: string) {
+  if (hallBuyOpen === itemId) return closeHallBuy();
+  hallBuyOpen = itemId;
+  const row = hallBuyRow();
+  if (!row) {
+    hallBuyOpen = null;
+    return;
+  }
+  if (!hallBuyStepper) {
+    hallBuyStepper = createQtyStepper({
+      label: "Số lượng đổi ở cửa hàng tông môn",
+      max: row.maxBuy,
+      initial: 1,
+      ids: { input: "sect-shop-qty" },
+      preview: (q) => {
+        const r = hallBuyRow();
+        return r ? shopBuyPreviewText(q, r.cost, sectHall?.view?.me.contrib ?? 0) : "";
+      },
+      onConfirm: () => runHallBuy(),
+      onCancel: () => closeHallBuy(),
+    });
+  }
+  hallBuyStepper.setMax(row.maxBuy);
+  hallBuyStepper.setQty(1);
+  renderSectHallTab();
+  hallBuyStepper.focus();
+}
+
+/** Xác nhận khung mua nhiều: đọc lại chữ trong ô (không tin số cũ), rồi gửi MỘT tin với số lượng đó (máy chủ vẫn kiểm lại tất cả). */
+function runHallBuy() {
+  const row = hallBuyRow();
+  if (!row) return closeHallBuy();
+  const qty = hallBuyStepper?.read() ?? null;
+  if (qty === null) {
+    ui.toast({ text: "Nhập số lượng từ 1 trở lên.", tone: "bad" });
+    return;
+  }
+  beginHallBusy(`shop:${row.itemId}`);
+  callbacks?.onSectShopBuy?.(row.itemId, qty);
+  hallBuyOpen = null; // đóng khung ngay; ảnh chụp mới về thì vẽ lại số lượt còn
+  if (sectModalOpen && sectTab === "hall") renderSectHallTab();
+}
+
+/**
+ * Vẽ lại tab Nội vụ nhưng GIỮ focus và vùng chọn của ô số lượng mua nhiều: `renderHall` thay cả cây DOM nên phần tử ô bị gỡ ra rồi gắn lại, mà gỡ phần tử đang focus thì
+ * mất focus (người chơi đang gõ dở sẽ bị ngắt mỗi khi ảnh chụp Nội vụ mới về).
+ */
 function renderSectHallTab() {
+  const input = hallBuyOpen
+    ? (document.getElementById("sect-shop-qty") as HTMLInputElement | null)
+    : null;
+  const keep = input !== null && document.activeElement === input;
+  const from = keep ? input.selectionStart : null;
+  const to = keep ? input.selectionEnd : null;
+  renderSectHallTabImpl();
+  if (keep && hallBuyOpen && input.isConnected) {
+    input.focus();
+    if (from !== null && to !== null) input.setSelectionRange(from, to);
+  }
+}
+
+function renderSectHallTabImpl() {
+  // khung mua nhiều: giới hạn theo ảnh chụp MỚI (cống hiến / lượt còn đổi); hàng khoá hoặc hết thì đóng khung
+  if (hallBuyOpen) {
+    const row = hallBuyRow();
+    if (!row) hallBuyOpen = null;
+    else hallBuyStepper?.setMax(row.maxBuy);
+  }
   renderHall($("sect-tab-hall"), hallUiState(), {
     onAccept: (id) => {
       beginHallBusy(`quest:${id}`);
@@ -3305,6 +4049,9 @@ function renderSectHallTab() {
       beginHallBusy(`shop:${itemId}`);
       callbacks?.onSectShopBuy?.(itemId);
     },
+    onBuyMore: (itemId) => toggleHallBuy(itemId),
+    onBuyConfirm: () => runHallBuy(),
+    onBuyCancel: () => closeHallBuy(),
     onGroupToggle: (key, open, defaultOpen) => {
       // chỉ nhớ lựa chọn KHÁC mặc định (mặc định đổi theo cấp tông thì nhóm theo mặc định mới)
       if (open === defaultOpen) hallGroupOpen.delete(key);
@@ -3551,8 +4298,30 @@ export const ui = {
       }
     });
     // Vứt có HỘP XÁC NHẬN ghi tên + số lượng (QUYET_DINH_M3 mục 24); gửi `dropItem` chỉ khi bấm "Vứt" trong hộp
+    // chặn click ma ngay sau khi hộp đóng (đăng ký TRƯỚC `bindTap`, pha bắt): chỉ click chuột / chạm (`detail` > 0), Enter / Space bằng bàn phím (`detail` 0) vẫn mở lại được ngay
+    for (const id of ["inv-btn-drop1", "inv-btn-dropall"]) {
+      $(id).addEventListener(
+        "click",
+        (e) => {
+          if (e.detail > 0 && performance.now() - dropConfirmClosedAt < DROP_CONFIRM_GUARD_MS)
+            e.stopImmediatePropagation();
+        },
+        true,
+      );
+    }
     bindTap("inv-btn-drop1", () => askDropConfirm(false, $("inv-btn-drop1")));
     bindTap("inv-btn-dropall", () => askDropConfirm(true, $("inv-btn-dropall")));
+    // Ô số lượng dùng chung trong hộp vứt (mục 47): Enter = Vứt (qua cửa sổ chống click ma của `confirmDrop`), Esc = Giữ lại
+    dropStepper = createQtyStepper({
+      label: "Số lượng vứt",
+      max: 1,
+      initial: 1,
+      ids: { input: "inv-drop-qty-input" },
+      onChange: (q) => onDropQtyChange(q),
+      onConfirm: () => confirmDrop(),
+      onCancel: () => void closeDropConfirm(true),
+    });
+    $("inv-drop-qty").append(dropStepper.el);
     bindTap("inv-drop-yes", () => confirmDrop());
     // Hộp xác nhận dùng chung: bỏ qua bấm trong cửa sổ chống click ma; "Chưa / Giữ lại" cũng vậy (hộp không được chớp tắt dưới ngón tay)
     bindTap("act-btn-yes", () => {
@@ -3622,6 +4391,53 @@ export const ui = {
 
     // Tông môn (M3.6, #230)
     bindTap("btn-sect", () => this.toggleSectModal());
+
+    // Xã hội (M9, #1025): nút HUD ẩn cho tới khi cờ `?social=1` bật
+    const socialOn = typeof window !== "undefined" && socialEnabled(window.location.search);
+    $("btn-social").hidden = !socialOn;
+    document.body.classList.toggle("social-on", socialOn); // CSS: hàng menu 8 nút cần mốc ☰ cao hơn (xem `body.social-on` ở style.css)
+    bindTap("btn-social", () => this.toggleSocialModal());
+    bindTap("social-close", () => this.toggleSocialModal(false));
+    for (const t of SOCIAL_TABS)
+      bindTap(`social-tab-btn-${t.id}`, () => this.switchSocialTab(t.id));
+    for (const id of BOARD_IDS) bindTap(`social-board-btn-${id}`, () => this.switchSocialBoard(id));
+    bindTap("social-board-retry", () => requestSocialBoard(socialBoard, true));
+    bindTap("ach-retry", () => {
+      requestAch(true);
+      renderAch();
+    });
+    bindTap("wbt-retry", () => {
+      requestWorldBoss(true);
+      renderWbTab();
+    });
+    bindTap("wb-toggle", () => {
+      wbExpanded = !wbExpanded;
+      renderWbBanner();
+    });
+    // banner trùm thế giới nằm TRÊN thanh trùm: đo chiều cao banner vào biến CSS `--wb-h` để thanh trùm tự xuống theo (0 khi banner ẩn)
+    if (typeof ResizeObserver !== "undefined") {
+      const wb = $("wb-banner");
+      new ResizeObserver(() => {
+        const h = wb.hidden ? 0 : Math.ceil(wb.getBoundingClientRect().height) + 6;
+        document.documentElement.style.setProperty("--wb-h", `${h}px`);
+      }).observe(wb);
+    }
+    $("social-board-tabs").addEventListener("keydown", (e) => {
+      if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
+      const next = tabByKey(BOARD_IDS, socialBoard, e.code);
+      if (next === null) return;
+      e.preventDefault();
+      this.switchSocialBoard(next, true);
+    });
+    // Mũi tên / Home / End trên thanh tab (WAI-ARIA tablist): đổi tab VÀ chuyển focus theo; `preventDefault` để bộ nghe phím ở `window`
+    // (`handlePanelKey`, chuyển focus theo hình học) bỏ qua, nếu không tab có `tabindex=-1` bị nhảy qua.
+    $("social-tabs").addEventListener("keydown", (e) => {
+      if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
+      const next = socialTabByKey(socialTab, e.code);
+      if (next === null) return;
+      e.preventDefault();
+      this.switchSocialTab(next, true);
+    });
     bindTap("sect-close", () => this.toggleSectModal(false));
 
     bindTap("sect-tab-btn-overview", () => this.switchSectTab("overview"));
@@ -3630,14 +4446,43 @@ export const ui = {
     bindTap("sect-tab-btn-vault", () => this.switchSectTab("vault"));
     bindTap("sect-tab-btn-hall", () => this.switchSectTab("hall"));
     buildSectVaultGrids();
-    bindTap("sect-vault-minus", () => {
-      vaultQty = Math.max(1, vaultQty - 1);
-      renderSectVaultTab();
+    // Ô nhập SỐ LƯỢNG dùng chung (mục 47): gõ số, − / +, ×10 / ×100, Tối đa, giữ nút tăng nhanh dần, Enter xác nhận
+    vaultStepper = createQtyStepper({
+      label: "Số lượng góp hoặc rút",
+      max: 1,
+      ids: { input: "sect-vault-qty", minus: "sect-vault-minus", plus: "sect-vault-plus" },
+      preview: (q) =>
+        `${vaultSel?.from === "vault" ? "Rút" : "Góp"} ${q.toLocaleString("vi-VN")} trong tối đa ${vaultSelMax().toLocaleString("vi-VN")}.`,
+      onChange: (q) => {
+        if (q !== null) vaultQty = q;
+        if (!vaultRendering && sectModalOpen && sectTab === "vault") renderSectVaultTab();
+      },
+      onConfirm: () => runVaultAction(),
     });
-    bindTap("sect-vault-plus", () => {
-      vaultQty = clampQty(vaultQty + 1, vaultSelMax()) || 1;
-      renderSectVaultTab();
+    $("sect-vault-qty-box").append(vaultStepper.el);
+    depositStepper = createQtyStepper({
+      label: "Số Linh thạch góp vào quỹ",
+      placeholder: "Số Linh thạch",
+      max: currentCoin,
+      initial: 1,
+      ids: { input: "sect-input-deposit" },
+      preview: (q) => depositPreviewText(q, currentCoin, sectHall?.view?.me ?? null),
+      onConfirm: () => ($("sect-form-deposit") as HTMLFormElement).requestSubmit(),
     });
+    $("sect-deposit-qty").append(depositStepper.el);
+    depositStepper.clear();
+    withdrawStepper = createQtyStepper({
+      label: "Số Linh thạch rút từ quỹ",
+      placeholder: "Số Linh thạch",
+      max: currentSect?.coin ?? 0,
+      initial: 1,
+      ids: { input: "sect-input-withdraw" },
+      preview: (q) =>
+        `Quỹ còn lại ${Math.max(0, (currentSect?.coin ?? 0) - q).toLocaleString("vi-VN")} Linh thạch.`,
+      onConfirm: () => ($("sect-form-withdraw") as HTMLFormElement).requestSubmit(),
+    });
+    $("sect-withdraw-qty").append(withdrawStepper.el);
+    withdrawStepper.clear();
     // Nút Góp / Rút dùng `click` (KHÔNG `bindTap`/pointerdown): hộp xác nhận đóng ở `pointerdown` của nút "Góp"/"Rút"/"Giữ lại" nằm ĐÚNG chỗ nút này, nên `click` ma sau khi nhả ngón
     // sẽ rơi xuống đây và mở lại hộp; chỉ chặn click của chuột / chạm (`detail > 0`) trong cửa sổ chống click ma, Enter / Space bằng bàn phím (`detail` = 0) vẫn bấm được ngay.
     $("sect-vault-act").addEventListener("click", (e) => {
@@ -3753,9 +4598,8 @@ export const ui = {
     // Kho tông môn: Nộp
     $("sect-form-deposit")?.addEventListener("submit", (e) => {
       e.preventDefault();
-      const input = $("sect-input-deposit") as HTMLInputElement;
-      const amount = parseInt(input.value, 10);
-      if (isNaN(amount) || amount <= 0) {
+      const amount = depositStepper?.read() ?? null;
+      if (amount === null) {
         this.toast({ text: "Số lượng Linh thạch không hợp lệ", tone: "bad" });
         return;
       }
@@ -3767,7 +4611,7 @@ export const ui = {
       );
       if (!spec) {
         callbacks?.onSectDeposit?.(amount);
-        input.value = "";
+        depositStepper?.clear();
         return;
       }
       askActConfirm(
@@ -3778,7 +4622,7 @@ export const ui = {
             return;
           }
           callbacks?.onSectDeposit?.(amount);
-          input.value = "";
+          depositStepper?.clear();
         },
         $("sect-btn-deposit"),
       );
@@ -3788,14 +4632,13 @@ export const ui = {
     // Kho tông môn: Rút
     $("sect-form-withdraw")?.addEventListener("submit", (e) => {
       e.preventDefault();
-      const input = $("sect-input-withdraw") as HTMLInputElement;
-      const amount = parseInt(input.value, 10);
-      if (isNaN(amount) || amount <= 0) {
+      const amount = withdrawStepper?.read() ?? null;
+      if (amount === null) {
         this.toast({ text: "Số lượng Linh thạch không hợp lệ", tone: "bad" });
         return;
       }
       callbacks?.onSectWithdraw?.(amount);
-      input.value = "";
+      withdrawStepper?.clear();
     });
 
     // Hộp lời mời tông môn
@@ -4495,6 +5338,7 @@ export const ui = {
   closeDialog() {
     stopTypewriter();
     currentDialog = null;
+    dlgPortrait?.clear();
     $("dialog-modal").hidden = true;
     $("dlg-options").replaceChildren();
     modalStack.remove("dialog-modal");
@@ -4547,6 +5391,10 @@ export const ui = {
       this.toggleSectModal(false);
       closedAny = true;
     }
+    if (socialModalOpen) {
+      this.toggleSocialModal(false);
+      closedAny = true;
+    }
     if (this.isPlayerMenuOpen()) {
       this.closePlayerMenu();
       closedAny = true;
@@ -4591,6 +5439,9 @@ export const ui = {
         return true;
       case "sect-modal":
         this.toggleSectModal(false);
+        return true;
+      case "social-modal":
+        this.toggleSocialModal(false);
         return true;
       case "dialog-modal":
         this.closeDialog();
@@ -4881,6 +5732,7 @@ export const ui = {
 
   onWallet(m: WalletMsg) {
     currentCoin = m.coin;
+    depositStepper?.setMax(currentCoin); // ô góp quỹ kẹp theo ví
     const coinStr = m.coin.toLocaleString("vi-VN");
     const hudCoin = $("hud-coin");
     if (hudCoin) hudCoin.textContent = coinStr;
@@ -4928,6 +5780,12 @@ export const ui = {
     const npc = NPC_BY_ID[m.npcId];
     $("dlg-npc-name").textContent = npc?.name ?? "Kỳ nhân";
     $("dlg-npc-title").textContent = npc?.title ?? "";
+    // Chân dung NPC (ảnh AI, gói `art:npc` tải theo nhu cầu): chưa có chân dung / chưa tải xong thì chỉ có tên như cũ; cùng NPC thì giữ ảnh (không chớp)
+    const portraitImg = document.getElementById("dlg-npc-art");
+    if (portraitImg instanceof HTMLImageElement) {
+      dlgPortrait ??= new NpcPortraitSlot(portraitImg);
+      dlgPortrait.show(m.npcId);
+    }
 
     $("dialog-modal").hidden = false;
     $("dlg-options").replaceChildren();
@@ -5051,10 +5909,22 @@ export const ui = {
     renderPartyPanel();
   },
 
-  showTransition(mapName: string) {
+  /**
+   * Thẻ minh hoạ ở đầu bảng Sơn Hà Đồ cho bản đồ ĐANG XEM (không nhất thiết bản đồ mình đứng). Chưa có ảnh / ảnh lỗi / bí cảnh thì thẻ ẩn,
+   * đầu bảng giữ nguyên như cũ (map-card.ts `applyMapCard`).
+   */
+  setMapPanelCard(mapId: string) {
+    const cardEl = document.getElementById("map-card");
+    if (cardEl instanceof HTMLImageElement) applyMapCard(cardEl, mapCardUrl(mapId));
+  },
+
+  showTransition(mapName: string, mapId?: string) {
     const overlay = $("transition-overlay");
     const nameEl = $("transition-map-name");
     if (nameEl) nameEl.textContent = mapName;
+    // Thẻ minh hoạ của bản đồ đích (ảnh AI, map-card.ts): chưa có ảnh / ảnh lỗi thì chỉ còn tên như cũ
+    const cardEl = document.getElementById("transition-card");
+    if (cardEl instanceof HTMLImageElement) applyMapCard(cardEl, mapCardUrl(mapId));
     overlay.hidden = false;
     // Ép tính kiểu (reflow) để trình duyệt GHI NHẬN kiểu "trước khi đổi" (mở) rồi mới thêm `active`: phần tử vừa bỏ `hidden`
     // (display: none) mà thêm lớp ngay trong cùng khung thì chuyển động CSS không chạy, màn đổi tức thì.
@@ -6062,6 +6932,167 @@ export const ui = {
     return sectModalOpen;
   },
 
+  // ---------- Xã hội (M9, #1025) ----------
+  /** Mở / đóng bảng Xã hội. Cờ `?social=1` tắt thì KHÔNG mở (phím Shift+G chạy tới đây nhưng không làm gì). */
+  toggleSocialModal(force?: boolean) {
+    const target = force ?? !socialModalOpen;
+    if (target === socialModalOpen) return;
+    if (target && !socialEnabled(window.location.search)) return;
+    socialModalOpen = target;
+    if (socialModalOpen) {
+      this.closeAllModals();
+      socialModalOpen = true;
+      $("social-modal").hidden = false;
+      $("btn-social").classList.add("active");
+      $("btn-social").setAttribute("aria-expanded", "true");
+      modalStack.push("social-modal", $("btn-social"));
+      renderSocialTabs();
+      renderSocialRank();
+      if (socialTab === "rank") requestSocialBoard(socialBoard);
+      if (socialTab === "event") requestWorldBoss();
+      if (socialTab === "ach") {
+        requestAch();
+        renderAch();
+      }
+      syncAchDot();
+      syncWbTick();
+      focusModal($("social-modal"));
+    } else {
+      $("social-modal").hidden = true;
+      $("btn-social").classList.remove("active");
+      $("btn-social").setAttribute("aria-expanded", "false");
+      modalStack.remove("social-modal");
+      clearSocialBoardTimer();
+      if (wbTabTimer !== null) clearTimeout(wbTabTimer);
+      wbTabTimer = null;
+      if (achTimer !== null) clearTimeout(achTimer);
+      achTimer = null;
+      if (socialTab === "ach") leaveAch();
+      syncWbTick();
+      returnFocus($("btn-social"));
+    }
+  },
+
+  isSocialModalOpen(): boolean {
+    return socialModalOpen;
+  },
+
+  /** Đổi tab Xã hội; `focus` = đưa focus về nút tab (khi đổi bằng phím mũi tên). Id lạ về tab mặc định. */
+  switchSocialTab(tab: string, focus = false) {
+    const prevTab = socialTab;
+    socialTab = asSocialTab(tab);
+    if (prevTab === "ach" && socialTab !== "ach") leaveAch();
+    renderSocialTabs();
+    if (socialTab === "rank" && socialModalOpen) {
+      renderSocialRank();
+      requestSocialBoard(socialBoard);
+    }
+    if (socialTab === "event" && socialModalOpen) requestWorldBoss();
+    if (socialModalOpen) {
+      if (socialTab === "ach") {
+        requestAch();
+        renderAch();
+      }
+      syncAchDot();
+    }
+    syncWbTick();
+    if (focus) $(`social-tab-btn-${socialTab}`).focus();
+  },
+
+  /** Đổi bảng xếp hạng (tab phụ). Id lạ bị bỏ qua. `focus` = đưa focus về nút tab (đổi bằng mũi tên). */
+  switchSocialBoard(board: string, focus = false) {
+    const id = asBoardId(board);
+    if (id === null) return;
+    socialBoard = id;
+    renderSocialRank();
+    if (socialModalOpen && socialTab === "rank") requestSocialBoard(id);
+    if (focus) $(`social-board-btn-${id}`).focus();
+  },
+
+  getSocialBoard(): BoardId {
+    return socialBoard;
+  },
+
+  /** Nhận tin `boards` từ máy chủ (M9.6): làm sạch, cất bản mới nhất, vẽ lại nếu đang xem tab Xếp hạng. Tin sai kiểu bị bỏ, không sập. */
+  setBoards(raw: unknown) {
+    const msg = sanitizeBoardsMsg(raw);
+    if (msg === null) return;
+    socialBoards.set(msg.board, { msg, at: performance.now() });
+    if (msg.board === socialBoard) clearSocialBoardTimer();
+    if (socialModalOpen && socialTab === "rank") renderSocialRank();
+  },
+
+  /**
+   * Nhận tin `worldBoss` từ máy chủ (M9.7): làm sạch, cất bản mới nhất, vẽ banner + tab Sự kiện. Cờ `?social=1` tắt thì BỎ tin (người chơi chưa thấy gì).
+   * `ended` hiện kết quả thay banner `WB_RESULT_MS` + một toast (không lặp nếu vừa nhận đúng sự kiện đó); tin sai kiểu bị bỏ, không sập.
+   */
+  setWorldBoss(raw: unknown) {
+    if (!socialFlagOn()) return;
+    const msg = sanitizeWorldBossMsg(raw);
+    if (msg === null) return;
+    const prev = wbLast;
+    wbLast = { msg, at: performance.now() };
+    if (wbTabTimer !== null) clearTimeout(wbTabTimer);
+    wbTabTimer = null;
+    if (wbResultTimer !== null) clearTimeout(wbResultTimer);
+    wbResultTimer = null;
+    wbResult = null;
+    if (msg.phase === "ended") {
+      const v = worldBossView(msg);
+      wbResult = { text: v.resultText, tone: v.tone };
+      wbResultTimer = setTimeout(() => {
+        wbResultTimer = null;
+        wbResult = null;
+        syncWbTick();
+      }, WB_RESULT_MS);
+      // `id` là KHUNG GIỜ của lịch (lặp mỗi ngày), không phải mã lần xảy ra: chỉ coi là tin LẶP khi cùng khung giờ + cùng kết quả + đến trong `WB_DUP_MS`
+      const dup =
+        prev !== null &&
+        prev.msg.phase === "ended" &&
+        prev.msg.id === msg.id &&
+        prev.msg.outcome === msg.outcome &&
+        wbLast.at - prev.at < WB_DUP_MS;
+      if (!dup) this.toast({ text: v.resultText, tone: v.tone });
+    }
+    syncWbTick();
+  },
+
+  /**
+   * Nhận tin `achievements` (M9.8): làm sạch, cất bản mới nhất, vẽ lại nếu đang xem tab Thành tựu. Đây cũng là câu trả lời của máy chủ cho `titleSet` (thành công
+   * hay bị từ chối): hết trạng thái "đang đổi". Cờ `?social=1` tắt thì BỎ tin; tin sai kiểu bị bỏ, không sập.
+   */
+  setAchievements(raw: unknown) {
+    if (!socialFlagOn()) return;
+    const msg = sanitizeAchievementsMsg(raw);
+    if (msg === null) return;
+    achLast = msg;
+    achPending = undefined;
+    if (achPendingTimer !== null) clearTimeout(achPendingTimer);
+    achPendingTimer = null;
+    if (achTimer !== null) clearTimeout(achTimer);
+    achTimer = null;
+    renderAch();
+  },
+
+  /**
+   * Nhận tin `achievementNew` (M9.8): đánh dấu "Mới" + chấm trên nút HUD; máy chủ đã gửi toast "Đạt thành tựu: ..." riêng nên chỉ thêm toast khi thành tựu mở danh hiệu
+   * (mời mở bảng Xã hội để đeo). Cờ tắt / tin sai kiểu thì bỏ.
+   */
+  onAchievementNew(raw: unknown) {
+    if (!socialFlagOn()) return;
+    const msg = sanitizeAchievementNewMsg(raw);
+    if (msg === null) return;
+    achNew.add(msg.id);
+    syncAchDot();
+    renderAch();
+    const t = titleUnlockToast(msg.id);
+    if (t) this.toast({ text: t, tone: "good" });
+  },
+
+  getSocialTab(): SocialTabId {
+    return socialTab;
+  },
+
   /** Đóng hộp xác nhận tông môn nếu đang mở (Esc đóng hộp trước, rồi mới tới bảng) */
   closeSectConfirm(): boolean {
     const box = document.getElementById("sect-action-confirm");
@@ -6100,10 +7131,11 @@ export const ui = {
       closeSectConfirm();
       sectVault = null;
       vaultSel = null;
-      vaultQty = 1;
+      resetVaultQty();
       endVaultBusy();
       sectHall = null;
       hallGroupOpen.clear();
+      hallBuyOpen = null;
       scheduleHallRefresh(); // bỏ hẹn giờ: không còn tông môn thì không xin gì
       endHallBusy();
     }
@@ -6117,7 +7149,7 @@ export const ui = {
     sectVault = sanitizeVaultView(m?.vault);
     if (!sectVault) {
       vaultSel = null;
-      vaultQty = 1;
+      resetVaultQty();
     }
     if (vaultBusyTimer) clearTimeout(vaultBusyTimer);
     vaultBusyTimer = null;

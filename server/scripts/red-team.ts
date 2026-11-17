@@ -29,6 +29,7 @@ import {
   NPCS,
   PROTOCOL_VERSION,
   SECT_MSG,
+  SOCIAL_MSG,
   roomNameOf,
   type ChatMsg,
 } from "@tien-gioi/shared";
@@ -94,6 +95,9 @@ export const EXPECTED_MESSAGE_TYPES = [
   SECT_MSG.vaultWithdraw,
   SECT_MSG.vaultPolicy,
   SECT_MSG.hallGet, // M8: xin ảnh chụp Nội vụ (chỉ đọc)
+  SOCIAL_MSG.boardsGet, // M9.3: xin bảng xếp hạng (chỉ đọc, tra bản chụp trong bộ nhớ)
+  SOCIAL_MSG.achievementsGet, // M9.5: xin sổ thành tựu (chỉ đọc)
+  SOCIAL_MSG.titleSet, // M9.5: đeo / gỡ danh hiệu (kiểm đã mở trong kho)
   SECT_MSG.questAccept, // M8.4: nhận nhiệm vụ tông môn
   SECT_MSG.questTurnIn, // M8.4: trả nhiệm vụ tông môn
   SECT_MSG.shopBuy, // M8.5: mua ở cửa hàng tông môn
@@ -405,6 +409,9 @@ export async function runRedTeam(options: {
       "sectInvited",
       "sectVault",
       "sectHall",
+      "boards",
+      "achievements",
+      "achievementNew",
       "netShield",
       "sect",
     ]) {

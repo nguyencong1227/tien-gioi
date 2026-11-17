@@ -1,0 +1,64 @@
+{
+  "asset": "client/public/assets/ai/the_hac_phong.webp",
+  "finalSha256": "357ddca904a1f8d3e1379ff4eb80e1994e8ff887233c913bf05e6bc404244aaa",
+  "rawSha256": "cfbae8b487e4bbc294a458ac3dafa092652e76ed16ef2f7d0aabda72a6d5032c",
+  "rawFile": "/mnt/data/comfyui/output/chosen/the_hac_phong_raw_2_00001_.png (ngoài repo; ảnh thô được chọn nằm ở thư mục chosen/ của /mnt/data, repo chỉ giữ băm)",
+  "model": {
+    "name": "sd_xl_base_1.0.safetensors",
+    "sha256": "31e35c80fc4829d14f90153f4c74cd59c90b779f6afe05a74cd6120b893f7e5b"
+  },
+  "lora": [],
+  "comfyui": {
+    "comfyui": "0.43.2",
+    "python": "3.12.16",
+    "pytorch": "2.14.1+cu130",
+    "driver": "615.71.09",
+    "gpu": "NVIDIA GeForce RTX 5060 8 GB"
+  },
+  "workflow": {
+    "path": "scripts/art/gen-raw-lo1.mjs",
+    "sha256": "5856141854947969dcd275dc3bd9f72c949e1cc168ea1e790cb00daed3bb4a6e",
+    "note": "Script được dựng lại ngày 17/11 sau khi sinh ảnh, cùng tham số: tệp đã chạy thật là gen-batch1-map-cards.mjs (ngoài repo); Dev C so bằng máy prompt, hạt giống và prompt âm của hai bên trùng từng ký tự (MAP_CARD_BATCH / NEGATIVE_PROMPT ở client/scripts/art/prompt-rules.mjs), KHÔNG trùng từng byte. rawSha256 là bằng chứng ảnh thô; băm script này chỉ chứng tỏ tham số.",
+    "params": {
+      "sampler": "euler",
+      "scheduler": "normal",
+      "steps": 25,
+      "cfg": 7,
+      "denoise": 1,
+      "width": 1216,
+      "height": 832
+    }
+  },
+  "prompt": "windswept dark canyon with thorny shrubs and twisted pines, ash drifting in the wind, a ruined stone watchtower far away, slate grey and cold blue shadows, pale grey haze, dim overcast light, painterly soft ink wash and gouache landscape, muted colors, misty depth, wide panoramic composition, eastern mountain cultivation fantasy, no people, no text",
+  "negativePrompt": "text, letters, words, calligraphy, watermark, signature, logo, cjk, chinese characters, frame, border, blurry, lowres, distorted, modern, futuristic, photorealistic, human face, western fantasy, anime, 3d render",
+  "seed": 2026111722,
+  "postProcess": [
+    {
+      "script": "client/scripts/art/hau-ky-webp.py",
+      "params": {
+        "crop": [38, 18, 1140, 760],
+        "size": [624, 416],
+        "quality": 86,
+        "method": 6
+      },
+      "result": {
+        "width": 624,
+        "height": 416,
+        "bytes": 30608,
+        "chunks": ["VP8 "],
+        "pillow": "10.2.0",
+        "libwebp": "1.3.2"
+      },
+      "note": "Cắt 38,18,1140,760 (bỏ viền giấy và mép ảnh, đúng 3:2) rồi đổi cỡ 624x416 (Lanczos) và mã hoá WebP sạch (không EXIF / XMP / ICC). Tất định: cùng ảnh thô + tham số + Pillow / libwebp cho cùng finalSha256."
+    }
+  ],
+  "reviewed": {
+    "by": "Dev B (Claude Code, chạy đêm)",
+    "date": "2026-11-17",
+    "noText": true,
+    "noOtherGameLikeness": true,
+    "note": "Xem cả 15 ảnh thô của lô 1 (ba hạt giống mỗi bản đồ), ảnh cuối ở cỡ thật và bốn góc phóng 200 %: không chữ, không ký tự giả, không chữ ký, không logo, không người. hẻm núi xám có tháp canh đổ nát và cây khô; số 2 chọn vì là ảnh duy nhất có tháp canh đúng prompt; số 1 / 3 có dải mép giấy ở đáy dày hơn."
+  },
+  "date": "2026-11-17",
+  "use": "Thẻ minh hoạ bản đồ `hac_phong` ở màn chuyển cảnh qua cổng (client/src/map-card.ts, MAP_CARDS)"
+}

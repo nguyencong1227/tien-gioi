@@ -5,6 +5,7 @@ import {
   dropStillValid,
   dropWarnText,
   planDrop,
+  withDropQty,
   type DropSlot,
 } from "./inv-drop";
 
@@ -84,6 +85,64 @@ describe("dropConfirmText: ghi rõ tên + số lượng", () => {
       "Vứt 1 Hồi Huyết Đan? (còn lại 4)",
     );
     expect(dropConfirmText("Lang Nha Kiếm", planDrop(b, 3, false)!)).toBe("Vứt Lang Nha Kiếm?");
+  });
+});
+
+describe("withDropQty: chỉnh số trong ô số lượng (mục 47)", () => {
+  const plan1 = () => planDrop(bag(), 0, false)!; // Vứt 1 từ stack 5
+  const planAll = () => planDrop(bag(), 0, true)!; // Vứt hết 5
+
+  it("số hợp lệ: đổi số lượng, giữ nguyên ô / món / số đang có, 'Vứt 1' không bao giờ thành 'Vứt hết' giữa chừng", () => {
+    const p = withDropQty(plan1(), 3);
+    expect(p).toMatchObject({ index: 0, itemId: "hoi_huyet_dan", qty: 3, have: 5, all: false });
+    expect(withDropQty(plan1(), 4).all).toBe(false);
+  });
+
+  it("kẹp vào [1, have]: 0 / âm / quá số đang có; số lẻ làm tròn xuống; số hỏng thành 1", () => {
+    expect(withDropQty(plan1(), 0).qty).toBe(1);
+    expect(withDropQty(plan1(), -7).qty).toBe(1);
+    expect(withDropQty(plan1(), 9999).qty).toBe(5);
+    expect(withDropQty(plan1(), 2.9).qty).toBe(2);
+    for (const bad of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])
+      expect(withDropQty(plan1(), bad).qty, String(bad)).toBe(1);
+  });
+
+  it("'Vứt hết' (gửi không kèm qty) chỉ khi bấm Vứt hết VÀ số vẫn là toàn bộ; chỉnh xuống thì gửi qty cụ thể, kéo về toàn bộ thì trở lại", () => {
+    expect(withDropQty(planAll(), 5)).toMatchObject({ qty: 5, all: true });
+    expect(withDropQty(planAll(), 3)).toMatchObject({ qty: 3, all: false });
+    expect(withDropQty(planAll(), 5).all).toBe(true); // dựng lại từ kế hoạch gốc: kéo về toàn bộ thì trở lại "Vứt hết"
+    expect(withDropQty(plan1(), 5)).toMatchObject({ qty: 5, all: false }); // Vứt 1 rồi chỉnh lên 5: gửi qty = 5 (rõ ràng), không phải "không kèm qty"
+  });
+
+  it("không đổi kế hoạch gốc (trả bản mới)", () => {
+    const p = plan1();
+    withDropQty(p, 4);
+    expect(p.qty).toBe(1);
+  });
+
+  it("kế hoạch hỏng (have 0 / NaN): vẫn không ném, số lượng >= 1", () => {
+    const bad = { index: 0, itemId: "x", qty: 1, have: Number.NaN, all: false };
+    expect(() => withDropQty(bad, 3)).not.toThrow();
+  });
+});
+
+describe("dropConfirmText với số lượng chọn từ ô số lượng", () => {
+  it("vứt một phần: nêu số vứt VÀ số còn lại", () => {
+    expect(dropConfirmText("Hồi Huyết Đan", withDropQty(planDrop(bag(), 0, false)!, 3))).toBe(
+      "Vứt 3 Hồi Huyết Đan? (còn lại 2)",
+    );
+  });
+
+  it("chọn đúng toàn bộ số đang có: nói 'Vứt hết', kể cả khi bấm từ 'Vứt 1'", () => {
+    expect(dropConfirmText("Hồi Huyết Đan", withDropQty(planDrop(bag(), 0, false)!, 5))).toBe(
+      "Vứt hết Hồi Huyết Đan ×5?",
+    );
+  });
+
+  it("chọn 1 trong stack: giữ lời 'Vứt 1 ... (còn lại N)' như trước", () => {
+    expect(dropConfirmText("Hồi Huyết Đan", withDropQty(planDrop(bag(), 0, true)!, 1))).toBe(
+      "Vứt 1 Hồi Huyết Đan? (còn lại 4)",
+    );
   });
 });
 

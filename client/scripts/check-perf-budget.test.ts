@@ -12,6 +12,8 @@ import {
   checkAtlasTileset,
   checkAiAssets,
   DEFAULT_AI_LIMITS,
+  DEFAULT_ART_FILE_KB,
+  DEFAULT_ART_PACK_KB,
   calculateStaticTextureMemory,
   calculateEffectiveFileSize,
   checkPacksBudget,
@@ -302,6 +304,65 @@ describe("M5.1: check-perf-budget (Kiểm tra ngân sách hiệu năng tĩnh)", 
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
+  });
+
+  it("checkPacksBudget: gói ảnh minh hoạ AI `art` có trần riêng (512 KB mỗi gói, 60 KB mỗi ảnh), KHÔNG rơi về trần 2048 KB của core", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-art-limits-"));
+    const packsDir = path.join(tmpDir, "packs");
+    const manifestPath = path.join(packsDir, "manifest.json");
+    try {
+      const budgetPacks = {
+        core: { maxKb: 2048 },
+        map: { maxKb: 1024 },
+        icons: { maxKb: 3072 },
+        audio: { maxKb: 5120 },
+        art: { maxKb: 512, maxFileKb: 60 },
+      };
+      const art = path.join(packsDir, "art-trum");
+      fs.mkdirSync(art, { recursive: true });
+      // 4 thẻ trùm 30 KB = 120 KB: hợp lệ
+      for (const n of ["a", "b", "c", "d"])
+        fs.writeFileSync(path.join(art, `${n}.webp`), Buffer.alloc(30 * 1024));
+      writePacksManifest(packsDir, manifestPath);
+      let res = checkPacksBudget({ packsDir, manifestPath, budgetPacks });
+      expect(res.errors).toEqual([]);
+      expect(res.packs.find((p) => p.id === "art:trum")?.limitKb).toBe(512);
+      // Cả gói 600 KB (vượt 512, còn dưới 2048 của core): ĐỎ, chứng minh không đọc nhầm trần core
+      for (const n of ["e", "f", "g", "h", "i", "j", "k", "l", "m", "n"])
+        fs.writeFileSync(path.join(art, `${n}.webp`), Buffer.alloc(48 * 1024));
+      writePacksManifest(packsDir, manifestPath);
+      res = checkPacksBudget({ packsDir, manifestPath, budgetPacks });
+      expect(res.errors.some((e) => e.includes("Gói 'art:trum'") && e.includes("512 KB"))).toBe(
+        true,
+      );
+      // Một ảnh 80 KB trong gói nhỏ: gói còn trong trần nhưng ảnh vượt trần mỗi ảnh 60 KB: ĐỎ
+      fs.rmSync(art, { recursive: true });
+      fs.mkdirSync(art, { recursive: true });
+      fs.writeFileSync(path.join(art, "to.webp"), Buffer.alloc(80 * 1024));
+      writePacksManifest(packsDir, manifestPath);
+      res = checkPacksBudget({ packsDir, manifestPath, budgetPacks });
+      expect(res.errors.some((e) => e.includes("to.webp") && e.includes("60 KB"))).toBe(true);
+      expect(res.errors.some((e) => e.includes("Gói 'art:trum'"))).toBe(false);
+      // Thiếu `packs.art` trong ngân sách: dùng mặc định 512 / 60, KHÔNG bỏ kiểm
+      const { art: _bỏ, ...noArt } = budgetPacks;
+      res = checkPacksBudget({ packsDir, manifestPath, budgetPacks: noArt });
+      expect(res.ok).toBe(false);
+      expect(DEFAULT_ART_PACK_KB).toBe(512);
+      expect(DEFAULT_ART_FILE_KB).toBe(60);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("perf-budget.json thật: có mục packs.art (tai-dan-nen) và các số khớp mặc định trong mã", () => {
+    const real = JSON.parse(
+      fs.readFileSync(path.resolve(__dirname, "../perf-budget.json"), "utf8"),
+    );
+    expect(real.packs.art.load).toBe("tai-dan-nen");
+    expect(real.packs.art.maxKb).toBe(DEFAULT_ART_PACK_KB);
+    expect(real.packs.art.maxFileKb).toBe(DEFAULT_ART_FILE_KB);
+    // Không precache: tổng ảnh minh hoạ tải ngay vẫn bị trần riêng 300 KB (A giữ, #998)
+    expect(real.static.aiAssets.totalKb).toBe(300);
   });
 
   it("checkPacksBudget: phát hiện các lỗi vi phạm N1 từ manifest (id sai, đường dẫn chứa ký tự cấm)", () => {
@@ -657,7 +718,7 @@ describe("M7.12 #513: trần dung lượng ảnh do AI sinh (checkAiAssets, perf
     expect(checkPerfBudget(fakeEnv({}, aiLimits)).aiAssets.files).toEqual([]);
   });
 
-  it("ảnh AI THẬT của repo: đúng ảnh đã khai báo (login_bg.webp, #513) và nằm trong trần của perf-budget.json thật", () => {
+  it("ảnh AI THẬT của repo: đúng ảnh đã khai báo (login_bg.webp + 5 thẻ bản đồ, #513) và nằm trong trần của perf-budget.json thật", () => {
     const budget = JSON.parse(
       fs.readFileSync(path.resolve(__dirname, "../perf-budget.json"), "utf8"),
     );
@@ -667,8 +728,16 @@ describe("M7.12 #513: trần dung lượng ảnh do AI sinh (checkAiAssets, perf
     );
     expect(real.ok).toBe(true);
     // thêm ảnh AI thì thêm tên vào đây CÙNG LÚC với JSON nguồn / CREDITS.md / RA_SOAT_TAI_SAN.md (các test credits cũng đếm)
-    expect(real.files.map((f: { file: string }) => f.file)).toEqual(["login_bg.webp"]);
-    expect(real.files[0].kb).toBeLessThanOrEqual(budget.static.aiAssets.maxFileKb);
+    expect(real.files.map((f: { file: string }) => f.file)).toEqual([
+      "login_bg.webp",
+      "the_am_suong.webp",
+      "the_hac_phong.webp",
+      "the_han_van.webp",
+      "the_lac_ha.webp",
+      "the_linh_hu.webp",
+    ]);
+    for (const f of real.files)
+      expect(f.kb, f.file).toBeLessThanOrEqual(budget.static.aiAssets.maxFileKb);
     expect(real.totalKb).toBeLessThanOrEqual(budget.static.aiAssets.totalKb);
   });
 

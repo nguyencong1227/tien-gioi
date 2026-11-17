@@ -12,6 +12,19 @@ describe("giới hạn tần suất tin nhắn", () => {
     expect(lim.check("attack", 1000 / perSec)).toBe("drop");
   });
 
+  it("danh hiệu / thành tựu (M9.5): titleSet và achievementsGet chặt hơn mặc định (mỗi tin có thể là một lần ghi tệp), người thật bấm vài lần vẫn qua", () => {
+    for (const type of ["titleSet", "achievementsGet"]) {
+      const l = MESSAGE_LIMITS[type];
+      expect(l, type).toBeDefined();
+      expect(l.perSec).toBeLessThan(DEFAULT_LIMIT.perSec);
+      expect(l.burst).toBeLessThan(DEFAULT_LIMIT.burst);
+      const lim = new RateLimiter(0);
+      for (let i = 0; i < l.burst; i++) expect(lim.check(type, 0)).toBe("ok");
+      expect(lim.check(type, 0)).toBe("drop");
+      expect(lim.check(type, 1000 / l.perSec)).toBe("ok"); // hồi lại
+    }
+  });
+
   it("nhịp tim: client thật (1 ping / 5 giây + 1 lúc quay lại tiền cảnh) không bao giờ bị bỏ; dồn dập thì bị chặn chặt", () => {
     const lim = new RateLimiter(0);
     for (let t = 0; t < 600_000; t += HEARTBEAT_INTERVAL_MS)

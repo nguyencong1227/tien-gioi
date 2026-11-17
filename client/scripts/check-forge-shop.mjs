@@ -348,7 +348,7 @@ async function main() {
           const m = await evalJs(
             measure("shop-modal", "shop-buy-list", {
               card: ".shop-card",
-              tap: ".shop-act-btn, .shop-qty-btn",
+              tap: ".shop-act-btn, .qty-btn",
               actionOnly: ".shop-act-btn",
               text: ".shop-item-name, .shop-price-tag",
               inner: ".shop-item-name, .shop-price-tag, .shop-act-btn",

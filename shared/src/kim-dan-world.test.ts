@@ -130,8 +130,8 @@ describe("Âm Sương Trạch: bản đồ thứ ba", () => {
 });
 
 describe("giao thức", () => {
-  it("PROTOCOL_VERSION = 4 (3: M7.1 chiêu thức / hành vi quái / kinh quyển; 4: nghề nhỏ #514 vật phẩm `status` + trạm Lò đan / Bàn phù); MIN_PROTOCOL_VERSION KHÔNG đổi (người vận hành quyết lúc phát hành)", () => {
-    expect(PROTOCOL_VERSION).toBe(4);
+  it("PROTOCOL_VERSION = 5 (3: M7.1 chiêu thức / hành vi quái / kinh quyển; 4: nghề nhỏ #514 vật phẩm `status` + trạm Lò đan / Bàn phù; 5: chặn đường #1061 tin ambush* + bản đồ arena); MIN_PROTOCOL_VERSION KHÔNG đổi (người vận hành quyết lúc phát hành)", () => {
+    expect(PROTOCOL_VERSION).toBe(5);
     expect(MIN_PROTOCOL_VERSION).toBe(0);
   });
 });
@@ -224,9 +224,10 @@ describe("nhiệm vụ Trúc Cơ / Kim Đan làm được từ đầu tới cu�
     }
   });
 
-  it("thưởng tu vi VIỆC PHỤ mỗi cảnh giới Trúc Cơ / Kim Đan / Nguyên Anh <= 2,5% tổng thanh (việc phụ được loại khỏi cap chuỗi chính ở trên nên cần cap RIÊNG)", () => {
+  it("thưởng tu vi VIỆC PHỤ mỗi cảnh giới (Luyện Khí / Trúc Cơ / Kim Đan / Nguyên Anh) <= 2,5% tổng thanh (việc phụ được loại khỏi cap chuỗi chính ở trên nên cần cap RIÊNG)", () => {
     // Số thật lúc đặt (#725): Trúc Cơ 1,96 %, Kim Đan 1,50 %, Nguyên Anh 1,95 % (gộp với chuỗi chính Nguyên Anh = 6,87 %, chủ ý của A: việc phụ trả công 10-15 quái
     // + nguyên liệu mỗi việc). Thêm việc phụ mới vượt 2,5 % thì phải cân lại có chủ ý (đổi ngưỡng này cùng PR), không để lọt vì "việc phụ không bị chặn".
+    // Realm 1 (Luyện Khí, D6 #754): ba việc phụ Lạc Hà exp 25/30/35 = 90, tổng thanh 9 tầng = 3803 → 2,37 %.
     const sums = new Map<number, number>();
     for (const q of QUESTS) {
       if (q.daily || !q.rewards.exp || !q.desc.startsWith("Việc phụ")) continue;
@@ -234,8 +235,10 @@ describe("nhiệm vụ Trúc Cơ / Kim Đan làm được từ đầu tới cu�
       const realm = reach?.kind === "reachRealm" ? reach.realm : (q.minRealm?.realm ?? 1);
       sums.set(realm, (sums.get(realm) ?? 0) + q.rewards.exp);
     }
-    for (const realm of [2, 3, 4]) {
-      const bars = [0, 1, 2].reduce((a, t) => a + expToNext(realm, t), 0);
+    for (const realm of [1, 2, 3, 4]) {
+      // Luyện Khí có 9 tầng (0-8); Trúc Cơ / Kim Đan / Nguyên Anh mỗi cảnh 3 tầng (0-2).
+      const tiers = realm === 1 ? [0, 1, 2, 3, 4, 5, 6, 7, 8] : [0, 1, 2];
+      const bars = tiers.reduce((a, t) => a + expToNext(realm, t), 0);
       expect(sums.get(realm)!, `cảnh giới ${realm}`).toBeGreaterThan(0);
       expect(sums.get(realm)! / bars, `cảnh giới ${realm}`).toBeLessThanOrEqual(0.025);
     }

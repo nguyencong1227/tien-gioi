@@ -4,7 +4,7 @@
 import { promises as fs } from "node:fs";
 import { createHash, randomBytes } from "node:crypto";
 import path from "node:path";
-import { newSoul, sanitizeSoul, type Soul } from "@tien-gioi/shared";
+import { BOARD_SCAN_MAX, newSoul, sanitizeSoul, type Soul } from "@tien-gioi/shared";
 
 /** Khoá chân linh: đạo hiệu chuẩn hoá (cùng cách `store.ts` đặt tên file nhân vật). Bước 3 đổi thành id tài khoản. */
 export function soulIdOf(name: string): string {
@@ -24,6 +24,11 @@ export interface SoulStore {
   update(id: string, fn: (s: Soul) => Soul): Promise<Soul>;
   /** Xoá chân linh theo id; trả về true nếu có và đã xoá, false nếu không tìm thấy. */
   delete(id: string): Promise<boolean>;
+  /**
+   * Liệt kê chân linh để XẾP HẠNG (M9, `LeaderboardService`): tối đa `limit` bản ghi (mặc định `BOARD_SCAN_MAX`), sắp theo id để kết quả tất định. CHỈ ĐỌC: bản ghi hỏng bị BỎ QUA
+   * (không cách ly, không ghi đè: việc đó chỉ làm khi `get` / `update` chạm tới đúng chân linh đó). Không dùng ở đường nóng (mỗi tick / mỗi tin nhắn). Quá `BOARD_SCAN_MAX` chân linh thì cắt theo THỨ TỰ ID (không phải top theo cảnh giới): xem `PlayerStore.listProfiles`. TUỲ CHỌN trong kiểu để các kho giả của test không phải khai báo; mọi kho THẬT (tệp, PostgreSQL) có, `store-contract.ts` kiểm.
+   */
+  all?(limit?: number): Promise<Soul[]>;
 }
 
 /**
@@ -112,6 +117,28 @@ export class FileSoulStore implements SoulStore {
       await this.write(next);
       return next;
     });
+  }
+
+  async all(limit = BOARD_SCAN_MAX): Promise<Soul[]> {
+    let names: string[];
+    try {
+      names = await fs.readdir(this.dir);
+    } catch (e: any) {
+      if (e?.code === "ENOENT") return [];
+      throw e;
+    }
+    const out: Soul[] = [];
+    for (const name of names.filter((n) => n.endsWith(".json")).sort()) {
+      if (out.length >= BOARD_SCAN_MAX) break; // trần quét (tên tệp là băm nên muốn cắt theo id phải đọc đủ rồi mới sắp)
+      try {
+        const raw = JSON.parse(await fs.readFile(path.join(this.dir, name), "utf8"));
+        const soul = sanitizeSoul(raw, this.clock());
+        if (soul && soul.id !== "") out.push(soul);
+      } catch {
+        // tệp hỏng / đang bị ghi dở: bỏ qua (không cách ly ở đường liệt kê)
+      }
+    }
+    return out.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)).slice(0, limit);
   }
 
   delete(id: string) {

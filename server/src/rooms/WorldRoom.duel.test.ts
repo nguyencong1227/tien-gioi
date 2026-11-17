@@ -171,6 +171,27 @@ describe("thách đấu qua phòng thật", () => {
     expect(ea).toEqual({ result: "won", reason: "ko" });
     expect(eb).toEqual({ result: "lost", reason: "ko" });
     expect(sb.dead).toBe(true);
+    // M9.2: thống kê PK ghi vào CHÂN LINH (ngoài tick, `WorldRoom.socialUpdate`): A +1 thắng, B +1 thua, cả bộ đếm `pk_won` / `pk_lost`
+    const souls = (serverRoom(a.room) as any).souls as {
+      get(id: string): Promise<{
+        social?: { pk: { won: number; lost: number }; counters: Record<string, number> };
+      } | null>;
+    };
+    const key = (n: string) => n.normalize("NFC").toLowerCase();
+    let sa = await souls.get(key(a.name));
+    let sbSoul = await souls.get(key(b.name));
+    for (let i = 0; i < 40 && !(sa?.social?.pk.won === 1 && sbSoul?.social?.pk.lost === 1); i++) {
+      await sleep(100);
+      sa = await souls.get(key(a.name));
+      sbSoul = await souls.get(key(b.name));
+    }
+    expect(sa?.social?.pk).toEqual({ won: 1, lost: 0 });
+    expect(sa?.social?.counters).toMatchObject({ pk_won: 1 });
+    expect(sbSoul?.social?.pk).toEqual({ won: 0, lost: 1 });
+    expect(sbSoul?.social?.counters).toMatchObject({ pk_lost: 1 });
+    // `PlayerCtrl.soul` của người trực tuyến cũng được cập nhật (M9.5 sẽ đọc `c.soul.social` để cấp thành tựu): không để bản cũ
+    expect(worldOf(a.room).ctrl.get(sidOf(a)).soul.social.pk).toEqual({ won: 1, lost: 0 });
+    expect(worldOf(b.room).ctrl.get(sidOf(b)).soul.social.pk).toEqual({ won: 0, lost: 1 });
     // đứng dậy tại chỗ (rút thời gian gục phía server)
     worldOf(b.room).ctrl.get(sidOf(b)).reviveAt = Date.now();
     await waitFor(() => !sb.dead, 3000, "B đứng dậy");

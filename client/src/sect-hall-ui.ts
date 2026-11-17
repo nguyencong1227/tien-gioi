@@ -29,12 +29,23 @@ export interface HallUiState {
    * nên trạng thái phải sống ngoài DOM: không thì mua một món là các nhóm vừa mở lại gập về mặc định.
    */
   groupOpen?: ReadonlyMap<string, boolean>;
+  /**
+   * Hàng cửa hàng đang mở khung "mua nhiều" (ô số lượng dùng chung, mục 47) và phần tử ô số lượng của nó. Ô số lượng sống ngoài DOM của tab (`ui.ts` giữ MỘT bản): tab vẽ lại
+   * toàn bộ mỗi lần dữ liệu đổi, nên nếu dựng lại ô thì số người chơi đang gõ mất; ở đây chỉ gắn lại phần tử có sẵn vào đúng hàng.
+   */
+  buy?: { itemId: string; stepperEl: HTMLElement } | null;
 }
 
 export interface HallUiHandlers {
   onAccept(questId: string): void;
   onTurnIn(questId: string): void;
   onBuy(itemId: string): void;
+  /** Bấm "Nhiều…": mở / đóng khung mua nhiều của một hàng */
+  onBuyMore?(itemId: string): void;
+  /** "Đổi" trong khung mua nhiều: bên gọi đọc số lượng từ ô rồi gửi */
+  onBuyConfirm?(itemId: string): void;
+  /** "Huỷ" trong khung mua nhiều */
+  onBuyCancel?(): void;
   /** Người chơi mở / thu một nhóm cửa hàng (`defaultOpen` để bên gọi chỉ nhớ khi khác mặc định) */
   onGroupToggle?(key: string, open: boolean, defaultOpen: boolean): void;
 }
@@ -221,6 +232,7 @@ export function renderHall(root: HTMLElement, st: HallUiState, h: HallUiHandlers
   } else {
     const shopRow = (r: HallShopRow) => {
       const li = make(doc, "li", `sect-hall-row ${r.canBuy ? "" : "locked"}`.trim());
+      li.setAttribute("data-item-id", r.itemId); // móc cho kiểm thử Chrome thật / E2E: ghép hàng DOM với món trong bảng
       const head = make(doc, "div", "sect-hall-row-head");
       head.append(make(doc, "b", undefined, r.name), make(doc, "span", "sect-hall-tag", r.price));
       const foot = make(doc, "div", "sect-hall-row-foot");
@@ -236,11 +248,47 @@ export function renderHall(root: HTMLElement, st: HallUiState, h: HallUiHandlers
           () => h.onBuy(r.itemId),
         ),
       );
+      // "Nhiều…": chỉ khi mua được từ 2 cái trở lên một lần (ô số lượng dùng chung); "Đổi" vẫn đổi ngay MỘT cái (đường nhanh)
+      if (r.maxBuy >= 2 && h.onBuyMore) {
+        const open = st.buy?.itemId === r.itemId;
+        const more = make(
+          doc,
+          "button",
+          "sect-small-btn sect-hall-btn sect-hall-more",
+          open ? "Gấp lại" : "Nhiều…",
+        );
+        more.type = "button";
+        more.setAttribute("aria-expanded", String(open));
+        more.addEventListener("click", () => h.onBuyMore?.(r.itemId));
+        foot.append(more);
+      }
       li.append(head, foot);
       if (r.why) {
         const why = make(doc, "p", "sect-hall-why", r.why);
         why.id = whyId;
         li.append(why);
+      }
+      if (st.buy && st.buy.itemId === r.itemId && r.maxBuy >= 1) {
+        const panel = make(doc, "div", "sect-hall-buy");
+        panel.append(st.buy.stepperEl);
+        const acts = make(doc, "div", "sect-hall-buy-actions");
+        const ok = make(
+          doc,
+          "button",
+          "sect-small-btn sect-hall-btn sect-primary-btn",
+          st.busy.has(`shop:${r.itemId}`) ? "Đang xử lý…" : "Đổi số này",
+        );
+        ok.type = "button";
+        ok.disabled = st.busy.has(`shop:${r.itemId}`);
+        ok.addEventListener("click", () => {
+          if (!ok.disabled) h.onBuyConfirm?.(r.itemId);
+        });
+        const cancel = make(doc, "button", "sect-small-btn sect-hall-btn", "Huỷ");
+        cancel.type = "button";
+        cancel.addEventListener("click", () => h.onBuyCancel?.());
+        acts.append(ok, cancel);
+        panel.append(acts);
+        li.append(panel);
       }
       return li;
     };

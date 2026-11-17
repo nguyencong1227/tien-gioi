@@ -2,6 +2,7 @@
 // nên các system có thể test riêng bằng một World giả.
 import type {
   GameMap,
+  SoulSocial,
   InputMsg,
   FxMsg,
   DmgMsg,
@@ -53,6 +54,7 @@ import { Duels } from "./systems/duel";
 import { TickStats } from "./metrics";
 import type { Bolt } from "./systems/bolt";
 import type { BossCtrl } from "./systems/boss-state";
+import type { NavCtrl } from "./systems/nav-chase";
 import type { TreasureRt } from "./systems/treasure";
 
 /** Dữ liệu riêng của server cho mỗi người chơi (không gửi xuống client). */
@@ -192,6 +194,8 @@ export interface MonsterCtrl {
   boss?: BossCtrl;
   /** Quái con do trùm gọi: id trùm. KHÔNG rơi đồ, KHÔNG tu vi, KHÔNG tính nhiệm vụ (chống cày); biến mất khi trùm chết hoặc reset. */
   addOf?: string;
+  /** Tìm đường / phát hiện kẹt / rút về của quái đang đuổi (mục 48, `systems/nav-chase.ts`); dựng lười ở lần đuổi đầu tiên, quái không đuổi thì không có. */
+  nav?: NavCtrl;
 }
 
 /** Pha của đòn mạnh (`systems/charge.ts`): `windup` đứng gồng tới `until` rồi lao theo `angle`; `recover` đứng thở tới `until`. */
@@ -313,8 +317,17 @@ export class World {
    * Mặc định TẮT (bản chạy thật không đổi cho tới khi dữ liệu thật của E và cân bằng của D xong); `WorldRoom` đặt từ `BOSS_MOVES` (`server/src/systems/boss-config.ts`).
    */
   bossMoves = false;
+  /** Số lần tìm đường còn lại của quái THƯỜNG trong tick này (đặt lại ở đầu `tickMonsters`; trùm không bị giới hạn). Mục 48, `systems/nav-chase.ts`. */
+  navBudget = 0;
   /** Phòng đăng ký: được gọi (một lần) khi một người vừa vào Hoàng Tuyền, để lưu file, cộng Duyên và gửi `limbo`. */
   onLimbo: ((sid: string) => void) | null = null;
+  /**
+   * Phòng đăng ký (M9, `systems/social.ts`): ghi PHẦN XÃ HỘI của một chân linh (`Soul.social`) bất đồng bộ NGOÀI tick: `fn` thuần, nhận bản hiện có (hoặc `undefined`) và trả bản mới;
+   * phòng chạy `SoulStore.update` rồi cập nhật `PlayerCtrl.soul` của người đang trực tuyến. Khoá là `identity.soulKey` (không phải sessionId: người đó có thể đã rời phòng). Không có hook
+   * (test đơn vị / bench) thì các sự kiện xã hội bị bỏ qua.
+   */
+  onSocial: ((soulKey: string, fn: (s: SoulSocial | undefined) => SoulSocial) => void) | null =
+    null;
   /**
    * Phòng đăng ký (bí cảnh, 4b): được gọi khi một run vừa được lập, để TẠO phòng bí cảnh (`matchMaker.createRoom`, bất
    * đồng bộ) rồi gọi `runReady(w, run, roomId)` (hoặc `runFailed`). Không có hook (test đơn vị): coi như phòng sẵn sàng ngay.

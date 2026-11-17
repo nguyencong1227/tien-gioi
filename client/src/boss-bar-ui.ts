@@ -1,6 +1,9 @@
 // Vẽ thanh máu TRÙM (T4 #873) từ `BossBarModel` (`boss-bar.ts`). Chỉ `createElement` + `textContent` (không `innerHTML`); cập nhật CÓ ĐIỀU KIỆN (chỉ ghi DOM khi giá trị đổi) vì gọi ~10 lần / giây.
 // Kênh thông tin KHÔNG chỉ bằng màu (người mù màu): tên chiêu bằng CHỮ, vạch giai đoạn có số, chỉ báo cuồng nộ bằng chữ + biểu tượng, `progressbar` có `aria-valuetext`.
+import { showArtImage } from "./art-image";
 import { bossBarText, type BossBarModel } from "./boss-bar";
+import { bossCardTarget } from "./boss-card";
+import { applyMapCard, type CardImg } from "./map-card";
 
 export class BossBarDom {
   private readonly root: HTMLElement;
@@ -17,6 +20,9 @@ export class BossBarDom {
   private readonly summon: HTMLElement;
   private markKey = "";
   private shownId: string | null = null;
+  /** Ảnh đại diện trùm (thẻ minh hoạ, tuỳ chọn: thiếu phần tử thì bỏ qua) và hàm huỷ yêu cầu tải ảnh đang chờ. */
+  private readonly art: (HTMLImageElement & CardImg) | null;
+  private cancelArt: (() => void) | null = null;
 
   constructor(private readonly doc: Document) {
     const get = (id: string) => {
@@ -36,12 +42,22 @@ export class BossBarDom {
     this.notes = get("boss-bar-notes");
     this.armor = get("boss-bar-armor");
     this.summon = get("boss-bar-summon");
+    const art = doc.getElementById("boss-bar-art");
+    this.art = art instanceof HTMLImageElement ? art : null;
+  }
+
+  /** Bỏ yêu cầu ảnh đang chờ và ẩn ảnh đại diện (không còn trùm / đổi trùm). */
+  private clearArt(): void {
+    this.cancelArt?.();
+    this.cancelArt = null;
+    if (this.art) applyMapCard(this.art, null);
   }
 
   /** Cập nhật thanh theo mô hình; `null` = ẩn thanh. */
   update(m: BossBarModel | null): void {
     if (!m) {
       if (!this.root.hidden) this.root.hidden = true;
+      if (this.shownId !== null) this.clearArt();
       this.shownId = null;
       return;
     }
@@ -49,6 +65,10 @@ export class BossBarDom {
     if (this.shownId !== m.id) {
       this.shownId = m.id;
       this.markKey = ""; // trùm khác: dựng lại vạch
+      // thẻ minh hoạ của loại trùm này (gói `art:trum` tải theo nhu cầu); chưa có thẻ / chưa tải xong thì ảnh ẩn, thanh chỉ có tên như cũ
+      this.clearArt();
+      const target = bossCardTarget(m.kind);
+      if (target && this.art) this.cancelArt = showArtImage(this.art, target);
     }
     setText(this.name, m.name);
     setText(this.phase, m.phaseCount > 1 ? `Giai đoạn ${m.phase + 1} / ${m.phaseCount}` : "");

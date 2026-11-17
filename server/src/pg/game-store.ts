@@ -4,9 +4,9 @@
 // Thứ tự ghi: các lần ghi cùng một khoá xếp hàng trong tiến trình (`KeyedQueue`: bản gọi sau luôn là bản cuối cùng dù pool
 // chạy song song), cộng với bảo vệ ở DB: `SoulStore.update` là giao dịch `SELECT ... FOR UPDATE` (nhiều tiến trình cũng
 // không mất cập nhật), `fn` chạy TRƯỚC khi ghi gì nên `fn` ném lỗi thì không có gì để hoàn tác.
-import { newSoul, sanitizeSoul, type Soul } from "@tien-gioi/shared";
+import { BOARD_SCAN_MAX, newSoul, sanitizeSoul, type Soul } from "@tien-gioi/shared";
 import { nameKeyOf } from "../account-store";
-import type { PlayerStore } from "../player-store";
+import { profileRowOf, type PlayerStore, type ProfileRow } from "../player-store";
 import type { SoulStore } from "../soul";
 import type { SavedPlayer } from "../store";
 import { isUniqueViolation, tx, upsert, type Db, type DbClient } from "./db";
@@ -22,6 +22,18 @@ export class PgPlayerStore implements PlayerStore {
       nameKeyOf(name),
     ]);
     return r.rows.length > 0 ? (r.rows[0].data as SavedPlayer) : null;
+  }
+
+  async listProfiles(limit = BOARD_SCAN_MAX): Promise<ProfileRow[]> {
+    const r = await this.db.query("SELECT data FROM characters ORDER BY name_key LIMIT $1", [
+      limit,
+    ]);
+    const out: ProfileRow[] = [];
+    for (const row of r.rows) {
+      const p = profileRowOf(row.data);
+      if (p) out.push(p);
+    }
+    return out;
   }
 
   save(p: SavedPlayer): Promise<void> {
@@ -83,6 +95,16 @@ export class PgSoulStore implements SoulStore {
 
   get(id: string): Promise<Soul | null> {
     return this.queue.run(id, () => this.read(this.db, id));
+  }
+
+  async all(limit = BOARD_SCAN_MAX): Promise<Soul[]> {
+    const r = await this.db.query("SELECT id, data FROM souls ORDER BY id LIMIT $1", [limit]);
+    const out: Soul[] = [];
+    for (const row of r.rows) {
+      const soul = this.parse(String(row.id), row.data);
+      if (soul) out.push(soul);
+    }
+    return out;
   }
 
   create(id: string, init?: (s: Soul) => Soul): Promise<Soul> {
