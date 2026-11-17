@@ -204,7 +204,7 @@ export const ACTIONS: readonly ActionDef[] = [
   },
   { id: "panel.sect", label: "Tông môn", group: "panel", defaults: ["KeyG"], world: false },
   // Bảng Xã hội (M9, #1025): xếp hạng / thành tựu / sự kiện. 26 chữ cái đã hết chỗ nên dùng Shift+G (cạnh G = Tông môn);
-  // chỉ chạy khi cờ `?social=1` bật (`social-tabs.ts` `socialEnabled`) cho đến khi M9.6-M9.8 xong
+  // mặc định BẬT; `?social=0` tắt (`social-tabs.ts` `socialEnabled`)
   {
     id: "panel.social",
     label: "Xã hội (xếp hạng, thành tựu, sự kiện)",

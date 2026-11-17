@@ -7,7 +7,7 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
  *   npm run build -w client && node client/scripts/check-social-shell.mjs [--shots <thư mục>] [--vp <khung>]
  *
  * Kiểm:
- *   - KHÔNG có `?social=1`: nút HUD ẩn, Shift+G không mở bảng (cờ tắt mặc định);
+ *   - MẶC ĐỊNH BẬT (không cờ): nút HUD hiện, banner trùm hiện khi có tin; `?social=0` (công tắc khẩn): nút HUD ẩn, Shift+G không mở bảng, không banner / chấm mới;
  *   - có `?social=1`: nút HUD hiện, nằm trọn khung, cao / rộng >= 44 px; Shift+G mở bảng (role=dialog, focus vào trong,
  *     `aria-expanded=true`), bảng nằm trọn khung, không tràn ngang; ba tab, tab Xếp hạng mở sẵn;
  *   - mũi tên Phải / Trái / Home / End đổi tab VÀ đưa focus theo (không nhảy qua tab `tabindex=-1`), vòng hai đầu, chỉ MỘT thân tab hiện;
@@ -217,28 +217,43 @@ async function main() {
       if (onlyVp && vp.name !== onlyVp) continue;
       console.log(`\n=== ${vp.name} ===`);
 
-      // ---- 1. cờ TẮT (mặc định): nút ẩn, Shift+G không mở ----
+      // ---- 0. MẶC ĐỊNH BẬT (M9 phát hành): không cờ nào thì nút HUD hiện, Shift+G mở bảng ----
       if (!(await openPage(vp, ""))) {
         console.log("  ✗ cảnh không sẵn sàng (cần ?debug)");
         failures++;
         continue;
       }
       let s = await state();
-      check(s.btnHidden, "không có ?social=1: nút HUD Xã hội ẩn");
+      check(!s.btnHidden, "mặc định (không cờ): nút HUD Xã hội HIỆN");
+      await evalJs(`window.__ui.setWorldBoss(window.__sample.worldBoss("live")); 1`);
+      check(
+        !(await evalJs(`document.getElementById("wb-banner").hidden`)),
+        "mặc định: tin trùm thế giới làm hiện banner",
+      );
+      await evalJs(`window.__ui.setWorldBoss(window.__sample.worldBoss("none")); 1`);
+
+      // ---- 1. công tắc khẩn ?social=0: nút ẩn, Shift+G không mở ----
+      if (!(await openPage(vp, "&social=0"))) {
+        console.log("  ✗ cảnh không sẵn sàng (cần ?debug&social=0)");
+        failures++;
+        continue;
+      }
+      s = await state();
+      check(s.btnHidden, "?social=0: nút HUD Xã hội ẩn");
       await shiftG();
       s = await state();
-      check(s.modalHidden, "không có ?social=1: Shift+G KHÔNG mở bảng");
+      check(s.modalHidden, "?social=0: Shift+G KHÔNG mở bảng");
       await evalJs(`window.__ui.setWorldBoss(window.__sample.worldBoss("live")); 1`);
       check(
         await evalJs(`document.getElementById("wb-banner").hidden`),
-        "không có ?social=1: tin trùm thế giới KHÔNG làm hiện banner",
+        "?social=0: tin trùm thế giới KHÔNG làm hiện banner",
       );
       await evalJs(
         `window.__ui.onAchievementNew({ id: "kiep_2" }); window.__ui.setAchievements(window.__sample.achievements()); 1`,
       );
       check(
         await evalJs(`!document.getElementById("btn-social").classList.contains("has-new")`),
-        "không có ?social=1: thành tựu mới KHÔNG tạo chấm trên nút HUD",
+        "?social=0: thành tựu mới KHÔNG tạo chấm trên nút HUD",
       );
 
       // ---- 2. cờ BẬT ----
@@ -258,8 +273,10 @@ async function main() {
         const open = await evalJs(`(() => {
           const btns = [...document.querySelectorAll("#hud-menu-items button")].filter((b) => b.getBoundingClientRect().width > 0);
           const lefts = btns.map((b) => b.getBoundingClientRect().left), rights = btns.map((b) => b.getBoundingClientRect().right);
-          const rows = new Set(btns.map((b) => Math.round(b.getBoundingClientRect().top))).size;
-          return { n: btns.length, minL: Math.min(...lefts), maxR: Math.max(...rights), vw: window.innerWidth, rows };
+          const tops = btns.map((b) => Math.round(b.getBoundingClientRect().top));
+          const rows = new Set(tops).size;
+          const perRow = [...new Set(tops)].sort((a, b) => a - b).map((t) => tops.filter((x) => x === t).length);
+          return { n: btns.length, minL: Math.min(...lefts), maxR: Math.max(...rights), vw: window.innerWidth, rows, perRow };
         })()`);
         check(
           open.n === 8 && open.minL >= -0.5 && open.maxR <= open.vw + 0.5,
@@ -268,6 +285,11 @@ async function main() {
         check(
           open.rows <= 2,
           `menu ☰ đang mở: tối đa 2 hàng, không thành một cột (${open.rows} hàng)`,
+        );
+        // MỞ MẶC ĐỊNH (M9): 8 nút xếp 4 + 4 (không phải 7 + 1 nút lẻ) ở màn hẹp
+        check(
+          open.perRow.join("+") === "4+4",
+          `menu ☰ đang mở: 8 nút xếp 4 + 4 (${open.perRow.join(" + ")})`,
         );
       }
       check(
@@ -1059,6 +1081,22 @@ async function main() {
         !a.bodyHidden && /^Đã đạt 2 \//.test(a.summary) && !a.dot,
         "tin sai kiểu bị bỏ; id lạ KHÔNG tạo dấu / chấm: giao diện giữ nguyên",
       );
+      // MÁY CHỦ CHƯA BẬT THÀNH TỰU (`ACHIEVEMENTS` tắt: vẫn trả sổ nhưng KHÔNG ai được cấp gì; hoặc người chơi mới tinh): sổ rỗng tiến độ phải hiện gọn, không nút chết / không giả vờ đã đạt
+      await setAch("m.ach = {}; m.counters = {}; m.title = null;");
+      a = await ach();
+      check(
+        !a.bodyHidden && /^Đã đạt 0 \//.test(a.summary) && !a.dot,
+        `sổ rỗng (máy chủ chưa cấp gì): "${a.summary}", không chấm Mới`,
+      );
+      check(
+        a.items.every((x) => x.state !== "Hoàn thành" && !x.isNew),
+        "sổ rỗng: không thành tựu nào hiện 'Hoàn thành' hay dấu Mới",
+      );
+      check(
+        a.radios.filter((x) => x.t !== "Không đeo" && x.dis !== "true").length === 0,
+        "sổ rỗng: mọi danh hiệu đều khoá (aria-disabled), không có lựa chọn đeo nào bấm được",
+      );
+      check(a.paneOverflow <= 0 && a.pageOverflow <= 0, "sổ rỗng: không tràn ngang");
       await evalJs(`window.__scene.room.send = window.__scene.room.__origSend; 1`);
 
       // danh hiệu hiện cạnh đạo hiệu trên đầu nhân vật (nhãn Phaser): chỉ khi cờ bật
