@@ -115,6 +115,26 @@ describe("world-boss: báo trước + sinh trùm", () => {
     expect(live[0].msg.endsInMs).toBeGreaterThan(29 * MIN);
   });
 
+  it("khung giờ 00:00-00:09: báo trước 10 / 5 / 1 phút rơi vào cuối NGÀY HÔM TRƯỚC (23:55...) vẫn phát đủ, mỗi mốc MỘT lần, qua nửa đêm không phát đôi, trùm sinh đúng 00:05", () => {
+    const slot: WorldBossSlot = {
+      ...sampleWorldBossSchedule()[0]!,
+      id: "dau_ngay",
+      hour: 0,
+      minute: 5,
+    };
+    const { han, lac } = setup([slot]);
+    addPlayer(han.w, "A");
+    addPlayer(lac.w, "B");
+    // 23:50 ngày 17 -> 00:06 ngày 18 (qua nửa đêm), bước 500 ms
+    run([han.w, lac.w], at(0) - 10 * MIN, at(0, 5, 5), 500);
+    const soon = lac.worldBosses.filter((x) => x.msg.phase === "soon");
+    expect(soon.map((x) => Math.round(x.msg.startsInMs! / MIN))).toEqual([10, 5, 1]); // trước khi sửa: chỉ [5, 1] hoặc rỗng
+    for (const m of [10, 5, 1])
+      expect(lac.sys.filter((t) => t.includes(`sau ${m} phút`))).toHaveLength(1);
+    expect(bossOf(han.w)?.m.kind).toBe("thien_han_vuong"); // đúng giờ 00:05 (sang ngày mới) vẫn sinh
+    expect(lac.worldBosses.filter((x) => x.msg.phase === "live")).toHaveLength(1);
+  });
+
   it("khởi động (sập máy) GIỮA sự kiện thì sự kiện đó coi như huỷ: không sinh, không báo, sự kiện kế vẫn đúng giờ", () => {
     const { hub, han } = setup();
     addPlayer(han.w, "A");

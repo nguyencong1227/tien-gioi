@@ -100,10 +100,19 @@ export class WorldBossBook {
     return prev;
   }
 
-  /** Các lần xảy ra (hôm nay) của mọi khung giờ, để bộ lập lịch xét báo trước / bắt đầu. */
+  /**
+   * Các lần xảy ra của mọi khung giờ HÔM NAY VÀ NGÀY MAI, để bộ lập lịch xét báo trước / bắt đầu. Phải có cả ngày mai: mốc báo trước (10 / 5 / 1 phút) của khung
+   * giờ 00:00-00:09 rơi vào cuối NGÀY HÔM TRƯỚC (vd khung 00:05 báo 10 phút lúc 23:55); chỉ xét hôm nay thì ba lời báo đó không bao giờ phát. Không phát đôi: mỗi mốc /
+   * giờ bắt đầu được so với cửa sổ (lần làm việc trước, bây giờ] theo thời gian tuyệt đối, nên sang ngày thì lần xảy ra cũ đã nằm ngoài cửa sổ.
+   */
   todaysOccurrences(nowMs: number): WorldBossOccurrence[] {
     const day = worldBossDayStart(nowMs);
-    return this.slots.map((s) => worldBossOccurrence(s, day));
+    const out: WorldBossOccurrence[] = [];
+    for (const s of this.slots) {
+      out.push(worldBossOccurrence(s, day));
+      out.push(worldBossOccurrence(s, day + 86_400_000));
+    }
+    return out;
   }
 
   /** Lần xảy ra SẮP TỚI sớm nhất (bắt đầu SAU `nowMs`; bỏ qua lần đã bắt đầu mà không có sự kiện: đã huỷ do sập máy), xét hôm nay và ngày mai; `null` nếu lịch rỗng. */
