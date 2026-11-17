@@ -8406,3 +8406,128 @@ body.ui-hidden
     margin-top: 2px;
   }
 }
+
+/* ---- Đấu trường gặp chặn đường (mục 52, CD7 bước 3): HUD, bảng xác nhận bỏ chạy, thẻ kết quả ---- */
+.ambush-hud {
+  position: fixed;
+  top: calc(max(8px, env(safe-area-inset-top)) + var(--wb-h, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 19;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-sizing: border-box;
+  max-width: calc(100vw - 24px);
+  padding: 4px 6px 4px 12px;
+  border: 1px solid rgba(255, 120, 90, 0.55);
+  border-radius: 8px;
+  background: rgba(20, 12, 10, 0.85);
+  color: #ffe9e0;
+}
+.ambush-hud[hidden] {
+  display: none;
+}
+.ahud-title {
+  font-size: var(--fs-13);
+  font-weight: 700;
+  color: #ff9a8a;
+  white-space: nowrap;
+}
+.ahud-clock {
+  min-width: 3.4em;
+  font-size: var(--fs-13);
+  font-variant-numeric: tabular-nums;
+  color: #ffe08a;
+}
+.ahud-clock.urgent {
+  color: #ff6b5a;
+  font-weight: 700;
+}
+.ahud-flee {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(201, 162, 74, 0.6);
+  background: rgba(201, 162, 74, 0.16);
+  color: #fff6dc;
+  font-size: var(--fs-13);
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ahud-flee[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  border-style: dashed;
+}
+.ahud-note {
+  margin: 0;
+  max-width: 14em;
+  font-size: var(--fs-11);
+  color: #ffd2a8;
+}
+.ahud-note:empty {
+  display: none;
+}
+/* thanh trùm nằm DƯỚI HUD đấu trường (cùng cách nhường chỗ cho banner trùm thế giới) */
+body.in-arena .boss-bar {
+  top: calc(max(8px, env(safe-area-inset-top)) + var(--wb-h, 0px) + 56px);
+}
+@media (orientation: portrait) {
+  .ambush-hud {
+    top: calc(max(8px, env(safe-area-inset-top)) + 186px + var(--wb-h, 0px));
+  }
+  body.in-arena .boss-bar {
+    top: calc(max(8px, env(safe-area-inset-top)) + 186px + var(--wb-h, 0px) + 56px);
+  }
+}
+/* bảng xác nhận bỏ chạy: dính đáy, nền nhạt để vẫn thấy trận đang diễn ra */
+.ambush-modal.ambush-sheet {
+  align-items: flex-end;
+  background: rgba(8, 6, 4, 0.38);
+  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+}
+.ambush-stay {
+  min-height: 48px;
+}
+/* thẻ kết quả: giữa màn hình, tự ẩn sau khi đưa về chỗ cũ; không chặn chạm */
+.ambush-result {
+  position: fixed;
+  left: 50%;
+  top: 38%;
+  transform: translate(-50%, -50%);
+  z-index: 20;
+  box-sizing: border-box;
+  width: min(360px, calc(100vw - 24px));
+  padding: 14px 16px;
+  border: 1px solid #ffe08a;
+  border-radius: 8px;
+  background: rgba(24, 21, 18, 0.95);
+  color: #f1e7c8;
+  text-align: center;
+  pointer-events: none;
+}
+.ambush-result[hidden] {
+  display: none;
+}
+.ambush-result .ar-title {
+  margin: 0 0 6px;
+  font-size: var(--fs-16, 16px);
+}
+.ambush-result.good .ar-title {
+  color: #8fe388;
+}
+.ambush-result.bad .ar-title {
+  color: #ff9a8a;
+}
+.ambush-result.info .ar-title {
+  color: #ffe08a;
+}
+.ambush-result .ar-lines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-13);
+}
