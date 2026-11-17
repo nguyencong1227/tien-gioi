@@ -2041,6 +2041,106 @@ html[data-input="touch"] #skill-slots .sk.slot .keycap {
   gap: 6px;
   padding-right: 2px;
 }
+/* Lọc / tìm sổ chiêu (CT11a, #1056): ô tìm + nút Lọc luôn thấy (một hàng), các lựa chọn gập sau nút (màn ngang thấp chỉ còn ~180 px cho danh sách). Mọi điều khiển cao >= 44 px. */
+.sk-filter {
+  margin: 0 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sk-filter[hidden],
+.sk-filter-more[hidden] {
+  display: none;
+}
+.sk-filter-top {
+  display: flex;
+  gap: 6px;
+}
+.sk-q {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 44px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--gold);
+  background: #1d1a16;
+  color: var(--paper);
+  font: inherit;
+  font-size: var(--fs-15);
+  color-scheme: dark;
+}
+.sk-q:focus-visible,
+.sk-filter-more select:focus-visible {
+  outline: 2px solid #ffe08a;
+  outline-offset: 2px;
+}
+.sk-filter-toggle[aria-expanded="true"] {
+  border-color: #ffe08a;
+  background: rgba(201, 162, 74, 0.35);
+}
+.sk-filter-more {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 6px;
+}
+.sk-filter-more select {
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 4px 6px 8px;
+  font-size: var(--fs-13);
+  border-radius: 6px;
+  border: 1px solid var(--gold);
+  background: #1d1a16;
+  color: var(--paper);
+  font: inherit;
+  color-scheme: dark;
+}
+.sk-filter-more .sk-filter-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  grid-column: 1 / -1;
+  font-size: var(--fs-13);
+  cursor: pointer;
+}
+.sk-filter-check input {
+  width: 22px;
+  height: 22px;
+  accent-color: var(--gold);
+  flex: none;
+}
+/* Màn thấp (điện thoại nằm ngang): danh sách chỉ còn ~150 px nên bỏ dòng gợi ý khi đã có thanh lọc, để nút gắn ô của chiêu vừa mở vẫn nằm trong vùng nhìn */
+@media (max-height: 520px) {
+  #skills-modal.sk-has-filter .skills-hint {
+    display: none;
+  }
+}
+/* Phẩm (Hoàng / Huyền / Địa / Thiên): nhãn nhỏ cạnh tên; màu CHỈ là phụ, chữ vẫn nói phẩm gì (không dựa vào màu) */
+.sk-grade {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 8px;
+  border: 1px solid currentColor;
+  font-size: var(--fs-12);
+  font-weight: normal;
+  vertical-align: 1px;
+  white-space: nowrap;
+}
+.sk-grade.g0 {
+  color: #cbb98a;
+}
+.sk-grade.g1 {
+  color: #7fd0c0;
+}
+.sk-grade.g2 {
+  color: #b79cf0;
+}
+.sk-grade.g3 {
+  color: #ffd166;
+  background: rgba(255, 209, 102, 0.12);
+}
 .sk-row {
   border: 1px solid var(--line);
   border-radius: 8px;

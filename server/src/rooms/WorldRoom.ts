@@ -27,6 +27,7 @@ import {
   DUNGEON_MSG,
   DUEL_MSG,
   HEARTBEAT_MSG,
+  AMBUSH_MSG,
   NET_MSG,
   NET_RECONNECT_GRACE_S,
   parseBeatMs,
@@ -187,6 +188,15 @@ import { applyRebirth, creditSoul } from "../systems/reincarnation";
 import { RateLimiter } from "../rate-limit";
 import { audit, auditCoinThreshold } from "../audit";
 import { bossMovesOf } from "../systems/boss-config";
+import { ambushOn } from "../systems/ambush-config";
+import {
+  ambushDropOffer,
+  ambushResend,
+  createAmbushRuntime,
+  onAmbushChoose,
+  onAmbushSeen,
+  protoOf,
+} from "../systems/ambush";
 import { testExpMultFor } from "../test-exp";
 import type { LeaderboardService } from "../leaderboard";
 import { achievementsMsgOf, grantDue, unlockedTitles, wornTitle } from "../systems/achievements";
@@ -316,6 +326,8 @@ export class WorldRoom extends Room<WorldState> {
         sectVault: (sid, msg) => this.sendTo(sid, SECT_MSG.vault, msg),
         sectHall: (sid, msg) => this.sendTo(sid, SECT_MSG.hall, msg),
         netShield: (sid, msg) => this.sendTo(sid, NET_MSG.shield, msg),
+        ambushOffer: (sid, msg) => this.sendTo(sid, AMBUSH_MSG.offer, msg),
+        ambushEnd: (sid, msg) => this.sendTo(sid, AMBUSH_MSG.end, msg),
       },
       map,
       this.hub,
@@ -323,6 +335,8 @@ export class WorldRoom extends Room<WorldState> {
     // Chết do quái = luân hồi: lưu hồ sơ ở trạng thái Hoàng Tuyền, cộng Duyên, gửi màn hình Hoàng Tuyền
     w.reincarnate = true;
     w.bossMoves = bossMovesOf(process.env); // bộ chiêu trùm (mục 42): mặc định tắt, `BOSS_MOVES=on` để bật
+    // Gặp chặn đường (mục 52): mặc định TẮT (`w.ambush` null), `AMBUSH=on` để bật; ngẫu nhiên do phòng tiêm vào (system không gọi `Math.random` trong tick)
+    if (ambushOn(process.env)) w.ambush = createAmbushRuntime({ random: Math.random });
     w.onLimbo = (sid) => void this.enterLimbo(sid);
     w.onSocial = (soulKey, fn) => void this.socialUpdate(soulKey, fn); // M9: thống kê PK / thành tựu theo linh hồn (`systems/social.ts`)
     // Tông môn (M3.6): dịch vụ dùng chung (`SECTS=off` gỡ gấp); lưu hồ sơ NGAY khi chuyển Linh thạch sang kho
@@ -454,6 +468,9 @@ export class WorldRoom extends Room<WorldState> {
     this.on(DUEL_MSG.accept, (sid, m) => duelAnswer(w, sid, m, true));
     this.on(DUEL_MSG.decline, (sid, m) => duelAnswer(w, sid, m, false));
     this.on(DUEL_MSG.yield, (sid) => duelYield(w, sid));
+    // Gặp chặn đường (mục 52, docs/THIET_KE_CHAN_DUONG.md): chỉ chọn / xác nhận đã thấy; mọi kết quả do máy chủ quyết, không tin số nào từ client
+    this.on(AMBUSH_MSG.seen, (sid, m) => onAmbushSeen(w, sid, m));
+    this.on(AMBUSH_MSG.choose, (sid, m) => void onAmbushChoose(w, sid, m));
     // Tông môn (docs/THIET_KE_TONG_MON.md): gắn với linh hồn, chung mọi phòng; thao tác bất đồng bộ (kho lưu)
     this.on(SECT_MSG.create, (sid, m) => void sectCreate(w, sid, m));
     this.on(SECT_MSG.invite, (sid, m) => void sectInvite(w, sid, m));
@@ -692,6 +709,7 @@ export class WorldRoom extends Room<WorldState> {
       identity,
       // Mục 33: client có khai nhịp gửi tin (`JoinOptions.beatMs`) thì máy chủ áp luật im lặng cho người này; client cũ thì không
       beatMs: parseBeatMs(_options?.beatMs) ?? undefined,
+      proto: protoOf(_options?.v), // chặn đường chỉ kích hoạt cho client đủ mới (`AMBUSH_MIN_PROTOCOL`)
       lastHeardAt: Date.now(),
       inputs: [],
       moveBudget: 4,
@@ -792,6 +810,7 @@ export class WorldRoom extends Room<WorldState> {
         sendSkills(this.world, sid);
         sendStatus(this.world, sid); // client mất hệ số tốc độ sau rớt mạng sẽ bị kéo giật nếu không gửi lại
         sendWallet(this.world, sid);
+        ambushResend(this.world, sid); // đang giữa hộp thoại chặn đường: gửi LẠI (cùng id, thời gian còn thật) cho Room mới
         resolveDone();
         return;
       } catch {
@@ -800,6 +819,7 @@ export class WorldRoom extends Room<WorldState> {
     }
     try {
       if (p && c) {
+        ambushDropOffer(this.world, sid); // thoát / rớt quá hạn lúc hộp thoại chặn đường mở = bỏ chạy bằng tu vi (chống né giá), TRƯỚC khi lưu cuối
         await this.persist(p, c).catch((e) => console.error("save failed", e));
         this.world.events.sys(`${p.name} đã rời đi.`);
       }

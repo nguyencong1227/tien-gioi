@@ -22,6 +22,7 @@ import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { Client, type Room } from "colyseus.js";
 import {
+  AMBUSH_MSG,
   DEFAULT_MAP_ID,
   DUEL_MSG,
   DUNGEON_MSG,
@@ -101,6 +102,8 @@ export const EXPECTED_MESSAGE_TYPES = [
   SECT_MSG.questAccept, // M8.4: nhận nhiệm vụ tông môn
   SECT_MSG.questTurnIn, // M8.4: trả nhiệm vụ tông môn
   SECT_MSG.shopBuy, // M8.5: mua ở cửa hàng tông môn
+  AMBUSH_MSG.seen, // M9+ mục 52: hộp thoại chặn đường đã hiện (CD2; chỉ máy chủ so với id lời đang chờ)
+  AMBUSH_MSG.choose, // mục 52: chọn Chiến / Bỏ chạy ở hộp thoại (CD2; máy chủ trừ ĐÚNG giá đã chốt, client không gửi số nào)
   // Luân hồi
   "soulBuy",
   "rebirth",
