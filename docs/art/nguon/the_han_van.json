@@ -36,16 +36,8 @@
     {
       "script": "client/scripts/art/hau-ky-webp.py",
       "params": {
-        "crop": [
-          38,
-          18,
-          1140,
-          760
-        ],
-        "size": [
-          624,
-          416
-        ],
+        "crop": [38, 18, 1140, 760],
+        "size": [624, 416],
         "quality": 86,
         "method": 6
       },
@@ -53,9 +45,7 @@
         "width": 624,
         "height": 416,
         "bytes": 23288,
-        "chunks": [
-          "VP8 "
-        ],
+        "chunks": ["VP8 "],
         "pillow": "10.2.0",
         "libwebp": "1.3.2"
       },
