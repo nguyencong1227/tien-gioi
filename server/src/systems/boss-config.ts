@@ -24,3 +24,10 @@ export function bossMovesWarnings(env: NodeJS.ProcessEnv): string[] {
     `BOSS_MOVES='${raw}' không hợp lệ (dùng on hoặc off): đang TẮT, trùm chạy như cũ (không có bộ chiêu nhiều chiêu).`,
   ];
 }
+
+/** Dòng log lúc khởi động khi BẬT (để `./prod.sh logs game | grep BOSS_MOVES` xác nhận sau khi triển khai); tắt thì không có dòng nào (`null`). */
+export function bossMovesNotice(env: NodeJS.ProcessEnv): string | null {
+  return bossMovesOf(env)
+    ? "Trùm nhiều chiêu: BẬT (BOSS_MOVES): trùm dùng bộ chiêu có báo trước"
+    : null;
+}

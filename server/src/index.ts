@@ -17,7 +17,7 @@ import { mountCors } from "./cors";
 import { createStores } from "./stores";
 import { Monitor, mountMetrics, thresholdsOf } from "./metrics";
 import { applyStaticHeaders } from "./static-headers";
-import { bossMovesOf } from "./systems/boss-config";
+import { bossMovesNotice } from "./systems/boss-config";
 
 // Đọc .env.local ở gốc repo (cổng riêng cho từng dev). Không có file thì dùng mặc định.
 const envFile = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../.env.local");
@@ -27,8 +27,8 @@ for (const w of startupWarnings(process.env)) console.warn(`[CẢNH BÁO] ${w}`)
 // Nhật ký kiểm toán (M4 2.4): một dòng JSON mỗi sự kiện nhạy cảm ra stdout; AUDIT_LOG=off tắt
 if (startAudit(process.env)) console.log("Nhật ký kiểm toán: bật (AUDIT_LOG=off để tắt)");
 // Bộ chiêu trùm (mục 42): in MỘT dòng khi BẬT để người vận hành kiểm được sau khi triển khai (`./prod.sh logs game | grep BOSS_MOVES`); tắt thì im như trước
-if (bossMovesOf(process.env))
-  console.log("Trùm nhiều chiêu: BẬT (BOSS_MOVES): trùm dùng bộ chiêu có báo trước");
+const bossNotice = bossMovesNotice(process.env);
+if (bossNotice) console.log(bossNotice);
 
 // Cổng 2567 chỉ của bản chạy thật: dev / test / bot dùng cổng riêng (portPolicy từ chối, thoát mã 1)
 const portCheck = portPolicy(process.env);

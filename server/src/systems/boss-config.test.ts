@@ -1,6 +1,6 @@
 // Cờ `BOSS_MOVES` (mục 42): mặc định TẮT, chỉ bật khi gõ đúng; giá trị lạ (gõ nhầm) không bao giờ bật ngầm.
 import { describe, expect, it } from "vitest";
-import { bossMovesOf, bossMovesWarnings } from "./boss-config";
+import { bossMovesNotice, bossMovesOf, bossMovesWarnings } from "./boss-config";
 
 describe("bossMovesOf", () => {
   it("không đặt / rỗng / tắt: false", () => {
@@ -65,5 +65,17 @@ describe("bossMovesWarnings: giá trị lạ phải được báo lúc khởi đ
       if (bossMovesOf(env)) expect(bossMovesWarnings(env), v).toEqual([]);
       if (bossMovesWarnings(env).length > 0) expect(bossMovesOf(env), v).toBe(false);
     }
+  });
+});
+
+describe("bossMovesNotice: dòng log để kiểm sau khi triển khai", () => {
+  it("bật: có dòng nêu tên BOSS_MOVES và chữ BẬT (để grep); tắt / lạ / không đặt: không có dòng", () => {
+    for (const v of ["on", "1", "true", "yes"]) {
+      const n = bossMovesNotice({ BOSS_MOVES: v });
+      expect(n, v).toContain("BOSS_MOVES");
+      expect(n, v).toContain("BẬT");
+    }
+    for (const v of [undefined, "", "off", "0", "enable", "onn"])
+      expect(bossMovesNotice({ BOSS_MOVES: v }), String(v)).toBeNull();
   });
 });
