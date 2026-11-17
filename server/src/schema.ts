@@ -75,6 +75,11 @@ export class Monster extends Schema {
    * Tinh anh (M7.3, #504): 0 = quái thường, 1 = tinh anh. Đặt MỘT lần lúc sinh (không đổi giữa chừng). Hiện mọi quái đều 0: bước tinh anh của M7.3 mới bật.
    */
   @type("uint8") elite = 0;
+  /**
+   * DẤU hệ mới nhất đang dính (mục 51, CT2): 1-9 = hệ theo `markIndexOf` (`AMP_ELEMENTS`), 0 = không có dấu (không tốn byte). Máy chủ giữ nhiều dấu trong `MonsterCtrl.st`; lên đầu quái
+   * CHỈ MỘT dấu (client vẽ vụ nổ dấu khi combo, `DmgMsg.combo`). Đổi khi dấu gắn / gỡ / hết hạn (hiếm).
+   */
+  @type("uint8") mark = 0;
 }
 
 /** Đồ rơi trên đất. Kiểu dùng chung cho client: LootView trong shared/src/items.ts */
