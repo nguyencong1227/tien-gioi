@@ -43,6 +43,7 @@ const PANELS = [
   ["shop-modal", "toggleShopModal"],
   ["forge-modal", "toggleForgeModal"],
   ["sect-modal", "toggleSectModal"],
+  ["social-modal", "toggleSocialModal"], // M9 (cờ `?social=1` ở địa chỉ trang)
 ];
 // Tấm KHÔNG tự cuộn, từng view cuộn bên trong (để hộp xác nhận lồng luôn phủ kín tấm): bỏ ca "tấm cuộn được" và đo hộp xác nhận
 const INNER_SCROLL = new Set(["sect-modal"]);
@@ -156,7 +157,7 @@ try {
   await send("Page.addScriptToEvaluateOnNewDocument", {
     source: "try{localStorage.setItem('tg_newbie_guide_dismissed','1')}catch(e){}",
   });
-  await send("Page.navigate", { url: `${BASE_URL}/?duel=mock&debug=1` });
+  await send("Page.navigate", { url: `${BASE_URL}/?duel=mock&debug=1&social=1` });
   let ready = false;
   for (let i = 0; i < 40; i++) {
     await sleep(300);
