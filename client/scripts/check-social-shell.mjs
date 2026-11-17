@@ -22,6 +22,8 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
  *   - thành tựu + danh hiệu (M9.8): tab Thành tựu (đang tải + Tải lại, nhóm <details> / danh hiệu radiogroup >= 44 px, thanh tiến độ có chữ, thưởng bằng chữ),
  *     đeo / gỡ danh hiệu CHỈ đổi khi máy chủ trả lại `achievements` (khóa / đang chờ không gửi, từ chối về đúng trạng thái máy chủ, im 5 s thì thôi chờ),
  *     thành tựu mới (chấm trên nút HUD khi ở tab khác, dấu 'Mới' + toast mời đeo, mất khi rời tab), tin sai kiểu / id lạ bị bỏ, danh hiệu trên đầu nhân vật (lạ thì không lộ id).
+ *   - bấm vào bảng KHÔNG chém: chuột trái giữa bảng / ở thân cả ba tab / ở vùng thế giới lúc bảng đang mở / ở nút banner trùm không gửi `attack`; đối chứng: đóng bảng thì bấm
+ *     vào thế giới vẫn chém (cờ chặn không kẹt).
  * `--shots`: lưu ảnh bảng đang mở mỗi khung nhìn (và bảng Tu vi / Tông môn đầy dòng).
  */
 import http from "node:http";
