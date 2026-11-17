@@ -10,5 +10,7 @@ export default defineConfig({
     // định làm test đỏ giả (WorldRoom.dungeon.test.ts quá hạn dù thường chỉ ~1 giây). Treo thật vẫn đỏ, chỉ muộn hơn; mỗi `waitFor` có hạn riêng.
     testTimeout: 15_000,
     hookTimeout: 15_000,
+    // Trên CI: bật thêm reporter hanging-process để phát hiện timer/socket chưa đóng nếu có test bị treo
+    reporters: process.env.CI ? ["default", "hanging-process"] : ["default"],
   },
 });

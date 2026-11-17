@@ -52,6 +52,11 @@ export const SECT_PRESENCE_MS = 10_000;
 
 /** Số ô kho đồ của một tông môn (cùng hình `InvSlot` như túi đồ). */
 export const SECT_VAULT_SLOTS = 40;
+/**
+ * Số ô kho đồ TỐI ĐA (cấp tông cao nhất, M8: docs/THIET_KE_TONG_MON.md mục 12.4); `SECT_VAULT_SLOTS` giữ nghĩa "ô ở cấp 1". Số ô DÙNG ĐƯỢC theo cấp ở
+ * `sectLevelInfo(level).vaultSlots` (`sect-depth.ts`); tin góp / rút chấp nhận ô tới `SECT_VAULT_SLOTS_MAX - 1`, máy chủ từ chối ô đang khoá.
+ */
+export const SECT_VAULT_SLOTS_MAX = 80;
 /** Số dòng sổ kho đồ giữ lại (mới nhất đứng đầu). */
 export const SECT_VAULT_LOG_MAX = 50;
 /** Số lượt rút mỗi ngày của Đệ tử khi Tông chủ chưa chỉnh. */
@@ -113,6 +118,13 @@ export const SECT_MSG = {
   vaultWithdraw: "sectVaultWithdraw",
   vaultPolicy: "sectVaultPolicy",
   vault: "sectVault",
+  // chiều sâu (M8, `sect-depth.ts`): nhiệm vụ tông, cửa hàng, ảnh chụp "Nội vụ"
+  questAccept: "sectQuestAccept",
+  questTurnIn: "sectQuestTurnIn",
+  shopBuy: "sectShopBuy",
+  /** Chỉ đọc: xin ảnh chụp "Nội vụ" mới (lúc mở tab, khi qua mốc đặt lại trong ngày) */
+  hallGet: "sectHallGet",
+  hall: "sectHall",
 } as const;
 
 /** Client -> server: lập tông môn. */
@@ -160,7 +172,7 @@ export interface SectVaultDepositMsg {
  * (khoá kỳ vọng theo ô, mục 11.5), nếu không từ chối `vault_changed` (không bao giờ rút nhầm món khác khi giao diện cũ).
  */
 export interface SectVaultWithdrawMsg {
-  /** Ô kho, 0..`SECT_VAULT_SLOTS`-1 */
+  /** Ô kho, 0..`SECT_VAULT_SLOTS_MAX`-1 (máy chủ từ chối ô đang khoá theo cấp tông) */
   slot: number;
   itemId: string;
   qty: number;
@@ -312,7 +324,7 @@ export function parseSectVaultDeposit(raw: unknown): SectVaultDepositMsg | null 
 export function parseSectVaultWithdraw(raw: unknown): SectVaultWithdrawMsg | null {
   const r = asRecord(raw);
   if (!r) return null;
-  const slot = intIn(r.slot, 0, SECT_VAULT_SLOTS - 1);
+  const slot = intIn(r.slot, 0, SECT_VAULT_SLOTS_MAX - 1);
   const qty = intIn(r.qty, 1, SECT_VAULT_QTY_MAX);
   const id = r.itemId;
   if (slot === null || qty === null || typeof id !== "string") return null;
@@ -346,6 +358,8 @@ export interface SectMember {
   rank: SectRank;
   /** Thời điểm vào tông môn (ms epoch) */
   joinedAt: number;
+  /** Công tích (M8): tổng cống hiến đã kiếm trong tông này, hiện trong danh sách thành viên. Thiếu = chưa có (máy chủ cũ). */
+  merit?: number;
 }
 
 export type SectLogKind = "deposit" | "withdraw";
@@ -418,7 +432,7 @@ export interface SectVaultLogEntry {
 
 /** Ảnh chụp kho đồ gửi cho từng thành viên (riêng tư). Tách khỏi `SectView`: đổi thông báo / thành viên không kéo theo cả kho. */
 export interface SectVaultView {
-  /** Đúng `SECT_VAULT_SLOTS` ô; ô trống là `null` */
+  /** Đúng `unlocked` ô ĐÃ MỞ theo cấp tông (máy chủ trước M8: `SECT_VAULT_SLOTS` ô); ô khoá không gửi; ô trống là `null` */
   slots: (InvSlot | null)[];
   /** Mới nhất đứng đầu, tối đa `SECT_VAULT_LOG_MAX` */
   log: SectVaultLogEntry[];
@@ -428,6 +442,8 @@ export interface SectVaultView {
   myDrawsLeft: number | null;
   /** Còn bao nhiêu ms nữa mới được rút (cờ "kiếp mới chưa được rút", mục 11.7); 0 = không khoá */
   lockMs: number;
+  /** Số ô DÙNG ĐƯỢC theo cấp tông (M8) = độ dài `slots`; thiếu = `SECT_VAULT_SLOTS` (máy chủ cũ). Phần còn lại tới `SECT_VAULT_SLOTS_MAX` là ô khoá. */
+  unlocked?: number;
 }
 
 /** Server -> client: gửi lúc vào phòng và mỗi khi kho đồ đổi (không mỗi tick). `vault: null` = không (còn) ở tông môn nào. */
@@ -459,7 +475,10 @@ export type SectAction =
   | "leave"
   | "vaultDeposit"
   | "vaultWithdraw"
-  | "vaultPolicy";
+  | "vaultPolicy"
+  | "questAccept"
+  | "questTurnIn"
+  | "shopBuy";
 
 /**
  * Bảng quyền (docs/THIET_KE_TONG_MON.md mục 4.3). Ngoài bảng còn hai ràng buộc theo ĐỐI TƯỢNG trong `canSect`: `kick` (Trưởng lão
@@ -481,6 +500,10 @@ export const SECT_PERMS: Record<SectAction, Record<SectRank, boolean>> = {
   vaultDeposit: { chu: true, truong_lao: true, de_tu: true },
   vaultWithdraw: { chu: true, truong_lao: true, de_tu: true },
   vaultPolicy: { chu: true, truong_lao: false, de_tu: false },
+  // chiều sâu (M8, mục 12): mọi thành viên làm nhiệm vụ tông và mua ở cửa hàng (bị giới hạn bởi cống hiến, cấp, hạn mức ngày)
+  questAccept: { chu: true, truong_lao: true, de_tu: true },
+  questTurnIn: { chu: true, truong_lao: true, de_tu: true },
+  shopBuy: { chu: true, truong_lao: true, de_tu: true },
 };
 
 /** Cách rút kho đồ theo chức vụ: `free` = không hạn mức; `limited` = `drawPerDay` lượt / ngày, mỗi lượt tối đa `SECT_VAULT_DRAW_QTY_DE_TU` món. */
@@ -564,6 +587,18 @@ export const SECT_FAILS = [
   "vault_locked",
   "bag_full",
   "item_invalid",
+  // chiều sâu (M8, mục 12.9)
+  "down",
+  "not_warm",
+  "earn_cap",
+  "no_contrib",
+  "shop_locked",
+  "shop_limit",
+  "shop_known",
+  "quest_unavailable",
+  "quest_done",
+  "quest_active",
+  "vault_locked_slot",
 ] as const;
 export type SectFail = (typeof SECT_FAILS)[number];
 
@@ -605,6 +640,17 @@ const FAIL_MESSAGES: Record<SectFail, string> = {
   vault_locked: "Kiếp này của ngươi còn quá mới, chưa được rút của kho tông môn.",
   bag_full: "Túi đồ của ngươi không đủ chỗ.",
   item_invalid: "Món đồ hoặc số lượng không hợp lệ.",
+  down: "Ngươi đã gục, chưa làm được việc này.",
+  not_warm: "Ngươi mới vào tông môn, sang ngày mai mới kiếm được cống hiến.",
+  earn_cap: "Hôm nay ngươi đã kiếm đủ cống hiến.",
+  no_contrib: "Ngươi chưa đủ cống hiến.",
+  shop_locked: "Tông môn chưa đủ cấp để mở món hàng này.",
+  shop_limit: "Hôm nay ngươi đã mua hết hạn mức của món hàng này.",
+  shop_known: "Ngươi đã học công pháp này rồi.",
+  quest_unavailable: "Nhiệm vụ này không có trong việc hôm nay của tông môn.",
+  quest_done: "Hôm nay ngươi đã làm xong nhiệm vụ này.",
+  quest_active: "Ngươi đang làm nhiệm vụ này rồi.",
+  vault_locked_slot: "Ô kho này chưa mở, tông môn cần lên cấp.",
 };
 
 /** Câu báo cho người chơi (toast). Không lộ số / id nội bộ. */

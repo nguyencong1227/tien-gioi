@@ -1096,6 +1096,28 @@ function drawItemIcon(id) {
         s.set(x, y, 0xfff3b0);
       s.circle(15, 15, 1.2, 0xffffff, 200);
     }
+  } else if (id === "dot_pha_dan" || id === "kinh_chi_dan" || id === "duong_anh_dan") {
+    // Đan hộ đạo (nghề nhỏ lát 1, #763): viên đan có ngọn lửa luyện trên đỉnh; số mũi tên lên vàng = bậc cảnh giới (1 Luyện Khí, 2 Trúc Cơ, 3 Kim Đan).
+    // Khác đan hồi (viên tròn lớn + vòng sáng + chấm trắng) cả về hình lẫn màu; bậc đọc được bằng số mũi tên, không chỉ bằng màu.
+    const tier = id === "dot_pha_dan" ? 1 : id === "kinh_chi_dan" ? 2 : 3;
+    const main = [0xe0953f, 0xc8503f, 0xa655a0][tier - 1];
+    const dark = [0x9a5a1c, 0x7e2a20, 0x5e2a5a][tier - 1];
+    // Ngọn lửa luyện đan hình giọt nước (vẽ trước, thân đan che chân lửa): màu ấm cố định cho cả ba để không giống cuống quả cầu
+    s.ellipse(12, 6.4, 3.4, 3.6, 0xffa23a);
+    s.tri(9.2, 5.6, 14, 4.6, 13.2, 0, 0xffa23a);
+    s.ellipse(12, 7, 2.1, 2.5, 0xffe27a);
+    s.tri(10.6, 6.4, 13, 5.6, 12.6, 2.6, 0xffe27a);
+    // Thân đan
+    s.circle(12, 14.5, 7.8, dark);
+    s.circle(12, 14.5, 6.6, main);
+    s.circle(8.6, 11.8, 1.1, 0xffffff, 200);
+    // Mũi tên lên vàng xếp dọc giữa thân (đột phá = đi lên), số mũi tên = bậc
+    const top = 14.8 - (tier - 1) * 1.7;
+    for (let k = 0; k < tier; k++) {
+      const y = top + k * 3.4;
+      s.line(9.6, y + 1.2, 12, y - 1.2, 0xfff3b0, 1.4);
+      s.line(14.4, y + 1.2, 12, y - 1.2, 0xfff3b0, 1.4);
+    }
   } else if (id === "long_tho") {
     // Chùm lông thỏ trắng mềm
     s.ellipse(11, 13, 6, 4, 0xe0d8c8);
@@ -1601,6 +1623,8 @@ function drawNpcSprite(id) {
     truong_tran: { robe: 0x7a5c3e, trim: 0xe6c365, hair: 0xd8d2c5, beard: true, prop: "staff" },
     duoc_su: { robe: 0x3f7850, trim: 0xb8e0a0, hair: 0xd8d2c5, beard: true, prop: "gourd" },
     tho_ren: { robe: 0x8c3b2a, trim: 0x473933, hair: 0x241c18, beard: false, prop: "hammer" },
+    // Lò đan Lạc Hà Trấn (nghề nhỏ lát 1, #763): lão đan sư áo vàng đất, tóc bạc, ôm lò đan nhỏ đang cháy
+    lao_dan: { robe: 0xb07a3a, trim: 0xf2e0b0, hair: 0xe8e4da, beard: true, prop: "cauldron" },
     // Hắc Phong Cốc và bí cảnh (trước M6 dùng ảnh dự phòng)
     lai_buon: { robe: 0x6b4f8a, trim: 0xe6c365, hair: 0x241c18, beard: false, prop: "pack" },
     thu_mon: { robe: 0x3a6f8f, trim: 0xb8e0f0, hair: 0xd8d2c5, beard: true, prop: "lantern" },
@@ -1673,6 +1697,18 @@ function drawNpcSprite(id) {
     s.rect(5, 19, 5, 12, 0x9c6d44);
     s.line(9, 16, 14, 22, 0x5c3d24, 1.4);
     s.rect(4, 17, 7, 2, 0xe8c25a);
+  } else if (cfg.prop === "cauldron") {
+    // Đan sư ôm lò đan nhỏ ba chân: thân sắt, nắp có núm, hai quai, ngọn lửa liếm lên từ miệng lò
+    s.tri(25.6, 22, 30.4, 22, 28, 16, 0xffb04a, 235);
+    s.tri(26.8, 22, 29.2, 22, 28, 18.6, 0xfff0c0, 235);
+    s.ellipse(28, 28, 4.8, 4, 0x4a423c);
+    s.ellipse(28, 27.2, 3.6, 2.6, 0x6e655c);
+    s.rect(23, 26, 2, 2, 0x4a423c);
+    s.rect(31, 26, 2, 2, 0x4a423c);
+    s.rect(24, 24, 8, 2, 0x2f2a26);
+    s.rect(27, 22.5, 2, 2, 0xc9a24a);
+    s.rect(24, 31, 2, 3, 0x2f2a26);
+    s.rect(30, 31, 2, 3, 0x2f2a26);
   } else if (cfg.prop === "hammer") {
     // Thợ rèn cầm búa sắt
     s.line(28, 15, 28, 32, 0x5c3d24, 2);
@@ -1757,6 +1793,7 @@ function buildAtlas() {
     "tram_truong_han",
     "lai_buon_han",
     "tho_ren_han",
+    "lao_dan",
   ]) {
     push(`npc-${npcId}`, drawNpcSprite(npcId));
   }
@@ -1812,6 +1849,10 @@ function buildAtlas() {
     "phong_nha_phu",
     "thuong_hoi_huyet_dan",
     "thuong_hoi_linh_dan",
+    // Nghề nhỏ lát 1 (#763): ba đan hộ đạo theo bậc cảnh giới
+    "dot_pha_dan",
+    "kinh_chi_dan",
+    "duong_anh_dan",
   ];
   for (const id of itemIds) {
     const icon = drawItemIcon(id);

@@ -9,6 +9,10 @@ Bốn dev cùng SSH vào một máy, cùng user Linux `nguyencong`, dùng chung 
 | **Dev B** (Client & Trải nghiệm) | `~/TT/tien-gioi-b` | 2577 | 5183 | đặt trong `.git/config` của thư mục |
 | **Dev C** (Công cụ, Thử tải & Phát hành) | `~/TT/tien-gioi-c` | 2587 | 5193 | `Dev C`, đã đặt sẵn |
 | **Dev D** (Nội dung & Dữ liệu) | `~/TT/tien-gioi-d` | 2607 | 5203 | `Dev D`, đặt trong `.git/config` của thư mục khi dựng |
+| **Dev E** (Nội dung & Nhiệm vụ) | `~/TT/tien-gioi-e` | 2617 | 5213 | `Dev E`, đặt trong `.git/config` của thư mục khi dựng |
+| **Dev F** (Kiểm thử & Chất lượng) | `~/TT/tien-gioi-f` | 2627 | 5223 | `Dev F`, đặt trong `.git/config` của thư mục khi dựng |
+| **Dev G** (Nội dung & Dữ liệu, dự phòng tự mở rộng) | `~/TT/tien-gioi-g` | 2637 | 5233 | `Dev G`, đặt trong `.git/config` của thư mục khi dựng |
+| **Dev H** (Kiểm thử, dự phòng tự mở rộng) | `~/TT/tien-gioi-h` | 2647 | 5243 | `Dev H`, đặt trong `.git/config` của thư mục khi dựng |
 
 Mỗi thư mục là một bản clone riêng của repo: nhánh riêng, `node_modules` riêng, dữ liệu nhân vật riêng
 (`server/data/`), tên commit riêng. Mọi người chỉ "gặp nhau" qua GitHub (push / PR / pull), giống như làm trên hai máy khác nhau.
@@ -38,7 +42,7 @@ Nếu cần tạo lại từ đầu:
 ```bash
 git clone https://github.com/nguyencong1227/tien-gioi.git ~/TT/tien-gioi-b
 cd ~/TT/tien-gioi-b
-cp .env.example .env.local     # rồi sửa cổng theo bảng trên (Dev B: 2577/5183, Dev C: 2587/5193, Dev D: 2607/5203)
+cp .env.example .env.local     # rồi sửa cổng theo bảng trên (Dev B: 2577/5183, Dev C: 2587/5193, Dev D: 2607/5203, Dev E: 2617/5213, Dev F: 2627/5223, Dev G: 2637/5233, Dev H: 2647/5243)
 npm install
 ```
 
@@ -70,6 +74,10 @@ Máy chủ dev có các địa chỉ:
 | Dev B | `http://100.109.206.6:5183` |
 | Dev C | `http://100.109.206.6:5193` |
 | Dev D | `http://100.109.206.6:5203` |
+| Dev E | `http://100.109.206.6:5213` |
+| Dev F | `http://100.109.206.6:5223` |
+| Dev G | `http://100.109.206.6:5233` |
+| Dev H | `http://100.109.206.6:5243` |
 
 Client tự kết nối tới server cùng địa chỉ, cổng lấy theo `PORT` trong `.env.local`.
 
@@ -84,9 +92,17 @@ ssh -L 5183:localhost:5183 -L 2577:localhost:2577 nguyencong@100.109.206.6
 ssh -L 5193:localhost:5193 -L 2587:localhost:2587 nguyencong@100.109.206.6
 # Dev D
 ssh -L 5203:localhost:5203 -L 2607:localhost:2607 nguyencong@100.109.206.6
+# Dev E
+ssh -L 5213:localhost:5213 -L 2617:localhost:2617 nguyencong@100.109.206.6
+# Dev F
+ssh -L 5223:localhost:5223 -L 2627:localhost:2627 nguyencong@100.109.206.6
+# Dev G
+ssh -L 5233:localhost:5233 -L 2637:localhost:2637 nguyencong@100.109.206.6
+# Dev H
+ssh -L 5243:localhost:5243 -L 2647:localhost:2647 nguyencong@100.109.206.6
 ```
 
-Rồi mở `http://localhost:5173` (Dev A) / `http://localhost:5183` (Dev B) / `http://localhost:5193` (Dev C) / `http://localhost:5203` (Dev D).
+Rồi mở `http://localhost:5173` (Dev A) / `http://localhost:5183` (Dev B) / `http://localhost:5193` (Dev C) / `http://localhost:5203` (Dev D) / `http://localhost:5213` (Dev E) / `http://localhost:5223` (Dev F) / `http://localhost:5233` (Dev G) / `http://localhost:5243` (Dev H).
 
 ## Soạn code
 

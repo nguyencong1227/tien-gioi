@@ -136,7 +136,12 @@ export class PgSectStore implements SectStore {
           const cur = await this.read(c, id, true);
           if (!cur) return null;
           next = assertWritableSect(
-            { ...fn(structuredClone(cur)), id, v: 1, updatedAt: this.clock() },
+            {
+              ...fn(structuredClone(cur)),
+              id,
+              v: 1,
+              updatedAt: Math.max(this.clock(), cur.updatedAt + 1),
+            },
             this.clock(),
           );
           const conflict = await this.findConflict(c, next, false);

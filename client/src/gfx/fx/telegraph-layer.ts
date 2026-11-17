@@ -31,6 +31,7 @@ import {
   type WarnMsg,
   type WarnPlan,
 } from "./telegraph";
+import { warnShownMs } from "../../net-latency";
 
 /** Phía trên nền + vòng trấn (-5), dưới mọi thực thể (độ sâu = y >= 0): vùng báo nằm DƯỚI chân người và quái, không che chữ / hình. */
 export const WARN_DEPTH = -4;
@@ -150,13 +151,17 @@ export class TelegraphLayer {
     this.pool.push(g);
   }
 
-  /** Nhận tin `warn`. `false` khi tin không hợp lệ. */
-  warn(m: WarnMsg, now: number): boolean {
-    const plan = planWarn(m);
-    if (!plan) {
+  /**
+   * Nhận tin `warn`. `false` khi tin không hợp lệ. `rttMs` (trung vị RTT, `null` / bỏ trống = chưa biết) rút ngắn thời gian đếm tới "đầy" theo
+   * `warnShownMs` (`net-latency.ts`, #873): vùng đầy đúng lúc input cuối còn tác dụng thay vì sau hạn chót ~RTT; nội dung tin không đổi.
+   */
+  warn(m: WarnMsg, now: number, rttMs?: number | null): boolean {
+    const planned = planWarn(m);
+    if (!planned) {
       this.rejected++;
       return false;
     }
+    const plan = rttMs == null ? planned : { ...planned, ms: warnShownMs(planned.ms, rttMs) };
     const cap = telegraphLimits(this.deps.emitterBudget()).warns;
     let item: WarnItem;
     if (this.warns.length >= cap) {
@@ -269,7 +274,16 @@ export class TelegraphLayer {
     // vùng tô đặc lớn dần: hết `ms` là đầy tới viền = lúc đòn đáp xuống (và mờ đi trong WARN_FADE_MS)
     g.fillStyle(WARN_FILL, Math.min(0.6, warnFillAlpha(elapsed, plan.ms) * (it.danger ? 1.4 : 1)));
     const steps = warnArcSteps(this.deps.emitterBudget());
-    if (plan.shape === "circle") {
+    if (plan.shape === "circle" && plan.r0 > 0) {
+      // VÀNH KHUYÊN: dải tô đặc lớn dần từ mép TRONG ra mép ngoài (nét dày bằng bề dày dải = dải tròn đúng); giữa lỗ KHÔNG tô (chỗ an toàn)
+      const outer = plan.r0 + (plan.r - plan.r0) * p;
+      g.lineStyle(
+        Math.max(1, outer - plan.r0),
+        WARN_FILL,
+        Math.min(0.6, warnFillAlpha(elapsed, plan.ms) * (it.danger ? 1.4 : 1)),
+      );
+      g.strokeCircle(0, 0, (plan.r0 + outer) / 2);
+    } else if (plan.shape === "circle") {
       g.fillCircle(0, 0, plan.r * p);
     } else {
       const n = warnPolygon(this.scratch, plan, p, steps);
@@ -282,6 +296,7 @@ export class TelegraphLayer {
     else g.lineStyle(2, WARN_LINE, a * fade);
     if (plan.shape === "circle") {
       g.strokeCircle(0, 0, plan.r);
+      if (plan.r0 > 0) g.strokeCircle(0, 0, plan.r0); // vành khuyên: viền cả mép trong (ranh giới chỗ an toàn)
     } else {
       const n = warnPolygon(this.scratch, plan, 1, steps);
       g.strokePoints(this.scratch, true, true, n);
@@ -290,8 +305,13 @@ export class TelegraphLayer {
     const burst = warnBurst(elapsed, plan.ms, plan.shape, reduced);
     if (burst) {
       if (burst.flash > 0) {
-        g.fillStyle(BURST_FLASH, burst.flash);
-        g.fillCircle(0, 0, plan.r);
+        if (plan.r0 > 0) {
+          g.lineStyle(plan.r - plan.r0, BURST_FLASH, burst.flash);
+          g.strokeCircle(0, 0, (plan.r + plan.r0) / 2); // vành khuyên: chớp chỉ phủ DẢI, không phủ lỗ an toàn
+        } else {
+          g.fillStyle(BURST_FLASH, burst.flash);
+          g.fillCircle(0, 0, plan.r);
+        }
       }
       // vòng sóng hai lớp: nét đỏ thẫm ngoài (đọc được cả trên nền băng nhạt, nơi nét trắng chìm) + lõi trắng ấm
       const rr = plan.r * burst.scale;

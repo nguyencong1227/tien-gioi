@@ -28,6 +28,7 @@ import type { WorldState } from "../schema";
 
 const dataDir = mkdtempSync(path.join(tmpdir(), "tien-gioi-sect-room-"));
 import { listenWithRetry } from "../test-port";
+import { gateSave, restoreSaves, slowSave } from "./test-save-hooks";
 
 // cổng do hệ điều hành cấp ở beforeAll (`listenWithRetry`): tự động thử lại nếu gặp EADDRINUSE giữa các tệp chạy song song
 let PORT = 0;
@@ -42,6 +43,7 @@ beforeAll(async () => {
   PORT = await listenWithRetry(server);
 });
 afterEach(async () => {
+  restoreSaves(); // trả việc lưu về bình thường trước khi đóng phòng (đóng phòng cũng lưu hồ sơ)
   await Promise.all(rooms.splice(0).map((r) => r.connection.isOpen && r.leave(true)));
   await sleep(150);
 });
@@ -65,6 +67,7 @@ async function waitFor<T>(
   }
 }
 let seq = 0;
+const SLOW_SAVE_MS = 150; // độ chậm giả của việc lưu hồ sơ ở các ca kho đồ (xem `slowSave`)
 const secretOf = (name: string) => `secret-${name}-0123456789abcdef`;
 const serverRoom = (room: Room) => matchMaker.getLocalRoomById(room.roomId) as WorldRoom;
 const serverState = (room: Room) => serverRoom(room).state as WorldState;
@@ -343,10 +346,13 @@ describe("tông môn: kho đồ qua server Colyseus thật (mục 27)", () => {
   const countIn = (slots: ({ itemId: string; qty: number } | null)[] | undefined, id: string) =>
     (slots ?? []).reduce((t, x) => t + (x?.itemId === id ? x.qty : 0), 0);
   const lastVault = (h: Hero) => h.vaults.at(-1)?.vault;
+  /** Số toast "Đã rút ..." Đệ tử đã nhận: mốc kết thúc của MỘT lượt rút (khoá thao tác kho đã nhả). */
+  const rutDuoc = (h: Hero) => h.toasts.filter((t) => /^Đã rút /.test(t)).length;
 
   it("Đệ tử góp, Tông chủ nhận ảnh chụp kho; Đệ tử rút có hạn mức (lượt 4 bị từ chối); túi + hồ sơ + tệp tông môn khớp, tổng đồ không đổi; tin rác không làm gì", async () => {
     const A = await join(`Kho Chu ${++seq}`, roomNameOf(DEFAULT_MAP_ID));
     const B = await join(`Kho De ${++seq}`, roomNameOf(DEFAULT_MAP_ID));
+    slowSave(A.room, SLOW_SAVE_MS); // mọi lần lưu hồ sơ trong ca này chậm: kiểm test không dựa vào tốc độ đĩa
     ctrlOf(A).coin = 3000;
     const sectName = `Kho Mon ${seq}`;
     A.room.send(SECT_MSG.create, { name: sectName, tag: "KM" });
@@ -382,13 +388,12 @@ describe("tông môn: kho đồ qua server Colyseus thật (mục 27)", () => {
 
     // Đệ tử rút: 3 lượt (mỗi lượt 2 món), lượt 4 bị từ chối
     const vslot = lastVault(A)!.slots.findIndex((s) => s?.itemId === MAT.id);
+    // Mỗi lượt chờ toast "Đã rút" (máy chủ gửi NGAY trước khi nhả khoá thao tác kho, cùng một lượt chạy): chờ túi đổi là sai vì túi đổi
+    // TRƯỚC lúc lưu xong, lượt gửi tiếp bị từ chối "trục trặc" (khoá còn giữ) và test treo tới hết giờ.
     for (let i = 0; i < 3; i++) {
       B.room.send(SECT_MSG.vaultWithdraw, { slot: vslot, itemId: MAT.id, qty: 2 });
-      await waitFor(
-        () => countIn(ctrlOf(B).inv, MAT.id) === 10 + 2 * (i + 1),
-        4000,
-        `lượt ${i + 1}`,
-      );
+      await waitFor(() => rutDuoc(B) === i + 1, 4000, `lượt ${i + 1}`);
+      expect(countIn(ctrlOf(B).inv, MAT.id)).toBe(10 + 2 * (i + 1));
     }
     B.room.send(SECT_MSG.vaultWithdraw, { slot: vslot, itemId: MAT.id, qty: 2 });
     await waitFor(
@@ -406,5 +411,56 @@ describe("tông môn: kho đồ qua server Colyseus thật (mục 27)", () => {
     // Tổng đồ (túi A + túi B + kho) bằng đúng số đưa vào ban đầu (40)
     const vaultNow = countIn(lastVault(A)?.slots, MAT.id);
     expect(countIn(ctrlOf(A).inv, MAT.id) + countIn(ctrlOf(B).inv, MAT.id) + vaultNow).toBe(40);
+  });
+
+  it("khoá một-thao-tác-một-lúc của từng người: lượt rút / góp thứ hai bị từ chối ('trục trặc') khi lượt đầu còn đang lưu; đồ KHÔNG nhân đôi, hạn mức chỉ tính một lượt", async () => {
+    const A = await join(`Khoa Chu ${++seq}`, roomNameOf(DEFAULT_MAP_ID));
+    const B = await join(`Khoa De ${++seq}`, roomNameOf(DEFAULT_MAP_ID));
+    ctrlOf(A).coin = 3000;
+    A.room.send(SECT_MSG.create, { name: `Khoa Mon ${seq}`, tag: "KH" });
+    await waitFor(() => lastSnap(A), 5000, "ảnh chụp của Tông chủ");
+    A.room.send(SECT_MSG.invite, { name: B.name });
+    await waitFor(() => B.invited[0], 4000, "lời mời");
+    B.room.send(SECT_MSG.accept, { from: A.name });
+    await waitFor(() => lastSnap(B)?.myRank === "de_tu", 4000, "B vào tông môn");
+    await waitFor(() => lastVault(B) && lastVault(A), 4000, "ảnh chụp kho đồ");
+    addToInventory(ctrlOf(B).inv, MAT.id, 40);
+    const bagSlot = () =>
+      ctrlOf(B).inv.findIndex((s: { itemId: string } | null) => s?.itemId === MAT.id);
+    const trucTrac = () => B.toasts.filter((t) => /trục trặc/.test(t)).length;
+    const total = () =>
+      countIn(ctrlOf(A).inv, MAT.id) +
+      countIn(ctrlOf(B).inv, MAT.id) +
+      countIn(lastVault(A)?.slots, MAT.id);
+    B.room.send(SECT_MSG.vaultDeposit, { slot: bagSlot(), qty: 30 });
+    await waitFor(() => countIn(lastVault(A)?.slots, MAT.id) === 30, 4000, "kho có 30");
+
+    // GÓP: lưu đứng yên cho tới khi test nhả. Lượt 1 đã trừ túi và đang chờ lưu; lượt 2 gửi lúc này PHẢI bị từ chối ngay (không cần đồng hồ)
+    let nha = gateSave(B.room);
+    B.room.send(SECT_MSG.vaultDeposit, { slot: bagSlot(), qty: 4 });
+    await waitFor(() => countIn(ctrlOf(B).inv, MAT.id) === 6, 4000, "lượt góp 1 đã trừ túi");
+    B.room.send(SECT_MSG.vaultDeposit, { slot: bagSlot(), qty: 4 });
+    await waitFor(() => trucTrac() === 1, 4000, "lượt góp 2 bị từ chối vì lượt 1 chưa xong");
+    expect(countIn(ctrlOf(B).inv, MAT.id)).toBe(6); // lượt 2 chưa đụng tới túi
+    nha();
+    await waitFor(() => countIn(lastVault(A)?.slots, MAT.id) === 34, 4000, "lượt góp 1 xong");
+    await waitFor(() => B.toasts.some((t) => /^Đã góp /.test(t)), 4000, "toast góp xong");
+    expect(countIn(ctrlOf(B).inv, MAT.id)).toBe(6);
+    expect(total()).toBe(40);
+
+    // RÚT: cùng cách. Lượt 1 đã cộng túi và đang chờ lưu; lượt 2 bị từ chối, không tính thêm lượt trong ngày
+    nha = gateSave(B.room);
+    const vslot = lastVault(A)!.slots.findIndex((s) => s?.itemId === MAT.id);
+    B.room.send(SECT_MSG.vaultWithdraw, { slot: vslot, itemId: MAT.id, qty: 2 });
+    await waitFor(() => countIn(ctrlOf(B).inv, MAT.id) === 8, 4000, "lượt rút 1 đã cộng túi");
+    B.room.send(SECT_MSG.vaultWithdraw, { slot: vslot, itemId: MAT.id, qty: 2 });
+    await waitFor(() => trucTrac() === 2, 4000, "lượt rút 2 bị từ chối vì lượt 1 chưa xong");
+    expect(countIn(ctrlOf(B).inv, MAT.id)).toBe(8);
+    nha();
+    await waitFor(() => B.toasts.some((t) => /^Đã rút /.test(t)), 4000, "toast rút xong");
+    expect(countIn(ctrlOf(B).inv, MAT.id)).toBe(8);
+    expect(countIn(lastVault(A)?.slots, MAT.id)).toBe(32);
+    expect(lastVault(B)?.myDrawsLeft).toBe(2); // 3 lượt - 1 lượt đã rút
+    expect(total()).toBe(40);
   });
 });

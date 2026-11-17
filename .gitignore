@@ -6,6 +6,7 @@ server/bench-*.json
 server/soak-*.json
 soak-*.json
 *.log
+vitest.log
 .DS_Store
 .env.local
 e2e-logs*/

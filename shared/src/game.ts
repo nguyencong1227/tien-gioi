@@ -453,8 +453,30 @@ export type FxMsg =
       arc?: number;
       /** Bề rộng vùng báo (px), CHỈ dùng với `line`: bằng đúng bề rộng server tính khi đáp đòn */
       w?: number;
+      /**
+       * Bán kính TRONG (px), CHỈ dùng với `circle` (M42 trùm, vành khuyên): vùng nguy hiểm là `[r0, r]`, giữa `r0` là chỗ an toàn. Thiếu = hình tròn đặc.
+       * Client cũ không biết trường này vẽ cả hình tròn đặc: thận trọng hơn, không nguy hiểm.
+       */
+      r0?: number;
       ms: number;
     }
+  /** Trùm (mục 42) bắt đầu vận chiêu `ability` (id trong `BossDef.abilities`): thanh máu trùm hiện tên chiêu trong `ms`. (x, y) = chỗ trùm đứng (để `sendNear` chỉ gửi cho người ở gần). Client cũ bỏ qua `fx` lạ. */
+  | { kind: "bossCast"; by: string; x: number; y: number; ability: string; ms: number }
+  /** Trùm chuyển sang giai đoạn `phase` (chỉ số trong `BossDef.phases`): tiếng gầm, hiệu ứng, cập nhật thanh máu. */
+  | { kind: "bossPhase"; by: string; x: number; y: number; phase: number }
+  /** Trùm bí cảnh vào cuồng nộ (đánh quá lâu). */
+  | { kind: "bossEnrage"; by: string; x: number; y: number }
+  /**
+   * Trùm (mục 42) dựng GIÁP (chiêu `buff` hoặc hành động vào giai đoạn): trong `ms` (ms) mọi sát thương trùm nhận được nhân `mult` (0 < `mult` <= 1, ví dụ 0,5 = chịu nửa sát thương).
+   * Gửi MỘT lần lúc dựng (không gửi lại mỗi tick); dựng lại lúc đang có giáp thì `fx` mới thay thế `fx` cũ. Client tự đếm `ms` để tắt vầng giáp; trùm chết / reset thì thực thể
+   * biến mất nên không cần tin "hết giáp". (x, y) = chỗ trùm đứng (để `sendNear` chỉ gửi cho người ở gần). Client cũ bỏ qua `fx` lạ.
+   */
+  | { kind: "bossArmor"; by: string; x: number; y: number; ms: number; mult: number }
+  /**
+   * Trùm triệu hồi `n` quái con (>= 1, đã trừ phần vượt `BossDef.maxAdds` và chỗ không dựng được): gửi MỘT lần mỗi lần gọi, chỉ khi có ít nhất một con thật sự xuất hiện.
+   * (x, y) = chỗ trùm đứng; quái con tự hiện qua state như mọi quái, `fx` chỉ để vẽ hiệu ứng gọi hồn / tiếng. Client cũ bỏ qua `fx` lạ.
+   */
+  | { kind: "bossSummon"; by: string; x: number; y: number; n: number }
   /** Đạn tầm xa bắn ra lúc này: bay thẳng từ (x, y) theo `angle` với `speed` (px/giây) tối đa `range` px; client tự vẽ, server tự kiểm trúng */
   | {
       kind: "bolt";

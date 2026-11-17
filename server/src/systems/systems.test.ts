@@ -3,7 +3,7 @@ import { describe, expect, it, vi, afterEach } from "vitest";
 import { expToNext, statsFor, killExp, MONSTER_BY_ID, TOWN_PX, TICK_MS } from "@tien-gioi/shared";
 import { makeWorld, addPlayer, addMonster } from "./test-helpers";
 import { gainExp, tickRecovery } from "./progression";
-import { applyInputs, queueInput } from "./movement";
+import { MAX_INPUT_BACKLOG, applyInputs, queueInput } from "./movement";
 import { hitMonster, hurtPlayer, killMonster } from "./combat";
 import { chat } from "./chat";
 
@@ -43,14 +43,22 @@ describe("progression", () => {
 });
 
 describe("movement", () => {
-  it("mỗi tick chỉ áp tối đa ngân sách input, phần còn lại chờ tick sau", () => {
+  it("mỗi tick chỉ áp tối đa ngân sách input, phần còn lại chờ tick sau (mục 41: chỉ chờ tối đa MAX_INPUT_BACKLOG, input cũ hơn bị bỏ)", () => {
     const { w } = makeWorld();
     const { p, c } = addPlayer(w, "a");
     c.moveBudget = 0;
-    for (let seq = 1; seq <= 10; seq++) queueInput(w, "a", { seq, dx: 0, dy: 1 });
+    for (let seq = 1; seq <= 4; seq++) queueInput(w, "a", { seq, dx: 0, dy: 1 });
     applyInputs(w.map, p, c); // ngân sách 0 + 1
     expect(p.lastSeq).toBe(1);
-    expect(c.inputs).toHaveLength(9);
+    expect(c.inputs).toHaveLength(3); // còn chờ tick sau, không bỏ gì (4 <= 1 + backlog)
+    // dồn 10: ngân sách 1 + backlog 5 = giữ 6 input MỚI NHẤT (5..10), áp seq 5, còn 5 chờ; 4 input cũ nhất bị bỏ
+    const w2 = makeWorld().w;
+    const b = addPlayer(w2, "a");
+    b.c.moveBudget = 0;
+    for (let seq = 1; seq <= 10; seq++) queueInput(w2, "a", { seq, dx: 0, dy: 1 });
+    expect(applyInputs(w2.map, b.p, b.c)).toBe(4);
+    expect(b.p.lastSeq).toBe(5);
+    expect(b.c.inputs).toHaveLength(MAX_INPUT_BACKLOG);
   });
 
   it("vector hướng dài hơn 1 bị chuẩn hóa", () => {

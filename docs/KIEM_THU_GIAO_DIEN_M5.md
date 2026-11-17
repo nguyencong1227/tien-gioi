@@ -22,7 +22,7 @@ Tài liệu này dành cho **người dùng** (có điện thoại Android tầm
 
 (Số draw call và bộ nhớ texture không hiện trên lớp phủ: harness của C đo trong CI.)
 
-> **`?perf=1` hiện HAI khung** (cả hai không bắt chạm): lớp phủ chữ xanh ở **góc trên trái** (các dòng trong bảng trên) và một **bảng đo nhỏ ở nửa phải** màn hình (`FPS`, `Frame TB / p95`, `Thực thể (N/Q/Đ)`, `Tween đang chạy`; hai khung do hai bộ đếm khác nhau nên FPS và p95 có thể lệch chút; lấy dòng của lớp phủ xanh để điền bảng mục 5). Chúng **che HUD trái** (tên, thanh khí huyết / linh lực) và một phần nút Đột phá / Đả tọa / Mục tiêu, nên **mục 4 (kiểm tra bằng mắt) phải làm SAU khi bỏ `?perf=1`**: mở lại `http://<IP>:5173/` không có đuôi.
+> **`?perf=1` hiện HAI khung** (cả hai không bắt chạm): lớp phủ chữ xanh ở **góc trên trái** (các dòng trong bảng trên) và một **bảng đo nhỏ ở nửa phải** màn hình (`FPS`, `Frame TB / p95`, `Thực thể (N/Q/Đ)`, `Tween đang chạy`, `RTT (trung vị 5)` = độ trễ mạng đo từ 5 lần ping gần nhất, "--" khi chưa đủ mẫu; hai khung do hai bộ đếm khác nhau nên FPS và p95 có thể lệch chút; lấy dòng của lớp phủ xanh để điền bảng mục 5). Chúng **che HUD trái** (tên, thanh khí huyết / linh lực) và một phần nút Đột phá / Đả tọa / Mục tiêu, nên **mục 4 (kiểm tra bằng mắt) phải làm SAU khi bỏ `?perf=1`**: mở lại `http://<IP>:5173/` không có đuôi.
 
 ## 3. Kịch bản đo (mỗi mục 60 giây, ghi FPS / p95 sau ~30 giây cho ổn định)
 Đặt **Cài đặt -> Chất lượng đồ hoạ** về từng bậc **Thấp (`low`) / Vừa (`mid`) / Cao (`high`)** (chọn tay thì bộ điều tốc tắt), lặp các cảnh dưới đây, điền bảng mục 5.
@@ -30,6 +30,7 @@ Tài liệu này dành cho **người dùng** (có điện thoại Android tầm
 - **Cảnh B, đi bộ ra vùng quái và đánh liên tục** (Chém + kỹ năng; có chữ bay, hạt, hoạt ảnh đánh / bị đánh).
 - **Cảnh C, đông người:** nếu có người khác trực tuyến thì tụ lại; nếu không thì dùng bot. **Công cụ bot (`server/scripts/bots.ts`) mặc định TỪ CHỐI cổng 2567 (bản chạy thật), 2577 (Dev B) và 2597 (Dev A)** để dev khỏi bắn nhầm vào server của người khác. Cách đơn giản nhất cho buổi đo: server A (cổng 2597, mục 1) là server của CHÍNH BẠN nên bạn bỏ hàng rào bằng cờ `--allow-other-port`; mở thêm một cửa sổ dòng lệnh trong `~/TT/tien-gioi-a/server` (lúc `npm run dev` đang chạy) và gõ `npm run bots -- --bots=50 --mode=crowd --duration=300 --url=ws://localhost:2597 --allow-other-port` (đã chạy thử thật 5 bot: kết nối 5/5, tự dọn file lưu của bot khi xong; không có cờ thì bị từ chối; cổng lấy từ `--url=` hoặc, nếu không có, từ `PORT` trong `.env.local` ở gốc repo: KHÔNG có cờ `--port=`, gõ cờ lạ bị bỏ qua êm). `--mode=crowd` = bot tụ trong trấn, đứng / đi lại (không có `--mode` thì bot ra vùng quái chém, KHÔNG đông trong trấn). **KHÔNG BAO GIỜ trỏ bot vào cổng 2567** (bản chạy thật): còn một hàng rào cứng thứ hai (`assertNotProd`) chặn cổng đó kể cả khi có `--allow-other-port`, nhưng đừng thử. Cách thay thế (không cần cờ): dùng server của Dev C (`~/TT/tien-gioi-c`, server 2587, client 5193; thư mục đó phải đang ở bản mới nhất của `main`, điện thoại mở `http://<IP>:5193/?perf=1`, chạy bot ở đó với `--mode=crowd`, không cần cờ); Dev C hết hạn mức đến khoảng 16/11 nên bạn tự chạy hoặc nhờ A.
 - **Cảnh D, Hắc Phong Cốc** (qua cổng truyền tống): thời tiết + sương + mặt nước.
+- **Cảnh E, trùm Xích Mãng (Hắc Phong Cốc, #873; trùm duy nhất đã có bộ chiêu)**: đứng cách con trùm khoảng 250-350 px (trong tầm nhìn, ngoài tầm vuốt của nó) khi nó vận chiêu liên tục, đo 60 giây ở từng bậc. Ghi FPS / p95 (so với số mô phỏng của `client/scripts/perf-boss.mjs`: 60 FPS ở CPU 4x / 6x, `update` p95 <= 2,1 ms, `docs/THIET_KE_TRUM.md` mục 5) VÀ số **`RTT (trung vị 5)`** ở bảng đo nhỏ nửa phải: đó là số RTT thật duy nhất (máy chủ không đo RTT), A cần để biết bù độ trễ (`BOSS_REACT_MS` 400 + client bù RTT) có đủ không: **bảo đảm tới ~190 ms; trên mức đó người chơi bị thiệt**. Ghi RTT lúc bình thường VÀ lúc mạng yếu (đi ra chỗ sóng kém).
 - **Tự động:** đặt `Tự động (khuyên dùng)`, chơi 3 phút (đi, đánh, qua cổng, mở các tấm), ghi bậc cuối và số lần `hạ`.
 - **Tiết kiệm pin:** bật ở **Cài đặt -> Tiết kiệm pin (giới hạn khoảng 30 khung hình/giây)** (khác với chế độ tiết kiệm pin của hệ điều hành ở mục 1), ghi FPS (mong đợi ~30) và xem có giật không.
 - **Xoay máy dọc <-> ngang** 3 lần: không tải lại trang, FPS và bố cục không vỡ.
@@ -53,19 +54,21 @@ Làm ở **cả dọc và ngang**, **không có `?perf=1`** (mở `http://<IP>:5
 6. **Bản đồ:** thời tiết, sương trôi, nước lấp lánh (trôi ở bậc Vừa / Cao, đứng yên ở bậc Thấp), bóng đốm dưới chân; ở bậc Thấp thì tối giản nhưng không lỗi.
 7. **Mất mạng:** tắt Wi-Fi 10 giây rồi bật lại: game tự nối lại và nhân vật còn nguyên chỗ cũ (server giữ chỗ 20 giây). Thử thêm **tắt > 25 giây**: sau 20 giây server không giữ chỗ nữa nên phải hiện thông báo / nút **Tải lại trang** (không treo im).
 8. **Nóng máy / pin:** sau 15 phút chơi, ghi nhiệt độ cảm nhận (bình thường / ấm / nóng) và % pin đã tụt.
+9. **Trùm (Xích Mãng, Hắc Phong Cốc; `?perf=1` TẮT):** thanh máu trùm ở nửa trên màn hình, có vạch mốc giai đoạn và tên chiêu đang vận bằng chữ; vùng cảnh báo trên đất (tròn / nón / đường / vành khuyên) lớn dần, **đầy lên = lúc đòn rơi gần như ngay** (client đã bù độ trễ: vùng báo đầy sớm hơn đòn rơi thật chừng RTT + 10 ms, không bao giờ co quá 30 %); thân trùm co thấp + ánh đỏ cam khi gồng rồi bật vươn khi đáp; có tiếng gồng / tiếng đòn rơi riêng; giáp hiện bằng chữ "Giáp: nhận N % sát thương" kèm vầng xanh; "Gọi N quái con" hiện vài giây. Né đòn bằng cách đi khỏi vùng ngay khi thấy nó hiện: **ghi lại nếu thấy mình bước ra kịp theo vùng báo mà vẫn trúng** (kèm RTT ở Cảnh E) hoặc ngược lại thấy vùng báo đầy mà đòn rơi chậm cả nhịp.
 
 ## 5. Mẫu báo cáo (sao chép, điền, gửi cho Dev A)
 ```
 Máy: ...   Android: ...   RAM: ...   Chrome: ...   Mạng: Wi-Fi ...
-Bậc | Cảnh A (FPS / p95) | Cảnh B | Cảnh C | Cảnh D
-Thấp |  /   |  /   |  /   |  /
-Vừa  |  /   |  /   |  /   |  /
-Cao  |  /   |  /   |  /   |  /
+Bậc | Cảnh A (FPS / p95) | Cảnh B | Cảnh C | Cảnh D | Cảnh E (trùm)
+Thấp |  /   |  /   |  /   |  /   |  /
+Vừa  |  /   |  /   |  /   |  /   |  /
+Cao  |  /   |  /   |  /   |  /   |  /
+RTT (trung vị 5) ở Cảnh E: bình thường ... ms, mạng yếu ... ms
 Tự động: bậc cuối = ..., số lần hạ = ...
 Tiết kiệm pin: FPS = ...
 heap sau 5 phút: ... MB (đầu: ... MB)
 Xoay máy: Đạt / Lỗi ...
-Mục 4 (Đạt / Lỗi + ghi chú, ảnh): 1 ... 2 ... 3 ... 4 ... 5 ... 6 ... 7 ... 8 ...
+Mục 4 (Đạt / Lỗi + ghi chú, ảnh): 1 ... 2 ... 3 ... 4 ... 5 ... 6 ... 7 ... 8 ... 9 (trùm) ...
 Nhận xét chung: ...
 ```
 

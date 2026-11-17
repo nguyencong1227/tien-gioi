@@ -215,6 +215,24 @@ export const NPCS: NpcDef[] = [
     ],
     color: 0x3a6f8f,
   },
+  {
+    // Lò đan (nghề nhỏ lát 1, #514/#763): trạm alchemy ở Lạc Hà Trấn. Đứng đối xứng thợ rèn qua tâm trấn
+    // (toạ độ đã kiểm: ô không chặn, trong trấn, cách NPC gần nhất 130 px > 64). Đan hộ đạo giúp tăng xác suất đột phá.
+    id: "lao_dan",
+    name: "Mộc Diên",
+    title: "Lão đan sư",
+    station: "alchemy",
+    x: TOWN_PX.x - 130,
+    y: TOWN_PX.y - 120,
+    dialog: [
+      "Lò ta nhóm lửa luyện đan, nhất là đan hộ đạo trợ giúp đạo hữu vượt ải đột phá cảnh giới.",
+      "Đột phá rủi ro lắm, thất bại là mất tu vi cùng nửa khí huyết; đan hộ đạo cộng chút xác suất cho an toàn hơn.",
+      "Muốn luyện đan hộ đạo thì mang nguyên liệu yêu thú tới, ta sẽ nấu cho ngươi viên hộ đạo đúng cảnh giới của mình.",
+      "Đan hộ đạo chỉ dùng được khi ngươi đã đạt đỉnh bậc với đầy tu vi, đúng cảnh giới của viên đan mới có tác dụng.",
+      "Hiệu lực đan hộ đạo có hạn, dùng xong trước khi đột phá là vừa; qua cổng, thoát game hay gục là mất, chớ luyện sớm.",
+    ],
+    color: 0xb07a3a,
+  },
 ];
 
 export const NPC_BY_ID: Record<string, NpcDef> = Object.fromEntries(NPCS.map((n) => [n.id, n]));

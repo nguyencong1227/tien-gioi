@@ -66,6 +66,8 @@ import {
   type RebornMsg,
   type SectInvitedMsg,
   type SectMsg,
+  type SectHallMsg,
+  type SectHallView,
   type SellMsg,
   type SkillBook,
   type SkillMsg,
@@ -316,6 +318,49 @@ function seededPrng(seed: number) {
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+export interface BotSectM8DecisionState {
+  sectTag?: string;
+  sectHall: SectHallView | null;
+  sectContrib: number;
+}
+
+export type BotSectM8Decision =
+  | { type: "hallGet" }
+  | { type: "questAccept"; questId: string }
+  | { type: "questTurnIn"; questId: string }
+  | { type: "shopBuy"; itemId: string; qty: number }
+  | null;
+
+/**
+ * Quyết định hành vi M8 (nhiệm vụ tông môn, cửa hàng bảo khố) cho bot thử tải (Issue #846, M8.9).
+ */
+export function decideSectM8Action(state: BotSectM8DecisionState): BotSectM8Decision {
+  if (!state.sectTag) return null;
+  if (!state.sectHall) return { type: "hallGet" };
+
+  // 1. Nhận nhiệm vụ nếu có nhiệm vụ chưa nhận và chưa hết trần ngày
+  const offerQuest = state.sectHall.quests.find((q) => q.state === "offer");
+  if (offerQuest && state.sectHall.me.earnedToday < state.sectHall.me.earnCap) {
+    return { type: "questAccept", questId: offerQuest.questId };
+  }
+
+  // 2. Đổi đồ cửa hàng nếu đủ cống hiến (ưu tiên tiêu cống hiến đã tích lũy trước khi thử trả nhiệm vụ)
+  if (state.sectContrib >= 5) {
+    const buyableItem = state.sectHall.shop.find((item) => item.locked === null && item.left > 0);
+    if (buyableItem) {
+      return { type: "shopBuy", itemId: buyableItem.itemId, qty: 1 };
+    }
+  }
+
+  // 3. Thử trả nhiệm vụ đang làm (đường tải gửi liên tục)
+  const activeQuest = state.sectHall.quests.find((q) => q.state === "active");
+  if (activeQuest) {
+    return { type: "questTurnIn", questId: activeQuest.questId };
+  }
+
+  return null;
 }
 
 /**
@@ -884,6 +929,15 @@ export interface BotState {
   sectDepositsCount: number;
   sectWithdrawsCount: number;
   sectChatsCount: number;
+  // Các trường cho thử tải Tông môn M8 (Issue #846)
+  sectContrib?: number;
+  sectMerit?: number;
+  sectLevel?: number;
+  sectHall?: SectHallView | null;
+  sectQuestsAcceptedCount: number;
+  sectQuestsTurnedInCount: number;
+  sectShopBuysCount: number;
+  sectLeavesCount: number;
   // Các trường cho thử tải chiêu thức (--skills, #511)
   skills?: boolean;
   skillsLearned: Record<string, number>;
@@ -1024,6 +1078,10 @@ export interface LoadTestMetrics {
   sectDepositsTotal?: number;
   sectWithdrawsTotal?: number;
   sectChatsTotal?: number;
+  sectQuestsAcceptedTotal?: number;
+  sectQuestsTurnedInTotal?: number;
+  sectShopBuysTotal?: number;
+  sectLeavesTotal?: number;
   /** Các chỉ số thử tải chiêu thức M7 (--skills, #511) */
   skills?: boolean;
   castsSent?: number;
@@ -1328,6 +1386,8 @@ export interface ActiveWarnZone {
   w: number;
   angle: number;
   arc: number;
+  /** Bán kính trong (px), CHỈ dùng với circle (vành khuyên của trùm, mục 42 #876) */
+  r0?: number;
   expiresAt: number;
   /** Bot có nằm trong vùng nguy hiểm của đòn này lúc nhận cảnh báo hay không */
   targeted?: boolean;
@@ -1350,6 +1410,7 @@ export function parseWarnZoneFromFx(
     const w = typeof msg.w === "number" && msg.w > 0 ? msg.w : 56;
     const angle = typeof msg.angle === "number" ? msg.angle : 0;
     const arc = typeof msg.arc === "number" ? msg.arc : Math.PI / 2;
+    const r0 = typeof msg.r0 === "number" && msg.r0 > 0 ? msg.r0 : undefined;
     const ms = typeof msg.ms === "number" && msg.ms > 0 ? msg.ms : 800;
     return {
       shape: msg.shape,
@@ -1359,6 +1420,7 @@ export function parseWarnZoneFromFx(
       w,
       angle,
       arc,
+      r0,
       expiresAt: now + ms,
     };
   }
@@ -1468,8 +1530,18 @@ export function isPointInWarnZone(
     return segDist(px, py, ax, ay, bx, by).dist <= reach;
   }
   if (warn.shape === "circle") {
+    const d = Math.hypot(px - warn.x, py - warn.y);
+    if (warn.r0 !== undefined && warn.r0 > 0) {
+      // Vành khuyên (donut/ring zone, trùm mục 42): nguy hiểm trong [r0 - reach, r + reach]
+      // Nếu d < r0 - reach: an toàn trong vùng lõi tâm
+      // Nếu d > r + reach: an toàn ngoài rìa
+      const reach = PLAYER_RADIUS + buffer;
+      const innerSafe = Math.max(0, warn.r0 - reach);
+      const outerReach = warn.r + reach;
+      return d >= innerSafe && d <= outerReach;
+    }
     const reach = warn.r + PLAYER_RADIUS + buffer;
-    return Math.hypot(px - warn.x, py - warn.y) <= reach;
+    return d <= reach;
   }
   if (warn.shape === "cone") {
     const d = Math.hypot(px - warn.x, py - warn.y);
@@ -1530,6 +1602,22 @@ export function computeEvadeVector(
 
   if (urgentWarn.shape === "circle") {
     const d = Math.hypot(px - urgentWarn.x, py - urgentWarn.y);
+    if (urgentWarn.r0 !== undefined && urgentWarn.r0 > 0) {
+      // Vành khuyên: bot đang ở trong vùng nguy hiểm. So sánh khoảng cách tới tâm an toàn và rìa ngoài
+      const mid = (urgentWarn.r0 + urgentWarn.r) / 2;
+      if (d < mid) {
+        // Gần tâm hơn -> chạy vào vùng lõi an toàn của tâm
+        if (d > 0.001) {
+          return { dx: -(px - urgentWarn.x) / d, dy: -(py - urgentWarn.y) / d };
+        }
+        return { dx: 0, dy: 0 };
+      }
+      // Gần rìa ngoài hơn -> chạy ra ngoài vòng bán kính r
+      if (d > 0.001) {
+        return { dx: (px - urgentWarn.x) / d, dy: (py - urgentWarn.y) / d };
+      }
+      return { dx: 1, dy: 0 };
+    }
     if (d > 0.001) {
       return { dx: (px - urgentWarn.x) / d, dy: (py - urgentWarn.y) / d };
     }
@@ -1685,6 +1773,24 @@ function bindRoomEvents(
     } else if (b.sect && !msg.sect) {
       b.sectTag = undefined;
       b.sectBalance = 0;
+      b.sectHall = null;
+      b.sectContrib = 0;
+      b.sectMerit = 0;
+      b.sectLevel = 1;
+    }
+  });
+  room.onMessage(SECT_MSG.hall, (msg: SectHallMsg) => {
+    if (b.sect) {
+      b.sectHall = msg.hall;
+      if (msg.hall) {
+        b.sectContrib = msg.hall.me.contrib;
+        b.sectMerit = msg.hall.me.merit;
+        b.sectLevel = msg.hall.level;
+      } else {
+        b.sectContrib = 0;
+        b.sectMerit = 0;
+        b.sectLevel = 1;
+      }
     }
   });
   room.onMessage("limbo", (msg: LimboMsg) => {
@@ -2174,6 +2280,14 @@ async function runLoadTest(
       sectDepositsCount: 0,
       sectWithdrawsCount: 0,
       sectChatsCount: 0,
+      sectContrib: 0,
+      sectMerit: 0,
+      sectLevel: 1,
+      sectHall: null,
+      sectQuestsAcceptedCount: 0,
+      sectQuestsTurnedInCount: 0,
+      sectShopBuysCount: 0,
+      sectLeavesCount: 0,
       skills,
       skillsLearned: {},
       skillsSlots: ["", "", "", ""],
@@ -2488,6 +2602,28 @@ async function runLoadTest(
         const roleIndex = (b.index - 1) % groupSize;
         const isLeader = roleIndex === 0;
 
+        // Helper hành vi M8 (Nội vụ: nhiệm vụ, cửa hàng)
+        const trySectM8Actions = () => {
+          const decision = decideSectM8Action({
+            sectTag: b.sectTag,
+            sectHall: b.sectHall ?? null,
+            sectContrib: b.sectContrib ?? 0,
+          });
+          if (!decision) return;
+          if (decision.type === "hallGet") {
+            b.room.send(SECT_MSG.hallGet, {});
+          } else if (decision.type === "questAccept") {
+            b.room.send(SECT_MSG.questAccept, { questId: decision.questId });
+            if (measuring) b.sectQuestsAcceptedCount++;
+          } else if (decision.type === "questTurnIn") {
+            b.room.send(SECT_MSG.questTurnIn, { questId: decision.questId });
+            if (measuring) b.sectQuestsTurnedInCount++;
+          } else if (decision.type === "shopBuy") {
+            b.room.send(SECT_MSG.shopBuy, { itemId: decision.itemId, qty: decision.qty });
+            if (measuring) b.sectShopBuysCount++;
+          }
+        };
+
         if (isLeader) {
           if (!b.sectTag) {
             const sectName = `Phai Dao ${groupIndex + 1}`;
@@ -2503,29 +2639,44 @@ async function runLoadTest(
             if (measuring) b.sectInvitesSentCount++;
 
             const r = Math.random();
-            if (r < 0.4) {
-              b.room.send(SECT_MSG.deposit, { amount: 100 });
+            if (r < 0.25) {
+              // Nộp 500 Linh thạch -> nhận 5 cống hiến (đủ điều kiện đổi bảo khố ngay)
+              b.room.send(SECT_MSG.deposit, { amount: 500 });
               if (measuring) b.sectDepositsCount++;
-            } else if (r < 0.7) {
+            } else if (r < 0.45) {
               b.room.send(SECT_MSG.withdraw, { amount: 50 });
               if (measuring) b.sectWithdrawsCount++;
+            } else if (r < 0.8) {
+              trySectM8Actions();
             } else {
               b.room.send("chat", { text: `/s Tông môn ${b.sectTag} đồng đạo cố lên` });
               if (measuring) b.sectChatsCount++;
             }
-            b.nextSectActionAt = now + 4000 + Math.random() * 2000;
+            b.nextSectActionAt = now + 3000 + Math.random() * 2000;
           }
         } else {
           if (b.sectTag) {
-            if (Math.random() < 0.5) {
-              b.room.send(SECT_MSG.deposit, { amount: 50 });
+            const r = Math.random();
+            if (r < 0.08) {
+              // Nhảy tông môn (leave): reset trạng thái, tiếp tục tick để gửi input di chuyển bình thường
+              b.room.send(SECT_MSG.leave, {});
+              b.sectTag = undefined;
+              b.sectHall = null;
+              b.sectContrib = 0;
+              if (measuring) b.sectLeavesCount++;
+              b.nextSectActionAt = now + 4000;
+            } else if (r < 0.4) {
+              // Nộp 500 Linh thạch -> nhận 5 cống hiến
+              b.room.send(SECT_MSG.deposit, { amount: 500 });
               if (measuring) b.sectDepositsCount++;
+            } else if (r < 0.8) {
+              trySectM8Actions();
             } else {
               b.room.send("chat", { text: `/s Bái kiến Tông chủ ${b.sectTag}` });
               if (measuring) b.sectChatsCount++;
             }
           }
-          b.nextSectActionAt = now + 4000 + Math.random() * 3000;
+          b.nextSectActionAt = now + 3000 + Math.random() * 2000;
         }
       }
     } else {
@@ -3299,6 +3450,10 @@ async function runLoadTest(
   const totalSectDeposits = bots.reduce((s, b) => s + b.sectDepositsCount, 0);
   const totalSectWithdraws = bots.reduce((s, b) => s + b.sectWithdrawsCount, 0);
   const totalSectChats = bots.reduce((s, b) => s + b.sectChatsCount, 0);
+  const totalSectQuestsAccepted = bots.reduce((s, b) => s + b.sectQuestsAcceptedCount, 0);
+  const totalSectQuestsTurnedIn = bots.reduce((s, b) => s + b.sectQuestsTurnedInCount, 0);
+  const totalSectShopBuys = bots.reduce((s, b) => s + b.sectShopBuysCount, 0);
+  const totalSectLeaves = bots.reduce((s, b) => s + b.sectLeavesCount, 0);
 
   const totalCasts = bots.reduce((s, b) => s + b.skillsCastCount, 0);
   const totalSkillsMsgs = bots.reduce((s, b) => s + b.skillsMsgsCount, 0);
@@ -3429,6 +3584,12 @@ async function runLoadTest(
     sectDepositsTotal: sect || totalSectDeposits > 0 ? totalSectDeposits : undefined,
     sectWithdrawsTotal: sect || totalSectWithdraws > 0 ? totalSectWithdraws : undefined,
     sectChatsTotal: sect || totalSectChats > 0 ? totalSectChats : undefined,
+    sectQuestsAcceptedTotal:
+      sect || totalSectQuestsAccepted > 0 ? totalSectQuestsAccepted : undefined,
+    sectQuestsTurnedInTotal:
+      sect || totalSectQuestsTurnedIn > 0 ? totalSectQuestsTurnedIn : undefined,
+    sectShopBuysTotal: sect || totalSectShopBuys > 0 ? totalSectShopBuys : undefined,
+    sectLeavesTotal: sect || totalSectLeaves > 0 ? totalSectLeaves : undefined,
     skills: skills ? true : undefined,
     castsSent: skills || totalCasts > 0 ? totalCasts : undefined,
     skillsMsgsReceivedPerBot:
@@ -3570,6 +3731,16 @@ function printMetrics(m: LoadTestMetrics) {
     console.log(
       `- Thử tải Tông môn (--sect): Lập: ${m.sectsCreatedTotal ?? 0} | Mời: ${m.sectInvitesSentTotal ?? 0} | Nhận: ${m.sectInvitesAcceptedTotal ?? 0} | Nạp: ${m.sectDepositsTotal ?? 0} | Rút: ${m.sectWithdrawsTotal ?? 0} | Chat /s: ${m.sectChatsTotal ?? 0}`,
     );
+    if (
+      m.sectQuestsAcceptedTotal !== undefined ||
+      m.sectQuestsTurnedInTotal !== undefined ||
+      m.sectShopBuysTotal !== undefined ||
+      m.sectLeavesTotal !== undefined
+    ) {
+      console.log(
+        `  + Chiều sâu M8: Nhận NV: ${m.sectQuestsAcceptedTotal ?? 0} | Gửi trả NV: ${m.sectQuestsTurnedInTotal ?? 0} | Đổi bảo khố: ${m.sectShopBuysTotal ?? 0} | Nhảy tông: ${m.sectLeavesTotal ?? 0}`,
+      );
+    }
   }
 }
 

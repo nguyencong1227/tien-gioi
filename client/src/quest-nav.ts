@@ -8,6 +8,7 @@ import {
   MONSTER_BY_ID,
   NPC_BY_ID,
   getMap,
+  isSectQuest,
   questReady,
   type PortalDef,
   type QuestCtx,
@@ -68,8 +69,9 @@ export function dropSourceIn(itemId: string, mapId: string): string | undefined 
 export function questGoal(def: QuestDef, prog: QuestProgress, ctx: QuestCtx): QuestGoal | null {
   const only = (ids: string[]): QuestGoal | null =>
     ids.length ? { kind: "maps", mapIds: ids } : null;
-  // Xong hết bước (hoặc đủ đồ để trả): về người giao
+  // Xong hết bước (hoặc đủ đồ để trả): về người giao. Nhiệm vụ TÔNG MÔN (M8) trả ở bảng Tông môn, không có NPC để đi tới: trả được ở bất cứ đâu
   if (questReady(def, prog, ctx)) {
+    if (isSectQuest(def)) return { kind: "anywhere" };
     const m = npcMapId(def.giver);
     return m ? { kind: "maps", mapIds: [m] } : null;
   }

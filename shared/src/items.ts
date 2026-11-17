@@ -385,6 +385,44 @@ export const ITEMS: ItemDef[] = [
     cooldown: 12_000,
     color: 0x5fa0f0,
   },
+  // Đan hộ đạo (nghề nhỏ lát 1, #514/#763): gắn trạng thái `dao_ho` cộng xác suất đột phá, bị gỡ khi thử đột phá.
+  // Nguồn nội dung: nhóm đan `dot_pha` (tăng % đột phá) của Vạn Kiếp Tu Tiên, viết lại tên Việt theo thế giới Tiên Giới
+  // (docs/NGUON_NOI_DUNG.md mục 3 + CREDITS.md). KHÔNG vào ITEM_VALUE (sellPrice = 0): chốt chặn chống sinh Linh thạch.
+  // `ratio` TĂNG theo bậc (0,08 / 0,10 / 0,12) — Dev A chốt (PR #815 comment, 16/11): chi phí một lần thất bại tăng mạnh theo
+  // bậc (1,4 phút -> 14 phút -> 1,9 giờ) nên đan đắt nhất phải mạnh nhất; mỗi đan cắt ~41% số lần thất bại. EV: docs/NGHE_NHO_KINH_TE.md.
+  {
+    id: "dot_pha_dan",
+    name: "Đột Phá Đan",
+    type: "consumable",
+    stack: 9,
+    rarity: 2,
+    desc: "Cộng 8% xác suất đột phá lần kế. Hiệu lực 15 phút; dùng khi đạt đỉnh Luyện Khí với đầy tu vi. Mất khi thoát, qua cổng hay gục.",
+    effect: { kind: "status", id: "dao_ho", ratio: 0.08, ms: 900_000, forRealm: 1 },
+    cooldown: 5_000,
+    color: 0xd98a3a,
+  },
+  {
+    id: "kinh_chi_dan",
+    name: "Kinh Chỉ Đan",
+    type: "consumable",
+    stack: 9,
+    rarity: 3,
+    desc: "Cộng 10% xác suất đột phá lần kế. Hiệu lực 15 phút; dùng khi đạt đỉnh Trúc Cơ với đầy tu vi. Mất khi thoát, qua cổng hay gục.",
+    effect: { kind: "status", id: "dao_ho", ratio: 0.1, ms: 900_000, forRealm: 2 },
+    cooldown: 5_000,
+    color: 0xc05a4a,
+  },
+  {
+    id: "duong_anh_dan",
+    name: "Dưỡng Anh Đan",
+    type: "consumable",
+    stack: 9,
+    rarity: 3,
+    desc: "Cộng 12% xác suất đột phá lần kế. Hiệu lực 15 phút; dùng khi đạt đỉnh Kim Đan với đầy tu vi. Mất khi thoát, qua cổng hay gục.",
+    effect: { kind: "status", id: "dao_ho", ratio: 0.12, ms: 900_000, forRealm: 3 },
+    cooldown: 5_000,
+    color: 0x9a4a8c,
+  },
   // ---------- Trang bị (rèn ở Thợ rèn, xem recipes.ts) ----------
   {
     id: "lang_nha_kiem",
@@ -843,14 +881,21 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
   ],
 };
 
-/** Tung bảng rơi đồ. rng trả về số trong [0, 1) (truyền vào để test được). */
+/**
+ * Tung bảng rơi đồ. rng trả về số trong [0, 1) (truyền vào để test được).
+ * `chanceMult` (M8, buff tông môn, `sectBuffOf(...).drop`) nhân cơ hội rơi của MỖI món (cơ hội >= 1 thì luôn rơi): mặc định 1 = không đổi gì; giá trị không hợp lệ
+ * (không phải số hữu hạn, nhỏ hơn 1) coi là 1; kẹp tối đa 2 (buff thật không bao giờ vượt `SECT_BUFF_DROP_MAX`). Với `chanceMult` = 1 kết quả và số lần gọi `rng`
+ * y hệt trước M8 (bench có seed không lệch quỹ đạo).
+ */
 export function rollDrops(
   monsterKind: string,
   rng: () => number = Math.random,
+  chanceMult = 1,
 ): { itemId: string; qty: number }[] {
   const out: { itemId: string; qty: number }[] = [];
+  const mult = Number.isFinite(chanceMult) && chanceMult > 1 ? Math.min(chanceMult, 2) : 1;
   for (const e of DROP_TABLES[monsterKind] ?? []) {
-    if (rng() >= e.chance) continue;
+    if (rng() >= e.chance * mult) continue; // rng < 1 nên cơ hội >= 1 luôn rơi (không cần kẹp)
     const qty = e.min + Math.floor(rng() * (e.max - e.min + 1));
     out.push({ itemId: e.itemId, qty: Math.min(qty, e.max) });
   }

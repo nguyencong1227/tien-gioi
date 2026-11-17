@@ -72,6 +72,13 @@ Mỗi lần sinh quái thường hiếu chiến (không trùm, không Linh Thố
 |---|---|---:|---:|---|
 ${table.join("\n")}
 
-Đọc bảng: ${lethal} / ${rows.length} loài có tinh anh làm người ĐỨNG YÊN solo mất hơn 100% khí huyết (Kim Đan và Nguyên Anh), nên tinh anh là mini-trùm: phải né báo trước đòn (loài gốc đã có), uống đan hoặc đi theo đội; chạy về khu an toàn là cách thoát. Luyện Khí / Trúc Cơ chỉ nhích nhẹ. Chết do quái là mất kiếp (Hoàng Tuyền) nên đây là rủi ro thật: số hệ số (khí huyết x${ELITE_HP_MULT}, công x${ELITE_ATK_MULT}, xác suất ${n0(ELITE_CHANCE * 100)}%) là số khởi đầu theo \`docs/PHAN_CONG_M7.md\` mục 6, chờ bot thật của C và quyết định của người dùng (\`questions.md\`).
+Đọc bảng: ${lethal} / ${rows.length} loài có tinh anh làm người ĐỨNG YÊN solo mất hơn 100% khí huyết (Kim Đan và Nguyên Anh), nên tinh anh là mini-trùm: phải né báo trước đòn (loài gốc đã có), uống đan hoặc đi theo đội; chạy về khu an toàn là cách thoát. Luyện Khí / Trúc Cơ chỉ nhích nhẹ. Chết do quái là mất kiếp (Hoàng Tuyền) nên đây là rủi ro thật. Hệ số (khí huyết x${ELITE_HP_MULT}, công x${ELITE_ATK_MULT}, xác suất ${n0(ELITE_CHANCE * 100)}%) ban đầu theo \`docs/PHAN_CONG_M7.md\` mục 6; bot thật của C và quyết định của người dùng bên dưới.
+
+**Quyết định (QUYET_DINH_M3 mục 22.2, người dùng chốt 16/11/2026): GIỮ NGUYÊN độ mạnh của tinh anh, KHÔNG giảm hệ số.** Số đo bot thật đánh tinh anh Hàn Vân Lĩnh (Nguyên Anh Hậu kỳ, phản xạ 200 ms, né báo trước đòn, uống đan khi khí huyết dưới 50 %, cùng cấu hình cho mọi loài):
+
+- **Hàn Lang / Phong Nha / Cốt Tượng:** solo SỐNG 6/6 (đáy khí huyết ~53-61 %, tốn 1 đan).
+- **Độc Tước:** solo CHẾT 6/6 kể cả mặc đủ 6 món đồ ô riêng hoặc mang 8 đan (tử vong ~11 giây: sát thương độc dồn dập nhanh hơn hồi chiêu 12 giây của đan dược, chỉ kịp dùng 1 viên trước khi hết máu); đi ĐỘI 2 người thì sống an toàn 6/6 (đáy máu 66 %, hạ trong 6,4 giây).
+
+Giữ nguyên vì: (1) tinh anh là mini-trùm — sao vàng + vầng cam dưới chân báo rõ từ xa (\`client/src/elite.ts\`), chạy về trấn / khu an toàn là thoát, rủi ro mất kiếp là cốt lõi thiết kế; (2) 3/4 loài solo có né + đan vẫn sống, chỉ Độc Tước (độc + đạn tầm xa) quá gắt khi một mình, nên GỢI Ý trong game thay vì hạ số: thông báo MỘT LẦN "★ Độc Tước tinh anh: nên đi đội." khi gặp (\`client/src/elite.ts\`, PR #750), không dán chữ lên đầu mọi tinh anh; (3) khuyến khích đi đội đúng tinh thần game. **Xem lại nếu** số liệu chơi thật sau này cho thấy người chơi bỏ Hàn Vân Lĩnh vì sợ Độc Tước tinh anh (tỉ lệ vào bản đồ / sống sót bất thường): khi đó cân nhắc giảm \`ELITE_ATK_MULT\` hoặc loại \`doc_tuoc\` khỏi \`canBeElite\` (mỗi bên một dòng ở \`server/src/systems/elite.ts\`).
 `;
 }

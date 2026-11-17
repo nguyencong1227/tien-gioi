@@ -23,6 +23,8 @@ import type {
   DuelStateMsg,
   DuelEndMsg,
   SectInvitedMsg,
+  SectHallMsg,
+  SectBuff,
   SectVaultMsg,
   NetShieldMsg,
   SectMsg,
@@ -50,6 +52,7 @@ import type { StatusBox } from "./systems/status-rules";
 import { Duels } from "./systems/duel";
 import { TickStats } from "./metrics";
 import type { Bolt } from "./systems/bolt";
+import type { BossCtrl } from "./systems/boss-state";
 import type { TreasureRt } from "./systems/treasure";
 
 /** Dữ liệu riêng của server cho mỗi người chơi (không gửi xuống client). */
@@ -137,6 +140,12 @@ export interface PlayerCtrl {
    * CHỈ ở phía máy chủ (không vào state, không gửi client: người dùng bỏ nhãn ở mục 36); `gainExp` nhân sau cùng.
    */
   testExpMult?: number;
+  /**
+   * Buff tông môn (M8.3b, docs/THIET_KE_TONG_MON.md mục 12.5): hệ số tu vi / cơ hội rơi đồ (chủ đồ) / tốc độ hồi phục ngoài đả tọa, CHỈ khi cấp tông >= 2 (cấp 1 không buff nên để
+   * trống: đường nóng không tốn gì). `systems/sect.ts` (`applySectBuff`) đặt lúc vào phòng / lên cấp / thành viên đổi, xoá khi rời / bị mời ra / giải tán. CHỈ phía máy chủ (không vào
+   * state); `gainExp`, `dropLoot`, `tickRecovery` đọc. Người ngoại tuyến không có `PlayerCtrl` nên không có buff (chỉ người ĐANG TRỰC TUYẾN).
+   */
+  sectBuff?: SectBuff;
   /** Dữ liệu chạy của pháp bảo đang mặc (M7.4, `systems/treasure.ts`): đồng hồ khiên, chỗ đứng yên. Chỉ có khi đang có pháp bảo tác dụng. */
   treasure?: TreasureRt;
 }
@@ -179,6 +188,10 @@ export interface MonsterCtrl {
   nextSlam?: number;
   /** Tinh anh (M7.3, `systems/elite.ts`): `def` là bản nhân số liệu; rơi thêm đồ và tiền. Trống = quái thường. */
   elite?: true;
+  /** Trùm nhiều chiêu (mục 42, `systems/boss.ts`): giai đoạn, chiêu đang vận, hồi chiêu, quái con. Chỉ có khi phòng bật `World.bossMoves` và loài có bộ chiêu. */
+  boss?: BossCtrl;
+  /** Quái con do trùm gọi: id trùm. KHÔNG rơi đồ, KHÔNG tu vi, KHÔNG tính nhiệm vụ (chống cày); biến mất khi trùm chết hoặc reset. */
+  addOf?: string;
 }
 
 /** Pha của đòn mạnh (`systems/charge.ts`): `windup` đứng gồng tới `until` rồi lao theo `angle`; `recover` đứng thở tới `until`. */
@@ -247,6 +260,8 @@ export interface WorldEvents {
   sectInvited(sessionId: string, msg: SectInvitedMsg): void;
   /** Ảnh chụp KHO ĐỒ của tông môn gửi chính người nhận (mục 11; `vault: null` = không còn ở tông môn nào). */
   sectVault(sessionId: string, msg: SectVaultMsg): void;
+  /** Ảnh chụp "Nội vụ" (M8: cấp, cống hiến, nhiệm vụ, cửa hàng) gửi chính người nhận (`hall: null` = không còn ở tông môn nào). */
+  sectHall(sessionId: string, msg: SectHallMsg): void;
   /** Hộ thể sau nối lại / có tin lại sau im lặng / được tha chết do mạng (mục 33; chỉ chủ nhân vật nhận). */
   netShield(sessionId: string, msg: NetShieldMsg): void;
 }
@@ -293,6 +308,11 @@ export class World {
    * system / bench chạy riêng không cần phòng. Nhánh hồi sinh còn dùng cho chết không mất kiếp (PK thách đấu, bước 5).
    */
   reincarnate = false;
+  /**
+   * Trùm nhiều chiêu (mục 42, `systems/boss.ts`): bật thì trùm có bộ chiêu trong `BOSSES` dùng bộ thực thi mới (báo trước, giai đoạn, triệu hồi, cuồng nộ) thay cho đòn thường / đập đất / lao.
+   * Mặc định TẮT (bản chạy thật không đổi cho tới khi dữ liệu thật của E và cân bằng của D xong); `WorldRoom` đặt từ `BOSS_MOVES` (`server/src/systems/boss-config.ts`).
+   */
+  bossMoves = false;
   /** Phòng đăng ký: được gọi (một lần) khi một người vừa vào Hoàng Tuyền, để lưu file, cộng Duyên và gửi `limbo`. */
   onLimbo: ((sid: string) => void) | null = null;
   /**
@@ -314,8 +334,8 @@ export class World {
   /** Thời gian xử lý mỗi tick của phòng này (M4 3.3); `WorldRoom.update` ghi, `/metrics` đọc. Bench / test không ghi. */
   readonly tickStats = new TickStats();
   /**
-   * Số đo hàng đợi input di chuyển của phòng (mục 25 QUYET_DINH_M3, `docs/THIET_KE_DI_CHUYEN.md`), `/metrics` đọc: `dropped` = input bị bỏ vì hàng đợi đầy
-   * (client đã đoán trước nên nhân vật bị kéo giật lùi); `backlogTicks` = số lượt (người chơi x tick) mà hàng đợi còn `INPUT_BACKLOG_WARN` input trở lên sau khi
+   * Số đo hàng đợi input di chuyển của phòng (mục 25 + 41 QUYET_DINH_M3, `docs/THIET_KE_DI_CHUYEN.md`), `/metrics` đọc: `dropped` = input bị bỏ (cũ vượt backlog
+   * `MAX_INPUT_BACKLOG`, bị input dừng cắt, hoặc hàng đợi đầy; client đã đoán trước nên nhân vật bị kéo lại); `backlogTicks` = số lượt (người chơi x tick) mà hàng đợi còn `INPUT_BACKLOG_WARN` input trở lên sau khi
    * xử lý (máy chủ tụt hậu so với client). Hai số này tăng đều trên bản chạy thật thì có chuyện về mạng hoặc nhịp tick.
    */
   readonly inputStats = { dropped: 0, backlogTicks: 0 };
@@ -329,6 +349,11 @@ export class World {
    * 0 = tắt (mặc định, người dùng chưa chọn). `WorldRoom` đặt từ biến môi trường `SECT_NEWLIFE_LOCK_HOURS`.
    */
   sectNewLifeLockMs = 0;
+  /**
+   * "Chờ sang ngày mới kiếm được cống hiến" (M8, `sectCanEarn`): MẶC ĐỊNH BẬT. `WorldRoom` đặt từ `SECT_EARN_WARMUP` (`off` chỉ để dev / E2E; test đơn vị đặt `false` khi cần
+   * kiểm kiếm ngay).
+   */
+  sectEarnWarmup = true;
   /**
    * Phòng đăng ký: lưu hồ sơ của một người NGAY và chờ ghi xong (trước khi chuyển Linh thạch sang kho tông môn).
    * Trả `true` CHỈ khi hồ sơ đã nằm trên đĩa / DB; `false` khi lưu lỗi hoặc không lưu được lúc này (đang qua cổng: bản ghi

@@ -14,6 +14,7 @@ import {
   QUESTS,
   RECIPES,
   SHOPS,
+  sampleSectHall,
   SKILLS_M7,
   getMap,
   isDungeonMap,
@@ -697,6 +698,8 @@ async function start(room: Room, mapId: string) {
   ui.setCurrentMapId(mapId);
   const currentMap = getMap(mapId) || getMap(DEFAULT_MAP_ID)!;
   activeScene = new WorldScene(room, currentMap);
+  // RTT cho độ bù vùng cảnh báo (#873): đọc từ nhịp tim của phòng ĐANG nối (đổi mỗi lần nối lại / qua cổng), `null` khi chưa đủ mẫu
+  activeScene.rttSource = () => activeHeartbeat?.lastRttMs ?? null;
   if (
     typeof window !== "undefined" &&
     (import.meta.env.DEV || new URLSearchParams(location.search).has("debug"))
@@ -706,6 +709,8 @@ async function start(room: Room, mapId: string) {
     // Cho `check-forge-shop.mjs` (#409): công thức rèn + cửa hàng THẬT của game (nguyên liệu, phí) để nạp túi / ví đúng ca "đủ" / "thiếu"
     // Cho `check-craft-ui.mjs` (#769): đối tượng dữ liệu DÙNG CHUNG để script chèn NPC / đan / công thức THỬ (nghề nhỏ chưa có dữ liệu thật: D làm ở #763) rồi dọn
     (window as any).__craftData = { NPC_BY_ID, ITEM_BY_ID, RECIPES };
+    // Cho `check-sect-hall.mjs` (M8.6, #843): ảnh chụp "Nội vụ" MẪU khớp kiểu thật (`sampleSectHall` của `shared/`) để nạp vào bảng Tông môn
+    (window as any).__sampleSectHall = sampleSectHall;
     (window as any).__catalog = () => ({
       recipes: RECIPES.map((r) => ({
         id: r.id,
