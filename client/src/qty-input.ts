@@ -20,25 +20,33 @@ export interface QtyParse {
 
 const fmtNum = (n: number) => n.toLocaleString("vi-VN");
 
+/** Số nguyên dương viết liền */
+const PLAIN_QTY = /^\d+$/;
 /**
- * Đọc chữ trong ô. Chấp nhận dấu cách và dấu chấm / phẩy phân nhóm nghìn kiểu "1.000" / "1,000" (điện thoại hay chèn); mọi ký tự khác (chữ, dấu trừ, dấu thập phân,
- * `e`) là hỏng. Trống thì chưa phải lỗi (người chơi đang xoá để gõ lại): `qty` null, không báo.
+ * Số có dấu phân nhóm nghìn ĐÚNG kiểu: nhóm đầu 1-3 chữ số và KHÔNG bắt đầu bằng 0, mọi nhóm sau đúng 3 chữ số, cùng MỘT loại dấu (chấm, phẩy hoặc khoảng trắng).
+ * "1.000" / "1,000" / "1 000" / "12.345.678" khớp; "2.5", "1,5", "12.34", "1.00", "1..000", ".5", "5.", "0.500", "1.000,000" thì không.
+ */
+const GROUPED_QTY = /^[1-9]\d{0,2}([.,\s])\d{3}(?:\1\d{3})*$/;
+
+/**
+ * Đọc chữ trong ô. Chấp nhận dấu phân nhóm nghìn kiểu "1.000" / "1,000" / "1 000" (điện thoại hay chèn) và khoảng trắng hai đầu; mọi thứ khác (chữ, dấu trừ, số lẻ như "2.5" /
+ * "1,5", dấu chấm / phẩy đứng sai chỗ, `e`) là hỏng, KHÔNG đoán ý: gỡ bừa mọi dấu chấm / phẩy sẽ biến "2.5" thành 25 và người gõ số lẻ theo thói quen sẽ góp nhầm cả kho.
+ * Trống thì chưa phải lỗi (người chơi đang xoá để gõ lại): `qty` null, không báo.
  */
 export function parseQty(text: unknown, max: number): QtyParse {
   const limit = Number.isFinite(max) ? Math.floor(max) : 0;
-  const raw = typeof text === "string" ? text : "";
-  const compact = raw.replace(/[\s.,]/g, "");
-  if (compact === "") return { qty: null, note: "", clamped: false, invalid: false };
+  const raw = typeof text === "string" ? text.trim() : "";
+  if (raw === "") return { qty: null, note: "", clamped: false, invalid: false };
   if (limit < 1)
     return { qty: null, note: "Không còn gì để chọn.", clamped: false, invalid: false };
-  if (!/^\d+$/.test(compact))
+  if (!PLAIN_QTY.test(raw) && !GROUPED_QTY.test(raw))
     return {
       qty: null,
       note: "Chỉ nhập số nguyên dương (không chữ, không dấu âm, không số lẻ).",
       clamped: false,
       invalid: true,
     };
-  const digits = compact.replace(/^0+(?=\d)/, "");
+  const digits = raw.replace(/[\s.,]/g, "").replace(/^0+(?=\d)/, "");
   const n = digits.length > MAX_DIGITS ? Number.POSITIVE_INFINITY : Number(digits);
   if (n < 1)
     return { qty: null, note: "Số lượng phải từ 1 trở lên.", clamped: false, invalid: true };

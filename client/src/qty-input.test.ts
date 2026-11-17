@@ -35,6 +35,51 @@ describe("parseQty (đọc chữ người chơi gõ)", () => {
     expect(parseQty("1 000", 5000).qty).toBe(1000);
   });
 
+  it("SỐ LẺ và dấu chấm / phẩy sai chỗ là HỎNG, không bao giờ đoán ('2.5' KHÔNG thành 25; A review #983)", () => {
+    for (const bad of [
+      "2.5",
+      "0.5",
+      "1,5",
+      "12.34",
+      "1.00",
+      "1..000",
+      ".5",
+      "5.",
+      "1.0000",
+      "1.000,000", // hai loại dấu lẫn lộn
+      "1.000 000",
+      "0.500", // nhóm đầu bắt đầu bằng 0: không phải số có dấu nghìn
+      "01.000",
+      ".",
+      ",",
+      "1.00.000",
+      "1,00",
+      "1.2.3",
+    ]) {
+      const r = parseQty(bad, 1_000_000);
+      expect(r.qty, bad).toBeNull();
+      expect(r.invalid, bad).toBe(true);
+      expect(r.clamped, bad).toBe(false);
+      expect(r.note, bad).toMatch(/số nguyên dương/);
+    }
+  });
+
+  it("dấu nghìn đúng kiểu vẫn đọc đúng số ('1.000', '1,000', '1 000', '12.345.678', '1.000.000')", () => {
+    expect(parseQty("1.000", 5_000_000).qty).toBe(1000);
+    expect(parseQty("1,000", 5_000_000).qty).toBe(1000);
+    expect(parseQty("1 000", 5_000_000).qty).toBe(1000);
+    expect(parseQty("12.345.678", 50_000_000).qty).toBe(12_345_678);
+    expect(parseQty("1.000.000", 5_000_000).qty).toBe(1_000_000);
+    expect(parseQty("999.999", 5_000_000).qty).toBe(999_999);
+    expect(parseQty(" 1.000 ", 5_000_000).qty).toBe(1000); // khoảng trắng hai đầu vẫn bỏ
+  });
+
+  it("số lẻ vượt giới hạn cũng KHÔNG bị kẹp theo số đoán: vẫn hỏng, không báo 'Chỉ có tối đa'", () => {
+    const r = parseQty("2.5", 20);
+    expect(r).toMatchObject({ qty: null, clamped: false, invalid: true });
+    expect(r.note).not.toMatch(/tối đa/);
+  });
+
   it("số 0 đứng đầu bị bỏ ('007' = 7); riêng '0' là sai (phải từ 1)", () => {
     expect(parseQty("007", 50).qty).toBe(7);
     expect(parseQty("0", 50)).toMatchObject({ qty: null, invalid: true });
