@@ -8,7 +8,9 @@ import {
   type AmbushFoeGroup,
   type AmbushScene,
 } from "./ambush-data";
-import { AMBUSH_FOE_COUNT_MAX, AMBUSH_TIERS } from "./ambush";
+import { AMBUSH_FOE_COUNT_MAX, AMBUSH_FOE_LEVEL_CAP, AMBUSH_TIERS } from "./ambush";
+import { MONSTER_BY_ID } from "./game";
+import { stepOf } from "./realms";
 import { BOSSES } from "./bosses";
 import { DEFAULT_MAP_ID, MAPS } from "./map";
 
@@ -140,14 +142,73 @@ describe("ambushViolations: bầy", () => {
   });
   it("kẻ cầm đầu: có BossDef thì qua; 2 con cầm đầu thì bắt", () => {
     const boss = BOSSES[0].kind;
+    // đủ cảnh giới để kẻ cầm đầu không vượt trần cấp (mục 53): bậc đầu ở cảnh giới của chính loài trùm đó
+    const high = { minStep: stepOf(4, 0), maxStep: stepOf(4, 2) };
     expect(
-      ambushViolations([], [group({ tier: "leader", foes: [{ kind: boss, count: 1 }] })]),
+      ambushViolations([], [group({ ...high, tier: "leader", foes: [{ kind: boss, count: 1 }] })]),
     ).toEqual([]);
     expect(
-      ambushViolations([], [group({ tier: "leader", foes: [{ kind: boss, count: 2 }] })]).join(
-        "\n",
-      ),
+      ambushViolations(
+        [],
+        [group({ ...high, tier: "leader", foes: [{ kind: boss, count: 2 }] })],
+      ).join("\n"),
     ).toMatch(/đúng 1 con/);
+  });
+
+  describe("MỤC 53: đối thủ KHÔNG mạnh vượt cảnh giới (cấp loài <= AMBUSH_FOE_LEVEL_CAP của cảnh giới bậc đầu)", () => {
+    const at = (realm: number, kind: string) =>
+      ambushViolations(
+        [],
+        [
+          group({
+            minStep: stepOf(realm, 0),
+            maxStep: stepOf(realm, 2),
+            foes: [{ kind, count: 1 }],
+          }),
+        ],
+      );
+    it("trần theo cảnh giới đúng bảng và loài nằm đúng chỗ", () => {
+      expect(AMBUSH_FOE_LEVEL_CAP).toEqual({ 0: 1, 1: 7, 2: 12, 3: 15, 4: 18 });
+      expect(MONSTER_BY_ID.lang!.level).toBeLessThanOrEqual(AMBUSH_FOE_LEVEL_CAP[0]!);
+      expect(MONSTER_BY_ID.ho!.level).toBeLessThanOrEqual(AMBUSH_FOE_LEVEL_CAP[1]!);
+      expect(MONSTER_BY_ID.mang!.level).toBeLessThanOrEqual(AMBUSH_FOE_LEVEL_CAP[2]!);
+      expect(MONSTER_BY_ID.doc_thiem!.level).toBeLessThanOrEqual(AMBUSH_FOE_LEVEL_CAP[3]!);
+      expect(MONSTER_BY_ID.hac_giao!.level).toBeLessThanOrEqual(AMBUSH_FOE_LEVEL_CAP[4]!);
+    });
+    it("loài cấp vừa tầm thì qua; loài mạnh hơn cảnh giới bị bắt, kèm tên loài và trần", () => {
+      expect(at(0, "lang")).toEqual([]);
+      expect(at(1, "ho")).toEqual([]);
+      expect(at(2, "mang")).toEqual([]);
+      expect(at(3, "doc_thiem")).toEqual([]);
+      expect(at(4, "hac_giao")).toEqual([]);
+      for (const [realm, kind] of [
+        [0, "ho"], // Hắc Hổ (cấp 7) quá mạnh cho Phàm Nhân
+        [1, "mang"], // Xích Mãng (cấp 12) cho Luyện Khí
+        [2, "suong_ho"], // cấp 13 > 12
+        [3, "hac_giao"], // trùm Kim Đan cấp 18 > 15
+        [4, "thien_han_vuong"], // cấp 21 > 18
+      ] as const)
+        expect(at(realm, kind).join("\n"), `${kind} ở cảnh giới ${realm}`).toMatch(
+          new RegExp(`${kind} cấp \\d+ vượt trần ${AMBUSH_FOE_LEVEL_CAP[realm]}`),
+        );
+    });
+    it("cảnh giới chưa khai báo trần (Hóa Thần trở lên) bị bắt: phải thêm trần trước khi thêm nội dung", () => {
+      expect(at(5, "lang").join("\n")).toMatch(/chưa có trần cấp/);
+    });
+    it("trần tính theo CẢNH GIỚI của bậc đầu (bầy trải nhiều bậc dùng bậc thấp nhất)", () => {
+      // bầy từ Luyện Khí (bậc đầu) tới Kim Đan (bậc cuối) có Xích Mãng: vượt trần Luyện Khí nên bắt (người Luyện Khí gặp phải)
+      const v = ambushViolations(
+        [],
+        [
+          group({
+            minStep: stepOf(1, 0),
+            maxStep: stepOf(3, 2),
+            foes: [{ kind: "mang", count: 1 }],
+          }),
+        ],
+      );
+      expect(v.join("\n")).toMatch(/mang cấp 12 vượt trần 7/);
+    });
   });
 });
 

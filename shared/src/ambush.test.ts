@@ -3,6 +3,7 @@ import {
   AMBUSH_CHOICES,
   AMBUSH_COIN_BASE,
   AMBUSH_COIN_GROWTH,
+  AMBUSH_FLEE_CHANNEL_MS,
   AMBUSH_FLEE_MIN_COIN,
   AMBUSH_MIN_PROTOCOL,
   AMBUSH_MSG,
@@ -283,5 +284,19 @@ describe("dữ liệu mẫu cho giao diện", () => {
       for (const it of e.rewards?.items ?? [])
         expect(ITEM_BY_ID[it.itemId], it.itemId).toBeDefined();
     }
+  });
+});
+
+describe("mục 53: bị hạ trong đấu trường = chết thật (hợp đồng)", () => {
+  it("vận bỏ chạy giữa trận 1 giây (không tức thời để không lách đòn, không quá lâu để không như tự sát)", () => {
+    expect(AMBUSH_FLEE_CHANNEL_MS).toBe(1000);
+  });
+  it("`AmbushStateMsg.fleeMs` và `AmbushEndMsg.died` là trường TUỲ CHỌN (client cũ bỏ qua; mẫu hiện có vẫn hợp lệ)", () => {
+    const st: import("./ambush").AmbushStateMsg = { ...sampleAmbushState(), fleeMs: 640 };
+    expect(st.fleeMs).toBe(640);
+    expect(sampleAmbushState().fleeMs).toBeUndefined();
+    const end: import("./ambush").AmbushEndMsg = { result: "lost", died: true };
+    expect(end.died).toBe(true);
+    expect(sampleAmbushEnd("lost").died).toBeUndefined();
   });
 });
