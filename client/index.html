@@ -1374,6 +1374,73 @@
           học ở kinh quyển trong Túi đồ.
         </p>
         <p id="skills-empty" class="lrelic-empty" hidden></p>
+        <!-- Lọc / tìm sổ chiêu (CT11a, #1056): chỉ hiện khi có từ SKILL_FILTER_MIN chiêu trở lên (ui.ts). Ô tìm luôn thấy, các lựa chọn gập sau nút "Lọc". -->
+        <div id="skills-filter" class="sk-filter" role="search" aria-label="Lọc chiêu thức" hidden>
+          <div class="sk-filter-top">
+            <input
+              id="skills-q"
+              type="search"
+              class="sk-q"
+              maxlength="64"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="Tìm chiêu, kinh quyển, hệ…"
+              aria-label="Tìm chiêu theo tên, kinh quyển hoặc hệ (không cần gõ dấu)"
+            />
+            <button
+              type="button"
+              id="skills-filter-toggle"
+              class="sk-slot-btn sk-filter-toggle"
+              aria-expanded="false"
+              aria-controls="skills-filter-more"
+            >
+              Lọc
+            </button>
+          </div>
+          <div id="skills-filter-more" class="sk-filter-more" hidden>
+            <label>
+              <span>Hệ</span>
+              <select id="skills-el" aria-label="Lọc theo hệ"></select>
+            </label>
+            <label>
+              <span>Phẩm</span>
+              <select id="skills-gr" aria-label="Lọc theo phẩm">
+                <option value="all">Mọi phẩm</option>
+                <option value="0">Hoàng</option>
+                <option value="1">Huyền</option>
+                <option value="2">Địa</option>
+                <option value="3">Thiên</option>
+              </select>
+            </label>
+            <label>
+              <span>Ô</span>
+              <select id="skills-sl" aria-label="Lọc theo ô đang gắn">
+                <option value="all">Tất cả</option>
+                <option value="equipped">Đang gắn</option>
+                <option value="free">Chưa gắn</option>
+              </select>
+            </label>
+            <label>
+              <span>Xếp</span>
+              <select id="skills-sort" aria-label="Sắp xếp chiêu">
+                <option value="slot">Đang gắn trước</option>
+                <option value="grade">Phẩm cao trước</option>
+                <option value="name">Theo tên</option>
+              </select>
+            </label>
+            <label class="sk-filter-check">
+              <input id="skills-usable" type="checkbox" />
+              <span>Chỉ chiêu dùng được ngay</span>
+            </label>
+          </div>
+          <div class="sk-filter-bar">
+            <small id="skills-filter-sum" aria-live="polite"></small>
+            <button type="button" id="skills-filter-clear" class="sk-slot-btn" hidden>
+              Bỏ lọc
+            </button>
+          </div>
+        </div>
+        <p id="skills-nomatch" class="lrelic-empty" hidden>Không có chiêu nào khớp bộ lọc.</p>
         <div id="skills-list" class="skills-list"></div>
       </section>
 

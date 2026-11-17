@@ -236,6 +236,17 @@ import { LEAVE_BUTTONS, pickPromptButton, pickVisible, type PromptAnswer } from 
 import { dirOfArrowKey, moveFocus, ownsArrowKeys, withFocusKept } from "./panel-nav";
 import { skillIconSvg } from "./skill-icon";
 import {
+  DEFAULT_SKILL_FILTER,
+  cleanSkillFilter,
+  elementCounts,
+  filterSkills,
+  skillFilterActive,
+  skillFilterSummary,
+  sortSkills,
+  type SkillFilter,
+  type SkillSort,
+} from "./skill-filter";
+import {
   nextOpenSkill,
   resolveOpenSkill,
   type SkillRow,
@@ -2978,6 +2989,10 @@ function skillRowEl(row: SkillRow): HTMLElement {
   const name = document.createElement("b");
   name.className = "sk-row-name";
   name.textContent = row.name;
+  const gr = document.createElement("span");
+  gr.className = `sk-grade g${row.grade}`;
+  gr.textContent = row.gradeName;
+  name.append(gr);
   const sub = document.createElement("small");
   sub.className = "sk-row-tag";
   sub.textContent = row.sub;
@@ -3081,6 +3096,81 @@ function skillRowEl(row: SkillRow): HTMLElement {
   return el;
 }
 
+/** Chỉ hiện thanh lọc / tìm khi sổ chiêu đủ dài để cần (người mới 3-7 chiêu không bị rối thêm). */
+const SKILL_FILTER_MIN = 8;
+/** Bộ lọc + cách xếp của sổ chiêu: sống trong lúc bảng mở, đóng bảng thì về mặc định (lần mở sau luôn thấy ĐỦ chiêu). */
+let skillFilter: SkillFilter = { ...DEFAULT_SKILL_FILTER };
+let skillSort: SkillSort = "slot";
+/** Chữ ký các lựa chọn hệ đã dựng ("hoa:5|kim:3"): chỉ dựng lại `<select>` khi đổi (dựng lại lúc người chơi đang chọn làm đóng danh sách thả). */
+let skillElSig = "";
+
+function resetSkillFilter() {
+  skillFilter = { ...DEFAULT_SKILL_FILTER };
+  skillSort = "slot";
+  skillElSig = "";
+}
+
+/** Đưa bộ lọc đang giữ lên các điều khiển (sau khi dựng lại lựa chọn hệ, hoặc bấm "Bỏ lọc"). */
+function syncSkillFilterControls() {
+  const q = $("skills-q") as HTMLInputElement | null;
+  if (q && q.value !== skillFilter.q) q.value = skillFilter.q;
+  const set = (id: string, v: string) => {
+    const el = $(id) as HTMLSelectElement | null;
+    if (el && el.value !== v) el.value = v;
+  };
+  set("skills-el", skillFilter.element);
+  set("skills-gr", skillFilter.grade === null ? "all" : String(skillFilter.grade));
+  set("skills-sl", skillFilter.slot);
+  set("skills-sort", skillSort);
+  const u = $("skills-usable") as HTMLInputElement | null;
+  if (u) u.checked = skillFilter.usable;
+}
+
+/** Dựng lại lựa chọn hệ theo các hệ CÓ chiêu (kèm số chiêu). Hệ đang chọn mà không còn chiêu thì về "Mọi hệ". */
+function buildSkillElementOptions(rows: readonly SkillRow[]) {
+  const sel = $("skills-el") as HTMLSelectElement | null;
+  if (!sel) return;
+  const counts = elementCounts(rows);
+  const names = new Map<string, string>();
+  for (const r of rows) names.set(r.elementId, r.element || "Vô hệ");
+  const sig = [...counts].map(([id, n]) => `${id}:${n}`).join("|");
+  if (sig === skillElSig) return;
+  skillElSig = sig;
+  if (skillFilter.element !== "all" && !counts.has(skillFilter.element))
+    skillFilter.element = "all";
+  sel.replaceChildren();
+  const add = (value: string, label: string) => {
+    const o = document.createElement("option");
+    o.value = value;
+    o.textContent = label;
+    sel.append(o);
+  };
+  add("all", `Mọi hệ (${rows.length})`);
+  for (const [id, n] of counts) add(id, `${names.get(id) ?? id} (${n})`);
+  syncSkillFilterControls();
+}
+
+/** Vẽ DANH SÁCH hàng (không đụng thanh lọc, để ô tìm giữ nguyên con trỏ khi gõ). */
+function renderSkillsList() {
+  const list = $("skills-list");
+  if (!list || !skillsModel) return;
+  const all = skillsModel.rows;
+  const bar = all.length >= SKILL_FILTER_MIN;
+  const shown = bar ? sortSkills(filterSkills(all, skillFilter), skillSort) : all;
+  const active = bar && skillFilterActive(skillFilter);
+  const sum = $("skills-filter-sum");
+  if (sum) sum.textContent = skillFilterSummary(shown.length, all.length, active);
+  const sumBar = $("skills-filter-sum")?.parentElement;
+  if (sumBar) sumBar.hidden = !active;
+  const clear = $("skills-filter-clear");
+  if (clear) clear.hidden = !active;
+  const nomatch = $("skills-nomatch");
+  if (nomatch) nomatch.hidden = !(bar && all.length > 0 && shown.length === 0);
+  list.replaceChildren();
+  for (const row of shown) list.append(skillRowEl(row));
+  setSkillsOpen(list, resolveOpenSkill(skillsOpenId, shown), false);
+}
+
 function renderSkillsModalImpl() {
   const list = $("skills-list");
   const emptyEl = $("skills-empty");
@@ -3090,6 +3180,16 @@ function renderSkillsModalImpl() {
   if (emptyEl) {
     emptyEl.hidden = skillsModel.empty === null;
     if (skillsModel.empty !== null) emptyEl.textContent = skillsModel.empty;
+  }
+  const filterEl = $("skills-filter");
+  const showBar = skillsModel.empty === null && skillsModel.rows.length >= SKILL_FILTER_MIN;
+  if (filterEl) filterEl.hidden = !showBar;
+  $("skills-modal").classList.toggle("sk-has-filter", showBar);
+  if (!showBar) {
+    // sổ chiêu ngắn lại dưới ngưỡng (kiếp mới): bỏ lọc cũ để không ẩn mất chiêu mà không có nút nào gỡ
+    resetSkillFilter();
+    const nomatch = $("skills-nomatch");
+    if (nomatch) nomatch.hidden = true;
   }
   list.replaceChildren();
   if (skillsModel.empty !== null) {
@@ -3105,8 +3205,59 @@ function renderSkillsModalImpl() {
     list.append(bag);
     return;
   }
-  for (const row of skillsModel.rows) list.append(skillRowEl(row));
-  setSkillsOpen(list, resolveOpenSkill(skillsOpenId, skillsModel.rows), false);
+  if (showBar) buildSkillElementOptions(skillsModel.rows);
+  renderSkillsList();
+}
+
+/** Nối ô tìm / lựa chọn lọc (một lần lúc dựng giao diện). Mọi giá trị đi qua `cleanSkillFilter` trước khi dùng. */
+function bindSkillFilter() {
+  const apply = (patch: Partial<SkillFilter>) => {
+    skillFilter = cleanSkillFilter({ ...skillFilter, ...patch });
+    renderSkillsList();
+  };
+  $("skills-q")?.addEventListener("input", (e) =>
+    apply({ q: (e.target as HTMLInputElement).value }),
+  );
+  $("skills-q")?.addEventListener("keydown", (e) => {
+    // Esc trong ô tìm: có chữ thì xoá chữ (không đóng bảng); hết chữ rồi mới để Esc đóng bảng như thường
+    if (e.key === "Escape" && skillFilter.q !== "") {
+      e.preventDefault();
+      e.stopPropagation();
+      (e.target as HTMLInputElement).value = "";
+      apply({ q: "" });
+    }
+  });
+  $("skills-el")?.addEventListener("change", (e) =>
+    apply({ element: (e.target as HTMLSelectElement).value }),
+  );
+  $("skills-gr")?.addEventListener("change", (e) => {
+    const v = (e.target as HTMLSelectElement).value;
+    apply({ grade: v === "all" ? null : Number(v) });
+  });
+  $("skills-sl")?.addEventListener("change", (e) =>
+    apply({ slot: (e.target as HTMLSelectElement).value as SkillFilter["slot"] }),
+  );
+  $("skills-sort")?.addEventListener("change", (e) => {
+    const v = (e.target as HTMLSelectElement).value;
+    skillSort = v === "grade" || v === "name" ? v : "slot";
+    renderSkillsList();
+  });
+  $("skills-usable")?.addEventListener("change", (e) =>
+    apply({ usable: (e.target as HTMLInputElement).checked }),
+  );
+  $("skills-filter-toggle")?.addEventListener("click", () => {
+    const more = $("skills-filter-more");
+    const btn = $("skills-filter-toggle");
+    if (!more || !btn) return;
+    more.hidden = !more.hidden;
+    btn.setAttribute("aria-expanded", String(!more.hidden));
+  });
+  $("skills-filter-clear")?.addEventListener("click", () => {
+    skillFilter = { ...DEFAULT_SKILL_FILTER };
+    syncSkillFilterControls();
+    renderSkillsList();
+    ($("skills-q") as HTMLInputElement | null)?.focus();
+  });
 }
 
 // ---------- Luân hồi (M3.2) ----------
@@ -4774,6 +4925,7 @@ export const ui = {
     bindTap("quest-close", () => this.toggleQuestModal(false));
     bindTap("btn-skills", () => this.toggleSkillsModal());
     bindTap("skills-close", () => this.toggleSkillsModal(false));
+    bindSkillFilter();
     bindTap("tab-q-active", () => {
       questTab = "active";
       $("tab-q-active").classList.add("active");
@@ -5285,6 +5437,8 @@ export const ui = {
       renderSkillsModal();
     } else {
       skillsOpenId = null; // lần mở sau luôn là danh sách gọn
+      resetSkillFilter();
+      syncSkillFilterControls();
       modalStack.remove("skills-modal");
       returnFocus($("btn-skills"));
     }

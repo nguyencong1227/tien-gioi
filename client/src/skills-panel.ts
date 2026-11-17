@@ -19,6 +19,7 @@ import {
 } from "@tien-gioi/shared";
 import { BAR_SLOTS, needText, unlockText, type SkillTracker, type SlotMe } from "./skill-bar";
 import { pipsText } from "./skill-bar-dom";
+import { gradeName, skillGradeOf, skillStyleOf, styleName } from "./skill-meta";
 
 /** Số thập phân kiểu Việt ("1,84"), tối đa `digits` chữ số, bỏ số 0 thừa ("2" chứ không "2,00"). */
 export function fmtNum(n: number, digits = 2): string {
@@ -108,6 +109,14 @@ export interface SkillRow {
   /** Chấm tầng "●●○" */
   pips: string;
   element: string;
+  /** id hệ ("hoa"...), để lọc theo hệ; `element` là tên hiển thị */
+  elementId: string;
+  /** Phẩm 0 Hoàng .. 3 Thiên (`skill-meta.ts`) và tên hiển thị */
+  grade: number;
+  gradeName: string;
+  /** Phong cách (`SKILL_STYLES`) chọn hình biểu tượng, và tên hiển thị */
+  style: string;
+  styleName: string;
   shape: string;
   /** Dòng số THẬT: sát thương, linh lực, hồi chiêu, tầm */
   stats: string[];
@@ -197,6 +206,8 @@ export function buildSkillsPanel(skills: SkillTracker, me: SlotMe): SkillsPanelM
     });
     const element = elementOf(def.element)?.name ?? "";
     const need = skillReqMet(def, me.realm, me.tier) ? null : needText(def);
+    const grade = skillGradeOf(def);
+    const style = skillStyleOf(def);
     const slotLabel = slotNow === null ? "Chưa gắn" : `Ô ${slotNow}`;
     rows.push({
       id: def.id,
@@ -204,6 +215,11 @@ export function buildSkillsPanel(skills: SkillTracker, me: SlotMe): SkillsPanelM
       level,
       pips: pipsText(Math.min(level, SKILL_MAX_LEVEL)),
       element,
+      elementId: def.element,
+      grade,
+      gradeName: gradeName(grade),
+      style,
+      styleName: styleName(style),
       shape: SHAPE_LABEL[def.shape] ?? "",
       stats: statLines(def, level, me.maxMp),
       effects: def.effects.map(effectText).filter((t) => t !== ""),
@@ -213,7 +229,7 @@ export function buildSkillsPanel(skills: SkillTracker, me: SlotMe): SkillsPanelM
       slotNow,
       slotLabel,
       sub: [element, `tầng ${level}`].filter((t) => t !== "").join(" · "),
-      aria: rowAria(def.name, element, level, slotNow, need),
+      aria: rowAria(def.name, element, level, slotNow, need, gradeName(grade)),
       slots,
       unequip: slotNow === null ? null : `Gỡ khỏi ô ${slotNow}`,
     });
@@ -233,9 +249,11 @@ export function rowAria(
   level: number,
   slotNow: SkillSlot | null,
   need: string | null,
+  grade = "",
 ): string {
   const parts = [name];
   if (element) parts.push(`hệ ${element}`);
+  if (grade) parts.push(`phẩm ${grade}`);
   parts.push(`tầng ${level} trên ${SKILL_MAX_LEVEL}`);
   parts.push(slotNow === null ? "chưa gắn ô" : `đang ở ô ${slotNow}`);
   if (need) parts.push(need.charAt(0).toLowerCase() + need.slice(1));
