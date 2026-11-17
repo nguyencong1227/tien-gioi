@@ -30,7 +30,39 @@ exit 0
 `,
     { mode: 0o755 },
   );
+  // Stub systemctl / systemd-run cô lập: test KHÔNG BAO GIỜ được chạm đơn vị tg-comfy THẬT. Trước đây test comfy-down.sh
+  // dùng PATH thật nên `systemctl --user stop tg-comfy` tắt ComfyUI đang sinh ảnh của dev khác (lô 2, 17/11 12:54).
+  // Mặc định is-active trả "inactive"; TEST_STUB_COMFY_ACTIVE=1 giả lập đơn vị đang chạy. Mọi lệnh gọi ghi vào systemctlLog.
+  const systemctlLog = path.join(stubNvidiaDir, "systemctl.log");
+  fs.writeFileSync(
+    path.join(stubNvidiaDir, "systemctl"),
+    `#!/bin/sh
+echo "systemctl $*" >> "${systemctlLog}"
+if [ "$2" = "is-active" ]; then
+  if [ "\${TEST_STUB_COMFY_ACTIVE:-0}" = "1" ]; then echo active; exit 0; fi
+  echo inactive
+  exit 3
+fi
+exit 0
+`,
+    { mode: 0o755 },
+  );
+  fs.writeFileSync(
+    path.join(stubNvidiaDir, "systemd-run"),
+    `#!/bin/sh
+echo "systemd-run $*" >> "${systemctlLog}"
+exit 1
+`,
+    { mode: 0o755 },
+  );
   const isolatedPath = `${stubNvidiaDir}:${process.env.PATH}`;
+  // Môi trường cô lập cho MỌI lần gọi comfy-up.sh / comfy-down.sh: PATH có stub, khoá và PID canh rảnh nằm trong thư mục tạm
+  // (comfy-down.sh xoá khoá ở $XDG_RUNTIME_DIR và giết PID canh rảnh: không được đụng bản thật của dev đang sinh ảnh).
+  const isoEnv = {
+    PATH: isolatedPath,
+    XDG_RUNTIME_DIR: tmpTestDir,
+    COMFY_IDLE_PID_FILE: path.join(tmpTestDir, "tg-comfy-idle.pid"),
+  };
 
   it("các script quản lý vòng đời ComfyUI tồn tại và có quyền thực thi", () => {
     expect(fs.existsSync(comfyUpScript)).toBe(true);
@@ -53,7 +85,7 @@ exit 0
       cwd: repoRoot,
       env: {
         ...process.env,
-        PATH: isolatedPath,
+        ...isoEnv,
         COMFY_DIR: tmpTestDir,
         COMFY_LOCK_FILE: tmpLockPath,
       },
@@ -70,7 +102,7 @@ exit 0
         cwd: repoRoot,
         env: {
           ...process.env,
-          PATH: isolatedPath,
+          ...isoEnv,
           COMFY_DIR: tmpTestDir,
           COMFY_LOCK_FILE: tmpLockPath,
           TEST_MIN_FREE_KB: "999999999999", // Giả lập ngưỡng yêu cầu 1000 TB
@@ -93,7 +125,7 @@ exit 0
         cwd: repoRoot,
         env: {
           ...process.env,
-          PATH: isolatedPath,
+          ...isoEnv,
           COMFY_DIR: tmpTestDir,
           COMFY_LOCK_FILE: tmpLockPath,
           TEST_GPU_BUSY: "1",
@@ -116,7 +148,7 @@ exit 0
         cwd: repoRoot,
         env: {
           ...process.env,
-          PATH: isolatedPath,
+          ...isoEnv,
           COMFY_DIR: tmpTestDir,
           COMFY_LOCK_FILE: tmpLockPath,
           TEST_STUB_CHROME: "1", // Stub nvidia-smi in ra tiến trình Chrome
@@ -137,7 +169,7 @@ exit 0
       cwd: repoRoot,
       env: {
         ...process.env,
-        PATH: isolatedPath,
+        ...isoEnv,
         COMFY_DIR: tmpTestDir,
         COMFY_LOCK_FILE: tmpLockPath,
         TEST_STUB_CHROME: "1",
@@ -156,12 +188,30 @@ exit 0
       cwd: repoRoot,
       env: {
         ...process.env,
+        ...isoEnv,
         COMFY_DIR: tmpTestDir,
         COMFY_LOCK_FILE: tmpLockPath,
       },
     });
     expect(stdout).toContain("Đã tắt dây chuyền ComfyUI và giải phóng tài nguyên");
     expect(fs.existsSync(tmpLockPath)).toBe(false);
+  });
+
+  it("comfy-down.sh trong test chỉ gọi systemctl GIẢ (không tắt tg-comfy thật của dev đang sinh ảnh)", () => {
+    fs.rmSync(systemctlLog, { force: true });
+    execFileSync(comfyDownScript, [], {
+      encoding: "utf-8",
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        ...isoEnv,
+        COMFY_DIR: tmpTestDir,
+        COMFY_LOCK_FILE: tmpLockPath,
+        TEST_STUB_COMFY_ACTIVE: "1",
+      },
+    });
+    // Lệnh dừng phải tới stub (đọc được trong log của stub), tức không tới systemctl thật
+    expect(fs.readFileSync(systemctlLog, "utf-8")).toContain("systemctl --user stop tg-comfy");
   });
 
   it("comfy-down.sh: KHÔNG giết các tiến trình khác chứa chuỗi ComfyUI/main.py trên dòng lệnh", () => {
@@ -178,6 +228,7 @@ exit 0
         cwd: repoRoot,
         env: {
           ...process.env,
+          ...isoEnv,
           COMFY_DIR: tmpTestDir,
           COMFY_LOCK_FILE: tmpLockPath,
         },
@@ -211,7 +262,7 @@ exit 0
         cwd: repoRoot,
         env: {
           ...process.env,
-          PATH: isolatedPath,
+          ...isoEnv,
           COMFY_DIR: nonExistentDir,
           COMFY_LOCK_FILE: errorLockPath,
           TEST_MIN_FREE_KB: "100",
