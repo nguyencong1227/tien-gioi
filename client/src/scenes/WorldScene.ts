@@ -135,6 +135,7 @@ import {
   type DungeonStateMsg,
   type DungeonEndMsg,
   DUEL_MSG,
+  AMBUSH_MSG,
   DUEL_KO_MS,
   isDungeonMap,
   type DuelInvitedMsg,
@@ -771,6 +772,9 @@ export class WorldScene extends Phaser.Scene {
       onBoardsGet: (board) =>
         !this.isReconnecting && this.room.send(SOCIAL_MSG.boardsGet, { board }),
       onWorldBossGet: () => !this.isReconnecting && this.room.send(SOCIAL_MSG.worldBossGet, {}),
+      // Gặp chặn đường (mục 52): trả `true` chỉ khi tin thật sự đi (đang nối lại thì không gửi, hộp thoại thử lại sau)
+      onAmbushSeen: (m) => this.sendAmbush(AMBUSH_MSG.seen, m),
+      onAmbushChoose: (m) => this.sendAmbush(AMBUSH_MSG.choose, m),
       onAchievementsGet: () =>
         !this.isReconnecting && this.room.send(SOCIAL_MSG.achievementsGet, {}),
       onTitleSet: (id) => !this.isReconnecting && this.room.send(SOCIAL_MSG.titleSet, { id }),
@@ -1602,7 +1606,16 @@ export class WorldScene extends Phaser.Scene {
     this.applyTargetState(stepTarget("auto", this.targetState(), this.targetCandidates(true)));
   }
 
+  /** Gửi tin chặn đường; `false` (không gửi) khi đang nối lại. */
+  private sendAmbush(type: string, msg: unknown): boolean {
+    if (this.isReconnecting) return false;
+    this.room.send(type, msg);
+    return true;
+  }
+
   private moveDir() {
+    // hộp thoại chặn đường đang mở: nhân vật đứng yên (máy chủ cũng tiêu thụ input mà không đi); cần điều khiển ảo cũng không đi, để không đoán trước sai
+    if (ui.isAmbushOpen()) return { dx: 0, dy: 0 };
     // chỉ ô NHẬP CHỮ chặn đi bộ (trước đây mọi `<input>`, kể cả ô đánh dấu / thanh trượt còn giữ focus sau khi đóng bảng, làm nhân vật đứng im)
     if (isTypingElement(document.activeElement)) return { dx: 0, dy: 0 };
     const k = this.moveKeys.state();
@@ -2405,6 +2418,9 @@ export class WorldScene extends Phaser.Scene {
     reg(SOCIAL_MSG.boards, (m: unknown) => ui.setBoards(m));
     // Trùm thế giới (M9.7): thông báo trước / xuất hiện / kết thúc (mọi phòng) + cập nhật máu / đóng góp (phòng đích); `setWorldBoss` tự làm sạch + tôn trọng cờ ?social=1
     reg(SOCIAL_MSG.worldBoss, (m: unknown) => ui.setWorldBoss(m));
+    // Gặp chặn đường (mục 52, CD7): hộp thoại + kết cục; gửi lại cùng `id` sau nối lại là bản CẬP NHẬT (`ui.onAmbushOffer` tự phân biệt)
+    reg(AMBUSH_MSG.offer, (m: unknown) => ui.onAmbushOffer(m));
+    reg(AMBUSH_MSG.end, (m: unknown) => ui.onAmbushEnd(m));
     // Thành tựu + danh hiệu (M9.8): sổ (cũng là câu trả lời của `titleSet`) + thông báo mới đạt; `ui` tự làm sạch + tôn trọng cờ ?social=1
     reg(SOCIAL_MSG.achievements, (m: unknown) => ui.setAchievements(m));
     reg(SOCIAL_MSG.achievementNew, (m: unknown) => ui.onAchievementNew(m));

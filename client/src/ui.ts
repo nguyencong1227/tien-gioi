@@ -100,7 +100,24 @@ import {
   WORLD_BOSS_SCHEDULE,
   type WorldBossMsg,
   type AchievementsMsg,
+  AMBUSH_OFFER_MS,
+  type AmbushChooseMsg,
+  type AmbushSeenMsg,
 } from "@tien-gioi/shared";
+import {
+  ambushDialogView,
+  ambushEndToast,
+  ambushEndView,
+  ambushChoiceForKey,
+  ambushMarkSeen,
+  ambushNeedsSeen,
+  ambushRemainingMs,
+  chooseAmbush,
+  openAmbush,
+  parseAmbushEnd,
+  parseAmbushOffer,
+  type AmbushDialog,
+} from "./ambush-view";
 import { REFRESH_NOTE, asBoardId, boardView, sanitizeBoardsMsg } from "./board-view";
 import {
   AskGate,
@@ -387,6 +404,12 @@ export interface UiCallbacks {
   onBoardsGet?: (board: BoardId) => void;
   /** Bảng Xã hội, tab Sự kiện (M9.7): xin sự kiện trùm thế giới đang diễn ra / sắp tới (máy chủ trả tin `worldBoss`) */
   onWorldBossGet?: () => void;
+  /**
+   * Gặp chặn đường (mục 52, CD7): gửi `ambushSeen` (hộp thoại đã hiện, trang đang hiển thị) / `ambushChoose` (Chiến hoặc bỏ chạy). Trả `true` khi tin THẬT SỰ đã gửi
+   * (đang nối lại thì `false`: giao diện chưa coi là đã gửi, sẽ gửi lại khi nối lại xong).
+   */
+  onAmbushSeen?: (msg: AmbushSeenMsg) => boolean;
+  onAmbushChoose?: (msg: AmbushChooseMsg) => boolean;
   /** Bảng Xã hội, tab Thành tựu (M9.8): xin sổ thành tựu (máy chủ trả tin `achievements`) / đeo hoặc gỡ danh hiệu (`null` = gỡ; máy chủ LUÔN trả lại `achievements`) */
   onAchievementsGet?: () => void;
   onTitleSet?: (id: string | null) => void;
@@ -653,6 +676,111 @@ function renderSocialRank() {
     body.appendChild(gap);
     addRow(v.mineRow, "outside");
   }
+}
+
+// ---- Gặp chặn đường (mục 52, CD7 #1067): hộp thoại Chiến / Bỏ chạy, vẽ từ `ambush-view.ts` (thuần) ----
+/** Hộp thoại đang mở (null = không có). Đồng hồ cục bộ chỉ để đo KHOẢNG TRÔI; máy chủ mới quyết (hết giờ = Chiến). */
+let ambushDlg: AmbushDialog | null = null;
+let ambushTimer: ReturnType<typeof setInterval> | null = null;
+const AMBUSH_TICK_MS = 250;
+const AMBUSH_BTN_ID: Readonly<Record<string, string>> = {
+  fight: "ambush-fight",
+  flee_coin: "ambush-flee-coin",
+  flee_exp: "ambush-flee-exp",
+};
+
+function setTextIfChanged(el: Element | null, text: string): void {
+  if (el && el.textContent !== text) el.textContent = text;
+}
+
+/** Vẽ lại hộp thoại theo đồng hồ hiện tại và gửi `ambushSeen` nếu đến lúc. Gọi mỗi `AMBUSH_TICK_MS`, khi nhận tin, khi trang hiện lại. */
+function renderAmbush(): void {
+  const d = ambushDlg;
+  if (!d) return;
+  const now = performance.now();
+  const v = ambushDialogView(d, now);
+  const reconnecting = document.body.classList.contains("reconnecting");
+  setTextIfChanged(document.getElementById("ambush-foe"), v.foe);
+  setTextIfChanged(document.getElementById("ambush-scene"), v.scene);
+  // đang nối lại: máy chủ ĐÓNG BĂNG đồng hồ, nên không đếm tiếp trên màn hình
+  setTextIfChanged(
+    document.getElementById("ambush-countdown"),
+    reconnecting ? "Tạm dừng" : v.waitingServer ? "Chờ…" : v.countdown,
+  );
+  const fill = document.getElementById("ambush-bar-fill");
+  if (fill) {
+    const pct = Math.round((ambushRemainingMs(d, now) / AMBUSH_OFFER_MS) * 100);
+    const w = `${Math.min(100, Math.max(0, pct))}%`;
+    if (fill.style.width !== w) fill.style.width = w;
+  }
+  for (const b of v.buttons) {
+    const el = document.getElementById(AMBUSH_BTN_ID[b.choice]);
+    if (!el) continue;
+    setTextIfChanged(el.querySelector(".ab-label"), b.label);
+    setTextIfChanged(el.querySelector(".ab-sub"), b.sub);
+    el.setAttribute("aria-disabled", String(!b.enabled || reconnecting));
+    el.setAttribute("aria-label", b.aria);
+  }
+  setTextIfChanged(
+    document.getElementById("ambush-note"),
+    reconnecting ? "Đang nối lại… đồng hồ tạm dừng." : v.note,
+  );
+  if (!reconnecting && ambushNeedsSeen(d, document.visibilityState === "visible")) {
+    // chỉ coi là ĐÃ GỬI khi tin thật sự đi (callback trả true); không thì lần vẽ sau thử lại
+    if (callbacks?.onAmbushSeen?.({ id: d.offer.id }) === true) ambushDlg = ambushMarkSeen(d);
+  }
+}
+
+/** Người chơi chọn (bấm nút / Enter / Y): `ambush-view.ts` quyết có gửi không (khoá 700 ms, đang chờ, nút mờ). */
+function pickAmbush(choice: unknown): void {
+  const d = ambushDlg;
+  if (!d || document.body.classList.contains("reconnecting")) return;
+  const r = chooseAmbush(d, choice, performance.now());
+  if (r.send !== null && callbacks?.onAmbushChoose?.(r.send) === true) ambushDlg = r.dialog;
+  renderAmbush();
+}
+
+function hideAmbushImpl(): void {
+  if (ambushTimer !== null) {
+    clearInterval(ambushTimer);
+    ambushTimer = null;
+  }
+  ambushDlg = null;
+  const el = document.getElementById("ambush-modal");
+  if (el) el.hidden = true;
+  document.body.classList.remove("in-ambush");
+  if (modalStack.remove("ambush-modal")) returnFocus(null);
+}
+
+/** Gắn sự kiện một lần lúc khởi tạo: bấm ba nút, phím Enter / Y = Chiến, trang hiện lại thì gửi `ambushSeen` đang nợ. */
+function bindAmbushDom(): void {
+  for (const id of Object.values(AMBUSH_BTN_ID)) {
+    const el = document.getElementById(id);
+    el?.addEventListener("click", () => pickAmbush(el.dataset.choice));
+  }
+  // pha BẮT: chạy trước bộ phím của thế giới. Enter trên NÚT đang có focus để nút đó nhận (click gốc); Enter / Y khi focus ở khung = Chiến. KHÔNG phím chữ nào chọn bỏ chạy.
+  window.addEventListener(
+    "keydown",
+    (e) => {
+      if (!ambushDlg || e.defaultPrevented || e.repeat || e.ctrlKey || e.altKey || e.metaKey)
+        return;
+      const choice = ambushChoiceForKey(e.code);
+      if (choice === null) return;
+      const active = document.activeElement;
+      if (
+        e.code !== "KeyY" &&
+        active instanceof HTMLButtonElement &&
+        active.closest("#ambush-modal")
+      )
+        return;
+      e.preventDefault();
+      pickAmbush(choice);
+    },
+    true,
+  );
+  document.addEventListener("visibilitychange", () => {
+    if (ambushDlg) renderAmbush();
+  });
 }
 
 // ---- Trùm thế giới (M9.7, #1026): banner + tab Sự kiện, vẽ từ `world-boss-view.ts` ----
@@ -4376,6 +4504,7 @@ export const ui = {
     // Đóng bằng closePlayerMenu (gỡ khỏi modalStack): ẩn thẳng `hidden = true` để sót mục "player-menu" trong modalStack làm
     // `isKeyboardCaptured()` kẹt true, WASD / phím thế giới không chạy cho tới khi bấm Esc (lỗi nền của #468, gặp khi dùng chuột bấm nút menu).
     bindTap("pm-close", () => this.closePlayerMenu());
+    bindAmbushDom();
     bindTap("pm-invite-btn", () => {
       this.closePlayerMenu();
       if (selectedPlayerName) callbacks?.onPartyInvite?.(selectedPlayerName);
@@ -5402,6 +5531,8 @@ export const ui = {
     modalStack.clear();
     // WorldScene gọi closeAllModals mỗi lần cập nhật khi đang chết: màn Hoàng Tuyền (không phải "modal" để đóng) phải còn trong modalStack
     if (this.isLimboOpen()) modalStack.push("limbo-overlay", null);
+    // hộp thoại chặn đường KHÔNG phải bảng để đóng (chỉ ba nút hoặc hết giờ): vẫn thuộc về nó, bàn phím vẫn bị giữ
+    if (this.isAmbushOpen()) modalStack.push("ambush-modal", null);
     return closedAny;
   },
 
@@ -5452,6 +5583,8 @@ export const ui = {
       case "newbie-guide-modal":
         this.dismissNewbieGuide();
         return true;
+      case "ambush-modal":
+        return true; // Esc KHÔNG đóng hộp thoại chặn đường (phải chọn, hoặc hết giờ = Chiến): nuốt phím, không bỏ chọn mục tiêu
       case "limbo-overlay":
         return true; // Esc KHÔNG đóng màn Hoàng Tuyền (chỉ đầu thai mới đóng); nuốt phím để không rơi xuống bước "bỏ chọn mục tiêu"
       default: {
@@ -6453,6 +6586,49 @@ export const ui = {
     if (overlay) overlay.hidden = true;
     document.body.classList.remove("in-limbo");
     if (modalStack.remove("limbo-overlay")) returnFocus(null);
+  },
+
+  /** Tin `ambushOffer` (mục 52): làm sạch rồi mở / CẬP NHẬT hộp thoại (cùng `id` sau nối lại = cập nhật, không đóng bảng, không tính lại khoá 700 ms). */
+  onAmbushOffer(raw: unknown) {
+    const offer = parseAmbushOffer(raw);
+    if (offer === null) return;
+    const { dialog, fresh } = openAmbush(ambushDlg, offer, performance.now());
+    ambushDlg = dialog;
+    const el = $("ambush-modal");
+    if (fresh) {
+      // lời đề nghị MỚI: bỏ mọi bảng đang mở (người chơi đọc và chọn, không bị che), rồi giữ bàn phím cho hộp thoại
+      this.closeAllModals();
+      this.closeDuelEndModal();
+      this.closeDialog();
+      this.closePlayerMenu();
+      el.setAttribute("aria-label", ambushDialogView(dialog, performance.now()).announce);
+      el.hidden = false;
+      document.body.classList.add("in-ambush");
+      modalStack.push("ambush-modal", null);
+      // focus vào KHUNG, không vào nút: người vừa đang bấm Enter / Cách không được chọn nhầm; nút nào cũng phải do Tab / mũi tên / bấm mới tới
+      el.focus();
+    }
+    renderAmbush();
+    if (ambushTimer === null) ambushTimer = setInterval(renderAmbush, AMBUSH_TICK_MS);
+  },
+
+  /** Tin `ambushEnd`: đóng hộp thoại (nếu mở) và báo kết cục; huỷ lặng lẽ (`canceled`) không báo gì. */
+  onAmbushEnd(raw: unknown) {
+    const end = parseAmbushEnd(raw);
+    if (end === null) return;
+    hideAmbushImpl();
+    const text = ambushEndToast(end);
+    if (text !== "") this.toast({ text, tone: ambushEndView(end).tone });
+  },
+
+  /** Đóng hộp thoại chặn đường không báo gì (đổi phòng / chuyển cảnh). */
+  hideAmbush() {
+    hideAmbushImpl();
+  },
+
+  isAmbushOpen(): boolean {
+    const el = document.getElementById("ambush-modal");
+    return Boolean(el && !el.hidden);
   },
 
   isLimboOpen(): boolean {
