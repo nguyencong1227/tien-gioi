@@ -473,6 +473,22 @@ cmd_xoa_tai_khoan() {
 }
 
 # ------------------------------------------------------------------------------
+# Hàm thuần cộng tổng một số đo Prometheus (nhiều dòng theo phòng) từ văn bản /metrics
+# Nhận văn bản /metrics qua $1 và tên metric qua $2.
+# ------------------------------------------------------------------------------
+sum_prometheus_metric() {
+  local text="${1:-}"
+  local name="${2:-}"
+  printf '%s\n' "$text" | awk -v m="$name" '
+    $0 ~ "^" m "(\\{|[[:space:]])" {
+      val = $NF + 0
+      sum += val
+    }
+    END { printf "%d", sum + 0 }
+  '
+}
+
+# ------------------------------------------------------------------------------
 # Hàm thuần phân tích nhật ký 3 phút gần nhất cho lệnh check (Issue #1001)
 # Nhận nội dung log qua tham số $1.
 # Mã trả về: 0 = sạch (ĐẠT), 2 = có [CẢNH BÁO] (CÓ CẢNH BÁO), 1 = có lỗi (THẤT BẠI)
@@ -626,6 +642,12 @@ cmd_check() {
       auth_code="$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 -H "Authorization: Bearer $token" http://127.0.0.1:2567/metrics || true)"
       if [[ "$auth_code" == "200" ]]; then
         echo "     [ĐẠT] Truy cập kèm METRICS_TOKEN thành công với HTTP 200 OK"
+        local metrics_body dropped_sum backlog_sum read_at
+        metrics_body="$(curl -s --max-time 5 -H "Authorization: Bearer $token" http://127.0.0.1:2567/metrics 2>/dev/null || true)"
+        dropped_sum="$(sum_prometheus_metric "$metrics_body" "tiengioi_room_input_dropped_total")"
+        backlog_sum="$(sum_prometheus_metric "$metrics_body" "tiengioi_room_input_backlog_ticks_total")"
+        read_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        echo "     Số đo input (#782, lúc $read_at): tiengioi_room_input_dropped_total=$dropped_sum, tiengioi_room_input_backlog_ticks_total=$backlog_sum"
       else
         echo "     [THẤT BẠI] Truy cập kèm METRICS_TOKEN trả mã HTTP $auth_code (kỳ vọng 200)" >&2
         has_fail=1

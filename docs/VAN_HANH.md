@@ -129,7 +129,7 @@ Ngay sau mỗi lần `./deploy/prod.sh up <thẻ>`, chạy lệnh kiểm tra **c
 Lệnh thực hiện 5 bước kiểm tra an toàn:
 1. **`docker ps` health (`db` + `game`):** Xác nhận cả hai container `tien-gioi-db` và `tien-gioi` đang `Up` và `healthy`.
 2. **Endpoint `/health`:** Kiểm tra HTTP 200 kèm `"ok":true`, `"authMode":"account"`, và đối chiếu `protocol` / `minProtocol` với `shared/src/protocol.ts` (hoặc `MIN_PROTOCOL_VERSION` trong `.env.production`).
-3. **Endpoint `/metrics`:** Xác nhận truy cập ẩn danh bị từ chối (HTTP 401) và truy cập kèm `METRICS_TOKEN` thành công (HTTP 200, tuyệt đối không in lộ token).
+3. **Endpoint `/metrics`:** Xác nhận truy cập ẩn danh bị từ chối (HTTP 401) và truy cập kèm `METRICS_TOKEN` thành công (HTTP 200, tuyệt đối không in lộ token); đồng thời đọc và in tổng hai chỉ số hàng đợi di chuyển qua mọi phòng (`tiengioi_room_input_dropped_total` và `tiengioi_room_input_backlog_ticks_total`) kèm mốc thời gian UTC để theo dõi #782 (nếu cả hai giữ gần 0 sau vài ngày vận hành thực tế thì không cần bật giữ bước phía client; nếu tăng đều thì xem xét bật `move-pacing`).
 4. **Phân tích nhật ký 3 phút gần nhất (`--since 3m`):** In ra các dòng cờ cấu hình quan trọng nếu có (`TEST_EXP_MULT`, `BOSS_MOVES`, cảnh báo `[CẢNH BÁO]`) và đếm số dòng lỗi (`error` / `lỗi` / `exception` / `unhandled`).
 5. **Kết luận bằng mã thoát:**
    - `ĐẠT` (mã thoát `0`): Mọi mục xanh, 0 lỗi, 0 cảnh báo.

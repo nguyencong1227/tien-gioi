@@ -486,6 +486,30 @@ describe("Hàng rào bảo vệ môi trường dev và kiểm tra triển khai (
       expect(res.out).toContain("[THẤT BẠI]");
       expect(res.out).toContain("ECONNREFUSED");
     });
+
+    it("hàm thuần sum_prometheus_metric cộng tổng đúng qua nhiều phòng (#1001, #782)", () => {
+      const sample = [
+        "# HELP tiengioi_room_input_dropped_total Input di chuyen bi bo",
+        "# TYPE tiengioi_room_input_dropped_total counter",
+        'tiengioi_room_input_dropped_total{room="r1",map="lac_ha"} 3',
+        'tiengioi_room_input_dropped_total{room="r2",map="hac_phong"} 5',
+        'tiengioi_room_input_backlog_ticks_total{room="r1",map="lac_ha"} 12',
+        'tiengioi_room_input_backlog_ticks_total{room="r2",map="hac_phong"} 7',
+      ].join("\n");
+      const r = spawnSync(
+        "bash",
+        [
+          "-c",
+          'source "$PROD_SH" && echo "dropped=$(sum_prometheus_metric "$SAMPLE" tiengioi_room_input_dropped_total) backlog=$(sum_prometheus_metric "$SAMPLE" tiengioi_room_input_backlog_ticks_total)"',
+        ],
+        {
+          encoding: "utf-8",
+          env: { ...process.env, PROD_SH: prodShPath, SAMPLE: sample },
+        },
+      );
+      expect(r.status).toBe(0);
+      expect(r.stdout.trim()).toBe("dropped=8 backlog=19");
+    });
   });
 });
 
@@ -544,6 +568,12 @@ if [[ "$args" == *"%{http_code}"* ]]; then
     printf "\${STUB_METRICS_AUTH_CODE:-200}"
   else
     printf "\${STUB_METRICS_ANON_CODE:-401}"
+  fi
+elif [[ "$args" == *"/metrics"* ]]; then
+  if [[ -n "\${STUB_METRICS_BODY:-}" ]]; then
+    printf "%s\\n" "$STUB_METRICS_BODY"
+  else
+    printf 'tiengioi_room_input_dropped_total{room="r1",map="lac_ha"} 2\\ntiengioi_room_input_backlog_ticks_total{room="r1",map="lac_ha"} 5\\n'
   fi
 else
   if [[ -n "\${STUB_HEALTH_OUT:-}" ]]; then
@@ -756,6 +786,9 @@ fi
     expect(ok.code).toBe(0);
     expect(ok.out).toContain("Kết luận: ĐẠT (mã thoát 0)");
     expect(ok.out).toContain("BOSS_MOVES");
+    expect(ok.out).toContain(
+      "tiengioi_room_input_dropped_total=2, tiengioi_room_input_backlog_ticks_total=5",
+    );
     expect(ok.out).not.toContain(metricsToken);
     const calls = dockerLog();
     expect(calls.some((l) => /\b(stop|restart|down|up|kill|rm|run|exec)\b/.test(l))).toBe(false);
