@@ -306,8 +306,16 @@ async function main() {
       `!${hidden("ach-body")} && /Hạ Xích Mãng/.test(document.getElementById('ach-groups')?.textContent || '')`,
       "tab Thành tựu có 'Hạ Xích Mãng'",
     );
+    // Số thành tựu đạt KHÔNG cố định 1: với 54 thành tựu thật (M9.9, #1146) hạ trùm còn kéo theo 'Dự sự kiện trùm', 'Đặt chân Lạc Hà', cảnh giới Luyện Khí... Chỉ đòi >= 1 và
+    // 'Hạ Xích Mãng' (id trum_mang_1) phải ở trạng thái HOÀN THÀNH.
     const summary = (await text(ta, "ach-summary")).trim();
-    if (!/^Đã đạt 1 \//.test(summary)) throw new Error(`Thành tựu phải đạt 1: '${summary}'`);
+    const doneN = Number(/^Đã đạt (\d+) \//.exec(summary)?.[1] ?? 0);
+    if (doneN < 1) throw new Error(`Thành tựu phải đạt >= 1: '${summary}'`);
+    const mangState = (await ta.ev(
+      `[...document.querySelectorAll('#ach-groups .ach-item')].find((li) => /Hạ Xích Mãng/.test(li.querySelector('.ach-name')?.textContent || ''))?.querySelector('.ach-state')?.textContent || ''`,
+    )) as string;
+    if (!/^Hoàn thành/.test(mangState))
+      throw new Error(`'Hạ Xích Mãng' phải Hoàn thành, thực tế '${mangState}'`);
     await ta.shot("m9-6-thanh-tuu");
     // đeo danh hiệu 'Thợ Săn Trùm' (nút radio mở khoá): máy chủ phải xác nhận
     await ta.ev(

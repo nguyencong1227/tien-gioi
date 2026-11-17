@@ -980,3 +980,62 @@ Bot né: phản xạ 400 ms rồi chạy 150 px/giây (`boss-dodge-bot.ts`, lờ
 - **Trần sức mạnh chiêu**: Chiêu mạnh nhất đạt tối đa **1.48×** (kể cả chiêu quạt Lạc Tuyết Phân Phi 5 tia sát người khi khắc hệ, ngưỡng an toàn < **2,0×**).
 - **Sức mạnh chuỗi chiêu khi khắc hệ đúng**: Đạt **1.31×** (nằm đúng trong dải mục tiêu **1,3 – 1,65×**).
 - **Kinh tế linh lực**: Duy trì **> 21 giây** trước khi cần nghỉ, vượt xa thời lượng trận đấu thông thường (6-15 giây).
+
+
+## DPS thật của mọi chiêu học được (CT10, #1055)
+
+> Chạy trong `World` thật (`cast` + `tickWorld`: bẫy / vùng / tượng / đạn bay / chiêu vận đúng như máy chủ), 30 giây mỗi lần đo, người chơi đúng cảnh giới yêu cầu của chiêu, linh lực hồi 20/giây, bù nhìn "lang" đứng yên cách 40 px (một, hoặc ba dàn hàng ngang cách 40 px). **Tỉ lệ** = sát thương bù nhìn mất khi luân phiên chiêu so với CHỈ chém thường cùng bố trí (chiêu thủ / hồi / tăng ích ~1 hoặc thấp hơn vì mất lượt chém). Số có hạt giống, ổn định. Mã: `server/src/balance/skills-dps.ts`.
+
+### Luyện Khí (8 chiêu)
+| Chiêu | Hệ | Hình | Vai | Hồi chiêu | Linh lực / giây | Tỉ lệ (1 mục tiêu) | Tỉ lệ (3 mục tiêu) |
+|---|---|---|---|---:|---:|---:|---:|
+| **Hỏa Vân Kiếm** | hoa | cone | sát thương | 3.0s | 0.027 | 1.25× | 1.26× |
+| **Bôn Thạch Quyền** | tho | cone | sát thương | 3.5s | 0.023 | 1.23× | 1.24× |
+| **Ưng Trảo** | kim | cone | sát thương | 2.5s | 0.024 | 1.20× | 1.25× |
+| **Trọng Nhạc Trảm** | tho | cone | sát thương | 3.0s | 0.027 | 1.22× | 1.25× |
+| **Huyền Băng Chỉ** | bang | line | sát thương | 2.5s | 0.028 | 1.23× | 1.26× |
+| **Kim Chung Tráo** | kim | self | thủ | 9.0s | 0.013 | 0.96× | 1.04× |
+| **Hồi Xuân** | thuy | self | hồi | 8.0s | 0.022 | 0.96× | 1.04× |
+| **Phiêu Phong Bộ** | phong | dash | thủ | 3.0s | 0.017 | 0.96× | 1.04× |
+
+Chiêu gây sát thương: trung vị **1.23×**, cao nhất **1.25×** (1 mục tiêu).
+
+### Trúc Cơ (7 chiêu)
+| Chiêu | Hệ | Hình | Vai | Hồi chiêu | Linh lực / giây | Tỉ lệ (1 mục tiêu) | Tỉ lệ (3 mục tiêu) |
+|---|---|---|---|---:|---:|---:|---:|
+| **Thanh Tùng Phi Châm** | moc | line | sát thương | 3.0s | 0.033 | 1.26× | 1.24× |
+| **Lạc Tuyết Phân Phi** | bang | fan | khống chế | 3.5s | 0.029 | 1.24× | 1.25× |
+| **Cửu Cung Khốn Sát** | tho | ground | khống chế | 7.0s | 0.020 | 1.11× | 1.28× |
+| **Mê Tung Bộ** | phong | self | thủ | 8.0s | 0.013 | 0.95× | 1.04× |
+| **Thanh Vân Kiếm Khí** | kim | line | sát thương | 3.0s | 0.023 | 1.27× | 1.25× |
+| **Bàn Thạch Hộ Thể** | tho | self | thủ | 9.0s | 0.013 | 0.95× | 1.04× |
+| **Độc Đằng Phục** | moc | trap | sát thương | 8.0s | 0.013 | 1.19× | 1.22× |
+
+Chiêu gây sát thương: trung vị **1.24×**, cao nhất **1.27×** (1 mục tiêu).
+
+### Kim Đan (6 chiêu)
+| Chiêu | Hệ | Hình | Vai | Hồi chiêu | Linh lực / giây | Tỉ lệ (1 mục tiêu) | Tỉ lệ (3 mục tiêu) |
+|---|---|---|---|---:|---:|---:|---:|
+| **Thu Thủy Kiếm Ảnh** | kim | cone | sát thương | 5.0s | 0.020 | 1.14× | 1.21× |
+| **Liệt Địa Nhất Quyền** | tho | ground | sát thương | 5.0s | 0.020 | 1.15× | 1.13× |
+| **Phân Nhạc Trảm** | tho | cone | sát thương | 5.0s | 0.020 | 1.12× | 1.16× |
+| **Phi Kiếm Tam Liên** | kim | bolt | sát thương | 5.5s | 0.024 | 1.17× | 1.24× |
+| **Liệt Diễm Trận** | hoa | zone | sát thương | 8.0s | 0.020 | 1.13× | 1.18× |
+| **Liên Châu Lôi** | loi | chain | khống chế | 4.5s | 0.031 | 1.13× | 1.12× |
+
+Chiêu gây sát thương: trung vị **1.14×**, cao nhất **1.17×** (1 mục tiêu).
+
+### Nguyên Anh (9 chiêu)
+| Chiêu | Hệ | Hình | Vai | Hồi chiêu | Linh lực / giây | Tỉ lệ (1 mục tiêu) | Tỉ lệ (3 mục tiêu) |
+|---|---|---|---|---:|---:|---:|---:|
+| **Hàn Quang Tiễn** | bang | line | khống chế | 3.0s | 0.037 | 1.33× | 1.31× |
+| **Bạch Kim Trảo** | kim | cone | sát thương | 3.2s | 0.037 | 1.40× | 1.43× |
+| **Vân Thạch Trận** | tho | ground | khống chế | 7.0s | 0.023 | 1.16× | 1.34× |
+| **Băng Hoa Loạn** | bang | fan | khống chế | 3.8s | 0.034 | 1.25× | 1.28× |
+| **Liệt Hỏa Kiếm** | hoa | cone | sát thương | 3.5s | 0.040 | 1.37× | 1.51× |
+| **Vân Hành Bộ** | phong | self | tăng ích | 8.0s | 0.015 | 0.95× | 1.04× |
+| **Vạn Kiếm Quy Tông** | kim | fan | sát thương | 5.0s | 0.034 | 1.19× | 1.25× |
+| **Hồn Phiên Tượng** | am | totem | khống chế | 12.0s | 0.017 | 1.13× | 1.18× |
+| **Phá Sơn Nhất Kích** | tho | ground | khống chế | 9.0s | 0.022 | 1.17× | 1.51× |
+
+Chiêu gây sát thương: trung vị **1.25×**, cao nhất **1.40×** (1 mục tiêu).

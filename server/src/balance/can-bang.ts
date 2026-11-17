@@ -27,6 +27,7 @@ import { renderBotHuntSection } from "./bot-hunt";
 import { renderSectEconomy } from "./tong-mon";
 import { renderBossBalance } from "./trum";
 import { renderSkillBalanceMarkdown } from "./skills-model";
+import { renderSkillDpsMarkdown } from "./skills-dps";
 import { PK_TARGET_SECONDS, representativeLevels, summarizeDuels } from "./pk";
 import {
   ASSUME_DUNGEON,
@@ -475,7 +476,9 @@ ${renderSectEconomy()}
 
 ${renderBossBalance()}
 
-${renderSkillBalanceMarkdown(statsFor(3, 0, emptyEquipment()))}`,
+${renderSkillBalanceMarkdown(statsFor(3, 0, emptyEquipment()))}
+
+${renderSkillDpsMarkdown()}`,
   );
   console.log(`Đã ghi ${out}\n\n${summary}`);
 }
