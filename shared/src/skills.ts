@@ -426,6 +426,12 @@ export const SKILL_LIMITS = {
   displaceMax: 200,
   comboMultMax: 2,
   allyRangeMax: 600,
+  /**
+   * Trần VẬT THỂ BỀN (`zone` / `trap` / `totem` / `aura`) cùng tồn tại: theo MỖI NGƯỜI và theo CẢ PHÒNG. Máy chủ giữ (CT3 / CT4: vượt thì vật thể cũ nhất của người đó / của phòng bị đẩy, `fxEnd`
+   * `gone`); client dùng ĐÚNG số này để cấp bể hạt (vẽ tối đa chừng đó, gần người chơi nhất trước). TẠM: CT3 / CT4 chốt bằng đo; đổi thì đổi ở đây, hai bên đọc cùng một nguồn.
+   */
+  persistPerPlayerMax: 4,
+  persistPerRoomMax: 60,
 } as const;
 
 export interface SkillEffect {

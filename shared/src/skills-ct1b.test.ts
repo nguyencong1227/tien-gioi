@@ -33,6 +33,7 @@ import {
   statusEmpowerMult,
   statusMask,
   statusesOfMask,
+  type DmgMsg,
   type FxMsg,
   type SkillDef,
   type StatusEntry,
@@ -433,6 +434,22 @@ describe("FxMsg mới (kiểm lúc biên dịch bằng `satisfies`)", () => {
     expect(msgs.length).toBe(7);
     expect(CHAIN_FX_POINTS_MAX).toBe(1 + SKILL_LIMITS.chainBouncesMax + 1);
     for (const m of msgs) expect(typeof (m as { x: number }).x).toBe("number"); // mọi tin có (x, y) cho `sendNear`
+  });
+});
+
+describe("DmgMsg.combo và trần vật thể bền cho client (review B ở #1084)", () => {
+  it("DmgMsg.combo tuỳ chọn: tin cũ (không có combo) và tin ăn combo đều hợp kiểu", () => {
+    const old = { target: "m1", amount: 10, x: 1, y: 2 } satisfies DmgMsg;
+    const hit = { target: "m1", amount: 20, x: 1, y: 2, combo: true } satisfies DmgMsg;
+    expect(old).not.toHaveProperty("combo");
+    expect(hit.combo).toBe(true);
+  });
+
+  it("persistPerPlayerMax / persistPerRoomMax: số nguyên dương, trần phòng không nhỏ hơn trần một người (client cấp bể hạt theo đúng số này)", () => {
+    const { persistPerPlayerMax: a, persistPerRoomMax: b } = SKILL_LIMITS;
+    expect(Number.isInteger(a) && a >= 1).toBe(true);
+    expect(Number.isInteger(b) && b >= 1).toBe(true);
+    expect(b).toBeGreaterThanOrEqual(a);
   });
 });
 
