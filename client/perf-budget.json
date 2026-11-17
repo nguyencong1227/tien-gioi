@@ -3,7 +3,8 @@
   "version": "1.1.0",
   "description": "Ngân sách hiệu năng đồ hoạ và tài nguyên client (M5.1, Issue #330, THIET_KE_GIAO_DIEN_DO_HOA.md mục 10; M7.15 #516: bậc Rất cao + gói tải theo nhu cầu, mục 10.1-10.3)",
   "static": {
-    "bundleGzipKb": 520,
+    "startupGzipKb": 220,
+    "totalJsGzipKb": 540,
     "atlasTilesetKb": 1024,
     "aiAssets": {
       "maxFileKb": 150,
@@ -77,6 +78,12 @@
     },
     "audio": {
       "maxKb": 5120,
+      "load": "tai-dan-nen"
+    },
+    "art": {
+      "_ghiChu": "Ảnh minh hoạ AI TẢI THEO NHU CẦU (thẻ trùm art:trum, chân dung NPC art:npc; quyết định ngân sách của A ở #998: KHÔNG nâng trần static.aiAssets 300 KB của gói tải ngay). `maxKb` mỗi GÓI, `maxFileKb` mỗi ảnh. Đề xuất đo ở docs/art/PHONG_CACH_MINH_HOA.md mục 4: art:trum <= 4 x 30 KB, art:npc <= 15 x 20 KB, cộng dư.",
+      "maxKb": 512,
+      "maxFileKb": 60,
       "load": "tai-dan-nen"
     },
     "hdMaxFactor": 3,

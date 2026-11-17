@@ -2,6 +2,7 @@
 // Module này chỉ chứa định nghĩa hợp đồng kiểm thử, tái sử dụng cho cả File* và Pg*.
 import {
   SECT_COIN_CAP,
+  socialTrack,
   SECT_CONTRIB_CAP,
   SECT_DEPOSIT_DAY_CAP,
   SECT_EARN_DAY_CAP,
@@ -78,9 +79,25 @@ export function describePlayerStoreContract(
       expect(nonExistent).toBeNull();
     });
 
+    it("listProfiles (M9): kho trống -> []; chỉ các trường xếp hạng (không mật khẩu / túi đồ), tối đa limit, sắp theo tên chuẩn hoá", async () => {
+      const store = await createStore();
+      expect(store.listProfiles, "kho thật phải có listProfiles").toBeDefined();
+      expect(await store.listProfiles!()).toEqual([]);
+      await store.save(makeSavedPlayer("Bao Thanh", { realm: 2, tier: 1, exp: 50 }));
+      await store.save(makeSavedPlayer("An Nhien", { realm: 1, tier: 0, exp: 5 }));
+      await store.save(makeSavedPlayer("Chau Huong", { realm: 0, tier: 3, exp: 1 }));
+      const rows = await store.listProfiles!();
+      expect(rows.map((r) => r.name)).toEqual(["An Nhien", "Bao Thanh", "Chau Huong"]);
+      expect(rows[1]).toEqual({ name: "Bao Thanh", realm: 2, tier: 1, exp: 50, limbo: false });
+      for (const r of rows)
+        expect(Object.keys(r).sort()).toEqual(["exp", "limbo", "name", "realm", "tier"]);
+      expect((await store.listProfiles!(2)).map((r) => r.name)).toEqual(["An Nhien", "Bao Thanh"]);
+      expect(await store.listProfiles!(0)).toEqual([]);
+    });
+
     it("save rồi load trả về đúng dữ liệu đã lưu", async () => {
       const store = await createStore();
-      const player = makeSavedPlayer("Hàn Lập", {
+      const player = makeSavedPlayer("Giang Tĩnh Uyên", {
         realm: 2,
         tier: 3,
         exp: 1500,
@@ -88,10 +105,10 @@ export function describePlayerStoreContract(
       });
 
       await store.save(player);
-      const loaded = await store.load("Hàn Lập");
+      const loaded = await store.load("Giang Tĩnh Uyên");
 
       expect(loaded).not.toBeNull();
-      expect(loaded?.name).toBe("Hàn Lập");
+      expect(loaded?.name).toBe("Giang Tĩnh Uyên");
       expect(loaded?.realm).toBe(2);
       expect(loaded?.tier).toBe(3);
       expect(loaded?.exp).toBe(1500);
@@ -207,6 +224,25 @@ export function describeSoulStoreContract(
     it("get chân linh chưa có trả về null", async () => {
       const store = await createStore();
       expect(await store.get("chua_co_linh_hon")).toBeNull();
+    });
+
+    it("all (M9): kho trống -> []; liệt kê mọi chân linh theo id, tối đa limit, giữ phần xã hội đã ghi", async () => {
+      const store = await createStore();
+      expect(store.all, "kho thật phải có all").toBeDefined();
+      expect(await store.all!()).toEqual([]);
+      await store.create("b_linh", (s) => ({ ...s, duyen: 7 }));
+      await store.create("a_linh");
+      await store.update("a_linh", (s) => ({
+        ...s,
+        social: socialTrack(socialTrack(s.social, "pk_won", 2).social, "kiep", 3).social,
+      }));
+      const all = await store.all!();
+      expect(all.map((s) => s.id)).toEqual(["a_linh", "b_linh"]);
+      expect(all[1].duyen).toBe(7);
+      expect(all[0].social?.counters).toEqual({ pk_won: 2, kiep: 3 });
+      expect("social" in all[1]).toBe(false);
+      expect((await store.all!(1)).map((s) => s.id)).toEqual(["a_linh"]);
+      expect(await store.all!(0)).toEqual([]);
     });
 
     it("create tạo mới chân linh kiếp 1, duyên 0; gọi lại lần hai không ghi đè", async () => {
@@ -428,7 +464,7 @@ export function describeAccountStoreContract(
     it("update: cập nhật mật khẩu, mã khôi phục, lần đăng nhập, khoá; giữ nguyên id, username, name", async () => {
       const store = await createStore();
       const acc = (await store.create(makeNewAccount("user_cap_nhat")))!;
-      await store.setName(acc.id, "Hàn Lập");
+      await store.setName(acc.id, "Giang Tĩnh Uyên");
 
       const updated = await store.update(acc.id, {
         passHash: "pass-hash-moi",
@@ -440,7 +476,7 @@ export function describeAccountStoreContract(
       expect(updated).not.toBeNull();
       expect(updated?.id).toBe(acc.id);
       expect(updated?.username).toBe("user_cap_nhat");
-      expect(updated?.name).toBe("Hàn Lập");
+      expect(updated?.name).toBe("Giang Tĩnh Uyên");
       expect(updated?.passHash).toBe("pass-hash-moi");
       expect(updated?.recoveryHash).toBe("recovery-hash-moi");
       expect(updated?.lastLoginAt).toBe("2026-11-11T12:00:00.000Z");

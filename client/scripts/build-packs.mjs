@@ -6,8 +6,8 @@
  * Quét cây thư mục tài sản trong client/public/packs/<gói>/ để sinh ra manifest chuẩn:
  * client/public/packs/manifest.json = {
  *   packs: [{
- *     id: string,                 // "core", "map:<mapId>", "icons", "audio", "hd:<tên>"
- *     kind: "core" | "map" | "icons" | "audio" | "hd",
+ *     id: string,                 // "core", "map:<mapId>", "icons", "audio", "art:<tên>", "hd:<tên>"
+ *     kind: "core" | "map" | "icons" | "audio" | "art" | "hd",
  *     mapId?: string,             // chỉ có ở kind "map"
  *     files: [{ path: string, bytes: number, sha256: string }],
  *     bytes: number
@@ -120,10 +120,11 @@ export function computeFileSha256(filePath) {
  * - core -> { id: "core", kind: "core" }
  * - icons -> { id: "icons", kind: "icons" }
  * - audio -> { id: "audio", kind: "audio" }
+ * - art-<tên> hoặc art_<tên> -> { id: "art:" + tên, kind: "art" } (ảnh minh hoạ AI tải theo nhu cầu: art-trum, art-npc; thư mục lồng art/<tên> cũng được)
  * - map-<id> hoặc map_<id> -> { id: "map:" + id, kind: "map", mapId: id }
  * - hd-<name> hoặc hd_<name> -> { id: "hd:" + name (map- thành map:), kind: "hd" }
  * @param {string} dirName
- * @returns {{ id: string, kind: "core" | "map" | "icons" | "audio" | "hd", mapId?: string } | null}
+ * @returns {{ id: string, kind: "core" | "map" | "icons" | "audio" | "art" | "hd", mapId?: string } | null}
  */
 export function parsePackDir(dirName) {
   if (!dirName || dirName.startsWith(".")) return null;
@@ -142,6 +143,11 @@ export function parsePackDir(dirName) {
   if (mapMatch) {
     const mapId = mapMatch[1];
     return { id: `map:${mapId}`, kind: "map", mapId };
+  }
+
+  const artMatch = dirName.match(/^art[-_:](.+)$/);
+  if (artMatch) {
+    return { id: `art:${artMatch[1]}`, kind: "art" };
   }
 
   const hdMatch = dirName.match(/^hd[-_:](.+)$/);
@@ -180,6 +186,19 @@ export function buildPacksManifest(packsDir = DEFAULT_PACKS_DIR) {
         if (!sub.isDirectory() || sub.name.startsWith(".")) continue;
         const packInfo = { id: `map:${sub.name}`, kind: "map", mapId: sub.name };
         const packDir = path.join(mapSubDir, sub.name);
+        const pack = processPackDirectory(packsDir, packDir, packInfo);
+        if (pack) packs.push(pack);
+      }
+      continue;
+    }
+
+    if (entry.name === "art") {
+      const artSubDir = path.join(packsDir, "art");
+      const subEntries = fs.readdirSync(artSubDir, { withFileTypes: true });
+      for (const sub of subEntries) {
+        if (!sub.isDirectory() || sub.name.startsWith(".")) continue;
+        const packInfo = { id: `art:${sub.name}`, kind: "art" };
+        const packDir = path.join(artSubDir, sub.name);
         const pack = processPackDirectory(packsDir, packDir, packInfo);
         if (pack) packs.push(pack);
       }

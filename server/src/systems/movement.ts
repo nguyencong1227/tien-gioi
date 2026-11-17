@@ -33,13 +33,16 @@ const BUDGET_EPS = 1 - 1e-9;
 
 /**
  * Nhận input từ client; bỏ qua dữ liệu sai kiểu. Input DỪNG (`dx = dy = 0`) cắt hàng đợi còn `STOP_KEEP_INPUTS` input cũ nhất (xem trên); đầy `INPUT_QUEUE_HARD_CAP` thì bỏ
- * input cũ nhất. Mọi input bị bỏ tính vào `World.inputStats.dropped`.
+ * input cũ nhất. Mọi input DI CHUYỂN bị bỏ tính vào `World.inputStats.dropped` (input dừng thừa bị cắt thì không).
  */
 export function queueInput(w: World, sid: string, m: InputMsg | undefined) {
   const c = w.ctrl.get(sid);
   if (!c || typeof m?.seq !== "number" || !Number.isFinite(m.dx) || !Number.isFinite(m.dy)) return;
   if (Math.hypot(m.dx, m.dy) <= STOP_LEN && c.inputs.length > STOP_KEEP_INPUTS) {
-    w.inputStats.dropped += c.inputs.length - STOP_KEEP_INPUTS;
+    // Chỉ input DI CHUYỂN bị cắt mới tính vào `dropped`: input DỪNG thừa bị cắt (client lặp tin dừng cho chắc: tin thứ ba cắt tin thứ hai) là vô hại
+    // và làm `input_dropped` ở `/metrics` nhiễu (chỉ cần một bước chờ + ba tin dừng là dropped = 1; B đo ở #963).
+    for (let i = STOP_KEEP_INPUTS; i < c.inputs.length; i++)
+      if (Math.hypot(c.inputs[i]!.dx, c.inputs[i]!.dy) > STOP_LEN) w.inputStats.dropped++;
     c.inputs.length = STOP_KEEP_INPUTS;
   }
   c.inputs.push({ seq: m.seq >>> 0, dx: m.dx, dy: m.dy });
@@ -105,8 +108,8 @@ export function applyInputs(
       dx /= len;
       dy /= len;
     }
-    // Choáng: vẫn TIÊU THỤ input và tăng `lastSeq` (chỉ không di chuyển) để hàng đợi dự đoán của client rỗng được, `reconcile` không chạy lại input cũ
-    if (len > 0.05 && !c.stunned) {
+    // Choáng / đang mở hộp thoại chặn đường (mục 52): vẫn TIÊU THỤ input và tăng `lastSeq` (chỉ không di chuyển) để hàng đợi dự đoán của client rỗng được, `reconcile` không chạy lại input cũ
+    if (len > 0.05 && !c.stunned && c.ambush?.offer === undefined) {
       p.meditating = false;
       const next = map.moveWithCollision(
         p.x,

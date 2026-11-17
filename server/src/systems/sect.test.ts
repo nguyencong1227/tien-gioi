@@ -9,6 +9,7 @@ import {
   DEFAULT_MAP,
   HAC_PHONG_ID,
   SECT_CREATE_COOLDOWN_MS,
+  TITLES,
   SECT_CREATE_COST,
   SECT_INVITES_MAX,
   SECT_INVITE_TTL_MS,
@@ -414,6 +415,17 @@ describe("chat tông môn /s", () => {
     expect(got(hp, B)).toEqual([{ from: A, text: "Hom nay san boss", channel: "sect" }]);
     expect(got(lh, C)).toEqual([]);
     expect(got(hp, D)).toEqual([]);
+    // danh hiệu đang đeo của người nói đi kèm tin tông môn (M9, `ChatOut.titleId`); người không đeo thì không có trường
+    lh.w.ctrl.get(A)!.nextChat = 0;
+    lh.w.state.players.get(A)!.title = TITLES[0]!.id;
+    chat(lh.w, A, "/s co danh hieu");
+    expect(got(hp, B).at(-1)).toEqual({
+      from: A,
+      text: "co danh hieu",
+      channel: "sect",
+      titleId: TITLES[0]!.id,
+    });
+    lh.w.state.players.get(A)!.title = "";
     // chat chung vẫn đi kênh chung; "/sect" không phải lệnh /s
     lh.w.ctrl.get(A)!.nextChat = 0;
     chat(lh.w, A, "/sect xin chao");

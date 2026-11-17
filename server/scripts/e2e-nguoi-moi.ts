@@ -236,11 +236,11 @@ async function main() {
     const goToNpc = async (npcId: string) => {
       const npc = NPC_BY_ID[npcId];
       me.x = npc.x;
-      me.y = npc.y + 50;
+      me.y = npc.y + 20; // sát NPC đích (20 px): từ khi có Lão Phù cạnh Trưởng trấn (G, #1071) điểm cách 50 px cách đều hai NPC
       syncPublicPos(me);
       world.ctrl.get(sid)!.lastHitAt = 0;
       await ev(
-        `(() => { const s = window.__scene; s.predX = ${Math.round(npc.x)}; s.predY = ${Math.round(npc.y + 50)}; return 1; })()`,
+        `(() => { const s = window.__scene; s.predX = ${Math.round(npc.x)}; s.predY = ${Math.round(npc.y + 20)}; return 1; })()`,
       );
       await T.waitFor(
         `window.__scene.closestNpcId === ${JSON.stringify(npcId)} && !document.getElementById('btn-talk').hidden`,

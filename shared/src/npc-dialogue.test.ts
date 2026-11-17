@@ -33,6 +33,9 @@ const ORIG_INTROS: Record<string, string> = {
   // Lò đan (nghề nhỏ lát 1, #763): chốt chặn giữ dòng giới thiệu của NPC mới không đổi khi mở rộng lời thoại
   lao_dan:
     "Lò ta nhóm lửa luyện đan, nhất là đan hộ đạo trợ giúp đạo hữu vượt ải đột phá cảnh giới.",
+  // Bàn phù (nghề nhỏ lát 2, #817): chốt chặn giữ dòng giới thiệu của NPC mới không đổi khi mở rộng lời thoại
+  lao_phu:
+    "Bàn phù ta nhóm hương trầm cả ngày, vẽ phù trấn yêu cho kẻ qua lại. Mang nguyên liệu yêu thú tới, ta chế phù cho đạo hữu.",
 };
 
 /** Phạm vi chữ Hán (CJK) — lời thoại Tiên Giới tiếng Việt, KHÔNG được có. */

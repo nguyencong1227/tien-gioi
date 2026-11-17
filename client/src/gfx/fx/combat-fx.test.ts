@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { MONSTERS, MONSTER_BY_ID } from "@tien-gioi/shared";
+import { MONSTERS, MONSTER_BY_ID, SUMMON_ONLY_KINDS } from "@tien-gioi/shared";
 import { FxBudget } from "./budget";
 import {
   ARMORED_NUMBER_COLOR,
@@ -336,6 +336,8 @@ describe("gfx/fx: trùm và quái Kim Đan (M6 #409)", () => {
 
   it("MỌI quái cấp >= 13 (Kim Đan trở lên) và mọi trùm có màu hạt riêng: thêm loài mới mà quên màu sẽ đỏ", () => {
     for (const m of MONSTERS) {
+      // Quái con do trùm triệu hồi (#887): nhỏ, chết không hạt riêng, dùng màu mặc định
+      if (SUMMON_ONLY_KINDS.includes(m.id)) continue;
       if (m.level >= 13 || m.boss) {
         // trùm cũ của Luyện Khí / Trúc Cơ (mang) giữ màu mặc định theo thiết kế M6
         if (m.id === "mang") continue;

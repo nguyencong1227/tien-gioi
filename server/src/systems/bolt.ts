@@ -12,6 +12,7 @@ import type { Monster } from "../schema";
 import { quantAngle, type World, type MonsterCtrl } from "../world";
 import { hurtPlayer } from "./combat";
 import { applyPlayerStatus } from "./status";
+import { weakened } from "./status-rules";
 
 /** Một đạn đang bay (chỉ server). */
 export interface Bolt {
@@ -73,7 +74,13 @@ export const boltRangeOf = (def: MonsterKind) => def.boltRange ?? DEFAULT_BOLT_R
 export const boltSpeedOf = (def: MonsterKind) => def.boltSpeed ?? DEFAULT_BOLT_SPEED;
 
 /** Bắn MỘT đạn từ quái `m` về hướng `angle`. Đủ `MAX_BOLTS` rồi thì bỏ (không ném lỗi); trả `true` nếu đã bắn. */
-export function fireBolt(w: World, m: Monster, def: MonsterKind, angle: number): boolean {
+export function fireBolt(
+  w: World,
+  m: Monster,
+  def: MonsterKind,
+  angle: number,
+  mc?: MonsterCtrl,
+): boolean {
   if (w.bolts.length >= MAX_BOLTS) return false;
   const speed = boltSpeedOf(def);
   const range = boltRangeOf(def);
@@ -84,7 +91,9 @@ export function fireBolt(w: World, m: Monster, def: MonsterKind, angle: number):
     uy: Math.sin(angle),
     speed,
     left: range,
-    dmg: Math.max(1, Math.round(def.atk)),
+    dmg: mc
+      ? weakened(mc, w.now, Math.max(1, Math.round(def.atk)))
+      : Math.max(1, Math.round(def.atk)), // `weaken` (mục 51) lúc BẮN
     kind: def.id,
     effect: onHitEffectOf(def),
   });
@@ -129,7 +138,7 @@ export function rangedStep(
   }
   m.angle = quantAngle(aim);
   if (!stunned && d <= range && w.now >= mc.nextAttack) {
-    if (fireBolt(w, m, def, aim)) mc.nextAttack = w.now + def.attackCd;
+    if (fireBolt(w, m, def, aim, mc)) mc.nextAttack = w.now + def.attackCd;
   }
   if (d < range * BOLT_HOLD_MIN) {
     // Mục tiêu áp sát: lùi ra xa mục tiêu (vẫn bắn)

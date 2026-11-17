@@ -70,6 +70,20 @@ Bản chạy thật hoàn toàn tách biệt với thư mục phát triển củ
 
 Mọi thao tác hàng ngày được thực hiện thông qua script `deploy/prod.sh` (hoặc bản chép tại `~/TT/tien-gioi-prod/prod.sh`). Cập nhật script trong repo thì chạy lại `./deploy/prod.sh init` để chép bản mới (giữ nguyên bí mật cũ).
 
+| Lệnh | Tác động người chơi | Mục đích |
+|---|---|---|
+| `./deploy/prod.sh init` | Không (chỉ đọc/tạo thiếu) | Khởi tạo thư mục chạy thật, chép `docker-compose.yml` / `prod.sh` / `restore-test.sh`, sinh bí mật nếu chưa có |
+| `./deploy/prod.sh up <thẻ>` | Có (khởi động lại game) | Kéo ảnh GHCR, ghi nhận `.last-tag` / `.current-tag` và khởi chạy phiên bản mới |
+| `./deploy/prod.sh check` | **Không (chỉ đọc)** | Kiểm tra sau triển khai: `docker ps` health (db + game), `/health` (giao thức), `/metrics` (401/200), log 3 phút (`TEST_EXP_MULT`, `BOSS_MOVES`, `[CẢNH BÁO]`, lỗi) |
+| `./deploy/prod.sh status` | Không (chỉ đọc) | Xem trạng thái các container và phiên bản đang chạy |
+| `./deploy/prod.sh logs [args]` | Không (chỉ đọc) | Xem nhật ký container (vd: `logs -f game`, `logs --since 3m game`) |
+| `./deploy/prod.sh backup` | Không | Sao lưu PostgreSQL ra `backups/tiengioi-YYYYmmdd-HHMMSS.sql.gz` (giữ 14 bản mới nhất) |
+| `./deploy/prod.sh restore <tệp>` | Có (dừng game lúc nạp) | Khôi phục cơ sở dữ liệu từ tệp sao lưu |
+| `./deploy/prod.sh rollback` | Có (khởi động lại game) | Quay lại phiên bản ổn định trước đó trong `.last-tag` |
+| `./deploy/prod.sh smoke` | **Có (dừng/bật lại game)** | Kiểm tra khói kèm bài thử tắt êm `docker stop < 25s` (chỉ chạy khi vắng người chơi) |
+| `./deploy/prod.sh stop` | Có (dừng hẳn dịch vụ) | Dừng toàn bộ dịch vụ (`docker compose down`) |
+| `./deploy/prod.sh xoa-tai-khoan` | Không (dry-run) / Có (`--yes`) | Kiểm tra hoặc xoá vĩnh viễn dữ liệu tài khoản theo yêu cầu người chơi |
+
 ### 3.1. Khởi tạo ban đầu (chỉ chạy 1 lần)
 ```bash
 ./deploy/prod.sh init
@@ -105,14 +119,31 @@ Mọi lệnh `docker compose` của script đều truyền `--env-file .env.prod
 ./deploy/prod.sh logs -f db
 ```
 
-### 3.4. Kiểm tra sức khoẻ sau cập nhật (Smoke Test)
-Sau mỗi lần cập nhật, luôn chạy lệnh kiểm tra nhanh:
+### 3.4. Kiểm tra sức khoẻ sau cập nhật (`check` và `smoke`)
+
+#### A. Kiểm tra sau triển khai KHÔNG làm gián đoạn người chơi (`check` — khuyên dùng sau mọi lần `up`)
+Ngay sau mỗi lần `./deploy/prod.sh up <thẻ>`, chạy lệnh kiểm tra **chỉ đọc** (không dừng hay khởi động lại container):
+```bash
+./deploy/prod.sh check
+```
+Lệnh thực hiện 5 bước kiểm tra an toàn:
+1. **`docker ps` health (`db` + `game`):** Xác nhận cả hai container `tien-gioi-db` và `tien-gioi` đang `Up` và `healthy`.
+2. **Endpoint `/health`:** Kiểm tra HTTP 200 kèm `"ok":true`, `"authMode":"account"`, và đối chiếu `protocol` / `minProtocol` với `shared/src/protocol.ts` (hoặc `MIN_PROTOCOL_VERSION` trong `.env.production`).
+3. **Endpoint `/metrics`:** Xác nhận truy cập ẩn danh bị từ chối (HTTP 401) và truy cập kèm `METRICS_TOKEN` thành công (HTTP 200, tuyệt đối không in lộ token); đồng thời đọc và in tổng hai chỉ số hàng đợi di chuyển qua mọi phòng (`tiengioi_room_input_dropped_total` và `tiengioi_room_input_backlog_ticks_total`) kèm mốc thời gian UTC để theo dõi #782 (nếu cả hai giữ gần 0 sau vài ngày vận hành thực tế thì không cần bật giữ bước phía client; nếu tăng đều thì xem xét bật `move-pacing`).
+4. **Phân tích nhật ký 3 phút gần nhất (`--since 3m`):** In ra các dòng cờ cấu hình quan trọng nếu có (`TEST_EXP_MULT`, `BOSS_MOVES`, cảnh báo `[CẢNH BÁO]`) và đếm số dòng lỗi (`error` / `lỗi` / `exception` / `unhandled`).
+5. **Kết luận bằng mã thoát:**
+   - `ĐẠT` (mã thoát `0`): Mọi mục xanh, 0 lỗi, 0 cảnh báo.
+   - `CÓ CẢNH BÁO` (mã thoát `2`): Không có lỗi thất bại nhưng có cảnh báo (vd: dòng `[CẢNH BÁO]` trong log hoặc healthcheck đang `starting`).
+   - `THẤT BẠI` (mã thoát `1`): Container ngừng chạy / `unhealthy`, `/health` hoặc `/metrics` lỗi, lệch `protocol`, hoặc có dòng lỗi trong nhật ký.
+
+#### B. Kiểm tra khói kèm bài thử tắt êm (`smoke` — chỉ chạy khi vắng người chơi)
+Khi cần kiểm chứng thêm cơ chế tắt êm (`SIGTERM` < 25s):
 ```bash
 ./deploy/prod.sh smoke
 ```
-> [!NOTE]
-> Bước 3 của `smoke` **dừng rồi bật lại container game** (người chơi đang nối bị rớt vài giây rồi tự nối lại). Game luôn được bật lại trước khi `smoke` kết luận, kể cả khi bước tắt êm đỏ. Chạy lúc ít người chơi.
-Lệnh kiểm tra toàn diện 4 bước:
+> [!WARNING]
+> Bước 3 của `smoke` **dừng rồi bật lại container game** (`docker stop -t 30 tien-gioi`), làm người chơi đang kết nối bị rớt vài giây rồi tự nối lại. Không chạy `smoke` ngay sau khi vừa `up` nếu đang có người chơi; hãy dùng `./deploy/prod.sh check`.
+Lệnh `smoke` kiểm tra 4 bước:
 1. Endpoint `http://127.0.0.1:2567/health` trả về HTTP 200 kèm `{"ok":true,"authMode":"account"}`.
 2. Endpoint `/metrics` từ chối truy cập ẩn danh (HTTP 401) và chấp nhận truy cập kèm `Authorization: Bearer <METRICS_TOKEN>` (HTTP 200).
 3. **Tắt êm ái (Graceful Shutdown):** `docker stop -t 30 tien-gioi` phải kết thúc < 25 giây với mã thoát 0 (chứng minh tiến trình server nhận được `SIGTERM`, lưu trữ trạng thái người chơi an toàn vào cơ sở dữ liệu thay vì bị ép dừng).
@@ -482,4 +513,6 @@ Tu vi đã tích luỹ KHÔNG bị trừ lại khi tắt (đã là tu vi thật 
 
 - **Bật / tắt:** biến môi trường `BOSS_MOVES` (`on`, `1`, `true`, `yes`; không phân biệt hoa thường). Mặc định **TẮT**: khi tắt, trùm chạy đúng như cũ (đánh thường, Thiên Hàn Vương còn đập đất và lao). Giá trị lạ (gõ nhầm) coi là TẮT, không bao giờ bật ngầm. Đọc MỘT lần lúc dựng phòng; đổi phải khởi động lại máy chủ.
 - **Khi bật:** trùm có bộ chiêu trong `BOSSES` (`shared/src/bosses.ts`) dùng bộ thực thi `server/src/systems/boss.ts`: mọi đòn có báo trước >= 800 ms (`fx` `warn`), chuyển giai đoạn theo khí huyết, triệu hồi quái con (không rơi đồ / tu vi), cuồng nộ ở bí cảnh, reset khi hết mục tiêu. Bộ chiêu thay hẳn đập đất / lao của loài đó.
-- **Hiện tại chỉ có bộ chiêu MẪU của Xích Mãng** (số liệu khung, KHÔNG phải cân bằng; dữ liệu thật của E ở T3 #872, cân bằng của D ở T5), nên bản chạy thật chưa nên bật. Chỉ bật trên máy dev / thử nghiệm.
+- **Dữ liệu (từ #872 / v0.4.0):** bộ chiêu THẬT của bốn trùm (Xích Mãng, Hắc Giao, Thiên Hàn Vương, Linh Hư Yêu Vương), qua ba cổng công bằng (`bossViolations`, bot né hoàn hảo `boss-data-dodge.test.ts`, `bossBalanceViolations`); số đo ở `docs/CAN_BANG.md` mục "Trùm nhiều chiêu". **Bản chạy thật v0.4.0 bật `BOSS_MOVES=on`** (quyết định lúc phát hành, ghi ở `questions.md`); tắt = xoá dòng `BOSS_MOVES` khỏi `.env` rồi `./prod.sh up` lại (trùm về đánh thường như cũ).
+- **Kiểm đã bật thật sau khi triển khai:** `./prod.sh logs --since 2m game 2>&1 | grep BOSS_MOVES` phải ra dòng `Trùm nhiều chiêu: BẬT (BOSS_MOVES): ...`; nếu ra `[CẢNH BÁO] BOSS_MOVES='...' không hợp lệ` thì giá trị trong `.env.production` bị gõ sai (chỉ `on` / `1` / `true` / `yes` mới bật) và trùm đang chạy như cũ; không ra dòng nào thì cờ chưa tới container (kiểm `.env.production`, rồi `./prod.sh up` lại).
+- **Bí cảnh Linh Hư khi bật:** Linh Hư Yêu Vương có bộ chiêu (vòng nổ, truy kích người xa nhất, dịch chuyển chớp, phân thân): đội 4 người đứng yên vẫn hạ được (~4,6 phút), đội 3 người cần né. Theo dõi `/metrics` và log kiểm toán (`dungeon`) sau khi bật; thấy tỉ lệ thua bí cảnh tăng bất thường thì tắt cờ (mục trên).

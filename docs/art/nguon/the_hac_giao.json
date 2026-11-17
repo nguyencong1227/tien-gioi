@@ -1,0 +1,64 @@
+{
+  "asset": "client/public/packs/art-trum/the_hac_giao.webp",
+  "finalSha256": "03c24079de760d7b5c0fba24c0d338f30fda00f36bc92c8ba12fed97e00c8a0c",
+  "rawSha256": "33d9b7110f024e203218fa18e24cfaf051af83a772910f4dc8b4d2344e3b672c",
+  "rawFile": "/mnt/data/comfyui/output/chosen/the_hac_giao_raw_1_00001_.png (ngoài repo; ảnh thô được chọn nằm ở thư mục chosen/ của /mnt/data, repo chỉ giữ băm)",
+  "model": {
+    "name": "sd_xl_base_1.0.safetensors",
+    "sha256": "31e35c80fc4829d14f90153f4c74cd59c90b779f6afe05a74cd6120b893f7e5b"
+  },
+  "lora": [],
+  "comfyui": {
+    "comfyui": "0.43.2",
+    "python": "3.12.16",
+    "pytorch": "2.14.1+cu130",
+    "driver": "615.71.09",
+    "gpu": "NVIDIA GeForce RTX 5060 8 GB"
+  },
+  "workflow": {
+    "path": "scripts/art/gen-raw-batch.mjs",
+    "sha256": "ddb4093b293c136f51886cf4d454139f92649b22fe708c4f7b60bca70e3e856a",
+    "note": "Lô 2 do Dev C sinh ngày 17/11 18:02 bằng `node scripts/art/gen-raw-batch.mjs boss` từ main, đúng tệp đã merge ở #1009 (băm trên khớp tệp trong repo, không dựng lại); prompt dương và hạt giống lấy từ BOSS_CARD_BATCH, prompt âm NEGATIVE_PROMPT (client/scripts/art/prompt-rules.mjs). rawSha256 khớp bảng của C ở #513.",
+    "params": {
+      "sampler": "euler",
+      "scheduler": "normal",
+      "steps": 25,
+      "cfg": 7,
+      "denoise": 1,
+      "width": 1024,
+      "height": 1024
+    }
+  },
+  "prompt": "enormous black river dragon-serpent rising from dark swamp water, wet obsidian scales with a pale green sheen, dead trees around it, moss green and grey-green mist, faint wisps of pale lantern light, heavy fog, painterly soft ink wash and gouache creature illustration, single creature centered, full body visible, muted colors, misty depth, eastern mountain cultivation fantasy, no people, no text",
+  "negativePrompt": "text, letters, words, calligraphy, watermark, signature, logo, cjk, chinese characters, frame, border, blurry, lowres, distorted, modern, futuristic, photorealistic, human face, western fantasy, anime, 3d render",
+  "seed": 2026111811,
+  "postProcess": [
+    {
+      "script": "client/scripts/art/hau-ky-webp.py",
+      "params": {
+        "crop": [200, 40, 800, 800],
+        "size": [384, 384],
+        "quality": 86,
+        "method": 6
+      },
+      "result": {
+        "width": 384,
+        "height": 384,
+        "bytes": 20092,
+        "chunks": ["VP8 "],
+        "pillow": "10.2.0",
+        "libwebp": "1.3.2"
+      },
+      "note": "Cắt 200,40,800,800 (vuông, bỏ mép giấy / viền, giữ cả con vật) rồi đổi cỡ 384x384 (Lanczos) và mã hoá WebP sạch (không EXIF / XMP / ICC). Tất định: cùng ảnh thô + tham số + Pillow / libwebp cho cùng finalSha256."
+    }
+  ],
+  "reviewed": {
+    "by": "Dev B (Claude Code, chạy đêm)",
+    "date": "2026-11-17",
+    "noText": true,
+    "noOtherGameLikeness": true,
+    "note": "Xem cả 16 ảnh thô của lô 2 (bốn hạt giống mỗi trùm) trên bảng thu nhỏ, hai ứng viên cuối ở 640 px, ảnh cuối ở cỡ thật và thu nhỏ 64 px (cỡ ảnh đại diện thật): không chữ, không ký tự giả, không chữ ký, không logo, không người (không mặt người). ảnh 1 chọn vì con giao long to, nằm giữa khung, hình bóng rõ ngay cả khi thu nhỏ 64 px; loại số 2 (con vật lệch phải, nửa chìm trong cây), số 3 (viền khung tối bao quanh, con vật bé) và số 4 (con vật cuộn nhỏ, mất chi tiết)."
+  },
+  "date": "2026-11-17",
+  "use": "Thẻ trùm `hac_giao` ở đầu thanh máu trùm (client/src/boss-card.ts, BOSS_CARDS; gói tải theo nhu cầu `art:trum`)"
+}

@@ -5,6 +5,7 @@ import path from "node:path";
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import { installSectQuestFixture } from "../src/systems/sect-fixtures";
 import {
+  AMBUSH_DAY_CAP,
   COIN_CAP,
   DEFAULT_MAP,
   DUNGEON_DAILY_REWARDS,
@@ -29,6 +30,7 @@ import {
   SECT_CONTRIB_CAP,
   SECT_EARN_DAY_CAP,
   SECT_DEPOSIT_DAY_CAP,
+  SECT_LEVELS,
   SECT_SHOP,
   SKILLS_M7,
   sanitizeSkillBook,
@@ -811,7 +813,7 @@ describe("audit-saves (Issue #112)", () => {
       createdAt: "2026-11-10T00:00:00.000Z",
       lastLoginAt: "2026-11-10T00:00:00.000Z",
       disabled: false,
-      name: "Hàn Lập",
+      name: "Giang Tĩnh Uyên",
     };
 
     const validSession = {
@@ -1132,6 +1134,66 @@ describe("audit-saves (Issue #112)", () => {
       expect(auditPlayerSaveData(rawOverCap, rawOverCap.length).map((e) => e.code)).toContain(
         "invalid_dungeon_daily_rewards",
       );
+    });
+  });
+
+  describe("Gặp chặn đường: ambushDaily & ambushUntil (mục 52, CD2)", () => {
+    const codesOf = (extra: Record<string, unknown>) => {
+      const raw = JSON.stringify({ ...validPlayer, ...extra });
+      return auditPlayerSaveData(raw, raw.length).map((e) => e.code);
+    };
+
+    it("hợp lệ (n từ 0 đến AMBUSH_DAY_CAP, day chuẩn, ambushUntil hữu hạn) -> 0 lỗi", () => {
+      for (let n = 0; n <= AMBUSH_DAY_CAP; n++)
+        expect(codesOf({ ambushDaily: { day: "2026-11-10", n } }), `n=${n}`).toEqual([]);
+      expect(codesOf({ ambushUntil: 1_800_000_000_000 })).toEqual([]);
+      expect(codesOf({ ambushUntil: 0 })).toEqual([]);
+    });
+
+    it("ambushDaily sai kiểu gốc (null, mảng, chuỗi, số) -> invalid_ambush_daily và không lộ chuỗi", () => {
+      const secretStr = "secret_token_khong_duoc_lo";
+      for (const bad of [null, [], [1, 2], secretStr, 123, true]) {
+        const raw = JSON.stringify({ ...validPlayer, ambushDaily: bad });
+        const errs = auditPlayerSaveData(raw, raw.length);
+        expect(
+          errs.map((e) => e.code),
+          JSON.stringify(bad),
+        ).toContain("invalid_ambush_daily");
+        expect(JSON.stringify(errs)).not.toContain(secretStr);
+      }
+    });
+
+    it("ambushDaily.day sai dạng / ngày không có -> invalid_ambush_daily_day, không lộ nội dung", () => {
+      const sensitive = "mat_khau_ngan_123";
+      for (const day of ["", "10-11-2026", "2026-02-30", "2026-13-01", sensitive, 20261110, null]) {
+        const raw = JSON.stringify({ ...validPlayer, ambushDaily: { day, n: 1 } });
+        const errs = auditPlayerSaveData(raw, raw.length);
+        expect(
+          errs.map((e) => e.code),
+          JSON.stringify(day),
+        ).toContain("invalid_ambush_daily_day");
+        expect(JSON.stringify(errs)).not.toContain(sensitive);
+      }
+    });
+
+    it("ambushDaily.n âm, lẻ, vượt AMBUSH_DAY_CAP hoặc sai kiểu -> invalid_ambush_daily_n", () => {
+      for (const n of [-1, 1.5, AMBUSH_DAY_CAP + 1, "3", null, Number.NaN])
+        expect(codesOf({ ambushDaily: { day: "2026-11-10", n } }), JSON.stringify(n)).toContain(
+          "invalid_ambush_daily_n",
+        );
+    });
+
+    it("ambushReturnAt hữu hạn thì hợp lệ; sai kiểu / không hữu hạn -> invalid_ambush_return_at", () => {
+      expect(codesOf({ ambushReturnAt: 1_800_000_000_000 })).toEqual([]);
+      for (const v of ["123", null, true, [], {}])
+        expect(codesOf({ ambushReturnAt: v }), JSON.stringify(v)).toContain(
+          "invalid_ambush_return_at",
+        );
+    });
+
+    it("ambushUntil không phải số hữu hạn -> invalid_ambush_until", () => {
+      for (const v of ["123", null, true, [], {}])
+        expect(codesOf({ ambushUntil: v }), JSON.stringify(v)).toContain("invalid_ambush_until");
     });
   });
 
@@ -1749,6 +1811,40 @@ describe("audit-saves (Issue #112)", () => {
       expect(auditSectSaveData(rawBadBuysQty, rawBadBuysQty.length).map((e) => e.code)).toContain(
         "invalid_sect_member_today_buy_qty",
       );
+    });
+
+    it("M8.10: today.buys món mở ở cấp tông cao hơn cấp HIỆN TẠI -> sect_member_today_buy_level_too_high (quét MỌI món SECT_SHOP thật, đúng cấp hợp lệ, liền dưới cấp thì lỗi)", () => {
+      const levelPoints = (lv: number) => SECT_LEVELS.find((l) => l.level === lv)!.points;
+      const rawAt = (itemId: string, qty: number, points: number) =>
+        JSON.stringify({
+          ...validSect,
+          points,
+          members: [
+            {
+              ...validSect.members[0],
+              today: { day: "2026-11-17", earned: 0, buys: { [itemId]: qty } },
+            },
+          ],
+        });
+      const codesOf = (raw: string) => auditSectSaveData(raw, raw.length).map((e) => e.code);
+      let lowered = 0;
+      for (const e of SECT_SHOP) {
+        // đúng cấp mở món: hợp lệ (không lỗi nào)
+        expect(codesOf(rawAt(e.itemId, 1, levelPoints(e.minLevel))), e.itemId).toEqual([]);
+        // một điểm dưới ngưỡng cấp mở món: cấp tông còn thấp hơn minLevel -> lỗi (cấp 1 không có cấp dưới)
+        if (e.minLevel > 1) {
+          lowered++;
+          expect(codesOf(rawAt(e.itemId, 1, levelPoints(e.minLevel) - 1)), e.itemId).toContain(
+            "sect_member_today_buy_level_too_high",
+          );
+          // qty = 0 (khoá có mặt nhưng chưa mua) không phải bằng chứng mua: không lỗi cấp
+          expect(codesOf(rawAt(e.itemId, 0, levelPoints(e.minLevel) - 1)), e.itemId).not.toContain(
+            "sect_member_today_buy_level_too_high",
+          );
+        }
+      }
+      // bảng thật phải có món mở sau cấp 1, không thì vòng lặp trên chẳng kiểm gì
+      expect(lowered).toBeGreaterThan(10);
     });
 
     it("M8: today.earned vượt quá tổng cống hiến các nguồn đã ghi nhận -> sect_member_today_earned_exceeds_sources (kèm các ca ranh giới nguồn)", () => {

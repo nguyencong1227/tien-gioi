@@ -1,0 +1,64 @@
+{
+  "asset": "client/public/assets/ai/login_bg.webp",
+  "finalSha256": "660925fb6ec43c3af89af2361b97787bf0e6084d02e4c84eaf7930c86f177599",
+  "rawSha256": "dfa1c42d0f9ec836425c86199391cc8f2fc236131442176f406ed974cd541407",
+  "rawFile": "/mnt/data/comfyui/output/login_bg_raw_04_00001_.png (ngoài repo; ảnh thô được chọn nên chuyển sang thư mục chosen/ ở /mnt/data, repo chỉ giữ băm)",
+  "model": {
+    "name": "sd_xl_base_1.0.safetensors",
+    "sha256": "31e35c80fc4829d14f90153f4c74cd59c90b779f6afe05a74cd6120b893f7e5b"
+  },
+  "lora": [],
+  "comfyui": {
+    "comfyui": "0.43.2",
+    "python": "3.12.16",
+    "pytorch": "2.14.1+cu130",
+    "driver": "615.71.09",
+    "gpu": "NVIDIA GeForce RTX 5060 8 GB"
+  },
+  "workflow": {
+    "path": "scripts/art/gen-raw-pilot.mjs",
+    "sha256": "9236af12ee5c67e6e34ffdf055ef2449781744b901ab4c1178b71f79d757a2c9",
+    "note": "Workflow dựng trong hàm buildWorkflow của script này (băm của tệp ở thời điểm ghi nguồn): KSampler euler / normal, 25 bước, cfg 7, denoise 1, ảnh trống 1024x1024, VAE trong checkpoint.",
+    "params": {
+      "sampler": "euler",
+      "scheduler": "normal",
+      "steps": 25,
+      "cfg": 7,
+      "denoise": 1,
+      "width": 1024,
+      "height": 1024
+    }
+  },
+  "prompt": "sacred peak at dawn overlooking vast sea of clouds, traditional ancient wooden cultivation pagoda on edge of cliff, flying spirit cranes in distance, gentle sunlight illuminating morning mist, calm meditative ambience, oriental landscape painting, no people, no text",
+  "negativePrompt": "text, letters, words, watermark, signature, logo, cjk, chinese characters, blurry, lowres, distorted, modern, futuristic, photorealistic human face, western fantasy",
+  "seed": 2026111504,
+  "postProcess": [
+    {
+      "script": "client/scripts/art/hau-ky-webp.py",
+      "params": {
+        "crop": null,
+        "size": null,
+        "quality": 86,
+        "method": 6
+      },
+      "result": {
+        "width": 1024,
+        "height": 1024,
+        "bytes": 73974,
+        "chunks": ["VP8 "],
+        "pillow": "10.2.0",
+        "libwebp": "1.3.2"
+      },
+      "note": "Chỉ mã hoá lại thành WebP sạch (không cắt, không đổi cỡ, không EXIF / XMP / ICC). Tất định: cùng ảnh thô + tham số + Pillow / libwebp cho cùng finalSha256."
+    }
+  ],
+  "reviewed": {
+    "by": "Dev B (Claude Code, chạy đêm)",
+    "date": "2026-11-17",
+    "noText": true,
+    "noOtherGameLikeness": true,
+    "note": "Xem cả ảnh và bốn góc phóng 200 % (Lanczos): không chữ, không ký tự giả, không người, không logo / chữ ký. Phong cảnh tháp gỗ + biển mây, không lấy nhân vật / phong cách của game nào. Chọn ảnh số 4 trong 4 ảnh nháp vì ít chi tiết, màu dịu, nén nhỏ nhất và hợp trấn Lạc Hà."
+  },
+  "date": "2026-11-15",
+  "use": "Nền màn đăng nhập (client/src/style.css, body:has(#login:not([hidden])))"
+}

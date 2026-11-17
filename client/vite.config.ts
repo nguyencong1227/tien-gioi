@@ -45,6 +45,12 @@ export default defineConfig(({ mode }) => {
       mode === "production"
         ? { alias: [{ find: /^phaser$/, replacement: "phaser/dist/phaser-arcade-physics.min.js" }] }
         : {},
-    build: { chunkSizeWarningLimit: 2000 },
+    // Nén bằng terser thay cho esbuild (mặc định của Vite): cùng mã mà gói nhỏ hơn ~3,5 % (tổng JS gzip ~538 -> ~520 KiB; Phaser 296 -> 285 KB vì terser nén lại bản `.min.js` tốt hơn esbuild).
+    // Build chậm hơn ~7 giây (2,4 -> 9,4 giây); chỉ lúc `vite build`, dev không đổi. Xem docs/THIET_KE_GIAO_DIEN_DO_HOA.md mục 10.7.
+    build: {
+      chunkSizeWarningLimit: 2000,
+      minify: "terser",
+      terserOptions: { format: { comments: false } },
+    },
   };
 });

@@ -3,7 +3,9 @@
 // Client KHÔNG đoán trước kết quả gắn ô: gửi `skillSlot {slot, skillId}` rồi chờ `skills` của máy chủ (từ chối thì máy chủ gửi lại sổ đúng và toast).
 import {
   SKILL_MAX_LEVEL,
+  skillMaxLevelOf,
   TILE,
+  WINDUP_SLOW,
   elementOf,
   skillCooldownMs,
   skillDamageMult,
@@ -19,6 +21,8 @@ import {
 } from "@tien-gioi/shared";
 import { BAR_SLOTS, needText, unlockText, type SkillTracker, type SlotMe } from "./skill-bar";
 import { pipsText } from "./skill-bar-dom";
+import { masteryView, type MasteryView } from "./skill-mastery";
+import { gradeName, skillGradeOf, skillStyleOf, styleName } from "./skill-meta";
 
 /** Số thập phân kiểu Việt ("1,84"), tối đa `digits` chữ số, bỏ số 0 thừa ("2" chứ không "2,00"). */
 export function fmtNum(n: number, digits = 2): string {
@@ -38,6 +42,13 @@ export const SHAPE_LABEL: Readonly<Record<SkillShape, string>> = {
   ground: "Vùng đặt xuống đất",
   dash: "Lao tới, né đòn",
   self: "Hộ thể quanh mình",
+  // hình mới (mục 51, CT1b)
+  chain: "Sét lan sang mục tiêu gần",
+  bolt: "Đạn bay",
+  zone: "Vùng duy trì",
+  trap: "Bẫy",
+  aura: "Hào quang quanh thân",
+  totem: "Tượng triệu hồi",
 };
 
 const seconds = (ms: number): string => fmtNum(ms / 1000, 1);
@@ -80,6 +91,15 @@ export function effectText(e: SkillEffect): string {
     case "stun":
       body = "";
       break;
+    case "empower":
+      body = ` (tăng ${pct(e.ratio)}% sát thương mọi chiêu)`;
+      break;
+    case "weaken":
+      body = ` (gây ít hơn ${pct(e.ratio)}% sát thương, trùm chỉ chịu một nửa)`;
+      break;
+    case "mark":
+      body = " (chiêu cùng hệ đánh vào sẽ ăn combo)";
+      break;
   }
   const who = st.harmful ? "" : ", cho bản thân";
   const chance = e.chance < 1 ? `${pct(e.chance)}% khả năng: ` : "";
@@ -105,9 +125,21 @@ export interface SkillRow {
   id: string;
   name: string;
   level: number;
-  /** Chấm tầng "●●○" */
+  /** Tầng tối đa của chiêu này (`skillMaxLevelOf`: Hoàng 3 / Huyền 4 / Địa 5 / Thiên 6) */
+  maxLevel: number;
+  /** Chấm tầng "●●○" (số chấm = `maxLevel`) */
   pips: string;
+  /** Thanh / dòng luyện chiêu (`skill-mastery.ts`); `null` khi máy chủ chưa gửi điểm luyện */
+  mastery: MasteryView | null;
   element: string;
+  /** id hệ ("hoa"...), để lọc theo hệ; `element` là tên hiển thị */
+  elementId: string;
+  /** Phẩm 0 Hoàng .. 3 Thiên (`skill-meta.ts`) và tên hiển thị */
+  grade: number;
+  gradeName: string;
+  /** Phong cách (`SKILL_STYLES`) chọn hình biểu tượng, và tên hiển thị */
+  style: string;
+  styleName: string;
   shape: string;
   /** Dòng số THẬT: sát thương, linh lực, hồi chiêu, tầm */
   stats: string[];
@@ -140,11 +172,7 @@ export function statLines(def: SkillDef, level: number, maxMp: number): string[]
   const out: string[] = [];
   if (def.mult > 0) {
     const m = fmtNum(def.mult * skillDamageMult(level));
-    out.push(
-      def.shape === "fan" && def.count
-        ? `Sát thương: ${m} lần công mỗi tia`
-        : `Sát thương: ${m} lần công`,
-    );
+    out.push(`Sát thương: ${m} lần công${damageUnit(def)}`);
   } else {
     out.push("Không gây sát thương");
   }
@@ -170,8 +198,94 @@ export function statLines(def: SkillDef, level: number, maxMp: number): string[]
       break;
     case "self":
       break;
+    // hình mới (mục 51, CT1b): số liệu riêng của từng hình (nảy, đạn, vùng / bẫy / hào quang / tượng)
+    case "chain":
+      out.push(`Tầm: ${tiles(def.range)} ô`);
+      out.push(
+        def.bounces && def.bounces > 0
+          ? `Sét lan: nảy ${def.bounces} lần, tầm nhảy ${tiles(def.chainReach ?? 0)} ô, mỗi lần còn ${pct(def.falloff ?? CHAIN_FALLOFF_DEFAULT)}% sát thương`
+          : "Sét lan: không nảy",
+      );
+      break;
+    case "bolt": {
+      const parts = [`Tầm: ${tiles(def.range)} ô`];
+      if (def.speed) parts.push(`bay ${fmtNum(def.speed / TILE, 1)} ô/giây`);
+      if (def.count && def.count > 1) parts.push(`${def.count} viên`);
+      if (def.pierce) parts.push(`xuyên ${def.pierce} quái`);
+      if (def.bounce) parts.push(`nảy ${def.bounce} lần`);
+      out.push(parts.join(", "));
+      break;
+    }
+    case "zone":
+      out.push(
+        `Vùng: bán kính ${tiles(def.range)} ô, đặt cách ${tiles(def.reach ?? 0)} ô${lasting(def)}`,
+      );
+      break;
+    case "trap":
+      out.push(
+        `Bẫy: bán kính ${tiles(def.range)} ô, đặt cách ${tiles(def.reach ?? 0)} ô, kích hoạt sau ${seconds(def.armMs ?? 0)} giây, tồn tại ${seconds(def.durationMs ?? 0)} giây, nổ một lần`,
+      );
+      break;
+    case "aura":
+      out.push(`Hào quang: bán kính ${tiles(def.range)} ô, bám theo người${lasting(def)}`);
+      break;
+    case "totem":
+      out.push(
+        `Tượng: tầm ${tiles(def.range)} ô, đặt cách ${tiles(def.reach ?? 0)} ô${lasting(def)}${def.taunt ? ", thu hút quái" : ""}`,
+      );
+      break;
   }
+  // trường chung của mục 51 (mọi hình có thể mang): chiêu vận, kéo / đẩy, combo, đồng đội
+  if (def.windupMs) {
+    out.push(
+      `Vận khí: ${seconds(def.windupMs)} giây rồi mới đáp (lúc vận đi chậm ${pct(WINDUP_SLOW)}%, bị choáng thì huỷ)`,
+    );
+  }
+  if (def.displace) {
+    out.push(
+      `${def.displace.dir === "pull" ? "Kéo" : "Đẩy"} mục tiêu ${tiles(def.displace.px)} ô (trùm miễn, tinh anh nửa quãng)`,
+    );
+  }
+  if (def.combo) {
+    const needs = statusOf(def.combo.needs)?.name ?? "";
+    if (needs !== "") {
+      const fx = def.combo.apply ? `, gắn ${effectText(def.combo.apply)}` : "";
+      out.push(
+        `Combo: đánh vào mục tiêu đang mang ${needs} thì sát thương x${fmtNum(def.combo.mult ?? COMBO_MULT_DEFAULT)}${def.combo.consume ? `, gỡ ${needs}` : ""}${fx}`,
+      );
+    }
+  }
+  if (def.ally) out.push(`Hiệu ứng có lợi cũng lên đồng đội trong ${tiles(def.ally.range)} ô`);
   return out;
+}
+
+/** Hệ số mặc định khi dữ liệu không ghi (đúng chú thích của `SkillDef`): sét lan còn 85% mỗi lần nảy, combo nhân 1,4. */
+const CHAIN_FALLOFF_DEFAULT = 0.85;
+const COMBO_MULT_DEFAULT = 1.4;
+
+/** Hậu tố của dòng "Sát thương": con số `mult` áp cho MỖI đơn vị nào (tia, viên, nhịp, đòn đầu). */
+function damageUnit(def: SkillDef): string {
+  switch (def.shape) {
+    case "fan":
+      return def.count ? " mỗi tia" : "";
+    case "bolt":
+      return def.count && def.count > 1 ? " mỗi viên" : "";
+    case "zone":
+    case "aura":
+    case "totem":
+      return " mỗi nhịp";
+    case "chain":
+      return def.bounces && def.bounces > 0 ? " ở đòn đầu" : "";
+    default:
+      return "";
+  }
+}
+
+/** ", tồn tại X giây, mỗi Y giây" của vật thể bền (thiếu số thì bỏ phần đó, không in "0 giây"). */
+function lasting(def: SkillDef): string {
+  const dur = def.durationMs ? `, tồn tại ${seconds(def.durationMs)} giây` : "";
+  const tick = def.tickMs ? `, mỗi ${seconds(def.tickMs)} giây` : "";
+  return dur + tick;
 }
 
 /** Dựng mô hình bảng từ sổ chiêu của mình. `me` = cảnh giới, bậc, linh lực tối đa hiện tại (đổi thì dựng lại). */
@@ -197,13 +311,23 @@ export function buildSkillsPanel(skills: SkillTracker, me: SlotMe): SkillsPanelM
     });
     const element = elementOf(def.element)?.name ?? "";
     const need = skillReqMet(def, me.realm, me.tier) ? null : needText(def);
+    const grade = skillGradeOf(def);
+    const maxLevel = skillMaxLevelOf(def);
+    const style = skillStyleOf(def);
     const slotLabel = slotNow === null ? "Chưa gắn" : `Ô ${slotNow}`;
     rows.push({
       id: def.id,
       name: def.name,
       level,
-      pips: pipsText(Math.min(level, SKILL_MAX_LEVEL)),
+      maxLevel,
+      pips: pipsText(level, maxLevel),
+      mastery: masteryView(def, level, skills.masteryOf(def.id), maxLevel, skills.masteryKnown),
       element,
+      elementId: def.element,
+      grade,
+      gradeName: gradeName(grade),
+      style,
+      styleName: styleName(style),
       shape: SHAPE_LABEL[def.shape] ?? "",
       stats: statLines(def, level, me.maxMp),
       effects: def.effects.map(effectText).filter((t) => t !== ""),
@@ -213,7 +337,7 @@ export function buildSkillsPanel(skills: SkillTracker, me: SlotMe): SkillsPanelM
       slotNow,
       slotLabel,
       sub: [element, `tầng ${level}`].filter((t) => t !== "").join(" · "),
-      aria: rowAria(def.name, element, level, slotNow, need),
+      aria: rowAria(def.name, element, level, slotNow, need, gradeName(grade), maxLevel),
       slots,
       unequip: slotNow === null ? null : `Gỡ khỏi ô ${slotNow}`,
     });
@@ -233,10 +357,13 @@ export function rowAria(
   level: number,
   slotNow: SkillSlot | null,
   need: string | null,
+  grade = "",
+  maxLevel: number = SKILL_MAX_LEVEL,
 ): string {
   const parts = [name];
   if (element) parts.push(`hệ ${element}`);
-  parts.push(`tầng ${level} trên ${SKILL_MAX_LEVEL}`);
+  if (grade) parts.push(`phẩm ${grade}`);
+  parts.push(`tầng ${level} trên ${maxLevel}`);
   parts.push(slotNow === null ? "chưa gắn ô" : `đang ở ô ${slotNow}`);
   if (need) parts.push(need.charAt(0).toLowerCase() + need.slice(1));
   return parts.join(", ");

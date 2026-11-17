@@ -28,6 +28,9 @@ export const TOWN: Readonly<{ cx: number; cy: number; r: number }> = {
   cy: MAP_H / 2,
   r: 7,
 };
+/** Số trùm (quái `boss: true`) SINH SẴN tối đa mỗi bản đồ (QUYET_DINH_M3 mục 55 / 56); `MapDef` kiểm lúc dựng (`checkMonsterCap`). Không tính trùm sự kiện thế giới, quái con trùm triệu hồi, đối thủ chặn đường. */
+export const MAX_BOSSES_PER_MAP = 6;
+
 export const TOWN_PX = { x: TOWN.cx * TILE, y: TOWN.cy * TILE, r: TOWN.r * TILE };
 
 function mulberry32(seed: number) {
@@ -160,11 +163,15 @@ export interface PortalDef {
 export interface MapDef {
   readonly id: string;
   /**
-   * Loại bản đồ: `world` (mặc định: một phòng sống mãi, nhiều người) hoặc `dungeon` (bí cảnh: phòng tạm của MỘT đội,
-   * docs/THIET_KE_BI_CANH.md). Bản đồ `dungeon` KHÔNG nằm trong `MAPS` (không có phòng thường) mà ở `DUNGEON_MAPS`;
-   * khu an toàn `town` của nó là cổng vào.
+   * Loại bản đồ: `world` (mặc định: một phòng sống mãi, nhiều người), `dungeon` (bí cảnh: phòng tạm của MỘT đội,
+   * docs/THIET_KE_BI_CANH.md) hoặc `arena` (đấu trường chặn đường: phòng tạm của MỘT người, docs/THIET_KE_CHAN_DUONG.md).
+   * Bản đồ `dungeon` / `arena` KHÔNG nằm trong `MAPS` (không có phòng thường) mà ở `DUNGEON_MAPS` / `ARENA_MAPS`;
+   * khu an toàn `town` của `dungeon` là cổng vào, còn `arena` KHÔNG có khu an toàn (`inTown` / `inSafe` luôn `false`: không đứng
+   * chỗ nào để né kẻ chặn đường hay hồi nhanh; `town` chỉ là chỗ đứng lúc vào, trải đá cho đẹp).
    */
-  readonly kind?: "world" | "dungeon";
+  readonly kind?: "world" | "dungeon" | "arena";
+  /** Chỉ `arena`: id bản đồ thường mà đấu trường này dựng cho (trang trí theo vùng; chỗ về sau trận là chỗ cũ trên bản đồ đó). */
+  readonly arenaFor?: string;
   /** Tên bản đồ (màn chuyển cảnh, danh sách). Lạc Hà giữ "Lạc Hà Trấn" cho tương thích */
   readonly name: string;
   readonly seed: number;
@@ -180,7 +187,7 @@ export interface MapDef {
   /** Cổng chuyển bản đồ; bỏ trống là bản đồ không có cổng */
   readonly portals?: readonly PortalDef[];
   /**
-   * Hang trùm (chỉ bí cảnh): ô tâm (số nguyên) và bán kính (ô). Trùm sinh ra ĐÚNG ở tâm hang (server: PR 4b/4c), nền trong
+   * Hang trùm (bí cảnh) / chỗ kẻ địch đứng lúc bắt đầu (đấu trường chặn đường): ô tâm (số nguyên) và bán kính (ô). Trùm sinh ra ĐÚNG ở tâm hang (server: PR 4b/4c), nền trong
    * bán kính được san thành đất (`T.Dirt`) nên luôn đi lại được. Client vẽ dấu hang trên bản đồ nhỏ từ `GameMap.lairPx`
    * thay vì chép toạ độ. Bỏ trống là bản đồ không có hang cố định.
    */
@@ -299,12 +306,20 @@ export class GameMap {
   }
 
   private checkMonsterCap() {
+    let bosses = 0;
     for (const [id, n] of Object.entries(this.monsterCap)) {
       if (!Object.prototype.hasOwnProperty.call(MONSTER_BY_ID, id))
         throw new Error(`MapDef ${this.def.id}: monsterCap có loại quái lạ "${id}"`);
       if (!Number.isInteger(n) || n < 0)
         throw new Error(`MapDef ${this.def.id}: monsterCap.${id} phải là số nguyên >= 0 (${n})`);
+      if (MONSTER_BY_ID[id]!.boss) bosses += n;
     }
+    // LUẬT CHUNG (QUYET_DINH_M3 mục 55 / 56): tối đa `MAX_BOSSES_PER_MAP` trùm sinh sẵn mỗi bản đồ (quái `boss: true` trong `monsterCap`). Không tính trùm sự kiện thế giới,
+    // quái con trùm triệu hồi, đối thủ chặn đường (phòng solo): ba thứ đó không nằm trong `monsterCap`.
+    if (bosses > MAX_BOSSES_PER_MAP)
+      throw new Error(
+        `MapDef ${this.def.id}: ${bosses} trùm sinh sẵn vượt giới hạn ${MAX_BOSSES_PER_MAP} mỗi bản đồ (monsterCap)`,
+      );
   }
 
   /** Số quái tối đa của loại `id` ở bản đồ này (loại không khai báo là 0). Id lạ cũng là 0. */
@@ -328,6 +343,7 @@ export class GameMap {
    * để quyết định chuyện đó thì dùng `inSafe`; `inTown` chỉ còn nghĩa "đang ở trấn" (hồi phục nhanh, tên khu, âm nhạc).
    */
   inSafe(x: number, y: number, pad = 0): boolean {
+    if (this.def.kind === "arena") return false; // đấu trường chặn đường không có khu an toàn
     if (this.inTown(x, y, pad)) return true;
     return this.portals.some((p) => Math.hypot(x - p.x, y - p.y) <= p.safeR + pad);
   }
@@ -363,6 +379,7 @@ export class GameMap {
   }
 
   inTown(x: number, y: number, pad = 0): boolean {
+    if (this.def.kind === "arena") return false; // không hồi nhanh / không tính là trấn
     return Math.hypot(x - this.townPx.x, y - this.townPx.y) <= this.townPx.r + pad;
   }
 
@@ -497,8 +514,8 @@ export const MAPS: readonly MapDef[] = [
         toPortal: "han_van_nam",
       },
     ],
-    // Tổng 62 (Hắc Phong Cốc 62; trần ~70 để tick < 10 ms): số liệu quái ở game.ts (#403), vùng sinh theo `minDanger` của từng loài
-    monsterCap: { suong_ho: 24, thach_quy: 18, doc_thiem: 18, hac_giao: 2 },
+    // Tổng 66 (Hắc Giao 6, mục 56; trần ~70 để tick < 10 ms): số liệu quái ở game.ts (#403), vùng sinh theo `minDanger` của từng loài
+    monsterCap: { suong_ho: 24, thach_quy: 18, doc_thiem: 18, hac_giao: 6 },
   },
   {
     id: HAN_VAN_ID,
@@ -559,9 +576,44 @@ export const DUNGEON_MAPS: readonly MapDef[] = [
   },
 ];
 
+/** Id đấu trường chặn đường dựng cho bản đồ thường `mapId` (một đấu trường mỗi bản đồ để trang trí theo vùng). */
+export function arenaMapIdOf(mapId: string): string {
+  return `arena_${mapId}`;
+}
+
+/**
+ * Đấu trường CHẶN ĐƯỜNG (docs/THIET_KE_CHAN_DUONG.md mục 5): phòng tạm của MỘT người, nhỏ (32x32 ô), một cái cho mỗi bản đồ thường (cùng vùng, hạt giống khác).
+ * Không có khu an toàn (xem `MapDef.kind`), không cổng, không quái sinh tự nhiên (`monsterCap` rỗng: kẻ chặn đường do server đặt). Người chơi vào ở phía nam
+ * (`townPx`), kẻ địch phía bắc / giữa. `getMap` tra được (client và server cùng dựng ô từ `seed`); `defineRooms` chỉ đăng ký `MAPS` nên phòng do server mở (CD3).
+ */
+export const ARENA_MAPS: readonly MapDef[] = MAPS.map((m) => ({
+  id: arenaMapIdOf(m.id),
+  kind: "arena",
+  arenaFor: m.id,
+  name: `Đấu Trường ${m.wildName ?? m.name}`,
+  seed: (m.seed + 7919) >>> 0,
+  w: 32,
+  h: 32,
+  town: { cx: 16, cy: 27, r: 2 },
+  townName: "Chỗ Đứng",
+  wildName: m.wildName ?? m.name,
+  // Chỗ kẻ địch đứng lúc bắt đầu: nền san phẳng thành đất (đi lại được), phía bắc, xa chỗ đứng của người chơi (~17 ô)
+  lair: { cx: 16, cy: 10, r: 5 },
+  monsterCap: {},
+}));
+
 export const MAP_BY_ID: Readonly<Record<string, MapDef>> = Object.fromEntries(
-  [...MAPS, ...DUNGEON_MAPS].map((m) => [m.id, m]),
+  [...MAPS, ...DUNGEON_MAPS, ...ARENA_MAPS].map((m) => [m.id, m]),
 );
+
+/** Bản đồ `id` là đấu trường chặn đường? Id lạ / sai kiểu là `false`. */
+export function isArenaMap(id: unknown): boolean {
+  return (
+    typeof id === "string" &&
+    Object.prototype.hasOwnProperty.call(MAP_BY_ID, id) &&
+    MAP_BY_ID[id].kind === "arena"
+  );
+}
 
 /** Bản đồ `id` là bí cảnh? Id lạ / sai kiểu là `false`. */
 export function isDungeonMap(id: unknown): boolean {

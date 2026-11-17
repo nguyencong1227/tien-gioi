@@ -10,10 +10,13 @@ import {
   SECT_LEVEL_MAX,
   SECT_QUEST_BY_ID,
   SECT_SHOP_BY_ITEM,
+  SECT_SHOP_QTY_MAX,
   SECT_TERMS,
+  sectDepositCh,
   sectFailMessage,
   sectLevelInfo,
   type SectBuff,
+  type SectHallMe,
   type SectHallQuest,
   type SectHallQuestState,
   type SectHallView,
@@ -332,6 +335,13 @@ export interface HallShopRow {
   /** "5 cống hiến" */
   price: string;
   hall: "baoKho" | "tangKinh";
+  /** Cấp tông tối thiểu để mua (để gom nhóm: `hallShopGroups`) */
+  minLevel: number;
+  /** Giá một món (cống hiến) và lượt còn lại hôm nay (cho ô chọn số lượng) */
+  cost: number;
+  left: number;
+  /** Mua được tối đa mấy cái trong MỘT lần (`shopBuyMax`): 0 nếu khoá */
+  maxBuy: number;
   /** "Bảo khố" / "Tàng Kinh Các" */
   hallLabel: string;
   /** "Còn 3 / 10 lượt hôm nay" */
@@ -376,6 +386,10 @@ export function hallShopRows(v: SectHallView, opts: { down: boolean }): HallShop
       name: itemName(e.itemId),
       price: `${e.cost.toLocaleString("vi-VN")} ${SECT_TERMS.contrib.toLowerCase()}`,
       hall: e.hall,
+      minLevel: e.minLevel,
+      cost: e.cost,
+      left: e.left,
+      maxBuy: opts.down || e.locked ? 0 : shopBuyMax(e, v.me.contrib),
       hallLabel: e.hall === "tangKinh" ? SECT_TERMS.tangKinh : SECT_TERMS.baoKho,
       leftLabel: `Còn ${e.left} / ${e.limitDay} lượt hôm nay`,
       locked,
@@ -383,4 +397,106 @@ export function hallShopRows(v: SectHallView, opts: { down: boolean }): HallShop
       canBuy: locked === null,
     };
   });
+}
+
+// ---------- Gom nhóm cửa hàng theo cấp tông (bảng thật có ~28 món: cuộn dài, nhiều hàng khoá) ----------
+
+/** Một phần của một gian hàng: các món ĐÃ mở theo cấp tông (không tiêu đề) hoặc một nhóm "Mở ở cấp tông N" (thu gọn được). */
+export interface HallShopSection {
+  /** Khoá ổn định để nhớ trạng thái mở / thu của người chơi qua các lần vẽ lại: `<hall>:open` hoặc `<hall>:<cấp>` */
+  key: string;
+  /** Cấp tông cần để mở nhóm; `null` = phần đã mở theo cấp (luôn hiện, không tiêu đề) */
+  level: number | null;
+  /** Tiêu đề nhóm ("Mở ở cấp tông 3 (Trung Hưng) · 3 món"); rỗng cho phần đã mở */
+  title: string;
+  rows: HallShopRow[];
+  /** Mặc định mở không: phần đã mở theo cấp luôn mở; nhóm chưa mở chỉ mở nếu là cấp KẾ TIẾP (gần nhất trên cả hai gian) */
+  defaultOpen: boolean;
+}
+
+export interface HallShopHall {
+  hall: "baoKho" | "tangKinh";
+  hallLabel: string;
+  sections: HallShopSection[];
+}
+
+/**
+ * Gom các hàng cửa hàng thành hai gian, mỗi gian: (1) các món đã mở theo cấp tông (`minLevel <= myLevel`; vẫn có thể khoá vì đã học / hết lượt / thiếu cống hiến, lý do hiện ở hàng),
+ * rồi (2) các nhóm chưa mở theo từng cấp tăng dần. Trong mỗi phần món xếp theo cấp rồi theo thứ tự gốc (ổn định), nên món rẻ / mở sớm lên trước và không còn xen kẽ cấp.
+ * Chỉ nhóm của cấp kế tiếp (nhỏ nhất trên cả hai gian) mở sẵn, các cấp xa hơn thu gọn: người mới không phải cuộn qua hàng chục hàng khoá. KHÔNG bỏ món nào: tổng số hàng giữ nguyên.
+ */
+export function hallShopGroups(rows: readonly HallShopRow[], myLevel: number): HallShopHall[] {
+  const lvl = Number.isFinite(myLevel) ? myLevel : 1;
+  const locked = rows.filter((r) => r.minLevel > lvl);
+  const nextLevel = locked.length ? Math.min(...locked.map((r) => r.minLevel)) : null;
+  const halls: HallShopHall[] = [];
+  for (const hall of ["baoKho", "tangKinh"] as const) {
+    const mine = rows
+      .filter((r) => r.hall === hall)
+      .map((r, i) => ({ r, i }))
+      .sort((a, b) => a.r.minLevel - b.r.minLevel || a.i - b.i)
+      .map((x) => x.r);
+    if (!mine.length) continue;
+    const sections: HallShopSection[] = [];
+    const open = mine.filter((r) => r.minLevel <= lvl);
+    if (open.length)
+      sections.push({ key: `${hall}:open`, level: null, title: "", rows: open, defaultOpen: true });
+    const levels = [...new Set(mine.filter((r) => r.minLevel > lvl).map((r) => r.minLevel))];
+    for (const lv of levels) {
+      const inLv = mine.filter((r) => r.minLevel === lv);
+      sections.push({
+        key: `${hall}:${lv}`,
+        level: lv,
+        title: `Mở ở ${SECT_TERMS.level.toLowerCase()} ${lv} (${sectLevelInfo(lv).name}) · ${inLv.length} món`,
+        rows: inLv,
+        defaultOpen: lv === nextLevel,
+      });
+    }
+    halls.push({ hall, hallLabel: mine[0]!.hallLabel, sections });
+  }
+  return halls;
+}
+
+// ---------- Mua nhiều một lần ở cửa hàng tông (ô số lượng dùng chung, mục 47) ----------
+
+/**
+ * Mua tối đa mấy cái trong một lần: không quá `SECT_SHOP_QTY_MAX` (máy chủ từ chối hơn), không quá lượt còn lại hôm nay, không quá số cống hiến mua nổi.
+ * Khoá theo cấp / đã học / ... KHÔNG tính ở đây (`HallShopRow.maxBuy` đặt 0 khi khoá). Số hỏng cho 0.
+ */
+export function shopBuyMax(row: { cost: number; left: number }, contrib: number): number {
+  const cost = Number.isFinite(row.cost) && row.cost > 0 ? row.cost : 0;
+  if (cost < 1) return 0;
+  const left = Number.isFinite(row.left) ? Math.floor(row.left) : 0;
+  const afford = Number.isFinite(contrib) && contrib > 0 ? Math.floor(contrib / cost) : 0;
+  return Math.max(0, Math.min(SECT_SHOP_QTY_MAX, left, afford));
+}
+
+/** Xem trước một lần đổi `qty` món giá `cost`: cống hiến mất và còn lại. Chỉ là gợi ý (máy chủ quyết định, kiểm cả túi chứa được không). */
+export function shopBuyPreviewText(qty: number, cost: number, contrib: number): string {
+  const total = qty * cost;
+  const left = Math.max(0, (Number.isFinite(contrib) ? contrib : 0) - total);
+  return `Mất ${total.toLocaleString("vi-VN")} ${SECT_TERMS.contrib.toLowerCase()}, còn ${left.toLocaleString("vi-VN")}.`;
+}
+
+// ---------- Chữ xem trước khi góp Linh thạch vào quỹ (ô số lượng dùng chung, mục 47) ----------
+
+/**
+ * Xem trước một lần góp `qty` Linh thạch vào quỹ: ví còn lại bao nhiêu và (nếu đã có ảnh chụp Nội vụ) được cộng bao nhiêu cống hiến. Cống hiến theo `sectDepositCh` rồi
+ * kẹp theo lượt góp còn lại hôm nay (`depositLeft`); chưa tới giờ được kiếm (`earnFromAt` > `serverNow`) thì nói rõ là chưa tính. Chỉ là gợi ý: máy chủ quyết định.
+ */
+export function depositPreviewText(
+  qty: number,
+  wallet: number,
+  me: SectHallMe | null,
+  serverNow = Date.now(),
+): string {
+  const left = Math.max(0, (Number.isFinite(wallet) ? wallet : 0) - qty);
+  const base = `Ví còn lại ${left.toLocaleString("vi-VN")} Linh thạch.`;
+  if (!me) return base;
+  if (me.earnFromAt > serverNow) return `${base} Cống hiến: ngày mai mới kiếm được.`;
+  const ch = sectDepositCh(qty);
+  if (ch < 1) return base;
+  const got = Math.min(ch, Math.max(0, me.depositLeft));
+  if (got < 1) return `${base} Hôm nay hết lượt kiếm cống hiến bằng cách góp.`;
+  return `${base} +${got.toLocaleString("vi-VN")} cống hiến${got < ch ? " (chạm trần hôm nay)" : ""}.`;
 }

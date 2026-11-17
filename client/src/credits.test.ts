@@ -3,9 +3,10 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { SKILLS_M7 } from "@tien-gioi/shared";
+import { LEARNABLE_SKILLS } from "@tien-gioi/shared";
 import {
   AI_ASSET_DIR,
+  aiAssetDirs,
   auditAiImages,
   auditAssets,
   auditContentSources,
@@ -23,6 +24,7 @@ import {
   validateAiSource,
   webpChunks,
 } from "../scripts/check-credits.mjs";
+import { NEGATIVE_PROMPT } from "../scripts/art/prompt-rules.mjs";
 
 describe("Rà soát tài sản và giấy phép (check-credits)", () => {
   const rootDir = path.resolve(__dirname, "../..");
@@ -168,17 +170,20 @@ describe("Tài liệu rà soát khớp số tệp thật (M6, #411)", () => {
     expect(doc("docs/RA_SOAT_TAI_SAN.md")).toContain(`**${scanned.length} tệp**`);
   });
 
-  it("số tệp theo thư mục khớp tài liệu: assets 81, icons 5, fonts 5; icon vật phẩm 78 = 60 vật phẩm của game + 12 icon Hàn Vân + 6 icon kinh quyển đợt 2 vẽ trước", () => {
+  it("số tệp theo thư mục khớp tài liệu: assets 102, icons 5, fonts 5; icon vật phẩm 99 = 69 vật phẩm của game + 12 icon Hàn Vân + 6 icon kinh quyển đợt 2 vẽ trước + 6 icon kinh quyển Kim / Thổ CT6 + 6 icon chiêu dạng mới CT9", () => {
     const under = (d: string) =>
       scanned.filter((f) => f.replace(/\\/g, "/").includes(`client/public/${d}/`));
     const items = under("assets").filter((f) => f.replace(/\\/g, "/").includes("/items/"));
-    expect(under("assets")).toHaveLength(81);
+    // `assets/ai/` (ảnh AI, mục 7 CREDITS.md / 2e RA_SOAT) tính trong "assets" nhưng đếm riêng: 102 tệp tài sản thường + số ảnh AI
+    const ai = under("assets/ai");
+    expect(ai).toHaveLength(6); // login_bg.webp + 5 thẻ bản đồ (#513): thêm ảnh AI thì sửa số này CÙNG LÚC với CREDITS.md và RA_SOAT_TAI_SAN.md
+    expect(under("assets")).toHaveLength(102 + ai.length);
     expect(under("icons")).toHaveLength(5);
     expect(under("fonts")).toHaveLength(5);
-    expect(items).toHaveLength(78);
+    expect(items).toHaveLength(99);
     const credits = doc("CREDITS.md");
-    expect(credits).toContain("`client/public/assets/`: 81 tệp");
-    expect(credits).toContain("78 biểu tượng vật phẩm");
+    expect(credits).toContain(`\`client/public/assets/\`: ${102 + ai.length} tệp`);
+    expect(credits).toContain("99 biểu tượng vật phẩm");
   });
 
   it("mọi icon vật phẩm có một hàng trong bảng của docs/RA_SOAT_TAI_SAN.md (thiếu hàng thì đỏ)", () => {
@@ -192,7 +197,7 @@ describe("Tài liệu rà soát khớp số tệp thật (M6, #411)", () => {
 });
 
 /**
- * Chiêu GỐC của Tiên Giới (soạn riêng, KHÔNG lấy từ Vạn Kiếp Tu Tiên): id trong `SKILLS_M7` nhưng không có dòng ở bảng nguồn `docs/NGUON_NOI_DUNG.md`. Ai thêm chiêu gốc
+ * Chiêu GỐC của Tiên Giới (soạn riêng, KHÔNG lấy từ Vạn Kiếp Tu Tiên): id trong `LEARNABLE_SKILLS` (18 chiêu gốc + tệp nhóm `skills-*.ts`) nhưng không có dòng ở bảng nguồn `docs/NGUON_NOI_DUNG.md`. Ai thêm chiêu gốc
  * (Dev D, Dev A...) thêm id vào đây; chiêu lấy từ nguồn thì thêm DÒNG ở bảng nguồn thay vì thêm vào đây.
  *
  * 6 chiêu Nguyên Anh đợt 2 (M7.9, #654): do Dev D soạn theo thế giới Tiên Giới, KHÔNG lấy từ nguồn nào.
@@ -204,6 +209,13 @@ const ORIGINAL_SKILL_IDS: string[] = [
   "bang_hoa_loan",
   "liet_hoa_kiem",
   "van_hanh_bo",
+  // 6 chiêu DẠNG MỚI (CT9 lát 1 #1054, A): soạn riêng, mỗi chiêu một hình (bẫy, đạn bay, vùng, sét lan, tượng, chiêu vận)
+  "doc_dang_phuc",
+  "phi_kiem_tam_lien",
+  "liet_diem_tran",
+  "loi_lien_chau",
+  "hon_phien_tuong",
+  "pha_son_nhat_kich",
 ];
 
 describe("Nguồn nội dung, hình ảnh và âm thanh bên ngoài (M7.16 #517, QUYET_DINH_M3 mục 19-20)", () => {
@@ -211,7 +223,7 @@ describe("Nguồn nội dung, hình ảnh và âm thanh bên ngoài (M7.16 #517,
   const contentSourcePath = path.resolve(rootDir, "docs/NGUON_NOI_DUNG.md");
   const creditsPath = path.resolve(rootDir, "CREDITS.md");
 
-  it("docs/NGUON_NOI_DUNG.md tồn tại, bảng nguồn hợp lệ: >= 12 dòng `cong_phap` (12 chiêu M7.1), audit sạch, mỗi chiêu của SKILLS_M7 khai báo đúng MỘT nơi", () => {
+  it("docs/NGUON_NOI_DUNG.md tồn tại, bảng nguồn hợp lệ: >= 12 dòng `cong_phap` (12 chiêu M7.1), audit sạch, mỗi chiêu của LEARNABLE_SKILLS khai báo đúng MỘT nơi", () => {
     expect(fs.existsSync(contentSourcePath)).toBe(true);
     const content = fs.readFileSync(contentSourcePath, "utf-8");
     expect(content).toContain("## 3. Bảng nguồn");
@@ -234,9 +246,9 @@ describe("Nguồn nội dung, hình ảnh và âm thanh bên ngoài (M7.16 #517,
     expect(audit.unrecordedVkttFiles).toEqual([]);
     expect(audit.unrecordedCreditsVktt).toEqual([]);
 
-    // Hai chiều: mỗi chiêu của SKILLS_M7 PHẢI được khai báo MỘT trong hai nơi: (1) có đúng một dòng ở bảng nguồn (lấy từ Vạn Kiếp Tu Tiên), hoặc (2) nằm trong
+    // Hai chiều: mỗi chiêu của LEARNABLE_SKILLS PHẢI được khai báo MỘT trong hai nơi: (1) có đúng một dòng ở bảng nguồn (lấy từ Vạn Kiếp Tu Tiên), hoặc (2) nằm trong
     // `ORIGINAL_SKILL_IDS` bên dưới (chiêu GỐC của Tiên Giới, không lấy từ nguồn). Thêm chiêu mới mà không khai báo thì đỏ; không dòng nào trỏ id không tồn tại.
-    const ids = SKILLS_M7.map((s) => s.id);
+    const ids = LEARNABLE_SKILLS.map((s) => s.id);
     const rowsOf = (id: string) =>
       audit.entries.filter(
         (e) => e.inRepo.includes(`id \`${id}\``) || e.inRepo.includes(`id ${id}`),
@@ -255,7 +267,7 @@ describe("Nguồn nội dung, hình ảnh và âm thanh bên ngoài (M7.16 #517,
     // Dòng dữ liệu khác (du_lieu -> items.ts, trang_bi/phap_bao... sau này) KHÔNG chứa id chiêu nên bỏ qua;
     // thêm dòng dữ liệu không phải chiêu mà không muốn sửa test này thì để inRepo KHÔNG có cụm "id <id>".
     for (const e of audit.entries) {
-      if (!e.inRepo.includes("skills.ts")) continue;
+      if (!/skills[a-z-]*\.ts/.test(e.inRepo)) continue; // `skills.ts` và các tệp nhóm `skills-kim-tho.ts`...
       const m = /id `?([a-z_]+)`?/.exec(e.inRepo);
       expect(
         m && ids.includes(m[1]),
@@ -726,8 +738,9 @@ const validSource = (asset: string, finalSha: string, over: Record<string, unkno
   lora: [],
   comfyui: { comfyui: "0.3.0", pytorch: "2.5.0", driver: "560.35" },
   workflow: { path: "docs/art/workflow/sdxl-base.json", sha256: HEX },
-  prompt: "misty mountain pass at dawn, ink wash, muted palette",
-  negativePrompt: "text, watermark, letters",
+  prompt:
+    "misty mountain pass at dawn, painterly ink wash landscape, muted palette, no people, no text",
+  negativePrompt: NEGATIVE_PROMPT,
   seed: 12345,
   postProcess: [{ script: "client/scripts/art/to-webp.mjs", params: { maxWidth: 512 } }],
   reviewed: { by: "dev-b", date: "2026-11-15", noText: true, noOtherGameLikeness: true },
@@ -769,9 +782,16 @@ describe("Ảnh do AI sinh: nguồn, băm, siêu dữ liệu, dòng CREDITS (che
     return { root, audit, jsonPath, imgPath, rel, kinds };
   }
 
-  it("kho thật của repo: sạch (hiện chưa có ảnh AI nào) và thư mục ảnh AI chưa có tệp lạ", () => {
+  it("kho thật của repo: sạch và thư mục ảnh AI chỉ có đúng ảnh đã khai báo (thêm ảnh AI thì thêm vào danh sách này CÙNG LÚC với JSON nguồn)", () => {
     expect(auditAiImages().errors).toEqual([]);
-    expect(scanFiles(AI_ASSET_DIR)).toEqual([]);
+    expect(scanFiles(AI_ASSET_DIR)).toEqual([
+      "client/public/assets/ai/login_bg.webp",
+      "client/public/assets/ai/the_am_suong.webp",
+      "client/public/assets/ai/the_hac_phong.webp",
+      "client/public/assets/ai/the_han_van.webp",
+      "client/public/assets/ai/the_lac_ha.webp",
+      "client/public/assets/ai/the_linh_hu.webp",
+    ]);
   });
 
   it("một ảnh WebP hợp lệ (JSON cùng tên, băm khớp, có dòng CREDITS, không siêu dữ liệu) thì qua", () => {
@@ -974,5 +994,122 @@ describe("Ảnh do AI sinh: nguồn, băm, siêu dữ liệu, dòng CREDITS (che
     const credits = fs.readFileSync(path.resolve(rootDir, "CREDITS.md"), "utf8");
     expect(credits).toMatch(/^## 7\. Ảnh do AI sinh/m);
     expect(credits).toContain("static.aiAssets");
+  });
+});
+
+describe("Ảnh AI ở gói tải theo nhu cầu `art` chịu CÙNG luật như assets/ai (check-credits, aiAssetDirs)", () => {
+  const NAME = "the_xich_mang";
+  const REL = `client/public/packs/art-trum/${NAME}.webp`;
+  const ROOT = path.resolve(__dirname, "../..");
+
+  /** Kho giả: một ảnh AI hợp lệ ở gói art-trum (JSON nguồn cùng tên, dòng CREDITS); `assets/ai` có thể trống. */
+  function artFixture(opts: { image?: Buffer } = {}) {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "tg-art-audit-"));
+    const img = opts.image ?? makeWebp();
+    fs.mkdirSync(path.join(root, "client/public/assets/ai"), { recursive: true });
+    fs.mkdirSync(path.join(root, "client/public/packs/art-trum"), { recursive: true });
+    fs.mkdirSync(path.join(root, "docs/art/nguon"), { recursive: true });
+    fs.writeFileSync(path.join(root, REL), img);
+    fs.writeFileSync(
+      path.join(root, `docs/art/nguon/${NAME}.json`),
+      JSON.stringify(validSource(REL, sha(img))),
+    );
+    fs.writeFileSync(
+      path.join(root, "CREDITS.md"),
+      `# Credits\n\n## 7. Ảnh do AI sinh (SDXL base)\n\n| Ảnh | Mô tả |\n|---|---|\n| \`${REL}\` | thẻ trùm |\n\n## 8. Khác\n`,
+    );
+    const dirs = () =>
+      aiAssetDirs(
+        path.join(root, "client/public/packs"),
+        path.join(root, "client/public/assets/ai"),
+      );
+    // KHÔNG truyền aiDir / aiDirs: dùng đúng đường mặc định (assets/ai + gói art tự dò dưới rootDir)
+    const audit = () =>
+      auditAiImages({
+        rootDir: root,
+        sourceDir: path.join(root, "docs/art/nguon"),
+        creditsPath: path.join(root, "CREDITS.md"),
+      });
+    return { root, audit, dirs, kinds: (a = audit()) => a.errors.map((e) => e.kind) };
+  }
+
+  it("aiAssetDirs: assets/ai + gói art phẳng (art-trum, art_npc) và lồng (art/boss); KHÔNG lấy icons / audio / map / thư mục ẩn / `artwork`", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "tg-art-dirs-"));
+    const packs = path.join(root, "packs");
+    for (const d of [
+      "art-trum",
+      "art_npc",
+      "art/boss",
+      "icons",
+      "audio",
+      "map-lac_ha",
+      "hd-core",
+      ".art-an",
+      "artwork",
+    ])
+      fs.mkdirSync(path.join(packs, d), { recursive: true });
+    const names = aiAssetDirs(packs).map((d) => path.relative(root, d).replace(/\\/g, "/"));
+    expect(names.filter((n) => n.startsWith("packs/"))).toEqual([
+      "packs/art-trum",
+      "packs/art/boss",
+      "packs/art_npc",
+    ]);
+    expect(aiAssetDirs(packs)).toContain(path.resolve(ROOT, "client/public/assets/ai"));
+    // không có thư mục packs: chỉ assets/ai
+    expect(aiAssetDirs(path.join(root, "khong-co"))).toEqual([
+      path.resolve(ROOT, "client/public/assets/ai"),
+    ]);
+  });
+
+  it("ảnh hợp lệ ở gói art (JSON cùng tên, băm khớp, dòng CREDITS, WebP sạch) thì qua", () => {
+    const f = artFixture();
+    expect(
+      f
+        .dirs()
+        .slice(1)
+        .map((d) => path.basename(d)),
+    ).toEqual(["art-trum"]);
+    const a = f.audit();
+    expect(a.files).toEqual([REL]);
+    expect(a.errors).toEqual([]);
+  });
+
+  it("ĐỘT BIẾN: ảnh ở gói art KHÔNG có cửa sau, thiếu JSON / sai băm / còn EXIF / thiếu dòng CREDITS / JSON trỏ chỗ khác đều đỏ", () => {
+    const missingJson = artFixture();
+    fs.rmSync(path.join(missingJson.root, `docs/art/nguon/${NAME}.json`));
+    expect(missingJson.kinds()).toContain("noSource");
+
+    const dirty = artFixture({ image: makeWebp(["EXIF"]) });
+    expect(dirty.kinds()).toContain("metadata");
+
+    const badHash = artFixture();
+    const jp = path.join(badHash.root, `docs/art/nguon/${NAME}.json`);
+    fs.writeFileSync(jp, JSON.stringify(validSource(REL, "0".repeat(64))));
+    expect(badHash.kinds()).toContain("badHash");
+
+    const noCredit = artFixture();
+    fs.writeFileSync(
+      path.join(noCredit.root, "CREDITS.md"),
+      "# Credits\n\n## 7. Ảnh do AI sinh\n\n",
+    );
+    expect(noCredit.kinds()).toContain("credits");
+
+    const elsewhere = artFixture();
+    fs.writeFileSync(
+      path.join(elsewhere.root, `docs/art/nguon/${NAME}.json`),
+      JSON.stringify(validSource("client/public/packs/icons/x.webp", HEX)),
+    );
+    expect(elsewhere.kinds()).toEqual(expect.arrayContaining(["assetPath"]));
+  });
+
+  it("hai ảnh cùng tên ở hai thư mục (assets/ai và gói art) bị từ chối: mỗi ảnh một JSON cùng tên", () => {
+    const f = artFixture();
+    fs.writeFileSync(path.join(f.root, `client/public/assets/ai/${NAME}.webp`), makeWebp());
+    expect(f.kinds()).toContain("dupName");
+  });
+
+  it("kho thật: aiAssetDirs mặc định gồm assets/ai; ảnh thật vẫn sạch", () => {
+    expect(aiAssetDirs()).toContain(path.resolve(ROOT, "client/public/assets/ai"));
+    expect(auditAiImages().errors).toEqual([]);
   });
 });

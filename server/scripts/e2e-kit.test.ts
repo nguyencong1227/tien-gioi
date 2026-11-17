@@ -70,24 +70,40 @@ async function freeOne(): Promise<number> {
 
 describe("e2e-kit: listenWithRetry", () => {
   it("cổng trống: nghe đúng cổng đó và trả về nó", async () => {
-    const port = await freeOne();
-    const server = http.createServer();
-    try {
-      expect(await listenWithRetry(server, port, { explicit: false, pick: () => 0 })).toBe(port);
-      expect((server.address() as net.AddressInfo).port).toBe(port);
-    } finally {
-      await new Promise<void>((r) => server.close(() => r()));
+    // freeOne() trả cổng trống tại THỜI ĐIỂM đóng, nhưng khe hở trước listen cho tiến trình khác (CẢ bộ
+    // song song, nhiều worker freePort cùng cấp cổng highest-free) chiếm mất -> kit rơi vào pick(0), trả
+    // cổng KHÁC (đỏ chập chờn, #1016). Chờ theo điều kiện: xin cổng mới + server mới, thử lại cho tới khi
+    // kit thực sự nghe ĐÚNG cổng xin (loại trừ ca bị cướp — không phải lỗi kit; không bắt đỏ khi bị cướp).
+    let server = http.createServer();
+    let port = 0;
+    let got = 0;
+    for (let k = 0; k < 25; k++) {
+      port = await freeOne();
+      got = await listenWithRetry(server, port, { explicit: false, pick: () => 0 });
+      if (got === port) break; // nghe đúng cổng xin -> thoả mãn
+      await new Promise<void>((r) => server.close(() => r())); // đóng server đã bind cổng khác, thử lại
+      server = http.createServer();
     }
-  });
+    expect(got).toBe(port);
+    expect((server.address() as net.AddressInfo).port).toBe(port);
+    await new Promise<void>((r) => server.close(() => r()));
+  }, 20000);
 
   it("cổng NGẪU NHIÊN bận: thử lại bằng cổng mới và trả về cổng thật", async () => {
     const busy = await occupyPort();
-    const free = await freeOne();
+    // Hồ cổng trống: pick() xoay vòng qua các cổng thật trống, tránh một cổng bị cướp (free-bind dưới
+    // contention, #1016) làm hết lượt thử. listenWithRetry vẫn chỉ retry khi EADDRINUSE; trả về cổng thật
+    // đang nghe (không nhất thiết cổng đầu tiên được pick).
+    const pool = await Promise.all(Array.from({ length: 6 }, () => freeOne()));
+    let i = 0;
     const server = http.createServer();
     try {
-      const got = await listenWithRetry(server, busy.port, { explicit: false, pick: () => free });
-      expect(got).toBe(free);
-      expect((server.address() as net.AddressInfo).port).toBe(free);
+      const got = await listenWithRetry(server, busy.port, {
+        explicit: false,
+        pick: () => pool[i++],
+      });
+      expect(pool).toContain(got);
+      expect((server.address() as net.AddressInfo).port).toBe(got);
     } finally {
       await new Promise<void>((r) => server.close(() => r()));
       await busy.close();
@@ -108,17 +124,19 @@ describe("e2e-kit: listenWithRetry", () => {
 
   it("net.Server + host (proxy TCP của E2E): nghe đúng địa chỉ, cổng bận thì thử cổng mới", async () => {
     const busy = await occupyPort(); // chiếm trên 127.0.0.1
-    const free = await freeOne();
+    // Hồ cổng trống tương tự ca "cổng NGẪU NHIÊN bận" (tránh free-bind bị cướp, #1016).
+    const pool = await Promise.all(Array.from({ length: 6 }, () => freeOne()));
+    let i = 0;
     const server = net.createServer();
     try {
       const got = await listenWithRetry(server, busy.port, {
         explicit: false,
-        pick: () => free,
+        pick: () => pool[i++],
         host: "127.0.0.1",
       });
-      expect(got).toBe(free);
+      expect(pool).toContain(got);
       const addr = server.address() as net.AddressInfo;
-      expect(addr.port).toBe(free);
+      expect(addr.port).toBe(got);
       expect(addr.address).toBe("127.0.0.1");
     } finally {
       await new Promise<void>((r) => server.close(() => r()));

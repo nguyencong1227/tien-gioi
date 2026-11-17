@@ -100,6 +100,8 @@ export function armorPercent(mult: unknown): number | null {
 
 export interface BossBarModel {
   id: string;
+  /** Loại trùm (id trong bảng quái): tra thẻ minh hoạ (`boss-card.ts`) */
+  kind: string;
   /** Tên trùm (từ bảng quái) */
   name: string;
   hp: number;
@@ -232,6 +234,7 @@ export class BossFxTracker {
     const sm = this.summon.get(c.id);
     return {
       id: c.id,
+      kind: c.kind,
       name: mon.name,
       hp: Math.max(0, Math.round(c.hp)),
       maxHp: Math.round(c.maxHp),

@@ -30,7 +30,39 @@ exit 0
 `,
     { mode: 0o755 },
   );
+  // Stub systemctl / systemd-run cô lập: test KHÔNG BAO GIỜ được chạm đơn vị tg-comfy THẬT. Trước đây test comfy-down.sh
+  // dùng PATH thật nên `systemctl --user stop tg-comfy` tắt ComfyUI đang sinh ảnh của dev khác (lô 2, 17/11 12:54).
+  // Mặc định is-active trả "inactive"; TEST_STUB_COMFY_ACTIVE=1 giả lập đơn vị đang chạy. Mọi lệnh gọi ghi vào systemctlLog.
+  const systemctlLog = path.join(stubNvidiaDir, "systemctl.log");
+  fs.writeFileSync(
+    path.join(stubNvidiaDir, "systemctl"),
+    `#!/bin/sh
+echo "systemctl $*" >> "${systemctlLog}"
+if [ "$2" = "is-active" ]; then
+  if [ "\${TEST_STUB_COMFY_ACTIVE:-0}" = "1" ]; then echo active; exit 0; fi
+  echo inactive
+  exit 3
+fi
+exit 0
+`,
+    { mode: 0o755 },
+  );
+  fs.writeFileSync(
+    path.join(stubNvidiaDir, "systemd-run"),
+    `#!/bin/sh
+echo "systemd-run $*" >> "${systemctlLog}"
+exit 1
+`,
+    { mode: 0o755 },
+  );
   const isolatedPath = `${stubNvidiaDir}:${process.env.PATH}`;
+  // Môi trường cô lập cho MỌI lần gọi comfy-up.sh / comfy-down.sh: PATH có stub, khoá và PID canh rảnh nằm trong thư mục tạm
+  // (comfy-down.sh xoá khoá ở $XDG_RUNTIME_DIR và giết PID canh rảnh: không được đụng bản thật của dev đang sinh ảnh).
+  const isoEnv = {
+    PATH: isolatedPath,
+    XDG_RUNTIME_DIR: tmpTestDir,
+    COMFY_IDLE_PID_FILE: path.join(tmpTestDir, "tg-comfy-idle.pid"),
+  };
 
   it("các script quản lý vòng đời ComfyUI tồn tại và có quyền thực thi", () => {
     expect(fs.existsSync(comfyUpScript)).toBe(true);
@@ -53,7 +85,7 @@ exit 0
       cwd: repoRoot,
       env: {
         ...process.env,
-        PATH: isolatedPath,
+        ...isoEnv,
         COMFY_DIR: tmpTestDir,
         COMFY_LOCK_FILE: tmpLockPath,
       },
@@ -70,7 +102,7 @@ exit 0
         cwd: repoRoot,
         env: {
           ...process.env,
-          PATH: isolatedPath,
+          ...isoEnv,
           COMFY_DIR: tmpTestDir,
           COMFY_LOCK_FILE: tmpLockPath,
           TEST_MIN_FREE_KB: "999999999999", // Giả lập ngưỡng yêu cầu 1000 TB
@@ -93,7 +125,7 @@ exit 0
         cwd: repoRoot,
         env: {
           ...process.env,
-          PATH: isolatedPath,
+          ...isoEnv,
           COMFY_DIR: tmpTestDir,
           COMFY_LOCK_FILE: tmpLockPath,
           TEST_GPU_BUSY: "1",
@@ -116,7 +148,7 @@ exit 0
         cwd: repoRoot,
         env: {
           ...process.env,
-          PATH: isolatedPath,
+          ...isoEnv,
           COMFY_DIR: tmpTestDir,
           COMFY_LOCK_FILE: tmpLockPath,
           TEST_STUB_CHROME: "1", // Stub nvidia-smi in ra tiến trình Chrome
@@ -137,7 +169,7 @@ exit 0
       cwd: repoRoot,
       env: {
         ...process.env,
-        PATH: isolatedPath,
+        ...isoEnv,
         COMFY_DIR: tmpTestDir,
         COMFY_LOCK_FILE: tmpLockPath,
         TEST_STUB_CHROME: "1",
@@ -156,12 +188,30 @@ exit 0
       cwd: repoRoot,
       env: {
         ...process.env,
+        ...isoEnv,
         COMFY_DIR: tmpTestDir,
         COMFY_LOCK_FILE: tmpLockPath,
       },
     });
     expect(stdout).toContain("Đã tắt dây chuyền ComfyUI và giải phóng tài nguyên");
     expect(fs.existsSync(tmpLockPath)).toBe(false);
+  });
+
+  it("comfy-down.sh trong test chỉ gọi systemctl GIẢ (không tắt tg-comfy thật của dev đang sinh ảnh)", () => {
+    fs.rmSync(systemctlLog, { force: true });
+    execFileSync(comfyDownScript, [], {
+      encoding: "utf-8",
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        ...isoEnv,
+        COMFY_DIR: tmpTestDir,
+        COMFY_LOCK_FILE: tmpLockPath,
+        TEST_STUB_COMFY_ACTIVE: "1",
+      },
+    });
+    // Lệnh dừng phải tới stub (đọc được trong log của stub), tức không tới systemctl thật
+    expect(fs.readFileSync(systemctlLog, "utf-8")).toContain("systemctl --user stop tg-comfy");
   });
 
   it("comfy-down.sh: KHÔNG giết các tiến trình khác chứa chuỗi ComfyUI/main.py trên dòng lệnh", () => {
@@ -178,6 +228,7 @@ exit 0
         cwd: repoRoot,
         env: {
           ...process.env,
+          ...isoEnv,
           COMFY_DIR: tmpTestDir,
           COMFY_LOCK_FILE: tmpLockPath,
         },
@@ -211,7 +262,7 @@ exit 0
         cwd: repoRoot,
         env: {
           ...process.env,
-          PATH: isolatedPath,
+          ...isoEnv,
           COMFY_DIR: nonExistentDir,
           COMFY_LOCK_FILE: errorLockPath,
           TEST_MIN_FREE_KB: "100",
@@ -259,5 +310,69 @@ exit 3
       process.env = origEnv;
       fs.rmSync(stubDir, { recursive: true, force: true });
     }
+  });
+
+  it("gen-raw-lo1.mjs: đọc MAP_CARD_BATCH từ prompt-rules.mjs, cỡ 1216x832, SDXL base, không LoRA", async () => {
+    const lo1Script = path.join(repoRoot, "scripts", "art", "gen-raw-lo1.mjs");
+    expect(fs.existsSync(lo1Script)).toBe(true);
+    const src = fs.readFileSync(lo1Script, "utf-8");
+    expect(src).toContain("MAP_CARD_BATCH");
+    expect(src).toContain("NEGATIVE_PROMPT");
+    expect(src).toContain("../../client/scripts/art/prompt-rules.mjs");
+    expect(src).toContain('"http://127.0.0.1:8188"');
+    expect(src).toContain('"sd_xl_base_1.0.safetensors"');
+    expect(src).not.toMatch(/LoraLoader/i);
+
+    const mod = await import("../../scripts/art/gen-raw-lo1.mjs");
+    const wf = mod.buildWorkflow("pos", "neg", 20260401, "the_lac_ha_raw_1");
+    expect(wf[4].inputs.ckpt_name).toBe("sd_xl_base_1.0.safetensors");
+    expect(wf[5].inputs.width).toBe(1216);
+    expect(wf[5].inputs.height).toBe(832);
+    expect(wf[3].inputs.sampler_name).toBe("euler");
+    expect(wf[3].inputs.scheduler).toBe("normal");
+    expect(wf[3].inputs.steps).toBe(25);
+    expect(wf[3].inputs.cfg).toBe(7);
+    expect(wf[3].inputs.denoise).toBe(1);
+    expect(wf[3].inputs.seed).toBe(20260401);
+    expect(wf[9].inputs.filename_prefix).toBe("the_lac_ha_raw_1");
+  });
+
+  it("gen-raw-batch.mjs: hỗ trợ cả lô 1 (MAP_CARD_BATCH 1216x832) và lô 2 (BOSS_CARD_BATCH 1024x1024), SDXL base, không LoRA", async () => {
+    const batchScript = path.join(repoRoot, "scripts", "art", "gen-raw-batch.mjs");
+    expect(fs.existsSync(batchScript)).toBe(true);
+    const src = fs.readFileSync(batchScript, "utf-8");
+    expect(src).toContain("MAP_CARD_BATCH");
+    expect(src).toContain("BOSS_CARD_BATCH");
+    expect(src).toContain("NEGATIVE_PROMPT");
+    expect(src).toContain('"sd_xl_base_1.0.safetensors"');
+    expect(src).not.toMatch(/LoraLoader/i);
+
+    const mod = await import("../../scripts/art/gen-raw-batch.mjs");
+    expect(mod.BATCH_MAP.map.raw).toEqual({ w: 1216, h: 832 });
+    expect(mod.BATCH_MAP.lo1).toBe(mod.BATCH_MAP.map);
+    expect(mod.BATCH_MAP.boss.raw).toEqual({ w: 1024, h: 1024 });
+    expect(mod.BATCH_MAP.lo2).toBe(mod.BATCH_MAP.boss);
+    expect(mod.BATCH_MAP.boss.items).toHaveLength(4);
+    for (const item of mod.BATCH_MAP.boss.items) {
+      expect(item.seeds).toHaveLength(4);
+    }
+
+    const wfBoss = mod.buildWorkflow(
+      mod.BATCH_MAP.boss.items[0].prompt,
+      "neg",
+      2026111801,
+      "the_xich_mang_raw_1",
+      mod.BATCH_MAP.boss.raw.w,
+      mod.BATCH_MAP.boss.raw.h,
+    );
+    expect(wfBoss[4].inputs.ckpt_name).toBe("sd_xl_base_1.0.safetensors");
+    expect(wfBoss[5].inputs.width).toBe(1024);
+    expect(wfBoss[5].inputs.height).toBe(1024);
+    expect(wfBoss[3].inputs.sampler_name).toBe("euler");
+    expect(wfBoss[3].inputs.scheduler).toBe("normal");
+    expect(wfBoss[3].inputs.steps).toBe(25);
+    expect(wfBoss[3].inputs.cfg).toBe(7);
+    expect(wfBoss[3].inputs.denoise).toBe(1);
+    expect(wfBoss[9].inputs.filename_prefix).toBe("the_xich_mang_raw_1");
   });
 });

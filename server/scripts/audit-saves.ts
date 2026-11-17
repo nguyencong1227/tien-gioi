@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import {
   COIN_CAP,
   DEFAULT_MAP,
+  AMBUSH_DAY_CAP,
   DUNGEON_DAILY_REWARDS,
   EQUIP_SLOTS,
   INVENTORY_SLOTS,
@@ -736,6 +737,53 @@ export function auditPlayerSaveData(rawText: string, byteLength: number): AuditE
         });
       }
     }
+  }
+
+  // 12b. Bộ đếm chặn đường theo ngày (mục 52): ambushDaily { day, n } và mốc hồi ambushUntil
+  if (data.ambushDaily !== undefined) {
+    if (
+      typeof data.ambushDaily !== "object" ||
+      data.ambushDaily === null ||
+      Array.isArray(data.ambushDaily)
+    ) {
+      errors.push({
+        code: "invalid_ambush_daily",
+        message: "ambushDaily phải là một JSON Object { day, n }",
+      });
+    } else {
+      const { day, n } = data.ambushDaily;
+      if (!isValidDayKey(day)) {
+        errors.push({
+          code: "invalid_ambush_daily_day",
+          message: `ambushDaily.day (${typeof day === "string" ? `<chuỗi ${day.length} ký tự>` : show(day)}) phải là chuỗi ngày YYYY-MM-DD hợp lệ`,
+        });
+      }
+      if (typeof n !== "number" || !Number.isInteger(n) || n < 0 || n > AMBUSH_DAY_CAP) {
+        errors.push({
+          code: "invalid_ambush_daily_n",
+          message: `ambushDaily.n (${typeof n === "string" ? `<chuỗi ${n.length} ký tự>` : show(n)}) phải là số nguyên trong khoảng [0, ${AMBUSH_DAY_CAP}]`,
+        });
+      }
+    }
+  }
+  if (
+    data.ambushUntil !== undefined &&
+    (typeof data.ambushUntil !== "number" || !Number.isFinite(data.ambushUntil))
+  ) {
+    errors.push({
+      code: "invalid_ambush_until",
+      message: `ambushUntil (${typeof data.ambushUntil === "string" ? `<chuỗi ${data.ambushUntil.length} ký tự>` : show(data.ambushUntil)}) phải là số hữu hạn (ms)`,
+    });
+  }
+
+  if (
+    data.ambushReturnAt !== undefined &&
+    (typeof data.ambushReturnAt !== "number" || !Number.isFinite(data.ambushReturnAt))
+  ) {
+    errors.push({
+      code: "invalid_ambush_return_at",
+      message: `ambushReturnAt (${typeof data.ambushReturnAt === "string" ? `<chuỗi ${data.ambushReturnAt.length} ký tự>` : show(data.ambushReturnAt)}) phải là số hữu hạn (ms)`,
+    });
   }
 
   // 13. Sổ chiêu (skills, M7.2, #503)
@@ -1695,6 +1743,19 @@ export function auditSectSaveData(rawText: string, byteLength: number): AuditErr
                   errors.push({
                     code: "invalid_sect_member_today_buy_qty",
                     message: `Thành viên thứ ${i} có today.buys[${itemId}] (${show(qty)}) không hợp lệ (cần số nguyên 0..${maxDayLimit})`,
+                  });
+                }
+                // Bất biến M8.10: điểm tông chỉ tăng nên cấp tông không bao giờ tụt; đã mua được món hôm nay
+                // thì cấp tông HIỆN TẠI >= `minLevel` của món (sectService.shopBuy từ chối `shop_locked` dưới cấp đó)
+                if (
+                  shopEntry &&
+                  typeof qty === "number" &&
+                  qty > 0 &&
+                  shopEntry.minLevel > sectLimits.level
+                ) {
+                  errors.push({
+                    code: "sect_member_today_buy_level_too_high",
+                    message: `Thành viên thứ ${i} có today.buys[${itemId}] = ${qty} nhưng món mở ở cấp tông ${shopEntry.minLevel}, tông đang cấp ${sectLimits.level}`,
                   });
                 }
               }

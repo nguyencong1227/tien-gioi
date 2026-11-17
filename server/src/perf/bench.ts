@@ -168,6 +168,10 @@ export function runBench(
         sectVault: () => {},
         sectHall: () => {},
         netShield: () => {},
+        ambushOffer: () => {},
+        ambushEnd: () => {},
+        ambushState: () => {},
+        worldBoss: () => {},
       },
       map,
     );
@@ -444,6 +448,10 @@ export function runMultiMapBench(
           sectVault: () => {},
           sectHall: () => {},
           netShield: () => {},
+          ambushOffer: () => {},
+          ambushEnd: () => {},
+          ambushState: () => {},
+          worldBoss: () => {},
         },
         map,
       );

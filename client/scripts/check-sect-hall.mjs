@@ -51,6 +51,8 @@ export const VIEWPORTS = [
   { name: "640x360", w: 640, h: 360, dpr: 2, mobile: true },
 ];
 const MIN_TAP_PX = 44;
+/** Cấp tông cao nhất (`SECT_LEVEL_MAX` của shared/): ở cấp này mọi món đã mở theo cấp */
+const SECT_LEVEL_MAX_FOR_CHECK = 5;
 
 async function main() {
   const shotsArg = process.argv.indexOf("--shots");
@@ -290,8 +292,9 @@ async function main() {
           small.length === 0,
           `mọi nút >= ${MIN_TAP_PX} px (nhỏ nhất ${Math.min(...bs.map((b) => b.h))} px)`,
         );
+        // chỉ năm nút của bảng Tông môn: `.sect-tab` còn là lớp của ba tab bảng Xã hội (M9, `#social-tabs`), đang ẩn nên đo ra 0 px
         const tabBtns = await evalJs(
-          `[...document.querySelectorAll(".sect-tab")].map((b) => Math.round(b.getBoundingClientRect().height))`,
+          `[...document.querySelectorAll("#sect-tab-btn-overview, #sect-tab-btn-members, #sect-tab-btn-treasury, #sect-tab-btn-vault, #sect-tab-btn-hall")].map((b) => Math.round(b.getBoundingClientRect().height))`,
         );
         check(
           tabBtns.every((h) => h >= MIN_TAP_PX),
@@ -354,6 +357,231 @@ async function main() {
         `Đổi gửi sectShopBuy {itemId, qty: 1}: ${JSON.stringify(buy?.[1])}`,
       );
       await hallOf(1);
+
+      // ---- mua nhiều (mục 47): ô số lượng dùng chung trong một khung ngay dưới hàng; "Đổi" vẫn mua nhanh MỘT cái ----
+      {
+        const NOW_ROWS = `window.__hv`;
+        const many = (patch = "") => hallOf(5, `v.me.contrib = 100000; window.__hv = v; ${patch}`);
+        // giới hạn mong đợi của từng món, tính độc lập từ dữ liệu (không dùng hàm của client): trần 10, lượt còn lại, cống hiến / giá
+        const expectMax = (id) =>
+          evalJs(
+            `(() => { const v = ${NOW_ROWS}; const e = v.shop.find((x) => x.itemId === ${JSON.stringify(id)}); if (!e || e.locked) return 0; return Math.max(0, Math.min(10, e.left, Math.floor(v.me.contrib / e.cost))); })()`,
+          );
+        const panels = () =>
+          evalJs(
+            `[...document.querySelectorAll("#sect-tab-hall .sect-hall-buy")].map((p) => p.closest("li").getAttribute("data-item-id"))`,
+          );
+        const moreRows = () =>
+          evalJs(
+            `[...document.querySelectorAll("#sect-tab-hall button.sect-hall-more")].map((b) => b.closest("li").getAttribute("data-item-id"))`,
+          );
+        const clickMore = (id) =>
+          evalJs(
+            `(() => { const b = document.querySelector('#sect-tab-hall li[data-item-id="${id}"] button.sect-hall-more'); if (!b) return false; b.click(); return true; })()`,
+          );
+        const qtyState = () =>
+          evalJs(
+            `(() => { const i = document.getElementById("sect-shop-qty"); if (!i) return null; const note = i.closest(".qty-stepper")?.querySelector(".qty-note"); return { value: i.value, focused: document.activeElement === i, invalid: i.getAttribute("aria-invalid") === "true", note: note ? note.textContent : "", mode: i.getAttribute("inputmode"), parent: i.closest("li")?.getAttribute("data-item-id") ?? null }; })()`,
+          );
+        const typeInto = async (text) => {
+          await evalJs(
+            `(() => { const i = document.getElementById("sect-shop-qty"); i.focus(); i.select(); return 1; })()`,
+          );
+          await send("Input.insertText", { text });
+          await sleep(60);
+        };
+        const pressKey = async (k, code, vk, text) => {
+          await send("Input.dispatchKeyEvent", {
+            type: text ? "keyDown" : "rawKeyDown",
+            key: k,
+            code,
+            windowsVirtualKeyCode: vk,
+            nativeVirtualKeyCode: vk,
+            text,
+          });
+          await send("Input.dispatchKeyEvent", {
+            type: "keyUp",
+            key: k,
+            code,
+            windowsVirtualKeyCode: vk,
+            nativeVirtualKeyCode: vk,
+          });
+          await sleep(60);
+        };
+
+        await many();
+        await sleep(150);
+        const ids = await moreRows();
+        const allItems = await evalJs(`${NOW_ROWS}.shop.map((e) => e.itemId)`);
+        let wantIds = [];
+        for (const id of allItems) if ((await expectMax(id)) >= 2) wantIds.push(id);
+        check(
+          wantIds.length >= 2 &&
+            ids.length === wantIds.length &&
+            wantIds.every((id) => ids.includes(id)),
+          `nút 'Nhiều…' chỉ ở món mua được từ 2 cái trở lên (${ids.length} / ${wantIds.length} món)`,
+        );
+        const lockedMore = await evalJs(
+          `[...document.querySelectorAll("#sect-tab-hall li.sect-hall-row")].filter((li) => li.querySelector("button.sect-hall-more") && [...li.querySelectorAll("button")].some((b) => b.textContent === "Đổi" && b.disabled)).length`,
+        );
+        check(lockedMore === 0, "món khoá (Đổi mờ) không có nút 'Nhiều…'");
+        check((await panels()).length === 0, "chưa bấm gì: không có khung mua nhiều nào");
+
+        // mở khung ở món thứ nhất: đúng MỘT khung, trong đúng hàng, ô số = 1, đang focus, bàn phím số
+        const [idA, idB] = ids;
+        check(await clickMore(idA), `bấm 'Nhiều…' ở ${idA}`);
+        await sleep(120);
+        let st = await qtyState();
+        check(
+          JSON.stringify(await panels()) === JSON.stringify([idA]) &&
+            st?.parent === idA &&
+            st.value === "1" &&
+            st.focused &&
+            st.mode === "numeric",
+          `khung mở đúng hàng, ô = 1, đang focus, bàn phím số: ${JSON.stringify(st)}`,
+        );
+        const lab = await evalJs(
+          `(() => { const b = document.querySelector('#sect-tab-hall li[data-item-id="${idA}"] button.sect-hall-more'); return { t: b.textContent, e: b.getAttribute("aria-expanded") }; })()`,
+        );
+        check(
+          lab.t === "Gấp lại" && lab.e === "true",
+          `nút đổi thành 'Gấp lại', aria-expanded: ${JSON.stringify(lab)}`,
+        );
+
+        // sang món khác: khung CHUYỂN (vẫn chỉ một), ô đặt lại 1
+        await typeInto("4");
+        check(await clickMore(idB), `bấm 'Nhiều…' ở ${idB}`);
+        await sleep(120);
+        st = await qtyState();
+        check(
+          JSON.stringify(await panels()) === JSON.stringify([idB]) && st?.value === "1",
+          `khung chuyển sang món khác, chỉ còn một, ô đặt lại 1: ${JSON.stringify([await panels(), st?.value])}`,
+        );
+
+        // gõ 9999 -> kẹp đúng giới hạn của món (tính độc lập), vùng báo nói rõ giới hạn; số hợp lệ thì vùng báo là xem trước tổng giá
+        const maxB = await expectMax(idB);
+        await typeInto("9999");
+        st = await qtyState();
+        check(
+          st?.value === String(maxB) && new RegExp(`Chỉ có tối đa ${maxB}`).test(st.note),
+          `gõ 9999 kẹp về ${maxB}, vùng báo nêu giới hạn: ${JSON.stringify([st?.value, st?.note])}`,
+        );
+        await typeInto("2");
+        st = await qtyState();
+        const price = await evalJs(
+          `(() => { const e = window.__hv.shop.find((x) => x.itemId === ${JSON.stringify(idB)}); return e.cost * 2; })()`,
+        );
+        check(
+          st?.value === "2" &&
+            st.note.startsWith(`Mất ${price.toLocaleString("vi-VN")} cống hiến, còn `),
+          `số hợp lệ: xem trước tổng giá (${price}): ${JSON.stringify(st?.note)}`,
+        );
+        // chữ / số sai: đánh dấu sai kèm lời nhắc, không bao giờ gửi
+        await clearSent();
+        await typeInto("abc");
+        st = await qtyState();
+        check(
+          st?.invalid === true && st.note.length > 0,
+          `gõ chữ: ô đánh dấu sai kèm lời nhắc: ${JSON.stringify([st?.invalid, st?.note])}`,
+        );
+        await pressKey("Enter", "Enter", 13, "\r");
+        check(
+          !(await sent()).some((m) => m[0] === "sectShopBuy"),
+          "Enter khi ô sai / trống: KHÔNG gửi gì",
+        );
+        await typeInto("0");
+        await pressKey("Enter", "Enter", 13, "\r");
+        check(!(await sent()).some((m) => m[0] === "sectShopBuy"), "gõ 0 rồi Enter: KHÔNG gửi gì");
+
+        // vẽ lại (ảnh chụp mới về) khi đang gõ: GIỮ số, focus, vị trí khung
+        await typeInto("2");
+        await many();
+        await sleep(120);
+        st = await qtyState();
+        check(
+          st?.value === "2" && st.focused && st.parent === idB && (await panels()).length === 1,
+          `ảnh chụp mới về lúc đang gõ: giữ số '2', giữ focus, giữ khung: ${JSON.stringify(st)}`,
+        );
+        // Enter gửi MỘT tin với đúng số lượng, khung đóng
+        await clearSent();
+        await typeInto("3");
+        await pressKey("Enter", "Enter", 13, "\r");
+        await sleep(100);
+        const bought = (await sent()).filter((m) => m[0] === "sectShopBuy");
+        check(
+          bought.length === 1 &&
+            bought[0][1].itemId === idB &&
+            bought[0][1].qty === Math.min(3, maxB),
+          `Enter gửi đúng MỘT sectShopBuy {itemId, qty}: ${JSON.stringify(bought)}`,
+        );
+        check((await panels()).length === 0, "gửi xong: khung đóng");
+        await many();
+
+        // nút 'Đổi số này' trong khung cũng gửi đúng số đang gõ; 'Huỷ' đóng không gửi
+        await clickMore(idA);
+        await sleep(100);
+        await typeInto("2");
+        await clearSent();
+        check(await click("Đổi số này"), "bấm 'Đổi số này'");
+        await sleep(100);
+        const viaBtn = (await sent()).filter((m) => m[0] === "sectShopBuy");
+        check(
+          viaBtn.length === 1 &&
+            viaBtn[0][1].itemId === idA &&
+            viaBtn[0][1].qty === Math.min(2, await expectMax(idA)),
+          `'Đổi số này' gửi đúng số: ${JSON.stringify(viaBtn)}`,
+        );
+        await many();
+        await clickMore(idA);
+        await sleep(100);
+        await clearSent();
+        check(await click("Huỷ"), "bấm 'Huỷ'");
+        await sleep(100);
+        check(
+          (await panels()).length === 0 && !(await sent()).some((m) => m[0] === "sectShopBuy"),
+          "'Huỷ': khung đóng, không gửi gì",
+        );
+
+        // Esc trong ô: huỷ khung, bảng KHÔNG đóng (lần Esc kế mới đóng bảng)
+        await clickMore(idA);
+        await sleep(100);
+        await typeInto("5");
+        await pressKey("Escape", "Escape", 27);
+        const stillOpen = await evalJs(`!document.getElementById("sect-modal").hidden`);
+        check(
+          (await panels()).length === 0 && stillOpen,
+          `Esc trong ô: khung đóng, bảng Tông môn vẫn mở (${stillOpen})`,
+        );
+
+        // món bị khoá / hết lượt khi ảnh chụp mới về: khung đóng, không giữ khung cho món không mua được
+        await clickMore(idA);
+        await sleep(100);
+        await many(`v.shop.find((e) => e.itemId === ${JSON.stringify(idA)}).left = 0`);
+        await sleep(120);
+        check(
+          (await panels()).length === 0 && !(await moreRows()).includes(idA),
+          "món hết lượt khi ảnh chụp mới về: khung đóng, không còn nút 'Nhiều…' ở món đó",
+        );
+        // sang ngày mới (món có lượt lại): khung đã đóng KHÔNG tự bật lên lại với số cũ
+        await many();
+        await sleep(120);
+        check(
+          (await panels()).length === 0 && (await moreRows()).includes(idA),
+          "món có lượt lại sau đó: nút 'Nhiều…' về, nhưng khung KHÔNG tự bật lại",
+        );
+        // đã gục: mọi nút mờ, không còn nút 'Nhiều…'
+        await evalJs(`window.__scene.me().dead = true; 1`);
+        await many();
+        await sleep(120);
+        check((await moreRows()).length === 0, "đã gục: không còn nút 'Nhiều…'");
+        await evalJs(`window.__scene.me().dead = false; 1`);
+        await many();
+        check(
+          (await overflow()).modal <= 0 && (await overflow()).tab <= 0,
+          `không tràn ngang sau khi mở khung: ${JSON.stringify(await overflow())}`,
+        );
+        await hallOf(1);
+      }
 
       // ---- mới vào tông: chờ sang ngày + Trả mờ kèm lý do ----
       await hallOf(2, "v.me.earnFromAt = v.now + 3 * 3600000");
@@ -571,6 +799,173 @@ async function main() {
         `window.__ui.toggleQuestModal(false); window.__ui.onQuests({ active: [], done: [], dailyDone: [] }); 1`,
       );
 
+      // ---- cửa hàng GOM NHÓM theo cấp tông (bảng thật ~28 món: cuộn dài, nhiều hàng khoá) ----
+      // Kỳ vọng suy ra từ chính bảng `shop` của ảnh chụp mẫu (khớp `SECT_SHOP` thật; `sanitizeHallView` bỏ món lạ nên không bơm bảng riêng được), nên script đúng với mọi bảng.
+      {
+        const shopOf = (level) => evalJs(`window.__sampleSectHall(${level}, Date.now()).shop`);
+        // oracle độc lập với `hallShopGroups`: món đã mở theo cấp; nhóm chưa mở theo cấp tăng dần; chỉ cấp kế tiếp (nhỏ nhất trên cả hai gian) mở sẵn
+        const expectFor = (shop, level) => {
+          const lockedLv = shop.filter((r) => r.minLevel > level).map((r) => r.minLevel);
+          const next = lockedLv.length ? Math.min(...lockedLv) : null;
+          const groups = [];
+          let visible = 0;
+          const subs = [];
+          for (const hall of ["baoKho", "tangKinh"]) {
+            const mine = shop.filter((r) => r.hall === hall);
+            if (!mine.length) continue;
+            subs.push(hall === "baoKho" ? "Bảo khố" : "Tàng Kinh Các");
+            visible += mine.filter((r) => r.minLevel <= level).length;
+            for (const lv of [
+              ...new Set(mine.filter((r) => r.minLevel > level).map((r) => r.minLevel)),
+            ].sort((a, b) => a - b)) {
+              const n = mine.filter((r) => r.minLevel === lv).length;
+              const open = lv === next;
+              groups.push({ lv, n, open });
+              if (open) visible += n;
+            }
+          }
+          return { groups, visible, subs, total: shop.length };
+        };
+        const probe = () =>
+          evalJs(`(() => {
+            const card = [...document.querySelectorAll("#sect-tab-hall section")].find((x) => x.querySelector("h4")?.textContent.trim() === "Cửa hàng tông môn");
+            const rows = [...card.querySelectorAll("li.sect-hall-row")];
+            const vis = (e) => e.checkVisibility() && e.getBoundingClientRect().height > 0;
+            const groups = [...card.querySelectorAll("details.sect-hall-group")].map((d) => ({
+              title: d.querySelector("summary").textContent, open: d.open, n: d.querySelectorAll("li.sect-hall-row").length,
+              sumH: Math.round(d.querySelector("summary").getBoundingClientRect().height),
+            }));
+            const modal = document.getElementById("sect-modal");
+            return { total: rows.length, visible: rows.filter(vis).length, groups, subs: [...card.querySelectorAll("h5")].map((h) => h.textContent), overflow: modal.scrollWidth - modal.clientWidth, cardH: Math.round(card.getBoundingClientRect().height) };
+          })()`);
+        const toggleGroup = (title) =>
+          evalJs(
+            `(() => { const s = [...document.querySelectorAll("#sect-tab-hall summary")].find((x) => x.textContent.startsWith(${JSON.stringify(title)})); if (!s) return false; s.click(); return true; })()`,
+          );
+        const key = (type, k, code, vk, text) =>
+          send("Input.dispatchKeyEvent", {
+            type,
+            key: k,
+            code,
+            windowsVirtualKeyCode: vk,
+            nativeVirtualKeyCode: vk,
+            text: type === "keyDown" ? text : undefined,
+          });
+        const lvOf = (title) => Number(/Mở ở cấp tông (\d+)/.exec(title)?.[1]);
+
+        await evalJs(
+          `window.__ui.toggleSectModal(true); window.__ui.onSect(${JSON.stringify(sect)}); 1`,
+        );
+        await evalJs(`document.getElementById("sect-tab-btn-hall").click(); 1`);
+        for (const level of [1, 2, 3, 4, 5]) {
+          const shop = await shopOf(level);
+          const want = expectFor(shop, level);
+          await hallOf(level);
+          await sleep(180);
+          const g = await probe();
+          console.log(
+            `    (cấp ${level}: thẻ cửa hàng cao ${g.cardH} px, ${g.visible} / ${g.total} hàng nhìn thấy)`,
+          );
+          check(
+            g.total === want.total,
+            `gom nhóm cấp ${level}: đủ ${want.total} hàng trong DOM, không bỏ món nào (${g.total})`,
+          );
+          check(
+            JSON.stringify(g.subs) === JSON.stringify(want.subs),
+            `cấp ${level}: tiêu đề gian ${JSON.stringify(g.subs)}`,
+          );
+          check(
+            JSON.stringify(g.groups.map((x) => [lvOf(x.title), x.n, x.open])) ===
+              JSON.stringify(want.groups.map((x) => [x.lv, x.n, x.open])),
+            `cấp ${level}: nhóm chưa mở (cấp, số món, mở sẵn) khớp: ${JSON.stringify(g.groups.map((x) => [lvOf(x.title), x.n, x.open]))}`,
+          );
+          check(
+            g.visible === want.visible,
+            `cấp ${level}: ${g.visible} / ${g.total} hàng nhìn thấy (cần ${want.visible})`,
+          );
+          check(g.overflow <= 1, `cấp ${level}: không tràn ngang (${g.overflow})`);
+          if (vp.mobile && g.groups.length)
+            check(
+              g.groups.every((x) => x.sumH >= MIN_TAP_PX),
+              `cấp ${level}: tiêu đề nhóm >= ${MIN_TAP_PX} px (${JSON.stringify(g.groups.map((x) => x.sumH))})`,
+            );
+          if (level === SECT_LEVEL_MAX_FOR_CHECK)
+            check(g.groups.length === 0, "cấp tông cao nhất: không còn nhóm nào");
+        }
+
+        // tương tác ở cấp 1: mở một nhóm đang thu, thu một nhóm đang mở sẵn, bàn phím; vẽ lại vẫn giữ lựa chọn
+        const shop1 = await shopOf(1);
+        const want1 = expectFor(shop1, 1);
+        await hallOf(1);
+        await sleep(180);
+        let g = await probe();
+        const collapsed = g.groups.find((x) => !x.open);
+        const openByDefault = g.groups.find((x) => x.open);
+        if (collapsed) {
+          const before = g.visible;
+          check(
+            await toggleGroup(collapsed.title.split(" · ")[0]),
+            "bấm tiêu đề một nhóm đang thu",
+          );
+          await sleep(150);
+          g = await probe();
+          check(
+            g.visible === before + collapsed.n,
+            `nhóm mở ra: ${g.visible} hàng (cần ${before + collapsed.n})`,
+          );
+          await hallOf(1);
+          await sleep(180);
+          g = await probe();
+          check(
+            g.groups.find((x) => x.title === collapsed.title)?.open === true,
+            "vẽ lại tab (ảnh chụp mới): nhóm người chơi vừa mở VẪN mở",
+          );
+          check(await toggleGroup(collapsed.title.split(" · ")[0]), "thu lại nhóm vừa mở");
+          await sleep(150);
+        }
+        if (openByDefault) {
+          check(
+            await toggleGroup(openByDefault.title.split(" · ")[0]),
+            "bấm tiêu đề nhóm đang mở sẵn",
+          );
+          await sleep(150);
+          await hallOf(1);
+          await sleep(180);
+          g = await probe();
+          check(
+            g.groups.find((x) => x.title === openByDefault.title)?.open === false,
+            "nhóm mở sẵn mà người chơi vừa thu VẪN thu sau khi vẽ lại",
+          );
+          await toggleGroup(openByDefault.title.split(" · ")[0]);
+          await sleep(150);
+        }
+        const kbTitle = (await probe()).groups.find((x) => !x.open)?.title;
+        if (kbTitle) {
+          await evalJs(
+            `[...document.querySelectorAll("#sect-tab-hall summary")].find((x) => x.textContent === ${JSON.stringify(kbTitle)}).focus(); 1`,
+          );
+          const isOpen = async () => (await probe()).groups.find((x) => x.title === kbTitle).open;
+          const k0 = await isOpen();
+          await key("keyDown", "Enter", "Enter", 13, "\r");
+          await key("keyUp", "Enter", "Enter", 13);
+          await sleep(150);
+          const k1 = await isOpen();
+          await key("keyDown", " ", "Space", 32, " ");
+          await key("keyUp", " ", "Space", 32);
+          await sleep(150);
+          const k2 = await isOpen();
+          check(
+            k0 === false && k1 === true && k2 === false,
+            `bàn phím: Enter mở, Cách thu một nhóm (${k0} -> ${k1} -> ${k2})`,
+          );
+        }
+        check(
+          want1.groups.length === 0 || (await probe()).groups.length === want1.groups.length,
+          "sau các thao tác số nhóm không đổi",
+        );
+        await evalJs(`window.__ui.toggleSectModal(false); 1`);
+      }
+
       if (shotsDir) {
         // Bảng Tông môn ĐANG MỞ ở tab Nội vụ (các bước trên đã đóng bảng để kiểm HUD / sổ nhiệm vụ: không mở lại thì ảnh chỉ có màn chơi)
         await evalJs(
@@ -597,6 +992,23 @@ async function main() {
           );
           await sleep(200);
           await snap(suffix);
+        }
+        // nhóm chưa mở của cửa hàng (nếu có): cuộn tới tiêu đề nhóm đầu tiên để ảnh thấy nhóm thu gọn và nhóm mở sẵn
+        const hasGroup = await evalJs(
+          `(() => { const s = document.querySelector("#sect-tab-hall summary.sect-hall-group-title"); if (!s) return false; s.scrollIntoView({ block: "center" }); return true; })()`,
+        );
+        if (hasGroup) {
+          await sleep(200);
+          await snap("-cua-hang-nhom");
+        }
+        // khung "mua nhiều" đang mở (ô số lượng + xem trước + nút): ảnh để người duyệt xem bố cục ở từng khung nhìn
+        await hallOf(5, "v.me.contrib = 100000");
+        const opened = await evalJs(
+          `(() => { const b = document.querySelector("#sect-tab-hall button.sect-hall-more"); if (!b) return false; b.click(); document.querySelector("#sect-tab-hall .sect-hall-buy")?.scrollIntoView({ block: "center" }); return true; })()`,
+        );
+        if (opened) {
+          await sleep(250);
+          await snap("-mua-nhieu");
         }
       }
       await evalJs(`window.__ui.toggleSectModal(false); 1`);
