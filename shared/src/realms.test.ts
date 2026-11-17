@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   REALMS,
   realmLabel,
+  realmOfStep,
   stepOf,
   isLastTier,
   isPeak,
@@ -92,5 +93,27 @@ describe("xác suất đột phá", () => {
       expect(c).toBeLessThanOrEqual(prev);
       prev = c;
     }
+  });
+});
+
+describe("realmOfStep: ngược của stepOf (cột step của bảng Linh hồn)", () => {
+  it("vòng tròn với stepOf trên MỌI bậc; ngoài thang / không nguyên thì null", () => {
+    let step = 0;
+    for (let realm = 0; realm < REALMS.length; realm++)
+      for (let tier = 0; tier < REALMS[realm].tiers.length; tier++, step++) {
+        expect(stepOf(realm, tier)).toBe(step);
+        expect(realmOfStep(step), `bậc ${step}`).toEqual({ realm, tier });
+      }
+    expect(realmOfStep(step)).toBeNull(); // một bậc sau bậc cuối
+    for (const bad of [
+      -1,
+      1.5,
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      "3" as unknown as number,
+      1e9,
+    ])
+      expect(realmOfStep(bad), String(bad)).toBeNull();
+    expect(realmLabel(realmOfStep(0)!.realm, realmOfStep(0)!.tier)).toBe(realmLabel(0, 0));
   });
 });

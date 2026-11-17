@@ -2,6 +2,7 @@
 // nên các system có thể test riêng bằng một World giả.
 import type {
   GameMap,
+  SoulSocial,
   InputMsg,
   FxMsg,
   DmgMsg,
@@ -320,6 +321,13 @@ export class World {
   navBudget = 0;
   /** Phòng đăng ký: được gọi (một lần) khi một người vừa vào Hoàng Tuyền, để lưu file, cộng Duyên và gửi `limbo`. */
   onLimbo: ((sid: string) => void) | null = null;
+  /**
+   * Phòng đăng ký (M9, `systems/social.ts`): ghi PHẦN XÃ HỘI của một chân linh (`Soul.social`) bất đồng bộ NGOÀI tick: `fn` thuần, nhận bản hiện có (hoặc `undefined`) và trả bản mới;
+   * phòng chạy `SoulStore.update` rồi cập nhật `PlayerCtrl.soul` của người đang trực tuyến. Khoá là `identity.soulKey` (không phải sessionId: người đó có thể đã rời phòng). Không có hook
+   * (test đơn vị / bench) thì các sự kiện xã hội bị bỏ qua.
+   */
+  onSocial: ((soulKey: string, fn: (s: SoulSocial | undefined) => SoulSocial) => void) | null =
+    null;
   /**
    * Phòng đăng ký (bí cảnh, 4b): được gọi khi một run vừa được lập, để TẠO phòng bí cảnh (`matchMaker.createRoom`, bất
    * đồng bộ) rồi gọi `runReady(w, run, roomId)` (hoặc `runFailed`). Không có hook (test đơn vị): coi như phòng sẵn sàng ngay.
