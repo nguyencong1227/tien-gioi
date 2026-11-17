@@ -14,6 +14,7 @@ import { quantAngle, type World, type MonsterCtrl } from "../world";
 import { hurtPlayer } from "./combat";
 import { byId } from "./lookup";
 import { applyPlayerStatus } from "./status";
+import { weakened } from "./status-rules";
 
 /** Quãng lao (px) và bề rộng đường lao / vùng báo trước (px). */
 export const CHARGE_LEN = 280;
@@ -88,7 +89,7 @@ function strike(w: World, id: string, m: Monster, mc: MonsterCtrl, angle: number
     left -= s;
   }
   w.events.fx({ kind: "mslash", by: id, x: m.x, y: m.y, angle });
-  const dmg = Math.round(def.atk * CHARGE_MULT);
+  const dmg = weakened(mc, w.now, Math.round(def.atk * CHARGE_MULT)); // `weaken` (mục 51)
   const reach = CHARGE_WIDTH / 2 + PLAYER_RADIUS;
   // Gom trước rồi mới gây sát thương: `hurtPlayer` có thể làm người chơi chết / đổi `w.state.players` (luân hồi)
   const hit: string[] = [];

@@ -285,6 +285,28 @@ export function takeDotDamage(s: StatusInst, now: number): number {
   return whole;
 }
 
+/**
+ * Hệ số sát thương mà quái GÂY RA (mục 51, `weaken` "suy"): `1 - ratio` của `weaken` còn hiệu lực (trần `WEAKEN_MAX_RATIO` = 40% đã kẹp lúc gắn); TRÙM chỉ chịu NỬA (`1 - ratio / 2`).
+ * 1 khi không có hộp / không có `weaken`. Áp cho đòn gây lên NGƯỜI CHƠI (đòn thường, đập đất, lao, đạn, chiêu trùm); không áp cho sát thương theo giây của trạng thái.
+ */
+export function dealtMult(box: StatusBox | undefined, now: number, boss = false): number {
+  if (!box || box.list.length === 0) return 1;
+  let r = 0;
+  for (const s of box.list) if (s.id === "weaken" && s.until > now && s.ratio > r) r = s.ratio;
+  return 1 - (boss ? r / 2 : r);
+}
+
+/** Sát thương `dmg` của một đòn quái gây ra sau khi trừ `weaken` (nguyên, tối thiểu 1); không có `weaken` thì trả đúng `dmg` (không đổi số, không đổi chuỗi ngẫu nhiên). */
+export function weakened(
+  mc: { st?: StatusBox; def: { boss?: boolean } },
+  now: number,
+  dmg: number,
+): number {
+  if (!mc.st) return dmg;
+  const m = dealtMult(mc.st, now, mc.def.boss === true);
+  return m === 1 ? dmg : Math.max(1, Math.round(dmg * m));
+}
+
 /** Trạng thái `id` đang còn hiệu lực trên `box` không. */
 export function hasStatus(box: StatusBox | undefined, id: string, now: number): boolean {
   if (!box) return false;
