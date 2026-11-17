@@ -870,6 +870,8 @@ async function main() {
           const r = (el) => { const b = el.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom, h: b.height, w: b.width }; };
           const radios = [...q("ach-titles").querySelectorAll('[role="radio"]')];
           const groups = [...q("ach-groups").querySelectorAll("details")];
+          const lk = q("ach-locked");
+          const lkItems = [...q("ach-locked-list").querySelectorAll(".ach-item")];
           const items = [...q("ach-groups").querySelectorAll(".ach-item")];
           const pane = q("social-tab-ach");
           const btn = q("btn-social");
@@ -877,6 +879,8 @@ async function main() {
             status: q("ach-status").textContent, statusHidden: q("ach-status").hidden, retryHidden: q("ach-retry").hidden, retryH: r(q("ach-retry")).h,
             bodyHidden: q("ach-body").hidden, summary: q("ach-summary").textContent, worn: q("ach-worn").textContent,
             radios: radios.map((b) => ({ t: b.querySelector(".ach-title-text").textContent, checked: b.getAttribute("aria-checked"), dis: b.getAttribute("aria-disabled"), hint: (b.querySelector(".ach-title-hint") || {}).textContent || "", h: r(b).h })),
+            locked: { hidden: lk.hidden, open: lk.open, sum: q("ach-locked-sum").textContent, sumH: r(q("ach-locked-sum")).h, nRadioInside: lk.querySelectorAll('[role="radio"]').length,
+              items: lkItems.map((li) => ({ name: li.querySelector(".ach-name").textContent, hint: li.querySelector(".ach-desc").textContent, w: r(li).w, h: r(li).h })) },
             groups: groups.map((g) => ({ s: g.querySelector("summary").textContent, open: g.open, h: r(g.querySelector("summary")).h })),
             items: items.map((li) => ({ name: li.querySelector(".ach-name").textContent, state: li.querySelector(".ach-state").textContent, isNew: !!li.querySelector(".ach-badge"),
               bar: li.querySelector(".ach-bar") ? { now: li.querySelector(".ach-bar").getAttribute("aria-valuenow"), text: li.querySelector(".ach-bar").getAttribute("aria-valuetext") } : null,
@@ -930,21 +934,27 @@ async function main() {
       );
       check(/^Đã đạt 1 \/ \d+ thành tựu\.$/.test(a.summary), `tóm tắt: "${a.summary}"`);
       check(a.worn === "Danh hiệu đang đeo: Tái Sinh", `danh hiệu đang đeo: "${a.worn}"`);
-      // Số danh hiệu lấy từ DANH MỤC (`TITLES` của shared, D / A mở rộng tới 32 ở M9.9) nên KHÔNG cứng: sổ mẫu chỉ mở một danh hiệu (Tái Sinh) => nút = "Không đeo" + mọi danh hiệu
+      // Danh hiệu ĐÃ mở hiện thẳng (radio) cùng "Không đeo"; CHƯA mở gập vào một mục riêng (M9.9: 32 danh hiệu, hiện hết thì phải cuộn ~1800 px mới tới thành tựu). Số danh hiệu
+      // lấy từ DANH MỤC (`TITLES` của shared) nên KHÔNG cứng: sổ mẫu chỉ mở một danh hiệu (Tái Sinh) => radio = "Không đeo" + Tái Sinh, mọi danh hiệu còn lại nằm trong mục gập
       check(
-        a.radios.length >= 5 &&
+        a.radios.length === 2 &&
           a.radios.filter((x) => x.checked === "true").length === 1 &&
-          a.radios[1].checked === "true",
-        `danh hiệu: Không đeo + ${a.radios.length - 1} danh hiệu, đúng MỘT cái được chọn (${a.radios.map((x) => x.t + (x.checked === "true" ? "*" : "")).join(" | ")})`,
+          a.radios[1].checked === "true" &&
+          a.radios.every((x) => x.dis === null),
+        `danh hiệu: chỉ "Không đeo" + cái đã mở là nút chọn, đúng MỘT cái được chọn (${a.radios.map((x) => x.t + (x.checked === "true" ? "*" : "")).join(" | ")})`,
       );
-      // khoá = mọi danh hiệu trừ "Không đeo" và Tái Sinh (cái duy nhất sổ mẫu đã mở)
-      const lockedN = a.radios.filter((x) => x.dis === "true").length;
+      const lockedN = a.locked.items.length;
       check(
-        lockedN === a.radios.length - 2 &&
-          a.radios
-            .filter((x) => x.dis === "true")
-            .every((x) => /^Mở bằng thành tựu: /.test(x.hint)),
-        `${lockedN} danh hiệu khoá: aria-disabled + nói cách mở bằng CHỮ`,
+        !a.locked.hidden &&
+          !a.locked.open &&
+          lockedN >= 3 &&
+          a.locked.sum === `Còn ${lockedN} danh hiệu chưa mở` &&
+          a.locked.nRadioInside === 0,
+        `danh hiệu chưa mở GẬP sẵn: "${a.locked.sum}" (${lockedN} mục, mở = ${a.locked.open}), không phải nút chọn`,
+      );
+      check(
+        a.locked.sumH >= 44 - 0.5,
+        `mục gập danh hiệu: tiêu đề cao >= 44 px (${Math.round(a.locked.sumH)} px)`,
       );
       check(
         a.radios.every((x) => x.h >= 44 - 0.5),
@@ -954,6 +964,28 @@ async function main() {
         a.groups.length >= 1 && a.groups.every((g) => g.h >= 44 - 0.5),
         `mỗi nhóm thành tựu có tiêu đề cao >= 44 px (${a.groups.length} nhóm)`,
       );
+      // bấm tiêu đề mở mục gập: mỗi danh hiệu chưa mở có TÊN + cách mở bằng CHỮ, không tràn ngang; vẽ lại sổ (tin mới) KHÔNG làm gập lại; bấm lần nữa thì gập
+      await evalJs(`document.getElementById("ach-locked-sum").click(); 1`);
+      await sleep(120);
+      let lk = await ach();
+      check(
+        lk.locked.open &&
+          lk.locked.items.length === lockedN &&
+          lk.locked.items.every(
+            (x) => x.name !== "" && /^Mở bằng thành tựu: /.test(x.hint) && x.h > 0 && x.w > 0,
+          ) &&
+          lk.paneOverflow <= 1 &&
+          lk.pageOverflow <= 1,
+        `mở mục gập: ${lk.locked.items.length} danh hiệu chưa mở, mỗi cái có tên + "Mở bằng thành tựu: ...", không tràn ngang (bảng ${lk.paneOverflow}, trang ${lk.pageOverflow})`,
+      );
+      await setAch();
+      await sleep(150);
+      lk = await ach();
+      check(lk.locked.open, "sổ mới về lúc đang xem: mục gập danh hiệu vẫn MỞ");
+      await evalJs(`document.getElementById("ach-locked-sum").click(); 1`);
+      await sleep(120);
+      lk = await ach();
+      check(!lk.locked.open, "bấm tiêu đề lần nữa: mục gập danh hiệu đóng lại");
       const itDone = a.items.find((x) => x.name === "Luân Hồi Lần Đầu");
       const itDoing = a.items.find((x) => x.name === "Mười Trận Thắng");
       check(
@@ -983,9 +1015,9 @@ async function main() {
         );
       }
 
-      // đeo / gỡ: KHÔNG đoán trước, chỉ đổi khi máy chủ trả lại achievements; bấm cái khoá không làm gì
+      // đeo / gỡ: KHÔNG đoán trước, chỉ đổi khi máy chủ trả lại achievements; bấm danh hiệu CHƯA mở (chỉ là chữ trong mục gập) không làm gì
       await evalJs(
-        `window.__sent.length = 0; [...document.querySelectorAll('#ach-titles [role="radio"]')].find((b) => b.getAttribute("aria-disabled") === "true").click(); 1`,
+        `window.__sent.length = 0; document.getElementById("ach-locked").open = true; document.querySelector("#ach-locked-list .ach-item").click(); document.getElementById("ach-locked").open = false; 1`,
       );
       a = await ach();
       check(

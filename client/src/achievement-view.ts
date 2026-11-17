@@ -156,6 +156,25 @@ export interface AchievementsView {
   wornText: string;
 }
 
+/** Danh hiệu chia hai phần: ĐÃ mở (hiện thẳng, đeo được) và CHƯA mở (gập lại; M9.9 có 32 danh hiệu, hiện cả 31 cái khoá thì người chơi phải cuộn ~1800 px ở 360 x 640 mới tới thành tựu). */
+export interface TitleSplit {
+  open: TitleChoiceView[];
+  locked: TitleChoiceView[];
+  /** "Còn 3 danh hiệu chưa mở" (rỗng khi không còn cái nào khoá). */
+  lockedLabel: string;
+}
+
+/** Tách danh sách danh hiệu của `achievementsView` thành đã mở / chưa mở, giữ nguyên thứ tự dữ liệu trong từng phần. */
+export function splitTitles(titles: readonly TitleChoiceView[]): TitleSplit {
+  const open = titles.filter((t) => t.unlocked);
+  const locked = titles.filter((t) => !t.unlocked);
+  return {
+    open,
+    locked,
+    lockedLabel: locked.length > 0 ? `Còn ${fmtCount(locked.length)} danh hiệu chưa mở` : "",
+  };
+}
+
 function rewardText(a: AchievementDef): string {
   const parts: string[] = [];
   const t = a.reward?.titleId !== undefined ? titleOf(a.reward.titleId) : undefined;
