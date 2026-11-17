@@ -157,6 +157,10 @@ try {
   await say({ from: "<img src=x onerror=alert(1)>", text: "<script>x</script>", titleId: "kp1" });
   r = await last();
   check(
+    r.label.includes("<img src=x onerror=alert(1)>") && r.all.endsWith("<script>x</script>"),
+    "tên / chữ chứa thẻ HTML hiện NGUYÊN VĂN như chữ (không bị lọc, không thành thẻ)",
+  );
+  check(
     !r.html && r.title === "«Lữ Khách»",
     "tên / chữ chứa thẻ HTML chỉ là chữ (textContent), danh hiệu vẫn đúng",
   );
