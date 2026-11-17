@@ -214,6 +214,7 @@ import { testExpMultFor } from "../test-exp";
 import type { LeaderboardService } from "../leaderboard";
 import { achievementsMsgOf, grantDue, unlockedTitles, wornTitle } from "../systems/achievements";
 import { trackSocial } from "../systems/social";
+import { worldBossStatus } from "../systems/world-boss";
 import { defaultHub, type Hub } from "../hub";
 
 const SAVE_EVERY_MS = 30_000;
@@ -342,6 +343,7 @@ export class WorldRoom extends Room<WorldState> {
         ambushOffer: (sid, msg) => this.sendTo(sid, AMBUSH_MSG.offer, msg),
         ambushEnd: (sid, msg) => this.sendTo(sid, AMBUSH_MSG.end, msg),
         ambushState: (sid, msg) => this.sendTo(sid, AMBUSH_MSG.state, msg),
+        worldBoss: (sid, msg) => this.sendTo(sid, SOCIAL_MSG.worldBoss, msg),
       },
       map,
       this.hub,
@@ -535,6 +537,10 @@ export class WorldRoom extends Room<WorldState> {
       };
       this.sendTo(sid, SOCIAL_MSG.boards, view);
     });
+    // Trùm thế giới (M9.4): trả MỘT tin trạng thái (đang diễn ra / sắp tới / không có lịch) cho người ở BẤT KỲ phòng nào; không tải, chỉ đọc sổ trong bộ nhớ
+    this.on(SOCIAL_MSG.worldBossGet, (sid) =>
+      this.sendTo(sid, SOCIAL_MSG.worldBoss, worldBossStatus(this.world, sid)),
+    );
     this.on(SECT_MSG.questAccept, (sid, m) => void sectQuestAccept(w, sid, m));
     this.on(SECT_MSG.questTurnIn, (sid, m) => void sectQuestTurnIn(w, sid, m));
     this.on(SECT_MSG.shopBuy, (sid, m) => void sectShopBuy(w, sid, m));
@@ -800,6 +806,12 @@ export class WorldRoom extends Room<WorldState> {
     partyResync(this.world, client.sessionId); // vừa qua cổng từ bản đồ khác: vẫn ở trong đội, nhận đội hình ngay
     void sectOnJoin(this.world, client.sessionId); // tông môn theo linh hồn: nhận ảnh chụp + đặt biệt hiệu (bất đồng bộ)
     this.world.events.sys(`${p.name} (${realmLabel(p.realm, p.tier)}) đã nhập thế.`);
+    if (this.world.hub.worldBoss.active)
+      this.sendTo(
+        client.sessionId,
+        SOCIAL_MSG.worldBoss,
+        worldBossStatus(this.world, client.sessionId),
+      ); // trùm thế giới (M9.4): vào giữa lúc báo trước / đang diễn ra thì biết ngay
     if (limbo) void this.resumeLimbo(client.sessionId); // vào lại giữa lúc ở Hoàng Tuyền: cộng Duyên nếu còn thiếu, hiện lại màn hình
     if (inRun) {
       const run = runOfWorld(this.world);

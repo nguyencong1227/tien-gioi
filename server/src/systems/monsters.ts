@@ -106,7 +106,9 @@ export function spawnDungeonMonsters(w: World) {
 /** Bổ sung quái bị giết, mỗi lần tối đa vài con mỗi loại. */
 export function topUpMonsters(w: World) {
   const count: Record<string, number> = {};
-  for (const m of w.state.monsters.values()) count[m.kind] = (count[m.kind] ?? 0) + 1;
+  w.state.monsters.forEach((m, id) => {
+    if (id !== w.wbossId) count[m.kind] = (count[m.kind] ?? 0) + 1; // trùm thế giới (M9.4) là thêm, không thay một con thường
+  });
   for (const def of MONSTERS) {
     const missing = w.map.monsterCapOf(def.id) - (count[def.id] ?? 0);
     for (let i = 0; i < Math.min(missing, MAX_SPAWN_PER_TOPUP); i++) spawnMonster(w, def);
