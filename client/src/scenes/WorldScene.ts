@@ -775,6 +775,7 @@ export class WorldScene extends Phaser.Scene {
       // Gặp chặn đường (mục 52): trả `true` chỉ khi tin thật sự đi (đang nối lại thì không gửi, hộp thoại thử lại sau)
       onAmbushSeen: (m) => this.sendAmbush(AMBUSH_MSG.seen, m),
       onAmbushChoose: (m) => this.sendAmbush(AMBUSH_MSG.choose, m),
+      onAmbushFlee: (m) => this.sendAmbush(AMBUSH_MSG.flee, m),
       onAchievementsGet: () =>
         !this.isReconnecting && this.room.send(SOCIAL_MSG.achievementsGet, {}),
       onTitleSet: (id) => !this.isReconnecting && this.room.send(SOCIAL_MSG.titleSet, { id }),
@@ -2421,6 +2422,7 @@ export class WorldScene extends Phaser.Scene {
     // Gặp chặn đường (mục 52, CD7): hộp thoại + kết cục; gửi lại cùng `id` sau nối lại là bản CẬP NHẬT (`ui.onAmbushOffer` tự phân biệt)
     reg(AMBUSH_MSG.offer, (m: unknown) => ui.onAmbushOffer(m));
     reg(AMBUSH_MSG.end, (m: unknown) => ui.onAmbushEnd(m));
+    reg(AMBUSH_MSG.state, (m: unknown) => ui.onAmbushState(m)); // đấu trường: mỗi giây `{ msLeft, giá giữa trận }`
     // Thành tựu + danh hiệu (M9.8): sổ (cũng là câu trả lời của `titleSet`) + thông báo mới đạt; `ui` tự làm sạch + tôn trọng cờ ?social=1
     reg(SOCIAL_MSG.achievements, (m: unknown) => ui.setAchievements(m));
     reg(SOCIAL_MSG.achievementNew, (m: unknown) => ui.onAchievementNew(m));

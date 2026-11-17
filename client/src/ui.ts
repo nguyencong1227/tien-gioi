@@ -101,8 +101,17 @@ import {
   type AchievementsMsg,
   AMBUSH_OFFER_MS,
   type AmbushChooseMsg,
+  type AmbushFleeMsg,
   type AmbushSeenMsg,
 } from "@tien-gioi/shared";
+import {
+  arenaHudView,
+  fleeArena,
+  parseAmbushState,
+  setFleeConfirm,
+  updateArenaHud,
+  type ArenaHud,
+} from "./arena-hud-view";
 import {
   ambushDialogView,
   ambushEndToast,
@@ -420,6 +429,8 @@ export interface UiCallbacks {
    */
   onAmbushSeen?: (msg: AmbushSeenMsg) => boolean;
   onAmbushChoose?: (msg: AmbushChooseMsg) => boolean;
+  /** Bỏ chạy giữa trận ở đấu trường (`ambushFlee { choice }`, CD7 bước 3); `true` CHỈ khi tin thật sự đã gửi. */
+  onAmbushFlee?: (msg: AmbushFleeMsg) => boolean;
   /** Bảng Xã hội, tab Thành tựu (M9.8): xin sổ thành tựu (máy chủ trả tin `achievements`) / đeo hoặc gỡ danh hiệu (`null` = gỡ; máy chủ LUÔN trả lại `achievements`) */
   onAchievementsGet?: () => void;
   onTitleSet?: (id: string | null) => void;
@@ -753,6 +764,8 @@ function pickAmbush(choice: unknown): void {
 }
 
 function hideAmbushImpl(): void {
+  hideArenaImpl();
+  hideArenaResult();
   if (ambushTimer !== null) {
     clearInterval(ambushTimer);
     ambushTimer = null;
@@ -793,6 +806,148 @@ function bindAmbushDom(): void {
   document.addEventListener("visibilitychange", () => {
     if (ambushDlg) renderAmbush();
   });
+}
+
+// ---- Đấu trường gặp chặn đường (mục 52, CD7 bước 3): HUD + bảng xác nhận bỏ chạy + thẻ kết quả, vẽ từ `arena-hud-view.ts` (thuần) ----
+/** HUD đang hiện (null = không ở đấu trường). Mỗi `ambushState` (mỗi giây) làm mới đồng hồ + giá; máy chủ quyết kết cục. */
+let arenaHud: ArenaHud | null = null;
+let arenaTimer: ReturnType<typeof setInterval> | null = null;
+let arenaResultTimer: ReturnType<typeof setTimeout> | null = null;
+const ARENA_RESULT_MS = 6_000;
+const FLEE_BTN_ID: Readonly<Record<string, string>> = {
+  flee_coin: "aflee-coin",
+  flee_exp: "aflee-exp",
+};
+
+function fleeSheetOpen(): boolean {
+  const el = document.getElementById("ambush-flee-modal");
+  return Boolean(el && !el.hidden);
+}
+
+/** Vẽ lại HUD (và bảng xác nhận nếu đang mở) theo đồng hồ hiện tại. */
+function renderArena(): void {
+  const h = arenaHud;
+  if (!h) return;
+  const v = arenaHudView(h, performance.now());
+  const reconnecting = document.body.classList.contains("reconnecting");
+  const clock = document.getElementById("ahud-clock");
+  setTextIfChanged(clock, reconnecting ? "Tạm dừng" : v.waitingServer ? "Chờ…" : v.countdown);
+  clock?.classList.toggle("urgent", v.urgent && !reconnecting);
+  const flee = document.getElementById("ahud-flee");
+  flee?.setAttribute("aria-disabled", String(!v.canOpenFlee || reconnecting));
+  flee?.setAttribute("aria-label", `Bỏ chạy giữa trận. ${v.announce}`);
+  setTextIfChanged(
+    document.getElementById("ahud-note"),
+    reconnecting ? "Đang nối lại…" : v.confirming ? "" : v.note,
+  );
+  if (!fleeSheetOpen()) return;
+  setTextIfChanged(document.getElementById("aflee-text"), v.confirmText);
+  v.buttons.forEach((b) => {
+    const el = document.getElementById(FLEE_BTN_ID[b.choice]);
+    if (!el) return;
+    setTextIfChanged(el.querySelector(".ab-label"), b.label);
+    setTextIfChanged(el.querySelector(".ab-sub"), b.sub);
+    el.setAttribute("aria-disabled", String(!b.enabled || reconnecting));
+    el.setAttribute("aria-label", b.aria);
+  });
+  setTextIfChanged(
+    document.getElementById("aflee-note"),
+    reconnecting ? "Đang nối lại… chưa bỏ chạy được." : v.note,
+  );
+}
+
+function openFleeSheet(): void {
+  const h = arenaHud;
+  if (!h || document.body.classList.contains("reconnecting") || fleeSheetOpen()) return;
+  arenaHud = setFleeConfirm(h, true, performance.now());
+  const el = document.getElementById("ambush-flee-modal");
+  if (!el) return;
+  el.hidden = false;
+  modalStack.push("ambush-flee-modal", document.getElementById("ahud-flee"));
+  // focus vào KHUNG, không vào nút giá: đang bấm phím chiến đấu thì không được chọn nhầm cách trả
+  el.focus();
+  renderArena();
+}
+
+/** Đóng bảng xác nhận ("Ở lại đánh" / Esc). Đang chờ phản hồi của lựa chọn đã gửi thì giữ (không rút lại giữa chừng). */
+function closeFleeSheet(): void {
+  const el = document.getElementById("ambush-flee-modal");
+  if (!el || el.hidden) return;
+  if (arenaHud) {
+    const next = setFleeConfirm(arenaHud, false, performance.now());
+    if (next.confirming) return;
+    arenaHud = next;
+  }
+  el.hidden = true;
+  if (modalStack.remove("ambush-flee-modal")) returnFocus(document.getElementById("ahud-flee"));
+  renderArena();
+}
+
+/** Người chơi chọn cách trả ở bảng xác nhận (chỉ nút giá mới gửi; không phím tắt chữ cái). */
+function pickFlee(choice: unknown): void {
+  const h = arenaHud;
+  if (!h || document.body.classList.contains("reconnecting")) return;
+  const r = fleeArena(h, choice, performance.now());
+  if (r.send !== null && callbacks?.onAmbushFlee?.(r.send) === true) arenaHud = r.hud;
+  renderArena();
+}
+
+function hideArenaResult(): void {
+  if (arenaResultTimer !== null) {
+    clearTimeout(arenaResultTimer);
+    arenaResultTimer = null;
+  }
+  const card = document.getElementById("ambush-result");
+  if (card) card.hidden = true;
+}
+
+/** Thẻ kết quả ở đấu trường (thắng liệt kê thưởng; bỏ chạy / thua / hết giờ nói đúng cái giá). Tự ẩn sau `ARENA_RESULT_MS` hoặc khi đổi phòng. */
+function showArenaResult(end: Parameters<typeof ambushEndView>[0]): void {
+  const v = ambushEndView(end);
+  const card = document.getElementById("ambush-result");
+  const title = document.getElementById("ar-title");
+  const list = document.getElementById("ar-lines");
+  if (!card || !title || !list || v.silent) return;
+  card.className = `ambush-result ${v.tone}`;
+  title.textContent = v.title;
+  list.replaceChildren(
+    ...v.lines.map((t) => {
+      const li = document.createElement("li");
+      li.textContent = t;
+      return li;
+    }),
+  );
+  card.hidden = false;
+  if (arenaResultTimer !== null) clearTimeout(arenaResultTimer);
+  arenaResultTimer = setTimeout(hideArenaResult, ARENA_RESULT_MS);
+}
+
+/** Gỡ HUD đấu trường + bảng xác nhận (hết trận / đổi phòng); KHÔNG đụng thẻ kết quả. */
+function hideArenaImpl(): void {
+  if (arenaTimer !== null) {
+    clearInterval(arenaTimer);
+    arenaTimer = null;
+  }
+  arenaHud = null;
+  const hud = document.getElementById("ambush-hud");
+  if (hud) hud.hidden = true;
+  const sheet = document.getElementById("ambush-flee-modal");
+  if (sheet) sheet.hidden = true;
+  document.body.classList.remove("in-arena");
+  modalStack.remove("ambush-flee-modal");
+}
+
+/** Gắn sự kiện một lần lúc khởi tạo: nút Bỏ chạy ở HUD (mở xác nhận), hai nút giá, "Ở lại đánh". */
+function bindArenaDom(): void {
+  const flee = document.getElementById("ahud-flee");
+  flee?.addEventListener("click", () => {
+    if (flee.getAttribute("aria-disabled") !== "true") openFleeSheet();
+  });
+  for (const id of Object.values(FLEE_BTN_ID)) {
+    const el = document.getElementById(id);
+    el?.addEventListener("click", () => pickFlee(el.dataset.choice));
+  }
+  document.getElementById("aflee-cancel")?.addEventListener("click", closeFleeSheet);
 }
 
 // ---- Trùm thế giới (M9.7, #1026): banner + tab Sự kiện, vẽ từ `world-boss-view.ts` ----
@@ -4667,6 +4822,7 @@ export const ui = {
     // `isKeyboardCaptured()` kẹt true, WASD / phím thế giới không chạy cho tới khi bấm Esc (lỗi nền của #468, gặp khi dùng chuột bấm nút menu).
     bindTap("pm-close", () => this.closePlayerMenu());
     bindAmbushDom();
+    bindArenaDom();
     bindTap("pm-invite-btn", () => {
       this.closePlayerMenu();
       if (selectedPlayerName) callbacks?.onPartyInvite?.(selectedPlayerName);
@@ -5693,6 +5849,10 @@ export const ui = {
       this.closePlayerMenu();
       closedAny = true;
     }
+    if (fleeSheetOpen()) {
+      closeFleeSheet();
+      closedAny = true;
+    }
     modalStack.clear();
     // WorldScene gọi closeAllModals mỗi lần cập nhật khi đang chết: màn Hoàng Tuyền (không phải "modal" để đóng) phải còn trong modalStack
     if (this.isLimboOpen()) modalStack.push("limbo-overlay", null);
@@ -5747,6 +5907,9 @@ export const ui = {
         return true;
       case "newbie-guide-modal":
         this.dismissNewbieGuide();
+        return true;
+      case "ambush-flee-modal":
+        closeFleeSheet(); // Esc = "Ở lại đánh" (đang chờ phản hồi thì giữ)
         return true;
       case "ambush-modal":
         return true; // Esc KHÔNG đóng hộp thoại chặn đường (phải chọn, hoặc hết giờ = Chiến): nuốt phím, không bỏ chọn mục tiêu
@@ -6781,9 +6944,28 @@ export const ui = {
   onAmbushEnd(raw: unknown) {
     const end = parseAmbushEnd(raw);
     if (end === null) return;
+    const inArena = arenaHud !== null; // kết cục của TRẬN trong đấu trường: hiện thẻ kết quả, không chỉ toast
     hideAmbushImpl();
+    if (inArena) {
+      showArenaResult(end);
+      return;
+    }
     const text = ambushEndToast(end);
     if (text !== "") this.toast({ text, tone: ambushEndView(end).tone });
+  },
+
+  /** Tin `ambushState` (mỗi giây trong đấu trường): làm sạch rồi hiện / làm mới HUD. Tin sai dạng bị bỏ. */
+  onAmbushState(raw: unknown) {
+    const st = parseAmbushState(raw);
+    if (st === null) return;
+    arenaHud = updateArenaHud(arenaHud, st, performance.now());
+    const hud = $("ambush-hud");
+    if (hud.hidden) {
+      hud.hidden = false;
+      document.body.classList.add("in-arena");
+    }
+    renderArena();
+    if (arenaTimer === null) arenaTimer = setInterval(renderArena, AMBUSH_TICK_MS);
   },
 
   /** Đóng hộp thoại chặn đường không báo gì (đổi phòng / chuyển cảnh). */

@@ -19,3 +19,22 @@ describe("canh nối mã: gặp chặn đường ở main.ts", () => {
     expect(hide, "hideAmbush phải đứng TRƯỚC showTransition").toBeLessThan(transition);
   });
 });
+
+describe("canh nối mã: gặp chặn đường ở WorldScene.ts", () => {
+  const scene = read("client/src/scenes/WorldScene.ts");
+  it("nhận đủ bốn tin của máy chủ (offer, end, state) qua `reg` (đăng ký lại ở Room mới sau nối lại)", () => {
+    for (const k of ["offer", "end", "state"])
+      expect(scene, `thiếu reg(AMBUSH_MSG.${k})`).toMatch(
+        new RegExp(`reg\\(AMBUSH_MSG\\.${k},\\s*\\(m: unknown\\)\\s*=>\\s*ui\\.onAmbush`),
+      );
+  });
+  it("ba lệnh gửi (seen, choose, flee) đi qua `sendAmbush` (trả true CHỈ khi tin thật sự đi; đang nối lại thì không gửi)", () => {
+    for (const k of ["seen", "choose", "flee"])
+      expect(scene, `thiếu callback cho AMBUSH_MSG.${k}`).toMatch(
+        new RegExp(`this\\.sendAmbush\\(AMBUSH_MSG\\.${k},`),
+      );
+    expect(scene).toMatch(
+      /private sendAmbush\([^)]*\): boolean \{\s*if \(this\.isReconnecting\) return false;/,
+    );
+  });
+});
