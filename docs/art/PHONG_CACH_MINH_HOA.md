@@ -44,7 +44,7 @@ Lý do từng nhóm: tên game / truyện / nghệ sĩ khác vi phạm quy tắc
 | lớp | dùng ở | tỉ lệ | thô (SDXL) | cuối (WebP) | trần mỗi ảnh | trạng thái |
 |---|---|---|---|---|---|---|
 | nền đăng nhập | `section#login` | 1:1 | 1024x1024 | 1024x1024 | 150 KB | ĐÃ VÀO (`login_bg.webp`, 72 KB) |
-| **thẻ bản đồ** | màn chuyển cảnh qua cổng (ĐÃ nối: `client/src/map-card.ts`, danh sách `MAP_CARDS`; chưa có ảnh thì chỉ hiện tên) và đầu bảng Sơn Hà Đồ (`M`, dự kiến) | 3:2 (thô ≈ 3:2, B cắt nhẹ về đúng 3:2) | 1216x832 | 624x416 | 40 KB | **LÔ 1 ĐÃ VÀO GAME (17/11/2026, mục 5)** |
+| **thẻ bản đồ** | màn chuyển cảnh qua cổng (ĐÃ nối: `client/src/map-card.ts`, danh sách `MAP_CARDS`; chưa có ảnh thì chỉ hiện tên) và đầu bảng Sơn Hà Đồ (`M`; ĐÃ nối: `ui.setMapPanelCard`, thẻ của bản đồ ĐANG XEM, 60x40 px, bỏ ở màn cao <= 480 px) | 3:2 (thô ≈ 3:2, B cắt nhẹ về đúng 3:2) | 1216x832 | 624x416 | 40 KB | **LÔ 1 ĐÃ VÀO GAME (17/11/2026, mục 5)** |
 | thẻ trùm | bảng / báo trùm (dự kiến) | 1:1 | 1024x1024 | 384x384 | 30 KB | lô 2 (mục 5b), vào GÓI `art:trum` (tải theo nhu cầu, mục 4b) |
 | chân dung NPC | khung hội thoại (dự kiến) | 1:1 | 1024x1024 | 256x256 | 20 KB | lô 3, vào GÓI `art:npc` (tải theo nhu cầu, mục 4b) |
 

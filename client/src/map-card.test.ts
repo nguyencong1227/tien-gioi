@@ -216,8 +216,9 @@ describe("canh nối mã: thẻ ở đầu bảng Sơn Hà Đồ theo bản đ�
     expect(scene).toMatch(/ui\.setMapPanelCard\(viewId \?\? this\.map\.def\.id\)/);
     const ui = read("client/src/ui.ts");
     expect(ui).toMatch(/setMapPanelCard\(mapId: string\)/);
+    // CHỈ trong thân hàm `setMapPanelCard` (`[^}]*`: không lấn sang `showTransition` có dòng giống hệt phía sau)
     expect(ui).toMatch(
-      /getElementById\("map-card"\)[^]*applyMapCard\(cardEl,\s*mapCardUrl\(mapId\)\)/,
+      /setMapPanelCard\(mapId: string\) \{[^}]*getElementById\("map-card"\)[^}]*applyMapCard\(cardEl,\s*mapCardUrl\(mapId\)\)/,
     );
   });
 
