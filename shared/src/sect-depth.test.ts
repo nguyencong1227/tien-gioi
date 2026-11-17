@@ -42,6 +42,7 @@ import {
   sectQuestTemplateOf,
   SECT_QUEST_TEMPLATE_BY_ID,
   ITEM_BY_ID,
+  ITEM_VALUE,
   parseSectHallGet,
   parseSectQuest,
   parseSectShopBuy,
@@ -686,6 +687,58 @@ describe("cửa hàng tông môn (mục 12.6)", () => {
     expect(sectShopViolations()).toEqual([]);
   });
 
+  describe("bảng THẬT (M8.7, #844): năm nhóm hàng, giá neo theo giá trị, không bán trang bị", () => {
+    const entries = [...SECT_SHOP];
+    const itemOf = (id: string) => ITEM_BY_ID[id]!;
+
+    it("đủ năm nhóm: nhóm k mở ở cấp tông k (mục 12.4), mỗi cấp có ít nhất một món", () => {
+      for (let lv = 1; lv <= 5; lv++)
+        expect(
+          entries.some((e) => e.minLevel === lv),
+          `cấp ${lv} không có món nào`,
+        ).toBe(true);
+      expect(entries.every((e) => e.minLevel >= 1 && e.minLevel <= 5)).toBe(true);
+    });
+
+    it("Bảo khố bán đồ dùng, Tàng Kinh Các bán kinh quyển (hall khớp loại vật phẩm)", () => {
+      for (const e of entries)
+        expect(e.hall, e.itemId).toBe(itemOf(e.itemId).type === "book" ? "tangKinh" : "baoKho");
+      expect(entries.some((e) => e.hall === "tangKinh")).toBe(true);
+      expect(entries.some((e) => e.hall === "baoKho")).toBe(true);
+    });
+
+    it("KHÔNG bán trang bị (rơi từ trùm / nghề nhỏ là mốc tiến độ; bán bằng cống hiến sẽ đi tắt)", () => {
+      for (const e of entries) expect(itemOf(e.itemId).type, e.itemId).not.toBe("equip");
+    });
+
+    it("kinh quyển theo cấp: cấp 2 rarity <= 1, cấp 4 rarity 2, cấp 5 rarity 3; mỗi quyển 1 lượt / ngày", () => {
+      for (const e of entries.filter((x) => itemOf(x.itemId).type === "book")) {
+        const r = itemOf(e.itemId).rarity;
+        if (e.minLevel === 2) expect(r, e.itemId).toBeLessThanOrEqual(1);
+        else if (e.minLevel === 4) expect(r, e.itemId).toBe(2);
+        else if (e.minLevel === 5) expect(r, e.itemId).toBe(3);
+        else
+          throw new Error(`${e.itemId}: kinh quyển chỉ ở cấp 2 / 4 / 5, không phải ${e.minLevel}`);
+        expect(e.limitDay, e.itemId).toBe(1);
+      }
+    });
+
+    it("GIÁ: mọi món có giá trị đều phải mua bằng cống hiến KHÔNG rẻ hơn 1,5 lần giá trị (chống sinh Linh thạch qua bán lại) và không quá 3 lần", () => {
+      for (const e of entries) {
+        const v = ITEM_VALUE[e.itemId];
+        expect(v, `${e.itemId} không có giá trị`).toBeGreaterThan(0);
+        expect(e.cost * SECT_CH_VALUE_LT, `${e.itemId} quá rẻ`).toBeGreaterThanOrEqual(1.5 * v!);
+        expect(e.cost * SECT_CH_VALUE_LT, `${e.itemId} quá đắt`).toBeLessThanOrEqual(
+          3 * v! + SECT_CH_VALUE_LT,
+        );
+      }
+    });
+
+    it("hạn mức ngày trong khoảng mua một lượt (không bắt người chơi bấm hơn một lượt cho hạn mức)", () => {
+      for (const e of entries) expect(e.limitDay, e.itemId).toBeLessThanOrEqual(SECT_SHOP_QTY_MAX);
+    });
+  });
+
   it("sectShopViolations bắt đúng: món lạ, trùng, giá / hạn mức / cấp xấu, RẺ HƠN NPC", () => {
     const ok: SectShopEntry = {
       itemId: "tu_khi_dan",
@@ -786,7 +839,7 @@ describe("tin nhắn M8 và bộ đọc không tin client", () => {
       { itemId: "__proto__", qty: 1 },
       { itemId: "khong_co", qty: 1 },
       { itemId: 5, qty: 1 },
-      { itemId: ITEM_BY_ID["long_tho"] ? "long_tho" : "x", qty: 1 }, // có thật nhưng KHÔNG bán ở cửa hàng tông
+      { itemId: ITEM_BY_ID["giao_lan"] ? "giao_lan" : "x", qty: 1 }, // có thật nhưng KHÔNG bán ở cửa hàng tông
     ]) {
       expect(parseSectShopBuy(bad)).toBeNull();
     }
