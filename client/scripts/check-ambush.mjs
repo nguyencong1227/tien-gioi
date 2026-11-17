@@ -789,6 +789,92 @@ try {
     await evalJs("window.__ui.hideAmbush(); 1");
   }
 
+  console.log(
+    "--- ĐƯỜNG DÂY THẬT: ?ambush=mock (máy chủ giả -> reg của WorldScene -> giao diện -> sendAmbush -> máy chủ giả) ---",
+  );
+  await send("Emulation.setDeviceMetricsOverride", {
+    width: 1280,
+    height: 720,
+    deviceScaleFactor: 1,
+    mobile: false,
+  });
+  await send("Page.navigate", { url: `${BASE_URL}/?ambush=mock&debug=1` });
+  for (let k = 0; k < 60; k++) {
+    await sleep(300);
+    if (
+      await evalJs(
+        "Boolean(window.__scene && window.__scene.me && window.__scene.me() && window.__ambushMock)",
+      )
+    )
+      break;
+  }
+  await evalJs(`(() => { const sc = window.__scene; window.__sent = [];
+    const orig = sc.room.send.bind(sc.room);
+    sc.room.send = (t, d) => { if (/^ambush/.test(t)) window.__sent.push({ t, d }); return orig(t, d); };
+    return 1; })()`);
+  // chờ lời đề nghị đầu tiên tự tới (máy chủ giả bắt đầu sau ~0,6 giây) bằng ĐÚNG tin ambushOffer qua reg
+  let mockState = await arena();
+  for (let k = 0; k < 40 && !(await state()).open; k++) await sleep(250);
+  s = await state();
+  check(
+    s.open && s.inAmbush && /^Sói Hoang/.test(s.foe),
+    `lời đề nghị đến bằng tin ambushOffer qua reg: hộp thoại tự mở ('${s.foe}')`,
+  );
+  m = await sent();
+  check(
+    m.filter((x) => x.t === "ambushSeen").length >= 1,
+    "giao diện tự gửi ambushSeen qua sendAmbush tới máy chủ giả",
+  );
+  await sleep(ARM_WAIT);
+  await clearSent();
+  await evalJs("document.getElementById('ambush-fight').click(); 1");
+  await sleep(200);
+  m = await sent();
+  check(
+    m.filter((x) => x.t === "ambushChoose" && x.d.choice === "fight").length === 1,
+    "bấm Chiến: gửi ambushChoose { fight } tới máy chủ giả",
+  );
+  s = await state();
+  mockState = await arena();
+  check(
+    !s.open && mockState.hud && mockState.inArena,
+    "máy chủ giả 'đổi phòng': hộp thoại đóng (hideAmbush), HUD đấu trường hiện bằng tin ambushState qua reg",
+  );
+  await sleep(2200);
+  const c1 = (await arena()).clock;
+  await sleep(2200);
+  const c2 = (await arena()).clock;
+  check(c1 !== c2, `đồng hồ HUD chạy theo ambushState mỗi giây ('${c1}' -> '${c2}')`);
+  await evalJs("document.getElementById('ahud-flee').click(); 1");
+  await sleep(500);
+  mockState = await arena();
+  check(
+    mockState.sheet && mockState.coin.sub === "120 Linh thạch" && mockState.exp.sub === "840 tu vi",
+    `bảng xác nhận hiện GIÁ GIỮA TRẬN của máy chủ giả ('${mockState.coin.sub}' / '${mockState.exp.sub}', gấp đôi giá hộp thoại)`,
+  );
+  await clearSent();
+  await evalJs("document.getElementById('aflee-coin').click(); 1");
+  await sleep(700);
+  m = await sent();
+  check(
+    m.filter((x) => x.t === "ambushFlee").length === 1 &&
+      m.find((x) => x.t === "ambushFlee").d.choice === "flee_coin",
+    "chọn Linh thạch: gửi ambushFlee { flee_coin } qua sendAmbush",
+  );
+  mockState = await arena();
+  check(
+    !mockState.hud &&
+      !mockState.sheet &&
+      mockState.result &&
+      mockState.rTitle === "Bỏ chạy thành công" &&
+      mockState.rLines.join("|") === "Mất 120 Linh thạch.",
+    `ambushEnd qua reg: thẻ kết quả đúng giá giữa trận ('${mockState.rTitle}' / '${mockState.rLines.join("|")}')`,
+  );
+  await sleep(6500);
+  s = await state();
+  check(s.open, "sau kết cục máy chủ giả đề nghị LẠI: hộp thoại mới tự mở (luồng lặp được)");
+  await evalJs("window.__ambushMock.stop(); window.__ui.hideAmbush(); 1");
+
   console.log("--- cảm ứng: cần điều khiển đang giữ lúc hộp thoại hiện, kiểu dính đáy ---");
   await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
   await open(390, 844, true);
