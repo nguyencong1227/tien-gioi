@@ -205,6 +205,15 @@ describe("world-boss: bảng đóng góp + trạng thái", () => {
     expect(away.mine).toBeUndefined();
   });
 
+  it("`hpPct` còn sống thì không bao giờ hiện 0 % (còn 0,1 % máu vẫn là 1)", () => {
+    const { han } = setup();
+    addPlayer(han.w, "A");
+    run([han.w], at(11, 59), at(12, 0, 1));
+    hit(han.w, "A", HAN.hp * 0.999);
+    expect(bossOf(han.w)!.m.hp).toBeGreaterThan(0);
+    expect(worldBossStatus(han.w, "A").hpPct).toBe(1);
+  });
+
   it("chỉ trùm thế giới ghi điểm: quái thường cùng loài không; nguồn không phải người chơi không; điểm theo LINH HỒN (hai nhân vật cùng linh hồn cộng dồn)", () => {
     const { hub, han } = setup();
     addPlayer(han.w, "A");
@@ -478,5 +487,34 @@ describe("world-boss: hiệu năng", () => {
       tickWorldBoss(lac.w);
     }
     expect(calls.length).toBe(4); // 1000 ms / 250 ms
+  });
+
+  it("100 người dồn một phòng đánh trùm thế giới 20 lần/giây: tick < 10 ms (ngân sách), bảng chỉ gửi mỗi 2 giây", () => {
+    const { hub, han } = setup();
+    const ids = Array.from({ length: 100 }, (_, i) => `P${i}`);
+    for (const id of ids) addPlayer(han.w, id);
+    run([han.w], at(11, 59), at(12, 0, 1));
+    const b = bossOf(han.w)!;
+    b.m.hp = b.m.maxHp = 1e12; // không chết trong ca đo: chỉ đo chi phí ghi điểm + gửi bảng
+    hub.worldBoss.current!.maxHp = 1e12;
+    han.worldBosses.length = 0;
+    let slow = 0;
+    let total = 0;
+    const TICKS = 200; // 10 giây
+    for (let t = 0; t < TICKS; t++) {
+      han.w.now = at(12, 0, 2) + t * 50;
+      const t0 = performance.now();
+      for (const id of ids) dealMonsterDamage(han.w, b.id, b.m, id, 1000, false); // mỗi người một đòn mỗi tick: nặng hơn thật nhiều
+      tickWorldBoss(han.w);
+      const dt = performance.now() - t0;
+      total += dt;
+      if (dt > 10) slow++;
+    }
+    expect(total / TICKS).toBeLessThan(10);
+    expect(slow).toBeLessThanOrEqual(2); // chấp nhận lẻ tẻ (GC, máy bận), không phải trạng thái thường xuyên
+    const boards = han.worldBosses.filter((m) => m.msg.phase === "live" && m.msg.top !== undefined);
+    expect(boards.length).toBeGreaterThanOrEqual(100 * 4); // ~5 lần mỗi 10 giây (mỗi 2 giây)
+    expect(boards.length).toBeLessThanOrEqual(100 * 6); // không phải mỗi tick (20 lần/giây x 100 người = 20000)
+    expect(hub.worldBoss.current!.rows.size).toBe(100);
   });
 });
