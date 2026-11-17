@@ -276,6 +276,7 @@ import {
   markNewbieGuideDismissed,
 } from "./a11y";
 import { $, buttonShown, fmt, hexColor, onPress, readPref, writePref } from "./ui-util";
+import { applyMapCard, mapCardUrl } from "./map-card";
 import { describeStep, renderQuestTrackerView } from "./ui-quest-tracker";
 import { createQtyStepper, type QtyStepper } from "./qty-stepper";
 import { buyQtyMax, sellQtyMax } from "./shop-qty";
@@ -5278,10 +5279,13 @@ export const ui = {
     renderPartyPanel();
   },
 
-  showTransition(mapName: string) {
+  showTransition(mapName: string, mapId?: string) {
     const overlay = $("transition-overlay");
     const nameEl = $("transition-map-name");
     if (nameEl) nameEl.textContent = mapName;
+    // Thẻ minh hoạ của bản đồ đích (ảnh AI, map-card.ts): chưa có ảnh / ảnh lỗi thì chỉ còn tên như cũ
+    const cardEl = document.getElementById("transition-card");
+    if (cardEl instanceof HTMLImageElement) applyMapCard(cardEl, mapCardUrl(mapId));
     overlay.hidden = false;
     // Ép tính kiểu (reflow) để trình duyệt GHI NHẬN kiểu "trước khi đổi" (mở) rồi mới thêm `active`: phần tử vừa bỏ `hidden`
     // (display: none) mà thêm lớp ngay trong cùng khung thì chuyển động CSS không chạy, màn đổi tức thì.
