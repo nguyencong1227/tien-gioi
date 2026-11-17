@@ -64,6 +64,13 @@ export const BANNED_PROMPT_TERMS = {
     "disney",
     "marvel",
     "ghibli",
+    "tolkien",
+    "middle earth",
+    "lord of the rings",
+    "game of thrones",
+    "skyrim",
+    "witcher",
+    "zelda",
   ],
   "nghệ sĩ / phong cách của một người": [
     "greg rutkowski",

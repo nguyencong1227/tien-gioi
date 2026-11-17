@@ -128,6 +128,11 @@ describe("luật được GHIM bằng chữ (xoá nhầm một từ khỏi danh 
     const all = Object.values(BANNED_PROMPT_TERMS).flat() as string[];
     for (const t of [
       "genshin",
+      "tolkien",
+      "skyrim",
+      "witcher",
+      "zelda",
+      "game of thrones",
       "warcraft",
       "greg rutkowski",
       "in the style of",
