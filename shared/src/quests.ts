@@ -776,6 +776,85 @@ export const QUESTS: QuestDef[] = [
     },
   },
 
+  // ---------- Việc phụ Lạc Hà (Luyện Khí, D6 #754): mỗi NPC một việc, một tầng, KHÔNG thuộc chuỗi chính ----------
+  // Việc phụ KHÔNG bắt buộc: thưởng cho công sức săn quái thêm. exp nhỏ (trần 2,5 % tổng thanh Luyện Khí, xem kim-dan-world.test.ts),
+  // mỗi việc tối đa một kinh quyển rarity <= 2. Steps tránh trùng đúng việc hằng ngày của cao_thi (lang_hai/nop_nanh/ho_hoan).
+  {
+    id: "lac_ha_bong_bang",
+    title: "Bông băng cứu thương",
+    giver: "duoc_su",
+    desc: "Việc phụ (không bắt buộc): Hà lão cần lông thỏ làm bông băng. Hạ 4 Linh Thố, mang về 3 túm lông.",
+    steps: [
+      { kind: "kill", monster: "tho", count: 4 },
+      { kind: "collect", itemId: "long_tho", count: 3 },
+    ],
+    rewards: {
+      exp: 25,
+      items: [
+        { itemId: "hoi_huyet_dan", qty: 3 },
+        { itemId: "kinh_bich_thuy_hoi_xuan", qty: 1 },
+      ],
+    },
+    minRealm: { realm: 1, tier: 0 },
+    talk: {
+      offer: [
+        "Ngươi mới bước vào tiên đồ, giúp lão một việc: tiệm thuốc sắp hết bông băng.",
+        "Lông thỏ mềm, ngâm thuốc là thành bông băng cứu thương. Ra ngoài hạ bốn con Linh Thố, mang ba túm lông về cho lão.",
+      ],
+      progress: ["Linh Thố hiền, đứng xa chém là được. Cẩn thận đừng làm nát lông."],
+      complete: [
+        "Lông thỏ còn ấm, tốt lắm. Lão pha ngay một mẻ bông băng.",
+        "Lấy thêm quyển Bích Thủy Hồi Xuân Thuật này: niệm chú hồi chút máu, phòng thân lúc lâm trận. Mở Túi đồ rồi bấm Học.",
+      ],
+    },
+  },
+  {
+    id: "lac_ha_gai_kiem",
+    title: "Nanh kiếm cho lò rèn",
+    giver: "tho_ren",
+    desc: "Việc phụ (không bắt buộc): Thiết Ngưu cần nanh sói làm chuôi kiếm. Hạ 6 Hôi Lang, mang về 4 nanh.",
+    steps: [
+      { kind: "kill", monster: "lang", count: 6 },
+      { kind: "collect", itemId: "nanh_soi", count: 4 },
+    ],
+    rewards: { exp: 30, items: [{ itemId: "tu_khi_dan", qty: 1 }] },
+    minRealm: { realm: 1, tier: 3 },
+    talk: {
+      offer: [
+        "Hỡi tu sĩ, lò ta đang thiếu chuôi kiếm. Nanh sói mài nhẵn là tốt nhất.",
+        "Hôi Lang đi bầy ở vùng cỏ cao. Hạ sáu con, mang bốn nanh về. Làm tốt ta rèn cho ngươi món ra hồn.",
+      ],
+      progress: ["Nanh sói để mài chuôi, càng tươi càng chắc. Chém trúng rồi nhặt, đừng làm vỡ."],
+      complete: [
+        "Nanh tốt, vừa tầm tay ta. Mài nhẵn là thành chuôi kiếm vững.",
+        "Cầm viên Tụ Khí Đan này, đả tọa nhanh hơn một chút. Kiếm tốt thì sớm có.",
+      ],
+    },
+  },
+  {
+    id: "lac_ha_tru_ho",
+    title: "Vệ trấn trừ hổ",
+    giver: "truong_tran",
+    desc: "Việc phụ (không bắt buộc): Hắc Hổ xuống quấy. Hạ 5 con, mang về 2 da hổ.",
+    steps: [
+      { kind: "kill", monster: "ho", count: 5 },
+      { kind: "collect", itemId: "da_ho", count: 2 },
+    ],
+    rewards: { exp: 35, items: [{ itemId: "dai_hoi_huyet_dan", qty: 1 }] },
+    minRealm: { realm: 1, tier: 6 },
+    talk: {
+      offer: [
+        "Hắc Hổ xuống bìa rừng nhiều hơn mọi năm, dân trấn sợ hãi. Ngươi đã tới tầng bảy, hãy giúp trấn trừ họa.",
+        "Hạ năm con, mang về hai da hổ làm bằng chứng. Đi sâu vào rừng, mang đủ đan dược theo người.",
+      ],
+      progress: ["Hắc Hổ đòn nặng. Đánh một đòn rồi lùi, đừng đứng yên chịu trận."],
+      complete: [
+        "Da Hắc Hổ! Từ nay dân trấn ngủ yên. Ngươi là trụ cột của Lạc Hà rồi.",
+        "Chẳng bao lâu nữa Lạc Hà không còn giữ được ngươi. Phía bắc còn nhiều cơ duyên đợi.",
+      ],
+    },
+  },
+
   // ---------- Nhiệm vụ lặp ở Bảng cáo thị ----------
   {
     id: "lang_hai",
