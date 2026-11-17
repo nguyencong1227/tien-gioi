@@ -141,7 +141,10 @@ try {
     // Bước mỗi input = MEDIAN các hiệu predX giữa hai lần gửi liền nhau. KHÔNG dùng dx / n: mock không có máy chủ xác nhận nên cảnh ngừng đoán sau ~13-14 input chưa xác nhận
     // (xs dẹt ở đoạn cuối), n đếm cả các input đứng yên đó => dx / n lệch 1-2 % tuỳ số input gửi được trong 700 ms (máy tải thì n = 16 thay vì 17) và làm ca tỉ lệ 1,4 chập chờn.
     const xs = JSON.parse(await evalJs("JSON.stringify(window.__xs)"));
-    const steps = xs.slice(1).map((x, i) => x - xs[i]).sort((p, q) => p - q);
+    const steps = xs
+      .slice(1)
+      .map((x, i) => x - xs[i])
+      .sort((p, q) => p - q);
     const per = steps.length >= 3 ? steps[Math.floor(steps.length / 2)] : 0;
     return { n, dx: b.x - a.x, dy: b.y - a.y, per };
   };

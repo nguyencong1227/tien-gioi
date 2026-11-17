@@ -288,7 +288,17 @@ try {
 
   // fx rác. Bit LẠ = 1 << 20 (ngoài mọi bit của `STATUS_BIT`, kể cả bit 64 `weaken` của mục 51 và bit 128 chừa cho `root`): chọn xa để script không hỏng mỗi lần thêm trạng thái
   const UNKNOWN_BIT = 1 << 20;
-  for (const bad of ["NaN", "'3'", "null", "undefined", "-1", "1.5", "Infinity", String(UNKNOWN_BIT), "{}"]) {
+  for (const bad of [
+    "NaN",
+    "'3'",
+    "null",
+    "undefined",
+    "-1",
+    "1.5",
+    "Infinity",
+    String(UNKNOWN_BIT),
+    "{}",
+  ]) {
     await evalJs(`window.__scene.state.monsters.get('m1').fx = ${bad}; 0`);
     await sleep(120);
     const p = await J("window.__scene.monsterPips('m1')");

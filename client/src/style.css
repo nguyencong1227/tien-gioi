@@ -7641,6 +7641,14 @@ body.ui-hidden
     height: 28px;
   }
 }
+/* Điện thoại ĐỨNG thấp (360 x 640): thanh nằm dưới khung thông tin (top ~194 px) và còn thêm hai dòng ghi chú giáp / gọi quái con; ảnh 40 px làm hàng đầu cao hơn chữ 21 px
+   nên đáy thanh tụt tới 332 px (> nửa khung 320). Ảnh 24 px đưa đáy về ~316 px, vẫn thấy rõ mặt trùm. */
+@media (orientation: portrait) and (max-height: 700px) {
+  .boss-bar-art {
+    width: 24px;
+    height: 24px;
+  }
+}
 .boss-bar-phase {
   font-size: var(--fs-12);
   color: #ffe08a;
