@@ -17,7 +17,13 @@ import { performance } from "node:perf_hooks";
 import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { Client, type Room } from "colyseus.js";
-import { MONSTER_BY_ID, PROTOCOL_VERSION, ROOM_NAME } from "@tien-gioi/shared";
+import {
+  BOSS_BY_KIND,
+  MONSTER_BY_ID,
+  PROTOCOL_VERSION,
+  ROOM_NAME,
+  type BossDef,
+} from "@tien-gioi/shared";
 import { listenWithRetry } from "../src/test-port";
 import { placeMonster } from "../src/systems/monster-place";
 import { tickMonsters } from "../src/systems/monsters";
@@ -772,9 +778,27 @@ describe("Kịch bản thử tải Bot né vùng cảnh báo trùm (M42 T7, Issu
       };
     }
 
-    const standRuns = [1, 2, 3].map((i) => runBossTrial("stand", 100, i));
-    const evadeRuns = [1, 2, 3].map((i) => runBossTrial("evade", 100, i));
-    const invertRuns = [1, 2, 3].map((i) => runBossTrial("invert", 100, i));
+    // Thí nghiệm này đo ĐÚNG hai chiêu `quat_duoi` (nón) + `cuon_minh` (lao), mỗi đòn một lần trúng / không trúng: dữ liệu thật của Xích Mãng nay còn `phun_doc` (vũng độc trúng NHIỀU
+    // lần mỗi vùng, mỗi giây một lần) và gọi rắn con, làm "số lần máu giảm" không còn bằng "số vùng cảnh báo". Nên cố định bộ chiêu của thí nghiệm, không theo dữ liệu hiện hành.
+    const realDef = BOSS_BY_KIND["mang"]!;
+    const twoMoves = {
+      ...realDef,
+      abilities: realDef.abilities.filter((a) => a.id === "quat_duoi" || a.id === "cuon_minh"),
+      phases: [
+        { ...realDef.phases[0]!, abilities: ["quat_duoi", "cuon_minh"], onEnter: undefined },
+      ],
+    };
+    let standRuns: ReturnType<typeof runBossTrial>[];
+    let evadeRuns: ReturnType<typeof runBossTrial>[];
+    let invertRuns: ReturnType<typeof runBossTrial>[];
+    (BOSS_BY_KIND as Record<string, BossDef>)["mang"] = twoMoves;
+    try {
+      standRuns = [1, 2, 3].map((i) => runBossTrial("stand", 100, i));
+      evadeRuns = [1, 2, 3].map((i) => runBossTrial("evade", 100, i));
+      invertRuns = [1, 2, 3].map((i) => runBossTrial("invert", 100, i));
+    } finally {
+      (BOSS_BY_KIND as Record<string, BossDef>)["mang"] = realDef;
+    }
 
     // 1. Nhánh đứng yên: 100/100 dính đòn ở cả 3 lần chạy
     for (const r of standRuns) {
