@@ -8,7 +8,13 @@ import { MONSTER_BY_ID } from "./game";
 import { MAPS } from "./map";
 import { realmOfStep } from "./realms";
 import { bossDefOf } from "./bosses";
-import { AMBUSH_FOE_COUNT_MAX, AMBUSH_TIERS, isAmbushTier, type AmbushTier } from "./ambush";
+import {
+  AMBUSH_FOE_COUNT_MAX,
+  AMBUSH_FOE_LEVEL_CAP,
+  AMBUSH_TIERS,
+  isAmbushTier,
+  type AmbushTier,
+} from "./ambush";
 
 /** Biến văn mẫu CHO PHÉP (server điền lúc dựng hộp thoại): `{dia_danh}` = tên vùng hoang của bản đồ, `{ke_dich}` = tên kẻ chặn đường. Biến khác là lỗi dữ liệu. */
 export const AMBUSH_SCENE_VARS = ["dia_danh", "ke_dich"] as const;
@@ -116,9 +122,22 @@ export function ambushViolations(
       continue;
     }
     let total = 0;
+    // Mục 53: kẻ chặn đường KHÔNG mạnh vượt cảnh giới của người chơi (bị hạ = chết thật): cấp loài <= trần của cảnh giới tối thiểu của bầy
+    const minRealm = realmOfStep(g.minStep)?.realm;
+    const levelCap = minRealm === undefined ? undefined : AMBUSH_FOE_LEVEL_CAP[minRealm];
     for (const f of g.foes) {
       if (typeof f.kind !== "string" || !hasOwn(MONSTER_BY_ID, f.kind))
         bad.push(`${at}: loài ${String(f.kind)} không có`);
+      else if (minRealm !== undefined) {
+        if (levelCap === undefined)
+          bad.push(
+            `${at}: cảnh giới ${minRealm} chưa có trần cấp kẻ chặn đường (AMBUSH_FOE_LEVEL_CAP)`,
+          );
+        else if (MONSTER_BY_ID[f.kind]!.level > levelCap)
+          bad.push(
+            `${at}: ${f.kind} cấp ${MONSTER_BY_ID[f.kind]!.level} vượt trần ${levelCap} của cảnh giới ${minRealm} (không được mạnh vượt cảnh giới người chơi)`,
+          );
+      }
       if (!Number.isInteger(f.count) || f.count < 1)
         bad.push(`${at}: count ${String(f.count)} sai`);
       else total += f.count;

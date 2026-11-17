@@ -141,7 +141,26 @@ export function readImageDimensions(buffer, ext = "") {
 }
 
 /**
- * Kiểm tra kích thước gói JS chính sau khi nén gzip
+ * Tên tệp JS của gói KHỞI ĐỘNG: chunk mà `index.html` nạp bằng `<script type="module">` (từ #1097, Phaser + cảnh thế giới nằm ở chunk riêng tải sau màn đăng nhập,
+ * nên "gói chính" không còn là tệp lớn nhất). Không có `index.html` (test dựng dist giả) hoặc không đọc ra được thì lấy tệp `index-*.js` lớn nhất như trước.
+ * @param {string} distDir
+ * @param {string[]} jsFiles tên các tệp `.js` trong dist/assets
+ * @returns {string|null}
+ */
+export function findStartupChunk(distDir, jsFiles) {
+  try {
+    const html = fs.readFileSync(path.join(distDir, "index.html"), "utf8");
+    const m = /<script[^>]*\btype="module"[^>]*\bsrc="([^"]+)"/.exec(html);
+    const name = m ? path.basename(m[1]) : null;
+    if (name && jsFiles.includes(name)) return name;
+  } catch {
+    // không có index.html: dùng cách dự phòng bên dưới
+  }
+  return null;
+}
+
+/**
+ * Kiểm tra kích thước gói KHỞI ĐỘNG (JS cần để hiện màn đăng nhập) sau khi nén gzip
  * @param {string} distDir
  * @param {number} limitKb
  * @returns {{ file: string, rawBytes: number, gzipBytes: number, gzipKb: number, limitKb: number, ok: boolean }}
@@ -155,7 +174,6 @@ export function checkBundleGzip(distDir, limitKb) {
   }
 
   const entries = fs.readdirSync(assetsDir);
-  // Tìm gói JS chính: tệp index-*.js lớn nhất trong dist/assets/
   const jsFiles = entries.filter((f) => /^index-.*\.js$/.test(f) && !f.endsWith(".map"));
   if (jsFiles.length === 0) {
     throw new Error(`Không tìm thấy tệp bundle JS chính (index-*.js) trong ${assetsDir}`);
@@ -163,7 +181,7 @@ export function checkBundleGzip(distDir, limitKb) {
   jsFiles.sort(
     (a, b) => fs.statSync(path.join(assetsDir, b)).size - fs.statSync(path.join(assetsDir, a)).size,
   );
-  const mainJsFile = jsFiles[0];
+  const mainJsFile = findStartupChunk(distDir, entries) ?? jsFiles[0];
 
   const filePath = path.join(assetsDir, mainJsFile);
   const rawBuffer = fs.readFileSync(filePath);
@@ -181,6 +199,31 @@ export function checkBundleGzip(distDir, limitKb) {
     limitKb,
     ok,
   };
+}
+
+/**
+ * Kiểm tra TỔNG JS (mọi tệp `.js` trong dist/assets, gzip mức 9 từng tệp): chặn việc "giấu" mã vào chunk tải sau để né trần gói khởi động (#1097).
+ * @param {string} distDir
+ * @param {number} limitKb
+ * @returns {{ files: Array<{ file: string, gzipKb: number }>, gzipBytes: number, gzipKb: number, limitKb: number, ok: boolean }}
+ */
+export function checkTotalJsGzip(distDir, limitKb) {
+  const assetsDir = path.join(distDir, "assets");
+  if (!fs.existsSync(assetsDir)) {
+    throw new Error(
+      `Thư mục dist/assets không tồn tại tại: ${assetsDir}. Cần chạy 'npm run build' trước.`,
+    );
+  }
+  const files = [];
+  let gzipBytes = 0;
+  for (const f of fs.readdirSync(assetsDir).sort()) {
+    if (!f.endsWith(".js")) continue;
+    const bytes = zlib.gzipSync(fs.readFileSync(path.join(assetsDir, f)), { level: 9 }).length;
+    gzipBytes += bytes;
+    files.push({ file: f, gzipKb: Number((bytes / 1024).toFixed(2)) });
+  }
+  const gzipKb = Number((gzipBytes / 1024).toFixed(2));
+  return { files, gzipBytes, gzipKb, limitKb, ok: gzipKb <= limitKb };
 }
 
 /**
@@ -751,7 +794,7 @@ export function checkWorstCaseTextureMemoryByTier({
 /**
  * Kiểm tra toàn bộ ngân sách tĩnh so với perf-budget.json
  * @param {{ budgetPath?: string, distDir?: string, assetsDir?: string, packsDir?: string, manifestPath?: string }} [opts]
- * @returns {{ ok: boolean, bundle: any, atlas: any, texture: any, packs: any, worstCaseTexture: any, errors: string[] }}
+ * @returns {{ ok: boolean, bundle: any, totalJs: any, atlas: any, texture: any, packs: any, worstCaseTexture: any, errors: string[] }}
  */
 export function checkPerfBudget(opts = {}) {
   const budgetPath = opts.budgetPath || BUDGET_FILE;
@@ -768,11 +811,23 @@ export function checkPerfBudget(opts = {}) {
   const budget = JSON.parse(fs.readFileSync(budgetPath, "utf-8"));
   const errors = [];
 
-  // 1. Kiểm tra Bundle Gzip
-  const bundle = checkBundleGzip(distDir, budget.static.bundleGzipKb);
+  // 1. Kiểm tra gói KHỞI ĐỘNG (`startupGzipKb`; khoá cũ `bundleGzipKb` vẫn đọc được) và TỔNG JS (`totalJsGzipKb`, tuỳ chọn)
+  const bundle = checkBundleGzip(
+    distDir,
+    budget.static.startupGzipKb ?? budget.static.bundleGzipKb,
+  );
   if (!bundle.ok) {
     errors.push(
-      `Gói JS chính (${bundle.file}) nén gzip ${bundle.gzipKb} KB vượt ngân sách ${bundle.limitKb} KB!`,
+      `Gói JS khởi động (${bundle.file}) nén gzip ${bundle.gzipKb} KB vượt ngân sách ${bundle.limitKb} KB!`,
+    );
+  }
+  const totalJs =
+    typeof budget.static.totalJsGzipKb === "number"
+      ? checkTotalJsGzip(distDir, budget.static.totalJsGzipKb)
+      : null;
+  if (totalJs && !totalJs.ok) {
+    errors.push(
+      `Tổng JS (${totalJs.files.length} tệp) nén gzip ${totalJs.gzipKb} KB vượt ngân sách ${totalJs.limitKb} KB!`,
     );
   }
 
@@ -830,6 +885,7 @@ export function checkPerfBudget(opts = {}) {
   return {
     ok: errors.length === 0,
     bundle,
+    totalJs,
     atlas,
     aiAssets,
     texture: { ...texture, limitMb: textureLimitMb, ok: textureOk },
@@ -845,10 +901,17 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   try {
     const res = checkPerfBudget();
 
-    console.log(`\n1. Gói JS chính (gzip):`);
+    console.log(
+      `\n1. Gói JS khởi động (gzip; Phaser + cảnh thế giới ở chunk tải sau màn đăng nhập):`,
+    );
     console.log(
       `   ${res.bundle.ok ? "✓" : "✗"} Tệp: ${res.bundle.file} - ${res.bundle.gzipKb} KB / Ngân sách: <= ${res.bundle.limitKb} KB (Thô: ${(res.bundle.rawBytes / 1024).toFixed(2)} KB)`,
     );
+    if (res.totalJs) {
+      console.log(
+        `   ${res.totalJs.ok ? "✓" : "✗"} Tổng JS (${res.totalJs.files.length} tệp) - ${res.totalJs.gzipKb} KB / Ngân sách: <= ${res.totalJs.limitKb} KB`,
+      );
+    }
 
     console.log(`\n2. Atlas & Tileset:`);
     for (const f of res.atlas.files) {
