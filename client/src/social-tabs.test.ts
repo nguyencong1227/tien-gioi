@@ -65,14 +65,19 @@ describe("socialTabByKey (mũi tên trên thanh tab)", () => {
 });
 
 describe("socialEnabled (cờ ?social=)", () => {
-  it("chỉ bật khi ?social=1 hoặc ?social=on; mặc định TẮT", () => {
-    expect(socialEnabled("")).toBe(false);
-    expect(socialEnabled("?debug=1")).toBe(false);
-    expect(socialEnabled("?social=0")).toBe(false);
-    expect(socialEnabled("?social=")).toBe(false);
-    expect(socialEnabled("?social=yes")).toBe(false);
+  it("MẶC ĐỊNH BẬT: không có cờ, cờ lạ, cờ rỗng, bật rõ ràng", () => {
+    expect(socialEnabled("")).toBe(true);
+    expect(socialEnabled("?debug=1")).toBe(true);
+    expect(socialEnabled("?social=")).toBe(true);
+    expect(socialEnabled("?social=yes")).toBe(true);
     expect(socialEnabled("?social=1")).toBe(true);
     expect(socialEnabled("?debug=1&social=on")).toBe(true);
+  });
+  it("công tắc khẩn: ?social=0 / off / false TẮT (cạnh tham số khác vẫn nhận)", () => {
+    expect(socialEnabled("?social=0")).toBe(false);
+    expect(socialEnabled("?social=off")).toBe(false);
+    expect(socialEnabled("?social=false")).toBe(false);
+    expect(socialEnabled("?debug=1&social=0")).toBe(false);
   });
 });
 

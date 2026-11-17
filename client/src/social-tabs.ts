@@ -61,10 +61,10 @@ export function socialTabByKey(cur: SocialTabId, code: string): SocialTabId | nu
 }
 
 /**
- * Cờ bật tính năng: nút HUD "Xã hội" và phím tắt CHỈ hoạt động khi `?social=1` (hoặc `?social=on`) cho đến khi cả ba
- * mảng M9.6-M9.8 xong; PR cuối của M9 đổi mặc định thành bật. Cố ý KHÔNG nhớ vào localStorage (khỏi kẹt cờ ở máy người chơi).
+ * Cờ tính năng Xã hội (nút HUD, phím Shift+G, banner trùm thế giới, danh hiệu): MẶC ĐỊNH BẬT (PR cuối của M9). `?social=0` (hoặc `off` / `false`) TẮT phía client: công tắc khẩn khi một
+ * mảng gặp lỗi mà chưa kịp phát hành bản vá (người dùng thêm vào địa chỉ trang; máy chủ vẫn gửi tin, client bỏ). Cố ý KHÔNG nhớ vào localStorage (khỏi kẹt cờ ở máy người chơi).
  */
 export function socialEnabled(search: string): boolean {
   const v = new URLSearchParams(search).get("social");
-  return v === "1" || v === "on";
+  return !(v === "0" || v === "off" || v === "false");
 }

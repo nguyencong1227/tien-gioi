@@ -549,7 +549,7 @@ let currentSect: SectView | null = null;
 let currentSectPresence: SectPresenceMsg | null = null;
 let sectModalOpen = false;
 let sectTab: "overview" | "members" | "treasury" | "vault" | "hall" = "overview";
-// Bảng Xã hội (M9, #1025): khung ba tab; chỉ mở được khi cờ `?social=1` bật (`socialEnabled`)
+// Bảng Xã hội (M9, #1025): khung ba tab; mặc định BẬT, `?social=0` tắt (`socialEnabled`)
 let socialModalOpen = false;
 let socialTab: SocialTabId = DEFAULT_SOCIAL_TAB;
 
@@ -4888,7 +4888,7 @@ export const ui = {
     // Tông môn (M3.6, #230)
     bindTap("btn-sect", () => this.toggleSectModal());
 
-    // Xã hội (M9, #1025): nút HUD ẩn cho tới khi cờ `?social=1` bật
+    // Xã hội (M9, #1025): nút HUD hiện mặc định; ẩn khi `?social=0`
     const socialOn = typeof window !== "undefined" && socialEnabled(window.location.search);
     $("btn-social").hidden = !socialOn;
     document.body.classList.toggle("social-on", socialOn); // CSS: hàng menu 8 nút cần mốc ☰ cao hơn (xem `body.social-on` ở style.css)
@@ -6611,7 +6611,7 @@ export const ui = {
     } else {
       if (m.channel === "party") p.className = "party";
       else if (m.channel === "sect") p.className = "sect";
-      // nhãn người nói: kênh + danh hiệu (chỉ khi cờ ?social=1, `chat-view.ts`) + tên; mọi chữ vào DOM bằng textContent
+      // nhãn người nói: kênh + danh hiệu (trừ khi `?social=0`, `chat-view.ts`) + tên; mọi chữ vào DOM bằng textContent
       const sp = chatSpeaker(m, socialFlagOn());
       const b = document.createElement("b");
       b.append(document.createTextNode(sp.tag));
@@ -7506,7 +7506,7 @@ export const ui = {
   },
 
   // ---------- Xã hội (M9, #1025) ----------
-  /** Mở / đóng bảng Xã hội. Cờ `?social=1` tắt thì KHÔNG mở (phím Shift+G chạy tới đây nhưng không làm gì). */
+  /** Mở / đóng bảng Xã hội. Cờ tắt (`?social=0`) thì KHÔNG mở (phím Shift+G chạy tới đây nhưng không làm gì). */
   toggleSocialModal(force?: boolean) {
     const target = force ?? !socialModalOpen;
     if (target === socialModalOpen) return;
@@ -7596,7 +7596,7 @@ export const ui = {
   },
 
   /**
-   * Nhận tin `worldBoss` từ máy chủ (M9.7): làm sạch, cất bản mới nhất, vẽ banner + tab Sự kiện. Cờ `?social=1` tắt thì BỎ tin (người chơi chưa thấy gì).
+   * Nhận tin `worldBoss` từ máy chủ (M9.7): làm sạch, cất bản mới nhất, vẽ banner + tab Sự kiện. Cờ tắt (`?social=0`) thì BỎ tin (người chơi chưa thấy gì).
    * `ended` hiện kết quả thay banner `WB_RESULT_MS` + một toast (không lặp nếu vừa nhận đúng sự kiện đó); tin sai kiểu bị bỏ, không sập.
    */
   setWorldBoss(raw: unknown) {
@@ -7632,7 +7632,7 @@ export const ui = {
 
   /**
    * Nhận tin `achievements` (M9.8): làm sạch, cất bản mới nhất, vẽ lại nếu đang xem tab Thành tựu. Đây cũng là câu trả lời của máy chủ cho `titleSet` (thành công
-   * hay bị từ chối): hết trạng thái "đang đổi". Cờ `?social=1` tắt thì BỎ tin; tin sai kiểu bị bỏ, không sập.
+   * hay bị từ chối): hết trạng thái "đang đổi". Cờ tắt (`?social=0`) thì BỎ tin; tin sai kiểu bị bỏ, không sập.
    */
   setAchievements(raw: unknown) {
     if (!socialFlagOn()) return;
