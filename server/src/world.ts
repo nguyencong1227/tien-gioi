@@ -229,7 +229,8 @@ export interface WorldEvents {
   dmgTo(sessionId: string, msg: DmgMsg): void;
   /** Thông báo hệ thống cho toàn server (kênh chat). */
   sys(text: string): void;
-  chat(from: string, text: string): void;
+  /** Chat toàn server. `titleId` = danh hiệu đang đeo của người nói (M9, `titleOf`), bỏ trống nếu không đeo; hệ thống không có người nói thì không truyền. */
+  chat(from: string, text: string, titleId?: string): void;
   toast(sessionId: string, msg: ToastMsg): void;
   /** Gửi túi đồ cho đúng chủ túi. */
   inv(sessionId: string, msg: InvMsg): void;
