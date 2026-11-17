@@ -147,6 +147,10 @@ describe("planBolt: đường bay thuần", () => {
     expect(p.legs[1].angle).toBeCloseTo(Math.atan2(60, 200 - hx), 9);
     expect(p.legs[1].t0).toBeCloseTo((hx / 500) * 1000, 9);
     expect(p.hits[1].fromX).toBeCloseTo(hx, 9); // kéo / đẩy tính từ đầu đoạn chứa lần trúng
+    // thời điểm trúng quái nảy = lúc tới chỗ nảy + quãng đoạn hai (tới mép quái) / tốc độ
+    const leg2 = Math.hypot(200 - hx, 60) - (R + PBOLT_RADIUS);
+    expect(p.hits[1].t).toBeCloseTo(p.legs[1].t0 + (leg2 / 500) * 1000, 9);
+    expect(p.hits[1].t).toBeGreaterThan(p.hits[0].t);
   });
 
   it("nảy: mục tiêu ngoài bán kính nảy thì đạn dừng ở chỗ trúng, không nảy", () => {
@@ -521,6 +525,45 @@ describe("cast bolt: dữ liệu sai và thứ tự việc hẹn giờ", () => {
     expect(pbolts(t)).toHaveLength(2); // đoạn nảy phát lúc tới b
     advance(t, 5000);
     expect(dmgTo(t, c.id)).toHaveLength(1);
+  });
+});
+
+describe("cast bolt: vòng đời trong phòng", () => {
+  it("đạn bay giữa khoảng không (không việc nào chờ) VẪN chiếm chỗ tới khi hết bay, rồi mới gỡ (trần đo theo đang bay thật)", () => {
+    const t = setup();
+    bolt({ range: 400 });
+    equip(t.c, "dan_thu");
+    cast(t.w, "a", { slot: 2, angle: 0 });
+    const flightMs = pbolts(t)[0].ms;
+    expect(flightMs).toBe(800); // 400 px / 500 px/s
+    expect(t.w.pbolts).toHaveLength(1);
+    advance(t, flightMs - 10);
+    expect(t.w.pbolts).toHaveLength(1);
+    advance(t, 20);
+    expect(t.w.pbolts).toEqual([]);
+  });
+
+  it("đối thủ thách đấu ĐÃ CHẾT không còn là mục tiêu: đạn xuyên qua và trúng quái đứng sau", () => {
+    const t = setup();
+    bolt();
+    equip(t.c, "dan_thu");
+    const b = addPlayer(t.w, "b", 4, 0);
+    b.p.x = 1200;
+    b.p.y = 1000;
+    b.p.dead = true;
+    t.w.duels._start({
+      a: "a",
+      b: "b",
+      phase: "fight",
+      fightAt: 0,
+      endsAt: Infinity,
+      ox: 0,
+      oy: 0,
+    });
+    const m = mon(t, 1350, 1000);
+    cast(t.w, "a", { slot: 2, angle: 0 });
+    advance(t, 5000);
+    expect(dmgTo(t, m.id)).toHaveLength(1);
   });
 });
 
