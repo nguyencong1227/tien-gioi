@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { getMap } from "@tien-gioi/shared";
+import { MAP_STYLES } from "./gfx/map-style";
 import {
   applyMapCard,
   MAP_CARD_DIR,
@@ -71,6 +72,36 @@ describe("MAP_CARDS: mỗi ảnh đã khai là ảnh CÓ THẬT, có nguồn, c�
         true,
       );
     }
+  });
+});
+
+describe("MAP_CARDS phủ MỌI bản đồ có kiểu riêng (bản đồ mới phải có thẻ, hoặc được miễn kèm lý do)", () => {
+  /** Bản đồ KHÔNG có thẻ minh hoạ, kèm lý do. Rỗng: cả năm bản đồ của lô 1 đều có. */
+  const EXEMPT: Record<string, string> = {};
+
+  it("mỗi mapId trong MAP_STYLES có dòng ở MAP_CARDS (trừ danh sách miễn)", () => {
+    for (const id of Object.keys(MAP_STYLES)) {
+      if (id in EXEMPT) {
+        expect(EXEMPT[id], `${id}: miễn thì phải có lý do`).not.toBe("");
+        continue;
+      }
+      expect(Object.keys(MAP_CARDS), `thiếu thẻ cho bản đồ ${id}`).toContain(id);
+    }
+  });
+
+  it("hai bản đồ không dùng chung một ảnh; ảnh nằm trong ngân sách mỗi ảnh (perf-budget.json)", () => {
+    const files = Object.values(MAP_CARDS);
+    expect(new Set(files).size).toBe(files.length);
+    const budget = JSON.parse(read("client/perf-budget.json")) as {
+      static: { aiAssets: { maxFileKb: number; totalKb: number } };
+    };
+    let total = fs.statSync(path.join(root, "client/public/assets/ai/login_bg.webp")).size;
+    for (const f of files) {
+      const size = fs.statSync(path.join(root, "client/public/assets/ai", f)).size;
+      expect(size / 1024, f).toBeLessThanOrEqual(budget.static.aiAssets.maxFileKb);
+      total += size;
+    }
+    expect(total / 1024).toBeLessThanOrEqual(budget.static.aiAssets.totalKb);
   });
 });
 

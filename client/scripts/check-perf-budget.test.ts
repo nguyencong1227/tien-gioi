@@ -718,7 +718,7 @@ describe("M7.12 #513: trần dung lượng ảnh do AI sinh (checkAiAssets, perf
     expect(checkPerfBudget(fakeEnv({}, aiLimits)).aiAssets.files).toEqual([]);
   });
 
-  it("ảnh AI THẬT của repo: đúng ảnh đã khai báo (login_bg.webp, #513) và nằm trong trần của perf-budget.json thật", () => {
+  it("ảnh AI THẬT của repo: đúng ảnh đã khai báo (login_bg.webp + 5 thẻ bản đồ, #513) và nằm trong trần của perf-budget.json thật", () => {
     const budget = JSON.parse(
       fs.readFileSync(path.resolve(__dirname, "../perf-budget.json"), "utf8"),
     );
@@ -728,8 +728,16 @@ describe("M7.12 #513: trần dung lượng ảnh do AI sinh (checkAiAssets, perf
     );
     expect(real.ok).toBe(true);
     // thêm ảnh AI thì thêm tên vào đây CÙNG LÚC với JSON nguồn / CREDITS.md / RA_SOAT_TAI_SAN.md (các test credits cũng đếm)
-    expect(real.files.map((f: { file: string }) => f.file)).toEqual(["login_bg.webp"]);
-    expect(real.files[0].kb).toBeLessThanOrEqual(budget.static.aiAssets.maxFileKb);
+    expect(real.files.map((f: { file: string }) => f.file)).toEqual([
+      "login_bg.webp",
+      "the_am_suong.webp",
+      "the_hac_phong.webp",
+      "the_han_van.webp",
+      "the_lac_ha.webp",
+      "the_linh_hu.webp",
+    ]);
+    for (const f of real.files)
+      expect(f.kb, f.file).toBeLessThanOrEqual(budget.static.aiAssets.maxFileKb);
     expect(real.totalKb).toBeLessThanOrEqual(budget.static.aiAssets.totalKb);
   });
 

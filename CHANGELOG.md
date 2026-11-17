@@ -4,6 +4,9 @@
 
 ## [Chưa phát hành] — sau v0.4.1
 
+### Giao diện
+- **NĂM THẺ MINH HOẠ BẢN ĐỒ đầu tiên vào game (M7.12 / #513, lô 1 của `docs/art/PHONG_CACH_MINH_HOA.md`; ảnh AI SDXL base do nhóm sinh, mục 7 `CREDITS.md`; chỉ client + ảnh, không đổi máy chủ / giao thức):** khi qua cổng sang Lạc Hà Trấn, Hắc Phong Cốc, Linh Hư Bí Cảnh, Âm Sương Trạch hoặc Hàn Vân Lĩnh, màn chuyển cảnh nay hiện thêm một bức tranh minh hoạ (tranh vẽ tay mềm, không chữ, không người) phía trên tên bản đồ. C sinh 15 ảnh thô (5 bản đồ x 3 hạt giống); B xem hết, chọn 5 ảnh (loại 4 ảnh có nét giống chữ ký ở góc, 1 ảnh có viền giấy trắng, 1 ảnh có hình bóng lạ), cắt bỏ viền giấy rồi đổi cỡ 624x416 bằng `hau-ky-webp.py` (WebP sạch 23-34 KB mỗi ảnh). `client/public/assets/ai/the_{lac_ha,hac_phong,linh_hu,am_suong,han_van}.webp`, tệp nguồn `docs/art/nguon/the_*.json` (model, băm ảnh thô khớp báo cáo của C, prompt, hạt giống, hậu kỳ, người duyệt), `MAP_CARDS`. Gói tải: 5 ảnh vào bộ nhớ đệm PWA (106 URL) và APK: 150 KB, cùng `login_bg` 72 KB = **222 KB <= trần 300 KB**. `check-map-card.mjs` nay kiểm NĂM THẺ THẬT (ảnh 624x416, đúng 3:2, nằm trọn khung ở sáu khung kể cả 568x320); `map-card.test.ts` thêm ca mọi bản đồ phải có thẻ.
+
 ## [0.4.1] — 17/11/2026: bản vá (trùm không còn kẹt ở cây)
 
 Bản vá theo yêu cầu của người dùng (`QUYET_DINH_M3.md` mục 48 / 49: "trùm hay bị kẹt ở cây"): **trùm và mọi quái đang đuổi biết đi vòng qua cây / đá / nước**, trùm kẹt thì rút về chỗ sinh và hồi đầy (đứng sau cây đánh trùm không cày được nữa), trùm sinh ở chỗ rộng. Kèm các việc nền của ảnh minh hoạ AI đã vào sau v0.4.0 (thẻ trùm, chân dung NPC, thẻ bản đồ: danh sách ảnh còn RỖNG nên người chơi CHƯA thấy gì đổi) và vài việc công cụ / tài liệu.
