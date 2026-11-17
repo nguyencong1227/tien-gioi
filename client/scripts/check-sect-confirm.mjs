@@ -518,13 +518,31 @@ async function main() {
       );
       await reset({ rank: "de_tu", coin: 3000 });
       await fill("sect-input-deposit", "9000");
+      // Ô số lượng dùng chung (mục 47): gõ quá ví thì KẸP về ví, ghi đè lại ô và báo bằng chữ; hộp xác nhận hỏi đúng số đã kẹp (không gửi số quá ví)
+      check(
+        (await val("sect-input-deposit")) === "3000",
+        `nộp 9.000 > ví 3.000: ô bị kẹp về 3000 (${await val("sect-input-deposit")})`,
+      );
+      check(
+        (
+          await evalJs(`document.querySelector("#sect-deposit-qty .qty-note")?.textContent ?? ""`)
+        ).includes("Chỉ có tối đa 3.000"),
+        "nộp quá ví: chữ báo 'Chỉ có tối đa 3.000'",
+      );
       b = await center("#sect-btn-deposit");
       await tap(b.x, b.y);
       await sleep(300);
       check(
-        !(await box()).open && (await sentOf(SENT_DEP)).length === 1,
-        "nộp 9.000 > ví 3.000: không hộp, gửi thẳng (máy chủ báo lý do)",
+        (await box()).open &&
+          /^Nộp 3\.?000 Linh thạch vào kho tông môn\?$/.test((await box()).text),
+        `nộp quá ví: hộp hỏi đúng số đã kẹp: "${(await box()).text}"`,
       );
+      check(
+        (await sentOf(SENT_DEP)).length === 0,
+        "nộp quá ví: chưa gửi gì khi hộp còn mở (không bao giờ gửi số quá ví)",
+      );
+      await key("Escape", "Escape", 27);
+      await sleep(500);
       await reset({ rank: "truong_lao", coin: 3000 });
       await fill("sect-input-deposit", "50");
       b = await center("#sect-btn-deposit");
@@ -567,6 +585,185 @@ async function main() {
       await evalJs(`window.__ui.toggleSectModal(false); 1`);
       await sleep(200);
       check(!(await box()).open, "bảng Tông môn đóng: hộp xác nhận cũng đóng");
+
+      console.log(
+        "  [8] ô SỐ LƯỢNG dùng chung (mục 47): gõ, kẹp theo ví, ×10 / ×100 / Tối đa, giữ nút tăng nhanh dần, Enter / Esc, không điều khiển nhân vật",
+      );
+      await reset({ rank: "chu", coin: 3000 });
+      const qtyInfo = () =>
+        evalJs(`(() => {
+          const root = document.getElementById("sect-deposit-qty");
+          const inp = document.getElementById("sect-input-deposit");
+          const btns = [...root.querySelectorAll("button")];
+          const modal = document.getElementById("sect-modal");
+          return {
+            im: inp.getAttribute("inputmode"), pat: inp.getAttribute("pattern"), ac: inp.getAttribute("autocomplete"),
+            label: inp.getAttribute("aria-label"), type: inp.type, value: inp.value, invalid: inp.getAttribute("aria-invalid"),
+            note: root.querySelector(".qty-note")?.textContent ?? "", btns: btns.map((b) => b.textContent), dis: btns.map((b) => b.disabled),
+            inputH: inp.getBoundingClientRect().height, btnH: btns.map((b) => Math.round(b.getBoundingClientRect().height)),
+            btnW: btns.map((b) => Math.round(b.getBoundingClientRect().width)), overflow: modal.scrollWidth - modal.clientWidth,
+          };
+        })()`);
+      const typeText = async (text) => {
+        await evalJs(
+          `(() => { const e = document.getElementById("sect-input-deposit"); e.focus(); e.value = ""; e.dispatchEvent(new Event("input", { bubbles: true })); return 1; })()`,
+        );
+        await send("Input.insertText", { text });
+        await sleep(80);
+      };
+      let q = await qtyInfo();
+      check(
+        q.im === "numeric" &&
+          q.pat === "[0-9]*" &&
+          q.ac === "off" &&
+          q.type === "text" &&
+          Boolean(q.label),
+        `ô gõ: inputmode numeric (bàn phím số trên điện thoại), pattern, autocomplete tắt, có nhãn (${q.im} / ${q.pat})`,
+      );
+      check(
+        JSON.stringify(q.btns) === JSON.stringify(["−", "+", "×10", "×100", "Tối đa"]),
+        `năm nút: ${JSON.stringify(q.btns)}`,
+      );
+      if (vp.mobile)
+        check(
+          q.btnH.every((h) => h >= MIN_TAP_PX) &&
+            q.inputH >= MIN_TAP_PX &&
+            q.btnW.every((w) => w >= MIN_TAP_PX),
+          `nút và ô gõ >= ${MIN_TAP_PX} px (ô ${Math.round(q.inputH)}, nút cao ${q.btnH}, rộng ${q.btnW})`,
+        );
+      check(q.overflow <= 1, `ô số lượng không làm tràn ngang bảng (${q.overflow})`);
+      // gõ quá ví: kẹp + báo bằng chữ + ghi đè lại ô
+      await typeText("9999");
+      q = await qtyInfo();
+      check(
+        q.value === "3000" && q.note.includes("Chỉ có tối đa 3.000"),
+        `gõ 9999 > ví 3.000: kẹp về ${q.value}, báo "${q.note}"`,
+      );
+      check(
+        q.dis[1] && q.dis[2] && q.dis[3] && q.dis[4] && !q.dis[0],
+        "chạm trần: khoá +, ×10, ×100, Tối đa; còn −",
+      );
+      // gõ sai: chữ / số âm
+      for (const bad of ["abc", "-5"]) {
+        await typeText(bad);
+        q = await qtyInfo();
+        check(
+          q.invalid === "true" && q.note !== "",
+          `gõ "${bad}": đánh dấu sai và báo "${q.note}"`,
+        );
+      }
+      await typeText("12");
+      q = await qtyInfo();
+      check(
+        q.invalid === null && q.note.includes("Ví còn lại 2.988"),
+        `gõ 12: hết lỗi, xem trước: "${q.note}"`,
+      );
+      await evalJs(
+        `document.getElementById("sect-input-deposit").scrollIntoView({ block: "center" }); 1`,
+      );
+      await shot("o-so-luong");
+      // nút bằng chạm / chuột thật
+      const press = async (i) => {
+        const c = await center("#sect-deposit-qty button", i);
+        check(c && c.hit, `nút ${["−", "+", "×10", "×100", "Tối đa"][i]} không bị che`);
+        await tap(c.x, c.y);
+        await sleep(120);
+        return (await qtyInfo()).value;
+      };
+      check((await press(1)) === "13", "bấm + : 12 -> 13");
+      check((await press(2)) === "130", "bấm ×10 : 13 -> 130");
+      check((await press(3)) === "3000", "bấm ×100 : 130 -> 13000 bị kẹp về ví 3000");
+      check((await press(0)) === "2999", "bấm − : 3000 -> 2999");
+      check((await press(4)) === "3000", "bấm Tối đa : 3000 (= ví)");
+      // giữ nút +: nhanh dần; nhả thì dừng
+      await fill("sect-input-deposit", "1");
+      const hc = await center("#sect-deposit-qty button", 1);
+      if (vp.mobile)
+        await send("Input.dispatchTouchEvent", {
+          type: "touchStart",
+          touchPoints: [{ x: hc.x, y: hc.y }],
+        });
+      else {
+        await send("Input.dispatchMouseEvent", {
+          type: "mouseMoved",
+          x: hc.x,
+          y: hc.y,
+          button: "none",
+          buttons: 0,
+        });
+        await mouse("mousePressed", hc.x, hc.y);
+      }
+      await sleep(1700);
+      const heldAt = Number((await qtyInfo()).value);
+      if (vp.mobile) await send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+      else await mouse("mouseReleased", hc.x, hc.y);
+      await sleep(150);
+      const afterRelease = Number((await qtyInfo()).value);
+      await sleep(700);
+      const later = Number((await qtyInfo()).value);
+      check(heldAt > 20, `giữ + 1,7 giây: tăng NHANH dần (1 -> ${heldAt}, nhịp đơn lẻ chỉ cho ~5)`);
+      check(
+        later === afterRelease,
+        `nhả nút thì dừng hẳn (${afterRelease} -> ${later} sau 0,7 giây)`,
+      );
+      // Enter = xác nhận (Tông chủ nộp thẳng), ô được xoá sau khi gửi
+      await reset({ rank: "chu", coin: 3000 });
+      await typeText("250");
+      await enterKey();
+      await sleep(300);
+      m = await sentOf(SENT_DEP);
+      check(
+        m.length === 1 &&
+          JSON.stringify(m[0][1]) === '{"amount":250}' &&
+          (await val("sect-input-deposit")) === "",
+        `Enter trong ô: gửi đúng một tin nộp 250 và xoá ô (${JSON.stringify(m.map((x) => x[1]))})`,
+      );
+      // ô trống / sai thì Enter KHÔNG gửi
+      await evalJs(`window.__sent.length = 0; 1`);
+      await typeText("abc");
+      await enterKey();
+      await sleep(250);
+      check((await sentOf(SENT_DEP)).length === 0, "Enter khi ô sai: không gửi gì");
+      // đang gõ trong ô thì phím KHÔNG điều khiển nhân vật
+      await evalJs(
+        `window.__sent.length = 0; document.getElementById("sect-input-deposit").focus(); 1`,
+      );
+      for (const [k, c, vk] of [
+        ["d", "KeyD", 68],
+        ["w", "KeyW", 87],
+        ["a", "KeyA", 65],
+        ["s", "KeyS", 83],
+      ]) {
+        await send("Input.dispatchKeyEvent", {
+          type: "keyDown",
+          key: k,
+          code: c,
+          windowsVirtualKeyCode: vk,
+          text: k,
+        });
+        await sleep(60);
+        await send("Input.dispatchKeyEvent", {
+          type: "keyUp",
+          key: k,
+          code: c,
+          windowsVirtualKeyCode: vk,
+        });
+      }
+      await sleep(250);
+      const moving = await evalJs(
+        `window.__sent.filter((x) => x[0] === "input" && (x[1].dx !== 0 || x[1].dy !== 0)).length`,
+      );
+      check(moving === 0, `gõ w a s d trong ô: nhân vật KHÔNG di chuyển (${moving} tin di chuyển)`);
+      // Esc = huỷ: lần đầu RỜI ô (không đóng bảng khi đang gõ), lần hai mới đóng bảng
+      await key("Escape", "Escape", 27);
+      await sleep(200);
+      check(
+        (await sectOpen()) && (await evalJs(`document.activeElement?.id !== "sect-input-deposit"`)),
+        "Esc lần 1 khi đang ở ô số lượng: rời ô, bảng Tông môn vẫn mở",
+      );
+      await key("Escape", "Escape", 27);
+      await sleep(300);
+      check(!(await sectOpen()), "Esc lần 2: đóng bảng Tông môn");
     }
   } finally {
     try {

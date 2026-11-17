@@ -424,15 +424,12 @@ async function main() {
       tab.ev(
         `(() => { const b = [...document.querySelectorAll('#${grid} .inv-slot')].find(e => e.querySelector('.slot-name')?.textContent === ${JSON.stringify(POTION_NAME)}); if (!b) throw new Error('không có ô ${POTION_NAME} ở ${grid}'); b.focus(); return 1; })()`,
       );
-    /** Chỉnh ô số lượng (nút +/-) về `n`: số lượng đang chọn có thể còn lại từ lần trước nếu chọn lại đúng ô cũ. */
+    /** Chỉnh ô số lượng (ô nhập số dùng chung, mục 47) về `n` bằng cách GÕ số như người chơi; số lượng đang chọn có thể còn lại từ lần trước nếu chọn lại đúng ô cũ. */
     const setQty = async (tab: Tab, n: number) => {
-      for (let i = 0; i < 12; i++) {
-        const cur = Number(await text(tab, "sect-vault-qty"));
-        if (cur === n) return;
-        await press(tab, cur < n ? "sect-vault-plus" : "sect-vault-minus");
-        await sleep(80);
-      }
-      throw new Error(`Không chỉnh được số lượng về ${n}`);
+      await fill(tab, "sect-vault-qty", String(n));
+      await sleep(80);
+      const cur = Number(await tab.ev(`document.getElementById('sect-vault-qty').value`));
+      if (cur !== n) throw new Error(`Không chỉnh được số lượng về ${n} (ô đang ${cur})`);
     };
     const clickAct = (tab: Tab) => tab.ev(`document.getElementById('sect-vault-act').click(); 1`);
     giveItem(world, sids.get(B.name)!, POTION, GIVEN);
@@ -450,7 +447,7 @@ async function main() {
     await pickSlot(tb, "sect-vault-bag");
     await setQty(tb, 3);
     await tb.waitFor(
-      `document.getElementById('sect-vault-qty')?.textContent === '3'`,
+      `document.getElementById('sect-vault-qty')?.value === '3'`,
       "số lượng góp = 3",
     );
     await clickAct(tb);
@@ -482,7 +479,7 @@ async function main() {
     await pickSlot(ta, "sect-vault-grid");
     await setQty(ta, 3);
     await ta.waitFor(
-      `document.getElementById('sect-vault-qty')?.textContent === '3'`,
+      `document.getElementById('sect-vault-qty')?.value === '3'`,
       "số lượng rút = 3",
     );
     await clickAct(ta);
