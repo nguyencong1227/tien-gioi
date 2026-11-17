@@ -25,8 +25,6 @@ import {
   HAC_PHONG_ID,
   SECT_CONTRIB_CAP,
   SECT_DEPOSIT_DAY_CAP,
-  SECT_DEPOSIT_VALUE_PER_CH,
-  SECT_DUNGEON_CH,
   SECT_EARN_DAY_CAP,
   SECT_POINTS_CAP,
   SECT_SHOP_BY_ITEM,
@@ -40,7 +38,7 @@ import {
   validateRebirth,
 } from "@tien-gioi/shared";
 import { Hub } from "../hub";
-import { FileSectStore, type Sect } from "../sect-store";
+import { FileSectStore } from "../sect-store";
 import { SectService } from "../sect-service";
 import { sectBalanceViolations } from "../balance/tong-mon";
 import { applyRebirth, beginLimbo } from "./reincarnation";
@@ -54,8 +52,6 @@ import {
   sectQuestAccept,
   sectQuestTurnIn,
   sectShopBuy,
-  sectVaultDeposit,
-  sectVaultWithdraw,
   sectWithdraw,
 } from "./sect";
 import { installSectQuestFixture, installSectShopFixture } from "./sect-fixtures";
