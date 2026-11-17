@@ -26,7 +26,7 @@ export interface SoulStore {
   delete(id: string): Promise<boolean>;
   /**
    * Liệt kê chân linh để XẾP HẠNG (M9, `LeaderboardService`): tối đa `limit` bản ghi (mặc định `BOARD_SCAN_MAX`), sắp theo id để kết quả tất định. CHỈ ĐỌC: bản ghi hỏng bị BỎ QUA
-   * (không cách ly, không ghi đè: việc đó chỉ làm khi `get` / `update` chạm tới đúng chân linh đó). Không dùng ở đường nóng (mỗi tick / mỗi tin nhắn). TUỲ CHỌN trong kiểu để các kho giả của test không phải khai báo; mọi kho THẬT (tệp, PostgreSQL) có, `store-contract.ts` kiểm.
+   * (không cách ly, không ghi đè: việc đó chỉ làm khi `get` / `update` chạm tới đúng chân linh đó). Không dùng ở đường nóng (mỗi tick / mỗi tin nhắn). Quá `BOARD_SCAN_MAX` chân linh thì cắt theo THỨ TỰ ID (không phải top theo cảnh giới): xem `PlayerStore.listProfiles`. TUỲ CHỌN trong kiểu để các kho giả của test không phải khai báo; mọi kho THẬT (tệp, PostgreSQL) có, `store-contract.ts` kiểm.
    */
   all?(limit?: number): Promise<Soul[]>;
 }

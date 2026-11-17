@@ -80,6 +80,7 @@
 | Đông người dồn một phòng làm tick vọt | Ca hiệu năng riêng; `sendNear`; bảng đóng góp thưa; trùm không co giãn theo số người |
 | Sập máy giữa sự kiện / giữa lúc cấp thưởng | Ghi sổ đã nhận TRƯỚC khi trao; sự kiện sập = huỷ, không bù |
 | Đổi `Soul` làm hỏng tệp cũ | `social` tuỳ chọn khi đọc, `sanitizeSocial` kẹp; `kiem-save` trên dữ liệu thật trước khi phát hành |
+| BXH quá `BOARD_SCAN_MAX` = 5000 bản ghi bị cắt theo thứ tự tên / id (không phải top theo tu vi), tên cuối bảng chữ cái không bao giờ được xét | Quy mô thật là vài chục người; khi gần ngưỡng thì đổi `listProfiles` / `all` sang truy vấn xếp theo khoá bảng (PostgreSQL `ORDER BY` jsonb) hoặc bảng tổng hợp riêng |
 | Giao diện quá tải trên điện thoại | B ra ảnh 5 khung nhìn; BXH và sổ thành tựu là bảng riêng, cuộn |
 
 ## 8. Câu hỏi cho người dùng (KHÔNG chặn; A đã chọn mặc định, đổi được)
