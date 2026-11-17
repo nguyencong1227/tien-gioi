@@ -113,7 +113,7 @@ describe("masteryView: thanh / dòng chữ ở bảng Công pháp", () => {
   });
 
   it("chiêu Thiên phẩm (tối đa 6): thanh ở tầng 1-4 với điểm cần 60 / 150 / 300 / 600, tầng 5 chỉ kinh quyển, tầng 6 tối đa", () => {
-    const d = { name: "Thiên", grade: 3 };
+    const d = { name: "Thiên", grade: 3 as const };
     [1, 2, 3, 4].forEach((lv, i) => {
       const v = masteryView(d, lv, 0, 6, true)!;
       expect(v.kind, `tầng ${lv}`).toBe("bar");
