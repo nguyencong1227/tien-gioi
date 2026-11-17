@@ -28,29 +28,36 @@ export function asSocialTab(v: unknown): SocialTabId {
 }
 
 /**
- * Tab kế khi bấm mũi tên trên thanh tab (kiểu WAI-ARIA tablist): Trái / Lên = lùi, Phải / Xuống = tiến,
- * vòng quanh hai đầu; Home / End nhảy về đầu / cuối. Phím khác trả `null` (để phím đi tiếp như thường).
+ * Mục kế khi bấm mũi tên trên một thanh tab bất kỳ (kiểu WAI-ARIA tablist): Trái / Lên = lùi, Phải / Xuống = tiến, vòng quanh hai đầu;
+ * Home / End nhảy về đầu / cuối. Phím khác trả `null` (để phím đi tiếp như thường). `cur` lạ coi như mục đầu. Danh sách rỗng -> `null`.
  */
-export function socialTabByKey(cur: SocialTabId, code: string): SocialTabId | null {
-  const n = SOCIAL_TABS.length;
-  const i = Math.max(
-    0,
-    SOCIAL_TABS.findIndex((t) => t.id === cur),
-  );
+export function tabByKey<T extends string>(ids: readonly T[], cur: T, code: string): T | null {
+  const n = ids.length;
+  if (n === 0) return null;
+  const i = Math.max(0, ids.indexOf(cur));
   switch (code) {
     case "ArrowRight":
     case "ArrowDown":
-      return SOCIAL_TABS[(i + 1) % n].id;
+      return ids[(i + 1) % n];
     case "ArrowLeft":
     case "ArrowUp":
-      return SOCIAL_TABS[(i - 1 + n) % n].id;
+      return ids[(i - 1 + n) % n];
     case "Home":
-      return SOCIAL_TABS[0].id;
+      return ids[0];
     case "End":
-      return SOCIAL_TABS[n - 1].id;
+      return ids[n - 1];
     default:
       return null;
   }
+}
+
+/** Tab chính của bảng Xã hội kế tiếp theo phím (xem `tabByKey`). */
+export function socialTabByKey(cur: SocialTabId, code: string): SocialTabId | null {
+  return tabByKey(
+    SOCIAL_TABS.map((t) => t.id),
+    cur,
+    code,
+  );
 }
 
 /**

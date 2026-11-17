@@ -142,6 +142,7 @@ import {
   type DuelEndMsg,
   type DuelChallengeCheck,
   SECT_MSG,
+  SOCIAL_MSG,
   type SectMsg,
   type SectVaultMsg,
   type SectHallMsg,
@@ -762,6 +763,8 @@ export class WorldScene extends Phaser.Scene {
       onSectVaultPolicy: (drawPerDay) =>
         !this.isReconnecting && this.room.send(SECT_MSG.vaultPolicy, { drawPerDay }),
       onSectHallGet: () => !this.isReconnecting && this.room.send(SECT_MSG.hallGet, {}),
+      onBoardsGet: (board) =>
+        !this.isReconnecting && this.room.send(SOCIAL_MSG.boardsGet, { board }),
       onSectQuestAccept: (questId) =>
         !this.isReconnecting && this.room.send(SECT_MSG.questAccept, { questId }),
       onSectQuestTurnIn: (questId) =>
@@ -2389,6 +2392,8 @@ export class WorldScene extends Phaser.Scene {
     reg(SECT_MSG.snapshot, (m: SectMsg) => ui.onSect(m));
     reg(SECT_MSG.vault, (m: SectVaultMsg) => ui.onSectVault(m));
     reg(SECT_MSG.hall, (m: SectHallMsg) => ui.onSectHall(m));
+    // Bảng Xã hội (M9.6): máy chủ trả bảng xếp hạng cho người hỏi; `setBoards` tự làm sạch (tin sai kiểu bị bỏ)
+    reg(SOCIAL_MSG.boards, (m: unknown) => ui.setBoards(m));
     reg(SECT_MSG.presence, (m: SectPresenceMsg) => ui.onSectPresence(m));
     reg(SECT_MSG.invited, (m: SectInvitedMsg) => ui.onSectInvited(m));
     replayEarlyMessages(this.room, handlers);
