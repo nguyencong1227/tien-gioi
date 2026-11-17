@@ -406,6 +406,21 @@ describe("hallShopGroups: gom cửa hàng theo cấp tông (bảng thật ~28 m�
     expect(ids(tk[0]!.rows)).toEqual(["kinh_phieu_phong_bo", "kinh_bon_thach_quyen"]);
   });
 
+  it("phần đã mở gộp món NHIỀU cấp: món cấp thấp lên trước (không xen kẽ như thứ tự gốc), cùng cấp giữ thứ tự gốc", () => {
+    const bk = groups(3)[0]!.sections[0]!;
+    expect(bk.key).toBe("baoKho:open");
+    // thứ tự gốc có tu_khi_dan (cấp 3) đứng giữa nguyên liệu cấp 1: sau khi gom thì cấp 1 trước, cấp 3 sau
+    expect(ids(bk.rows)).toEqual([
+      "hoi_huyet_dan",
+      "hoi_linh_dan",
+      "long_tho",
+      "nanh_soi",
+      "tu_khi_dan",
+      "dai_hoi_huyet_dan",
+    ]);
+    expect(bk.rows.map((r) => r.minLevel)).toEqual([1, 1, 1, 1, 3, 3]);
+  });
+
   it("KHÔNG bỏ món nào và không nhân đôi: tổng số hàng = số món, mọi cấp tông", () => {
     for (let lv = 1; lv <= SECT_LEVEL_MAX; lv++) {
       const n = groups(lv).reduce(
