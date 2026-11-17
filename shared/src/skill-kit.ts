@@ -92,10 +92,10 @@ export function skillMaxLevelOf(def: { grade?: unknown }): number {
 }
 
 /**
- * LUYỆN CHIÊU (CT5): điểm luyện cần để lên tầng kế, theo tầng hiện tại (`MASTERY_NEED[tầng - 1]`: tầng 1 -> 2 cần 60 điểm, ... tầng 5 -> 6 cần 1000). Mỗi lần dùng chiêu TRÚNG ít nhất
+ * LUYỆN CHIÊU (CT5): điểm luyện cần để lên tầng kế, theo tầng hiện tại (`MASTERY_NEED[tầng - 1]`: tầng 1 -> 2 cần 60 điểm, ... tầng 4 -> 5 cần 600; không có mục cho tầng 5 -> 6: tầng cuối chỉ bằng quyển trùng, B review #1103). Mỗi lần dùng chiêu TRÚNG ít nhất
  * một mục tiêu được 1 điểm, tối đa `MASTERY_PER_MIN_CAP` điểm mỗi phút mỗi người (không cày bù nhìn). Luyện chỉ đưa tới (tầng tối đa - 1): tầng cuối chỉ bằng kinh quyển trùng.
  */
-export const MASTERY_NEED: readonly number[] = [60, 150, 300, 600, 1000];
+export const MASTERY_NEED: readonly number[] = [60, 150, 300, 600];
 export const MASTERY_PER_MIN_CAP = 60;
 
 /** Phong cách của chiêu: dùng `style` nếu hợp lệ; thiếu thì theo `SHAPE_DEFAULT_STYLE[shape]`; hình lạ -> `khac`. */

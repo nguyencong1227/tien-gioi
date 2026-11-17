@@ -137,7 +137,7 @@ describe("learnSkill theo tầng tối đa của phẩm", () => {
 
 describe("masteryNeedOf", () => {
   it("điểm cần theo tầng hiện tại; dừng ở (tầng tối đa - 1); tầng / phẩm lạ -> null", () => {
-    expect(MASTERY_NEED).toEqual([60, 150, 300, 600, 1000]);
+    expect(MASTERY_NEED).toEqual([60, 150, 300, 600]);
     expect(MASTERY_PER_MIN_CAP).toBe(60);
     // Hoàng (max 3): chỉ luyện tầng 1 -> 2
     expect(masteryNeedOf({ grade: 0 }, 1)).toBe(60);
