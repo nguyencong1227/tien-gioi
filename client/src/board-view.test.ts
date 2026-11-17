@@ -86,6 +86,41 @@ describe("ageText", () => {
   });
 });
 
+describe("mineLine: bảng Tông môn khi người chơi chưa thuộc tông môn nào", () => {
+  it("không tông môn + bảng tongmon + không hạng (none / vắng lý do): 'Bạn chưa thuộc tông môn nào.'", () => {
+    expect(mineLine({ rank: null, reason: "none" }, "tongmon", true)).toBe(
+      "Bạn chưa thuộc tông môn nào.",
+    );
+    expect(mineLine({ rank: null }, "tongmon", true)).toBe("Bạn chưa thuộc tông môn nào.");
+    expect(mineLine(undefined, "tongmon", true)).toBe("Bạn chưa thuộc tông môn nào.");
+  });
+  it("CÓ tông môn (hoặc không biết): giữ 'Chưa có hạng.'", () => {
+    expect(mineLine({ rank: null, reason: "none" }, "tongmon", false)).toBe("Chưa có hạng.");
+    expect(mineLine({ rank: null, reason: "none" }, "tongmon")).toBe("Chưa có hạng.");
+  });
+  it("bảng khác KHÔNG đổi câu dù chưa có tông môn (tu vi, linh hồn, thách đấu)", () => {
+    for (const b of ["tuvi", "linhhon", "pk"] as const)
+      expect(mineLine({ rank: null, reason: "none" }, b, true), b).toBe("Chưa có hạng.");
+  });
+  it("lý do khác (test, min_games) giữ câu riêng; có hạng thì nói hạng, kể cả khi cờ noSect bật nhầm", () => {
+    expect(mineLine({ rank: null, reason: "test" }, "tongmon", true)).toBe(
+      "Tài khoản thử nghiệm không vào bảng này.",
+    );
+    expect(mineLine({ rank: null, reason: "min_games", need: 3 }, "tongmon", true)).toBe(
+      "Cần thêm 3 trận để lên bảng.",
+    );
+    expect(mineLine({ rank: 4 }, "tongmon", true)).toBe("Hạng của bạn: 4");
+  });
+  it("boardView truyền đúng: chỉ bảng tongmon đổi mineText", () => {
+    const none = (board: "tongmon" | "tuvi"): BoardsMsg => ({
+      ...sampleBoards(board, 5, "none"),
+    });
+    expect(boardView(none("tongmon"), 0, true).mineText).toBe("Bạn chưa thuộc tông môn nào.");
+    expect(boardView(none("tongmon"), 0, false).mineText).toBe("Chưa có hạng.");
+    expect(boardView(none("tuvi"), 0, true).mineText).toBe("Chưa có hạng.");
+  });
+});
+
 describe("mineLine", () => {
   it("có hạng -> số hạng", () => {
     expect(mineLine({ rank: 3 })).toBe("Hạng của bạn: 3");

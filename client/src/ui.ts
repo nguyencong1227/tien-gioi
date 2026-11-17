@@ -570,10 +570,13 @@ const socialBoards = new Map<
   BoardId,
   { msg: NonNullable<ReturnType<typeof sanitizeBoardsMsg>>; at: number }
 >();
-/** Lần xin gần nhất của từng bảng (đồng hồ máy khách): không xin lại trong `BOARD_ASK_GAP_MS`; quá `BOARD_WAIT_MS` chưa thấy trả lời thì hiện nút "Tải lại". */
-const socialBoardAsked = new Map<BoardId, number>();
-const BOARD_ASK_GAP_MS = 20_000;
-const BOARD_WAIT_MS = 6_000;
+/** Bộ điều tiết xin của TỪNG bảng (`AskGate`, dùng chung với thành tựu và trùm thế giới): không xin lại trong 20 giây khi đã có bản; quá 6 giây chưa thấy trả lời thì hiện nút "Tải lại". */
+const socialBoardGates = new Map<BoardId, AskGate>();
+const boardGate = (board: BoardId): AskGate => {
+  let g = socialBoardGates.get(board);
+  if (!g) socialBoardGates.set(board, (g = new AskGate()));
+  return g;
+};
 let socialBoardTimer: ReturnType<typeof setTimeout> | null = null;
 
 function clearSocialBoardTimer() {
@@ -585,18 +588,15 @@ function clearSocialBoardTimer() {
 
 /** Xin bảng `board` từ máy chủ (bỏ qua nếu vừa xin chưa lâu và đã có bản; `force` = bấm "Tải lại"). Có hẹn giờ để hiện nút thử lại nếu máy chủ im. */
 function requestSocialBoard(board: BoardId, force = false) {
-  const now = performance.now();
-  const last = socialBoardAsked.get(board);
-  if (!force && last !== undefined && now - last < BOARD_ASK_GAP_MS && socialBoards.has(board))
-    return;
-  socialBoardAsked.set(board, now);
+  const gate = boardGate(board);
+  if (!gate.tryAsk(performance.now(), socialBoards.has(board), force)) return;
   callbacks?.onBoardsGet?.(board);
   clearSocialBoardTimer();
   if (!socialBoards.has(board)) {
     socialBoardTimer = setTimeout(() => {
       socialBoardTimer = null;
       if (socialModalOpen && socialTab === "rank") renderSocialRank();
-    }, BOARD_WAIT_MS + 50);
+    }, gate.waitMsValue + 50);
   }
 }
 
@@ -617,8 +617,7 @@ function renderSocialRank() {
   const mine = $("social-board-mine");
   const age = $("social-board-age");
   if (!entry) {
-    const asked = socialBoardAsked.get(socialBoard);
-    const stale = asked !== undefined && performance.now() - asked >= BOARD_WAIT_MS;
+    const stale = boardGate(socialBoard).stale(performance.now(), false);
     status.hidden = false;
     status.textContent = stale
       ? "Chưa nhận được bảng. Thử tải lại nhé."
@@ -629,7 +628,7 @@ function renderSocialRank() {
     age.textContent = "";
     return;
   }
-  const v = boardView(entry.msg, performance.now() - entry.at);
+  const v = boardView(entry.msg, performance.now() - entry.at, currentSect === null);
   retry.hidden = true;
   mine.textContent = v.mineText;
   const ageLine = v.ageText ? v.ageText.charAt(0).toUpperCase() + v.ageText.slice(1) + ". " : "";
@@ -975,7 +974,8 @@ let wbLast: { msg: WorldBossMsg; at: number } | null = null;
 /** Kết quả của sự kiện vừa kết thúc, hiện thay banner một lúc (`WB_RESULT_MS`). */
 let wbResult: { text: string; tone: "info" | "good" | "bad" } | null = null;
 let wbResultTimer: ReturnType<typeof setTimeout> | null = null;
-let wbAskedAt: number | null = null;
+/** Bộ điều tiết xin sự kiện trùm thế giới (`AskGate`): không xin lại trong 20 giây khi đã có tin; quá 6 giây chưa thấy tin thì hiện nút "Tải lại". */
+const wbGate = new AskGate();
 let wbTabTimer: ReturnType<typeof setTimeout> | null = null;
 let wbTickTimer: ReturnType<typeof setInterval> | null = null;
 /** Danh sách đóng góp mở sẵn trên màn rộng; điện thoại / khung thấp thu gọn (bấm "Xem đóng góp" để mở). */
@@ -984,8 +984,6 @@ let wbExpanded =
 let wbTopKey = "";
 let wbScheduleBuilt = false;
 const WB_RESULT_MS = 10_000;
-const WB_ASK_GAP_MS = 20_000;
-const WB_WAIT_MS = 6_000;
 /** Tin kết thúc giống hệt đến lại trong chừng này thì không toast lần hai (gửi lại khi vào phòng / nối lại). */
 const WB_DUP_MS = 60_000;
 
@@ -1000,9 +998,7 @@ function setWbText(id: string, t: string) {
 
 /** Xin sự kiện trùm thế giới (bỏ qua nếu vừa xin chưa lâu và đã có tin; `force` = bấm "Tải lại" / tin đã quá hạn). */
 function requestWorldBoss(force = false) {
-  const now = performance.now();
-  if (!force && wbAskedAt !== null && now - wbAskedAt < WB_ASK_GAP_MS && wbLast) return;
-  wbAskedAt = now;
+  if (!wbGate.tryAsk(performance.now(), wbLast !== null, force)) return;
   callbacks?.onWorldBossGet?.();
   if (wbTabTimer !== null) clearTimeout(wbTabTimer);
   wbTabTimer = null;
@@ -1010,7 +1006,7 @@ function requestWorldBoss(force = false) {
     wbTabTimer = setTimeout(() => {
       wbTabTimer = null;
       renderWbTab();
-    }, WB_WAIT_MS + 50);
+    }, wbGate.waitMsValue + 50);
   }
 }
 
@@ -1114,7 +1110,7 @@ function renderWbTab(): boolean {
   }
   const retry = $("wbt-retry");
   if (!wbLast) {
-    const stale = wbAskedAt !== null && performance.now() - wbAskedAt >= WB_WAIT_MS;
+    const stale = wbGate.stale(performance.now(), false);
     setWbText(
       "wbt-status",
       stale ? "Chưa nhận được thông tin sự kiện. Thử tải lại nhé." : "Đang tải sự kiện…",
@@ -7699,6 +7695,7 @@ export const ui = {
 
   onSect(m: SectMsg) {
     currentSect = m.sect;
+    if (socialModalOpen && socialTab === "rank") renderSocialRank(); // câu "Hạng của bạn" của bảng Tông môn phụ thuộc có tông môn hay không
     // Không còn tông môn (bị trục xuất / giải tán): hộp xác nhận cũ không còn ý nghĩa, kho đồ cũng không còn
     if (!m.sect) {
       closeSectConfirm();
