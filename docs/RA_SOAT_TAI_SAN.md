@@ -20,7 +20,7 @@
 
 ---
 
-## 2. Bảng thống kê chi tiết tài sản (91 tệp tĩnh = 24 của M4 + 5 phông (#331) + 15 icon Kim Đan (M6) + 14 icon ba ô riêng + 12 icon kinh quyển (M7.4 #505) + 12 icon Hàn Vân Lĩnh (M7.5 #506) + 6 icon kinh quyển đợt 2 (#654) + 3 icon đan hộ đạo (#763); các mô-đun vẽ bằng mã ở mục 2c)
+## 2. Bảng thống kê chi tiết tài sản (92 tệp tĩnh = 1 ảnh AI đầu tiên (`login_bg.webp`, #513) + 24 của M4 + 5 phông (#331) + 15 icon Kim Đan (M6) + 14 icon ba ô riêng + 12 icon kinh quyển (M7.4 #505) + 12 icon Hàn Vân Lĩnh (M7.5 #506) + 6 icon kinh quyển đợt 2 (#654) + 3 icon đan hộ đạo (#763); các mô-đun vẽ bằng mã ở mục 2c)
 
 | STT | Đường dẫn tệp | Loại tài nguyên | Nguồn gốc / Tác giả | Giấy phép | Tình trạng |
 |:---:|---|---|---|:---:|:---:|
@@ -149,13 +149,13 @@ Tư thế đánh / bị đánh / gục của yêu thú và nhân vật suy từ 
 
 ### 2e. Tài sản có AI sinh nháp (SDXL base)
 
-- Số tệp ảnh AI trong `client/public/assets/ai/`: **0 tệp** (chưa có ảnh AI nào vào repo; đường kiểm tự động đã sẵn sàng TRƯỚC khi ảnh đầu tiên vào).
+- Số tệp ảnh AI trong `client/public/assets/ai/`: **1 tệp** (`login_bg.webp`, nền màn đăng nhập, ảnh AI đầu tiên của game; đường kiểm tự động có từ TRƯỚC khi ảnh đầu tiên vào).
 - Mỗi ảnh vào đây phải có: tệp nguồn `docs/art/nguon/<tên>.json` (đủ trường mục 9.3 của `docs/KE_HOACH_DO_HOA_AI.md`, `finalSha256` khớp), một dòng ở `CREDITS.md` mục 7, không siêu dữ liệu (PNG không `tEXt` / `iTXt` / `zTXt` / `eXIf`, WebP không `EXIF` / `XMP `), chỉ model SDXL base và không LoRA, người duyệt xác nhận không chữ và không giống game khác, dung lượng <= trần `static.aiAssets` (mỗi ảnh 150 KB, tổng 300 KB).
-- Bảng ảnh (thêm hàng khi có ảnh; `credits.test.ts` đếm số tệp thật và so với con số "0 tệp" ở trên):
+- Bảng ảnh (thêm hàng khi có ảnh; `credits.test.ts` đếm số tệp thật và so với con số "N tệp" ở trên):
 
 | Ảnh | Tệp nguồn | Ngày | Người duyệt |
 |---|---|---|---|
-| (chưa có) | | | |
+| `client/public/assets/ai/login_bg.webp` | `docs/art/nguon/login_bg.json` | 2026-11-17 (sinh 2026-11-15) | Dev B (xem cả ảnh và bốn góc phóng 200 %: không chữ / ký tự giả, không người, không logo) |
 
 ---
 
@@ -190,7 +190,7 @@ Danh sách HIỆN HÀNH, lấy từ dữ liệu của `shared/` (bản M4 ghi id
 
 | Hạng mục | Kết quả |
 |---|---|
-| Tệp tĩnh quét (`client/public/assets`, `icons`, `fonts`) | **91 tệp** (3 trong `assets/` + 78 icon + 5 icon PWA + 5 phông), **0 tệp thiếu nguồn / tác giả / giấy phép** |
+| Tệp tĩnh quét (`client/public/assets`, `icons`, `fonts`) | **92 tệp** (3 trong `assets/` + 1 ảnh AI `assets/ai/login_bg.webp` + 78 icon + 5 icon PWA + 5 phông), **0 tệp thiếu nguồn / tác giả / giấy phép** |
 | Tài sản bên thứ ba có SHA-256 khớp `CREDITS.md` mục 6 | 5 / 5 (4 tệp `woff2` + `OFL.txt`) |
 | Giấy phép | CC0 1.0 (Tiên Giới tự tạo) cho 39 tệp; SIL OFL 1.1 cho 5 tệp phông (Noto Serif); không có CC-BY mới |
 | Mô-đun đồ hoạ / âm thanh vẽ bằng mã | 7 dòng (mô-đun hoặc nhóm mô-đun) ở 2c, không có tài sản ngoài |
