@@ -57,7 +57,6 @@ import {
   DEFAULT_ORIGIN,
   ORIGIN_BUY_PREFIX,
   levelOf,
-  skillOf,
   SKILL_MAX_LEVEL,
   type SkillSlot,
   keepSlotsOf,
@@ -2976,14 +2975,17 @@ function skillRowEl(row: SkillRow): HTMLElement {
   line.setAttribute("aria-expanded", "false");
   line.setAttribute("aria-controls", detailId);
   line.setAttribute("aria-label", row.aria);
-  const def = skillOf(row.id);
   const ico = document.createElement("span");
   ico.className = "sk-row-ico skico";
   ico.setAttribute("aria-hidden", "true");
-  if (def) {
-    ico.innerHTML = skillIconSvg(def);
-    ico.style.setProperty("--si-c", elementColor(def.element));
-  }
+  // vẽ từ DỮ LIỆU CỦA HÀNG (phong cách / phẩm đã suy bằng hàm của shared, hệ), không tra lại bảng chiêu: chiêu giả của chế độ mock và chiêu mới chưa vào bảng vẫn có hình
+  ico.innerHTML = skillIconSvg({
+    shape: undefined,
+    style: row.style,
+    grade: row.grade,
+    element: row.elementId,
+  });
+  ico.style.setProperty("--si-c", elementColor(row.elementId));
   const main = document.createElement("span");
   main.className = "sk-line-main";
   const name = document.createElement("b");

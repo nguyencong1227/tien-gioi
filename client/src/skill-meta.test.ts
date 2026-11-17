@@ -42,8 +42,8 @@ describe("skillStyleOf", () => {
     expect(skillStyleOf({ shape: "dash" })).toBe("than_phap");
     expect(skillStyleOf({ style: "zzz", shape: "self" })).toBe("ho_the");
     expect(skillStyleOf({ shape: "constructor" })).toBe("khac");
-    expect(skillStyleOf({ style: "constructor" })).toBe("khac");
-    expect(skillStyleOf({})).toBe("khac");
+    expect(skillStyleOf({ style: "constructor", shape: undefined })).toBe("khac");
+    expect(skillStyleOf({ shape: undefined })).toBe("khac");
   });
   it("mọi chiêu dạy được ra một phong cách có tên", () => {
     for (const d of Object.values(SKILL_BY_ID))
