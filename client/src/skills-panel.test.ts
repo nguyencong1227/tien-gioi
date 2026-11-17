@@ -202,10 +202,35 @@ describe("buildSkillsPanel: mô hình bảng", () => {
     const [hoa, bang] = m.rows;
     expect(hoa.slotLabel).toBe("Ô 2");
     expect(hoa.sub).toBe("Hỏa · tầng 2");
-    expect(hoa.aria).toBe("Hỏa Vân Kiếm, hệ Hỏa, tầng 2 trên 3, đang ở ô 2");
+    expect(hoa.aria).toBe("Hỏa Vân Kiếm, hệ Hỏa, phẩm Hoàng, tầng 2 trên 3, đang ở ô 2");
     expect(bang.slotLabel).toBe("Chưa gắn");
     expect(bang.sub).toBe("Băng · tầng 1");
-    expect(bang.aria).toBe("Huyền Băng Chỉ, hệ Băng, tầng 1 trên 3, chưa gắn ô");
+    expect(bang.aria).toBe(
+      `Huyền Băng Chỉ, hệ Băng, phẩm ${bang.gradeName}, tầng 1 trên 3, chưa gắn ô`,
+    );
+  });
+
+  it("mỗi hàng mang id hệ, phẩm 0..3 (kèm tên) và phong cách (kèm tên) để lọc và vẽ biểu tượng", () => {
+    const [hoa, bang] = buildSkillsPanel(tracker(), ME).rows;
+    expect(hoa.elementId).toBe(skillOf(HOA)!.element);
+    expect(bang.elementId).toBe(skillOf(BANG)!.element);
+    for (const r of [hoa, bang]) {
+      expect(Number.isInteger(r.grade) && r.grade >= 0 && r.grade <= 3).toBe(true);
+      expect(r.gradeName).toBe(["Hoàng", "Huyền", "Địa", "Thiên"][r.grade]);
+      expect(r.style).not.toBe("");
+      expect(r.styleName).not.toBe("");
+    }
+    // thiếu `grade` thì suy theo rarity của kinh quyển: Hỏa Vân Kiếm rarity 1 -> Hoàng
+    expect(hoa.grade).toBe(Math.max(0, skillOf(HOA)!.rarity - 1));
+  });
+
+  it("rowAria thêm phẩm khi có, bỏ khi thiếu (không lặp dấu phẩy)", () => {
+    expect(rowAria("Chiêu A", "Lôi", 1, null, null, "Địa")).toBe(
+      "Chiêu A, hệ Lôi, phẩm Địa, tầng 1 trên 3, chưa gắn ô",
+    );
+    expect(rowAria("Chiêu A", "", 1, null, null, "Thiên")).toBe(
+      "Chiêu A, phẩm Thiên, tầng 1 trên 3, chưa gắn ô",
+    );
   });
 
   it("hàng gọn của chiêu thiếu cảnh giới: aria nói điều kiện, nhãn ô vẫn đúng", () => {
@@ -213,7 +238,7 @@ describe("buildSkillsPanel: mô hình bảng", () => {
     const row = buildSkillsPanel(t, { realm: 1, tier: 3, mp: 9, maxMp: 9 }).rows[0];
     expect(row.slotLabel).toBe("Ô 2");
     expect(row.aria).toBe(
-      "Thanh Tùng Phi Châm, hệ Mộc, tầng 1 trên 3, đang ở ô 2, cần đạt Trúc Cơ",
+      `Thanh Tùng Phi Châm, hệ Mộc, phẩm ${row.gradeName}, tầng 1 trên 3, đang ở ô 2, cần đạt Trúc Cơ`,
     );
   });
 
