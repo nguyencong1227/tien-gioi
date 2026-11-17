@@ -7,6 +7,8 @@ import {
   assignSlot,
   skillCooldownMs,
   SKILL_MAX_LEVEL,
+  SKILL_TIER_MAX,
+  skillMaxLevelOf,
   SLOT_UNLOCK_REALM,
   REALMS,
   realmLabel,
@@ -129,6 +131,8 @@ export interface SlotView {
   def: SkillDef | undefined;
   /** Tầng đã học (0 khi không có chiêu) */
   level: number;
+  /** Tầng tối đa của chiêu này (`skillMaxLevelOf`; 0 khi không có chiêu): số chấm tầng trên ô */
+  maxLevel: number;
   /** Hồi chiêu còn lại (ms) và phần còn lại 0..1 của vòng quét (0 khi không hồi chiêu) */
   cdLeftMs: number;
   cdFrac: number;
@@ -159,6 +163,7 @@ export function slotView(
     skillId: def ? skillId : "",
     def,
     level: def ? skills.levelOf(def.id) : 0,
+    maxLevel: def ? skillMaxLevelOf(def) : 0,
     cdLeftMs: 0,
     cdFrac: 0,
     cdSec: 0,
@@ -166,7 +171,15 @@ export function slotView(
     canCast: false,
   };
   if (!slotOpen(slot, me.realm))
-    return { ...base, kind: "locked", skillId: "", def: undefined, level: 0, mpCost: 0 };
+    return {
+      ...base,
+      kind: "locked",
+      skillId: "",
+      def: undefined,
+      level: 0,
+      maxLevel: 0,
+      mpCost: 0,
+    };
   if (!def) return { ...base, kind: "empty" };
   if (!skillReqMet(def, me.realm, me.tier)) return { ...base, kind: "needRealm" };
   if (stunned) return { ...base, kind: "stunned" };
@@ -313,9 +326,17 @@ export function elementColor(id: unknown): string {
   return e ? (ELEMENT_COLOR[e.id] ?? ELEMENT_COLOR.none) : ELEMENT_COLOR.none;
 }
 
-/** Số chấm tầng hiện trên ô (1..3): chiêu chưa học / lạ -> 0. */
-export function levelPips(level: number): number {
-  return Number.isFinite(level) ? Math.min(SKILL_MAX_LEVEL, Math.max(0, Math.floor(level))) : 0;
+/**
+ * Số chấm tầng hiện trên ô (0..`max`): chiêu chưa học / lạ -> 0. `max` là tầng tối đa CỦA CHIÊU (`skillMaxLevelOf`: Hoàng 3 / Huyền 4 / Địa 5 / Thiên 6); bỏ trống = 3 (chiêu
+ * không khai phẩm). `max` lạ rơi về 3.
+ */
+export function levelPips(level: number, max: number = SKILL_MAX_LEVEL): number {
+  return Number.isFinite(level) ? Math.min(pipCap(max), Math.max(0, Math.floor(level))) : 0;
+}
+
+/** Số chấm tối đa hợp lệ: số nguyên trong [1, `SKILL_TIER_MAX`]; lạ (NaN, 0, âm, số lẻ, quá 6) rơi về 3. Một chỗ cho `levelPips` và `pipsText`. */
+export function pipCap(max: number): number {
+  return Number.isInteger(max) && max >= 1 && max <= SKILL_TIER_MAX ? max : SKILL_MAX_LEVEL;
 }
 
 /**
@@ -355,7 +376,10 @@ export function mockSkillsMsg(ids: readonly string[], n: 0 | 1 | 2 | 4, cdMs = 0
   const cd: [number, number, number, number] = [0, 0, 0, 0];
   const cdMax: [number, number, number, number] = [0, 0, 0, 0];
   const learned: Record<string, number> = {};
-  for (let i = 0; i < ids.length; i++) learned[ids[i]] = 1 + (i % SKILL_MAX_LEVEL);
+  for (let i = 0; i < ids.length; i++) {
+    const d = skillOf(ids[i]);
+    learned[ids[i]] = 1 + (i % (d ? skillMaxLevelOf(d) : SKILL_MAX_LEVEL)); // quay vòng 1..tầng tối đa của chính chiêu
+  }
   for (let i = 0; i < n && i < ids.length; i++) {
     slots[i] = ids[i];
     const def = skillOf(ids[i]);
