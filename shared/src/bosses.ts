@@ -194,7 +194,7 @@ export const BOSSES: readonly BossDef[] = [
       {
         id: "phun_doc",
         name: "Phun độc bủa vũng",
-        shape: { t: "pool", r: 75, ttlMs: 5000, tickMs: 1000 },
+        shape: { t: "pool", r: 68, ttlMs: 5000, tickMs: 1000 },
         telegraphMs: 1000,
         recoverMs: 800,
         cooldownMs: 11000,
@@ -266,7 +266,7 @@ export const BOSSES: readonly BossDef[] = [
       {
         id: "vuc_xoay",
         name: "Vực xoáy nuốt người",
-        shape: { t: "pull", r: 220, pullPx: 50, blastR: 80 },
+        shape: { t: "pull", r: 200, pullPx: 30, blastR: 70 },
         telegraphMs: 1300,
         recoverMs: 900,
         cooldownMs: 14000,
@@ -315,7 +315,7 @@ export const BOSSES: readonly BossDef[] = [
       {
         id: "dap_dat",
         name: "Đập đất băng giá",
-        shape: { t: "circleAt", at: "self", r: 112 },
+        shape: { t: "circleAt", at: "self", r: 100 },
         telegraphMs: 1200,
         recoverMs: 900,
         cooldownMs: 8000,
@@ -339,7 +339,7 @@ export const BOSSES: readonly BossDef[] = [
       {
         id: "mua_bang",
         name: "Mưa băng",
-        shape: { t: "rain", r: 62, count: 5, spreadPx: 240, gapMs: 900 },
+        shape: { t: "rain", r: 55, count: 5, spreadPx: 240, gapMs: 900 },
         telegraphMs: 900,
         recoverMs: 800,
         cooldownMs: 13000,
@@ -350,7 +350,7 @@ export const BOSSES: readonly BossDef[] = [
       {
         id: "vung_bang",
         name: "Vùng băng giá",
-        shape: { t: "pool", r: 85, ttlMs: 6000, tickMs: 1000 },
+        shape: { t: "pool", r: 70, ttlMs: 6000, tickMs: 1000 },
         telegraphMs: 1000,
         recoverMs: 800,
         cooldownMs: 12000,
@@ -434,7 +434,7 @@ export const BOSSES: readonly BossDef[] = [
       {
         id: "truy_kich",
         name: "Truy kích kẻ đứng xa",
-        shape: { t: "circleAt", at: "farthest", r: 80 },
+        shape: { t: "circleAt", at: "farthest", r: 70 },
         telegraphMs: 1000,
         recoverMs: 700,
         cooldownMs: 9000,
@@ -445,7 +445,7 @@ export const BOSSES: readonly BossDef[] = [
       {
         id: "chop_den",
         name: "Dịch chuyển chớp",
-        shape: { t: "blink", landR: 110 },
+        shape: { t: "blink", landR: 95 },
         telegraphMs: 1200,
         recoverMs: 900,
         cooldownMs: 12000,
