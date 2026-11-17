@@ -16,6 +16,9 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
  *   - tab Xếp hạng (M9.6): trạng thái đang tải + nút Tải lại (>= 44 px), bốn bảng bằng tin MẪU `window.__sample.boards` (20 dòng, đủ cột, dòng của mình, thử nghiệm,
  *     không ô trống / NaN, không cắt chữ, không tràn), mình ngoài top / không hạng (3 lý do) / bảng rỗng, đạo hiệu có thẻ HTML không thành phần tử, tin sai kiểu bị bỏ,
  *     tab phụ >= 44 px + mũi tên / Home / End đổi bảng và đưa focus theo.
+ *   - trùm thế giới (M9.7): tab Sự kiện (đang tải + nút Tải lại, đồng hồ GIẢM theo thời gian, chưa có sự kiện, sự kiện cách 3 giờ chỉ ở tab, đang diễn ra),
+ *     banner (trọn khung, không tràn, KHÔNG chặn chạm, thanh trùm nằm dưới và theo --wb-h, nút >= 44 px, danh sách đóng góp mở / thu gọn theo khung),
+ *     chưa đủ ngưỡng, bốn kết quả (+ toast cùng tông, không toast lần hai, tự ẩn sau ~10 s), tin sai kiểu bị bỏ, cờ tắt thì không hiện.
  * `--shots`: lưu ảnh bảng đang mở mỗi khung nhìn (và bảng Tu vi / Tông môn đầy dòng).
  */
 import http from "node:http";
@@ -40,6 +43,9 @@ export const VIEWPORTS = [
   { name: "390x844", w: 390, h: 844, dpr: 2, mobile: true },
   { name: "360x640", w: 360, h: 640, dpr: 2, mobile: true },
   { name: "568x320", w: 568, h: 320, dpr: 2, mobile: true },
+  // cửa sổ trình duyệt hẹp: hàng menu 8 nút (nút Xã hội) quanh mốc chuyển sang ☰ (670 px khi cờ bật)
+  { name: "664x900", w: 664, h: 900, dpr: 1, mobile: false },
+  { name: "700x900", w: 700, h: 900, dpr: 1, mobile: false },
 ];
 
 async function main() {
@@ -217,6 +223,11 @@ async function main() {
       await shiftG();
       s = await state();
       check(s.modalHidden, "không có ?social=1: Shift+G KHÔNG mở bảng");
+      await evalJs(`window.__ui.setWorldBoss(window.__sample.worldBoss("live")); 1`);
+      check(
+        await evalJs(`document.getElementById("wb-banner").hidden`),
+        "không có ?social=1: tin trùm thế giới KHÔNG làm hiện banner",
+      );
 
       // ---- 2. cờ BẬT ----
       if (!(await openPage(vp, "&social=1"))) {
@@ -232,6 +243,20 @@ async function main() {
         await evalJs(`document.getElementById("btn-menu").click(); 1`);
         await sleep(500);
         s = await state();
+        const open = await evalJs(`(() => {
+          const btns = [...document.querySelectorAll("#hud-menu-items button")].filter((b) => b.getBoundingClientRect().width > 0);
+          const lefts = btns.map((b) => b.getBoundingClientRect().left), rights = btns.map((b) => b.getBoundingClientRect().right);
+          const rows = new Set(btns.map((b) => Math.round(b.getBoundingClientRect().top))).size;
+          return { n: btns.length, minL: Math.min(...lefts), maxR: Math.max(...rights), vw: window.innerWidth, rows };
+        })()`);
+        check(
+          open.n === 8 && open.minL >= -0.5 && open.maxR <= open.vw + 0.5,
+          `menu ☰ đang mở: cả ${open.n} nút nằm trọn khung (${Math.round(open.minL)} - ${Math.round(open.maxR)} / ${open.vw})`,
+        );
+        check(
+          open.rows <= 2,
+          `menu ☰ đang mở: tối đa 2 hàng, không thành một cột (${open.rows} hàng)`,
+        );
       }
       check(
         s.btn.l >= -0.5 && s.btn.t >= -0.5 && s.btn.r <= s.vw + 0.5 && s.btn.b <= s.vh + 0.5,
@@ -248,6 +273,26 @@ async function main() {
           `điện thoại: nút HUD >= 44 px (${Math.round(s.btn.w)}x${Math.round(s.btn.h)})`,
         );
       check(s.modalHidden && s.btnExpanded === "false", "ban đầu bảng ẩn, aria-expanded=false");
+      // hàng nút menu (8 nút khi bật nút Xã hội): MỌI nút nằm trọn khung (360 px từng bị cắt nút đầu) và, khi hàng đứng cạnh cột trái, không chồng bảng Tổ đội
+      const menu = await evalJs(`(() => {
+        const items = document.getElementById("hud-menu-items");
+        const shown = getComputedStyle(items).display !== "none";
+        const btns = [...items.querySelectorAll("button")].filter((b) => b.getBoundingClientRect().width > 0);
+        const r = items.getBoundingClientRect();
+        return { shown, n: btns.length, minL: Math.min(...btns.map((b) => b.getBoundingClientRect().left)), maxR: Math.max(...btns.map((b) => b.getBoundingClientRect().right)), left: r.left, vw: window.innerWidth,
+          abs: getComputedStyle(items).position === "absolute" };
+      })()`);
+      check(
+        !menu.shown || (menu.n === 8 && menu.minL >= -0.5 && menu.maxR <= menu.vw + 0.5),
+        menu.shown
+          ? `hàng menu (${menu.n} nút) nằm trọn khung (${Math.round(menu.minL)} - ${Math.round(menu.maxR)} / ${menu.vw})`
+          : "hàng menu thu vào nút ☰ ở khung này",
+      );
+      if (menu.shown && !menu.abs)
+        check(
+          menu.left >= 12 + 240 + 8 - 1,
+          `hàng menu đứng cạnh cột trái, không chồng bảng Tổ đội (trái ${Math.round(menu.left)} px >= 259)`,
+        );
 
       await shiftG();
       await sleep(700); // tấm trượt vào (transition): đo khi đã yên vị
@@ -526,6 +571,256 @@ async function main() {
         "tab phụ: Home -> Tu vi",
       );
       check(!(await state()).modalHidden, "mũi tên ở tab phụ không đóng bảng");
+
+      // ---- 4c. trùm thế giới (M9.7, #1026): tab Sự kiện + banner ----
+      const wb = () =>
+        evalJs(`(() => {
+          const q = (id) => document.getElementById(id);
+          const r = (el) => { const b = el.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height }; };
+          const banner = q("wb-banner"), bar = q("boss-bar");
+          return {
+            hidden: banner.hidden, rect: r(banner), tone: banner.dataset.tone || "",
+            title: q("wb-title").textContent, hp: q("wb-hp").textContent, timerLabel: q("wb-timer-label").textContent, timer: q("wb-timer").textContent,
+            mine: q("wb-mine").textContent, mineHidden: q("wb-mine").hidden, result: q("wb-result").textContent, resultHidden: q("wb-result").hidden,
+            toggleHidden: q("wb-toggle").hidden, toggleH: r(q("wb-toggle")).h, toggleDisplay: getComputedStyle(q("wb-toggle")).display, expanded: q("wb-toggle").getAttribute("aria-expanded"),
+            topHidden: q("wb-top").hidden, topItems: [...q("wb-top").children].map((li) => li.textContent),
+            pe: getComputedStyle(banner).pointerEvents, peToggle: getComputedStyle(q("wb-toggle")).pointerEvents,
+            barTop: parseFloat(getComputedStyle(bar).top), wbH: getComputedStyle(document.documentElement).getPropertyValue("--wb-h").trim(),
+            overflow: banner.scrollWidth - banner.clientWidth, pageOverflow: document.documentElement.scrollWidth - window.innerWidth,
+            vw: window.innerWidth, vh: window.innerHeight,
+            tab: { status: q("wbt-status").textContent, detail: q("wbt-detail").textContent, retryHidden: q("wbt-retry").hidden, retryH: r(q("wbt-retry")).h, emptyHidden: q("wbt-empty").hidden, wrapHidden: q("wbt-wrap").hidden, tz: q("wbt-tz").textContent },
+            toasts: [...document.querySelectorAll("#toast p")].map((p) => p.className + ":" + p.textContent),
+          };
+        })()`);
+      const sendWb = (phase, variant = "killed", patch = "") =>
+        evalJs(
+          `(() => { const m = window.__sample.worldBoss(${JSON.stringify(phase)}, ${JSON.stringify(variant)}); ${patch} window.__ui.setWorldBoss(m); return 1; })()`,
+        );
+      const secs = (t) => {
+        const m = /(\d\d):(\d\d)/.exec(t);
+        return m ? Number(m[1]) * 60 + Number(m[2]) : -1;
+      };
+
+      // tab Sự kiện: chưa có tin -> "Đang tải sự kiện…", im ~6 s -> nút Tải lại (>= 44 px)
+      await evalJs(`document.getElementById("social-tab-btn-event").click(); 1`);
+      await sleep(150);
+      let w = await wb();
+      check(
+        w.tab.status === "Đang tải sự kiện…" && w.tab.retryHidden,
+        `tab Sự kiện chưa có tin: "${w.tab.status}"`,
+      );
+      await sleep(6300);
+      w = await wb();
+      check(
+        !w.tab.retryHidden && w.tab.retryH >= 44 - 0.5 && w.tab.status.startsWith("Chưa nhận được"),
+        `máy chủ im quá 6 s: nút Tải lại (${Math.round(w.tab.retryH)} px), "${w.tab.status}"`,
+      );
+      check(w.hidden, "chưa có tin: banner ẩn");
+      // lịch hằng ngày: dữ liệu thật còn RỖNG (E chưa nhập) -> câu giữ chỗ, không bảng rỗng
+      check(
+        !w.tab.emptyHidden && w.tab.wrapHidden && w.tab.tz === "",
+        "lịch rỗng: 'Lịch sự kiện chưa được công bố.', không hiện bảng / ghi chú múi giờ",
+      );
+
+      // sắp xuất hiện (5 phút): trạng thái ở tab + đếm ngược GIẢM theo thời gian; banner hiện
+      await sendWb("soon");
+      w = await wb();
+      const t0 = secs(w.tab.status);
+      check(/xuất hiện sau 0[45]:\d\d$/.test(w.tab.status) && t0 > 0, `tab: "${w.tab.status}"`);
+      check(w.tab.retryHidden, "có tin: nút Tải lại ẩn");
+      check(
+        !w.hidden && w.timerLabel === "Xuất hiện sau" && w.title.includes(" · "),
+        `banner (sắp): "${w.title}" ${w.timerLabel} ${w.timer}`,
+      );
+      await sleep(2300);
+      w = await wb();
+      check(
+        secs(w.timer) > 0 && secs(w.timer) <= t0 - 2,
+        `đồng hồ giảm theo thời gian (${t0}s -> ${secs(w.timer)}s)`,
+      );
+      check(secs(w.tab.status) <= t0 - 2, "đồng hồ ở tab Sự kiện cũng giảm");
+
+      // chưa có sự kiện: banner ẩn, tab báo; sự kiện xa hơn 15 phút: CHỈ ở tab, banner không hiện
+      await sendWb("none");
+      w = await wb();
+      check(
+        w.hidden && w.tab.status === "Chưa có sự kiện.",
+        `không có sự kiện: banner ẩn, tab "${w.tab.status}"`,
+      );
+      await evalJs(
+        `window.__ui.setWorldBoss({ ...window.__sample.worldBoss("soon"), startsInMs: 3 * 3600000 }); 1`,
+      );
+      w = await wb();
+      check(
+        w.hidden && /xuất hiện sau 3 giờ 00 phút$/.test(w.tab.status),
+        `sự kiện cách 3 giờ: banner ẩn, tab "${w.tab.status}"`,
+      );
+
+      // đang diễn ra: tab (còn bao lâu + máu + đóng góp), banner
+      await sendWb("live");
+      w = await wb();
+      check(/đang diễn ra, còn 2[12]:\d\d\.$/.test(w.tab.status), `tab live: "${w.tab.status}"`);
+      check(
+        w.tab.detail === "Máu 64% · Bạn đóng góp 4,6%: đủ điều kiện nhận thưởng.",
+        `tab live chi tiết: "${w.tab.detail}"`,
+      );
+
+      // đóng bảng để đo banner thật: vị trí, không đè thanh trùm, nút >= 44 px, danh sách đóng góp, không chặn chạm
+      await evalJs(
+        `window.__ui.toggleSocialModal(false); document.getElementById("boss-bar").hidden = false; 1`,
+      );
+      await sleep(300);
+      w = await wb();
+      check(
+        !w.hidden && w.timerLabel === "Còn lại" && w.hp === "Máu 64%",
+        `banner live: ${w.title} · ${w.timerLabel} ${w.timer} · ${w.hp}`,
+      );
+      check(
+        w.mine === "Bạn đóng góp 4,6%: đủ điều kiện nhận thưởng." && !w.mineHidden,
+        `banner: "${w.mine}"`,
+      );
+      check(
+        w.rect.l >= -0.5 && w.rect.t >= -0.5 && w.rect.r <= w.vw + 0.5 && w.rect.b <= w.vh + 0.5,
+        `banner nằm trọn khung (${Math.round(w.rect.l)},${Math.round(w.rect.t)} - ${Math.round(w.rect.r)},${Math.round(w.rect.b)} / ${w.vw}x${w.vh})`,
+      );
+      check(
+        w.overflow <= 1 && w.pageOverflow <= 1,
+        `banner không tràn ngang (${w.overflow} / ${w.pageOverflow})`,
+      );
+      if (inMenu) {
+        const onTop = await evalJs(`(() => {
+          const items = document.getElementById("hud-menu-items");
+          if (getComputedStyle(items).display === "none") return "menu đóng";
+          const b = document.getElementById("btn-char").getBoundingClientRect();
+          const el = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+          return el && items.contains(el) ? "ok" : "banner đè: " + (el ? el.id || el.className : "null");
+        })()`);
+        check(
+          onTop === "ok" || onTop === "menu đóng",
+          `menu ☰ (điện thoại dọc) nằm TRÊN banner, bấm được (${onTop})`,
+        );
+      }
+      check(
+        w.pe === "none" && w.peToggle === "auto",
+        "banner KHÔNG chặn chạm xuống thế giới (chỉ nút bật / tắt nhận chạm)",
+      );
+      check(
+        w.barTop >= w.rect.b - 0.5,
+        `thanh trùm nằm DƯỚI banner, không đè (${Math.round(w.barTop)} >= ${Math.round(w.rect.b)})`,
+      );
+      check(
+        parseInt(w.wbH, 10) >= Math.round(w.rect.h),
+        `--wb-h = ${w.wbH} (cao banner ${Math.round(w.rect.h)} px)`,
+      );
+      const compact = w.vh <= 420 && w.vw > w.vh;
+      if (compact) {
+        check(
+          w.toggleDisplay === "none" && w.rect.h <= 64,
+          `khung ngang thấp: banner MỘT dòng (cao ${Math.round(w.rect.h)} px), không nút / danh sách che HUD`,
+        );
+      }
+      if (!compact) {
+        check(
+          !w.toggleHidden && w.toggleH >= 44 - 0.5,
+          `nút "Xem đóng góp" cao >= 44 px (${Math.round(w.toggleH)})`,
+        );
+        // mở sẵn trên màn rộng, thu gọn trên điện thoại; bấm đổi trạng thái
+        const wide = w.vw >= 900 && w.vh >= 500;
+        check(
+          w.expanded === String(wide) && w.topHidden === !wide,
+          `danh sách đóng góp ${wide ? "mở sẵn" : "thu gọn"} ở khung này`,
+        );
+        await evalJs(`document.getElementById("wb-toggle").click(); 1`);
+        await sleep(150);
+        w = await wb();
+        check(
+          w.expanded === String(!wide) && w.topHidden === wide,
+          "bấm nút: đổi mở / thu gọn, aria-expanded đúng",
+        );
+        await evalJs(
+          `if (document.getElementById("wb-top").hidden) document.getElementById("wb-toggle").click(); 1`,
+        );
+        await sleep(150);
+        w = await wb();
+        check(
+          !w.topHidden && w.topItems.length === 3 && w.topItems.every((t) => /\d,\d%$/.test(t)),
+          `danh sách đóng góp: ${w.topItems.length} dòng, mỗi dòng có phần trăm`,
+        );
+        check(
+          w.rect.b <= w.vh + 0.5 && w.overflow <= 1,
+          "mở danh sách: banner vẫn trọn khung, không tràn",
+        );
+        check(
+          w.barTop >= w.rect.b - 0.5,
+          "mở danh sách: thanh trùm vẫn dưới banner (--wb-h cập nhật theo chiều cao)",
+        );
+      }
+      if (shotsDir) {
+        const shot = await send("Page.captureScreenshot", { format: "png" });
+        fs.writeFileSync(
+          path.join(shotsDir, `xa-hoi-trum-${vp.name}.png`),
+          Buffer.from(shot.result.data, "base64"),
+        );
+      }
+
+      await sendWb("live", "below");
+      w = await wb();
+      check(/cần từ 1,5% để nhận thưởng\.$/.test(w.mine), `chưa đủ ngưỡng: "${w.mine}"`);
+
+      // kết quả: bốn trường hợp (banner đổi sang câu kết quả + một toast đúng tông)
+      for (const [variant, re, tone] of [
+        ["killed", /^Đã hạ .+! Thưởng: \+46 tu vi, \+9 Linh thạch, .+ x1\.$/, "good"],
+        ["fled", /đã bỏ chạy\.$/, "bad"],
+        ["cancelled", /đã bị huỷ\.$/, "info"],
+      ]) {
+        await sendWb("ended", variant);
+        await sleep(100);
+        w = await wb();
+        check(
+          !w.hidden && !w.resultHidden && re.test(w.result) && w.tone === tone,
+          `kết quả ${variant}: "${w.result}" (tông ${w.tone})`,
+        );
+        check(
+          w.toasts.some((t) => t.startsWith(tone + ":") && re.test(t.slice(tone.length + 1))),
+          `kết quả ${variant}: có toast cùng tông`,
+        );
+        check(
+          w.timer === "" || w.mineHidden,
+          `kết quả ${variant}: banner không còn đồng hồ / đóng góp`,
+        );
+      }
+      // cùng một sự kiện kết thúc nhận LẠI thì KHÔNG toast lần hai
+      const before = (await wb()).toasts.length;
+      await sendWb("ended", "cancelled");
+      await sleep(100);
+      check(
+        (await wb()).toasts.length === before,
+        "tin kết thúc lặp đúng sự kiện đó: không toast lần hai",
+      );
+      if (vp.name === VIEWPORTS[0].name) {
+        await sleep(10_300);
+        w = await wb();
+        check(w.hidden, "sau ~10 s kết quả tự ẩn, banner biến mất");
+      }
+
+      // tin sai kiểu bị bỏ; có tin mới thì banner lại hiện; ẩn thì thanh trùm lên lại chỗ cũ
+      await sendWb("live");
+      await evalJs(
+        `window.__ui.setWorldBoss(null); window.__ui.setWorldBoss({ phase: "zzz", id: "a", name: "b", mapId: "c" }); window.__ui.setWorldBoss("x"); 1`,
+      );
+      w = await wb();
+      check(!w.hidden && w.hp === "Máu 64%", "tin sai kiểu bị bỏ, banner giữ nguyên");
+      await sendWb("none");
+      await sleep(250);
+      w = await wb();
+      check(
+        w.hidden && parseInt(w.wbH, 10) === 0,
+        `không còn sự kiện: banner ẩn, --wb-h = ${w.wbH}`,
+      );
+      await evalJs(
+        `document.getElementById("boss-bar").hidden = true; window.__ui.toggleSocialModal(true); 1`,
+      );
+      await sleep(700);
 
       // ---- 5. Esc đóng, trả focus; Shift+G đóng / mở lại ----
       await press("Escape", "Escape", 27);

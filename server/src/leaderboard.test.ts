@@ -1,5 +1,5 @@
 // Bảng xếp hạng (M9.3 #1022): bốn bảng từ kho, loại TEST_EXP_MULT khỏi `tuvi`, `mine` có lý do, làm mới an toàn, không rò id.
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   BOARD_PK_MIN_GAMES,
   BOARD_SIZE,
@@ -8,7 +8,7 @@ import {
   stepOf,
   type Soul,
 } from "@tien-gioi/shared";
-import { LeaderboardService, type LeaderboardDeps } from "./leaderboard";
+import { BOARD_SLOW_REFRESH_MS, LeaderboardService, type LeaderboardDeps } from "./leaderboard";
 import type { ProfileRow } from "./player-store";
 import type { Sect } from "./sect-store";
 import type { AccountRecord } from "./account-store";
@@ -57,6 +57,13 @@ const sect = (name: string, points: number, members: number): Sect =>
     points,
     createdAt: "t",
     updatedAt: "t",
+  }) as unknown as Sect;
+
+/** Tông có thành viên THẬT theo khoá chân linh (`soulKey`), để thử `mine` của bảng `tongmon`. */
+const sectWith = (name: string, points: number, soulKeys: string[]): Sect =>
+  ({
+    ...sect(name, points, 0),
+    members: soulKeys.map((k) => ({ soulKey: k })) as never,
   }) as unknown as Sect;
 
 interface Data {
@@ -290,5 +297,113 @@ describe("LeaderboardService: top 20, hạng ngoài top, làm mới", () => {
     });
     await svc.refresh();
     expect(svc.view("tuvi", null).rows).toEqual([]);
+  });
+});
+
+describe("LeaderboardService: sửa theo review của B (#1041)", () => {
+  afterEach(() => vi.restoreAllMocks());
+  const data = (): Data => ({
+    profiles: [prof("An Nhiên", 2, 1, 50), prof("Bảo Thanh", 3, 0, 5)],
+    souls: [
+      soul(soulIdOf("An Nhiên"), { kiep: 2, best: { step: 5, realm: 1, tier: 0 } }),
+      soul(soulIdOf("Bảo Thanh"), { kiep: 1, best: { step: 9, realm: 1, tier: 1 } }),
+    ],
+    sects: [],
+  });
+
+  it("TEST_EXP_MULT hệ số 1 (không nhân gì) KHÔNG phải tài khoản thử nghiệm: vẫn vào tuvi, không đánh dấu test, mine có hạng; hệ số > 1 vẫn bị loại", async () => {
+    const d = data();
+    d.testExp = new Map([
+      [soulIdOf("An Nhiên"), 1],
+      [soulIdOf("Bảo Thanh"), 3],
+    ]);
+    const { svc } = make(d);
+    await svc.refresh();
+    expect(svc.view("tuvi", null).rows.map((r) => r.name)).toEqual(["An Nhiên"]); // Bảo Thanh x3 bị loại
+    expect(svc.view("tuvi", "An Nhiên").mine).toMatchObject({ rank: 1 });
+    expect(svc.view("tuvi", "Bảo Thanh").mine).toEqual({ rank: null, reason: "test" });
+    const lh = svc.view("linhhon", null).rows;
+    expect(lh.find((r) => r.name === "An Nhiên")?.test).toBeUndefined(); // hệ số 1: không có cờ test
+    expect(lh.find((r) => r.name === "Bảo Thanh")?.test).toBe(true);
+  });
+
+  it("tongmon: mine là hạng của tông người xem đang ở (tra theo khoá chân linh); không ở tông nào / không truyền khoá thì none", async () => {
+    const d = data();
+    d.sects = [
+      sectWith("Thanh Vân", 9000, ["soul-a", "soul-b"]),
+      sectWith("Bạch Liên", 100, ["soul-c"]),
+      sectWith("Trống", 99999, []), // không thành viên: không lên bảng
+    ];
+    const { svc } = make(d);
+    await svc.refresh();
+    const b = svc.view("tongmon", "An Nhiên", "soul-a");
+    expect(b.rows.map((r) => r.name)).toEqual(["Thanh Vân", "Bạch Liên"]);
+    expect(b.mine).toMatchObject({ rank: 1, row: { name: "Thanh Vân" } });
+    expect(svc.view("tongmon", "X", "soul-c").mine).toMatchObject({
+      rank: 2,
+      row: { name: "Bạch Liên" },
+    });
+    expect(svc.view("tongmon", "An Nhiên", "soul-khong-co-tong").mine).toEqual({
+      rank: null,
+      reason: "none",
+    });
+    expect(svc.view("tongmon", "An Nhiên").mine).toEqual({ rank: null, reason: "none" });
+    expect(svc.view("tongmon", "An Nhiên", null).mine).toEqual({ rank: null, reason: "none" });
+    // tên tông trùng đạo hiệu người xem không làm lẫn: vẫn tra theo khoá chân linh
+    expect(svc.view("tongmon", "Thanh Vân", "soul-khong-co-tong").mine.rank).toBeNull();
+  });
+
+  it("tongmon: các bảng khác không bị ảnh hưởng bởi khoá chân linh người xem", async () => {
+    const d = data();
+    d.sects = [sectWith("Thanh Vân", 9000, ["soul-a"])];
+    const { svc } = make(d);
+    await svc.refresh();
+    expect(svc.view("tuvi", "An Nhiên", "soul-a").mine).toMatchObject({ rank: 2 }); // Bảo Thanh (cảnh giới cao hơn) hạng 1
+    expect(svc.view("tuvi", "An Nhiên", "soul-a")).toEqual(svc.view("tuvi", "An Nhiên"));
+  });
+
+  it("stats: chưa làm mới = null; sau làm mới có thời gian + số lượng đã đọc; làm mới chậm ghi cảnh báo, nhanh thì không", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const d = data();
+    d.sects = [sectWith("Thanh Vân", 1, ["soul-a"])];
+    const clock = { t: 1_000_000 };
+    const { svc } = make(d, clock);
+    expect(svc.stats).toEqual({ lastRefreshMs: null, souls: 0, profiles: 0, sects: 0 });
+    await svc.refresh();
+    expect(svc.stats).toEqual({ lastRefreshMs: 0, souls: 2, profiles: 2, sects: 1 });
+    expect(warn).not.toHaveBeenCalled();
+    // làm chậm: kho đọc mất BOARD_SLOW_REFRESH_MS + 1 ms theo đồng hồ của dịch vụ
+    const slow = new LeaderboardService({
+      souls: {
+        all: async () => {
+          clock.t += BOARD_SLOW_REFRESH_MS + 1;
+          return d.souls;
+        },
+      } as never,
+      players: { listProfiles: async () => d.profiles } as never,
+      sects: { all: async () => d.sects } as never,
+      testExp: () => new Map(),
+      now: () => clock.t,
+    });
+    await slow.refresh();
+    expect(slow.stats.lastRefreshMs).toBe(BOARD_SLOW_REFRESH_MS + 1);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0][0])).toContain("làm mới chậm");
+    // đúng ngưỡng thì không cảnh báo
+    warn.mockClear();
+    const edge = new LeaderboardService({
+      souls: {
+        all: async () => {
+          clock.t += BOARD_SLOW_REFRESH_MS;
+          return d.souls;
+        },
+      } as never,
+      players: { listProfiles: async () => d.profiles } as never,
+      sects: { all: async () => d.sects } as never,
+      testExp: () => new Map(),
+      now: () => clock.t,
+    });
+    await edge.refresh();
+    expect(warn).not.toHaveBeenCalled();
   });
 });

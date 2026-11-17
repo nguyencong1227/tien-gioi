@@ -7,9 +7,13 @@
 //     trận, đếm ngược `AMBUSH_OFFER_MS`. Trong lúc chờ nhân vật đứng yên, quái bỏ mục tiêu.
 //  2. Client gửi `ambushChoose { id, choice }`; hết giờ = `fight`. `flee_*`: trừ giá -> lưu -> `ambushEnd { result: "fled" }`. `fight`: server dựng đấu trường solo
 //     (`ARENA_MAPS`) rồi gửi `travelTo { mapId, roomId }` như bí cảnh.
-//  3. Trong đấu trường: `ambushState` mỗi giây (máu kẻ địch, thời gian còn, GIÁ bỏ chạy giữa trận); nút Bỏ chạy = `ambushFlee { choice }`.
+//  3. Trong đấu trường: `ambushState` mỗi giây (thời gian còn, GIÁ bỏ chạy giữa trận; máu kẻ địch KHÔNG ở đây: đã có trong `state.monsters`); nút Bỏ chạy = `ambushFlee { choice }`.
 //  4. Kết thúc: `ambushEnd { result, paid?, rewards? }`; rồi server đưa về ĐÚNG chỗ cũ trên bản đồ gốc.
-// Giá hiện trên nút LÀ SỐ DO SERVER GỬI; server TÍNH LẠI khi nhận lựa chọn (không bao giờ tin số client).
+// Giá hiện trên nút LÀ GIÁ BỊ TRỪ: máy chủ CHỐT giá lúc gửi `ambushOffer` / `ambushState` (gắn với `id` đề nghị), `ambushChoose` / `ambushFlee` trừ ĐÚNG số đã chốt, chỉ kiểm lại ví còn đủ
+// (client không gửi số nào; không tính lại theo trạng thái lúc nhận vì tu vi có thể đổi trong lúc chờ).
+// Nối lại mạng giữa chừng: máy chủ ĐÓNG BĂNG đồng hồ (hộp thoại / trận) tối đa `AMBUSH_DROP_GRACE_S`; sau khi nối lại máy chủ gửi LẠI `ambushOffer` (CÙNG `id`, `ms` còn lại THẬT) hoặc
+// `ambushState` (trong đấu trường). Client coi cùng `id` là CẬP NHẬT hộp thoại đang mở (không dựng lại, không gửi lại `ambushSeen`); hết đồng hồ cục bộ mà chưa có tin mới thì KHÔNG tự chọn
+// (máy chủ mới là bên quyết): hiện "đang chờ máy chủ".
 
 import { NET_RECONNECT_GRACE_S } from "./net-guard";
 
@@ -156,7 +160,11 @@ export interface AmbushPriceInput {
   wallet: number;
 }
 
-/** Cả hai giá ở thời điểm `stage`; `coin.enough` là `false` khi ví không đủ. Thuần. */
+/**
+ * Cả hai giá ở thời điểm `stage`; `coin.enough` là `false` khi ví không đủ. Thuần.
+ * `exp` BẰNG 0 khi thanh tu vi trống (vừa đột phá): luật máy chủ (CD2) là CHỈ cho nút "Bỏ chạy: trả tu vi" khi `exp > 0`; thanh trống thì chỉ còn nút Linh thạch (giá có sàn
+ * `AMBUSH_FLEE_MIN_COIN`), để không thể giữ tu vi ở 0 rồi bỏ chạy mãi miễn phí. Client thấy `exp === 0` thì khoá nút tu vi (không hiện "miễn phí").
+ */
 export function ambushPrice(input: AmbushPriceInput, stage: AmbushPriceStage): AmbushPrice {
   const price = ambushCoinPrice(input.step, stage);
   return {
@@ -193,7 +201,10 @@ export interface AmbushFoeInfo {
   count: number;
 }
 
-/** Server -> client (chỉ người bị chặn): hộp thoại tình huống. `scene` là văn mẫu ĐÃ điền (không còn `{biến}`); `ms` = thời gian còn. */
+/**
+ * Server -> client (chỉ người bị chặn): hộp thoại tình huống. `scene` là văn mẫu ĐÃ điền (không còn `{biến}`); `ms` = thời gian còn THẬT lúc gửi (gửi lại cùng `id` sau khi nối lại
+ * mạng thì là bản cập nhật, xem chú thích đầu tệp); `price` là giá đã CHỐT.
+ */
 export interface AmbushOfferMsg {
   id: string;
   scene: string;

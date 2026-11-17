@@ -384,6 +384,30 @@
         Chế độ Quyết đấu giả lập (DEV / Debug)
       </div>
 
+      <!-- Banner TRÙM THẾ GIỚI (M9.7, #1026; vẽ bằng ui.ts từ world-boss-view.ts; chỉ hiện khi cờ ?social=1): đếm ngược, máu, phần đóng góp của mình, kết quả. Không chặn chạm / nhấp xuống thế giới (chỉ nút "Xem đóng góp" nhận chạm). -->
+      <section id="wb-banner" class="wb-banner" hidden aria-label="Trùm thế giới">
+        <div class="wb-head">
+          <b id="wb-title" class="wb-title"></b>
+          <span id="wb-hp" class="wb-hp"></span>
+          <span class="wb-timer"
+            ><span id="wb-timer-label"></span> <b id="wb-timer" class="wb-time"></b
+          ></span>
+        </div>
+        <p id="wb-mine" class="wb-mine"></p>
+        <button
+          type="button"
+          id="wb-toggle"
+          class="wb-toggle"
+          aria-expanded="false"
+          aria-controls="wb-top"
+          hidden
+        >
+          Xem đóng góp
+        </button>
+        <ol id="wb-top" class="wb-top" aria-label="Người đóng góp nhiều nhất" hidden></ol>
+        <p id="wb-result" class="wb-result" role="status" hidden></p>
+      </section>
+
       <!-- Thanh máu TRÙM (mục 42, T4 #873): trùm gần nhất / trùm bí cảnh; mốc giai đoạn, tên chiêu đang vận, chỉ báo cuồng nộ, giáp + gọi quái con (vẽ bằng boss-bar-ui.ts) -->
       <section id="boss-bar" class="boss-bar" hidden aria-label="Trùm">
         <div class="boss-bar-head">
@@ -1613,7 +1637,28 @@
           tabindex="0"
           hidden
         >
-          <p class="social-empty">Lịch sự kiện đang được dựng.</p>
+          <p id="wbt-status" class="social-mine" role="status" aria-live="polite"></p>
+          <p id="wbt-detail" class="social-age"></p>
+          <button type="button" id="wbt-retry" class="social-retry" hidden>Tải lại</button>
+          <h3 class="wbt-h">Lịch hằng ngày</h3>
+          <p id="wbt-empty" class="social-empty">Lịch sự kiện chưa được công bố.</p>
+          <div id="wbt-wrap" class="social-table-wrap" hidden>
+            <table id="wbt-table" class="social-table">
+              <caption class="sr-only">
+                Lịch trùm thế giới hằng ngày
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col" class="c-time">Giờ</th>
+                  <th scope="col" class="c-name">Trùm</th>
+                  <th scope="col">Bản đồ</th>
+                  <th scope="col" class="c-num">Thời lượng</th>
+                </tr>
+              </thead>
+              <tbody id="wbt-body"></tbody>
+            </table>
+          </div>
+          <p id="wbt-tz" class="social-age"></p>
         </div>
       </section>
 
