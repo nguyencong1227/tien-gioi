@@ -526,6 +526,13 @@ async function main() {
           `không hạng (${variant}): "${k.mine}"`,
         );
       }
+      // bảng Tông môn khi CHƯA thuộc tông môn nào (mock không có tông môn): nói thẳng, không 'Chưa có hạng.' (các bảng khác giữ câu cũ ở vòng trên)
+      await setBoard("tongmon", 5, "", "none");
+      k = await rank();
+      check(
+        k.mine === "Bạn chưa thuộc tông môn nào.",
+        `bảng Tông môn, chưa thuộc tông môn nào: "${k.mine}"`,
+      );
       await setBoard("tuvi", 5, `m.rows = [];`);
       k = await rank();
       check(
