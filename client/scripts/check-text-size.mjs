@@ -287,6 +287,46 @@ try {
         check(await noOverflow(), `${vp.name} [large] #ambush-modal: không tràn ngang / dọc`);
       await evalJs('window.__ui.onAmbushEnd({ result: "canceled" });0');
       await sleep(100);
+      // Đấu trường chặn đường (CD7 bước 3): HUD, bảng xác nhận bỏ chạy, thẻ kết quả: chữ >= 14 px trên điện thoại, không tràn ở cỡ Lớn
+      await evalJs(
+        `window.__ui.onAmbushState(${JSON.stringify({ msLeft: 83000, price: { exp: 123456, coin: { price: 12345, enough: true } } })});0`,
+      );
+      await sleep(300);
+      const hud = await scan("#ambush-hud");
+      await evalJs('document.getElementById("ahud-flee").click();0');
+      await sleep(300);
+      const flee = await scan("#ambush-flee-modal");
+      if (vp.phone) {
+        for (const [name, o] of [
+          ["#ambush-hud (HUD đấu trường)", hud],
+          ["#ambush-flee-modal (xác nhận bỏ chạy)", flee],
+        ]) {
+          const bad = offenders(o, 14);
+          check(
+            !bad,
+            `${vp.name} [${mode}] ${name}: mọi chữ >= 14 px${bad ? " (nhỏ hơn: " + bad + ")" : ""}`,
+          );
+        }
+      }
+      if (mode === "large" && vp.phone)
+        check(
+          await noOverflow(),
+          `${vp.name} [large] đấu trường chặn đường: không tràn ngang / dọc`,
+        );
+      await evalJs(
+        'window.__ui.onAmbushEnd({ result: "won", rewards: { exp: 360, coin: 48, items: [] } });0',
+      );
+      await sleep(200);
+      const res = await scan("#ambush-result");
+      if (vp.phone) {
+        const bad = offenders(res, 14);
+        check(
+          !bad,
+          `${vp.name} [${mode}] #ambush-result (thẻ kết quả): mọi chữ >= 14 px${bad ? " (nhỏ hơn: " + bad + ")" : ""}`,
+        );
+      }
+      await evalJs("window.__ui.hideAmbush();0");
+      await sleep(100);
       // HUD: điện thoại >= 12 px; HUD không co giãn theo cỡ chữ
       if (vp.phone) {
         let worst = "";

@@ -58,7 +58,7 @@ Chỉ THÊM (`PROTOCOL_VERSION` KHÔNG tăng): `fx` mới (client cũ bỏ qua: 
 ## 6. Phẩm cấp + luyện chiêu
 - **Phẩm** `grade` 0-3 = **Hoàng / Huyền / Địa / Thiên** (nguồn `pham_cap` 1-7: 1-2 Hoàng, 3-4 Huyền, 5-6 Địa, 7 Thiên; ánh xạ ghi ở `NGUON_NOI_DUNG.md` mục 3). Phẩm quyết định TẦNG TỐI ĐA (3 / 4 / 5 / 6) và hiện trên sổ chiêu + quyển; độ hiếm quyển (`rarity`) vẫn là màu đồ.
 - **Tầng** (thay `SKILL_MAX_LEVEL` = 3 cố định): hệ số sát thương `[1, 1,15, 1,30, 1,40, 1,50, 1,60]`, hồi chiêu `[1, 0,92, 0,84, 0,80, 0,76, 0,72]` (tầng 1-3 GIỮ NGUYÊN số hiện có).
-- **Nguồn tầng**: (a) quyển trùng (như nay, tới tầng tối đa của phẩm); (b) **LUYỆN**: mỗi lần dùng chiêu TRÚNG ít nhất một mục tiêu cộng 1 điểm luyện (tối đa 60 điểm / phút / người để không cày bù nhìn); đủ `MASTERY_NEED = [60, 150, 300, 600, 1000]` điểm thì lên tầng kế, NHƯNG luyện chỉ đưa tới (tầng tối đa - 1): tầng cuối chỉ bằng quyển trùng (quyển hiếm có giá trị). Lưu `SkillBook.mastery` (tuỳ chọn khi đọc, `sanitizeSkillBook` kẹp). Khắc chân linh GIỮ tầng 1 như nay (luyện lại ở kiếp mới).
+- **Nguồn tầng**: (a) quyển trùng (như nay, tới tầng tối đa của phẩm); (b) **LUYỆN**: mỗi lần dùng chiêu TRÚNG ít nhất một mục tiêu cộng 1 điểm luyện (tối đa 60 điểm / phút / người để không cày bù nhìn); đủ `MASTERY_NEED = [60, 150, 300, 600]` điểm thì lên tầng kế, NHƯNG luyện chỉ đưa tới (tầng tối đa - 1): tầng cuối chỉ bằng quyển trùng (quyển hiếm có giá trị). Lưu `SkillBook.mastery` (tuỳ chọn khi đọc, `sanitizeSkillBook` kẹp). Khắc chân linh GIỮ tầng 1 như nay (luyện lại ở kiếp mới).
 - Nguồn có lợi cho người mới: tầng 1-2 của chiêu Hoàng phẩm đạt nhanh bằng luyện (khoảng 20-40 phút chơi); Thiên phẩm là mục tiêu dài hạn.
 
 ## 7. Nguồn sách chiêu

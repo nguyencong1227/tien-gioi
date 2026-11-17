@@ -247,11 +247,11 @@ describe("dữ liệu chiêu thức (18: 12 chiêu đợt 1 + 6 chiêu Nguyên A
 });
 
 describe("tầng chiêu", () => {
-  it("tầng 1 không đổi, mỗi tầng +15% sát thương / -8% hồi chiêu, kẹp 1..3, đầu vào xấu về tầng 1", () => {
+  it("tầng 1 không đổi, tầng 1-3 mỗi tầng +15% sát thương / -8% hồi chiêu (tầng 4-6 theo bảng), kẹp 1..6, đầu vào xấu về tầng 1", () => {
     expect(skillDamageMult(1)).toBe(1);
     expect(skillDamageMult(2)).toBeCloseTo(1.15, 10);
     expect(skillDamageMult(3)).toBeCloseTo(1.3, 10);
-    expect(skillDamageMult(99)).toBeCloseTo(1.3, 10);
+    expect(skillDamageMult(99)).toBeCloseTo(1.6, 10); // kẹp ở tầng lớn nhất của MỌI chiêu (6, CT1b-3); chiêu cũ không đạt tới (tối đa tầng 3)
     expect(skillCooldownMult(1)).toBe(1);
     expect(skillCooldownMult(3)).toBeCloseTo(0.84, 10);
     for (const bad of [0, -5, Number.NaN, Infinity, 1.9]) {
@@ -575,7 +575,7 @@ describe("tính số dùng chung: linh lực và hồi chiêu", () => {
     }
   });
 
-  it("skillCooldownMs: tầng 1 không đổi, tầng 3 -16%, cdr kẹp 0..30%, NaN -> 0, không âm", () => {
+  it("skillCooldownMs: tầng 1 không đổi, tầng 3 -16%, tầng 6 -28%, cdr kẹp 0..30%, NaN -> 0, không âm", () => {
     const d = { cooldown: 3000 };
     expect(skillCooldownMs(d, 1)).toBe(3000);
     expect(skillCooldownMs(d, 2)).toBe(2760);
@@ -584,7 +584,8 @@ describe("tính số dùng chung: linh lực và hồi chiêu", () => {
     expect(skillCooldownMs(d, 1, 0.99)).toBe(Math.round(3000 * (1 - CDR_CAP)));
     expect(skillCooldownMs(d, 1, -1)).toBe(3000);
     expect(skillCooldownMs(d, 1, Number.NaN)).toBe(3000);
-    expect(skillCooldownMs(d, 99, 0.3)).toBe(Math.round(3000 * 0.84 * 0.7));
+    expect(skillCooldownMs(d, 99, 0.3)).toBe(Math.round(3000 * 0.72 * 0.7)); // tầng kẹp ở 6
+    expect(skillCooldownMs(d, 3, 0.3)).toBe(Math.round(3000 * 0.84 * 0.7));
     expect(CDR_CAP).toBe(0.3);
     for (const bad of [0, -3, Number.NaN]) expect(skillCooldownMs(d, bad)).toBeGreaterThan(0);
   });

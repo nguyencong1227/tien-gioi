@@ -76,6 +76,28 @@ export function skillGradeOf(def: Pick<SkillDef, "rarity"> & { grade?: unknown }
   return Math.min(3, Math.max(0, r - 1)) as SkillGrade;
 }
 
+/**
+ * TẦNG tối đa theo PHẨM (mục 51, CT1b-3): Hoàng 3, Huyền 4, Địa 5, Thiên 6. Tầng 1-3 giữ NGUYÊN số hiện có (`skillDamageMult` / `skillCooldownMult`); tầng 4-6 chỉ có ở phẩm cao.
+ * `SKILL_TIER_MAX` là tầng lớn nhất của MỌI chiêu (cận trên của hai bảng hệ số).
+ */
+export const SKILL_MAX_LEVEL_BY_GRADE: readonly [number, number, number, number] = [3, 4, 5, 6];
+export const SKILL_TIER_MAX = 6;
+
+/**
+ * Tầng học tối đa của chiêu: phẩm KHAI BÁO (`grade` hợp lệ) theo `SKILL_MAX_LEVEL_BY_GRADE`; KHÔNG khai (18 chiêu cũ và chiêu chưa gắn phẩm) thì 3: chiêu cũ không đổi một byte
+ * dù `skillGradeOf` suy ra phẩm cao từ độ hiếm (phẩm suy ra chỉ để HIỆN, không cấp thêm tầng).
+ */
+export function skillMaxLevelOf(def: { grade?: unknown }): number {
+  return isGrade(def.grade) ? SKILL_MAX_LEVEL_BY_GRADE[def.grade] : SKILL_MAX_LEVEL_BY_GRADE[0];
+}
+
+/**
+ * LUYỆN CHIÊU (CT5): điểm luyện cần để lên tầng kế, theo tầng hiện tại (`MASTERY_NEED[tầng - 1]`: tầng 1 -> 2 cần 60 điểm, ... tầng 4 -> 5 cần 600; không có mục cho tầng 5 -> 6: tầng cuối chỉ bằng quyển trùng, B review #1103). Mỗi lần dùng chiêu TRÚNG ít nhất
+ * một mục tiêu được 1 điểm, tối đa `MASTERY_PER_MIN_CAP` điểm mỗi phút mỗi người (không cày bù nhìn). Luyện chỉ đưa tới (tầng tối đa - 1): tầng cuối chỉ bằng kinh quyển trùng.
+ */
+export const MASTERY_NEED: readonly number[] = [60, 150, 300, 600];
+export const MASTERY_PER_MIN_CAP = 60;
+
 /** Phong cách của chiêu: dùng `style` nếu hợp lệ; thiếu thì theo `SHAPE_DEFAULT_STYLE[shape]`; hình lạ -> `khac`. */
 export function skillStyleOf(def: { shape: unknown; style?: unknown }): SkillStyle {
   if (isStyle(def.style)) return def.style;
