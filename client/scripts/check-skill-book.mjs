@@ -183,6 +183,7 @@ try {
         sum: q('skills-count').textContent, clearHidden: q('skills-filter-clear').hidden,
         nomatchHidden: q('skills-nomatch').hidden, n: rows.length, ids: rows.map((r) => r.dataset.skill),
         names: rows.map((r) => r.querySelector('.sk-row-name').firstChild.textContent), grades: rows.map((r) => r.querySelector('.sk-grade').textContent),
+        icons: rows.map((r) => { const s = r.querySelector('.sk-row-ico svg'); return s ? { rects: s.querySelectorAll(':scope > rect').length, gold: !!s.querySelector('g[fill="#ffe08a"]'), glyph: !!s.querySelector('g[transform]') } : null; }),
         focus: document.activeElement ? (document.activeElement.id || document.activeElement.dataset.nav || document.activeElement.tagName) : '' };
     })()`);
 
@@ -288,6 +289,22 @@ try {
     b.moreHidden && b.toggleExp === "false",
     "các lựa chọn lọc gập sau nút Lọc, aria-expanded=false",
   );
+  {
+    // biểu tượng vẽ từ dữ liệu hàng (chiêu giả cũng có hình); khung nói phẩm bằng CẤU TRÚC: Hoàng / Huyền 1 nét, Địa / Thiên 2 nét, chấm vàng chỉ ở Thiên
+    const want = { Hoàng: [1, false], Huyền: [1, false], Địa: [2, false], Thiên: [2, true] };
+    const bad = b.icons
+      .map((ic, i) => ({ ic, g: b.grades[i], id: b.ids[i] }))
+      .filter(({ ic, g }) => !ic || !ic.glyph || ic.rects !== want[g][0] || ic.gold !== want[g][1]);
+    check(
+      bad.length === 0,
+      `60 hàng đều có biểu tượng, khung đúng phẩm (lỗi ${bad.length}: ${bad
+        .slice(0, 3)
+        .map((x) => `${x.id}/${x.g}`)
+        .join(", ")})`,
+    );
+    const seen = new Set(b.grades);
+    check(seen.size === 4, `đủ bốn phẩm trong 60 chiêu mẫu (${[...seen].join(", ")})`);
+  }
   check(
     b.clearHidden && b.sum === "60 chiêu đã học",
     `chưa lọc: tiêu đề '${b.sum}', không có nút Bỏ lọc`,
