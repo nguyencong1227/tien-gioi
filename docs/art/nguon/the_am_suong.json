@@ -16,9 +16,9 @@
     "gpu": "NVIDIA GeForce RTX 5060 8 GB"
   },
   "workflow": {
-    "path": "scripts/art/gen-raw-pilot.mjs",
-    "sha256": "9236af12ee5c67e6e34ffdf055ef2449781744b901ab4c1178b71f79d757a2c9",
-    "note": "TẠM (chờ C đưa script riêng của lô 1 vào repo): băm và đường dẫn này là của script PILOT (cỡ 1024x1024); lô 1 sinh bằng script khác cùng KSampler euler / normal, 25 bước, cfg 7, denoise 1 nhưng cỡ 1216x832 và prompt của MAP_CARD_BATCH (client/scripts/art/prompt-rules.mjs). SỬA dòng này khi có script lô 1.",
+    "path": "scripts/art/gen-raw-lo1.mjs",
+    "sha256": "5856141854947969dcd275dc3bd9f72c949e1cc168ea1e790cb00daed3bb4a6e",
+    "note": "Script được dựng lại ngày 17/11 sau khi sinh ảnh, cùng tham số: tệp đã chạy thật là gen-batch1-map-cards.mjs (ngoài repo); Dev C so bằng máy prompt, hạt giống và prompt âm của hai bên trùng từng ký tự (MAP_CARD_BATCH / NEGATIVE_PROMPT ở client/scripts/art/prompt-rules.mjs), KHÔNG trùng từng byte. rawSha256 là bằng chứng ảnh thô; băm script này chỉ chứng tỏ tham số.",
     "params": {
       "sampler": "euler",
       "scheduler": "normal",
