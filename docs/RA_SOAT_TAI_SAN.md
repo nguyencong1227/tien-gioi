@@ -150,6 +150,7 @@ Tư thế đánh / bị đánh / gục của yêu thú và nhân vật suy từ 
 ### 2e. Tài sản có AI sinh nháp (SDXL base)
 
 - Số tệp ảnh AI trong `client/public/assets/ai/`: **6 tệp** (`login_bg.webp`, nền màn đăng nhập, ảnh AI đầu tiên của game; và 5 thẻ minh hoạ bản đồ của lô 1: `the_lac_ha`, `the_hac_phong`, `the_linh_hu`, `the_am_suong`, `the_han_van`; đường kiểm tự động có từ TRƯỚC khi ảnh đầu tiên vào).
+- **Gói tải theo nhu cầu `art:trum`** (`client/public/packs/art-trum/`, KHÔNG đếm vào con số trên): **4 tệp** thẻ trùm của lô 2 (`the_xich_mang`, `the_hac_giao`, `the_thien_han_vuong`, `the_yeu_vuong`, 384x384, <= 30 KB mỗi ảnh), cùng luật nguồn như `assets/ai` (`check:credits` `aiAssetDirs`); bảng dưới liệt kê chung.
 - Mỗi ảnh vào đây phải có: tệp nguồn `docs/art/nguon/<tên>.json` (đủ trường mục 9.3 của `docs/KE_HOACH_DO_HOA_AI.md`, `finalSha256` khớp), một dòng ở `CREDITS.md` mục 7, không siêu dữ liệu (PNG không `tEXt` / `iTXt` / `zTXt` / `eXIf`, WebP không `EXIF` / `XMP `), chỉ model SDXL base và không LoRA, người duyệt xác nhận không chữ và không giống game khác, dung lượng <= trần `static.aiAssets` (mỗi ảnh 150 KB, tổng 300 KB).
 - Bảng ảnh (thêm hàng khi có ảnh; `credits.test.ts` đếm số tệp thật và so với con số "N tệp" ở trên):
 
@@ -161,6 +162,10 @@ Tư thế đánh / bị đánh / gục của yêu thú và nhân vật suy từ 
 | `client/public/assets/ai/the_linh_hu.webp` | `docs/art/nguon/the_linh_hu.json` | 2026-11-17 (sinh 2026-11-17) | Dev B (xem cả 15 ảnh thô của lô 1, ảnh cuối ở cỡ thật và bốn góc phóng 200 %: không chữ / ký tự giả / chữ ký, không người, không logo) |
 | `client/public/assets/ai/the_am_suong.webp` | `docs/art/nguon/the_am_suong.json` | 2026-11-17 (sinh 2026-11-17) | Dev B (xem cả 15 ảnh thô của lô 1, ảnh cuối ở cỡ thật và bốn góc phóng 200 %: không chữ / ký tự giả / chữ ký, không người, không logo) |
 | `client/public/assets/ai/the_han_van.webp` | `docs/art/nguon/the_han_van.json` | 2026-11-17 (sinh 2026-11-17) | Dev B (xem cả 15 ảnh thô của lô 1, ảnh cuối ở cỡ thật và bốn góc phóng 200 %: không chữ / ký tự giả / chữ ký, không người, không logo) |
+| `client/public/packs/art-trum/the_xich_mang.webp` | `docs/art/nguon/the_xich_mang.json` | 2026-11-17 (sinh 2026-11-17) | Dev B (xem cả 16 ảnh thô của lô 2, hai ứng viên cuối ở 640 px, ảnh cuối ở cỡ thật và thu nhỏ 64 px: không chữ / ký tự giả / chữ ký, không người, không logo) |
+| `client/public/packs/art-trum/the_hac_giao.webp` | `docs/art/nguon/the_hac_giao.json` | 2026-11-17 (sinh 2026-11-17) | Dev B (xem cả 16 ảnh thô của lô 2, hai ứng viên cuối ở 640 px, ảnh cuối ở cỡ thật và thu nhỏ 64 px: không chữ / ký tự giả / chữ ký, không người, không logo) |
+| `client/public/packs/art-trum/the_thien_han_vuong.webp` | `docs/art/nguon/the_thien_han_vuong.json` | 2026-11-17 (sinh 2026-11-17) | Dev B (xem cả 16 ảnh thô của lô 2, hai ứng viên cuối ở 640 px, ảnh cuối ở cỡ thật và thu nhỏ 64 px: không chữ / ký tự giả / chữ ký, không người, không logo) |
+| `client/public/packs/art-trum/the_yeu_vuong.webp` | `docs/art/nguon/the_yeu_vuong.json` | 2026-11-17 (sinh 2026-11-17) | Dev B (xem cả 16 ảnh thô của lô 2, hai ứng viên cuối ở 640 px, ảnh cuối ở cỡ thật và thu nhỏ 64 px: không chữ / ký tự giả / chữ ký, không người, không logo) |
 
 ---
 

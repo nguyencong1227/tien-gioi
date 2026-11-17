@@ -170,6 +170,7 @@ export function runBench(
         netShield: () => {},
         ambushOffer: () => {},
         ambushEnd: () => {},
+        ambushState: () => {},
       },
       map,
     );
@@ -448,6 +449,7 @@ export function runMultiMapBench(
           netShield: () => {},
           ambushOffer: () => {},
           ambushEnd: () => {},
+          ambushState: () => {},
         },
         map,
       );

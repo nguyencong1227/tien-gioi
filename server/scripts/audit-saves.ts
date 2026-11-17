@@ -776,6 +776,16 @@ export function auditPlayerSaveData(rawText: string, byteLength: number): AuditE
     });
   }
 
+  if (
+    data.ambushReturnAt !== undefined &&
+    (typeof data.ambushReturnAt !== "number" || !Number.isFinite(data.ambushReturnAt))
+  ) {
+    errors.push({
+      code: "invalid_ambush_return_at",
+      message: `ambushReturnAt (${typeof data.ambushReturnAt === "string" ? `<chuỗi ${data.ambushReturnAt.length} ký tự>` : show(data.ambushReturnAt)}) phải là số hữu hạn (ms)`,
+    });
+  }
+
   // 13. Sổ chiêu (skills, M7.2, #503)
   if (data.skills !== undefined) {
     if (typeof data.skills !== "object" || data.skills === null || Array.isArray(data.skills)) {
