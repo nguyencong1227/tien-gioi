@@ -1004,11 +1004,15 @@ describe("Ảnh AI ở gói tải theo nhu cầu `art` chịu CÙNG luật như 
       path.join(root, "CREDITS.md"),
       `# Credits\n\n## 7. Ảnh do AI sinh (SDXL base)\n\n| Ảnh | Mô tả |\n|---|---|\n| \`${REL}\` | thẻ trùm |\n\n## 8. Khác\n`,
     );
-    const dirs = () => aiAssetDirs(path.join(root, "client/public/packs"));
-    const audit = (aiDirs?: string[]) =>
+    const dirs = () =>
+      aiAssetDirs(
+        path.join(root, "client/public/packs"),
+        path.join(root, "client/public/assets/ai"),
+      );
+    // KHÔNG truyền aiDir / aiDirs: dùng đúng đường mặc định (assets/ai + gói art tự dò dưới rootDir)
+    const audit = () =>
       auditAiImages({
         rootDir: root,
-        aiDirs: aiDirs ?? [path.join(root, "client/public/assets/ai"), ...dirs().slice(1)], // [0] là assets/ai THẬT của repo
         sourceDir: path.join(root, "docs/art/nguon"),
         creditsPath: path.join(root, "CREDITS.md"),
       });

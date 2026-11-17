@@ -534,10 +534,11 @@ export const PACKS_DIR = path.join(CLIENT_PUBLIC, "packs");
  * MỌI thư mục có thể chứa ảnh AI: `assets/ai` (tải ngay) và từng gói `art` (tải theo nhu cầu, docs/art/PHONG_CACH_MINH_HOA.md mục 4).
  * Ảnh AI ở gói `art` chịu ĐÚNG luật như ảnh ở `assets/ai` (JSON nguồn, băm, siêu dữ liệu, dòng CREDITS, prompt): không có "cửa sau".
  * @param {string} [packsDir]
+ * @param {string} [aiDir] thư mục `assets/ai` (mặc định của repo thật)
  * @returns {string[]}
  */
-export function aiAssetDirs(packsDir = PACKS_DIR) {
-  const dirs = [AI_ASSET_DIR];
+export function aiAssetDirs(packsDir = PACKS_DIR, aiDir = AI_ASSET_DIR) {
+  const dirs = [aiDir];
   if (fs.existsSync(packsDir)) {
     for (const e of fs.readdirSync(packsDir, { withFileTypes: true })) {
       if (!e.isDirectory() || e.name.startsWith(".")) continue;
@@ -728,12 +729,19 @@ export function validateAiSource(j) {
 
 /**
  * Rà ảnh AI: nguồn (JSON cùng tên, băm khớp, dòng riêng ở CREDITS.md), siêu dữ liệu sạch, định dạng. Không có ảnh nào thì sạch (cũng báo JSON mồ côi).
- * @param {{ aiDir?: string, aiDirs?: string[], sourceDir?: string, creditsPath?: string, rootDir?: string }} [opts]
+ * @param {{ aiDir?: string, aiDirs?: string[], packsDir?: string, sourceDir?: string, creditsPath?: string, rootDir?: string }} [opts]
  * @returns {{ files: string[], sources: string[], errors: Array<{ kind: string, file: string, detail: string }> }}
  */
 export function auditAiImages(opts = {}) {
   const rootDir = opts.rootDir ?? ROOT_DIR;
-  const aiDirs = opts.aiDirs ?? (opts.aiDir ? [opts.aiDir] : aiAssetDirs());
+  const aiDirs =
+    opts.aiDirs ??
+    (opts.aiDir
+      ? [opts.aiDir]
+      : aiAssetDirs(
+          opts.packsDir ?? path.join(rootDir, "client/public/packs"),
+          path.join(rootDir, "client/public/assets/ai"),
+        ));
   const sourceDir = opts.sourceDir ?? AI_SOURCE_DIR;
   const creditsPath = opts.creditsPath ?? CREDITS_FILE;
   const errors = [];
