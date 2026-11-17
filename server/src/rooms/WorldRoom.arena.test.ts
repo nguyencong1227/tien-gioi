@@ -333,6 +333,44 @@ describe("Đấu trường chặn đường qua mạng (máy chủ Colyseus th�
     await expect(join(other, roomId, true)).rejects.toThrow();
   }, 20_000);
 
+  it("về chỗ cũ: vé được dọn NGAY khi đã đưa đi (không đợi phòng đấu trường đóng), nên vào lại phòng thường liền không bị 409", async () => {
+    const { h, hub } = await enterArena("Dau Ve Don");
+    const sid = h.room.sessionId;
+    await waitFor(() => h.states[0], 3000, "nhận ambushState");
+    expect(hub.ambushes.ofKey(h.name.toLowerCase())).toBeDefined();
+    await (serverRoom(h.room) as any).exitArenaRoom(sid);
+    // ngay lúc `exitArenaRoom` trả về, phòng đấu trường còn chưa kịp đóng: vé đã phải biến mất
+    expect(hub.ambushes.ofKey(h.name.toLowerCase())).toBeUndefined();
+    const back = await waitFor(() => h.travel[0], 3000, "travelTo về chỗ cũ");
+    expect(back.mapId).toBe(DEFAULT_MAP_ID);
+    const again: Hero = {
+      name: h.name,
+      room: undefined as never,
+      offers: [],
+      ends: [],
+      states: [],
+      travel: [],
+    };
+    await join(again, roomNameOf(DEFAULT_MAP_ID), false); // không bị 409
+  }, 20_000);
+
+  it("rớt kết nối ngay sau khi chọn Chiến (trước khi được đưa sang): vé bị huỷ và dọn, không kẹt nhân vật ở phòng đấu trường vô chủ", async () => {
+    const h = await spawn("Dau Rot");
+    const env = prime(h);
+    expect(rollAmbush(env.w, env.sid, env.p, env.c)).toBe(true);
+    const offer = await waitFor(() => h.offers[0], 3000, "nhận ambushOffer");
+    h.room.send(AMBUSH_MSG.seen, { id: offer.id });
+    await sleep(AMBUSH_ARM_MS + 80);
+    h.room.send(AMBUSH_MSG.choose, { id: offer.id, choice: "fight" });
+    (h.room.connection.transport as any).ws.close(); // rớt NGAY: máy chủ đã nhận lựa chọn nhưng chưa kịp đưa sang
+    await waitFor(
+      () => env.w.hub.ambushes.ofKey(h.name.toLowerCase()) === undefined,
+      4000,
+      "vé bị huỷ và dọn",
+    );
+    expect(env.c.coin).toBe(5000); // không phạt
+  }, 20_000);
+
   it("đầy MAX_AMBUSH_ROOMS: lựa chọn Chiến bị huỷ lặng lẽ (ambushEnd canceled), không phạt, không sang phòng nào", async () => {
     const h = await spawn("Dau Day");
     const env = prime(h);

@@ -247,13 +247,13 @@ describe("đồng hồ trận và ambushState", () => {
       tickArena(s.w);
     }
     expect(s.ambushStates.length).toBe(n0); // chưa đủ một giây
-    s.p.exp = 100;
+    s.p.exp = 30; // thấp hơn giá cũ (100): giá làm mới phải theo tu vi MỚI, không phải bản chốt lúc vào
     s.w.now += 1000;
     tickArena(s.w);
     expect(s.ambushStates.length).toBe(n0 + 1);
     const last = s.ambushStates.at(-1)!.msg;
     expect(last.msLeft).toBe(AMBUSH_TIME_MS - 1000 - 19 * TICK_MS);
-    expect(last.price.exp).toBe(Math.min(Math.floor(1000 * 0.1), 100)); // giá mới theo tu vi 100
+    expect(last.price.exp).toBe(30);
   });
 });
 
