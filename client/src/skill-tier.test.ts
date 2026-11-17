@@ -115,10 +115,25 @@ describe("slotView.maxLevel", () => {
     });
   });
 
-  it("ô trống / ô khoá không có chiêu: maxLevel 0", () => {
-    const t = trackerWith({}, "");
-    expect(slotView(2, t, ME, false, 0).maxLevel).toBe(0);
-    expect(slotView(5, t, { ...ME, realm: 1 }, false, 0).maxLevel).toBe(0); // ô 5 khoá ở Luyện Khí
+  it("ô trống / ô KHOÁ (dù sổ có chiêu ở đó, cảnh giới thấp): maxLevel 0, không lộ tầng tối đa của chiêu", () => {
+    const a = withSkill("thu_khoa_a", 3);
+    const b = withSkill("thu_khoa_b", 3);
+    const t = new SkillTracker();
+    t.set(
+      {
+        learned: { [a.id]: 1, [b.id]: 1 },
+        slots: [a.id, b.id, "", ""],
+        cd: [0, 0, 0, 0],
+        cdMax: [0, 0, 0, 0],
+      },
+      0,
+    );
+    const low: SlotMe = { ...ME, realm: 1 }; // Luyện Khí: chỉ ô 2 mở, ô 3 khoá
+    expect(slotView(2, t, low, false, 0).maxLevel).toBe(6);
+    const locked = slotView(3, t, low, false, 0);
+    expect(locked.kind).toBe("locked");
+    expect(locked.maxLevel).toBe(0);
+    expect(slotView(4, t, ME, false, 0).maxLevel).toBe(0); // ô trống
   });
 });
 
