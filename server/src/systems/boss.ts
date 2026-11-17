@@ -37,6 +37,7 @@ import { placeMonster } from "./monster-place";
 import { isShielded } from "./net-guard";
 import { syncPublicPos } from "./movement";
 import { applyPlayerStatus } from "./status";
+import { weakened } from "./status-rules";
 
 /** Tầm (px) quanh trùm để tìm người XA nhất cho đòn `circleAt` kiểu `farthest`. */
 export const BOSS_FAR_RANGE = 640;
@@ -94,8 +95,8 @@ function hitList(w: World, z: BossZone): string[] {
 }
 
 /** Sát thương một đòn của chiêu `ab`: `round(atk x hệ số hiện hành x dmgMult)`, ít nhất 1. Cố định, không ngẫu nhiên. */
-function damageOf(mc: MonsterCtrl, bs: BossCtrl, ab: BossAbility): number {
-  return Math.max(1, Math.round(mc.def.atk * bs.atk * ab.dmgMult));
+function damageOf(w: World, mc: MonsterCtrl, bs: BossCtrl, ab: BossAbility): number {
+  return weakened(mc, w.now, Math.max(1, Math.round(mc.def.atk * bs.atk * ab.dmgMult))); // `weaken` (mục 51): trùm chỉ chịu nửa
 }
 
 /** Đáp đòn lên MỌI người trong vùng `z`: `hurtPlayer` (một nơi giữ luật bất tử / né), trúng thật thì mới gắn trạng thái của chiêu. */
@@ -108,7 +109,7 @@ function strike(
   ab: BossAbility,
   z: BossZone,
 ) {
-  const dmg = damageOf(mc, bs, ab);
+  const dmg = damageOf(w, mc, bs, ab);
   w.events.fx({ kind: "mslash", by: id, x: m.x, y: m.y, angle: m.angle });
   for (const sid of hitList(w, z)) {
     const p = w.state.players.get(sid);
@@ -504,7 +505,7 @@ function resolveCast(
         until: w.now + s.ttlMs,
         next: w.now + s.tickMs,
         tickMs: s.tickMs,
-        dmg: damageOf(mc, bs, ab),
+        dmg: damageOf(w, mc, bs, ab),
         effect: ab.effect,
       });
       warnCircle(w, cast.x, cast.y, s.r, s.ttlMs);
