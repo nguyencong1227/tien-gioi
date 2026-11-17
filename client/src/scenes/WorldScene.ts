@@ -765,6 +765,7 @@ export class WorldScene extends Phaser.Scene {
       onSectHallGet: () => !this.isReconnecting && this.room.send(SECT_MSG.hallGet, {}),
       onBoardsGet: (board) =>
         !this.isReconnecting && this.room.send(SOCIAL_MSG.boardsGet, { board }),
+      onWorldBossGet: () => !this.isReconnecting && this.room.send(SOCIAL_MSG.worldBossGet, {}),
       onSectQuestAccept: (questId) =>
         !this.isReconnecting && this.room.send(SECT_MSG.questAccept, { questId }),
       onSectQuestTurnIn: (questId) =>
@@ -2394,6 +2395,8 @@ export class WorldScene extends Phaser.Scene {
     reg(SECT_MSG.hall, (m: SectHallMsg) => ui.onSectHall(m));
     // Bảng Xã hội (M9.6): máy chủ trả bảng xếp hạng cho người hỏi; `setBoards` tự làm sạch (tin sai kiểu bị bỏ)
     reg(SOCIAL_MSG.boards, (m: unknown) => ui.setBoards(m));
+    // Trùm thế giới (M9.7): thông báo trước / xuất hiện / kết thúc (mọi phòng) + cập nhật máu / đóng góp (phòng đích); `setWorldBoss` tự làm sạch + tôn trọng cờ ?social=1
+    reg(SOCIAL_MSG.worldBoss, (m: unknown) => ui.setWorldBoss(m));
     reg(SECT_MSG.presence, (m: SectPresenceMsg) => ui.onSectPresence(m));
     reg(SECT_MSG.invited, (m: SectInvitedMsg) => ui.onSectInvited(m));
     replayEarlyMessages(this.room, handlers);

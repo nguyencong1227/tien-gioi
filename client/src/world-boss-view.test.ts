@@ -8,6 +8,9 @@ import {
 } from "@tien-gioi/shared";
 import {
   SCHEDULE_TZ_NOTE,
+  WB_BANNER_SOON_MS,
+  WB_OVERDUE_MS,
+  bannerShown,
   countdownText,
   fmtInt,
   fmtPct,
@@ -330,5 +333,47 @@ describe("scheduleRows", () => {
   it("ghi chú múi giờ nói rõ là giờ MÁY CHỦ", () => {
     expect(SCHEDULE_TZ_NOTE).toContain("UTC+7");
     expect(SCHEDULE_TZ_NOTE).toContain("máy chủ");
+  });
+});
+
+describe("bannerShown", () => {
+  const soon = (ms: number | undefined): WorldBossMsg => ({
+    phase: "soon",
+    id: "a",
+    name: "B",
+    mapId: "han_van",
+    ...(ms === undefined ? {} : { startsInMs: ms }),
+  });
+
+  it("soon: chỉ hiện khi còn <= 15 phút (biên), xa hơn thì chỉ tab Sự kiện", () => {
+    expect(bannerShown(worldBossView(soon(WB_BANNER_SOON_MS)))).toBe(true);
+    expect(bannerShown(worldBossView(soon(WB_BANNER_SOON_MS + 1)))).toBe(false);
+    expect(bannerShown(worldBossView(soon(5 * 3600_000)))).toBe(false);
+    expect(bannerShown(worldBossView(soon(60_000)))).toBe(true);
+    // đồng hồ trôi dần vào cửa sổ 15 phút thì banner xuất hiện
+    expect(bannerShown(worldBossView(soon(WB_BANNER_SOON_MS + 60_000), 60_000))).toBe(true);
+  });
+
+  it("soon không có đồng hồ: không hiện (không biết còn bao lâu)", () => {
+    expect(bannerShown(worldBossView(soon(undefined)))).toBe(false);
+  });
+
+  it("live luôn hiện (kể cả không có đồng hồ); ended / none không phải banner", () => {
+    expect(bannerShown(worldBossView(sampleWorldBossEvent("live")))).toBe(true);
+    expect(bannerShown(worldBossView({ phase: "live", id: "a", name: "B", mapId: "c" }))).toBe(
+      true,
+    );
+    expect(bannerShown(worldBossView(sampleWorldBossEvent("ended")))).toBe(false);
+    expect(bannerShown(worldBossView(sampleWorldBossEvent("none")))).toBe(false);
+  });
+
+  it("đồng hồ hết quá WB_OVERDUE_MS mà chưa có tin mới: tự ẩn (biên đúng bằng thì còn hiện)", () => {
+    const live = sampleWorldBossEvent("live"); // còn 22 phút
+    const end = live.endsInMs as number;
+    expect(bannerShown(worldBossView(live, end))).toBe(true);
+    expect(bannerShown(worldBossView(live, end + WB_OVERDUE_MS))).toBe(true);
+    expect(bannerShown(worldBossView(live, end + WB_OVERDUE_MS + 1))).toBe(false);
+    expect(worldBossView(live, end + 5000).overdueMs).toBe(5000);
+    expect(worldBossView(live, 1000).overdueMs).toBe(0);
   });
 });

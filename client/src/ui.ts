@@ -97,8 +97,18 @@ import {
   BOARD_IDS,
   BOARD_LABELS,
   type BoardId,
+  WORLD_BOSS_SCHEDULE,
+  type WorldBossMsg,
 } from "@tien-gioi/shared";
 import { REFRESH_NOTE, asBoardId, boardView, sanitizeBoardsMsg } from "./board-view";
+import {
+  SCHEDULE_TZ_NOTE,
+  WB_OVERDUE_MS,
+  bannerShown,
+  sanitizeWorldBossMsg,
+  scheduleRows,
+  worldBossView,
+} from "./world-boss-view";
 import {
   dungeonEndReasonText,
   dungeonFallenToastText,
@@ -367,6 +377,8 @@ export interface UiCallbacks {
   onSectHallGet?: () => void;
   /** Bảng Xã hội (M9.6): xin một bảng xếp hạng (máy chủ trả tin `boards`) */
   onBoardsGet?: (board: BoardId) => void;
+  /** Bảng Xã hội, tab Sự kiện (M9.7): xin sự kiện trùm thế giới đang diễn ra / sắp tới (máy chủ trả tin `worldBoss`) */
+  onWorldBossGet?: () => void;
   onSectQuestAccept?: (questId: string) => void;
   onSectQuestTurnIn?: (questId: string) => void;
   onSectShopBuy?: (itemId: string, qty?: number) => void;
@@ -629,6 +641,199 @@ function renderSocialRank() {
     gap.appendChild(td);
     body.appendChild(gap);
     addRow(v.mineRow, "outside");
+  }
+}
+
+// ---- Trùm thế giới (M9.7, #1026): banner + tab Sự kiện, vẽ từ `world-boss-view.ts` ----
+/** Tin `worldBoss` MỚI NHẤT (mọi phase) + đồng hồ máy khách lúc nhận (chỉ để đo KHOẢNG TRÔI của đồng hồ đếm ngược, không phải giờ tuyệt đối). */
+let wbLast: { msg: WorldBossMsg; at: number } | null = null;
+/** Kết quả của sự kiện vừa kết thúc, hiện thay banner một lúc (`WB_RESULT_MS`). */
+let wbResult: { text: string; tone: "info" | "good" | "bad" } | null = null;
+let wbResultTimer: ReturnType<typeof setTimeout> | null = null;
+let wbAskedAt: number | null = null;
+let wbTabTimer: ReturnType<typeof setTimeout> | null = null;
+let wbTickTimer: ReturnType<typeof setInterval> | null = null;
+/** Danh sách đóng góp mở sẵn trên màn rộng; điện thoại / khung thấp thu gọn (bấm "Xem đóng góp" để mở). */
+let wbExpanded =
+  typeof window !== "undefined" && window.innerWidth >= 900 && window.innerHeight >= 500;
+let wbTopKey = "";
+let wbScheduleBuilt = false;
+const WB_RESULT_MS = 10_000;
+const WB_ASK_GAP_MS = 20_000;
+const WB_WAIT_MS = 6_000;
+/** Tin kết thúc giống hệt đến lại trong chừng này thì không toast lần hai (gửi lại khi vào phòng / nối lại). */
+const WB_DUP_MS = 60_000;
+
+function socialFlagOn(): boolean {
+  return typeof window !== "undefined" && socialEnabled(window.location.search);
+}
+
+function setWbText(id: string, t: string) {
+  const e = $(id);
+  if (e.textContent !== t) e.textContent = t;
+}
+
+/** Xin sự kiện trùm thế giới (bỏ qua nếu vừa xin chưa lâu và đã có tin; `force` = bấm "Tải lại" / tin đã quá hạn). */
+function requestWorldBoss(force = false) {
+  const now = performance.now();
+  if (!force && wbAskedAt !== null && now - wbAskedAt < WB_ASK_GAP_MS && wbLast) return;
+  wbAskedAt = now;
+  callbacks?.onWorldBossGet?.();
+  if (wbTabTimer !== null) clearTimeout(wbTabTimer);
+  wbTabTimer = null;
+  if (!wbLast) {
+    wbTabTimer = setTimeout(() => {
+      wbTabTimer = null;
+      renderWbTab();
+    }, WB_WAIT_MS + 50);
+  }
+}
+
+/** Banner đầu màn hình: đếm ngược / máu / phần đóng góp của mình / danh sách đóng góp, hoặc kết quả vừa kết thúc. Trả `true` nếu cần đồng hồ chạy. */
+function renderWbBanner(): boolean {
+  const banner = $("wb-banner");
+  const hide = () => {
+    if (!banner.hidden) banner.hidden = true;
+    return false;
+  };
+  if (!socialFlagOn()) return hide();
+  if (wbResult) {
+    banner.hidden = false;
+    banner.dataset.tone = wbResult.tone;
+    for (const id of ["wb-title", "wb-hp", "wb-mine"]) setWbText(id, "");
+    $("wb-timer").parentElement!.hidden = true;
+    $("wb-title").parentElement!.hidden = true;
+    $("wb-mine").hidden = true;
+    $("wb-toggle").hidden = true;
+    $("wb-top").hidden = true;
+    const r = $("wb-result");
+    r.hidden = false;
+    setWbText("wb-result", wbResult.text);
+    return false;
+  }
+  if (!wbLast) return hide();
+  const v = worldBossView(wbLast.msg, performance.now() - wbLast.at);
+  if (!bannerShown(v)) return hide();
+  banner.hidden = false;
+  banner.dataset.tone = "info";
+  $("wb-result").hidden = true;
+  $("wb-title").parentElement!.hidden = false;
+  $("wb-timer").parentElement!.hidden = v.leftMs === null;
+  setWbText("wb-title", v.title);
+  setWbText("wb-hp", v.hp);
+  setWbText("wb-timer-label", v.timerLabel);
+  setWbText("wb-timer", v.timer);
+  setWbText("wb-mine", v.mineText);
+  $("wb-mine").hidden = v.mineText === "";
+  $("wb-mine").classList.toggle("low", v.mineEligible === false);
+  const hasTop = v.top.length > 0;
+  const toggle = $("wb-toggle");
+  toggle.hidden = !hasTop;
+  toggle.setAttribute("aria-expanded", wbExpanded ? "true" : "false");
+  setWbText("wb-toggle", wbExpanded ? "Ẩn đóng góp" : "Xem đóng góp");
+  const list = $("wb-top");
+  list.hidden = !(hasTop && wbExpanded);
+  const key = v.top.map((r) => `${r.rank}|${r.name}|${r.title}|${r.pct}`).join("\n");
+  if (key !== wbTopKey) {
+    wbTopKey = key;
+    list.textContent = "";
+    for (const r of v.top) {
+      const li = document.createElement("li");
+      const n = document.createElement("span");
+      n.className = "n";
+      n.textContent = r.name;
+      li.append(n);
+      if (r.title) {
+        const t = document.createElement("span");
+        t.className = "t";
+        t.textContent = r.title;
+        li.append(t);
+      }
+      const pct = document.createElement("span");
+      pct.className = "pct";
+      pct.textContent = r.pct;
+      li.append(pct);
+      list.append(li);
+    }
+  }
+  return v.leftMs !== null;
+}
+
+/** Tab "Sự kiện": trạng thái hiện tại (đếm ngược / đang diễn ra / kết quả / chưa có) + bảng lịch hằng ngày (dữ liệu tĩnh của shared, giờ máy chủ). Trả `true` nếu cần đồng hồ chạy. */
+function renderWbTab(): boolean {
+  if (!socialModalOpen || socialTab !== "event") return false;
+  if (!wbScheduleBuilt) {
+    wbScheduleBuilt = true;
+    const rows = scheduleRows(WORLD_BOSS_SCHEDULE);
+    $("wbt-empty").hidden = rows.length > 0;
+    $("wbt-wrap").hidden = rows.length === 0;
+    const body = $("wbt-body");
+    body.textContent = "";
+    for (const r of rows) {
+      const tr = document.createElement("tr");
+      const cells: [string, string][] = [
+        [r.time, "c-time"],
+        [r.boss, "c-name"],
+        [r.map, ""],
+        [r.duration, "c-num nw"],
+      ];
+      for (const [t, cls] of cells) {
+        const td = document.createElement("td");
+        td.textContent = t;
+        if (cls) td.className = cls;
+        tr.append(td);
+      }
+      body.append(tr);
+    }
+    setWbText("wbt-tz", rows.length > 0 ? SCHEDULE_TZ_NOTE : "");
+  }
+  const retry = $("wbt-retry");
+  if (!wbLast) {
+    const stale = wbAskedAt !== null && performance.now() - wbAskedAt >= WB_WAIT_MS;
+    setWbText(
+      "wbt-status",
+      stale ? "Chưa nhận được thông tin sự kiện. Thử tải lại nhé." : "Đang tải sự kiện…",
+    );
+    setWbText("wbt-detail", "");
+    retry.hidden = !stale;
+    return false;
+  }
+  retry.hidden = true;
+  const v = worldBossView(wbLast.msg, performance.now() - wbLast.at);
+  if (v.active && v.overdueMs > WB_OVERDUE_MS) {
+    setWbText("wbt-status", "Đang cập nhật sự kiện…");
+    setWbText("wbt-detail", "");
+    return false;
+  }
+  let status: string;
+  let detail = "";
+  if (v.phase === "none" || v.phase === "ended") status = v.resultText;
+  else if (v.phase === "soon")
+    status = `${v.title}: ${v.timerLabel.toLowerCase()} ${v.timer}`.trim();
+  else {
+    status = `${v.title}: đang diễn ra${v.timer ? `, còn ${v.timer}` : ""}.`;
+    detail = [v.hp, v.mineText].filter(Boolean).join(" · ");
+  }
+  setWbText("wbt-status", status);
+  setWbText("wbt-detail", detail);
+  return v.active && v.leftMs !== null;
+}
+
+/** Bật / tắt đồng hồ 1 giây theo nhu cầu (banner hoặc tab Sự kiện đang hiện đồng hồ); không có gì đếm thì KHÔNG chạy gì nền. */
+function syncWbTick() {
+  // vẽ CẢ HAI trước rồi mới gộp (`a || b` sẽ bỏ qua vế sau khi vế đầu đúng: tab Sự kiện không được vẽ lại khi banner đang đếm)
+  const banner = renderWbBanner();
+  const tab = renderWbTab();
+  const need = banner || tab;
+  if (need && wbTickTimer === null) {
+    wbTickTimer = setInterval(() => {
+      const b = renderWbBanner();
+      const t = renderWbTab();
+      if (!b && !t) syncWbTick();
+    }, 1000);
+  } else if (!need && wbTickTimer !== null) {
+    clearInterval(wbTickTimer);
+    wbTickTimer = null;
   }
 }
 
@@ -3995,12 +4200,29 @@ export const ui = {
     // Xã hội (M9, #1025): nút HUD ẩn cho tới khi cờ `?social=1` bật
     const socialOn = typeof window !== "undefined" && socialEnabled(window.location.search);
     $("btn-social").hidden = !socialOn;
+    document.body.classList.toggle("social-on", socialOn); // CSS: hàng menu 8 nút cần mốc ☰ cao hơn (xem `body.social-on` ở style.css)
     bindTap("btn-social", () => this.toggleSocialModal());
     bindTap("social-close", () => this.toggleSocialModal(false));
     for (const t of SOCIAL_TABS)
       bindTap(`social-tab-btn-${t.id}`, () => this.switchSocialTab(t.id));
     for (const id of BOARD_IDS) bindTap(`social-board-btn-${id}`, () => this.switchSocialBoard(id));
     bindTap("social-board-retry", () => requestSocialBoard(socialBoard, true));
+    bindTap("wbt-retry", () => {
+      requestWorldBoss(true);
+      renderWbTab();
+    });
+    bindTap("wb-toggle", () => {
+      wbExpanded = !wbExpanded;
+      renderWbBanner();
+    });
+    // banner trùm thế giới nằm TRÊN thanh trùm: đo chiều cao banner vào biến CSS `--wb-h` để thanh trùm tự xuống theo (0 khi banner ẩn)
+    if (typeof ResizeObserver !== "undefined") {
+      const wb = $("wb-banner");
+      new ResizeObserver(() => {
+        const h = wb.hidden ? 0 : Math.ceil(wb.getBoundingClientRect().height) + 6;
+        document.documentElement.style.setProperty("--wb-h", `${h}px`);
+      }).observe(wb);
+    }
     $("social-board-tabs").addEventListener("keydown", (e) => {
       if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
       const next = tabByKey(BOARD_IDS, socialBoard, e.code);
@@ -6528,6 +6750,8 @@ export const ui = {
       renderSocialTabs();
       renderSocialRank();
       if (socialTab === "rank") requestSocialBoard(socialBoard);
+      if (socialTab === "event") requestWorldBoss();
+      syncWbTick();
       focusModal($("social-modal"));
     } else {
       $("social-modal").hidden = true;
@@ -6535,6 +6759,9 @@ export const ui = {
       $("btn-social").setAttribute("aria-expanded", "false");
       modalStack.remove("social-modal");
       clearSocialBoardTimer();
+      if (wbTabTimer !== null) clearTimeout(wbTabTimer);
+      wbTabTimer = null;
+      syncWbTick();
       returnFocus($("btn-social"));
     }
   },
@@ -6551,6 +6778,8 @@ export const ui = {
       renderSocialRank();
       requestSocialBoard(socialBoard);
     }
+    if (socialTab === "event" && socialModalOpen) requestWorldBoss();
+    syncWbTick();
     if (focus) $(`social-tab-btn-${socialTab}`).focus();
   },
 
@@ -6575,6 +6804,41 @@ export const ui = {
     socialBoards.set(msg.board, { msg, at: performance.now() });
     if (msg.board === socialBoard) clearSocialBoardTimer();
     if (socialModalOpen && socialTab === "rank") renderSocialRank();
+  },
+
+  /**
+   * Nhận tin `worldBoss` từ máy chủ (M9.7): làm sạch, cất bản mới nhất, vẽ banner + tab Sự kiện. Cờ `?social=1` tắt thì BỎ tin (người chơi chưa thấy gì).
+   * `ended` hiện kết quả thay banner `WB_RESULT_MS` + một toast (không lặp nếu vừa nhận đúng sự kiện đó); tin sai kiểu bị bỏ, không sập.
+   */
+  setWorldBoss(raw: unknown) {
+    if (!socialFlagOn()) return;
+    const msg = sanitizeWorldBossMsg(raw);
+    if (msg === null) return;
+    const prev = wbLast;
+    wbLast = { msg, at: performance.now() };
+    if (wbTabTimer !== null) clearTimeout(wbTabTimer);
+    wbTabTimer = null;
+    if (wbResultTimer !== null) clearTimeout(wbResultTimer);
+    wbResultTimer = null;
+    wbResult = null;
+    if (msg.phase === "ended") {
+      const v = worldBossView(msg);
+      wbResult = { text: v.resultText, tone: v.tone };
+      wbResultTimer = setTimeout(() => {
+        wbResultTimer = null;
+        wbResult = null;
+        syncWbTick();
+      }, WB_RESULT_MS);
+      // `id` là KHUNG GIỜ của lịch (lặp mỗi ngày), không phải mã lần xảy ra: chỉ coi là tin LẶP khi cùng khung giờ + cùng kết quả + đến trong `WB_DUP_MS`
+      const dup =
+        prev !== null &&
+        prev.msg.phase === "ended" &&
+        prev.msg.id === msg.id &&
+        prev.msg.outcome === msg.outcome &&
+        wbLast.at - prev.at < WB_DUP_MS;
+      if (!dup) this.toast({ text: v.resultText, tone: v.tone });
+    }
+    syncWbTick();
   },
 
   getSocialTab(): SocialTabId {

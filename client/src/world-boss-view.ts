@@ -129,6 +129,14 @@ export function sanitizeWorldBossMsg(raw: unknown): WorldBossMsg | null {
   return out;
 }
 
+/**
+ * Banner "sắp xuất hiện" chỉ hiện khi còn không quá chừng này: máy chủ báo trước 10 / 5 / 1 phút, nhưng tin trả lời `worldBossGet` có thể báo sự kiện
+ * cách vài giờ (chỉ để tab "Sự kiện" hiện, không làm banner chiếm chỗ cả buổi).
+ */
+export const WB_BANNER_SOON_MS = 15 * 60_000;
+/** Đồng hồ đã về 0 mà quá chừng này vẫn chưa có tin tiếp theo thì tự ẩn banner (tin kết thúc bị mất / máy chủ khởi động lại): không treo mãi. */
+export const WB_OVERDUE_MS = 60_000;
+
 export interface WorldBossTopView {
   rank: number;
   name: string;
@@ -150,6 +158,8 @@ export interface WorldBossView {
   timer: string;
   /** Còn bao nhiêu mili giây (đã trừ khoảng trôi); `null` nếu tin không có đồng hồ. */
   leftMs: number | null;
+  /** Đồng hồ đã hết từ bao lâu (0 nếu chưa hết / không có đồng hồ). */
+  overdueMs: number;
   /** "Máu 64%" (chỉ khi live và có `hpPct`). */
   hp: string;
   /** Câu về phần đóng góp của MÌNH ("" nếu không có `mine`). */
@@ -207,6 +217,7 @@ export function worldBossView(msg: WorldBossMsg, sinceMs = 0): WorldBossView {
     timerLabel: "",
     timer: "",
     leftMs: null as number | null,
+    overdueMs: 0,
     hp: "",
     mineText: "",
     mineEligible: null as boolean | null,
@@ -235,6 +246,7 @@ export function worldBossView(msg: WorldBossMsg, sinceMs = 0): WorldBossView {
     timerLabel: leftMs === null ? "" : msg.phase === "soon" ? "Xuất hiện sau" : "Còn lại",
     timer: leftMs === null ? "" : countdownText(leftMs),
     leftMs,
+    overdueMs: left === undefined ? 0 : Math.max(0, since - left),
     hp: msg.phase === "live" && msg.hpPct !== undefined ? `Máu ${fmtPct(msg.hpPct)}` : "",
     mineText: msg.phase === "live" ? mineLine(msg.mine) : "",
     mineEligible: msg.phase === "live" && msg.mine ? msg.mine.eligible : null,
@@ -248,6 +260,12 @@ export function worldBossView(msg: WorldBossMsg, sinceMs = 0): WorldBossView {
           }))
         : [],
   };
+}
+
+/** Có nên hiện banner không: `live` luôn hiện; `soon` chỉ khi còn <= `WB_BANNER_SOON_MS`; hết đồng hồ quá `WB_OVERDUE_MS` thì ẩn; ended / none không phải banner. */
+export function bannerShown(v: WorldBossView): boolean {
+  if (!v.active || v.overdueMs > WB_OVERDUE_MS) return false;
+  return v.phase === "live" || (v.leftMs !== null && v.leftMs <= WB_BANNER_SOON_MS);
 }
 
 export interface ScheduleRowView {
