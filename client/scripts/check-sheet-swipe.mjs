@@ -95,7 +95,7 @@ try {
     deviceScaleFactor: 1,
     mobile: false,
   });
-  await send("Page.navigate", { url: `${BASE_URL}/?duel=mock&debug=1&crowd=6` });
+  await send("Page.navigate", { url: `${BASE_URL}/?duel=mock&debug=1&crowd=6&social=1` });
   for (let k = 0; k < 40; k++) {
     await sleep(300);
     if (await evalJs("Boolean(window.__scene && window.__scene.me && window.__scene.me())")) break;
@@ -115,6 +115,7 @@ try {
     ["shop-modal", "toggleShopModal"],
     ["forge-modal", "toggleForgeModal"],
     ["sect-modal", "toggleSectModal"],
+    ["social-modal", "toggleSocialModal"], // M9 (cờ `?social=1` ở địa chỉ trang)
   ];
   const VPS = [
     { name: "390x844", w: 390, h: 844, form: "phone", orient: "portrait", panels: PANELS },

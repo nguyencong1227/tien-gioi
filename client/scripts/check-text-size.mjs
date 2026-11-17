@@ -95,7 +95,7 @@ try {
     deviceScaleFactor: 1,
     mobile: false,
   });
-  await send("Page.navigate", { url: `${BASE_URL}/?duel=mock&debug=1&crowd=6` });
+  await send("Page.navigate", { url: `${BASE_URL}/?duel=mock&debug=1&crowd=6&social=1` });
   for (let k = 0; k < 40; k++) {
     await sleep(300);
     if (await evalJs("Boolean(window.__scene && window.__scene.me && window.__scene.me())")) break;
@@ -127,6 +127,7 @@ try {
     ["shop-modal", "toggleShopModal"],
     ["forge-modal", "toggleForgeModal"],
     ["sect-modal", "toggleSectModal"],
+    ["social-modal", "toggleSocialModal"], // M9 (cờ `?social=1` bật ở địa chỉ trang): ba tab Xếp hạng / Thành tựu / Sự kiện
   ];
   const CARDS = ["dungeon-end-modal", "duel-end-modal", "newbie-guide-modal", "outdated-modal"];
   // Hộp thoại NPC (#dialog-modal, dock đáy): mở bằng ui.onDialog với tin mẫu có đủ loại nhãn (tiêu đề, huy hiệu, chữ, gợi ý, lựa chọn + nhãn phụ)
@@ -286,6 +287,25 @@ try {
       if (mode === "large" && vp.phone)
         check(await noOverflow(), `${vp.name} [large] #ambush-modal: không tràn ngang / dọc`);
       await evalJs('window.__ui.onAmbushEnd({ result: "canceled" });0');
+      await sleep(100);
+      // Banner trùm thế giới (M9.7, `#wb-banner`) lúc đang diễn ra (có danh sách đóng góp): là lớp phủ kiểu HUD nằm trên màn chiến đấu nên theo sàn HUD (nhãn >= 12 px trên điện thoại, kể cả Nhỏ), không tràn khi cỡ Lớn
+      await evalJs(`window.__ui.setWorldBoss(window.__sample.worldBoss("live"));0`);
+      await sleep(300);
+      const wb = await scan("#wb-banner");
+      check(
+        wb !== null && Object.keys(wb).length > 0,
+        `${vp.name} [${mode}] #wb-banner: hiện có chữ`,
+      );
+      if (vp.phone && wb) {
+        const bad = offenders(wb, 12);
+        check(
+          !bad,
+          `${vp.name} [${mode}] #wb-banner (trùm thế giới, kiểu HUD): mọi nhãn >= 12 px${bad ? " (nhỏ hơn: " + bad + ")" : ""}`,
+        );
+      }
+      if (mode === "large" && vp.phone)
+        check(await noOverflow(), `${vp.name} [large] #wb-banner: không tràn ngang / dọc`);
+      await evalJs(`window.__ui.setWorldBoss(window.__sample.worldBoss("none"));0`);
       await sleep(100);
       // Đấu trường chặn đường (CD7 bước 3): HUD, bảng xác nhận bỏ chạy, thẻ kết quả: chữ >= 14 px trên điện thoại, không tràn ở cỡ Lớn
       await evalJs(
