@@ -12,6 +12,7 @@ import { startAudit } from "./audit";
 import { minProtocolOf } from "./protocol";
 import { earnWarmupOf } from "./sect-config";
 import { testExpMultOf } from "./test-exp";
+import { LeaderboardService } from "./leaderboard";
 import { mountAuth } from "./auth-http";
 import { mountCors } from "./cors";
 import { createStores } from "./stores";
@@ -48,6 +49,18 @@ async function main() {
   WorldRoom.souls = stores.souls;
   WorldRoom.sects = new SectService(stores.sects); // tông môn cùng backend với nhân vật / chân linh (`SECTS=off` gỡ tính năng)
   console.log(`Lưu trữ: ${stores.kind === "pg" ? "PostgreSQL" : "tệp JSON"}`);
+  // Bảng xếp hạng (M9.3): làm mới mỗi 5 phút ngoài tick; `LEADERBOARD=off` gỡ. Chế độ tài khoản: đạo hiệu nằm ở tài khoản.
+  if (process.env.LEADERBOARD !== "off") {
+    const lb = new LeaderboardService({
+      souls: stores.souls,
+      players: stores.players,
+      sects: stores.sects,
+      accounts: process.env.AUTH_MODE === "account" ? stores.accounts : null,
+      testExp: () => WorldRoom.testExpMult,
+    });
+    WorldRoom.leaderboards = lb;
+    lb.start();
+  }
 
   const app = express();
   // CORS theo danh sách cho phép (CORS_ORIGINS, mặc định TẮT) cho /health và /api/*: gắn TRƯỚC mountAuth (app đóng gói khác nguồn)

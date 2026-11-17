@@ -25,6 +25,8 @@ export const MESSAGE_LIMITS: Record<string, Limit> = {
   [SKILL_MSG.cast]: { perSec: 10, burst: 10 },
   // Gắn chiêu vào ô (M7.2): thao tác bảng, hiếm
   [SKILL_MSG.slot]: { perSec: 4, burst: 8 },
+  // Xin bảng xếp hạng (M9.3, `boardsGet`): mở bảng / đổi tab, tra bản chụp trong bộ nhớ; chặn spam
+  boardsGet: { perSec: 2, burst: 6 },
   chat: { perSec: 2, burst: 5 },
   // Nhịp tim: client gửi mỗi `NET_BEAT_MS` = 1 giây (mục 33; bản cũ 5 giây) + 1 lần lúc quay lại tiền cảnh; chặn vì mỗi ping tốn một tin trả lời
   ping: { perSec: 2, burst: 6 },
