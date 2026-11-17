@@ -72,6 +72,8 @@ Hình theo TÊN gọi: Kiếm -> `cone` / `line` / `bolt` (Kiếm khí); Đao ->
 - **Hiệu năng (A)**: `perf.test` ca chiêu bền; bench mốc; số liệu trước / sau trong PR.
 
 ## 10. Chia việc (mỗi dòng một issue; nhãn `dev-x` + `chieu`; milestone "Chiêu thức (mục 51)")
+Số issue: CT1 #1046, CT2 #1047, CT3 #1048, CT4 #1049, CT5 #1050, CT6 #1051, CT7 #1052, CT8 #1053, CT9 #1054, CT10 #1055, CT11 #1056, CT12 #1057, CT13 #1058, CT14 #1059.
+
 | # | Việc | Ai | Phụ thuộc | Tiêu chí xong |
 |---|---|---|---|---|
 | CT1 | **Hợp đồng `shared/`**: hình / trường / trạng thái mới, `skillViolations`, chia tệp dữ liệu, `SKILLS`, tầng theo phẩm, `SkillBook.mastery`, `sampleSkills()`; PR RIÊNG, B hoặc C review | A | - | 18 chiêu cũ không đổi; test + đột biến |
