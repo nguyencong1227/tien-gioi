@@ -13,6 +13,11 @@ import { TILE, type GameMap } from "@tien-gioi/shared";
 export const NAV_CELL = TILE / 2;
 /** Số nút tối đa một lần tìm được xét (trần CPU); quá thì trả đường tới nút gần đích nhất. */
 export const NAV_MAX_NODES = 3000;
+/**
+ * Trọng số của heuristic (A* có trọng số): > 1 xét ít nút hơn nhiều (mô phỏng 100 quái đuổi ~3 lần nhanh hơn) đổi lại đường dài hơn chút (<= 1,5 lần trong trường hợp xấu nhất, thường ~5%): quái đuổi không cần đường tối ưu.
+ * Chỉ ảnh hưởng thứ tự xét nút; `reached` / nút gần đích nhất vẫn tính theo heuristic gốc.
+ */
+export const NAV_H_WEIGHT = 1.5;
 /** Bước lấy mẫu khi kiểm đường thẳng (px), nhỏ hơn nửa ô nên không lọt qua ô chặn. */
 const LOS_STEP = 8;
 const SQRT2 = Math.SQRT2;
@@ -285,7 +290,7 @@ class NavGrid {
     g[start] = 0;
     parent[start] = -1;
     stamp[start] = run;
-    this.push(heur(si, sj), start);
+    this.push(NAV_H_WEIGHT * heur(si, sj), start);
     let best = start;
     let bestH = heur(si, sj);
     let reachedAt = -1;
@@ -325,7 +330,7 @@ class NavGrid {
         stamp[nk] = run;
         g[nk] = ng;
         parent[nk] = k;
-        this.push(ng + heur(ni, nj), nk);
+        this.push(ng + NAV_H_WEIGHT * heur(ni, nj), nk);
       }
     }
     const end = reachedAt >= 0 ? reachedAt : best;
