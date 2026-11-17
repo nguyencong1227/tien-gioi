@@ -20,6 +20,7 @@ import {
   dayKey,
   type AmbushFoeGroup,
   type AmbushScene,
+  stepOf,
 } from "@tien-gioi/shared";
 import { applyInputs } from "./movement";
 import { addMonster, addPlayer, makeWorld } from "./test-helpers";
@@ -370,6 +371,42 @@ describe("chọn cảnh + bầy (pickAmbush)", () => {
     // đủ cảnh cho cả hai mức: normal 70, elite 25 (tổng 95): 0 -> normal, 0.99 -> elite
     expect(pickAmbush(rt([0], [NORMAL, ELITE]), MAP_ID, 3)?.group.tier).toBe("normal");
     expect(pickAmbush(rt([0.99], [NORMAL, ELITE]), MAP_ID, 3)?.group.tier).toBe("elite");
+  });
+
+  it("MỤC 53 (bị hạ = chết thật): KHÔNG BAO GIỜ chọn bầy có loài mạnh vượt cảnh giới người chơi (dây an toàn thứ hai ngoài ambushViolations)", () => {
+    const wide = (kind: string): AmbushFoeGroup => ({
+      ...NORMAL,
+      minStep: 0,
+      maxStep: 200,
+      foes: [{ kind, count: 1 }],
+    });
+    const step = (realm: number) => stepOf(realm, 0);
+    // Hắc Hổ (cấp 7): vừa Luyện Khí (trần 7), quá sức Phàm Nhân (trần 1)
+    expect(pickAmbush(rt([], [wide("ho")]), MAP_ID, step(0))).toBeNull();
+    expect(pickAmbush(rt([], [wide("ho")]), MAP_ID, step(1))).not.toBeNull();
+    // Xích Mãng (cấp 12): quá sức Luyện Khí, vừa Trúc Cơ
+    expect(pickAmbush(rt([], [wide("mang")]), MAP_ID, step(1))).toBeNull();
+    expect(pickAmbush(rt([], [wide("mang")]), MAP_ID, step(2))).not.toBeNull();
+    // Hắc Giao (cấp 18): chỉ từ Nguyên Anh; Thiên Hàn Vương (21) không bao giờ
+    expect(pickAmbush(rt([], [wide("hac_giao")]), MAP_ID, step(3))).toBeNull();
+    expect(pickAmbush(rt([], [wide("hac_giao")]), MAP_ID, step(4))).not.toBeNull();
+    expect(pickAmbush(rt([], [wide("thien_han_vuong")]), MAP_ID, step(4))).toBeNull();
+    // cảnh giới chưa khai trần (Hóa Thần): không chọn gì; loài lạ trong bảng: không chọn (không ném lỗi)
+    expect(pickAmbush(rt([], [wide("lang")]), MAP_ID, step(5))).toBeNull();
+    expect(pickAmbush(rt([], [wide("khong_co")]), MAP_ID, step(1))).toBeNull();
+    // chỉ một loài quá sức trong bầy cũng loại cả bầy
+    const mixed = {
+      ...wide("lang"),
+      foes: [
+        { kind: "lang", count: 1 },
+        { kind: "mang", count: 1 },
+      ],
+    };
+    expect(pickAmbush(rt([], [mixed]), MAP_ID, step(1))).toBeNull();
+    // còn bầy khác hợp thì chọn bầy đó
+    expect(pickAmbush(rt([0], [mixed, wide("lang")]), MAP_ID, step(1))?.group.foes[0]?.kind).toBe(
+      "lang",
+    );
   });
 
   it("khoảng bậc là gồm cả hai đầu", () => {
