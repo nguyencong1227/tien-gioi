@@ -108,8 +108,8 @@ export function applyInputs(
       dx /= len;
       dy /= len;
     }
-    // Choáng: vẫn TIÊU THỤ input và tăng `lastSeq` (chỉ không di chuyển) để hàng đợi dự đoán của client rỗng được, `reconcile` không chạy lại input cũ
-    if (len > 0.05 && !c.stunned) {
+    // Choáng / đang mở hộp thoại chặn đường (mục 52): vẫn TIÊU THỤ input và tăng `lastSeq` (chỉ không di chuyển) để hàng đợi dự đoán của client rỗng được, `reconcile` không chạy lại input cũ
+    if (len > 0.05 && !c.stunned && c.ambush?.offer === undefined) {
       p.meditating = false;
       const next = map.moveWithCollision(
         p.x,

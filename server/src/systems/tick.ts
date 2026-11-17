@@ -13,6 +13,7 @@ import { tickStatuses } from "./status";
 import { tickBolts } from "./bolt";
 import { tickTreasure } from "./treasure";
 import { tickNetGuard } from "./net-guard";
+import { tickAmbush, trackAmbushWalk } from "./ambush";
 
 export function tickWorld(w: World, dtMs: number) {
   const dt = dtMs / 1000;
@@ -25,6 +26,7 @@ export function tickWorld(w: World, dtMs: number) {
     if (w.ghosts.size > 0 && w.ghosts.has(sid)) return; // hồn lìa xác: đứng yên, không hồi phục, không tu luyện
     c.life.playMs += dtMs; // thời gian chơi thật của kiếp (không tính chết, hồn lìa xác)
     w.inputStats.dropped += applyInputs(w.map, p, c, dtMs); // ngân sách bước theo thời gian thật (`dtMs` đồng hồ phòng), không +1 mỗi tick; input cũ vượt backlog bị bỏ (mục 41)
+    if (w.ambush !== null) trackAmbushWalk(w, sid, p, c); // chặn đường (mục 52): cộng quãng đi THẬT sau khi áp input; tính năng tắt thì không tốn gì
     if (c.inputs.length >= INPUT_BACKLOG_WARN) w.inputStats.backlogTicks++;
     if ((w.tick + c.posPhase) % POS_SYNC_EVERY_TICKS === 0) syncPublicPos(p);
     if (!w.duels.has(sid)) tickRecovery(w, sid, p, c, dt); // trong trận thách đấu: không hồi khí huyết / linh lực, không đả tọa
@@ -41,6 +43,7 @@ export function tickWorld(w: World, dtMs: number) {
   tickDungeonRun(w);
   tickDuels(w);
   tickSect(w);
+  tickAmbush(w, dtMs); // hộp thoại chặn đường: hết giờ / huỷ / đóng băng khi hồn lìa xác (không có hộp thoại nào thì thoát ngay)
   w.interest.update(w); // sau cùng: dựa trên vị trí mới của tick này
   w.tick++;
 }

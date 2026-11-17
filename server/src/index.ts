@@ -19,6 +19,7 @@ import { createStores } from "./stores";
 import { Monitor, mountMetrics, thresholdsOf } from "./metrics";
 import { applyStaticHeaders } from "./static-headers";
 import { bossMovesNotice } from "./systems/boss-config";
+import { ambushNotice } from "./systems/ambush-config";
 
 // Đọc .env.local ở gốc repo (cổng riêng cho từng dev). Không có file thì dùng mặc định.
 const envFile = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../.env.local");
@@ -30,6 +31,9 @@ if (startAudit(process.env)) console.log("Nhật ký kiểm toán: bật (AUDIT_
 // Bộ chiêu trùm (mục 42): in MỘT dòng khi BẬT để người vận hành kiểm được sau khi triển khai (`./prod.sh logs game | grep BOSS_MOVES`); tắt thì im như trước
 const bossNotice = bossMovesNotice(process.env);
 if (bossNotice) console.log(bossNotice);
+// Gặp chặn đường (mục 52): cũng in MỘT dòng khi BẬT (`grep AMBUSH`); tắt thì im
+const ambushMsg = ambushNotice(process.env);
+if (ambushMsg) console.log(ambushMsg);
 
 // Cổng 2567 chỉ của bản chạy thật: dev / test / bot dùng cổng riêng (portPolicy từ chối, thoát mã 1)
 const portCheck = portPolicy(process.env);
