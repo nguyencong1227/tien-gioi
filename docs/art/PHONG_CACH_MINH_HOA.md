@@ -46,7 +46,7 @@ Lý do từng nhóm: tên game / truyện / nghệ sĩ khác vi phạm quy tắc
 | nền đăng nhập | `section#login` | 1:1 | 1024x1024 | 1024x1024 | 150 KB | ĐÃ VÀO (`login_bg.webp`, 72 KB) |
 | **thẻ bản đồ** | màn chuyển cảnh qua cổng (ĐÃ nối: `client/src/map-card.ts`, danh sách `MAP_CARDS`; chưa có ảnh thì chỉ hiện tên) và đầu bảng Sơn Hà Đồ (`M`, dự kiến) | 3:2 (thô ≈ 3:2, B cắt nhẹ về đúng 3:2) | 1216x832 | 624x416 | 40 KB | **LÔ 1 (mục 5)** |
 | thẻ trùm | bảng / báo trùm (dự kiến) | 1:1 | 1024x1024 | 384x384 | 30 KB | lô 2 (mục 5b), vào GÓI `art:trum` (tải theo nhu cầu, mục 4b) |
-| chân dung NPC | khung hội thoại (dự kiến) | 1:1 | 1024x1024 | 256x256 | 20 KB | lô 3 (mục 5c), vào GÓI `art:npc` (tải theo nhu cầu, mục 4b) |
+| chân dung NPC | đầu khung hội thoại (ĐÃ nối: `client/src/npc-portrait.ts`, danh sách `NPC_PORTRAITS` rỗng tới khi có ảnh; ảnh dự phòng là chữ) | 1:1 | 1024x1024 | 256x256 | 20 KB | lô 3 (mục 5c), vào GÓI `art:npc` (tải theo nhu cầu, mục 4b) |
 
 **Ngân sách gói tải NGAY** (`client/perf-budget.json` `static.aiAssets`: mỗi ảnh <= 150 KB, tổng <= 300 KB; ảnh ở `client/public/assets/ai/` vào `dist/` nên vào cả APK lẫn bộ nhớ đệm PWA của mọi người chơi web): `login_bg` 72 KB + 5 thẻ bản đồ (23-34 KB mỗi ảnh, thực đo 146,5 KB) = **218,7 KB <= 300 KB**. **A giữ trần 300 KB** (quyết định ở #998): lô 2 và lô 3 KHÔNG vào đây mà vào gói tải theo nhu cầu `art` (mục 4b).
 
