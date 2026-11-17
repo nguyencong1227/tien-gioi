@@ -280,6 +280,7 @@ describe("a11y: Cấu trúc HTML & ARIA trong client/index.html", () => {
       "quest-modal",
       "map-modal",
       "sect-modal",
+      "social-modal",
       "dungeon-end-modal",
       "duel-end-modal",
       "player-menu",

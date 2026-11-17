@@ -179,6 +179,14 @@ import {
 import { quickLabel } from "./quick-label";
 import { initKeyLabels } from "./keybinds-dom";
 import {
+  DEFAULT_SOCIAL_TAB,
+  SOCIAL_TABS,
+  asSocialTab,
+  socialEnabled,
+  socialTabByKey,
+  type SocialTabId,
+} from "./social-tabs";
+import {
   ACTION_BY_ID,
   FIXED_KEYS,
   getKeymap,
@@ -466,6 +474,21 @@ let currentSect: SectView | null = null;
 let currentSectPresence: SectPresenceMsg | null = null;
 let sectModalOpen = false;
 let sectTab: "overview" | "members" | "treasury" | "vault" | "hall" = "overview";
+// Bảng Xã hội (M9, #1025): khung ba tab; chỉ mở được khi cờ `?social=1` bật (`socialEnabled`)
+let socialModalOpen = false;
+let socialTab: SocialTabId = DEFAULT_SOCIAL_TAB;
+
+/** Đồng bộ thanh tab + thân tab Xã hội theo `socialTab` (aria-selected, tabindex lăn, ẩn / hiện thân). */
+function renderSocialTabs() {
+  for (const t of SOCIAL_TABS) {
+    const on = t.id === socialTab;
+    const btn = $(`social-tab-btn-${t.id}`);
+    btn.classList.toggle("active", on);
+    btn.setAttribute("aria-selected", on ? "true" : "false");
+    btn.tabIndex = on ? 0 : -1;
+    $(`social-tab-${t.id}`).hidden = !on;
+  }
+}
 // ---- Nội vụ tông môn (M8.6, #843) ----
 /** Ảnh chụp "Nội vụ" MỚI NHẤT đã làm sạch + đồng hồ máy khách lúc nhận (để đếm ngược theo giờ máy chủ); `null` = chưa có. */
 let sectHall: { view: NonNullable<ReturnType<typeof sanitizeHallView>>; at: number } | null = null;
@@ -3825,6 +3848,23 @@ export const ui = {
 
     // Tông môn (M3.6, #230)
     bindTap("btn-sect", () => this.toggleSectModal());
+
+    // Xã hội (M9, #1025): nút HUD ẩn cho tới khi cờ `?social=1` bật
+    const socialOn = typeof window !== "undefined" && socialEnabled(window.location.search);
+    $("btn-social").hidden = !socialOn;
+    bindTap("btn-social", () => this.toggleSocialModal());
+    bindTap("social-close", () => this.toggleSocialModal(false));
+    for (const t of SOCIAL_TABS)
+      bindTap(`social-tab-btn-${t.id}`, () => this.switchSocialTab(t.id));
+    // Mũi tên / Home / End trên thanh tab (WAI-ARIA tablist): đổi tab VÀ chuyển focus theo; `preventDefault` để bộ nghe phím ở `window`
+    // (`handlePanelKey`, chuyển focus theo hình học) bỏ qua, nếu không tab có `tabindex=-1` bị nhảy qua.
+    $("social-tabs").addEventListener("keydown", (e) => {
+      if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
+      const next = socialTabByKey(socialTab, e.code);
+      if (next === null) return;
+      e.preventDefault();
+      this.switchSocialTab(next, true);
+    });
     bindTap("sect-close", () => this.toggleSectModal(false));
 
     bindTap("sect-tab-btn-overview", () => this.switchSectTab("overview"));
@@ -4778,6 +4818,10 @@ export const ui = {
       this.toggleSectModal(false);
       closedAny = true;
     }
+    if (socialModalOpen) {
+      this.toggleSocialModal(false);
+      closedAny = true;
+    }
     if (this.isPlayerMenuOpen()) {
       this.closePlayerMenu();
       closedAny = true;
@@ -4822,6 +4866,9 @@ export const ui = {
         return true;
       case "sect-modal":
         this.toggleSectModal(false);
+        return true;
+      case "social-modal":
+        this.toggleSocialModal(false);
         return true;
       case "dialog-modal":
         this.closeDialog();
@@ -6310,6 +6357,46 @@ export const ui = {
 
   isSectModalOpen(): boolean {
     return sectModalOpen;
+  },
+
+  // ---------- Xã hội (M9, #1025) ----------
+  /** Mở / đóng bảng Xã hội. Cờ `?social=1` tắt thì KHÔNG mở (phím Shift+G chạy tới đây nhưng không làm gì). */
+  toggleSocialModal(force?: boolean) {
+    const target = force ?? !socialModalOpen;
+    if (target === socialModalOpen) return;
+    if (target && !socialEnabled(window.location.search)) return;
+    socialModalOpen = target;
+    if (socialModalOpen) {
+      this.closeAllModals();
+      socialModalOpen = true;
+      $("social-modal").hidden = false;
+      $("btn-social").classList.add("active");
+      $("btn-social").setAttribute("aria-expanded", "true");
+      modalStack.push("social-modal", $("btn-social"));
+      renderSocialTabs();
+      focusModal($("social-modal"));
+    } else {
+      $("social-modal").hidden = true;
+      $("btn-social").classList.remove("active");
+      $("btn-social").setAttribute("aria-expanded", "false");
+      modalStack.remove("social-modal");
+      returnFocus($("btn-social"));
+    }
+  },
+
+  isSocialModalOpen(): boolean {
+    return socialModalOpen;
+  },
+
+  /** Đổi tab Xã hội; `focus` = đưa focus về nút tab (khi đổi bằng phím mũi tên). Id lạ về tab mặc định. */
+  switchSocialTab(tab: string, focus = false) {
+    socialTab = asSocialTab(tab);
+    renderSocialTabs();
+    if (focus) $(`social-tab-btn-${socialTab}`).focus();
+  },
+
+  getSocialTab(): SocialTabId {
+    return socialTab;
   },
 
   /** Đóng hộp xác nhận tông môn nếu đang mở (Esc đóng hộp trước, rồi mới tới bảng) */
