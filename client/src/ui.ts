@@ -717,7 +717,9 @@ function renderAmbush(): void {
     const el = document.getElementById(AMBUSH_BTN_ID[b.choice]);
     if (!el) continue;
     setTextIfChanged(el.querySelector(".ab-label"), b.label);
-    setTextIfChanged(el.querySelector(".ab-sub"), b.sub);
+    // gợi ý phím chỉ có nghĩa khi có chuột / bàn phím (điện thoại cảm ứng không có Enter)
+    const keyHint = b.choice === "fight" && window.matchMedia("(pointer: fine)").matches;
+    setTextIfChanged(el.querySelector(".ab-sub"), keyHint ? `${b.sub} · Enter` : b.sub);
     el.setAttribute("aria-disabled", String(!b.enabled || reconnecting));
     el.setAttribute("aria-label", b.aria);
   }

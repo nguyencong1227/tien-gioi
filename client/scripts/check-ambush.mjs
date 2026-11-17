@@ -202,6 +202,10 @@ try {
   check(s.open && s.inAmbush, "ambushOffer mở hộp thoại (hiện, body.in-ambush)");
   check(s.captured, "bàn phím bị giữ (phím thế giới không chạy)");
   check(s.focus === "ambush-modal", `focus ở KHUNG, không ở nút (${s.focus})`);
+  check(
+    s.fight.sub === "Đấu một mình · Enter",
+    `nút Chiến ghi 'Đấu một mình' kèm gợi ý Enter khi có chuột ('${s.fight.sub}')`,
+  );
   check(s.foe === "Sói Hoang · Thường × 2", `tên kẻ chặn đường kèm mức và số lượng ('${s.foe}')`);
   check(s.scene.startsWith("Đường đi bỗng vắng hẳn"), "văn mẫu hiện đúng");
   check(
@@ -562,6 +566,12 @@ try {
     );
     const smallC = [Lc.fight, Lc.coin, Lc.exp].filter((b) => b.h < 44 || b.w < 44);
     check(smallC.length === 0, `điện thoại dọc (cảm ứng): ba nút >= 44 px (${smallC.length} nhỏ)`);
+    await sleep(ARM_WAIT);
+    const stc = await state();
+    check(
+      stc.fight.sub === "Đấu một mình" && stc.fight.dis === "false",
+      `cảm ứng: nút Chiến KHÔNG ghi Enter ('${stc.fight.sub}'), đã hết khoá`,
+    );
     await shot("chan-duong-cam-ung-dinh-day");
   } else {
     console.log("  (Chrome không báo pointer: coarse ở khung này: bỏ qua kiểm kiểu dính đáy)");
