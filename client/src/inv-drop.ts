@@ -37,12 +37,23 @@ export function dropStillValid(slots: Slots, plan: DropPlan): boolean {
 }
 
 /**
- * Lời hộp xác nhận: "Vứt hết Hồi Huyết Đan ×5?", "Vứt 1 Hồi Huyết Đan? (còn lại 4)", "Vứt Long Thố?" (chỉ có 1).
+ * Kế hoạch vứt sau khi người chơi chỉnh số trong ô số lượng (mục 47): kẹp vào [1, `have`], số hỏng thành 1. `plan` là kế hoạch GỐC lúc bấm nút (không phải kế hoạch đã chỉnh), nên
+ * kéo số về đúng toàn bộ thì "Vứt hết" của lần bấm "Vứt hết" trở lại (gửi không kèm `qty`); chỉnh sang số khác thì luôn gửi `qty` cụ thể.
+ */
+export function withDropQty(plan: DropPlan, qty: number): DropPlan {
+  const have = Math.max(1, Math.floor(plan.have));
+  const q = Math.min(have, Math.max(1, Number.isFinite(qty) ? Math.floor(qty) : 1));
+  return { ...plan, qty: q, all: plan.all && q === have };
+}
+
+/**
+ * Lời hộp xác nhận: "Vứt hết Hồi Huyết Đan ×5?", "Vứt 3 Hồi Huyết Đan? (còn lại 2)", "Vứt Long Thố?" (chỉ có 1). Vứt đúng toàn bộ số đang có thì luôn nói "Vứt hết".
  * `name` là tên đầy đủ của món (không viết tắt).
  */
 export function dropConfirmText(name: string, plan: DropPlan): string {
-  if (plan.all) return plan.qty > 1 ? `Vứt hết ${name} ×${plan.qty}?` : `Vứt ${name}?`;
-  return plan.have > 1 ? `Vứt 1 ${name}? (còn lại ${plan.have - 1})` : `Vứt ${name}?`;
+  if (plan.all || plan.qty >= plan.have)
+    return plan.qty > 1 ? `Vứt hết ${name} ×${plan.qty}?` : `Vứt ${name}?`;
+  return `Vứt ${plan.qty} ${name}? (còn lại ${plan.have - plan.qty})`;
 }
 
 /** Từ bậc phẩm (`ItemDef.rarity`) này trở lên là đồ quý: hộp xác nhận thêm một dòng nhắc. */
