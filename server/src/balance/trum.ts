@@ -1,5 +1,5 @@
 // Cân bằng TRÙM NHIỀU CHIÊU (mục 42, T5 #874): chạy BỘ THỰC THI THẬT (`systems/boss.ts` qua `tickMonsters`) trên dữ liệu `BOSSES` THẬT, nên thêm / sửa trùm là báo cáo
-// đổi theo. Mỗi trùm đo ở bậc "đúng bậc" (`stepOf` = `level` của loài):
+// đổi theo. Mỗi trùm đo ở bậc "đúng bậc" (`BOSS_PLAYER_STEP`):
 //  1. thời gian hạ trùm của đội 1..4 người (đánh thường liên tục, uống Hồi Huyết Đan, KHÔNG né: ca KHÓ, như `dungeon.ts`), quy ra thời gian thật = giây mô phỏng / `bossUptime`;
 //  2. sát thương MỖI ĐÒN / khí huyết tối đa của người đúng bậc (mọi chiêu, mọi giai đoạn, kể cả cuồng nộ), thiết kế <= ~55%;
 //  3. tỉ lệ chết: bot KHÔNG né (đứng cạnh trùm) vs bot né hoàn hảo (`boss-dodge-bot.ts`: phản xạ 400 ms, 150 px/giây): né phải ~0 trúng;
@@ -8,6 +8,7 @@
 import {
   BOSSES,
   DEFAULT_MAP,
+  DUNGEONS,
   MONSTER_BY_ID,
   TICK_MS,
   stepOf,
@@ -47,10 +48,22 @@ function openArena(): GameMap {
   return m;
 }
 
-/** Bậc tu "đúng bậc" của trùm: `stepOf` = `level` của loài (Xích Mãng 12 = Trúc Cơ cuối, Hắc Giao 15 = Kim Đan ...). */
+/**
+ * Bậc người chơi "đúng bậc" của từng trùm (`stepOf`; ngoài bảng này lấy `level` của loài). KHÔNG luôn bằng `level`: `level` của quái là thang so sánh với người chơi, còn trùm
+ * đội (Hắc Giao, Thiên Hàn Vương) được đo ở bậc CUỐI cảnh giới mà đội tới đánh, đúng như các mục "Kim Đan sau nội dung" / "Nguyên Anh sau nội dung" của `CAN_BANG.md`; Linh Hư Yêu Vương
+ * là trùm bí cảnh nên đo ở ngưỡng vào bí cảnh (`DUNGEONS[].minStep`, ca khó nhất, như `dungeon.ts`).
+ */
+export const BOSS_PLAYER_STEP: Readonly<Record<string, number>> = {
+  mang: 12, // Trúc Cơ Hậu kỳ (bậc cuối của Trúc Cơ), cũng là `level` của loài
+  hac_giao: 15, // Kim Đan Hậu kỳ
+  thien_han_vuong: 18, // Nguyên Anh Hậu kỳ
+  yeu_vuong: DUNGEONS.find((d) => d.boss === "yeu_vuong")?.minStep ?? 9,
+};
+
+/** Bậc tu "đúng bậc" của trùm (xem `BOSS_PLAYER_STEP`). */
 export function bossStep(def: BossDef): { realm: number; tier: number; step: number } {
-  const level = MONSTER_BY_ID[def.kind]!.level;
-  const { realm, tier } = realmTierOfStep(level);
+  const step = BOSS_PLAYER_STEP[def.kind] ?? MONSTER_BY_ID[def.kind]!.level;
+  const { realm, tier } = realmTierOfStep(step);
   return { realm, tier, step: stepOf(realm, tier) };
 }
 

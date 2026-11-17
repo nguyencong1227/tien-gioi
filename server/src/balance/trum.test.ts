@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { BOSSES, MONSTER_BY_ID, bossViolations, type BossDef } from "@tien-gioi/shared";
 import {
   ASSUME_BOSS,
+  BOSS_PLAYER_STEP,
   bossBalanceViolations,
   bossStep,
   dodgeSummary,
@@ -59,7 +60,7 @@ describe("cân bằng trùm trên dữ liệu THẬT (BOSSES, T5 #874)", () => {
   it("mỗi trùm: có bậc đúng bậc, có chiêu sát thương, bot đứng yên bị trúng (đối chứng) còn bot né thì không", () => {
     for (const def of BOSSES) {
       const st = bossStep(def);
-      expect(st.step, def.kind).toBe(MONSTER_BY_ID[def.kind]!.level);
+      expect(st.step, def.kind).toBe(BOSS_PLAYER_STEP[def.kind] ?? MONSTER_BY_ID[def.kind]!.level);
       expect(hitFractions(def).length, def.kind).toBeGreaterThan(0);
       const d = dodgeSummary(def);
       expect(d.casts, def.kind).toBeGreaterThan(0);
@@ -79,6 +80,15 @@ describe("cân bằng trùm trên dữ liệu THẬT (BOSSES, T5 #874)", () => {
 });
 
 describe("hàm đo", () => {
+  it("bậc đúng bậc: Xích Mãng = Trúc Cơ cuối (12), Hắc Giao = Kim Đan cuối (15), Thiên Hàn Vương = Nguyên Anh cuối (18), Yêu Vương = ngưỡng vào bí cảnh; loài ngoài bảng lấy `level`", () => {
+    expect(bossStep(MANG).step).toBe(12);
+    expect(BOSS_PLAYER_STEP.hac_giao).toBe(15);
+    expect(BOSS_PLAYER_STEP.thien_han_vuong).toBe(18);
+    expect(BOSS_PLAYER_STEP.yeu_vuong).toBe(9);
+    const other = { ...MANG, kind: "doc_thiem" } as BossDef; // ngoài bảng: lấy level của loài
+    expect(bossStep(other).step).toBe(MONSTER_BY_ID.doc_thiem!.level);
+  });
+
   it("hitFractions: đúng công thức `round(atk x hệ số giai đoạn x dmgMult)` / khí huyết tối đa; lấy hệ số công LỚN NHẤT (kể cả cuồng nộ)", () => {
     const atk = MONSTER_BY_ID.mang!.atk;
     const plain = hitFractions(fakeBoss({ dmgMult: 1, atkMult: 1 }))[0]!;
