@@ -275,8 +275,10 @@ import {
   shouldShowNewbieGuide,
   markNewbieGuideDismissed,
 } from "./a11y";
+import { $, buttonShown, fmt, hexColor, onPress, readPref, writePref } from "./ui-util";
 
-const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
+// `fmt` từng được xuất từ đây (test `sect.test.ts` nhập động): giữ tên xuất cũ sau khi chuyển sang `ui-util.ts`.
+export { fmt };
 
 let currentMapId: string = DEFAULT_MAP_ID;
 let portalCallback: (() => void) | null = null;
@@ -355,17 +357,6 @@ export interface UiCallbacks {
   /** Bảng Công pháp vừa mở: cảnh dựng mô hình mới từ sổ chiêu hiện tại (`ui.setSkillsModel`) */
   onSkillsOpen?: () => void;
 }
-
-export const fmt = (n: number) =>
-  !Number.isFinite(n) || n < 0
-    ? "0"
-    : n >= 1e6
-      ? `${(n / 1e6).toFixed(1)}M`
-      : n >= 1e4
-        ? `${(n / 1e3).toFixed(1)}k`
-        : `${Math.floor(n)}`;
-
-const hexColor = (c: number) => `#${c.toString(16).padStart(6, "0")}`;
 
 // ---------- Trạng thái Client ----------
 const HIDE_NAMES_KEY = "tg_hide_names";
@@ -996,23 +987,6 @@ function renderSlotDetail() {
   drop1Btn.hidden = s.qty <= 1;
 }
 
-/**
- * Gắn hành động bấm cho nút tạo động: chuột / chạm = `pointerdown` (nhanh, giữ hành vi cũ), bàn phím = Enter / Cách (#463).
- * Nút `<button>` chỉ nhận `click` khi bấm phím nên các nút chỉ nghe `pointerdown` không dùng được bằng bàn phím.
- */
-function onPress(el: HTMLElement, fn: () => void, stop = false) {
-  el.addEventListener("pointerdown", (e) => {
-    e.preventDefault();
-    if (stop) e.stopPropagation();
-    fn();
-  });
-  el.addEventListener("keydown", (e) => {
-    if (e.key !== "Enter" && e.key !== " ") return;
-    e.preventDefault();
-    if (!e.repeat) fn();
-  });
-}
-
 function renderInventory() {
   let used = 0;
   for (let i = 0; i < INVENTORY_SLOTS; i++) {
@@ -1146,22 +1120,6 @@ function describeStep(
 }
 
 /** Bảng Nhiệm vụ thu gọn / mở (gfx/hud-compact.ts): lựa chọn của người chơi (`tg_qt_open`) thắng, chưa chọn thì theo độ gọn của máy. */
-/** Đọc / ghi `localStorage` an toàn (chế độ riêng tư có thể chặn). */
-function readPref(key: string): string | null {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-function writePref(key: string, value: string) {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    /* chế độ riêng tư: bỏ qua */
-  }
-}
-
 interface PanelPrefHandle {
   /** Đang mở không (theo lựa chọn đã nhớ, chưa chọn thì theo độ gọn của máy) */
   isOpen(): boolean;
@@ -1332,11 +1290,6 @@ function watchModalHidden(id: string) {
   sync(); // tấm đã hiện sẵn lúc gắn
 }
 
-/** Nút đang hiện và bấm được (không `disabled`; nit của A ở #470): không có tổ tiên nào bị `hidden` (hộp lời mời, HUD bí cảnh / quyết đấu, hộp xác nhận ẩn bằng thuộc tính `hidden` của hộp chứa). */
-function buttonShown(id: string): boolean {
-  const el = document.getElementById(id);
-  return el !== null && el.closest("[hidden]") === null && !(el as HTMLButtonElement).disabled;
-}
 /** Hành động đang chờ người chơi bấm phím mới; `null` = không chờ. */
 let keyCaptureFor: ActionId | null = null;
 
