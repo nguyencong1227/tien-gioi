@@ -45,8 +45,8 @@ Khi bổ sung thêm sprite, biểu tượng hoặc hiệu ứng từ thư viện
 
 ## 4. Kết quả rà soát tài sản (M4-sớm, Issue #257)
 
-- **Tổng số tệp tài nguyên tĩnh quét qua script tự động (`npm run check:credits`):** 91 tệp (cập nhật đan hộ đạo #763, 16/11/2026; 88 sau kinh quyển đợt 2 #654, 15/11/2026; 82 sau M7.5 Hàn Vân Lĩnh; 70 sau kinh quyển M7.4, 58 sau đồ ba ô riêng, lúc M6 là 44 tệp, lúc M4-sớm là 24 tệp, chi tiết ở `docs/RA_SOAT_TAI_SAN.md`).
-  - `client/public/assets/`: 81 tệp (1 tileset, 2 atlas, 78 biểu tượng vật phẩm).
+- **Tổng số tệp tài nguyên tĩnh quét qua script tự động (`npm run check:credits`):** 92 tệp (cập nhật ảnh AI ĐẦU TIÊN `login_bg.webp` #513, 17/11/2026; 91 sau đan hộ đạo #763, 16/11/2026; 88 sau kinh quyển đợt 2 #654, 15/11/2026; 82 sau M7.5 Hàn Vân Lĩnh; 70 sau kinh quyển M7.4, 58 sau đồ ba ô riêng, lúc M6 là 44 tệp, lúc M4-sớm là 24 tệp, chi tiết ở `docs/RA_SOAT_TAI_SAN.md`).
+  - `client/public/assets/`: 82 tệp (1 tileset, 2 atlas, 78 biểu tượng vật phẩm, 1 ảnh AI `assets/ai/login_bg.webp` ở mục 7).
   - `client/public/icons/`: 5 tệp (1 svg, 4 png icon PWA / favicon).
   - `client/public/fonts/`: 5 tệp (4 `woff2` + `OFL.txt`, có SHA-256 ở mục 6).
 - **Tài nguyên tự sinh runtime (không có tệp ảnh, ngoài phạm vi quét):** `client/src/textures.ts` (vẽ canvas), `client/src/audio.ts` (Web Audio) và các mô-đun đồ hoạ M5-M6 `client/src/gfx/` (tileset trang trí, ánh sáng, sương, nước, atlas hạt + phông bit-map, bóng đốm): danh sách ở `docs/RA_SOAT_TAI_SAN.md` mục 2c.
@@ -124,4 +124,4 @@ Mỗi ảnh PHẢI có: (1) một dòng ở bảng dưới (tên tệp đầy đ
 
 | Ảnh | Mô tả | Model | Ngày sinh | Tệp nguồn |
 |---|---|---|---|---|
-| (chưa có ảnh AI nào trong repo) | | | | |
+| `client/public/assets/ai/login_bg.webp` | Nền màn đăng nhập: đỉnh núi sương sớm, tháp gỗ trên vách đá nhìn ra biển mây (1024x1024, WebP sạch 72 KB; ảnh thô số 4 của lô pilot, seed 2026111504, hậu kỳ chỉ mã hoá lại bằng `client/scripts/art/hau-ky-webp.py`); đã xem 200 %: không chữ / ký tự giả / người | `sd_xl_base_1.0.safetensors` (SDXL base 1.0, không LoRA) | 2026-11-15 | `docs/art/nguon/login_bg.json` |

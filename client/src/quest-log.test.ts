@@ -172,7 +172,11 @@ describe("nhiệm vụ TÔNG MÔN (M8.6): không có NPC giao", () => {
 });
 
 describe("giao diện dùng đúng loại nhiệm vụ (không gọi việc phụ là chính tuyến)", () => {
-  const ui = fs.readFileSync(path.resolve(__dirname, "ui.ts"), "utf8");
+  // `ui.ts` + `ui-quest-tracker.ts` (bảng theo dõi nhiệm vụ HUD đã tách khỏi ui.ts, dọn ui.ts bước 2): canh cả hai nơi dán nhãn loại nhiệm vụ
+  const ui =
+    fs.readFileSync(path.resolve(__dirname, "ui.ts"), "utf8") +
+    "\n" +
+    fs.readFileSync(path.resolve(__dirname, "ui-quest-tracker.ts"), "utf8");
 
   it("ui.ts dán nhãn thẻ đang làm / huy hiệu hộp thoại / hàng đã xong qua `questKind`, không còn nhãn cứng 'Chính tuyến' theo `daily`", () => {
     expect(ui).toContain("questCardSubtitle(def)");
