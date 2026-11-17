@@ -23,6 +23,7 @@ const dataDir = mkdtempSync(path.join(tmpdir(), "tien-gioi-wboss-"));
 let PORT = 0;
 let server: Server;
 let WorldRoomCls: typeof import("./WorldRoom").WorldRoom;
+let ensureWorldBossRooms: typeof import("./WorldRoom").ensureWorldBossRooms;
 const rooms: Room[] = [];
 
 /** 00:00 giờ máy chủ (UTC+7) của ngày 18/11/2026. */
@@ -45,6 +46,7 @@ beforeAll(async () => {
   process.env.DATA_DIR = dataDir;
   const mod = await import("./WorldRoom");
   WorldRoomCls = mod.WorldRoom;
+  ensureWorldBossRooms = mod.ensureWorldBossRooms;
   server = new Server({ transport: new WebSocketTransport(), gracefullyShutdown: false });
   mod.defineRooms(server);
   PORT = await listenWithRetry(server);
@@ -256,4 +258,18 @@ describe("trùm thế giới qua phòng thật", () => {
       fake = false;
     }
   }, 25_000);
+
+  it("`ensureWorldBossRooms`: bản đồ có trùm trong lịch mà chưa ai vào vẫn có phòng sẵn (để sinh trùm); gọi lại không tạo thêm; không có lịch thì không tạo", async () => {
+    const roomsOf = (mapId: string) =>
+      [...WorldRoomCls.hub.worlds].filter((w) => w.map.def.id === mapId && w.runId === null);
+    const MAP = "hac_phong";
+    expect(roomsOf(MAP)).toHaveLength(0); // chưa ai vào
+    await ensureWorldBossRooms();
+    expect(roomsOf(MAP)).toHaveLength(0); // không có lịch: không làm gì
+    WorldRoomCls.hub.worldBoss.slots = [{ ...SLOT, mapId: MAP }];
+    await ensureWorldBossRooms();
+    expect(roomsOf(MAP)).toHaveLength(1);
+    await ensureWorldBossRooms();
+    expect(roomsOf(MAP)).toHaveLength(1); // gọi lại: không tạo thêm
+  });
 });

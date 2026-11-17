@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
-import { defineRooms, WorldRoom } from "./rooms/WorldRoom";
+import { defineRooms, ensureWorldBossRooms, WorldRoom } from "./rooms/WorldRoom";
 import { SectService } from "./sect-service";
 import { portPolicy, startupWarnings } from "./startup";
 import { startAudit } from "./audit";
@@ -121,6 +121,7 @@ async function main() {
     return stores.close();
   });
   await gameServer.listen(PORT);
+  await ensureWorldBossRooms(); // bản đồ có trùm theo giờ phải có phòng sẵn để sinh trùm (không đợi người vào lần đầu)
   console.log(`Tiên Giới server: http://localhost:${PORT}`);
 }
 

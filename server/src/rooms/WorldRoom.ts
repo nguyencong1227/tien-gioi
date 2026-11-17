@@ -1463,6 +1463,30 @@ export class WorldRoom extends Room<WorldState> {
 }
 
 /**
+ * Tạo sẵn phòng thế giới của các bản đồ có trùm theo giờ trong lịch (M9.4). Phòng Colyseus chỉ sinh khi có người vào lần đầu; bản đồ chưa ai vào thì không có phòng để sinh
+ * trùm, mà tin "xuất hiện" đã gửi cho cả máy chủ (sự kiện kết thúc "bỏ chạy" dù trùm chưa từng có). Gọi sau `defineRooms` + `listen`; chỉ tạo bản đồ CHƯA có phòng thường
+ * (không phải bí cảnh / đấu trường), nên gọi lại không tạo thêm; phòng chính `autoDispose = false` nên sống tiếp. Không có lịch / `WORLD_BOSS=off` thì không làm gì.
+ */
+export async function ensureWorldBossRooms(): Promise<void> {
+  const book = WorldRoom.hub.worldBoss;
+  if (!book.active) return;
+  for (const mapId of new Set(book.slots.map((s) => s.mapId))) {
+    const has = [...WorldRoom.hub.worlds].some(
+      (w) => w.map.def.id === mapId && w.runId === null && w.arena === null,
+    );
+    if (has) continue;
+    try {
+      await matchMaker.createRoom(roomNameOf(mapId), {});
+    } catch (e) {
+      console.error(
+        `[trùm thế giới] không tạo được phòng ${mapId}:`,
+        e instanceof Error ? e.message : e,
+      );
+    }
+  }
+}
+
+/**
  * Đăng ký phòng thế giới: mỗi bản đồ một phòng với tên phòng riêng (`roomNameOf`, shared/src/travel.ts).
  * Dùng chung cho `index.ts` và test tích hợp để cấu hình không lệch nhau.
  */
