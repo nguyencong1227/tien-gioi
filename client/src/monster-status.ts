@@ -22,6 +22,8 @@ export const PIP_STYLE: Readonly<Partial<Record<StatusId, { shape: PipShape; col
   chill: { shape: "square", color: 0x7fdcff },
   sunder: { shape: "cross", color: 0xffd34d },
   stun: { shape: "star", color: 0xffffff },
+  // Suy Yếu (mục 51, CT1b): chấm TẠM; B chỉnh hình / màu ở CT11a. DẤU hệ KHÔNG có bit (xem `Monster.mark`, CT2).
+  weaken: { shape: "square", color: 0xb59cff },
 };
 
 /** Các chấm cho một mặt nạ `fx`, theo thứ tự bit tăng dần (ổn định: chấm không nhảy chỗ khi một cái hết hạn). */

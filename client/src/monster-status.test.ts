@@ -37,10 +37,10 @@ describe("monster-status: pipsOf (mặt nạ -> chấm)", () => {
   });
 
   it("mặt nạ rỗng / rác: không chấm nào, không ném lỗi", () => {
-    for (const bad of [0, -1, 1.5, NaN, Infinity, "3", null, undefined, {}, [], 64, 128])
+    for (const bad of [0, -1, 1.5, NaN, Infinity, "3", null, undefined, {}, [], 128, 256])
       expect(pipsOf(bad as never), String(bad)).toEqual([]);
     // bit lạ lẫn bit thật: giữ bit thật
-    expect(pipsOf(64 | 2).map((p) => p.id)).toEqual(["poison"]);
+    expect(pipsOf(128 | 2).map((p) => p.id)).toEqual(["poison"]);
   });
 });
 

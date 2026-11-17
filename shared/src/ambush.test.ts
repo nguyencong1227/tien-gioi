@@ -48,7 +48,7 @@ const CJK = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hang
 
 describe("hằng số chặn đường", () => {
   it("giao thức: chặn đường chỉ cho client đủ mới, và không vượt phiên bản hiện tại", () => {
-    expect(AMBUSH_MIN_PROTOCOL).toBe(5);
+    expect(AMBUSH_MIN_PROTOCOL).toBe(6); // bản đầu tiên có hộp thoại ở client (review B ở #1083: client v5 đang chạy thật KHÔNG có hộp thoại); CD10 chốt lại khi bật
     expect(AMBUSH_MIN_PROTOCOL).toBeLessThanOrEqual(PROTOCOL_VERSION);
   });
 
