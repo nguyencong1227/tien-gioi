@@ -21,6 +21,7 @@ import {
   Ambushes,
   arenaDrop,
   arenaJoined,
+  arenaResend,
   createArena,
   finishArena,
   onAmbushFlee,
@@ -544,6 +545,64 @@ describe("về chỗ cũ sau kết cục", () => {
     s.p.dead = false;
     tickArena(s.w);
     expect(s.exits).toEqual([s.sid]);
+  });
+});
+
+describe("rớt mạng giữa trận: ĐÓNG BĂNG đồng hồ (mục 33)", () => {
+  it("hồn lìa xác: hạn trận dời tiến đúng bước tick (không hết giờ), kẻ địch bỏ mục tiêu; nối lại thì còn nguyên thời gian", () => {
+    const s = setup();
+    const deadline0 = s.a.deadline;
+    s.w.ghosts.add(s.sid);
+    const mc = [...s.w.mctrl.values()][0]!;
+    for (let i = 0; i < 4000; i++) {
+      // 200 giây > AMBUSH_TIME_MS
+      s.w.now += TICK_MS;
+      mc.target = s.sid;
+      tickArena(s.w, TICK_MS);
+    }
+    expect(s.a.phase).toBe("fighting");
+    expect(s.a.deadline).toBe(deadline0 + 4000 * TICK_MS);
+    expect(mc.target).toBeNull();
+    expect(s.ambushStates.length).toBe(1); // đóng băng: không gửi state cho người không có mặt
+    s.w.ghosts.delete(s.sid);
+    arenaResend(s.w, s.sid);
+    expect(s.ambushStates.at(-1)!.msg.msLeft).toBe(AMBUSH_TIME_MS); // còn NGUYÊN 120 giây
+  });
+
+  it("đã có kết cục: đồng hồ về chỗ cũ cũng đóng băng (không đưa hồn lìa xác đi); nối lại thì gửi LẠI kết cục", () => {
+    const s = setup();
+    act(s);
+    s.w.now = s.a.deadline;
+    tickArena(s.w);
+    const end = s.a.end!;
+    expect(end.result).toBe("timeout");
+    s.w.ghosts.add(s.sid);
+    for (let i = 0; i < 400; i++) {
+      s.w.now += TICK_MS;
+      tickArena(s.w, TICK_MS);
+    }
+    expect(s.exits).toEqual([]);
+    s.w.ghosts.delete(s.sid);
+    const n = s.ambushEnds.length;
+    arenaResend(s.w, s.sid);
+    expect(s.ambushEnds.length).toBe(n + 1);
+    expect(s.ambushEnds.at(-1)!.msg).toEqual(end);
+    s.w.now = s.a.endAt!;
+    tickArena(s.w);
+    expect(s.exits).toEqual([s.sid]); // hết đóng băng thì đi
+  });
+
+  it("arenaResend ở phòng thường / chưa vào trận: không làm gì", () => {
+    const h = makeWorld();
+    addPlayer(h.w, "a");
+    arenaResend(h.w, "a");
+    expect(h.ambushStates).toHaveLength(0);
+    const g = makeWorld(ARENA);
+    g.w.now = T0;
+    createArena(g.w, ticketOf(group("normal", [{ kind: "tho", count: 1 }])));
+    addPlayer(g.w, "a");
+    arenaResend(g.w, "a"); // chưa arenaJoined
+    expect(g.ambushStates).toHaveLength(0);
   });
 });
 

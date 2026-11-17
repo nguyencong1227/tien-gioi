@@ -19,6 +19,7 @@ import {
   AMBUSH_FALL_MS,
   AMBUSH_TIME_MS,
   MAX_AMBUSH_ROOMS,
+  TICK_MS,
   MONSTER_BY_ID,
   parseAmbushFlee,
   rollCoin,
@@ -144,6 +145,8 @@ export interface ArenaCtrl {
   endAt: number | null;
   exitTryAt: number;
   result?: AmbushResult;
+  /** Tin kết cục đã gửi (để gửi LẠI cho người nối lại sau khi rớt mạng lúc xem kết quả). */
+  end?: AmbushEndMsg;
   /** Đang bỏ chạy: đã trừ `paid` (một lần), chờ LƯU xong rồi mới kết thúc. */
   settling?: { choice: "flee_coin" | "flee_exp"; paid: { exp?: number; coin?: number } };
 }
@@ -359,6 +362,7 @@ export function finishArena(w: World, sid: string, result: "won" | "lost" | "tim
     map: a.ticket.origin.mapId,
     tier: a.ticket.tier,
   });
+  a.end = end;
   void saveThenNotify(w, sid, end);
 }
 
@@ -418,7 +422,8 @@ export async function onAmbushFlee(w: World, sid: string, raw: unknown): Promise
     paid: settling.paid,
     stage: "arena",
   });
-  w.events.ambushEnd(sid, { result: "fled", paid: settling.paid });
+  a.end = { result: "fled", paid: settling.paid };
+  w.events.ambushEnd(sid, a.end);
 }
 
 /**
@@ -438,13 +443,27 @@ export function arenaDrop(w: World, sid: string): number {
   return paid;
 }
 
+/**
+ * Nối lại mạng giữa trận: gửi LẠI trạng thái hiện tại cho phòng mới (đang đánh: `ambushState` với thời gian còn THẬT; đã có kết cục: `ambushEnd` đã gửi), để giao diện không treo.
+ * Phòng thường / chưa vào trận thì không làm gì.
+ */
+export function arenaResend(w: World, sid: string): void {
+  const a = w.arena;
+  const p = w.state.players.get(sid);
+  const c = w.ctrl.get(sid);
+  if (!a || !p || !c || a.startedAt === null) return;
+  if (a.phase === "fighting")
+    w.events.ambushState(sid, { msLeft: Math.max(0, a.deadline - w.now), price: a.price });
+  else if (a.end !== undefined) w.events.ambushEnd(sid, a.end);
+}
+
 // ---------- Mỗi tick ----------
 
 /**
  * Mỗi tick của phòng đấu trường (phòng thường thoát ngay): đồng hồ, điều kiện thắng / hết giờ, `ambushState` mỗi giây, đưa về chỗ cũ khi tới `endAt`.
  * Đồng hồ chỉ chạy khi người chơi đã vào (`startedAt`).
  */
-export function tickArena(w: World): void {
+export function tickArena(w: World, dtMs: number = TICK_MS): void {
   const a = w.arena;
   if (a === null || a.startedAt === null) return;
   let sid: string | undefined;
@@ -453,6 +472,19 @@ export function tickArena(w: World): void {
   const p = w.state.players.get(sid)!;
   const c = w.ctrl.get(sid);
   if (!c) return;
+  if (w.ghosts.size > 0 && w.ghosts.has(sid)) {
+    // Rớt mạng (hồn lìa xác, mục 33): ĐÓNG BĂNG đồng hồ trận / đồng hồ về chỗ cũ đúng bước tick; kẻ địch bỏ mục tiêu, người chơi bất khả xâm phạm (`hurtPlayer`). Quá hạn chờ nối
+    // lại thì `WorldRoom.onLeave` gọi `arenaDrop` (giá giữa trận bằng tu vi).
+    if (a.phase === "fighting") {
+      a.deadline += dtMs;
+      a.nextStateAt += dtMs;
+    } else if (a.endAt !== null) {
+      a.endAt += dtMs;
+      a.exitTryAt += dtMs;
+    }
+    forgetTarget(w, sid);
+    return;
+  }
   if (a.phase === "fighting") {
     updateActed(w, a, p, c);
     if (w.now >= a.deadline) return finishArena(w, sid, "timeout");
@@ -464,7 +496,8 @@ export function tickArena(w: World): void {
     }
     return;
   }
-  // pha `over`: kẻ địch không đánh tiếp; tới giờ thì đưa về chỗ cũ
+  // pha `over`: kẻ địch không đánh tiếp (đặt lại hộ thể phòng hộ thể mạng vừa ghi đè `shieldUntil` lúc nối lại); tới giờ thì đưa về chỗ cũ
+  if (a.endAt !== null) lockOver(w, sid, c, a.endAt + 5_000);
   forgetTarget(w, sid);
   if (a.endAt !== null && w.now >= a.endAt && w.now >= a.exitTryAt && !c.travelling && !p.dead) {
     a.exitTryAt = w.now + EXIT_RETRY_MS;

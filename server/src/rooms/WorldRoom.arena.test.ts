@@ -383,6 +383,113 @@ describe("Đấu trường chặn đường qua mạng (máy chủ Colyseus th�
     expect(env.c.coin).toBe(5000); // không phạt
   }, 20_000);
 
+  it("rớt socket giữa trận: ĐÓNG BĂNG đồng hồ trận (phòng không đóng); nối lại nhận LẠI ambushState với thời gian còn thật, vẫn bỏ chạy được; không bị trừ gì lúc rớt", async () => {
+    const { h, hub } = await enterArena("Dau Rot Mang");
+    const w = worldOf(h.room);
+    const sid = h.room.sessionId;
+    await waitFor(() => h.states[0], 3000, "nhận ambushState");
+    const deadline0 = w.arena.deadline;
+    w.arena.ticket.expiresAt = 0; // hạn VÀO phòng đã qua từ lâu: phòng đã có người nên KHÔNG được đóng chỉ vì hạn đó khi người chơi rớt mạng
+    (h.room.connection.transport as any).ws.close();
+    await waitFor(() => (serverRoom(h.room) as any).ghosts.has(sid), 3000, "thành hồn lìa xác");
+    await sleep(1500);
+    expect(w.arena.phase).toBe("fighting");
+    expect(matchMaker.getLocalRoomById(h.room.roomId)).toBeDefined(); // phòng còn sống (không bị `watchArena` đóng giữa trận)
+    expect(w.arena.deadline).toBeGreaterThan(deadline0 + 1000); // đồng hồ dời tiến theo thời gian rớt
+    expect(hub.ambushes.ofKey(h.name.toLowerCase())).toBeDefined(); // vé còn, phòng còn
+    const c = w.ctrl.get(sid);
+    expect(c.coin).toBe(5000);
+
+    const client = new Client(`ws://localhost:${PORT}`);
+    const r2 = await client.reconnect(h.room.reconnectionToken);
+    const h2: Hero = { name: h.name, room: r2, offers: [], ends: [], states: [], travel: [] };
+    listen(r2, h2);
+    rooms.push(r2);
+    const again = await waitFor(() => h2.states[0], 4000, "nhận LẠI ambushState sau nối lại");
+    expect(again.msLeft).toBeGreaterThan(100_000); // còn gần nguyên 120 giây (không bị tính lúc rớt)
+    r2.send(AMBUSH_MSG.flee, { choice: "flee_coin" });
+    const end = await waitFor(() => h2.ends[0], 3000, "nhận ambushEnd");
+    expect(end.result).toBe("fled");
+  }, 25_000);
+
+  it("đăng nhập ĐÈ ở phòng thường khi đang rớt mạng ở đấu trường: huỷ chờ, trả giá giữa trận bằng tu vi, LƯU rồi mới nạp hồ sơ (không hai bản, không ghi đè); vé được dọn", async () => {
+    const { h, hub, origin } = await enterArena("Dang Nhap De");
+    const w = worldOf(h.room);
+    const sid = h.room.sessionId;
+    const p = serverState(h.room).players.get(sid)!;
+    await waitFor(() => h.states[0], 3000, "nhận ambushState");
+    p.x += 100; // đã hành động: giá giữa trận
+    await sleep(1200);
+    const chot = w.arena.price.exp;
+    (h.room.connection.transport as any).ws.close();
+    await waitFor(() => (serverRoom(h.room) as any).ghosts.has(sid), 3000, "thành hồn lìa xác");
+    // chính chủ mở lại ứng dụng: vào phòng thường (không phải 409)
+    const again: Hero = {
+      name: h.name,
+      room: undefined as never,
+      offers: [],
+      ends: [],
+      states: [],
+      travel: [],
+    };
+    await join(again, roomNameOf(DEFAULT_MAP_ID), false);
+    const saved = await loadPlayer(h.name);
+    expect(saved?.exp).toBe(400 - chot); // hồ sơ mới đã gồm giá trả
+    const p2 = serverState(again.room).players.get(again.room.sessionId)!;
+    expect(p2.exp).toBe(400 - chot);
+    expect(Math.abs(p2.x - origin.x)).toBeLessThan(4);
+    expect(hub.ambushes.ofKey(h.name.toLowerCase())).toBeUndefined();
+  }, 25_000);
+
+  it("đăng nhập ĐÈ nhưng KHÔNG đúng chủ (sai mã): bị từ chối, hồn lìa xác ở đấu trường vẫn còn, tu vi / vé nguyên vẹn", async () => {
+    const { h, hub } = await enterArena("Sai Chu");
+    const w = worldOf(h.room);
+    const sid = h.room.sessionId;
+    await waitFor(() => h.states[0], 3000, "nhận ambushState");
+    (h.room.connection.transport as any).ws.close();
+    await waitFor(() => (serverRoom(h.room) as any).ghosts.has(sid), 3000, "thành hồn lìa xác");
+    const intruder = new Client(`ws://localhost:${PORT}`);
+    await expect(
+      intruder.joinOrCreate(roomNameOf(DEFAULT_MAP_ID), {
+        v: PROTOCOL_VERSION,
+        name: h.name,
+        secret: "ma-sai-ma-sai-0123456789",
+      }),
+    ).rejects.toThrow();
+    expect((serverRoom(h.room) as any).ghosts.has(sid)).toBe(true);
+    expect(hub.ambushes.ofKey(h.name.toLowerCase())).toBeDefined();
+    expect(w.ctrl.get(sid).coin).toBe(5000);
+    // chính chủ nối lại bình thường
+    const client = new Client(`ws://localhost:${PORT}`);
+    const r2 = await client.reconnect(h.room.reconnectionToken);
+    rooms.push(r2);
+  }, 25_000);
+
+  it("về chỗ cũ rồi vào lại phòng thường: bảo hộ 5 giây (quái không nhắm), trường ambushReturnAt được xoá khỏi hồ sơ", async () => {
+    const { h } = await enterArena("Dau Bao Ho");
+    await waitFor(() => h.states[0], 3000, "nhận ambushState");
+    h.room.send(AMBUSH_MSG.flee, { choice: "flee_coin" });
+    await waitFor(() => h.ends[0], 3000, "nhận ambushEnd");
+    const back = await waitFor(() => h.travel[0], AMBUSH_EXIT_MS + 4000, "travelTo về chỗ cũ");
+    expect(back.mapId).toBe(DEFAULT_MAP_ID);
+    const saved = await loadPlayer(h.name);
+    expect(saved?.ambushReturnAt).toBeGreaterThan(Date.now() - 10_000);
+    const again: Hero = {
+      name: h.name,
+      room: undefined as never,
+      offers: [],
+      ends: [],
+      states: [],
+      travel: [],
+    };
+    await join(again, roomNameOf(DEFAULT_MAP_ID), false);
+    const w2 = worldOf(again.room);
+    const sid2 = again.room.sessionId;
+    expect(w2.shielded.has(sid2)).toBe(true);
+    expect(w2.ctrl.get(sid2).shieldUntil).toBeGreaterThan(w2.now);
+    expect(w2.ctrl.get(sid2).save.ambushReturnAt).toBeUndefined();
+  }, 30_000);
+
   it("đầy MAX_AMBUSH_ROOMS: lựa chọn Chiến bị huỷ lặng lẽ (ambushEnd canceled), không phạt, không sang phòng nào", async () => {
     const h = await spawn("Dau Day");
     const env = prime(h);

@@ -195,6 +195,7 @@ import { ambushOn } from "../systems/ambush-config";
 import {
   ambushDropOffer,
   ambushResend,
+  applyReturnGrace,
   createAmbushRuntime,
   onAmbushChoose,
   onAmbushSeen,
@@ -203,6 +204,7 @@ import {
 import {
   arenaDrop,
   arenaJoined,
+  arenaResend,
   createArena,
   onAmbushFlee,
   openTicket,
@@ -599,7 +601,9 @@ export class WorldRoom extends Room<WorldState> {
     if (secret.length < 16 || secret.length > MAX_SECRET_LEN)
       throw new ServerError(400, "Thiếu mã nhân vật.");
     // Chỉ chính chủ (đúng mã) được huỷ chờ của nhân vật đang rớt mạng
-    await this.takeSeat(name, (c) => c.save.secretHash === hashSecret(secret));
+    const owns = (c: PlayerCtrl) => c.save.secretHash === hashSecret(secret);
+    await this.takeSeat(name, owns);
+    await this.takeArena(name, owns); // TRƯỚC khi nạp hồ sơ: đấu trường trả giá + lưu xong thì hồ sơ nạp mới là bản mới nhất
     const identity = legacyIdentity(name);
     const existing = await this.players.load(name);
     if (existing) {
@@ -626,7 +630,9 @@ export class WorldRoom extends Room<WorldState> {
       throw new ServerError(JOIN_NEED_CHARACTER, "Tài khoản chưa có đạo hiệu.");
     const name = account.name;
     // Chỉ chính tài khoản đó được huỷ chờ của nhân vật đang rớt mạng
-    await this.takeSeat(name, (c) => c.identity.accountId === account.id);
+    const owns = (c: PlayerCtrl) => c.identity.accountId === account.id;
+    await this.takeSeat(name, owns);
+    await this.takeArena(name, owns);
     const identity: Identity = { name, soulKey: account.id, accountId: account.id };
     const existing = await this.players.load(name);
     if (existing) return this.resume(existing, identity);
@@ -668,8 +674,7 @@ export class WorldRoom extends Room<WorldState> {
       return { save: existing, identity, soul: await this.soulOf(existing, identity) };
     }
     // Phòng thường: người đang có vé đấu trường (đang ở đấu trường hoặc đang được đưa sang) KHÔNG được vào chỗ cũ lúc này (không hai bản của một nhân vật; không đăng nhập đè)
-    if (this.hub.ambushes.ofKey(identity.name.toLowerCase()))
-      throw new ServerError(409, "Nhân vật này đang ở đấu trường chặn đường.");
+
     // Chỉ sau khi xác thực xong mới tiết lộ nhân vật đang ở bản đồ nào. Server quyết định bản đồ; `options.mapId`
     // chỉ là gợi ý chọn phòng, sai thì báo bản đồ đúng để client vào lại (shared/src/travel.ts).
     const home = mapIdOf(existing);
@@ -790,6 +795,7 @@ export class WorldRoom extends Room<WorldState> {
         ["kiep", soul.kiep],
         ["realm_step", Math.max(soul.best.step, stepOf(p.realm, p.tier))],
       );
+    applyReturnGrace(this.world, client.sessionId, this.world.ctrl.get(client.sessionId)!); // vừa được đưa về từ đấu trường chặn đường: bảo hộ 5 giây
     partyResync(this.world, client.sessionId); // vừa qua cổng từ bản đồ khác: vẫn ở trong đội, nhận đội hình ngay
     void sectOnJoin(this.world, client.sessionId); // tông môn theo linh hồn: nhận ảnh chụp + đặt biệt hiệu (bất đồng bộ)
     this.world.events.sys(`${p.name} (${realmLabel(p.realm, p.tier)}) đã nhập thế.`);
@@ -814,14 +820,7 @@ export class WorldRoom extends Room<WorldState> {
     // Phòng bí cảnh KHÔNG giữ chỗ chờ nối lại: hồ sơ luôn ghi bản đồ vào (Lạc Hà) nên người rớt mạng đăng nhập lại sẽ vào
     // PHÒNG KHÁC (Lạc Hà); một "hồn lìa xác" còn ở đây sẽ ghi đè hồ sơ mới bằng dữ liệu cũ khi hết hạn chờ. Rớt mạng = rời
     // run (lưu ngay, gỡ khỏi phòng); nhân vật không có gì để mất vì không còn ở trong bí cảnh.
-    if (
-      p &&
-      c &&
-      consented === false &&
-      this.limiters.has(sid) &&
-      this.world.runId === null &&
-      this.world.arena === null
-    ) {
+    if (p && c && consented === false && this.limiters.has(sid) && this.world.runId === null) {
       const done = new Promise<void>((r) => (resolveDone = r));
       const wait = this.allowReconnection(client, WorldRoom.reconnectGraceS);
       // allowReconnection trả về Promise đã bị từ chối (không có `reject`) khi phòng đang đóng: khi đó không có gì để huỷ
@@ -856,6 +855,7 @@ export class WorldRoom extends Room<WorldState> {
         sendStatus(this.world, sid); // client mất hệ số tốc độ sau rớt mạng sẽ bị kéo giật nếu không gửi lại
         sendWallet(this.world, sid);
         ambushResend(this.world, sid); // đang giữa hộp thoại chặn đường: gửi LẠI (cùng id, thời gian còn thật) cho Room mới
+        arenaResend(this.world, sid); // đang giữa trận ở đấu trường: gửi LẠI trạng thái (hoặc kết cục) cho Room mới
         resolveDone();
         return;
       } catch {
@@ -1062,8 +1062,10 @@ export class WorldRoom extends Room<WorldState> {
 
   /** Phòng đấu trường chưa có ai mà vé đã hết hạn / bị dọn: đóng, không để phòng treo; vé luôn được dọn khi phòng đóng (`onDispose`). */
   private watchArena() {
-    const t = this.world.arena?.ticket;
-    if (!t || this.clients.length > 0) return;
+    const a = this.world.arena;
+    const t = a?.ticket;
+    // Chỉ khi CHƯA ai vào (`startedAt === null`): người đã vào mà rớt mạng thì phòng phải chờ nối lại (`allowReconnection`), không được đóng giữa trận
+    if (!a || !t || a.startedAt !== null || this.clients.length > 0) return;
     if (this.hub.ambushes.get(t.id) !== t || this.world.now >= t.expiresAt) void this.disconnect();
   }
 
@@ -1102,10 +1104,44 @@ export class WorldRoom extends Room<WorldState> {
     if (!ok) this.abortArena(w, sid, ticket);
   }
 
+  /**
+   * Phòng thường: chính chủ (`owns` đúng, như `takeSeat`) đăng nhập khi nhân vật còn vé đấu trường. Đang rớt mạng (hồn lìa xác) ở đấu trường thì HUỶ chờ rồi mới nạp hồ sơ (phòng đấu trường trả giá
+   * giữa trận bằng tu vi, LƯU, dọn vé: không để hồ sơ cũ ghi đè hồ sơ mới khi hết hạn chờ); đang kết nối thật hoặc vé chưa có ai thì 409.
+   */
+  private async takeArena(name: string, owns: (c: PlayerCtrl) => boolean) {
+    if (this.world.arena !== null) return; // phòng đấu trường tự kiểm vé ở `checkArenaSeat`
+    const t = this.hub.ambushes.ofKey(name.toLowerCase());
+    if (!t) return;
+    const room = t.roomId
+      ? (matchMaker.getLocalRoomById(t.roomId) as WorldRoom | undefined)
+      : undefined;
+    if (!room || !(await room.evictFromArena(t, owns)))
+      throw new ServerError(409, "Nhân vật này đang ở đấu trường chặn đường.");
+  }
+
+  /** Gọi từ phòng KHÁC (`takeArena`): đuổi hồn lìa xác của chủ vé khỏi đấu trường này (huỷ chờ, trả giá, lưu, dọn vé). `false` nếu người đó đang kết nối thật hoặc không phải phòng của vé. */
+  async evictFromArena(t: AmbushTicket, owns: (c: PlayerCtrl) => boolean): Promise<boolean> {
+    if (this.world?.arena?.ticket !== t) return false;
+    let sid: string | undefined;
+    this.state.players.forEach((p, k) => {
+      if (p.name.toLowerCase() === t.key) sid = k;
+    });
+    if (sid === undefined) return false;
+    const g = this.ghosts.get(sid);
+    const c = this.world.ctrl.get(sid);
+    if (!g || !c || !owns(c)) return false; // đang kết nối thật, hoặc không đúng chủ
+    g.cancel();
+    await g.done;
+    this.hub.ambushes._remove(t);
+    return true;
+  }
+
   /** Hook `World.onArenaExit`: đưa người chơi từ đấu trường về CHỖ CŨ của vé; xong thì dọn vé NGAY (người chơi vào lại phòng thường không bị chặn bởi vé cũ). */
   private async exitArenaRoom(sid: string) {
     const t = this.world.arena?.ticket;
     if (!t) return;
+    const c = this.world.ctrl.get(sid);
+    if (c) c.save = { ...c.save, ambushReturnAt: Date.now() }; // phòng nhận người chơi bảo hộ 5 giây (`applyReturnGrace`); `persist` của `handOff` mang theo
     const ok = await this.handOff(sid, { mapId: t.origin.mapId, x: t.origin.x, y: t.origin.y });
     if (ok) this.hub.ambushes._remove(t);
   }

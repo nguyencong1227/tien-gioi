@@ -20,6 +20,7 @@ import {
   AMBUSH_MIN_PROTOCOL,
   AMBUSH_ARM_MS,
   AMBUSH_OFFER_MS,
+  AMBUSH_RETURN_GRACE_MS,
   AMBUSH_SEEN_MS,
   AMBUSH_STRIDE_PX,
   AMBUSH_TIERS,
@@ -173,6 +174,30 @@ export function ambushLeftToday(c: PlayerCtrl, now: number): number {
 export function sanitizeAmbushUntil(raw: unknown, now: number): number | undefined {
   if (typeof raw !== "number" || !Number.isFinite(raw)) return undefined;
   return Math.max(0, Math.min(raw, now + AMBUSH_COOLDOWN_MS));
+}
+
+/** Vừa được đưa về từ đấu trường thì chừng này (ms) kể từ lúc đưa về vẫn được hưởng bảo hộ khi vào phòng (đủ cho client chuyển phòng, không cho "để dành" bảo hộ). */
+export const AMBUSH_RETURN_WINDOW_MS = 30_000;
+
+/**
+ * Vào phòng sau khi được đưa về từ đấu trường (`ambushReturnAt` trong hồ sơ, `WorldRoom.exitArenaRoom` ghi): bảo hộ `AMBUSH_RETURN_GRACE_MS` kể từ BÂY GIỜ (quái quanh chỗ cũ không nhắm,
+ * không đánh được), rồi xoá trường để lần vào sau không còn. Trường quá cũ / sai kiểu / ở tương lai chỉ bị xoá, không bảo hộ (file hỏng không cho bảo hộ vô hạn).
+ */
+export function applyReturnGrace(w: World, sid: string, c: PlayerCtrl): boolean {
+  const at = c.save.ambushReturnAt;
+  if (at === undefined) return false;
+  c.save = { ...c.save, ambushReturnAt: undefined };
+  if (
+    typeof at !== "number" ||
+    !Number.isFinite(at) ||
+    at > w.now + 1000 ||
+    w.now - at >= AMBUSH_RETURN_WINDOW_MS
+  )
+    return false;
+  c.shieldUntil = Math.max(c.shieldUntil ?? 0, w.now + AMBUSH_RETURN_GRACE_MS);
+  w.shielded.add(sid);
+  forgetTarget(w, sid);
+  return true;
 }
 
 /** Dữ liệu chặn đường của người này; dựng lười (hồi: không sớm hơn mốc đã lưu, và ít nhất `AMBUSH_LOGIN_COOLDOWN_MS` kể từ lúc vào phòng này). */
