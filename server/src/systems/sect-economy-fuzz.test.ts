@@ -332,17 +332,26 @@ async function oracleShopBuy(
   const limitExceeded = boughtToday + qty > entry.limitDay;
   const notEnoughContrib = before.contrib < totalCost;
 
-  if (notEnoughContrib) {
-    // Thiếu cống hiến: BẮT BUỘC bị từ chối, không trừ gì, không giao đồ (BẮT M5!)
-    expect(after.contrib).toBe(before.contrib);
-    expect(after.merit).toBe(before.merit);
-    expect(afterBag).toBe(beforeBag);
-    cov.shopRefusedNoContrib++;
-  } else if (isLocked || limitExceeded) {
+  if (isLocked || limitExceeded) {
     // Khoá cấp hoặc quá hạn mức ngày: không trừ gì
     expect(after.contrib).toBe(before.contrib);
     expect(after.merit).toBe(before.merit);
     expect(afterBag).toBe(beforeBag);
+  } else if (notEnoughContrib) {
+    // Đủ cấp & trong hạn mức nhưng THIẾU CỐNG HIẾN: BẮT BUỘC bị từ chối với lý do "no_contrib" (BẮT M5!)
+    const checkBuy = await rig.svc.shopBuy(
+      { soulKey: keyOf(who), name: who },
+      itemId,
+      qty,
+      { known: false },
+    );
+    expect(checkBuy.ok).toBe(false);
+    expect((checkBuy as any).reason).toBe("no_contrib");
+
+    expect(after.contrib).toBe(before.contrib);
+    expect(after.merit).toBe(before.merit);
+    expect(afterBag).toBe(beforeBag);
+    cov.shopRefusedNoContrib++;
   } else if (after.contrib < before.contrib) {
     // Đủ cống hiến & đủ cấp & trong hạn mức & mua THÀNH CÔNG:
     // cống hiến giảm đúng cost x qty, công tích KHÔNG ĐỔI, hàng vào túi (BẮT M2!)
@@ -533,7 +542,16 @@ describe("Kiểm kinh tế đồng thời tông môn (M8.8 - Fuzz & Oracle)", ()
     rig.advanceTime(2 * DAY);
 
     // Bravo mới vào chưa có cống hiến (contrib = 0)
-    // Cố mua Hồi Huyết Đan (cost 5) -> Bị từ chối (no_contrib) (BẮT M5!)
+    // Cố mua Hồi Huyết Đan (cost 5) -> Bị từ chối đúng lý do "no_contrib" (BẮT M5!)
+    const checkBuy = await rig.svc.shopBuy(
+      { soulKey: keyOf("Bravo"), name: "Bravo" },
+      "hoi_huyet_dan",
+      1,
+      { known: false },
+    );
+    expect(checkBuy.ok).toBe(false);
+    expect((checkBuy as any).reason).toBe("no_contrib");
+
     await oracleShopBuy(rig, "Bravo", "hoi_huyet_dan", 1, cov);
     const m = await getMemberData(rig, "Bravo");
     expect(m?.contrib).toBe(0);
