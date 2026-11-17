@@ -22,6 +22,8 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
  *   - thành tựu + danh hiệu (M9.8): tab Thành tựu (đang tải + Tải lại, nhóm <details> / danh hiệu radiogroup >= 44 px, thanh tiến độ có chữ, thưởng bằng chữ),
  *     đeo / gỡ danh hiệu CHỈ đổi khi máy chủ trả lại `achievements` (khóa / đang chờ không gửi, từ chối về đúng trạng thái máy chủ, im 5 s thì thôi chờ),
  *     thành tựu mới (chấm trên nút HUD khi ở tab khác, dấu 'Mới' + toast mời đeo, mất khi rời tab), tin sai kiểu / id lạ bị bỏ, danh hiệu trên đầu nhân vật (lạ thì không lộ id).
+ *   - bấm vào bảng KHÔNG chém: chuột trái giữa bảng / ở thân cả ba tab / ở vùng thế giới lúc bảng đang mở / ở nút banner trùm không gửi `attack`; đối chứng: đóng bảng thì bấm
+ *     vào thế giới vẫn chém (cờ chặn không kẹt).
  * `--shots`: lưu ảnh bảng đang mở mỗi khung nhìn (và bảng Tu vi / Tông môn đầy dòng).
  */
 import http from "node:http";
@@ -524,6 +526,13 @@ async function main() {
           `không hạng (${variant}): "${k.mine}"`,
         );
       }
+      // bảng Tông môn khi CHƯA thuộc tông môn nào (mock không có tông môn): nói thẳng, không 'Chưa có hạng.' (các bảng khác giữ câu cũ ở vòng trên)
+      await setBoard("tongmon", 5, "", "none");
+      k = await rank();
+      check(
+        k.mine === "Bạn chưa thuộc tông môn nào.",
+        `bảng Tông môn, chưa thuộc tông môn nào: "${k.mine}"`,
+      );
       await setBoard("tuvi", 5, `m.rows = [];`);
       k = await rank();
       check(
@@ -1078,6 +1087,110 @@ async function main() {
       await evalJs(
         `(() => { const sc = window.__scene; const me = sc.room.state.players.get(sc.room.sessionId); me.title = ""; return 1; })()`,
       );
+
+      // ---- 4c. BẤM VÀO BẢNG KHÔNG CHÉM (M9): chuột trái trên bảng Xã hội, trên vùng thế giới lúc bảng đang mở, và trên nút của banner KHÔNG gửi `attack`; ĐỐI CHỨNG: đóng bảng thì bấm vào
+      // thế giới VẪN chém (không thì ca này không bắt được gì); bảng mở lại / đóng lại vẫn đúng (cờ chặn không kẹt) ----
+      await evalJs(
+        `(() => { window.__sent = []; const rm = window.__scene.room; if (!rm.__origSend) rm.__origSend = rm.send; rm.send = (t, m) => { window.__sent.push([t, m]); }; return 1; })()`,
+      );
+      const mouseClick = async (x, y) => {
+        await send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
+        await send("Input.dispatchMouseEvent", {
+          type: "mousePressed",
+          x,
+          y,
+          button: "left",
+          buttons: 1,
+          clickCount: 1,
+        });
+        await send("Input.dispatchMouseEvent", {
+          type: "mouseReleased",
+          x,
+          y,
+          button: "left",
+          buttons: 0,
+          clickCount: 1,
+        });
+        await sleep(150);
+      };
+      const attackCount = () => evalJs(`window.__sent.filter((x) => x[0] === "attack").length`);
+      /** Điểm trên canvas không bị phần tử DOM nào che (quét lưới); `null` nếu bảng phủ kín (điện thoại). */
+      const worldPoint = () =>
+        evalJs(`(() => {
+          for (let fy = 0.92; fy >= 0.08; fy -= 0.06) for (let fx = 0.04; fx <= 0.97; fx += 0.06) {
+            const x = Math.round(innerWidth * fx), y = Math.round(innerHeight * fy);
+            const el = document.elementFromPoint(x, y);
+            if (el && el.tagName === "CANVAS") return { x, y };
+          }
+          return null;
+        })()`);
+      s = await state();
+      check(!s.modalHidden, "(mồi) bảng Xã hội đang mở");
+      await mouseClick(
+        Math.round((s.modal.l + s.modal.r) / 2),
+        Math.round((s.modal.t + s.modal.b) / 2),
+      );
+      check((await attackCount()) === 0, "bấm chuột giữa bảng Xã hội: KHÔNG chém");
+      const outside = await worldPoint();
+      if (outside) {
+        await mouseClick(outside.x, outside.y);
+        check(
+          (await attackCount()) === 0,
+          `bảng đang mở, bấm vào vùng thế giới (${outside.x}, ${outside.y}): KHÔNG chém`,
+        );
+      } else {
+        console.log("  (bảng phủ kín khung nhìn: không có vùng thế giới để bấm)");
+      }
+      for (const tab of ["rank", "ach", "event"]) {
+        await evalJs(`document.getElementById("social-tab-btn-${tab}").click(); 1`);
+        await sleep(200);
+        s = await state();
+        await mouseClick(Math.round((s.modal.l + s.modal.r) / 2), Math.round(s.modal.t + 120));
+      }
+      check((await attackCount()) === 0, "bấm trong thân cả ba tab: KHÔNG chém");
+      await press("Escape", "Escape", 27);
+      s = await state();
+      check(s.modalHidden, "(mồi) Esc đóng bảng");
+      await sleep(900); // qua hồi chiêu chém
+      const wp = await worldPoint();
+      check(wp !== null, "(mồi) có điểm thế giới để bấm khi bảng đóng");
+      if (wp) {
+        await mouseClick(wp.x, wp.y);
+        check(
+          (await attackCount()) >= 1,
+          "ĐỐI CHỨNG: bảng đã đóng, bấm vào thế giới VẪN chém (cờ chặn không kẹt)",
+        );
+      }
+      // nút của banner trùm thế giới (banner nền KHÔNG chặn chạm, riêng nút vẫn nhận): bấm nút KHÔNG chém
+      await evalJs(`window.__ui.setWorldBoss(window.__sample.worldBoss("live")); 1`);
+      await sleep(400);
+      const tgl = await evalJs(`(() => {
+        const b = document.getElementById("wb-toggle");
+        if (!b || b.hidden) return null;
+        const r = b.getBoundingClientRect();
+        return r.width > 0 ? { x: Math.round((r.left + r.right) / 2), y: Math.round((r.top + r.bottom) / 2) } : null;
+      })()`);
+      if (tgl) {
+        await sleep(900);
+        await evalJs(`window.__sent.length = 0; 1`);
+        await mouseClick(tgl.x, tgl.y);
+        check(
+          (await attackCount()) === 0,
+          "bấm nút 'Ẩn / Hiện đóng góp' của banner trùm: KHÔNG chém",
+        );
+      } else {
+        console.log("  (khung này banner không có nút đóng góp hiện: bỏ qua ca nút banner)");
+      }
+      await evalJs(`window.__ui.setWorldBoss(window.__sample.worldBoss("none")); 1`);
+      await evalJs(`window.__scene.room.send = window.__scene.room.__origSend; 1`);
+      await shiftG(); // mở lại bảng như trước ca này (bước 5 bắt đầu từ bảng đang mở)
+      s = await state();
+      check(!s.modalHidden, "(mồi) Shift+G mở lại bảng cho bước kế");
+      // điện thoại: bấm ra vùng thế giới làm menu ☰ thu lại (nút Xã hội nằm trong menu); mở lại cho bước 5 (focus bằng bàn phím vào nút HUD)
+      if (inMenu && (await state()).btn.w === 0) {
+        await evalJs(`document.getElementById("btn-menu").click(); 1`);
+        await sleep(500);
+      }
 
       // ---- 5. Esc đóng, trả focus; Shift+G đóng / mở lại ----
       await press("Escape", "Escape", 27);

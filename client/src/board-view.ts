@@ -118,10 +118,16 @@ function rowView(board: BoardId, row: BoardRow, mineRank: number | null): BoardR
   };
 }
 
-/** Câu cho ô "Hạng của bạn". `rank` null -> lý do (`BoardMine.reason`), thiếu lý do thì "Chưa có hạng." */
-export function mineLine(mine: BoardMine | undefined): string {
+/**
+ * Câu cho ô "Hạng của bạn". `rank` null -> lý do (`BoardMine.reason`), thiếu lý do thì "Chưa có hạng."
+ * Bảng `tongmon` mà người chơi CHƯA thuộc tông môn nào (`noSect`, client biết từ tin `sect`) thì nói thẳng "Bạn chưa thuộc tông môn nào." thay vì "Chưa có hạng." (không hạng vì không có tông môn,
+ * không phải vì chưa đủ điểm). Chỉ áp cho lý do `none` / vắng: `test` / `min_games` giữ nguyên câu của chúng.
+ */
+export function mineLine(mine: BoardMine | undefined, board?: BoardId, noSect = false): string {
   if (mine && typeof mine.rank === "number" && Number.isInteger(mine.rank) && mine.rank >= 1)
     return `Hạng của bạn: ${mine.rank}`;
+  if (board === "tongmon" && noSect && (mine?.reason === undefined || mine.reason === "none"))
+    return "Bạn chưa thuộc tông môn nào.";
   switch (mine?.reason) {
     case "test":
       return "Tài khoản thử nghiệm không vào bảng này.";
@@ -138,9 +144,9 @@ export function mineLine(mine: BoardMine | undefined): string {
 
 /**
  * Tin `boards` -> dữ liệu hiện. `sinceMs` = thời gian đã trôi từ lúc nhận tin (đồng hồ máy người chơi chỉ dùng để ĐO KHOẢNG TRÔI, không phải
- * giờ tuyệt đối, đúng nguyên tắc "thời gian tương đối" của hợp đồng M9).
+ * giờ tuyệt đối, đúng nguyên tắc "thời gian tương đối" của hợp đồng M9). `noSect` = người chơi chưa thuộc tông môn nào (chỉ đổi câu "Hạng của bạn" của bảng `tongmon`).
  */
-export function boardView(msg: BoardsMsg, sinceMs = 0): BoardView {
+export function boardView(msg: BoardsMsg, sinceMs = 0, noSect = false): BoardView {
   const board = msg.board;
   const rank =
     msg.mine && Number.isInteger(msg.mine.rank) && (msg.mine.rank as number) >= 1
@@ -160,7 +166,7 @@ export function boardView(msg: BoardsMsg, sinceMs = 0): BoardView {
     label: BOARD_LABELS[board],
     columns: BOARD_COLUMNS[board].map((c) => c.label),
     rows,
-    mineText: mineLine(msg.mine),
+    mineText: mineLine(msg.mine, board, noSect),
     mineRank: rank,
     mineRow,
     ageText: ageText(age + (Number.isFinite(sinceMs) && sinceMs > 0 ? sinceMs : 0)),
