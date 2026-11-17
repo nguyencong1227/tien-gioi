@@ -33,6 +33,7 @@ import {
 import type { Player } from "../schema";
 import { angleDiff, type PlayerCtrl, type World } from "../world";
 import { rollDamage } from "./damage";
+import { recordPkResult } from "./social";
 
 /** Sai số khoảng cách (px) cho độ trễ: client kiểm bằng vị trí đoán trước nên có thể lệch vài bước (như `PORTAL_SLACK`). */
 export const DUEL_RANGE_SLACK = 24;
@@ -405,6 +406,8 @@ export function endDuel(w: World, d: Duel, winner: string | undefined, reason: D
     winner: winner === undefined ? null : (w.state.players.get(winner)?.name ?? null),
     reason,
   });
+  // M9: thống kê PK theo linh hồn (hoà không tính; vượt hạn mức đổi thắng của cặp thì không tính cho cả hai bên)
+  if (winner !== undefined) recordPkResult(w, winner, winner === d.a ? d.b : d.a);
   for (const sid of [d.a, d.b]) {
     const p = w.state.players.get(sid);
     const c = w.ctrl.get(sid);
