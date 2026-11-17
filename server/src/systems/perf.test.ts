@@ -1,11 +1,19 @@
 // Giữ các tối ưu băng thông / CPU của vòng lặp tick (xem AGENTS.md, mục Hiệu năng).
 import { describe, expect, it } from "vitest";
 import { Encoder, StateView } from "@colyseus/schema";
-import { MONSTER_BY_ID, TOWN_PX, getMap, MAX_BOLTS } from "@tien-gioi/shared";
+import {
+  AMBUSH_MIN_PROTOCOL,
+  MONSTER_BY_ID,
+  TICK_MS,
+  TOWN_PX,
+  getMap,
+  MAX_BOLTS,
+} from "@tien-gioi/shared";
 import { ANGLE_STEP, quantAngle, takeWhole } from "../world";
 import { addMonster, addPlayer, makeWorld } from "./test-helpers";
 import { POS_SYNC_EVERY_TICKS, applyInputs, syncPublicPos } from "./movement";
 import { tickWorld } from "./tick";
+import { ambushOf, createAmbushRuntime } from "./ambush";
 import { slash, tickRespawn } from "./combat";
 import { cast } from "./cast";
 import { MONSTER_WAKE_DIST, WANDER_STRIDE, spawnInitial, tickMonsters } from "./monsters";
@@ -400,6 +408,71 @@ describe("ngân sách băng thông và CPU (benchmark có seed, kết quả cố
     // Băng thông rất nhỏ nhưng > 0 khi có quái bị hạ, giữ ngân sách < 0.5 KB/s mỗi client.
     expect(r.walletKbPerClient).toBeGreaterThan(0);
     expect(r.walletKbPerClient).toBeLessThan(0.5);
+  });
+
+  it("chặn đường (mục 52): 100 người đi hoang, hộp thoại mở đồng loạt: mỗi người đúng MỘT tin ambushOffer (không lặp mỗi tick), tick dưới 10 ms", () => {
+    const { w, ambushOffers, ambushEnds } = makeWorld();
+    const mapId = w.map.def.id;
+    w.ambush = createAmbushRuntime({
+      random: () => 0, // luôn trúng: ca xấu nhất, ai đủ một chặng cũng bị chặn
+      scenes: [
+        {
+          id: "canh",
+          text: "Bóng đen chắn đường {dia_danh}, {ke_dich}.",
+          mapIds: [mapId],
+          tiers: ["normal"],
+          source: "test",
+        },
+      ],
+      foes: [
+        {
+          id: "bay",
+          name: "Sói Hoang",
+          mapId,
+          minStep: 0,
+          maxStep: 100,
+          tier: "normal",
+          foes: [{ kind: "tho", count: 2 }],
+        },
+      ],
+    });
+    const heroes = Array.from({ length: 100 }, (_, i) => {
+      const h = addPlayer(w, `walker_${i}`, 1, 0);
+      h.c.proto = AMBUSH_MIN_PROTOCOL;
+      h.c.coin = 1000;
+      h.p.exp = 100;
+      h.p.expMax = 1000;
+      ambushOf(w, h.c).cooldownUntil = 0;
+      return h;
+    });
+    // Đi qua lại ở vùng hoang tới khi MỌI người đã bị chặn (cùng tốc độ nên gần như cùng lúc)
+    let seq = 0;
+    const walk = (tick: number) => {
+      w.now += TICK_MS;
+      seq++;
+      for (const h of heroes) {
+        h.c.inputs.push({ seq, dx: Math.floor(tick / 100) % 2 === 0 ? 1 : -1, dy: 0 });
+        h.c.moveBudget = 5;
+      }
+      tickWorld(w, TICK_MS);
+    };
+    for (let t = 0; t < 600 && heroes.some((h) => h.c.ambush!.offer === undefined); t++) walk(t);
+    expect(heroes.every((h) => h.c.ambush!.offer !== undefined)).toBe(true);
+    expect(ambushOffers).toHaveLength(100); // đúng MỘT tin mỗi người lúc mở
+    // Cả 100 hộp thoại đang mở: đo tick (ví dụ `tickAmbush` duyệt 100 người, hộ thể, khoá input) và đếm tin phát thêm
+    for (const h of heroes) h.c.ambush!.offer!.seen = true; // người thật đã xác nhận: giữ hộp thoại mở suốt phép đo
+    const ticks: number[] = [];
+    for (let t = 0; t < 100; t++) {
+      const t0 = performance.now();
+      w.now += TICK_MS;
+      tickWorld(w, TICK_MS);
+      ticks.push(performance.now() - t0);
+    }
+    const avg = ticks.reduce((a, b) => a + b, 0) / ticks.length;
+    expect(avg).toBeLessThan(10);
+    expect(ambushOffers).toHaveLength(100); // không phát lại mỗi tick
+    expect(ambushEnds).toHaveLength(0);
+    expect(w.ambush.open.size).toBe(100);
   });
 
   it("kho đồ tông môn (sectVault): không tick nào gửi sectVault khi không ai đụng kho (Issue #790 K6)", () => {

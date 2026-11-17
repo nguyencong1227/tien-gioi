@@ -6,6 +6,7 @@ import { corsOriginsOf } from "./cors";
 import { metricsTokenOf, thresholdsOf } from "./metrics";
 import { earnWarmupOf, newLifeLockOf } from "./sect-config";
 import { bossMovesWarnings } from "./systems/boss-config";
+import { ambushWarnings } from "./systems/ambush-config";
 
 /** Cảnh báo cấu hình in ra khi server khởi động (thuần hàm để test được). */
 export function startupWarnings(env: NodeJS.ProcessEnv): string[] {
@@ -54,6 +55,7 @@ export function startupWarnings(env: NodeJS.ProcessEnv): string[] {
   warnings.push(...newLifeLockOf(env).warnings);
   warnings.push(...earnWarmupOf(env).warnings);
   warnings.push(...bossMovesWarnings(env));
+  warnings.push(...ambushWarnings(env));
   warnings.push(...metricsTokenOf(env).warnings, ...thresholdsOf(env).warnings);
   warnings.push(...corsOriginsOf(env).warnings);
   const kind = storeKindOf(env);
