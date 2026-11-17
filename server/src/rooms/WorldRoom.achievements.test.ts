@@ -169,6 +169,9 @@ describe("thành tựu qua phòng thật", () => {
     expect(me(h).title).toBe("");
     h.room.send(SOCIAL_MSG.titleSet, { id: "tr1" }); // đã mở
     await waitFor(() => me(h).title === "tr1", 3000, "Player.title");
+    // `titleSet` đổi `Player.title` (state, đi theo bản vá của phòng) RỒI MỚI gửi tin `achievements`: hai thứ tới client ở hai lúc khác nhau. Đọc `h.ach.at(-1)` ngay lúc
+    // `Player.title` đổi có thể còn là câu trả lời CŨ (của `lh2` bị từ chối, `title` null) -> "expected null to be 'tr1'" chập chờn ở CI (#1093). CHỜ tin đúng.
+    await waitFor(() => h.ach.at(-1)?.title === "tr1", 3000, "tin achievements mang title tr1");
     expect(h.ach.at(-1)!.title).toBe("tr1");
     expect((await soulOf(h))!.social!.title).toBe("tr1");
     // tin rác: bỏ, không trả lời, không đổi
