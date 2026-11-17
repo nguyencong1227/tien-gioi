@@ -25,7 +25,7 @@ export * from "./social-soul";
 
 const hasOwn = (o: object, k: string): boolean => Object.prototype.hasOwnProperty.call(o, k);
 /** Chữ Hán / CJK (quy tắc "không chữ Hán" của dự án). */
-const CJK_RE = /[⺀-鿿豈-﫿＀-￯]/;
+const CJK_RE = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
 const ID_RE = /^[a-z0-9][a-z0-9_]{0,31}$/;
 const lenOf = (s: string): number => [...s].length;
 

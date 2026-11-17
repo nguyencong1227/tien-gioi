@@ -42,6 +42,9 @@ import {
   type WorldBossSlot,
 } from "./social";
 
+/** Hai chữ Hán dựng bằng mã (repo cấm viết chữ Hán trực tiếp trong mã, `no-cjk.test.ts`). */
+const HAN = String.fromCharCode(0x5929, 0x9053);
+
 /** ms của (năm, tháng, ngày, giờ, phút) theo giờ máy chủ UTC+7. */
 const at7 = (y: number, mo: number, d: number, h = 0, mi = 0) =>
   Date.UTC(y, mo - 1, d, h, mi) - WORLD_BOSS_TZ_OFFSET_MS;
@@ -277,7 +280,7 @@ describe("danh hiệu + thành tựu: luật kiểm bắt dữ liệu sai", () =
     );
     expect(t({ text: "" })).toContain("chữ phải dài");
     expect(t({ text: "x".repeat(13) })).toContain("chữ phải dài");
-    expect(t({ text: "天道" })).toContain("chữ Hán");
+    expect(t({ text: HAN })).toContain("chữ Hán");
     expect(t({ group: "khong_co" as never })).toContain("nhóm");
   });
 
@@ -291,7 +294,7 @@ describe("danh hiệu + thành tựu: luật kiểm bắt dữ liệu sai", () =
     ).toContain("id trùng");
     expect(bad({ name: "" })).toContain("tên phải dài");
     expect(bad({ name: "x".repeat(41) })).toContain("tên phải dài");
-    expect(bad({ desc: "鬼" })).toContain("chữ Hán");
+    expect(bad({ desc: HAN })).toContain("chữ Hán");
     expect(bad({ group: "khong_co" as never })).toContain("nhóm");
     expect(bad({ cond: { counter: "xyz", atLeast: 1 } })).toContain("bộ đếm");
     expect(bad({ cond: { counter: "boss:ho", atLeast: 1 } })).toContain("không phải loài trùm");
