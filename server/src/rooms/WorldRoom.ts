@@ -6,6 +6,7 @@ import { randomBytes } from "node:crypto";
 import { Room, Client, ServerError, matchMaker, type RoomException, type Server } from "colyseus";
 import {
   TICK_MS,
+  type SoulSocial,
   MAX_PLAYERS_PER_ROOM,
   MONSTER_RESPAWN_MS,
   DEFAULT_MAP_ID,
@@ -306,6 +307,7 @@ export class WorldRoom extends Room<WorldState> {
     w.reincarnate = true;
     w.bossMoves = bossMovesOf(process.env); // bộ chiêu trùm (mục 42): mặc định tắt, `BOSS_MOVES=on` để bật
     w.onLimbo = (sid) => void this.enterLimbo(sid);
+    w.onSocial = (soulKey, fn) => void this.socialUpdate(soulKey, fn); // M9: thống kê PK / thành tựu theo linh hồn (`systems/social.ts`)
     // Tông môn (M3.6): dịch vụ dùng chung (`SECTS=off` gỡ gấp); lưu hồ sơ NGAY khi chuyển Linh thạch sang kho
     w.sectService = WorldRoom.sectService();
     w.sectEarnWarmup = WorldRoom.sectEarnWarmup;
@@ -963,6 +965,19 @@ export class WorldRoom extends Room<WorldState> {
   }
 
   /** Cộng Duyên của kiếp vừa qua vào chân linh (idempotent theo `endedLifeId`) và ghi "đã cộng" vào hồ sơ. */
+  /**
+   * M9: ghi phần xã hội của chân linh `soulKey` (nguyên tử theo chân linh, `SoulStore.update`) NGOÀI tick, rồi cập nhật `PlayerCtrl.soul` của người đang trực tuyến cùng chân linh.
+   * Lỗi chỉ ghi log: mất một lần thống kê còn hơn làm hỏng ván hay chặn hàng đợi.
+   */
+  private async socialUpdate(soulKey: string, fn: (s: SoulSocial | undefined) => SoulSocial) {
+    try {
+      const soul = await this.souls.update(soulKey, (s) => ({ ...s, social: fn(s.social) }));
+      for (const c of this.world.ctrl.values()) if (c.identity.soulKey === soulKey) c.soul = soul;
+    } catch (e) {
+      console.error("[xã hội] ghi chân linh thất bại", e);
+    }
+  }
+
   private async creditLimbo(sid: string): Promise<boolean> {
     const p = this.state.players.get(sid);
     const c = this.world.ctrl.get(sid);
