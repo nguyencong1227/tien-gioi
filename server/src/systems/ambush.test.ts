@@ -423,9 +423,9 @@ describe("quãng đi THẬT (trackAmbushWalk)", () => {
     walk(s, AMBUSH_STRIDE_PX - 20);
     expect(s.c.ambush!.walked).toBe(AMBUSH_STRIDE_PX - 20);
     expect(s.ambushOffers).toHaveLength(0);
-    // vượt đủ chặng: tung (random 0.99 không trúng): `walked` về phần dư
-    walk(s, 30);
-    expect(s.c.ambush!.walked).toBe(10);
+    // vượt đủ chặng bằng MỘT bước 70 px: tung (random 0.99 không trúng), `walked` còn đúng phần dư (1180 + 70 - 1200 = 50), không mất
+    walk(s, 70, 70);
+    expect(s.c.ambush!.walked).toBe(50);
   });
 
   it("đủ chặng + trúng thì mở hộp thoại ngay và reset quãng", () => {
