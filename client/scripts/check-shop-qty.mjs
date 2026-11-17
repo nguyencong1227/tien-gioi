@@ -36,6 +36,11 @@ export const VIEWPORTS = [
 ];
 
 export const MIN_TAP_PX = 44;
+/** Ngưỡng hình học thẻ cửa hàng (px): cột thông tin tối thiểu, ô số lượng tối thiểu, cột thông tin / thẻ tối đa (thẻ bị kéo cao nếu vượt) */
+const GEO_MIN_LEFT_W = 200;
+const GEO_MIN_STEP_W = 250;
+const GEO_MAX_LEFT_H = 90;
+const GEO_MAX_CARD_H = 300;
 
 async function main() {
   const shotsArg = process.argv.indexOf("--shots");
@@ -357,6 +362,23 @@ async function main() {
           `nút / ô của thẻ 0 đều >= ${MIN_TAP_PX} px (${JSON.stringify(sizes)})`,
         );
       }
+      // hình học của thẻ: cột thông tin không bị ép hẹp, ô số lượng đủ rộng cho cả sáu phần tử, thẻ không bị kéo cao (cột phải / trái KHÔNG lấy bề rộng làm chiều cao khi xếp dọc)
+      const geo = await evalJs(`(() => {
+        const c = document.querySelector("#shop-buy-list .shop-card");
+        const r = (e) => e.getBoundingClientRect();
+        return {
+          leftW: Math.round(r(c.querySelector(".shop-card-left")).width), leftH: Math.round(r(c.querySelector(".shop-card-left")).height),
+          rightH: Math.round(r(c.querySelector(".shop-card-right")).height), stepW: Math.round(r(c.querySelector(".qty-stepper")).width),
+          cardW: Math.round(r(c).width), cardH: Math.round(r(c).height),
+        };
+      })()`);
+      check(
+        geo.leftW >= GEO_MIN_LEFT_W &&
+          geo.stepW >= GEO_MIN_STEP_W &&
+          geo.leftH <= GEO_MAX_LEFT_H &&
+          geo.cardH <= GEO_MAX_CARD_H,
+        `bố cục thẻ không bị ép / không bị kéo cao: ${JSON.stringify(geo)}`,
+      );
       // gõ 9999: kẹp đúng giới hạn (ví / giá, trần 99)
       await typeInto("buy", 0, "9999");
       c0 = await cardInfo("buy", 0);
