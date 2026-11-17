@@ -1183,6 +1183,14 @@ describe("audit-saves (Issue #112)", () => {
         );
     });
 
+    it("ambushReturnAt hữu hạn thì hợp lệ; sai kiểu / không hữu hạn -> invalid_ambush_return_at", () => {
+      expect(codesOf({ ambushReturnAt: 1_800_000_000_000 })).toEqual([]);
+      for (const v of ["123", null, true, [], {}])
+        expect(codesOf({ ambushReturnAt: v }), JSON.stringify(v)).toContain(
+          "invalid_ambush_return_at",
+        );
+    });
+
     it("ambushUntil không phải số hữu hạn -> invalid_ambush_until", () => {
       for (const v of ["123", null, true, [], {}])
         expect(codesOf({ ambushUntil: v }), JSON.stringify(v)).toContain("invalid_ambush_until");

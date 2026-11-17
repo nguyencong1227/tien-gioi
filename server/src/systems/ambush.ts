@@ -20,6 +20,7 @@ import {
   AMBUSH_MIN_PROTOCOL,
   AMBUSH_ARM_MS,
   AMBUSH_OFFER_MS,
+  AMBUSH_RETURN_GRACE_MS,
   AMBUSH_SEEN_MS,
   AMBUSH_STRIDE_PX,
   AMBUSH_TIERS,
@@ -175,6 +176,30 @@ export function sanitizeAmbushUntil(raw: unknown, now: number): number | undefin
   return Math.max(0, Math.min(raw, now + AMBUSH_COOLDOWN_MS));
 }
 
+/** Vừa được đưa về từ đấu trường thì chừng này (ms) kể từ lúc đưa về vẫn được hưởng bảo hộ khi vào phòng (đủ cho client chuyển phòng, không cho "để dành" bảo hộ). */
+export const AMBUSH_RETURN_WINDOW_MS = 30_000;
+
+/**
+ * Vào phòng sau khi được đưa về từ đấu trường (`ambushReturnAt` trong hồ sơ, `WorldRoom.exitArenaRoom` ghi): bảo hộ `AMBUSH_RETURN_GRACE_MS` kể từ BÂY GIỜ (quái quanh chỗ cũ không nhắm,
+ * không đánh được), rồi xoá trường để lần vào sau không còn. Trường quá cũ / sai kiểu / ở tương lai chỉ bị xoá, không bảo hộ (file hỏng không cho bảo hộ vô hạn).
+ */
+export function applyReturnGrace(w: World, sid: string, c: PlayerCtrl): boolean {
+  const at = c.save.ambushReturnAt;
+  if (at === undefined) return false;
+  c.save = { ...c.save, ambushReturnAt: undefined };
+  if (
+    typeof at !== "number" ||
+    !Number.isFinite(at) ||
+    at > w.now + 1000 ||
+    w.now - at >= AMBUSH_RETURN_WINDOW_MS
+  )
+    return false;
+  c.shieldUntil = Math.max(c.shieldUntil ?? 0, w.now + AMBUSH_RETURN_GRACE_MS);
+  w.shielded.add(sid);
+  forgetTarget(w, sid);
+  return true;
+}
+
 /** Dữ liệu chặn đường của người này; dựng lười (hồi: không sớm hơn mốc đã lưu, và ít nhất `AMBUSH_LOGIN_COOLDOWN_MS` kể từ lúc vào phòng này). */
 export function ambushOf(w: World, c: PlayerCtrl): AmbushCtrl {
   if (c.ambush) return c.ambush;
@@ -247,7 +272,7 @@ export function ambushBlocked(w: World, sid: string): AmbushBlock | null {
   const c = w.ctrl.get(sid);
   if (!rt || !p || !c) return "off";
   if ((c.proto ?? 0) < AMBUSH_MIN_PROTOCOL) return "protocol";
-  if (w.runId !== null) return "run";
+  if (w.runId !== null || w.arena !== null) return "run";
   if (p.dead) return "dead";
   if (c.limbo) return "limbo";
   if (w.ghosts.has(sid) || c.silent === true) return "ghost";
@@ -449,7 +474,9 @@ export function rollAmbush(w: World, sid: string, p: Player, c: PlayerCtrl): boo
 function fight(w: World, sid: string, c: PlayerCtrl, o: AmbushOfferCtrl): void {
   const started = w.ambush?.startFight?.(w, sid, o) === true;
   if (started) {
-    // CD3 đã nhận việc: hộp thoại đóng, người chơi sắp được chuyển phòng. Không đặt hồi / gửi `ambushEnd` ở đây (kết cục là của CD3).
+    // Đấu trường đã nhận vé: hộp thoại đóng, người chơi sắp được chuyển phòng (kết cục `ambushEnd` đến từ phòng đấu trường). Đặt hồi NGAY (vào hồ sơ trước lần lưu lúc chuyển phòng:
+    // sập máy giữa trận không cho bị chặn lại liền).
+    startCooldown(w, c);
     const a = ambushOf(w, c);
     a.offer = undefined;
     a.walked = 0;
@@ -498,18 +525,18 @@ export function onAmbushSeen(w: World, sid: string, raw: unknown): void {
  * Trừ ĐÚNG giá đã chốt (một lần): `flee_coin` trừ ví, `flee_exp` trừ tu vi trong thanh (không rớt cảnh giới). `false` nếu không đủ (không trừ gì).
  * `flee_exp` với `exp` = 0 (thanh trống) bị từ chối: chỉ cho trả Linh thạch (luật của `ambushPrice`, chống bỏ chạy miễn phí mãi).
  */
-function charge(
+export function chargeFlee(
   w: World,
   sid: string,
   p: Player,
-  o: AmbushOfferCtrl,
+  chot: AmbushPrice,
   choice: Exclude<AmbushChoice, "fight">,
 ): { exp?: number; coin?: number } | null {
   if (choice === "flee_coin") {
-    const price = Math.max(AMBUSH_FLEE_MIN_COIN, o.price.coin.price);
+    const price = Math.max(AMBUSH_FLEE_MIN_COIN, chot.coin.price);
     return trySpendCoin(w, sid, price) ? { coin: price } : null;
   }
-  const price = o.price.exp;
+  const price = chot.exp;
   if (price <= 0 || p.exp < price) return null; // thanh trống / tu vi đã đổi thấp hơn giá chốt: không trừ
   p.exp -= price;
   return { exp: price };
@@ -546,7 +573,7 @@ async function settleFlee(
   choice: Exclude<AmbushChoice, "fight">,
 ): Promise<void> {
   if (o.settling === undefined) {
-    const paid = charge(w, sid, p, o, choice);
+    const paid = chargeFlee(w, sid, p, o.price, choice);
     if (paid === null) {
       w.events.toast(sid, { text: "Không đủ để trả giá bỏ chạy", tone: "bad" });
       return;
