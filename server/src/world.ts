@@ -53,6 +53,7 @@ import { Duels } from "./systems/duel";
 import { TickStats } from "./metrics";
 import type { Bolt } from "./systems/bolt";
 import type { BossCtrl } from "./systems/boss-state";
+import type { NavCtrl } from "./systems/nav-chase";
 import type { TreasureRt } from "./systems/treasure";
 
 /** Dữ liệu riêng của server cho mỗi người chơi (không gửi xuống client). */
@@ -192,6 +193,8 @@ export interface MonsterCtrl {
   boss?: BossCtrl;
   /** Quái con do trùm gọi: id trùm. KHÔNG rơi đồ, KHÔNG tu vi, KHÔNG tính nhiệm vụ (chống cày); biến mất khi trùm chết hoặc reset. */
   addOf?: string;
+  /** Tìm đường / phát hiện kẹt / rút về của quái đang đuổi (mục 48, `systems/nav-chase.ts`); dựng lười ở lần đuổi đầu tiên, quái không đuổi thì không có. */
+  nav?: NavCtrl;
 }
 
 /** Pha của đòn mạnh (`systems/charge.ts`): `windup` đứng gồng tới `until` rồi lao theo `angle`; `recover` đứng thở tới `until`. */
@@ -313,6 +316,8 @@ export class World {
    * Mặc định TẮT (bản chạy thật không đổi cho tới khi dữ liệu thật của E và cân bằng của D xong); `WorldRoom` đặt từ `BOSS_MOVES` (`server/src/systems/boss-config.ts`).
    */
   bossMoves = false;
+  /** Số lần tìm đường còn lại của quái THƯỜNG trong tick này (đặt lại ở đầu `tickMonsters`; trùm không bị giới hạn). Mục 48, `systems/nav-chase.ts`. */
+  navBudget = 0;
   /** Phòng đăng ký: được gọi (một lần) khi một người vừa vào Hoàng Tuyền, để lưu file, cộng Duyên và gửi `limbo`. */
   onLimbo: ((sid: string) => void) | null = null;
   /**

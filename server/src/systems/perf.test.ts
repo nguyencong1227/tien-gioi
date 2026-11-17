@@ -381,7 +381,9 @@ describe("ngân sách băng thông và CPU (benchmark có seed, kết quả cố
     expect(r.eventKbNear).toBeLessThan(r.eventKbBroadcast / 2);
     // M7.3 tinh anh: 3,80 -> 4,01 KB/s (100 người tranh ~20 con trong bench; tinh anh x2,5 khí huyết sống lâu hơn nên nhiều đòn trúng / số sát thương hơn). Roll tinh anh KHÔNG
     // gọi `Math.random` (`eliteHash`): lần đầu dùng `Math.random` nhích tới 4,43 dù xác suất 0 vì lệch chuỗi có hạt giống, không phải do tinh anh.
-    expect(r.eventKbNear).toBeLessThan(4.5);
+    // Mục 48 (trùm tìm đường, #1012): chỗ sinh trùm có thêm điều kiện (rộng, thuộc vùng chính) nên số lần gọi `Math.random` lúc sinh đổi và quỹ đạo có hạt giống lệch: 4,0 -> 5,2 KB/s.
+    // A đã thử TẮT hẳn tìm đường (chỉ giữ luật chỗ sinh): vẫn 5,2 KB/s, tức do lệch chuỗi chứ không phải do quái tìm đường. Vẫn ít hơn nửa broadcast cả phòng (16 KB/s) ở dòng trên.
+    expect(r.eventKbNear).toBeLessThan(6);
   });
 
   it("tin tổ đội (PartyMsg) cho một client dưới ngân sách < 1 KB/s (#76)", () => {
