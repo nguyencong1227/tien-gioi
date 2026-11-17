@@ -27,8 +27,28 @@ export const AMBUSH_OFFER_MS = 10_000;
 export const AMBUSH_TIME_MS = 120_000;
 /** Sau khi thắng / thua: xem kết quả (và nhặt đồ rơi) chừng này rồi đưa về chỗ cũ. */
 export const AMBUSH_EXIT_MS = 4_000;
-/** Bị hạ: nằm chừng này rồi đứng dậy (như `DUNGEON_FALL_EXIT_MS`). */
+/**
+ * Bị hạ khi KHÔNG bật luân hồi (bản thử / bench): nằm chừng này rồi đứng dậy (như `DUNGEON_FALL_EXIT_MS`). Từ QUYET_DINH_M3 mục 53 (17/11): khi luân hồi BẬT (bản chạy thật) bị hạ trong đấu trường
+ * = CHẾT THẬT (Hoàng Tuyền, mất kiếp), không còn nằm rồi đứng dậy.
+ */
 export const AMBUSH_FALL_MS = 3_000;
+/**
+ * BỎ CHẠY GIỮA TRẬN luôn bấm được (mục 53, kể cả khi đang bị khống chế) nhưng cần VẬN chừng này (ms) rồi mới thoát và trừ giá: không lách được đòn đang ra bằng cách bấm đúng lúc. Trong lúc vận
+ * người chơi KHÔNG bất khả xâm phạm: bị hạ giữa chừng thì chết thật và KHÔNG trừ giá. Bấm lần hai khi đang vận bị bỏ qua.
+ */
+export const AMBUSH_FLEE_CHANNEL_MS = 1_000;
+/**
+ * Trần CẤP (`MonsterKind.level`) của loài kẻ chặn đường theo cảnh giới tối thiểu của bầy (mục 53: đối thủ không mạnh vượt cảnh giới người chơi). Phàm Nhân 1 (Sói Hoang), Luyện Khí 7 (Hắc Hổ), Trúc Cơ 12 (Xích Mãng),
+ * Kim Đan 15 (Độc Thiềm), Nguyên Anh 18 (Độc Tước, Hắc Giao). `ambushViolations` bắt bầy có loài cấp cao hơn trần của cảnh giới của `minStep`; cảnh giới chưa liệt kê (Hóa Thần trở lên) thì
+ * không có bầy hợp lệ (đòi khai báo trần trước khi thêm nội dung).
+ */
+export const AMBUSH_FOE_LEVEL_CAP: Readonly<Record<number, number>> = {
+  0: 1,
+  1: 7,
+  2: 12,
+  3: 15,
+  4: 18,
+};
 /** Bảo hộ sau khi về chỗ cũ (quái quanh đó không nhắm, không đánh được). */
 export const AMBUSH_RETURN_GRACE_MS = 5_000;
 /**
@@ -231,6 +251,11 @@ export interface AmbushFleeMsg {
 export interface AmbushStateMsg {
   msLeft: number;
   price: AmbushPrice;
+  /**
+   * Đang VẬN bỏ chạy giữa trận (mục 53): thời gian còn lại (ms, > 0) tới lúc thoát; VẮNG = không đang vận. Gửi lúc bắt đầu vận và mỗi giây; client hiện thanh "đang thoát..." và KHÔNG đổi chỗ
+   * nút. Bị hạ giữa chừng thì vận huỷ (chết thật, không trừ giá).
+   */
+  fleeMs?: number;
 }
 
 /** Client -> server: "hộp thoại `id` đã THẤY" (gửi khi hộp thoại thật sự hiện và trang đang hiển thị). Không nhận trong `AMBUSH_SEEN_MS` thì huỷ (kết cục `canceled`). */
@@ -248,6 +273,8 @@ export type AmbushResult = (typeof AMBUSH_RESULTS)[number];
 /** Server -> client: kết thúc. `paid` = cái giá ĐÃ trừ (có khi bỏ chạy / thua / hết giờ); `rewards` = thưởng (chỉ khi `won`). */
 export interface AmbushEndMsg {
   result: AmbushResult;
+  /** `true` khi `lost` là CHẾT THẬT (mục 53: Hoàng Tuyền, mất kiếp): màn hình Hoàng Tuyền hiện ngay sau khi đổi phòng. Vắng = không chết (mọi kết cục khác). */
+  died?: boolean;
   paid?: { exp?: number; coin?: number };
   rewards?: { exp: number; coin: number; items: { itemId: string; count: number }[] };
 }
