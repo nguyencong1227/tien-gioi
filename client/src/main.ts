@@ -26,6 +26,7 @@ import { WorldScene } from "./scenes/WorldScene";
 import { ui } from "./ui";
 import { setBossCardOverride } from "./boss-card";
 import { setMapCardOverride } from "./map-card";
+import { setNpcPortraitOverride } from "./npc-portrait";
 import {
   buildMockThuMonDialog,
   dungeonFallenDeathText,
@@ -711,6 +712,8 @@ async function start(room: Room, mapId: string) {
     (window as any).__mapCardOverride = setMapCardOverride;
     // Cho `check-boss-card.mjs`: thử thẻ trùm trên thanh máu với gói giả (bản chạy thật không có mục ghi đè)
     (window as any).__bossCardOverride = setBossCardOverride;
+    // Cho `check-npc-portrait.mjs`: thử chân dung NPC ở hộp thoại với gói giả (bản chạy thật không có mục ghi đè)
+    (window as any).__npcPortraitOverride = setNpcPortraitOverride;
     // Cho `check-quest-log.mjs` (#409): id mọi nhiệm vụ chính tuyến / lặp THẬT của game để nạp vào sổ nhiệm vụ
     // Cho `check-forge-shop.mjs` (#409): công thức rèn + cửa hàng THẬT của game (nguyên liệu, phí) để nạp túi / ví đúng ca "đủ" / "thiếu"
     // Cho `check-craft-ui.mjs` (#769): đối tượng dữ liệu DÙNG CHUNG để script chèn NPC / đan / công thức THỬ (nghề nhỏ chưa có dữ liệu thật: D làm ở #763) rồi dọn
