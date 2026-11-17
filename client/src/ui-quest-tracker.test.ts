@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ITEM_BY_ID,
@@ -181,5 +182,25 @@ describe("renderQuestTrackerView (bảng theo dõi nhiệm vụ HUD)", () => {
     expect(e.preventDefault).toHaveBeenCalledTimes(1);
     expect(onTrack).toHaveBeenCalledWith(B.id);
     expect(onTrack).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("nối vào ui.ts (canh MÃ NGUỒN: hành vi thật do check-quest-log / check-hud / check-sect-hall kiểm bằng Chrome)", () => {
+  const ui = readFileSync(new URL("./ui.ts", import.meta.url), "utf8");
+
+  it("renderQuestTracker gán lại nhiệm vụ theo dõi từ giá trị `renderQuestTrackerView` trả về (tự chọn mặc định phải được nhớ)", () => {
+    expect(ui).toMatch(/trackingQuestId = renderQuestTrackerView\(\{/);
+  });
+
+  it("chạm thẻ giữ ĐÚNG thứ tự cũ: đặt nhiệm vụ theo dõi, vẽ lại, rồi báo cảnh (onTrackQuest)", () => {
+    expect(ui).toMatch(
+      /onTrack: \(id\) => \{\s*trackingQuestId = id;\s*renderQuestTracker\(\);\s*callbacks\?\.onTrackQuest\?\.\(id\);\s*\},/,
+    );
+  });
+
+  it("ui.ts không còn bản sao của describeStep / vẽ thẻ (một nơi duy nhất) và sổ nhiệm vụ dùng describeStep với bối cảnh hiện tại", () => {
+    expect(ui).not.toMatch(/function describeStep\(/);
+    expect(ui).not.toMatch(/className = "qt-item/);
+    expect(ui).toMatch(/describeStep\(def, a, getCtx\(\)\)/);
   });
 });
