@@ -388,3 +388,75 @@ describe("qty-stepper: giới hạn đổi theo thời gian (setMax / setQty)", 
     expect(onChange).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("qty-stepper: id giữ chỗ và đọc lại chữ hiện tại", () => {
+  it("ids đặt id cho ô gõ và hai nút −/+ (để tập lệnh kiểm tìm được); không đặt thì không có id", () => {
+    const { input, btn } = make({
+      ids: { input: "sect-input-deposit", minus: "m", plus: "p" },
+    });
+    expect((input as unknown as { id: string }).id).toBe("sect-input-deposit");
+    expect((btn.minus as unknown as { id: string }).id).toBe("m");
+    expect((btn.plus as unknown as { id: string }).id).toBe("p");
+    const b = make();
+    expect((b.input as unknown as { id?: string }).id).toBeUndefined();
+  });
+
+  it("read() đọc lại chữ ĐANG có trong ô: chữ đổi bằng mã không kèm sự kiện input vẫn được tính đúng lúc xác nhận", () => {
+    const { s, input } = make();
+    input.value = "88"; // KHÔNG bắn sự kiện input
+    expect(s.getQty()).toBe(1); // bản lưu cũ
+    expect(s.read()).toBe(88);
+    expect(s.getQty()).toBe(88);
+    input.value = "9999";
+    expect(s.read()).toBe(120); // kẹp theo max và ghi đè ô
+    expect(input.value).toBe("120");
+    input.value = "x";
+    expect(s.read()).toBeNull();
+  });
+});
+
+describe("qty-stepper: clear() và placeholder", () => {
+  it("có placeholder (mặc định 'Số lượng', đổi được)", () => {
+    expect(make().input.getAttribute("placeholder")).toBe("Số lượng");
+    expect(make({ placeholder: "Số Linh thạch" }).input.getAttribute("placeholder")).toBe(
+      "Số Linh thạch",
+    );
+  });
+
+  it("clear(): ô trống, qty null, KHÔNG báo lỗi, báo onChange(null) một lần; setMax về sau KHÔNG tự điền 1", () => {
+    const { s, input, note, onChange } = make({ initial: 30 });
+    onChange.mockClear();
+    s.clear();
+    expect(input.value).toBe("");
+    expect(s.getQty()).toBeNull();
+    expect(note.textContent).toBe("");
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenLastCalledWith(null);
+    s.setMax(500); // ví đổi sau khi gửi
+    expect(input.value).toBe("");
+    expect(s.getQty()).toBeNull();
+    s.clear(); // gọi lần nữa: không báo thừa
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
+  it("sau clear(): bấm + từ ô trống ra 1; gõ và setQty hoạt động lại bình thường; setMax không còn giữ trống", () => {
+    const a = make();
+    a.s.clear();
+    a.press(a.btn.plus);
+    expect(a.s.getQty()).toBe(1);
+    expect(a.input.value).toBe("1");
+    const b = make();
+    b.s.clear();
+    b.type("25");
+    expect(b.s.getQty()).toBe(25);
+    b.s.setMax(300);
+    expect(b.input.value).toBe("25");
+    const c = make();
+    c.s.clear();
+    c.s.setQty(40);
+    expect(c.s.getQty()).toBe(40);
+    c.s.clear();
+    c.press(c.btn.x10);
+    expect(c.s.getQty()).toBe(10);
+  });
+});

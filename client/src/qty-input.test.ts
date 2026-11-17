@@ -99,11 +99,15 @@ describe("applyQtyAction (nút nhanh)", () => {
     expect(A(1, "max", 87.6)).toBe(87);
   });
 
-  it("số hiện tại hỏng / trống / dưới 1 coi như 1", () => {
-    expect(A(null, "plus", 50)).toBe(2);
+  it("ô trống / hỏng / dưới 1: + cho 1, ×10 cho 10, ×100 cho 100, − cho 1 (không nhảy lên 2 vô lý)", () => {
+    expect(A(null, "plus", 50)).toBe(1);
+    expect(A(0, "plus", 50)).toBe(1);
+    expect(A(Number.NaN, "plus", 50)).toBe(1);
     expect(A(Number.NaN, "x10", 50)).toBe(10);
-    expect(A(0, "plus", 50)).toBe(2);
+    expect(A(null, "x100", 500)).toBe(100);
+    expect(A(null, "x100", 50)).toBe(50);
     expect(A(-4, "minus", 50)).toBe(1);
+    expect(A(null, "minus", 50)).toBe(1);
   });
 
   it("không còn gì để chọn: mọi nút cho 0", () => {

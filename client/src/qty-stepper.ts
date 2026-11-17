@@ -16,6 +16,10 @@ export interface QtyStepperOptions {
   doc?: Document;
   /** Nhãn đọc cho trình đọc màn hình của ô gõ, ví dụ "Số lượng góp" */
   label: string;
+  /** id của ô gõ và hai nút −/+ (giữ id cũ của hộp mà ô này thay thế để tập lệnh kiểm / E2E tìm được); bỏ trống = không đặt id */
+  ids?: { input?: string; minus?: string; plus?: string };
+  /** Chữ gợi ý khi ô trống (mặc định "Số lượng") */
+  placeholder?: string;
   /** Giới hạn trên hiện tại (số nguyên; < 1 = không còn gì để chọn, mọi nút khoá). Đổi sau bằng `setMax`. */
   max: number;
   /** Số lượng ban đầu (kẹp vào [1, max]); mặc định 1 */
@@ -39,9 +43,13 @@ export interface QtyStepper {
   readonly el: HTMLElement;
   /** Số lượng hợp lệ đang chọn, hoặc `null` (ô trống / hỏng / không còn gì để chọn) */
   getQty(): number | null;
+  /** Đọc lại CHỮ HIỆN TẠI trong ô rồi trả số lượng (dùng lúc xác nhận: chữ có thể vừa bị đổi bằng mã mà chưa có sự kiện `input`) */
+  read(): number | null;
   setQty(n: number): void;
   setMax(max: number): void;
   focus(): void;
+  /** Xoá ô về TRỐNG (sau khi gửi xong): `getQty()` = null, không báo lỗi; `setMax` về sau không tự điền lại số 1 cho tới khi người chơi gõ / bấm nút / `setQty` */
+  clear(): void;
   /** Dừng mọi hẹn giờ giữ nút (gọi khi gỡ ô khỏi cây DOM) */
   destroy(): void;
 }
@@ -74,6 +82,8 @@ export function createQtyStepper(opts: QtyStepperOptions): QtyStepper {
   input.setAttribute("enterkeyhint", "done");
   input.setAttribute("autocomplete", "off");
   input.setAttribute("aria-label", opts.label);
+  if (opts.ids?.input) input.id = opts.ids.input;
+  input.setAttribute("placeholder", opts.placeholder ?? "Số lượng");
   const note = doc.createElement("p");
   note.className = "qty-note";
   note.setAttribute("role", "status");
@@ -86,6 +96,8 @@ export function createQtyStepper(opts: QtyStepperOptions): QtyStepper {
     btn.className = b.cls;
     btn.textContent = b.text;
     btn.setAttribute("aria-label", b.label);
+    if (b.action === "minus" && opts.ids?.minus) btn.id = opts.ids.minus;
+    if (b.action === "plus" && opts.ids?.plus) btn.id = opts.ids.plus;
     buttons.set(b.action, btn);
   }
   // thứ tự DOM: − [ô] + ×10 ×100 Tối đa (Tab đi theo thứ tự này)
@@ -96,6 +108,7 @@ export function createQtyStepper(opts: QtyStepperOptions): QtyStepper {
   root.append(row, quick, note);
 
   let qty: number | null = null;
+  let cleared = false;
   let invalid = false;
   let errNote = "";
 
@@ -113,6 +126,7 @@ export function createQtyStepper(opts: QtyStepperOptions): QtyStepper {
   const commit = (next: number | null, writeInput: boolean, msg = "") => {
     const changed = next !== qty;
     qty = next;
+    cleared = false;
     invalid = false;
     errNote = msg;
     if (writeInput) input.value = next === null ? "" : String(next);
@@ -211,6 +225,10 @@ export function createQtyStepper(opts: QtyStepperOptions): QtyStepper {
   return {
     el: root,
     getQty: () => qty,
+    read: () => {
+      fromText();
+      return qty;
+    },
     setQty: (n) => {
       stopHold();
       commit(
@@ -222,8 +240,21 @@ export function createQtyStepper(opts: QtyStepperOptions): QtyStepper {
       stopHold();
       max = Number.isFinite(m) ? Math.floor(m) : 0;
       if (max < 1) commit(null, true, "Không còn gì để chọn.");
+      else if (qty === null && cleared)
+        render(); // người chơi vừa gửi xong và ô đang trống: giữ trống
       else if (qty === null) commit(Math.min(max, 1), true);
       else commit(Math.min(max, qty), true);
+    },
+    clear: () => {
+      stopHold();
+      const changed = qty !== null;
+      qty = null;
+      invalid = false;
+      errNote = "";
+      input.value = "";
+      render();
+      cleared = true;
+      if (changed) opts.onChange?.(null);
     },
     focus: () => input.focus(),
     destroy: stopHold,

@@ -47,17 +47,19 @@ export function parseQty(text: unknown, max: number): QtyParse {
   return { qty: n, note: "", clamped: false, invalid: false };
 }
 
-/** Số lượng sau một lần bấm nút nhanh, kẹp vào [1, max] (`max` < 1 thì 0). Số hiện tại hỏng coi như 1. */
+/** Số lượng sau một lần bấm nút nhanh, kẹp vào [1, max] (`max` < 1 thì 0). Ô trống / hỏng: + cho 1, ×10 cho 10, ×100 cho 100, − cho 1. */
 export function applyQtyAction(cur: number | null, action: QtyAction, max: number): number {
   const limit = Number.isFinite(max) ? Math.floor(max) : 0;
   if (limit < 1) return 0;
-  const c = cur !== null && Number.isFinite(cur) && cur >= 1 ? Math.floor(cur) : 1;
+  // ô TRỐNG / hỏng coi như 0 cho nút thêm và nhân (bấm + từ ô trống ra 1, ×10 ra 10, ×100 ra 100); nút bớt luôn về tối thiểu 1
+  const have = cur !== null && Number.isFinite(cur) && cur >= 1;
+  const c = have ? Math.floor(cur) : 1;
   const clamp = (v: number) => Math.min(limit, Math.max(1, v));
   switch (action) {
     case "minus":
       return clamp(c - 1);
     case "plus":
-      return clamp(c + 1);
+      return clamp(have ? c + 1 : 1);
     case "x10":
       return clamp(c * 10);
     case "x100":
