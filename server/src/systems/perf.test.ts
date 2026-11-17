@@ -3,9 +3,12 @@ import { describe, expect, it } from "vitest";
 import { Encoder, StateView } from "@colyseus/schema";
 import {
   AMBUSH_MIN_PROTOCOL,
+  DEFAULT_MAP_ID,
+  MAX_AMBUSH_ROOMS,
   MONSTER_BY_ID,
   TICK_MS,
   TOWN_PX,
+  arenaMapIdOf,
   getMap,
   MAX_BOLTS,
 } from "@tien-gioi/shared";
@@ -14,6 +17,7 @@ import { addMonster, addPlayer, makeWorld } from "./test-helpers";
 import { POS_SYNC_EVERY_TICKS, applyInputs, syncPublicPos } from "./movement";
 import { tickWorld } from "./tick";
 import { ambushOf, createAmbushRuntime } from "./ambush";
+import { arenaJoined, createArena, type AmbushTicket } from "./arena";
 import { slash, tickRespawn } from "./combat";
 import { cast } from "./cast";
 import { MONSTER_WAKE_DIST, WANDER_STRIDE, spawnInitial, tickMonsters } from "./monsters";
@@ -473,6 +477,61 @@ describe("ngân sách băng thông và CPU (benchmark có seed, kết quả cố
     expect(ambushOffers).toHaveLength(100); // không phát lại mỗi tick
     expect(ambushEnds).toHaveLength(0);
     expect(w.ambush.open.size).toBe(100);
+  });
+
+  it("đấu trường chặn đường (mục 52): MAX_AMBUSH_ROOMS phòng solo chạy cùng lúc (mỗi phòng một người + 3 kẻ địch đang đánh): tổng tick một vòng dưới 10 ms; ambushState đúng mỗi giây", () => {
+    const arenaMap = getMap(arenaMapIdOf(DEFAULT_MAP_ID))!;
+    const rooms = Array.from({ length: MAX_AMBUSH_ROOMS }, (_, i) => {
+      const h = makeWorld(arenaMap);
+      h.w.now = 1_800_000_000_000;
+      h.w.ambush = createAmbushRuntime({ random: () => 0, scenes: [], foes: [] });
+      const ticket: AmbushTicket = {
+        id: `${i}`.padStart(32, "a"),
+        key: `p${i}`,
+        name: `p${i}`,
+        origin: { mapId: DEFAULT_MAP_ID, x: 2200, y: 1536 },
+        group: {
+          id: "g",
+          name: "Sói Hoang",
+          mapId: DEFAULT_MAP_ID,
+          minStep: 0,
+          maxStep: 100,
+          tier: "normal",
+          foes: [{ kind: "lang", count: 3 }],
+        },
+        tier: "normal",
+        roomId: `room-${i}`,
+        createdAt: h.w.now,
+        expiresAt: h.w.now + 30_000,
+        ended: false,
+      };
+      h.w.hub.ambushes._add(ticket);
+      createArena(h.w, ticket);
+      const { p } = addPlayer(h.w, `p${i}`, 1, 2);
+      p.x = h.w.map.townPx.x;
+      p.y = h.w.map.townPx.y;
+      p.hp = p.maxHp = 1_000_000; // trụ vững suốt phép đo: chỉ đo chi phí tick, không đo kết cục
+      arenaJoined(h.w, `p${i}`);
+      return h;
+    });
+    const ticks: number[] = [];
+    const rounds = 200; // 10 giây
+    for (let t = 0; t < rounds; t++) {
+      const t0 = performance.now();
+      for (const h of rooms) {
+        h.w.now += TICK_MS;
+        tickWorld(h.w, TICK_MS);
+      }
+      ticks.push(performance.now() - t0);
+    }
+    const avg = ticks.reduce((a, b) => a + b, 0) / ticks.length;
+    expect(avg).toBeLessThan(10); // tổng cả 20 phòng trong MỘT vòng tick (mỗi phòng thật chạy trong timer riêng, đây là chặn trên nghiêm hơn thực tế)
+    for (const h of rooms) {
+      // ambushState ~ mỗi giây (10 giây -> 9..11 tin: tin đầu lúc vào + mỗi giây một tin), không mỗi tick
+      expect(h.ambushStates.length).toBeGreaterThanOrEqual(9);
+      expect(h.ambushStates.length).toBeLessThanOrEqual(12);
+      expect(h.w.arena!.phase).toBe("fighting");
+    }
   });
 
   it("kho đồ tông môn (sectVault): không tick nào gửi sectVault khi không ai đụng kho (Issue #790 K6)", () => {
