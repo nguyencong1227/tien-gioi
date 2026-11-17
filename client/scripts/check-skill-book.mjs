@@ -142,48 +142,14 @@ try {
     await sleep(150);
   };
   const SHIFT = 8;
-  const state = () =>
-    J(`(() => {
-      const m = document.getElementById('skills-modal');
-      const rows = [...document.querySelectorAll('#skills-list .sk-row')].map((r) => {
-        const line = r.querySelector('.sk-line'), detail = r.querySelector('.sk-detail');
-        return {
-        id: r.dataset.skill, name: r.querySelector('.sk-row-name').firstChild.textContent, pips: r.querySelector('.sk-row-pips').textContent.trim(),
-        badge: r.querySelector('.sk-row-badge')?.textContent ?? '', need: r.querySelector('.sk-row-need')?.textContent ?? '', sub: r.querySelector('.sk-line .sk-row-tag').textContent,
-        aria: line.getAttribute('aria-label'), expanded: line.getAttribute('aria-expanded'), detailHidden: detail.hidden, h: Math.round(line.getBoundingClientRect().height),
-        stats: [...r.querySelectorAll('.sk-row-stats li')].map((l) => l.textContent),
-        slots: [...r.querySelectorAll('.sk-slot-btn:not(.unequip)')].map((b) => ({ slot: b.dataset.nav.split(':')[2], here: b.classList.contains('here'), locked: b.classList.contains('locked'), pressed: b.getAttribute('aria-pressed'), aria: b.getAttribute('aria-label') })),
-        unequip: r.querySelector('.sk-slot-btn.unequip')?.getAttribute('aria-label') ?? '' };
-      });
-      return { open: !m.hidden, expanded: document.getElementById('btn-skills').getAttribute('aria-expanded'), count: document.getElementById('skills-count').textContent,
-        emptyHidden: document.getElementById('skills-empty').hidden, emptyText: document.getElementById('skills-empty').textContent,
-        focus: document.activeElement && document.activeElement.dataset ? (document.activeElement.dataset.nav || document.activeElement.id || '') : '', rows };
-    })()`);
   const sent = () => J("window.__sent");
   const clearSent = () => evalJs("window.__sent.length = 0; 1");
-  const focusNav = (nav) => evalJs(`document.querySelector('[data-nav="${nav}"]').focus(); 1`);
-  const toastText = () => evalJs("document.getElementById('toast').textContent");
-  const barSlot = (n) =>
-    J(
-      `({ cls: document.getElementById('sk-slot${n}').className, label: document.getElementById('sk-slot${n}').getAttribute('aria-label') })`,
-    );
   const shot = async (name) => {
     if (!SHOTS) return;
     const png = await send("Page.captureScreenshot", { format: "png" });
     fs.mkdirSync(SHOTS, { recursive: true });
     fs.writeFileSync(path.join(SHOTS, `${name}.png`), Buffer.from(png.result.data, "base64"));
   };
-
-  /** Mở chi tiết một hàng bằng bàn phím: focus nút hàng + Enter */
-  const openRow = async (id) => {
-    await focusNav(`skillrow:${id}`);
-    const on = await evalJs(
-      `document.querySelector('[data-nav="skillrow:${id}"]').getAttribute('aria-expanded') === 'true'`,
-    );
-    if (!on) await press("Enter");
-  };
-  const expandedIds = async () =>
-    (await state()).rows.filter((r) => r.expanded === "true" && !r.detailHidden).map((r) => r.id);
 
   // gõ chữ như bàn phím thật: focus ô tìm rồi `Input.insertText` (sinh sự kiện `input`), không đặt `.value` bằng tay
   const typeQ = async (text) => {
