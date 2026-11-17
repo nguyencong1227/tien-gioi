@@ -628,7 +628,7 @@ function renderSocialRank() {
     age.textContent = "";
     return;
   }
-  const v = boardView(entry.msg, performance.now() - entry.at);
+  const v = boardView(entry.msg, performance.now() - entry.at, currentSect === null);
   retry.hidden = true;
   mine.textContent = v.mineText;
   const ageLine = v.ageText ? v.ageText.charAt(0).toUpperCase() + v.ageText.slice(1) + ". " : "";
@@ -7677,6 +7677,7 @@ export const ui = {
 
   onSect(m: SectMsg) {
     currentSect = m.sect;
+    if (socialModalOpen && socialTab === "rank") renderSocialRank(); // câu "Hạng của bạn" của bảng Tông môn phụ thuộc có tông môn hay không
     // Không còn tông môn (bị trục xuất / giải tán): hộp xác nhận cũ không còn ý nghĩa, kho đồ cũng không còn
     if (!m.sect) {
       closeSectConfirm();
