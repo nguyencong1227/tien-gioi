@@ -79,6 +79,12 @@
       "maxKb": 5120,
       "load": "tai-dan-nen"
     },
+    "art": {
+      "_ghiChu": "Ảnh minh hoạ AI TẢI THEO NHU CẦU (thẻ trùm art:trum, chân dung NPC art:npc; quyết định ngân sách của A ở #998: KHÔNG nâng trần static.aiAssets 300 KB của gói tải ngay). `maxKb` mỗi GÓI, `maxFileKb` mỗi ảnh. Đề xuất đo ở docs/art/PHONG_CACH_MINH_HOA.md mục 4: art:trum <= 4 x 30 KB, art:npc <= 15 x 20 KB, cộng dư.",
+      "maxKb": 512,
+      "maxFileKb": 60,
+      "load": "tai-dan-nen"
+    },
     "hdMaxFactor": 3,
     "mapLoadTimeoutMs": 8000,
     "dungeonLoadTimeoutMs": 3000,

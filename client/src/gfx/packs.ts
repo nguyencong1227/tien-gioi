@@ -10,6 +10,8 @@
  *   áp dụng (dựng lại hình bản đồ nếu người chơi còn ở đó) hoặc để dành cho lần sau.
  * - **Thử lại:** gói lỗi được thử lại ở các lần gọi sau, tối đa `MAX_ATTEMPTS` lần tải rồi dừng (không đập mạng).
  * - **Bản native (APK)** có sẵn `client/dist`: trả `cached` ngay, không `fetch`, và LOẠI `hd:*` (`skipped`).
+ * - **`art:*`** (ảnh minh hoạ AI: thẻ trùm, chân dung NPC) tải khi cần (mở bảng trùm / hội thoại) hoặc lúc rảnh; KHÔNG precache; bản native có sẵn
+ *   trong APK (cùng `dist`) nên trả `cached`; chưa tải xong / lỗi thì nơi dùng giữ ảnh dự phòng (`client/src/art-image.ts`).
  * - **`hd:*`** chỉ khi môi trường cho phép (`hdAllowed`: bậc Rất cao đã ổn định); hạ bậc thì `releaseKind("hd")`.
  * - Manifest rỗng / thiếu (chưa có tài sản nào vào repo, hoặc máy chủ trả `index.html` cho đường dẫn lạ) coi là KHÔNG có gói: mọi `ensure` trả `skipped`,
  *   không gọi mạng thêm và không ghi cảnh báo.
@@ -20,7 +22,7 @@
 
 import { isDungeonMap } from "@tien-gioi/shared";
 
-export type PackKind = "core" | "map" | "icons" | "audio" | "hd";
+export type PackKind = "core" | "map" | "icons" | "audio" | "art" | "hd";
 export type PackResult = "loaded" | "cached" | "failed" | "skipped";
 export type PackState = "idle" | "loading" | "ready" | "failed";
 
@@ -58,13 +60,15 @@ export const MAP_WAIT_TTL_MS = 30_000;
 /** `hd:*` chỉ nạp khi bậc Rất cao đã ổn định chừng này (ms). */
 export const HD_STABLE_MS = 60_000;
 
-const KINDS: ReadonlySet<string> = new Set(["core", "map", "icons", "audio", "hd"]);
+const KINDS: ReadonlySet<string> = new Set(["core", "map", "icons", "audio", "art", "hd"]);
 const ID_RE = /^[a-z0-9_:.-]{1,64}$/i;
 const SHA_RE = /^[0-9a-f]{64}$/i;
 const MAX_PACKS = 64;
 const MAX_FILES = 512;
 
 export const mapPackId = (mapId: string): string => `map:${mapId}`;
+/** Gói ảnh minh hoạ AI tải theo nhu cầu (thẻ trùm `art:trum`, chân dung NPC `art:npc`; docs/art/PHONG_CACH_MINH_HOA.md mục 4). */
+export const artPackId = (name: string): string => `art:${name}`;
 
 function cleanPath(p: unknown): string | null {
   if (typeof p !== "string" || p.length === 0 || p.length > 200) return null;
@@ -165,6 +169,11 @@ export interface PackController {
   releaseKind(kind: PackKind): void;
   /** Tải trước ưu tiên thấp lúc rảnh; bỏ qua khi tiết kiệm dữ liệu / mạng 2g / native; mỗi gói chỉ một lần. */
   prefetch(id: string): void;
+  /**
+   * URL (có `?v=<băm>`, đúng URL mà `ensure` đã tải nên khớp bộ nhớ đệm) của MỘT tệp trong gói theo đường dẫn tương đối trong `/packs/`
+   * (vd `art-trum/the_xich_mang.webp`); `null` nếu manifest chưa nạp xong, không có gói hoặc không có tệp đó.
+   */
+  fileUrl(id: string, path: string): string | null;
   /**
    * Lúc GỬI `travel`: bắt đầu tải gói của bản đồ đích và bắt đầu tính giờ chờ (8 s, bí cảnh 3 s). Việc tải tiếp tục dù hết giờ.
    * Mỗi lần gọi thay lời hứa cũ của cùng bản đồ.
@@ -399,6 +408,12 @@ export function createPacks(env: PacksEnv): PackController {
       for (const e of loadedMap.values()) if (e.def.kind === kind) release(e.def.id);
     },
     prefetch,
+    fileUrl(id, path) {
+      const f = loadedMap?.get(id)?.def.files.find((x) => x.path === path);
+      if (f) return packFileUrl(f);
+      // Bản native trả `cached` mà KHÔNG nạp manifest (mọi gói đã đóng sẵn trong APK): URL không băm vẫn đúng tệp trong `dist/packs/`
+      return env.native() && cleanPath(path) !== null ? `/packs/${path}` : null;
+    },
     startMapWait(mapId) {
       waits.set(mapId, { at: Date.now(), p: waitFor(mapId) });
     },
@@ -486,6 +501,7 @@ export function packs(): PackController {
       release: () => undefined,
       releaseKind: () => undefined,
       prefetch: () => undefined,
+      fileUrl: () => null,
       startMapWait: () => undefined,
       takeMapWait: async () => "skipped",
       prefetchNeighbors: () => undefined,

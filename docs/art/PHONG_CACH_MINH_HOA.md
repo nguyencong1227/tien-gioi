@@ -32,7 +32,7 @@ text, letters, words, calligraphy, watermark, signature, logo, cjk, chinese char
 
 **CẤM trong prompt dương** (so khớp theo từ nguyên vẹn, không phân biệt hoa thường; các mệnh đề phủ định như `no people`, `without text`, `avoid …` được bỏ qua khi quét, vì vậy `no text` hợp lệ còn `text` thì cấm):
 
-- **tên game / truyện / thương hiệu khác:** `genshin`, `honkai`, `warcraft`, `diablo`, `league of legends`, `dota`, `perfect world`, `jade dynasty`, `zhu xian`, `tru tien`, `van kiep`, `path of exile`, `elden ring`, `dark souls`, `sekiro`, `black myth`, `wukong`, `final fantasy`, `pokemon`, `maplestory`, `ragnarok`, `lineage`, `disney`, `marvel`, `ghibli`
+- **tên game / truyện / thương hiệu khác:** `genshin`, `honkai`, `warcraft`, `diablo`, `league of legends`, `dota`, `perfect world`, `jade dynasty`, `zhu xian`, `tru tien`, `van kiep`, `path of exile`, `elden ring`, `dark souls`, `sekiro`, `black myth`, `wukong`, `final fantasy`, `pokemon`, `maplestory`, `ragnarok`, `lineage`, `disney`, `marvel`, `ghibli`, `tolkien`, `middle earth`, `lord of the rings`, `game of thrones`, `skyrim`, `witcher`, `zelda`
 - **nghệ sĩ / phong cách của một người:** `greg rutkowski`, `artgerm`, `wlop`, `ruan jia`, `makoto shinkai`, `miyazaki`, `thomas kinkade`, `craig mullins`, `in the style of`, `style of`, `inspired by`, `reminiscent of`, `fan art`, `fanart`
 - **gợi chữ / ký tự (SDXL vẽ chữ giả):** `text`, `letters`, `calligraphy`, `inscription`, `signboard`, `sign board`, `banner with`, `scroll with`, `writing`, `poem`, `seal`, `stamp`, `hanzi`, `kanji`, `glyph`, `rune`, `runes`, `symbols`
 - **thể loại kéo ảnh về kiểu game khác:** `chinese`, `xianxia`, `wuxia`, `xuanhuan`, `anime`, `manga`, `chibi`, `video game`, `game art`, `game`, `screenshot`, `trending on`, `artstation`, `pixiv`, `deviantart`, `unreal engine`, `octane`
@@ -45,10 +45,20 @@ Lý do từng nhóm: tên game / truyện / nghệ sĩ khác vi phạm quy tắc
 |---|---|---|---|---|---|---|
 | nền đăng nhập | `section#login` | 1:1 | 1024x1024 | 1024x1024 | 150 KB | ĐÃ VÀO (`login_bg.webp`, 72 KB) |
 | **thẻ bản đồ** | màn chuyển cảnh qua cổng (ĐÃ nối: `client/src/map-card.ts`, danh sách `MAP_CARDS`; chưa có ảnh thì chỉ hiện tên) và đầu bảng Sơn Hà Đồ (`M`, dự kiến) | 3:2 (thô ≈ 3:2, B cắt nhẹ về đúng 3:2) | 1216x832 | 624x416 | 40 KB | **LÔ 1 ĐÃ VÀO GAME (17/11/2026, mục 5)** |
-| thẻ trùm | thanh máu trùm / báo trùm (dự kiến) | 1:1 | 1024x1024 | 384x384 | 30 KB | lô 2, SAU khi B xem lô 1 |
-| chân dung NPC | khung hội thoại (dự kiến) | 1:1 | 1024x1024 | 256x256 | 20 KB | lô 3 |
+| thẻ trùm | bảng / báo trùm (dự kiến) | 1:1 | 1024x1024 | 384x384 | 30 KB | lô 2 (mục 5b), vào GÓI `art:trum` (tải theo nhu cầu, mục 4b) |
+| chân dung NPC | khung hội thoại (dự kiến) | 1:1 | 1024x1024 | 256x256 | 20 KB | lô 3, vào GÓI `art:npc` (tải theo nhu cầu, mục 4b) |
 
-**Ngân sách gói tải** (`client/perf-budget.json` `static.aiAssets`: mỗi ảnh <= 150 KB, tổng <= 300 KB; ảnh vào `dist/` nên vào cả APK lẫn bộ nhớ đệm PWA của mọi người chơi web): `login_bg` 72 KB + 5 thẻ bản đồ x 40 KB = **272 KB <= 300 KB**. Lô 2 và 3 CHƯA vừa trần này: trước khi sinh lô 2, B + A chốt một trong hai (nâng trần có đo `client/dist` trước / sau, hoặc tải lười ảnh minh hoạ ngoài màn đăng nhập, không precache: đổi `stamp-sw.mjs`, mất tính offline của riêng các thẻ này). Đây là việc của A / người dùng, KHÔNG chặn lô 1.
+**Ngân sách gói tải NGAY** (`client/perf-budget.json` `static.aiAssets`: mỗi ảnh <= 150 KB, tổng <= 300 KB; ảnh ở `client/public/assets/ai/` vào `dist/` nên vào cả APK lẫn bộ nhớ đệm PWA của mọi người chơi web): `login_bg` 72 KB + 5 thẻ bản đồ (23-34 KB mỗi ảnh, thực đo 146,5 KB) = **218,7 KB <= 300 KB**. **A giữ trần 300 KB** (quyết định ở #998): lô 2 và lô 3 KHÔNG vào đây mà vào gói tải theo nhu cầu `art` (mục 4b).
+
+### 4b. Gói tải theo nhu cầu `art` (lô 2 thẻ trùm, lô 3 chân dung NPC)
+- **Id và thư mục:** `art:trum` = `client/public/packs/art-trum/`, `art:npc` = `client/public/packs/art-npc/` (thư mục lồng `art/<tên>/` cũng được). `npm run build:packs` sinh `client/public/packs/manifest.json` (loại `art`), `check:packs` kiểm manifest khớp đĩa. Tên tệp ảnh = tên của JSON nguồn (vd `the_xich_mang.webp` <-> `docs/art/nguon/the_xich_mang.json`).
+- **Ngân sách** (`perf-budget.json` `packs.art`, `check-perf-budget` kiểm): **mỗi gói <= 512 KB, mỗi ảnh <= 60 KB**, `load: tai-dan-nen`. Cỡ dự kiến: `art:trum` 4 thẻ x <= 30 KB = 120 KB; `art:npc` 15 chân dung x <= 20 KB = 300 KB (15 NPC hiện có); số 512 / 60 cho dư một đợt thêm trùm / NPC mà không phải đổi ngân sách. Đây là ĐỀ XUẤT để A duyệt (thấp hơn `audio` 5120 KB và `icons` 3072 KB vì ảnh nhỏ, chạy 1 - 2 bảng một lúc).
+- **Không precache:** `stamp-sw.mjs` chỉ đưa gói `core` vào `PRECACHE_URLS`; test `stamp-sw.test.ts` chứng minh thêm gói `art` KHÔNG đổi danh sách precache. Người chơi web chỉ tải một gói khi mở bảng trùm / hội thoại lần đầu (gói đã tải thì lần sau lấy từ bộ nhớ đệm).
+- **APK:** bản native đóng sẵn `client/dist` (Capacitor `webDir`) nên các gói `art` nằm trong APK (+420 KB với đủ lô 2 + 3, so với APK vài chục MB) và `ensure` trả `cached` ngay, không `fetch`, dùng URL không băm `/packs/<đường dẫn>`. ĐỀ XUẤT giữ như vậy (đơn giản, chạy được offline); nếu A muốn loại khỏi APK thì phải thêm một bước chép `dist` có lọc trước `cap sync` (chưa có, `hd:*` hiện cũng chưa bị loại khỏi APK ở tầng đóng gói).
+- **Nơi dùng** gọi `showArtImage(img, { packId: artPackId("trum"), file: "art-trum/<tên>.webp" })` (`client/src/art-image.ts`): thẻ `<img>` ẨN cho tới khi ảnh giải mã xong; chưa có gói / lỗi / hết giờ chờ 3 giây / tệp không có trong gói thì thẻ vẫn ẩn và nơi dùng giữ ảnh dự phòng (chữ, màu); gói về muộn thì áp dụng nếu nơi dùng còn cần; đổi nội dung thì yêu cầu cũ bị bỏ.
+- **Kiểm nguồn:** ảnh AI trong gói `art` chịu ĐÚNG luật của `assets/ai` (`check-credits` `aiAssetDirs`): JSON nguồn cùng tên, băm khớp, WebP / PNG sạch, dòng ở `CREDITS.md` mục 7, prompt qua `promptViolations`; hai ảnh cùng tên ở hai thư mục bị từ chối; một tệp lạ bỏ vào gói `art` làm `check:credits` ĐỎ (đã thử).
+- **Đo `client/dist` trước / sau** (gói THỬ gồm 4 + 15 tệp ngẫu nhiên 30 / 20 KB, đã xoá): `dist` 2.486.955 B -> 2.920.522 B (+433.567 B = gói 420 KB + manifest); **số URL precache 101 -> 101, băm danh sách precache giống hệt, tệp JS chính không đổi**; `check-perf-budget`: `art:trum` 120 KB và `art:npc` 300 KB, cả hai <= 512 KB; bậc đồ hoạ thấp / vừa / cao / rất cao vẫn 10,18 MB (ảnh `<img>` giải mã khi hiện, một lúc chỉ 1 - 2 ảnh).
+- **Việc sau gói này:** (1) B đưa prompt lô 2 (4 trùm: Xích Mãng, Hắc Giao, Thiên Hàn Vương, Linh Hư Yêu Vương) cho C sau khi PR gói được duyệt; (2) B nối thẻ vào bảng trùm / hội thoại bằng `showArtImage` ở các PR riêng, kèm `capture-viewports` năm khung.
 
 ## 5. LÔ 1: năm thẻ bản đồ (việc của C)
 Mỗi bản đồ một thẻ, **ba hạt giống** mỗi thẻ để B chọn một (15 ảnh thô). Cỡ thô 1216x832; cùng cài đặt KSampler của lô pilot (`euler`, `normal`, 25 bước, CFG 7.0, denoise 1.0) và cùng prompt âm ở mục 3. Tên tệp thô `<id>_raw_<n>_00001_.png` (n = 1..3 theo thứ tự hạt giống) vào `/mnt/data/comfyui/output/`. Prompt dương của từng thẻ (đã qua `promptViolations`, KHÔNG sửa tay: cần đổi thì sửa `MAP_CARD_BATCH` trong `prompt-rules.mjs` rồi cập nhật trang này):
@@ -76,6 +86,29 @@ foggy swamp of dead trees and still black water, faint wisps of pale lantern lig
 ### `the_han_van` (bản đồ `han_van`; hạt giống `2026111751`, `2026111752`, `2026111753`)
 ```text
 icy highland with drifting snow, frozen lake and sheer ice cliffs under a pale dawn, thin clouds on the ridges, pale ice blue and white haze, cold silver light, painterly soft ink wash and gouache landscape, muted colors, misty depth, wide panoramic composition, eastern mountain cultivation fantasy, no people, no text
+```
+
+## 5b. LÔ 2: bốn thẻ trùm (việc của C, CHỈ KHI #1005 gói `art` đã được A duyệt)
+Mỗi trùm một thẻ vuông, **bốn hạt giống** mỗi thẻ để B chọn một (16 ảnh thô; lô 1 cho thấy 4 / 15 ảnh có chữ ký giả ở góc nên dư một ảnh). Cỡ thô 1024x1024, ảnh cuối 384x384 WebP <= 30 KB, vào gói `art:trum` (`client/public/packs/art-trum/`, mục 4b). Cùng cài đặt KSampler của lô 1 (`euler`, `normal`, 25 bước, CFG 7.0, denoise 1.0), cùng prompt âm ở mục 3, chỉ SDXL base. Tên tệp thô `<id>_raw_<n>_00001_.png` (n = 1..4 theo thứ tự hạt giống) vào `/mnt/data/comfyui/output/`. Màu và ánh sáng theo bản đồ của từng trùm (bảng màu mục 2); trùm là thú / khối băng, KHÔNG mặt người (để khỏi giống nhân vật của game khác). Prompt dương (đã qua `promptViolations`, KHÔNG sửa tay: cần đổi thì sửa `BOSS_CARD_BATCH` trong `prompt-rules.mjs` rồi cập nhật trang này):
+
+### `the_xich_mang` (trùm `mang`; hạt giống `2026111801`, `2026111802`, `2026111803`, `2026111804`)
+```text
+colossal crimson python coiled around mossy boulders beneath blossoming peach branches, glossy blood-red scales, warm amber evening light, soft rose and cream haze, painterly soft ink wash and gouache creature illustration, single creature centered, full body visible, muted colors, misty depth, eastern mountain cultivation fantasy, no people, no text
+```
+
+### `the_hac_giao` (trùm `hac_giao`; hạt giống `2026111811`, `2026111812`, `2026111813`, `2026111814`)
+```text
+enormous black river dragon-serpent rising from dark swamp water, wet obsidian scales with a pale green sheen, dead trees around it, moss green and grey-green mist, faint wisps of pale lantern light, heavy fog, painterly soft ink wash and gouache creature illustration, single creature centered, full body visible, muted colors, misty depth, eastern mountain cultivation fantasy, no people, no text
+```
+
+### `the_thien_han_vuong` (trùm `thien_han_vuong`; hạt giống `2026111821`, `2026111822`, `2026111823`, `2026111824`)
+```text
+towering colossus of living glacier ice standing on a frozen lake, armor-like plates of blue ice, a jagged crown of icicles, no face, pale ice blue and white haze, cold silver light, painterly soft ink wash and gouache creature illustration, single creature centered, full body visible, muted colors, misty depth, eastern mountain cultivation fantasy, no people, no text
+```
+
+### `the_yeu_vuong` (trùm `yeu_vuong`; hạt giống `2026111831`, `2026111832`, `2026111833`, `2026111834`)
+```text
+ancient spirit beast lord with huge branching luminous antlers and long fur drifting like mist, standing in a crystal cavern with glowing mushrooms, jade teal and cyan glow with deep violet accents against blue-black shadows, painterly soft ink wash and gouache creature illustration, single creature centered, full body visible, muted colors, misty depth, eastern mountain cultivation fantasy, no people, no text
 ```
 
 ## 6. Quy trình sau khi C sinh xong

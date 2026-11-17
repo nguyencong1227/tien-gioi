@@ -256,6 +256,7 @@ Một ngân sách tĩnh chung (trước: atlas + tileset <= 1 MB) quá chật ch
 | `map:<mapId>` (mỗi bản đồ một gói) | tileset, quái, trang trí của bản đồ đó | <= 2 MB mỗi bản đồ | **trước khi đi qua cổng** (mục 10.2), màn chờ ngắn |
 | `icons` | biểu tượng vật phẩm, công pháp, pháp bảo | <= 3 MB | mở túi / bảng Công pháp LẦN ĐẦU |
 | `audio` | nhạc, tiếng động | <= 5 MB | tải dần nền sau khi vào được thế giới, KHÔNG chặn màn tải |
+| `art:<tên>` | ảnh minh hoạ AI tải theo nhu cầu: thẻ trùm `art:trum`, chân dung NPC `art:npc` (`docs/art/PHONG_CACH_MINH_HOA.md` mục 4b) | mỗi gói <= 512 KB, mỗi ảnh <= 60 KB | khi mở bảng trùm / hội thoại lần đầu (hoặc lúc rảnh), KHÔNG precache; có ảnh dự phòng khi chưa tải xong (`client/src/art-image.ts`) |
 | `hd:<gói>` (ảnh 2x, chỉ mức Rất cao) | bản độ phân giải cao của gói cùng tên | mỗi gói 2x <= **3 lần** gói thường tương ứng | sau khi vào thế giới, nhàn rỗi, CHỈ khi mức = Rất cao |
 
 - **"Đã nén" = byte thật phải tải**: ảnh (`png` / `webp`) và âm thanh (`ogg` / `mp3`) tính theo byte trên đĩa (đã là định dạng nén); `json` / `svg` / văn bản tính gzip.

@@ -4,10 +4,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { MONSTER_BY_ID } from "@tien-gioi/shared";
 import { MAP_STYLES } from "../../src/gfx/map-style";
+import { parsePackDir } from "../build-packs.mjs";
 import { CJK_REGEX, validateAiSource } from "../check-credits.mjs";
 import {
   BANNED_PROMPT_TERMS,
+  BOSS_CARD_BATCH,
   MAP_CARD_BATCH,
   NEGATIVE_PROMPT,
   REQUIRED_NEGATIVE_TERMS,
@@ -128,6 +131,11 @@ describe("luật được GHIM bằng chữ (xoá nhầm một từ khỏi danh 
     const all = Object.values(BANNED_PROMPT_TERMS).flat() as string[];
     for (const t of [
       "genshin",
+      "tolkien",
+      "skyrim",
+      "witcher",
+      "zelda",
+      "game of thrones",
       "warcraft",
       "greg rutkowski",
       "in the style of",
@@ -223,5 +231,81 @@ describe("lô 1 (thẻ bản đồ) và tài liệu khớp mã", () => {
 
   it("tài liệu không chứa chữ Hán", () => {
     expect(CJK_REGEX.test(DOC)).toBe(false);
+  });
+});
+
+describe("lô 2 (thẻ trùm) khớp trò chơi, luật prompt, ngân sách gói art và tài liệu", () => {
+  const { items, raw, final } = BOSS_CARD_BATCH;
+  const budget = JSON.parse(
+    fs.readFileSync(path.join(REPO, "client/perf-budget.json"), "utf8"),
+  ) as {
+    packs: { art: { maxKb: number; maxFileKb: number } };
+  };
+
+  it("bốn trùm THẬT của shared (có boss: true), mỗi trùm một thẻ, bốn hạt giống không trùng với bất kỳ ảnh nào của hai lô", () => {
+    expect(items.map((i: { bossId: string }) => i.bossId).sort()).toEqual(
+      ["hac_giao", "mang", "thien_han_vuong", "yeu_vuong"].sort(),
+    );
+    for (const it of items as Array<{
+      id: string;
+      bossId: string;
+      seeds: number[];
+      prompt: string;
+    }>) {
+      const boss = MONSTER_BY_ID[it.bossId];
+      expect(boss, `${it.id}: trùm ${it.bossId} không có trong shared`).toBeDefined();
+      expect(boss!.boss, `${it.bossId} phải là trùm`).toBe(true);
+      expect(it.seeds).toHaveLength(4);
+      expect(promptViolations(it.prompt, NEGATIVE_PROMPT), it.id).toEqual([]);
+      expect(it.id, "tên tệp = tên JSON nguồn").toMatch(/^the_[a-z_]+$/);
+    }
+    const all = [
+      ...MAP_CARD_BATCH.items.flatMap((i: { seeds: number[] }) => i.seeds),
+      ...items.flatMap((i: { seeds: number[] }) => i.seeds),
+    ];
+    expect(new Set(all).size).toBe(all.length);
+    const ids = [...MAP_CARD_BATCH.items, ...items].map((i: { id: string }) => i.id);
+    expect(new Set(ids).size).toBe(ids.length); // tên tệp không trùng giữa lô 1 và lô 2
+  });
+
+  it("thẻ vuông, cỡ thô SDXL (bội số của 64), nằm trong gói `art:trum` đúng thư mục và trong ngân sách `packs.art`", () => {
+    expect(raw.w).toBe(raw.h);
+    expect(final.w).toBe(final.h);
+    expect(raw.w % 64).toBe(0);
+    expect(final.w).toBeLessThan(raw.w);
+    expect(BOSS_CARD_BATCH.pack).toBe("art:trum");
+    expect(parsePackDir(path.basename(BOSS_CARD_BATCH.dir))).toEqual({
+      id: "art:trum",
+      kind: "art",
+    });
+    expect(final.maxKb).toBeLessThanOrEqual(budget.packs.art.maxFileKb);
+    expect(items.length * final.maxKb).toBeLessThanOrEqual(budget.packs.art.maxKb);
+  });
+
+  it("trùm KHÔNG mặt người / người: mọi prompt có 'no people' và không có từ chỉ người", () => {
+    for (const it of items as Array<{ id: string; prompt: string }>) {
+      expect(it.prompt, it.id).toContain("no people");
+      expect(
+        /\b(man|woman|person|human|king|queen|warrior|girl|boy)\b/i.test(it.prompt),
+        it.id,
+      ).toBe(false);
+    }
+  });
+
+  it("tài liệu (mục 5b) liệt kê ĐỦ prompt, hạt giống, cỡ và gói của lô 2", () => {
+    for (const it of items as Array<{
+      id: string;
+      bossId: string;
+      seeds: number[];
+      prompt: string;
+    }>) {
+      expect(DOC, `prompt ${it.id}`).toContain(it.prompt);
+      expect(DOC, `mục ${it.id}`).toContain(`### \`${it.id}\` (trùm \`${it.bossId}\``);
+      for (const s of it.seeds) expect(DOC, `seed ${s}`).toContain(`\`${s}\``);
+    }
+    expect(DOC).toContain(`${raw.w}x${raw.h}`);
+    expect(DOC).toContain(`${final.w}x${final.h}`);
+    expect(DOC).toContain("## 5b. LÔ 2");
+    expect(DOC).toContain(BOSS_CARD_BATCH.dir);
   });
 });

@@ -64,6 +64,13 @@ export const BANNED_PROMPT_TERMS = {
     "disney",
     "marvel",
     "ghibli",
+    "tolkien",
+    "middle earth",
+    "lord of the rings",
+    "game of thrones",
+    "skyrim",
+    "witcher",
+    "zelda",
   ],
   "nghệ sĩ / phong cách của một người": [
     "greg rutkowski",
@@ -271,6 +278,64 @@ export const MAP_CARD_BATCH = {
       prompt: buildPrompt(
         "icy highland with drifting snow, frozen lake and sheer ice cliffs under a pale dawn, thin clouds on the ridges",
         "pale ice blue and white haze, cold silver light",
+      ),
+    },
+  ],
+};
+
+/** Dựng prompt dương chuẩn cho THẺ TRÙM (một con vật khổng lồ ở giữa khung, thấy trọn thân, không người, không mặt người). */
+function buildBossPrompt(subject, mood) {
+  return `${subject}, ${mood}, painterly soft ink wash and gouache creature illustration, single creature centered, full body visible, muted colors, misty depth, eastern mountain cultivation fantasy, no people, no text`;
+}
+
+/**
+ * Lô 2: THẺ TRÙM (mỗi trùm một ảnh vuông, vào gói tải theo nhu cầu `art:trum`, `client/public/packs/art-trum/`; mục 4b của trang).
+ * Thô 1024x1024 (cỡ gốc của SDXL), cuối 384x384 WebP <= 30 KB. Bốn hạt giống mỗi trùm (lô 1 cho thấy 4 / 15 ảnh có chữ ký giả ở góc, nên dư
+ * một ảnh để còn chọn). Tên tệp thô `<id>_raw_<n>_00001_.png`. Màu và ánh sáng lấy theo bản đồ của trùm (bảng màu mục 2). `bossId` là id
+ * trong `MONSTERS` của `shared/` (test bắt id sai); không mặt người: trùm là thú / khối băng để khỏi giống nhân vật của game khác.
+ */
+export const BOSS_CARD_BATCH = {
+  class: "the-trum",
+  aspect: "1:1",
+  pack: "art:trum",
+  dir: "client/public/packs/art-trum",
+  raw: { w: 1024, h: 1024 },
+  final: { w: 384, h: 384, maxKb: 30 },
+  items: [
+    {
+      id: "the_xich_mang",
+      bossId: "mang",
+      seeds: [2026111801, 2026111802, 2026111803, 2026111804],
+      prompt: buildBossPrompt(
+        "colossal crimson python coiled around mossy boulders beneath blossoming peach branches, glossy blood-red scales",
+        "warm amber evening light, soft rose and cream haze",
+      ),
+    },
+    {
+      id: "the_hac_giao",
+      bossId: "hac_giao",
+      seeds: [2026111811, 2026111812, 2026111813, 2026111814],
+      prompt: buildBossPrompt(
+        "enormous black river dragon-serpent rising from dark swamp water, wet obsidian scales with a pale green sheen, dead trees around it",
+        "moss green and grey-green mist, faint wisps of pale lantern light, heavy fog",
+      ),
+    },
+    {
+      id: "the_thien_han_vuong",
+      bossId: "thien_han_vuong",
+      seeds: [2026111821, 2026111822, 2026111823, 2026111824],
+      prompt: buildBossPrompt(
+        "towering colossus of living glacier ice standing on a frozen lake, armor-like plates of blue ice, a jagged crown of icicles, no face",
+        "pale ice blue and white haze, cold silver light",
+      ),
+    },
+    {
+      id: "the_yeu_vuong",
+      bossId: "yeu_vuong",
+      seeds: [2026111831, 2026111832, 2026111833, 2026111834],
+      prompt: buildBossPrompt(
+        "ancient spirit beast lord with huge branching luminous antlers and long fur drifting like mist, standing in a crystal cavern with glowing mushrooms",
+        "jade teal and cyan glow with deep violet accents against blue-black shadows",
       ),
     },
   ],

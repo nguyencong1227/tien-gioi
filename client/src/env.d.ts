@@ -67,8 +67,12 @@ declare module "*check-credits.mjs" {
     file: string;
     detail: string;
   }
+  export const PACKS_DIR: string;
+  export function aiAssetDirs(packsDir?: string, aiDir?: string): string[];
   export function auditAiImages(opts?: {
     aiDir?: string;
+    aiDirs?: string[];
+    packsDir?: string;
     sourceDir?: string;
     creditsPath?: string;
     rootDir?: string;
@@ -140,6 +144,21 @@ declare module "*prompt-rules.mjs" {
     raw: { w: number; h: number };
     final: { w: number; h: number; maxKb: number };
     items: MapCardItem[];
+  };
+  export interface BossCardItem {
+    id: string;
+    bossId: string;
+    seeds: number[];
+    prompt: string;
+  }
+  export const BOSS_CARD_BATCH: {
+    class: string;
+    aspect: string;
+    pack: string;
+    dir: string;
+    raw: { w: number; h: number };
+    final: { w: number; h: number; maxKb: number };
+    items: BossCardItem[];
   };
   export function promptViolations(prompt: unknown, negativePrompt: unknown): string[];
 }

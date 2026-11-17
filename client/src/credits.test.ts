@@ -6,6 +6,7 @@ import path from "node:path";
 import { SKILLS_M7 } from "@tien-gioi/shared";
 import {
   AI_ASSET_DIR,
+  aiAssetDirs,
   auditAiImages,
   auditAssets,
   auditContentSources,
@@ -986,5 +987,122 @@ describe("Ảnh do AI sinh: nguồn, băm, siêu dữ liệu, dòng CREDITS (che
     const credits = fs.readFileSync(path.resolve(rootDir, "CREDITS.md"), "utf8");
     expect(credits).toMatch(/^## 7\. Ảnh do AI sinh/m);
     expect(credits).toContain("static.aiAssets");
+  });
+});
+
+describe("Ảnh AI ở gói tải theo nhu cầu `art` chịu CÙNG luật như assets/ai (check-credits, aiAssetDirs)", () => {
+  const NAME = "the_xich_mang";
+  const REL = `client/public/packs/art-trum/${NAME}.webp`;
+  const ROOT = path.resolve(__dirname, "../..");
+
+  /** Kho giả: một ảnh AI hợp lệ ở gói art-trum (JSON nguồn cùng tên, dòng CREDITS); `assets/ai` có thể trống. */
+  function artFixture(opts: { image?: Buffer } = {}) {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "tg-art-audit-"));
+    const img = opts.image ?? makeWebp();
+    fs.mkdirSync(path.join(root, "client/public/assets/ai"), { recursive: true });
+    fs.mkdirSync(path.join(root, "client/public/packs/art-trum"), { recursive: true });
+    fs.mkdirSync(path.join(root, "docs/art/nguon"), { recursive: true });
+    fs.writeFileSync(path.join(root, REL), img);
+    fs.writeFileSync(
+      path.join(root, `docs/art/nguon/${NAME}.json`),
+      JSON.stringify(validSource(REL, sha(img))),
+    );
+    fs.writeFileSync(
+      path.join(root, "CREDITS.md"),
+      `# Credits\n\n## 7. Ảnh do AI sinh (SDXL base)\n\n| Ảnh | Mô tả |\n|---|---|\n| \`${REL}\` | thẻ trùm |\n\n## 8. Khác\n`,
+    );
+    const dirs = () =>
+      aiAssetDirs(
+        path.join(root, "client/public/packs"),
+        path.join(root, "client/public/assets/ai"),
+      );
+    // KHÔNG truyền aiDir / aiDirs: dùng đúng đường mặc định (assets/ai + gói art tự dò dưới rootDir)
+    const audit = () =>
+      auditAiImages({
+        rootDir: root,
+        sourceDir: path.join(root, "docs/art/nguon"),
+        creditsPath: path.join(root, "CREDITS.md"),
+      });
+    return { root, audit, dirs, kinds: (a = audit()) => a.errors.map((e) => e.kind) };
+  }
+
+  it("aiAssetDirs: assets/ai + gói art phẳng (art-trum, art_npc) và lồng (art/boss); KHÔNG lấy icons / audio / map / thư mục ẩn / `artwork`", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "tg-art-dirs-"));
+    const packs = path.join(root, "packs");
+    for (const d of [
+      "art-trum",
+      "art_npc",
+      "art/boss",
+      "icons",
+      "audio",
+      "map-lac_ha",
+      "hd-core",
+      ".art-an",
+      "artwork",
+    ])
+      fs.mkdirSync(path.join(packs, d), { recursive: true });
+    const names = aiAssetDirs(packs).map((d) => path.relative(root, d).replace(/\\/g, "/"));
+    expect(names.filter((n) => n.startsWith("packs/"))).toEqual([
+      "packs/art-trum",
+      "packs/art/boss",
+      "packs/art_npc",
+    ]);
+    expect(aiAssetDirs(packs)).toContain(path.resolve(ROOT, "client/public/assets/ai"));
+    // không có thư mục packs: chỉ assets/ai
+    expect(aiAssetDirs(path.join(root, "khong-co"))).toEqual([
+      path.resolve(ROOT, "client/public/assets/ai"),
+    ]);
+  });
+
+  it("ảnh hợp lệ ở gói art (JSON cùng tên, băm khớp, dòng CREDITS, WebP sạch) thì qua", () => {
+    const f = artFixture();
+    expect(
+      f
+        .dirs()
+        .slice(1)
+        .map((d) => path.basename(d)),
+    ).toEqual(["art-trum"]);
+    const a = f.audit();
+    expect(a.files).toEqual([REL]);
+    expect(a.errors).toEqual([]);
+  });
+
+  it("ĐỘT BIẾN: ảnh ở gói art KHÔNG có cửa sau, thiếu JSON / sai băm / còn EXIF / thiếu dòng CREDITS / JSON trỏ chỗ khác đều đỏ", () => {
+    const missingJson = artFixture();
+    fs.rmSync(path.join(missingJson.root, `docs/art/nguon/${NAME}.json`));
+    expect(missingJson.kinds()).toContain("noSource");
+
+    const dirty = artFixture({ image: makeWebp(["EXIF"]) });
+    expect(dirty.kinds()).toContain("metadata");
+
+    const badHash = artFixture();
+    const jp = path.join(badHash.root, `docs/art/nguon/${NAME}.json`);
+    fs.writeFileSync(jp, JSON.stringify(validSource(REL, "0".repeat(64))));
+    expect(badHash.kinds()).toContain("badHash");
+
+    const noCredit = artFixture();
+    fs.writeFileSync(
+      path.join(noCredit.root, "CREDITS.md"),
+      "# Credits\n\n## 7. Ảnh do AI sinh\n\n",
+    );
+    expect(noCredit.kinds()).toContain("credits");
+
+    const elsewhere = artFixture();
+    fs.writeFileSync(
+      path.join(elsewhere.root, `docs/art/nguon/${NAME}.json`),
+      JSON.stringify(validSource("client/public/packs/icons/x.webp", HEX)),
+    );
+    expect(elsewhere.kinds()).toEqual(expect.arrayContaining(["assetPath"]));
+  });
+
+  it("hai ảnh cùng tên ở hai thư mục (assets/ai và gói art) bị từ chối: mỗi ảnh một JSON cùng tên", () => {
+    const f = artFixture();
+    fs.writeFileSync(path.join(f.root, `client/public/assets/ai/${NAME}.webp`), makeWebp());
+    expect(f.kinds()).toContain("dupName");
+  });
+
+  it("kho thật: aiAssetDirs mặc định gồm assets/ai; ảnh thật vẫn sạch", () => {
+    expect(aiAssetDirs()).toContain(path.resolve(ROOT, "client/public/assets/ai"));
+    expect(auditAiImages().errors).toEqual([]);
   });
 });
