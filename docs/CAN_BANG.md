@@ -826,6 +826,86 @@ Giữ nguyên vì: (1) tinh anh là mini-trùm — sao vàng + vầng cam dướ
    - **Ghi nhận:** Bộ hệ số tinh anh (x2.5 khí huyết, x1.5 công, xác suất 4%) của M7.3 là số đo thực nghiệm; rủi ro Độc Tước tinh anh solo chết 100% đã được **người dùng chốt GIỮ NGUYÊN** (QUYET_DINH_M3 mục 22.2, 16/11/2026): tinh anh là mini-trùm nhìn rõ (sao vàng + vầng cam), chạy về trấn là thoát, gợi ý "nên đi đội" trong game (`client/src/elite.ts`, PR #750) thay vì hạ số; xem lại nếu số liệu chơi thật cho thấy người chơi bỏ Hàn Vân vì sợ Độc Tước (chi tiết ở mục "Tinh anh").
 
 
+## Tông môn có chiều sâu trên BẢNG THẬT (M8.7, #844)
+
+> Phần này sinh từ `server/src/balance/tong-mon.ts`, tính SỐNG từ `SECT_LEVELS`, `SECT_QUEST_CH`, `SECT_SHOP` (28 món) và hàm giá của `shared/src/currency.ts`; phân tích bằng giấy (số trong thiết kế) ở `docs/M8_TONG_MON_MO_PHONG.md`.
+> Bất biến giữ bằng `sectBalanceViolations` (test `tong-mon.test.ts`): không vòng lời, sức mua / ngày <= 1 giờ săn bậc thấp nhất, buff <= 5%.
+
+### 1. Ngày lên cấp tông theo số thành viên tích cực
+
+Điểm tông = tổng cống hiến MỌI thành viên từng kiếm (chỉ tăng). Trần mỗi người 140 cống hiến / ngày; ba nhiệm vụ / ngày = 90 (độ khó 20 + 30 + 40).
+
+**Cả trần (140 / người / ngày: nhiệm vụ + góp kho + bí cảnh), số NGÀY tới từng cấp:**
+
+| Tích cực | điểm / ngày | Cấp 2 (1.000) | Cấp 3 (4.000) | Cấp 4 (12.000) | Cấp 5 (30.000) |
+|:-:|--:|--:|--:|--:|--:|
+| 1 | 140 | 7,1 | 28,6 | 85,7 | 214,3 |
+| 2 | 280 | 3,6 | 14,3 | 42,9 | 107,1 |
+| 3 | 420 | 2,4 | 9,5 | 28,6 | 71,4 |
+| 5 | 700 | 1,4 | 5,7 | 17,1 | 42,9 |
+| 10 | 1.400 | 0,7 | 2,9 | 8,6 | 21,4 |
+
+**Chỉ làm nhiệm vụ (90 / người / ngày):**
+
+| Tích cực | điểm / ngày | Cấp 2 (1.000) | Cấp 3 (4.000) | Cấp 4 (12.000) | Cấp 5 (30.000) |
+|:-:|--:|--:|--:|--:|--:|
+| 1 | 90 | 11,1 | 44,4 | 133,3 | 333,3 |
+| 2 | 180 | 5,6 | 22,2 | 66,7 | 166,7 |
+| 3 | 270 | 3,7 | 14,8 | 44,4 | 111,1 |
+| 5 | 450 | 2,2 | 8,9 | 26,7 | 66,7 |
+| 10 | 900 | 1,1 | 4,4 | 13,3 | 33,3 |
+
+Lên cấp là chuyện của TUẦN, không phải GIỜ: tông 3 người tích cực đạt cấp 5 sau 10,2 tuần (cả trần) tới 15,9 tuần (chỉ nhiệm vụ).
+
+### 2. Sức mua mỗi ngày của cửa hàng thật
+
+Cận trên giá trị (Linh thạch theo GIÁ MUA NPC) một người mua trong một ngày với 140 cống hiến (knapsack phân số theo sức mua mỗi cống hiến, tới hạn mức `limitDay` của từng món). Cột còn lại: sức mua đó bằng bao nhiêu GIỜ săn solo của cảnh giới (loại quái tốt nhất ở bậc đầu, `monsterEconomy`).
+
+| Cấp tông | món đã mở | sức mua tối đa / ngày (LT) | giờ săn Phàm Nhân (1.075 LT/h) | giờ săn Luyện Khí (1.377 LT/h) | giờ săn Trúc Cơ (4.399 LT/h) | giờ săn Kim Đan (15.735 LT/h) |
+|:-:|--:|--:|--:|--:|--:|--:|
+| 1 (Sơ Lập) | 5 | 660 | 0,61 | 0,48 | 0,15 | 0,04 |
+| 2 (Tiểu Thành) | 13 | 687 | 0,64 | 0,50 | 0,16 | 0,04 |
+| 3 (Trung Hưng) | 16 | 759 | 0,71 | 0,55 | 0,17 | 0,05 |
+| 4 (Hưng Vượng) | 23 | 760 | 0,71 | 0,55 | 0,17 | 0,05 |
+| 5 (Đỉnh Thịnh) | 28 | 760 | 0,71 | 0,55 | 0,17 | 0,05 |
+
+- Mốc bất biến: bậc thu nhập thấp nhất là **Phàm Nhân** (1.075 LT/h); sức mua tối đa ở cấp 5 = **0,71 giờ** (<= 1). Cửa hàng là tiện lợi / phần thưởng tham gia, không phải chỗ kiếm tiền.
+- Sức mua cao nhất mỗi cống hiến: **6,00 LT / cống hiến** (Tụ Khí Đan); neo thiết kế là 5. Chỉ món NPC KHÔNG bán (Tụ Khí Đan, rẻ hơn công thức chủ ý) có thể vượt neo; mọi món NPC có bán bị `sectShopViolations` giữ <= 5.
+
+### 3. Vòng Linh thạch -> cống hiến -> hàng -> bán lại
+
+Một món mua bằng `cost` cống hiến rồi bán lại NPC (`sellPrice`). Vốn tính hai cách: (a) cống hiến kiếm bằng nhiệm vụ coi như đáng 5 LT (neo); (b) cống hiến có được bằng GÓP KHO, 100 LT giá trị = 1 cống hiến (Linh thạch thật). Vòng có lời khi bán lại / vốn >= 1.
+
+| Cách quy vốn | bán lại / vốn LỚN NHẤT trên 28 món có giá bán | món |
+|---|--:|---|
+| (a) neo 5 LT / cống hiến | 0,30 | Tụ Khí Đan (cost 30, bán 45 LT) |
+| (b) góp kho 100 LT / cống hiến | 0,02 | Tụ Khí Đan (cost 30, bán 45 LT) |
+
+**Không có vòng lời** (mọi tỉ lệ < 1); hàng mua bằng cống hiến không rửa Linh thạch.
+
+### 4. Buff cấp tông
+
+Buff gắn vào tu vi cá nhân / rơi đồ / hồi phục, KHÔNG gắn vào điểm tông nên không tạo vòng tăng tốc lên cấp. Ngân sách thiết kế: nhịp lên cảnh giới nhanh hơn <= 5%, rơi đồ <= +5%; trần cứng x1.1 / x1.1.
+
+| Cấp tông | buff tu vi | nhịp lên cảnh giới nhanh hơn | buff rơi đồ | rơi đồ |
+|:-:|--:|--:|--:|--:|
+| 1 (Sơ Lập) | x1.00 | 0% | x1.00 | +0% |
+| 2 (Tiểu Thành) | x1.02 | 2% | x1.00 | +0% |
+| 3 (Trung Hưng) | x1.03 | 2,9% | x1.03 | +3% |
+| 4 (Hưng Vượng) | x1.04 | 3,8% | x1.05 | +5% |
+| 5 (Đỉnh Thịnh) | x1.05 | 4,8% | x1.05 | +5% |
+
+### 5. Đường tắt Tụ Khí Đan mua bằng cống hiến
+
+Tụ Khí Đan (cấp tông 3, 30 cống hiến, tối đa 2 viên / ngày) cộng 5% thanh tu vi, tối đa 300 tu vi mỗi viên. Mua đủ hạn mức mỗi ngày tốn 60 / 140 cống hiến của ngày. Thời gian tiết kiệm theo nhịp bậc (mô hình `simulate`, có chuỗi nhiệm vụ):
+
+| Bậc | thanh tu vi | tu vi / viên | tu vi / ngày | tiết kiệm / ngày |
+|---|--:|--:|--:|---|
+| Luyện Khí Tầng 5 | 410 | 21 | 41 | 0,6 phút (10% thanh) |
+| Luyện Khí Tầng 9 | 600 | 30 | 60 | 0,5 phút (10% thanh) |
+| Trúc Cơ Trung kỳ | 5.060 | 253 | 506 | 3,5 phút (10% thanh) |
+
+
 ## Cân bằng chiêu thức, ngũ hành và trạng thái (M7, #510)
 
 > Dựa trên `shared/src/skills.ts` (18 chiêu: 12 đợt 1 + 6 chiêu Nguyên Anh đợt 2, #654) và `server/src/systems/status-rules.ts`. Mọi chiêu thức được mô phỏng theo chu kỳ thi triển đều đặn theo hồi chiêu, kết hợp đan xen Kiếm chém thường (`SKILLS.slash`).
