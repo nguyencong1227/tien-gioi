@@ -26,7 +26,7 @@ import type { WorldRoom } from "./WorldRoom";
 import type { WorldState } from "../schema";
 import { listenWithRetry } from "../test-port";
 import { ambushOf, rollAmbush } from "../systems/ambush";
-import { killMonster } from "../systems/combat";
+import { hurtPlayer, killMonster } from "../systems/combat";
 
 const dataDir = mkdtempSync(path.join(tmpdir(), "tien-gioi-arena-room-"));
 
@@ -252,6 +252,48 @@ describe("Đấu trường chặn đường qua mạng (máy chủ Colyseus th�
     expect(Math.abs(p2.x - origin.x)).toBeLessThan(4);
     expect(Math.abs(p2.y - origin.y)).toBeLessThan(4);
     void sid;
+  }, 30_000);
+
+  it("MỤC 53: bị hạ trong đấu trường = CHẾT THẬT: ambushEnd lost + died (KHÔNG trừ giá), màn Hoàng Tuyền, hồ sơ lưu Hoàng Tuyền ở CHỖ CŨ, về phòng gốc NGAY (không đợi AMBUSH_EXIT_MS), vào lại thấy trạng thái Hoàng Tuyền", async () => {
+    const { h, hub } = await enterArena("Chet That");
+    const w = worldOf(h.room);
+    const sid = h.room.sessionId;
+    const limbos: unknown[] = [];
+    h.room.onMessage("limbo", (m: unknown) => limbos.push(m));
+    await waitFor(() => h.states.at(-1), 3000, "nhận ambushState");
+    const p = serverState(h.room).players.get(sid)!;
+    const c = w.ctrl.get(sid);
+    const mc = [...w.mctrl.values()][0]!;
+    const t0 = Date.now();
+    p.hp = 1;
+    hurtPlayer(w, sid, p, 99_999, { kind: mc.def.id });
+    const end = await waitFor(() => h.ends[0], 3000, "nhận ambushEnd");
+    expect(end).toEqual({ result: "lost", died: true }); // không `paid`: cái chết thay giá
+    expect(c.limbo).toBeDefined();
+    await waitFor(() => limbos[0], 4000, "nhận màn hình Hoàng Tuyền");
+    // hồ sơ lưu: Hoàng Tuyền ở CHỖ CŨ (bản đồ thường), Linh thạch lúc chết giữ nguyên (không bị trừ giá)
+    const back = await waitFor(() => h.travel[0], AMBUSH_EXIT_MS + 4000, "travelTo về phòng gốc");
+    expect(back.mapId).toBe(DEFAULT_MAP_ID);
+    expect(Date.now() - t0).toBeLessThan(AMBUSH_EXIT_MS); // về NGAY khi Duyên cộng xong, không đợi giờ xem kết quả
+    const saved = await loadPlayer(h.name);
+    expect(saved?.mapId).toBe(DEFAULT_MAP_ID);
+    expect(saved?.limbo).toBeDefined();
+    expect(saved?.limbo?.coinAtDeath).toBe(5000);
+    await waitFor(() => hub.ambushes.ofKey(h.name.toLowerCase()) === undefined, 3000, "dọn vé");
+    // vào lại phòng gốc: vẫn ở trạng thái Hoàng Tuyền (chưa đầu thai)
+    await sleep(300);
+    const again: Hero = {
+      name: h.name,
+      room: undefined as never,
+      offers: [],
+      ends: [],
+      states: [],
+      travel: [],
+    };
+    await join(again, roomNameOf(DEFAULT_MAP_ID), false);
+    const c2 = worldOf(again.room).ctrl.get(again.room.sessionId);
+    expect(c2.limbo).toBeDefined();
+    expect(serverState(again.room).players.get(again.room.sessionId)!.dead).toBe(true);
   }, 30_000);
 
   it("thắng: hạ hết bầy -> ambushEnd won + thưởng (tu vi + Linh thạch cộng đúng số báo, hồ sơ đã lưu); quái chết KHÔNG tự cho tu vi; rồi về chỗ cũ", async () => {
