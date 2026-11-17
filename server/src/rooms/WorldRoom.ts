@@ -7,6 +7,8 @@ import { Room, Client, ServerError, matchMaker, type RoomException, type Server 
 import {
   TICK_MS,
   type SoulSocial,
+  SOCIAL_MSG,
+  parseBoardsGet,
   MAX_PLAYERS_PER_ROOM,
   MONSTER_RESPAWN_MS,
   DEFAULT_MAP_ID,
@@ -182,6 +184,7 @@ import { RateLimiter } from "../rate-limit";
 import { audit, auditCoinThreshold } from "../audit";
 import { bossMovesOf } from "../systems/boss-config";
 import { testExpMultFor } from "../test-exp";
+import type { LeaderboardService } from "../leaderboard";
 import { defaultHub, type Hub } from "../hub";
 
 const SAVE_EVERY_MS = 30_000;
@@ -242,6 +245,8 @@ export class WorldRoom extends Room<WorldState> {
    * (biến môi trường) gỡ tính năng: không có dịch vụ, mọi tin tông môn bị từ chối.
    */
   static sects: SectService | null = null;
+  /** Dịch vụ bảng xếp hạng (M9, `leaderboard.ts`; đặt ở `index.ts`, `LEADERBOARD=off` gỡ). `null`: tin `boardsGet` trả bảng trống. */
+  static leaderboards: LeaderboardService | null = null;
   /** "Chờ sang ngày mới kiếm được cống hiến" (M8; mặc định BẬT; `index.ts` đặt từ `SECT_EARN_WARMUP`, `off` chỉ để dev / E2E). */
   static sectEarnWarmup = true;
   private static defaultSects: SectService | undefined;
@@ -451,6 +456,21 @@ export class WorldRoom extends Room<WorldState> {
     this.on(SECT_MSG.deposit, (sid, m) => void sectDeposit(w, sid, m));
     this.on(SECT_MSG.withdraw, (sid, m) => void sectWithdraw(w, sid, m));
     this.on(SECT_MSG.hallGet, (sid, m) => void sectHallGet(w, sid, m));
+    // Bảng xếp hạng (M9.3): tra bản chụp trong bộ nhớ (không I/O), chỉ cho người hỏi
+    this.on(SOCIAL_MSG.boardsGet, (sid, m) => {
+      const board = parseBoardsGet(m);
+      if (board === null) return;
+      const view = WorldRoom.leaderboards?.view(
+        board,
+        this.state.players.get(sid)?.name ?? null,
+      ) ?? {
+        board,
+        rows: [],
+        mine: { rank: null, reason: "none" as const },
+        ageMs: 0,
+      };
+      this.sendTo(sid, SOCIAL_MSG.boards, view);
+    });
     this.on(SECT_MSG.questAccept, (sid, m) => void sectQuestAccept(w, sid, m));
     this.on(SECT_MSG.questTurnIn, (sid, m) => void sectQuestTurnIn(w, sid, m));
     this.on(SECT_MSG.shopBuy, (sid, m) => void sectShopBuy(w, sid, m));
