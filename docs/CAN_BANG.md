@@ -79,7 +79,7 @@ Mô hình kinh tế dựa trên hợp đồng `shared/src/currency.ts`: tiền r
 |---|---:|---:|---:|---:|---:|---|
 | Linh Thố (`tho`) | 0 | 40 | 1.20 | 1.23 | **2.43** | Lông thỏ (1 LT), Hồi huyết đan (6 LT) |
 | Hôi Lang (`lang`) | 1 | 140 | 2.80 | 2.55 | **5.35** | Nanh sói (2 LT), Hồi huyết đan (6 LT), Hồi linh đan (6 LT) |
-| Hắc Hổ (`ho`) | 7 | 600 | 11.20 | 8.52 | **19.72** | Da hổ (9 LT), Đan hồi phục (6 LT), Tụ khí đan (45 LT) |
+| Hắc Hổ (`ho`) | 7 | 600 | 11.20 | 9.87 | **21.07** | Da hổ (9 LT), Đan hồi phục (6 LT), Tụ khí đan (45 LT) |
 | Xích Mãng (`mang`) | 12 | 4000 | 225.00 | 246.00 | **471.00** | Vảy mãng (60 LT), Tụ khí đan (45 LT), Hồi huyết đan (6 LT) |
 
 ### 2. Thu nhập Linh thạch mỗi giờ khi săn một loại quái
@@ -101,25 +101,25 @@ Giả định người chơi đánh đơn lẻ (solo), dùng Kiếm chém, đả
 | Luyện Khí Tầng 5 | Hôi Lang | 334 | 934 | 851 | **1,785** | 74.4 |
 | Luyện Khí Tầng 6 | Linh Thố | 553 | 664 | 681 | **1,345** | 56.0 |
 | Luyện Khí Tầng 6 | Hôi Lang | 348 | 976 | 888 | **1,864** | 77.7 |
-| Luyện Khí Tầng 6 | Hắc Hổ | 133 | 1,492 | 1,135 | **2,627** | 109.5 |
+| Luyện Khí Tầng 6 | Hắc Hổ | 133 | 1,492 | 1,315 | **2,807** | 117.0 |
 | Luyện Khí Tầng 7 | Linh Thố | 566 | 679 | 696 | **1,375** | 57.3 |
 | Luyện Khí Tầng 7 | Hôi Lang | 376 | 1,054 | 960 | **2,014** | 83.9 |
-| Luyện Khí Tầng 7 | Hắc Hổ | 168 | 1,883 | 1,433 | **3,316** | 138.2 |
+| Luyện Khí Tầng 7 | Hắc Hổ | 168 | 1,883 | 1,660 | **3,543** | 147.6 |
 | Luyện Khí Tầng 8 | Linh Thố | 570 | 683 | 701 | **1,384** | 57.7 |
 | Luyện Khí Tầng 8 | Hôi Lang | 385 | 1,077 | 981 | **2,057** | 85.7 |
-| Luyện Khí Tầng 8 | Hắc Hổ | 180 | 2,018 | 1,535 | **3,554** | 148.1 |
+| Luyện Khí Tầng 8 | Hắc Hổ | 180 | 2,018 | 1,779 | **3,797** | 158.2 |
 | Luyện Khí Tầng 9 | Linh Thố | 573 | 688 | 705 | **1,393** | 58.1 |
 | Luyện Khí Tầng 9 | Hôi Lang | 393 | 1,101 | 1,002 | **2,103** | 87.6 |
-| Luyện Khí Tầng 9 | Hắc Hổ | 193 | 2,167 | 1,648 | **3,815** | 159.0 |
+| Luyện Khí Tầng 9 | Hắc Hổ | 193 | 2,167 | 1,910 | **4,076** | 169.9 |
 | Trúc Cơ Sơ kỳ | Linh Thố | 581 | 697 | 715 | **1,412** | 58.8 |
 | Trúc Cơ Sơ kỳ | Hôi Lang | 410 | 1,149 | 1,046 | **2,195** | 91.5 |
-| Trúc Cơ Sơ kỳ | Hắc Hổ | 223 | 2,499 | 1,901 | **4,399** | 183.3 |
+| Trúc Cơ Sơ kỳ | Hắc Hổ | 223 | 2,499 | 2,202 | **4,700** | 195.8 |
 | Trúc Cơ Trung kỳ | Linh Thố | 583 | 700 | 718 | **1,418** | 59.1 |
 | Trúc Cơ Trung kỳ | Hôi Lang | 415 | 1,163 | 1,059 | **2,222** | 92.6 |
-| Trúc Cơ Trung kỳ | Hắc Hổ | 232 | 2,603 | 1,980 | **4,583** | 191.0 |
+| Trúc Cơ Trung kỳ | Hắc Hổ | 232 | 2,603 | 2,294 | **4,897** | 204.0 |
 | Trúc Cơ Hậu kỳ | Linh Thố | 586 | 703 | 720 | **1,423** | 59.3 |
 | Trúc Cơ Hậu kỳ | Hôi Lang | 420 | 1,176 | 1,071 | **2,247** | 93.6 |
-| Trúc Cơ Hậu kỳ | Hắc Hổ | 241 | 2,699 | 2,053 | **4,752** | 198.0 |
+| Trúc Cơ Hậu kỳ | Hắc Hổ | 241 | 2,699 | 2,378 | **5,077** | 211.6 |
 
 ### 3. Nhận xét & phân tích cân bằng kinh tế
 
@@ -228,9 +228,9 @@ Linh thạch ròng = thưởng hoàn thành + giá bán đồ thưởng kỳ v�
 
 | Đội | Linh thạch ròng / người | = phút săn | Tu vi / người | = phút săn |
 |---|---:|---:|---:|---:|
-| 2 người | 1248 | 19.6 | 2816 | 23.4 |
-| 3 người | 1076 | 16.9 | 2122 | 17.7 |
-| 4 người | 990 | 15.6 | 1776 | 14.8 |
+| 2 người | 1255 | 18.5 | 2816 | 23.4 |
+| 3 người | 1080 | 15.9 | 2122 | 17.7 |
+| 4 người | 993 | 14.6 | 1776 | 14.8 |
 
 Tối đa 3 lượt thưởng mỗi ngày (`DUNGEON_DAILY_REWARDS`) nên bí cảnh là một lựa chọn thêm chứ không thay được việc săn quái.
 
@@ -363,16 +363,16 @@ Mục tiêu: không bãi nào cho tu vi / giờ vượt ~1,5x bãi mới tốt n
 | Bậc | Loài | Tu vi / giờ | Linh thạch / giờ | Con / giờ | Khí huyết mất |
 |---|---|---:|---:|---:|---:|
 | Kim Đan Sơ kỳ | Xích Mãng | 33,407 | 15,735 | 33 | 45% |
-| Kim Đan Sơ kỳ | Sương Hồ | 34,746 | 7,808 | 151 | 46% |
-| Kim Đan Sơ kỳ | Thạch Quy | 35,131 | 7,157 | 80 | 49% |
+| Kim Đan Sơ kỳ | Sương Hồ | 34,746 | 7,980 | 151 | 46% |
+| Kim Đan Sơ kỳ | Thạch Quy | 35,131 | 7,334 | 80 | 49% |
 | Kim Đan Sơ kỳ | Độc Thiềm | không an toàn solo (97% khí huyết / trận) | – | – | – |
 | Kim Đan Trung kỳ | Xích Mãng | 34,502 | 16,279 | 35 | 32% |
-| Kim Đan Trung kỳ | Sương Hồ | 39,534 | 8,952 | 173 | 33% |
-| Kim Đan Trung kỳ | Thạch Quy | 40,301 | 8,245 | 92 | 35% |
+| Kim Đan Trung kỳ | Sương Hồ | 39,534 | 9,149 | 173 | 33% |
+| Kim Đan Trung kỳ | Thạch Quy | 40,301 | 8,448 | 92 | 35% |
 | Kim Đan Trung kỳ | Độc Thiềm | không an toàn solo (70% khí huyết / trận) | – | – | – |
 | Kim Đan Hậu kỳ | Xích Mãng | 35,378 | 16,715 | 35 | 24% |
-| Kim Đan Hậu kỳ | Sương Hồ | 44,081 | 10,042 | 194 | 24% |
-| Kim Đan Hậu kỳ | Thạch Quy | 45,544 | 9,348 | 104 | 26% |
+| Kim Đan Hậu kỳ | Sương Hồ | 44,081 | 10,264 | 194 | 24% |
+| Kim Đan Hậu kỳ | Thạch Quy | 45,544 | 9,580 | 104 | 26% |
 | Kim Đan Hậu kỳ | Độc Thiềm | không an toàn solo (51% khí huyết / trận) | – | – | – |
 
 ### 2. Trùm Hắc Giao theo cỡ đội (tu vi / giờ MỖI người, trong ngoặc khí huyết mất / trận)
@@ -440,13 +440,13 @@ Cao nhất **1.51x**, thấp nhất **0.91x**: ở Kim Đan đội 3-4 hạ Hắ
 
 ### 6. Kinh tế Kim Đan: chỗ tiêu Linh thạch so với thu nhập (#406)
 
-Thu nhập theo nhịp "bãi mới" ở mục 3 (săn solo, mỗi bậc một loài tốt nhất): tiền rơi cộng bán đồ rơi, TRỪ nguyên liệu của ba bộ (người chơi giữ lại để rèn). Chi: phí rèn `RecipeDef.coin` (mỗi bộ rèn được từ bậc ghi ở cột đầu, tiền trả khi rèn). Cột "Cộng dồn / Phí cộng dồn" so sánh tiền có được tới hết bậc với phí cộng dồn của các bộ mặc được tới bậc kế; tiền có được gồm cả **10,782** Linh thạch kiếm ở Luyện Khí / Trúc Cơ CÙNG kiếp (ví chỉ đặt lại lúc đầu thai và ở đó gần như không có chỗ tiêu); bộ III chỉ mặc được ở Hậu kỳ nên phí của nó tính vào cuối Hậu kỳ. Săn trùm theo đội lấy Giao Lân kiếm ít tiền hơn solo (tiền rơi của trùm chia 4 người: ~2,731 Linh thạch / giờ mỗi người): phần hụt đã trừ vào thu nhập Hậu kỳ.
+Thu nhập theo nhịp "bãi mới" ở mục 3 (săn solo, mỗi bậc một loài tốt nhất): tiền rơi cộng bán đồ rơi, TRỪ nguyên liệu của ba bộ (người chơi giữ lại để rèn). Chi: phí rèn `RecipeDef.coin` (mỗi bộ rèn được từ bậc ghi ở cột đầu, tiền trả khi rèn). Cột "Cộng dồn / Phí cộng dồn" so sánh tiền có được tới hết bậc với phí cộng dồn của các bộ mặc được tới bậc kế; tiền có được gồm cả **11,473** Linh thạch kiếm ở Luyện Khí / Trúc Cơ CÙNG kiếp (ví chỉ đặt lại lúc đầu thai và ở đó gần như không có chỗ tiêu); bộ III chỉ mặc được ở Hậu kỳ nên phí của nó tính vào cuối Hậu kỳ. Săn trùm theo đội lấy Giao Lân kiếm ít tiền hơn solo (tiền rơi của trùm chia 4 người: ~2,731 Linh thạch / giờ mỗi người): phần hụt đã trừ vào thu nhập Hậu kỳ.
 
 | Bậc | Nguồn | Phút | Linh thạch / giờ (khả dụng) | Kiếm trong bậc | Cộng dồn | Phí rèn cộng dồn | Dư / thiếu |
 |---|---|---:|---:|---:|---:|---:|---:|
-| Kim Đan Sơ kỳ | Thạch Quy | 77 | 5,364 | 6,906 | 17,688 | 9,500 | +8,188 |
-| Kim Đan Trung kỳ | Thạch Quy | 78 | 6,179 | 8,039 | 25,727 | 31,500 | -5,773 |
-| Kim Đan Hậu kỳ | Thạch Quy | 96 | 7,006 | 7,296 | 33,023 | 78,500 | -45,477 |
+| Kim Đan Sơ kỳ | Thạch Quy | 77 | 5,541 | 7,134 | 18,607 | 9,500 | +9,107 |
+| Kim Đan Trung kỳ | Thạch Quy | 78 | 6,383 | 8,304 | 26,911 | 31,500 | -4,589 |
+| Kim Đan Hậu kỳ | Thạch Quy | 96 | 7,237 | 7,454 | 34,365 | 78,500 | -44,135 |
 
 Chi cho từng bộ (nguyên liệu tính MỖI NGƯỜI; trùm đi theo đội 4 người, mỗi mảnh rơi chung nên cả đội cần 4 lần số lượng):
 
@@ -456,22 +456,22 @@ Chi cho từng bộ (nguyên liệu tính MỖI NGƯỜI; trùm đi theo đội 
 | Bộ II (từ Trung kỳ) | 3 | 22,000 | 48 Quy giáp, 20 Độc nang | 51.6 | 0.0 | 66% |
 | Bộ III (từ Hậu kỳ) | 3 | 47,000 | 19 Giao lân, 30 Độc nang | 14.7 | 55.0 | 72% |
 
-Tổng phí rèn ba bộ **78,500** Linh thạch so với **33,023** có được từ đầu kiếp tới hết Kim Đan: thiếu 45,477 (~6.5 giờ săn Hậu kỳ sau khi hết Kim Đan). Bộ I mua đủ trong Sơ kỳ (dư 8,188 cuối bậc) và bộ II trong Trung kỳ (thiếu 5,773); bộ III (47,000, 60% tổng phí) là mục tiêu cuối game: người chơi KHÔNG dư hàng vạn Linh thạch không có chỗ tiêu như cảnh báo cũ của mục "Kinh tế Linh thạch", và cũng không bị chặn (thiếu chừng 6.5 giờ). Cột cuối: cày nguyên liệu chiếm tối đa 72% thời gian bậc và các giờ đó vẫn kiếm tu vi, nên nguyên liệu không phải nút cổ chai, tiền mới là.
+Tổng phí rèn ba bộ **78,500** Linh thạch so với **34,365** có được từ đầu kiếp tới hết Kim Đan: thiếu 44,135 (~6.1 giờ săn Hậu kỳ sau khi hết Kim Đan). Bộ I mua đủ trong Sơ kỳ (dư 9,107 cuối bậc) và bộ II trong Trung kỳ (thiếu 4,589); bộ III (47,000, 60% tổng phí) là mục tiêu cuối game: người chơi KHÔNG dư hàng vạn Linh thạch không có chỗ tiêu như cảnh báo cũ của mục "Kinh tế Linh thạch", và cũng không bị chặn (thiếu chừng 6.1 giờ). Cột cuối: cày nguyên liệu chiếm tối đa 72% thời gian bậc và các giờ đó vẫn kiếm tu vi, nên nguyên liệu không phải nút cổ chai, tiền mới là.
 Đan cấp 2 (`dai_hoi_huyet_dan` / `dai_hoi_linh_dan`, 120 Linh thạch / viên ở Lái buôn Vọng Sương) là chỗ xả TUỲ CHỌN thêm vào: mô hình không tính vì không giả định người chơi uống đan (đả tọa hồi khí huyết). Mô hình cũng bỏ qua nhiệm vụ lặp và phí rèn ở nhịp tu luyện (mục 3), phần Linh thạch / đồ thưởng của nhiệm vụ.
 
 **Qua kiếp.** Bảng trên là kiếp 1 (không Dư âm tu hành). Khi kiếp nào cũng cày tới hết Kim Đan và nâng Dư âm tu hành (mục 4), bậc ngắn lại theo hệ số tốc độ nhưng Linh thạch theo số quái hạ nên KHÔNG tăng, còn `applyRebirth` đưa ví về tối đa `coinCarryCap` (400 khi đủ Kim nang) và túi rỗng:
 
 | Kiếp | Dư âm tu hành | Phút cả kiếp | Linh thạch có được | Rèn đủ phí | Cày nguyên liệu bộ III so với Hậu kỳ |
 |---|---:|---:|---:|---|---:|
-| 1 | Nấc 5 | 422 | 33,023 | bộ I + II | 72% |
-| 2 | Nấc 7 | 284 | 20,710 | bộ I | 109% |
-| 3 | Nấc 8 | 251 | 17,813 | bộ I | 123% |
-| 4 | Nấc 9 | 238 | 16,721 | bộ I | 130% |
-| 5 | Nấc 9 | 226 | 15,841 | bộ I | 138% |
-| 6 | Nấc 10 | 226 | 15,841 | bộ I | 138% |
-| 7 | Nấc 10 | 215 | 15,049 | bộ I | 145% |
+| 1 | Nấc 5 | 422 | 34,365 | bộ I + II | 72% |
+| 2 | Nấc 7 | 284 | 21,534 | bộ I | 109% |
+| 3 | Nấc 8 | 251 | 18,515 | bộ I | 123% |
+| 4 | Nấc 9 | 238 | 17,379 | bộ I | 130% |
+| 5 | Nấc 9 | 226 | 16,464 | bộ I | 138% |
+| 6 | Nấc 10 | 226 | 16,464 | bộ I | 138% |
+| 7 | Nấc 10 | 215 | 15,641 | bộ I | 145% |
 
-Không kiếp nào trả đủ cả ba bộ (kiếp 1 chỉ tới bộ I + II); từ kiếp 2 trở đi chỉ trả đủ bộ I (kiếp 7: 15,049 Linh thạch, cày nguyên liệu bộ III chiếm 145% Hậu kỳ nên không kịp trong bậc). Đây là CHỦ Ý hay không là câu hỏi cho người dùng (ghi ở `questions.md`): đường giữ đồ là **Ký vật** (3 nấc, tổng 225 Duyên ~ 1.2 kiếp Kim Đan; nấc 3 giữ lại cả ba món đang mặc), nên bộ rèn ở kiếp trước đi theo sang kiếp sau và Linh thạch chỉ cần cho phần còn thiếu; Linh thạch KHÔNG tích lũy qua kiếp (ví về tối đa 400) nên "dư hàng vạn" ở kiếp sau không thành vấn đề tích tụ. Mô hình chưa tính người chơi kiếp sau rèn lại từ đầu (không Ký vật).
+Không kiếp nào trả đủ cả ba bộ (kiếp 1 chỉ tới bộ I + II); từ kiếp 2 trở đi chỉ trả đủ bộ I (kiếp 7: 15,641 Linh thạch, cày nguyên liệu bộ III chiếm 145% Hậu kỳ nên không kịp trong bậc). Đây là CHỦ Ý hay không là câu hỏi cho người dùng (ghi ở `questions.md`): đường giữ đồ là **Ký vật** (3 nấc, tổng 225 Duyên ~ 1.2 kiếp Kim Đan; nấc 3 giữ lại cả ba món đang mặc), nên bộ rèn ở kiếp trước đi theo sang kiếp sau và Linh thạch chỉ cần cho phần còn thiếu; Linh thạch KHÔNG tích lũy qua kiếp (ví về tối đa 400) nên "dư hàng vạn" ở kiếp sau không thành vấn đề tích tụ. Mô hình chưa tính người chơi kiếp sau rèn lại từ đầu (không Ký vật).
 
 ### 7. Trang bị: ba bộ tăng sức mạnh đều, không bộ nào bắt buộc hay vô dụng (#406)
 
@@ -626,17 +626,17 @@ Bốn mức hiểu biết của thợ săn (đo càng thật thì càng chậm):
 |---|---|---:|---:|---:|---:|---:|---:|
 | Lạc Hà Trấn | Linh Thố | 40 | 6 | 0.8 (0.5) | 0.8 (0.6) | 0.8 (0.6) | 0.9 (0.4) |
 | Lạc Hà Trấn | Hôi Lang | 30 | 8 | 2.6 (2.1) | 2.7 (2.0) | 2.3 (1.6) | 2.9 (2.5) |
-| Lạc Hà Trấn | Hắc Hổ | 16 | 12 | 2.3 (1.7) | 3.4 (1.6) | 3.1 (1.5) | 4.1 (1.8) |
+| Lạc Hà Trấn | Hắc Hổ | 16 | 12 | 2.4 (1.7) | 3.4 (1.7) | 2.8 (1.7) | 4.0 (2.0) |
 | Lạc Hà Trấn | Xích Mãng | 2 | 90 | 10.1 (10.5) | 18.6 (10.4) | 22.0 (12.5) | 21.7 (14.7) |
 | Hắc Phong Cốc | Hôi Lang | 20 | 8 | 3.8 (3.7) | 4.8 (3.0) | 6.1 (4.5) | 4.5 (3.4) |
-| Hắc Phong Cốc | Hắc Hổ | 36 | 12 | 1.9 (1.7) | 3.2 (1.8) | 3.2 (1.9) | 3.3 (2.6) |
+| Hắc Phong Cốc | Hắc Hổ | 36 | 12 | 1.9 (1.8) | 3.5 (1.8) | 3.3 (2.0) | 2.6 (1.7) |
 | Hắc Phong Cốc | Xích Mãng | 6 | 90 | 3.3 (2.8) | 5.2 (2.9) | 5.0 (2.9) | 6.3 (3.1) |
-| Âm Sương Trạch | Sương Hồ | 24 | 10 | 3.4 (2.5) | 5.4 (2.9) | 4.6 (2.5) | 5.2 (3.6) |
-| Âm Sương Trạch | Thạch Quy | 18 | 12 | 3.9 (2.4) | 5.5 (2.2) | 6.1 (2.2) | 7.1 (3.1) |
+| Âm Sương Trạch | Sương Hồ | 24 | 10 | 3.6 (2.4) | 4.3 (2.5) | 3.4 (2.2) | 5.2 (3.1) |
+| Âm Sương Trạch | Thạch Quy | 18 | 12 | 3.9 (2.5) | 6.8 (2.7) | 7.7 (2.7) | 6.5 (3.3) |
 | Âm Sương Trạch | Độc Thiềm | 18 | 14 | 3.0 (2.1) | 5.0 (2.3) | 5.7 (2.6) | 5.9 (2.3) |
 | Âm Sương Trạch | Hắc Giao | 6 | 90 | 4.5 (4.2) | 6.1 (4.8) | 7.5 (5.6) | 8.3 (6.3) |
 | Hàn Vân Lĩnh | Hàn Lang | 20 | 10 | 3.7 (3.5) | 4.7 (3.6) | 4.7 (3.8) | 6.2 (4.8) |
-| Hàn Vân Lĩnh | Phong Nha | 16 | 10 | 4.2 (3.2) | 4.5 (3.4) | 4.6 (2.6) | 5.8 (4.3) |
+| Hàn Vân Lĩnh | Phong Nha | 16 | 10 | 3.9 (3.6) | 4.6 (4.5) | 5.3 (5.5) | 6.0 (4.3) |
 | Hàn Vân Lĩnh | Cốt Tượng | 12 | 12 | 3.4 (2.6) | 4.9 (2.8) | 5.0 (3.2) | 6.1 (3.4) |
 | Hàn Vân Lĩnh | Độc Tước | 12 | 14 | 3.4 (2.6) | 5.3 (2.7) | 6.2 (2.6) | 4.7 (2.6) |
 | Hàn Vân Lĩnh | Thiên Hàn Vương | 2 | 90 | 8.8 (7.3) | 26.0 (15.9) | 26.4 (18.4) | 26.1 (18.5) |
@@ -650,29 +650,29 @@ Bốn mức hiểu biết của thợ săn (đo càng thật thì càng chậm):
 | Giả định tìm quái | Hết Luyện Khí (cộng dồn) | Hết Trúc Cơ (cộng dồn) | Riêng Kim Đan (tối ưu) | Riêng Kim Đan (bãi mới) | Nguồn nhanh nhất ở Kim Đan (tối ưu) | Xích Mãng / bãi mới tốt nhất (Sơ / Trung / Hậu) |
 |---|---:|---:|---:|---:|---|---:|
 | Mô hình (giả định hiện tại) | 51 | 170 | 251 (4.2 giờ) | 251 (4.2 giờ) | Thạch Quy | 0.95 / 0.86 / 0.78 |
-| Biết hết bản đồ | 27 | 71 | 75 (1.3 giờ) | 175 (2.9 giờ) | Xích Mãng | 2.69 / 2.56 / 2.44 |
-| Máy tính 1280x720 (nhìn 1138x640 px) | 28 | 80 | 102 (1.7 giờ) | 199 (3.3 giờ) | Xích Mãng | 2.29 / 2.16 / 2.03 |
-| Điện thoại ngang 844x390 (nhìn 1125x520 px) | 28 | 79 | 112 (1.9 giờ) | 189 (3.2 giờ) | Xích Mãng | 2.01 / 1.86 / 1.72 |
-| Điện thoại dọc 390x844 (nhìn 508x1100 px) | 29 | 87 | 112 (1.9 giờ) | 197 (3.3 giờ) | Xích Mãng | 2.09 / 1.94 / 1.81 |
+| Biết hết bản đồ | 27 | 72 | 75 (1.3 giờ) | 177 (3.0 giờ) | Xích Mãng | 2.72 / 2.59 / 2.47 |
+| Máy tính 1280x720 (nhìn 1138x640 px) | 28 | 81 | 102 (1.7 giờ) | 187 (3.1 giờ) | Xích Mãng | 2.17 / 2.02 / 1.88 |
+| Điện thoại ngang 844x390 (nhìn 1125x520 px) | 28 | 79 | 112 (1.9 giờ) | 175 (2.9 giờ) | Xích Mãng | 1.89 / 1.72 / 1.57 |
+| Điện thoại dọc 390x844 (nhìn 508x1100 px) | 29 | 86 | 112 (1.9 giờ) | 197 (3.3 giờ) | Xích Mãng | 2.09 / 1.95 / 1.82 |
 
-Tiêu chí #406 mục 1 ("không nguồn nào vượt ~1,5x bãi mới tốt nhất cùng bậc", cột cuối): mô hình ĐẠT (tối đa 0.95x); biết hết bản đồ KHÔNG ĐẠT (tối đa 2.69x); máy tính 1280x720 KHÔNG ĐẠT (tối đa 2.29x); điện thoại ngang 844x390 KHÔNG ĐẠT (tối đa 2.01x); điện thoại dọc 390x844 KHÔNG ĐẠT (tối đa 2.09x).
+Tiêu chí #406 mục 1 ("không nguồn nào vượt ~1,5x bãi mới tốt nhất cùng bậc", cột cuối): mô hình ĐẠT (tối đa 0.95x); biết hết bản đồ KHÔNG ĐẠT (tối đa 2.72x); máy tính 1280x720 KHÔNG ĐẠT (tối đa 2.17x); điện thoại ngang 844x390 KHÔNG ĐẠT (tối đa 1.89x); điện thoại dọc 390x844 KHÔNG ĐẠT (tối đa 2.09x).
 
 **So công bằng: hiệu chỉnh theo độ vụng của loài thường.** Thợ săn là thuật toán (biết loài sống ở vùng nào, đường đi hoàn hảo, không bao giờ dừng), nên mọi số đo ở trên đều nhanh hơn giả định của mô hình; mô hình đã chừa cho người chơi thật một khoảng thời gian tìm quái lớn hơn thợ săn (do dự, đả tọa, nhặt đồ, tranh quái). So Xích Mãng / Hắc Giao với số đo THÔ là so không công bằng (mô hình cho chúng 90 giây, không chừa khoảng ấy). Bảng dưới giữ giả định mô hình cho loài thường và đặt Xích Mãng / Hắc Giao = số đo (bản đồ chậm hơn) cộng độ vụng. Độ vụng chỉ ước lượng được từ các loài thường (trung vị trên 36 dòng: 8 loài x 3 cỡ màn hình, 3 hạt giống) và **dạng của nó là giả thuyết chưa kiểm chứng**, nên cho hai dạng: NHÂN (người chậm gấp k lần thợ săn ở mọi nơi) và CỘNG (người mất thêm b giây cố định mỗi lần tìm). Một hệ số CHUNG cho cả ba cỡ màn hình, vì số đo thô của trùm gần y hệt giữa ba cỡ (Xích Mãng Lạc Hà 18.6 / 22.0 / 21.7 giây) nên hệ số riêng từng cỡ chỉ thêm nhiễu của loài thường. Thật nằm đâu đó giữa hai dạng; **số đo của bot / người (#410) mới phân xử được**.
 
 | Giả thuyết độ vụng | Mức nhìn | Xích Mãng (s, giả định 90) | Hắc Giao (s, giả định 90) | Riêng Kim Đan (tối ưu) | Riêng Kim Đan (bãi mới) | Xích Mãng / bãi mới tốt nhất (Sơ / Trung / Hậu) |
 |---|---|---:|---:|---:|---:|---:|
-| Nhân (người chậm gấp 2.4x) | Máy tính 1280x720 (nhìn 1138x640 px) | 45 | 15 | 185 (3.1 giờ) | 251 (4.2 giờ) | 1.63 / 1.51 / 1.40 |
-| Nhân (người chậm gấp 2.4x) | Điện thoại ngang 844x390 (nhìn 1125x520 px) | 53 | 18 | 210 (3.5 giờ) | 251 (4.2 giờ) | 1.45 / 1.33 / 1.22 |
-| Nhân (người chậm gấp 2.4x) | Điện thoại dọc 390x844 (nhìn 508x1100 px) | 52 | 20 | 208 (3.5 giờ) | 251 (4.2 giờ) | 1.46 / 1.34 / 1.23 |
-| Cộng (người mất thêm 6 giây) | Máy tính 1280x720 (nhìn 1138x640 px) | 24 | 12 | 120 (2.0 giờ) | 251 (4.2 giờ) | 2.43 / 2.32 / 2.20 |
-| Cộng (người mất thêm 6 giây) | Điện thoại ngang 844x390 (nhìn 1125x520 px) | 28 | 13 | 130 (2.2 giờ) | 251 (4.2 giờ) | 2.25 / 2.13 / 2.01 |
-| Cộng (người mất thêm 6 giây) | Điện thoại dọc 390x844 (nhìn 508x1100 px) | 27 | 14 | 130 (2.2 giờ) | 251 (4.2 giờ) | 2.27 / 2.14 / 2.03 |
+| Nhân (người chậm gấp 2.4x) | Máy tính 1280x720 (nhìn 1138x640 px) | 45 | 15 | 186 (3.1 giờ) | 251 (4.2 giờ) | 1.62 / 1.50 / 1.39 |
+| Nhân (người chậm gấp 2.4x) | Điện thoại ngang 844x390 (nhìn 1125x520 px) | 54 | 18 | 211 (3.5 giờ) | 251 (4.2 giờ) | 1.44 / 1.32 / 1.21 |
+| Nhân (người chậm gấp 2.4x) | Điện thoại dọc 390x844 (nhìn 508x1100 px) | 53 | 20 | 209 (3.5 giờ) | 251 (4.2 giờ) | 1.45 / 1.33 / 1.22 |
+| Cộng (người mất thêm 6 giây) | Máy tính 1280x720 (nhìn 1138x640 px) | 24 | 12 | 120 (2.0 giờ) | 251 (4.2 giờ) | 2.44 / 2.32 / 2.21 |
+| Cộng (người mất thêm 6 giây) | Điện thoại ngang 844x390 (nhìn 1125x520 px) | 28 | 13 | 130 (2.2 giờ) | 251 (4.2 giờ) | 2.26 / 2.13 / 2.02 |
+| Cộng (người mất thêm 6 giây) | Điện thoại dọc 390x844 (nhìn 508x1100 px) | 27 | 14 | 129 (2.2 giờ) | 251 (4.2 giờ) | 2.27 / 2.15 / 2.03 |
 
-Tiêu chí #406 mục 1 sau hiệu chỉnh (tối đa của ba bậc; ĐẠT khi <= 1,5x), nhân: máy tính 1280x720 1.63x KHÔNG ĐẠT; điện thoại ngang 844x390 1.45x ĐẠT; điện thoại dọc 390x844 1.46x ĐẠT. Cộng: máy tính 1280x720 2.43x KHÔNG ĐẠT; điện thoại ngang 844x390 2.25x KHÔNG ĐẠT; điện thoại dọc 390x844 2.27x KHÔNG ĐẠT. Xích Mãng tìm mỗi 45-53 giây (nhân) hoặc 24-28 giây (cộng) chứ không phải 90; nhịp Kim Đan "tối ưu" ra 3.1-3.5 giờ (nhân) hoặc 2.0-2.2 giờ (cộng), mục tiêu 5-7. Có dòng ĐẠT, có dòng KHÔNG ĐẠT: xem từng dòng ở cột cuối. Lấy bản đồ CHẬM hơn của Xích Mãng (Lạc Hà Trấn, 2 con) là cách nghiêng về phía mô hình: người chơi chọn Hắc Phong Cốc (6 con) sẽ tìm nhanh hơn (số đo thô 5.0-6.3 giây so với 18.6-22.0 giây).
+Tiêu chí #406 mục 1 sau hiệu chỉnh (tối đa của ba bậc; ĐẠT khi <= 1,5x), nhân: máy tính 1280x720 1.62x KHÔNG ĐẠT; điện thoại ngang 844x390 1.44x ĐẠT; điện thoại dọc 390x844 1.45x ĐẠT. Cộng: máy tính 1280x720 2.44x KHÔNG ĐẠT; điện thoại ngang 844x390 2.26x KHÔNG ĐẠT; điện thoại dọc 390x844 2.27x KHÔNG ĐẠT. Xích Mãng tìm mỗi 45-54 giây (nhân) hoặc 24-28 giây (cộng) chứ không phải 90; nhịp Kim Đan "tối ưu" ra 3.1-3.5 giờ (nhân) hoặc 2.0-2.2 giờ (cộng), mục tiêu 5-7. Có dòng ĐẠT, có dòng KHÔNG ĐẠT: xem từng dòng ở cột cuối. Lấy bản đồ CHẬM hơn của Xích Mãng (Lạc Hà Trấn, 2 con) là cách nghiêng về phía mô hình: người chơi chọn Hắc Phong Cốc (6 con) sẽ tìm nhanh hơn (số đo thô 5.0-6.3 giây so với 18.6-22.0 giây).
 
 **Ngưỡng hoà vốn cho #410.** Chạy `simulate` với `ASSUME.searchSec.mang` = T (thời gian TÌM: từ lúc hạ con trước tới lúc chạm con kế, KHÔNG gồm trận và đả tọa hồi sức), tiêu chí #406 mục 1 đạt khi T >= **51 giây** (mô hình hiện tại: 90 giây, tối đa 0.95x). Trận + đả tọa hồi sức của Xích Mãng theo mô hình thêm 17.8 / 14.2 / 11.4 giây mỗi con (Sơ / Trung / Hậu kỳ), nên nếu bot đo từ lúc hạ tới lúc hạ con kế (kill-to-kill) thì phải trừ khoảng đó trước khi so với ngưỡng (khoảng 68 / 65 / 62 giây kill-to-kill ở ba bậc). Bot (#410) là thuật toán như thợ săn ở đây, nên so số đo THỜI GIAN TÌM của bot với ngưỡng đó phải trừ độ vụng: bot đo NGẮN hơn ~21 giây (giả thuyết nhân) hoặc ~45 giây (giả thuyết cộng) thì Xích Mãng nhanh quá mức tiêu chí; dài hơn thì đạt.
 
-Đọc bảng: nhịp Kim Đan là hàm của giả định tìm quái. Mô hình ra 4.2 giờ (tối ưu) / 4.2 giờ (bãi mới); thợ săn máy tính 1280x720 1.7 / 3.3 giờ, điện thoại ngang 844x390 1.9 / 3.2 giờ, điện thoại dọc 390x844 1.9 / 3.3 giờ; biết hết bản đồ 1.3 / 2.9 giờ. Phần lớn chênh lệch tới từ Xích Mãng (nguồn nhanh nhất của cả ba bậc ở kịch bản tối ưu: Thạch Quy): giả định 90 giây cho nó là một con số đoán và là cái quyết định nhịp "tối ưu". **Kết luận (chốt trước phát hành 0.2.0, #406 mục 7): GIỮ NGUYÊN `ASSUME.searchSec`, mật độ và EXP Xích Mãng; chấp nhận đường tắt Xích Mãng và theo dõi bằng số liệu thật.** Lý do: (1) số đo là thợ săn thuật toán, không phải người, nên chỉ là cận dưới (mô hình không lạc quan); người chơi chậm hơn bao nhiêu thì không ai biết: hai giả thuyết hiệu chỉnh ở trên cho thời gian TÌM Xích Mãng 45-53 giây (nhân) và 24-28 giây (cộng), cả hai dưới ngưỡng hoà vốn, tức tiêu chí 1,5x CHƯA đạt ở bãi Xích Mãng và nhịp Kim Đan "tối ưu" ngắn hơn mục tiêu (cột "Riêng Kim Đan (tối ưu)" ở bảng hiệu chỉnh); nhưng nhịp "bãi mới" (người không cày Xích Mãng) vẫn 4.2 giờ, trong mục tiêu 5-7 giờ. (2) Chỉnh mật độ hay EXP Xích Mãng bây giờ là căn theo MỘT trong hai giả thuyết trái nhau, kéo theo chạy lại mô phỏng luân hồi, nhiệm vụ và trang bị ngay trước phát hành: rủi ro cao hơn lợi ích. Bot (`bots.ts`) cũng không phân xử được vì cũng là thuật toán, nên phần "bot săn Kim Đan" của #410 được thay bằng chính phép đo này (thợ săn trong `World` thật, vùng nhìn chữ nhật như client) cùng `hunt-check` (mục 9). (3) Đường tắt đã biết và đã chặn bớt (Tụ Khí Đan trần 300 tu vi mỗi viên, Xích Mãng rơi ít hơn, #403 / #425; ca "tìm nhanh" 30 giây có trong `kim-dan.ts`). **Sau phát hành:** tệp lưu ghi `life.playMs` cùng cảnh giới / bậc; nếu trung vị người chơi hết Kim Đan trong dưới ~4 giờ thì chỉnh ở bản 0.2.x theo thứ tự (a) giảm mật độ / kéo dài hồi sinh Xích Mãng (`shared/`, PR riêng, B review), (b) chỉnh EXP; KHÔNG sửa `ASSUME.searchSec` cho tới khi có số đo người thật. Số hạt giống nhiều hơn (12 cho trùm) và thợ săn khoá mục tiêu / quét vòng đã loại các lần kẹt hàng nghìn giây mô phỏng của bản đầu (#459).
+Đọc bảng: nhịp Kim Đan là hàm của giả định tìm quái. Mô hình ra 4.2 giờ (tối ưu) / 4.2 giờ (bãi mới); thợ săn máy tính 1280x720 1.7 / 3.1 giờ, điện thoại ngang 844x390 1.9 / 2.9 giờ, điện thoại dọc 390x844 1.9 / 3.3 giờ; biết hết bản đồ 1.3 / 3.0 giờ. Phần lớn chênh lệch tới từ Xích Mãng (nguồn nhanh nhất của cả ba bậc ở kịch bản tối ưu: Thạch Quy): giả định 90 giây cho nó là một con số đoán và là cái quyết định nhịp "tối ưu". **Kết luận (chốt trước phát hành 0.2.0, #406 mục 7): GIỮ NGUYÊN `ASSUME.searchSec`, mật độ và EXP Xích Mãng; chấp nhận đường tắt Xích Mãng và theo dõi bằng số liệu thật.** Lý do: (1) số đo là thợ săn thuật toán, không phải người, nên chỉ là cận dưới (mô hình không lạc quan); người chơi chậm hơn bao nhiêu thì không ai biết: hai giả thuyết hiệu chỉnh ở trên cho thời gian TÌM Xích Mãng 45-54 giây (nhân) và 24-28 giây (cộng), cả hai dưới ngưỡng hoà vốn, tức tiêu chí 1,5x CHƯA đạt ở bãi Xích Mãng và nhịp Kim Đan "tối ưu" ngắn hơn mục tiêu (cột "Riêng Kim Đan (tối ưu)" ở bảng hiệu chỉnh); nhưng nhịp "bãi mới" (người không cày Xích Mãng) vẫn 4.2 giờ, trong mục tiêu 5-7 giờ. (2) Chỉnh mật độ hay EXP Xích Mãng bây giờ là căn theo MỘT trong hai giả thuyết trái nhau, kéo theo chạy lại mô phỏng luân hồi, nhiệm vụ và trang bị ngay trước phát hành: rủi ro cao hơn lợi ích. Bot (`bots.ts`) cũng không phân xử được vì cũng là thuật toán, nên phần "bot săn Kim Đan" của #410 được thay bằng chính phép đo này (thợ săn trong `World` thật, vùng nhìn chữ nhật như client) cùng `hunt-check` (mục 9). (3) Đường tắt đã biết và đã chặn bớt (Tụ Khí Đan trần 300 tu vi mỗi viên, Xích Mãng rơi ít hơn, #403 / #425; ca "tìm nhanh" 30 giây có trong `kim-dan.ts`). **Sau phát hành:** tệp lưu ghi `life.playMs` cùng cảnh giới / bậc; nếu trung vị người chơi hết Kim Đan trong dưới ~4 giờ thì chỉnh ở bản 0.2.x theo thứ tự (a) giảm mật độ / kéo dài hồi sinh Xích Mãng (`shared/`, PR riêng, B review), (b) chỉnh EXP; KHÔNG sửa `ASSUME.searchSec` cho tới khi có số đo người thật. Số hạt giống nhiều hơn (12 cho trùm) và thợ săn khoá mục tiêu / quét vòng đã loại các lần kẹt hàng nghìn giây mô phỏng của bản đầu (#459).
 
 ## Nguyên Anh sau nội dung (M7.5 / M7.9)
 
@@ -687,11 +687,11 @@ Tính SỐNG từ `shared/` bằng mô hình ở trên. Quái mới ở Hàn Vâ
 | Nguyên Anh Sơ kỳ | Cốt Tượng | 202,666 | 24,940 | 78 | 49% |
 | Nguyên Anh Sơ kỳ | Độc Tước | không an toàn solo (97% khí huyết / trận) | – | – | – |
 | Nguyên Anh Trung kỳ | Hàn Lang | 221,840 | 25,877 | 167 | 36% |
-| Nguyên Anh Trung kỳ | Phong Nha | 248,718 | 30,038 | 163 | 40% |
+| Nguyên Anh Trung kỳ | Phong Nha | 248,718 | 30,184 | 163 | 40% |
 | Nguyên Anh Trung kỳ | Cốt Tượng | 226,751 | 27,917 | 88 | 38% |
 | Nguyên Anh Trung kỳ | Độc Tước | không an toàn solo (75% khí huyết / trận) | – | – | – |
 | Nguyên Anh Hậu kỳ | Hàn Lang | 244,902 | 28,590 | 184 | 27% |
-| Nguyên Anh Hậu kỳ | Phong Nha | 275,963 | 33,355 | 180 | 31% |
+| Nguyên Anh Hậu kỳ | Phong Nha | 275,963 | 33,516 | 180 | 31% |
 | Nguyên Anh Hậu kỳ | Cốt Tượng | 252,311 | 31,077 | 97 | 29% |
 | Nguyên Anh Hậu kỳ | Độc Tước | không an toàn solo (58% khí huyết / trận) | – | – | – |
 
@@ -720,16 +720,16 @@ Thu nhập theo nhịp mục 3 (săn solo, mỗi bậc nguồn tốt nhất): ti
 | Bậc | Nguồn | Phút | Linh thạch / giờ (khả dụng) | Kiếm trong bậc | Cộng dồn | Phí rèn cộng dồn | Dư / thiếu |
 |---|---|---:|---:|---:|---:|---:|---:|
 | Nguyên Anh Sơ kỳ | Cốt Tượng | 78 | 19,660 | 24,428 | 24,428 | 43,500 | -19,072 |
-| Nguyên Anh Trung kỳ | Phong Nha | 74 | 19,068 | 23,635 | 48,063 | 43,500 | +4,563 |
-| Nguyên Anh Hậu kỳ | Phong Nha | 100 | 21,173 | 35,240 | 83,303 | 43,500 | +39,803 |
+| Nguyên Anh Trung kỳ | Phong Nha | 74 | 19,213 | 23,816 | 48,243 | 43,500 | +4,743 |
+| Nguyên Anh Hậu kỳ | Phong Nha | 100 | 21,335 | 35,509 | 83,752 | 43,500 | +40,252 |
 
 | Bộ | Món | Phí rèn | Nguyên liệu | Phút cày solo | Phút săn trùm theo đội | So với thời gian ở bậc |
 |---|---:|---:|---|---:|---:|---:|
 | Bộ IV (từ Sơ kỳ) | 5 | 43,500 | 38 Hàn Lang mao, 2 Thiên Hàn châu, 22 Tượng cốt, 18 Phong Nha vũ, 6 Độc tước nang | 54.7 | 6.3 | 78% |
 
-Tổng phí rèn bộ IV **43,500** Linh thạch = **2.2 giờ** thu nhập Sơ kỳ (so với Kim Đan: bộ III một mình 47,000 Linh thạch ~ 6.7 giờ thu nhập Hậu kỳ, ba bộ 78,500 ~ 11.2 giờ). Có được 83,303 tới hết Nguyên Anh: dư 39,803. Đan cấp 3 (`thuong_hoi_huyet_dan`, 360 Linh thạch / viên) là chỗ xả TUỲ CHỌN: 55 viên / giờ thu nhập Sơ kỳ.
+Tổng phí rèn bộ IV **43,500** Linh thạch = **2.2 giờ** thu nhập Sơ kỳ (so với Kim Đan: bộ III một mình 47,000 Linh thạch ~ 6.5 giờ thu nhập Hậu kỳ, ba bộ 78,500 ~ 10.8 giờ). Có được 83,752 tới hết Nguyên Anh: dư 40,252. Đan cấp 3 (`thuong_hoi_huyet_dan`, 360 Linh thạch / viên) là chỗ xả TUỲ CHỌN: 55 viên / giờ thu nhập Sơ kỳ.
 
-**Đọc bảng.** Bộ IV trả đủ từ Nguyên Anh Trung kỳ (dư 4,563 cuối bậc; cuối Sơ kỳ còn thiếu 19,072); cày nguyên liệu chiếm tối đa 78% thời gian bậc nên nguyên liệu không phải nút cổ chai, tiền mới là. **CHƯA CHỐT (câu hỏi ở `questions.md`):** vì cả năm món cùng mặc được từ Sơ kỳ (khác Kim Đan: ba bộ rải ba bậc), sau khi rèn xong Linh thạch còn dư **39,803** (0.9x phí bộ IV) tới hết cảnh giới mà chỉ có đan cấp 3 (111 viên) và kho tông môn làm chỗ tiêu: đúng cảnh báo "dư hàng vạn Linh thạch không có chỗ tiêu" của mục "Kinh tế Linh thạch" (Kim Đan thì thiếu 45,477 cuối cảnh giới). Hướng đề xuất: tách bộ IV thành ba bậc (Sơ / Trung / Hậu kỳ, phí tăng dần như Kim Đan) hoặc nâng phí; chưa đổi vì đụng `shared/` (công thức, món đồ, `reqTier`) và phải chờ số đo bot thật của C.
+**Đọc bảng.** Bộ IV trả đủ từ Nguyên Anh Trung kỳ (dư 4,743 cuối bậc; cuối Sơ kỳ còn thiếu 19,072); cày nguyên liệu chiếm tối đa 78% thời gian bậc nên nguyên liệu không phải nút cổ chai, tiền mới là. **CHƯA CHỐT (câu hỏi ở `questions.md`):** vì cả năm món cùng mặc được từ Sơ kỳ (khác Kim Đan: ba bộ rải ba bậc), sau khi rèn xong Linh thạch còn dư **40,252** (0.9x phí bộ IV) tới hết cảnh giới mà chỉ có đan cấp 3 (112 viên) và kho tông môn làm chỗ tiêu: đúng cảnh báo "dư hàng vạn Linh thạch không có chỗ tiêu" của mục "Kinh tế Linh thạch" (Kim Đan thì thiếu 44,135 cuối cảnh giới). Hướng đề xuất: tách bộ IV thành ba bậc (Sơ / Trung / Hậu kỳ, phí tăng dần như Kim Đan) hoặc nâng phí; chưa đổi vì đụng `shared/` (công thức, món đồ, `reqTier`) và phải chờ số đo bot thật của C.
 
 ### 5. Độ nhạy với đồ ba ô riêng (`ASSUME.useOwnerGear`)
 
@@ -856,13 +856,13 @@ Lên cấp là chuyện của TUẦN, không phải GIỜ: tông 3 người tíc
 
 Cận trên giá trị (Linh thạch theo GIÁ MUA NPC) một người mua trong một ngày với 140 cống hiến (knapsack phân số theo sức mua mỗi cống hiến, tới hạn mức `limitDay` của từng món). Cột còn lại: sức mua đó bằng bao nhiêu GIỜ săn solo của cảnh giới (loại quái tốt nhất ở bậc đầu, `monsterEconomy`).
 
-| Cấp tông | món đã mở | sức mua tối đa / ngày (LT) | giờ săn Phàm Nhân (1.075 LT/h) | giờ săn Luyện Khí (1.377 LT/h) | giờ săn Trúc Cơ (4.399 LT/h) | giờ săn Kim Đan (15.735 LT/h) |
+| Cấp tông | món đã mở | sức mua tối đa / ngày (LT) | giờ săn Phàm Nhân (1.075 LT/h) | giờ săn Luyện Khí (1.377 LT/h) | giờ săn Trúc Cơ (4.700 LT/h) | giờ săn Kim Đan (15.735 LT/h) |
 |:-:|--:|--:|--:|--:|--:|--:|
-| 1 (Sơ Lập) | 5 | 660 | 0,61 | 0,48 | 0,15 | 0,04 |
-| 2 (Tiểu Thành) | 13 | 687 | 0,64 | 0,50 | 0,16 | 0,04 |
-| 3 (Trung Hưng) | 16 | 759 | 0,71 | 0,55 | 0,17 | 0,05 |
-| 4 (Hưng Vượng) | 23 | 760 | 0,71 | 0,55 | 0,17 | 0,05 |
-| 5 (Đỉnh Thịnh) | 28 | 760 | 0,71 | 0,55 | 0,17 | 0,05 |
+| 1 (Sơ Lập) | 5 | 660 | 0,61 | 0,48 | 0,14 | 0,04 |
+| 2 (Tiểu Thành) | 13 | 687 | 0,64 | 0,50 | 0,15 | 0,04 |
+| 3 (Trung Hưng) | 16 | 759 | 0,71 | 0,55 | 0,16 | 0,05 |
+| 4 (Hưng Vượng) | 23 | 760 | 0,71 | 0,55 | 0,16 | 0,05 |
+| 5 (Đỉnh Thịnh) | 28 | 760 | 0,71 | 0,55 | 0,16 | 0,05 |
 
 - Mốc bất biến: bậc thu nhập thấp nhất là **Phàm Nhân** (1.075 LT/h); sức mua tối đa ở cấp 5 = **0,71 giờ** (<= 1). Cửa hàng là tiện lợi / phần thưởng tham gia, không phải chỗ kiếm tiền.
 - Sức mua cao nhất mỗi cống hiến: **6,00 LT / cống hiến** (Tụ Khí Đan); neo thiết kế là 5. Chỉ món NPC KHÔNG bán (Tụ Khí Đan, rẻ hơn công thức chủ ý) có thể vượt neo; mọi món NPC có bán bị `sectShopViolations` giữ <= 5.

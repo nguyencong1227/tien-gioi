@@ -900,6 +900,9 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     // Kinh quyển chiêu cơ bản (M7.4): rơi rất hiếm (ngoài việc mua ở cửa hàng)
     { itemId: bookIdOf("hoa_van_kiem"), chance: 0.012, min: 1, max: 1 },
     { itemId: bookIdOf("bon_thach_quyen"), chance: 0.012, min: 1, max: 1 },
+    // Kinh quyển Kim / Thổ Trúc Cơ, Huyền phẩm (CT6 lát 1, A): rơi hiếm từ quái Trúc Cơ (không từ trùm: giữ nguyên số Linh thạch / giờ của mục 30)
+    { itemId: bookIdOf("thanh_van_kiem_khi"), chance: 0.01, min: 1, max: 1 },
+    { itemId: bookIdOf("ban_thach_ho_the"), chance: 0.01, min: 1, max: 1 },
   ],
   mang: [
     { itemId: "vay_mang", chance: 1, min: 2, max: 4 },
@@ -916,12 +919,15 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: "hoi_huyet_dan", chance: 0.1, min: 1, max: 1 },
     { itemId: "dai_hoi_huyet_dan", chance: 0.04, min: 1, max: 1 },
     { itemId: bookIdOf("lac_tuyet_phan_phi"), chance: 0.02, min: 1, max: 1 }, // kinh quyển hiếm (M7.4)
+    { itemId: bookIdOf("thu_thuy_kiem_anh"), chance: 0.012, min: 1, max: 1 }, // Kim + Thủy (CT6 lát 1)
   ],
   thach_quy: [
     { itemId: "quy_giap", chance: 0.5, min: 1, max: 2 },
     { itemId: "hoi_linh_dan", chance: 0.1, min: 1, max: 1 },
     { itemId: "dai_hoi_linh_dan", chance: 0.04, min: 1, max: 1 },
     { itemId: bookIdOf("cuu_cung_khon_sat"), chance: 0.02, min: 1, max: 1 }, // kinh quyển hiếm (M7.4)
+    { itemId: bookIdOf("liet_dia_nhat_quyen"), chance: 0.012, min: 1, max: 1 }, // Thổ (CT6 lát 1)
+    { itemId: bookIdOf("phan_nhac_tram"), chance: 0.012, min: 1, max: 1 },
   ],
   doc_thiem: [
     { itemId: "doc_nang", chance: 0.45, min: 1, max: 2 },
@@ -954,6 +960,7 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("thanh_tung_phi_cham"), chance: 0.02, min: 1, max: 1 },
     { itemId: bookIdOf("bang_hoa_loan"), chance: 0.02, min: 1, max: 1 },
     { itemId: bookIdOf("han_quang_tien"), chance: 0.012, min: 1, max: 1 },
+    { itemId: bookIdOf("van_kiem_quy_tong"), chance: 0.008, min: 1, max: 1 }, // Kim, Địa phẩm (CT6 lát 1)
   ],
   cot_tuong: [
     { itemId: "tuong_cot", chance: 0.5, min: 1, max: 2 },
