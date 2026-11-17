@@ -1,0 +1,277 @@
+/**
+ * Luật cho PROMPT sinh ảnh AI (ComfyUI + SDXL base; `docs/art/PHONG_CACH_MINH_HOA.md`, `docs/KE_HOACH_DO_HOA_AI.md` mục 9.1 "Bước 0").
+ *
+ * Một nguồn duy nhất cho: bảng màu của "phong cách minh hoạ", danh sách từ khoá CẤM / BẮT BUỘC và lô ảnh đầu tiên (thẻ bản đồ).
+ * `check-credits.mjs` (`validateAiSource`) gọi `promptViolations` cho MỌI `docs/art/nguon/*.json`, nên prompt vi phạm không vào được game;
+ * `prompt-rules.test.ts` giữ bảng màu khớp `MAP_STYLES` / `style.css` thật và giữ tài liệu khớp mã (đổi một bên thì test đỏ).
+ *
+ * Mọi chuỗi ở đây là tiếng Anh vì SDXL đọc tiếng Anh; chú thích tiếng Việt.
+ */
+
+/**
+ * Bảng màu 10 màu của phong cách minh hoạ: 5 màu của giao diện (`client/src/style.css`) + 5 màu môi trường của năm bản đồ
+ * (`MAP_STYLES[mapId].ambient.color`). `from` nói màu lấy ở đâu để test đối chiếu với nguồn thật (tránh bảng màu trôi khỏi mã).
+ * @type {ReadonlyArray<{ id: string, hex: string, role: string, from: { css: string } | { map: string } }>}
+ */
+export const STYLE_PALETTE = [
+  { id: "ink", hex: "#1d1a16", role: "nền tối, bóng đổ, nét mực", from: { css: "--ink" } },
+  { id: "paper", hex: "#f3ecda", role: "vùng sáng, giấy, mây sương", from: { css: "--paper" } },
+  { id: "gold", hex: "#c9a24a", role: "điểm nhấn ấm, ánh linh khí", from: { css: "--gold" } },
+  { id: "red", hex: "#a31d1d", role: "điểm nhấn nguy hiểm, rất ít", from: { css: "--red" } },
+  { id: "mp", hex: "#3f7fa6", role: "điểm nhấn lạnh, linh lực", from: { css: "--mp" } },
+  { id: "lac_ha", hex: "#ffe2b0", role: "Lạc Hà: ấm, hoa đào", from: { map: "lac_ha" } },
+  { id: "hac_phong", hex: "#8c93a6", role: "Hắc Phong: xám lam, tro", from: { map: "hac_phong" } },
+  {
+    id: "bi_canh_linh_hu",
+    hex: "#7fe3d4",
+    role: "Linh Hư: lam ngọc",
+    from: { map: "bi_canh_linh_hu" },
+  },
+  { id: "am_suong", hex: "#7c9a76", role: "Âm Sương: xanh rêu, sương", from: { map: "am_suong" } },
+  { id: "han_van", hex: "#bcd6f2", role: "Hàn Vân: băng, tuyết", from: { map: "han_van" } },
+];
+
+/**
+ * Từ khoá CẤM trong prompt DƯƠNG (nhóm -> danh sách; so khớp không phân biệt hoa thường, theo từ nguyên vẹn).
+ * Mục đích: không tên game / truyện / nghệ sĩ khác, không gợi chữ (SDXL hay vẽ ký tự giả), không kéo ảnh về ảnh chụp hay người thật.
+ * Mệnh đề phủ định ("no text", "without people") được bỏ qua khi quét (xem `promptViolations`).
+ * @type {Readonly<Record<string, readonly string[]>>}
+ */
+export const BANNED_PROMPT_TERMS = {
+  "tên game / truyện / thương hiệu khác": [
+    "genshin",
+    "honkai",
+    "warcraft",
+    "diablo",
+    "league of legends",
+    "dota",
+    "perfect world",
+    "jade dynasty",
+    "zhu xian",
+    "tru tien",
+    "van kiep",
+    "path of exile",
+    "elden ring",
+    "dark souls",
+    "sekiro",
+    "black myth",
+    "wukong",
+    "final fantasy",
+    "pokemon",
+    "maplestory",
+    "ragnarok",
+    "lineage",
+    "disney",
+    "marvel",
+    "ghibli",
+  ],
+  "nghệ sĩ / phong cách của một người": [
+    "greg rutkowski",
+    "artgerm",
+    "wlop",
+    "ruan jia",
+    "makoto shinkai",
+    "miyazaki",
+    "thomas kinkade",
+    "craig mullins",
+    "in the style of",
+    "style of",
+    "inspired by",
+    "reminiscent of",
+    "fan art",
+    "fanart",
+  ],
+  "gợi chữ / ký tự (SDXL vẽ chữ giả)": [
+    "text",
+    "letters",
+    "calligraphy",
+    "inscription",
+    "signboard",
+    "sign board",
+    "banner with",
+    "scroll with",
+    "writing",
+    "poem",
+    "seal",
+    "stamp",
+    "hanzi",
+    "kanji",
+    "glyph",
+    "rune",
+    "runes",
+    "symbols",
+  ],
+  "thể loại kéo ảnh về kiểu game khác": [
+    "chinese",
+    "xianxia",
+    "wuxia",
+    "xuanhuan",
+    "anime",
+    "manga",
+    "chibi",
+    "video game",
+    "game art",
+    "game",
+    "screenshot",
+    "trending on",
+    "artstation",
+    "pixiv",
+    "deviantart",
+    "unreal engine",
+    "octane",
+  ],
+  "ảnh chụp / người thật": [
+    "photorealistic",
+    "photo realistic",
+    "photograph",
+    "photo of",
+    "real person",
+    "celebrity",
+    "portrait of",
+  ],
+};
+
+/**
+ * Từ khoá BẮT BUỘC.
+ * - Dương: ít nhất MỘT neo phong cách (tranh, không phải ảnh chụp) và đúng một mệnh đề "no text".
+ * - Âm: đủ các từ dưới (chặn chữ, chữ ký, logo, ký tự Hán).
+ */
+export const STYLE_ANCHORS = [
+  "painterly",
+  "painting",
+  "ink wash",
+  "gouache",
+  "watercolor",
+  "watercolour",
+  "matte painting",
+];
+export const REQUIRED_POSITIVE_CLAUSE = "no text";
+export const REQUIRED_NEGATIVE_TERMS = [
+  "text",
+  "letters",
+  "watermark",
+  "signature",
+  "logo",
+  "cjk",
+  "chinese characters",
+];
+
+/** Prompt âm chuẩn của mọi lô (đã gồm các từ bắt buộc). */
+export const NEGATIVE_PROMPT =
+  "text, letters, words, calligraphy, watermark, signature, logo, cjk, chinese characters, frame, border, blurry, lowres, distorted, modern, futuristic, photorealistic, human face, western fantasy, anime, 3d render";
+
+/** Chuẩn hoá để so khớp: chữ thường, gộp khoảng trắng. */
+const norm = (s) => String(s).toLowerCase().replace(/\s+/g, " ").trim();
+
+/** Tách thành mệnh đề (theo dấu phẩy / chấm phẩy / chấm / xuống dòng) đã chuẩn hoá, bỏ mệnh đề rỗng. */
+const clauses = (s) =>
+  String(s)
+    .split(/[,;.\n]/)
+    .map(norm)
+    .filter(Boolean);
+
+/** Mệnh đề phủ định ("no people", "without text", "avoid ..."): không quét từ cấm bên trong. */
+const isNegation = (c) => /^(no|without|avoid)\b/.test(c);
+
+/** Từ `term` có xuất hiện nguyên vẹn (không dính vào chữ cái khác) trong `clause` không. */
+function hasTerm(clause, term) {
+  let from = 0;
+  for (;;) {
+    const i = clause.indexOf(term, from);
+    if (i < 0) return false;
+    const before = i === 0 ? "" : clause[i - 1];
+    const after = clause[i + term.length] ?? "";
+    if (!/[a-z0-9]/.test(before) && !/[a-z0-9]/.test(after)) return true;
+    from = i + 1;
+  }
+}
+
+/**
+ * Kiểm một cặp prompt (dương, âm). Trả danh sách vấn đề tiếng Việt (rỗng = hợp lệ).
+ * @param {unknown} prompt
+ * @param {unknown} negativePrompt
+ * @returns {string[]}
+ */
+export function promptViolations(prompt, negativePrompt) {
+  const bad = [];
+  if (typeof prompt !== "string" || prompt.trim() === "") return ["prompt trống"];
+  const pos = clauses(prompt).filter((c) => !isNegation(c));
+  for (const [group, terms] of Object.entries(BANNED_PROMPT_TERMS)) {
+    for (const t of terms) {
+      if (pos.some((c) => hasTerm(c, t))) bad.push(`prompt có từ cấm "${t}" (${group})`);
+    }
+  }
+  if (!pos.some((c) => STYLE_ANCHORS.some((a) => hasTerm(c, a))))
+    bad.push(`prompt thiếu neo phong cách tranh (một trong: ${STYLE_ANCHORS.join(", ")})`);
+  if (!clauses(prompt).includes(REQUIRED_POSITIVE_CLAUSE))
+    bad.push(`prompt thiếu mệnh đề "${REQUIRED_POSITIVE_CLAUSE}"`);
+  const neg = clauses(typeof negativePrompt === "string" ? negativePrompt : "");
+  for (const t of REQUIRED_NEGATIVE_TERMS) {
+    if (!neg.some((c) => c === t || hasTerm(c, t))) bad.push(`negativePrompt thiếu "${t}"`);
+  }
+  return bad;
+}
+
+/** Dựng prompt dương chuẩn từ chủ đề + màu / ánh sáng (đủ neo phong cách và "no text"). */
+function buildPrompt(subject, mood) {
+  return `${subject}, ${mood}, painterly soft ink wash and gouache landscape, muted colors, misty depth, wide panoramic composition, eastern mountain cultivation fantasy, no people, no text`;
+}
+
+/**
+ * Lô 1: THẺ BẢN ĐỒ (mỗi bản đồ một ảnh minh hoạ, tỉ lệ 3:2). Thô 1216x832 (cỡ gốc gần 3:2 nhất của SDXL, tỉ lệ 1,46: B cắt nhẹ), cuối 624x416 (đúng 3:2) WebP <= 40 KB.
+ * Ngân sách: `login_bg.webp` 72 KB + 5 x 40 KB = 272 KB <= trần 300 KB (`client/perf-budget.json` `static.aiAssets.totalKb`).
+ * `seeds`: ba hạt giống mỗi bản đồ để B chọn một; tên tệp thô `<id>_raw_<n>_00001_.png`.
+ */
+export const MAP_CARD_BATCH = {
+  class: "the-ban-do",
+  aspect: "3:2",
+  raw: { w: 1216, h: 832 },
+  final: { w: 624, h: 416, maxKb: 40 },
+  items: [
+    {
+      id: "the_lac_ha",
+      mapId: "lac_ha",
+      seeds: [2026111711, 2026111712, 2026111713],
+      prompt: buildPrompt(
+        "small mountain town of timber houses below a sacred misty peak, a river winding past peach blossom trees, falling pink petals",
+        "warm peach and amber light, soft rose and cream haze",
+      ),
+    },
+    {
+      id: "the_hac_phong",
+      mapId: "hac_phong",
+      seeds: [2026111721, 2026111722, 2026111723],
+      prompt: buildPrompt(
+        "windswept dark canyon with thorny shrubs and twisted pines, ash drifting in the wind, a ruined stone watchtower far away",
+        "slate grey and cold blue shadows, pale grey haze, dim overcast light",
+      ),
+    },
+    {
+      id: "the_linh_hu",
+      mapId: "bi_canh_linh_hu",
+      seeds: [2026111731, 2026111732, 2026111733],
+      prompt: buildPrompt(
+        "hidden spirit realm cavern with glowing lotus pools and luminous mushrooms, floating motes of light, crystal rock arches",
+        "jade teal and cyan glow against deep blue-black shadows",
+      ),
+    },
+    {
+      id: "the_am_suong",
+      mapId: "am_suong",
+      seeds: [2026111741, 2026111742, 2026111743],
+      prompt: buildPrompt(
+        "foggy swamp of dead trees and still black water, faint wisps of pale lantern light, rotting wooden walkway",
+        "moss green and grey-green mist, dim sickly glow, heavy fog",
+      ),
+    },
+    {
+      id: "the_han_van",
+      mapId: "han_van",
+      seeds: [2026111751, 2026111752, 2026111753],
+      prompt: buildPrompt(
+        "icy highland with drifting snow, frozen lake and sheer ice cliffs under a pale dawn, thin clouds on the ridges",
+        "pale ice blue and white haze, cold silver light",
+      ),
+    },
+  ],
+};
