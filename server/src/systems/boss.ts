@@ -253,7 +253,7 @@ function planCast(
         xs.push(target.x + Math.cos(a) * rr);
         ys.push(target.y + Math.sin(a) * rr);
       }
-      cast.rain = { xs, ys, warned: 0, hit: 0 };
+      cast.rain = { xs, ys, warned: 0, hit: 0, warnAt: [] };
       cast.hitAt = now + (s.count - 1) * s.gapMs + ab.telegraphMs;
       break;
     }
@@ -553,12 +553,14 @@ function runCast(w: World, id: string, m: Monster, mc: MonsterCtrl, bs: BossCtrl
   const rain = cast.rain;
   if (rain && ab.shape.t === "rain") {
     const s = ab.shape;
-    // Mỗi vòng có báo trước RIÊNG, >= `telegraphMs` từ lúc hiện tới lúc đáp
+    // Mỗi vòng có báo trước RIÊNG, >= `telegraphMs` từ lúc hiện tới lúc đáp. Vòng đáp `telegraphMs` sau MỐC THẬT SỰ báo (tick phát `warn`), không theo mốc lý thuyết
+    // `startAt + k x gapMs`: hai mốc đó làm tròn lên tick khác nhau nên vòng thứ hai trở đi có thể đáp SỚM hơn báo trước tới 49 ms (fuzz #934 tìm ra, bot sát biên bị trúng).
     while (rain.warned < s.count && now >= cast.startAt + rain.warned * s.gapMs) {
       warnCircle(w, rain.xs[rain.warned]!, rain.ys[rain.warned]!, s.r, ab.telegraphMs);
+      rain.warnAt.push(now);
       rain.warned++;
     }
-    while (rain.hit < rain.warned && now >= cast.startAt + rain.hit * s.gapMs + ab.telegraphMs) {
+    while (rain.hit < rain.warned && now >= rain.warnAt[rain.hit]! + ab.telegraphMs) {
       strike(w, id, m, mc, bs, ab, {
         t: "circle",
         x: rain.xs[rain.hit]!,
@@ -572,7 +574,8 @@ function runCast(w: World, id: string, m: Monster, mc: MonsterCtrl, bs: BossCtrl
     cast.done = true;
     resolveCast(w, id, m, mc, bs, cast);
   }
-  if (bs.cast === cast && now >= cast.endAt) {
+  // chiêu mưa chưa đáp hết vòng thì chưa kết thúc (vòng cuối nay có thể đáp muộn hơn `hitAt` vài chục ms)
+  if (bs.cast === cast && now >= cast.endAt && !(rain && rain.hit < rain.xs.length)) {
     bs.cast = undefined;
     bs.nextCastAt = now + gapOf(bs);
   }

@@ -37,7 +37,8 @@ export interface BossCast {
   /** Đã đáp đòn (không mưa). */
   done: boolean;
   /** Mưa: tâm từng vòng, số vòng đã báo, số vòng đã đáp. */
-  rain?: { xs: number[]; ys: number[]; warned: number; hit: number };
+  /** Mưa: tâm từng vòng, số vòng đã báo / đã đáp, và MỐC (ms) mỗi vòng thật sự được báo (vòng đáp đúng `telegraphMs` sau mốc này, không sớm hơn). */
+  rain?: { xs: number[]; ys: number[]; warned: number; hit: number; warnAt: number[] };
 }
 
 export interface BossCtrl {

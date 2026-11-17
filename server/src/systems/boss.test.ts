@@ -384,6 +384,52 @@ describe("hình chiêu trong trận thật", () => {
     ).toBe(true);
   });
 
+  it("mưa: MỌI vòng đáp >= telegraphMs sau tick phát `warn` của chính nó, kể cả khi gapMs / telegraphMs không chia hết cho tick (fuzz #934: trước đây vòng 2+ có thể sớm tới 49 ms)", () => {
+    // gapMs 1101 và telegraphMs 912: mốc lý thuyết của vòng 2 là +1101 (làm tròn lên +1150) và đáp +2013 (làm tròn lên +2050): chỉ cách 900 ms < 912
+    const TELE = 912;
+    const GAP = 1101;
+    const { p, w, tick, untilCast, warns } = scene(
+      def([
+        ab(
+          "mua",
+          { t: "rain", r: 60, count: 3, spreadPx: 1, gapMs: GAP },
+          { telegraphMs: TELE, cooldownMs: 60_000 },
+        ),
+      ]),
+    );
+    const t = untilCast();
+    const drops: number[] = [];
+    let last = p.hp;
+    while (w.now < t + 2 * GAP + TELE + 500) {
+      tick();
+      if (p.hp < last) {
+        drops.push(w.now);
+        last = p.hp;
+      }
+    }
+    const ws = warns();
+    expect(ws).toHaveLength(3);
+    expect(drops).toHaveLength(3); // cả ba vòng đều trúng người đứng giữa (spreadPx 1)
+    for (let k = 0; k < 3; k++)
+      expect(drops[k]! - ws[k]!.at, `vòng ${k + 1}`).toBeGreaterThanOrEqual(TELE);
+  });
+
+  it("mưa: hồi chiêu 0 ms không làm chiêu kết thúc trước khi vòng cuối đáp", () => {
+    const { p, w, tick, untilCast } = scene(
+      def([
+        ab(
+          "mua",
+          { t: "rain", r: 60, count: 2, spreadPx: 1, gapMs: 1101 },
+          { telegraphMs: 912, recoverMs: 0, cooldownMs: 60_000 },
+        ),
+      ]),
+    );
+    const hp0 = p.hp;
+    const t = untilCast();
+    while (w.now < t + 1101 + 912 + 600) tick();
+    expect(hp0 - p.hp).toBeGreaterThanOrEqual(2 * BOSS_ATK); // cả hai vòng đều đáp
+  });
+
   it("triệu hồi: gọi quái con quanh trùm, không vượt maxAdds, quái con mang `addOf`", () => {
     const { w, mon, tick, until } = scene(
       def([ab("goi", { t: "summon", kind: "tho", count: 2 }, { dmgMult: 0, cooldownMs: 3000 })], {
