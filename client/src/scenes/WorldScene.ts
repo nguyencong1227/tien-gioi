@@ -1319,6 +1319,7 @@ export class WorldScene extends Phaser.Scene {
         ui.isMapModalOpen() ||
         ui.isSettingsModalOpen() ||
         ui.isSkillsModalOpen() ||
+        ui.isSocialModalOpen() ||
         ui.isDialogOpen()
       )
         return;
@@ -1458,6 +1459,9 @@ export class WorldScene extends Phaser.Scene {
         break;
       case "panel.sect":
         ui.toggleSectModal();
+        break;
+      case "panel.social":
+        ui.toggleSocialModal();
         break;
       case "panel.skills":
         ui.toggleSkillsModal();
@@ -2955,6 +2959,7 @@ export class WorldScene extends Phaser.Scene {
     this.mapCtl.reset({ worldW: ov.w * TILE, worldH: ov.h * TILE }, viewId === null);
     const title = document.getElementById("map-title");
     if (title) title.textContent = `Sơn Hà Đồ · ${ov.name}`;
+    ui.setMapPanelCard(viewId ?? this.map.def.id);
     const sub = document.getElementById("map-coords");
     if (sub) {
       sub.textContent =

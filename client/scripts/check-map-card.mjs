@@ -299,6 +299,101 @@ async function main() {
       m = await measure();
       check(m.cardHidden && !m.card.shown, 'mapId "constructor": không có thẻ, không lỗi');
       await hide();
+
+      // ---- 6. THẺ Ở ĐẦU BẢNG SƠN HÀ ĐỒ (`M`): theo bản đồ ĐANG XEM; điện thoại ngang thấp (<= 480 px cao) bỏ hẳn ----
+      const SHORT = vp.h <= 480;
+      const measurePanel = () =>
+        evalJs(`(() => {
+          const R = (e) => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom, w: r.width, h: r.height, shown: e.getClientRects().length > 0 }; };
+          const card = document.getElementById("map-card");
+          return {
+            vw: window.innerWidth, vh: window.innerHeight,
+            open: !document.getElementById("map-modal").hidden,
+            card: R(card), head: R(document.querySelector("#map-modal .inv-head")), title: R(document.getElementById("map-title")),
+            close: R(document.getElementById("map-close")), panel: R(document.getElementById("map-modal")),
+            cardHidden: card.hidden, cardSrc: card.getAttribute("src"), naturalW: card.naturalWidth,
+            alt: card.getAttribute("alt"), aria: card.getAttribute("aria-hidden"), ptr: getComputedStyle(card).pointerEvents,
+            titleText: document.getElementById("map-title").textContent, scrollW: document.documentElement.scrollWidth,
+            closePos: getComputedStyle(document.getElementById("map-close")).position,
+          };
+        })()`);
+      /** Chờ tới khi `pred(x)` đúng (tối đa 3 s), trả số đo cuối. */
+      const panelUntil = async (pred) => {
+        let x = await measurePanel();
+        for (let t = 0; t < 3000 && !pred(x); t += 150) {
+          await sleep(150);
+          x = await measurePanel();
+        }
+        return x;
+      };
+      const sceneOk = await evalJs(
+        `Boolean(window.__scene && typeof window.__scene.setMapView === "function")`,
+      );
+      check(sceneOk, "bảng bản đồ: cảnh sẵn sàng (cần ?debug)");
+      if (sceneOk) {
+        await evalJs("window.__ui.toggleMapModal(true); 1");
+        let p = await panelUntil((x) => x.open && x.cardSrc !== null);
+        check(p.open, "bảng Sơn Hà Đồ mở");
+        check(
+          p.cardSrc === "/assets/ai/the_am_suong.webp",
+          `thẻ của bản đồ mình đứng (am_suong): ${p.cardSrc}`,
+        );
+        if (SHORT) {
+          check(!p.card.shown, `màn thấp (${vp.h} px): thẻ bỏ hẳn, đầu bảng như cũ`);
+        } else {
+          p = await panelUntil((x) => x.card.shown);
+          check(p.card.shown && !p.cardHidden, "bảng bản đồ: thẻ HIỆN sau khi ảnh tải xong");
+          check(p.naturalW === 624, `ảnh thật 624 px rộng (${p.naturalW})`);
+          check(
+            Math.abs(p.card.w / p.card.h - 1.5) < 0.02,
+            `thẻ đúng 3:2 (${Math.round(p.card.w)}x${Math.round(p.card.h)})`,
+          );
+          check(
+            p.card.l >= p.head.l - 0.5 && p.card.r <= p.title.l + 0.5,
+            "thẻ nằm TRONG đầu bảng, bên TRÁI tiêu đề, không đè",
+          );
+          // Điện thoại: nút Đóng NỔI cố định ở góc dưới (sheet.css), không nằm trong hàng đầu bảng: chỉ cần thẻ không chạm nó
+          const rowClose = p.closePos !== "fixed";
+          const hit = (a, b) => a.l < b.r && b.l < a.r && a.t < b.b && b.t < a.b;
+          check(
+            !hit(p.card, p.close) && (!rowClose || p.title.r <= p.close.l + 0.5),
+            `thẻ + tiêu đề không đè nút đóng (${rowClose ? "nút trong hàng" : "nút nổi"}: thẻ ${Math.round(p.card.r)}, tiêu đề ${Math.round(p.title.r)}, nút ${Math.round(p.close.l)})`,
+          );
+          check(
+            p.card.t >= p.head.t - 0.5 && p.card.b <= p.head.b + 0.5,
+            `thẻ nằm trong đầu bảng (thẻ ${Math.round(p.card.t)}-${Math.round(p.card.b)}, đầu bảng ${Math.round(p.head.t)}-${Math.round(p.head.b)})`,
+          );
+          check(p.scrollW <= p.vw + 1, "bảng bản đồ không làm trang tràn ngang");
+          check(
+            p.alt === "" && p.aria === "true" && p.ptr === "none",
+            "thẻ chỉ trang trí (alt rỗng, aria-hidden, không bắt chuột)",
+          );
+          if (vp.name === "1280x720" || vp.name === "390x844")
+            await snap(`bang-son-ha-do-${vp.name}`);
+        }
+        // đang xem bản đồ KHÁC: thẻ đổi theo bản đồ xem, về chỗ mình thì quay lại thẻ của mình
+        await evalJs(`window.__scene.setMapView("hac_phong"); 1`);
+        p = await panelUntil((x) => x.cardSrc === "/assets/ai/the_hac_phong.webp");
+        check(
+          p.cardSrc === "/assets/ai/the_hac_phong.webp" && p.titleText.includes("Hắc Phong"),
+          `xem bản đồ khác: thẻ theo bản đồ xem (${p.cardSrc})`,
+        );
+        await evalJs(`window.__scene.setMapView(null); 1`);
+        p = await panelUntil((x) => x.cardSrc === "/assets/ai/the_am_suong.webp");
+        check(p.cardSrc === "/assets/ai/the_am_suong.webp", "Về chỗ mình: về thẻ của mình");
+        // bản đồ chưa có thẻ: ẩn NGAY, bỏ src, đầu bảng như cũ
+        await evalJs(`window.__ui.setMapPanelCard("khong_co_the"); 1`);
+        p = await measurePanel();
+        check(
+          p.cardHidden && !p.card.shown && p.cardSrc === null,
+          "bản đồ chưa có thẻ: thẻ ẩn ngay, bỏ src",
+        );
+        check(
+          p.title.shown && (p.closePos === "fixed" || p.title.r <= p.close.l + 0.5),
+          `bản đồ chưa có thẻ: tiêu đề vẫn hiện, không chỗ trống (tiêu đề ${Math.round(p.title.l)}-${Math.round(p.title.r)}, nút đóng ${Math.round(p.close.l)}, ${p.closePos})`,
+        );
+        await evalJs("window.__ui.toggleMapModal(false); 1");
+      }
     }
   } finally {
     try {
