@@ -198,6 +198,7 @@ describe("thành tựu qua phòng thật", () => {
     await sleep(300);
     const h = await spawn(name);
     await waitFor(() => h.news.includes("kiep_2"), 4000, "cấp bù khi vào");
+    h.ach.length = 0; // bỏ các tin do cấp bù đã gửi: tin dưới đây PHẢI là trả lời của achievementsGet
     h.room.send(SOCIAL_MSG.achievementsGet, {});
     const m = await waitFor(() => h.ach.at(-1), 3000, "achievements");
     expect(m.ach.kiep_2).toBeTruthy();
