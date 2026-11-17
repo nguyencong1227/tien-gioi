@@ -482,6 +482,48 @@ describe("cast bolt: bắn", () => {
   });
 });
 
+describe("cast bolt: dữ liệu sai và thứ tự việc hẹn giờ", () => {
+  it("trường sai bị KẸP theo SKILL_LIMITS: count 50 chỉ bắn tối đa boltCountMax viên; tốc độ / tầm không vượt trần", () => {
+    const t = setup();
+    bolt({ count: 50, arc: Math.PI, speed: 99_999, range: 99_999, pierce: 99, bounce: 99 });
+    equip(t.c, "dan_thu");
+    cast(t.w, "a", { slot: 2, angle: 0 });
+    const f = pbolts(t);
+    expect(f).toHaveLength(SKILL_LIMITS.boltCountMax);
+    for (const x of f) {
+      expect(x.speed).toBe(SKILL_LIMITS.boltSpeedMax);
+      expect(x.ms).toBeLessThanOrEqual(
+        Math.round((SKILL_LIMITS.boltRangeMax / SKILL_LIMITS.boltSpeedMax) * 1000),
+      );
+    }
+    const slow = setup();
+    bolt({ speed: 1, range: 400 });
+    equip(slow.c, "dan_thu");
+    cast(slow.w, "a", { slot: 2, angle: 0 });
+    expect(pbolts(slow)[0].speed).toBe(SKILL_LIMITS.boltSpeedMin);
+  });
+
+  it("xuyên rồi nảy: mỗi lần trúng áp ĐÚNG thời điểm của nó (không dồn theo đoạn nảy phát sau)", () => {
+    const t = setup();
+    bolt({ pierce: 1, bounce: 1 });
+    equip(t.c, "dan_thu");
+    const a = mon(t, 1150, 1000);
+    const b = mon(t, 1300, 1000);
+    const c = mon(t, 1300, 1090);
+    cast(t.w, "a", { slot: 2, angle: 0 });
+    const tA = (stopAt(1150, a.mc.def.radius) / 500) * 1000;
+    const tB = (stopAt(1300, b.mc.def.radius) / 500) * 1000;
+    advance(t, tA + 1);
+    expect(dmgTo(t, a.id)).toHaveLength(1); // a trúng SỚM, trước khi tới b / chỗ nảy
+    expect(dmgTo(t, b.id)).toEqual([]);
+    advance(t, tB - tA);
+    expect(dmgTo(t, b.id)).toHaveLength(1);
+    expect(pbolts(t)).toHaveLength(2); // đoạn nảy phát lúc tới b
+    advance(t, 5000);
+    expect(dmgTo(t, c.id)).toHaveLength(1);
+  });
+});
+
 describe("cast bolt: trần", () => {
   /** Đạn giả của `owner` (không việc nào, hết bay sau `ms`). */
   const dummy = (t: T, owner: string, n: number) => {
@@ -603,6 +645,24 @@ describe("cast bolt: thách đấu (PK)", () => {
     const hpC = c.p.hp;
     advance(t, 5000);
     expect(c.p.hp).toBe(hpC);
+  });
+
+  it("trúng đối thủ thì hiệu ứng Tê cóng gắn lên người và kéo / đẩy áp từ chỗ bắt đầu đoạn bay (như chiêu tức thời); trạng thái khác không gắn", () => {
+    const t = duel(300);
+    bolt({
+      effects: [
+        { status: "chill", ms: 3000, ratio: 0.3, chance: 1 },
+        { status: "mark_hoa" as never, ms: 3000, ratio: 0, chance: 1 },
+      ],
+      displace: { dir: "push", px: 40 },
+    });
+    cast(t.w, "a", { slot: 2, angle: 0 });
+    const x0 = t.b.p.x;
+    advance(t, 5000);
+    const ids = (t.w.ctrl.get("b")!.st?.list ?? []).map((s) => s.id);
+    expect(ids).toContain("chill");
+    expect(ids).not.toContain("mark_hoa");
+    expect(t.b.p.x).toBeGreaterThan(x0);
   });
 
   it("trúng quái trên đường TRƯỚC đối thủ thì đạn dừng ở quái (xuyên 0): đối thủ phía sau không trúng", () => {
