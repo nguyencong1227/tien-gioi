@@ -36,9 +36,21 @@ export const SOCIAL_MSG = {
   boardsGet: "boardsGet",
   /** Server -> client (chỉ người hỏi). */
   boards: "boards",
-  /** Server -> client: sự kiện trùm thế giới (người trong phòng đích + người đang xem lịch). */
+  /**
+   * Client -> server (không tải): xin trạng thái trùm thế giới MỘT lần (lúc mở tab "Sự kiện", người ở BẤT KỲ phòng nào). Server trả MỘT tin `worldBoss` cho lần xảy ra đang diễn ra (`live`) hoặc sắp tới nhất
+   * (`soon`, `startsInMs` BẤT KỲ độ lớn); không có lịch (rỗng / `WORLD_BOSS=off`) thì `phase: "none"` (client phân biệt "chưa có sự kiện" với "chưa nhận được tin"). Giới hạn tần suất.
+   */
+  worldBossGet: "worldBossGet",
+  /**
+   * Server -> client: sự kiện trùm thế giới. Gửi cho MỌI người chơi trực tuyến ở MỌI phòng (qua `Hub`) ở các mốc: báo trước (`soon`, 10 / 5 / 1 phút theo `announceMin`), xuất hiện (`live`), hạ gục / bỏ chạy /
+   * huỷ (`ended`); trong lúc `live`, người đang Ở PHÒNG ĐÍCH nhận thêm bản cập nhật `hpPct` / `top` / `mine` mỗi `WORLD_BOSS_BOARD_EVERY_MS` (người phòng khác chỉ nhận khi hỏi bằng `worldBossGet`).
+   * Thời gian luôn TƯƠNG ĐỐI (client cộng mốc nhận tin), kể cả khi ở phòng khác.
+   */
   worldBoss: "worldBoss",
-  /** Client -> server: đeo / gỡ danh hiệu. */
+  /**
+   * Client -> server: đeo / gỡ danh hiệu. KHÔNG có tin trả lời riêng: server LUÔN gửi lại `achievements` (có `title` hiện tại) sau mỗi `titleSet`, thành công hay bị từ chối (chưa mở danh hiệu / id lạ);
+   * client vẽ từ tin đó, không đoán trước.
+   */
   titleSet: "titleSet",
   /** Client -> server: xin sổ thành tựu (lúc mở bảng). */
   achievementsGet: "achievementsGet",
@@ -86,6 +98,9 @@ export interface BoardRow {
   lost?: number;
 }
 
+/**
+ * Hiển thị cột: `realm` (bảng `tuvi`) = `realmLabel(row.realm, row.tier)`; `step` (bảng `linhhon`, bậc cao nhất từng đạt) = `realmOfStep(row.step)` rồi `realmLabel`; `level` = cấp tông; còn lại là số thô.
+ */
 export interface BoardColumn {
   /** Trường của `BoardRow` cần hiển thị. */
   key: Exclude<keyof BoardRow, "rank" | "name" | "titleId" | "test">;
@@ -298,6 +313,9 @@ export function worldBossNext(
 
 export type WorldBossPhase = "soon" | "live" | "ended";
 
+/** Pha trong tin `worldBoss`: thêm `none` = hiện KHÔNG có sự kiện nào (lịch rỗng / tắt); khi đó `id`, `name`, `mapId` là chuỗi rỗng, không có trường nào khác. */
+export type WorldBossMsgPhase = WorldBossPhase | "none";
+
 export function worldBossPhaseAt(o: WorldBossOccurrence, nowMs: number): WorldBossPhase {
   return nowMs < o.startMs ? "soon" : nowMs < o.endMs ? "live" : "ended";
 }
@@ -365,7 +383,7 @@ export interface WorldBossRewardMsg {
  * `mine` chỉ cho người nhận. `ended`: `outcome` + (nếu có) `reward`.
  */
 export interface WorldBossMsg {
-  phase: WorldBossPhase;
+  phase: WorldBossMsgPhase;
   /** id khung giờ của lịch. */
   id: string;
   /** Tên trùm hiển thị. */
@@ -380,8 +398,13 @@ export interface WorldBossMsg {
   reward?: WorldBossRewardMsg;
 }
 
+/** Tin `worldBoss` "không có sự kiện" (trả lời `worldBossGet` khi lịch rỗng / tắt). */
+export function worldBossNoneMsg(): WorldBossMsg {
+  return { phase: "none", id: "", name: "", mapId: "" };
+}
+
 /**
- * Kiểm lịch trùm thế giới (trả danh sách lỗi, rỗng = hợp lệ): id duy nhất; `boss` là loài trùm có thật CÓ bộ chiêu; bản đồ có thật và KHÔNG phải bí cảnh; giờ / phút / thời lượng hợp lệ;
+ * Kiểm lịch trùm thế giới (trả danh sách lỗi, rỗng = hợp lệ): id duy nhất; mỗi lần xảy ra nằm gọn trong MỘT ngày (không vắt qua nửa đêm); `boss` là loài trùm có thật CÓ bộ chiêu; bản đồ có thật và KHÔNG phải bí cảnh; giờ / phút / thời lượng hợp lệ;
  * mốc báo trước giảm dần, dương, nhỏ hơn 60 phút; thưởng là số nguyên dương hợp lý, vật phẩm có thật; không hai khung giờ chồng lên nhau (một trùm thế giới tại một thời điểm).
  */
 export function worldBossViolations(
@@ -408,6 +431,14 @@ export function worldBossViolations(
       bad.push(`${at}: phút phải là số nguyên 0-59`);
     if (!Number.isInteger(s.durationMin) || s.durationMin < 10 || s.durationMin > 120)
       bad.push(`${at}: thời lượng phải là số nguyên 10-120 phút`);
+    else if (
+      Number.isInteger(s.hour) &&
+      Number.isInteger(s.minute) &&
+      s.hour * 60 + s.minute + s.durationMin > 1440
+    )
+      bad.push(
+        `${at}: vắt qua nửa đêm (giờ + thời lượng phải <= 24:00; \`worldBossNext\` và kiểm chồng giờ giả định mỗi lần xảy ra nằm gọn trong một ngày)`,
+      );
     const a = s.announceMin;
     if (!Array.isArray(a) || a.length === 0 || a.length > 5)
       bad.push(`${at}: cần 1-5 mốc báo trước`);
@@ -504,6 +535,11 @@ export const TITLE_BY_ID: Readonly<Record<string, TitleDef>> = Object.fromEntrie
   TITLES.map((t) => [t.id, t]),
 );
 
+/** Tra danh hiệu theo id BẤT KỲ (id từ file lưu / client / state người khác): thuộc tính RIÊNG (xem `achievementOf`). */
+export function titleOf(id: unknown): TitleDef | undefined {
+  return typeof id === "string" && hasOwn(TITLE_BY_ID, id) ? TITLE_BY_ID[id] : undefined;
+}
+
 /**
  * Thành tựu. Khung có VÀI MẪU thật (D mở rộng tới >= 40 ở M9.9). Máy chủ cấp qua MỘT cổng (`trackSocial`, M9.5); `achievementsDue` cho biết thành tựu nào vừa đủ điều kiện.
  */
@@ -545,6 +581,13 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
 export const ACHIEVEMENT_BY_ID: Readonly<Record<string, AchievementDef>> = Object.fromEntries(
   ACHIEVEMENTS.map((a) => [a.id, a]),
 );
+
+/** Tra thành tựu theo id BẤT KỲ (id từ file lưu / client): thuộc tính RIÊNG, `ACHIEVEMENT_BY_ID["constructor"]` không phải `undefined` nên đừng tra trực tiếp. */
+export function achievementOf(id: unknown): AchievementDef | undefined {
+  return typeof id === "string" && hasOwn(ACHIEVEMENT_BY_ID, id)
+    ? ACHIEVEMENT_BY_ID[id]
+    : undefined;
+}
 
 /** Bậc cảnh giới cao nhất có thật (`stepOf` của bậc cuối). */
 function maxRealmStep(): number {
@@ -705,49 +748,83 @@ const SAMPLE_NAMES = [
   "Bùi Chấn Nhạc",
 ];
 
-/** Bảng MẪU cho `board` (không có dữ liệu thật): `n` dòng đã xếp hạng + `mine` (hạng 3). Tất định theo `board` và `n`. */
-export function sampleBoards(board: BoardId, n = 5): BoardsMsg {
+/** Biến thể của `mine` trong bảng mẫu: `top` (hạng 3, trong top), `outside` (hạng 47 ngoài top 20, có `row`), `test` / `min_games` / `none` (không hạng, kèm lý do; `min_games` có `need`). */
+export type SampleBoardVariant = "top" | "outside" | "test" | "min_games" | "none";
+
+/** Bảng MẪU cho `board` (không có dữ liệu thật): `n` dòng đã xếp hạng + `mine` theo `variant` (mặc định hạng 3). Tất định theo (`board`, `n`, `variant`). */
+export function sampleBoards(
+  board: BoardId,
+  n = 5,
+  variant: SampleBoardVariant = "top",
+): BoardsMsg {
   const rows: BoardRow[] = [];
   for (let i = 0; i < Math.min(n, BOARD_SIZE); i++) {
     const name =
       board === "tongmon"
         ? `Tông ${SAMPLE_NAMES[i % 5].split(" ")[0]} ${i + 1}`
         : `${SAMPLE_NAMES[i % 5]} ${i + 1}`;
-    const base: BoardRow = { rank: i + 1, name };
-    if (i === 1 && board !== "tuvi") base.test = true;
-    if (i === 0) base.titleId = "kp1";
-    switch (board) {
-      case "tuvi":
-        Object.assign(base, { realm: 3, tier: 2 - (i % 3), exp: 90_000 - i * 7_000 });
-        break;
-      case "linhhon":
-        Object.assign(base, { step: 40 - i * 2, kiep: 12 - i });
-        break;
-      case "tongmon":
-        Object.assign(base, {
-          level: 5 - Math.min(4, i),
-          points: 40_000 - i * 5_000,
-          members: 20 - i * 2,
-        });
-        break;
-      case "pk":
-        Object.assign(base, { won: 60 - i * 8, lost: 10 + i * 3 });
-        break;
-    }
-    rows.push(base);
+    rows.push(sampleBoardRow(board, i, name));
   }
   const ranked = rankBoard(board, rows);
-  const mine = ranked[2];
-  return {
-    board,
-    rows: ranked,
-    mine: mine ? { rank: mine.rank, row: mine } : { rank: null, reason: "none" },
-    ageMs: 90_000,
-  };
+  let mine: BoardMine;
+  switch (variant) {
+    case "outside": {
+      const row = { ...sampleBoardRow(board, 46, "Người Chơi Hiện Tại"), rank: 47 };
+      mine = { rank: 47, row };
+      break;
+    }
+    case "test":
+      mine = { rank: null, reason: "test" };
+      break;
+    case "min_games":
+      mine = { rank: null, reason: "min_games", need: Math.max(1, BOARD_PK_MIN_GAMES - 4) };
+      break;
+    case "none":
+      mine = { rank: null, reason: "none" };
+      break;
+    default: {
+      const row = ranked[2];
+      mine = row ? { rank: row.rank, row } : { rank: null, reason: "none" };
+    }
+  }
+  return { board, rows: ranked, mine, ageMs: 90_000 };
 }
 
-/** Tin `worldBoss` MẪU cho `phase` (dùng lịch mẫu `sampleWorldBossSchedule`). */
-export function sampleWorldBossEvent(phase: WorldBossPhase = "live"): WorldBossMsg {
+/** Dòng mẫu thứ `i` (số liệu giảm dần theo `i`) của `board`. */
+function sampleBoardRow(board: BoardId, i: number, name: string): BoardRow {
+  const base: BoardRow = { rank: i + 1, name };
+  if (i === 1 && board !== "tuvi") base.test = true;
+  if (i === 0) base.titleId = "kp1";
+  switch (board) {
+    case "tuvi":
+      Object.assign(base, { realm: 3, tier: 2 - (i % 3), exp: Math.max(0, 90_000 - i * 7_000) });
+      break;
+    case "linhhon":
+      Object.assign(base, { step: Math.max(1, 40 - i * 2), kiep: Math.max(1, 12 - i) });
+      break;
+    case "tongmon":
+      Object.assign(base, {
+        level: Math.max(1, 5 - Math.min(4, i)),
+        points: Math.max(0, 40_000 - i * 5_000),
+        members: Math.max(1, 20 - i * 2),
+      });
+      break;
+    case "pk":
+      Object.assign(base, { won: Math.max(0, 60 - i * 8), lost: 10 + i * 3 });
+      break;
+  }
+  return base;
+}
+
+/** Biến thể của `ended` / `live` trong tin trùm mẫu: `killed` (mặc định, có thưởng), `fled`, `cancelled`, `below` (hạ được nhưng người xem CHƯA đủ ngưỡng: không thưởng; với `live`: `mine.eligible: false`). */
+export type SampleWorldBossVariant = "killed" | "fled" | "cancelled" | "below";
+
+/** Tin `worldBoss` MẪU cho `phase` (dùng lịch mẫu `sampleWorldBossSchedule`); `none` = không có sự kiện. */
+export function sampleWorldBossEvent(
+  phase: WorldBossMsgPhase = "live",
+  variant: SampleWorldBossVariant = "killed",
+): WorldBossMsg {
+  if (phase === "none") return worldBossNoneMsg();
   const slot = sampleWorldBossSchedule()[0];
   const base: WorldBossMsg = {
     phase,
@@ -766,8 +843,13 @@ export function sampleWorldBossEvent(phase: WorldBossPhase = "live"): WorldBossM
         { name: SAMPLE_NAMES[1], pts: 44_000, pct: 22.5 },
         { name: SAMPLE_NAMES[2], pts: 30_000, pct: 15.3 },
       ],
-      mine: { pts: 9_000, pct: 4.6, eligible: true },
+      mine:
+        variant === "below"
+          ? { pts: 900, pct: 0.4, eligible: false }
+          : { pts: 9_000, pct: 4.6, eligible: true },
     };
+  if (variant === "fled" || variant === "cancelled") return { ...base, outcome: variant };
+  if (variant === "below") return { ...base, outcome: "killed" };
   return {
     ...base,
     outcome: "killed",
