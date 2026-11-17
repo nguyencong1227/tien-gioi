@@ -126,6 +126,9 @@ describe("khớp index.html (bảng Xã hội)", () => {
       "ach-body",
       "ach-worn",
       "ach-titles",
+      "ach-locked",
+      "ach-locked-sum",
+      "ach-locked-list",
       "ach-groups",
     ])
       tagOf(id);
@@ -135,6 +138,9 @@ describe("khớp index.html (bảng Xã hội)", () => {
     expect(tagOf("ach-titles")).toContain("aria-label=");
     expect(/\shidden[\s>]/.test(tagOf("ach-retry"))).toBe(true);
     expect(/\shidden[\s>]/.test(tagOf("ach-body"))).toBe(true);
+    // danh hiệu CHƯA mở gập trong <details> ngoài radiogroup (không phải nút chọn), ẩn sẵn tới khi có sổ
+    expect(tagOf("ach-locked")).toContain("<details");
+    expect(/\shidden[\s>]/.test(tagOf("ach-locked"))).toBe(true);
   });
 
   it("nút HUD Xã hội ẩn mặc định (bật bằng cờ ?social=1) và có aria-expanded", () => {

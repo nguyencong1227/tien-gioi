@@ -144,11 +144,13 @@ describe("thành tựu qua phòng thật", () => {
     expect(s.duyen).toBe(duyenBefore + 2); // thưởng Duyên của kiep_2
     expect(s.duyenTotal).toBeGreaterThanOrEqual(s.duyen);
     await sleep(200);
-    expect(b.news).toEqual([]); // người khác không nhận
+    // người khác không nhận thành tựu của A; B chỉ có thể nhận thành tựu CỦA CHÍNH MÌNH lúc vào Lạc Hà (`den_lac_ha`, M9.9: ai nhập thế cũng có)
+    expect(b.news.filter((id) => id !== "den_lac_ha")).toEqual([]);
     // idempotent: ghi lại cùng mốc không cấp / cộng Duyên lần nữa
-    trackSocial(serverRoom(a.room).world, a.room.sessionId, ["kiep", 2], ["pk_won", 1]);
+    // (dùng `pk_lost`: `pk_won` 1 mở `pk_thang_1` có thưởng Duyên từ M9.9, sẽ làm lệch phép so Duyên của ca này)
+    trackSocial(serverRoom(a.room).world, a.room.sessionId, ["kiep", 2], ["pk_lost", 1]);
     await until(
-      async () => ((await soulOf(a))?.social?.counters.pk_won === 1 ? true : undefined),
+      async () => ((await soulOf(a))?.social?.counters.pk_lost === 1 ? true : undefined),
       4000,
       "ghi lần hai",
     );
@@ -249,7 +251,7 @@ describe("thành tựu qua phòng thật", () => {
     await sleep(400);
     expect(a.ach.length).toBeGreaterThan(2); // A thật sự nhận các tin (ca dương: không phải thử nhầm một hướng không có tin nào)
     expect(b.ach.length).toBe(baseline); // B không nhận thêm tin achievements nào
-    expect(b.news).toEqual([]); // cũng không nhận achievementNew của A
+    expect(b.news.filter((id) => id !== "den_lac_ha")).toEqual([]); // cũng không nhận achievementNew của A (chỉ `den_lac_ha` của chính B lúc nhập thế)
   });
 
   it("tần suất ghi: đeo lại cái đang đeo, gỡ khi chưa đeo, đeo cái CHƯA mở -> KHÔNG ghi chân linh (vẫn trả achievements); đổi thật thì ghi đúng một lần", async () => {
