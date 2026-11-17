@@ -1081,6 +1081,22 @@ async function main() {
         !a.bodyHidden && /^Đã đạt 2 \//.test(a.summary) && !a.dot,
         "tin sai kiểu bị bỏ; id lạ KHÔNG tạo dấu / chấm: giao diện giữ nguyên",
       );
+      // MÁY CHỦ CHƯA BẬT THÀNH TỰU (`ACHIEVEMENTS` tắt: vẫn trả sổ nhưng KHÔNG ai được cấp gì; hoặc người chơi mới tinh): sổ rỗng tiến độ phải hiện gọn, không nút chết / không giả vờ đã đạt
+      await setAch("m.ach = {}; m.counters = {}; m.title = null;");
+      a = await ach();
+      check(
+        !a.bodyHidden && /^Đã đạt 0 \//.test(a.summary) && !a.dot,
+        `sổ rỗng (máy chủ chưa cấp gì): "${a.summary}", không chấm Mới`,
+      );
+      check(
+        a.items.every((x) => x.state !== "Hoàn thành" && !x.isNew),
+        "sổ rỗng: không thành tựu nào hiện 'Hoàn thành' hay dấu Mới",
+      );
+      check(
+        a.radios.filter((x) => x.t !== "Không đeo" && x.dis !== "true").length === 0,
+        "sổ rỗng: mọi danh hiệu đều khoá (aria-disabled), không có lựa chọn đeo nào bấm được",
+      );
+      check(a.paneOverflow <= 0 && a.pageOverflow <= 0, "sổ rỗng: không tràn ngang");
       await evalJs(`window.__scene.room.send = window.__scene.room.__origSend; 1`);
 
       // danh hiệu hiện cạnh đạo hiệu trên đầu nhân vật (nhãn Phaser): chỉ khi cờ bật
